@@ -30,6 +30,11 @@ type Listener interface {
 type Notifier interface {
 	// AddListener is adds a listener to be notified of potential input changes.
 	// This is a noop on static providers.
+	//
+	// AddListener is safe to call concurrently with a running provider.
+	// A listener is only notified of changes made after it was added, so it
+	// should read the current content of the provider after adding itself
+	// to not miss a change made in between.
 	AddListener(listener Listener)
 }
 
