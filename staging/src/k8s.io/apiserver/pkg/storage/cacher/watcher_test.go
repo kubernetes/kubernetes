@@ -19,10 +19,17 @@ package cacher_test
 import (
 	"context"
 	"fmt"
+	"strconv"
+	"sync"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/apiserver/pkg/apis/example"
 	"k8s.io/apiserver/pkg/features"
+	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/cacher"
 	"k8s.io/apiserver/pkg/storage/cacher/testing/setup"
 	storagetesting "k8s.io/apiserver/pkg/storage/testing"
@@ -172,4 +179,75 @@ func testWatch(t *testing.T, watchCacheStallResume bool) {
 		t.Cleanup(terminate)
 		storagetesting.RunWatchListMatchSingle(context.TODO(), t, store)
 	})
+}
+
+func TestWatchResyncSingleTick(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchCacheStallResume, true)
+	fakeClock := testingclock.NewFakeClock(time.Now())
+	ctx, delegator, _, terminate := setup.SetupWithEtcdServer(t, setup.WithClock(fakeClock), setup.WithMaxResyncEvents(5))
+	t.Cleanup(terminate)
+	store := &setup.CreateWrapper{CacheDelegator: delegator}
+
+	rv, err := store.GetCurrentResourceVersion(ctx)
+	require.NoError(t, err)
+
+	var (
+		w, otherWatch      watch.Interface
+		watchErr, otherErr error
+		watchesOpened      sync.WaitGroup
+	)
+	opts := storage.ListOptions{ResourceVersion: strconv.FormatUint(rv, 10), Predicate: storage.Everything, Recursive: true}
+	watchesOpened.Add(2)
+	go func() {
+		defer watchesOpened.Done()
+		w, watchErr = store.Watch(ctx, "/pods/ns", opts)
+	}()
+	go func() {
+		defer watchesOpened.Done()
+		otherWatch, otherErr = store.Watch(ctx, "/pods/other-ns", opts)
+	}()
+	time.Sleep(50 * time.Millisecond)
+	fakeClock.Step(100 * time.Millisecond)
+	watchesOpened.Wait()
+	require.NoError(t, watchErr)
+	require.NoError(t, otherErr)
+	defer w.Stop()
+	defer otherWatch.Stop()
+
+	const stallCount = 35
+	stallEvents := make([]watch.Event, stallCount)
+	for i := range stallCount {
+		pod := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("stall-%02d", i), Namespace: "ns"}}
+		require.NoError(t, store.Create(ctx, fmt.Sprintf("/pods/ns/%s", pod.Name), pod, pod, 0))
+		stallEvents[i] = watch.Event{Type: watch.Added, Object: pod}
+	}
+	for i := range 12 {
+		pod := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("other-%02d", i), Namespace: "other-ns"}}
+		require.NoError(t, store.Create(ctx, fmt.Sprintf("/pods/other-ns/%s", pod.Name), pod, pod, 0))
+		ev := <-otherWatch.ResultChan()
+		require.Equal(t, watch.Added, ev.Type)
+	}
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		storagetesting.ExpectWatchEventsExact(stallEvents).Check(t, w)
+	}()
+	time.Sleep(50 * time.Millisecond)
+	fakeClock.Step(100 * time.Millisecond)
+	time.Sleep(50 * time.Millisecond)
+	select {
+	case <-done:
+		t.Fatal("expected single resync tick not to finish catchup")
+	default:
+	}
+	for range 10 {
+		fakeClock.Step(100 * time.Millisecond)
+		time.Sleep(20 * time.Millisecond)
+	}
+	<-done
+
+	livePod := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "live", Namespace: "ns"}}
+	require.NoError(t, store.Create(ctx, "/pods/ns/live", livePod, livePod, 0))
+	storagetesting.ExpectWatchEventsExact([]watch.Event{{Type: watch.Added, Object: livePod}}).Check(t, w)
 }

@@ -46,14 +46,15 @@ import (
 type TearDownFunc func()
 
 type SetupOptions struct {
-	ResourcePrefix string
-	KeyFunc        func(runtime.Object) (string, error)
-	ReverseKeyFunc storage.ReverseKeyFunc
-	IndexerFuncs   map[string]storage.IndexerFunc
-	Indexers       cache.Indexers
-	Clock          clock.WithTicker
-	Codec          runtime.Codec
-	Transformer    value.Transformer
+	ResourcePrefix  string
+	KeyFunc         func(runtime.Object) (string, error)
+	ReverseKeyFunc  storage.ReverseKeyFunc
+	IndexerFuncs    map[string]storage.IndexerFunc
+	Indexers        cache.Indexers
+	Clock           clock.WithTicker
+	Codec           runtime.Codec
+	Transformer     value.Transformer
+	MaxResyncEvents int
 }
 
 type SetupOption func(*SetupOptions)
@@ -117,6 +118,12 @@ func WithClock(c clock.WithTicker) SetupOption {
 	}
 }
 
+func WithMaxResyncEvents(maxResyncEvents int) SetupOption {
+	return func(options *SetupOptions) {
+		options.MaxResyncEvents = maxResyncEvents
+	}
+}
+
 func Setup(t *testing.T, opts ...SetupOption) (context.Context, *cacher.CacheDelegator, TearDownFunc) {
 	ctx, _, _, delegator, _, tearDown := SetupWithCacher(t, opts...)
 	return ctx, delegator, tearDown
@@ -162,6 +169,7 @@ func SetupWithCacher(t testing.TB, opts ...SetupOption) (context.Context, *cache
 		Codec:               setupOpts.Codec,
 		Clock:               setupOpts.Clock,
 		CompactorPollPeriod: 5 * time.Millisecond,
+		MaxResyncEvents:     setupOpts.MaxResyncEvents,
 	}
 	rawCacher, err := cacher.NewCacherFromConfig(config)
 	if err != nil {

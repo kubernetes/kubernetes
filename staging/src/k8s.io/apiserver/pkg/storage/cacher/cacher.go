@@ -83,9 +83,9 @@ const (
 	// with the watch cache.
 	watcherResyncPeriod = 100 * time.Millisecond
 
-	// maxResyncEvents bounds the number of watch cache history events scanned in
+	// defaultMaxResyncEvents bounds the number of watch cache history events scanned in
 	// a single resyncStalledWatchersLocked pass while holding locks.
-	maxResyncEvents = 1000
+	defaultMaxResyncEvents = 1000
 )
 
 // Config contains the configuration for a given Cache.
@@ -136,6 +136,10 @@ type Config struct {
 	// CompactorPollPeriod specifies how frequently compactor polls storage for compaction revision.
 	// Defaults to 15s when zero.
 	CompactorPollPeriod time.Duration
+
+	// MaxResyncEvents bounds the number of watch cache history events scanned in a single
+	// stalled-watcher resync pass. Defaults to 1000 when zero.
+	MaxResyncEvents int
 
 	// DisableConsistentGetFromCache disables serving consistent Get, Delete, and GuaranteedUpdate
 	// from cache, e.g. when a storage value transformer is configured.
@@ -354,6 +358,7 @@ type Cacher struct {
 	watchersBuffer []*cacheWatcher
 	// unsyncedWatchers is a map that need to be synchronized before sending events.
 	unsyncedWatchers watchersMap
+	maxResyncEvents  int
 	// blockedWatchers is a list of watchers whose buffer is currently full.
 	blockedWatchers []*cacheWatcher
 	// watchersToStop is a list of watchers that were supposed to be stopped
@@ -403,6 +408,10 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 	if config.Clock == nil {
 		config.Clock = clock.RealClock{}
 	}
+	maxResyncEvents := config.MaxResyncEvents
+	if maxResyncEvents <= 0 {
+		maxResyncEvents = defaultMaxResyncEvents
+	}
 	objType := reflect.TypeOf(obj)
 	resourcePrefix := config.ResourcePrefix
 	if resourcePrefix == "" {
@@ -442,6 +451,7 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 		clock:                         config.Clock,
 		timer:                         time.NewTimer(time.Duration(0)),
 		unsyncedWatchers:              make(watchersMap),
+		maxResyncEvents:               maxResyncEvents,
 		bookmarkWatchers:              newTimeBucketWatchers(config.Clock, defaultBookmarkFrequency),
 		watcherMetrics:                metrics.NewWatcherMetricsObservers(config.GroupResource),
 		resyncMetrics:                 metrics.NewResyncMetrics(config.GroupResource),
@@ -630,7 +640,7 @@ func (c *Cacher) resyncWatchers() {
 func (c *Cacher) resyncStalledWatchersLocked(stalledWatchers *indexedWatchers, minResourceVersion uint64) {
 	processedEvents := 0
 	for rawEvent := range c.watchCache.history.eventsAfterLocked(minResourceVersion) {
-		if processedEvents >= maxResyncEvents {
+		if processedEvents >= c.maxResyncEvents {
 			for watcher := range stalledWatchers.allWatchers() {
 				watcher.dispatchedResourceVersion = max(watcher.dispatchedResourceVersion, rawEvent.ResourceVersion-1)
 			}
