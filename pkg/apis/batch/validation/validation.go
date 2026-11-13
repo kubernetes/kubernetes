@@ -642,7 +642,7 @@ func ValidateJobUpdate(job, oldJob *batch.Job, opts JobValidationOptions) field.
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&job.ObjectMeta, &oldJob.ObjectMeta, field.NewPath("metadata"))
 	allErrs = append(allErrs, ValidateJobSpecUpdate(job.Spec, oldJob.Spec, field.NewPath("spec"), opts)...)
 	allErrs = append(allErrs, validateSchedulingAndDelegationAnnotations(&job.ObjectMeta, &oldJob.ObjectMeta, &job.Spec, &oldJob.Spec, field.NewPath("spec", "scheduling"))...)
-	allErrs = append(allErrs, validateDelegationAnnotations(&job.ObjectMeta, &oldJob.ObjectMeta, field.NewPath("metadata", "annotations"))...)
+	allErrs = append(allErrs, validateDelegationAnnotationsUpdate(&job.ObjectMeta, &oldJob.ObjectMeta, field.NewPath("metadata", "annotations"))...)
 	allErrs = append(allErrs, validateNameAllowsCompletions(job, opts)...)
 	return allErrs
 }
@@ -650,6 +650,7 @@ func ValidateJobUpdate(job, oldJob *batch.Job, opts JobValidationOptions) field.
 // ValidateJobUpdateStatus validates an update to the status of a Job and returns an ErrorList with any errors.
 func ValidateJobUpdateStatus(job, oldJob *batch.Job, opts JobStatusValidationOptions) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&job.ObjectMeta, &oldJob.ObjectMeta, field.NewPath("metadata"))
+	allErrs = append(allErrs, validateDelegationAnnotationsUpdate(&job.ObjectMeta, &oldJob.ObjectMeta, field.NewPath("metadata", "annotations"))...)
 	allErrs = append(allErrs, ValidateJobStatusUpdate(job, oldJob, opts)...)
 	return allErrs
 }
@@ -721,6 +722,13 @@ func validateSchedulingAndSchedulingGroup(spec, oldSpec *batch.JobSpec, fldPath 
 // delegationAnnotations select a template in an external Workload.
 var delegationAnnotations = []string{apischeduling.WorkloadNameAnnotation, apischeduling.GroupTemplateNameAnnotation}
 
+// immutableJobAnnotations cannot change after Job creation.
+var immutableJobAnnotations = []string{
+	apischeduling.WorkloadNameAnnotation,
+	apischeduling.GroupTemplateNameAnnotation,
+	apischeduling.ParentCompositePodGroupAnnotation,
+}
+
 // validateSchedulingAndDelegationAnnotations rejects spec.scheduling when the
 // object also carries a delegation annotation. On update, an annotation is
 // allowed only if oldSpec already had spec.scheduling and oldMeta already had
@@ -772,13 +780,27 @@ func validateDelegationAnnotations(meta, oldMeta *metav1.ObjectMeta, fldPath *fi
 
 func delegationAnnotationsUnchanged(meta, oldMeta *metav1.ObjectMeta) bool {
 	for _, key := range delegationAnnotations {
-		value, ok := meta.Annotations[key]
-		oldValue, oldOk := oldMeta.Annotations[key]
-		if ok != oldOk || value != oldValue {
+		if annotationChanged(meta, oldMeta, key) {
 			return false
 		}
 	}
 	return true
+}
+
+func validateDelegationAnnotationsUpdate(meta, oldMeta *metav1.ObjectMeta, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	for _, key := range immutableJobAnnotations {
+		if annotationChanged(meta, oldMeta, key) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Key(key), meta.Annotations[key], apimachineryapivalidation.FieldImmutableErrorMsg))
+		}
+	}
+	return allErrs
+}
+
+func annotationChanged(meta, oldMeta *metav1.ObjectMeta, key string) bool {
+	value, ok := meta.Annotations[key]
+	oldValue, oldOk := oldMeta.Annotations[key]
+	return ok != oldOk || value != oldValue
 }
 
 // validateJobSchedulingUpdate enforces the spec.scheduling immutability

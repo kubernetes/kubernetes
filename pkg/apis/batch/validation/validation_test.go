@@ -2936,6 +2936,59 @@ func TestValidateJobUpdateStatus(t *testing.T) {
 			},
 			cmpopts: cmp.Options{cmpopts.IgnoreFields(field.Error{}, "Origin")},
 		},
+		"unchanged delegation annotations": {
+			old: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "abc",
+					Namespace:       metav1.NamespaceDefault,
+					ResourceVersion: "1",
+					Annotations: map[string]string{
+						apischeduling.WorkloadNameAnnotation:      "parent-workload",
+						apischeduling.GroupTemplateNameAnnotation: "workers",
+					},
+				},
+			},
+			update: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "abc",
+					Namespace:       metav1.NamespaceDefault,
+					ResourceVersion: "1",
+					Annotations: map[string]string{
+						apischeduling.WorkloadNameAnnotation:      "parent-workload",
+						apischeduling.GroupTemplateNameAnnotation: "workers",
+					},
+				},
+				Status: batch.JobStatus{Active: 1},
+			},
+		},
+		"changing delegation annotation": {
+			old: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "abc",
+					Namespace:       metav1.NamespaceDefault,
+					ResourceVersion: "1",
+					Annotations: map[string]string{
+						apischeduling.WorkloadNameAnnotation:      "parent-workload",
+						apischeduling.GroupTemplateNameAnnotation: "workers",
+					},
+				},
+			},
+			update: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "abc",
+					Namespace:       metav1.NamespaceDefault,
+					ResourceVersion: "1",
+					Annotations: map[string]string{
+						apischeduling.WorkloadNameAnnotation:      "other-workload",
+						apischeduling.GroupTemplateNameAnnotation: "workers",
+					},
+				},
+			},
+			wantErrs: field.ErrorList{
+				{Type: field.ErrorTypeInvalid, Field: field.NewPath("metadata", "annotations").Key(apischeduling.WorkloadNameAnnotation).String()},
+			},
+			cmpopts: cmp.Options{ignoreErrValueDetail},
+		},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -3483,7 +3536,7 @@ func TestValidateCronJob(t *testing.T) {
 func TestValidateCronJobSchedulingUpdate(t *testing.T) {
 	validPodTemplateSpec := getValidPodTemplateSpecForGenerated(getValidGeneratedSelector())
 	validPodTemplateSpec.Labels = map[string]string{}
-	mkCronJob := func(sched *batch.JobSchedulingConfiguration) batch.CronJob {
+	mkCronJob := func(sched *batch.JobSchedulingConfiguration, annotations map[string]string) batch.CronJob {
 		cj := batch.CronJob{
 			ObjectMeta: metav1.ObjectMeta{Name: "mycronjob", Namespace: metav1.NamespaceDefault, UID: types.UID("1a2b3c")},
 			Spec: batch.CronJobSpec{
@@ -3495,8 +3548,14 @@ func TestValidateCronJobSchedulingUpdate(t *testing.T) {
 			},
 		}
 		cj.Spec.JobTemplate.Spec.Scheduling = sched
+		cj.Spec.JobTemplate.Annotations = annotations
 		return cj
 	}
+	delegation := map[string]string{
+		apischeduling.WorkloadNameAnnotation:      "parent-workload",
+		apischeduling.GroupTemplateNameAnnotation: "workers",
+	}
+	workloadNameOnly := map[string]string{apischeduling.WorkloadNameAnnotation: "parent-workload"}
 	basic := func() *batch.JobSchedulingConfiguration {
 		return &batch.JobSchedulingConfiguration{SchedulingPolicy: &schedulingv1.WorkloadPodGroupSchedulingPolicy{Basic: &schedulingv1.WorkloadPodGroupBasicSchedulingPolicy{}}}
 	}
@@ -3511,9 +3570,11 @@ func TestValidateCronJobSchedulingUpdate(t *testing.T) {
 	// is covered in the declarative_validation tests. The only scheduling rule this
 	// imperative path enforces is the structural gang minCount<=parallelism check.
 	cases := map[string]struct {
-		old    *batch.JobSchedulingConfiguration
-		update *batch.JobSchedulingConfiguration
-		err    *field.Error
+		old               *batch.JobSchedulingConfiguration
+		update            *batch.JobSchedulingConfiguration
+		oldAnnotations    map[string]string
+		updateAnnotations map[string]string
+		err               *field.Error
 	}{
 		"unchanged is valid": {
 			old:    basic(),
@@ -3544,13 +3605,43 @@ func TestValidateCronJobSchedulingUpdate(t *testing.T) {
 			update: gang(16),
 			err:    field.Invalid(field.NewPath("spec", "jobTemplate", "spec", "scheduling", "schedulingPolicy", "gang", "minCount"), nil, ""),
 		},
+		"changing jobTemplate delegation annotations is allowed": {
+			oldAnnotations: delegation,
+			updateAnnotations: map[string]string{
+				apischeduling.WorkloadNameAnnotation:      "other-workload",
+				apischeduling.GroupTemplateNameAnnotation: "other-template",
+			},
+		},
+		"unchanged incomplete jobTemplate delegation annotations are ratcheted": {
+			oldAnnotations:    workloadNameOnly,
+			updateAnnotations: workloadNameOnly,
+		},
+		"changed incomplete jobTemplate delegation annotations are rejected": {
+			oldAnnotations: workloadNameOnly,
+			updateAnnotations: map[string]string{
+				apischeduling.WorkloadNameAnnotation: "other-workload",
+			},
+			err: field.Required(field.NewPath("spec", "jobTemplate", "metadata", "annotations").Key(apischeduling.GroupTemplateNameAnnotation), ""),
+		},
+		"adding jobTemplate delegation annotations when scheduling is set is rejected": {
+			old:               basic(),
+			update:            basic(),
+			updateAnnotations: delegation,
+			err:               field.Invalid(field.NewPath("spec", "jobTemplate", "spec", "scheduling"), nil, ""),
+		},
+		"jobTemplate scheduling and delegation annotations already present are ratcheted": {
+			old:               basic(),
+			update:            basic(),
+			oldAnnotations:    delegation,
+			updateAnnotations: delegation,
+		},
 	}
 	ignoreValueAndDetail := cmpopts.IgnoreFields(field.Error{}, "BadValue", "Detail")
 	for k, tc := range cases {
 		t.Run(k, func(t *testing.T) {
-			old := mkCronJob(tc.old)
+			old := mkCronJob(tc.old, tc.oldAnnotations)
 			old.ResourceVersion = "1"
-			update := mkCronJob(tc.update)
+			update := mkCronJob(tc.update, tc.updateAnnotations)
 			update.ResourceVersion = "2"
 			errs := ValidateCronJobUpdate(&update, &old, corevalidation.PodValidationOptions{})
 			var wantErrs field.ErrorList
@@ -3614,6 +3705,7 @@ func TestValidateJobSchedulingUpdate(t *testing.T) {
 	disruptionModePath := field.NewPath("spec", "scheduling", "disruptionMode")
 	workloadNamePath := field.NewPath("metadata", "annotations").Key(apischeduling.WorkloadNameAnnotation)
 	templateNamePath := field.NewPath("metadata", "annotations").Key(apischeduling.GroupTemplateNameAnnotation)
+	parentCompositePath := field.NewPath("metadata", "annotations").Key(apischeduling.ParentCompositePodGroupAnnotation)
 	cases := map[string]struct {
 		old                  *batch.JobSchedulingConfiguration
 		update               *batch.JobSchedulingConfiguration
@@ -3679,7 +3771,11 @@ func TestValidateJobSchedulingUpdate(t *testing.T) {
 			old:               basic(),
 			update:            basic(),
 			updateAnnotations: delegation,
-			errs:              field.ErrorList{field.Invalid(schedulingPath, nil, "")},
+			errs: field.ErrorList{
+				field.Invalid(schedulingPath, nil, ""),
+				field.Invalid(workloadNamePath, nil, ""),
+				field.Invalid(templateNamePath, nil, ""),
+			},
 		},
 		"adding scheduling when delegation annotations are set is rejected": {
 			oldAnnotations:    delegation,
@@ -3698,7 +3794,10 @@ func TestValidateJobSchedulingUpdate(t *testing.T) {
 			update:            basic(),
 			oldAnnotations:    workloadNameOnly,
 			updateAnnotations: delegation,
-			errs:              field.ErrorList{field.Invalid(schedulingPath, nil, "")},
+			errs: field.ErrorList{
+				field.Invalid(schedulingPath, nil, ""),
+				field.Invalid(templateNamePath, nil, ""),
+			},
 		},
 		"unchanged incomplete delegation annotations are ratcheted": {
 			oldAnnotations:    workloadNameOnly,
@@ -3707,7 +3806,7 @@ func TestValidateJobSchedulingUpdate(t *testing.T) {
 		"changed incomplete delegation annotations are rejected": {
 			oldAnnotations:    workloadNameOnly,
 			updateAnnotations: map[string]string{apischeduling.WorkloadNameAnnotation: "other-workload"},
-			errs:              field.ErrorList{field.Required(templateNamePath, "")},
+			errs:              field.ErrorList{field.Invalid(workloadNamePath, nil, "")},
 		},
 		"emptying a delegation annotation is rejected": {
 			oldAnnotations: delegation,
@@ -3715,7 +3814,64 @@ func TestValidateJobSchedulingUpdate(t *testing.T) {
 				apischeduling.WorkloadNameAnnotation:      "",
 				apischeduling.GroupTemplateNameAnnotation: "workers",
 			},
-			errs: field.ErrorList{field.Required(workloadNamePath, "")},
+			errs: field.ErrorList{field.Invalid(workloadNamePath, nil, "")},
+		},
+		"changing group-template-name is rejected": {
+			oldAnnotations: delegation,
+			updateAnnotations: map[string]string{
+				apischeduling.WorkloadNameAnnotation:      "parent-workload",
+				apischeduling.GroupTemplateNameAnnotation: "other-template",
+			},
+			errs: field.ErrorList{field.Invalid(templateNamePath, nil, "")},
+		},
+		"adding delegation annotations after creation is rejected": {
+			updateAnnotations: delegation,
+			errs: field.ErrorList{
+				field.Invalid(workloadNamePath, nil, ""),
+				field.Invalid(templateNamePath, nil, ""),
+			},
+		},
+		"removing delegation annotations is rejected": {
+			oldAnnotations: delegation,
+			errs: field.ErrorList{
+				field.Invalid(workloadNamePath, nil, ""),
+				field.Invalid(templateNamePath, nil, ""),
+			},
+		},
+		"adding parent-compositepodgroup after creation is rejected": {
+			updateAnnotations: map[string]string{apischeduling.ParentCompositePodGroupAnnotation: "parent-cpg"},
+			errs:              field.ErrorList{field.Invalid(parentCompositePath, nil, "")},
+		},
+		"changing parent-compositepodgroup is rejected": {
+			oldAnnotations:    map[string]string{apischeduling.ParentCompositePodGroupAnnotation: "parent-cpg"},
+			updateAnnotations: map[string]string{apischeduling.ParentCompositePodGroupAnnotation: "other-cpg"},
+			errs:              field.ErrorList{field.Invalid(parentCompositePath, nil, "")},
+		},
+		"removing parent-compositepodgroup is rejected": {
+			oldAnnotations: map[string]string{apischeduling.ParentCompositePodGroupAnnotation: "parent-cpg"},
+			errs:           field.ErrorList{field.Invalid(parentCompositePath, nil, "")},
+		},
+		"adding an empty parent-compositepodgroup is rejected": {
+			updateAnnotations: map[string]string{apischeduling.ParentCompositePodGroupAnnotation: ""},
+			errs:              field.ErrorList{field.Invalid(parentCompositePath, nil, "")},
+		},
+		"unchanged parent-compositepodgroup with scheduling is allowed": {
+			old:               basic(),
+			update:            basic(),
+			oldAnnotations:    map[string]string{apischeduling.ParentCompositePodGroupAnnotation: "parent-cpg"},
+			updateAnnotations: map[string]string{apischeduling.ParentCompositePodGroupAnnotation: "parent-cpg"},
+		},
+		"changing an unrelated annotation keeps delegation annotations valid": {
+			oldAnnotations: map[string]string{
+				apischeduling.WorkloadNameAnnotation:      "parent-workload",
+				apischeduling.GroupTemplateNameAnnotation: "workers",
+				"example.com/owner":                       "team-a",
+			},
+			updateAnnotations: map[string]string{
+				apischeduling.WorkloadNameAnnotation:      "parent-workload",
+				apischeduling.GroupTemplateNameAnnotation: "workers",
+				"example.com/owner":                       "team-b",
+			},
 		},
 		"unchanged spec with now-invalid scheduling is ratcheted": {
 			old:    basicDisruptionModeAll(),
