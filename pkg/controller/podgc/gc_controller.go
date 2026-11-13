@@ -366,5 +366,10 @@ func (gcc *PodGCController) markFailedAndDeletePodWithCondition(ctx context.Cont
 			return err
 		}
 	}
-	return gcc.kubeClient.CoreV1().Pods(pod.Namespace).Delete(ctx, pod.Name, *metav1.NewDeleteOptions(0))
+	// The pod comes from the informer cache, so by now it may have been replaced
+	// by a new pod with the same name (for example a StatefulSet pod). Without the
+	// UID precondition that replacement would be force deleted.
+	opts := metav1.NewDeleteOptions(0)
+	opts.Preconditions = metav1.NewUIDPreconditions(string(pod.UID))
+	return gcc.kubeClient.CoreV1().Pods(pod.Namespace).Delete(ctx, pod.Name, *opts)
 }
