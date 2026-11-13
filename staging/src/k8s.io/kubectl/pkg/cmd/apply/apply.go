@@ -104,7 +104,7 @@ type ApplyOptions struct {
 	Builder             *resource.Builder
 	Mapper              meta.RESTMapper
 	DynamicClient       dynamic.Interface
-	OpenAPIV3Root       openapi3.Root
+	OpenAPIV3Root       openapi3.RootAndResources
 
 	Namespace        string
 	EnforceNamespace bool
@@ -281,10 +281,10 @@ func (flags *ApplyFlags) ToOptions(f cmdutil.Factory, cmd *cobra.Command, baseNa
 		return nil, err
 	}
 
-	var openAPIV3Root openapi3.Root
+	var openAPIV3Root openapi3.RootAndResources
 	openAPIV3Client, err := f.OpenAPIV3Client()
 	if err == nil {
-		openAPIV3Root = openapi3.NewRoot(openAPIV3Client)
+		openAPIV3Root = openapi3.NewRootAndResources(openAPIV3Client)
 	} else {
 		klog.V(4).Infof("warning: OpenAPI V3 Patch is enabled but is unable to be loaded")
 	}

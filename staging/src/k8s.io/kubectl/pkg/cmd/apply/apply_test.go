@@ -88,8 +88,14 @@ var (
 		},
 		OpenAPIV3ClientFunc: func() (openapiclient.Client, error) {
 			c := openapitest.NewFakeClient()
-			c.PathsMap["api/v1"] = openapitest.FakeGroupVersion{GVSpec: fakeOpenAPIV3Legacy.SchemaBytesOrDie()}
-			c.PathsMap["apis/apps/v1"] = openapitest.FakeGroupVersion{GVSpec: fakeOpenAPIV3AppsV1.SchemaBytesOrDie()}
+			c.PathsMap["api/v1"] = &countingGroupVersion{
+				delegate:    openapitest.FakeGroupVersion{GVSpec: fakeOpenAPIV3Legacy.SchemaBytesOrDie()},
+				relativeURL: "/openapi/v3/api/v1?hash=corev1",
+			}
+			c.PathsMap["apis/apps/v1"] = &countingGroupVersion{
+				delegate:    openapitest.FakeGroupVersion{GVSpec: fakeOpenAPIV3AppsV1.SchemaBytesOrDie()},
+				relativeURL: "/openapi/v3/apis/apps/v1?hash=appsv1",
+			}
 			return c, nil
 		},
 	}
