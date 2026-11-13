@@ -53,6 +53,7 @@ func testDeviceBindingConditions(tCtx ktesting.TContext, enabled bool) {
 		tCtx.Run("FailureRemove", func(tCtx ktesting.TContext) { testDeviceBindingFailureConditionsReschedule(tCtx, false) })
 		tCtx.Run("TimeoutReached", func(tCtx ktesting.TContext) { testDeviceBindingConditionsTimeoutReached(tCtx) })
 		tCtx.Run("TimeoutRecover", func(tCtx ktesting.TContext) { testDeviceBindingConditionsTimeoutRecovery(tCtx) })
+		tCtx.Run("ClaimDeletedReschedule", func(tCtx ktesting.TContext) { testDeviceBindingConditionsClaimDeletedReschedule(tCtx) })
 	}
 }
 
@@ -485,6 +486,90 @@ profiles:
 				Status: v1.ConditionTrue,
 			}))),
 	))
+}
+
+// testDeviceBindingConditionsClaimDeletedReschedule verifies that a pod
+// waiting for a device gets scheduled promptly when the claim of a pod that
+// is itself waiting in PreBind gets deleted. This is what happens for claims
+// generated from a claim template when their pod is deleted: the claim is
+// gone, but the pod that was waiting in PreBind keeps its allocation in-flight
+// until its binding cycle fails and Unreserve runs. After that only the
+// AssignedPodDelete event is emitted, so pods rejected by DynamicResources
+// must react to it to get retried instead of waiting for the periodic flush
+// of the unschedulable queue.
+func testDeviceBindingConditionsClaimDeletedReschedule(tCtx ktesting.TContext) {
+	tCtx.Parallel()
+
+	namespace := createTestNamespace(tCtx, nil)
+	class, driver := createTestClass(tCtx, namespace)
+
+	// One device that requires a binding condition which never becomes true.
+	slice := &resourceapi.ResourceSlice{
+		ObjectMeta: metav1.ObjectMeta{GenerateName: namespace + "-claim-deleted-"},
+		Spec: resourceapi.ResourceSliceSpec{
+			NodeName: &nodeName,
+			Pool: resourceapi.ResourcePool{
+				Name:               poolWithBinding,
+				ResourceSliceCount: 1,
+			},
+			Driver: driver,
+			Devices: []resourceapi.Device{{
+				Name:                     "with-binding",
+				BindingConditions:        []string{bindingCondition},
+				BindingFailureConditions: []string{failureCondition},
+			}},
+		},
+	}
+	createSlice(tCtx, slice)
+
+	// The ResourceClaim controller releases the claim of a deleted pod by
+	// removing its consumers and finalizer. Without it, the claim of the
+	// first pod could not get deleted below.
+	startClaimController(tCtx)
+	startScheduler(tCtx)
+
+	// The first pod gets the device allocated and then waits in PreBind.
+	claim1 := createClaim(tCtx, namespace, "-waiting", class, claim)
+	pod1 := createPod(tCtx, namespace, "-waiting", podWithClaimName, claim1)
+	waitForClaimAllocatedToDevice(tCtx, namespace, claim1.Name, schedulingTimeout)
+
+	// A second pod requesting the same device must be rejected while the
+	// first pod's allocation is held in-flight.
+	claim2 := createClaim(tCtx, namespace, "-waiting-too", class, claim)
+	pod2 := createPod(tCtx, namespace, "-waiting-too", podWithClaimName, claim2)
+	tCtx.Eventually(func(tCtx ktesting.TContext) (*v1.Pod, error) {
+		return tCtx.Client().CoreV1().Pods(namespace).Get(tCtx, pod2.Name, metav1.GetOptions{})
+	}).WithTimeout(schedulingTimeout).WithPolling(500*time.Millisecond).Should(
+		gomega.HaveField("Status.Conditions",
+			gomega.ContainElement(
+				gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+					"Type":    gomega.Equal(v1.PodScheduled),
+					"Status":  gomega.Equal(v1.ConditionFalse),
+					"Message": gomega.ContainSubstring("cannot allocate"),
+				}),
+			),
+		),
+		"second pod must be rejected while the first pod holds the device",
+	)
+
+	// Delete the pod first and then its claim. This is what happens for a
+	// claim generated from a claim template when its pod gets deleted: the
+	// garbage collector removes the claim once the pod is gone, while the
+	// pod's scheduling cycle is still waiting in PreBind. The scheduler
+	// notices the missing claim there, unreserves the in-flight allocation,
+	// and then must retry the second pod.
+	deleteAndWait(tCtx,
+		tCtx.Client().CoreV1().Pods(namespace).Delete,
+		tCtx.Client().CoreV1().Pods(namespace).Get,
+		pod1.Name,
+	)
+	deleteAndWait(tCtx,
+		tCtx.Client().ResourceV1().ResourceClaims(namespace).Delete,
+		tCtx.Client().ResourceV1().ResourceClaims(namespace).Get,
+		claim1.Name,
+	)
+
+	waitForClaimAllocatedToDevice(tCtx, namespace, claim2.Name, schedulingTimeout)
 }
 
 // testDeviceBindingConditionsTimeoutRecovery verifies that when a device with BindingConditions
