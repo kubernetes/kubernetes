@@ -74,6 +74,11 @@ import (
 	"k8s.io/kubernetes/pkg/util/oom"
 )
 
+const (
+	// internalSwapResourceName is the internal ResourceName key used to track node swap capacity in internalCapacity.
+	internalSwapResourceName v1.ResourceName = "swap"
+)
+
 // A non-user container tracked by the Kubelet.
 type systemContainer struct {
 	// Absolute name of the container.
@@ -120,6 +125,8 @@ type containerManagerImpl struct {
 	capacity v1.ResourceList
 	// Capacity of this node, including internal resources.
 	internalCapacity v1.ResourceList
+	// getSwapControllerAvailable reports whether the swap cgroup controller is available on the host.
+	getSwapControllerAvailable func() bool
 	// Absolute cgroupfs path to a cgroup that Kubelet needs to place all pods under.
 	// This path include a top level container for enforcing Node Allocatable.
 	cgroupRoot CgroupName
@@ -247,6 +254,9 @@ func NewContainerManager(ctx context.Context, mountUtil mount.Interface, cadviso
 	for k, v := range capacity {
 		internalCapacity[k] = v
 	}
+	internalCapacity[internalSwapResourceName] = *resource.NewQuantity(
+		int64(machineInfo.SwapCapacity),
+		resource.BinarySI)
 	pidlimits, err := pidlimit.Stats()
 	if err == nil && pidlimits != nil && pidlimits.MaxPID != nil {
 		internalCapacity[pidlimit.PIDs] = *resource.NewQuantity(
@@ -285,16 +295,17 @@ func NewContainerManager(ctx context.Context, mountUtil mount.Interface, cadviso
 	}
 
 	cm := &containerManagerImpl{
-		cadvisorInterface:   cadvisorInterface,
-		mountUtil:           mountUtil,
-		NodeConfig:          nodeConfig,
-		subsystems:          subsystems,
-		cgroupManager:       cgroupManager,
-		capacity:            capacity,
-		internalCapacity:    internalCapacity,
-		cgroupRoot:          cgroupRoot,
-		recorder:            recorder,
-		qosContainerManager: qosContainerManager,
+		cadvisorInterface:          cadvisorInterface,
+		mountUtil:                  mountUtil,
+		NodeConfig:                 nodeConfig,
+		subsystems:                 subsystems,
+		cgroupManager:              cgroupManager,
+		capacity:                   capacity,
+		internalCapacity:           internalCapacity,
+		getSwapControllerAvailable: sync.OnceValue(func() bool { return CheckSwapControllerAvailability(ctx, cgroups.IsCgroup2UnifiedMode()) }),
+		cgroupRoot:                 cgroupRoot,
+		recorder:                   recorder,
+		qosContainerManager:        qosContainerManager,
 	}
 
 	cm.topologyManager, err = topologymanager.NewManager(
@@ -404,10 +415,14 @@ func (cm *containerManagerImpl) NewPodContainerManager() PodContainerManager {
 			enforceCPULimits:  cm.EnforceCPULimits,
 			// cpuCFSQuotaPeriod is in microseconds. NodeConfig.CPUCFSQuotaPeriod is time.Duration (measured in nano seconds).
 			// Convert (cm.CPUCFSQuotaPeriod) [nanoseconds] / time.Microsecond (1000) to get cpuCFSQuotaPeriod in microseconds.
-			cpuCFSQuotaPeriod:       uint64(cm.CPUCFSQuotaPeriod / time.Microsecond),
-			podContainerManager:     cm,
-			memoryReservationPolicy: cm.MemoryReservationPolicy,
-			memoryThrottlingFactor:  cm.MemoryThrottlingFactor,
+			cpuCFSQuotaPeriod:          uint64(cm.CPUCFSQuotaPeriod / time.Microsecond),
+			podContainerManager:        cm,
+			memoryReservationPolicy:    cm.MemoryReservationPolicy,
+			memoryThrottlingFactor:     cm.MemoryThrottlingFactor,
+			memorySwapBehavior:         cm.MemorySwapBehavior,
+			memoryCapacity:             cm.internalCapacity.Memory().Value(),
+			swapCapacity:               cm.internalCapacity.Name(internalSwapResourceName, resource.BinarySI).Value(),
+			getSwapControllerAvailable: cm.getSwapControllerAvailable,
 		}
 	}
 	return &podContainerManagerNoop{

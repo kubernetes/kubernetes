@@ -1859,6 +1859,369 @@ func TestRetryPendingResizesWithSwap(t *testing.T) {
 	}
 }
 
+func TestRetryPendingPodLevelResizesWithSwap(t *testing.T) {
+	if goruntime.GOOS != "linux" {
+		t.Skip("In-place pod-level resources resize is only supported on Linux")
+	}
+	metrics.Register()
+
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.PodLevelResources:                       true,
+		features.InPlacePodLevelResourcesVerticalScaling: true,
+	})
+	logger, tCtx := ktesting.NewTestContext(t)
+	noSwapContainerName, swapContainerName := "plr-noswap", "plr-limitedswap"
+
+	cpu500m := resource.MustParse("500m")
+	cpu1 := resource.MustParse("1")
+	mem1Gi := resource.MustParse("1Gi")
+	mem2Gi := resource.MustParse("2Gi")
+	mem4Gi := resource.MustParse("4Gi")
+	mem6Gi := resource.MustParse("6Gi")
+
+	basePod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "plr-swap-resize-1",
+			Name:      "pod-plr",
+			Namespace: "ns1",
+		},
+		Spec: v1.PodSpec{
+			Resources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem1Gi},
+				Limits:   v1.ResourceList{v1.ResourceCPU: cpu1, v1.ResourceMemory: mem4Gi},
+			},
+			Containers: []v1.Container{
+				{
+					Name:  swapContainerName,
+					Image: "i1",
+					ResizePolicy: []v1.ContainerResizePolicy{
+						{ResourceName: v1.ResourceMemory, RestartPolicy: v1.RestartContainer},
+					},
+				},
+			},
+		},
+		Status: v1.PodStatus{
+			Phase: v1.PodRunning,
+			ContainerStatuses: []v1.ContainerStatus{
+				{
+					Name:      swapContainerName,
+					Resources: &v1.ResourceRequirements{},
+				},
+			},
+		},
+	}
+
+	tests := []struct {
+		name               string
+		disablePLRScaling  bool
+		swapBehavior       kubetypes.SwapBehavior
+		origPodResources   *v1.ResourceRequirements
+		newPodResources    *v1.ResourceRequirements
+		origCtrResources   *v1.ResourceRequirements
+		newCtrResources    *v1.ResourceRequirements
+		expectInfeasible   bool
+		expectedConditions []*v1.PodCondition
+		expectedMetrics    string
+	}{
+		{
+			name:         "LimitedSwap pod-level memory request resize is rejected even with container RestartContainer policy",
+			swapBehavior: kubetypes.LimitedSwap,
+			newPodResources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem2Gi},
+				Limits:   v1.ResourceList{v1.ResourceCPU: cpu1, v1.ResourceMemory: mem4Gi},
+			},
+			expectInfeasible: true,
+			expectedConditions: []*v1.PodCondition{
+				{
+					Type:    v1.PodResizePending,
+					Status:  v1.ConditionTrue,
+					Reason:  v1.PodReasonInfeasible,
+					Message: "In-place resize of containers with swap is not supported",
+				},
+			},
+			expectedMetrics: `
+				# HELP kubelet_pod_infeasible_resizes_total [ALPHA] Number of infeasible resizes for pods.
+				# TYPE kubelet_pod_infeasible_resizes_total counter
+				kubelet_pod_infeasible_resizes_total{reason_detail="swap_limitation"} 1
+			`,
+		},
+		{
+			name:         "LimitedSwap pod-level memory limit resize keeping req < lim is allowed",
+			swapBehavior: kubetypes.LimitedSwap,
+			newPodResources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem1Gi},
+				Limits:   v1.ResourceList{v1.ResourceCPU: cpu1, v1.ResourceMemory: mem6Gi},
+			},
+			expectInfeasible: false,
+			expectedConditions: []*v1.PodCondition{
+				{
+					Type:   v1.PodResizeInProgress,
+					Status: v1.ConditionTrue,
+				},
+			},
+		},
+		{
+			name:         "LimitedSwap pod-level memory limit resize flipping eligibility (req < lim to req == lim) is rejected",
+			swapBehavior: kubetypes.LimitedSwap,
+			origPodResources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem2Gi},
+				Limits:   v1.ResourceList{v1.ResourceCPU: cpu1, v1.ResourceMemory: mem4Gi},
+			},
+			newPodResources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem2Gi},
+				Limits:   v1.ResourceList{v1.ResourceCPU: cpu1, v1.ResourceMemory: mem2Gi},
+			},
+			expectInfeasible: true,
+			expectedConditions: []*v1.PodCondition{
+				{
+					Type:    v1.PodResizePending,
+					Status:  v1.ConditionTrue,
+					Reason:  v1.PodReasonInfeasible,
+					Message: "In-place resize of containers with swap is not supported",
+				},
+			},
+			expectedMetrics: `
+				# HELP kubelet_pod_infeasible_resizes_total [ALPHA] Number of infeasible resizes for pods.
+				# TYPE kubelet_pod_infeasible_resizes_total counter
+				kubelet_pod_infeasible_resizes_total{reason_detail="swap_limitation"} 1
+			`,
+		},
+		{
+			name:         "LimitedSwap pod-level memory limit resize flipping eligibility (req == lim to req < lim) is rejected",
+			swapBehavior: kubetypes.LimitedSwap,
+			origPodResources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem2Gi},
+				Limits:   v1.ResourceList{v1.ResourceCPU: cpu1, v1.ResourceMemory: mem2Gi},
+			},
+			newPodResources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem2Gi},
+				Limits:   v1.ResourceList{v1.ResourceCPU: cpu1, v1.ResourceMemory: mem4Gi},
+			},
+			expectInfeasible: true,
+			expectedConditions: []*v1.PodCondition{
+				{
+					Type:    v1.PodResizePending,
+					Status:  v1.ConditionTrue,
+					Reason:  v1.PodReasonInfeasible,
+					Message: "In-place resize of containers with swap is not supported",
+				},
+			},
+			expectedMetrics: `
+				# HELP kubelet_pod_infeasible_resizes_total [ALPHA] Number of infeasible resizes for pods.
+				# TYPE kubelet_pod_infeasible_resizes_total counter
+				kubelet_pod_infeasible_resizes_total{reason_detail="swap_limitation"} 1
+			`,
+		},
+		{
+			name:         "LimitedSwap pod-level memory request resize flipping eligibility (req < lim to req == lim) is rejected",
+			swapBehavior: kubetypes.LimitedSwap,
+			origPodResources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem2Gi},
+				Limits:   v1.ResourceList{v1.ResourceCPU: cpu1, v1.ResourceMemory: mem4Gi},
+			},
+			newPodResources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem4Gi},
+				Limits:   v1.ResourceList{v1.ResourceCPU: cpu1, v1.ResourceMemory: mem4Gi},
+			},
+			expectInfeasible: true,
+			expectedConditions: []*v1.PodCondition{
+				{
+					Type:    v1.PodResizePending,
+					Status:  v1.ConditionTrue,
+					Reason:  v1.PodReasonInfeasible,
+					Message: "In-place resize of containers with swap is not supported",
+				},
+			},
+			expectedMetrics: `
+				# HELP kubelet_pod_infeasible_resizes_total [ALPHA] Number of infeasible resizes for pods.
+				# TYPE kubelet_pod_infeasible_resizes_total counter
+				kubelet_pod_infeasible_resizes_total{reason_detail="swap_limitation"} 1
+			`,
+		},
+		{
+			name:         "LimitedSwap pod-level memory request and limit resize keeping req == lim (NoSwap -> NoSwap) is allowed",
+			swapBehavior: kubetypes.LimitedSwap,
+			origPodResources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem2Gi},
+				Limits:   v1.ResourceList{v1.ResourceCPU: cpu1, v1.ResourceMemory: mem2Gi},
+			},
+			newPodResources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem4Gi},
+				Limits:   v1.ResourceList{v1.ResourceCPU: cpu1, v1.ResourceMemory: mem4Gi},
+			},
+			expectInfeasible: false,
+			expectedConditions: []*v1.PodCondition{
+				{
+					Type:   v1.PodResizeInProgress,
+					Status: v1.ConditionTrue,
+				},
+			},
+		},
+		{
+			name:         "LimitedSwap pod-level CPU-only resize is allowed",
+			swapBehavior: kubetypes.LimitedSwap,
+			newPodResources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{v1.ResourceCPU: cpu1, v1.ResourceMemory: mem1Gi},
+				Limits:   v1.ResourceList{v1.ResourceCPU: cpu1, v1.ResourceMemory: mem4Gi},
+			},
+			expectInfeasible: false,
+			expectedConditions: []*v1.PodCondition{
+				{
+					Type:   v1.PodResizeInProgress,
+					Status: v1.ConditionTrue,
+				},
+			},
+		},
+		{
+			name:         "NoSwap pod-level memory request resize is allowed",
+			swapBehavior: kubetypes.NoSwap,
+			newPodResources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem2Gi},
+				Limits:   v1.ResourceList{v1.ResourceCPU: cpu1, v1.ResourceMemory: mem4Gi},
+			},
+			expectInfeasible: false,
+			expectedConditions: []*v1.PodCondition{
+				{
+					Type:   v1.PodResizeInProgress,
+					Status: v1.ConditionTrue,
+				},
+			},
+		},
+		{
+			name:             "LimitedSwap container-only pod resizing container memory request with RestartContainer is allowed",
+			swapBehavior:     kubetypes.LimitedSwap,
+			origPodResources: nil,
+			newPodResources:  nil,
+			origCtrResources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem1Gi},
+				Limits:   v1.ResourceList{v1.ResourceCPU: cpu1, v1.ResourceMemory: mem4Gi},
+			},
+			newCtrResources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem2Gi},
+				Limits:   v1.ResourceList{v1.ResourceCPU: cpu1, v1.ResourceMemory: mem4Gi},
+			},
+			expectInfeasible: false,
+			expectedConditions: []*v1.PodCondition{
+				{
+					Type:   v1.PodResizeInProgress,
+					Status: v1.ConditionTrue,
+				},
+			},
+		},
+		{
+			name:              "Pod-level memory request resize reports plr_feature_gate_off when InPlacePodLevelResourcesVerticalScaling is disabled",
+			disablePLRScaling: true,
+			swapBehavior:      kubetypes.LimitedSwap,
+			newPodResources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem2Gi},
+				Limits:   v1.ResourceList{v1.ResourceCPU: cpu1, v1.ResourceMemory: mem4Gi},
+			},
+			expectInfeasible: true,
+			expectedConditions: []*v1.PodCondition{
+				{
+					Type:    v1.PodResizePending,
+					Status:  v1.ConditionTrue,
+					Reason:  v1.PodReasonInfeasible,
+					Message: "InPlacePodLevelResourcesVerticalScaling is disabled",
+				},
+			},
+			expectedMetrics: `
+				# HELP kubelet_pod_infeasible_resizes_total [ALPHA] Number of infeasible resizes for pods.
+				# TYPE kubelet_pod_infeasible_resizes_total counter
+				kubelet_pod_infeasible_resizes_total{reason_detail="plr_feature_gate_off"} 1
+			`,
+		},
+		{
+			name:             "container-only pod transitioning to pod-level resources with same effective memory request - Infeasible",
+			swapBehavior:     kubetypes.LimitedSwap,
+			origPodResources: nil,
+			origCtrResources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem1Gi},
+				Limits:   v1.ResourceList{v1.ResourceCPU: cpu1, v1.ResourceMemory: mem2Gi},
+			},
+			newPodResources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem1Gi},
+				Limits:   v1.ResourceList{v1.ResourceCPU: cpu1, v1.ResourceMemory: mem4Gi},
+			},
+			expectInfeasible: true,
+			expectedConditions: []*v1.PodCondition{
+				{
+					Type:    v1.PodResizePending,
+					Status:  v1.ConditionTrue,
+					Reason:  v1.PodReasonInfeasible,
+					Message: "In-place resize of containers with swap is not supported.",
+				},
+			},
+			expectedMetrics: `
+				# HELP kubelet_pod_infeasible_resizes_total [ALPHA] Number of infeasible resizes for pods.
+				# TYPE kubelet_pod_infeasible_resizes_total counter
+				kubelet_pod_infeasible_resizes_total{reason_detail="swap_limitation"} 1
+			`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.disablePLRScaling {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodLevelResourcesVerticalScaling, false)
+			}
+			metrics.PodInfeasibleResizes.Reset()
+			originalPod := basePod.DeepCopy()
+			if tt.origPodResources != nil || tt.origCtrResources != nil {
+				originalPod.Spec.Resources = tt.origPodResources.DeepCopy()
+			}
+			if tt.origCtrResources != nil {
+				originalPod.Spec.Containers[0].Resources = *tt.origCtrResources.DeepCopy()
+			}
+			ctrName := swapContainerName
+			if tt.swapBehavior == kubetypes.NoSwap {
+				ctrName = noSwapContainerName
+			}
+			originalPod.Spec.Containers[0].Name = ctrName
+			originalPod.Status.ContainerStatuses[0].Name = ctrName
+
+			newPod := originalPod.DeepCopy()
+			newPod.Spec.Resources = tt.newPodResources.DeepCopy()
+			if tt.newCtrResources != nil {
+				newPod.Spec.Containers[0].Resources = *tt.newCtrResources.DeepCopy()
+			}
+
+			podStatus := &kubecontainer.PodStatus{
+				ID:                originalPod.UID,
+				Name:              originalPod.Name,
+				Namespace:         originalPod.Namespace,
+				ContainerStatuses: make([]*kubecontainer.Status, 1),
+			}
+			setContainerStatus(podStatus, &originalPod.Spec.Containers[0], 0)
+
+			runtime := &containertest.FakeRuntime{
+				SwapBehavior: map[string]kubetypes.SwapBehavior{
+					noSwapContainerName: kubetypes.NoSwap,
+					swapContainerName:   kubetypes.LimitedSwap,
+				},
+				PodStatus: *podStatus,
+			}
+			allocationManager := makeAllocationManager(t, runtime, []*v1.Pod{originalPod}, nil)
+			require.NoError(t, allocationManager.SetAllocatedPod(logger, originalPod))
+			t.Cleanup(func() { allocationManager.RemovePod(logger, originalPod.UID) })
+
+			allocationManager.(*manager).podProvider.(*fakePodProvider).getPodByUID = func(uid types.UID) (*v1.Pod, bool) {
+				return newPod, true
+			}
+			allocationManager.PushPendingAllocation(logger, originalPod.UID)
+			allocationManager.RetryPendingAllocations(tCtx, TriggerReasonPodUpdated)
+
+			require.Equal(t, tt.expectInfeasible, allocationManager.(*manager).statusManager.IsPodResizeInfeasible(newPod.UID))
+			verifyResizeConditions(t, tt.expectedConditions, allocationManager.(*manager).statusManager.GetPodResizeConditions(newPod.UID))
+			if tt.expectedMetrics != "" {
+				assert.NoError(t, testutil.GatherAndCompare(
+					legacyregistry.DefaultGatherer, strings.NewReader(tt.expectedMetrics), "kubelet_pod_infeasible_resizes_total",
+				))
+			}
+		})
+	}
+}
+
 func TestRetryPendingResizesMultipleConditions(t *testing.T) {
 	if goruntime.GOOS == "windows" {
 		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")

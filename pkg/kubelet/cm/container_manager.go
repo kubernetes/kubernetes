@@ -43,6 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
 	"k8s.io/kubernetes/pkg/kubelet/status"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/utils/cpuset"
 )
@@ -198,6 +199,7 @@ type NodeConfig struct {
 	MemoryManagerReservedMemory  []kubeletconfig.MemoryReservation
 	MemoryReservationPolicy      kubeletconfig.MemoryReservationPolicy
 	MemoryThrottlingFactor       *float64
+	MemorySwapBehavior           kubetypes.SwapBehavior
 	PodPidsLimit                 int64
 	EnforceCPULimits             bool
 	CPUCFSQuotaPeriod            time.Duration

@@ -282,7 +282,7 @@ func (cm *containerManagerImpl) getNodeAllocatableAbsoluteImpl(capacity v1.Resou
 }
 
 // getNodeAllocatableInternalAbsolute is similar to getNodeAllocatableAbsolute except that
-// it also includes internal resources (currently process IDs).  It is intended for setting
+// it also includes internal resources (currently process IDs and swap).  It is intended for setting
 // up top level cgroups only.
 func (cm *containerManagerImpl) getNodeAllocatableInternalAbsolute() v1.ResourceList {
 	return cm.getNodeAllocatableAbsoluteImpl(cm.internalCapacity)

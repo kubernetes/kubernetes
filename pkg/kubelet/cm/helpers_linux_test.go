@@ -19,6 +19,8 @@ limitations under the License.
 package cm
 
 import (
+	"os"
+	"path/filepath"
 	"reflect"
 	"strconv"
 	"testing"
@@ -28,8 +30,11 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/klog/v2/ktesting"
+	"k8s.io/kubernetes/pkg/apis/scheduling"
 	pkgfeatures "k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/utils/ptr"
 )
 
@@ -1501,6 +1506,864 @@ func TestCPUSharesEqualAfterV2RoundTrip(t *testing.T) {
 			if got != tc.expected {
 				t.Fatalf("CPUSharesEqualAfterV2RoundTrip(%d, %d) = %t, want %t",
 					tc.allocatedShares, tc.readbackShares, got, tc.expected)
+			}
+		})
+	}
+}
+
+func TestIsPodEligibleForSwap(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.PodLevelResources, true)
+
+	gi := int64(1024 * 1024 * 1024)
+	mi := int64(1024 * 1024)
+
+	testCases := []struct {
+		name            string
+		pod             *v1.Pod
+		plrEnabled      *bool
+		expectedElig    bool
+		expectedRequest int64
+	}{
+		{
+			name:         "nil pod is ineligible",
+			pod:          nil,
+			expectedElig: false,
+		},
+		{
+			name:         "BestEffort pod is ineligible",
+			pod:          &v1.Pod{Spec: v1.PodSpec{Containers: []v1.Container{{Name: "c1"}}}},
+			expectedElig: false,
+		},
+		{
+			name: "Guaranteed pod with pod-level resources is ineligible",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: getResourceList("1", "2Gi"),
+						Limits:   getResourceList("1", "2Gi"),
+					},
+					Containers: []v1.Container{{Name: "c1"}},
+				},
+			},
+			expectedElig: false,
+		},
+		{
+			name: "critical Burstable pod is ineligible",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Priority: ptr.To(scheduling.SystemCriticalPriority),
+					Resources: &v1.ResourceRequirements{
+						Requests: getResourceList("", "2Gi"),
+						Limits:   getResourceList("", "4Gi"),
+					},
+					Containers: []v1.Container{{Name: "c1"}},
+				},
+			},
+			expectedElig: false,
+		},
+		{
+			name: "Burstable CPU-only pod with zero memory request is ineligible",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Overhead: v1.ResourceList{v1.ResourceMemory: resource.MustParse("64Mi")},
+					Resources: &v1.ResourceRequirements{
+						Requests: getResourceList("500m", ""),
+						Limits:   getResourceList("1", ""),
+					},
+					Containers: []v1.Container{{Name: "c1"}},
+				},
+			},
+			expectedElig: false,
+		},
+		{
+			name: "Case 1a: pod-level resources only with req < lim is eligible and excludes overhead",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Overhead: v1.ResourceList{v1.ResourceMemory: resource.MustParse("64Mi")},
+					Resources: &v1.ResourceRequirements{
+						Requests: getResourceList("", "2Gi"),
+						Limits:   getResourceList("", "4Gi"),
+					},
+					Containers: []v1.Container{{Name: "c1"}, {Name: "c2"}},
+				},
+			},
+			expectedElig:    true,
+			expectedRequest: 2 * gi,
+		},
+		{
+			name: "Case 1b: pod-level memory request without memory limit is eligible",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: getResourceList("", "2Gi"),
+					},
+					Containers: []v1.Container{{Name: "c1"}},
+				},
+			},
+			expectedElig:    true,
+			expectedRequest: 2 * gi,
+		},
+		{
+			name: "Case 2: mixed pod uses pod-level memory request",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: getResourceList("", "4Gi"),
+						Limits:   getResourceList("", "8Gi"),
+					},
+					Containers: []v1.Container{
+						{Name: "c1", Resources: getResourceRequirements(getResourceList("", "2Gi"), getResourceList("", "3Gi"))},
+						{Name: "c2"},
+					},
+				},
+			},
+			expectedElig:    true,
+			expectedRequest: 4 * gi,
+		},
+		{
+			name: "container-only pod aggregates container memory requests",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: "c1", Resources: getResourceRequirements(getResourceList("", "500Mi"), getResourceList("", ""))},
+						{Name: "c2"},
+					},
+				},
+			},
+			expectedElig:    true,
+			expectedRequest: 500 * mi,
+		},
+		{
+			name: "pod-level CPU with container c1 req == lim and c2 unbounded is eligible via aggregated request",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: getResourceList("500m", ""),
+						Limits:   getResourceList("1", ""),
+					},
+					Containers: []v1.Container{
+						{Name: "c1", Resources: getResourceRequirements(getResourceList("", "2Gi"), getResourceList("", "2Gi"))},
+						{Name: "c2"},
+					},
+				},
+			},
+			expectedElig:    true,
+			expectedRequest: 2 * gi,
+		},
+		{
+			name: "pod-level CPU with single container req == lim is ineligible because aggregated PodMemoryRequest == PodMemoryLimit",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: getResourceList("500m", ""),
+						Limits:   getResourceList("1", ""),
+					},
+					Containers: []v1.Container{
+						{Name: "c1", Resources: getResourceRequirements(getResourceList("", "2Gi"), getResourceList("", "2Gi"))},
+					},
+				},
+			},
+			expectedElig: false,
+		},
+		{
+			name: "Case 6: Burstable pod via CPU where PodMemoryRequest == PodMemoryLimit is ineligible",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: getResourceList("1", "4Gi"),
+						Limits:   getResourceList("2", "4Gi"),
+					},
+					Containers: []v1.Container{
+						{Name: "c1", Resources: getResourceRequirements(getResourceList("", "1Gi"), getResourceList("", "2Gi"))},
+					},
+				},
+			},
+			expectedElig: false,
+		},
+		{
+			name: "PodLevelResources disabled ignores pod.spec.resources",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: getResourceList("", "4Gi"),
+						Limits:   getResourceList("", "8Gi"),
+					},
+					Containers: []v1.Container{
+						{Name: "c1", Resources: getResourceRequirements(getResourceList("", "1Gi"), getResourceList("", "2Gi"))},
+					},
+				},
+			},
+			plrEnabled:      new(false),
+			expectedElig:    true,
+			expectedRequest: 1 * gi,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.plrEnabled != nil {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.PodLevelResources, *tc.plrEnabled)
+			}
+			elig, req := IsPodEligibleForSwap(tc.pod)
+			if elig != tc.expectedElig || req != tc.expectedRequest {
+				t.Fatalf("IsPodEligibleForSwap() = (%t, %d), want (%t, %d)", elig, req, tc.expectedElig, tc.expectedRequest)
+			}
+		})
+	}
+}
+
+func TestApplyPodLevelSwapConfig(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	const (
+		gi                   = 1024 * 1024 * 1024
+		nodeMem        int64 = 40 * gi
+		nodeSwap       int64 = 5 * gi
+		expectedSwap2G int64 = (2 * gi * 5 * gi) / (40 * gi)
+		expectedSwap4G int64 = (4 * gi * 5 * gi) / (40 * gi)
+		expectedSwap6G int64 = (6 * gi * 5 * gi) / (40 * gi)
+	)
+
+	burstablePod2Gi := &v1.Pod{
+		Spec: v1.PodSpec{
+			Resources: &v1.ResourceRequirements{
+				Requests: getResourceList("", "2Gi"),
+				Limits:   getResourceList("", "4Gi"),
+			},
+			Containers: []v1.Container{{Name: "c1"}},
+		},
+	}
+
+	testCases := []struct {
+		name                    string
+		plrEnabled              bool
+		pod                     *v1.Pod
+		initialUnified          map[string]string
+		swapBehavior            kubetypes.SwapBehavior
+		nodeTotalMemory         int64
+		totalPodsSwapAvailable  int64
+		isCgroup2               bool
+		swapControllerAvailable bool
+		expectedUnified         map[string]string
+	}{
+		{
+			name:                    "PodLevelResources disabled leaves Unified untouched",
+			plrEnabled:              false,
+			pod:                     burstablePod2Gi,
+			swapBehavior:            kubetypes.LimitedSwap,
+			nodeTotalMemory:         nodeMem,
+			totalPodsSwapAvailable:  nodeSwap,
+			isCgroup2:               true,
+			swapControllerAvailable: true,
+			expectedUnified:         nil,
+		},
+		{
+			name:                    "nil pod leaves Unified untouched",
+			plrEnabled:              true,
+			pod:                     nil,
+			swapBehavior:            kubetypes.LimitedSwap,
+			nodeTotalMemory:         nodeMem,
+			totalPodsSwapAvailable:  nodeSwap,
+			isCgroup2:               true,
+			swapControllerAvailable: true,
+			expectedUnified:         nil,
+		},
+		{
+			name:       "container-only pod (pod.spec.resources nil) leaves Unified untouched",
+			plrEnabled: true,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: "c1", Resources: getResourceRequirements(getResourceList("", "2Gi"), getResourceList("", "4Gi"))},
+					},
+				},
+			},
+			swapBehavior:            kubetypes.LimitedSwap,
+			nodeTotalMemory:         nodeMem,
+			totalPodsSwapAvailable:  nodeSwap,
+			isCgroup2:               true,
+			swapControllerAvailable: true,
+			expectedUnified:         nil,
+		},
+		{
+			name:       "container-only pod with empty pod.spec.resources leaves Unified untouched",
+			plrEnabled: true,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{},
+					Containers: []v1.Container{
+						{Name: "c1", Resources: getResourceRequirements(getResourceList("", "2Gi"), getResourceList("", "4Gi"))},
+					},
+				},
+			},
+			swapBehavior:            kubetypes.LimitedSwap,
+			nodeTotalMemory:         nodeMem,
+			totalPodsSwapAvailable:  nodeSwap,
+			isCgroup2:               true,
+			swapControllerAvailable: true,
+			expectedUnified:         nil,
+		},
+		{
+			name:       "pod-level CPU only with no memory anywhere sets pod memory.swap.max to 0",
+			plrEnabled: true,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: getResourceList("500m", ""),
+						Limits:   getResourceList("1", ""),
+					},
+					Containers: []v1.Container{{Name: "c1"}},
+				},
+			},
+			swapBehavior:            kubetypes.LimitedSwap,
+			nodeTotalMemory:         nodeMem,
+			totalPodsSwapAvailable:  nodeSwap,
+			isCgroup2:               true,
+			swapControllerAvailable: true,
+			expectedUnified:         map[string]string{Cgroup2MaxSwapFilename: "0"},
+		},
+		{
+			name:       "pod-level CPU with c1 req == lim and c2 unbounded gets PodSwapLimit from aggregated memory request",
+			plrEnabled: true,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: getResourceList("500m", ""),
+						Limits:   getResourceList("1", ""),
+					},
+					Containers: []v1.Container{
+						{Name: "c1", Resources: getResourceRequirements(getResourceList("", "2Gi"), getResourceList("", "2Gi"))},
+						{Name: "c2"},
+					},
+				},
+			},
+			swapBehavior:            kubetypes.LimitedSwap,
+			nodeTotalMemory:         nodeMem,
+			totalPodsSwapAvailable:  nodeSwap,
+			isCgroup2:               true,
+			swapControllerAvailable: true,
+			expectedUnified:         map[string]string{Cgroup2MaxSwapFilename: strconv.FormatInt(expectedSwap2G, 10)},
+		},
+		{
+			name:       "pod-level CPU with single container req == lim sets pod memory.swap.max to 0",
+			plrEnabled: true,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: getResourceList("500m", ""),
+						Limits:   getResourceList("1", ""),
+					},
+					Containers: []v1.Container{
+						{Name: "c1", Resources: getResourceRequirements(getResourceList("", "2Gi"), getResourceList("", "2Gi"))},
+					},
+				},
+			},
+			swapBehavior:            kubetypes.LimitedSwap,
+			nodeTotalMemory:         nodeMem,
+			totalPodsSwapAvailable:  nodeSwap,
+			isCgroup2:               true,
+			swapControllerAvailable: true,
+			expectedUnified:         map[string]string{Cgroup2MaxSwapFilename: "0"},
+		},
+		{
+			name:       "Guaranteed pod with pod-level resources sets pod memory.swap.max to 0",
+			plrEnabled: true,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: getResourceList("1", "2Gi"),
+						Limits:   getResourceList("1", "2Gi"),
+					},
+					Containers: []v1.Container{{Name: "c1"}},
+				},
+			},
+			swapBehavior:            kubetypes.LimitedSwap,
+			nodeTotalMemory:         nodeMem,
+			totalPodsSwapAvailable:  nodeSwap,
+			isCgroup2:               true,
+			swapControllerAvailable: true,
+			expectedUnified:         map[string]string{Cgroup2MaxSwapFilename: "0"},
+		},
+		{
+			name:       "critical Burstable pod with pod-level resources sets pod memory.swap.max to 0",
+			plrEnabled: true,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Priority: ptr.To(scheduling.SystemCriticalPriority),
+					Resources: &v1.ResourceRequirements{
+						Requests: getResourceList("", "2Gi"),
+						Limits:   getResourceList("", "4Gi"),
+					},
+					Containers: []v1.Container{{Name: "c1"}},
+				},
+			},
+			swapBehavior:            kubetypes.LimitedSwap,
+			nodeTotalMemory:         nodeMem,
+			totalPodsSwapAvailable:  nodeSwap,
+			isCgroup2:               true,
+			swapControllerAvailable: true,
+			expectedUnified:         map[string]string{Cgroup2MaxSwapFilename: "0"},
+		},
+		{
+			name:                    "cgroup v1 leaves Unified untouched",
+			plrEnabled:              true,
+			pod:                     burstablePod2Gi,
+			swapBehavior:            kubetypes.LimitedSwap,
+			nodeTotalMemory:         nodeMem,
+			totalPodsSwapAvailable:  nodeSwap,
+			isCgroup2:               false,
+			swapControllerAvailable: true,
+			expectedUnified:         nil,
+		},
+		{
+			name:                    "swap controller unavailable leaves Unified untouched",
+			plrEnabled:              true,
+			pod:                     burstablePod2Gi,
+			swapBehavior:            kubetypes.LimitedSwap,
+			nodeTotalMemory:         nodeMem,
+			totalPodsSwapAvailable:  nodeSwap,
+			isCgroup2:               true,
+			swapControllerAvailable: false,
+			expectedUnified:         nil,
+		},
+		{
+			name:                    "NoSwap sets pod memory.swap.max to 0",
+			plrEnabled:              true,
+			pod:                     burstablePod2Gi,
+			swapBehavior:            kubetypes.NoSwap,
+			nodeTotalMemory:         nodeMem,
+			totalPodsSwapAvailable:  nodeSwap,
+			isCgroup2:               true,
+			swapControllerAvailable: true,
+			expectedUnified:         map[string]string{Cgroup2MaxSwapFilename: "0"},
+		},
+		{
+			name:                    "empty SwapBehavior defaults to NoSwap (0)",
+			plrEnabled:              true,
+			pod:                     burstablePod2Gi,
+			swapBehavior:            "",
+			nodeTotalMemory:         nodeMem,
+			totalPodsSwapAvailable:  nodeSwap,
+			isCgroup2:               true,
+			swapControllerAvailable: true,
+			expectedUnified:         map[string]string{Cgroup2MaxSwapFilename: "0"},
+		},
+		{
+			name:                    "Case 1: pod-only Burstable pod gets proportional PodSwapLimit",
+			plrEnabled:              true,
+			pod:                     burstablePod2Gi,
+			swapBehavior:            kubetypes.LimitedSwap,
+			nodeTotalMemory:         nodeMem,
+			totalPodsSwapAvailable:  nodeSwap,
+			isCgroup2:               true,
+			swapControllerAvailable: true,
+			expectedUnified:         map[string]string{Cgroup2MaxSwapFilename: strconv.FormatInt(expectedSwap2G, 10)},
+		},
+		{
+			name:       "Case 2 & 3: mixed pod gets PodSwapLimit proportional to pod-level request and preserves MemoryQoS keys",
+			plrEnabled: true,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: getResourceList("", "4Gi"),
+						Limits:   getResourceList("", "8Gi"),
+					},
+					Containers: []v1.Container{
+						{Name: "c1", Resources: getResourceRequirements(getResourceList("", "2Gi"), getResourceList("", "3Gi"))},
+						{Name: "c2"},
+					},
+				},
+			},
+			initialUnified:          map[string]string{Cgroup2MemoryLow: "4294967296"},
+			swapBehavior:            kubetypes.LimitedSwap,
+			nodeTotalMemory:         nodeMem,
+			totalPodsSwapAvailable:  nodeSwap,
+			isCgroup2:               true,
+			swapControllerAvailable: true,
+			expectedUnified: map[string]string{
+				Cgroup2MemoryLow:       "4294967296",
+				Cgroup2MaxSwapFilename: strconv.FormatInt(expectedSwap4G, 10),
+			},
+		},
+		{
+			name:       "Case 4: container opt-out keeps pod cgroup swap proportional to full pod request",
+			plrEnabled: true,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: getResourceList("", "6Gi"),
+						Limits:   getResourceList("", "10Gi"),
+					},
+					Containers: []v1.Container{
+						{Name: "c1", Resources: getResourceRequirements(getResourceList("", "2Gi"), getResourceList("", "2Gi"))},
+						{Name: "c2"},
+					},
+				},
+			},
+			swapBehavior:            kubetypes.LimitedSwap,
+			nodeTotalMemory:         nodeMem,
+			totalPodsSwapAvailable:  nodeSwap,
+			isCgroup2:               true,
+			swapControllerAvailable: true,
+			expectedUnified:         map[string]string{Cgroup2MaxSwapFilename: strconv.FormatInt(expectedSwap6G, 10)},
+		},
+		{
+			name:       "Case 6: Burstable pod with PodMemoryRequest == PodMemoryLimit sets pod memory.swap.max to 0",
+			plrEnabled: true,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: getResourceList("1", "4Gi"),
+						Limits:   getResourceList("2", "4Gi"),
+					},
+					Containers: []v1.Container{
+						{Name: "c1", Resources: getResourceRequirements(getResourceList("", "1Gi"), getResourceList("", "2Gi"))},
+					},
+				},
+			},
+			swapBehavior:            kubetypes.LimitedSwap,
+			nodeTotalMemory:         nodeMem,
+			totalPodsSwapAvailable:  nodeSwap,
+			isCgroup2:               true,
+			swapControllerAvailable: true,
+			expectedUnified:         map[string]string{Cgroup2MaxSwapFilename: "0"},
+		},
+		{
+			name:                    "calculation error (zero node memory) falls back to 0",
+			plrEnabled:              true,
+			pod:                     burstablePod2Gi,
+			swapBehavior:            kubetypes.LimitedSwap,
+			nodeTotalMemory:         0,
+			totalPodsSwapAvailable:  nodeSwap,
+			isCgroup2:               true,
+			swapControllerAvailable: true,
+			expectedUnified:         map[string]string{Cgroup2MaxSwapFilename: "0"},
+		},
+		{
+			name:                    "calculation error (pod memory request exceeds node memory) falls back to 0",
+			plrEnabled:              true,
+			pod:                     burstablePod2Gi,
+			swapBehavior:            kubetypes.LimitedSwap,
+			nodeTotalMemory:         1 * gi,
+			totalPodsSwapAvailable:  nodeSwap,
+			isCgroup2:               true,
+			swapControllerAvailable: true,
+			expectedUnified:         map[string]string{Cgroup2MaxSwapFilename: "0"},
+		},
+	}
+
+	t.Run("nil ResourceConfig is a no-op", func(t *testing.T) {
+		ApplyPodLevelSwapConfig(logger, burstablePod2Gi, nil, kubetypes.LimitedSwap, nodeMem, nodeSwap, true, true)
+	})
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.PodLevelResources, tc.plrEnabled)
+			rc := &ResourceConfig{Unified: tc.initialUnified}
+			ApplyPodLevelSwapConfig(logger, tc.pod, rc, tc.swapBehavior, tc.nodeTotalMemory, tc.totalPodsSwapAvailable, tc.isCgroup2, tc.swapControllerAvailable)
+			if !reflect.DeepEqual(rc.Unified, tc.expectedUnified) {
+				t.Fatalf("rc.Unified = %v, want %v", rc.Unified, tc.expectedUnified)
+			}
+		})
+	}
+}
+
+func TestIsContainerEligibleForSwap(t *testing.T) {
+	testCases := []struct {
+		name       string
+		plrEnabled bool
+		pod        *v1.Pod
+		container  *v1.Container
+		expected   bool
+	}{
+		{
+			name:       "nil container is ineligible",
+			plrEnabled: true,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: getResourceList("", "1Gi"),
+						Limits:   getResourceList("", "2Gi"),
+					},
+					Containers: []v1.Container{{Name: "c1"}},
+				},
+			},
+			container: nil,
+			expected:  false,
+		},
+		{
+			name:       "Guaranteed pod container is ineligible",
+			plrEnabled: true,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: getResourceList("1", "2Gi"),
+						Limits:   getResourceList("1", "2Gi"),
+					},
+					Containers: []v1.Container{{Name: "c1"}},
+				},
+			},
+			container: &v1.Container{Name: "c1"},
+			expected:  false,
+		},
+		{
+			name:       "resource-less container in eligible PLR pod is eligible",
+			plrEnabled: true,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: getResourceList("", "1Gi"),
+						Limits:   getResourceList("", "2Gi"),
+					},
+					Containers: []v1.Container{{Name: "c1"}},
+				},
+			},
+			container: &v1.Container{Name: "c1"},
+			expected:  true,
+		},
+		{
+			name:       "resource-less container in pod without pod-level memory request is ineligible",
+			plrEnabled: true,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Limits: getResourceList("", "4Gi"),
+					},
+					Containers: []v1.Container{
+						{Name: "c1", Resources: getResourceRequirements(getResourceList("", "1Gi"), getResourceList("", "2Gi"))},
+						{Name: "c2"},
+					},
+				},
+			},
+			container: &v1.Container{Name: "c2"},
+			expected:  false,
+		},
+		{
+			name:       "resource-less container in container-only pod is ineligible",
+			plrEnabled: true,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: "c1", Resources: getResourceRequirements(getResourceList("", "1Gi"), getResourceList("", "2Gi"))},
+						{Name: "c2"},
+					},
+				},
+			},
+			container: &v1.Container{Name: "c2"},
+			expected:  false,
+		},
+		{
+			name:       "container with request == limit in eligible PLR pod is ineligible",
+			plrEnabled: true,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: getResourceList("", "2Gi"),
+						Limits:   getResourceList("", "4Gi"),
+					},
+					Containers: []v1.Container{
+						{Name: "c1", Resources: getResourceRequirements(getResourceList("", "1Gi"), getResourceList("", "1Gi"))},
+					},
+				},
+			},
+			container: &v1.Container{Name: "c1", Resources: getResourceRequirements(getResourceList("", "1Gi"), getResourceList("", "1Gi"))},
+			expected:  false,
+		},
+		{
+			name:       "ephemeral container in eligible PLR pod is ineligible",
+			plrEnabled: true,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: getResourceList("", "2Gi"),
+						Limits:   getResourceList("", "4Gi"),
+					},
+					Containers: []v1.Container{{Name: "c1"}},
+					EphemeralContainers: []v1.EphemeralContainer{
+						{EphemeralContainerCommon: v1.EphemeralContainerCommon{Name: "debug"}},
+					},
+				},
+			},
+			container: &v1.Container{Name: "debug"},
+			expected:  false,
+		},
+		{
+			name:       "synthetic resize container with inherited pod memory limit for resource-less container in pod.Spec remains eligible",
+			plrEnabled: true,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: getResourceList("100m", "1Gi"),
+						Limits:   getResourceList("200m", "2Gi"),
+					},
+					Containers: []v1.Container{
+						{
+							Name:      "c1",
+							Resources: getResourceRequirements(getResourceList("100m", ""), getResourceList("200m", "")),
+						},
+					},
+				},
+			},
+			// Simulates updatePodContainerResources populating Limits[memory] from pod.Spec.Resources.Limits[memory]
+			// while Requests[memory] is 0.
+			container: &v1.Container{
+				Name:      "c1",
+				Resources: getResourceRequirements(getResourceList("150m", "0"), getResourceList("200m", "2Gi")),
+			},
+			expected: true,
+		},
+		{
+			name:       "synthetic resize initContainer with inherited pod memory limit for resource-less sidecar in pod.Spec remains eligible",
+			plrEnabled: true,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: getResourceList("100m", "1Gi"),
+						Limits:   getResourceList("200m", "2Gi"),
+					},
+					InitContainers: []v1.Container{
+						{
+							Name:      "sidecar",
+							Resources: getResourceRequirements(getResourceList("50m", ""), getResourceList("100m", "")),
+						},
+					},
+					Containers: []v1.Container{{Name: "c1"}},
+				},
+			},
+			container: &v1.Container{
+				Name:      "sidecar",
+				Resources: getResourceRequirements(getResourceList("75m", "0"), getResourceList("100m", "2Gi")),
+			},
+			expected: true,
+		},
+		{
+			name:       "Case 6: container with req < lim in Burstable pod where PodMemoryRequest == PodMemoryLimit is ineligible",
+			plrEnabled: true,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: getResourceList("1", "4Gi"),
+						Limits:   getResourceList("2", "4Gi"),
+					},
+					Containers: []v1.Container{
+						{Name: "c1", Resources: getResourceRequirements(getResourceList("", "1Gi"), getResourceList("", "2Gi"))},
+					},
+				},
+			},
+			container: &v1.Container{Name: "c1", Resources: getResourceRequirements(getResourceList("", "1Gi"), getResourceList("", "2Gi"))},
+			expected:  false,
+		},
+		{
+			name:       "resource-less container when PodLevelResources feature gate is disabled is ineligible",
+			plrEnabled: false,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: getResourceList("", "1Gi"),
+						Limits:   getResourceList("", "2Gi"),
+					},
+					Containers: []v1.Container{
+						{Name: "c1", Resources: getResourceRequirements(getResourceList("", "512Mi"), getResourceList("", "1Gi"))},
+						{Name: "c2"},
+					},
+				},
+			},
+			container: &v1.Container{Name: "c2"},
+			expected:  false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.PodLevelResources, tc.plrEnabled)
+			if got := IsContainerEligibleForSwap(tc.pod, tc.container); got != tc.expected {
+				t.Fatalf("IsContainerEligibleForSwap() = %t, want %t", got, tc.expected)
+			}
+		})
+	}
+}
+
+func TestCheckSwapControllerAvailability(t *testing.T) {
+	testCases := []struct {
+		name      string
+		isCgroup2 bool
+		setup     func(t *testing.T, cgroupRoot string) string
+		expected  bool
+	}{
+		{
+			name:      "cgroup v1 swap controller file present returns true",
+			isCgroup2: false,
+			setup: func(t *testing.T, cgroupRoot string) string {
+				memDir := filepath.Join(cgroupRoot, "memory")
+				if err := os.MkdirAll(memDir, 0755); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(filepath.Join(memDir, "memory.memsw.limit_in_bytes"), []byte("max\n"), 0644); err != nil {
+					t.Fatal(err)
+				}
+				return ""
+			},
+			expected: true,
+		},
+		{
+			name:      "cgroup v1 swap controller file missing returns false",
+			isCgroup2: false,
+			setup: func(t *testing.T, cgroupRoot string) string {
+				return ""
+			},
+			expected: false,
+		},
+		{
+			name:      "cgroup v2 swap controller file present in self cgroup returns true",
+			isCgroup2: true,
+			setup: func(t *testing.T, cgroupRoot string) string {
+				selfDir := filepath.Join(cgroupRoot, "kubelet.slice")
+				if err := os.MkdirAll(selfDir, 0755); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(filepath.Join(selfDir, Cgroup2MaxSwapFilename), []byte("max\n"), 0644); err != nil {
+					t.Fatal(err)
+				}
+				procFile := filepath.Join(t.TempDir(), "cgroup")
+				if err := os.WriteFile(procFile, []byte("0::/kubelet.slice\n"), 0644); err != nil {
+					t.Fatal(err)
+				}
+				return procFile
+			},
+			expected: true,
+		},
+		{
+			name:      "cgroup v2 swap controller file missing in self cgroup returns false",
+			isCgroup2: true,
+			setup: func(t *testing.T, cgroupRoot string) string {
+				selfDir := filepath.Join(cgroupRoot, "kubelet.slice")
+				if err := os.MkdirAll(selfDir, 0755); err != nil {
+					t.Fatal(err)
+				}
+				procFile := filepath.Join(t.TempDir(), "cgroup")
+				if err := os.WriteFile(procFile, []byte("0::/kubelet.slice\n"), 0644); err != nil {
+					t.Fatal(err)
+				}
+				return procFile
+			},
+			expected: false,
+		},
+		{
+			name:      "cgroup v2 missing proc cgroup file returns false",
+			isCgroup2: true,
+			setup: func(t *testing.T, cgroupRoot string) string {
+				return filepath.Join(t.TempDir(), "nonexistent")
+			},
+			expected: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			cgroupRoot := t.TempDir()
+			procCgroupPath := tc.setup(t, cgroupRoot)
+			if got := checkSwapControllerAvailability(ctx, tc.isCgroup2, cgroupRoot, procCgroupPath); got != tc.expected {
+				t.Fatalf("checkSwapControllerAvailability() = %t, want %t", got, tc.expected)
 			}
 		})
 	}
