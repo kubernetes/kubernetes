@@ -513,6 +513,79 @@ func TestCPGScheduling(t *testing.T) {
 			},
 		},
 		{
+			name: "TestCPGBasicWithHeterogeneousBasicChildren",
+			// TestCPGBasicWithHeterogeneousBasicChildren verifies that a Basic CompositePodGroup with a
+			// heterogeneous Basic child pod group and a homogeneous one schedules all fitting pods even
+			// when a child has an unschedulable pod evaluated first.
+			//
+			// Tree structure:
+			//
+			//	   cpg-root (Basic)
+			//	  /            \
+			//	pg1            pg2
+			//	(S)            (S)
+			//
+			// (S) = Success
+			steps: []stepsframework.Step{
+				{
+					Name:        "Create Node",
+					CreateNodes: []*v1.Node{st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "20"}).Obj()},
+				},
+				{
+					Name: "Create Workload",
+					CreateWorkloads: []*schedulingapi.Workload{
+						st.MakeWorkload().Name("workload-cpg-basic-het").
+							Children(
+								st.MakeCompositePodGroupTemplate().Name("root-t").BasicPolicy().Priority(100).Children(
+									st.MakePodGroupTemplate().Name("basic-t").BasicPolicy().Priority(100),
+								),
+							).Obj(),
+					},
+				},
+				{
+					Name:           "Create pg1",
+					CreatePodGroup: st.MakePodGroup().Name("pg1").WorkloadRef("workload-cpg-basic-het", "basic-t").ParentCompositePodGroup("cpg-root").Priority(100).BasicPolicy().Obj(),
+				},
+				{
+					Name:           "Create pg2",
+					CreatePodGroup: st.MakePodGroup().Name("pg2").WorkloadRef("workload-cpg-basic-het", "basic-t").ParentCompositePodGroup("cpg-root").Priority(100).BasicPolicy().Obj(),
+				},
+				{
+					Name: "Create Pods",
+					CreatePods: concatPods(
+						makeTestPods("pg1", "100", "1"),
+						makeTestPods("pg2", "1", "1"),
+					),
+				},
+				{
+					Name: "Wait for pods in incompletePodGroupPods",
+					WaitForPodsInIncompletePodGroupPods: podNames(concatPods(
+						makeTestPods("pg1", "100", "1"),
+						makeTestPods("pg2", "1", "1"),
+					)),
+				},
+				{
+					Name:                    "Create root CPG",
+					CreateCompositePodGroup: st.MakeCompositePodGroup().Name("cpg-root").WorkloadRef("workload-cpg-basic-het", "root-t").BasicPolicy().Priority(100).Obj(),
+				},
+				{
+					Name:                 "Wait for successful pods",
+					WaitForPodsScheduled: []string{"pg1-pod-1", "pg2-pod-0", "pg2-pod-1"},
+				},
+				{
+					Name:                     "Verify failing pods remain unschedulable",
+					WaitForPodsUnschedulable: []string{"pg1-pod-0"},
+				},
+				{
+					Name: "Verify root CPG and child pod groups conditions are Scheduled",
+					WaitForGroupsScheduled: &stepsframework.Groups{
+						CompositePodGroups: []string{"cpg-root"},
+						PodGroups:          []string{"pg1", "pg2"},
+					},
+				},
+			},
+		},
+		{
 			name: "TestCPGMixedPolicyHierarchy",
 			// TestCPGMixedPolicyHierarchy verifies that a Basic root CompositePodGroup with mixed
 			// Gang and Basic child CompositePodGroups and PodGroups enforces gang constraints on
@@ -1495,6 +1568,274 @@ func TestCPGScheduling(t *testing.T) {
 							"pg3":      "ancestor composite pod group \"cpg-root\" is unschedulable",
 							"pg4":      "ancestor composite pod group \"cpg-root\" is unschedulable",
 						},
+					},
+				},
+			},
+		},
+		{
+			name: "TestCPGBasicWithFailedHeterogeneousGangChild",
+			// TestCPGBasicWithFailedHeterogeneousGangChild verifies that when a heterogeneous Gang
+			// child pod group fails after partially fitting on a node, its reservations are rolled back
+			// so a sibling Gang child can schedule on that node.
+			//
+			// The test assumes the evaluation order:
+			// - pg1 before pg2 (children are ordered by creation time, then name),
+			// - within pg1, pg1-pod-0 (2 CPU) before pg1-pod-1 (5 CPU) (member pods are ordered by
+			//   priority, attempts, enqueue timestamp (QueuedPodInfo.Timestamp), with pod name as
+			//   tie-breaker).
+			// If pg2 were evaluated first, or if pg1-pod-1 were evaluated before pg1-pod-0,
+			// pg1 wouldn't tentatively reserve node1 and the test would pass without validating
+			// that the tentative assumption of the first pod is rolled back.
+			//
+			// Tree structure:
+			//
+			//	      cpg-root (Basic)
+			//	     /                \
+			//	   pg1                pg2
+			//	   (F)                (S)
+			//
+			//	[Gang, Min: 2]   [Gang, Min: 1]
+			//
+			// (S) = Success
+			// (F) = Fail
+			steps: []stepsframework.Step{
+				{
+					Name:        "Create Node",
+					CreateNodes: []*v1.Node{st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Obj()},
+				},
+				{
+					Name: "Create Workload",
+					CreateWorkloads: []*schedulingapi.Workload{
+						st.MakeWorkload().Name("workload-cpg-het").
+							Children(
+								st.MakeCompositePodGroupTemplate().Name("root-t").BasicPolicy().Priority(100).Children(
+									st.MakePodGroupTemplate().Name("gang-t1").MinCount(2).Priority(100),
+									st.MakePodGroupTemplate().Name("gang-t2").MinCount(1).Priority(100),
+								),
+							).Obj(),
+					},
+				},
+				{
+					Name:           "Create pg1",
+					CreatePodGroup: st.MakePodGroup().Name("pg1").WorkloadRef("workload-cpg-het", "gang-t1").ParentCompositePodGroup("cpg-root").MinCount(2).Priority(100).Obj(),
+				},
+				{
+					Name:           "Create pg2",
+					CreatePodGroup: st.MakePodGroup().Name("pg2").WorkloadRef("workload-cpg-het", "gang-t2").ParentCompositePodGroup("cpg-root").MinCount(1).Priority(100).Obj(),
+				},
+				{
+					Name: "Create Pods",
+					CreatePods: concatPods(
+						makeTestPods("pg1", "2", "5"),
+						makeTestPods("pg2", "2"),
+					),
+				},
+				{
+					Name: "Wait for pods in incompletePodGroupPods",
+					WaitForPodsInIncompletePodGroupPods: podNames(concatPods(
+						makeTestPods("pg1", "2", "5"),
+						makeTestPods("pg2", "2"),
+					)),
+				},
+				{
+					Name:                    "Create root CPG",
+					CreateCompositePodGroup: st.MakeCompositePodGroup().Name("cpg-root").WorkloadRef("workload-cpg-het", "root-t").BasicPolicy().Priority(100).Obj(),
+				},
+				{
+					Name:                 "Wait for successful pods",
+					WaitForPodsScheduled: []string{"pg2-pod-0"},
+				},
+				{
+					Name:                     "Verify failing pods remain unschedulable",
+					WaitForPodsUnschedulable: []string{"pg1-pod-0", "pg1-pod-1"},
+				},
+				{
+					Name: "Verify root CPG and pg2 conditions are Scheduled",
+					WaitForGroupsScheduled: &stepsframework.Groups{
+						CompositePodGroups: []string{"cpg-root"},
+						PodGroups:          []string{"pg2"},
+					},
+				},
+				{
+					Name: "Verify pg1 condition is Unschedulable",
+					WaitForGroupsUnschedulable: &stepsframework.Groups{
+						PodGroups: []string{"pg1"},
+					},
+				},
+			},
+		},
+		{
+			name: "TestCPGGangWithHeterogeneousGangChildren",
+			// TestCPGGangWithHeterogeneousGangChildren verifies that a Gang CompositePodGroup with
+			// heterogeneous Gang child pod groups schedules all fitting pods when children satisfy
+			// their gang constraints, even when a child with MinCount < len(pods) has an
+			// unschedulable pod evaluated first.
+			//
+			// Tree structure:
+			//
+			//	      cpg-root (Gang, MinGroup: 2)
+			//	     /                            \
+			//	   pg1                            pg2
+			//	   (S)                            (S)
+			//
+			//	[Gang, Min: 1]                 [Gang, Min: 2]
+			//
+			// (S) = Success
+			steps: []stepsframework.Step{
+				{
+					Name:        "Create Node",
+					CreateNodes: []*v1.Node{st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "20"}).Obj()},
+				},
+				{
+					Name: "Create Workload",
+					CreateWorkloads: []*schedulingapi.Workload{
+						st.MakeWorkload().Name("workload-cpg-gang-het").
+							Children(
+								st.MakeCompositePodGroupTemplate().Name("root-t").MinGroupCount(2).Priority(100).Children(
+									st.MakePodGroupTemplate().Name("gang-t1").MinCount(1).Priority(100),
+									st.MakePodGroupTemplate().Name("gang-t2").MinCount(2).Priority(100),
+								),
+							).Obj(),
+					},
+				},
+				{
+					Name:           "Create pg1",
+					CreatePodGroup: st.MakePodGroup().Name("pg1").WorkloadRef("workload-cpg-gang-het", "gang-t1").ParentCompositePodGroup("cpg-root").MinCount(1).Priority(100).Obj(),
+				},
+				{
+					Name:           "Create pg2",
+					CreatePodGroup: st.MakePodGroup().Name("pg2").WorkloadRef("workload-cpg-gang-het", "gang-t2").ParentCompositePodGroup("cpg-root").MinCount(2).Priority(100).Obj(),
+				},
+				{
+					Name: "Create Pods",
+					CreatePods: concatPods(
+						makeTestPods("pg1", "100", "1"),
+						makeTestPods("pg2", "1", "2"),
+					),
+				},
+				{
+					Name: "Wait for pods in incompletePodGroupPods",
+					WaitForPodsInIncompletePodGroupPods: podNames(concatPods(
+						makeTestPods("pg1", "100", "1"),
+						makeTestPods("pg2", "1", "2"),
+					)),
+				},
+				{
+					Name:                    "Create root CPG",
+					CreateCompositePodGroup: st.MakeCompositePodGroup().Name("cpg-root").WorkloadRef("workload-cpg-gang-het", "root-t").MinGroupCount(2).Priority(100).Obj(),
+				},
+				{
+					Name:                 "Wait for successful pods",
+					WaitForPodsScheduled: []string{"pg1-pod-1", "pg2-pod-0", "pg2-pod-1"},
+				},
+				{
+					Name:                     "Verify failing pods remain unschedulable",
+					WaitForPodsUnschedulable: []string{"pg1-pod-0"},
+				},
+				{
+					Name: "Verify root CPG and child pod groups conditions are Scheduled",
+					WaitForGroupsScheduled: &stepsframework.Groups{
+						CompositePodGroups: []string{"cpg-root"},
+						PodGroups:          []string{"pg1", "pg2"},
+					},
+				},
+			},
+		},
+		{
+			name: "TestCPGGangWithFailedHeterogeneousGangChild",
+			// TestCPGGangWithFailedHeterogeneousGangChild verifies that when a heterogeneous Gang
+			// child pod group under a Gang root CompositePodGroup fails after partially fitting on a
+			// node, its reservations are rolled back so sibling Gang children can schedule on that
+			// node and satisfy the root's MinGroupCount.
+			//
+			// The test assumes the evaluation order:
+			// - pg1 before pg2 and pg3 (children are ordered by creation time, then name),
+			// - within pg1, pg1-pod-0 (2 CPU) before pg1-pod-1 (5 CPU) (member pods are ordered by
+			//   priority, attempts, enqueue timestamp (QueuedPodInfo.Timestamp), with pod name as
+			//   tie-breaker).
+			// If pg2 and pg3 were evaluated first, or if pg1-pod-1 were evaluated before pg1-pod-0,
+			// pg1 wouldn't tentatively reserve node1 and the test would pass without validating
+			// that the tentative assumption of the first pod is rolled back.
+			//
+			// Tree structure:
+			//
+			//	            cpg-root (Gang, MinGroup: 2)
+			//	           /             |              \
+			//	         pg1            pg2             pg3
+			//	         (F)            (S)             (S)
+			//
+			//	   [Gang, Min: 2]  [Gang, Min: 1]  [Gang, Min: 1]
+			//
+			// (S) = Success
+			// (F) = Fail
+			steps: []stepsframework.Step{
+				{
+					Name:        "Create Node",
+					CreateNodes: []*v1.Node{st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Obj()},
+				},
+				{
+					Name: "Create Workload",
+					CreateWorkloads: []*schedulingapi.Workload{
+						st.MakeWorkload().Name("workload-cpg-gang-failed-het").
+							Children(
+								st.MakeCompositePodGroupTemplate().Name("root-t").MinGroupCount(2).Priority(100).Children(
+									st.MakePodGroupTemplate().Name("gang-t1").MinCount(2).Priority(100),
+									st.MakePodGroupTemplate().Name("gang-t2").MinCount(1).Priority(100),
+								),
+							).Obj(),
+					},
+				},
+				{
+					Name:           "Create pg1",
+					CreatePodGroup: st.MakePodGroup().Name("pg1").WorkloadRef("workload-cpg-gang-failed-het", "gang-t1").ParentCompositePodGroup("cpg-root").MinCount(2).Priority(100).Obj(),
+				},
+				{
+					Name:           "Create pg2",
+					CreatePodGroup: st.MakePodGroup().Name("pg2").WorkloadRef("workload-cpg-gang-failed-het", "gang-t2").ParentCompositePodGroup("cpg-root").MinCount(1).Priority(100).Obj(),
+				},
+				{
+					Name:           "Create pg3",
+					CreatePodGroup: st.MakePodGroup().Name("pg3").WorkloadRef("workload-cpg-gang-failed-het", "gang-t2").ParentCompositePodGroup("cpg-root").MinCount(1).Priority(100).Obj(),
+				},
+				{
+					Name: "Create Pods",
+					CreatePods: concatPods(
+						makeTestPods("pg1", "2", "5"),
+						makeTestPods("pg2", "1"),
+						makeTestPods("pg3", "1"),
+					),
+				},
+				{
+					Name: "Wait for pods in incompletePodGroupPods",
+					WaitForPodsInIncompletePodGroupPods: podNames(concatPods(
+						makeTestPods("pg1", "2", "5"),
+						makeTestPods("pg2", "1"),
+						makeTestPods("pg3", "1"),
+					)),
+				},
+				{
+					Name:                    "Create root CPG",
+					CreateCompositePodGroup: st.MakeCompositePodGroup().Name("cpg-root").WorkloadRef("workload-cpg-gang-failed-het", "root-t").MinGroupCount(2).Priority(100).Obj(),
+				},
+				{
+					Name:                 "Wait for successful pods",
+					WaitForPodsScheduled: []string{"pg2-pod-0", "pg3-pod-0"},
+				},
+				{
+					Name:                     "Verify failing pods remain unschedulable",
+					WaitForPodsUnschedulable: []string{"pg1-pod-0", "pg1-pod-1"},
+				},
+				{
+					Name: "Verify root CPG and pg2, pg3 conditions are Scheduled",
+					WaitForGroupsScheduled: &stepsframework.Groups{
+						CompositePodGroups: []string{"cpg-root"},
+						PodGroups:          []string{"pg2", "pg3"},
+					},
+				},
+				{
+					Name: "Verify pg1 condition is Unschedulable",
+					WaitForGroupsUnschedulable: &stepsframework.Groups{
+						PodGroups: []string{"pg1"},
 					},
 				},
 			},
