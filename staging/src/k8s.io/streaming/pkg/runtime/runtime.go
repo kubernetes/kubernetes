@@ -19,6 +19,8 @@ package runtime
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"runtime"
 
 	"k8s.io/klog/v2"
 )
@@ -39,24 +41,48 @@ func HandleErrorWithContext(ctx context.Context, err error, msg string, keysAndV
 	klog.FromContext(ctx).Error(err, msg, keysAndValues...)
 }
 
-// HandleCrash recovers from panic and logs it.
+// HandleCrash logs a recovered panic with a stack trace and panics again.
+// Meant to be called via defer.
+//
+// Contextual logging: HandleCrashWithContext or HandleCrashWithLogger should be
+// used instead of HandleCrash in code which supports contextual logging.
 func HandleCrash() {
-	HandleCrashWithLogger(klog.Background())
+	if r := recover(); r != nil {
+		handleCrash(context.Background(), r)
+	}
 }
 
-// HandleCrashWithContext recovers from panic and logs it with the context logger.
+// HandleCrashWithContext is HandleCrash with the logger taken from the context.
+// The additional handlers run after logging, before the panic continues.
 func HandleCrashWithContext(ctx context.Context, additionalHandlers ...func(context.Context, interface{})) {
 	if r := recover(); r != nil {
-		for _, fn := range additionalHandlers {
-			fn(ctx, r)
-		}
-		klog.FromContext(ctx).Error(fmt.Errorf("%v", r), "Observed a panic")
+		handleCrash(ctx, r, additionalHandlers...)
 	}
 }
 
-// HandleCrashWithLogger recovers from panic and logs it using the provided logger.
+// HandleCrashWithLogger is HandleCrash with the given logger.
 func HandleCrashWithLogger(logger klog.Logger) {
 	if r := recover(); r != nil {
-		logger.Error(fmt.Errorf("%v", r), "Observed a panic")
+		handleCrash(klog.NewContext(context.Background(), logger), r)
 	}
+}
+
+// Each variant calls recover itself, because recover only works in the
+// deferred function. The rest is shared so that the call depth is the same.
+func handleCrash(ctx context.Context, r interface{}, additionalHandlers ...func(context.Context, interface{})) {
+	// Skip handleCrash, the variant and the Go panic handler to reach the
+	// function which deferred the variant.
+	logger := klog.FromContext(ctx).WithCallDepth(3)
+	// net/http panics with ErrAbortHandler to abort a handler quietly.
+	if r != http.ErrAbortHandler {
+		// Same buffer size as the net/http server.
+		stacktrace := make([]byte, 64<<10)
+		stacktrace = stacktrace[:runtime.Stack(stacktrace, false)]
+		logger.Error(nil, "Observed a panic", "panic", fmt.Sprintf("%v", r), "stacktrace", string(stacktrace))
+	}
+	ctx = klog.NewContext(ctx, logger)
+	for _, fn := range additionalHandlers {
+		fn(ctx, r)
+	}
+	panic(r)
 }
