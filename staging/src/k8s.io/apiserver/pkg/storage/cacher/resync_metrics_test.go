@@ -235,7 +235,7 @@ func (c *resyncMetricsTest) waitUnsynced(want int) {
 	if err := wait.PollUntilContextTimeout(context.Background(), time.Millisecond, wait.ForeverTestTimeout, true, func(context.Context) (bool, error) {
 		c.RLock()
 		defer c.RUnlock()
-		return len(c.unsyncedWatchers) == want, nil
+		return c.unsyncedWatchers.len() == want, nil
 	}); err != nil {
 		c.t.Fatalf("waiting for %d unsynced watchers: %v", want, err)
 	}
