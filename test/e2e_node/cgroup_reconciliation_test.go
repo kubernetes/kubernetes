@@ -84,14 +84,13 @@ var _ = SIGDescribe("Cgroup reconciliation", framework.WithSerial(), func() {
 		// systemd driver, where UpdateQOSCgroups -> SetUnitProperties resets the
 		// slice's unspecified properties. On cgroupfs the equivalent update writes
 		// no files, so the reconciliation expectations encoded here do not hold.
-		if driver := getCgroupDriver(); driver != "systemd" {
-			ginkgo.Skip(fmt.Sprintf("This test requires the systemd cgroup driver (detected %q)", driver))
+		if cgroupDriver != "systemd" {
+			ginkgo.Skip(fmt.Sprintf("This test requires the systemd cgroup driver (detected %q)", cgroupDriver))
 		}
 	})
 
 	testCgroups := func(ctx context.Context, cgroupPath string, params []cgroupTestParam, trigger reconcileTrigger) {
-		driver := getCgroupDriver()
-		ginkgo.By(fmt.Sprintf("Running batch test for %d cgroups in %s (driver=%s, trigger=%s)", len(params), cgroupPath, driver, trigger.label))
+		ginkgo.By(fmt.Sprintf("Running batch test for %d cgroups in %s (driver=%s, trigger=%s)", len(params), cgroupPath, cgroupDriver, trigger.label))
 
 		// 0. Ensure Kubelet is started and has performed its initial reconciliation
 		ginkgo.By("Ensuring Kubelet is started before capturing baseline")
@@ -462,7 +461,7 @@ func podCgroupUIDs(cgroupRoot string) (sets.Set[string], error) {
 }
 
 func getCgroupParams() []cgroupTestParam {
-	isSystemd := getCgroupDriver() == "systemd"
+	isSystemd := cgroupDriver == "systemd"
 	// Pod churn drives UpdateQOSCgroups, which calls cgroupManager.Update on the
 	// pod root cgroup. That alone does not rewrite the root's attributes. They
 	// are only rewritten when the pod count crosses 0 <-> N: that changes the
@@ -569,24 +568,10 @@ func getCgroupParams() []cgroupTestParam {
 	}
 }
 
-func getCgroupDriver() string {
-	driver := "cgroupfs"
-	source := "fallback"
-	if kubeletCfg != nil && kubeletCfg.CgroupDriver != "" {
-		driver = kubeletCfg.CgroupDriver
-		source = "kubelet config"
-	}
-	framework.Logf("Detected cgroup driver: %s (source: %s)", driver, source)
-	return driver
-}
-
 func getPodRootCgroupPath() string {
 	// Kubelet root is "kubepods" for cgroupfs and "kubepods.slice" for systemd.
-	// We check the Kubelet configuration first, then fallback to filesystem discovery.
-	driver := getCgroupDriver()
-
 	var path string
-	if driver == "systemd" {
+	if cgroupDriver == "systemd" {
 		path = filepath.Join(cgroupRoot, "kubepods.slice")
 	} else {
 		path = filepath.Join(cgroupRoot, "kubepods")
