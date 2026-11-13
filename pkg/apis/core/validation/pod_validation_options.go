@@ -26,7 +26,9 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 )
 
-// PodValidationOptions contains the different settings for pod validation
+// PodValidationOptions contains the different settings for pod validation. It holds a map field
+// (StoredResourceQuantities), so values of this type cannot be compared with == or !=; use
+// reflect.DeepEqual or cmp.Diff instead.
 type PodValidationOptions struct {
 	// Allow invalid pod-deletion-cost annotation value for backward compatibility.
 	AllowInvalidPodDeletionCost bool
@@ -63,6 +65,13 @@ type PodValidationOptions struct {
 	OldPodViolatesMatchLabelKeysValidation bool
 	// OldPod has invalid MatchLabelKeys in TopologySpreadConstraints against legacy(<v1.34) validation
 	OldPodViolatesLegacyMatchLabelKeysValidation bool
+	// StoredResourceQuantities holds the resource quantities the stored pod already carries, so an
+	// update that leaves one of them untouched is not rejected by a check that has since tightened
+	// (#141166); a changed value is still validated as on create. This intentionally also lets an
+	// already-stored value that was never valid persist unchanged, the standard ratchet trade-off:
+	// re-validating on every update would make already-stored, previously-accepted objects
+	// unupdatable. Nil on create.
+	StoredResourceQuantities StoredResourceQuantitySet
 	// Allows containers to consume environment variables via environment variable files.
 	AllowEnvFilesValidation bool
 	// Allows containers have restart policy and restart policy rules.
@@ -237,6 +246,8 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *core.PodSpec, p
 		}
 		// if old spec has an invalid projected token volume path, we must allow it
 		opts.AllowNonLocalProjectedTokenPath = hasNonLocalProjectedTokenPath(oldPodSpec)
+		// a resource quantity the stored spec already holds was accepted when it was written
+		opts.StoredResourceQuantities = StoredResourceQuantitiesOf(oldPodSpec)
 
 		// if old spec has invalid sysctl with hostNet or hostIPC, we must allow it when update
 		if oldPodSpec.SecurityContext != nil && len(oldPodSpec.SecurityContext.Sysctls) != 0 {
