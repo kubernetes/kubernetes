@@ -672,6 +672,7 @@ func (c *Cacher) resyncStalledWatchersLocked(stalledWatchers *indexedWatchers, m
 
 	for watcher := range stalledWatchers.allWatchers() {
 		watcher.dispatchedResourceVersion = max(watcher.dispatchedResourceVersion, c.watchCache.resourceVersion)
+		watcher.syncedResourceVersion = c.watchCache.resourceVersion
 		c.deleteUnsyncedWatcherLocked(watcher)
 		c.watchers.addWatcher(watcher)
 	}
@@ -882,6 +883,7 @@ func (c *Cacher) watch(ctx context.Context, key string, requestedWatchRV uint64,
 
 func (c *Cacher) registerWatcherLocked(watcher *cacheWatcher, cacheInterval *watchCacheInterval) {
 	watcher.dispatchedResourceVersion = cacheInterval.resourceVersion
+	watcher.syncedResourceVersion = cacheInterval.resourceVersion
 	c.watchers.addWatcher(watcher)
 	// Add it to the queue only when the client support watch bookmarks.
 	if watcher.allowWatchBookmarks {
@@ -1286,7 +1288,10 @@ func (c *Cacher) dispatchEvent(event *watchCacheEvent) {
 
 		c.blockedWatchers = c.blockedWatchers[:0]
 		for _, watcher := range c.watchersBuffer {
-			if event.ResourceVersion <= watcher.dispatchedResourceVersion {
+			// Skip only the events that the watcher got from the watch cache. The events
+			// of one etcd transaction share a resourceVersion, and the watcher needs
+			// every one of them.
+			if event.ResourceVersion <= watcher.syncedResourceVersion {
 				c.resyncMetrics.SkippedEvents.Inc()
 				continue
 			}
