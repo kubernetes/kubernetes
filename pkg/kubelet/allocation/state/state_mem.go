@@ -402,9 +402,10 @@ func (s *stateMemory) removePodVolume(logger klog.Logger, podUID types.UID, volu
 }
 
 func (s *stateMemory) SetPod(logger klog.Logger, pod *v1.Pod) error {
-	// Only the identity and the spec of the pod are kept. The spec is copied because the caller owns the pod.
+	// Only the identity, the generation and the spec of the pod are kept. The spec is copied because
+	// the caller owns the pod.
 	stored := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{UID: pod.UID, Name: pod.Name, Namespace: pod.Namespace},
+		ObjectMeta: metav1.ObjectMeta{UID: pod.UID, Name: pod.Name, Namespace: pod.Namespace, Generation: pod.Generation},
 		Spec:       *pod.Spec.DeepCopy(),
 	}
 	if s.maskFn != nil {

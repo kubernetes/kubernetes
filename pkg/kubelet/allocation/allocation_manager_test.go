@@ -2699,6 +2699,69 @@ func TestAllocationManagerAddPod(t *testing.T) {
 	}
 }
 
+// TestAllocatedGeneration checks that the allocation records the generation of the pod when it was
+// allocated, and that re-admitting the pod after a kubelet restart keeps it.
+func TestAllocatedGeneration(t *testing.T) {
+	if goruntime.GOOS == "windows" {
+		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
+	}
+	logger, tCtx := ktesting.NewTestContext(t)
+	cpu := func(quantity string) v1.ResourceRequirements {
+		return v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse(quantity)}}
+	}
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{UID: "1111", Name: "pod", Namespace: "ns", Generation: 1},
+		Spec:       v1.PodSpec{Containers: []v1.Container{{Name: "c1", Image: "i1", Resources: cpu("1")}}},
+		Status:     v1.PodStatus{Phase: v1.PodRunning},
+	}
+	allocationManager := makeAllocationManager(t, &containertest.FakeRuntime{}, []*v1.Pod{pod}, nil)
+
+	_, ok := allocationManager.GetAllocatedGeneration(pod.UID)
+	require.False(t, ok, "not allocated yet")
+	admitted, _, _ := allocationManager.AddPod(tCtx, nil, pod)
+	require.True(t, admitted)
+	generation, ok := allocationManager.GetAllocatedGeneration(pod.UID)
+	require.True(t, ok)
+	assert.Equal(t, int64(1), generation, "admitting the pod records its generation")
+
+	// A resize that can't be allocated doesn't change the allocated generation.
+	tooLarge := pod.DeepCopy()
+	tooLarge.Generation = 2
+	tooLarge.Spec.Containers[0].Resources = cpu("100")
+	allocationManager.(*manager).podProvider.(*fakePodProvider).getPodByUID = func(types.UID) (*v1.Pod, bool) { return tooLarge, true }
+	allocationManager.PushPendingAllocation(logger, pod.UID)
+	allocationManager.RetryPendingAllocations(tCtx, TriggerReasonPodUpdated)
+	generation, _ = allocationManager.GetAllocatedGeneration(pod.UID)
+	assert.Equal(t, int64(1), generation, "a pending resize isn't allocated")
+
+	// After a kubelet restart, the pod is admitted again as allocated, keeping its generation.
+	admitted, _, _ = allocationManager.AddPod(tCtx, nil, tooLarge)
+	require.True(t, admitted)
+	generation, _ = allocationManager.GetAllocatedGeneration(pod.UID)
+	assert.Equal(t, int64(1), generation, "re-admitting the pod keeps the allocated generation")
+	assert.Equal(t, int64(2), tooLarge.Generation, "the pod is not mutated")
+
+	// Allocating the resize records its generation.
+	resized := pod.DeepCopy()
+	resized.Generation = 3
+	resized.Spec.Containers[0].Resources = cpu("2")
+	allocationManager.(*manager).podProvider.(*fakePodProvider).getPodByUID = func(types.UID) (*v1.Pod, bool) { return resized, true }
+	allocationManager.PushPendingAllocation(logger, pod.UID)
+	allocationManager.RetryPendingAllocations(tCtx, TriggerReasonPodUpdated)
+	generation, _ = allocationManager.GetAllocatedGeneration(pod.UID)
+	assert.Equal(t, int64(3), generation, "allocating a resize records its generation")
+
+	// A pod allocated without a generation, e.g. by an older kubelet, gets the generation it is
+	// admitted at.
+	require.NoError(t, allocationManager.SetAllocatedPod(logger, &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: pod.UID, Name: pod.Name, Namespace: pod.Namespace}, Spec: resized.Spec}))
+	_, ok = allocationManager.GetAllocatedGeneration(pod.UID)
+	require.False(t, ok, "unknown generation")
+	admitted, _, _ = allocationManager.AddPod(tCtx, nil, resized)
+	require.True(t, admitted)
+	generation, _ = allocationManager.GetAllocatedGeneration(pod.UID)
+	assert.Equal(t, int64(3), generation)
+}
+
 func TestIsResizeIncreasingRequests(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
 
