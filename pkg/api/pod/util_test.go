@@ -5996,3 +5996,227 @@ func TestGetContainerStatus(t *testing.T) {
 	assert.False(t, ok)
 	assert.Equal(t, api.ContainerStatus{}, status)
 }
+
+func TestDropDisabledDynamicNodeLocalEphemeralVolumesFields(t *testing.T) {
+	policy := &api.ContainerDynamicVolumeMountPolicy{RestartPolicy: api.DynamicVolumeMountRestartContainer}
+	volStatuses := []api.PodVolumeStatus{{Name: "v1", HostPhase: api.PodVolumeHostPending}}
+
+	withSpecFields := func() *api.Pod {
+		return &api.Pod{
+			Spec: api.PodSpec{
+				InitContainers:      []api.Container{{Name: "init", DynamicVolumeMountPolicy: &api.ContainerDynamicVolumeMountPolicy{RestartPolicy: api.DynamicVolumeMountRestartContainer}}},
+				Containers:          []api.Container{{Name: "c1", DynamicVolumeMountPolicy: &api.ContainerDynamicVolumeMountPolicy{RestartPolicy: api.DynamicVolumeMountRestartContainer}}},
+				EphemeralContainers: []api.EphemeralContainer{{EphemeralContainerCommon: api.EphemeralContainerCommon{Name: "eph", DynamicVolumeMountPolicy: &api.ContainerDynamicVolumeMountPolicy{RestartPolicy: api.DynamicVolumeMountRestartContainer}}}},
+			},
+			Status: api.PodStatus{
+				VolumeStatuses: []api.PodVolumeStatus{{Name: "v1", HostPhase: api.PodVolumeHostPending}},
+			},
+		}
+	}
+	withoutFields := func() *api.Pod {
+		return &api.Pod{
+			Spec: api.PodSpec{
+				InitContainers:      []api.Container{{Name: "init"}},
+				Containers:          []api.Container{{Name: "c1"}},
+				EphemeralContainers: []api.EphemeralContainer{{EphemeralContainerCommon: api.EphemeralContainerCommon{Name: "eph"}}},
+			},
+		}
+	}
+
+	t.Run("disabled and not in use drops fields across all container types and status", func(t *testing.T) {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicNodeLocalEphemeralVolumes, false)
+		pod := withSpecFields()
+		DropDisabledPodFields(pod, nil)
+		if diff := cmp.Diff(withoutFields(), pod); diff != "" {
+			t.Errorf("unexpected pod (-want, +got):\n%s", diff)
+		}
+	})
+
+	t.Run("disabled but already in use in oldPod preserves fields", func(t *testing.T) {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicNodeLocalEphemeralVolumes, false)
+		oldPod := &api.Pod{
+			Spec:   api.PodSpec{Containers: []api.Container{{Name: "c1", DynamicVolumeMountPolicy: policy}}},
+			Status: api.PodStatus{VolumeStatuses: volStatuses},
+		}
+		pod := withSpecFields()
+		DropDisabledPodFields(pod, oldPod)
+		if diff := cmp.Diff(withSpecFields(), pod); diff != "" {
+			t.Errorf("unexpected pod (-want, +got):\n%s", diff)
+		}
+	})
+
+	t.Run("enabled preserves fields", func(t *testing.T) {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicNodeLocalEphemeralVolumes, true)
+		pod := withSpecFields()
+		DropDisabledPodFields(pod, nil)
+		if diff := cmp.Diff(withSpecFields(), pod); diff != "" {
+			t.Errorf("unexpected pod (-want, +got):\n%s", diff)
+		}
+	})
+
+	t.Run("selective subfield dropping across CSIVolumeHealth and DynamicNodeLocalEphemeralVolumes", func(t *testing.T) {
+		health := &api.VolumeHealthStatus{
+			HealthConditions: []api.VolumeHealthCondition{{Status: api.VolumeHealthHealthy, Reason: "VolumeHealthy"}},
+		}
+		combined := func() *api.Pod {
+			return &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{{Name: "c1"}},
+				},
+				Status: api.PodStatus{
+					VolumeStatuses: []api.PodVolumeStatus{
+						{Name: "csi-only", HealthStatus: health.DeepCopy()},
+						{Name: "dyn-only", HostPhase: api.PodVolumeHostMounted},
+						{Name: "both", HealthStatus: health.DeepCopy(), HostPhase: api.PodVolumeHostMounted},
+						{Name: "empty-only"},
+					},
+				},
+			}
+		}
+
+		cases := []struct {
+			name        string
+			csiGate     bool
+			dynGate     bool
+			oldStatus   *api.PodStatus
+			wantEntries []api.PodVolumeStatus
+		}{
+			{
+				name:        "both disabled and unused drops VolumeStatuses entirely",
+				csiGate:     false,
+				dynGate:     false,
+				wantEntries: nil,
+			},
+			{
+				name:    "CSIVolumeHealth=true, DynamicNodeLocalEphemeralVolumes=false keeps HealthStatus and prunes HostPhase-only and empty entries",
+				csiGate: true,
+				dynGate: false,
+				wantEntries: []api.PodVolumeStatus{
+					{Name: "csi-only", HealthStatus: health.DeepCopy()},
+					{Name: "both", HealthStatus: health.DeepCopy()},
+				},
+			},
+			{
+				name:    "CSIVolumeHealth=false, DynamicNodeLocalEphemeralVolumes=true keeps HostPhase and prunes HealthStatus-only and empty entries",
+				csiGate: false,
+				dynGate: true,
+				wantEntries: []api.PodVolumeStatus{
+					{Name: "dyn-only", HostPhase: api.PodVolumeHostMounted},
+					{Name: "both", HostPhase: api.PodVolumeHostMounted},
+				},
+			},
+			{
+				name:    "both enabled keeps all entries",
+				csiGate: true,
+				dynGate: true,
+				wantEntries: []api.PodVolumeStatus{
+					{Name: "csi-only", HealthStatus: health.DeepCopy()},
+					{Name: "dyn-only", HostPhase: api.PodVolumeHostMounted},
+					{Name: "both", HealthStatus: health.DeepCopy(), HostPhase: api.PodVolumeHostMounted},
+					{Name: "empty-only"},
+				},
+			},
+			{
+				name:    "both disabled but oldStatus uses HostPhase preserves only HostPhase",
+				csiGate: false,
+				dynGate: false,
+				oldStatus: &api.PodStatus{
+					VolumeStatuses: []api.PodVolumeStatus{{Name: "dyn-only", HostPhase: api.PodVolumeHostPending}},
+				},
+				wantEntries: []api.PodVolumeStatus{
+					{Name: "dyn-only", HostPhase: api.PodVolumeHostMounted},
+					{Name: "both", HostPhase: api.PodVolumeHostMounted},
+				},
+			},
+			{
+				name:    "both disabled but oldStatus uses HealthStatus preserves only HealthStatus",
+				csiGate: false,
+				dynGate: false,
+				oldStatus: &api.PodStatus{
+					VolumeStatuses: []api.PodVolumeStatus{{Name: "csi-only", HealthStatus: health.DeepCopy()}},
+				},
+				wantEntries: []api.PodVolumeStatus{
+					{Name: "csi-only", HealthStatus: health.DeepCopy()},
+					{Name: "both", HealthStatus: health.DeepCopy()},
+				},
+			},
+			{
+				name:    "CSIVolumeHealth=true, DynamicNodeLocalEphemeralVolumes=false with oldStatus using HostPhase preserves both",
+				csiGate: true,
+				dynGate: false,
+				oldStatus: &api.PodStatus{
+					VolumeStatuses: []api.PodVolumeStatus{{Name: "dyn-only", HostPhase: api.PodVolumeHostPending}},
+				},
+				wantEntries: []api.PodVolumeStatus{
+					{Name: "csi-only", HealthStatus: health.DeepCopy()},
+					{Name: "dyn-only", HostPhase: api.PodVolumeHostMounted},
+					{Name: "both", HealthStatus: health.DeepCopy(), HostPhase: api.PodVolumeHostMounted},
+					{Name: "empty-only"},
+				},
+			},
+			{
+				name:    "CSIVolumeHealth=false, DynamicNodeLocalEphemeralVolumes=true with oldStatus using HealthStatus preserves both",
+				csiGate: false,
+				dynGate: true,
+				oldStatus: &api.PodStatus{
+					VolumeStatuses: []api.PodVolumeStatus{{Name: "csi-only", HealthStatus: health.DeepCopy()}},
+				},
+				wantEntries: []api.PodVolumeStatus{
+					{Name: "csi-only", HealthStatus: health.DeepCopy()},
+					{Name: "dyn-only", HostPhase: api.PodVolumeHostMounted},
+					{Name: "both", HealthStatus: health.DeepCopy(), HostPhase: api.PodVolumeHostMounted},
+					{Name: "empty-only"},
+				},
+			},
+		}
+
+		for _, tc := range cases {
+			t.Run(tc.name, func(t *testing.T) {
+				featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+					features.CSIVolumeHealth:                  tc.csiGate,
+					features.DynamicNodeLocalEphemeralVolumes: tc.dynGate,
+				})
+				got := combined()
+				var oldPod *api.Pod
+				if tc.oldStatus != nil {
+					oldPod = &api.Pod{
+						Spec:   api.PodSpec{Containers: []api.Container{{Name: "c1"}}},
+						Status: *tc.oldStatus,
+					}
+				}
+				DropDisabledPodFields(got, oldPod)
+				want := combined()
+				want.Status.VolumeStatuses = tc.wantEntries
+				if diff := cmp.Diff(want, got); diff != "" {
+					t.Errorf("unexpected pod (-want, +got):\n%s", diff)
+				}
+			})
+		}
+	})
+}
+
+func TestIsSupportedDynamicVolumeSource(t *testing.T) {
+	tests := []struct {
+		name     string
+		source   *api.VolumeSource
+		expected bool
+	}{
+		{name: "nil", source: nil, expected: false},
+		{name: "empty", source: &api.VolumeSource{}, expected: false},
+		{name: "configMap", source: &api.VolumeSource{ConfigMap: &api.ConfigMapVolumeSource{}}, expected: true},
+		{name: "secret", source: &api.VolumeSource{Secret: &api.SecretVolumeSource{}}, expected: true},
+		{name: "projected", source: &api.VolumeSource{Projected: &api.ProjectedVolumeSource{}}, expected: true},
+		{name: "emptyDir", source: &api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}, expected: true},
+		{name: "image", source: &api.VolumeSource{Image: &api.ImageVolumeSource{}}, expected: true},
+		{name: "hostPath", source: &api.VolumeSource{HostPath: &api.HostPathVolumeSource{}}, expected: false},
+		{name: "pvc", source: &api.VolumeSource{PersistentVolumeClaim: &api.PersistentVolumeClaimVolumeSource{}}, expected: false},
+		{name: "downwardAPI", source: &api.VolumeSource{DownwardAPI: &api.DownwardAPIVolumeSource{}}, expected: false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := IsSupportedDynamicVolumeSource(tc.source); got != tc.expected {
+				t.Errorf("IsSupportedDynamicVolumeSource() = %v, want %v", got, tc.expected)
+			}
+		})
+	}
+}

@@ -53,6 +53,10 @@ type PodValidationOptions struct {
 	// Indicates whether InPlacePodVerticalScalingMemoryBackedVolumes feature is enabled
 	// or disabled.
 	InPlacePodVerticalScalingMemoryBackedVolumesEnabled bool
+	// Indicates whether DynamicContainers feature is enabled or disabled.
+	DynamicContainersEnabled bool
+	// Indicates whether DynamicNodeLocalEphemeralVolumes feature is enabled or disabled.
+	DynamicNodeLocalEphemeralVolumesEnabled bool
 	// Allow invalid label-value in RequiredNodeSelector
 	AllowInvalidLabelValueInRequiredNodeAffinity bool
 	// Allow feature of MatchLabelKeys in TopologySpreadConstraints
@@ -199,6 +203,8 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *core.PodSpec, p
 		AllowMatchLabelKeysInPodTopologySpreadSelectorMerge: utilfeature.DefaultFeatureGate.Enabled(features.MatchLabelKeysInPodTopologySpreadSelectorMerge),
 		InPlacePodLevelResourcesVerticalScalingEnabled:      utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling),
 		InPlacePodVerticalScalingMemoryBackedVolumesEnabled: utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingMemoryBackedVolumes),
+		DynamicContainersEnabled:                            utilfeature.DefaultFeatureGate.Enabled(features.DynamicContainers),
+		DynamicNodeLocalEphemeralVolumesEnabled:             utilfeature.DefaultFeatureGate.Enabled(features.DynamicNodeLocalEphemeralVolumes),
 		OldPodViolatesMatchLabelKeysValidation:              false,
 		OldPodViolatesLegacyMatchLabelKeysValidation:        false,
 		AllowContainerRestartPolicyRules:                    utilfeature.DefaultFeatureGate.Enabled(features.ContainerRestartRules),

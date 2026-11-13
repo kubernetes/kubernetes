@@ -467,6 +467,10 @@ func dropDisabledFields(
 		dropContainerRestartRules(podSpec)
 	}
 
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DynamicNodeLocalEphemeralVolumes) && !dynamicVolumeMountPolicyInUse(oldPodSpec) {
+		dropDynamicVolumeMountPolicy(podSpec)
+	}
+
 	if !utilfeature.DefaultFeatureGate.Enabled(features.EmptyDirVolumeMode) && !emptyDirVolumeModeInUse(oldPodSpec) {
 		for i := range podSpec.Volumes {
 			if podSpec.Volumes[i].EmptyDir != nil {
@@ -747,9 +751,7 @@ func dropDisabledPodStatusFields(podStatus, oldPodStatus *api.PodStatus, podSpec
 
 	dropPodNodeAllocatableResourceStatus(podStatus, oldPodStatus)
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIVolumeHealth) && !volumeHealthInUse(oldPodStatus) {
-		podStatus.VolumeStatuses = nil
-	}
+	dropDisabledPodVolumeStatuses(podStatus, oldPodStatus)
 }
 
 func draExendedResourceInUse(podStatus *api.PodStatus) bool {
@@ -773,6 +775,35 @@ func draNodeAllocatableResourceStatusInUse(podStatus *api.PodStatus) bool {
 	return len(podStatus.NodeAllocatableResourceClaimStatuses) > 0
 }
 
+func dropDisabledPodVolumeStatuses(podStatus, oldPodStatus *api.PodStatus) {
+	healthEnabled := utilfeature.DefaultFeatureGate.Enabled(features.CSIVolumeHealth) || volumeHealthInUse(oldPodStatus)
+	hostPhaseEnabled := utilfeature.DefaultFeatureGate.Enabled(features.DynamicNodeLocalEphemeralVolumes) || volumeHostPhaseInUse(oldPodStatus)
+	if !healthEnabled && !hostPhaseEnabled {
+		podStatus.VolumeStatuses = nil
+		return
+	}
+	if healthEnabled && hostPhaseEnabled || len(podStatus.VolumeStatuses) == 0 {
+		return
+	}
+	filtered := make([]api.PodVolumeStatus, 0, len(podStatus.VolumeStatuses))
+	for _, vs := range podStatus.VolumeStatuses {
+		if !healthEnabled {
+			vs.HealthStatus = nil
+		}
+		if !hostPhaseEnabled {
+			vs.HostPhase = ""
+		}
+		if vs.HealthStatus != nil || vs.HostPhase != "" {
+			filtered = append(filtered, vs)
+		}
+	}
+	if len(filtered) == 0 {
+		podStatus.VolumeStatuses = nil
+	} else {
+		podStatus.VolumeStatuses = filtered
+	}
+}
+
 func volumeHealthInUse(podStatus *api.PodStatus) bool {
 	if podStatus == nil {
 		return false
@@ -780,6 +811,69 @@ func volumeHealthInUse(podStatus *api.PodStatus) bool {
 	for _, volumeStatus := range podStatus.VolumeStatuses {
 		if volumeStatus.HealthStatus != nil {
 			return true
+		}
+	}
+	return false
+}
+
+func volumeHostPhaseInUse(podStatus *api.PodStatus) bool {
+	if podStatus == nil {
+		return false
+	}
+	for _, volumeStatus := range podStatus.VolumeStatuses {
+		if volumeStatus.HostPhase != "" {
+			return true
+		}
+	}
+	return false
+}
+
+func dropDynamicVolumeMountPolicy(podSpec *api.PodSpec) {
+	if podSpec == nil {
+		return
+	}
+	for c := range ContainerIter(podSpec, AllContainers) {
+		c.DynamicVolumeMountPolicy = nil
+	}
+}
+
+func dynamicVolumeMountPolicyInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+	for c := range ContainerIter(podSpec, AllContainers) {
+		if c.DynamicVolumeMountPolicy != nil {
+			return true
+		}
+	}
+	return false
+}
+
+// IsSupportedDynamicVolumeSource reports whether vs is a node-local ephemeral volume source
+// supported by DynamicNodeLocalEphemeralVolumes (ConfigMap, Secret, Projected, EmptyDir, or Image).
+// Note: keep this in sync with k8s.io/kubernetes/pkg/api/v1/pod.IsSupportedDynamicVolumeSource.
+func IsSupportedDynamicVolumeSource(vs *api.VolumeSource) bool {
+	if vs == nil {
+		return false
+	}
+	return vs.ConfigMap != nil ||
+		vs.Secret != nil ||
+		vs.Projected != nil ||
+		vs.EmptyDir != nil ||
+		vs.Image != nil
+}
+
+// IsVolumeMountedInPodSpec reports whether any container (init, main, or ephemeral)
+// in spec has a VolumeMount referencing volName.
+func IsVolumeMountedInPodSpec(spec *api.PodSpec, volName string) bool {
+	if spec == nil {
+		return false
+	}
+	for c := range ContainerIter(spec, AllContainers) {
+		for i := range c.VolumeMounts {
+			if c.VolumeMounts[i].Name == volName {
+				return true
+			}
 		}
 	}
 	return false
