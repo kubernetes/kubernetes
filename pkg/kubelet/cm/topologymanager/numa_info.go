@@ -58,14 +58,22 @@ func NewNUMAInfo(topology []cadvisorapi.Node, opts PolicyOptions) (*NUMAInfo, er
 	return numaInfo, nil
 }
 
-func (n *NUMAInfo) Narrowest(m1 bitmask.BitMask, m2 bitmask.BitMask) bitmask.BitMask {
+// Narrowest returns the narrower of two bitmasks. The second return value is
+// true when both masks have the same width (equally fit under the narrowest
+// criterion), and the result is chosen by an arbitrary tiebreaker.
+func (n *NUMAInfo) Narrowest(m1 bitmask.BitMask, m2 bitmask.BitMask) (bitmask.BitMask, bool) {
+	equal := m1.Count() == m2.Count()
 	if m1.IsNarrowerThan(m2) {
-		return m1
+		return m1, equal
 	}
-	return m2
+	return m2, equal
 }
 
-func (n *NUMAInfo) Closest(m1 bitmask.BitMask, m2 bitmask.BitMask) bitmask.BitMask {
+// Closest returns the mask with the shortest average distance between its NUMA
+// nodes. The second return value is true when both masks are equally fit under
+// the closest criterion (same width and same average distance), and the result
+// is chosen by an arbitrary tiebreaker.
+func (n *NUMAInfo) Closest(m1 bitmask.BitMask, m2 bitmask.BitMask) (bitmask.BitMask, bool) {
 	// If the length of both bitmasks aren't the same, choose the one that is narrowest.
 	if m1.Count() != m2.Count() {
 		return n.Narrowest(m1, m2)
@@ -74,19 +82,21 @@ func (n *NUMAInfo) Closest(m1 bitmask.BitMask, m2 bitmask.BitMask) bitmask.BitMa
 	m1Distance := n.NUMADistances.CalculateAverageFor(m1)
 	m2Distance := n.NUMADistances.CalculateAverageFor(m2)
 	// If average distance is the same, take bitmask with more lower-number bits set.
+	// The masks are equally fit: same width, same distance.
 	if m1Distance == m2Distance {
 		if m1.IsLessThan(m2) {
-			return m1
+			return m1, true
 		}
-		return m2
+		return m2, true
 	}
 
 	// Otherwise, return the bitmask with the shortest average distance between NUMA nodes.
+	// Not equally fit: one has a better (shorter) distance.
 	if m1Distance < m2Distance {
-		return m1
+		return m1, false
 	}
 
-	return m2
+	return m2, false
 }
 
 func (n NUMAInfo) DefaultAffinityMask() bitmask.BitMask {

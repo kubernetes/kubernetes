@@ -179,12 +179,27 @@ type requiredMetrics struct {
 	expPodSharedPoolAssignments int
 }
 
+// scoringStore reports a policy which reads hint scores, leaving the rest of
+// the store it wraps alone. Hint providers skip computing a score when the
+// configured policy selects no NUMA allocation strategy, which is the
+// default, so a test that asserts scores has to ask for one.
+type scoringStore struct {
+	topologymanager.Store
+}
+
+func (s scoringStore) GetPolicy() topologymanager.Policy {
+	return topologymanager.NewBestEffortPolicy(nil, topologymanager.PolicyOptions{
+		NUMAAllocationStrategy: topologymanager.NUMAAllocationStrategyMostAllocated,
+	})
+}
+
 func initTests(t *testing.T, testCase *testStaticPolicy, hint *topologymanager.TopologyHint, initContainersReusableMemory reusableMemory) (Policy, state.State, error) {
 	logger, _ := ktesting.NewTestContext(t)
-	manager := topologymanager.NewFakeManager(logger)
+	var manager topologymanager.Store = topologymanager.NewFakeManager(logger)
 	if hint != nil {
 		manager = topologymanager.NewFakeManagerWithHint(logger, hint)
 	}
+	manager = scoringStore{manager}
 
 	p, err := NewPolicyStatic(logger, testCase.machineInfo, testCase.systemReserved, manager)
 	if err != nil {
@@ -4664,7 +4679,8 @@ func TestCalculateHintsScore(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
-			p := &staticPolicy{}
+			logger, _ := ktesting.NewTestContext(t)
+			p := &staticPolicy{affinity: scoringStore{topologymanager.NewFakeManager(logger)}}
 			hints := p.calculateHints(tc.machineState, pod, tc.requestedResources)
 
 			for resourceName, expectedMasks := range tc.expectedScores {
