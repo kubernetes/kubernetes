@@ -35,6 +35,7 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	ndf "k8s.io/component-helpers/nodedeclaredfeatures"
 	"k8s.io/component-helpers/nodedeclaredfeatures/features/dranodeallocatableresources"
+	"k8s.io/component-helpers/nodedeclaredfeatures/features/dynamicvolumes"
 	ndftesting "k8s.io/component-helpers/nodedeclaredfeatures/testing"
 	"k8s.io/kubernetes/pkg/apis/core"
 	apisresource "k8s.io/kubernetes/pkg/apis/resource"
@@ -57,7 +58,15 @@ func TestAdmission(t *testing.T) {
 		},
 	}
 
-	client := fake.NewClientset(nodeWithFeature, nodeWithoutFeature)
+	nodeWithDynamicVolumes := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-node-dynamic-volumes"},
+		Status: v1.NodeStatus{
+			DeclaredFeatures: []string{dynamicvolumes.DynamicNodeLocalEphemeralVolumesFeatureGate},
+			NodeInfo:         v1.NodeSystemInfo{KubeletVersion: "1.38.0"},
+		},
+	}
+
+	client := fake.NewClientset(nodeWithFeature, nodeWithoutFeature, nodeWithDynamicVolumes)
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
 
 	oldPod := &core.Pod{
@@ -234,6 +243,68 @@ func TestAdmission(t *testing.T) {
 			},
 			subresource: "resize",
 			expectErr:   false,
+		},
+		{
+			name: "dynamic volume add rejected on node without DynamicNodeLocalEphemeralVolumes",
+			pod: func() *core.Pod {
+				p := oldPod.DeepCopy()
+				p.Spec.NodeName = "test-node-no-feature"
+				p.Generation++
+				p.Spec.Volumes = append(p.Spec.Volumes, core.Volume{Name: "dyn-vol"})
+				return p
+			}(),
+			oldPod: func() *core.Pod {
+				p := oldPod.DeepCopy()
+				p.Spec.NodeName = "test-node-no-feature"
+				return p
+			}(),
+			featureGateEnabled: true,
+			componentVersion:   "1.38.0",
+			registeredFeatures: []ndf.Feature{dynamicvolumes.Feature},
+			subresource:        "dynamic",
+			expectErr:          true,
+			errContains:        "pod update requires features DynamicNodeLocalEphemeralVolumes which are not available on node \"test-node-no-feature\"",
+		},
+		{
+			name: "dynamic volume and volumeMount allowed on node with DynamicNodeLocalEphemeralVolumes",
+			pod: func() *core.Pod {
+				p := oldPod.DeepCopy()
+				p.Spec.NodeName = "test-node-dynamic-volumes"
+				p.Generation++
+				p.Spec.Volumes = append(p.Spec.Volumes, core.Volume{Name: "dyn-vol"})
+				p.Spec.Containers[0].VolumeMounts = append(p.Spec.Containers[0].VolumeMounts, core.VolumeMount{Name: "dyn-vol", MountPath: "/mnt/dyn"})
+				return p
+			}(),
+			oldPod: func() *core.Pod {
+				p := oldPod.DeepCopy()
+				p.Spec.NodeName = "test-node-dynamic-volumes"
+				return p
+			}(),
+			featureGateEnabled: true,
+			componentVersion:   "1.38.0",
+			registeredFeatures: []ndf.Feature{dynamicvolumes.Feature},
+			subresource:        "dynamic",
+			expectErr:          false,
+		},
+		{
+			name: "dynamic update without volume changes allowed on node without DynamicNodeLocalEphemeralVolumes",
+			pod: func() *core.Pod {
+				p := oldPod.DeepCopy()
+				p.Spec.NodeName = "test-node-no-feature"
+				p.Generation++
+				p.Spec.Containers[0].Image = "new-image"
+				return p
+			}(),
+			oldPod: func() *core.Pod {
+				p := oldPod.DeepCopy()
+				p.Spec.NodeName = "test-node-no-feature"
+				return p
+			}(),
+			featureGateEnabled: true,
+			componentVersion:   "1.38.0",
+			registeredFeatures: []ndf.Feature{dynamicvolumes.Feature},
+			subresource:        "dynamic",
+			expectErr:          false,
 		},
 	}
 

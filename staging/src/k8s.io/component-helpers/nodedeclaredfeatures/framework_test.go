@@ -566,7 +566,7 @@ func TestInferForPodUpdate(t *testing.T) {
 				},
 			},
 			targetVersion: version.MustParse("1.36.0"),
-			expectedReqs:  []string{"VolumeBindMountOptions"},
+			expectedReqs:  []string{"DynamicNodeLocalEphemeralVolumes", "VolumeBindMountOptions"},
 			expectErr:     false,
 		},
 		{
@@ -618,7 +618,7 @@ func TestInferForPodUpdate(t *testing.T) {
 				},
 			},
 			targetVersion: version.MustParse("1.36.0"),
-			expectedReqs:  []string{"PodCertificateMLDSA"},
+			expectedReqs:  []string{"DynamicNodeLocalEphemeralVolumes", "PodCertificateMLDSA"},
 			expectErr:     false,
 		},
 	}
