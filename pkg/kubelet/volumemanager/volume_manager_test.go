@@ -46,6 +46,7 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/ktesting"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/allocation/state"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/volume"
@@ -53,6 +54,7 @@ import (
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
+	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
 	"k8s.io/kubernetes/pkg/volume/util/types"
 	"k8s.io/mount-utils"
 )
@@ -1061,4 +1063,165 @@ func TestVolumeManager_ResizeEphemeralVolume(t *testing.T) {
 
 		})
 	}
+}
+
+func TestWaitForAttachAndMount_DynamicVolumes(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicNodeLocalEphemeralVolumes, true)
+	logger, tCtx := ktesting.NewTestContext(t)
+
+	tmpDir := t.TempDir()
+	plugMgr := &volume.VolumePluginMgr{}
+	fakeVolumeHost := volumetest.NewFakeKubeletVolumeHost(t, tmpDir, nil, nil)
+	require.NoError(t, plugMgr.InitPlugins(emptydir.ProbeVolumePlugins(), nil, fakeVolumeHost))
+
+	actuatedState := state.NewStateMemory(logger, nil, nil)
+	podManager := kubepod.NewBasicPodManager()
+
+	vm := NewVolumeManager(
+		true,
+		testHostname,
+		podManager,
+		&fakePodStateProvider{},
+		nil,
+		plugMgr,
+		mount.NewFakeMounter(nil),
+		hostutil.NewFakeHostUtil(nil),
+		tmpDir,
+		&record.FakeRecorder{},
+		volumetest.NewBlockVolumePathHandler(),
+		nil,
+		0,
+		actuatedState).(*volumeManager)
+
+	vol1 := v1.Volume{Name: "vol1", VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}}
+	vol2 := v1.Volume{Name: "vol2", VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}}
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "dyn-vm-pod",
+			Namespace: "default",
+			UID:       "dyn-vm-uid",
+		},
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{vol1},
+			Containers: []v1.Container{
+				{
+					Name:         "c1",
+					VolumeMounts: []v1.VolumeMount{{Name: "vol1", MountPath: "/mnt/vol1"}},
+				},
+			},
+		},
+	}
+
+	// Initial startup (actuatedPod not yet initialized): blocks and fails on timeout when vol1 is not mounted.
+	shortCtx, cancel := context.WithTimeout(tCtx, 50*time.Millisecond)
+	defer cancel()
+	require.Error(t, vm.WaitForAttachAndMount(shortCtx, pod))
+
+	// Simulate vol1 mounted in DSW/ASW and pod initialized in actuatedState.
+	uniquePodName := util.GetUniquePodName(pod)
+	volSpec1 := volume.NewSpecFromVolume(&vol1)
+	uniqueVol1, err := vm.desiredStateOfWorld.AddPodToVolume(logger, uniquePodName, pod, volSpec1, vol1.Name, "", nil)
+	require.NoError(t, err)
+	plugin1, err := plugMgr.FindPluginBySpec(volSpec1)
+	require.NoError(t, err)
+	mounter1, err := plugin1.NewMounter(volSpec1, pod)
+	require.NoError(t, err)
+	require.NoError(t, vm.actualStateOfWorld.MarkVolumeAsAttached(logger, uniqueVol1, volSpec1, testHostname, ""))
+	require.NoError(t, vm.actualStateOfWorld.MarkVolumeAsMounted(operationexecutor.MarkVolumeOpts{
+		PodName:          uniquePodName,
+		PodUID:           pod.UID,
+		Pod:              pod,
+		VolumeName:       uniqueVol1,
+		Mounter:          mounter1,
+		VolumeSpec:       volSpec1,
+		VolumeMountState: operationexecutor.VolumeMounted,
+	}))
+	require.NoError(t, actuatedState.SetPod(logger, pod))
+
+	// Dynamically add unmounted vol2 to pod.Spec: WaitForAttachAndMount verifies vol1 and does not block on vol2.
+	updatedPod := pod.DeepCopy()
+	updatedPod.Spec.Volumes = []v1.Volume{vol1, vol2}
+	updatedPod.Spec.Containers[0].VolumeMounts = append(updatedPod.Spec.Containers[0].VolumeMounts, v1.VolumeMount{
+		Name:      "vol2",
+		MountPath: "/mnt/vol2",
+	})
+	shortCtx2, cancel2 := context.WithTimeout(tCtx, 50*time.Millisecond)
+	defer cancel2()
+	require.NoError(t, vm.WaitForAttachAndMount(shortCtx2, updatedPod))
+
+	// Post-reboot simulation: a pod with an actuated checkpoint and a raw-block PVC (VolumeDevices) or
+	// non-dynamic volume source that has not yet been remounted must still block WaitForAttachAndMount.
+	rawBlockPod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "raw-block-pod",
+			Namespace: "default",
+			UID:       "raw-block-uid",
+		},
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{
+				{
+					Name: "block-pvc",
+					VolumeSource: v1.VolumeSource{
+						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{ClaimName: "my-block-pvc"},
+					},
+				},
+			},
+			Containers: []v1.Container{
+				{
+					Name:          "c1",
+					VolumeDevices: []v1.VolumeDevice{{Name: "block-pvc", DevicePath: "/dev/xvda"}},
+				},
+			},
+		},
+	}
+	require.NoError(t, actuatedState.SetPod(logger, rawBlockPod))
+	shortCtx3, cancel3 := context.WithTimeout(tCtx, 50*time.Millisecond)
+	defer cancel3()
+	require.Error(t, vm.WaitForAttachAndMount(shortCtx3, rawBlockPod), "unmapped raw-block PVC must still block WaitForAttachAndMount after reboot")
+
+	// Likewise, a dynamic volume already recorded in actuatedState before a reboot must be remounted
+	// into actualStateOfWorld before WaitForAttachAndMount returns (mount vol1 first so the timeout
+	// specifically exercises vol2).
+	rebootedDynPod := updatedPod.DeepCopy()
+	rebootedDynPod.UID = "rebooted-dyn-uid"
+	rebootedUniquePodName := util.GetUniquePodName(rebootedDynPod)
+	rebootedUniqueVol1, err := vm.desiredStateOfWorld.AddPodToVolume(logger, rebootedUniquePodName, rebootedDynPod, volSpec1, vol1.Name, "", nil)
+	require.NoError(t, err)
+	rebootedMounter1, err := plugin1.NewMounter(volSpec1, rebootedDynPod)
+	require.NoError(t, err)
+	require.NoError(t, vm.actualStateOfWorld.MarkVolumeAsAttached(logger, rebootedUniqueVol1, volSpec1, testHostname, ""))
+	require.NoError(t, vm.actualStateOfWorld.MarkVolumeAsMounted(operationexecutor.MarkVolumeOpts{
+		PodName:          rebootedUniquePodName,
+		PodUID:           rebootedDynPod.UID,
+		Pod:              rebootedDynPod,
+		VolumeName:       rebootedUniqueVol1,
+		Mounter:          rebootedMounter1,
+		VolumeSpec:       volSpec1,
+		VolumeMountState: operationexecutor.VolumeMounted,
+	}))
+	require.NoError(t, actuatedState.SetPod(logger, podWithUID(pod, rebootedDynPod.UID)))
+	require.NoError(t, actuatedState.SetPodVolume(logger, rebootedDynPod.UID, vol2))
+	shortCtx4, cancel4 := context.WithTimeout(tCtx, 50*time.Millisecond)
+	defer cancel4()
+	require.Error(t, vm.WaitForAttachAndMount(shortCtx4, rebootedDynPod), "volume already recorded in actuatedState before reboot must be remounted")
+
+	// Ephemeral container referencing a volume absent from the allocated pod's Spec.Volumes (vol == nil)
+	// is deferred in WaitForAttachAndMount rather than blocking for 2 minutes.
+	podWithUnallocatedEphemeralMount := pod.DeepCopy()
+	podWithUnallocatedEphemeralMount.Spec.EphemeralContainers = []v1.EphemeralContainer{{
+		EphemeralContainerCommon: v1.EphemeralContainerCommon{
+			Name:         "ec-unallocated",
+			Image:        "busybox",
+			VolumeMounts: []v1.VolumeMount{{Name: "unallocated-vol", MountPath: "/mnt/unallocated"}},
+		},
+	}}
+	shortCtx5, cancel5 := context.WithTimeout(tCtx, 50*time.Millisecond)
+	defer cancel5()
+	require.NoError(t, vm.WaitForAttachAndMount(shortCtx5, podWithUnallocatedEphemeralMount))
+}
+
+func podWithUID(p *v1.Pod, uid kubetypes.UID) *v1.Pod {
+	cp := p.DeepCopy()
+	cp.UID = uid
+	return cp
 }
