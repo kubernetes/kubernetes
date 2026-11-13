@@ -18,6 +18,10 @@ package serviceaccount
 
 import (
 	"context"
+	"crypto"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/mldsa"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
@@ -34,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/ktesting"
@@ -232,6 +237,241 @@ func TestExternalJWTSigningAndAuth(t *testing.T) {
 
 			// Adjust parameters on mock signer for the test.
 			tc.preValidationSignerUpdate(t)
+
+			// Try Validating the token.
+			tokenReviewResult, err := client.AuthenticationV1().TokenReviews().Create(ctx, &authv1.TokenReview{
+				Spec: authv1.TokenReviewSpec{
+					Token: tokenRequest.Status.Token,
+				},
+			}, metav1.CreateOptions{})
+			if err != nil {
+				t.Fatalf("Error when validating token: %v", err)
+			}
+
+			if !tokenReviewResult.Status.Authenticated && tc.shouldPassAuth {
+				t.Fatalf("Expected Authentication to succeed, got %v", tokenReviewResult.Status.Error)
+			} else if tokenReviewResult.Status.Authenticated && !tc.shouldPassAuth {
+				t.Fatal("Expected Authentication to fail")
+			}
+
+			// Perform SSAR
+			if tc.shouldPassAuth {
+				config := *clientConfig
+				config.BearerToken = tokenRequest.Status.Token
+
+				newClient, err := kubernetes.NewForConfig(&config)
+				if err != nil {
+					t.Fatalf("While creating a new client using token: %v", err)
+				}
+
+				ssr, err := newClient.AuthenticationV1().SelfSubjectReviews().Create(ctx, &authv1.SelfSubjectReview{
+					TypeMeta: metav1.TypeMeta{
+						Kind:       "SelfSubjectReview",
+						APIVersion: "authentication.k8s.io/v1",
+					},
+				}, metav1.CreateOptions{})
+				if err != nil {
+					t.Fatalf("Failed to perform SelfSubjectAccessReview: %v", err)
+				}
+
+				if ssr.Status.UserInfo.Username != "system:serviceaccount:ns-1:sa-1" {
+					t.Fatalf("Unexpected username (%s) on SelfSubjectReview", ssr.Status.UserInfo.Username)
+				}
+			}
+		})
+	}
+}
+
+func TestExternalJWTSigningAndAuthSupportedKeyTypes(t *testing.T) {
+	// Enable feature gate for external JWT signer.
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExternalServiceAccountTokenSigner, true)
+
+	testCases := []struct {
+		desc           string
+		keyFunc        func() (crypto.PrivateKey, crypto.PublicKey)
+		enabledGates   []featuregate.Feature
+		signingAlg     string
+		signingKeyID   string
+		shouldPassAuth bool
+	}{
+		{
+			desc:         "ecdsa p256 key",
+			signingAlg:   "ES256",
+			signingKeyID: "key-id",
+			keyFunc: func() (crypto.PrivateKey, crypto.PublicKey) {
+				key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+				if err != nil {
+					t.Fatalf("generating ecdsa p256 key: %v", err)
+				}
+
+				return key, key.Public()
+			},
+			shouldPassAuth: true,
+		},
+		{
+			desc:         "ecdsa p384 key",
+			signingAlg:   "ES384",
+			signingKeyID: "key-id",
+			keyFunc: func() (crypto.PrivateKey, crypto.PublicKey) {
+				key, err := ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
+				if err != nil {
+					t.Fatalf("generating ecdsa p384 key: %v", err)
+				}
+
+				return key, key.Public()
+			},
+			shouldPassAuth: true,
+		},
+		{
+			desc:         "ecdsa p521 key",
+			signingAlg:   "ES512",
+			signingKeyID: "key-id",
+			keyFunc: func() (crypto.PrivateKey, crypto.PublicKey) {
+				key, err := ecdsa.GenerateKey(elliptic.P521(), rand.Reader)
+				if err != nil {
+					t.Fatalf("generating ecdsa p521 key: %v", err)
+				}
+
+				return key, key.Public()
+			},
+			shouldPassAuth: true,
+		},
+		{
+			desc:         "ML-DSA-44 key",
+			signingAlg:   "ML-DSA-44",
+			signingKeyID: "key-id",
+			keyFunc: func() (crypto.PrivateKey, crypto.PublicKey) {
+				key, err := mldsa.GenerateKey(mldsa.MLDSA44())
+				if err != nil {
+					t.Fatalf("generating ML-DSA-44 key: %v", err)
+				}
+
+				return key, key.PublicKey()
+			},
+			shouldPassAuth: true,
+			enabledGates: []featuregate.Feature{
+				features.ServiceAccountTokenMLDSA,
+			},
+		},
+		{
+			desc:         "ML-DSA-65 key",
+			signingAlg:   "ML-DSA-65",
+			signingKeyID: "key-id",
+			keyFunc: func() (crypto.PrivateKey, crypto.PublicKey) {
+				key, err := mldsa.GenerateKey(mldsa.MLDSA65())
+				if err != nil {
+					t.Fatalf("generating ML-DSA-65 key: %v", err)
+				}
+
+				return key, key.PublicKey()
+			},
+			shouldPassAuth: true,
+			enabledGates: []featuregate.Feature{
+				features.ServiceAccountTokenMLDSA,
+			},
+		},
+		{
+			desc:         "ML-DSA-87 key",
+			signingAlg:   "ML-DSA-87",
+			signingKeyID: "key-id",
+			keyFunc: func() (crypto.PrivateKey, crypto.PublicKey) {
+				key, err := mldsa.GenerateKey(mldsa.MLDSA87())
+				if err != nil {
+					t.Fatalf("generating ML-DSA-87 key: %v", err)
+				}
+
+				return key, key.PublicKey()
+			},
+			shouldPassAuth: true,
+			enabledGates: []featuregate.Feature{
+				features.ServiceAccountTokenMLDSA,
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			for _, gate := range tc.enabledGates {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, gate, true)
+			}
+
+			// Prep some keys to use with test.
+			privateKey, publicKey := tc.keyFunc()
+			publicKeyBytes, err := x509.MarshalPKIXPublicKey(publicKey)
+			if err != nil {
+				t.Fatalf("marshalling public key bytes: %v", err)
+			}
+
+			tCtx := ktesting.Init(t)
+			ctx, cancel := context.WithCancel(tCtx)
+			defer cancel()
+
+			// create and start mock signer.
+			socketPath := utilnettesting.MakeSocketNameForTest(t, fmt.Sprintf("mock-external-jwt-signer-%d.sock", time.Now().Nanosecond()))
+			t.Cleanup(func() { _ = os.Remove(socketPath) })
+			mockSigner := v1testing.NewMockSigner(t, socketPath)
+			defer mockSigner.CleanUp()
+
+			mockSigner.SigningKey = privateKey
+			mockSigner.SigningKeyID = tc.signingKeyID
+			mockSigner.SigningAlg = tc.signingAlg
+			mockSigner.SetSupportedKeys(map[string]v1testing.KeyT{
+				tc.signingKeyID: {Key: publicKeyBytes},
+			})
+
+			// Start Api server configured with external signer.
+			client, clientConfig, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
+				ModifyServerRunOptions: func(opt *options.ServerRunOptions) {
+					opt.ServiceAccountSigningEndpoint = socketPath
+					opt.ServiceAccountSigningKeyFile = ""
+					opt.Authentication.ServiceAccounts.KeyFiles = []string{}
+				},
+			})
+			defer tearDownFn()
+
+			// Validate that OIDC discovery doc and keys are available.
+			for _, p := range []string{
+				"/.well-known/openid-configuration",
+				"/openid/v1/jwks",
+			} {
+				if _, err := client.CoreV1().RESTClient().Get().AbsPath(p).DoRaw(ctx); err != nil {
+					t.Errorf("Validating OIDC discovery failed, error getting api path %q: %v", p, err)
+				}
+			}
+
+			// Create Namesapce (ns-1) to work with.
+			if _, err := client.CoreV1().Namespaces().Create(ctx, &corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "ns-1",
+				},
+			}, metav1.CreateOptions{}); err != nil {
+				t.Fatalf("Error when creating namespace: %v", err)
+			}
+
+			// Create ServiceAccount (sa-1) to work with.
+			if _, err := client.CoreV1().ServiceAccounts("ns-1").Create(ctx, &corev1.ServiceAccount{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "sa-1",
+				},
+			}, metav1.CreateOptions{}); err != nil {
+				t.Fatalf("Error when creating service-account: %v", err)
+			}
+
+			mockSigner.WaitForSupportedKeysFetch()
+			// Wait for the apiserver to process the refreshed keys so that
+			// token signing and verification use a consistent key set.
+			waitForDataTimestamp(t, client, time.Now())
+
+			// Request a token for ns-1:sa-1.
+			tokenExpirationSec := int64(2 * 60 * 60) // 2h
+			tokenRequest, err := client.CoreV1().ServiceAccounts("ns-1").CreateToken(ctx, "sa-1", &authv1.TokenRequest{
+				Spec: authv1.TokenRequestSpec{
+					ExpirationSeconds: &tokenExpirationSec,
+				},
+			}, metav1.CreateOptions{})
+			if err != nil {
+				t.Fatalf("Error when creating token: %v", err)
+			}
 
 			// Try Validating the token.
 			tokenReviewResult, err := client.AuthenticationV1().TokenReviews().Create(ctx, &authv1.TokenReview{
