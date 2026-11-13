@@ -811,46 +811,30 @@ func TestRetryPendingResizes(t *testing.T) {
 		inPlacePodLevelResizeEnabled bool
 	}{
 		{
-			name:                  "Request CPU and memory decrease - expect InProgress",
+			name:                  "Request CPU and memory decrease - expect allocated",
 			originalRequests:      v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
 			newRequests:           v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
 			expectedAllocatedReqs: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
 
-			expectedResize: []*v1.PodCondition{
-				{
-					Type:    v1.PodResizeInProgress,
-					Status:  "True",
-					Message: "", // Expect the original InProgress condition to be cleared.
-				},
-			},
+			expectedResize:         nil,
 			expectPodSyncTriggered: "true",
 		},
 		{
-			name:                  "Request CPU increase, memory decrease - expect InProgress",
+			name:                  "Request CPU increase, memory decrease - expect allocated",
 			originalRequests:      v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
 			newRequests:           v1.ResourceList{v1.ResourceCPU: cpu1500m, v1.ResourceMemory: mem500M},
 			expectedAllocatedReqs: v1.ResourceList{v1.ResourceCPU: cpu1500m, v1.ResourceMemory: mem500M},
 
-			expectedResize: []*v1.PodCondition{
-				{
-					Type:   v1.PodResizeInProgress,
-					Status: "True",
-				},
-			},
+			expectedResize:         nil,
 			expectPodSyncTriggered: "true",
 		},
 		{
-			name:                  "Request CPU decrease, memory increase - expect InProgress",
+			name:                  "Request CPU decrease, memory increase - expect allocated",
 			originalRequests:      v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
 			newRequests:           v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem1500M},
 			expectedAllocatedReqs: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem1500M},
 
-			expectedResize: []*v1.PodCondition{
-				{
-					Type:   v1.PodResizeInProgress,
-					Status: "True",
-				},
-			},
+			expectedResize:         nil,
 			expectPodSyncTriggered: "true",
 		},
 		{
@@ -918,7 +902,7 @@ func TestRetryPendingResizes(t *testing.T) {
 			expectPodSyncTriggered: "true",
 		},
 		{
-			name:                  "CPU increase in progress, resources unchanged - expect InProgress",
+			name:                  "CPU increase in progress, resources unchanged - expect allocated",
 			originalRequests:      v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
 			newRequests:           v1.ResourceList{v1.ResourceCPU: cpu1500m, v1.ResourceMemory: mem1000M},
 			newResourcesAllocated: true,
@@ -938,7 +922,7 @@ func TestRetryPendingResizes(t *testing.T) {
 			expectPodSyncTriggered: "true",
 		},
 		{
-			name:                  "CPU increase in progress, new allocation - expect InProgress reset",
+			name:                  "CPU increase in progress, new allocation - expect InProgress unchanged",
 			originalRequests:      v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
 			newRequests:           v1.ResourceList{v1.ResourceCPU: cpu1500m, v1.ResourceMemory: mem1000M},
 			expectedAllocatedReqs: v1.ResourceList{v1.ResourceCPU: cpu1500m, v1.ResourceMemory: mem1000M},
@@ -949,7 +933,7 @@ func TestRetryPendingResizes(t *testing.T) {
 				{
 					Type:    v1.PodResizeInProgress,
 					Status:  "True",
-					Message: "",
+					Message: originalInProgressMsg, // The allocation manager doesn't reset the condition.
 				},
 			},
 			expectPodSyncTriggered: "true",
@@ -990,12 +974,7 @@ func TestRetryPendingResizes(t *testing.T) {
 			newRequests:           v1.ResourceList{v1.ResourceCPU: cpu1000m},
 			expectedAllocatedReqs: v1.ResourceList{v1.ResourceCPU: cpu1000m},
 
-			expectedResize: []*v1.PodCondition{
-				{
-					Type:   v1.PodResizeInProgress,
-					Status: "True",
-				},
-			},
+			expectedResize:         nil,
 			expectPodSyncTriggered: "true",
 		},
 		{
@@ -1004,12 +983,7 @@ func TestRetryPendingResizes(t *testing.T) {
 			newRequests:           v1.ResourceList{v1.ResourceCPU: cpu2m},
 			expectedAllocatedReqs: v1.ResourceList{v1.ResourceCPU: cpu2m},
 
-			expectedResize: []*v1.PodCondition{
-				{
-					Type:   v1.PodResizeInProgress,
-					Status: "True",
-				},
-			},
+			expectedResize:         nil,
 			expectPodSyncTriggered: "true",
 		},
 		{
@@ -1021,12 +995,7 @@ func TestRetryPendingResizes(t *testing.T) {
 			expectedAllocatedReqs: v1.ResourceList{v1.ResourceCPU: resource.MustParse("10m")},
 			expectedAllocatedLims: v1.ResourceList{v1.ResourceCPU: resource.MustParse("20m")},
 
-			expectedResize: []*v1.PodCondition{
-				{
-					Type:   v1.PodResizeInProgress,
-					Status: "True",
-				},
-			},
+			expectedResize:         nil,
 			expectPodSyncTriggered: "true",
 		},
 		{
@@ -1038,16 +1007,11 @@ func TestRetryPendingResizes(t *testing.T) {
 			expectedAllocatedReqs: v1.ResourceList{v1.ResourceCPU: resource.MustParse("10m")},
 			expectedAllocatedLims: v1.ResourceList{v1.ResourceCPU: resource.MustParse("10m")},
 
-			expectedResize: []*v1.PodCondition{
-				{
-					Type:   v1.PodResizeInProgress,
-					Status: "True",
-				},
-			},
+			expectedResize:         nil,
 			expectPodSyncTriggered: "true",
 		},
 		{
-			name:                         "pod-level: Request CPU and memory increase - expect InProgress",
+			name:                         "pod-level: Request CPU and memory increase - expect allocated",
 			inPlacePodLevelResizeEnabled: true,
 			originalPodRequests:          v1.ResourceList{v1.ResourceCPU: cpu1500m, v1.ResourceMemory: mem1500M},
 			newPodRequests:               v1.ResourceList{v1.ResourceCPU: cpu2000m, v1.ResourceMemory: mem2000M},
@@ -1055,16 +1019,11 @@ func TestRetryPendingResizes(t *testing.T) {
 			newRequests:                  v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
 			expectedAllocatedReqs:        v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
 			expectedAllocatedPodReqs:     v1.ResourceList{v1.ResourceCPU: cpu2000m, v1.ResourceMemory: mem2000M},
-			expectedResize: []*v1.PodCondition{
-				{
-					Type:   v1.PodResizeInProgress,
-					Status: "True",
-				},
-			},
-			expectPodSyncTriggered: "true",
+			expectedResize:               nil,
+			expectPodSyncTriggered:       "true",
 		},
 		{
-			name:                         "pod-level: Request CPU and memory decrease - expect InProgress",
+			name:                         "pod-level: Request CPU and memory decrease - expect allocated",
 			inPlacePodLevelResizeEnabled: true,
 			originalPodRequests:          v1.ResourceList{v1.ResourceCPU: cpu1500m, v1.ResourceMemory: mem1500M},
 			newPodRequests:               v1.ResourceList{v1.ResourceCPU: cpu1200m, v1.ResourceMemory: mem1200M}, // still > container reqs
@@ -1072,14 +1031,8 @@ func TestRetryPendingResizes(t *testing.T) {
 			newRequests:                  v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
 			expectedAllocatedReqs:        v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
 			expectedAllocatedPodReqs:     v1.ResourceList{v1.ResourceCPU: cpu1200m, v1.ResourceMemory: mem1200M},
-			expectedResize: []*v1.PodCondition{
-				{
-					Type:    v1.PodResizeInProgress,
-					Status:  "True",
-					Message: "",
-				},
-			},
-			expectPodSyncTriggered: "true",
+			expectedResize:               nil,
+			expectPodSyncTriggered:       "true",
 		},
 		{
 			name:                         "pod-level: Request CPU increase beyond current capacity - expect Deferred",
@@ -1393,12 +1346,7 @@ func TestRetryPendingResizesGuanteedQOSPods(t *testing.T) {
 			newLimits:                      v1.ResourceList{v1.ResourceCPU: cpu2000m, v1.ResourceMemory: mem1000M},
 			expectedAllocatedReqs:          v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
 			expectedAllocatedLims:          v1.ResourceList{v1.ResourceCPU: cpu2000m, v1.ResourceMemory: mem1000M},
-			expectedResize: []*v1.PodCondition{
-				{
-					Type:   v1.PodResizeInProgress,
-					Status: "True",
-				},
-			},
+			expectedResize:                 nil,
 		},
 	}
 
@@ -1557,17 +1505,12 @@ func TestRetryPendingResizesMemoryBackedVolumes(t *testing.T) {
 		expectSuccess       bool
 	}{
 		{
-			name:          "Resize succeeds on cgroups v2",
-			originalLimit: &quantity100Mi,
-			newLimit:      &quantity200Mi,
-			cgroupVersion: 2,
-			expectedResize: []*v1.PodCondition{
-				{
-					Type:   v1.PodResizeInProgress,
-					Status: "True",
-				},
-			},
-			expectSuccess: true,
+			name:           "Resize succeeds on cgroups v2",
+			originalLimit:  &quantity100Mi,
+			newLimit:       &quantity200Mi,
+			cgroupVersion:  2,
+			expectedResize: nil,
+			expectSuccess:  true,
 		},
 		{
 			name:          "Resize fails on cgroups v1",
@@ -1612,13 +1555,8 @@ func TestRetryPendingResizesMemoryBackedVolumes(t *testing.T) {
 			originalLimit:       &quantity100Mi,
 			newLimit:            &quantity200Mi,
 			cgroupVersion:       2,
-			expectedResize: []*v1.PodCondition{
-				{
-					Type:   v1.PodResizeInProgress,
-					Status: "True",
-				},
-			},
-			expectSuccess: true,
+			expectedResize:      nil,
+			expectSuccess:       true,
 		},
 	}
 
@@ -1748,30 +1686,20 @@ func TestRetryPendingResizesWithSwap(t *testing.T) {
 		expectedMetrics       string
 	}{
 		{
-			name:                  "NoSwap Request Memory decrease ResizePolicy RestartContainer - expect InProgress",
+			name:                  "NoSwap Request Memory decrease ResizePolicy RestartContainer - expect allocated",
 			newRequests:           v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
 			expectedAllocatedReqs: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
 			swapBehavior:          kubetypes.NoSwap,
 			resizePolicy:          v1.ContainerResizePolicy{ResourceName: v1.ResourceMemory, RestartPolicy: v1.RestartContainer},
-			expectedResize: []*v1.PodCondition{
-				{
-					Type:   v1.PodResizeInProgress,
-					Status: "True",
-				},
-			},
+			expectedResize:        nil,
 		},
 		{
-			name:                  "LimitedSwap Request Memory increase with ResizePolicy RestartContainer - expect InProgress",
+			name:                  "LimitedSwap Request Memory increase with ResizePolicy RestartContainer - expect allocated",
 			newRequests:           v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
 			expectedAllocatedReqs: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
 			swapBehavior:          kubetypes.LimitedSwap,
 			resizePolicy:          v1.ContainerResizePolicy{ResourceName: v1.ResourceMemory, RestartPolicy: v1.RestartContainer},
-			expectedResize: []*v1.PodCondition{
-				{
-					Type:   v1.PodResizeInProgress,
-					Status: "True",
-				},
-			},
+			expectedResize:        nil,
 		},
 		{
 			name:                  "LimitedSwap Request Memory increase with ResizePolicy NotRequired - expect Infeasible",
@@ -1931,36 +1859,24 @@ func TestRetryPendingResizesMultipleConditions(t *testing.T) {
 		expectedEvent      string
 	}{
 		{
-			name:       "allocated != actuated, pod resize should be in progress",
+			// The kubelet reports the resize as in progress when it syncs the pod.
+			name:       "resize allocated",
 			cpu:        cpu1000m,
 			mem:        mem1000M,
 			generation: 1,
-			expectedConditions: []*v1.PodCondition{{
-				Type:               v1.PodResizeInProgress,
-				Status:             "True",
-				ObservedGeneration: 1,
-			}},
-			expectedEvent: `Normal ResizeStarted Pod resize started: {"containers":[{"name":"c1","resources":{"requests":{"cpu":"1","memory":"1Gi"}}}],"generation":1}`,
 		},
 		{
-			name:       "desired != allocated != actuated, both conditions should be present in the pod status",
+			name:       "desired != allocated, pod resize should be pending",
 			cpu:        cpu5000m,
 			mem:        mem4500M,
 			generation: 2,
-			expectedConditions: []*v1.PodCondition{
-				{
-					Type:               v1.PodResizePending,
-					Status:             "True",
-					Reason:             v1.PodReasonDeferred,
-					Message:            "Node didn't have enough resource: cpu, requested: 5000, used: 0, capacity: 4000",
-					ObservedGeneration: 2,
-				},
-				{
-					Type:               v1.PodResizeInProgress,
-					Status:             "True",
-					ObservedGeneration: 1,
-				},
-			},
+			expectedConditions: []*v1.PodCondition{{
+				Type:               v1.PodResizePending,
+				Status:             "True",
+				Reason:             v1.PodReasonDeferred,
+				Message:            "Node didn't have enough resource: cpu, requested: 5000, used: 0, capacity: 4000",
+				ObservedGeneration: 2,
+			}},
 			expectedEvent: `Warning ResizeDeferred Pod resize OutOfcpu: {"containers":[{"name":"c1","resources":{"requests":{"cpu":"5","memory":"4500Mi"}}}],"generation":2,"error":"Node didn't have enough resource: cpu, requested: 5000, used: 0, capacity: 4000"}`,
 		},
 		{
@@ -1968,55 +1884,31 @@ func TestRetryPendingResizesMultipleConditions(t *testing.T) {
 			cpu:        cpu5000m,
 			mem:        mem4500M,
 			generation: 2,
-			expectedConditions: []*v1.PodCondition{
-				{
-					Type:               v1.PodResizePending,
-					Status:             "True",
-					Reason:             v1.PodReasonDeferred,
-					Message:            "Node didn't have enough resource: cpu, requested: 5000, used: 0, capacity: 4000",
-					ObservedGeneration: 2,
-				},
-				{
-					Type:               v1.PodResizeInProgress,
-					Status:             "True",
-					ObservedGeneration: 1,
-				},
-			},
+			expectedConditions: []*v1.PodCondition{{
+				Type:               v1.PodResizePending,
+				Status:             "True",
+				Reason:             v1.PodReasonDeferred,
+				Message:            "Node didn't have enough resource: cpu, requested: 5000, used: 0, capacity: 4000",
+				ObservedGeneration: 2,
+			}},
 		},
 		{
-			name:       "revert back to the original resize request",
+			name:       "revert back to the allocated resize request",
 			cpu:        cpu1000m,
 			mem:        mem1000M,
 			generation: 3,
-			expectedConditions: []*v1.PodCondition{{
-				Type:               v1.PodResizeInProgress,
-				Status:             "True",
-				ObservedGeneration: 1,
-			}},
 		},
-
 		{
 			name:       "no changes except generation",
 			cpu:        cpu1000m,
 			mem:        mem1000M,
 			generation: 4,
-			expectedConditions: []*v1.PodCondition{{
-				Type:               v1.PodResizeInProgress,
-				Status:             "True",
-				ObservedGeneration: 1,
-			}},
 		},
 		{
 			name:       "allocate a new resize",
 			cpu:        cpu500m,
 			mem:        mem500M,
 			generation: 5,
-			expectedConditions: []*v1.PodCondition{{
-				Type:               v1.PodResizeInProgress,
-				Status:             "True",
-				ObservedGeneration: 5,
-			}},
-			expectedEvent: `Normal ResizeStarted Pod resize started: {"containers":[{"name":"c1","resources":{"requests":{"cpu":"500m","memory":"500Mi"}}}],"generation":5}`,
 		},
 	}
 
@@ -2119,12 +2011,6 @@ func TestRetryPendingResizesNonResourceChange(t *testing.T) {
 				changeOtherField(pod)
 				pod.Spec.Containers[0].Resources = cpu("1")
 			},
-			expectedConditions: []*v1.PodCondition{{
-				Type:               v1.PodResizeInProgress,
-				Status:             "True",
-				ObservedGeneration: 1,
-			}},
-			expectedEvent:   `Normal ResizeStarted Pod resize started: {"containers":[{"name":"c1","resources":{"requests":{"cpu":"1"}}}],"generation":1}`,
 			expectAllocated: true,
 		},
 		{
@@ -2699,6 +2585,69 @@ func TestAllocationManagerAddPod(t *testing.T) {
 	}
 }
 
+// TestAllocatedGeneration checks that the allocation records the generation of the pod when it was
+// allocated, and that re-admitting the pod after a kubelet restart keeps it.
+func TestAllocatedGeneration(t *testing.T) {
+	if goruntime.GOOS == "windows" {
+		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
+	}
+	logger, tCtx := ktesting.NewTestContext(t)
+	cpu := func(quantity string) v1.ResourceRequirements {
+		return v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse(quantity)}}
+	}
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{UID: "1111", Name: "pod", Namespace: "ns", Generation: 1},
+		Spec:       v1.PodSpec{Containers: []v1.Container{{Name: "c1", Image: "i1", Resources: cpu("1")}}},
+		Status:     v1.PodStatus{Phase: v1.PodRunning},
+	}
+	allocationManager := makeAllocationManager(t, &containertest.FakeRuntime{}, []*v1.Pod{pod}, nil)
+
+	_, ok := allocationManager.GetAllocatedGeneration(pod.UID)
+	require.False(t, ok, "not allocated yet")
+	admitted, _, _ := allocationManager.AddPod(tCtx, nil, pod)
+	require.True(t, admitted)
+	generation, ok := allocationManager.GetAllocatedGeneration(pod.UID)
+	require.True(t, ok)
+	assert.Equal(t, int64(1), generation, "admitting the pod records its generation")
+
+	// A resize that can't be allocated doesn't change the allocated generation.
+	tooLarge := pod.DeepCopy()
+	tooLarge.Generation = 2
+	tooLarge.Spec.Containers[0].Resources = cpu("100")
+	allocationManager.(*manager).podProvider.(*fakePodProvider).getPodByUID = func(types.UID) (*v1.Pod, bool) { return tooLarge, true }
+	allocationManager.PushPendingAllocation(logger, pod.UID)
+	allocationManager.RetryPendingAllocations(tCtx, TriggerReasonPodUpdated)
+	generation, _ = allocationManager.GetAllocatedGeneration(pod.UID)
+	assert.Equal(t, int64(1), generation, "a pending resize isn't allocated")
+
+	// After a kubelet restart, the pod is admitted again as allocated, keeping its generation.
+	admitted, _, _ = allocationManager.AddPod(tCtx, nil, tooLarge)
+	require.True(t, admitted)
+	generation, _ = allocationManager.GetAllocatedGeneration(pod.UID)
+	assert.Equal(t, int64(1), generation, "re-admitting the pod keeps the allocated generation")
+	assert.Equal(t, int64(2), tooLarge.Generation, "the pod is not mutated")
+
+	// Allocating the resize records its generation.
+	resized := pod.DeepCopy()
+	resized.Generation = 3
+	resized.Spec.Containers[0].Resources = cpu("2")
+	allocationManager.(*manager).podProvider.(*fakePodProvider).getPodByUID = func(types.UID) (*v1.Pod, bool) { return resized, true }
+	allocationManager.PushPendingAllocation(logger, pod.UID)
+	allocationManager.RetryPendingAllocations(tCtx, TriggerReasonPodUpdated)
+	generation, _ = allocationManager.GetAllocatedGeneration(pod.UID)
+	assert.Equal(t, int64(3), generation, "allocating a resize records its generation")
+
+	// A pod allocated without a generation, e.g. by an older kubelet, gets the generation it is
+	// admitted at.
+	require.NoError(t, allocationManager.SetAllocatedPod(logger, &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: pod.UID, Name: pod.Name, Namespace: pod.Namespace}, Spec: resized.Spec}))
+	_, ok = allocationManager.GetAllocatedGeneration(pod.UID)
+	require.False(t, ok, "unknown generation")
+	admitted, _, _ = allocationManager.AddPod(tCtx, nil, resized)
+	require.True(t, admitted)
+	generation, _ = allocationManager.GetAllocatedGeneration(pod.UID)
+	assert.Equal(t, int64(3), generation)
+}
+
 func TestIsResizeIncreasingRequests(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
 
@@ -3015,12 +2964,10 @@ func TestRecordPodDeferredAcceptedResizes(t *testing.T) {
 		trigger             string
 		hasPendingCondition bool
 		expectedMetrics     string
-		expectedEvent       string
 	}{
 		{
-			name:          "trigger reason: pod updated, no pending condition",
-			trigger:       TriggerReasonPodUpdated,
-			expectedEvent: `Normal ResizeStarted Pod resize started: {"containers":[{"name":"c1","resources":{"requests":{"cpu":"500m","memory":"500Mi"}}}],"generation":0}`,
+			name:    "trigger reason: pod updated, no pending condition",
+			trigger: TriggerReasonPodUpdated,
 		},
 		{
 			name:                "trigger reason: pod resized, pending condition",
@@ -3031,7 +2978,6 @@ func TestRecordPodDeferredAcceptedResizes(t *testing.T) {
 					# TYPE kubelet_pod_deferred_accepted_resizes_total counter
 					kubelet_pod_deferred_accepted_resizes_total{retry_trigger="pod_resized"} 1
 			`,
-			expectedEvent: `Normal ResizeStarted Pod resize started: {"containers":[{"name":"c1","resources":{"requests":{"cpu":"500m","memory":"500Mi"}}}],"generation":0}`,
 		},
 		{
 			name:                "trigger reason: periodic retry, pending condition",
@@ -3043,7 +2989,6 @@ func TestRecordPodDeferredAcceptedResizes(t *testing.T) {
 					kubelet_pod_deferred_accepted_resizes_total{retry_trigger="periodic_retry"} 1
 					kubelet_pod_deferred_accepted_resizes_total{retry_trigger="pod_resized"} 1
 			`,
-			expectedEvent: `Normal ResizeStarted Pod resize started: {"containers":[{"name":"c1","resources":{"requests":{"cpu":"500m","memory":"500Mi"}}}],"generation":0}`,
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -3098,10 +3043,8 @@ func TestRecordPodDeferredAcceptedResizes(t *testing.T) {
 				legacyregistry.DefaultGatherer, strings.NewReader(tc.expectedMetrics), "kubelet_pod_deferred_accepted_resizes_total",
 			))
 
-			fakeRecorder := am.(*manager).recorder.(*record.FakeRecorder)
-			require.Len(t, fakeRecorder.Events, 1)
-			event := <-fakeRecorder.Events
-			require.Equal(t, tc.expectedEvent, event)
+			// The kubelet reports the resize as started when it syncs the pod.
+			require.Empty(t, am.(*manager).recorder.(*record.FakeRecorder).Events)
 		})
 	}
 }
@@ -3647,13 +3590,6 @@ func TestAllocationManager_EmptyDirVolumeLimits_RetryPendingResizes(t *testing.T
 			},
 			expectResizeAllocated:  true,
 			expectedAllocatedLimit: resource.NewQuantity(1024*1024*256, resource.BinarySI),
-			expectedResizeConditions: []*v1.PodCondition{
-				{
-					Type:               v1.PodResizeInProgress,
-					Status:             "True",
-					ObservedGeneration: 2,
-				},
-			},
 		},
 		{
 			name:          "successfully scale down emptyDir limit when gate is enabled",
@@ -3724,13 +3660,6 @@ func TestAllocationManager_EmptyDirVolumeLimits_RetryPendingResizes(t *testing.T
 			},
 			expectResizeAllocated:  true,
 			expectedAllocatedLimit: resource.NewQuantity(1024*1024*64, resource.BinarySI),
-			expectedResizeConditions: []*v1.PodCondition{
-				{
-					Type:               v1.PodResizeInProgress,
-					Status:             "True",
-					ObservedGeneration: 2,
-				},
-			},
 		},
 		{
 			name:          "resize request is infeasible when gate is disabled",
@@ -4030,13 +3959,6 @@ func TestAllocationManager_EmptyDirVolumeLimits_RetryPendingResizes(t *testing.T
 			},
 			expectResizeAllocated:  true,
 			expectedAllocatedLimit: nil,
-			expectedResizeConditions: []*v1.PodCondition{
-				{
-					Type:               v1.PodResizeInProgress,
-					Status:             "True",
-					ObservedGeneration: 2,
-				},
-			},
 		},
 		{
 			name:          "successfully add emptyDir limit when gate is enabled",
@@ -4107,13 +4029,6 @@ func TestAllocationManager_EmptyDirVolumeLimits_RetryPendingResizes(t *testing.T
 			},
 			expectResizeAllocated:  true,
 			expectedAllocatedLimit: resource.NewQuantity(1024*1024*256, resource.BinarySI),
-			expectedResizeConditions: []*v1.PodCondition{
-				{
-					Type:               v1.PodResizeInProgress,
-					Status:             "True",
-					ObservedGeneration: 2,
-				},
-			},
 		},
 	}
 
@@ -4300,10 +4215,7 @@ func TestNonAllocatedPodsExcludedFromCapacity_Resize(t *testing.T) {
 
 	// If pendingPod was incorrectly included in capacity calculations, this
 	// resize would be deferred (1500m + 10000m > 4000m allocatable).
-	resizeStatus := allocationManager.(*manager).statusManager.GetPodResizeConditions(runningPod.UID)
-	require.Len(t, resizeStatus, 1)
-	assert.Equal(t, v1.PodResizeInProgress, resizeStatus[0].Type)
-	assert.Equal(t, v1.ConditionTrue, resizeStatus[0].Status)
+	assert.Empty(t, allocationManager.(*manager).statusManager.GetPodResizeConditions(runningPod.UID))
 
 	alloc, found := allocationManager.GetContainerResourceAllocation(runningPod.UID, "c1")
 	require.True(t, found)
@@ -4462,14 +4374,12 @@ func TestRetryPendingResizesTerminatingPods(t *testing.T) {
 		terminating          bool
 		hadDeferredCondition bool
 		expectAllocatedCPU   resource.Quantity
-		expectInProgress     bool
 		expectSyncTriggered  bool
 	}{
 		{
 			name:                 "running pod allocates pending resize",
 			hadDeferredCondition: true,
 			expectAllocatedCPU:   cpu200m,
-			expectInProgress:     true,
 			expectSyncTriggered:  true,
 		},
 		{
@@ -4477,7 +4387,6 @@ func TestRetryPendingResizesTerminatingPods(t *testing.T) {
 			terminating:          true,
 			hadDeferredCondition: true,
 			expectAllocatedCPU:   cpu100m,
-			expectInProgress:     false,
 			expectSyncTriggered:  true,
 		},
 		{
@@ -4485,7 +4394,6 @@ func TestRetryPendingResizesTerminatingPods(t *testing.T) {
 			terminating:          true,
 			hadDeferredCondition: false,
 			expectAllocatedCPU:   cpu100m,
-			expectInProgress:     false,
 			expectSyncTriggered:  false,
 		},
 	}
@@ -4557,13 +4465,7 @@ func TestRetryPendingResizesTerminatingPods(t *testing.T) {
 			require.True(t, found)
 			assert.True(t, tc.expectAllocatedCPU.Equal(*alloc.Requests.Cpu()), "expected allocated CPU %s, got %s", tc.expectAllocatedCPU.String(), alloc.Requests.Cpu().String())
 
-			conditions := am.statusManager.GetPodResizeConditions(resizedPod.UID)
-			if tc.expectInProgress {
-				require.Len(t, conditions, 1)
-				assert.Equal(t, v1.PodResizeInProgress, conditions[0].Type)
-			} else {
-				assert.Empty(t, conditions)
-			}
+			assert.Empty(t, am.statusManager.GetPodResizeConditions(resizedPod.UID))
 
 			assert.Equal(t, tc.expectSyncTriggered, resizedPod.Annotations["pod-sync-triggered"] == "true")
 		})

@@ -71,8 +71,12 @@ type Manager interface {
 	// field that is gated on allocation is pending. Callers must not mutate the returned pod.
 	UpdatePodFromAllocation(pod *v1.Pod) (*v1.Pod, bool)
 
-	// SetAllocatedPod checkpoints the allocation for a pod.
+	// SetAllocatedPod checkpoints the allocation for a pod, including its generation.
 	SetAllocatedPod(logger klog.Logger, allocatedPod *v1.Pod) error
+
+	// GetAllocatedGeneration returns the generation of the pod when its allocation was last
+	// updated, and whether it is known.
+	GetAllocatedGeneration(podUID types.UID) (int64, bool)
 
 	// AddPodAdmitHandlers adds the admit handlers to the allocation manager.
 	// TODO: See if we can remove this and just add them in the allocation manager constructor.
@@ -527,6 +531,16 @@ func (m *manager) SetAllocatedPod(logger klog.Logger, pod *v1.Pod) error {
 	return m.allocated.SetPod(logger, pod)
 }
 
+// GetAllocatedGeneration returns the generation of the pod when its allocation was last updated.
+// It is unknown for pods allocated by a kubelet that didn't record it.
+func (m *manager) GetAllocatedGeneration(podUID types.UID) (int64, bool) {
+	allocated, ok := m.allocated.GetPodReadOnly(podUID)
+	if !ok || allocated.Generation == 0 {
+		return 0, false
+	}
+	return allocated.Generation, true
+}
+
 func (m *manager) AddPodAdmitHandlers(handlers lifecycle.PodAdmitHandlers) {
 	for _, a := range handlers {
 		m.admitHandlers.AddPodAdmitHandler(a)
@@ -551,6 +565,13 @@ func (m *manager) AddPod(ctx context.Context, activePods []*v1.Pod, pod *v1.Pod)
 	})
 
 	if result.Admit {
+		// On a kubelet restart, the pod is admitted again as it was allocated, so keep the generation
+		// it was allocated at rather than that of a newer change that may still be pending.
+		if generation, ok := m.GetAllocatedGeneration(pod.UID); ok && generation != pod.Generation {
+			allocatedPod := *pod
+			allocatedPod.Generation = generation
+			pod = &allocatedPod
+		}
 		// Checkpoint the resource values at which the Pod has been admitted or resized.
 		if err := m.SetAllocatedPod(logger, pod); err != nil {
 			// TODO(vinaykul,InPlacePodVerticalScaling): Can we recover from this in some way? Investigate
@@ -606,16 +627,6 @@ func (m *manager) handlePendingAllocation(ctx context.Context, pod *v1.Pod) (lif
 			return lifecycle.PodAdmitResult{}, false, err
 		}
 		m.statusManager.ClearPodResizePendingCondition(pod.UID, metrics.DeferredResizeResolutionAccepted)
-
-		if resizeRequested {
-			// Clear any errors that may have been surfaced from a previous resize and update the
-			// generation of the resize in-progress condition.
-			m.statusManager.ClearPodResizeInProgressCondition(pod.UID)
-			m.statusManager.SetPodResizeInProgressCondition(pod.UID, "", "", pod.Generation)
-
-			msg := events.PodResizeStartedMsg(logger, pod, pod.Generation)
-			m.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeNormal, events.ResizeStarted, "%s", msg)
-		}
 		return result, true, nil
 	}
 

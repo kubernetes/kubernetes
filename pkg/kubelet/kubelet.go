@@ -2167,16 +2167,21 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 	}
 
 	// Check whether a resize is in progress so we can set the PodResizeInProgressCondition accordingly.
+	// The condition tracks the allocated resize, which may be older than the pod's generation.
+	allocatedGeneration, ok := kl.allocationManager.GetAllocatedGeneration(pod.UID)
+	if !ok {
+		allocatedGeneration = pod.Generation
+	}
 	if kl.containerRuntime.IsPodResizeInProgress(pod, podStatus) {
-		kl.statusManager.SetPodResizeInProgressCondition(pod.UID, "", "", pod.Generation)
+		if _, started := kl.statusManager.SetPodResizeInProgressCondition(pod.UID, "", "", allocatedGeneration); started {
+			msg := events.PodResizeStartedMsg(logger, pod, allocatedGeneration)
+			kl.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeNormal, events.ResizeStarted, "%s", msg)
+		}
 	} else if generation, cleared := kl.statusManager.ClearPodResizeInProgressCondition(pod.UID); cleared {
 		// (Allocated == Actual) => clear the resize in-progress status.
 		msg := events.PodResizeCompletedMsg(logger, pod, generation)
 		kl.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeNormal, events.ResizeCompleted, "%s", msg)
 	}
-	// TODO(natasha41575): There is a race condition here, where the goroutine in the
-	// allocation manager may allocate a new resize and unconditionally set the
-	// PodResizeInProgressCondition before we set the status below.
 
 	// Generate final API pod status with pod and status manager status
 	apiPodStatus := kl.generateAPIPodStatus(ctx, pod, podStatus, SyncPod)
@@ -2389,9 +2394,8 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 
 	for _, r := range result.SyncResults {
 		if r.Action == kubecontainer.ResizePodInPlace && r.Error != nil {
-			// If the condition already exists, the observedGeneration does not get updated.
-			if generation, updated := kl.statusManager.SetPodResizeInProgressCondition(pod.UID, v1.PodReasonError, r.Message, pod.Generation); updated {
-				msg := events.PodResizeErrorMsg(logger, pod, generation, r.Message)
+			if updated, _ := kl.statusManager.SetPodResizeInProgressCondition(pod.UID, v1.PodReasonError, r.Message, allocatedGeneration); updated {
+				msg := events.PodResizeErrorMsg(logger, pod, allocatedGeneration, r.Message)
 				kl.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeWarning, events.ResizeError, "%s", msg)
 			}
 		}
