@@ -30,13 +30,20 @@ type sortedNodeScores struct {
 
 // NewSortedScoredNodes creates a SortedScoredNodes backed by a max-heap keyed on TotalScore.
 func NewSortedScoredNodes(nodeScoreList []fwk.NodePluginScores) SortedScoredNodes {
-	var h nodeScoreHeap = nodeScoreList
+	return NewSortedRankedNodes(nodeScoreList, nil)
+}
+
+// NewSortedRankedNodes creates a SortedScoredNodes that returns nodes of a lower rank first
+// (see NodeWithRank) and orders nodes of the same rank like NewSortedScoredNodes does.
+// ranks[i] is the rank of nodeScoreList[i]. Nil ranks mean that the nodes are not ranked.
+func NewSortedRankedNodes(nodeScoreList []fwk.NodePluginScores, ranks []int) SortedScoredNodes {
+	h := nodeScoreHeap{scores: nodeScoreList, ranks: ranks}
 	heap.Init(&h)
 	return &sortedNodeScores{nodes: h}
 }
 
 func (s *sortedNodeScores) Pop() fwk.NodePluginScores {
-	return heap.Pop(&s.nodes).(fwk.NodePluginScores)
+	return heap.Pop(&s.nodes).(rankedNodeScores).NodePluginScores
 }
 
 func (s *sortedNodeScores) Len() int {
@@ -47,31 +54,57 @@ func (s *sortedNodeScores) Len() int {
 // Only the outer slice is copied. Each NodePluginScores.Scores slice is still
 // shared with the heap. Callers must not mutate the returned elements.
 func (s *sortedNodeScores) UnorderedList() []fwk.NodePluginScores {
-	result := make([]fwk.NodePluginScores, len(s.nodes))
-	copy(result, s.nodes)
+	result := make([]fwk.NodePluginScores, len(s.nodes.scores))
+	copy(result, s.nodes.scores)
 	return result
 }
 
 // nodeScoreHeap is a heap of fwk.NodePluginScores.
-type nodeScoreHeap []fwk.NodePluginScores
+type nodeScoreHeap struct {
+	scores []fwk.NodePluginScores
+	// ranks is parallel to scores. Keeping it apart from the scores lets the
+	// common, unranked case use the caller's slice as it is.
+	ranks []int
+}
+
+// rankedNodeScores is what nodeScoreHeap exchanges with container/heap.
+type rankedNodeScores struct {
+	fwk.NodePluginScores
+	rank int
+}
 
 var _ heap.Interface = &nodeScoreHeap{}
 
-func (h nodeScoreHeap) Len() int { return len(h) }
-func (h nodeScoreHeap) Less(i, j int) bool {
-	return (h[i].TotalScore > h[j].TotalScore ||
-		(h[i].TotalScore == h[j].TotalScore && h[i].Randomizer > h[j].Randomizer))
+func (h *nodeScoreHeap) Len() int { return len(h.scores) }
+func (h *nodeScoreHeap) Less(i, j int) bool {
+	if h.ranks != nil && h.ranks[i] != h.ranks[j] {
+		return h.ranks[i] < h.ranks[j]
+	}
+	return (h.scores[i].TotalScore > h.scores[j].TotalScore ||
+		(h.scores[i].TotalScore == h.scores[j].TotalScore && h.scores[i].Randomizer > h.scores[j].Randomizer))
 }
-func (h nodeScoreHeap) Swap(i, j int) { h[i], h[j] = h[j], h[i] }
+func (h *nodeScoreHeap) Swap(i, j int) {
+	h.scores[i], h.scores[j] = h.scores[j], h.scores[i]
+	if h.ranks != nil {
+		h.ranks[i], h.ranks[j] = h.ranks[j], h.ranks[i]
+	}
+}
 
 func (h *nodeScoreHeap) Push(x interface{}) {
-	*h = append(*h, x.(fwk.NodePluginScores))
+	n := x.(rankedNodeScores)
+	h.scores = append(h.scores, n.NodePluginScores)
+	if h.ranks != nil {
+		h.ranks = append(h.ranks, n.rank)
+	}
 }
 
 func (h *nodeScoreHeap) Pop() interface{} {
-	old := *h
-	n := len(old)
-	x := old[n-1]
-	*h = old[0 : n-1]
-	return x
+	last := len(h.scores) - 1
+	n := rankedNodeScores{NodePluginScores: h.scores[last]}
+	h.scores = h.scores[:last]
+	if h.ranks != nil {
+		n.rank = h.ranks[last]
+		h.ranks = h.ranks[:last]
+	}
+	return n
 }

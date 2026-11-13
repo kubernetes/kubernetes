@@ -87,6 +87,12 @@ func TestPodGroupPreemption(t *testing.T) {
 		// This avoids test flakiness caused by running multiple PodGroup scheduling cycles with a partial set of preemptor pods.
 		tempRemovePG       bool
 		expectedEventOrder []string
+		// opportunisticBatching drops the default topology spreading constraints, which is what
+		// keeps the pods of the other test cases from being signed and thus from being batched.
+		opportunisticBatching bool
+		// expectedMinBatchedPods is the least number of pods that opportunistic batching has to
+		// find a node for. Only preemptor pods are in question, as nothing else gets scheduled.
+		expectedMinBatchedPods int64
 	}{
 		{
 			name: "Full PodGroup Preemption",
@@ -279,6 +285,76 @@ func TestPodGroupPreemption(t *testing.T) {
 			tempRemovePG:                    true,
 			customPluginName:                "mockScorePlugin",
 			customPluginFunc:                newPresetScorePlugin(map[string]int64{"node1": 100, "node2": 0, "node3": 90, "node4": 0}),
+		},
+		{
+			name: "Preemption node ranking reuses capacity from already-condemned DisruptionModeAll PodGroup victim across nodes with opportunistic batching",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+				st.MakeNode().Name("node2").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+				st.MakeNode().Name("node3").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+				st.MakeNode().Name("node4").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+			},
+			podGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Name("victim-pg-1").Namespace("default").Priority(10).DisruptionModeAll().MinCount(2).Obj(),
+				st.MakePodGroup().Name("victim-pg-2").Namespace("default").Priority(10).DisruptionModeAll().MinCount(2).Obj(),
+				st.MakePodGroup().Name("preemptor-pg").Namespace("default").Priority(100).MinCount(2).Obj(),
+			},
+			initialPods: []*v1.Pod{
+				st.MakePod().Name("v1-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("victim-pg-1").ZeroTerminationGracePeriod().Priority(10).Node("node1").Obj(),
+				st.MakePod().Name("v1-2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("victim-pg-1").ZeroTerminationGracePeriod().Priority(10).Node("node2").Obj(),
+				st.MakePod().Name("v2-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("victim-pg-2").ZeroTerminationGracePeriod().Priority(10).Node("node3").Obj(),
+				st.MakePod().Name("v2-2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("victim-pg-2").ZeroTerminationGracePeriod().Priority(10).Node("node4").Obj(),
+			},
+			preemptorPods: []*v1.Pod{
+				st.MakePod().Name("high-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("preemptor-pg").ZeroTerminationGracePeriod().Priority(100).Obj(),
+				st.MakePod().Name("high-2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("preemptor-pg").ZeroTerminationGracePeriod().Priority(100).Obj(),
+			},
+			// The nodes found for high-1 are cached for high-2, in the order of node3, node2 and node4 (all Rank 1).
+			// Condemning victim-pg-1 for high-1 on node1 also changes the rank of node2, so high-2 must not get
+			// node3 from the cache but have the nodes ranked again, which spares victim-pg-2.
+			expectedScheduled:               []string{"high-1", "high-2", "v2-1", "v2-2"},
+			expectedCandidatesForPreemption: []string{"v1-1", "v1-2"},
+			expectedToHaveNNNInfo:           []string{"high-1", "high-2"},
+			expectedPodsPreemptedByWAP:      2,
+			tempRemovePG:                    true,
+			customPluginName:                "mockScorePlugin",
+			customPluginFunc:                newPresetScorePlugin(map[string]int64{"node1": 100, "node2": 0, "node3": 90, "node4": 0}),
+			opportunisticBatching:           true,
+		},
+		{
+			name: "Preemption node ranking orders the nodes that opportunistic batching hints",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+				st.MakeNode().Name("node2").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+				st.MakeNode().Name("node3").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+				st.MakeNode().Name("node4").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+			},
+			podGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Name("pg1").Namespace("default").Priority(100).MinCount(3).Obj(),
+			},
+			initialPods: []*v1.Pod{
+				st.MakePod().Name("low-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").ZeroTerminationGracePeriod().Priority(10).Node("node1").Obj(),
+				st.MakePod().Name("low-2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").ZeroTerminationGracePeriod().Priority(10).Node("node2").Obj(),
+				st.MakePod().Name("mid-3").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").ZeroTerminationGracePeriod().Priority(20).Node("node3").Obj(),
+				st.MakePod().Name("mid-4").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").ZeroTerminationGracePeriod().Priority(30).Node("node4").Obj(),
+			},
+			preemptorPods: []*v1.Pod{
+				st.MakePod().Name("high-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
+				st.MakePod().Name("high-2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
+				st.MakePod().Name("high-3").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
+			},
+			// The first pod has all nodes ranked: node1 and node2 (Rank 1), node3 (Rank 2), node4 (Rank 3).
+			// It takes node2 for its score, and the other two pods get node1 and node3 from the cache.
+			// mockScorePlugin would give them node4 and node3 if the cached nodes weren't ordered by rank.
+			expectedScheduled:               []string{"high-1", "high-2", "high-3", "mid-4"},
+			expectedCandidatesForPreemption: []string{"low-1", "low-2", "mid-3"},
+			expectedToHaveNNNInfo:           []string{"high-1", "high-2", "high-3"},
+			expectedPodsPreemptedByWAP:      3,
+			tempRemovePG:                    true,
+			customPluginName:                "mockScorePlugin",
+			customPluginFunc:                newPresetScorePlugin(map[string]int64{"node1": 0, "node2": 10, "node3": 50, "node4": 100}),
+			opportunisticBatching:           true,
+			expectedMinBatchedPods:          2,
 		},
 		{
 			name: "PDB Violation Handling (Reprieve)",
@@ -1262,6 +1338,16 @@ func TestPodGroupPreemption(t *testing.T) {
 					cfg.Profiles[0].Plugins.MultiPoint.Enabled = append(cfg.Profiles[0].Plugins.MultiPoint.Enabled, config.Plugin{Name: tt.customPluginName})
 				}
 
+				if tt.opportunisticBatching {
+					for _, pluginConfig := range cfg.Profiles[0].PluginConfig {
+						if pluginConfig.Name == names.PodTopologySpread {
+							args := pluginConfig.Args.(*config.PodTopologySpreadArgs)
+							args.DefaultingType = config.ListDefaulting
+							args.DefaultConstraints = nil
+						}
+					}
+				}
+
 				// Set PodMaxBackoff to 1 second to turn on backoff and allow apiCacher to get information about
 				// pod NNN. Without this we might have a race between starting binding and update of apiCacher.
 				testCtx := testutils.InitTestSchedulerWithOptions(t,
@@ -1278,6 +1364,16 @@ func TestPodGroupPreemption(t *testing.T) {
 				t.Cleanup(func() {
 					cleanupSharedPodGroupPreemptionResources(t, testCtx.Ctx, cs, ns, append(tt.initialPods, tt.unscheduledPodsWithNNN...), tt.preemptorPods, tt.podGroups, nil, tt.pdb, tt.nodes)
 				})
+
+				profile := testCtx.Scheduler.Profiles[v1.DefaultSchedulerName]
+				if tt.opportunisticBatching {
+					// Unsigned pods are never batched, which would turn the test case into a copy of its unbatched twin.
+					for _, p := range tt.preemptorPods {
+						if profile.SignPod(testCtx.Ctx, p) == nil {
+							t.Fatalf("Pod %s has no scheduling signature, opportunistic batching can't be tested", p.Name)
+						}
+					}
+				}
 
 				// Create nodes
 				for _, n := range tt.nodes {
@@ -1526,6 +1622,14 @@ func TestPodGroupPreemption(t *testing.T) {
 					actualEvents := recorder.GetEvents()
 					if diff := cmp.Diff(tt.expectedEventOrder, actualEvents); diff != "" {
 						t.Errorf("Unexpected event order (-want,+got):\n%s", diff)
+					}
+				}
+
+				// 10b. Verify that opportunistic batching took part in scheduling the preemptor pods
+				if tt.expectedMinBatchedPods > 0 {
+					batchedPods := profile.(interface{ TotalBatchedPods() int64 }).TotalBatchedPods()
+					if batchedPods < tt.expectedMinBatchedPods {
+						t.Errorf("Expected at least %d pods to be scheduled on a node hinted by opportunistic batching, got %d", tt.expectedMinBatchedPods, batchedPods)
 					}
 				}
 
@@ -4433,6 +4537,11 @@ func (p *mockScorePlugin) Score(ctx context.Context, state fwk.CycleState, pod *
 
 func (p *mockScorePlugin) ScoreExtensions() fwk.ScoreExtensions {
 	return nil
+}
+
+// SignPod lets opportunistic batching sign the pods that the plugin scores. No pod attribute affects the scores.
+func (p *mockScorePlugin) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.SignFragment, *fwk.Status) {
+	return nil, nil
 }
 
 func (p *mockScorePlugin) PlacementScoreExtensions() fwk.PlacementScoreExtensions {

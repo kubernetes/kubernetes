@@ -635,7 +635,9 @@ func findNodesThatPassExtenders(ctx context.Context, extenders []fwk.Extender, p
 // which return a score for each node from the call to RunScorePlugins().
 // The scores from each plugin are added together to make the score for that node, then
 // any extenders are run as well.
-// All scores are finally combined (added) to get the total weighted scores of all nodes
+// All scores are finally combined (added) to get the total weighted scores of all nodes.
+// Ranks play no part here: the returned scores are in the order of rankedNodes, and it is
+// up to the caller which ranks to pass and how to combine them with the scores.
 func prioritizeNodes(
 	ctx context.Context,
 	schedFramework framework.Framework,
@@ -651,17 +653,9 @@ func prioritizeNodes(
 
 	var nodes []fwk.NodeInfo
 	if len(rankedNodes) > 0 {
-		minRank := rankedNodes[0].Rank
-		for _, n := range rankedNodes[1:] {
-			if n.Rank < minRank {
-				minRank = n.Rank
-			}
-		}
-		nodes = make([]fwk.NodeInfo, 0, len(rankedNodes))
-		for _, n := range rankedNodes {
-			if n.Rank == minRank {
-				nodes = append(nodes, n.NodeInfo)
-			}
+		nodes = make([]fwk.NodeInfo, len(rankedNodes))
+		for i, n := range rankedNodes {
+			nodes[i] = n.NodeInfo
 		}
 	}
 

@@ -205,7 +205,7 @@ func newTestNodes(n []string) *testSortedScoredNodes {
 
 const (
 	batchAttemptsHelp        = "Counts of results when we attempt to use batching, by scheduler profile. 'no_hint' covers every pod that asked for a hint and got none, including pods that later fail to schedule. 'hint_used' and 'hint_not_used' are recorded only when a node is selected, and say whether it was the hinted one."
-	batchCacheFlushedHelp    = "Counts of batch cache flushes by reason and scheduler profile. A flush is counted when an existing batch state is dropped instead of providing a hint. 'pod_skipped' means the previous pod was handled by another profile or failed to schedule, 'pod_nominated' means the pod has a nominated node, 'pod_incompatible' means the pod's signature is missing or differs from the batch's, 'expired' means the state is older than the maximum batch age, 'node_missing' means a node needed to reuse the state is no longer in the snapshot, and 'filter_error', 'prescore_error', 'rescore_error' and 'normalize_error' mean that phase failed while rescoring."
+	batchCacheFlushedHelp    = "Counts of batch cache flushes by reason and scheduler profile. A flush is counted when an existing batch state is dropped instead of providing a hint. 'pod_skipped' means the previous pod was handled by another profile or failed to schedule, 'pod_nominated' means the pod has a nominated node, 'pod_incompatible' means the pod's signature is missing or differs from the batch's, 'expired' means the state is older than the maximum batch age, 'node_missing' means a node needed to reuse the state is no longer in the snapshot, 'rank_invalidated' means the ranks that order the nodes of the state no longer hold, and 'filter_error', 'rank_error', 'prescore_error', 'rescore_error' and 'normalize_error' mean that phase failed while rescoring."
 	storeScheduleResultsHelp = "Counts of the outcomes of storing scheduling results for batching, by scheduler profile. 'stored' means the pod seeded a batch, 'pod_not_batchable' means the pod has no signature, and 'empty_list' means no other feasible nodes were left to cache. Pods that used the hinted node store nothing."
 )
 
@@ -963,63 +963,300 @@ func TestBatchMetricsOtherPaths(t *testing.T) {
 	}
 }
 
-func TestBatchSetDisabled(t *testing.T) {
-	var nilBatch *OpportunisticBatch
-	nilBatch.SetDisabled(true)
-
-	_, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	testFwk, lister, err := newBatchTestFramework(ctx, nil, nil)
-	if err != nil {
-		t.Fatalf("Failed to create framework: %v", err)
+// TestBatchRankInvalidation checks which rank invalidations make the batch give up its state.
+// In every case the first pod blocks n3, so the hint for the second pod can only be n1, the cached node.
+func TestBatchRankInvalidation(t *testing.T) {
+	tests := []struct {
+		name string
+		// ranked says whether a RankNodes plugin ordered the nodes that the first pod was scheduled on.
+		ranked bool
+		// invalidateBefore runs before the first pod is scheduled, i.e. before there is a state.
+		invalidateBefore func(batch *OpportunisticBatch)
+		// invalidate runs between the two pods.
+		invalidate  func(batch *OpportunisticBatch)
+		wantHint    string
+		wantFlushes map[string]int
+	}{
+		{
+			name:     "nothing invalidated",
+			ranked:   true,
+			wantHint: "n1",
+		},
+		{
+			name:       "node chosen for the previous pod is evaluated again anyway",
+			ranked:     true,
+			invalidate: func(batch *OpportunisticBatch) { batch.InvalidateNodeRank("n3") },
+			wantHint:   "n1",
+		},
+		{
+			name:        "cached node",
+			ranked:      true,
+			invalidate:  func(batch *OpportunisticBatch) { batch.InvalidateNodeRank("n1") },
+			wantFlushes: map[string]int{metrics.BatchFlushRankInvalidated: 1},
+		},
+		{
+			name:        "node that is not cached may have become the best one",
+			ranked:      true,
+			invalidate:  func(batch *OpportunisticBatch) { batch.InvalidateNodeRank("n9") },
+			wantFlushes: map[string]int{metrics.BatchFlushRankInvalidated: 1},
+		},
+		{
+			name:   "node chosen for the previous pod and another one",
+			ranked: true,
+			invalidate: func(batch *OpportunisticBatch) {
+				batch.InvalidateNodeRank("n3")
+				batch.InvalidateNodeRank("n9")
+				batch.InvalidateNodeRank("n3")
+			},
+			wantFlushes: map[string]int{metrics.BatchFlushRankInvalidated: 1},
+		},
+		{
+			name:        "all nodes",
+			ranked:      true,
+			invalidate:  func(batch *OpportunisticBatch) { batch.InvalidateAllNodeRanks() },
+			wantFlushes: map[string]int{metrics.BatchFlushRankInvalidated: 1},
+		},
+		{
+			name:       "ranks don't matter to nodes that were not ranked",
+			invalidate: func(batch *OpportunisticBatch) { batch.InvalidateAllNodeRanks() },
+			wantHint:   "n1",
+		},
+		{
+			name:             "ranks invalidated before the nodes were ranked",
+			ranked:           true,
+			invalidateBefore: func(batch *OpportunisticBatch) { batch.InvalidateAllNodeRanks() },
+			wantHint:         "n1",
+		},
 	}
 
-	pod1 := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1", UID: types.UID(blockingPodID("1"))}}
-	pod2 := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod2", UID: types.UID(blockingPodID("2"))}}
-	pod3 := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod3", UID: types.UID(blockingPodID("3"))}}
-	n3Info := framework.NewNodeInfo(pod1)
-	n3Info.SetNode(&v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "n3", UID: "n3"}})
-	lister.nodes = nodeInfoLister{n3Info}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
 
-	sig := fwk.PodSignature("sig")
-	batch := newOpportunisticBatch(testFwk, true, time.Minute)
-	state := framework.NewCycleState()
+			testFwk, lister, err := newBatchTestFramework(ctx, nil, nil)
+			if err != nil {
+				t.Fatalf("Failed to create framework: %v", err)
+			}
+			batch := newOpportunisticBatch(testFwk, false, time.Minute)
+			sig := fwk.PodSignature("sig")
+			pod1 := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1", UID: types.UID(blockingPodID("1"))}}
+			pod2 := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod2", UID: types.UID(blockingPodID("2"))}}
 
-	// Seed batch state in cycle 1.
-	batch.StoreScheduleResults(ctx, sig, "", "n3", newTestNodes([]string{"n1", "n2"}), 1)
-	if batch.state == nil {
-		t.Fatal("expected non-nil batch state before disabling")
-	}
+			if tt.invalidateBefore != nil {
+				tt.invalidateBefore(batch)
+			}
+			batch.GetNodeHint(ctx, pod1, sig, framework.NewCycleState(), 1)
+			if tt.ranked {
+				batch.nodesRanked()
+			}
+			batch.StoreScheduleResults(ctx, sig, "", "n3", newTestNodes([]string{"n1"}), 1)
+			n3Info := framework.NewNodeInfo(pod1)
+			n3Info.SetNode(&v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "n3", UID: "n3"}})
+			lister.nodes = nodeInfoLister{n3Info}
 
-	// Disabling clears existing state and suppresses hints and result storage.
-	batch.SetDisabled(true)
-	if batch.state != nil {
-		t.Fatal("expected nil batch state after SetDisabled(true)")
-	}
-	if hint := batch.GetNodeHint(ctx, pod2, sig, state, 1); hint != "" {
-		t.Fatalf("expected empty hint while disabled, got %q", hint)
-	}
-	batch.StoreScheduleResults(ctx, sig, "", "n1", newTestNodes([]string{"n2"}), 1)
-	if batch.state != nil {
-		t.Fatal("expected StoreScheduleResults to be ignored while disabled")
-	}
+			if tt.invalidate != nil {
+				tt.invalidate(batch)
+			}
+			resetBatchMetrics()
+			if hint := batch.GetNodeHint(ctx, pod2, sig, framework.NewCycleState(), 2); hint != tt.wantHint {
+				t.Fatalf("got hint %q, want %q", hint, tt.wantHint)
+			}
 
-	// Re-enabling starts with clean state and allows subsequent cycles to batch normally.
-	batch.SetDisabled(false)
-	if hint := batch.GetNodeHint(ctx, pod2, sig, state, 1); hint != "" {
-		t.Fatalf("expected empty hint immediately after SetDisabled(false), got %q", hint)
-	}
-	batch.StoreScheduleResults(ctx, sig, "", "n3", newTestNodes([]string{"n1"}), 2)
-	if hint := batch.GetNodeHint(ctx, pod3, sig, state, 2); hint != "n1" {
-		t.Fatalf("expected hint %q after re-enabling, got %q", "n1", hint)
+			var wantAttempts map[string]int
+			if tt.wantHint == "" {
+				wantAttempts = map[string]int{metrics.BatchAttemptNoHint: 1}
+				if batch.state != nil {
+					t.Error("expected batch state to be dropped")
+				}
+			}
+			assertBatchCounters(t, testFwk.ProfileName(), wantAttempts, tt.wantFlushes, 0)
+		})
 	}
 }
 
+// rankingBatchHandle ranks nodes on behalf of a framework that has no RankNodes plugin.
+type rankingBatchHandle struct {
+	batchHandle
+	// ranks holds the rank of each node. Nil stands for RankNodes plugins that don't rank.
+	ranks map[string]int
+	err   error
+	calls int
+}
+
+func (h *rankingBatchHandle) RunRankNodesPlugins(_ context.Context, _ fwk.CycleState, _ *v1.Pod, nodes []fwk.NodeInfo) ([]framework.NodeWithRank, *fwk.Status) {
+	h.calls++
+	if h.err != nil {
+		return nil, fwk.AsStatus(h.err)
+	}
+	var ranked []framework.NodeWithRank
+	for _, n := range nodes {
+		if rank, ok := h.ranks[n.Node().Name]; ok {
+			ranked = append(ranked, framework.NodeWithRank{NodeInfo: n, Rank: rank})
+		}
+	}
+	sort.SliceStable(ranked, func(i, j int) bool { return ranked[i].Rank < ranked[j].Rank })
+	return ranked, nil
+}
+
+// TestBatchRescoreRanked checks that the node chosen for the previous pod, when it is still feasible,
+// competes with the cached nodes by rank first and by score second.
+func TestBatchRescoreRanked(t *testing.T) {
+	// The cached nodes are n1 and n3. The first pod went to n2, which stays feasible and is scored again.
+	const n1CachedScore, n3CachedScore = 50, 80
+
+	tests := []struct {
+		name string
+		// ordinaryCycle makes the second pod a pod that is scheduled on its own.
+		ordinaryCycle bool
+		ranks         map[string]int
+		rankErr       error
+		n2Score       int64
+		wantRankCalls int
+		// wantNodes are the hint followed by the nodes that remain cached, in the order they would be hinted.
+		wantNodes       []string
+		wantRanked      bool
+		wantFlushReason string
+	}{
+		{
+			name:          "better rank beats a higher score",
+			ranks:         map[string]int{"n1": 1, "n2": 0, "n3": 1},
+			n2Score:       10,
+			wantRankCalls: 1,
+			wantNodes:     []string{"n2", "n3", "n1"},
+			wantRanked:    true,
+		},
+		{
+			name:          "worse rank loses to a lower score",
+			ranks:         map[string]int{"n1": 0, "n2": 1, "n3": 0},
+			n2Score:       100,
+			wantRankCalls: 1,
+			wantNodes:     []string{"n3", "n1", "n2"},
+			wantRanked:    true,
+		},
+		{
+			name:          "cached nodes get their current ranks",
+			ranks:         map[string]int{"n1": 0, "n2": 1, "n3": 2},
+			n2Score:       10,
+			wantRankCalls: 1,
+			wantNodes:     []string{"n1", "n2", "n3"},
+			wantRanked:    true,
+		},
+		{
+			name:          "score decides within a rank",
+			ranks:         map[string]int{"n1": 0, "n2": 0, "n3": 0},
+			n2Score:       60,
+			wantRankCalls: 1,
+			wantNodes:     []string{"n3", "n2", "n1"},
+			wantRanked:    true,
+		},
+		{
+			name:          "score decides when RankNodes plugins don't rank",
+			n2Score:       100,
+			wantRankCalls: 1,
+			wantNodes:     []string{"n2", "n3", "n1"},
+		},
+		{
+			name:          "nodes are not ranked outside of a PodGroup scheduling cycle",
+			ordinaryCycle: true,
+			ranks:         map[string]int{"n1": 0, "n2": 1, "n3": 2},
+			n2Score:       100,
+			wantNodes:     []string{"n2", "n3", "n1"},
+		},
+		{
+			name:            "rank error gives no hint",
+			rankErr:         fmt.Errorf("injected rank error"),
+			n2Score:         100,
+			wantRankCalls:   1,
+			wantFlushReason: metrics.BatchFlushRankError,
+		},
+		{
+			name:            "node without a rank gives no hint",
+			ranks:           map[string]int{"n1": 0, "n2": 1},
+			n2Score:         100,
+			wantRankCalls:   1,
+			wantFlushReason: metrics.BatchFlushRankError,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			testFwk, lister, err := newBatchTestFramework(ctx, &configurableScorePlugin{score: tt.n2Score}, nil)
+			if err != nil {
+				t.Fatalf("Failed to create framework: %v", err)
+			}
+			handle := &rankingBatchHandle{batchHandle: testFwk, ranks: tt.ranks, err: tt.rankErr}
+			batch := newOpportunisticBatch(handle, true, time.Minute)
+			sig := fwk.PodSignature("sig")
+			newState := func() *framework.CycleState {
+				state := framework.NewCycleState()
+				if !tt.ordinaryCycle {
+					state.SetPodGroupCycleState(framework.NewCycleState())
+				}
+				return state
+			}
+
+			pod1 := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1", UID: types.UID(nonBlockingPodID("1"))}}
+			batch.GetNodeHint(ctx, pod1, sig, newState(), 1)
+			batch.StoreScheduleResults(ctx, sig, "", "n2", framework.NewSortedScoredNodes([]fwk.NodePluginScores{
+				{Name: "n1", RawScores: []fwk.PluginScore{{Name: "configurableScore", Score: n1CachedScore}}},
+				{Name: "n3", RawScores: []fwk.PluginScore{{Name: "configurableScore", Score: n3CachedScore}}},
+			}), 1)
+
+			var nodes nodeInfoLister
+			for _, name := range []string{"n1", "n2", "n3"} {
+				nodeInfo := framework.NewNodeInfo()
+				nodeInfo.SetNode(&v1.Node{ObjectMeta: metav1.ObjectMeta{Name: name, UID: types.UID(name)}})
+				nodes = append(nodes, nodeInfo)
+			}
+			lister.nodes = nodes
+
+			pod2 := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod2", UID: types.UID(nonBlockingPodID("2"))}}
+			resetBatchMetrics()
+			gotNodes := []string{batch.GetNodeHint(ctx, pod2, sig, newState(), 1)}
+			if handle.calls != tt.wantRankCalls {
+				t.Errorf("RunRankNodesPlugins was called %d times, want %d", handle.calls, tt.wantRankCalls)
+			}
+
+			var wantFlushes, wantAttempts map[string]int
+			if tt.wantFlushReason != "" {
+				wantFlushes = map[string]int{tt.wantFlushReason: 1}
+				wantAttempts = map[string]int{metrics.BatchAttemptNoHint: 1}
+				if gotNodes[0] != "" {
+					t.Errorf("got hint %q, want none", gotNodes[0])
+				}
+				if batch.state != nil {
+					t.Error("expected batch state to be dropped")
+				}
+			} else {
+				if batch.state == nil {
+					t.Fatal("expected batch state to be kept")
+				}
+				if batch.state.ranked != tt.wantRanked {
+					t.Errorf("batch state ranked = %v, want %v", batch.state.ranked, tt.wantRanked)
+				}
+				for batch.state.sortedNodes.Len() > 0 {
+					gotNodes = append(gotNodes, batch.state.sortedNodes.Pop().Name)
+				}
+				if diff := cmp.Diff(tt.wantNodes, gotNodes); diff != "" {
+					t.Errorf("unexpected hint and remaining nodes (-want,+got):\n%s", diff)
+				}
+			}
+			assertBatchCounters(t, testFwk.ProfileName(), wantAttempts, wantFlushes, 1)
+		})
+	}
+}
+
+// podGroupPostFilterCallbackPlugin calls the scheduling function it is given a number of times.
 type podGroupPostFilterCallbackPlugin struct {
-	name string
-	fh   fwk.Handle
+	name  string
+	fh    fwk.Handle
+	calls int
 }
 
 func (pl *podGroupPostFilterCallbackPlugin) Name() string {
@@ -1027,12 +1264,16 @@ func (pl *podGroupPostFilterCallbackPlugin) Name() string {
 }
 
 func (pl *podGroupPostFilterCallbackPlugin) PodGroupPostFilter(ctx context.Context, _ fwk.PodGroupCycleState, _ fwk.PodGroupInfo, pgSchedulingFunc fwk.PodGroupSchedulingFunc) (*fwk.PodGroupPostFilterResult, *fwk.Status) {
-	if _, status := pgSchedulingFunc(ctx, pl.fh.NewPodGroupCycleState()); !status.IsSuccess() {
-		return nil, status
+	for range pl.calls {
+		if _, status := pgSchedulingFunc(ctx, pl.fh.NewPodGroupCycleState()); !status.IsSuccess() {
+			return nil, status
+		}
 	}
 	return &fwk.PodGroupPostFilterResult{}, fwk.NewStatus(fwk.Success)
 }
 
+// TestRunPodGroupPostFilterPluginsBatching checks that every scheduling pass of a PodGroupPostFilter plugin
+// batches on its own: it neither sees what was cached before it nor leaves anything behind.
 func TestRunPodGroupPostFilterPluginsBatching(t *testing.T) {
 	for _, opportunisticBatchingEnabled := range []bool{true, false} {
 		t.Run(fmt.Sprintf("OpportunisticBatching=%v", opportunisticBatchingEnabled), func(t *testing.T) {
@@ -1047,18 +1288,18 @@ func TestRunPodGroupPostFilterPluginsBatching(t *testing.T) {
 
 			pod1 := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1", UID: types.UID(blockingPodID("1"))}}
 			pod2 := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod2", UID: types.UID(blockingPodID("2"))}}
-			pod3 := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod3", UID: types.UID(blockingPodID("3"))}}
 			n3Info := framework.NewNodeInfo(pod1)
 			n3Info.SetNode(&v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "n3", UID: "n3"}})
 			lister := &sharedLister{nodes: nodeInfoLister{n3Info}}
 
 			const pgPostFilterPluginName = "pgPostFilterCallback"
+			const schedulingPasses = 2
 			r := Registry{
 				"batchTest":     newBatchTestPlugin,
 				queueSortPlugin: newQueueSortPlugin,
 				bindPlugin:      newBindPlugin,
 				pgPostFilterPluginName: func(_ context.Context, _ runtime.Object, fh fwk.Handle) (fwk.Plugin, error) {
-					return &podGroupPostFilterCallbackPlugin{name: pgPostFilterPluginName, fh: fh}, nil
+					return &podGroupPostFilterCallbackPlugin{name: pgPostFilterPluginName, fh: fh, calls: schedulingPasses}, nil
 				},
 			}
 			profile := config.KubeSchedulerProfile{
@@ -1080,11 +1321,12 @@ func TestRunPodGroupPostFilterPluginsBatching(t *testing.T) {
 			sig := fwk.PodSignature("sig")
 			state := framework.NewCycleState()
 
+			// seedBatch behaves like a pod that went to n3 and left the other nodes for the pods after it.
+			seedBatch := func(otherNodes ...string) {
+				f.StoreScheduleResults(ctx, sig, "", "n3", newTestNodes(otherNodes), 1)
+			}
 			if opportunisticBatchingEnabled {
-				if fwkImpl.batch == nil {
-					t.Fatal("expected non-nil batch when OpportunisticBatching is enabled")
-				}
-				f.StoreScheduleResults(ctx, sig, "", "n3", newTestNodes([]string{"n1", "n2"}), 1)
+				seedBatch("n1", "n2")
 				if fwkImpl.batch.state == nil {
 					t.Fatal("expected non-nil batch state before RunPodGroupPostFilterPlugins")
 				}
@@ -1092,23 +1334,20 @@ func TestRunPodGroupPostFilterPluginsBatching(t *testing.T) {
 				t.Fatal("expected nil batch when OpportunisticBatching is disabled")
 			}
 
-			schedulingFuncCalled := false
+			passes := 0
 			pgSchedulingFunc := func(ctx context.Context, _ fwk.PodGroupCycleState) (*fwk.PodGroupAssignments, *fwk.Status) {
-				schedulingFuncCalled = true
+				passes++
 				if opportunisticBatchingEnabled {
-					if !fwkImpl.batch.disabled {
-						t.Error("expected batch.disabled to be true inside RunPodGroupPostFilterPlugins")
-					}
 					if fwkImpl.batch.state != nil {
-						t.Error("expected batch.state to be cleared inside RunPodGroupPostFilterPlugins")
+						t.Errorf("pass %d: expected no batch state at the start of the scheduling pass", passes)
 					}
-					if hint := f.GetNodeHint(ctx, pod2, sig, state, 1); hint != "" {
-						t.Errorf("expected empty hint inside RunPodGroupPostFilterPlugins, got %q", hint)
+					// A node that only this pass caches tells its hints from those of the other passes.
+					passNode := fmt.Sprintf("pass%d", passes)
+					seedBatch(passNode)
+					if hint := f.GetNodeHint(ctx, pod2, sig, state, 1); hint != passNode {
+						t.Errorf("pass %d: got hint %q, want %q", passes, hint, passNode)
 					}
-					f.StoreScheduleResults(ctx, sig, "", "n1", newTestNodes([]string{"n2"}), 1)
-					if fwkImpl.batch.state != nil {
-						t.Error("expected StoreScheduleResults to be ignored inside RunPodGroupPostFilterPlugins")
-					}
+					seedBatch(passNode)
 				}
 				return &fwk.PodGroupAssignments{}, fwk.NewStatus(fwk.Success)
 			}
@@ -1117,20 +1356,20 @@ func TestRunPodGroupPostFilterPluginsBatching(t *testing.T) {
 			if !status.IsSuccess() {
 				t.Fatalf("RunPodGroupPostFilterPlugins failed: %v", status)
 			}
-			if !schedulingFuncCalled {
-				t.Fatal("expected pgSchedulingFunc to be called")
+			if passes != schedulingPasses {
+				t.Fatalf("pgSchedulingFunc was called %d times, want %d", passes, schedulingPasses)
 			}
 
 			if opportunisticBatchingEnabled {
-				if fwkImpl.batch.disabled {
-					t.Fatal("expected batch.disabled to be restored to false after RunPodGroupPostFilterPlugins")
+				if fwkImpl.batch.state != nil {
+					t.Fatal("expected no batch state after RunPodGroupPostFilterPlugins")
 				}
 				if hint := f.GetNodeHint(ctx, pod2, sig, state, 1); hint != "" {
 					t.Fatalf("expected empty hint immediately after RunPodGroupPostFilterPlugins, got %q", hint)
 				}
-				f.StoreScheduleResults(ctx, sig, "", "n3", newTestNodes([]string{"n1"}), 2)
-				if hint := f.GetNodeHint(ctx, pod3, sig, state, 2); hint != "n1" {
-					t.Fatalf("expected hint %q after RunPodGroupPostFilterPlugins re-enables batching, got %q", "n1", hint)
+				seedBatch("n1")
+				if hint := f.GetNodeHint(ctx, pod2, sig, state, 1); hint != "n1" {
+					t.Fatalf("got hint %q after RunPodGroupPostFilterPlugins, want %q", hint, "n1")
 				}
 			}
 		})
