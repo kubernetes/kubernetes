@@ -640,18 +640,18 @@ func (dc *DeploymentController) syncDeployment(ctx context.Context, key string) 
 		return dc.syncStatusOnly(ctx, d, rsList)
 	}
 
-	// Update deployment conditions with an Unknown condition when pausing/resuming
-	// a deployment. In this way, we can be sure that we won't timeout when a user
-	// resumes a Deployment with a set progressDeadlineSeconds.
-	if err = dc.checkPausedConditions(ctx, d); err != nil {
-		return err
-	}
-
 	// Reconcile once before rollout or scaling logic can mutate ReplicaSets.
 	if shouldManageWorkloadForDeployment(d) {
 		if _, err := dc.ensureWorkloadForDeployment(ctx, d); err != nil {
 			return fmt.Errorf("failed to ensure Workload for Deployment %s: %w", d.Name, err)
 		}
+	}
+
+	// Update deployment conditions with an Unknown condition when pausing/resuming
+	// a deployment. In this way, we can be sure that we won't timeout when a user
+	// resumes a Deployment with a set progressDeadlineSeconds.
+	if err = dc.checkPausedConditions(ctx, d); err != nil {
+		return err
 	}
 
 	if d.Spec.Paused {

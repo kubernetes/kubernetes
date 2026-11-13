@@ -48,6 +48,7 @@ import (
 	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2ereplicaset "k8s.io/kubernetes/test/e2e/framework/replicaset"
+	testutil "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
@@ -179,10 +180,62 @@ var _ = SIGDescribe("ReplicaSet", func() {
 		testRSStatus(ctx, f)
 	})
 
+	f.It("should create a Workload and a new PodGroup for each gang Deployment revision", f.WithFeatureGate(features.GenericWorkload), f.WithFeatureGate(features.WorkloadWithDeployment), func(ctx context.Context) {
+		testGangReplicaSetRollout(ctx, f)
+	})
+
 	f.It("should replace a deleted gang pod without recreating the PodGroup", f.WithFeatureGate(features.GenericWorkload), f.WithFeatureGate(features.WorkloadWithDeployment), func(ctx context.Context) {
 		testGangReplicaSetPodReplacement(ctx, f)
 	})
 })
+
+func testGangReplicaSetRollout(ctx context.Context, f *framework.Framework) {
+	c := f.ClientSet
+	ns := f.Namespace.Name
+	podLabels := map[string]string{"name": "gang-rs-rollout"}
+	replicas := int32(3)
+
+	ginkgo.By("creating a gang Deployment")
+	d := newGangDeployment("gang-rs-rollout", replicas, podLabels, new(replicas))
+	deploy, err := c.AppsV1().Deployments(ns).Create(ctx, d, metav1.CreateOptions{})
+	framework.ExpectNoError(err, "create gang Deployment %q", d.Name)
+
+	ginkgo.By("verifying Workload and PodGroup creation")
+	workload := waitForDeploymentWorkload(ctx, c, ns, deploy.Name)
+	framework.ExpectNoError(e2edeployment.WaitForDeploymentRevisionAndImage(c, ns, deploy.Name, "1", AgnhostImage), "wait for gang Deployment revision 1")
+	rs, err := testutil.GetNewReplicaSet(deploy, c)
+	framework.ExpectNoError(err, "get the initial ReplicaSet")
+	gomega.Expect(rs).NotTo(gomega.BeNil(), "expected a ReplicaSet for revision 1")
+
+	podGroup := waitForReplicaSetPodGroup(ctx, c, ns, rs.Name)
+	gomega.Expect(podGroup.Spec.WorkloadRef).NotTo(gomega.BeNil(), "PodGroup workloadRef")
+	gomega.Expect(podGroup.Spec.WorkloadRef.WorkloadName).To(gomega.Equal(workload.Name), "PodGroup should reference the Workload")
+	framework.ExpectNoError(e2edeployment.WaitForDeploymentComplete(c, deploy), "gang replicas should bind")
+
+	ginkgo.By("rolling out a new Deployment revision")
+	deploy, err = e2edeployment.UpdateDeploymentWithRetries(c, ns, deploy.Name, func(update *appsv1.Deployment) {
+		update.Spec.Template.Spec.Containers[0].Image = PrevAgnhostImage
+	})
+	framework.ExpectNoError(err, "update gang Deployment %q", d.Name)
+	framework.ExpectNoError(e2edeployment.WaitForDeploymentRevisionAndImage(c, ns, deploy.Name, "2", PrevAgnhostImage), "wait for gang Deployment revision 2")
+	framework.ExpectNoError(e2edeployment.WaitForDeploymentComplete(c, deploy), "wait for gang Deployment rollout to complete")
+
+	ginkgo.By("verifying the new ReplicaSet uses a new PodGroup and the same Workload")
+	newRS, err := testutil.GetNewReplicaSet(deploy, c)
+	framework.ExpectNoError(err, "get the new ReplicaSet")
+	gomega.Expect(newRS).NotTo(gomega.BeNil(), "expected a ReplicaSet for revision 2")
+	gomega.Expect(newRS.UID).NotTo(gomega.Equal(rs.UID), "rollout should create a new ReplicaSet")
+
+	newPodGroup := waitForReplicaSetPodGroup(ctx, c, ns, newRS.Name)
+	gomega.Expect(newPodGroup.Name).NotTo(gomega.Equal(podGroup.Name), "new revision should have a different PodGroup name")
+	gomega.Expect(newPodGroup.UID).NotTo(gomega.Equal(podGroup.UID), "new revision should have a new PodGroup")
+	gomega.Expect(newPodGroup.Spec.WorkloadRef).NotTo(gomega.BeNil(), "new PodGroup workloadRef")
+	gomega.Expect(newPodGroup.Spec.WorkloadRef.WorkloadName).To(gomega.Equal(workload.Name), "new PodGroup should reference the original Workload")
+
+	currentWorkload, err := c.SchedulingV1beta1().Workloads(ns).Get(ctx, workload.Name, metav1.GetOptions{})
+	framework.ExpectNoError(err, "get Workload after rollout")
+	gomega.Expect(currentWorkload.UID).To(gomega.Equal(workload.UID), "rollout should retain the original Workload")
+}
 
 func testGangReplicaSetPodReplacement(ctx context.Context, f *framework.Framework) {
 	c := f.ClientSet
