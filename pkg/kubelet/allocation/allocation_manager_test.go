@@ -2995,6 +2995,63 @@ func TestSortPendingResizes(t *testing.T) {
 	}
 }
 
+// TestSortPendingResizesWithoutIncreasedRequests covers the pods that the first sort key puts in
+// the same group. A resize that does not increase requests still ends up in the queue when it is
+// rejected for another reason, so the later keys have to order those pods too.
+func TestSortPendingResizesWithoutIncreasedRequests(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+
+	cpu500m := resource.MustParse("500m")
+	cpu1000m := resource.MustParse("1")
+	mem500M := resource.MustParse("500Mi")
+	mem1000M := resource.MustParse("1Gi")
+
+	newPod := func(podNumber int, priority int32) *v1.Pod {
+		return &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				UID:       types.UID(fmt.Sprintf("%d", podNumber)),
+				Name:      fmt.Sprintf("pod%d", podNumber),
+				Namespace: fmt.Sprintf("ns%d", podNumber),
+			},
+			Spec: v1.PodSpec{
+				Priority: ptr.To(priority),
+				Containers: []v1.Container{{
+					Name:  fmt.Sprintf("c%d", podNumber),
+					Image: fmt.Sprintf("i%d", podNumber),
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
+					},
+				}},
+			},
+		}
+	}
+
+	highPriority, mediumPriority, lowPriority := newPod(0, 100), newPod(1, 50), newPod(2, 0)
+	testPods := []*v1.Pod{highPriority, mediumPriority, lowPriority}
+	allocationManager := makeAllocationManager(t, &containertest.FakeRuntime{}, testPods, nil)
+	for _, testPod := range testPods {
+		require.NoError(t, allocationManager.SetAllocatedPod(logger, testPod))
+	}
+	// Every pod shrinks, so the first sort key does not tell any of them apart and the
+	// PriorityClass decides.
+	for _, testPod := range testPods {
+		testPod.Spec.Containers[0].Resources.Requests = v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M}
+	}
+
+	expected := []types.UID{highPriority.UID, mediumPriority.UID, lowPriority.UID}
+	// The queue is sorted on every push, so a valid ordering gives the same queue either way.
+	for _, pushOrder := range [][]*v1.Pod{
+		{highPriority, mediumPriority, lowPriority},
+		{lowPriority, mediumPriority, highPriority},
+	} {
+		allocationManager.(*manager).podsWithPendingAllocations = nil
+		for _, testPod := range pushOrder {
+			allocationManager.PushPendingAllocation(logger, testPod.UID)
+		}
+		require.Equal(t, expected, allocationManager.(*manager).podsWithPendingAllocations)
+	}
+}
+
 func TestRecordPodDeferredAcceptedResizes(t *testing.T) {
 	if goruntime.GOOS == "windows" {
 		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")

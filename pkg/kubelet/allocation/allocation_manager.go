@@ -17,6 +17,7 @@ limitations under the License.
 package allocation
 
 import (
+	"cmp"
 	"context"
 	"path/filepath"
 	"slices"
@@ -303,38 +304,57 @@ func (m *manager) PushPendingAllocation(logger klog.Logger, uid types.UID) {
 // - Second, based on the pod's PriorityClass.
 // - Third, prioritizing pods that can preempt over PreemptNever pods (when InPlacePodVerticalScalingSchedulerPreemption is enabled).
 // - Fourth, based on the pod's QoS class.
-// - Last, prioritizing allocations that have been in the deferred state the longest.
+// - Fifth, prioritizing allocations that have been in the deferred state the longest.
+// - Last, by pod UID, so that the queue does not depend on the order the pods were pushed in.
 func (m *manager) sortPendingAllocations(logger klog.Logger) {
-	var pendingPods []*v1.Pod
+	// The keys that come from state other goroutines can change are read once up front: a
+	// comparison function that can see two values for the same pod does not define an ordering,
+	// and slices.SortFunc is then free to return any permutation.
+	schedulerPreemptionEnabled := utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption)
+
+	type pendingPod struct {
+		pod *v1.Pod
+		// increasesRequests reports whether the resize increases the pod's requests.
+		increasesRequests bool
+		// pendingSince is the last transition time of the PodResizePending condition, if the pod
+		// has one.
+		pendingSince *metav1.Time
+	}
+
+	var pendingPods []pendingPod
 	for _, uid := range m.podsWithPendingAllocations {
 		pod, found := m.podProvider.GetPodByUID(uid)
 		if !found {
 			logger.V(4).Info("Pod not found; removing from pending allocations", "podUID", uid)
 			continue
 		}
-		pendingPods = append(pendingPods, pod)
+		pending := pendingPod{pod: pod, increasesRequests: m.isResizeIncreasingRequests(pod)}
+		for _, c := range m.statusManager.GetPodResizeConditions(uid) {
+			if c.Type == v1.PodResizePending {
+				pending.pendingSince = &c.LastTransitionTime
+			}
+		}
+		pendingPods = append(pendingPods, pending)
 	}
 
-	slices.SortFunc(pendingPods, func(firstPod, secondPod *v1.Pod) int {
+	slices.SortFunc(pendingPods, func(firstPod, secondPod pendingPod) int {
 		// First, resizes that don't increase requests will be prioritized.
 		// These resizes are expected to always succeed.
-		firstPodIncreasing := m.isResizeIncreasingRequests(firstPod)
-		secondPodIncreasing := m.isResizeIncreasingRequests(secondPod)
-		if !firstPodIncreasing {
-			return -1
-		}
-		if !secondPodIncreasing {
+		if firstPod.increasesRequests != secondPod.increasesRequests {
+			if !firstPod.increasesRequests {
+				return -1
+			}
 			return 1
 		}
 
 		// Second, pods with a higher PriorityClass will be prioritized.
 		firstPodPriority := int32(0)
-		if firstPod.Spec.Priority != nil {
-			firstPodPriority = *firstPod.Spec.Priority
+		if firstPod.pod.Spec.Priority != nil {
+			firstPodPriority = *firstPod.pod.Spec.Priority
 		}
 		secondPodPriority := int32(0)
-		if secondPod.Spec.Priority != nil {
-			secondPodPriority = *secondPod.Spec.Priority
+		if secondPod.pod.Spec.Priority != nil {
+			secondPodPriority = *secondPod.pod.Spec.Priority
 		}
 		if firstPodPriority > secondPodPriority {
 			return -1
@@ -345,9 +365,9 @@ func (m *manager) sortPendingAllocations(logger klog.Logger) {
 
 		// Third, prioritize pods eligible to preempt over PreemptNever pods so a pod that preempted
 		// lower-priority victims to free node capacity isn't jumped by an equal-priority PreemptNever pod.
-		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption) {
-			firstNeverPreempts := firstPod.Spec.PreemptionPolicy != nil && *firstPod.Spec.PreemptionPolicy == v1.PreemptNever
-			secondNeverPreempts := secondPod.Spec.PreemptionPolicy != nil && *secondPod.Spec.PreemptionPolicy == v1.PreemptNever
+		if schedulerPreemptionEnabled {
+			firstNeverPreempts := firstPod.pod.Spec.PreemptionPolicy != nil && *firstPod.pod.Spec.PreemptionPolicy == v1.PreemptNever
+			secondNeverPreempts := secondPod.pod.Spec.PreemptionPolicy != nil && *secondPod.pod.Spec.PreemptionPolicy == v1.PreemptNever
 			if !firstNeverPreempts && secondNeverPreempts {
 				return -1
 			}
@@ -358,8 +378,8 @@ func (m *manager) sortPendingAllocations(logger klog.Logger) {
 
 		// Fourth, pods with a higher QoS class will be prioritized, where guaranteed > burstable.
 		// Best effort pods don't have resource requests or limits, so we don't need to consider them here.
-		firstPodQOS := v1qos.GetPodQOS(firstPod)
-		secondPodQOS := v1qos.GetPodQOS(secondPod)
+		firstPodQOS := v1qos.GetPodQOS(firstPod.pod)
+		secondPodQOS := v1qos.GetPodQOS(secondPod.pod)
 		if firstPodQOS == v1.PodQOSGuaranteed && secondPodQOS != v1.PodQOSGuaranteed {
 			return -1
 		}
@@ -367,37 +387,30 @@ func (m *manager) sortPendingAllocations(logger klog.Logger) {
 			return 1
 		}
 
-		// If all else is the same, resize requests that have been pending longer will be
-		// evaluated first.
-		var firstPodLastTransitionTime *metav1.Time
-		firstPodResizeConditions := m.statusManager.GetPodResizeConditions(firstPod.UID)
-		for _, c := range firstPodResizeConditions {
-			if c.Type == v1.PodResizePending {
-				firstPodLastTransitionTime = &c.LastTransitionTime
-			}
-		}
-		var secondPodLastTransitionTime *metav1.Time
-		secondPodResizeConditions := m.statusManager.GetPodResizeConditions(secondPod.UID)
-		for _, c := range secondPodResizeConditions {
-			if c.Type == v1.PodResizePending {
-				secondPodLastTransitionTime = &c.LastTransitionTime
-			}
-		}
-		if firstPodLastTransitionTime == nil {
+		// Fifth, resize requests that have been pending longer will be evaluated first. A pod that
+		// has no pending condition yet is evaluated after one that has.
+		switch {
+		case firstPod.pendingSince == nil && secondPod.pendingSince != nil:
 			return 1
-		}
-		if secondPodLastTransitionTime == nil {
+		case firstPod.pendingSince != nil && secondPod.pendingSince == nil:
 			return -1
+		case firstPod.pendingSince != nil && secondPod.pendingSince != nil:
+			if firstPod.pendingSince.Before(secondPod.pendingSince) {
+				return -1
+			}
+			if secondPod.pendingSince.Before(firstPod.pendingSince) {
+				return 1
+			}
 		}
-		if firstPodLastTransitionTime.Before(secondPodLastTransitionTime) {
-			return -1
-		}
-		return 1
+
+		// Everything the order is based on is equal, so fall back to the UID to keep the queue
+		// independent of the order the pods were pushed in.
+		return cmp.Compare(firstPod.pod.UID, secondPod.pod.UID)
 	})
 
 	m.podsWithPendingAllocations = make([]types.UID, len(pendingPods))
-	for i, pod := range pendingPods {
-		m.podsWithPendingAllocations[i] = pod.UID
+	for i, pending := range pendingPods {
+		m.podsWithPendingAllocations[i] = pending.pod.UID
 	}
 }
 
