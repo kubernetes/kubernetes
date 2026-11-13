@@ -1488,20 +1488,29 @@ func (p *PriorityQueue) Update(ctx context.Context, oldPod, newPod *v1.Pod) {
 		// whether the update may make the entities schedulable.
 		// Plugins have to implement a QueueingHint for Pod/Update event
 		// if the rejection from them could be resolved by updating unscheduled Pods itself.
+		// One update can produce several events. Take the strongest hint across all of them and requeue once:
+		// requeueing per event would re-evaluate an entity that has already left unschedulableEntities.
+		strategy, event := queueSkip, ""
 		for _, evt := range events {
-			// Capture the entity type and reference before requeueing. Once the entity is added to activeQ,
-			// it can be popped and processed before this goroutine logs the update. The scheduling cycle can
-			// then mutate fields accessed by Type and KObj.
-			entityType, entityRef := entity.Type(), klog.KObj(entity)
-			hint := p.isEntityWorthRequeuing(logger, entity, evt, oldPod, newPod, nil)
-			queue := p.requeueEntityWithQueueingStrategy(logger, entity, hint, evt.Label())
-			if queue != unschedulableQ {
-				logger.V(5).Info("Entity moved to an internal scheduling queue because the Pod is updated", "type", entityType, "entity", entityRef, "pod", klog.KObj(newPod), "event", evt.Label(), "queue", queue)
+			if hint := p.isEntityWorthRequeuing(logger, entity, evt, oldPod, newPod, nil); hint > strategy {
+				strategy, event = hint, evt.Label()
 			}
-			if queue == activeQ || (p.isPopFromBackoffQEnabled && queue == backoffQ) {
-				p.activeQ.broadcast()
+			if strategy == queueImmediately {
 				break
 			}
+		}
+
+		// Capture the entity type and reference before requeueing. Once the entity is added to activeQ,
+		// it can be popped and processed before this goroutine logs the update. The scheduling cycle can
+		// then mutate fields accessed by Type and KObj.
+		entityType, entityRef := entity.Type(), klog.KObj(entity)
+		queue := p.requeueEntityWithQueueingStrategy(logger, entity, strategy, event)
+
+		if queue != unschedulableQ {
+			logger.V(5).Info("Entity moved to an internal scheduling queue because the Pod is updated", "type", entityType, "entity", entityRef, "pod", klog.KObj(newPod), "event", event, "queue", queue)
+		}
+		if queue == activeQ || (p.isPopFromBackoffQEnabled && queue == backoffQ) {
+			p.activeQ.broadcast()
 		}
 		return
 	}
