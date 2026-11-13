@@ -99,27 +99,6 @@ func waitForPodGroup(ctx context.Context, t *testing.T, c clientset.Interface, r
 	return podGroup
 }
 
-// waitForNewReplicaSet polls until the Deployment's new ReplicaSet exists.
-func waitForNewReplicaSet(ctx context.Context, t *testing.T, tester *deploymentTester) *apps.ReplicaSet {
-	t.Helper()
-	var rs *apps.ReplicaSet
-	err := wait.PollUntilContextTimeout(ctx, pollInterval, pollTimeout, true, func(context.Context) (bool, error) {
-		got, getErr := tester.getNewReplicaSet()
-		if getErr != nil {
-			return false, getErr
-		}
-		if got == nil {
-			return false, nil
-		}
-		rs = got
-		return true, nil
-	})
-	if err != nil {
-		t.Fatalf("Timed out waiting for new ReplicaSet of Deployment %q: %v", tester.deployment.Name, err)
-	}
-	return rs
-}
-
 func hasOwnerRef(refs []metav1.OwnerReference, kind string, uid types.UID) bool {
 	for _, ref := range refs {
 		if ref.Kind == kind && ref.UID == uid {
@@ -288,7 +267,13 @@ func TestDeploymentGangScheduling(t *testing.T) {
 				t.Errorf("Workload gang = %#v, want minCount %d", pgt.SchedulingPolicy.Gang, tc.wantMinCount)
 			}
 
-			rs := waitForNewReplicaSet(ctx, t, tester)
+			if err := tester.waitForDeploymentRevisionAndImage("1", fakeImage); err != nil {
+				t.Fatal(err)
+			}
+			rs, err := tester.expectNewReplicaSet()
+			if err != nil {
+				t.Fatal(err)
+			}
 			podGroup := waitForPodGroup(ctx, t, c, rs, false, pollTimeout)
 			if !hasOwnerRef(podGroup.OwnerReferences, "ReplicaSet", rs.UID) {
 				t.Errorf("PodGroup %q is not owned by the ReplicaSet: %v", podGroup.Name, podGroup.OwnerReferences)
@@ -345,7 +330,13 @@ func TestDeploymentSchedulingExplicitMinCountUpdate(t *testing.T) {
 	defer stop()
 
 	workload := waitForWorkload(ctx, t, c, tester.deployment, false, pollTimeout)
-	rs := waitForNewReplicaSet(ctx, t, tester)
+	if err := tester.waitForDeploymentRevisionAndImage("1", fakeImage); err != nil {
+		t.Fatal(err)
+	}
+	rs, err := tester.expectNewReplicaSet()
+	if err != nil {
+		t.Fatal(err)
+	}
 	podGroup := waitForPodGroup(ctx, t, c, rs, false, pollTimeout)
 	waitForGangMinCount(ctx, t, c, ns.Name, workload.Name, podGroup.Name, 4)
 
@@ -383,7 +374,13 @@ func TestDeploymentSchedulingDerivedMinCountUpdate(t *testing.T) {
 	defer stop()
 
 	workload := waitForWorkload(ctx, t, c, tester.deployment, false, pollTimeout)
-	rs := waitForNewReplicaSet(ctx, t, tester)
+	if err := tester.waitForDeploymentRevisionAndImage("1", fakeImage); err != nil {
+		t.Fatal(err)
+	}
+	rs, err := tester.expectNewReplicaSet()
+	if err != nil {
+		t.Fatal(err)
+	}
 	podGroup := waitForPodGroup(ctx, t, c, rs, false, pollTimeout)
 	waitForGangMinCount(ctx, t, c, ns.Name, workload.Name, podGroup.Name, 2)
 
@@ -421,7 +418,13 @@ func TestDeploymentSchedulingScaleToZero(t *testing.T) {
 	defer stop()
 
 	workload := waitForWorkload(ctx, t, c, tester.deployment, false, pollTimeout)
-	rs := waitForNewReplicaSet(ctx, t, tester)
+	if err := tester.waitForDeploymentRevisionAndImage("1", fakeImage); err != nil {
+		t.Fatal(err)
+	}
+	rs, err := tester.expectNewReplicaSet()
+	if err != nil {
+		t.Fatal(err)
+	}
 	podGroup := waitForPodGroup(ctx, t, c, rs, false, pollTimeout)
 	waitForGangMinCount(ctx, t, c, ns.Name, workload.Name, podGroup.Name, 2)
 	waitForPodsWithPodGroup(ctx, t, c, ns.Name, podGroup.Name, 2)
@@ -499,7 +502,13 @@ func TestDeploymentSchedulingControllerRestart(t *testing.T) {
 	informers.WaitForCacheSync(ctx.Done())
 
 	workload := waitForWorkload(ctx, t, c, tester.deployment, false, pollTimeout)
-	rs := waitForNewReplicaSet(ctx, t, tester)
+	if err := tester.waitForDeploymentRevisionAndImage("1", fakeImage); err != nil {
+		t.Fatal(err)
+	}
+	rs, err := tester.expectNewReplicaSet()
+	if err != nil {
+		t.Fatal(err)
+	}
 	podGroup := waitForPodGroup(ctx, t, c, rs, false, pollTimeout)
 
 	stop()

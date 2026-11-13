@@ -179,6 +179,13 @@ func equalIgnoreHash(template1, template2 *corev1.PodTemplateSpec) bool {
 	return apiequality.Semantic.DeepEqual(t1Copy, t2Copy)
 }
 
+// Workload-aware scheduling delegation annotations.
+const (
+	workloadNameAnnotation            = "scheduling.k8s.io/workload-name"
+	groupTemplateNameAnnotation       = "scheduling.k8s.io/group-template-name"
+	parentCompositePodGroupAnnotation = "scheduling.k8s.io/parent-compositepodgroup"
+)
+
 // annotationsToSkip lists the annotations that should be preserved from the deployment and not
 // copied from the replicaset when rolling a deployment back
 var annotationsToSkip = map[string]bool{
@@ -188,6 +195,9 @@ var annotationsToSkip = map[string]bool{
 	deploymentutil.DesiredReplicasAnnotation: true,
 	deploymentutil.MaxReplicasAnnotation:     true,
 	appsv1.DeprecatedRollbackTo:              true,
+	workloadNameAnnotation:                   true,
+	groupTemplateNameAnnotation:              true,
+	parentCompositePodGroupAnnotation:        true,
 }
 
 // getPatch returns a patch that can be applied to restore a Deployment to a

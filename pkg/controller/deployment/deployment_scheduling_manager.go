@@ -202,12 +202,7 @@ func (dc *DeploymentController) ensureWorkloadForDeployment(ctx context.Context,
 }
 
 func isWorkloadControlledByDeployment(workload *schedulingv1beta1.Workload, d *apps.Deployment) bool {
-	owner := metav1.GetControllerOf(workload)
-	if owner == nil ||
-		owner.APIVersion != apps.SchemeGroupVersion.String() ||
-		owner.Kind != "Deployment" ||
-		owner.Name != d.Name ||
-		owner.UID != d.UID {
+	if !metav1.IsControlledBy(workload, d) {
 		return false
 	}
 	controllerRef := workload.Spec.ControllerRef

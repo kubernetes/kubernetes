@@ -124,7 +124,7 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.WorkloadWithDeployment) {
 		deploymentControllerRules = append(deploymentControllerRules,
-			rbacv1helpers.NewRule("get", "list", "watch", "create", "patch").Groups(schedulingGroup).Resources("workloads").RuleOrDie(),
+			rbacv1helpers.NewRule("get", "list", "watch", "create", "update", "patch").Groups(schedulingGroup).Resources("workloads").RuleOrDie(),
 		)
 	}
 	addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
@@ -375,7 +375,7 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 	if utilfeature.DefaultFeatureGate.Enabled(features.WorkloadWithDeployment) {
 		replicaSetControllerRules = append(replicaSetControllerRules,
 			rbacv1helpers.NewRule("get", "list", "watch").Groups(schedulingGroup).Resources("workloads").RuleOrDie(),
-			rbacv1helpers.NewRule("get", "list", "watch", "create", "patch", "delete").Groups(schedulingGroup).Resources("podgroups").RuleOrDie(),
+			rbacv1helpers.NewRule("get", "list", "watch", "create", "update", "patch", "delete").Groups(schedulingGroup).Resources("podgroups").RuleOrDie(),
 		)
 	}
 	addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
