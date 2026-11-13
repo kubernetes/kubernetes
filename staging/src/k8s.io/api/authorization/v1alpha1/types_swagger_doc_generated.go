@@ -29,7 +29,7 @@ package v1alpha1
 // AUTO-GENERATED FUNCTIONS START HERE. DO NOT EDIT.
 var map_AuthorizationConditionsRequest = map[string]string{
 	"":                 "AuthorizationConditionsRequest describes the authorization conditions request.",
-	"decision":         "decision contains the conditional decision the authorizer authored at authorization time.",
+	"decision":         "decision contains the conditional decision the authorizer authored at authorization time. The API server may refine the decision before sending it, by evaluating some of the conditions in-process, e.g. removing conditions that evaluated to false.",
 	"admissionRequest": "admissionRequest may contain additional information for evaluating the conditions.",
 }
 

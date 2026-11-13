@@ -13815,7 +13815,7 @@ func schema_k8sio_api_authorization_v1alpha1_AuthorizationConditionsRequest(ref 
 				Properties: map[string]spec.Schema{
 					"decision": {
 						SchemaProps: spec.SchemaProps{
-							Description: "decision contains the conditional decision the authorizer authored at authorization time.",
+							Description: "decision contains the conditional decision the authorizer authored at authorization time. The API server may refine the decision before sending it, by evaluating some of the conditions in-process, e.g. removing conditions that evaluated to false.",
 							Default:     map[string]interface{}{},
 							Ref:         ref(authorizationv1.ConditionsAwareDecision{}.OpenAPIModelName()),
 						},
