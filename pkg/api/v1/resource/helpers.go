@@ -29,6 +29,14 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 )
 
+// MinPodPIDLimit and MaxPodPIDLimit define the valid range for
+// spec.resources.limits.pids.  Exported so that validation and kubelet
+// admission share a single definition.
+const (
+	MinPodPIDLimit = 128
+	MaxPodPIDLimit = 16384
+)
+
 // GetResourceRequestQuantity finds and returns the request quantity for a specific resource.
 func GetResourceRequestQuantity(pod *v1.Pod, resourceName v1.ResourceName) resource.Quantity {
 	requestQuantity := resource.Quantity{}

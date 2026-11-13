@@ -138,7 +138,10 @@ type PodStatusApplyConfiguration struct {
 	AllocatedResources *corev1.ResourceList `json:"allocatedResources,omitempty"`
 	// Resources represents the compute resource requests and limits that have been
 	// applied at the pod level if pod-level requests or limits are set in
-	// PodSpec.Resources
+	// PodSpec.Resources. This also includes pod-level-only, limit-only resources
+	// (e.g. pids) when set; such values reflect what was requested and are not
+	// currently reconciled against an enacted value that may differ (e.g. a pids
+	// limit clamped by the node's podPidsLimit).
 	Resources *ResourceRequirementsApplyConfiguration `json:"resources,omitempty"`
 	// NodeAllocatableResourceClaimStatuses contains the status of node-allocatable resources
 	// that were allocated for this pod through DRA claims. This includes resources currently

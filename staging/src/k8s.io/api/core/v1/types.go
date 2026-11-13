@@ -5995,7 +5995,10 @@ type PodStatus struct {
 
 	// Resources represents the compute resource requests and limits that have been
 	// applied at the pod level if pod-level requests or limits are set in
-	// PodSpec.Resources
+	// PodSpec.Resources. This also includes pod-level-only, limit-only resources
+	// (e.g. pids) when set; such values reflect what was requested and are not
+	// currently reconciled against an enacted value that may differ (e.g. a pids
+	// limit clamped by the node's podPidsLimit).
 	// +featureGate=InPlacePodLevelResourcesVerticalScaling
 	// +optional
 	Resources *ResourceRequirements `json:"resources,omitempty" protobuf:"bytes,20,opt,name=resources"`
@@ -7625,6 +7628,14 @@ const (
 	ResourceStorage ResourceName = "storage"
 	// Local ephemeral storage, in bytes. (500Gi = 500GiB = 500 * 1024 * 1024 * 1024)
 	ResourceEphemeralStorage ResourceName = "ephemeral-storage"
+	// PID limit for a pod (integer count of processes).
+	// ResourcePID is a pod-level PID limit set via spec.resources.limits.pids.
+	// Valid range: [MinPodPIDLimit, MaxPodPIDLimit] (see pkg/api/v1/resource).
+	// Only limits are accepted; requests.pids is forbidden. The effective
+	// limit enforced by the kubelet is min(node podPidsLimit, pod pid limit).
+	// Requires the PerPodPIDLimit feature gate and cgroupsv2.
+	// When omitted, the node-level --pod-pids-limit applies.
+	ResourcePID ResourceName = "pids"
 )
 
 const (

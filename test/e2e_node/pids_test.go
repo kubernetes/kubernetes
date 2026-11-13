@@ -19,6 +19,11 @@ package e2enode
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -26,13 +31,17 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	admissionapi "k8s.io/pod-security-admission/api"
 
+	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 )
 
 // makePodToVerifyPids returns a pod that verifies specified cgroup with pids
@@ -87,6 +96,82 @@ func makePodToVerifyPids(baseName string, pidsLimit resource.Quantity) *v1.Pod {
 	return pod
 }
 
+// makePodToVerifyForkBlocked returns a pod that checks the target pod cgroup
+// (and its descendants) for evidence that the kernel blocked a fork:
+// pids.max matches the requested limit and pids.events max > 0 somewhere in
+// the tree (the counter may be on the pod cgroup or a child container cgroup).
+func makePodToVerifyForkBlocked(baseName string, pidLimit int) *v1.Pod {
+	cgroupName := cm.NewCgroupName(cm.RootCgroupName, defaultNodeAllocatableCgroup, baseName)
+	cgroupFsName := ""
+	if kubeletCfg.CgroupDriver == "systemd" {
+		cgroupFsName = cgroupName.ToSystemd()
+	} else {
+		cgroupFsName = cgroupName.ToCgroupfs()
+	}
+	// HostPath mounts /sys/fs/cgroup at /tmp; tolerate a leading '/' in the
+	// cgroup path the same way makePodToVerifyPids does.
+	command := fmt.Sprintf(`
+cgroup_root=/tmp/%s
+if [ ! -d "$cgroup_root" ]; then
+  echo "FAIL: missing cgroup dir $cgroup_root"
+  exit 1
+fi
+actual_max=$(cat "$cgroup_root/pids.max")
+echo "pids.max=$actual_max (expected %d)"
+if [ "$actual_max" != "%d" ]; then
+  echo "FAIL: unexpected pids.max"
+  exit 1
+fi
+# Sum 'max' counters across the pod cgroup tree; runc may place events on a child.
+events_max=0
+for f in $(find "$cgroup_root" -name pids.events 2>/dev/null); do
+  n=$(awk '/^max /{print $2}' "$f")
+  if [ -n "$n" ]; then
+    events_max=$((events_max + n))
+  fi
+done
+current=$(cat "$cgroup_root/pids.current")
+echo "pids.current=$current pids.events.max_sum=$events_max"
+if [ "$events_max" -gt 0 ]; then
+  echo "PASS: kernel blocked fork ($events_max time(s))"
+  exit 0
+fi
+echo "FAIL: pids.events max still 0"
+exit 1
+`, cgroupFsName, pidLimit, pidLimit)
+
+	framework.Logf("Pod to run fork-blocked check: %v", command)
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "verify-fork-blocked-" + string(uuid.NewUUID()),
+		},
+		Spec: v1.PodSpec{
+			RestartPolicy: v1.RestartPolicyNever,
+			Containers: []v1.Container{
+				{
+					Image:   busyboxImage,
+					Name:    "verify-" + string(uuid.NewUUID()),
+					Command: []string{"sh", "-c", command},
+					VolumeMounts: []v1.VolumeMount{
+						{
+							Name:      "sysfscgroup",
+							MountPath: "/tmp",
+						},
+					},
+				},
+			},
+			Volumes: []v1.Volume{
+				{
+					Name: "sysfscgroup",
+					VolumeSource: v1.VolumeSource{
+						HostPath: &v1.HostPathVolumeSource{Path: "/sys/fs/cgroup"},
+					},
+				},
+			},
+		},
+	}
+}
+
 func runPodPidsLimitTests(f *framework.Framework) {
 	ginkgo.It("should set pids.max for Pod", func(ctx context.Context) {
 		ginkgo.By("by creating a G pod")
@@ -129,5 +214,609 @@ var _ = SIGDescribe("PodPidsLimit", framework.WithSerial(), func() {
 		})
 		runPodPidsLimitTests(f)
 		addAfterEachForCleaningUpPods(f)
+	})
+})
+
+// Non-Serial: tests that verify per-pod PID limits without changing kubelet config.
+// These assume the node podPidsLimit is either unlimited (-1, the default) or at
+// least as large as the pod limits used below; otherwise the effective limit would
+// be the node's, and the assertions would not hold.
+var _ = SIGDescribe("PerPodPIDLimit", framework.WithFeatureGate(features.PerPodPIDLimit), func() {
+	f := framework.NewDefaultFramework("per-pod-pid-limit-test")
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+
+	ginkgo.BeforeEach(func() {
+		if kubeletCfg.PodPidsLimit > 0 && kubeletCfg.PodPidsLimit < 2048 {
+			framework.Failf("node podPidsLimit %d is lower than the pod limits exercised by this test; test setup requires podPidsLimit >= 2048", kubeletCfg.PodPidsLimit)
+		}
+	})
+
+	ginkgo.It("should apply per-pod PID limit lower than node default", func(ctx context.Context) {
+		ginkgo.By("creating a pod with pid limit below the node default")
+		pod := e2epod.NewPodClient(f).CreateSync(ctx, &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "pod" + string(uuid.NewUUID()),
+				Namespace: f.Namespace.Name,
+			},
+			Spec: v1.PodSpec{
+				Resources: &v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourcePID: resource.MustParse("2048"),
+					},
+				},
+				Containers: []v1.Container{
+					{
+						Image: imageutils.GetPauseImageName(),
+						Name:  "container" + string(uuid.NewUUID()),
+						Resources: v1.ResourceRequirements{
+							Limits: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("10m"),
+								v1.ResourceMemory: resource.MustParse("100Mi"),
+							},
+						},
+					},
+				},
+			},
+		})
+		podUID := string(pod.UID)
+		ginkgo.By("checking if the per-pod PID limit was applied")
+		verifyPod := makePodToVerifyPids("pod"+podUID, resource.MustParse("2048"))
+		e2epod.NewPodClient(f).Create(ctx, verifyPod)
+		err := e2epod.WaitForPodSuccessInNamespace(ctx, f.ClientSet, verifyPod.Name, f.Namespace.Name)
+		framework.ExpectNoError(err)
+	})
+
+	ginkgo.It("should apply single pod-level PID limit shared by multiple containers", func(ctx context.Context) {
+		ginkgo.By("creating a multi-container pod with a pod-level pid limit")
+		pod := e2epod.NewPodClient(f).CreateSync(ctx, &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "pod" + string(uuid.NewUUID()),
+				Namespace: f.Namespace.Name,
+			},
+			Spec: v1.PodSpec{
+				Resources: &v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourcePID: resource.MustParse("2048"),
+					},
+				},
+				Containers: []v1.Container{
+					{
+						Image: imageutils.GetPauseImageName(),
+						Name:  "app" + string(uuid.NewUUID()),
+						Resources: v1.ResourceRequirements{
+							Limits: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("10m"),
+								v1.ResourceMemory: resource.MustParse("50Mi"),
+							},
+						},
+					},
+					{
+						Image: imageutils.GetPauseImageName(),
+						Name:  "sidecar" + string(uuid.NewUUID()),
+						Resources: v1.ResourceRequirements{
+							Limits: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("10m"),
+								v1.ResourceMemory: resource.MustParse("50Mi"),
+							},
+						},
+					},
+				},
+			},
+		})
+		podUID := string(pod.UID)
+		ginkgo.By("checking that both containers share the same pod-level PID limit (2048)")
+		verifyPod := makePodToVerifyPids("pod"+podUID, resource.MustParse("2048"))
+		e2epod.NewPodClient(f).Create(ctx, verifyPod)
+		err := e2epod.WaitForPodSuccessInNamespace(ctx, f.ClientSet, verifyPod.Name, f.Namespace.Name)
+		framework.ExpectNoError(err)
+	})
+
+	ginkgo.It("should enforce per-pod PID limit with hostPID enabled", func(ctx context.Context) {
+		ginkgo.By("creating a hostPID pod with per-pod PID limit to verify cgroup pids.max")
+		pod := e2epod.NewPodClient(f).CreateSync(ctx, &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "hostpid-cgroup-" + string(uuid.NewUUID()),
+				Namespace: f.Namespace.Name,
+			},
+			Spec: v1.PodSpec{
+				HostPID: true,
+				Resources: &v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourcePID: resource.MustParse("1024"),
+					},
+				},
+				Containers: []v1.Container{
+					{
+						Image: imageutils.GetPauseImageName(),
+						Name:  "container" + string(uuid.NewUUID()),
+						Resources: v1.ResourceRequirements{
+							Limits: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("10m"),
+								v1.ResourceMemory: resource.MustParse("100Mi"),
+							},
+						},
+					},
+				},
+			},
+		})
+		podUID := string(pod.UID)
+		ginkgo.By("verifying pids.max is set to 1024 in the pod cgroup despite hostPID")
+		verifyPod := makePodToVerifyPids("pod"+podUID, resource.MustParse("1024"))
+		e2epod.NewPodClient(f).Create(ctx, verifyPod)
+		err := e2epod.WaitForPodSuccessInNamespace(ctx, f.ClientSet, verifyPod.Name, f.Namespace.Name)
+		framework.ExpectNoError(err)
+	})
+
+	ginkgo.It("should enforce per-pod PID limit via cgroup", func(ctx context.Context) {
+		ginkgo.By("creating a pod with a per-pod PID limit of 256")
+		// This test creates a pod with a per-pod PID limit and then
+		// verifies (via a host-path mount of /sys/fs/cgroup) that the
+		// kernel's cgroup pids.max knob is set to the requested value.
+		// This value differs from the per-container limits already
+		// validated above, confirming that the kubelet wrote the pod-level
+		// cgroup correctly.
+		pod := e2epod.NewPodClient(f).CreateSync(ctx, &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "perpod-pid-enforce-" + string(uuid.NewUUID()),
+				Namespace: f.Namespace.Name,
+			},
+			Spec: v1.PodSpec{
+				Resources: &v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourcePID: resource.MustParse("256"),
+					},
+				},
+				Containers: []v1.Container{
+					{
+						Image: imageutils.GetPauseImageName(),
+						Name:  "container" + string(uuid.NewUUID()),
+						Resources: v1.ResourceRequirements{
+							Limits: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("100m"),
+								v1.ResourceMemory: resource.MustParse("100Mi"),
+							},
+						},
+					},
+				},
+			},
+		})
+		podUID := string(pod.UID)
+		ginkgo.By("verifying pids.max is set to 256 in the pod cgroup")
+		verifyPod := makePodToVerifyPids("pod"+podUID, resource.MustParse("256"))
+		e2epod.NewPodClient(f).Create(ctx, verifyPod)
+		err := e2epod.WaitForPodSuccessInNamespace(ctx, f.ClientSet, verifyPod.Name, f.Namespace.Name)
+		framework.ExpectNoError(err, "expected pod-level cgroup pids.max to be 256")
+	})
+
+	ginkgo.It("should block fork when per-pod PID limit is exhausted", func(ctx context.Context) {
+		if !IsCgroup2UnifiedMode() {
+			ginkgo.Skip("pids.events is only available on cgroupsv2")
+		}
+		const pidLimit = 128 // minimum allowed by MinPodPIDLimit
+		ginkgo.By("creating a pod that exhausts its pid limit and stays running")
+		// Prove kernel enforcement: after the pod tries to create more
+		// processes than limits.pids, pids.events 'max' must be > 0.
+		//
+		// Exhaust runs in a child shell so busybox ash exiting with status 2
+		// on fork failure does not kill the pod. The parent just sleeps so
+		// the pod cgroup remains observable via the same hostPath pattern
+		// used by makePodToVerifyPids.
+		pod := e2epod.NewPodClient(f).CreateSync(ctx, &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "fork-exhaust-" + string(uuid.NewUUID()),
+				Namespace: f.Namespace.Name,
+			},
+			Spec: v1.PodSpec{
+				RestartPolicy: v1.RestartPolicyNever,
+				Resources: &v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourcePID: resource.MustParse(strconv.Itoa(pidLimit)),
+					},
+				},
+				Containers: []v1.Container{
+					{
+						Image: busyboxImage,
+						Name:  "fork-exhaust-" + string(uuid.NewUUID()),
+						Command: []string{"sh", "-c", `
+# Child shell does the forking; it may die with status 2 when the limit is hit.
+# Sustain fork attempts for the whole observation window (time-based, not a
+# fixed burst count) so pressure is still being applied whenever the verify
+# pod checks, regardless of scheduling delays. Avoid $SECONDS (bash-ism, not
+# guaranteed in busybox ash); use date +%s instead.
+/bin/sh -c '
+  end=$(( $(date +%s) + 80 ))
+  while [ "$(date +%s)" -lt "$end" ]; do
+    /bin/sleep 3600 &
+  done
+  wait
+' &
+# Keep the pod alive so the cgroup can be inspected.
+sleep 3600
+`},
+						Resources: v1.ResourceRequirements{
+							Limits: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("100m"),
+								v1.ResourceMemory: resource.MustParse("100Mi"),
+							},
+						},
+					},
+				},
+			},
+		})
+		podUID := string(pod.UID)
+
+		ginkgo.By("verifying pids.max is set and pids.events shows blocked forks")
+		// Retry: the exhaust loop needs a moment after CreateSync, and events
+		// are recorded on the pod cgroup or a child container cgroup.
+		gomega.Eventually(ctx, func() error {
+			verifyPod := makePodToVerifyForkBlocked("pod"+podUID, pidLimit)
+			e2epod.NewPodClient(f).Create(ctx, verifyPod)
+			err := e2epod.WaitForPodSuccessInNamespaceTimeout(ctx, f.ClientSet, verifyPod.Name, f.Namespace.Name, 20*time.Second)
+			// Surface the verify pod's diagnostic output (pids.max, pids.current,
+			// pids.events sum) in the test log on every attempt, so a failure
+			// shows what was actually observed instead of just a timeout.
+			if logs, logErr := e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, verifyPod.Name, verifyPod.Spec.Containers[0].Name); logErr == nil {
+				framework.Logf("verify-fork-blocked pod output:\n%s", logs)
+			} else {
+				framework.Logf("failed to fetch verify-fork-blocked pod logs: %v", logErr)
+			}
+			return err
+		}, 90*time.Second, 5*time.Second).Should(gomega.Succeed(),
+			"expected kernel to block forks after exhausting PID limit %d", pidLimit)
+	})
+
+	ginkgo.It("should preserve container-derived QOS class for a pod with only a PID limit", func(ctx context.Context) {
+		ginkgo.By("creating a pod with guaranteed containers and only a pod-level pid limit")
+		pod := e2epod.NewPodClient(f).CreateSync(ctx, &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "pod" + string(uuid.NewUUID()),
+				Namespace: f.Namespace.Name,
+			},
+			Spec: v1.PodSpec{
+				Resources: &v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourcePID: resource.MustParse("2048"),
+					},
+				},
+				Containers: []v1.Container{
+					{
+						Image: imageutils.GetPauseImageName(),
+						Name:  "container" + string(uuid.NewUUID()),
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("100m"),
+								v1.ResourceMemory: resource.MustParse("100Mi"),
+							},
+							Limits: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("100m"),
+								v1.ResourceMemory: resource.MustParse("100Mi"),
+							},
+						},
+					},
+				},
+			},
+		})
+
+		ginkgo.By("verifying the pid limit did not change the QOS class or default pod-level requests")
+		gomega.Expect(pod.Status.QOSClass).To(gomega.Equal(v1.PodQOSGuaranteed),
+			"a pod-level pids limit must not change the container-derived QOS class")
+		gomega.Expect(pod.Spec.Resources.Requests).To(gomega.BeEmpty(),
+			"pod-level requests must not be defaulted for a pod that only sets limits.pids")
+
+		ginkgo.By("verifying pids.max at the Guaranteed-tier pod cgroup path")
+		pidsMax, err := getPodCgroupPidsMax(pod)
+		framework.ExpectNoError(err)
+		gomega.Expect(pidsMax).To(gomega.Equal(int64(2048)))
+	})
+
+	addAfterEachForCleaningUpPods(f)
+})
+
+// Serial because the test updates kubelet configuration to set a specific podPidsLimit.
+var _ = SIGDescribe("PerPodPIDLimit", framework.WithSerial(), framework.WithFeatureGate(features.PerPodPIDLimit), func() {
+	f := framework.NewDefaultFramework("per-pod-pid-limit-serial-test")
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+
+	ginkgo.Context("With podPidsLimit=4096", func() {
+		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
+			initialConfig.PodPidsLimit = int64(4096)
+		})
+
+		ginkgo.It("should cap per-pod PID limit at node default when pod requests more", func(ctx context.Context) {
+			ginkgo.By("creating a pod with pid limit above the node default")
+			pod := e2epod.NewPodClient(f).CreateSync(ctx, &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "pod" + string(uuid.NewUUID()),
+					Namespace: f.Namespace.Name,
+				},
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourcePID: resource.MustParse("8192"),
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Image: imageutils.GetPauseImageName(),
+							Name:  "container" + string(uuid.NewUUID()),
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("10m"),
+									v1.ResourceMemory: resource.MustParse("100Mi"),
+								},
+							},
+						},
+					},
+				},
+			})
+			podUID := string(pod.UID)
+			ginkgo.By("checking that the node default (4096) was applied since it is lower")
+			verifyPod := makePodToVerifyPids("pod"+podUID, resource.MustParse("4096"))
+			e2epod.NewPodClient(f).Create(ctx, verifyPod)
+			err := e2epod.WaitForPodSuccessInNamespace(ctx, f.ClientSet, verifyPod.Name, f.Namespace.Name)
+			framework.ExpectNoError(err)
+
+			ginkgo.By("checking that a PIDLimitCapped warning event was emitted for the pod")
+			gomega.Eventually(ctx, func(ctx context.Context) error {
+				events, err := f.ClientSet.CoreV1().Events(f.Namespace.Name).List(ctx, metav1.ListOptions{
+					FieldSelector: fmt.Sprintf("involvedObject.name=%s,reason=PIDLimitCapped", pod.Name),
+				})
+				if err != nil {
+					return err
+				}
+				if len(events.Items) == 0 {
+					return fmt.Errorf("no PIDLimitCapped event for pod %s yet", pod.Name)
+				}
+				return nil
+			}, 2*time.Minute, 5*time.Second).Should(gomega.Succeed())
+		})
+
+		ginkgo.It("should use node default when no per-pod PID limit is specified", func(ctx context.Context) {
+			ginkgo.By("creating a pod without a pid limit")
+			pod := e2epod.NewPodClient(f).CreateSync(ctx, &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "pod" + string(uuid.NewUUID()),
+					Namespace: f.Namespace.Name,
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Image: imageutils.GetPauseImageName(),
+							Name:  "container" + string(uuid.NewUUID()),
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("10m"),
+									v1.ResourceMemory: resource.MustParse("100Mi"),
+								},
+							},
+						},
+					},
+				},
+			})
+			podUID := string(pod.UID)
+			ginkgo.By("checking that the node default (4096) was applied")
+			verifyPod := makePodToVerifyPids("pod"+podUID, resource.MustParse("4096"))
+			e2epod.NewPodClient(f).Create(ctx, verifyPod)
+			err := e2epod.WaitForPodSuccessInNamespace(ctx, f.ClientSet, verifyPod.Name, f.Namespace.Name)
+			framework.ExpectNoError(err)
+		})
+
+		addAfterEachForCleaningUpPods(f)
+	})
+})
+
+// Non-Serial: PSA compatibility does not require specific kubelet configuration.
+var _ = SIGDescribe("PerPodPIDLimit PSA Compatibility", framework.WithFeatureGate(features.PerPodPIDLimit), func() {
+	ginkgo.Context("Baseline PSA profile", func() {
+		f := framework.NewDefaultFramework("per-pod-pid-psa-baseline")
+		f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
+
+		ginkgo.It("should admit pod with pid limit under Baseline PSA", func(ctx context.Context) {
+			ginkgo.By("creating a pod with pid limit in a Baseline namespace")
+			pod := e2epod.NewPodClient(f).CreateSync(ctx, &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "psa-baseline-pid-" + string(uuid.NewUUID()),
+					Namespace: f.Namespace.Name,
+				},
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourcePID: resource.MustParse("2048"),
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Image: imageutils.GetPauseImageName(),
+							Name:  "container" + string(uuid.NewUUID()),
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("10m"),
+									v1.ResourceMemory: resource.MustParse("100Mi"),
+								},
+							},
+						},
+					},
+				},
+			})
+			ginkgo.By("verifying the pod was admitted and is running")
+			gomega.Expect(pod.Status.Phase).To(gomega.Equal(v1.PodRunning))
+		})
+
+		addAfterEachForCleaningUpPods(f)
+	})
+
+	ginkgo.Context("Restricted PSA profile", func() {
+		f := framework.NewDefaultFramework("per-pod-pid-psa-restricted")
+		f.NamespacePodSecurityLevel = admissionapi.LevelRestricted
+
+		ginkgo.It("should admit pod with pid limit under Restricted PSA", func(ctx context.Context) {
+			ginkgo.By("creating a restricted-compliant pod with pid limit")
+			pod := e2epod.NewPodClient(f).CreateSync(ctx, &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "psa-restricted-pid-" + string(uuid.NewUUID()),
+					Namespace: f.Namespace.Name,
+				},
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourcePID: resource.MustParse("2048"),
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Image: imageutils.GetPauseImageName(),
+							Name:  "container" + string(uuid.NewUUID()),
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("10m"),
+									v1.ResourceMemory: resource.MustParse("100Mi"),
+								},
+							},
+							SecurityContext: &v1.SecurityContext{
+								RunAsNonRoot:             new(true),
+								RunAsUser:                new(int64(1000)),
+								AllowPrivilegeEscalation: new(false),
+								Capabilities: &v1.Capabilities{
+									Drop: []v1.Capability{"ALL"},
+								},
+								SeccompProfile: &v1.SeccompProfile{
+									Type: v1.SeccompProfileTypeRuntimeDefault,
+								},
+							},
+						},
+					},
+				},
+			})
+			ginkgo.By("verifying the pod was admitted and is running")
+			gomega.Expect(pod.Status.Phase).To(gomega.Equal(v1.PodRunning))
+		})
+
+		addAfterEachForCleaningUpPods(f)
+	})
+})
+
+// podCgroupPath returns the host path of the pod-level cgroup directory.
+func podCgroupPath(pod *v1.Pod) (string, error) {
+	podCgroupSuffix := cm.GetPodCgroupNameSuffix(pod.UID)
+	var cgroupName cm.CgroupName
+	switch pod.Status.QOSClass {
+	case v1.PodQOSGuaranteed:
+		cgroupName = cm.NewCgroupName(cm.RootCgroupName, defaultNodeAllocatableCgroup, podCgroupSuffix)
+	case v1.PodQOSBurstable:
+		cgroupName = cm.NewCgroupName(cm.RootCgroupName, defaultNodeAllocatableCgroup, strings.ToLower(string(v1.PodQOSBurstable)), podCgroupSuffix)
+	case v1.PodQOSBestEffort:
+		cgroupName = cm.NewCgroupName(cm.RootCgroupName, defaultNodeAllocatableCgroup, strings.ToLower(string(v1.PodQOSBestEffort)), podCgroupSuffix)
+	default:
+		return "", fmt.Errorf("unexpected QOS class %q for pod %s", pod.Status.QOSClass, pod.Name)
+	}
+	// ToSystemd/ToCgroupfs return paths with a leading '/', and filepath.Join
+	// discards prior elements when an argument is absolute.
+	return filepath.Join("/sys/fs/cgroup", strings.TrimPrefix(toCgroupFsName(cgroupName), "/")), nil
+}
+
+// getPodCgroupPidsMax reads pids.max from the pod-level cgroup.
+func getPodCgroupPidsMax(pod *v1.Pod) (int64, error) {
+	dir, err := podCgroupPath(pod)
+	if err != nil {
+		return 0, err
+	}
+	pidsMaxFile := filepath.Join(dir, "pids.max")
+	out, err := os.ReadFile(pidsMaxFile)
+	if err != nil {
+		return 0, fmt.Errorf("failed to read %s: %w", pidsMaxFile, err)
+	}
+	return strconv.ParseInt(strings.TrimSpace(string(out)), 10, 64)
+}
+
+var _ = SIGDescribe("PerPodPIDLimit Static Pod", feature.StandaloneMode, framework.WithFeatureGate(features.PerPodPIDLimit), func() {
+	f := framework.NewDefaultFramework("per-pod-pid-static")
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+
+	ginkgo.Context("when creating a static pod with per-pod PID limit", func() {
+		var ns, podPath, staticPodName string
+
+		ginkgo.BeforeEach(func() {
+			if !IsCgroup2UnifiedMode() {
+				ginkgo.Skip("per-pod PID limits require cgroupsv2")
+			}
+			ns = f.Namespace.Name
+			staticPodName = "static-pid-limit-" + string(uuid.NewUUID())
+			podPath = kubeletCfg.StaticPodPath
+		})
+
+		ginkgo.AfterEach(func(ctx context.Context) {
+			ginkgo.By(fmt.Sprintf("delete the static pod (%v/%v)", ns, staticPodName))
+			err := deleteStaticPod(podPath, staticPodName, ns)
+			framework.ExpectNoError(err)
+
+			ginkgo.By(fmt.Sprintf("wait for pod to disappear (%v/%v)", ns, staticPodName))
+			gomega.Eventually(ctx, func(ctx context.Context) error {
+				_, err := getPodFromStandaloneKubelet(ctx, ns, staticPodName)
+				if err != nil {
+					return nil
+				}
+				return fmt.Errorf("pod (%v/%v) still exists", ns, staticPodName)
+			}, f.Timeouts.PodStart, time.Second*5).Should(gomega.Succeed())
+		})
+
+		ginkgo.It("should enforce per-pod PID limit on a static pod without API server", func(ctx context.Context) {
+			ginkgo.By("creating a static pod with pid limit 2048")
+			podSpec := &v1.Pod{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "Pod",
+					APIVersion: "v1",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      staticPodName,
+					Namespace: ns,
+				},
+				Spec: v1.PodSpec{
+					RestartPolicy: v1.RestartPolicyAlways,
+					Resources: &v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourcePID: resource.MustParse("2048"),
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Name:  "pause",
+							Image: imageutils.GetPauseImageName(),
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceMemory: resource.MustParse("50Mi"),
+								},
+							},
+						},
+					},
+				},
+			}
+
+			err := scheduleStaticPod(podPath, staticPodName, ns, podSpec)
+			framework.ExpectNoError(err)
+
+			ginkgo.By("waiting for the static pod to be running")
+			var pod *v1.Pod
+			gomega.Eventually(ctx, func(ctx context.Context) error {
+				var err error
+				pod, err = getPodFromStandaloneKubelet(ctx, ns, staticPodName)
+				if err != nil {
+					return fmt.Errorf("error getting pod (%v/%v): %w", ns, staticPodName, err)
+				}
+				isReady, err := testutils.PodRunningReady(pod)
+				if err != nil {
+					return fmt.Errorf("error checking pod readiness: %w", err)
+				}
+				if !isReady {
+					return fmt.Errorf("pod (%v/%v) is not running", ns, staticPodName)
+				}
+				return nil
+			}, f.Timeouts.PodStart, time.Second*5).Should(gomega.Succeed())
+
+			ginkgo.By("verifying pids.max is set to 2048 in the pod cgroup")
+			pidsMax, err := getPodCgroupPidsMax(pod)
+			framework.ExpectNoError(err)
+			gomega.Expect(pidsMax).To(gomega.Equal(int64(2048)),
+				"expected pids.max=2048 for static pod with pid limit 2048")
+		})
 	})
 })

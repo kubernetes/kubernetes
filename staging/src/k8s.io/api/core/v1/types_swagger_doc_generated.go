@@ -2035,7 +2035,7 @@ var map_PodStatus = map[string]string{
 	"resourceClaimStatuses":                "Status of resource claims.",
 	"extendedResourceClaimStatus":          "Status of extended resource claim backed by DRA.",
 	"allocatedResources":                   "AllocatedResources is the total requests allocated for this pod by the node. If pod-level requests are not set, this will be the total requests aggregated across containers in the pod.",
-	"resources":                            "Resources represents the compute resource requests and limits that have been applied at the pod level if pod-level requests or limits are set in PodSpec.Resources",
+	"resources":                            "Resources represents the compute resource requests and limits that have been applied at the pod level if pod-level requests or limits are set in PodSpec.Resources. This also includes pod-level-only, limit-only resources (e.g. pids) when set; such values reflect what was requested and are not currently reconciled against an enacted value that may differ (e.g. a pids limit clamped by the node's podPidsLimit).",
 	"nodeAllocatableResourceClaimStatuses": "NodeAllocatableResourceClaimStatuses contains the status of node-allocatable resources that were allocated for this pod through DRA claims. This includes resources currently reported in v1.Node `status.allocatable` that are not extended resources (see https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#extended-resources). Examples include \"cpu\", \"memory\", \"ephemeral-storage\", and hugepages.",
 	"volumeStatuses":                       "VolumeStatuses contains the status of individual volumes used by this pod. This is an alpha field and requires enabling the CSIVolumeHealth feature gate.",
 }

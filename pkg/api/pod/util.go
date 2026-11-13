@@ -1500,6 +1500,18 @@ func DefaultPodLevelResources(pod *api.Pod) {
 		return
 	}
 
+	// A pod whose only pod-level entries are limit-only resources (e.g. pids)
+	// has not opted into pod-level cpu/memory/hugepages semantics; defaulting
+	// must be a no-op for it. Checked once here so the property holds
+	// regardless of which defaulting steps run or in what order.
+	v1Resources := &apiv1.ResourceRequirements{}
+	if err := corev1.Convert_core_ResourceRequirements_To_v1_ResourceRequirements(pod.Spec.Resources, v1Resources, nil); err != nil {
+		return
+	}
+	if !resourcehelper.HasAccountablePodLevelResource(v1Resources) {
+		return
+	}
+
 	v1PodSpec := &apiv1.PodSpec{}
 	// Ephemeral containers are excluded here as they cannot specify resources and do not contribute
 	// to QoS or pod-level resource defaulting. If this changes, this location may need to be updated.
@@ -1525,7 +1537,6 @@ func defaultHugePagePodLevelLimits(pod *api.Pod, v1Pod *apiv1.Pod) {
 	if len(pod.Spec.Resources.Limits) == 0 && len(pod.Spec.Resources.Requests) == 0 {
 		return
 	}
-
 	podLims := pod.Spec.Resources.Limits
 	if podLims == nil {
 		podLims = make(api.ResourceList)
@@ -1578,7 +1589,7 @@ func defaultPodLevelRequests(pod *api.Pod, v1Pod *apiv1.Pod) {
 
 	if pod.Spec.Resources.Limits != nil {
 		for key, podLim := range pod.Spec.Resources.Limits {
-			if _, exists := podReqs[key]; !exists && resourcehelper.IsSupportedPodLevelResource(apiv1.ResourceName(key)) {
+			if _, exists := podReqs[key]; !exists && resourcehelper.IsSupportedPodLevelResource(apiv1.ResourceName(key)) && !resourcehelper.IsLimitOnlyPodLevelResource(apiv1.ResourceName(key)) {
 				podReqs[key] = podLim.DeepCopy()
 			}
 		}
