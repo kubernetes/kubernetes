@@ -627,16 +627,6 @@ func (m *manager) handlePendingAllocation(ctx context.Context, pod *v1.Pod) (lif
 			return lifecycle.PodAdmitResult{}, false, err
 		}
 		m.statusManager.ClearPodResizePendingCondition(pod.UID, metrics.DeferredResizeResolutionAccepted)
-
-		if resizeRequested {
-			// Clear any errors that may have been surfaced from a previous resize and update the
-			// generation of the resize in-progress condition.
-			m.statusManager.ClearPodResizeInProgressCondition(pod.UID)
-			m.statusManager.SetPodResizeInProgressCondition(pod.UID, "", "", pod.Generation)
-
-			msg := events.PodResizeStartedMsg(logger, pod, pod.Generation)
-			m.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeNormal, events.ResizeStarted, "%s", msg)
-		}
 		return result, true, nil
 	}
 

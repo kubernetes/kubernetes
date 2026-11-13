@@ -4461,6 +4461,10 @@ func TestSyncPodWithErrorsDuringInPlacePodResize(t *testing.T) {
 	})
 	pod.Generation = 2
 	kubelet.podManager.SetPods([]*v1.Pod{pod})
+	// The resize in progress was allocated at generation 1.
+	allocatedPod := pod.DeepCopy()
+	allocatedPod.Generation = 1
+	require.NoError(t, kubelet.allocationManager.SetAllocatedPod(tCtx.Logger(), allocatedPod))
 	kubelet.statusManager.SetPodResizeInProgressCondition(pod.UID, "", "", 1)
 
 	testCases := []struct {
@@ -4572,6 +4576,102 @@ func TestSyncPodWithErrorsDuringInPlacePodResize(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestSyncPodResizeInProgressCondition checks that SyncPod reports the resize the runtime is
+// actuating, at the generation it was allocated at, and emits the resize events.
+func TestSyncPodResizeInProgressCondition(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+	kubelet := testKubelet.kubelet
+	fakeRecorder := record.NewFakeRecorder(20)
+	kubelet.recorder = fakeRecorder
+
+	pod := podWithUIDNameNsSpec("12345678", "foo", "new", v1.PodSpec{
+		Containers: []v1.Container{{Name: "bar"}},
+	})
+	kubelet.podManager.SetPods([]*v1.Pod{pod})
+	allocate := func(generation int64) {
+		t.Helper()
+		allocatedPod := pod.DeepCopy()
+		allocatedPod.Generation = generation
+		require.NoError(t, kubelet.allocationManager.SetAllocatedPod(tCtx.Logger(), allocatedPod))
+	}
+	syncPod := func(generation int64, resizeInProgress bool, syncResults *kubecontainer.PodSyncResult) {
+		t.Helper()
+		pod.Generation = generation
+		testKubelet.fakeRuntime.PodResizeInProgress = resizeInProgress
+		testKubelet.fakeRuntime.SyncResults = syncResults
+		_, _, _ = kubelet.SyncPod(tCtx, kubetypes.SyncPodUpdate, pod, nil, &kubecontainer.PodStatus{})
+	}
+	expectCondition := func(expected *v1.PodCondition) {
+		t.Helper()
+		conditions := kubelet.statusManager.GetPodResizeConditions(pod.UID)
+		if expected == nil {
+			assert.Empty(t, conditions)
+			return
+		}
+		require.Len(t, conditions, 1)
+		conditions[0].LastProbeTime = metav1.Time{}
+		conditions[0].LastTransitionTime = metav1.Time{}
+		assert.Equal(t, expected, conditions[0])
+	}
+	expectEvents := func(expected ...string) {
+		t.Helper()
+		var events []string
+		for len(fakeRecorder.Events) > 0 {
+			if event := <-fakeRecorder.Events; strings.Contains(event, "Resize") {
+				events = append(events, event)
+			}
+		}
+		assert.Equal(t, expected, events)
+	}
+	inProgress := func(generation int64, reason, message string) *v1.PodCondition {
+		return &v1.PodCondition{Type: v1.PodResizeInProgress, Status: v1.ConditionTrue, ObservedGeneration: generation, Reason: reason, Message: message}
+	}
+	resizeError := &kubecontainer.PodSyncResult{SyncResults: []*kubecontainer.SyncResult{{
+		Action:  kubecontainer.ResizePodInPlace,
+		Target:  pod.UID,
+		Error:   kubecontainer.ErrResizePodInPlace,
+		Message: "could not resize pod",
+	}}}
+
+	// A resize that the runtime doesn't need to actuate, e.g. of a container that isn't running.
+	allocate(1)
+	syncPod(1, false, nil)
+	expectCondition(nil)
+	expectEvents()
+
+	// The runtime starts actuating a resize.
+	allocate(2)
+	syncPod(2, true, nil)
+	expectCondition(inProgress(2, "", ""))
+	expectEvents(`Normal ResizeStarted Pod resize started: {"containers":[{"name":"bar","resources":{}}],"generation":2}`)
+
+	// A newer change that isn't allocated yet doesn't change the resize in progress.
+	syncPod(3, true, nil)
+	expectCondition(inProgress(2, "", ""))
+	expectEvents()
+
+	// The resize fails, and keeps failing.
+	syncPod(3, true, resizeError)
+	expectCondition(inProgress(2, v1.PodReasonError, "could not resize pod"))
+	expectEvents(`Warning ResizeError Pod resize error: {"containers":[{"name":"bar","resources":{}}],"generation":2,"error":"could not resize pod"}`)
+	syncPod(3, true, nil)
+	expectCondition(inProgress(2, v1.PodReasonError, "could not resize pod"))
+	expectEvents()
+
+	// A new resize resets the error.
+	allocate(4)
+	syncPod(4, true, nil)
+	expectCondition(inProgress(4, "", ""))
+	expectEvents(`Normal ResizeStarted Pod resize started: {"containers":[{"name":"bar","resources":{}}],"generation":4}`)
+
+	// The resize completes.
+	syncPod(4, false, nil)
+	expectCondition(nil)
+	expectEvents(`Normal ResizeCompleted Pod resize completed: {"containers":[{"name":"bar","resources":{}}],"generation":4}`)
 }
 
 func TestHandlePodUpdates_RecordContainerRequestedResizes(t *testing.T) {
@@ -6433,7 +6533,7 @@ func TestHandlePodUpdates_ResizeTerminatingPods(t *testing.T) {
 				v1.ResourcePods:   resource.MustParse("110"),
 			}},
 		}}}
-		// Keep UpdatePod from running SyncPod, which would clear PodResizeInProgress.
+		// Keep UpdatePod from running SyncPod, which would update PodResizeInProgress.
 		kl.podWorkers.(*fakePodWorkers).syncPodFn = func(context.Context, kubetypes.SyncPodType, *v1.Pod, *v1.Pod, *kubecontainer.PodStatus) (bool, func(), error) {
 			return false, nil, nil
 		}
@@ -6480,9 +6580,8 @@ func TestHandlePodUpdates_ResizeTerminatingPods(t *testing.T) {
 
 		kl.HandlePodUpdates(tCtx, []*v1.Pod{newPod(4, cpu200m)})
 		assertAllocatedCPU(t, kl, cpu200m)
-		conditions := kl.statusManager.GetPodResizeConditions(podUID)
-		require.Len(t, conditions, 1)
-		assert.Equal(t, v1.PodResizeInProgress, conditions[0].Type)
+		// The resize is reported in progress once the pod is synced.
+		assert.Empty(t, kl.statusManager.GetPodResizeConditions(podUID))
 	})
 
 	terminatingCases := []struct {
