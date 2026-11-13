@@ -23,6 +23,7 @@ import (
 
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -589,6 +590,13 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 				field.Invalid(schedulingPath.Child("resourceClaims"), nil, "").WithOrigin("immutable"),
 			},
 		},
+		"ephemeral volume volumeName modified": {
+			old:    mkCronJob(tweakEphemeralVolumeName("pv-old")),
+			update: mkCronJob(tweakEphemeralVolumeName("pv-new")),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "jobTemplate", "spec", "template", "spec", "volumes").Index(0).Child("ephemeral", "volumeClaimTemplate", "spec", "volumeName"), "", "").WithOrigin("update"),
+			},
+		},
 	}
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {
@@ -778,6 +786,29 @@ func tweakJobTemplateBackoffLimitPerIndex(v *int32) func(*batch.CronJob) {
 func tweakTolerations(tolerations ...api.Toleration) func(*batch.CronJob) {
 	return func(job *batch.CronJob) {
 		job.Spec.JobTemplate.Spec.Template.Spec.Tolerations = tolerations
+	}
+}
+
+func tweakEphemeralVolumeName(volumeName string) func(*batch.CronJob) {
+	return func(cj *batch.CronJob) {
+		cj.Spec.JobTemplate.Spec.Template.Spec.Volumes = []api.Volume{
+			{
+				Name: "ephemeral-vol",
+				VolumeSource: api.VolumeSource{
+					Ephemeral: &api.EphemeralVolumeSource{
+						VolumeClaimTemplate: &api.PersistentVolumeClaimTemplate{
+							Spec: api.PersistentVolumeClaimSpec{
+								VolumeName:  volumeName,
+								AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+								Resources: api.VolumeResourceRequirements{
+									Requests: api.ResourceList{api.ResourceStorage: resource.MustParse("1Gi")},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
 	}
 }
 

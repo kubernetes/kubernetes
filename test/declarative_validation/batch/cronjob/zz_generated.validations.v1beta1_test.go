@@ -231,6 +231,9 @@ func init() {
 			"spec.jobTemplate.spec.template.spec.tolerations[*].key": {
 				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-label-key"},
 			},
+			"spec.jobTemplate.spec.template.spec.volumes[*].ephemeral.volumeClaimTemplate.spec.volumeName": {
+				{ErrorType: "FieldValueInvalid", Origin: "update"},
+			},
 			"spec.jobTemplate.spec.ttlSecondsAfterFinished": {
 				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
 			},
