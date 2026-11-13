@@ -68,6 +68,12 @@ export PATH="${PATH}:${KUBE_ROOT}/_output/local/go/bin"
 # shellcheck disable=SC2031 # we are intentionally isolating subshells
 export GOTOOLCHAIN=go1.21.0+auto
 
+# Each module must be tested in module mode. In workspace mode the go command
+# takes the toolchain from go.work, which tracks the root module, and ignores
+# the module's own go directive.
+# shellcheck disable=SC2031 # we are intentionally isolating subshells
+export GOWORK=off
+
 res=0
 for module_dir in "${staging_modules_root}"/*; do
     module="${module_dir#"${staging_modules_root}"/}"
