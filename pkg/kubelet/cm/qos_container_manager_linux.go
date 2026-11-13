@@ -284,7 +284,9 @@ func (m *qosContainerManagerImpl) getQoSMemoryRequests() map[v1.PodQOSClass]int6
 		}
 		draNodeAllocatableEnabled := utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DRANodeAllocatableResources)
 		req := resource.PodRequests(pod, resource.PodResourcesOptions{
-			Reuse:                                    reuseReqs,
+			Reuse: reuseReqs,
+			// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
+			SkipPodLevelResources:                    !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodLevelResources),
 			UseDRANodeAllocatableResourceClaimStatus: draNodeAllocatableEnabled,
 		})
 		if request, found := req[v1.ResourceMemory]; found {

@@ -167,6 +167,70 @@ func TestQoSContainerCgroup(t *testing.T) {
 	burstableMin := resource.MustParse("384Mi")
 	guaranteedMin := resource.MustParse("128Mi")
 
+	// Shared by the two pod-level resources cases below: a Guaranteed pod with no
+	// pod-level resources, and a Burstable pod whose pod-level memory request (512Mi)
+	// is larger than its container request (128Mi) plus its DRA mapping (128Mi).
+	podLevelResourcePods := []*v1.Pod{
+		{
+			ObjectMeta: metav1.ObjectMeta{UID: "12345678", Name: "guaranteed-pod", Namespace: "test"},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name:  "foo",
+						Image: "busybox",
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceMemory: resource.MustParse("128Mi"),
+								v1.ResourceCPU:    resource.MustParse("1"),
+							},
+							Limits: v1.ResourceList{
+								v1.ResourceMemory: resource.MustParse("128Mi"),
+								v1.ResourceCPU:    resource.MustParse("1"),
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{UID: "87654321", Name: "burstable-pod-pod-level", Namespace: "test"},
+			Spec: v1.PodSpec{
+				Resources: &v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceMemory: resource.MustParse("512Mi"),
+					},
+				},
+				Containers: []v1.Container{
+					{
+						Name:  "foo",
+						Image: "busybox",
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceMemory: resource.MustParse("128Mi"),
+								v1.ResourceCPU:    resource.MustParse("1"),
+							},
+							Limits: v1.ResourceList{
+								v1.ResourceMemory: resource.MustParse("256Mi"),
+								v1.ResourceCPU:    resource.MustParse("2"),
+							},
+						},
+					},
+				},
+			},
+			Status: v1.PodStatus{
+				NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+					{
+						ResourceClaimName: "direct-claim",
+						Containers:        []string{"foo"},
+						Mapping: []v1.NodeAllocatableMappedResources{
+							{Name: v1.ResourceMemory, Quantity: new(resource.MustParse("128Mi"))},
+						},
+					},
+				},
+			},
+		},
+	}
+
 	tests := []struct {
 		name                               string
 		pods                               []*v1.Pod
@@ -318,73 +382,24 @@ func TestQoSContainerCgroup(t *testing.T) {
 			expectedBurstable:                  strconv.FormatInt(256*1024*1024, 10), // Burstable 128Mi spec + 128Mi DRA = 256Mi
 		},
 		{
-			name: "writes memory min with pod-level resources",
-			pods: []*v1.Pod{
-				{
-					ObjectMeta: metav1.ObjectMeta{UID: "12345678", Name: "guaranteed-pod", Namespace: "test"},
-					Spec: v1.PodSpec{
-						Containers: []v1.Container{
-							{
-								Name:  "foo",
-								Image: "busybox",
-								Resources: v1.ResourceRequirements{
-									Requests: v1.ResourceList{
-										v1.ResourceMemory: resource.MustParse("128Mi"),
-										v1.ResourceCPU:    resource.MustParse("1"),
-									},
-									Limits: v1.ResourceList{
-										v1.ResourceMemory: resource.MustParse("128Mi"),
-										v1.ResourceCPU:    resource.MustParse("1"),
-									},
-								},
-							},
-						},
-					},
-				},
-				{
-					ObjectMeta: metav1.ObjectMeta{UID: "87654321", Name: "burstable-pod-pod-level", Namespace: "test"},
-					Spec: v1.PodSpec{
-						Resources: &v1.ResourceRequirements{
-							Requests: v1.ResourceList{
-								v1.ResourceMemory: resource.MustParse("512Mi"),
-							},
-						},
-						Containers: []v1.Container{
-							{
-								Name:  "foo",
-								Image: "busybox",
-								Resources: v1.ResourceRequirements{
-									Requests: v1.ResourceList{
-										v1.ResourceMemory: resource.MustParse("128Mi"),
-										v1.ResourceCPU:    resource.MustParse("1"),
-									},
-									Limits: v1.ResourceList{
-										v1.ResourceMemory: resource.MustParse("256Mi"),
-										v1.ResourceCPU:    resource.MustParse("2"),
-									},
-								},
-							},
-						},
-					},
-					Status: v1.PodStatus{
-						NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
-							{
-								ResourceClaimName: "direct-claim",
-								Containers:        []string{"foo"},
-								Mapping: []v1.NodeAllocatableMappedResources{
-									{Name: v1.ResourceMemory, Quantity: new(resource.MustParse("128Mi"))},
-								},
-							},
-						},
-					},
-				},
-			},
+			name:                               "writes memory min with pod-level resources",
+			pods:                               podLevelResourcePods,
 			draNodeAllocatableResourcesEnabled: true,
 			podLevelResourcesEnabled:           true,
 			initialGuaranteed:                  "",
 			initialBurstable:                   "",
 			expectedGuaranteed:                 strconv.FormatInt(640*1024*1024, 10), // Guaranteed 128Mi + Burstable pod-level 512Mi = 640Mi
 			expectedBurstable:                  strconv.FormatInt(512*1024*1024, 10), // Burstable pod-level 512Mi
+		},
+		{
+			name:                               "ignores pod-level resources when PodLevelResources is disabled",
+			pods:                               podLevelResourcePods,
+			draNodeAllocatableResourcesEnabled: true,
+			podLevelResourcesEnabled:           false,
+			initialGuaranteed:                  "",
+			initialBurstable:                   "",
+			expectedGuaranteed:                 strconv.FormatInt(384*1024*1024, 10), // Guaranteed 128Mi + Burstable containers 256Mi = 384Mi
+			expectedBurstable:                  strconv.FormatInt(256*1024*1024, 10), // Burstable 128Mi container + 128Mi DRA, pod-level ignored
 		},
 	}
 
