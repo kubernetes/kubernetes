@@ -305,6 +305,7 @@ func makeMounts(logger klog.Logger, pod *v1.Pod, podDir string, container *v1.Co
 	mountEtcHostsFile := shouldMountHostsFile(pod, podIPs)
 	logger.V(3).Info("Creating hosts mount for container", "pod", klog.KObj(pod), "containerName", container.Name, "podIPs", podIPs, "path", mountEtcHostsFile)
 	mounts := []kubecontainer.Mount{}
+	var activeSubPathIndices map[string]map[int]struct{}
 	var cleanupActions []func()
 	cleanupAction := func() {
 		// We reverse the order to do the cleanup in the opposite order the mounts were done in - in case there are dependencies
@@ -411,6 +412,13 @@ func makeMounts(logger klog.Logger, pod *v1.Pod, podDir string, container *v1.Co
 					logger.Error(nil, "Failed to prepare subPath for volumeMount of the container", "containerName", container.Name, "volumeMountName", mount.Name)
 					return nil, cleanupAction, fmt.Errorf("failed to prepare subPath for volumeMount %q of container %q", mount.Name, container.Name)
 				}
+				if activeSubPathIndices == nil {
+					activeSubPathIndices = make(map[string]map[int]struct{})
+				}
+				if activeSubPathIndices[vol.InnerVolumeSpecName] == nil {
+					activeSubPathIndices[vol.InnerVolumeSpecName] = make(map[int]struct{})
+				}
+				activeSubPathIndices[vol.InnerVolumeSpecName][i] = struct{}{}
 			}
 
 			// Docker Volume Mounts fail on Windows if it is not of the form C:/
@@ -449,6 +457,13 @@ func makeMounts(logger klog.Logger, pod *v1.Pod, podDir string, container *v1.Co
 			Propagation:       propagation,
 			BindMountOptions:  mount.BindMountOptions,
 		})
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicNodeLocalEphemeralVolumes) {
+		if cleaner, ok := subpather.(subpath.ContainerSubPathCleaner); ok {
+			if err := cleaner.CleanContainerSubPaths(podDir, container.Name, activeSubPathIndices); err != nil {
+				logger.Error(err, "Failed to clean stale container subPath mounts", "pod", klog.KObj(pod), "containerName", container.Name)
+			}
+		}
 	}
 	if mountEtcHostsFile {
 		hostAliases := pod.Spec.HostAliases
