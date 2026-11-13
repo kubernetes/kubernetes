@@ -10,7 +10,7 @@ Inspired by [etcd robustness testing](https://github.com/etcd-io/etcd/tree/main/
 Historical correctness bugs in `cacher` and `etcd3`, and whether this test suite can
 reproduce them. A bug counts as reproducible once its fix has been reverted and
 `TestCorrectness` has been observed to fail. All `Yes` entries were last confirmed at
-[3ec9b6b8a7a7b62e464a5e40804db8fb40583f20].
+[1db1654736737022e146af9d1b00825b583404b7].
 
 | Correctness / Consistency issue | Report | Component | Discovered by | Reproducible | Reproduction command |
 | ------------------------------- | ------ | --------- | ------------- | ------------ | -------------------- |
@@ -18,7 +18,7 @@ reproduce them. A bug counts as reproducible once its fix has been reverted and
 | `GuaranteedUpdate` rewrites the live cached object in place [#35415] | Oct 2016 | cacher | Maintainer | Yes | `./test/integration/apiserver/storage/reproduce.sh 35415-deepcopy` |
 | Conflict on a stale suggestion is returned instead of retried against live data [#43152] | Mar 2017 | etcd3 | Maintainer | Yes | `./test/integration/apiserver/storage/reproduce.sh 43152` |
 | `GuaranteedUpdate` skips the write when the stored data is not canonical [#48394] | Jul 2017 | etcd3 | Maintainer | Yes | `./test/integration/apiserver/storage/reproduce.sh 48394` |
-| Watch events out of order when watching from RV=0 [#49745] | Jul 2017 | cacher | User | No, `streamInterval` advances `resourceVersion` | `./test/integration/apiserver/storage/reproduce.sh 49745` |
+| Watch events out of order when watching from RV=0 [#49745] | Jul 2017 | cacher | User | Yes | `./test/integration/apiserver/storage/reproduce.sh 49745` |
 | Patch of a custom resource fails against a stale cached suggestion [#54780] | Oct 2017 | etcd3 | User | Yes | `./test/integration/apiserver/storage/reproduce.sh 54780` |
 | Delete notifications carry old ResourceVersion [#58545] | Jan 2018 | cacher | User | Yes | `./test/integration/apiserver/storage/reproduce.sh 58545` |
 | Re-watching from a DELETE event's RV replays events [#63356] | May 2018 | cacher | User | Yes | `./test/integration/apiserver/storage/reproduce.sh 58545` |
@@ -36,7 +36,7 @@ reproduce them. A bug counts as reproducible once its fix has been reverted and
 | Non-recursive consistent list from the watch cache errors with "resource version too high" [#123674] | Mar 2024 | cacher | Maintainer | No, all writes target the watched resource | `./test/integration/apiserver/storage/reproduce.sh 123674` |
 | Consistent list from the watch cache ignores `resourceVersion=0` [#123676] | Mar 2024 | cacher | Maintainer | No, consistent read satisfies `NotOlderThan 0` | `./test/integration/apiserver/storage/reproduce.sh 123676` |
 | Watch of a single namespace missing all events [#125133] | May 2024 | cacher | User | Yes | `./test/integration/apiserver/storage/reproduce.sh 125133` |
-| Bookmark RV not synced to list RV [#125244] | May 2024 | cacher | CI flake | No, bookmarks are only requested on WatchList | `./test/integration/apiserver/storage/reproduce.sh 125244` |
+| Bookmark RV not synced to list RV [#125244] | May 2024 | cacher | CI flake | No, Reflector stages initial events before Replace | `./test/integration/apiserver/storage/reproduce.sh 125244` |
 | Recursive list from the watch cache returns items outside the key prefix [#125584] | Jun 2024 | cacher | Maintainer | Yes | `./test/integration/apiserver/storage/reproduce.sh 125584` |
 | `sendInitialEvents` returns non-ADDED events before initial BOOKMARK [#134831] | Oct 2025 | cacher | User | Yes | `./test/integration/apiserver/storage/reproduce.sh 134831` |
 | WatchList on an unrecognized (too large) RV hangs instead of erroring [#135452] | Nov 2025 | cacher, etcd3 | User | Yes | `./test/integration/apiserver/storage/reproduce.sh 135452` |
@@ -45,7 +45,7 @@ reproduce them. A bug counts as reproducible once its fix has been reverted and
 | Get with no ResourceVersion served from a stale watch cache | n/a | cacher | Synthetic | Yes | `./test/integration/apiserver/storage/reproduce.sh stale-get` |
 | List with no ResourceVersion served from a stale watch cache | n/a | cacher | Synthetic | Yes | `./test/integration/apiserver/storage/reproduce.sh stale-list` |
 
-[3ec9b6b8a7a7b62e464a5e40804db8fb40583f20]: https://github.com/kubernetes/kubernetes/tree/3ec9b6b8a7a7b62e464a5e40804db8fb40583f20
+[1db1654736737022e146af9d1b00825b583404b7]: https://github.com/kubernetes/kubernetes/tree/1db1654736737022e146af9d1b00825b583404b7
 [#35415]: https://github.com/kubernetes/kubernetes/pull/35415
 [#43152]: https://github.com/kubernetes/kubernetes/pull/43152
 [#48394]: https://github.com/kubernetes/kubernetes/pull/48394

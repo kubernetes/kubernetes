@@ -1,20 +1,39 @@
 diff --git a/staging/src/k8s.io/apiserver/pkg/storage/cacher/cache_watcher.go b/staging/src/k8s.io/apiserver/pkg/storage/cacher/cache_watcher.go
-index d2f388d1fb4..9c1a8be41a2 100644
+index 7e6030d263a..338b9d78e8d 100644
 --- a/staging/src/k8s.io/apiserver/pkg/storage/cacher/cache_watcher.go
 +++ b/staging/src/k8s.io/apiserver/pkg/storage/cacher/cache_watcher.go
-@@ -502,12 +502,9 @@ func (c *cacheWatcher) processInterval(ctx context.Context, cacheInterval *watch
- 	const initProcessThreshold = 500 * time.Millisecond
- 	startTime := time.Now()
+@@ -505,7 +505,7 @@ func (c *cacheWatcher) process(ctx context.Context) {
+ 	defer close(c.result)
+ 	defer c.Stop()
+ 	initialized := false
+-	var resourceVersion uint64
++	resourceVersion := c.requiredResourceVersion
  
--	// cacheInterval may be created from a version being more fresh than requested
--	// (e.g. for NotOlderThan semantic). In such a case, we need to prevent watch event
--	// with lower resourceVersion from being delivered to ensure watch contract.
--	if cacheInterval.resourceVersion > resourceVersion {
--		resourceVersion = cacheInterval.resourceVersion
--	}
-+	// BUG REVERT (#49745 class): pre-fix the watch RV floor was not raised to the
-+	// snapshot RV, so a cacheInterval built from a fresher version could deliver
-+	// events below the requested resourceVersion.
+ 	for {
+ 		select {
+@@ -525,7 +525,9 @@ func (c *cacheWatcher) process(ctx context.Context) {
+ 				if err := c.processInitialEvents(item.interval); err != nil {
+ 					return
+ 				}
+-				resourceVersion = item.interval.resourceVersion
++				// BUG REVERT (#49745 class): pre-fix the watch RV floor was not raised to the
++				// snapshot RV, so a cacheInterval built from a fresher version could deliver
++				// events at or below the snapshot resourceVersion.
+ 				// At this point we already start processing incoming watch events.
+ 				// However, the init event can still be processed because their serialization
+ 				// and sending to the client happens asynchrnously.
+diff --git a/staging/src/k8s.io/apiserver/pkg/storage/cacher/cacher.go b/staging/src/k8s.io/apiserver/pkg/storage/cacher/cacher.go
+index 92628f8e2df..fcb9c99ced1 100644
+--- a/staging/src/k8s.io/apiserver/pkg/storage/cacher/cacher.go
++++ b/staging/src/k8s.io/apiserver/pkg/storage/cacher/cacher.go
+@@ -867,7 +867,9 @@ func (c *Cacher) watch(ctx context.Context, key string, requestedWatchRV uint64,
+ }
  
- 	initEventCount, err := c.streamInterval(cacheInterval, &resourceVersion)
- 	if err != nil {
+ func (c *Cacher) registerWatcherLocked(watcher *cacheWatcher, cacheInterval *watchCacheInterval) {
+-	watcher.dispatchedResourceVersion = cacheInterval.resourceVersion
++	// BUG REVERT (#49745 class): do not raise dispatchedResourceVersion to the
++	// snapshot/interval RV.
++	watcher.dispatchedResourceVersion = watcher.requiredResourceVersion
+ 	c.watchers.addWatcher(watcher)
+ 	// Add it to the queue only when the client support watch bookmarks.
+ 	if watcher.allowWatchBookmarks {
