@@ -78,6 +78,24 @@ func (f *volumeBindMountOptionsFeature) InferForScheduling(podInfo *types.PodInf
 }
 
 func (f *volumeBindMountOptionsFeature) InferForUpdate(oldPodInfo, newPodInfo *types.PodInfo) bool {
+	// Container volumeMounts are immutable, with one exception: ephemeral containers may be added.
+	// Existing entries may not be changed, but their order is not preserved by patch (see
+	// ValidatePodEphemeralContainersUpdate), so identify the added ones by name rather than by index.
+	existing := make(map[string]struct{}, len(oldPodInfo.Spec.EphemeralContainers))
+	for i := range oldPodInfo.Spec.EphemeralContainers {
+		existing[oldPodInfo.Spec.EphemeralContainers[i].Name] = struct{}{}
+	}
+	for i := range newPodInfo.Spec.EphemeralContainers {
+		added := &newPodInfo.Spec.EphemeralContainers[i]
+		if _, ok := existing[added.Name]; ok {
+			continue
+		}
+		for j := range added.VolumeMounts {
+			if len(added.VolumeMounts[j].BindMountOptions) > 0 {
+				return true
+			}
+		}
+	}
 	return false
 }
 
