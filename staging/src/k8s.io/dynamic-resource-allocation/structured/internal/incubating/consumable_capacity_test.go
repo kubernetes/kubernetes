@@ -168,6 +168,7 @@ func testConsumableCapacity(tCtx ktesting.TContext) {
 
 	tCtx.Run("cmp-request-over-capacity-fatal-beats-soft", testCmpRequestOverCapacityFatalBeatsSoft)
 	tCtx.Run("cmp-request-over-capacity-conflict-beats-missing", testCmpRequestOverCapacityConflictBeatsMissing)
+	tCtx.Run("cmp-request-over-capacity-admin-access", testCmpRequestOverCapacityAdminAccess)
 }
 
 // testCmpRequestOverCapacityFatalBeatsSoft pins that a representability error takes
@@ -209,7 +210,7 @@ func testCmpRequestOverCapacityFatalBeatsSoft(tCtx ktesting.TContext) {
 	// Go's map order is unspecified, so run the check repeatedly to make an
 	// order-dependent regression very likely to surface rather than to rely on one order.
 	for range 64 {
-		_, ok, err := cmpRequestOverCapacity(NewConsumedCapacity(), request, device, NewConsumedCapacity(), false)
+		_, ok, err := cmpRequestOverCapacity(NewConsumedCapacity(), request, device, NewConsumedCapacity(), false, false)
 		tCtx.Require(ok).To(g.BeFalseBecause("an unrepresentable request must not be considered satisfiable"))
 		tCtx.Require(err).To(g.MatchError(errCapacityRequestNotRepresentable), "a representability error must take precedence over the soft over-capacity mismatch")
 	}
@@ -245,10 +246,68 @@ func testCmpRequestOverCapacityConflictBeatsMissing(tCtx ktesting.TContext) {
 	}
 	// Go's map order is unspecified, so run the check repeatedly.
 	for range 64 {
-		_, ok, err := cmpRequestOverCapacity(NewConsumedCapacity(), request, device, NewConsumedCapacity(), false)
+		_, ok, err := cmpRequestOverCapacity(NewConsumedCapacity(), request, device, NewConsumedCapacity(), false, false)
 		tCtx.Require(ok).To(g.BeFalseBecause("a conflicting request must not be considered satisfiable"))
 		tCtx.Require(err).To(g.MatchError(g.ContainSubstring("requested both as")), "the conflict must take precedence over the missing capacity")
 	}
+}
+
+func testCmpRequestOverCapacityAdminAccess(tCtx ktesting.TContext) {
+	slice := &draapi.ResourceSlice{}
+	driverName := slice.MakeUniqueString(driverA)
+	device := deviceWithID{
+		Device: &draapi.Device{
+			Capacity: draapi.DeviceCapacities{
+				Nested: map[draapi.UniqueString]map[draapi.UniqueString]*draapi.DeviceCapacity{
+					driverName: {
+						slice.MakeUniqueString(capacity0): {
+							Value: two,
+							RequestPolicy: &resourceapi.CapacityRequestPolicy{
+								ValidValues: []resource.Quantity{two},
+							},
+						},
+					},
+				},
+				DriverName: driverName,
+			},
+		},
+		id: DeviceID{
+			Driver: driverName,
+		},
+		slice: slice,
+	}
+	// Requesting 1 violates the policy (ValidValues is [2]), but admin access skips the policy check
+	// and only requires that the requested quantity fits the device's total capacity of 2.
+	requestFitting := &resourceapi.CapacityRequirements{
+		Requests: map[resourceapi.QualifiedName]resource.Quantity{
+			capacity0: one,
+		},
+	}
+	res, ok, err := cmpRequestOverCapacity(NewConsumedCapacity(), requestFitting, device, NewConsumedCapacity(), false, true)
+	tCtx.Require(err).NotTo(g.HaveOccurred())
+	tCtx.Require(ok).To(g.BeTrueBecause("admin access should skip policy check and fit within total capacity"))
+	tCtx.Require(res).To(g.HaveLen(1))
+
+	// Requesting 3 exceeds the device's total capacity of 2, so it must not be satisfied.
+	requestExceeding := &resourceapi.CapacityRequirements{
+		Requests: map[resourceapi.QualifiedName]resource.Quantity{
+			capacity0: three,
+		},
+	}
+	res, ok, err = cmpRequestOverCapacity(NewConsumedCapacity(), requestExceeding, device, NewConsumedCapacity(), false, true)
+	tCtx.Require(err).NotTo(g.HaveOccurred())
+	tCtx.Require(ok).To(g.BeFalseBecause("admin access requesting more than total capacity must fail"))
+	tCtx.Require(res).To(g.BeNil())
+
+	// Requesting a negative value is rejected with errNegativeCapacity.
+	requestNegative := &resourceapi.CapacityRequirements{
+		Requests: map[resourceapi.QualifiedName]resource.Quantity{
+			capacity0: negativeOne,
+		},
+	}
+	_, ok, err = cmpRequestOverCapacity(NewConsumedCapacity(), requestNegative, device, NewConsumedCapacity(), false, true)
+	tCtx.Require(ok).To(g.BeFalseBecause("negative capacity request must not be satisfiable"))
+	tCtx.Require(err).To(g.MatchError(errNegativeCapacity))
 }
 
 func testSafeMilliValue(tCtx ktesting.TContext) {
