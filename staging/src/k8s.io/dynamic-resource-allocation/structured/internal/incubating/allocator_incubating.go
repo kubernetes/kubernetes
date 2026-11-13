@@ -247,6 +247,7 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 
 	// We can estimate the size based on what we need to allocate.
 	alloc.allocatingDevices = make(map[DeviceID]sets.Set[int], minDevicesTotal)
+	alloc.allocatingAdminDevices = make(map[DeviceID]sets.Set[int])
 
 	alloc.logger.V(6).Info("Gathered information about devices", "numAllocated", len(alloc.allocatedDevices), "minDevicesToBeAllocated", minDevicesTotal)
 
@@ -506,13 +507,16 @@ type allocator struct {
 	// The keys in the map are resource pool names.
 	consumedCounters map[draapi.UniqueString]counterSets
 	requestData      map[requestIndices]requestData // one entry per request with no subrequests and one entry per subrequest
-	// allocatingDevices tracks which devices will be newly allocated for a
-	// particular attempt to find a solution. The map is indexed by device
-	// and its values represent for which of a pod's claims the device will
-	// be allocated.
+	// allocatingDevices tracks which devices will be newly allocated without
+	// admin access for a particular attempt to find a solution. The map is
+	// indexed by device and its values represent for which of a pod's claims
+	// the device will be allocated.
 	// Claims are identified by their index in claimsToAllocate.
 	allocatingDevices map[DeviceID]sets.Set[int]
-	result            []internalAllocationResult
+	// allocatingAdminDevices does the same for admin access. Only requests of the
+	// same claim check it, because admin access must not block other claims.
+	allocatingAdminDevices map[DeviceID]sets.Set[int]
+	result                 []internalAllocationResult
 }
 
 // counterSets is a map with the name of counter sets to the counters in
@@ -919,7 +923,7 @@ func (alloc *allocator) allocateOne(r deviceIndices, allocateSubRequest bool) (b
 				deviceID := DeviceID{Driver: pool.Driver, Pool: pool.Pool, Device: slice.Spec.Devices[deviceIndex].Name}
 
 				// Checking for "in use" is cheap and thus gets done first.
-				if request.adminAccess() && alloc.allocatingDeviceForClaim(deviceID, r.claimIndex) {
+				if alloc.allocatingDeviceForClaim(deviceID, r.claimIndex) {
 					alloc.logger.V(7).Info("Device in use in same claim", "device", deviceID)
 					continue
 				}
@@ -1098,7 +1102,7 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 	requestKey := requestIndices{claimIndex: r.claimIndex, requestIndex: r.requestIndex, subRequestIndex: r.subRequestIndex}
 	requestData := alloc.requestData[requestKey]
 	request := requestData.request
-	if request.adminAccess() && alloc.allocatingDeviceForClaim(device.id, r.claimIndex) {
+	if alloc.allocatingDeviceForClaim(device.id, r.claimIndex) {
 		alloc.logger.V(7).Info("Device in use in same claim", "device", device.id)
 		return false, nil, nil
 	}
@@ -1167,10 +1171,17 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 	// and record the result.
 	alloc.logger.V(7).Info("Device allocated", "device", device.id)
 
-	if alloc.allocatingDevices[device.id] == nil {
-		alloc.allocatingDevices[device.id] = make(sets.Set[int])
+	if request.adminAccess() {
+		if alloc.allocatingAdminDevices[device.id] == nil {
+			alloc.allocatingAdminDevices[device.id] = make(sets.Set[int])
+		}
+		alloc.allocatingAdminDevices[device.id].Insert(r.claimIndex)
+	} else {
+		if alloc.allocatingDevices[device.id] == nil {
+			alloc.allocatingDevices[device.id] = make(sets.Set[int])
+		}
+		alloc.allocatingDevices[device.id].Insert(r.claimIndex)
 	}
-	alloc.allocatingDevices[device.id].Insert(r.claimIndex)
 
 	result := internalDeviceResult{
 		request:       request.name(),
@@ -1189,7 +1200,11 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 		for _, constraint := range alloc.constraints[r.claimIndex] {
 			constraint.remove(baseRequestName, subRequestName, device.Device, device.id)
 		}
-		alloc.allocatingDevices[device.id].Delete(r.claimIndex)
+		if request.adminAccess() {
+			alloc.allocatingAdminDevices[device.id].Delete(r.claimIndex)
+		} else {
+			alloc.allocatingDevices[device.id].Delete(r.claimIndex)
+		}
 		if alloc.features.PartitionableDevices && len(device.ConsumesCounters) > 0 {
 			alloc.deallocateCountersForDevice(device)
 		}
@@ -1345,8 +1360,10 @@ func (alloc *allocator) allocatingDeviceForAnyClaim(deviceID DeviceID) bool {
 	return alloc.allocatingDevices[deviceID].Len() > 0
 }
 
+// allocatingDeviceForClaim checks devices allocated with and without admin access,
+// to avoid using the same device twice in one claim.
 func (alloc *allocator) allocatingDeviceForClaim(deviceID DeviceID, claimIndex int) bool {
-	return alloc.allocatingDevices[deviceID].Has(claimIndex)
+	return alloc.allocatingDevices[deviceID].Has(claimIndex) || alloc.allocatingAdminDevices[deviceID].Has(claimIndex)
 }
 
 // deallocateCountersForDevice subtracts the consumed counters of the provided
