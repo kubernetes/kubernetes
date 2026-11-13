@@ -3406,6 +3406,10 @@ const (
 	SchedulerEvaluationCompleted PodConditionType = "SchedulerEvaluationCompleted"
 	// AllContainersRestarting indicates that all containers of the pod is being restarted.
 	AllContainersRestarting PodConditionType = "AllContainersRestarting"
+	// PodAllocationPending indicates that the pod spec has been updated, but the kubelet has
+	// not yet allocated the update. This is an alpha condition gated by the DynamicContainers
+	// feature gate.
+	PodAllocationPending PodConditionType = "PodAllocationPending"
 )
 
 // PodCondition represents pod's condition
