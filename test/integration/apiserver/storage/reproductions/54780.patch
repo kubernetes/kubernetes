@@ -1,18 +1,21 @@
 diff --git a/staging/src/k8s.io/apiserver/pkg/storage/etcd3/store.go b/staging/src/k8s.io/apiserver/pkg/storage/etcd3/store.go
-index 0cb165fb4ec..b712f8c4310 100644
+index 05ae1e5ef8e..a1b9edfd486 100644
 --- a/staging/src/k8s.io/apiserver/pkg/storage/etcd3/store.go
 +++ b/staging/src/k8s.io/apiserver/pkg/storage/etcd3/store.go
-@@ -587,10 +587,9 @@ func (s *store) GuaranteedUpdate(
- 					return err
- 				}
- 				origStateIsCurrent = true
--				if !bytes.Equal(data, origState.data) {
--					// original data changed, restart loop
--					continue
--				}
-+				// BUG REVERT (#54780): do not restart the update loop when the live
-+				// stored data differs from the stale suggestion, returning the
-+				// un-updated live object instead of applying the update.
+@@ -505,13 +505,9 @@ func (s *store) updateOnce(ctx context.Context, preparedKey string, destination
+ 			if err != nil {
+ 				return origState, false, err
  			}
- 			// recheck that the data from etcd is not stale before short-circuiting a write
- 			if !origState.stale {
+-			if !bytes.Equal(data, origState.Data) {
+-				// original data changed, restart loop
+-				if !getOnFailure {
+-					return origState, false, storage.NewResourceVersionConflictsError(preparedKey, origState.Rev)
+-				}
+-				return origState, false, nil
+-			}
++			// BUG REVERT (#54780): do not restart the update loop when the live
++			// stored data differs from the stale suggestion, returning the
++			// un-updated live object instead of applying the update.
+ 		}
+ 		// recheck that the data from etcd is not stale before short-circuiting a write
+ 		if !origState.Stale {

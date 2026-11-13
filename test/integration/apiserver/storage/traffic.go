@@ -522,7 +522,8 @@ func resolveResourceVersion(ctx context.Context, store storage.Interface, rvType
 		if err != nil {
 			panic(err)
 		}
-		return accessor.GetResourceVersion(), true
+		rv := accessor.GetResourceVersion()
+		return rv, rv != ""
 	case RVCurrent:
 		return relativeRV(ctx, store, 0), true
 	case RVPast:
@@ -662,7 +663,7 @@ func runTraffic(ctx context.Context, store storage.Interface, request *correctne
 		panic(fmt.Sprintf("%v: unknown operation", request.Op))
 	}
 	if err != nil {
-		if _, ok := errors.AsType[*storage.StorageError](err); ok || storage.IsTooLargeResourceVersion(err) || apierrors.IsTooManyRequests(err) || apierrors.IsResourceExpired(err) || apierrors.IsBadRequest(err) || errors.Is(err, errDeleteRejected) || errors.Is(err, errUpdateRejected) {
+		if _, ok := errors.AsType[*storage.StorageError](err); ok || storage.IsInternalError(err) || storage.IsTooLargeResourceVersion(err) || apierrors.IsTooManyRequests(err) || apierrors.IsResourceExpired(err) || apierrors.IsBadRequest(err) || errors.Is(err, errDeleteRejected) || errors.Is(err, errUpdateRejected) {
 			return correctness.Response{
 				Err: err,
 			}
@@ -868,9 +869,15 @@ func runWatch(ctx context.Context, store storage.Interface, req correctness.Watc
 		case <-ctx.Done():
 			return correctness.WatchResponse{Events: events, Err: ctx.Err()}
 		case <-timer.C:
+			if !initialEventsDone && watchCtx.Err() != nil {
+				return correctness.WatchResponse{}
+			}
 			return correctness.WatchResponse{Events: events}
 		case event, open := <-w.ResultChan():
 			if !open {
+				if !initialEventsDone && watchCtx.Err() != nil {
+					return correctness.WatchResponse{}
+				}
 				return correctness.WatchResponse{Events: events}
 			}
 			if cacheable, ok := event.Object.(runtime.CacheableObject); ok {
