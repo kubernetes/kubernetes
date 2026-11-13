@@ -19,6 +19,7 @@ limitations under the License.
 package cm
 
 import (
+	"errors"
 	"strings"
 	"testing"
 
@@ -293,5 +294,34 @@ func TestGetPodContainerName(t *testing.T) {
 			require.Equalf(t, tt.wantCgroupName, actualCgroupName, "Unexpected cgroup name for pod with UID %s, container resources: %v", tt.args.pod.UID, tt.args.pod.Spec.Containers[0].Resources)
 			require.Equalf(t, tt.wantLiteralCgroupfs, actualLiteralCgroupfs, "Unexpected literal cgroupfs for pod with UID %s, container resources: %v", tt.args.pod.UID, tt.args.pod.Spec.Containers[0].Resources)
 		})
+	}
+}
+
+// validatingCgroupManager returns a fixed Validate error and records the cgroup it was asked about.
+type validatingCgroupManager struct {
+	fakeCgroupManager
+	err       error
+	validated CgroupName
+}
+
+func (m *validatingCgroupManager) Validate(name CgroupName) error {
+	m.validated = name
+	return m.err
+}
+
+func TestPodContainerManagerValidate(t *testing.T) {
+	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: "fake-uid"}}
+	missing := errors.New("cgroup is missing controllers: cpuset")
+	for _, err := range []error{nil, missing} {
+		cgroupManager := &validatingCgroupManager{err: err}
+		pcm := &podContainerManagerImpl{
+			cgroupManager:     cgroupManager,
+			qosContainersInfo: QOSContainersInfo{BestEffort: RootCgroupName},
+		}
+		wantName, _ := pcm.GetPodContainerName(pod)
+
+		require.ErrorIs(t, pcm.Validate(pod), err)
+		require.Equal(t, wantName, cgroupManager.validated)
+		require.Equal(t, err == nil, pcm.Exists(pod))
 	}
 }
