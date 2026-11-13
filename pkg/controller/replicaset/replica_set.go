@@ -32,6 +32,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -39,6 +40,7 @@ import (
 
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -49,11 +51,13 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	appsinformers "k8s.io/client-go/informers/apps/v1"
 	coreinformers "k8s.io/client-go/informers/core/v1"
+	schedulinginformers "k8s.io/client-go/informers/scheduling/v1beta1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	appslisters "k8s.io/client-go/listers/apps/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
+	schedulinglisters "k8s.io/client-go/listers/scheduling/v1beta1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	consistencyutil "k8s.io/client-go/util/consistency"
@@ -105,6 +109,7 @@ type ReplicaSetController struct {
 	// podIndexer allows looking up pods by ControllerRef UID
 	podIndexer       cache.Indexer
 	eventBroadcaster record.EventBroadcaster
+	recorder         record.EventRecorder
 
 	// A ReplicaSet is temporarily suspended after creating/deleting these many replicas.
 	// It resumes normal action after observing the watch events for them.
@@ -131,6 +136,11 @@ type ReplicaSetController struct {
 	// Controllers that need to be synced
 	queue workqueue.TypedRateLimitingInterface[string]
 
+	workloadLister       schedulinglisters.WorkloadLister
+	workloadListerSynced cache.InformerSynced
+	podGroupLister       schedulinglisters.PodGroupLister
+	podGroupListerSynced cache.InformerSynced
+
 	clock clock.PassiveClock
 
 	consistencyStore consistencyutil.ConsistencyStore
@@ -143,16 +153,19 @@ type ReplicaSetController struct {
 // These do not have to correspond to FeatureGates, or their stability, nor do they have to undergo graduation.
 type ReplicaSetControllerFeatures struct {
 	EnableStatusTerminatingReplicas bool
+	EnableWorkloadScheduling        bool
 }
 
 func DefaultReplicaSetControllerFeatures() ReplicaSetControllerFeatures {
 	return ReplicaSetControllerFeatures{
 		EnableStatusTerminatingReplicas: true,
+		EnableWorkloadScheduling:        true,
 	}
 }
 
 // NewReplicaSetController configures a replica set controller with the specified event recorder
-func NewReplicaSetController(ctx context.Context, rsInformer appsinformers.ReplicaSetInformer, podInformer coreinformers.PodInformer, kubeClient clientset.Interface, burstReplicas int) *ReplicaSetController {
+// Workload and PodGroup informers are required when WorkloadWithDeployment is enabled.
+func NewReplicaSetController(ctx context.Context, rsInformer appsinformers.ReplicaSetInformer, podInformer coreinformers.PodInformer, workloadInformer schedulinginformers.WorkloadInformer, podGroupInformer schedulinginformers.PodGroupInformer, kubeClient clientset.Interface, burstReplicas int) (*ReplicaSetController, error) {
 	logger := klog.FromContext(ctx)
 	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
 	if err := metrics.Register(legacyregistry.Register); err != nil {
@@ -184,25 +197,34 @@ func NewReplicaSetController(ctx context.Context, rsInformer appsinformers.Repli
 		consistencyStore = consistencyutil.NewNoopConsistencyStore()
 	}
 
-	return NewBaseController(ctx, rsInformer, podInformer, kubeClient, burstReplicas,
+	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "replicaset-controller"})
+	rsc := NewBaseController(ctx, rsInformer, podInformer, kubeClient, burstReplicas,
 		apps.SchemeGroupVersion.WithKind("ReplicaSet"),
 		"replicaset_controller",
 		"replicaset",
 		controller.RealPodControl{
 			KubeClient: kubeClient,
-			Recorder:   eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "replicaset-controller"}),
+			Recorder:   recorder,
 			OnWrite:    podWriteCallback,
 		},
 		eventBroadcaster,
+		recorder,
 		DefaultReplicaSetControllerFeatures(),
 		consistencyStore,
 	)
+	if !utilfeature.DefaultFeatureGate.Enabled(features.WorkloadWithDeployment) {
+		return rsc, nil
+	}
+	if err := rsc.addSchedulingInformers(workloadInformer, podGroupInformer); err != nil {
+		return nil, err
+	}
+	return rsc, nil
 }
 
 // NewBaseController is the implementation of NewReplicaSetController with additional injected
 // parameters so that it can also serve as the implementation of NewReplicationController.
 func NewBaseController(ctx context.Context, rsInformer appsinformers.ReplicaSetInformer, podInformer coreinformers.PodInformer, kubeClient clientset.Interface, burstReplicas int,
-	gvk schema.GroupVersionKind, metricOwnerName, queueName string, podControl controller.PodControlInterface, eventBroadcaster record.EventBroadcaster, controllerFeatures ReplicaSetControllerFeatures, consistencyStore consistencyutil.ConsistencyStore) *ReplicaSetController {
+	gvk schema.GroupVersionKind, metricOwnerName, queueName string, podControl controller.PodControlInterface, eventBroadcaster record.EventBroadcaster, recorder record.EventRecorder, controllerFeatures ReplicaSetControllerFeatures, consistencyStore consistencyutil.ConsistencyStore) *ReplicaSetController {
 	logger := klog.FromContext(ctx)
 
 	rsc := &ReplicaSetController{
@@ -210,6 +232,7 @@ func NewBaseController(ctx context.Context, rsInformer appsinformers.ReplicaSetI
 		kubeClient:       kubeClient,
 		podControl:       podControl,
 		eventBroadcaster: eventBroadcaster,
+		recorder:         recorder,
 		burstReplicas:    burstReplicas,
 		expectations:     controller.NewUIDTrackingControllerExpectations(controller.NewControllerExpectations()),
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
@@ -295,7 +318,9 @@ func (rsc *ReplicaSetController) Run(ctx context.Context, workers int) {
 		wg.Wait()
 	}()
 
-	if !cache.WaitForNamedCacheSyncWithContext(ctx, rsc.podListerSynced, rsc.rsListerSynced) {
+	syncs := []cache.InformerSynced{rsc.podListerSynced, rsc.rsListerSynced}
+	syncs = append(syncs, rsc.schedulingCachesSynced()...)
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, syncs...) {
 		return
 	}
 
@@ -650,7 +675,12 @@ func (rsc *ReplicaSetController) processNextWorkItem(ctx context.Context) bool {
 // manageReplicas checks and updates replicas for the given ReplicaSet.
 // Does NOT modify <activePods>.
 // It will requeue the replica set in case of an error while creating/deleting pods.
-func (rsc *ReplicaSetController) manageReplicas(ctx context.Context, activePods []*v1.Pod, rs *apps.ReplicaSet) error {
+func (rsc *ReplicaSetController) manageReplicas(
+	ctx context.Context,
+	activePods []*v1.Pod,
+	rs *apps.ReplicaSet,
+	podGroup *schedulingv1beta1.PodGroup,
+) error {
 	diff := len(activePods) - int(*(rs.Spec.Replicas))
 	rsKey, err := controller.KeyFunc(rs)
 	if err != nil {
@@ -678,8 +708,27 @@ func (rsc *ReplicaSetController) manageReplicas(ctx context.Context, activePods 
 		// prevented from spamming the API service with the pod create requests
 		// after one of its pods fails.  Conveniently, this also prevents the
 		// event spam that those failures would generate.
+		if podGroup != nil && slices.ContainsFunc(activePods, func(p *v1.Pod) bool {
+			return p.Spec.SchedulingGroup == nil
+		}) {
+			// Avoid mixing pods with and without a schedulingGroup (for example, after the
+			// feature gate is re-enabled). For gang scheduling this is especially problematic,
+			// as the PodGroup would never reach its minCount.
+			rsc.recorder.Eventf(rs, v1.EventTypeWarning, "MixedSchedulingGroup",
+				"ReplicaSet %s has active pods without a schedulingGroup; creating new pods without PodGroup %s", rs.Name, podGroup.Name)
+			podGroup = nil
+		}
+		// If this ReplicaSet is scheduling-enabled, add scheduling metadata to
+		// created Pods without mutating the stored template.
+		podTemplate := &rs.Spec.Template
+		if podGroup != nil {
+			podGroupName := podGroup.Name
+			t := rs.Spec.Template.DeepCopy()
+			t.Spec.SchedulingGroup = &v1.PodSchedulingGroup{PodGroupName: &podGroupName}
+			podTemplate = t
+		}
 		successfulCreations, err := slowStartBatch(diff, controller.SlowStartInitialBatchSize, func() error {
-			err := rsc.podControl.CreatePods(ctx, rs.Namespace, &rs.Spec.Template, rs, metav1.NewControllerRef(rs, rsc.GroupVersionKind))
+			err := rsc.podControl.CreatePods(ctx, rs.Namespace, podTemplate, rs, metav1.NewControllerRef(rs, rsc.GroupVersionKind))
 			if err != nil {
 				if apierrors.HasStatusCause(err, v1.NamespaceTerminatingCause) {
 					// if the namespace is being terminated, we don't have to do
@@ -790,6 +839,8 @@ func (rsc *ReplicaSetController) syncReplicaSet(ctx context.Context, key string)
 		return err
 	}
 
+	podGroup, podGroupErr := rsc.ensurePodGroupForReplicaSet(ctx, rs)
+
 	rsNeedsSync := rsc.expectations.SatisfiedExpectations(logger, key)
 	selector, err := metav1.LabelSelectorAsSelector(rs.Spec.Selector)
 	if err != nil {
@@ -820,7 +871,9 @@ func (rsc *ReplicaSetController) syncReplicaSet(ctx context.Context, key string)
 	var manageReplicasErr error
 	var nextSyncDuration *time.Duration
 	if rsNeedsSync && rs.DeletionTimestamp == nil {
-		manageReplicasErr = rsc.manageReplicas(ctx, activePods, rs)
+		if podGroupErr == nil || len(activePods) > int(*rs.Spec.Replicas) {
+			manageReplicasErr = rsc.manageReplicas(ctx, activePods, rs, podGroup)
+		}
 	}
 	rs = rs.DeepCopy()
 	// Use the same time for calculating status and nextSyncDuration.
@@ -840,8 +893,8 @@ func (rsc *ReplicaSetController) syncReplicaSet(ctx context.Context, key string)
 		replicaSetGroupResource,
 		updatedRS.ResourceVersion,
 	)
-	if manageReplicasErr != nil {
-		return manageReplicasErr
+	if manageReplicasErr != nil || podGroupErr != nil {
+		return errors.Join(manageReplicasErr, podGroupErr)
 	}
 	// Plan the next availability check as a last line of defense against queue preemption (we have one queue key for checking availability of all the pods)
 	// or early sync (see https://github.com/kubernetes/kubernetes/issues/39785#issuecomment-279959133 for more info).

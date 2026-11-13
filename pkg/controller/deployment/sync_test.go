@@ -27,13 +27,18 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	testclient "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	workloadbuilder "k8s.io/component-helpers/scheduling/schedulingv1/workloadbuilder"
 	"k8s.io/klog/v2/ktesting"
+	apischeduling "k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/controller"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/ptr"
 )
 
@@ -416,7 +421,7 @@ func TestDeploymentController_cleanupDeployment(t *testing.T) {
 
 		fake := &fake.Clientset{}
 		informers := informers.NewSharedInformerFactory(fake, controller.NoResyncPeriodFunc())
-		controller, err := NewDeploymentController(ctx, informers.Apps().V1().Deployments(), informers.Apps().V1().ReplicaSets(), informers.Core().V1().Pods(), fake)
+		controller, err := NewDeploymentController(ctx, informers.Apps().V1().Deployments(), informers.Apps().V1().ReplicaSets(), informers.Core().V1().Pods(), informers.Scheduling().V1beta1().Workloads(), fake)
 		if err != nil {
 			t.Fatalf("error creating Deployment controller: %v", err)
 		}
@@ -552,7 +557,7 @@ func TestDeploymentController_cleanupDeploymentOrder(t *testing.T) {
 
 		fake := &fake.Clientset{}
 		informers := informers.NewSharedInformerFactory(fake, controller.NoResyncPeriodFunc())
-		controller, err := NewDeploymentController(ctx, informers.Apps().V1().Deployments(), informers.Apps().V1().ReplicaSets(), informers.Core().V1().Pods(), fake)
+		controller, err := NewDeploymentController(ctx, informers.Apps().V1().Deployments(), informers.Apps().V1().ReplicaSets(), informers.Core().V1().Pods(), informers.Scheduling().V1beta1().Workloads(), fake)
 		if err != nil {
 			t.Fatalf("error creating Deployment controller: %v", err)
 		}
@@ -623,7 +628,7 @@ func TestDeploymentController_generateReplicaSetName(t *testing.T) {
 
 		fake := &fake.Clientset{}
 		informers := informers.NewSharedInformerFactory(fake, controller.NoResyncPeriodFunc())
-		controller, err := NewDeploymentController(ctx, informers.Apps().V1().Deployments(), informers.Apps().V1().ReplicaSets(), informers.Core().V1().Pods(), fake)
+		controller, err := NewDeploymentController(ctx, informers.Apps().V1().Deployments(), informers.Apps().V1().ReplicaSets(), informers.Core().V1().Pods(), informers.Scheduling().V1beta1().Workloads(), fake)
 		if err != nil {
 			t.Fatalf("error creating Deployment controller: %v", err)
 		}
@@ -679,6 +684,101 @@ func TestDeploymentController_generateReplicaSetName(t *testing.T) {
 		if deploymentPortion != test.wantDeploymentPortion {
 			t.Errorf("Deployment name portion mismatch: got %q, want %q", deploymentPortion, test.wantDeploymentPortion)
 		}
+	}
+}
+
+func TestGetNewReplicaSetStampsWorkloadAnnotations(t *testing.T) {
+	selector := map[string]string{"foo": "bar"}
+	tests := []struct {
+		name             string
+		gateEnabled      bool
+		deploymentMutate func(*apps.Deployment)
+		wantAnnotations  func(*apps.Deployment) map[string]string
+	}{
+		{
+			name:        "delegated mode forwards the deployment's annotations to the new ReplicaSet",
+			gateEnabled: true,
+			deploymentMutate: func(d *apps.Deployment) {
+				d.Annotations[apischeduling.WorkloadNameAnnotation] = "parent-workload"
+				d.Annotations[apischeduling.GroupTemplateNameAnnotation] = "parent-pgt-0"
+			},
+			wantAnnotations: func(d *apps.Deployment) map[string]string {
+				return map[string]string{
+					apischeduling.WorkloadNameAnnotation:      "parent-workload",
+					apischeduling.GroupTemplateNameAnnotation: "parent-pgt-0",
+				}
+			},
+		},
+		{
+			name:        "owned mode stamps the generated workload annotations",
+			gateEnabled: true,
+			deploymentMutate: func(d *apps.Deployment) {
+				d.Spec.Scheduling = &apps.DeploymentSchedulingConfiguration{}
+			},
+			wantAnnotations: func(d *apps.Deployment) map[string]string {
+				return map[string]string{
+					apischeduling.WorkloadNameAnnotation:      workloadbuilder.GenerateWorkloadName(d.Name, d.UID),
+					apischeduling.GroupTemplateNameAnnotation: podGroupTemplateName(d),
+				}
+			},
+		},
+		{
+			name:        "feature gate off does not forward delegation annotations",
+			gateEnabled: false,
+			deploymentMutate: func(d *apps.Deployment) {
+				d.Annotations[apischeduling.WorkloadNameAnnotation] = "parent-workload"
+				d.Annotations[apischeduling.GroupTemplateNameAnnotation] = "parent-pgt-0"
+			},
+			wantAnnotations: func(d *apps.Deployment) map[string]string { return nil },
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, true)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WorkloadWithDeployment, test.gateEnabled)
+
+			_, ctx := ktesting.NewTestContext(t)
+			client := &fake.Clientset{}
+			informers := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
+			dc, err := NewDeploymentController(ctx, informers.Apps().V1().Deployments(), informers.Apps().V1().ReplicaSets(), informers.Core().V1().Pods(), informers.Scheduling().V1beta1().Workloads(), client)
+			if err != nil {
+				t.Fatalf("error creating Deployment controller: %v", err)
+			}
+			dc.eventRecorder = &record.FakeRecorder{}
+			dc.dListerSynced = alwaysReady
+			dc.rsListerSynced = alwaysReady
+			dc.podListerSynced = alwaysReady
+			informers.StartWithContext(ctx)
+
+			d := newDeployment("test", 1, nil, nil, nil, selector)
+			test.deploymentMutate(d)
+
+			if _, err := dc.getNewReplicaSet(ctx, d, []*apps.ReplicaSet{}, []*apps.ReplicaSet{}, true); err != nil {
+				t.Fatalf("failed to create new ReplicaSet: %v", err)
+			}
+
+			var createdRS *apps.ReplicaSet
+			for _, action := range client.Actions() {
+				if createAction, ok := action.(testclient.CreateAction); ok {
+					if rs, ok := createAction.GetObject().(*apps.ReplicaSet); ok && rs.Name != "" {
+						createdRS = rs
+						break
+					}
+				}
+			}
+			if createdRS == nil {
+				t.Fatal("no ReplicaSet was created")
+			}
+
+			for _, key := range []string{apischeduling.WorkloadNameAnnotation, apischeduling.GroupTemplateNameAnnotation} {
+				got := createdRS.Annotations[key]
+				want := test.wantAnnotations(d)[key]
+				if got != want {
+					t.Errorf("ReplicaSet annotation %q = %q, want %q", key, got, want)
+				}
+			}
+		})
 	}
 }
 

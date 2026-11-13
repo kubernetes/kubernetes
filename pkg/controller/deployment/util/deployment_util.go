@@ -38,6 +38,7 @@ import (
 	appsclient "k8s.io/client-go/kubernetes/typed/apps/v1"
 	appslisters "k8s.io/client-go/listers/apps/v1"
 	"k8s.io/klog/v2"
+	apischeduling "k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/controller"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
 )
@@ -292,12 +293,15 @@ func SetNewReplicaSetAnnotations(ctx context.Context, deployment *apps.Deploymen
 }
 
 var annotationsToSkip = map[string]bool{
-	v1.LastAppliedConfigAnnotation: true,
-	RevisionAnnotation:             true,
-	RevisionHistoryAnnotation:      true,
-	DesiredReplicasAnnotation:      true,
-	MaxReplicasAnnotation:          true,
-	apps.DeprecatedRollbackTo:      true,
+	v1.LastAppliedConfigAnnotation:                  true,
+	RevisionAnnotation:                              true,
+	RevisionHistoryAnnotation:                       true,
+	DesiredReplicasAnnotation:                       true,
+	MaxReplicasAnnotation:                           true,
+	apps.DeprecatedRollbackTo:                       true,
+	apischeduling.WorkloadNameAnnotation:            true,
+	apischeduling.GroupTemplateNameAnnotation:       true,
+	apischeduling.ParentCompositePodGroupAnnotation: true,
 }
 
 // skipCopyAnnotation returns true if we should skip copying the annotation with the given annotation key
