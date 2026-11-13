@@ -1040,6 +1040,128 @@ func TestPodGroupEvaluator_Preempt_Victims(t *testing.T) {
 			expectedNumPDBViolations: 1,
 		},
 		{
+			name: "PDB: Reprieved victims do not consume disruptions allowed",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Obj(),
+			},
+			// GenerateVictims evaluates p1 before p2, so p1 consumes the only disruption and p2 is then violating.
+			// After reprieval, p2 fits next to the preemptor so only p1 is evicted, within the 1 disruption allowed.
+			initPods: []*v1.Pod{
+				st.MakePod().Name("p1").UID("v1").Node("node1").Label("app", "foo").Label("size", "2").Priority(lowPriority).Obj(),
+				st.MakePod().Name("p2").UID("v2").Node("node1").Label("app", "foo").Priority(midPriority).Obj(),
+			},
+			pdbs: []*policy.PodDisruptionBudget{
+				{
+					Spec:   policy.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "foo"}}},
+					Status: policy.PodDisruptionBudgetStatus{DisruptionsAllowed: 1},
+				},
+			},
+			preemptor: makePodGroupPreemptor(
+				st.MakePodGroup().Name("preemptor-pg").Priority(highPriority).Obj(),
+				[]*v1.Pod{st.MakePod().Name("p").UID("p").Label("size", "2").Priority(highPriority).Obj()},
+			),
+			nodeCapacities: []nodeCapacity{
+				{nodeName: "node1", capacity: 3},
+			},
+			expectedVictims:          []string{"p1"},
+			expectedStatus:           fwk.NewStatus(fwk.Success),
+			expectedDisruptions:      map[fwk.EntityKeyType]int{fwk.PodKeyType: 1},
+			expectedNumPDBViolations: 0,
+		},
+		{
+			name: "PDB: Evicted victims consume disruptions allowed from least to most important",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Obj(),
+			},
+			// p1 (least important) consumes pdb-app first, so only p2 violates.
+			// Evaluating p2 first would make both violate.
+			initPods: []*v1.Pod{
+				st.MakePod().Name("p1").UID("v1").Node("node1").Label("app", "foo").Priority(lowPriority).Obj(),
+				st.MakePod().Name("p2").UID("v2").Node("node1").Label("app", "foo").Label("tier", "frontend").Priority(midPriority).Obj(),
+			},
+			pdbs: []*policy.PodDisruptionBudget{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pdb-app"},
+					Spec:       policy.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "foo"}}},
+					Status:     policy.PodDisruptionBudgetStatus{DisruptionsAllowed: 1},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pdb-frontend"},
+					Spec:       policy.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"tier": "frontend"}}},
+					Status:     policy.PodDisruptionBudgetStatus{DisruptionsAllowed: 0},
+				},
+			},
+			preemptor: makePodGroupPreemptor(
+				st.MakePodGroup().Name("preemptor-pg").Priority(highPriority).Obj(),
+				[]*v1.Pod{st.MakePod().Name("p").UID("p").Label("size", "2").Priority(highPriority).Obj()},
+			),
+			nodeCapacities: []nodeCapacity{
+				{nodeName: "node1", capacity: 2},
+			},
+			expectedVictims:          []string{"p1", "p2"},
+			expectedStatus:           fwk.NewStatus(fwk.Success),
+			expectedDisruptions:      map[fwk.EntityKeyType]int{fwk.PodKeyType: 2},
+			expectedNumPDBViolations: 1,
+		},
+		{
+			name: "PDB: Lower priority victim consumes the disruption allowed, so the higher priority victim on the same node is reprieved",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Obj(),
+			},
+			initPods: []*v1.Pod{
+				st.MakePod().Name("pdb-low").UID("v1").Node("node1").Label("app", "foo").Priority(lowPriority).Obj(),
+				st.MakePod().Name("pdb-mid").UID("v2").Node("node1").Label("app", "foo").Priority(midPriority).Obj(),
+			},
+			pdbs: []*policy.PodDisruptionBudget{
+				{
+					Spec:   policy.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "foo"}}},
+					Status: policy.PodDisruptionBudgetStatus{DisruptionsAllowed: 1},
+				},
+			},
+			preemptor: makePodGroupPreemptor(
+				st.MakePodGroup().Name("preemptor-pg").Priority(highPriority).Obj(),
+				[]*v1.Pod{st.MakePod().Name("p").UID("p").Priority(highPriority).Obj()},
+			),
+			// The preemptor fits next to either pdb-low or pdb-mid, but not both.
+			nodeCapacities: []nodeCapacity{
+				{nodeName: "node1", capacity: 2},
+			},
+			expectedVictims:          []string{"pdb-low"},
+			expectedStatus:           fwk.NewStatus(fwk.Success),
+			expectedDisruptions:      map[fwk.EntityKeyType]int{fwk.PodKeyType: 1},
+			expectedNumPDBViolations: 0,
+		},
+		{
+			name: "PDB: Victims beyond the disruptions allowed are reprieved from the most important one",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Obj(),
+			},
+			initPods: []*v1.Pod{
+				st.MakePod().Name("pdb-low").UID("v1").Node("node1").Label("app", "foo").Priority(lowPriority).Obj(),
+				st.MakePod().Name("pdb-mid").UID("v2").Node("node1").Label("app", "foo").Priority(midPriority).Obj(),
+				st.MakePod().Name("pdb-high").UID("v3").Node("node1").Label("app", "foo").Priority(highPriority - 1).Obj(),
+			},
+			pdbs: []*policy.PodDisruptionBudget{
+				{
+					Spec:   policy.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "foo"}}},
+					Status: policy.PodDisruptionBudgetStatus{DisruptionsAllowed: 1},
+				},
+			},
+			preemptor: makePodGroupPreemptor(
+				st.MakePodGroup().Name("preemptor-pg").Priority(highPriority).Obj(),
+				[]*v1.Pod{st.MakePod().Name("p").UID("p").Label("size", "2").Priority(highPriority).Obj()},
+			),
+			// Only one of the three victims fits next to the preemptor.
+			nodeCapacities: []nodeCapacity{
+				{nodeName: "node1", capacity: 3},
+			},
+			// pdb-low consumes the only disruption allowed, so evicting pdb-mid is the single violation.
+			expectedVictims:          []string{"pdb-low", "pdb-mid"},
+			expectedStatus:           fwk.NewStatus(fwk.Success),
+			expectedDisruptions:      map[fwk.EntityKeyType]int{fwk.PodKeyType: 2},
+			expectedNumPDBViolations: 1,
+		},
+		{
 			name: "PodGroup: Preempt group as a whole",
 			nodes: []*v1.Node{
 				st.MakeNode().Name("node1").Obj(),

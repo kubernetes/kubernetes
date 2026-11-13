@@ -335,6 +335,76 @@ func TestFilterVictimsWithPDBViolation(t *testing.T) {
 			},
 			expectedNonViolating: nil,
 		},
+		{
+			name:    "victim matching multiple PDBs consumes disruptions from all of them, even when the violated PDB is listed first",
+			victims: []*victim{viMatchMultiplePDBs, viMatchPDB2},
+			pdbs: []*policy.PodDisruptionBudget{
+				{
+					ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault},
+					Spec: policy.PodDisruptionBudgetSpec{
+						Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"tier": "backend"}},
+					},
+					Status: policy.PodDisruptionBudgetStatus{
+						DisruptionsAllowed: 0,
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault},
+					Spec: policy.PodDisruptionBudgetSpec{
+						Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "foo"}},
+					},
+					Status: policy.PodDisruptionBudgetStatus{
+						DisruptionsAllowed: 1,
+					},
+				},
+			},
+			expectedViolating: []ViolatingVictim[*victim]{
+				{
+					Victim:       viMatchMultiplePDBs,
+					ViolateCount: 1,
+				},
+				{
+					Victim:       viMatchPDB2,
+					ViolateCount: 1,
+				},
+			},
+			expectedNonViolating: nil,
+		},
+		{
+			name:    "victim matching multiple PDBs consumes disruptions from all of them, even when the violated PDB is listed last",
+			victims: []*victim{viMatchMultiplePDBs, viMatchPDB2},
+			pdbs: []*policy.PodDisruptionBudget{
+				{
+					ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault},
+					Spec: policy.PodDisruptionBudgetSpec{
+						Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "foo"}},
+					},
+					Status: policy.PodDisruptionBudgetStatus{
+						DisruptionsAllowed: 1,
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault},
+					Spec: policy.PodDisruptionBudgetSpec{
+						Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"tier": "backend"}},
+					},
+					Status: policy.PodDisruptionBudgetStatus{
+						DisruptionsAllowed: 0,
+					},
+				},
+			},
+			expectedViolating: []ViolatingVictim[*victim]{
+				{
+					Victim:       viMatchMultiplePDBs,
+					ViolateCount: 1,
+				},
+				{
+					Victim:       viMatchPDB2,
+					ViolateCount: 1,
+				},
+			},
+			expectedNonViolating: nil,
+		},
 	}
 
 	for _, tt := range tests {

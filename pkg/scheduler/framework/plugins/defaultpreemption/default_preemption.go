@@ -579,8 +579,8 @@ func (pl *DefaultPreemption) RankNodes(ctx context.Context, cycleState fwk.Cycle
 	}
 
 	type nodeVictimEval struct {
-		nodeInfo fwk.NodeInfo
-		victims  []fwk.PreemptionVictim
+		nodeInfo  fwk.NodeInfo
+		victimSet fwk.PreemptionVictimSet
 	}
 	rankedNodes := make([]framework.NodeWithRank, 0, len(nodes))
 	evals := make([]nodeVictimEval, 0, len(nodes))
@@ -594,19 +594,19 @@ func (pl *DefaultPreemption) RankNodes(ctx context.Context, cycleState fwk.Cycle
 			continue
 		}
 		evals = append(evals, nodeVictimEval{
-			nodeInfo: nodeInfo,
-			victims:  victims,
+			nodeInfo:  nodeInfo,
+			victimSet: preemptionState.VictimSet(victims),
 		})
 	}
 
 	preemptionManager := pl.fh.PreemptionManager()
 	slices.SortStableFunc(evals, func(a, b nodeVictimEval) int {
-		return preemptionManager.CompareVictimSets(ctx, a.victims, b.victims)
+		return preemptionManager.CompareVictimSets(ctx, a.victimSet, b.victimSet)
 	})
 
 	rank := 0
 	for i := range evals {
-		if i == 0 || preemptionManager.CompareVictimSets(ctx, evals[i-1].victims, evals[i].victims) != 0 {
+		if i == 0 || preemptionManager.CompareVictimSets(ctx, evals[i-1].victimSet, evals[i].victimSet) != 0 {
 			rank++
 		}
 		rankedNodes = append(rankedNodes, framework.NodeWithRank{
