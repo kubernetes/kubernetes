@@ -308,6 +308,16 @@ func SetDefaults_Secret(obj *v1.Secret) {
 	if obj.Type == "" {
 		obj.Type = v1.SecretTypeOpaque
 	}
+	// Fold write-only StringData into Data and clear StringData.
+	if len(obj.StringData) > 0 {
+		if obj.Data == nil {
+			obj.Data = make(map[string][]byte, len(obj.StringData))
+		}
+		for k, v := range obj.StringData {
+			obj.Data[k] = []byte(v)
+		}
+	}
+	obj.StringData = nil
 }
 func SetDefaults_ProjectedVolumeSource(obj *v1.ProjectedVolumeSource) {
 	if obj.DefaultMode == nil {
@@ -383,6 +393,23 @@ func SetDefaults_Namespace(obj *v1.Namespace) {
 func SetDefaults_NamespaceStatus(obj *v1.NamespaceStatus) {
 	if obj.Phase == "" {
 		obj.Phase = v1.NamespaceActive
+	}
+}
+func SetDefaults_NodeSpec(obj *v1.NodeSpec) {
+	// Keep the singular PodCIDR and the PodCIDRs list in sync.
+	hasCIDR := len(obj.PodCIDR) > 0
+	hasCIDRs := len(obj.PodCIDRs) > 0
+	switch {
+	case hasCIDR && !hasCIDRs:
+		// default the list from the singular field
+		obj.PodCIDRs = []string{obj.PodCIDR}
+	case !hasCIDR && hasCIDRs:
+		// default the singular field from the list
+		obj.PodCIDR = obj.PodCIDRs[0]
+	case hasCIDR && hasCIDRs && obj.PodCIDRs[0] != obj.PodCIDR:
+		// when both are specified and mismatch, PodCIDR is authoritative for
+		// compatibility with older clients
+		obj.PodCIDRs = []string{obj.PodCIDR}
 	}
 }
 func SetDefaults_NodeStatus(obj *v1.NodeStatus) {

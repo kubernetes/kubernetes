@@ -196,54 +196,6 @@ func Convert_apps_ReplicaSetStatus_To_v1_ReplicationControllerStatus(in *apps.Re
 	return nil
 }
 
-func Convert_core_NodeSpec_To_v1_NodeSpec(in *core.NodeSpec, out *v1.NodeSpec, s conversion.Scope) error {
-	if err := autoConvert_core_NodeSpec_To_v1_NodeSpec(in, out, s); err != nil {
-		return err
-	}
-	// at the this point autoConvert copied core.PodCIDRs -> v1.PodCIDRs
-	// v1.PodCIDR (singular value field, which does not exist in core) needs to
-	// be set with core.PodCIDRs[0]
-	if len(in.PodCIDRs) > 0 {
-		out.PodCIDR = in.PodCIDRs[0]
-	}
-	return nil
-}
-
-func Convert_v1_NodeSpec_To_core_NodeSpec(in *v1.NodeSpec, out *core.NodeSpec, s conversion.Scope) error {
-	if err := autoConvert_v1_NodeSpec_To_core_NodeSpec(in, out, s); err != nil {
-		return err
-	}
-	// If both fields (v1.PodCIDRs and v1.PodCIDR) are provided and differ, then PodCIDR is authoritative for compatibility with older clients
-	if (len(in.PodCIDR) > 0 && len(in.PodCIDRs) > 0) && (in.PodCIDR != in.PodCIDRs[0]) {
-		out.PodCIDRs = []string{in.PodCIDR}
-	}
-
-	// at the this point, autoConvert copied v1.PodCIDRs -> core.PodCIDRs
-	// if v1.PodCIDRs was empty but v1.PodCIDR is not, then set core.PodCIDRs[0] with v1.PodCIDR
-	if len(in.PodCIDR) > 0 && len(in.PodCIDRs) == 0 {
-		out.PodCIDRs = []string{in.PodCIDR}
-	}
-	return nil
-}
-
-func Convert_v1_Secret_To_core_Secret(in *v1.Secret, out *core.Secret, s conversion.Scope) error {
-	if err := autoConvert_v1_Secret_To_core_Secret(in, out, s); err != nil {
-		return err
-	}
-
-	// StringData overwrites Data
-	if len(in.StringData) > 0 {
-		if out.Data == nil {
-			out.Data = map[string][]byte{}
-		}
-		for k, v := range in.StringData {
-			out.Data[k] = []byte(v)
-		}
-	}
-
-	return nil
-}
-
 // +k8s:conversion-fn=copy-only
 func Convert_v1_ResourceList_To_core_ResourceList(in *v1.ResourceList, out *core.ResourceList, s conversion.Scope) error {
 	if *in == nil {
