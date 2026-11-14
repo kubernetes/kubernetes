@@ -86,6 +86,18 @@ func TestNodeAllocatableReservationForScheduling(t *testing.T) {
 			capacity:       getResourceList("10", ""),
 			expected:       getResourceList("", "150Mi"),
 		},
+		{
+			kubeReserved:   hugepagesResourceList("100m", "100Mi", "4Mi"),
+			systemReserved: hugepagesResourceList("50m", "50Mi", "6Mi"),
+			capacity:       hugepagesResourceList("10", "10Gi", "256Mi"),
+			expected:       hugepagesResourceList("150m", "150Mi", "10Mi"),
+		},
+		{
+			kubeReserved:   getResourceList("100m", "100Mi"),
+			systemReserved: hugepagesResourceList("50m", "50Mi", "8Mi"),
+			capacity:       hugepagesResourceList("10", "10Gi", "256Mi"),
+			expected:       hugepagesResourceList("150m", "150Mi", "8Mi"),
+		},
 	}
 	for idx, tc := range cpuMemCases {
 		nc := NodeConfig{
@@ -231,6 +243,18 @@ func TestNodeAllocatableForEnforcement(t *testing.T) {
 			capacity:       getResourceList("10", ""),
 			expected:       getResourceList("10", ""),
 		},
+		{
+			kubeReserved:   hugepagesResourceList("100m", "100Mi", "4Mi"),
+			systemReserved: hugepagesResourceList("50m", "50Mi", "6Mi"),
+			capacity:       hugepagesResourceList("10", "10Gi", "256Mi"),
+			expected:       hugepagesResourceList("9850m", "10090Mi", "246Mi"),
+		},
+		{
+			kubeReserved:   getResourceList("100m", "100Mi"),
+			systemReserved: getResourceList("50m", "50Mi"),
+			capacity:       hugepagesResourceList("10", "10Gi", "256Mi"),
+			expected:       hugepagesResourceList("9850m", "10090Mi", "256Mi"),
+		},
 	}
 	for idx, tc := range testCases {
 		nc := NodeConfig{
@@ -316,6 +340,17 @@ func TestNodeAllocatableInputValidation(t *testing.T) {
 				Quantity: &highMemoryEvictionThreshold,
 			},
 			capacity:             getResourceList("10", "11Gi"),
+			invalidConfiguration: true,
+		},
+		{
+			kubeReserved:   hugepagesResourceList("100m", "100Mi", "128Mi"),
+			systemReserved: getResourceList("50m", "50Mi"),
+			capacity:       hugepagesResourceList("10", "10Gi", "256Mi"),
+		},
+		{
+			kubeReserved:         getResourceList("50m", "50Mi"),
+			systemReserved:       hugepagesResourceList("100m", "100Mi", "128Mi"),
+			capacity:             hugepagesResourceList("10", "10Gi", "64Mi"),
 			invalidConfiguration: true,
 		},
 	}
@@ -501,6 +536,23 @@ func TestGetCgroupConfig(t *testing.T) {
 				assert.NotNil(t, actual.CPUShares)
 			},
 		},
+		{
+			name: "Hugepages included in resource list",
+			resourceList: v1.ResourceList{
+				v1.ResourceCPU:                   resource.MustParse("100m"),
+				v1.ResourceMemory:                resource.MustParse("200Mi"),
+				v1.ResourceName("hugepages-2Mi"): resource.MustParse("64Mi"),
+			},
+			compressibleResources: false,
+			checks: func(actual *ResourceConfig, t *testing.T) {
+				assert.NotNil(t, actual.Memory)
+				assert.NotNil(t, actual.CPUShares)
+				assert.NotNil(t, actual.HugePageLimit, "HugePageLimit should be populated")
+				limit, ok := actual.HugePageLimit[2*1024*1024]
+				assert.True(t, ok, "expected entry for 2Mi page size")
+				assert.Equal(t, int64(64*1024*1024), limit)
+			},
+		},
 	}
 
 	for _, tc := range cases {
@@ -509,4 +561,13 @@ func TestGetCgroupConfig(t *testing.T) {
 			tc.checks(actual, t)
 		})
 	}
+}
+
+// hugepagesResourceList builds a ResourceList containing cpu, memory and hugepages-2Mi.
+func hugepagesResourceList(cpu, memory, hugepages2Mi string) v1.ResourceList {
+	rl := getResourceList(cpu, memory)
+	if hugepages2Mi != "" {
+		rl[v1.ResourceName("hugepages-2Mi")] = resource.MustParse(hugepages2Mi)
+	}
+	return rl
 }
