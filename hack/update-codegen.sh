@@ -346,8 +346,9 @@ function codegen::prerelease() {
 #       true:  always generate a defaulter for this type
 #       false: never generate a defaulter for this type
 #     on functions:
-#       covers: if the function name matches SetDefault_NAME, instructs
+#       covers: if the function name matches SetDefaults_NAME, instructs
 #               the generator not to recurse
+#       after:  call this defaulter after defaulting the type's children
 #     on packages:
 #       FIELDNAME: any object with a field of this name is a candidate
 #                  for having a defaulter generated

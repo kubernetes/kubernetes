@@ -30,3 +30,17 @@ func SetDefaults_DefaultedWithFunction(obj *DefaultedWithFunction) {
 		obj.S1 = "default_function"
 	}
 }
+
+// +k8s:defaulter-gen=after
+func SetDefaults_Service(obj *Service) {
+	if obj.Spec.Type == "ClusterIP" && obj.Spec.InternalTrafficPolicy == "" {
+		obj.Spec.InternalTrafficPolicy = "Cluster"
+	}
+}
+
+// +k8s:defaulter-gen=after
+func SetDefaults_DefaultedWithFunction_PrimaryService(obj *DefaultedWithFunction) {
+	if obj.PrimaryService == nil && len(obj.Services) > 0 && obj.Services[0].Spec.InternalTrafficPolicy == "Cluster" {
+		obj.PrimaryService = &obj.Services[0]
+	}
+}

@@ -253,6 +253,20 @@ func SetObjectDefaults_DefaultedWithFunction(in *DefaultedWithFunction) {
 	if in.S2 == "" {
 		in.S2 = "default_marker"
 	}
+	for i := range in.Services {
+		a := &in.Services[i]
+		if a.Spec.Type == "" {
+			a.Spec.Type = "ClusterIP"
+		}
+		SetDefaults_Service(a)
+	}
+	if in.PrimaryService != nil {
+		if in.PrimaryService.Spec.Type == "" {
+			in.PrimaryService.Spec.Type = "ClusterIP"
+		}
+		SetDefaults_Service(in.PrimaryService)
+	}
+	SetDefaults_DefaultedWithFunction_PrimaryService(in)
 }
 
 func SetObjectDefaults_DefaultedWithReference(in *DefaultedWithReference) {
