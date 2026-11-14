@@ -24,16 +24,22 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	v1 "k8s.io/api/core/v1"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	crierror "k8s.io/cri-api/pkg/errors"
 	"k8s.io/ktesting"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/images"
 	imagepullmanager "k8s.io/kubernetes/pkg/kubelet/images/pullmanager"
+	testingclock "k8s.io/utils/clock/testing"
 	"k8s.io/utils/ptr"
 )
 
@@ -67,6 +73,261 @@ func TestPullImageWithError(t *testing.T) {
 	images, err := fakeManager.ListImages(tCtx)
 	assert.NoError(t, err)
 	assert.Empty(t, images)
+}
+
+func TestPullImageErrorContext(t *testing.T) {
+	notFound := status.Error(codes.NotFound, "image not found")
+	wrappedNotFound := fmt.Errorf("resolve image: %w", notFound)
+	unauthorized := fmt.Errorf("failed to fetch anonymous token: 401 Unauthorized")
+	denied := status.Error(codes.PermissionDenied, "access denied")
+	unknown := status.Error(codes.Unknown, "image not found")
+	credentialed := credentialprovider.TrackedAuthConfig{
+		AuthConfig: credentialprovider.AuthConfig{Username: "private-user", Password: "private-password"},
+	}
+	anonymous := credentialprovider.TrackedAuthConfig{}
+	const guidance = "image pull returned NotFound with supplied credentials; check the repository name, tag or digest, and access; pull attempts: "
+
+	tests := []struct {
+		name        string
+		credentials []credentialprovider.TrackedAuthConfig
+		pullErrors  []error
+		wantError   string
+		wantCalls   int
+		wantCreds   *credentialprovider.TrackedAuthConfig
+	}{
+		{
+			name:        "not found followed by anonymous failure",
+			credentials: []credentialprovider.TrackedAuthConfig{credentialed, anonymous},
+			pullErrors:  []error{notFound, unauthorized},
+			wantError:   guidance + "[with supplied credentials: " + notFound.Error() + ", without supplied credentials: " + unauthorized.Error() + "]",
+			wantCalls:   2,
+		},
+		{
+			name:        "wrapped not found",
+			credentials: []credentialprovider.TrackedAuthConfig{credentialed, anonymous},
+			pullErrors:  []error{wrappedNotFound, unauthorized},
+			wantError:   guidance + "[with supplied credentials: " + wrappedNotFound.Error() + ", without supplied credentials: " + unauthorized.Error() + "]",
+			wantCalls:   2,
+		},
+		{
+			name:        "anonymous failure before not found",
+			credentials: []credentialprovider.TrackedAuthConfig{anonymous, credentialed},
+			pullErrors:  []error{unauthorized, notFound},
+			wantError:   guidance + "[without supplied credentials: " + unauthorized.Error() + ", with supplied credentials: " + notFound.Error() + "]",
+			wantCalls:   2,
+		},
+		{
+			name:        "access denied is not a missing tag",
+			credentials: []credentialprovider.TrackedAuthConfig{credentialed, anonymous},
+			pullErrors:  []error{denied, unauthorized},
+			wantError:   utilerrors.NewAggregate([]error{denied, unauthorized}).Error(),
+			wantCalls:   2,
+		},
+		{
+			name:        "not found text without structured status",
+			credentials: []credentialprovider.TrackedAuthConfig{credentialed, anonymous},
+			pullErrors:  []error{unknown, unauthorized},
+			wantError:   utilerrors.NewAggregate([]error{unknown, unauthorized}).Error(),
+			wantCalls:   2,
+		},
+		{
+			name:        "not found only without credentials",
+			credentials: []credentialprovider.TrackedAuthConfig{credentialed, anonymous},
+			pullErrors:  []error{denied, notFound},
+			wantError:   utilerrors.NewAggregate([]error{denied, notFound}).Error(),
+			wantCalls:   2,
+		},
+		{
+			name:       "no credentials",
+			pullErrors: []error{notFound},
+			wantError:  notFound.Error(),
+			wantCalls:  1,
+		},
+		{
+			name:        "single credential",
+			credentials: []credentialprovider.TrackedAuthConfig{credentialed},
+			pullErrors:  []error{notFound},
+			wantError:   notFound.Error(),
+			wantCalls:   1,
+		},
+		{
+			name:        "multiple credentials without anonymous fallback",
+			credentials: []credentialprovider.TrackedAuthConfig{credentialed, credentialed},
+			pullErrors:  []error{notFound, denied},
+			wantError:   utilerrors.NewAggregate([]error{notFound, denied}).Error(),
+			wantCalls:   2,
+		},
+		{
+			name:        "signature error classification unchanged",
+			credentials: []credentialprovider.TrackedAuthConfig{credentialed, anonymous},
+			pullErrors:  []error{crierror.ErrSignatureValidationFailed, crierror.ErrSignatureValidationFailed},
+			wantError:   crierror.ErrSignatureValidationFailed.Error(),
+			wantCalls:   2,
+		},
+		{
+			name:        "registry error classification unchanged",
+			credentials: []credentialprovider.TrackedAuthConfig{credentialed, anonymous},
+			pullErrors:  []error{crierror.ErrRegistryUnavailable, crierror.ErrRegistryUnavailable},
+			wantError:   crierror.ErrRegistryUnavailable.Error(),
+			wantCalls:   2,
+		},
+		{
+			name:        "credentialed success does not try fallback",
+			credentials: []credentialprovider.TrackedAuthConfig{credentialed, anonymous},
+			pullErrors:  []error{nil, unauthorized},
+			wantCalls:   1,
+			wantCreds:   &credentialed,
+		},
+		{
+			name:        "anonymous success after not found",
+			credentials: []credentialprovider.TrackedAuthConfig{credentialed, anonymous},
+			pullErrors:  []error{notFound, nil},
+			wantCalls:   2,
+			wantCreds:   &anonymous,
+		},
+		{
+			name:        "anonymous success after denied",
+			credentials: []credentialprovider.TrackedAuthConfig{credentialed, anonymous},
+			pullErrors:  []error{denied, nil},
+			wantCalls:   2,
+			wantCreds:   &anonymous,
+		},
+		{
+			name:        "later credential succeeds after mixed failures",
+			credentials: []credentialprovider.TrackedAuthConfig{credentialed, anonymous, credentialed},
+			pullErrors:  []error{notFound, unauthorized, nil},
+			wantCalls:   3,
+			wantCreds:   &credentialed,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			_, fakeImageService, manager, err := createTestRuntimeManager(tCtx)
+			require.NoError(t, err)
+			for _, pullErr := range test.pullErrors {
+				fakeImageService.InjectError("PullImage", pullErr)
+			}
+
+			imageRef, creds, err := manager.PullImage(tCtx, kubecontainer.ImageSpec{Image: "example.azurecr.io/repo:tag"}, test.credentials, nil)
+			if test.wantError == "" {
+				require.NoError(t, err)
+				assert.Equal(t, "example.azurecr.io/repo:tag", imageRef)
+				assert.Equal(t, test.wantCreds, creds)
+			} else {
+				require.EqualError(t, err, test.wantError)
+				assert.Empty(t, imageRef)
+				assert.Nil(t, creds)
+				for _, pullErr := range test.pullErrors {
+					assert.ErrorIs(t, err, pullErr)
+				}
+				assert.NotContains(t, err.Error(), credentialed.Username)
+				assert.NotContains(t, err.Error(), credentialed.Password)
+			}
+			pullCalls := 0
+			for _, call := range fakeImageService.Called {
+				if call == "PullImage" {
+					pullCalls++
+				}
+			}
+			assert.Equal(t, test.wantCalls, pullCalls)
+		})
+	}
+}
+
+func TestPullImageErrorContextAuthFields(t *testing.T) {
+	tests := []struct {
+		name         string
+		auth         credentialprovider.AuthConfig
+		wantGuidance bool
+	}{
+		{name: "username", auth: credentialprovider.AuthConfig{Username: "private-user"}, wantGuidance: true},
+		{name: "password", auth: credentialprovider.AuthConfig{Password: "private-password"}, wantGuidance: true},
+		{name: "encoded auth", auth: credentialprovider.AuthConfig{Auth: "private-encoded-auth"}, wantGuidance: true},
+		{name: "identity token", auth: credentialprovider.AuthConfig{IdentityToken: "private-identity-token"}, wantGuidance: true},
+		{name: "registry token", auth: credentialprovider.AuthConfig{RegistryToken: "private-registry-token"}, wantGuidance: true},
+		{name: "server address only", auth: credentialprovider.AuthConfig{ServerAddress: "example.azurecr.io"}},
+		{name: "empty auth"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			_, fakeImageService, manager, err := createTestRuntimeManager(tCtx)
+			require.NoError(t, err)
+			notFound := status.Error(codes.NotFound, "image not found")
+			unauthorized := fmt.Errorf("401 Unauthorized")
+			fakeImageService.InjectError("PullImage", notFound)
+			fakeImageService.InjectError("PullImage", unauthorized)
+			credentials := []credentialprovider.TrackedAuthConfig{{AuthConfig: test.auth}, {}}
+
+			_, _, err = manager.PullImage(tCtx, kubecontainer.ImageSpec{Image: "example.azurecr.io/repo:tag"}, credentials, nil)
+			require.Error(t, err)
+			if test.wantGuidance {
+				assert.Contains(t, err.Error(), "image pull returned NotFound with supplied credentials")
+				assert.Contains(t, err.Error(), "with supplied credentials: "+notFound.Error())
+				assert.Contains(t, err.Error(), "without supplied credentials: "+unauthorized.Error())
+			} else {
+				assert.EqualError(t, err, utilerrors.NewAggregate([]error{notFound, unauthorized}).Error())
+			}
+			for _, secret := range []string{test.auth.Username, test.auth.Password, test.auth.Auth, test.auth.IdentityToken, test.auth.RegistryToken} {
+				if secret != "" {
+					assert.NotContains(t, err.Error(), secret)
+				}
+			}
+			assert.ErrorIs(t, err, notFound)
+			assert.ErrorIs(t, err, unauthorized)
+		})
+	}
+}
+
+func TestPullImageErrorContextInEventAndBackOff(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	recorder := record.NewFakeRecorder(10)
+	_, fakeImageService, manager, err := createTestRuntimeManager(tCtx, withRecorder(recorder))
+	require.NoError(t, err)
+	keyring := &credentialprovider.BasicDockerKeyring{}
+	keyring.Add(nil, credentialprovider.DockerConfig{
+		"example.azurecr.io": {Username: "private-user", Password: "private-password"},
+		"*.azurecr.*":        {},
+	})
+	backOff := flowcontrol.NewBackOff(time.Minute, 5*time.Minute)
+	backOff.Clock = testingclock.NewFakeClock(time.Now())
+	manager.imagePuller = images.NewImageManager(
+		recorder,
+		keyring,
+		manager,
+		&imagepullmanager.NoopImagePullManager{},
+		backOff,
+		true,
+		nil,
+		0,
+		0,
+		&fakePodPullingTimeRecorder{},
+	)
+	fakeImageService.InjectError("PullImage", status.Error(codes.NotFound, "image not found"))
+	fakeImageService.InjectError("PullImage", fmt.Errorf("failed to fetch anonymous token: 401 Unauthorized"))
+	pod := makeTestPod("testpod", "testns", "testuid", nil)
+	ref := &v1.ObjectReference{Name: pod.Name, Namespace: pod.Namespace, UID: pod.UID}
+	sandbox := &runtimeapi.PodSandboxConfig{
+		Metadata: &runtimeapi.PodSandboxMetadata{Name: pod.Name, Namespace: pod.Namespace, Uid: string(pod.UID)},
+	}
+	const image = "example.azurecr.io/repo:missing"
+
+	imageRef, message, err := manager.imagePuller.EnsureImageExists(tCtx, ref, pod, image, nil, sandbox, "", v1.PullAlways)
+	require.ErrorIs(t, err, images.ErrImagePull)
+	assert.Empty(t, imageRef)
+	assert.Contains(t, message, "image pull returned NotFound with supplied credentials")
+	assert.Contains(t, message, "without supplied credentials: failed to fetch anonymous token: 401 Unauthorized")
+	require.Len(t, recorder.Events, 2)
+	assert.Equal(t, fmt.Sprintf("Normal Pulling Pulling image %q", image), <-recorder.Events)
+	assert.Equal(t, fmt.Sprintf("Warning Failed Failed to pull image %q: %s", image, message), <-recorder.Events)
+
+	calls := len(fakeImageService.Called)
+	_, backOffMessage, err := manager.imagePuller.EnsureImageExists(tCtx, ref, pod, image, nil, sandbox, "", v1.PullAlways)
+	require.ErrorIs(t, err, images.ErrImagePullBackOff)
+	assert.Contains(t, backOffMessage, message)
+	assert.Len(t, fakeImageService.Called, calls)
 }
 
 func TestListImages(t *testing.T) {
