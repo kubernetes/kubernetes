@@ -605,6 +605,79 @@ func TestSyncPodsStartPod(t *testing.T) {
 	fakeRuntime.AssertStartedPods([]string{string(pods[0].UID)})
 }
 
+func TestSyncPodSandboxCreationError(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+	kubelet := testKubelet.kubelet
+	pod := podWithUIDNameNsSpec("12345678", "foo", "new", v1.PodSpec{
+		Containers: []v1.Container{{Name: "bar"}},
+	})
+	kubelet.podManager.SetPods([]*v1.Pod{pod})
+	podStatus := &kubecontainer.PodStatus{ID: pod.UID}
+
+	syncPod := func(results ...*kubecontainer.SyncResult) {
+		t.Helper()
+		result := &kubecontainer.PodSyncResult{SyncResults: results}
+		testKubelet.fakeRuntime.SyncResults = result
+		isTerminal, _, err := kubelet.SyncPod(tCtx, kubetypes.SyncPodUpdate, pod, nil, podStatus)
+		require.False(t, isTerminal)
+		if result.Error() != nil {
+			require.EqualError(t, err, result.Error().Error())
+		} else {
+			require.NoError(t, err)
+		}
+	}
+	expectCondition := func(expectedStatus v1.ConditionStatus, expectedMessage string) {
+		t.Helper()
+		apiStatus := kubelet.generateAPIPodStatus(tCtx, pod, podStatus, SyncPod)
+		_, condition := podutil.GetPodCondition(&apiStatus, v1.PodReadyToStartContainers)
+		require.NotNil(t, condition)
+		require.Equal(t, expectedStatus, condition.Status)
+		require.Equal(t, expectedMessage, condition.Message)
+		if expectedStatus == v1.ConditionFalse {
+			require.Equal(t, kubetypes.PodSandboxNotReadyReason, condition.Reason)
+		}
+	}
+
+	sandboxFailure := kubecontainer.NewSyncResult(kubecontainer.CreatePodSandbox, pod.UID)
+	for _, message := range []string{
+		"failed to set up sandbox network: unable to allocate IP from exhausted range 10.244.0.0/24",
+		"failed to set up sandbox network: bridge cni0 does not exist",
+	} {
+		sandboxFailure.Fail(kubecontainer.ErrCreatePodSandbox, message)
+		syncPod(sandboxFailure)
+		expectCondition(v1.ConditionFalse, "no pod sandbox exists: "+message)
+	}
+
+	syncPod()
+	expectCondition(v1.ConditionFalse, "no pod sandbox exists: "+sandboxFailure.Message)
+	apiStatus, found := kubelet.statusManager.GetPodStatus(pod.UID)
+	require.True(t, found)
+	_, condition := podutil.GetPodCondition(&apiStatus, v1.PodReadyToStartContainers)
+	require.NotNil(t, condition)
+	require.Equal(t, "no pod sandbox exists: "+sandboxFailure.Message, condition.Message)
+
+	podStatus.SandboxStatuses = []*runtimeapi.PodSandboxStatus{{
+		State:    runtimeapi.PodSandboxState_SANDBOX_READY,
+		Metadata: &runtimeapi.PodSandboxMetadata{},
+		Network:  &runtimeapi.PodSandboxNetworkStatus{Ip: "10.244.0.2"},
+	}}
+	imageFailure := kubecontainer.NewSyncResult(kubecontainer.StartContainer, "bar")
+	imageFailure.Fail(images.ErrImagePull, "failed to pull container image")
+	syncPod(imageFailure)
+	expectCondition(v1.ConditionTrue, "")
+
+	podStatus.SandboxStatuses = nil
+	syncPod()
+	expectCondition(v1.ConditionFalse, "no pod sandbox exists")
+
+	syncPod(sandboxFailure)
+	expectCondition(v1.ConditionFalse, "no pod sandbox exists: "+sandboxFailure.Message)
+	syncPod(kubecontainer.NewSyncResult(kubecontainer.CreatePodSandbox, pod.UID), imageFailure)
+	expectCondition(v1.ConditionFalse, "no pod sandbox exists")
+}
+
 func TestHandlePodCleanupsPerQOS(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
