@@ -18,12 +18,15 @@ package wsstream
 
 import (
 	"encoding/base64"
+	"errors"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
 	"sync"
 	"testing"
+	"time"
 
 	"golang.org/x/net/websocket"
 )
@@ -417,5 +420,55 @@ func TestProtocolSupportsStreamClose(t *testing.T) {
 		if actual != test.expected {
 			t.Errorf("%s: expected (%t), got (%t)", name, test.expected, actual)
 		}
+	}
+}
+
+// TestWriteDeadlineNotExtendedByIdleTimeout checks that a write deadline holds
+// for a peer that has stopped reading: the idle timeout, which every frame
+// renews, must not move it later.
+func TestWriteDeadlineNotExtendedByIdleTimeout(t *testing.T) {
+	conn := NewConn(NewDefaultChannelProtocols([]ChannelType{WriteChannel}))
+	conn.SetIdleTimeout(10 * time.Second)
+	opened := make(chan []io.ReadWriteCloser, 1)
+	s, addr := newServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		_, channels, err := conn.Open(w, req)
+		if err != nil {
+			t.Errorf("open: %v", err)
+			close(opened)
+			return
+		}
+		opened <- channels
+	}))
+	defer s.Close()
+	client, err := websocket.Dial("ws://"+addr, "", "http://localhost/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close() //nolint:errcheck
+	channels, ok := <-opened
+	if !ok {
+		t.FailNow()
+	}
+	defer conn.Close() //nolint:errcheck
+
+	// The client never reads, so the writes below fill the socket and block.
+	conn.SetWriteDeadline(200 * time.Millisecond)
+	start := time.Now()
+	buf := make([]byte, 64*1024)
+	for {
+		_, err := channels[0].Write(buf)
+		if err != nil {
+			var ne net.Error
+			if !errors.As(err, &ne) || !ne.Timeout() {
+				t.Fatalf("write failed with %v, want a timeout", err)
+			}
+			break
+		}
+		if time.Since(start) > 9*time.Second {
+			t.Fatal("writes to a peer that does not read never failed")
+		}
+	}
+	if elapsed := time.Since(start); elapsed > 3*time.Second {
+		t.Errorf("writes failed after %v: the 200ms write deadline was extended to the idle timeout", elapsed)
 	}
 }
