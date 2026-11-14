@@ -22,7 +22,7 @@ import (
 	"k8s.io/apiextensions-api/pkg/client/clientset/clientset"
 	externalversions "k8s.io/apiextensions-api/pkg/client/informers/externalversions"
 	"k8s.io/apiextensions-api/pkg/client/informers/externalversions/internalinterfaces"
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/sharding"
 	"k8s.io/client-go/tools/cache"
 )
@@ -40,7 +40,7 @@ type SharedInformerOption = externalversions.SharedInformerOption
 //
 //go:fix inline
 func NewFilteredSharedInformerFactory(client clientset.Interface, defaultResync time.Duration, namespace string, tweakListOptions internalinterfaces.TweakListOptionsFunc) externalversions.SharedInformerFactory {
-	return externalversions.NewFilteredSharedInformerFactory(client, defaultResync, namespace, tweakListOptions)
+	return externalversions.NewSharedInformerFactoryWithOptions(client, defaultResync, externalversions.WithNamespace(namespace), externalversions.WithTweakListOptions(tweakListOptions))
 }
 
 //go:fix inline
