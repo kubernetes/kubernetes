@@ -122,6 +122,12 @@ func SpreadServiceOrFail(ctx context.Context, f *framework.Framework, replicaCou
 	// Thus, no need to test for it. Once the precondition changes to zero number of replicas,
 	// test for replicaCount > 0. Otherwise, StartPods panics.
 	framework.ExpectNoError(testutils.StartPods(f.ClientSet, replicaCount, f.Namespace.Name, serviceName, *podSpec, false, framework.Logf), "start %d pods for Service %q in namespace %q", replicaCount, serviceName, f.Namespace.Name)
+	defer func() {
+		for i := range replicaCount {
+			podName := fmt.Sprintf("%v-%v", serviceName, i)
+			framework.ExpectNoError(e2epod.DeletePodWithWaitByName(ctx, f.ClientSet, podName, f.Namespace.Name))
+		}
+	}()
 
 	// Wait for all of them to be scheduled
 	selector := labels.SelectorFromSet(labels.Set(map[string]string{"service": serviceName}))

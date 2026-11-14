@@ -183,6 +183,9 @@ var _ = SIGDescribe("NoExecuteTaintManager Single Pod", framework.WithSerial(), 
 		ginkgo.By("Starting pod...")
 		nodeName, err := testutils.RunPodAndGetNodeName(ctx, cs, pod, 2*time.Minute)
 		framework.ExpectNoError(err)
+		defer func() {
+			framework.ExpectNoError(e2epod.DeletePodWithWait(ctx, cs, pod))
+		}()
 		framework.Logf("Pod is running on %v. Tainting Node", nodeName)
 
 		ginkgo.By("Trying to apply a taint on the Node")
@@ -214,6 +217,9 @@ var _ = SIGDescribe("NoExecuteTaintManager Single Pod", framework.WithSerial(), 
 		ginkgo.By("Starting pod...")
 		nodeName, err := testutils.RunPodAndGetNodeName(ctx, cs, pod, 2*time.Minute)
 		framework.ExpectNoError(err)
+		defer func() {
+			framework.ExpectNoError(e2epod.DeletePodWithWait(ctx, cs, pod))
+		}()
 		framework.Logf("Pod is running on %v. Tainting Node", nodeName)
 
 		ginkgo.By("Trying to apply a taint on the Node")
@@ -246,6 +252,9 @@ var _ = SIGDescribe("NoExecuteTaintManager Single Pod", framework.WithSerial(), 
 		ginkgo.By("Starting pod...")
 		nodeName, err := testutils.RunPodAndGetNodeName(ctx, cs, pod, 2*time.Minute)
 		framework.ExpectNoError(err)
+		defer func() {
+			framework.ExpectNoError(e2epod.DeletePodWithWait(ctx, cs, pod))
+		}()
 		framework.Logf("Pod is running on %v. Tainting Node", nodeName)
 
 		ginkgo.By("Trying to apply a taint on the Node")
@@ -291,6 +300,9 @@ var _ = SIGDescribe("NoExecuteTaintManager Single Pod", framework.WithSerial(), 
 		ginkgo.By("Starting pod...")
 		nodeName, err := testutils.RunPodAndGetNodeName(ctx, cs, pod, 2*time.Minute)
 		framework.ExpectNoError(err)
+		defer func() {
+			framework.ExpectNoError(e2epod.DeletePodWithWait(ctx, cs, pod))
+		}()
 		framework.Logf("Pod is running on %v. Tainting Node", nodeName)
 
 		// 2. Taint the node running this pod with a no-execute taint
@@ -346,7 +358,10 @@ var _ = SIGDescribe("NoExecuteTaintManager Single Pod", framework.WithSerial(), 
 		framework.ExpectNoError(err)
 		framework.Logf("Pod is running on %v. Tainting Node", nodeName)
 
-		ginkgo.DeferCleanup(e2epod.NewPodClient(f).RemoveFinalizer, pod.Name, testFinalizer)
+		defer func() {
+			e2epod.NewPodClient(f).RemoveFinalizer(ctx, pod.Name, testFinalizer)
+			framework.ExpectNoError(e2epod.DeletePodWithWait(ctx, cs, pod))
+		}()
 
 		ginkgo.By("Trying to apply a taint on the Node")
 		testTaint := getTestTaint()
@@ -394,9 +409,15 @@ var _ = SIGDescribe("NoExecuteTaintManager Multiple Pods", framework.WithSerial(
 		ginkgo.By("Starting pods...")
 		nodeName1, err := testutils.RunPodAndGetNodeName(ctx, cs, pod1, 2*time.Minute)
 		framework.ExpectNoError(err)
+		defer func() {
+			framework.ExpectNoError(e2epod.DeletePodWithWait(ctx, cs, pod1))
+		}()
 		framework.Logf("Pod1 is running on %v. Tainting Node", nodeName1)
 		nodeName2, err := testutils.RunPodAndGetNodeName(ctx, cs, pod2, 2*time.Minute)
 		framework.ExpectNoError(err)
+		defer func() {
+			framework.ExpectNoError(e2epod.DeletePodWithWait(ctx, cs, pod2))
+		}()
 		framework.Logf("Pod2 is running on %v. Tainting Node", nodeName2)
 
 		ginkgo.By("Trying to apply a taint on the Nodes")
@@ -453,6 +474,9 @@ var _ = SIGDescribe("NoExecuteTaintManager Multiple Pods", framework.WithSerial(
 		ginkgo.By("Starting pods...")
 		nodeName, err := testutils.RunPodAndGetNodeName(ctx, cs, pod1, 2*time.Minute)
 		framework.ExpectNoError(err)
+		defer func() {
+			framework.ExpectNoError(e2epod.DeletePodWithWait(ctx, cs, pod1))
+		}()
 		node, err := cs.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		nodeHostNameLabel, ok := node.GetObjectMeta().GetLabels()["kubernetes.io/hostname"]
@@ -465,6 +489,9 @@ var _ = SIGDescribe("NoExecuteTaintManager Multiple Pods", framework.WithSerial(
 		pod2.Spec.NodeSelector = map[string]string{"kubernetes.io/hostname": nodeHostNameLabel}
 		_, err = testutils.RunPodAndGetNodeName(ctx, cs, pod2, 2*time.Minute)
 		framework.ExpectNoError(err)
+		defer func() {
+			framework.ExpectNoError(e2epod.DeletePodWithWait(ctx, cs, pod2))
+		}()
 		// Wait for pods to be running state before eviction happens
 		framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, cs, pod1))
 		framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, cs, pod2))

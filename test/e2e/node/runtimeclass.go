@@ -117,6 +117,9 @@ var _ = SIGDescribe("RuntimeClass", func() {
 			labelFooName: "bar",
 		}
 		pod = e2epod.NewPodClient(f).Create(ctx, pod)
+		defer func() {
+			framework.ExpectNoError(e2epod.DeletePodWithWait(ctx, f.ClientSet, pod))
+		}()
 
 		framework.ExpectNoError(e2epod.WaitForPodNotPending(ctx, f.ClientSet, f.Namespace.Name, pod.Name))
 
@@ -163,6 +166,9 @@ var _ = SIGDescribe("RuntimeClass", func() {
 			labelFooName: "bar",
 		}
 		pod = e2epod.NewPodClient(f).Create(ctx, pod)
+		defer func() {
+			framework.ExpectNoError(e2epod.DeletePodWithWait(ctx, f.ClientSet, pod))
+		}()
 
 		framework.ExpectNoError(e2epod.WaitForPodNotPending(ctx, f.ClientSet, f.Namespace.Name, pod.Name))
 

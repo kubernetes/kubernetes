@@ -185,6 +185,11 @@ var _ = SIGDescribe("SchedulerPredicates", framework.WithSerial(), func() {
 					},
 				}), true, framework.Logf), "start %d pods in namespace %q to saturate ephemeral storage", podsNeededForSaturation, ns)
 		}
+		defer func() {
+			for i := range podsNeededForSaturation {
+				framework.ExpectNoError(e2epod.DeletePodWithWaitByName(ctx, cs, fmt.Sprintf("overcommit-%v", i), ns))
+			}
+		}()
 		podName := "additional-pod"
 		conf := pausePodConfig{
 			Name:   podName,
@@ -199,6 +204,9 @@ var _ = SIGDescribe("SchedulerPredicates", framework.WithSerial(), func() {
 			},
 		}
 		WaitForSchedulerAfterAction(ctx, f, createPausePodAction(f, conf), ns, podName, false)
+		defer func() {
+			framework.ExpectNoError(e2epod.DeletePodWithWaitByName(ctx, cs, podName, ns))
+		}()
 		verifyResult(ctx, cs, podsNeededForSaturation, 1, ns)
 	})
 
@@ -290,6 +298,9 @@ var _ = SIGDescribe("SchedulerPredicates", framework.WithSerial(), func() {
 					Limits:   v1.ResourceList{beardsecond: resource.MustParse("700")},
 				},
 			})
+			defer func() {
+				framework.ExpectNoError(e2epod.DeletePodWithWait(ctx, cs, fillerPod))
+			}()
 
 			// Wait for filler pod to schedule.
 			framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, cs, fillerPod), "wait for Pod %q in namespace %q to run", fillerPod.Name, fillerPod.Namespace)
@@ -310,6 +321,9 @@ var _ = SIGDescribe("SchedulerPredicates", framework.WithSerial(), func() {
 			}
 
 			WaitForSchedulerAfterAction(ctx, f, createPausePodAction(f, conf), ns, podName, false)
+			defer func() {
+				framework.ExpectNoError(e2epod.DeletePodWithWaitByName(ctx, cs, podName, ns))
+			}()
 			verifyResult(ctx, cs, 1, 1, ns)
 		})
 	})
@@ -411,6 +425,9 @@ var _ = SIGDescribe("SchedulerPredicates", framework.WithSerial(), func() {
 			}))
 		}
 		// Wait for filler pods to schedule.
+		defer func() {
+			e2epod.DeletePodsWithWait(ctx, cs, fillerPods)
+		}()
 		for _, pod := range fillerPods {
 			framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, cs, pod), "wait for Pod %q in namespace %q to run", pod.Name, pod.Namespace)
 		}
@@ -432,6 +449,9 @@ var _ = SIGDescribe("SchedulerPredicates", framework.WithSerial(), func() {
 			},
 		}
 		WaitForSchedulerAfterAction(ctx, f, createPausePodAction(f, conf), ns, podName, false)
+		defer func() {
+			framework.ExpectNoError(e2epod.DeletePodWithWaitByName(ctx, cs, podName, ns))
+		}()
 		verifyResult(ctx, cs, len(fillerPods), 1, ns)
 	})
 
@@ -457,6 +477,9 @@ var _ = SIGDescribe("SchedulerPredicates", framework.WithSerial(), func() {
 		}
 
 		WaitForSchedulerAfterAction(ctx, f, createPausePodAction(f, conf), ns, podName, false)
+		defer func() {
+			framework.ExpectNoError(e2epod.DeletePodWithWaitByName(ctx, cs, podName, ns))
+		}()
 		verifyResult(ctx, cs, 0, 1, ns)
 	})
 
@@ -477,12 +500,15 @@ var _ = SIGDescribe("SchedulerPredicates", framework.WithSerial(), func() {
 
 		ginkgo.By("Trying to relaunch the pod, now with labels.")
 		labelPodName := "with-labels"
-		createPausePod(ctx, f, pausePodConfig{
+		pod := createPausePod(ctx, f, pausePodConfig{
 			Name: labelPodName,
 			NodeSelector: map[string]string{
 				k: v,
 			},
 		})
+		defer func() {
+			framework.ExpectNoError(e2epod.DeletePodWithWait(ctx, cs, pod))
+		}()
 
 		// check that pod got scheduled. We intentionally DO NOT check that the
 		// pod is running because this will create a race condition with the
@@ -533,6 +559,9 @@ var _ = SIGDescribe("SchedulerPredicates", framework.WithSerial(), func() {
 			Labels: map[string]string{"name": "restricted"},
 		}
 		WaitForSchedulerAfterAction(ctx, f, createPausePodAction(f, conf), ns, podName, false)
+		defer func() {
+			framework.ExpectNoError(e2epod.DeletePodWithWaitByName(ctx, cs, podName, ns))
+		}()
 		verifyResult(ctx, cs, 0, 1, ns)
 	})
 
@@ -550,7 +579,7 @@ var _ = SIGDescribe("SchedulerPredicates", framework.WithSerial(), func() {
 
 		ginkgo.By("Trying to relaunch the pod, now with labels.")
 		labelPodName := "with-labels"
-		createPausePod(ctx, f, pausePodConfig{
+		pod := createPausePod(ctx, f, pausePodConfig{
 			Name: labelPodName,
 			Affinity: &v1.Affinity{
 				NodeAffinity: &v1.NodeAffinity{
@@ -570,6 +599,9 @@ var _ = SIGDescribe("SchedulerPredicates", framework.WithSerial(), func() {
 				},
 			},
 		})
+		defer func() {
+			framework.ExpectNoError(e2epod.DeletePodWithWait(ctx, cs, pod))
+		}()
 
 		// check that pod got scheduled. We intentionally DO NOT check that the
 		// pod is running because this will create a race condition with the
@@ -608,11 +640,14 @@ var _ = SIGDescribe("SchedulerPredicates", framework.WithSerial(), func() {
 
 		ginkgo.By("Trying to relaunch the pod, now with tolerations.")
 		tolerationPodName := "with-tolerations"
-		createPausePod(ctx, f, pausePodConfig{
+		pod := createPausePod(ctx, f, pausePodConfig{
 			Name:         tolerationPodName,
 			Tolerations:  []v1.Toleration{{Key: testTaint.Key, Value: testTaint.Value, Effect: testTaint.Effect}},
 			NodeSelector: map[string]string{labelKey: labelValue},
 		})
+		defer func() {
+			framework.ExpectNoError(e2epod.DeletePodWithWait(ctx, cs, pod))
+		}()
 
 		// check that pod got scheduled. We intentionally DO NOT check that the
 		// pod is running because this will create a race condition with the
@@ -657,6 +692,9 @@ var _ = SIGDescribe("SchedulerPredicates", framework.WithSerial(), func() {
 		}
 
 		WaitForSchedulerAfterAction(ctx, f, createPausePodAction(f, conf), ns, podNameNoTolerations, false)
+		defer func() {
+			framework.ExpectNoError(e2epod.DeletePodWithWaitByName(ctx, cs, podNameNoTolerations, ns))
+		}()
 		verifyResult(ctx, cs, 0, 1, ns)
 
 		ginkgo.By("Removing taint off the node")
@@ -688,12 +726,21 @@ var _ = SIGDescribe("SchedulerPredicates", framework.WithSerial(), func() {
 		port := int32(54321)
 		ginkgo.By(fmt.Sprintf("Trying to create a pod(pod1) with hostport %v and hostIP %s and expect scheduled", port, localhost))
 		createHostPortPodOnNode(ctx, f, "pod1", ns, localhost, port, v1.ProtocolTCP, nodeSelector, true)
+		defer func() {
+			framework.ExpectNoError(e2epod.DeletePodWithWaitByName(ctx, cs, "pod1", ns))
+		}()
 
 		ginkgo.By(fmt.Sprintf("Trying to create another pod(pod2) with hostport %v but hostIP %s on the node which pod1 resides and expect scheduled", port, hostIP))
 		createHostPortPodOnNode(ctx, f, "pod2", ns, hostIP, port, v1.ProtocolTCP, nodeSelector, true)
+		defer func() {
+			framework.ExpectNoError(e2epod.DeletePodWithWaitByName(ctx, cs, "pod2", ns))
+		}()
 
 		ginkgo.By(fmt.Sprintf("Trying to create a third pod(pod3) with hostport %v, hostIP %s but use UDP protocol on the node which pod2 resides", port, hostIP))
 		createHostPortPodOnNode(ctx, f, "pod3", ns, hostIP, port, v1.ProtocolUDP, nodeSelector, true)
+		defer func() {
+			framework.ExpectNoError(e2epod.DeletePodWithWaitByName(ctx, cs, "pod3", ns))
+		}()
 
 	})
 
@@ -721,9 +768,15 @@ var _ = SIGDescribe("SchedulerPredicates", framework.WithSerial(), func() {
 		port := int32(54322)
 		ginkgo.By(fmt.Sprintf("Trying to create a pod(pod4) with hostport %v and hostIP 0.0.0.0(empty string here) and expect scheduled", port))
 		createHostPortPodOnNode(ctx, f, "pod4", ns, "", port, v1.ProtocolTCP, nodeSelector, true)
+		defer func() {
+			framework.ExpectNoError(e2epod.DeletePodWithWaitByName(ctx, cs, "pod4", ns))
+		}()
 
 		ginkgo.By(fmt.Sprintf("Trying to create another pod(pod5) with hostport %v but hostIP %s on the node which pod4 resides and expect not scheduled", port, hostIP))
 		createHostPortPodOnNode(ctx, f, "pod5", ns, hostIP, port, v1.ProtocolTCP, nodeSelector, false)
+		defer func() {
+			framework.ExpectNoError(e2epod.DeletePodWithWaitByName(ctx, cs, "pod5", ns))
+		}()
 	})
 
 	ginkgo.Context("PodTopologySpread Filtering", func() {
@@ -790,7 +843,8 @@ var _ = SIGDescribe("SchedulerPredicates", framework.WithSerial(), func() {
 					},
 				},
 			}
-			runPauseRS(ctx, f, rsConfig)
+			rs := runPauseRS(ctx, f, rsConfig)
+			defer deletePauseRS(ctx, f, rs)
 			podList, err := cs.CoreV1().Pods(ns).List(ctx, metav1.ListOptions{})
 			framework.ExpectNoError(err, "list Pods in namespace %q", ns)
 			numInNode1, numInNode2 := 0, 0
@@ -823,7 +877,8 @@ var _ = SIGDescribe("SchedulerPredicates", framework.WithSerial(), func() {
 				},
 			},
 		}
-		createPauseRS(ctx, f, rsConfig)
+		rs := createPauseRS(ctx, f, rsConfig)
+		defer deletePauseRS(ctx, f, rs)
 
 		ginkgo.By("Expect all pods stay in pending state")
 		podList, err := e2epod.WaitForNumberOfPods(ctx, cs, ns, replicas, time.Minute)
@@ -924,8 +979,11 @@ var _ = SIGDescribe("SchedulerPredicates", framework.WithSerial(), func() {
 				},
 			},
 		}
-		_, err = f.ClientSet.CoreV1().Pods(ns).Create(ctx, bindPvPod, metav1.CreateOptions{})
+		bindPvPod, err = f.ClientSet.CoreV1().Pods(ns).Create(ctx, bindPvPod, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "create Pod %q in namespace %q", bindPvPod.Name, ns)
+		defer func() {
+			framework.ExpectNoError(e2epod.DeletePodWithWait(ctx, f.ClientSet, bindPvPod))
+		}()
 		framework.ExpectNoError(e2epod.WaitForPodNotPending(ctx, f.ClientSet, ns, podName), "wait for Pod %q in namespace %q to leave Pending phase", podName, ns)
 	})
 })
@@ -1052,7 +1110,7 @@ func runPodAndGetNodeName(ctx context.Context, f *framework.Framework, conf paus
 	pod := runPausePod(ctx, f, conf)
 
 	ginkgo.By("Explicitly delete pod here to free the resource it takes.")
-	err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(ctx, pod.Name, *metav1.NewDeleteOptions(0))
+	err := e2epod.DeletePodWithWait(ctx, f.ClientSet, pod)
 	framework.ExpectNoError(err, "delete Pod %q in namespace %q", pod.Name, f.Namespace.Name)
 
 	return pod.Spec.NodeName
