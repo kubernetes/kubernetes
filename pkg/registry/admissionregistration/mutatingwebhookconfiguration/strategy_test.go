@@ -33,6 +33,7 @@ func validMutatingWebhookConfiguration() *admissionregistration.MutatingWebhookC
 	thirty := int32(30)
 	none := admissionregistration.SideEffectClassNone
 	servicePath := "/"
+	port := int32(443)
 	return &admissionregistration.MutatingWebhookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "foo",
@@ -44,7 +45,7 @@ func validMutatingWebhookConfiguration() *admissionregistration.MutatingWebhookC
 					Name:      "foo",
 					Namespace: "bar",
 					Path:      &servicePath,
-					Port:      443,
+					Port:      &port,
 				},
 			},
 			FailurePolicy:           &ignore,

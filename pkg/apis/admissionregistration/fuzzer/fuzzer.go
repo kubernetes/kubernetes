@@ -34,6 +34,13 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 				obj.Scope = &s
 			}
 		},
+		func(obj *admissionregistration.ServiceReference, c randfill.Continue) {
+			c.FillNoCustom(obj) // fuzz self without calling this function again
+			if obj.Port == nil {
+				p := int32(443)
+				obj.Port = &p
+			}
+		},
 		func(obj *admissionregistration.ValidatingWebhook, c randfill.Continue) {
 			c.FillNoCustom(obj) // fuzz self without calling this function again
 			if obj.FailurePolicy == nil {
