@@ -337,11 +337,10 @@ func testWebhookConverter(t *testing.T, watchCache bool) {
 			upCh, handler := closeOnCall(test.handler)
 
 			// Inject the logic for this specific test case
-			proxyHandler.set(handler)
-			defer proxyHandler.set(nil)
+			proxyHandler.set(test.group, handler)
 
 			// Configure the CRD to use the shared webhook server
-			ctc.setConversionWebhook(t, webhookClientConfig, test.reviewVersions)
+			ctc.setConversionWebhook(t, WebhookClientConfigForPath(t, webhookClientConfig, test.group), test.reviewVersions)
 			defer ctc.removeConversionWebhook(t)
 
 			// wait until new webhook is called the first time
@@ -1645,25 +1644,35 @@ func TestWebhookConversion_WhitespaceCABundleEtcdBypass(t *testing.T) {
 // the underlying delegate handler at runtime. This is useful for sharing a single
 // server instance across multiple test cases that require different behaviors.
 type dynamicWebhookHandler struct {
-	mu       sync.RWMutex
-	delegate http.Handler
+	mu        sync.RWMutex
+	delegates map[string]http.Handler
 }
 
-// ServeHTTP implements http.Handler. It delegates the request to the currently
-// configured handler. If no handler is set, it returns an internal server error.
+// ServeHTTP implements http.Handler, dispatching on the path segment below
+// /convert/. A path with no registered delegate gets an internal server error.
 func (h *dynamicWebhookHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	key := strings.TrimPrefix(r.URL.Path, "/convert/")
 	h.mu.RLock()
 	defer h.mu.RUnlock()
-	if h.delegate != nil {
-		h.delegate.ServeHTTP(w, r)
+	delegate := h.delegates[key]
+	if delegate != nil {
+		delegate.ServeHTTP(w, r)
 	} else {
-		http.Error(w, "unexpected call", http.StatusInternalServerError)
+		http.Error(w, fmt.Sprintf("unexpected call for %q: no handler registered for key %q", r.URL.Path, key), http.StatusInternalServerError)
 	}
 }
 
-// set safely swaps the underlying delegate handler.
-func (h *dynamicWebhookHandler) set(delegate http.Handler) {
+// set safely swaps the delegate handler registered for key. A nil delegate
+// unregisters it.
+func (h *dynamicWebhookHandler) set(key string, delegate http.Handler) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	h.delegate = delegate
+	if delegate == nil {
+		delete(h.delegates, key)
+		return
+	}
+	if h.delegates == nil {
+		h.delegates = map[string]http.Handler{}
+	}
+	h.delegates[key] = delegate
 }
