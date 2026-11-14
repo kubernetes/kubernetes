@@ -43,6 +43,7 @@ type testEnv struct {
 
 func testNodeAllocatableResources(tCtx ktesting.TContext, enabled bool) {
 	if !enabled {
+		tCtx.Run("Disabled", testNodeAllocatableResourcesDisabled)
 		return
 	}
 	tCtx.Run("ConsumablePool", testNodeAllocatableResourcesConsumablePool)
@@ -58,10 +59,16 @@ func testNodeAllocatableResources(tCtx ktesting.TContext, enabled bool) {
 	tCtx.Run("OverheadMappingsInsufficient", testNodeAllocatableResourcesWithOverheadInsufficient)
 	tCtx.Run("ClaimSharingOverhead", testNodeAllocatableResourceClaimSharingOverhead)
 	tCtx.Run("ExtendedResource", testNodeAllocatableExtendedResource)
+	tCtx.Run("FilterOrder", testNodeAllocatableResourcesFilterOrder)
+	tCtx.Run("Quota", testNodeAllocatableResourcesQuota)
+	tCtx.Run("Scoring", testNodeAllocatableResourcesScoring)
+	tCtx.Run("PerRequestEntries", testNodeAllocatableResourcesPerRequestEntries)
+	tCtx.Run("ExtendedResourcePerContainerEntries", testNodeAllocatableExtendedResourcePerContainerEntries)
 }
 
+// setupTestEnv pins a test to worker-<nodeNum>. Parallel tests share the workers, so a test
+// that fills a node or expects it to be full needs a node that no other parallel test uses.
 func setupTestEnv(tCtx ktesting.TContext, nodeNum int) *testEnv {
-
 	nodeName := fmt.Sprintf("worker-%d", nodeNum)
 	namespace := createTestNamespace(tCtx, nil)
 	class, driverName := createTestClass(tCtx, namespace)
@@ -112,25 +119,24 @@ func expectPodUnschedulable(tCtx ktesting.TContext, pod *v1.Pod, reason string) 
 	}))))
 }
 
-func verifyPodNodeAllocatableStatus(tCtx ktesting.TContext, namespace, podName string, expectedStatus []v1.NodeAllocatableResourceClaimStatus) {
+func verifyPodNodeAllocatableStatus(tCtx ktesting.TContext, namespace, podName string, expectedStatus []v1.ExtraNodeAllocatableResource) {
 	tCtx.Helper()
 	var statusMatchers []gtypes.GomegaMatcher
 	for _, expected := range expectedStatus {
 		statusMatchers = append(statusMatchers, gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
-			"ResourceClaimName": gomega.ContainSubstring(expected.ResourceClaimName),
-			"Containers":        gomega.Equal(expected.Containers),
-			"Mapping":           gomega.Equal(expected.Mapping),
-			"Overhead":          gomega.Equal(expected.Overhead),
+			"ContainerName": gomega.Equal(expected.ContainerName),
+			"Requests":      gomega.Equal(expected.Requests),
+			"Limits":        gomega.Equal(expected.Limits),
 		}))
 	}
-	tCtx.Eventually(func(tCtx ktesting.TContext) []v1.NodeAllocatableResourceClaimStatus {
+	tCtx.Eventually(func(tCtx ktesting.TContext) []v1.ExtraNodeAllocatableResource {
 		pod, err := tCtx.Client().CoreV1().Pods(namespace).Get(tCtx, podName, metav1.GetOptions{})
 		if err != nil {
 			tCtx.Logf("Error getting pod: %v", err)
 			return nil
 		}
-		return pod.Status.NodeAllocatableResourceClaimStatuses
-	}).WithTimeout(30*time.Second).WithPolling(200*time.Millisecond).Should(gomega.ConsistOf(statusMatchers), "pod node allocatable resource claim status")
+		return pod.Status.ExtraNodeAllocatableResources
+	}).WithTimeout(30*time.Second).WithPolling(200*time.Millisecond).Should(gomega.ConsistOf(statusMatchers), "pod extra node allocatable resources")
 }
 
 func createPodWithNodeAllocatableClaim(tCtx ktesting.TContext, env *testEnv, claimName, podName string, numContainers int) (*v1.Pod, *resourceapi.ResourceClaim) {
@@ -222,14 +228,21 @@ func testNodeAllocatableResourcesConsumablePool(tCtx ktesting.TContext) {
 		"node allocatable claim allocation",
 	)
 
-	expectedStatus := []v1.NodeAllocatableResourceClaimStatus{{
-		ResourceClaimName: claim.Name,
-		Containers:        []string{"my-container-1", "my-container-2"},
-		Mapping: []v1.NodeAllocatableMappedResources{
-			{Name: v1.ResourceCPU, Quantity: new(resource.MustParse(nodeCPUCapacity))},
-			{Name: v1.ResourceMemory, Quantity: new(resource.MustParse(nodeMemoryCapacity))},
+	expectedStatus := []v1.ExtraNodeAllocatableResource{
+		{
+			ContainerName: "",
+			Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse(nodeCPUCapacity), v1.ResourceMemory: resource.MustParse(nodeMemoryCapacity)},
+			Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse(nodeCPUCapacity), v1.ResourceMemory: resource.MustParse(nodeMemoryCapacity)},
 		},
-	}}
+		{
+			ContainerName: "my-container-1",
+			Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse(nodeCPUCapacity), v1.ResourceMemory: resource.MustParse(nodeMemoryCapacity)},
+		},
+		{
+			ContainerName: "my-container-2",
+			Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse(nodeCPUCapacity), v1.ResourceMemory: resource.MustParse(nodeMemoryCapacity)},
+		},
+	}
 	verifyPodNodeAllocatableStatus(tCtx, env.namespace, pod.Name, expectedStatus)
 
 	anotherPod := st.MakePod().Name("another-pod").Namespace(env.namespace).Obj()
@@ -245,6 +258,34 @@ func testNodeAllocatableResourcesConsumablePool(tCtx ktesting.TContext) {
 	}
 	anotherPod = createPod(tCtx, env.namespace, "", anotherPod)
 	expectPodUnschedulable(tCtx, anotherPod, "Insufficient cpu")
+}
+
+func testNodeAllocatableResourcesDisabled(tCtx ktesting.TContext) {
+	tCtx.Parallel()
+	env := setupTestEnv(tCtx, 0)
+
+	devices := []resourceapi.Device{
+		{
+			Name: "gpu0",
+			NodeAllocatableResources: map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+				v1.ResourceCPU: {
+					Overhead: &resourceapi.NodeAllocatableOverhead{
+						PerPod: new(resource.MustParse("1")),
+					},
+				},
+			},
+		},
+	}
+	slice := createSlice(tCtx, makeSlice(env, devices))
+	tCtx.Expect(slice.Spec.Devices).To(gomega.HaveLen(1))
+	tCtx.Expect(slice.Spec.Devices[0].NodeAllocatableResources).To(
+		gomega.BeEmpty(), "nodeAllocatableResources must be dropped when the feature is disabled")
+
+	startScheduler(tCtx)
+	pod, _ := createPodWithNodeAllocatableClaim(tCtx, env, "claim1", "pod1", 1)
+	scheduled := waitForPodScheduled(tCtx, env.namespace, pod.Name)
+	tCtx.Expect(scheduled.Status.ExtraNodeAllocatableResources).To(
+		gomega.BeEmpty(), "extraNodeAllocatableResources must not be populated when the feature is disabled")
 }
 
 func testNodeAllocatableResourcesIndividualDevices(tCtx ktesting.TContext) {
@@ -296,13 +337,21 @@ func testNodeAllocatableResourcesIndividualDevices(tCtx ktesting.TContext) {
 		"node allocatable claim allocation",
 	)
 
-	expectedStatus := []v1.NodeAllocatableResourceClaimStatus{{
-		ResourceClaimName: claim.Name,
-		Containers:        []string{"my-container-1", "my-container-2"},
-		Mapping: []v1.NodeAllocatableMappedResources{
-			{Name: v1.ResourceCPU, Quantity: new(numCPUsPerDevice)},
+	expectedStatus := []v1.ExtraNodeAllocatableResource{
+		{
+			ContainerName: "",
+			Requests:      v1.ResourceList{v1.ResourceCPU: numCPUsPerDevice},
+			Limits:        v1.ResourceList{v1.ResourceCPU: numCPUsPerDevice},
 		},
-	}}
+		{
+			ContainerName: "my-container-1",
+			Limits:        v1.ResourceList{v1.ResourceCPU: numCPUsPerDevice},
+		},
+		{
+			ContainerName: "my-container-2",
+			Limits:        v1.ResourceList{v1.ResourceCPU: numCPUsPerDevice},
+		},
+	}
 	verifyPodNodeAllocatableStatus(tCtx, env.namespace, pod.Name, expectedStatus)
 }
 
@@ -554,7 +603,7 @@ func testInsufficientNodeResources(tCtx ktesting.TContext) {
 
 func testNodeAllocatableResourcesWithClaimTemplate(tCtx ktesting.TContext) {
 	tCtx.Parallel()
-	env := setupTestEnv(tCtx, 5) // Use a different node index
+	env := setupTestEnv(tCtx, 5)
 
 	cpuCapacityKey := resourceapi.QualifiedName("dra.example.com/cpu")
 	memCapacityKey := resourceapi.QualifiedName("dra.example.com/memory")
@@ -625,20 +674,23 @@ func testNodeAllocatableResourcesWithClaimTemplate(tCtx ktesting.TContext) {
 
 	waitForPodScheduled(tCtx, env.namespace, pod.Name)
 
-	expectedStatus := []v1.NodeAllocatableResourceClaimStatus{{
-		ResourceClaimName: podName, // The genereate claim based on template contains pod name
-		Containers:        []string{"c1"},
-		Mapping: []v1.NodeAllocatableMappedResources{
-			{Name: v1.ResourceCPU, Quantity: new(resource.MustParse("10"))},
-			{Name: v1.ResourceMemory, Quantity: new(resource.MustParse("100"))},
+	expectedStatus := []v1.ExtraNodeAllocatableResource{
+		{
+			ContainerName: "",
+			Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("10"), v1.ResourceMemory: resource.MustParse("100")},
+			Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("10"), v1.ResourceMemory: resource.MustParse("100")},
 		},
-	}}
+		{
+			ContainerName: "c1",
+			Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("10"), v1.ResourceMemory: resource.MustParse("100")},
+		},
+	}
 	verifyPodNodeAllocatableStatus(tCtx, env.namespace, pod.Name, expectedStatus)
 }
 
 func testNodeAllocatableUnreferencedClaimInPod(tCtx ktesting.TContext) {
 	tCtx.Parallel()
-	env := setupTestEnv(tCtx, 6) // Use a different node index
+	env := setupTestEnv(tCtx, 6)
 
 	cpuCapacityKey := resourceapi.QualifiedName("dra.example.com/cpu")
 	devices := []resourceapi.Device{
@@ -682,20 +734,19 @@ func testNodeAllocatableUnreferencedClaimInPod(tCtx ktesting.TContext) {
 	// and that the pod status correctly lists the allocated claim with an empty container list.
 	waitForPodScheduled(tCtx, env.namespace, pod.Name)
 
-	expectedStatus := []v1.NodeAllocatableResourceClaimStatus{{
-		ResourceClaimName: claimName,
-		Containers:        nil,
-		Mapping: []v1.NodeAllocatableMappedResources{{
-			Name:     v1.ResourceCPU,
-			Quantity: new(resource.MustParse(nodeCPUCapacity)),
-		}},
-	}}
+	expectedStatus := []v1.ExtraNodeAllocatableResource{
+		{
+			ContainerName: "",
+			Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse(nodeCPUCapacity)},
+			Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse(nodeCPUCapacity)},
+		},
+	}
 	verifyPodNodeAllocatableStatus(tCtx, env.namespace, pod.Name, expectedStatus)
 }
 
 func testNodeAllocatableResourcesWithOverheadPerPod(tCtx ktesting.TContext) {
 	tCtx.Parallel()
-	env := setupTestEnv(tCtx, 7) // Use a different node index
+	env := setupTestEnv(tCtx, 7)
 
 	devices := []resourceapi.Device{
 		{
@@ -741,22 +792,27 @@ func testNodeAllocatableResourcesWithOverheadPerPod(tCtx ktesting.TContext) {
 		"node allocatable claim allocation",
 	)
 
-	expectedStatus := []v1.NodeAllocatableResourceClaimStatus{{
-		ResourceClaimName: claimName,
-		Containers:        []string{"my-container-1", "my-container-2"},
-		Overhead: []v1.NodeAllocatableOverheadResources{
-			{
-				Name:   v1.ResourceMemory,
-				PerPod: new(resource.MustParse("100")),
-			},
+	expectedStatus := []v1.ExtraNodeAllocatableResource{
+		{
+			ContainerName: "",
+			Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("100")},
+			Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("100")},
 		},
-	}}
+		{
+			ContainerName: "my-container-1",
+			Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("100")},
+		},
+		{
+			ContainerName: "my-container-2",
+			Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("100")},
+		},
+	}
 	verifyPodNodeAllocatableStatus(tCtx, env.namespace, pod.Name, expectedStatus)
 }
 
 func testNodeAllocatableResourcesWithOverheadPerContainer(tCtx ktesting.TContext) {
 	tCtx.Parallel()
-	env := setupTestEnv(tCtx, 7) // Use a different node index
+	env := setupTestEnv(tCtx, 7)
 
 	devices := []resourceapi.Device{
 		{
@@ -802,22 +858,29 @@ func testNodeAllocatableResourcesWithOverheadPerContainer(tCtx ktesting.TContext
 		"node allocatable claim allocation",
 	)
 
-	expectedStatus := []v1.NodeAllocatableResourceClaimStatus{{
-		ResourceClaimName: claimName,
-		Containers:        []string{"my-container-1", "my-container-2"},
-		Overhead: []v1.NodeAllocatableOverheadResources{
-			{
-				Name:         v1.ResourceMemory,
-				PerContainer: new(resource.MustParse("50")),
-			},
+	expectedStatus := []v1.ExtraNodeAllocatableResource{
+		{
+			ContainerName: "",
+			Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("100")},
+			Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("100")},
 		},
-	}}
+		{
+			ContainerName: "my-container-1",
+			Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("50")},
+			Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("50")},
+		},
+		{
+			ContainerName: "my-container-2",
+			Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("50")},
+			Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("50")},
+		},
+	}
 	verifyPodNodeAllocatableStatus(tCtx, env.namespace, pod.Name, expectedStatus)
 }
 
 func testNodeAllocatableResourcesWithOverheadBoth(tCtx ktesting.TContext) {
 	tCtx.Parallel()
-	env := setupTestEnv(tCtx, 7) // Use a different node index
+	env := setupTestEnv(tCtx, 7)
 
 	devices := []resourceapi.Device{
 		{
@@ -864,23 +927,29 @@ func testNodeAllocatableResourcesWithOverheadBoth(tCtx ktesting.TContext) {
 		"node allocatable claim allocation",
 	)
 
-	expectedStatus := []v1.NodeAllocatableResourceClaimStatus{{
-		ResourceClaimName: claimName,
-		Containers:        []string{"my-container-1", "my-container-2"},
-		Overhead: []v1.NodeAllocatableOverheadResources{
-			{
-				Name:         v1.ResourceMemory,
-				PerPod:       new(resource.MustParse("100")),
-				PerContainer: new(resource.MustParse("50")),
-			},
+	expectedStatus := []v1.ExtraNodeAllocatableResource{
+		{
+			ContainerName: "",
+			Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("200")},
+			Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("200")},
 		},
-	}}
+		{
+			ContainerName: "my-container-1",
+			Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("50")},
+			Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("150")},
+		},
+		{
+			ContainerName: "my-container-2",
+			Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("50")},
+			Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("150")},
+		},
+	}
 	verifyPodNodeAllocatableStatus(tCtx, env.namespace, pod.Name, expectedStatus)
 }
 
 func testNodeAllocatableResourcesWithOverheadInsufficient(tCtx ktesting.TContext) {
 	tCtx.Parallel()
-	env := setupTestEnv(tCtx, 7) // Use a different node index
+	env := setupTestEnv(tCtx, 7)
 
 	devices := []resourceapi.Device{
 		{
@@ -947,33 +1016,25 @@ func testNodeAllocatableExtendedResource(tCtx ktesting.TContext) {
 	// pod stays unschedulable because the pod status patch fails validation.
 	waitForPodScheduled(tCtx, env.namespace, pod.Name)
 
-	// The node allocatable status must reference the real extended-resource
-	// claim name (recorded in ExtendedResourceClaimStatus), never the in-memory
-	// placeholder "<extended-resources>".
-	tCtx.Eventually(func(tCtx ktesting.TContext) error {
-		p, err := tCtx.Client().CoreV1().Pods(env.namespace).Get(tCtx, pod.Name, metav1.GetOptions{})
-		if err != nil {
-			return err
-		}
-		if p.Status.ExtendedResourceClaimStatus == nil {
-			return fmt.Errorf("pod has no ExtendedResourceClaimStatus yet")
-		}
-		realClaimName := p.Status.ExtendedResourceClaimStatus.ResourceClaimName
-		if len(p.Status.NodeAllocatableResourceClaimStatuses) == 0 {
-			return fmt.Errorf("pod has no NodeAllocatableResourceClaimStatuses yet")
-		}
-		for _, s := range p.Status.NodeAllocatableResourceClaimStatuses {
-			if s.ResourceClaimName != realClaimName {
-				return fmt.Errorf("node allocatable status references claim name %q, want real extended resource claim name %q", s.ResourceClaimName, realClaimName)
-			}
-		}
-		return nil
-	}).WithTimeout(30*time.Second).WithPolling(200*time.Millisecond).Should(gomega.Succeed(), "node allocatable status should reference the real extended resource claim name")
+	// The container that requests the extended resource uses the device of the claim that the
+	// scheduler creates for it, so the mapped CPU is in the limits of that container.
+	expectedStatus := []v1.ExtraNodeAllocatableResource{
+		{
+			ContainerName: "",
+			Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
+			Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
+		},
+		{
+			ContainerName: pod.Spec.Containers[0].Name,
+			Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
+		},
+	}
+	verifyPodNodeAllocatableStatus(tCtx, env.namespace, pod.Name, expectedStatus)
 }
 
 func testNodeAllocatableResourceClaimSharingOverhead(tCtx ktesting.TContext) {
 	tCtx.Parallel()
-	env := setupTestEnv(tCtx, 7) // Use a different node index
+	env := setupTestEnv(tCtx, 7)
 
 	devices := []resourceapi.Device{
 		{
@@ -1008,4 +1069,245 @@ func testNodeAllocatableResourceClaimSharingOverhead(tCtx ktesting.TContext) {
 	pod2.Spec.NodeSelector = map[string]string{"kubernetes.io/hostname": env.nodeName}
 	pod2 = createPod(tCtx, env.namespace, "", pod2, claim) // Pass the existing claim
 	waitForPodScheduled(tCtx, env.namespace, pod2.Name)
+}
+
+func testNodeAllocatableResourcesQuota(tCtx ktesting.TContext) {
+	tCtx.Parallel()
+	env := setupTestEnv(tCtx, 3)
+
+	quota := &v1.ResourceQuota{
+		ObjectMeta: metav1.ObjectMeta{Name: "cpu"},
+		Spec:       v1.ResourceQuotaSpec{Hard: v1.ResourceList{v1.ResourceRequestsCPU: resource.MustParse("1")}},
+	}
+	quota = must(tCtx, tCtx.Client().CoreV1().ResourceQuotas(env.namespace).Create, quota, metav1.CreateOptions{})
+	// Create drops the status and no quota controller runs here, so set the status that quota admission checks.
+	quota.Status = v1.ResourceQuotaStatus{Hard: quota.Spec.Hard, Used: v1.ResourceList{v1.ResourceRequestsCPU: resource.MustParse("0")}}
+	must(tCtx, tCtx.Client().CoreV1().ResourceQuotas(env.namespace).UpdateStatus, quota, metav1.UpdateOptions{})
+
+	cpuCapacityKey := resourceapi.QualifiedName("dra.example.com/cpu")
+	devices := []resourceapi.Device{
+		{
+			Name:                     "quota-cpus",
+			AllowMultipleAllocations: new(true),
+			Capacity: map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{
+				cpuCapacityKey: {Value: resource.MustParse(nodeCPUCapacity)},
+			},
+			NodeAllocatableResources: map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+				v1.ResourceCPU: {Mapping: &resourceapi.NodeAllocatableMapping{CapacityKey: &cpuCapacityKey, CapacityMultiplier: new(resource.MustParse("1"))}},
+			},
+		},
+	}
+	createSliceAndStartScheduler(tCtx, makeSlice(env, devices))
+
+	claim := st.MakeResourceClaim().
+		Name("quota-claim").
+		Namespace(env.namespace).
+		Request(env.class.Name).
+		Obj()
+	claim.Spec.Devices.Requests[0].Exactly.Capacity = &resourceapi.CapacityRequirements{
+		Requests: map[resourceapi.QualifiedName]resource.Quantity{cpuCapacityKey: resource.MustParse("2")},
+	}
+	claim = createClaim(tCtx, env.namespace, "", env.class, claim)
+
+	pod := st.MakePod().Name("quota-pod").Namespace(env.namespace).Obj()
+	pod.Spec.Containers = []v1.Container{
+		{
+			Name:  "c1",
+			Image: "test-image",
+			Resources: v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU: resource.MustParse("100m"),
+				},
+				Claims: []v1.ResourceClaim{
+					{Name: claim.Name},
+				},
+			},
+		},
+	}
+	pod.Spec.NodeSelector = map[string]string{"kubernetes.io/hostname": env.nodeName}
+	pod = createPod(tCtx, env.namespace, "", pod, claim)
+
+	// The status patch is charged only the DRA footprint and gets rejected by quota admission.
+	expectPodSchedulerError(tCtx, pod, "exceeded quota: cpu, requested: requests.cpu=2,")
+	gomega.NewWithT(tCtx).Expect(must(tCtx, tCtx.Client().CoreV1().Pods(env.namespace).Get, pod.Name, metav1.GetOptions{})).
+		To(gomega.HaveField("Status.ExtraNodeAllocatableResources", gomega.BeEmpty()), "extraNodeAllocatableResources should not have been persisted")
+}
+
+func testNodeAllocatableResourcesScoring(tCtx ktesting.TContext) {
+	// Not parallel: pods of the parallel subtests would change the scores.
+	testEnv := setupTestEnv(tCtx, 0)
+	other := *testEnv
+	other.nodeName = "worker-1"
+	other.poolName = testEnv.namespace + "-pool-other"
+
+	cpuCapacityKey := resourceapi.QualifiedName("dra.example.com/cpu")
+	cpuPool := []resourceapi.Device{
+		{
+			Name:                     "cpu-pool",
+			AllowMultipleAllocations: new(true),
+			Capacity: map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{
+				cpuCapacityKey: {Value: resource.MustParse(nodeCPUCapacity)},
+			},
+			NodeAllocatableResources: map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+				v1.ResourceCPU: {Mapping: &resourceapi.NodeAllocatableMapping{CapacityKey: &cpuCapacityKey, CapacityMultiplier: new(resource.MustParse("1"))}},
+			},
+		},
+	}
+	createSlice(tCtx, makeSlice(testEnv, cpuPool))
+	createSliceAndStartScheduler(tCtx, makeSlice(&other, cpuPool))
+
+	// createPodWithCPU creates a pod that requests specCPU and, if set, claims claimCPU from the pool.
+	createPodWithCPU := func(name, specCPU, claimCPU string, nodeNames ...string) *v1.Pod {
+		pod := st.MakePod().Name(name).Namespace(testEnv.namespace).
+			NodeAffinityIn("kubernetes.io/hostname", nodeNames, st.NodeSelectorTypeMatchExpressions).
+			Obj()
+		container := v1.Container{Name: "c1", Image: "test-image"}
+		if specCPU != "" {
+			container.Resources.Requests = v1.ResourceList{v1.ResourceCPU: resource.MustParse(specCPU)}
+		}
+		var claims []*resourceapi.ResourceClaim
+		if claimCPU != "" {
+			claim := st.MakeResourceClaim().Name(name).Namespace(testEnv.namespace).Request(testEnv.class.Name).Obj()
+			claim.Spec.Devices.Requests[0].Exactly.Capacity = &resourceapi.CapacityRequirements{
+				Requests: map[resourceapi.QualifiedName]resource.Quantity{cpuCapacityKey: resource.MustParse(claimCPU)},
+			}
+			claims = append(claims, createClaim(tCtx, testEnv.namespace, "", testEnv.class, claim))
+			container.Resources.Claims = []v1.ResourceClaim{{Name: name}}
+		}
+		pod.Spec.Containers = []v1.Container{container}
+		return createPod(tCtx, testEnv.namespace, "", pod, claims...)
+	}
+
+	waitForPodScheduled(tCtx, testEnv.namespace, createPodWithCPU("dra-load", "", "80", testEnv.nodeName).Name)
+	waitForPodScheduled(tCtx, testEnv.namespace, createPodWithCPU("spec-load", "40", "", other.nodeName).Name)
+
+	// Counting the DRA load, node 1 is 80% used and the other one 40%. Without it the node with dra would look empty.
+	pod := waitForPodScheduled(tCtx, testEnv.namespace, createPodWithCPU("scoring-pod", "", "10", testEnv.nodeName, other.nodeName).Name)
+	gomega.NewWithT(tCtx).Expect(pod.Spec.NodeName).To(gomega.Equal(other.nodeName), "node chosen by scoring")
+}
+
+func testNodeAllocatableResourcesFilterOrder(tCtx ktesting.TContext) {
+	env := setupTestEnv(tCtx, 1)
+	nodeCPUs := resource.MustParse(nodeCPUCapacity)
+	const claimCPUs = 10
+	cpuCapacityKey := resourceapi.QualifiedName("dra.example.com/cpu")
+	createSlice(tCtx, makeSlice(env, []resourceapi.Device{
+		{
+			Name:                     "dev-filter-order",
+			AllowMultipleAllocations: new(true),
+			Capacity: map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{
+				cpuCapacityKey: {Value: resource.MustParse(nodeCPUCapacity)},
+			},
+			NodeAllocatableResources: map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+				v1.ResourceCPU: {Mapping: &resourceapi.NodeAllocatableMapping{CapacityKey: &cpuCapacityKey, CapacityMultiplier: new(resource.MustParse("1"))}},
+			},
+		},
+	}))
+	// Run DynamicResources before NodeResourcesFit in Filter, so NodeResourcesFit checks the footprint DynamicResources records.
+	startSchedulerWithConfig(tCtx, `
+profiles:
+- schedulerName: default-scheduler
+  plugins:
+    filter:
+      enabled:
+      - name: DynamicResources
+      - name: NodeResourcesFit
+`)
+
+	createPodWithCPU := func(name string, cpu int64) *v1.Pod {
+		claim := st.MakeResourceClaim().Name(name).Namespace(env.namespace).Request(env.class.Name).Obj()
+		claim.Spec.Devices.Requests[0].Exactly.Capacity = &resourceapi.CapacityRequirements{
+			Requests: map[resourceapi.QualifiedName]resource.Quantity{cpuCapacityKey: *resource.NewQuantity(claimCPUs, resource.DecimalSI)},
+		}
+		claim = createClaim(tCtx, env.namespace, "", env.class, claim)
+		pod := st.MakePod().Name(name).Namespace(env.namespace).Obj()
+		pod.Spec.Containers = []v1.Container{
+			{
+				Name:  "c1",
+				Image: "test-image",
+				Resources: v1.ResourceRequirements{
+					Requests: v1.ResourceList{v1.ResourceCPU: *resource.NewQuantity(cpu, resource.DecimalSI)},
+					Claims:   []v1.ResourceClaim{{Name: claim.Name}},
+				},
+			},
+		}
+		pod.Spec.NodeSelector = map[string]string{"kubernetes.io/hostname": env.nodeName}
+		return createPod(tCtx, env.namespace, "", pod, claim)
+	}
+
+	expectPodUnschedulable(tCtx, createPodWithCPU("pod-over", nodeCPUs.Value()-claimCPUs+1), "Insufficient cpu")
+	// Spec and claim fill the node exactly, so this fails if NodeResourcesFit counts the claim's cpus twice.
+	waitForPodScheduled(tCtx, env.namespace, createPodWithCPU("pod-exact", nodeCPUs.Value()-claimCPUs).Name)
+}
+
+func perContainerOverheadDevice(name string) resourceapi.Device {
+	return resourceapi.Device{
+		Name: name,
+		NodeAllocatableResources: map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+			v1.ResourceMemory: {Overhead: &resourceapi.NodeAllocatableOverhead{PerContainer: new(resource.MustParse("50"))}},
+		},
+	}
+}
+
+// Two containers each reference a different request of one claim, so each
+// container gets only the overhead of the device of its request.
+func testNodeAllocatableResourcesPerRequestEntries(tCtx ktesting.TContext) {
+	tCtx.Parallel()
+	env := setupTestEnv(tCtx, 5)
+	slice := makeSlice(env, []resourceapi.Device{perContainerOverheadDevice("per-request-a"), perContainerOverheadDevice("per-request-b")})
+	env.poolName = env.namespace + "-pool-per-request"
+	slice.Spec.Pool.Name = env.poolName
+	createSliceAndStartScheduler(tCtx, slice)
+
+	claimName := "claim-per-request"
+	claim := st.MakeResourceClaim().Name(claimName).Namespace(env.namespace).Request(env.class.Name).Request(env.class.Name).Obj()
+	claim = createClaim(tCtx, env.namespace, "", env.class, claim)
+
+	pod := st.MakePod().Name("pod-per-request").Namespace(env.namespace).Obj()
+	pod.Spec.Containers = []v1.Container{
+		{Name: "c1", Image: "test-image", Resources: v1.ResourceRequirements{Claims: []v1.ResourceClaim{{Name: claimName, Request: "req-1"}}}},
+		{Name: "c2", Image: "test-image", Resources: v1.ResourceRequirements{Claims: []v1.ResourceClaim{{Name: claimName, Request: "req-2"}}}},
+	}
+	pod.Spec.NodeSelector = map[string]string{"kubernetes.io/hostname": env.nodeName}
+	pod = createPod(tCtx, env.namespace, "", pod, claim)
+
+	waitForPodScheduled(tCtx, env.namespace, pod.Name)
+	overhead := v1.ResourceList{v1.ResourceMemory: resource.MustParse("50")}
+	verifyPodNodeAllocatableStatus(tCtx, env.namespace, pod.Name, []v1.ExtraNodeAllocatableResource{
+		{
+			ContainerName: "",
+			Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("100")},
+			Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("100")},
+		},
+		{ContainerName: "c1", Requests: overhead, Limits: overhead},
+		{ContainerName: "c2", Requests: overhead, Limits: overhead},
+	})
+}
+
+// Two containers each request one device through an extended resource, so
+// each container gets only the overhead of its own device.
+func testNodeAllocatableExtendedResourcePerContainerEntries(tCtx ktesting.TContext) {
+	tCtx.Parallel()
+	env := setupTestEnv(tCtx, 5)
+	resourceName := resourceapi.ResourceDeviceClassPrefix + env.class.Name
+	slice := makeSlice(env, []resourceapi.Device{perContainerOverheadDevice("ext-per-container-a"), perContainerOverheadDevice("ext-per-container-b")})
+	env.poolName = env.namespace + "-pool-ext-per-container"
+	slice.Spec.Pool.Name = env.poolName
+	createSliceAndStartScheduler(tCtx, slice)
+
+	pod := st.MakePod().Name("pod-ext-per-container").Namespace(env.namespace).Container("image").Container("image").Obj()
+	pod.Spec.NodeSelector = map[string]string{"kubernetes.io/hostname": env.nodeName}
+	pod = createPodWithExtendedResource(tCtx, env.namespace, resourceName, "1", pod)
+
+	waitForPodScheduled(tCtx, env.namespace, pod.Name)
+	overhead := v1.ResourceList{v1.ResourceMemory: resource.MustParse("50")}
+	verifyPodNodeAllocatableStatus(tCtx, env.namespace, pod.Name, []v1.ExtraNodeAllocatableResource{
+		{
+			ContainerName: "",
+			Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("100")},
+			Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("100")},
+		},
+		{ContainerName: "con0", Requests: overhead, Limits: overhead},
+		{ContainerName: "con1", Requests: overhead, Limits: overhead},
+	})
 }

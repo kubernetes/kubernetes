@@ -5018,16 +5018,23 @@ type PodStatus struct {
 	// +optional
 	Resources *ResourceRequirements
 
-	// NodeAllocatableResourceClaimStatuses contains the status of node-allocatable resources
-	// that were allocated for this pod through DRA claims. This includes resources currently
-	// reported in v1.Node `status.allocatable` that are not extended resources
-	// (see https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#extended-resources).
-	// Examples include "cpu", "memory", "ephemeral-storage", and hugepages.
+	// ExtraNodeAllocatableResources lists node allocatable resources that the pod and its containers
+	// use in addition to their spec, for example for the devices allocated to the pod's DRA claims.
+	// The scheduler sets them before it binds the pod. Allowed are the resources that v1.Node reports
+	// in `status.allocatable` that are not extended resources
+	// (see https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#extended-resources),
+	// such as "cpu", "memory", "ephemeral-storage", and "hugepages-<size>".
+	//
+	// The list has one pod entry, with an empty containerName, and at most one entry for each init
+	// or regular container. The pod's total footprint is its spec plus the pod entry, so the pod entry
+	// must cover what the container entries add to the peak of the spec, across the init, sidecar,
+	// and regular containers. For resources that the pod level resources (`spec.resources`) set, that
+	// value is the footprint and must already include the extra resources.
 	// +featureGate=DRANodeAllocatableResources
 	// +optional
 	// +listType=map
-	// +listMapKey=resourceClaimName
-	NodeAllocatableResourceClaimStatuses []NodeAllocatableResourceClaimStatus
+	// +listMapKey=containerName
+	ExtraNodeAllocatableResources []ExtraNodeAllocatableResource
 
 	// VolumeStatuses contains the status of individual volumes used by this pod.
 	// This is an alpha field and requires enabling the CSIVolumeHealth feature gate.
@@ -7648,62 +7655,56 @@ type ImageVolumeSource struct {
 	PullPolicy PullPolicy
 }
 
-// NodeAllocatableResourceClaimStatus describes the status of node allocatable resources allocated via DRA.
-type NodeAllocatableResourceClaimStatus struct {
-	// ResourceClaimName is the resource claim referenced by the pod that resulted in this node allocatable resource allocation.
+// ExtraNodeAllocatableResource describes node allocatable resources that are added to the
+// resources of a pod or of one of its containers.
+//
+// A list that is not empty must satisfy:
+//   - It has exactly one pod entry (empty containerName).
+//   - Each container entry names an init or regular container.
+//   - In each entry, requests must not exceed limits for the resources that have both.
+//   - The sum of the requests of the regular and sidecar container entries must not exceed the
+//     pod entry's requests.
+//   - The limits of each regular and sidecar container entry must not exceed the pod entry's limits
+//     for the resources that the pod entry limits.
+//
+// Non-restartable init container entries are not checked against the pod entry, because the spec
+// of the containers that run after them may already cover them.
+//
+// For DRA, the scheduler fills the entries from the `nodeAllocatableResources` of the devices
+// allocated to the pod's claims:
+//   - Each container entry, summed over the devices that the container uses:
+//     `overhead.perContainer` in requests, and `mapping` + `overhead.perPod` +
+//     `overhead.perContainer` in limits.
+//   - The pod entry: `mapping` + `overhead.perPod`, summed over all devices, plus what the
+//     container entries' requests add to the peak of the spec requests and limits.
+//
+// A container can use all the resources of its devices, while the pod entry caps the extra
+// resources that the containers use together.
+type ExtraNodeAllocatableResource struct {
+	// ContainerName is the name of the init or regular container that these resources are added to.
+	// An empty name marks the pod entry, whose requests and limits apply to the entire pod.
 	// +required
-	ResourceClaimName string
-	// Containers lists the names of all containers in this pod that reference the claim.
+	ContainerName string
+	// Requests are added to the requests of the pod or container, as described in ContainerName.
+	// A resource that is missing from requests counts as zero; it is not defaulted from limits.
+	// The kubelet applies them as follows:
+	// - Pod cgroup: the requests of the pod entry are added to the aggregate of the containers'
+	//   spec requests, unless the pod level resources (`spec.resources`) set the resource. That value
+	//   is then used as is and must already include the extra resources.
+	// - Container cgroup: the requests of the container entry are added to the container's spec
+	//   requests.
 	// +optional
-	// +listType=set
-	Containers []string
-	// Mapping contains allocations through devices mapped in `device.nodeAllocatableResources.mapping`.
-	// This is used by kubelet for pod level and container level cgroup enforcement.
-	// +optional
-	// +listType=map
-	// +listMapKey=name
-	Mapping []NodeAllocatableMappedResources
-	// Overhead contains allocations through devices mapped in `device.nodeAllocatableResources.overhead`.
-	// This is used by kubelet for pod level and container level cgroup enforcement.
-	// +optional
-	// +listType=map
-	// +listMapKey=name
-	Overhead []NodeAllocatableOverheadResources
-}
-
-// NodeAllocatableMappedResources describes mapped node allocatable resource allocations.
-type NodeAllocatableMappedResources struct {
-	// Name is the name of the resource (e.g., cpu, memory).
+	Requests ResourceList
+	// Limits are added to the limits of the pod or container, as described in ContainerName.
+	// The kubelet applies them as follows:
+	// - Pod cgroup: the limits of the pod entry are added to the aggregate of the containers' spec
+	//   limits when they are set, unless the pod level resources (`spec.resources`) set the resource.
+	//   That value is then used as is and must already include the extra resources.
+	// - Container cgroup: the limits of the container entry are added to the container's spec limits.
+	//   For cpu and memory only when the container spec sets a limit; for hugepages also when it does
+	//   not, unless the pod level resources (`spec.resources`) set a hugepages limit.
+	// - Ephemeral-storage is not enforced through cgroups. The limits are added to the container's
+	//   and the pod's limits that kubelet eviction uses, when the spec sets one.
 	// +required
-	Name ResourceName
-	// Quantity is the total node allocatable resource capacity allocated for the claim.
-	// This claim's allocated devices is shared by all the containers referencing the claim.
-	// Kubelet adds this value to both requests and limits at the pod-level cgroup, and to limits at the container-level cgroup for each container referencing the claim.
-	// +required
-	Quantity *resource.Quantity
-}
-
-// NodeAllocatableOverheadResources describes auxiliary overhead resource allocations.
-type NodeAllocatableOverheadResources struct {
-	// Name is the name of the resource (e.g., cpu, memory).
-	// +required
-	Name ResourceName
-	// PerPod is the flat overhead quantity allocated per pod.
-	// Adding to each container limit allows individual containers to utilize the overhead, while the parent pod-level cgroup limit caps the total usage at the pod boundary where the overhead is accounted for exactly once.
-	// At least one of PerPod or PerContainer must be specified. Specifying neither is an invalid configuration.
-	// +optional
-	PerPod *resource.Quantity
-	// PerContainer is the variable overhead quantity applied for each container referencing the claim.
-	// The container references are recorded in `nodeAllocatableResourceClaimStatuses.containers`.
-	// The total overhead quantity allocated for the claim is computed as:
-	// Quantity = PerPod + (PerContainer * NumReferences)
-	// Kubelet accounts for this overhead in cgroups:
-	// - Pod-level cgroup (requests and limits): Kubelet adds PerPod + (PerContainer * NumReferences).
-	// - Container-level cgroup (limits only): Kubelet adds PerPod + PerContainer for each referencing container.
-	// This allows any single container to access the pod-level overhead, while the parent cgroup caps the total usage to account for PerPod exactly once.
-	// At least one of PerPod or PerContainer must be specified. Specifying neither is an invalid configuration.
-	// PerContainer overhead of a claim referenced by a non-restartable init container is counted towards
-	// the pod's peak resource calculation (see Pod `spec.initContainers`), not for the pod's entire duration.
-	// +optional
-	PerContainer *resource.Quantity
+	Limits ResourceList
 }

@@ -548,6 +548,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		corev1.EventSource{}.OpenAPIModelName():                                                                         schema_k8sio_api_core_v1_EventSource(ref),
 		corev1.EvictionResponder{}.OpenAPIModelName():                                                                   schema_k8sio_api_core_v1_EvictionResponder(ref),
 		corev1.ExecAction{}.OpenAPIModelName():                                                                          schema_k8sio_api_core_v1_ExecAction(ref),
+		corev1.ExtraNodeAllocatableResource{}.OpenAPIModelName():                                                        schema_k8sio_api_core_v1_ExtraNodeAllocatableResource(ref),
 		corev1.FCVolumeSource{}.OpenAPIModelName():                                                                      schema_k8sio_api_core_v1_FCVolumeSource(ref),
 		corev1.FileKeySelector{}.OpenAPIModelName():                                                                     schema_k8sio_api_core_v1_FileKeySelector(ref),
 		corev1.FlexPersistentVolumeSource{}.OpenAPIModelName():                                                          schema_k8sio_api_core_v1_FlexPersistentVolumeSource(ref),
@@ -590,9 +591,6 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		corev1.Node{}.OpenAPIModelName():                                                                                schema_k8sio_api_core_v1_Node(ref),
 		corev1.NodeAddress{}.OpenAPIModelName():                                                                         schema_k8sio_api_core_v1_NodeAddress(ref),
 		corev1.NodeAffinity{}.OpenAPIModelName():                                                                        schema_k8sio_api_core_v1_NodeAffinity(ref),
-		corev1.NodeAllocatableMappedResources{}.OpenAPIModelName():                                                      schema_k8sio_api_core_v1_NodeAllocatableMappedResources(ref),
-		corev1.NodeAllocatableOverheadResources{}.OpenAPIModelName():                                                    schema_k8sio_api_core_v1_NodeAllocatableOverheadResources(ref),
-		corev1.NodeAllocatableResourceClaimStatus{}.OpenAPIModelName():                                                  schema_k8sio_api_core_v1_NodeAllocatableResourceClaimStatus(ref),
 		corev1.NodeCondition{}.OpenAPIModelName():                                                                       schema_k8sio_api_core_v1_NodeCondition(ref),
 		corev1.NodeConfigSource{}.OpenAPIModelName():                                                                    schema_k8sio_api_core_v1_NodeConfigSource(ref),
 		corev1.NodeConfigStatus{}.OpenAPIModelName():                                                                    schema_k8sio_api_core_v1_NodeConfigStatus(ref),
@@ -23699,6 +23697,58 @@ func schema_k8sio_api_core_v1_ExecAction(ref common.ReferenceCallback) common.Op
 	}
 }
 
+func schema_k8sio_api_core_v1_ExtraNodeAllocatableResource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ExtraNodeAllocatableResource describes node allocatable resources that are added to the resources of a pod or of one of its containers.\n\nA list that is not empty must satisfy:\n  - It has exactly one pod entry (empty containerName).\n  - Each container entry names an init or regular container.\n  - In each entry, requests must not exceed limits for the resources that have both.\n  - The sum of the requests of the regular and sidecar container entries must not exceed the\n    pod entry's requests.\n  - The limits of each regular and sidecar container entry must not exceed the pod entry's limits\n    for the resources that the pod entry limits.\n\nNon-restartable init container entries are not checked against the pod entry, because the spec of the containers that run after them may already cover them.\n\nFor DRA, the scheduler fills the entries from the `nodeAllocatableResources` of the devices allocated to the pod's claims:\n  - Each container entry, summed over the devices that the container uses:\n    `overhead.perContainer` in requests, and `mapping` + `overhead.perPod` +\n    `overhead.perContainer` in limits.\n  - The pod entry: `mapping` + `overhead.perPod`, summed over all devices, plus what the\n    container entries' requests add to the peak of the spec requests and limits.\n\nA container can use all the resources of its devices, while the pod entry caps the extra resources that the containers use together.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"containerName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "containerName is the name of the init or regular container that these resources are added to. An empty name marks the pod entry, whose requests and limits apply to the entire pod.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"requests": {
+						SchemaProps: spec.SchemaProps{
+							Description: "requests are added to the requests of the pod or container, as described in containerName. A resource that is missing from requests counts as zero; it is not defaulted from limits. The kubelet applies them as follows: - Pod cgroup: the requests of the pod entry are added to the aggregate of the containers'\n  spec requests, unless the pod level resources (`spec.resources`) set the resource. That value\n  is then used as is and must already include the extra resources.\n- Container cgroup: the requests of the container entry are added to the container's spec\n  requests.",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(resource.Quantity{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+					"limits": {
+						SchemaProps: spec.SchemaProps{
+							Description: "limits are added to the limits of the pod or container, as described in containerName. The kubelet applies them as follows: - Pod cgroup: the limits of the pod entry are added to the aggregate of the containers' spec\n  limits when they are set, unless the pod level resources (`spec.resources`) set the resource.\n  That value is then used as is and must already include the extra resources.\n- Container cgroup: the limits of the container entry are added to the container's spec limits.\n  For cpu and memory only when the container spec sets a limit; for hugepages also when it does\n  not, unless the pod level resources (`spec.resources`) set a hugepages limit.\n- Ephemeral-storage is not enforced through cgroups. The limits are added to the container's\n  and the pod's limits that kubelet eviction uses, when the spec sets one.",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(resource.Quantity{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"containerName", "limits"},
+			},
+		},
+		Dependencies: []string{
+			resource.Quantity{}.OpenAPIModelName()},
+	}
+}
+
 func schema_k8sio_api_core_v1_FCVolumeSource(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -25615,161 +25665,6 @@ func schema_k8sio_api_core_v1_NodeAffinity(ref common.ReferenceCallback) common.
 		},
 		Dependencies: []string{
 			corev1.NodeSelector{}.OpenAPIModelName(), corev1.PreferredSchedulingTerm{}.OpenAPIModelName()},
-	}
-}
-
-func schema_k8sio_api_core_v1_NodeAllocatableMappedResources(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "NodeAllocatableMappedResources describes mapped node allocatable resource allocations.",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"name": {
-						SchemaProps: spec.SchemaProps{
-							Description: "name is the name of the resource (e.g., cpu, memory).",
-							Default:     "",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"quantity": {
-						SchemaProps: spec.SchemaProps{
-							Description: "quantity is the total node allocatable resource capacity allocated for the claim. This claim's allocated devices is shared by all the containers referencing the claim. Kubelet adds this value to both requests and limits at the pod-level cgroup, and to limits at the container-level cgroup for each container referencing the claim.",
-							Ref:         ref(resource.Quantity{}.OpenAPIModelName()),
-						},
-					},
-				},
-				Required: []string{"name", "quantity"},
-			},
-		},
-		Dependencies: []string{
-			resource.Quantity{}.OpenAPIModelName()},
-	}
-}
-
-func schema_k8sio_api_core_v1_NodeAllocatableOverheadResources(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "NodeAllocatableOverheadResources describes auxiliary overhead resource allocations.",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"name": {
-						SchemaProps: spec.SchemaProps{
-							Description: "name is the name of the resource (e.g., cpu, memory).",
-							Default:     "",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"perPod": {
-						SchemaProps: spec.SchemaProps{
-							Description: "perPod is the flat overhead quantity allocated per pod. Adding to each container limit allows individual containers to utilize the overhead, while the parent pod-level cgroup limit caps the total usage at the pod boundary where the overhead is accounted for exactly once. At least one of PerPod or PerContainer must be specified. Specifying neither is an invalid configuration.",
-							Ref:         ref(resource.Quantity{}.OpenAPIModelName()),
-						},
-					},
-					"perContainer": {
-						SchemaProps: spec.SchemaProps{
-							Description: "perContainer is the variable overhead quantity applied for each container referencing the claim. The container references are recorded in `nodeAllocatableResourceClaimStatuses.containers`. The total overhead quantity allocated for the claim is computed as: Quantity = PerPod + (PerContainer * NumReferences) Kubelet accounts for this overhead in cgroups: - Pod-level cgroup (requests and limits): Kubelet adds PerPod + (PerContainer * NumReferences). - Container-level cgroup (limits only): Kubelet adds PerPod + PerContainer for each referencing container. This allows any single container to access the pod-level overhead, while the parent cgroup caps the total usage to account for PerPod exactly once. At least one of PerPod or PerContainer must be specified. Specifying neither is an invalid configuration. PerContainer overhead of a claim referenced by a non-restartable init container is counted towards the pod's peak resource calculation (see Pod `spec.initContainers`), not for the pod's entire duration.",
-							Ref:         ref(resource.Quantity{}.OpenAPIModelName()),
-						},
-					},
-				},
-				Required: []string{"name"},
-			},
-		},
-		Dependencies: []string{
-			resource.Quantity{}.OpenAPIModelName()},
-	}
-}
-
-func schema_k8sio_api_core_v1_NodeAllocatableResourceClaimStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "NodeAllocatableResourceClaimStatus describes the status of node allocatable resources allocated via DRA.",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"resourceClaimName": {
-						SchemaProps: spec.SchemaProps{
-							Description: "resourceClaimName is the resource claim referenced by the pod that resulted in this node allocatable resource allocation.",
-							Default:     "",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"containers": {
-						VendorExtensible: spec.VendorExtensible{
-							Extensions: spec.Extensions{
-								"x-kubernetes-list-type": "set",
-							},
-						},
-						SchemaProps: spec.SchemaProps{
-							Description: "containers lists the names of all containers in this pod that reference the claim.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Type:   []string{"string"},
-										Format: "",
-									},
-								},
-							},
-						},
-					},
-					"mapping": {
-						VendorExtensible: spec.VendorExtensible{
-							Extensions: spec.Extensions{
-								"x-kubernetes-list-map-keys": []interface{}{
-									"name",
-								},
-								"x-kubernetes-list-type":       "map",
-								"x-kubernetes-patch-merge-key": "name",
-								"x-kubernetes-patch-strategy":  "merge",
-							},
-						},
-						SchemaProps: spec.SchemaProps{
-							Description: "mapping contains allocations through devices mapped in the device spec's `nodeAllocatableResources[...].mapping` field. This is used by kubelet for pod level and container-level cgroup enforcement.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Ref: ref(corev1.NodeAllocatableMappedResources{}.OpenAPIModelName()),
-									},
-								},
-							},
-						},
-					},
-					"overhead": {
-						VendorExtensible: spec.VendorExtensible{
-							Extensions: spec.Extensions{
-								"x-kubernetes-list-map-keys": []interface{}{
-									"name",
-								},
-								"x-kubernetes-list-type":       "map",
-								"x-kubernetes-patch-merge-key": "name",
-								"x-kubernetes-patch-strategy":  "merge",
-							},
-						},
-						SchemaProps: spec.SchemaProps{
-							Description: "overhead contains allocations through devices mapped in the device spec's `nodeAllocatableResources[...].overhead` field. This is used by kubelet for pod level and container-level cgroup enforcement.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Ref: ref(corev1.NodeAllocatableOverheadResources{}.OpenAPIModelName()),
-									},
-								},
-							},
-						},
-					},
-				},
-				Required: []string{"resourceClaimName"},
-			},
-		},
-		Dependencies: []string{
-			corev1.NodeAllocatableMappedResources{}.OpenAPIModelName(), corev1.NodeAllocatableOverheadResources{}.OpenAPIModelName()},
 	}
 }
 
@@ -29791,24 +29686,22 @@ func schema_k8sio_api_core_v1_PodStatus(ref common.ReferenceCallback) common.Ope
 							Ref:         ref(corev1.ResourceRequirements{}.OpenAPIModelName()),
 						},
 					},
-					"nodeAllocatableResourceClaimStatuses": {
+					"extraNodeAllocatableResources": {
 						VendorExtensible: spec.VendorExtensible{
 							Extensions: spec.Extensions{
 								"x-kubernetes-list-map-keys": []interface{}{
-									"resourceClaimName",
+									"containerName",
 								},
-								"x-kubernetes-list-type":       "map",
-								"x-kubernetes-patch-merge-key": "resourceClaimName",
-								"x-kubernetes-patch-strategy":  "merge",
+								"x-kubernetes-list-type": "map",
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "NodeAllocatableResourceClaimStatuses contains the status of node-allocatable resources that were allocated for this pod through DRA claims. This includes resources currently reported in v1.Node `status.allocatable` that are not extended resources (see https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#extended-resources). Examples include \"cpu\", \"memory\", \"ephemeral-storage\", and hugepages.",
+							Description: "extraNodeAllocatableResources lists node allocatable resources that the pod and its containers use in addition to their spec, for example for the devices allocated to the pod's DRA claims. The scheduler sets them before it binds the pod. Allowed are the resources that v1.Node reports in `status.allocatable` that are not extended resources (see https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#extended-resources), such as \"cpu\", \"memory\", \"ephemeral-storage\", and \"hugepages-<size>\".\n\nThe list has one pod entry, with an empty containerName, and at most one entry for each init or regular container. The pod's total footprint is its spec plus the pod entry, so the pod entry must cover what the container entries add to the peak of the spec, across the init, sidecar, and regular containers. For resources that the pod level resources (`spec.resources`) set, that value is the footprint and must already include the extra resources.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Ref: ref(corev1.NodeAllocatableResourceClaimStatus{}.OpenAPIModelName()),
+										Ref: ref(corev1.ExtraNodeAllocatableResource{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -29841,7 +29734,7 @@ func schema_k8sio_api_core_v1_PodStatus(ref common.ReferenceCallback) common.Ope
 			},
 		},
 		Dependencies: []string{
-			corev1.ContainerStatus{}.OpenAPIModelName(), corev1.HostIP{}.OpenAPIModelName(), corev1.NodeAllocatableResourceClaimStatus{}.OpenAPIModelName(), corev1.PodCondition{}.OpenAPIModelName(), corev1.PodExtendedResourceClaimStatus{}.OpenAPIModelName(), corev1.PodIP{}.OpenAPIModelName(), corev1.PodResourceClaimStatus{}.OpenAPIModelName(), corev1.PodVolumeStatus{}.OpenAPIModelName(), corev1.ResourceRequirements{}.OpenAPIModelName(), resource.Quantity{}.OpenAPIModelName(), metav1.Time{}.OpenAPIModelName()},
+			corev1.ContainerStatus{}.OpenAPIModelName(), corev1.ExtraNodeAllocatableResource{}.OpenAPIModelName(), corev1.HostIP{}.OpenAPIModelName(), corev1.PodCondition{}.OpenAPIModelName(), corev1.PodExtendedResourceClaimStatus{}.OpenAPIModelName(), corev1.PodIP{}.OpenAPIModelName(), corev1.PodResourceClaimStatus{}.OpenAPIModelName(), corev1.PodVolumeStatus{}.OpenAPIModelName(), corev1.ResourceRequirements{}.OpenAPIModelName(), resource.Quantity{}.OpenAPIModelName(), metav1.Time{}.OpenAPIModelName()},
 	}
 }
 
@@ -48617,7 +48510,7 @@ func schema_k8sio_api_resource_v1_Device(ref common.ReferenceCallback) common.Op
 					},
 					"nodeAllocatableResources": {
 						SchemaProps: spec.SchemaProps{
-							Description: "nodeAllocatableResources defines the mapping of node resources that are managed by the DRA driver exposing this device. This includes resources currently reported in v1.Node `status.allocatable` that are not extended resources (see https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#extended-resources). Examples include \"cpu\", \"memory\", \"ephemeral-storage\", and hugepages. In addition to standard requests made through the Pod `spec`, these resources can also be requested through claims and allocated by the DRA driver. For example, a CPU DRA driver might allocate exclusive CPUs or auxiliary node memory dependencies of an accelerator device. The keys of this map are the node-allocatable resource names (e.g., \"cpu\", \"memory\"). Extended resource names are not permitted as keys.",
+							Description: "nodeAllocatableResources defines the mapping of node resources that are managed by the DRA driver exposing this device. This includes resources currently reported in v1.Node `status.allocatable` that are not extended resources (see https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#extended-resources). Examples include \"cpu\", \"memory\", \"ephemeral-storage\", and hugepages. In addition to standard requests made through the Pod `spec`, these resources can also be requested through claims and allocated by the DRA driver. For example, a CPU DRA driver might allocate exclusive CPUs or auxiliary node memory dependencies of an accelerator device. When the device is allocated for a pod's claim, the scheduler records these resources in the pod's `status.extraNodeAllocatableResources`, as described for mapping and overhead. The keys of this map are the node-allocatable resource names (e.g., \"cpu\", \"memory\"). Extended resource names are not permitted as keys.",
 							Type:        []string{"object"},
 							AdditionalProperties: &spec.SchemaOrBool{
 								Allows: true,
@@ -50115,7 +50008,7 @@ func schema_k8sio_api_resource_v1_NodeAllocatableMapping(ref common.ReferenceCal
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "NodeAllocatableMapping defines how a DRA allocation directly translates into a node allocatable resource quantity. The mapping can be derived from either the count of allocated devices (via deviceMultiplier) or the specific capacity consumed (via capacityKey and capacityMultiplier). These options are mutually exclusive. Kubelet adds this mapped resource quantity from claim to both requests and limits at the pod-level cgroup, and to limits at the container-level cgroup for each container referencing the claim.",
+				Description: "NodeAllocatableMapping defines how a DRA allocation directly translates into a node allocatable resource quantity. The mapping can be derived from either the count of allocated devices (via deviceMultiplier) or the specific capacity consumed (via capacityKey and capacityMultiplier). These options are mutually exclusive. The scheduler records the mapped quantity in the pod's `status.extraNodeAllocatableResources`: once in the requests and limits of the pod level entry, and in the limits of the container entry of each container referencing the claim, so that each of these containers can use all of it while the pod level entry caps their total usage.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"capacityKey": {
@@ -50149,7 +50042,7 @@ func schema_k8sio_api_resource_v1_NodeAllocatableOverhead(ref common.ReferenceCa
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "NodeAllocatableOverhead defines auxiliary resource overheads incurred when allocating a device. Overheads can be specified as a fixed cost per pod referencing the claim, a variable cost per container reference, or both. Kubelet accounts for this overhead by adding it to both the pod-level and container-level cgroups of referencing containers.",
+				Description: "NodeAllocatableOverhead defines auxiliary resource overheads incurred when allocating a device. Overheads can be specified as a fixed cost per pod referencing the claim, a variable cost per container reference, or both. The scheduler records the overhead in the pod's `status.extraNodeAllocatableResources`, as described for perContainer.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"perPod": {
@@ -50160,7 +50053,7 @@ func schema_k8sio_api_resource_v1_NodeAllocatableOverhead(ref common.ReferenceCa
 					},
 					"perContainer": {
 						SchemaProps: spec.SchemaProps{
-							Description: "perContainer is applied per container reference to the claim. This models overhead scaling linearly with the number of containers actively using the device. When both PerPod and PerContainer are specified, the total overhead allocated for each pod referencing the claim is computed as: Quantity = PerPod + (PerContainer * NumReferences) Kubelet accounts for this overhead in cgroups: - Pod-level cgroup (requests and limits): Kubelet adds PerPod + (PerContainer * NumReferences). - Container-level cgroup (limits only): Kubelet adds PerPod + PerContainer for each referencing container. This allows any single container to access the pod-level overhead, while the parent cgroup caps the total usage to account for PerPod exactly once. PerContainer overhead of a claim referenced by a non-restartable init container is counted towards the pod's peak resource calculation (see Pod `spec.initContainers`), not for the pod's entire duration.",
+							Description: "perContainer is applied per container reference to the claim. This models overhead scaling linearly with the number of containers actively using the device. When both PerPod and PerContainer are specified, the total overhead allocated for each pod referencing the claim is computed as: Quantity = PerPod + (PerContainer * NumReferences) The scheduler records this overhead in the pod's `status.extraNodeAllocatableResources`: - The pod level entry (requests and limits) gets PerPod + (PerContainer * NumReferences).\n  PerContainer of a non-restartable init container counts towards the pod's peak resource\n  calculation (see Pod `spec.initContainers`), not for the pod's entire duration.\n- The container entry of each referencing container gets PerContainer in its requests,\n  and PerPod + PerContainer in its limits.\nThis allows any single container to use the pod level overhead, while the pod level entry caps the total usage to account for PerPod exactly once.",
 							Ref:         ref(resource.Quantity{}.OpenAPIModelName()),
 						},
 					},
@@ -51846,7 +51739,7 @@ func schema_k8sio_api_resource_v1beta1_BasicDevice(ref common.ReferenceCallback)
 					},
 					"nodeAllocatableResources": {
 						SchemaProps: spec.SchemaProps{
-							Description: "nodeAllocatableResources defines the mapping of node resources that are managed by the DRA driver exposing this device. This includes resources currently reported in v1.Node `status.allocatable` that are not extended resources (see https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#extended-resources). Examples include \"cpu\", \"memory\", \"ephemeral-storage\", and hugepages. In addition to standard requests made through the Pod `spec`, these resources can also be requested through claims and allocated by the DRA driver. For example, a CPU DRA driver might allocate exclusive CPUs or auxiliary node memory dependencies of an accelerator device. The keys of this map are the node-allocatable resource names (e.g., \"cpu\", \"memory\"). Extended resource names are not permitted as keys.",
+							Description: "nodeAllocatableResources defines the mapping of node resources that are managed by the DRA driver exposing this device. This includes resources currently reported in v1.Node `status.allocatable` that are not extended resources (see https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#extended-resources). Examples include \"cpu\", \"memory\", \"ephemeral-storage\", and hugepages. In addition to standard requests made through the Pod `spec`, these resources can also be requested through claims and allocated by the DRA driver. For example, a CPU DRA driver might allocate exclusive CPUs or auxiliary node memory dependencies of an accelerator device. When the device is allocated for a pod's claim, the scheduler records these resources in the pod's `status.extraNodeAllocatableResources`, as described for mapping and overhead. The keys of this map are the node-allocatable resource names (e.g., \"cpu\", \"memory\"). Extended resource names are not permitted as keys.",
 							Type:        []string{"object"},
 							AdditionalProperties: &spec.SchemaOrBool{
 								Allows: true,
@@ -53332,7 +53225,7 @@ func schema_k8sio_api_resource_v1beta1_NodeAllocatableMapping(ref common.Referen
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "NodeAllocatableMapping defines how a DRA allocation directly translates into a node allocatable resource quantity. The mapping can be derived from either the count of allocated devices or the specific capacity consumed. These options are mutually exclusive. Kubelet adds this mapped resource quantity from claim to both requests and limits at the pod-level cgroup, and to limits at the container-level cgroup for each container referencing the claim.",
+				Description: "NodeAllocatableMapping defines how a DRA allocation directly translates into a node allocatable resource quantity. The mapping can be derived from either the count of allocated devices or the specific capacity consumed. These options are mutually exclusive. The scheduler records the mapped quantity in the pod's `status.extraNodeAllocatableResources`: once in the requests and limits of the pod level entry, and in the limits of the container entry of each container referencing the claim, so that each of these containers can use all of it while the pod level entry caps their total usage.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"capacityKey": {
@@ -53366,7 +53259,7 @@ func schema_k8sio_api_resource_v1beta1_NodeAllocatableOverhead(ref common.Refere
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "NodeAllocatableOverhead defines auxiliary resource overheads incurred when allocating a device. Overheads can be specified as a fixed cost per pod referencing the claim, a variable cost per container reference, or both. Kubelet accounts for this overhead by adding it to both the pod-level and container-level cgroups of referencing containers.",
+				Description: "NodeAllocatableOverhead defines auxiliary resource overheads incurred when allocating a device. Overheads can be specified as a fixed cost per pod referencing the claim, a variable cost per container reference, or both. The scheduler records the overhead in the pod's `status.extraNodeAllocatableResources`, as described for perContainer.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"perPod": {
@@ -53377,7 +53270,7 @@ func schema_k8sio_api_resource_v1beta1_NodeAllocatableOverhead(ref common.Refere
 					},
 					"perContainer": {
 						SchemaProps: spec.SchemaProps{
-							Description: "perContainer is applied per container reference to the claim. This models overhead scaling linearly with the number of containers actively using the device. When both PerPod and PerContainer are specified, the total overhead allocated for each pod referencing the claim is computed as: Quantity = PerPod + (PerContainer * NumReferences) Kubelet accounts for this overhead in cgroups: - Pod-level cgroup (requests and limits): Kubelet adds PerPod + (PerContainer * NumReferences). - Container-level cgroup (limits only): Kubelet adds PerPod + PerContainer for each referencing container. This allows any single container to access the pod-level overhead, while the parent cgroup caps the total usage to account for PerPod exactly once. PerContainer overhead of a claim referenced by a non-restartable init container is counted towards the pod's peak resource calculation (see Pod `spec.initContainers`), not for the pod's entire duration.",
+							Description: "perContainer is applied per container reference to the claim. This models overhead scaling linearly with the number of containers actively using the device. When both PerPod and PerContainer are specified, the total overhead allocated for each pod referencing the claim is computed as: Quantity = PerPod + (PerContainer * NumReferences) The scheduler records this overhead in the pod's `status.extraNodeAllocatableResources`: - The pod level entry (requests and limits) gets PerPod + (PerContainer * NumReferences).\n  PerContainer of a non-restartable init container counts towards the pod's peak resource\n  calculation (see Pod `spec.initContainers`), not for the pod's entire duration.\n- The container entry of each referencing container gets PerContainer in its requests,\n  and PerPod + PerContainer in its limits.\nThis allows any single container to use the pod level overhead, while the pod level entry caps the total usage to account for PerPod exactly once.",
 							Ref:         ref(resource.Quantity{}.OpenAPIModelName()),
 						},
 					},
@@ -54513,7 +54406,7 @@ func schema_k8sio_api_resource_v1beta2_Device(ref common.ReferenceCallback) comm
 					},
 					"nodeAllocatableResources": {
 						SchemaProps: spec.SchemaProps{
-							Description: "nodeAllocatableResources defines the mapping of node resources that are managed by the DRA driver exposing this device. This includes resources currently reported in v1.Node `status.allocatable` that are not extended resources (see https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#extended-resources). Examples include \"cpu\", \"memory\", \"ephemeral-storage\", and hugepages. In addition to standard requests made through the Pod `spec`, these resources can also be requested through claims and allocated by the DRA driver. For example, a CPU DRA driver might allocate exclusive CPUs or auxiliary node memory dependencies of an accelerator device. The keys of this map are the node-allocatable resource names (e.g., \"cpu\", \"memory\"). Extended resource names are not permitted as keys.",
+							Description: "nodeAllocatableResources defines the mapping of node resources that are managed by the DRA driver exposing this device. This includes resources currently reported in v1.Node `status.allocatable` that are not extended resources (see https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#extended-resources). Examples include \"cpu\", \"memory\", \"ephemeral-storage\", and hugepages. In addition to standard requests made through the Pod `spec`, these resources can also be requested through claims and allocated by the DRA driver. For example, a CPU DRA driver might allocate exclusive CPUs or auxiliary node memory dependencies of an accelerator device. When the device is allocated for a pod's claim, the scheduler records these resources in the pod's `status.extraNodeAllocatableResources`, as described for mapping and overhead. The keys of this map are the node-allocatable resource names (e.g., \"cpu\", \"memory\"). Extended resource names are not permitted as keys.",
 							Type:        []string{"object"},
 							AdditionalProperties: &spec.SchemaOrBool{
 								Allows: true,
@@ -56011,7 +55904,7 @@ func schema_k8sio_api_resource_v1beta2_NodeAllocatableMapping(ref common.Referen
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "NodeAllocatableMapping defines how a DRA allocation directly translates into a node allocatable resource quantity. The mapping can be derived from either the count of allocated devices (via deviceMultiplier) or the specific capacity consumed (via capacityKey and capacityMultiplier). These options are mutually exclusive. Kubelet adds this mapped resource quantity from claim to both requests and limits at the pod-level cgroup, and to limits at the container-level cgroup for each container referencing the claim.",
+				Description: "NodeAllocatableMapping defines how a DRA allocation directly translates into a node allocatable resource quantity. The mapping can be derived from either the count of allocated devices (via deviceMultiplier) or the specific capacity consumed (via capacityKey and capacityMultiplier). These options are mutually exclusive. The scheduler records the mapped quantity in the pod's `status.extraNodeAllocatableResources`: once in the requests and limits of the pod level entry, and in the limits of the container entry of each container referencing the claim, so that each of these containers can use all of it while the pod level entry caps their total usage.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"capacityKey": {
@@ -56045,7 +55938,7 @@ func schema_k8sio_api_resource_v1beta2_NodeAllocatableOverhead(ref common.Refere
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "NodeAllocatableOverhead defines auxiliary resource overheads incurred when allocating a device. Overheads can be specified as a fixed cost per pod referencing the claim, a variable cost per container reference, or both. Kubelet accounts for this overhead by adding it to both the pod-level and container-level cgroups of referencing containers.",
+				Description: "NodeAllocatableOverhead defines auxiliary resource overheads incurred when allocating a device. Overheads can be specified as a fixed cost per pod referencing the claim, a variable cost per container reference, or both. The scheduler records the overhead in the pod's `status.extraNodeAllocatableResources`, as described for perContainer.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"perPod": {
@@ -56056,7 +55949,7 @@ func schema_k8sio_api_resource_v1beta2_NodeAllocatableOverhead(ref common.Refere
 					},
 					"perContainer": {
 						SchemaProps: spec.SchemaProps{
-							Description: "perContainer is applied per container reference to the claim. This models overhead scaling linearly with the number of containers actively using the device. When both PerPod and PerContainer are specified, the total overhead allocated for each pod referencing the claim is computed as: Quantity = PerPod + (PerContainer * NumReferences) Kubelet accounts for this overhead in cgroups: - Pod-level cgroup (requests and limits): Kubelet adds PerPod + (PerContainer * NumReferences). - Container-level cgroup (limits only): Kubelet adds PerPod + PerContainer for each referencing container. This allows any single container to access the pod-level overhead, while the parent cgroup caps the total usage to account for PerPod exactly once. PerContainer overhead of a claim referenced by a non-restartable init container is counted towards the pod's peak resource calculation (see Pod `spec.initContainers`), not for the pod's entire duration.",
+							Description: "perContainer is applied per container reference to the claim. This models overhead scaling linearly with the number of containers actively using the device. When both PerPod and PerContainer are specified, the total overhead allocated for each pod referencing the claim is computed as: Quantity = PerPod + (PerContainer * NumReferences) The scheduler records this overhead in the pod's `status.extraNodeAllocatableResources`: - The pod level entry (requests and limits) gets PerPod + (PerContainer * NumReferences).\n  PerContainer of a non-restartable init container counts towards the pod's peak resource\n  calculation (see Pod `spec.initContainers`), not for the pod's entire duration.\n- The container entry of each referencing container gets PerContainer in its requests,\n  and PerPod + PerContainer in its limits.\nThis allows any single container to use the pod level overhead, while the pod level entry caps the total usage to account for PerPod exactly once.",
 							Ref:         ref(resource.Quantity{}.OpenAPIModelName()),
 						},
 					},

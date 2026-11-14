@@ -608,27 +608,15 @@ func Test_nodePlugin_Admit(t *testing.T) {
 	extendedResourceClaimPod.Status.ExtendedResourceClaimStatus = &api.PodExtendedResourceClaimStatus{ResourceClaimName: "myclaim"}
 
 	nodeAllocatableResourceClaimPod, _ := makeTestPod("ns", "myclaimpod", "mynode", true)
-	nodeAllocatableResourceClaimPod.Status.NodeAllocatableResourceClaimStatuses = []api.NodeAllocatableResourceClaimStatus{
+	nodeAllocatableResourceClaimPod.Status.ExtraNodeAllocatableResources = []api.ExtraNodeAllocatableResource{
 		{
-			ResourceClaimName: "myclaim",
-			Containers:        []string{"mycontainer"},
-			Mapping: []api.NodeAllocatableMappedResources{{
-				Name:     api.ResourceCPU,
-				Quantity: new(resource.MustParse("1")),
-			}},
+			ContainerName: "",
+			Requests:      api.ResourceList{api.ResourceCPU: resource.MustParse("1")},
+			Limits:        api.ResourceList{api.ResourceCPU: resource.MustParse("1")},
 		},
-	}
-
-	nodeAllocatableOverheadResourceClaimPod, _ := makeTestPod("ns", "myclaimpod", "mynode", true)
-	nodeAllocatableOverheadResourceClaimPod.Status.NodeAllocatableResourceClaimStatuses = []api.NodeAllocatableResourceClaimStatus{
 		{
-			ResourceClaimName: "myclaim",
-			Containers:        []string{"mycontainer"},
-			Overhead: []api.NodeAllocatableOverheadResources{{
-				Name:         api.ResourceMemory,
-				PerPod:       new(resource.MustParse("1Gi")),
-				PerContainer: new(resource.MustParse("500Mi")),
-			}},
+			ContainerName: "mycontainer",
+			Limits:        api.ResourceList{api.ResourceCPU: resource.MustParse("1")},
 		},
 	}
 
@@ -1192,16 +1180,10 @@ func Test_nodePlugin_Admit(t *testing.T) {
 			err:        "annot update extended resource claim status",
 		},
 		{
-			name:       "forbid update of pod's node allocatable resource claim status",
+			name:       "allow update of pod's extra node allocatable resources",
 			podsGetter: existingPods,
 			attributes: admission.NewAttributesRecord(nodeAllocatableResourceClaimPod, claimpod, podKind, nodeAllocatableResourceClaimPod.Namespace, nodeAllocatableResourceClaimPod.Name, podResource, "status", admission.Update, &metav1.UpdateOptions{}, false, mynode),
-			err:        "cannot update node allocatable resource claim statuses",
-		},
-		{
-			name:       "forbid update of pod's node allocatable overhead resource claim status",
-			podsGetter: existingPods,
-			attributes: admission.NewAttributesRecord(nodeAllocatableOverheadResourceClaimPod, claimpod, podKind, nodeAllocatableOverheadResourceClaimPod.Namespace, nodeAllocatableOverheadResourceClaimPod.Name, podResource, "status", admission.Update, &metav1.UpdateOptions{}, false, mynode),
-			err:        "cannot update node allocatable resource claim statuses",
+			err:        "",
 		},
 
 		// My node object

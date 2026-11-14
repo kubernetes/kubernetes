@@ -657,19 +657,13 @@ type oomTest struct {
 	enableDRANodeAllocatableResources bool
 }
 
-type draMemAllocation struct {
-	containers           []string
-	mapping              string
-	perContainerOverhead string
-	perPodOverhead       string
-}
-
 type podParams struct {
-	c1Mem       string
-	c2Mem       string
-	sidecarMem  string
-	podLevelMem string
-	draAlloc    draMemAllocation
+	c1Mem                         string
+	c2Mem                         string
+	initMem                       string
+	sidecarMem                    string
+	podLevelMem                   string
+	extraNodeAllocatableResources []v1.ExtraNodeAllocatableResource
 }
 
 func TestGetContainerOOMScoreAdjust(t *testing.T) {
@@ -700,6 +694,17 @@ func TestGetContainerOOMScoreAdjust(t *testing.T) {
 			})
 		}
 
+		if p.initMem != "" {
+			pod.Spec.InitContainers = append(pod.Spec.InitContainers, v1.Container{
+				Name: "i1",
+				Resources: v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceMemory: resource.MustParse(p.initMem),
+					},
+				},
+			})
+		}
+
 		if p.sidecarMem != "" {
 			pod.Spec.InitContainers = append(pod.Spec.InitContainers, v1.Container{
 				Name: "s1",
@@ -720,35 +725,7 @@ func TestGetContainerOOMScoreAdjust(t *testing.T) {
 			}
 		}
 
-		if len(p.draAlloc.containers) > 0 {
-			status := v1.NodeAllocatableResourceClaimStatus{
-				ResourceClaimName: "dra-claim",
-				Containers:        p.draAlloc.containers,
-			}
-			if p.draAlloc.mapping != "" {
-				status.Mapping = []v1.NodeAllocatableMappedResources{
-					{
-						Name:     v1.ResourceMemory,
-						Quantity: new(resource.MustParse(p.draAlloc.mapping)),
-					},
-				}
-			}
-			var overheads []v1.NodeAllocatableOverheadResources
-			if p.draAlloc.perContainerOverhead != "" {
-				overheads = append(overheads, v1.NodeAllocatableOverheadResources{
-					Name:         v1.ResourceMemory,
-					PerContainer: new(resource.MustParse(p.draAlloc.perContainerOverhead)),
-				})
-			}
-			if p.draAlloc.perPodOverhead != "" {
-				overheads = append(overheads, v1.NodeAllocatableOverheadResources{
-					Name:   v1.ResourceMemory,
-					PerPod: new(resource.MustParse(p.draAlloc.perPodOverhead)),
-				})
-			}
-			status.Overhead = overheads
-			pod.Status.NodeAllocatableResourceClaimStatuses = []v1.NodeAllocatableResourceClaimStatus{status}
-		}
+		pod.Status.ExtraNodeAllocatableResources = p.extraNodeAllocatableResources
 
 		return pod
 	}
@@ -944,9 +921,17 @@ func TestGetContainerOOMScoreAdjust(t *testing.T) {
 		"burstable-pod-with-dra-disabled": {
 			pod: makeTestPodForDRA(podParams{
 				c1Mem: "500Mi",
-				draAlloc: draMemAllocation{
-					containers:           []string{"c1"},
-					perContainerOverhead: "500Mi",
+				extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+					{
+						ContainerName: "",
+						Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("500Mi")},
+						Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("500Mi")},
+					},
+					{
+						ContainerName: "c1",
+						Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("500Mi")},
+						Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("500Mi")},
+					},
 				},
 			}),
 			memoryCapacity: 4000000000,
@@ -959,9 +944,17 @@ func TestGetContainerOOMScoreAdjust(t *testing.T) {
 		"burstable-pod-with-dra-enabled": {
 			pod: makeTestPodForDRA(podParams{
 				c1Mem: "500Mi",
-				draAlloc: draMemAllocation{
-					containers:           []string{"c1"},
-					perContainerOverhead: "500Mi",
+				extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+					{
+						ContainerName: "",
+						Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("500Mi")},
+						Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("500Mi")},
+					},
+					{
+						ContainerName: "c1",
+						Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("500Mi")},
+						Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("500Mi")},
+					},
 				},
 			}),
 			memoryCapacity: 4000000000,
@@ -975,9 +968,20 @@ func TestGetContainerOOMScoreAdjust(t *testing.T) {
 			pod: makeTestPodForDRA(podParams{
 				c1Mem: "500Mi",
 				c2Mem: "500Mi",
-				draAlloc: draMemAllocation{
-					containers:     []string{"c1", "c2"},
-					perPodOverhead: "1000Mi",
+				extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+					{
+						ContainerName: "",
+						Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("1000Mi")},
+						Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("1000Mi")},
+					},
+					{
+						ContainerName: "c1",
+						Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("1000Mi")},
+					},
+					{
+						ContainerName: "c2",
+						Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("1000Mi")},
+					},
 				},
 			}),
 			memoryCapacity: 4000000000,
@@ -992,9 +996,17 @@ func TestGetContainerOOMScoreAdjust(t *testing.T) {
 			pod: makeTestPodForDRA(podParams{
 				c1Mem:       "1Gi",
 				podLevelMem: "5Gi",
-				draAlloc: draMemAllocation{
-					containers:           []string{"c1"},
-					perContainerOverhead: "2Gi",
+				extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+					{
+						ContainerName: "",
+						Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("2Gi")},
+						Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("2Gi")},
+					},
+					{
+						ContainerName: "c1",
+						Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("2Gi")},
+						Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("2Gi")},
+					},
 				},
 			}),
 			memoryCapacity: 8000000000,
@@ -1011,9 +1023,20 @@ func TestGetContainerOOMScoreAdjust(t *testing.T) {
 				c1Mem:       "1Gi",
 				c2Mem:       "1Gi",
 				podLevelMem: "6Gi",
-				draAlloc: draMemAllocation{
-					containers:     []string{"c1", "c2"},
-					perPodOverhead: "2Gi",
+				extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+					{
+						ContainerName: "",
+						Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("2Gi")},
+						Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("2Gi")},
+					},
+					{
+						ContainerName: "c1",
+						Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("2Gi")},
+					},
+					{
+						ContainerName: "c2",
+						Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("2Gi")},
+					},
 				},
 			}),
 			memoryCapacity: 8000000000,
@@ -1031,9 +1054,16 @@ func TestGetContainerOOMScoreAdjust(t *testing.T) {
 		"burstable-pod-with-dra-direct-device": {
 			pod: makeTestPodForDRA(podParams{
 				c1Mem: "500Mi",
-				draAlloc: draMemAllocation{
-					containers: []string{"c1"},
-					mapping:    "500Mi",
+				extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+					{
+						ContainerName: "",
+						Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("500Mi")},
+						Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("500Mi")},
+					},
+					{
+						ContainerName: "c1",
+						Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("500Mi")},
+					},
 				},
 			}),
 			memoryCapacity: 4000000000,
@@ -1046,11 +1076,17 @@ func TestGetContainerOOMScoreAdjust(t *testing.T) {
 		"burstable-pod-with-combined-dra-direct-and-overhead-device": {
 			pod: makeTestPodForDRA(podParams{
 				c1Mem: "500Mi",
-				draAlloc: draMemAllocation{
-					containers:           []string{"c1"},
-					mapping:              "500Mi",
-					perContainerOverhead: "300Mi",
-					perPodOverhead:       "200Mi",
+				extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+					{
+						ContainerName: "",
+						Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("1000Mi")},
+						Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("1000Mi")},
+					},
+					{
+						ContainerName: "c1",
+						Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("300Mi")},
+						Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("1000Mi")},
+					},
 				},
 			}),
 			memoryCapacity: 4000000000,
@@ -1064,9 +1100,17 @@ func TestGetContainerOOMScoreAdjust(t *testing.T) {
 			pod: makeTestPodForDRA(podParams{
 				c1Mem:      "500Mi",
 				sidecarMem: "200Mi",
-				draAlloc: draMemAllocation{
-					containers:           []string{"c1"},
-					perContainerOverhead: "500Mi",
+				extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+					{
+						ContainerName: "",
+						Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("500Mi")},
+						Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("500Mi")},
+					},
+					{
+						ContainerName: "c1",
+						Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("500Mi")},
+						Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("500Mi")},
+					},
 				},
 			}),
 			memoryCapacity: 4000000000,
@@ -1075,6 +1119,159 @@ func TestGetContainerOOMScoreAdjust(t *testing.T) {
 				"c1": {lowOOMScoreAdj: 738, highOOMScoreAdj: 738},
 				// s1 OOMScoreAdj = 1000 - (1000 * 200Mi Spec / 4GB) = 948 capped to min regular container score (738)
 				"s1": {lowOOMScoreAdj: 738, highOOMScoreAdj: 738},
+			},
+			enableDRANodeAllocatableResources: true,
+		},
+		"burstable-pod-with-shared-dra-claim-and-per-container-overhead": {
+			pod: makeTestPodForDRA(podParams{
+				c1Mem: "500Mi",
+				c2Mem: "500Mi",
+				extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+					{
+						ContainerName: "",
+						Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("1224Mi")},
+						Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("1224Mi")},
+					},
+					{
+						ContainerName: "c1",
+						Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("100Mi")},
+						Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("1124Mi")},
+					},
+					{
+						ContainerName: "c2",
+						Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("100Mi")},
+						Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("1124Mi")},
+					},
+				},
+			}),
+			memoryCapacity: 4000000000,
+			lowHighOOMScoreAdj: map[string]lowHighOOMScoreAdjTest{
+				// OOMScoreAdj = 1000 - (1000 * (500Mi Spec + 1Gi DRA / 2 references + 100Mi DRA) / 4GB) = 709
+				"c1": {lowOOMScoreAdj: 709, highOOMScoreAdj: 709},
+				"c2": {lowOOMScoreAdj: 709, highOOMScoreAdj: 709},
+			},
+			enableDRANodeAllocatableResources: true,
+		},
+		"burstable-pod-with-dra-claims-in-different-containers": {
+			// c1 references a claim with 2Gi of mapped memory, and c2 a claim with 100Mi perContainer overhead.
+			pod: makeTestPodForDRA(podParams{
+				c1Mem: "500Mi",
+				c2Mem: "500Mi",
+				extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+					{
+						ContainerName: "",
+						Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("2148Mi")},
+						Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("2148Mi")},
+					},
+					{
+						ContainerName: "c1",
+						Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("2Gi")},
+					},
+					{
+						ContainerName: "c2",
+						Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("100Mi")},
+						Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("100Mi")},
+					},
+				},
+			}),
+			memoryCapacity: 4000000000,
+			lowHighOOMScoreAdj: map[string]lowHighOOMScoreAdjTest{
+				// OOMScoreAdj = 1000 - (1000 * (500Mi Spec + 2Gi DRA) / 4GB) = 333
+				"c1": {lowOOMScoreAdj: 333, highOOMScoreAdj: 333},
+				// OOMScoreAdj = 1000 - (1000 * (500Mi Spec + 100Mi DRA) / 4GB) = 843
+				"c2": {lowOOMScoreAdj: 843, highOOMScoreAdj: 843},
+			},
+			enableDRANodeAllocatableResources: true,
+		},
+		"burstable-pod-with-unreferenced-dra-claim": {
+			// c1 references a claim with 1Gi of mapped memory. No container references the other claim,
+			// which also has 1Gi of mapped memory.
+			pod: makeTestPodForDRA(podParams{
+				c1Mem: "500Mi",
+				c2Mem: "500Mi",
+				extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+					{
+						ContainerName: "",
+						Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("2Gi")},
+						Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("2Gi")},
+					},
+					{
+						ContainerName: "c1",
+						Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("1Gi")},
+					},
+				},
+			}),
+			memoryCapacity: 4000000000,
+			lowHighOOMScoreAdj: map[string]lowHighOOMScoreAdjTest{
+				// OOMScoreAdj = 1000 - (1000 * (500Mi Spec + 1Gi DRA) / 4GB) = 601
+				"c1": {lowOOMScoreAdj: 601, highOOMScoreAdj: 601},
+				// OOMScoreAdj = 1000 - (1000 * 500Mi Spec / 4GB) = 869
+				"c2": {lowOOMScoreAdj: 869, highOOMScoreAdj: 869},
+			},
+			enableDRANodeAllocatableResources: true,
+		},
+		"burstable-pod-with-shared-and-own-dra-claims": {
+			// c1 and c2 share a claim with 1Gi of mapped memory, and c2 also references a claim with 1Gi of
+			// mapped memory. The status does not say which claim the memory comes from, so the 2Gi of pod
+			// level memory is split in proportion to the 1Gi c1 and the 2Gi c2 can use.
+			pod: makeTestPodForDRA(podParams{
+				c1Mem: "500Mi",
+				c2Mem: "500Mi",
+				extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+					{
+						ContainerName: "",
+						Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("2Gi")},
+						Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("2Gi")},
+					},
+					{
+						ContainerName: "c1",
+						Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("1Gi")},
+					},
+					{
+						ContainerName: "c2",
+						Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("2Gi")},
+					},
+				},
+			}),
+			memoryCapacity: 4000000000,
+			lowHighOOMScoreAdj: map[string]lowHighOOMScoreAdjTest{
+				// OOMScoreAdj = 1000 - (1000 * (500Mi Spec + 2Gi DRA * 1/3) / 4GB) = 690
+				"c1": {lowOOMScoreAdj: 690, highOOMScoreAdj: 690},
+				// OOMScoreAdj = 1000 - (1000 * (500Mi Spec + 2Gi DRA * 2/3) / 4GB) = 512
+				"c2": {lowOOMScoreAdj: 512, highOOMScoreAdj: 512},
+			},
+			enableDRANodeAllocatableResources: true,
+		},
+		"burstable-pod-with-init-container-sharing-dra-claim": {
+			// i1 and c1 share a claim with 1Gi perPod and 100Mi perContainer overhead. The pod entry
+			// counts the perContainer overhead once, and each container gets all of the perPod overhead,
+			// because i1 finishes before c1 starts.
+			pod: makeTestPodForDRA(podParams{
+				c1Mem:   "500Mi",
+				initMem: "500Mi",
+				extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+					{
+						ContainerName: "",
+						Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("1124Mi")},
+						Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("1124Mi")},
+					},
+					{
+						ContainerName: "i1",
+						Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("100Mi")},
+						Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("1124Mi")},
+					},
+					{
+						ContainerName: "c1",
+						Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("100Mi")},
+						Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("1124Mi")},
+					},
+				},
+			}),
+			memoryCapacity: 4000000000,
+			lowHighOOMScoreAdj: map[string]lowHighOOMScoreAdjTest{
+				// OOMScoreAdj = 1000 - (1000 * (500Mi Spec + 1Gi DRA + 100Mi DRA) / 4GB) = 575
+				"i1": {lowOOMScoreAdj: 575, highOOMScoreAdj: 575},
+				"c1": {lowOOMScoreAdj: 575, highOOMScoreAdj: 575},
 			},
 			enableDRANodeAllocatableResources: true,
 		},
