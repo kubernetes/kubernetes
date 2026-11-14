@@ -23,7 +23,9 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"reflect"
 	"strconv"
+	"sync"
 	"time"
 
 	"go.opentelemetry.io/otel/attribute"
@@ -103,16 +105,19 @@ func SerializeObject(mediaType string, encoder runtime.Encoder, hw http.Response
 		attribute.String("protocol", req.Proto),
 		attribute.String("mediaType", mediaType),
 		attribute.String("encoder", string(encoder.Identifier())))
-	req = req.WithContext(ctx)
 	defer span.End(5 * time.Second)
 
-	w := &deferredResponseWriter{
-		mediaType:       mediaType,
-		statusCode:      statusCode,
-		contentEncoding: responseContentEncodingSupported(req),
-		hw:              hw,
-		ctx:             ctx,
-	}
+	w := deferredResponseWriterPool.Get().(*deferredResponseWriter)
+	w.mediaType = mediaType
+	w.statusCode = statusCode
+	w.contentEncoding = responseContentEncodingSupported(req)
+	w.hw = hw
+	w.ctx = ctx
+	w.span = span
+	defer func() {
+		*w = deferredResponseWriter{}
+		deferredResponseWriterPool.Put(w)
+	}()
 
 	var memoryAllocator runtime.MemoryAllocator
 	if encoderWithAllocator, supportsAllocator := encoder.(runtime.EncoderWithAllocator); supportsAllocator {
@@ -180,7 +185,39 @@ type deferredResponseWriter struct {
 	// lastWriteErr holds the error result (if any) of the last write attempt to `w`
 	lastWriteErr error
 
-	ctx context.Context
+	ctx  context.Context
+	span *tracing.Span
+}
+
+var deferredResponseWriterPool = sync.Pool{
+	New: func() any {
+		return &deferredResponseWriter{}
+	},
+}
+
+var writerTypeCache sync.Map
+
+func writerTypeName(w io.Writer) string {
+	if _, ok := w.(*gzip.Writer); ok {
+		return "*gzip.Writer"
+	}
+	if w == nil {
+		return "<nil>"
+	}
+	t := reflect.TypeOf(w)
+	if s, ok := writerTypeCache.Load(t); ok {
+		return s.(string)
+	}
+	s := t.String()
+	writerTypeCache.Store(t, s)
+	return s
+}
+
+func (w *deferredResponseWriter) getSpan() *tracing.Span {
+	if w.span != nil {
+		return w.span
+	}
+	return tracing.SpanFromContext(w.ctx)
 }
 
 func (w *deferredResponseWriter) Write(p []byte) (n int, err error) {
@@ -254,9 +291,9 @@ func (w *deferredResponseWriter) unbufferedWrite(p []byte) (n int, err error) {
 		w.w = hw
 	}
 
-	span := tracing.SpanFromContext(w.ctx)
+	span := w.getSpan()
 	span.AddEvent("About to start writing response",
-		attribute.String("writer", fmt.Sprintf("%T", w.w)),
+		attribute.String("writer", writerTypeName(w.w)),
 		attribute.Int("size", len(p)),
 	)
 
@@ -271,7 +308,7 @@ func (w *deferredResponseWriter) Close() (err error) {
 			return
 		}
 
-		span := tracing.SpanFromContext(w.ctx)
+		span := w.getSpan()
 
 		if w.lastWriteErr != nil {
 			span.AddEvent("Write call failed",
