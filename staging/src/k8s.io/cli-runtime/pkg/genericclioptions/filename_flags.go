@@ -32,9 +32,10 @@ import (
 type FileNameFlags struct {
 	Usage string
 
-	Filenames *[]string
-	Kustomize *string
-	Recursive *bool
+	Filenames  *[]string
+	Kustomize  *string
+	Recursive  *bool
+	EnableHelm *bool
 }
 
 // ToOptions creates a new FileNameOptions struct and sets FilenameOptions based on FileNameflags
@@ -53,6 +54,9 @@ func (o *FileNameFlags) ToOptions() resource.FilenameOptions {
 	}
 	if o.Kustomize != nil {
 		options.Kustomize = *o.Kustomize
+	}
+	if o.EnableHelm != nil {
+		options.EnableHelm = *o.EnableHelm
 	}
 
 	return options
@@ -78,5 +82,9 @@ func (o *FileNameFlags) AddFlags(flags *pflag.FlagSet) {
 	if o.Kustomize != nil {
 		flags.StringVarP(o.Kustomize, "kustomize", "k", *o.Kustomize,
 			"Process a kustomization directory. This flag can't be used together with -f or -R.")
+	}
+	if o.EnableHelm != nil {
+		flags.BoolVar(o.EnableHelm, "enable-helm", *o.EnableHelm,
+			"Enable use of the Helm chart inflator generator when processing a kustomization directory with -k.")
 	}
 }
