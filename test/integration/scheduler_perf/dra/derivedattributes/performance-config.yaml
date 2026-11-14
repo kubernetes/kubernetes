@@ -1,0 +1,70 @@
+# match_fast and match_empty_500nodes from ../performance-config.yaml.
+# matchAttribute names derivedPciRoot, computed from the published
+# resource.kubernetes.io/pciRoot and not present on the device.
+- name: SchedulingWithResourceClaimTemplate
+  featureGates:
+    DRADerivedAttributes: true
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $nodesWithoutDRA
+  - opcode: createNodes
+    nodeTemplatePath: ../templates/node-with-dra-test-driver.yaml
+    countParam: $nodesWithDRA
+  - opcode: createAny
+    templatePath: ../templates/resourceslice-basic-devices.yaml
+    countParam: $nodesWithDRA
+    templateParams:
+      numPCIRoots: $numPCIRoots|2
+      numDevices: 10
+  - opcode: createAny
+    templatePath: ../templates/deviceclass.yaml
+  - opcode: createAny
+    templatePath: ../templates/resourceclaim.yaml
+    countParam: $initClaims
+    namespace: init
+  - opcode: allocResourceClaims
+    namespace: init
+  - opcode: createAny
+    templatePath: ../templates/resourceclaimtemplate.yaml
+    namespace: test
+    templateParams:
+      numRequests: $numRequests|1
+      selectors: $selectors|
+      constraints: $constraints|
+      derivedAttributes:
+      - name: test-driver.cdi.k8s.io/derivedPciRoot
+        expression: device.attributes["resource.kubernetes.io"].pciRoot
+  - opcode: createPods
+    namespace: test
+    countParam: $measurePods
+    steadyStateParam: $steadyState
+    durationParam: $duration
+    podTemplatePath: ../templates/pod-with-claim-template.yaml
+    collectMetrics: true
+  workloads:
+  - name: match_fast
+    labels: [integration-test, short]
+    params:
+      nodesWithDRA: 1
+      nodesWithoutDRA: 1
+      initClaims: 0
+      measurePods: 2
+      steadyState: false
+      duration: 0s # unused
+      numRequests: 5
+      numPCIRoots: 2
+      constraints:
+      - matchAttribute: test-driver.cdi.k8s.io/derivedPciRoot
+  - name: match_empty_500nodes
+    labels: [performance]
+    params:
+      nodesWithDRA: 500
+      nodesWithoutDRA: 0
+      initClaims: 0
+      measurePods: 10
+      steadyState: true
+      duration: 10s
+      numRequests: 5
+      numPCIRoots: 2
+      constraints:
+      - matchAttribute: test-driver.cdi.k8s.io/derivedPciRoot
