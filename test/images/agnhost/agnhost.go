@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/test/images/agnhost/guestbook"
 	h2cserver "k8s.io/kubernetes/test/images/agnhost/h2c-server"
 	"k8s.io/kubernetes/test/images/agnhost/inclusterclient"
+	invalidconntrackstateserver "k8s.io/kubernetes/test/images/agnhost/invalid-conntrack-state-server"
 	"k8s.io/kubernetes/test/images/agnhost/liveness"
 	logsgen "k8s.io/kubernetes/test/images/agnhost/logs-generator"
 	"k8s.io/kubernetes/test/images/agnhost/mounttest"
@@ -77,6 +78,7 @@ func main() {
 	rootCmd.AddCommand(fakeregistryserver.CmdFakeRegistryServer)
 	rootCmd.AddCommand(guestbook.CmdGuestbook)
 	rootCmd.AddCommand(inclusterclient.CmdInClusterClient)
+	rootCmd.AddCommand(invalidconntrackstateserver.CmdInvalidConntrackStateServer)
 	rootCmd.AddCommand(liveness.CmdLiveness)
 	rootCmd.AddCommand(logsgen.CmdLogsGenerator)
 	rootCmd.AddCommand(mounttest.CmdMounttest)
