@@ -50,6 +50,19 @@ type DRACaches struct {
 	nodeMatchCache sync.Map // map[nodeMatchCacheKey]bool
 }
 
+// resetMatchCaches drops all cached device- and node-match results. It gets
+// called at the start of each scheduling cycle in which DRA-backed extended
+// resources are scored because those results depend on inputs that are not
+// part of the cache keys: device attributes and capacities in ResourceSlices
+// and node labels. Those inputs can change at any time without an event that
+// could invalidate individual entries, so the caches must not outlive the
+// current cycle. Dropping them once per cycle still retains reuse within the
+// cycle, where the same selectors get evaluated for many nodes and devices.
+func (c *DRACaches) resetMatchCaches() {
+	c.deviceMatchCache.Clear()
+	c.nodeMatchCache.Clear()
+}
+
 // resourceAllocationScorer contains information to calculate resource allocation score.
 type resourceAllocationScorer struct {
 	Name                                          string
@@ -65,6 +78,23 @@ type resourceAllocationScorer struct {
 	draManager   fwk.SharedDRAManager
 	// Caches for DRA-related computations
 	DRACaches
+}
+
+// Without PreScore, no plugin call resets the match caches before parallel
+// scoring. Give each Score call fresh match caches while retaining CEL programs.
+func (r *resourceAllocationScorer) withFreshMatchCaches() *resourceAllocationScorer {
+	return &resourceAllocationScorer{
+		Name:                      r.Name,
+		enablePodLevelResources:   r.enablePodLevelResources,
+		enableDRAExtendedResource: r.enableDRAExtendedResource,
+		enableInPlacePodLevelResourcesVerticalScaling: r.enableInPlacePodLevelResourcesVerticalScaling,
+		useRequested: r.useRequested,
+		scorer:       r.scorer,
+		resources:    r.resources,
+		draFeatures:  r.draFeatures,
+		draManager:   r.draManager,
+		DRACaches:    DRACaches{celCache: r.celCache},
+	}
 }
 
 // buildNodeMatchCacheKey creates a string cache key for node matching results

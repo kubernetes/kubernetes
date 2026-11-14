@@ -1018,3 +1018,236 @@ func TestCalculateNodeAllocatableRequestSaturatesRequested(t *testing.T) {
 		}
 	}
 }
+
+// TestDRAMatchCachesResetPerCycle covers that the DRA device/node match result
+// caches do not outlive a scheduling cycle: device attributes in ResourceSlices
+// and node labels can change between cycles without any cache invalidation, so
+// stale match results must not be reused in later cycles
+// (https://github.com/kubernetes/kubernetes/issues/144106).
+func TestDRAMatchCachesResetPerCycle(t *testing.T) {
+	testDRAMatchCachesResetPerCycle(ktesting.Init(t))
+}
+
+func testDRAMatchCachesResetPerCycle(tCtx ktesting.TContext) {
+	const (
+		nodeName   = "match-cache-node"
+		driverName = "test-driver"
+	)
+	resource := v1.ResourceName(extendedResourceName)
+	celClass := &resourceapi.DeviceClass{
+		ObjectMeta: metav1.ObjectMeta{Name: "cel-class"},
+		Spec: resourceapi.DeviceClassSpec{
+			ExtendedResourceName: &extendedResourceName,
+			Selectors: []resourceapi.DeviceSelector{{
+				CEL: &resourceapi.CELDeviceSelector{
+					Expression: `device.driver == "test-driver" && device.attributes["test-driver"].model == "SOME-GOOD"`,
+				},
+			}},
+		},
+	}
+	draFeatures := structured.Features{
+		AdminAccess:          true,
+		PrioritizedList:      true,
+		PartitionableDevices: true,
+		DeviceTaints:         true,
+		ConsumableCapacity:   true,
+	}
+	sliceWithModel := func(model string) *resourceapi.ResourceSlice {
+		slice := st.MakeResourceSlice(nodeName, driverName).Obj()
+		slice.Spec.Devices = append(slice.Spec.Devices, resourceapi.Device{
+			Name: "device-1",
+			Attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+				"model": {StringValue: ptr.To(model)},
+			},
+		})
+		return slice
+	}
+	pod := st.MakePod().Name("pod").Obj()
+	podWithRequests := st.MakePod().Name("pod").Req(map[v1.ResourceName]string{v1.ResourceCPU: "100m"}).Obj()
+	node := st.MakeNode().Name(nodeName).Obj()
+	enableFeature := func(tCtx ktesting.TContext) {
+		featuregatetesting.SetFeatureGateDuringTest(tCtx, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, true)
+	}
+	capacityViaFit := func(tCtx ktesting.TContext, f *Fit, pod *v1.Pod, node *v1.Node) int64 {
+		cycleState := framework.NewCycleState()
+		if status := f.PreScore(tCtx, cycleState, pod, nil); !status.IsSuccess() {
+			tCtx.Fatalf("PreScore failed: %v", status)
+		}
+		state, err := getPreScoreState(cycleState)
+		if err != nil {
+			tCtx.Fatal(err)
+		}
+		nodeInfo := framework.NewNodeInfo()
+		nodeInfo.SetNode(node)
+		allocatable, _ := f.calculateResourceAllocatableRequest(tCtx, nodeInfo, resource, state.draPreScoreState)
+		return allocatable
+	}
+	capacityViaBalancedAllocation := func(tCtx ktesting.TContext, ba *BalancedAllocation, pod *v1.Pod, node *v1.Node) int64 {
+		cycleState := framework.NewCycleState()
+		if status := ba.PreScore(tCtx, cycleState, pod, nil); !status.IsSuccess() {
+			tCtx.Fatalf("PreScore failed: %v", status)
+		}
+		state, err := getBalancedAllocationPreScoreState(cycleState)
+		if err != nil {
+			tCtx.Fatal(err)
+		}
+		nodeInfo := framework.NewNodeInfo()
+		nodeInfo.SetNode(node)
+		allocatable, _ := ba.calculateResourceAllocatableRequest(tCtx, nodeInfo, resource, state.draPreScoreState)
+		return allocatable
+	}
+
+	tCtx.SyncTest("device attributes changed between cycles", func(tCtx ktesting.TContext) {
+		enableFeature(tCtx)
+		f := &Fit{
+			enableDRAExtendedResource: true,
+			resourceAllocationScorer: &resourceAllocationScorer{
+				enableDRAExtendedResource: true,
+				draManager:                newTestDRAManager(tCtx, celClass, sliceWithModel("SOME-GOOD")),
+				draFeatures:               draFeatures,
+				resources:                 []config.ResourceSpec{{Name: string(resource)}},
+				DRACaches:                 DRACaches{celCache: cel.NewCache(10, cel.Features{})},
+			},
+		}
+		if got := capacityViaFit(tCtx, f, pod, node); got != 1 {
+			tCtx.Errorf("first cycle: expected capacity 1, got %d", got)
+		}
+
+		// The driver re-publishes the slice for the same pool with a changed
+		// device attribute, so the device no longer matches the class.
+		f.draManager = newTestDRAManager(tCtx, celClass, sliceWithModel("SOME-BAD"))
+		if got := capacityViaFit(tCtx, f, pod, node); got != 0 {
+			tCtx.Errorf("after attribute change: expected capacity 0, got %d (stale match result reused)", got)
+		}
+	})
+
+	tCtx.SyncTest("node labels changed between cycles", func(tCtx ktesting.TContext) {
+		enableFeature(tCtx)
+		slice := st.MakeResourceSliceWithPerDeviceNodeSelection("match-cache-pool", driverName).Obj()
+		slice.Spec.Devices = append(slice.Spec.Devices, resourceapi.Device{
+			Name: "device-1",
+			NodeSelector: &v1.NodeSelector{
+				NodeSelectorTerms: []v1.NodeSelectorTerm{{
+					MatchExpressions: []v1.NodeSelectorRequirement{{
+						Key:      "zone",
+						Operator: v1.NodeSelectorOpIn,
+						Values:   []string{"us-east-1a"},
+					}},
+				}},
+			},
+			Attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+				"model": {StringValue: ptr.To("SOME-GOOD")},
+			},
+		})
+		draManager := newTestDRAManager(tCtx, celClass, slice)
+		f := &Fit{
+			enableDRAExtendedResource: true,
+			resourceAllocationScorer: &resourceAllocationScorer{
+				enableDRAExtendedResource: true,
+				draManager:                draManager,
+				draFeatures:               draFeatures,
+				resources:                 []config.ResourceSpec{{Name: string(resource)}},
+				DRACaches:                 DRACaches{celCache: cel.NewCache(10, cel.Features{})},
+			},
+		}
+		if got := capacityViaFit(tCtx, f, pod, st.MakeNode().Name(nodeName).Obj()); got != 0 {
+			tCtx.Errorf("first cycle: expected capacity 0, got %d", got)
+		}
+
+		// Labeling the node makes the device available on it.
+		if got := capacityViaFit(tCtx, f, pod, st.MakeNode().Name(nodeName).Label("zone", "us-east-1a").Obj()); got != 1 {
+			tCtx.Errorf("after labeling node: expected capacity 1, got %d (stale match result reused)", got)
+		}
+	})
+
+	tCtx.SyncTest("device attributes changed between cycles (balanced allocation)", func(tCtx ktesting.TContext) {
+		enableFeature(tCtx)
+		// The pod has a CPU request, so BalancedAllocation must not skip it
+		// as best-effort (it checks the requests of its own resource list).
+		ba := &BalancedAllocation{
+			resourceAllocationScorer: resourceAllocationScorer{
+				enableDRAExtendedResource: true,
+				draManager:                newTestDRAManager(tCtx, celClass, sliceWithModel("SOME-GOOD")),
+				draFeatures:               draFeatures,
+				resources:                 []config.ResourceSpec{{Name: string(v1.ResourceCPU)}, {Name: string(resource)}},
+				DRACaches:                 DRACaches{celCache: cel.NewCache(10, cel.Features{})},
+			},
+		}
+		if got := capacityViaBalancedAllocation(tCtx, ba, podWithRequests, node); got != 1 {
+			tCtx.Errorf("first cycle: expected capacity 1, got %d", got)
+		}
+
+		ba.draManager = newTestDRAManager(tCtx, celClass, sliceWithModel("SOME-BAD"))
+		if got := capacityViaBalancedAllocation(tCtx, ba, podWithRequests, node); got != 0 {
+			tCtx.Errorf("after attribute change: expected capacity 0, got %d (stale match result reused)", got)
+		}
+	})
+}
+
+func TestDRAMatchCachesWithoutPreScore(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	for _, balanced := range []bool{false, true} {
+		name := "fit"
+		if balanced {
+			name = "balanced allocation"
+		}
+		tCtx.SyncTest(name, func(tCtx ktesting.TContext) {
+			featuregatetesting.SetFeatureGateDuringTest(tCtx, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, true)
+			class := &resourceapi.DeviceClass{
+				ObjectMeta: metav1.ObjectMeta{Name: "fallback-class"},
+				Spec: resourceapi.DeviceClassSpec{
+					ExtendedResourceName: &extendedResourceName,
+					Selectors: []resourceapi.DeviceSelector{{CEL: &resourceapi.CELDeviceSelector{
+						Expression: `device.attributes["test-driver"].model == "GOOD"`,
+					}}},
+				},
+			}
+			scorer := &resourceAllocationScorer{
+				enableDRAExtendedResource: true,
+				resources:                 []config.ResourceSpec{{Name: string(v1.ResourceCPU)}, {Name: extendedResourceName}},
+				DRACaches:                 DRACaches{celCache: cel.NewCache(10, cel.Features{})},
+				// Expose DRA capacity through Score so the assertion does not depend on a scoring strategy.
+				scorer: func(_, _, allocatable []int64) int64 { return allocatable[1] },
+			}
+			pod := st.MakePod().Name("pod").Req(map[v1.ResourceName]string{v1.ResourceCPU: "100m", v1.ResourceName(extendedResourceName): "1"}).Obj()
+			nodeInfo := framework.NewNodeInfo()
+			nodeInfo.SetNode(st.MakeNode().Name("fallback-node").Obj())
+			fit := &Fit{enableDRAExtendedResource: true, resourceAllocationScorer: scorer}
+			ba := &BalancedAllocation{resourceAllocationScorer: resourceAllocationScorer{
+				enableDRAExtendedResource: true,
+				resources:                 scorer.resources,
+				scorer:                    scorer.scorer,
+				DRACaches:                 DRACaches{celCache: scorer.celCache},
+			}}
+			for _, tc := range []struct {
+				model string
+				want  int64
+			}{{"GOOD", 1}, {"BAD", 0}, {"GOOD", 1}} {
+				slice := st.MakeResourceSlice("fallback-node", "test-driver").Obj()
+				slice.Spec.Devices = []resourceapi.Device{{
+					Name: "device-1",
+					Attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						"model": {StringValue: ptr.To(tc.model)},
+					},
+				}}
+				manager := newTestDRAManager(tCtx, class, slice)
+				fit.draManager = manager
+				ba.draManager = manager
+				state := framework.NewCycleState()
+				var got int64
+				var status *fwk.Status
+				if balanced {
+					got, status = ba.Score(tCtx, state, pod, nodeInfo)
+				} else {
+					got, status = fit.Score(tCtx, state, pod, nodeInfo)
+				}
+				if !status.IsSuccess() {
+					tCtx.Fatalf("Score failed: %v", status)
+				}
+				if got != tc.want {
+					tCtx.Errorf("model %s: expected capacity %d, got %d", tc.model, tc.want, got)
+				}
+			}
+		})
+	}
+}
