@@ -807,6 +807,10 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 		}, {
 			name: "DefaultPodSysctls configured with feature gate disabled",
 			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				if conf.FeatureGates == nil {
+					conf.FeatureGates = make(map[string]bool)
+				}
+				conf.FeatureGates[string(features.DefaultPodSysctls)] = false
 				conf.DefaultPodSysctls = map[string]string{"net.ipv4.ip_forward": "1"}
 				return conf
 			},
