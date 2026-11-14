@@ -384,6 +384,38 @@ func RecordResourceVersion(groupResource schema.GroupResource, resourceVersion u
 	watchCacheResourceVersion.WithLabelValues(groupResource.Group, groupResource.Resource).Set(float64(resourceVersion % 1000000000000000))
 }
 
+var (
+	runningWatchCachesLock sync.Mutex
+	// runningWatchCaches counts the running watch caches of each resource type,
+	// which can have several, for example one per version of a custom resource.
+	runningWatchCaches = map[schema.GroupResource]int{}
+)
+
+// RecordWatchCacheStart records that a watch cache of a resource type starts,
+// before it sets any gauge of the resource type.
+func RecordWatchCacheStart(groupResource schema.GroupResource) {
+	runningWatchCachesLock.Lock()
+	defer runningWatchCachesLock.Unlock()
+	runningWatchCaches[groupResource]++
+}
+
+// RecordWatchCacheStop records that a watch cache of a resource type stopped,
+// after it set any gauge of the resource type, and deletes the gauges of the
+// resource type when none of its watch caches is left running. Otherwise, the
+// gauges of removed resource types, such as the resource version of the watch
+// cache of a deleted CustomResourceDefinition, would keep their last values.
+func RecordWatchCacheStop(groupResource schema.GroupResource) {
+	runningWatchCachesLock.Lock()
+	defer runningWatchCachesLock.Unlock()
+	runningWatchCaches[groupResource]--
+	if runningWatchCaches[groupResource] > 0 {
+		return
+	}
+	delete(runningWatchCaches, groupResource)
+	watchCacheResourceVersion.DeleteLabelValues(groupResource.Group, groupResource.Resource)
+	WatchCacheCapacity.DeleteLabelValues(groupResource.Group, groupResource.Resource)
+}
+
 // RecordShardedWatchStarted increments the active sharded watch gauge for the given resource.
 func RecordShardedWatchStarted(groupResource schema.GroupResource) {
 	WatchShardsTotal.WithLabelValues(groupResource.Group, groupResource.Resource).Inc()

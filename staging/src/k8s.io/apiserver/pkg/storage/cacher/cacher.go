@@ -478,6 +478,7 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 	}
 
 	progressRequester := progress.NewConditionalProgressRequester(config.Storage.RequestWatchProgress, config.Clock, contextMetadata)
+	metrics.RecordWatchCacheStart(config.GroupResource)
 	watchCache := newWatchCache(
 		config.KeyFunc, cacher.processEvent, config.GetAttrsFunc, config.Versioner, config.Indexers,
 		config.Clock, eventFreshDuration, config.GroupResource, progressRequester, config.Storage.GetCurrentResourceVersion)
@@ -499,6 +500,7 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 	if utilfeature.DefaultFeatureGate.Enabled(features.SizeBasedListCostEstimate) {
 		err := config.Storage.EnableResourceSizeEstimation(cacher.getKeys)
 		if err != nil {
+			metrics.RecordWatchCacheStop(config.GroupResource)
 			return nil, fmt.Errorf("failed to enable resource size estimation: %w", err)
 		}
 	}
@@ -1577,6 +1579,8 @@ func (c *Cacher) Stop() {
 	c.stopLock.Unlock()
 	close(c.stopCh)
 	c.stopWg.Wait()
+	// The watch cache is updated only by the goroutines waited for above.
+	metrics.RecordWatchCacheStop(c.groupResource)
 }
 
 func (c *Cacher) prepareKey(key string, recursive bool) (string, error) {
