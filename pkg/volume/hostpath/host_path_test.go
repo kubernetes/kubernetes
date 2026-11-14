@@ -141,6 +141,35 @@ func TestDeleterTempDir(t *testing.T) {
 	}
 }
 
+// TestDeleterPathTraversal ensures the deleter rejects path-traversal and
+// embedded-/tmp-substring bypasses that the old unanchored regex accepted.
+func TestDeleterPathTraversal(t *testing.T) {
+	bypasses := []string{
+		"/tmp/../etc",
+		"/evil/tmp/../etc",
+		"/tmp/../../etc/passwd",
+		"/tmp/a/../../etc",
+		"/tmp/..",
+	}
+	logger, _ := ktesting.NewTestContext(t)
+	for _, p := range bypasses {
+		plugMgr := volume.VolumePluginMgr{}
+		plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), nil /* prober */, volumetest.NewFakeKubeletVolumeHost(t, "/tmp/fake", nil, nil))
+		spec := &volume.Spec{PersistentVolume: &v1.PersistentVolume{Spec: v1.PersistentVolumeSpec{PersistentVolumeSource: v1.PersistentVolumeSource{HostPath: &v1.HostPathVolumeSource{Path: p}}}}}
+		plug, err := plugMgr.FindDeletablePluginBySpec(spec)
+		if err != nil {
+			t.Fatalf("Can't find the plugin by name: %v", err)
+		}
+		deleter, err := plug.NewDeleter(logger, spec)
+		if err != nil {
+			t.Fatalf("Failed to make a new Deleter: %v", err)
+		}
+		if err := deleter.Delete(); err == nil {
+			t.Errorf("Expected deletion of %q to be rejected, but it was accepted", p)
+		}
+	}
+}
+
 func TestProvisioner(t *testing.T) {
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{ProvisioningEnabled: true}),
