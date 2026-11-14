@@ -213,7 +213,8 @@ func (o *CreateOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []s
 		editOptions.PrintFlags = o.PrintFlags
 		editOptions.ApplyAnnotation = o.CreateAnnotation
 		editOptions.RecordFlags = o.RecordFlags
-		editOptions.FieldManager = "kubectl-create"
+		editOptions.FieldManager = o.fieldManager
+		editOptions.DryRunStrategy = o.DryRunStrategy
 		if err := editOptions.Complete(f, []string{}, cmd); err != nil {
 			return err
 		}
