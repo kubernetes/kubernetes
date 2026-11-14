@@ -297,7 +297,20 @@ func TestPrefixToMetrics(t *testing.T) {
 }
 
 func TestLogTransformErr(t *testing.T) {
-	klog.InitFlags(nil)
+	// klog.InitFlags(nil) installs klog's flags into flag.CommandLine, which
+	// panics with "flag redefined" the second time this runs in one binary.
+	// Bind them to a throwaway set instead; setting v on it still reaches
+	// klog's verbosity, so no flag.Parse is needed.
+	fs := flag.NewFlagSet("klog", flag.ContinueOnError)
+	klog.InitFlags(fs)
+	if err := fs.Set("v", "6"); err != nil {
+		t.Fatalf("failed to set klog verbosity: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := fs.Set("v", "0"); err != nil {
+			t.Errorf("failed to restore klog verbosity: %v", err)
+		}
+	})
 	tests := []struct {
 		name        string
 		ctx         context.Context
@@ -332,8 +345,6 @@ func TestLogTransformErr(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var buf bytes.Buffer
-			flag.Set("v", "6")
-			flag.Parse()
 			klog.SetOutput(&buf)
 			klog.LogToStderr(false)
 			defer klog.LogToStderr(true)
