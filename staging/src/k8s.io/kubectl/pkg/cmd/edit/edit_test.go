@@ -53,6 +53,8 @@ type EditTestCase struct {
 	SaveConfig       string   `yaml:"saveConfig"`
 	Subresource      string   `yaml:"subresource"`
 	Namespace        string   `yaml:"namespace"`
+	ServerSide       string   `yaml:"serverSide"`
+	ForceConflicts   string   `yaml:"forceConflicts"`
 	ExpectedStdout   []string `yaml:"expectedStdout"`
 	ExpectedStderr   []string `yaml:"expectedStderr"`
 	ExpectedExitCode int      `yaml:"expectedExitCode"`
@@ -65,10 +67,11 @@ type EditStep struct {
 	StepType string `yaml:"type"`
 
 	// only applies to request
-	RequestMethod      string `yaml:"expectedMethod,omitempty"`
-	RequestPath        string `yaml:"expectedPath,omitempty"`
-	RequestContentType string `yaml:"expectedContentType,omitempty"`
-	Input              string `yaml:"expectedInput"`
+	RequestMethod      string            `yaml:"expectedMethod,omitempty"`
+	RequestPath        string            `yaml:"expectedPath,omitempty"`
+	RequestContentType string            `yaml:"expectedContentType,omitempty"`
+	RequestQuery       map[string]string `yaml:"expectedQuery,omitempty"`
+	Input              string            `yaml:"expectedInput"`
 
 	// only applies to request
 	ResponseStatusCode int `yaml:"resultingStatusCode,omitempty"`
@@ -140,6 +143,11 @@ func TestEdit(t *testing.T) {
 				step.RequestMethod, step.RequestPath, step.RequestContentType,
 				req.Method, req.URL.Path, req.Header.Get("Content-Type"),
 			)
+		}
+		for key, want := range step.RequestQuery {
+			if got := req.URL.Query().Get(key); got != want {
+				t.Errorf("%s, step %d: query parameter %q = %q, want %q", name, i, key, got, want)
+			}
 		}
 		if !bytes.Equal(body, expectedInput) {
 			if updateInputFixtures {
@@ -254,6 +262,16 @@ func TestEdit(t *testing.T) {
 			}
 			if len(testcase.Subresource) > 0 {
 				cmd.Flags().Set("subresource", testcase.Subresource)
+			}
+			if len(testcase.ServerSide) > 0 {
+				if err := cmd.Flags().Set("server-side", testcase.ServerSide); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if len(testcase.ForceConflicts) > 0 {
+				if err := cmd.Flags().Set("force-conflicts", testcase.ForceConflicts); err != nil {
+					t.Fatal(err)
+				}
 			}
 
 			cmdutil.BehaviorOnFatal(func(str string, code int) {

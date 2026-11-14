@@ -1,0 +1,21 @@
+{
+  "kind": "Status",
+  "apiVersion": "v1",
+  "status": "Failure",
+  "message": "Apply failed with 1 conflict: conflict with \"kubectl-create\" using v1: .spec.ports",
+  "reason": "Conflict",
+  "details": {
+    "name": "dns",
+    "group": "",
+    "kind": "services",
+    "causes": [
+      {
+        "reason": "FieldManagerConflict",
+        "message": "conflict with \"kubectl-create\"",
+        "field": ".spec.ports"
+      }
+    ]
+  },
+  "code": 409
+}
+
