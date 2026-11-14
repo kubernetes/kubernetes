@@ -57,6 +57,7 @@ import (
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/fieldpath"
+	"k8s.io/kubernetes/pkg/kubelet/allocation"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/envvars"
@@ -2293,7 +2294,10 @@ func getEffectiveAllocatedResources(allocatedPod *v1.Pod) *v1.ResourceRequiremen
 }
 
 func (kl *Kubelet) convertToAPIPodLevelResourcesStatus(logger klog.Logger, allocatedPod *v1.Pod, oldPodStatus v1.PodStatus) *v1.ResourceRequirements {
-	if allocatedPod.Status.Phase != v1.PodRunning {
+	// Pod-level cgroup values can only be read for running pods on platforms
+	// that support in-place pod-level resize (e.g. not on Windows, which uses
+	// job objects rather than cgroups).
+	if resizable, _, _ := allocation.IsInPlacePodLevelResourcesVerticalScalingAllowed(allocatedPod); !resizable || allocatedPod.Status.Phase != v1.PodRunning {
 		return getEffectiveAllocatedResources(allocatedPod)
 	}
 
@@ -2309,8 +2313,7 @@ func (kl *Kubelet) convertToAPIPodLevelResourcesStatus(logger klog.Logger, alloc
 	memoryLimit := cm.MemoryLimitsFromConfig(memoryConfig)
 	cpuConfig, err := pcm.GetPodCgroupConfig(allocatedPod, v1.ResourceCPU)
 	if err != nil {
-		logger.Error(err, "failed to read memory cgroup limits for the pod", "podName", allocatedPod.Name)
-
+		logger.Error(err, "failed to read cpu cgroup config for the pod", "podName", allocatedPod.Name)
 	}
 
 	cpuRequest := cm.CPURequestsFromConfig(cpuConfig)
