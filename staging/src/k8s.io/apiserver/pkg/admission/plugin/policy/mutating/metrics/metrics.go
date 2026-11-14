@@ -43,6 +43,9 @@ const (
 	MutatingOutOfBudget MutationErrorType = "out_of_budget"
 	// MutationNoError indicates that the expression returns without an error.
 	MutationNoError MutationErrorType = "no_error"
+	// MutationCoverageViolation indicates that the request was rejected because
+	// the policy binding doesn't cover it; no expression was evaluated.
+	MutationCoverageViolation MutationErrorType = "coverage_violation"
 )
 
 var (

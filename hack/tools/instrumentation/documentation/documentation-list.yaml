@@ -116,6 +116,22 @@
   componentEndpoints:
   - component: kube-apiserver
     endpoint: /metrics
+- name: coverage_violations_total
+  subsystem: admission
+  namespace: apiserver
+  help: Admission coverage violations count, identified by name of the webhook or
+    policy that intercepts a coverage source but not its target, and broken out for
+    each kind (webhook or policy), admission type (validate or admit), and operation.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - kind
+  - name
+  - operation
+  - type
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
 - name: match_condition_evaluation_errors_total
   subsystem: admission
   namespace: apiserver

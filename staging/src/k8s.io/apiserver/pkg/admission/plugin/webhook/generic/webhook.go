@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"slices"
 
 	"k8s.io/apiserver/pkg/cel/environment"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -32,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/admission/coverage"
 	genericadmissioninit "k8s.io/apiserver/pkg/admission/initializer"
 	admissionmetrics "k8s.io/apiserver/pkg/admission/metrics"
 	"k8s.io/apiserver/pkg/admission/plugin/cel"
@@ -95,6 +97,10 @@ type Webhook struct {
 	// excludeVirtualResources caches whether the ExcludeAdmissionWebhookVirtualResources
 	// feature is enabled, set once via InspectFeatureGates to avoid a gate lookup per request.
 	excludeVirtualResources bool
+
+	// coverageRequirements holds the injected admission coverage requirements; empty disables
+	// coverage checks. It is set by an initializer and read-only once initialization completes.
+	coverageRequirements []coverage.Requirement
 }
 
 var (
@@ -102,6 +108,7 @@ var (
 	_ genericadmissioninit.WantsDrainedNotification        = &Webhook{}
 	_ genericadmissioninit.WantsAPIServerID                = &Webhook{}
 	_ genericadmissioninit.WantsExcludedAdmissionResources = &Webhook{}
+	_ genericadmissioninit.WantsAdmissionCoverage          = &Webhook{}
 	_ genericadmissioninit.WantsFeatures                   = &Webhook{}
 	_ admission.Interface                                  = &Webhook{}
 )
@@ -220,6 +227,11 @@ func (a *Webhook) SetExcludedAdmissionResources(excludedResources []schema.Group
 	a.excludedAdmissionResources.Insert(excludedResources...)
 }
 
+// SetAdmissionCoverage implements the WantsAdmissionCoverage interface.
+func (a *Webhook) SetAdmissionCoverage(reqs []coverage.Requirement) {
+	a.coverageRequirements = slices.Clone(reqs)
+}
+
 // InspectFeatureGates implements the WantsFeatures interface. It caches whether the
 // ExcludeAdmissionWebhookVirtualResources feature is enabled so Dispatch avoids a gate
 // lookup on every request.
@@ -271,6 +283,9 @@ func (a *Webhook) ValidateInitialization() error {
 	}
 	if err := a.clientManager.Validate(); err != nil {
 		return fmt.Errorf("clientManager is not properly setup: %v", err)
+	}
+	if err := coverage.Validate(a.coverageRequirements); err != nil {
+		return fmt.Errorf("invalid admission coverage requirements: %w", err)
 	}
 
 	// Guard: if static manifests dir is set but feature gate is off, return an error
@@ -375,7 +390,19 @@ func (a *Webhook) ShouldCallHook(ctx context.Context, h webhook.WebhookAccessor,
 	}
 
 	if invocation == nil {
-		return nil, nil
+		violation := a.coverageViolation(h, attr)
+		if violation == nil {
+			return nil, nil
+		}
+		// Selectors weren't a clean mismatch (we'd have returned above). If one
+		// errored, return that: it's already fail-closed and more actionable.
+		if matchNsErr != nil {
+			return nil, matchNsErr
+		}
+		if matchObjErr != nil {
+			return nil, matchObjErr
+		}
+		return nil, a.coverageRejection(ctx, h, attr, violation)
 	}
 	if matchNsErr != nil {
 		return nil, matchNsErr
@@ -404,6 +431,43 @@ func (a *Webhook) ShouldCallHook(ctx context.Context, h webhook.WebhookAccessor,
 	}
 
 	return invocation, nil
+}
+
+// coverageViolation returns the coverage violation, if any, of a hook that doesn't match attr.
+func (a *Webhook) coverageViolation(h webhook.WebhookAccessor, attr admission.Attributes) *coverage.Violation {
+	// Reinvocations are exempt: coverage was already enforced in the first round.
+	if len(a.coverageRequirements) == 0 || attr.GetReinvocationContext().IsReinvoke() {
+		return nil
+	}
+	return h.GetCoverageGaps(a.coverageRequirements).Check(attr)
+}
+
+// coverageRejection reports and rejects a request that h fails to cover. failurePolicy
+// doesn't apply: it governs failures to call a webhook, and h isn't called.
+func (a *Webhook) coverageRejection(ctx context.Context, h webhook.WebhookAccessor, attr admission.Attributes, violation *coverage.Violation) *apierrors.StatusError {
+	entry := coverage.AuditAnnotationEntry{
+		Name:          h.GetName(),
+		Configuration: h.GetConfigurationName(),
+		Source:        violation.SourceString(),
+		Target:        violation.TargetString(),
+	}
+	reason := fmt.Errorf("admission webhook %q (configuration %q) intercepts %s but not %s; "+
+		"add %s to the webhook's rules to allow this request",
+		h.GetName(), h.GetConfigurationName(), entry.Source, entry.Target, violation.RuleHint())
+
+	kind := coverage.WebhookValidating
+	if _, ok := h.GetMutatingWebhook(); ok {
+		kind = coverage.WebhookMutating
+	}
+	admissionmetrics.Metrics.ObserveCoverageViolation(ctx, h.GetName(), admissionmetrics.KindWebhook, h.GetType(), string(attr.GetOperation()))
+	klog.V(2).InfoS("Admission coverage violation", "kind", kind, "webhook", h.GetName(), "configuration", h.GetConfigurationName(),
+		"source", entry.Source, "target", entry.Target)
+	// The dispatcher stops at the first error, so this is the plugin's only coverage annotation.
+	if err := coverage.AddAuditAnnotation(attr, kind, []coverage.AuditAnnotationEntry{entry}); err != nil {
+		klog.Warningf("Failed to set admission coverage audit annotation for %s: %v", kind, err)
+	}
+
+	return apierrors.NewForbidden(attr.GetResource().GroupResource(), attr.GetName(), reason)
 }
 
 type attrWithResourceOverride struct {
