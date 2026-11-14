@@ -211,6 +211,36 @@ func getManualConversionFunctions(context *generator.Context, pkg *types.Package
 	}
 }
 
+// getGeneratedConversionFunctions records, in generatedMap, the public
+// Convert_inType_To_outType functions that will be generated into pkg for the
+// types in typesPkg that have a peer type in one of peerPkgs. Conversions that
+// already have a manual function are skipped, as no public function is
+// generated for those.
+func getGeneratedConversionFunctions(context *generator.Context, pkg, typesPkg *types.Package, peerPkgs []string, manualMap, generatedMap conversionFuncMap) {
+	if pkg == nil || typesPkg == nil {
+		return
+	}
+	buffer := &bytes.Buffer{}
+	sw := generator.NewSnippetWriter(buffer, context, "$", "$")
+	for _, t := range typesPkg.Types {
+		peerType := getPeerTypeFor(context, t, peerPkgs)
+		if peerType == nil || !isConvertibleStruct(t, peerType) {
+			continue
+		}
+		for _, pair := range []conversionPair{{t, peerType}, {peerType, t}} {
+			if _, found := manualMap[pair]; found {
+				continue
+			}
+			sw.Do("Convert_$.inType|public$_To_$.outType|public$", argsFromType(pair.inType, pair.outType))
+			generatedMap[pair] = &types.Type{
+				Name: types.Name{Package: pkg.Path, Name: buffer.String()},
+				Kind: types.DeclarationOf,
+			}
+			buffer.Reset()
+		}
+	}
+}
+
 func GetTargets(context *generator.Context, args *args.Args) []generator.Target {
 	boilerplate, err := gengo.GoBoilerplate(args.GoHeaderFile, args.GeneratedBuildTag, gengo.StdGeneratedBy)
 	if err != nil {
@@ -305,6 +335,16 @@ func GetTargets(context *generator.Context, args *args.Args) []generator.Target 
 		getManualConversionFunctions(context, p, manualConversions)
 	}
 
+	// Record the public conversion functions that this run will generate into
+	// each input package, so that other input packages can call them.
+	// These are kept separate from manualConversions: they do not block
+	// memory-identical conversions, and they are not registered as manual
+	// conversion functions.
+	generatedConversions := conversionFuncMap{}
+	for _, i := range filteredInputs {
+		getGeneratedConversionFunctions(context, context.Universe[i], context.Universe[pkgToExternal[i]], pkgToPeers[i], manualConversions, generatedConversions)
+	}
+
 	// We are generating conversions only for packages that are explicitly
 	// passed as InputDir.
 	for _, i := range filteredInputs {
@@ -338,7 +378,7 @@ func GetTargets(context *generator.Context, args *args.Args) []generator.Target 
 				},
 				GeneratorsFunc: func(c *generator.Context) (generators []generator.Generator) {
 					return []generator.Generator{
-						NewGenConversion(args.OutputFile, typesPkg.Path, pkg.Path, manualConversions, pkgToPeers[pkg.Path], unsafeEquality),
+						NewGenConversion(args.OutputFile, typesPkg.Path, pkg.Path, manualConversions, generatedConversions, pkgToPeers[pkg.Path], unsafeEquality),
 					}
 				},
 			})
@@ -499,9 +539,13 @@ type genConversion struct {
 	explicitConversions []conversionPair
 	skippedFields       map[*types.Type][]string
 	useUnsafe           TypesEqual
+
+	// public conversion functions that are generated into other output
+	// packages in the same run
+	generatedFuncs conversionFuncMap
 }
 
-func NewGenConversion(outputFilename, typesPackage, outputPackage string, manualConversions conversionFuncMap, peerPkgs []string, useUnsafe TypesEqual) generator.Generator {
+func NewGenConversion(outputFilename, typesPackage, outputPackage string, manualConversions, generatedConversions conversionFuncMap, peerPkgs []string, useUnsafe TypesEqual) generator.Generator {
 	return &genConversion{
 		GoGenerator: generator.GoGenerator{
 			OutputFilename: outputFilename,
@@ -515,6 +559,7 @@ func NewGenConversion(outputFilename, typesPackage, outputPackage string, manual
 		explicitConversions: []conversionPair{},
 		skippedFields:       map[*types.Type][]string{},
 		useUnsafe:           useUnsafe,
+		generatedFuncs:      generatedConversions,
 	}
 }
 
@@ -551,6 +596,12 @@ func (g *genConversion) convertibleOnlyWithinPackage(inType, outType *types.Type
 	if t.Name.Package != g.typesPackage {
 		return false
 	}
+	return isConvertibleStruct(t, other)
+}
+
+// isConvertibleStruct reports whether conversion-gen generates conversion
+// functions between t and its peer type other.
+func isConvertibleStruct(t, other *types.Type) bool {
 	// If the type has opted out, skip it.
 	tagvals, err := extractTag(t.CommentLines)
 	if err != nil {
@@ -664,6 +715,16 @@ const nameTmpl = "Convert_$.inType|publicIT$_To_$.outType|publicIT$"
 func (g *genConversion) preexists(inType, outType *types.Type) (*types.Type, bool) {
 	function, ok := g.manualConversions[conversionPair{inType, outType}]
 	return function, ok
+}
+
+// generatedElsewhere returns the public conversion function that is generated
+// into another output package for inType -> outType, if there is one.
+func (g *genConversion) generatedElsewhere(inType, outType *types.Type) (*types.Type, bool) {
+	function, ok := g.generatedFuncs[conversionPair{inType, outType}]
+	if !ok || function.Name.Package == g.outputPackage {
+		return nil, false
+	}
+	return function, true
 }
 
 func (g *genConversion) preexistsPointers(inType, outType *types.Type) (*types.Type, bool) {
@@ -868,6 +929,9 @@ func (g *genConversion) doMap(inType, outType *types.Type, sw *generator.Snippet
 			} else if g.convertibleOnlyWithinPackage(inType.Elem, outType.Elem) {
 				sw.Do("newVal := new($.|raw$)\n", outType.Elem)
 				sw.Do("if err := "+nameTmpl+"(&val, newVal, s); err != nil {\n", argsFromType(inType.Elem, outType.Elem))
+			} else if function, ok := g.generatedElsewhere(inType.Elem, outType.Elem); ok {
+				sw.Do("newVal := new($.|raw$)\n", outType.Elem)
+				sw.Do("if err := $.|raw$(&val, newVal, s); err != nil {\n", function)
 			} else {
 				args := argsFromType(inType.Elem, outType.Elem)
 				sw.Do("// FIXME: Provide conversion function to convert $.inType|raw$ to $.outType|raw$\n", args)
@@ -919,6 +983,8 @@ func (g *genConversion) doSlice(inType, outType *types.Type, sw *generator.Snipp
 				conditionalConversionExists = true
 			} else if g.convertibleOnlyWithinPackage(inType.Elem, outType.Elem) {
 				sw.Do("if err := "+nameTmpl+"(&(*in)[i], &(*out)[i], s); err != nil {\n", argsFromType(inType.Elem, outType.Elem))
+			} else if function, ok := g.generatedElsewhere(inType.Elem, outType.Elem); ok {
+				sw.Do("if err := $.|raw$(&(*in)[i], &(*out)[i], s); err != nil {\n", function)
 			} else {
 				args := argsFromType(inType.Elem, outType.Elem)
 				sw.Do("// FIXME: Provide conversion function to convert $.inType|raw$ to $.outType|raw$\n", args)
@@ -1074,6 +1140,9 @@ func (g *genConversion) doStruct(inType, outType *types.Type, sw *generator.Snip
 			conversionExists := true
 			if g.convertibleOnlyWithinPackage(inMemberType, outMemberType) {
 				sw.Do("if err := "+nameTmpl+"(&in.$.name$, &out.$.name$, s); err != nil {\n", args)
+			} else if function, ok := g.generatedElsewhere(inMemberType, outMemberType); ok {
+				args["function"] = function
+				sw.Do("if err := $.function|raw$(&in.$.name$, &out.$.name$, s); err != nil {\n", args)
 			} else {
 				args := argsFromType(inMemberType, outMemberType)
 				sw.Do("// FIXME: Provide conversion function to convert $.inType|raw$ to $.outType|raw$\n", args)
@@ -1095,6 +1164,9 @@ func (g *genConversion) doStruct(inType, outType *types.Type, sw *generator.Snip
 				conversionExists := true
 				if g.convertibleOnlyWithinPackage(inMemberType, outMemberType) {
 					sw.Do("if err := "+nameTmpl+"(&in.$.name$, &out.$.name$, s); err != nil {\n", args)
+				} else if function, ok := g.generatedElsewhere(inMemberType, outMemberType); ok {
+					args["function"] = function
+					sw.Do("if err := $.function|raw$(&in.$.name$, &out.$.name$, s); err != nil {\n", args)
 				} else {
 					args := argsFromType(inMemberType, outMemberType)
 					sw.Do("// FIXME: Provide conversion function to convert $.inType|raw$ to $.outType|raw$\n", args)
@@ -1110,6 +1182,9 @@ func (g *genConversion) doStruct(inType, outType *types.Type, sw *generator.Snip
 			conversionExists := true
 			if g.convertibleOnlyWithinPackage(inMemberType, outMemberType) {
 				sw.Do("if err := "+nameTmpl+"(&in.$.name$, &out.$.name$, s); err != nil {\n", args)
+			} else if function, ok := g.generatedElsewhere(inMemberType, outMemberType); ok {
+				args["function"] = function
+				sw.Do("if err := $.function|raw$(&in.$.name$, &out.$.name$, s); err != nil {\n", args)
 			} else {
 				args := argsFromType(inMemberType, outMemberType)
 				sw.Do("// FIXME: Provide conversion function to convert $.inType|raw$ to $.outType|raw$\n", args)
@@ -1191,6 +1266,8 @@ func (g *genConversion) doPointer(inType, outType *types.Type, sw *generator.Sni
 			sw.Do("if err := $.|raw$(*in, *out, s); err != nil {\n", function)
 		} else if g.convertibleOnlyWithinPackage(inType.Elem, outType.Elem) {
 			sw.Do("if err := "+nameTmpl+"(*in, *out, s); err != nil {\n", argsFromType(inType.Elem, outType.Elem))
+		} else if function, ok := g.generatedElsewhere(inType.Elem, outType.Elem); ok {
+			sw.Do("if err := $.|raw$(*in, *out, s); err != nil {\n", function)
 		} else {
 			args := argsFromType(inType.Elem, outType.Elem)
 			sw.Do("// FIXME: Provide conversion function to convert $.inType|raw$ to $.outType|raw$\n", args)

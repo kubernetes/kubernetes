@@ -22,11 +22,12 @@ limitations under the License.
 package v1alpha1
 
 import (
+	unsafe "unsafe"
+
 	apiadmissionv1 "k8s.io/api/admission/v1"
 	authorizationv1alpha1 "k8s.io/api/authorization/v1alpha1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	types "k8s.io/apimachinery/pkg/types"
 	admission "k8s.io/kubernetes/pkg/apis/admission"
 	admissionv1 "k8s.io/kubernetes/pkg/apis/admission/v1"
 	authorization "k8s.io/kubernetes/pkg/apis/authorization"
@@ -116,10 +117,7 @@ func Convert_authorization_AuthorizationConditionsRequest_To_v1alpha1_Authorizat
 }
 
 func autoConvert_v1alpha1_AuthorizationConditionsResponse_To_authorization_AuthorizationConditionsResponse(in *authorizationv1alpha1.AuthorizationConditionsResponse, out *authorization.AuthorizationConditionsResponse, s conversion.Scope) error {
-	out.UID = types.UID(in.UID)
-	if err := v1.Convert_v1_ConditionsAwareDecision_To_authorization_ConditionsAwareDecision(&in.Decision, &out.Decision, s); err != nil {
-		return err
-	}
+	*out = *(*authorization.AuthorizationConditionsResponse)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -129,10 +127,7 @@ func Convert_v1alpha1_AuthorizationConditionsResponse_To_authorization_Authoriza
 }
 
 func autoConvert_authorization_AuthorizationConditionsResponse_To_v1alpha1_AuthorizationConditionsResponse(in *authorization.AuthorizationConditionsResponse, out *authorizationv1alpha1.AuthorizationConditionsResponse, s conversion.Scope) error {
-	out.UID = types.UID(in.UID)
-	if err := v1.Convert_authorization_ConditionsAwareDecision_To_v1_ConditionsAwareDecision(&in.Decision, &out.Decision, s); err != nil {
-		return err
-	}
+	*out = *(*authorizationv1alpha1.AuthorizationConditionsResponse)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -152,15 +147,7 @@ func autoConvert_v1alpha1_AuthorizationConditionsReview_To_authorization_Authori
 	} else {
 		out.Request = nil
 	}
-	if in.Response != nil {
-		in, out := &in.Response, &out.Response
-		*out = new(authorization.AuthorizationConditionsResponse)
-		if err := Convert_v1alpha1_AuthorizationConditionsResponse_To_authorization_AuthorizationConditionsResponse(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.Response = nil
-	}
+	out.Response = (*authorization.AuthorizationConditionsResponse)(unsafe.Pointer(in.Response))
 	return nil
 }
 
@@ -180,15 +167,7 @@ func autoConvert_authorization_AuthorizationConditionsReview_To_v1alpha1_Authori
 	} else {
 		out.Request = nil
 	}
-	if in.Response != nil {
-		in, out := &in.Response, &out.Response
-		*out = new(authorizationv1alpha1.AuthorizationConditionsResponse)
-		if err := Convert_authorization_AuthorizationConditionsResponse_To_v1alpha1_AuthorizationConditionsResponse(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.Response = nil
-	}
+	out.Response = (*authorizationv1alpha1.AuthorizationConditionsResponse)(unsafe.Pointer(in.Response))
 	return nil
 }
 
