@@ -54,6 +54,7 @@ import (
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
+	consistencyutil "k8s.io/client-go/util/consistency"
 	"k8s.io/client-go/util/workqueue"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	metricstestutil "k8s.io/component-base/metrics/testutil"
@@ -7565,8 +7566,25 @@ func (pb podBuilder) customDeletionTimestamp(t time.Time) podBuilder {
 	return pb
 }
 
+type consistencyWrite struct {
+	owner    types.NamespacedName
+	ownerUID types.UID
+	resource schema.GroupResource
+	rv       string
+}
+
+type recordingConsistencyStore struct {
+	consistencyutil.ConsistencyStore
+	writes []consistencyWrite
+}
+
+func (s *recordingConsistencyStore) WroteAt(owner types.NamespacedName, ownerUID types.UID, resource schema.GroupResource, rv string) {
+	s.writes = append(s.writes, consistencyWrite{owner: owner, ownerUID: ownerUID, resource: resource, rv: rv})
+	s.ConsistencyStore.WroteAt(owner, ownerUID, resource, rv)
+}
+
 func TestSyncJobPodSchedulingGroup(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
+	logger, ctx := ktesting.NewTestContext(t)
 
 	gangJob := newGangSchedulingJob("test-job", 4)
 	gangJob.Spec.BackoffLimit = ptr.To[int32](6)
@@ -7641,19 +7659,25 @@ func TestSyncJobPodSchedulingGroup(t *testing.T) {
 		existingWorkload *schedulingv1beta1.Workload
 		existingPodGroup *schedulingv1beta1.PodGroup
 
-		workloadWithJob bool
+		workloadWithJob             bool
+		podGroupFinalizer           bool
+		podGroupDeleteReturnsStatus bool
+		unsatisfiedExpectations     bool
 
-		wantSchedulingGroupName string
-		wantCreations           int32
-		wantErr                 bool
-		wantSchedulingBlocked   *batch.JobCondition
-		wantStatusUpdates       *int
-		wantActive              *int32
-		wantReady               *int32
-		wantTerminating         *int32
-		wantSucceeded           *int32
-		wantPodPatches          int
-		wantEvents              []string
+		wantSchedulingGroupName   string
+		wantCreations             int32
+		wantDeletions             int
+		wantErr                   bool
+		wantSchedulingBlocked     *batch.JobCondition
+		wantPodGroupsInAPI        []string
+		wantPodGroupWriteRecorded bool
+		wantStatusUpdates         *int
+		wantActive                *int32
+		wantReady                 *int32
+		wantTerminating           *int32
+		wantSucceeded             *int32
+		wantPodPatches            int
+		wantEvents                []string
 	}{
 		"gang-eligible job with PodGroup: pods get schedulingGroup without PodGroup ownerRef": {
 			job:              gangJob,
@@ -7701,8 +7725,104 @@ func TestSyncJobPodSchedulingGroup(t *testing.T) {
 				wl := makeWorkload(j)
 				return makePodGroup(j, wl)
 			}(),
+			wantCreations:      0,
+			wantEvents:         []string{"Normal PodGroupDeleted", "Normal Suspended"},
+			wantPodGroupsInAPI: []string{},
+		},
+		"suspended job with a finalizer-protected PodGroup: delete is recorded so resume waits for the informer": {
+			job: func() *batch.Job {
+				j := newGangSchedulingJob("suspended-job", 4)
+				j.Spec.BackoffLimit = ptr.To[int32](6)
+				j.Spec.Suspend = new(true)
+				return j
+			}(),
+			workloadWithJob:   true,
+			podGroupFinalizer: true,
+			existingWorkload: func() *schedulingv1beta1.Workload {
+				j := newGangSchedulingJob("suspended-job", 4)
+				return makeWorkload(j)
+			}(),
+			existingPodGroup: func() *schedulingv1beta1.PodGroup {
+				j := newGangSchedulingJob("suspended-job", 4)
+				wl := makeWorkload(j)
+				pg := makePodGroup(j, wl)
+				pg.Finalizers = []string{"scheduling.k8s.io/podgroup-protection"}
+				return pg
+			}(),
+			wantCreations:             0,
+			wantEvents:                []string{"Normal PodGroupDeleted", "Normal Suspended"},
+			wantPodGroupWriteRecorded: true,
+		},
+		"suspended job with an immediately deleted PodGroup: delete is recorded so resume waits for the informer": {
+			job: func() *batch.Job {
+				j := newGangSchedulingJob("suspended-job", 4)
+				j.Spec.BackoffLimit = ptr.To[int32](6)
+				j.Spec.Suspend = new(true)
+				return j
+			}(),
+			workloadWithJob:             true,
+			podGroupDeleteReturnsStatus: true,
+			existingWorkload: func() *schedulingv1beta1.Workload {
+				j := newGangSchedulingJob("suspended-job", 4)
+				return makeWorkload(j)
+			}(),
+			existingPodGroup: func() *schedulingv1beta1.PodGroup {
+				j := newGangSchedulingJob("suspended-job", 4)
+				return makePodGroup(j, makeWorkload(j))
+			}(),
+			wantCreations:             0,
+			wantEvents:                []string{"Normal PodGroupDeleted", "Normal Suspended"},
+			wantPodGroupsInAPI:        []string{},
+			wantPodGroupWriteRecorded: true,
+		},
+		"suspended job with unobserved pods: PodGroup is kept until expectations are met": {
+			job: func() *batch.Job {
+				j := newGangSchedulingJob("suspended-job", 4)
+				j.Spec.BackoffLimit = ptr.To[int32](6)
+				j.Spec.Suspend = new(true)
+				return j
+			}(),
+			workloadWithJob:         true,
+			unsatisfiedExpectations: true,
+			existingWorkload: func() *schedulingv1beta1.Workload {
+				j := newGangSchedulingJob("suspended-job", 4)
+				return makeWorkload(j)
+			}(),
+			existingPodGroup: func() *schedulingv1beta1.PodGroup {
+				j := newGangSchedulingJob("suspended-job", 4)
+				wl := makeWorkload(j)
+				return makePodGroup(j, wl)
+			}(),
 			wantCreations: 0,
-			wantEvents:    []string{"Normal Suspended"},
+			wantPodGroupsInAPI: []string{func() string {
+				j := newGangSchedulingJob("suspended-job", 4)
+				return makePodGroup(j, makeWorkload(j)).Name
+			}()},
+		},
+		"deleting job: PodGroup is not recreated": {
+			job: func() *batch.Job {
+				j := gangJob.DeepCopy()
+				j.DeletionTimestamp = new(metav1.Now())
+				j.Finalizers = []string{"foregroundDeletion"}
+				return j
+			}(),
+			workloadWithJob:    true,
+			existingWorkload:   gangWorkload,
+			wantCreations:      0,
+			wantPodGroupsInAPI: []string{},
+		},
+		"job with FailureTarget: PodGroup is not recreated": {
+			job:             gangJob,
+			workloadWithJob: true,
+			conditions: []batch.JobCondition{{
+				Type:   batch.JobFailureTarget,
+				Status: v1.ConditionTrue,
+				Reason: batch.JobReasonBackoffLimitExceeded,
+			}},
+			existingWorkload:   gangWorkload,
+			wantCreations:      0,
+			wantPodGroupsInAPI: []string{},
+			wantEvents:         []string{"Warning BackoffLimitExceeded"},
 		},
 		"unsupported Workload structure blocks pod creation and records SchedulingBlocked": {
 			job:               gangJob,
@@ -7746,6 +7866,30 @@ func TestSyncJobPodSchedulingGroup(t *testing.T) {
 			wantReady:       new(int32(1)),
 			wantTerminating: new(int32(1)),
 			wantEvents:      []string{"Warning InvalidSchedulingObjects"},
+		},
+		"suspending a blocked Job still deletes its active pods": {
+			job: func() *batch.Job {
+				j := gangJob.DeepCopy()
+				j.Spec.Suspend = new(true)
+				return j
+			}(),
+			workloadWithJob: true,
+			pods: []*v1.Pod{
+				buildPod().name("running-0").job(gangJob).index("0").phase(v1.PodRunning).Pod,
+				buildPod().name("running-1").job(gangJob).index("1").phase(v1.PodRunning).Pod,
+			},
+			existingWorkload: twoTemplateWorkload,
+			wantErr:          true,
+			wantCreations:    0,
+			wantDeletions:    2,
+			wantSchedulingBlocked: &batch.JobCondition{
+				Type:    batch.JobSchedulingBlocked,
+				Status:  v1.ConditionTrue,
+				Reason:  ReasonInvalidSchedulingObjects,
+				Message: twoTemplateMessage,
+			},
+			wantActive: new(int32(0)),
+			wantEvents: []string{"Warning InvalidSchedulingObjects", "Normal Suspended"},
 		},
 		"running delegated Job whose external Workload is gone keeps tracking its pods": {
 			job:             delegatedJob,
@@ -7833,6 +7977,18 @@ func TestSyncJobPodSchedulingGroup(t *testing.T) {
 				Message: "Scheduling objects for the Job are valid",
 			},
 		},
+		"terminating PodGroup - no pods are created until it is gone": {
+			job:              gangJob,
+			workloadWithJob:  true,
+			existingWorkload: gangWorkload,
+			existingPodGroup: func() *schedulingv1beta1.PodGroup {
+				pg := gangPodGroup.DeepCopy()
+				pg.DeletionTimestamp = new(metav1.Now())
+				pg.Finalizers = []string{"scheduling.k8s.io/podgroup-protection"}
+				return pg
+			}(),
+			wantCreations: 0,
+		},
 		"active pod without schedulingGroup - new pods are created without the PodGroup": {
 			job:              gangJob,
 			workloadWithJob:  true,
@@ -7854,6 +8010,15 @@ func TestSyncJobPodSchedulingGroup(t *testing.T) {
 			existingPodGroup:        gangPodGroup,
 			wantSchedulingGroupName: gangPodGroup.Name,
 			wantCreations:           3,
+		},
+		"resumed job with only terminal pods - PodGroup is recreated and pods get schedulingGroup": {
+			job:                     gangJob,
+			workloadWithJob:         true,
+			pods:                    []*v1.Pod{buildPod().name("failed").job(gangJob).index("0").phase(v1.PodFailed).Pod},
+			existingWorkload:        gangWorkload,
+			wantSchedulingGroupName: gangPodGroup.Name,
+			wantCreations:           4,
+			wantEvents:              []string{"Normal PodGroupCreated"},
 		},
 		"feature gate disabled: gang-eligible job creates pods without scheduling objects": {
 			job: func() *batch.Job {
@@ -7882,6 +8047,34 @@ func TestSyncJobPodSchedulingGroup(t *testing.T) {
 				features.WorkloadWithJob: tc.workloadWithJob,
 			})
 
+			if tc.podGroupFinalizer {
+				podGroupGVR := schedulingv1beta1.SchemeGroupVersion.WithResource("podgroups")
+				clientSet.PrependReactor("delete", "podgroups", func(action core.Action) (bool, runtime.Object, error) {
+					del := action.(core.DeleteAction)
+					obj, err := clientSet.Tracker().Get(podGroupGVR, del.GetNamespace(), del.GetName())
+					if err != nil {
+						return true, nil, err
+					}
+					pg := obj.(*schedulingv1beta1.PodGroup).DeepCopy()
+					pg.DeletionTimestamp = new(metav1.Now())
+					pg.ResourceVersion = "100"
+					if err := clientSet.Tracker().Update(podGroupGVR, pg, del.GetNamespace()); err != nil {
+						return true, nil, err
+					}
+					return true, pg, nil
+				})
+			}
+			if tc.podGroupDeleteReturnsStatus {
+				podGroupGVR := schedulingv1beta1.SchemeGroupVersion.WithResource("podgroups")
+				clientSet.PrependReactor("delete", "podgroups", func(action core.Action) (bool, runtime.Object, error) {
+					del := action.(core.DeleteAction)
+					if err := clientSet.Tracker().Delete(podGroupGVR, del.GetNamespace(), del.GetName()); err != nil {
+						return true, nil, err
+					}
+					return true, &metav1.Status{Status: metav1.StatusSuccess, ListMeta: metav1.ListMeta{ResourceVersion: "100"}}, nil
+				})
+			}
+
 			jm, sharedInformers := newControllerFromClient(ctx, t, clientSet, controller.NoResyncPeriodFunc)
 
 			fakePodControl := controller.FakePodControl{}
@@ -7893,6 +8086,8 @@ func TestSyncJobPodSchedulingGroup(t *testing.T) {
 				statusUpdates = append(statusUpdates, job.DeepCopy())
 				return job, nil
 			}
+			consistencyStore := &recordingConsistencyStore{ConsistencyStore: consistencyutil.NewNoopConsistencyStore()}
+			jm.consistencyStore = consistencyStore
 
 			sharedInformers.StartWithContext(ctx)
 			sharedInformers.WaitForCacheSyncWithContext(ctx)
@@ -7907,13 +8102,47 @@ func TestSyncJobPodSchedulingGroup(t *testing.T) {
 					t.Fatalf("Failed to insert pod in index: %v", err)
 				}
 			}
+			jobKey := testutil.GetKey(job, t)
+			if tc.unsatisfiedExpectations {
+				if err := jm.expectations.ExpectCreations(logger, jobKey, 1); err != nil {
+					t.Fatalf("Failed to set creation expectations: %v", err)
+				}
+			}
 
-			err := jm.syncJob(ctx, testutil.GetKey(job, t))
+			err := jm.syncJob(ctx, jobKey)
 			if (err != nil) != tc.wantErr {
 				t.Fatalf("syncJob() error = %v, wantErr %v", err, tc.wantErr)
 			}
+			if tc.wantPodGroupsInAPI != nil {
+				list, err := clientSet.SchedulingV1beta1().PodGroups(metav1.NamespaceDefault).List(ctx, metav1.ListOptions{})
+				if err != nil {
+					t.Fatalf("list podGroups: %v", err)
+				}
+				var got []string
+				for _, pg := range list.Items {
+					got = append(got, pg.Name)
+				}
+				if diff := cmp.Diff(tc.wantPodGroupsInAPI, got, cmpopts.EquateEmpty()); diff != "" {
+					t.Errorf("unexpected PodGroups in the API (-want +got):\n%s", diff)
+				}
+			}
+			var wantWrites []consistencyWrite
+			if tc.wantPodGroupWriteRecorded {
+				wantWrites = []consistencyWrite{{
+					owner:    types.NamespacedName{Namespace: job.Namespace, Name: job.Name},
+					ownerUID: job.UID,
+					resource: podGroupsGroupResource,
+					rv:       "100",
+				}}
+			}
+			if diff := cmp.Diff(wantWrites, consistencyStore.writes, cmp.AllowUnexported(consistencyWrite{}), cmpopts.EquateEmpty()); diff != "" {
+				t.Errorf("unexpected consistency store writes (-want +got):\n%s", diff)
+			}
 			if int32(len(fakePodControl.Templates)) != tc.wantCreations {
 				t.Fatalf("expected %d pod creations, got %d", tc.wantCreations, len(fakePodControl.Templates))
+			}
+			if len(fakePodControl.DeletePodName) != tc.wantDeletions {
+				t.Errorf("pod deletions = %d, want %d", len(fakePodControl.DeletePodName), tc.wantDeletions)
 			}
 			if tc.wantStatusUpdates != nil && len(statusUpdates) != *tc.wantStatusUpdates {
 				t.Errorf("status updates = %d, want %d", len(statusUpdates), *tc.wantStatusUpdates)
