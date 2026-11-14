@@ -140,6 +140,36 @@ func TestBuildUserAgent(t *testing.T) {
 			"beos", "itanium", "baaaaaaaaad"))
 }
 
+func TestServiceAccountFilePath(t *testing.T) {
+	testCases := []struct {
+		name     string
+		goos     string
+		filename string
+		want     string
+	}{
+		{
+			name:     "linux",
+			goos:     "linux",
+			filename: "token",
+			want:     "/var/run/secrets/kubernetes.io/serviceaccount/token",
+		},
+		{
+			name:     "windows",
+			goos:     "windows",
+			filename: "token",
+			want:     "c:/var/run/secrets/kubernetes.io/serviceaccount/token",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := serviceAccountFilePath(tc.goos, tc.filename); got != tc.want {
+				t.Fatalf("serviceAccountFilePath(%q, %q) = %q, want %q", tc.goos, tc.filename, got, tc.want)
+			}
+		})
+	}
+}
+
 // This function untestable since it doesn't accept arguments.
 func TestDefaultKubernetesUserAgent(t *testing.T) {
 	assert.New(t).Contains(DefaultKubernetesUserAgent(), "kubernetes")
