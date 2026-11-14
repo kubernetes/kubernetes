@@ -1393,7 +1393,7 @@ func getURLRootPath(path string) string {
 var longRunningRequestPathMap = map[string]bool{
 	"exec":        true,
 	"attach":      true,
-	"portforward": true,
+	"portForward": true,
 	"debug":       true,
 }
 
