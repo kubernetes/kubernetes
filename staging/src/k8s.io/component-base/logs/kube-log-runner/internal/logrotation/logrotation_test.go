@@ -19,6 +19,8 @@ package logrotation
 import (
 	"os"
 	"path/filepath"
+	"runtime"
+	"strings"
 	"testing"
 	"time"
 )
@@ -234,5 +236,139 @@ func TestLogrotationWrite(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestRotationWithinSameSecondKeepsBackups(t *testing.T) {
+	tmpDir := t.TempDir()
+	logFilePath := filepath.Join(tmpDir, "test.log")
+
+	rotationFile, err := Open(logFilePath, 0, 10, 0)
+	if err != nil {
+		t.Fatalf("Failed to open RotationFile: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := rotationFile.Close(); err != nil {
+			t.Errorf("Failed to close rotationFile: %v", err)
+		}
+	})
+
+	// Each write exceeds maxSize, so each one rotates, typically within the same second.
+	lines := []string{"AAAAAAAAAA\n", "BBBBBBBBBB\n", "CCCCCCCCCC\n"}
+	for _, line := range lines {
+		if _, err := rotationFile.Write([]byte(line)); err != nil {
+			t.Fatalf("Failed to write to RotationFile: %v", err)
+		}
+	}
+
+	rotatedFiles, err := filepath.Glob(filepath.Join(tmpDir, "test-*.log"))
+	if err != nil {
+		t.Fatalf("Failed to list rotated files: %v", err)
+	}
+	if len(rotatedFiles) != len(lines) {
+		t.Errorf("Expected %d rotated log files, but found %d: %v", len(lines), len(rotatedFiles), rotatedFiles)
+	}
+	var combined strings.Builder
+	for _, f := range rotatedFiles {
+		content, err := os.ReadFile(f)
+		if err != nil {
+			t.Fatalf("Failed to read rotated log file: %v", err)
+		}
+		combined.Write(content)
+	}
+	for _, line := range lines {
+		if !strings.Contains(combined.String(), line) {
+			t.Errorf("Expected rotated log files to contain %q, got %q", line, combined.String())
+		}
+	}
+}
+
+func TestCleanRemovesSuffixedBackups(t *testing.T) {
+	tmpDir := t.TempDir()
+	pathWithoutExt := filepath.Join(tmpDir, "test")
+
+	old := time.Now().Add(-time.Hour)
+	for _, name := range []string{"test-20250101-000000.log", "test-20250101-000000.1.log"} {
+		path := filepath.Join(tmpDir, name)
+		if err := os.WriteFile(path, []byte("old"), 0644); err != nil {
+			t.Fatalf("Failed to create backup: %v", err)
+		}
+		if err := os.Chtimes(path, old, old); err != nil {
+			t.Fatalf("Failed to change modification time: %v", err)
+		}
+	}
+
+	w := &rotationFile{maxAge: time.Minute}
+	if err := w.clean(pathWithoutExt, ".log"); err != nil {
+		t.Fatalf("clean failed: %v", err)
+	}
+
+	remaining, err := filepath.Glob(filepath.Join(tmpDir, "test-*.log"))
+	if err != nil {
+		t.Fatalf("Failed to list rotated files: %v", err)
+	}
+	if len(remaining) != 0 {
+		t.Errorf("Expected all expired backups to be removed, but found %v", remaining)
+	}
+}
+
+func TestWriteSurvivesFailedRotation(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("directory permissions do not prevent rename on Windows")
+	}
+	if os.Geteuid() == 0 {
+		t.Skip("root bypasses directory permissions")
+	}
+
+	tmpDir := t.TempDir()
+	logFilePath := filepath.Join(tmpDir, "test.log")
+
+	rotationFile, err := Open(logFilePath, 0, 10, 0)
+	if err != nil {
+		t.Fatalf("Failed to open RotationFile: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := rotationFile.Close(); err != nil {
+			t.Errorf("Failed to close rotationFile: %v", err)
+		}
+	})
+
+	// Make the rename in rotate() fail.
+	if err := os.Chmod(tmpDir, 0555); err != nil {
+		t.Fatalf("Failed to make log directory read-only: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(tmpDir, 0755) })
+
+	first := []byte("AAAAAAAAAAAA\n")
+	n, err := rotationFile.Write(first)
+	if err != nil {
+		t.Fatalf("Expected a failed rotation not to fail the write, got: %v", err)
+	}
+	if n != len(first) {
+		t.Errorf("Expected to write %d bytes, but wrote %d bytes", len(first), n)
+	}
+
+	if err := os.Chmod(tmpDir, 0755); err != nil {
+		t.Fatalf("Failed to restore log directory permissions: %v", err)
+	}
+
+	second := []byte("BBBBBBBBBBBB\n")
+	if _, err := rotationFile.Write(second); err != nil {
+		t.Fatalf("Expected writes to recover after the rotation failure cleared, got: %v", err)
+	}
+
+	rotatedFiles, err := filepath.Glob(filepath.Join(tmpDir, "test-*.log"))
+	if err != nil {
+		t.Fatalf("Failed to list rotated files: %v", err)
+	}
+	if len(rotatedFiles) != 1 {
+		t.Fatalf("Expected 1 rotated log file once the rotation succeeded, but found %d", len(rotatedFiles))
+	}
+	content, err := os.ReadFile(rotatedFiles[0])
+	if err != nil {
+		t.Fatalf("Failed to read rotated log file: %v", err)
+	}
+	if want := string(first) + string(second); string(content) != want {
+		t.Errorf("Expected rotated log file content %q, got %q", want, string(content))
 	}
 }
