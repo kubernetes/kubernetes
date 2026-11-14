@@ -653,14 +653,21 @@ func waitForDefinitionCleanup(c k8sclientset.Interface, name string) error {
 
 func waitForOpenAPISchema(c k8sclientset.Interface, pred func(*spec.Swagger) (bool, string)) error {
 	client := c.Discovery().RESTClient().(*rest.RESTClient).Client
-	url := c.Discovery().RESTClient().Get().AbsPath("openapi", "v2").URL()
+	url := c.Discovery().RESTClient().Get().AbsPath("openapi", "v2").URL().String()
+	return waitForOpenAPISchemaWithClient(client, url, 500*time.Millisecond, 60*time.Second, pred)
+}
+
+func waitForOpenAPISchemaWithClient(client *http.Client, url string, pollInterval, pollTimeout time.Duration, pred func(*spec.Swagger) (bool, string)) error {
+	ctx, cancel := context.WithTimeout(context.Background(), pollTimeout)
+	defer cancel()
+
 	lastMsg := ""
 	etag := ""
 	var etagSpec *spec.Swagger
-	if err := wait.Poll(500*time.Millisecond, 60*time.Second, mustSucceedMultipleTimes(waitSuccessThreshold, func() (bool, error) {
+	condition := mustSucceedMultipleTimes(waitSuccessThreshold, func() (bool, error) {
 		// download spec with etag support
 		spec := &spec.Swagger{}
-		req, err := http.NewRequest("GET", url.String(), nil)
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 		if err != nil {
 			return false, err
 		}
@@ -670,7 +677,8 @@ func waitForOpenAPISchema(c k8sclientset.Interface, pred func(*spec.Swagger) (bo
 		}
 		resp, err := client.Do(req)
 		if err != nil {
-			return false, err
+			lastMsg = fmt.Sprintf("failed to get OpenAPI spec: %v", err)
+			return false, nil
 		}
 		defer resp.Body.Close()
 		if resp.StatusCode == http.StatusNotModified {
@@ -689,8 +697,9 @@ func waitForOpenAPISchema(c k8sclientset.Interface, pred func(*spec.Swagger) (bo
 		var ok bool
 		ok, lastMsg = pred(spec)
 		return ok, nil
-	})); err != nil {
-		return fmt.Errorf("failed to wait for OpenAPI spec validating condition: %v; lastMsg: %s", err, lastMsg)
+	})
+	if err := wait.PollUntilContextCancel(ctx, pollInterval, false, wait.ConditionFunc(condition).WithContext()); err != nil {
+		return fmt.Errorf("failed to wait for OpenAPI spec validating condition: %w; lastMsg: %s", err, lastMsg)
 	}
 	return nil
 }
