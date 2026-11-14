@@ -141,6 +141,10 @@ func (rt mockRuntimeService) UpdateContainerResources(_ context.Context, _ strin
 	return rt.err
 }
 
+func (rt mockRuntimeService) ListContainers(context.Context, *runtimeapi.ContainerFilter) ([]*runtimeapi.Container, error) {
+	return nil, rt.err
+}
+
 type mockPodStatusProvider struct {
 	podStatus v1.PodStatus
 	found     bool
