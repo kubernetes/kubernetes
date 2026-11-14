@@ -1927,7 +1927,9 @@ func (kl *Kubelet) initializeRuntimeDependentModules(ctx context.Context) {
 		os.Exit(1)
 	}
 	// containerManager must start after cAdvisor because it needs filesystem capacity information
-	if err := kl.containerManager.Start(ctx, node, kl.GetActivePods, kl.getNodeAnyWay, kl.sourcesReady, kl.statusManager, kl.runtimeService, kl.supportLocalStorageCapacityIsolation()); err != nil {
+	// The QoS-class cgroups are sized from these pods, so they are the allocated (rather than
+	// desired) pod resources, the same as the pod cgroups beneath them and eviction below.
+	if err := kl.containerManager.Start(ctx, node, kl.getAllocatedPods, kl.getNodeAnyWay, kl.sourcesReady, kl.statusManager, kl.runtimeService, kl.supportLocalStorageCapacityIsolation()); err != nil {
 		// Fail kubelet and rely on the babysitter to retry starting kubelet.
 		logger.Error(err, "Failed to start ContainerManager")
 		os.Exit(1)
