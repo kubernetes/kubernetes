@@ -56,6 +56,7 @@ func TestFallbackClient_WebSocketPrimarySucceeds(t *testing.T) {
 		if err != nil {
 			t.Errorf("unexpected error %v", err)
 		}
+		writeSuccessStatus(t, conns.writeStatus)
 	}))
 	defer websocketServer.Close()
 
@@ -126,6 +127,7 @@ func TestFallbackClient_SPDYSecondarySucceeds(t *testing.T) {
 		if err != nil {
 			t.Fatalf("error copying STDIN to STDOUT: %v", err)
 		}
+		writeSuccessStatus(t, ctx.writeStatus)
 	}))
 	defer spdyServer.Close()
 
@@ -394,6 +396,7 @@ func TestFallbackClient_WebSocketHTTPSProxyNoFallback(t *testing.T) {
 		if err != nil {
 			t.Fatalf("websocket copy error: %v", err)
 		}
+		writeSuccessStatus(t, conns.writeStatus)
 	}))
 	defer websocketServer.Close() //nolint:errcheck
 
