@@ -17,11 +17,48 @@ limitations under the License.
 package benchmark
 
 import (
+	"context"
+	"errors"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"k8s.io/component-base/featuregate"
 )
+
+func TestWaitForEmptyInFlightEvents(t *testing.T) {
+	checks := 0
+	err := waitForEmptyInFlightEventsWithCheck(t.Context(), time.Millisecond, time.Second, func() error {
+		checks++
+		if checks < 3 {
+			return errors.New("InFlightEvents for label AssignedPodAdd should be empty, but has 1 items")
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("waitForEmptyInFlightEventsWithCheck() returned error: %v", err)
+	}
+	if checks != 3 {
+		t.Errorf("check was called %d times, want 3", checks)
+	}
+}
+
+func TestWaitForEmptyInFlightEventsTimeout(t *testing.T) {
+	const checkError = "InFlightEvents for label AssignedPodAdd should be empty, but has 1 items"
+	err := waitForEmptyInFlightEventsWithCheck(t.Context(), time.Millisecond, 5*time.Millisecond, func() error {
+		return errors.New(checkError)
+	})
+	if err == nil {
+		t.Fatal("waitForEmptyInFlightEventsWithCheck() returned nil, want timeout error")
+	}
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Errorf("waitForEmptyInFlightEventsWithCheck() error = %v, want deadline exceeded", err)
+	}
+	if !strings.Contains(err.Error(), checkError) {
+		t.Errorf("waitForEmptyInFlightEventsWithCheck() error = %q, want last check error", err)
+	}
+}
 
 func TestFeatureGatesMerge(t *testing.T) {
 	const (
