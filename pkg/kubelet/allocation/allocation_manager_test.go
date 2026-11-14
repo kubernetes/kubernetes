@@ -5733,3 +5733,136 @@ func TestRetryPendingAllocationsSyncsSchedulerEvaluationCompletedRemoval(t *test
 	assert.True(t, am.statusManager.ShouldClearSchedulerEvaluationCompleted(resizedPod.UID))
 	assert.Equal(t, 1, syncCount, "re-evaluation with SchedulerEvaluationCompleted=True must trigger SyncPodNow even when resize conditions stay Deferred")
 }
+
+// makeAllocationManagerWithNodeGetter is like makeAllocationManager but accepts a
+// caller-supplied getNode function, enabling tests to swap allocatable between
+// RetryPendingAllocations calls and observe state-machine transitions.
+func makeAllocationManagerWithNodeGetter(
+	t *testing.T,
+	runtime *containertest.FakeRuntime,
+	allocatedPods []*v1.Pod,
+	getNode func(context.Context, bool) (*v1.Node, error),
+) Manager {
+	t.Helper()
+	logger, _ := ktesting.NewTestContext(t)
+	statusManager := status.NewManager(&fake.Clientset{}, kubepod.NewBasicPodManager(), &statustest.FakePodDeletionSafetyProvider{}, kubeletutil.NewPodStartupLatencyTracker())
+	containerManager := cm.NewFakeContainerManager(logger)
+	allocationManager := NewInMemoryManager(
+		logger,
+		statusManager,
+		&fakePodProvider{pods: allocatedPods},
+		config.NewSourcesReady(func(_ sets.Set[string]) bool { return true }),
+		record.NewFakeRecorder(20),
+	)
+	predicateHandler := lifecycle.NewPredicateAdmitHandler(getNode, lifecycle.NewAdmissionFailureHandlerStub(), containerManager.UpdatePluginResources)
+	resizeHandler := NewPodResizesAdmitHandler(containerManager, containerManager, runtime, allocationManager)
+	allocationManager.AddPodAdmitHandlers(lifecycle.PodAdmitHandlers{resizeHandler, predicateHandler})
+	return allocationManager
+}
+
+// TestDeferredResizeRetriedOnNodeUpscale verifies that a pod resize that was
+// Deferred because the node lacked capacity is re-evaluated and accepted when
+// Node.Status.Allocatable increases.
+func TestDeferredResizeRetriedOnNodeUpscale(t *testing.T) {
+	if goruntime.GOOS == "windows" {
+		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
+	}
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlaceNodeResourceResize, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, true)
+	logger, tCtx := ktesting.NewTestContext(t)
+
+	cpu1000m := resource.MustParse("1")
+	mem1000M := resource.MustParse("1Gi")
+	mem3500M := resource.MustParse("3500Mi")
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{UID: "resize-pod", Name: "resize-pod", Namespace: "default"},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{{
+				Name:  "c1",
+				Image: "pause",
+				Resources: v1.ResourceRequirements{
+					Requests: v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
+				},
+			}},
+		},
+		Status: v1.PodStatus{
+			Phase: v1.PodRunning,
+			ContainerStatuses: []v1.ContainerStatus{{
+				Name:               "c1",
+				AllocatedResources: v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
+				Resources:          &v1.ResourceRequirements{},
+			}},
+		},
+	}
+
+	// Filler pod consumes 1Gi so that only 3Gi is free on the 4Gi node.
+	fillerPod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{UID: "filler-pod", Name: "filler-pod", Namespace: "default"},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{{
+				Name:  "c1",
+				Image: "pause",
+				Resources: v1.ResourceRequirements{
+					Requests: v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
+				},
+			}},
+		},
+		Status: v1.PodStatus{Phase: v1.PodRunning,
+			ContainerStatuses: []v1.ContainerStatus{{
+				Name:               "c1",
+				AllocatedResources: v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
+				Resources:          &v1.ResourceRequirements{},
+			}}},
+	}
+
+	// Node starts at 4Gi allocatable, filler takes 1Gi, leaving 3Gi free.
+	node := &v1.Node{
+		Status: v1.NodeStatus{
+			Allocatable: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("4"),
+				v1.ResourceMemory: resource.MustParse("4Gi"),
+				v1.ResourcePods:   *resource.NewQuantity(40, resource.DecimalSI),
+			},
+		},
+	}
+
+	podStatus := &kubecontainer.PodStatus{
+		ID: pod.UID, Name: pod.Name, Namespace: pod.Namespace,
+		ContainerStatuses: make([]*kubecontainer.Status, 1),
+	}
+	setContainerStatus(podStatus, &pod.Spec.Containers[0], 0)
+
+	allPods := []*v1.Pod{pod, fillerPod}
+	allocationManager := makeAllocationManagerWithNodeGetter(t, &containertest.FakeRuntime{PodStatus: *podStatus}, allPods,
+		func(_ context.Context, _ bool) (*v1.Node, error) { return node, nil })
+
+	require.NoError(t, allocationManager.SetAllocatedPod(logger, pod))
+	require.NoError(t, allocationManager.SetAllocatedPod(logger, fillerPod))
+	t.Cleanup(func() {
+		allocationManager.RemovePod(logger, pod.UID)
+		allocationManager.RemovePod(logger, fillerPod.UID)
+	})
+
+	// Submit resize to 3.5Gi (which exceeds 3Gi free on 4Gi node).
+	resizedPod := pod.DeepCopy()
+	resizedPod.Spec.Containers[0].Resources.Requests[v1.ResourceMemory] = mem3500M
+	allocationManager.(*manager).podProvider.(*fakePodProvider).getPodByUID = func(uid types.UID) (*v1.Pod, bool) { return resizedPod, true }
+	allocationManager.PushPendingAllocation(logger, pod.UID)
+	allocationManager.RetryPendingAllocations(tCtx, TriggerReasonPodUpdated)
+
+	conditions := allocationManager.(*manager).statusManager.GetPodResizeConditions(pod.UID)
+	require.Len(t, conditions, 1, "expected one resize condition after initial retry")
+	assert.Equal(t, v1.PodResizePending, conditions[0].Type, "resize should be Deferred at 4Gi allocatable")
+	assert.Equal(t, v1.PodReasonDeferred, conditions[0].Reason)
+
+	// Simulate node upscale to 8Gi.
+	node.Status.Allocatable[v1.ResourceMemory] = resource.MustParse("8Gi")
+	allocationManager.PushPendingAllocation(logger, pod.UID)
+	allocationManager.RetryPendingAllocations(tCtx, TriggerReasonNodeCapacityChanged)
+
+	conditions = allocationManager.(*manager).statusManager.GetPodResizeConditions(pod.UID)
+	require.Len(t, conditions, 1, "expected one resize condition after upscale")
+	assert.Equal(t, v1.PodResizeInProgress, conditions[0].Type, "resize should be InProgress after upscale")
+	assert.Equal(t, v1.ConditionTrue, conditions[0].Status)
+}

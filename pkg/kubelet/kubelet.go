@@ -53,6 +53,7 @@ import (
 	"k8s.io/utils/ptr"
 
 	v1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -1237,6 +1238,25 @@ func NewMainKubelet(ctx context.Context,
 	handlers = append(handlers, shutdownManager)
 
 	klet.allocationManager.AddPodAdmitHandlers(append([]lifecycle.PodAdmitHandler{resizeAdmitHandler}, handlers...))
+
+	// When node allocatable changes, pending deferred pod allocations may have enough capacity to be admitted.
+	if nodeInformer != nil && utilfeature.DefaultFeatureGate.Enabled(features.InPlaceNodeResourceResize) {
+		if _, err := nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+			UpdateFunc: func(oldObj, newObj interface{}) {
+				oldNode, ok1 := oldObj.(*v1.Node)
+				newNode, ok2 := newObj.(*v1.Node)
+				if !ok1 || !ok2 {
+					return
+				}
+				if apiequality.Semantic.DeepEqual(oldNode.Status.Allocatable, newNode.Status.Allocatable) {
+					return
+				}
+				klet.allocationManager.RetryPendingAllocations(ctx, allocation.TriggerReasonNodeCapacityChanged)
+			},
+		}); err != nil {
+			return nil, fmt.Errorf("failed to add node informer event handler for resize: %w", err)
+		}
+	}
 
 	var usernsIDsPerPod *int64
 	if kubeCfg.UserNamespaces != nil {
