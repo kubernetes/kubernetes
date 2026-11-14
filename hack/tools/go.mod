@@ -7,6 +7,7 @@ godebug default=go1.27
 require (
 	golang.org/x/exp v0.0.0-20260212183809-81e46e3db34a
 	golang.org/x/mod v0.42.0
+	golang.org/x/tools v0.52.0
 	k8s.io/publishing-bot v0.5.0
 )
 
@@ -57,7 +58,6 @@ require (
 	golang.org/x/telemetry v0.0.0-20261010193011-f71dc92da45e // indirect
 	golang.org/x/term v0.40.0 // indirect
 	golang.org/x/text v0.34.0 // indirect
-	golang.org/x/tools v0.52.0 // indirect
 	golang.org/x/vuln v1.9.0 // indirect
 	google.golang.org/grpc/cmd/protoc-gen-go-grpc v1.6.2 // indirect
 	google.golang.org/protobuf v1.36.12 // indirect
