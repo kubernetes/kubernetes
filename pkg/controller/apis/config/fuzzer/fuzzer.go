@@ -23,6 +23,7 @@ import (
 
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
+	nodelifecycleconfig "k8s.io/kubernetes/pkg/controller/nodelifecycle/config"
 )
 
 // Funcs returns the fuzzer functions for the kube-controller manager apis.
@@ -43,6 +44,9 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.CSRSigningController.ClusterSigningKeyFile = fmt.Sprintf("/%s", c.String(0))
 			obj.PersistentVolumeBinderController.VolumeConfiguration.FlexVolumePluginDir = fmt.Sprintf("/%s", c.String(0))
 			obj.TTLAfterFinishedController.ConcurrentTTLSyncs = c.Int31()
+			if obj.NodeLifecycleController.NodeLivenessSource == "" {
+				obj.NodeLifecycleController.NodeLivenessSource = nodelifecycleconfig.NodeLivenessSourceKubelet
+			}
 		},
 	}
 }

@@ -5621,6 +5621,16 @@
   componentEndpoints:
   - component: kube-apiserver
     endpoint: /metrics
+- name: liveness_source
+  subsystem: node_collector
+  help: Gauge set to 1 for the configured node liveness source.
+  type: Gauge
+  stabilityLevel: ALPHA
+  labels:
+  - source
+  componentEndpoints:
+  - component: kube-controller-manager
+    endpoint: /metrics
 - name: unhealthy_nodes_in_zone
   subsystem: node_collector
   help: Gauge measuring number of not Ready Nodes per zones.

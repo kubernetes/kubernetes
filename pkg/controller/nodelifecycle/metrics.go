@@ -32,6 +32,7 @@ const (
 
 	updateNodeHealthKey     = "update_node_health_duration_seconds"
 	updateAllNodesHealthKey = "update_all_nodes_health_duration_seconds"
+	livenessSourceKey       = "liveness_source"
 )
 
 var (
@@ -90,6 +91,15 @@ var (
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
+	livenessSource = metrics.NewGaugeVec(
+		&metrics.GaugeOpts{
+			Subsystem:      nodeControllerSubsystem,
+			Name:           livenessSourceKey,
+			Help:           "Gauge set to 1 for the configured node liveness source.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"source"},
+	)
 )
 
 var registerMetrics sync.Once
@@ -103,5 +113,6 @@ func Register() {
 		legacyregistry.MustRegister(evictionsTotal)
 		legacyregistry.MustRegister(updateNodeHealthDuration)
 		legacyregistry.MustRegister(updateAllNodesHealthDuration)
+		legacyregistry.MustRegister(livenessSource)
 	})
 }

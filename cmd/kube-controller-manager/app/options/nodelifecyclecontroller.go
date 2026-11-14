@@ -21,8 +21,10 @@ import (
 
 	"github.com/spf13/pflag"
 
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 	nodelifecycleconfig "k8s.io/kubernetes/pkg/controller/nodelifecycle/config"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // NodeLifecycleControllerOptions holds the NodeLifecycleController options.
@@ -49,6 +51,9 @@ func (o *NodeLifecycleControllerOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.Float32Var(&o.UnhealthyZoneThreshold, "unhealthy-zone-threshold", 0.55, "Fraction of Nodes in a zone which needs to be not Ready (minimum 3) for zone to be treated as unhealthy. ")
 	fs.DurationVar(&o.NodeMonitorPeriod.Duration, "node-monitor-period", o.NodeMonitorPeriod.Duration,
 		"The period for syncing NodeStatus in NodeLifecycleController.")
+	fs.StringVar(&o.NodeLivenessSource, "node-liveness-source", o.NodeLivenessSource,
+		fmt.Sprintf("Determines how NodeLifecycleController detects node liveness. Valid values are %q (default) and %q (requires %s feature gate).",
+			nodelifecycleconfig.NodeLivenessSourceKubelet, nodelifecycleconfig.NodeLivenessSourceExternal, features.ExternalNodeLivenessDetection))
 }
 
 // ApplyTo fills up NodeLifecycleController config with options.
@@ -64,16 +69,28 @@ func (o *NodeLifecycleControllerOptions) ApplyTo(cfg *nodelifecycleconfig.NodeLi
 	cfg.LargeClusterSizeThreshold = o.LargeClusterSizeThreshold
 	cfg.UnhealthyZoneThreshold = o.UnhealthyZoneThreshold
 	cfg.NodeMonitorPeriod = o.NodeMonitorPeriod
+	cfg.NodeLivenessSource = o.NodeLivenessSource
 
 	return nil
 }
 
 // Validate checks validation of NodeLifecycleControllerOptions.
 func (o *NodeLifecycleControllerOptions) Validate() []error {
-	if o == nil {
+	if o == nil || o.NodeLifecycleControllerConfiguration == nil {
 		return nil
 	}
 
-	errs := []error{}
+	var errs []error
+	switch o.NodeLivenessSource {
+	case "", nodelifecycleconfig.NodeLivenessSourceKubelet:
+	case nodelifecycleconfig.NodeLivenessSourceExternal:
+		if !utilfeature.DefaultFeatureGate.Enabled(features.ExternalNodeLivenessDetection) {
+			errs = append(errs, fmt.Errorf("--node-liveness-source=%q requires feature gate %s to be enabled (e.g. --feature-gates=%s=true)",
+				nodelifecycleconfig.NodeLivenessSourceExternal, features.ExternalNodeLivenessDetection, features.ExternalNodeLivenessDetection))
+		}
+	default:
+		errs = append(errs, fmt.Errorf("invalid --node-liveness-source=%q: must be %q or %q",
+			o.NodeLivenessSource, nodelifecycleconfig.NodeLivenessSourceKubelet, nodelifecycleconfig.NodeLivenessSourceExternal))
+	}
 	return errs
 }

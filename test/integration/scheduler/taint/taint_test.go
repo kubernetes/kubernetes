@@ -80,21 +80,20 @@ func TestTaintNodeByCondition(t *testing.T) {
 	nsName := testCtx.NS.Name
 
 	// Start NodeLifecycleController for taint.
-	nc, err := nodelifecycle.NewNodeLifecycleController(
-		testCtx.Ctx,
-		externalInformers.Coordination().V1().Leases(),
-		externalInformers.Core().V1().Pods(),
-		externalInformers.Core().V1().Nodes(),
-		externalInformers.Apps().V1().DaemonSets(),
-		cs,
-		time.Hour,   // Node monitor grace period
-		time.Second, // Node startup grace period
-		time.Second, // Node monitor period
-		100,         // Eviction limiter QPS
-		100,         // Secondary eviction limiter QPS
-		100,         // Large cluster threshold
-		100,         // Unhealthy zone threshold
-	)
+	nc, err := nodelifecycle.NewNodeLifecycleController(testCtx.Ctx, nodelifecycle.ControllerOptions{
+		LeaseInformer:               externalInformers.Coordination().V1().Leases(),
+		PodInformer:                 externalInformers.Core().V1().Pods(),
+		NodeInformer:                externalInformers.Core().V1().Nodes(),
+		DaemonSetInformer:           externalInformers.Apps().V1().DaemonSets(),
+		KubeClient:                  cs,
+		NodeMonitorPeriod:           time.Hour,
+		NodeStartupGracePeriod:      time.Second,
+		NodeMonitorGracePeriod:      time.Second,
+		EvictionLimiterQPS:          100,
+		SecondaryEvictionLimiterQPS: 100,
+		LargeClusterThreshold:       100,
+		UnhealthyZoneThreshold:      100,
+	})
 	if err != nil {
 		t.Errorf("Failed to create node controller: %v", err)
 		return

@@ -73086,8 +73086,16 @@ func schema_k8sio_kube_controller_manager_config_v1alpha1_NodeLifecycleControlle
 							Ref:         ref(metav1.Duration{}.OpenAPIModelName()),
 						},
 					},
+					"NodeLivenessSource": {
+						SchemaProps: spec.SchemaProps{
+							Description: "NodeLivenessSource determines how NodeLifecycleController detects node liveness. Valid values are \"kubelet\" (default) and \"external\" (requires ExternalNodeLivenessDetection feature gate).",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 				},
-				Required: []string{"NodeEvictionRate", "SecondaryNodeEvictionRate", "NodeStartupGracePeriod", "NodeMonitorGracePeriod", "PodEvictionTimeout", "LargeClusterSizeThreshold", "UnhealthyZoneThreshold", "NodeMonitorPeriod"},
+				Required: []string{"NodeEvictionRate", "SecondaryNodeEvictionRate", "NodeStartupGracePeriod", "NodeMonitorGracePeriod", "PodEvictionTimeout", "LargeClusterSizeThreshold", "UnhealthyZoneThreshold", "NodeMonitorPeriod", "NodeLivenessSource"},
 			},
 		},
 		Dependencies: []string{
