@@ -52,7 +52,7 @@ type EndpointSliceApplyConfiguration struct {
 	// this slice. Each port must have a unique name. When ports is empty, it
 	// indicates that there are no defined ports. When a port is defined with a
 	// nil port value, it indicates "all ports". Each slice may include a
-	// maximum of 100 ports.
+	// maximum of 20000 ports.
 	Ports []EndpointPortApplyConfiguration `json:"ports,omitempty"`
 }
 
