@@ -828,6 +828,36 @@ func TestStatusNormalizationEnforcesMaxBytes(t *testing.T) {
 	}
 }
 
+func TestStatusNormalizationBudgetsRemovedContainers(t *testing.T) {
+	message := strings.Repeat("x", kubecontainer.MaxPodTerminationMessageLogLength)
+	terminated := func(name string) v1.ContainerStatus {
+		return v1.ContainerStatus{
+			Name:  name,
+			State: v1.ContainerState{Terminated: &v1.ContainerStateTerminated{Message: message}},
+		}
+	}
+	for _, tc := range []struct {
+		name          string
+		enabled       bool
+		expectedBytes int
+	}{
+		{name: "gate enabled", enabled: true, expectedBytes: kubecontainer.MaxPodTerminationMessageLogLength / 3},
+		{name: "gate disabled", enabled: false, expectedBytes: kubecontainer.MaxPodTerminationMessageLogLength},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicContainers, tc.enabled)
+			pod := &v1.Pod{Spec: v1.PodSpec{Containers: []v1.Container{{Name: "a"}}}}
+			status := &v1.PodStatus{ContainerStatuses: []v1.ContainerStatus{
+				terminated("a"), terminated("removed-1"), terminated("removed-2"),
+			}}
+			normalizeStatus(pod, status)
+			for _, s := range status.ContainerStatuses {
+				assert.Len(t, s.State.Terminated.Message, tc.expectedBytes, s.Name)
+			}
+		})
+	}
+}
+
 func TestStatusNormalizeTimeStamp(t *testing.T) {
 	pod := v1.Pod{
 		Spec: v1.PodSpec{},
@@ -4049,4 +4079,41 @@ func TestSchedulerEvaluationCompletedRemoval(t *testing.T) {
 		m.syncBatch(ctx, true)
 		assert.True(t, hasSEC(t, ctx, client, pod), "expected SchedulerEvaluationCompleted with non-DeferredPodResize reason to be preserved")
 	})
+}
+
+// A removed-container status that the kubelet stops reporting (pruned, or its
+// runtime container was garbage collected) must be dropped from the API, not
+// merged back in from the old API status.
+func TestSyncPodDropsRemovedContainerStatus(t *testing.T) {
+	logger, ctx := ktesting.NewTestContext(t)
+	running := v1.ContainerStatus{
+		Name:  "main",
+		State: v1.ContainerState{Running: &v1.ContainerStateRunning{}},
+	}
+	removed := v1.ContainerStatus{
+		Name:  "removed",
+		State: v1.ContainerState{Terminated: &v1.ContainerStateTerminated{ExitCode: 0}},
+	}
+
+	pod := getTestPod()
+	pod.Spec.Containers = []v1.Container{{Name: "main"}}
+	pod.Status.ContainerStatuses = []v1.ContainerStatus{running, removed}
+
+	syncer := newTestManager(&fake.Clientset{})
+	syncer.podManager.(mutablePodManager).AddPod(pod)
+	client := fake.NewSimpleClientset(pod)
+	syncer.kubeClient = client
+
+	status := *pod.Status.DeepCopy()
+	status.ContainerStatuses = []v1.ContainerStatus{running}
+	syncer.SetPodStatus(logger, pod, status)
+	verifyActions(t, syncer, []core.Action{getAction(), patchAction()})
+
+	updated, err := client.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
+	require.NoError(t, err)
+	var names []string
+	for _, s := range updated.Status.ContainerStatuses {
+		names = append(names, s.Name)
+	}
+	assert.Equal(t, []string{"main"}, names)
 }

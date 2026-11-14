@@ -1697,8 +1697,9 @@ func (kl *Kubelet) GetKubeletContainerLogs(ctx context.Context, podFullName, con
 	return kl.containerRuntime.GetContainerLogs(ctx, pod, containerID, logOptions, stdout, stderr)
 }
 
-// getPhase returns the phase of a pod given its container info.
-func getPhase(logger klog.Logger, pod *v1.Pod, info []v1.ContainerStatus, podIsTerminal, podHasInitialized bool) v1.PodPhase {
+// getPhase returns the phase of a pod given its container info. previousPhase is the phase the
+// pod last reported.
+func getPhase(logger klog.Logger, pod *v1.Pod, info []v1.ContainerStatus, podIsTerminal, podHasInitialized bool, previousPhase v1.PodPhase) v1.PodPhase {
 	spec := pod.Spec
 	pendingRestartableInitContainers := 0
 	pendingRegularInitContainers := 0
@@ -1847,6 +1848,17 @@ func getPhase(logger klog.Logger, pod *v1.Pod, info []v1.ContainerStatus, podIsT
 		}
 	}
 
+	dynamicContainers := utilfeature.DefaultFeatureGate.Enabled(features.DynamicContainers)
+	if dynamicContainers {
+		// A container removed from the spec still runs until it is killed, and the pod mustn't
+		// become terminal before it stops. Once it stops, it no longer affects the phase.
+		for _, containerStatus := range info {
+			if containerStatus.State.Running != nil && !hasContainer(pod, containerStatus.Name, podutil.InitContainers|podutil.Containers) {
+				running++
+			}
+		}
+	}
+
 	if utilfeature.DefaultFeatureGate.Enabled(features.ContainerRestartRules) {
 		if failedInitializationNotRestartable > 0 {
 			return v1.PodFailed
@@ -1858,6 +1870,11 @@ func getPhase(logger klog.Logger, pod *v1.Pod, info []v1.ContainerStatus, podIsT
 	}
 
 	switch {
+	case dynamicContainers && previousPhase == v1.PodRunning && !podIsTerminal && podHasInitialized &&
+		waiting > 0 && unknown == 0 && pendingRegularInitContainers == 0:
+		// A container added to a running pod hasn't started yet. The pod doesn't go back to
+		// pending, and doesn't become terminal before the added container runs.
+		return v1.PodRunning
 	case pendingRegularInitContainers > 0 ||
 		(pendingRestartableInitContainers > 0 &&
 			// This is needed to handle the case where the pod has been initialized but
@@ -1952,7 +1969,7 @@ func (kl *Kubelet) generateAPIPodStatus(ctx context.Context, pod *v1.Pod, podSta
 	s := kl.convertStatusToAPIStatus(ctx, pod, podStatus, oldPodStatus)
 	// calculate the next phase and preserve reason
 	allStatus := append(append([]v1.ContainerStatus{}, s.ContainerStatuses...), s.InitContainerStatuses...)
-	s.Phase = getPhase(logger, pod, allStatus, podIsTerminal, kubecontainer.HasAnyActiveRegularContainerStarted(&pod.Spec, podStatus))
+	s.Phase = getPhase(logger, pod, allStatus, podIsTerminal, kubecontainer.HasAnyActiveRegularContainerStarted(&pod.Spec, podStatus), oldPodStatus.Phase)
 	logger.V(4).Info("Got phase for pod", "pod", klog.KObj(pod), "oldPhase", oldPodStatus.Phase, "phase", s.Phase)
 
 	// Perform a three-way merge between the statuses from the status manager,
@@ -2182,9 +2199,13 @@ func (kl *Kubelet) convertStatusToAPIStatus(ctx context.Context, pod *v1.Pod, po
 		pod.Spec.Containers,
 		imageVolumeNames,
 		len(pod.Spec.InitContainers) > 0,
-		false,
+		podutil.Containers,
 		podRestarting,
 	)
+	if unallocated := kl.unallocatedContainerStatuses(pod); len(unallocated) > 0 {
+		apiPodStatus.ContainerStatuses = append(apiPodStatus.ContainerStatuses, unallocated...)
+		sort.Sort(kubetypes.SortedContainerStatuses(apiPodStatus.ContainerStatuses))
+	}
 	apiPodStatus.InitContainerStatuses = kl.convertToAPIContainerStatuses(
 		ctx,
 		pod, podStatus,
@@ -2192,7 +2213,7 @@ func (kl *Kubelet) convertStatusToAPIStatus(ctx context.Context, pod *v1.Pod, po
 		pod.Spec.InitContainers,
 		imageVolumeNames,
 		len(pod.Spec.InitContainers) > 0,
-		true,
+		podutil.InitContainers,
 		podRestarting,
 	)
 	var ecSpecs []v1.Container
@@ -2209,7 +2230,7 @@ func (kl *Kubelet) convertStatusToAPIStatus(ctx context.Context, pod *v1.Pod, po
 		ecSpecs,
 		imageVolumeNames,
 		len(pod.Spec.InitContainers) > 0,
-		false,
+		podutil.EphemeralContainers,
 		podRestarting,
 	)
 
@@ -2223,6 +2244,38 @@ func (kl *Kubelet) convertStatusToAPIStatus(ctx context.Context, pod *v1.Pod, po
 	}
 
 	return &apiPodStatus
+}
+
+// unallocatedContainerStatuses returns a Waiting status for each main container that was added to
+// the pod but isn't allocated yet, i.e. isn't in allocatedPod. The kubelet doesn't run these
+// containers until they are allocated.
+func (kl *Kubelet) unallocatedContainerStatuses(allocatedPod *v1.Pod) []v1.ContainerStatus {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DynamicContainers) {
+		return nil
+	}
+	apiPod, ok := kl.podManager.GetPodByUID(allocatedPod.UID)
+	if !ok {
+		return nil
+	}
+	// No other status can have the name of an unallocated container: validation rejects adding a
+	// container whose name is still in the pod's statuses, and a removed container's status goes
+	// away only together with its runtime container.
+	var statuses []v1.ContainerStatus
+	for pair := range podutil.ContainerPairs(apiPod, allocatedPod, podutil.Containers) {
+		if pair.Old != nil {
+			continue
+		}
+		c := pair.New
+		statuses = append(statuses, v1.ContainerStatus{
+			Name:  c.Name,
+			Image: c.Image,
+			State: v1.ContainerState{Waiting: &v1.ContainerStateWaiting{
+				Reason:  kubecontainer.ContainerReasonUnallocated,
+				Message: "The container has not been allocated by the kubelet yet",
+			}},
+		})
+	}
+	return statuses
 }
 
 func getEffectiveAllocatedResources(allocatedPod *v1.Pod) *v1.ResourceRequirements {
@@ -2368,9 +2421,20 @@ func makeVolumeMountStatuses(logger klog.Logger, volumeMounts []v1.VolumeMount, 
 	return mountStatuses
 }
 
+// hasContainer returns whether the pod spec has a container with the given name among the
+// container types in mask.
+func hasContainer(pod *v1.Pod, name string, mask podutil.ContainerType) bool {
+	for c := range podutil.ContainerIter(&pod.Spec, mask) {
+		if c.Name == name {
+			return true
+		}
+	}
+	return false
+}
+
 // convertToAPIContainerStatuses converts the given internal container
 // statuses into API container statuses.
-func (kl *Kubelet) convertToAPIContainerStatuses(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, previousStatus []v1.ContainerStatus, containers []v1.Container, imageVolumeNames sets.Set[string], hasInitContainers, isInitContainer bool, podRestarting bool) []v1.ContainerStatus {
+func (kl *Kubelet) convertToAPIContainerStatuses(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, previousStatus []v1.ContainerStatus, containers []v1.Container, imageVolumeNames sets.Set[string], hasInitContainers bool, containerType podutil.ContainerType, podRestarting bool) []v1.ContainerStatus {
 	logger := klog.FromContext(ctx)
 	supportsRRO := kl.runtimeClassSupportsRecursiveReadOnlyMounts(logger, pod)
 
@@ -2734,8 +2798,14 @@ func (kl *Kubelet) convertToAPIContainerStatuses(ctx context.Context, pod *v1.Po
 	containerSeen := map[string]int{}
 	for _, cStatus := range containerStatusesCopy {
 		cName := cStatus.Name
-		if _, ok := statuses[cName]; !ok {
-			// This would also ignore the infra container.
+		// Only regular containers can be removed from the spec, and API validation doesn't let an
+		// added container reuse the name of a removed one while its status is reported. So a
+		// regular container that isn't in the spec at all was removed.
+		removed := containerType == podutil.Containers &&
+			!slices.ContainsFunc(containers, func(c v1.Container) bool { return c.Name == cName }) &&
+			!hasContainer(pod, cName, podutil.InitContainers|podutil.EphemeralContainers)
+		// statuses starts out with an entry for each container in the spec list for this type.
+		if _, ok := statuses[cName]; !ok && !removed {
 			continue
 		}
 		if containerSeen[cName] >= 2 {
@@ -2770,6 +2840,12 @@ func (kl *Kubelet) convertToAPIContainerStatuses(ctx context.Context, pod *v1.Po
 			// This is because the claims can be shared across containers in the pod and can be
 			// shared unevenly (enforced by the DRA driver).
 			status.AllocatedResources = allocatedContainer.Resources.Requests
+		} else if removed && cStatus.State == kubecontainer.ContainerStateRunning && utilfeature.DefaultFeatureGate.Enabled(features.DynamicContainers) {
+			// A removed container is no longer allocated, but until it stops it still uses the
+			// resources it was started with, which the actuated state keeps.
+			if resources, ok := kl.actuatedState.GetContainerResources(pod.UID, cName); ok {
+				status.Resources = convertContainerStatusResources(&v1.Container{Name: cName, Resources: resources}, status, cStatus, oldStatuses)
+			}
 		}
 
 		status.User = convertContainerStatusUser(cStatus)
@@ -2778,6 +2854,10 @@ func (kl *Kubelet) convertToAPIContainerStatuses(ctx context.Context, pod *v1.Po
 		}
 
 		if containerSeen[cName] == 0 {
+			// This also creates the entry for a container removed from the spec.
+			// It is never carried over from the old status, so it goes away with the
+			// runtime container, which kuberuntime prunes beyond maxRemovedContainers.
+			// TODO(KEP-5972): revisit ContainerStateUnknown handling for removed containers.
 			statuses[cName] = status
 		} else {
 			statuses[cName].LastTerminationState = status.State
@@ -2787,7 +2867,7 @@ func (kl *Kubelet) convertToAPIContainerStatuses(ctx context.Context, pod *v1.Po
 
 	// Handle the containers failed to be started, which should be in Waiting state.
 	for _, container := range containers {
-		if isInitContainer {
+		if containerType == podutil.InitContainers {
 			// If the init container is terminated with exit code 0, it won't be restarted.
 			// TODO(random-liu): Handle this in a cleaner way.
 			s := podStatus.FindContainerStatusByName(container.Name)
@@ -2849,7 +2929,7 @@ func (kl *Kubelet) convertToAPIContainerStatuses(ctx context.Context, pod *v1.Po
 
 	// Sort the container statuses since clients of this interface expect the list
 	// of containers in a pod has a deterministic order.
-	if isInitContainer {
+	if containerType == podutil.InitContainers {
 		return kubetypes.SortStatusesOfInitContainers(pod, statuses)
 	}
 	containerStatuses := make([]v1.ContainerStatus, 0, len(statuses))
@@ -2923,13 +3003,33 @@ func (kl *Kubelet) GetAttach(ctx context.Context, podFullName string, podUID typ
 	if !found || (string(podUID) != "" && pod.UID != podUID) {
 		return nil, fmt.Errorf("pod %s not found", podFullName)
 	}
-	containerSpec := kubecontainer.GetContainerSpec(pod, containerName)
+	containerSpec := kl.getAttachContainerSpec(pod, containerName)
 	if containerSpec == nil {
 		return nil, fmt.Errorf("container %s not found in pod %s", containerName, podFullName)
 	}
 	tty := containerSpec.TTY
 
 	return kl.streamingRuntime.GetAttach(ctx, container.ID, streamOpts.Stdin, streamOpts.Stdout, streamOpts.Stderr, tty)
+}
+
+// getAttachContainerSpec returns the spec a container was started with, including containers
+// that were removed from the pod spec but are still running.
+func (kl *Kubelet) getAttachContainerSpec(pod *v1.Pod, containerName string) *v1.Container {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DynamicContainers) {
+		return kubecontainer.GetContainerSpec(pod, containerName)
+	}
+	allocatedPod, _ := kl.allocationManager.UpdatePodFromAllocation(pod)
+	if containerSpec := kubecontainer.GetContainerSpec(allocatedPod, containerName); containerSpec != nil {
+		return containerSpec
+	}
+	if kl.actuatedState == nil {
+		return nil
+	}
+	// An empty image means the full spec wasn't recorded, so the TTY setting is unknown.
+	if actuated, ok := kl.actuatedState.GetContainer(pod.UID, containerName, podutil.Containers); ok && actuated.Image != "" {
+		return actuated
+	}
+	return nil
 }
 
 // GetPortForward gets the URL the port-forward will be served from, or nil if the Kubelet will serve it.

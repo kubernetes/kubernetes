@@ -27,6 +27,7 @@ import (
 	"path/filepath"
 	"regexp"
 	goruntime "runtime"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -278,7 +279,7 @@ func (m *kubeGenericRuntimeManager) startContainer(ctx context.Context, podSandb
 		return s.Message(), ErrCreateContainerConfig
 	}
 
-	// When creating a container, mark the resources and volume mounts as actuated.
+	// When creating a container, record its whole spec as actuated.
 	if err := m.setActuatedContainer(logger, pod, container, spec.containerType); err != nil {
 		m.recordContainerEvent(ctx, pod, container, "", v1.EventTypeWarning, events.FailedToCreateContainer, "Error: %v", err)
 		return err.Error(), ErrCreateContainerConfig
@@ -437,25 +438,36 @@ func (m *kubeGenericRuntimeManager) updateContainerResources(ctx context.Context
 	return err
 }
 
-func (m *kubeGenericRuntimeManager) setActuatedContainer(logger klog.Logger, pod *v1.Pod, container *v1.Container, containerType podutil.ContainerType) error {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.DynamicNodeLocalEphemeralVolumes) {
-		return m.setActuatedContainerResources(logger, pod, container, containerType)
-	}
-	actuatedContainer := *container
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling) {
-		actuatedContainer.Resources = *container.Resources.DeepCopy()
-		actuatedContainer.Resources.Limits = kubeutil.GetLimits(&kubeutil.ResourceOpts{PodResources: pod.Spec.Resources, ContainerResources: &container.Resources})
-	}
-	return m.actuatedState.SetContainer(logger, pod.UID, containerType, actuatedContainer)
+func (m *kubeGenericRuntimeManager) setActuatedContainerResources(logger klog.Logger, pod *v1.Pod, container *v1.Container, containerType podutil.ContainerType) error {
+	return m.actuatedState.SetContainerResources(logger, pod.UID, container.Name, containerType, actuatedContainerResources(pod, container))
 }
 
-func (m *kubeGenericRuntimeManager) setActuatedContainerResources(logger klog.Logger, pod *v1.Pod, container *v1.Container, containerType podutil.ContainerType) error {
+// setActuatedContainer records the whole spec of a container that is being started, so that it can
+// still be looked up after the container is removed from the pod spec.
+func (m *kubeGenericRuntimeManager) setActuatedContainer(logger klog.Logger, pod *v1.Pod, container *v1.Container, containerType podutil.ContainerType) error {
+	actuated := container.DeepCopy()
+	actuated.Resources = actuatedContainerResources(pod, container)
+	return m.actuatedState.SetContainer(logger, pod.UID, containerType, *actuated)
+}
+
+func actuatedContainerResources(pod *v1.Pod, container *v1.Container) v1.ResourceRequirements {
 	containerResources := container.Resources
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling) {
 		containerResources = *containerResources.DeepCopy()
 		containerResources.Limits = kubeutil.GetLimits(&kubeutil.ResourceOpts{PodResources: pod.Spec.Resources, ContainerResources: &container.Resources})
 	}
-	return m.actuatedState.SetContainerResources(logger, pod.UID, container.Name, containerType, containerResources)
+	return containerResources
+}
+
+// getActuatedContainer returns the spec a container of the given type was last started with, if
+// recorded. It is used for containers removed from the pod spec.
+func (m *kubeGenericRuntimeManager) getActuatedContainer(podUID kubetypes.UID, containerName string, containerType podutil.ContainerType) (*v1.Container, bool) {
+	c, ok := m.actuatedState.GetContainer(podUID, containerName, containerType)
+	// A record written by an older kubelet holds only resources, and has no image.
+	if !ok || c.Image == "" {
+		return nil, false
+	}
+	return c, true
 }
 
 func (m *kubeGenericRuntimeManager) updatePodSandboxResources(ctx context.Context, sandboxID string, pod *v1.Pod, podResources *cm.ResourceConfig) error {
@@ -888,17 +900,25 @@ func (m *kubeGenericRuntimeManager) killContainer(ctx context.Context, pod *v1.P
 	logger := klog.FromContext(ctx)
 	var containerSpec *v1.Container
 	if pod != nil {
-		if containerSpec = kubecontainer.GetContainerSpec(pod, containerName); containerSpec == nil {
-			return fmt.Errorf("failed to get containerSpec %q (id=%q) in pod %q when killing container for reason %q",
-				containerName, containerID.String(), format.Pod(pod), message)
+		containerSpec = kubecontainer.GetContainerSpec(pod, containerName)
+		if containerSpec == nil {
+			// The container may have been removed from the pod spec, which only regular containers
+			// can be; use the spec it was started with, if recorded.
+			containerSpec, _ = m.getActuatedContainer(pod.UID, containerName, podutil.Containers)
 		}
-	} else {
-		// Restore necessary information if one of the specs is nil.
+	}
+	if containerSpec == nil {
+		// The pod may be unknown, or the container spec wasn't recorded; fall back to the specs
+		// recorded in the container labels.
 		restoredPod, restoredContainer, err := m.restoreSpecsFromContainerLabels(ctx, containerID)
 		if err != nil {
 			return err
 		}
-		pod, containerSpec = restoredPod, restoredContainer
+		// Prefer the live pod when available since it carries the current grace period and deletion state.
+		if pod == nil {
+			pod = restoredPod
+		}
+		containerSpec = restoredContainer
 	}
 
 	// From this point, pod and container must be non-nil.
@@ -960,13 +980,13 @@ func (m *kubeGenericRuntimeManager) killRunningPodContainers(ctx context.Context
 			reason: reasonUnknown,
 		}
 	}
+	var runningContainerNames []string
+	for _, container := range runningPod.Containers {
+		runningContainerNames = append(runningContainerNames, container.Name)
+	}
 	var termOrdering *terminationOrdering
-	if types.HasRestartableInitContainer(pod) {
-		var runningContainerNames []string
-		for _, container := range runningPod.Containers {
-			runningContainerNames = append(runningContainerNames, container.Name)
-		}
-		termOrdering = newTerminationOrdering(pod, runningContainerNames)
+	if orderingPod := m.terminationOrderingPod(pod, runningContainerNames); types.HasRestartableInitContainer(orderingPod) {
+		termOrdering = newTerminationOrdering(orderingPod, runningContainerNames)
 	}
 	return m.killContainers(ctx, pod, containersToKill, gracePeriodOverride, termOrdering)
 }
@@ -1001,6 +1021,31 @@ func (m *kubeGenericRuntimeManager) killContainers(ctx context.Context, pod *v1.
 		syncResults = append(syncResults, containerResult)
 	}
 	return syncResults
+}
+
+// terminationOrderingPod returns the pod to order the termination of its containers by. That's pod
+// plus the running containers that were removed from its spec, as they were started, so that
+// sidecars wait for them as they do for main containers.
+func (m *kubeGenericRuntimeManager) terminationOrderingPod(pod *v1.Pod, runningContainerNames []string) *v1.Pod {
+	if pod == nil {
+		return pod
+	}
+	var removed []v1.Container
+	for _, name := range runningContainerNames {
+		if kubecontainer.GetContainerSpec(pod, name) != nil {
+			continue
+		}
+		// Only regular containers can be removed from the pod spec.
+		if container, ok := m.getActuatedContainer(pod.UID, name, podutil.Containers); ok {
+			removed = append(removed, *container)
+		}
+	}
+	if len(removed) == 0 {
+		return pod
+	}
+	orderingPod := *pod
+	orderingPod.Spec.Containers = append(slices.Clone(pod.Spec.Containers), removed...)
+	return &orderingPod
 }
 
 // pruneInitContainersBeforeStart ensures that before we begin creating init
@@ -1070,9 +1115,19 @@ func (m *kubeGenericRuntimeManager) purgeInitContainers(ctx context.Context, pod
 // HasAnyRegularContainerCreated returns true if any regular container has been
 // created, which indicates all init containers have been initialized.
 func HasAnyRegularContainerCreated(pod *v1.Pod, podStatus *kubecontainer.PodStatus) bool {
-	for _, container := range pod.Spec.Containers {
-		status := podStatus.FindContainerStatusByName(container.Name)
-		if status == nil {
+	seen := sets.New[string]()
+	for _, status := range podStatus.ContainerStatuses {
+		// Only the most recent status of each container counts, as with FindContainerStatusByName.
+		if seen.Has(status.Name) {
+			continue
+		}
+		seen.Insert(status.Name)
+		// Only regular containers can be removed from the spec, and API validation doesn't let an
+		// added container reuse the name of a removed one while the pod reports its status, which
+		// it does while the removed container has runtime containers. So a container that isn't an
+		// init or ephemeral container is a regular one, even one that was removed from the spec.
+		if slices.ContainsFunc(pod.Spec.InitContainers, func(c v1.Container) bool { return c.Name == status.Name }) ||
+			slices.ContainsFunc(pod.Spec.EphemeralContainers, func(c v1.EphemeralContainer) bool { return c.Name == status.Name }) {
 			continue
 		}
 		switch status.State {

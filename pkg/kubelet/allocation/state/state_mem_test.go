@@ -371,8 +371,15 @@ func TestStateMemory_UpdatesDoNotModifyStoredPods(t *testing.T) {
 		"new volume limit": func() error {
 			return sm.SetEmptyDirVolumeLimit(logger, podUID, "new-volume", &v1.EmptyDirVolumeSource{Medium: v1.StorageMediumMemory, SizeLimit: &newLimit})
 		},
+		"full container": func() error {
+			return sm.SetContainer(logger, podUID, podutil.Containers, v1.Container{Name: "main", Image: "image", Resources: cpu("3")})
+		},
+		"new full container": func() error {
+			return sm.SetContainer(logger, podUID, podutil.Containers, v1.Container{Name: "other", Image: "image"})
+		},
+		"remove containers": func() error { return sm.RemoveContainers(logger, podUID, podutil.Containers, "new", "other") },
 	}
-	for _, name := range []string{"init container", "container", "ephemeral container", "new container", "pod-level resources", "volume limit", "new volume limit"} {
+	for _, name := range []string{"init container", "container", "ephemeral container", "new container", "pod-level resources", "volume limit", "new volume limit", "full container", "new full container", "remove containers"} {
 		// Not GetPod: that returns a copy, which would never show a modification.
 		stored := sm.pods[podUID]
 		storedBefore := stored.DeepCopy()
@@ -645,4 +652,70 @@ func TestStateMemory_GetPodReadOnly(t *testing.T) {
 	}))
 	require.NoError(t, sm.RemovePodVolume(logger, "pod-ro", "vol-1"))
 	assert.Equal(t, snapshot, readOnly1, "previously returned read-only pod must remain immutable across updates")
+}
+
+func TestStateMemory_Containers(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	state := NewStateMemory(logger, PodMap{}, nil)
+	podUID := types.UID("pod-1")
+	cpu := func(q string) v1.ResourceRequirements {
+		return v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse(q)}}
+	}
+
+	_, ok := state.GetContainer(podUID, "main", podutil.Containers)
+	assert.False(t, ok)
+	require.NoError(t, state.RemoveContainers(logger, podUID, podutil.Containers, "main"))
+	assert.False(t, state.HasPod(podUID), "removing from an unknown pod doesn't add it")
+
+	require.NoError(t, state.SetContainerResources(logger, podUID, "init", podutil.InitContainers, cpu("1")))
+	main := &v1.Container{
+		Name:         "main",
+		Image:        "image",
+		Resources:    cpu("1"),
+		VolumeMounts: []v1.VolumeMount{{Name: "vol", MountPath: "/vol"}},
+	}
+	debug := &v1.Container{Name: "debug", Image: "debug-image"}
+	require.NoError(t, state.SetContainer(logger, podUID, podutil.Containers, *main))
+	require.NoError(t, state.SetContainer(logger, podUID, podutil.Containers, v1.Container{Name: "other", Image: "image"}))
+	require.NoError(t, state.SetContainer(logger, podUID, podutil.EphemeralContainers, *debug))
+
+	got, ok := state.GetContainer(podUID, "main", podutil.Containers)
+	require.True(t, ok)
+	assert.Equal(t, main, got)
+	got, ok = state.GetContainer(podUID, "debug", podutil.EphemeralContainers)
+	require.True(t, ok)
+	assert.Equal(t, debug, got)
+	_, ok = state.GetContainer(podUID, "init", podutil.Containers)
+	assert.False(t, ok, "only containers of the given type")
+
+	// SetContainer replaces the whole container, and SetContainerResources only its resources.
+	require.NoError(t, state.SetContainer(logger, podUID, podutil.InitContainers, v1.Container{Name: "init", Image: "image"}))
+	require.NoError(t, state.SetContainer(logger, podUID, podutil.Containers, v1.Container{Name: "main", Image: "image2", Resources: cpu("2")}))
+	require.NoError(t, state.SetContainerResources(logger, podUID, "main", podutil.Containers, cpu("3")))
+	got, _ = state.GetContainer(podUID, "init", podutil.InitContainers)
+	assert.Equal(t, &v1.Container{Name: "init", Image: "image"}, got)
+	got, _ = state.GetContainer(podUID, "main", podutil.Containers)
+	assert.Equal(t, &v1.Container{Name: "main", Image: "image2", Resources: cpu("3")}, got)
+
+	require.NoError(t, state.RemoveContainers(logger, podUID, podutil.Containers, "main", "debug", "missing"))
+	_, ok = state.GetContainer(podUID, "main", podutil.Containers)
+	assert.False(t, ok)
+	_, ok = state.GetContainer(podUID, "other", podutil.Containers)
+	assert.True(t, ok)
+	_, ok = state.GetContainer(podUID, "debug", podutil.EphemeralContainers)
+	assert.True(t, ok, "only containers of the given type are removed")
+	require.NoError(t, state.RemoveContainers(logger, podUID, podutil.EphemeralContainers, "debug"))
+	_, ok = state.GetContainer(podUID, "debug", podutil.EphemeralContainers)
+	assert.False(t, ok)
+	_, ok = state.GetContainerResources(podUID, "init")
+	assert.True(t, ok)
+
+	// removeContainers reports whether anything was removed, so the checkpoint can skip the write.
+	sm := state.(*stateMemory)
+	removed, err := sm.removeContainers(logger, podUID, podutil.Containers, "missing")
+	require.NoError(t, err)
+	assert.False(t, removed)
+	removed, err = sm.removeContainers(logger, podUID, podutil.Containers, "other")
+	require.NoError(t, err)
+	assert.True(t, removed)
 }

@@ -17,6 +17,7 @@ limitations under the License.
 package allocation
 
 import (
+	"cmp"
 	"context"
 	"path/filepath"
 	"slices"
@@ -444,7 +445,7 @@ func (m *manager) GetPodLevelResourceAllocation(podUID types.UID) (*v1.ResourceR
 //   - passthrough: they take effect as soon as they change in the pod, e.g. tolerations.
 //   - gated on allocation: they take their allocated value, so that a change only takes effect once it is
 //     allocated (admitted and checkpointed) as a whole. Today the only gated fields that can change
-//     are resources.
+//     are resources, and with DynamicContainers also the images and the set of main containers.
 //   - immutable fields: they are classified as 'gated on allocation' too, since which value they take then does
 //     not matter, and this requires fewer changes as we make more fields mutable over time.
 //
@@ -489,10 +490,10 @@ func copyPassthroughFields(spec, desired *v1.PodSpec) {
 	spec.Tolerations = desired.Tolerations
 	spec.TerminationGracePeriodSeconds = desired.TerminationGracePeriodSeconds
 	spec.EphemeralContainers = desired.EphemeralContainers
-	// TODO: The image becomes gated with dynamic containers, at which point we
-	// should stop copying the image here.
-	spec.Containers = copyImages(spec.Containers, desired.Containers)
-	spec.InitContainers = copyImages(spec.InitContainers, desired.InitContainers)
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DynamicContainers) {
+		spec.Containers = copyImages(spec.Containers, desired.Containers)
+		spec.InitContainers = copyImages(spec.InitContainers, desired.InitContainers)
+	}
 }
 
 // copyImages returns containers with each container's image set to the one of the container with
@@ -585,7 +586,8 @@ func (m *manager) handlePendingAllocation(ctx context.Context, pod *v1.Pod) (lif
 	}
 
 	resizeRequested := isResizeRequested(pod, allocatedPod)
-	if !resizeRequested {
+	dynamicContainers := utilfeature.DefaultFeatureGate.Enabled(features.DynamicContainers)
+	if !resizeRequested && !dynamicContainers {
 		m.statusManager.ClearPodResizePendingCondition(pod.UID, metrics.DeferredResizeResolutionReverted)
 	}
 
@@ -605,7 +607,12 @@ func (m *manager) handlePendingAllocation(ctx context.Context, pod *v1.Pod) (lif
 		if err := m.SetAllocatedPod(logger, pod); err != nil {
 			return lifecycle.PodAdmitResult{}, false, err
 		}
-		m.statusManager.ClearPodResizePendingCondition(pod.UID, metrics.DeferredResizeResolutionAccepted)
+		resolution := metrics.DeferredResizeResolutionAccepted
+		if !resizeRequested {
+			// Any resize that was pending has been reverted, even if other changes were allocated.
+			resolution = metrics.DeferredResizeResolutionReverted
+		}
+		m.statusManager.ClearPodResizePendingCondition(pod.UID, resolution)
 
 		if resizeRequested {
 			// Clear any errors that may have been surfaced from a previous resize and update the
@@ -619,15 +626,17 @@ func (m *manager) handlePendingAllocation(ctx context.Context, pod *v1.Pod) (lif
 		return result, true, nil
 	}
 
-	// TODO: Report rejected pod updates that aren't resizes in the pod status.
-	if resizeRequested {
+	// With DynamicContainers, a blocked change that isn't a resize (e.g. an image update, or adding a
+	// container without resources) is reported too, so that it doesn't go unnoticed.
+	// TODO(KEP-5972): Revisit reporting blocked changes that aren't resizes as PodResizePending.
+	if resizeRequested || dynamicContainers {
 		// TODO: Distinguish resource shortages, which scheduler preemption can resolve, from other
 		// deferred rejections in the pod status.
 		reason := v1.PodReasonDeferred
 		if result.RejectionType == lifecycle.RejectionInfeasible {
 			reason = v1.PodReasonInfeasible
 			// podResizesAdmitHandler counts its own rejections with a more specific reason.
-			if result.Reason != v1.PodReasonInfeasible {
+			if resizeRequested && result.Reason != v1.PodReasonInfeasible {
 				metrics.PodInfeasibleResizes.WithLabelValues(result.Reason).Inc()
 			}
 		}
@@ -647,20 +656,31 @@ func (m *manager) handlePendingAllocation(ctx context.Context, pod *v1.Pod) (lif
 	return result, false, nil
 }
 
+func containerHasResources(c *v1.Container) bool {
+	return len(c.Resources.Requests) > 0 || len(c.Resources.Limits) > 0
+}
+
 // isResizeRequested returns whether the desired pod asks for a change to the resources of its
 // containers, to its pod-level resources, or to the size limit of one of its memory-backed emptyDir
-// volumes. Any other field that is gated on allocation can differ too, but that is not a resize.
+// volumes. With DynamicContainers, adding or removing a main container that has resources is a
+// resize too. Any other field that is gated on allocation can differ too, but that is not a resize.
 func isResizeRequested(desired, allocated *v1.Pod) bool {
-	// TODO: Adjust this function when dynamic containers is implemented, to check for added/removed containers
-	// that will also cause a resize.
 	if !apiequality.Semantic.DeepEqual(desired.Spec.Resources, allocated.Spec.Resources) {
 		return true
 	}
-	for c := range podutil.ContainerIter(&desired.Spec, podutil.InitContainers|podutil.Containers) {
-		for ac := range podutil.ContainerIter(&allocated.Spec, podutil.AllContainers) {
-			if ac.Name == c.Name && !apiequality.Semantic.DeepEqual(c.Resources, ac.Resources) {
+	// TODO(KEP-5972): Report rejected container additions and removals (e.g. by NodeDeclaredFeatures
+	// when DynamicContainers is disabled) as PodResizePending, and consider classifying them as
+	// resizes only when the effective pod-level resources change. The add/remove constraints (swap,
+	// exclusive CPU/memory) must move out of the resize-gated admission path first.
+	dynamicContainers := utilfeature.DefaultFeatureGate.Enabled(features.DynamicContainers)
+	for pair := range podutil.ContainerPairs(desired, allocated, podutil.InitContainers|podutil.Containers) {
+		if pair.New != nil && pair.Old != nil {
+			if !apiequality.Semantic.DeepEqual(pair.New.Resources, pair.Old.Resources) {
 				return true
 			}
+		} else if dynamicContainers && containerHasResources(cmp.Or(pair.New, pair.Old)) {
+			// The container was added or removed.
+			return true
 		}
 	}
 	return IsMemoryBackedVolumeResizeRequested(desired, allocated)

@@ -498,13 +498,9 @@ func HasAnyRegularContainerStarted(spec *v1.PodSpec, statuses []v1.ContainerStat
 		return false
 	}
 
-	containerNames := make(map[string]struct{})
-	for _, c := range spec.Containers {
-		containerNames[c.Name] = struct{}{}
-	}
-
+	nonRegular := nonRegularContainerNames(spec)
 	for _, status := range statuses {
-		if _, ok := containerNames[status.Name]; !ok {
+		if nonRegular.Has(status.Name) {
 			continue
 		}
 		if status.State.Running != nil || status.State.Terminated != nil {
@@ -523,13 +519,9 @@ func HasAnyActiveRegularContainerStarted(spec *v1.PodSpec, podStatus *PodStatus)
 		return false
 	}
 
-	containerNames := sets.New[string]()
-	for _, c := range spec.Containers {
-		containerNames.Insert(c.Name)
-	}
-
+	nonRegular := nonRegularContainerNames(spec)
 	for _, status := range podStatus.ActiveContainerStatuses {
-		if !containerNames.Has(status.Name) {
+		if nonRegular.Has(status.Name) {
 			continue
 		}
 		return true
@@ -560,4 +552,17 @@ func SecurityProfileOCIRefs(pod *v1.Pod) []string {
 		}
 	}
 	return refs
+}
+
+// nonRegularContainerNames returns the names of the init and ephemeral containers in spec. Any other
+// container of the pod is a regular container, even one that was removed from the spec: only
+// regular containers can be removed, and API validation doesn't let an added container reuse the
+// name of a removed one while the pod reports its status, which it does while the removed
+// container has runtime containers.
+func nonRegularContainerNames(spec *v1.PodSpec) sets.Set[string] {
+	names := sets.New[string]()
+	for c := range podutil.ContainerIter(spec, podutil.InitContainers|podutil.EphemeralContainers) {
+		names.Insert(c.Name)
+	}
+	return names
 }

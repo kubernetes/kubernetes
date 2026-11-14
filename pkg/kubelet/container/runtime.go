@@ -321,8 +321,14 @@ const (
 	ContainerStateUnknown State = "unknown"
 )
 
-// ContainerReasonStatusUnknown indicates a container the status of the container cannot be determined.
-const ContainerReasonStatusUnknown string = "ContainerStatusUnknown"
+const (
+	// ContainerReasonStatusUnknown indicates a container the status of the container cannot be determined.
+	ContainerReasonStatusUnknown string = "ContainerStatusUnknown"
+
+	// ContainerReasonUnallocated indicates a container that was added to the pod but that the kubelet
+	// has not allocated yet.
+	ContainerReasonUnallocated string = "Unallocated"
+)
 
 // Container provides the runtime information for a container, such as ID, hash,
 // state of the container.

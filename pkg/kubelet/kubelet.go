@@ -746,7 +746,13 @@ func NewMainKubelet(ctx context.Context,
 	klet.mirrorPodClient = kubepod.NewBasicMirrorClient(klet.kubeClient, string(nodeName), nodeLister)
 	klet.podManager = kubepod.NewBasicPodManager()
 
-	klet.statusManager = status.NewManager(klet.kubeClient, klet.podManager, klet, kubeDeps.PodStartupLatencyTracker)
+	var statusPodManager status.PodManager = klet.podManager
+	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicContainers) {
+		// The status manager must see the allocated containers, which can differ from the spec
+		// while dynamic container changes are pending.
+		statusPodManager = &allocatedStatusPodManager{PodManager: klet.podManager, kl: klet}
+	}
+	klet.statusManager = status.NewManager(klet.kubeClient, statusPodManager, klet, kubeDeps.PodStartupLatencyTracker)
 
 	broadcaster := pods.NewBroadcaster(ctx)
 	klet.podsServer = pods.NewPodsServer(broadcaster, klet.podManager, klet.statusManager, klet.sourcesReady)
@@ -2343,7 +2349,7 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 	}
 
 	// Ensure the pod is being probed
-	kl.probeManager.AddPod(ctx, pod)
+	kl.probeManager.SyncPod(ctx, pod)
 
 	// TODO(#113606): use cancellation from the incoming context parameter, which comes from the pod worker.
 	// Currently, using cancellation from that context causes test failures. To remove this WithoutCancel,
@@ -2365,9 +2371,10 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 
 	// If we just performed a RestartAllContainers reset, we want to immediately
 	// trigger another sync to start the containers, rather than waiting for PLEG
-	// or the periodic resync.
-	if utilfeature.DefaultFeatureGate.Enabled(features.RestartAllContainersOnContainerExits) &&
-		restartingAllContainers && result.Error() == nil {
+	// or the periodic resync. The same goes for pruning the containers removed from
+	// the pod spec, so that the pod status drops them: the status was generated
+	// before they were removed, and PLEG doesn't sync a pod for removed containers.
+	if result.Error() == nil {
 		shouldRequeue := false
 		for _, r := range result.SyncResults {
 			if r.Action == kubecontainer.RemoveContainer && r.Error == nil {
@@ -2379,6 +2386,7 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 			// This will not cause an infinite loop because UpdatePod merges concurrent updates
 			// to the same pod. Because all containers are removed, the subsequent SyncPod
 			// execution will unset the AllContainersRestarting condition and break the cycle.
+			// Pruned containers are gone from the subsequent SyncPod, so it prunes nothing.
 			kl.podWorkers.UpdatePod(ctx, UpdatePodOptions{
 				Pod:        pod,
 				MirrorPod:  mirrorPod,
@@ -3152,19 +3160,12 @@ func recordPodLevelResourceResizeOperations(oldPod, newPod *v1.Pod) {
 // recordContainerResizeOperations records the resizes that an update of a pod requests for its
 // containers.
 func recordContainerResizeOperations(oldPod, newPod *v1.Pod) {
-	for oldContainer, containerType := range podutil.ContainerIter(&oldPod.Spec, podutil.InitContainers|podutil.Containers) {
-		if !allocation.IsResizableContainer(oldContainer, containerType) {
+	for pair, containerType := range podutil.ContainerPairs(newPod, oldPod, podutil.InitContainers|podutil.Containers) {
+		oldContainer, newContainer := pair.Old, pair.New
+		// An added or removed container isn't a resize.
+		if oldContainer == nil || newContainer == nil ||
+			!allocation.IsResizableContainer(oldContainer, containerType) || !allocation.IsResizableContainer(newContainer, containerType) {
 			continue
-		}
-
-		var newContainer *v1.Container
-		for new, newType := range podutil.ContainerIter(&newPod.Spec, podutil.InitContainers|podutil.Containers) {
-			if !allocation.IsResizableContainer(new, newType) {
-				continue
-			}
-			if new.Name == oldContainer.Name && containerType == newType {
-				newContainer = new
-			}
 		}
 
 		newResources := newContainer.Resources
@@ -3335,7 +3336,12 @@ func (kl *Kubelet) HandlePodReconcile(ctx context.Context, pods []*v1.Pod) {
 		// TODO: this should be unnecessary today - determine what is the cause for this to
 		// be different than Sync, or if there is a better place for it. For instance, we have
 		// needsReconcile in kubelet/config, here, and in status_manager.
-		if status.NeedToReconcilePodReadiness(pod) {
+		readinessPod := pod
+		if utilfeature.DefaultFeatureGate.Enabled(features.DynamicContainers) {
+			// Readiness is computed from the allocated containers.
+			readinessPod, _ = kl.allocationManager.UpdatePodFromAllocation(pod)
+		}
+		if status.NeedToReconcilePodReadiness(readinessPod) {
 			kl.podWorkers.UpdatePod(ctx, UpdatePodOptions{
 				Pod:        pod,
 				MirrorPod:  mirrorPod,
@@ -3801,4 +3807,22 @@ func (a *allocatedPodManager) GetPods() []*v1.Pod {
 		}
 	}
 	return allocatedPods
+}
+
+// allocatedStatusPodManager returns allocated pods to the status manager.
+// TODO(KEP-5972): Move the allocated pod lookup out of the allocation manager, so the status
+// manager can read it directly instead of through a wrapper that references the kubelet.
+type allocatedStatusPodManager struct {
+	status.PodManager
+	// kl provides the allocation manager, which is constructed after the status manager.
+	kl *Kubelet
+}
+
+func (a *allocatedStatusPodManager) GetPodByUID(uid types.UID) (*v1.Pod, bool) {
+	pod, found := a.PodManager.GetPodByUID(uid)
+	if !found || a.kl.allocationManager == nil {
+		return pod, found
+	}
+	pod, _ = a.kl.allocationManager.UpdatePodFromAllocation(pod)
+	return pod, true
 }
