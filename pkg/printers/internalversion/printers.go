@@ -1154,6 +1154,15 @@ func hasPodReadyCondition(conditions []api.PodCondition) bool {
 	return false
 }
 
+func getJobCondition(conditions []batch.JobCondition, conditionType batch.JobConditionType) *batch.JobCondition {
+	for i := range conditions {
+		if conditions[i].Type == conditionType {
+			return &conditions[i]
+		}
+	}
+	return nil
+}
+
 func hasJobCondition(conditions []batch.JobCondition, conditionType batch.JobConditionType) bool {
 	for _, condition := range conditions {
 		if condition.Type == conditionType {
@@ -1304,10 +1313,16 @@ func printJob(obj *batch.Job, options printers.GenerateOptions) ([]metav1.TableR
 	var jobDuration string
 	switch {
 	case obj.Status.StartTime == nil:
-	case obj.Status.CompletionTime == nil:
-		jobDuration = duration.HumanDuration(time.Since(obj.Status.StartTime.Time))
-	default:
+	case obj.Status.CompletionTime != nil:
 		jobDuration = duration.HumanDuration(obj.Status.CompletionTime.Sub(obj.Status.StartTime.Time))
+	default:
+		// CompletionTime is only set when a Job succeeds, so for a failed Job
+		// stop counting when the Failed condition was added.
+		end := time.Now()
+		if failed := getJobCondition(obj.Status.Conditions, batch.JobFailed); failed != nil && failed.Status == api.ConditionTrue && !failed.LastTransitionTime.IsZero() {
+			end = failed.LastTransitionTime.Time
+		}
+		jobDuration = duration.HumanDuration(end.Sub(obj.Status.StartTime.Time))
 	}
 	var status string
 	if hasJobCondition(obj.Status.Conditions, batch.JobComplete) {
