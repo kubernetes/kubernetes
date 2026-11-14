@@ -193,6 +193,54 @@ func WatchEvent(eventChan <-chan string) (string, error) {
 	}
 }
 
+func TestVolumeMetricsErrorLoggingState(t *testing.T) {
+	ktesting.Init(t).SyncTest("", testVolumeMetricsErrorLoggingState)
+}
+
+func testVolumeMetricsErrorLoggingState(tCtx ktesting.TContext) {
+	t := tCtx.TB()
+	logger := tCtx.Logger()
+
+	mockStats := statstest.NewMockProvider(t)
+	errVol := &fakeVolumeWithMetricsError{err: fmt.Errorf("nfs: connection refused")}
+	volumes := map[string]volume.Volume{vol0: errVol}
+	mockStats.EXPECT().ListVolumesForPod(fakePod.UID).Return(volumes, true).Maybe()
+	mockStats.EXPECT().ListBlockVolumesForPod(fakePod.UID).Return(nil, false).Maybe()
+
+	fakeEventRecorder := record.FakeRecorder{}
+	statsCalculator := newVolumeStatCalculator(mockStats, time.Minute, fakePod, &fakeEventRecorder)
+
+	// First failure: track the error message for Error-level logging.
+	statsCalculator.calcAndStoreStats(logger)
+	assert.Equal(t, map[string]string{vol0: "nfs: connection refused"}, statsCalculator.lastMetricsErrors)
+	vs, ok := statsCalculator.GetLatest()
+	assert.True(t, ok)
+	assert.Empty(t, vs.EphemeralVolumes)
+	assert.Empty(t, vs.PersistentVolumes)
+
+	// Identical failure: still tracked (repeat logs go to V(4) only).
+	statsCalculator.calcAndStoreStats(logger)
+	assert.Equal(t, map[string]string{vol0: "nfs: connection refused"}, statsCalculator.lastMetricsErrors)
+
+	// Changed failure message: update tracked error.
+	errVol.err = fmt.Errorf("nfs: timeout")
+	statsCalculator.calcAndStoreStats(logger)
+	assert.Equal(t, map[string]string{vol0: "nfs: timeout"}, statsCalculator.lastMetricsErrors)
+
+	// Success clears the tracked error so a later failure logs at Error again.
+	errVol.err = nil
+	statsCalculator.calcAndStoreStats(logger)
+	assert.Empty(t, statsCalculator.lastMetricsErrors)
+	vs, ok = statsCalculator.GetLatest()
+	assert.True(t, ok)
+	assert.NotEmpty(t, append(vs.EphemeralVolumes, vs.PersistentVolumes...))
+
+	// NotSupported errors are expected and must not be tracked.
+	errVol.err = volume.NewNotSupportedError()
+	statsCalculator.calcAndStoreStats(logger)
+	assert.Empty(t, statsCalculator.lastMetricsErrors)
+}
+
 // Fake volume/metrics provider
 var _ volume.Volume = &fakeVolume{}
 
@@ -274,4 +322,18 @@ func expectedBlockStats() kubestats.FsStats {
 		InodesFree:     &null,
 		InodesUsed:     &null,
 	}
+}
+
+// fakeVolumeWithMetricsError returns a controllable GetMetrics error.
+type fakeVolumeWithMetricsError struct {
+	err error
+}
+
+func (v *fakeVolumeWithMetricsError) GetPath() string { return "" }
+
+func (v *fakeVolumeWithMetricsError) GetMetrics() (*volume.Metrics, error) {
+	if v.err != nil {
+		return nil, v.err
+	}
+	return expectedMetrics(), nil
 }
