@@ -1047,8 +1047,36 @@ func (p *staticPolicy) allocateCPUs(logger klog.Logger, s state.State, numCPUs i
 	result.CPUs = result.CPUs.Union(remainingCPUs)
 	result.Aligned = p.topology.CheckAlignment(result.CPUs)
 
+	updatedDefaultCPUSet := s.GetDefaultCPUSet().Difference(result.CPUs)
+	if p.options.StrictCPUReservation && updatedDefaultCPUSet.IsEmpty() {
+		// Topology selection can consume the last shared CPU even when init CPUs
+		// could be reused instead. Retry with reusable CPUs before rejecting.
+		retryCPUs := allocatableCPUs
+		if numaAffinity != nil {
+			alignedCPUs := p.getAlignedCPUs(numaAffinity, allocatableCPUs)
+			if alignedCPUs.Size() >= numCPUs {
+				retryCPUs = alignedCPUs
+			}
+		}
+		reusableCPUs = reusableCPUs.Intersection(retryCPUs)
+		reusedCPUs, err := p.takeByTopology(logger, reusableCPUs, min(numCPUs, reusableCPUs.Size()), 0)
+		if err != nil {
+			return topology.EmptyAllocation(), err
+		}
+		remainingCPUs, err := p.takeByTopology(logger, retryCPUs.Difference(reusedCPUs), numCPUs-reusedCPUs.Size(), 0)
+		if err != nil {
+			return topology.EmptyAllocation(), err
+		}
+		result.CPUs = reusedCPUs.Union(remainingCPUs)
+		result.Aligned = p.topology.CheckAlignment(result.CPUs)
+		updatedDefaultCPUSet = s.GetDefaultCPUSet().Difference(result.CPUs)
+		if updatedDefaultCPUSet.IsEmpty() {
+			return topology.EmptyAllocation(), fmt.Errorf("exclusive CPU allocation would empty the shared CPU pool")
+		}
+	}
+
 	// Remove allocated CPUs from the shared CPUSet.
-	s.SetDefaultCPUSet(s.GetDefaultCPUSet().Difference(result.CPUs))
+	s.SetDefaultCPUSet(updatedDefaultCPUSet)
 
 	logger.Info("AllocateCPUs", "result", result.String())
 	return result, nil

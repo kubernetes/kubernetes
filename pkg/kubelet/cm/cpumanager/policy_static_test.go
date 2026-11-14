@@ -733,6 +733,62 @@ func TestStaticPolicyAdd(t *testing.T) {
 	}
 }
 
+func TestStaticPolicyStrictCPUReservationPreservesSharedPool(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	reservedCPUs := cpuset.New(0)
+	policy, err := NewStaticPolicy(
+		logger,
+		topoSingleSocketHT,
+		reservedCPUs.Size(),
+		reservedCPUs,
+		topologymanager.NewFakeManager(logger),
+		map[string]string{StrictCPUReservationOption: "true"},
+	)
+	require.NoError(t, err)
+
+	defaultCPUSet := cpuset.New(1, 2, 3, 4, 5, 6, 7)
+	st := &mockState{
+		assignments:   state.ContainerCPUAssignments{},
+		defaultCPUSet: defaultCPUSet,
+	}
+	pod := makePod("fakePod", "fakeContainer", "7000m", "7000m")
+
+	err = policy.Allocate(logger, st, pod, &pod.Spec.Containers[0], lifecycle.AddOperation)
+	require.EqualError(t, err, "exclusive CPU allocation would empty the shared CPU pool")
+	require.Empty(t, st.assignments)
+	require.Equal(t, defaultCPUSet, st.defaultCPUSet)
+}
+
+func TestStaticPolicyStrictCPUReservationReusesInitCPUs(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	for _, defaultCPUSet := range []cpuset.CPUSet{cpuset.New(7), cpuset.New(6, 7)} {
+		t.Run(defaultCPUSet.String(), func(t *testing.T) {
+			policy, err := NewStaticPolicy(logger, topoSingleSocketHT, 1, cpuset.New(0), topologymanager.NewFakeManager(logger), map[string]string{StrictCPUReservationOption: "true"})
+			require.NoError(t, err)
+			st := state.NewMemoryState(logger)
+			initCPUs := cpuset.New(1, 2, 3, 4, 5, 6).Difference(defaultCPUSet)
+			st.SetDefaultCPUSet(defaultCPUSet)
+			st.SetCPUSet("fakePod", "init", initCPUs)
+			require.NoError(t, policy.Start(logger, st))
+			pod := makePod("fakePod", "app", "6000m", "6000m")
+			init := makePod("fakePod", "init", "5000m", "5000m").Spec.Containers[0]
+			if initCPUs.Size() == 6 {
+				init = makePod("fakePod", "init", "6000m", "6000m").Spec.Containers[0]
+			}
+			pod.Spec.InitContainers = []v1.Container{init}
+			require.NoError(t, policy.Allocate(logger, st, pod, &pod.Spec.InitContainers[0], lifecycle.AddOperation))
+			require.NoError(t, policy.Allocate(logger, st, pod, &pod.Spec.Containers[0], lifecycle.AddOperation))
+			appCPUs, ok := st.GetCPUSet("fakePod", "app")
+			require.True(t, ok)
+			require.Equal(t, 6, appCPUs.Size())
+			require.True(t, initCPUs.IsSubsetOf(appCPUs))
+			require.Equal(t, 1, st.GetDefaultCPUSet().Size())
+			require.True(t, st.GetDefaultCPUSet().Intersection(appCPUs).IsEmpty())
+			require.NoError(t, policy.Start(logger, st))
+		})
+	}
+}
+
 func runStaticPolicyTestCase(t *testing.T, testCase staticPolicyTest) {
 	logger, _ := ktesting.NewTestContext(t)
 	tm := topologymanager.NewFakeManager(logger)
