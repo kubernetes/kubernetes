@@ -37,6 +37,14 @@ type HorizontalPodAutoscalerSpecApplyConfiguration struct {
 	// targetCPUUtilizationPercentage is the target average CPU utilization (represented as a percentage of requested CPU) over all the pods;
 	// if not specified the default autoscaling policy will be used.
 	TargetCPUUtilizationPercentage *int32 `json:"targetCPUUtilizationPercentage,omitempty"`
+	// syncPeriodSeconds is the delay after a reconciliation completes before
+	// the next periodic reconciliation of this HPA is eligible to run.
+	// Other events may trigger reconciliation before the delay expires.
+	// When unset, the global --horizontal-pod-autoscaler-sync-period is used.
+	// A short period does not make metrics fresher; it is useful only when
+	// the metrics source updates its values at least as often.
+	// The value must be in the range [3, 3600]. Timing is best-effort.
+	SyncPeriodSeconds *int32 `json:"syncPeriodSeconds,omitempty"`
 }
 
 // HorizontalPodAutoscalerSpecApplyConfiguration constructs a declarative configuration of the HorizontalPodAutoscalerSpec type for use with
@@ -74,5 +82,13 @@ func (b *HorizontalPodAutoscalerSpecApplyConfiguration) WithMaxReplicas(value in
 // If called multiple times, the TargetCPUUtilizationPercentage field is set to the value of the last call.
 func (b *HorizontalPodAutoscalerSpecApplyConfiguration) WithTargetCPUUtilizationPercentage(value int32) *HorizontalPodAutoscalerSpecApplyConfiguration {
 	b.TargetCPUUtilizationPercentage = &value
+	return b
+}
+
+// WithSyncPeriodSeconds sets the SyncPeriodSeconds field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the SyncPeriodSeconds field is set to the value of the last call.
+func (b *HorizontalPodAutoscalerSpecApplyConfiguration) WithSyncPeriodSeconds(value int32) *HorizontalPodAutoscalerSpecApplyConfiguration {
+	b.SyncPeriodSeconds = &value
 	return b
 }

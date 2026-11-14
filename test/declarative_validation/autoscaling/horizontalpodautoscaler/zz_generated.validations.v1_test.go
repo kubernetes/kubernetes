@@ -80,6 +80,10 @@ func init() {
 			"spec.scaleTargetRef.name": {
 				{ErrorType: "FieldValueRequired"},
 			},
+			"spec.syncPeriodSeconds": {
+				{ErrorType: "FieldValueInvalid", Origin: "maximum"},
+				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
+			},
 		},
 	)
 }

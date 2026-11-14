@@ -88,6 +88,17 @@ var (
 		[]string{"group", "resource"},
 	)
 
+	// ReconciliationDelayRatio tracks how closely periodic reconciliations
+	// follow the requested sync period.
+	ReconciliationDelayRatio = metrics.NewHistogramVec(
+		&metrics.HistogramOpts{
+			Subsystem:      hpaControllerSubsystem,
+			Name:           "reconciliation_delay_ratio",
+			Help:           "Ratio of the observed delay to the requested delay between the end of an HPA reconciliation and the start of the next periodic reconciliation. The label 'period_source' is 'global' for HPAs that use the controller-wide sync period and 'spec' for HPAs that set spec.syncPeriodSeconds.",
+			Buckets:        []float64{1, 1.1, 1.25, 1.5, 2, 3, 5, 10},
+			StabilityLevel: metrics.ALPHA,
+		}, []string{"period_source"})
+
 	metricsList = []metrics.Registerable{
 		ReconciliationsTotal,
 		ReconciliationsDuration,
@@ -96,6 +107,7 @@ var (
 		NumHorizontalPodAutoscalers,
 		DesiredReplicasCount,
 		HPARequeueSkips,
+		ReconciliationDelayRatio,
 	}
 )
 
