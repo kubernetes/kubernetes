@@ -513,6 +513,10 @@ func (s KubeControllerManagerOptions) Config(ctx context.Context, allControllers
 		return nil, err
 	}
 
+	// Propagate feature gate state to the metrics subsystem. This must be called
+	// after feature gates are set and before any histogram metrics are registered.
+	metricsfeatures.ApplyFeatureGates(utilfeature.DefaultMutableFeatureGate)
+
 	if err := s.SecureServing.MaybeDefaultWithSelfSignedCerts("localhost", nil, []net.IP{netutils.ParseIPSloppy("127.0.0.1")}); err != nil {
 		return nil, fmt.Errorf("error creating self-signed certificates: %v", err)
 	}
@@ -546,7 +550,6 @@ func (s KubeControllerManagerOptions) Config(ctx context.Context, allControllers
 	if err := s.ApplyTo(c, allControllers, disabledByDefaultControllers, controllerAliases); err != nil {
 		return nil, err
 	}
-	metricsfeatures.ApplyFeatureGates(utilfeature.DefaultMutableFeatureGate)
 	s.Metrics.Apply()
 
 	if s.ParsedFlags != nil {
