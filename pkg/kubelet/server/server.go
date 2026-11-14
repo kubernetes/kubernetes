@@ -818,6 +818,7 @@ func (s *Server) InstallProfilingHandler(enableProfilingLogHandler bool, enableC
 
 	if enableContentionProfiling {
 		goruntime.SetBlockProfileRate(1)
+		goruntime.SetMutexProfileFraction(1)
 	}
 }
 

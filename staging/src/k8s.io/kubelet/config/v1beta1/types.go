@@ -342,7 +342,7 @@ type KubeletConfiguration struct {
 	// Default: true
 	// +optional
 	EnableDebuggingHandlers *bool `json:"enableDebuggingHandlers,omitempty"`
-	// enableContentionProfiling enables block profiling, if enableDebuggingHandlers is true.
+	// enableContentionProfiling enables block and mutex profiling, if enableDebuggingHandlers is true.
 	// Default: false
 	// +optional
 	EnableContentionProfiling bool `json:"enableContentionProfiling,omitempty"`
