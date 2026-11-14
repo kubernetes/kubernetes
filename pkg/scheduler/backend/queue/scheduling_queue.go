@@ -951,27 +951,55 @@ func (p *PriorityQueue) addPodGroupMember(logger klog.Logger, pInfo *framework.Q
 		logger.V(5).Info("Pod with pod group added to incompletePodGroupPods, waiting for one or more parent pod group objects to be observed", "podGroup", pInfo.Pod.Spec.SchedulingGroup.PodGroupName, "pod", klog.KObj(pInfo))
 		return
 	}
+	p.addPodGroupMembers(logger, rootInfoLookup, []*framework.QueuedPodInfo{pInfo})
+}
 
-	if added := p.addToPodGroupIfExists(logger, pInfo, rootInfoLookup); added {
+// addPodGroupMembers adds pInfos, which all belong to the root group rootInfoLookup, into the scheduling queue
+// in one step. Calling addPodGroupMember for each of them is not equivalent: Pop doesn't take p.lock,
+// so the root could be popped as soon as it had enough pods to pass PreEnqueue, and the remaining pods
+// would only join it after a placement was chosen without them.
+func (p *PriorityQueue) addPodGroupMembers(logger klog.Logger, rootInfoLookup *framework.QueuedPodGroupInfo, pInfos []*framework.QueuedPodInfo) {
+	if len(pInfos) == 0 {
+		return
+	}
+
+	if entity, strategy := p.deleteFromAnyQueue(rootInfoLookup); entity != nil {
+		rootInfo := entity.(*framework.QueuedPodGroupInfo)
+		for _, pInfo := range pInfos {
+			rootInfo.AddPod(pInfo)
+		}
+		// Capture the root type and references before requeueing. Once the root is added to
+		// activeQ, it can be popped and processed before this goroutine logs the update.
+		rootType, rootRef := rootInfo.Type(), klog.KObj(rootInfo)
+		queue := p.requeueEntityWithQueueingStrategy(logger, rootInfo, strategy, framework.EventUnscheduledPodAdd.Label())
+		if queue == activeQ || (p.isPopFromBackoffQEnabled && queue == backoffQ) {
+			p.activeQ.broadcast()
+		}
+		logger.V(5).Info("Pods added to existing root group info", "rootType", rootType, "root", rootRef, "pods", klog.KObjSlice(pInfos), "queue", queue)
 		return
 	}
 
 	if p.activeQ.isLastPoppedEntity(rootInfoLookup) {
-		// If the last popped entity is the matching pod group, add the pod to the pending pod group pods,
-		// so it will be added to the pod group when it's requeued.
-		p.pendingPodGroupPods.add(pInfo)
-		logger.V(5).Info("Pod added to pending pod group pods, waiting for its root group to be requeued", "rootType", rootInfoLookup.Type(), "root", klog.KObj(rootInfoLookup), "pod", klog.KObj(pInfo))
+		// If the last popped entity is the matching pod group, add the pods to the pending pod group pods,
+		// so they will be added to the pod group when it's requeued.
+		for _, pInfo := range pInfos {
+			p.pendingPodGroupPods.add(pInfo)
+		}
+		logger.V(5).Info("Pods added to pending pod group pods, waiting for their root group to be requeued", "rootType", rootInfoLookup.Type(), "root", klog.KObj(rootInfoLookup), "pods", klog.KObjSlice(pInfos))
 		return
 	}
 
-	// Create a new group as it's the first member pod in the queue.
-	rootInfo := p.newQueuedPodGroupInfoFromRootLookup(logger, pInfo, rootInfoLookup)
+	// Create a new group as these are the first member pods in the queue.
+	rootInfo := p.newQueuedPodGroupInfoFromRootLookup(logger, pInfos[0], rootInfoLookup)
+	for _, pInfo := range pInfos[1:] {
+		rootInfo.AddPod(pInfo)
+	}
 	// Get the log values before moving to activeQ, because accessing these values later can race with scheduling cycle.
 	rootType, rootRef := rootInfo.Type(), klog.KObj(rootInfo)
 	if added := p.moveToActiveQ(logger, rootInfo, framework.EventUnscheduledPodAdd.Label(), false, nil); added {
 		p.activeQ.broadcast()
 	}
-	logger.V(5).Info("Pod was added to root group as the first member pod", "rootType", rootType, "root", rootRef, "pod", klog.KObj(pInfo))
+	logger.V(5).Info("Pods were added to root group as the first member pods", "rootType", rootType, "root", rootRef, "pods", klog.KObjSlice(pInfos))
 }
 
 // deleteFromAnyQueue deletes an entity from any queue it may be in and returns
@@ -989,27 +1017,6 @@ func (p *PriorityQueue) deleteFromAnyQueue(entityLookup framework.QueuedEntityIn
 		return entity, queueSkip
 	}
 	return nil, queueSkip
-}
-
-// addToPodGroupIfExists tries to add pInfo as a member of its pod group into the scheduling queue.
-// It returns true if pInfo was added to an existing pod group.
-func (p *PriorityQueue) addToPodGroupIfExists(logger klog.Logger, pInfo *framework.QueuedPodInfo, rootInfoLookup framework.QueuedEntityInfo) bool {
-	entity, strategy := p.deleteFromAnyQueue(rootInfoLookup)
-	if entity == nil {
-		return false
-	}
-	rootInfo := entity.(*framework.QueuedPodGroupInfo)
-	rootInfo.AddPod(pInfo)
-	// Capture the root type and references before requeueing. Once the root is added to
-	// activeQ, it can be popped and processed before this goroutine logs the update.
-	rootType, rootRef := rootInfo.Type(), klog.KObj(rootInfo)
-	podRef := klog.KObj(pInfo)
-	queue := p.requeueEntityWithQueueingStrategy(logger, rootInfo, strategy, framework.EventUnscheduledPodAdd.Label())
-	if queue == activeQ || (p.isPopFromBackoffQEnabled && queue == backoffQ) {
-		p.activeQ.broadcast()
-	}
-	logger.V(5).Info("Pod added to existing root group info", "rootType", rootType, "root", rootRef, "pod", podRef, "queue", queue)
-	return true
 }
 
 // Activate moves the given pods to activeQ.
@@ -1664,11 +1671,7 @@ func (p *PriorityQueue) AddGenericPodGroup(logger klog.Logger, gpg *fwk.GenericP
 		pInfos = append(pInfos, p.incompletePodGroupPods.clear(pg.Namespace, pg.Name)...)
 	}
 
-	for _, pInfo := range pInfos {
-		// To handle all cases reliably, pods removed from incompletePodGroupPods are added to the queue
-		// through the addPodGroupMember method.
-		p.addPodGroupMember(logger, pInfo)
-	}
+	p.addPodGroupMembers(logger, rootInfoLookup, pInfos)
 	logger.V(5).Info("New group was added to the root group and its pods were attempted to be moved from incompletePodGroupPods to the queue", "rootType", rootInfoLookup.Type(), "root", klog.KObj(rootInfoLookup), "groupType", gpg.GetType(), "group", klog.KObj(gpg), "podsLen", len(pInfos))
 }
 
