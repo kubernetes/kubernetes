@@ -307,7 +307,7 @@ func TestHintMergerMergePreferredEquivalentToMerge(t *testing.T) {
 
 					merger := NewHintMerger(numaInfo, hints, policyName, optionSet.opts)
 					preferred, ok := merger.mergePreferred(klog.Background())
-					best := merger.Merge(klog.Background())
+					best := mergeExhaustive(merger)
 					if ok != best.Preferred {
 						t.Fatalf("expected mergePreferred ok=%v to match Merge Preferred=%v; full=%v hints=%v", ok, best.Preferred, best, hints)
 					}
