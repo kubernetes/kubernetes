@@ -215,7 +215,7 @@ func TestValidateClaim(t *testing.T) {
 			}(),
 		},
 		"bad-labels": {
-			wantFailures: field.ErrorList{field.Invalid(field.NewPath("metadata", "labels"), badValue, "a valid label must be an empty string or consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyValue',  or 'my_value',  or '12345', regex used for validation is '(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?')")},
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("metadata", "labels").Key("hello-world"), badValue, "a valid label must be an empty string or consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyValue',  or 'my_value',  or '12345', regex used for validation is '(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?')").MarkCoveredByDeclarative()},
 			claim: func() *resource.ResourceClaim {
 				claim := testClaim(goodName, goodNS, validClaimSpec)
 				claim.Labels = map[string]string{
