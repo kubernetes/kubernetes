@@ -2411,7 +2411,9 @@ func (kl *Kubelet) convertToAPIPodLevelResourcesStatus(logger klog.Logger, alloc
 	}
 
 	// KEP-5359: pod-level swap limit, read back from the pod cgroup's
-	// memory.swap.max when the pod declared one and swap is enforced on the node.
+	// memory.swap.max. "max" means no limit has been actuated yet (for example
+	// a deferred resize that adds one), so status omits it rather than report
+	// the allocated value.
 	if _, declared := resources.Limits[v1.ResourceSwap]; declared {
 		if !kl.isSwapLimitEnforced(allocatedPod) {
 			delete(resources.Limits, v1.ResourceSwap)
@@ -2421,7 +2423,7 @@ func (kl *Kubelet) convertToAPIPodLevelResourcesStatus(logger klog.Logger, alloc
 		} else if swapLimit, ok := cm.SwapLimitFromConfig(swapConfig); ok {
 			resources.Limits[v1.ResourceSwap] = *apiresource.NewQuantity(swapLimit, apiresource.BinarySI)
 		} else {
-			preserveOldResourcesValue(v1.ResourceSwap, oldPodStatus.Resources.Limits, resources.Limits)
+			delete(resources.Limits, v1.ResourceSwap)
 		}
 	}
 
@@ -2684,12 +2686,16 @@ func (kl *Kubelet) convertToAPIContainerStatuses(ctx context.Context, pod *v1.Po
 			// values (pod-level inheritance, LimitedSwap) stay out of status until
 			// the API shape is settled.
 			if _, declared := resources.Limits[v1.ResourceSwap]; declared {
-				if !kl.isSwapLimitEnforced(pod) {
-					delete(resources.Limits, v1.ResourceSwap)
-				} else if cStatus.Resources != nil && cStatus.Resources.SwapLimit != nil {
-					resources.Limits[v1.ResourceSwap] = *cStatus.Resources.SwapLimit
-				} else {
-					preserveOldResourcesValue(v1.ResourceSwap, oldStatus.Resources.Limits, resources.Limits)
+				// Swap has no dedicated CRI status field, so runtimes are not
+				// required to echo memory.swap.max back. Report the value the
+				// kubelet last applied successfully, and nothing until then.
+				delete(resources.Limits, v1.ResourceSwap)
+				if kl.isSwapLimitEnforced(pod) {
+					if actuated, found := kl.actuatedState.GetContainerResources(pod.UID, cName); found {
+						if q, ok := actuated.Limits[v1.ResourceSwap]; ok {
+							resources.Limits[v1.ResourceSwap] = q
+						}
+					}
 				}
 			}
 		}
