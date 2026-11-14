@@ -2153,9 +2153,9 @@
     version: "1.37"
 - name: WatchCacheStallResume
   versionedSpecs:
-  - default: false
+  - default: true
     lockToDefault: false
-    preRelease: Alpha
+    preRelease: Beta
     version: "1.38"
 - name: WatchFromStorageWithoutPrevKV
   versionedSpecs:
