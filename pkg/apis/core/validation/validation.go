@@ -4456,7 +4456,7 @@ func ValidateHostAliases(hostAliases []core.HostAlias, fldPath *field.Path) fiel
 	for i, hostAlias := range hostAliases {
 		allErrs = append(allErrs, IsValidIPForLegacyField(fldPath.Index(i).Child("ip"), hostAlias.IP, nil)...)
 		for j, hostname := range hostAlias.Hostnames {
-			allErrs = append(allErrs, ValidateDNS1123Subdomain(hostname, fldPath.Index(i).Child("hostnames").Index(j))...)
+			allErrs = append(allErrs, ValidateDNS1123Subdomain(strings.TrimSuffix(hostname, "."), fldPath.Index(i).Child("hostnames").Index(j))...)
 		}
 	}
 	return allErrs
@@ -5757,6 +5757,15 @@ func ValidatePodCreate(pod *core.Pod, opts PodValidationOptions) field.ErrorList
 	}
 	allErrs = append(allErrs, validateSeccompAnnotationsAndFields(pod.ObjectMeta, &pod.Spec, fldPath)...)
 	allErrs = append(allErrs, validateAppArmorAnnotationsAndFieldsMatchOnCreate(pod.ObjectMeta, &pod.Spec, fldPath)...)
+	if !opts.AllowHostAliasesFQDN {
+		for i, hostAlias := range pod.Spec.HostAliases {
+			for j, hostname := range hostAlias.Hostnames {
+				if strings.HasSuffix(hostname, ".") && hostname != "." {
+					allErrs = append(allErrs, field.Forbidden(fldPath.Child("hostAliases").Index(i).Child("hostnames").Index(j), "trailing dot requires feature gate HostAliasesAllowFQDN"))
+				}
+			}
+		}
+	}
 
 	return allErrs
 }
