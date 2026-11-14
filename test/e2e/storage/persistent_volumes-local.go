@@ -271,14 +271,14 @@ var _ = utils.SIGDescribe("PersistentVolumes-local", func() {
 					}
 				})
 
-				f.It("should set fsGroup for one pod", f.WithSlow(), func(ctx context.Context) {
+				f.It("should set fsGroup for one pod", func(ctx context.Context) {
 					ginkgo.By("Checking fsGroup is set")
 					pod := createPodWithFsGroupTest(ctx, config, testVol, 1234, 1234)
 					ginkgo.By("Deleting pod")
 					e2epod.DeletePodOrFail(ctx, config.client, config.ns, pod.Name)
 				})
 
-				f.It("should set same fsGroup for two pods simultaneously", f.WithSlow(), func(ctx context.Context) {
+				f.It("should set same fsGroup for two pods simultaneously", func(ctx context.Context) {
 					fsGroup := int64(1234)
 					ginkgo.By("Create first pod and check fsGroup is set")
 					pod1 := createPodWithFsGroupTest(ctx, config, testVol, fsGroup, fsGroup)
