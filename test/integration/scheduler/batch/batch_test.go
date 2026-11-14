@@ -405,7 +405,7 @@ func TestBatchScenarios(t *testing.T) {
 			cs := testCtx.ClientSet
 
 			for _, n := range tt.nodes {
-				_, err := schedulerutils.CreateNode(cs, newNode(&n))
+				_, err := schedulerutils.CreateNode(testCtx.Ctx, cs, newNode(&n))
 				if err != nil {
 					t.Fatal("Failed adding node", "node", n, err)
 				}

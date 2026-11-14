@@ -47,7 +47,7 @@ func TestDefaultBinder(t *testing.T) {
 			}
 
 			// Add a node.
-			node, err := schedulerutils.CreateNode(testCtx.ClientSet, st.MakeNode().Name("testnode").Obj())
+			node, err := schedulerutils.CreateNode(testCtx.Ctx, testCtx.ClientSet, st.MakeNode().Name("testnode").Obj())
 			if err != nil {
 				t.Fatal(err)
 			}

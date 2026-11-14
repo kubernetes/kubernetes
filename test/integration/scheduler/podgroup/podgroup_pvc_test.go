@@ -17,6 +17,7 @@ limitations under the License.
 package podgroup
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -37,10 +38,10 @@ import (
 
 // createBoundRWOPPVC creates a HostPath PV and a PVC bound to it, both with the
 // ReadWriteOncePod access mode.
-func createBoundRWOPPVC(cs kubernetes.Interface, ns, name string) error {
+func createBoundRWOPPVC(ctx context.Context, cs kubernetes.Interface, ns, name string) error {
 	storage := v1.VolumeResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}}
 	volType := v1.HostPathDirectoryOrCreate
-	pv, err := schedulerutils.CreatePV(cs, st.MakePersistentVolume().
+	pv, err := schedulerutils.CreatePV(ctx, cs, st.MakePersistentVolume().
 		Name(fmt.Sprintf("pv-%s-%s", ns, name)).
 		AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteOncePod}).
 		Capacity(storage.Requests).
@@ -49,7 +50,7 @@ func createBoundRWOPPVC(cs kubernetes.Interface, ns, name string) error {
 	if err != nil {
 		return fmt.Errorf("cannot create pv: %w", err)
 	}
-	_, err = schedulerutils.CreatePVC(cs, st.MakePersistentVolumeClaim().
+	_, err = schedulerutils.CreatePVC(ctx, cs, st.MakePersistentVolumeClaim().
 		Name(name).
 		Namespace(ns).
 		// Annotation and volume name required for PVC to be considered bound.
@@ -140,7 +141,7 @@ func TestPodGroupSchedulingWithReadWriteOncePodPVC(t *testing.T) {
 				ns := testCtx.NS.Name
 
 				for _, pvcName := range sets.List(sets.New("pvc-1", tt.secondPodPVC)) {
-					if err := createBoundRWOPPVC(testCtx.ClientSet, ns, pvcName); err != nil {
+					if err := createBoundRWOPPVC(testCtx.Ctx, testCtx.ClientSet, ns, pvcName); err != nil {
 						t.Fatal(err)
 					}
 				}

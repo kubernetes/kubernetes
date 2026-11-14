@@ -41,11 +41,6 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
-// imported from testutils
-var (
-	createNode = schedulerutils.CreateNode
-)
-
 const (
 	filter               = "filter"
 	prioritize           = "prioritize"
@@ -358,13 +353,17 @@ func TestSchedulerExtender(t *testing.T) {
 	testutils.SyncSchedulerInformerFactory(testCtx)
 	go testCtx.Scheduler.Run(testCtx.Ctx)
 
-	DoTestPodScheduling(testCtx.NS, t, clientSet)
+	DoTestPodScheduling(testCtx.Ctx, testCtx.NS, t, clientSet)
 }
 
-func DoTestPodScheduling(ns *v1.Namespace, t *testing.T, cs clientset.Interface) {
+func DoTestPodScheduling(ctx context.Context, ns *v1.Namespace, t *testing.T, cs clientset.Interface) {
 	// NOTE: This test cannot run in parallel, because it is creating and deleting
 	// non-namespaced objects (Nodes).
-	defer cs.CoreV1().Nodes().DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
+	defer func() {
+		if err := cs.CoreV1().Nodes().DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{}); err != nil {
+			t.Errorf("Failed to delete nodes: %v", err)
+		}
+	}()
 
 	goodCondition := v1.NodeCondition{
 		Type:              v1.NodeReady,
@@ -384,7 +383,7 @@ func DoTestPodScheduling(ns *v1.Namespace, t *testing.T, cs clientset.Interface)
 
 	for ii := range 5 {
 		node.Name = fmt.Sprintf("machine%d", ii+1)
-		if _, err := createNode(cs, node); err != nil {
+		if _, err := schedulerutils.CreateNode(ctx, cs, node); err != nil {
 			t.Fatalf("Failed to create nodes: %v", err)
 		}
 	}

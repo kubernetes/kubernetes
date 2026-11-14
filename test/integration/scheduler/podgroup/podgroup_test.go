@@ -1215,7 +1215,7 @@ func cleanupPodGroupTestResources(t *testing.T, ctx context.Context, cs clientse
 		t.Fatalf("Failed to delete pods in namespace %s: %v", ns, err)
 	}
 	if err := wait.PollUntilContextTimeout(ctx, 50*time.Millisecond, wait.ForeverTestTimeout, true,
-		schedulerutils.PodsCleanedUp(ctx, cs, ns)); err != nil {
+		schedulerutils.PodsCleanedUp(cs, ns)); err != nil {
 		t.Fatalf("Failed to wait for pods in namespace %s to be deleted: %v", ns, err)
 	}
 

@@ -1762,7 +1762,7 @@ func TestSchedulerRestartWithNominatedNode(t *testing.T) {
 	nodeOther := st.MakeNode().Name("node-other").Taints([]v1.Taint{{Key: "foo", Effect: v1.TaintEffectPreferNoSchedule}}).Obj()
 
 	for _, n := range []*v1.Node{nodePreferred, nodeOther} {
-		if _, err := schedulerutils.CreateNode(cs, n); err != nil {
+		if _, err := schedulerutils.CreateNode(testContext.Ctx, cs, n); err != nil {
 			t.Fatalf("Failed to create node %s: %v", n.Name, err)
 		}
 	}
@@ -1820,7 +1820,7 @@ func TestSchedulerRestartWithNominatedNode(t *testing.T) {
 	// We expect the scheduler will stop due to SchedulerCloseFn being called in bind
 	<-testCtx.SchedulerCtx.Done()
 
-	podA, err := schedulerutils.GetPod(cs, podA.Name, podA.Namespace)
+	podA, err := schedulerutils.GetPod(ctx, cs, podA.Name, podA.Namespace)
 	if err != nil {
 		t.Fatalf("Failed to get pod %s: %v", podA.Name, err)
 	}
@@ -1852,7 +1852,7 @@ func TestSchedulerRestartWithNominatedNode(t *testing.T) {
 
 	checkNode := func(pod *v1.Pod, expected string) {
 		t.Helper()
-		p, _ := schedulerutils.GetPod(cs, pod.Name, pod.Namespace)
+		p, _ := schedulerutils.GetPod(ctx, cs, pod.Name, pod.Namespace)
 		if p.Spec.NodeName != expected {
 			t.Errorf("%s scheduled on %s, wanted %s", pod.Name, p.Spec.NodeName, expected)
 		}
