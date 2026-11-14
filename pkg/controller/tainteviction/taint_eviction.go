@@ -57,6 +57,8 @@ const (
 	UpdateWorkerSize     = 8
 	podUpdateChannelSize = 1
 	retries              = 5
+
+	disruptionReason = "DeletionByTaintManager"
 )
 
 type nodeUpdateItem struct {
@@ -115,6 +117,10 @@ func deletePodHandler(c clientset.Interface, emitEventFunc func(types.Namespaced
 		var err error
 		for i := 0; i < retries; i++ {
 			err = addConditionAndDeletePod(ctx, c, name, ns)
+			if apierrors.IsNotFound(err) {
+				klog.FromContext(ctx).V(4).Info("Pod already deleted", "controller", controllerName, "pod", args.Object)
+				return nil
+			}
 			if err == nil {
 				metrics.PodDeletionsTotal.Inc()
 				metrics.PodDeletionsLatency.Observe(time.Since(fireAt).Seconds())
@@ -136,7 +142,7 @@ func addConditionAndDeletePod(ctx context.Context, c clientset.Interface, name, 
 		Type:               v1.DisruptionTarget,
 		ObservedGeneration: apipod.CalculatePodConditionObservedGeneration(&pod.Status, pod.Generation, v1.DisruptionTarget),
 		Status:             v1.ConditionTrue,
-		Reason:             "DeletionByTaintManager",
+		Reason:             disruptionReason,
 		Message:            "Taint manager: deleting due to NoExecute taint",
 	})
 	if updated {
@@ -511,7 +517,13 @@ func (tc *Controller) handlePodUpdate(ctx context.Context, podUpdate podUpdateIt
 
 	// Create or Update
 	podNamespacedName := types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}
+	if alreadyEvicted(pod) {
+		logger.V(4).Info("Pod already evicted by this controller", "pod", podNamespacedName)
+		tc.cancelWorkWithEvent(logger, podNamespacedName)
+		return
+	}
 	logger.V(4).Info("Noticed pod update", "pod", podNamespacedName)
+
 	nodeName := pod.Spec.NodeName
 	if nodeName == "" {
 		return
@@ -582,9 +594,20 @@ func (tc *Controller) handleNodeUpdate(ctx context.Context, nodeUpdate nodeUpdat
 
 	now := time.Now()
 	for _, pod := range pods {
+		if alreadyEvicted(pod) {
+			continue
+		}
 		podNamespacedName := types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}
 		tc.processPodOnNode(ctx, podNamespacedName, node.Name, pod.Spec.Tolerations, taints, now)
 	}
+}
+
+func alreadyEvicted(pod *v1.Pod) bool {
+	if pod.DeletionTimestamp == nil {
+		return false
+	}
+	_, cond := apipod.GetPodCondition(&pod.Status, v1.DisruptionTarget)
+	return cond != nil && cond.Status == v1.ConditionTrue && cond.Reason == disruptionReason
 }
 
 func (tc *Controller) emitPodDeletionEvent(nsName types.NamespacedName) {
