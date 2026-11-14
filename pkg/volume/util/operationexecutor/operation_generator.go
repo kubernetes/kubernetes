@@ -604,6 +604,11 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 			SELinuxMountContext: volumeToMount.SELinuxLabel,
 		}
 		if mountErr != nil {
+			if volumeDeviceMounter != nil && volumetypes.IsStageRecoveryRequiredError(mountErr) {
+				if err := actualStateOfWorld.MarkDeviceAsUncertain(volumeToMount.VolumeName, devicePath, resizeOptions.DeviceStagePath, volumeToMount.SELinuxLabel); err != nil {
+					klog.ErrorS(err, "Failed to mark CSI stage recovery uncertain", "volumeName", volumeToMount.VolumeName)
+				}
+			}
 			og.checkForFailedMount(volumeToMount, mountErr)
 			og.markVolumeErrorState(volumeToMount, markOpts, mountErr, actualStateOfWorld)
 			// On failure, return error. Caller will log and retry.
