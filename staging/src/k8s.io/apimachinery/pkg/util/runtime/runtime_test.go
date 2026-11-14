@@ -29,6 +29,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/stretchr/testify/assert"
@@ -346,4 +347,19 @@ func TestErrorToString(t *testing.T) {
 			assert.Equal(t, tt.expectString, actualString)
 		})
 	}
+}
+
+func TestRudimentaryErrorBackoffClockMovesBackward(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		r := &rudimentaryErrorBackoff{
+			minPeriod:     time.Second,
+			lastErrorTime: time.Now().Add(time.Hour),
+		}
+
+		start := time.Now()
+		r.OnError()
+		if elapsed := time.Since(start); elapsed != 0 {
+			t.Errorf("OnError slept after the clock moved backward: %s", elapsed)
+		}
+	})
 }
