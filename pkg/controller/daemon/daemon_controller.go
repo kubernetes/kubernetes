@@ -118,7 +118,7 @@ type DaemonSetsController struct {
 	// used for unit testing
 	enqueueDaemonSet func(ds *apps.DaemonSet)
 	// A TTLCache of pod creates/deletes each ds expects to see
-	expectations controller.ControllerExpectationsInterface
+	expectations *controller.ControllerExpectationsWithUID
 	// dsLister can list/get daemonsets from the shared informer's store
 	dsLister appslisters.DaemonSetLister
 	// dsStoreSynced returns true if the daemonset store has been synced at least once.
@@ -205,7 +205,7 @@ func NewDaemonSetsController(
 			KubeClient: kubeClient,
 		},
 		burstReplicas: BurstReplicas,
-		expectations:  controller.NewControllerExpectations(),
+		expectations:  controller.NewControllerExpectationsWithUID(controller.NewControllerExpectations()),
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
 			workqueue.TypedRateLimitingQueueConfig[string]{
@@ -350,7 +350,7 @@ func (dsc *DaemonSetsController) deleteDaemonset(logger klog.Logger, obj interfa
 	)
 
 	// Delete expectations for the DaemonSet so if we create a new one with the same name it starts clean
-	dsc.expectations.DeleteExpectations(logger, key)
+	dsc.expectations.DeleteExpectationsWithUID(logger, key)
 
 	dsc.queue.Add(key)
 }
@@ -977,7 +977,7 @@ func (dsc *DaemonSetsController) updateDaemonSet(ctx context.Context, ds *apps.D
 	}
 
 	// Process rolling updates if we're ready.
-	if dsc.expectations.SatisfiedExpectations(klog.FromContext(ctx), key) {
+	if dsc.expectations.SatisfiedExpectationsWithUID(klog.FromContext(ctx), key, ds.UID) {
 		switch ds.Spec.UpdateStrategy.Type {
 		case apps.OnDeleteDaemonSetStrategyType:
 		case apps.RollingUpdateDaemonSetStrategyType:
@@ -1055,7 +1055,9 @@ func (dsc *DaemonSetsController) syncNodes(ctx context.Context, ds *apps.DaemonS
 		deleteDiff = dsc.burstReplicas
 	}
 
-	dsc.expectations.SetExpectations(logger, dsKey, createDiff, deleteDiff)
+	if err = dsc.expectations.SetExpectationsWithUID(logger, dsKey, ds.UID, createDiff, deleteDiff); err != nil {
+		logger.V(4).Info("Failed to set expectations for DaemonSet", "daemonset", klog.KObj(ds), "err", err)
+	}
 
 	// error channel to communicate back failures.  make the buffer big enough to avoid any blocking
 	errCh := make(chan error, createDiff+deleteDiff)
@@ -1313,7 +1315,7 @@ func (dsc *DaemonSetsController) syncDaemonSet(ctx context.Context, key string) 
 	ds, err := dsc.dsLister.DaemonSets(namespace).Get(name)
 	if apierrors.IsNotFound(err) {
 		logger.V(3).Info("Daemon set has been deleted", "daemonset", key)
-		dsc.expectations.DeleteExpectations(logger, key)
+		dsc.expectations.DeleteExpectationsWithUID(logger, key)
 		dsc.consistencyStore.Clear(dsNamespacedName, "")
 		return nil
 	}
@@ -1359,7 +1361,7 @@ func (dsc *DaemonSetsController) syncDaemonSet(ctx context.Context, key string) 
 	}
 	hash := cur.Labels[apps.DefaultDaemonSetUniqueLabelKey]
 
-	if !dsc.expectations.SatisfiedExpectations(logger, dsKey) {
+	if !dsc.expectations.SatisfiedExpectationsWithUID(logger, dsKey, ds.UID) {
 		// Only update status. Don't raise observedGeneration since controller didn't process object of that generation.
 		return dsc.updateDaemonSetStatus(ctx, ds, nodeList, hash, false)
 	}
