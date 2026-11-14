@@ -133,7 +133,7 @@ func GatherPools(ctx context.Context, slicesForNode []*draapi.ResourceSlice, nod
 			if err != nil {
 				return nil, err
 			}
-			if poolHasBindingConditions(*pool) {
+			if features.DeviceBindingAndStatus && poolHasBindingConditions(*pool) {
 				resultWithBindingConditions = append(resultWithBindingConditions, pool)
 				continue
 			}
@@ -180,7 +180,7 @@ func GatherPools(ctx context.Context, slicesForNode []*draapi.ResourceSlice, nod
 			return nil, err
 		}
 		// if pool has binding conditions, add the pool to the end of the result
-		if poolHasBindingConditions(*pool) {
+		if features.DeviceBindingAndStatus && poolHasBindingConditions(*pool) {
 			resultWithBindingConditions = append(resultWithBindingConditions, pool)
 			continue
 		}
