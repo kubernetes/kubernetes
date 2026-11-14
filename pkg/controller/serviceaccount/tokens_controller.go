@@ -94,7 +94,7 @@ func NewTokensController(ctx context.Context, serviceAccounts informers.ServiceA
 			workqueue.DefaultTypedControllerRateLimiter[secretQueueKey](),
 			workqueue.TypedRateLimitingQueueConfig[secretQueueKey]{
 				Logger: &logger,
-				Name:   "serviceaccount_tokens_service",
+				Name:   "serviceaccount_tokens_secret",
 			},
 		),
 
