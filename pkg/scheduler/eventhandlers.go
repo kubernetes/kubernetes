@@ -381,7 +381,9 @@ func (sched *Scheduler) updatePodInSchedulingQueue(oldPod, newPod *v1.Pod) {
 
 	logger.V(4).Info("Update event for unscheduled pod", "pod", klog.KObj(newPod))
 	sched.SchedulingQueue.Update(klog.NewContext(context.Background(), logger), oldPod, newPod)
-	if hasNominatedNodeNameChanged(oldPod, newPod) {
+	// If the scheduling queue tracks the nomination in memory, SchedulingQueue.Update
+	// already requeued the pods blocked by a changed nomination.
+	if !sched.SchedulingQueue.TracksNominationInMemory(newPod) && hasNominatedNodeNameChanged(oldPod, newPod) {
 		// Nominated node changed in pod, so we need to treat it as if the pod was deleted from the old nominated node,
 		// because the scheduler treats such a pod as if it was already assigned when scheduling lower or equal priority pods.
 		sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, framework.EventAssignedPodDelete, oldPod, nil, getLEPriorityPreCheck(corev1helpers.PodPriority(oldPod)))
@@ -405,6 +407,8 @@ func (sched *Scheduler) deletePodFromSchedulingQueue(pod *v1.Pod, inBinding bool
 		// Any necessary notifications will be sent by the binding process, unless it was an unlikely external binding.
 		// In that case, we need to notify about the release of resources that were held by different assume/nomination
 		// once the https://github.com/kubernetes/kubernetes/issues/134859 is fixed.
+		// If the scheduling queue tracks the nomination in memory, SchedulingQueue.Delete
+		// already requeued the pods blocked by the cleared nomination.
 		return
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption) && resource.IsPodResizeDeferred(pod) {
@@ -426,7 +430,9 @@ func (sched *Scheduler) deletePodFromSchedulingQueue(pod *v1.Pod, inBinding bool
 	if sched.podGroupHierarchyTracker != nil {
 		sched.podGroupHierarchyTracker.DeletePod(logger, pod)
 	}
-	if pod.Status.NominatedNodeName != "" {
+	// If the scheduling queue tracks the nomination in memory, SchedulingQueue.Delete
+	// already requeued the pods blocked by the cleared nomination.
+	if !sched.SchedulingQueue.TracksNominationInMemory(pod) && pod.Status.NominatedNodeName != "" {
 		// When a pod that had nominated node is deleted, it can unblock scheduling of other pods,
 		// because the lower or equal priority pods treat such a pod as if it was assigned.
 		// Note that a nominated pod can fall into `handleAssumedPodDeletion` case as well,
