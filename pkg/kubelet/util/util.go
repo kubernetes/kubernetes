@@ -73,7 +73,8 @@ type ResourceOpts struct {
 // as defaults to the returned map.
 // TODO(ndixita): Consolidate resource limit logic
 // The implementation of CPU/Memory limit calculation is duplicated here and in
-// pkg/kubelet/kuberuntime/kuberuntime_container_linux.go (getCPULimits/getMemoryLimits).
+// pkg/kubelet/kuberuntime/kuberuntime_container_linux.go (getCPULimit) and
+// pkg/kubelet/qos/helpers.go (GetContainerMemoryLimit).
 // Refactor into a shared utility function.
 func GetLimits(res *ResourceOpts) v1.ResourceList {
 	if res == nil {

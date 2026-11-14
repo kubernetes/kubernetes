@@ -114,53 +114,12 @@ func getCPULimit(pod *v1.Pod, container *v1.Container, draAllocations v1.Resourc
 	}
 	// Only add DRA values to limits if limits are explicitly specified in the container spec.
 	// If not, we retain the current defaults which is setting to pod-level limits if specified, or unlimited.
-	if origContainer := getContainerSpec(pod, container.Name); origContainer != nil && origContainer.Resources.Limits.Cpu().IsZero() {
+	if origContainer := kubecontainer.GetContainerSpec(pod, container.Name); origContainer != nil && origContainer.Resources.Limits.Cpu().IsZero() {
 		return limit
 	}
 	q := limit.DeepCopy()
 	q.Add(draCPU)
 	return &q
-}
-
-// getMemoryLimit returns the memory limit for the container to be used to calculate
-// Linux Container Resources.
-func getMemoryLimit(pod *v1.Pod, container *v1.Container, draAllocations v1.ResourceList) *resource.Quantity {
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodLevelResources) && resourcehelper.IsPodLevelResourcesSet(pod) {
-		// When container-level memory limit is not set, the pod-level
-		// limit is used in the calculation for components relying on linux resource limits
-		// to be set.
-		if container.Resources.Limits.Memory().IsZero() {
-			return pod.Spec.Resources.Limits.Memory()
-		}
-	}
-	limit := container.Resources.Limits.Memory()
-	draMemory, exists := draAllocations[v1.ResourceMemory]
-	if limit.IsZero() || !exists || draMemory.IsZero() {
-		return limit
-	}
-	// Only add DRA values to limits if limits are explicitly specified in the container spec.
-	// If not, we retain the current defaults which is setting to pod-level limits if specified, or unlimited.
-	if origContainer := getContainerSpec(pod, container.Name); origContainer != nil && origContainer.Resources.Limits.Memory().IsZero() {
-		return limit
-	}
-	q := limit.DeepCopy()
-	q.Add(draMemory)
-	return &q
-}
-
-// getContainerSpec returns the container spec with the given name from the pod spec.
-func getContainerSpec(pod *v1.Pod, containerName string) *v1.Container {
-	for i := range pod.Spec.Containers {
-		if pod.Spec.Containers[i].Name == containerName {
-			return &pod.Spec.Containers[i]
-		}
-	}
-	for i := range pod.Spec.InitContainers {
-		if pod.Spec.InitContainers[i].Name == containerName {
-			return &pod.Spec.InitContainers[i]
-		}
-	}
-	return nil
 }
 
 // generateLinuxContainerResources generates linux container resources config for runtime
@@ -176,7 +135,7 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerResources(ctx context.
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DRANodeAllocatableResources) {
 		draAllocations = resourcehelper.GetContainerDRAAllocations(pod, container.Name)
 	}
-	memoryLimit := getMemoryLimit(pod, container, draAllocations)
+	memoryLimit := qos.GetContainerMemoryLimit(pod, container, draAllocations)
 	cpuLimit := getCPULimit(pod, container, draAllocations)
 
 	// If request is not specified, default it to CPU limit without DRA allocations to prevent
