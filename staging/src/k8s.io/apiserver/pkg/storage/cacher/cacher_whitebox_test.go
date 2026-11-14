@@ -1096,6 +1096,7 @@ func testEmptyWatchEventCache(t *testing.T) {
 	// It should support establishing watches from rv and higher, but not older.
 
 	expectedResourceExpiredError := apierrors.NewResourceExpired("").ErrStatus
+	expectedBookmark := &example.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: strconv.FormatUint(lastRV, 10)}}
 	tests := []struct {
 		name            string
 		resourceVersion uint64
@@ -1109,6 +1110,7 @@ func testEmptyWatchEventCache(t *testing.T) {
 		{
 			name:            "RV",
 			resourceVersion: lastRV,
+			expectedEvent:   &watch.Event{Type: watch.Bookmark, Object: expectedBookmark},
 		},
 		{
 			name:            "RV+1",
@@ -1141,20 +1143,22 @@ func testEmptyWatchEventCache(t *testing.T) {
 				if e, a := tt.expectedEvent.Object, event.Object; !apiequality.Semantic.DeepDerivative(e, a) {
 					t.Errorf("Expected: %#v, got: %#v", e, a)
 				}
-				select {
-				case event, ok := <-watcher.ResultChan():
-					if ok {
-						t.Errorf("Expected ResultChan() to be closed after error event, got: %#v", event)
+				if tt.expectedEvent.Type == watch.Error {
+					select {
+					case event, ok := <-watcher.ResultChan():
+						if ok {
+							t.Errorf("Expected ResultChan() to be closed after error event, got: %#v", event)
+						}
+					case <-time.After(wait.ForeverTestTimeout):
+						t.Errorf("Timed out waiting for ResultChan() to close")
 					}
-				case <-time.After(wait.ForeverTestTimeout):
-					t.Errorf("Timed out waiting for ResultChan() to close")
+					cacher.Lock()
+					if len(cacher.watchers.scopeWatchers) != 0 || len(cacher.watchers.indexWatchers) != 0 || len(cacher.bookmarkWatchers.watchersBuckets) != 0 {
+						t.Errorf("Expected no watchers registered in cacher, got: %#v, %#v", cacher.watchers, cacher.bookmarkWatchers)
+					}
+					cacher.Unlock()
 				}
-				cacher.Lock()
-				if len(cacher.watchers.scopeWatchers) != 0 || len(cacher.watchers.indexWatchers) != 0 || len(cacher.bookmarkWatchers.watchersBuckets) != 0 {
-					t.Errorf("Expected no watchers registered in cacher, got: %#v, %#v", cacher.watchers, cacher.bookmarkWatchers)
-				}
-				cacher.Unlock()
-			case <-time.After(1 * time.Second):
+			case <-time.After(2 * time.Second):
 				// the watch was established otherwise
 				// we would be blocking on cache.Watch(...)
 				// in addition to that, the tests are serial in nature,

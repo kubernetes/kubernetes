@@ -624,7 +624,7 @@ func TestCacheWatcherDrainingNoBookmarkAfterResourceVersionSent(t *testing.T) {
 	}, time.NewTimer(1*time.Second)) {
 		t.Fatal("failed adding an even to the watcher")
 	}
-	if !w.nonblockingAdd(&watchCacheEvent{Type: watch.Bookmark, ResourceVersion: 10, Object: &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "10"}}}) {
+	if !w.nonblockingAdd(&watchCacheEvent{Type: watch.Bookmark, ResourceVersion: 10, Object: &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "10", Annotations: map[string]string{metav1.InitialEventsAnnotationKey: "true"}}}}) {
 		t.Fatal("failed adding an even to the watcher")
 	}
 	require.Equal(t, uint64(10), w.dispatchedResourceVersion)
