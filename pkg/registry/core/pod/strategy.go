@@ -53,6 +53,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper/qos"
 	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
+	checkpointutil "k8s.io/kubernetes/pkg/apis/node/util"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/client"
 )
@@ -110,6 +111,13 @@ func (podStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object
 	oldPod := old.(*api.Pod)
 	newPod.Status = oldPod.Status
 
+	// Reapplying a name-only reference must retain the immutable identity that
+	// admission selected. Never resolve a replacement checkpoint during update.
+	oldRef, newRef := oldPod.Spec.RestoreFrom, newPod.Spec.RestoreFrom
+	if oldRef != nil && newRef != nil && oldRef.Name == newRef.Name && newRef.UID == "" {
+		newRef.UID = oldRef.UID
+	}
+
 	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourcesFixDefaulting) {
 		if newPod.Spec.Resources == nil && oldPod.Spec.Resources != nil {
 			// preserve existing PLR for requests from potentially PLR-unaware clients that completely dropped the field
@@ -156,7 +164,9 @@ func (podStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) 
 	oldPod := old.(*api.Pod)
 	opts := corevalidation.GetValidationOptionsFromPodSpecAndMeta(&pod.Spec, &oldPod.Spec, &pod.ObjectMeta, &oldPod.ObjectMeta)
 	opts.ResourceIsPod = true
-	return corevalidation.ValidatePodUpdate(obj.(*api.Pod), old.(*api.Pod), opts)
+	errs := corevalidation.ValidatePodUpdate(obj.(*api.Pod), old.(*api.Pod), opts)
+	errs = append(errs, validateCheckpointingUpdate(pod, oldPod)...)
+	return append(errs, validateRestoreUpdate(pod, oldPod)...)
 }
 
 // WarningsOnUpdate returns warnings for the given update.
@@ -251,6 +261,13 @@ func (podStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 	}
 	if newPod.Status.NodeAllocatableResourceClaimStatuses == nil && oldPod.Status.NodeAllocatableResourceClaimStatuses != nil {
 		newPod.Status.NodeAllocatableResourceClaimStatuses = oldPod.Status.NodeAllocatableResourceClaimStatuses
+	}
+	// An older status client must not erase the durable record that prevents
+	// the kubelet from replaying a completed or interrupted restore.
+	if _, condition := podutil.GetPodCondition(&newPod.Status, api.PodRestored); condition == nil {
+		if _, oldCondition := podutil.GetPodCondition(&oldPod.Status, api.PodRestored); oldCondition != nil {
+			newPod.Status.Conditions = append(newPod.Status.Conditions, *oldCondition)
+		}
 	}
 
 	preserveOldObservedGeneration(newPod, oldPod)
@@ -347,7 +364,9 @@ func (podEphemeralContainersStrategy) ValidateUpdate(ctx context.Context, obj, o
 	oldPod := old.(*api.Pod)
 	opts := corevalidation.GetValidationOptionsFromPodSpecAndMeta(&newPod.Spec, &oldPod.Spec, &newPod.ObjectMeta, &oldPod.ObjectMeta)
 	opts.ResourceIsPod = true
-	return corevalidation.ValidatePodEphemeralContainersUpdate(newPod, oldPod, opts)
+	errs := corevalidation.ValidatePodEphemeralContainersUpdate(newPod, oldPod, opts)
+	errs = append(errs, validateCheckpointingUpdate(newPod, oldPod)...)
+	return append(errs, validateRestoreUpdate(newPod, oldPod)...)
 }
 
 // WarningsOnUpdate returns warnings for the given update.
@@ -473,7 +492,9 @@ func (podResizeStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Ob
 	oldPod := old.(*api.Pod)
 	opts := corevalidation.GetValidationOptionsFromPodSpecAndMeta(&newPod.Spec, &oldPod.Spec, &newPod.ObjectMeta, &oldPod.ObjectMeta)
 	opts.ResourceIsPod = true
-	return corevalidation.ValidatePodResize(newPod, oldPod, opts)
+	errs := corevalidation.ValidatePodResize(newPod, oldPod, opts)
+	errs = append(errs, validateCheckpointingUpdate(newPod, oldPod)...)
+	return append(errs, validateRestoreUpdate(newPod, oldPod)...)
 }
 
 // WarningsOnUpdate returns warnings for the given update.
@@ -523,12 +544,96 @@ func (podDynamicStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.O
 	oldPod := old.(*api.Pod)
 	opts := corevalidation.GetValidationOptionsFromPodSpecAndMeta(&newPod.Spec, &oldPod.Spec, &newPod.ObjectMeta, &oldPod.ObjectMeta)
 	opts.ResourceIsPod = true
-	return corevalidation.ValidatePodDynamicUpdate(newPod, oldPod, opts)
+	errs := corevalidation.ValidatePodDynamicUpdate(newPod, oldPod, opts)
+	return append(errs, validateCheckpointingUpdate(newPod, oldPod)...)
 }
 
 // WarningsOnUpdate returns warnings for the given update.
 func (podDynamicStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
 	return nil
+}
+
+// validateCheckpointingUpdate preserves the workload while the kubelet captures
+// it. The old status determines whether capture is active, so an update cannot
+// clear the condition to bypass the check. Status updates keep the existing
+// spec and do not need the check.
+// New Pod subresources that can change the workload, including /dynamic
+// (KEP-5972), must also call this validation.
+func validateCheckpointingUpdate(newPod, oldPod *api.Pod) field.ErrorList {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelCheckpointRestore) {
+		return nil
+	}
+	var checkpointing *api.PodCondition
+	for i := range oldPod.Status.Conditions {
+		condition := &oldPod.Status.Conditions[i]
+		if condition.Type == api.PodCheckpointing && condition.Status == api.ConditionTrue {
+			checkpointing = condition
+			break
+		}
+	}
+	if checkpointing == nil {
+		return nil
+	}
+
+	specPath := field.NewPath("spec")
+	changedFields, err := podSpecChangedFields(&oldPod.Spec, &newPod.Spec)
+	if err != nil {
+		return field.ErrorList{field.InternalError(specPath, err)}
+	}
+	if len(changedFields) == 0 {
+		return nil
+	}
+	message := "pod spec cannot change while Checkpointing=True"
+	if checkpointing.Message != "" {
+		message += ": " + checkpointing.Message
+	}
+	return field.ErrorList{field.Forbidden(specPath, fmt.Sprintf("%s; scheduling gates may be removed; changed fields: %s", message, strings.Join(changedFields, ", ")))}
+}
+
+// validateRestoreUpdate preserves the workload until restore succeeds. The old
+// status determines whether the restore has completed, so an update cannot set
+// PodRestored=True to bypass the check. Status updates keep the existing spec
+// and do not need the check.
+func validateRestoreUpdate(newPod, oldPod *api.Pod) field.ErrorList {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelCheckpointRestore) || oldPod.Spec.RestoreFrom == nil {
+		return nil
+	}
+	// Declarative validation reports a changed restoreFrom; do not report it twice.
+	if !apiequality.Semantic.DeepEqual(oldPod.Spec.RestoreFrom, newPod.Spec.RestoreFrom) {
+		return nil
+	}
+	for _, condition := range oldPod.Status.Conditions {
+		if condition.Type == api.PodRestored && condition.Status == api.ConditionTrue {
+			return nil
+		}
+	}
+
+	specPath := field.NewPath("spec")
+	changedFields, err := podSpecChangedFields(&oldPod.Spec, &newPod.Spec)
+	if err != nil {
+		return field.ErrorList{field.InternalError(specPath, err)}
+	}
+	if len(changedFields) == 0 {
+		return nil
+	}
+	return field.ErrorList{field.Forbidden(specPath, fmt.Sprintf("pod spec cannot change until restore succeeds (PodRestored=True); scheduling gates may be removed; changed fields: %s", strings.Join(changedFields, ", ")))}
+}
+
+// podSpecChangedFields lists the paths of changed fields without their values.
+// It compares versioned specs because the internal types do not have the API
+// field names and nest some fields differently.
+func podSpecChangedFields(oldSpec, newSpec *api.PodSpec) ([]string, error) {
+	var want, got apiv1.PodSpec
+	if err := legacyscheme.Scheme.Convert(oldSpec, &want, nil); err != nil {
+		return nil, fmt.Errorf("failed to convert existing Pod spec: %w", err)
+	}
+	if err := legacyscheme.Scheme.Convert(newSpec, &got, nil); err != nil {
+		return nil, fmt.Errorf("failed to convert updated Pod spec: %w", err)
+	}
+	// Gates delay scheduling and are not part of the captured workload. Removing
+	// a gate must remain possible so that a restore Pod can be scheduled.
+	want.SchedulingGates, got.SchedulingGates = nil, nil
+	return checkpointutil.PodSpecChangedFields(&want, &got), nil
 }
 
 // GetAttrs returns labels and fields of a given object for filtering purposes.

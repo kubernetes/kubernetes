@@ -18,19 +18,25 @@ package statefulset
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/registry/rest"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	podtest "k8s.io/kubernetes/pkg/api/pod/testing"
 	"k8s.io/kubernetes/pkg/apis/apps"
+	_ "k8s.io/kubernetes/pkg/apis/apps/install"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/ptr"
 )
@@ -587,4 +593,122 @@ func TestStatefulSetStrategy_RecreateStrategy_ValidateUpdate(t *testing.T) {
 		})
 	}
 
+}
+
+func TestStatefulSetRestoreFromUpdate(t *testing.T) {
+	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
+		APIGroup: "apps", APIVersion: "v1", Resource: "statefulsets", IsResourceRequest: true, Verb: "update",
+	})
+	for _, tc := range []struct {
+		name          string
+		legacyInvalid bool
+		repair        bool
+		oldReference  *api.CheckpointReference
+		newReference  *api.CheckpointReference
+		gateDisabled  bool
+		wantForbidden bool
+	}{
+		{name: "legacy defect without restore", legacyInvalid: true},
+		{name: "legacy defect cannot add restore", legacyInvalid: true, newReference: &api.CheckpointReference{Name: "checkpoint"}, wantForbidden: true},
+		{name: "repaired legacy defect cannot add restore", legacyInvalid: true, repair: true, newReference: &api.CheckpointReference{Name: "checkpoint"}, wantForbidden: true},
+		{name: "empty reference cannot be added", legacyInvalid: true, newReference: &api.CheckpointReference{}, wantForbidden: true},
+		{name: "valid old template cannot add restore", newReference: &api.CheckpointReference{Name: "checkpoint"}, wantForbidden: true},
+		{name: "unchanged legacy reference", legacyInvalid: true, oldReference: &api.CheckpointReference{Name: "checkpoint"}, newReference: &api.CheckpointReference{Name: "checkpoint"}},
+		{name: "clear legacy reference", legacyInvalid: true, oldReference: &api.CheckpointReference{Name: "checkpoint"}},
+		{name: "retarget legacy reference", legacyInvalid: true, oldReference: &api.CheckpointReference{Name: "checkpoint"}, newReference: &api.CheckpointReference{Name: "other"}, wantForbidden: true},
+		{name: "unchanged empty legacy reference", legacyInvalid: true, oldReference: &api.CheckpointReference{}, newReference: &api.CheckpointReference{}},
+		{name: "clear empty legacy reference", legacyInvalid: true, oldReference: &api.CheckpointReference{}},
+		{name: "disabled drops new reference", legacyInvalid: true, gateDisabled: true, newReference: &api.CheckpointReference{Name: "checkpoint"}},
+		{name: "disabled drops empty reference", legacyInvalid: true, gateDisabled: true, newReference: &api.CheckpointReference{}},
+		{name: "disabled preserves legacy reference", legacyInvalid: true, gateDisabled: true, oldReference: &api.CheckpointReference{Name: "checkpoint"}, newReference: &api.CheckpointReference{Name: "checkpoint"}},
+		{name: "disabled can clear legacy reference", legacyInvalid: true, gateDisabled: true, oldReference: &api.CheckpointReference{Name: "checkpoint"}},
+		{name: "disabled cannot retarget legacy reference", legacyInvalid: true, gateDisabled: true, oldReference: &api.CheckpointReference{Name: "checkpoint"}, newReference: &api.CheckpointReference{Name: "other"}, wantForbidden: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelCheckpointRestore, !tc.gateDisabled)
+			labels := map[string]string{"a": "b"}
+			old := &apps.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault, ResourceVersion: "1"},
+				Spec: apps.StatefulSetSpec{
+					PodManagementPolicy: apps.OrderedReadyPodManagement,
+					Selector:            &metav1.LabelSelector{MatchLabels: labels},
+					Template: api.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{Labels: labels},
+						Spec:       podtest.MakePodSpec(),
+					},
+					UpdateStrategy: apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
+				},
+			}
+			old.Spec.Template.Spec.RestoreFrom = tc.oldReference
+			if tc.legacyInvalid {
+				// This previously persisted defect triggers compatibility handling.
+				old.Spec.Template.Spec.Containers[0].VolumeMounts = []api.VolumeMount{{Name: "missing", MountPath: "/data"}}
+			}
+			updated := old.DeepCopy()
+			updated.Spec.Template.Spec.RestoreFrom = tc.newReference
+			if tc.repair {
+				updated.Spec.Template.Spec.Containers[0].VolumeMounts = nil
+			}
+			Strategy.PrepareForUpdate(ctx, updated, old)
+			wantReference := tc.newReference
+			if tc.gateDisabled && tc.oldReference == nil {
+				wantReference = nil
+			}
+			if !apiequality.Semantic.DeepEqual(updated.Spec.Template.Spec.RestoreFrom, wantReference) {
+				t.Fatalf("unexpected reference after preparation: got %#v, want %#v", updated.Spec.Template.Spec.RestoreFrom, wantReference)
+			}
+			// Exercise both handwritten and generated validation, as REST does.
+			errs := rest.ValidateUpdate(ctx, updated, old, Strategy)
+			if !tc.wantForbidden {
+				if len(errs) != 0 {
+					t.Fatalf("unexpected errors: %v", errs)
+				}
+				return
+			}
+			for _, err := range errs {
+				if err.Type == field.ErrorTypeForbidden && err.Field == "spec.template.spec.restoreFrom" {
+					return
+				}
+			}
+			t.Fatalf("expected restoreFrom to be forbidden: %v", errs)
+		})
+	}
+}
+
+func TestStatefulSetRestoreFromCreate(t *testing.T) {
+	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
+		APIGroup: "apps", APIVersion: "v1", Resource: "statefulsets", IsResourceRequest: true, Verb: "create",
+	})
+	for _, enabled := range []bool{true, false} {
+		t.Run(fmt.Sprintf("enabled=%t", enabled), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelCheckpointRestore, enabled)
+			labels := map[string]string{"a": "b"}
+			set := &apps.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: apps.StatefulSetSpec{
+					PodManagementPolicy: apps.OrderedReadyPodManagement,
+					Selector:            &metav1.LabelSelector{MatchLabels: labels},
+					Template: api.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{Labels: labels},
+						Spec:       podtest.MakePodSpec(podtest.SetRestoreFrom("checkpoint")),
+					},
+					UpdateStrategy: apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
+				},
+			}
+			Strategy.PrepareForCreate(ctx, set)
+			errs := rest.ValidateCreate(ctx, set, Strategy)
+			if !enabled {
+				if set.Spec.Template.Spec.RestoreFrom != nil || len(errs) != 0 {
+					t.Fatalf("disabled field was not dropped cleanly: reference=%#v, errors=%v", set.Spec.Template.Spec.RestoreFrom, errs)
+				}
+				return
+			}
+			for _, err := range errs {
+				if err.Type == field.ErrorTypeForbidden && err.Field == "spec.template.spec.restoreFrom" {
+					return
+				}
+			}
+			t.Fatalf("expected restoreFrom to be forbidden: %v", errs)
+		})
+	}
 }

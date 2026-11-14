@@ -126,6 +126,6 @@ func TestCleanupOrphanedPodUsernsAllocationsDisabled(t *testing.T) {
 	m, err := MakeUserNsManager(logger, testUserNsPodsManager, nil)
 	require.NoError(t, err)
 
-	err = m.CleanupOrphanedPodUsernsAllocations(ctx, nil, nil)
+	err = m.CleanupOrphanedPodUsernsAllocations(ctx, nil, nil, nil)
 	assert.NoError(t, err)
 }

@@ -66,6 +66,8 @@ var (
 		MaxParallelImagePulls:                  nil,
 		HairpinMode:                            kubeletconfig.PromiscuousBridge,
 		NodeLeaseDurationSeconds:               1,
+		PodCheckpointTimeout:                   metav1.Duration{Duration: 15 * time.Second},
+		PodRestoreTimeout:                      metav1.Duration{Duration: 5 * time.Minute},
 		CPUCFSQuotaPeriod:                      metav1.Duration{Duration: 25 * time.Millisecond},
 		TopologyManagerScope:                   kubeletconfig.PodTopologyManagerScope,
 		TopologyManagerPolicy:                  kubeletconfig.SingleNumaNodeTopologyManagerPolicy,
@@ -125,6 +127,20 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 			return conf
 		},
 		errMsg: "invalid configuration: nodeLeaseDurationSeconds must be greater than 0",
+	}, {
+		name: "invalid PodCheckpointTimeout",
+		configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+			conf.PodCheckpointTimeout = metav1.Duration{Duration: -time.Second}
+			return conf
+		},
+		errMsg: "invalid configuration: podCheckpointTimeout must be greater than 0",
+	}, {
+		name: "invalid PodRestoreTimeout",
+		configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+			conf.PodRestoreTimeout = metav1.Duration{}
+			return conf
+		},
+		errMsg: "invalid configuration: podRestoreTimeout must be greater than 0",
 	}, {
 		name: "specify EnforceNodeAllocatable without enabling CgroupsPerQOS",
 		configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
@@ -1002,6 +1018,40 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 
 			if got := errs.Error(); !strings.Contains(got, tc.errMsg) {
 				t.Errorf("unexpected error: %s expected to contain %s", got, tc.errMsg)
+			}
+		})
+	}
+}
+
+func TestValidatePodCheckpointStorage(t *testing.T) {
+	for _, test := range []struct {
+		name    string
+		enabled bool
+		policy  *kubeletconfig.PodCheckpointStorageConfiguration
+		invalid bool
+	}{
+		{name: "disabled"},
+		{name: "enabled without storage", enabled: true},
+		{name: "bounded storage", enabled: true, policy: &kubeletconfig.PodCheckpointStorageConfiguration{MaxBytes: 1024, MaxInodes: 100, MinAvailableBytes: 128, MinAvailableInodes: 10, MaxOperations: 2}},
+		{name: "unlimited operation population", enabled: true, policy: &kubeletconfig.PodCheckpointStorageConfiguration{MaxBytes: 1024, MaxInodes: 100, MinAvailableBytes: 128, MinAvailableInodes: 10}, invalid: true},
+		{name: "invalid policy even when disabled", policy: &kubeletconfig.PodCheckpointStorageConfiguration{MaxBytes: -1}, invalid: true},
+		{name: "headroom exceeds capacity", enabled: true, policy: &kubeletconfig.PodCheckpointStorageConfiguration{MaxBytes: 1024, MaxInodes: 100, MinAvailableBytes: 2048, MinAvailableInodes: 10, MaxOperations: 2}, invalid: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			conf := successConfig.DeepCopy()
+			conf.FeatureGates["PodLevelCheckpointRestore"] = test.enabled
+			conf.PodCheckpointStorage = test.policy
+			gate := utilfeature.DefaultFeatureGate.DeepCopy()
+			if err := logsapi.AddFeatureGates(gate); err != nil {
+				t.Fatal(err)
+			}
+			err := validation.ValidateKubeletConfiguration(conf, gate)
+			if test.invalid {
+				if err == nil || !strings.Contains(err.Error(), "podCheckpointStorage") {
+					t.Fatalf("expected storage validation error, got %v", err)
+				}
+			} else if err != nil {
+				t.Fatal(err)
 			}
 		})
 	}

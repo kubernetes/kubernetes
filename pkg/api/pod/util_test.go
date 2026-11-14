@@ -3446,6 +3446,67 @@ func TestDropSELinuxChangePolicy(t *testing.T) {
 	}
 }
 
+func TestDropDisabledPodCheckpointConditions(t *testing.T) {
+	tests := []struct {
+		name        string
+		gateEnabled bool
+		oldStatus   *api.PodStatus
+		wantDropped bool
+	}{
+		{name: "gate disabled drops new status", wantDropped: true},
+		{name: "gate disabled drops new status on update", oldStatus: &api.PodStatus{}, wantDropped: true},
+		{name: "gate enabled preserves new status", gateEnabled: true},
+		{name: "gate disabled preserves in-progress status", oldStatus: &api.PodStatus{Conditions: []api.PodCondition{{Type: api.PodRestored, Status: api.ConditionUnknown}}}},
+		{name: "gate disabled preserves completed status", oldStatus: &api.PodStatus{Conditions: []api.PodCondition{{Type: api.PodRestored, Status: api.ConditionTrue}}}},
+		{name: "gate disabled preserves failed status", oldStatus: &api.PodStatus{Conditions: []api.PodCondition{{Type: api.PodRestored, Status: api.ConditionFalse}}}},
+		{name: "gate disabled preserves legacy status", oldStatus: &api.PodStatus{Conditions: []api.PodCondition{{Type: api.PodRestored}}}},
+	}
+	for _, conditionType := range []api.PodConditionType{api.PodRestored, api.PodCheckpointing} {
+		t.Run(string(conditionType), func(t *testing.T) {
+			for _, tc := range tests {
+				t.Run(tc.name, func(t *testing.T) {
+					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelCheckpointRestore, tc.gateEnabled)
+					oldStatus := tc.oldStatus.DeepCopy()
+					if oldStatus != nil {
+						for i := range oldStatus.Conditions {
+							oldStatus.Conditions[i].Type = conditionType
+						}
+					}
+					want := &api.PodCondition{Type: conditionType, Status: api.ConditionTrue}
+					got := &api.PodStatus{Conditions: []api.PodCondition{{Type: api.PodReady, Status: api.ConditionTrue}, *want}}
+					dropDisabledPodStatusFields(got, oldStatus, &api.PodSpec{}, &api.PodSpec{})
+					_, condition := GetPodCondition(got, conditionType)
+					if tc.wantDropped {
+						assert.Nil(t, condition)
+					} else {
+						assert.Equal(t, want, condition)
+					}
+					_, ready := GetPodCondition(got, api.PodReady)
+					assert.NotNil(t, ready)
+				})
+			}
+		})
+	}
+}
+
+func TestDropDisabledPodCheckpointConditionsOnExistingRestore(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelCheckpointRestore, false)
+	for _, conditionType := range []api.PodConditionType{api.PodRestored, api.PodCheckpointing} {
+		t.Run(string(conditionType), func(t *testing.T) {
+			condition := api.PodCondition{Type: conditionType, Status: api.ConditionFalse, Reason: "RestoreNotStarted"}
+			got := &api.PodStatus{Conditions: []api.PodCondition{condition}}
+			oldSpec := &api.PodSpec{RestoreFrom: &api.CheckpointReference{Name: "checkpoint"}}
+			dropDisabledPodStatusFields(got, &api.PodStatus{}, oldSpec, oldSpec)
+			_, persisted := GetPodCondition(got, conditionType)
+			if conditionType == api.PodRestored {
+				assert.Equal(t, &condition, persisted, "an existing restore must acknowledge completion even if its first status arrives after gate disable")
+			} else {
+				assert.Nil(t, persisted)
+			}
+		})
+	}
+}
+
 func TestHasAPIReferences(t *testing.T) {
 	tests := []struct {
 		name            string

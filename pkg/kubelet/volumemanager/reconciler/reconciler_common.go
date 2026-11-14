@@ -103,7 +103,8 @@ func NewReconciler(
 	hostutil hostutil.HostUtils,
 	volumePluginMgr *volumepkg.VolumePluginMgr,
 	kubeletPodsDir string,
-	actuatedState state.State) Reconciler {
+	actuatedState state.State,
+	podOperationMayUsePodResources func(types.UID) bool) Reconciler {
 	if actuatedState == nil {
 		actuatedState = state.NewNoopStateCheckpoint()
 	}
@@ -123,6 +124,7 @@ func NewReconciler(
 		volumePluginMgr:                 volumePluginMgr,
 		kubeletPodsDir:                  kubeletPodsDir,
 		actuatedState:                   actuatedState,
+		podOperationMayUsePodResources:  podOperationMayUsePodResources,
 		timeOfLastSync:                  time.Time{},
 		volumesFailedReconstruction:     make([]podVolume, 0),
 		volumesNeedUpdateFromNodeStatus: make([]v1.UniqueVolumeName, 0),
@@ -130,21 +132,22 @@ func NewReconciler(
 }
 
 type reconciler struct {
-	kubeClient                    clientset.Interface
-	controllerAttachDetachEnabled bool
-	loopSleepDuration             time.Duration
-	waitForAttachTimeout          time.Duration
-	nodeName                      types.NodeName
-	desiredStateOfWorld           cache.DesiredStateOfWorld
-	actualStateOfWorld            cache.ActualStateOfWorld
-	populatorHasAddedPods         func() bool
-	operationExecutor             operationexecutor.OperationExecutor
-	mounter                       mount.Interface
-	hostutil                      hostutil.HostUtils
-	volumePluginMgr               *volumepkg.VolumePluginMgr
-	skippedDuringReconstruction   map[v1.UniqueVolumeName]*globalVolumeInfo
-	kubeletPodsDir                string
-	actuatedState                 state.State
+	kubeClient                     clientset.Interface
+	controllerAttachDetachEnabled  bool
+	loopSleepDuration              time.Duration
+	waitForAttachTimeout           time.Duration
+	nodeName                       types.NodeName
+	desiredStateOfWorld            cache.DesiredStateOfWorld
+	actualStateOfWorld             cache.ActualStateOfWorld
+	populatorHasAddedPods          func() bool
+	operationExecutor              operationexecutor.OperationExecutor
+	mounter                        mount.Interface
+	hostutil                       hostutil.HostUtils
+	volumePluginMgr                *volumepkg.VolumePluginMgr
+	skippedDuringReconstruction    map[v1.UniqueVolumeName]*globalVolumeInfo
+	kubeletPodsDir                 string
+	actuatedState                  state.State
+	podOperationMayUsePodResources func(types.UID) bool
 	// lock protects timeOfLastSync for updating and checking
 	timeOfLastSyncLock              sync.Mutex
 	timeOfLastSync                  time.Time
@@ -159,6 +162,9 @@ func (rc *reconciler) unmountVolumes(logger klog.Logger) {
 			continue
 		}
 		if !rc.desiredStateOfWorld.PodExistsInVolume(mountedVolume.PodName, mountedVolume.VolumeName, mountedVolume.SELinuxMountContext) {
+			if rc.podOperationMayUsePodResources != nil && rc.podOperationMayUsePodResources(mountedVolume.PodUID) {
+				continue
+			}
 			// Volume is mounted, unmount it
 			logger.V(5).Info(mountedVolume.GenerateMsgDetailed("Starting operationExecutor.UnmountVolume", ""))
 			err := rc.operationExecutor.UnmountVolume(
@@ -277,11 +283,28 @@ func (rc *reconciler) waitForVolumeAttach(logger klog.Logger, volumeToMount cach
 	}
 }
 
+// Failed reconstruction cannot identify the global volume, so retain devices
+// from that plugin until the operation releases its Pod resources.
+func (rc *reconciler) deviceMayBeUsedByPodOperation(pluginName string) bool {
+	if rc.podOperationMayUsePodResources == nil {
+		return false
+	}
+	for _, volume := range rc.volumesFailedReconstruction {
+		if volume.pluginName == pluginName && rc.podOperationMayUsePodResources(types.UID(volume.podName)) {
+			return true
+		}
+	}
+	return false
+}
+
 func (rc *reconciler) unmountDetachDevices(logger klog.Logger) {
 	for _, attachedVolume := range rc.actualStateOfWorld.GetUnmountedVolumes() {
 		// Check IsOperationPending to avoid marking a volume as detached if it's in the process of mounting.
 		if !rc.desiredStateOfWorld.VolumeExists(attachedVolume.VolumeName, attachedVolume.SELinuxMountContext) &&
 			!rc.operationExecutor.IsOperationPending(attachedVolume.VolumeName, nestedpendingoperations.EmptyUniquePodName, nestedpendingoperations.EmptyNodeName) {
+			if rc.deviceMayBeUsedByPodOperation(attachedVolume.PluginName) {
+				continue
+			}
 
 			// Re-read the actual state of the world, maybe the volume got mounted in the meantime.
 			// This is safe, because there is no pending operation (checked above) and no new operation

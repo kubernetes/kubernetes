@@ -1,0 +1,56 @@
+/*
+Copyright The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package app
+
+import (
+	"context"
+	"fmt"
+
+	"k8s.io/component-base/featuregate"
+	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
+	"k8s.io/kubernetes/pkg/controller/podcheckpoint"
+	"k8s.io/kubernetes/pkg/features"
+)
+
+func newPodCheckpointControllerDescriptor() *ControllerDescriptor {
+	return &ControllerDescriptor{
+		name:                 names.PodCheckpointController,
+		constructor:          newPodCheckpointController,
+		requiredFeatureGates: []featuregate.Feature{features.PodLevelCheckpointRestore},
+	}
+}
+
+func newPodCheckpointController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
+	kubeClient, err := controllerContext.NewClient(controllerName)
+	if err != nil {
+		return nil, err
+	}
+
+	pc, err := podcheckpoint.NewController(
+		ctx,
+		controllerName,
+		controllerContext.InformerFactory.Node().V1alpha1().PodCheckpoints(),
+		controllerContext.InformerFactory.Core().V1().Pods(),
+		controllerContext.InformerFactory.Core().V1().Nodes(),
+		kubeClient,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("creating PodCheckpoint controller: %w", err)
+	}
+
+	return newControllerLoop(pc.Run, controllerName), nil
+}

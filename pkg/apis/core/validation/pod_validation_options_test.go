@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/assert"
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -1409,5 +1410,37 @@ func TestSecurityProfileOCIValidationOption(t *testing.T) {
 				})
 			}
 		}
+	}
+}
+
+func TestGetValidationOptionsRestoreFrom(t *testing.T) {
+	testCases := []struct {
+		name        string
+		oldPodSpec  *core.PodSpec
+		gateEnabled bool
+		want        bool
+	}{
+		{name: "gate enabled, no old", gateEnabled: true, want: true},
+		{name: "gate disabled, no old", gateEnabled: false, want: false},
+		{
+			name:        "gate disabled, old set restoreFrom (ratcheting)",
+			oldPodSpec:  &core.PodSpec{RestoreFrom: &core.CheckpointReference{Name: "checkpoint-1"}},
+			gateEnabled: false,
+			want:        true,
+		},
+		{
+			name:        "gate disabled, old had empty restoreFrom (ratcheting)",
+			oldPodSpec:  &core.PodSpec{RestoreFrom: &core.CheckpointReference{}},
+			gateEnabled: false,
+			want:        true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelCheckpointRestore, tc.gateEnabled)
+			gotOptions := GetValidationOptionsFromPodSpecAndMeta(&core.PodSpec{}, tc.oldPodSpec, nil, nil)
+			assert.Equal(t, tc.want, gotOptions.AllowRestoreFrom, "AllowRestoreFrom")
+		})
 	}
 }

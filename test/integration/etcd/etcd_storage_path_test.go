@@ -37,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer/cbor"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/apimachinery/pkg/runtime/serializer/recognizer"
+	"k8s.io/apimachinery/pkg/types"
 	utiljson "k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/version"
@@ -421,6 +422,12 @@ func (c *allClient) createPrerequisites(mapper meta.RESTMapper, ns string, prere
 		}
 		if err := c.create(prerequisite.Stub, ns, mapping, all); err != nil {
 			return err
+		}
+		if prerequisite.StatusStub != "" {
+			obj := (*all)[len(*all)-1].obj
+			if _, err := c.dynamicClient.Resource(mapping.Resource).Namespace(obj.GetNamespace()).Patch(context.TODO(), obj.GetName(), types.MergePatchType, []byte(prerequisite.StatusStub), metav1.PatchOptions{}, "status"); err != nil {
+				return err
+			}
 		}
 	}
 	return nil

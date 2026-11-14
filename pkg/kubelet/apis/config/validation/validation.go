@@ -76,6 +76,19 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featur
 	if kc.NodeLeaseDurationSeconds <= 0 {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: nodeLeaseDurationSeconds must be greater than 0"))
 	}
+	if kc.PodCheckpointTimeout.Duration <= 0 {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: podCheckpointTimeout must be greater than 0"))
+	}
+	// Without a policy, checkpoint admission rejects captures on this node, so
+	// enabling the gate does not stop the kubelet from starting.
+	if storage := kc.PodCheckpointStorage; storage != nil {
+		if storage.MaxBytes <= 0 || storage.MaxInodes <= 0 || storage.MinAvailableBytes <= 0 || storage.MinAvailableBytes >= storage.MaxBytes || storage.MinAvailableInodes <= 0 || storage.MinAvailableInodes >= storage.MaxInodes || storage.MaxOperations <= 0 || storage.MaxOperations > 1024 {
+			allErrors = append(allErrors, fmt.Errorf("invalid configuration: podCheckpointStorage requires positive capacities and headroom below capacity, and maxOperations between 1 and 1024"))
+		}
+	}
+	if kc.PodRestoreTimeout.Duration <= 0 {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: podRestoreTimeout must be greater than 0"))
+	}
 	if kc.SystemCgroups != "" && kc.CgroupRoot == "" {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: systemCgroups (--system-cgroups) was specified and cgroupRoot (--cgroup-root) was not specified"))
 	}

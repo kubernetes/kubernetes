@@ -275,6 +275,9 @@ func TestDryRun(t *testing.T) {
 				t.Fatalf("failed to unmarshal stub (%v): %v", testData.Stub, err)
 			}
 
+			if err := etcd.CreatePrerequisites(context.TODO(), dynamicClient, testNamespace, testData.Prerequisites); err != nil {
+				t.Fatal(err)
+			}
 			name := obj.GetName()
 
 			DryRunCreateTest(t, rsc, obj, gvResource)

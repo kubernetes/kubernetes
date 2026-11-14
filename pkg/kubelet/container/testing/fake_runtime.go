@@ -73,9 +73,11 @@ type FakeRuntime struct {
 	PulledSecurityProfiles []string
 	// SecurityProfiles is returned by ListSecurityProfiles and updated by
 	// RemoveSecurityProfile.
-	SecurityProfiles []*runtimeapi.SecurityProfileInfo
-	InspectErr       error
-	StatusErr        error
+	SecurityProfiles       []*runtimeapi.SecurityProfileInfo
+	InspectErr             error
+	StatusErr              error
+	CanceledPodOperations  []*runtimeapi.CancelPodOperationRequest
+	CancelPodOperationFunc func(context.Context, *runtimeapi.CancelPodOperationRequest) error
 	// If BlockImagePulls is true, then all PullImage() calls will be blocked until
 	// UnblockImagePulls() is called. This is used to simulate image pull latency
 	// from container runtime.
@@ -536,6 +538,27 @@ func (f *FakeRuntime) CheckpointContainer(_ context.Context, options *runtimeapi
 	defer f.Unlock()
 
 	f.CalledFunctions = append(f.CalledFunctions, "CheckpointContainer")
+	return f.Err
+}
+
+func (f *FakeRuntime) CancelPodOperation(ctx context.Context, request *runtimeapi.CancelPodOperationRequest) error {
+	f.Lock()
+	f.CalledFunctions = append(f.CalledFunctions, "CancelPodOperation")
+	f.CanceledPodOperations = append(f.CanceledPodOperations, request)
+	callback := f.CancelPodOperationFunc
+	err := f.Err
+	f.Unlock()
+	if callback != nil {
+		return callback(ctx, request)
+	}
+	return err
+}
+
+func (f *FakeRuntime) CheckpointPod(_ context.Context, options *runtimeapi.CheckpointPodRequest) error {
+	f.Lock()
+	defer f.Unlock()
+
+	f.CalledFunctions = append(f.CalledFunctions, "CheckpointPod")
 	return f.Err
 }
 
