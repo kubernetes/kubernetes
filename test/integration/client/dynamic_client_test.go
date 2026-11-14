@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	cbor "k8s.io/apimachinery/pkg/runtime/serializer/cbor/direct"
 	"k8s.io/apimachinery/pkg/types"
+	kjson "k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/features"
@@ -307,7 +308,7 @@ func TestUnstructuredExtract(t *testing.T) {
 		},
 	}
 	mgr := "testManager"
-	podData, err := json.Marshal(pod)
+	podData, err := kjson.Marshal(pod)
 	if err != nil {
 		t.Fatalf("failed to marshal pod into bytes: %v", err)
 	}
@@ -617,6 +618,64 @@ func TestDynamicClientCBOREnablement(t *testing.T) {
 						t.Errorf("unexpected error: %v", err)
 					}
 				})
+			}
+		})
+	}
+}
+
+// TestDynamicClientIntegersFromManifestToNativeResource verifies that programs can unmarshal a JSON
+// manifest into an unstructured via encoding/json and use it in a request to a native resource that
+// has integer fields. With JSON as the request encoding, this works because an int and a float with
+// the same value serialize to identical bytes. CBOR distinguishes between floating-point numbers
+// and integers in serialized representation, so Kubernetes must accept integral-valued floating
+// point numbers when decoding into Go int and uint types to support this use case.
+func TestDynamicClientIntegersFromManifestToNativeResource(t *testing.T) {
+	priorityClassJSON := []byte(`{
+		"apiVersion": "scheduling.k8s.io/v1",
+		"kind": "PriorityClass",
+		"metadata": {
+			"name": "test-dynamic-client-create-from-json"
+		},
+		"value": 1000,
+		"description": "test priority class"
+	}`)
+
+	var obj map[string]interface{}
+	// This intentionally uses encoding/json instead of k8s.io/apimachinery/pkg/util/json
+	// because the former decodes all JSON numbers to float64 and because client programs in the
+	// ecosystem also use it.
+	if err := json.Unmarshal(priorityClassJSON, &obj); err != nil {
+		t.Fatalf("failed to unmarshal JSON: %v", err)
+	}
+
+	for _, tc := range []struct {
+		name string
+		cbor bool
+	}{
+		{name: "json", cbor: false},
+		{name: "cbor", cbor: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CBORServingAndStorage, tc.cbor)
+			clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.ClientsAllowCBOR, tc.cbor)
+			clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.ClientsPreferCBOR, tc.cbor)
+
+			server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
+			defer server.TearDownFn()
+
+			dynamicClient, err := dynamic.NewForConfig(server.ClientConfig)
+			if err != nil {
+				t.Fatalf("unexpected error creating dynamic client: %v", err)
+			}
+
+			gvr := schema.GroupVersionResource{Group: "scheduling.k8s.io", Version: "v1", Resource: "priorityclasses"}
+			_, err = dynamicClient.Resource(gvr).Create(
+				context.TODO(),
+				&unstructured.Unstructured{Object: obj},
+				metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}},
+			)
+			if err != nil {
+				t.Fatalf("unexpected error creating PriorityClass: %v", err)
 			}
 		})
 	}
