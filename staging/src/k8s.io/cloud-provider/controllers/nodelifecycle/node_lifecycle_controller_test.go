@@ -19,6 +19,7 @@ package nodelifecycle
 import (
 	"context"
 	"errors"
+	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -28,11 +29,14 @@ import (
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/informers"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
+	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
 	cloudprovider "k8s.io/cloud-provider"
 	fakecloud "k8s.io/cloud-provider/fake"
@@ -516,6 +520,11 @@ func Test_NodesDeleted(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
+			// The fake client does not assign UIDs as the API server does.
+			testcase.existingNode.UID = "node-uid"
+			if !testcase.expectedDeleted {
+				testcase.expectedNode.UID = testcase.existingNode.UID
+			}
 			clientset := fake.NewSimpleClientset(testcase.existingNode)
 			informer := informers.NewSharedInformerFactory(clientset, time.Second)
 			nodeInformer := informer.Core().V1().Nodes()
@@ -894,6 +903,11 @@ func Test_NodesShutdown(t *testing.T) {
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 
+			// The fake client does not assign UIDs as the API server does.
+			testcase.existingNode.UID = "node-uid"
+			if !testcase.expectedDeleted {
+				testcase.expectedNode.UID = testcase.existingNode.UID
+			}
 			clientset := fake.NewSimpleClientset(testcase.existingNode)
 			informer := informers.NewSharedInformerFactory(clientset, time.Second)
 			nodeInformer := informer.Core().V1().Nodes()
@@ -1236,5 +1250,81 @@ func TestMonitorNodesMetrics(t *testing.T) {
 	}
 	if shutdownCount != 1.0 {
 		t.Errorf("expected %s calls count to be 1.0, but got %f", instanceShutdownOp, shutdownCount)
+	}
+}
+
+// The informer may still contain the previous Node after its name is reused.
+// Model API-server UID enforcement explicitly because the fake tracker does not.
+func TestNodeDeletionUIDPrecondition(t *testing.T) {
+	for _, instancesV2 := range []bool{false, true} {
+		for _, tc := range []struct {
+			name        string
+			cachedUID   types.UID
+			liveUID     types.UID
+			wantDelete  bool
+			wantRequest bool
+		}{
+			{"same object", "old-uid", "old-uid", true, true},
+			{"replacement object", "old-uid", "new-uid", false, true},
+			{"missing cached UID", "", "new-uid", false, false},
+		} {
+			t.Run(fmt.Sprintf("%s/instancesV2=%t", tc.name, instancesV2), func(t *testing.T) {
+				_, ctx := ktesting.NewTestContext(t)
+				cached := &v1.Node{
+					ObjectMeta: metav1.ObjectMeta{Name: "reused-name", UID: tc.cachedUID},
+					Spec:       v1.NodeSpec{ProviderID: "fake://old-instance"},
+					Status:     v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionFalse}}},
+				}
+				live := cached.DeepCopy()
+				live.UID = tc.liveUID
+				if tc.liveUID != tc.cachedUID {
+					live.Spec.ProviderID = "fake://replacement-instance"
+				}
+				client := fake.NewSimpleClientset(live)
+				nodeInformer := informers.NewSharedInformerFactory(client, 0).Core().V1().Nodes()
+				if err := nodeInformer.Informer().GetStore().Add(cached); err != nil {
+					t.Fatal(err)
+				}
+				requested := false
+				client.PrependReactor("delete", "nodes", func(action clienttesting.Action) (bool, runtime.Object, error) {
+					requested = true
+					deletion := action.(clienttesting.DeleteAction)
+					options := deletion.GetDeleteOptions()
+					if options.Preconditions == nil || options.Preconditions.UID == nil {
+						t.Error("Node deletion must include a UID precondition")
+						return false, nil, nil
+					}
+					if *options.Preconditions.UID != tc.cachedUID {
+						t.Errorf("delete UID = %q, want checked UID %q", *options.Preconditions.UID, tc.cachedUID)
+					}
+					if *options.Preconditions.UID != live.UID {
+						return true, nil, apierrors.NewConflict(schema.GroupResource{Resource: "nodes"}, live.Name, errors.New("UID precondition failed"))
+					}
+					return false, nil, nil
+				})
+				controller := &CloudNodeLifecycleController{
+					nodeLister: nodeInformer.Lister(), kubeClient: client,
+					cloud:    &fakecloud.Cloud{EnableInstancesV2: instancesV2, ExistsByProviderID: false},
+					recorder: record.NewFakeRecorder(10), concurrentNodeLifecycleSyncs: 1,
+				}
+				controller.MonitorNodes(ctx)
+				if requested != tc.wantRequest {
+					t.Errorf("delete requested = %t, want %t", requested, tc.wantRequest)
+				}
+				got, err := client.CoreV1().Nodes().Get(ctx, live.Name, metav1.GetOptions{})
+				if tc.wantDelete {
+					if !apierrors.IsNotFound(err) {
+						t.Fatalf("expected deleted Node, got error %v", err)
+					}
+				} else {
+					if err != nil {
+						t.Fatal(err)
+					}
+					if diff := cmp.Diff(live, got); diff != "" {
+						t.Errorf("surviving Node changed (-want +got):\n%s", diff)
+					}
+				}
+			})
+		}
 	}
 }
