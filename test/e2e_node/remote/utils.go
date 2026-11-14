@@ -111,7 +111,7 @@ func setupCNI(host, workspace string) error {
 	klog.V(2).Infof("Install CNI on path %q", cniPath)
 	cmd := getSSHCommand(" ; ",
 		fmt.Sprintf("mkdir -p %s", cniPath),
-		fmt.Sprintf("curl -s -L %s | tar -xz -C %s", getCNIURL(), cniPath),
+		fmt.Sprintf("curl -sSfL --retry 5 --retry-delay 3 %s | tar -xz -C %s", getCNIURL(), cniPath),
 	)
 	if output, err := SSH(host, "sh", "-c", cmd); err != nil {
 		return fmt.Errorf("failed to install cni plugin on %q: %v output: %q", host, err, output)
@@ -143,7 +143,7 @@ func getECRCredentialProviderURL() string {
 func setupECRCredentialProvider(host, workspace string) error {
 	klog.V(2).Infof("Install ecr-credential-provider on %q at %q", host, workspace)
 	cmd := getSSHCommand(" ; ",
-		fmt.Sprintf("curl -s -Lo %s/ecr-credential-provider %s", workspace, getECRCredentialProviderURL()),
+		fmt.Sprintf("curl -sSfL --retry 5 --retry-delay 3 -o %s/ecr-credential-provider %s", workspace, getECRCredentialProviderURL()),
 		fmt.Sprintf("chmod a+x %s/ecr-credential-provider", workspace),
 	)
 	if output, err := SSH(host, "sh", "-c", cmd); err != nil {
