@@ -45,7 +45,7 @@ import (
 //
 // See https://github.com/kubernetes/kubernetes/issues/130926
 func TestProxyRulesInUserNS(t *testing.T) {
-	nft, err := getNFTablesInterface(v1.IPv4Protocol)
+	nft, err := getNFTablesInterface(context.Background(), v1.IPv4Protocol)
 	if err != nil {
 		t.Skipf("nftables not available: %v", err)
 	}
@@ -89,6 +89,7 @@ func TestProxyRulesInUserNS(t *testing.T) {
 		noEndpointNodePorts: newNFTElementStorage("map", noEndpointNodePortsMap),
 		serviceNodePorts:    newNFTElementStorage("map", serviceNodePortsMap),
 		hairpinConnections:  newNFTElementStorage("set", hairpinConnectionsSet),
+		endpoints:           newEndpointsStorage(),
 	}
 	fp.setInitialized(true)
 	fp.syncRunner = runner.NewBoundedFrequencyRunner("test-sync-runner", fp.syncProxyRules, 0, 30*time.Second, time.Minute)

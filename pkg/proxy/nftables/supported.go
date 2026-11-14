@@ -19,6 +19,7 @@ limitations under the License.
 package nftables
 
 import (
+	"context"
 	"fmt"
 	"os"
 
@@ -30,13 +31,17 @@ import (
 	"sigs.k8s.io/knftables"
 )
 
+const nftMinVersion = "1.0.3"
+
 // Create a knftables.Interface and check if we can use the nftables proxy mode on this host.
-func getNFTablesInterface(ipFamily v1.IPFamily) (knftables.Interface, error) {
+func getNFTablesInterface(ctx context.Context, ipFamily v1.IPFamily) (knftables.Interface, error) {
 	var nftablesFamily knftables.Family
+	ipX := "ip"
 	if ipFamily == v1.IPv4Protocol {
 		nftablesFamily = knftables.IPv4Family
 	} else {
 		nftablesFamily = knftables.IPv6Family
+		ipX = "ip6"
 	}
 
 	var options []knftables.Option
@@ -57,6 +62,21 @@ func getNFTablesInterface(ipFamily v1.IPFamily) (knftables.Interface, error) {
 		return nil, err
 	}
 
+	// The shared endpoints maps additionally need nft >= 1.0.3 (see
+	// endpointsMapKind.typeOf). Probe with the real declaration so that an older
+	// nft fails here, with an actionable error, rather than on every sync.
+	tx := nft.NewTransaction()
+	tx.Add(&knftables.Table{})
+	for _, kind := range endpointsMapKinds {
+		tx.Add(&knftables.Map{
+			Name:   kind.mapName("tcp"),
+			TypeOf: kind.typeOf(ipX, "tcp"),
+		})
+	}
+	if err := nft.Check(ctx, tx); err != nil {
+		return nil, fmt.Errorf("kube-proxy in nftables mode requires nft %s or later (nft rejected the shared endpoints map declaration): %w", nftMinVersion, err)
+	}
+
 	// Likewise, we want to ensure that the host filesystem has nft >= 1.0.1, so that
 	// it's not possible that *our* rules break *the system's* nft. (In particular, we
 	// know that if kube-proxy uses nft >= 1.0.3 and the system has nft <= 0.9.8, that
@@ -65,6 +85,12 @@ func getNFTablesInterface(ipFamily v1.IPFamily) (knftables.Interface, error) {
 	// check the kernel version, under the assumption that the distro will have an nft
 	// binary that supports the same features as its kernel does, and so kernel 5.13
 	// or later implies nft 1.0.1 or later. https://issues.k8s.io/122743
+	//
+	// This heuristic cannot express the nftMinVersion requirement above: host nft
+	// 1.0.1 and 1.0.2 abort when listing a shared endpoints map that holds two or
+	// more elements (they can still manage their own tables), but the kernel
+	// version that would imply nft 1.0.3 would also exclude distros that pair an
+	// older kernel with a newer nft, such as RHEL 9.
 	//
 	// However, we allow the user to bypass this check by setting
 	// `KUBE_PROXY_NFTABLES_SKIP_KERNEL_VERSION_CHECK` to anything non-empty.
