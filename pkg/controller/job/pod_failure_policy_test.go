@@ -314,7 +314,7 @@ func TestMatchPodFailurePolicy(t *testing.T) {
 							},
 						},
 						{
-							Name: "suppport-container",
+							Name: "support-container",
 							State: v1.ContainerState{
 								Terminated: &v1.ContainerStateTerminated{
 									ExitCode: 0,
@@ -383,7 +383,7 @@ func TestMatchPodFailurePolicy(t *testing.T) {
 							},
 						},
 						{
-							Name: "suppport-container",
+							Name: "support-container",
 							State: v1.ContainerState{
 								Terminated: &v1.ContainerStateTerminated{
 									ExitCode: 0,
