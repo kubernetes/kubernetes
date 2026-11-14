@@ -93,11 +93,6 @@ func init() {
 	utilruntime.Must(logsapi.AddFeatureGates(utilfeature.DefaultMutableFeatureGate))
 }
 
-// proxyRun defines the interface to run a specified ProxyServer
-type proxyRun interface {
-	Run(ctx context.Context) error
-}
-
 // NewProxyCommand creates a *cobra.Command object with default parameters
 func NewProxyCommand() *cobra.Command {
 	opts := NewOptions()
