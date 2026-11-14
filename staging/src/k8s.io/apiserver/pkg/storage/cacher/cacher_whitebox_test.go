@@ -3100,13 +3100,10 @@ func (b *stopDuringDispatchBudget) returnUnused(_ time.Duration) {
 	close(b.done)
 }
 
-// TestWatchListStopDuringDispatch verifies that the watcher goroutine ends.
-// A watch-list watcher has received its initial-events-end bookmark but not
-// sent it, because the client does not read. A dispatch blocks on the
-// watcher, the watcher may be stopped, and the dispatch then closes the watcher
-// for unresponsiveness in draining mode. A stop must stay final. After a client
-// Stop, a draining close would leave the watcher goroutine waiting forever to
-// send to a client that is gone.
+// TestWatchListStopDuringDispatch verifies how a dispatch closes a blocked
+// watch-list watcher that has received its initial-events-end bookmark but not
+// sent it, because the client does not read. TestWatchGoroutineLeak covers a
+// client Stop in that window.
 func TestWatchListStopDuringDispatch(t *testing.T) {
 	cachertesting.ForceRequestWatchProgressSupport(t)
 	// Only this goroutine counts. Etcd clients of earlier tests can start
@@ -3118,10 +3115,6 @@ func TestWatchListStopDuringDispatch(t *testing.T) {
 		stop   func(cacher *Cacher, w watch.Interface)
 		drains bool
 	}{
-		{
-			name: "client Stop",
-			stop: func(_ *Cacher, w watch.Interface) { w.Stop() },
-		},
 		{
 			// It asks for an immediate stop, which must not become a drain.
 			name: "terminateAllWatchers",
@@ -4247,4 +4240,127 @@ func TestGetListWithShardedListAndWatch(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestWatchGoroutineLeak(t *testing.T) {
+	cachertesting.ForceRequestWatchProgressSupport(t)
+	ctx := context.Background()
+	server, etcdStorage := cachertesting.NewEtcdTestStorage(t, etcd3testing.PathPrefix())
+	t.Cleanup(func() {
+		// RunEtcd closes the embedded server on cleanup, not the client connection.
+		_ = server.V3Client.Close()
+	})
+	cacher, _, err := newTestCacher(etcdStorage)
+	require.NoError(t, err)
+	store := NewCacheDelegator(cacher, etcdStorage)
+	t.Cleanup(func() {
+		store.Stop()
+		cacher.Stop()
+		server.Terminate(t)
+	})
+
+	ignoreBeforeTest := goleak.IgnoreCurrent()
+	t.Cleanup(func() {
+		// Etcd clients of earlier tests can start goroutines at any time, so
+		// only the watcher goroutine counts.
+		if err := goleak.Find(ignoreBeforeTest); err != nil {
+			require.NotContains(t, err.Error(), "cacher.(*cacheWatcher).process")
+		}
+	})
+
+	createPod := func(name string) (*example.Pod, string) {
+		pod := &example.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: name}}
+		out := &example.Pod{}
+		key := cachertesting.ComputePodKey(pod)
+		require.NoError(t, store.Create(ctx, key, pod, out, 0))
+		return out, key
+	}
+
+	var (
+		lastPod *example.Pod
+		lastKey string
+	)
+	// The dispatcher can be behind the watch cache. Events still queued for it
+	// would fill the input and close the watcher before the test is ready, so
+	// wait until a second watch received all of them.
+	dispatched, err := store.Watch(ctx, "/pods/ns", storage.ListOptions{ResourceVersion: "0", Predicate: storage.Everything, Recursive: true})
+	require.NoError(t, err)
+	for i := range minWatchChanSize + 2 {
+		lastPod, lastKey = createPod(fmt.Sprintf("initial-pod-%d", i))
+		select {
+		case <-dispatched.ResultChan():
+		case <-time.After(wait.ForeverTestTimeout):
+			t.Fatalf("timed out waiting for %s to be dispatched", lastPod.Name)
+		}
+	}
+	dispatched.Stop()
+	require.Eventually(t, func() bool {
+		store.cacher.Lock()
+		defer store.cacher.Unlock()
+		return !store.cacher.dispatching
+	}, wait.ForeverTestTimeout, time.Millisecond)
+	// Wait via RV=0 so Watch finds the cache already fresh and avoids spawning
+	// waitUntilFreshLocked's 3s blockTimeout timer goroutine.
+	require.Eventually(t, func() bool {
+		return store.Get(ctx, lastKey, storage.GetOptions{ResourceVersion: "0"}, &example.Pod{}) == nil
+	}, wait.ForeverTestTimeout, time.Millisecond)
+
+	watchCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	pred := storage.Everything
+	pred.AllowWatchBookmarks = true
+	w, err := store.Watch(watchCtx, "/pods/ns", storage.ListOptions{
+		ResourceVersion:   lastPod.ResourceVersion,
+		SendInitialEvents: new(true),
+		Predicate:         pred,
+		Recursive:         true,
+	})
+	require.NoError(t, err)
+	cw, ok := w.(*cacheWatcher)
+	require.True(t, ok)
+
+	// More initial pods than chanSize keeps watcher.process blocked on ResultChan
+	// before initialEventsEndBookmark is sent (state == cacheWatcherBookmarkReceived).
+	require.Eventually(t, func() bool {
+		return len(w.ResultChan()) == cap(w.ResultChan())
+	}, wait.ForeverTestTimeout, time.Millisecond)
+
+	for i := range cap(cw.input) {
+		createPod(fmt.Sprintf("buffered-pod-%d", i))
+	}
+	require.Eventually(t, func() bool {
+		store.cacher.Lock()
+		defer store.cacher.Unlock()
+		return len(cw.input) == cap(cw.input) && !store.cacher.dispatching
+	}, wait.ForeverTestTimeout, time.Millisecond)
+
+	store.cacher.dispatchTimeoutBudget.returnUnused(maxBudget)
+
+	// A watcher closed early would make the test pass without the race.
+	store.cacher.Lock()
+	stopped := cw.stopped
+	store.cacher.Unlock()
+	require.False(t, stopped, "the watcher closed before the test was ready")
+
+	// With both ResultChan and cw.input full, the next event blocks dispatchEvent in cw.add on timer.C.
+	createPod("blocking-pod")
+	require.Eventually(t, func() bool {
+		store.cacher.Lock()
+		defer store.cacher.Unlock()
+		return store.cacher.dispatching || cw.stopped
+	}, wait.ForeverTestTimeout, time.Millisecond)
+
+	// Stopping the watch while dispatchEvent is in flight defers the stop to
+	// finishDispatching. cw.add's timeout then defers a second, draining stop
+	// with forget(true). The first stop must stay final, or the watcher
+	// goroutine waits forever to send.
+	w.Stop()
+	cancel()
+
+	require.Eventually(t, func() bool {
+		store.cacher.Lock()
+		defer store.cacher.Unlock()
+		return !store.cacher.dispatching
+	}, wait.ForeverTestTimeout, time.Millisecond)
 }
