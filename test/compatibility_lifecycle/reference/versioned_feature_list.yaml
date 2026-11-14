@@ -1538,6 +1538,12 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.37"
+- name: PodLevelResourcesFixInitContainerLimits
+  versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.38"
 - name: PodLevelResourcesFixKubeletQOSClass
   versionedSpecs:
   - default: true

@@ -4852,15 +4852,16 @@ func validatePodResources(spec *core.PodSpec, podClaimNames sets.Set[string], fl
 	// validatePodResourceRequirements checks if resource names and quantities are
 	// valid, and requests are less than limits.
 	allErrs = append(allErrs, validatePodResourceRequirements(spec.Resources, podClaimNames, resourcesFldPath, opts)...)
-	allErrs = append(allErrs, validatePodResourceConsistency(spec, resourcesFldPath)...)
+	allErrs = append(allErrs, validatePodResourceConsistency(spec, fldPath, opts)...)
 	return allErrs
 }
 
 // validatePodResourceConsistency checks if aggregate container-level requests are
 // less than or equal to pod-level requests, and individual container-level limits
 // are less than or equal to pod-level limits.
-func validatePodResourceConsistency(spec *core.PodSpec, fldPath *field.Path) field.ErrorList {
+func validatePodResourceConsistency(spec *core.PodSpec, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
+	resourcesFldPath := fldPath.Child("resources")
 
 	// Convert the *core.PodSpec to *v1.PodSpec to satisfy the call to
 	// resourcehelper.PodRequests method, in the subsequent lines,
@@ -4870,10 +4871,10 @@ func validatePodResourceConsistency(spec *core.PodSpec, fldPath *field.Path) fie
 	// AggregateContainerRequests against internal core.Pod type for beta release of
 	// PodLevelResources feature.
 	if err := corev1.Convert_core_PodSpec_To_v1_PodSpec(spec, v1PodSpec, nil); err != nil {
-		allErrs = append(allErrs, field.InternalError(fldPath, fmt.Errorf("invalid %q: %v", fldPath, err.Error())))
+		allErrs = append(allErrs, field.InternalError(resourcesFldPath, fmt.Errorf("invalid %q: %v", resourcesFldPath, err.Error())))
 	}
 
-	reqPath := fldPath.Child("requests")
+	reqPath := resourcesFldPath.Child("requests")
 	// resourcehelper.AggregateContainerRequests method requires a Pod object to
 	// calculate the total requests requirements of a pod. Hence a Pod object using
 	// v1PodSpec i.e. (&v1.Pod{Spec: *v1PodSpec}, is created on the fly, and passed
@@ -4914,7 +4915,7 @@ func validatePodResourceConsistency(spec *core.PodSpec, fldPath *field.Path) fie
 		}
 
 		if ctrLims.Cmp(podSpecLimits) > 0 {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("limits").Key(string(resourceName)), podSpecLimits.String(), fmt.Sprintf("must be greater than or equal to aggregate container limits of %s", ctrLims.String())))
+			allErrs = append(allErrs, field.Invalid(resourcesFldPath.Child("limits").Key(string(resourceName)), podSpecLimits.String(), fmt.Sprintf("must be greater than or equal to aggregate container limits of %s", ctrLims.String())))
 		}
 	}
 
@@ -4928,8 +4929,25 @@ func validatePodResourceConsistency(spec *core.PodSpec, fldPath *field.Path) fie
 			}
 
 			if ctrLimit.Cmp(podSpecLimits) > 0 {
-				fldPath := fldPath.Child("containers").Index(i).Key(resourceName.String()).Child("limits")
+				fldPath := resourcesFldPath.Child("containers").Index(i).Key(resourceName.String()).Child("limits")
 				allErrs = append(allErrs, field.Invalid(fldPath, ctrLimit.String(), fmt.Sprintf("must be less than or equal to pod limits of %s", podSpecLimits.String())))
+			}
+		}
+	}
+
+	if !opts.AllowInitContainerLimitsExceedingPodLimits {
+		for i, ctr := range spec.InitContainers {
+			for resourceName, ctrLimit := range ctr.Resources.Limits {
+				// Skip if the pod-level limit of the resource is not set.
+				podSpecLimits, exists := spec.Resources.Limits[resourceName]
+				if !exists {
+					continue
+				}
+
+				if ctrLimit.Cmp(podSpecLimits) > 0 {
+					fldPath := fldPath.Child("initContainers").Index(i).Child("resources", "limits").Key(resourceName.String())
+					allErrs = append(allErrs, field.Invalid(fldPath, ctrLimit.String(), fmt.Sprintf("must be less than or equal to pod limits of %s", podSpecLimits.String())))
+				}
 			}
 		}
 	}
@@ -6940,13 +6958,21 @@ func validatePodLevelResourcesResize(newPod, oldPod *core.Pod, specPath *field.P
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources) && len(newPod.Status.NodeAllocatableResourceClaimStatuses) > 0 {
+		if !opts.AllowInitContainerLimitsExceedingPodLimits && len(oldPod.Status.NodeAllocatableResourceClaimStatuses) > 0 {
+			v1OldPod := &v1.Pod{}
+			if err := corev1.Convert_core_Pod_To_v1_Pod(oldPod, v1OldPod, nil); err == nil {
+				if ok, _ := validateInitContainerLimitsCoverDRA(v1OldPod); !ok {
+					opts.AllowInitContainerLimitsExceedingPodLimits = true
+				}
+			}
+		}
 		v1Pod := &v1.Pod{}
 		if err := corev1.Convert_core_Pod_To_v1_Pod(newPod, v1Pod, nil); err != nil {
 			allErrs = append(allErrs, field.InternalError(specPath, fmt.Errorf("failed to convert pod for DRA validation: %w", err)))
 		} else {
 			// TODO(pravk03): Explore optimization to avoid double aggregation of container resources
 			// in validatePodResourceConsistency and validatePodLevelResourcesCoverDRA.
-			if ok, msg := validatePodLevelResourcesCoverDRA(v1Pod); !ok {
+			if ok, msg := validatePodLevelResourcesCoverDRA(v1Pod, opts); !ok {
 				allErrs = append(allErrs, field.Invalid(specPath.Child("resources"), newPod.Spec.Resources, msg))
 			}
 		}
@@ -7017,7 +7043,7 @@ func dropResizableResourceRequirementsUpdates(resources *core.ResourceRequiremen
 	return resources
 }
 
-func validatePodLevelResourcesCoverDRA(pod *v1.Pod) (bool, string) {
+func validatePodLevelResourcesCoverDRA(pod *v1.Pod, validationOpts PodValidationOptions) (bool, string) {
 	if pod.Spec.Resources == nil {
 		return true, ""
 	}
@@ -7094,8 +7120,43 @@ func validatePodLevelResourcesCoverDRA(pod *v1.Pod) (bool, string) {
 				}
 			}
 		}
+
+		if !validationOpts.AllowInitContainerLimitsExceedingPodLimits {
+			if ok, msg := validateInitContainerLimitsCoverDRA(pod); !ok {
+				return false, msg
+			}
+		}
 	}
 
+	return true, ""
+}
+
+func validateInitContainerLimitsCoverDRA(pod *v1.Pod) (bool, string) {
+	if pod.Spec.Resources == nil || pod.Spec.Resources.Limits == nil {
+		return true, ""
+	}
+	for _, ctr := range pod.Spec.InitContainers {
+		initDRAAllocations := resourcehelper.GetContainerDRAAllocations(pod, ctr.Name)
+		for resourceName, ctrLimit := range ctr.Resources.Limits {
+			if helper.IsHugePageResourceName(core.ResourceName(resourceName)) {
+				continue
+			}
+
+			// Skip if the pod-level limit of the resource is not set.
+			podLevelResLimit, exists := pod.Spec.Resources.Limits[resourceName]
+			if !exists {
+				continue
+			}
+
+			draResAllocation := initDRAAllocations[resourceName]
+			effectiveLimit := ctrLimit
+			effectiveLimit.Add(draResAllocation)
+
+			if effectiveLimit.Cmp(podLevelResLimit) > 0 {
+				return false, fmt.Sprintf("pod level limit for %s is insufficient to cover the limit and DRA overhead for init container %s", resourceName, ctr.Name)
+			}
+		}
+	}
 	return true, ""
 }
 

@@ -87,6 +87,8 @@ type PodValidationOptions struct {
 	AllowSecurityProfileOCI bool
 	// Allow podCertificate volumes to specify ML-DSA algorithms in the keyType field
 	AllowMLDSAPodCertificateKeyTypes bool
+	// Allow init container limits to exceed pod-level limits for backward compatibility on update
+	AllowInitContainerLimitsExceedingPodLimits bool
 }
 
 func hasIndivisibleHugePagesValue(list core.ResourceList) bool {
@@ -210,6 +212,7 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *core.PodSpec, p
 		AllowSysAdminWhenPrivilegeEscalationFalse:               false,
 		AllowMLDSAPodCertificateKeyTypes:                        utilfeature.DefaultFeatureGate.Enabled(features.PodCertificateMLDSA),
 		AllowSecurityProfileOCI:                                 utilfeature.DefaultFeatureGate.Enabled(features.SecurityProfileOCI),
+		AllowInitContainerLimitsExceedingPodLimits:              !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourcesFixInitContainerLimits),
 	}
 
 	opts.AllowEnvFilesValidation = useAllowEnvFilesValidation(oldPodSpec)
@@ -266,6 +269,9 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *core.PodSpec, p
 
 		// If old spec uses a seccomp profile of type OCI, allow it
 		opts.AllowSecurityProfileOCI = opts.AllowSecurityProfileOCI || seccompProfileOCIInUse(oldPodSpec)
+
+		// If old spec has init container limits exceeding pod-level limits, allow it on update
+		opts.AllowInitContainerLimitsExceedingPodLimits = opts.AllowInitContainerLimitsExceedingPodLimits || hasInitContainerLimitsExceedingPodLimits(oldPodSpec)
 	}
 	if oldPodMeta != nil && !opts.AllowInvalidPodDeletionCost {
 		// This is an update, so validate only if the existing object was valid.
@@ -557,4 +563,20 @@ func seccompProfileOCIInUse(podSpec *core.PodSpec) bool {
 		return true
 	})
 	return inUse
+}
+
+// hasInitContainerLimitsExceedingPodLimits returns true if any init container limit
+// exceeds the corresponding pod-level limit.
+func hasInitContainerLimitsExceedingPodLimits(spec *core.PodSpec) bool {
+	if spec == nil || spec.Resources == nil || len(spec.Resources.Limits) == 0 {
+		return false
+	}
+	for _, ctr := range spec.InitContainers {
+		for resourceName, ctrLimit := range ctr.Resources.Limits {
+			if podLimit, exists := spec.Resources.Limits[resourceName]; exists && ctrLimit.Cmp(podLimit) > 0 {
+				return true
+			}
+		}
+	}
+	return false
 }

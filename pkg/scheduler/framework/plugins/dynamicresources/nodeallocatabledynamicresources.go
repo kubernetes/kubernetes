@@ -491,6 +491,31 @@ func (pl *DynamicResources) validatePodLevelResourcesCoverDRA(pod *v1.Pod) *fwk.
 				}
 			}
 		}
+
+		if pl.fts.EnablePodLevelResourcesFixInitContainerLimits {
+			for _, ctr := range pod.Spec.InitContainers {
+				initDRAAllocations := resourcehelper.GetContainerDRAAllocations(pod, ctr.Name)
+				for resourceName, ctrLimit := range ctr.Resources.Limits {
+					if v1helper.IsHugePageResourceName(resourceName) {
+						continue
+					}
+
+					// Skip if the pod-level limit of the resource is not set.
+					podLevelResLimit, exists := pod.Spec.Resources.Limits[resourceName]
+					if !exists {
+						continue
+					}
+
+					draResAllocation := initDRAAllocations[resourceName]
+					effectiveLimit := ctrLimit
+					effectiveLimit.Add(draResAllocation)
+
+					if effectiveLimit.Cmp(podLevelResLimit) > 0 {
+						return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, fmt.Sprintf("pod level limit for %s is insufficient to cover the limit and DRA overhead for init container %s", resourceName, ctr.Name))
+					}
+				}
+			}
+		}
 	}
 
 	return nil
