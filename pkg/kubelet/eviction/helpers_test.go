@@ -1235,6 +1235,58 @@ func TestOrderedByPriorityMemory(t *testing.T) {
 	}
 }
 
+func TestRankPressureWithMissingPodStats(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		rank     rankFunc
+		podStats func(*v1.Pod, resource.Quantity) statsapi.PodStats
+		resource v1.ResourceName
+	}{
+		{
+			name:     "memory",
+			rank:     rankMemoryPressure,
+			podStats: newPodMemoryStats,
+			resource: v1.ResourceMemory,
+		},
+		{
+			name: "disk",
+			rank: rankDiskPressureFunc([]fsStatsType{fsStatsRoot}, v1.ResourceEphemeralStorage),
+			podStats: func(pod *v1.Pod, usage resource.Quantity) statsapi.PodStats {
+				return newPodDiskStats(pod, usage, resource.MustParse("0"), resource.MustParse("0"))
+			},
+			resource: v1.ResourceEphemeralStorage,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			missing := newPod("missing-stats", highPriority, nil, nil)
+			measured := newPod("measured", lowPriority, []v1.Container{{
+				Name: "measured",
+				Resources: v1.ResourceRequirements{Requests: v1.ResourceList{
+					tc.resource: resource.MustParse("100Mi"),
+				}},
+			}}, nil)
+			for _, usage := range []struct {
+				name  string
+				value string
+				first *v1.Pod
+			}{
+				{name: "measured pod exceeds request", value: "200Mi", first: measured},
+				{name: "measured pod is below request", value: "50Mi", first: missing},
+			} {
+				t.Run(usage.name, func(t *testing.T) {
+					stats := tc.podStats(measured, resource.MustParse(usage.value))
+					statsFn := func(pod *v1.Pod) (statsapi.PodStats, bool) {
+						return stats, pod == measured
+					}
+					pods := []*v1.Pod{missing, measured}
+					tc.rank(pods, statsFn)
+					assert.Same(t, usage.first, pods[0])
+				})
+			}
+		})
+	}
+}
+
 // TestOrderedByPriorityProcess ensures we order by priority and then process consumption relative to request.
 func TestOrderedByPriorityProcess(t *testing.T) {
 	pod1 := newPod("low-priority-high-usage", lowPriority, nil, nil)
