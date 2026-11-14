@@ -92,7 +92,6 @@ func ValidateEventUpdate(newEvent, oldEvent *core.Event, requestVersion schema.G
 	allErrs = append(allErrs, ValidateImmutableField(newEvent.FirstTimestamp, oldEvent.FirstTimestamp, field.NewPath("firstTimestamp"))...)
 	allErrs = append(allErrs, ValidateImmutableField(newEvent.LastTimestamp, oldEvent.LastTimestamp, field.NewPath("lastTimestamp"))...)
 	allErrs = append(allErrs, ValidateImmutableField(newEvent.Count, oldEvent.Count, field.NewPath("count"))...)
-	allErrs = append(allErrs, ValidateImmutableField(newEvent.Reason, oldEvent.Reason, field.NewPath("reason"))...)
 	allErrs = append(allErrs, ValidateImmutableField(newEvent.Type, oldEvent.Type, field.NewPath("type"))...)
 
 	// Disallow changes to eventTime greater than microsecond-level precision.
