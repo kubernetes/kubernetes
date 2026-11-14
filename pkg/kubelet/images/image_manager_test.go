@@ -200,15 +200,15 @@ func noFGPullerTestCases() []pullerTestCase {
 				{[]string{"GetImageRef"}, ErrImageInspect, false, false,
 					[]v1.Event{
 						{Reason: "InspectFailed"},
-					}, ""},
+					}, "missing_image"},
 				{[]string{"GetImageRef"}, ErrImageInspect, false, false,
 					[]v1.Event{
 						{Reason: "InspectFailed"},
-					}, ""},
+					}, "missing_image"},
 				{[]string{"GetImageRef"}, ErrImageInspect, false, false,
 					[]v1.Event{
 						{Reason: "InspectFailed"},
-					}, ""},
+					}, "missing_image"},
 			},
 			expectedEnsureImageMetrics: ensureExistsMetricForLabels("ifnotpresent", "unknown", "unknown"),
 		},
