@@ -144,9 +144,13 @@ func (dswp *desiredStateOfWorldPopulator) Run(ctx context.Context, sourcesReady 
 	// Wait for the completion of a loop that started after sources are all ready, then set hasAddedPods accordingly
 	logger := klog.FromContext(ctx)
 	logger.Info("Desired state populator starts to run")
+	// Removal does not call the API server, so it must not wait behind findAndAddNewPods.
+	go wait.UntilWithContext(ctx, func(context.Context) {
+		dswp.findAndRemoveDeletedPods(logger)
+	}, dswp.loopSleepDuration)
 	_ = wait.PollUntilContextCancel(ctx, dswp.loopSleepDuration, false, func(ctx context.Context) (bool, error) {
 		done := sourcesReady.AllReady()
-		dswp.populatorLoop(ctx)
+		dswp.findAndAddNewPods(ctx)
 		return done, nil
 	})
 	dswp.hasAddedPodsLock.Lock()
@@ -155,7 +159,7 @@ func (dswp *desiredStateOfWorldPopulator) Run(ctx context.Context, sourcesReady 
 		dswp.hasAddedPods = true
 	}
 	dswp.hasAddedPodsLock.Unlock()
-	wait.UntilWithContext(ctx, dswp.populatorLoop, dswp.loopSleepDuration)
+	wait.UntilWithContext(ctx, dswp.findAndAddNewPods, dswp.loopSleepDuration)
 }
 
 func (dswp *desiredStateOfWorldPopulator) ReprocessPod(
@@ -169,34 +173,33 @@ func (dswp *desiredStateOfWorldPopulator) HasAddedPods() bool {
 	return dswp.hasAddedPods
 }
 
-func (dswp *desiredStateOfWorldPopulator) populatorLoop(ctx context.Context) {
-	logger := klog.FromContext(ctx)
-	dswp.findAndAddNewPods(ctx)
-	dswp.findAndRemoveDeletedPods(logger)
-}
-
 // Iterate through all pods and add to desired state of world if they don't
 // exist but should
 func (dswp *desiredStateOfWorldPopulator) findAndAddNewPods(ctx context.Context) {
 	for _, pod := range dswp.podManager.GetPods() {
-		// Keep consistency of adding pod during reconstruction
-		if dswp.hasAddedPods && dswp.podStateProvider.ShouldPodContainersBeTerminating(pod.UID) {
-			// Do not (re)add volumes for pods that can't also be starting containers
+		if dswp.shouldSkipPod(pod.UID) {
 			continue
 		}
-
-		if !dswp.hasAddedPods && dswp.podStateProvider.ShouldPodRuntimeBeRemoved(pod.UID) {
-			// When kubelet restarts, we need to add pods to dsw if there is a possibility
-			// that the container may still be running
-			continue
-		}
-
 		dswp.processPodVolumes(ctx, pod)
 	}
 }
 
+// shouldSkipPod returns true if the volumes of the pod must not be added to the desired state of world.
+func (dswp *desiredStateOfWorldPopulator) shouldSkipPod(uid types.UID) bool {
+	if dswp.hasAddedPods {
+		// Do not (re)add volumes for pods that can't also be starting containers
+		return dswp.podStateProvider.ShouldPodContainersBeTerminating(uid)
+	}
+	// When kubelet restarts, we need to add pods to dsw if there is a possibility
+	// that the container may still be running
+	return dswp.podStateProvider.ShouldPodRuntimeBeRemoved(uid)
+}
+
 // Iterate through all pods in desired state of world, and remove if they no
-// longer exist
+// longer exist.
+// It runs in its own loop, apart from findAndAddNewPods, so it must not call the
+// API server or block. Otherwise a hanging API server delays unmounting the
+// volumes of terminated pods again.
 func (dswp *desiredStateOfWorldPopulator) findAndRemoveDeletedPods(logger klog.Logger) {
 	podsFromCache := make(map[volumetypes.UniquePodName]struct{})
 	for _, volumeToMount := range dswp.desiredStateOfWorld.GetVolumesToMount() {
@@ -304,6 +307,13 @@ func (dswp *desiredStateOfWorldPopulator) processPodVolumes(ctx context.Context,
 			dswp.desiredStateOfWorld.AddErrorToPod(uniquePodName, err.Error())
 			allVolumesAdded = false
 			continue
+		}
+
+		// The pod may have started terminating while createVolumeSpec waited on the API server.
+		// This is best-effort: findAndRemoveDeletedPods can still run before AddPodToVolume,
+		// and the next removal pass deletes the volume again.
+		if dswp.shouldSkipPod(pod.UID) {
+			return
 		}
 
 		// Add volume to desired state of world
