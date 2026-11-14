@@ -128,6 +128,9 @@ func ParseEnv(envFilePath, key string) (string, bool, error) {
 			valueBuilder.WriteString(rest)
 			valueBuilder.WriteString("\n")
 			if !scanner.Scan() {
+				if err := scanner.Err(); err != nil {
+					return "", false, fmt.Errorf("error reading environment variable file %q: %w", envFilePath, err)
+				}
 				return "", false, fmt.Errorf("invalid environment variable format starting at line %d: unclosed single quote", startLineNum)
 			}
 			lineNum++
