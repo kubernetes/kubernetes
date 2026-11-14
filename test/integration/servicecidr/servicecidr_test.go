@@ -523,3 +523,118 @@ func TestValidationAdmissionPolicyServiceCIDR(t *testing.T) {
 		t.Errorf("Expected ServiceCIDR to be %v, but got %v", expectedCIDRs, updatedDefaultCIDR.Spec.CIDRs)
 	}
 }
+
+// TestServiceCIDRDeletionTogether deletes overlapping ServiceCIDRs at the same
+// time. A ServiceCIDR that is being deleted can't keep the IP addresses it
+// contains, so neither of them may be removed while a Service still uses an IP
+// address that only they contain.
+func TestServiceCIDRDeletionTogether(t *testing.T) {
+	testCases := []struct {
+		name      string
+		cidrs     map[string]string
+		clusterIP string
+	}{
+		{
+			name:      "same range",
+			cidrs:     map[string]string{"cidr-a": "10.0.0.0/24", "cidr-b": "10.0.0.0/24"},
+			clusterIP: "10.0.0.10",
+		},
+		{
+			name:      "parent and child",
+			cidrs:     map[string]string{"parent": "10.0.0.0/16", "child": "10.0.0.0/24"},
+			clusterIP: "10.0.0.10",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			etcdOptions := framework.SharedEtcd()
+			apiServerOptions := kubeapiservertesting.NewDefaultTestServerOptions()
+			s := kubeapiservertesting.StartTestServerOrDie(t,
+				apiServerOptions,
+				[]string{
+					"--service-cluster-ip-range=192.168.0.0/29",
+					"--advertise-address=172.16.1.1",
+					"--disable-admission-plugins=ServiceAccount",
+				},
+				etcdOptions)
+			defer s.TearDownFn()
+
+			client, err := kubernetes.NewForConfig(s.ClientConfig)
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+
+			ns := framework.CreateNamespaceOrDie(client, "test-service-cidr-deletion-together", t)
+			defer framework.DeleteNamespaceOrDie(client, ns, t)
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			informerFactory := informers.NewSharedInformerFactory(client, 12*time.Hour)
+			go servicecidrs.NewController(
+				ctx,
+				informerFactory.Networking().V1().ServiceCIDRs(),
+				informerFactory.Networking().V1().IPAddresses(),
+				client,
+			).Run(ctx, 5)
+			informerFactory.Start(ctx.Done())
+			informerFactory.WaitForCacheSync(ctx.Done())
+
+			for name, cidr := range tc.cidrs {
+				if _, err := client.NetworkingV1().ServiceCIDRs().Create(ctx, makeServiceCIDR(name, cidr, ""), metav1.CreateOptions{}); err != nil {
+					t.Fatal(err)
+				}
+			}
+			for name := range tc.cidrs {
+				if err := wait.PollUntilContextTimeout(ctx, 250*time.Millisecond, 30*time.Second, false, func(ctx context.Context) (bool, error) {
+					cidr, err := client.NetworkingV1().ServiceCIDRs().Get(ctx, name, metav1.GetOptions{})
+					if err != nil {
+						return false, nil
+					}
+					return isServiceCIDRReady(cidr), nil
+				}); err != nil {
+					t.Fatalf("%s is not ready", name)
+				}
+			}
+
+			svc := makeService("svc")
+			svc.Spec.ClusterIP = tc.clusterIP
+			if _, err := client.CoreV1().Services(ns.Name).Create(ctx, svc, metav1.CreateOptions{}); err != nil {
+				t.Fatal(err)
+			}
+
+			for name := range tc.cidrs {
+				if err := client.NetworkingV1().ServiceCIDRs().Delete(ctx, name, metav1.DeleteOptions{}); err != nil {
+					t.Fatal(err)
+				}
+			}
+
+			// The controller waits 10s after the deletion before it removes the
+			// finalizer; give it some more time.
+			if err := wait.PollUntilContextTimeout(ctx, 250*time.Millisecond, 20*time.Second, true, func(ctx context.Context) (bool, error) {
+				for name := range tc.cidrs {
+					_, err := client.NetworkingV1().ServiceCIDRs().Get(ctx, name, metav1.GetOptions{})
+					if apierrors.IsNotFound(err) {
+						return false, fmt.Errorf("ServiceCIDR %s was deleted while Service %s/%s still uses %s", name, ns.Name, svc.Name, tc.clusterIP)
+					}
+				}
+				return false, nil
+			}); !wait.Interrupted(err) {
+				t.Fatal(err)
+			}
+
+			// Once the Service is gone, nothing blocks the deletion anymore.
+			if err := client.CoreV1().Services(ns.Name).Delete(ctx, svc.Name, metav1.DeleteOptions{}); err != nil {
+				t.Fatal(err)
+			}
+			for name := range tc.cidrs {
+				if err := wait.PollUntilContextTimeout(ctx, 250*time.Millisecond, 30*time.Second, false, func(ctx context.Context) (bool, error) {
+					_, err := client.NetworkingV1().ServiceCIDRs().Get(ctx, name, metav1.GetOptions{})
+					return apierrors.IsNotFound(err), nil
+				}); err != nil {
+					t.Fatalf("%s has not been deleted after the Service was deleted", name)
+				}
+			}
+		})
+	}
+}
