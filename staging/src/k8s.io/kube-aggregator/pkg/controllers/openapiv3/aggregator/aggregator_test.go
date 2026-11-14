@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
@@ -187,6 +188,31 @@ func TestV3APIService(t *testing.T) {
 
 	apiServiceNames := specProxier.GetAPIServiceNames()
 	assert.ElementsMatch(t, []string{openAPIV2Converter, apiService.Name}, apiServiceNames)
+}
+
+func TestV3Gzip(t *testing.T) {
+	pathHandler := mux.NewPathRecorderMux("aggregator_test")
+	specProxier, err := BuildAndRegisterAggregator(Downloader{}, genericapiserver.NewEmptyDelegate(), nil, nil, pathHandler)
+	if err != nil {
+		t.Fatal(err)
+	}
+	apiService := &v1.APIService{Spec: v1.APIServiceSpec{Group: "group.example.com", Version: "v1"}}
+	apiService.Name = "v1.group.example.com"
+	// The spec has to be larger than the gzip handler's minimum size.
+	specProxier.AddUpdateAPIService(testV3APIService{data: bytes.Repeat([]byte(`{"openapi":"3.0.0"}`), 100)}, apiService)
+	if err := specProxier.UpdateAPIServiceSpec(apiService.Name); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, acceptEncoding := range []string{"", "gzip"} {
+		req := httptest.NewRequest(http.MethodGet, "/openapi/v3/apis/group.example.com/v1", nil)
+		req.Header.Set("Accept-Encoding", acceptEncoding)
+		recorder := httptest.NewRecorder()
+		pathHandler.ServeHTTP(recorder, req)
+		if got := recorder.Header().Get("Content-Encoding"); got != acceptEncoding {
+			t.Errorf("Accept-Encoding %q: expected Content-Encoding %q, got %q", acceptEncoding, acceptEncoding, got)
+		}
+	}
 }
 
 func TestV3RootAPIService(t *testing.T) {
