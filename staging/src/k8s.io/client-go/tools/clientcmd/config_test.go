@@ -17,10 +17,14 @@ limitations under the License.
 package clientcmd
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
+
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
 
 func TestModifyConfigWritesToFirstKubeconfigFile(t *testing.T) {
@@ -115,5 +119,142 @@ current-context: `+contextNameB+`
 
 	if config2.CurrentContext != newContextName {
 		t.Errorf("Config should be modified, but was not. Expected %q, got %q", newContextName, config2.CurrentContext)
+	}
+}
+
+func TestModifyConfigWithReadOnlySource(t *testing.T) {
+	for _, operation := range []string{"current-context", "new-context", "existing-context", "deleted-context", "read-only-context"} {
+		t.Run(operation, func(t *testing.T) {
+			dir := t.TempDir()
+			readOnlyDir := filepath.Join(dir, "readonly")
+			if err := os.Mkdir(readOnlyDir, 0755); err != nil {
+				t.Fatal(err)
+			}
+			readOnlyFile := filepath.Join(readOnlyDir, "config")
+			writableFile := filepath.Join(dir, "config")
+			readOnlyConfig := clientcmdapi.NewConfig()
+			readOnlyConfig.Contexts["shared"] = &clientcmdapi.Context{Namespace: "shared"}
+			writableConfig := clientcmdapi.NewConfig()
+			writableConfig.Contexts["local"] = &clientcmdapi.Context{Namespace: "old"}
+			for filename, config := range map[string]*clientcmdapi.Config{readOnlyFile: readOnlyConfig, writableFile: writableConfig} {
+				if err := WriteToFile(*config, filename); err != nil {
+					t.Fatal(err)
+				}
+			}
+			original, err := os.ReadFile(readOnlyFile)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Chmod(readOnlyDir, 0555); err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() {
+				if err := os.Chmod(readOnlyDir, 0755); err != nil {
+					t.Error(err)
+				}
+			})
+			// Windows and privileged users may not enforce directory mode bits.
+			if err := lockFile(readOnlyFile); err == nil {
+				if err := unlockFile(readOnlyFile); err != nil {
+					t.Fatal(err)
+				}
+				t.Skip("directory permissions do not prevent lock creation")
+			} else if !os.IsPermission(err) {
+				t.Fatalf("expected permission error, got %v", err)
+			}
+
+			rules := &ClientConfigLoadingRules{Precedence: []string{writableFile, readOnlyFile}}
+			config, err := rules.GetStartingConfig()
+			if err != nil {
+				t.Fatal(err)
+			}
+			switch operation {
+			case "current-context":
+				config.CurrentContext = "local"
+			case "new-context":
+				config.Contexts["new"] = clientcmdapi.NewContext()
+				config.Contexts["new"].Namespace = "new"
+			case "existing-context":
+				config.Contexts["local"].Namespace = "new"
+			case "deleted-context":
+				delete(config.Contexts, "local")
+			case "read-only-context":
+				config.Contexts["shared"].Namespace = "new"
+			}
+			err = ModifyConfig(rules, *config, false)
+			if operation == "read-only-context" {
+				if !os.IsPermission(err) {
+					t.Fatalf("expected permission error for unlocked destination, got %v", err)
+				}
+			} else {
+				if err != nil {
+					t.Fatal(err)
+				}
+				actual, err := rules.GetStartingConfig()
+				if err != nil {
+					t.Fatal(err)
+				}
+				if operation == "new-context" {
+					config.Contexts["new"].LocationOfOrigin = writableFile
+				}
+				if !reflect.DeepEqual(actual, config) {
+					t.Errorf("expected config %#v, got %#v", config, actual)
+				}
+			}
+			unchanged, err := os.ReadFile(readOnlyFile)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !bytes.Equal(original, unchanged) {
+				t.Error("read-only source was modified")
+			}
+			if _, err := os.Stat(lockName(writableFile)); !os.IsNotExist(err) {
+				t.Errorf("destination lock was not removed: %v", err)
+			}
+		})
+	}
+}
+
+func TestModifyConfigWithExistingLock(t *testing.T) {
+	for _, lockedFile := range []string{"destination", "source"} {
+		t.Run(lockedFile, func(t *testing.T) {
+			dir := t.TempDir()
+			destination := filepath.Join(dir, "a-config")
+			source := filepath.Join(dir, "b-config")
+			for _, filename := range []string{destination, source} {
+				if err := WriteToFile(*clientcmdapi.NewConfig(), filename); err != nil {
+					t.Fatal(err)
+				}
+			}
+			filename := destination
+			if lockedFile == "source" {
+				filename = source
+			}
+			if err := lockFile(filename); err != nil {
+				t.Fatal(err)
+			}
+			defer unlockFile(filename)
+			rules := &ClientConfigLoadingRules{Precedence: []string{destination, source}}
+			config := clientcmdapi.NewConfig()
+			config.CurrentContext = "new"
+			if err := ModifyConfig(rules, *config, false); !os.IsExist(err) {
+				t.Fatalf("expected existing lock error, got %v", err)
+			}
+			actual, err := LoadFromFile(destination)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if actual.CurrentContext != "" {
+				t.Error("locked configuration was modified")
+			}
+			if _, err := os.Stat(lockName(filename)); err != nil {
+				t.Errorf("existing lock was removed: %v", err)
+			}
+			if lockedFile == "source" {
+				if _, err := os.Stat(lockName(destination)); !os.IsNotExist(err) {
+					t.Errorf("destination lock was not removed after failure: %v", err)
+				}
+			}
+		})
 	}
 }

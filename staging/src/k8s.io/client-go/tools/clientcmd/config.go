@@ -163,6 +163,7 @@ func NewDefaultPathOptions() *PathOptions {
 // that means that this code will only write into a single file.  If you want to relativizePaths, you must provide a fully qualified path in any
 // modified element.
 func ModifyConfig(configAccess ConfigAccess, newConfig clientcmdapi.Config, relativizePaths bool) error {
+	lockErrors := map[string]error{}
 	if UseModifyConfigLock {
 		possibleSources := configAccess.GetLoadingPrecedence()
 		// sort the possible kubeconfig files so we always "lock" in the same order
@@ -170,10 +171,22 @@ func ModifyConfig(configAccess ConfigAccess, newConfig clientcmdapi.Config, rela
 		sort.Strings(possibleSources)
 		for _, filename := range possibleSources {
 			if err := lockFile(filename); err != nil {
-				return err
+				if !os.IsPermission(err) {
+					return err
+				}
+				lockErrors[filename] = err
+				continue
 			}
 			defer unlockFile(filename)
 		}
+	}
+
+	// A source that cannot be locked may still be read, but must never be written.
+	writeToFile := func(config clientcmdapi.Config, filename string) error {
+		if err := lockErrors[filename]; err != nil {
+			return err
+		}
+		return WriteToFile(config, filename)
 	}
 
 	startingConfig, err := configAccess.GetStartingConfig()
@@ -189,13 +202,13 @@ func ModifyConfig(configAccess ConfigAccess, newConfig clientcmdapi.Config, rela
 	}
 
 	if startingConfig.CurrentContext != newConfig.CurrentContext {
-		if err := writeCurrentContext(configAccess, newConfig.CurrentContext); err != nil {
+		if err := writeCurrentContext(configAccess, newConfig.CurrentContext, writeToFile); err != nil {
 			return err
 		}
 	}
 
 	if !reflect.DeepEqual(startingConfig.Preferences, newConfig.Preferences) {
-		if err := writePreferences(configAccess, newConfig.Preferences); err != nil {
+		if err := writePreferences(configAccess, newConfig.Preferences, writeToFile); err != nil {
 			return err
 		}
 	}
@@ -223,7 +236,7 @@ func ModifyConfig(configAccess ConfigAccess, newConfig clientcmdapi.Config, rela
 				}
 			}
 
-			if err := WriteToFile(*configToWrite, destinationFile); err != nil {
+			if err := writeToFile(*configToWrite, destinationFile); err != nil {
 				return err
 			}
 		}
@@ -260,7 +273,7 @@ func ModifyConfig(configAccess ConfigAccess, newConfig clientcmdapi.Config, rela
 
 	// actually persist config object changes
 	for destinationFile, configToWrite := range seenConfigs {
-		if err := WriteToFile(*configToWrite, destinationFile); err != nil {
+		if err := writeToFile(*configToWrite, destinationFile); err != nil {
 			return err
 		}
 	}
@@ -286,7 +299,7 @@ func ModifyConfig(configAccess ConfigAccess, newConfig clientcmdapi.Config, rela
 				}
 			}
 
-			if err := WriteToFile(*configToWrite, destinationFile); err != nil {
+			if err := writeToFile(*configToWrite, destinationFile); err != nil {
 				return err
 			}
 		}
@@ -305,7 +318,7 @@ func ModifyConfig(configAccess ConfigAccess, newConfig clientcmdapi.Config, rela
 			}
 			delete(configToWrite.Clusters, key)
 
-			if err := WriteToFile(*configToWrite, destinationFile); err != nil {
+			if err := writeToFile(*configToWrite, destinationFile); err != nil {
 				return err
 			}
 		}
@@ -324,7 +337,7 @@ func ModifyConfig(configAccess ConfigAccess, newConfig clientcmdapi.Config, rela
 			}
 			delete(configToWrite.Contexts, key)
 
-			if err := WriteToFile(*configToWrite, destinationFile); err != nil {
+			if err := writeToFile(*configToWrite, destinationFile); err != nil {
 				return err
 			}
 		}
@@ -343,7 +356,7 @@ func ModifyConfig(configAccess ConfigAccess, newConfig clientcmdapi.Config, rela
 			}
 			delete(configToWrite.AuthInfos, key)
 
-			if err := WriteToFile(*configToWrite, destinationFile); err != nil {
+			if err := writeToFile(*configToWrite, destinationFile); err != nil {
 				return err
 			}
 		}
@@ -378,7 +391,7 @@ func (p *persister) Persist(config map[string]string) error {
 // If newCurrentContext is the same as the startingConfig's current context, then we exit.
 // If newCurrentContext has a value, then that value is written into the default destination file.
 // If newCurrentContext is empty, then we find the config file that is setting the CurrentContext and clear the value from that file
-func writeCurrentContext(configAccess ConfigAccess, newCurrentContext string) error {
+func writeCurrentContext(configAccess ConfigAccess, newCurrentContext string, writeToFile func(clientcmdapi.Config, string) error) error {
 	if startingConfig, err := configAccess.GetStartingConfig(); err != nil {
 		return err
 	} else if startingConfig.CurrentContext == newCurrentContext {
@@ -392,7 +405,7 @@ func writeCurrentContext(configAccess ConfigAccess, newCurrentContext string) er
 			return err
 		}
 		currConfig.CurrentContext = newCurrentContext
-		if err := WriteToFile(*currConfig, file); err != nil {
+		if err := writeToFile(*currConfig, file); err != nil {
 			return err
 		}
 
@@ -407,7 +420,7 @@ func writeCurrentContext(configAccess ConfigAccess, newCurrentContext string) er
 		}
 		config.CurrentContext = newCurrentContext
 
-		if err := WriteToFile(*config, destinationFile); err != nil {
+		if err := writeToFile(*config, destinationFile); err != nil {
 			return err
 		}
 
@@ -424,7 +437,7 @@ func writeCurrentContext(configAccess ConfigAccess, newCurrentContext string) er
 
 			if len(currConfig.CurrentContext) > 0 {
 				currConfig.CurrentContext = newCurrentContext
-				if err := WriteToFile(*currConfig, file); err != nil {
+				if err := writeToFile(*currConfig, file); err != nil {
 					return err
 				}
 
@@ -436,7 +449,7 @@ func writeCurrentContext(configAccess ConfigAccess, newCurrentContext string) er
 	return errors.New("no config found to write context")
 }
 
-func writePreferences(configAccess ConfigAccess, newPrefs clientcmdapi.Preferences) error {
+func writePreferences(configAccess ConfigAccess, newPrefs clientcmdapi.Preferences, writeToFile func(clientcmdapi.Config, string) error) error {
 	if startingConfig, err := configAccess.GetStartingConfig(); err != nil {
 		return err
 	} else if reflect.DeepEqual(startingConfig.Preferences, newPrefs) {
@@ -450,7 +463,7 @@ func writePreferences(configAccess ConfigAccess, newPrefs clientcmdapi.Preferenc
 			return err
 		}
 		currConfig.Preferences = newPrefs
-		if err := WriteToFile(*currConfig, file); err != nil {
+		if err := writeToFile(*currConfig, file); err != nil {
 			return err
 		}
 
@@ -465,7 +478,7 @@ func writePreferences(configAccess ConfigAccess, newPrefs clientcmdapi.Preferenc
 
 		if !reflect.DeepEqual(currConfig.Preferences, newPrefs) {
 			currConfig.Preferences = newPrefs
-			if err := WriteToFile(*currConfig, file); err != nil {
+			if err := writeToFile(*currConfig, file); err != nil {
 				return err
 			}
 
