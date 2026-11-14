@@ -57,6 +57,7 @@ const (
 type watcherInput struct {
 	event    *watchCacheEvent
 	interval *watchCacheInterval
+	resyncCh chan<- struct{}
 	err      error
 }
 
@@ -180,6 +181,10 @@ func (c *cacheWatcher) stopLocked() {
 }
 
 func (c *cacheWatcher) nonblockingAdd(event *watchCacheEvent) bool {
+	return c.nonblockingAddWithResync(event, nil)
+}
+
+func (c *cacheWatcher) nonblockingAddWithResync(event *watchCacheEvent, resyncCh chan<- struct{}) bool {
 	// if the bookmarkAfterResourceVersion hasn't been seen
 	// we will try to deliver a bookmark event every second.
 	// the following check will discard a bookmark event
@@ -189,7 +194,7 @@ func (c *cacheWatcher) nonblockingAdd(event *watchCacheEvent) bool {
 		return false
 	}
 	select {
-	case c.input <- watcherInput{event: event}:
+	case c.input <- watcherInput{event: event, resyncCh: resyncCh}:
 		c.markBookmarkAfterRvAsReceived(event)
 		c.dispatchedResourceVersion = max(c.dispatchedResourceVersion, event.ResourceVersion)
 		return true
@@ -543,6 +548,15 @@ func (c *cacheWatcher) process(ctx context.Context) {
 					return
 				}
 				c.processEvent(item.event, resourceVersion)
+				// Wait until the input buffer is empty rather than signaling on every
+				// consumed event to batch catchup refills and avoid waking resyncWatchers
+				// (and acquiring watchCache/cacher locks) per event.
+				if item.resyncCh != nil && len(c.input) == 0 {
+					select {
+					case item.resyncCh <- struct{}{}:
+					default:
+					}
+				}
 			case item.err != nil:
 				c.sendWatchError(item.err)
 				return
