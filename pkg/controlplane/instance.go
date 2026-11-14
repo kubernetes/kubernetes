@@ -47,6 +47,7 @@ import (
 	networkingapiv1 "k8s.io/api/networking/v1"
 	networkingapiv1beta1 "k8s.io/api/networking/v1beta1"
 	nodev1 "k8s.io/api/node/v1"
+	nodev1alpha1 "k8s.io/api/node/v1alpha1"
 	policyapiv1 "k8s.io/api/policy/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	resourcev1 "k8s.io/api/resource/v1"
@@ -431,7 +432,7 @@ func (c CompletedConfig) StorageProviders(client *kubernetes.Clientset) ([]contr
 		discoveryrest.StorageProvider{},
 		lifecyclerest.RESTStorageProvider{},
 		networkingrest.RESTStorageProvider{},
-		noderest.RESTStorageProvider{},
+		noderest.RESTStorageProvider{Pods: client.CoreV1()},
 		policyrest.RESTStorageProvider{},
 		rbacrest.RESTStorageProvider{Authorizer: c.ControlPlane.Generic.Authorization.Authorizer},
 		schedulingrest.RESTStorageProvider{},
@@ -515,6 +516,7 @@ var (
 	}
 	// alphaAPIGroupVersionsDisabledByDefault holds the alpha APIs we have for additional API groups only provided in kube-apiserver. They are always disabled by default.
 	alphaAPIGroupVersionsDisabledByDefault = []schema.GroupVersion{
+		nodev1alpha1.SchemeGroupVersion,
 		lifecyclev1alpha1.SchemeGroupVersion,
 		resourcev1alpha3.SchemeGroupVersion,
 		schedulingapiv1alpha3.SchemeGroupVersion,

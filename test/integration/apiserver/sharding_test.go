@@ -602,6 +602,9 @@ func TestShardedListAllResources(t *testing.T) {
 		}
 
 		t.Run(gvr.String(), func(t *testing.T) {
+			if err := etcd.CreatePrerequisites(ctx, dynamicClient, testNamespace, testData.Prerequisites); err != nil {
+				t.Fatal(err)
+			}
 			res, obj, err := etcd.JSONToUnstructured(testData.Stub, testNamespace, mapping, dynamicClient)
 			if err != nil {
 				t.Fatalf("failed to unmarshal stub: %v", err)

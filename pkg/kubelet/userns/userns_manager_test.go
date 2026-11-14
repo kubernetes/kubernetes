@@ -483,7 +483,7 @@ func TestCleanupOrphanedPodUsernsAllocations(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			err = m.CleanupOrphanedPodUsernsAllocations(ctx, tc.pods, tc.runningPods)
+			err = m.CleanupOrphanedPodUsernsAllocations(ctx, tc.pods, tc.runningPods, nil)
 			require.NoError(t, err)
 
 			for _, pod := range tc.podSetAfterCleanup {

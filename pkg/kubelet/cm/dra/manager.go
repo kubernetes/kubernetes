@@ -97,7 +97,8 @@ type Manager struct {
 
 	// activePods is a method for listing active pods on the node
 	// so all claim info state can be updated in the reconciliation loop.
-	activePods ActivePodsFunc
+	activePods                     ActivePodsFunc
+	podOperationMayUsePodResources func(types.UID) bool
 
 	// sourcesReady provides the readiness of kubelet configuration sources such as apiserver update readiness.
 	// We use it to determine when we can treat pods as inactive and react appropriately.
@@ -170,7 +171,8 @@ func (m *Manager) Stop() {
 }
 
 // Start starts the reconcile loop of the manager.
-func (m *Manager) Start(ctx context.Context, activePods ActivePodsFunc, getNode GetNodeFunc, sourcesReady config.SourcesReady) error {
+func (m *Manager) Start(ctx context.Context, activePods ActivePodsFunc, getNode GetNodeFunc, sourcesReady config.SourcesReady, podOperationMayUsePodResources func(types.UID) bool) error {
+	m.podOperationMayUsePodResources = podOperationMayUsePodResources
 	m.initDRAPluginManager(ctx, getNode, defaultWipingDelay)
 	m.activePods = activePods
 	m.sourcesReady = sourcesReady
@@ -227,6 +229,9 @@ func (m *Manager) reconcileLoop(ctx context.Context) {
 
 	// Loop through all inactive pods and call UnprepareResources on them.
 	for _, podClaims := range inactivePodClaims {
+		if m.podOperationMayUsePodResources != nil && m.podOperationMayUsePodResources(podClaims.uid) {
+			continue
+		}
 		if err := m.unprepareResources(ctx, podClaims.uid, podClaims.namespace, podClaims.claimNames); err != nil {
 			logger.Info("Unpreparing pod resources in reconcile loop failed, will retry", "podUID", podClaims.uid, "err", err)
 		}

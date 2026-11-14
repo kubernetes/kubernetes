@@ -89,7 +89,10 @@ type FakeRuntimeService struct {
 	RestoredPods []*runtimeapi.RestorePodRequest
 	// RestorePodDeadline records the most recent RestorePod context deadline
 	// observed by the fake runtime.
-	RestorePodDeadline time.Time
+	RestorePodDeadline         time.Time
+	CanceledPodOperations      []*runtimeapi.CancelPodOperationRequest
+	CancelPodOperationDeadline time.Time
+	CancelPodOperationFunc     func(context.Context, *runtimeapi.CancelPodOperationRequest) error
 }
 
 // GetContainerID returns the unique container ID from the FakeRuntimeService.
@@ -760,6 +763,24 @@ func (r *FakeRuntimeService) CheckpointPod(ctx context.Context, options *runtime
 		return err
 	}
 
+	return nil
+}
+
+// CancelPodOperation records a cancellation barrier request in the fake runtime.
+func (r *FakeRuntimeService) CancelPodOperation(ctx context.Context, request *runtimeapi.CancelPodOperationRequest) error {
+	r.Lock()
+	r.Called = append(r.Called, "CancelPodOperation")
+	r.CanceledPodOperations = append(r.CanceledPodOperations, proto.Clone(request).(*runtimeapi.CancelPodOperationRequest))
+	r.CancelPodOperationDeadline, _ = ctx.Deadline()
+	err := r.popError("CancelPodOperation")
+	callback := r.CancelPodOperationFunc
+	r.Unlock()
+	if err != nil {
+		return err
+	}
+	if callback != nil {
+		return callback(ctx, request)
+	}
 	return nil
 }
 

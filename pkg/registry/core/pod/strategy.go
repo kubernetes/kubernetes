@@ -53,6 +53,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper/qos"
 	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
+	checkpointutil "k8s.io/kubernetes/pkg/apis/node/util"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/client"
 )
@@ -156,7 +157,8 @@ func (podStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) 
 	oldPod := old.(*api.Pod)
 	opts := corevalidation.GetValidationOptionsFromPodSpecAndMeta(&pod.Spec, &oldPod.Spec, &pod.ObjectMeta, &oldPod.ObjectMeta)
 	opts.ResourceIsPod = true
-	return corevalidation.ValidatePodUpdate(obj.(*api.Pod), old.(*api.Pod), opts)
+	errs := corevalidation.ValidatePodUpdate(obj.(*api.Pod), old.(*api.Pod), opts)
+	return append(errs, validateCheckpointingUpdate(pod, oldPod)...)
 }
 
 // WarningsOnUpdate returns warnings for the given update.
@@ -347,7 +349,8 @@ func (podEphemeralContainersStrategy) ValidateUpdate(ctx context.Context, obj, o
 	oldPod := old.(*api.Pod)
 	opts := corevalidation.GetValidationOptionsFromPodSpecAndMeta(&newPod.Spec, &oldPod.Spec, &newPod.ObjectMeta, &oldPod.ObjectMeta)
 	opts.ResourceIsPod = true
-	return corevalidation.ValidatePodEphemeralContainersUpdate(newPod, oldPod, opts)
+	errs := corevalidation.ValidatePodEphemeralContainersUpdate(newPod, oldPod, opts)
+	return append(errs, validateCheckpointingUpdate(newPod, oldPod)...)
 }
 
 // WarningsOnUpdate returns warnings for the given update.
@@ -473,7 +476,8 @@ func (podResizeStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Ob
 	oldPod := old.(*api.Pod)
 	opts := corevalidation.GetValidationOptionsFromPodSpecAndMeta(&newPod.Spec, &oldPod.Spec, &newPod.ObjectMeta, &oldPod.ObjectMeta)
 	opts.ResourceIsPod = true
-	return corevalidation.ValidatePodResize(newPod, oldPod, opts)
+	errs := corevalidation.ValidatePodResize(newPod, oldPod, opts)
+	return append(errs, validateCheckpointingUpdate(newPod, oldPod)...)
 }
 
 // WarningsOnUpdate returns warnings for the given update.
@@ -523,12 +527,66 @@ func (podDynamicStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.O
 	oldPod := old.(*api.Pod)
 	opts := corevalidation.GetValidationOptionsFromPodSpecAndMeta(&newPod.Spec, &oldPod.Spec, &newPod.ObjectMeta, &oldPod.ObjectMeta)
 	opts.ResourceIsPod = true
-	return corevalidation.ValidatePodDynamicUpdate(newPod, oldPod, opts)
+	errs := corevalidation.ValidatePodDynamicUpdate(newPod, oldPod, opts)
+	return append(errs, validateCheckpointingUpdate(newPod, oldPod)...)
 }
 
 // WarningsOnUpdate returns warnings for the given update.
 func (podDynamicStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
 	return nil
+}
+
+// validateCheckpointingUpdate preserves the workload while the kubelet captures
+// it. The old status determines whether capture is active, so an update cannot
+// clear the condition to bypass the check. Status updates keep the existing
+// spec and do not need the check.
+// New Pod subresources that can change the workload, including /dynamic
+// (KEP-5972), must also call this validation.
+func validateCheckpointingUpdate(newPod, oldPod *api.Pod) field.ErrorList {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelCheckpointRestore) {
+		return nil
+	}
+	var checkpointing *api.PodCondition
+	for i := range oldPod.Status.Conditions {
+		condition := &oldPod.Status.Conditions[i]
+		if condition.Type == api.PodCheckpointing && condition.Status == api.ConditionTrue {
+			checkpointing = condition
+			break
+		}
+	}
+	if checkpointing == nil {
+		return nil
+	}
+
+	specPath := field.NewPath("spec")
+	changedFields, err := podSpecChangedFields(&oldPod.Spec, &newPod.Spec)
+	if err != nil {
+		return field.ErrorList{field.InternalError(specPath, err)}
+	}
+	if len(changedFields) == 0 {
+		return nil
+	}
+	message := "pod spec cannot change while Checkpointing=True"
+	if checkpointing.Message != "" {
+		message += ": " + checkpointing.Message
+	}
+	return field.ErrorList{field.Forbidden(specPath, fmt.Sprintf("%s; scheduling gates may be removed; changed fields: %s", message, strings.Join(changedFields, ", ")))}
+}
+
+// podSpecChangedFields lists the paths of changed fields without their values.
+// It compares versioned specs because the internal types do not have the API
+// field names and nest some fields differently.
+func podSpecChangedFields(oldSpec, newSpec *api.PodSpec) ([]string, error) {
+	var want, got apiv1.PodSpec
+	if err := legacyscheme.Scheme.Convert(oldSpec, &want, nil); err != nil {
+		return nil, fmt.Errorf("failed to convert existing Pod spec: %w", err)
+	}
+	if err := legacyscheme.Scheme.Convert(newSpec, &got, nil); err != nil {
+		return nil, fmt.Errorf("failed to convert updated Pod spec: %w", err)
+	}
+	// Gates delay scheduling and are not part of the captured workload.
+	want.SchedulingGates, got.SchedulingGates = nil, nil
+	return checkpointutil.PodSpecChangedFields(&want, &got), nil
 }
 
 // GetAttrs returns labels and fields of a given object for filtering purposes.

@@ -23,6 +23,7 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -51,6 +52,7 @@ import (
 	certificatesapi "k8s.io/kubernetes/pkg/apis/certificates"
 	"k8s.io/kubernetes/pkg/apis/coordination"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	nodeapi "k8s.io/kubernetes/pkg/apis/node"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	resourceapi "k8s.io/kubernetes/pkg/apis/resource"
 	"k8s.io/kubernetes/pkg/apis/storage"
@@ -244,6 +246,138 @@ type admitTestCase struct {
 	setupFunc            func(t *testing.T)
 	err                  string
 	authz                authorizer.UnconditionalAuthorizer
+}
+
+func Test_nodePlugin_Admit_PodCheckpointStatus(t *testing.T) {
+	var (
+		mynode = &user.DefaultInfo{Name: "system:node:mynode", Groups: []string{"system:nodes"}}
+
+		pcResource = nodeapi.SchemeGroupVersion.WithResource("podcheckpoints")
+		pcKind     = nodeapi.SchemeGroupVersion.WithKind("PodCheckpoint")
+	)
+	mkPC := func(statusNode, sourcePodName string) *nodeapi.PodCheckpoint {
+		pc := &nodeapi.PodCheckpoint{
+			ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: "cp"},
+			Spec:       nodeapi.PodCheckpointSpec{SourcePod: nodeapi.PodReference{Name: sourcePodName}},
+		}
+		if statusNode != "" {
+			pc.Status.NodeName = &statusNode
+			pc.Status.SourcePodUID = ptr.To(types.UID("u1"))
+		}
+		return pc
+	}
+	attrs := func(old, obj runtime.Object, subresource string, op admission.Operation) admission.Attributes {
+		var opts runtime.Object = &metav1.UpdateOptions{}
+		if op == admission.Create {
+			opts = &metav1.CreateOptions{}
+		}
+		return admission.NewAttributesRecord(obj, old, pcKind, "ns", "cp", pcResource, subresource, op, opts, false, mynode)
+	}
+
+	emptyNodePC := mkPC("", "mypod")
+	emptyNodePC.Status.NodeName = new(string)
+	unassignedReplacement := mkPC("mynode", "mypod")
+	unassignedReplacement.Status.Conditions = []metav1.Condition{{Type: nodeapi.PodCheckpointConditionReady, Status: metav1.ConditionFalse, Reason: nodeapi.PodCheckpointReasonSourcePodReplaced}}
+
+	tests := []admitTestCase{
+		{
+			name:       "node finalizes status of its own checkpoint",
+			attributes: attrs(mkPC("mynode", "mypod"), mkPC("mynode", "mypod"), "status", admission.Update),
+		},
+		{
+			name:       "node finalizes its checkpoint after source pod deletion",
+			attributes: attrs(mkPC("mynode", "ghost"), mkPC("mynode", "ghost"), "status", admission.Update),
+		},
+		{
+			name:       "node cannot finalize status of another node's checkpoint",
+			attributes: attrs(mkPC("othernode", "mypod"), mkPC("mynode", "mypod"), "status", admission.Update),
+			err:        "recorded on node \"othernode\"",
+		},
+		{
+			name:       "node cannot transfer its checkpoint to another node",
+			attributes: attrs(mkPC("mynode", "mypod"), mkPC("othernode", "mypod"), "status", admission.Update),
+			err:        "must preserve status.nodeName as \"mynode\"",
+		},
+		{
+			name:       "node cannot unset its checkpoint's node name",
+			attributes: attrs(mkPC("mynode", "mypod"), mkPC("", "mypod"), "status", admission.Update),
+			err:        "must preserve status.nodeName as \"mynode\"",
+		},
+		{
+			name:       "node cannot empty its checkpoint's node name",
+			attributes: attrs(mkPC("mynode", "mypod"), emptyNodePC, "status", admission.Update),
+			err:        "must preserve status.nodeName as \"mynode\"",
+		},
+		{
+			name:       "node cannot claim an unassigned checkpoint",
+			attributes: attrs(mkPC("", "mypod"), mkPC("mynode", "mypod"), "status", admission.Update),
+			err:        "cannot update unassigned PodCheckpoint",
+		},
+		{
+			name:       "node cannot claim an empty node assignment",
+			attributes: attrs(emptyNodePC, mkPC("mynode", "mypod"), "status", admission.Update),
+			err:        "cannot update unassigned PodCheckpoint",
+		},
+		{
+			name:       "node cannot reject an unassigned replacement",
+			attributes: attrs(mkPC("", "mypod"), unassignedReplacement, "status", admission.Update),
+			err:        "cannot update unassigned PodCheckpoint",
+		},
+		{
+			name:       "node cannot submit an unexpected object type",
+			attributes: attrs(mkPC("mynode", "mypod"), &api.Pod{}, "status", admission.Update),
+			err:        "unexpected type *core.Pod",
+		},
+		{
+			name:       "node cannot update non-status subresource",
+			attributes: attrs(mkPC("mynode", "mypod"), mkPC("mynode", "mypod"), "", admission.Update),
+			err:        "may only update the status subresource",
+		},
+		{
+			name:       "node cannot create podcheckpoint status",
+			attributes: attrs(nil, mkPC("mynode", "mypod"), "status", admission.Create),
+			err:        "unexpected operation",
+		},
+	}
+
+	for _, test := range []struct {
+		name   string
+		mutate func(*nodeapi.PodCheckpoint, *nodeapi.PodCheckpoint)
+		err    string
+	}{
+		{name: "completion after source deletion preserves assigned UID", mutate: func(old, obj *nodeapi.PodCheckpoint) {
+			old.Spec.SourcePod.Name = "deleted-source"
+			obj.Status.Conditions = []metav1.Condition{{Type: nodeapi.PodCheckpointConditionReady, Status: metav1.ConditionTrue, Reason: nodeapi.PodCheckpointReasonCompleted}}
+		}},
+		{name: "matching pinned UID", mutate: func(old, obj *nodeapi.PodCheckpoint) { old.Spec.SourcePod.UID = ptr.To(types.UID("u1")) }},
+		{name: "assigned node can report source replacement", mutate: func(old, obj *nodeapi.PodCheckpoint) {
+			obj.Status.Conditions = []metav1.Condition{{Type: nodeapi.PodCheckpointConditionReady, Status: metav1.ConditionFalse, Reason: nodeapi.PodCheckpointReasonSourcePodReplaced}}
+		}},
+		{name: "assigned UID cannot change", mutate: func(old, obj *nodeapi.PodCheckpoint) {
+			obj.Status.SourcePodUID = ptr.To(types.UID("replacement"))
+		}, err: "must preserve status.sourcePodUID"},
+		{name: "assigned UID cannot be cleared", mutate: func(old, obj *nodeapi.PodCheckpoint) {
+			obj.Status.SourcePodUID = nil
+		}, err: "must preserve status.sourcePodUID"},
+	} {
+		old, obj := mkPC("mynode", "mypod"), mkPC("mynode", "mypod")
+		test.mutate(old, obj)
+		obj.Spec = old.Spec
+		tests = append(tests, admitTestCase{name: test.name, attributes: attrs(old, obj, "status", admission.Update), err: test.err})
+	}
+
+	for _, enabled := range []bool{true, false} {
+		t.Run(fmt.Sprintf("gate=%t", enabled), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PodLevelCheckpointRestore, enabled)
+			for _, tc := range tests {
+				tc.features = feature.DefaultFeatureGate
+				if !enabled {
+					tc.err = ""
+				}
+				tc.run(t)
+			}
+		})
+	}
 }
 
 func (a *admitTestCase) run(t *testing.T) {

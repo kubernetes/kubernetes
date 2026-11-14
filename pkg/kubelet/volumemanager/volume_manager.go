@@ -236,6 +236,12 @@ func NewVolumeManager(
 		csiMigratedPluginManager,
 		intreeToCSITranslator,
 		volumePluginMgr)
+	var podOperationMayUsePodResources func(k8stypes.UID) bool
+	if provider, ok := podStateProvider.(interface {
+		PodOperationMayUsePodResources(k8stypes.UID) bool
+	}); ok {
+		podOperationMayUsePodResources = provider.PodOperationMayUsePodResources
+	}
 	vm.reconciler = reconciler.NewReconciler(
 		kubeClient,
 		controllerAttachDetachEnabled,
@@ -250,7 +256,8 @@ func NewVolumeManager(
 		hostutil,
 		volumePluginMgr,
 		kubeletPodsDir,
-		actuatedState)
+		actuatedState,
+		podOperationMayUsePodResources)
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.CSIVolumeHealth) {
 		vm.volumeHealthManager = volumehealth.NewManager(

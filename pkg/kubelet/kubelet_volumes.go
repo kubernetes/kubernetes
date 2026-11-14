@@ -185,7 +185,7 @@ func (kl *Kubelet) cleanupOrphanedPodDirs(logger klog.Logger, pods []*v1.Pod, ru
 	var totalPods, errorPods int
 
 	for _, uid := range found {
-		if allPods.Has(string(uid)) {
+		if allPods.Has(string(uid)) || kl.podOperationMayUsePodResources(uid) {
 			continue
 		}
 

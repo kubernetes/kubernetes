@@ -392,6 +392,15 @@ func (in instrumentedRuntimeService) CheckpointPod(ctx context.Context, options 
 	return err
 }
 
+func (in instrumentedRuntimeService) CancelPodOperation(ctx context.Context, request *runtimeapi.CancelPodOperationRequest) error {
+	const operation = "cancel_pod_operation"
+	defer recordOperation(operation, time.Now())
+
+	err := in.service.CancelPodOperation(ctx, request)
+	recordError(operation, err)
+	return err
+}
+
 func (in instrumentedRuntimeService) RestorePod(ctx context.Context, options *runtimeapi.RestorePodRequest) (*runtimeapi.RestorePodResponse, error) {
 	const operation = "restore_pod"
 	defer recordOperation(operation, time.Now())

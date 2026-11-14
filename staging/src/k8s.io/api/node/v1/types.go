@@ -70,6 +70,9 @@ type RuntimeClass struct {
 	// +optional
 	// +k8s:beta(since: "1.38")=+k8s:optional
 	Scheduling *Scheduling `json:"scheduling,omitempty" protobuf:"bytes,4,opt,name=scheduling"`
+
+	// PodCheckpointOptions is tombstoned to reserve its JSON name and protobuf tag.
+	// PodCheckpointOptions *RuntimeClassPodCheckpointOptions `json:"podCheckpointOptions,omitempty" protobuf:"bytes,5,opt,name=podCheckpointOptions"`
 }
 
 // Overhead structure represents the resource overhead associated with running a pod.

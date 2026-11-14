@@ -83,6 +83,7 @@ const (
 	RuntimeService_CheckpointContainer_FullMethodName       = "/runtime.v1.RuntimeService/CheckpointContainer"
 	RuntimeService_CheckpointPod_FullMethodName             = "/runtime.v1.RuntimeService/CheckpointPod"
 	RuntimeService_RestorePod_FullMethodName                = "/runtime.v1.RuntimeService/RestorePod"
+	RuntimeService_CancelPodOperation_FullMethodName        = "/runtime.v1.RuntimeService/CancelPodOperation"
 	RuntimeService_GetContainerEvents_FullMethodName        = "/runtime.v1.RuntimeService/GetContainerEvents"
 	RuntimeService_ListMetricDescriptors_FullMethodName     = "/runtime.v1.RuntimeService/ListMetricDescriptors"
 	RuntimeService_ListPodSandboxMetrics_FullMethodName     = "/runtime.v1.RuntimeService/ListPodSandboxMetrics"
@@ -230,22 +231,51 @@ type RuntimeServiceClient interface {
 	// CheckpointContainer checkpoints a container
 	CheckpointContainer(ctx context.Context, in *CheckpointContainerRequest, opts ...grpc.CallOption) (*CheckpointContainerResponse, error)
 	// CheckpointPod creates a Pod-level checkpoint. The caller must set a
-	// deadline on the call. If the pod sandbox does not exist, the deadline is
-	// exceeded, or the checkpoint operation fails, the call returns an error.
-	// The pod sandbox and containers must be running when the call starts. The
-	// runtime must pause every selected container before capturing any of
-	// them, keep all selected containers paused until every selected
-	// container has been captured, and resume all of them before returning on
-	// success, error, or deadline expiry. This produces one consistent
-	// pod-wide cut while ensuring the runtime never returns a frozen pod.
+	// deadline and a unique operation_id. All selected containers must be
+	// running when capture starts. The runtime must pause every selected
+	// container before capturing any of them, keep them paused until all have
+	// been captured, and resume them before reporting successful completion.
+	// A cancelled, expired or disconnected call does not acknowledge cleanup.
+	// After an ambiguous result the caller must use CancelPodOperation before
+	// resuming probes, removing output_path or permitting conflicting work.
+	// A runtime that implements CheckpointPod must also implement
+	// CancelPodOperation. A runtime without Pod checkpoint support must return
+	// Unimplemented without starting any work.
 	CheckpointPod(ctx context.Context, in *CheckpointPodRequest, opts ...grpc.CallOption) (*CheckpointPodResponse, error)
-	// RestorePod prepares a pod sandbox and containers from a checkpoint. The
-	// caller must set a deadline on the call. On success, every returned
-	// container must be in the CREATED state and must not have executed the
-	// restored process; the caller invokes its pre-start hooks and then calls
-	// StartContainer for each returned ID. On error, the runtime must remove
-	// any sandbox and containers created by the call before returning.
+	// RestorePod prepares a pod sandbox and containers from a checkpoint.
+	// The caller must set a deadline and a unique operation_id. On success,
+	// every returned container must be CREATED and must not have executed the
+	// restored process; the caller invokes pre-start hooks and StartContainer.
+	// On failure the runtime must roll back created resources. Cancellation
+	// or deadline expiry before successful preparation is committed must abort
+	// preparation and start rollback independently of the original RPC context,
+	// even if the caller is gone. Successful preparation and cancellation must
+	// be coordinated so normal context closure after a successful RestorePod
+	// or subsequent StartContainer call does not roll back its resources.
+	// A client-side error does not acknowledge rollback: the caller must use
+	// CancelPodOperation before releasing resources or runtime-use protection.
+	// A runtime that implements RestorePod must also implement
+	// CancelPodOperation. A runtime without Pod restore support must return
+	// Unimplemented without starting any work.
 	RestorePod(ctx context.Context, in *RestorePodRequest, opts ...grpc.CallOption) (*RestorePodResponse, error)
+	// CancelPodOperation cancels and settles an identified checkpoint or
+	// abandoned restore. The caller must set a finite deadline. Success is a
+	// durable acknowledgement that this operation cannot execute again, even
+	// if the original request arrives later or either process restarts.
+	// An unknown operation ID must be durably fenced before success.
+	// For checkpoint, all capture tasks and output writers must have stopped
+	// and selected containers must have resumed or been authoritatively
+	// destroyed. For restore, this includes work admitted by subsequent
+	// StartContainer calls: new creation/start work must be fenced, admitted
+	// work and input readers must have stopped, and partially created or
+	// abandoned resources must have been removed, even if RestorePod had
+	// completed successfully.
+	// Cancellation must coordinate with the existing operation owner; repeated
+	// cancellation is idempotent. A timeout, unavailable backend, incomplete
+	// recovery or uncertain surviving work must return an error, never success.
+	// Every runtime that implements CheckpointPod or RestorePod must implement
+	// CancelPodOperation.
+	CancelPodOperation(ctx context.Context, in *CancelPodOperationRequest, opts ...grpc.CallOption) (*CancelPodOperationResponse, error)
 	// GetContainerEvents gets container events from the CRI runtime
 	GetContainerEvents(ctx context.Context, in *GetEventsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ContainerEventResponse], error)
 	// ListMetricDescriptors gets the descriptors for the metrics that will be returned in ListPodSandboxMetrics.
@@ -640,6 +670,16 @@ func (c *runtimeServiceClient) RestorePod(ctx context.Context, in *RestorePodReq
 	return out, nil
 }
 
+func (c *runtimeServiceClient) CancelPodOperation(ctx context.Context, in *CancelPodOperationRequest, opts ...grpc.CallOption) (*CancelPodOperationResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CancelPodOperationResponse)
+	err := c.cc.Invoke(ctx, RuntimeService_CancelPodOperation_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *runtimeServiceClient) GetContainerEvents(ctx context.Context, in *GetEventsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ContainerEventResponse], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	stream, err := c.cc.NewStream(ctx, &RuntimeService_ServiceDesc.Streams[4], RuntimeService_GetContainerEvents_FullMethodName, cOpts...)
@@ -857,22 +897,51 @@ type RuntimeServiceServer interface {
 	// CheckpointContainer checkpoints a container
 	CheckpointContainer(context.Context, *CheckpointContainerRequest) (*CheckpointContainerResponse, error)
 	// CheckpointPod creates a Pod-level checkpoint. The caller must set a
-	// deadline on the call. If the pod sandbox does not exist, the deadline is
-	// exceeded, or the checkpoint operation fails, the call returns an error.
-	// The pod sandbox and containers must be running when the call starts. The
-	// runtime must pause every selected container before capturing any of
-	// them, keep all selected containers paused until every selected
-	// container has been captured, and resume all of them before returning on
-	// success, error, or deadline expiry. This produces one consistent
-	// pod-wide cut while ensuring the runtime never returns a frozen pod.
+	// deadline and a unique operation_id. All selected containers must be
+	// running when capture starts. The runtime must pause every selected
+	// container before capturing any of them, keep them paused until all have
+	// been captured, and resume them before reporting successful completion.
+	// A cancelled, expired or disconnected call does not acknowledge cleanup.
+	// After an ambiguous result the caller must use CancelPodOperation before
+	// resuming probes, removing output_path or permitting conflicting work.
+	// A runtime that implements CheckpointPod must also implement
+	// CancelPodOperation. A runtime without Pod checkpoint support must return
+	// Unimplemented without starting any work.
 	CheckpointPod(context.Context, *CheckpointPodRequest) (*CheckpointPodResponse, error)
-	// RestorePod prepares a pod sandbox and containers from a checkpoint. The
-	// caller must set a deadline on the call. On success, every returned
-	// container must be in the CREATED state and must not have executed the
-	// restored process; the caller invokes its pre-start hooks and then calls
-	// StartContainer for each returned ID. On error, the runtime must remove
-	// any sandbox and containers created by the call before returning.
+	// RestorePod prepares a pod sandbox and containers from a checkpoint.
+	// The caller must set a deadline and a unique operation_id. On success,
+	// every returned container must be CREATED and must not have executed the
+	// restored process; the caller invokes pre-start hooks and StartContainer.
+	// On failure the runtime must roll back created resources. Cancellation
+	// or deadline expiry before successful preparation is committed must abort
+	// preparation and start rollback independently of the original RPC context,
+	// even if the caller is gone. Successful preparation and cancellation must
+	// be coordinated so normal context closure after a successful RestorePod
+	// or subsequent StartContainer call does not roll back its resources.
+	// A client-side error does not acknowledge rollback: the caller must use
+	// CancelPodOperation before releasing resources or runtime-use protection.
+	// A runtime that implements RestorePod must also implement
+	// CancelPodOperation. A runtime without Pod restore support must return
+	// Unimplemented without starting any work.
 	RestorePod(context.Context, *RestorePodRequest) (*RestorePodResponse, error)
+	// CancelPodOperation cancels and settles an identified checkpoint or
+	// abandoned restore. The caller must set a finite deadline. Success is a
+	// durable acknowledgement that this operation cannot execute again, even
+	// if the original request arrives later or either process restarts.
+	// An unknown operation ID must be durably fenced before success.
+	// For checkpoint, all capture tasks and output writers must have stopped
+	// and selected containers must have resumed or been authoritatively
+	// destroyed. For restore, this includes work admitted by subsequent
+	// StartContainer calls: new creation/start work must be fenced, admitted
+	// work and input readers must have stopped, and partially created or
+	// abandoned resources must have been removed, even if RestorePod had
+	// completed successfully.
+	// Cancellation must coordinate with the existing operation owner; repeated
+	// cancellation is idempotent. A timeout, unavailable backend, incomplete
+	// recovery or uncertain surviving work must return an error, never success.
+	// Every runtime that implements CheckpointPod or RestorePod must implement
+	// CancelPodOperation.
+	CancelPodOperation(context.Context, *CancelPodOperationRequest) (*CancelPodOperationResponse, error)
 	// GetContainerEvents gets container events from the CRI runtime
 	GetContainerEvents(*GetEventsRequest, grpc.ServerStreamingServer[ContainerEventResponse]) error
 	// ListMetricDescriptors gets the descriptors for the metrics that will be returned in ListPodSandboxMetrics.
@@ -1013,6 +1082,9 @@ func (UnimplementedRuntimeServiceServer) CheckpointPod(context.Context, *Checkpo
 }
 func (UnimplementedRuntimeServiceServer) RestorePod(context.Context, *RestorePodRequest) (*RestorePodResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method RestorePod not implemented")
+}
+func (UnimplementedRuntimeServiceServer) CancelPodOperation(context.Context, *CancelPodOperationRequest) (*CancelPodOperationResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CancelPodOperation not implemented")
 }
 func (UnimplementedRuntimeServiceServer) GetContainerEvents(*GetEventsRequest, grpc.ServerStreamingServer[ContainerEventResponse]) error {
 	return status.Error(codes.Unimplemented, "method GetContainerEvents not implemented")
@@ -1583,6 +1655,24 @@ func _RuntimeService_RestorePod_Handler(srv interface{}, ctx context.Context, de
 	return interceptor(ctx, in, info, handler)
 }
 
+func _RuntimeService_CancelPodOperation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CancelPodOperationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RuntimeServiceServer).CancelPodOperation(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: RuntimeService_CancelPodOperation_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RuntimeServiceServer).CancelPodOperation(ctx, req.(*CancelPodOperationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _RuntimeService_GetContainerEvents_Handler(srv interface{}, stream grpc.ServerStream) error {
 	m := new(GetEventsRequest)
 	if err := stream.RecvMsg(m); err != nil {
@@ -1791,6 +1881,10 @@ var RuntimeService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RestorePod",
 			Handler:    _RuntimeService_RestorePod_Handler,
+		},
+		{
+			MethodName: "CancelPodOperation",
+			Handler:    _RuntimeService_CancelPodOperation_Handler,
 		},
 		{
 			MethodName: "ListMetricDescriptors",

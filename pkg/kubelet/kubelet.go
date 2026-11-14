@@ -40,11 +40,14 @@ import (
 	"go.opentelemetry.io/otel/codes"
 	semconv "go.opentelemetry.io/otel/semconv/v1.43.0"
 	"go.opentelemetry.io/otel/trace"
+	grpccodes "google.golang.org/grpc/codes"
+	grpcstatus "google.golang.org/grpc/status"
 
 	"k8s.io/client-go/informers"
 	ndf "k8s.io/component-helpers/nodedeclaredfeatures"
 	"k8s.io/mount-utils"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/tainttoleration"
 	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
@@ -801,6 +804,7 @@ func NewMainKubelet(ctx context.Context,
 		klet.podCache,
 		klet.allocationManager,
 	)
+	klet.podWorkers = &podOperationAwarePodWorkers{PodWorkers: klet.podWorkers, kubelet: klet}
 
 	var singleProcessOOMKill *bool
 	if sysruntime.GOOS == "linux" {
@@ -1133,6 +1137,7 @@ func NewMainKubelet(ctx context.Context,
 	klet.crashLoopBackOff.HasExpiredFunc = func(eventTime time.Time, lastUpdate time.Time, maxDuration time.Duration) bool {
 		return eventTime.Sub(lastUpdate) > 600*time.Second
 	}
+	klet.checkpointRecoveryBackOff = flowcontrol.NewBackOff(time.Second, podOperationRecoveryMaxBackOff)
 
 	// setup eviction manager
 	evictionManager, evictionAdmitHandler := eviction.NewManager(klet.resourceAnalyzer, evictionConfig,
@@ -1269,11 +1274,40 @@ type Kubelet struct {
 	// hostname is the hostname the kubelet detected or was given via flag/config
 	hostname string
 
-	nodeName        types.NodeName
-	cachedNode      *v1.Node
-	runtimeCache    kubecontainer.RuntimeCache
-	kubeClient      clientset.Interface
-	heartbeatClient clientset.Interface
+	nodeName     types.NodeName
+	cachedNode   *v1.Node
+	runtimeCache kubecontainer.RuntimeCache
+	kubeClient   clientset.Interface
+	// checkpointsInFlight prevents replay from the time the watch hands a
+	// checkpoint to the pod worker until its outcome is published. The source
+	// Checkpointing condition ends earlier, when probes resume. This state does
+	// not survive restart; interrupted checkpoints are recovered on startup (see
+	// finalizeInterruptedCheckpoints).
+	checkpointsInFlight sync.Map // map[types.UID]types.UID
+	// podCheckpointRequests holds the checkpoint that SyncPod captures next for
+	// each Pod.
+	podCheckpointRequests sync.Map // map[types.UID]*podCheckpointRequest
+
+	// podCheckpointWatch is published before the checkpoint informer starts.
+	podCheckpointWatch            atomic.Pointer[podCheckpointWatchState]
+	podCheckpointFilesystem       utilfs.Filesystem
+	podCheckpointStorageInfo      func(string) (podCheckpointStorageInfo, error)
+	podCheckpointStorageAdmission sync.Mutex
+	// checkpointCleanupBlocked holds interrupted PodCheckpoint UIDs whose
+	// caller-owned output could not be removed during startup recovery. They are
+	// not retried in this process, because doing so could overwrite or orphan the
+	// existing data; startup recovery tries cleanup again after the next restart.
+	checkpointCleanupBlocked sync.Map // map[types.UID]struct{}
+	// checkpointRecoveryPending blocks capture while runtime settlement or
+	// publication of an interrupted checkpoint remains pending.
+	checkpointRecoveryPending sync.Map // map[types.UID]struct{}
+	// checkpointRecoveryBackOff spaces out recovery attempts per source Pod.
+	checkpointRecoveryBackOff *flowcontrol.Backoff
+	// Recovery and capture share probe ownership for a source Pod.
+	checkpointOperationOwners  sync.Map // map[types.UID]struct{}
+	checkpointPublications     sync.Map // map[types.UID]struct{}
+	checkpointOperationContext atomic.Pointer[context.Context]
+	heartbeatClient            clientset.Interface
 	// mirrorPodClient is used to create and delete mirror pods in the API for static
 	// pods.
 	mirrorPodClient kubepod.MirrorClient
@@ -1764,6 +1798,11 @@ func (kl *Kubelet) setupDataDirs(logger klog.Logger) error {
 			return fmt.Errorf("error creating checkpoint directory: %v", err)
 		}
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelCheckpointRestore) {
+		if err := utilfs.MkdirAll(kl.getPodCheckpointsDir(), 0700); err != nil {
+			return fmt.Errorf("error creating pod checkpoint directory: %w", err)
+		}
+	}
 	if selinux.GetEnabled() {
 		err := selinux.SetFileLabel(pluginRegistrationDir, kubeletconfig.KubeletPluginsDirSELinuxLabel)
 		if err != nil {
@@ -1927,7 +1966,7 @@ func (kl *Kubelet) initializeRuntimeDependentModules(ctx context.Context) {
 		os.Exit(1)
 	}
 	// containerManager must start after cAdvisor because it needs filesystem capacity information
-	if err := kl.containerManager.Start(ctx, node, kl.GetActivePods, kl.getNodeAnyWay, kl.sourcesReady, kl.statusManager, kl.runtimeService, kl.supportLocalStorageCapacityIsolation()); err != nil {
+	if err := kl.containerManager.Start(ctx, node, kl.GetActivePods, kl.getNodeAnyWay, kl.sourcesReady, &podOperationAwareStatusProvider{PodStatusProvider: kl.statusManager, kubelet: kl}, kl.runtimeService, kl.supportLocalStorageCapacityIsolation()); err != nil {
 		// Fail kubelet and rely on the babysitter to retry starting kubelet.
 		logger.Error(err, "Failed to start ContainerManager")
 		os.Exit(1)
@@ -2042,6 +2081,8 @@ func (kl *Kubelet) Run(ctx context.Context, updates <-chan kubetypes.PodUpdate) 
 		// propagating logging values for contextual logging.
 		go kl.fastStatusUpdateOnce(context.WithoutCancel(ctx))
 
+		go kl.runPodCheckpointWatch(ctx)
+
 		// Keep renewing the node lease until the kubelet exits.
 		// This intentionally does not use the kubelet context so lease renewal can
 		// continue during graceful shutdown.
@@ -2150,6 +2191,10 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 		logger.V(4).Info("SyncPod exit", "pod", klog.KObj(pod), "podUID", pod.UID, "isTerminal", isTerminal)
 		otelSpan.End()
 	}()
+
+	if err := kl.reconcilePodCheckpointOperation(ctx, pod); err != nil {
+		return false, nil, err
+	}
 
 	// Latency measurements for the main workflow are relative to the
 	// first time the pod was seen by kubelet.
@@ -2351,6 +2396,14 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 	// Ensure the pod is being probed
 	kl.probeManager.SyncPod(ctx, pod)
 
+	// Capture a requested checkpoint before the runtime sync can start, stop,
+	// or resize containers.
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelCheckpointRestore) {
+		if err := kl.syncPodCheckpointRequest(ctx, pod, podStatus); err != nil {
+			return false, nil, err
+		}
+	}
+
 	// TODO(#113606): use cancellation from the incoming context parameter, which comes from the pod worker.
 	// Currently, using cancellation from that context causes test failures. To remove this WithoutCancel,
 	// any wait.Interrupted errors need to be filtered from result and bypass the reasonCache - cancelling
@@ -2460,6 +2513,14 @@ func (kl *Kubelet) SyncTerminatingPod(ctx context.Context, pod *v1.Pod, podStatu
 		otelSpan.End()
 		logger.V(4).Info("SyncTerminatingPod exit", "pod", klog.KObj(pod), "podUID", pod.UID)
 	}()
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelCheckpointRestore) {
+		kl.abandonPodCheckpointRequest(pod)
+	}
+
+	if err := kl.reconcilePodCheckpointOperation(ctx, pod); err != nil {
+		return err
+	}
 
 	apiPodStatus := kl.generateAPIPodStatus(ctx, pod, podStatus, TerminatingPod)
 	if podStatusFn != nil {
@@ -2595,6 +2656,10 @@ func (kl *Kubelet) SyncTerminatingRuntimePod(ctx context.Context, runningPod *ku
 	logger.V(4).Info("SyncTerminatingRuntimePod enter", "pod", klog.KObj(pod), "podUID", pod.UID)
 	defer logger.V(4).Info("SyncTerminatingRuntimePod exit", "pod", klog.KObj(pod), "podUID", pod.UID)
 
+	if err := kl.reconcilePodCheckpointOperation(ctx, pod); err != nil {
+		return err
+	}
+
 	// we kill the pod directly since we have lost all other information about the pod.
 	logger.V(4).Info("Orphaned running pod terminating without grace period", "pod", klog.KObj(pod), "podUID", pod.UID)
 	// TODO: this should probably be zero, to bypass any waiting (needs fixes in container runtime)
@@ -2629,6 +2694,10 @@ func (kl *Kubelet) SyncTerminatedPod(ctx context.Context, pod *v1.Pod, podStatus
 	defer otelSpan.End()
 	logger.V(4).Info("SyncTerminatedPod enter", "pod", klog.KObj(pod), "podUID", pod.UID)
 	defer logger.V(4).Info("SyncTerminatedPod exit", "pod", klog.KObj(pod), "podUID", pod.UID)
+
+	if err := kl.reconcilePodCheckpointOperation(ctx, pod); err != nil {
+		return err
+	}
 
 	// generate the final status of the pod
 	// TODO: should we simply fold this into TerminatePod? that would give a single pod update
@@ -3003,6 +3072,7 @@ func (kl *Kubelet) HandlePodAdditions(ctx context.Context, pods []*v1.Pod) {
 		// not exist in the pod manager, it means that it has been deleted in
 		// the apiserver and no action (other than cleanup) is required.
 		kl.podManager.AddPod(pod)
+		kl.enqueuePodCheckpoints(logger, pod)
 
 		pod, mirrorPod, wasMirror := kl.podManager.GetPodAndMirrorPod(pod)
 		if wasMirror {
@@ -3618,6 +3688,542 @@ func (kl *Kubelet) CheckpointContainer(
 	return nil
 }
 
+// podCheckpointRequest is a PodCheckpoint that the watch handed to the pod
+// worker of its source Pod (KEP-5823).
+type podCheckpointRequest struct {
+	// ctx is the watch context. Outcome publication uses it because it
+	// continues after SyncPod returns.
+	ctx       context.Context
+	namespace string
+	name      string
+	uid       types.UID
+	timeout   time.Duration
+}
+
+// requestPodCheckpoint hands a PodCheckpoint to the pod worker of its source
+// Pod and triggers a sync. SyncPod captures the checkpoint, so the capture does
+// not overlap a container operation of the Pod, and terminating the Pod
+// cancels it. A second request for the Pod returns errPodCheckpointInFlight
+// until the outcome of the first one is published, so the watch can retry it.
+func (kl *Kubelet) requestPodCheckpoint(ctx context.Context, pod *v1.Pod, request *podCheckpointRequest) error {
+	operations, err := kl.readPodCheckpointOperations(pod.UID)
+	if err != nil {
+		return err
+	}
+	for _, operation := range operations {
+		if operation.CheckpointUID == request.uid || !operation.Complete {
+			kl.SyncPodNow(ctx, pod)
+			return errPodCheckpointInFlight
+		}
+	}
+	if request.name == "" {
+		return errors.New("PodCheckpoint name must not be empty")
+	}
+	if _, alreadyInFlight := kl.checkpointsInFlight.LoadOrStore(pod.UID, request.uid); alreadyInFlight {
+		klog.FromContext(ctx).V(2).Info("Checkpoint already in flight for pod; deferring duplicate trigger", "pod", klog.KObj(pod), "podUID", pod.UID)
+		return errPodCheckpointInFlight
+	}
+	kl.podCheckpointRequests.Store(pod.UID, request)
+	// The Pod may have been updated or deleted while the watch wrote the
+	// in-progress status, so sync the Pod that the Pod manager has now. The
+	// pod worker does not call SyncPod for a terminating Pod, and
+	// SyncTerminatingPod may have looked for a request before this one.
+	current, ok := kl.podManager.GetPodByUID(pod.UID)
+	if !ok || kl.podWorkers.IsPodTerminationRequested(pod.UID) {
+		kl.abandonPodCheckpointRequest(pod)
+		return nil
+	}
+	kl.SyncPodNow(ctx, current)
+	return nil
+}
+
+// abandonPodCheckpointRequest fails the checkpoint requested for a terminating
+// Pod if SyncPod has not started it.
+func (kl *Kubelet) abandonPodCheckpointRequest(pod *v1.Pod) {
+	value, ok := kl.podCheckpointRequests.LoadAndDelete(pod.UID)
+	if !ok {
+		return
+	}
+	request := value.(*podCheckpointRequest)
+	run := &podCheckpointRun{pod: pod, namespace: request.namespace, name: request.name, uid: request.uid}
+	kl.publishPodCheckpointOutcome(request.ctx, run, false, "", "checkpoint failed: source pod is terminating")
+}
+
+// syncPodCheckpointRequest captures the checkpoint requested for the Pod, if
+// any, from podStatus, the status that the runtime sync uses. SyncPod calls it
+// before the runtime sync, so the pod worker does not start, stop, or resize
+// containers of the Pod during capture. Terminating the Pod cancels ctx, which
+// stops the capture.
+func (kl *Kubelet) syncPodCheckpointRequest(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus) error {
+	if _, owned := kl.checkpointOperationOwners.LoadOrStore(pod.UID, struct{}{}); owned {
+		return errPodCheckpointCompletionPending
+	}
+	defer kl.checkpointOperationOwners.Delete(pod.UID)
+	value, ok := kl.podCheckpointRequests.LoadAndDelete(pod.UID)
+	if !ok {
+		return nil
+	}
+	request := value.(*podCheckpointRequest)
+	logger := klog.FromContext(ctx)
+	// Admission must not make another Pod worker wait for a capture. It also
+	// serializes the record-count check with creation of durable intent.
+	if !kl.podCheckpointStorageAdmission.TryLock() {
+		kl.podCheckpointRequests.Store(pod.UID, request)
+		return nil
+	}
+	run, err := kl.preparePodCheckpoint(ctx, pod, podStatus, request)
+	if err == nil {
+		// Reserve durable journal capacity before draining probes. Other Pods
+		// may capture concurrently once their intent is charged to the limit.
+		if storeErr := kl.writePodCheckpointOperation(kl.checkpointOperation(run)); storeErr != nil {
+			err = fmt.Errorf("persist checkpoint intent: %w", storeErr)
+			kl.removePodCheckpointOutput(ctx, run, "intent persistence failure")
+		}
+	}
+	kl.podCheckpointStorageAdmission.Unlock()
+	switch {
+	case errors.Is(err, errPodCheckpointInFlight) || errors.Is(err, errPodCheckpointAPIUnavailable):
+		if !kl.podCheckpointPending(request) {
+			kl.finishPodCheckpoint(pod.UID, request.uid)
+			return nil
+		}
+		// The pod worker syncs a running Pod at least once per sync period, so
+		// a later sync retries the request.
+		logger.V(2).Info("Deferring Pod checkpoint", "pod", klog.KObj(pod), "podCheckpoint", klog.KRef(request.namespace, request.name), "err", err)
+		kl.podCheckpointRequests.Store(pod.UID, request)
+		return nil
+	case errors.Is(err, errPodCheckpointNotPending):
+		// The PodCheckpoint was deleted, replaced, or finished elsewhere.
+		kl.finishPodCheckpoint(pod.UID, request.uid)
+		return nil
+	case err != nil:
+		if run == nil {
+			run = &podCheckpointRun{pod: pod, namespace: request.namespace, name: request.name, uid: request.uid}
+		}
+		kl.publishPodCheckpointOutcome(request.ctx, run, false, "", fmt.Sprintf("checkpoint failed: %v", err))
+		return nil
+	}
+
+	// Bound probe draining and the CRI call together so draining cannot
+	// extend the requested checkpoint duration.
+	criCtx, cancel := context.WithTimeout(ctx, run.timeout)
+	defer cancel()
+	err = kl.capturePodCheckpoint(ctx, criCtx, cancel, run)
+	if errors.Is(err, errPodCheckpointCompletionPending) {
+		return err
+	}
+	succeeded, relLocation, message, ok := kl.finishPodCheckpointCapture(ctx, run, err)
+	if !ok {
+		kl.finishPodCheckpoint(pod.UID, request.uid)
+		return errPodCheckpointCompletionPending
+	}
+	// Publication retries until the API server confirms the outcome. It must
+	// not hold the pod worker.
+	kl.publishPodCheckpointOutcome(request.ctx, run, succeeded, relLocation, message)
+	return nil
+}
+
+// podCheckpointPending reports whether the watch cache still has the
+// PodCheckpoint of a request, with the same UID and without an outcome. A
+// deferred request must not outlive its PodCheckpoint.
+func (kl *Kubelet) podCheckpointPending(request *podCheckpointRequest) bool {
+	state := kl.podCheckpointWatch.Load()
+	if state == nil || state.lister == nil {
+		return true
+	}
+	pc, err := state.lister.PodCheckpoints(request.namespace).Get(request.name)
+	if err != nil {
+		return !apierrors.IsNotFound(err)
+	}
+	return pc.UID == request.uid && !podCheckpointTerminal(pc)
+}
+
+// finishPodCheckpoint releases local execution ownership only after runtime
+// completion. Durable records still prevent replay until outcome publication.
+func (kl *Kubelet) finishPodCheckpoint(podUID, checkpointUID types.UID) {
+	kl.prunePodCheckpointMarkers()
+	operations, err := kl.readPodCheckpointOperations(podUID)
+	if err != nil {
+		return
+	}
+	for _, operation := range operations {
+		if !operation.Complete {
+			return
+		}
+	}
+	kl.checkpointsInFlight.CompareAndDelete(podUID, checkpointUID)
+}
+
+// podCheckpointRun holds one accepted Pod checkpoint: the request sent to the
+// runtime and the PodCheckpoint that receives the outcome.
+type podCheckpointRun struct {
+	pod            *v1.Pod
+	namespace      string
+	name           string
+	uid            types.UID
+	timeout        time.Duration
+	checkpointsDir string
+	outputPath     string
+	request        *runtimeapi.CheckpointPodRequest
+}
+
+// preparePodCheckpoint checks that the Pod can be checkpointed now, captures its
+// template, and creates the output directory.
+func (kl *Kubelet) preparePodCheckpoint(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, request *podCheckpointRequest) (*podCheckpointRun, error) {
+	if kubetypes.IsStaticPod(pod) || kubetypes.IsMirrorPod(pod) {
+		return nil, fmt.Errorf("checkpointing static Pods is not supported")
+	}
+	allocatedPod, _ := kl.allocationManager.UpdatePodFromAllocation(pod)
+	// A pending request does not change the running workload. Keep one allocated
+	// snapshot for validation, resize detection, and the captured template.
+	pod = allocatedPod.DeepCopy()
+
+	podFullName := kubecontainer.GetPodFullName(pod)
+	if len(podStatus.SandboxStatuses) == 0 {
+		return nil, fmt.Errorf("pod %v has no sandbox", podFullName)
+	}
+	activeSandbox := podStatus.SandboxStatuses[0]
+	if activeSandbox == nil || activeSandbox.State != runtimeapi.PodSandboxState_SANDBOX_READY || activeSandbox.Id == "" {
+		return nil, fmt.Errorf("pod %v has no ready sandbox", podFullName)
+	}
+
+	// Enforce the execution-time preconditions (KEP-5823) before reaching the
+	// container runtime: the pod must be bound to a node, non-restartable init
+	// containers completed, and regular and restartable init containers running.
+	if err := validateCheckpointPodPreconditions(pod, podStatus); err != nil {
+		return nil, err
+	}
+	if kl.containerRuntime.IsPodResizeInProgress(pod, podStatus) {
+		// The runtime sync that follows finishes the resize. Until then, the
+		// allocated resources in the template do not describe the containers.
+		return nil, errPodCheckpointInFlight
+	}
+	containerIDs, err := checkpointPodContainerIDs(pod, podStatus)
+	if err != nil {
+		return nil, err
+	}
+	ceiling := kl.kubeletConfiguration.PodCheckpointTimeout.Duration
+	if ceiling <= 0 {
+		return nil, fmt.Errorf("pod checkpoint timeout must be positive, got %v", ceiling)
+	}
+	timeout := request.timeout
+	if timeout <= 0 || timeout > ceiling {
+		timeout = ceiling
+	}
+	if err := kl.admitPodCheckpointStorage(); err != nil {
+		return nil, err
+	}
+	if err := kl.publishPodCheckpointTemplate(ctx, request.namespace, request.name, request.uid, pod, podStatus); err != nil {
+		return nil, err
+	}
+
+	checkpointsDir, outputPath, err := kl.createPodCheckpointOutput(request.uid)
+	if err != nil {
+		return nil, err
+	}
+	return &podCheckpointRun{
+		pod:            pod,
+		namespace:      request.namespace,
+		name:           request.name,
+		uid:            request.uid,
+		timeout:        timeout,
+		checkpointsDir: checkpointsDir,
+		outputPath:     outputPath,
+		request: &runtimeapi.CheckpointPodRequest{
+			OperationId:  string(request.uid),
+			PodSandboxId: activeSandbox.Id,
+			OutputPath:   outputPath,
+			ContainerIds: containerIDs,
+		},
+	}, nil
+}
+
+// createPodCheckpointOutput creates the private output directory for one
+// PodCheckpoint and returns the checkpoint root and that directory.
+func (kl *Kubelet) createPodCheckpointOutput(podCheckpointUID types.UID) (string, string, error) {
+	// The kubelet owns checkpoint storage. A deterministic leaf keyed by the
+	// PodCheckpoint UID lets startup recovery find and remove an interrupted
+	// caller-owned directory after the kubelet restarts.
+	checkpointsDir, outputPath, err := kl.podCheckpointOutputPath(podCheckpointUID)
+	if err != nil {
+		return "", "", err
+	}
+	if err := utilfs.MkdirAll(checkpointsDir, 0o700); err != nil {
+		return "", "", fmt.Errorf("failed to create pod checkpoint directory %q: %w", checkpointsDir, err)
+	}
+	if err := os.Mkdir(outputPath, 0o700); err != nil {
+		return "", "", fmt.Errorf("failed to create checkpoint output directory %q: %w", outputPath, err)
+	}
+	// os.FileMode alone does not install a restrictive Windows ACL. Apply the
+	// platform-specific permission helper after exclusive creation so the leaf
+	// that receives checkpoint data is private on every supported OS.
+	if err := utilfs.Chmod(outputPath, 0o700); err != nil {
+		if cleanupErr := os.RemoveAll(outputPath); cleanupErr != nil {
+			return "", "", fmt.Errorf("failed to restrict access to checkpoint output directory %q: %w (cleanup also failed: %w)", outputPath, err, cleanupErr)
+		}
+		return "", "", fmt.Errorf("failed to restrict access to checkpoint output directory %q: %w", outputPath, err)
+	}
+	return checkpointsDir, outputPath, nil
+}
+
+// capturePodCheckpoint keeps probes and Checkpointing behind runtime completion.
+// A client error alone does not authorize either probe resumption or cleanup.
+func (kl *Kubelet) capturePodCheckpoint(ctx, criCtx context.Context, cancel context.CancelFunc, run *podCheckpointRun) error {
+	podUID := run.pod.UID
+	kl.statusManager.SetPodCheckpointingCondition(klog.FromContext(ctx), podUID, &v1.PodCondition{
+		Type: v1.PodCheckpointing, Status: v1.ConditionTrue,
+		Reason: events.CheckpointingPod, Message: fmt.Sprintf("Checkpointing for PodCheckpoint %q", run.name),
+		ObservedGeneration: run.pod.Generation,
+	})
+	kl.recordPodCheckpointStarted(ctx, run.pod, run.namespace, run.name, run.uid)
+	err := kl.probeManager.SuspendProbes(criCtx, podUID)
+	if err == nil {
+		err = criCtx.Err()
+	}
+	operation := kl.checkpointOperation(run)
+	if err == nil {
+		err = kl.containerRuntime.CheckpointPod(criCtx, run.request)
+		if grpcstatus.Code(err) == grpccodes.Unimplemented {
+			// The runtime started no work, so there is nothing to cancel.
+			err = fmt.Errorf("runtime does not support Pod checkpoints: %w", err)
+		} else if err != nil {
+			if completionErr := kl.confirmPodCheckpointCompletion(context.WithoutCancel(ctx), run.uid); completionErr != nil {
+				cancel()
+				return errors.Join(err, completionErr)
+			}
+		}
+	}
+	if err != nil && errors.Is(criCtx.Err(), context.DeadlineExceeded) && ctx.Err() == nil {
+		err = fmt.Errorf("did not finish within the %v checkpoint timeout (spec.timeoutSeconds, limited to the node's podCheckpointTimeout): %w", run.timeout, err)
+	} else if err != nil && ctx.Err() != nil {
+		err = fmt.Errorf("stopped because the source pod started terminating: %w", err)
+	}
+	cancel()
+	// Runtime completion, rather than persistence of its outcome, owns probes.
+	// A full metadata filesystem must not extend a confirmed checkpoint pause.
+	defer func() {
+		kl.probeManager.ResumeProbes(podUID)
+		kl.statusManager.SetPodCheckpointingCondition(klog.FromContext(ctx), podUID, nil)
+	}()
+	operation.Complete, operation.Succeeded = true, err == nil
+	if err != nil {
+		operation.Message = fmt.Sprintf("checkpoint failed: %v", err)
+	} else {
+		operation.Location, err = filepath.Rel(run.checkpointsDir, run.outputPath)
+		if err != nil || !filepath.IsLocal(operation.Location) {
+			operation.Succeeded = false
+			operation.Message = "checkpoint failed: invalid output location"
+			err = errors.New(operation.Message)
+		}
+	}
+	if storeErr := kl.writePodCheckpointOperation(operation); storeErr != nil {
+		// Failed output may be what filled the filesystem. The original durable
+		// record still fences replay if cleanup or the completion write fails.
+		if !operation.Succeeded {
+			kl.removePodCheckpointOutput(ctx, run, "confirmed runtime failure before completion persistence")
+		}
+		return fmt.Errorf("%w: cannot persist checkpoint completion: %w", errPodCheckpointCompletionPending, storeErr)
+	}
+	return err
+}
+
+// finishPodCheckpointCapture removes the output of a failed capture and returns
+// the outcome to publish. It returns ok=false when output cleanup failed and the
+// PodCheckpoint must stay in progress for startup recovery.
+func (kl *Kubelet) finishPodCheckpointCapture(ctx context.Context, run *podCheckpointRun, err error) (succeeded bool, relLocation, message string, ok bool) {
+	logger := klog.FromContext(ctx)
+	if err != nil {
+		logger.Error(err, "Pod checkpoint failed", "pod", klog.KObj(run.pod), "checkpointPath", run.outputPath)
+		if !kl.removePodCheckpointOutput(ctx, run, "runtime failure") {
+			return false, "", "", false
+		}
+		return false, "", fmt.Sprintf("checkpoint failed: %v", err), true
+	}
+
+	logger.V(2).Info("Pod checkpoint completed", "pod", klog.KObj(run.pod), "checkpointPath", run.outputPath)
+	// Publish a path relative to the checkpoint root, never an absolute host path.
+	relLocation, err = filepath.Rel(run.checkpointsDir, run.outputPath)
+	if err == nil && !filepath.IsLocal(relLocation) {
+		err = fmt.Errorf("computed location %q is not local to the checkpoint root", relLocation)
+	}
+	if err != nil {
+		logger.Error(err, "Failed to compute relative checkpoint location", "pod", klog.KObj(run.pod), "checkpointPath", run.outputPath)
+		if !kl.removePodCheckpointOutput(ctx, run, "invalid checkpoint location") {
+			return false, "", "", false
+		}
+		return false, "", fmt.Sprintf("checkpoint failed: cannot compute checkpoint location relative to %q: %v", run.checkpointsDir, err), true
+	}
+	return true, relLocation, "", true
+}
+
+// publishPodCheckpointOutcome writes the outcome to the PodCheckpoint status.
+// An update error does not establish that the API server rejected the write,
+// so it retains successful data and retries the same result until confirmed.
+// The in-flight marker stays set until it returns, so watch events cannot
+// repeat the capture.
+func (kl *Kubelet) publishPodCheckpointOutcome(ctx context.Context, run *podCheckpointRun, succeeded bool, relLocation, message string) {
+	if _, publishing := kl.checkpointPublications.LoadOrStore(run.uid, struct{}{}); publishing {
+		return
+	}
+	// Claim before scheduling: recovery must not queue a second publisher that
+	// can start after this owner's status update and record cleanup complete.
+	go kl.doPublishPodCheckpointOutcome(ctx, run, succeeded, relLocation, message)
+}
+
+func (kl *Kubelet) doPublishPodCheckpointOutcome(ctx context.Context, run *podCheckpointRun, succeeded bool, relLocation, message string) {
+	defer kl.checkpointPublications.Delete(run.uid)
+	defer kl.finishPodCheckpoint(run.pod.UID, run.uid)
+	logger := klog.FromContext(ctx)
+	delay := time.Second
+	lastError := ""
+	for ctx.Err() == nil {
+		err := kl.finalizePodCheckpointPublication(ctx, run, succeeded, relLocation, message, true)
+		if err == nil {
+			return
+		}
+		if err.Error() != lastError {
+			logMessage := "Failed to publish PodCheckpoint result; retrying"
+			switch {
+			case apierrors.IsForbidden(err):
+				logMessage = "Cannot publish PodCheckpoint result; check status update permissions and admission errors"
+			case apierrors.IsInvalid(err):
+				logMessage = "PodCheckpoint status was rejected; check the reported validation errors"
+			case errors.Is(err, errPodCheckpointOutputCleanupPending):
+				logMessage = "Cannot finish checkpoint cleanup; check archive permissions and storage"
+			}
+			logger.Error(err, logMessage, "podCheckpoint", klog.KRef(run.namespace, run.name), "podCheckpointUID", run.uid)
+			lastError = err.Error()
+		}
+		// Runtime completion is already known. Keep retrying the same outcome
+		// without flooding an API server that continues denying the status write.
+		timer := kl.clock.NewTimer(min(wait.Jitter(delay, 0.1), time.Minute))
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return
+		case <-timer.C():
+		}
+		delay = min(2*delay, time.Minute)
+	}
+}
+
+// removePodCheckpointOutput removes the output directory after a failed or
+// abandoned checkpoint. A failed removal must retain its durable operation
+// record so recovery can retry even after the API object has disappeared.
+func (kl *Kubelet) removePodCheckpointOutput(ctx context.Context, run *podCheckpointRun, after string) bool {
+	if cleanupErr := os.RemoveAll(run.outputPath); cleanupErr != nil {
+		kl.checkpointCleanupBlocked.Store(run.uid, struct{}{})
+		klog.FromContext(ctx).Error(cleanupErr, "Failed to remove checkpoint output; retaining its operation for cleanup retry", "pod", klog.KObj(run.pod), "checkpointPath", run.outputPath, "after", after)
+		kl.recordPodCheckpointEvent(ctx, run.namespace, run.name, run.uid, v1.EventTypeWarning, events.CheckpointFailed, "Checkpoint output cleanup failed; recovery will retry")
+		return false
+	}
+	return true
+}
+
+// podCheckpointDataPrefix starts the name of each PodCheckpoint data directory.
+const podCheckpointDataPrefix = "checkpoint-"
+
+// podCheckpointOutputPath returns the caller-owned directory for one
+// PodCheckpoint object. Kubernetes UIDs are path-safe, but validate the value
+// before joining it to the checkpoint root because this path contains pod data.
+func (kl *Kubelet) podCheckpointOutputPath(podCheckpointUID types.UID) (string, string, error) {
+	if podCheckpointUID == "" {
+		return "", "", errors.New("PodCheckpoint UID must not be empty")
+	}
+	directoryName := podCheckpointDataPrefix + string(podCheckpointUID)
+	if !filepath.IsLocal(directoryName) || filepath.Base(directoryName) != directoryName {
+		return "", "", fmt.Errorf("PodCheckpoint UID %q cannot be used as a checkpoint directory name", podCheckpointUID)
+	}
+	checkpointsDir, err := filepath.Abs(kl.getPodCheckpointsDir())
+	if err != nil {
+		return "", "", fmt.Errorf("failed to resolve pod checkpoint directory %q: %w", kl.getPodCheckpointsDir(), err)
+	}
+	return checkpointsDir, filepath.Join(checkpointsDir, directoryName), nil
+}
+
+// checkpointPodContainerIDs selects the exact live container set represented by
+// a Pod checkpoint. Completed init containers are no longer running, and
+// ephemeral containers are not part of a Pod checkpoint.
+func checkpointPodContainerIDs(pod *v1.Pod, podStatus *kubecontainer.PodStatus) ([]string, error) {
+	containerIDs := make([]string, 0, len(pod.Spec.InitContainers)+len(pod.Spec.Containers))
+	containerNamesByID := make(map[string]string, cap(containerIDs))
+	appendRunningID := func(name string) error {
+		status := podStatus.FindContainerStatusByName(name)
+		if status == nil || status.State != kubecontainer.ContainerStateRunning {
+			return fmt.Errorf("cannot checkpoint pod %v: container %q is not running", klog.KObj(pod), name)
+		}
+		if status.ID.ID == "" {
+			return fmt.Errorf("cannot checkpoint pod %v: running container %q has no runtime ID", klog.KObj(pod), name)
+		}
+		if existingName, duplicate := containerNamesByID[status.ID.ID]; duplicate {
+			return fmt.Errorf("cannot checkpoint pod %v: containers %q and %q have duplicate runtime ID %q", klog.KObj(pod), existingName, name, status.ID.ID)
+		}
+		containerNamesByID[status.ID.ID] = name
+		containerIDs = append(containerIDs, status.ID.ID)
+		return nil
+	}
+
+	for container := range kubecontainer.CheckpointContainers(&pod.Spec) {
+		if err := appendRunningID(container.Name); err != nil {
+			return nil, err
+		}
+	}
+	if len(containerIDs) == 0 {
+		return nil, fmt.Errorf("cannot checkpoint pod %v: no running containers were selected", klog.KObj(pod))
+	}
+	return containerIDs, nil
+}
+
+// validateCheckpointPodPreconditions enforces the execution-time gate from
+// KEP-5823: the pod must be bound to a node, all non-restartable init containers
+// must have completed successfully, and all regular containers (plus restartable
+// init/sidecar containers) must be running. Checkpoint requests that do not meet
+// these preconditions are rejected before reaching the container runtime.
+func validateCheckpointPodPreconditions(pod *v1.Pod, podStatus *kubecontainer.PodStatus) error {
+	if pod.Spec.NodeName == "" {
+		return fmt.Errorf("cannot checkpoint pod %v: pod is not bound to a node", klog.KObj(pod))
+	}
+
+	requireRunning := func(name string) error {
+		cs := podStatus.FindContainerStatusByName(name)
+		if cs == nil || cs.State != kubecontainer.ContainerStateRunning {
+			return fmt.Errorf("cannot checkpoint pod %v: container %q is not running", klog.KObj(pod), name)
+		}
+		return nil
+	}
+
+	// Regular containers can only be running after every non-restartable init
+	// container has completed successfully. Validate them first so a missing
+	// completed-init runtime status (which runtime GC may remove) is not treated
+	// as a failed precondition.
+	for i := range pod.Spec.Containers {
+		if err := requireRunning(pod.Spec.Containers[i].Name); err != nil {
+			return err
+		}
+	}
+
+	for i := range pod.Spec.InitContainers {
+		c := &pod.Spec.InitContainers[i]
+		if podutil.IsRestartableInitContainer(c) {
+			// Restartable init (sidecar) containers run alongside the regular
+			// containers, so they must be running like regular containers.
+			if err := requireRunning(c.Name); err != nil {
+				return err
+			}
+			continue
+		}
+		cs := podStatus.FindContainerStatusByName(c.Name)
+		if cs == nil {
+			continue
+		}
+		if cs.State != kubecontainer.ContainerStateExited || cs.ExitCode != 0 {
+			return fmt.Errorf("cannot checkpoint pod %v: init container %q has not completed successfully", klog.KObj(pod), c.Name)
+		}
+	}
+
+	return nil
+}
+
 // ListMetricDescriptors gets the descriptors for the metrics that will be returned in ListPodSandboxMetrics.
 func (kl *Kubelet) ListMetricDescriptors(ctx context.Context) ([]*runtimeapi.MetricDescriptor, error) {
 	return kl.containerRuntime.ListMetricDescriptors(ctx)
@@ -3825,4 +4431,11 @@ func (a *allocatedStatusPodManager) GetPodByUID(uid types.UID) (*v1.Pod, bool) {
 	}
 	pod, _ = a.kl.allocationManager.UpdatePodFromAllocation(pod)
 	return pod, true
+}
+
+// podCheckpointInFlight reports whether a checkpoint of the Pod is waiting for
+// the pod worker, capturing, or publishing its outcome.
+func (kl *Kubelet) podCheckpointInFlight(podUID types.UID) bool {
+	_, ok := kl.checkpointsInFlight.Load(podUID)
+	return ok
 }

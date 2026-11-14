@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apimachinery/pkg/util/version"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -2100,6 +2101,118 @@ func TestPodStrategyValidateUpdate(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			if errs := Strategy.ValidateUpdate(genericapirequest.NewContext(), tc.newPod, tc.oldPod); len(errs) != 0 {
 				t.Errorf("unexpected error:%v", errs)
+			}
+		})
+	}
+}
+
+// validatePodUpdate prepares and validates an update with the strategy that
+// serves the subresource, in the order the registry uses.
+func validatePodUpdate(subresource string, newPod, oldPod *api.Pod) field.ErrorList {
+	strategy := map[string]rest.RESTUpdateStrategy{
+		"":                    Strategy,
+		"status":              StatusStrategy,
+		"resize":              ResizeStrategy,
+		"ephemeralcontainers": EphemeralContainersStrategy,
+	}[subresource]
+	ctx := genericapirequest.NewContext()
+	strategy.PrepareForUpdate(ctx, newPod, oldPod)
+	return strategy.ValidateUpdate(ctx, newPod, oldPod)
+}
+
+// workloadFreezeErrors returns the errors whose detail contains message.
+func workloadFreezeErrors(errs field.ErrorList, message string) field.ErrorList {
+	var freezeErrs field.ErrorList
+	for _, err := range errs {
+		if strings.Contains(err.Detail, message) {
+			freezeErrs = append(freezeErrs, err)
+		}
+	}
+	return freezeErrs
+}
+
+func TestCheckpointingUpdatesPreserveWorkload(t *testing.T) {
+	changeImage := func(p *api.Pod) { p.Spec.Containers[0].Image = "changed-private-image" }
+	resizeCPU := func(p *api.Pod) {
+		p.Spec.Containers[0].Resources.Requests = api.ResourceList{api.ResourceCPU: resource.MustParse("2")}
+	}
+	for _, tc := range []struct {
+		name             string
+		subresource      string
+		mutate           func(*api.Pod)
+		checkpointStatus api.ConditionStatus
+		gateDisabled     bool
+		wantFields       []string
+	}{
+		{name: "image during checkpoint", checkpointStatus: api.ConditionTrue, mutate: changeImage, wantFields: []string{"spec.containers[0].image"}},
+		{name: "resize during checkpoint", checkpointStatus: api.ConditionTrue, subresource: "resize", mutate: resizeCPU, wantFields: []string{"spec.containers[0].resources.requests[cpu]"}},
+		{name: "ephemeral container during checkpoint", checkpointStatus: api.ConditionTrue, subresource: "ephemeralcontainers", mutate: func(p *api.Pod) {
+			p.Spec.EphemeralContainers = []api.EphemeralContainer{{EphemeralContainerCommon: api.EphemeralContainerCommon{
+				Name: "debug", Image: "changed-private-image", ImagePullPolicy: api.PullIfNotPresent, TerminationMessagePolicy: api.TerminationMessageReadFile,
+			}}}
+		}, wantFields: []string{"spec.ephemeralContainers[0]"}},
+		{name: "arguments during checkpoint", checkpointStatus: api.ConditionTrue, mutate: func(p *api.Pod) { p.Spec.Containers[0].Args[0] = "changed-private-argument" }, wantFields: []string{"spec.containers[0].args[0]"}},
+		{name: "environment during checkpoint", checkpointStatus: api.ConditionTrue, mutate: func(p *api.Pod) { p.Spec.Containers[0].Env[0].Value = "changed-private-environment" }, wantFields: []string{"spec.containers[0].env[0].value"}},
+		{name: "multiple changes during checkpoint", checkpointStatus: api.ConditionTrue, mutate: func(p *api.Pod) {
+			p.Spec.Containers[0].Image = "changed-private-image"
+			p.Spec.Containers[0].Env[0].Value = "changed-private-environment"
+		}, wantFields: []string{"spec.containers[0].image", "spec.containers[0].env[0].value"}},
+		{name: "new status cannot bypass active checkpoint", checkpointStatus: api.ConditionTrue, mutate: func(p *api.Pod) {
+			p.Spec.Containers[0].Image = "changed-private-image"
+			p.Status.Conditions = []api.PodCondition{{Type: api.PodCheckpointing, Status: api.ConditionFalse}}
+		}, wantFields: []string{"spec.containers[0].image"}},
+		{name: "metadata during checkpoint", checkpointStatus: api.ConditionTrue, mutate: func(p *api.Pod) { p.Labels = map[string]string{"app": "test"} }},
+		{name: "scheduling gate removal during checkpoint", checkpointStatus: api.ConditionTrue, mutate: func(p *api.Pod) { p.Spec.SchedulingGates = nil }},
+		{name: "status update during checkpoint", checkpointStatus: api.ConditionTrue, subresource: "status", mutate: changeImage},
+		{name: "image after checkpoint", checkpointStatus: api.ConditionFalse, mutate: changeImage},
+		{name: "resize after checkpoint", checkpointStatus: api.ConditionFalse, subresource: "resize", mutate: resizeCPU},
+		{name: "image with unknown checkpoint state", checkpointStatus: api.ConditionUnknown, mutate: changeImage},
+		{name: "image without checkpoint state", mutate: changeImage},
+		{name: "feature disabled", checkpointStatus: api.ConditionTrue, gateDisabled: true, mutate: changeImage},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelCheckpointRestore, !tc.gateDisabled)
+			oldPod := podtest.MakePod("source",
+				podtest.SetResourceVersion("1"),
+				podtest.SetContainers(podtest.MakeContainer("app",
+					podtest.SetContainerImage("captured-private-image"),
+					podtest.SetContainerResources(podtest.MakeResourceRequirements(map[string]string{"cpu": "1"}, nil)),
+				)),
+				podtest.SetSchedulingGates(api.PodSchedulingGate{Name: "example.com/ready"}),
+			)
+			oldPod.Spec.Containers[0].Args = []string{"captured-private-argument"}
+			oldPod.Spec.Containers[0].Env = []api.EnvVar{{Name: "PRIVATE_VALUE", Value: "captured-private-environment"}}
+			if tc.checkpointStatus != "" {
+				oldPod.Status.Conditions = []api.PodCondition{{
+					Type: api.PodCheckpointing, Status: tc.checkpointStatus, Message: `Checkpointing for PodCheckpoint "source-checkpoint"`,
+					Reason: "CheckpointingPod", LastTransitionTime: metav1.Now(),
+				}}
+			}
+			newPod := oldPod.DeepCopy()
+			tc.mutate(newPod)
+
+			errs := validatePodUpdate(tc.subresource, newPod, oldPod)
+			if len(tc.wantFields) == 0 {
+				if len(errs) != 0 {
+					t.Fatalf("unexpected errors: %v", errs)
+				}
+				return
+			}
+			freezeErrs := workloadFreezeErrors(errs, "while Checkpointing=True")
+			if len(freezeErrs) != 1 {
+				t.Fatalf("want one Checkpointing error, got %v", errs)
+			}
+			err := freezeErrs[0]
+			if err.Type != field.ErrorTypeForbidden || err.Field != "spec" {
+				t.Errorf("want a forbidden spec error, got %v", err)
+			}
+			for _, want := range append([]string{`PodCheckpoint "source-checkpoint"`}, tc.wantFields...) {
+				if !strings.Contains(err.Detail, want) {
+					t.Errorf("error %q does not contain %q", err.Detail, want)
+				}
+			}
+			if strings.Contains(err.Error(), "captured-private-") || strings.Contains(err.Error(), "changed-private-") {
+				t.Errorf("error exposes a field value: %v", err)
 			}
 		})
 	}

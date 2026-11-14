@@ -38,6 +38,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	versionedinformers "k8s.io/client-go/informers"
 	certinformersv1 "k8s.io/client-go/informers/certificates/v1"
+	nodeinformersv1alpha1 "k8s.io/client-go/informers/node/v1alpha1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/auth/authorizer/abac"
 	"k8s.io/kubernetes/pkg/auth/nodeidentifier"
@@ -123,6 +124,10 @@ func (config Config) New(ctx context.Context, serverID string) (authorizer.Autho
 			if utilfeature.DefaultFeatureGate.Enabled(features.PodCertificateRequest) {
 				podCertificateRequestInformer = config.VersionedInformerFactory.Certificates().V1().PodCertificateRequests()
 			}
+			var podCheckpointInformer nodeinformersv1alpha1.PodCheckpointInformer
+			if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelCheckpointRestore) {
+				podCheckpointInformer = config.VersionedInformerFactory.Node().V1alpha1().PodCheckpoints()
+			}
 			node.RegisterMetrics()
 			graph := node.NewGraph()
 			node.AddGraphEventHandlers(
@@ -134,6 +139,7 @@ func (config Config) New(ctx context.Context, serverID string) (authorizer.Autho
 				config.VersionedInformerFactory.Storage().V1().VolumeAttachments(),
 				config.VersionedInformerFactory.Resource().V1().ResourceSlices(),
 				podCertificateRequestInformer,
+				podCheckpointInformer,
 			)
 			r.nodeAuthorizer = node.NewAuthorizer(graph, nodeidentifier.NewDefaultNodeIdentifier(), bootstrappolicy.NodeRules())
 
