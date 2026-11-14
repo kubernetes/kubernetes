@@ -17,9 +17,50 @@ limitations under the License.
 package garbagecollector
 
 import (
+	"context"
 	"reflect"
 	"testing"
+
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
+	fakemetadata "k8s.io/client-go/metadata/fake"
 )
+
+func TestMigrateOwnerReference(t *testing.T) {
+	metadataClient := fakemetadata.NewSimpleMetadataClient(fakemetadata.NewTestScheme())
+	mapper := meta.NewDefaultRESTMapper(nil)
+	mapper.AddSpecific(
+		schema.GroupVersionKind{Group: "apps", Version: "v1", Kind: "Deployment"},
+		schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"},
+		schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployment"},
+		meta.RESTScopeNamespace,
+	)
+	dependent := &node{
+		identity: objectReference{OwnerReference: metav1.OwnerReference{APIVersion: "apps/v1", Kind: "Deployment", Name: "child", UID: types.UID("child")}, Namespace: "ns1"},
+		owners: []metav1.OwnerReference{{APIVersion: "extensions/v1beta1", Kind: "Deployment", Name: "owner", UID: types.UID("owner")}},
+	}
+	owner := metav1.OwnerReference{APIVersion: "apps/v1", Kind: "Deployment", Name: "owner", UID: types.UID("owner")}
+	resourceClient := metadataClient.Resource(schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"}).Namespace("ns1").(fakemetadata.MetadataClient)
+	if _, err := resourceClient.CreateFake(&metav1.PartialObjectMetadata{
+		ObjectMeta: metav1.ObjectMeta{Name: "child", Namespace: "ns1", OwnerReferences: dependent.owners},
+	}, metav1.CreateOptions{}); err != nil {
+		t.Fatal(err)
+	}
+
+	builder := &GraphBuilder{metadataClient: metadataClient, restMapper: mapper}
+	if err := builder.migrateOwnerReference(dependent, dependent.owners[0], owner); err != nil {
+		t.Fatal(err)
+	}
+	updated, err := metadataClient.Resource(schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"}).Namespace("ns1").Get(context.Background(), "child", metav1.GetOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := updated.OwnerReferences[0].APIVersion; got != "apps/v1" {
+		t.Fatalf("expected owner apiVersion apps/v1, got %q", got)
+	}
+}
 
 func TestGetAlternateOwnerIdentity(t *testing.T) {
 	ns1child1 := makeID("v1", "Child", "ns1", "child1", "childuid11")
