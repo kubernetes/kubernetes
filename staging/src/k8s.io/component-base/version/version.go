@@ -19,23 +19,66 @@ package version
 import (
 	"fmt"
 	"runtime"
+	"strconv"
 
+	utilversion "k8s.io/apimachinery/pkg/util/version"
 	apimachineryversion "k8s.io/apimachinery/pkg/version"
 )
 
 // Get returns the overall codebase version. It's for detecting
 // what code a binary was built from.
-// The caller should use BinaryMajor and BinaryMinor to determine
-// the binary version. The Major and Minor fields are still set by git version for backwards compatibility.
+//
+// Major, Minor and the base of GitVersion come from constants in this package,
+// i.e. they describe the Kubernetes source code that this package comes from.
+// GitCommit, GitTreeState and the build metadata in GitVersion come from the
+// VCS information that the Go toolchain embeds in the main module of a binary.
+// BuildDate is set by the Kubernetes build with ldflags.
+//
+// Minor has a trailing "+" if and only if the source is for a pre-release,
+// i.e. KubePreReleaseVersion is not empty. It does not depend on tags or
+// on the commit distance to them.
+//
+// Behavior in different scenarios:
+//
+//   - "go build" in a git checkout: VCS information is embedded, so
+//     GitVersion is v<major>.<minor>.<patch>[-<pre>]+<commit>[-dirty].
+//     The "+<commit>" is omitted if the commit is tagged with exactly
+//     the version from the constants.
+//   - "go build -buildvcs=false", or a tree without .git: GitCommit and
+//     GitTreeState are empty and GitVersion has no build metadata.
+//   - "git archive" export or GitHub source tarball: the commit and refs
+//     recorded in base.go are used. GitTreeState is "archive" and GitVersion
+//     has "+<commit>", unless the refs contain a tag which is exactly the
+//     version from the constants.
+//   - "go run" and "go test": the Go toolchain does not embed VCS information
+//     for these, so the result is the same as with -buildvcs=false (or the
+//     archive case for an archive).
+//   - "make build" on the host: same as "go build". BuildDate is the time of
+//     the build instead of the placeholder.
+//   - "make build" in a container: same, provided that git works in the
+//     container. The build runs as the owner of the source tree, which
+//     avoids git's "dubious ownership" error.
+//   - Build with KUBE_GIT_VERSION_FILE: GitVersion, GitCommit and GitTreeState
+//     come from that file instead.
+//   - Library of a downstream application: the constants still describe the
+//     Kubernetes version of this package, but the VCS information describes
+//     the application, not Kubernetes. A tagged application also does not
+//     get a clean GitVersion because its tag does not match the constants.
+//     Applications should not rely on these fields for anything except the
+//     Kubernetes base version.
 func Get() apimachineryversion.Info {
-	// These variables typically come from -ldflags settings and in
-	// their absence fallback to the settings in ./base.go
+	binaryVersion := utilversion.MustParseMajorMinor(DefaultKubeBinaryVersion)
+	vcs := vcsInfo()
+	minor := strconv.FormatUint(uint64(binaryVersion.Minor()), 10)
+	if KubePreReleaseVersion != "" {
+		minor += "+"
+	}
 	return apimachineryversion.Info{
-		Major:        gitMajor,
-		Minor:        gitMinor,
+		Major:        strconv.FormatUint(uint64(binaryVersion.Major()), 10),
+		Minor:        minor,
 		GitVersion:   dynamicGitVersion.Load().(string),
-		GitCommit:    gitCommit,
-		GitTreeState: gitTreeState,
+		GitCommit:    vcs.commit,
+		GitTreeState: vcs.treeState,
 		BuildDate:    buildDate,
 		GoVersion:    runtime.Version(),
 		Compiler:     runtime.Compiler,
