@@ -1809,7 +1809,7 @@ function setup-easyrsa {
   # Note: This was heavily cribbed from make-ca-cert.sh
   (set -x
     cd "${KUBE_TEMP}"
-    curl -L -o easy-rsa.tar.gz --connect-timeout 20 --retry 6 --retry-delay 2 https://github.com/OpenVPN/easy-rsa/releases/download/v3.1.7/EasyRSA-3.1.7.tgz
+    curl -fL -o easy-rsa.tar.gz --connect-timeout 20 --retry 6 --retry-delay 2 https://github.com/OpenVPN/easy-rsa/releases/download/v3.1.7/EasyRSA-3.1.7.tgz
     mkdir -p easy-rsa && tar xzf easy-rsa.tar.gz -C easy-rsa --strip-components 1
     local -r files_to_copy=(easyrsa openssl-easyrsa.cnf  x509-types vars.example)
     mkdir easy-rsa/aggregator
