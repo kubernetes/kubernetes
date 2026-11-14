@@ -603,7 +603,7 @@ type IngressClassSpec struct {
 	// configuration for the controller. This is optional if the controller does
 	// not require extra parameters.
 	// +optional
-	// +k8s:beta(since: "1.37")=+k8s:optional
+	// +k8s:optional
 	Parameters *IngressClassParametersReference `json:"parameters,omitempty" protobuf:"bytes,2,opt,name=parameters"`
 }
 
@@ -627,12 +627,12 @@ type IngressClassParametersReference struct {
 
 	// kind is the type of resource being referenced.
 	// +required
-	// +k8s:beta(since: "1.37")=+k8s:required
+	// +k8s:required
 	Kind string `json:"kind" protobuf:"bytes,2,opt,name=kind"`
 
 	// name is the name of resource being referenced.
 	// +required
-	// +k8s:beta(since: "1.37")=+k8s:required
+	// +k8s:required
 	Name string `json:"name" protobuf:"bytes,3,opt,name=name"`
 
 	// scope represents if this refers to a cluster or namespace scoped resource.
