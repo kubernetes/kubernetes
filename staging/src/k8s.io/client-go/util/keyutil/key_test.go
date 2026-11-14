@@ -18,6 +18,8 @@ package keyutil
 
 import (
 	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -204,6 +206,31 @@ func TestReadPrivateKey(t *testing.T) {
 	}
 	if _, err := PrivateKeyFromFile(f.Name()); err != nil {
 		t.Fatalf("error reading private ML-DSA key: %v", err)
+	}
+}
+
+func TestLoadOrGenerateKeyFileInvalidKey(t *testing.T) {
+	tests := []struct {
+		name string
+		data string
+	}{
+		{name: "empty file", data: ""},
+		{name: "not a private key", data: rsaPublicKey},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			keyPath := filepath.Join(t.TempDir(), "key.pem")
+			if err := os.WriteFile(keyPath, []byte(tc.data), os.FileMode(0600)); err != nil {
+				t.Fatalf("error writing key file: %v", err)
+			}
+			_, _, err := LoadOrGenerateKeyFile(keyPath)
+			if err == nil {
+				t.Fatal("expected an error for an invalid key file, got none")
+			}
+			if !strings.Contains(err.Error(), "does not contain a valid private key") {
+				t.Errorf("expected the error to say why the key could not be loaded, got: %v", err)
+			}
+		})
 	}
 }
 
