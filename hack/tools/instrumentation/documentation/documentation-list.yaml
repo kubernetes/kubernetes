@@ -6264,6 +6264,28 @@
     endpoint: /metrics
   - component: kubelet
     endpoint: /metrics
+- name: rest_client_requests_rejected_total
+  help: Number of HTTP request attempts the server rejected because it is overloaded,
+    partitioned by method and host. Requires an apiserver that sets the X-Kubernetes-Overload-Rejected
+    response header.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - host
+  - method
+  componentEndpoints:
+  - component: cloud-controller-manager
+    endpoint: /metrics
+  - component: kube-apiserver
+    endpoint: /metrics
+  - component: kube-controller-manager
+    endpoint: /metrics
+  - component: kube-proxy
+    endpoint: /metrics
+  - component: kube-scheduler
+    endpoint: /metrics
+  - component: kubelet
+    endpoint: /metrics
 - name: rest_client_requests_total
   help: Number of HTTP requests, partitioned by status code, method, and host.
   type: Counter

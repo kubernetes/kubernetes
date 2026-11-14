@@ -73,6 +73,19 @@ func TestClientGOMetrics(t *testing.T) {
 				`,
 		},
 		{
+			description: "Number of requests the server rejected because it is overloaded, partitioned by method and host.",
+			name:        "rest_client_requests_rejected_total",
+			metric:      requestRejected,
+			update: func() {
+				metrics.RequestRejected.IncrementRejected(context.TODO(), "POST", "www.bar.com")
+			},
+			want: `
+			            # HELP rest_client_requests_rejected_total [ALPHA] Number of HTTP request attempts the server rejected because it is overloaded, partitioned by method and host. Requires an apiserver that sets the X-Kubernetes-Overload-Rejected response header.
+			            # TYPE rest_client_requests_rejected_total counter
+			            rest_client_requests_rejected_total{host="www.bar.com",method="POST"} 1
+				`,
+		},
+		{
 			description: "Number of calls to an exec plugin",
 			name:        "rest_client_exec_plugin_call_total",
 			metric:      execPluginCalls,
