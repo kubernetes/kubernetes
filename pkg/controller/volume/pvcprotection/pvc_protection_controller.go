@@ -19,6 +19,7 @@ package pvcprotection
 import (
 	"context"
 	"fmt"
+	"iter"
 	"sync"
 	"time"
 
@@ -45,17 +46,53 @@ import (
 // Controller is controller that removes PVCProtectionFinalizer
 // from PVCs that are used by no pods.
 
+// LazyLivePodList holds the live pod list of one namespace for the duration of
+// a processPVCsByNamespace run, indexed by PVC the same way as the informer's
+// cache so both lookups go through common.PodPVCIndexFunc.
 type LazyLivePodList struct {
-	cache      []v1.Pod
+	// pods is nil until the namespace has been listed.
+	pods       cache.Indexer
 	controller *Controller
 }
 
-func (ll *LazyLivePodList) getCache() []v1.Pod {
-	return ll.cache
+func (ll *LazyLivePodList) listed() bool {
+	return ll.pods != nil
 }
 
-func (ll *LazyLivePodList) setCache(pods []v1.Pod) {
-	ll.cache = pods
+// setPods publishes the indexer only after every pod was added, so a failed
+// index leaves ll unlisted and the next PVC in the batch re-lists.
+func (ll *LazyLivePodList) setPods(pods []v1.Pod) error {
+	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{common.PodPVCIndex: common.PodPVCIndexFunc()})
+	for i := range pods {
+		if err := indexer.Add(&pods[i]); err != nil {
+			return err
+		}
+	}
+	ll.pods = indexer
+	return nil
+}
+
+func (ll *LazyLivePodList) podsUsingPVC(pvc *v1.PersistentVolumeClaim) (iter.Seq[*v1.Pod], error) {
+	objs, err := ll.pods.ByIndex(common.PodPVCIndex, pvcIndexKey(pvc))
+	if err != nil {
+		return nil, err
+	}
+	return func(yield func(*v1.Pod) bool) {
+		for _, obj := range objs {
+			pod, ok := obj.(*v1.Pod)
+			if !ok {
+				continue
+			}
+			if !yield(pod) {
+				return
+			}
+		}
+	}, nil
+}
+
+// pvcIndexKey returns the key under which common.PodPVCIndexFunc indexes pvc.
+func pvcIndexKey(pvc *v1.PersistentVolumeClaim) string {
+	return cache.MetaObjectToName(pvc).String()
 }
 
 type pvcData struct {
@@ -409,7 +446,7 @@ func (c *Controller) askInformer(logger klog.Logger, pvc *v1.PersistentVolumeCla
 	logger.V(4).Info("Looking for Pods using PVC in the Informer's cache", "PVC", klog.KObj(pvc))
 
 	// The indexer is used to find pods which might use the PVC.
-	objs, err := c.podIndexer.ByIndex(common.PodPVCIndex, fmt.Sprintf("%s/%s", pvc.Namespace, pvc.Name))
+	objs, err := c.podIndexer.ByIndex(common.PodPVCIndex, pvcIndexKey(pvc))
 	if err != nil {
 		return false, fmt.Errorf("cache-based list of pods failed while processing %s/%s: %s", pvc.Namespace, pvc.Name, err.Error())
 	}
@@ -434,22 +471,23 @@ func (c *Controller) askInformer(logger klog.Logger, pvc *v1.PersistentVolumeCla
 func (c *Controller) askAPIServer(ctx context.Context, pvc *v1.PersistentVolumeClaim, lazyLivePodList *LazyLivePodList, podUsage podUsageCheckFunc) (bool, error) {
 	logger := klog.FromContext(ctx)
 	logger.V(4).Info("Looking for Pods using PVC", "PVC", klog.KObj(pvc))
-	if lazyLivePodList.getCache() == nil {
+	if !lazyLivePodList.listed() {
 		logger.V(4).Info("Live listing Pods in namespace", "namespace", pvc.Namespace)
 		podsList, err := c.client.CoreV1().Pods(pvc.Namespace).List(ctx, metav1.ListOptions{})
 		if err != nil {
 			return false, fmt.Errorf("live list of pods failed: %s", err.Error())
 		}
-
-		if podsList.Items == nil {
-			lazyLivePodList.setCache(make([]v1.Pod, 0))
-		} else {
-			lazyLivePodList.setCache(podsList.Items)
+		if err := lazyLivePodList.setPods(podsList.Items); err != nil {
+			return false, fmt.Errorf("indexing live list of pods failed: %s", err.Error())
 		}
 	}
 
-	for _, pod := range lazyLivePodList.getCache() {
-		if podUsage(logger, &pod, pvc) {
+	pods, err := lazyLivePodList.podsUsingPVC(pvc)
+	if err != nil {
+		return false, fmt.Errorf("live-list lookup of pods failed while processing %s/%s: %s", pvc.Namespace, pvc.Name, err.Error())
+	}
+	for pod := range pods {
+		if podUsage(logger, pod, pvc) {
 			return true, nil
 		}
 	}
