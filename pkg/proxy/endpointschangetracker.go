@@ -175,6 +175,9 @@ type UpdateEndpointsMapResult struct {
 	// UpdatedServices lists the names of all services with added/updated/deleted
 	// endpoints since the last Update.
 	UpdatedServices sets.Set[types.NamespacedName]
+	// UpdatedServicePorts lists every port of each of UpdatedServices that has
+	// endpoints before or after the update.
+	UpdatedServicePorts sets.Set[ServicePortName]
 	// ConntrackCleanupRequired will be true if any UDP ServicePort changed endpoints, false otherwise.
 	// It's used to minimise conntrack cleanup calls.
 	ConntrackCleanupRequired bool
@@ -193,6 +196,7 @@ type EndpointsMap map[ServicePortName][]Endpoint
 func (em EndpointsMap) Update(ect *EndpointsChangeTracker) UpdateEndpointsMapResult {
 	result := UpdateEndpointsMapResult{
 		UpdatedServices:        sets.New[types.NamespacedName](),
+		UpdatedServicePorts:    sets.New[ServicePortName](),
 		LastChangeTriggerTimes: make(map[types.NamespacedName][]time.Time),
 	}
 	if ect == nil {
@@ -205,6 +209,12 @@ func (em EndpointsMap) Update(ect *EndpointsChangeTracker) UpdateEndpointsMapRes
 			ect.processEndpointsMapChange(change.previous, change.current)
 		}
 		result.UpdatedServices.Insert(nn)
+		for svcPortName := range change.previous {
+			result.UpdatedServicePorts.Insert(svcPortName)
+		}
+		for svcPortName := range change.current {
+			result.UpdatedServicePorts.Insert(svcPortName)
+		}
 
 		em.unmerge(change.previous)
 		em.merge(change.current)
@@ -264,35 +274,35 @@ func formatEndpointsList(endpoints []Endpoint) []string {
 	return formattedList
 }
 
-// getLocalEndpointIPs returns endpoints IPs if given endpoint is local - local means the endpoint is running in same host as kube-proxy.
+// addLocalReadyEndpointIPs adds the IPs of the local ready endpoints in epList to
+// localIPs[nsn] - local means the endpoint is running in same host as kube-proxy.
+func addLocalReadyEndpointIPs(localIPs map[types.NamespacedName]sets.Set[string], nsn types.NamespacedName, epList []Endpoint) {
+	for _, ep := range epList {
+		// Only add ready endpoints for health checking. Terminating endpoints may still serve traffic
+		// but the health check signal should fail if there are only terminating endpoints on a node.
+		if !ep.IsReady() || !ep.IsLocal() {
+			continue
+		}
+		if localIPs[nsn] == nil {
+			localIPs[nsn] = sets.New[string]()
+		}
+		localIPs[nsn].Insert(ep.IP())
+	}
+}
+
+// getLocalReadyEndpointIPs returns the IPs of the local ready endpoints of each Service.
 func (em EndpointsMap) getLocalReadyEndpointIPs() map[types.NamespacedName]sets.Set[string] {
 	localIPs := make(map[types.NamespacedName]sets.Set[string])
 	for svcPortName, epList := range em {
-		for _, ep := range epList {
-			// Only add ready endpoints for health checking. Terminating endpoints may still serve traffic
-			// but the health check signal should fail if there are only terminating endpoints on a node.
-			if !ep.IsReady() {
-				continue
-			}
-
-			if ep.IsLocal() {
-				nsn := svcPortName.NamespacedName
-				if localIPs[nsn] == nil {
-					localIPs[nsn] = sets.New[string]()
-				}
-				localIPs[nsn].Insert(ep.IP())
-			}
-		}
+		addLocalReadyEndpointIPs(localIPs, svcPortName.NamespacedName, epList)
 	}
 	return localIPs
 }
 
 // LocalReadyEndpoints returns a map of Service names to the number of local ready
-// endpoints for that service.
+// endpoints for that service. Use UpdateLocalReadyEndpoints to keep the result current
+// without rescanning em.
 func (em EndpointsMap) LocalReadyEndpoints() map[types.NamespacedName]int {
-	// TODO: If this will appear to be computationally expensive, consider
-	// computing this incrementally similarly to endpointsMap.
-
 	// (Note that we need to call getLocalEndpointIPs first to squash the data by IP,
 	// because the EndpointsMap is sorted by IP+port, not just IP, and we want to
 	// consider a Service pointing to 10.0.0.1:80 and 10.0.0.1:443 to have 1 endpoint,
@@ -304,4 +314,18 @@ func (em EndpointsMap) LocalReadyEndpoints() map[types.NamespacedName]int {
 		eps[nsn] = len(ips)
 	}
 	return eps
+}
+
+// UpdateLocalReadyEndpoints updates counts, as returned by LocalReadyEndpoints, for
+// the Services of svcPortNames. svcPortNames must contain every port those Services
+// have endpoints for, as UpdateEndpointsMapResult.UpdatedServicePorts does.
+func (em EndpointsMap) UpdateLocalReadyEndpoints(counts map[types.NamespacedName]int, svcPortNames sets.Set[ServicePortName]) {
+	localIPs := make(map[types.NamespacedName]sets.Set[string])
+	for svcPortName := range svcPortNames {
+		delete(counts, svcPortName.NamespacedName)
+		addLocalReadyEndpointIPs(localIPs, svcPortName.NamespacedName, em[svcPortName])
+	}
+	for nsn, ips := range localIPs {
+		counts[nsn] = len(ips)
+	}
 }

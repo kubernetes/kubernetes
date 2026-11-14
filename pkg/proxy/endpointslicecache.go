@@ -31,7 +31,7 @@ import (
 
 // EndpointSliceCache is used as a cache of EndpointSlice information.
 type EndpointSliceCache struct {
-	// lock protects trackerByServiceMap.
+	// lock protects trackerByServiceMap and pendingServices.
 	lock sync.Mutex
 
 	// trackerByServiceMap is the basis of this cache. It contains endpoint
@@ -41,6 +41,9 @@ type EndpointSliceCache struct {
 	// require slice specific caching to prevent endpoints being removed from
 	// the cache when they may have just moved to a different slice.
 	trackerByServiceMap map[types.NamespacedName]*endpointSliceTracker
+	// pendingServices contains the keys of trackerByServiceMap that may have pending
+	// changes, so that checkoutChanges doesn't have to look at every Service.
+	pendingServices sets.Set[types.NamespacedName]
 
 	makeEndpointInfo makeEndpointFunc
 	nodeName         string
@@ -71,6 +74,7 @@ func NewEndpointSliceCache(nodeName string, makeEndpointInfo makeEndpointFunc) *
 	}
 	return &EndpointSliceCache{
 		trackerByServiceMap: map[types.NamespacedName]*endpointSliceTracker{},
+		pendingServices:     sets.New[types.NamespacedName](),
 		nodeName:            nodeName,
 		makeEndpointInfo:    makeEndpointInfo,
 	}
@@ -110,6 +114,7 @@ func (cache *EndpointSliceCache) updatePending(endpointSlice *discovery.Endpoint
 
 	if changed {
 		cache.trackerByServiceMap[serviceKey].pending[sliceKey] = esData
+		cache.pendingServices.Insert(serviceKey)
 	}
 
 	return changed
@@ -123,8 +128,9 @@ func (cache *EndpointSliceCache) checkoutChanges() map[types.NamespacedName]*end
 	cache.lock.Lock()
 	defer cache.lock.Unlock()
 
-	for serviceNN, esTracker := range cache.trackerByServiceMap {
-		if len(esTracker.pending) == 0 {
+	for serviceNN := range cache.pendingServices {
+		esTracker, ok := cache.trackerByServiceMap[serviceNN]
+		if !ok || len(esTracker.pending) == 0 {
 			continue
 		}
 
@@ -148,6 +154,9 @@ func (cache *EndpointSliceCache) checkoutChanges() map[types.NamespacedName]*end
 		change.current = cache.getEndpointsMap(serviceNN, esTracker.applied)
 		changes[serviceNN] = change
 	}
+	// Not clear(): a map keeps its capacity, and iterating it costs time proportional
+	// to that, so after the initial sync every checkout would scan every Service.
+	cache.pendingServices = sets.New[types.NamespacedName]()
 
 	return changes
 }
