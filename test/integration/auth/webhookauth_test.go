@@ -48,6 +48,7 @@ import (
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/discovery/cached/memory"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/keyutil"
@@ -857,4 +858,57 @@ func TestWebhookAuthLiveAPIServerDispatch(t *testing.T) {
 			t.Fatalf("Ignore authentication failure: error=%v status=%d admissions=%d, want skipped401 without callback", err, lastWebhookStatus.Load(), admittedCount.Load())
 		}
 	})
+}
+
+// TestAllowedSubresourceGroupMismatchesMatchAllBuiltins starts a kube-apiserver
+// with all built-in APIs and feature gates enabled, queries aggregated
+// discovery via a cached discovery client, and asserts that every cross-group
+// subresource in Kubernetes is already covered by
+// admissionauth.AllowedSubresourceGroupMismatchList(). If a future Kubernetes
+// feature adds a new cross-group subresource, this test will fail so
+// AllowedSubresourceGroupMismatchList() is updated accordingly.
+func TestAllowedSubresourceGroupMismatchesMatchAllBuiltins(t *testing.T) {
+	t.Setenv("KUBE_APISERVER_SERVE_REMOVED_APIS_FOR_ONE_RELEASE", "true")
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		"AllAlpha": true,
+		"AllBeta":  true,
+	})
+
+	ctx := ktesting.Init(t)
+	_, kubeConfig, tearDown := framework.StartTestServer(ctx, t, framework.TestServerSetup{
+		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
+			opts.APIEnablement.RuntimeConfig["api/all"] = "true"
+			opts.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount", "TaintNodesByCondition"}
+		},
+	})
+	defer tearDown()
+
+	cs, err := clientset.NewForConfig(kubeConfig)
+	if err != nil {
+		t.Fatalf("create Kubernetes client: %v", err)
+	}
+	cachedDiscovery := memory.NewMemCacheClient(cs.Discovery())
+	discovered, err := admissionauth.DiscoverSubresourceGroupMismatches(ctx, cachedDiscovery)
+	if err != nil {
+		t.Fatalf("DiscoverSubresourceGroupMismatches: %v", err)
+	}
+	defaults := admissionauth.AllowedSubresourceGroupMismatchList()
+	if len(discovered) != len(defaults) {
+		t.Fatalf("discovered cross-group subresource map has %d entries (%+v), want exact match with built-in defaults (%d entries: %+v); update AllowedSubresourceGroupMismatchList()",
+			len(discovered), discovered, len(defaults), defaults)
+	}
+	for key, gotKinds := range discovered {
+		wantKinds, ok := defaults[key]
+		if !ok {
+			t.Fatalf("discovered cross-group subresource %+v -> %+v is missing from AllowedSubresourceGroupMismatchList()", key, gotKinds)
+		}
+		if len(gotKinds) != len(wantKinds) {
+			t.Fatalf("discovered cross-group subresource %+v has kinds %+v, want %+v", key, gotKinds, wantKinds)
+		}
+		for kind := range gotKinds {
+			if _, ok := wantKinds[kind]; !ok {
+				t.Fatalf("discovered cross-group subresource %+v has unexpected kind %+v (want %+v)", key, kind, wantKinds)
+			}
+		}
+	}
 }

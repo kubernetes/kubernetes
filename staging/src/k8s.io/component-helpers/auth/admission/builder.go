@@ -31,7 +31,10 @@ import (
 	"github.com/go-jose/go-jose/v4/jwt"
 
 	"k8s.io/apimachinery/pkg/util/validation"
+	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/rest"
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -58,6 +61,9 @@ type builder struct {
 	// namespaceFile is the projected ServiceAccount namespace file path,
 	// defaulted by newBuilder to projectedServiceAccountNamespace.
 	namespaceFile string
+
+	mismatchProviderSet bool
+	mismatchProvider    WebhookSubresourceGroupAllowedMismatch
 }
 
 func newBuilder() *builder {
@@ -79,18 +85,32 @@ func WithIssuer(issuer, audience string, client *http.Client) Option {
 }
 
 // WithServiceAudience sets the expected audience of a Service-backed in-cluster
-// webhook to https://<name>.<namespace>.svc:<port><path>, reading <namespace>
-// from the Pod's projected ServiceAccount namespace file. Supply the registered
-// Service's name, path (starting with "/", or "/" if omitted in the
-// registration), and non-zero port (443 if omitted in the registration). Use
-// [WithIssuer] for URL-backed registrations; it cannot be combined with
-// WithServiceAudience. Never derive the audience from a request or token.
-func WithServiceAudience(name, path string, port uint16) Option {
+// webhook to https://<serviceName>.<namespace>.svc:<servicePort><servicePath>,
+// reading <namespace> from the Pod's projected ServiceAccount namespace file.
+// Supply the registered Service's serviceName, servicePath (starting with "/",
+// or "/" if omitted in the registration), and non-zero servicePort (443 if
+// omitted in the registration; this is Service spec.ports[].port /
+// clientConfig.service.port, not the container's targetPort). Use [WithIssuer]
+// for URL-backed registrations; it cannot be combined with WithServiceAudience.
+// Never derive the audience from a request or token.
+func WithServiceAudience(serviceName, servicePath string, servicePort uint16) Option {
 	return func(b *builder) {
 		b.serviceAudienceSet = true
-		b.serviceName = name
-		b.servicePath = path
-		b.servicePort = port
+		b.serviceName = serviceName
+		b.servicePath = servicePath
+		b.servicePort = servicePort
+	}
+}
+
+// WithSubresourceGroupMismatches overrides the allowed cross-group subresource
+// object Kind map using provider.Build(ctx) at startup. When omitted,
+// [WithServiceAudience] queries cluster discovery once at startup via a cached
+// discovery client (seeded with [AllowedSubresourceGroupMismatchList]) and
+// [WithIssuer] uses [AllowedSubresourceGroupMismatchList].
+func WithSubresourceGroupMismatches(provider WebhookSubresourceGroupAllowedMismatch) Option {
+	return func(b *builder) {
+		b.mismatchProviderSet = true
+		b.mismatchProvider = provider
 	}
 }
 
@@ -103,6 +123,9 @@ func newVerifier(ctx context.Context, opts ...Option) (*verifier, error) {
 }
 
 func (b *builder) buildVerifier(ctx context.Context) (*verifier, error) {
+	if b.mismatchProviderSet && b.mismatchProvider == nil {
+		return nil, errors.New("admission: WithSubresourceGroupMismatches requires a non-nil provider")
+	}
 	if b.remoteSet && b.serviceAudienceSet {
 		return nil, errors.New("admission: WithServiceAudience cannot be combined with WithIssuer")
 	}
@@ -127,7 +150,35 @@ func (b *builder) localVerifier(ctx context.Context) (*verifier, error) {
 	if err != nil {
 		return nil, fmt.Errorf("admission: loading in-cluster configuration: %w", err)
 	}
-	return newLocalVerifier(ctx, config, audience)
+	return b.localVerifierWithConfig(ctx, config, audience)
+}
+
+func (b *builder) localVerifierWithConfig(ctx context.Context, config *rest.Config, audience string) (*verifier, error) {
+	v, err := newLocalVerifier(ctx, config, audience)
+	if err != nil {
+		return nil, err
+	}
+	if b.mismatchProviderSet {
+		expectedMismatches, err := b.mismatchProvider.Build(ctx)
+		if err != nil {
+			klog.LoggerWithName(klog.FromContext(ctx), "admissionTokenVerifier").Error(err, "Failed to build subresource group mismatch map")
+			return nil, fmt.Errorf("admission: building subresource group mismatches: %w", err)
+		}
+		v.expectedSubresourceMismatches = expectedMismatches
+		return v, nil
+	}
+	discoveryClient, err := discovery.NewDiscoveryClientForConfig(config)
+	if err != nil {
+		return nil, fmt.Errorf("admission: creating in-cluster discovery client: %w", err)
+	}
+	cachedDiscovery := memory.NewMemCacheClient(discoveryClient)
+	expectedMismatches, err := DiscoverSubresourceGroupMismatches(ctx, cachedDiscovery)
+	if err != nil {
+		klog.LoggerWithName(klog.FromContext(ctx), "admissionTokenVerifier").Error(err, "Failed to discover in-cluster subresource group mismatches on startup")
+		return nil, err
+	}
+	v.expectedSubresourceMismatches = expectedMismatches
+	return v, nil
 }
 
 // buildInClusterServiceAudience validates the Service name, path, port, and
@@ -196,10 +247,21 @@ func (b *builder) remoteVerifier(ctx context.Context) (*verifier, error) {
 	if err != nil || jwksURL.Scheme != "https" || jwksURL.Host == "" || jwksURL.User != nil || jwksURL.Fragment != "" {
 		return nil, errors.New("admission: signing-key endpoint must be an HTTPS URL without credentials or fragment")
 	}
-	return &verifier{verifier: provider.VerifierContext(ctx, &oidc.Config{
-		ClientID:             b.audience,
-		SupportedSigningAlgs: supportedSigningAlgs,
-	})}, nil
+	expectedMismatches := AllowedSubresourceGroupMismatchList()
+	if b.mismatchProviderSet {
+		expectedMismatches, err = b.mismatchProvider.Build(ctx)
+		if err != nil {
+			klog.LoggerWithName(klog.FromContext(ctx), "admissionTokenVerifier").Error(err, "Failed to build subresource group mismatch map")
+			return nil, fmt.Errorf("admission: building subresource group mismatches: %w", err)
+		}
+	}
+	return &verifier{
+		verifier: provider.VerifierContext(ctx, &oidc.Config{
+			ClientID:             b.audience,
+			SupportedSigningAlgs: supportedSigningAlgs,
+		}),
+		expectedSubresourceMismatches: expectedMismatches,
+	}, nil
 }
 
 func extractLocalIssuer(tokenFile string) (string, error) {
@@ -237,6 +299,7 @@ func newLocalVerifier(ctx context.Context, config *rest.Config, audience string)
 		SupportedSigningAlgs: supportedSigningAlgs,
 	}
 	return &verifier{
-		verifier: oidc.NewVerifier(issuer, oidc.NewRemoteKeySet(oidc.ClientContext(ctx, client), jwksURL), verifierConfig),
+		verifier:                      oidc.NewVerifier(issuer, oidc.NewRemoteKeySet(oidc.ClientContext(ctx, client), jwksURL), verifierConfig),
+		expectedSubresourceMismatches: AllowedSubresourceGroupMismatchList(),
 	}, nil
 }

@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -27,10 +28,15 @@ import (
 	"testing"
 
 	admissionv1 "k8s.io/api/admission/v1"
+	apidiscoveryv2 "k8s.io/api/apidiscovery/v2"
 	authenticationv1 "k8s.io/api/authentication/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/discovery/cached/memory"
+	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/textlogger"
 )
@@ -656,5 +662,200 @@ func TestAdmissionRequestKindDiagnostics(t *testing.T) {
 		if strings.Contains(log, private) {
 			t.Errorf("log leaked %q: %s", private, log)
 		}
+	}
+}
+
+type staticSubresourceMismatchProvider struct {
+	expectedMismatches ExpectedSubresourceGroupMismatchMap
+	err                error
+}
+
+func (p *staticSubresourceMismatchProvider) Build(context.Context) (ExpectedSubresourceGroupMismatchMap, error) {
+	return p.expectedMismatches, p.err
+}
+
+func TestAllowedSubresourceGroupMismatchList_MutationIsolated(t *testing.T) {
+	first := AllowedSubresourceGroupMismatchList()
+	if len(first) != 3 {
+		t.Fatalf("len(AllowedSubresourceGroupMismatchList()) = %d, want 3", len(first))
+	}
+	scaleKey := SubresourceGroupMismatchKey{Subresource: "scale"}
+	first[scaleKey][schema.GroupVersionKind{Group: "evil.example.com", Version: "v1", Kind: "Scale"}] = struct{}{}
+	delete(first, SubresourceGroupMismatchKey{Resource: coreV1PodsGVR, Subresource: "eviction"})
+
+	second := AllowedSubresourceGroupMismatchList()
+	if _, ok := second[scaleKey][schema.GroupVersionKind{Group: "evil.example.com", Version: "v1", Kind: "Scale"}]; ok {
+		t.Fatal("mutating inner GVK set in AllowedSubresourceGroupMismatchList affected subsequent calls")
+	}
+	if _, ok := second[SubresourceGroupMismatchKey{Resource: coreV1PodsGVR, Subresource: "eviction"}]; !ok {
+		t.Fatal("deleting key in AllowedSubresourceGroupMismatchList affected subsequent calls")
+	}
+}
+
+func TestWithSubresourceGroupMismatches(t *testing.T) {
+	ts := newOIDCTestServer(t)
+	claims := ts.baseClaims()
+	claims["kubernetes.io"].(map[string]any)["attestations"] = map[string]any{
+		admissionReviewAPIGroupsClaimKey: []string{"pets.example.com", "apps"},
+	}
+	token := ts.sign(t, claims)
+
+	customResource := metav1.GroupVersionResource{Group: "pets.example.com", Version: "v1", Resource: "kittens"}
+	customKind := metav1.GroupVersionKind{Group: "adoption.example.com", Version: "v1", Kind: "AdoptionRequest"}
+	customReq := admissionRequest(customKind, customResource, "adopt", admissionv1.Create)
+	customReq.Object.Raw = []byte(`{"apiVersion":"adoption.example.com/v1","kind":"AdoptionRequest"}`)
+
+	defaultVerifier, err := NewVerifierForTest(context.Background(), WithIssuer(ts.issuer, testAudience, ts.client()))
+	if err != nil {
+		t.Fatalf("construct default verifier: %v", err)
+	}
+	if err := defaultVerifier.Verify(context.Background(), customReq, token); err == nil {
+		t.Fatal("default verifier accepted custom cross-group subresource without override")
+	}
+
+	extended := AllowedSubresourceGroupMismatchList()
+	extended[SubresourceGroupMismatchKey{Resource: customResource, Subresource: "adopt"}] = map[schema.GroupVersionKind]struct{}{
+		schema.GroupVersionKind(customKind): {},
+	}
+	customVerifier, err := NewVerifierForTest(
+		context.Background(),
+		WithIssuer(ts.issuer, testAudience, ts.client()),
+		WithSubresourceGroupMismatches(&staticSubresourceMismatchProvider{expectedMismatches: extended}),
+	)
+	if err != nil {
+		t.Fatalf("construct custom verifier: %v", err)
+	}
+	if err := customVerifier.Verify(context.Background(), customReq, token); err != nil {
+		t.Fatalf("custom verifier rejected configured cross-group subresource: %v", err)
+	}
+	scaleReq := admissionRequest(
+		metav1.GroupVersionKind{Group: "autoscaling", Version: "v1", Kind: "Scale"},
+		metav1.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"},
+		"scale", admissionv1.Update,
+	)
+	if err := customVerifier.Verify(context.Background(), scaleReq, token); err != nil {
+		t.Fatalf("seeded default scale subresource rejected: %v", err)
+	}
+
+	if _, err := NewVerifierForTest(context.Background(), WithIssuer(ts.issuer, testAudience, ts.client()), WithSubresourceGroupMismatches(nil)); err == nil {
+		t.Fatal("nil WithSubresourceGroupMismatches provider succeeded, want error")
+	}
+	if _, err := NewVerifierForTest(
+		context.Background(),
+		WithIssuer(ts.issuer, testAudience, ts.client()),
+		WithSubresourceGroupMismatches(&staticSubresourceMismatchProvider{err: errors.New("discovery unavailable")}),
+	); err == nil {
+		t.Fatal("failing WithSubresourceGroupMismatches provider succeeded, want startup error")
+	}
+}
+
+func TestDiscoverSubresourceGroupMismatches(t *testing.T) {
+	var discoveryRequests atomic.Int32
+	var failDiscovery atomic.Bool
+	aggGroups := apidiscoveryv2.APIGroupDiscoveryList{
+		TypeMeta: metav1.TypeMeta{APIVersion: "apidiscovery.k8s.io/v2", Kind: "APIGroupDiscoveryList"},
+		Items: []apidiscoveryv2.APIGroupDiscovery{
+			{
+				ObjectMeta: metav1.ObjectMeta{Name: "pets.example.com"},
+				Versions: []apidiscoveryv2.APIVersionDiscovery{
+					{
+						Version:   "v1",
+						Freshness: apidiscoveryv2.DiscoveryFreshnessCurrent,
+						Resources: []apidiscoveryv2.APIResourceDiscovery{
+							{
+								Resource:     "kittens",
+								ResponseKind: &metav1.GroupVersionKind{Group: "pets.example.com", Version: "v1", Kind: "Kitten"},
+								Scope:        apidiscoveryv2.ScopeNamespace,
+								Verbs:        []string{"create", "get"},
+								Subresources: []apidiscoveryv2.APISubresourceDiscovery{
+									{
+										Subresource:  "status",
+										ResponseKind: &metav1.GroupVersionKind{Group: "pets.example.com", Version: "v1", Kind: "Kitten"},
+										Verbs:        []string{"update"},
+									},
+									{
+										Subresource:  "adopt",
+										ResponseKind: &metav1.GroupVersionKind{Group: "adoption.example.com", Version: "v1", Kind: "AdoptionRequest"},
+										Verbs:        []string{"create"},
+									},
+									{
+										Subresource:  "scale",
+										ResponseKind: &metav1.GroupVersionKind{Group: "autoscaling", Version: "v1", Kind: "Scale"},
+										Verbs:        []string{"get", "update"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	coreGroups := apidiscoveryv2.APIGroupDiscoveryList{
+		TypeMeta: metav1.TypeMeta{APIVersion: "apidiscovery.k8s.io/v2", Kind: "APIGroupDiscoveryList"},
+	}
+
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		discoveryRequests.Add(1)
+		if failDiscovery.Load() {
+			http.Error(w, "discovery down", http.StatusServiceUnavailable)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json;g=apidiscovery.k8s.io;v=v2;as=APIGroupDiscoveryList")
+		switch r.URL.Path {
+		case "/api":
+			_ = json.NewEncoder(w).Encode(coreGroups)
+		case "/apis":
+			_ = json.NewEncoder(w).Encode(aggGroups)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer srv.Close()
+
+	cfg := &rest.Config{
+		Host:      srv.URL,
+		Transport: srv.Client().Transport,
+	}
+	discClient, err := discovery.NewDiscoveryClientForConfig(cfg)
+	if err != nil {
+		t.Fatalf("NewDiscoveryClientForConfig: %v", err)
+	}
+	cached := memory.NewMemCacheClient(discClient)
+
+	mismatches, err := DiscoverSubresourceGroupMismatches(context.Background(), cached)
+	if err != nil {
+		t.Fatalf("DiscoverSubresourceGroupMismatches: %v", err)
+	}
+	firstCallRequests := discoveryRequests.Load()
+	if firstCallRequests == 0 {
+		t.Fatal("expected discovery requests on initial populate")
+	}
+
+	adoptKey := SubresourceGroupMismatchKey{
+		Resource:    metav1.GroupVersionResource{Group: "pets.example.com", Version: "v1", Resource: "kittens"},
+		Subresource: "adopt",
+	}
+	wantAdoptKind := schema.GroupVersionKind{Group: "adoption.example.com", Version: "v1", Kind: "AdoptionRequest"}
+	if _, ok := mismatches[adoptKey][wantAdoptKind]; !ok {
+		t.Fatalf("discovered mismatches missing %+v -> %+v: %+v", adoptKey, wantAdoptKind, mismatches)
+	}
+
+	// Subsequent call without Invalidate uses the cached discovery response.
+	if _, err := DiscoverSubresourceGroupMismatches(context.Background(), cached); err != nil {
+		t.Fatalf("cached DiscoverSubresourceGroupMismatches: %v", err)
+	}
+	if discoveryRequests.Load() != firstCallRequests {
+		t.Fatalf("cached discovery made extra requests: got %d, want %d", discoveryRequests.Load(), firstCallRequests)
+	}
+
+	// Failing discovery after cache invalidation fails closed.
+	failDiscovery.Store(true)
+	cached.Invalidate()
+	if _, err := DiscoverSubresourceGroupMismatches(context.Background(), cached); err == nil {
+		t.Fatal("expected error when discovery fails, got nil")
+	}
+	if _, err := DiscoverSubresourceGroupMismatches(context.Background(), nil); err == nil {
+		t.Fatal("expected error when cached client is nil, got nil")
 	}
 }

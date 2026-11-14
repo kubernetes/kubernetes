@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 
 	"github.com/coreos/go-oidc/v3/oidc"
 	jose "github.com/go-jose/go-jose/v4"
@@ -31,6 +32,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/discovery"
 	"k8s.io/klog/v2"
 )
 
@@ -89,7 +91,28 @@ func allowsAPIGroup(groups []string, group string) bool {
 // which authenticates the Authorization header before reading or decoding the
 // HTTP request body.
 type verifier struct {
-	verifier *oidc.IDTokenVerifier
+	verifier                      *oidc.IDTokenVerifier
+	expectedSubresourceMismatches ExpectedSubresourceGroupMismatchMap
+}
+
+// SubresourceGroupMismatchKey identifies a subresource whose admitted object
+// Kind may belong to a different API group than the parent resource attested by
+// the webhook token. A zero Resource matches the named subresource on any
+// parent resource (for example, "/scale").
+type SubresourceGroupMismatchKey struct {
+	Resource    metav1.GroupVersionResource
+	Subresource string
+}
+
+// ExpectedSubresourceGroupMismatchMap maps a parent resource and subresource to
+// the set of expected (and therefore allowed) cross-group object Kinds for that
+// subresource.
+type ExpectedSubresourceGroupMismatchMap map[SubresourceGroupMismatchKey]map[schema.GroupVersionKind]struct{}
+
+// WebhookSubresourceGroupAllowedMismatch builds the map of expected cross-group
+// subresource object Kinds for a webhook.
+type WebhookSubresourceGroupAllowedMismatch interface {
+	Build(ctx context.Context) (ExpectedSubresourceGroupMismatchMap, error)
 }
 
 func (v *verifier) verify(ctx context.Context, req *admissionv1.AdmissionRequest, token string) error {
@@ -131,7 +154,7 @@ func (v *verifier) checkDecodedRequest(ctx context.Context, req *admissionv1.Adm
 		logger.V(2).Info("Webhook token verification failed", "reason", "token admissionReviewAPIGroups does not authorize the review's API group")
 		return errVerificationFailed
 	}
-	if err := checkRequestObjectKinds(req); err != nil {
+	if err := checkRequestObjectKinds(req, v.expectedSubresourceMismatches); err != nil {
 		logger.V(2).Info("Admission request rejected", "reason", "invalid admission request",
 			"requestUID", req.UID, "operation", req.Operation, "resource", schema.GroupVersionResource(req.Resource).String(),
 			"detail", err.Error())
@@ -140,7 +163,7 @@ func (v *verifier) checkDecodedRequest(ctx context.Context, req *admissionv1.Adm
 	return nil
 }
 
-func checkRequestObjectKinds(req *admissionv1.AdmissionRequest) error {
+func checkRequestObjectKinds(req *admissionv1.AdmissionRequest, expectedMismatches ExpectedSubresourceGroupMismatchMap) error {
 	if req == nil {
 		return errors.New("admission request is nil")
 	}
@@ -148,7 +171,7 @@ func checkRequestObjectKinds(req *admissionv1.AdmissionRequest) error {
 	if kindOrResourceIncomplete {
 		return errors.New("admission request kind or resource is incomplete")
 	}
-	if req.Kind.Group != req.Resource.Group && !allowedKindResourceGroupMismatch(req) {
+	if req.Kind.Group != req.Resource.Group && !allowedKindResourceGroupMismatch(req, expectedMismatches) {
 		return fmt.Errorf("object kind group %q differs from authorized resource group %q", req.Kind.Group, req.Resource.Group)
 	}
 	admittedKind := schema.GroupVersionKind(req.Kind)
@@ -161,24 +184,110 @@ func checkRequestObjectKinds(req *admissionv1.AdmissionRequest) error {
 // allowedKindResourceGroupMismatch reports whether req is a known subresource
 // whose admitted object Kind is in a different API group than the parent
 // resource attested by the token.
-func allowedKindResourceGroupMismatch(req *admissionv1.AdmissionRequest) bool {
-	switch schema.GroupVersionKind(req.Kind) {
-	case autoscalingSchemeGVKScale:
-		return req.SubResource == "scale"
-	case policySchemeGVKEviction:
-		return req.Resource == coreV1PodsGVR && req.SubResource == "eviction"
-	case authenticationv1.SchemeGroupVersion.WithKind("TokenRequest"):
-		return req.Resource == coreV1ServiceAccountsGVR && req.SubResource == "token"
-	default:
+func allowedKindResourceGroupMismatch(req *admissionv1.AdmissionRequest, expectedMismatches ExpectedSubresourceGroupMismatchMap) bool {
+	if req == nil || req.SubResource == "" {
 		return false
+	}
+	if expectedMismatches == nil {
+		expectedMismatches = defaultSubresourceGroupMismatches
+	}
+	admittedKind := schema.GroupVersionKind(req.Kind)
+	if kinds, ok := expectedMismatches[SubresourceGroupMismatchKey{Resource: req.Resource, Subresource: req.SubResource}]; ok {
+		if _, allowed := kinds[admittedKind]; allowed {
+			return true
+		}
+	}
+	if kinds, ok := expectedMismatches[SubresourceGroupMismatchKey{Subresource: req.SubResource}]; ok {
+		if _, allowed := kinds[admittedKind]; allowed {
+			return true
+		}
+	}
+	return false
+}
+
+// AllowedSubresourceGroupMismatchList returns a copy of the built-in Kubernetes
+// subresources whose admitted object Kind belongs to a different API group than
+// the parent resource attested by the webhook token ("/scale", "pods/eviction",
+// and "serviceaccounts/token"). Webhooks implementing
+// [WebhookSubresourceGroupAllowedMismatch] can call this function to seed their
+// map before adding custom cross-group subresources.
+func AllowedSubresourceGroupMismatchList() ExpectedSubresourceGroupMismatchMap {
+	return ExpectedSubresourceGroupMismatchMap{
+		{Subresource: "scale"}: {
+			autoscalingSchemeGVKScale: {},
+		},
+		{Resource: coreV1PodsGVR, Subresource: "eviction"}: {
+			policySchemeGVKEviction: {},
+		},
+		{Resource: coreV1ServiceAccountsGVR, Subresource: "token"}: {
+			authenticationV1TokenRequestGVK: {},
+		},
 	}
 }
 
+// DiscoverSubresourceGroupMismatches queries cluster discovery via a
+// [discovery.CachedDiscoveryInterface] and returns the built-in
+// [AllowedSubresourceGroupMismatchList] extended with any discovered
+// subresources whose response Kind group differs from their parent resource
+// group.
+func DiscoverSubresourceGroupMismatches(ctx context.Context, client discovery.CachedDiscoveryInterface) (ExpectedSubresourceGroupMismatchMap, error) {
+	if client == nil {
+		return nil, errors.New("admission: cached discovery client is nil")
+	}
+	_, resources, err := discovery.ServerGroupsAndResourcesWithContext(ctx, discovery.ToDiscoveryInterfaceWithContext(client))
+	if err != nil {
+		return nil, fmt.Errorf("admission: discovering subresource group mismatches: %w", err)
+	}
+	expectedMismatches := AllowedSubresourceGroupMismatchList()
+	for _, list := range resources {
+		if list == nil {
+			continue
+		}
+		gv, err := schema.ParseGroupVersion(list.GroupVersion)
+		if err != nil {
+			return nil, fmt.Errorf("admission: parsing discovered groupVersion %q: %w", list.GroupVersion, err)
+		}
+		for _, resource := range list.APIResources {
+			parent, subresource, isSubresource := strings.Cut(resource.Name, "/")
+			if !isSubresource || parent == "" || subresource == "" || resource.Kind == "" {
+				continue
+			}
+			kind := schema.GroupVersionKind{Group: gv.Group, Version: gv.Version, Kind: resource.Kind}
+			if resource.Group != "" {
+				kind.Group = resource.Group
+			}
+			if resource.Version != "" {
+				kind.Version = resource.Version
+			}
+			if kind.Group == gv.Group {
+				continue
+			}
+			gvr := metav1.GroupVersionResource{Group: gv.Group, Version: gv.Version, Resource: parent}
+			if allowedKindResourceGroupMismatch(&admissionv1.AdmissionRequest{
+				Kind:        metav1.GroupVersionKind(kind),
+				Resource:    gvr,
+				SubResource: subresource,
+			}, expectedMismatches) {
+				continue
+			}
+			key := SubresourceGroupMismatchKey{Resource: gvr, Subresource: subresource}
+			if expectedMismatches[key] == nil {
+				expectedMismatches[key] = make(map[schema.GroupVersionKind]struct{}, 1)
+			}
+			expectedMismatches[key][kind] = struct{}{}
+		}
+	}
+	return expectedMismatches, nil
+}
+
 var (
-	autoscalingSchemeGVKScale = schema.GroupVersionKind{Group: "autoscaling", Version: "v1", Kind: "Scale"}
-	policySchemeGVKEviction   = schema.GroupVersionKind{Group: "policy", Version: "v1", Kind: "Eviction"}
-	coreV1PodsGVR             = metav1.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}
-	coreV1ServiceAccountsGVR  = metav1.GroupVersionResource{Group: "", Version: "v1", Resource: "serviceaccounts"}
+	autoscalingSchemeGVKScale       = schema.GroupVersionKind{Group: "autoscaling", Version: "v1", Kind: "Scale"}
+	policySchemeGVKEviction         = schema.GroupVersionKind{Group: "policy", Version: "v1", Kind: "Eviction"}
+	authenticationV1TokenRequestGVK = authenticationv1.SchemeGroupVersion.WithKind("TokenRequest")
+	coreV1PodsGVR                   = metav1.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}
+	coreV1ServiceAccountsGVR        = metav1.GroupVersionResource{Group: "", Version: "v1", Resource: "serviceaccounts"}
+
+	defaultSubresourceGroupMismatches = AllowedSubresourceGroupMismatchList()
 )
 
 // checkObjectMatchesAdmittedKind validates both RawExtension representations against the admitted GVK.

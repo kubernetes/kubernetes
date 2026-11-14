@@ -30,6 +30,9 @@ import (
 	"time"
 
 	admissionv1 "k8s.io/api/admission/v1"
+	apidiscoveryv2 "k8s.io/api/apidiscovery/v2"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/rest"
 )
 
@@ -420,5 +423,130 @@ func TestGoModOIDCDependenciesMatchAPIServer(t *testing.T) {
 		if got == "" || want == "" || got != want {
 			t.Errorf("%s version in component-helpers/go.mod = %q, want %q from root go.mod", dep, got, want)
 		}
+	}
+}
+
+func TestLocalVerifierWithConfig_StartupDiscoveryAndOverride(t *testing.T) {
+	ts := newOIDCTestServer(t)
+	var failDiscovery atomic.Bool
+	aggGroups := apidiscoveryv2.APIGroupDiscoveryList{
+		TypeMeta: metav1.TypeMeta{APIVersion: "apidiscovery.k8s.io/v2", Kind: "APIGroupDiscoveryList"},
+		Items: []apidiscoveryv2.APIGroupDiscovery{
+			{
+				ObjectMeta: metav1.ObjectMeta{Name: "pets.example.com"},
+				Versions: []apidiscoveryv2.APIVersionDiscovery{
+					{
+						Version:   "v1",
+						Freshness: apidiscoveryv2.DiscoveryFreshnessCurrent,
+						Resources: []apidiscoveryv2.APIResourceDiscovery{
+							{
+								Resource:     "kittens",
+								ResponseKind: &metav1.GroupVersionKind{Group: "pets.example.com", Version: "v1", Kind: "Kitten"},
+								Scope:        apidiscoveryv2.ScopeNamespace,
+								Verbs:        []string{"create"},
+								Subresources: []apidiscoveryv2.APISubresourceDiscovery{
+									{
+										Subresource:  "adopt",
+										ResponseKind: &metav1.GroupVersionKind{Group: "adoption.example.com", Version: "v1", Kind: "AdoptionRequest"},
+										Verbs:        []string{"create"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	emptyGroups := apidiscoveryv2.APIGroupDiscoveryList{
+		TypeMeta: metav1.TypeMeta{APIVersion: "apidiscovery.k8s.io/v2", Kind: "APIGroupDiscoveryList"},
+	}
+
+	keys := testJWKS(t, ts.server, "/openid/v1/jwks")
+	apiServer := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/openid/v1/jwks":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write(keys)
+		case "/api":
+			if failDiscovery.Load() {
+				http.Error(w, "discovery unavailable", http.StatusServiceUnavailable)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json;g=apidiscovery.k8s.io;v=v2;as=APIGroupDiscoveryList")
+			_ = json.NewEncoder(w).Encode(emptyGroups)
+		case "/apis":
+			if failDiscovery.Load() {
+				http.Error(w, "discovery unavailable", http.StatusServiceUnavailable)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json;g=apidiscovery.k8s.io;v=v2;as=APIGroupDiscoveryList")
+			_ = json.NewEncoder(w).Encode(aggGroups)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer apiServer.Close()
+
+	projectedClaims := ts.baseClaims()
+	projectedClaims["iss"] = apiServer.URL
+	projectedClaims["aud"] = []string{"https://kubernetes.default.svc"}
+	delete(projectedClaims, "kubernetes.io")
+	projected := ts.sign(t, projectedClaims)
+	tokenFile := filepath.Join(t.TempDir(), "token")
+	if err := os.WriteFile(tokenFile, []byte(projected), 0600); err != nil {
+		t.Fatal(err)
+	}
+	config := &rest.Config{
+		Host:            apiServer.URL,
+		BearerTokenFile: tokenFile,
+		TLSClientConfig: rest.TLSClientConfig{
+			CAData: pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: apiServer.Certificate().Raw}),
+		},
+	}
+
+	b := newBuilder()
+	v, err := b.localVerifierWithConfig(context.Background(), config, testAudience)
+	if err != nil {
+		t.Fatalf("localVerifierWithConfig startup discovery: %v", err)
+	}
+	claims := ts.baseClaims()
+	claims["iss"] = apiServer.URL
+	claims["kubernetes.io"].(map[string]any)["attestations"] = map[string]any{
+		admissionReviewAPIGroupsClaimKey: []string{"pets.example.com"},
+	}
+	token := ts.sign(t, claims)
+	customReq := admissionRequest(
+		metav1.GroupVersionKind{Group: "adoption.example.com", Version: "v1", Kind: "AdoptionRequest"},
+		metav1.GroupVersionResource{Group: "pets.example.com", Version: "v1", Resource: "kittens"},
+		"adopt", admissionv1.Create,
+	)
+	if err := v.Verify(context.Background(), customReq, token); err != nil {
+		t.Fatalf("in-cluster verifier rejected discovered cross-group subresource: %v", err)
+	}
+
+	// Startup fails closed if discovery fails.
+	failDiscovery.Store(true)
+	if _, err := b.localVerifierWithConfig(context.Background(), config, testAudience); err == nil {
+		t.Fatal("localVerifierWithConfig succeeded when discovery failed, want startup error")
+	}
+
+	// Custom WithSubresourceGroupMismatches provider overrides in-cluster discovery.
+	WithSubresourceGroupMismatches(&staticSubresourceMismatchProvider{
+		expectedMismatches: ExpectedSubresourceGroupMismatchMap{
+			{
+				Resource:    metav1.GroupVersionResource{Group: "pets.example.com", Version: "v1", Resource: "kittens"},
+				Subresource: "adopt",
+			}: {
+				schema.GroupVersionKind{Group: "adoption.example.com", Version: "v1", Kind: "AdoptionRequest"}: {},
+			},
+		},
+	})(b)
+	vOverride, err := b.localVerifierWithConfig(context.Background(), config, testAudience)
+	if err != nil {
+		t.Fatalf("localVerifierWithConfig with custom provider: %v", err)
+	}
+	if err := vOverride.Verify(context.Background(), customReq, token); err != nil {
+		t.Fatalf("overridden in-cluster verifier rejected custom cross-group subresource: %v", err)
 	}
 }
