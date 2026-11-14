@@ -72,3 +72,17 @@ func remainingPodMemReqPerContainer(pod *v1.Pod) int64 {
 	remainingMemoryPerContainer := remainingMemory / int64(numContainers)
 	return remainingMemoryPerContainer
 }
+
+// getEffectiveContainerMemoryLimit returns the container memory limit used for
+// oom_score_adj. An unset limit, a zero limit, or a limit larger than node
+// memory capacity is treated as the node capacity.
+func getEffectiveContainerMemoryLimit(container *v1.Container, memoryCapacity int64) int64 {
+	if memoryCapacity < 0 {
+		memoryCapacity = 0
+	}
+	limit := container.Resources.Limits.Memory().Value()
+	if limit <= 0 || limit > memoryCapacity {
+		return memoryCapacity
+	}
+	return limit
+}
