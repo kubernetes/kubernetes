@@ -76,6 +76,9 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featur
 	if kc.NodeLeaseDurationSeconds <= 0 {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: nodeLeaseDurationSeconds must be greater than 0"))
 	}
+	if !kc.EnableNodeLease && !localFeatureGate.Enabled(features.ExternalNodeLivenessDetection) {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: ExternalNodeLivenessDetection feature gate is required to set enableNodeLease to false"))
+	}
 	if kc.SystemCgroups != "" && kc.CgroupRoot == "" {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: systemCgroups (--system-cgroups) was specified and cgroupRoot (--cgroup-root) was not specified"))
 	}

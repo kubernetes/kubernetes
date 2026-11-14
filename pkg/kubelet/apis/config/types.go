@@ -271,8 +271,14 @@ type KubeletConfiguration struct {
 	// ignore this frequency and post node status immediately if any change
 	// is detected.
 	NodeStatusReportFrequency metav1.Duration
-	// nodeLeaseDurationSeconds is the duration the Kubelet will set on its corresponding Lease.
+	// nodeLeaseDurationSeconds is the duration the Kubelet will set on its corresponding Lease,
+	// when enableNodeLease is true, and also bounds the heartbeat client timeout.
 	NodeLeaseDurationSeconds int32
+	// enableNodeLease controls whether the Kubelet creates and periodically renews
+	// its Node Lease in the kube-node-lease namespace.
+	// +featureGate=ExternalNodeLivenessDetection
+	// +optional
+	EnableNodeLease bool
 	// ImageMinimumGCAge is the minimum age for an unused image before it is
 	// garbage collected.
 	// The field value must be greater than 0.

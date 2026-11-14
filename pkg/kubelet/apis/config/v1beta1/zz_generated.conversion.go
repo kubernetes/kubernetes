@@ -599,6 +599,9 @@ func autoConvert_v1beta1_KubeletConfiguration_To_config_KubeletConfiguration(in 
 	out.NodeStatusUpdateFrequency = in.NodeStatusUpdateFrequency
 	out.NodeStatusReportFrequency = in.NodeStatusReportFrequency
 	out.NodeLeaseDurationSeconds = in.NodeLeaseDurationSeconds
+	if err := v1.Convert_Pointer_bool_To_bool(&in.EnableNodeLease, &out.EnableNodeLease, s); err != nil {
+		return err
+	}
 	out.ImageMinimumGCAge = in.ImageMinimumGCAge
 	out.ImageMaximumGCAge = in.ImageMaximumGCAge
 	if err := v1.Convert_Pointer_int32_To_int32(&in.ImageGCHighThresholdPercent, &out.ImageGCHighThresholdPercent, s); err != nil {
@@ -812,6 +815,9 @@ func autoConvert_config_KubeletConfiguration_To_v1beta1_KubeletConfiguration(in 
 	out.NodeStatusUpdateFrequency = in.NodeStatusUpdateFrequency
 	out.NodeStatusReportFrequency = in.NodeStatusReportFrequency
 	out.NodeLeaseDurationSeconds = in.NodeLeaseDurationSeconds
+	if err := v1.Convert_bool_To_Pointer_bool(&in.EnableNodeLease, &out.EnableNodeLease, s); err != nil {
+		return err
+	}
 	out.ImageMinimumGCAge = in.ImageMinimumGCAge
 	out.ImageMaximumGCAge = in.ImageMaximumGCAge
 	if err := v1.Convert_int32_To_Pointer_int32(&in.ImageGCHighThresholdPercent, &out.ImageGCHighThresholdPercent, s); err != nil {

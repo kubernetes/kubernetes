@@ -1206,18 +1206,20 @@ func NewMainKubelet(ctx context.Context,
 		handlers = append(handlers, lifecycle.NewDeclaredFeaturesAdmitHandler(klet.nodeDeclaredFeaturesFramework, klet.nodeDeclaredFeaturesSet, klet.version))
 	}
 
-	leaseDuration := time.Duration(kubeCfg.NodeLeaseDurationSeconds) * time.Second
-	renewInterval := time.Duration(float64(leaseDuration) * nodeLeaseRenewIntervalFraction)
-	klet.nodeLeaseController = lease.NewController(
-		klet.clock,
-		klet.heartbeatClient,
-		string(klet.nodeName),
-		kubeCfg.NodeLeaseDurationSeconds,
-		klet.onRepeatedHeartbeatFailure,
-		renewInterval,
-		string(klet.nodeName),
-		v1.NamespaceNodeLease,
-		util.SetNodeOwnerFunc(ctx, klet.heartbeatClient, string(klet.nodeName)))
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ExternalNodeLivenessDetection) || kubeCfg.EnableNodeLease {
+		leaseDuration := time.Duration(kubeCfg.NodeLeaseDurationSeconds) * time.Second
+		renewInterval := time.Duration(float64(leaseDuration) * nodeLeaseRenewIntervalFraction)
+		klet.nodeLeaseController = lease.NewController(
+			klet.clock,
+			klet.heartbeatClient,
+			string(klet.nodeName),
+			kubeCfg.NodeLeaseDurationSeconds,
+			klet.onRepeatedHeartbeatFailure,
+			renewInterval,
+			string(klet.nodeName),
+			v1.NamespaceNodeLease,
+			util.SetNodeOwnerFunc(ctx, klet.heartbeatClient, string(klet.nodeName)))
+	}
 
 	// setup node shutdown manager
 	shutdownManager := nodeshutdown.NewManager(&nodeshutdown.Config{
@@ -1500,9 +1502,9 @@ type Kubelet struct {
 	// kubelet recomputes the node status and posts it to the API server if the
 	// status has changed or if nodeStatusReportFrequency has elapsed since the
 	// last report.
-	// Note: node liveness is primarily signaled to the node controller via
-	// NodeLease renewals. nodeStatusUpdateFrequency controls how quickly node
-	// status changes (e.g. conditions) are detected and reported.
+	// Note: when enableNodeLease is true (the default), node liveness is primarily
+	// signaled to the node controller via NodeLease renewals. nodeStatusUpdateFrequency
+	// controls how quickly node status changes (e.g. conditions) are detected and reported.
 	// nodeStatusUpdateFrequency needs to be large enough for kubelet to generate
 	// node status. Kubelet may fail to update node status reliably if the value
 	// is too small, as it takes time to gather all necessary node information.
@@ -2042,10 +2044,14 @@ func (kl *Kubelet) Run(ctx context.Context, updates <-chan kubetypes.PodUpdate) 
 		// propagating logging values for contextual logging.
 		go kl.fastStatusUpdateOnce(context.WithoutCancel(ctx))
 
-		// Keep renewing the node lease until the kubelet exits.
-		// This intentionally does not use the kubelet context so lease renewal can
-		// continue during graceful shutdown.
-		go kl.nodeLeaseController.Run(context.Background())
+		if kl.nodeLeaseController != nil {
+			// Keep renewing the node lease until the kubelet exits.
+			// This intentionally does not use the kubelet context so lease renewal can
+			// continue during graceful shutdown.
+			go kl.nodeLeaseController.Run(context.Background())
+		} else {
+			logger.Info("Node lease heartbeat is disabled", "enableNodeLease", false)
+		}
 
 		// Mirror pods for static pods may not be created immediately during node startup
 		// due to node registration or informer sync delays. They will be created eventually
