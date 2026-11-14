@@ -30,6 +30,7 @@ import (
 
 	csipbv1 "github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -458,25 +459,29 @@ func TestClientNodeGetInfo(t *testing.T) {
 	for _, tc := range testCases {
 		t.Logf("test case: %s", tc.name)
 
+		nodeClient := fake.NewNodeClient(false /* stagingCapable */)
+		nodeClient.SetNextError(tc.err)
+		nodeClient.SetNodeGetInfoResp(&csipbv1.NodeGetInfoResponse{
+			NodeId:            tc.expectedNodeID,
+			MaxVolumesPerNode: tc.expectedMaxVolumePerNode,
+			AccessibleTopology: &csipbv1.Topology{
+				Segments: tc.expectedAccessibleTopology,
+			},
+		})
+
 		fakeCloser := fake.NewCloser(t)
 		client := &csiDriverClient{
 			driverName: "Fake Driver Name",
 			nodeV1ClientCreator: func(addr csiAddr, m *MetricsManager) (csipbv1.NodeClient, io.Closer, error) {
-				nodeClient := fake.NewNodeClient(false /* stagingCapable */)
-				nodeClient.SetNextError(tc.err)
-				nodeClient.SetNodeGetInfoResp(&csipbv1.NodeGetInfoResponse{
-					NodeId:            tc.expectedNodeID,
-					MaxVolumesPerNode: tc.expectedMaxVolumePerNode,
-					AccessibleTopology: &csipbv1.Topology{
-						Segments: tc.expectedAccessibleTopology,
-					},
-				})
 				return nodeClient, fakeCloser, nil
 			},
 		}
 
-		nodeID, maxVolumePerNode, accessibleTopology, err := client.NodeGetInfo(context.Background())
+		nodeID, maxVolumePerNode, accessibleTopology, err := client.NodeGetInfo(t.Context())
+
 		checkErr(t, tc.mustFail, err)
+		require.Len(t, nodeClient.NodeGetInfoRequests(), 1)
+		assert.False(t, nodeClient.NodeGetInfoRequests()[0].GetControllerGetNodeInfo())
 
 		if nodeID != tc.expectedNodeID {
 			t.Errorf("expected nodeID: %v; got: %v", tc.expectedNodeID, nodeID)
@@ -493,6 +498,59 @@ func TestClientNodeGetInfo(t *testing.T) {
 		if !tc.mustFail {
 			fakeCloser.Check()
 		}
+	}
+}
+
+func TestClientNodeGetInfoForController(t *testing.T) {
+	testCases := []struct {
+		name       string
+		wantID     string
+		rpcErr     error
+		creatorErr error
+	}{
+		{
+			name:   "request flag and node ID",
+			wantID: "node1",
+		},
+		{
+			name:   "RPC error",
+			rpcErr: errors.New("RPC failed"),
+		},
+		{
+			name:       "connection error",
+			creatorErr: errors.New("connection failed"),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			nodeClient := fake.NewNodeClient(false)
+			nodeClient.SetNodeGetInfoResp(&csipbv1.NodeGetInfoResponse{NodeId: "node1"})
+			nodeClient.SetNextError(tc.rpcErr)
+
+			fakeCloser := fake.NewCloser(t)
+			client := &csiDriverClient{
+				driverName: "Fake Driver Name",
+				nodeV1ClientCreator: func(addr csiAddr, m *MetricsManager) (csipbv1.NodeClient, io.Closer, error) {
+					return nodeClient, fakeCloser, tc.creatorErr
+				},
+			}
+
+			nodeID, err := client.NodeGetInfoForController(t.Context())
+
+			wantErr := tc.rpcErr
+			if tc.creatorErr != nil {
+				wantErr = tc.creatorErr
+				assert.Empty(t, nodeClient.NodeGetInfoRequests())
+			} else {
+				require.Len(t, nodeClient.NodeGetInfoRequests(), 1)
+				assert.True(t, nodeClient.NodeGetInfoRequests()[0].GetControllerGetNodeInfo())
+				fakeCloser.Check()
+			}
+
+			require.ErrorIs(t, err, wantErr)
+			assert.Equal(t, tc.wantID, nodeID)
+		})
 	}
 }
 
@@ -743,7 +801,7 @@ func TestNodeSupportsStageUnstageReturnNewUncertainProgressError(t *testing.T) {
 func TestClientNodeSupportsStageUnstage(t *testing.T) {
 	testClientNodeSupportsCapabilities(t,
 		func(client *csiDriverClient) (bool, error) {
-			return client.NodeSupportsStageUnstage(context.Background())
+			return client.NodeSupportsStageUnstage(t.Context())
 		},
 		func(stagingCapable bool) *fake.NodeClient {
 			// Creates a staging-capable client
@@ -754,7 +812,7 @@ func TestClientNodeSupportsStageUnstage(t *testing.T) {
 func TestClientNodeSupportsNodeExpand(t *testing.T) {
 	testClientNodeSupportsCapabilities(t,
 		func(client *csiDriverClient) (bool, error) {
-			return client.NodeSupportsNodeExpand(context.Background())
+			return client.NodeSupportsNodeExpand(t.Context())
 		},
 		func(expansionCapable bool) *fake.NodeClient {
 			return fake.NewNodeClientWithExpansion(false /* stageCapable */, expansionCapable)
@@ -764,7 +822,7 @@ func TestClientNodeSupportsNodeExpand(t *testing.T) {
 func TestClientNodeSupportsVolumeStats(t *testing.T) {
 	testClientNodeSupportsCapabilities(t,
 		func(client *csiDriverClient) (bool, error) {
-			return client.NodeSupportsVolumeStats(context.Background())
+			return client.NodeSupportsVolumeStats(t.Context())
 		},
 		func(volumeStatsCapable bool) *fake.NodeClient {
 			return fake.NewNodeClientWithVolumeStats(volumeStatsCapable)
@@ -774,10 +832,22 @@ func TestClientNodeSupportsVolumeStats(t *testing.T) {
 func TestClientNodeSupportsVolumeMountGroup(t *testing.T) {
 	testClientNodeSupportsCapabilities(t,
 		func(client *csiDriverClient) (bool, error) {
-			return client.NodeSupportsVolumeMountGroup(context.Background())
+			return client.NodeSupportsVolumeMountGroup(t.Context())
 		},
 		func(volumeMountGroupCapable bool) *fake.NodeClient {
 			return fake.NewNodeClientWithVolumeMountGroup(false /* stagingCapable */, volumeMountGroupCapable)
+		})
+}
+
+func TestClientNodeSupportsNodeInfoFromController(t *testing.T) {
+	testClientNodeSupportsCapabilities(t,
+		func(client *csiDriverClient) (bool, error) {
+			return client.NodeSupportsNodeInfoFromController(t.Context())
+		},
+		func(nodeInfoFromControllerCapable bool) *fake.NodeClient {
+			client := fake.NewNodeClient(true)
+			client.SetNodeInfoFromControllerCapability(nodeInfoFromControllerCapable)
+			return client
 		})
 }
 
@@ -787,11 +857,26 @@ func testClientNodeSupportsCapabilities(
 	nodeClientGenerator func(bool) *fake.NodeClient) {
 
 	testCases := []struct {
-		name    string
-		capable bool
+		name       string
+		capable    bool
+		rpcErr     error
+		creatorErr error
 	}{
-		{name: "positive", capable: true},
-		{name: "negative", capable: false},
+		{
+			name:    "positive",
+			capable: true,
+		},
+		{
+			name: "negative",
+		},
+		{
+			name:   "RPC error",
+			rpcErr: status.Error(codes.Internal, "capabilities RPC failed"),
+		},
+		{
+			name:       "connection error",
+			creatorErr: errors.New("connection failed"),
+		},
 	}
 
 	for _, tc := range testCases {
@@ -800,18 +885,29 @@ func testClientNodeSupportsCapabilities(
 		client := &csiDriverClient{
 			driverName: "Fake Driver Name",
 			nodeV1ClientCreator: func(addr csiAddr, m *MetricsManager) (csipbv1.NodeClient, io.Closer, error) {
+				if tc.creatorErr != nil {
+					return nil, nil, tc.creatorErr
+				}
 				nodeClient := nodeClientGenerator(tc.capable)
+				nodeClient.SetGetCapabilitiesErr(tc.rpcErr)
 				return nodeClient, fakeCloser, nil
 			},
 		}
 
-		got, _ := capabilityMethodToTest(client)
+		got, err := capabilityMethodToTest(client)
 
+		wantErr := tc.rpcErr
+		if tc.creatorErr != nil {
+			wantErr = tc.creatorErr
+		}
+		require.ErrorIs(t, err, wantErr)
 		if got != tc.capable {
 			t.Errorf("Expected capability support to be %v, got: %v", tc.capable, got)
 		}
 
-		fakeCloser.Check()
+		if tc.creatorErr == nil {
+			fakeCloser.Check()
+		}
 	}
 }
 
