@@ -2355,6 +2355,9 @@ func TestValidateIngressStatusUpdate(t *testing.T) {
 }
 
 func TestValidateIPAddress(t *testing.T) {
+	// The required checks on spec.parentRef and its resource and name fields are
+	// handled by declarative validation; their test cases live in
+	// test/declarative_validation/networking/ipaddress/.
 	testCases := map[string]struct {
 		expectedErrors int
 		ipAddress      *networking.IPAddress
@@ -2376,7 +2379,7 @@ func TestValidateIPAddress(t *testing.T) {
 			},
 		},
 		"empty-ipaddress-bad-name-no-parent-reference": {
-			expectedErrors: 2,
+			expectedErrors: 1,
 			ipAddress: &networking.IPAddress{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test-name",
@@ -2448,14 +2451,6 @@ func TestValidateIPAddress(t *testing.T) {
 				},
 			},
 		},
-		"missing-ipaddress-reference": {
-			expectedErrors: 1,
-			ipAddress: &networking.IPAddress{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "192.168.1.1",
-				},
-			},
-		},
 		"wrong-ipaddress-reference": {
 			expectedErrors: 1,
 			ipAddress: &networking.IPAddress{
@@ -2473,7 +2468,7 @@ func TestValidateIPAddress(t *testing.T) {
 			},
 		},
 		"wrong-ipaddress-reference-multiple-errors": {
-			expectedErrors: 4,
+			expectedErrors: 2,
 			ipAddress: &networking.IPAddress{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "192.168.1.1",
@@ -2516,6 +2511,8 @@ func TestValidateIPAddressUpdate(t *testing.T) {
 		},
 	}
 
+	// The spec immutable check is handled by declarative validation; the cases
+	// for it live in test/declarative_validation/networking/ipaddress/.
 	testCases := []struct {
 		name      string
 		new       func(svc *networking.IPAddress) *networking.IPAddress
@@ -2527,30 +2524,7 @@ func TestValidateIPAddressUpdate(t *testing.T) {
 			return out
 		},
 		expectErr: false,
-	},
-
-		{
-			name: "Failed update, update spec.ParentRef",
-			new: func(svc *networking.IPAddress) *networking.IPAddress {
-				out := svc.DeepCopy()
-				out.Spec.ParentRef = &networking.ParentReference{
-					Group:     "custom.resource.com",
-					Resource:  "Gateway",
-					Name:      "foo",
-					Namespace: "bar",
-				}
-
-				return out
-			}, expectErr: true,
-		}, {
-			name: "Failed update, delete spec.ParentRef",
-			new: func(svc *networking.IPAddress) *networking.IPAddress {
-				out := svc.DeepCopy()
-				out.Spec.ParentRef = nil
-				return out
-			}, expectErr: true,
-		},
-	}
+	}}
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
 			err := ValidateIPAddressUpdate(testCase.new(old), old)
