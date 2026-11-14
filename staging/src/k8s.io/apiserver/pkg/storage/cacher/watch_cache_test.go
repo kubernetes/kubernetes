@@ -134,7 +134,11 @@ func newTestWatchCache(capacity int, eventFreshDuration time.Duration, indexers 
 		defer wc.RUnlock()
 		return wc.resourceVersion, nil
 	}
-	wc.watchCache = newWatchCache(keyFunc, mockHandler, getAttrsFunc, versioner, indexers, testingclock.NewFakeClock(time.Now()), eventFreshDuration, schema.GroupResource{Resource: "pods"}, pr, getCurrentRV)
+	var err error
+	wc.watchCache, err = newWatchCache(keyFunc, mockHandler, getAttrsFunc, versioner, indexers, testingclock.NewFakeClock(time.Now()), eventFreshDuration, 0, schema.GroupResource{Resource: "pods"}, pr, getCurrentRV)
+	if err != nil {
+		panic(err)
+	}
 	go wc.freshness.Run(wc.stopCh)
 	// To preserve behavior of tests that assume a given capacity,
 	// resize it to th expected size.
@@ -1272,6 +1276,82 @@ func TestCapacityUpperBound(t *testing.T) {
 			capacity := capacityUpperBound(test.eventFreshDuration)
 			if test.expected != capacity {
 				t.Errorf("expected %v, got %v", test.expected, capacity)
+			}
+		})
+	}
+}
+
+func TestNewWatchCacheHistoryMaxEvents(t *testing.T) {
+	testCases := []struct {
+		name               string
+		eventFreshDuration time.Duration
+		maxEvents          int
+		expectedUpperBound int
+		expectErr          bool
+	}{
+		{
+			name:               "zero keeps the default upper bound",
+			eventFreshDuration: DefaultEventFreshDuration,
+			maxEvents:          0,
+			expectedUpperBound: defaultUpperBoundCapacity,
+		},
+		{
+			name:               "zero keeps the upper bound derived from eventFreshDuration",
+			eventFreshDuration: 4 * DefaultEventFreshDuration,
+			maxEvents:          0,
+			expectedUpperBound: 4 * defaultUpperBoundCapacity,
+		},
+		{
+			name:               "override raises the upper bound",
+			eventFreshDuration: DefaultEventFreshDuration,
+			maxEvents:          1_000_000,
+			expectedUpperBound: 1_000_000,
+		},
+		{
+			name:               "override replaces the upper bound derived from eventFreshDuration",
+			eventFreshDuration: 4 * DefaultEventFreshDuration,
+			maxEvents:          200_000,
+			expectedUpperBound: 200_000,
+		},
+		{
+			name:               "override equal to the lower bound",
+			eventFreshDuration: DefaultEventFreshDuration,
+			maxEvents:          defaultLowerBoundCapacity,
+			expectedUpperBound: defaultLowerBoundCapacity,
+		},
+		{
+			name:               "override below the lower bound",
+			eventFreshDuration: DefaultEventFreshDuration,
+			maxEvents:          defaultLowerBoundCapacity - 1,
+			expectErr:          true,
+		},
+		{
+			name:               "negative override",
+			eventFreshDuration: DefaultEventFreshDuration,
+			maxEvents:          -1,
+			expectErr:          true,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			config := &ImmutableWatchCacheConfig{groupResource: schema.GroupResource{Resource: "pods"}}
+			h, err := newWatchCacheHistory(config, test.eventFreshDuration, test.maxEvents)
+			if test.expectErr {
+				if err == nil {
+					t.Fatalf("expected an error for maxEvents %d, got nil", test.maxEvents)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if h.upperBoundCapacity != test.expectedUpperBound {
+				t.Errorf("expected upperBoundCapacity %d, got %d", test.expectedUpperBound, h.upperBoundCapacity)
+			}
+			if h.capacity != defaultLowerBoundCapacity || len(h.cache) != defaultLowerBoundCapacity {
+				t.Errorf("expected initial capacity %d, got capacity %d with cache length %d", defaultLowerBoundCapacity, h.capacity, len(h.cache))
 			}
 		})
 	}
