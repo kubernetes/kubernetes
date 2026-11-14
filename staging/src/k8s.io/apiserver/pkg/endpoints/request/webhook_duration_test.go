@@ -76,3 +76,28 @@ func TestLatencyTrackersFrom(t *testing.T) {
 		}
 	})
 }
+
+func TestAuditAnnotationsFromLatencyTrackersAPFClassification(t *testing.T) {
+	ctx := WithLatencyTrackersAndCustomClock(context.TODO(), &clocktesting.FakeClock{})
+	if annotations := AuditAnnotationsFromLatencyTrackers(ctx); len(annotations) != 0 {
+		t.Errorf("expected no annotations before classification, but got: %v", annotations)
+	}
+
+	TrackAPFClassification(ctx, "global-default", "global-default-pl")
+	TrackAPFQueueWaitLatency(ctx, 145)
+
+	annotations := AuditAnnotationsFromLatencyTrackers(ctx)
+	expected := map[string]string{
+		"apiserver.latency.k8s.io/apf-flow-schema":    "global-default",
+		"apiserver.latency.k8s.io/apf-priority-level": "global-default-pl",
+		"apiserver.latency.k8s.io/apf-queue-wait":     "145ns",
+	}
+	if len(annotations) != len(expected) {
+		t.Errorf("expected annotations: %v, but got: %v", expected, annotations)
+	}
+	for k, v := range expected {
+		if annotations[k] != v {
+			t.Errorf("expected annotation %q to be %q, but got: %q", k, v, annotations[k])
+		}
+	}
+}
