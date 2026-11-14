@@ -85,6 +85,8 @@ type criStatsProvider struct {
 	// useCRIPodSandboxStats is true when PodAndContainerStatsFromCRI is
 	// enabled and the CRI implements PodSandboxStats.
 	useCRIPodSandboxStats bool
+	// podManager is used to check whether a pod is still known to the kubelet.
+	podManager PodManager
 
 	// cpuUsageCache caches the cpu usage for containers.
 	cpuUsageCache map[string]*cpuUsageRecord
@@ -102,6 +104,7 @@ func newCRIStatsProvider(
 	podAndContainerStatsFromCRI bool,
 	podSandboxStatsUnimplemented bool,
 	fallbackStatsProvider containerStatsProvider,
+	podManager PodManager,
 ) containerStatsProvider {
 	return &criStatsProvider{
 		cadvisor:              cadvisor,
@@ -113,6 +116,7 @@ func newCRIStatsProvider(
 		useCRIPodSandboxStats: podAndContainerStatsFromCRI && !podSandboxStatsUnimplemented,
 		clock:                 clock.RealClock{},
 		fallbackStatsProvider: fallbackStatsProvider,
+		podManager:            podManager,
 	}
 }
 
@@ -443,6 +447,10 @@ func (p *criStatsProvider) getPodAndContainerMaps(ctx context.Context) (map[stri
 	}
 	podSandboxes = removeTerminatedPods(podSandboxes)
 	for _, s := range podSandboxes {
+		// Skip sandboxes whose pod is no longer known to the kubelet.
+		if _, found := p.podManager.GetPodByUID(types.UID(s.GetMetadata().GetUid())); !found {
+			continue
+		}
 		podSandboxMap[s.Id] = s
 	}
 
