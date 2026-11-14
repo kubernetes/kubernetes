@@ -3555,45 +3555,76 @@ func TestPodTopoSignatures(t *testing.T) {
 		name              string
 		pod               *v1.Pod
 		expectedSignature []fwk.SignFragment
-		scheduleable      bool
 		config            config.PodTopologySpreadArgs
+		objects           []runtime.Object
 	}{
 		{
-			name: "pod w constraints",
+			name: "explicit constraints",
 			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "ns-a",
+					Labels:    map[string]string{"app": "foo"},
+				},
 				Spec: v1.PodSpec{
-					TopologySpreadConstraints: []v1.TopologySpreadConstraint{
-						{
-							TopologyKey: "test",
-						},
+					TopologySpreadConstraints: []v1.TopologySpreadConstraint{{
+						MaxSkew:           1,
+						TopologyKey:       "zone",
+						WhenUnsatisfiable: v1.DoNotSchedule,
+						MatchLabelKeys:    []string{"pod-template-hash"},
+					}},
+				},
+			},
+			expectedSignature: []fwk.SignFragment{
+				{Key: fwk.NamespaceSignerName, Value: "ns-a"},
+				{Key: fwk.LabelsSignerName, Value: map[string]string{"app": "foo"}},
+				{
+					Key: fwk.TopologySpreadConstraintsSignerName,
+					Value: topologySpreadSignature{
+						Constraints: []v1.TopologySpreadConstraint{{
+							MaxSkew:           1,
+							TopologyKey:       "zone",
+							WhenUnsatisfiable: v1.DoNotSchedule,
+							MatchLabelKeys:    []string{"pod-template-hash"},
+						}},
 					},
 				},
 			},
-			config: config.PodTopologySpreadArgs{
-				DefaultingType: "System",
-			},
-			scheduleable: false,
+			config: config.PodTopologySpreadArgs{DefaultingType: config.SystemDefaulting},
 		},
 		{
-			name: "pod no constraints but default",
+			name: "system default constraints",
 			pod: &v1.Pod{
-				Spec: v1.PodSpec{},
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "ns-b",
+					Labels:    map[string]string{"app": "bar"},
+				},
 			},
-			config: config.PodTopologySpreadArgs{
-				DefaultingType: "System",
+			expectedSignature: []fwk.SignFragment{
+				{Key: fwk.NamespaceSignerName, Value: "ns-b"},
+				{Key: fwk.LabelsSignerName, Value: map[string]string{"app": "bar"}},
+				{
+					Key: fwk.TopologySpreadConstraintsSignerName,
+					Value: topologySpreadSignature{
+						Constraints:     systemDefaultConstraints,
+						DefaultSelector: "app=bar",
+					},
+				},
 			},
-			scheduleable: false,
+			config: config.PodTopologySpreadArgs{DefaultingType: config.SystemDefaulting},
+			objects: []runtime.Object{
+				&v1.Service{
+					ObjectMeta: metav1.ObjectMeta{Namespace: "ns-b", Name: "svc"},
+					Spec:       v1.ServiceSpec{Selector: map[string]string{"app": "bar"}},
+				},
+			},
 		},
 		{
-			name: "pod no constraints no default",
-			pod: &v1.Pod{
-				Spec: v1.PodSpec{},
-			},
+			name: "no constraints",
+			pod:  &v1.Pod{},
 			config: config.PodTopologySpreadArgs{
-				DefaultingType:     "List",
+				DefaultingType:     config.ListDefaulting,
 				DefaultConstraints: []v1.TopologySpreadConstraint{},
 			},
-			scheduleable: true,
 		},
 	}
 
@@ -3604,20 +3635,13 @@ func TestPodTopoSignatures(t *testing.T) {
 			defer cancel()
 
 			snapshot := cache.NewSnapshot(nil, nil)
-			state := framework.NewCycleState()
-			pl := plugintesting.SetupPluginWithInformers(ctx, t, frameworkruntime.FactoryAdapter(feature.Features{}, New), &test.config, snapshot, nil)
+			pl := plugintesting.SetupPluginWithInformers(ctx, t, frameworkruntime.FactoryAdapter(feature.Features{}, New), &test.config, snapshot, test.objects)
 			p := pl.(*PodTopologySpread)
-			_, status := p.PreFilter(ctx, state, test.pod, []fwk.NodeInfo{})
-			if status.Code() == fwk.Error {
-				t.Fatalf("Expected success, got error")
-			}
-
 			signature, status := p.SignPod(ctx, test.pod)
 
-			if !status.IsSuccess() && test.scheduleable {
+			if !status.IsSuccess() {
 				t.Fatalf("Expected success, got %v", status)
 			}
-
 			if diff := cmp.Diff(test.expectedSignature, signature); diff != "" {
 				t.Fatalf("Diff %s", diff)
 			}

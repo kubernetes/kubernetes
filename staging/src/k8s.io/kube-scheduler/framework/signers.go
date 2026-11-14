@@ -31,18 +31,22 @@ import (
 
 // Signer names
 const (
-	DynamicResourcesSignerName = "v1.Pod.Spec.DynamicResources"
-	ImageNamesSignerName       = "v1.Pod.Spec.CanonicalImageNames()"
-	LabelsSignerName           = "v1.Pod.Labels"
-	NodeNameSignerName         = "v1.Pod.Spec.NodeName"
-	NodeAffinitySignerName     = "v1.Pod.Spec.Affinity.NodeAffinity"
-	NodeSelectorSignerName     = "v1.Pod.Spec.Affinity.NodeSelector"
-	HostPortsSignerName        = "v1.Pod.Spec.HostPorts()"
-	ResourcesSignerName        = "v1.Pod.Spec.ContainerRequestsAndOverheads()"
-	SchedulerNameSignerName    = "v1.Pod.Spec.SchedulerName"
-	TolerationsSignerName      = "v1.Pod.Spec.Tolerations"
-	VolumesSignerName          = "v1.Pod.Spec.Volumes.NonSyntheticSources()"
-	FeaturesSignerName         = "v1.Pod.Spec.RequiredFeatures()"
+	DynamicResourcesSignerName          = "v1.Pod.Spec.DynamicResources"
+	ImageNamesSignerName                = "v1.Pod.Spec.CanonicalImageNames()"
+	LabelsSignerName                    = "v1.Pod.Labels"
+	NamespaceSignerName                 = "v1.Pod.Namespace"
+	NodeNameSignerName                  = "v1.Pod.Spec.NodeName"
+	NodeAffinitySignerName              = "v1.Pod.Spec.Affinity.NodeAffinity"
+	PodAffinitySignerName               = "v1.Pod.Spec.Affinity.PodAffinity"
+	PodAntiAffinitySignerName           = "v1.Pod.Spec.Affinity.PodAntiAffinity"
+	NodeSelectorSignerName              = "v1.Pod.Spec.Affinity.NodeSelector"
+	HostPortsSignerName                 = "v1.Pod.Spec.HostPorts()"
+	ResourcesSignerName                 = "v1.Pod.Spec.ContainerRequestsAndOverheads()"
+	SchedulerNameSignerName             = "v1.Pod.Spec.SchedulerName"
+	TolerationsSignerName               = "v1.Pod.Spec.Tolerations"
+	TopologySpreadConstraintsSignerName = "v1.Pod.Spec.TopologySpreadConstraints.EffectiveConstraints()"
+	VolumesSignerName                   = "v1.Pod.Spec.Volumes.NonSyntheticSources()"
+	FeaturesSignerName                  = "v1.Pod.Spec.RequiredFeatures()"
 )
 
 // Common signers. These are either generic or shared across plugins.
