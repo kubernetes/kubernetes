@@ -259,7 +259,7 @@ var _ = SIGDescribe(feature.StandaloneMode, func() {
 			}, f.Timeouts.PodStart, time.Second*5).Should(gomega.BeNil())
 		})
 
-		// the test below is not working - pod update fails with the "Predicate NodePorts failed: node(s) didn't have free ports for the requested pod ports"
+		// the test below is not working - pod update fails with the "Predicate NodePorts failed: node(s) port conflict for the requested pod ports"
 		// ginkgo.It("the pod with the port on host network should be running and can be upgraded when namespace of a Pod changes", func(ctx context.Context) {
 		// 	ns = f.Namespace.Name
 		// 	staticPodName = "static-pod-" + string(uuid.NewUUID())
