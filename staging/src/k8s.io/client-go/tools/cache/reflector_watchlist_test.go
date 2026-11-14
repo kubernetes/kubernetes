@@ -221,7 +221,7 @@ func TestWatchListResourceVersion(t *testing.T) {
 				}
 			}
 
-			_, err := handleListWatch(ctx, time.Now(), lw, s, r.expectedType, r.expectedGVK, r.name, r.typeDescription, trackRV, r.clock, nevererrc)
+			_, err := handleListWatch(ctx, time.Now(), lw, s, r.expectedType, r.expectedGVK, r.name, r.typeDescription, trackRV, r.clock, nevererrc, nil)
 			if err != nil && !errors.Is(err, errorStopRequested) {
 				t.Errorf("expected errorStopRequested, got %v", err)
 			}

@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/utils/clock"
 )
 
 // Decoder implements the watch.Decoder interface for io.ReadClosers that
@@ -32,6 +33,7 @@ import (
 type Decoder struct {
 	decoder         streaming.Decoder
 	embeddedDecoder runtime.Decoder
+	decodeLogger    *watch.BlockLogger
 }
 
 // NewDecoder creates an Decoder for the given writer and codec.
@@ -39,6 +41,14 @@ func NewDecoder(decoder streaming.Decoder, embeddedDecoder runtime.Decoder) *Dec
 	return &Decoder{
 		decoder:         decoder,
 		embeddedDecoder: embeddedDecoder,
+		decodeLogger: watch.NewBlockLoggerWithOptions(
+			"Fast watcher, slow object decoding. Probably caused by CPU-intensive unmarshaling or large watch events",
+			watch.BlockLoggerOptions{
+				Threshold:       watch.DefaultDecodeLoggerThreshold,
+				SingleThreshold: watch.DefaultBlockLoggerSingleThreshold,
+				Clock:           clock.RealClock{},
+			},
+		),
 	}
 }
 
@@ -50,7 +60,12 @@ func (d *Decoder) Decode() (watch.EventType, runtime.Object, error) {
 		return "", nil, err
 	}
 
+	start := d.decodeLogger.Now()
 	obj, err := runtime.Decode(d.embeddedDecoder, got.Object.Raw)
+	if got.Type != string(watch.Error) {
+		d.decodeLogger.EnsureResourceType(obj)
+	}
+	d.decodeLogger.RecordSince(start)
 	if err != nil {
 		return "", nil, fmt.Errorf("unable to decode watch event: %v", err)
 	}
@@ -59,6 +74,7 @@ func (d *Decoder) Decode() (watch.EventType, runtime.Object, error) {
 
 // Close closes the underlying r.
 func (d *Decoder) Close() {
+	d.decodeLogger.Flush()
 	d.decoder.Close()
 }
 

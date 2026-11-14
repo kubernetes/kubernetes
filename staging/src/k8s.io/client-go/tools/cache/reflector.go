@@ -168,6 +168,8 @@ type Reflector struct {
 	//
 	// See https://github.com/kubernetes/enhancements/tree/master/keps/sig-api-machinery/3157-watch-list#design-details
 	useWatchList bool
+
+	storeLogger *watch.BlockLogger
 }
 
 func (r *Reflector) Name() string {
@@ -176,6 +178,11 @@ func (r *Reflector) Name() string {
 
 func (r *Reflector) TypeDescription() string {
 	return r.typeDescription
+}
+
+// StoreLogger returns the BlockLogger tracking DeltaFIFO store processing duration.
+func (r *Reflector) StoreLogger() *watch.BlockLogger {
+	return r.storeLogger
 }
 
 // ResourceVersionUpdater is an interface that allows store implementation to
@@ -359,6 +366,20 @@ func NewReflectorWithOptions(lw ListerWatcher, expectedType interface{}, store R
 	if r.expectedGVK == nil {
 		r.expectedGVK = getExpectedGVKFromObject(expectedType)
 	}
+
+	initialResourceType := r.typeDescription
+	if initialResourceType == defaultExpectedTypeName {
+		initialResourceType = ""
+	}
+	r.storeLogger = watch.NewBlockLoggerWithOptions(
+		"Fast watcher, slow DeltaFIFO store processing. Probably caused by blocked OnAdd/OnUpdate/OnDelete event handlers",
+		watch.BlockLoggerOptions{
+			Source:          r.name,
+			ResourceType:    initialResourceType,
+			SingleThreshold: watch.DefaultBlockLoggerSingleThreshold,
+			Clock:           reflectorClock,
+		},
+	)
 
 	r.useWatchList = clientfeatures.FeatureGates().Enabled(clientfeatures.WatchListClient)
 	if r.useWatchList && watchlist.DoesClientNotSupportWatchListSemantics(lw) {
@@ -638,7 +659,7 @@ func (r *Reflector) watch(ctx context.Context, w watch.Interface, resyncerrc cha
 					}
 				}
 			},
-			r.clock, resyncerrc)
+			r.clock, resyncerrc, r.storeLogger)
 		// handleWatch always stops the watcher. So we don't need to here.
 		// Just set it to nil to trigger a retry on the next loop.
 		w = nil
@@ -875,7 +896,7 @@ func (r *Reflector) watchList(ctx context.Context) (watch.Interface, error) {
 					resourceVersion = rv
 				}
 			},
-			r.clock, make(chan error))
+			r.clock, make(chan error), r.storeLogger)
 		if err != nil {
 			w.Stop() // stop and retry with clean state
 			if errors.Is(err, errorStopRequested) {
@@ -934,10 +955,11 @@ func handleListWatch(
 	setLastSyncResourceVersion func(string, bool),
 	clock clock.Clock,
 	errCh chan error,
+	storeLogger *watch.BlockLogger,
 ) (bool, error) {
 	exitOnWatchListBookmarkReceived := true
 	return handleAnyWatch(ctx, start, w, store, expectedType, expectedGVK, name, expectedTypeName,
-		setLastSyncResourceVersion, exitOnWatchListBookmarkReceived, clock, errCh)
+		setLastSyncResourceVersion, exitOnWatchListBookmarkReceived, clock, errCh, storeLogger)
 }
 
 // handleListWatch consumes events from w, updates the Store, and records the
@@ -955,10 +977,11 @@ func handleWatch(
 	setLastSyncResourceVersion func(string, bool),
 	clock clock.Clock,
 	errCh chan error,
+	storeLogger *watch.BlockLogger,
 ) error {
 	exitOnWatchListBookmarkReceived := false
 	_, err := handleAnyWatch(ctx, start, w, store, expectedType, expectedGVK, name, expectedTypeName,
-		setLastSyncResourceVersion, exitOnWatchListBookmarkReceived, clock, errCh)
+		setLastSyncResourceVersion, exitOnWatchListBookmarkReceived, clock, errCh, storeLogger)
 	return err
 }
 
@@ -984,11 +1007,15 @@ func handleAnyWatch(
 	exitOnWatchListBookmarkReceived bool,
 	clock clock.Clock,
 	errCh chan error,
+	storeLogger *watch.BlockLogger,
 ) (bool, error) {
 	watchListBookmarkReceived := false
 	eventReceivedBesidesAdded := false
 	eventCount := 0
 	logger := klog.FromContext(ctx)
+	if storeLogger != nil {
+		defer storeLogger.Flush()
+	}
 	initialEventsEndBookmarkWarningTicker := newInitialEventsEndBookmarkTicker(logger, name, clock, start, exitOnWatchListBookmarkReceived)
 	defer initialEventsEndBookmarkWarningTicker.Stop()
 	stopWatcher := true
@@ -1036,6 +1063,10 @@ loop:
 				continue
 			}
 			resourceVersion := meta.GetResourceVersion()
+			if storeLogger != nil {
+				storeLogger.EnsureResourceType(event.Object)
+			}
+			start := clock.Now()
 			switch event.Type {
 			case watch.Added:
 				err := store.Add(event.Object)
@@ -1072,6 +1103,9 @@ loop:
 				}
 			default:
 				utilruntime.HandleErrorWithContext(ctx, err, "Unknown watch event", "reflector", name, "event", event)
+			}
+			if storeLogger != nil {
+				storeLogger.RecordSince(start)
 			}
 			// when eventReceivedBesidesAdded is true, that indicates we are definitely past any initial synthetic Added events
 			setLastSyncResourceVersion(resourceVersion, eventReceivedBesidesAdded)

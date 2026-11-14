@@ -27,6 +27,7 @@ import (
 	goruntime "runtime"
 	"slices"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -51,6 +52,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	clientfeatures "k8s.io/client-go/features"
 	clientfeaturestesting "k8s.io/client-go/features/testing"
+	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/utils/clock"
 	testingclock "k8s.io/utils/clock/testing"
@@ -235,7 +237,7 @@ func TestReflectorHandleWatchStoppedBefore(t *testing.T) {
 			return resultCh
 		},
 	}
-	err := handleWatch(ctx, time.Now(), fw, s, g.expectedType, g.expectedGVK, g.name, g.typeDescription, func(rv string, _ bool) { g.setLastSyncResourceVersion(rv) }, g.clock, nevererrc)
+	err := handleWatch(ctx, time.Now(), fw, s, g.expectedType, g.expectedGVK, g.name, g.typeDescription, func(rv string, _ bool) { g.setLastSyncResourceVersion(rv) }, g.clock, nevererrc, nil)
 	require.Equal(t, err, errorStopRequested)
 	// Ensure handleWatch calls ResultChan and Stop
 	assert.Equal(t, []string{"ResultChan", "Stop"}, calls)
@@ -268,7 +270,7 @@ func TestReflectorHandleWatchStoppedAfter(t *testing.T) {
 			return resultCh
 		},
 	}
-	err := handleWatch(ctx, time.Now(), fw, s, g.expectedType, g.expectedGVK, g.name, g.typeDescription, func(rv string, _ bool) { g.setLastSyncResourceVersion(rv) }, g.clock, nevererrc)
+	err := handleWatch(ctx, time.Now(), fw, s, g.expectedType, g.expectedGVK, g.name, g.typeDescription, func(rv string, _ bool) { g.setLastSyncResourceVersion(rv) }, g.clock, nevererrc, nil)
 	require.Equal(t, err, errorStopRequested)
 	// Ensure handleWatch calls ResultChan and Stop
 	assert.Equal(t, []string{"ResultChan", "Stop"}, calls)
@@ -294,7 +296,7 @@ func TestReflectorHandleWatchResultChanClosedBefore(t *testing.T) {
 	}
 	// Simulate the result channel being closed by the producer before handleWatch is called.
 	close(resultCh)
-	err := handleWatch(ctx, time.Now(), fw, s, g.expectedType, g.expectedGVK, g.name, g.typeDescription, func(rv string, _ bool) { g.setLastSyncResourceVersion(rv) }, g.clock, nevererrc)
+	err := handleWatch(ctx, time.Now(), fw, s, g.expectedType, g.expectedGVK, g.name, g.typeDescription, func(rv string, _ bool) { g.setLastSyncResourceVersion(rv) }, g.clock, nevererrc, nil)
 	require.Equal(t, &VeryShortWatchError{Name: g.name}, err)
 	// Ensure handleWatch calls ResultChan and Stop
 	assert.Equal(t, []string{"ResultChan", "Stop"}, calls)
@@ -325,7 +327,7 @@ func TestReflectorHandleWatchResultChanClosedAfter(t *testing.T) {
 			return resultCh
 		},
 	}
-	err := handleWatch(ctx, time.Now(), fw, s, g.expectedType, g.expectedGVK, g.name, g.typeDescription, func(rv string, _ bool) { g.setLastSyncResourceVersion(rv) }, g.clock, nevererrc)
+	err := handleWatch(ctx, time.Now(), fw, s, g.expectedType, g.expectedGVK, g.name, g.typeDescription, func(rv string, _ bool) { g.setLastSyncResourceVersion(rv) }, g.clock, nevererrc, nil)
 	require.Equal(t, &VeryShortWatchError{Name: g.name}, err)
 	// Ensure handleWatch calls ResultChan and Stop
 	assert.Equal(t, []string{"ResultChan", "Stop"}, calls)
@@ -355,7 +357,7 @@ func TestReflectorWatchHandler(t *testing.T) {
 		// Stop means that the consumer is done reading events.
 		// So let handleWatch call fw.Stop, after the Context is cancelled.
 	}()
-	err := handleWatch(ctx, time.Now(), fw, s, g.expectedType, g.expectedGVK, g.name, g.typeDescription, setLastSyncResourceVersion, g.clock, nevererrc)
+	err := handleWatch(ctx, time.Now(), fw, s, g.expectedType, g.expectedGVK, g.name, g.typeDescription, setLastSyncResourceVersion, g.clock, nevererrc, nil)
 	require.Equal(t, err, errorStopRequested)
 
 	mkPod := func(id string, rv string) *v1.Pod {
@@ -398,7 +400,7 @@ func TestReflectorStopWatch(t *testing.T) {
 	fw := watch.NewFakeWithOptions(watch.FakeOptions{Logger: &logger})
 	ctx, cancel := context.WithCancelCause(ctx)
 	cancel(errors.New("don't run"))
-	err := handleWatch(ctx, time.Now(), fw, s, g.expectedType, g.expectedGVK, g.name, g.typeDescription, func(rv string, _ bool) { g.setLastSyncResourceVersion(rv) }, g.clock, nevererrc)
+	err := handleWatch(ctx, time.Now(), fw, s, g.expectedType, g.expectedGVK, g.name, g.typeDescription, func(rv string, _ bool) { g.setLastSyncResourceVersion(rv) }, g.clock, nevererrc, nil)
 	require.Equal(t, err, errorStopRequested)
 }
 
@@ -2533,6 +2535,183 @@ func TestIsUnsupportedTableObject(t *testing.T) {
 			if result != tt.expected {
 				t.Errorf("Expected %v, got %v", tt.expected, result)
 			}
+		})
+	}
+}
+
+// clockSteppingStore advances a fake clock inside every mutation to simulate deterministic store processing cost.
+type clockSteppingStore struct {
+	Store
+	clock *testingclock.FakeClock
+	cost  time.Duration
+}
+
+func (s *clockSteppingStore) Add(obj interface{}) error {
+	s.clock.Step(s.cost)
+	return s.Store.Add(obj)
+}
+
+func (s *clockSteppingStore) Update(obj interface{}) error {
+	s.clock.Step(s.cost)
+	return s.Store.Update(obj)
+}
+
+func (s *clockSteppingStore) Delete(obj interface{}) error {
+	s.clock.Step(s.cost)
+	return s.Store.Delete(obj)
+}
+
+func newStoreLoggerTestLogger(t *testing.T) klog.Logger {
+	return ktesting.NewLogger(t, ktesting.NewConfig(ktesting.Verbosity(2), ktesting.BufferLogs(true)))
+}
+
+func storeLoggerWarnings(logger klog.Logger, msgPrefix string) []map[string]any {
+	var warnings []map[string]any
+	for _, entry := range logger.GetSink().(ktesting.Underlier).GetBuffer().Data() {
+		if !strings.HasPrefix(entry.Message, msgPrefix) {
+			continue
+		}
+		values := map[string]any{}
+		for i := 0; i+1 < len(entry.ParameterKVList); i += 2 {
+			values[fmt.Sprint(entry.ParameterKVList[i])] = entry.ParameterKVList[i+1]
+		}
+		warnings = append(warnings, values)
+	}
+	return warnings
+}
+
+// feedPodsThroughHandleWatch sends pods through handleWatch one at a time, advancing fakeClock by idle only after
+// each event is fully processed, then cancels the watch and returns the handleWatch error.
+func feedPodsThroughHandleWatch(t *testing.T, r *Reflector, store ReflectorStore, storeLogger *watch.BlockLogger, fakeClock *testingclock.FakeClock, pods int, idle time.Duration) error {
+	t.Helper()
+
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancelCause(ctx)
+	defer cancel(errors.New("test finished"))
+
+	fw := watch.NewFake()
+	processed := make(chan struct{})
+	result := make(chan error, 1)
+	go func() {
+		result <- handleWatch(ctx, fakeClock.Now(), fw, store, r.expectedType, r.expectedGVK, r.name, r.typeDescription,
+			func(string, bool) { processed <- struct{}{} }, fakeClock, nevererrc, storeLogger)
+	}()
+
+	for i := 0; i < pods; i++ {
+		fw.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: fmt.Sprintf("pod-%d", i), ResourceVersion: strconv.Itoa(i + 1)}})
+		select {
+		case <-processed:
+		case err := <-result:
+			t.Fatalf("handleWatch exited early: %v", err)
+		}
+		fakeClock.Step(idle)
+	}
+	cancel(errors.New("stop watching"))
+	return <-result
+}
+
+func TestReflector_StoreLoggerAttributesWarningsToReflector(t *testing.T) {
+	fakeClock := testingclock.NewFakeClock(time.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC))
+	logger := newStoreLoggerTestLogger(t)
+	store := &clockSteppingStore{Store: NewStore(MetaNamespaceKeyFunc), clock: fakeClock, cost: 300 * time.Millisecond}
+
+	// The store logger binds klog.Background() at construction, so the test logger is installed only for that call.
+	klog.SetLoggerWithOptions(logger, klog.ContextualLogger(true))
+	r := NewReflectorWithOptions(&ListWatch{}, &v1.Pod{}, store, ReflectorOptions{Name: "pods-reflector", Clock: fakeClock})
+	klog.ClearLogger()
+
+	err := feedPodsThroughHandleWatch(t, r, store, r.StoreLogger(), fakeClock, 1, 0)
+	require.Equal(t, errorStopRequested, err)
+
+	warnings := storeLoggerWarnings(logger, "Fast watcher, slow DeltaFIFO store processing")
+	require.Len(t, warnings, 1)
+	assert.Equal(t, "pods-reflector", warnings[0]["source"])
+	assert.Equal(t, "*v1.Pod", warnings[0]["resourceType"])
+	assert.Equal(t, 300*time.Millisecond, warnings[0]["maxWait"])
+	assert.Equal(t, 1, warnings[0]["eventCount"])
+}
+
+func TestReflector_StoreLoggerResourceType(t *testing.T) {
+	widgetGVK := schema.GroupVersionKind{Group: "example.com", Version: "v1", Kind: "Widget"}
+	newWidget := func() *unstructured.Unstructured {
+		u := &unstructured.Unstructured{}
+		u.SetGroupVersionKind(widgetGVK)
+		u.SetNamespace("ns")
+		u.SetName("widget")
+		u.SetResourceVersion("1")
+		return u
+	}
+	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: "foo", ResourceVersion: "1"}}
+
+	testCases := []struct {
+		name         string
+		expectedType interface{}
+		event        watch.Event
+		wantInitial  string
+		wantFinal    string
+		wantErr      bool
+	}{
+		{
+			name:         "typed reflector",
+			expectedType: &v1.Pod{},
+			event:        watch.Event{Type: watch.Added, Object: pod},
+			wantInitial:  "*v1.Pod",
+			wantFinal:    "*v1.Pod",
+		},
+		{
+			name:        "untyped reflector infers the type from the first object",
+			event:       watch.Event{Type: watch.Added, Object: pod},
+			wantInitial: "",
+			wantFinal:   "*v1.Pod",
+		},
+		{
+			name: "untyped reflector ignores error events",
+			event: watch.Event{Type: watch.Error, Object: &metav1.Status{
+				Status: metav1.StatusFailure, Code: http.StatusGone, Reason: metav1.StatusReasonExpired, Message: "too old resource version",
+			}},
+			wantInitial: "",
+			wantFinal:   "",
+			wantErr:     true,
+		},
+		{
+			name:         "unstructured reflector keeps its GVK description",
+			expectedType: newWidget(),
+			event:        watch.Event{Type: watch.Added, Object: newWidget()},
+			wantInitial:  widgetGVK.String(),
+			wantFinal:    widgetGVK.String(),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			s := NewStore(MetaNamespaceKeyFunc)
+			r := NewReflector(&ListWatch{}, tc.expectedType, s, 0)
+			require.Equal(t, tc.wantInitial, r.StoreLogger().ResourceType())
+
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancelCause(ctx)
+			defer cancel(errors.New("test finished"))
+			fw := watch.NewFakeWithChanSize(1, false)
+			fw.Action(tc.event.Type, tc.event.Object)
+			processed := make(chan struct{}, 1)
+			result := make(chan error, 1)
+			go func() {
+				result <- handleWatch(ctx, time.Now(), fw, s, r.expectedType, r.expectedGVK, r.name, r.typeDescription,
+					func(string, bool) { processed <- struct{}{} }, r.clock, nevererrc, r.StoreLogger())
+			}()
+
+			if tc.wantErr {
+				require.Error(t, <-result)
+			} else {
+				select {
+				case <-processed:
+				case err := <-result:
+					t.Fatalf("handleWatch exited early: %v", err)
+				}
+				cancel(errors.New("stop watching"))
+				require.Equal(t, errorStopRequested, <-result)
+			}
+			assert.Equal(t, tc.wantFinal, r.StoreLogger().ResourceType())
 		})
 	}
 }
