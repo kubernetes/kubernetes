@@ -172,6 +172,9 @@ func init() {
 			"spec.tolerations[*].key": {
 				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-label-key"},
 			},
+			"spec.volumes[*].ephemeral.volumeClaimTemplate.spec.volumeName": {
+				{ErrorType: "FieldValueInvalid", Origin: "update"},
+			},
 			"status.nodeAllocatableResourceClaimStatuses[*]": {
 				{ErrorType: "FieldValueDuplicate"},
 			},

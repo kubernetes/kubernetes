@@ -275,6 +275,13 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 				field.Invalid(field.NewPath("spec").Child("volumeClaimTemplates"), nil, "").WithOrigin("immutable").MarkBeta(),
 			},
 		},
+		"ephemeral volume volumeName modified": {
+			oldObj:    mkValidStatefulSet(tweakEphemeralVolumeName("pv-old")),
+			updateObj: mkValidStatefulSet(tweakEphemeralVolumeName("pv-new")),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "template", "spec", "volumes").Index(0).Child("ephemeral", "volumeClaimTemplate", "spec", "volumeName"), "", "").WithOrigin("update"),
+			},
+		},
 	}
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {
@@ -371,6 +378,29 @@ func tweakVolumeClaimTemplate(name, storage string) func(obj *apps.StatefulSet) 
 				},
 			},
 		}}
+	}
+}
+
+func tweakEphemeralVolumeName(volumeName string) func(*apps.StatefulSet) {
+	return func(ss *apps.StatefulSet) {
+		ss.Spec.Template.Spec.Volumes = []api.Volume{
+			{
+				Name: "ephemeral-vol",
+				VolumeSource: api.VolumeSource{
+					Ephemeral: &api.EphemeralVolumeSource{
+						VolumeClaimTemplate: &api.PersistentVolumeClaimTemplate{
+							Spec: api.PersistentVolumeClaimSpec{
+								VolumeName:  volumeName,
+								AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+								Resources: api.VolumeResourceRequirements{
+									Requests: api.ResourceList{api.ResourceStorage: resource.MustParse("1Gi")},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
 	}
 }
 

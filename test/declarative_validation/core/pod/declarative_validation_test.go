@@ -20,6 +20,7 @@ import (
 	"strings"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/api/resource"
 	apiresource "k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -181,6 +182,42 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 				updateObj.Spec.ActiveDeadlineSeconds = &newDeadline
 				apitesting.VerifyUpdateValidationEquivalence(t, ctx, updateObj, oldObj, registry.Strategy, tc.expectedErrs)
 			})
+		}
+
+		t.Run("ephemeral volume volumeName modified", func(t *testing.T) {
+			oldObj := podtest.MakePod("foo")
+			oldObj.ResourceVersion = "1"
+			tweakEphemeralVolumeName("pv-old")(oldObj)
+			updateObj := oldObj.DeepCopy()
+			tweakEphemeralVolumeName("pv-new")(updateObj)
+			expectedErrs := field.ErrorList{
+				field.Invalid(field.NewPath("spec", "volumes").Index(0).Child("ephemeral", "volumeClaimTemplate", "spec", "volumeName"), "", "").WithOrigin("update"),
+				field.Forbidden(field.NewPath("spec"), "").MarkFromImperative(),
+			}
+			apitesting.VerifyUpdateValidationEquivalence(t, ctx, updateObj, oldObj, registry.Strategy, expectedErrs)
+		})
+	}
+}
+
+func tweakEphemeralVolumeName(volumeName string) func(*api.Pod) {
+	return func(pod *api.Pod) {
+		pod.Spec.Volumes = []api.Volume{
+			{
+				Name: "ephemeral-vol",
+				VolumeSource: api.VolumeSource{
+					Ephemeral: &api.EphemeralVolumeSource{
+						VolumeClaimTemplate: &api.PersistentVolumeClaimTemplate{
+							Spec: api.PersistentVolumeClaimSpec{
+								VolumeName:  volumeName,
+								AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+								Resources: api.VolumeResourceRequirements{
+									Requests: api.ResourceList{api.ResourceStorage: resource.MustParse("1Gi")},
+								},
+							},
+						},
+					},
+				},
+			},
 		}
 	}
 }

@@ -71,6 +71,58 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 		Verb:              "update",
 	}), metav1.NamespaceDefault)
 
+	testCases := map[string]struct {
+		oldObj       core.PersistentVolumeClaim
+		updateObj    core.PersistentVolumeClaim
+		expectedErrs field.ErrorList
+	}{
+		"valid update no change": {
+			oldObj:    mkValidPersistentVolumeClaim(),
+			updateObj: mkValidPersistentVolumeClaim(),
+		},
+		"valid set volumeName from empty": {
+			oldObj: mkValidPersistentVolumeClaim(),
+			updateObj: mkValidPersistentVolumeClaim(func(pvc *core.PersistentVolumeClaim) {
+				pvc.Spec.VolumeName = "pv-123"
+			}),
+		},
+		"invalid modify volumeName": {
+			oldObj: mkValidPersistentVolumeClaim(func(pvc *core.PersistentVolumeClaim) {
+				pvc.Spec.VolumeName = "pv-123"
+			}),
+			updateObj: mkValidPersistentVolumeClaim(func(pvc *core.PersistentVolumeClaim) {
+				pvc.Spec.VolumeName = "pv-456"
+			}),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "volumeName"), "", "").WithOrigin("update"),
+			},
+		},
+		"invalid clear volumeName": {
+			oldObj: mkValidPersistentVolumeClaim(func(pvc *core.PersistentVolumeClaim) {
+				pvc.Spec.VolumeName = "pv-123"
+			}),
+			updateObj: mkValidPersistentVolumeClaim(),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "volumeName"), "", "").WithOrigin("update"),
+			},
+		},
+		"valid same volumeName": {
+			oldObj: mkValidPersistentVolumeClaim(func(pvc *core.PersistentVolumeClaim) {
+				pvc.Spec.VolumeName = "pv-123"
+			}),
+			updateObj: mkValidPersistentVolumeClaim(func(pvc *core.PersistentVolumeClaim) {
+				pvc.Spec.VolumeName = "pv-123"
+			}),
+		},
+	}
+	for k, tc := range testCases {
+		t.Run(k, func(t *testing.T) {
+			tc.oldObj.ResourceVersion = "1"
+			tc.updateObj.ResourceVersion = "2"
+			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.updateObj, &tc.oldObj, registry.Strategy, tc.expectedErrs)
+		})
+	}
+
 	updateObj := mkValidPersistentVolumeClaim()
 	meta.RunObjectMetaUpdateTestCases(t, ctx, &updateObj, registry.Strategy, meta.WithStringentFinalizerValidation())
 }
@@ -151,8 +203,8 @@ func makeVolumeHealthConditions(count int) []core.VolumeHealthCondition {
 	return conditions
 }
 
-func mkValidPersistentVolumeClaim() core.PersistentVolumeClaim {
-	return core.PersistentVolumeClaim{
+func mkValidPersistentVolumeClaim(tweaks ...func(*core.PersistentVolumeClaim)) core.PersistentVolumeClaim {
+	obj := core.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "valid-obj",
 			Namespace: metav1.NamespaceDefault,
@@ -164,4 +216,8 @@ func mkValidPersistentVolumeClaim() core.PersistentVolumeClaim {
 			},
 		},
 	}
+	for _, tweak := range tweaks {
+		tweak(&obj)
+	}
+	return obj
 }
