@@ -156,6 +156,72 @@ func TestList(t *testing.T) {
 	}
 }
 
+func TestListGateways(t *testing.T) {
+	gv := schema.GroupVersion{Group: "gateway.networking.k8s.io", Version: "v1"}
+	otherVersion := schema.GroupVersion{Group: gv.Group, Version: "v1beta1"}
+	otherGroup := schema.GroupVersion{Group: "example.com", Version: gv.Version}
+	first := newUnstructured(gv.String(), "Gateway", "ns-a", "gateway")
+	second := newUnstructured(gv.String(), "Gateway", "ns-b", "gateway")
+	versioned := newUnstructured(otherVersion.String(), "Gateway", "ns-a", "gateway")
+	grouped := newUnstructured(otherGroup.String(), "Gateway", "ns-a", "gateway")
+	client := NewSimpleDynamicClient(runtime.NewScheme(), first, second, versioned, grouped)
+
+	for _, tc := range []struct {
+		name      string
+		gv        schema.GroupVersion
+		namespace string
+		want      []unstructured.Unstructured
+	}{
+		{
+			name: "all namespaces",
+			gv:   gv,
+			want: []unstructured.Unstructured{*first, *second},
+		},
+		{
+			name:      "first namespace",
+			gv:        gv,
+			namespace: "ns-a",
+			want:      []unstructured.Unstructured{*first},
+		},
+		{
+			name:      "second namespace",
+			gv:        gv,
+			namespace: "ns-b",
+			want:      []unstructured.Unstructured{*second},
+		},
+		{
+			name:      "empty namespace",
+			gv:        gv,
+			namespace: "ns-empty",
+		},
+		{
+			name:      "other version",
+			gv:        otherVersion,
+			namespace: "ns-a",
+			want:      []unstructured.Unstructured{*versioned},
+		},
+		{
+			name:      "other group",
+			gv:        otherGroup,
+			namespace: "ns-a",
+			want:      []unstructured.Unstructured{*grouped},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			list, err := client.Resource(tc.gv.WithResource("gateways")).Namespace(tc.namespace).List(context.Background(), metav1.ListOptions{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got, want := list.GroupVersionKind(), tc.gv.WithKind("GatewayList"); got != want {
+				t.Errorf("list kind = %v, want %v", got, want)
+			}
+			if diff := cmp.Diff(tc.want, list.Items); diff != "" {
+				t.Errorf("unexpected gateways (-want, +got):\n%s", diff)
+			}
+		})
+	}
+}
+
 func Test_ListKind(t *testing.T) {
 	scheme := runtime.NewScheme()
 
