@@ -1094,6 +1094,56 @@ func newConditionTestOptions(t *testing.T, reporter drain.ConditionReporter, nod
 	return o
 }
 
+func TestRunCordonOrUncordonReturnsFailures(t *testing.T) {
+	for _, desired := range []bool{false, true} {
+		t.Run(changed(desired), func(t *testing.T) {
+			o := newConditionTestOptions(t, &recordingConditionReporter{}, "failed", "succeeded")
+			for _, info := range o.nodeInfos {
+				info.Object.(*corev1.Node).Spec.Unschedulable = !desired
+			}
+			client := o.drainer.Client.(*kubernetesfake.Clientset)
+			denied := errors.New("node patch denied")
+			var patched []string
+			client.PrependReactor("patch", "nodes", func(action clienttesting.Action) (bool, runtime.Object, error) {
+				name := action.(clienttesting.PatchAction).GetName()
+				patched = append(patched, name)
+				if name == "failed" {
+					return true, nil, denied
+				}
+				return false, nil, nil
+			})
+			if err := o.RunCordonOrUncordon(t.Context(), desired); !errors.Is(err, denied) {
+				t.Errorf("error = %v, want node patch failure", err)
+			}
+			if !reflect.DeepEqual(patched, []string{"failed", "succeeded"}) {
+				t.Errorf("patched nodes = %v, want both nodes attempted", patched)
+			}
+		})
+	}
+}
+
+func TestRunDrainStopsAfterCordonFailure(t *testing.T) {
+	reporter := &recordingConditionReporter{}
+	o := newConditionTestOptions(t, reporter, "node")
+	o.nodeInfos[0].Object.(*corev1.Node).Spec.Unschedulable = false
+	client := o.drainer.Client.(*kubernetesfake.Clientset)
+	denied := errors.New("cordon denied")
+	client.PrependReactor("patch", "nodes", func(clienttesting.Action) (bool, runtime.Object, error) {
+		return true, nil, denied
+	})
+	if err := o.RunDrain(t.Context()); !errors.Is(err, denied) {
+		t.Errorf("RunDrain() = %v, want cordon failure", err)
+	}
+	for _, action := range client.Actions() {
+		if action.GetResource().Resource == "pods" {
+			t.Errorf("drain proceeded after failed cordon: %s pods", action.GetVerb())
+		}
+	}
+	if events := reporter.recordedEvents(); len(events) != 0 {
+		t.Errorf("drain conditions reported after failed cordon: %v", events)
+	}
+}
+
 func assertRecordedConditions(t *testing.T, got, want []recordedCondition) {
 	t.Helper()
 	if fmt.Sprint(got) != fmt.Sprint(want) {
