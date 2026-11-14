@@ -2205,6 +2205,7 @@
   labels:
   - group
   - resource
+  - verb
   buckets:
   - 0.005
   - 0.025

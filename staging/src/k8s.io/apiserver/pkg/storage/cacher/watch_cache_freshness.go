@@ -19,12 +19,14 @@ package cacher
 import (
 	"container/heap"
 	"context"
+	"strings"
 	"sync"
 	"time"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/cacher/metrics"
 	"k8s.io/apiserver/pkg/storage/cacher/progress"
@@ -89,7 +91,11 @@ func (w *freshnessWaiter) waitUntilFreshLockedWithLocker(ctx context.Context, re
 	startTime := w.clock.Now()
 	defer func() {
 		if resourceVersion > 0 {
-			metrics.WatchCacheReadWait.WithContext(ctx).WithLabelValues(w.groupResource.Group, w.groupResource.Resource).Observe(w.clock.Since(startTime).Seconds())
+			var verb string
+			if requestInfo, ok := request.RequestInfoFrom(ctx); ok && requestInfo != nil {
+				verb = strings.ToUpper(requestInfo.Verb)
+			}
+			metrics.WatchCacheReadWait.WithContext(ctx).WithLabelValues(w.groupResource.Group, w.groupResource.Resource, verb).Observe(w.clock.Since(startTime).Seconds())
 		}
 	}()
 
