@@ -26,6 +26,7 @@ import (
 	"testing"
 
 	"golang.org/x/net/http2"
+
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -46,26 +47,72 @@ func TestWebhookClientConfig(t *testing.T) {
 		name             string
 		url              string
 		expectAllowHTTP2 bool
+		expectHost       string
+		expectPath       string
 	}{
 		{
 			name:             "force http1",
 			url:              "https://webhook.example.com",
 			expectAllowHTTP2: false,
+			expectHost:       "https://webhook.example.com",
+			expectPath:       "",
 		},
 		{
 			name:             "allow http2 for localhost",
 			url:              "https://localhost",
 			expectAllowHTTP2: true,
+			expectHost:       "https://localhost",
+			expectPath:       "",
 		},
 		{
 			name:             "allow http2 for 127.0.0.1",
 			url:              "https://127.0.0.1",
 			expectAllowHTTP2: true,
+			expectHost:       "https://127.0.0.1",
+			expectPath:       "",
 		},
 		{
 			name:             "allow http2 for [::1]:0",
 			url:              "https://[::1]",
 			expectAllowHTTP2: true,
+			expectHost:       "https://[::1]",
+			expectPath:       "",
+		},
+		{
+			name:       "trailing slash omitted from host",
+			url:        "https://example.com/foo",
+			expectHost: "https://example.com",
+			expectPath: "/foo",
+		},
+		{
+			name:       "encoded host re-encoded",
+			url:        "https://[::ffff:1.1.1.1%25.zone]",
+			expectHost: "https://[::ffff:1.1.1.1%25.zone]",
+			expectPath: "",
+		},
+		{
+			name:       "encoded host re-encoded with port",
+			url:        "https://[::ffff:1.1.1.1%25.zone]:443",
+			expectHost: "https://[::ffff:1.1.1.1%25.zone]:443",
+			expectPath: "",
+		},
+		{
+			name:       "encoded host re-encoded with port and path",
+			url:        "https://[::ffff:1.1.1.1%25.zone]:443/foo",
+			expectHost: "https://[::ffff:1.1.1.1%25.zone]:443",
+			expectPath: "/foo",
+		},
+		{
+			name:       "unescaped path re-escaped",
+			url:        "https://example.com/path with spaces",
+			expectHost: "https://example.com",
+			expectPath: "/path%20with%20spaces",
+		},
+		{
+			name:       "escaped path re-escaped",
+			url:        "https://example.com/path%20with%20spaces",
+			expectHost: "https://example.com",
+			expectPath: "/path%20with%20spaces",
 		},
 	}
 	for _, tc := range tests {
@@ -80,6 +127,12 @@ func TestWebhookClientConfig(t *testing.T) {
 			}
 			if tc.expectAllowHTTP2 && !allowHTTP2(cfg.NextProtos) {
 				t.Errorf("expected allow http/2, got: %v", cfg.NextProtos)
+			}
+			if tc.expectHost != cfg.Host {
+				t.Errorf("expected host %s, got: %s", tc.expectHost, cfg.Host)
+			}
+			if tc.expectPath != cfg.APIPath {
+				t.Errorf("expected apiPath %s, got: %s", tc.expectPath, cfg.APIPath)
 			}
 		})
 	}

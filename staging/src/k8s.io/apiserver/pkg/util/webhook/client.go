@@ -253,8 +253,8 @@ func (cm *ClientManager) hookClientConfig(cc ClientConfig) (*rest.Config, error)
 	}
 
 	cfg := rest.CopyConfig(restConfig)
-	cfg.Host = u.Scheme + "://" + u.Host
-	cfg.APIPath = u.Path
+	cfg.Host = (&url.URL{Scheme: u.Scheme, Host: u.Host}).String()
+	cfg.APIPath = u.EscapedPath()
 	if !isLocalHost(u) {
 		cfg.NextProtos = []string{"http/1.1"}
 	}
