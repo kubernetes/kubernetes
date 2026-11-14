@@ -17,6 +17,7 @@ limitations under the License.
 package loader
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -28,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apiserver/pkg/admission/plugin/manifest"
 )
 
 func TestValidateWebhookClientConfig(t *testing.T) {
@@ -180,6 +182,15 @@ webhooks:
 			wantErr:        true,
 			wantErrContain: "duplicate",
 		},
+		{
+			name: "malformed document",
+			files: map[string]string{
+				"bad.yaml": `kind: [unterminated
+`,
+			},
+			wantErr:        true,
+			wantErrContain: "error loading",
+		},
 	}
 
 	for _, tt := range tests {
@@ -195,9 +206,21 @@ webhooks:
 
 			if tt.wantErr {
 				if err == nil {
-					t.Error("expected error but got none")
-				} else if tt.wantErrContain != "" && !strings.Contains(err.Error(), tt.wantErrContain) {
+					t.Fatal("expected error but got none")
+				}
+				if tt.wantErrContain != "" && !strings.Contains(err.Error(), tt.wantErrContain) {
 					t.Errorf("expected error containing %q, got %q", tt.wantErrContain, err.Error())
+				}
+				contentErr, ok := errors.AsType[*manifest.InvalidContentError](err)
+				if !ok {
+					t.Fatalf("expected InvalidContentError, got %T: %v", err, err)
+				}
+				_, wantHash, loadErr := manifest.LoadFiles(dir)
+				if loadErr != nil {
+					t.Fatalf("LoadFiles() unexpected error: %v", loadErr)
+				}
+				if contentErr.Hash != wantHash {
+					t.Errorf("InvalidContentError hash = %q, want %q", contentErr.Hash, wantHash)
 				}
 				return
 			}

@@ -17,10 +17,13 @@ limitations under the License.
 package loader
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"k8s.io/apiserver/pkg/admission/plugin/manifest"
 )
 
 func TestLoadValidatingManifests(t *testing.T) {
@@ -405,6 +408,10 @@ webhooks:
 				if tt.errContains != "" && !strings.Contains(err.Error(), tt.errContains) {
 					t.Errorf("LoadValidatingManifests() error = %v, want error containing %q", err, tt.errContains)
 				}
+				contentErr, ok := errors.AsType[*manifest.InvalidContentError](err)
+				if !ok || len(contentErr.Hash) == 0 {
+					t.Errorf("LoadValidatingManifests() error = %v, want InvalidContentError with a hash", err)
+				}
 				return
 			}
 
@@ -572,7 +579,10 @@ func TestLoadManifestsFromDirectory_EmptyPath(t *testing.T) {
 func TestLoadManifestsFromDirectory_NonExistentDirectory(t *testing.T) {
 	_, err := LoadValidatingManifests("/nonexistent/directory/path")
 	if err == nil {
-		t.Error("LoadValidatingManifests() expected error for non-existent directory, got nil")
+		t.Fatal("LoadValidatingManifests() expected error for non-existent directory, got nil")
+	}
+	if _, ok := errors.AsType[*manifest.InvalidContentError](err); ok {
+		t.Errorf("LoadValidatingManifests() error = %v, want a read error, not InvalidContentError", err)
 	}
 }
 
