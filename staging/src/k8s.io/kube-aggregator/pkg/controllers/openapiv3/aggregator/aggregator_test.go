@@ -20,8 +20,10 @@ import (
 	"bytes"
 	"encoding/json"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/emicklei/go-restful/v3"
 	"github.com/stretchr/testify/assert"
@@ -187,6 +189,86 @@ func TestV3APIService(t *testing.T) {
 
 	apiServiceNames := specProxier.GetAPIServiceNames()
 	assert.ElementsMatch(t, []string{openAPIV2Converter, apiService.Name}, apiServiceNames)
+}
+
+func TestV3RequestDoesNotBlockAPIServiceChanges(t *testing.T) {
+	for _, remove := range []bool{false, true} {
+		name := "update"
+		if remove {
+			name = "remove"
+		}
+		t.Run(name, func(t *testing.T) {
+			pathHandler := mux.NewPathRecorderMux("aggregator_test")
+			proxier, err := BuildAndRegisterAggregator(Downloader{}, genericapiserver.NewEmptyDelegate(), nil, nil, pathHandler)
+			if err != nil {
+				t.Fatal(err)
+			}
+			apiService := &v1.APIService{Spec: v1.APIServiceSpec{Group: "group.example.com", Version: "v1"}}
+			apiService.Name = "v1.group.example.com"
+			requestStarted := make(chan struct{})
+			releaseRequest := make(chan struct{})
+			originalHandler := testV3APIService{data: []byte("original")}
+			proxier.AddUpdateAPIService(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path != "/openapi/v3" {
+					close(requestStarted)
+					<-releaseRequest
+				}
+				originalHandler.ServeHTTP(w, r)
+			}), apiService)
+			if err := proxier.UpdateAPIServiceSpec(apiService.Name); err != nil {
+				t.Fatal(err)
+			}
+
+			response := httptest.NewRecorder()
+			requestDone := make(chan struct{})
+			var changeDone chan struct{}
+			go func() {
+				defer close(requestDone)
+				pathHandler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/openapi/v3/apis/group.example.com/v1", nil))
+			}()
+			t.Cleanup(func() {
+				close(releaseRequest)
+				<-requestDone
+				if changeDone != nil {
+					<-changeDone
+				}
+				if response.Code != http.StatusOK || response.Body.String() != "original" {
+					t.Errorf("in-flight response = %d %q, want 200 original", response.Code, response.Body.String())
+				}
+			})
+			select {
+			case <-requestStarted:
+			case <-time.After(5 * time.Second):
+				t.Fatal("request did not reach the APIService handler")
+			}
+
+			changeDone = make(chan struct{})
+			go func() {
+				defer close(changeDone)
+				if remove {
+					proxier.RemoveAPIServiceSpec(apiService.Name)
+				} else {
+					proxier.AddUpdateAPIService(testV3APIService{data: []byte("updated")}, apiService)
+				}
+			}()
+			select {
+			case <-changeDone:
+			case <-time.After(5 * time.Second):
+				t.Fatal("APIService change was blocked by an in-flight OpenAPI request")
+			}
+
+			// New requests must observe the change while the original request is still in flight.
+			updatedResponse := httptest.NewRecorder()
+			pathHandler.ServeHTTP(updatedResponse, httptest.NewRequest(http.MethodGet, "/openapi/v3/apis/group.example.com/v1", nil))
+			if remove {
+				if updatedResponse.Code != http.StatusNotFound {
+					t.Errorf("response after removal = %d, want 404", updatedResponse.Code)
+				}
+			} else if updatedResponse.Code != http.StatusOK || updatedResponse.Body.String() != "updated" {
+				t.Errorf("response after update = %d %q, want 200 updated", updatedResponse.Code, updatedResponse.Body.String())
+			}
+		})
+	}
 }
 
 func TestV3RootAPIService(t *testing.T) {
