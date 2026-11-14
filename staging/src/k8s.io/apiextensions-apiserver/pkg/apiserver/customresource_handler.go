@@ -388,8 +388,27 @@ func (r *crdHandler) serveResource(w http.ResponseWriter, req *http.Request, req
 			time.Sleep(2 * time.Second)
 		}
 
+		// The justCreated sleep (and ordinary request latency) widen the gap between the
+		// terminating check taken at the top of ServeHTTP and the create below, so a create
+		// can slip in after the CRD has started terminating and write an orphan resource to
+		// etcd. Re-read the CRD right before admission to shrink that window: a fresh NotFound
+		// means the CRD is gone, so forbid that too; a same-name CRD recreated in between has a
+		// new UID, so the UID check leaves it alone.
+		// See https://github.com/kubernetes/kubernetes/issues/99181.
+		if !terminating {
+			if freshCRD, err := r.crdLister.Get(crd.Name); err != nil {
+				if apierrors.IsNotFound(err) {
+					terminating = true
+				}
+			} else if freshCRD.UID == crd.UID &&
+				(!freshCRD.DeletionTimestamp.IsZero() || apiextensionshelpers.IsCRDConditionTrue(freshCRD, apiextensionsv1.Terminating)) {
+				terminating = true
+			}
+		}
+
 		a := r.admission
 		if terminating {
+			klog.V(4).Infof("Forbidding create of %s: CRD %q is terminating or has been deleted", requestInfo.Resource, crd.Name)
 			a = &forbidCreateAdmission{delegate: a}
 		}
 		return handlers.CreateResource(storage, requestScope, a)
