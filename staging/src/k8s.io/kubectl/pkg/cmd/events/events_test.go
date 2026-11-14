@@ -217,3 +217,55 @@ foo         18m (x3 over 28m)   Warning   ScalingReplicaSet   Deployment/bar   S
 		t.Errorf("expected\n%v\ngot\n%v", e, a)
 	}
 }
+
+func TestToOptionsChunkSize(t *testing.T) {
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+
+	streams, _, _, _ := genericiooptions.NewTestIOStreams()
+	flags := NewEventsFlags(tf, streams)
+	flags.ChunkSize = 250
+
+	opts, err := flags.ToOptions()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if opts.ChunkSize != 250 {
+		t.Errorf("expected ChunkSize 250, got %d", opts.ChunkSize)
+	}
+}
+
+func TestEventChunkSize(t *testing.T) {
+	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+	streams, _, _, _ := genericiooptions.NewTestIOStreams()
+	clientset, err := kubernetes.NewForConfig(cmdtesting.DefaultClientConfig())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var requestedLimit string
+	clientset.CoreV1().RESTClient().(*restclient.RESTClient).Client = fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+		requestedLimit = req.URL.Query().Get("limit")
+		return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, getFakeEvents())}, nil
+	})
+
+	options := &EventsOptions{
+		AllNamespaces: true,
+		ChunkSize:     100,
+		client:        clientset,
+		PrintObj: func(object runtime.Object, writer io.Writer) error {
+			return nil
+		},
+		IOStreams: streams,
+	}
+
+	err = options.Run()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if requestedLimit != "100" {
+		t.Errorf("expected limit 100, got %q", requestedLimit)
+	}
+}

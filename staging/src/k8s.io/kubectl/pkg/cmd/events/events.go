@@ -105,6 +105,7 @@ type EventsOptions struct {
 	AllNamespaces bool
 	Watch         bool
 	FilterTypes   []string
+	ChunkSize     int64
 
 	forGVK  schema.GroupVersionKind
 	forName string
@@ -154,6 +155,7 @@ func (flags *EventsFlags) ToOptions() (*EventsOptions, error) {
 		AllNamespaces: flags.AllNamespaces,
 		Watch:         flags.Watch,
 		FilterTypes:   flags.FilterTypes,
+		ChunkSize:     flags.ChunkSize,
 		IOStreams:     flags.IOStreams,
 	}
 	var err error
@@ -225,7 +227,7 @@ func (o *EventsOptions) Run() error {
 	if o.AllNamespaces {
 		namespace = ""
 	}
-	listOptions := metav1.ListOptions{Limit: cmdutil.DefaultChunkSize}
+	listOptions := metav1.ListOptions{Limit: o.ChunkSize}
 	if o.forName != "" {
 		listOptions.FieldSelector = fields.AndSelectors(
 			fields.OneTermEqualSelector("involvedObject.kind", o.forGVK.Kind),
