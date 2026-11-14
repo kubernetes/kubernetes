@@ -27,7 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	genericfeatures "k8s.io/apiserver/pkg/features"
-	apiserveroptions "k8s.io/apiserver/pkg/server/options"
+	apiserveroptions "k8s.io/apiserver/pkg/server/serving/options"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"

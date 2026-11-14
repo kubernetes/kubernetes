@@ -1,5 +1,3 @@
-//go:build go1.27
-
 /*
 Copyright The Kubernetes Authors.
 
@@ -16,14 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package server
-
-import "net/http"
-
-// 1 MiB MaxHeaderBytes / 64 bytes per value (~16 for header and ~48 for value) bounds tiny-header floods
-// while allowing thousands of identity groups sent one per header line.
-const maxHeaderValueCount = 16384
-
-func setMaxHeaderValueCount(server *http.Server) {
-	server.MaxHeaderValueCount = maxHeaderValueCount
-}
+// Package options holds the secure serving and delegated authentication and
+// authorization options of a server. Like k8s.io/apiserver/pkg/server/serving,
+// it does not depend on the generic API server, so components which only serve
+// HTTPS can use it without linking k8s.io/apiserver/pkg/server/options.
+package options
