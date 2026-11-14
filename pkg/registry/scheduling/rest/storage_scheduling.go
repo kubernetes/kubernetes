@@ -118,6 +118,19 @@ func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource serverstorag
 		}
 	}
 
+	if resource := "compositepodgroups"; apiResourceConfigSource.ResourceEnabled(schedulingapiv1beta1.SchemeGroupVersion.WithResource(resource)) {
+		if utilfeature.DefaultFeatureGate.Enabled(features.CompositePodGroup) {
+			cpgStorage, cpgStatusStorage, err := compositepodgroupstore.NewREST(restOptionsGetter)
+			if err != nil {
+				return nil, err
+			}
+			storage[resource] = cpgStorage
+			storage[resource+"/status"] = cpgStatusStorage
+		} else {
+			klog.Warning("CompositePodGroup storage is disabled because the CompositePodGroup feature gate is disabled")
+		}
+	}
+
 	return storage, nil
 }
 
@@ -173,7 +186,8 @@ func AddSystemPriorityClasses() genericapiserver.PostStartHookFunc {
 	return func(hookContext genericapiserver.PostStartHookContext) error {
 		// Adding system priority classes is important. If they fail to add, many critical system
 		// components may fail and cluster may break.
-		err := wait.Poll(1*time.Second, 30*time.Second, func() (done bool, err error) {
+		// The first attempt is made immediately so that a healthy start does not wait out the polling interval.
+		err := wait.PollUntilContextTimeout(context.Background(), 1*time.Second, 30*time.Second, true, func(context.Context) (done bool, err error) {
 			schedClientSet, err := schedulingclient.NewForConfig(hookContext.LoopbackClientConfig)
 			if err != nil {
 				utilruntime.HandleError(fmt.Errorf("unable to initialize client: %v", err))

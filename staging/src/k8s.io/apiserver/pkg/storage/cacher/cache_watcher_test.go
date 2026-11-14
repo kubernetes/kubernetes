@@ -26,17 +26,18 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/cacher/metrics"
-	"k8s.io/apiserver/pkg/storage/cacher/store"
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
 	compbasemetrics "k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/testutil"
@@ -51,7 +52,6 @@ func TestCacheWatcherCleanupNotBlockedByResult(t *testing.T) {
 	var lock sync.RWMutex
 	var w *cacheWatcher
 	count := 0
-	filter := func(string, labels.Set, fields.Set, runtime.Object) bool { return true }
 	forget := func(drainWatcher bool) {
 		lock.Lock()
 		defer lock.Unlock()
@@ -63,15 +63,16 @@ func TestCacheWatcherCleanupNotBlockedByResult(t *testing.T) {
 		w.stopLocked()
 	}
 	initEvents := []*watchCacheEvent{
-		{Object: &v1.Pod{}},
-		{Object: &v1.Pod{}},
+		{Object: &v1.Pod{}, ResourceVersion: 1},
+		{Object: &v1.Pod{}, ResourceVersion: 2},
 	}
 	// set the size of the buffer of w.result to 0, so that the writes to
 	// w.result is blocked.
-	w = newCacheWatcher(0, filter, forget, storage.APIObjectVersioner{}, time.Now(), false, schema.GroupResource{Resource: "pods"}, metrics.NewNoopWatcherMetricsObservers(), nil, "")
-	go w.process(context.Background(), intervalFromEvents(initEvents), 0)
+	w = newCacheWatcher(0, filterAny, forget, storage.APIObjectVersioner{}, time.Now(), false, schema.GroupResource{Resource: "pods"}, metrics.NewNoopWatcherMetricsObservers(), nil, "", watchSelector{}, 0, nil)
+	w.input <- watcherInput{interval: intervalFromEvents(initEvents)}
+	go w.process(context.Background())
 	w.Stop()
-	if err := wait.PollImmediate(1*time.Second, 5*time.Second, func() (bool, error) {
+	if err := wait.PollImmediate(5*time.Millisecond, 5*time.Second, func() (bool, error) {
 		lock.RLock()
 		defer lock.RUnlock()
 		return count == 2, nil
@@ -81,9 +82,13 @@ func TestCacheWatcherCleanupNotBlockedByResult(t *testing.T) {
 }
 
 func TestCacheWatcherHandlesFiltering(t *testing.T) {
-	filter := func(_ string, _ labels.Set, field fields.Set, _ runtime.Object) bool {
-		return field["spec.nodeName"] == "host"
-	}
+	filter := newWatchEventFilter("", storage.ListOptions{
+		Predicate: storage.SelectionPredicate{
+			Label: labels.Everything(),
+			Field: fields.SelectorFromSet(fields.Set{"spec.nodeName": "host"}),
+		},
+		Recursive: true,
+	}, schema.GroupResource{Resource: "pods"})
 	forget := func(bool) {}
 
 	testCases := []struct {
@@ -188,8 +193,9 @@ TestCase:
 			testCase.events[j].ResourceVersion = uint64(j) + 1
 		}
 
-		w := newCacheWatcher(0, filter, forget, storage.APIObjectVersioner{}, time.Now(), false, schema.GroupResource{Resource: "pods"}, metrics.NewNoopWatcherMetricsObservers(), nil, "")
-		go w.process(context.Background(), intervalFromEvents(testCase.events), 0)
+		w := newCacheWatcher(0, filter, forget, storage.APIObjectVersioner{}, time.Now(), false, schema.GroupResource{Resource: "pods"}, metrics.NewNoopWatcherMetricsObservers(), nil, "", watchSelector{}, 0, nil)
+		w.input <- watcherInput{interval: intervalFromEvents(testCase.events)}
+		go w.process(context.Background())
 
 		ch := w.ResultChan()
 		for j, event := range testCase.expected {
@@ -213,7 +219,6 @@ TestCase:
 func TestCacheWatcherStoppedInAnotherGoroutine(t *testing.T) {
 	var w *cacheWatcher
 	done := make(chan struct{})
-	filter := func(string, labels.Set, fields.Set, runtime.Object) bool { return true }
 	forget := func(drainWatcher bool) {
 		w.setDrainInputBufferLocked(drainWatcher)
 		w.stopLocked()
@@ -225,7 +230,7 @@ func TestCacheWatcherStoppedInAnotherGoroutine(t *testing.T) {
 	// timeout to zero and run the Stop goroutine concurrently.
 	// May sure that the watch will not be blocked on Stop.
 	for i := 0; i < maxRetriesToProduceTheRaceCondition; i++ {
-		w = newCacheWatcher(0, filter, forget, storage.APIObjectVersioner{}, time.Now(), false, schema.GroupResource{Resource: "pods"}, metrics.NewNoopWatcherMetricsObservers(), nil, "")
+		w = newCacheWatcher(0, filterAny, forget, storage.APIObjectVersioner{}, time.Now(), false, schema.GroupResource{Resource: "pods"}, metrics.NewNoopWatcherMetricsObservers(), nil, "", watchSelector{}, 0, nil)
 		go w.Stop()
 		select {
 		case <-done:
@@ -237,11 +242,12 @@ func TestCacheWatcherStoppedInAnotherGoroutine(t *testing.T) {
 	deadline := time.Now().Add(time.Hour)
 	// After that, verifies the cacheWatcher.process goroutine works correctly.
 	for i := 0; i < maxRetriesToProduceTheRaceCondition; i++ {
-		w = newCacheWatcher(2, filter, emptyFunc, storage.APIObjectVersioner{}, deadline, false, schema.GroupResource{Resource: "pods"}, metrics.NewNoopWatcherMetricsObservers(), nil, "")
-		w.input <- &watchCacheEvent{Object: &v1.Pod{}, ResourceVersion: uint64(i + 1)}
+		w = newCacheWatcher(2, filterAny, emptyFunc, storage.APIObjectVersioner{}, deadline, false, schema.GroupResource{Resource: "pods"}, metrics.NewNoopWatcherMetricsObservers(), nil, "", watchSelector{}, 0, nil)
+		w.input <- watcherInput{interval: intervalFromEvents(nil)}
+		w.input <- watcherInput{event: &watchCacheEvent{Object: &v1.Pod{}, ResourceVersion: uint64(i + 1)}}
 		ctx, cancel := context.WithDeadline(context.Background(), deadline)
 		defer cancel()
-		go w.process(ctx, nil, 0)
+		go w.process(ctx)
 		select {
 		case <-w.ResultChan():
 		case <-time.After(time.Second):
@@ -293,70 +299,12 @@ func TestCacheWatcherStoppedOnDestroy(t *testing.T) {
 
 }
 
-func TestResourceVersionAfterInitEvents(t *testing.T) {
-	const numObjects = 10
-	store := store.NewWatchCacheStorage(nil)
-
-	for i := 0; i < numObjects; i++ {
-		elem := makeTestStoreElement(makeTestPod(fmt.Sprintf("pod-%d", i), uint64(i)))
-		if _, err := store.UpdateStore(watch.Added, elem, uint64(i)); err != nil {
-			t.Fatal(err)
-		}
-	}
-
-	wci, err := newCacheIntervalFromStore(numObjects, store.LatestSnapshot(), "", false)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	filter := func(_ string, _ labels.Set, _ fields.Set, _ runtime.Object) bool { return true }
-	forget := func(_ bool) {}
-	deadline := time.Now().Add(time.Minute)
-	w := newCacheWatcher(numObjects+1, filter, forget, storage.APIObjectVersioner{}, deadline, true, schema.GroupResource{Resource: "pods"}, metrics.NewNoopWatcherMetricsObservers(), nil, "")
-
-	// Simulate a situation when the last event will that was already in
-	// the state, wasn't yet processed by cacher and will be delivered
-	// via channel again.
-	event := &watchCacheEvent{
-		Type:            watch.Added,
-		Object:          makeTestPod(fmt.Sprintf("pod-%d", numObjects-1), uint64(numObjects-1)),
-		ResourceVersion: uint64(numObjects - 1),
-	}
-	if !w.add(event, time.NewTimer(time.Second)) {
-		t.Fatalf("failed to add event")
-	}
-	w.stopLocked()
-
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		w.process(context.Background(), wci, uint64(numObjects-1))
-	}()
-
-	// We expect all init events to be delivered.
-	for i := 0; i < numObjects; i++ {
-		<-w.ResultChan()
-	}
-	// We don't expect any other event to be delivered and thus
-	// the ResultChan to be closed.
-	result, ok := <-w.ResultChan()
-	if ok {
-		t.Errorf("unexpected event: %#v", result)
-	}
-
-	wg.Wait()
-}
-
 func TestTimeBucketWatchersBasic(t *testing.T) {
-	filter := func(_ string, _ labels.Set, _ fields.Set, _ runtime.Object) bool {
-		return true
-	}
 	forget := func(bool) {}
 
 	newWatcher := func(deadline time.Time) *cacheWatcher {
-		w := newCacheWatcher(0, filter, forget, storage.APIObjectVersioner{}, deadline, true, schema.GroupResource{Resource: "pods"}, metrics.NewNoopWatcherMetricsObservers(), nil, "")
-		w.setBookmarkAfterResourceVersion(0)
+		w := newCacheWatcher(0, filterAny, forget, storage.APIObjectVersioner{}, deadline, true, schema.GroupResource{Resource: "pods"}, metrics.NewNoopWatcherMetricsObservers(), nil, "", watchSelector{}, 0, nil)
+		w.state = cacheWatcherBookmarkSent
 		return w
 	}
 
@@ -407,10 +355,52 @@ func makeWatchCacheEvent(rv uint64) *watchCacheEvent {
 
 // TestCacheWatcherDraining verifies the cacheWatcher.process goroutine is properly cleaned up when draining was requested
 func TestCacheWatcherDraining(t *testing.T) {
+	scenarios := []struct {
+		name          string
+		chanSize      int
+		inputs        []watcherInput
+		expectedTypes []watch.EventType
+	}{
+		{
+			name:     "events",
+			chanSize: 1,
+			inputs: []watcherInput{
+				{interval: intervalFromEvents([]*watchCacheEvent{makeWatchCacheEvent(5), makeWatchCacheEvent(6)})},
+				{event: makeWatchCacheEvent(7)},
+			},
+			expectedTypes: []watch.EventType{watch.Added, watch.Added, watch.Added},
+		},
+		{
+			name:     "initial error",
+			chanSize: 0,
+			inputs: []watcherInput{
+				{err: apierrors.NewResourceExpired("expired")},
+			},
+			expectedTypes: []watch.EventType{watch.Error},
+		},
+		{
+			name:     "events followed by terminal error",
+			chanSize: 2,
+			inputs: []watcherInput{
+				{interval: intervalFromEvents([]*watchCacheEvent{makeWatchCacheEvent(4), makeWatchCacheEvent(5), makeWatchCacheEvent(6)})},
+				{event: makeWatchCacheEvent(7)},
+				{err: apierrors.NewResourceExpired("expired")},
+			},
+			expectedTypes: []watch.EventType{watch.Added, watch.Added, watch.Added, watch.Added, watch.Error},
+		},
+	}
+
+	for _, tc := range scenarios {
+		t.Run(tc.name, func(t *testing.T) {
+			testCacheWatcherDraining(t, tc.chanSize, tc.inputs, tc.expectedTypes)
+		})
+	}
+}
+
+func testCacheWatcherDraining(t *testing.T, chanSize int, inputs []watcherInput, expectedTypes []watch.EventType) {
 	var lock sync.RWMutex
 	var w *cacheWatcher
 	count := 0
-	filter := func(string, labels.Set, fields.Set, runtime.Object) bool { return true }
 	forget := func(drainWatcher bool) {
 		lock.Lock()
 		defer lock.Unlock()
@@ -418,25 +408,26 @@ func TestCacheWatcherDraining(t *testing.T) {
 		w.setDrainInputBufferLocked(drainWatcher)
 		w.stopLocked()
 	}
-	initEvents := []*watchCacheEvent{
-		makeWatchCacheEvent(5),
-		makeWatchCacheEvent(6),
-	}
-	w = newCacheWatcher(1, filter, forget, storage.APIObjectVersioner{}, time.Now(), true, schema.GroupResource{Resource: "pods"}, metrics.NewNoopWatcherMetricsObservers(), nil, "")
-	go w.process(context.Background(), intervalFromEvents(initEvents), 1)
-	if !w.add(makeWatchCacheEvent(7), time.NewTimer(1*time.Second)) {
-		t.Fatal("failed adding an even to the watcher")
+	w = newCacheWatcher(chanSize, filterAny, forget, storage.APIObjectVersioner{}, time.Now(), true, schema.GroupResource{Resource: "pods"}, metrics.NewNoopWatcherMetricsObservers(), nil, "", watchSelector{}, 0, nil)
+	go w.process(context.Background())
+	for _, in := range inputs {
+		select {
+		case w.input <- in:
+		case <-time.After(time.Second):
+			t.Fatal("failed adding input to the watcher")
+		}
 	}
 	forget(true) // drain the watcher
 
-	eventCount := 0
-	for range w.ResultChan() {
-		eventCount++
+	var gotTypes []watch.EventType
+	for event := range w.ResultChan() {
+		gotTypes = append(gotTypes, event.Type)
+		if event.Type == watch.Error {
+			require.True(t, apierrors.IsResourceExpired(apierrors.FromObject(event.Object)))
+		}
 	}
-	if eventCount != 3 {
-		t.Errorf("Unexpected number of objects received: %d, expected: 3", eventCount)
-	}
-	if err := wait.PollImmediate(1*time.Second, 5*time.Second, func() (bool, error) {
+	require.Equal(t, expectedTypes, gotTypes)
+	if err := wait.PollImmediate(5*time.Millisecond, 5*time.Second, func() (bool, error) {
 		lock.RLock()
 		defer lock.RUnlock()
 		return count == 2, nil
@@ -448,10 +439,48 @@ func TestCacheWatcherDraining(t *testing.T) {
 // TestCacheWatcherDrainingRequestedButNotDrained verifies the cacheWatcher.process goroutine is properly cleaned up when draining was requested
 // but the client never actually get any data
 func TestCacheWatcherDrainingRequestedButNotDrained(t *testing.T) {
+	scenarios := []struct {
+		name     string
+		chanSize int
+		inputs   []watcherInput
+	}{
+		{
+			name:     "events",
+			chanSize: 1,
+			inputs: []watcherInput{
+				{interval: intervalFromEvents([]*watchCacheEvent{makeWatchCacheEvent(5), makeWatchCacheEvent(6)})},
+				{event: makeWatchCacheEvent(7)},
+			},
+		},
+		{
+			name:     "initial error",
+			chanSize: 0,
+			inputs: []watcherInput{
+				{err: apierrors.NewResourceExpired("expired")},
+			},
+		},
+		{
+			name:     "events followed by terminal error",
+			chanSize: 2,
+			inputs: []watcherInput{
+				{interval: intervalFromEvents([]*watchCacheEvent{makeWatchCacheEvent(4), makeWatchCacheEvent(5), makeWatchCacheEvent(6)})},
+				{event: makeWatchCacheEvent(7)},
+				{err: apierrors.NewResourceExpired("expired")},
+			},
+		},
+	}
+
+	for _, tc := range scenarios {
+		t.Run(tc.name, func(t *testing.T) {
+			testCacheWatcherDrainingRequestedButNotDrained(t, tc.chanSize, tc.inputs)
+		})
+	}
+}
+
+func testCacheWatcherDrainingRequestedButNotDrained(t *testing.T, chanSize int, inputs []watcherInput) {
 	var lock sync.RWMutex
 	var w *cacheWatcher
 	count := 0
-	filter := func(string, labels.Set, fields.Set, runtime.Object) bool { return true }
 	forget := func(drainWatcher bool) {
 		lock.Lock()
 		defer lock.Unlock()
@@ -459,18 +488,18 @@ func TestCacheWatcherDrainingRequestedButNotDrained(t *testing.T) {
 		w.setDrainInputBufferLocked(drainWatcher)
 		w.stopLocked()
 	}
-	initEvents := []*watchCacheEvent{
-		makeWatchCacheEvent(5),
-		makeWatchCacheEvent(6),
-	}
-	w = newCacheWatcher(1, filter, forget, storage.APIObjectVersioner{}, time.Now(), true, schema.GroupResource{Resource: "pods"}, metrics.NewNoopWatcherMetricsObservers(), nil, "")
-	go w.process(context.Background(), intervalFromEvents(initEvents), 1)
-	if !w.add(makeWatchCacheEvent(7), time.NewTimer(1*time.Second)) {
-		t.Fatal("failed adding an even to the watcher")
+	w = newCacheWatcher(chanSize, filterAny, forget, storage.APIObjectVersioner{}, time.Now(), true, schema.GroupResource{Resource: "pods"}, metrics.NewNoopWatcherMetricsObservers(), nil, "", watchSelector{}, 0, nil)
+	go w.process(context.Background())
+	for _, in := range inputs {
+		select {
+		case w.input <- in:
+		case <-time.After(time.Second):
+			t.Fatal("failed adding input to the watcher")
+		}
 	}
 	forget(true) // drain the watcher
 	w.Stop()     // client disconnected, timeout expired or ctx was actually closed
-	if err := wait.PollImmediate(1*time.Second, 5*time.Second, func() (bool, error) {
+	if err := wait.PollImmediate(5*time.Millisecond, 5*time.Second, func() (bool, error) {
 		lock.RLock()
 		defer lock.RUnlock()
 		return count == 3, nil
@@ -485,7 +514,6 @@ func TestCacheWatcherDrainingNoBookmarkAfterResourceVersionReceived(t *testing.T
 	var lock sync.RWMutex
 	var w *cacheWatcher
 	count := 0
-	filter := func(string, labels.Set, fields.Set, runtime.Object) bool { return true }
 	forget := func(drainWatcher bool) {
 		lock.Lock()
 		defer lock.Unlock()
@@ -497,12 +525,14 @@ func TestCacheWatcherDrainingNoBookmarkAfterResourceVersionReceived(t *testing.T
 		w.stopLocked()
 	}
 	initEvents := []*watchCacheEvent{
-		{Object: &v1.Pod{}},
-		{Object: &v1.Pod{}},
+		{Object: &v1.Pod{}, ResourceVersion: 1},
+		{Object: &v1.Pod{}, ResourceVersion: 2},
 	}
-	w = newCacheWatcher(0, filter, forget, storage.APIObjectVersioner{}, time.Now(), true, schema.GroupResource{Resource: "pods"}, metrics.NewNoopWatcherMetricsObservers(), nil, "")
-	w.setBookmarkAfterResourceVersion(10)
-	go w.process(context.Background(), intervalFromEvents(initEvents), 0)
+	w = newCacheWatcher(0, filterAny, forget, storage.APIObjectVersioner{}, time.Now(), true, schema.GroupResource{Resource: "pods"}, metrics.NewNoopWatcherMetricsObservers(), nil, "", watchSelector{}, 0, nil)
+	w.state = cacheWatcherWaitingForBookmark
+	w.bookmarkAfterResourceVersion = 10
+	w.input <- watcherInput{interval: intervalFromEvents(initEvents)}
+	go w.process(context.Background())
 
 	// get an event so that
 	// we know the w.process
@@ -512,13 +542,18 @@ func TestCacheWatcherDrainingNoBookmarkAfterResourceVersionReceived(t *testing.T
 	// to the result chan
 	<-w.ResultChan()
 
+	// Fill the 1-element input buffer freed when w.process dequeued the initial interval.
+	if !w.add(&watchCacheEvent{Object: &v1.Pod{}}, time.NewTimer(time.Second)) {
+		t.Fatal("failed adding an event to the watcher")
+	}
+
 	// now, once we know, the process
 	// is waiting add another event that will time out
 	// and start the cleanup process
 	if w.add(&watchCacheEvent{Object: &v1.Pod{}}, time.NewTimer(10*time.Millisecond)) {
 		t.Fatal("expected the add method to fail")
 	}
-	if err := wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, 5*time.Second, true, func(_ context.Context) (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), 5*time.Millisecond, 5*time.Second, true, func(_ context.Context) (bool, error) {
 		lock.RLock()
 		defer lock.RUnlock()
 		return count == 2, nil
@@ -549,7 +584,6 @@ func TestCacheWatcherDrainingNoBookmarkAfterResourceVersionSent(t *testing.T) {
 	watchInitializationSignal := utilflowcontrol.NewInitializationSignal()
 	ctx := utilflowcontrol.WithInitializationSignal(context.Background(), watchInitializationSignal)
 	count := 0
-	filter := func(string, labels.Set, fields.Set, runtime.Object) bool { return true }
 	forget := func(drainWatcher bool) {
 		lock.Lock()
 		defer lock.Unlock()
@@ -557,7 +591,7 @@ func TestCacheWatcherDrainingNoBookmarkAfterResourceVersionSent(t *testing.T) {
 		w.setDrainInputBufferLocked(drainWatcher)
 		w.stopLocked()
 	}
-	initEvents := []*watchCacheEvent{{Object: makePod(1)}, {Object: makePod(2)}}
+	initEvents := []*watchCacheEvent{{Object: makePod(1), ResourceVersion: 1}, {Object: makePod(2), ResourceVersion: 2}}
 
 	registry := compbasemetrics.NewKubeRegistry()
 	if err := registry.Register(metrics.DispatchStageDuration); err != nil {
@@ -568,9 +602,11 @@ func TestCacheWatcherDrainingNoBookmarkAfterResourceVersionSent(t *testing.T) {
 	})
 
 	fakeClock := testingclock.NewFakeClock(time.Now())
-	w = newCacheWatcher(2, filter, forget, storage.APIObjectVersioner{}, time.Now(), true, schema.GroupResource{Resource: "pods"}, metrics.NewWatcherMetricsObservers(schema.GroupResource{Resource: "pods"}), fakeClock, "")
-	w.setBookmarkAfterResourceVersion(10)
-	go w.process(ctx, intervalFromEvents(initEvents), 0)
+	w = newCacheWatcher(2, filterAny, forget, storage.APIObjectVersioner{}, time.Now(), true, schema.GroupResource{Resource: "pods"}, metrics.NewWatcherMetricsObservers(schema.GroupResource{Resource: "pods"}), fakeClock, "", watchSelector{}, 0, nil)
+	w.state = cacheWatcherWaitingForBookmark
+	w.bookmarkAfterResourceVersion = 10
+	w.input <- watcherInput{interval: intervalFromEvents(initEvents)}
+	go w.process(ctx)
 	watchInitializationSignal.Wait()
 
 	// note that we can add three events even though the chanSize is two because
@@ -591,6 +627,7 @@ func TestCacheWatcherDrainingNoBookmarkAfterResourceVersionSent(t *testing.T) {
 	if !w.nonblockingAdd(&watchCacheEvent{Type: watch.Bookmark, ResourceVersion: 10, Object: &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "10"}}}) {
 		t.Fatal("failed adding an even to the watcher")
 	}
+	require.Equal(t, uint64(10), w.dispatchedResourceVersion)
 	if !w.add(&watchCacheEvent{
 		Object:          makePod(15),
 		ResourceVersion: 15,
@@ -607,7 +644,8 @@ func TestCacheWatcherDrainingNoBookmarkAfterResourceVersionSent(t *testing.T) {
 	if w.add(&watchCacheEvent{Object: makePod(20), ResourceVersion: 20}, time.NewTimer(1*time.Second)) {
 		t.Fatal("expected the add method to fail")
 	}
-	if err := wait.PollImmediate(1*time.Second, 5*time.Second, func() (bool, error) {
+	require.Equal(t, uint64(19), w.dispatchedResourceVersion)
+	if err := wait.PollImmediate(5*time.Millisecond, 5*time.Second, func() (bool, error) {
 		lock.RLock()
 		defer lock.RUnlock()
 		return count == 1, nil
@@ -631,7 +669,7 @@ func TestCacheWatcherDrainingNoBookmarkAfterResourceVersionSent(t *testing.T) {
 		{Type: watch.Added, Object: makePod(15)},
 	}, true)
 
-	if err := wait.PollImmediate(1*time.Second, 5*time.Second, func() (bool, error) {
+	if err := wait.PollImmediate(5*time.Millisecond, 5*time.Second, func() (bool, error) {
 		lock.RLock()
 		defer lock.RUnlock()
 		return count == 2, nil
@@ -665,8 +703,9 @@ apiserver_watch_events_dispatch_duration_seconds_count{group="",resource="pods",
 
 func TestBookmarkAfterResourceVersionWatchers(t *testing.T) {
 	newWatcher := func(id string, deadline time.Time) *cacheWatcher {
-		w := newCacheWatcher(0, func(_ string, _ labels.Set, _ fields.Set, _ runtime.Object) bool { return true }, func(bool) {}, storage.APIObjectVersioner{}, deadline, true, schema.GroupResource{Resource: "pods"}, metrics.NewNoopWatcherMetricsObservers(), nil, id)
-		w.setBookmarkAfterResourceVersion(10)
+		w := newCacheWatcher(0, filterAny, func(bool) {}, storage.APIObjectVersioner{}, deadline, true, schema.GroupResource{Resource: "pods"}, metrics.NewNoopWatcherMetricsObservers(), nil, id, watchSelector{}, 0, nil)
+		w.state = cacheWatcherWaitingForBookmark
+		w.bookmarkAfterResourceVersion = 10
 		return w
 	}
 
@@ -733,4 +772,61 @@ func gatherWithoutBuckets(gatherer compbasemetrics.Gatherer) testutil.GathererFu
 		}
 		return got, err
 	}
+}
+
+// filterAny allways passes the watch events as recursive on "" prefix with no predicate will always pass the filtering. GroupResource is just for logging.
+var filterAny watchEventFilter = newWatchEventFilter("", storage.ListOptions{Recursive: true, Predicate: storage.Everything}, schema.GroupResource{Resource: "pods"})
+
+func TestGetShallowCopyObject(t *testing.T) {
+	t.Run("typed struct", func(t *testing.T) {
+		orig := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:   "pod-1",
+				Labels: map[string]string{"app": "test"},
+			},
+		}
+		copied := getShallowCopyObject(orig).(*v1.Pod)
+		if copied == orig {
+			t.Fatalf("expected new struct pointer, got same pointer")
+		}
+		copied.GetObjectKind().SetGroupVersionKind(v1.SchemeGroupVersion.WithKind("Pod"))
+		if orig.APIVersion != "" || orig.Kind != "" {
+			t.Errorf("expected original TypeMeta to remain empty, got %v", orig.TypeMeta)
+		}
+		if reflect.ValueOf(copied.Labels).Pointer() != reflect.ValueOf(orig.Labels).Pointer() {
+			t.Errorf("expected shallow copy to share nested map")
+		}
+	})
+
+	t.Run("unstructured", func(t *testing.T) {
+		nested := map[string]interface{}{"key": "val"}
+		orig := &unstructured.Unstructured{
+			Object: map[string]interface{}{
+				"apiVersion": "v1",
+				"kind":       "Pod",
+				"spec":       nested,
+			},
+		}
+		copied := getShallowCopyObject(orig).(*unstructured.Unstructured)
+		if copied == orig {
+			t.Fatalf("expected new Unstructured pointer, got same pointer")
+		}
+		copied.SetGroupVersionKind(schema.GroupVersionKind{Group: "example.com", Version: "v2", Kind: "Custom"})
+		if orig.GetAPIVersion() != "v1" || orig.GetKind() != "Pod" {
+			t.Errorf("expected original GVK to remain v1/Pod, got %s/%s", orig.GetAPIVersion(), orig.GetKind())
+		}
+		if reflect.ValueOf(copied.Object["spec"]).Pointer() != reflect.ValueOf(orig.Object["spec"]).Pointer() {
+			t.Errorf("expected shallow copy to share nested spec map")
+		}
+	})
+
+	t.Run("cachingObject", func(t *testing.T) {
+		co, err := newCachingObject(&v1.Pod{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := getShallowCopyObject(co); got != co {
+			t.Errorf("expected same cachingObject pointer, got %#v", got)
+		}
+	})
 }

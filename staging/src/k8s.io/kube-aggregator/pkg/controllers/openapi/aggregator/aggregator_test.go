@@ -27,10 +27,16 @@ import (
 
 	"bytes"
 
+	restful "github.com/emicklei/go-restful/v3"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
+	genericfeatures "k8s.io/apiserver/pkg/features"
+	"k8s.io/apiserver/pkg/server"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
 	v1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
+	"k8s.io/kube-openapi/pkg/cached"
 	"k8s.io/kube-openapi/pkg/common"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 )
@@ -669,8 +675,50 @@ func buildAndRegisterSpecAggregator(delegationHandlers []http.Handler, mux commo
 			},
 		},
 	}
-	s := buildAndRegisterSpecAggregatorForLocalServices(&downloader, aggregatorSpec, delegationHandlers, mux)
+	s := buildAndRegisterSpecAggregatorForLocalServices(&downloader, cached.Static(aggregatorSpec, "never-changes"), delegationHandlers, mux)
 	return s
+}
+
+func TestBuildAndRegisterAggregatorLazy(t *testing.T) {
+	for _, lazy := range []bool{true, false} {
+		t.Run(strings.Join([]string{"lazy", map[bool]string{true: "true", false: "false"}[lazy]}, "="), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.OpenAPIV2LazyBuild, lazy)
+
+			var builds int
+			cfg := &common.Config{
+				Info: &spec.Info{InfoProps: spec.InfoProps{Title: "test", Version: "v1"}},
+				GetDefinitions: func(common.ReferenceCallback) map[string]common.OpenAPIDefinition {
+					builds++
+					return map[string]common.OpenAPIDefinition{}
+				},
+			}
+			ws := new(restful.WebService)
+			ws.Path("/apis/apiregistration.k8s.io/v1").Produces(restful.MIME_JSON)
+			ws.Route(ws.GET("/").To(func(*restful.Request, *restful.Response) {}).Operation("getAPIRegistration"))
+
+			mux := http.NewServeMux()
+			downloader := NewDownloader()
+			if _, err := BuildAndRegisterAggregator(&downloader, server.NewEmptyDelegate(), []*restful.WebService{ws}, cfg, mux); err != nil {
+				t.Fatal(err)
+			}
+
+			if lazy && builds != 0 {
+				t.Fatalf("expected 0 builds at registration with OpenAPIV2LazyBuild=true, got %d", builds)
+			}
+			if !lazy && builds != 1 {
+				t.Fatalf("expected 1 build at registration with OpenAPIV2LazyBuild=false, got %d", builds)
+			}
+
+			swagger, err := fetchOpenAPI(mux)
+			if err != nil {
+				t.Fatal(err)
+			}
+			expectPath(t, swagger, "/apis/apiregistration.k8s.io/v1/")
+			if builds != 1 {
+				t.Fatalf("expected 1 build after first request, got %d", builds)
+			}
+		})
+	}
 }
 
 func expectPath(t *testing.T, swagger *spec.Swagger, path string) {

@@ -324,7 +324,8 @@ func TestWaitForAttachAndMountVolumeAttachLimitExceededError(t *testing.T) {
 		&record.FakeRecorder{},
 		volumetest.NewBlockVolumePathHandler(),
 		nil,
-		0)
+		0,
+		nil)
 
 	tCtx := ktesting.Init(t)
 	sourcesReady := config.NewSourcesReady(func(_ sets.Set[string]) bool { return true })
@@ -531,7 +532,8 @@ func newTestVolumeManager(t *testing.T, tmpDir string, podManager kubepod.Manage
 		fakeRecorder,
 		fakePathHandler,
 		nil,
-		0)
+		0,
+		nil)
 
 	return vm
 }
@@ -916,13 +918,13 @@ func TestVolumeManager_ResizeEphemeralVolume(t *testing.T) {
 					Name: "vol1",
 					VolumeSource: v1.VolumeSource{
 						EmptyDir: &v1.EmptyDirVolumeSource{
-							Medium: v1.StorageMediumMemory,
+							Medium:    v1.StorageMediumMemory,
+							SizeLimit: &quantity200Mi,
 						},
 					},
 				},
 			},
 			isMounted:         false,
-			newSize:           &quantity200Mi,
 			expectedErrSubstr: "is not yet mounted; deferring resize",
 		},
 		{
@@ -932,13 +934,13 @@ func TestVolumeManager_ResizeEphemeralVolume(t *testing.T) {
 					Name: "vol1",
 					VolumeSource: v1.VolumeSource{
 						EmptyDir: &v1.EmptyDirVolumeSource{
-							Medium: v1.StorageMediumMemory,
+							Medium:    v1.StorageMediumMemory,
+							SizeLimit: &quantity200Mi,
 						},
 					},
 				},
 			},
 			isMounted:         true,
-			newSize:           &quantity200Mi,
 			expectedErrSubstr: "",
 			expectedMountOpts: []string{"remount", "size=209715200"},
 		},
@@ -949,13 +951,13 @@ func TestVolumeManager_ResizeEphemeralVolume(t *testing.T) {
 					Name: "vol1",
 					VolumeSource: v1.VolumeSource{
 						EmptyDir: &v1.EmptyDirVolumeSource{
-							Medium: v1.StorageMediumDefault,
+							Medium:    v1.StorageMediumDefault,
+							SizeLimit: &quantity200Mi,
 						},
 					},
 				},
 			},
 			isMounted:         false,
-			newSize:           &quantity200Mi,
 			expectedErrSubstr: "only memory-backed emptyDir volumes support direct resize",
 		},
 		{
@@ -971,14 +973,12 @@ func TestVolumeManager_ResizeEphemeralVolume(t *testing.T) {
 				},
 			},
 			isMounted:         false,
-			newSize:           &quantity200Mi,
 			expectedErrSubstr: "does not support direct resizing",
 		},
 		{
 			name:              "volume not found in pod spec (error path)",
 			volumes:           []v1.Volume{},
 			isMounted:         false,
-			newSize:           &quantity200Mi,
 			expectedErrSubstr: "volume vol1 not found in pod test-pod",
 		},
 	}
@@ -1034,10 +1034,11 @@ func TestVolumeManager_ResizeEphemeralVolume(t *testing.T) {
 				&record.FakeRecorder{},
 				volumetest.NewBlockVolumePathHandler(),
 				nil,
-				0)
+				0,
+				nil)
 
 			// Test ResizeEphemeralVolume
-			err = manager.ResizeEphemeralVolume(pod, "vol1", tt.newSize)
+			err = manager.ResizeEphemeralVolume(pod, "vol1")
 			if tt.expectedErrSubstr != "" {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.expectedErrSubstr)

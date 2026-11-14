@@ -60,7 +60,6 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		input                           scheduling.PodGroup
 		enableTopologyAwareScheduling   bool
 		enableDRAWorkloadResourceClaims bool
-		enablePodGroupPreemptionPolicy  bool
 		enableCompositePodGroup         bool
 		expectedErrs                    field.ErrorList
 	}{
@@ -175,6 +174,25 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		"pod group disruption mode": {
 			input: mkValidPodGroup(setDisruptionModeAll()),
 		},
+		"basic policy with disruption mode all": {
+			input: mkValidPodGroup(setBasicPolicy(), setDisruptionModeAll()),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "disruptionMode"), nil, `cannot have "all" disruption mode when scheduling policy is other than "gang"`).MarkFromImperative(),
+			},
+		},
+		"neither basic nor gang policy with disruption mode all": {
+			input: mkValidPodGroup(clearPodGroupPolicy(), setDisruptionModeAll()),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "schedulingPolicy"), nil, "").WithOrigin("union"),
+				field.Invalid(field.NewPath("spec", "disruptionMode"), nil, `cannot have "all" disruption mode when scheduling policy is other than "gang"`).MarkFromImperative(),
+			},
+		},
+		"both basic and gang policy with disruption mode all": {
+			input: mkValidPodGroup(setBothPolicies(), setDisruptionModeAll()),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "schedulingPolicy"), nil, "").WithOrigin("union"),
+			},
+		},
 		"disruption mode with neither single nor all": {
 			input:        mkValidPodGroup(setDisruptionModeNeither()),
 			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "disruptionMode"), nil, "").WithOrigin("union")},
@@ -211,24 +229,17 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		"valid system-node-critical priority": {
 			input: mkValidPodGroup(setPriority(scheduling.SystemCriticalPriority + 1000)),
 		},
-		"preemption policy set, pod group preemptionPolicy disabled": {
-			input:        mkValidPodGroup(setPreemptionPolicy(scheduling.PreemptNever)),
-			expectedErrs: field.ErrorList{field.Forbidden(field.NewPath("spec", "preemptionPolicy"), "")},
+		"valid preemption policy (Never)": {
+			input: mkValidPodGroup(setPreemptionPolicy(scheduling.PreemptNever)),
 		},
-		"valid preemption policy (Never), pod group preemptionPolicy enabled": {
-			input:                          mkValidPodGroup(setPreemptionPolicy(scheduling.PreemptNever)),
-			enablePodGroupPreemptionPolicy: true,
-		},
-		"invalid preemption policy, pod group preemptionPolicy enabled": {
-			input:                          mkValidPodGroup(setPreemptionPolicy(scheduling.PreemptionPolicy("Invalid"))),
-			enablePodGroupPreemptionPolicy: true,
+		"invalid preemption policy": {
+			input: mkValidPodGroup(setPreemptionPolicy(scheduling.PreemptionPolicy("Invalid"))),
 			expectedErrs: field.ErrorList{
 				field.NotSupported(field.NewPath("spec", "preemptionPolicy"), core.PreemptionPolicy("Invalid"), []string{"Never", "PreemptLowerPriority"}),
 			},
 		},
-		"pod group without preemption policy, pod group preemptionPolicy enabled": {
-			input:                          mkValidPodGroup(clearPreemptionPolicy()),
-			enablePodGroupPreemptionPolicy: true,
+		"pod group without preemption policy": {
+			input: mkValidPodGroup(clearPreemptionPolicy()),
 		},
 		"ok resourceClaimName reference": {
 			input: mkValidPodGroup(addResourceClaims(scheduling.PodGroupResourceClaim{Name: "claim", ResourceClaimName: new("resource-claim")})),
@@ -338,7 +349,7 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 			input:                         mkValidPodGroup(setParentCompositePodGroupName("my-parent"), unsetWorkloadRef()),
 			enableCompositePodGroup:       true,
 			enableTopologyAwareScheduling: true,
-			expectedErrs:                  field.ErrorList{field.Required(field.NewPath("spec", "workloadRef"), "").WithOrigin("dependentRequired").MarkAlpha()},
+			expectedErrs:                  field.ErrorList{field.Required(field.NewPath("spec", "workloadRef"), "").WithOrigin("dependentRequired").MarkBeta()},
 		},
 	}
 	for k, tc := range testCases {
@@ -347,7 +358,6 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				features.GenericWorkload:                 true,
 				features.TopologyAwareWorkloadScheduling: tc.enableTopologyAwareScheduling,
 				features.DRAWorkloadResourceClaims:       tc.enableDRAWorkloadResourceClaims,
-				features.PodGroupPreemptionPolicy:        tc.enablePodGroupPreemptionPolicy,
 				features.CompositePodGroup:               tc.enableCompositePodGroup,
 			})
 			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, strategy, tc.expectedErrs)
@@ -382,13 +392,16 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 		updateObj                       scheduling.PodGroup
 		enableTopologyAwareScheduling   bool
 		enableDRAWorkloadResourceClaims bool
-		enablePodGroupPreemptionPolicy  bool
 		enableCompositePodGroup         bool
 		expectedErrs                    field.ErrorList
 	}{
 		"valid update": {
 			oldObj:    mkValidPodGroup(setResourceVersion("1")),
-			updateObj: mkValidPodGroup(setResourceVersion("1")),
+			updateObj: mkValidPodGroup(setResourceVersion("1"), setLabel("foo", "bar")),
+		},
+		"valid update with existing basic policy and disruption mode all": {
+			oldObj:    mkValidPodGroup(setResourceVersion("1"), setBasicPolicy(), setDisruptionModeAll()),
+			updateObj: mkValidPodGroup(setResourceVersion("1"), setBasicPolicy(), setDisruptionModeAll(), setLabel("foo", "bar")),
 		},
 		"valid update minCount": {
 			oldObj:    mkValidPodGroup(setResourceVersion("1")),
@@ -486,11 +499,11 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 		},
 		"valid update with unchanged scheduling constraints and TAS disabled": {
 			oldObj:    mkValidPodGroup(setResourceVersion("1"), addTopologyConstraint("foo")),
-			updateObj: mkValidPodGroup(setResourceVersion("1"), addTopologyConstraint("foo")),
+			updateObj: mkValidPodGroup(setResourceVersion("1"), addTopologyConstraint("foo"), setLabel("foo", "bar")),
 		},
 		"valid update with unchanged scheduling constraints": {
 			oldObj:                        mkValidPodGroup(setResourceVersion("1"), addTopologyConstraint("foo")),
-			updateObj:                     mkValidPodGroup(setResourceVersion("1"), addTopologyConstraint("foo")),
+			updateObj:                     mkValidPodGroup(setResourceVersion("1"), addTopologyConstraint("foo"), setLabel("foo", "bar")),
 			enableTopologyAwareScheduling: true,
 		},
 		"invalid update to scheduling constraints": {
@@ -590,24 +603,12 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			updateObj:    mkValidPodGroup(setResourceVersion("1"), setPriority(2000)),
 			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "priority"), nil, "").WithOrigin("immutable")},
 		},
-		"invalid update of preemption policy, pod group preemptionPolicy enabled": {
-			oldObj:                         mkValidPodGroup(setResourceVersion("1"), setPreemptionPolicy(scheduling.PreemptNever)),
-			updateObj:                      mkValidPodGroup(setResourceVersion("1"), setPreemptionPolicy(scheduling.PreemptLowerPriority)),
-			enablePodGroupPreemptionPolicy: true,
-			expectedErrs:                   field.ErrorList{field.Invalid(field.NewPath("spec", "preemptionPolicy"), nil, "").WithOrigin("immutable")},
-		},
-		"invalid clearing of preemption policy, pod group preemptionPolicy enabled": {
-			oldObj:                         mkValidPodGroup(setResourceVersion("1"), setPreemptionPolicy(scheduling.PreemptNever)),
-			updateObj:                      mkValidPodGroup(setResourceVersion("1"), clearPreemptionPolicy()),
-			enablePodGroupPreemptionPolicy: true,
-			expectedErrs:                   field.ErrorList{field.Invalid(field.NewPath("spec", "preemptionPolicy"), nil, "").WithOrigin("immutable")},
-		},
-		"invalid update of preemption policy, pod group preemptionPolicy disabled": {
+		"invalid update of preemption policy": {
 			oldObj:       mkValidPodGroup(setResourceVersion("1"), setPreemptionPolicy(scheduling.PreemptNever)),
 			updateObj:    mkValidPodGroup(setResourceVersion("1"), setPreemptionPolicy(scheduling.PreemptLowerPriority)),
-			expectedErrs: field.ErrorList{field.Forbidden(field.NewPath("spec", "preemptionPolicy"), ""), field.Invalid(field.NewPath("spec", "preemptionPolicy"), nil, "").WithOrigin("immutable")},
+			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "preemptionPolicy"), nil, "").WithOrigin("immutable")},
 		},
-		"invalid clearing of preemption policy, pod group preemptionPolicy disabled": {
+		"invalid clearing of preemption policy": {
 			oldObj:       mkValidPodGroup(setResourceVersion("1"), setPreemptionPolicy(scheduling.PreemptNever)),
 			updateObj:    mkValidPodGroup(setResourceVersion("1"), clearPreemptionPolicy()),
 			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "preemptionPolicy"), nil, "").WithOrigin("immutable")},
@@ -626,7 +627,6 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 				features.GenericWorkload:                 true,
 				features.TopologyAwareWorkloadScheduling: tc.enableTopologyAwareScheduling,
 				features.DRAWorkloadResourceClaims:       tc.enableDRAWorkloadResourceClaims,
-				features.PodGroupPreemptionPolicy:        tc.enablePodGroupPreemptionPolicy,
 				features.CompositePodGroup:               tc.enableCompositePodGroup,
 			})
 			strategy := registry.NewStrategy()
@@ -968,5 +968,14 @@ func clearPreemptionPolicy() func(obj *scheduling.PodGroup) {
 func setParentCompositePodGroupName(name string) func(obj *scheduling.PodGroup) {
 	return func(obj *scheduling.PodGroup) {
 		obj.Spec.ParentCompositePodGroupName = &name
+	}
+}
+
+func setLabel(k, v string) func(obj *scheduling.PodGroup) {
+	return func(obj *scheduling.PodGroup) {
+		if obj.Labels == nil {
+			obj.Labels = make(map[string]string)
+		}
+		obj.Labels[k] = v
 	}
 }

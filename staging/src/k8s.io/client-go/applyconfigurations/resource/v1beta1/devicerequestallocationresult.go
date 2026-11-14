@@ -71,15 +71,9 @@ type DeviceRequestAllocationResultApplyConfiguration struct {
 	Tolerations []DeviceTolerationApplyConfiguration `json:"tolerations,omitempty"`
 	// bindingConditions contains a copy of the BindingConditions
 	// from the corresponding ResourceSlice at the time of allocation.
-	//
-	// This is a beta field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
-	// feature gates.
 	BindingConditions []string `json:"bindingConditions,omitempty"`
 	// bindingFailureConditions contains a copy of the BindingFailureConditions
 	// from the corresponding ResourceSlice at the time of allocation.
-	//
-	// This is a beta field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
-	// feature gates.
 	BindingFailureConditions []string `json:"bindingFailureConditions,omitempty"`
 	// shareID uniquely identifies an individual allocation share of the device,
 	// used when the device supports multiple simultaneous allocations.
@@ -96,6 +90,8 @@ type DeviceRequestAllocationResultApplyConfiguration struct {
 	// All capacity entries are included, even if the consumed amount is zero.
 	// The domain prefix in the capacity name may be omitted if it is
 	// the same as the driver name.
+	//
+	// ConsumedCapacity may have at most 32 entries. The values must not be negative.
 	ConsumedCapacity map[resourcev1beta1.QualifiedName]resource.Quantity `json:"consumedCapacity,omitempty"`
 	// skipNodeOperations lists node-local resource operations (gRPC calls)
 	// that will be skipped for this allocated device when determining whether

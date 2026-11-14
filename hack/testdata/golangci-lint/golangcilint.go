@@ -47,6 +47,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/client-go/rest"
+	cloudprovider "k8s.io/cloud-provider"
+	"k8s.io/controller-manager/pkg/clientbuilder"
 	"k8s.io/klog/v2"
 	"k8s.io/ktesting" // depguard issue: ktesting is allowed only in test files
 )
@@ -112,6 +116,32 @@ func Forbidigo() [16]byte {
 	return md5.Sum(nil) // forbidigo issue: md5 is oudated, insecure
 }
 
+func ForbidigoClientBuilderConfig(builder clientbuilder.ControllerClientBuilder) (*rest.Config, error) {
+	return builder.Config("controller") // forbidigo issue: ControllerClientBuilder.Config and ConfigOrDie are deprecated
+}
+
+func ForbidigoClientBuilderConfigOrDie(builder clientbuilder.ControllerClientBuilder) *rest.Config {
+	return builder.ConfigOrDie("controller") // forbidigo issue: ControllerClientBuilder.Config and ConfigOrDie are deprecated
+}
+
+func ForbidigoTypedClientBuilderConfig(builder clientbuilder.TypedClientBuilder) *rest.Config {
+	return builder.WithDropManagedFields().ConfigOrDie("controller") // forbidigo issue: ControllerClientBuilder.Config and ConfigOrDie are deprecated
+}
+
+func ForbidigoCloudProviderClientBuilderConfig(builder cloudprovider.ControllerClientBuilder) *rest.Config {
+	return builder.ConfigOrDie("controller") // forbidigo issue: ControllerClientBuilder.Config and ConfigOrDie are deprecated
+}
+
+// configHolder has a Config method of its own, which the forbidigo rule for
+// the client builders must not report.
+type configHolder struct{}
+
+func (configHolder) Config(string) *rest.Config { return nil }
+
+func ConfigOnAnotherType() *rest.Config {
+	return configHolder{}.Config("controller")
+}
+
 func Modernize(a, b int) int {
 	var m int
 	if a > b { // modernize hint: if/else statement can be modernized using max
@@ -123,7 +153,9 @@ func Modernize(a, b int) int {
 }
 
 func Logcheck() {
-	klog.InfoS("message", "key") // logcheck issue: Additional arguments to InfoS should always be Key Value pairs
+	klog.InfoS("message", "key")                                                    // logcheck issue: Additional arguments to InfoS should always be Key Value pairs
+	utilruntime.HandleErrorWithLogger(klog.Background(), nil, "message", "key")     // logcheck issue: Additional arguments to HandleErrorWithLogger should always be Key Value pairs
+	utilruntime.HandleErrorWithContext(context.Background(), nil, "message", "key") // logcheck issue: Additional arguments to HandleErrorWithContext should always be Key Value pairs
 }
 
 func Errcheck() {

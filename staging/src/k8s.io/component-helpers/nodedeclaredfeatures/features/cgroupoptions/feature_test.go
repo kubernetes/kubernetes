@@ -1,0 +1,148 @@
+/*
+Copyright The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package cgroupoptions
+
+import (
+	"testing"
+
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/component-helpers/nodedeclaredfeatures/types"
+)
+
+func TestRequirements(t *testing.T) {
+	reqs := Feature.Requirements()
+	if reqs == nil {
+		t.Fatalf("Requirements returned nil")
+	}
+	if len(reqs.EnabledFeatureGates) != 1 || reqs.EnabledFeatureGates[0] != CgroupOptionsFeatureGate {
+		t.Fatalf("unexpected required feature gates: %v", reqs.EnabledFeatureGates)
+	}
+	if reqs.RequiredRuntimeFeatures == nil || !reqs.RequiredRuntimeFeatures.CgroupMountMode {
+		t.Fatalf("unexpected required runtime features: %v", reqs.RequiredRuntimeFeatures)
+	}
+}
+
+func TestName(t *testing.T) {
+	if Feature.Name() != CgroupOptionsFeatureName {
+		t.Fatalf("expected Name to be %s, got %s", CgroupOptionsFeatureName, Feature.Name())
+	}
+}
+
+func TestDiscoverFeature(t *testing.T) {
+	tests := []struct {
+		name           string
+		featureGate    bool
+		runtimeSupport bool
+		expected       bool
+	}{
+		{
+			name:           "feature gate disabled",
+			featureGate:    false,
+			runtimeSupport: true,
+			expected:       false,
+		},
+		{
+			name:           "runtime does not support cgroup mount mode",
+			featureGate:    true,
+			runtimeSupport: false,
+			expected:       false,
+		},
+		{
+			name:           "all requirements met",
+			featureGate:    true,
+			runtimeSupport: true,
+			expected:       true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := &types.NodeConfiguration{
+				FeatureGates:    types.FeatureGateMap{CgroupOptionsFeatureGate: tt.featureGate},
+				RuntimeFeatures: types.RuntimeFeatures{CgroupMountMode: tt.runtimeSupport},
+			}
+			if got := Feature.Discover(cfg); got != tt.expected {
+				t.Errorf("Discover() = %v, want %v", got, tt.expected)
+			}
+		})
+	}
+}
+
+func readWriteCgroupsSecurityContext() *v1.SecurityContext {
+	mountMode := v1.CgroupMountModeReadWrite
+	return &v1.SecurityContext{CgroupOptions: &v1.CgroupOptions{MountMode: &mountMode}}
+}
+
+func readOnlyCgroupsSecurityContext() *v1.SecurityContext {
+	mountMode := v1.CgroupMountModeReadOnly
+	return &v1.SecurityContext{CgroupOptions: &v1.CgroupOptions{MountMode: &mountMode}}
+}
+
+func TestInferForScheduling(t *testing.T) {
+	tests := []struct {
+		name     string
+		spec     v1.PodSpec
+		expected bool
+	}{
+		{
+			name:     "no security context",
+			spec:     v1.PodSpec{Containers: []v1.Container{{Name: "a"}}},
+			expected: false,
+		},
+		{
+			name:     "read-only mount mode",
+			spec:     v1.PodSpec{Containers: []v1.Container{{Name: "a", SecurityContext: readOnlyCgroupsSecurityContext()}}},
+			expected: true,
+		},
+		{
+			name:     "empty cgroupOptions",
+			spec:     v1.PodSpec{Containers: []v1.Container{{Name: "a", SecurityContext: &v1.SecurityContext{CgroupOptions: &v1.CgroupOptions{}}}}},
+			expected: false,
+		},
+		{
+			name:     "read-write container",
+			spec:     v1.PodSpec{Containers: []v1.Container{{Name: "a", SecurityContext: readWriteCgroupsSecurityContext()}}},
+			expected: true,
+		},
+		{
+			name:     "read-write init container",
+			spec:     v1.PodSpec{InitContainers: []v1.Container{{Name: "a", SecurityContext: readWriteCgroupsSecurityContext()}}},
+			expected: true,
+		},
+		{
+			name:     "read-only init container",
+			spec:     v1.PodSpec{InitContainers: []v1.Container{{Name: "a", SecurityContext: readOnlyCgroupsSecurityContext()}}},
+			expected: true,
+		},
+		{
+			name: "read-write ephemeral container",
+			spec: v1.PodSpec{EphemeralContainers: []v1.EphemeralContainer{{
+				EphemeralContainerCommon: v1.EphemeralContainerCommon{Name: "a", SecurityContext: readWriteCgroupsSecurityContext()},
+			}}},
+			expected: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			spec := tt.spec
+			if got := Feature.InferForScheduling(&types.PodInfo{Spec: &spec}); got != tt.expected {
+				t.Errorf("InferForScheduling() = %v, want %v", got, tt.expected)
+			}
+		})
+	}
+}

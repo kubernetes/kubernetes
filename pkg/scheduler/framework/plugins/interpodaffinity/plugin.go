@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	listersv1 "k8s.io/client-go/listers/core/v1"
@@ -45,12 +46,11 @@ var _ fwk.SignPlugin = &InterPodAffinity{}
 
 // InterPodAffinity is a plugin that checks inter pod affinity
 type InterPodAffinity struct {
-	parallelizer                                       fwk.Parallelizer
-	args                                               config.InterPodAffinityArgs
-	sharedLister                                       fwk.SharedLister
-	nsLister                                           listersv1.NamespaceLister
-	enableInPlacePodVerticalScalingSchedulerPreemption bool
-	enableInterPodAffinityHostnameFastPath             bool
+	parallelizer                           fwk.Parallelizer
+	args                                   config.InterPodAffinityArgs
+	sharedLister                           fwk.SharedLister
+	nsLister                               listersv1.NamespaceLister
+	enableInterPodAffinityHostnameFastPath bool
 }
 
 // Name returns name of the plugin. It is used in logs, etc.
@@ -109,12 +109,11 @@ func New(_ context.Context, plArgs runtime.Object, h fwk.Handle, fts feature.Fea
 		return nil, err
 	}
 	pl := &InterPodAffinity{
-		parallelizer: h.Parallelizer(),
-		args:         args,
-		sharedLister: h.SnapshotSharedLister(),
-		nsLister:     h.SharedInformerFactory().Core().V1().Namespaces().Lister(),
-		enableInPlacePodVerticalScalingSchedulerPreemption: fts.EnableInPlacePodVerticalScalingSchedulerPreemption,
-		enableInterPodAffinityHostnameFastPath:             fts.EnableInterPodAffinityHostnameFastPath,
+		parallelizer:                           h.Parallelizer(),
+		args:                                   args,
+		sharedLister:                           h.SnapshotSharedLister(),
+		nsLister:                               h.SharedInformerFactory().Core().V1().Namespaces().Lister(),
+		enableInterPodAffinityHostnameFastPath: fts.EnableInterPodAffinityHostnameFastPath,
 	}
 
 	return pl, nil
@@ -162,6 +161,47 @@ func GetNamespaceLabelsSnapshot(logger klog.Logger, ns string, nsLister listersv
 	return
 }
 
+// termsNeedNamespaceLabels reports whether matching any of the terms against
+// any of the pods requires the pods' namespace labels. A term that already
+// matches the pod namespace via Namespaces, or whose namespace selector is
+// empty/nothing, can be evaluated without looking the namespace up.
+func termsNeedNamespaceLabels(terms []fwk.AffinityTerm, pods ...*v1.Pod) bool {
+	for i := range terms {
+		term := &terms[i]
+		if term.NamespaceSelector == nil ||
+			labels.MatchesNothing(term.NamespaceSelector) ||
+			term.NamespaceSelector.Empty() {
+			continue
+		}
+		for _, pod := range pods {
+			if pod == nil || term.Namespaces.Has(pod.Namespace) {
+				continue
+			}
+			if term.Selector.Matches(labels.Set(pod.Labels)) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// namespaceLabelsForNamespace returns namespace labels, whether the namespace
+// was found, and an error. A missing namespace is reported as found=false with
+// no error; other lister errors are returned to the caller.
+func (pl *InterPodAffinity) namespaceLabelsForNamespace(namespace string, needed bool) (labels.Set, bool, error) {
+	if !needed {
+		return nil, true, nil
+	}
+	ns, err := pl.nsLister.Get(namespace)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil, false, nil
+		}
+		return nil, false, err
+	}
+	return labels.Set(ns.Labels), true, nil
+}
+
 func (pl *InterPodAffinity) isSchedulableAfterAssignedPodChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
 	originalPod, modifiedPod, err := util.As[*v1.Pod](oldObj, newObj)
 	if err != nil {
@@ -175,26 +215,38 @@ func (pl *InterPodAffinity) isSchedulableAfterAssignedPodChange(logger klog.Logg
 		return fwk.QueueSkip, nil
 	}
 
-	terms, err := fwk.GetAffinityTerms(pod, fwk.GetPodAffinityTerms(pod.Spec.Affinity))
-	if err != nil {
-		return fwk.Queue, err
-	}
-
-	antiTerms, err := fwk.GetAffinityTerms(pod, fwk.GetPodAntiAffinityTerms(pod.Spec.Affinity))
-	if err != nil {
-		return fwk.Queue, err
-	}
-
 	// Pod is updated. Return Queue when the updated pod matching the target pod's affinity or not matching anti-affinity.
 	// Note that, we don't need to check each affinity individually when the Pod has more than one affinity
 	// because the current PodAffinity looks for a **single** existing pod that can satisfy **all** the terms of inter-pod affinity of an incoming pod.
 	if modifiedPod != nil && originalPod != nil {
-		if !podMatchesAllAffinityTerms(terms, originalPod) && podMatchesAllAffinityTerms(terms, modifiedPod) {
+		terms, err := fwk.GetAffinityTerms(pod, fwk.GetPodAffinityTerms(pod.Spec.Affinity))
+		if err != nil {
+			return fwk.Queue, err
+		}
+		antiTerms, err := fwk.GetAffinityTerms(pod, fwk.GetPodAntiAffinityTerms(pod.Spec.Affinity))
+		if err != nil {
+			return fwk.Queue, err
+		}
+		// Pod namespace is immutable, so originalPod and modifiedPod share it.
+		needNSLabels := termsNeedNamespaceLabels(terms, originalPod, modifiedPod) ||
+			termsNeedNamespaceLabels(antiTerms, originalPod, modifiedPod)
+		nsLabels, found, err := pl.namespaceLabelsForNamespace(originalPod.Namespace, needNSLabels)
+		if err != nil {
+			return fwk.Queue, err
+		}
+		if !found {
+			logger.V(5).Info("namespace is not in the informer cache; requeueing conservatively",
+				"namespace", originalPod.Namespace, "pod", klog.KObj(pod))
+			return fwk.Queue, nil
+		}
+		if !podMatchesAllAffinityTermsWithNSLabels(terms, originalPod, nsLabels) &&
+			podMatchesAllAffinityTermsWithNSLabels(terms, modifiedPod, nsLabels) {
 			logger.V(5).Info("a scheduled pod was updated to match the target pod's affinity, and the pod may be schedulable now",
 				"pod", klog.KObj(pod), "modifiedPod", klog.KObj(modifiedPod))
 			return fwk.Queue, nil
 		}
-		if podMatchesAnyAffinityTerms(antiTerms, originalPod) && !podMatchesAnyAffinityTerms(antiTerms, modifiedPod) {
+		if podMatchesAnyAffinityTermsWithNSLabels(antiTerms, originalPod, nsLabels) &&
+			!podMatchesAnyAffinityTermsWithNSLabels(antiTerms, modifiedPod, nsLabels) {
 			logger.V(5).Info("a scheduled pod was updated not to match the target pod's anti affinity, and the pod may be schedulable now",
 				"pod", klog.KObj(pod), "modifiedPod", klog.KObj(modifiedPod))
 			return fwk.Queue, nil
@@ -206,7 +258,21 @@ func (pl *InterPodAffinity) isSchedulableAfterAssignedPodChange(logger klog.Logg
 
 	// Pod is added. Return Queue when the added pod matching the target pod's affinity.
 	if modifiedPod != nil {
-		if podMatchesAllAffinityTerms(terms, modifiedPod) {
+		terms, err := fwk.GetAffinityTerms(pod, fwk.GetPodAffinityTerms(pod.Spec.Affinity))
+		if err != nil {
+			return fwk.Queue, err
+		}
+		needNSLabels := termsNeedNamespaceLabels(terms, modifiedPod)
+		nsLabels, found, err := pl.namespaceLabelsForNamespace(modifiedPod.Namespace, needNSLabels)
+		if err != nil {
+			return fwk.Queue, err
+		}
+		if !found {
+			logger.V(5).Info("namespace is not in the informer cache; requeueing conservatively",
+				"namespace", modifiedPod.Namespace, "pod", klog.KObj(pod))
+			return fwk.Queue, nil
+		}
+		if podMatchesAllAffinityTermsWithNSLabels(terms, modifiedPod, nsLabels) {
 			logger.V(5).Info("a scheduled pod was added and it matches the target pod's affinity",
 				"pod", klog.KObj(pod), "modifiedPod", klog.KObj(modifiedPod))
 			return fwk.Queue, nil
@@ -217,8 +283,22 @@ func (pl *InterPodAffinity) isSchedulableAfterAssignedPodChange(logger klog.Logg
 	}
 
 	// Pod is deleted. Return Queue when the deleted pod matches the target pod's anti-affinity or vice versa.
+	antiTerms, err := fwk.GetAffinityTerms(pod, fwk.GetPodAntiAffinityTerms(pod.Spec.Affinity))
+	if err != nil {
+		return fwk.Queue, err
+	}
+	needNSLabels := termsNeedNamespaceLabels(antiTerms, originalPod)
+	nsLabels, found, err := pl.namespaceLabelsForNamespace(originalPod.Namespace, needNSLabels)
+	if err != nil {
+		return fwk.Queue, err
+	}
+	if !found {
+		logger.V(5).Info("namespace is not in the informer cache; requeueing conservatively",
+			"namespace", originalPod.Namespace, "pod", klog.KObj(pod))
+		return fwk.Queue, nil
+	}
 
-	if podMatchesAnyAffinityTerms(antiTerms, originalPod) {
+	if podMatchesAnyAffinityTermsWithNSLabels(antiTerms, originalPod, nsLabels) {
 		logger.V(5).Info("a scheduled pod was deleted and it matches the target pod's anti-affinity. The pod may be schedulable now",
 			"pod", klog.KObj(pod), "originalPod", klog.KObj(originalPod))
 		return fwk.Queue, nil
@@ -228,7 +308,17 @@ func (pl *InterPodAffinity) isSchedulableAfterAssignedPodChange(logger klog.Logg
 	if err != nil {
 		return fwk.Queue, err
 	}
-	if podMatchesAnyAffinityTerms(originalPodAntiTerms, pod) {
+	needNSLabels = termsNeedNamespaceLabels(originalPodAntiTerms, pod)
+	nsLabels, found, err = pl.namespaceLabelsForNamespace(pod.Namespace, needNSLabels)
+	if err != nil {
+		return fwk.Queue, err
+	}
+	if !found {
+		logger.V(5).Info("namespace is not in the informer cache; requeueing conservatively",
+			"namespace", pod.Namespace, "pod", klog.KObj(pod))
+		return fwk.Queue, nil
+	}
+	if podMatchesAnyAffinityTermsWithNSLabels(originalPodAntiTerms, pod, nsLabels) {
 		logger.V(5).Info("a scheduled pod was deleted and the target pod matches the deleted pod's anti-affinity. The pod may be schedulable now",
 			"pod", klog.KObj(pod), "originalPod", klog.KObj(originalPod))
 		return fwk.Queue, nil

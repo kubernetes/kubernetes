@@ -625,16 +625,17 @@ func (s *ProxyServer) Run(ctx context.Context) error {
 
 	// This has to start after the calls to NewServiceConfig because that
 	// function must configure its shared informer event handlers first.
-	informerFactory.Start(wait.NeverStop)
-	endpointSliceInformerFactory.Start(wait.NeverStop)
-	serviceInformerFactory.Start(wait.NeverStop)
+	informerFactory.StartWithContext(ctx)
+	endpointSliceInformerFactory.StartWithContext(ctx)
+	serviceInformerFactory.StartWithContext(ctx)
 
 	// hollow-proxy doesn't need node config, and we don't create nodeManager for hollow-proxy.
 	if s.NodeManager != nil {
 		nodeConfig := config.NewNodeConfig(ctx, s.NodeManager.NodeInformer(), s.Config.ConfigSyncPeriod.Duration)
 		nodeConfig.RegisterEventHandler(s.NodeManager)
-		nodeTopologyConfig := config.NewNodeTopologyConfig(ctx, s.NodeManager.NodeInformer(), s.Config.ConfigSyncPeriod.Duration)
-		nodeTopologyConfig.RegisterEventHandler(s.Proxier)
+		// NodeManager has already started and synced the node informer, so the handler must be attached in one step
+		// Ref: https://issues.k8s.io/143275
+		config.NewNodeTopologyConfig(ctx, s.NodeManager.NodeInformer(), s.Config.ConfigSyncPeriod.Duration, s.Proxier)
 
 		go nodeConfig.Run(wait.NeverStop)
 	}

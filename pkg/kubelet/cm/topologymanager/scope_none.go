@@ -43,6 +43,6 @@ func NewNoneScope() Scope {
 	}
 }
 
-func (s *noneScope) Admit(ctx context.Context, pod *v1.Pod, operation lifecycle.Operation) lifecycle.PodAdmitResult {
-	return s.admitPolicyNone(ctx, pod, operation)
+func (s *noneScope) Admit(ctx context.Context, pod *v1.Pod, operation lifecycle.Operation, dryRun bool) lifecycle.PodAdmitResult {
+	return s.admitPolicyNone(ctx, pod, operation, dryRun)
 }

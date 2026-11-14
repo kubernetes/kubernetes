@@ -31,16 +31,16 @@ import (
 	"k8s.io/kubernetes/pkg/proxy"
 	ipsettest "k8s.io/kubernetes/pkg/proxy/ipvs/ipset/testing"
 	ipvstest "k8s.io/kubernetes/pkg/proxy/ipvs/util/testing"
-	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
-	iptablestest "k8s.io/kubernetes/pkg/util/iptables/testing"
 	"k8s.io/utils/ptr"
+	utiliptables "sigs.k8s.io/iptables-wrappers/pkg/iptables"
+	iptablestest "sigs.k8s.io/iptables-wrappers/pkg/iptables/testing"
 )
 
 func TestCleanupLeftovers(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 	ipt := iptablestest.NewFake()
-	ipts := map[v1.IPFamily]utiliptables.Interface{
-		v1.IPv4Protocol: ipt,
+	ipts := map[utiliptables.Protocol]utiliptables.Interface{
+		utiliptables.ProtocolIPv4: ipt,
 	}
 	ipvs := ipvstest.NewFake()
 	ipset := ipsettest.NewFake(testIPSetVersion)
@@ -72,7 +72,7 @@ func TestCleanupLeftovers(t *testing.T) {
 		:KUBE-KUBELET-CANARY - [0:0]
 		COMMIT
 		`)
-	err := ipt.RestoreAll([]byte(initial), utiliptables.NoFlushTables, utiliptables.NoRestoreCounters)
+	err := ipt.Restore(ctx, []byte(initial))
 	if err != nil {
 		t.Fatalf("Unexpected error setting up iptables state: %v", err)
 	}
@@ -122,7 +122,7 @@ func TestCleanupLeftovers(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	err = ipt.SaveInto("", &buf)
+	err = ipt.SaveInto(ctx, "", &buf)
 	if err != nil {
 		t.Fatalf("Unexpected error reading filter table: %v", err)
 	}

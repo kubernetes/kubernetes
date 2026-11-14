@@ -55,6 +55,21 @@ const (
 	// "application/json" or "application/apply-patch+yaml", respectively.
 	ClientsAllowCBOR Feature = "ClientsAllowCBOR"
 
+	// owner: @mborsz
+	// beta: v1.38
+	//
+	// If enabled, setting rest.Config.MinConnectionPoolSize or transport.Config.MinConnectionPoolSize
+	// greater than 1 make clients spread requests across a pool of independent transports.
+	// Disabling it restores a single shared transport per config.
+	ClientsAllowConnectionPool Feature = "ClientsAllowConnectionPool"
+
+	// owner: @mborsz
+	// beta: v1.38
+	//
+	// If enabled, a connection pool (see ClientsAllowConnectionPool) sends a request through
+	// another member when the member it picked fails to connect to the server.
+	ClientsAllowConnectionPoolFailureAvoidance Feature = "ClientsAllowConnectionPoolFailureAvoidance"
+
 	// owner: @enj
 	// beta: v1.36
 	//
@@ -109,6 +124,11 @@ const (
 	//
 	// Allow the client to get a stream of individual items instead of chunking from the server.
 	WatchListClient Feature = "WatchListClient"
+
+	// beta: v1.38
+	//
+	// Decode objects in WatchList responses concurrently while preserving event order.
+	WatchListClientConcurrentDecoding Feature = "WatchListClientConcurrentDecoding"
 )
 
 // defaultVersionedKubernetesFeatureGates consists of all known Kubernetes-specific feature keys.
@@ -125,6 +145,12 @@ var defaultVersionedKubernetesFeatureGates = map[Feature]VersionedSpecs{
 	},
 	ClientsAllowCBOR: {
 		{Version: version.MustParse("1.32"), Default: false, PreRelease: Alpha},
+	},
+	ClientsAllowConnectionPool: {
+		{Version: version.MustParse("1.38"), Default: true, PreRelease: Beta},
+	},
+	ClientsAllowConnectionPoolFailureAvoidance: {
+		{Version: version.MustParse("1.38"), Default: true, PreRelease: Beta},
 	},
 	ClientsAllowTLSCacheGC: {
 		{Version: version.MustParse("1.36"), Default: true, PreRelease: Beta},
@@ -152,5 +178,8 @@ var defaultVersionedKubernetesFeatureGates = map[Feature]VersionedSpecs{
 	WatchListClient: {
 		{Version: version.MustParse("1.30"), Default: false, PreRelease: Beta},
 		{Version: version.MustParse("1.35"), Default: true, PreRelease: Beta},
+	},
+	WatchListClientConcurrentDecoding: {
+		{Version: version.MustParse("1.38"), Default: true, PreRelease: Beta},
 	},
 }

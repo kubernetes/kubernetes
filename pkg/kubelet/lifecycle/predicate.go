@@ -23,7 +23,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/component-base/featuregate"
 	"k8s.io/component-helpers/scheduling/corev1"
 	corev1nodeaffinity "k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
 	"k8s.io/klog/v2"
@@ -98,7 +97,7 @@ type pluginResourceUpdateFuncType func(*schedulerframework.NodeInfo, *PodAdmitAt
 // AdmissionFailureHandler is an interface which defines how to deal with a failure to admit a pod.
 // This allows for the graceful handling of pod admission failure.
 type AdmissionFailureHandler interface {
-	HandleAdmissionFailure(ctx context.Context, admitPod *v1.Pod, failureReasons []PredicateFailureReason, operation Operation) ([]PredicateFailureReason, error)
+	HandleAdmissionFailure(ctx context.Context, admitPod *v1.Pod, failureReasons []PredicateFailureReason, attrs *PodAdmitAttributes) ([]PredicateFailureReason, error)
 }
 
 type predicateAdmitHandler struct {
@@ -133,18 +132,22 @@ func (w *predicateAdmitHandler) Admit(ctx context.Context, attrs *PodAdmitAttrib
 	admitPod := attrs.Pod
 
 	// perform the checks that preemption will not help first to avoid meaningless pod eviction
+	// TODO: Skip this check for updates, since the pod has already been admitted to the node.
 	if rejectPodAdmissionBasedOnOSSelector(admitPod, node) {
 		return PodAdmitResult{
 			Admit:   false,
 			Reason:  PodOSSelectorNodeLabelDoesNotMatch,
 			Message: "Failed to admit pod as the `kubernetes.io/os` label doesn't match node label",
+			// The kubelet reconciles the node label.
+			RejectionType: RejectionBlocked,
 		}
 	}
 	if rejectPodAdmissionBasedOnOSField(admitPod) {
 		return PodAdmitResult{
-			Admit:   false,
-			Reason:  PodOSNotSupported,
-			Message: "Failed to admit pod as the OS field doesn't match node OS",
+			Admit:         false,
+			Reason:        PodOSNotSupported,
+			Message:       "Failed to admit pod as the OS field doesn't match node OS",
+			RejectionType: RejectionInfeasible,
 		}
 	}
 
@@ -152,9 +155,10 @@ func (w *predicateAdmitHandler) Admit(ctx context.Context, attrs *PodAdmitAttrib
 		message := fmt.Sprintf("SupplementalGroupsPolicy=%s is not supported in this node", v1.SupplementalGroupsPolicyStrict)
 		logger.Info("Failed to admit pod", "pod", klog.KObj(admitPod), "message", message)
 		return PodAdmitResult{
-			Admit:   false,
-			Reason:  SupplementalGroupsPolicyNotSupported,
-			Message: message,
+			Admit:         false,
+			Reason:        SupplementalGroupsPolicyNotSupported,
+			Message:       message,
+			RejectionType: RejectionInfeasible,
 		}
 	}
 
@@ -186,8 +190,8 @@ func (w *predicateAdmitHandler) Admit(ctx context.Context, attrs *PodAdmitAttrib
 
 	reasons := w.generalFilter(ctx, podWithoutMissingExtendedResources, nodeInfo)
 	fit := len(reasons) == 0
-	if !fit {
-		reasons, err = w.admissionFailureHandler.HandleAdmissionFailure(ctx, admitPod, reasons, attrs.Operation)
+	if !fit && !attrs.DryRun {
+		reasons, err = w.admissionFailureHandler.HandleAdmissionFailure(ctx, admitPod, reasons, attrs)
 		fit = len(reasons) == 0 && err == nil
 		if err != nil {
 			message := fmt.Sprintf("Unexpected error while attempting to recover from admission failure: %v", err)
@@ -211,8 +215,14 @@ func (w *predicateAdmitHandler) Admit(ctx context.Context, attrs *PodAdmitAttrib
 				Message: message,
 			}
 		}
-		// If there are failed predicates, we only return the first one as a reason.
+		// If there are failed predicates, we only return the first one with the highest rejection type as a reason.
 		r := reasons[0]
+		rejectionType := predicateFailureRejectionType(r)
+		for _, other := range reasons[1:] {
+			if otherRejectionType := predicateFailureRejectionType(other); otherRejectionType > rejectionType {
+				r, rejectionType = other, otherRejectionType
+			}
+		}
 		switch re := r.(type) {
 		case *PredicateFailureError:
 			reason = re.PredicateName
@@ -239,14 +249,36 @@ func (w *predicateAdmitHandler) Admit(ctx context.Context, attrs *PodAdmitAttrib
 			logger.Info("Failed to admit pod", "pod", klog.KObj(admitPod), "err", message)
 		}
 		return PodAdmitResult{
-			Admit:   fit,
-			Reason:  reason,
-			Message: message,
+			Admit:         fit,
+			Reason:        reason,
+			Message:       message,
+			RejectionType: rejectionType,
 		}
 	}
 	return PodAdmitResult{
 		Admit: true,
 	}
+}
+
+// predicateFailureRejectionType returns the rejection type of a predicate failure reason.
+func predicateFailureRejectionType(reason PredicateFailureReason) RejectionType {
+	switch r := reason.(type) {
+	case *InsufficientResourceError:
+		return RejectionResourceShortage
+	case *PredicateFailureError:
+		switch r.PredicateName {
+		case nodeaffinity.Name, tainttoleration.Name:
+			// Node labels and taints may change.
+			// TODO: Skip these checks for updates, since the pod has already been admitted to the node.
+			return RejectionBlocked
+		case nodeports.Name:
+			// The conflicting pod may terminate.
+			return RejectionBlocked
+		case nodename.Name:
+			return RejectionInfeasible
+		}
+	}
+	return RejectionTransient
 }
 
 // generalFilter checks a group of filterings that the kubelet cares about.
@@ -308,25 +340,13 @@ func rejectPodAdmissionBasedOnOSField(pod *v1.Pod) bool {
 }
 
 // rejectPodAdmissionBasedOnSupplementalGroupsPolicy rejects pod only if
-// - the feature is beta or above, and SupplementalPolicy=Strict is set in the pod
+// - SupplementalGroupsPolicy=Strict is set in the pod
 // - but, the node does not support the feature
-//
-// Note: During the feature is alpha or before(not yet released) in emulated version,
-// it should admit for backward compatibility
 func rejectPodAdmissionBasedOnSupplementalGroupsPolicy(pod *v1.Pod, node *v1.Node) bool {
 	admit, reject := false, true // just for readability
 
 	inUse := (pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.SupplementalGroupsPolicy != nil)
 	if !inUse {
-		return admit
-	}
-
-	isBetaOrAbove := false
-	if featureSpec, ok := utilfeature.DefaultMutableFeatureGate.GetAll()[features.SupplementalGroupsPolicy]; ok {
-		isBetaOrAbove = (featureSpec.PreRelease == featuregate.Beta) || (featureSpec.PreRelease == featuregate.GA)
-	}
-
-	if !isBetaOrAbove {
 		return admit
 	}
 

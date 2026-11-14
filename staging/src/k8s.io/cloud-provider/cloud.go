@@ -29,11 +29,22 @@ import (
 	restclient "k8s.io/client-go/rest"
 )
 
-// ControllerClientBuilder allows you to get clients and configs for controllers
+// ControllerClientBuilder allows you to get clients for controllers.
 // Please note a copy also exists in pkg/controller/client_builder.go
 // TODO: Make this depend on the separate controller utilities repo (issues/68947)
 type ControllerClientBuilder interface {
+	// Config returns a client config for the named controller.
+	//
+	// Deprecated: build clients through the builder so that they inherit the
+	// controller manager's client configuration and transport wrappers; a
+	// client built from a raw config bypasses them. The builder the cloud
+	// controller manager passes to Initialize also implements
+	// k8s.io/controller-manager/pkg/clientbuilder.TypedClientBuilder, which
+	// constructs the other client types; assert to it when one is needed.
 	Config(name string) (*restclient.Config, error)
+	// ConfigOrDie is Config, exiting the process on error.
+	//
+	// Deprecated: see Config.
 	ConfigOrDie(name string) *restclient.Config
 	Client(name string) (clientset.Interface, error)
 	ClientOrDie(name string) clientset.Interface
@@ -65,7 +76,12 @@ type Interface interface {
 	Routes() (Routes, bool)
 	// ProviderName returns the cloud provider ID.
 	ProviderName() string
-	// HasClusterID returns true if a ClusterID is required and set
+	// HasClusterID returns true if the cluster has a ClusterID set. The
+	// cloud-controller-manager checks this during cloud initialization at startup
+	// and exits on false unless the deprecated --allow-untagged-cloud flag is set.
+	// The framework only reads this boolean and never reads the ID itself, so how a
+	// provider stores and verifies it (for example, that instances carry the cluster
+	// tag) is up to the provider.
 	HasClusterID() bool
 }
 

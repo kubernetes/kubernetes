@@ -17,6 +17,8 @@ limitations under the License.
 package storage
 
 import (
+	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"time"
@@ -27,11 +29,14 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/generic"
+	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/server/options"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/cacher"
+	cacherdelegator "k8s.io/apiserver/pkg/storage/cacher/delegator"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
+	"k8s.io/apiserver/pkg/storage/value"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/ktesting"
@@ -42,6 +47,27 @@ import (
 	"k8s.io/kubernetes/test/integration/framework"
 	testutils "k8s.io/kubernetes/test/utils"
 )
+
+type prefixTransformer struct{}
+
+func (prefixTransformer) TransformToStorage(_ context.Context, data []byte, dataCtx value.Context) ([]byte, error) {
+	if dataCtx == nil {
+		return nil, errors.New("missing value.Context in TransformToStorage")
+	}
+	prefix := append(append([]byte{}, dataCtx.AuthenticatedData()...), ':')
+	return append(prefix, data...), nil
+}
+
+func (prefixTransformer) TransformFromStorage(_ context.Context, data []byte, dataCtx value.Context) ([]byte, bool, error) {
+	if dataCtx == nil {
+		return nil, false, errors.New("missing value.Context in TransformFromStorage")
+	}
+	expectedPrefix := append(append([]byte{}, dataCtx.AuthenticatedData()...), ':')
+	if !bytes.HasPrefix(data, expectedPrefix) {
+		return nil, false, fmt.Errorf("authenticated data mismatch: expected prefix %q", string(expectedPrefix))
+	}
+	return bytes.TrimPrefix(data, expectedPrefix), false, nil
+}
 
 func cacheKeyFunc(obj runtime.Object) (string, error) {
 	pod, ok := obj.(*api.Pod)
@@ -70,7 +96,7 @@ func newEtcdStorageForResource(t testutils.TB, etcdConfig *storagebackend.Config
 	return resourceConfig
 }
 
-func setupStore(tCtx ktesting.TContext) (storage.Interface, string) {
+func setupStore(tCtx ktesting.TContext, transformer value.Transformer) (storage.Interface, string) {
 	featuregatetesting.SetFeatureGateDuringTest(tCtx, utilfeature.DefaultFeatureGate, features.WatchList, true)
 	etcdURL, stop, err := framework.RunCustomEtcd(tCtx.Logger(), "storage_correctness_etcd", nil)
 	if err != nil {
@@ -80,13 +106,16 @@ func setupStore(tCtx ktesting.TContext) (storage.Interface, string) {
 
 	etcdConfig := storagebackend.NewDefaultConfig("registry", nil)
 	etcdConfig.Transport.ServerList = []string{etcdURL}
+	if transformer != nil {
+		etcdConfig.Transformer = transformer
+	}
 
 	storageConfig := newEtcdStorageForResource(tCtx, etcdConfig, schema.GroupResource{Resource: "pods"})
 	store, destroyFunc, err := generic.NewRawStorage(
 		storageConfig,
 		func() runtime.Object { return &api.Pod{} },
 		func() runtime.Object { return &api.PodList{} },
-		nil,
+		genericregistry.NamespaceReverseKeyFunc("/pods"),
 		"/pods",
 	)
 	if err != nil {
@@ -123,5 +152,6 @@ func setupCacher(tCtx ktesting.TContext, s storage.Interface) storage.Interface 
 		c.Stop()
 	})
 	tCtx.Eventually(delegator.ReadinessCheck).WithPolling(10*time.Millisecond).WithTimeout(5*time.Second).Should(gomega.Succeed(), "storage ready")
+	tCtx.Eventually(cacherdelegator.ConsistentReadSupported).WithPolling(10*time.Millisecond).WithTimeout(5*time.Second).Should(gomega.BeTrue(), "RequestWatchProgress supported")
 	return delegator
 }

@@ -65,6 +65,13 @@ var clientConnectionCounter uint64
 
 var goAwayLoopyWriterTimeout = 5 * time.Second
 
+// clientThrottleTimeout is the maximum amount of time for which the client
+// stops reading from the connection because too many frames queued in
+// response to the server (see maxQueuedTransportResponseFrames) are waiting
+// to be written. After that, the client closes the connection instead of
+// waiting forever, since the server is most likely not reading.
+var clientThrottleTimeout = 10 * time.Second
+
 var metadataFromOutgoingContextRaw = internal.FromOutgoingContextRaw.(func(context.Context) (metadata.MD, [][]string, bool))
 
 // http2Client implements the ClientTransport interface with HTTP2.
@@ -106,6 +113,12 @@ type http2Client struct {
 
 	kp               keepalive.ClientParameters
 	keepaliveEnabled bool
+
+	// throttleTimeout is the maximum amount of time for which reads can
+	// stay throttled before the connection is closed. It is copied from
+	// clientThrottleTimeout on creation, so that tests can override the
+	// latter without racing with the readers of other transports.
+	throttleTimeout time.Duration
 
 	statsHandler stats.Handler
 
@@ -359,6 +372,7 @@ func NewHTTP2Client(connectCtx, ctx context.Context, addr resolver.Address, opts
 		streamQuota:           defaultMaxStreamsClient,
 		streamsQuotaAvailable: make(chan struct{}, 1),
 		keepaliveEnabled:      keepaliveEnabled,
+		throttleTimeout:       clientThrottleTimeout,
 		bufferPool:            opts.BufferPool,
 		onClose:               onClose,
 	}
@@ -386,7 +400,7 @@ func NewHTTP2Client(connectCtx, ctx context.Context, addr resolver.Address, opts
 	} else if md := imetadata.Get(addr); md != nil {
 		t.md = md
 	}
-	t.controlBuf = newControlBuffer(t.ctxDone)
+	t.controlBuf = newControlBuffer(t.ctxDone, clientSide)
 	if opts.InitialWindowSize >= defaultWindowSize {
 		t.initialWindowSize = opts.InitialWindowSize
 	}
@@ -952,6 +966,7 @@ func (t *http2Client) NewStream(ctx context.Context, callHdr *CallHdr, handler s
 			LocalAddr:   t.localAddr,
 			Compression: callHdr.SendCompress,
 			Header:      header,
+			Authority:   callHdr.Host,
 		})
 	}
 	if transportDrainRequired {
@@ -1726,9 +1741,19 @@ func (t *http2Client) reader(errCh chan<- error) {
 		atomic.StoreInt64(&t.lastRead, time.Now().UnixNano())
 	}
 
-	// loop to keep reading incoming messages on this transport.
+	// Loop to keep reading incoming messages on this transport.
 	for {
-		t.controlBuf.throttle()
+		// Stop reading while too many items that the server can make
+		// the client queue (see cbItem.isTransportResponseFrame) are
+		// waiting to be written, to bound the memory that a server
+		// can make the client use by flooding it without reading. If
+		// reads stay throttled for t.throttleTimeout, close the
+		// connection instead of waiting forever.
+		if err := t.controlBuf.throttleWithTimeout(t.throttleTimeout); err != nil {
+			t.logger.Warningf("Closing connection since the server is not reading: %v", err)
+			errClose = connectionErrorf(true, err, "closing connection since the server is not reading: %v", err)
+			return
+		}
 		frame, err := t.framer.readFrame()
 		if t.keepaliveEnabled {
 			atomic.StoreInt64(&t.lastRead, time.Now().UnixNano())

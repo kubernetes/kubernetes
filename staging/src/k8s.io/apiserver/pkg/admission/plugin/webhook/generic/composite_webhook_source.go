@@ -17,16 +17,21 @@ limitations under the License.
 package generic
 
 import (
+	"slices"
+	"strings"
 	"sync"
 
 	"k8s.io/apiserver/pkg/admission/plugin/webhook"
+	"k8s.io/apiserver/pkg/admission/plugin/webhook/config/apis/webhookadmission"
 )
 
 // compositeWebhookSource combines multiple webhook sources into a single source.
-// Static (manifest-based) webhooks are returned before API-based webhooks.
+// The relative order of static (manifest-based) and API-based webhooks is determined
+// by staticOrder.
 type compositeWebhookSource struct {
 	staticSource Source
 	apiSource    Source
+	staticOrder  webhookadmission.StaticOrder
 
 	mu              sync.RWMutex
 	lastStaticSlice []webhook.WebhookAccessor
@@ -36,21 +41,23 @@ type compositeWebhookSource struct {
 
 var _ Source = &compositeWebhookSource{}
 
-// NewCompositeWebhookSource creates a webhook source that combines static and API-based sources.
-// Static webhooks are evaluated first, followed by API-based webhooks.
+// newCompositeWebhookSource creates a webhook source that combines static and API-based
+// sources using staticOrder, which callers are expected to have validated and normalized
+// (see NewWebhook).
 // If staticSource is nil, only apiSource webhooks are returned.
-func NewCompositeWebhookSource(staticSource, apiSource Source) Source {
+func newCompositeWebhookSource(staticSource, apiSource Source, staticOrder webhookadmission.StaticOrder) Source {
 	if staticSource == nil {
 		return apiSource
 	}
 	return &compositeWebhookSource{
 		staticSource: staticSource,
 		apiSource:    apiSource,
+		staticOrder:  staticOrder,
 	}
 }
 
-// Webhooks returns all webhook accessors from both sources.
-// Static webhooks come first, followed by API-based webhooks.
+// Webhooks returns all webhook accessors from both sources, merged according to the
+// configured order.
 // The combined slice is cached and reused when the underlying slices haven't changed.
 func (c *compositeWebhookSource) Webhooks() []webhook.WebhookAccessor {
 	var staticSlice, apiSlice []webhook.WebhookAccessor
@@ -76,13 +83,38 @@ func (c *compositeWebhookSource) Webhooks() []webhook.WebhookAccessor {
 		return c.lastCombined
 	}
 
-	combined := make([]webhook.WebhookAccessor, 0, len(staticSlice)+len(apiSlice))
-	combined = append(combined, staticSlice...)
-	combined = append(combined, apiSlice...)
+	combined := mergeAccessors(staticSlice, apiSlice, c.staticOrder)
 
 	c.lastStaticSlice = staticSlice
 	c.lastAPISlice = apiSlice
 	c.lastCombined = combined
+	return combined
+}
+
+// mergeAccessors merges static and API-based accessors according to staticOrder.
+func mergeAccessors(staticSlice, apiSlice []webhook.WebhookAccessor, staticOrder webhookadmission.StaticOrder) []webhook.WebhookAccessor {
+	combined := make([]webhook.WebhookAccessor, 0, len(staticSlice)+len(apiSlice))
+
+	switch staticOrder {
+	case webhookadmission.ByName:
+		combined = append(combined, staticSlice...)
+		combined = append(combined, apiSlice...)
+		// Both sources already group the webhooks of a configuration contiguously and in
+		// the user-provided order, so a stable sort interleaves the configurations
+		// without reordering the webhooks within one.
+		slices.SortStableFunc(combined, func(a, b webhook.WebhookAccessor) int {
+			return strings.Compare(a.GetConfigurationName(), b.GetConfigurationName())
+		})
+
+	case webhookadmission.StaticLast:
+		combined = append(combined, apiSlice...)
+		combined = append(combined, staticSlice...)
+
+	default: // StaticFirst; NewWebhook normalizes the empty value
+		combined = append(combined, staticSlice...)
+		combined = append(combined, apiSlice...)
+	}
+
 	return combined
 }
 

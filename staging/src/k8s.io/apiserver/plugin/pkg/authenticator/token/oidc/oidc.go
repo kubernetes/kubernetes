@@ -44,12 +44,12 @@ import (
 	"sync/atomic"
 	"time"
 
+	celgo "cel.dev/cel-go/cel"
+	"cel.dev/cel-go/common/types"
+	"cel.dev/cel-go/common/types/ref"
+	"cel.dev/cel-go/common/types/traits"
 	"github.com/coreos/go-oidc/v3/oidc"
 	jose "github.com/go-jose/go-jose/v4"
-	celgo "github.com/google/cel-go/cel"
-	"github.com/google/cel-go/common/types"
-	"github.com/google/cel-go/common/types/ref"
-	"github.com/google/cel-go/common/types/traits"
 	"golang.org/x/time/rate"
 
 	"k8s.io/apimachinery/pkg/util/net"
@@ -255,16 +255,22 @@ func AllValidSigningAlgorithms() []string {
 }
 
 // allowlist of signing algorithms to ensure users don't mistakenly pass something goofy.
+//
+// IMPORTANT: The algorithms in this list must support at least the algorithms
+// that we support for serviceaccount tokens (pkg/serviceaccount/jwt.go AcceptableServiceAccountSignatureAlgorithms).
 var allowedSigningAlgs = map[string]bool{
-	oidc.RS256: true,
-	oidc.RS384: true,
-	oidc.RS512: true,
-	oidc.ES256: true,
-	oidc.ES384: true,
-	oidc.ES512: true,
-	oidc.PS256: true,
-	oidc.PS384: true,
-	oidc.PS512: true,
+	oidc.RS256:           true,
+	oidc.RS384:           true,
+	oidc.RS512:           true,
+	oidc.ES256:           true,
+	oidc.ES384:           true,
+	oidc.ES512:           true,
+	oidc.PS256:           true,
+	oidc.PS384:           true,
+	oidc.PS512:           true,
+	string(jose.MLDSA44): true,
+	string(jose.MLDSA65): true,
+	string(jose.MLDSA87): true,
 }
 
 type AuthenticatorTokenWithHealthCheck interface {

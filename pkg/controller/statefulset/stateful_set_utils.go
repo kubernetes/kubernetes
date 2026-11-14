@@ -692,13 +692,15 @@ func (do descendingOrdinal) Less(i, j int) bool {
 	return getOrdinal(do[i]) > getOrdinal(do[j])
 }
 
-// getStatefulSetMaxUnavailable calculates the real maxUnavailable number according to the replica count
-// and maxUnavailable from rollingUpdateStrategy. The number defaults to 1 if the maxUnavailable field is
-// not set, and it will be round down to at least 1 if the maxUnavailable value is a percentage.
+// getStatefulSetMaxUnavailable calculates the real maxUnavailable number from rollingUpdateStrategy.
+// updateRangeCount is the number of pods in the RollingUpdate range (Replicas - Partition). Absolute
+// MaxUnavailable values are used as-is; percentages are scaled from updateRangeCount. The number
+// defaults to 1 if the maxUnavailable field is not set, and it will be rounded down to at least 1 if
+// the maxUnavailable value is a percentage.
 // Note that API validation has already guaranteed the maxUnavailable field to be >1 if it is an integer
 // or 0% < value <= 100% if it is a percentage, so we don't have to consider other cases.
-func getStatefulSetMaxUnavailable(maxUnavailable *intstr.IntOrString, replicaCount int) (int, error) {
-	maxUnavailableNum, err := intstr.GetScaledValueFromIntOrPercent(intstr.ValueOrDefault(maxUnavailable, intstr.FromInt32(1)), replicaCount, false)
+func getStatefulSetMaxUnavailable(maxUnavailable *intstr.IntOrString, updateRangeCount int) (int, error) {
+	maxUnavailableNum, err := intstr.GetScaledValueFromIntOrPercent(intstr.ValueOrDefault(maxUnavailable, intstr.FromInt32(1)), updateRangeCount, false)
 	if err != nil {
 		return 0, err
 	}

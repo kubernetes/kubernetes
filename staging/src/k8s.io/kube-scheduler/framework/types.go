@@ -21,7 +21,6 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -69,8 +68,6 @@ const (
 	UpdatePodLabel
 	// UpdatePodScaleDown is an update for pod's scale down (i.e., any resource request is reduced).
 	UpdatePodScaleDown
-	// UpdatePodScaleUp is an update for pod's scale up (i.e., any resource request is increased).
-	UpdatePodScaleUp
 	// UpdatePodToleration is an addition for pod's tolerations.
 	// (Due to API validation, we can add, but cannot modify or remove tolerations.)
 	UpdatePodToleration
@@ -82,7 +79,7 @@ const (
 	All ActionType = 1<<iota - 1
 
 	// Use the general Update type if you don't either know or care the specific sub-Update type to use.
-	Update = UpdateNodeAllocatable | UpdateNodeLabel | UpdateNodeTaint | UpdateNodeCondition | UpdateNodeAnnotation | UpdateNodeDeclaredFeature | UpdateNodePreemptionPolicy | UpdatePodLabel | UpdatePodScaleDown | UpdatePodScaleUp | UpdatePodToleration | UpdatePodSchedulingGatesEliminated | UpdatePodGeneratedResourceClaim
+	Update = UpdateNodeAllocatable | UpdateNodeLabel | UpdateNodeTaint | UpdateNodeCondition | UpdateNodeAnnotation | UpdateNodeDeclaredFeature | UpdateNodePreemptionPolicy | UpdatePodLabel | UpdatePodScaleDown | UpdatePodToleration | UpdatePodSchedulingGatesEliminated | UpdatePodGeneratedResourceClaim
 
 	// None is a special ActionType that is only used internally.
 	None ActionType = 0
@@ -112,8 +109,6 @@ func (a ActionType) String() string {
 		return "UpdatePodLabel"
 	case UpdatePodScaleDown:
 		return "UpdatePodScaleDown"
-	case UpdatePodScaleUp:
-		return "UpdatePodScaleUp"
 	case UpdatePodToleration:
 		return "UpdatePodToleration"
 	case UpdatePodSchedulingGatesEliminated:
@@ -179,7 +174,7 @@ const (
 	CSIStorageCapacity    EventResource = "storage.k8s.io/CSIStorageCapacity"
 	StorageClass          EventResource = "storage.k8s.io/StorageClass"
 	ResourceClaim         EventResource = "resource.k8s.io/ResourceClaim"
-	ResourceSlice         EventResource = "resource.k8s.io/ResourceSlice"
+	ResourceSlice         EventResource = "resource.k8s.io/ResourceSlice" // Hints use the ResourceSlice type from k8s.io/dynamic-resource-allocation/api.
 	DeviceClass           EventResource = "resource.k8s.io/DeviceClass"
 	PodGroup              EventResource = "scheduling.k8s.io/PodGroup"
 	CompositePodGroup     EventResource = "scheduling.k8s.io/CompositePodGroup"
@@ -202,8 +197,8 @@ type ClusterEventWithHint struct {
 	// the scheduling of Pods will be always retried with backoff when this Event happens.
 	// (the same as Queue)
 	QueueingHintFn QueueingHintFn
-	// PreQueueingHintFn is called once per event to narrow the set of pods to evaluate with QueueingHint.
-	// If set, only pods identified in the returned PreQueueingHintResult are checked.
+	// PreQueueingHintFn, if set, can narrow the unschedulable pods this plugin's
+	// QueueingHintFn is evaluated for when Event happens.
 	PreQueueingHintFn PreQueueingHintFn
 }
 
@@ -221,18 +216,22 @@ type ClusterEventWithHint struct {
 type QueueingHintFn func(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (QueueingHint, error)
 
 // PreQueueingHintResult is the return value of PreQueueingHintFn.
-// When AllPods is true, all unschedulable pods are evaluated (existing behavior).
-// When AllPods is false, only pods listed in Pods are evaluated.
+// If AllPods is true, the plugin is not narrowed for the event. Otherwise, of the
+// unschedulable pods the plugin rejected, its QueueingHintFn is evaluated only for
+// those listed in Pods.
 type PreQueueingHintResult struct {
 	AllPods bool
 	Pods    []types.NamespacedName
 }
 
-// PreQueueingHintFn is called once per event before iterating unschedulable pods.
-// PreQueueingHintFn will not be called when the deleted object is unknown (both oldObj and newObj are nil).
-// It returns a PreQueueingHintResult indicating which pods should be evaluated
-// by QueueingHintFn for this event. If it returns an error, the error is logged
-// and the result is treated as AllPods (all unschedulable pods are evaluated).
+// PreQueueingHintFn returns the pods for which the plugin's QueueingHintFn should
+// be evaluated when an event occurs. It is called before QueueingHintFn for each
+// matching registration, unless both oldObj and newObj are nil.
+//
+// Results are merged by plugin name across registrations and profiles. If any
+// matching registration of a plugin returns AllPods, returns an error, or omits
+// PreQueueingHintFn, that plugin evaluates all pods it rejected while other
+// plugins keep their narrowing.
 //
 // - oldObj is the old object in update events, or the deleted object in delete events.
 // - newObj is the new/added object. It is nil for delete events.
@@ -708,15 +707,14 @@ type PodGroupInfo interface {
 	GetPodGroup() *schedulingv1beta1.PodGroup
 	// GetCompositePodGroup returns the associated composite pod group or nil if the group is not a composite pod group.
 	// It should only be used when the CompositePodGroup feature gate is enabled.
-	GetCompositePodGroup() *schedulingv1alpha3.CompositePodGroup
+	GetCompositePodGroup() *schedulingv1beta1.CompositePodGroup
 	// GetChildren returns the child pod groups of this pod group.
 	// Only composite pod groups have children.
 	GetChildren() []PodGroupInfo
 	// GetPriority returns the priority of the inner pod group or composite pod group.
 	GetPriority() int32
-	// GetPreemptionPolicy returns the PreemptionPolicy set in the inner pod group or composite pod group,
-	// or the default policy (PreemptLowerPriority) if not set.
-	// It should be used only when the PodGroupPreemptionPolicy feature gate is enabled.
+	// GetPreemptionPolicy returns the PreemptionPolicy of the inner pod group or composite pod group,
+	// or an empty string if not set.
 	GetPreemptionPolicy() v1.PreemptionPolicy
 	// GetMinCount returns the minimum number of pods or child groups required
 	// to satisfy the group's scheduling policy requirements.
@@ -730,6 +728,8 @@ type Placement struct {
 	// Name uniquely identifies the placement.
 	// This is used for diagnostics and debugability.
 	// The choice of the name is up to the PlacementGeneratePlugin.
+	// Names returned by one plugin must be unique and must not contain "/",
+	// which the framework uses to join names when merging placements.
 	Name string
 	// Nodes specifies the nodes that are valid for this placement.
 	// Scheduler will try to schedule the pod group using only those nodes.
@@ -811,7 +811,7 @@ type GenericPodGroup struct {
 	PodGroup *schedulingv1beta1.PodGroup
 	// CompositePodGroup is a CompositePodGroup API object.
 	// It can be set only when CompositePodGroup feature is enabled.
-	CompositePodGroup *schedulingv1alpha3.CompositePodGroup
+	CompositePodGroup *schedulingv1beta1.CompositePodGroup
 }
 
 // NewGenericPodGroup returns a GenericPodGroup for a PodGroup.
@@ -820,7 +820,7 @@ func NewGenericPodGroup(pg *schedulingv1beta1.PodGroup) *GenericPodGroup {
 }
 
 // NewGenericCompositePodGroup returns a GenericPodGroup for a CompositePodGroup.
-func NewGenericCompositePodGroup(cpg *schedulingv1alpha3.CompositePodGroup) *GenericPodGroup {
+func NewGenericCompositePodGroup(cpg *schedulingv1beta1.CompositePodGroup) *GenericPodGroup {
 	return &GenericPodGroup{CompositePodGroup: cpg}
 }
 
@@ -830,7 +830,7 @@ func (gpg *GenericPodGroup) GetPodGroup() *schedulingv1beta1.PodGroup {
 }
 
 // GetCompositePodGroup unwraps the underlying CompositePodGroup object. Returns nil if this wraps a PodGroup.
-func (gpg *GenericPodGroup) GetCompositePodGroup() *schedulingv1alpha3.CompositePodGroup {
+func (gpg *GenericPodGroup) GetCompositePodGroup() *schedulingv1beta1.CompositePodGroup {
 	return gpg.CompositePodGroup
 }
 
@@ -950,9 +950,8 @@ func (gpg *GenericPodGroup) GetCreationTimestamp() time.Time {
 	return gpg.CompositePodGroup.CreationTimestamp.Time
 }
 
-// GetPreemptionPolicy returns the PreemptionPolicy set in the inner pod group or composite pod group,
-// or the default policy (PreemptLowerPriority) if not set.
-// It should be used only when the PodGroupPreemptionPolicy feature gate is enabled.
+// GetPreemptionPolicy returns the PreemptionPolicy of the inner PodGroup or CompositePodGroup,
+// or an empty string if not set.
 func (gpg *GenericPodGroup) GetPreemptionPolicy() v1.PreemptionPolicy {
 	if pg := gpg.PodGroup; pg != nil && pg.Spec.PreemptionPolicy != nil {
 		return v1.PreemptionPolicy(*pg.Spec.PreemptionPolicy)
@@ -960,7 +959,7 @@ func (gpg *GenericPodGroup) GetPreemptionPolicy() v1.PreemptionPolicy {
 	if cpg := gpg.CompositePodGroup; cpg != nil && cpg.Spec.PreemptionPolicy != nil {
 		return v1.PreemptionPolicy(*cpg.Spec.PreemptionPolicy)
 	}
-	return v1.PreemptLowerPriority
+	return ""
 }
 
 // HasDisruptionModeAll returns true if the wrapped object has disruption mode All.

@@ -146,7 +146,7 @@ func (i *discoveryInterfaceWrapper) RESTClient() restclient.Interface {
 }
 
 func (i *discoveryInterfaceWrapper) WithLegacyWithContext(ctx context.Context) DiscoveryInterfaceWithContext {
-	return ToDiscoveryInterfaceWithContext(i.delegate.WithLegacy())
+	return ToDiscoveryInterfaceWithContext(i.delegate.WithLegacy()) //nolint:logcheck // Bridging from the old interface without context support; cannot provide a logger here.
 }
 
 // AggregatedDiscoveryInterface extends DiscoveryInterface to include a method to possibly
@@ -193,7 +193,7 @@ type aggregatedDiscoveryInterfaceWrapper struct {
 }
 
 func (i *aggregatedDiscoveryInterfaceWrapper) GroupsAndMaybeResourcesWithContext(ctx context.Context) (*metav1.APIGroupList, map[schema.GroupVersion]*metav1.APIResourceList, map[schema.GroupVersion]error, error) {
-	return i.delegate.GroupsAndMaybeResources()
+	return i.delegate.GroupsAndMaybeResources() //nolint:logcheck // Bridging from the old interface without context support; cannot provide a logger here.
 }
 
 // CachedDiscoveryInterface is a DiscoveryInterface with cache invalidation and freshness.
@@ -261,11 +261,11 @@ type cachedDiscoveryInterfaceWrapper struct {
 }
 
 func (i *cachedDiscoveryInterfaceWrapper) FreshWithContext(ctx context.Context) bool {
-	return i.delegate.Fresh()
+	return i.delegate.Fresh() //nolint:logcheck // Bridging from the old interface without context support; cannot provide a logger here.
 }
 
 func (i *cachedDiscoveryInterfaceWrapper) InvalidateWithContext(ctx context.Context) {
-	i.delegate.Invalidate()
+	i.delegate.Invalidate() //nolint:logcheck // Bridging from the old interface without context support; cannot provide a logger here.
 }
 
 // ServerGroupsInterface has methods for obtaining supported groups on the API server
@@ -307,7 +307,7 @@ type serverGroupsInterfaceWrapper struct {
 }
 
 func (i *serverGroupsInterfaceWrapper) ServerGroupsWithContext(ctx context.Context) (*metav1.APIGroupList, error) {
-	return i.delegate.ServerGroups()
+	return i.delegate.ServerGroups() //nolint:logcheck // Bridging from the old interface without context support; cannot provide a logger here.
 }
 
 // ServerResourcesInterface has methods for obtaining supported resources on the API server
@@ -318,7 +318,7 @@ func (i *serverGroupsInterfaceWrapper) ServerGroupsWithContext(ctx context.Conte
 type ServerResourcesInterface interface {
 	// ServerResourcesForGroupVersion returns the supported resources for a group and version.
 	//
-	// ServerGroupsAndResourcesWithContext.ServerResourcesForGroupVersionWithContext is a better alternative because it supports contextual logging and cancellation.
+	// ServerResourcesInterfaceWithContext.ServerResourcesForGroupVersionWithContext is a better alternative because it supports contextual logging and cancellation.
 	//
 	// Contextual logging: Use ServerGroupsAndResourcesWithContext.ServerResourcesForGroupVersionWithContext instead.
 	ServerResourcesForGroupVersion(groupVersion string) (*metav1.APIResourceList, error)
@@ -327,7 +327,7 @@ type ServerResourcesInterface interface {
 	// The returned group and resource lists might be non-nil with partial results even in the
 	// case of non-nil error.
 	//
-	// ServerGroupsAndResourcesWithContext.ServerGroupsAndResourcesWithContext is a better alternative because it supports contextual logging and cancellation.
+	// ServerResourcesInterfaceWithContext.ServerGroupsAndResourcesWithContext is a better alternative because it supports contextual logging and cancellation.
 	//
 	// Contextual logging: Use ServerGroupsAndResourcesWithContext.ServerGroupsAndResourcesWithContext instead.
 	ServerGroupsAndResources() ([]*metav1.APIGroup, []*metav1.APIResourceList, error)
@@ -393,19 +393,19 @@ type serverResourcesInterfaceWrapper struct {
 }
 
 func (i *serverResourcesInterfaceWrapper) ServerResourcesForGroupVersionWithContext(ctx context.Context, groupVersion string) (*metav1.APIResourceList, error) {
-	return i.delegate.ServerResourcesForGroupVersion(groupVersion)
+	return i.delegate.ServerResourcesForGroupVersion(groupVersion) //nolint:logcheck // Bridging from the old interface without context support; cannot provide a logger here.
 }
 
 func (i *serverResourcesInterfaceWrapper) ServerGroupsAndResourcesWithContext(ctx context.Context) ([]*metav1.APIGroup, []*metav1.APIResourceList, error) {
-	return i.delegate.ServerGroupsAndResources()
+	return i.delegate.ServerGroupsAndResources() //nolint:logcheck // Bridging from the old interface without context support; cannot provide a logger here.
 }
 
 func (i *serverResourcesInterfaceWrapper) ServerPreferredResourcesWithContext(ctx context.Context) ([]*metav1.APIResourceList, error) {
-	return i.delegate.ServerPreferredResources()
+	return i.delegate.ServerPreferredResources() //nolint:logcheck // Bridging from the old interface without context support; cannot provide a logger here.
 }
 
 func (i *serverResourcesInterfaceWrapper) ServerPreferredNamespacedResourcesWithContext(ctx context.Context) ([]*metav1.APIResourceList, error) {
-	return i.delegate.ServerPreferredNamespacedResources()
+	return i.delegate.ServerPreferredNamespacedResources() //nolint:logcheck // Bridging from the old interface without context support; cannot provide a logger here.
 }
 
 // ServerVersionInterface has a method for retrieving the server's version.
@@ -445,7 +445,7 @@ type serverVersionInterfaceWrapper struct {
 }
 
 func (i *serverVersionInterfaceWrapper) ServerVersionWithContext(ctx context.Context) (*version.Info, error) {
-	return i.delegate.ServerVersion()
+	return i.delegate.ServerVersion() //nolint:logcheck // Bridging from the old interface without context support; cannot provide a logger here.
 }
 
 // OpenAPISchemaInterface has a method to retrieve the open API schema.
@@ -485,7 +485,7 @@ type openAPISchemaInterfaceWrapper struct {
 }
 
 func (i *openAPISchemaInterfaceWrapper) OpenAPISchemaWithContext(ctx context.Context) (*openapi_v2.Document, error) {
-	return i.delegate.OpenAPISchema()
+	return i.delegate.OpenAPISchema() //nolint:logcheck // Bridging from the old interface without context support; cannot provide a logger here.
 }
 
 // OpenAPIV3SchemaInterfaceWithContext is a better alternative because it supports contextual logging and cancellation.
@@ -519,7 +519,7 @@ type openAPIV3SchemaInterfaceWrapper struct {
 }
 
 func (i *openAPIV3SchemaInterfaceWrapper) OpenAPIV3WithContext(ctx context.Context) openapi.ClientWithContext {
-	return ToOpenAPIClientWithContext(i.delegate.OpenAPIV3())
+	return ToOpenAPIClientWithContext(i.delegate.OpenAPIV3()) //nolint:logcheck // Bridging from the old interface without context support; cannot provide a logger here.
 }
 
 func ToOpenAPIClientWithContext(i openapi.Client) openapi.ClientWithContext { //nolint:staticcheck // Intentionally using the old interface here.
@@ -1102,8 +1102,9 @@ func fetchGroupVersionResources(ctx context.Context, d DiscoveryInterfaceWithCon
 //
 // Contextual logging: Use ServerPreferredResourcesWithContext instead.
 func (d *DiscoveryClient) ServerPreferredResources() ([]*metav1.APIResourceList, error) {
-	_, rs, err := withRetries(context.Background(), defaultRetries, func() ([]*metav1.APIGroup, []*metav1.APIResourceList, error) {
-		rs, err := ServerPreferredResources(d)
+	ctx := context.Background()
+	_, rs, err := withRetries(ctx, defaultRetries, func() ([]*metav1.APIGroup, []*metav1.APIResourceList, error) {
+		rs, err := ServerPreferredResourcesWithContext(ctx, ToDiscoveryInterfaceWithContext(d))
 		return nil, rs, err
 	})
 	return rs, err
@@ -1194,7 +1195,7 @@ func (d *DiscoveryClient) OpenAPISchemaWithContext(ctx context.Context) (*openap
 //
 // Contextual logging: Use OpenAPIV3WithContext instead.
 func (d *DiscoveryClient) OpenAPIV3() openapi.Client {
-	return openapi.NewClient(d.restClient)
+	return openapi.NewClient(d.restClient) //nolint:logcheck // This method itself is deprecated in favor of OpenAPIV3WithContext.
 }
 
 func (d *DiscoveryClient) OpenAPIV3WithContext(ctx context.Context) openapi.ClientWithContext {

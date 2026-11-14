@@ -27,9 +27,10 @@ import (
 
 	"github.com/spf13/cobra"
 
-	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apiextensionsv1 "k8s.io/apiextensions-api/pkg/apis/apiextensions/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
 	genericapifilters "k8s.io/apiserver/pkg/endpoints/filters"
 	genericapiserver "k8s.io/apiserver/pkg/server"
@@ -149,10 +150,11 @@ cluster's shared state through which all other components interact.`,
 
 // Run runs the specified APIServer.  This should never exit.
 func Run(ctx context.Context, opts options.CompletedOptions) error {
+	logger := klog.FromContext(ctx)
 	// To help debugging, immediately log version
-	klog.Infof("Version: %+v", utilversion.Get())
+	logger.Info("Build information", "version", utilversion.Get())
 
-	klog.InfoS("Golang settings", "GOGC", os.Getenv("GOGC"), "GOMAXPROCS", os.Getenv("GOMAXPROCS"), "GOTRACEBACK", os.Getenv("GOTRACEBACK"))
+	logger.Info("Golang settings", "GOGC", os.Getenv("GOGC"), "GOMAXPROCS", os.Getenv("GOMAXPROCS"), "GOTRACEBACK", os.Getenv("GOTRACEBACK"))
 
 	if opts.InformerName == nil {
 		informerName, err := cache.NewInformerName("kube-apiserver")
@@ -259,6 +261,8 @@ func CreateKubeAPIServerConfig(
 
 			EndpointReconcilerType: reconcilers.Type(opts.EndpointReconcilerType),
 			MasterCount:            opts.MasterCount,
+
+			DisabledPodSubresources: sets.New(opts.DisablePodSubresources...),
 		},
 	}
 

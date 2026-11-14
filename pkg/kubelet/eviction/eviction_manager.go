@@ -143,6 +143,7 @@ func NewManager(
 }
 
 // Admit rejects a pod if its not safe to admit for node stability.
+// TODO: Admit updates that don't increase the pod's resource requests.
 func (m *managerImpl) Admit(ctx context.Context, attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
 	m.RLock()
 	defer m.RUnlock()
@@ -180,6 +181,8 @@ func (m *managerImpl) Admit(ctx context.Context, attrs *lifecycle.PodAdmitAttrib
 		Admit:   false,
 		Reason:  Reason,
 		Message: fmt.Sprintf(nodeConditionMessageFmt, m.nodeConditions),
+		// The pressure may be relieved, for example by evicting pods.
+		RejectionType: lifecycle.RejectionBlocked,
 	}
 }
 

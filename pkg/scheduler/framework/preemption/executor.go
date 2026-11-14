@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
 	corelisters "k8s.io/client-go/listers/core/v1"
+	"k8s.io/component-helpers/resource"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
@@ -63,6 +64,8 @@ type ExecutorPreemptor interface {
 	Priority() int32
 	// Type returns the type of the preemptor.
 	Type() fwk.EntityKeyType
+	// IsResize returns true if the preemptor is a deferred resize pod.
+	IsResize() bool
 }
 
 // Executor is responsible for actuating the preemption process based on the provided candidate.
@@ -84,7 +87,8 @@ type Executor struct {
 	lastVictimsPendingPreemption map[types.UID]pendingVictim
 
 	// PreemptPod is a function that actually preempts a specific Pod. It returns true
-	// when the victim was preempted only in scheduler memory, without a delete call.
+	// when the API server deletes a bound victim and will emit a pod deletion event,
+	// and false when the victim was preempted only in scheduler memory or was already deleted.
 	// This is exposed to be replaced during tests.
 	PreemptPod func(ctx context.Context, c fwk.PreemptionCandidate, preemptor ExecutorPreemptor, victim *v1.Pod, pluginName string) (bool, error)
 }
@@ -157,7 +161,7 @@ func NewExecutor(fh fwk.Handle, fts feature.Features) *Executor {
 
 		fh.EventRecorder().WithLogger(logger).Eventf(victim, preemptor.Obj(), v1.EventTypeNormal, "Preempted", "Preempting", eventMessage)
 
-		return preemptedInMemory, nil
+		return !preemptedInMemory, nil
 	}
 
 	return e
@@ -166,7 +170,10 @@ func NewExecutor(fh fwk.Handle, fts feature.Features) *Executor {
 // ActuatePodPreemption actuates the preemption given preemptorPod to be scheduled on targetNode and a list of victims to be evicted.
 // victims to be evicted.
 func (e *Executor) ActuatePodPreemption(ctx context.Context, candidate fwk.PreemptionCandidate, preemptorPod *v1.Pod, pluginName string) *fwk.Status {
-	podPreemptor := &podExecutorPreemptor{Pod: preemptorPod}
+	podPreemptor := &podExecutorPreemptor{
+		Pod:      preemptorPod,
+		isResize: e.fts.EnableInPlacePodVerticalScalingSchedulerPreemption && resource.IsPodResizeDeferred(preemptorPod),
+	}
 	if e.fts.EnableAsyncPreemption {
 		e.prepareCandidateAsync(candidate, podPreemptor, pluginName)
 		return nil
@@ -214,7 +221,7 @@ func (e *Executor) prepareCandidateAsync(c fwk.PreemptionCandidate, preemptor Ex
 
 	errCh := parallelize.NewResultChannel[error]()
 	// PreEnqueue only watches the last victim for completion, so activate when that victim won't emit a deletion event.
-	preemptedLastVictimInMemory := false
+	willProduceDeletionEvent := false
 	preemptPod := func(index int) {
 		victim := victimPods[index]
 		if _, err := e.PreemptPod(ctx, c, preemptor, victim, pluginName); err != nil {
@@ -230,17 +237,18 @@ func (e *Executor) prepareCandidateAsync(c fwk.PreemptionCandidate, preemptor Ex
 		logger := klog.FromContext(ctx)
 		startTime := time.Now()
 		result := metrics.GoroutineResultSuccess
+		operation := metrics.OperationToLabel(preemptor.IsResize())
 		defer func() {
-			metrics.PreemptionExecutionDuration.WithLabelValues(metrics.EntityTypeToLabel(preemptor.Type()), result).Observe(metrics.SinceInSeconds(startTime))
+			metrics.PreemptionExecutionDuration.WithLabelValues(metrics.EntityTypeToLabel(preemptor.Type()), result, operation).Observe(metrics.SinceInSeconds(startTime))
 		}()
 		defer func() {
 			metrics.PreemptionGoroutinesDuration.WithLabelValues(result).Observe(metrics.SinceInSeconds(startTime))
 		}()
 		defer func() {
-			metrics.PreemptionGoroutinesExecutionTotal.WithLabelValues(result).Inc()
+			metrics.PreemptionGoroutinesExecutionTotal.WithLabelValues(result, operation).Inc()
 		}()
 		defer func() {
-			if result == metrics.GoroutineResultError || preemptedLastVictimInMemory {
+			if result == metrics.GoroutineResultError || !willProduceDeletionEvent {
 				// When API call isn't successful or no victim deletion event will be produced, the preemptor's
 				// Pods may get stuck in the unschedulable pod pool in the worst case.
 				e.fh.Activate(logger, preemptor.Pods())
@@ -289,12 +297,11 @@ func (e *Executor) prepareCandidateAsync(c fwk.PreemptionCandidate, preemptor Ex
 			e.lastVictimsPendingPreemption[preemptor.UID()] = pendingVictim{namespace: lastVictim.Namespace, name: lastVictim.Name}
 			e.mu.Unlock()
 
-			preemptedInMemory, err := e.PreemptPod(ctx, c, preemptor, lastVictim, pluginName)
+			var err error
+			willProduceDeletionEvent, err = e.PreemptPod(ctx, c, preemptor, lastVictim, pluginName)
 			if err != nil {
 				utilruntime.HandleErrorWithContext(ctx, err, "Error occurred during async preemption of the last victim")
 				result = metrics.GoroutineResultError
-			} else if preemptedInMemory {
-				preemptedLastVictimInMemory = true
 			}
 		}
 		e.mu.Lock()
@@ -315,7 +322,7 @@ func (e *Executor) prepareCandidate(ctx context.Context, c fwk.PreemptionCandida
 	startTime := time.Now()
 	metricsResult := metrics.GoroutineResultSuccess
 	defer func() {
-		metrics.PreemptionExecutionDuration.WithLabelValues(metrics.EntityTypeToLabel(preemptor.Type()), metricsResult).Observe(metrics.SinceInSeconds(startTime))
+		metrics.PreemptionExecutionDuration.WithLabelValues(metrics.EntityTypeToLabel(preemptor.Type()), metricsResult, metrics.OperationToLabel(preemptor.IsResize())).Observe(metrics.SinceInSeconds(startTime))
 	}()
 
 	fh := e.fh
@@ -357,19 +364,24 @@ func (e *Executor) prepareCandidate(ctx context.Context, c fwk.PreemptionCandida
 func observeVictims(preemptor ExecutorPreemptor, candidate fwk.PreemptionCandidate) {
 	numVictims := float64(len(candidate.Victims().Pods))
 	if preemptor.Type() == fwk.PodKeyType {
-		metrics.PreemptionVictims.Observe(numVictims)
+		if preemptor.IsResize() {
+			metrics.ResizePreemptionVictims.Observe(numVictims)
+		} else {
+			metrics.PreemptionVictims.Observe(numVictims)
+		}
 	} else {
-		metrics.WorkloadPreemptionVictims.WithLabelValues(metrics.EntityTypeToLabel(preemptor.Type())).Observe(numVictims)
-	}
-
-	workloadDisruptions := float64(candidate.NumPodGroupDisruptions())
-	if workloadDisruptions > 0 {
-		metrics.PreemptionWorkloadDisruptions.WithLabelValues(metrics.EntityTypeToLabel(preemptor.Type())).Observe(workloadDisruptions)
+		preemptorLabel := metrics.EntityTypeToLabel(preemptor.Type())
+		metrics.WorkloadPreemptionVictims.WithLabelValues(preemptorLabel).Observe(numVictims)
+		for victimType, n := range candidate.NumDisruptionsByVictimType() {
+			if n > 0 {
+				metrics.PreemptionWorkloadDisruptions.WithLabelValues(preemptorLabel, metrics.EntityTypeToLabel(victimType)).Observe(float64(n))
+			}
+		}
 	}
 
 	numPDBViolations := float64(candidate.Victims().NumPDBViolations)
 	if numPDBViolations > 0 {
-		metrics.PreemptionPDBViolations.WithLabelValues(metrics.EntityTypeToLabel(preemptor.Type())).Add(numPDBViolations)
+		metrics.PreemptionPDBViolations.WithLabelValues(metrics.EntityTypeToLabel(preemptor.Type()), metrics.OperationToLabel(preemptor.IsResize())).Add(numPDBViolations)
 	}
 }
 
@@ -484,6 +496,7 @@ func getLowerPriorityNominatedPods(logger klog.Logger, pn fwk.PodNominator, prio
 // podExecutorPreemptor is a wrapper around single pod used by preemption execution.
 type podExecutorPreemptor struct {
 	*v1.Pod
+	isResize bool
 }
 
 func (p *podExecutorPreemptor) UID() types.UID {
@@ -508,6 +521,10 @@ func (p *podExecutorPreemptor) Priority() int32 {
 
 func (p *podExecutorPreemptor) Type() fwk.EntityKeyType {
 	return fwk.PodKeyType
+}
+
+func (p *podExecutorPreemptor) IsResize() bool {
+	return p.isResize
 }
 
 // podGroupExecutorPreemptor is a wrapper around PodGroupInfo used by preemption execution.
@@ -543,4 +560,8 @@ func (p *podGroupExecutorPreemptor) Pods() map[string]*v1.Pod {
 
 func (p *podGroupExecutorPreemptor) Type() fwk.EntityKeyType {
 	return p.GetType()
+}
+
+func (p *podGroupExecutorPreemptor) IsResize() bool {
+	return false
 }

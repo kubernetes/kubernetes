@@ -46,6 +46,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
+	schedulerutils "k8s.io/kubernetes/test/integration/scheduler"
 	testutils "k8s.io/kubernetes/test/integration/util"
 	"k8s.io/utils/ptr"
 )
@@ -102,6 +103,8 @@ type CoreResourceEnqueueTestCase struct {
 	TriggerFn func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error)
 	// WantRequeuedPods is the map of Pods that are expected to be requeued after triggerFn.
 	WantRequeuedPods sets.Set[string]
+	// WantScheduledPods is the set of Pods that are expected to be successfully scheduled after triggerFn and requeueing.
+	WantScheduledPods sets.Set[string]
 	// EnablePlugins is a list of plugins to enable.
 	// PrioritySort and DefaultPreemption are enabled by default because they are required by the framework.
 	// If empty, all plugins are enabled.
@@ -298,7 +301,8 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.UnscheduledPod, ActionType: fwk.UpdatePodScaleDown}: 1}, nil
 		},
-		WantRequeuedPods: sets.New("pod1"),
+		WantRequeuedPods:  sets.New("pod1"),
+		WantScheduledPods: sets.New("pod1"),
 	},
 	{
 		Name:          "Pod rejected by the NodeResourcesFit plugin is requeued when a Pod is deleted",
@@ -319,7 +323,8 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			}
 			return map[fwk.ClusterEvent]uint64{framework.EventAssignedPodDelete: 1}, nil
 		},
-		WantRequeuedPods: sets.New("pod2"),
+		WantRequeuedPods:  sets.New("pod2"),
+		WantScheduledPods: sets.New("pod2"),
 	},
 	{
 		Name:          "Pod rejected by the NodeResourcesFit plugin is requeued when a Node is created",
@@ -340,7 +345,8 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.Node, ActionType: fwk.Add}: 1}, nil
 		},
-		WantRequeuedPods: sets.New("pod1"),
+		WantRequeuedPods:  sets.New("pod1"),
+		WantScheduledPods: sets.New("pod1"),
 	},
 	{
 		Name:          "Pod rejected by the NodeResourcesFit plugin is requeued when a Node is updated",
@@ -360,7 +366,8 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.Node, ActionType: fwk.UpdateNodeAllocatable}: 1}, nil
 		},
-		WantRequeuedPods: sets.New("pod1"),
+		WantRequeuedPods:  sets.New("pod1"),
+		WantScheduledPods: sets.New("pod1"),
 	},
 	{
 		Name:          "Pod rejected by the NodeResourcesFit plugin isn't requeued when a Node has the extended resource, and DRAExtendedResource is disabled",
@@ -2572,7 +2579,6 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 // moved properly upon their registered events.
 func RunTestCoreResourceEnqueue(t *testing.T, tt *CoreResourceEnqueueTestCase) { //nolint:forbidigo // calls ndftesting.NewMockFeature/ktesting.NewTestContext, which require *testing.T
 	t.Helper()
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 	if tt.EnableDRAExtendedResource {
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, true)
 	}
@@ -2597,7 +2603,11 @@ func RunTestCoreResourceEnqueue(t *testing.T, tt *CoreResourceEnqueueTestCase) {
 	}
 	logger, _ := ktesting.NewTestContext(t)
 
-	opts := []scheduler.Option{scheduler.WithPodInitialBackoffSeconds(0), scheduler.WithPodMaxBackoffSeconds(0)}
+	opts := []scheduler.Option{
+		scheduler.WithPodInitialBackoffSeconds(0),
+		scheduler.WithPodMaxBackoffSeconds(0),
+		scheduler.WithPodMaxInUnschedulablePodsDuration(24 * time.Hour),
+	}
 	if tt.EnablePlugins != nil {
 		enablePlugins := []configv1.Plugin{
 			// These are required plugins to start the scheduler.
@@ -2683,14 +2693,14 @@ func RunTestCoreResourceEnqueue(t *testing.T, tt *CoreResourceEnqueueTestCase) {
 	}
 
 	for _, pv := range tt.InitialPVs {
-		if _, err := testutils.CreatePV(cs, pv); err != nil {
+		if _, err := schedulerutils.CreatePV(cs, pv); err != nil {
 			t.Fatalf("Failed to create a PV %q: %v", pv.Name, err)
 		}
 	}
 
 	for _, pvc := range tt.InitialPVCs {
 		pvc.Namespace = ns
-		if _, err := testutils.CreatePVC(cs, pvc); err != nil {
+		if _, err := schedulerutils.CreatePVC(cs, pvc); err != nil {
 			t.Fatalf("Failed to create a PVC %q: %v", pvc.Name, err)
 		}
 	}
@@ -2797,5 +2807,28 @@ func RunTestCoreResourceEnqueue(t *testing.T, tt *CoreResourceEnqueueTestCase) {
 		return requeuedPods.Equal(tt.WantRequeuedPods), nil
 	}); err != nil {
 		t.Fatalf("Expect Pods %v to be requeued, but %v are requeued actually", tt.WantRequeuedPods, requeuedPods)
+	}
+	if tt.WantScheduledPods.Len() > 0 {
+		t.Log("Waiting for pods to be scheduled")
+		for range testCtx.Scheduler.SchedulingQueue.PodsInActiveQ() {
+			testCtx.Scheduler.ScheduleOne(testCtx.Ctx)
+		}
+		// Verify that the scheduled status of every Pod in tt.Pods matches tt.WantScheduledPods
+		var scheduledPods sets.Set[string]
+		if err := wait.PollUntilContextTimeout(ctx, time.Millisecond*200, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
+			scheduledPods = sets.Set[string]{} // reset
+			for _, podInfo := range tt.Pods {
+				pod, err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Get(testCtx.Ctx, podInfo.Name, metav1.GetOptions{})
+				if err != nil {
+					return false, err
+				}
+				if pod.Spec.NodeName != "" {
+					scheduledPods.Insert(podInfo.Name)
+				}
+			}
+			return scheduledPods.Equal(tt.WantScheduledPods), nil
+		}); err != nil {
+			t.Fatalf("Failed to wait for pods to match scheduled expectations: want scheduled=%v, got scheduled=%v", tt.WantScheduledPods, scheduledPods)
+		}
 	}
 }

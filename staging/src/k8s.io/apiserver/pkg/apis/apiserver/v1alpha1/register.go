@@ -55,6 +55,7 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(ConfigSchemeGroupVersion,
 		&AuthenticationConfiguration{},
 		&AuthorizationConfiguration{},
+		&StorageCompressionConfiguration{},
 		&TracingConfiguration{},
 	)
 	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)

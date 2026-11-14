@@ -228,6 +228,7 @@ type PodSpecApplyConfiguration struct {
 	// - spec.containers[*].securityContext.procMount
 	// - spec.containers[*].securityContext.runAsUser
 	// - spec.containers[*].securityContext.runAsGroup
+	// - spec.containers[*].securityContext.cgroupOptions
 	OS *PodOSApplyConfiguration `json:"os,omitempty"`
 	// hostUsers specifies whether to use the host's user namespace.
 	// Optional: Default to true.
@@ -256,10 +257,14 @@ type PodSpecApplyConfiguration struct {
 	//
 	// This field enables fine-grained control over resource allocation for the
 	// entire pod, allowing resource sharing among containers in a pod.
-	// TODO: For beta graduation, expand this comment with a detailed explanation.
 	//
-	// This is an alpha field and requires enabling the PodLevelResources feature
-	// gate.
+	// If a limit is not specified at the pod level, the pod is limited by the aggregate of
+	// its container limits:
+	// - For cpu and memory, the aggregate is used only if every init and regular container
+	// specifies a limit; otherwise the pod is not limited for that resource.
+	// - For hugepages, the container limits are summed and unspecified values are treated as 0.
+	//
+	// More details: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
 	Resources *ResourceRequirementsApplyConfiguration `json:"resources,omitempty"`
 	// hostnameOverride specifies an explicit override for the pod's hostname as perceived by the pod.
 	// This field only specifies the pod's hostname and does not affect its DNS records.
@@ -280,9 +285,11 @@ type PodSpecApplyConfiguration struct {
 	// the Pod is treated as a single unit in all of these aspects.
 	// The group object referenced by this field may not exist at the time the
 	// Pod is created.
-	// This field is immutable, but a group object with the same name may be
-	// recreated with different policies. Doing this during pod scheduling
-	// may result in the placement not conforming to the expected policies.
+	// This field is immutable. The scheduler cannot distinguish PodGroup runtime
+	// instances that reuse the same namespace and name. Controllers should use a
+	// new PodGroup name for each runtime instance. Reusing a name for a PodGroup
+	// with different policies may result in Pod placement not conforming to the
+	// expected policies.
 	SchedulingGroup *PodSchedulingGroupApplyConfiguration `json:"schedulingGroup,omitempty"`
 	// evictionResponders reference responders that react to Evictions based on EvictionRequests.
 	// Responders should observe and communicate through the Eviction Resource API to help with

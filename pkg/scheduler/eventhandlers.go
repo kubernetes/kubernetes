@@ -23,7 +23,6 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -43,6 +42,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/profile"
+	"k8s.io/kubernetes/pkg/scheduler/util"
 	"k8s.io/kubernetes/pkg/scheduler/util/assumecache"
 )
 
@@ -129,12 +129,15 @@ func (sched *Scheduler) addPod(obj interface{}) {
 		return
 	}
 
-	isPodDeferred := utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption) && resource.IsPodResizeDeferred(pod)
-	if responsibleForPod(pod, sched.Profiles) && (!assignedPod(pod) || isPodDeferred) {
-		sched.addPodToSchedulingQueue(pod)
-	}
+	// Cache first: scheduling a deferred resize pod assumes nodeInfo already counts it.
 	if assignedPod(pod) {
 		sched.addAssignedPodToCache(pod)
+	}
+	isPodDeferred := utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption) &&
+		resource.IsPodResizeDeferred(pod) && !util.IsPodResizeSchedulerEvaluationCompleted(pod) &&
+		!sched.profilesWithoutDeferredPodScheduling.Has(pod.Spec.SchedulerName)
+	if responsibleForPod(pod, sched.Profiles) && (!assignedPod(pod) || isPodDeferred) {
+		sched.addPodToSchedulingQueue(pod)
 	}
 }
 
@@ -151,28 +154,46 @@ func (sched *Scheduler) updatePod(oldObj, newObj interface{}) {
 		return
 	}
 
+	// The informer identifies objects by namespace/name; ObjectMeta.UID is not part
+	// of that identity. If a Pod is deleted and recreated under the same name while
+	// the watch is broken, the relist that follows reconciles by name only, so the
+	// deletion is never detected and both objects arrive as a single update event.
+	// This is documented behavior of SharedInformer, which leaves the detection to
+	// the consumer. Split the event back into the delete and the add that actually
+	// happened, so that the recreated Pod is routed to the cache or to the
+	// scheduling queue depending on whether it is already assigned to a node.
+	if oldPod.UID != newPod.UID {
+		logger.V(3).Info("Pod was recreated with a different UID, splitting into delete and add events", "pod", klog.KObj(newPod), "oldUID", oldPod.UID, "newUID", newPod.UID)
+		sched.deletePod(oldPod)
+		sched.addPod(newPod)
+		return
+	}
+
 	if assignedPod(oldPod) {
-		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption) && responsibleForPod(newPod, sched.Profiles) {
-			oldDeferred := resource.IsPodResizeDeferred(oldPod)
-			newDeferred := resource.IsPodResizeDeferred(newPod)
+		// Update the cache before the queue so a scheduling cycle popped by the queue
+		// addition below sees the pod's updated resources in the cache snapshot.
+		sched.updateAssignedPodInCache(oldPod, newPod)
+		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption) && responsibleForPod(newPod, sched.Profiles) && !sched.profilesWithoutDeferredPodScheduling.Has(newPod.Spec.SchedulerName) {
+			oldDeferred := resource.IsPodResizeDeferred(oldPod) && !util.IsPodResizeSchedulerEvaluationCompleted(oldPod)
+			newDeferred := resource.IsPodResizeDeferred(newPod) && !util.IsPodResizeSchedulerEvaluationCompleted(newPod)
 
 			if !oldDeferred && newDeferred {
-				// When an assigned pod transitions to a deferred resize,
-				// we must add it to the scheduling queue so the scheduler can evaluate feasibility and run preemption on the assigned node.
-				logger.V(3).Info("Assigned pod transitioned to deferred resize, adding to scheduling queue", "pod", klog.KObj(newPod))
+				// When an assigned pod transitions to a deferred resize or needs scheduler re-evaluation
+				// after Kubelet clears SchedulerEvaluationCompleted, add it to the scheduling queue.
+				logger.V(3).Info("Assigned pod transitioned to deferred resize pending scheduler evaluation, adding to scheduling queue", "pod", klog.KObj(newPod))
 				sched.addPodToSchedulingQueue(newPod)
 			} else if oldDeferred && !newDeferred {
-				// When an assigned pod is no longer deferred,
+				// When an assigned pod is no longer deferred or scheduler evaluation has completed,
 				// remove it from the scheduling queue so the scheduler stops evaluating preemption for it.
-				logger.V(3).Info("Assigned pod is no longer deferred, removing from scheduling queue", "pod", klog.KObj(newPod))
-				sched.deletePodFromSchedulingQueue(newPod, false)
+				logger.V(3).Info("Assigned pod is no longer deferred or scheduler evaluation completed, removing from scheduling queue", "pod", klog.KObj(newPod))
+				// Pass the deferred version that was queued; otherwise the queue would look for newPod in its pod group.
+				sched.deletePodFromSchedulingQueue(oldPod, false)
 			} else if oldDeferred && newDeferred {
 				// If the pod's spec mutates while queued for a deferred resize (e.g., resource requests updated), update its queue representation.
 				logger.V(3).Info("Assigned pod spec changed while deferred, updating scheduling queue", "pod", klog.KObj(newPod))
 				sched.SchedulingQueue.Update(klog.NewContext(context.Background(), logger), oldPod, newPod)
 			}
 		}
-		sched.updateAssignedPodInCache(oldPod, newPod)
 	} else if assignedPod(newPod) {
 		// This update means binding operation. We can treat it as adding the pod to a cache
 		// (addition to the cache will handle this binding appropriately).
@@ -231,10 +252,21 @@ func (sched *Scheduler) deletePod(obj interface{}) {
 }
 
 func (sched *Scheduler) addPodToSchedulingQueue(pod *v1.Pod) {
-	defer metrics.EventHandlingLatency.ObserveSince(time.Now(), framework.EventUnscheduledPodAdd.Label())()
+	isDeferredResize := utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption) && resource.IsPodResizeDeferred(pod)
+	event := framework.EventUnscheduledPodAdd.Label()
+	if isDeferredResize {
+		event = framework.AssignedPodResize
+	}
+	defer metrics.EventHandlingLatency.ObserveSince(time.Now(), event)()
 
 	logger := sched.logger
 	logger.V(3).Info("Add event for unscheduled pod", "pod", klog.KObj(pod))
+	if isDeferredResize {
+		// Deferred resize pods are already running: the assigned-pod cache path owns their pod group
+		// membership, and they aren't new members to announce.
+		sched.SchedulingQueue.Add(klog.NewContext(context.Background(), logger), pod)
+		return
+	}
 	sched.Cache.AddPodGroupMember(pod)
 	if sched.podGroupHierarchyTracker != nil {
 		sched.podGroupHierarchyTracker.AddPod(logger, pod)
@@ -375,6 +407,10 @@ func (sched *Scheduler) deletePodFromSchedulingQueue(pod *v1.Pod, inBinding bool
 		// once the https://github.com/kubernetes/kubernetes/issues/134859 is fixed.
 		return
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption) && resource.IsPodResizeDeferred(pod) {
+		// Deferred resize pods are assigned: the assigned-pod cache path owns their pod group membership.
+		return
+	}
 	isAssumed, err := sched.Cache.IsAssumedPod(pod)
 	if err != nil {
 		utilruntime.HandleErrorWithLogger(logger, err, "Failed to check whether pod is assumed", "pod", klog.KObj(pod))
@@ -502,7 +538,7 @@ func (sched *Scheduler) addPodGroup(obj any) {
 
 func (sched *Scheduler) updatePodGroup(oldObj, newObj any) {
 	evt := fwk.ClusterEvent{Resource: fwk.PodGroup, ActionType: fwk.Update}
-	defer metrics.EventHandlingLatency.ObserveSince(time.Now(), evt.Label())()
+	start := time.Now()
 	logger := sched.logger
 	oldPG, ok := oldObj.(*schedulingv1beta1.PodGroup)
 	if !ok {
@@ -515,9 +551,16 @@ func (sched *Scheduler) updatePodGroup(oldObj, newObj any) {
 		return
 	}
 
+	if oldPG.UID != newPG.UID {
+		sched.deletePodGroup(oldPG)
+		sched.addPodGroup(newPG)
+		return
+	}
 	if oldPG.ResourceVersion == newPG.ResourceVersion {
 		return
 	}
+
+	defer metrics.EventHandlingLatency.ObserveSince(start, evt.Label())()
 
 	logger.V(4).Info("Update event for pod group", "podGroup", klog.KObj(newPG))
 	gpg := fwk.NewGenericPodGroup(newPG)
@@ -560,9 +603,9 @@ func (sched *Scheduler) addCompositePodGroup(obj any) {
 	evt := fwk.ClusterEvent{Resource: fwk.CompositePodGroup, ActionType: fwk.Add}
 	defer metrics.EventHandlingLatency.ObserveSince(time.Now(), evt.Label())()
 	logger := sched.logger
-	cpg, ok := obj.(*schedulingv1alpha3.CompositePodGroup)
+	cpg, ok := obj.(*schedulingv1beta1.CompositePodGroup)
 	if !ok {
-		utilruntime.HandleErrorWithLogger(logger, nil, "Cannot convert to *v1alpha3.CompositePodGroup", "obj", obj)
+		utilruntime.HandleErrorWithLogger(logger, nil, "Cannot convert to *v1beta1.CompositePodGroup", "obj", obj)
 		return
 	}
 
@@ -576,22 +619,29 @@ func (sched *Scheduler) addCompositePodGroup(obj any) {
 
 func (sched *Scheduler) updateCompositePodGroup(oldObj, newObj any) {
 	evt := fwk.ClusterEvent{Resource: fwk.CompositePodGroup, ActionType: fwk.Update}
-	defer metrics.EventHandlingLatency.ObserveSince(time.Now(), evt.Label())()
+	start := time.Now()
 	logger := sched.logger
-	oldCPG, ok := oldObj.(*schedulingv1alpha3.CompositePodGroup)
+	oldCPG, ok := oldObj.(*schedulingv1beta1.CompositePodGroup)
 	if !ok {
-		utilruntime.HandleErrorWithLogger(logger, nil, "Cannot convert oldObj to *v1alpha3.CompositePodGroup", "oldObj", oldObj)
+		utilruntime.HandleErrorWithLogger(logger, nil, "Cannot convert oldObj to *v1beta1.CompositePodGroup", "oldObj", oldObj)
 		return
 	}
-	newCPG, ok := newObj.(*schedulingv1alpha3.CompositePodGroup)
+	newCPG, ok := newObj.(*schedulingv1beta1.CompositePodGroup)
 	if !ok {
-		utilruntime.HandleErrorWithLogger(logger, nil, "Cannot convert newObj to *v1alpha3.CompositePodGroup", "newObj", newObj)
+		utilruntime.HandleErrorWithLogger(logger, nil, "Cannot convert newObj to *v1beta1.CompositePodGroup", "newObj", newObj)
 		return
 	}
 
+	if oldCPG.UID != newCPG.UID {
+		sched.deleteCompositePodGroup(oldCPG)
+		sched.addCompositePodGroup(newCPG)
+		return
+	}
 	if oldCPG.ResourceVersion == newCPG.ResourceVersion {
 		return
 	}
+
+	defer metrics.EventHandlingLatency.ObserveSince(start, evt.Label())()
 
 	logger.V(4).Info("Update event for composite pod group", "compositePodGroup", klog.KObj(newCPG))
 	gpg := fwk.NewGenericCompositePodGroup(newCPG)
@@ -606,19 +656,19 @@ func (sched *Scheduler) deleteCompositePodGroup(obj any) {
 	defer metrics.EventHandlingLatency.ObserveSince(time.Now(), evt.Label())()
 
 	logger := sched.logger
-	var cpg *schedulingv1alpha3.CompositePodGroup
+	var cpg *schedulingv1beta1.CompositePodGroup
 	switch t := obj.(type) {
-	case *schedulingv1alpha3.CompositePodGroup:
+	case *schedulingv1beta1.CompositePodGroup:
 		cpg = t
 	case cache.DeletedFinalStateUnknown:
 		var ok bool
-		cpg, ok = t.Obj.(*schedulingv1alpha3.CompositePodGroup)
+		cpg, ok = t.Obj.(*schedulingv1beta1.CompositePodGroup)
 		if !ok {
-			utilruntime.HandleErrorWithLogger(logger, nil, "Cannot convert to *v1alpha3.CompositePodGroup", "obj", t.Obj)
+			utilruntime.HandleErrorWithLogger(logger, nil, "Cannot convert to *v1beta1.CompositePodGroup", "obj", t.Obj)
 			return
 		}
 	default:
-		utilruntime.HandleErrorWithLogger(logger, nil, "Cannot convert to *v1alpha3.CompositePodGroup", "obj", t)
+		utilruntime.HandleErrorWithLogger(logger, nil, "Cannot convert to *v1beta1.CompositePodGroup", "obj", t)
 		return
 	}
 
@@ -667,43 +717,44 @@ func addAllEventHandlers(
 
 	logger := sched.logger
 
-	if handlerRegistration, err = informerFactory.Core().V1().Pods().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	if handlerRegistration, err = informerFactory.Core().V1().Pods().Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc:    sched.addPod,
 		UpdateFunc: sched.updatePod,
 		DeleteFunc: sched.deletePod,
-	}); err != nil {
+	}, cache.HandlerOptions{Logger: &logger}); err != nil {
 		return err
 	}
 	handlers = append(handlers, handlerRegistration)
 
-	if handlerRegistration, err = informerFactory.Core().V1().Nodes().Informer().AddEventHandler(
+	if handlerRegistration, err = informerFactory.Core().V1().Nodes().Informer().AddEventHandlerWithOptions(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc:    sched.addNodeToCache,
 			UpdateFunc: sched.updateNodeInCache,
 			DeleteFunc: sched.deleteNodeFromCache,
 		},
+		cache.HandlerOptions{Logger: &logger},
 	); err != nil {
 		return err
 	}
 	handlers = append(handlers, handlerRegistration)
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
-		if handlerRegistration, err = informerFactory.Scheduling().V1beta1().PodGroups().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		if handlerRegistration, err = informerFactory.Scheduling().V1beta1().PodGroups().Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 			AddFunc:    sched.addPodGroup,
 			UpdateFunc: sched.updatePodGroup,
 			DeleteFunc: sched.deletePodGroup,
-		}); err != nil {
+		}, cache.HandlerOptions{Logger: &logger}); err != nil {
 			return err
 		}
 		handlers = append(handlers, handlerRegistration)
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.CompositePodGroup) {
-		if handlerRegistration, err = informerFactory.Scheduling().V1alpha3().CompositePodGroups().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		if handlerRegistration, err = informerFactory.Scheduling().V1beta1().CompositePodGroups().Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 			AddFunc:    sched.addCompositePodGroup,
 			UpdateFunc: sched.updateCompositePodGroup,
 			DeleteFunc: sched.deleteCompositePodGroup,
-		}); err != nil {
+		}, cache.HandlerOptions{Logger: &logger}); err != nil {
 			return err
 		}
 		handlers = append(handlers, handlerRegistration)
@@ -746,22 +797,25 @@ func addAllEventHandlers(
 			// UnscheduledPod, and TargetPod are logical Pod event resources
 			// emitted from the Pod add/update/delete handlers.
 		case fwk.CSINode:
-			if handlerRegistration, err = informerFactory.Storage().V1().CSINodes().Informer().AddEventHandler(
+			if handlerRegistration, err = informerFactory.Storage().V1().CSINodes().Informer().AddEventHandlerWithOptions(
 				buildEvtResHandler(at, fwk.CSINode),
+				cache.HandlerOptions{Logger: &logger},
 			); err != nil {
 				return err
 			}
 			handlers = append(handlers, handlerRegistration)
 		case fwk.CSIDriver:
-			if handlerRegistration, err = informerFactory.Storage().V1().CSIDrivers().Informer().AddEventHandler(
+			if handlerRegistration, err = informerFactory.Storage().V1().CSIDrivers().Informer().AddEventHandlerWithOptions(
 				buildEvtResHandler(at, fwk.CSIDriver),
+				cache.HandlerOptions{Logger: &logger},
 			); err != nil {
 				return err
 			}
 			handlers = append(handlers, handlerRegistration)
 		case fwk.CSIStorageCapacity:
-			if handlerRegistration, err = informerFactory.Storage().V1().CSIStorageCapacities().Informer().AddEventHandler(
+			if handlerRegistration, err = informerFactory.Storage().V1().CSIStorageCapacities().Informer().AddEventHandlerWithOptions(
 				buildEvtResHandler(at, fwk.CSIStorageCapacity),
+				cache.HandlerOptions{Logger: &logger},
 			); err != nil {
 				return err
 			}
@@ -780,16 +834,18 @@ func addAllEventHandlers(
 			// bindings due to conflicts if PVs are updated by PV controller or other
 			// parties, then scheduler will add pod back to unschedulable queue. We
 			// need to move pods to active queue on PV update for this scenario.
-			if handlerRegistration, err = informerFactory.Core().V1().PersistentVolumes().Informer().AddEventHandler(
+			if handlerRegistration, err = informerFactory.Core().V1().PersistentVolumes().Informer().AddEventHandlerWithOptions(
 				buildEvtResHandler(at, fwk.PersistentVolume),
+				cache.HandlerOptions{Logger: &logger},
 			); err != nil {
 				return err
 			}
 			handlers = append(handlers, handlerRegistration)
 		case fwk.PersistentVolumeClaim:
 			// MaxPDVolumeCountPredicate: add/update PVC will affect counts of PV when it is bound.
-			if handlerRegistration, err = informerFactory.Core().V1().PersistentVolumeClaims().Informer().AddEventHandler(
+			if handlerRegistration, err = informerFactory.Core().V1().PersistentVolumeClaims().Informer().AddEventHandlerWithOptions(
 				buildEvtResHandler(at, fwk.PersistentVolumeClaim),
+				cache.HandlerOptions{Logger: &logger},
 			); err != nil {
 				return err
 			}
@@ -819,22 +875,25 @@ func addAllEventHandlers(
 				erCache.AddEventHandler(handler)
 				handler = erCache
 			}
-			if handlerRegistration, err = informerFactory.Resource().V1().DeviceClasses().Informer().AddEventHandler(
+			if handlerRegistration, err = informerFactory.Resource().V1().DeviceClasses().Informer().AddEventHandlerWithOptions(
 				handler,
+				cache.HandlerOptions{Logger: &logger},
 			); err != nil {
 				return err
 			}
 			handlers = append(handlers, handlerRegistration)
 		case fwk.StorageClass:
-			if handlerRegistration, err = informerFactory.Storage().V1().StorageClasses().Informer().AddEventHandler(
+			if handlerRegistration, err = informerFactory.Storage().V1().StorageClasses().Informer().AddEventHandlerWithOptions(
 				buildEvtResHandler(at, fwk.StorageClass),
+				cache.HandlerOptions{Logger: &logger},
 			); err != nil {
 				return err
 			}
 			handlers = append(handlers, handlerRegistration)
 		case fwk.VolumeAttachment:
-			if handlerRegistration, err = informerFactory.Storage().V1().VolumeAttachments().Informer().AddEventHandler(
+			if handlerRegistration, err = informerFactory.Storage().V1().VolumeAttachments().Informer().AddEventHandlerWithOptions(
 				buildEvtResHandler(at, fwk.VolumeAttachment),
+				cache.HandlerOptions{Logger: &logger},
 			); err != nil {
 				return err
 			}
@@ -861,8 +920,9 @@ func addAllEventHandlers(
 			// Fall back to try dynamic informers.
 			gvr, _ := schema.ParseResourceArg(string(gvk))
 			dynInformer := dynInformerFactory.ForResource(*gvr).Informer()
-			if handlerRegistration, err = dynInformer.AddEventHandler(
+			if handlerRegistration, err = dynInformer.AddEventHandlerWithOptions(
 				buildEvtResHandler(at, gvk),
+				cache.HandlerOptions{Logger: &logger},
 			); err != nil {
 				return err
 			}

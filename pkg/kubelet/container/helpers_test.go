@@ -1124,6 +1124,31 @@ func TestHasAnyActiveRegularContainerStarted(t *testing.T) {
 			},
 			expected: false,
 		},
+		{
+			desc: "regular containers replaced",
+			spec: &v1.PodSpec{
+				InitContainers: []v1.Container{{Name: "init"}},
+				Containers:     []v1.Container{{Name: "new"}},
+			},
+			podStatus: &PodStatus{
+				SandboxStatuses:         []*runtimeapi.PodSandboxStatus{{Id: "current", State: runtimeapi.PodSandboxState_SANDBOX_READY}},
+				ActiveContainerStatuses: []*Status{{Name: "removed", State: ContainerStateRunning}},
+			},
+			expected: true,
+		},
+		{
+			desc: "only an ephemeral container started",
+			spec: &v1.PodSpec{
+				InitContainers:      []v1.Container{{Name: "init"}},
+				Containers:          []v1.Container{{Name: "regular"}},
+				EphemeralContainers: []v1.EphemeralContainer{{EphemeralContainerCommon: v1.EphemeralContainerCommon{Name: "debug"}}},
+			},
+			podStatus: &PodStatus{
+				SandboxStatuses:         []*runtimeapi.PodSandboxStatus{{Id: "current", State: runtimeapi.PodSandboxState_SANDBOX_READY}},
+				ActiveContainerStatuses: []*Status{{Name: "init", State: ContainerStateExited}, {Name: "debug", State: ContainerStateRunning}},
+			},
+			expected: false,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -1677,5 +1702,29 @@ func TestShouldAllContainersRestart(t *testing.T) {
 			actual := ShouldAllContainersRestart(tc.pod, tc.podStatus, tc.apiPodStatus)
 			assert.Equal(t, tc.expected, actual, "ShouldAllContainersRestart(%v, %v)", tc.pod, tc.podStatus)
 		})
+	}
+}
+
+func TestSecurityProfileOCIRefs(t *testing.T) {
+	oci := func(ref string) *v1.SeccompProfile {
+		return &v1.SeccompProfile{Type: v1.SeccompProfileTypeOCI, OCI: &v1.SecurityProfileOCI{Ref: ref}}
+	}
+	pod := &v1.Pod{Spec: v1.PodSpec{
+		SecurityContext: &v1.PodSecurityContext{SeccompProfile: oci("a")},
+		InitContainers:  []v1.Container{{Name: "init", SecurityContext: &v1.SecurityContext{SeccompProfile: oci("b")}}},
+		Containers: []v1.Container{
+			{Name: "c1", SecurityContext: &v1.SecurityContext{SeccompProfile: oci("a")}},
+			{Name: "c2", SecurityContext: &v1.SecurityContext{SeccompProfile: &v1.SeccompProfile{Type: v1.SeccompProfileTypeRuntimeDefault}}},
+			{Name: "c3"},
+		},
+		EphemeralContainers: []v1.EphemeralContainer{{EphemeralContainerCommon: v1.EphemeralContainerCommon{
+			Name: "debug", SecurityContext: &v1.SecurityContext{SeccompProfile: oci("c")},
+		}}},
+	}}
+	if got, want := SecurityProfileOCIRefs(pod), []string{"a", "b", "c"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("SecurityProfileOCIRefs() = %v, want %v", got, want)
+	}
+	if got := SecurityProfileOCIRefs(&v1.Pod{}); got != nil {
+		t.Errorf("SecurityProfileOCIRefs() of an empty pod = %v, want nil", got)
 	}
 }

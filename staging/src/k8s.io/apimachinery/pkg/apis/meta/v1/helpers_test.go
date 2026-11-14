@@ -28,6 +28,107 @@ import (
 	"sigs.k8s.io/randfill"
 )
 
+func TestParseToLabelSelector(t *testing.T) {
+	tc := []struct {
+		selector  string
+		out       *LabelSelector
+		expectErr bool
+	}{
+		{
+			selector: "",
+			out:      &LabelSelector{MatchLabels: map[string]string{}, MatchExpressions: []LabelSelectorRequirement{}},
+		},
+		{
+			selector: "foo=bar",
+			out:      &LabelSelector{MatchLabels: map[string]string{"foo": "bar"}, MatchExpressions: []LabelSelectorRequirement{}},
+		},
+		{
+			selector: "foo==bar",
+			out:      &LabelSelector{MatchLabels: map[string]string{"foo": "bar"}, MatchExpressions: []LabelSelectorRequirement{}},
+		},
+		{
+			selector: "foo!=bar",
+			out: &LabelSelector{MatchLabels: map[string]string{}, MatchExpressions: []LabelSelectorRequirement{
+				{Key: "foo", Operator: LabelSelectorOpNotIn, Values: []string{"bar"}},
+			}},
+		},
+		{
+			selector: "foo in (bar,baz)",
+			out: &LabelSelector{MatchLabels: map[string]string{}, MatchExpressions: []LabelSelectorRequirement{
+				{Key: "foo", Operator: LabelSelectorOpIn, Values: []string{"bar", "baz"}},
+			}},
+		},
+		{
+			selector: "foo notin (bar)",
+			out: &LabelSelector{MatchLabels: map[string]string{}, MatchExpressions: []LabelSelectorRequirement{
+				{Key: "foo", Operator: LabelSelectorOpNotIn, Values: []string{"bar"}},
+			}},
+		},
+		{
+			selector: "foo",
+			out: &LabelSelector{MatchLabels: map[string]string{}, MatchExpressions: []LabelSelectorRequirement{
+				{Key: "foo", Operator: LabelSelectorOpExists, Values: []string{}},
+			}},
+		},
+		{
+			selector: "!foo",
+			out: &LabelSelector{MatchLabels: map[string]string{}, MatchExpressions: []LabelSelectorRequirement{
+				{Key: "foo", Operator: LabelSelectorOpDoesNotExist, Values: []string{}},
+			}},
+		},
+		{
+			selector:  "foo>1",
+			expectErr: true,
+		},
+		{
+			selector:  "foo<1",
+			expectErr: true,
+		},
+		{
+			selector:  "foo=",
+			expectErr: false,
+			out:       &LabelSelector{MatchLabels: map[string]string{"foo": ""}, MatchExpressions: []LabelSelectorRequirement{}},
+		},
+		{
+			selector:  "=bar",
+			expectErr: true,
+		},
+	}
+
+	for _, tt := range tc {
+		t.Run(tt.selector, func(t *testing.T) {
+			out, err := ParseToLabelSelector(tt.selector)
+			if tt.expectErr {
+				if err == nil {
+					t.Fatalf("expected error parsing %q, got %v", tt.selector, out)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error parsing %q: %v", tt.selector, err)
+			}
+			if diff := cmp.Diff(tt.out, out); diff != "" {
+				t.Errorf("unexpected LabelSelector for %q (-want +got):\n%s", tt.selector, diff)
+			}
+			// The parsed LabelSelector must select the same objects as the
+			// selector string it was parsed from.
+			selector, err := LabelSelectorAsSelector(out)
+			if err != nil {
+				t.Fatalf("unexpected error converting %v back to a selector: %v", out, err)
+			}
+			original, err := labels.Parse(tt.selector)
+			if err != nil {
+				t.Fatalf("unexpected error parsing %q with labels.Parse: %v", tt.selector, err)
+			}
+			for _, ls := range []labels.Set{{}, {"foo": "bar"}, {"foo": "baz"}, {"foo": ""}, {"other": "bar"}} {
+				if got, want := selector.Matches(ls), original.Matches(ls); got != want {
+					t.Errorf("selector %q parsed to %v matches %v: got %t, want %t", tt.selector, out, ls, got, want)
+				}
+			}
+		})
+	}
+}
+
 func TestLabelSelectorAsSelector(t *testing.T) {
 	matchLabels := map[string]string{"foo": "bar"}
 	matchExpressions := []LabelSelectorRequirement{{

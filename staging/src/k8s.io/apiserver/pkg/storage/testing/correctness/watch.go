@@ -17,6 +17,7 @@ limitations under the License.
 package correctness
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"reflect"
@@ -92,18 +93,35 @@ func (v WatchValidator) ValidateWatch(request WatchRequest, response WatchRespon
 }
 
 // checkWatch returns the error storage returns for an invalid watch and panics
-// on watches the model can't reproduce.
+// on watches the validator can't verify without internal state.
 func (v WatchValidator) checkWatch(request WatchRequest) error {
+	if err := checkWatchOptions(v.versioner, request); err != nil {
+		return err
+	}
+	opts := request.Options
+	if opts.SendInitialEvents == nil && (opts.ResourceVersion == "" || opts.ResourceVersion == "0") {
+		panic("legacy initial events are not supported by correctness testing")
+	}
+	if opts.SendInitialEvents != nil && *opts.SendInitialEvents && !opts.Predicate.AllowWatchBookmarks {
+		panic("initial events without bookmarks are not supported, set allowWatchBookmarks=true")
+	}
+	return nil
+}
+
+func checkWatchOptions(versioner storage.Versioner, request WatchRequest) error {
 	opts := request.Options
 	if err := checkKey(request.Key, opts.Recursive); err != nil {
 		return err
 	}
-	if _, err := v.versioner.ParseResourceVersion(opts.ResourceVersion); err != nil {
+	if _, err := versioner.ParseResourceVersion(opts.ResourceVersion); err != nil {
 		return err
 	}
 	if opts.Predicate.Label == nil || opts.Predicate.Field == nil {
 		// etcd3 and the cacher call methods on both selectors.
 		panic("nil label or field selector is not supported, use storage.Everything to match everything")
+	}
+	if opts.WatchWithoutPrevKV && !opts.Predicate.Empty() {
+		return apierrors.NewInternalError(errors.New("watchWithoutPrevKV requires an empty predicate"))
 	}
 	if opts.Predicate.Limit != 0 || opts.Predicate.Continue != "" {
 		panic("pagination (limit, continue) is not supported")
@@ -113,12 +131,6 @@ func (v WatchValidator) checkWatch(request WatchRequest) error {
 	}
 	if opts.RecordTimestamps {
 		panic("recordTimestamps is not supported, it wraps objects in storage-internal types")
-	}
-	if opts.SendInitialEvents == nil && (opts.ResourceVersion == "" || opts.ResourceVersion == "0") {
-		panic("legacy initial events are not supported by correctness testing")
-	}
-	if opts.SendInitialEvents != nil && *opts.SendInitialEvents && !opts.Predicate.AllowWatchBookmarks {
-		panic("initial events without bookmarks are not supported, set allowWatchBookmarks=true")
 	}
 	return nil
 }
@@ -279,7 +291,7 @@ func (v WatchValidator) toEventReference(events []watch.Event) ([]eventReference
 		if err != nil {
 			return nil, err
 		}
-		rv, err := objectRV(event.Object, v.replay.versioner)
+		rv, err := objectRV(event.Object, v.versioner)
 		if err != nil {
 			return nil, err
 		}
@@ -292,10 +304,32 @@ func (v WatchValidator) toEventReference(events []watch.Event) ([]eventReference
 	return refs, nil
 }
 
-func (c Change) toWatchEvent(versioner storage.Versioner, pred storage.SelectionPredicate) (*watch.Event, error) {
+func newBookmarkEvent(newFunc func() runtime.Object, versioner storage.Versioner, rv uint64, initialEventsEnd bool) (watch.Event, error) {
+	bookmark := newFunc()
+	if err := versioner.UpdateObject(bookmark, rv); err != nil {
+		return watch.Event{}, err
+	}
+	if initialEventsEnd {
+		if err := storage.AnnotateInitialEventsEndBookmark(bookmark); err != nil {
+			return watch.Event{}, err
+		}
+	}
+	return watch.Event{Type: watch.Bookmark, Object: bookmark}, nil
+}
+
+func errorWatchEvent(err error) watch.Event {
+	var statusErr *apierrors.StatusError
+	if errors.As(err, &statusErr) {
+		return watch.Event{Type: watch.Error, Object: &statusErr.ErrStatus}
+	}
+	return watch.Event{Type: watch.Error, Object: &apierrors.NewInternalError(err).ErrStatus}
+}
+
+func (c Change) toWatchEvent(newFunc func() runtime.Object, versioner storage.Versioner, reverseKeyFunc storage.ReverseKeyFunc, opts storage.ListOptions) (*watch.Event, error) {
 	if c.Object == nil && c.PrevObject == nil {
 		panic(fmt.Sprintf("change at resource version %d has neither Object nor PrevObject", c.ResourceVersion))
 	}
+	pred := opts.Predicate
 	var curMatches, prevMatches bool
 	var err error
 	if c.Object != nil {
@@ -312,10 +346,36 @@ func (c Change) toWatchEvent(versioner storage.Versioner, pred storage.Selection
 	}
 	switch {
 	case curMatches && prevMatches:
-		return &watch.Event{Type: watch.Modified, Object: c.Object}, nil
+		return &watch.Event{Type: watch.Modified, Object: c.Object.DeepCopyObject()}, nil
 	case curMatches:
-		return &watch.Event{Type: watch.Added, Object: c.Object}, nil
+		return &watch.Event{Type: watch.Added, Object: c.Object.DeepCopyObject()}, nil
 	case prevMatches:
+		if c.Object == nil && opts.WatchWithoutPrevKV {
+			var name, namespace string
+			if reverseKeyFunc != nil {
+				name, namespace, err = reverseKeyFunc(c.Key)
+				if err != nil {
+					return nil, fmt.Errorf("failed to reverse watch event key %q: %w", c.Key, err)
+				}
+			} else {
+				prevAcc, err := meta.Accessor(c.PrevObject)
+				if err != nil {
+					return nil, err
+				}
+				name, namespace = prevAcc.GetName(), prevAcc.GetNamespace()
+			}
+			deleted := newFunc()
+			acc, err := meta.Accessor(deleted)
+			if err != nil {
+				return nil, err
+			}
+			acc.SetName(name)
+			acc.SetNamespace(namespace)
+			if err := versioner.UpdateObject(deleted, c.ResourceVersion); err != nil {
+				return nil, err
+			}
+			return &watch.Event{Type: watch.Deleted, Object: deleted}, nil
+		}
 		// The watcher gets the last state it matched, at the RV of the write
 		// that made it stop matching.
 		prev := c.PrevObject.DeepCopyObject()

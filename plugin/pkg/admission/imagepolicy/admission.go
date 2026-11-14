@@ -38,6 +38,7 @@ import (
 	"k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	podutil "k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
 
 	// install the clientgo image policy API for use with api registry
@@ -46,7 +47,10 @@ import (
 
 // PluginName indicates name of admission plugin.
 const PluginName = "ImagePolicyWebhook"
-const ephemeralcontainers = "ephemeralcontainers"
+const (
+	ephemeralcontainers = "ephemeralcontainers"
+	dynamic             = "dynamic"
+)
 
 // AuditKeyPrefix is used as the prefix for all audit keys handled by this
 // pluggin. Some well known suffixes are listed below.
@@ -133,9 +137,9 @@ func (a *Plugin) webhookError(pod *api.Pod, attributes admission.Attributes, err
 
 // Validate makes an admission decision based on the request attributes
 func (a *Plugin) Validate(ctx context.Context, attributes admission.Attributes, o admission.ObjectInterfaces) (err error) {
-	// Ignore all calls to subresources other than ephemeralcontainers or calls to resources other than pods.
+	// Ignore calls to resources other than pods, and to subresources that can't modify images.
 	subresource := attributes.GetSubresource()
-	if (subresource != "" && subresource != ephemeralcontainers) || attributes.GetResource().GroupResource() != api.Resource("pods") {
+	if (subresource != "" && subresource != ephemeralcontainers && subresource != dynamic) || attributes.GetResource().GroupResource() != api.Resource("pods") {
 		return nil
 	}
 
@@ -146,16 +150,14 @@ func (a *Plugin) Validate(ctx context.Context, attributes admission.Attributes, 
 
 	// Build list of ImageReviewContainerSpec
 	var imageReviewContainerSpecs []v1alpha1.ImageReviewContainerSpec
-	if subresource == "" {
-		containers := make([]api.Container, 0, len(pod.Spec.Containers)+len(pod.Spec.InitContainers))
-		containers = append(containers, pod.Spec.Containers...)
-		containers = append(containers, pod.Spec.InitContainers...)
-		for _, c := range containers {
+	switch subresource {
+	case "", dynamic:
+		for c := range podutil.ContainerIter(&pod.Spec, podutil.InitContainers|podutil.Containers) {
 			imageReviewContainerSpecs = append(imageReviewContainerSpecs, v1alpha1.ImageReviewContainerSpec{
 				Image: c.Image,
 			})
 		}
-	} else if subresource == ephemeralcontainers {
+	case ephemeralcontainers:
 		for _, c := range pod.Spec.EphemeralContainers {
 			imageReviewContainerSpecs = append(imageReviewContainerSpecs, v1alpha1.ImageReviewContainerSpec{
 				Image: c.Image,

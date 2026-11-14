@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"iter"
+	"math"
 	"slices"
 	"sort"
 	"strings"
@@ -43,11 +44,14 @@ import (
 
 var generation int64
 
+// ErrStalePodGeneration indicates that a pod's spec generation changed between scheduling and binding.
+var ErrStalePodGeneration = errors.New("pod spec changed during scheduling")
+
 var (
 	// basicActionTypes is a list of basic ActionTypes.
 	basicActionTypes = []fwk.ActionType{fwk.Add, fwk.Delete, fwk.Update}
 	// podActionTypes is a list of ActionTypes that are only applicable for Pod events.
-	podActionTypes = []fwk.ActionType{fwk.UpdatePodLabel, fwk.UpdatePodScaleDown, fwk.UpdatePodScaleUp, fwk.UpdatePodToleration, fwk.UpdatePodSchedulingGatesEliminated, fwk.UpdatePodGeneratedResourceClaim}
+	podActionTypes = []fwk.ActionType{fwk.UpdatePodLabel, fwk.UpdatePodScaleDown, fwk.UpdatePodToleration, fwk.UpdatePodSchedulingGatesEliminated, fwk.UpdatePodGeneratedResourceClaim}
 	// nodeActionTypes is a list of ActionTypes that are only applicable for Node events.
 	nodeActionTypes = []fwk.ActionType{fwk.UpdateNodeAllocatable, fwk.UpdateNodeLabel, fwk.UpdateNodeTaint, fwk.UpdateNodeCondition, fwk.UpdateNodeAnnotation, fwk.UpdateNodeDeclaredFeature, fwk.UpdateNodePreemptionPolicy}
 )
@@ -76,7 +80,7 @@ var (
 
 // AllClusterEventLabels returns all possible cluster event labels given to the metrics.
 func AllClusterEventLabels() []string {
-	labels := []string{UnschedulableTimeout, ForceActivate}
+	labels := []string{UnschedulableTimeout, ForceActivate, AssignedPodResize}
 	for _, r := range allResources {
 		for _, a := range basicActionTypes {
 			labels = append(labels, fwk.ClusterEvent{Resource: r, ActionType: a}.Label())
@@ -373,7 +377,7 @@ func (n *NodeInfo) AddPodInfo(podInfo fwk.PodInfo) {
 	if utilfeature.DefaultFeatureGate.Enabled(features.InterPodAffinityHostnameFastPath) && podWithRequiredNonHostScopedAntiAffinity(podInfo.GetPod()) {
 		n.PodsWithRequiredNonHostScopedAntiAffinity = append(n.PodsWithRequiredNonHostScopedAntiAffinity, podInfo)
 	}
-	n.update(podInfo, 1)
+	n.update(podInfo, true /* add */)
 }
 
 // AddPod is a wrapper around AddPodInfo.
@@ -450,33 +454,71 @@ func (n *NodeInfo) RemovePod(logger klog.Logger, pod *v1.Pod) error {
 
 	var removedPod fwk.PodInfo
 	if n.Pods, removedPod = removeFromSlice(logger, n.Pods, k); removedPod != nil {
-		n.update(removedPod, -1)
+		n.update(removedPod, false /* add */)
 		return nil
 	}
 	return fmt.Errorf("no corresponding pod %s in pods of node %s", pod.Name, n.node.Name)
 }
 
-// update node info based on the pod, and sign.
-// The sign will be set to `+1` when AddPod and to `-1` when RemovePod.
-func (n *NodeInfo) update(podInfo fwk.PodInfo, sign int64) {
+// update updates NodeInfo when AddPodInfo adds a pod or RemovePod removes a pod.
+func (n *NodeInfo) update(podInfo fwk.PodInfo, add bool) {
+	n.updateRequested(podInfo, add)
+	n.updateUsedPorts(podInfo.GetPod(), add)
+	n.updatePVCRefCounts(podInfo.GetPod(), add)
+	n.Generation = nextGeneration()
+}
+
+// updateRequested updates Requested and NonZeroRequested for a pod addition or removal.
+func (n *NodeInfo) updateRequested(podInfo fwk.PodInfo, add bool) {
+	if !add && n.requestedSaturated() {
+		// Saturation loses the exact sum, so rebuild from the remaining pods in n.Pods.
+		n.recomputeRequested()
+		return
+	}
+
 	podResource := podInfo.CalculateResource()
-	n.Requested.MilliCPU += sign * podResource.Resource.GetMilliCPU()
-	n.Requested.Memory += sign * podResource.Resource.GetMemory()
-	n.Requested.EphemeralStorage += sign * podResource.Resource.GetEphemeralStorage()
-	if n.Requested.ScalarResources == nil && len(podResource.Resource.GetScalarResources()) > 0 {
+	n.Requested.MilliCPU = addOrSub(n.Requested.MilliCPU, podResource.Resource.GetMilliCPU(), add)
+	n.Requested.Memory = addOrSub(n.Requested.Memory, podResource.Resource.GetMemory(), add)
+	n.Requested.EphemeralStorage = addOrSub(n.Requested.EphemeralStorage, podResource.Resource.GetEphemeralStorage(), add)
+	scalars := podResource.Resource.GetScalarResources()
+	if n.Requested.ScalarResources == nil && len(scalars) > 0 {
 		n.Requested.ScalarResources = map[v1.ResourceName]int64{}
 	}
-	for rName, rQuant := range podResource.Resource.GetScalarResources() {
-		n.Requested.ScalarResources[rName] += sign * rQuant
+	for rName, rQuant := range scalars {
+		n.Requested.ScalarResources[rName] = addOrSub(n.Requested.ScalarResources[rName], rQuant, add)
 	}
-	n.NonZeroRequested.MilliCPU += sign * podResource.Non0CPU
-	n.NonZeroRequested.Memory += sign * podResource.Non0Mem
+	n.NonZeroRequested.MilliCPU = addOrSub(n.NonZeroRequested.MilliCPU, podResource.Non0CPU, add)
+	n.NonZeroRequested.Memory = addOrSub(n.NonZeroRequested.Memory, podResource.Non0Mem, add)
+}
 
-	// Consume ports when pod added or release ports when pod removed.
-	n.updateUsedPorts(podInfo.GetPod(), sign > 0)
-	n.updatePVCRefCounts(podInfo.GetPod(), sign > 0)
+// requestedSaturated reports whether any total kept by updateRequested is at math.MaxInt64.
+func (n *NodeInfo) requestedSaturated() bool {
+	if n.Requested.MilliCPU == math.MaxInt64 ||
+		n.Requested.Memory == math.MaxInt64 ||
+		n.Requested.EphemeralStorage == math.MaxInt64 ||
+		n.NonZeroRequested.MilliCPU == math.MaxInt64 ||
+		n.NonZeroRequested.Memory == math.MaxInt64 {
+		return true
+	}
+	for _, v := range n.Requested.ScalarResources {
+		if v == math.MaxInt64 {
+			return true
+		}
+	}
+	return false
+}
 
-	n.Generation = nextGeneration()
+// recomputeRequested rebuilds Requested and NonZeroRequested from the pods in n.Pods.
+func (n *NodeInfo) recomputeRequested() {
+	n.Requested.MilliCPU = 0
+	n.Requested.Memory = 0
+	n.Requested.EphemeralStorage = 0
+	clear(n.Requested.ScalarResources)
+	n.NonZeroRequested.MilliCPU = 0
+	n.NonZeroRequested.Memory = 0
+	for _, p := range n.Pods {
+		n.updateRequested(p, true /* add */)
+	}
 }
 
 // updateUsedPorts updates the UsedPorts of NodeInfo.
@@ -548,6 +590,8 @@ type QueuedEntityInfo interface {
 	Gated() bool
 	// Size returns the number of pods in the entity.
 	Size() int
+	// IsResize returns true if the entity represents a deferred in-place pod resize.
+	IsResize() bool
 	// IncAttempts increments the number of schedule attempts in QueueingParams.
 	IncAttempts()
 	// SetInitialAttemptTimestamp sets the initial attempt timestamp in QueueingParams.
@@ -704,6 +748,11 @@ func (pqi *QueuedPodInfo) Type() fwk.EntityKeyType {
 	return fwk.PodKeyType
 }
 
+func (pqi *QueuedPodInfo) IsResize() bool {
+	return utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption) &&
+		resourcehelper.IsPodResizeDeferred(pqi.Pod)
+}
+
 func (pqi *QueuedPodInfo) ForEachPodInfo() iter.Seq[*QueuedPodInfo] {
 	return func(yield func(*QueuedPodInfo) bool) {
 		_ = yield(pqi)
@@ -805,6 +854,10 @@ type QueuedPodGroupInfo struct {
 
 func (pgqi *QueuedPodGroupInfo) Type() fwk.EntityKeyType {
 	return pgqi.PodGroupInfo.GetType()
+}
+
+func (pgqi *QueuedPodGroupInfo) IsResize() bool {
+	return false
 }
 
 // AddPod adds a pod to the queued pod group info, if the pod belongs to the pod group.
@@ -1091,7 +1144,10 @@ func (pgqi *QueuedPodGroupInfo) RemoveGenericPodGroup(gpg *fwk.GenericPodGroup) 
 	if parent != nil {
 		for i, child := range parent.children {
 			if child.GetKey() == gpg.GetKey() {
-				parent.children = append(parent.children[:i], parent.children[i+1:]...)
+				parent.children = slices.Delete(parent.children, i, i+1)
+				if len(parent.children) == 0 {
+					parent.children = nil
+				}
 				break
 			}
 		}
@@ -1119,7 +1175,7 @@ func findTreeNodeAndParent(curr, parent *PodGroupInfo, key fwk.EntityKey) (*PodG
 // all encountered PodGroups from the pgqi.queuedPodInfos map.
 // It returns a flat slice of all QueuedPodInfo elements that were successfully removed.
 func (pgqi *QueuedPodGroupInfo) deleteSubtreePods(curr *PodGroupInfo) []*QueuedPodInfo {
-	removedPods := make([]*QueuedPodInfo, 0)
+	var removedPods []*QueuedPodInfo
 	if curr.GetType() == fwk.PodGroupKeyType {
 		curr.UnscheduledPods = nil
 		key := fwk.PodGroupKey(curr.GetNamespace(), curr.GetName())
@@ -1241,8 +1297,7 @@ type PodInfo struct {
 	PreferredAffinityTerms     []fwk.WeightedAffinityTerm
 	PreferredAntiAffinityTerms []fwk.WeightedAffinityTerm
 	// cachedResource contains precomputed resources for Pod (podResource).
-	// The value can change only if InPlacePodVerticalScaling is enabled.
-	// In that case, the whole PodInfo object is recreated (for assigned pods in cache).
+	// When a pod is resized in-place, the whole PodInfo object is recreated (for assigned pods in cache).
 	// cachedResource contains a podResource, computed when adding a scheduled pod to NodeInfo.
 	// When removing a pod from a NodeInfo, i.e. finding victims for preemption or removing a pod from a cluster,
 	// cachedResource is used instead, what provides a noticeable performance boost.
@@ -1313,13 +1368,12 @@ func (pi *PodInfo) CalculateResource() fwk.PodResource {
 	if pi.cachedResource != nil {
 		return *pi.cachedResource
 	}
-	inPlacePodVerticalScalingEnabled := utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling)
 	podLevelResourcesEnabled := utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources)
 	inPlacePodLevelResourcesVerticalScalingEnabled := utilfeature.DefaultMutableFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling)
 	nodeAllocatableResourcesDRAEnabled := utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources)
 
 	requests := resourcehelper.PodRequests(pi.Pod, resourcehelper.PodResourcesOptions{
-		UseStatusResources: inPlacePodVerticalScalingEnabled,
+		UseStatusResources: true,
 		InPlacePodLevelResourcesVerticalScalingEnabled: inPlacePodLevelResourcesVerticalScalingEnabled,
 		// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
 		SkipPodLevelResources:                    !podLevelResourcesEnabled,
@@ -1330,7 +1384,7 @@ func (pi *PodInfo) CalculateResource() fwk.PodResource {
 	non0Requests := requests
 	if len(nonMissingContainerRequests) > 0 {
 		non0Requests = resourcehelper.PodRequests(pi.Pod, resourcehelper.PodResourcesOptions{
-			UseStatusResources: inPlacePodVerticalScalingEnabled,
+			UseStatusResources: true,
 			InPlacePodLevelResourcesVerticalScalingEnabled: inPlacePodLevelResourcesVerticalScalingEnabled,
 			// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
 			SkipPodLevelResources:                    !podLevelResourcesEnabled,
@@ -1541,6 +1595,25 @@ func NewResource(rl v1.ResourceList) *Resource {
 	r := &Resource{}
 	r.Add(rl)
 	return r
+}
+
+// SaturatingAdd returns a + b for non-negative totals, capping at math.MaxInt64
+// instead of wrapping; a wrapped total would misreport the node as having spare capacity.
+func SaturatingAdd(a, b int64) int64 {
+	sum := a + b
+	if a > 0 && b > 0 && sum < 0 {
+		return math.MaxInt64
+	}
+	return sum
+}
+
+// addOrSub adds b to a with SaturatingAdd, or subtracts it when add is false.
+// The subtract stays exact because updateRequested rebuilds a saturated total instead.
+func addOrSub(a, b int64, add bool) int64 {
+	if add {
+		return SaturatingAdd(a, b)
+	}
+	return a - b
 }
 
 // Add adds ResourceList into Resource.

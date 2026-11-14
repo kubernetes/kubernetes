@@ -32,18 +32,33 @@ type PodMap map[types.UID]*v1.Pod
 // Reader interface used to read current pod resource state
 type Reader interface {
 	GetContainerResources(podUID types.UID, containerName string) (v1.ResourceRequirements, bool)
+	GetContainerVolumeMounts(podUID types.UID, containerName string) ([]v1.VolumeMount, bool)
+	GetPodVolumes(podUID types.UID) ([]v1.Volume, bool)
+	// GetContainer returns a copy of the stored container of the given type. What it holds depends
+	// on what was stored, e.g. only the resources.
+	GetContainer(podUID types.UID, containerName string, containerType podutil.ContainerType) (*v1.Container, bool)
 	GetPodUIDs() []types.UID
 	GetPod(podUID types.UID) (*v1.Pod, bool)
+	// GetPodReadOnly returns a read-only reference to the stored pod without copying.
+	// Callers must not mutate the returned pod or any of its nested fields.
+	GetPodReadOnly(podUID types.UID) (*v1.Pod, bool)
 	HasPod(podUID types.UID) bool
 	GetPodLevelResources(podUID types.UID) (*v1.ResourceRequirements, bool)
 	GetEmptyDirVolumeLimit(podUID types.UID, volumeName string) (*resource.Quantity, bool)
 }
 
 type writer interface {
+	// SetContainer stores a copy of the given container as a container of the given type, replacing
+	// any container with the same name.
+	SetContainer(logger klog.Logger, podUID types.UID, containerType podutil.ContainerType, container v1.Container) error
 	SetContainerResources(logger klog.Logger, podUID types.UID, containerName string, containerType podutil.ContainerType, resources v1.ResourceRequirements) error
+	SetPodVolume(logger klog.Logger, podUID types.UID, volume v1.Volume) error
+	RemovePodVolume(logger klog.Logger, podUID types.UID, volumeName string) error
+	// RemoveContainers removes the named containers of the given type.
+	RemoveContainers(logger klog.Logger, podUID types.UID, containerType podutil.ContainerType, containerNames ...string) error
 	SetPod(logger klog.Logger, pod *v1.Pod) error
 	SetPodLevelResources(logger klog.Logger, podUID types.UID, alloc *v1.ResourceRequirements) error
-	SetEmptyDirVolumeLimit(podUID types.UID, volumeName string, emptyDir *v1.EmptyDirVolumeSource) error
+	SetEmptyDirVolumeLimit(logger klog.Logger, podUID types.UID, volumeName string, emptyDir *v1.EmptyDirVolumeSource) error
 	RemovePod(logger klog.Logger, podUID types.UID) error
 	// RemoveOrphanedPods removes the stored state for any pods not included in the set of remaining pods.
 	RemoveOrphanedPods(remainingPods sets.Set[types.UID])

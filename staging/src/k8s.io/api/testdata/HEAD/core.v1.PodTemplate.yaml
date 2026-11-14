@@ -361,6 +361,8 @@ template:
           - addValue
           drop:
           - dropValue
+        cgroupOptions:
+          mountMode: mountModeValue
         privileged: true
         procMount: procMountValue
         readOnlyRootFilesystem: true
@@ -374,6 +376,11 @@ template:
           user: userValue
         seccompProfile:
           localhostProfile: localhostProfileValue
+          oci:
+            baseProfile:
+              localhostProfile: localhostProfileValue
+              type: typeValue
+            ref: refValue
           type: typeValue
         windowsOptions:
           gmsaCredentialSpec: gmsaCredentialSpecValue
@@ -599,6 +606,8 @@ template:
           - addValue
           drop:
           - dropValue
+        cgroupOptions:
+          mountMode: mountModeValue
         privileged: true
         procMount: procMountValue
         readOnlyRootFilesystem: true
@@ -612,6 +621,11 @@ template:
           user: userValue
         seccompProfile:
           localhostProfile: localhostProfileValue
+          oci:
+            baseProfile:
+              localhostProfile: localhostProfileValue
+              type: typeValue
+            ref: refValue
           type: typeValue
         windowsOptions:
           gmsaCredentialSpec: gmsaCredentialSpecValue
@@ -843,6 +857,8 @@ template:
           - addValue
           drop:
           - dropValue
+        cgroupOptions:
+          mountMode: mountModeValue
         privileged: true
         procMount: procMountValue
         readOnlyRootFilesystem: true
@@ -856,6 +872,11 @@ template:
           user: userValue
         seccompProfile:
           localhostProfile: localhostProfileValue
+          oci:
+            baseProfile:
+              localhostProfile: localhostProfileValue
+              type: typeValue
+            ref: refValue
           type: typeValue
         windowsOptions:
           gmsaCredentialSpec: gmsaCredentialSpecValue
@@ -955,6 +976,11 @@ template:
         user: userValue
       seccompProfile:
         localhostProfile: localhostProfileValue
+        oci:
+          baseProfile:
+            localhostProfile: localhostProfileValue
+            type: typeValue
+          ref: refValue
         type: typeValue
       supplementalGroups:
       - 4

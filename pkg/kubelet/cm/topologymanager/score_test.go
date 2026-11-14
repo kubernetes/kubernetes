@@ -93,3 +93,70 @@ func TestUtilizationScore(t *testing.T) {
 		})
 	}
 }
+
+func TestHintScoresNeeded(t *testing.T) {
+	numaInfo := commonNUMAInfoTwoNodes()
+
+	tcases := []struct {
+		description string
+		store       Store
+		expected    bool
+	}{
+		{
+			description: "a nil store reads nothing",
+			store:       nil,
+			expected:    false,
+		},
+		{
+			description: "a store with no policy reads nothing",
+			store:       &fakeManager{},
+			expected:    false,
+		},
+		{
+			description: "the none policy never selects between hints",
+			store:       &fakeManager{policy: NewNonePolicy()},
+			expected:    false,
+		},
+		{
+			description: "no allocation strategy means scores are unused",
+			store:       &fakeManager{policy: NewBestEffortPolicy(numaInfo, PolicyOptions{})},
+			expected:    false,
+		},
+		{
+			description: "an explicit none strategy means scores are unused",
+			store: &fakeManager{policy: NewBestEffortPolicy(numaInfo, PolicyOptions{
+				NUMAAllocationStrategy: NUMAAllocationStrategyNone,
+			})},
+			expected: false,
+		},
+		{
+			description: "most-allocated reads scores",
+			store: &fakeManager{policy: NewBestEffortPolicy(numaInfo, PolicyOptions{
+				NUMAAllocationStrategy: NUMAAllocationStrategyMostAllocated,
+			})},
+			expected: true,
+		},
+		{
+			description: "least-allocated reads scores",
+			store: &fakeManager{policy: NewSingleNumaNodePolicy(numaInfo, PolicyOptions{
+				NUMAAllocationStrategy: NUMAAllocationStrategyLeastAllocated,
+			})},
+			expected: true,
+		},
+		{
+			description: "weights alone do not turn scoring on",
+			store: &fakeManager{policy: NewRestrictedPolicy(numaInfo, PolicyOptions{
+				NUMAScoreWeights: map[string]int{"cpu": 5},
+			})},
+			expected: false,
+		},
+	}
+
+	for _, tc := range tcases {
+		t.Run(tc.description, func(t *testing.T) {
+			if got := HintScoresNeeded(tc.store); got != tc.expected {
+				t.Errorf("expected %v, got %v", tc.expected, got)
+			}
+		})
+	}
+}

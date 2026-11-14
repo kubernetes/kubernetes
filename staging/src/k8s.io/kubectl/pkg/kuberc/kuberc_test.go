@@ -2595,6 +2595,45 @@ func TestApplyAlias(t *testing.T) {
 			expectedCmd:  "alias",
 			expectedArgs: []string{},
 		},
+		{
+			name: "alias with non-existent flag reports alias name in error",
+			nestedCmds: []fakeCmds[string]{
+				{
+					name: "command1",
+					flags: []fakeFlag[string]{
+						{
+							name:  "validflag",
+							value: "test",
+						},
+					},
+				},
+			},
+			args: []string{
+				"root",
+				"myalias",
+			},
+			getPreferencesFunc: func(kuberc string, errOut io.Writer) (*config.Preference, error) {
+				return &config.Preference{
+					TypeMeta: metav1.TypeMeta{
+						Kind:       "Preference",
+						APIVersion: "kubectl.config.k8s.io/v1alpha1",
+					},
+					Aliases: []config.AliasOverride{
+						{
+							Name:    "myalias",
+							Command: "command1",
+							Options: []config.CommandOptionDefault{
+								{
+									Name:    "nonexistentflag",
+									Default: "val",
+								},
+							},
+						},
+					},
+				}, nil
+			},
+			expectedErr: fmt.Errorf("invalid alias flag nonexistentflag in alias myalias"),
+		},
 	}
 
 	for _, test := range tests {
@@ -2686,6 +2725,10 @@ func TestGetExplicitKuberc(t *testing.T) {
 			expected: "/tmp/filepath",
 		},
 		{
+			args:     []string{"kubectl", "get", "--kuberc=/tmp/env=dev"},
+			expected: "/tmp/env=dev",
+		},
+		{
 			args:     []string{"kubectl", "get", "--kuberc=/tmp/filepath", "--", "/bin/bash", "--kuberc", "anotherpath"},
 			expected: "/tmp/filepath",
 		},
@@ -2704,6 +2747,18 @@ func TestGetExplicitKuberc(t *testing.T) {
 		{
 			args:     []string{"kubectl", "get", "--", "/bin/bash", "--kuberc", "anotherpath"},
 			expected: "",
+		},
+		{
+			args:     []string{"kubectl", "create", "configmap", "cm", "--from-literal=flags=--kuberc=/tmp/x"},
+			expected: "",
+		},
+		{
+			args:     []string{"kubectl", "set", "env", "deploy/x", "ARGS=--kuberc=/tmp/x"},
+			expected: "",
+		},
+		{
+			args:     []string{"kubectl", "create", "configmap", "cm", "--from-literal=flags=--kuberc=/tmp/x", "--kuberc=/tmp/filepath"},
+			expected: "/tmp/filepath",
 		},
 	}
 	for _, test := range tests {
@@ -2755,6 +2810,8 @@ func addCommands[T supportedTypes](rootCmd *cobra.Command, commands []fakeCmds[T
 }
 
 func TestDefaultGetPreferences(t *testing.T) {
+	defaultPath := filepath.Join(t.TempDir(), "kuberc")
+
 	tests := map[string]struct {
 		defaultKubercFile string
 
@@ -2806,6 +2863,33 @@ unknownField: value`,
 		"explicit flag with non-existent file returns error": {
 			kubercFlag:    "/non/existent/file",
 			expectedError: "no such file or directory",
+		},
+		"explicit flag with default path overrides KUBERC": {
+			defaultKubercFile: `apiVersion: kubectl.config.k8s.io/v1beta1
+kind: Preference
+defaults:
+  - command: delete
+    options:
+      - name: interactive
+        default: "true"`,
+			kubercEnvFile: `apiVersion: kubectl.config.k8s.io/v1beta1
+kind: Preference
+defaults:
+  - command: delete
+    options:
+      - name: interactive
+        default: "false"`,
+			kubercFlag: defaultPath,
+			expectedPreferences: &config.Preference{
+				Defaults: []config.CommandDefaults{
+					{
+						Command: "delete",
+						Options: []config.CommandOptionDefault{
+							{Name: "interactive", Default: "true"},
+						},
+					},
+				},
+			},
 		},
 
 		// KUBERC env variants
@@ -2892,7 +2976,7 @@ unknownField: value`,
 			}()
 			RecommendedKubeRCFile = ""
 			if len(tc.defaultKubercFile) != 0 {
-				RecommendedKubeRCFile = filepath.Join(t.TempDir(), "kuberc")
+				RecommendedKubeRCFile = defaultPath
 				require.NoError(t, os.WriteFile(RecommendedKubeRCFile, []byte(tc.defaultKubercFile), 0644))
 			}
 

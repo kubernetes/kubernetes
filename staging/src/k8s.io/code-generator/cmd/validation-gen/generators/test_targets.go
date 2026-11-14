@@ -27,12 +27,13 @@ import (
 	"strconv"
 	"strings"
 
+	"sigs.k8s.io/yaml"
+
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/code-generator/cmd/validation-gen/validators"
 	"k8s.io/gengo/v2/generator"
 	"k8s.io/gengo/v2/namer"
 	"k8s.io/gengo/v2/types"
-	"sigs.k8s.io/yaml"
 )
 
 // Package symbols referenced in emitted test fixtures. fmtPkgSymbols (shared
@@ -71,10 +72,10 @@ type report struct {
 }
 
 // allowlistEntry filters a declared rule out of coverage fixture generation.
-// Every field is required: apiVersion matches by literal equality (in the
-// "<group>/<version>" form, or just "<version>" for core); kind/path/
-// errorType/origin match literally or wildcard with "*". Empty is rejected
-// at load time so an entry can never silently overexclude.
+// Every field is required, empty is rejected at load time so an entry can never silently overexclude.
+//   - apiVersion matches by literal equality (in the "<group>/<version>" form, or just "<version>" for core or wildcard equality with "*/*")
+//   - path matches by literal equality or wildcard with "*" or glob prefix with "*..."
+//   - kind/errorType/origin match literally or wildcard with "*" or glob prefix with "*..."
 type allowlistEntry struct {
 	APIVersion string `json:"apiVersion"`
 	Kind       string `json:"kind"`
@@ -94,14 +95,14 @@ func (e *allowlistEntry) groupVersion() (string, string) {
 }
 
 // matches reports whether the entry filters out the given rule. apiVersion
-// must match exactly; the remaining fields match by literal equality or
-// wildcard with "*".
+// must match exactly or wildcard on */*; the remaining fields match by literal equality or
+// wildcard with "*". Path can prefix glob match with "*...".
 func (e *allowlistEntry) matches(group, version, kind, path string, rule rule) bool {
 	g, v := e.groupVersion()
-	return g == group &&
-		v == version &&
+	return (g == "*" || g == group) &&
+		(v == "*" || v == version) &&
 		(e.Kind == "*" || e.Kind == kind) &&
-		(e.Path == "*" || e.Path == path) &&
+		(e.Path == "*" || e.Path == path || (strings.HasPrefix(e.Path, "*.") && strings.HasSuffix(path, e.Path[1:]))) &&
 		(e.ErrorType == "*" || e.ErrorType == rule.ErrorType) &&
 		(e.Origin == "*" || e.Origin == rule.Origin)
 }

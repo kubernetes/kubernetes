@@ -104,9 +104,15 @@ type Runtime interface {
 	// will be GC'd.
 	// TODO: Revisit this method and make it cleaner.
 	GarbageCollect(ctx context.Context, gcPolicy GCPolicy, allSourcesReady bool, evictNonDeletedPods bool) error
+	// EnsureSecurityProfiles pulls the OCI security profiles referenced by a
+	// pod that has not started. Permanent failures are marked so that the
+	// caller can fail the pod (see pkg/kubelet/images). Once the pod has
+	// started, SyncPod pulls each profile when it creates the container that
+	// uses it.
+	EnsureSecurityProfiles(ctx context.Context, pod *v1.Pod, podStatus *PodStatus, pullSecrets []v1.Secret) error
 	// SyncPod syncs the running pod into the desired pod.
 	SyncPod(ctx context.Context, pod *v1.Pod, podStatus *PodStatus, pullSecrets []v1.Secret, backOff *flowcontrol.Backoff, restartAllContainers bool) PodSyncResult
-	// KillPod kills all the containers of a pod. Pod may be nil, running pod must not be.
+	// KillPod kills all the containers of a pod. pod must not be nil.
 	// TODO(random-liu): Return PodSyncResult in KillPod.
 	// gracePeriodOverride if specified allows the caller to override the pod default grace period.
 	// only hard kill paths are allowed to specify a gracePeriodOverride in the kubelet in order to not corrupt user data.
@@ -147,6 +153,8 @@ type Runtime interface {
 	// GetContainerSwapBehavior reports whether a container could be swappable.
 	// This is used to decide whether to handle InPlacePodVerticalScaling for containers.
 	GetContainerSwapBehavior(pod *v1.Pod, container *v1.Container) kubelettypes.SwapBehavior
+	// TODO: Move IsPodResizeInProgress, UpdateActuatedPodLevelResources, and InitializeActuatedPod
+	// out of the Runtime interface now that actuatedState is owned by the Kubelet.
 	// IsPodResizeInProgress checks whether the given pod is in the process of resizing
 	// (allocated resources != actuated resources).
 	IsPodResizeInProgress(allocatedPod *v1.Pod, podStatus *PodStatus) bool
@@ -179,6 +187,14 @@ type ImageService interface {
 	// that were used to pull the image. If the returned credentials are nil, the
 	// pull was anonymous.
 	PullImage(ctx context.Context, image ImageSpec, credentials []credentialprovider.TrackedAuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, *credentialprovider.TrackedAuthConfig, error)
+	// PullSecurityProfile pulls a security profile from the network to the
+	// runtime's storage using the supplied secrets if necessary. It returns
+	// whether the profile was already present.
+	PullSecurityProfile(ctx context.Context, image ImageSpec, credentials []credentialprovider.TrackedAuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig, kind runtimeapi.SecurityProfileKind) (bool, error)
+	// ListSecurityProfiles lists the security profiles in the runtime's storage.
+	ListSecurityProfiles(ctx context.Context) ([]*runtimeapi.SecurityProfileInfo, error)
+	// RemoveSecurityProfile removes a security profile by its digest.
+	RemoveSecurityProfile(ctx context.Context, digest string) error
 	// GetImageRef gets the reference (digest or ID) of the image which has already been in
 	// the local storage. It returns ("", nil) if the image isn't in the local storage.
 	GetImageRef(ctx context.Context, image ImageSpec) (string, error)
@@ -305,8 +321,14 @@ const (
 	ContainerStateUnknown State = "unknown"
 )
 
-// ContainerReasonStatusUnknown indicates a container the status of the container cannot be determined.
-const ContainerReasonStatusUnknown string = "ContainerStatusUnknown"
+const (
+	// ContainerReasonStatusUnknown indicates a container the status of the container cannot be determined.
+	ContainerReasonStatusUnknown string = "ContainerStatusUnknown"
+
+	// ContainerReasonUnallocated indicates a container that was added to the pod but that the kubelet
+	// has not allocated yet.
+	ContainerReasonUnallocated string = "Unallocated"
+)
 
 // Container provides the runtime information for a container, such as ID, hash,
 // state of the container.
@@ -686,6 +708,8 @@ type RuntimeFeatures struct {
 	SupplementalGroupsPolicy  bool
 	UserNamespacesHostNetwork bool
 	MountOptions              bool
+	SeccompProfileOCI         bool
+	CgroupMountMode           bool
 }
 
 // String formats the runtime condition into a human readable string.
@@ -693,7 +717,7 @@ func (f *RuntimeFeatures) String() string {
 	if f == nil {
 		return "nil"
 	}
-	return fmt.Sprintf("SupplementalGroupsPolicy: %v UserNamespacesHostNetwork: %v MountOptions: %v", f.SupplementalGroupsPolicy, f.UserNamespacesHostNetwork, f.MountOptions)
+	return fmt.Sprintf("SupplementalGroupsPolicy: %v UserNamespacesHostNetwork: %v MountOptions: %v SeccompProfileOCI: %v CgroupMountMode: %v", f.SupplementalGroupsPolicy, f.UserNamespacesHostNetwork, f.MountOptions, f.SeccompProfileOCI, f.CgroupMountMode)
 }
 
 // Pods represents the list of pods

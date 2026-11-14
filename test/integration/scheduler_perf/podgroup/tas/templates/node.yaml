@@ -5,7 +5,7 @@ metadata:
   labels:
     kubernetes.io/hostname: node-{{.Index}}
     topology.kubernetes.io/zone: zone-{{DivideInt .Index 100}}
-    topology.kubernetes.io/rack: rack-{{DivideInt .Index 100}}
+    topology.kubernetes.io/rack: rack-{{DivideInt .Index .nodesPerRack}}
 status:
   capacity:
     cpu: "4"

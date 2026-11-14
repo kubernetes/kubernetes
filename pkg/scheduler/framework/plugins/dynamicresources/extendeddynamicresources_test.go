@@ -20,8 +20,11 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/ktesting"
 	fwk "k8s.io/kube-scheduler/framework"
@@ -281,6 +284,92 @@ func Test_createRequestsAndMappings_requests(t *testing.T) {
 				if r.Exactly.Count != gotDeviceRequests[i].Exactly.Count {
 					t.Errorf("different count, want %#v, got %#v", r.Exactly.Count, gotDeviceRequests[i].Exactly.Count)
 				}
+			}
+		})
+	}
+}
+
+func Test_createRequestsAndMappings_capacity(t *testing.T) {
+	sharedResource := v1.ResourceName(extendedResourceName + ".shared")
+	defaultResource := v1.ResourceName(extendedResourceName)
+	oneShare := func() *resourceapi.CapacityRequirements {
+		return &resourceapi.CapacityRequirements{
+			Requests: map[resourceapi.QualifiedName]resource.Quantity{
+				"shares": resource.MustParse("1"),
+			},
+		}
+	}
+	classes := &mockDeviceClassResolver{mapping: map[v1.ResourceName]*resourceapi.DeviceClass{
+		sharedResource: {
+			ObjectMeta: metav1.ObjectMeta{Name: "shared-class"},
+			Spec: resourceapi.DeviceClassSpec{
+				ExtendedResourceName:             new(string(sharedResource)),
+				ExtendedResourceCapacityRequests: oneShare(),
+			},
+		},
+		defaultResource: {
+			ObjectMeta: metav1.ObjectMeta{Name: "default-class"},
+			Spec: resourceapi.DeviceClassSpec{
+				ExtendedResourceName: new(string(defaultResource)),
+			},
+		},
+	}}
+	exactly := func(name, className string, count int64, capacity *resourceapi.CapacityRequirements) resourceapi.DeviceRequest {
+		return resourceapi.DeviceRequest{
+			Name: name,
+			Exactly: &resourceapi.ExactDeviceRequest{
+				DeviceClassName: className,
+				AllocationMode:  resourceapi.DeviceAllocationModeExactCount,
+				Count:           count,
+				Capacity:        capacity,
+			},
+		}
+	}
+
+	testcases := map[string]struct {
+		pod                *v1.Pod
+		extendedResources  map[v1.ResourceName]int64
+		wantDeviceRequests []resourceapi.DeviceRequest
+	}{
+		"count-is-allocations-capacity-per-allocation": {
+			pod: st.MakePod().Name(podName).Namespace(namespace).UID(podUID).
+				Res(map[v1.ResourceName]string{sharedResource: "3"}).
+				Obj(),
+			extendedResources: map[v1.ResourceName]int64{sharedResource: 3},
+			wantDeviceRequests: []resourceapi.DeviceRequest{
+				exactly("container-0-request-0", "shared-class", 3, oneShare()),
+			},
+		},
+		"only-class-with-capacity-requests-sets-capacity": {
+			pod: st.MakePod().Name(podName).Namespace(namespace).UID(podUID).
+				Res(map[v1.ResourceName]string{sharedResource: "1", defaultResource: "2"}).
+				Obj(),
+			extendedResources: map[v1.ResourceName]int64{sharedResource: 1, defaultResource: 2},
+			wantDeviceRequests: []resourceapi.DeviceRequest{
+				exactly("container-0-request-0", "default-class", 2, nil),
+				exactly("container-0-request-1", "shared-class", 1, oneShare()),
+			},
+		},
+		"init-container-requests-set-capacity": {
+			pod: st.MakePod().Name(podName).Namespace(namespace).UID(podUID).
+				InitReq(map[v1.ResourceName]string{sharedResource: "1"}).
+				InitReq(map[v1.ResourceName]string{sharedResource: "3"}).
+				Res(map[v1.ResourceName]string{sharedResource: "1"}).
+				Obj(),
+			extendedResources: map[v1.ResourceName]int64{sharedResource: 3},
+			wantDeviceRequests: []resourceapi.DeviceRequest{
+				exactly("container-1-request-0", "shared-class", 2, oneShare()),
+				exactly("container-2-request-0", "shared-class", 1, oneShare()),
+			},
+		},
+	}
+
+	for name, tc := range testcases {
+		t.Run(name, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
+			gotDeviceRequests, _ := createRequestsAndMappings(tc.pod, tc.extendedResources, logger, classes)
+			if diff := cmp.Diff(tc.wantDeviceRequests, gotDeviceRequests); diff != "" {
+				t.Errorf("unexpected device requests (-want +got):\n%s", diff)
 			}
 		})
 	}

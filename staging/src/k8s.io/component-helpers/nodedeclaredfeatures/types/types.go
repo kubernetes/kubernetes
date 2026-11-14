@@ -47,9 +47,13 @@ type Feature interface {
 	Requirements() *FeatureRequirements
 
 	// InferForScheduling checks if pod scheduling requires the feature.
+	// It must depend only on the pod spec (podInfo.Spec), not pod status.
+	// Framework.InferForPodUpdate automatically infers a feature on update if
+	// InferForScheduling(newPodInfo) && !InferForScheduling(oldPodInfo).
 	InferForScheduling(podInfo *PodInfo) bool
 
-	// InferForUpdate checks if a pod update requires the feature.
+	// InferForUpdate checks if a pod update requires the feature for update-specific
+	// transitions not already covered by InferForScheduling(newPodInfo) && !InferForScheduling(oldPodInfo).
 	InferForUpdate(oldPodInfo, newPodInfo *PodInfo) bool
 
 	// MaxVersion specifies the upper bound Kubernetes version (inclusive) for this feature's relevance
@@ -80,6 +84,11 @@ type RuntimeFeatures struct {
 	UserNamespacesHostNetwork bool
 	// MountOptions indicates if the runtime supports additional bind mount options on container mounts.
 	MountOptions bool
+	// SeccompProfileOCI indicates if the runtime supports seccomp profiles pulled from OCI registries.
+	SeccompProfileOCI bool
+	// CgroupMountMode indicates if the runtime supports the cgroup_mount_mode
+	// field of LinuxContainerSecurityContext.
+	CgroupMountMode bool
 }
 
 // StaticConfiguration provides a view of a node's static configuration required for feature discovery.

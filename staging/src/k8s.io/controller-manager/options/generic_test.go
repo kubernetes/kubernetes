@@ -20,7 +20,9 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/component-base/config"
 	cmconfig "k8s.io/controller-manager/config"
@@ -131,6 +133,51 @@ func TestValidateGenericControllerManagerConfigurationOptions(t *testing.T) {
 			}),
 			expectErrors:           true,
 			expectedErrorSubString: "resourceLock value must be \"leases\"",
+		},
+		{
+			name:              "recovery deadline unset means no limit",
+			allControllers:    getAllControllers(),
+			controllerAliases: getControllerAliases(),
+			options:           NewGenericControllerManagerConfigurationOptions(&cmconfig.GenericControllerManagerConfiguration{}),
+		},
+		{
+			name:              "recovery deadline of exactly 1s accepted",
+			allControllers:    getAllControllers(),
+			controllerAliases: getControllerAliases(),
+			options: NewGenericControllerManagerConfigurationOptions(&cmconfig.GenericControllerManagerConfiguration{
+				LeaderElectionRecoveryDeadline: metav1.Duration{Duration: time.Second},
+			}),
+		},
+		{
+			name:              "recovery deadline below 1s rejected",
+			allControllers:    getAllControllers(),
+			controllerAliases: getControllerAliases(),
+			options: NewGenericControllerManagerConfigurationOptions(&cmconfig.GenericControllerManagerConfiguration{
+				LeaderElectionRecoveryDeadline: metav1.Duration{Duration: 999 * time.Millisecond},
+			}),
+			expectErrors:           true,
+			expectedErrorSubString: "leader-elect-recovery-deadline must be at least 1s",
+		},
+		{
+			name:              "negative recovery deadline rejected",
+			allControllers:    getAllControllers(),
+			controllerAliases: getControllerAliases(),
+			options: NewGenericControllerManagerConfigurationOptions(&cmconfig.GenericControllerManagerConfiguration{
+				LeaderElectionRecoveryDeadline: metav1.Duration{Duration: -time.Second},
+			}),
+			expectErrors:           true,
+			expectedErrorSubString: "leader-elect-recovery-deadline must be at least 1s",
+		},
+		{
+			name:              "recovery deadline validated even when leader election is disabled",
+			allControllers:    getAllControllers(),
+			controllerAliases: getControllerAliases(),
+			options: NewGenericControllerManagerConfigurationOptions(&cmconfig.GenericControllerManagerConfiguration{
+				LeaderElection:                 config.LeaderElectionConfiguration{LeaderElect: false},
+				LeaderElectionRecoveryDeadline: metav1.Duration{Duration: 500 * time.Millisecond},
+			}),
+			expectErrors:           true,
+			expectedErrorSubString: "leader-elect-recovery-deadline must be at least 1s",
 		},
 	}
 

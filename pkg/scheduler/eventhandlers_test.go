@@ -18,8 +18,8 @@ package scheduler
 
 import (
 	"context"
-	"maps"
 	"reflect"
+	"slices"
 	"testing"
 	"time"
 
@@ -29,8 +29,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
-	schedulingapi "k8s.io/api/scheduling/v1beta1"
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -45,6 +44,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/cache"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	draapi "k8s.io/dynamic-resource-allocation/api"
 	resourceslicetracker "k8s.io/dynamic-resource-allocation/resourceslice/tracker"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
@@ -292,7 +292,7 @@ func TestAddAllEventHandlers(t *testing.T) {
 				reflect.TypeFor[*v1.Node]():                     true,
 				reflect.TypeFor[*v1.Namespace]():                true,
 				reflect.TypeFor[*resourceapi.ResourceClaim]():   true,
-				reflect.TypeFor[*resourceapi.ResourceSlice]():   true,
+				reflect.TypeFor[*draapi.ResourceSlice]():        true,
 				reflect.TypeFor[*resourceapi.DeviceTaintRule](): true,
 				reflect.TypeFor[*resourceapi.DeviceClass]():     true,
 			},
@@ -316,7 +316,7 @@ func TestAddAllEventHandlers(t *testing.T) {
 				reflect.TypeFor[*v1.Node]():                   true,
 				reflect.TypeFor[*v1.Namespace]():              true,
 				reflect.TypeFor[*resourceapi.ResourceClaim](): true,
-				reflect.TypeFor[*resourceapi.ResourceSlice](): true,
+				reflect.TypeFor[*draapi.ResourceSlice]():      true,
 				reflect.TypeFor[*resourceapi.DeviceClass]():   true,
 			},
 			expectDynamicInformers: map[schema.GroupVersionResource]bool{},
@@ -337,7 +337,7 @@ func TestAddAllEventHandlers(t *testing.T) {
 				reflect.TypeFor[*v1.Node]():                   true,
 				reflect.TypeFor[*v1.Namespace]():              true,
 				reflect.TypeFor[*resourceapi.ResourceClaim](): true,
-				reflect.TypeFor[*resourceapi.ResourceSlice](): true,
+				reflect.TypeFor[*draapi.ResourceSlice]():      true,
 				reflect.TypeFor[*resourceapi.DeviceClass]():   true,
 			},
 			expectDynamicInformers: map[schema.GroupVersionResource]bool{},
@@ -354,7 +354,7 @@ func TestAddAllEventHandlers(t *testing.T) {
 				reflect.TypeFor[*v1.Node]():                     true,
 				reflect.TypeFor[*v1.Namespace]():                true,
 				reflect.TypeFor[*resourceapi.ResourceClaim]():   true,
-				reflect.TypeFor[*resourceapi.ResourceSlice]():   true,
+				reflect.TypeFor[*draapi.ResourceSlice]():        true,
 				reflect.TypeFor[*resourceapi.DeviceTaintRule](): true,
 				reflect.TypeFor[*resourceapi.DeviceClass]():     true,
 			},
@@ -362,6 +362,9 @@ func TestAddAllEventHandlers(t *testing.T) {
 		},
 		{
 			name: "PodGroup events disabled",
+			overrides: featuregatetesting.FeatureOverrides{
+				features.GenericWorkload: false,
+			},
 			gvkMap: map[fwk.EventResource]fwk.ActionType{
 				fwk.PodGroup: fwk.Add,
 			},
@@ -370,7 +373,7 @@ func TestAddAllEventHandlers(t *testing.T) {
 				reflect.TypeFor[*v1.Node]():                     true,
 				reflect.TypeFor[*v1.Namespace]():                true,
 				reflect.TypeFor[*resourceapi.ResourceClaim]():   true,
-				reflect.TypeFor[*resourceapi.ResourceSlice]():   true,
+				reflect.TypeFor[*draapi.ResourceSlice]():        true,
 				reflect.TypeFor[*resourceapi.DeviceTaintRule](): true,
 				reflect.TypeFor[*resourceapi.DeviceClass]():     true,
 			},
@@ -389,10 +392,55 @@ func TestAddAllEventHandlers(t *testing.T) {
 				reflect.TypeFor[*v1.Node]():                     true,
 				reflect.TypeFor[*v1.Namespace]():                true,
 				reflect.TypeFor[*resourceapi.ResourceClaim]():   true,
-				reflect.TypeFor[*resourceapi.ResourceSlice]():   true,
+				reflect.TypeFor[*draapi.ResourceSlice]():        true,
 				reflect.TypeFor[*resourceapi.DeviceTaintRule](): true,
 				reflect.TypeFor[*resourceapi.DeviceClass]():     true,
-				reflect.TypeFor[*schedulingapi.PodGroup]():      true,
+				reflect.TypeFor[*schedulingv1beta1.PodGroup]():  true,
+			},
+			expectDynamicInformers: map[schema.GroupVersionResource]bool{},
+		},
+		{
+			name: "CompositePodGroup events disabled",
+			overrides: featuregatetesting.FeatureOverrides{
+				features.GenericWorkload:                 true,
+				features.TopologyAwareWorkloadScheduling: true,
+				features.CompositePodGroup:               false,
+			},
+			gvkMap: map[fwk.EventResource]fwk.ActionType{
+				fwk.CompositePodGroup: fwk.Add,
+			},
+			expectStaticInformers: map[reflect.Type]bool{
+				reflect.TypeFor[*v1.Pod]():                      true,
+				reflect.TypeFor[*v1.Node]():                     true,
+				reflect.TypeFor[*v1.Namespace]():                true,
+				reflect.TypeFor[*resourceapi.ResourceClaim]():   true,
+				reflect.TypeFor[*draapi.ResourceSlice]():        true,
+				reflect.TypeFor[*resourceapi.DeviceTaintRule](): true,
+				reflect.TypeFor[*resourceapi.DeviceClass]():     true,
+				reflect.TypeFor[*schedulingv1beta1.PodGroup]():  true,
+			},
+			expectDynamicInformers: map[schema.GroupVersionResource]bool{},
+		},
+		{
+			name: "CompositePodGroup events enabled",
+			overrides: featuregatetesting.FeatureOverrides{
+				features.GenericWorkload:                 true,
+				features.TopologyAwareWorkloadScheduling: true,
+				features.CompositePodGroup:               true,
+			},
+			gvkMap: map[fwk.EventResource]fwk.ActionType{
+				fwk.CompositePodGroup: fwk.Add,
+			},
+			expectStaticInformers: map[reflect.Type]bool{
+				reflect.TypeFor[*v1.Pod]():                              true,
+				reflect.TypeFor[*v1.Node]():                             true,
+				reflect.TypeFor[*v1.Namespace]():                        true,
+				reflect.TypeFor[*resourceapi.ResourceClaim]():           true,
+				reflect.TypeFor[*draapi.ResourceSlice]():                true,
+				reflect.TypeFor[*resourceapi.DeviceTaintRule]():         true,
+				reflect.TypeFor[*resourceapi.DeviceClass]():             true,
+				reflect.TypeFor[*schedulingv1beta1.PodGroup]():          true,
+				reflect.TypeFor[*schedulingv1beta1.CompositePodGroup](): true,
 			},
 			expectDynamicInformers: map[schema.GroupVersionResource]bool{},
 		},
@@ -410,7 +458,7 @@ func TestAddAllEventHandlers(t *testing.T) {
 				reflect.TypeFor[*v1.PersistentVolume]():          true,
 				reflect.TypeFor[*storagev1.CSIStorageCapacity](): true,
 				reflect.TypeFor[*resourceapi.ResourceClaim]():    true,
-				reflect.TypeFor[*resourceapi.ResourceSlice]():    true,
+				reflect.TypeFor[*draapi.ResourceSlice]():         true,
 				reflect.TypeFor[*resourceapi.DeviceTaintRule]():  true,
 				reflect.TypeFor[*resourceapi.DeviceClass]():      true,
 			},
@@ -427,7 +475,7 @@ func TestAddAllEventHandlers(t *testing.T) {
 				reflect.TypeFor[*v1.Node]():                     true,
 				reflect.TypeFor[*v1.Namespace]():                true,
 				reflect.TypeFor[*resourceapi.ResourceClaim]():   true,
-				reflect.TypeFor[*resourceapi.ResourceSlice]():   true,
+				reflect.TypeFor[*draapi.ResourceSlice]():        true,
 				reflect.TypeFor[*resourceapi.DeviceTaintRule](): true,
 				reflect.TypeFor[*resourceapi.DeviceClass]():     true,
 			},
@@ -447,7 +495,7 @@ func TestAddAllEventHandlers(t *testing.T) {
 				reflect.TypeFor[*v1.Node]():                     true,
 				reflect.TypeFor[*v1.Namespace]():                true,
 				reflect.TypeFor[*resourceapi.ResourceClaim]():   true,
-				reflect.TypeFor[*resourceapi.ResourceSlice]():   true,
+				reflect.TypeFor[*draapi.ResourceSlice]():        true,
 				reflect.TypeFor[*resourceapi.DeviceTaintRule](): true,
 				reflect.TypeFor[*resourceapi.DeviceClass]():     true,
 			},
@@ -488,9 +536,11 @@ func TestAddAllEventHandlers(t *testing.T) {
 			var draManager fwk.SharedDRAManager
 			resourceClaimInformer := informerFactory.Resource().V1().ResourceClaims().Informer()
 			resourceClaimCache := assumecache.NewAssumeCache(logger, resourceClaimInformer, "ResourceClaim", "", nil)
+			sliceInformer := draapi.NewInformerForResourceSlice(informerFactory)
 			opts := resourceslicetracker.Options{
 				EnableDeviceTaintRules: utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaintRules),
-				SliceInformer:          informerFactory.Resource().V1().ResourceSlices(),
+				SliceLister:            draapi.NewResourceSliceLister(sliceInformer.GetIndexer()),
+				SliceInformer:          sliceInformer,
 			}
 			if opts.EnableDeviceTaintRules {
 				opts.TaintInformer = informerFactory.Resource().V1().DeviceTaintRules()
@@ -508,21 +558,12 @@ func TestAddAllEventHandlers(t *testing.T) {
 				t.Fatalf("Add event handlers failed, error = %v", err)
 			}
 
-			informerFactory.Start(testSched.StopEverything)
-			dynInformerFactory.Start(testSched.StopEverything)
-			staticInformers := informerFactory.WaitForCacheSync(testSched.StopEverything)
-			dynamicInformers := dynInformerFactory.WaitForCacheSync(testSched.StopEverything)
+			informerFactory.StartWithContext(ctx)
+			dynInformerFactory.StartWithContext(ctx)
+			staticInformers := informerFactory.WaitForCacheSyncWithContext(ctx).Synced
+			dynamicInformers := dynInformerFactory.WaitForCacheSyncWithContext(ctx).Synced
 
-			expectedStaticInformers := make(map[reflect.Type]bool)
-			maps.Copy(expectedStaticInformers, tt.expectStaticInformers)
-			if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
-				expectedStaticInformers[reflect.TypeFor[*schedulingapi.PodGroup]()] = true
-				if utilfeature.DefaultFeatureGate.Enabled(features.CompositePodGroup) {
-					expectedStaticInformers[reflect.TypeFor[*schedulingv1alpha3.CompositePodGroup]()] = true
-				}
-			}
-
-			if diff := cmp.Diff(expectedStaticInformers, staticInformers); diff != "" {
+			if diff := cmp.Diff(tt.expectStaticInformers, staticInformers); diff != "" {
 				t.Errorf("Unexpected diff (-want, +got):\n%s", diff)
 			}
 			if diff := cmp.Diff(tt.expectDynamicInformers, dynamicInformers); diff != "" {
@@ -575,10 +616,10 @@ func TestAddAllEventHandlersPodEventResources(t *testing.T) {
 		}
 	}
 
-	informerFactory.Start(testSched.StopEverything)
-	dynInformerFactory.Start(testSched.StopEverything)
-	staticInformers := informerFactory.WaitForCacheSync(testSched.StopEverything)
-	dynamicInformers := dynInformerFactory.WaitForCacheSync(testSched.StopEverything)
+	informerFactory.StartWithContext(ctx)
+	dynInformerFactory.StartWithContext(ctx)
+	staticInformers := informerFactory.WaitForCacheSyncWithContext(ctx).Synced
+	dynamicInformers := dynInformerFactory.WaitForCacheSyncWithContext(ctx).Synced
 
 	expectStaticInformers := map[reflect.Type]bool{
 		reflect.TypeFor[*v1.Pod]():       true,
@@ -816,12 +857,20 @@ func TestUpdatePod(t *testing.T) {
 
 	scheduledPodOtherNode := st.MakePod().Name("pod1").Namespace("ns1").UID("pod1").Node("node2").SchedulerName("supported-scheduler").Obj()
 
+	// Pods sharing the name of the fixtures above, but with a different UID. They
+	// stand for a Pod that was deleted and recreated under the same name, which the
+	// informer can deliver as a single update event instead of a delete and an add.
+	recreatedPod := st.MakePod().Name("pod1").Namespace("ns1").UID("pod2").ResourceVersion("2").SchedulerName("supported-scheduler").Obj()
+	recreatedScheduledPod := st.MakePod().Name("pod1").Namespace("ns1").UID("pod2").ResourceVersion("2").Node("node1").SchedulerName("supported-scheduler").Obj()
+	recreatedScheduledPodOtherNode := st.MakePod().Name("pod1").Namespace("ns1").UID("pod2").ResourceVersion("2").Node("node2").SchedulerName("supported-scheduler").Obj()
+
 	unscheduledPodGroupMember := st.MakePod().Name("pod1").Namespace("ns1").UID("pgpod1").SchedulerName("supported-scheduler").PodGroupName("pg1").Obj()
 	unscheduledPodGroupMemberWithLabels := st.MakePod().Name("pod1").Namespace("ns1").UID("pgpod1").Labels(map[string]string{"foo": "bar"}).ResourceVersion("2").SchedulerName("supported-scheduler").PodGroupName("pg1").Obj()
 	scheduledPodGroupMember := st.MakePod().Name("pod1").Namespace("ns1").UID("pgpod1").Node("node1").SchedulerName("supported-scheduler").PodGroupName("pg1").Obj()
 	scheduledPodGroupMemberWithLabels := st.MakePod().Name("pod1").Namespace("ns1").UID("pgpod1").Labels(map[string]string{"foo": "bar"}).ResourceVersion("2").Node("node1").SchedulerName("supported-scheduler").PodGroupName("pg1").Obj()
 	scheduledPodGroupMemberWithOtherNode := st.MakePod().Name("pod1").Namespace("ns1").UID("pgpod1").Node("node2").SchedulerName("supported-scheduler").PodGroupName("pg1").Obj()
 	podGroupMemberWithDeletionTimestamp := st.MakePod().Name("pod1").Namespace("ns1").UID("pgpod1").Terminating().ResourceVersion("2").SchedulerName("supported-scheduler").PodGroupName("pg1").Obj()
+	recreatedUnscheduledPodGroupMember := st.MakePod().Name("pod1").Namespace("ns1").UID("pgpod2").ResourceVersion("2").SchedulerName("supported-scheduler").PodGroupName("pg1").Obj()
 
 	tests := []struct {
 		name                             string
@@ -831,6 +880,7 @@ func TestUpdatePod(t *testing.T) {
 		genericWorkloadEnabled           bool
 		waitingOnPermit                  bool
 		expectInQueue                    *v1.Pod
+		expectInActiveQ                  bool
 		expectInCache                    *v1.Pod
 		expectInPodGroupStateUnscheduled bool
 		expectInPodGroupStateAssumed     bool
@@ -906,6 +956,57 @@ func TestUpdatePod(t *testing.T) {
 			newPod:          podWithDeletionTimestamp,
 			waitingOnPermit: true,
 			expectInCache:   scheduledPod,
+		},
+		{
+			name:            "recreated pod with a different UID, not scheduled yet",
+			oldPod:          scheduledPod,
+			newPod:          recreatedPod,
+			expectInQueue:   recreatedPod,
+			expectInActiveQ: true,
+		},
+		{
+			name:          "recreated pod with a different UID, scheduled to a different node",
+			oldPod:        scheduledPod,
+			newPod:        recreatedScheduledPodOtherNode,
+			expectInCache: recreatedScheduledPodOtherNode,
+		},
+		{
+			name:          "recreated pod with a different UID, scheduled to the same node",
+			oldPod:        scheduledPod,
+			newPod:        recreatedScheduledPod,
+			expectInCache: recreatedScheduledPod,
+		},
+		{
+			name:            "recreated unscheduled pod with a different UID",
+			oldPod:          pod,
+			newPod:          recreatedPod,
+			expectInQueue:   recreatedPod,
+			expectInActiveQ: true,
+		},
+		{
+			name:            "recreated pod with a different UID while the previous one waits on permit",
+			oldPod:          pod,
+			assumedPod:      scheduledPod,
+			newPod:          recreatedPod,
+			waitingOnPermit: true,
+			expectInQueue:   recreatedPod,
+			expectInActiveQ: true,
+		},
+		{
+			name:                             "recreated unscheduled pod group member with a different UID",
+			oldPod:                           unscheduledPodGroupMember,
+			newPod:                           recreatedUnscheduledPodGroupMember,
+			genericWorkloadEnabled:           true,
+			expectInQueue:                    recreatedUnscheduledPodGroupMember,
+			expectInPodGroupStateUnscheduled: true,
+		},
+		{
+			name:                             "recreated scheduled pod group member with a different UID, not scheduled yet",
+			oldPod:                           scheduledPodGroupMember,
+			newPod:                           recreatedUnscheduledPodGroupMember,
+			genericWorkloadEnabled:           true,
+			expectInQueue:                    recreatedUnscheduledPodGroupMember,
+			expectInPodGroupStateUnscheduled: true,
 		},
 		{
 			name:          "update pod group member with GenericWorkload disabled",
@@ -1049,6 +1150,15 @@ func TestUpdatePod(t *testing.T) {
 				}
 			}
 
+			// A Pod that was rejected on Permit is deliberately left in the cache by
+			// handleAssumedPodDeletion: its binding cycle unwinds through
+			// handleBindingCycleError on the binding goroutine, which this test does not run.
+			if tt.oldPod.UID != tt.newPod.UID && !tt.waitingOnPermit {
+				if oldCached, err := sched.Cache.GetPod(tt.oldPod); err == nil {
+					t.Errorf("Expected pod UID %v to be evicted from cache, but it is still there", oldCached.UID)
+				}
+			}
+
 			qPod, ok := sched.SchedulingQueue.GetPod(ctx, tt.newPod.Name, tt.newPod.Namespace, tt.newPod.Spec.SchedulingGroup)
 			if tt.expectInQueue != nil {
 				if !ok {
@@ -1058,6 +1168,18 @@ func TestUpdatePod(t *testing.T) {
 				}
 			} else if ok {
 				t.Errorf("Expected pod not to be in scheduling queue")
+			}
+			if tt.expectInActiveQ {
+				var found bool
+				for _, p := range sched.SchedulingQueue.PodsInActiveQ() {
+					if p.UID == tt.newPod.UID {
+						found = true
+						break
+					}
+				}
+				if !found {
+					t.Errorf("Expected pod %v to be in activeQ", tt.newPod.UID)
+				}
 			}
 			pod, err := sched.Cache.GetPod(tt.newPod)
 			if tt.expectInCache != nil {
@@ -1085,6 +1207,10 @@ func TestUpdatePod(t *testing.T) {
 
 			if err != nil {
 				t.Fatalf("Expected pod group state to exist, got error: %v", err)
+			}
+
+			if tt.oldPod.UID != tt.newPod.UID && pgs.AllPods().Has(tt.oldPod.UID) {
+				t.Errorf("Expected pod UID %v to be dropped from the pod group state, but it is still there", tt.oldPod.UID)
 			}
 
 			if inUnscheduled := pgs.UnscheduledPods()[tt.newPod.Name] != nil; inUnscheduled != tt.expectInPodGroupStateUnscheduled {
@@ -1293,16 +1419,74 @@ func TestDeletePod(t *testing.T) {
 	}
 }
 
+// queueingHintTracker is a convenience tuple for testing queueing hints.
+// Its zero value indicates that the queueing hint was not invoked.
+type queueingHintTracker struct {
+	Called bool
+	OldObj any
+	NewObj any
+}
+
+// newTestQueueWithQHintTracker is a test helper that constructs a queue with an observer queueing function.
+// It needs to add an unschedulable pod to the queue, because otherwise the queueing hint will not run.
+// The returned hint tracker will get filled in when the queueing hint is run.
+func newTestQueueWithQHintTracker(ctx context.Context, t *testing.T, event fwk.ClusterEvent) (internalqueue.SchedulingQueue, *queueingHintTracker) {
+	t.Helper()
+	logger := klog.FromContext(ctx)
+
+	tracker := &queueingHintTracker{}
+	activeHint := func(logger klog.Logger, pod *v1.Pod, oldObj, newObj any) (fwk.QueueingHint, error) {
+		tracker.Called = true
+		tracker.OldObj = oldObj
+		tracker.NewObj = newObj
+		return fwk.QueueSkip, nil
+	}
+
+	queueingHintMap := internalqueue.QueueingHintMapPerProfile{
+		testSchedulerName: {
+			event: {
+				{PluginName: "fake-plugin", QueueingHintFn: activeHint},
+			},
+		},
+	}
+
+	queue := internalqueue.NewTestQueue(ctx, nil,
+		internalqueue.WithQueueingHintMapPerProfile(queueingHintMap),
+	)
+
+	pod := st.MakePod().Name("p").Namespace("ns1").UID("pns").SchedulerName(testSchedulerName).Obj()
+	queue.Add(ctx, pod)
+	poppedEntity, err := queue.Pop(logger)
+	if err != nil {
+		t.Fatalf("Pop failed: %v", err)
+	}
+	poppedPod := poppedEntity.(*framework.QueuedPodInfo)
+	poppedPod.UnschedulablePlugins = sets.New("fake-plugin")
+	if err := queue.AddUnschedulablePodIfNotPresent(ctx, poppedPod, queue.SchedulingCycle()); err != nil {
+		t.Fatalf("Failed to add unschedulable pod: %v", err)
+	}
+
+	return queue, tracker
+}
+
 func TestAddPodGroup(t *testing.T) {
 	podGroup := st.MakePodGroup().Namespace("ns1").Name("pg1").Obj()
 
 	tests := []struct {
-		name     string
-		podGroup *schedulingapi.PodGroup
+		name          string
+		podGroup      any
+		expectInCache bool
+		wantHint      queueingHintTracker
 	}{
 		{
-			name:     "add valid pod group",
-			podGroup: podGroup,
+			name:          "add valid pod group",
+			podGroup:      podGroup,
+			expectInCache: true,
+			wantHint:      queueingHintTracker{Called: true, NewObj: podGroup},
+		},
+		{
+			name:     "add invalid pod group type",
+			podGroup: "invalid-type",
 		},
 	}
 
@@ -1312,21 +1496,33 @@ func TestAddPodGroup(t *testing.T) {
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 
+			queue, hintTracker := newTestQueueWithQHintTracker(ctx, t, fwk.ClusterEvent{Resource: fwk.PodGroup, ActionType: fwk.Add})
 			sched := &Scheduler{
 				Cache:                    internalcache.New(ctx, nil, true, false /* CompositePodGroup */),
-				SchedulingQueue:          internalqueue.NewTestQueue(ctx, nil),
+				SchedulingQueue:          queue,
 				podGroupHierarchyTracker: gangscheduling.NewHierarchyTracker(false /* CompositePodGroup */),
 				logger:                   logger,
 			}
 
 			sched.addPodGroup(tt.podGroup)
 
-			gotPodGroup, err := sched.Cache.PodGroups().Get(podGroup.Namespace, podGroup.Name)
-			if err != nil {
-				t.Errorf("Expected pod group to be in cache, got error: %v", err)
+			if diff := cmp.Diff(tt.wantHint, *hintTracker); diff != "" {
+				t.Errorf("Unexpected queueing hint (-want, +got):\n%s", diff)
 			}
-			if diff := cmp.Diff(podGroup, gotPodGroup); diff != "" {
-				t.Errorf("Unexpected pod group in cache (-want, +got):\n%s", diff)
+
+			gotPodGroup, err := sched.Cache.PodGroups().Get(podGroup.Namespace, podGroup.Name)
+			if tt.expectInCache {
+				if err != nil {
+					t.Errorf("Expected pod group to be in cache, got error: %v", err)
+				}
+				if diff := cmp.Diff(podGroup, gotPodGroup); diff != "" {
+					t.Errorf("Unexpected pod group in cache (-want, +got):\n%s", diff)
+				}
+				return
+			}
+
+			if err == nil {
+				t.Errorf("Expected pod group NOT to be in cache, but got: %v", gotPodGroup)
 			}
 		})
 	}
@@ -1340,20 +1536,34 @@ func TestUpdatePodGroup(t *testing.T) {
 
 	tests := []struct {
 		name           string
-		oldPodGroup    *schedulingapi.PodGroup
-		newPodGroup    *schedulingapi.PodGroup
-		expectPodGroup *schedulingapi.PodGroup
+		oldPodGroup    any
+		newPodGroup    any
+		expectPodGroup *schedulingv1beta1.PodGroup
+		wantHint       queueingHintTracker
 	}{
 		{
 			name:           "update valid pod group",
 			oldPodGroup:    oldPodGroup,
 			newPodGroup:    newPodGroup,
 			expectPodGroup: newPodGroup,
+			wantHint:       queueingHintTracker{Called: true, OldObj: oldPodGroup, NewObj: newPodGroup},
 		},
 		{
 			name:           "update pod group with same resource version should be no-op",
 			oldPodGroup:    oldPodGroup,
 			newPodGroup:    oldPodGroup,
+			expectPodGroup: oldPodGroup,
+		},
+		{
+			name:           "update invalid old pod group type",
+			oldPodGroup:    "invalid-type",
+			newPodGroup:    newPodGroup,
+			expectPodGroup: oldPodGroup,
+		},
+		{
+			name:           "update invalid new pod group type",
+			oldPodGroup:    oldPodGroup,
+			newPodGroup:    "invalid-type",
 			expectPodGroup: oldPodGroup,
 		},
 	}
@@ -1364,18 +1574,23 @@ func TestUpdatePodGroup(t *testing.T) {
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 
+			queue, hintTracker := newTestQueueWithQHintTracker(ctx, t, fwk.ClusterEvent{Resource: fwk.PodGroup, ActionType: fwk.Update})
 			sched := &Scheduler{
 				Cache:                    internalcache.New(ctx, nil, true, false /* CompositePodGroup */),
-				SchedulingQueue:          internalqueue.NewTestQueue(ctx, nil),
+				SchedulingQueue:          queue,
 				podGroupHierarchyTracker: gangscheduling.NewHierarchyTracker(false /* CompositePodGroup */),
 				logger:                   logger,
 			}
 
-			sched.Cache.AddGenericPodGroup(fwk.NewGenericPodGroup(tt.oldPodGroup))
+			sched.Cache.AddGenericPodGroup(fwk.NewGenericPodGroup(oldPodGroup))
 
 			sched.updatePodGroup(tt.oldPodGroup, tt.newPodGroup)
 
-			gotPodGroup, err := sched.Cache.PodGroups().Get(tt.expectPodGroup.Namespace, tt.expectPodGroup.Name)
+			if diff := cmp.Diff(tt.wantHint, *hintTracker); diff != "" {
+				t.Errorf("Unexpected queueing hint (-want, +got):\n%s", diff)
+			}
+
+			gotPodGroup, err := sched.Cache.PodGroups().Get(oldPodGroup.Namespace, oldPodGroup.Name)
 			if err != nil {
 				t.Errorf("Expected pod group to be in cache, got error: %v", err)
 			}
@@ -1390,19 +1605,30 @@ func TestDeletePodGroup(t *testing.T) {
 	podGroup := st.MakePodGroup().Namespace("ns1").Name("pg1").Obj()
 
 	tests := []struct {
-		name             string
-		initPodGroup     *schedulingapi.PodGroup
-		podGroupToDelete any
+		name              string
+		podGroupToDelete  any
+		expectStillExists bool
+		wantHint          queueingHintTracker
 	}{
 		{
 			name:             "delete pod group",
-			initPodGroup:     podGroup,
 			podGroupToDelete: podGroup,
+			wantHint:         queueingHintTracker{Called: true, OldObj: podGroup},
 		},
 		{
 			name:             "delete DeletedFinalStateUnknown tombstone with pod group",
-			initPodGroup:     podGroup,
 			podGroupToDelete: cache.DeletedFinalStateUnknown{Obj: podGroup},
+			wantHint:         queueingHintTracker{Called: true, OldObj: podGroup},
+		},
+		{
+			name:              "delete DeletedFinalStateUnknown tombstone with invalid type",
+			podGroupToDelete:  cache.DeletedFinalStateUnknown{Obj: "invalid-type"},
+			expectStillExists: true,
+		},
+		{
+			name:              "delete pod group with invalid type",
+			podGroupToDelete:  "invalid-type",
+			expectStillExists: true,
 		},
 	}
 
@@ -1412,20 +1638,33 @@ func TestDeletePodGroup(t *testing.T) {
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 
+			queue, hintTracker := newTestQueueWithQHintTracker(ctx, t, fwk.ClusterEvent{Resource: fwk.PodGroup, ActionType: fwk.Delete})
 			sched := &Scheduler{
 				Cache:                    internalcache.New(ctx, nil, true, false /* CompositePodGroup */),
-				SchedulingQueue:          internalqueue.NewTestQueue(ctx, nil),
+				SchedulingQueue:          queue,
 				podGroupHierarchyTracker: gangscheduling.NewHierarchyTracker(false /* CompositePodGroup */),
 				logger:                   logger,
 			}
 
-			if tt.initPodGroup != nil {
-				sched.Cache.AddGenericPodGroup(fwk.NewGenericPodGroup(tt.initPodGroup))
-			}
+			sched.Cache.AddGenericPodGroup(fwk.NewGenericPodGroup(podGroup))
 
 			sched.deletePodGroup(tt.podGroupToDelete)
 
-			_, err := sched.Cache.PodGroups().Get(tt.initPodGroup.Namespace, tt.initPodGroup.Name)
+			if diff := cmp.Diff(tt.wantHint, *hintTracker); diff != "" {
+				t.Errorf("Unexpected queueing hint (-want, +got):\n%s", diff)
+			}
+
+			gotPodGroup, err := sched.Cache.PodGroups().Get(podGroup.Namespace, podGroup.Name)
+			if tt.expectStillExists {
+				if err != nil {
+					t.Errorf("Expected pod group to still exist in cache, but got error: %v", err)
+				}
+				if diff := cmp.Diff(podGroup, gotPodGroup); diff != "" {
+					t.Errorf("Unexpected pod group in cache (-want, +got):\n%s", diff)
+				}
+				return
+			}
+
 			if err == nil {
 				t.Errorf("Expected pod group to be deleted from cache, but it still exists")
 			}
@@ -1437,36 +1676,20 @@ func TestAddCompositePodGroup(t *testing.T) {
 	cpg := st.MakeCompositePodGroup().Namespace("ns1").Name("cpg1").Obj()
 
 	tests := []struct {
-		name                string
-		cpg                 any
-		cpgEnabled          bool
-		expectInCache       bool
-		triggerQueueingHint bool
+		name          string
+		cpg           any
+		expectInCache bool
+		wantHint      queueingHintTracker
 	}{
 		{
-			name:          "add valid composite pod group with feature enabled",
+			name:          "add valid composite pod group",
 			cpg:           cpg,
-			cpgEnabled:    true,
 			expectInCache: true,
+			wantHint:      queueingHintTracker{Called: true, NewObj: cpg},
 		},
 		{
-			name:          "add valid composite pod group with feature disabled",
-			cpg:           cpg,
-			cpgEnabled:    false,
-			expectInCache: false,
-		},
-		{
-			name:          "add invalid composite pod group type with feature enabled",
-			cpg:           "invalid-type",
-			cpgEnabled:    true,
-			expectInCache: false,
-		},
-		{
-			name:                "add valid composite pod group triggers queueing hint with correct arguments",
-			cpg:                 cpg,
-			cpgEnabled:          true,
-			expectInCache:       true,
-			triggerQueueingHint: true,
+			name: "add invalid composite pod group type",
+			cpg:  "invalid-type",
 		},
 	}
 
@@ -1474,66 +1697,27 @@ func TestAddCompositePodGroup(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 				features.GenericWorkload:                 true,
-				features.TopologyAwareWorkloadScheduling: tt.cpgEnabled,
-				features.CompositePodGroup:               tt.cpgEnabled,
+				features.TopologyAwareWorkloadScheduling: true,
+				features.CompositePodGroup:               true,
 			})
 
 			logger, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 
-			var actualOldObj, actualNewObj any
-			var queueingHintCalled bool
-			activeHint := func(logger klog.Logger, pod *v1.Pod, oldObj, newObj any) (fwk.QueueingHint, error) {
-				queueingHintCalled = true
-				actualOldObj = oldObj
-				actualNewObj = newObj
-				return fwk.QueueSkip, nil
-			}
-
-			queueingHintMap := internalqueue.QueueingHintMapPerProfile{
-				testSchedulerName: {
-					fwk.ClusterEvent{Resource: fwk.CompositePodGroup, ActionType: fwk.Add}: {
-						{PluginName: "fake-plugin", QueueingHintFn: activeHint},
-					},
-				},
-			}
-
-			pod := st.MakePod().Name("p").Namespace("ns1").UID("pns").SchedulerName(testSchedulerName).Obj()
-			client := fake.NewClientset(pod)
-			apiDispatcher := apidispatcher.New(client, 16, apicalls.Relevances)
-			apiDispatcher.Run(logger)
-			defer apiDispatcher.Close()
-
-			queue := internalqueue.NewTestQueue(ctx, nil,
-				internalqueue.WithQueueingHintMapPerProfile(queueingHintMap),
-				internalqueue.WithAPIDispatcher(apiDispatcher),
-			)
-
+			queue, hintTracker := newTestQueueWithQHintTracker(ctx, t, fwk.ClusterEvent{Resource: fwk.CompositePodGroup, ActionType: fwk.Add})
 			sched := &Scheduler{
-				Cache:                    internalcache.New(ctx, nil, true, tt.cpgEnabled),
+				Cache:                    internalcache.New(ctx, nil, true, true),
 				SchedulingQueue:          queue,
-				podGroupHierarchyTracker: gangscheduling.NewHierarchyTracker(tt.cpgEnabled),
+				podGroupHierarchyTracker: gangscheduling.NewHierarchyTracker(true),
 				logger:                   logger,
 			}
 
-			if tt.triggerQueueingHint {
-				cpgObj := st.MakeCompositePodGroup().Namespace("ns1").Name("cpg1").Obj()
-				queue.AddGenericPodGroup(logger, fwk.NewGenericCompositePodGroup(cpgObj))
-				pg := st.MakePodGroup().Name("pg1").Namespace("ns1").ParentCompositePodGroup("cpg1").Obj()
-				queue.AddGenericPodGroup(logger, fwk.NewGenericPodGroup(pg))
-
-				queue.Add(ctx, pod)
-				poppedEntity, _ := queue.Pop(logger)
-				poppedPod := poppedEntity.(*framework.QueuedPodInfo)
-				poppedPod.QueueingParams.Timestamp = time.Now().Add(-10 * time.Minute)
-				poppedPod.QueueingParams.UnschedulablePlugins = sets.New("fake-plugin")
-				if err := queue.AddUnschedulablePodIfNotPresent(ctx, poppedPod, queue.SchedulingCycle()); err != nil {
-					t.Fatalf("Failed to add unschedulable pod: %v", err)
-				}
-			}
-
 			sched.addCompositePodGroup(tt.cpg)
+
+			if diff := cmp.Diff(tt.wantHint, *hintTracker); diff != "" {
+				t.Errorf("Unexpected queueing hint (-want, +got):\n%s", diff)
+			}
 
 			gotCPG, err := sched.Cache.CompositePodGroups().Get(cpg.Namespace, cpg.Name)
 			if tt.expectInCache {
@@ -1543,20 +1727,11 @@ func TestAddCompositePodGroup(t *testing.T) {
 				if diff := cmp.Diff(cpg, gotCPG); diff != "" {
 					t.Errorf("Unexpected composite pod group in cache (-want, +got):\n%s", diff)
 				}
-			} else if err == nil {
-				t.Errorf("Expected composite pod group NOT to be in cache, but got: %v", gotCPG)
+				return
 			}
 
-			if tt.triggerQueueingHint {
-				if !queueingHintCalled {
-					t.Errorf("expected QueueingHint to be called")
-				}
-				if actualOldObj != nil {
-					t.Errorf("expected oldObj to be nil, got %v", actualOldObj)
-				}
-				if actualNewObj != tt.cpg {
-					t.Errorf("expected newObj to be %v, got %v", tt.cpg, actualNewObj)
-				}
+			if err == nil {
+				t.Errorf("Expected composite pod group NOT to be in cache, but got: %v", gotCPG)
 			}
 		})
 	}
@@ -1569,62 +1744,36 @@ func TestUpdateCompositePodGroup(t *testing.T) {
 	newCPG.ResourceVersion = "2"
 
 	tests := []struct {
-		name                string
-		oldCPG              any
-		newCPG              any
-		expectCPG           *schedulingv1alpha3.CompositePodGroup
-		cpgEnabled          bool
-		expectInCache       bool
-		triggerQueueingHint bool
+		name      string
+		oldCPG    any
+		newCPG    any
+		expectCPG *schedulingv1beta1.CompositePodGroup
+		wantHint  queueingHintTracker
 	}{
 		{
-			name:          "update valid composite pod group with feature enabled",
-			oldCPG:        oldCPG,
-			newCPG:        newCPG,
-			expectCPG:     newCPG,
-			cpgEnabled:    true,
-			expectInCache: true,
+			name:      "update valid composite pod group",
+			oldCPG:    oldCPG,
+			newCPG:    newCPG,
+			expectCPG: newCPG,
+			wantHint:  queueingHintTracker{Called: true, OldObj: oldCPG, NewObj: newCPG},
 		},
 		{
-			name:          "update composite pod group with same resource version should be no-op",
-			oldCPG:        oldCPG,
-			newCPG:        oldCPG,
-			expectCPG:     oldCPG,
-			cpgEnabled:    true,
-			expectInCache: true,
+			name:      "update composite pod group with same resource version should be no-op",
+			oldCPG:    oldCPG,
+			newCPG:    oldCPG,
+			expectCPG: oldCPG,
 		},
 		{
-			name:          "update composite pod group with feature disabled",
-			oldCPG:        oldCPG,
-			newCPG:        newCPG,
-			expectCPG:     nil,
-			cpgEnabled:    false,
-			expectInCache: false,
+			name:      "update invalid old composite pod group type",
+			oldCPG:    "invalid-type",
+			newCPG:    newCPG,
+			expectCPG: oldCPG,
 		},
 		{
-			name:          "update invalid old composite pod group type with feature enabled",
-			oldCPG:        "invalid-type",
-			newCPG:        newCPG,
-			expectCPG:     oldCPG,
-			cpgEnabled:    true,
-			expectInCache: true,
-		},
-		{
-			name:          "update invalid new composite pod group type with feature enabled",
-			oldCPG:        oldCPG,
-			newCPG:        "invalid-type",
-			expectCPG:     oldCPG,
-			cpgEnabled:    true,
-			expectInCache: true,
-		},
-		{
-			name:                "update valid composite pod group triggers queueing hint with correct arguments",
-			oldCPG:              oldCPG,
-			newCPG:              newCPG,
-			expectCPG:           newCPG,
-			cpgEnabled:          true,
-			expectInCache:       true,
-			triggerQueueingHint: true,
+			name:      "update invalid new composite pod group type",
+			oldCPG:    oldCPG,
+			newCPG:    "invalid-type",
+			expectCPG: oldCPG,
 		},
 	}
 
@@ -1632,93 +1781,36 @@ func TestUpdateCompositePodGroup(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 				features.GenericWorkload:                 true,
-				features.TopologyAwareWorkloadScheduling: tt.cpgEnabled,
-				features.CompositePodGroup:               tt.cpgEnabled,
+				features.TopologyAwareWorkloadScheduling: true,
+				features.CompositePodGroup:               true,
 			})
 
 			logger, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 
-			var actualOldObj, actualNewObj any
-			var queueingHintCalled bool
-			activeHint := func(logger klog.Logger, pod *v1.Pod, oldObj, newObj any) (fwk.QueueingHint, error) {
-				queueingHintCalled = true
-				actualOldObj = oldObj
-				actualNewObj = newObj
-				return fwk.QueueSkip, nil
-			}
-
-			queueingHintMap := internalqueue.QueueingHintMapPerProfile{
-				testSchedulerName: {
-					fwk.ClusterEvent{Resource: fwk.CompositePodGroup, ActionType: fwk.Update}: {
-						{PluginName: "fake-plugin", QueueingHintFn: activeHint},
-					},
-				},
-			}
-
-			pod := st.MakePod().Name("p").Namespace("ns1").UID("pns").SchedulerName(testSchedulerName).Obj()
-			client := fake.NewClientset(pod)
-			apiDispatcher := apidispatcher.New(client, 16, apicalls.Relevances)
-			apiDispatcher.Run(logger)
-			defer apiDispatcher.Close()
-
-			queue := internalqueue.NewTestQueue(ctx, nil,
-				internalqueue.WithQueueingHintMapPerProfile(queueingHintMap),
-				internalqueue.WithAPIDispatcher(apiDispatcher),
-			)
-
+			queue, hintTracker := newTestQueueWithQHintTracker(ctx, t, fwk.ClusterEvent{Resource: fwk.CompositePodGroup, ActionType: fwk.Update})
 			sched := &Scheduler{
-				Cache:                    internalcache.New(ctx, nil, true, tt.cpgEnabled),
+				Cache:                    internalcache.New(ctx, nil, true, true),
 				SchedulingQueue:          queue,
-				podGroupHierarchyTracker: gangscheduling.NewHierarchyTracker(tt.cpgEnabled),
+				podGroupHierarchyTracker: gangscheduling.NewHierarchyTracker(true),
 				logger:                   logger,
 			}
 
-			if tt.cpgEnabled {
-				sched.Cache.AddGenericPodGroup(fwk.NewGenericCompositePodGroup(oldCPG))
-			}
-
-			if tt.triggerQueueingHint {
-				cpgObj := st.MakeCompositePodGroup().Namespace("ns1").Name("cpg1").Obj()
-				queue.AddGenericPodGroup(logger, fwk.NewGenericCompositePodGroup(cpgObj))
-				pg := st.MakePodGroup().Name("pg1").Namespace("ns1").ParentCompositePodGroup("cpg1").Obj()
-				queue.AddGenericPodGroup(logger, fwk.NewGenericPodGroup(pg))
-
-				queue.Add(ctx, pod)
-				poppedEntity, _ := queue.Pop(logger)
-				poppedPod := poppedEntity.(*framework.QueuedPodInfo)
-				poppedPod.QueueingParams.Timestamp = time.Now().Add(-10 * time.Minute)
-				poppedPod.QueueingParams.UnschedulablePlugins = sets.New("fake-plugin")
-				if err := queue.AddUnschedulablePodIfNotPresent(ctx, poppedPod, queue.SchedulingCycle()); err != nil {
-					t.Fatalf("Failed to add unschedulable pod: %v", err)
-				}
-			}
+			sched.Cache.AddGenericPodGroup(fwk.NewGenericCompositePodGroup(oldCPG))
 
 			sched.updateCompositePodGroup(tt.oldCPG, tt.newCPG)
 
-			gotCPG, err := sched.Cache.CompositePodGroups().Get(oldCPG.Namespace, oldCPG.Name)
-			if tt.expectInCache {
-				if err != nil {
-					t.Errorf("Expected composite pod group to be in cache, got error: %v", err)
-				}
-				if diff := cmp.Diff(tt.expectCPG, gotCPG); diff != "" {
-					t.Errorf("Unexpected composite pod group in cache (-want, +got):\n%s", diff)
-				}
-			} else if err == nil {
-				t.Errorf("Expected composite pod group NOT to be in cache, but got: %v", gotCPG)
+			if diff := cmp.Diff(tt.wantHint, *hintTracker); diff != "" {
+				t.Errorf("Unexpected queueing hint (-want, +got):\n%s", diff)
 			}
 
-			if tt.triggerQueueingHint {
-				if !queueingHintCalled {
-					t.Errorf("expected QueueingHint to be called")
-				}
-				if actualOldObj != tt.oldCPG {
-					t.Errorf("expected oldObj to be %v, got %v", tt.oldCPG, actualOldObj)
-				}
-				if actualNewObj != tt.newCPG {
-					t.Errorf("expected newObj to be %v, got %v", tt.newCPG, actualNewObj)
-				}
+			gotCPG, err := sched.Cache.CompositePodGroups().Get(oldCPG.Namespace, oldCPG.Name)
+			if err != nil {
+				t.Errorf("Expected composite pod group to be in cache, got error: %v", err)
+			}
+			if diff := cmp.Diff(tt.expectCPG, gotCPG); diff != "" {
+				t.Errorf("Unexpected composite pod group in cache (-want, +got):\n%s", diff)
 			}
 		})
 	}
@@ -1728,41 +1820,29 @@ func TestDeleteCompositePodGroup(t *testing.T) {
 	cpg := st.MakeCompositePodGroup().Namespace("ns1").Name("cpg1").Obj()
 
 	tests := []struct {
-		name                string
-		initCPG             *schedulingv1alpha3.CompositePodGroup
-		cpgToDelete         any
-		cpgEnabled          bool
-		expectStillExists   bool
-		triggerQueueingHint bool
+		name              string
+		cpgToDelete       any
+		expectStillExists bool
+		wantHint          queueingHintTracker
 	}{
 		{
-			name:                "delete composite pod group",
-			initCPG:             cpg,
-			cpgToDelete:         cpg,
-			cpgEnabled:          true,
-			expectStillExists:   false,
-			triggerQueueingHint: true,
+			name:        "delete composite pod group",
+			cpgToDelete: cpg,
+			wantHint:    queueingHintTracker{Called: true, OldObj: cpg},
 		},
 		{
-			name:                "delete DeletedFinalStateUnknown tombstone with composite pod group",
-			initCPG:             cpg,
-			cpgToDelete:         cache.DeletedFinalStateUnknown{Obj: cpg},
-			cpgEnabled:          true,
-			expectStillExists:   false,
-			triggerQueueingHint: true,
+			name:        "delete DeletedFinalStateUnknown tombstone with composite pod group",
+			cpgToDelete: cache.DeletedFinalStateUnknown{Obj: cpg},
+			wantHint:    queueingHintTracker{Called: true, OldObj: cpg},
 		},
 		{
-			name:              "delete composite pod group with feature disabled",
-			initCPG:           cpg,
-			cpgToDelete:       cpg,
-			cpgEnabled:        false,
-			expectStillExists: false,
+			name:              "delete DeletedFinalStateUnknown tombstone with invalid type",
+			cpgToDelete:       cache.DeletedFinalStateUnknown{Obj: "invalid-type"},
+			expectStillExists: true,
 		},
 		{
 			name:              "delete composite pod group with invalid type",
-			initCPG:           cpg,
 			cpgToDelete:       "invalid-type",
-			cpgEnabled:        true,
 			expectStillExists: true,
 		},
 	}
@@ -1771,85 +1851,28 @@ func TestDeleteCompositePodGroup(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 				features.GenericWorkload:                 true,
-				features.TopologyAwareWorkloadScheduling: tt.cpgEnabled,
-				features.CompositePodGroup:               tt.cpgEnabled,
+				features.TopologyAwareWorkloadScheduling: true,
+				features.CompositePodGroup:               true,
 			})
 
 			logger, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 
-			var actualOldObj, actualNewObj any
-			var queueingHintCalled bool
-			activeHint := func(logger klog.Logger, pod *v1.Pod, oldObj, newObj any) (fwk.QueueingHint, error) {
-				queueingHintCalled = true
-				actualOldObj = oldObj
-				actualNewObj = newObj
-				return fwk.QueueSkip, nil
-			}
-
-			queueingHintMap := internalqueue.QueueingHintMapPerProfile{
-				testSchedulerName: {
-					fwk.ClusterEvent{Resource: fwk.CompositePodGroup, ActionType: fwk.Delete}: {
-						{PluginName: "fake-plugin", QueueingHintFn: activeHint},
-					},
-				},
-			}
-
-			pod := st.MakePod().Name("p").Namespace("ns1").UID("pns").SchedulerName(testSchedulerName).Obj()
-			client := fake.NewClientset(pod)
-			apiDispatcher := apidispatcher.New(client, 16, apicalls.Relevances)
-			apiDispatcher.Run(logger)
-			defer apiDispatcher.Close()
-
-			queue := internalqueue.NewTestQueue(ctx, nil,
-				internalqueue.WithQueueingHintMapPerProfile(queueingHintMap),
-				internalqueue.WithAPIDispatcher(apiDispatcher),
-			)
-
+			queue, hintTracker := newTestQueueWithQHintTracker(ctx, t, fwk.ClusterEvent{Resource: fwk.CompositePodGroup, ActionType: fwk.Delete})
 			sched := &Scheduler{
-				Cache:                    internalcache.New(ctx, nil, true, tt.cpgEnabled),
+				Cache:                    internalcache.New(ctx, nil, true, true),
 				SchedulingQueue:          queue,
-				podGroupHierarchyTracker: gangscheduling.NewHierarchyTracker(tt.cpgEnabled),
+				podGroupHierarchyTracker: gangscheduling.NewHierarchyTracker(true),
 				logger:                   logger,
 			}
 
-			if tt.triggerQueueingHint {
-				cpgObj := st.MakeCompositePodGroup().Namespace("ns1").Name("cpg1").Obj()
-				queue.AddGenericPodGroup(logger, fwk.NewGenericCompositePodGroup(cpgObj))
-				pg := st.MakePodGroup().Name("pg1").Namespace("ns1").ParentCompositePodGroup("cpg1").Obj()
-				queue.AddGenericPodGroup(logger, fwk.NewGenericPodGroup(pg))
-
-				queue.Add(ctx, pod)
-				poppedEntity, _ := queue.Pop(logger)
-				poppedPod := poppedEntity.(*framework.QueuedPodInfo)
-				poppedPod.QueueingParams.Timestamp = time.Now().Add(-10 * time.Minute)
-				poppedPod.QueueingParams.UnschedulablePlugins = sets.New("fake-plugin")
-				if err := queue.AddUnschedulablePodIfNotPresent(ctx, poppedPod, queue.SchedulingCycle()); err != nil {
-					t.Fatalf("Failed to add unschedulable pod: %v", err)
-				}
-			}
-
-			if tt.initCPG != nil && tt.cpgEnabled {
-				sched.Cache.AddGenericPodGroup(fwk.NewGenericCompositePodGroup(tt.initCPG))
-			}
+			sched.Cache.AddGenericPodGroup(fwk.NewGenericCompositePodGroup(cpg))
 
 			sched.deleteCompositePodGroup(tt.cpgToDelete)
 
-			if tt.triggerQueueingHint {
-				if !queueingHintCalled {
-					t.Errorf("expected QueueingHint to be called")
-				}
-				expectedOldObj := tt.cpgToDelete
-				if tombstone, ok := tt.cpgToDelete.(cache.DeletedFinalStateUnknown); ok {
-					expectedOldObj = tombstone.Obj
-				}
-				if actualOldObj != expectedOldObj {
-					t.Errorf("expected oldObj to be %v, got %v", expectedOldObj, actualOldObj)
-				}
-				if actualNewObj != nil {
-					t.Errorf("expected newObj to be nil, got %v", actualNewObj)
-				}
+			if diff := cmp.Diff(tt.wantHint, *hintTracker); diff != "" {
+				t.Errorf("Unexpected queueing hint (-want, +got):\n%s", diff)
 			}
 
 			gotCPG, err := sched.Cache.CompositePodGroups().Get(cpg.Namespace, cpg.Name)
@@ -1860,7 +1883,10 @@ func TestDeleteCompositePodGroup(t *testing.T) {
 				if diff := cmp.Diff(cpg, gotCPG); diff != "" {
 					t.Errorf("Unexpected composite pod group in cache (-want, +got):\n%s", diff)
 				}
-			} else if err == nil {
+				return
+			}
+
+			if err == nil {
 				t.Errorf("Expected composite pod group NOT to be in cache, but got: %v", gotCPG)
 			}
 		})
@@ -1990,6 +2016,421 @@ func TestEventHandlers_DeferredResize(t *testing.T) {
 			inCache := err == nil
 			if inCache != tt.expectInCache {
 				t.Errorf("Unexpected cache state: got inCache=%v, want inCache=%v", inCache, tt.expectInCache)
+			}
+		})
+	}
+}
+
+// TestUpdatePodGroupRecreatedWithDifferentParent verifies that recreating a
+// PodGroup with a different UID updates its parent CompositePodGroup links.
+func TestUpdatePodGroupRecreatedWithDifferentParent(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.GenericWorkload:                 true,
+		features.TopologyAwareWorkloadScheduling: true,
+		features.CompositePodGroup:               true,
+	})
+
+	logger, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	oldParent := st.MakeCompositePodGroup().Namespace("ns1").Name("old-parent").Obj()
+	newParent := st.MakeCompositePodGroup().Namespace("ns1").Name("new-parent").Obj()
+	oldPG := st.MakePodGroup().Namespace("ns1").Name("pg1").UID("old-uid").ParentCompositePodGroup("old-parent").Obj()
+	oldPG.ResourceVersion = "1"
+	newPG := st.MakePodGroup().Namespace("ns1").Name("pg1").UID("new-uid").ParentCompositePodGroup("new-parent").Obj()
+	newPG.ResourceVersion = "2"
+
+	sched := &Scheduler{
+		Cache:                    internalcache.New(ctx, nil, true, true),
+		SchedulingQueue:          internalqueue.NewTestQueue(ctx, nil),
+		podGroupHierarchyTracker: gangscheduling.NewHierarchyTracker(true),
+		logger:                   logger,
+	}
+
+	sched.Cache.AddGenericPodGroup(fwk.NewGenericCompositePodGroup(oldParent))
+	sched.Cache.AddGenericPodGroup(fwk.NewGenericCompositePodGroup(newParent))
+	sched.Cache.AddGenericPodGroup(fwk.NewGenericPodGroup(oldPG))
+
+	sched.updatePodGroup(oldPG, newPG)
+
+	oldState, err := sched.Cache.CompositePodGroupStates().Get("ns1", "old-parent")
+	if err != nil {
+		t.Fatalf("getting old parent state: %v", err)
+	}
+	newState, err := sched.Cache.CompositePodGroupStates().Get("ns1", "new-parent")
+	if err != nil {
+		t.Fatalf("getting new parent state: %v", err)
+	}
+
+	childKey := fwk.PodGroupKey("ns1", "pg1")
+	if slices.Contains(oldState.GetChildren(), childKey) {
+		t.Fatalf("old parent still contains recreated PodGroup %v", childKey)
+	}
+
+	if !slices.Contains(newState.GetChildren(), childKey) {
+		t.Fatalf("new parent does not contain recreated PodGroup %v", childKey)
+	}
+}
+
+// TestRecreatedPodGroupQueueingHints verifies that recreation is processed as
+// Delete followed by Add for both PodGroup and CompositePodGroup.
+func TestRecreatedPodGroupQueueingHints(t *testing.T) {
+	tests := []struct {
+		name     string
+		resource fwk.EventResource
+		run      func(*Scheduler, any, any)
+		oldObj   any
+		newObj   any
+	}{
+		{
+			name:     "PodGroup",
+			resource: fwk.PodGroup,
+			oldObj: func() *schedulingv1beta1.PodGroup {
+				obj := st.MakePodGroup().Namespace("ns1").Name("pg1").UID("old-uid").Obj()
+				obj.ResourceVersion = "1"
+				return obj
+			}(),
+			newObj: func() *schedulingv1beta1.PodGroup {
+				obj := st.MakePodGroup().Namespace("ns1").Name("pg1").UID("new-uid").Obj()
+				obj.ResourceVersion = "2"
+				return obj
+			}(),
+			run: func(s *Scheduler, oldObj, newObj any) {
+				s.updatePodGroup(oldObj, newObj)
+			},
+		},
+		{
+			name:     "CompositePodGroup",
+			resource: fwk.CompositePodGroup,
+			oldObj: func() *schedulingv1beta1.CompositePodGroup {
+				obj := st.MakeCompositePodGroup().Namespace("ns1").Name("cpg1").UID("old-uid").Obj()
+				obj.ResourceVersion = "1"
+				return obj
+			}(),
+			newObj: func() *schedulingv1beta1.CompositePodGroup {
+				obj := st.MakeCompositePodGroup().Namespace("ns1").Name("cpg1").UID("new-uid").Obj()
+				obj.ResourceVersion = "2"
+				return obj
+			}(),
+			run: func(s *Scheduler, oldObj, newObj any) {
+				s.updateCompositePodGroup(oldObj, newObj)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cpgEnabled := tt.resource == fwk.CompositePodGroup
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.GenericWorkload:                 true,
+				features.TopologyAwareWorkloadScheduling: cpgEnabled,
+				features.CompositePodGroup:               cpgEnabled,
+			})
+
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			type observedEvent struct {
+				action fwk.ActionType
+				oldObj any
+				newObj any
+			}
+			var observed []observedEvent
+
+			queueingHintMap := internalqueue.QueueingHintMapPerProfile{
+				testSchedulerName: {
+					fwk.ClusterEvent{Resource: tt.resource, ActionType: fwk.Delete}: {
+						{PluginName: "recreate-test", QueueingHintFn: func(logger klog.Logger, pod *v1.Pod, oldObj, newObj any) (fwk.QueueingHint, error) {
+							observed = append(observed, observedEvent{action: fwk.Delete, oldObj: oldObj, newObj: newObj})
+							return fwk.QueueSkip, nil
+						}},
+					},
+					fwk.ClusterEvent{Resource: tt.resource, ActionType: fwk.Add}: {
+						{PluginName: "recreate-test", QueueingHintFn: func(logger klog.Logger, pod *v1.Pod, oldObj, newObj any) (fwk.QueueingHint, error) {
+							observed = append(observed, observedEvent{action: fwk.Add, oldObj: oldObj, newObj: newObj})
+							return fwk.QueueSkip, nil
+						}},
+					},
+					fwk.ClusterEvent{Resource: tt.resource, ActionType: fwk.Update}: {
+						{PluginName: "recreate-test", QueueingHintFn: func(logger klog.Logger, pod *v1.Pod, oldObj, newObj any) (fwk.QueueingHint, error) {
+							observed = append(observed, observedEvent{action: fwk.Update, oldObj: oldObj, newObj: newObj})
+							return fwk.QueueSkip, nil
+						}},
+					},
+				},
+			}
+
+			pod := st.MakePod().Namespace("ns1").Name("p").UID("pod-uid").SchedulerName(testSchedulerName).Obj()
+			client := fake.NewClientset(pod)
+			apiDispatcher := apidispatcher.New(client, 16, apicalls.Relevances)
+			apiDispatcher.Run(logger)
+			defer apiDispatcher.Close()
+
+			queue := internalqueue.NewTestQueue(ctx, nil,
+				internalqueue.WithQueueingHintMapPerProfile(queueingHintMap),
+				internalqueue.WithAPIDispatcher(apiDispatcher),
+			)
+			sched := &Scheduler{
+				Cache:                    internalcache.New(ctx, nil, true, cpgEnabled),
+				SchedulingQueue:          queue,
+				podGroupHierarchyTracker: gangscheduling.NewHierarchyTracker(cpgEnabled),
+				logger:                   logger,
+			}
+
+			if tt.resource == fwk.PodGroup {
+				sched.addPodGroup(tt.oldObj)
+			} else {
+				sched.addCompositePodGroup(tt.oldObj)
+			}
+
+			queue.Add(ctx, pod)
+			poppedEntity, err := queue.Pop(logger)
+			if err != nil {
+				t.Fatalf("popping pod: %v", err)
+			}
+			poppedPod := poppedEntity.(*framework.QueuedPodInfo)
+			poppedPod.QueueingParams.Timestamp = time.Now().Add(-10 * time.Minute)
+			poppedPod.QueueingParams.UnschedulablePlugins = sets.New("recreate-test")
+			if err := queue.AddUnschedulablePodIfNotPresent(ctx, poppedPod, queue.SchedulingCycle()); err != nil {
+				t.Fatalf("adding unschedulable pod: %v", err)
+			}
+
+			tt.run(sched, tt.oldObj, tt.newObj)
+
+			if len(observed) != 2 {
+				t.Fatalf("expected exactly 2 queueing hints (Delete, Add), got %d: %#v", len(observed), observed)
+			}
+			if observed[0].action != fwk.Delete {
+				t.Errorf("first event = %v, want Delete", observed[0].action)
+			}
+			if observed[0].oldObj != tt.oldObj || observed[0].newObj != nil {
+				t.Errorf("Delete args = (%v, %v), want (%v, nil)", observed[0].oldObj, observed[0].newObj, tt.oldObj)
+			}
+			if observed[1].action != fwk.Add {
+				t.Errorf("second event = %v, want Add", observed[1].action)
+			}
+			if observed[1].oldObj != nil || observed[1].newObj != tt.newObj {
+				t.Errorf("Add args = (%v, %v), want (nil, %v)", observed[1].oldObj, observed[1].newObj, tt.newObj)
+			}
+		})
+	}
+}
+
+func TestEventHandlers_DeferredResizePodGroupMember(t *testing.T) {
+	member := st.MakePod().Name("pod1").Namespace("ns1").UID("pod1").Node("node1").SchedulerName(testSchedulerName).PodGroupName("pg1").Obj()
+	deferredMember := st.MakePod().Name("pod1").Namespace("ns1").UID("pod1").Node("node1").SchedulerName(testSchedulerName).PodGroupName("pg1").
+		Condition(v1.PodResizePending, v1.ConditionTrue, v1.PodReasonDeferred).Obj()
+	evaluatedMember := st.MakePod().Name("pod1").Namespace("ns1").UID("pod1").Node("node1").SchedulerName(testSchedulerName).PodGroupName("pg1").
+		Condition(v1.PodResizePending, v1.ConditionTrue, v1.PodReasonDeferred).
+		Condition(v1.SchedulerEvaluationCompleted, v1.ConditionTrue, v1.PodReasonDeferredPodResize).Obj()
+
+	tests := []struct {
+		name          string
+		initialPod    *v1.Pod
+		updatedPod    *v1.Pod
+		deletePod     bool
+		expectInQueue bool
+		// expectMember is whether the pod still counts toward its pod group,
+		// both in the cache's assigned pods and in the gang's quorum.
+		expectMember bool
+	}{
+		{
+			name:          "add assigned member with deferred resize",
+			initialPod:    deferredMember,
+			expectInQueue: true,
+			expectMember:  true,
+		},
+		{
+			name:          "assigned member transitions to deferred resize",
+			initialPod:    member,
+			updatedPod:    deferredMember,
+			expectInQueue: true,
+			expectMember:  true,
+		},
+		{
+			name:         "assigned member transitions out of deferred resize",
+			initialPod:   deferredMember,
+			updatedPod:   member,
+			expectMember: true,
+		},
+		{
+			name:         "scheduler evaluation completes for assigned member with deferred resize",
+			initialPod:   deferredMember,
+			updatedPod:   evaluatedMember,
+			expectMember: true,
+		},
+		{
+			name:          "SchedulerEvaluationCompleted removed from assigned member that is still deferred",
+			initialPod:    evaluatedMember,
+			updatedPod:    deferredMember,
+			expectInQueue: true,
+			expectMember:  true,
+		},
+		{
+			name:       "delete assigned member with deferred resize",
+			initialPod: deferredMember,
+			deletePod:  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.GenericWorkload:                              true,
+				features.InPlacePodVerticalScalingSchedulerPreemption: true,
+			})
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			// The sentinel only requeues on EventUnscheduledPodAdd, so it reaches activeQ
+			// only if a handler broadcasts that event.
+			sentinel := &framework.QueuedPodInfo{
+				PodInfo: &framework.PodInfo{
+					Pod: st.MakePod().Name("sentinel").Namespace("ns1").UID("sentinel").SchedulerName(testSchedulerName).Obj(),
+				},
+				QueueingParams: framework.QueueingParams{
+					UnschedulablePlugins: sets.New("fooPlugin"),
+				},
+			}
+			queueingHintMap := internalqueue.QueueingHintMapPerProfile{
+				testSchedulerName: {
+					framework.EventUnscheduledPodAdd: {
+						{
+							PluginName: "fooPlugin",
+							QueueingHintFn: func(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
+								return fwk.Queue, nil
+							},
+						},
+					},
+				},
+			}
+			sched := &Scheduler{
+				Cache: internalcache.New(ctx, nil, true /* GenericWorkload */, false /* CompositePodGroup */),
+				SchedulingQueue: internalqueue.NewTestQueue(ctx, newDefaultQueueSort(),
+					internalqueue.WithQueueingHintMapPerProfile(queueingHintMap),
+					internalqueue.WithPodInitialBackoffDuration(0),
+					internalqueue.WithPodMaxBackoffDuration(0),
+				),
+				podGroupHierarchyTracker: gangscheduling.NewHierarchyTracker(false /* CompositePodGroup */),
+				logger:                   logger,
+				Profiles:                 profile.Map{testSchedulerName: nil},
+			}
+
+			sched.addPodGroup(st.MakePodGroup().Namespace("ns1").Name("pg1").MinCount(1).Obj())
+			sched.SchedulingQueue.Add(ctx, sentinel.Pod)
+			if _, err := sched.SchedulingQueue.Pop(logger); err != nil {
+				t.Fatalf("Pop failed: %v", err)
+			}
+			if err := sched.SchedulingQueue.AddUnschedulablePodIfNotPresent(ctx, sentinel, sched.SchedulingQueue.SchedulingCycle()); err != nil {
+				t.Fatalf("AddUnschedulablePodIfNotPresent failed: %v", err)
+			}
+
+			sched.addPod(tt.initialPod)
+			if tt.updatedPod != nil {
+				sched.updatePod(tt.initialPod, tt.updatedPod)
+			}
+			if tt.deletePod {
+				sched.deletePod(tt.initialPod)
+			}
+
+			// GetPod would look a pod group member up in its group, but deferred pods are queued individually.
+			pendingPods, _ := sched.SchedulingQueue.PendingPods()
+			inQueue := false
+			for _, p := range pendingPods {
+				if p.UID == tt.initialPod.UID {
+					inQueue = true
+				}
+			}
+			if inQueue != tt.expectInQueue {
+				t.Errorf("Unexpected queue state: got inQueue=%v, want inQueue=%v", inQueue, tt.expectInQueue)
+			}
+			for _, p := range sched.SchedulingQueue.PodsInActiveQ() {
+				if p.UID == sentinel.Pod.UID {
+					t.Errorf("Sentinel pod moved to activeQ: a handler broadcast %s for an assigned pod", framework.EventUnscheduledPodAdd.Label())
+				}
+			}
+
+			pgs, err := sched.Cache.PodGroupStates().Get("ns1", "pg1")
+			if err != nil {
+				t.Fatalf("Failed to get pod group state: %v", err)
+			}
+			if inAssigned := pgs.AssignedPods().Has(tt.initialPod.UID); inAssigned != tt.expectMember {
+				t.Errorf("Unexpected pod in AssignedPods of PodGroupState: got %v, want %v", inAssigned, tt.expectMember)
+			}
+			readiness, err := sched.podGroupHierarchyTracker.FindRootGroupReadiness(fwk.PodGroupKey("ns1", "pg1"))
+			if err != nil || readiness == nil {
+				t.Fatalf("Failed to get pod group readiness: readiness=%v, err=%v", readiness, err)
+			}
+			if readiness.IsReady != tt.expectMember {
+				t.Errorf("Unexpected gang readiness with minCount=1: got %v, want %v", readiness.IsReady, tt.expectMember)
+			}
+		})
+	}
+}
+
+func TestEventHandlers_SchedulerEvaluationCompleted(t *testing.T) {
+	deferred := st.MakePod().Name("pod1").Namespace("ns1").UID("pod1").Node("node1").SchedulerName(testSchedulerName).
+		Condition(v1.PodResizePending, v1.ConditionTrue, v1.PodReasonDeferred).Obj()
+	evaluated := st.MakePod().Name("pod1").Namespace("ns1").UID("pod1").Node("node1").SchedulerName(testSchedulerName).
+		Condition(v1.PodResizePending, v1.ConditionTrue, v1.PodReasonDeferred).
+		Condition(v1.SchedulerEvaluationCompleted, v1.ConditionTrue, v1.PodReasonDeferredPodResize).Obj()
+	nextGenWithStaleCondition := evaluated.DeepCopy()
+	nextGenWithStaleCondition.Generation = 2
+
+	tests := []struct {
+		name          string
+		initialPod    *v1.Pod
+		updatedPod    *v1.Pod // nil for an add event
+		expectInQueue bool
+	}{
+		{
+			name:       "add: evaluated deferred resize",
+			initialPod: evaluated,
+		},
+		{
+			name:       "update: scheduler evaluation completes",
+			initialPod: deferred,
+			updatedPod: evaluated,
+		},
+		{
+			name:          "update: condition removed while the resize is still deferred",
+			initialPod:    evaluated,
+			updatedPod:    deferred,
+			expectInQueue: true,
+		},
+		{
+			name:          "update: new resize generation while stale SchedulerEvaluationCompleted remains",
+			initialPod:    evaluated,
+			updatedPod:    nextGenWithStaleCondition,
+			expectInQueue: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingSchedulerPreemption, true)
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			sched := &Scheduler{
+				Cache:           internalcache.New(ctx, nil, false, false /* CompositePodGroup */),
+				SchedulingQueue: internalqueue.NewTestQueue(ctx, nil),
+				logger:          logger,
+				Profiles:        profile.Map{testSchedulerName: nil},
+			}
+
+			sched.addPod(tt.initialPod)
+			if tt.updatedPod != nil {
+				sched.updatePod(tt.initialPod, tt.updatedPod)
+			}
+
+			pod := tt.initialPod
+			if _, inQueue := sched.SchedulingQueue.GetPod(ctx, pod.Name, pod.Namespace, pod.Spec.SchedulingGroup); inQueue != tt.expectInQueue {
+				t.Errorf("Unexpected queue state: got inQueue=%v, want inQueue=%v", inQueue, tt.expectInQueue)
 			}
 		})
 	}

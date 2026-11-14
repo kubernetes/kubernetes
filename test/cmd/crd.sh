@@ -22,6 +22,14 @@ run_crd_tests() {
   set -o nounset
   set -o errexit
 
+  cleanup_crd_tests() {
+    kubectl delete customresourcedefinitions/foos.company.com "${kube_flags_with_token[@]:?}" --ignore-not-found=true --timeout=60s || true
+    kubectl delete customresourcedefinitions/bars.company.com "${kube_flags_with_token[@]:?}" --ignore-not-found=true --timeout=60s || true
+    kubectl delete customresourcedefinitions/resources.mygroup.example.com "${kube_flags_with_token[@]:?}" --ignore-not-found=true --timeout=60s || true
+    kubectl delete customresourcedefinitions/validfoos.company.com "${kube_flags_with_token[@]:?}" --ignore-not-found=true --timeout=60s || true
+  }
+  trap cleanup_crd_tests EXIT
+
   create_and_use_new_namespace
   kube::log::status "Testing kubectl crd"
   kubectl "${kube_flags_with_token[@]:?}" create -f - << __EOF__
@@ -189,11 +197,8 @@ __EOF__
 
   run_non_native_resource_tests
 
-  # teardown
-  kubectl delete customresourcedefinitions/foos.company.com "${kube_flags_with_token[@]}"
-  kubectl delete customresourcedefinitions/bars.company.com "${kube_flags_with_token[@]}"
-  kubectl delete customresourcedefinitions/resources.mygroup.example.com "${kube_flags_with_token[@]}"
-  kubectl delete customresourcedefinitions/validfoos.company.com "${kube_flags_with_token[@]}"
+  cleanup_crd_tests
+  trap - EXIT
 
   set +o nounset
   set +o errexit

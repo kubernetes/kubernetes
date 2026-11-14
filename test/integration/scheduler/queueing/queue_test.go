@@ -25,8 +25,8 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	apiextensionsv1 "k8s.io/apiextensions-api/pkg/apis/apiextensions/v1"
+	apiextensionsclient "k8s.io/apiextensions-api/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -52,6 +52,7 @@ import (
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	testfwk "k8s.io/kubernetes/test/integration/framework"
+	schedulerutils "k8s.io/kubernetes/test/integration/scheduler"
 	testutils "k8s.io/kubernetes/test/integration/util"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	"k8s.io/utils/ptr"
@@ -151,7 +152,7 @@ func TestSchedulingGates(t *testing.T) {
 			// Schedule pods.
 			for _, podName := range tt.schedule {
 				testCtx.Scheduler.ScheduleOne(testCtx.Ctx)
-				if err := wait.PollUntilContextTimeout(ctx, time.Millisecond*200, wait.ForeverTestTimeout, false, testutils.PodScheduled(cs, ns, podName)); err != nil {
+				if err := wait.PollUntilContextTimeout(ctx, time.Millisecond*200, wait.ForeverTestTimeout, false, schedulerutils.PodScheduled(cs, ns, podName)); err != nil {
 					t.Fatalf("Failed to schedule %s", podName)
 				}
 			}
@@ -182,7 +183,7 @@ func TestSchedulingGates(t *testing.T) {
 			// Schedule pods which no longer have gates.
 			for _, podName := range tt.rmGates {
 				testCtx.Scheduler.ScheduleOne(testCtx.Ctx)
-				if err := wait.PollUntilContextTimeout(ctx, time.Millisecond*200, wait.ForeverTestTimeout, false, testutils.PodScheduled(cs, ns, podName)); err != nil {
+				if err := wait.PollUntilContextTimeout(ctx, time.Millisecond*200, wait.ForeverTestTimeout, false, schedulerutils.PodScheduled(cs, ns, podName)); err != nil {
 					t.Fatalf("Failed to schedule %s", podName)
 				}
 			}
@@ -332,7 +333,7 @@ func TestCustomResourceEnqueue(t *testing.T) {
 	}
 
 	// Pop fake-pod out. It should be unschedulable.
-	entity := testutils.NextEntityOrDie(t, testCtx)
+	entity := schedulerutils.NextEntityOrDie(t, testCtx)
 	podInfo := entity.(*framework.QueuedPodInfo)
 	schedFramework, ok := testCtx.Scheduler.Profiles[podInfo.Pod.Spec.SchedulerName]
 	if !ok {
@@ -361,7 +362,7 @@ func TestCustomResourceEnqueue(t *testing.T) {
 	}
 
 	// Now we should be able to pop the Pod from activeQ again.
-	entity = testutils.NextEntityOrDie(t, testCtx)
+	entity = schedulerutils.NextEntityOrDie(t, testCtx)
 	if attempts := entity.GetAttempts(); attempts != 2 {
 		t.Errorf("Expected the Pod to be attempted 2 times, but got %v", attempts)
 	}
@@ -427,7 +428,7 @@ func TestRequeueByBindFailure(t *testing.T) {
 	// 2. The pod should be enqueued to activeQ/backoffQ without any event.
 	// 3. The pod should be scheduled in the second binding try.
 	// Here, waiting until (3).
-	err := wait.PollUntilContextTimeout(ctx, 200*time.Millisecond, wait.ForeverTestTimeout, false, testutils.PodScheduled(cs, ns, pod.Name))
+	err := wait.PollUntilContextTimeout(ctx, 200*time.Millisecond, wait.ForeverTestTimeout, false, schedulerutils.PodScheduled(cs, ns, pod.Name))
 	if err != nil {
 		t.Fatalf("Expect pod-1 to be scheduled by the bind plugin: %v", err)
 	}
@@ -557,7 +558,7 @@ func TestRequeueByPermitRejection(t *testing.T) {
 				wp.Allow(fakePermitPluginName)
 			}
 		})
-		return testutils.PodScheduled(cs, ns, "pod-1")(ctx)
+		return schedulerutils.PodScheduled(cs, ns, "pod-1")(ctx)
 	}); err != nil {
 		t.Fatalf("Expect pod-1 to be scheduled again: %v", err)
 	}
@@ -624,7 +625,7 @@ func (p *fakePermitPlugin) EventsToRegister(_ context.Context) ([]fwk.ClusterEve
 
 func TestPopFromBackoffQWhenActiveQEmpty(t *testing.T) {
 	// Set initial backoff to 1000s to make sure pod won't go to the activeQ after being requeued.
-	testCtx := testutils.InitTestSchedulerWithNS(t, "pop-from-backoffq", scheduler.WithPodInitialBackoffSeconds(1000), scheduler.WithPodMaxBackoffSeconds(1000))
+	testCtx := schedulerutils.InitTestSchedulerWithNS(t, "pop-from-backoffq", scheduler.WithPodInitialBackoffSeconds(1000), scheduler.WithPodMaxBackoffSeconds(1000))
 	cs, ns, ctx := testCtx.ClientSet, testCtx.NS.Name, testCtx.Ctx
 
 	// Create node, so we can schedule pods.
@@ -639,7 +640,7 @@ func TestPopFromBackoffQWhenActiveQEmpty(t *testing.T) {
 		t.Fatalf("Failed to create pod: %v", err)
 	}
 
-	err := wait.PollUntilContextTimeout(ctx, 200*time.Millisecond, wait.ForeverTestTimeout, false, testutils.PodUnschedulable(cs, ns, pod.Name))
+	err := wait.PollUntilContextTimeout(ctx, 200*time.Millisecond, wait.ForeverTestTimeout, false, schedulerutils.PodUnschedulable(cs, ns, pod.Name))
 	if err != nil {
 		t.Fatalf("Expected pod to be unschedulable: %v", err)
 	}
@@ -651,7 +652,7 @@ func TestPopFromBackoffQWhenActiveQEmpty(t *testing.T) {
 	}
 
 	// Pod should be scheduled, even if it was in the backoffQ, because PopFromBackoffQ feature is enabled.
-	err = wait.PollUntilContextTimeout(ctx, 200*time.Millisecond, wait.ForeverTestTimeout, false, testutils.PodScheduled(cs, ns, pod.Name))
+	err = wait.PollUntilContextTimeout(ctx, 200*time.Millisecond, wait.ForeverTestTimeout, false, schedulerutils.PodScheduled(cs, ns, pod.Name))
 	if err != nil {
 		t.Fatalf("Expected pod to be scheduled: %v", err)
 	}

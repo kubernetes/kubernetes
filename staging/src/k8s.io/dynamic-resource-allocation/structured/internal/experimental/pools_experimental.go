@@ -25,7 +25,6 @@ import (
 	"github.com/go-logr/logr"
 
 	v1 "k8s.io/api/core/v1"
-	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
 	draapi "k8s.io/dynamic-resource-allocation/api"
@@ -56,7 +55,7 @@ func NodeMatches(node *v1.Node, nodeNameToMatch string, allNodesMatch bool, node
 // Out-dated slices are silently ignored. Pools may be incomplete (not all
 // required slices available) or invalid (for example, device names not unique).
 // Both is recorded in the result.
-func GatherPools(ctx context.Context, slicesForNode []*resourceapi.ResourceSlice, node *v1.Node, features Features, allSlices []*resourceapi.ResourceSlice) ([]*Pool, error) {
+func GatherPools(ctx context.Context, slicesForNode []*draapi.ResourceSlice, node *v1.Node, features Features, allSlices []*draapi.ResourceSlice) ([]*Pool, error) {
 	pools := make(map[PoolID][]*draapi.ResourceSlice)
 
 	for _, slice := range slicesForNode {
@@ -81,7 +80,7 @@ func GatherPools(ctx context.Context, slicesForNode []*resourceapi.ResourceSlice
 		// the initial isComplete check below will fail due to the missing slice. Consequently,
 		// checkSlicesInPool will be called to fetch all slices in the pool, ensuring that the required
 		// shared counter slice is collected and included during pool construction.
-		if nodeName, allNodes := ptr.Deref(slice.Spec.NodeName, ""), ptr.Deref(slice.Spec.AllNodes, false); nodeName != "" || allNodes || slice.Spec.NodeSelector != nil {
+		if nodeName, allNodes := ptr.Deref(slice.Spec.NodeName, ""), slice.Spec.AllNodes; nodeName != "" || allNodes || slice.Spec.NodeSelector != nil {
 			match, err := NodeMatches(node, nodeName, allNodes, slice.Spec.NodeSelector)
 			if err != nil {
 				return nil, fmt.Errorf("failed to perform node selection for slice %s: %w", slice.Name, err)
@@ -92,7 +91,7 @@ func GatherPools(ctx context.Context, slicesForNode []*resourceapi.ResourceSlice
 				match, err := NodeMatches(node, ptr.Deref(device.NodeName, ""), ptr.Deref(device.AllNodes, false), device.NodeSelector)
 				if err != nil {
 					return nil, fmt.Errorf("failed to perform node selection for device %s in slice %s: %w",
-						device.String(), slice.Name, err)
+						device.Name, slice.Name, err)
 				}
 				if match {
 					relevant = true
@@ -218,17 +217,12 @@ func sortPoolsByID(pools []*Pool) {
 	})
 }
 
-func addSlice(pools map[PoolID][]*draapi.ResourceSlice, s *resourceapi.ResourceSlice) error {
-	var slice draapi.ResourceSlice
-	if err := draapi.Convert_v1_ResourceSlice_To_api_ResourceSlice(s, &slice, nil); err != nil {
-		return fmt.Errorf("convert ResourceSlice: %w", err)
-	}
-
+func addSlice(pools map[PoolID][]*draapi.ResourceSlice, slice *draapi.ResourceSlice) error {
 	id := PoolID{Driver: slice.Spec.Driver, Pool: slice.Spec.Pool.Name}
 	slicesForPool := pools[id]
 	if slicesForPool == nil {
 		// New pool.
-		pools[id] = []*draapi.ResourceSlice{&slice}
+		pools[id] = []*draapi.ResourceSlice{slice}
 		return nil
 	}
 
@@ -239,17 +233,17 @@ func addSlice(pools map[PoolID][]*draapi.ResourceSlice, s *resourceapi.ResourceS
 
 	if slice.Spec.Pool.Generation > slicesForPool[0].Spec.Pool.Generation {
 		// Newer, replaces all old slices.
-		pools[id] = []*draapi.ResourceSlice{&slice}
+		pools[id] = []*draapi.ResourceSlice{slice}
 		return nil
 	}
 
 	// Add to pool.
-	slicesForPool = append(slicesForPool, &slice)
+	slicesForPool = append(slicesForPool, slice)
 	pools[id] = slicesForPool
 	return nil
 }
 
-func buildPool(id PoolID, slices []*draapi.ResourceSlice, features Features, allSlicesForPool []*resourceapi.ResourceSlice) (*Pool, error) {
+func buildPool(id PoolID, slices []*draapi.ResourceSlice, features Features, allSlicesForPool []*draapi.ResourceSlice) (*Pool, error) {
 	// Sort slices by name to ensure a deterministic allocation order.
 	// Because the allocator uses a first-fit search, this allows driver authors
 	// to influence prioritization through their naming conventions.
@@ -279,14 +273,10 @@ func buildPool(id PoolID, slices []*draapi.ResourceSlice, features Features, all
 			if slicesTargetingNodeNames.Has(slice.Name) {
 				continue
 			}
-			var convertedSlice draapi.ResourceSlice
-			if err := draapi.Convert_v1_ResourceSlice_To_api_ResourceSlice(slice, &convertedSlice, nil); err != nil {
-				return nil, fmt.Errorf("convert ResourceSlice: %w", err)
-			}
-			if features.PartitionableDevices && len(convertedSlice.Spec.SharedCounters) > 0 {
-				counterSetSlices = append(counterSetSlices, &convertedSlice)
+			if features.PartitionableDevices && len(slice.Spec.SharedCounters) > 0 {
+				counterSetSlices = append(counterSetSlices, slice)
 			} else {
-				slicesNotTargetingNode = append(slicesNotTargetingNode, &convertedSlice)
+				slicesNotTargetingNode = append(slicesNotTargetingNode, slice)
 			}
 		}
 	}
@@ -417,14 +407,14 @@ func poolHasBindingConditions(pool Pool) bool {
 // decides completeness. The extra cross-slice check was considered in
 // https://github.com/kubernetes/kubernetes/pull/141118 and left out to keep the
 // allocation path cheap. Drivers must publish consistent counts.
-func checkSlicesInPool(slices []*resourceapi.ResourceSlice, poolID PoolID, generation int64) (bool, []*resourceapi.ResourceSlice) {
+func checkSlicesInPool(slices []*draapi.ResourceSlice, poolID PoolID, generation int64) (bool, []*draapi.ResourceSlice) {
 	// A cached index by pool ID would make this more efficient.
 	// It may be needed long-term to support features which always have to consider all slices.
-	var allSlicesForPool []*resourceapi.ResourceSlice
+	var allSlicesForPool []*draapi.ResourceSlice
 	for i := range slices {
 		slice := slices[i]
-		if slice.Spec.Driver != poolID.Driver.String() ||
-			slice.Spec.Pool.Name != poolID.Pool.String() {
+		if slice.Spec.Driver != poolID.Driver ||
+			slice.Spec.Pool.Name != poolID.Pool {
 			// Different pool.
 			continue
 		}

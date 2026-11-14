@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"hash/fnv"
+	"slices"
 	"strings"
 
 	"k8s.io/klog/v2"
@@ -82,7 +83,10 @@ type RuntimeHelper interface {
 	OnPodSandboxReady(ctx context.Context, pod *v1.Pod) error
 
 	// ResizeEphemeralVolume directly triggers a resize of the specified volume.
-	ResizeEphemeralVolume(pod *v1.Pod, volumeName string, newSize *resource.Quantity) error
+	ResizeEphemeralVolume(pod *v1.Pod, volumeName string) error
+
+	// EffectiveEphemeralVolumeLimit returns the effective size limit for the specified volume.
+	EffectiveEphemeralVolumeLimit(pod *v1.Pod, volumeName string) (*resource.Quantity, error)
 }
 
 // ShouldContainerBeRestarted checks whether a container needs to be restarted.
@@ -494,13 +498,9 @@ func HasAnyRegularContainerStarted(spec *v1.PodSpec, statuses []v1.ContainerStat
 		return false
 	}
 
-	containerNames := make(map[string]struct{})
-	for _, c := range spec.Containers {
-		containerNames[c.Name] = struct{}{}
-	}
-
+	nonRegular := nonRegularContainerNames(spec)
 	for _, status := range statuses {
-		if _, ok := containerNames[status.Name]; !ok {
+		if nonRegular.Has(status.Name) {
 			continue
 		}
 		if status.State.Running != nil || status.State.Terminated != nil {
@@ -519,17 +519,50 @@ func HasAnyActiveRegularContainerStarted(spec *v1.PodSpec, podStatus *PodStatus)
 		return false
 	}
 
-	containerNames := sets.New[string]()
-	for _, c := range spec.Containers {
-		containerNames.Insert(c.Name)
-	}
-
+	nonRegular := nonRegularContainerNames(spec)
 	for _, status := range podStatus.ActiveContainerStatuses {
-		if !containerNames.Has(status.Name) {
+		if nonRegular.Has(status.Name) {
 			continue
 		}
 		return true
 	}
 
 	return false
+}
+
+// SecurityProfileOCIRefs returns the unique references of the OCI seccomp
+// profiles used by the pod, at pod level and in any container, in the order
+// they appear.
+func SecurityProfileOCIRefs(pod *v1.Pod) []string {
+	var refs []string
+	add := func(profile *v1.SeccompProfile) {
+		if profile == nil || profile.Type != v1.SeccompProfileTypeOCI || profile.OCI == nil {
+			return
+		}
+		if !slices.Contains(refs, profile.OCI.Ref) {
+			refs = append(refs, profile.OCI.Ref)
+		}
+	}
+	if pod.Spec.SecurityContext != nil {
+		add(pod.Spec.SecurityContext.SeccompProfile)
+	}
+	for container := range podutil.ContainerIter(&pod.Spec, podutil.AllContainers) {
+		if container.SecurityContext != nil {
+			add(container.SecurityContext.SeccompProfile)
+		}
+	}
+	return refs
+}
+
+// nonRegularContainerNames returns the names of the init and ephemeral containers in spec. Any other
+// container of the pod is a regular container, even one that was removed from the spec: only
+// regular containers can be removed, and API validation doesn't let an added container reuse the
+// name of a removed one while the pod reports its status, which it does while the removed
+// container has runtime containers.
+func nonRegularContainerNames(spec *v1.PodSpec) sets.Set[string] {
+	names := sets.New[string]()
+	for c := range podutil.ContainerIter(spec, podutil.InitContainers|podutil.EphemeralContainers) {
+		names.Insert(c.Name)
+	}
+	return names
 }

@@ -182,7 +182,8 @@ func conditionNeedsUpdate(status *v1.PodStatus, condition *v1.PodCondition) bool
 	isEqual := condition.Status == oldCondition.Status &&
 		condition.Reason == oldCondition.Reason &&
 		condition.Message == oldCondition.Message &&
-		condition.LastProbeTime.Equal(&oldCondition.LastProbeTime)
+		condition.LastProbeTime.Equal(&oldCondition.LastProbeTime) &&
+		condition.ObservedGeneration == oldCondition.ObservedGeneration
 
 	// Return true if one of the fields have changed.
 	return !isEqual

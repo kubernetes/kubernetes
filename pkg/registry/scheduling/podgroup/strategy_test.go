@@ -91,6 +91,12 @@ func podGroupWithPreemptionPolicy(policy scheduling.PreemptionPolicy) *schedulin
 	return pg
 }
 
+func podGroupWithParentCompositePodGroupName(name *string) *scheduling.PodGroup {
+	pg := podGroup.DeepCopy()
+	pg.Spec.ParentCompositePodGroupName = name
+	return pg
+}
+
 var (
 	fieldImmutableError    = "field is immutable"
 	minCountError          = "must be greater than or equal to 1"
@@ -126,11 +132,10 @@ func TestStrategyCreate(t *testing.T) {
 	ctx := ctxWithRequestInfo()
 	now := metav1.Now()
 	testCases := map[string]struct {
-		obj                            *scheduling.PodGroup
-		expectObj                      *scheduling.PodGroup
-		enableTopologyAwareScheduling  bool
-		enablePodGroupPreemptionPolicy bool
-		expectValidationError          string
+		obj                           *scheduling.PodGroup
+		expectObj                     *scheduling.PodGroup
+		enableTopologyAwareScheduling bool
+		expectValidationError         string
 	}{
 		"simple": {
 			obj:       podGroup,
@@ -250,28 +255,17 @@ func TestStrategyCreate(t *testing.T) {
 				return pg
 			}(),
 		},
-		"podgroup preemptionPolicy disabled - drop preemptionPolicy": {
+		"preserve preemptionPolicy (Never)": {
 			obj:       podGroupWithPreemptionPolicy(scheduling.PreemptNever),
-			expectObj: podGroup,
+			expectObj: podGroupWithPreemptionPolicy(scheduling.PreemptNever),
 		},
-		"podgroup preemptionPolicy disabled - drop invalid preemptionPolicy": {
-			obj:       podGroupWithPreemptionPolicy(scheduling.PreemptionPolicy("Invalid")),
-			expectObj: podGroup,
+		"preserve preemptionPolicy (PreemptLowerPriority)": {
+			obj:       podGroupWithPreemptionPolicy(scheduling.PreemptLowerPriority),
+			expectObj: podGroupWithPreemptionPolicy(scheduling.PreemptLowerPriority),
 		},
-		"podgroup preemptionPolicy enabled - preserve preemptionPolicy (Never)": {
-			obj:                            podGroupWithPreemptionPolicy(scheduling.PreemptNever),
-			expectObj:                      podGroupWithPreemptionPolicy(scheduling.PreemptNever),
-			enablePodGroupPreemptionPolicy: true,
-		},
-		"podgroup preemptionPolicy enabled - preserve preemptionPolicy (PreemptLowerPriority)": {
-			obj:                            podGroupWithPreemptionPolicy(scheduling.PreemptLowerPriority),
-			expectObj:                      podGroupWithPreemptionPolicy(scheduling.PreemptLowerPriority),
-			enablePodGroupPreemptionPolicy: true,
-		},
-		"podgroup preemptionPolicy enabled - invalid preemptionPolicy": {
-			obj:                            podGroupWithPreemptionPolicy(scheduling.PreemptionPolicy("Invalid")),
-			enablePodGroupPreemptionPolicy: true,
-			expectValidationError:          supportedPoliciesError,
+		"invalid preemptionPolicy": {
+			obj:                   podGroupWithPreemptionPolicy(scheduling.PreemptionPolicy("Invalid")),
+			expectValidationError: supportedPoliciesError,
 		},
 	}
 
@@ -280,7 +274,6 @@ func TestStrategyCreate(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 				features.GenericWorkload:                 true,
 				features.TopologyAwareWorkloadScheduling: tc.enableTopologyAwareScheduling,
-				features.PodGroupPreemptionPolicy:        tc.enablePodGroupPreemptionPolicy,
 			})
 			podGroup := tc.obj.DeepCopy()
 
@@ -319,11 +312,10 @@ func TestStrategyCreate(t *testing.T) {
 func TestStrategyUpdate(t *testing.T) {
 	ctx := ctxWithRequestInfo()
 	testCases := map[string]struct {
-		oldObj                         *scheduling.PodGroup
-		newObj                         *scheduling.PodGroup
-		enableTopologyAwareScheduling  bool
-		enablePodGroupPreemptionPolicy bool
-		expectValidationErrors         []string
+		oldObj                        *scheduling.PodGroup
+		newObj                        *scheduling.PodGroup
+		enableTopologyAwareScheduling bool
+		expectValidationErrors        []string
 	}{
 		"no changes": {
 			oldObj: podGroup,
@@ -425,16 +417,10 @@ func TestStrategyUpdate(t *testing.T) {
 			}(),
 			expectValidationErrors: []string{fieldImmutableError},
 		},
-		"changing preemptionPolicy not allowed with podgroup preemptionPolicy disabled": {
+		"changing preemptionPolicy not allowed": {
 			oldObj:                 podGroupWithPreemptionPolicy(scheduling.PreemptNever),
 			newObj:                 podGroupWithPreemptionPolicy(scheduling.PreemptLowerPriority),
-			expectValidationErrors: []string{forbiddenError, fieldImmutableError},
-		},
-		"changing preemptionPolicy not allowed with podgroup preemptionPolicy enabled": {
-			oldObj:                         podGroupWithPreemptionPolicy(scheduling.PreemptNever),
-			newObj:                         podGroupWithPreemptionPolicy(scheduling.PreemptLowerPriority),
-			enablePodGroupPreemptionPolicy: true,
-			expectValidationErrors:         []string{fieldImmutableError},
+			expectValidationErrors: []string{fieldImmutableError},
 		},
 	}
 
@@ -443,7 +429,6 @@ func TestStrategyUpdate(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 				features.GenericWorkload:                 true,
 				features.TopologyAwareWorkloadScheduling: tc.enableTopologyAwareScheduling,
-				features.PodGroupPreemptionPolicy:        tc.enablePodGroupPreemptionPolicy,
 			})
 			podGroup := tc.oldObj.DeepCopy()
 			newPodGroup := tc.newObj.DeepCopy()
@@ -846,18 +831,8 @@ func TestDropPodGroupTemplateResourceClaims(t *testing.T) {
 func TestDropPodGroupParentCompositePodGroupNameField(t *testing.T) {
 	var noPodGroup *scheduling.PodGroup
 	podGroupWithoutParent := podGroup
-
-	podGroupWithParent := func() *scheduling.PodGroup {
-		w := podGroupWithoutParent.DeepCopy()
-		w.Spec.ParentCompositePodGroupName = new("parent1")
-		return w
-	}()
-
-	podGroupWithParentDropped := func() *scheduling.PodGroup {
-		w := podGroupWithParent.DeepCopy()
-		w.Spec.ParentCompositePodGroupName = nil
-		return w
-	}()
+	podGroupWithParent := podGroupWithParentCompositePodGroupName(new("parent1"))
+	podGroupWithParentDropped := podGroupWithParentCompositePodGroupName(nil)
 
 	tests := []struct {
 		description  string
@@ -931,14 +906,84 @@ func TestDropPodGroupParentCompositePodGroupNameField(t *testing.T) {
 				features.TopologyAwareWorkloadScheduling: true,
 				features.CompositePodGroup:               tc.enabled,
 			})
+
+			// Each case gets its own copy of newPodGroup because dropDisabledPodGroupSpecFields
+			// mutates it in place. Sharing it would leak changes into subsequent test cases.
+			newPodGroup := tc.newPodGroup.DeepCopy()
+
 			var oldSpec *scheduling.PodGroupSpec
 			if tc.oldPodGroup != nil {
 				oldSpec = &tc.oldPodGroup.Spec
 			}
-			dropDisabledPodGroupSpecFields(&tc.newPodGroup.Spec, oldSpec)
-			if diff := cmp.Diff(tc.wantPodGroup, tc.newPodGroup); diff != "" {
+			dropDisabledPodGroupSpecFields(&newPodGroup.Spec, oldSpec)
+			if diff := cmp.Diff(tc.wantPodGroup, newPodGroup); diff != "" {
 				t.Errorf("new PodGroup changed (- want, + got): %s", diff)
 			}
 		})
+	}
+}
+
+func TestParentCompositePodGroupNameEnablement(t *testing.T) {
+	var (
+		ctx        = ctxWithRequestInfo()
+		strategy   = NewStrategy()
+		parentName = "parent-cpg"
+		pg         = podGroupWithParentCompositePodGroupName(new(parentName))
+	)
+
+	// Enable the CompositePodGroup feature gate during PodGroup creation.
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.GenericWorkload:                 true,
+		features.TopologyAwareWorkloadScheduling: true,
+		features.CompositePodGroup:               true,
+	})
+
+	createdPG := pg.DeepCopy()
+	strategy.PrepareForCreate(ctx, createdPG)
+
+	errs := strategy.Validate(ctx, createdPG)
+	errs = strategy.ValidateDeclaratively(ctx, createdPG, nil, errs, operation.Create, strategy.DeclarativeValidationConfig(ctx, createdPG, nil))
+	if len(errs) != 0 {
+		t.Fatalf("create with CompositePodGroup enabled: unexpected validation errors: %v", errs.ToAggregate())
+	}
+
+	if diff := cmp.Diff(pg.Spec.ParentCompositePodGroupName, createdPG.Spec.ParentCompositePodGroupName); diff != "" {
+		t.Fatalf("create with CompositePodGroup enabled: spec.parentCompositePodGroupName mismatch (-want +got):\n%s", diff)
+	}
+
+	// Disable the CompositePodGroup feature gate and check that the ParentCompositePodGroupName field still exists after the update.
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CompositePodGroup, false)
+
+	updatedPG := createdPG.DeepCopy()
+	updatedPG.Labels = map[string]string{"foo": "bar"}
+	updatedPG.ResourceVersion = "2"
+	strategy.PrepareForUpdate(ctx, updatedPG, createdPG)
+
+	errs = strategy.ValidateUpdate(ctx, updatedPG, createdPG)
+	errs = strategy.ValidateDeclaratively(ctx, updatedPG, createdPG, errs, operation.Update, strategy.DeclarativeValidationConfig(ctx, updatedPG, createdPG))
+	if len(errs) != 0 {
+		t.Fatalf("update with CompositePodGroup disabled: unexpected validation errors: %v", errs.ToAggregate())
+	}
+
+	if diff := cmp.Diff(pg.Spec.ParentCompositePodGroupName, updatedPG.Spec.ParentCompositePodGroupName); diff != "" {
+		t.Fatalf("update with CompositePodGroup disabled: spec.parentCompositePodGroupName mismatch (-want +got):\n%s", diff)
+	}
+
+	// Re-enable the CompositePodGroup feature gate to verify that the ParentCompositePodGroupName field still exists after the update.
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CompositePodGroup, true)
+
+	updatedPG2 := updatedPG.DeepCopy()
+	updatedPG2.Labels = map[string]string{"foo": "baz"}
+	updatedPG2.ResourceVersion = "3"
+	strategy.PrepareForUpdate(ctx, updatedPG2, updatedPG)
+
+	errs = strategy.ValidateUpdate(ctx, updatedPG2, updatedPG)
+	errs = strategy.ValidateDeclaratively(ctx, updatedPG2, updatedPG, errs, operation.Update, strategy.DeclarativeValidationConfig(ctx, updatedPG2, updatedPG))
+	if len(errs) != 0 {
+		t.Fatalf("update after re-enabling CompositePodGroup: unexpected validation errors: %v", errs.ToAggregate())
+	}
+
+	if diff := cmp.Diff(pg.Spec.ParentCompositePodGroupName, updatedPG2.Spec.ParentCompositePodGroupName); diff != "" {
+		t.Fatalf("update after re-enabling CompositePodGroup: spec.parentCompositePodGroupName mismatch (-want +got):\n%s", diff)
 	}
 }

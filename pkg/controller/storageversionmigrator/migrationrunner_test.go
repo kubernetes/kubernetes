@@ -23,9 +23,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 	svmv1 "k8s.io/api/storagemigration/v1"
-	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	apiextensionsfake "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/fake"
-	apiextensionsscheme "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/scheme"
+	apiextensionsv1 "k8s.io/apiextensions-api/pkg/apis/apiextensions/v1"
+	apiextensionsfake "k8s.io/apiextensions-api/pkg/client/clientset/clientset/fake"
+	apiextensionsscheme "k8s.io/apiextensions-api/pkg/client/clientset/clientset/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -232,7 +232,7 @@ func TestCustomResourceController_Sync(t *testing.T) {
 			},
 		},
 		{
-			name: "Migration failed: CRD condition updated",
+			name: "Migration failed: CRD condition updated, stored versions kept",
 			svms: []*svmv1.StorageVersionMigration{newSVM("test-svm", "example.com", "widgets",
 				metav1.Condition{
 					Type:   string(svmv1.MigrationFailed),
@@ -267,7 +267,7 @@ func TestCustomResourceController_Sync(t *testing.T) {
 							Message: "The migration has failed",
 						},
 					},
-					[]string{"v2"},
+					nil,
 				),
 			},
 		},

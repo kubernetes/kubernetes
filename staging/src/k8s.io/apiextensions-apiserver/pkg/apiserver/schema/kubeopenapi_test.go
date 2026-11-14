@@ -25,8 +25,9 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"sigs.k8s.io/randfill"
 
+	apiextensionsv1beta1 "k8s.io/apiextensions-api/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
-	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	apiextensionsv1beta1conversion "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apimachinery/pkg/util/json"
 )
 
@@ -111,7 +112,7 @@ func TestStructuralKubeOpenAPIRoundtrip(t *testing.T) {
 			t.Fatal(err)
 		}
 		internalSchema := &apiextensions.JSONSchemaProps{}
-		err = apiextensionsv1beta1.Convert_v1beta1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(v1beta1Schema, internalSchema, nil)
+		err = apiextensionsv1beta1conversion.Convert_v1beta1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(v1beta1Schema, internalSchema, nil)
 		if err != nil {
 			t.Fatal(err)
 		}

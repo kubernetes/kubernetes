@@ -1234,6 +1234,7 @@ func TestResizeEphemeralVolume(t *testing.T) {
 		expectError          bool
 		expectedMountAction  string
 		expectedMountOpts    []string
+		unexpectedMountOpts  []string
 	}{
 		{
 			name:                 "resize memory volume when mount point does not exist yet",
@@ -1254,6 +1255,17 @@ func TestResizeEphemeralVolume(t *testing.T) {
 			expectError:          false,
 			expectedMountAction:  "mount",
 			expectedMountOpts:    []string{"remount", "size=209715200"},
+			unexpectedMountOpts:  []string{swap.TmpfsNoswapOption},
+		},
+		{
+			name:                 "resize memory volume mounted with noswap keeps noswap",
+			medium:               v1.StorageMediumMemory,
+			isMountPoint:         true,
+			currentMountSizeOpts: []string{"rw", "relatime", "size=104857600", swap.TmpfsNoswapOption},
+			newSize:              &quantity200Mi,
+			expectError:          false,
+			expectedMountAction:  "mount",
+			expectedMountOpts:    []string{"remount", "size=209715200", swap.TmpfsNoswapOption},
 		},
 		{
 			name:                 "resize disk-backed volume should return error",
@@ -1266,20 +1278,26 @@ func TestResizeEphemeralVolume(t *testing.T) {
 			expectedMountOpts:    nil,
 		},
 		{
-			name:                 "resize memory volume with nil newSize (error path)",
+			name:                 "resize memory volume with nil newSize (remount to default)",
 			medium:               v1.StorageMediumMemory,
 			isMountPoint:         true,
 			currentMountSizeOpts: []string{"size=104857600"},
 			newSize:              nil,
-			expectError:          true,
+			expectError:          false,
+			expectedMountAction:  "mount",
+			// Defaults to node allocatable memory (16Gi in fakeVolumeHost) when sizeLimit is nil
+			expectedMountOpts: []string{"remount", "size=17179869184"},
 		},
 		{
-			name:                 "resize memory volume with zero newSize (error path)",
+			name:                 "resize memory volume with zero newSize (remount to default)",
 			medium:               v1.StorageMediumMemory,
 			isMountPoint:         true,
 			currentMountSizeOpts: []string{"size=104857600"},
 			newSize:              &quantity0,
-			expectError:          true,
+			expectError:          false,
+			expectedMountAction:  "mount",
+			// Defaults to node allocatable memory (16Gi in fakeVolumeHost) when sizeLimit is zero
+			expectedMountOpts: []string{"remount", "size=17179869184"},
 		},
 	}
 
@@ -1319,7 +1337,7 @@ func TestResizeEphemeralVolume(t *testing.T) {
 			resizablePlugin, ok := plug.(volume.ResizableEphemeralVolumePlugin)
 			require.True(t, ok, "plugin does not implement ResizableEphemeralVolumePlugin")
 
-			err = resizablePlugin.ResizeEphemeralVolume(volumeSpec, pod, tt.newSize)
+			err = resizablePlugin.ResizeEphemeralVolume(volumeSpec, pod)
 			if tt.expectError {
 				require.Error(t, err)
 				return
@@ -1344,6 +1362,9 @@ func TestResizeEphemeralVolume(t *testing.T) {
 			require.NotNil(t, targetMp, "expected a mount point at %s, but got none", volPath)
 			for _, expectedOpt := range tt.expectedMountOpts {
 				assert.Contains(t, targetMp.Opts, expectedOpt)
+			}
+			for _, unexpectedOpt := range tt.unexpectedMountOpts {
+				assert.NotContains(t, targetMp.Opts, unexpectedOpt)
 			}
 		})
 	}

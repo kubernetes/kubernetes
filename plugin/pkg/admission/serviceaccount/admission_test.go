@@ -18,22 +18,27 @@ package serviceaccount
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/admission"
 	admissiontesting "k8s.io/apiserver/pkg/admission/testing"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	v1defaults "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/features"
 	kubelet "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/utils/ptr"
 )
@@ -162,36 +167,7 @@ func TestRejectsMirrorPodWithServiceAccountTokenVolumeProjections(t *testing.T) 
 func TestAssignsDefaultServiceAccountAndBoundTokenWithNoSecretTokens(t *testing.T) {
 	ns := "myns"
 
-	admit := NewServiceAccount()
-	informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
-	admit.SetExternalKubeInformerFactory(informerFactory)
-	admit.MountServiceAccountToken = true
-
-	// Add the default service account for the ns into the cache
-	informerFactory.Core().V1().ServiceAccounts().Informer().GetStore().Add(&corev1.ServiceAccount{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      DefaultServiceAccountName,
-			Namespace: ns,
-		},
-	})
-
-	v1PodIn := &corev1.Pod{
-		Spec: corev1.PodSpec{
-			Containers: []corev1.Container{{}},
-		},
-	}
-	v1defaults.SetObjectDefaults_Pod(v1PodIn)
-	pod := &api.Pod{}
-	if err := v1defaults.Convert_v1_Pod_To_core_Pod(v1PodIn, pod, nil); err != nil {
-		t.Fatal(err)
-	}
-	attrs := admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil)
-	err := admissiontesting.WithReinvocationTesting(t, admit).Admit(context.TODO(), attrs, nil)
-	if err != nil {
-		t.Fatalf("Expected success, got: %v", err)
-	}
-
-	expectedVolumes := []api.Volume{{
+	expectedConfigMapVolumes := []api.Volume{{
 		Name: "cleared",
 		VolumeSource: api.VolumeSource{
 			Projected: &api.ProjectedVolumeSource{
@@ -204,40 +180,95 @@ func TestAssignsDefaultServiceAccountAndBoundTokenWithNoSecretTokens(t *testing.
 			},
 		},
 	}}
-	expectedVolumeMounts := []api.VolumeMount{{
-		Name:      "cleared",
-		ReadOnly:  true,
-		MountPath: "/var/run/secrets/kubernetes.io/serviceaccount",
+	expectedVolumesClusterTrustBundle := []api.Volume{{
+		Name: "cleared",
+		VolumeSource: api.VolumeSource{
+			Projected: &api.ProjectedVolumeSource{
+				Sources: []api.VolumeProjection{
+					{ServiceAccountToken: &api.ServiceAccountTokenProjection{ExpirationSeconds: ptr.To[int64](3607), Path: "token"}},
+					{ClusterTrustBundle: &api.ClusterTrustBundleProjection{SignerName: new("kubernetes.io/kube-apiserver-serving"), LabelSelector: &metav1.LabelSelector{}, Path: "ca.crt"}},
+					{DownwardAPI: &api.DownwardAPIProjection{Items: []api.DownwardAPIVolumeFile{{Path: "namespace", FieldRef: &api.ObjectFieldSelector{APIVersion: "v1", FieldPath: "metadata.namespace"}}}}},
+				},
+				DefaultMode: ptr.To[int32](0644),
+			},
+		},
 	}}
 
-	// clear generated volume names
-	for i := range pod.Spec.Volumes {
-		if len(pod.Spec.Volumes[i].Name) > 0 {
-			pod.Spec.Volumes[i].Name = "cleared"
+	for _, ctbTrustEnabled := range []bool{false, true} {
+		expectedVolumes := expectedConfigMapVolumes
+		if ctbTrustEnabled {
+			expectedVolumes = expectedVolumesClusterTrustBundle
 		}
-	}
-	for i := range pod.Spec.Containers[0].VolumeMounts {
-		if len(pod.Spec.Containers[0].VolumeMounts[i].Name) > 0 {
-			pod.Spec.Containers[0].VolumeMounts[i].Name = "cleared"
-		}
-	}
 
-	if !reflect.DeepEqual(expectedVolumes, pod.Spec.Volumes) {
-		t.Errorf("unexpected volumes: %s", cmp.Diff(expectedVolumes, pod.Spec.Volumes))
-	}
-	if !reflect.DeepEqual(expectedVolumeMounts, pod.Spec.Containers[0].VolumeMounts) {
-		t.Errorf("unexpected volumes: %s", cmp.Diff(expectedVolumeMounts, pod.Spec.Containers[0].VolumeMounts))
-	}
+		t.Run(fmt.Sprintf("KubeAPIServerWorkloadsTrust=%t", ctbTrustEnabled), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeAPIServerWorkloadsTrust, ctbTrustEnabled)
 
-	// ensure result converted to v1 matches defaulted object
-	v1PodOut := &corev1.Pod{}
-	if err := v1defaults.Convert_core_Pod_To_v1_Pod(pod, v1PodOut, nil); err != nil {
-		t.Fatal(err)
-	}
-	v1PodOutDefaulted := v1PodOut.DeepCopy()
-	v1defaults.SetObjectDefaults_Pod(v1PodOutDefaulted)
-	if !reflect.DeepEqual(v1PodOut, v1PodOutDefaulted) {
-		t.Error(cmp.Diff(v1PodOut, v1PodOutDefaulted))
+			admit := NewServiceAccount()
+			informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
+			admit.SetExternalKubeInformerFactory(informerFactory)
+			admit.MountServiceAccountToken = true
+
+			// Add the default service account for the ns into the cache
+			err := informerFactory.Core().V1().ServiceAccounts().Informer().GetStore().Add(&corev1.ServiceAccount{
+				Name:      DefaultServiceAccountName,
+				Namespace: ns,
+			})
+			if err != nil {
+				t.Fatalf("failed to add ServiceAccount to the informer's store: %v", err)
+			}
+
+			v1PodIn := &corev1.Pod{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{{}},
+				},
+			}
+			v1defaults.SetObjectDefaults_Pod(v1PodIn)
+			pod := &api.Pod{}
+			if err := v1defaults.Convert_v1_Pod_To_core_Pod(v1PodIn, pod, nil); err != nil {
+				t.Fatal(err)
+			}
+			attrs := admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil)
+			err = admissiontesting.WithReinvocationTesting(t, admit).Admit(context.TODO(), attrs, nil)
+			if err != nil {
+				t.Fatalf("Expected success, got: %v", err)
+			}
+
+			expectedVolumeMounts := []api.VolumeMount{{
+				Name:      "cleared",
+				ReadOnly:  true,
+				MountPath: "/var/run/secrets/kubernetes.io/serviceaccount",
+			}}
+
+			// clear generated volume names
+			for i := range pod.Spec.Volumes {
+				if len(pod.Spec.Volumes[i].Name) > 0 {
+					pod.Spec.Volumes[i].Name = "cleared"
+				}
+			}
+			for i := range pod.Spec.Containers[0].VolumeMounts {
+				if len(pod.Spec.Containers[0].VolumeMounts[i].Name) > 0 {
+					pod.Spec.Containers[0].VolumeMounts[i].Name = "cleared"
+				}
+			}
+
+			if !reflect.DeepEqual(expectedVolumes, pod.Spec.Volumes) {
+				t.Errorf("unexpected volumes: %s", cmp.Diff(expectedVolumes, pod.Spec.Volumes))
+			}
+			if !reflect.DeepEqual(expectedVolumeMounts, pod.Spec.Containers[0].VolumeMounts) {
+				t.Errorf("unexpected volumes: %s", cmp.Diff(expectedVolumeMounts, pod.Spec.Containers[0].VolumeMounts))
+			}
+
+			// ensure result converted to v1 matches defaulted object
+			v1PodOut := &corev1.Pod{}
+			if err := v1defaults.Convert_core_Pod_To_v1_Pod(pod, v1PodOut, nil); err != nil {
+				t.Fatal(err)
+			}
+			v1PodOutDefaulted := v1PodOut.DeepCopy()
+			v1defaults.SetObjectDefaults_Pod(v1PodOutDefaulted)
+			if !reflect.DeepEqual(v1PodOut, v1PodOutDefaulted) {
+				t.Error(cmp.Diff(v1PodOut, v1PodOutDefaulted))
+			}
+		})
 	}
 }
 
@@ -288,6 +319,12 @@ func TestDeniesInvalidServiceAccount(t *testing.T) {
 }
 
 func TestAutomountsAPIToken(t *testing.T) {
+	for _, ctbTrustEnabled := range []bool{false, true} {
+		t.Run(fmt.Sprintf("KubeAPIServerWorkloadsTrust=%t", ctbTrustEnabled), func(t *testing.T) { testAutomountsAPIToken(t, ctbTrustEnabled) })
+	}
+}
+func testAutomountsAPIToken(t *testing.T, ctbTrustEnabled bool) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeAPIServerWorkloadsTrust, ctbTrustEnabled)
 
 	admit := NewServiceAccount()
 	informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
@@ -681,7 +718,7 @@ func TestRejectsUnreferencedSecretVolumes(t *testing.T) {
 		},
 	}
 	attrs = admission.NewAttributesRecord(pod2, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil)
-	if err := admissiontesting.WithReinvocationTesting(t, admit).Admit(context.TODO(), attrs, nil); err == nil || !strings.Contains(err.Error(), "with envVar") {
+	if err := admissiontesting.WithReinvocationTesting(t, admit).Admit(context.TODO(), attrs, nil); err == nil || !strings.Contains(err.Error(), `secrets ["foo"]`) {
 		t.Errorf("Unexpected error: %v", err)
 	}
 
@@ -700,7 +737,7 @@ func TestRejectsUnreferencedSecretVolumes(t *testing.T) {
 		},
 	}
 	attrs = admission.NewAttributesRecord(pod2, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil)
-	if err := admissiontesting.WithReinvocationTesting(t, admit).Admit(context.TODO(), attrs, nil); err == nil || !strings.Contains(err.Error(), "with envFrom") {
+	if err := admissiontesting.WithReinvocationTesting(t, admit).Admit(context.TODO(), attrs, nil); err == nil || !strings.Contains(err.Error(), `secrets ["foo"]`) {
 		t.Errorf("Unexpected error: %v", err)
 	}
 
@@ -729,7 +766,7 @@ func TestRejectsUnreferencedSecretVolumes(t *testing.T) {
 		t.Errorf("admit only enforces restrictions on secret mounts when operation==create. Unexpected error: %v", err)
 	}
 	attrs = admission.NewAttributesRecord(pod2, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil)
-	if err := admit.Validate(context.TODO(), attrs, nil); err == nil || !strings.Contains(err.Error(), "with envVar") {
+	if err := admit.Validate(context.TODO(), attrs, nil); err == nil || !strings.Contains(err.Error(), `secrets ["foo"]`) {
 		t.Errorf("validate only enforces restrictions on secret mounts when operation==create and subresource==''. Unexpected error: %v", err)
 	}
 
@@ -753,7 +790,7 @@ func TestRejectsUnreferencedSecretVolumes(t *testing.T) {
 		t.Errorf("admit only enforces restrictions on secret mounts when operation==create. Unexpected error: %v", err)
 	}
 	attrs = admission.NewAttributesRecord(pod2, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil)
-	if err := admit.Validate(context.TODO(), attrs, nil); err == nil || !strings.Contains(err.Error(), "with envFrom") {
+	if err := admit.Validate(context.TODO(), attrs, nil); err == nil || !strings.Contains(err.Error(), `secrets ["foo"]`) {
 		t.Errorf("validate only enforces restrictions on secret mounts when operation==create and subresource==''. Unexpected error: %v", err)
 	}
 
@@ -784,7 +821,7 @@ func TestRejectsUnreferencedSecretVolumes(t *testing.T) {
 		t.Errorf("admit only enforces restrictions on secret mounts when operation==create and subresource==''. Unexpected error: %v", err)
 	}
 	attrs = admission.NewAttributesRecord(pod2, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "ephemeralcontainers", admission.Update, &metav1.UpdateOptions{}, false, nil)
-	if err := admit.Validate(context.TODO(), attrs, nil); err == nil || !strings.Contains(err.Error(), "with envVar") {
+	if err := admit.Validate(context.TODO(), attrs, nil); err == nil || !strings.Contains(err.Error(), `secrets ["foo"]`) {
 		t.Errorf("validate enforces restrictions on secret mounts when operation==update and subresource==ephemeralcontainers. Unexpected error: %v", err)
 	}
 
@@ -805,7 +842,7 @@ func TestRejectsUnreferencedSecretVolumes(t *testing.T) {
 		},
 	}
 	attrs = admission.NewAttributesRecord(pod2, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "ephemeralcontainers", admission.Update, &metav1.UpdateOptions{}, false, nil)
-	if err := admit.Validate(context.TODO(), attrs, nil); err == nil || !strings.Contains(err.Error(), "with envFrom") {
+	if err := admit.Validate(context.TODO(), attrs, nil); err == nil || !strings.Contains(err.Error(), `secrets ["foo"]`) {
 		t.Errorf("validate enforces restrictions on secret mounts when operation==update and subresource==ephemeralcontainers. Unexpected error: %v", err)
 	}
 }
@@ -982,3 +1019,244 @@ func testGenerateName(n string) string {
 }
 
 var generatedVolumeName = testGenerateName(ServiceAccountVolumeName + "-")
+
+func TestEnforceMountableSecrets(t *testing.T) {
+	ns := "myns"
+
+	secretVolume := func(name string) api.Volume {
+		return api.Volume{Name: name, VolumeSource: api.VolumeSource{Secret: &api.SecretVolumeSource{SecretName: name}}}
+	}
+	projectedSecretVolume := func(name string) api.Volume {
+		return api.Volume{Name: name, VolumeSource: api.VolumeSource{Projected: &api.ProjectedVolumeSource{
+			Sources: []api.VolumeProjection{{Secret: &api.SecretProjection{LocalObjectReference: api.LocalObjectReference{Name: name}}}},
+		}}}
+	}
+	secretEnv := func(name string) []api.EnvVar {
+		return []api.EnvVar{{Name: "env", ValueFrom: &api.EnvVarSource{
+			SecretKeyRef: &api.SecretKeySelector{LocalObjectReference: api.LocalObjectReference{Name: name}},
+		}}}
+	}
+	ephemeralContainer := func(secretName string) api.EphemeralContainer {
+		return api.EphemeralContainer{EphemeralContainerCommon: api.EphemeralContainerCommon{Name: "debug", Env: secretEnv(secretName)}}
+	}
+	podWithVolumes := func(volumes ...api.Volume) *api.Pod {
+		return &api.Pod{Spec: api.PodSpec{ServiceAccountName: DefaultServiceAccountName, Volumes: volumes}}
+	}
+	withEphemeral := func(pod *api.Pod, ec api.EphemeralContainer) *api.Pod {
+		pod = pod.DeepCopy()
+		pod.Spec.EphemeralContainers = append(pod.Spec.EphemeralContainers, ec)
+		return pod
+	}
+
+	tests := []struct {
+		name string
+		pod  *api.Pod
+		// oldPod is set for ephemeralcontainers updates; otherwise the request is a create.
+		oldPod      *api.Pod
+		expectedErr string
+	}{
+		{
+			name: "projected secret allowed",
+			pod:  podWithVolumes(projectedSecretVolume("allowed")),
+		},
+		{
+			name:        "projected secret rejected",
+			pod:         podWithVolumes(projectedSecretVolume("denied")),
+			expectedErr: `secrets ["denied"]`,
+		},
+		{
+			name: "csi nodePublishSecretRef rejected",
+			pod: podWithVolumes(api.Volume{Name: "csi", VolumeSource: api.VolumeSource{CSI: &api.CSIVolumeSource{
+				Driver:               "example.com/driver",
+				NodePublishSecretRef: &api.LocalObjectReference{Name: "denied"},
+			}}}),
+			expectedErr: `secrets ["denied"]`,
+		},
+		{
+			name: "multiple disallowed secrets listed sorted",
+			pod: &api.Pod{Spec: api.PodSpec{
+				ServiceAccountName: DefaultServiceAccountName,
+				Volumes:            []api.Volume{secretVolume("zzz"), projectedSecretVolume("mmm"), secretVolume("allowed")},
+				Containers:         []api.Container{{Name: "c", Env: secretEnv("aaa")}},
+			}},
+			expectedErr: `secrets ["aaa" "mmm" "zzz"] which are not allowed because service account default does not reference them`,
+		},
+		{
+			name: "pull secret allowed by imagePullSecrets only",
+			pod: &api.Pod{Spec: api.PodSpec{
+				ServiceAccountName: DefaultServiceAccountName,
+				ImagePullSecrets:   []api.LocalObjectReference{{Name: "pull"}},
+			}},
+		},
+		{
+			name: "pull secret also mounted as a volume rejected",
+			pod: &api.Pod{Spec: api.PodSpec{
+				ServiceAccountName: DefaultServiceAccountName,
+				ImagePullSecrets:   []api.LocalObjectReference{{Name: "pull"}},
+				Volumes:            []api.Volume{secretVolume("pull")},
+			}},
+			expectedErr: `secrets ["pull"]`,
+		},
+		{
+			name:        "ephemeral container adding a disallowed secret rejected",
+			oldPod:      podWithVolumes(secretVolume("allowed")),
+			pod:         withEphemeral(podWithVolumes(secretVolume("allowed")), ephemeralContainer("denied")),
+			expectedErr: `secrets ["denied"]`,
+		},
+		{
+			name:   "ephemeral container update allowed when old pod already referenced a disallowed secret",
+			oldPod: podWithVolumes(secretVolume("legacy")),
+			pod:    withEphemeral(podWithVolumes(secretVolume("legacy")), ephemeralContainer("legacy")),
+		},
+		{
+			name:        "ephemeral container update only reports newly referenced secrets",
+			oldPod:      podWithVolumes(secretVolume("legacy")),
+			pod:         withEphemeral(podWithVolumes(secretVolume("legacy")), ephemeralContainer("denied")),
+			expectedErr: `pod references secrets ["denied"] which`,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			admit := NewServiceAccount()
+			informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
+			admit.SetExternalKubeInformerFactory(informerFactory)
+			err := informerFactory.Core().V1().ServiceAccounts().Informer().GetStore().Add(&corev1.ServiceAccount{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        DefaultServiceAccountName,
+					Namespace:   ns,
+					Annotations: map[string]string{EnforceMountableSecretsAnnotation: "true"},
+				},
+				Secrets:          []corev1.ObjectReference{{Name: "allowed"}},
+				ImagePullSecrets: []corev1.LocalObjectReference{{Name: "pull"}},
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			var attrs admission.Attributes
+			if tc.oldPod == nil {
+				attrs = admission.NewAttributesRecord(tc.pod, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil)
+			} else {
+				attrs = admission.NewAttributesRecord(tc.pod, tc.oldPod, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "ephemeralcontainers", admission.Update, &metav1.UpdateOptions{}, false, nil)
+			}
+			err = admit.Validate(context.TODO(), attrs, nil)
+			if tc.expectedErr == "" {
+				if err != nil {
+					t.Errorf("Unexpected error: %v", err)
+				}
+			} else if err == nil || !strings.Contains(err.Error(), tc.expectedErr) {
+				t.Errorf("Expected error containing %q, got: %v", tc.expectedErr, err)
+			}
+		})
+	}
+}
+
+func TestDynamicContainers(t *testing.T) {
+	ns := "myns"
+	admit := NewServiceAccount()
+	informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
+	admit.SetExternalKubeInformerFactory(informerFactory)
+	admit.LimitSecretReferences = true
+	if err := informerFactory.Core().V1().ServiceAccounts().Informer().GetStore().Add(&corev1.ServiceAccount{
+		ObjectMeta: metav1.ObjectMeta{Name: DefaultServiceAccountName, Namespace: ns},
+		Secrets:    []corev1.ObjectReference{{Name: "allowed"}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	tokenMount := api.VolumeMount{Name: generatedVolumeName, ReadOnly: true, MountPath: DefaultAPITokenMountPath}
+	secretEnv := func(secret string) []api.EnvVar {
+		return []api.EnvVar{{Name: "SECRET", ValueFrom: &api.EnvVarSource{SecretKeyRef: &api.SecretKeySelector{LocalObjectReference: api.LocalObjectReference{Name: secret}, Key: "key"}}}}
+	}
+	basePod := func(withTokenVolume bool) *api.Pod {
+		pod := &api.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: "myname", Namespace: ns},
+			Spec: api.PodSpec{
+				ServiceAccountName: DefaultServiceAccountName,
+				// Stored containers aren't re-checked, even if they no longer comply.
+				Containers: []api.Container{{Name: "existing", Env: secretEnv("legacy")}},
+			},
+		}
+		if withTokenVolume {
+			pod.Spec.Volumes = []api.Volume{{Name: generatedVolumeName, VolumeSource: api.VolumeSource{Projected: TokenVolumeSource()}}}
+			pod.Spec.Containers[0].VolumeMounts = []api.VolumeMount{tokenMount}
+		}
+		return pod
+	}
+	withAdded := func(pod *api.Pod, c api.Container) *api.Pod {
+		pod = pod.DeepCopy()
+		pod.Spec.Containers = append(pod.Spec.Containers, c)
+		return pod
+	}
+
+	testCases := []struct {
+		name             string
+		oldPod, pod      *api.Pod
+		expectErr        bool
+		expectAddedMount []api.VolumeMount
+	}{{
+		name:             "added container mounts the token volume",
+		oldPod:           basePod(true),
+		pod:              withAdded(basePod(true), api.Container{Name: "added"}),
+		expectAddedMount: []api.VolumeMount{tokenMount},
+	}, {
+		name:   "added container doesn't mount a token without a token volume",
+		oldPod: basePod(false),
+		pod:    withAdded(basePod(false), api.Container{Name: "added"}),
+	}, {
+		name:   "added container keeps its own mount at the token path",
+		oldPod: basePod(true),
+		pod: withAdded(basePod(true), api.Container{Name: "added", VolumeMounts: []api.VolumeMount{
+			{Name: generatedVolumeName, MountPath: DefaultAPITokenMountPath},
+		}}),
+		expectAddedMount: []api.VolumeMount{{Name: generatedVolumeName, MountPath: DefaultAPITokenMountPath}},
+	}, {
+		name:             "added container referencing an allowed secret",
+		oldPod:           basePod(true),
+		pod:              withAdded(basePod(true), api.Container{Name: "added", Env: secretEnv("allowed")}),
+		expectAddedMount: []api.VolumeMount{tokenMount},
+	}, {
+		name:      "added container referencing a disallowed secret",
+		oldPod:    basePod(true),
+		pod:       withAdded(basePod(true), api.Container{Name: "added", Env: secretEnv("disallowed")}),
+		expectErr: true,
+	}, {
+		name:             "added container referencing a secret the pod already references",
+		oldPod:           basePod(true),
+		pod:              withAdded(basePod(true), api.Container{Name: "added", Env: secretEnv("legacy")}),
+		expectAddedMount: []api.VolumeMount{tokenMount},
+	}, {
+		name:      "added container referencing a disallowed secret through envFrom",
+		oldPod:    basePod(true),
+		pod:       withAdded(basePod(true), api.Container{Name: "added", EnvFrom: []api.EnvFromSource{{SecretRef: &api.SecretEnvSource{LocalObjectReference: api.LocalObjectReference{Name: "disallowed"}}}}}),
+		expectErr: true,
+	}}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			attrs := admission.NewAttributesRecord(tc.pod, tc.oldPod, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "dynamic", admission.Update, &metav1.UpdateOptions{}, false, nil)
+			if err := admissiontesting.WithReinvocationTesting(t, admit).Admit(t.Context(), attrs, nil); err != nil {
+				t.Fatalf("Unexpected Admit() error: %v", err)
+			}
+			err := admit.Validate(t.Context(), attrs, nil)
+			if tc.expectErr {
+				if err == nil {
+					t.Fatal("expected an error")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("Unexpected Validate() error: %v", err)
+			}
+			if diff := cmp.Diff(tc.expectAddedMount, tc.pod.Spec.Containers[1].VolumeMounts, cmpopts.EquateEmpty()); diff != "" {
+				t.Errorf("unexpected added container volume mounts (-want,+got):\n%s", diff)
+			}
+			if diff := cmp.Diff(tc.oldPod.Spec.Containers[0], tc.pod.Spec.Containers[0]); diff != "" {
+				t.Errorf("existing container changed (-want,+got):\n%s", diff)
+			}
+			if diff := cmp.Diff(tc.oldPod.Spec.Volumes, tc.pod.Spec.Volumes); diff != "" {
+				t.Errorf("volumes changed (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}

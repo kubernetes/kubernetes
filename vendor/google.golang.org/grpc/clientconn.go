@@ -553,7 +553,6 @@ func chainStreamClientInterceptors(cc *ClientConn) {
 	if cc.dopts.streamInt != nil {
 		interceptors = append([]StreamClientInterceptor{cc.dopts.streamInt}, interceptors...)
 	}
-	interceptors = append(interceptors, defaultStreamInterceptor)
 	var chainedInt StreamClientInterceptor
 	if len(interceptors) == 0 {
 		chainedInt = nil
@@ -1212,6 +1211,12 @@ func (cc *ClientConn) Close() error {
 	cc.mu.Unlock()
 
 	cc.resolverWrapper.close()
+	// Swap in a default ConfigSelector so the resolver-provided one (which may
+	// transitively retain resolver-owned state such as parsed service configs
+	// and cluster maps) is released once in-flight RPCs finish selecting on
+	// it. Done after the resolver has closed so no further UpdateState calls
+	// race with this swap.
+	cc.safeConfigSelector.UpdateConfigSelector(&defaultConfigSelector{nil})
 	// The order of closing matters here since the balancer wrapper assumes the
 	// picker is closed before it is closed.
 	cc.pickerWrapper.close()

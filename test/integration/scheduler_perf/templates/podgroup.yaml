@@ -4,7 +4,7 @@
 #   - minCount: Minimum pod count required for gang scheduling (required)
 #   - priority: Priority value (default: 1000)
 #   - disruptionMode: Eviction behavior ("single" or "all", defaults to "all")
-apiVersion: scheduling.k8s.io/v1alpha3
+apiVersion: scheduling.k8s.io/v1beta1
 kind: PodGroup
 metadata:
   name: gang-{{.Index}}

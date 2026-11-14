@@ -48,6 +48,10 @@ const (
 
 	// Reasons for pod features admission failure
 	PodFeatureUnsupported = "PodFeatureUnsupported"
+
+	// SecurityProfileOCIUnsupportedReason is the reason for rejecting pods
+	// with OCI security profiles on nodes whose runtime does not support them.
+	SecurityProfileOCIUnsupportedReason = "SecurityProfileOCIUnsupported"
 )
 
 type handlerRunner struct {
@@ -207,9 +211,36 @@ func (a *appArmorAdmitHandler) Admit(_ context.Context, attrs *PodAdmitAttribute
 		return PodAdmitResult{Admit: true}
 	}
 	return PodAdmitResult{
+		Admit:         false,
+		Reason:        AppArmorNotAdmittedReason,
+		Message:       fmt.Sprintf("Cannot enforce AppArmor: %v", err),
+		RejectionType: RejectionInfeasible,
+	}
+}
+
+// NewSecurityProfileOCIAdmitHandler returns a PodAdmitHandler which rejects
+// pods with OCI security profiles if the container runtime does not report
+// support for them. The runtime features are unknown until the runtime
+// reported its status, which is treated as no support.
+func NewSecurityProfileOCIAdmitHandler(runtimeFeatures func() *kubecontainer.RuntimeFeatures) PodAdmitHandler {
+	return &securityProfileOCIAdmitHandler{runtimeFeatures: runtimeFeatures}
+}
+
+type securityProfileOCIAdmitHandler struct {
+	runtimeFeatures func() *kubecontainer.RuntimeFeatures
+}
+
+func (h *securityProfileOCIAdmitHandler) Admit(_ context.Context, attrs *PodAdmitAttributes) PodAdmitResult {
+	if len(kubecontainer.SecurityProfileOCIRefs(attrs.Pod)) == 0 {
+		return PodAdmitResult{Admit: true}
+	}
+	if features := h.runtimeFeatures(); features != nil && features.SeccompProfileOCI {
+		return PodAdmitResult{Admit: true}
+	}
+	return PodAdmitResult{
 		Admit:   false,
-		Reason:  AppArmorNotAdmittedReason,
-		Message: fmt.Sprintf("Cannot enforce AppArmor: %v", err),
+		Reason:  SecurityProfileOCIUnsupportedReason,
+		Message: "The container runtime does not support seccomp profiles of type OCI",
 	}
 }
 
@@ -255,9 +286,22 @@ func NewDeclaredFeaturesAdmitHandler(nodeDeclaredFeaturesHelper *ndf.Framework, 
 // Admit checks if a pod's feature requirements are met by the node.
 func (c *declaredFeaturesAdmitHandler) Admit(_ context.Context, attrs *PodAdmitAttributes) PodAdmitResult {
 	pod := attrs.Pod
-
 	podInfo := &ndf.PodInfo{Spec: &pod.Spec, Status: &pod.Status}
-	reqs, err := c.ndfFramework.InferForPodScheduling(podInfo, c.version)
+
+	var (
+		reqs ndf.FeatureSet
+		err  error
+	)
+	if attrs.Operation == UpdateOperation {
+		// AllocatedPod carries the desired pod's passthrough fields (e.g. ephemeral containers), so
+		// only changes to fields gated on allocation are checked here. Passthrough fields take
+		// effect without allocation, so they aren't rejected in admission.
+		allocatedPod := attrs.Update.AllocatedPod
+		oldPodInfo := &ndf.PodInfo{Spec: &allocatedPod.Spec, Status: &allocatedPod.Status}
+		reqs, err = c.ndfFramework.InferForPodUpdate(oldPodInfo, podInfo, c.version)
+	} else {
+		reqs, err = c.ndfFramework.InferForPodScheduling(podInfo, c.version)
+	}
 	if err != nil {
 		return PodAdmitResult{
 			Admit:   false,
@@ -281,9 +325,10 @@ func (c *declaredFeaturesAdmitHandler) Admit(_ context.Context, attrs *PodAdmitA
 
 	if !matchResult.IsMatch {
 		return PodAdmitResult{
-			Admit:   false,
-			Reason:  PodFeatureUnsupported,
-			Message: fmt.Sprintf("Pod requires node features that are not available: %s", strings.Join(matchResult.UnsatisfiedRequirements, ", ")),
+			Admit:         false,
+			Reason:        PodFeatureUnsupported,
+			Message:       fmt.Sprintf("Pod requires node features that are not available: %s", strings.Join(matchResult.UnsatisfiedRequirements, ", ")),
+			RejectionType: RejectionInfeasible,
 		}
 	}
 

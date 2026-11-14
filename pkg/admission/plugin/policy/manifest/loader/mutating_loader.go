@@ -21,11 +21,13 @@ limitations under the License.
 package loader
 
 import (
+	"context"
 	"fmt"
 
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	policyloader "k8s.io/apiserver/pkg/admission/plugin/policy/manifest/loader"
+	"k8s.io/apiserver/pkg/registry/rest"
 	admissionregistration "k8s.io/kubernetes/pkg/apis/admissionregistration"
 	"k8s.io/kubernetes/pkg/apis/admissionregistration/validation"
 )
@@ -115,7 +117,9 @@ func defaultAndValidateMAP(policy *admissionregistrationv1.MutatingAdmissionPoli
 	if err := scheme.Convert(policy, internalObj, nil); err != nil {
 		return fmt.Errorf("MutatingAdmissionPolicy %q: conversion error: %w", policy.Name, err)
 	}
-	if errs := validation.ValidateMutatingAdmissionPolicy(internalObj); len(errs) > 0 {
+	errs := validation.ValidateMutatingAdmissionPolicy(internalObj)
+	errs = rest.ValidateDeclarativelyForManifest(context.Background(), scheme, admissionregistrationv1.SchemeGroupVersion, internalObj, errs, rest.DeclarativeValidationConfig{})
+	if len(errs) > 0 {
 		return fmt.Errorf("MutatingAdmissionPolicy %q: %w", policy.Name, errs.ToAggregate())
 	}
 	resultObj := &admissionregistrationv1.MutatingAdmissionPolicy{}
@@ -134,7 +138,9 @@ func defaultAndValidateMAPB(binding *admissionregistrationv1.MutatingAdmissionPo
 	if err := scheme.Convert(binding, internalObj, nil); err != nil {
 		return fmt.Errorf("MutatingAdmissionPolicyBinding %q: conversion error: %w", binding.Name, err)
 	}
-	if errs := validation.ValidateMutatingAdmissionPolicyBinding(internalObj); len(errs) > 0 {
+	errs := validation.ValidateMutatingAdmissionPolicyBinding(internalObj)
+	errs = rest.ValidateDeclarativelyForManifest(context.Background(), scheme, admissionregistrationv1.SchemeGroupVersion, internalObj, errs, rest.DeclarativeValidationConfig{})
+	if len(errs) > 0 {
 		return fmt.Errorf("MutatingAdmissionPolicyBinding %q: %w", binding.Name, errs.ToAggregate())
 	}
 	resultObj := &admissionregistrationv1.MutatingAdmissionPolicyBinding{}

@@ -21,14 +21,17 @@ import (
 	goerrors "errors"
 	"fmt"
 	"net/url"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
+	apivalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -1412,5 +1415,160 @@ func TestEtcdCreateBindingScrubsLegacyAnnotations(t *testing.T) {
 	}
 	if pod.Annotations["kept"] != "value" {
 		t.Errorf("expected unrelated binding annotation to be kept, got %v", pod.Annotations)
+	}
+}
+
+func TestBindingValidation(t *testing.T) {
+	testcases := []struct {
+		name         string
+		tweakPod     func(*api.Pod)
+		tweakBinding func(*api.Binding)
+		expectError  string
+	}{
+		{
+			name: "invalid label",
+			tweakBinding: func(b *api.Binding) {
+				b.Labels = map[string]string{"invalid label": "invalid value"}
+			},
+			expectError: "metadata.labels: Invalid value",
+		},
+		{
+			name: "invalid annotation",
+			tweakBinding: func(b *api.Binding) {
+				b.Annotations = map[string]string{"invalid annotation": "invalid value"}
+			},
+			expectError: "metadata.annotations: Invalid value",
+		},
+		{
+			name: "invalid annotations size when combined",
+			tweakPod: func(p *api.Pod) {
+				p.Annotations = map[string]string{
+					// one byte for the key, remaining bytes for the value
+					"a": strings.Repeat("a", apivalidation.TotalAnnotationSizeLimitB-1),
+				}
+			},
+			tweakBinding: func(b *api.Binding) {
+				b.Annotations = map[string]string{"b": ""}
+			},
+			expectError: "metadata.annotations: Too long",
+		},
+		{
+			name: "invalid pod-specific annotation format",
+			tweakBinding: func(b *api.Binding) {
+				b.Annotations = map[string]string{"controller.kubernetes.io/pod-deletion-cost": "foo"}
+			},
+			expectError: "must be a 32bit integer",
+		},
+		{
+			name: "invalid pod-specific annotation update",
+			tweakBinding: func(b *api.Binding) {
+				b.Annotations = map[string]string{"container.apparmor.security.beta.kubernetes.io/foo": "runtime/default"}
+			},
+			expectError: "may not add AppArmor annotations",
+		},
+		{
+			name: "invalid bind with scheduling gates",
+			tweakPod: func(p *api.Pod) {
+				p.Spec.SchedulingGates = []api.PodSchedulingGate{{Name: "foo"}}
+			},
+			expectError: "non-empty .spec.schedulingGates",
+		},
+	}
+
+	storage, bindingStorage, _, server := newStorage(t)
+	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
+	ctx := genericregistrytest.NewNamespaceScopeContext(storage.Store, metav1.NamespaceDefault)
+
+	for i, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			pod := validNewPod()
+			pod.Name += strconv.Itoa(i)
+			if tc.tweakPod != nil {
+				tc.tweakPod(pod)
+			}
+			if _, err := storage.Create(ctx, pod, rest.ValidateAllObjectFunc, &metav1.CreateOptions{}); err != nil {
+				t.Fatalf("unexpected error creating pod: %v", err)
+			}
+
+			binding := &api.Binding{
+				ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Name: pod.Name},
+				Target:     api.ObjectReference{Name: "machine"},
+			}
+			if tc.tweakBinding != nil {
+				tc.tweakBinding(binding)
+			}
+
+			_, err := bindingStorage.Create(ctx, pod.Name, binding, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+			if err == nil {
+				t.Fatalf("expected error binding, got none")
+			}
+			if !strings.Contains(err.Error(), tc.expectError) {
+				t.Fatalf("expected error containing %q, got %v", tc.expectError, err.Error())
+			}
+		})
+	}
+}
+
+func TestEtcdUpdateDynamic(t *testing.T) {
+	etcdStorage, server := registrytest.NewEtcdStorage(t, "")
+	defer server.Terminate(t)
+	restOptions := generic.RESTOptions{
+		StorageConfig:           etcdStorage,
+		Decorator:               generic.UndecoratedStorage,
+		DeleteCollectionWorkers: 3,
+		ResourcePrefix:          "pods",
+	}
+	podStorage, err := NewStorage(restOptions, nil, nil, nil, nil)
+	if err != nil {
+		t.Fatalf("unexpected error from REST storage: %v", err)
+	}
+	defer podStorage.Pod.Store.DestroyFunc()
+	ctx := genericregistrytest.NewNamespaceScopeContext(podStorage.Pod.Store, metav1.NamespaceDefault)
+	// The subresource matters: declarative validation dispatches on it.
+	dynamicCtx := genericregistrytest.NewNamespaceScopeContext(podStorage.Pod.Store, metav1.NamespaceDefault, "dynamic")
+
+	podStart := validNewPod()
+	podStart.Spec.NodeName = "machine"
+	podStart.Status = api.PodStatus{
+		Phase:             api.PodRunning,
+		Conditions:        []api.PodCondition{{Type: api.PodInitialized, Status: api.ConditionTrue}},
+		ContainerStatuses: []api.ContainerStatus{{Name: "foo", State: api.ContainerState{Running: &api.ContainerStateRunning{}}}},
+	}
+	key, _ := podStorage.Pod.KeyFunc(ctx, podStart.Name)
+	if err := podStorage.Pod.Storage.Create(ctx, key, podStart, nil, 0, false); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	obj, err := podStorage.Dynamic.Get(dynamicCtx, podStart.Name, &metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	added := obj.(*api.Pod).DeepCopy()
+	added.Spec.Containers = append(added.Spec.Containers, added.Spec.Containers[0])
+	added.Spec.Containers[1].Name = "bar"
+
+	if _, _, err := podStorage.Dynamic.Update(dynamicCtx, added.Name, rest.DefaultUpdatedObjectInfo(added), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{}); err != nil {
+		t.Fatalf("unexpected error adding a container: %v", err)
+	}
+	obj, err = podStorage.Pod.Get(ctx, podStart.Name, &metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	var names []string
+	for _, c := range obj.(*api.Pod).Spec.Containers {
+		names = append(names, c.Name)
+	}
+	if diff := cmp.Diff([]string{"foo", "bar"}, names); diff != "" {
+		t.Errorf("unexpected containers (-want, +got):\n%s", diff)
+	}
+
+	removed := obj.(*api.Pod).DeepCopy()
+	removed.Spec.Containers = removed.Spec.Containers[1:]
+	if _, _, err := podStorage.Pod.Update(ctx, removed.Name, rest.DefaultUpdatedObjectInfo(removed), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{}); err == nil {
+		t.Error("expected the pods resource to reject removing a container")
+	}
+	if _, _, err := podStorage.Dynamic.Update(dynamicCtx, removed.Name, rest.DefaultUpdatedObjectInfo(removed), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{}); err != nil {
+		t.Errorf("unexpected error removing a container: %v", err)
 	}
 }

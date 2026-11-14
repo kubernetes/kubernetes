@@ -26,7 +26,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -43,13 +42,6 @@ import (
 )
 
 var maxPodStartTime = metav1.NewTime(time.Unix(0, math.MaxInt64).UTC())
-
-// GetPodFullName returns a name that uniquely identifies a pod.
-func GetPodFullName(pod *v1.Pod) string {
-	// Use underscore as the delimiter because it is not allowed in pod name
-	// (DNS subdomain format).
-	return pod.Name + "_" + pod.Namespace
-}
 
 // GetPodStartTime returns start time of the given pod or a stable maximum timestamp
 // if it hasn't started yet.
@@ -200,26 +192,26 @@ func PatchPodGroupStatus(ctx context.Context, cs kubernetes.Interface, name stri
 // PatchCompositePodGroupStatus calculates the delta bytes change from <old.Status> to <newStatus>,
 // and then submits a request to API server to patch the CompositePodGroup status changes.
 func PatchCompositePodGroupStatus(ctx context.Context, cs kubernetes.Interface, name string,
-	namespace string, oldStatus *schedulingv1alpha3.CompositePodGroupStatus,
-	newStatus *schedulingv1alpha3.CompositePodGroupStatus) error {
+	namespace string, oldStatus *schedulingv1beta1.CompositePodGroupStatus,
+	newStatus *schedulingv1beta1.CompositePodGroupStatus) error {
 	if newStatus == nil {
 		return nil
 	}
 
 	if oldStatus == nil {
-		oldStatus = &schedulingv1alpha3.CompositePodGroupStatus{}
+		oldStatus = &schedulingv1beta1.CompositePodGroupStatus{}
 	}
 
-	oldData, err := json.Marshal(schedulingv1alpha3.CompositePodGroup{Status: *oldStatus})
+	oldData, err := json.Marshal(schedulingv1beta1.CompositePodGroup{Status: *oldStatus})
 	if err != nil {
 		return err
 	}
 
-	newData, err := json.Marshal(schedulingv1alpha3.CompositePodGroup{Status: *newStatus})
+	newData, err := json.Marshal(schedulingv1beta1.CompositePodGroup{Status: *newStatus})
 	if err != nil {
 		return err
 	}
-	patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, &schedulingv1alpha3.CompositePodGroup{})
+	patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, &schedulingv1beta1.CompositePodGroup{})
 	if err != nil {
 		return fmt.Errorf("failed to create merge patch for composite podgroup %q/%q: %w", namespace, name, err)
 	}
@@ -229,7 +221,7 @@ func PatchCompositePodGroupStatus(ctx context.Context, cs kubernetes.Interface, 
 	}
 
 	patchFn := func() error {
-		_, err := cs.SchedulingV1alpha3().CompositePodGroups(namespace).Patch(ctx, name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}, "status")
+		_, err := cs.SchedulingV1beta1().CompositePodGroups(namespace).Patch(ctx, name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}, "status")
 		return err
 	}
 
@@ -324,4 +316,17 @@ func PodPreemptionPolicy(pod *v1.Pod) v1.PreemptionPolicy {
 		return *pod.Spec.PreemptionPolicy
 	}
 	return v1.PreemptLowerPriority
+}
+
+// IsPodResizeSchedulerEvaluationCompleted returns true if the pod condition SchedulerEvaluationCompleted
+// is set to true with reason DeferredPodResize for the pod's current generation.
+func IsPodResizeSchedulerEvaluationCompleted(pod *v1.Pod) bool {
+	for _, condition := range pod.Status.Conditions {
+		if condition.Type == v1.SchedulerEvaluationCompleted {
+			return condition.Status == v1.ConditionTrue &&
+				condition.Reason == v1.PodReasonDeferredPodResize &&
+				condition.ObservedGeneration == pod.Generation
+		}
+	}
+	return false
 }

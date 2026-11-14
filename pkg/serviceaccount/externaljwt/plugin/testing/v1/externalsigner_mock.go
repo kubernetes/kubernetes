@@ -19,6 +19,8 @@ package v1
 import (
 	"context"
 	"crypto"
+	"crypto/ecdsa"
+	"crypto/mldsa"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
@@ -44,7 +46,7 @@ type MockSigner struct {
 	server     *grpc.Server
 	listener   net.Listener
 
-	SigningKey                *rsa.PrivateKey
+	SigningKey                crypto.PrivateKey
 	SigningKeyID              string
 	SigningAlg                string
 	TokenType                 string
@@ -100,11 +102,13 @@ func (m *MockSigner) GetSupportedKeys() map[string]KeyT {
 	defer m.supportedKeysLock.RUnlock()
 	return m.supportedKeys
 }
+
 func (m *MockSigner) SetSupportedKeys(keys map[string]KeyT) {
 	m.supportedKeysLock.Lock()
 	defer m.supportedKeysLock.Unlock()
 	m.supportedKeys = keys
 }
+
 func (m *MockSigner) WaitForSupportedKeysFetch() {
 	m.supportedKeysLock.Lock()
 	defer m.supportedKeysLock.Unlock()
@@ -112,7 +116,6 @@ func (m *MockSigner) WaitForSupportedKeysFetch() {
 }
 
 func (m *MockSigner) Sign(ctx context.Context, req *v1.SignJWTRequest) (*v1.SignJWTResponse, error) {
-
 	header := &struct {
 		Algorithm string `json:"alg,omitempty"`
 		KeyID     string `json:"kid,omitempty"`
@@ -130,9 +133,9 @@ func (m *MockSigner) Sign(ctx context.Context, req *v1.SignJWTRequest) (*v1.Sign
 
 	base64Header := base64.RawURLEncoding.EncodeToString(headerJSON)
 
-	toBeSignedHash := hashBytes([]byte(base64Header + "." + req.Claims))
+	payload := []byte(base64Header + "." + req.Claims)
 
-	signature, err := rsa.SignPKCS1v15(rand.Reader, m.SigningKey, crypto.SHA256, toBeSignedHash)
+	signature, err := m.signPayload(payload)
 	if err != nil {
 		return nil, fmt.Errorf("unable to sign payload: %w", err)
 	}
@@ -141,6 +144,38 @@ func (m *MockSigner) Sign(ctx context.Context, req *v1.SignJWTRequest) (*v1.Sign
 		Header:    base64Header,
 		Signature: base64.RawURLEncoding.EncodeToString(signature),
 	}, nil
+}
+
+func (m *MockSigner) signPayload(payload []byte) ([]byte, error) {
+	hashedPayload, err := hashBytesForSignatureAlgorithm(m.SigningAlg, payload)
+	if err != nil {
+		return nil, fmt.Errorf("hashing payload: %w", err)
+	}
+
+	switch key := m.SigningKey.(type) {
+	case *rsa.PrivateKey:
+		return rsa.SignPKCS1v15(rand.Reader, key, crypto.SHA256, hashedPayload)
+	case *ecdsa.PrivateKey:
+		r, s, err := ecdsa.Sign(rand.Reader, key, hashedPayload)
+		if err != nil {
+			return nil, err
+		}
+
+		curveBits := key.Curve.Params().BitSize
+		keyBytes := curveBits / 8
+		if curveBits%8 > 0 {
+			keyBytes++
+		}
+
+		rBytesLeftPadded := leftPadBytes(r.Bytes(), keyBytes)
+		sBytesLeftPadded := leftPadBytes(s.Bytes(), keyBytes)
+
+		return append(rBytesLeftPadded, sBytesLeftPadded...), nil
+	case *mldsa.PrivateKey:
+		return key.Sign(nil, payload, nil)
+	default:
+		return nil, fmt.Errorf("unknown key type %T", key)
+	}
 }
 
 func (m *MockSigner) FetchKeys(ctx context.Context, req *v1.FetchKeysRequest) (*v1.FetchKeysResponse, error) {
@@ -184,7 +219,6 @@ func (m *MockSigner) Metadata(ctx context.Context, req *v1.MetadataRequest) (*v1
 
 // Reset genrate and adds signing/supported keys to MockSigner instance.
 func (m *MockSigner) Reset() error {
-
 	priv1, pub1, err := generateKeyPair()
 	if err != nil {
 		return err
@@ -274,7 +308,6 @@ func (m *MockSigner) CleanUp() {
 }
 
 func generateKeyPair() (*rsa.PrivateKey, []byte, error) {
-
 	// Generate a new private key
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
@@ -291,8 +324,25 @@ func generateKeyPair() (*rsa.PrivateKey, []byte, error) {
 	return privateKey, publicKeyBytes, nil
 }
 
-func hashBytes(bytes []byte) []byte {
+func hashBytesForSignatureAlgorithm(algorithm string, bytes []byte) ([]byte, error) {
 	hasher := crypto.SHA256.New()
+	switch algorithm {
+	case "RS256", "ES256":
+		// uses sha-256 hashing
+	case "ES384":
+		hasher = crypto.SHA384.New()
+	case "ES512":
+		hasher = crypto.SHA512.New()
+	case "ML-DSA-44", "ML-DSA-65", "ML-DSA-87":
+		// no hashing necessary.
+		return bytes, nil
+	}
 	hasher.Write(bytes)
-	return hasher.Sum(nil)
+	return hasher.Sum(nil), nil
+}
+
+func leftPadBytes(bytes []byte, length int) []byte {
+	dest := make([]byte, length)
+	copy(dest[length-len(bytes):], bytes)
+	return dest
 }

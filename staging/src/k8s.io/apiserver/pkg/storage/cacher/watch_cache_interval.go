@@ -22,7 +22,9 @@ import (
 	"sync"
 
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/apiserver/pkg/storage/cacher/consistency"
 	"k8s.io/apiserver/pkg/storage/cacher/store"
+	"k8s.io/klog/v2"
 )
 
 // cacheIntervalSource provides the iteration logic for a watchCacheInterval.
@@ -68,66 +70,29 @@ type indexerFunc func(int) *watchCacheEvent
 type indexValidator func(int) bool
 
 func newCacheInterval(startIndex, endIndex int, indexer indexerFunc, indexValidator indexValidator, resourceVersion uint64, locker sync.Locker) *watchCacheInterval {
+	source := &historyCacheIntervalSource{
+		startIndex:     startIndex,
+		endIndex:       endIndex,
+		indexer:        indexer,
+		indexValidator: indexValidator,
+		buffer:         &watchCacheIntervalBuffer{buffer: make([]*watchCacheEvent, bufferSize)},
+		lock:           locker,
+	}
 	return &watchCacheInterval{
-		source: &historyCacheIntervalSource{
-			startIndex:     startIndex,
-			endIndex:       endIndex,
-			indexer:        indexer,
-			indexValidator: indexValidator,
-			buffer:         &watchCacheIntervalBuffer{buffer: make([]*watchCacheEvent, bufferSize)},
-			lock:           locker,
-		},
-		resourceVersion: resourceVersion,
+		source:          source,
+		resourceVersion: max(resourceVersion, source.maxResourceVersion()),
 	}
-}
-
-// newCacheIntervalFromStore is meant to handle the case of rv=0, such that the events
-// returned by Next() need to be events from a List() done on the underlying store of
-// the watch cache.
-// The items returned in the interval will be sorted by Key.
-func newCacheIntervalFromStore(resourceVersion uint64, s store.Snapshot, key string, matchesSingle bool) (*watchCacheInterval, error) {
-	buffer := &watchCacheIntervalBuffer{}
-	var allItems []interface{}
-	var err error
-	if matchesSingle {
-		item, exists, err := s.GetByKey(key)
-		if err != nil {
-			return nil, err
-		}
-		if exists {
-			allItems = append(allItems, item)
-		}
-	} else {
-		allItems, err = s.OrderedListPrefix("", "")
-		if err != nil {
-			return nil, err
-		}
-	}
-	buffer.buffer = make([]*watchCacheEvent, len(allItems))
-	for i, item := range allItems {
-		elem, ok := item.(*store.Element)
-		if !ok {
-			return nil, fmt.Errorf("not a storeElement: %v", elem)
-		}
-		buffer.buffer[i] = storeElementToWatchCacheEvent(elem, resourceVersion)
-		buffer.endIndex++
-	}
-	ci := &watchCacheInterval{
-		source:          &snapshotCacheIntervalSource{buffer: buffer},
-		resourceVersion: resourceVersion,
-	}
-
-	return ci, nil
 }
 
 // newCacheIntervalFromLazySnapshot captures a snapshot under the watch cache
 // lock and traverses it incrementally after the lock is released.
-func newCacheIntervalFromLazySnapshot(resourceVersion uint64, snap store.Snapshot, prefix string) *watchCacheInterval {
+func newCacheIntervalFromLazySnapshot(resourceVersion uint64, snap store.Snapshot, key string, recursive bool) *watchCacheInterval {
 	return &watchCacheInterval{
 		source: &lazySnapshotCacheIntervalSource{
 			snapshot:        snap,
 			resourceVersion: resourceVersion,
-			prefix:          prefix,
+			key:             key,
+			recursive:       recursive,
 		},
 		resourceVersion: resourceVersion,
 	}
@@ -200,6 +165,17 @@ type historyCacheIntervalSource struct {
 	// Given that indexer and indexValidator only read state, if
 	// possible, Locker obtained through RLocker() is provided.
 	lock sync.Locker
+
+	// lastResourceVersion tracks the resourceVersion of the last event read from
+	// the underlying source to assert that events are ordered by resourceVersion.
+	lastResourceVersion uint64
+}
+
+func (s *historyCacheIntervalSource) maxResourceVersion() uint64 {
+	if s.endIndex <= s.startIndex {
+		return 0
+	}
+	return s.indexer(s.endIndex - 1).ResourceVersion
 }
 
 // next returns the next event from the watchCache circular buffer.
@@ -256,27 +232,17 @@ func (s *historyCacheIntervalSource) fillBuffer() {
 		if event == nil {
 			break
 		}
+		if event.ResourceVersion <= s.lastResourceVersion {
+			klog.ErrorS(nil, "Watch cache history interval event resourceVersion must be greater than previous event resourceVersion", "eventResourceVersion", event.ResourceVersion, "lastResourceVersion", s.lastResourceVersion)
+			if consistency.PanicOnCacheInconsistency {
+				panic(fmt.Sprintf("Watch cache history interval event resourceVersion (%d) must be greater than previous event resourceVersion (%d)", event.ResourceVersion, s.lastResourceVersion))
+			}
+		}
+		s.lastResourceVersion = event.ResourceVersion
 		s.buffer.buffer[s.buffer.endIndex] = event
 		s.buffer.endIndex++
 		s.startIndex++
 	}
-}
-
-// snapshotCacheIntervalSource serves events from a pre-populated buffer.
-type snapshotCacheIntervalSource struct {
-	buffer *watchCacheIntervalBuffer
-}
-
-func (s *snapshotCacheIntervalSource) next() (*watchCacheEvent, error) {
-	event, exists := s.buffer.next()
-	if !exists {
-		return nil, nil
-	}
-	return event, nil
-}
-
-func (s *snapshotCacheIntervalSource) All() iter.Seq2[*watchCacheEvent, error] {
-	return eventsFromNext(s.next)
 }
 
 // lazySnapshotCacheIntervalSource serves events from an immutable snapshot.
@@ -287,19 +253,41 @@ type lazySnapshotCacheIntervalSource struct {
 	snapshot store.Snapshot
 	// resourceVersion is assigned to every watchCacheEvent produced by this source.
 	resourceVersion uint64
-	prefix          string
+	key             string
+	recursive       bool
 }
 
 func (s *lazySnapshotCacheIntervalSource) All() iter.Seq2[*watchCacheEvent, error] {
 	return func(yield func(*watchCacheEvent, error) bool) {
-		for elem, err := range s.snapshot.RangePrefix(s.prefix, "").All() {
-			if err != nil {
-				yield(nil, err)
-				return
+		// Recursive expects key to be a prefix thus storage.PrepareKey ensures it has "/" suffix.
+		// For requests with selector matching single object, we expect the caller to set opts.Recursive=false and use the full key.
+		if s.recursive {
+			for elem, err := range s.snapshot.RangePrefix(s.key, "").All() {
+				if err != nil {
+					yield(nil, err)
+					return
+				}
+				if !yield(storeElementToWatchCacheEvent(elem, s.resourceVersion), nil) {
+					return
+				}
 			}
-			if !yield(storeElementToWatchCacheEvent(elem, s.resourceVersion), nil) {
-				return
-			}
+			return
+		}
+		// Non-recursive expects key to be an exact match.
+		obj, exists, err := s.snapshot.GetByKey(s.key)
+		if err != nil {
+			yield(nil, err)
+			return
+		}
+		if !exists {
+			return
+		}
+		elem, ok := obj.(*store.Element)
+		if !ok {
+			return
+		}
+		if !yield(storeElementToWatchCacheEvent(elem, s.resourceVersion), nil) {
+			return
 		}
 	}
 }

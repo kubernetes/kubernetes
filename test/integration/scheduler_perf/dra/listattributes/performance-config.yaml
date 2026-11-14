@@ -85,3 +85,45 @@
       numListValues: 47
       constraints:
       - matchAttribute: dra.example.com/match
+
+# Model KEP-5491's topology-aligned CPU and NIC allocation: CPU cores publish
+# lists of nearby PCIe roots, while NIC VFs publish their single PCIe root.
+# Two cores and two VFs must share a root, exercising list/list and list/scalar
+# matching with a small topology instead of the stress workload above.
+- name: SchedulingWithResourceClaimTemplateCPUNICTopology
+  featureGates:
+    DRAListTypeAttributes: true
+  workloadTemplate:
+  - opcode: createNodes
+    nodeTemplatePath: ../templates/node-with-dra-test-driver.yaml
+    countParam: $nodesWithDRA
+  - opcode: createAny
+    templatePath: ../templates/resourceslice-cpu-nic-pcie.yaml
+    countParam: $nodesWithDRA
+  - opcode: createAny
+    templatePath: ../templates/deviceclass.yaml
+  - opcode: createAny
+    templatePath: ../templates/resourceclaimtemplate-cpu-nic-pcie.yaml
+    namespace: test
+  - opcode: createPods
+    namespace: test
+    countParam: $measurePods
+    steadyStateParam: $steadyState
+    durationParam: $duration
+    podTemplatePath: ../templates/pod-with-claim-template.yaml
+    collectMetrics: true
+  workloads:
+  - name: fast
+    labels: [integration-test, short]
+    params:
+      nodesWithDRA: 1
+      measurePods: 2
+      steadyState: false
+      duration: 0s # unused
+  - name: empty_500nodes
+    labels: [performance]
+    params:
+      nodesWithDRA: 500
+      measurePods: 10
+      steadyState: true
+      duration: 10s

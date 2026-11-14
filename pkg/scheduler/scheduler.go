@@ -21,19 +21,22 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"slices"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic/dynamicinformer"
+	clientfeatures "k8s.io/client-go/features"
 	"k8s.io/client-go/informers"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/informers/internalinterfaces"
 	clientset "k8s.io/client-go/kubernetes"
-	schedulinglisters "k8s.io/client-go/listers/scheduling/v1alpha3"
+	schedulinglisters "k8s.io/client-go/listers/scheduling/v1beta1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
@@ -48,6 +51,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/gangscheduling"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
@@ -100,12 +104,6 @@ type Scheduler struct {
 
 	nodeInfoSnapshot *internalcache.Snapshot
 
-	percentageOfPlacementsToScore int32
-
-	// shufflePlacements randomizes candidate placement order so the placement limit picks a fair
-	// subset. Set via New; nil disables shuffling to keep tests deterministic.
-	shufflePlacements func(placements []*fwk.Placement)
-
 	// logger *must* be initialized when creating a Scheduler,
 	// otherwise logging functions will access a nil sink and
 	// panic.
@@ -117,10 +115,13 @@ type Scheduler struct {
 	nominatedNodeNameForExpectationEnabled              bool
 	genericWorkloadEnabled                              bool
 	inPlacePodVerticalScalingSchedulerPreemptionEnabled bool
-	podGroupPreemptionPolicyEnabled                     bool
 	podGroupHierarchyTracker                            *gangscheduling.HierarchyTracker
+	// profilesWithoutDeferredPodScheduling can't evaluate deferred pod resizes, so their pods aren't queued for one.
+	profilesWithoutDeferredPodScheduling sets.Set[string]
 
 	algorithm *SchedulingAlgorithm
+
+	podGroupAlgorithm *PodGroupSchedulingAlgorithm
 }
 
 // applyDefaultHandlers installs the default handlers. It must run after
@@ -129,6 +130,31 @@ func (sched *Scheduler) applyDefaultHandlers() {
 	sched.SchedulePod = sched.algorithm.SchedulePod
 	sched.FailureHandler = sched.handleSchedulingFailure
 }
+
+// schedulerPodStep adapts Scheduler to the PodScheduler interface, bridging single-pod
+// evaluation and tentative snapshot reservations into PodGroupSchedulingAlgorithm.
+// This decouples gang scheduling orchestration from Scheduler's queue, binding, and error-handling mechanics.
+type schedulerPodStep struct {
+	sched *Scheduler
+}
+
+// SchedulePod delegates single-pod evaluation to Scheduler.SchedulePod rather than calling
+// the underlying algorithm directly, ensuring custom handlers or test hooks configured on
+// Scheduler are respected during pod group scheduling.
+func (s *schedulerPodStep) SchedulePod(ctx context.Context, schedFramework framework.Framework, state fwk.CycleState, podInfo *framework.QueuedPodInfo) (result ScheduleResult, err error) {
+	return s.sched.SchedulePod(ctx, schedFramework, state, podInfo)
+}
+
+// AssumeAndReserveInSnapshot delegates tentative snapshot reservation to SchedulingAlgorithm,
+// allowing subsequent group members to observe simulated node allocations and reserve plugins
+// without committing mutations to the live scheduler cache before group completion.
+func (s *schedulerPodStep) AssumeAndReserveInSnapshot(ctx context.Context, state fwk.CycleState,
+	schedFramework framework.Framework, podInfo *framework.QueuedPodInfo,
+	scheduleResult ScheduleResult) (*fwk.Status, func()) {
+	return s.sched.algorithm.AssumeAndReserveInSnapshot(ctx, state, schedFramework, podInfo, scheduleResult)
+}
+
+var _ PodScheduler = (*schedulerPodStep)(nil)
 
 type schedulerOptions struct {
 	clock                  clock.WithTicker
@@ -330,13 +356,18 @@ func New(ctx context.Context,
 	}
 
 	preEnqueuePluginMap := make(map[string]map[string]fwk.PreEnqueuePlugin)
+	resizePreEnqueuePluginMap := make(map[string]map[string]fwk.PreEnqueuePlugin)
 	queueingHintsPerProfile := make(internalqueue.QueueingHintMapPerProfile)
 	var returnErr error
 	for profileName, profile := range profiles {
 		plugins := profile.PreEnqueuePlugins()
 		preEnqueuePluginMap[profileName] = make(map[string]fwk.PreEnqueuePlugin, len(plugins))
+		resizePreEnqueuePluginMap[profileName] = make(map[string]fwk.PreEnqueuePlugin)
 		for _, plugin := range plugins {
 			preEnqueuePluginMap[profileName][plugin.Name()] = plugin
+			if framework.IsRelevantForPodResize(plugin) {
+				resizePreEnqueuePluginMap[profileName][plugin.Name()] = plugin
+			}
 		}
 
 		queueingHintsPerProfile[profileName], err = buildQueueingHintMap(ctx, profile.EnqueueExtensions())
@@ -364,6 +395,7 @@ func New(ctx context.Context,
 		internalqueue.WithPodLister(podLister),
 		internalqueue.WithPodMaxInUnschedulablePodsDuration(options.podMaxInUnschedulablePodsDuration),
 		internalqueue.WithPreEnqueuePluginMap(preEnqueuePluginMap),
+		internalqueue.WithResizePreEnqueuePluginMap(resizePreEnqueuePluginMap),
 		internalqueue.WithQueueingHintMapPerProfile(queueingHintsPerProfile),
 		internalqueue.WithPluginMetricsSamplePercent(pluginMetricsSamplePercent),
 		internalqueue.WithMetricsRecorder(comps.metricsRecorder),
@@ -390,15 +422,30 @@ func New(ctx context.Context,
 
 	var compositePodGroupLister schedulinglisters.CompositePodGroupLister
 	if feature.DefaultFeatureGate.Enabled(features.CompositePodGroup) {
-		compositePodGroupLister = informerFactory.Scheduling().V1alpha3().CompositePodGroups().Lister()
+		compositePodGroupLister = informerFactory.Scheduling().V1beta1().CompositePodGroups().Lister()
+	}
+
+	// DeferredPodScheduling keeps a deferred resize pod on its node, honors the node's resize preemption
+	// policy, and binds it by marking the evaluation complete. A profile without it at Filter and Bind
+	// can't evaluate a deferred resize, so don't queue one for it.
+	profilesWithoutDeferredPodScheduling := sets.New[string]()
+	if feature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption) {
+		hasDeferredPodScheduling := func(ps schedulerapi.PluginSet) bool {
+			return slices.ContainsFunc(ps.Enabled, func(p schedulerapi.Plugin) bool { return p.Name == names.DeferredPodScheduling })
+		}
+		for profileName, profile := range profiles {
+			plugins := profile.ListPlugins()
+			if !hasDeferredPodScheduling(plugins.Filter) || !hasDeferredPodScheduling(plugins.Bind) {
+				logger.Info("Profile doesn't enable DeferredPodScheduling at Filter and Bind, so deferred pod resizes won't be evaluated for it", "profile", profileName)
+				profilesWithoutDeferredPodScheduling.Insert(profileName)
+			}
+		}
 	}
 
 	sched := &Scheduler{
 		Cache:                                  schedulerCache,
 		client:                                 client,
 		nodeInfoSnapshot:                       snapshot,
-		percentageOfPlacementsToScore:          options.percentageOfPlacementsToScore,
-		shufflePlacements:                      randShufflePlacements,
 		StopEverything:                         stopEverything,
 		SchedulingQueue:                        podQueue,
 		Profiles:                               profiles,
@@ -408,10 +455,13 @@ func New(ctx context.Context,
 		nominatedNodeNameForExpectationEnabled: feature.DefaultFeatureGate.Enabled(features.NominatedNodeNameForExpectation),
 		genericWorkloadEnabled:                 feature.DefaultFeatureGate.Enabled(features.GenericWorkload),
 		inPlacePodVerticalScalingSchedulerPreemptionEnabled: feature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption),
-		podGroupPreemptionPolicyEnabled:                     feature.DefaultFeatureGate.Enabled(features.PodGroupPreemptionPolicy),
 		podGroupHierarchyTracker:                            comps.podGroupHierarchyTracker,
+		profilesWithoutDeferredPodScheduling:                profilesWithoutDeferredPodScheduling,
 	}
-	if err = sched.initAlgorithm(WithAlgorithmPercentageOfNodesToScore(options.percentageOfNodesToScore)); err != nil {
+	if err = sched.initAlgorithms(
+		[]AlgorithmOption{WithAlgorithmPercentageOfNodesToScore(options.percentageOfNodesToScore)},
+		[]PodGroupAlgorithmOption{WithAlgorithmPercentageOfPlacementsToScore(options.percentageOfPlacementsToScore)},
+	); err != nil {
 		return nil, fmt.Errorf("initializing scheduling algorithm: %w", err)
 	}
 	sched.NextEntity = podQueue.Pop
@@ -606,17 +656,20 @@ func newPodInformer(cs clientset.Interface, resyncPeriod time.Duration, informer
 		InformerName:     informerName,
 	})
 
-	// Dropping `.metadata.managedFields` to improve memory usage.
-	// The Extract workflow (i.e. `ExtractPod`) should be unused.
-	trim := func(obj interface{}) (interface{}, error) {
-		if accessor, err := meta.Accessor(obj); err == nil {
-			if accessor.GetManagedFields() != nil {
-				accessor.SetManagedFields(nil)
+	// With ManagedFieldsOptOutClient, kube-scheduler's informer client drops managedFields instead.
+	if !clientfeatures.FeatureGates().Enabled(clientfeatures.ManagedFieldsOptOutClient) {
+		// Dropping `.metadata.managedFields` to improve memory usage.
+		// The Extract workflow (i.e. `ExtractPod`) should be unused.
+		trim := func(obj interface{}) (interface{}, error) {
+			if accessor, err := meta.Accessor(obj); err == nil {
+				if accessor.GetManagedFields() != nil {
+					accessor.SetManagedFields(nil)
+				}
 			}
+			return obj, nil
 		}
-		return obj, nil
+		_ = informer.SetTransform(trim)
 	}
-	informer.SetTransform(trim)
 	return informer
 }
 
@@ -627,19 +680,26 @@ func (sched *Scheduler) CurrentCycle() int64 {
 	return 0
 }
 
-// initAlgorithm builds the scheduling algorithm from the Scheduler's fields. It
-// has to run before any scheduling method, and before applyDefaultHandlers, which
-// hands SchedulePod the algorithm's method value. New calls it, and so must a
-// Scheduler assembled field by field.
+// initAlgorithm builds the scheduling algorithms from the Scheduler's fields
+// with default options. It has to run before any scheduling method, and before
+// applyDefaultHandlers, which hands SchedulePod the algorithm's method value.
+// A Scheduler assembled field by field in tests must call it.
+func (sched *Scheduler) initAlgorithm() error {
+	return sched.initAlgorithms(nil, nil)
+}
+
+// initAlgorithms builds both the single-pod and pod-group scheduling algorithms
+// from the Scheduler's fields.
 //
 // CurrentCycle is passed as a bound method value, so a SchedulingQueue installed
 // after this call is still picked up.
-func (sched *Scheduler) initAlgorithm(opts ...AlgorithmOption) error {
-	algorithm, err := NewSchedulingAlgorithm(sched.nodeInfoSnapshot, sched.Cache, append(opts, WithCurrentCycleProvider(sched.CurrentCycle))...)
+func (sched *Scheduler) initAlgorithms(algOpts []AlgorithmOption, podGroupAlgOpts []PodGroupAlgorithmOption) error {
+	algorithm, err := NewSchedulingAlgorithm(sched.nodeInfoSnapshot, sched.Cache, append(algOpts, WithCurrentCycleProvider(sched.CurrentCycle))...)
 	if err != nil {
 		return err
 	}
 
 	sched.algorithm = algorithm
+	sched.podGroupAlgorithm = NewPodGroupAlgorithm(sched.nodeInfoSnapshot, &schedulerPodStep{sched: sched}, podGroupAlgOpts...)
 	return nil
 }

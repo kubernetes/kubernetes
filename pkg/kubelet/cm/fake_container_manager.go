@@ -28,6 +28,7 @@ import (
 	"k8s.io/apiserver/pkg/server/healthz"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
+	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/resourceupdates"
@@ -308,4 +309,30 @@ func (cm *FakeContainerManager) PodHasExclusiveCPUs(_ klog.Logger, _ *v1.Pod) bo
 
 func (cm *FakeContainerManager) ContainerHasExclusiveCPUs(_ klog.Logger, _ *v1.Pod, _ *v1.Container) bool {
 	return cm.ExclusiveCPUs
+}
+
+func (cm *FakeContainerManager) AllocationMode(res v1.ResourceName) ResourceAllocationMode {
+	cm.Lock()
+	defer cm.Unlock()
+	cm.CalledFunctions = append(cm.CalledFunctions, "AllocationMode")
+	switch res {
+	case v1.ResourceCPU:
+		if cm.nodeConfig.CPUManagerPolicy == string(cpumanager.PolicyStatic) {
+			return ResourceAllocationModeExclusive
+		}
+		return ResourceAllocationModeShared
+	case v1.ResourceMemory:
+		if cm.nodeConfig.MemoryManagerPolicy == string(memorymanager.PolicyTypeStatic) {
+			return ResourceAllocationModeExclusive
+		}
+		return ResourceAllocationModeShared
+	default:
+		if v1helper.IsHugePageResourceName(res) {
+			if cm.nodeConfig.MemoryManagerPolicy == string(memorymanager.PolicyTypeStatic) {
+				return ResourceAllocationModeExclusive
+			}
+			return ResourceAllocationModeShared
+		}
+		return ResourceAllocationModeUnsupported
+	}
 }

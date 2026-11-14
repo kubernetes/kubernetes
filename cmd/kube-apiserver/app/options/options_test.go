@@ -106,6 +106,7 @@ func TestAddFlags(t *testing.T) {
 		"--client-ca-file=/client-ca",
 		"--cors-allowed-origins=10.10.10.100,10.10.10.200",
 		"--contention-profiling=true",
+		"--disable-pod-subresources=exec,attach",
 		"--egress-selector-config-file=/var/run/kubernetes/egress-selector/connectivity.yaml",
 		"--enable-aggregator-routing=true",
 		"--enable-priority-and-fairness=false",
@@ -337,7 +338,8 @@ func TestAddFlags(t *testing.T) {
 					CAFile:   "/var/run/kubernetes/caserver.crt",
 				},
 			},
-			MasterCount: 5,
+			MasterCount:            5,
+			DisablePodSubresources: []string{"exec", "attach"},
 		},
 	}
 

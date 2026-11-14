@@ -19,6 +19,8 @@ package volumehealth
 import (
 	"context"
 	"errors"
+	"reflect"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -29,8 +31,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2"
-	"k8s.io/klog/v2/ktesting"
+	"k8s.io/ktesting"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
 	"k8s.io/kubernetes/pkg/volume"
@@ -112,7 +115,7 @@ type storageCall struct {
 	conditions []storagev1.StorageHealthCondition
 }
 
-func (f *fakeCSINodeUpdater) UpdateCSINodeStorageHealth(driverName string, conditions []storagev1.StorageHealthCondition) error {
+func (f *fakeCSINodeUpdater) UpdateCSINodeStorageHealth(ctx context.Context, driverName string, conditions []storagev1.StorageHealthCondition) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.calls = append(f.calls, storageCall{
@@ -127,7 +130,7 @@ func newTestManager(t *testing.T, statusUpdater StatusUpdater, client csi.Health
 	logger, _ := ktesting.NewTestContext(t)
 	volumePluginMgr, _ := volumetesting.GetTestKubeletVolumePluginMgr(t)
 	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr, util.NewFakeSELinuxLabelTranslator())
-	asw := cache.NewActualStateOfWorld("node1", volumePluginMgr)
+	asw := cache.NewActualStateOfWorld("node1", volumePluginMgr, nil)
 
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: "pod1", UID: "pod-uid-1", Namespace: "ns"},
@@ -159,32 +162,49 @@ func newTestManager(t *testing.T, statusUpdater StatusUpdater, client csi.Health
 	}
 	asw.MarkVolumeAsMountAttempted(util.GetUniquePodName(pod), volumeName)
 
-	return &manager{
-		dsw:           dsw,
-		asw:           asw,
-		statusUpdater: statusUpdater,
-		probeInterval: time.Minute,
-		clientFactory: func(driverName string) csi.HealthClient {
-			return client
-		},
-		listDrivers: func() []string { return []string{"test.driver"} },
-		csiNodeUpdater: func() CSINodeUpdater {
-			return nil
-		},
+	m := newManager(statusUpdater, time.Minute, DefaultWorkers)
+	t.Cleanup(m.queue.ShutDown)
+	m.listVolumes = func() []cache.VolumeToHealthCheck {
+		return cache.GetVolumesToReportHealth(dsw, asw)
+	}
+	m.clientFactory = func(driverName string) csi.HealthClient {
+		return client
+	}
+	m.listDrivers = func() []string { return []string{"test.driver"} }
+	m.csiNodeUpdater = func() CSINodeUpdater { return nil }
+	return m
+}
+
+// syncVolumes runs one volume probe cycle synchronously: enqueue every volume,
+// then process the queue on the calling goroutine until it is empty.
+func syncVolumes(ctx context.Context, m *manager) {
+	m.enqueueVolumes(ctx)
+	for m.queue.Len() > 0 {
+		m.processNextVolume(ctx)
 	}
 }
 
 func TestProbeVolumeHealth(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIVolumeHealth, true)
 
 	degraded := []v1.VolumeHealthCondition{{
 		Status: v1.VolumeHealthDegraded, Reason: "DiskSlow", Message: "slow disk",
+	}}
+	healthy := []v1.VolumeHealthCondition{{
+		Status:  v1.VolumeHealthHealthy,
+		Reason:  CSIVolumeHealthy,
+		Message: "Volume is healthy",
+	}}
+	unknown := []v1.VolumeHealthCondition{{
+		Status: v1.VolumeHealthUnknown, Reason: "FutureHealth", Message: "unrecognized driver health status",
 	}}
 
 	type step struct {
 		volumeConditions []v1.VolumeHealthCondition
 		volumeErr        error
 		wantCallCount    int
+		wantConditions   []v1.VolumeHealthCondition
 	}
 
 	tests := []struct {
@@ -196,15 +216,32 @@ func TestProbeVolumeHealth(t *testing.T) {
 			name:                 "bad health updates pod status",
 			supportsVolumeHealth: true,
 			steps: []step{
-				{volumeConditions: degraded, wantCallCount: 1},
+				{volumeConditions: degraded, wantCallCount: 1, wantConditions: degraded},
 			},
 		},
 		{
-			name:                 "cleared health clears pod status",
+			name:                 "healthy and degraded transitions update pod status",
 			supportsVolumeHealth: true,
 			steps: []step{
-				{volumeConditions: degraded, wantCallCount: 1},
-				{volumeConditions: nil, wantCallCount: 2},
+				{volumeConditions: degraded, wantCallCount: 1, wantConditions: degraded},
+				{volumeConditions: nil, wantCallCount: 2, wantConditions: healthy},
+				{volumeConditions: degraded, wantCallCount: 3, wantConditions: degraded},
+			},
+		},
+		{
+			name:                 "initial empty report populates healthy status",
+			supportsVolumeHealth: true,
+			steps: []step{
+				{volumeConditions: nil, wantCallCount: 1, wantConditions: healthy},
+				{volumeConditions: []v1.VolumeHealthCondition{}, wantCallCount: 2, wantConditions: healthy},
+				{volumeErr: errors.New("rpc failed"), wantCallCount: 2},
+			},
+		},
+		{
+			name:                 "unknown health is not considered healthy",
+			supportsVolumeHealth: true,
+			steps: []step{
+				{volumeConditions: unknown, wantCallCount: 1, wantConditions: unknown},
 			},
 		},
 		{
@@ -212,15 +249,15 @@ func TestProbeVolumeHealth(t *testing.T) {
 			name:                 "same condition twice still calls status updater",
 			supportsVolumeHealth: true,
 			steps: []step{
-				{volumeConditions: degraded, wantCallCount: 1},
-				{volumeConditions: degraded, wantCallCount: 2},
+				{volumeConditions: degraded, wantCallCount: 1, wantConditions: degraded},
+				{volumeConditions: degraded, wantCallCount: 2, wantConditions: degraded},
 			},
 		},
 		{
 			name:                 "error leaves previous conditions unchanged",
 			supportsVolumeHealth: true,
 			steps: []step{
-				{volumeConditions: degraded, wantCallCount: 1},
+				{volumeConditions: degraded, wantCallCount: 1, wantConditions: degraded},
 				{volumeErr: errors.New("rpc failed"), wantCallCount: 1},
 			},
 		},
@@ -243,7 +280,7 @@ func TestProbeVolumeHealth(t *testing.T) {
 			for i, s := range tc.steps {
 				client.volumeConditions = s.volumeConditions
 				client.volumeErr = s.volumeErr
-				m.probeVolumeHealth(context.Background())
+				syncVolumes(tCtx, m)
 
 				got := status.callCount()
 				if got != s.wantCallCount {
@@ -254,14 +291,8 @@ func TestProbeVolumeHealth(t *testing.T) {
 					if last.podUID != "pod-uid-1" || last.volumeName != "vol1" {
 						t.Fatalf("step %d: update for wrong pod/volume: %+v", i, last)
 					}
-					if len(last.conditions) != len(s.volumeConditions) {
-						t.Fatalf("step %d: expected %d conditions, got %d", i, len(s.volumeConditions), len(last.conditions))
-					}
-					for j, want := range s.volumeConditions {
-						if last.conditions[j].Status != want.Status || last.conditions[j].Reason != want.Reason {
-							t.Fatalf("step %d: condition %d: want {%s,%s}, got {%s,%s}",
-								i, j, want.Status, want.Reason, last.conditions[j].Status, last.conditions[j].Reason)
-						}
+					if !reflect.DeepEqual(last.conditions, s.wantConditions) {
+						t.Fatalf("step %d: expected conditions %+v, got %+v", i, s.wantConditions, last.conditions)
 					}
 				}
 				prevCalls = got
@@ -271,17 +302,27 @@ func TestProbeVolumeHealth(t *testing.T) {
 }
 
 func TestProbeStorageHealth(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIVolumeHealth, true)
 	registerHealthMetrics()
 
 	degraded := []storagev1.StorageHealthCondition{{
 		Status: storagev1.StorageDegraded, Reason: "PoolFull", Message: "pool nearly full",
 	}}
+	healthy := []storagev1.StorageHealthCondition{{
+		Status:  storagev1.StorageHealthy,
+		Reason:  CSIBackendHealthy,
+		Message: "Storage subsystems are healthy",
+	}}
+	unknown := []storagev1.StorageHealthCondition{{
+		Status: storagev1.StorageHealthUnknown, Reason: "FutureHealth", Message: "unrecognized driver health status",
+	}}
 
 	type step struct {
 		storageConditions []storagev1.StorageHealthCondition
 		storageErr        error
 		wantCallCount     int
+		wantConditions    []storagev1.StorageHealthCondition
 	}
 
 	tests := []struct {
@@ -293,15 +334,32 @@ func TestProbeStorageHealth(t *testing.T) {
 			name:                  "bad health updates CSINode",
 			supportsStorageHealth: true,
 			steps: []step{
-				{storageConditions: degraded, wantCallCount: 1},
+				{storageConditions: degraded, wantCallCount: 1, wantConditions: degraded},
 			},
 		},
 		{
-			name:                  "cleared health clears CSINode",
+			name:                  "healthy and degraded transitions update CSINode",
 			supportsStorageHealth: true,
 			steps: []step{
-				{storageConditions: degraded, wantCallCount: 1},
-				{storageConditions: nil, wantCallCount: 2},
+				{storageConditions: degraded, wantCallCount: 1, wantConditions: degraded},
+				{storageConditions: nil, wantCallCount: 2, wantConditions: healthy},
+				{storageConditions: degraded, wantCallCount: 3, wantConditions: degraded},
+			},
+		},
+		{
+			name:                  "initial empty report populates healthy status",
+			supportsStorageHealth: true,
+			steps: []step{
+				{storageConditions: nil, wantCallCount: 1, wantConditions: healthy},
+				{storageConditions: []storagev1.StorageHealthCondition{}, wantCallCount: 2, wantConditions: healthy},
+				{storageErr: errors.New("rpc failed"), wantCallCount: 2},
+			},
+		},
+		{
+			name:                  "unknown health is not considered healthy",
+			supportsStorageHealth: true,
+			steps: []step{
+				{storageConditions: unknown, wantCallCount: 1, wantConditions: unknown},
 			},
 		},
 		{
@@ -309,15 +367,15 @@ func TestProbeStorageHealth(t *testing.T) {
 			name:                  "same condition twice still calls CSINode updater",
 			supportsStorageHealth: true,
 			steps: []step{
-				{storageConditions: degraded, wantCallCount: 1},
-				{storageConditions: degraded, wantCallCount: 2},
+				{storageConditions: degraded, wantCallCount: 1, wantConditions: degraded},
+				{storageConditions: degraded, wantCallCount: 2, wantConditions: degraded},
 			},
 		},
 		{
 			name:                  "error leaves previous conditions unchanged",
 			supportsStorageHealth: true,
 			steps: []step{
-				{storageConditions: degraded, wantCallCount: 1},
+				{storageConditions: degraded, wantCallCount: 1, wantConditions: degraded},
 				{storageErr: errors.New("rpc failed"), wantCallCount: 1},
 			},
 		},
@@ -341,36 +399,72 @@ func TestProbeStorageHealth(t *testing.T) {
 			for i, s := range tc.steps {
 				client.storageConditions = s.storageConditions
 				client.storageErr = s.storageErr
-				m.probeStorageHealth(context.Background())
+				m.probeStorageHealth(tCtx)
 
 				updater.mu.Lock()
 				got := len(updater.calls)
+				var last storageCall
+				if got > 0 {
+					last = updater.calls[got-1]
+				}
+				updater.mu.Unlock()
+
 				if got != s.wantCallCount {
-					updater.mu.Unlock()
 					t.Fatalf("step %d: expected %d CSINode update(s), got %d", i, s.wantCallCount, got)
 				}
 				if got > prevCalls {
-					last := updater.calls[got-1]
 					if last.driverName != "test.driver" {
-						updater.mu.Unlock()
 						t.Fatalf("step %d: unexpected driver: %s", i, last.driverName)
 					}
-					if len(last.conditions) != len(s.storageConditions) {
-						updater.mu.Unlock()
-						t.Fatalf("step %d: expected %d conditions, got %d", i, len(s.storageConditions), len(last.conditions))
-					}
-					for j, want := range s.storageConditions {
-						if last.conditions[j].Status != want.Status || last.conditions[j].Reason != want.Reason {
-							updater.mu.Unlock()
-							t.Fatalf("step %d: condition %d: want {%s,%s}, got {%s,%s}",
-								i, j, want.Status, want.Reason, last.conditions[j].Status, last.conditions[j].Reason)
-						}
+					if !reflect.DeepEqual(last.conditions, s.wantConditions) {
+						t.Fatalf("step %d: expected conditions %+v, got %+v", i, s.wantConditions, last.conditions)
 					}
 				}
-				updater.mu.Unlock()
 				prevCalls = got
 			}
 		})
+	}
+}
+
+func TestProbeStorageHealthGauges(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIVolumeHealth, true)
+	registerHealthMetrics()
+	t.Cleanup(func() {
+		csiNodeStorageHealthStatus.DeletePartialMatch(map[string]string{"driver_name": "test.driver"})
+	})
+
+	client := &fakeHealthClient{supportsStorageHealth: true}
+	m := newTestManager(t, &testStatusUpdater{}, client)
+	m.csiNodeUpdater = func() CSINodeUpdater { return &fakeCSINodeUpdater{} }
+
+	const header = `
+		# HELP csi_node_storage_health_status [ALPHA] CSI node storage backend health conditions currently reported (1 = present).
+		# TYPE csi_node_storage_health_status gauge
+`
+	steps := []struct {
+		conditions []storagev1.StorageHealthCondition
+		want       string
+	}{
+		{
+			conditions: nil,
+			want:       header + `csi_node_storage_health_status{driver_name="test.driver",reason="StorageHealthy",status="StorageHealthy"} 1` + "\n",
+		},
+		{
+			conditions: []storagev1.StorageHealthCondition{{Status: storagev1.StorageUnreachable, Reason: "BackendDown"}},
+			want:       header + `csi_node_storage_health_status{driver_name="test.driver",reason="BackendDown",status="StorageUnreachable"} 1` + "\n",
+		},
+		{
+			conditions: nil,
+			want:       header + `csi_node_storage_health_status{driver_name="test.driver",reason="StorageHealthy",status="StorageHealthy"} 1` + "\n",
+		},
+	}
+	for i, s := range steps {
+		client.storageConditions = s.conditions
+		m.probeStorageHealth(tCtx)
+		if err := testutil.CollectAndCompare(csiNodeStorageHealthStatus, strings.NewReader(s.want), "csi_node_storage_health_status"); err != nil {
+			t.Fatalf("step %d: %v", i, err)
+		}
 	}
 }
 

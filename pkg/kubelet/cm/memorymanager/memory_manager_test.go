@@ -37,6 +37,7 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/ktesting"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	"k8s.io/kubernetes/pkg/kubelet/cm/admission"
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
@@ -81,7 +82,10 @@ func returnPolicyByName(logger klog.Logger, testCase testMemoryManager) Policy {
 			err: fmt.Errorf("fake reg error"),
 		}
 	case PolicyTypeStatic:
-		policy, _ := NewPolicyStatic(logger, &testCase.machineInfo, testCase.reserved, topologymanager.NewFakeManager(logger))
+		// Wrap the store so the policy reads hint scores: providers skip
+		// computing them when no NUMA allocation strategy is selected, and
+		// TestGetTopologyHints asserts on the scores.
+		policy, _ := NewPolicyStatic(logger, &testCase.machineInfo, testCase.reserved, scoringStore{topologymanager.NewFakeManager(logger)})
 		return policy
 	case policyTypeNone:
 		return NewPolicyNone(logger)
@@ -123,6 +127,10 @@ func (p *mockPolicy) AllocatePod(_ klog.Logger, _ state.State, _ *v1.Pod, _ life
 // GetAllocatableMemory returns the amount of allocatable memory for each NUMA node
 func (p *mockPolicy) GetAllocatableMemory(state.State) []state.Block {
 	return []state.Block{}
+}
+
+func (p *mockPolicy) CanAllocateExclusively() bool {
+	return false
 }
 
 type mockRuntimeService struct {
@@ -1368,7 +1376,7 @@ func TestAddContainer(t *testing.T) {
 					},
 				},
 			},
-			expectedAllocateError:     fmt.Errorf("[memorymanager] failed to get the default NUMA affinity, no NUMA nodes with enough memory is available"),
+			expectedAllocateError:     admission.NewOutOfResourceError(v1.ResourceMemory, fmt.Errorf("[memorymanager] failed to get the default NUMA affinity, no NUMA nodes with enough memory is available")),
 			expectedAddContainerError: nil,
 			podAllocate: getPod("fakePod2", "fakeContainer2", &v1.ResourceRequirements{
 				Limits: v1.ResourceList{

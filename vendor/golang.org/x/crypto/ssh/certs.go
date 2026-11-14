@@ -35,6 +35,15 @@ const (
 	CertAlgoED25519v01     = "ssh-ed25519-cert-v01@openssh.com"
 	CertAlgoSKED25519v01   = "sk-ssh-ed25519-cert-v01@openssh.com"
 
+	// CertAlgoMLDSA44v01Go, CertAlgoMLDSA65v01Go and CertAlgoMLDSA87v01Go
+	// are certificate algorithms based on ML-DSA. No specification defines
+	// them, so these are vendor names as per RFC 4251, Section 4.2. The
+	// format is that of [SSH-CERTS], with the public key encoded as in
+	// [SSH-MLDSA], Section 4.
+	CertAlgoMLDSA44v01Go = "ssh-mldsa-44-cert-v01@golang.org"
+	CertAlgoMLDSA65v01Go = "ssh-mldsa-65-cert-v01@golang.org"
+	CertAlgoMLDSA87v01Go = "ssh-mldsa-87-cert-v01@golang.org"
+
 	// CertAlgoRSASHA256v01 and CertAlgoRSASHA512v01 can't appear as a
 	// Certificate.Type (or PublicKey.Type), but only in
 	// ClientConfig.HostKeyAlgorithms.
@@ -525,6 +534,9 @@ var certKeyAlgoNames = map[string]string{
 	CertAlgoSKECDSA256v01:  KeyAlgoSKECDSA256,
 	CertAlgoED25519v01:     KeyAlgoED25519,
 	CertAlgoSKED25519v01:   KeyAlgoSKED25519,
+	CertAlgoMLDSA44v01Go:   KeyAlgoMLDSA44,
+	CertAlgoMLDSA65v01Go:   KeyAlgoMLDSA65,
+	CertAlgoMLDSA87v01Go:   KeyAlgoMLDSA87,
 }
 
 // underlyingAlgo returns the signature algorithm associated with algo (which is

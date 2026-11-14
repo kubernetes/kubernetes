@@ -78,7 +78,7 @@ type RuntimeClassSpec struct {
 	// If scheduling is nil, this RuntimeClass is assumed to be supported by all
 	// nodes.
 	// +optional
-	// +k8s:alpha(since: "1.37")=+k8s:optional
+	// +k8s:beta(since: "1.38")=+k8s:optional
 	Scheduling *Scheduling `json:"scheduling,omitempty" protobuf:"bytes,3,opt,name=scheduling"`
 }
 
@@ -106,7 +106,7 @@ type Scheduling struct {
 	// tolerated by the pod and the RuntimeClass.
 	// +optional
 	// +listType=atomic
-	// +k8s:alpha(since: "1.37")=+k8s:optional
+	// +k8s:beta(since: "1.38")=+k8s:optional
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty" protobuf:"bytes,2,rep,name=tolerations"`
 }
 

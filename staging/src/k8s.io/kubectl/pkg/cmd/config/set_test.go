@@ -55,6 +55,48 @@ func TestSetConfigCurrentContext(t *testing.T) {
 	test.run(t)
 }
 
+func TestSetConfigInteger(t *testing.T) {
+	conf := clientcmdapi.NewConfig()
+	conf.Clusters["my-cluster"] = &clientcmdapi.Cluster{Server: "https://localhost:8443"}
+	fakeKubeFile, err := os.CreateTemp(os.TempDir(), "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	defer utiltesting.CloseAndRemove(t, fakeKubeFile)
+	if err := clientcmd.WriteToFile(*conf, fakeKubeFile.Name()); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	pathOptions := clientcmd.NewDefaultPathOptions()
+	pathOptions.GlobalFile = fakeKubeFile.Name()
+	pathOptions.EnvVar = ""
+
+	for _, tc := range []struct {
+		property  string
+		value     string
+		expectErr bool
+		expected  int32
+	}{
+		{property: "clusters.my-cluster.min-connection-pool-size", value: "4", expected: 4},
+		{property: "clusters.my-cluster.min-connection-pool-size", value: "four", expectErr: true, expected: 4},
+		{property: "clusters.my-cluster.min-connection-pool-size", value: "4294967296", expectErr: true, expected: 4},
+		{property: "clusters.my-cluster.min-connection-pool-size.foo", value: "4", expectErr: true, expected: 4},
+		{property: "clusters.my-cluster.min-connection-pool-size", value: "0", expected: 0},
+	} {
+		opts := setOptions{configAccess: pathOptions, propertyName: tc.property, propertyValue: tc.value}
+		err := opts.run()
+		if tc.expectErr != (err != nil) {
+			t.Errorf("%s=%s: expected error %v, got %v", tc.property, tc.value, tc.expectErr, err)
+		}
+		config, err := clientcmd.LoadFromFile(fakeKubeFile.Name())
+		if err != nil {
+			t.Fatalf("unexpected error loading kubeconfig file: %v", err)
+		}
+		if got := config.Clusters["my-cluster"].MinConnectionPoolSize; got != tc.expected {
+			t.Errorf("%s=%s: expected min-connection-pool-size %d, got %d", tc.property, tc.value, tc.expected, got)
+		}
+	}
+}
+
 func (test setConfigTest) run(t *testing.T) {
 	fakeKubeFile, err := os.CreateTemp(os.TempDir(), "")
 	if err != nil {

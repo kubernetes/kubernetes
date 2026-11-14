@@ -721,7 +721,16 @@ func (r *ModuleResolver) loadExports(ctx context.Context, pkg *pkg, includeTest 
 
 func (r *ModuleResolver) scanDirForPackage(root gopathwalk.Root, dir string) directoryPackageInfo {
 	subdir := ""
-	if prefix := root.Path + string(filepath.Separator); strings.HasPrefix(dir, prefix) {
+	base := root.Path
+	if root.Type == gopathwalk.RootModuleCache && r.dirInModuleCache(root.Path) {
+		// A RootModuleCache root may be either the module cache itself or
+		// a dependency's module directory within it (see addDep in
+		// newModuleResolver). In both cases, subdir must be relative to
+		// the module cache so that it contains the module@version
+		// component that modCacheRegexp expects.
+		base = r.moduleCacheDir
+	}
+	if prefix := base + string(filepath.Separator); strings.HasPrefix(dir, prefix) {
 		subdir = dir[len(prefix):]
 	}
 	importPath := filepath.ToSlash(subdir)

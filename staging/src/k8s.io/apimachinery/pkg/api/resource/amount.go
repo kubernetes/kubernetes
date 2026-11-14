@@ -37,8 +37,11 @@ type Scale int32
 // infScale adapts a Scale value to an inf.Scale value, returning false in overflow cases.
 func (s Scale) infScale() (inf.Scale, bool) {
 	// inf.Scale is upside-down
-	// TODO: saturate instead of wrap in overflow cases
-	return inf.Scale(-s), s != math.MinInt32
+	if s == math.MinInt32 {
+		// saturate instead of wrap in overflow cases
+		return inf.Scale(math.MaxInt32), false
+	}
+	return inf.Scale(-s), true
 }
 
 // canInfScale reports whether infScale is faithful for s. Scale is int32 and
@@ -500,7 +503,9 @@ func (a int64Amount) AsCanonicalBytes(out []byte) (result []byte, exponent int32
 		}
 		// 'times' is always positive, and the `e > 0` case above handles positive overflow,
 		// so this means we could not round down to SI exponent without negative overflow, so keep e as-is
-		c, _ = narrowScale(e)
+		if c, fits = narrowScale(e); !fits {
+			assertUnreachable("int64Amount.AsCanonicalBytes: exponent does not fit in a Scale")
+		}
 	} else {
 		// If the rounded-down exponent fits,
 		// add the zeros that c no longer covers to the mantissa
@@ -604,7 +609,10 @@ func (a infDecAmount) AsCanonicalBytes(out []byte) (result []byte, exponent int3
 		if e > 0 {
 			c = math.MaxInt32 - 1 // largest multiple of 3 in int32 is math.MaxInt32-1
 		} else {
-			c, _ = narrowScale(e) // no multiple of 3 below e fits, so keep e
+			// no multiple of 3 below e fits, so keep e
+			if c, fits = narrowScale(e); !fits {
+				assertUnreachable("infDecAmount.AsCanonicalBytes: exponent does not fit in a Scale")
+			}
 		}
 	}
 

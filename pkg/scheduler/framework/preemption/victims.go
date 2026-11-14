@@ -28,7 +28,8 @@ import (
 
 // getHighestAllAncestor returns the key of the highest ancestor in the hierarchy that has disruption mode All.
 // It returns (key, true) if found, or (empty, false) if not found.
-// TODO: log/return an error if there is a gap in the hierarchy.
+// The search ends at the first group that cannot be resolved (a missing object, or the CompositePodGroup
+// feature gate being disabled); an All ancestor found below that point still applies.
 func getHighestAllAncestor(pod *v1.Pod, snapshot fwk.SharedLister) (fwk.EntityKey, bool) {
 	if pod.Spec.SchedulingGroup == nil {
 		return fwk.EntityKey{}, false
@@ -37,7 +38,10 @@ func getHighestAllAncestor(pod *v1.Pod, snapshot fwk.SharedLister) (fwk.EntityKe
 	var highestAllKey fwk.EntityKey
 	var hasAll bool
 
-	for gpg := range traverseHierarchyUp(pod.Namespace, startKey, snapshot.PodGroups(), snapshot.CompositePodGroups()) {
+	for gpg, err := range helper.TraverseHierarchyUp(snapshot, startKey) {
+		if err != nil {
+			break
+		}
 		if gpg.HasDisruptionModeAll() {
 			highestAllKey = gpg.GetKey()
 			hasAll = true

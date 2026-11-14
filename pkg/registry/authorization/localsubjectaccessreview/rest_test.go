@@ -43,6 +43,16 @@ func (f *fakeAuthorizer) Authorize(ctx context.Context, attrs authorizer.Attribu
 	return f.decision, f.reason, f.err
 }
 
+// The tests using fakeAuthorizer expect the conditions-unaware Authorize to be called, so the
+// conditions-aware path denies with a distinct reason that the status assertions would catch.
+func (f *fakeAuthorizer) ConditionsAwareAuthorize(_ context.Context, _ authorizer.Attributes) authorizer.ConditionsAwareDecision {
+	return authorizer.ConditionsAwareDecisionDeny("unexpected ConditionsAwareAuthorize call", nil)
+}
+
+func (f *fakeAuthorizer) EvaluateConditions(_ context.Context, _ authorizer.ConditionsAwareDecision, _ authorizer.ConditionsData) (authorizer.Decision, string, error) {
+	return authorizer.DecisionDeny, "", authorizer.ErrorConditionEvaluationNotSupported
+}
+
 // TestCreateIgnoresPostedStatus pins the behavior of k8s 1.37 and earlier: a client
 // could post a LocalSubjectAccessReview carrying a bogus status and the request still
 // succeeded. The handler clears the status before validating, so status rules that would

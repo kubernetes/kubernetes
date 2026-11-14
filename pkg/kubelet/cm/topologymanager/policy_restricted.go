@@ -36,6 +36,10 @@ func (p *restrictedPolicy) Name() string {
 	return PolicyRestricted
 }
 
+func (p *restrictedPolicy) UsesHintScores() bool {
+	return usesHintScores(p.opts)
+}
+
 func (p *restrictedPolicy) canAdmitPodResult(hint *TopologyHint) bool {
 	return hint.Preferred
 }
@@ -43,7 +47,16 @@ func (p *restrictedPolicy) canAdmitPodResult(hint *TopologyHint) bool {
 func (p *restrictedPolicy) Merge(logger klog.Logger, providersHints []map[string][]TopologyHint) (TopologyHint, bool) {
 	filteredHints := filterProvidersHints(logger, providersHints)
 	merger := NewHintMerger(p.numaInfo, filteredHints, p.Name(), p.opts)
-	bestHint := merger.Merge(logger)
+	// If any preferred merged hint exists, it will always win over any non-preferred
+	// merged hint, so search preferred space first and fall back to full search only
+	// when needed.
+	bestPreferred, ok := merger.mergePreferred(logger)
+	var bestHint TopologyHint
+	if ok {
+		bestHint = bestPreferred
+	} else {
+		bestHint = merger.Merge(logger)
+	}
 	admit := p.canAdmitPodResult(&bestHint)
 	return bestHint, admit
 }

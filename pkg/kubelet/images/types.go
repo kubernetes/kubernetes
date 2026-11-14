@@ -22,11 +22,12 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
 var (
 	// ErrImagePullBackOff - Container image pull failed, kubelet is backing off image pull
-	ErrImagePullBackOff = errors.New("ImagePullBackOff")
+	ErrImagePullBackOff = kubecontainer.ErrImagePullBackOff
 
 	// ErrImageInspect - Unable to inspect image
 	ErrImageInspect = errors.New("ImageInspectError")
@@ -39,6 +40,15 @@ var (
 
 	// ErrInvalidImageName - Unable to parse the image name.
 	ErrInvalidImageName = errors.New("InvalidImageName")
+
+	// ErrSecurityProfilePull - General security profile pull error
+	ErrSecurityProfilePull = errors.New("ErrSecurityProfilePull")
+
+	// ErrSecurityProfileRejected - The container runtime permanently rejected a security profile.
+	ErrSecurityProfileRejected = errors.New("SecurityProfileRejected")
+
+	// ErrSecurityProfilePullBackOff - Security profile pull failed, kubelet is backing off the pull
+	ErrSecurityProfilePullBackOff = kubecontainer.ErrSecurityProfilePullBackOff
 )
 
 // ImageManager provides an interface to manage the lifecycle of images.
@@ -49,6 +59,11 @@ var (
 type ImageManager interface {
 	// EnsureImageExists ensures that image specified by `requestedImage` exists.
 	EnsureImageExists(ctx context.Context, objRef *v1.ObjectReference, pod *v1.Pod, requestedImage string, pullSecrets []v1.Secret, podSandboxConfig *runtimeapi.PodSandboxConfig, podRuntimeHandler string, pullPolicy v1.PullPolicy) (imageRef, message string, err error)
+
+	// EnsureSecurityProfile pulls the security profile at the digest-pinned
+	// reference ref, with the image puller's parallelism limit and the image
+	// pull credentials. Errors that no retry can fix wrap ErrSecurityProfileRejected.
+	EnsureSecurityProfile(ctx context.Context, objRef *v1.ObjectReference, pod *v1.Pod, ref string, kind runtimeapi.SecurityProfileKind, pullSecrets []v1.Secret, podSandboxConfig *runtimeapi.PodSandboxConfig, podRuntimeHandler string) error
 
 	// TODO(ronl): consolidating image managing and deleting operation in this interface
 }

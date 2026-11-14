@@ -26,13 +26,16 @@ import (
 // with apply.
 //
 // VolumeHealthStatus contains health information for a volume reported
-// by the CSI controller plugin.
+// by a CSI controller or node plugin.
 type VolumeHealthStatusApplyConfiguration struct {
-	// healthConditions is the set of adverse conditions reported by
-	// the CSI controller plugin. An empty list means no adverse condition.
-	// At most 16 conditions may be reported.
+	// healthConditions is the set of health conditions reported by
+	// a CSI plugin. At most 16 conditions may be reported.
+	// An empty list means the CSI driver either does not support volume health
+	// or has not reported it yet. If the driver supports volume health and the
+	// volume is healthy, a Healthy condition is reported.
 	HealthConditions []VolumeHealthConditionApplyConfiguration `json:"healthConditions,omitempty"`
-	// lastTransitionTime is when the current set of conditions first appeared.
+	// lastTransitionTime is when the current set of (status, reason) pairs first appeared.
+	// lastTransitionTime remains unchanged when only message associated with healthConditions change.
 	LastTransitionTime *metav1.Time `json:"lastTransitionTime,omitempty"`
 }
 

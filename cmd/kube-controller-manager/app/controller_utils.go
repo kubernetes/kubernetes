@@ -19,6 +19,9 @@ package app
 import (
 	"context"
 	"sync"
+
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/client-go/tools/leaderelection"
 )
 
 // This file contains utility functions for implementing controller wrappers,
@@ -33,6 +36,7 @@ func (rx runFuncSlice) Run(ctx context.Context) {
 	wg.Add(len(rx))
 	for _, fnc := range rx {
 		go func() {
+			defer utilruntime.HandleCrashWithContext(ctx)
 			defer wg.Done()
 			fnc(ctx)
 		}()
@@ -64,4 +68,23 @@ func (loop *controllerLoop) Name() string {
 
 func (loop *controllerLoop) Run(ctx context.Context) {
 	loop.run(ctx)
+}
+
+// pausableControllerLoop is a controllerLoop whose controller can be paused,
+// which opts it in to leader election recovery; see BuildControllers.
+type pausableControllerLoop struct {
+	*controllerLoop
+	leaderelection.Pausable
+}
+
+// newPausableControllerLoop wraps run like newControllerLoop and exposes
+// pausable, which must not be nil, as the controller's Pausable.
+func newPausableControllerLoop(run runFunc, controllerName string, pausable leaderelection.Pausable) *pausableControllerLoop {
+	if pausable == nil {
+		panic("newPausableControllerLoop: pausable must not be nil for " + controllerName)
+	}
+	return &pausableControllerLoop{
+		controllerLoop: newControllerLoop(run, controllerName),
+		Pausable:       pausable,
+	}
 }

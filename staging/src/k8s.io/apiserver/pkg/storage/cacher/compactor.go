@@ -30,26 +30,30 @@ const (
 	compactorPollPeriod = 15 * time.Second
 )
 
-func newCompactor(store storage.Interface, wc *watchCache, clock clock.Clock) *compactor {
-	pr := &compactor{
-		clock: clock,
-		store: store,
-		wc:    wc,
+func newCompactor(store storage.Interface, wc *watchCache, clock clock.Clock, pollPeriod time.Duration) *compactor {
+	if pollPeriod <= 0 {
+		pollPeriod = compactorPollPeriod
 	}
-	return pr
+	return &compactor{
+		clock:      clock,
+		store:      store,
+		wc:         wc,
+		pollPeriod: pollPeriod,
+	}
 }
 
 type compactor struct {
-	clock clock.Clock
-	store storage.Interface
-	wc    *watchCache
+	clock      clock.Clock
+	store      storage.Interface
+	wc         *watchCache
+	pollPeriod time.Duration
 
 	lock            sync.Mutex
 	compactRevision int64
 }
 
 func (c *compactor) Run(stopCh <-chan struct{}) {
-	timer := c.clock.NewTimer(compactorPollPeriod)
+	timer := c.clock.NewTimer(c.pollPeriod)
 	defer timer.Stop()
 	for {
 		select {
@@ -57,7 +61,7 @@ func (c *compactor) Run(stopCh <-chan struct{}) {
 			return
 		case <-timer.C():
 			c.compactIfNeeded()
-			timer.Reset(compactorPollPeriod)
+			timer.Reset(c.pollPeriod)
 		}
 	}
 }

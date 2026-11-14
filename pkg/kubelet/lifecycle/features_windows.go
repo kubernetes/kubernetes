@@ -26,9 +26,10 @@ import (
 func isPodLevelResourcesSupported(pod *v1.Pod) PodAdmitResult {
 	if resource.IsPodLevelResourcesSet(pod) {
 		return PodAdmitResult{
-			Admit:   false,
-			Reason:  PodLevelResourcesNotAdmittedReason,
-			Message: "pod-level resources are not supported on Windows",
+			Admit:         false,
+			Reason:        PodLevelResourcesNotAdmittedReason,
+			Message:       "pod-level resources are not supported on Windows",
+			RejectionType: RejectionInfeasible,
 		}
 	}
 	return PodAdmitResult{Admit: true}

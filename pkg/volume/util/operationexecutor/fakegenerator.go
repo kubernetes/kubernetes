@@ -91,10 +91,6 @@ func (f *fakeOGCounter) GetVolumePluginMgr() *volume.VolumePluginMgr {
 	return nil
 }
 
-func (f *fakeOGCounter) GenerateExpandVolumeFunc(*v1.PersistentVolumeClaim, *v1.PersistentVolume) (volumetypes.GeneratedOperations, error) {
-	return f.recordFuncCall("GenerateExpandVolumeFunc"), nil
-}
-
 func (f *fakeOGCounter) GenerateExpandAndRecoverVolumeFunc(*v1.PersistentVolumeClaim, *v1.PersistentVolume, string) (volumetypes.GeneratedOperations, error) {
 	return f.recordFuncCall("GenerateExpandVolumeFunc"), nil
 }

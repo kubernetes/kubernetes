@@ -539,9 +539,8 @@ type PersistentVolumeClaimSpec struct {
 	// +optional
 	Selector *metav1.LabelSelector
 	// Resources represents the minimum resources required
-	// If RecoverVolumeExpansionFailure feature is enabled users are allowed to specify resource requirements
-	// that are lower than previous value but must still be higher than capacity recorded in the
-	// status field of the claim.
+	// Users are allowed to specify resource requirements that are lower than the previous value
+	// but must still be higher than capacity recorded in the status field of the claim.
 	// +optional
 	Resources VolumeResourceRequirements
 	// VolumeName is the binding reference to the PersistentVolume backing this
@@ -626,7 +625,7 @@ type TypedObjectReference struct {
 // Valid values are:
 //   - "Resizing", "FileSystemResizePending"
 //
-// If RecoverVolumeExpansionFailure feature gate is enabled, then following additional values can be expected:
+// The following additional values can be expected:
 //   - "ControllerResizeError", "NodeResizeError"
 //
 // If VolumeAttributesClass feature gate is enabled, then following additional values can be expected:
@@ -737,21 +736,38 @@ type PersistentVolumeClaimCondition struct {
 type VolumeHealthStatusType string
 
 const (
+	// VolumeHealthUnknown indicates that the driver reported an unknown health status, or a status
+	// Kubernetes does not recognize. The volume must not be considered healthy.
+	VolumeHealthUnknown VolumeHealthStatusType = "Unknown"
 	// VolumeHealthInaccessible indicates the volume cannot be accessed.
 	VolumeHealthInaccessible VolumeHealthStatusType = "Inaccessible"
 	// VolumeHealthDataLoss indicates data loss has been detected on the volume.
 	VolumeHealthDataLoss VolumeHealthStatusType = "DataLoss"
 	// VolumeHealthDegraded indicates the volume is functioning but with reduced capability.
 	VolumeHealthDegraded VolumeHealthStatusType = "Degraded"
+	// VolumeHealthHealthy indicates the volume is healthy and there are no issues with it.
+	VolumeHealthHealthy VolumeHealthStatusType = "Healthy"
 )
 
-// VolumeHealthCondition represents an adverse health condition reported for a volume.
+// VolumeHealthCondition represents a health condition reported for a volume.
+// Both pod and PVC reuse this type to report volume health in their status fields.
 type VolumeHealthCondition struct {
 	// status is the machine-parseable health category.
-	// Possible values:
+	// Possible values are:
+	// - "Unknown": the driver reported an unknown health status, or a status Kubernetes does not recognize. The volume must not be considered healthy.
 	// - "Inaccessible": the volume cannot be accessed.
 	// - "DataLoss": data loss has been detected on the volume.
 	// - "Degraded": the volume is functioning with reduced capability.
+	// - "Healthy": the volume is healthy.
+	//
+	// This field allows additional enum values to be added to VolumeHealthStatusType via CSI spec change.
+	// A future version of a CSI driver may emit health conditions that Kubernetes components are not aware of.
+	//
+	// A writer which does not know how to handle incoming new VolumeHealthStatusType may classify the status
+	// as unknown.
+	//
+	// A reader which does not know how to handle new VolumeHealthStatusType MUST only use it for health reporting
+	// purposes.
 	Status VolumeHealthStatusType
 	// reason is a brief CamelCase machine-parseable reason.
 	// Together with status it forms the unique identity of a condition entry.
@@ -762,35 +778,20 @@ type VolumeHealthCondition struct {
 }
 
 // VolumeHealthStatus contains health information for a volume reported
-// by the CSI controller plugin.
+// by a CSI controller or node plugin.
 type VolumeHealthStatus struct {
-	// conditions is the set of adverse conditions reported by
-	// the CSI controller plugin. An empty list means no adverse condition.
-	// At most 16 conditions may be reported.
+	// healthConditions is the set of health conditions reported by
+	// a CSI plugin. At most 16 conditions may be reported.
+	// An empty list means the CSI driver either does not support volume health
+	// or has not reported it yet. If the driver supports volume health and the
+	// volume is healthy, a Healthy condition is reported.
 	// +optional
 	// +listType=map
 	// +listMapKey=status
 	// +listMapKey=reason
 	HealthConditions []VolumeHealthCondition
-	// lastTransitionTime is when the current set of conditions first appeared.
-	// +optional
-	LastTransitionTime metav1.Time
-}
-
-// PodVolumeHealth contains health information for a volume used by a pod,
-// reported by the CSI node plugin via the kubelet.
-type PodVolumeHealth struct {
-	// name matches an entry in pod.spec.volumes.
-	Name string
-	// conditions is the set of adverse conditions reported by
-	// the CSI node plugin for this volume on this node.
-	// At most 16 conditions may be reported.
-	// +optional
-	// +listType=map
-	// +listMapKey=status
-	// +listMapKey=reason
-	HealthConditions []VolumeHealthCondition
-	// lastTransitionTime is when the current set of conditions first appeared.
+	// lastTransitionTime is when the current set of (status, reason) pairs first appeared.
+	// lastTransitionTime remains unchanged when only message associated with healthConditions change.
 	// +optional
 	LastTransitionTime metav1.Time
 }
@@ -878,6 +879,7 @@ type PersistentVolumeClaimStatus struct {
 	ModifyVolumeStatus *ModifyVolumeStatus
 	// healthStatus contains the latest controller-reported health information
 	// for the volume bound to this claim.
+	// This is an alpha field and requires enabling the CSIVolumeHealth feature gate.
 	// +featureGate=CSIVolumeHealth
 	// +optional
 	HealthStatus *VolumeHealthStatus
@@ -1299,7 +1301,7 @@ type SecretVolumeSource struct {
 	Optional *bool
 	// The owner UID of the created files by default.
 	// The defaultUser field is only used as a fallback when the item-level user field is unset.
-	// (Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
+	// (Beta) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
 	// +featureGate=AtomicWriteVolumeUserFields
 	// +optional
 	DefaultUser *int64
@@ -1604,7 +1606,7 @@ type DownwardAPIVolumeSource struct {
 	DefaultMode *int32
 	// The owner UID of the created files by default.
 	// The defaultUser field is only used as a fallback when the item-level user field is unset.
-	// (Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
+	// (Beta) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
 	// +featureGate=AtomicWriteVolumeUserFields
 	// +optional
 	DefaultUser *int64
@@ -1629,7 +1631,7 @@ type DownwardAPIVolumeFile struct {
 	Mode *int32
 	// The owner UID of the created file.
 	// If specified, the item-level user field takes precedence over defaultUser.
-	// (Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
+	// (Beta) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
 	// +featureGate=AtomicWriteVolumeUserFields
 	// +optional
 	User *int64
@@ -1913,7 +1915,7 @@ type ConfigMapVolumeSource struct {
 	Optional *bool
 	// The owner UID of the created files by default.
 	// The defaultUser field is only used as a fallback when the item-level user field is unset.
-	// (Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
+	// (Beta) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
 	// +featureGate=AtomicWriteVolumeUserFields
 	// +optional
 	DefaultUser *int64
@@ -1965,7 +1967,7 @@ type ServiceAccountTokenProjection struct {
 	Path string
 	// The owner UID of the created file.
 	// If specified, the item-level user field takes precedence over defaultUser.
-	// (Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
+	// (Beta) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
 	// +featureGate=AtomicWriteVolumeUserFields
 	// +optional
 	User *int64
@@ -1995,7 +1997,7 @@ type ClusterTrustBundleProjection struct {
 
 	// The owner UID of the created file.
 	// If specified, the item-level user field takes precedence over defaultUser.
-	// (Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
+	// (Beta) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
 	// +featureGate=AtomicWriteVolumeUserFields
 	// +optional
 	User *int64
@@ -2074,7 +2076,7 @@ type PodCertificateProjection struct {
 
 	// The owner UID of the created file.
 	// If specified, the item-level user field takes precedence over defaultUser.
-	// (Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
+	// (Beta) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
 	// +featureGate=AtomicWriteVolumeUserFields
 	// +optional
 	User *int64
@@ -2093,7 +2095,7 @@ type ProjectedVolumeSource struct {
 	DefaultMode *int32
 	// The owner UID of the created files by default.
 	// The defaultUser field is only used as a fallback when the item-level user field is unset.
-	// (Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
+	// (Beta) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
 	// +featureGate=AtomicWriteVolumeUserFields
 	// +optional
 	DefaultUser *int64
@@ -2135,7 +2137,7 @@ type KeyToPath struct {
 	Mode *int32
 	// The owner UID of the created file.
 	// If specified, the item-level user field takes precedence over defaultUser.
-	// (Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
+	// (Beta) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
 	// +featureGate=AtomicWriteVolumeUserFields
 	// +optional
 	User *int64
@@ -2781,6 +2783,11 @@ type Capabilities struct {
 // ResourceRequirements describes the compute resource requirements.
 type ResourceRequirements struct {
 	// Limits describes the maximum amount of compute resources allowed.
+	// For kubelet cgroup enforcement:
+	// - cpu and memory: a limit of 0 is treated the same as an unspecified limit. If
+	//   neither the container nor the pod specifies a limit, the resource is not limited.
+	// - hugepages: an unspecified limit is treated the same as a limit of 0.
+	// More details: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
 	// +optional
 	Limits ResourceList
 	// Requests describes the minimum amount of compute resources required.
@@ -2868,7 +2875,6 @@ type Container struct {
 	Resources ResourceRequirements
 	// Resources resize policy for the container.
 	// This field cannot be set on ephemeral containers.
-	// +featureGate=InPlacePodVerticalScaling
 	// +optional
 	ResizePolicy []ContainerResizePolicy
 	// RestartPolicy defines the restart behavior of individual containers in a pod.
@@ -3233,7 +3239,6 @@ type ContainerStatus struct {
 	AllocatedResources ResourceList
 	// Resources represents the compute resource requests and limits that have been successfully
 	// enacted on the running container after it has been started or has been successfully resized.
-	// +featureGate=InPlacePodVerticalScaling
 	// +optional
 	Resources *ResourceRequirements
 	// Status of volume mounts.
@@ -3241,7 +3246,6 @@ type ContainerStatus struct {
 	// +optional
 	VolumeMounts []VolumeMountStatus
 	// User represents user identity information initially attached to the first process of the container
-	// +featureGate=SupplementalGroupsPolicy
 	// +optional
 	User *ContainerUser
 	// AllocatedResourcesStatus represents the status of various resources
@@ -3395,6 +3399,11 @@ const (
 	// If both PodResizePending and PodResizeInProgress are set, it means that a new resize was
 	// requested in the middle of a previous pod resize that is still in progress.
 	PodResizeInProgress PodConditionType = "PodResizeInProgress"
+	// SchedulerEvaluationCompleted indicates that the scheduler has completed its evaluation
+	// (and any required preemption) for a deferred resize of an already-scheduled pod.
+	// This condition is only ever set with status True. Rather than transitioning to False, it is
+	// removed by the kubelet once it re-evaluates the resize, or if the resize is no longer deferred.
+	SchedulerEvaluationCompleted PodConditionType = "SchedulerEvaluationCompleted"
 	// AllContainersRestarting indicates that all containers of the pod is being restarted.
 	AllContainersRestarting PodConditionType = "AllContainersRestarting"
 )
@@ -4139,6 +4148,7 @@ type PodSpec struct {
 	// - spec.containers[*].securityContext.procMount
 	// - spec.containers[*].securityContext.runAsUser
 	// - spec.containers[*].securityContext.runAsGroup
+	// - spec.containers[*].securityContext.cgroupOptions
 	// +optional
 	OS *PodOS
 
@@ -4176,10 +4186,14 @@ type PodSpec struct {
 	//
 	// This field enables fine-grained control over resource allocation for the
 	// entire pod, allowing resource sharing among containers in a pod.
-	// TODO: For beta graduation, expand this comment with a detailed explanation.
 	//
-	// This is an alpha field and requires enabling the PodLevelResources feature
-	// gate.
+	// If a limit is not specified at the pod level, the pod is limited by the aggregate of
+	// its container limits:
+	// - For cpu and memory, the aggregate is used only if every init and regular container
+	//   specifies a limit; otherwise the pod is not limited for that resource.
+	// - For hugepages, the container limits are summed and unspecified values are treated as 0.
+	//
+	// More details: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
 	//
 	// +featureGate=PodLevelResources
 	// +optional
@@ -4206,9 +4220,11 @@ type PodSpec struct {
 	// the Pod is treated as a single unit in all of these aspects.
 	// The group object referenced by this field may not exist at the time the
 	// Pod is created.
-	// This field is immutable, but a group object with the same name may be
-	// recreated with different policies. Doing this during pod scheduling
-	// may result in the placement not conforming to the expected policies.
+	// This field is immutable. The scheduler cannot distinguish PodGroup runtime
+	// instances that reuse the same namespace and name. Controllers should use a
+	// new PodGroup name for each runtime instance. Reusing a name for a PodGroup
+	// with different policies may result in Pod placement not conforming to the
+	// expected policies.
 	//
 	// +featureGate=GenericWorkload
 	// +optional
@@ -4488,11 +4504,8 @@ type PodSecurityContext struct {
 	SupplementalGroups []int64
 	// Defines how supplemental groups of the first container processes are calculated.
 	// Valid values are "Merge" and "Strict". If not specified, "Merge" is used.
-	// (Alpha) Using the field requires the SupplementalGroupsPolicy feature gate to be enabled
-	// and the container runtime must implement support for this feature.
+	// The container runtime must implement support for this feature.
 	// Note that this field cannot be set when spec.os.name is windows.
-	// TODO: update the default value to "Merge" when spec.os.name is not windows in v1.34
-	// +featureGate=SupplementalGroupsPolicy
 	// +optional
 	SupplementalGroupsPolicy *SupplementalGroupsPolicy
 	// A special supplemental group that applies to all containers in a pod.
@@ -4565,7 +4578,44 @@ type SeccompProfile struct {
 	// LocalhostProfile cannot be an absolute nor a descending path.
 	// +optional
 	LocalhostProfile *string
+	// Use a profile stored as an artifact in an OCI registry.
+	// +featureGate=SecurityProfileOCI
+	// +optional
+	OCI *SecurityProfileOCI
 }
+
+// SecurityProfileOCI references a security profile stored as an artifact in an
+// OCI registry, with an optional base profile.
+type SecurityProfileOCI struct {
+	// Fully qualified, digest-pinned OCI reference of the profile.
+	Ref string
+	// Base profile that the container runtime merges with the OCI profile; the
+	// runtime default profile when omitted.
+	// +optional
+	BaseProfile *SecurityProfileOCIBase
+}
+
+// SecurityProfileOCIBase specifies the base profile of an OCI security profile.
+// +union
+type SecurityProfileOCIBase struct {
+	// +unionDiscriminator
+	Type SecurityProfileOCIBaseType
+	// Load a base profile defined in a static file on the node.
+	// LocalhostProfile must be a relative path without '..' elements.
+	// +optional
+	LocalhostProfile *string
+}
+
+// SecurityProfileOCIBaseType defines the supported base profile types of an
+// OCI security profile.
+type SecurityProfileOCIBaseType string
+
+const (
+	// SecurityProfileOCIBaseTypeRuntimeDefault represents the default container runtime profile.
+	SecurityProfileOCIBaseTypeRuntimeDefault SecurityProfileOCIBaseType = "RuntimeDefault"
+	// SecurityProfileOCIBaseTypeLocalhost represents custom made profiles stored on the node's disk.
+	SecurityProfileOCIBaseTypeLocalhost SecurityProfileOCIBaseType = "Localhost"
+)
 
 // SeccompProfileType defines the supported seccomp profile types.
 type SeccompProfileType string
@@ -4577,6 +4627,8 @@ const (
 	SeccompProfileTypeRuntimeDefault SeccompProfileType = "RuntimeDefault"
 	// SeccompProfileTypeLocalhost represents custom made profiles stored on the node's disk.
 	SeccompProfileTypeLocalhost SeccompProfileType = "Localhost"
+	// SeccompProfileTypeOCI represents profiles pulled from an OCI registry.
+	SeccompProfileTypeOCI SeccompProfileType = "OCI"
 )
 
 // AppArmorProfile defines a pod or container's AppArmor settings.
@@ -4713,7 +4765,6 @@ type EphemeralContainerCommon struct {
 	// +optional
 	Resources ResourceRequirements
 	// Resources resize policy for the container.
-	// +featureGate=InPlacePodVerticalScaling
 	// +optional
 	ResizePolicy []ContainerResizePolicy
 	// Restart policy for the container to manage the restart behavior of each
@@ -4833,6 +4884,19 @@ type EvictionResponder struct {
 	Priority *int32
 }
 
+// PodVolumeStatus represents the status of an individual volume used by a pod.
+type PodVolumeStatus struct {
+	// name matches an entry in pod.spec.volumes.
+	// +required
+	Name string
+	// healthStatus contains health reported by the CSI node plugin for this volume
+	// on the pod's node. Populated by the kubelet.
+	// This is an alpha field and requires enabling the CSIVolumeHealth feature gate.
+	// +featureGate=CSIVolumeHealth
+	// +optional
+	HealthStatus *VolumeHealthStatus
+}
+
 // PodStatus represents information about the status of a pod. Status may trail the actual
 // state of a system.
 type PodStatus struct {
@@ -4929,7 +4993,6 @@ type PodStatus struct {
 	// Deprecated: Resize status is moved to two pod conditions PodResizePending and PodResizeInProgress.
 	// PodResizePending will track states where the spec has been resized, but the Kubelet has not yet allocated the resources.
 	// PodResizeInProgress will track in-progress resizes, and should be present whenever allocated resources != acknowledged resources.
-	// +featureGate=InPlacePodVerticalScaling
 	// +optional
 	Resize PodResizeStatus
 
@@ -4966,13 +5029,15 @@ type PodStatus struct {
 	// +listMapKey=resourceClaimName
 	NodeAllocatableResourceClaimStatuses []NodeAllocatableResourceClaimStatus
 
-	// volumeHealth contains node-reported health for each volume the pod is using.
-	// Populated by the kubelet on the pod's node.
+	// VolumeStatuses contains the status of individual volumes used by this pod.
+	// This is an alpha field and requires enabling the CSIVolumeHealth feature gate.
 	// +featureGate=CSIVolumeHealth
 	// +optional
+	// +patchMergeKey=name
+	// +patchStrategy=merge
 	// +listType=map
 	// +listMapKey=name
-	VolumeHealth []PodVolumeHealth
+	VolumeStatuses []PodVolumeStatus
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -5787,7 +5852,7 @@ type NodeSpec struct {
 	DoNotUseExternalID string
 
 	// PodPreemptionPolicy controls the node-level preemption behaviors for pods on this node.
-	// This is an alpha field and requires enabling the InPlacePodVerticalScalingSchedulerPreemption feature gate.
+	// This is a beta field and requires the InPlacePodVerticalScalingSchedulerPreemption feature gate to be enabled (enabled by default).
 	// +featureGate=InPlacePodVerticalScalingSchedulerPreemption
 	// +optional
 	PodPreemptionPolicy *NodePodPreemptionPolicy
@@ -5796,7 +5861,7 @@ type NodeSpec struct {
 // NodePodPreemptionPolicy defines the node-level policies governing preemption for pods on this node.
 type NodePodPreemptionPolicy struct {
 	// DisableResizePreemption lists the owners that have requested to disable scheduler and Kubelet preemption for in-place pod resize on this node.
-	// This is an alpha field and requires enabling the InPlacePodVerticalScalingSchedulerPreemption feature gate.
+	// This is a beta field and requires the InPlacePodVerticalScalingSchedulerPreemption feature gate to be enabled (enabled by default).
 	// +optional
 	DisableResizePreemption []string
 }
@@ -6007,7 +6072,6 @@ type NodeStatus struct {
 	// +optional
 	RuntimeHandlers []NodeRuntimeHandler
 	// Features describes the set of features implemented by the CRI implementation.
-	// +featureGate=SupplementalGroupsPolicy
 	// +optional
 	Features *NodeFeatures
 	// DeclaredFeatures represents the declared features of a node.
@@ -7256,7 +7320,39 @@ type SecurityContext struct {
 	// Note that this field cannot be set when spec.os.name is windows.
 	// +optional
 	AppArmorProfile *AppArmorProfile
+	// cgroupOptions holds the cgroup options for this container.
+	// If mountMode is specified, the scheduler only places the pod on a node
+	// whose status.declaredFeatures includes CgroupOptions.
+	// (Alpha) This field requires the CgroupOptions feature gate to be enabled.
+	// This field cannot be set for ephemeral containers or when spec.os.name is windows.
+	// +featureGate=CgroupOptions
+	// +optional
+	CgroupOptions *CgroupOptions
 }
+
+// CgroupOptions defines options for cgroup filesystem access.
+type CgroupOptions struct {
+	// mountMode controls how the cgroup filesystem is mounted in the container.
+	// Valid values are "ReadOnly" and "ReadWrite". If not specified, the
+	// container runtime's default mount mode is used.
+	// The kubelet refuses to create a container with an unrecognized value.
+	// "ReadOnly" cannot be set when the container's privileged field is true.
+	// "ReadWrite" cannot be set when spec.hostNetwork is true and
+	// spec.hostUsers is false.
+	// +optional
+	MountMode *CgroupMountMode
+}
+
+// CgroupMountMode defines how the cgroup filesystem is mounted in a container.
+// +enum
+type CgroupMountMode string
+
+const (
+	// CgroupMountModeReadOnly mounts the cgroup filesystem read-only.
+	CgroupMountModeReadOnly CgroupMountMode = "ReadOnly"
+	// CgroupMountModeReadWrite mounts the cgroup filesystem read-write.
+	CgroupMountModeReadWrite CgroupMountMode = "ReadWrite"
+)
 
 // ProcMountType defines the type of proc mount
 type ProcMountType string
@@ -7606,6 +7702,8 @@ type NodeAllocatableOverheadResources struct {
 	// - Container-level cgroup (limits only): Kubelet adds PerPod + PerContainer for each referencing container.
 	// This allows any single container to access the pod-level overhead, while the parent cgroup caps the total usage to account for PerPod exactly once.
 	// At least one of PerPod or PerContainer must be specified. Specifying neither is an invalid configuration.
+	// PerContainer overhead of a claim referenced by a non-restartable init container is counted towards
+	// the pod's peak resource calculation (see Pod `spec.initContainers`), not for the pod's entire duration.
 	// +optional
 	PerContainer *resource.Quantity
 }

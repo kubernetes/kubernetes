@@ -57,7 +57,7 @@ type NamespaceController struct {
 	// returns true when the namespace cache is ready
 	listerSynced cache.InformerSynced
 	// namespaces that have been queued up for processing by workers
-	queue workqueue.TypedRateLimitingInterface[string]
+	queue pausableQueue[string]
 	// helper to delete all resources in the namespace when the namespace is deleted.
 	namespacedResourcesDeleter deletion.NamespacedResourcesDeleterInterface
 }
@@ -81,7 +81,7 @@ func NewNamespaceController(
 				Logger: &logger,
 				Name:   "namespace",
 			},
-		),
+		).(pausableQueue[string]),
 		namespacedResourcesDeleter: deletion.NewNamespacedResourcesDeleter(ctx, kubeClient.CoreV1().Namespaces(), metadataClient, kubeClient.CoreV1(), discoverResourcesFn, finalizerToken),
 	}
 
@@ -222,4 +222,23 @@ func (nm *NamespaceController) Run(ctx context.Context, workers int) {
 		})
 	}
 	<-ctx.Done()
+}
+
+// pausableQueue is a rate limiting workqueue that can be paused, which the
+// default one is; see Pause.
+type pausableQueue[T comparable] interface {
+	workqueue.TypedRateLimitingInterface[T]
+	workqueue.Pausable
+}
+
+// Pause blocks the controller workqueue from dequeuing items while the leader
+// election write gate is closed.
+func (nm *NamespaceController) Pause() {
+	nm.queue.Pause()
+}
+
+// Resume unblocks the controller workqueue after the leader election write gate
+// reopens.
+func (nm *NamespaceController) Resume() {
+	nm.queue.Resume()
 }

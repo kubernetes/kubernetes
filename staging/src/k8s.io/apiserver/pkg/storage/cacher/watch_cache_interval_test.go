@@ -28,7 +28,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/cacher/store"
@@ -67,9 +66,11 @@ func generateEvents(start, end int) []*watchCacheEvent {
 	n := end - start
 	events := make([]*watchCacheEvent, n)
 	for i := 0; i < n; i++ {
+		rv := uint64(start + i + 1)
 		events[i] = &watchCacheEvent{
-			Type:   watch.Added,
-			Object: makeTestPod(fmt.Sprintf("pod%d", start+i), uint64(start+i)),
+			Type:            watch.Added,
+			Object:          makeTestPod(fmt.Sprintf("pod%d", start+i), rv),
+			ResourceVersion: rv,
 		}
 	}
 	return events
@@ -298,7 +299,9 @@ func TestCacheIntervalNextFromWatchCache(t *testing.T) {
 			wc := newTestWatchCache(capacity, DefaultEventFreshDuration, &cache.Indexers{})
 			defer wc.Stop()
 			for i := 0; i < c.eventsAddedToWatchcache; i++ {
-				wc.Add(makeTestPod(fmt.Sprintf("pod%d", i), uint64(i)))
+				if err := wc.Add(makeTestPod(fmt.Sprintf("pod%d", i), uint64(i+1))); err != nil {
+					t.Fatal(err)
+				}
 			}
 			indexerFunc := func(i int) *watchCacheEvent {
 				return wc.history.cache[i%wc.history.capacity]
@@ -372,72 +375,6 @@ func TestCacheIntervalNextFromWatchCache(t *testing.T) {
 	}
 }
 
-func TestCacheIntervalNextFromStore(t *testing.T) {
-	getAttrsFunc := func(obj runtime.Object) (labels.Set, fields.Set, error) {
-		pod, ok := obj.(*v1.Pod)
-		if !ok {
-			return nil, nil, fmt.Errorf("not a pod")
-		}
-		return labels.Set(pod.Labels), fields.Set{"spec.nodeName": pod.Spec.NodeName}, nil
-	}
-	const numEvents = 50
-	store := store.NewWatchCacheStorage(nil)
-	events := make(map[string]*watchCacheEvent)
-	var rv uint64 = 1 // arbitrary number; rv till which the watch cache has progressed.
-
-	for i := 0; i < numEvents; i++ {
-		elem := makeTestStoreElement(makeTestPod(fmt.Sprintf("pod%d", i), uint64(i)))
-		objLabels, objFields, err := getAttrsFunc(elem.Object)
-		if err != nil {
-			t.Fatal(err)
-		}
-		events[elem.Key] = &watchCacheEvent{
-			Type:            watch.Added,
-			Object:          elem.Object,
-			ObjLabels:       objLabels,
-			ObjFields:       objFields,
-			Key:             elem.Key,
-			ResourceVersion: rv,
-		}
-		if _, err := store.UpdateStore(watch.Added, elem, rv); err != nil {
-			t.Fatal(err)
-		}
-	}
-
-	wci, err := newCacheIntervalFromStore(rv, store.LatestSnapshot(), "", false)
-	if err != nil {
-		t.Fatal(err)
-	}
-	src := wci.source.(*snapshotCacheIntervalSource)
-
-	for i := 0; i < numEvents; i++ {
-		event, err := src.next()
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if event == nil {
-			t.Error("unexpected nil event")
-			break
-		}
-		expectedEvent, ok := events[event.Key]
-		if !ok {
-			t.Fatalf("event with key %s not found", event.Key)
-		}
-		if !reflect.DeepEqual(event, expectedEvent) {
-			t.Errorf("expected: %v, got %v", *events[event.Key], *event)
-		}
-	}
-
-	// All events should have been consumed.
-	event, err := src.next()
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if event != nil {
-		t.Errorf("expected nil event after consuming all events, got %v", *event)
-	}
-}
-
 // TestCacheIntervalFromStoreSorted verifies getIntervalFromStoreLocked returns
 // events sorted by Key for both unindexed and indexed snapshots.
 func TestCacheIntervalFromStoreSorted(t *testing.T) {
@@ -477,7 +414,7 @@ func TestCacheIntervalFromStoreSorted(t *testing.T) {
 			}
 
 			wc.RLock()
-			wci, indexUsed, err := wc.getIntervalFromStoreLocked(context.Background(), "/prefix/", tc.opts)
+			wci, indexUsed, err := wc.getIntervalFromStoreLocked("/prefix/", tc.opts, tc.opts.Predicate.MatcherIndex(context.Background()))
 			wc.RUnlock()
 			if err != nil {
 				t.Fatal(err)
@@ -509,40 +446,35 @@ func TestCacheIntervalFromStoreSorted(t *testing.T) {
 func TestCacheIntervalSourceSelection(t *testing.T) {
 	node1Selector := fields.SelectorFromSet(fields.Set{"spec.nodeName": "node1"})
 	cases := []struct {
-		name             string
-		key              string
-		opts             storage.ListOptions
-		wantLazySnapshot bool
-		wantIndex        string
-		wantKeys         []string
+		name      string
+		key       string
+		opts      storage.ListOptions
+		wantIndex string
+		wantKeys  []string
 	}{
 		{
-			name:             "everything predicate serves from lazy snapshot",
-			key:              "/prefix/",
-			opts:             storage.ListOptions{Recursive: true, Predicate: storage.Everything},
-			wantLazySnapshot: true,
-			wantKeys:         []string{"/prefix/ns/pod1", "/prefix/ns/pod2", "/prefix/other/pod3"},
+			name:     "everything predicate serves from lazy snapshot",
+			key:      "/prefix/",
+			opts:     storage.ListOptions{Recursive: true, Predicate: storage.Everything},
+			wantKeys: []string{"/prefix/ns/pod1", "/prefix/ns/pod2", "/prefix/other/pod3"},
 		},
 		{
-			name:             "key prefix scopes lazy snapshot",
-			key:              "/prefix/ns/",
-			opts:             storage.ListOptions{Recursive: true, Predicate: storage.Everything},
-			wantLazySnapshot: true,
-			wantKeys:         []string{"/prefix/ns/pod1", "/prefix/ns/pod2"},
+			name:     "key prefix scopes lazy snapshot",
+			key:      "/prefix/ns/",
+			opts:     storage.ListOptions{Recursive: true, Predicate: storage.Everything},
+			wantKeys: []string{"/prefix/ns/pod1", "/prefix/ns/pod2"},
 		},
 		{
-			name:             "unindexed predicate serves all items from lazy snapshot",
-			key:              "/prefix/",
-			opts:             storage.ListOptions{Recursive: true, Predicate: storage.SelectionPredicate{Field: node1Selector}},
-			wantLazySnapshot: true,
-			wantKeys:         []string{"/prefix/ns/pod1", "/prefix/ns/pod2", "/prefix/other/pod3"},
+			name:     "unindexed predicate serves all items from lazy snapshot",
+			key:      "/prefix/",
+			opts:     storage.ListOptions{Recursive: true, Predicate: storage.SelectionPredicate{Field: node1Selector}},
+			wantKeys: []string{"/prefix/ns/pod1", "/prefix/ns/pod2", "/prefix/other/pod3"},
 		},
 		{
-			name:             "unindexed predicate with key prefix scopes to prefix",
-			key:              "/prefix/ns/",
-			opts:             storage.ListOptions{Recursive: true, Predicate: storage.SelectionPredicate{Field: node1Selector}},
-			wantLazySnapshot: true,
-			wantKeys:         []string{"/prefix/ns/pod1", "/prefix/ns/pod2"},
+			name:     "unindexed predicate with key prefix scopes to prefix",
+			key:      "/prefix/ns/",
+			opts:     storage.ListOptions{Recursive: true, Predicate: storage.SelectionPredicate{Field: node1Selector}},
+			wantKeys: []string{"/prefix/ns/pod1", "/prefix/ns/pod2"},
 		},
 		{
 			name: "indexed field predicate serves matching items from lazy snapshot",
@@ -551,9 +483,8 @@ func TestCacheIntervalSourceSelection(t *testing.T) {
 				Recursive: true,
 				Predicate: storage.SelectionPredicate{Field: node1Selector, IndexFields: []string{"spec.nodeName"}},
 			},
-			wantLazySnapshot: true,
-			wantIndex:        "f:spec.nodeName",
-			wantKeys:         []string{"/prefix/ns/pod1", "/prefix/other/pod3"},
+			wantIndex: "f:spec.nodeName",
+			wantKeys:  []string{"/prefix/ns/pod1", "/prefix/other/pod3"},
 		},
 		{
 			name: "indexed field predicate with key prefix scopes to prefix",
@@ -562,9 +493,8 @@ func TestCacheIntervalSourceSelection(t *testing.T) {
 				Recursive: true,
 				Predicate: storage.SelectionPredicate{Field: node1Selector, IndexFields: []string{"spec.nodeName"}},
 			},
-			wantLazySnapshot: true,
-			wantIndex:        "f:spec.nodeName",
-			wantKeys:         []string{"/prefix/ns/pod1"},
+			wantIndex: "f:spec.nodeName",
+			wantKeys:  []string{"/prefix/ns/pod1"},
 		},
 		{
 			name: "indexed label predicate serves matching items from lazy snapshot",
@@ -576,29 +506,26 @@ func TestCacheIntervalSourceSelection(t *testing.T) {
 					IndexLabels: []string{"label"},
 				},
 			},
-			wantLazySnapshot: true,
-			wantIndex:        "l:label",
-			wantKeys:         []string{"/prefix/ns/pod1", "/prefix/ns/pod2"},
+			wantIndex: "l:label",
+			wantKeys:  []string{"/prefix/ns/pod1", "/prefix/ns/pod2"},
 		},
 		{
-			name: "single key match serves from eager snapshot",
+			name: "single key match serves from lazy snapshot",
 			key:  "/prefix/ns/pod1",
 			opts: storage.ListOptions{
 				Recursive: false,
 				Predicate: storage.SelectionPredicate{Field: fields.SelectorFromSet(fields.Set{"metadata.name": "pod1"})},
 			},
-			wantLazySnapshot: false,
-			wantKeys:         []string{"/prefix/ns/pod1"},
+			wantKeys: []string{"/prefix/ns/pod1"},
 		},
 		{
-			name: "single key match with namespace selector serves from eager snapshot",
+			name: "single key match with namespace selector serves from lazy snapshot",
 			key:  "/prefix/ns/pod1",
 			opts: storage.ListOptions{
 				Recursive: false,
 				Predicate: storage.SelectionPredicate{Field: fields.SelectorFromSet(fields.Set{"metadata.name": "pod1", "metadata.namespace": "ns"})},
 			},
-			wantLazySnapshot: false,
-			wantKeys:         []string{"/prefix/ns/pod1"},
+			wantKeys: []string{"/prefix/ns/pod1"},
 		},
 		{
 			name: "single key with everything predicate serves from lazy snapshot",
@@ -607,8 +534,7 @@ func TestCacheIntervalSourceSelection(t *testing.T) {
 				Recursive: false,
 				Predicate: storage.Everything,
 			},
-			wantLazySnapshot: true,
-			wantKeys:         []string{"/prefix/ns/pod1"},
+			wantKeys: []string{"/prefix/ns/pod1"},
 		},
 		{
 			name: "single key with namespace predicate serves from lazy snapshot",
@@ -617,8 +543,28 @@ func TestCacheIntervalSourceSelection(t *testing.T) {
 				Recursive: false,
 				Predicate: storage.SelectionPredicate{Field: fields.SelectorFromSet(fields.Set{"metadata.namespace": "ns"})},
 			},
-			wantLazySnapshot: true,
-			wantKeys:         []string{"/prefix/ns/pod1"},
+			wantKeys: []string{"/prefix/ns/pod1"},
+		},
+		{
+			name: "single key with indexed field predicate serves from unindexed lazy snapshot",
+			key:  "/prefix/ns/pod1",
+			opts: storage.ListOptions{
+				Recursive: false,
+				Predicate: storage.SelectionPredicate{Field: node1Selector, IndexFields: []string{"spec.nodeName"}},
+			},
+			wantKeys: []string{"/prefix/ns/pod1"},
+		},
+		{
+			name: "single key with indexed label predicate serves from unindexed lazy snapshot",
+			key:  "/prefix/ns/pod1",
+			opts: storage.ListOptions{
+				Recursive: false,
+				Predicate: storage.SelectionPredicate{
+					Label:       labels.SelectorFromSet(labels.Set{"label": "value1"}),
+					IndexLabels: []string{"label"},
+				},
+			},
+			wantKeys: []string{"/prefix/ns/pod1"},
 		},
 		{
 			name: "single object predicate with prefix key serves from lazy snapshot",
@@ -627,8 +573,7 @@ func TestCacheIntervalSourceSelection(t *testing.T) {
 				Recursive: true,
 				Predicate: storage.SelectionPredicate{Field: fields.SelectorFromSet(fields.Set{"metadata.name": "pod1"})},
 			},
-			wantLazySnapshot: true,
-			wantKeys:         []string{"/prefix/ns/pod1", "/prefix/ns/pod2", "/prefix/other/pod3"},
+			wantKeys: []string{"/prefix/ns/pod1", "/prefix/ns/pod2", "/prefix/other/pod3"},
 		},
 		{
 			name: "namespace predicate with prefix key serves from lazy snapshot",
@@ -637,8 +582,7 @@ func TestCacheIntervalSourceSelection(t *testing.T) {
 				Recursive: true,
 				Predicate: storage.SelectionPredicate{Field: fields.SelectorFromSet(fields.Set{"metadata.namespace": "ns"})},
 			},
-			wantLazySnapshot: true,
-			wantKeys:         []string{"/prefix/ns/pod1", "/prefix/ns/pod2", "/prefix/other/pod3"},
+			wantKeys: []string{"/prefix/ns/pod1", "/prefix/ns/pod2", "/prefix/other/pod3"},
 		},
 		{
 			name: "single object and namespace predicate with prefix key serves from lazy snapshot",
@@ -647,8 +591,7 @@ func TestCacheIntervalSourceSelection(t *testing.T) {
 				Recursive: true,
 				Predicate: storage.SelectionPredicate{Field: fields.SelectorFromSet(fields.Set{"metadata.name": "pod1", "metadata.namespace": "ns"})},
 			},
-			wantLazySnapshot: true,
-			wantKeys:         []string{"/prefix/ns/pod1", "/prefix/ns/pod2", "/prefix/other/pod3"},
+			wantKeys: []string{"/prefix/ns/pod1", "/prefix/ns/pod2", "/prefix/other/pod3"},
 		},
 		{
 			name: "namespace predicate with namespace prefix key serves from lazy snapshot",
@@ -657,8 +600,7 @@ func TestCacheIntervalSourceSelection(t *testing.T) {
 				Recursive: true,
 				Predicate: storage.SelectionPredicate{Field: fields.SelectorFromSet(fields.Set{"metadata.namespace": "ns"})},
 			},
-			wantLazySnapshot: true,
-			wantKeys:         []string{"/prefix/ns/pod1", "/prefix/ns/pod2"},
+			wantKeys: []string{"/prefix/ns/pod1", "/prefix/ns/pod2"},
 		},
 		{
 			name: "single object predicate with namespace prefix key serves from lazy snapshot",
@@ -667,8 +609,7 @@ func TestCacheIntervalSourceSelection(t *testing.T) {
 				Recursive: true,
 				Predicate: storage.SelectionPredicate{Field: fields.SelectorFromSet(fields.Set{"metadata.name": "pod1"})},
 			},
-			wantLazySnapshot: true,
-			wantKeys:         []string{"/prefix/ns/pod1", "/prefix/ns/pod2"},
+			wantKeys: []string{"/prefix/ns/pod1", "/prefix/ns/pod2"},
 		},
 		{
 			name: "single object and namespace predicate with namespace prefix key serves from lazy snapshot",
@@ -677,8 +618,7 @@ func TestCacheIntervalSourceSelection(t *testing.T) {
 				Recursive: true,
 				Predicate: storage.SelectionPredicate{Field: fields.SelectorFromSet(fields.Set{"metadata.name": "pod1", "metadata.namespace": "ns"})},
 			},
-			wantLazySnapshot: true,
-			wantKeys:         []string{"/prefix/ns/pod1", "/prefix/ns/pod2"},
+			wantKeys: []string{"/prefix/ns/pod1", "/prefix/ns/pod2"},
 		},
 		{
 			name: "everything predicate with object prefix key serves empty from lazy snapshot",
@@ -687,8 +627,7 @@ func TestCacheIntervalSourceSelection(t *testing.T) {
 				Recursive: true,
 				Predicate: storage.Everything,
 			},
-			wantLazySnapshot: true,
-			wantKeys:         nil,
+			wantKeys: nil,
 		},
 		{
 			name: "namespace predicate with object prefix key serves empty from lazy snapshot",
@@ -697,8 +636,7 @@ func TestCacheIntervalSourceSelection(t *testing.T) {
 				Recursive: true,
 				Predicate: storage.SelectionPredicate{Field: fields.SelectorFromSet(fields.Set{"metadata.namespace": "ns"})},
 			},
-			wantLazySnapshot: true,
-			wantKeys:         nil,
+			wantKeys: nil,
 		},
 		{
 			name: "single object predicate with object prefix key serves empty from lazy snapshot",
@@ -707,8 +645,7 @@ func TestCacheIntervalSourceSelection(t *testing.T) {
 				Recursive: true,
 				Predicate: storage.SelectionPredicate{Field: fields.SelectorFromSet(fields.Set{"metadata.name": "pod1"})},
 			},
-			wantLazySnapshot: true,
-			wantKeys:         nil,
+			wantKeys: nil,
 		},
 		{
 			name: "single object and namespace predicate with object prefix key serves empty from lazy snapshot",
@@ -717,88 +654,88 @@ func TestCacheIntervalSourceSelection(t *testing.T) {
 				Recursive: true,
 				Predicate: storage.SelectionPredicate{Field: fields.SelectorFromSet(fields.Set{"metadata.name": "pod1", "metadata.namespace": "ns"})},
 			},
-			wantLazySnapshot: true,
-			wantKeys:         nil,
+			wantKeys: nil,
 		},
 		{
-			name: "prefix key with non-recursive everything predicate serves from lazy snapshot",
+			name: "prefix key with non-recursive everything predicate serves empty from lazy snapshot",
 			key:  "/prefix/",
 			opts: storage.ListOptions{
 				Recursive: false,
 				Predicate: storage.Everything,
 			},
-			wantLazySnapshot: true,
-			wantKeys:         []string{"/prefix/ns/pod1", "/prefix/ns/pod2", "/prefix/other/pod3"},
+			wantKeys: nil,
 		},
 		{
-			name: "prefix key with non-recursive namespace predicate serves from lazy snapshot",
+			name: "prefix key with non-recursive namespace predicate serves empty from lazy snapshot",
 			key:  "/prefix/",
 			opts: storage.ListOptions{
 				Recursive: false,
 				Predicate: storage.SelectionPredicate{Field: fields.SelectorFromSet(fields.Set{"metadata.namespace": "ns"})},
 			},
-			wantLazySnapshot: true,
-			wantKeys:         []string{"/prefix/ns/pod1", "/prefix/ns/pod2", "/prefix/other/pod3"},
+			wantKeys: nil,
 		},
 		{
-			name: "prefix key with non-recursive single object predicate serves empty from eager snapshot",
+			name: "prefix key with non-recursive single object predicate serves empty from lazy snapshot",
 			key:  "/prefix/",
 			opts: storage.ListOptions{
 				Recursive: false,
 				Predicate: storage.SelectionPredicate{Field: fields.SelectorFromSet(fields.Set{"metadata.name": "pod1"})},
 			},
-			wantLazySnapshot: false,
-			wantKeys:         nil,
+			wantKeys: nil,
 		},
 		{
-			name: "prefix key with non-recursive single object and namespace predicate serves empty from eager snapshot",
+			name: "prefix key with non-recursive single object and namespace predicate serves empty from lazy snapshot",
 			key:  "/prefix/",
 			opts: storage.ListOptions{
 				Recursive: false,
 				Predicate: storage.SelectionPredicate{Field: fields.SelectorFromSet(fields.Set{"metadata.name": "pod1", "metadata.namespace": "ns"})},
 			},
-			wantLazySnapshot: false,
-			wantKeys:         nil,
+			wantKeys: nil,
 		},
 		{
-			name: "namespace prefix key with non-recursive everything predicate serves from lazy snapshot",
+			name: "namespace prefix key with non-recursive everything predicate serves empty from lazy snapshot",
 			key:  "/prefix/ns/",
 			opts: storage.ListOptions{
 				Recursive: false,
 				Predicate: storage.Everything,
 			},
-			wantLazySnapshot: true,
-			wantKeys:         []string{"/prefix/ns/pod1", "/prefix/ns/pod2"},
+			wantKeys: nil,
 		},
 		{
-			name: "namespace prefix key with non-recursive namespace predicate serves from lazy snapshot",
+			name: "namespace prefix key with non-recursive namespace predicate serves empty from lazy snapshot",
 			key:  "/prefix/ns/",
 			opts: storage.ListOptions{
 				Recursive: false,
 				Predicate: storage.SelectionPredicate{Field: fields.SelectorFromSet(fields.Set{"metadata.namespace": "ns"})},
 			},
-			wantLazySnapshot: true,
-			wantKeys:         []string{"/prefix/ns/pod1", "/prefix/ns/pod2"},
+			wantKeys: nil,
 		},
 		{
-			name: "namespace prefix key with non-recursive single object predicate serves empty from eager snapshot",
+			name: "namespace prefix key with non-recursive single object predicate serves empty from lazy snapshot",
 			key:  "/prefix/ns/",
 			opts: storage.ListOptions{
 				Recursive: false,
 				Predicate: storage.SelectionPredicate{Field: fields.SelectorFromSet(fields.Set{"metadata.name": "pod1"})},
 			},
-			wantLazySnapshot: false,
-			wantKeys:         nil,
+			wantKeys: nil,
 		},
 		{
-			name: "namespace prefix key with non-recursive single object and namespace predicate serves empty from eager snapshot",
+			name: "namespace prefix key with non-recursive single object and namespace predicate serves empty from lazy snapshot",
 			key:  "/prefix/ns/",
 			opts: storage.ListOptions{
 				Recursive: false,
 				Predicate: storage.SelectionPredicate{Field: fields.SelectorFromSet(fields.Set{"metadata.name": "pod1", "metadata.namespace": "ns"})},
 			},
-			wantLazySnapshot: false,
-			wantKeys:         nil,
+			wantKeys: nil,
+		},
+		{
+			name: "missing single key with non-recursive everything predicate serves empty from lazy snapshot",
+			key:  "/prefix/ns/missing",
+			opts: storage.ListOptions{
+				Recursive: false,
+				Predicate: storage.Everything,
+			},
+			wantKeys: nil,
 		},
 	}
 	for _, tc := range cases {
@@ -818,7 +755,7 @@ func TestCacheIntervalSourceSelection(t *testing.T) {
 			}
 
 			wc.Lock()
-			wci, indexUsed, err := wc.getIntervalFromStoreLocked(context.Background(), tc.key, tc.opts)
+			wci, indexUsed, err := wc.getIntervalFromStoreLocked(tc.key, tc.opts, tc.opts.Predicate.MatcherIndex(context.Background()))
 			wc.Unlock()
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
@@ -826,21 +763,17 @@ func TestCacheIntervalSourceSelection(t *testing.T) {
 			if indexUsed != tc.wantIndex {
 				t.Errorf("unexpected index used: got %q, want %q", indexUsed, tc.wantIndex)
 			}
-
-			if tc.wantLazySnapshot {
-				if _, ok := wci.source.(*lazySnapshotCacheIntervalSource); !ok {
-					t.Errorf("expected *lazySnapshotCacheIntervalSource, got %T", wci.source)
-				}
-			} else {
-				if _, ok := wci.source.(*snapshotCacheIntervalSource); !ok {
-					t.Errorf("expected *snapshotCacheIntervalSource, got %T", wci.source)
-				}
+			if _, ok := wci.source.(*lazySnapshotCacheIntervalSource); !ok {
+				t.Errorf("expected *lazySnapshotCacheIntervalSource, got %T", wci.source)
 			}
 
 			var gotKeys []string
 			for ev, err := range wci.All() {
 				if err != nil {
 					t.Fatalf("unexpected error: %v", err)
+				}
+				if ev.ResourceVersion != wc.resourceVersion {
+					t.Errorf("expected event RV %d, got %d", wc.resourceVersion, ev.ResourceVersion)
 				}
 				gotKeys = append(gotKeys, ev.Key)
 			}
@@ -852,10 +785,12 @@ func TestCacheIntervalSourceSelection(t *testing.T) {
 }
 
 type countingSnapshot struct {
+	getByKeyCalls    int
 	rangePrefixCalls int
 }
 
 func (s *countingSnapshot) GetByKey(string) (interface{}, bool, error) {
+	s.getByKeyCalls++
 	return nil, false, nil
 }
 
@@ -873,13 +808,40 @@ func (s *countingSnapshot) ResourceVersion() uint64 {
 }
 
 func TestLazySnapshotCacheIntervalSourceEmpty(t *testing.T) {
-	snap := &countingSnapshot{}
-	wci := newCacheIntervalFromLazySnapshot(100, snap, "")
-
-	for event, err := range wci.All() {
-		t.Fatalf("empty snapshot yielded (%v, %v)", event, err)
+	cases := []struct {
+		name                 string
+		key                  string
+		recursive            bool
+		wantGetByKeyCalls    int
+		wantRangePrefixCalls int
+	}{
+		{
+			name:                 "recursive",
+			key:                  "",
+			recursive:            true,
+			wantRangePrefixCalls: 1,
+		},
+		{
+			name:              "non-recursive",
+			key:               "/prefix/ns/pod1",
+			recursive:         false,
+			wantGetByKeyCalls: 1,
+		},
 	}
-	if snap.rangePrefixCalls != 1 {
-		t.Errorf("expected RangePrefix to be called once, got %d", snap.rangePrefixCalls)
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			snap := &countingSnapshot{}
+			wci := newCacheIntervalFromLazySnapshot(100, snap, tc.key, tc.recursive)
+
+			for event, err := range wci.All() {
+				t.Fatalf("empty snapshot yielded (%v, %v)", event, err)
+			}
+			if snap.getByKeyCalls != tc.wantGetByKeyCalls {
+				t.Errorf("expected GetByKey calls %d, got %d", tc.wantGetByKeyCalls, snap.getByKeyCalls)
+			}
+			if snap.rangePrefixCalls != tc.wantRangePrefixCalls {
+				t.Errorf("expected RangePrefix calls %d, got %d", tc.wantRangePrefixCalls, snap.rangePrefixCalls)
+			}
+		})
 	}
 }

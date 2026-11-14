@@ -29,6 +29,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	authzconfig "k8s.io/apiserver/pkg/apis/apiserver"
+	apiservervalidation "k8s.io/apiserver/pkg/apis/apiserver/validation"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
@@ -64,10 +65,11 @@ type reloadableAuthorizerResolver struct {
 	reloadInterval         time.Duration
 	requireNonWebhookTypes sets.Set[authzconfig.AuthorizerType]
 
-	nodeAuthorizer *node.NodeAuthorizer
-	rbacAuthorizer *rbac.RBACAuthorizer
-	abacAuthorizer abac.PolicyList
-	compiler       authorizationcel.Compiler // non-nil and shared across reloads.
+	nodeAuthorizer                    *node.NodeAuthorizer
+	rbacAuthorizer                    *rbac.RBACAuthorizer
+	abacAuthorizer                    abac.PolicyList
+	compiler                          authorizationcel.Compiler                    // non-nil and shared across reloads.
+	builtinConditionsEvaluatorBuilder authorizer.BuiltinConditionsEvaluatorBuilder // non-nil when tbe ConditionalAuthorization feature is on, shared across reloads.
 
 	lastLoadedLock   sync.Mutex
 	lastLoadedConfig *authzconfig.AuthorizationConfiguration
@@ -199,18 +201,24 @@ func (r *reloadableAuthorizerResolver) newForConfig(authzConfig *authzconfig.Aut
 				}
 			}
 
+			webhookMetrics := kubeapiserverWebhookMetrics{WebhookMetrics: webhookmetrics.NewWebhookMetrics(), MatcherMetrics: authorizationcel.NewMatcherMetrics()}
+			matcher, err := apiservervalidation.NewWebhookMatcher(r.compiler, configuredAuthorizer.Webhook.MatchConditions, configuredAuthorizer.Name, webhookMetrics)
+			if err != nil {
+				return nil, nil, err
+			}
+
 			webhookAuthorizer, err := webhook.New(sarClientConfig,
 				configuredAuthorizer.Webhook.SubjectAccessReviewVersion,
 				authorizedTTL,
 				unauthorizedTTL,
 				*r.initialConfig.WebhookRetryBackoff,
 				decisionOnError,
-				configuredAuthorizer.Webhook.MatchConditions,
+				matcher,
 				configuredAuthorizer.Name,
-				kubeapiserverWebhookMetrics{WebhookMetrics: webhookmetrics.NewWebhookMetrics(), MatcherMetrics: authorizationcel.NewMatcherMetrics()},
-				r.compiler,
+				webhookMetrics,
 				conditionsReviewConfig,
 				conditionsReviewVersion,
+				r.builtinConditionsEvaluatorBuilder,
 			)
 			if err != nil {
 				return nil, nil, err

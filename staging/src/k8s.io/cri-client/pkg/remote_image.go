@@ -38,6 +38,7 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
 
+	crimetrics "k8s.io/cri-client/pkg/metrics"
 	"k8s.io/cri-client/pkg/util"
 )
 
@@ -256,6 +257,7 @@ func (r *remoteImageService) streamImagesV1(ctx context.Context, filter *runtime
 	})
 	if err != nil {
 		logger.Error(err, "StreamImages from image service failed", "filter", filter)
+		crimetrics.ListStreamingTotal.Increment(ctx, "list_images", "error")
 		return nil, err
 	}
 
@@ -263,6 +265,7 @@ func (r *remoteImageService) streamImagesV1(ctx context.Context, filter *runtime
 	for {
 		resp, err := stream.Recv()
 		if errors.Is(err, io.EOF) {
+			crimetrics.ListStreamingTotal.Increment(ctx, "list_images", "success")
 			break
 		}
 		if err != nil {
@@ -272,9 +275,11 @@ func (r *remoteImageService) streamImagesV1(ctx context.Context, filter *runtime
 			if status.Code(err) == codes.Unimplemented {
 				logger.Info("StreamImages not implemented, falling back to ListImages", "filter", filter)
 				r.useStreaming.Store(false)
+				crimetrics.ListStreamingTotal.Increment(ctx, "list_images", "fallback")
 				return r.listImagesV1(ctx, filter)
 			}
 			logger.Error(err, "StreamImages recv failed", "filter", filter, "itemsReceived", len(images))
+			crimetrics.ListStreamingTotal.Increment(ctx, "list_images", "error")
 			return nil, err
 		}
 		images = append(images, resp.Images...)
@@ -332,18 +337,7 @@ func (r *remoteImageService) pullImageV1(ctx context.Context, image *runtimeapi.
 	if err != nil {
 		logger := klog.FromContext(ctx)
 		logger.Error(err, "PullImage from image service failed", "image", image.Image)
-
-		// We can strip the code from unknown status errors since they add no value
-		// and will make them easier to read in the logs/events.
-		//
-		// It also ensures that checking custom error types from pkg/kubelet/images/types.go
-		// works in `imageManager.EnsureImageExists` (pkg/kubelet/images/image_manager.go).
-		statusErr, ok := status.FromError(err)
-		if ok && statusErr.Code() == codes.Unknown {
-			return "", errors.New(statusErr.Message())
-		}
-
-		return "", err
+		return "", stripUnknownStatusCode(err)
 	}
 
 	if resp.ImageRef == "" {
@@ -354,6 +348,74 @@ func (r *remoteImageService) pullImageV1(ctx context.Context, image *runtimeapi.
 	}
 
 	return resp.ImageRef, nil
+}
+
+// stripUnknownStatusCode strips the code from unknown status errors since it
+// adds no value and makes them easier to read in the logs/events.
+//
+// It also ensures that checking custom error types from pkg/kubelet/images/types.go
+// works in `imageManager.EnsureImageExists` (pkg/kubelet/images/image_manager.go).
+// Errors with other codes are returned as they are; callers that match the
+// well-known error messages of the CRI use the status message for that.
+func stripUnknownStatusCode(err error) error {
+	statusErr, ok := status.FromError(err)
+	if ok && statusErr.Code() == codes.Unknown {
+		return errors.New(statusErr.Message())
+	}
+	return err
+}
+
+// PullSecurityProfile pulls a security profile with authentication config.
+// Unlike PullImage, it is bound by the runtime request timeout, because
+// profile artifacts are small.
+func (r *remoteImageService) PullSecurityProfile(ctx context.Context, image *runtimeapi.ImageSpec, auth *runtimeapi.AuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig, kind runtimeapi.SecurityProfileKind) (*runtimeapi.PullSecurityProfileResponse, error) {
+	ctx, cancel := context.WithTimeout(ctx, r.timeout)
+	defer cancel()
+
+	resp, err := r.imageClient.PullSecurityProfile(ctx, &runtimeapi.PullSecurityProfileRequest{
+		Image:         image,
+		Auth:          auth,
+		SandboxConfig: podSandboxConfig,
+		ProfileKind:   kind,
+	})
+	if err != nil {
+		logger := klog.FromContext(ctx)
+		logger.Error(err, "PullSecurityProfile from image service failed", "image", image.GetImage(), "kind", kind)
+		return nil, stripUnknownStatusCode(err)
+	}
+
+	return resp, nil
+}
+
+// ListSecurityProfiles lists the pulled security profiles.
+func (r *remoteImageService) ListSecurityProfiles(ctx context.Context) ([]*runtimeapi.SecurityProfileInfo, error) {
+	ctx, cancel := context.WithTimeout(ctx, r.timeout)
+	defer cancel()
+
+	resp, err := r.imageClient.ListSecurityProfiles(ctx, &runtimeapi.ListSecurityProfilesRequest{})
+	if err != nil {
+		logger := klog.FromContext(ctx)
+		logger.Error(err, "ListSecurityProfiles from image service failed")
+		return nil, err
+	}
+
+	return resp.Profiles, nil
+}
+
+// RemoveSecurityProfile removes a pulled security profile by its digest.
+func (r *remoteImageService) RemoveSecurityProfile(ctx context.Context, digest string) error {
+	ctx, cancel := context.WithTimeout(ctx, r.timeout)
+	defer cancel()
+
+	if _, err := r.imageClient.RemoveSecurityProfile(ctx, &runtimeapi.RemoveSecurityProfileRequest{
+		Digest: digest,
+	}); err != nil {
+		logger := klog.FromContext(ctx)
+		logger.Error(err, "RemoveSecurityProfile from image service failed", "digest", digest)
+		return err
+	}
+
+	return nil
 }
 
 // RemoveImage removes the image.

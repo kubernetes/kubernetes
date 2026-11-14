@@ -147,7 +147,7 @@ func TestDeclarativeValidate(t *testing.T) {
 						StringValues: []string{strings.Repeat("é", resource.DeviceAttributeMaxValueLength/2+1)},
 					})),
 					expectedErrs: field.ErrorList{
-						field.TooLong(field.NewPath("spec", "devices").Index(0).Child("attributes").Key("test.io/list_of_strings").Child("strings").Index(0), "", resource.DeviceAttributeMaxValueLength).WithOrigin("maxBytes").MarkAlpha(),
+						field.TooLong(field.NewPath("spec", "devices").Index(0).Child("attributes").Key("test.io/list_of_strings").Child("strings").Index(0), "", resource.DeviceAttributeMaxValueLength).WithOrigin("maxBytes").MarkBeta(),
 					},
 				},
 				"valid: device attribute list of versions": {
@@ -434,7 +434,7 @@ func TestDeclarativeValidate(t *testing.T) {
 					expectedErrs: field.ErrorList{
 						field.NotFound(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResources").Key("cpu").Child("mapping", "capacityKey"), "capacity_1").MarkFromImperative(),
 						field.Invalid(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResources").Key("cpu").Child("mapping"), "", "").WithOrigin("union"),
-						field.Required(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResources").Key("cpu").Child("mapping", "capacityMultiplier"), "must be set when capacityKey is set").WithOrigin("dependentRequired").MarkAlpha(),
+						field.Required(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResources").Key("cpu").Child("mapping", "capacityMultiplier"), "must be set when capacityKey is set").WithOrigin("dependentRequired").MarkBeta(),
 					},
 				},
 				"invalid: node allocatable mapping capacityMultiplier set when capacityKey is not set": {
@@ -447,7 +447,7 @@ func TestDeclarativeValidate(t *testing.T) {
 					})),
 					expectedErrs: field.ErrorList{
 						field.Invalid(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResources").Key("cpu").Child("mapping"), "", "").WithOrigin("union"),
-						field.Required(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResources").Key("cpu").Child("mapping", "capacityKey"), "must be set when capacityMultiplier is set").WithOrigin("dependentRequired").MarkAlpha(),
+						field.Required(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResources").Key("cpu").Child("mapping", "capacityKey"), "must be set when capacityMultiplier is set").WithOrigin("dependentRequired").MarkBeta(),
 					},
 				},
 				"invalid: node allocatable mapping both capacityMultiplier and deviceMultiplier set": {
@@ -697,7 +697,7 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 						StringValues: []string{strings.Repeat("é", resource.DeviceAttributeMaxValueLength/2+1)},
 					})),
 					expectedErrs: field.ErrorList{
-						field.TooLong(field.NewPath("spec", "devices").Index(0).Child("attributes").Key("test.io/list_of_strings").Child("strings").Index(0), "", resource.DeviceAttributeMaxValueLength).WithOrigin("maxBytes").MarkAlpha(),
+						field.TooLong(field.NewPath("spec", "devices").Index(0).Child("attributes").Key("test.io/list_of_strings").Child("strings").Index(0), "", resource.DeviceAttributeMaxValueLength).WithOrigin("maxBytes").MarkBeta(),
 					},
 				},
 				// spec.sharedCounters

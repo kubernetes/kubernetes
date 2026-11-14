@@ -907,10 +907,23 @@ func TestUpdatePodCondition(t *testing.T) {
 			expected: true,
 			desc:     "not equal Status, should get updated",
 		},
+		{
+			status: &podStatus,
+			conditions: v1.PodCondition{
+				Type:               v1.PodReady,
+				Status:             v1.ConditionTrue,
+				Reason:             "successfully",
+				Message:            "sync pod successfully",
+				LastProbeTime:      time,
+				LastTransitionTime: metav1.NewTime(time.Add(1000)),
+				ObservedGeneration: 2},
+			expected: true,
+			desc:     "not equal ObservedGeneration, should get updated",
+		},
 	}
 
 	for _, test := range tests {
-		resultStatus := UpdatePodCondition(test.status, &test.conditions)
+		resultStatus := UpdatePodCondition(test.status.DeepCopy(), &test.conditions)
 
 		assert.Equal(t, test.expected, resultStatus, test.desc)
 	}
@@ -1522,4 +1535,71 @@ func TestFindMatchingContainerRestartRule(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestContainerPairs(t *testing.T) {
+	containers := func(names ...string) []v1.Container {
+		var containers []v1.Container
+		for _, name := range names {
+			containers = append(containers, v1.Container{Name: name})
+		}
+		return containers
+	}
+	// pairs returns each pair as "type:new/old", with "-" for a missing container.
+	pairs := func(pod, oldPod *v1.Pod, mask ContainerType) string {
+		name := func(c *v1.Container) string {
+			if c == nil {
+				return "-"
+			}
+			return c.Name
+		}
+		typeNames := map[ContainerType]string{InitContainers: "init", Containers: "main", EphemeralContainers: "ephemeral"}
+		var pairs []string
+		for pair, containerType := range ContainerPairs(pod, oldPod, mask) {
+			pairs = append(pairs, typeNames[containerType]+":"+name(pair.New)+"/"+name(pair.Old))
+		}
+		return strings.Join(pairs, " ")
+	}
+
+	tests := []struct {
+		name       string
+		names, old []string
+		expected   string
+	}{
+		{name: "no containers"},
+		{name: "unchanged", names: []string{"a", "b"}, old: []string{"a", "b"}, expected: "main:a/a main:b/b"},
+		{name: "added in the middle", names: []string{"a", "x", "b"}, old: []string{"a", "b"}, expected: "main:a/a main:x/- main:b/b"},
+		{name: "removed first", names: []string{"b", "c"}, old: []string{"a", "b", "c"}, expected: "main:b/b main:c/c main:-/a"},
+		{name: "replaced", names: []string{"a", "x", "c"}, old: []string{"a", "b", "c"}, expected: "main:a/a main:x/- main:c/c main:-/b"},
+		{
+			name:     "added and removed in several places",
+			names:    []string{"x", "b", "y", "d", "z"},
+			old:      []string{"a", "b", "c", "d", "e"},
+			expected: "main:x/- main:b/b main:y/- main:d/d main:z/- main:-/a main:-/c main:-/e",
+		},
+		{name: "reordered", names: []string{"c", "a", "b"}, old: []string{"a", "b", "c"}, expected: "main:c/c main:a/a main:b/b"},
+		{name: "reordered with added", names: []string{"b", "x", "a"}, old: []string{"a", "b"}, expected: "main:b/b main:x/- main:a/a"},
+		{name: "reordered with removed", names: []string{"c", "a"}, old: []string{"a", "b", "c"}, expected: "main:c/c main:a/a main:-/b"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			pod := &v1.Pod{Spec: v1.PodSpec{Containers: containers(tc.names...)}}
+			oldPod := &v1.Pod{Spec: v1.PodSpec{Containers: containers(tc.old...)}}
+			assert.Equal(t, tc.expected, pairs(pod, oldPod, Containers))
+		})
+	}
+
+	t.Run("mask", func(t *testing.T) {
+		pod := &v1.Pod{Spec: v1.PodSpec{
+			InitContainers:      containers("init"),
+			Containers:          containers("a", "x"),
+			EphemeralContainers: []v1.EphemeralContainer{{EphemeralContainerCommon: v1.EphemeralContainerCommon{Name: "debug"}}},
+		}}
+		oldPod := &v1.Pod{Spec: v1.PodSpec{
+			InitContainers: containers("init"),
+			Containers:     containers("a", "b"),
+		}}
+		assert.Equal(t, "init:init/init", pairs(pod, oldPod, InitContainers))
+		assert.Equal(t, "init:init/init main:a/a main:x/- main:-/b ephemeral:debug/-", pairs(pod, oldPod, AllContainers))
+	})
 }

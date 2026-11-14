@@ -21,9 +21,9 @@ import (
 	"k8s.io/client-go/discovery/cached/memory"
 )
 
-// NewMemCacheClient is DEPRECATED. Use memory.NewMemCacheClient directly.
+// NewMemCacheClient is DEPRECATED. Use memory.NewMemCacheClientWithContext directly.
 func NewMemCacheClient(delegate discovery.DiscoveryInterface) discovery.CachedDiscoveryInterface {
-	return memory.NewMemCacheClient(delegate)
+	return memory.NewMemCacheClient(delegate) //nolint:logcheck // This whole package is deprecated in favor of the memory package.
 }
 
 // ErrCacheNotFound is DEPRECATED. Use memory.ErrCacheNotFound directly.

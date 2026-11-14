@@ -22,6 +22,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -77,6 +78,11 @@ func GenerateContainersReadyCondition(pod *v1.Pod, oldPodStatus *v1.PodStatus, c
 
 	for _, container := range pod.Spec.Containers {
 		if containerStatus, ok := podutil.GetContainerStatus(containerStatuses, container.Name); ok {
+			if isUnallocated(&containerStatus) {
+				// A container that was added but isn't allocated yet doesn't run, and shouldn't
+				// make the pod unready until it does.
+				continue
+			}
 			if !containerStatus.Ready {
 				unreadyContainers = append(unreadyContainers, container.Name)
 			}
@@ -119,6 +125,11 @@ func GenerateContainersReadyCondition(pod *v1.Pod, oldPodStatus *v1.PodStatus, c
 		ObservedGeneration: podutil.CalculatePodConditionObservedGeneration(oldPodStatus, pod.Generation, v1.ContainersReady),
 		Status:             v1.ConditionTrue,
 	}
+}
+
+func isUnallocated(status *v1.ContainerStatus) bool {
+	return utilfeature.DefaultFeatureGate.Enabled(features.DynamicContainers) &&
+		status.State.Waiting != nil && status.State.Waiting.Reason == kubecontainer.ContainerReasonUnallocated
 }
 
 // GeneratePodReadyCondition returns "Ready" condition of a pod.
@@ -268,8 +279,8 @@ func GeneratePodInitializedCondition(pod *v1.Pod, oldPodStatus *v1.PodStatus, co
 	}
 }
 
-func GeneratePodReadyToStartContainersCondition(pod *v1.Pod, oldPodStatus *v1.PodStatus, podStatus *kubecontainer.PodStatus) v1.PodCondition {
-	newSandboxNeeded, _, _, reason := runtimeutil.PodSandboxChanged(pod, podStatus)
+func GeneratePodReadyToStartContainersCondition(logger klog.Logger, pod *v1.Pod, oldPodStatus *v1.PodStatus, podStatus *kubecontainer.PodStatus) v1.PodCondition {
+	newSandboxNeeded, _, _, reason := runtimeutil.PodSandboxChanged(logger, pod, podStatus)
 	// if a new sandbox does not need to be created for a pod, it indicates that
 	// a sandbox for the pod with networking configured already exists.
 	// Otherwise, the kubelet needs to invoke the container runtime to create a

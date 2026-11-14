@@ -155,8 +155,8 @@ func shouldIgnore(a admission.Attributes) bool {
 	if resource != api.Resource("pods") {
 		return true
 	}
-	if a.GetSubresource() != "" {
-		// only run the checks below on pods proper and not subresources
+	if a.GetSubresource() != "" && a.GetSubresource() != "dynamic" {
+		// only run the checks below on pods proper and the dynamic subresource
 		return true
 	}
 

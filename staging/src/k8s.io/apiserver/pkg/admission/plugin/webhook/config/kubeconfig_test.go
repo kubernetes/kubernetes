@@ -23,6 +23,7 @@ import (
 	"strings"
 	"testing"
 
+	"k8s.io/apiserver/pkg/admission/plugin/webhook/config/apis/webhookadmission"
 	"k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -44,6 +45,7 @@ func TestLoadConfig(t *testing.T) {
 		expectErr                string
 		expectKubeconfig         string
 		expectStaticManifestsDir string
+		expectStaticOrder        webhookadmission.StaticOrder
 	}{
 		{
 			name:      "empty",
@@ -130,6 +132,73 @@ staticManifestsDir: ` + validDir + `
 `,
 			expectStaticManifestsDir: validDir,
 		},
+		{
+			name:              "staticOrder StaticFirst",
+			enableFeatureGate: new(true),
+			input: `
+kind: WebhookAdmissionConfiguration
+apiVersion: apiserver.config.k8s.io/v1
+staticManifestsDir: ` + validDir + `
+staticOrder: StaticFirst
+`,
+			expectStaticManifestsDir: validDir,
+			expectStaticOrder:        webhookadmission.StaticFirst,
+		},
+		{
+			name:              "staticOrder StaticLast",
+			enableFeatureGate: new(true),
+			input: `
+kind: WebhookAdmissionConfiguration
+apiVersion: apiserver.config.k8s.io/v1
+staticManifestsDir: ` + validDir + `
+staticOrder: StaticLast
+`,
+			expectStaticManifestsDir: validDir,
+			expectStaticOrder:        webhookadmission.StaticLast,
+		},
+		{
+			name:              "staticOrder ByName",
+			enableFeatureGate: new(true),
+			input: `
+kind: WebhookAdmissionConfiguration
+apiVersion: apiserver.config.k8s.io/v1
+staticManifestsDir: ` + validDir + `
+staticOrder: ByName
+`,
+			expectStaticManifestsDir: validDir,
+			expectStaticOrder:        webhookadmission.ByName,
+		},
+		{
+			name:              "unrecognized staticOrder",
+			enableFeatureGate: new(true),
+			input: `
+kind: WebhookAdmissionConfiguration
+apiVersion: apiserver.config.k8s.io/v1
+staticManifestsDir: ` + validDir + `
+staticOrder: staticfirst
+`,
+			expectErr: `staticOrder: Unsupported value: "staticfirst": supported values: "ByName", "StaticFirst", "StaticLast"`,
+		},
+		{
+			name:              "staticOrder forbidden when feature gate disabled",
+			enableFeatureGate: new(false),
+			input: `
+kind: WebhookAdmissionConfiguration
+apiVersion: apiserver.config.k8s.io/v1
+staticOrder: StaticLast
+`,
+			expectErr: "staticOrder: Forbidden",
+		},
+		{
+			name:              "staticOrder requires staticManifestsDir",
+			enableFeatureGate: new(true),
+			input: `
+kind: WebhookAdmissionConfiguration
+apiVersion: apiserver.config.k8s.io/v1
+staticOrder: StaticLast
+`,
+			expectErr: `staticOrder: Invalid value: "StaticLast": may only be set when staticManifestsDir is set`,
+		},
 	}
 
 	for _, tc := range testcases {
@@ -155,6 +224,9 @@ staticManifestsDir: ` + validDir + `
 			}
 			if cfg.StaticManifestsDir != tc.expectStaticManifestsDir {
 				t.Fatalf("expected StaticManifestsDir %q, got %q", tc.expectStaticManifestsDir, cfg.StaticManifestsDir)
+			}
+			if cfg.StaticOrder != tc.expectStaticOrder {
+				t.Fatalf("expected StaticOrder %q, got %q", tc.expectStaticOrder, cfg.StaticOrder)
 			}
 		})
 	}

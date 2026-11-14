@@ -159,6 +159,16 @@ func Test_stateCheckpoint_storeState(t *testing.T) {
 				args: args{podMap: PodMap{"pod1": newTestPod("pod1", qStr, false, true)}},
 			})
 
+			// Test case 3b: Container resources and volume limits populated with nil limit
+			podWithNilVolLimit := newTestPod("pod1", qStr, false, false)
+			podWithNilVolLimit.Spec.Volumes = []v1.Volume{
+				{Name: "volume1", VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{Medium: v1.StorageMediumMemory, SizeLimit: nil}}},
+			}
+			tests = append(tests, testCase{
+				name: fmt.Sprintf("resource - %s - container and nil volume limits", qStr),
+				args: args{podMap: PodMap{"pod1": podWithNilVolLimit}},
+			})
+
 			// Test case 4: Container resources and pod level resources populated (volume limits is nil)
 			tests = append(tests, testCase{
 				name: fmt.Sprintf("resource - %s - container and pod-level", qStr),
@@ -450,7 +460,7 @@ func Test_stateCheckpoint_concurrentUpdates(t *testing.T) {
 				assert.NoError(t, sc.SetContainerResources(logger, podUID, "container1", podutil.Containers, v1.ResourceRequirements{Requests: requests}))
 				assert.NoError(t, sc.SetPodLevelResources(logger, podUID, &v1.ResourceRequirements{Requests: requests}))
 				limit := resource.MustParse(fmt.Sprintf("%dMi", j+1))
-				assert.NoError(t, sc.SetEmptyDirVolumeLimit(podUID, "volume1", &v1.EmptyDirVolumeSource{Medium: v1.StorageMediumMemory, SizeLimit: &limit}))
+				assert.NoError(t, sc.SetEmptyDirVolumeLimit(logger, podUID, "volume1", &v1.EmptyDirVolumeSource{Medium: v1.StorageMediumMemory, SizeLimit: &limit}))
 			}
 		})
 		readers.Go(func() {
@@ -463,6 +473,9 @@ func Test_stateCheckpoint_concurrentUpdates(t *testing.T) {
 				sc.GetPodUIDs()
 				sc.HasPod(podUID)
 				sc.GetPod(podUID)
+				if roPod, ok := sc.GetPodReadOnly(podUID); ok {
+					_ = len(roPod.Spec.Containers)
+				}
 				sc.GetContainerResources(podUID, "container1")
 				sc.GetPodLevelResources(podUID)
 				sc.GetEmptyDirVolumeLimit(podUID, "volume1")
@@ -479,4 +492,32 @@ func Test_stateCheckpoint_concurrentUpdates(t *testing.T) {
 	expected, actual := getPodMap(sc), getPodMap(restored)
 	require.Len(t, expected, pods)
 	verifyPodResourceAllocation(t, &expected, &actual, "the checkpoint does not have the latest state")
+}
+
+// The V2 checkpoint stores whole containers, so a full container spec survives a restart without
+// a format change.
+func Test_stateCheckpoint_containersSurviveRestart(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	testDir := getTestDir(t)
+	podUID := types.UID("pod-1")
+	main := &v1.Container{
+		Name:         "main",
+		Image:        "image",
+		VolumeMounts: []v1.VolumeMount{{Name: "vol", MountPath: "/vol"}},
+		Lifecycle:    &v1.Lifecycle{PreStop: &v1.LifecycleHandler{Exec: &v1.ExecAction{Command: []string{"stop"}}}},
+	}
+
+	sc, err := NewStateCheckpoint(logger, testDir, testCheckpoint, nil)
+	require.NoError(t, err)
+	require.NoError(t, sc.SetContainer(logger, podUID, podutil.Containers, *main))
+	require.NoError(t, sc.SetContainer(logger, podUID, podutil.Containers, v1.Container{Name: "removed", Image: "image"}))
+	require.NoError(t, sc.RemoveContainers(logger, podUID, podutil.Containers, "removed"))
+
+	restored, err := NewStateCheckpoint(logger, testDir, testCheckpoint, nil)
+	require.NoError(t, err)
+	got, ok := restored.GetContainer(podUID, "main", podutil.Containers)
+	require.True(t, ok)
+	assert.Equal(t, main, got)
+	_, ok = restored.GetContainer(podUID, "removed", podutil.Containers)
+	assert.False(t, ok)
 }

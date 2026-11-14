@@ -191,6 +191,10 @@ type Interface interface {
 		ctx context.Context, key string, out runtime.Object, preconditions *Preconditions,
 		validateDeletion ValidateObjectFunc, cachedExistingObject runtime.Object, opts DeleteOptions) error
 
+	// DeleteOnce executes a single conditional delete attempt for key against origState.Rev.
+	// On a revision conflict, it returns a ResourceVersionConflicts StorageError carrying the current storage revision.
+	DeleteOnce(ctx context.Context, key string, origState *ObjState, out runtime.Object) error
+
 	// Watch begins watching the specified key. Events are decoded into API objects,
 	// and any items selected by 'p' are sent down to returned watch.Interface.
 	// resourceVersion may be used to specify what version to begin watching,
@@ -250,6 +254,11 @@ type Interface interface {
 	GuaranteedUpdate(
 		ctx context.Context, key string, destination runtime.Object, ignoreNotFound bool,
 		preconditions *Preconditions, tryUpdate UpdateFunc, cachedExistingObject runtime.Object) error
+
+	// UpdateOnce executes a single conditional update attempt for key against origState.Rev.
+	// On a revision conflict, it returns a ResourceVersionConflicts StorageError carrying the current storage revision
+	// (along with the refreshed state if it was already read during a no-op write check).
+	UpdateOnce(ctx context.Context, key string, origState *ObjState, obj runtime.Object, ttl uint64, destination runtime.Object, ignoreNotFound bool) (*ObjState, error)
 
 	// Stats returns storage stats.
 	Stats(ctx context.Context) (Stats, error)
@@ -338,6 +347,14 @@ type ListOptions struct {
 	// event containing a ResourceVersion after which the server
 	// continues streaming events.
 	SendInitialEvents *bool
+	// WatchWithoutPrevKV requests omission of previous values from etcd watch
+	// events. Deleted objects may then contain only name, namespace, and the deletion
+	// resource version; callers must not rely on other fields being populated.
+	// This is intended for the watch cache, which retains the full previous object.
+	// For watches, this option requires an empty predicate. Etcd storage also requires
+	// an object constructor and a reverse key function. The cacher returns complete
+	// objects from its cache. The option is ignored for non-watch requests.
+	WatchWithoutPrevKV bool
 	// RecordTimestamps requests that the storage layer wrap each emitted watch
 	// object in a WatchEventWithRecordTime carrying its decode timestamp, for dispatch
 	// latency telemetry. This is intended for internal clients only (the watch
@@ -457,5 +474,6 @@ func PrepareKey(resourcePrefix, key string, recursive bool) (string, error) {
 // cluster-scoped resources, namespace is empty and name is non-empty. An error
 // is returned if the key cannot be parsed into a valid object identity.
 // A nil ReverseKeyFunc indicates that identity cannot be derived from the
-// key and callers must fall back to decoding the stored object.
+// key. Callers must decode the stored object or reject operations that require
+// key-derived identity.
 type ReverseKeyFunc func(key string) (name string, namespace string, err error)

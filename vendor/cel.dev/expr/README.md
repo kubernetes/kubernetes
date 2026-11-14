@@ -47,7 +47,7 @@ highly recommended to serialize the type-checked expression as a protocol
 buffer. The CEL team will maintains canonical protocol buffers for ASTs and
 will keep these versions identical and wire-compatible in perpetuity:
 
-*  [CEL canonical](https://github.com/google/cel-spec/tree/master/proto/cel/expr)
+*  [CEL canonical](https://github.com/cel-expr/cel-spec/tree/master/proto/cel/expr)
 *  [CEL v1alpha1](https://github.com/googleapis/googleapis/tree/master/google/api/expr/v1alpha1)
 
 

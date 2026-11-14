@@ -118,7 +118,7 @@ const (
 	// RecreateStatefulSetStrategyType indicates that all existing pods will be
 	// deleted and fully terminated before any new-revision pods are created.
 	// This ensures that old and new revision Pods never run at the same time.
-	// This is an alpha type and requires enabling StatefulSetRecreateStrategy feature gate.
+	// This is a beta type and requires enabling StatefulSetRecreateStrategy feature gate.
 	// Switching to the Recreate strategy is allowed when the feature gate is enabled,
 	// and switching away from it to a different update strategy is also allowed.
 	//
@@ -135,11 +135,13 @@ type RollingUpdateStatefulSetStrategy struct {
 	// +optional
 	Partition *int32 `json:"partition,omitempty" protobuf:"varint,1,opt,name=partition"`
 	// maxUnavailable is the maximum number of pods that can be unavailable during the update.
-	// Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%).
+	// Value can be an absolute number (ex: 5) or a percentage of pods in the update range (ex: 10%).
 	// Absolute number is calculated from percentage by rounding down. This can not be 0.
-	// Defaults to 1. This field is beta-level and is enabled by default. The field applies to all pods in the range 0 to
-	// Replicas-1. That means if there is any unavailable pod in the range 0 to Replicas-1, it
-	// will be counted towards MaxUnavailable.
+	// Defaults to 1. This field is beta-level and is enabled by default.
+	// The field applies only to pods in the update range (ordinals greater than or equal to
+	// Partition, up to Replicas-1). Unavailable pods below Partition are not counted towards
+	// MaxUnavailable. When MaxUnavailable is a percentage, it is calculated from the number of
+	// pods in that update range (Replicas - Partition), not from all replicas.
 	// This setting might not be effective for the OrderedReady podManagementPolicy. That policy ensures pods are created and become ready one at a time.
 	//
 	// +featureGate=MaxUnavailableStatefulSet
@@ -212,8 +214,8 @@ type StatefulSetSpec struct {
 	// It must match the pod template's labels.
 	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors
 	// +required
-	// +k8s:alpha(since: "1.37")=+k8s:required
-	// +k8s:alpha(since: "1.37")=+k8s:immutable
+	// +k8s:beta(since: "1.38")=+k8s:required
+	// +k8s:beta(since: "1.38")=+k8s:immutable
 	Selector *metav1.LabelSelector `json:"selector" protobuf:"bytes,2,opt,name=selector"`
 
 	// template is the object that describes the pod that will be created if
@@ -224,6 +226,7 @@ type StatefulSetSpec struct {
 	// "web" with index number "3" would be named "web-3".
 	// The only allowed template.spec.restartPolicy value is "Always".
 	// +required
+	// +k8s:alpha(since: "1.38")=+k8s:subfield(spec)=+k8s:subfield(restartPolicy)=+k8s:eq="Always"
 	Template v1.PodTemplateSpec `json:"template" protobuf:"bytes,3,opt,name=template"`
 
 	// volumeClaimTemplates is a list of claims that pods are allowed to reference.
@@ -234,9 +237,9 @@ type StatefulSetSpec struct {
 	// any volumes in the template, with the same name.
 	// TODO: Define the behavior if a claim already exists with the same name.
 	// +optional
-	// +k8s:alpha(since: "1.37")=+k8s:immutable
-	// +k8s:alpha(since: "1.37")=+k8s:optional
-	// +k8s:alpha(since: "1.37")=+k8s:eachVal=+k8s:opaqueType
+	// +k8s:beta(since: "1.38")=+k8s:immutable
+	// +k8s:beta(since: "1.38")=+k8s:optional
+	// +k8s:beta(since: "1.38")=+k8s:eachVal=+k8s:opaqueType
 	// +listType=atomic
 	VolumeClaimTemplates []v1.PersistentVolumeClaim `json:"volumeClaimTemplates,omitempty" protobuf:"bytes,4,rep,name=volumeClaimTemplates"`
 
@@ -246,8 +249,8 @@ type StatefulSetSpec struct {
 	// pattern: pod-specific-string.serviceName.default.svc.cluster.local
 	// where "pod-specific-string" is managed by the StatefulSet controller.
 	// +optional
-	// +k8s:alpha(since: "1.37")=+k8s:immutable
-	// +k8s:alpha(since: "1.37")=+k8s:optional
+	// +k8s:beta(since: "1.38")=+k8s:immutable
+	// +k8s:beta(since: "1.38")=+k8s:optional
 	ServiceName string `json:"serviceName" protobuf:"bytes,5,opt,name=serviceName"`
 
 	// podManagementPolicy controls how pods are created during initial scale up,
@@ -259,8 +262,8 @@ type StatefulSetSpec struct {
 	// to match the desired scale without waiting, and on scale down will delete
 	// all pods at once.
 	// +optional
-	// +k8s:alpha(since: "1.37")=+k8s:immutable
-	// +k8s:alpha(since: "1.37")=+k8s:optional
+	// +k8s:beta(since: "1.38")=+k8s:immutable
+	// +k8s:beta(since: "1.38")=+k8s:optional
 	PodManagementPolicy PodManagementPolicyType `json:"podManagementPolicy,omitempty" protobuf:"bytes,6,opt,name=podManagementPolicy,casttype=PodManagementPolicyType"`
 
 	// updateStrategy indicates the StatefulSetUpdateStrategy that will be
@@ -351,7 +354,7 @@ type StatefulSetConditionType string
 
 const (
 	// StatefulSetProgressing means the StatefulSet is progressing through an update.
-	// This condition is an alpha type and requires enabling StatefulSetRecreateStrategy feature gate.
+	// This condition is a beta type and requires enabling StatefulSetRecreateStrategy feature gate.
 	StatefulSetProgressing StatefulSetConditionType = "Progressing"
 )
 
@@ -714,6 +717,7 @@ type DaemonSetSpec struct {
 	// The only allowed template.spec.restartPolicy value is "Always".
 	// More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller#pod-template
 	// +required
+	// +k8s:alpha(since: "1.38")=+k8s:subfield(spec)=+k8s:subfield(restartPolicy)=+k8s:eq="Always"
 	Template v1.PodTemplateSpec `json:"template" protobuf:"bytes,2,opt,name=template"`
 
 	// updateStrategy to replace existing DaemonSet pods with new pods.

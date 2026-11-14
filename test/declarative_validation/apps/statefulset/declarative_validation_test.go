@@ -23,6 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	podtest "k8s.io/kubernetes/pkg/api/pod/testing"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	_ "k8s.io/kubernetes/pkg/apis/apps/install"
@@ -79,11 +80,13 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		apitesting.VerifyValidationEquivalence(t, ctx, &objWithEmptyVCTName, registry.Strategy, expectedErrs)
 	})
 
-	testCases := map[string]struct {
+	type testCase struct {
 		input apps.StatefulSet
 
 		expectedErrs field.ErrorList
-	}{
+	}
+
+	testCases := map[string]testCase{
 		"valid": {
 			input: mkValidStatefulSet(),
 		},
@@ -96,7 +99,7 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		"invalid toleration key format": {
 			input: mkValidStatefulSet(tweakTolerations(api.Toleration{Key: "invalid key", Operator: api.TolerationOpExists})),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "template", "spec", "tolerations").Index(0).Child("key"), nil, "").WithOrigin("format=k8s-label-key").MarkAlpha(),
+				field.Invalid(field.NewPath("spec", "template", "spec", "tolerations").Index(0).Child("key"), nil, "").WithOrigin("format=k8s-label-key").MarkBeta(),
 			},
 		},
 		"activeDeadlineSeconds minimum boundary violation": {
@@ -122,11 +125,27 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		"selector required": {
 			input: mkValidStatefulSet(tweakSelectorLabels(nil)),
 			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("spec").Child("selector"), "").MarkAlpha(),
+				field.Required(field.NewPath("spec").Child("selector"), "").MarkBeta(),
 				field.Invalid(field.NewPath("spec").Child("template").Child("metadata").Child("labels"), nil, "").MarkFromImperative(),
 			},
 		},
+		"restartPolicy not Always": {
+			input: mkValidStatefulSet(func(ss *apps.StatefulSet) {
+				ss.Spec.Template.Spec.RestartPolicy = api.RestartPolicyNever
+			}),
+			expectedErrs: field.ErrorList{
+				field.NotSupported(field.NewPath("spec", "template", "spec", "restartPolicy"), api.RestartPolicyNever, []api.RestartPolicy{api.RestartPolicyAlways}).MarkAlpha(),
+			},
+		},
 	}
+
+	for _, tc := range poddeclarativevalidation.InvalidPodSpecTestcases(field.NewPath("spec", "template", "spec")) {
+		testCases["podspec:"+tc.ID] = testCase{
+			input:        mkValidStatefulSet(tweakPodSpec(tc.Tweaks...)),
+			expectedErrs: tc.ExpectedErrs,
+		}
+	}
+
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {
 			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, registry.Strategy, tc.expectedErrs)
@@ -174,14 +193,14 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			updateObj: mkValidStatefulSet(tweakSelectorLabels(map[string]string{"a": "c"})),
 			expectedErrs: field.ErrorList{
 				field.Invalid(field.NewPath("spec").Child("template").Child("metadata").Child("labels"), nil, "").MarkFromImperative(),
-				field.Invalid(field.NewPath("spec").Child("selector"), nil, "").WithOrigin("immutable").MarkAlpha(),
+				field.Invalid(field.NewPath("spec").Child("selector"), nil, "").WithOrigin("immutable").MarkBeta(),
 			},
 		},
 		"selector set from unset": {
 			oldObj:    mkValidStatefulSet(tweakSelectorLabels(nil)),
 			updateObj: mkValidStatefulSet(),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec").Child("selector"), nil, "").WithOrigin("immutable").MarkAlpha(),
+				field.Invalid(field.NewPath("spec").Child("selector"), nil, "").WithOrigin("immutable").MarkBeta(),
 			},
 		},
 		"selector unset from set": {
@@ -189,42 +208,42 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			updateObj: mkValidStatefulSet(tweakSelectorLabels(map[string]string{})),
 			expectedErrs: field.ErrorList{
 				field.Invalid(field.NewPath("spec").Child("selector"), nil, "").MarkFromImperative(),
-				field.Invalid(field.NewPath("spec").Child("selector"), nil, "").WithOrigin("immutable").MarkAlpha(),
+				field.Invalid(field.NewPath("spec").Child("selector"), nil, "").WithOrigin("immutable").MarkBeta(),
 			},
 		},
 		"serviceName changed": {
 			oldObj:    mkValidStatefulSet(),
 			updateObj: mkValidStatefulSet(tweakServiceName("other-service")),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec").Child("serviceName"), nil, "").WithOrigin("immutable").MarkAlpha(),
+				field.Invalid(field.NewPath("spec").Child("serviceName"), nil, "").WithOrigin("immutable").MarkBeta(),
 			},
 		},
 		"serviceName set from unset": {
 			oldObj:    mkValidStatefulSet(tweakServiceName("")),
 			updateObj: mkValidStatefulSet(),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec").Child("serviceName"), nil, "").WithOrigin("immutable").MarkAlpha(),
+				field.Invalid(field.NewPath("spec").Child("serviceName"), nil, "").WithOrigin("immutable").MarkBeta(),
 			},
 		},
 		"serviceName unset from set": {
 			oldObj:    mkValidStatefulSet(),
 			updateObj: mkValidStatefulSet(tweakServiceName("")),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec").Child("serviceName"), nil, "").WithOrigin("immutable").MarkAlpha(),
+				field.Invalid(field.NewPath("spec").Child("serviceName"), nil, "").WithOrigin("immutable").MarkBeta(),
 			},
 		},
 		"podManagementPolicy changed": {
 			oldObj:    mkValidStatefulSet(),
 			updateObj: mkValidStatefulSet(tweakPodManagementPolicy(apps.ParallelPodManagement)),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec").Child("podManagementPolicy"), nil, "").WithOrigin("immutable").MarkAlpha(),
+				field.Invalid(field.NewPath("spec").Child("podManagementPolicy"), nil, "").WithOrigin("immutable").MarkBeta(),
 			},
 		},
 		"podManagementPolicy set from unset": {
 			oldObj:    mkValidStatefulSet(tweakPodManagementPolicy("")),
 			updateObj: mkValidStatefulSet(),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec").Child("podManagementPolicy"), nil, "").WithOrigin("immutable").MarkAlpha(),
+				field.Invalid(field.NewPath("spec").Child("podManagementPolicy"), nil, "").WithOrigin("immutable").MarkBeta(),
 			},
 		},
 		"podManagementPolicy unset from set": {
@@ -232,28 +251,28 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			updateObj: mkValidStatefulSet(tweakPodManagementPolicy("")),
 			expectedErrs: field.ErrorList{
 				field.Required(field.NewPath("spec").Child("podManagementPolicy"), "").MarkFromImperative(),
-				field.Invalid(field.NewPath("spec").Child("podManagementPolicy"), nil, "").WithOrigin("immutable").MarkAlpha(),
+				field.Invalid(field.NewPath("spec").Child("podManagementPolicy"), nil, "").WithOrigin("immutable").MarkBeta(),
 			},
 		},
 		"volumeClaimTemplates changed": {
 			oldObj:    mkValidStatefulSet(tweakVolumeClaimTemplate("pvc-abc", "1Gi")),
 			updateObj: mkValidStatefulSet(tweakVolumeClaimTemplate("pvc-abc", "2Gi")),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec").Child("volumeClaimTemplates"), nil, "").WithOrigin("immutable").MarkAlpha(),
+				field.Invalid(field.NewPath("spec").Child("volumeClaimTemplates"), nil, "").WithOrigin("immutable").MarkBeta(),
 			},
 		},
 		"volumeClaimTemplates set from unset": {
 			oldObj:    mkValidStatefulSet(),
 			updateObj: mkValidStatefulSet(tweakVolumeClaimTemplate("pvc-abc", "1Gi")),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec").Child("volumeClaimTemplates"), nil, "").WithOrigin("immutable").MarkAlpha(),
+				field.Invalid(field.NewPath("spec").Child("volumeClaimTemplates"), nil, "").WithOrigin("immutable").MarkBeta(),
 			},
 		},
 		"volumeClaimTemplates unset from set": {
 			oldObj:    mkValidStatefulSet(tweakVolumeClaimTemplate("pvc-abc", "1Gi")),
 			updateObj: mkValidStatefulSet(),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec").Child("volumeClaimTemplates"), nil, "").WithOrigin("immutable").MarkAlpha(),
+				field.Invalid(field.NewPath("spec").Child("volumeClaimTemplates"), nil, "").WithOrigin("immutable").MarkBeta(),
 			},
 		},
 	}
@@ -352,5 +371,17 @@ func tweakVolumeClaimTemplate(name, storage string) func(obj *apps.StatefulSet) 
 				},
 			},
 		}}
+	}
+}
+
+func tweakPodSpec(podTweaks ...podtest.Tweak) func(*apps.StatefulSet) {
+	return func(ss *apps.StatefulSet) {
+		pod := &api.Pod{
+			Spec: ss.Spec.Template.Spec,
+		}
+		for _, tweak := range podTweaks {
+			tweak(pod)
+		}
+		ss.Spec.Template.Spec = pod.Spec
 	}
 }

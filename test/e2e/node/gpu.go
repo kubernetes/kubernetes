@@ -61,7 +61,7 @@ var _ = SIGDescribe(feature.GPUDevicePlugin, framework.WithSerial(), "Sanity tes
 
 	f.It("should run nvidia-smi and cuda-demo-suite", func(ctx context.Context) {
 		SetupEnvironmentAndSkipIfNeeded(ctx, f, f.ClientSet)
-		pod := testNvidiaCLIPod()
+		pod := testNvidiaCLIPod(gpuNodeArchitecture(ctx, f.ClientSet))
 
 		ginkgo.By("Creating a pod that runs nvidia-smi")
 		createAndValidatePod(ctx, f, podClient, pod)
@@ -167,7 +167,37 @@ func createAndValidatePod(ctx context.Context, f *framework.Framework, podClient
 	gomega.Expect(pod.Status.Phase).To(gomega.Equal(v1.PodSucceeded))
 }
 
-func testNvidiaCLIPod() *v1.Pod {
+const (
+	// The devel image is ~3.9GB with a ~2.5GB layer. Unpacking it can outlast
+	// containerd's image_pull_progress_timeout, which then cancels the pull and
+	// throws away the downloaded layers (containerd/containerd#13909), so it is
+	// only used where nvcc is needed to build cuda-samples.
+	cudaBaseImage  = "nvidia/cuda:12.5.0-base-ubuntu22.04"
+	cudaDevelImage = "nvidia/cuda:12.5.0-devel-ubuntu22.04"
+)
+
+// gpuNodeArchitecture returns the CPU architecture of a ready, schedulable
+// node with allocatable NVIDIA GPUs.
+func gpuNodeArchitecture(ctx context.Context, clientSet clientset.Interface) string {
+	nodes, err := e2enode.GetReadySchedulableNodes(ctx, clientSet)
+	framework.ExpectNoError(err)
+	for _, node := range nodes.Items {
+		if val, ok := node.Status.Allocatable[e2egpu.NVIDIAGPUResourceName]; ok && val.Value() > 0 {
+			return node.Status.NodeInfo.Architecture
+		}
+	}
+	framework.Failf("%d ready nodes do not have any allocatable Nvidia GPU(s)", len(nodes.Items))
+	return ""
+}
+
+func testNvidiaCLIPod(arch string) *v1.Pod {
+	// cuda-demo-suite binaries link cudart statically and libcuda comes from
+	// the driver, so the base image (which has the CUDA apt repo) is enough
+	// on amd64.
+	image := cudaDevelImage
+	if arch == "amd64" {
+		image = cudaBaseImage
+	}
 	podName := "gpu-cli-" + string(uuid.NewUUID())
 	pod := v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -175,10 +205,12 @@ func testNvidiaCLIPod() *v1.Pod {
 			Annotations: map[string]string{},
 		},
 		Spec: v1.PodSpec{
+			// The image and the in-container uname branch must agree.
+			NodeSelector: map[string]string{v1.LabelArchStable: arch},
 			Containers: []v1.Container{
 				{
 					Name:  "nvidia-smi",
-					Image: "nvidia/cuda:12.5.0-devel-ubuntu22.04",
+					Image: image,
 					Command: []string{
 						"bash",
 						"-c",
@@ -215,7 +247,7 @@ else
 	# skipped on non-x86_64.
 	#
 	# cuda-samples is pinned to v12.5 to match the CUDA 12.5 toolkit in the
-	# nvidia/cuda:12.5.0-devel-ubuntu22.04 base image above and the
+	# nvidia/cuda:12.5.0-devel-ubuntu22.04 image used on this branch and the
 	# cuda-demo-suite-12-5 apt package used on the x86_64 branch; NVIDIA
 	# tags cuda-samples 1:1 with a toolkit version (v12.5 -> CUDA 12.5,
 	# v13.x -> CUDA 13.x), and v13+ also switched the build system from
