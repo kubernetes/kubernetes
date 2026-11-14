@@ -291,6 +291,39 @@ KEY2='bar' # comment
 			wantErr:     true,
 			errContains: "at line 1: unexpected content after closing quote",
 		},
+		// Regression test for https://github.com/kubernetes/kubernetes/issues/143946.
+		{
+			name:       "duplicate key returns last value",
+			envContent: "KEY1='first'\nKEY2='bar'\nKEY1='second'\n",
+			key:        "KEY1",
+			wantValue:  `second`,
+		},
+		{
+			name:       "duplicate key with empty last value",
+			envContent: "KEY1='first'\nKEY1=''\n",
+			key:        "KEY1",
+			wantValue:  ``,
+		},
+		{
+			name:       "duplicate key with whitespace and comment after '=' returns empty",
+			envContent: "KEY1='first'\nKEY1= # unset\n",
+			key:        "KEY1",
+			wantValue:  ``,
+		},
+		{
+			name:       "duplicate key with multi-line last value",
+			envContent: "KEY1='first'\nKEY1='line1\nline2'\n",
+			key:        "KEY1",
+			wantValue:  "line1\nline2",
+		},
+		{
+			// The whole file is read to find the last definition, so a later invalid line fails too.
+			name:        "invalid line after key triggers error",
+			envContent:  "KEY1='foo'\nKEY2 'bar'\n",
+			key:         "KEY1",
+			wantErr:     true,
+			errContains: "at line 2: missing '='",
+		},
 		{
 			name: "missing key triggers error with line number",
 			envContent: `='foo'

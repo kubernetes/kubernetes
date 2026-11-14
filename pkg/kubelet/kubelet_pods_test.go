@@ -10151,6 +10151,35 @@ func TestMakeEnvironmentVariablesWithFileKeyRef(t *testing.T) {
 				return []string{createEnvFile("empty.env", "EMPTY=''\n")}
 			},
 		},
+		// Regression test for https://github.com/kubernetes/kubernetes/issues/143946.
+		{
+			name: "last definition of a duplicated key is published",
+			container: &v1.Container{
+				Env: []v1.EnvVar{
+					{
+						Name: "DUP",
+						ValueFrom: &v1.EnvVarSource{
+							FileKeyRef: &v1.FileKeySelector{
+								VolumeName: "config-volume",
+								Path:       "dup.env",
+								Key:        "DUP",
+							},
+						},
+					},
+				},
+			},
+			podVolumes: map[string]kubecontainer.VolumeInfo{
+				"config-volume": {
+					Mounter: &testVolumeMounter{path: tmpDir},
+				},
+			},
+			expectedEnvs: []kubecontainer.EnvVar{
+				{Name: "DUP", Value: "second"},
+			},
+			setupFiles: func() []string {
+				return []string{createEnvFile("dup.env", "DUP='first'\nDUP='second'\n")}
+			},
+		},
 		// POSIX shell reads KEY= # comment as an empty assignment.
 		{
 			name: "whitespace and comment after equals sign is published as empty",
