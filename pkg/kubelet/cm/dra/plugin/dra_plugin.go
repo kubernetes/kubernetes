@@ -19,7 +19,6 @@ package plugin
 import (
 	"context"
 	"fmt"
-	"sync"
 	"time"
 
 	"google.golang.org/grpc"
@@ -75,11 +74,7 @@ type DRAPlugin struct {
 	chosenHealthService string
 	clientCallTimeout   time.Duration
 
-	mutex         sync.Mutex
 	backgroundCtx context.Context
-
-	healthStreamCtx    context.Context
-	healthStreamCancel context.CancelFunc
 }
 
 func (p *DRAPlugin) DriverName() string {
@@ -156,21 +151,6 @@ func newMetricsInterceptor(driverName string) grpc.UnaryClientInterceptor {
 		metrics.DRAGRPCOperationsDuration.WithLabelValues(driverName, method, status.Code(err).String()).Observe(time.Since(start).Seconds())
 		return err
 	}
-}
-
-// SetHealthStream stores the context and cancel function for the active health stream.
-func (p *DRAPlugin) SetHealthStream(ctx context.Context, cancel context.CancelFunc) {
-	p.mutex.Lock()
-	defer p.mutex.Unlock()
-	p.healthStreamCtx = ctx
-	p.healthStreamCancel = cancel
-}
-
-// HealthStreamCancel returns the cancel function for the current health stream, if any.
-func (p *DRAPlugin) HealthStreamCancel() context.CancelFunc {
-	p.mutex.Lock()
-	defer p.mutex.Unlock()
-	return p.healthStreamCancel
 }
 
 // NodeWatchResources establishes a stream to receive health updates from the DRA
