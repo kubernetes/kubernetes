@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"slices"
 	"strings"
 	"time"
 
@@ -163,6 +164,57 @@ func ContainerCompletionFunc(f cmdutil.Factory) func(*cobra.Command, []string, s
 	}
 }
 
+// LabelSelectorCompletionFunc Returns a completion function for the --selector flag that completes
+// the label keys, or the label values once a key and an operator are typed, found on the objects of
+// the specified resourceType. If resourceType is empty, the first argument is used as the resource type.
+// Only the last term of a comma-separated selector is completed.
+func LabelSelectorCompletionFunc(f cmdutil.Factory, resourceType string) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
+	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		directive := cobra.ShellCompDirectiveNoFileComp
+		resource := resourceType
+		if resource == "" {
+			if len(args) == 0 {
+				return nil, directive
+			}
+			resource = args[0]
+		}
+		allNamespaces, _ := cmd.Flags().GetBool("all-namespaces")
+		template := "{{ range .items }}{{ range $k, $v := .metadata.labels }}{{ $k }}={{ $v }} {{ end }}{{ end }}"
+		labels := compGetFromTemplate(&template, f, "", allNamespaces, []string{resource}, "")
+
+		prefix, term := "", toComplete
+		if i := strings.LastIndex(toComplete, ","); i != -1 {
+			prefix, term = toComplete[:i+1], toComplete[i+1:]
+		}
+
+		var comps []string
+		opIdx := strings.IndexAny(term, "!=")
+		if opIdx == -1 {
+			// Completing a key, the user still needs to type the value
+			directive |= cobra.ShellCompDirectiveNoSpace
+			for _, label := range labels {
+				key, _, _ := strings.Cut(label, "=")
+				if strings.HasPrefix(key, term) {
+					comps = append(comps, prefix+key+"=")
+				}
+			}
+		} else {
+			// Completing the value of key=value, key==value or key!=value
+			key := term[:opIdx]
+			value := strings.TrimLeft(term[opIdx:], "!=")
+			op := term[opIdx : len(term)-len(value)]
+			for _, label := range labels {
+				k, v, _ := strings.Cut(label, "=")
+				if k == key && strings.HasPrefix(v, value) {
+					comps = append(comps, prefix+key+op+v)
+				}
+			}
+		}
+		slices.Sort(comps)
+		return slices.Compact(comps), directive
+	}
+}
+
 // ContextCompletionFunc is a completion function that completes as a first argument the
 // context names that match the toComplete prefix
 func ContextCompletionFunc(_ *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
@@ -229,6 +281,10 @@ func CompGetServicePorts(f cmdutil.Factory, serviceName string, toComplete strin
 // CompGetFromTemplate executes a Get operation using the specified template and args and returns the results
 // which begin with `toComplete`.
 func CompGetFromTemplate(template *string, f cmdutil.Factory, namespace string, args []string, toComplete string) []string {
+	return compGetFromTemplate(template, f, namespace, false, args, toComplete)
+}
+
+func compGetFromTemplate(template *string, f cmdutil.Factory, namespace string, allNamespaces bool, args []string, toComplete string) []string {
 	buf := new(bytes.Buffer)
 	streams := genericiooptions.IOStreams{In: os.Stdin, Out: buf, ErrOut: io.Discard}
 	o := get.NewGetOptions("kubectl", streams)
@@ -251,6 +307,8 @@ func CompGetFromTemplate(template *string, f cmdutil.Factory, namespace string, 
 			return nil
 		}
 	}
+
+	o.AllNamespaces = allNamespaces
 
 	o.ToPrinter = func(mapping *meta.RESTMapping, outputObjects *bool, withNamespace bool, withKind bool) (printers.ResourcePrinterFunc, error) {
 		printer, err := o.PrintFlags.ToPrinter()

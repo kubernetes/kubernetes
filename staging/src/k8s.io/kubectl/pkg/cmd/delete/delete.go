@@ -165,6 +165,7 @@ func NewCmdDelete(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.
 
 	deleteFlags.AddFlags(cmd)
 	cmdutil.AddDryRunFlag(cmd)
+	cmdutil.CheckErr(cmd.RegisterFlagCompletionFunc("selector", completion.LabelSelectorCompletionFunc(f, "")))
 
 	return cmd
 }

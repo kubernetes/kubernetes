@@ -155,6 +155,7 @@ func NewCmdAnnotate(parent string, f cmdutil.Factory, streams genericiooptions.I
 	}
 
 	flags.AddFlags(cmd, streams)
+	cmdutil.CheckErr(cmd.RegisterFlagCompletionFunc("selector", completion.LabelSelectorCompletionFunc(f, "")))
 
 	return cmd
 }

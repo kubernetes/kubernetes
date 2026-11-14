@@ -248,6 +248,7 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 	// Avoid import cycle by setting ValidArgsFunction here instead of in NewCmdGet()
 	getCmd := get.NewCmdGet("kubectl", f, o.IOStreams)
 	getCmd.ValidArgsFunction = utilcomp.ResourceTypeAndNameCompletionFunc(f)
+	cmdutil.CheckErr(getCmd.RegisterFlagCompletionFunc("selector", utilcomp.LabelSelectorCompletionFunc(f, "")))
 	debugCmd := debug.NewCmdDebug(f, o.IOStreams)
 	debugCmd.ValidArgsFunction = utilcomp.ResourceTypeAndNameCompletionFunc(f)
 
