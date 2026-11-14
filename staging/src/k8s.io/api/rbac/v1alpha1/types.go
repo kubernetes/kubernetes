@@ -126,7 +126,7 @@ type Role struct {
 	// +optional
 	// +listType=atomic
 	// +k8s:optional
-	Rules []PolicyRule `json:"rules" protobuf:"bytes,2,rep,name=rules"`
+	Rules []PolicyRule `json:"rules,omitempty" protobuf:"bytes,2,rep,name=rules"`
 }
 
 // +genclient
@@ -195,7 +195,7 @@ type ClusterRole struct {
 	// +optional
 	// +listType=atomic
 	// +k8s:optional
-	Rules []PolicyRule `json:"rules" protobuf:"bytes,2,rep,name=rules"`
+	Rules []PolicyRule `json:"rules,omitempty" protobuf:"bytes,2,rep,name=rules"`
 
 	// aggregationRule is an optional field that describes how to build the Rules for this ClusterRole.
 	// If AggregationRule is set, then the Rules are controller managed and direct changes to Rules will be
