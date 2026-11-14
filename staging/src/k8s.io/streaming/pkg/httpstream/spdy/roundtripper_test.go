@@ -942,6 +942,79 @@ func TestRoundTripSocks5AndNewConnection(t *testing.T) {
 	}
 }
 
+func TestRoundTripClosesConnOnFailedProxyConnect(t *testing.T) {
+	testCases := map[string]struct {
+		response      string
+		expectedError string
+	}{
+		"authentication required": {
+			response:      "HTTP/1.1 407 Proxy Authentication Required\r\nContent-Length: 0\r\n\r\n",
+			expectedError: "407 Proxy Authentication Required",
+		},
+		"malformed response": {
+			response:      "invalid response\r\n\r\n",
+			expectedError: "malformed HTTP",
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			readErrors := make(chan error, 1)
+			proxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+				defer close(readErrors)
+				if req.Method != http.MethodConnect {
+					t.Errorf("expected CONNECT request, got %s", req.Method)
+					return
+				}
+				conn, brw, err := w.(http.Hijacker).Hijack()
+				if err != nil {
+					t.Errorf("error hijacking proxy connection: %v", err)
+					return
+				}
+				defer func() {
+					_ = conn.Close()
+				}()
+				if _, err := brw.WriteString(tc.response); err != nil {
+					t.Errorf("error writing proxy response: %v", err)
+					return
+				}
+				if err := brw.Flush(); err != nil {
+					t.Errorf("error flushing proxy response: %v", err)
+					return
+				}
+				// Keep the proxy side open so EOF only follows client cleanup.
+				if err := conn.SetReadDeadline(time.Now().Add(time.Second)); err != nil {
+					t.Errorf("error setting proxy read deadline: %v", err)
+					return
+				}
+				_, err = brw.ReadByte()
+				readErrors <- err
+			}))
+			defer proxy.Close()
+
+			proxyURL, err := url.Parse(proxy.URL)
+			if err != nil {
+				t.Fatal(err)
+			}
+			spdyTransport, err := NewRoundTripperWithProxy(nil, http.ProxyURL(proxyURL))
+			if err != nil {
+				t.Fatal(err)
+			}
+			req, err := http.NewRequest(http.MethodGet, "https://api.example.com", nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if _, err := spdyTransport.RoundTrip(req); err == nil || !strings.Contains(err.Error(), tc.expectedError) {
+				t.Errorf("expected error containing %q, got %v", tc.expectedError, err)
+			}
+			if err := <-readErrors; !errors.Is(err, io.EOF) {
+				t.Errorf("expected proxy connection to be closed by client, got read error: %v", err)
+			}
+		})
+	}
+}
+
 // TestNewConnectionClosesConnOnFailedUpgrade guards against leaking the dialed
 // connection when the upgrade is rejected, e.g. exec into a container that is
 // not running (https://github.com/kubernetes/kubernetes/issues/135245).
