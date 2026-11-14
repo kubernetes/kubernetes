@@ -53,3 +53,5 @@ replace (
 	k8s.io/client-go => ../../client-go
 	k8s.io/ktesting => ../../ktesting
 )
+
+replace github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus => github.com/skitt/go-grpc-middleware/providers/prometheus v0.0.0-20261102150504-c19cbb1cb1e5
