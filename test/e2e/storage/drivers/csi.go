@@ -195,7 +195,6 @@ func InitHostPathCSIDriver() storageframework.TestDriver {
 		"test/e2e/testing-manifests/storage-csi/external-resizer/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/hostpath/hostpath/csi-hostpath-driverinfo.yaml",
 		"test/e2e/testing-manifests/storage-csi/hostpath/hostpath/csi-hostpath-plugin.yaml",
-		"test/e2e/testing-manifests/storage-csi/hostpath/hostpath/e2e-test-rbac.yaml",
 	)
 }
 
