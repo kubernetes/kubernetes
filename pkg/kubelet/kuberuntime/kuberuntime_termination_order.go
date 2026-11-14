@@ -17,6 +17,7 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"context"
 	"sync"
 	"time"
 
@@ -95,8 +96,8 @@ func newTerminationOrdering(pod *v1.Pod, runningContainerNames []string) *termin
 }
 
 // waitForTurn waits until it is time for the container with the specified name to begin terminating, up until
-// the specified grace period.  If gracePeriod = 0, there is no wait.
-func (o *terminationOrdering) waitForTurn(name string, gracePeriod int64) float64 {
+// the specified grace period or context cancellation. If gracePeriod = 0, there is no wait.
+func (o *terminationOrdering) waitForTurn(ctx context.Context, name string, gracePeriod int64) float64 {
 	// if there is no grace period, we don't wait
 	if gracePeriod <= 0 {
 		return 0
@@ -104,9 +105,12 @@ func (o *terminationOrdering) waitForTurn(name string, gracePeriod int64) float6
 
 	start := time.Now()
 	remainingGrace := time.NewTimer(time.Duration(gracePeriod) * time.Second)
+	defer remainingGrace.Stop()
 
 	for _, c := range o.prereqs[name] {
 		select {
+		case <-ctx.Done():
+			return time.Since(start).Seconds()
 		case <-c:
 		case <-remainingGrace.C:
 			// grace period expired, so immediately exit
