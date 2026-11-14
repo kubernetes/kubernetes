@@ -106,6 +106,10 @@ type cacheWatcher struct {
 	requiredResourceVersion   uint64
 	matchedValues             []storage.MatchValue
 	dispatchedResourceVersion uint64
+	// syncedResourceVersion is the resourceVersion of the watch cache when the
+	// watcher was registered or last resynced. The watcher got the events up to
+	// it from the watch cache, and the dispatcher can still have them in its queue.
+	syncedResourceVersion uint64
 }
 
 func newCacheWatcher(
