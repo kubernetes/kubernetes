@@ -116,6 +116,7 @@ func TestRunHandlerExec(t *testing.T) {
 type fakeHTTP struct {
 	url     string
 	headers http.Header
+	ctx     context.Context
 	err     error
 	resp    *http.Response
 }
@@ -123,11 +124,14 @@ type fakeHTTP struct {
 func (f *fakeHTTP) Do(req *http.Request) (*http.Response, error) {
 	f.url = req.URL.String()
 	f.headers = req.Header.Clone()
+	f.ctx = req.Context()
 	return f.resp, f.err
 }
 
 func TestRunHandlerHttp(t *testing.T) {
 	_, tCtx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(tCtx)
+	defer cancel()
 	fakeHTTPGetter := fakeHTTP{}
 	fakePodStatusProvider := stubPodStatusProvider("127.0.0.1")
 	handlerRunner := NewHandlerRunner(&fakeHTTPGetter, &fakeContainerCommandRunner{}, fakePodStatusProvider, nil)
@@ -152,7 +156,7 @@ func TestRunHandlerHttp(t *testing.T) {
 	pod.ObjectMeta.Namespace = "nsFoo"
 	pod.ObjectMeta.UID = "foo-bar-quux"
 	pod.Spec.Containers = []v1.Container{container}
-	_, err := handlerRunner.Run(tCtx, containerID, &pod, &container, container.Lifecycle.PostStart)
+	_, err := handlerRunner.Run(ctx, containerID, &pod, &container, container.Lifecycle.PostStart)
 
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -160,6 +164,8 @@ func TestRunHandlerHttp(t *testing.T) {
 	if fakeHTTPGetter.url != "http://foo:8080/bar" {
 		t.Errorf("unexpected url: %s", fakeHTTPGetter.url)
 	}
+	cancel()
+	require.ErrorIs(t, fakeHTTPGetter.ctx.Err(), context.Canceled)
 }
 
 func TestRunHandlerHttpWithHeaders(t *testing.T) {
