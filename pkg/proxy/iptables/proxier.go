@@ -473,7 +473,7 @@ func (proxier *Proxier) OnServiceSynced() {
 	proxier.mu.Unlock()
 
 	// Sync unconditionally - this is called once per lifetime.
-	proxier.syncProxyRules()
+	proxier.Sync()
 }
 
 // OnEndpointSliceAdd is called whenever creation of a new endpoint slice object
@@ -509,7 +509,7 @@ func (proxier *Proxier) OnEndpointSlicesSynced() {
 	proxier.mu.Unlock()
 
 	// Sync unconditionally - this is called once per lifetime.
-	proxier.syncProxyRules()
+	proxier.Sync()
 }
 
 // OnTopologyChange is called whenever this node's proxy relevant topology-related labels change.
@@ -609,14 +609,14 @@ func (proxier *Proxier) appendServiceCommentLocked(args []string, svcName string
 }
 
 // Called by the iptables.Monitor, and in response to topology changes; this calls
-// syncProxyRules() and tells it to resync all services, regardless of whether the
+// Sync() and tells it to resync all services, regardless of whether the
 // Service or Endpoints/EndpointSlice objects themselves have changed
 func (proxier *Proxier) forceSyncProxyRules() {
 	proxier.mu.Lock()
 	proxier.needFullSync = true
 	proxier.mu.Unlock()
 
-	proxier.syncProxyRules()
+	proxier.Sync()
 }
 
 // This is where all of the iptables-save/restore calls happen.
