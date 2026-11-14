@@ -14,7 +14,7 @@ go test -v -bench=. -benchmem -benchtime=10s .
 The files under `data` define test cases for specific aspects of formatting. To
 test with a log file that represents output under some kind of real load, copy
 the log file into `data/<file name>.log` and run benchmarking as described
-above.  `-bench=BenchmarkLogging/<file name without .log suffix>` can be used
+above.  `-bench=BenchmarkEncoding/<file name without .log suffix>` can be used
 to benchmark just the new file.
 
 When using `data/v<some number>/<file name>.log`, formatting will be done at
