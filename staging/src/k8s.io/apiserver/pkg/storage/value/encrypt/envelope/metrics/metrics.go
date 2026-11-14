@@ -41,10 +41,9 @@ const (
 )
 
 type metricLabels struct {
-	transformationType string
-	providerName       string
-	keyIDHash          string
-	apiServerIDHash    string
+	providerName    string
+	keyIDHash       string
+	apiServerIDHash string
 }
 
 /*
@@ -58,12 +57,10 @@ type metricLabels struct {
 var (
 	lockLastFromStorage   sync.Mutex
 	lockLastToStorage     sync.Mutex
-	lockRecordKeyID       sync.Mutex
 	lockRecordKeyIDStatus sync.Mutex
 
 	lastFromStorage                                 time.Time
 	lastToStorage                                   time.Time
-	keyIDHashTotalMetricLabels                      *lru.Cache
 	keyIDHashStatusLastTimestampSecondsMetricLabels *lru.Cache
 	cacheSize                                       = 100
 
@@ -106,34 +103,6 @@ var (
 		[]string{"provider_name", "method_name", "grpc_status_code"},
 	)
 
-	// keyIDHashTotal is the number of times a keyID is used
-	// e.g. apiserver_envelope_encryption_key_id_hash_total counter
-	// apiserver_envelope_encryption_key_id_hash_total{apiserver_id_hash="sha256",key_id_hash="sha256",
-	// provider_name="providerName",transformation_type="from_storage"} 1
-	KeyIDHashTotal = metrics.NewCounterVec(
-		&metrics.CounterOpts{
-			Namespace:      namespace,
-			Subsystem:      subsystem,
-			Name:           "key_id_hash_total",
-			Help:           "Number of times a keyID is used split by transformation type, provider, and apiserver identity.",
-			StabilityLevel: metrics.ALPHA,
-		},
-		[]string{"transformation_type", "provider_name", "key_id_hash", "apiserver_id_hash"},
-	)
-
-	// keyIDHashLastTimestampSeconds is the last time in seconds when a keyID was used
-	// e.g. apiserver_envelope_encryption_key_id_hash_last_timestamp_seconds{apiserver_id_hash="sha256",key_id_hash="sha256", provider_name="providerName",transformation_type="from_storage"} 1.674865558833728e+09
-	KeyIDHashLastTimestampSeconds = metrics.NewGaugeVec(
-		&metrics.GaugeOpts{
-			Namespace:      namespace,
-			Subsystem:      subsystem,
-			Name:           "key_id_hash_last_timestamp_seconds",
-			Help:           "The last time in seconds when a keyID was used.",
-			StabilityLevel: metrics.ALPHA,
-		},
-		[]string{"transformation_type", "provider_name", "key_id_hash", "apiserver_id_hash"},
-	)
-
 	// keyIDHashStatusLastTimestampSeconds is the last time in seconds when a keyID was returned by the Status RPC call.
 	// e.g. apiserver_envelope_encryption_key_id_hash_status_last_timestamp_seconds{apiserver_id_hash="sha256",key_id_hash="sha256", provider_name="providerName"} 1.674865558833728e+09
 	KeyIDHashStatusLastTimestampSeconds = metrics.NewGaugeVec(
@@ -174,24 +143,10 @@ var registerMetricsFunc sync.Once
 var hashPool *sync.Pool
 
 func registerLRUMetrics() {
-	if keyIDHashTotalMetricLabels != nil {
-		keyIDHashTotalMetricLabels.Clear()
-	}
 	if keyIDHashStatusLastTimestampSecondsMetricLabels != nil {
 		keyIDHashStatusLastTimestampSecondsMetricLabels.Clear()
 	}
 
-	keyIDHashTotalMetricLabels = lru.NewWithEvictionFunc(cacheSize, func(key lru.Key, _ interface{}) {
-		item := key.(metricLabels)
-		if deleted := KeyIDHashTotal.DeleteLabelValues(item.transformationType, item.providerName, item.keyIDHash, item.apiServerIDHash); deleted {
-			klog.InfoS("Deleted keyIDHashTotalMetricLabels", "transformationType", item.transformationType,
-				"providerName", item.providerName, "keyIDHash", item.keyIDHash, "apiServerIDHash", item.apiServerIDHash)
-		}
-		if deleted := KeyIDHashLastTimestampSeconds.DeleteLabelValues(item.transformationType, item.providerName, item.keyIDHash, item.apiServerIDHash); deleted {
-			klog.InfoS("Deleted keyIDHashLastTimestampSecondsMetricLabels", "transformationType", item.transformationType,
-				"providerName", item.providerName, "keyIDHash", item.keyIDHash, "apiServerIDHash", item.apiServerIDHash)
-		}
-	})
 	keyIDHashStatusLastTimestampSecondsMetricLabels = lru.NewWithEvictionFunc(cacheSize, func(key lru.Key, _ interface{}) {
 		item := key.(metricLabels)
 		if deleted := KeyIDHashStatusLastTimestampSeconds.DeleteLabelValues(item.providerName, item.keyIDHash, item.apiServerIDHash); deleted {
@@ -210,22 +165,10 @@ func RegisterMetrics() {
 		legacyregistry.MustRegister(dekCacheFillPercent)
 		legacyregistry.MustRegister(dekCacheInterArrivals)
 		legacyregistry.MustRegister(DekSourceCacheSize)
-		legacyregistry.MustRegister(KeyIDHashTotal)
-		legacyregistry.MustRegister(KeyIDHashLastTimestampSeconds)
 		legacyregistry.MustRegister(KeyIDHashStatusLastTimestampSeconds)
 		legacyregistry.MustRegister(InvalidKeyIDFromStatusTotal)
 		legacyregistry.MustRegister(KMSOperationsLatencyMetric)
 	})
-}
-
-// RecordKeyID records total count and last time in seconds when a KeyID was used for TransformFromStorage and TransformToStorage operations
-func RecordKeyID(transformationType, providerName, keyID, apiServerID string) {
-	lockRecordKeyID.Lock()
-	defer lockRecordKeyID.Unlock()
-
-	keyIDHash, apiServerIDHash := addLabelToCache(keyIDHashTotalMetricLabels, transformationType, providerName, keyID, apiServerID)
-	KeyIDHashTotal.WithLabelValues(transformationType, providerName, keyIDHash, apiServerIDHash).Inc()
-	KeyIDHashLastTimestampSeconds.WithLabelValues(transformationType, providerName, keyIDHash, apiServerIDHash).SetToCurrentTime()
 }
 
 // RecordKeyIDFromStatus records last time in seconds when a KeyID was returned by the Status RPC call.
@@ -233,7 +176,7 @@ func RecordKeyIDFromStatus(providerName, keyID, apiServerID string) {
 	lockRecordKeyIDStatus.Lock()
 	defer lockRecordKeyIDStatus.Unlock()
 
-	keyIDHash, apiServerIDHash := addLabelToCache(keyIDHashStatusLastTimestampSecondsMetricLabels, "", providerName, keyID, apiServerID)
+	keyIDHash, apiServerIDHash := addLabelToCache(keyIDHashStatusLastTimestampSecondsMetricLabels, providerName, keyID, apiServerID)
 	KeyIDHashStatusLastTimestampSeconds.WithLabelValues(providerName, keyIDHash, apiServerIDHash).SetToCurrentTime()
 }
 
@@ -309,14 +252,13 @@ func getHash(data string) string {
 	return dataHash
 }
 
-func addLabelToCache(c *lru.Cache, transformationType, providerName, keyID, apiServerID string) (string, string) {
+func addLabelToCache(c *lru.Cache, providerName, keyID, apiServerID string) (string, string) {
 	keyIDHash := getHash(keyID)
 	apiServerIDHash := getHash(apiServerID)
 	c.Add(metricLabels{
-		transformationType: transformationType,
-		providerName:       providerName,
-		keyIDHash:          keyIDHash,
-		apiServerIDHash:    apiServerIDHash,
+		providerName:    providerName,
+		keyIDHash:       keyIDHash,
+		apiServerIDHash: apiServerIDHash,
 	}, nil) // value is irrelevant, this is a set and not a map
 	return keyIDHash, apiServerIDHash
 }
