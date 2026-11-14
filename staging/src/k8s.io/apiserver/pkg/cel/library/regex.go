@@ -95,14 +95,8 @@ func (*regex) ProgramOptions() []cel.ProgramOption {
 }
 
 func find(strVal ref.Val, regexVal ref.Val) ref.Val {
-	str, ok := strVal.Value().(string)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(strVal)
-	}
-	regex, ok := regexVal.Value().(string)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(regexVal)
-	}
+	str := strVal.Value().(string)
+	regex := regexVal.Value().(string)
 	re, err := regexp.Compile(regex)
 	if err != nil {
 		return types.NewErr("Illegal regex: %v", err.Error())
@@ -116,20 +110,11 @@ func findAll(args ...ref.Val) ref.Val {
 	if argn < 2 || argn > 3 {
 		return types.NoSuchOverloadErr()
 	}
-	str, ok := args[0].Value().(string)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(args[0])
-	}
-	regex, ok := args[1].Value().(string)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(args[1])
-	}
+	str := args[0].Value().(string)
+	regex := args[1].Value().(string)
 	n := int64(-1)
 	if argn == 3 {
-		n, ok = args[2].Value().(int64)
-		if !ok {
-			return types.MaybeNoSuchOverloadErr(args[2])
-		}
+		n = args[2].Value().(int64)
 	}
 
 	re, err := regexp.Compile(regex)
@@ -153,6 +138,7 @@ var FindRegexOptimization = &interpreter.RegexOptimization{
 		if err != nil {
 			return nil, err
 		}
+		// Optimized calls bypass overload type guards, so check argument types here.
 		return interpreter.NewCall(call.ID(), call.Function(), call.OverloadID(), call.Args(), func(args ...ref.Val) ref.Val {
 			if len(args) != 2 {
 				return types.NoSuchOverloadErr()
@@ -177,6 +163,7 @@ var FindAllRegexOptimization = &interpreter.RegexOptimization{
 		if err != nil {
 			return nil, err
 		}
+		// Optimized calls bypass overload type guards, so check argument types here.
 		return interpreter.NewCall(call.ID(), call.Function(), call.OverloadID(), call.Args(), func(args ...ref.Val) ref.Val {
 			argn := len(args)
 			if argn < 2 || argn > 3 {
