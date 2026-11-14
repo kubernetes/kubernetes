@@ -631,13 +631,7 @@ func (s *ProxyServer) Run(ctx context.Context) error {
 
 	// hollow-proxy doesn't need node config, and we don't create nodeManager for hollow-proxy.
 	if s.NodeManager != nil {
-		nodeConfig := config.NewNodeConfig(ctx, s.NodeManager.NodeInformer(), s.Config.ConfigSyncPeriod.Duration)
-		nodeConfig.RegisterEventHandler(s.NodeManager)
-		// NodeManager has already started and synced the node informer, so the handler must be attached in one step
-		// Ref: https://issues.k8s.io/143275
-		config.NewNodeTopologyConfig(ctx, s.NodeManager.NodeInformer(), s.Config.ConfigSyncPeriod.Duration, s.Proxier)
-
-		go nodeConfig.Run(wait.NeverStop)
+		s.NodeManager.RegisterTopologyHandler(s.Proxier)
 	}
 
 	// Birth Cry after the birth is successful
