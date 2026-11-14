@@ -353,9 +353,20 @@ func (grm *nestedPendingOperations) Wait() {
 	grm.lock.Lock()
 	defer grm.lock.Unlock()
 
-	for len(grm.operations) > 0 {
+	for grm.hasPendingOperations() {
 		grm.cond.Wait()
 	}
+}
+
+// hasPendingOperations returns true if any operation is currently pending.
+// Assumes lock has been acquired by caller.
+func (grm *nestedPendingOperations) hasPendingOperations() bool {
+	for _, op := range grm.operations {
+		if op.operationPending {
+			return true
+		}
+	}
+	return false
 }
 
 type operationKey struct {
