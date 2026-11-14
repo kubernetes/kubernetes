@@ -120,6 +120,14 @@ func (kl *Kubelet) tryRegisterWithAPIServer(ctx context.Context, node *v1.Node) 
 		return false
 	}
 
+	// A replacement instance must not adopt a Node belonging to another instance.
+	// An empty provider ID is not evidence of a mismatch: external cloud providers
+	// may initialize it after kubelet registration.
+	if node.Spec.ProviderID != "" && existingNode.Spec.ProviderID != "" && node.Spec.ProviderID != existingNode.Spec.ProviderID {
+		logger.Error(nil, "Unable to register node with API server, existing node has a different provider ID; verify the node name and provider ID before retrying", "node", klog.KObj(node), "providerID", node.Spec.ProviderID, "existingProviderID", existingNode.Spec.ProviderID)
+		return false
+	}
+
 	originalNode := existingNode.DeepCopy()
 
 	logger.Info("Node was previously registered", "node", klog.KObj(node))
