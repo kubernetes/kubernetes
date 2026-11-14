@@ -204,6 +204,13 @@ const (
 	// Enables coordinated leader election in the API server
 	CoordinatedLeaderElection featuregate.Feature = "CoordinatedLeaderElection"
 
+	// owner: @vishals-3
+	// kep: https://kep.k8s.io/78564
+	//
+	// Enables populating the next scheduled time of a CronJob in its status
+	// via the CronJobStatus.nextScheduleTime field.
+	CronJobsNextScheduleTime featuregate.Feature = "CronJobsNextScheduleTime"
+
 	// owner: @ttakahashi21 @mkimuram
 	// kep: https://kep.k8s.io/3294
 	//
@@ -1367,6 +1374,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.38"), Default: true, PreRelease: featuregate.Beta},
 	},
 
+	CronJobsNextScheduleTime: {
+		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	CrossNamespaceVolumeDataSource: {
 		{Version: version.MustParse("1.26"), Default: false, PreRelease: featuregate.Alpha},
 	},
@@ -2422,6 +2433,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	ContainerStopSignals: {},
 
 	CoordinatedLeaderElection: {},
+
+	CronJobsNextScheduleTime: {},
 
 	CrossNamespaceVolumeDataSource: {},
 
