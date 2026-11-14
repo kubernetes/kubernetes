@@ -238,7 +238,9 @@ func (r *leaseEndpointReconciler) doReconcile(serviceName string, endpointPorts 
 	skipMirrorChanged := setSkipMirrorTrue(e)
 
 	// Next, we compare the current list of endpoints with the list of master IP keys
-	formatCorrect, ipCorrect, portsCorrect := checkEndpointSubsetFormatWithLease(e, masterIPs, endpointPorts, reconcilePorts)
+	// Endpoint ports are part of the managed endpoint shape even when callers
+	// skip service port reconciliation.
+	formatCorrect, ipCorrect, portsCorrect := checkEndpointSubsetFormatWithLease(e, masterIPs, endpointPorts, true)
 	if !skipMirrorChanged && formatCorrect && ipCorrect && portsCorrect {
 		return r.epAdapter.EnsureEndpointSliceFromEndpoints(corev1.NamespaceDefault, e)
 	}
