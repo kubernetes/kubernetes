@@ -337,8 +337,10 @@ func (p *Preferences) applyAliases(rootCmd *cobra.Command, kuberc *config.Prefer
 		// expect that it will be passed along to the actual command.
 		rootCmd.SetArgs(args[1:])
 		// Remove alias arg to add the remaining arguments that are not flags nor part of the preferences
-		sanitizedArgs := strings.ReplaceAll(strings.Join(args[1:], " "), foundAliasCmd.Name(), "")
-		if len(sanitizedArgs) > 0 {
+		var remainingArgs []string
+		remainingArgs = append(remainingArgs, args[1:commandIndex]...)
+		remainingArgs = append(remainingArgs, args[commandIndex+1:]...)
+		if sanitizedArgs := strings.Join(remainingArgs, " "); len(sanitizedArgs) > 0 {
 			aliasArgs.originalCommand.WriteString(fmt.Sprintf(" %s", sanitizedArgs))
 		}
 		// Add annotation to trace back command built without aliases applied
