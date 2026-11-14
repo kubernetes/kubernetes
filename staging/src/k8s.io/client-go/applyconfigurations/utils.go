@@ -1642,8 +1642,14 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsresourcev1.CELDeviceSelectorApplyConfiguration{}
 	case resourcev1.SchemeGroupVersion.WithKind("Counter"):
 		return &applyconfigurationsresourcev1.CounterApplyConfiguration{}
+	case resourcev1.SchemeGroupVersion.WithKind("CounterRequirement"):
+		return &applyconfigurationsresourcev1.CounterRequirementApplyConfiguration{}
 	case resourcev1.SchemeGroupVersion.WithKind("CounterSet"):
 		return &applyconfigurationsresourcev1.CounterSetApplyConfiguration{}
+	case resourcev1.SchemeGroupVersion.WithKind("CounterSetConsumption"):
+		return &applyconfigurationsresourcev1.CounterSetConsumptionApplyConfiguration{}
+	case resourcev1.SchemeGroupVersion.WithKind("CounterValueFrom"):
+		return &applyconfigurationsresourcev1.CounterValueFromApplyConfiguration{}
 	case resourcev1.SchemeGroupVersion.WithKind("Device"):
 		return &applyconfigurationsresourcev1.DeviceApplyConfiguration{}
 	case resourcev1.SchemeGroupVersion.WithKind("DeviceAllocationConfiguration"):
@@ -1766,8 +1772,14 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsresourcev1beta1.CELDeviceSelectorApplyConfiguration{}
 	case resourcev1beta1.SchemeGroupVersion.WithKind("Counter"):
 		return &applyconfigurationsresourcev1beta1.CounterApplyConfiguration{}
+	case resourcev1beta1.SchemeGroupVersion.WithKind("CounterRequirement"):
+		return &applyconfigurationsresourcev1beta1.CounterRequirementApplyConfiguration{}
 	case resourcev1beta1.SchemeGroupVersion.WithKind("CounterSet"):
 		return &applyconfigurationsresourcev1beta1.CounterSetApplyConfiguration{}
+	case resourcev1beta1.SchemeGroupVersion.WithKind("CounterSetConsumption"):
+		return &applyconfigurationsresourcev1beta1.CounterSetConsumptionApplyConfiguration{}
+	case resourcev1beta1.SchemeGroupVersion.WithKind("CounterValueFrom"):
+		return &applyconfigurationsresourcev1beta1.CounterValueFromApplyConfiguration{}
 	case resourcev1beta1.SchemeGroupVersion.WithKind("Device"):
 		return &applyconfigurationsresourcev1beta1.DeviceApplyConfiguration{}
 	case resourcev1beta1.SchemeGroupVersion.WithKind("DeviceAllocationConfiguration"):
@@ -1852,8 +1864,14 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsresourcev1beta2.CELDeviceSelectorApplyConfiguration{}
 	case resourcev1beta2.SchemeGroupVersion.WithKind("Counter"):
 		return &applyconfigurationsresourcev1beta2.CounterApplyConfiguration{}
+	case resourcev1beta2.SchemeGroupVersion.WithKind("CounterRequirement"):
+		return &applyconfigurationsresourcev1beta2.CounterRequirementApplyConfiguration{}
 	case resourcev1beta2.SchemeGroupVersion.WithKind("CounterSet"):
 		return &applyconfigurationsresourcev1beta2.CounterSetApplyConfiguration{}
+	case resourcev1beta2.SchemeGroupVersion.WithKind("CounterSetConsumption"):
+		return &applyconfigurationsresourcev1beta2.CounterSetConsumptionApplyConfiguration{}
+	case resourcev1beta2.SchemeGroupVersion.WithKind("CounterValueFrom"):
+		return &applyconfigurationsresourcev1beta2.CounterValueFromApplyConfiguration{}
 	case resourcev1beta2.SchemeGroupVersion.WithKind("Device"):
 		return &applyconfigurationsresourcev1beta2.DeviceApplyConfiguration{}
 	case resourcev1beta2.SchemeGroupVersion.WithKind("DeviceAllocationConfiguration"):

@@ -24,3 +24,5 @@
 ^- \./informers\.SharedInformerFactory\..*: (added|removed)$
 ^- \./(listers|applyconfigurations)/[a-z]+/v1.*(, method set of .*)?: (added|removed|old is comparable, new is not)$
 ^- package k8s\.io/client-go/(applyconfigurations|informers|kubernetes/typed|listers)/[a-z]+/v[a-z0-9]+(/fake)?: (added|removed)$
+^- \./applyconfigurations/[a-z]+/v[a-z0-9]+\.[a-zA-Z0-9]+ApplyConfiguration\.[a-zA-Z0-9]+: changed from map\[string\][a-zA-Z0-9]+ApplyConfiguration to map\[string\][a-zA-Z0-9]+ApplyConfiguration$
+^- \./applyconfigurations/[a-z]+/v[a-z0-9]+\.\(\*[a-zA-Z0-9]+ApplyConfiguration\)\.With[a-zA-Z0-9]+: changed from func\(map\[string\][a-zA-Z0-9]+ApplyConfiguration\) \*[a-zA-Z0-9]+ApplyConfiguration to func\(map\[string\][a-zA-Z0-9]+ApplyConfiguration\) \*[a-zA-Z0-9]+ApplyConfiguration$

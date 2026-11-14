@@ -78,6 +78,12 @@ import (
 // asserts it for each of the objects built here.
 const maxObjectSize = 1536 * 1024
 
+// mustParseQuantityPtr parses a quantity string and returns a pointer to it.
+func mustParseQuantityPtr(value string) *resource.Quantity {
+	quantity := resource.MustParse(value)
+	return &quantity
+}
+
 // NewMaxResourceSlices creates slices that are as large as possible given the current validation constraints.
 func NewMaxResourceSlices() map[string]*resourceapi.ResourceSlice {
 	slices := map[string]*resourceapi.ResourceSlice{
@@ -114,11 +120,11 @@ func newResourceSliceWithTaintsAndConsumesCounters() *resourceapi.ResourceSlice 
 			for i := range resourceapi.ResourceSliceMaxDeviceCounterConsumptionsPerDevice {
 				consumesCounters = append(consumesCounters, resourceapi.DeviceCounterConsumption{
 					CounterSet: maxDNSLabel(i),
-					Counters: func() map[string]resourceapi.Counter {
-						counters := make(map[string]resourceapi.Counter)
+					Counters: func() map[string]resourceapi.CounterRequirement {
+						counters := make(map[string]resourceapi.CounterRequirement)
 						for i := range resourceapi.ResourceSliceMaxCountersPerDeviceCounterConsumption {
-							counters[maxDNSLabel(i)] = resourceapi.Counter{
-								Value: resource.MustParse("80Gi"),
+							counters[maxDNSLabel(i)] = resourceapi.CounterRequirement{
+								Value: mustParseQuantityPtr("80Gi"),
 							}
 						}
 						return counters

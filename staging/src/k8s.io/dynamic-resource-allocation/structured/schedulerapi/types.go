@@ -93,6 +93,28 @@ type AllocatedState struct {
 	// AggregatedCapacity records the consumed capacity per device ID when
 	// the DRAConsumableCapacity feature is enabled.
 	AggregatedCapacity ConsumedCapacityCollection
+	// ConsumedCounters contains saved counter snapshots from non-admin allocations,
+	// grouped by device and including allocations still in flight.
+	// Entries exist only for devices with at least one saved snapshot, including
+	// known zero usage. Each allocation result's snapshot is preserved separately.
+	// The allocator uses current ResourceSlices to decide whether missing
+	// snapshots make counter accounting unavailable.
+	// Snapshot contents remain immutable while the allocator uses this state.
+	// Fixed consumption is reconstructed from ResourceSlices instead.
+	// This field may be nil when DRASharedConsumableCapacity is disabled.
+	ConsumedCounters CounterConsumptionByDevice
+}
+
+// CounterConsumptionByDevice contains allocation-status snapshots per device.
+type CounterConsumptionByDevice map[DeviceID][]CounterConsumptionForAllocation
+
+// CounterConsumptionForAllocation contains one allocation result's counter snapshot.
+// An empty slice records an allocation without a snapshot.
+type CounterConsumptionForAllocation []resourceapi.CounterSetConsumption
+
+// Add appends an allocation's snapshot, including empty snapshots and known zeros.
+func (c CounterConsumptionByDevice) Add(id DeviceID, consumption []resourceapi.CounterSetConsumption) {
+	c[id] = append(c[id], consumption)
 }
 
 // ConsumedCapacity represents the consumed capacity of a specific resource.
