@@ -17,7 +17,7 @@ limitations under the License.
 package rest
 
 import (
-	"time"
+	"fmt"
 
 	eventsapiv1 "k8s.io/api/events/v1"
 	"k8s.io/apiserver/pkg/registry/generic"
@@ -29,8 +29,15 @@ import (
 	eventstore "k8s.io/kubernetes/pkg/registry/core/event/storage"
 )
 
+// EventStorageProvider supplies the events shared with core/v1.
+// Implemented by pkg/registry/core/rest.EventStorageProvider
+type EventStorageProvider interface {
+	Storage(generic.RESTOptionsGetter) (*eventstore.REST, error)
+}
+
 type RESTStorageProvider struct {
-	TTL time.Duration
+	// EventStorage is shared with core/v1.
+	EventStorage EventStorageProvider
 }
 
 func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, error) {
@@ -52,7 +59,10 @@ func (p RESTStorageProvider) v1Storage(apiResourceConfigSource serverstorage.API
 
 	// events
 	if resource := "events"; apiResourceConfigSource.ResourceEnabled(eventsapiv1.SchemeGroupVersion.WithResource(resource)) {
-		eventsStorage, err := eventstore.NewREST(restOptionsGetter, uint64(p.TTL.Seconds()))
+		if p.EventStorage == nil {
+			return storage, fmt.Errorf("events.k8s.io storage requires EventStorage to be set so events storage is shared with core/v1")
+		}
+		eventsStorage, err := p.EventStorage.Storage(restOptionsGetter)
 		if err != nil {
 			return storage, err
 		}
