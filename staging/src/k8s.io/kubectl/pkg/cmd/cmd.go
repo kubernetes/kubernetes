@@ -21,6 +21,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"sync/atomic"
 
 	"github.com/spf13/cobra"
@@ -335,13 +336,23 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 		filters = append(filters, alpha.Name())
 	}
 
-	// Add plugin command group to the list of command groups.
-	// The commands are only injected for the scope of showing help and completion, they are not
-	// invoked directly.
-	pluginCommandGroup := plugin.GetPluginCommandGroup(cmds)
-	groups = append(groups, pluginCommandGroup)
-
 	templates.ActsAsRootCommand(cmds, filters, groups...)
+	// Discover plugins only when rendering help, not on every invocation (including completion).
+	var helpFunc func(*cobra.Command, []string)
+	var usageFunc func(*cobra.Command) error
+	initPluginHelp := sync.OnceFunc(func() {
+		helpGroups := append(groups, plugin.GetPluginCommandGroup(cmds))
+		templates.ActsAsRootCommand(cmds, filters, helpGroups...)
+		helpFunc, usageFunc = cmds.HelpFunc(), cmds.UsageFunc()
+	})
+	cmds.SetHelpFunc(func(cmd *cobra.Command, args []string) {
+		initPluginHelp()
+		helpFunc(cmd, args)
+	})
+	cmds.SetUsageFunc(func(cmd *cobra.Command) error {
+		initPluginHelp()
+		return usageFunc(cmd)
+	})
 
 	utilcomp.SetFactoryForCompletion(f)
 	registerCompletionFuncForGlobalFlags(cmds, f)
