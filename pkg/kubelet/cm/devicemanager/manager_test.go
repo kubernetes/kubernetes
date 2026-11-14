@@ -887,6 +887,7 @@ func (a *activePodsStub) updateActivePods(newPods []*v1.Pod) {
 }
 
 type MockEndpoint struct {
+	preStartContainerFunc      func(devs []string) (*pluginapi.PreStartContainerResponse, error)
 	getPreferredAllocationFunc func(available, mustInclude []string, size int) (*pluginapi.PreferredAllocationResponse, error)
 	allocateFunc               func(devs []string) (*pluginapi.AllocateResponse, error)
 	initChan                   chan []string
@@ -894,6 +895,9 @@ type MockEndpoint struct {
 }
 
 func (m *MockEndpoint) preStartContainer(_ context.Context, devs []string) (*pluginapi.PreStartContainerResponse, error) {
+	if m.preStartContainerFunc != nil {
+		return m.preStartContainerFunc(devs)
+	}
 	m.initChan <- devs
 	return &pluginapi.PreStartContainerResponse{}, nil
 }
@@ -1930,6 +1934,113 @@ func TestUpdatePluginResources(t *testing.T) {
 	as.Equal(2, int(allocatableScalarResources[v1.ResourceName(resourceName2)]))
 }
 
+func TestGetDeviceRunContainerOptionsDeferredAllocation(t *testing.T) {
+	for _, tc := range []struct {
+		name              string
+		preStartRequired  bool
+		cached            bool
+		allocateFails     bool
+		preStartFails     bool
+		multipleResources bool
+	}{
+		{name: "required PreStart", preStartRequired: true},
+		{name: "no PreStart"},
+		{name: "multiple resources", preStartRequired: true, multipleResources: true},
+		{name: "cached allocation", preStartRequired: true, cached: true},
+		{name: "allocation failure", preStartRequired: true, allocateFails: true},
+		{name: "PreStart failure", preStartRequired: true, preStartFails: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			logger, ctx := ktesting.NewTestContext(t)
+			res := TestResource{
+				resourceName:     "example.com/device",
+				resourceQuantity: resource.MustParse("1"),
+				devs:             checkpoint.DevicesPerNUMA{0: []string{"dev1"}},
+			}
+			resources := []TestResource{res}
+			limits := v1.ResourceList{v1.ResourceName(res.resourceName): res.resourceQuantity}
+			if tc.multipleResources {
+				second := res
+				second.resourceName = "example.com/second-device"
+				resources = append(resources, second)
+				limits[v1.ResourceName(second.resourceName)] = second.resourceQuantity
+			}
+			pod := makePod(limits)
+			pods := activePodsStub{activePods: []*v1.Pod{pod}}
+			manager, err := getTestManager(logger, t.TempDir(), pods.getActivePods, resources)
+			require.NoError(t, err)
+			allocationErr := fmt.Errorf("test allocation failure")
+			preStartErr := fmt.Errorf("test PreStart failure")
+			var calls []string
+			manager.endpoints[res.resourceName] = endpointInfo{
+				e: &MockEndpoint{
+					allocateFunc: func(devs []string) (*pluginapi.AllocateResponse, error) {
+						calls = append(calls, "Allocate")
+						require.ElementsMatch(t, []string{"dev1"}, devs)
+						if tc.allocateFails {
+							return nil, allocationErr
+						}
+						return allocateStubFunc()(devs)
+					},
+					preStartContainerFunc: func(devs []string) (*pluginapi.PreStartContainerResponse, error) {
+						calls = append(calls, "PreStartContainer")
+						for _, resource := range resources {
+							require.NotNil(t, manager.podDevices.containerDevices(string(pod.UID), pod.Spec.Containers[0].Name, resource.resourceName))
+						}
+						require.ElementsMatch(t, []string{"dev1"}, devs)
+						if tc.preStartFails {
+							return nil, preStartErr
+						}
+						return &pluginapi.PreStartContainerResponse{}, nil
+					},
+				},
+				opts: &pluginapi.DevicePluginOptions{PreStartRequired: tc.preStartRequired},
+			}
+			if tc.multipleResources {
+				manager.endpoints[resources[1].resourceName] = manager.endpoints[res.resourceName]
+			}
+			require.NoError(t, manager.AllocatePod(logger, pod, lifecycle.AddOperation))
+			require.Empty(t, calls, "pod admission must not allocate devices")
+			if tc.cached {
+				require.NoError(t, manager.Allocate(ctx, pod, &pod.Spec.Containers[0], lifecycle.AddOperation))
+				calls = nil
+			}
+			opts, err := manager.GetDeviceRunContainerOptions(ctx, pod, &pod.Spec.Containers[0])
+			if tc.allocateFails {
+				require.ErrorIs(t, err, allocationErr)
+				require.Equal(t, []string{"Allocate"}, calls)
+				return
+			}
+			expected := []string{}
+			if !tc.cached {
+				for range resources {
+					expected = append(expected, "Allocate")
+				}
+			}
+			if tc.preStartRequired {
+				for range resources {
+					expected = append(expected, "PreStartContainer")
+				}
+			}
+			require.Equal(t, expected, calls)
+			if tc.preStartFails {
+				require.ErrorContains(t, err, preStartErr.Error())
+				return
+			}
+			require.NoError(t, err)
+			require.NotNil(t, opts)
+			calls = nil
+			_, err = manager.GetDeviceRunContainerOptions(ctx, pod, &pod.Spec.Containers[0])
+			require.NoError(t, err)
+			if tc.preStartRequired {
+				require.Equal(t, expected[len(expected)-len(resources):], calls)
+			} else {
+				require.Empty(t, calls)
+			}
+		})
+	}
+}
+
 func TestDevicePreStartContainer(t *testing.T) {
 	logger, tCtx := ktesting.NewTestContext(t)
 	// Ensures that if device manager is indicated to invoke `PreStartContainer` RPC
@@ -2630,6 +2741,7 @@ func TestGetDeviceRunContainerOptionsWithDRAResourceAndStaleDevicePluginState(t 
 			}
 
 			testManager := &ManagerImpl{
+				activePods: func() []*v1.Pod { return nil },
 				endpoints:  make(map[string]endpointInfo),
 				podDevices: newPodDevices(),
 				allocatedDevices: map[string]sets.Set[string]{
