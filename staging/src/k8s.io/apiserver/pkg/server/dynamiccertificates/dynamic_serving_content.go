@@ -44,7 +44,7 @@ type DynamicCertKeyPairContent struct {
 	// certKeyPair is a certKeyContent that contains the last read, non-zero length content of the key and cert
 	certKeyPair atomic.Value
 
-	listeners []Listener
+	listeners listenerList
 
 	// queue only ever has one item, but it has nice error handling backoff/retry semantics
 	queue workqueue.TypedRateLimitingInterface[string]
@@ -78,7 +78,7 @@ func NewDynamicServingContentFromFiles(purpose, certFile, keyFile string) (*Dyna
 
 // AddListener adds a listener to be notified when the serving cert content changes.
 func (c *DynamicCertKeyPairContent) AddListener(listener Listener) {
-	c.listeners = append(c.listeners, listener)
+	c.listeners.Add(listener)
 }
 
 // loadCertKeyPair determines the next set of content for the file.
@@ -115,9 +115,7 @@ func (c *DynamicCertKeyPairContent) loadCertKeyPair() error {
 	c.certKeyPair.Store(newCertKey)
 	klog.V(2).InfoS("Loaded a new cert/key pair", "name", c.Name())
 
-	for _, listener := range c.listeners {
-		listener.Enqueue()
-	}
+	c.listeners.Notify()
 
 	return nil
 }
