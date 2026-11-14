@@ -18,6 +18,7 @@ package portforward
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -52,6 +53,8 @@ type fakeConnection struct {
 	dataStream  *fakeStream
 	errorStream *fakeStream
 	streamCount int
+	// createErr, if set, is returned by CreateStream for streams of that type.
+	createErr map[string]error
 }
 
 func newFakeConnection() *fakeConnection {
@@ -63,6 +66,9 @@ func newFakeConnection() *fakeConnection {
 }
 
 func (c *fakeConnection) CreateStream(headers http.Header) (httpstream.Stream, error) {
+	if err := c.createErr[headers.Get(v1.StreamType)]; err != nil {
+		return nil, err
+	}
 	switch headers.Get(v1.StreamType) {
 	case v1.StreamTypeData:
 		c.streamCount++
@@ -550,6 +556,30 @@ func TestHandleConnectionSendsRemoteError(t *testing.T) {
 	assert.Equal(t, "", remoteDataReceived.String())
 	assert.Equal(t, "", localConnection.receiveBuffer.String())
 	assert.Equal(t, "Handling connection for 1111\n", out.String())
+	assert.False(t, remoteConnection.closed, "an error on a single forwarded connection must not close the port-forward connection")
+}
+
+func TestHandleConnectionClosesStreamConnWhenStreamCreationFails(t *testing.T) {
+	for _, streamType := range []string{v1.StreamTypeError, v1.StreamTypeData} {
+		t.Run(streamType, func(t *testing.T) {
+			pf, err := New(&fakeDialer{}, []string{":2222"}, nil, nil, bytes.NewBufferString(""), bytes.NewBufferString(""))
+			if err != nil {
+				t.Fatalf("error while calling New: %s", err)
+			}
+			localConnection := &fakeConn{
+				sendBuffer:    bytes.NewBufferString(""),
+				receiveBuffer: bytes.NewBufferString(""),
+			}
+			remoteConnection := newFakeConnection()
+			remoteConnection.errorStream.readFunc = bytes.NewBufferString("").Read
+			remoteConnection.createErr = map[string]error{streamType: errors.New("connection closed")}
+			pf.streamConn = remoteConnection
+
+			pf.handleConnection(localConnection, ForwardedPort{Local: 1111, Remote: 2222})
+
+			assert.True(t, remoteConnection.closed, "port-forward connection should be closed when a stream cannot be created")
+		})
+	}
 }
 
 func TestWaitForConnectionExitsOnStreamConnClosed(t *testing.T) {

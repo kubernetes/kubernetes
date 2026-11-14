@@ -474,6 +474,9 @@ func (pf *PortForwarder) handleConnection(conn net.Conn, port ForwardedPort) {
 	errorStream, err := pf.streamConn.CreateStream(headers)
 	if err != nil {
 		runtime.HandleErrorWithLogger(pf.logger, err, "Error creating error stream", "localPort", port.Local, "remotePort", port.Remote)
+		// The connection to the pod is no longer usable; tear it down so
+		// that ForwardPorts returns instead of accepting further connections.
+		pf.streamConn.Close()
 		return
 	}
 	// we're not writing to this stream
@@ -499,6 +502,9 @@ func (pf *PortForwarder) handleConnection(conn net.Conn, port ForwardedPort) {
 	dataStream, err := pf.streamConn.CreateStream(headers)
 	if err != nil {
 		runtime.HandleErrorWithLogger(pf.logger, err, "Error creating forwarding stream", "localPort", port.Local, "remotePort", port.Remote)
+		// The connection to the pod is no longer usable; tear it down so
+		// that ForwardPorts returns instead of accepting further connections.
+		pf.streamConn.Close()
 		return
 	}
 	defer pf.streamConn.RemoveStreams(dataStream)
@@ -546,8 +552,13 @@ func (pf *PortForwarder) handleConnection(conn net.Conn, port ForwardedPort) {
 		runtime.HandleErrorWithLogger(pf.logger, errResult.err, "Error reading from error stream", "localPort", port.Local, "remotePort", port.Remote)
 		pf.streamConn.Close()
 	case len(errResult.message) > 0:
+		// An error message on the error stream only concerns this forwarded
+		// connection (for example the remote side resetting the TCP connection
+		// to the pod). Do not tear down the whole port-forward session: later
+		// connections can still be forwarded. If the connection to the pod is
+		// really gone, creating the streams for the next connection fails and
+		// the session is closed above.
 		runtime.HandleErrorWithLogger(pf.logger, errors.New(string(errResult.message)), "An error occurred forwarding", "localPort", port.Local, "remotePort", port.Remote)
-		pf.streamConn.Close()
 	}
 }
 
