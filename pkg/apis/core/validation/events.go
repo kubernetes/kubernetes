@@ -19,6 +19,7 @@ package validation
 import (
 	"fmt"
 	"reflect"
+	"slices"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -36,6 +37,21 @@ const (
 	ReasonLengthLimit            = 128
 	NoteLengthLimit              = 1024
 )
+
+// strictEventPaths are the fields that only events.k8s.io/v1 validates.
+// core/v1 accepts any value for them, for backwards compatibility.
+var strictEventPaths = []string{
+	"series.count",
+}
+
+// EventOmittedFieldPaths returns the field paths whose validation errors cannot
+// be compared between core/v1 and events.k8s.io/v1, because only the latter
+// validates them.
+func EventOmittedFieldPaths() map[schema.GroupVersionKind][]string {
+	return map[schema.GroupVersionKind][]string{
+		v1.SchemeGroupVersion.WithKind("Event"): slices.Clone(strictEventPaths),
+	}
+}
 
 func ValidateEventCreate(event *core.Event, requestVersion schema.GroupVersion) field.ErrorList {
 	// Make sure events always pass legacy validation.
@@ -118,8 +134,10 @@ func validateV1EventSeries(event *core.Event) field.ErrorList {
 	allErrs := field.ErrorList{}
 	zeroTime := time.Time{}
 	if event.Series != nil {
-		if event.Series.Count < 2 {
-			allErrs = append(allErrs, field.Invalid(field.NewPath("series.count"), "", "should be at least 2"))
+		if event.Series.Count == 0 {
+			allErrs = append(allErrs, field.Required(field.NewPath("series", "count"), "").MarkCoveredByDeclarative())
+		} else if event.Series.Count < 2 {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("series", "count"), "", "should be at least 2").WithOrigin("minimum").MarkCoveredByDeclarative())
 		}
 		if event.Series.LastObservedTime.Time == zeroTime {
 			allErrs = append(allErrs, field.Required(field.NewPath("series.lastObservedTime"), ""))
