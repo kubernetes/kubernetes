@@ -84,6 +84,7 @@ func (e *EventedPLEG) watchEventsChannel(ctx context.Context) {
 
 			err := e.runtimeService.GetContainerEvents(ctx, containerEventsResponseCh, func(runtimeapi.RuntimeService_GetContainerEventsClient) {
 				metrics.EventedPLEGConn.Inc()
+				metrics.EventedPLEGConnTotal.Inc()
 			})
 			if ctx.Err() != nil {
 				return
@@ -92,6 +93,7 @@ func (e *EventedPLEG) watchEventsChannel(ctx context.Context) {
 				err = errEventedPLEGStreamClosed
 			}
 			metrics.EventedPLEGConnErr.Inc()
+			metrics.EventedPLEGConnErrTotal.Inc()
 			numAttempts++
 			lastStreamErr = err
 			logger.V(4).Info("Evented PLEG: failed to get container events, retrying", "err", err)
