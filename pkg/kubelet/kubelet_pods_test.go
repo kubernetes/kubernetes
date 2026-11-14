@@ -34,6 +34,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -53,11 +54,13 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/cri-streaming/pkg/streaming/portforward"
 	"k8s.io/cri-streaming/pkg/streaming/remotecommand"
+	"k8s.io/klog/v2"
 	"k8s.io/ktesting"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
+	cmtesting "k8s.io/kubernetes/pkg/kubelet/cm/testing"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
@@ -4790,6 +4793,313 @@ func TestConvertToAPIContainerStatusesVolumeMounts(t *testing.T) {
 			)
 			require.Len(t, statuses, 1)
 			assert.Equal(t, test.expectedMounts, statuses[0].VolumeMounts)
+		})
+	}
+}
+
+func TestConvertToAPIPodLevelResourcesStatusWithOverhead(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.PodLevelResources:                       true,
+		features.InPlacePodLevelResourcesVerticalScaling: true,
+	})
+
+	testKubelet := newTestKubelet(t, false)
+	defer testKubelet.Cleanup()
+	kl := testKubelet.kubelet
+
+	mockPCM := cmtesting.NewMockPodContainerManager(t)
+	mockCM := cmtesting.NewMockContainerManager(t)
+	mockCM.EXPECT().NewPodContainerManager().Return(mockPCM).Maybe()
+	kl.containerManager = mockCM
+
+	mockPCM.EXPECT().GetPodCgroupConfig(mock.Anything, v1.ResourceMemory).Return(nil, errors.New("cgroup not found")).Maybe()
+	mockPCM.EXPECT().GetPodCgroupConfig(mock.Anything, v1.ResourceCPU).Return(nil, errors.New("cgroup not found")).Maybe()
+
+	cases := []struct {
+		name        string
+		pod         *v1.Pod
+		oldStatus   v1.PodStatus
+		expectedRes *v1.ResourceRequirements
+	}{
+		{
+			name: "running pod with overhead adds overhead to fallback requests and limits",
+			pod: &v1.Pod{
+				Status: v1.PodStatus{Phase: v1.PodRunning},
+				Spec: v1.PodSpec{
+					Overhead: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("500m"),
+						v1.ResourceMemory: resource.MustParse("200Mi"),
+					},
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("1"),
+							v1.ResourceMemory: resource.MustParse("1Gi"),
+						},
+						Limits: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("2"),
+							v1.ResourceMemory: resource.MustParse("2Gi"),
+						},
+					},
+				},
+			},
+			oldStatus: v1.PodStatus{Phase: v1.PodRunning},
+			expectedRes: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("1.5"),
+					v1.ResourceMemory: resource.MustParse("1224Mi"),
+				},
+				Limits: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("2.5"),
+					v1.ResourceMemory: resource.MustParse("2248Mi"),
+				},
+			},
+		},
+		{
+			name: "running pod preserves old status resources without double-adding overhead",
+			pod: &v1.Pod{
+				Status: v1.PodStatus{
+					Phase: v1.PodRunning,
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("1.5"),
+							v1.ResourceMemory: resource.MustParse("1224Mi"),
+						},
+						Limits: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("2.5"),
+							v1.ResourceMemory: resource.MustParse("2248Mi"),
+						},
+					},
+					AllocatedResources: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("1.5"),
+						v1.ResourceMemory: resource.MustParse("1224Mi"),
+					},
+				},
+				Spec: v1.PodSpec{
+					Overhead: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("500m"),
+						v1.ResourceMemory: resource.MustParse("200Mi"),
+					},
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("1"),
+							v1.ResourceMemory: resource.MustParse("1Gi"),
+						},
+						Limits: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("2"),
+							v1.ResourceMemory: resource.MustParse("2Gi"),
+						},
+					},
+				},
+			},
+			oldStatus: v1.PodStatus{
+				Phase: v1.PodRunning,
+				Resources: &v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("1.5"),
+						v1.ResourceMemory: resource.MustParse("1224Mi"),
+					},
+					Limits: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("2.5"),
+						v1.ResourceMemory: resource.MustParse("2248Mi"),
+					},
+				},
+			},
+			expectedRes: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("1.5"),
+					v1.ResourceMemory: resource.MustParse("1224Mi"),
+				},
+				Limits: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("2.5"),
+					v1.ResourceMemory: resource.MustParse("2248Mi"),
+				},
+			},
+		},
+		{
+			name: "running pod memory request upsize updates status to new spec value rather than preserving old status",
+			pod: &v1.Pod{
+				Status: v1.PodStatus{
+					Phase: v1.PodRunning,
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("1224Mi"),
+						},
+					},
+					AllocatedResources: v1.ResourceList{
+						v1.ResourceMemory: resource.MustParse("1224Mi"),
+					},
+				},
+				Spec: v1.PodSpec{
+					Overhead: v1.ResourceList{
+						v1.ResourceMemory: resource.MustParse("200Mi"),
+					},
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("2Gi"),
+						},
+					},
+				},
+			},
+			oldStatus: v1.PodStatus{
+				Phase: v1.PodRunning,
+				Resources: &v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceMemory: resource.MustParse("1224Mi"),
+					},
+				},
+			},
+			expectedRes: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceMemory: resource.MustParse("2248Mi"),
+				},
+				Limits: v1.ResourceList{},
+			},
+		},
+		{
+			name: "running pod memory request downsize updates status to new spec value rather than preserving old status",
+			pod: &v1.Pod{
+				Status: v1.PodStatus{
+					Phase: v1.PodRunning,
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("2248Mi"),
+						},
+					},
+					AllocatedResources: v1.ResourceList{
+						v1.ResourceMemory: resource.MustParse("2248Mi"),
+					},
+				},
+				Spec: v1.PodSpec{
+					Overhead: v1.ResourceList{
+						v1.ResourceMemory: resource.MustParse("200Mi"),
+					},
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("1Gi"),
+						},
+					},
+				},
+			},
+			oldStatus: v1.PodStatus{
+				Phase: v1.PodRunning,
+				Resources: &v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceMemory: resource.MustParse("2248Mi"),
+					},
+				},
+			},
+			expectedRes: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceMemory: resource.MustParse("1224Mi"),
+				},
+				Limits: v1.ResourceList{},
+			},
+		},
+		{
+			name: "running pod without memory request clears memory request from status",
+			pod: &v1.Pod{
+				Status: v1.PodStatus{
+					Phase: v1.PodRunning,
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("1224Mi"),
+						},
+					},
+					AllocatedResources: v1.ResourceList{
+						v1.ResourceMemory: resource.MustParse("1224Mi"),
+					},
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: "c1"},
+					},
+				},
+			},
+			oldStatus: v1.PodStatus{
+				Phase: v1.PodRunning,
+				Resources: &v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceMemory: resource.MustParse("1224Mi"),
+					},
+				},
+			},
+			expectedRes: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{},
+				Limits:   v1.ResourceList{},
+			},
+		},
+		{
+			name: "running pod with container-level resources and overhead (spec.resources nil) adds overhead to fallback requests and limits",
+			pod: &v1.Pod{
+				Status: v1.PodStatus{Phase: v1.PodRunning},
+				Spec: v1.PodSpec{
+					Overhead: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("500m"),
+						v1.ResourceMemory: resource.MustParse("200Mi"),
+					},
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("1"),
+									v1.ResourceMemory: resource.MustParse("1Gi"),
+								},
+								Limits: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("2"),
+									v1.ResourceMemory: resource.MustParse("2Gi"),
+								},
+							},
+						},
+					},
+				},
+			},
+			oldStatus: v1.PodStatus{Phase: v1.PodRunning},
+			expectedRes: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("1.5"),
+					v1.ResourceMemory: resource.MustParse("1224Mi"),
+				},
+				Limits: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("2.5"),
+					v1.ResourceMemory: resource.MustParse("2248Mi"),
+				},
+			},
+		},
+		{
+			name: "running pod with requests and overhead but no limits does not add overhead as a limit",
+			pod: &v1.Pod{
+				Status: v1.PodStatus{Phase: v1.PodRunning},
+				Spec: v1.PodSpec{
+					Overhead: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("500m"),
+						v1.ResourceMemory: resource.MustParse("200Mi"),
+					},
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("1"),
+							v1.ResourceMemory: resource.MustParse("1Gi"),
+						},
+					},
+				},
+			},
+			oldStatus: v1.PodStatus{Phase: v1.PodRunning},
+			expectedRes: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("1.5"),
+					v1.ResourceMemory: resource.MustParse("1224Mi"),
+				},
+				Limits: v1.ResourceList{},
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := kl.convertToAPIPodLevelResourcesStatus(klog.Background(), tc.pod, tc.oldStatus)
+			if !apiequality.Semantic.DeepEqual(tc.expectedRes, got) {
+				t.Errorf("Unexpected resources (-want,+got):\n%s", cmp.Diff(tc.expectedRes, got))
+			}
 		})
 	}
 }

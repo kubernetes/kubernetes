@@ -2324,22 +2324,10 @@ func (kl *Kubelet) convertToAPIPodLevelResourcesStatus(logger klog.Logger, alloc
 		}
 	}
 
-	resources := allocatedPod.Spec.Resources.DeepCopy()
+	resources := getEffectiveAllocatedResources(allocatedPod)
 
 	if oldPodStatus.Resources == nil {
 		oldPodStatus.Resources = &v1.ResourceRequirements{}
-	}
-
-	if resources == nil {
-		resources = &v1.ResourceRequirements{}
-	}
-
-	if resources.Requests == nil {
-		resources.Requests = make(v1.ResourceList)
-	}
-
-	if resources.Limits == nil {
-		resources.Limits = make(v1.ResourceList)
 	}
 
 	if cpuRequest != nil {
@@ -2367,17 +2355,6 @@ func (kl *Kubelet) convertToAPIPodLevelResourcesStatus(logger klog.Logger, alloc
 		preserveOldResourcesValue(v1.ResourceCPU, oldPodStatus.Resources.Requests, resources.Requests)
 	}
 
-	if _, found := resources.Requests[v1.ResourceMemory]; !found {
-		opts := resourcehelper.PodResourcesOptions{
-			SkipPodLevelResources:                    !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
-			UseDRANodeAllocatableResourceClaimStatus: utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources),
-		}
-		aggregatedResources := resourcehelper.PodRequests(allocatedPod, opts)
-		if val, ok := aggregatedResources[v1.ResourceMemory]; ok {
-			resources.Requests[v1.ResourceMemory] = val
-		}
-	}
-
 	if cpuLimit != nil {
 		// If both the allocated & actual resources are at
 		// or below the minimum effective limit, preserve the
@@ -2387,7 +2364,6 @@ func (kl *Kubelet) convertToAPIPodLevelResourcesStatus(logger klog.Logger, alloc
 		}
 	} else {
 		preserveOldResourcesValue(v1.ResourceCPU, oldPodStatus.Resources.Limits, resources.Limits)
-
 	}
 
 	if memoryLimit != nil {
