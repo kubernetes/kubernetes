@@ -491,6 +491,66 @@ func testGetTrustAnchorsBySignerName[T clusterTrustBundle](tCtx ktesting.TContex
 	}()
 }
 
+func TestGetTrustAnchorsBySignerNameSelectorCacheIsolation(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	tCtx.SyncTest("v1alpha1", func(tCtx ktesting.TContext) {
+		testGetTrustAnchorsBySignerNameSelectorCacheIsolation(tCtx, alphaFunctionsBundle)
+	})
+	tCtx.SyncTest("v1beta1", func(tCtx ktesting.TContext) {
+		testGetTrustAnchorsBySignerNameSelectorCacheIsolation(tCtx, betaFunctionsBundle)
+	})
+	tCtx.SyncTest("v1", func(tCtx ktesting.TContext) {
+		testGetTrustAnchorsBySignerNameSelectorCacheIsolation(tCtx, gaFunctionsBundle)
+	})
+}
+
+func testGetTrustAnchorsBySignerNameSelectorCacheIsolation[T clusterTrustBundle](tCtx ktesting.TContext, b testingFunctionBundle[T]) {
+	t := tCtx.TB()
+	ctb := b.ctbConstructor("foo.bar:a:root", "foo.bar/a", nil, mustMakeRoot(t, "root"))
+	kc := fake.NewSimpleClientset(b.ctbToObj(ctb))
+	informerFactory := informers.NewSharedInformerFactoryWithOptions(kc, 0)
+
+	ctbManager, err := b.informerManagerConstructor(tCtx, informerFactory, 256, 5*time.Minute)
+	if err != nil {
+		t.Fatalf("Error while constructing the informer manager: %v", err)
+	}
+	informerFactory.StartWithContext(tCtx)
+	ctbInformer := b.informerGetter(informerFactory)
+	if !cache.WaitForCacheSync(tCtx.Done(), ctbInformer.HasSynced) {
+		t.Fatalf("Timed out waiting for informer to sync")
+	}
+	// Initial add handlers must finish before warming the cache, or they could
+	// evict the entry whose isolation this test checks.
+	tCtx.Wait()
+
+	checkNilSelector := func(phase string) {
+		for _, allowMissing := range []bool{false, true} {
+			gotBundle, err := ctbManager.GetTrustAnchorsBySigner(tCtx, "foo.bar/a", nil, allowMissing)
+			if len(gotBundle) != 0 {
+				t.Errorf("%s, nil selector, allowMissing=%v: got %d certificate bytes, wanted none", phase, allowMissing, len(gotBundle))
+			}
+			if allowMissing && err != nil {
+				t.Errorf("%s, nil selector, allowMissing=true: got unexpected error: %v", phase, err)
+			}
+			if !allowMissing && (err == nil || !strings.Contains(err.Error(), "matched zero ClusterTrustBundles")) {
+				t.Errorf("%s, nil selector, allowMissing=false: got error %v, wanted a zero-matches error", phase, err)
+			}
+		}
+	}
+
+	checkNilSelector("cold cache")
+	for _, allowMissing := range []bool{false, true} {
+		gotBundle, err := ctbManager.GetTrustAnchorsBySigner(tCtx, "foo.bar/a", &metav1.LabelSelector{}, allowMissing)
+		if err != nil {
+			t.Fatalf("Empty selector, allowMissing=%v: got unexpected error: %v", allowMissing, err)
+		}
+		if diff := diffBundles(gotBundle, []byte(b.ctbTrustBundle(ctb))); diff != "" {
+			t.Fatalf("Empty selector, allowMissing=%v: bad bundle; diff (-got +want)\n%s", allowMissing, diff)
+		}
+		checkNilSelector(fmt.Sprintf("after empty selector with allowMissing=%v", allowMissing))
+	}
+}
+
 func TestGetTrustAnchorsBySignerNameCaching(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	tCtx.SyncTest("v1alpha1", func(tCtx ktesting.TContext) { testGetTrustAnchorsBySignerNameCaching(tCtx, alphaFunctionsBundle) })
