@@ -1,0 +1,59 @@
+# Minimal out-of-cluster / explicit-issuer example manifests showing how the
+# Service, Deployment, and ValidatingWebhookConfiguration values line up with
+# WithIssuer(issuer, audience, nil) in examples/main.go.
+apiVersion: v1
+kind: Service
+metadata:
+  name: kittens-external
+  namespace: external-webhooks
+spec:
+  selector:
+    app: kittens-webhook-external
+  ports:
+    - name: https
+      port: 443
+      targetPort: 8443
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kittens-webhook-external
+  namespace: external-webhooks
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kittens-webhook-external
+  template:
+    metadata:
+      labels:
+        app: kittens-webhook-external
+    spec:
+      containers:
+        - name: webhook
+          image: example.com/kittens-webhook:latest
+          env:
+            - name: WEBHOOK_LOVE_KITTENS_ISSUER
+              value: "https://issuer.example.com"
+            - name: WEBHOOK_LOVE_KITTENS_AUDIENCE
+              value: "https://kittens.external.example.com/validate"
+          ports:
+            - containerPort: 8443
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: kittens-external.example.com
+webhooks:
+  - name: kittens-external.example.com
+    admissionReviewVersions: ["v1"]
+    sideEffects: None
+    failurePolicy: Fail
+    clientConfig:
+      # Matches WEBHOOK_LOVE_KITTENS_AUDIENCE passed to WithIssuer.
+      url: "https://kittens.external.example.com/validate"
+    rules:
+      - apiGroups: ["apps"]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["deployments", "deployments/scale"]

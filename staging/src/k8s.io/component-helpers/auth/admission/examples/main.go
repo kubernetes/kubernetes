@@ -28,10 +28,43 @@ import (
 
 	admissionv1 "k8s.io/api/admission/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/discovery"
 	authadmission "k8s.io/component-helpers/auth/admission"
 )
 
-const resourceNameMustContainForAdmission = "love-kittens"
+const (
+	resourceNameMustContainForAdmission = "love-kittens"
+
+	// Matches the Service and ValidatingWebhookConfiguration in examples/in-cluster.yaml.
+	serviceName = "kittens"
+	servicePath = "/validate"
+	servicePort = 443     // Service spec.ports[].port (clientConfig.service.port), not container targetPort
+	targetPort  = ":8443" // Container listen port (Service spec.ports[].targetPort)
+)
+
+// customSubresourceGroupMismatches shows how a multi-resource webhook can seed
+// from the built-in cross-group subresource list and extend it via cached
+// cluster discovery (on-cluster) or explicit entries (off-cluster). This list
+// is only consulted when req.Kind.Group differs from req.Resource.Group on a
+// subresource; ordinary resources do not belong in this map.
+type customSubresourceGroupMismatches struct {
+	cachedDiscovery discovery.CachedDiscoveryInterface
+}
+
+func (c *customSubresourceGroupMismatches) Build(ctx context.Context) (authadmission.ExpectedSubresourceGroupMismatchMap, error) {
+	if c.cachedDiscovery != nil {
+		return authadmission.DiscoverSubresourceGroupMismatches(ctx, c.cachedDiscovery)
+	}
+	defaults := authadmission.AllowedSubresourceGroupMismatchList()
+	defaults[authadmission.SubresourceGroupMismatchKey{
+		Resource:    metav1.GroupVersionResource{Group: "pets.example.com", Version: "v1", Resource: "kittens"},
+		Subresource: "adopt",
+	}] = map[schema.GroupVersionKind]struct{}{
+		{Group: "adoption.example.com", Version: "v1", Kind: "AdoptionRequest"}: {},
+	}
+	return defaults, nil
+}
 
 func main() {
 	cert := flag.String("tls-cert", "tls.crt", "PEM certificate for the webhook's HTTPS host")
@@ -39,10 +72,15 @@ func main() {
 	flag.Parse()
 
 	// Default to in-cluster Service verification; use WithIssuer for explicit OIDC discovery.
-	verificationOption := authadmission.WithServiceAudience("kittens", "/validate", 443)
+	options := []authadmission.Option{
+		authadmission.WithServiceAudience(serviceName, servicePath, servicePort),
+	}
 	if issuer := os.Getenv("WEBHOOK_LOVE_KITTENS_ISSUER"); issuer != "" {
 		audience := os.Getenv("WEBHOOK_LOVE_KITTENS_AUDIENCE")
-		verificationOption = authadmission.WithIssuer(issuer, audience, nil)
+		options = []authadmission.Option{
+			authadmission.WithIssuer(issuer, audience, nil),
+			authadmission.WithSubresourceGroupMismatches(&customSubresourceGroupMismatches{}),
+		}
 	}
 	kittenPolicy := func(_ context.Context, req *admissionv1.AdmissionRequest) *admissionv1.AdmissionResponse {
 		if strings.Contains(req.Name, resourceNameMustContainForAdmission) || len(req.Name) == 0 {
@@ -57,13 +95,13 @@ func main() {
 		}
 	}
 	// Pass the webhook server's root lifecycle context (typically tied to signal handling).
-	handler, err := authadmission.WithTokenVerification(context.Background(), kittenPolicy, verificationOption)
+	handler, err := authadmission.WithTokenVerification(context.Background(), kittenPolicy, options...)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	mux := http.NewServeMux()
-	mux.Handle("/validate", handler)
-	server := &http.Server{Addr: ":8443", Handler: mux, ReadHeaderTimeout: 5 * time.Second}
+	mux.Handle(servicePath, handler)
+	server := &http.Server{Addr: targetPort, Handler: mux, ReadHeaderTimeout: 5 * time.Second}
 	log.Fatal(server.ListenAndServeTLS(*cert, *key))
 }
