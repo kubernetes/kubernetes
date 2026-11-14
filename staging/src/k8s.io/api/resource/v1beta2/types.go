@@ -2084,8 +2084,8 @@ type ResourceClaimStatus struct {
 	// allocation is set once the claim has been allocated successfully.
 	//
 	// +optional
-	// +k8s:beta(since: "1.37")=+k8s:optional
-	// +k8s:beta(since: "1.37")=+k8s:update=NoModify
+	// +k8s:optional
+	// +k8s:update=NoModify
 	Allocation *AllocationResult `json:"allocation,omitempty" protobuf:"bytes,1,opt,name=allocation"`
 
 	// reservedFor indicates which entities are currently allowed to use
@@ -2113,10 +2113,10 @@ type ResourceClaimStatus struct {
 	// +listMapKey=uid
 	// +patchStrategy=merge
 	// +patchMergeKey=uid
-	// +k8s:beta(since: "1.37")=+k8s:optional
-	// +k8s:beta(since: "1.37")=+k8s:listType=map
-	// +k8s:beta(since: "1.37")=+k8s:listMapKey=uid
-	// +k8s:beta(since: "1.37")=+k8s:maxItems=256
+	// +k8s:optional
+	// +k8s:listType=map
+	// +k8s:listMapKey=uid
+	// +k8s:maxItems=256
 	ReservedFor []ResourceClaimConsumerReference `json:"reservedFor,omitempty" protobuf:"bytes,2,opt,name=reservedFor" patchStrategy:"merge" patchMergeKey:"uid"`
 
 	// DeallocationRequested is tombstoned since Kubernetes 1.32 where
@@ -2129,18 +2129,18 @@ type ResourceClaimStatus struct {
 	// information. Entries are owned by their respective drivers.
 	//
 	// +optional
-	// +k8s:beta(since: "1.37")=+k8s:optional
+	// +k8s:optional
 	// +listType=map
 	// +listMapKey=driver
 	// +listMapKey=device
 	// +listMapKey=pool
 	// +listMapKey=shareID
 	// +featureGate=DRAResourceClaimDeviceStatus
-	// +k8s:beta(since: "1.37")=+k8s:listType=map
-	// +k8s:beta(since: "1.37")=+k8s:listMapKey=driver
-	// +k8s:beta(since: "1.37")=+k8s:listMapKey=device
-	// +k8s:beta(since: "1.37")=+k8s:listMapKey=pool
-	// +k8s:beta(since: "1.37")=+k8s:listMapKey=shareID
+	// +k8s:listType=map
+	// +k8s:listMapKey=driver
+	// +k8s:listMapKey=device
+	// +k8s:listMapKey=pool
+	// +k8s:listMapKey=shareID
 	Devices []AllocatedDeviceStatus `json:"devices,omitempty" protobuf:"bytes,4,opt,name=devices"`
 }
 
@@ -2200,8 +2200,8 @@ type DeviceAllocationResult struct {
 	//
 	// +optional
 	// +listType=atomic
-	// +k8s:beta(since: "1.37")=+k8s:optional
-	// +k8s:beta(since: "1.37")=+k8s:maxItems=32
+	// +k8s:optional
+	// +k8s:maxItems=32
 	Results []DeviceRequestAllocationResult `json:"results,omitempty" protobuf:"bytes,1,opt,name=results"`
 
 	// config is a combination of all the claim and class configuration parameters.
@@ -2214,8 +2214,8 @@ type DeviceAllocationResult struct {
 	//
 	// +optional
 	// +listType=atomic
-	// +k8s:beta(since: "1.37")=+k8s:optional
-	// +k8s:beta(since: "1.37")=+k8s:maxItems=64
+	// +k8s:optional
+	// +k8s:maxItems=64
 	Config []DeviceAllocationConfiguration `json:"config,omitempty" protobuf:"bytes,2,opt,name=config"`
 }
 
@@ -2244,9 +2244,9 @@ type DeviceRequestAllocationResult struct {
 	// vendor of the driver. It should use only lower case characters.
 	//
 	// +required
-	// +k8s:beta(since: "1.37")=+k8s:format=k8s-long-name-caseless
-	// +k8s:beta(since: "1.37")=+k8s:maxLength=63
-	// +k8s:beta(since: "1.37")=+k8s:required
+	// +k8s:format=k8s-long-name-caseless
+	// +k8s:maxLength=63
+	// +k8s:required
 	Driver string `json:"driver" protobuf:"bytes,2,name=driver"`
 
 	// pool together with the driver name and the device name field
@@ -2256,8 +2256,8 @@ type DeviceRequestAllocationResult struct {
 	// DNS sub-domains separated by slashes.
 	//
 	// +required
-	// +k8s:beta(since: "1.37")=+k8s:required
-	// +k8s:beta(since: "1.37")=+k8s:format=k8s-resource-pool-name
+	// +k8s:required
+	// +k8s:format=k8s-resource-pool-name
 	Pool string `json:"pool" protobuf:"bytes,3,name=pool"`
 
 	// device references one device instance via its name in the driver's
@@ -2289,7 +2289,7 @@ type DeviceRequestAllocationResult struct {
 	// +optional
 	// +listType=atomic
 	// +featureGate=DRADeviceTaints
-	// +k8s:beta(since: "1.37")=+k8s:optional
+	// +k8s:optional
 	Tolerations []DeviceToleration `json:"tolerations,omitempty" protobuf:"bytes,6,opt,name=tolerations"`
 
 	// bindingConditions contains a copy of the BindingConditions
@@ -2298,8 +2298,8 @@ type DeviceRequestAllocationResult struct {
 	// +optional
 	// +listType=atomic
 	// +featureGate=DRADeviceBindingConditions,DRAResourceClaimDeviceStatus
-	// +k8s:beta(since: "1.37")=+k8s:optional
-	// +k8s:beta(since: "1.37")=+k8s:maxItems=4
+	// +k8s:optional
+	// +k8s:maxItems=4
 	BindingConditions []string `json:"bindingConditions,omitempty" protobuf:"bytes,7,rep,name=bindingConditions"`
 
 	// bindingFailureConditions contains a copy of the BindingFailureConditions
@@ -2308,8 +2308,8 @@ type DeviceRequestAllocationResult struct {
 	// +optional
 	// +listType=atomic
 	// +featureGate=DRADeviceBindingConditions,DRAResourceClaimDeviceStatus
-	// +k8s:beta(since: "1.37")=+k8s:optional
-	// +k8s:beta(since: "1.37")=+k8s:maxItems=4
+	// +k8s:optional
+	// +k8s:maxItems=4
 	BindingFailureConditions []string `json:"bindingFailureConditions,omitempty" protobuf:"bytes,8,rep,name=bindingFailureConditions"`
 
 	// shareID uniquely identifies an individual allocation share of the device,
@@ -2319,8 +2319,8 @@ type DeviceRequestAllocationResult struct {
 	//
 	// +optional
 	// +featureGate=DRAConsumableCapacity
-	// +k8s:beta(since: "1.37")=+k8s:optional
-	// +k8s:beta(since: "1.37")=+k8s:format=k8s-uuid
+	// +k8s:optional
+	// +k8s:format=k8s-uuid
 	ShareID *types.UID `json:"shareID,omitempty" protobuf:"bytes,9,opt,name=shareID"`
 
 	// consumedCapacity tracks the amount of capacity consumed per device as part of the claim request.
@@ -2364,7 +2364,7 @@ type DeviceAllocationConfiguration struct {
 	// or from a claim.
 	//
 	// +required
-	// +k8s:beta(since: "1.37")=+k8s:required
+	// +k8s:required
 	Source AllocationConfigSource `json:"source" protobuf:"bytes,1,name=source"`
 
 	// requests lists the names of requests where the configuration applies.
@@ -2376,17 +2376,17 @@ type DeviceAllocationConfiguration struct {
 	//
 	// +optional
 	// +listType=atomic
-	// +k8s:beta(since: "1.37")=+k8s:optional
+	// +k8s:optional
 	// +k8s:listType=atomic
-	// +k8s:beta(since: "1.37")=+k8s:unique=set
-	// +k8s:beta(since: "1.37")=+k8s:maxItems=32
+	// +k8s:unique=set
+	// +k8s:maxItems=32
 	Requests []string `json:"requests,omitempty" protobuf:"bytes,2,opt,name=requests"`
 
 	DeviceConfiguration `json:"" protobuf:"bytes,3,name=deviceConfiguration"`
 }
 
 // +enum
-// +k8s:beta(since: "1.37")=+k8s:enum
+// +k8s:enum
 type AllocationConfigSource string
 
 // Valid [DeviceAllocationConfiguration.Source] values.
@@ -2628,8 +2628,8 @@ type AllocatedDeviceStatus struct {
 	//
 	// +optional
 	// +featureGate=DRAConsumableCapacity
-	// +k8s:beta(since: "1.37")=+k8s:optional
-	// +k8s:beta(since: "1.37")=+k8s:format=k8s-uuid
+	// +k8s:optional
+	// +k8s:format=k8s-uuid
 	ShareID *string `json:"shareID,omitempty" protobuf:"bytes,7,opt,name=shareID"`
 
 	// Conditions contains the latest observation of the device's state.
@@ -2656,7 +2656,7 @@ type AllocatedDeviceStatus struct {
 	// NetworkData contains network-related information specific to the device.
 	//
 	// +optional
-	// +k8s:beta(since: "1.37")=+k8s:optional
+	// +k8s:optional
 	NetworkData *NetworkDeviceData `json:"networkData,omitempty" protobuf:"bytes,6,opt,name=networkData"`
 }
 
@@ -2671,8 +2671,8 @@ type NetworkDeviceData struct {
 	// Must not be longer than 256 bytes.
 	//
 	// +optional
-	// +k8s:beta(since: "1.37")=+k8s:optional
-	// +k8s:beta(since: "1.37")=+k8s:maxBytes=256
+	// +k8s:optional
+	// +k8s:maxBytes=256
 	InterfaceName string `json:"interfaceName,omitempty" protobuf:"bytes,1,opt,name=interfaceName"`
 
 	// ips lists the network addresses assigned to the device's network interface.
@@ -2683,10 +2683,10 @@ type NetworkDeviceData struct {
 	//
 	// +optional
 	// +listType=atomic
-	// +k8s:beta(since: "1.37")=+k8s:optional
+	// +k8s:optional
 	// +k8s:listType=atomic
-	// +k8s:beta(since: "1.37")=+k8s:unique=set
-	// +k8s:beta(since: "1.37")=+k8s:maxItems=16
+	// +k8s:unique=set
+	// +k8s:maxItems=16
 	IPs []string `json:"ips,omitempty" protobuf:"bytes,2,opt,name=ips"`
 
 	// hardwareAddress represents the hardware address (e.g. MAC Address) of the device's network interface.
@@ -2694,7 +2694,7 @@ type NetworkDeviceData struct {
 	// Must not be longer than 128 bytes.
 	//
 	// +optional
-	// +k8s:beta(since: "1.37")=+k8s:optional
-	// +k8s:beta(since: "1.37")=+k8s:maxBytes=128
+	// +k8s:optional
+	// +k8s:maxBytes=128
 	HardwareAddress string `json:"hardwareAddress,omitempty" protobuf:"bytes,3,opt,name=hardwareAddress"`
 }

@@ -1047,28 +1047,28 @@ func testDeclarativeValidateStatusUpdate(t *testing.T, apiVersion string) {
 			old:    mkValidResourceClaim(),
 			update: mkResourceClaimWithStatus(tweakStatusDeviceRequestAllocationResultDriver("")),
 			expectedErrs: field.ErrorList{
-				field.Required(driverPath, "").MarkBeta(),
+				field.Required(driverPath, ""),
 			},
 		},
 		"invalid driver name, too long - 64 characters": {
 			old:    mkValidResourceClaim(),
 			update: mkResourceClaimWithStatus(tweakStatusDeviceRequestAllocationResultDriver(strings.Repeat("a", 64))),
 			expectedErrs: field.ErrorList{
-				field.TooLong(driverPath, "", 63).MarkBeta().WithOrigin("maxLength"),
+				field.TooLong(driverPath, "", 63).WithOrigin("maxLength"),
 			},
 		},
 		"invalid driver name, invalid character": {
 			old:    mkValidResourceClaim(),
 			update: mkResourceClaimWithStatus(tweakStatusDeviceRequestAllocationResultDriver("dra_example.com")),
 			expectedErrs: field.ErrorList{
-				field.Invalid(driverPath, "dra_example.com", "").WithOrigin("format=k8s-long-name-caseless").MarkBeta(),
+				field.Invalid(driverPath, "dra_example.com", "").WithOrigin("format=k8s-long-name-caseless"),
 			},
 		},
 		"invalid driver name, invalid DNS name (leading dot)": {
 			old:    mkValidResourceClaim(),
 			update: mkResourceClaimWithStatus(tweakStatusDeviceRequestAllocationResultDriver(".example.com")),
 			expectedErrs: field.ErrorList{
-				field.Invalid(driverPath, ".example.com", "").WithOrigin("format=k8s-long-name-caseless").MarkBeta(),
+				field.Invalid(driverPath, ".example.com", "").WithOrigin("format=k8s-long-name-caseless"),
 			},
 		},
 		// .Status.Allocation.Devices.Results[%d].Pool
@@ -1084,42 +1084,42 @@ func testDeclarativeValidateStatusUpdate(t *testing.T, apiVersion string) {
 			old:    mkValidResourceClaim(),
 			update: mkResourceClaimWithStatus(tweakStatusDeviceRequestAllocationResultPool("")),
 			expectedErrs: field.ErrorList{
-				field.Required(poolPath, "").MarkBeta(),
+				field.Required(poolPath, ""),
 			},
 		},
 		"invalid pool name, too long": {
 			old:    mkValidResourceClaim(),
 			update: mkResourceClaimWithStatus(tweakStatusDeviceRequestAllocationResultPool(strings.Repeat("a", 253) + "/" + strings.Repeat("a", 253))),
 			expectedErrs: field.ErrorList{
-				field.TooLong(poolPath, "", 253).WithOrigin("format=k8s-resource-pool-name").MarkBeta(),
+				field.TooLong(poolPath, "", 253).WithOrigin("format=k8s-resource-pool-name"),
 			},
 		},
 		"invalid pool name, format": {
 			old:    mkValidResourceClaim(),
 			update: mkResourceClaimWithStatus(tweakStatusDeviceRequestAllocationResultPool("a/Not_Valid")),
 			expectedErrs: field.ErrorList{
-				field.Invalid(poolPath, "Not_Valid", "").WithOrigin("format=k8s-resource-pool-name").MarkBeta(),
+				field.Invalid(poolPath, "Not_Valid", "").WithOrigin("format=k8s-resource-pool-name"),
 			},
 		},
 		"invalid pool name, leading slash": {
 			old:    mkValidResourceClaim(),
 			update: mkResourceClaimWithStatus(tweakStatusDeviceRequestAllocationResultPool("/a")),
 			expectedErrs: field.ErrorList{
-				field.Invalid(poolPath, "", "").WithOrigin("format=k8s-resource-pool-name").MarkBeta(),
+				field.Invalid(poolPath, "", "").WithOrigin("format=k8s-resource-pool-name"),
 			},
 		},
 		"invalid pool name, trailing slash": {
 			old:    mkValidResourceClaim(),
 			update: mkResourceClaimWithStatus(tweakStatusDeviceRequestAllocationResultPool("a/")),
 			expectedErrs: field.ErrorList{
-				field.Invalid(poolPath, "", "").WithOrigin("format=k8s-resource-pool-name").MarkBeta(),
+				field.Invalid(poolPath, "", "").WithOrigin("format=k8s-resource-pool-name"),
 			},
 		},
 		"invalid pool name, double slash": {
 			old:    mkValidResourceClaim(),
 			update: mkResourceClaimWithStatus(tweakStatusDeviceRequestAllocationResultPool("a//b")),
 			expectedErrs: field.ErrorList{
-				field.Invalid(poolPath, "", "").WithOrigin("format=k8s-resource-pool-name").MarkBeta(),
+				field.Invalid(poolPath, "", "").WithOrigin("format=k8s-resource-pool-name"),
 			},
 		},
 		// .Status.Allocation.Devices.Results[%d].ShareID
@@ -1131,14 +1131,14 @@ func testDeclarativeValidateStatusUpdate(t *testing.T, apiVersion string) {
 			old:    mkValidResourceClaim(),
 			update: mkResourceClaimWithStatus(tweakStatusDeviceRequestAllocationResultShareID("invalid-uid")),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("status", "allocation", "devices", "results").Index(0).Child("shareID"), "invalid-uid", "").WithOrigin("format=k8s-uuid").MarkBeta(),
+				field.Invalid(field.NewPath("status", "allocation", "devices", "results").Index(0).Child("shareID"), "invalid-uid", "").WithOrigin("format=k8s-uuid"),
 			},
 		},
 		"invalid uppercase status.Allocation.Devices.Results[].ShareID ": {
 			old:    mkValidResourceClaim(),
 			update: mkResourceClaimWithStatus(tweakStatusDeviceRequestAllocationResultShareID("123e4567-E89b-12d3-A456-426614174000")),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("status", "allocation", "devices", "results").Index(0).Child("shareID"), "invalid-uid", "").WithOrigin("format=k8s-uuid").MarkBeta(),
+				field.Invalid(field.NewPath("status", "allocation", "devices", "results").Index(0).Child("shareID"), "invalid-uid", "").WithOrigin("format=k8s-uuid"),
 			},
 		},
 		// .Status.Devices[%d].ShareID
@@ -1158,8 +1158,8 @@ func testDeclarativeValidateStatusUpdate(t *testing.T, apiVersion string) {
 				tweakStatusAllocatedDeviceStatusShareID("invalid-uid"),
 			),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("status", "allocation", "devices", "results").Index(0).Child("shareID"), "invalid-uid", "must be a lowercase UUID in 8-4-4-4-12 format").WithOrigin("format=k8s-uuid").MarkBeta(),
-				field.Invalid(field.NewPath("status", "devices").Index(0).Child("shareID"), "invalid-uid", "must be a lowercase UUID in 8-4-4-4-12 format").WithOrigin("format=k8s-uuid").MarkBeta(),
+				field.Invalid(field.NewPath("status", "allocation", "devices", "results").Index(0).Child("shareID"), "invalid-uid", "must be a lowercase UUID in 8-4-4-4-12 format").WithOrigin("format=k8s-uuid"),
+				field.Invalid(field.NewPath("status", "devices").Index(0).Child("shareID"), "invalid-uid", "must be a lowercase UUID in 8-4-4-4-12 format").WithOrigin("format=k8s-uuid"),
 			},
 		},
 		"invalid upper case status.Devices[].ShareID": {
@@ -1170,8 +1170,8 @@ func testDeclarativeValidateStatusUpdate(t *testing.T, apiVersion string) {
 				tweakStatusAllocatedDeviceStatusShareID("123e4567-E89b-12d3-A456-426614174000"),
 			),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("status", "allocation", "devices", "results").Index(0).Child("shareID"), "invalid-uid", "must be a lowercase UUID in 8-4-4-4-12 format").WithOrigin("format=k8s-uuid").MarkBeta(),
-				field.Invalid(field.NewPath("status", "devices").Index(0).Child("shareID"), "invalid-uid", "must be a lowercase UUID in 8-4-4-4-12 format").WithOrigin("format=k8s-uuid").MarkBeta(),
+				field.Invalid(field.NewPath("status", "allocation", "devices", "results").Index(0).Child("shareID"), "invalid-uid", "must be a lowercase UUID in 8-4-4-4-12 format").WithOrigin("format=k8s-uuid"),
+				field.Invalid(field.NewPath("status", "devices").Index(0).Child("shareID"), "invalid-uid", "must be a lowercase UUID in 8-4-4-4-12 format").WithOrigin("format=k8s-uuid"),
 			},
 		},
 		// UID in status.ReservedFor
@@ -1184,7 +1184,7 @@ func testDeclarativeValidateStatusUpdate(t *testing.T, apiVersion string) {
 					resourceClaimReference(validUUID),
 				)),
 			expectedErrs: field.ErrorList{
-				field.Duplicate(field.NewPath("status", "reservedFor").Index(2), "").MarkBeta(),
+				field.Duplicate(field.NewPath("status", "reservedFor").Index(2), ""),
 			},
 		},
 		"multiple- duplicate uid in status.ReservedFor": {
@@ -1198,8 +1198,8 @@ func testDeclarativeValidateStatusUpdate(t *testing.T, apiVersion string) {
 				resourceClaimReference(uuid.New().String()),
 			)),
 			expectedErrs: field.ErrorList{
-				field.Duplicate(field.NewPath("status", "reservedFor").Index(2), "").MarkBeta(),
-				field.Duplicate(field.NewPath("status", "reservedFor").Index(4), "").MarkBeta(),
+				field.Duplicate(field.NewPath("status", "reservedFor").Index(2), ""),
+				field.Duplicate(field.NewPath("status", "reservedFor").Index(4), ""),
 			},
 		},
 		"invalid status.ReservedFor, too many": {
@@ -1208,7 +1208,7 @@ func testDeclarativeValidateStatusUpdate(t *testing.T, apiVersion string) {
 				tweakStatusReservedFor(generateResourceClaimReferences(257)...),
 			),
 			expectedErrs: field.ErrorList{
-				field.TooMany(field.NewPath("status", "reservedFor"), 257, 256).WithOrigin("maxItems").MarkBeta(),
+				field.TooMany(field.NewPath("status", "reservedFor"), 257, 256).WithOrigin("maxItems"),
 			},
 		},
 		"valid status.ReservedFor, max items": {
@@ -1265,35 +1265,35 @@ func testDeclarativeValidateStatusUpdate(t *testing.T, apiVersion string) {
 			old:    mkResourceClaimWithStatus(),
 			update: tweakStatusAllocationDevice(mkResourceClaimWithStatus(), "device-different"),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("status", "allocation"), nil, "field is immutable").WithOrigin("update").MarkBeta(),
+				field.Invalid(field.NewPath("status", "allocation"), nil, "field is immutable").WithOrigin("update"),
 			},
 		},
 		"invalid status.allocation changed driver (NoModify)": {
 			old:    mkResourceClaimWithStatus(),
 			update: tweakStatusAllocationDriver(mkResourceClaimWithStatus(), "different.example.com"),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("status", "allocation"), nil, "field is immutable").WithOrigin("update").MarkBeta(),
+				field.Invalid(field.NewPath("status", "allocation"), nil, "field is immutable").WithOrigin("update"),
 			},
 		},
 		"invalid status.allocation changed pool (NoModify)": {
 			old:    mkResourceClaimWithStatus(),
 			update: tweakStatusAllocationPool(mkResourceClaimWithStatus(), "different-pool"),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("status", "allocation"), nil, "field is immutable").WithOrigin("update").MarkBeta(),
+				field.Invalid(field.NewPath("status", "allocation"), nil, "field is immutable").WithOrigin("update"),
 			},
 		},
 		"invalid status.allocation added result (NoModify)": {
 			old:    mkResourceClaimWithStatus(),
 			update: addStatusAllocationResult(mkResourceClaimWithStatus()),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("status", "allocation"), nil, "field is immutable").WithOrigin("update").MarkBeta(),
+				field.Invalid(field.NewPath("status", "allocation"), nil, "field is immutable").WithOrigin("update"),
 			},
 		},
 		"invalid status.allocation removed result (NoModify)": {
 			old:    addStatusAllocationResult(mkResourceClaimWithStatus()),
 			update: mkResourceClaimWithStatus(),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("status", "allocation"), nil, "field is immutable").WithOrigin("update").MarkBeta(),
+				field.Invalid(field.NewPath("status", "allocation"), nil, "field is immutable").WithOrigin("update"),
 			},
 		},
 		"invalid status.allocation.devices.results, too many": {
@@ -1302,7 +1302,7 @@ func testDeclarativeValidateStatusUpdate(t *testing.T, apiVersion string) {
 				tweakStatusAllocationDevicesResults(33),
 			),
 			expectedErrs: field.ErrorList{
-				field.TooMany(field.NewPath("status", "allocation", "devices", "results"), 33, 32).WithOrigin("maxItems").MarkBeta(),
+				field.TooMany(field.NewPath("status", "allocation", "devices", "results"), 33, 32).WithOrigin("maxItems"),
 			},
 		},
 		"valid status.allocation.devices.config, max items": {
@@ -1317,7 +1317,7 @@ func testDeclarativeValidateStatusUpdate(t *testing.T, apiVersion string) {
 				tweakStatusAllocationDevicesConfig(65),
 			),
 			expectedErrs: field.ErrorList{
-				field.TooMany(field.NewPath("status", "allocation", "devices", "config"), 33, 32).WithOrigin("maxItems").MarkBeta(),
+				field.TooMany(field.NewPath("status", "allocation", "devices", "config"), 65, 64).WithOrigin("maxItems"),
 			},
 		},
 		"invalid status.allocation.devices.config requests, duplicate": {
@@ -1326,7 +1326,7 @@ func testDeclarativeValidateStatusUpdate(t *testing.T, apiVersion string) {
 				tweakAddStatusAllocationConfigRequest("req-0"),
 			),
 			expectedErrs: field.ErrorList{
-				field.Duplicate(field.NewPath("status", "allocation", "devices", "config").Index(0).Child("requests").Index(1), "req-0").MarkBeta(),
+				field.Duplicate(field.NewPath("status", "allocation", "devices", "config").Index(0).Child("requests").Index(1), "req-0"),
 			},
 		},
 		// .Status.Allocation.Devices.Config[%d].Source
@@ -1342,14 +1342,14 @@ func testDeclarativeValidateStatusUpdate(t *testing.T, apiVersion string) {
 			old:    mkValidResourceClaim(),
 			update: mkResourceClaimWithStatus(tweakStatusAllocationConfigSource("")),
 			expectedErrs: field.ErrorList{
-				field.Required(configSourcePath, "").MarkCoveredByDeclarative().MarkBeta(),
+				field.Required(configSourcePath, "").MarkCoveredByDeclarative(),
 			},
 		},
 		"invalid status.allocation.devices.config source invalid": {
 			old:    mkValidResourceClaim(),
 			update: mkResourceClaimWithStatus(tweakStatusAllocationConfigSource("invalid")),
 			expectedErrs: field.ErrorList{
-				field.NotSupported(configSourcePath, resource.AllocationConfigSource("invalid"), []string{string(resource.AllocationConfigSourceClaim), string(resource.AllocationConfigSourceClass)}).MarkCoveredByDeclarative().MarkBeta(),
+				field.NotSupported(configSourcePath, resource.AllocationConfigSource("invalid"), []string{string(resource.AllocationConfigSourceClaim), string(resource.AllocationConfigSourceClass)}).MarkCoveredByDeclarative(),
 			},
 		},
 		// .Status.Allocation.Devices.Config[%d].Opaque.Driver
@@ -1491,7 +1491,7 @@ func testDeclarativeValidateStatusUpdate(t *testing.T, apiVersion string) {
 				),
 			),
 			expectedErrs: field.ErrorList{
-				field.Duplicate(field.NewPath("status", "devices").Index(1), "driver1/pool1/device1").MarkBeta(),
+				field.Duplicate(field.NewPath("status", "devices").Index(1), "driver1/pool1/device1"),
 			},
 		},
 		"invalid devices, duplicate with share ID": {
@@ -1506,7 +1506,7 @@ func testDeclarativeValidateStatusUpdate(t *testing.T, apiVersion string) {
 				),
 			),
 			expectedErrs: field.ErrorList{
-				field.Duplicate(field.NewPath("status", "devices").Index(1), "driver1/pool1/device1").MarkBeta(),
+				field.Duplicate(field.NewPath("status", "devices").Index(1), "driver1/pool1/device1"),
 			},
 		},
 		// .Status.Allocation.Devices.Results[%d].BindingConditions
@@ -1524,7 +1524,7 @@ func testDeclarativeValidateStatusUpdate(t *testing.T, apiVersion string) {
 				tweakStatusBindingFailureConditions(1),
 			),
 			expectedErrs: field.ErrorList{
-				field.TooMany(field.NewPath("status", "allocation", "devices", "results").Index(0).Child("bindingConditions"), resource.BindingConditionsMaxSize+1, resource.BindingConditionsMaxSize).WithOrigin("maxItems").MarkBeta(),
+				field.TooMany(field.NewPath("status", "allocation", "devices", "results").Index(0).Child("bindingConditions"), resource.BindingConditionsMaxSize+1, resource.BindingConditionsMaxSize).WithOrigin("maxItems"),
 			},
 		},
 		"valid binding failure conditions, max items": {
@@ -1541,7 +1541,7 @@ func testDeclarativeValidateStatusUpdate(t *testing.T, apiVersion string) {
 				tweakStatusBindingFailureConditions(resource.BindingFailureConditionsMaxSize+1),
 			),
 			expectedErrs: field.ErrorList{
-				field.TooMany(field.NewPath("status", "allocation", "devices", "results").Index(0).Child("bindingFailureConditions"), resource.BindingFailureConditionsMaxSize+1, resource.BindingFailureConditionsMaxSize).WithOrigin("maxItems").MarkBeta(),
+				field.TooMany(field.NewPath("status", "allocation", "devices", "results").Index(0).Child("bindingFailureConditions"), resource.BindingFailureConditionsMaxSize+1, resource.BindingFailureConditionsMaxSize).WithOrigin("maxItems"),
 			},
 		},
 		// .Status.Devices[%d].NetworkData.InterfaceName
@@ -1590,7 +1590,7 @@ func testDeclarativeValidateStatusUpdate(t *testing.T, apiVersion string) {
 				),
 			),
 			expectedErrs: field.ErrorList{
-				field.TooLong(field.NewPath("status", "devices").Index(0).Child("networkData", "interfaceName"), "", resource.NetworkDeviceDataInterfaceNameMaxLength).MarkCoveredByDeclarative().WithOrigin("maxBytes").MarkBeta(),
+				field.TooLong(field.NewPath("status", "devices").Index(0).Child("networkData", "interfaceName"), "", resource.NetworkDeviceDataInterfaceNameMaxLength).MarkCoveredByDeclarative().WithOrigin("maxBytes"),
 			},
 		},
 		"invalid networkdevicedata interfacename too long with multi-byte characters repeating max bytes length times": {
@@ -1611,7 +1611,7 @@ func testDeclarativeValidateStatusUpdate(t *testing.T, apiVersion string) {
 				),
 			),
 			expectedErrs: field.ErrorList{
-				field.TooLong(field.NewPath("status", "devices").Index(0).Child("networkData", "interfaceName"), "", resource.NetworkDeviceDataInterfaceNameMaxLength).MarkCoveredByDeclarative().WithOrigin("maxBytes").MarkBeta(),
+				field.TooLong(field.NewPath("status", "devices").Index(0).Child("networkData", "interfaceName"), "", resource.NetworkDeviceDataInterfaceNameMaxLength).MarkCoveredByDeclarative().WithOrigin("maxBytes"),
 			},
 		},
 		"valid status.devices.networkData.hardwareAddress": {
@@ -1659,7 +1659,7 @@ func testDeclarativeValidateStatusUpdate(t *testing.T, apiVersion string) {
 				),
 			),
 			expectedErrs: field.ErrorList{
-				field.TooLong(field.NewPath("status", "devices").Index(0).Child("networkData", "hardwareAddress"), "", resource.NetworkDeviceDataHardwareAddressMaxLength).MarkCoveredByDeclarative().WithOrigin("maxBytes").MarkBeta(),
+				field.TooLong(field.NewPath("status", "devices").Index(0).Child("networkData", "hardwareAddress"), "", resource.NetworkDeviceDataHardwareAddressMaxLength).MarkCoveredByDeclarative().WithOrigin("maxBytes"),
 			},
 		},
 		"invalid status.devices.networkData.hardwareAddress too long with multi-byte characters repeating max bytes length times": {
@@ -1680,7 +1680,7 @@ func testDeclarativeValidateStatusUpdate(t *testing.T, apiVersion string) {
 				),
 			),
 			expectedErrs: field.ErrorList{
-				field.TooLong(field.NewPath("status", "devices").Index(0).Child("networkData", "hardwareAddress"), "", resource.NetworkDeviceDataHardwareAddressMaxLength).MarkCoveredByDeclarative().WithOrigin("maxBytes").MarkBeta(),
+				field.TooLong(field.NewPath("status", "devices").Index(0).Child("networkData", "hardwareAddress"), "", resource.NetworkDeviceDataHardwareAddressMaxLength).MarkCoveredByDeclarative().WithOrigin("maxBytes"),
 			},
 		},
 		"invalid status.devices.networkData.ips duplicate": {
@@ -1698,7 +1698,7 @@ func testDeclarativeValidateStatusUpdate(t *testing.T, apiVersion string) {
 				),
 			),
 			expectedErrs: field.ErrorList{
-				field.Duplicate(field.NewPath("status", "devices").Index(0).Child("networkData", "ips").Index(1), "1.2.3.4/32").MarkBeta(),
+				field.Duplicate(field.NewPath("status", "devices").Index(0).Child("networkData", "ips").Index(1), "1.2.3.4/32"),
 			},
 		},
 		"invalid status.allocation.devices.config.requests too many": {
@@ -1707,7 +1707,7 @@ func testDeclarativeValidateStatusUpdate(t *testing.T, apiVersion string) {
 				tweakStatusAllocationConfigRequests(33),
 			),
 			expectedErrs: field.ErrorList{
-				field.TooMany(field.NewPath("status", "allocation", "devices", "config").Index(0).Child("requests"), 33, 32).WithOrigin("maxItems").MarkBeta(),
+				field.TooMany(field.NewPath("status", "allocation", "devices", "config").Index(0).Child("requests"), 33, 32).WithOrigin("maxItems"),
 			},
 		},
 		"valid status.allocation.devices.config.requests, max allowed": {
@@ -1722,7 +1722,7 @@ func testDeclarativeValidateStatusUpdate(t *testing.T, apiVersion string) {
 				tweakStatusDevicesTooManyIPs(17),
 			),
 			expectedErrs: field.ErrorList{
-				field.TooMany(field.NewPath("status", "devices").Index(0).Child("networkData", "ips"), 17, 16).WithOrigin("maxItems").MarkBeta(),
+				field.TooMany(field.NewPath("status", "devices").Index(0).Child("networkData", "ips"), 17, 16).WithOrigin("maxItems"),
 			},
 		},
 		"invalid status.devices.networkData.ips, max allowed": {
