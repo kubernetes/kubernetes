@@ -9390,6 +9390,226 @@ func TestAllocator(t *testing.T,
 			expectWithFeatures: expectDistinctAttributeWithLists,
 		},
 
+		// A derived attribute can evaluate to a list, so both constraints must
+		// compare the results of request-scoped CEL expressions as sets.
+		"list-attributes-match-constraint-on-derived-list-values-with-common-elements": {
+			features: Features{
+				ListTypeAttributes: true,
+				DerivedAttributes:  true,
+			},
+			claimsToAllocate: objects(claimWithRequests(
+				claim0,
+				[]resourceapi.DeviceConstraint{
+					{
+						Requests:       []string{req0, req1},
+						MatchAttribute: ptr.To(resourceapi.FullyQualifiedName("derived/tags")),
+					},
+				},
+				requestWithDerivedAttributes(req0, classA, 1,
+					[]resourceapi.DeviceDerivedAttribute{{
+						Name:       "derived/tags",
+						Expression: fmt.Sprintf(`device.attributes["%s"]["tags"]`, driverA),
+					}},
+				),
+				requestWithDerivedAttributes(req1, classB, 1,
+					[]resourceapi.DeviceDerivedAttribute{{
+						Name:       "derived/tags",
+						Expression: fmt.Sprintf(`device.attributes["%s"]["labels"]`, driverB),
+					}},
+				),
+			)),
+			classes: objects(class(classA, driverA), class(classB, driverB)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, pool1, driverA,
+					device(device1).withAttribute("tags", []string{"x", "y"}),
+				),
+				sliceWithDevices(slice2, node1, pool2, driverB,
+					device(device2).withAttribute("labels", []string{"y", "z"}),
+				),
+			),
+			node: node(node1, region1),
+
+			expectResults: []any{matchAllocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device1, false),
+				deviceAllocationResult(req1, driverB, pool2, device2, false),
+			)},
+			expectWithFeatures: expectDerivedAttributeWithLists,
+		},
+		"list-attributes-match-constraint-on-derived-list-values-without-common-elements": {
+			features: Features{
+				ListTypeAttributes: true,
+				DerivedAttributes:  true,
+			},
+			claimsToAllocate: objects(claimWithRequests(
+				claim0,
+				[]resourceapi.DeviceConstraint{
+					{
+						Requests:       []string{req0, req1},
+						MatchAttribute: ptr.To(resourceapi.FullyQualifiedName("derived/tags")),
+					},
+				},
+				requestWithDerivedAttributes(req0, classA, 1,
+					[]resourceapi.DeviceDerivedAttribute{{
+						Name:       "derived/tags",
+						Expression: fmt.Sprintf(`device.attributes["%s"]["tags"]`, driverA),
+					}},
+				),
+				requestWithDerivedAttributes(req1, classB, 1,
+					[]resourceapi.DeviceDerivedAttribute{{
+						Name:       "derived/tags",
+						Expression: fmt.Sprintf(`device.attributes["%s"]["labels"]`, driverB),
+					}},
+				),
+			)),
+			classes: objects(class(classA, driverA), class(classB, driverB)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, pool1, driverA,
+					device(device1).withAttribute("tags", []string{"x", "y"}),
+				),
+				sliceWithDevices(slice2, node1, pool2, driverB,
+					device(device2).withAttribute("labels", []string{"z"}),
+				),
+			),
+			node: node(node1, region1),
+
+			expectResults:      nil,
+			expectWithFeatures: expectDerivedAttributeWithLists,
+		},
+
+		"list-attributes-distinct-constraint-on-derived-list-values-with-common-elements": {
+			features: Features{
+				ListTypeAttributes: true,
+				DerivedAttributes:  true,
+				ConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(claimWithRequests(
+				claim0,
+				[]resourceapi.DeviceConstraint{
+					{
+						Requests:          []string{req0, req1},
+						DistinctAttribute: new(resourceapi.FullyQualifiedName("derived/tags")),
+					},
+				},
+				requestWithDerivedAttributes(req0, classA, 1,
+					[]resourceapi.DeviceDerivedAttribute{{
+						Name:       "derived/tags",
+						Expression: fmt.Sprintf(`device.attributes["%s"]["tags"]`, driverA),
+					}},
+				),
+				requestWithDerivedAttributes(req1, classB, 1,
+					[]resourceapi.DeviceDerivedAttribute{{
+						Name:       "derived/tags",
+						Expression: fmt.Sprintf(`device.attributes["%s"]["labels"]`, driverB),
+					}},
+				),
+			)),
+			classes: objects(class(classA, driverA), class(classB, driverB)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, pool1, driverA,
+					device(device1).withAttribute("tags", []string{"x", "y"}),
+				),
+				sliceWithDevices(slice2, node1, pool2, driverB,
+					device(device2).withAttribute("labels", []string{"y", "z"}),
+				),
+			),
+			node: node(node1, region1),
+
+			expectResults:      nil,
+			expectWithFeatures: expectDistinctDerivedAttributeWithLists,
+		},
+		"list-attributes-distinct-constraint-on-derived-list-values-without-common-elements": {
+			features: Features{
+				ListTypeAttributes: true,
+				DerivedAttributes:  true,
+				ConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(claimWithRequests(
+				claim0,
+				[]resourceapi.DeviceConstraint{
+					{
+						Requests:          []string{req0, req1},
+						DistinctAttribute: new(resourceapi.FullyQualifiedName("derived/tags")),
+					},
+				},
+				requestWithDerivedAttributes(req0, classA, 1,
+					[]resourceapi.DeviceDerivedAttribute{{
+						Name:       "derived/tags",
+						Expression: fmt.Sprintf(`device.attributes["%s"]["tags"]`, driverA),
+					}},
+				),
+				requestWithDerivedAttributes(req1, classB, 1,
+					[]resourceapi.DeviceDerivedAttribute{{
+						Name:       "derived/tags",
+						Expression: fmt.Sprintf(`device.attributes["%s"]["labels"]`, driverB),
+					}},
+				),
+			)),
+			classes: objects(class(classA, driverA), class(classB, driverB)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, pool1, driverA,
+					device(device1).withAttribute("tags", []string{"x", "y"}),
+				),
+				sliceWithDevices(slice2, node1, pool2, driverB,
+					device(device2).withAttribute("labels", []string{"z"}),
+				),
+			),
+			node: node(node1, region1),
+
+			expectResults: []any{matchAllocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device1, false),
+				deviceAllocationResult(req1, driverB, pool2, device2, false),
+			)},
+			expectWithFeatures: expectDistinctDerivedAttributeWithLists,
+		},
+		"list-attributes-distinct-constraint-on-derived-list-values-backtracking": {
+			features: Features{
+				ListTypeAttributes: true,
+				DerivedAttributes:  true,
+				ConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(claimWithRequests(
+				claim0,
+				[]resourceapi.DeviceConstraint{
+					{
+						Requests:          []string{req0, req1},
+						DistinctAttribute: new(resourceapi.FullyQualifiedName("derived/tags")),
+					},
+				},
+				requestWithDerivedAttributes(req0, classA, 1,
+					[]resourceapi.DeviceDerivedAttribute{{
+						Name:       "derived/tags",
+						Expression: fmt.Sprintf(`device.attributes["%s"]["tags"]`, driverA),
+					}},
+				),
+				requestWithDerivedAttributes(req1, classB, 1,
+					[]resourceapi.DeviceDerivedAttribute{{
+						Name:       "derived/tags",
+						Expression: fmt.Sprintf(`device.attributes["%s"]["labels"]`, driverB),
+					}},
+				),
+			)),
+			classes: objects(class(classA, driverA), class(classB, driverB)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, pool1, driverA,
+					device(device1).withAttribute("tags", []string{"x", "y"}),
+					device(device2).withAttribute("tags", []string{"w"}),
+				),
+				sliceWithDevices(slice2, node1, pool2, driverB,
+					device(device3).withAttribute("labels", []string{"y", "z"}),
+				),
+			),
+			node: node(node1, region1),
+
+			expectResults: []any{matchAllocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device2, false),
+				deviceAllocationResult(req1, driverB, pool2, device3, false),
+			)},
+			expectWithFeatures: expectDistinctDerivedAttributeWithLists,
+		},
+
 		"allocation-mode-all-with-multi-host-resource-pool": {
 			claimsToAllocate: objects(claimWithRequests(claim0, nil, resourceapi.DeviceRequest{
 				Name: req0,
@@ -10924,6 +11144,24 @@ func expectDistinctAttributeWithLists(expectResults []any, expectError types.Gom
 		return nil, g.MatchError(g.ContainSubstring("unsupported attribute value")), nil
 	}
 	return expectResults, expectError, expectErrorIs
+}
+
+func expectDerivedAttributeWithLists(expectResults []any, expectError types.GomegaMatcher, expectErrorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+	switch {
+	case !features.DerivedAttributes:
+		return nil, g.MatchError(g.ContainSubstring("cannot handle request with derived attributes, the feature is disabled")), nil
+	case !features.ListTypeAttributes:
+		return nil, g.MatchError(g.ContainSubstring("unsupported attribute value")), nil
+	}
+	return expectResults, expectError, expectErrorIs
+}
+
+func expectDistinctDerivedAttributeWithLists(expectResults []any, expectError types.GomegaMatcher, expectErrorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+	// Requests are validated before constraints, so this error takes precedence.
+	if !features.DerivedAttributes {
+		return expectDerivedAttributeWithLists(expectResults, expectError, expectErrorIs, features)
+	}
+	return expectDistinctAttributeWithLists(expectResults, expectError, expectErrorIs, features)
 }
 
 // expectAdminAccessThenCapacityRequestWithCounters covers test cases where an admin access claim
