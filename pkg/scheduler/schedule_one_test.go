@@ -5645,7 +5645,12 @@ func setupTestSchedulerWithVolumeBinding(ctx context.Context, t *testing.T, clie
 		tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 		tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 		tf.RegisterPluginAsExtensions(volumebinding.Name, func(ctx context.Context, plArgs runtime.Object, handle fwk.Handle) (fwk.Plugin, error) {
-			return &volumebinding.VolumeBinding{Binder: volumeBinder, PVCLister: pvcInformer.Lister()}, nil
+			plugin, err := volumebinding.New(ctx, &schedulerapi.VolumeBindingArgs{BindTimeoutSeconds: 300}, handle, feature.Features{})
+			if err != nil {
+				return nil, err
+			}
+			plugin.(*volumebinding.VolumeBinding).Binder = volumeBinder
+			return plugin, nil
 		}, "PreFilter", "Filter", "Reserve", "PreBind"),
 	}
 	s, errChan := setupTestScheduler(ctx, t, client, queuedPodStore, scache, apiDispatcher, informerFactory, broadcaster, fns...)

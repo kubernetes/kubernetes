@@ -84,9 +84,8 @@ func (bp *podInPreBind) CancelPod(message string) bool {
 	return true
 }
 
-// MarkPrebound marks the pod as finished with preBind phase
-// of binding cycle, making it impossible to cancel
-// the binding cycle for it.
+// MarkPrebound prevents canceling the binding cycle, either after PreBind has
+// finished or before a plugin makes changes that cannot be reverted by Unreserve.
 func (bp *podInPreBind) MarkPrebound() bool {
 	bp.mu.Lock()
 	defer bp.mu.Unlock()

@@ -385,7 +385,8 @@ type PodInPreBind interface {
 	CancelPod(reason string) bool
 
 	// MarkPrebound marks the pod as prebound, making it impossible to cancel the context of binding cycle
-	// via PodInPreBind
+	// via PodInPreBind. PreBind plugins must call this before making changes that
+	// cannot be reverted by Unreserve, and stop if it returns false.
 	// Returns false if the context was already canceled.
 	MarkPrebound() bool
 }
