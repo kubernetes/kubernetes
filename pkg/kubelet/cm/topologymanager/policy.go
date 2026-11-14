@@ -117,12 +117,9 @@ func (m HintMerger) aggregateHintScores(permutation []TopologyHint) (int64, bool
 }
 
 // Merge a TopologyHints permutation to a single hint by performing a bitwise-AND
-// of their affinity masks. The hint shall be preferred if all hits in the permutation
-// are preferred.
-//
-// The permutation must be one produced from m.Hints, since the score
-// aggregation reads the resource of its i-th element from m.Hints[i].
-func (m HintMerger) mergePermutation(logger klog.Logger, defaultAffinity bitmask.BitMask, permutation []TopologyHint) TopologyHint {
+// of their affinity masks. The merged hint is preferred if all hints are
+// preferred and all non-nil affinity masks are equal.
+func mergePermutation(logger klog.Logger, defaultAffinity bitmask.BitMask, permutation []TopologyHint) TopologyHint {
 	// Get the NUMANodeAffinity from each hint in the permutation and see if any
 	// of them encode unpreferred allocations.
 	preferred := true
