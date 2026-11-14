@@ -450,9 +450,14 @@ func (ssc *defaultStatefulSetControl) processReplica(ctx context.Context, set *a
 			// if the set does not allow bursting, return immediately
 			return true, nil
 		}
+		// The Pod was just built from the set, so identity and storage match, and
+		// CreateStatefulPod has written its claims; see UpdateStatefulPod for why they
+		// are not re-checked in this sync.
+		return false, nil
 	}
 
 	// If the Pod is in pending state then trigger PVC creation to create missing PVCs
+	claimsReconciled := false
 	if isPending(replicas[i]) {
 		logger.V(4).Info(
 			"StatefulSet is triggering PVC creation for pending Pod",
@@ -460,6 +465,7 @@ func (ssc *defaultStatefulSetControl) processReplica(ctx context.Context, set *a
 		if err := ssc.podControl.createMissingPersistentVolumeClaims(ctx, set, replicas[i]); err != nil {
 			return true, err
 		}
+		claimsReconciled = true
 	}
 
 	// If we find a Pod that is currently terminating, we must wait until graceful deletion
@@ -489,10 +495,15 @@ func (ssc *defaultStatefulSetControl) processReplica(ctx context.Context, set *a
 	}
 
 	// Enforce the StatefulSet invariants
-	retentionMatch, err := ssc.podControl.ClaimsMatchRetentionPolicy(ctx, updateSet, replicas[i])
-	// An error is expected if the pod is not yet fully updated, and so return is treated as matching.
-	if err != nil {
-		retentionMatch = true
+	retentionMatch := true
+	// Claims written above are not re-checked in this sync; see UpdateStatefulPod.
+	if !claimsReconciled {
+		var err error
+		retentionMatch, err = ssc.podControl.ClaimsMatchRetentionPolicy(ctx, updateSet, replicas[i])
+		// An error is expected if the pod is not yet fully updated, and so return is treated as matching.
+		if err != nil {
+			retentionMatch = true
+		}
 	}
 
 	if identityMatches(set, replicas[i]) && storageMatches(set, replicas[i]) && retentionMatch {
@@ -501,7 +512,7 @@ func (ssc *defaultStatefulSetControl) processReplica(ctx context.Context, set *a
 
 	// Make a deep copy so we don't mutate the shared cache
 	replica := replicas[i].DeepCopy()
-	if err := ssc.podControl.UpdateStatefulPod(ctx, updateSet, replica); err != nil {
+	if err := ssc.podControl.UpdateStatefulPod(ctx, updateSet, replica, claimsReconciled); err != nil {
 		return true, err
 	}
 
