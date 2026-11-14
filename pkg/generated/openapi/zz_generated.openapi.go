@@ -29206,7 +29206,7 @@ func schema_k8sio_api_core_v1_PodSpec(ref common.ReferenceCallback) common.OpenA
 					},
 					"hostNetwork": {
 						SchemaProps: spec.SchemaProps{
-							Description: "hostNetwork indicates that the pod should use the host's network namespace. When using hostNetwork you should specify ports so the scheduler is aware. When `hostNetwork` is true, specified `hostPort` fields in port definitions must match `containerPort`, and unspecified `hostPort` fields in port definitions are defaulted to match `containerPort`. Default to false.",
+							Description: "hostNetwork indicates that the pod should use the host's network namespace. When using hostNetwork you should specify ports so the scheduler is aware. When `hostNetwork` is true, specified `hostPort` fields in port definitions must match `containerPort`, and unspecified `hostPort` fields in port definitions are defaulted to match `containerPort`. Default to false. When true, podNetwork may not be set: the pod has no network namespace of its own.",
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
@@ -29533,6 +29533,14 @@ func schema_k8sio_api_core_v1_PodSpec(ref common.ReferenceCallback) common.OpenA
 									},
 								},
 							},
+						},
+					},
+					"podNetwork": {
+						SchemaProps: spec.SchemaProps{
+							Description: "podNetwork selects whether a non-hostNetwork pod is attached to the pod network. \"Default\" attaches the pod to the pod network. \"Isolated\" gives the pod an isolated network namespace with only the loopback interface configured, not attached to the pod network and with no automatic network plumbing. This field must be unset if hostNetwork is true. For non-hostNetwork pods, this behaves as if it was set to \"Default\" if it is not set. If a pod is \"Isolated\", hostPort and network-based probes and lifecycle handlers are not allowed. This field is immutable on Pods.\n\nPossible enum values:\n - `\"Default\"` attaches the pod to the pod network (the network that Kubernetes connects every pod to unless the pod opts out). The container runtime performs its configured network plumbing and the pod is assigned pod IPs. This is the historical behavior (for non-hostNetwork pods).\n - `\"Isolated\"` does not attach the pod to the pod network. The pod gets an isolated network namespace with only the loopback interface configured. The pod's podIPs are left unset and the pod is never selected into Services.",
+							Type:        []string{"string"},
+							Format:      "",
+							Enum:        []interface{}{"Default", "Isolated"},
 						},
 					},
 				},

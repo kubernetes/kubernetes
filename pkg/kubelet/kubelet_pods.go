@@ -293,7 +293,7 @@ func (kl *Kubelet) makeBlockVolumes(logger klog.Logger, pod *v1.Pod, container *
 // - the Pod is on the pod network and PodIP has not yet been set (e.g., Pod sandbox is being created).
 // - the Pod is on Windows, and contains a hostProcess container.
 func shouldMountHostsFile(pod *v1.Pod, podIPs []string) bool {
-	shouldMount := len(podIPs) > 0 || pod.Spec.HostNetwork
+	shouldMount := len(podIPs) > 0 || pod.Spec.HostNetwork || kubecontainer.IsNetworkIsolatedPod(pod)
 	if runtime.GOOS == "windows" {
 		return shouldMount && !kubecontainer.HasWindowsHostProcessContainer(pod)
 	}
@@ -452,7 +452,12 @@ func makeMounts(logger klog.Logger, pod *v1.Pod, podDir string, container *v1.Co
 	}
 	if mountEtcHostsFile {
 		hostAliases := pod.Spec.HostAliases
-		hostsMount, err := makeHostsMount(podDir, podIPs, hostName, hostDomain, hostAliases, pod.Spec.HostNetwork)
+		hostsIPs := podIPs
+		if kubecontainer.IsNetworkIsolatedPod(pod) {
+			// No pod IPs will ever exist; the hostname resolves to loopback.
+			hostsIPs = []string{"127.0.0.1", "::1"}
+		}
+		hostsMount, err := makeHostsMount(podDir, hostsIPs, hostName, hostDomain, hostAliases, pod.Spec.HostNetwork)
 		if err != nil {
 			return nil, cleanupAction, err
 		}

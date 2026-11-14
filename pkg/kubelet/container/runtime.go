@@ -710,6 +710,7 @@ type RuntimeFeatures struct {
 	MountOptions              bool
 	SeccompProfileOCI         bool
 	CgroupMountMode           bool
+	PodNetworkIsolated        bool
 }
 
 // String formats the runtime condition into a human readable string.
@@ -717,7 +718,7 @@ func (f *RuntimeFeatures) String() string {
 	if f == nil {
 		return "nil"
 	}
-	return fmt.Sprintf("SupplementalGroupsPolicy: %v UserNamespacesHostNetwork: %v MountOptions: %v SeccompProfileOCI: %v CgroupMountMode: %v", f.SupplementalGroupsPolicy, f.UserNamespacesHostNetwork, f.MountOptions, f.SeccompProfileOCI, f.CgroupMountMode)
+	return fmt.Sprintf("SupplementalGroupsPolicy: %v UserNamespacesHostNetwork: %v MountOptions: %v SeccompProfileOCI: %v CgroupMountMode: %v PodNetworkIsolated: %v", f.SupplementalGroupsPolicy, f.UserNamespacesHostNetwork, f.MountOptions, f.SeccompProfileOCI, f.CgroupMountMode, f.PodNetworkIsolated)
 }
 
 // Pods represents the list of pods

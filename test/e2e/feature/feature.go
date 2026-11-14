@@ -259,6 +259,12 @@ var (
 	// TODO: document the feature (when to use this feature for a test)
 	MemoryManager = framework.WithFeature(framework.ValidFeatures.Add("MemoryManager"))
 
+	// NetworkIsolatedPodsSupport is in test-infra nodes whose container
+	// runtime reports the pod_network_isolated CRI capability, i.e. it can
+	// create sandboxes with spec.podNetwork "Isolated" (https://kep.k8s.io/6313).
+	// Owner: sig-network
+	NetworkIsolatedPodsSupport = framework.WithFeature(framework.ValidFeatures.Add("NetworkIsolatedPodsSupport"))
+
 	// Owner: sig-network
 	// Marks tests that require a conforming implementation of
 	// NetworkPolicy.networking.k8s.io to be present.

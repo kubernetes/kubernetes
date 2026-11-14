@@ -1881,7 +1881,8 @@
         "name": "nameValue",
         "priority": 2
       }
-    ]
+    ],
+    "podNetwork": "podNetworkValue"
   },
   "status": {
     "observedGeneration": 17,
