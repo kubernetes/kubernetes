@@ -282,6 +282,13 @@ func (pl *DynamicResources) EventsToRegister(_ context.Context) ([]fwk.ClusterEv
 		{Event: fwk.ClusterEvent{Resource: fwk.Node, ActionType: fwk.Add | fwk.UpdateNodeLabel | fwk.UpdateNodeAllocatable}},
 		// Allocation is tracked in ResourceClaims, so any changes may make the pods schedulable.
 		{Event: fwk.ClusterEvent{Resource: fwk.ResourceClaim, ActionType: fwk.Add | fwk.Update | fwk.Delete}, QueueingHintFn: pl.isSchedulableAfterClaimChange, PreQueueingHintFn: claimPreQueueingHint},
+		// A pod with an in-flight allocation holds devices until Unreserve
+		// runs, which for a deleted pod happens after its ResourceClaims are
+		// already gone and thus no claim event for the freed devices is
+		// coming. Unreserve has completed by the time the AssignedPodDelete
+		// event gets emitted, so pods waiting for those devices can be
+		// retried.
+		{Event: fwk.ClusterEvent{Resource: fwk.AssignedPod, ActionType: fwk.Delete}, QueueingHintFn: pl.isSchedulableAfterAssignedPodDeletion},
 		// Adding the ResourceClaim name to the pod status makes pods waiting for their ResourceClaim schedulable.
 		{Event: fwk.ClusterEvent{Resource: fwk.TargetPod, ActionType: fwk.UpdatePodGeneratedResourceClaim}, QueueingHintFn: pl.isSchedulableAfterTargetPodUpdate},
 		// A pod might be waiting for a class to get created or modified.
@@ -473,6 +480,31 @@ func (pl *DynamicResources) isSchedulableAfterClaimChange(logger klog.Logger, po
 	}
 
 	logger.V(5).Info("status of claim for pod got updated", "pod", klog.KObj(pod), "claim", klog.KObj(modifiedClaim))
+	return fwk.Queue, nil
+}
+
+// isSchedulableAfterAssignedPodDeletion is invoked when an assigned pod gets
+// deleted. Besides real deletions observed through the API this also covers a
+// pod whose binding cycle was aborted, because the scheduler emits the same
+// event for it after Unreserve released its in-flight allocation. A pod that
+// was rejected while that allocation was held may become schedulable now.
+func (pl *DynamicResources) isSchedulableAfterAssignedPodDeletion(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
+	// The tombstone inside a DeletedFinalStateUnknown carries the last known
+	// revision of the deleted pod. That is good enough here because whether a
+	// pod uses ResourceClaims never changes (spec.resourceClaims is immutable).
+	deletedPod, _, err := schedutil.As[*v1.Pod](oldObj, newObj)
+	if err != nil {
+		// Shouldn't happen.
+		return fwk.Queue, fmt.Errorf("unexpected object in isSchedulableAfterAssignedPodDeletion: %w", err)
+	}
+	if len(deletedPod.Spec.ResourceClaims) == 0 {
+		// The deleted pod had no ResourceClaims and thus held no devices.
+		logger.V(6).Info("assigned pod without resource claims got deleted", "pod", klog.KObj(pod), "deletedPod", klog.KObj(deletedPod))
+		return fwk.QueueSkip, nil
+	}
+	// Whether the devices held by the deleted pod are needed by this pod gets
+	// decided by the next scheduling attempt.
+	logger.V(6).Info("assigned pod with resource claims got deleted", "pod", klog.KObj(pod), "deletedPod", klog.KObj(deletedPod))
 	return fwk.Queue, nil
 }
 

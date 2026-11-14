@@ -5413,6 +5413,68 @@ func testIsSchedulableAfterTargetPodUpdate(tCtx ktesting.TContext) {
 	}
 }
 
+func TestIsSchedulableAfterAssignedPodDeletion(t *testing.T) {
+	testIsSchedulableAfterAssignedPodDeletion(ktesting.Init(t))
+}
+func testIsSchedulableAfterAssignedPodDeletion(tCtx ktesting.TContext) {
+	deletedPodWithClaims := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "deleted-pod", Namespace: "default"},
+		Spec: v1.PodSpec{
+			ResourceClaims: []v1.PodResourceClaim{{Name: "resource-claim", ResourceClaimName: &claimName}},
+		},
+	}
+	deletedPodWithoutClaims := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "deleted-pod", Namespace: "default"},
+	}
+
+	testcases := map[string]struct {
+		oldObj   interface{}
+		wantHint fwk.QueueingHint
+		wantErr  bool
+	}{
+		"pod-with-claims": {
+			oldObj:   deletedPodWithClaims,
+			wantHint: fwk.Queue,
+		},
+		"pod-without-claims": {
+			oldObj:   deletedPodWithoutClaims,
+			wantHint: fwk.QueueSkip,
+		},
+		"tombstone-with-claims": {
+			// The tombstone carries the last known revision of the pod,
+			// which is good enough because spec.resourceClaims is immutable.
+			oldObj:   cache.DeletedFinalStateUnknown{Key: "default/deleted-pod", Obj: deletedPodWithClaims},
+			wantHint: fwk.Queue,
+		},
+		"tombstone-without-claims": {
+			oldObj:   cache.DeletedFinalStateUnknown{Key: "default/deleted-pod", Obj: deletedPodWithoutClaims},
+			wantHint: fwk.QueueSkip,
+		},
+		"unexpected-object": {
+			oldObj:   "not-a-pod",
+			wantHint: fwk.Queue,
+			wantErr:  true,
+		},
+	}
+
+	for name, tc := range testcases {
+		tCtx.Run(name, func(tCtx ktesting.TContext) {
+			pl := &DynamicResources{}
+			gotHint, err := pl.isSchedulableAfterAssignedPodDeletion(tCtx.Logger(), podWithClaimTemplate, tc.oldObj, nil)
+			if tc.wantErr {
+				if err == nil {
+					tCtx.Fatalf("want error, got nil")
+				}
+			} else {
+				tCtx.ExpectNoError(err)
+			}
+			if tc.wantHint != gotHint {
+				tCtx.Fatalf("want %v, got %v", tc.wantHint.String(), gotHint.String())
+			}
+		})
+	}
+}
+
 // mockDeviceClassResolver is a simple mock implementation of fwk.DeviceClassResolver for testing
 type mockDeviceClassResolver struct {
 	mapping map[v1.ResourceName]*resourceapi.DeviceClass
