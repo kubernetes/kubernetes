@@ -21,6 +21,7 @@ package watchdog
 import (
 	"context"
 	"fmt"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -28,7 +29,9 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/server/healthz"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // WatchdogClient defines the interface for interacting with the systemd watchdog.
@@ -61,15 +64,18 @@ func WithWatchdogClient(watchdog WatchdogClient) Option {
 }
 
 type healthChecker struct {
-	checkers     atomic.Value
-	retryBackoff wait.Backoff
-	interval     time.Duration
-	watchdog     WatchdogClient
+	checkers       atomic.Value
+	retryBackoff   wait.Backoff
+	interval       time.Duration
+	watchdog       WatchdogClient
+	diagnosticMu   sync.Mutex
+	lastDiagnostic map[string]time.Time
 }
 
 var _ HealthChecker = &healthChecker{}
 
 const minimalNotifyInterval = time.Second
+const diagnosticLogInterval = time.Minute
 
 // NewHealthChecker creates a new HealthChecker instance.
 // This function initializes the health checker and configures its behavior based on the status of the systemd watchdog.
@@ -139,36 +145,85 @@ func (hc *healthChecker) Start(ctx context.Context) {
 	}
 	logger.Info("Starting systemd watchdog with interval", "interval", hc.interval)
 
-	go wait.UntilWithContext(ctx, func(ctx context.Context) {
-		if err := hc.doCheck(); err != nil {
-			logger.Error(err, "Do not notify watchdog this iteration as the kubelet is reportedly not healthy")
-			return
-		}
-
-		err := wait.ExponentialBackoffWithContext(ctx, hc.retryBackoff, func(_ context.Context) (bool, error) {
-			ack, err := hc.watchdog.SdNotify(false)
-			if err != nil {
-				logger.V(5).Info("Failed to notify systemd watchdog, retrying", "error", err)
-				return false, nil
-			}
-			if !ack {
-				return false, fmt.Errorf("failed to notify systemd watchdog, notification not supported - (i.e. NOTIFY_SOCKET is unset)")
-			}
-
-			logger.V(5).Info("Watchdog plugin notified", "acknowledgment", ack, "state", daemon.SdNotifyWatchdog)
-			return true, nil
-		})
-		if err != nil {
-			logger.Error(err, "Failed to notify watchdog")
-		}
-	}, hc.interval)
+	go wait.UntilWithContext(ctx, hc.runOnce, hc.interval)
 }
 
-func (hc *healthChecker) doCheck() error {
-	for _, hc := range hc.getHealthCheckers() {
-		if err := hc.Check(nil); err != nil {
-			return fmt.Errorf("checker %s failed: %w", hc.Name(), err)
+func (hc *healthChecker) runOnce(ctx context.Context) {
+	logger := klog.FromContext(ctx)
+	diagnosticsEnabled := utilfeature.DefaultFeatureGate.Enabled(features.KubeletWatchdogDiagnostics)
+	if !diagnosticsEnabled {
+		hc.resetDiagnosticRateLimit()
+	}
+	checker, checkErr := hc.doCheck()
+	if checkErr != nil {
+		if diagnosticsEnabled {
+			if hc.shouldLogDiagnostic("checker:" + checker) {
+				logger.Error(checkErr, "Watchdog health check failed", "operation", "watchdog_health_check", "checker", checker, "result", "error", "watchdog_interval", hc.interval)
+			}
+		} else {
+			logger.Error(checkErr, "Do not notify watchdog this iteration as the kubelet is reportedly not healthy")
+		}
+		return
+	}
+
+	var attempt int
+	var lastNotifyErr error
+	err := wait.ExponentialBackoffWithContext(ctx, hc.retryBackoff, func(_ context.Context) (bool, error) {
+		attempt++
+		ack, err := hc.watchdog.SdNotify(false)
+		if err != nil {
+			lastNotifyErr = err
+			logger.V(5).Info("Failed to notify systemd watchdog, retrying", "error", err)
+			if diagnosticsEnabled {
+				if hc.shouldLogDiagnostic("notify-error") {
+					logger.Error(err, "Watchdog notification failed", "operation", "watchdog_notify", "attempt", attempt, "result", "error", "watchdog_interval", hc.interval)
+				}
+			}
+			return false, nil
+		}
+		if !ack {
+			return false, fmt.Errorf("failed to notify systemd watchdog, notification not supported - (i.e. NOTIFY_SOCKET is unset)")
+		}
+
+		logger.V(5).Info("Watchdog plugin notified", "acknowledgment", ack, "state", daemon.SdNotifyWatchdog)
+		return true, nil
+	})
+	if err != nil {
+		if diagnosticsEnabled && wait.Interrupted(err) && attempt == hc.retryBackoff.Steps && lastNotifyErr != nil {
+			if hc.shouldLogDiagnostic("notify-summary") {
+				logger.Error(lastNotifyErr, "Watchdog notification retries exhausted", "operation", "watchdog_notify", "attempts", attempt, "result", "retry_exhausted", "watchdog_interval", hc.interval)
+			}
+		} else {
+			logger.Error(err, "Failed to notify watchdog")
 		}
 	}
-	return nil
+}
+
+func (hc *healthChecker) shouldLogDiagnostic(key string) bool {
+	hc.diagnosticMu.Lock()
+	defer hc.diagnosticMu.Unlock()
+	if hc.lastDiagnostic == nil {
+		hc.lastDiagnostic = make(map[string]time.Time)
+	}
+	now := time.Now()
+	if last, ok := hc.lastDiagnostic[key]; ok && now.Sub(last) < diagnosticLogInterval {
+		return false
+	}
+	hc.lastDiagnostic[key] = now
+	return true
+}
+
+func (hc *healthChecker) resetDiagnosticRateLimit() {
+	hc.diagnosticMu.Lock()
+	defer hc.diagnosticMu.Unlock()
+	clear(hc.lastDiagnostic)
+}
+
+func (hc *healthChecker) doCheck() (string, error) {
+	for _, hc := range hc.getHealthCheckers() {
+		if err := hc.Check(nil); err != nil {
+			return hc.Name(), fmt.Errorf("checker %s failed: %w", hc.Name(), err)
+		}
+	}
+	return "", nil
 }
