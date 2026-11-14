@@ -115,6 +115,10 @@ func deletePodHandler(c clientset.Interface, emitEventFunc func(types.Namespaced
 		var err error
 		for i := 0; i < retries; i++ {
 			err = addConditionAndDeletePod(ctx, c, name, ns)
+			if apierrors.IsNotFound(err) {
+				klog.FromContext(ctx).V(2).Info("Pod already deleted", "controller", controllerName, "pod", args.Object)
+				return nil
+			}
 			if err == nil {
 				metrics.PodDeletionsTotal.Inc()
 				metrics.PodDeletionsLatency.Observe(time.Since(fireAt).Seconds())
@@ -512,6 +516,11 @@ func (tc *Controller) handlePodUpdate(ctx context.Context, podUpdate podUpdateIt
 	// Create or Update
 	podNamespacedName := types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}
 	logger.V(4).Info("Noticed pod update", "pod", podNamespacedName)
+
+	if pod.DeletionTimestamp != nil {
+		return
+	}
+
 	nodeName := pod.Spec.NodeName
 	if nodeName == "" {
 		return
@@ -582,6 +591,9 @@ func (tc *Controller) handleNodeUpdate(ctx context.Context, nodeUpdate nodeUpdat
 
 	now := time.Now()
 	for _, pod := range pods {
+		if pod.DeletionTimestamp != nil {
+			continue
+		}
 		podNamespacedName := types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}
 		tc.processPodOnNode(ctx, podNamespacedName, node.Name, pod.Spec.Tolerations, taints, now)
 	}

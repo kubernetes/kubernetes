@@ -49,13 +49,19 @@ func NewWorkArgs(name, namespace string) *WorkArgs {
 	}
 }
 
+const (
+	workerPending int32 = iota
+	workerRunning
+	workerCancelled
+)
+
 // TimedWorker is a responsible for executing a function no earlier than at FireAt time.
 type TimedWorker struct {
 	WorkItem  *WorkArgs
 	CreatedAt time.Time
 	FireAt    time.Time
 	Timer     clock.Timer
-	cancelled atomic.Bool
+	state     atomic.Int32
 }
 
 // createWorker creates a TimedWorker that will execute `f` not earlier than `fireAt`.
@@ -70,7 +76,7 @@ func createWorker(ctx context.Context, wg *sync.WaitGroup, args *WorkArgs, creat
 		FireAt:    fireAt,
 	}
 
-	// This dance with the cancelled flag is here so that we can be sure that once TimedWorker.Cancel returns,
+	// This dance with the state is here so that we can be sure that once TimedWorker.Cancel returns,
 	// we either never get to any processing, or the thread is already registered with the WaitGroup.
 	// Otherwise, the following sequence can happen:
 	//   1. TimedWorker.Timer fires and gets to go wrapper().
@@ -81,7 +87,7 @@ func createWorker(ctx context.Context, wg *sync.WaitGroup, args *WorkArgs, creat
 	// So in our case we can still get to starting an unregistered goroutine, but it will exit immediately.
 	wrapper := func() {
 		wg.Go(func() {
-			if worker.cancelled.Load() {
+			if !worker.state.CompareAndSwap(workerPending, workerRunning) {
 				return
 			}
 			if err := f(ctx, fireAt, args); err != nil {
@@ -97,14 +103,14 @@ func createWorker(ctx context.Context, wg *sync.WaitGroup, args *WorkArgs, creat
 	return &worker
 }
 
-// Cancel cancels the execution of function by the `TimedWorker`
-func (w *TimedWorker) Cancel() {
-	if w != nil {
-		// Mark the worker as cancelled.
-		// This ensures the worker is either already running or unstarted on return from Cancel.
-		w.cancelled.Store(true)
-		w.Timer.Stop()
+// Cancel cancels the execution of function by the `TimedWorker`.
+// Returns false if the function is already running, in which case it runs to completion.
+func (w *TimedWorker) Cancel() bool {
+	if w == nil || !w.state.CompareAndSwap(workerPending, workerCancelled) {
+		return false
 	}
+	w.Timer.Stop()
+	return true
 }
 
 // TimedWorkerQueue keeps a set of TimedWorkers that are still wait for execution.
@@ -168,16 +174,15 @@ func (q *TimedWorkerQueue) UpdateWork(ctx context.Context, args *WorkArgs, creat
 	q.Lock()
 	defer q.Unlock()
 	if worker, exists := q.workers[key]; exists {
-		if worker == nil {
-			logger.V(4).Info("Keeping existing work, already in progress", "item", key)
-			return
-		}
-		if worker.FireAt.Compare(fireAt) == 0 {
+		if worker != nil && worker.FireAt.Compare(fireAt) == 0 {
 			logger.V(4).Info("Keeping existing work, same time", "item", key, "createTime", worker.CreatedAt, "firedTime", worker.FireAt)
 			return
 		}
+		if !worker.Cancel() {
+			logger.V(4).Info("Keeping existing work, already in progress", "item", key)
+			return
+		}
 		logger.V(4).Info("Replacing existing work", "item", key, "createTime", worker.CreatedAt, "firedTime", worker.FireAt)
-		worker.Cancel()
 	}
 	logger.V(4).Info("Adding TimedWorkerQueue item and to be fired at firedTime", "item", key, "createTime", createdAt, "firedTime", fireAt)
 	worker := createWorker(ctx, &q.workerWG, args, createdAt, fireAt, q.getWrappedWorkerFunc(key), q.clock)
@@ -185,22 +190,24 @@ func (q *TimedWorkerQueue) UpdateWork(ctx context.Context, args *WorkArgs, creat
 }
 
 // CancelWork removes scheduled function execution from the queue. Returns true if work was cancelled.
+// Work that is already running cannot be cancelled and stays in the queue until it finishes,
+// so that adding the same key again doesn't start a second, concurrent worker.
 // The key must be the same as the one returned by WorkArgs.KeyFromWorkArgs, i.e.
 // the result of NamespacedName.String.
 func (q *TimedWorkerQueue) CancelWork(logger klog.Logger, key string) bool {
 	q.Lock()
 	defer q.Unlock()
 	worker, found := q.workers[key]
-	result := false
-	if found {
-		logger.V(4).Info("Cancelling TimedWorkerQueue item", "item", key, "time", time.Now())
-		if worker != nil {
-			result = true
-			worker.Cancel()
-		}
-		delete(q.workers, key)
+	if !found {
+		return false
 	}
-	return result
+	if !worker.Cancel() {
+		logger.V(4).Info("Not cancelling TimedWorkerQueue item, already in progress", "item", key)
+		return false
+	}
+	logger.V(4).Info("Cancelled TimedWorkerQueue item", "item", key, "time", time.Now())
+	delete(q.workers, key)
+	return true
 }
 
 // GetWorkerUnsafe returns a TimedWorker corresponding to the given key.
