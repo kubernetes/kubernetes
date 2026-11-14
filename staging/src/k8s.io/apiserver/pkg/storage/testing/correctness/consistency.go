@@ -17,6 +17,7 @@ limitations under the License.
 package correctness
 
 import (
+	"errors"
 	"fmt"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -47,6 +48,9 @@ func GetReadConsistency(opts storage.GetOptions) ReadConsistency {
 // ListReadConsistency qualifies the read consistency of a List operation,
 // validates ListOptions, and parses ResourceVersion and Continue token.
 func ListReadConsistency(keyPrefix string, versioner storage.Versioner, opts storage.ListOptions) (consistency ReadConsistency, rv uint64, continueKey string, err error) {
+	if opts.KeysOnly && !opts.Predicate.Empty() {
+		return "", 0, "", apierrors.NewInternalError(errors.New("keysOnly requires an empty predicate"))
+	}
 	if opts.SendInitialEvents != nil {
 		return "", 0, "", fmt.Errorf("sendInitialEvents is forbidden for list")
 	}

@@ -144,10 +144,10 @@ func (w *watcher) Watch(ctx context.Context, key string, rev int64, opts storage
 	if opts.ProgressNotify && w.newFunc == nil {
 		return nil, apierrors.NewInternalError(errors.New("progressNotify for watch is unsupported by the etcd storage because no newFunc was provided"))
 	}
+	if err := storage.ValidateWatchOptions(opts); err != nil {
+		return nil, err
+	}
 	if opts.WatchWithoutPrevKV {
-		if !opts.Predicate.Empty() {
-			return nil, apierrors.NewInternalError(errors.New("watchWithoutPrevKV requires an empty predicate"))
-		}
 		if w.newFunc == nil {
 			return nil, apierrors.NewInternalError(errors.New("watchWithoutPrevKV requires a newFunc"))
 		}
@@ -862,13 +862,7 @@ func (wc *watchChan) prepareObjs(e *event) (curObj runtime.Object, oldObj runtim
 			return nil, nil, fmt.Errorf("failed to reverse watch event key %q: %w", e.key, err)
 		}
 		oldObj = wc.watcher.newFunc()
-		accessor, err := meta.Accessor(oldObj)
-		if err != nil {
-			return nil, nil, err
-		}
-		accessor.SetName(name)
-		accessor.SetNamespace(namespace)
-		if err := wc.watcher.versioner.UpdateObject(oldObj, uint64(e.rev)); err != nil {
+		if err := storage.SetObjectIdentity(oldObj, wc.watcher.versioner, name, namespace, uint64(e.rev)); err != nil {
 			return nil, nil, err
 		}
 		return nil, oldObj, nil
