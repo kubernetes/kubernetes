@@ -30,7 +30,7 @@ type oomWatcherUnsupported struct{}
 var _ Watcher = new(oomWatcherUnsupported)
 
 // NewWatcher creates a fake one here
-func NewWatcher(_ record.EventRecorder) (Watcher, error) {
+func NewWatcher(_ record.EventRecorder, rootDir string) (Watcher, error) {
 	return &oomWatcherUnsupported{}, nil
 }
 
