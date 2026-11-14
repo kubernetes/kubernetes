@@ -356,7 +356,7 @@ func (c *fakeCsiDriverClient) NodeGetVolumeHealth(ctx context.Context, volID, st
 	if err != nil {
 		return nil, err
 	}
-	return mapVolumeHealthConditions(resp.GetVolumeHealth()), nil
+	return volumeHealthFromResponse(volID, resp)
 }
 
 func (c *fakeCsiDriverClient) NodeGetStorageHealth(ctx context.Context, secrets map[string]string) ([]storagev1.StorageHealthCondition, error) {
@@ -1184,13 +1184,15 @@ func TestAccessModeMapping(t *testing.T) {
 
 func TestNodeGetVolumeHealth(t *testing.T) {
 	tests := []struct {
-		name            string
-		volID           string
-		setVolumeHealth bool
-		volumeHealthSet bool
-		wantConditions  int
-		wantStatus      api.VolumeHealthStatusType
-		mustFail        bool
+		name             string
+		volID            string
+		setVolumeHealth  bool
+		volumeHealthSet  bool
+		omitVolumeHealth bool
+		responseVolumeID *string
+		wantConditions   int
+		wantStatus       api.VolumeHealthStatusType
+		mustFail         bool
 	}{
 		{
 			name:            "healthy volume returns empty conditions",
@@ -1212,6 +1214,29 @@ func TestNodeGetVolumeHealth(t *testing.T) {
 			volID:    "",
 			mustFail: true,
 		},
+		{
+			name:             "missing volume health fails",
+			volID:            "vol-healthy",
+			volumeHealthSet:  true,
+			omitVolumeHealth: true,
+			mustFail:         true,
+		},
+		{
+			name:             "empty volume id in response fails",
+			volID:            "vol-healthy",
+			setVolumeHealth:  true,
+			volumeHealthSet:  true,
+			responseVolumeID: new(""),
+			mustFail:         true,
+		},
+		{
+			name:             "volume id of another volume fails",
+			volID:            "vol-healthy",
+			setVolumeHealth:  true,
+			volumeHealthSet:  true,
+			responseVolumeID: new("vol-other"),
+			mustFail:         true,
+		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -1220,6 +1245,8 @@ func TestNodeGetVolumeHealth(t *testing.T) {
 				driverName: "Fake Driver Name",
 				nodeV1ClientCreator: func(addr csiAddr, m *MetricsManager) (csipbv1.NodeClient, io.Closer, error) {
 					nodeClient := fake.NewNodeClientWithVolumeStatsAndHealth(true, tc.volumeHealthSet, true, tc.setVolumeHealth)
+					nodeClient.OmitVolumeHealth = tc.omitVolumeHealth
+					nodeClient.VolumeHealthVolumeID = tc.responseVolumeID
 					return nodeClient, fakeCloser, nil
 				},
 			}
