@@ -415,8 +415,10 @@ func (cm *containerManagerImpl) NewPodContainerManager() PodContainerManager {
 			podContainerManager:     cm,
 			memoryReservationPolicy: cm.MemoryReservationPolicy,
 			memoryThrottlingFactor:  cm.MemoryThrottlingFactor,
+			configuredPods:          sets.New[types.UID](),
 		}
 	}
+
 	return &podContainerManagerNoop{
 		cgroupRoot: cm.cgroupRoot,
 	}

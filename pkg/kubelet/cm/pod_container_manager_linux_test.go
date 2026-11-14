@@ -19,7 +19,9 @@ limitations under the License.
 package cm
 
 import (
+	"fmt"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -27,6 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 
@@ -402,4 +405,193 @@ func TestEnsureExistsWritableCgroupLimits(t *testing.T) {
 			require.NotContains(t, unified, "cgroup.max.depth")
 		})
 	}
+}
+
+type testPodCgroupManager struct {
+	*fakeCgroupManager
+	mu               sync.Mutex
+	exists           map[string]bool
+	createCalls      int
+	updateCalls      int
+	createErr        error
+	updateErr        error
+	createPartialDir bool
+}
+
+func newTestPodCgroupManager() *testPodCgroupManager {
+	return &testPodCgroupManager{
+		fakeCgroupManager: &fakeCgroupManager{},
+		exists:            make(map[string]bool),
+	}
+}
+
+func (m *testPodCgroupManager) Exists(name CgroupName) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.exists[m.Name(name)]
+}
+
+func (m *testPodCgroupManager) Create(_ klog.Logger, config *CgroupConfig) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.createCalls++
+	key := m.Name(config.Name)
+	if m.createErr != nil {
+		if m.createPartialDir {
+			m.exists[key] = true
+		}
+		return m.createErr
+	}
+	m.exists[key] = true
+	return nil
+}
+
+func (m *testPodCgroupManager) Update(_ klog.Logger, _ *CgroupConfig) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.updateCalls++
+	return m.updateErr
+}
+
+func (m *testPodCgroupManager) Destroy(_ klog.Logger, config *CgroupConfig) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	delete(m.exists, m.Name(config.Name))
+	return nil
+}
+
+func TestEnsureExists(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	qosContainersInfo := QOSContainersInfo{
+		Guaranteed: RootCgroupName,
+		Burstable:  NewCgroupName(RootCgroupName, strings.ToLower(string(v1.PodQOSBurstable))),
+		BestEffort: NewCgroupName(RootCgroupName, strings.ToLower(string(v1.PodQOSBestEffort))),
+	}
+
+	newPod := func(uid types.UID) *v1.Pod {
+		return &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{UID: uid},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{{Name: "container"}},
+			},
+		}
+	}
+
+	t.Run("creates cgroup once and skips subsequent calls", func(t *testing.T) {
+		fakeCM := newTestPodCgroupManager()
+		pcm := &podContainerManagerImpl{
+			cgroupManager:     fakeCM,
+			qosContainersInfo: qosContainersInfo,
+			enforceCPULimits:  true,
+		}
+		pod := newPod("uid-create-once")
+
+		require.NoError(t, pcm.EnsureExists(logger, pod))
+		require.Equal(t, 1, fakeCM.createCalls)
+		require.Equal(t, 0, fakeCM.updateCalls)
+
+		// Second call should be a fast-path no-op.
+		require.NoError(t, pcm.EnsureExists(logger, pod))
+		require.Equal(t, 1, fakeCM.createCalls)
+		require.Equal(t, 0, fakeCM.updateCalls)
+	})
+
+	t.Run("reconciles partial Create failure via Update on retry", func(t *testing.T) {
+		fakeCM := newTestPodCgroupManager()
+		fakeCM.createErr = fmt.Errorf("simulated Set failure")
+		fakeCM.createPartialDir = true
+
+		pcm := &podContainerManagerImpl{
+			cgroupManager:     fakeCM,
+			qosContainersInfo: qosContainersInfo,
+			enforceCPULimits:  true,
+		}
+		pod := newPod("uid-partial-fail")
+
+		// First attempt creates directory on disk but fails Set.
+		require.Error(t, pcm.EnsureExists(logger, pod))
+		require.Equal(t, 1, fakeCM.createCalls)
+		require.Equal(t, 0, fakeCM.updateCalls)
+		require.True(t, pcm.Exists(pod))
+
+		// Clear transient Set failure; retry sees directory exists on disk and reconciles via Update.
+		fakeCM.createErr = nil
+		require.NoError(t, pcm.EnsureExists(logger, pod))
+		require.Equal(t, 1, fakeCM.createCalls)
+		require.Equal(t, 1, fakeCM.updateCalls)
+
+		// Subsequent call is now a no-op.
+		require.NoError(t, pcm.EnsureExists(logger, pod))
+		require.Equal(t, 1, fakeCM.createCalls)
+		require.Equal(t, 1, fakeCM.updateCalls)
+	})
+
+	t.Run("reconciles existing pod cgroup via Update after kubelet restart", func(t *testing.T) {
+		fakeCM := newTestPodCgroupManager()
+		pod := newPod("uid-restart")
+
+		// Initial kubelet instance creates and configures the pod cgroup.
+		pcm1 := &podContainerManagerImpl{
+			cgroupManager:     fakeCM,
+			qosContainersInfo: qosContainersInfo,
+			enforceCPULimits:  true,
+		}
+		require.NoError(t, pcm1.EnsureExists(logger, pod))
+		require.Equal(t, 1, fakeCM.createCalls)
+
+		// Simulate kubelet restart with fresh in-memory state while cgroup remains on disk.
+		pcm2 := &podContainerManagerImpl{
+			cgroupManager:     fakeCM,
+			qosContainersInfo: qosContainersInfo,
+			enforceCPULimits:  true,
+		}
+		require.NoError(t, pcm2.EnsureExists(logger, pod))
+		require.Equal(t, 1, fakeCM.createCalls)
+		require.Equal(t, 1, fakeCM.updateCalls)
+
+		// Next SyncPod on restarted kubelet is a no-op.
+		require.NoError(t, pcm2.EnsureExists(logger, pod))
+		require.Equal(t, 1, fakeCM.updateCalls)
+	})
+
+	t.Run("Destroy evicts pod from configured tracking", func(t *testing.T) {
+		fakeCM := newTestPodCgroupManager()
+		pcm := &podContainerManagerImpl{
+			cgroupManager:     fakeCM,
+			qosContainersInfo: qosContainersInfo,
+			enforceCPULimits:  true,
+		}
+		pod := newPod("uid-destroy")
+
+		require.NoError(t, pcm.EnsureExists(logger, pod))
+		podCgroup, _ := pcm.GetPodContainerName(pod)
+		require.NoError(t, pcm.Destroy(logger, podCgroup))
+
+		// Re-ensuring after Destroy must recreate rather than skip.
+		require.NoError(t, pcm.EnsureExists(logger, pod))
+		require.Equal(t, 2, fakeCM.createCalls)
+	})
+
+	t.Run("concurrent EnsureExists and Destroy are race-free", func(t *testing.T) {
+		fakeCM := newTestPodCgroupManager()
+		pcm := &podContainerManagerImpl{
+			cgroupManager:     fakeCM,
+			qosContainersInfo: qosContainersInfo,
+			enforceCPULimits:  true,
+		}
+
+		var wg sync.WaitGroup
+		for i := 0; i < 16; i++ {
+			wg.Add(1)
+			go func(idx int) {
+				defer wg.Done()
+				pod := newPod(types.UID(fmt.Sprintf("uid-concurrent-%d", idx)))
+				require.NoError(t, pcm.EnsureExists(logger, pod))
+				require.NoError(t, pcm.EnsureExists(logger, pod))
+				podCgroup, _ := pcm.GetPodContainerName(pod)
+				require.NoError(t, pcm.Destroy(logger, podCgroup))
+			}(i)
+		}
+		wg.Wait()
+	})
 }
