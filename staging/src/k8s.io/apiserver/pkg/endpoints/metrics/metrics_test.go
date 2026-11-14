@@ -18,18 +18,80 @@ package metrics
 
 import (
 	"context"
+	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"strings"
 	"testing"
 
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/endpoints/responsewriter"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
 )
+
+func TestRecordRequestTermination(t *testing.T) {
+	Register()
+	requestTerminationsTotal.Reset()
+	t.Cleanup(requestTerminationsTotal.Reset)
+
+	for _, tc := range []struct {
+		name    string
+		paths   []string
+		nilInfo bool
+		scope   string
+	}{
+		{
+			name: "unvalidated resource paths",
+			paths: []string{
+				"/apis/first.example/v1/namespaces/ns/widgets/name/status",
+				"/apis/second.example/v2/namespaces/ns/gadgets/name/scale",
+			},
+			scope: "resource",
+		},
+		{
+			name:  "non-resource paths",
+			paths: []string{"/first-path", "/second-path"},
+		},
+		{
+			name:    "missing request info",
+			paths:   []string{"/first-path", "/second-path"},
+			nilInfo: true,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			defer requestTerminationsTotal.Reset()
+			resolver := &request.RequestInfoFactory{
+				APIPrefixes:          sets.NewString("api", "apis"),
+				GrouplessAPIPrefixes: sets.NewString("api"),
+			}
+			for _, path := range tc.paths {
+				req := httptest.NewRequest(http.MethodGet, path, nil)
+				var info *request.RequestInfo
+				if !tc.nilInfo {
+					var err error
+					info, err = resolver.NewRequestInfo(req)
+					if err != nil {
+						t.Fatal(err)
+					}
+				}
+				RecordRequestTermination(req, info, APIServerComponent, http.StatusGatewayTimeout)
+			}
+			want := fmt.Sprintf(`
+# HELP apiserver_request_terminations_total [ALPHA] Number of requests which apiserver terminated in self-defense.
+# TYPE apiserver_request_terminations_total counter
+apiserver_request_terminations_total{code="504",component="apiserver",scope="%s",verb="GET"} 2
+`, tc.scope)
+			if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(want), "apiserver_request_terminations_total"); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
 
 func TestCleanVerb(t *testing.T) {
 	testCases := []struct {
