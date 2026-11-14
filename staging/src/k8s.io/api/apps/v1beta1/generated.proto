@@ -88,7 +88,7 @@ message Deployment {
 // DeploymentCondition describes the state of a deployment at a certain point.
 message DeploymentCondition {
   // type of deployment condition.
-  // +optional
+  // +required
   optional string type = 1;
 
   // status of the condition, one of True, False, Unknown.
@@ -390,7 +390,7 @@ message StatefulSet {
 // StatefulSetCondition describes the state of a statefulset at a certain point.
 message StatefulSetCondition {
   // type of statefulset condition.
-  // +optional
+  // +required
   optional string type = 1;
 
   // status of the condition, one of True, False, Unknown.
