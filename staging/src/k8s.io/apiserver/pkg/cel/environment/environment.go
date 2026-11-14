@@ -226,6 +226,9 @@ func (e *EnvSet) Extend(options ...VersionedOptions) (*EnvSet, error) {
 		if err != nil {
 			return nil, err
 		}
+		if e.newExpressions == e.storedExpressions && optionsMatchForBothEnvs(e.compatibilityVersion, options) {
+			return &EnvSet{compatibilityVersion: e.compatibilityVersion, newExpressions: p, storedExpressions: p}, nil
+		}
 		storedExprOpt, err := e.filterAndBuildOpts(e.storedExpressions, version.MajorMinor(math.MaxUint, math.MaxUint), false, options)
 		if err != nil {
 			return nil, err
@@ -237,6 +240,28 @@ func (e *EnvSet) Extend(options ...VersionedOptions) (*EnvSet, error) {
 		return &EnvSet{compatibilityVersion: e.compatibilityVersion, newExpressions: p, storedExpressions: s}, nil
 	}
 	return e, nil
+}
+
+func optionsMatchForBothEnvs(compatVer *version.Version, opts []VersionedOptions) bool {
+	if compatVer == nil || !compatVer.AtLeast(version.MajorMinor(1, 31)) {
+		return false
+	}
+	for _, opt := range opts {
+		if opt.IntroducedVersion == nil {
+			return false
+		}
+		var includedInNew bool
+		if opt.FeatureEnabled != nil {
+			includedInNew = opt.FeatureEnabled()
+		} else {
+			includedInNew = compatVer.AtLeast(opt.IntroducedVersion) && (opt.RemovedVersion == nil || compatVer.LessThan(opt.RemovedVersion))
+		}
+		includedInStored := opt.RemovedVersion == nil
+		if includedInNew != includedInStored {
+			return false
+		}
+	}
+	return true
 }
 
 func (e *EnvSet) filterAndBuildOpts(base *cel.Env, compatVer *version.Version, honorFeatureGateEnablement bool, opts []VersionedOptions) (cel.EnvOption, error) {
