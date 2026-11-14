@@ -486,6 +486,33 @@ func TestTarUntarWrongPrefix(t *testing.T) {
 	}
 }
 
+func TestMakeTarGlobCharactersInNames(t *testing.T) {
+	// "[" starts a character class in filepath.Glob. A file that really has
+	// such a name must be archived as itself, not treated as a pattern.
+	names := []string{"[Draft] notes.md", "data[1].txt", "unclosed[.txt"}
+	for _, name := range names {
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			createTmpFile(t, filepath.Join(dir, name), "contents of "+name)
+
+			writer := &bytes.Buffer{}
+			require.NoError(t, makeTar(newLocalPath(dir), newRemotePath("dest"), writer))
+
+			var got []string
+			tarReader := tar.NewReader(writer)
+			for {
+				header, err := tarReader.Next()
+				if err == io.EOF {
+					break
+				}
+				require.NoError(t, err)
+				got = append(got, header.Name)
+			}
+			assert.Contains(t, got, "dest/"+name)
+		})
+	}
+}
+
 func TestTarDestinationName(t *testing.T) {
 	dir, err := os.MkdirTemp(os.TempDir(), "input")
 	dir2, err2 := os.MkdirTemp(os.TempDir(), "output")
