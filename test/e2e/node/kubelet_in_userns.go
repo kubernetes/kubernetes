@@ -24,8 +24,8 @@ import (
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2ehostexec "k8s.io/kubernetes/test/e2e/framework/hostexec"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
-	"k8s.io/kubernetes/test/e2e/storage/utils"
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
@@ -43,7 +43,7 @@ var _ = SIGDescribe("Kubelet running in user namespace", "[LinuxOnly]", feature.
 			Description: When the kubelet is running in a user namespace, the Node's status.nodeInfo.runningInUserNamespace MUST be true.
 		*/
 		framework.It("should report RunningInUserNamespace", func(ctx context.Context) {
-			hostExec := utils.NewHostExec(f)
+			hostExec := e2ehostexec.New(f)
 			ginkgo.DeferCleanup(hostExec.Cleanup)
 
 			node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)

@@ -34,10 +34,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eendpointslice "k8s.io/kubernetes/test/e2e/framework/endpointslice"
+	e2ehostexec "k8s.io/kubernetes/test/e2e/framework/hostexec"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2enetwork "k8s.io/kubernetes/test/e2e/framework/network"
 	e2eoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
-	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
 // secondNodePortSvcName is the name of the secondary node port service
@@ -91,7 +91,7 @@ func DescribeSvc(ns string) {
 // we require that just creating an SCTP Pod/Service/NetworkPolicy must not do anything
 // that would cause the sctp kernel module to be loaded.
 func CheckSCTPModuleLoadedOnNodes(ctx context.Context, f *framework.Framework, nodes *v1.NodeList) bool {
-	hostExec := utils.NewHostExec(f)
+	hostExec := e2ehostexec.New(f)
 	ginkgo.DeferCleanup(hostExec.Cleanup)
 	re := regexp.MustCompile(`^\s*sctp\s+`)
 	cmd := "lsmod | grep sctp"

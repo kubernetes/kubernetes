@@ -55,6 +55,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eauth "k8s.io/kubernetes/test/e2e/framework/auth"
+	e2ehostexec "k8s.io/kubernetes/test/e2e/framework/hostexec"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
@@ -1186,7 +1187,7 @@ func (a *awsDriver) PrepareTest(ctx context.Context, f *framework.Framework) *st
 type localDriver struct {
 	driverInfo storageframework.DriverInfo
 	node       *v1.Node
-	hostExec   utils.HostExec
+	hostExec   e2ehostexec.HostExec
 	// volumeType represents local volume type we are testing, e.g.  tmpfs,
 	// directory, block device.
 	volumeType utils.LocalVolumeType
@@ -1321,7 +1322,7 @@ func (l *localDriver) PrepareTest(ctx context.Context, f *framework.Framework) *
 	l.node, err = e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
 	framework.ExpectNoError(err)
 
-	l.hostExec = utils.NewHostExec(f)
+	l.hostExec = e2ehostexec.New(f)
 	l.ltrMgr = utils.NewLocalResourceManager("local-driver", l.hostExec, "/tmp")
 
 	// This can't be done in SkipUnsupportedTest because the test framework is not initialized yet
