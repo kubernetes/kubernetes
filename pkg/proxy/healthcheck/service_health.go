@@ -198,6 +198,9 @@ func (hcI *hcInstance) listenAndServeAll(hcs *server) error {
 			return err
 		}
 
+		// wrap the listener to discard PROXY protocol v2 header if present
+		listener = proxyProtocolListener{Listener: listener}
+
 		// start serving
 		go func(hcI *hcInstance, listener net.Listener, httpSrv httpServer) {
 			// Serve() will exit and return ErrServerClosed when the http server is closed.
