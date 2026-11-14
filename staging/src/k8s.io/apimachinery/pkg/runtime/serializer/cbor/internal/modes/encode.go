@@ -174,7 +174,7 @@ func (em EncMode) Marshal(v interface{}) ([]byte, error) {
 	buf := buffers.Get()
 	defer buffers.Put(buf)
 
-	if err := em.MarshalTo(v, &buf.Buffer); err != nil {
+	if err := em.MarshalTo(v, buf); err != nil {
 		return nil, err
 	}
 
