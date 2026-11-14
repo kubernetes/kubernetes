@@ -894,6 +894,8 @@ func (p *staticPolicy) Allocate(logger klog.Logger, s state.State, pod *v1.Pod, 
 	switch operation {
 	case lifecycle.AddOperation:
 		return p.allocateForAdd(logger, s, pod, container)
+	case lifecycle.UpdateOperation:
+		return p.allocateForResize(logger, s, pod, container)
 	default:
 		logger.V(2).Info("CPU Manager container-level resource allocation skipped, operation not supported by the static CPU manager policy")
 		return nil
@@ -937,6 +939,15 @@ func (p *staticPolicy) allocateForAdd(logger klog.Logger, s state.State, pod *v1
 	// satisfy SMT alignment are accepted to avoid disrupting running workloads.
 	if cset, ok := s.GetCPUSet(string(pod.UID), container.Name); ok {
 		p.updateCPUsToReuse(pod, container, cset)
+		if cset.Size() != numCPUs {
+			// The pod is admitted again, for example after a kubelet restart,
+			// with allocated resources that differ from its CPU assignment: a
+			// resize was admitted, but its CPU assignment was not changed.
+			// Handle it as a resize, which aligns the assignment if possible;
+			// see resizeTransaction for when it may not be possible.
+			logger.Info("Static policy: container already present in state with a different number of CPUs, resizing", "cpuset", cset, "requestedSize", numCPUs)
+			return p.allocateForResize(logger, s, pod, container)
+		}
 		logger.Info("Static policy: container already present in state, skipping")
 		return nil
 	}
@@ -963,6 +974,14 @@ func (p *staticPolicy) allocateForAdd(logger klog.Logger, s state.State, pod *v1
 	metrics.ResourceManagerContainerAssignments.WithLabelValues(metrics.ResourceManagerCPU, metrics.ResourceManagerExclusiveNode).Inc()
 
 	logger.V(4).Info("Allocated exclusive CPUs", "cpuset", cpuAllocation.CPUs.String())
+	return nil
+}
+
+// allocateForResize changes the CPU assignment of a container to its allocated
+// resources. The static policy does not support it yet, so it keeps the
+// assignment unchanged.
+func (p *staticPolicy) allocateForResize(logger klog.Logger, _ state.State, _ *v1.Pod, _ *v1.Container) error {
+	logger.V(2).Info("CPU Manager container-level resource allocation skipped, operation not supported by the static CPU manager policy")
 	return nil
 }
 
@@ -1160,6 +1179,8 @@ func (p *staticPolicy) GetTopologyHints(logger klog.Logger, s state.State, pod *
 	switch operation {
 	case lifecycle.AddOperation:
 		return p.getTopologyHintsForAdd(logger, s, pod, container)
+	case lifecycle.UpdateOperation:
+		return p.getTopologyHintsForResize(logger, s, pod, container)
 	default:
 		logger.V(2).Info("CPU Manager container-level hint generation skipped, operation not supported by the static CPU manager policy")
 		return nil
@@ -1191,13 +1212,9 @@ func (p *staticPolicy) getTopologyHintsForAdd(logger klog.Logger, s state.State,
 	// kubelet restart, for example.
 	if allocated, exists := s.GetCPUSet(string(pod.UID), container.Name); exists {
 		if allocated.Size() != requested {
-			logger.Info("CPUs already allocated to container with different number than request", "requestedSize", requested, "allocatedSize", allocated.Size())
-			// An empty list of hints will be treated as a preference that cannot be satisfied.
-			// In definition of hints this is equal to: TopologyHint[NUMANodeAffinity: nil, Preferred: false].
-			// For all but the best-effort policy, the Topology Manager will throw a pod-admission error.
-			return map[string][]topologymanager.TopologyHint{
-				string(v1.ResourceCPU): {},
-			}
+			// Handled as a resize, see allocateForAdd.
+			logger.Info("CPUs already allocated to container with different number than request, generating hints for a resize", "requestedSize", requested, "allocatedSize", allocated.Size())
+			return p.getTopologyHintsForResize(logger, s, pod, container)
 		}
 		logger.Info("Regenerating TopologyHints for CPUs already allocated")
 		// The already allocated CPUs stand in for the usable set so that the same
@@ -1225,11 +1242,27 @@ func (p *staticPolicy) getTopologyHintsForAdd(logger klog.Logger, s state.State,
 	}
 }
 
+// getTopologyHintsForResize generates the hints for a resize of a container.
+// The static policy does not support resize yet, so it has no preference.
+func (p *staticPolicy) getTopologyHintsForResize(logger klog.Logger, _ state.State, _ *v1.Pod, _ *v1.Container) map[string][]topologymanager.TopologyHint {
+	logger.V(2).Info("CPU Manager container-level hint generation skipped, operation not supported by the static CPU manager policy")
+	return nil
+}
+
+// getPodTopologyHintsForResize generates the hints for a resize of a pod.
+// The static policy does not support resize yet, so it has no preference.
+func (p *staticPolicy) getPodTopologyHintsForResize(logger klog.Logger, _ state.State, _ *v1.Pod) map[string][]topologymanager.TopologyHint {
+	logger.V(2).Info("CPU Manager pod hint generation skipped, operation not supported by the static CPU manager policy")
+	return nil
+}
+
 func (p *staticPolicy) GetPodTopologyHints(logger klog.Logger, s state.State, pod *v1.Pod, operation lifecycle.Operation) map[string][]topologymanager.TopologyHint {
 	logger = klog.LoggerWithValues(logger, "pod", klog.KObj(pod), "podUID", pod.UID, "operation", operation)
 	switch operation {
 	case lifecycle.AddOperation:
 		return p.getPodTopologyHintsForAdd(logger, s, pod)
+	case lifecycle.UpdateOperation:
+		return p.getPodTopologyHintsForResize(logger, s, pod)
 	default:
 		logger.V(2).Info("CPU Manager pod hint generation skipped, operation not supported by the static CPU manager policy")
 		return nil
@@ -1333,13 +1366,9 @@ func (p *staticPolicy) getPodTopologyHintsForAdd(logger klog.Logger, s state.Sta
 			// kubelet restart, for example.
 			if allocated, exists := s.GetCPUSet(string(pod.UID), container.Name); exists {
 				if allocated.Size() != requestedByContainer {
-					logger_.Info("CPUs already allocated to container with different number than request", "requestedByContainer", requestedByContainer, "allocatedSize", allocated.Size())
-					// An empty list of hints will be treated as a preference that cannot be satisfied.
-					// In definition of hints this is equal to: TopologyHint[NUMANodeAffinity: nil, Preferred: false].
-					// For all but the best-effort policy, the Topology Manager will throw a pod-admission error.
-					return map[string][]topologymanager.TopologyHint{
-						string(v1.ResourceCPU): {},
-					}
+					// Handled as a resize, see allocateForAdd.
+					logger_.Info("CPUs already allocated to container with different number than request, generating hints for a resize", "requestedByContainer", requestedByContainer, "allocatedSize", allocated.Size())
+					return p.getPodTopologyHintsForResize(logger, s, pod)
 				}
 				// A set of CPUs already assigned to containers in this pod
 				assignedCPUs = assignedCPUs.Union(allocated)
