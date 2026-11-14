@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/proxy"
+	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/capabilities"
@@ -73,6 +74,19 @@ func (r *ProxyREST) Connect(ctx context.Context, id string, opts runtime.Object,
 		return nil, err
 	}
 	location.Path = net.JoinPreservingTrailingSlash(location.Path, proxyOpts.Path)
+	// UpgradeAwareHandler preserves raw query parameters for HTTP requests (by copying
+	// request.URL.RawQuery in ServeHTTP) but does not do so for upgraded connection requests
+	// (e.g., WebSockets/SPDY) unless UseRequestLocation is enabled.
+	//
+	// Modifying UpgradeAwareHandler to handle this is risky due to its widespread use and
+	// complexity. Instead, we preemptively copy the query parameters here. We only do so
+	// if location.RawQuery is empty to avoid overriding any query parameters defined by
+	// the resource location generator.
+	if requestInfo, ok := request.RequestInfoFrom(ctx); ok {
+		if len(location.RawQuery) == 0 {
+			location.RawQuery = requestInfo.RawQuery
+		}
+	}
 	// Return a proxy handler that uses the desired transport, wrapped with additional proxy handling (to get URL rewriting, X-Forwarded-* headers, etc)
 	return newThrottledUpgradeAwareProxyHandler(location, transport, true, false, responder), nil
 }
