@@ -5290,6 +5290,8 @@ type podGroupPreemptionRankNodesTestCase struct {
 	name                       string
 	nodeNames                  []string
 	victims                    []fwk.PreemptionVictim
+	pods                       []*v1.Pod
+	pdbs                       []*policy.PodDisruptionBudget
 	withoutPreemptionState     bool
 	expectedRankNodesCode      fwk.Code
 	expectedInitialRanked      []rankedNode
@@ -5391,6 +5393,29 @@ func TestDefaultPreemption_PodGroupPreemptionRankNodes(t *testing.T) {
 				{Node: "node-high", Rank: 2},
 			},
 		},
+		{
+			name:      "PodDisruptionBudget: disruptionsAllowed is tracked dynamically across RankNodes, Reserve, and Unreserve",
+			nodeNames: []string{"node-unprotected-high", "node-pdb-mid", "node-pdb-low"},
+			pods: []*v1.Pod{
+				st.MakePod().Name("unprotected-high").UID("unprotected-high").Namespace(v1.NamespaceDefault).Node("node-unprotected-high").Priority(30).Obj(),
+				st.MakePod().Name("pdb-mid").UID("pdb-mid").Namespace(v1.NamespaceDefault).Node("node-pdb-mid").Priority(20).Label("app", "web").Obj(),
+				st.MakePod().Name("pdb-low").UID("pdb-low").Namespace(v1.NamespaceDefault).Node("node-pdb-low").Priority(10).Label("app", "web").Obj(),
+			},
+			pdbs: []*policy.PodDisruptionBudget{
+				st.MakePDB().Name("pdb-web").Namespace(v1.NamespaceDefault).MatchLabel("app", "web").DisruptionsAllowed(1).Obj(),
+			},
+			expectedInitialRanked: []rankedNode{
+				{Node: "node-pdb-low", Rank: 1},
+				{Node: "node-pdb-mid", Rank: 2},
+				{Node: "node-unprotected-high", Rank: 3},
+			},
+			reserveNode: "node-pdb-low",
+			expectedRankedAfterReserve: []rankedNode{
+				{Node: "node-pdb-low", Rank: 0},
+				{Node: "node-unprotected-high", Rank: 1},
+				{Node: "node-pdb-mid", Rank: 2},
+			},
+		},
 	}
 
 	runPodGroupPreemptionRankNodesTests(t, tests, nil)
@@ -5406,6 +5431,7 @@ func runPodGroupPreemptionRankNodesTests(
 	}
 	preemptor1 := st.MakePod().Name("preemptor-1").UID("preemptor-1").Priority(100).Obj()
 	preemptor2 := st.MakePod().Name("preemptor-2").UID("preemptor-2").Priority(100).Obj()
+	preemptorPG := newPGInfo(st.MakePodGroup().Name("preemptor-pg").Priority(100).Obj(), preemptor1, preemptor2)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -5424,9 +5450,14 @@ func runPodGroupPreemptionRankNodesTests(
 			}
 
 			fts := feature.Features{EnableGenericWorkload: true}
-			snapshot := internalcache.NewSnapshot(nil, nodes)
+			snapshot := internalcache.NewSnapshot(tt.pods, nodes)
 			client := clientsetfake.NewClientset()
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
+			for _, pdb := range tt.pdbs {
+				if err := informerFactory.Policy().V1().PodDisruptionBudgets().Informer().GetStore().Add(pdb); err != nil {
+					t.Fatalf("Failed to add PodDisruptionBudgets to informer store: %v", err)
+				}
+			}
 			f, err := tf.NewFramework(ctx, registeredPlugins, "",
 				frameworkruntime.WithClientSet(client),
 				frameworkruntime.WithSnapshotSharedLister(snapshot),
@@ -5465,7 +5496,16 @@ func runPodGroupPreemptionRankNodesTests(
 				return
 			}
 
-			preemptState := preemption.NewPodGroupPreemptionState(tt.victims)
+			victims := tt.victims
+			if len(victims) == 0 && len(tt.pods) > 0 {
+				var status *fwk.Status
+				victims, status = f.PreemptionManager().GenerateVictims(ctx, preemptorPG)
+				if !status.IsSuccess() {
+					t.Fatalf("GenerateVictims failed: %v", status)
+				}
+			}
+
+			preemptState := preemption.NewPodGroupPreemptionState(victims)
 			pgState := framework.NewCycleState()
 			preemptState.WriteToPodGroupCycleState(pgState)
 			newCycleStateWithPreemption := func() fwk.CycleState {
