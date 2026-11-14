@@ -21,7 +21,6 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/utils/ptr"
 )
 
 func Test(t *testing.T) {
@@ -49,7 +48,7 @@ func Test(t *testing.T) {
 	for _, s := range validCases {
 		st.Value(&Struct{
 			LabelKeyField:        s,
-			LabelKeyPtrField:     ptr.To(s),
+			LabelKeyPtrField:     new(s),
 			LabelKeyTypedefField: LabelKeyStringType(s),
 		}).ExpectValid()
 	}
@@ -70,7 +69,7 @@ func Test(t *testing.T) {
 	for _, s := range invalidCases {
 		st.Value(&Struct{
 			LabelKeyField:        s,
-			LabelKeyPtrField:     ptr.To(s),
+			LabelKeyPtrField:     new(s),
 			LabelKeyTypedefField: LabelKeyStringType(s),
 		}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByOrigin(), field.ErrorList{
 			field.Invalid(field.NewPath("labelKeyField"), nil, "").WithOrigin("format=k8s-label-key"),
