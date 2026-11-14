@@ -764,7 +764,11 @@ func (dc *DisruptionController) sync(ctx context.Context, key string) error {
 	}
 	if err != nil {
 		logger.Error(err, "Failed to sync PDB", "podDisruptionBudget", klog.KRef(namespace, name))
-		return dc.failSafe(ctx, pdb, err)
+		failSafeError := dc.failSafe(ctx, pdb, err)
+		if failSafeError != nil {
+			return failSafeError
+		}
+		return err
 	}
 
 	return nil
