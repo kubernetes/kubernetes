@@ -57,8 +57,7 @@ func SetObjectDefaults_DeviceTaintRuleList(in *resourcev1alpha3.DeviceTaintRuleL
 func SetObjectDefaults_ResourcePoolStatusRequest(in *resourcev1alpha3.ResourcePoolStatusRequest) {
 	SetDefaults_ResourcePoolStatusRequestSpec(&in.Spec)
 	if in.Spec.Limit == nil {
-		var ptrVar1 int32 = 100
-		in.Spec.Limit = &ptrVar1
+		in.Spec.Limit = new(int32(100))
 	}
 }
 
