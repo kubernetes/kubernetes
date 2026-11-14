@@ -447,6 +447,56 @@ func TestYAMLOrJSONDecoder(t *testing.T) {
 	}
 }
 
+// TestYAMLOrJSONDecoderShortTrailingDocument covers a document shorter than
+// the four bytes consumeWhitespace reads at a time. ReadN returns the bytes it
+// did read together with io.EOF; discarding them left the YAML decoder
+// unbuilt, so a document decoded or not depending on how long it was.
+func TestYAMLOrJSONDecoderShortTrailingDocument(t *testing.T) {
+	// "{a}" is three bytes and "{aa}" is four, so this spans the read on
+	// either side. None of them is valid JSON, so each reaches the YAML
+	// decoder, and none of them needs more input to be complete.
+	for n := 1; n <= 6; n++ {
+		key := strings.Repeat("a", n)
+		doc := "{" + key + "}"
+		t.Run(fmt.Sprintf("document of %d bytes", len(doc)), func(t *testing.T) {
+			var out generic
+			d := NewYAMLOrJSONDecoder(bytes.NewReader([]byte(doc)), 4096)
+			if err := d.Decode(&out); err != nil {
+				t.Fatalf("Decode(%q) = %v, want it to decode", doc, err)
+			}
+			if want := (generic{key: nil}); !reflect.DeepEqual(out, want) {
+				t.Fatalf("Decode(%q) = %v, want %v", doc, out, want)
+			}
+		})
+	}
+}
+
+// TestYAMLOrJSONDecoderShortDocumentAfterJSON is the same defect reached the
+// way a stream reaches it: the first document is JSON, and what follows is
+// shorter than the four byte read.
+func TestYAMLOrJSONDecoderShortDocumentAfterJSON(t *testing.T) {
+	for n := 1; n <= 4; n++ {
+		key := strings.Repeat("b", n)
+		second := "{" + key + "}"
+		t.Run(fmt.Sprintf("second document of %d bytes", len(second)), func(t *testing.T) {
+			d := NewYAMLOrJSONDecoder(bytes.NewReader([]byte(`{"a":1} `+second)), 4096)
+
+			var first generic
+			if err := d.Decode(&first); err != nil {
+				t.Fatalf("first document: unexpected error: %v", err)
+			}
+
+			var out generic
+			if err := d.Decode(&out); err != nil {
+				t.Fatalf("second document %q: %v, want it to decode", second, err)
+			}
+			if want := (generic{key: nil}); !reflect.DeepEqual(out, want) {
+				t.Fatalf("second document %q = %v, want %v", second, out, want)
+			}
+		})
+	}
+}
+
 func TestReadSingleLongLine(t *testing.T) {
 	testReadLines(t, []int{128 * 1024})
 }
