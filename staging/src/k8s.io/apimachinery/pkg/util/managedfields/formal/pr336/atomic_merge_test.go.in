@@ -1,0 +1,224 @@
+/*
+Copyright 2026 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package typed
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"os"
+	"os/exec"
+	"reflect"
+	"testing"
+	"time"
+
+	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
+	"sigs.k8s.io/structured-merge-diff/v6/schema"
+	"sigs.k8s.io/structured-merge-diff/v6/value"
+)
+
+type ssaFormalMergeAllocator struct {
+	value.Allocator
+	freed []int
+}
+
+func (a *ssaFormalMergeAllocator) Free(resource any) {
+	length := 0
+	switch resource := resource.(type) {
+	case value.Map:
+		length = resource.Length()
+	case value.List:
+		length = resource.Length()
+	default:
+		panic(fmt.Sprintf("unexpected atomic merge resource %T", resource))
+	}
+	a.freed = append(a.freed, length+1)
+	a.Allocator.Free(resource)
+}
+
+type ssaFormalMergeCase struct {
+	Kind   string  `json:"kind"`
+	LHS    *string `json:"lhs"`
+	RHS    *string `json:"rhs"`
+	Output *string `json:"output"`
+	InLeaf bool    `json:"inLeaf"`
+}
+
+type ssaFormalMergeReport struct {
+	Output    *string `json:"output"`
+	InLeaf    bool    `json:"inLeaf"`
+	RuleCalls int     `json:"ruleCalls"`
+	Freed     []int   `json:"freed"`
+}
+
+func TestSSAFormalAtomicMerge(t *testing.T) {
+	model := os.Getenv("SSA_SET_MODEL")
+	if model == "" {
+		t.Fatal("set SSA_SET_MODEL to the built ssa-model executable")
+	}
+	encode := func(data any) string {
+		t.Helper()
+		encoded, err := json.Marshal(data)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(encoded)
+	}
+	type operand struct {
+		present bool
+		data    any
+	}
+	optional := func(input operand) *string {
+		if !input.present {
+			return nil
+		}
+		encoded := encode(input.data)
+		return &encoded
+	}
+	wrap := func(input operand) value.Value {
+		if !input.present {
+			return nil
+		}
+		return value.NewValueInterface(input.data)
+	}
+	handle := func(input operand) []int {
+		if !input.present || input.data == nil {
+			return []int{}
+		}
+		switch data := input.data.(type) {
+		case map[string]any:
+			return []int{len(data) + 1}
+		case []any:
+			return []int{len(data) + 1}
+		default:
+			panic("atomic merge test requires map/list operands")
+		}
+	}
+	pathTokens := func(path fieldpath.Path) []string {
+		t.Helper()
+		result := []string{}
+		for _, element := range path {
+			token, err := fieldpath.SerializePathElement(element)
+			if err != nil {
+				t.Fatal(err)
+			}
+			result = append(result, token)
+		}
+		return result
+	}
+	for _, kind := range []string{"map", "list"} {
+		t.Run(kind, func(t *testing.T) {
+			wideMap, wideList := map[string]any{}, []any{}
+			for i := 0; i < 64; i++ {
+				wideMap[fmt.Sprint(i)] = int64(i)
+				wideList = append(wideList, int64(i))
+			}
+			var deep any = "leaf"
+			for depth := 0; depth < 64; depth++ {
+				deep = map[string]any{"nested": deep}
+			}
+			payloads := []any{map[string]any{}, map[string]any{"n": int64(9007199254740993)},
+				map[string]any{"n": float64(9007199254740992)}, wideMap, deep}
+			var prior any = map[string]any{"prior": "selected"}
+			if kind == "list" {
+				payloads = []any{[]any{}, []any{int64(9007199254740993)}, []any{float64(9007199254740992)}, wideList, []any{deep}}
+				prior = []any{"selected"}
+			}
+			operands := []operand{{}, {present: true}}
+			for _, data := range payloads {
+				operands = append(operands, operand{true, data})
+			}
+			outputs := []operand{{}, {present: true}, {true, prior}}
+			paths := []fieldpath.Path{nil, fieldpath.MakePathOrDie("unit"), fieldpath.MakePathOrDie("spec", "unit"),
+				fieldpath.MakePathOrDie("spec", fieldpath.KeyByFields("name", "db"), "unit")}
+			cases, expected := []ssaFormalMergeCase{}, []ssaFormalMergeReport{}
+			for _, path := range paths {
+				for _, covered := range []bool{false, true} {
+					for _, previous := range outputs {
+						for _, lhs := range operands {
+							for _, rhs := range operands {
+								allocator := &ssaFormalMergeAllocator{Allocator: value.NewFreelistAllocator(), freed: []int{}}
+								walker := mergingWalker{lhs: wrap(lhs), rhs: wrap(rhs), path: path, allocator: allocator, inLeaf: covered}
+								if previous.present {
+									data := previous.data
+									walker.out = &data
+								}
+								calls := 0
+								walker.rule = func(w *mergingWalker) { calls++; ruleKeepRHS(w) }
+								beforeLeft, beforeRight, beforePath := optional(lhs), optional(rhs), pathTokens(path)
+								var errs ValidationErrors
+								if kind == "map" {
+									errs = walker.doMap(&schema.Map{ElementRelationship: schema.Atomic})
+								} else {
+									errs = walker.doList(&schema.List{ElementRelationship: schema.Atomic})
+								}
+								if len(errs) != 0 {
+									t.Fatalf("atomic merge rejected its operands: %v", errs)
+								}
+								var result *string
+								if walker.out != nil {
+									encoded := encode(*walker.out)
+									result = &encoded
+								}
+								want, count := optional(previous), 0
+								if !covered {
+									count = 1
+									if rhs.present {
+										want = beforeRight
+									} else if lhs.present {
+										want = beforeLeft
+									}
+								}
+								freed := append(handle(rhs), handle(lhs)...)
+								actual := ssaFormalMergeReport{result, walker.inLeaf, calls, allocator.freed}
+								oracle := ssaFormalMergeReport{want, true, count, freed}
+								if !reflect.DeepEqual(actual, oracle) {
+									t.Fatalf("atomic merge violated whole-operand choice or call frame: kind=%s case=%d got=%+v want=%+v", kind, len(cases), actual, oracle)
+								}
+								if !reflect.DeepEqual(beforeLeft, optional(lhs)) || !reflect.DeepEqual(beforeRight, optional(rhs)) || !reflect.DeepEqual(beforePath, pathTokens(walker.path)) {
+									t.Fatal("atomic merge mutated operands or its scope path")
+								}
+								cases = append(cases, ssaFormalMergeCase{kind, beforeLeft, beforeRight, optional(previous), covered})
+								expected = append(expected, actual)
+							}
+						}
+					}
+				}
+			}
+			encoded, err := json.Marshal(cases)
+			if err != nil {
+				t.Fatal(err)
+			}
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+			defer cancel()
+			command := exec.CommandContext(ctx, model, "--atomic-merge", "-")
+			command.Stdin = bytes.NewReader(encoded)
+			var stderr bytes.Buffer
+			command.Stderr = &stderr
+			output, err := command.Output()
+			if err != nil {
+				t.Fatalf("atomic merge source model failed: %v: %s", err, stderr.String())
+			}
+			var reports []ssaFormalMergeReport
+			if err := json.Unmarshal(output, &reports); err != nil || !reflect.DeepEqual(reports, expected) {
+				t.Fatalf("atomic source/Go output, rule count or cleanup differs: %v", err)
+			}
+			t.Logf("%d source/native atomic %s merges: exact whole operands, missing/null distinction, prior leaf, reverse cleanup, numeric/wide/deep values", len(cases), kind)
+		})
+	}
+}

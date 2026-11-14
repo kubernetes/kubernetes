@@ -1,0 +1,71 @@
+# Copyright 2026 The Kubernetes Authors.
+# SPDX-License-Identifier: Apache-2.0
+types:
+- name: Document
+  map:
+    fields:
+    - name: apiVersion
+      type: {scalar: string}
+    - name: kind
+      type: {scalar: string}
+    - name: number
+      type: {scalar: numeric}
+    - name: flag
+      type: {scalar: boolean}
+    - name: nullable
+      type: {scalar: string}
+    - name: foo
+      type:
+        map:
+          fields:
+          - name: bar
+            type: {namedType: Branch}
+          - name: abc
+            type: {namedType: Branch}
+    - name: entries
+      type:
+        map:
+          elementType: {namedType: Branch}
+    - name: tags
+      type:
+        list:
+          elementRelationship: associative
+          elementType: {scalar: string}
+    - name: atomicList
+      type:
+        list:
+          elementRelationship: atomic
+          elementType: {scalar: numeric}
+    - name: atomicMap
+      type:
+        map:
+          elementRelationship: atomic
+          elementType: {scalar: string}
+    - name: services
+      type:
+        list:
+          elementRelationship: associative
+          keys: [name, port]
+          elementType: {namedType: Service}
+- name: Branch
+  map:
+    fields:
+    - name: left
+      type: {scalar: string}
+    - name: right
+      type: {scalar: string}
+- name: Service
+  map:
+    fields:
+    - name: name
+      type: {scalar: string}
+    - name: port
+      type: {scalar: numeric}
+    - name: config
+      type: {namedType: Branch}
+    - name: children
+      type:
+        list:
+          elementRelationship: associative
+          keys: [name, port]
+          elementType: {namedType: Service}

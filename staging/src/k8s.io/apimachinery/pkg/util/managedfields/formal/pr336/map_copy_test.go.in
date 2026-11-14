@@ -1,0 +1,181 @@
+/*
+Copyright 2026 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package schema
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"os"
+	"os/exec"
+	"reflect"
+	"testing"
+	"time"
+)
+
+type ssaFormalMapCopyData struct {
+	Fields       string  `json:"fields"`
+	ElementType  string  `json:"elementType"`
+	Unions       string  `json:"unions"`
+	Relationship string  `json:"relationship"`
+	Cache        *string `json:"cache"`
+	Consumed     bool    `json:"consumed"`
+}
+
+type ssaFormalMapCopyCase struct {
+	Source ssaFormalMapCopyData  `json:"source"`
+	Target *ssaFormalMapCopyData `json:"target"`
+}
+
+func TestSSAFormalMapCopy(t *testing.T) {
+	model := os.Getenv("SSA_SET_MODEL")
+	if model == "" {
+		t.Fatal("set SSA_SET_MODEL to the built ssa-model executable")
+	}
+	encode := func(value any) string {
+		t.Helper()
+		data, err := json.Marshal(value)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(data)
+	}
+	pointer := func(value string) *string { return &value }
+	makeMap := func(label string, shape, state int, relationship ElementRelationship) *Map {
+		scalar := String
+		result := &Map{ElementRelationship: relationship}
+		if shape == 1 {
+			result.Fields = []StructField{}
+			result.Unions = []Union{}
+			result.ElementType.Nullable = true
+		} else if shape == 2 {
+			result.Fields = []StructField{{Name: label + "λ", Type: TypeRef{Inlined: Atom{Scalar: &scalar}}}}
+			result.Unions = []Union{{Discriminator: pointer(label)}}
+			result.ElementType = TypeRef{NamedType: pointer(label)}
+		}
+		if state/2 != 0 {
+			cache := map[string]StructField{}
+			if state/2 == 2 {
+				cache[label+"cached"] = StructField{Name: label + "cached"}
+			}
+			result.m.Store(&cache)
+		}
+		if state%2 != 0 {
+			result.once.Do(func() {})
+		}
+		return result
+	}
+	view := func(value *Map, consumed bool) ssaFormalMapCopyData {
+		result := ssaFormalMapCopyData{Fields: encode(value.Fields), ElementType: encode(value.ElementType),
+			Unions: encode(value.Unions), Relationship: string(value.ElementRelationship), Consumed: consumed}
+		if cache := value.m.Load(); cache != nil {
+			result.Cache = pointer(encode(*cache))
+		}
+		return result
+	}
+	probeConsumed := func(value *Map) bool {
+		// The callback only records whether the token had already been consumed; inspect after the copy.
+		ran := false
+		value.once.Do(func() { ran = true })
+		return !ran
+	}
+	cases := []ssaFormalMapCopyCase{}
+	expected := []*ssaFormalMapCopyData{}
+	for shape := 0; shape < 3; shape++ {
+		for _, relationship := range []ElementRelationship{Atomic, Separable} {
+			for sourceState := 0; sourceState < 6; sourceState++ {
+				for targetState := -1; targetState < 6; targetState++ {
+					source := makeMap("source", shape, sourceState, relationship)
+					before := view(source, sourceState%2 != 0)
+					var destination *Map
+					var targetBefore, want *ssaFormalMapCopyData
+					var oldCache *map[string]StructField
+					if targetState >= 0 {
+						destination = makeMap("target", 2, targetState, Associative)
+						oldCache = destination.m.Load()
+						old := view(destination, targetState%2 != 0)
+						targetBefore = &old
+						copy := before
+						if before.Cache == nil {
+							copy.Cache, copy.Consumed = old.Cache, old.Consumed
+						} else {
+							copy.Consumed = true
+						}
+						want = &copy
+					}
+					cases = append(cases, ssaFormalMapCopyCase{before, targetBefore})
+					source.CopyInto(destination)
+					var actual *ssaFormalMapCopyData
+					if destination != nil {
+						value := view(destination, probeConsumed(destination))
+						actual = &value
+						cache := oldCache
+						if source.m.Load() != nil {
+							cache = source.m.Load()
+						}
+						if destination.m.Load() != cache || destination.ElementType != source.ElementType ||
+							(len(source.Fields) > 0 && &destination.Fields[0] != &source.Fields[0]) ||
+							(len(source.Unions) > 0 && &destination.Unions[0] != &source.Unions[0]) {
+							t.Fatal("source map copy changed shared contents or cache pointer identity")
+						}
+					}
+					if !reflect.DeepEqual(actual, want) || !reflect.DeepEqual(view(source, probeConsumed(source)), before) {
+						t.Fatalf("source map copy violated fields, cache or once contract: case=%s got=%s want=%s", encode(cases[len(cases)-1]), encode(actual), encode(want))
+					}
+					expected = append(expected, actual)
+				}
+			}
+		}
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	command := exec.CommandContext(ctx, model, "--map-copy", "-")
+	command.Stdin = bytes.NewBufferString(encode(cases))
+	output, err := command.CombinedOutput()
+	if err != nil {
+		t.Fatalf("source map-copy model: %v: %s", err, output)
+	}
+	var actual []*ssaFormalMapCopyData
+	if err := json.Unmarshal(output, &actual); err != nil {
+		t.Fatalf("decode source map-copy model: %v: %s", err, output)
+	}
+	if len(actual) != len(expected) {
+		t.Fatalf("map-copy result count: got %d want %d", len(actual), len(expected))
+	}
+	for index := range expected {
+		if !reflect.DeepEqual(actual[index], expected[index]) {
+			t.Fatalf("Go/source map-copy mismatch at case %d: got=%s want=%s", index, encode(actual[index]), encode(expected[index]))
+		}
+	}
+	t.Logf("Compared %d source/native copies: nil destination, exported contents, shared pointers and independently initialized cache/Once states", len(cases))
+}
+
+func TestSSAFormalMapCopyReusedDestination(t *testing.T) {
+	scalar := String
+	source := &Map{Fields: []StructField{{Name: "new", Type: TypeRef{Inlined: Atom{Scalar: &scalar}}}}}
+	destination := &Map{Fields: []StructField{{Name: "old", Type: TypeRef{Inlined: Atom{Scalar: &scalar}}}}}
+	if _, ok := destination.FindField("old"); !ok {
+		t.Fatal("failed to initialize destination field index")
+	}
+	source.CopyInto(destination)
+	old, foundOld := destination.FindField("old")
+	_, foundNew := destination.FindField("new")
+	if len(destination.Fields) != 1 || destination.Fields[0].Name != "new" || !foundOld || old.Name != "old" || foundNew {
+		t.Fatal("reused-destination stale-index source counterexample changed")
+	}
+	t.Log("Reproduced stale index after copying an unindexed source into a reused destination; Resolve supplies a fresh destination.")
+}

@@ -1,0 +1,61 @@
+# Copyright 2026 The Kubernetes Authors.
+# SPDX-License-Identifier: Apache-2.0
+types:
+- name: Document
+  map:
+    fields:
+    - name: apiVersion
+      type: {scalar: string}
+    - name: kind
+      type: {scalar: string}
+    - name: x
+      type: {scalar: string}
+    - name: "y"
+      type: {scalar: string}
+    - name: z
+      type: {scalar: string}
+    - name: settings
+      type:
+        map:
+          fields:
+          - name: left
+            type: {scalar: string}
+          - name: right
+            type: {scalar: string}
+    - name: atomic
+      type:
+        map:
+          elementRelationship: atomic
+          elementType: {scalar: string}
+    - name: items
+      type:
+        list:
+          elementRelationship: associative
+          keys: [name]
+          elementType: {namedType: Item}
+- name: Item
+  map:
+    fields:
+    - name: name
+      type: {scalar: string}
+    - name: host
+      type: {scalar: string}
+    - name: port
+      type: {scalar: string}
+    - name: note
+      type: {scalar: string}
+    - name: children
+      type:
+        list:
+          elementRelationship: associative
+          keys: [name]
+          elementType: {namedType: Child}
+- name: Child
+  map:
+    fields:
+    - name: name
+      type: {scalar: string}
+    - name: url
+      type: {scalar: string}
+    - name: note
+      type: {scalar: string}
