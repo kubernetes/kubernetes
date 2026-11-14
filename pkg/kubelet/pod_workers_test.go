@@ -272,7 +272,7 @@ func (w *timeIncrementingWorkers) UpdatePod(ctx context.Context, options UpdateP
 		w.lock.Lock()
 		defer w.lock.Unlock()
 		w.w.UpdatePod(ctx, options)
-		w.w.clock.(*clocktesting.FakePassiveClock).SetTime(w.w.clock.Now().Add(time.Second))
+		w.w.clock.(*clocktesting.FakeClock).SetTime(w.w.clock.Now().Add(time.Second))
 		for _, fn := range afterFns {
 			fn()
 		}
@@ -287,7 +287,7 @@ func (w *timeIncrementingWorkers) SyncKnownPods(logger klog.Logger, desiredPods 
 		w.lock.Lock()
 		defer w.lock.Unlock()
 		knownPods = w.w.SyncKnownPods(logger, desiredPods)
-		w.w.clock.(*clocktesting.FakePassiveClock).SetTime(w.w.clock.Now().Add(time.Second))
+		w.w.clock.(*clocktesting.FakeClock).SetTime(w.w.clock.Now().Add(time.Second))
 	}()
 	w.drainUnpausedWorkers()
 	return
@@ -369,7 +369,7 @@ func (w *timeIncrementingWorkers) drainUnpausedWorkers() {
 func (w *timeIncrementingWorkers) tick() {
 	w.lock.Lock()
 	defer w.lock.Unlock()
-	w.w.clock.(*clocktesting.FakePassiveClock).SetTime(w.w.clock.Now().Add(time.Second))
+	w.w.clock.(*clocktesting.FakeClock).SetTime(w.w.clock.Now().Add(time.Second))
 }
 
 // createTimeIncrementingPodWorkers will guarantee that each call to UpdatePod and each worker goroutine invocation advances the clock by one second,
@@ -409,7 +409,7 @@ func createPodWorkersWithLogger(logger klog.Logger) (*podWorkers, *containertest
 	fakeRuntime := &containertest.FakeRuntime{}
 	fakeCache := containertest.NewFakeCache(fakeRuntime)
 	fakeQueue := &fakeQueue{}
-	clock := clocktesting.NewFakePassiveClock(time.Unix(1, 0))
+	clock := clocktesting.NewFakeClock(time.Unix(1, 0))
 	w := newPodWorkers(
 		&podSyncerFuncs{
 			syncPod: func(ctx context.Context, updateType kubetypes.SyncPodType, pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus) (bool, func(), error) {
@@ -424,7 +424,7 @@ func createPodWorkersWithLogger(logger klog.Logger) (*podWorkers, *containertest
 				}()
 				return false, nil, nil
 			},
-			syncTerminatingPod: func(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, gracePeriod *int64, podStatusFn func(*v1.PodStatus)) error {
+			syncTerminatingPod: func(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, gracePeriod *int64, deadline time.Time, podStatusFn func(*v1.PodStatus)) (bool, error) {
 				func() {
 					lock.Lock()
 					defer lock.Unlock()
@@ -434,7 +434,7 @@ func createPodWorkersWithLogger(logger klog.Logger) (*podWorkers, *containertest
 						gracePeriod: gracePeriod,
 					})
 				}()
-				return nil
+				return true, nil
 			},
 			syncTerminatingRuntimePod: func(ctx context.Context, runningPod *kubecontainer.Pod) error {
 				func() {
@@ -908,7 +908,7 @@ func TestCompleteWork_Enqueue(t *testing.T) {
 
 	defaultBackoff := 10 * time.Second
 	resyncInterval := 20 * time.Second
-	clock := clocktesting.NewFakePassiveClock(time.Unix(1, 0))
+	clock := clocktesting.NewFakeClock(time.Unix(1, 0))
 
 	testCases := []struct {
 		name            string
@@ -1024,7 +1024,7 @@ func TestCompleteWork_Enqueue(t *testing.T) {
 			podWorkers.resyncInterval = resyncInterval
 			podWorkers.backOffPeriod = defaultBackoff
 			podWorkers.podSyncStatuses[podUID] = &podSyncStatus{}
-			podWorkers.completeWork(logger, podUID, tc.phaseTransition, tc.syncErr)
+			podWorkers.completeWork(logger, podUID, tc.phaseTransition, tc.syncErr, time.Time{})
 
 			if fakeQueue.Empty() {
 				t.Fatalf("work queue should not be empty")
@@ -1057,7 +1057,7 @@ func TestCompleteWork_PendingUpdate(t *testing.T) {
 		}
 		p.podSyncStatuses[podUID] = &podSyncStatus{working: true, pendingUpdate: nil}
 
-		p.completeWork(logger, podUID, false, nil)
+		p.completeWork(logger, podUID, false, nil, time.Time{})
 
 		p.podLock.Lock()
 		defer p.podLock.Unlock()
@@ -1080,7 +1080,7 @@ func TestCompleteWork_PendingUpdate(t *testing.T) {
 		}
 		p.podSyncStatuses[podUID] = &podSyncStatus{working: true, pendingUpdate: dummyUpdate}
 
-		p.completeWork(logger, podUID, false, nil)
+		p.completeWork(logger, podUID, false, nil, time.Time{})
 
 		select {
 		case <-p.podUpdates[podUID]:
@@ -2142,8 +2142,8 @@ func (kl *simpleFakeKubelet) SyncPodWithWaitGroup(ctx context.Context, updateTyp
 	return false, nil, nil
 }
 
-func (kl *simpleFakeKubelet) SyncTerminatingPod(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, gracePeriod *int64, podStatusFn func(*v1.PodStatus)) error {
-	return nil
+func (kl *simpleFakeKubelet) SyncTerminatingPod(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, gracePeriod *int64, deadline time.Time, podStatusFn func(*v1.PodStatus)) (bool, error) {
+	return true, nil
 }
 
 func (kl *simpleFakeKubelet) SyncTerminatingRuntimePod(ctx context.Context, runningPod *kubecontainer.Pod) error {
@@ -2781,8 +2781,8 @@ func TestPodWorkerErrorsMetric(t *testing.T) {
 				syncPod: func(ctx context.Context, updateType kubetypes.SyncPodType, pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus) (bool, func(), error) {
 					return false, nil, tc.syncPodErr
 				},
-				syncTerminatingPod: func(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, gracePeriod *int64, podStatusFn func(*v1.PodStatus)) error {
-					return tc.syncTerminatingPodErr
+				syncTerminatingPod: func(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, gracePeriod *int64, deadline time.Time, podStatusFn func(*v1.PodStatus)) (bool, error) {
+					return true, tc.syncTerminatingPodErr
 				},
 				syncTerminatingRuntimePod: func(ctx context.Context, runningPod *kubecontainer.Pod) error {
 					return tc.syncTerminatingRuntimePodErr
