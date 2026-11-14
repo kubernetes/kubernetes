@@ -28,7 +28,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	storagelisters "k8s.io/client-go/listers/storage/v1"
@@ -173,17 +172,15 @@ func (kvh *kubeletVolumeHost) CSIDriversSynced() cache.InformerSynced {
 }
 
 // WaitForCacheSync is a helper function that waits for cache sync for CSIDriverLister
-func (kvh *kubeletVolumeHost) WaitForCacheSync() error {
-	// Use context.TODO() because we currently do not have a proper context to pass in.
-	// Replace this with an appropriate context when refactoring this function to accept a context parameter.
-	logger := klog.FromContext(context.TODO())
+func (kvh *kubeletVolumeHost) WaitForCacheSync(ctx context.Context) error {
+	logger := klog.FromContext(ctx)
 	if kvh.csiDriversSynced == nil {
 		logger.Error(nil, "CsiDriversSynced not found on KubeletVolumeHost")
 		return fmt.Errorf("csiDriversSynced not found on KubeletVolumeHost")
 	}
 
 	synced := []cache.InformerSynced{kvh.csiDriversSynced}
-	if !cache.WaitForCacheSync(wait.NeverStop, synced...) {
+	if !cache.WaitForCacheSync(ctx.Done(), synced...) {
 		logger.Info("Failed to wait for cache sync for CSIDriverLister")
 		return fmt.Errorf("failed to wait for cache sync for CSIDriverLister")
 	}
