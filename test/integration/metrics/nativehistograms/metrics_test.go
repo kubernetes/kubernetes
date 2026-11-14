@@ -85,12 +85,15 @@ func TestAPIServerNativeHistogramMetrics(t *testing.T) {
 	httpClient := &http.Client{Transport: transport}
 
 	// Scrape metrics in protobuf format to get native histogram data
-	histogramMetric := "apiserver_request_duration_seconds"
 	metrics, err := testutil.ScrapeMetricsProto(s.ClientConfig.Host+"/metrics", httpClient)
 	if err != nil {
 		t.Fatalf("failed to scrape metrics: %v", err)
 	}
 
+	for _, histogramMetric := range []string{
+		"apiserver_request_duration_seconds",
+		"workqueue_work_duration_seconds",
+	} {
 	mf, ok := metrics[histogramMetric]
 	if !ok {
 		t.Fatalf("metric %q not found", histogramMetric)
@@ -98,6 +101,7 @@ func TestAPIServerNativeHistogramMetrics(t *testing.T) {
 
 	// Verify native histogram data is present
 	testutil.AssertHasNativeHistogram(t, mf, nil)
+	}
 
 	// Verify classic histogram buckets are still exposed
 	textMetrics, err := scrapeMetrics(s)
