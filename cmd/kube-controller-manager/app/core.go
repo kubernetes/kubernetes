@@ -549,9 +549,9 @@ func newNamespaceController(ctx context.Context, controllerContext ControllerCon
 		controllerContext.ComponentConfig.NamespaceController.NamespaceSyncPeriod.Duration,
 		v1.FinalizerKubernetes,
 	)
-	return newControllerLoop(func(ctx context.Context) {
+	return newPausableControllerLoop(func(ctx context.Context) {
 		namespaceController.Run(ctx, int(controllerContext.ComponentConfig.NamespaceController.ConcurrentNamespaceSyncs))
-	}, controllerName), nil
+	}, controllerName, namespaceController), nil
 }
 
 func newServiceAccountControllerDescriptor() *ControllerDescriptor {

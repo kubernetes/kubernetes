@@ -18,6 +18,10 @@ package app
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"regexp"
 	"strings"
 	"testing"
@@ -25,13 +29,24 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/server/healthz"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	clientset "k8s.io/client-go/kubernetes"
+	fakeclientset "k8s.io/client-go/kubernetes/fake"
+	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/leaderelection"
+	"k8s.io/client-go/tools/leaderelection/resourcelock"
+	"k8s.io/client-go/transport"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/controller-manager/pkg/clientbuilder"
+	cmfeatures "k8s.io/controller-manager/pkg/features"
 	"k8s.io/klog/v2/ktesting"
+	"k8s.io/kubernetes/cmd/kube-controller-manager/app/config"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
 )
 
 func TestControllerNamesConsistency(t *testing.T) {
@@ -264,4 +279,240 @@ func runControllers(
 	}
 	RunControllers(ctx, controllerCtx, controllers, 0, 0)
 	return nil
+}
+
+// serviceAccountServer answers token requests with a token and every other
+// request with a service account, which is all the dynamic client builder
+// needs to hand out per-controller clients.
+func serviceAccountServer(t *testing.T) *httptest.Server {
+	t.Helper()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if strings.HasSuffix(r.URL.Path, "/token") {
+			_, _ = fmt.Fprintf(w, `{"kind":"TokenRequest","apiVersion":"authentication.k8s.io/v1","spec":{"expirationSeconds":3600},"status":{"token":"t","expirationTimestamp":%q}}`, time.Now().Add(time.Hour).Format(time.RFC3339))
+			return
+		}
+		_, _ = w.Write([]byte(`{"kind":"ServiceAccount","apiVersion":"v1","metadata":{"name":"x","namespace":"kube-system"}}`))
+	}))
+	t.Cleanup(server.Close)
+	return server
+}
+
+func TestCreateClientBuilders(t *testing.T) {
+	server := serviceAccountServer(t)
+	for _, useServiceAccounts := range []bool{false, true} {
+		for _, gated := range []bool{false, true} {
+			t.Run(fmt.Sprintf("serviceAccountCredentials=%v/gate=%v", useServiceAccounts, gated), func(t *testing.T) {
+				kubeconfig := &restclient.Config{Host: server.URL}
+				c := &config.Config{Kubeconfig: kubeconfig, Client: clientset.NewForConfigOrDie(kubeconfig)}
+				c.ComponentConfig.KubeCloudShared.UseServiceAccountCredentials = useServiceAccounts
+
+				wraps := 0
+				var gate transport.WrapperFunc
+				if gated {
+					gate = func(rt http.RoundTripper) http.RoundTripper {
+						wraps++
+						return rt
+					}
+				}
+
+				clientBuilder, rootClientBuilder := createClientBuilders(c.Complete(), gate)
+
+				// Building a client applies the gate to its transport.
+				rootClientBuilder.ClientOrDie("root")
+				clientBuilder.ClientOrDie("controller")
+				wantWraps := 0
+				if gated {
+					wantWraps = 2
+				}
+				if wraps != wantWraps {
+					t.Errorf("gate applied %d times building a root and a controller client, want %d", wraps, wantWraps)
+				}
+				if kubeconfig.WrapTransport != nil {
+					t.Errorf("the controller manager's kubeconfig must not be modified")
+				}
+
+				if useServiceAccounts {
+					if _, ok := clientBuilder.(*clientbuilder.DynamicControllerClientBuilder); !ok {
+						t.Errorf("controller builder is %T, want the service account builder", clientBuilder)
+					}
+				} else if clientBuilder != rootClientBuilder {
+					t.Errorf("controller builder is %T, want the root builder", clientBuilder)
+				}
+			})
+		}
+	}
+}
+
+func TestRecoveryConfigFor(t *testing.T) {
+	deadline := func(d time.Duration) *config.CompletedConfig {
+		c := &config.Config{}
+		c.ComponentConfig.Generic.LeaderElectionRecoveryDeadline = metav1.Duration{Duration: d}
+		return c.Complete()
+	}
+	if got := recoveryConfigFor(deadline(0)); got == nil || got.RecoveryDeadline != nil {
+		t.Errorf("zero deadline: got %+v, want a config with no deadline", got)
+	}
+	if got := recoveryConfigFor(deadline(30 * time.Second)); got == nil || got.RecoveryDeadline == nil || *got.RecoveryDeadline != 30*time.Second {
+		t.Errorf("30s deadline: got %+v, want a config with a 30s deadline", got)
+	}
+}
+
+// notLeadingElection returns an election whose elector has not acquired its
+// lease, so its write gate is closed.
+func notLeadingElection(t *testing.T) *electionRun {
+	t.Helper()
+	le, err := leaderelection.NewLeaderElector(leaderelection.LeaderElectionConfig{
+		Lock: &resourcelock.LeaseLock{
+			LeaseMeta:  metav1.ObjectMeta{Namespace: "kube-system", Name: "test"},
+			Client:     fakeclientset.NewSimpleClientset().CoordinationV1(),
+			LockConfig: resourcelock.ResourceLockConfig{Identity: "test"},
+		},
+		LeaseDuration: 15 * time.Second,
+		RenewDeadline: 10 * time.Second,
+		RetryPeriod:   2 * time.Second,
+		Callbacks:     leaderelection.LeaderCallbacks{OnStartedLeading: func(context.Context) {}, OnStoppedLeading: func() {}},
+		Recovery:      &leaderelection.RecoveryConfig{},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return &electionRun{elector: le}
+}
+
+// TestClientBuildersFor checks which builders controllers get: the controller
+// manager's own unless recovery is enabled and the controllers run under an
+// election, in which case writes are rejected while the election is not leading.
+func TestClientBuildersFor(t *testing.T) {
+	server := serviceAccountServer(t)
+	ctx := context.Background()
+	for _, useServiceAccounts := range []bool{false, true} {
+		for _, tc := range []struct {
+			name      string
+			election  bool
+			recovery  bool
+			wantGated bool
+		}{
+			{name: "no election"},
+			{name: "election without recovery", election: true},
+			{name: "election with recovery", election: true, recovery: true, wantGated: true},
+		} {
+			t.Run(fmt.Sprintf("serviceAccountCredentials=%v/%s", useServiceAccounts, tc.name), func(t *testing.T) {
+				kubeconfig := &restclient.Config{Host: server.URL}
+				c := &config.Config{Kubeconfig: kubeconfig, Client: clientset.NewForConfigOrDie(kubeconfig)}
+				c.ComponentConfig.KubeCloudShared.UseServiceAccountCredentials = useServiceAccounts
+				completed := c.Complete()
+				clientBuilder, rootClientBuilder := createClientBuilders(completed, nil)
+				var election *electionRun
+				switch {
+				case tc.recovery:
+					election = notLeadingElection(t)
+				case tc.election:
+					election = &electionRun{}
+				}
+
+				gotClient, gotRoot := clientBuildersFor(completed, clientBuilder, rootClientBuilder, election)
+				if !tc.wantGated && (gotClient != clientBuilder || gotRoot != rootClientBuilder) {
+					t.Fatalf("expected the controller manager's own builders back, got %T and %T", gotClient, gotRoot)
+				}
+				for name, b := range map[string]clientbuilder.TypedClientBuilder{"controller": gotClient, "root": gotRoot} {
+					rest := b.ClientOrDie(name).CoreV1().RESTClient()
+					if err := rest.Get().AbsPath("/api/v1/namespaces").Do(ctx).Error(); err != nil {
+						t.Errorf("%s builder: read failed: %v", name, err)
+					}
+					err := rest.Post().AbsPath("/api/v1/namespaces").Body([]byte("{}")).Do(ctx).Error()
+					switch {
+					case tc.wantGated && !errors.Is(err, leaderelection.ErrWriteGateClosed):
+						t.Errorf("%s builder: write must be rejected while not leading, got %v", name, err)
+					case !tc.wantGated && err != nil:
+						t.Errorf("%s builder: write failed: %v", name, err)
+					}
+				}
+			})
+		}
+	}
+}
+
+func TestLeaderElectionRecoveryEnabled(t *testing.T) {
+	for _, tc := range []struct {
+		name          string
+		recovery, cle bool
+		want          bool
+	}{
+		{name: "gate off", want: false},
+		{name: "gate on", recovery: true, want: true},
+		{name: "gate on with coordinated leader election", recovery: true, cle: true, want: false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, cmfeatures.LeaderElectionRecovery, tc.recovery)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeatures.CoordinatedLeaderElection, tc.cle)
+			logger, _ := ktesting.NewTestContext(t)
+			if got := leaderElectionRecoveryEnabled(logger); got != tc.want {
+				t.Errorf("got %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+type testPausable struct{ paused bool }
+
+func (p *testPausable) Pause()  { p.paused = true }
+func (p *testPausable) Resume() { p.paused = false }
+
+// TestBuildControllersRecoveryOptIn verifies that BuildControllers registers
+// the controllers that implement Pausable with the election, and only those,
+// so they are paused while the controller manager is not leading.
+func TestBuildControllersRecoveryOptIn(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	pausable := &testPausable{}
+	specialPausable := &testPausable{}
+	pausableConstructor := func(p *testPausable) func(context.Context, ControllerContext, string) (Controller, error) {
+		return func(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
+			return newPausableControllerLoop(func(context.Context) {}, controllerName, p), nil
+		}
+	}
+	plainConstructor := func(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
+		return newControllerLoop(func(context.Context) {}, controllerName), nil
+	}
+	descriptors := map[string]*ControllerDescriptor{
+		"pausable": {name: "pausable", constructor: pausableConstructor(pausable)},
+		"plain":    {name: "plain", constructor: plainConstructor},
+		// Skipped by its constructor: nothing runs, so nothing to pause.
+		"skipped": {name: "skipped", constructor: func(context.Context, ControllerContext, string) (Controller, error) { return nil, nil }},
+		// Disabled by --controllers: never built.
+		"disabled": {name: "disabled", constructor: plainConstructor},
+		// Built through the special-handling path, like the tokens controller.
+		names.ServiceAccountTokenController: {name: names.ServiceAccountTokenController, constructor: pausableConstructor(specialPausable), requiresSpecialHandling: true},
+	}
+
+	t.Run("recovery enabled", func(t *testing.T) {
+		controllerCtx := ControllerContext{}
+		controllerCtx.ComponentConfig.Generic.Controllers = []string{"*", "-disabled"}
+		// The election is not leading, so registered controllers are paused at once.
+		controllerCtx.PausableRegistrar = notLeadingElection(t).elector
+
+		var healthChecks mockHealthCheckAdder
+		controllers, err := BuildControllers(ctx, controllerCtx, descriptors, nil, &healthChecks)
+		if err != nil {
+			t.Fatalf("unexpected error building controllers: %v", err)
+		}
+
+		if !pausable.paused || !specialPausable.paused {
+			t.Error("the pausable and the special-handling controllers must be registered with the election and paused while it is not leading")
+		}
+		// The plain controller is built and runs unpaused.
+		if len(controllers) != 3 {
+			t.Errorf("expected the pausable, plain and special-handling controllers to be built, got %d controllers", len(controllers))
+		}
+	})
+
+	t.Run("recovery disabled", func(t *testing.T) {
+		// Without a registrar nothing is recorded and building still works.
+		controllerCtx := ControllerContext{}
+		controllerCtx.ComponentConfig.Generic.Controllers = []string{"*"}
+		var healthChecks mockHealthCheckAdder
+		if _, err := BuildControllers(ctx, controllerCtx, descriptors, nil, &healthChecks); err != nil {
+			t.Fatalf("unexpected error building controllers: %v", err)
+		}
+	})
 }
