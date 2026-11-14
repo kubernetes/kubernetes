@@ -45,7 +45,7 @@ func TestRecordWebhookMetrics(t *testing.T) {
 			result:   "timeout",
 			duration: 1.5,
 			want: `
-			# HELP apiserver_authorization_webhook_duration_seconds [ALPHA] Request latency in seconds.
+			# HELP apiserver_authorization_webhook_duration_seconds [BETA] Request latency in seconds.
 			# TYPE apiserver_authorization_webhook_duration_seconds histogram
             apiserver_authorization_webhook_duration_seconds_bucket{name="wh1.example.com",result="timeout",le="0.005"} 0
             apiserver_authorization_webhook_duration_seconds_bucket{name="wh1.example.com",result="timeout",le="0.01"} 0
@@ -61,10 +61,10 @@ func TestRecordWebhookMetrics(t *testing.T) {
             apiserver_authorization_webhook_duration_seconds_bucket{name="wh1.example.com",result="timeout",le="+Inf"} 1
             apiserver_authorization_webhook_duration_seconds_sum{name="wh1.example.com",result="timeout"} 1.5
             apiserver_authorization_webhook_duration_seconds_count{name="wh1.example.com",result="timeout"} 1
-            # HELP apiserver_authorization_webhook_evaluations_fail_open_total [ALPHA] NoOpinion results due to webhook timeout or error.
+            # HELP apiserver_authorization_webhook_evaluations_fail_open_total [BETA] NoOpinion results due to webhook timeout or error.
             # TYPE apiserver_authorization_webhook_evaluations_fail_open_total counter
             apiserver_authorization_webhook_evaluations_fail_open_total{name="wh1.example.com",result="timeout"} 1
-            # HELP apiserver_authorization_webhook_evaluations_total [ALPHA] Round-trips to authorization webhooks.
+            # HELP apiserver_authorization_webhook_evaluations_total [BETA] Round-trips to authorization webhooks.
             # TYPE apiserver_authorization_webhook_evaluations_total counter
             apiserver_authorization_webhook_evaluations_total{name="wh1.example.com",result="timeout"} 1
             `,
