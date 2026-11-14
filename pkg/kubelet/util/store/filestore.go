@@ -147,7 +147,23 @@ func writeFile(fs utilfs.Filesystem, path string, data []byte) (retErr error) {
 		return err
 	}
 
-	return fs.Rename(tmpPath, path)
+	if err := fs.Rename(tmpPath, path); err != nil {
+		return err
+	}
+
+	return syncDirectory(fs, filepath.Dir(path))
+}
+
+func syncDirectory(_ utilfs.Filesystem, dir string) error {
+	d, err := os.Open(dir)
+	if err != nil {
+		return nil
+	}
+	err = d.Sync()
+	if closeErr := d.Close(); err == nil {
+		err = closeErr
+	}
+	return err
 }
 
 func removePath(fs utilfs.Filesystem, path string) error {
