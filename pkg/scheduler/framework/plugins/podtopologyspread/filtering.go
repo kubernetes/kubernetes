@@ -187,13 +187,6 @@ func (pl *PodTopologySpread) updateWithPod(logger klog.Logger, s *preFilterState
 	}
 
 	requiredSchedulingTerm := nodeaffinity.GetRequiredNodeAffinity(preemptorPod)
-	if !pl.enableNodeInclusionPolicyInPodTopologySpread {
-		// spreading is applied to nodes that pass those filters.
-		// Ignore parsing errors for backwards compatibility.
-		if match, _ := requiredSchedulingTerm.Match(node); !match {
-			return
-		}
-	}
 
 	podLabelSet := labels.Set(updatedPod.Labels)
 	for i, constraint := range s.Constraints {
@@ -201,8 +194,7 @@ func (pl *PodTopologySpread) updateWithPod(logger klog.Logger, s *preFilterState
 			continue
 		}
 
-		if pl.enableNodeInclusionPolicyInPodTopologySpread &&
-			!constraint.matchNodeInclusionPolicies(logger, preemptorPod, node, requiredSchedulingTerm, pl.enableTaintTolerationComparisonOperators) {
+		if !constraint.matchNodeInclusionPolicies(logger, preemptorPod, node, requiredSchedulingTerm, pl.enableTaintTolerationComparisonOperators) {
 			continue
 		}
 
@@ -259,14 +251,6 @@ func (pl *PodTopologySpread) calPreFilterState(ctx context.Context, pod *v1.Pod,
 		nodeInfo := allNodes[n]
 		node := nodeInfo.Node()
 
-		if !pl.enableNodeInclusionPolicyInPodTopologySpread {
-			// spreading is applied to nodes that pass those filters.
-			// Ignore parsing errors for backwards compatibility.
-			if match, _ := requiredNodeAffinity.Match(node); !match {
-				return
-			}
-		}
-
 		// Ensure current node's labels contains all topologyKeys in 'Constraints'.
 		if !nodeLabelsMatchSpreadConstraints(node.Labels, constraints) {
 			return
@@ -274,8 +258,7 @@ func (pl *PodTopologySpread) calPreFilterState(ctx context.Context, pod *v1.Pod,
 
 		tpCounts := make([]topologyCount, 0, len(constraints))
 		for i, c := range constraints {
-			if pl.enableNodeInclusionPolicyInPodTopologySpread &&
-				!c.matchNodeInclusionPolicies(logger, pod, node, requiredNodeAffinity, pl.enableTaintTolerationComparisonOperators) {
+			if !c.matchNodeInclusionPolicies(logger, pod, node, requiredNodeAffinity, pl.enableTaintTolerationComparisonOperators) {
 				continue
 			}
 
