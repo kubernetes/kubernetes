@@ -224,7 +224,7 @@ func (pl *DynamicResources) filterExtendedResources(state *stateData, pod *v1.Po
 	// The claim is from the prior scheduling cycle, return unschedulable such that it can be
 	// deleted at the PostFilter phase, and retry anew.
 	if extendedResourceClaim.Spec.Devices.Requests != nil {
-		return nil, nil, statusUnschedulable(logger, "cannot schedule extended resource claim", "pod", klog.KObj(pod), "node", klog.KObj(nodeInfo.Node()), "claim", klog.KObj(extendedResourceClaim))
+		return nil, nil, statusUnschedulableAndUnresolvable(logger, "cannot schedule extended resource claim", "pod", klog.KObj(pod), "node", klog.KObj(nodeInfo.Node()), "claim", klog.KObj(extendedResourceClaim))
 	}
 
 	extendedResources := make(map[v1.ResourceName]int64)
@@ -250,7 +250,7 @@ func (pl *DynamicResources) filterExtendedResources(state *stateData, pod *v1.Po
 		} else if !okScalar {
 			// has request neither provided by device plugin, nor backed by DRA,
 			// hence the pod does not fit the node.
-			return nil, nil, statusUnschedulable(logger, "cannot fit resource", "pod", klog.KObj(pod), "node", klog.KObj(nodeInfo.Node()), "resource", rName)
+			return nil, nil, statusUnschedulableAndUnresolvable(logger, "cannot fit resource", "pod", klog.KObj(pod), "node", klog.KObj(nodeInfo.Node()), "resource", rName)
 		}
 	}
 	// No extended resources backed by DRA on this node.
@@ -286,7 +286,7 @@ func (pl *DynamicResources) checkExtendedResourceCapacity(logger klog.Logger, po
 	if pl.fts.EnableDRAExtendedResourceCapacity || class.Spec.ExtendedResourceCapacityRequests == nil {
 		return nil
 	}
-	return statusUnschedulable(logger, fmt.Sprintf("device class %s sets extendedResourceCapacityRequests, which requires the DRAExtendedResourceCapacity feature", class.Name),
+	return statusUnschedulableAndUnresolvable(logger, fmt.Sprintf("device class %s sets extendedResourceCapacityRequests, which requires the DRAExtendedResourceCapacity feature", class.Name),
 		"pod", klog.KObj(pod), "node", klog.KObj(nodeInfo.Node()), "resource", rName, "deviceClass", klog.KObj(class))
 }
 

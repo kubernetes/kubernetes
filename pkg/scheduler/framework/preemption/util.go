@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	policylisters "k8s.io/client-go/listers/policy/v1"
 	fwk "k8s.io/kube-scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
 // PodTerminatingByPreemption returns true if the pod is in the termination state caused by scheduler preemption.
@@ -39,6 +40,18 @@ func PodTerminatingByPreemption(p *v1.Pod) bool {
 		}
 	}
 	return false
+}
+
+// NominatedNodeName returns the node that pod is nominated to. It asks the
+// handle if the handle implements framework.NominatedNodeNameGetter, because
+// with the DRAPreemption feature gate the pod object can lag behind the
+// nomination in the PodNominator. Otherwise it returns
+// pod.Status.NominatedNodeName.
+func NominatedNodeName(fh fwk.Handle, pod *v1.Pod) string {
+	if nominator, ok := fh.(framework.NominatedNodeNameGetter); ok {
+		return nominator.NominatedNodeName(pod)
+	}
+	return pod.Status.NominatedNodeName
 }
 
 // MoreImportantVictim decides which of two preemption units is considered more critical.

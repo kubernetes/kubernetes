@@ -93,6 +93,15 @@ type AllocatedState struct {
 	// AggregatedCapacity records the consumed capacity per device ID when
 	// the DRAConsumableCapacity feature is enabled.
 	AggregatedCapacity ConsumedCapacityCollection
+	// AllocatedShareCounts records the number of active shares (distinct ShareIDs)
+	// per device in AllocatedSharedDeviceIDs. The scheduler populates it only when
+	// both DRAConsumableCapacity and DRAPreemption are enabled.
+	//
+	// Callers simulating share release (such as preemption) need these counts to
+	// tell when removing shares frees a device completely. If the map is nil
+	// (for example, from a producer that does not track share counts) or lacks an
+	// entry for a device, callers must assume the device remains shared.
+	AllocatedShareCounts map[DeviceID]int
 }
 
 // ConsumedCapacity represents the consumed capacity of a specific resource.

@@ -17,7 +17,10 @@ limitations under the License.
 package dynamicresources
 
 import (
+	"fmt"
 	"maps"
+	"math/rand/v2"
+	"sync"
 	"testing"
 
 	"github.com/onsi/gomega"
@@ -29,6 +32,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/dynamic-resource-allocation/structured"
+	"k8s.io/klog/v2"
 	"k8s.io/ktesting"
 	"k8s.io/kubernetes/pkg/features"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
@@ -423,5 +427,217 @@ func testGatherAllocatedStateConsumedCapacity(tCtx ktesting.TContext) {
 				tCtx.Expect(memory.Cmp(resource.MustParse(test.expectMemory))).To(gomega.BeZero(), "aggregated memory %s", memory)
 			}
 		})
+	}
+}
+
+func TestGatherAllocatedStateShareCounts(t *testing.T) {
+	testGatherAllocatedStateShareCounts(ktesting.Init(t))
+}
+func testGatherAllocatedStateShareCounts(tCtx ktesting.TContext) {
+	featuregatetesting.SetFeatureGateDuringTest(tCtx, utilfeature.DefaultFeatureGate, features.DRAConsumableCapacity, true)
+
+	device := structured.MakeDeviceID(sharedDriver, sharedPool, sharedDevice)
+	share := claimWithConsumedCapacity("share", "1")
+	otherShare := claimWithConsumedCapacity("other-share", "1")
+	dedicated := claimWithConsumedCapacity("dedicated", "1")
+	dedicated.Status.Allocation.Devices.Results[0].ShareID = nil
+
+	tests := map[string]struct {
+		disablePreemption bool
+		// preemptionOnlyAtCall enables DRAPreemption only after newAllocatedDevices
+		// runs; share counting is initialized at creation time, so counts stay nil.
+		preemptionOnlyAtCall bool
+		allocated            []*resourceapi.ResourceClaim
+		inFlight             []*resourceapi.ResourceClaim
+		expectCounts         map[structured.DeviceID]int
+	}{
+		"without-DRAPreemption": {
+			disablePreemption: true,
+			allocated:         []*resourceapi.ResourceClaim{share, otherShare},
+		},
+		"DRAPreemption-only-at-call": {
+			preemptionOnlyAtCall: true,
+			allocated:            []*resourceapi.ResourceClaim{share, otherShare},
+		},
+		"allocated": {
+			allocated:    []*resourceapi.ResourceClaim{share, otherShare},
+			expectCounts: map[structured.DeviceID]int{device: 2},
+		},
+		"in-flight": {
+			allocated:    []*resourceapi.ResourceClaim{share},
+			inFlight:     []*resourceapi.ResourceClaim{otherShare},
+			expectCounts: map[structured.DeviceID]int{device: 2},
+		},
+		// During PreBind, a claim can be both in flight and in the assume cache.
+		"in-flight-and-allocated": {
+			allocated:    []*resourceapi.ResourceClaim{share},
+			inFlight:     []*resourceapi.ResourceClaim{share},
+			expectCounts: map[structured.DeviceID]int{device: 1},
+		},
+		"dedicated": {
+			allocated:    []*resourceapi.ResourceClaim{dedicated},
+			expectCounts: map[structured.DeviceID]int{},
+		},
+	}
+
+	for name, test := range tests {
+		tCtx.Run(name, func(tCtx ktesting.TContext) {
+			featuregatetesting.SetFeatureGateDuringTest(tCtx, utilfeature.DefaultFeatureGate, features.DRAPreemption, !test.disablePreemption && !test.preemptionOnlyAtCall)
+			c := &claimTracker{
+				logger:              tCtx.Logger(),
+				inFlightAllocations: make(map[types.UID]inFlightAllocation),
+				allocatedDevices:    newAllocatedDevices(tCtx.Logger()),
+			}
+			if test.preemptionOnlyAtCall {
+				featuregatetesting.SetFeatureGateDuringTest(tCtx, utilfeature.DefaultFeatureGate, features.DRAPreemption, true)
+			}
+			for _, claim := range test.allocated {
+				c.allocatedDevices.onAdd(claim)
+			}
+			for _, claim := range test.inFlight {
+				c.inFlightAllocations[claim.UID] = inFlightAllocation{claim: claim, sharers: 1}
+			}
+
+			state, err := c.GatherAllocatedState()
+			tCtx.ExpectNoError(err)
+			tCtx.Expect(state.AllocatedShareCounts).To(gomega.Equal(test.expectCounts))
+		})
+	}
+}
+
+func claimWithShares(i int, shares ...int) *resourceapi.ResourceClaim {
+	uid := types.UID(fmt.Sprintf("claim-%d", i))
+	claim := &resourceapi.ResourceClaim{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: string(uid), UID: uid},
+		Status:     resourceapi.ResourceClaimStatus{Allocation: &resourceapi.AllocationResult{}},
+	}
+	for _, s := range shares {
+		shareID := types.UID(fmt.Sprintf("share-%d", s))
+		claim.Status.Allocation.Devices.Results = append(claim.Status.Allocation.Devices.Results, resourceapi.DeviceRequestAllocationResult{
+			Request: "req-0", Driver: "driver", Pool: "pool", Device: fmt.Sprintf("dev-%d", s%3),
+			ShareID:          &shareID,
+			ConsumedCapacity: map[resourceapi.QualifiedName]resource.Quantity{"memory": resource.MustParse("1Gi")},
+		})
+	}
+	return claim
+}
+
+// TestShareCountsMatchShareIDs verifies that shareCounts stays in sync with
+// shareIDs across random add, update, and delete events (including duplicates).
+func TestShareCountsMatchShareIDs(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.DRAConsumableCapacity: true,
+		features.DRAPreemption:         true,
+	})
+	r := rand.New(rand.NewPCG(1, 2))
+	a := newAllocatedDevices(klog.Background())
+	claims := make([]*resourceapi.ResourceClaim, 20)
+	for i := range claims {
+		claims[i] = claimWithShares(i, 2*i, 2*i+1)
+	}
+	deallocated := func(claim *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
+		claim = claim.DeepCopy()
+		claim.Status.Allocation = nil
+		return claim
+	}
+	for step := range 5000 {
+		claim := claims[r.IntN(len(claims))]
+		switch r.IntN(4) {
+		case 0:
+			a.onAdd(claim)
+		case 1:
+			a.onDelete(claim)
+		case 2:
+			a.onUpdate(deallocated(claim), claim)
+		case 3:
+			a.onUpdate(claim, deallocated(claim))
+		}
+		want := make(map[structured.DeviceID]int)
+		for id := range a.shareIDs {
+			want[id.GetDeviceID()]++
+		}
+		if len(want) != len(a.shareCounts) {
+			t.Fatalf("step %d: counts %v, want %v", step, a.shareCounts, want)
+		}
+		for id, n := range want {
+			if a.shareCounts[id] != n {
+				t.Fatalf("step %d: count of %s is %d, want %d", step, id, a.shareCounts[id], n)
+			}
+		}
+	}
+}
+
+// TestGatherAllocatedStateConcurrent verifies that GatherAllocatedState
+// returns share counts consistent with AllocatedSharedDeviceIDs while cached
+// claims and in-flight allocations mutate concurrently.
+func TestGatherAllocatedStateConcurrent(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.DRAConsumableCapacity: true,
+		features.DRAPreemption:         true,
+	})
+	logger := klog.Background()
+	c := &claimTracker{
+		logger:              logger,
+		inFlightAllocations: make(map[types.UID]inFlightAllocation),
+		allocatedDevices:    newAllocatedDevices(logger),
+	}
+	claims := make([]*resourceapi.ResourceClaim, 10)
+	for i := range claims {
+		claims[i] = claimWithShares(i, i)
+	}
+	var wg sync.WaitGroup
+	stop := make(chan struct{})
+	wg.Go(func() {
+		r := rand.New(rand.NewPCG(3, 4))
+		for {
+			select {
+			case <-stop:
+				return
+			default:
+			}
+			claim := claims[r.IntN(len(claims))]
+			switch r.IntN(4) {
+			case 0:
+				c.allocatedDevices.onAdd(claim)
+			case 1:
+				c.allocatedDevices.onDelete(claim)
+			case 2:
+				c.inFlightMutex.Lock()
+				c.inFlightAllocations[claim.UID] = inFlightAllocation{claim: claim, sharers: 1}
+				c.inFlightMutex.Unlock()
+			case 3:
+				c.inFlightMutex.Lock()
+				delete(c.inFlightAllocations, claim.UID)
+				c.inFlightMutex.Unlock()
+			}
+		}
+	})
+	succeeded := 0
+	for range 2000 {
+		state, err := c.GatherAllocatedState()
+		if err != nil {
+			continue
+		}
+		succeeded++
+		total := 0
+		for id, n := range state.AllocatedShareCounts {
+			if !state.AllocatedSharedDeviceIDs.Has(id) || n < 1 {
+				t.Errorf("count %d for %s, shared devices %v", n, id, state.AllocatedSharedDeviceIDs)
+			}
+			total += n
+		}
+		if len(state.AllocatedShareCounts) != state.AllocatedSharedDeviceIDs.Len() {
+			t.Errorf("counts %v don't cover shared devices %v", state.AllocatedShareCounts, state.AllocatedSharedDeviceIDs)
+		}
+		// Each claim has a single unique share, so total exceeds len(claims)
+		// only if an in-flight share already in the cache is double-counted.
+		if total > len(claims) {
+			t.Errorf("total %d exceeds number of claims", total)
+		}
+	}
+	close(stop)
+	wg.Wait()
+	if succeeded == 0 {
+		t.Fatal("GatherAllocatedState never succeeded, nothing got checked")
 	}
 }

@@ -453,13 +453,17 @@ func (pl *DefaultPreemption) SelectVictimsOnNode(
 //     Currently we check the node that is nominated for this pod (or the assigned node for a deferred
 //     in-place resize pod), and as long as there are terminating pods on this node, we don't attempt to
 //     preempt more pods.
-func (pl *DefaultPreemption) PodEligibleToPreemptOthers(_ context.Context, pod *v1.Pod, nominatedNodeStatus *fwk.Status) (bool, string) {
+//  3. A plugin implementing framework.VictimExtensions reports that resources freed by
+//     an earlier preemption are still being reclaimed.
+func (pl *DefaultPreemption) PodEligibleToPreemptOthers(ctx context.Context, pod *v1.Pod, nominatedNodeStatus *fwk.Status) (bool, string) {
 	if pod.Spec.PreemptionPolicy != nil && *pod.Spec.PreemptionPolicy == v1.PreemptNever {
 		return false, "not eligible due to preemptionPolicy=Never."
 	}
 
 	nodeInfos := pl.fh.MutableSnapshotSharedLister().NodeInfos()
-	nomNodeName := pod.Status.NominatedNodeName
+	// With the DRAPreemption feature gate, pod can lag behind its nomination in
+	// the PodNominator, so direct callers also get the nominated node from there.
+	nomNodeName := preemption.NominatedNodeName(pl.fh, pod)
 	isResize := pl.fts.EnableInPlacePodVerticalScalingSchedulerPreemption && len(pod.Spec.NodeName) > 0 && resourcehelper.IsPodResizeDeferred(pod)
 	targetNodeName := nomNodeName
 	if isResize {
@@ -487,6 +491,14 @@ func (pl *DefaultPreemption) PodEligibleToPreemptOthers(_ context.Context, pod *
 					return false, "not eligible due to a terminating pod on the nominated node."
 				}
 			}
+		}
+	}
+
+	// VictimExtensions also runs with an empty nomNodeName because plugins can
+	// track pending resource release that is not tied to a single node.
+	if runner, ok := pl.fh.(framework.VictimExtensionsRunner); ok {
+		if eligible, reason := runner.RunVictimExtensionsPodEligibleToPreempt(ctx, pod, nomNodeName); !eligible {
+			return false, reason
 		}
 	}
 	return true, ""

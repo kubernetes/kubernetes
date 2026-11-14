@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -103,7 +104,13 @@ func TestIsPodRunningPreemption(t *testing.T) {
 		preemptingSet   sets.Set[types.UID]
 		lastVictimSet   map[types.UID]pendingVictim
 		podsInPodLister map[string]*v1.Pod
-		expectedResult  bool
+		// draPreemption means that DRAPreemption was enabled when the
+		// preemptors in preemptingSet started to preempt.
+		draPreemption  bool
+		expectedResult bool
+		// expectedNeedsActivation is whether the executor recorded that it
+		// has to activate the preemptor when it is done (DRAPreemption).
+		expectedNeedsActivation bool
 	}{
 		{
 			name:           "preemptor not in preemptingSet",
@@ -181,6 +188,72 @@ func TestIsPodRunningPreemption(t *testing.T) {
 			},
 			expectedResult: false,
 		},
+		{
+			name:                    "DRAPreemption, preemptor in preemptingSet, no lastVictim for preemptor",
+			preemptorUID:            "preemptor",
+			preemptingSet:           sets.New[types.UID]("preemptor"),
+			lastVictimSet:           map[types.UID]pendingVictim{},
+			draPreemption:           true,
+			expectedResult:          true,
+			expectedNeedsActivation: true,
+		},
+		{
+			name:          "DRAPreemption, victim in lastVictimSet, not in PodLister",
+			preemptorUID:  "preemptor",
+			preemptingSet: sets.New[types.UID]("preemptor"),
+			lastVictimSet: map[types.UID]pendingVictim{
+				"preemptor": {
+					namespace: "ns",
+					name:      "victim1",
+				},
+			},
+			podsInPodLister:         map[string]*v1.Pod{},
+			draPreemption:           true,
+			expectedResult:          true,
+			expectedNeedsActivation: true,
+		},
+		{
+			name:          "DRAPreemption, victim in lastVictimSet and in PodLister with deletion timestamp",
+			preemptorUID:  "preemptor",
+			preemptingSet: sets.New[types.UID]("preemptor"),
+			lastVictimSet: map[types.UID]pendingVictim{
+				"preemptor": {
+					namespace: "ns",
+					name:      "victim-deleted",
+				},
+			},
+			podsInPodLister: map[string]*v1.Pod{
+				"victim-deleted": victimWithDeletionTimestamp,
+			},
+			draPreemption:           true,
+			expectedResult:          true,
+			expectedNeedsActivation: true,
+		},
+		{
+			name:          "DRAPreemption, victim in lastVictimSet and in PodLister",
+			preemptorUID:  "preemptor",
+			preemptingSet: sets.New[types.UID]("preemptor"),
+			lastVictimSet: map[types.UID]pendingVictim{
+				"preemptor": {
+					namespace: "ns",
+					name:      "victim1",
+				},
+			},
+			podsInPodLister: map[string]*v1.Pod{
+				"victim1": victim1,
+			},
+			draPreemption:           true,
+			expectedResult:          true,
+			expectedNeedsActivation: true,
+		},
+		{
+			name:           "DRAPreemption, preemptor not in preemptingSet",
+			preemptorUID:   "preemptor",
+			preemptingSet:  sets.New[types.UID]("other"),
+			lastVictimSet:  map[types.UID]pendingVictim{},
+			draPreemption:  true,
+			expectedResult: false,
+		},
 	}
 
 	for _, tt := range tests {
@@ -199,10 +272,20 @@ func TestIsPodRunningPreemption(t *testing.T) {
 				podLister:                    informerFactory.Core().V1().Pods().Lister(),
 				preempting:                   tt.preemptingSet,
 				lastVictimsPendingPreemption: tt.lastVictimSet,
+				needsActivation:              make(map[types.UID]*atomic.Bool),
+			}
+			if tt.draPreemption {
+				for uid := range tt.preemptingSet {
+					a.needsActivation[uid] = &atomic.Bool{}
+				}
 			}
 
 			if result := a.IsPodRunningPreemption(tt.preemptorUID); tt.expectedResult != result {
 				t.Errorf("Expected IsPodRunningPreemption to return %v but got %v", tt.expectedResult, result)
+			}
+			needsActivation, ok := a.needsActivation[tt.preemptorUID]
+			if got := ok && needsActivation.Load(); got != tt.expectedNeedsActivation {
+				t.Errorf("Expected the executor to record that the preemptor needs activation: %v, got %v", tt.expectedNeedsActivation, got)
 			}
 		})
 	}
@@ -1919,6 +2002,191 @@ func TestPrepareCandidateAsyncActivatesPreemptor(t *testing.T) {
 			}
 			if (tt.addVictimToPrebind || tt.addVictimToPrebindOnPreempt) && (victimCtx == nil || victimCtx.Err() == nil) {
 				t.Fatalf("Expected preBind victim context to be cancelled")
+			}
+		})
+	}
+}
+
+// TestPrepareCandidateAsyncGatesPreemptorUntilAssumeVictim checks PreEnqueue
+// for a preemptor whose asynchronous preemption is still running. With
+// DRAPreemption, the preemptor must stay gated until AssumeVictim told plugins
+// about the victim, also when the informer shows the last victim deleted or
+// terminating before the delete call returned. Otherwise it could preempt more
+// pods while the resources of the victim are still being released. It must get
+// activated afterwards whenever PreEnqueue gated it, because the events which
+// follow may not run PreEnqueue for it again.
+func TestPrepareCandidateAsyncGatesPreemptorUntilAssumeVictim(t *testing.T) {
+	preemptorPod := st.MakePod().Name("p").Namespace("ns").UID("p").Priority(highPriority).Obj()
+	victim := st.MakePod().Name("v").Namespace("ns").UID("v").Priority(midPriority).Node("node1").Obj()
+	assumeCall := "AssumeVictim ns/v"
+
+	// What the informer shows for the victim when PreEnqueue runs, before
+	// the delete call returned.
+	const (
+		victimRunning     = "running"
+		victimTerminating = "terminating"
+		victimGone        = "gone"
+	)
+
+	for _, tc := range []struct {
+		name          string
+		draPreemption bool
+		victimState   string
+		wantGated     bool
+		wantActivated bool
+		wantCalls     []string
+	}{
+		{
+			name:          "DRAPreemption, victim gone",
+			draPreemption: true,
+			victimState:   victimGone,
+			wantGated:     true,
+			wantActivated: true,
+			wantCalls:     []string{assumeCall},
+		},
+		{
+			name:          "DRAPreemption, victim terminating",
+			draPreemption: true,
+			victimState:   victimTerminating,
+			wantGated:     true,
+			wantActivated: true,
+			wantCalls:     []string{assumeCall},
+		},
+		{
+			// Without the activation, the preemptor stays gated by
+			// DefaultPreemption until an event requeues it, which a pod
+			// rejected only by another plugin may not get.
+			name:          "DRAPreemption, victim running",
+			draPreemption: true,
+			victimState:   victimRunning,
+			wantGated:     true,
+			wantActivated: true,
+			wantCalls:     []string{assumeCall},
+		},
+		{
+			name:        "without DRAPreemption, victim gone",
+			victimState: victimGone,
+		},
+		{
+			name:        "without DRAPreemption, victim running",
+			victimState: victimRunning,
+			wantGated:   true,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAPreemption, tc.draPreemption)
+			metrics.Register()
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			cs := clientsetfake.NewClientset(preemptorPod.DeepCopy(), victim.DeepCopy())
+			informerFactory := informers.NewSharedInformerFactory(cs, 0)
+			podStore := informerFactory.Core().V1().Pods().Informer().GetStore()
+			for _, pod := range []*v1.Pod{preemptorPod, victim} {
+				if err := podStore.Add(pod.DeepCopy()); err != nil {
+					t.Fatal(err)
+				}
+			}
+
+			mu := &sync.RWMutex{}
+			fakeActivator := &fakePodActivator{activatedPods: make(map[string]*v1.Pod), mu: mu, activatedCh: make(chan struct{})}
+			nominationExtensions := &tf.FakeNominationExtensionsPlugin{}
+			schedFwk, err := tf.NewFramework(
+				ctx,
+				[]tf.RegisterPluginFunc{
+					tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+					tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+					tf.RegisterPreFilterPlugin(nominationExtensions.Name(), tf.NewFakeNominationExtensionsPlugin(nominationExtensions)),
+				}, "",
+				frameworkruntime.WithClientSet(cs),
+				frameworkruntime.WithSnapshotSharedLister(internalcache.NewSnapshot([]*v1.Pod{victim}, []*v1.Node{st.MakeNode().Name("node1").Obj()})),
+				frameworkruntime.WithInformerFactory(informerFactory),
+				frameworkruntime.WithWaitingPods(frameworkruntime.NewWaitingPodsMap()),
+				frameworkruntime.WithPodsInPreBind(frameworkruntime.NewPodsInPreBindMap()),
+				frameworkruntime.WithLogger(logger),
+				frameworkruntime.WithEventRecorder(&events.FakeRecorder{}),
+				frameworkruntime.WithPodActivator(fakeActivator),
+				frameworkruntime.WithPodNominator(internalqueue.NewSchedulingQueue(nil, informerFactory)),
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			executor := NewExecutor(schedFwk, feature.Features{EnableAsyncPreemption: true, EnableDRAPreemption: tc.draPreemption})
+			fakeActivator.isPreempting = func() bool {
+				executor.mu.RLock()
+				defer executor.mu.RUnlock()
+				return executor.preempting.Has(preemptorPod.UID)
+			}
+
+			type observation struct {
+				gated bool
+				calls []string
+			}
+			observed := make(chan observation, 1)
+			cs.PrependReactor("delete", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
+				// The watch event may reach the informer before the response
+				// of the delete call reaches the executor.
+				switch tc.victimState {
+				case victimGone:
+					if err := podStore.Delete(victim); err != nil {
+						t.Error(err)
+					}
+				case victimTerminating:
+					terminating := victim.DeepCopy()
+					now := metav1.Now()
+					terminating.DeletionTimestamp = &now
+					if err := podStore.Update(terminating); err != nil {
+						t.Error(err)
+					}
+				}
+				observed <- observation{
+					gated: executor.IsPodRunningPreemption(preemptorPod.UID),
+					calls: nominationExtensions.Calls(),
+				}
+				return true, nil, nil
+			})
+
+			executor.prepareCandidateAsync(&candidate{
+				name:    "node1",
+				victims: &extenderv1.Victims{Pods: []*v1.Pod{victim}},
+			}, &podExecutorPreemptor{Pod: preemptorPod}, "test-plugin")
+
+			select {
+			case o := <-observed:
+				if o.gated != tc.wantGated {
+					t.Errorf("Preemptor gated before the delete call returned: %v, want %v", o.gated, tc.wantGated)
+				}
+				if len(o.calls) != 0 {
+					t.Errorf("Unexpected calls before the delete call returned: %v", o.calls)
+				}
+			case <-time.After(wait.ForeverTestTimeout):
+				t.Fatal("Timed out waiting for the deletion of the victim")
+			}
+			if tc.wantActivated {
+				select {
+				case <-fakeActivator.activatedCh:
+				case <-time.After(wait.ForeverTestTimeout):
+					t.Fatal("Timed out waiting for preemptor activation")
+				}
+			} else if err := wait.PollUntilContextTimeout(ctx, 10*time.Millisecond, wait.ForeverTestTimeout, true /* immediate */, func(context.Context) (bool, error) {
+				executor.mu.RLock()
+				defer executor.mu.RUnlock()
+				return len(executor.preempting) == 0, nil
+			}); err != nil {
+				t.Fatalf("Timed out waiting for async preemption to finish: %v", err)
+			}
+
+			mu.RLock()
+			defer mu.RUnlock()
+			if fakeActivator.activatedWhilePreempting {
+				t.Error("Preemptor was activated before its preempting state was cleared")
+			}
+			if _, activated := fakeActivator.activatedPods[preemptorPod.Name]; activated != tc.wantActivated {
+				t.Errorf("Preemptor activated: %v, want %v", activated, tc.wantActivated)
+			}
+			if diff := cmp.Diff(tc.wantCalls, nominationExtensions.Calls()); diff != "" {
+				t.Errorf("Unexpected calls (-want, +got):\n%s", diff)
 			}
 		})
 	}

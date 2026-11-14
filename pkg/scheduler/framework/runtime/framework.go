@@ -79,6 +79,12 @@ type frameworkImpl struct {
 	batchablePlugins          []fwk.SignPlugin
 	podGroupPostFilterPlugins []fwk.PodGroupPostFilterPlugin
 	rankNodesPlugins          []framework.RankNodesPlugin
+	nominationExtensions      []framework.NominationExtensions
+	victimExtensions          []framework.VictimExtensions
+	preparedNominations       *preparedNominations
+	// genericWorkloadEnabled is whether the GenericWorkload feature gate was
+	// enabled when the plugins with NominationExtensions got collected.
+	genericWorkloadEnabled bool
 
 	placementGeneratePlugins   []fwk.PlacementGeneratePlugin
 	placementFeasiblePlugins   []fwk.PlacementFeasiblePlugin
@@ -376,6 +382,7 @@ func defaultFrameworkOptions(stopCh <-chan struct{}) frameworkOptions {
 }
 
 var _ framework.Framework = &frameworkImpl{}
+var _ framework.NominatedNodeNameGetter = &frameworkImpl{}
 
 // NewFramework initializes plugins given the configuration and the registry.
 //
@@ -484,6 +491,7 @@ func NewFramework(ctx context.Context, r Registry, profile *config.KubeScheduler
 
 		f.fillEnqueueExtensions(p)
 	}
+	f.fillNominationExtensions()
 
 	// initialize plugins per individual extension points
 	for _, e := range f.getExtensionPoints(profile.Plugins) {
@@ -669,6 +677,26 @@ func pluginsForPod[T fwk.Plugin](f *frameworkImpl, pod *v1.Pod, all, resize []T)
 
 func (f *frameworkImpl) SetPodNominator(n fwk.PodNominator) {
 	f.PodNominator = n
+}
+
+// NominatedNodeName implements framework.NominatedNodeNameGetter by delegating
+// to the PodNominator. It falls back to pod.Status.NominatedNodeName if the
+// PodNominator does not implement framework.NominatedNodeNameGetter.
+func (f *frameworkImpl) NominatedNodeName(pod *v1.Pod) string {
+	if nominator, ok := f.PodNominator.(framework.NominatedNodeNameGetter); ok {
+		return nominator.NominatedNodeName(pod)
+	}
+	return pod.Status.NominatedNodeName
+}
+
+// TracksNominationInMemory implements framework.NominatedNodeNameGetter by
+// delegating to the PodNominator. It returns false if the PodNominator does
+// not implement framework.NominatedNodeNameGetter.
+func (f *frameworkImpl) TracksNominationInMemory(pod *v1.Pod) bool {
+	if nominator, ok := f.PodNominator.(framework.NominatedNodeNameGetter); ok {
+		return nominator.TracksNominationInMemory(pod)
+	}
+	return false
 }
 
 func (f *frameworkImpl) SetPodActivator(a fwk.PodActivator) {

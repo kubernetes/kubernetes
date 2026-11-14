@@ -54,6 +54,8 @@ type DefaultDRAManager struct {
 	resourceSliceLister   *resourceSliceLister
 	deviceClassLister     *deviceClassLister
 	extendedResourceCache *extendedresourcecache.ExtendedResourceCache
+	// store is only set if the DRAPreemption feature is enabled.
+	store *preemptionStore
 }
 
 func NewDRAManager(ctx context.Context, claimsCache *assumecache.AssumeCache, resourceSliceTracker *resourceslicetracker.Tracker, informerFactory informers.SharedInformerFactory) *DefaultDRAManager {
@@ -73,11 +75,29 @@ func NewDRAManager(ctx context.Context, claimsCache *assumecache.AssumeCache, re
 		manager.extendedResourceCache = extendedresourcecache.NewExtendedResourceCache(logger)
 	}
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRAPreemption) {
+		manager.store = newPreemptionStore()
+		manager.resourceClaimTracker.cache.AddEventHandler(manager.store.claimHandlers(logger))
+	}
+
 	// Reacting to events is more efficient than iterating over the list
 	// repeatedly in PreFilter.
 	manager.resourceClaimTracker.cache.AddEventHandler(manager.resourceClaimTracker.allocatedDevices.handlers())
 
 	return manager
+}
+
+// preemptionStoreProvider exposes DefaultDRAManager's preemptionStore without
+// adding package-internal types to fwk.SharedDRAManager; custom SharedDRAManager
+// implementations that omit it do not track DRA preemption state.
+type preemptionStoreProvider interface {
+	sharedPreemptionStore() *preemptionStore
+}
+
+var _ preemptionStoreProvider = &DefaultDRAManager{}
+
+func (s *DefaultDRAManager) sharedPreemptionStore() *preemptionStore {
+	return s.store
 }
 
 func (s *DefaultDRAManager) ResourceClaims() fwk.ResourceClaimTracker {
@@ -351,6 +371,7 @@ func (c *claimTracker) ListAllAllocatedDevices() (a sets.Set[structured.DeviceID
 // - AllocatedDevices: Set of device IDs that are fully allocated (dedicated mode)
 // - AllocatedSharedDeviceIDs: Set of device IDs with shared allocations when consumable capacity is enabled
 // - AggregatedCapacity: Consumed capacity across all devices when consumable capacity is enabled
+// - AllocatedShareCounts: Number of shares per shared device when consumable capacity and DRAPreemption are enabled
 //
 // The function handles two allocation models:
 //  1. Legacy dedicated mode (DRAConsumableCapacity disabled): Devices are allocated exclusively
@@ -385,8 +406,13 @@ func (c *claimTracker) GatherAllocatedState() (s *structured.AllocatedState, err
 	if err != nil {
 		return nil, err
 	}
+	var shareCounts map[structured.DeviceID]int
+	revision4 := revision1
+	if enabledConsumableCapacity && utilfeature.DefaultFeatureGate.Enabled(features.DRAPreemption) {
+		shareCounts, revision4 = c.allocatedDevices.getShareCounts()
+	}
 
-	if revision1 != revision2 || revision2 != revision3 {
+	if revision1 != revision2 || revision2 != revision3 || revision3 != revision4 {
 		// Already not consistent. Try again.
 		return nil, errClaimTrackerConcurrentModification
 	}
@@ -408,10 +434,12 @@ func (c *claimTracker) GatherAllocatedState() (s *structured.AllocatedState, err
 		AllocatedDevices:         allocated,
 		AllocatedSharedDeviceIDs: allocatedSharedDeviceIDs,
 		AggregatedCapacity:       aggregatedCapacity,
+		AllocatedShareCounts:     shareCounts,
 	}
 
 	// Whatever is in flight also has to be checked.
 	var inFlightErr error
+	var inFlightShares sets.Set[structured.SharedDeviceID]
 	structured.AddToAllocatedState(state,
 		func(yield func(*resourceapi.AllocationResult) bool) {
 			for _, inFlight := range c.allInFlightAllocationsRLocked() {
@@ -419,6 +447,19 @@ func (c *claimTracker) GatherAllocatedState() (s *structured.AllocatedState, err
 					if inFlightErr = consumedCapacityError(inFlight.claim); inFlightErr != nil {
 						return
 					}
+				}
+				if shareCounts != nil {
+					structured.ForEachAllocatedDevice(inFlight.claim.Status.Allocation,
+						func(structured.DeviceID) {},
+						true,
+						func(sharedDeviceID structured.SharedDeviceID) {
+							if inFlightShares == nil {
+								inFlightShares = sets.New[structured.SharedDeviceID]()
+							}
+							inFlightShares.Insert(sharedDeviceID)
+						},
+						func(structured.DeviceConsumedCapacity) {},
+					)
 				}
 				if !yield(inFlight.claim.Status.Allocation) {
 					return
@@ -429,6 +470,14 @@ func (c *claimTracker) GatherAllocatedState() (s *structured.AllocatedState, err
 	)
 	if inFlightErr != nil {
 		return nil, inFlightErr
+	}
+	// A claim in PreBind can be both in flight and in the assume cache, so
+	// only add in-flight shares not already counted in allocatedDevices. The
+	// revision check below verifies allocatedDevices did not change meanwhile.
+	if len(inFlightShares) > 0 {
+		for _, share := range c.allocatedDevices.uncachedShares(inFlightShares) {
+			shareCounts[share.GetDeviceID()]++
+		}
 	}
 	if revision1 == c.allocatedDevices.getRevision() {
 		// Our current result is valid, nothing changed in the meantime.
