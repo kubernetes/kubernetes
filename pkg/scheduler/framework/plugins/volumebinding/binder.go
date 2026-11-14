@@ -107,6 +107,16 @@ type DynamicProvision struct {
 	NodeCapacity *storagev1.CSIStorageCapacity
 }
 
+// AvailableCapacity returns the free capacity reported by the CSIStorageCapacity
+// that Filter matched. ok is false when Filter did not check the capacity, or when
+// the matched object sets only MaximumVolumeSize, which is not the free capacity.
+func (p *DynamicProvision) AvailableCapacity() (capacity int64, ok bool) {
+	if p.NodeCapacity == nil || p.NodeCapacity.Capacity == nil {
+		return 0, false
+	}
+	return p.NodeCapacity.Capacity.Value(), true
+}
+
 // PodVolumes holds pod's volumes information used in volume scheduling.
 type PodVolumes struct {
 	// StaticBindings are binding decisions for PVCs which can be bound to
