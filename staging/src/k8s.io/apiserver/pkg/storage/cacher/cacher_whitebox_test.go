@@ -21,6 +21,7 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
+	"io"
 	"reflect"
 	goruntime "runtime"
 	"slices"
@@ -2349,6 +2350,23 @@ func testCachingObjects(t *testing.T, watchersCount int) {
 		watchers = append(watchers, w)
 	}
 
+	var stalledWatch watch.Interface
+	if utilfeature.DefaultFeatureGate.Enabled(features.WatchCacheStallResume) {
+		initSignal := utilflowcontrol.NewInitializationSignal()
+		ctx := utilflowcontrol.WithInitializationSignal(context.Background(), initSignal)
+		stalledWatch, err = cacher.Watch(ctx, "/pods/ns", storage.ListOptions{ResourceVersion: "1000", Predicate: storage.Everything, Recursive: true})
+		require.NoError(t, err)
+		defer stalledWatch.Stop()
+		initSignal.Wait()
+
+		sw := stalledWatch.(*cacheWatcher)
+		cacher.Lock()
+		cacher.watchers.deleteWatcher(sw)
+		cacher.unsyncedWatchers.addWatcher(sw)
+		cacher.resyncMetrics.StalledWatchers.Inc()
+		cacher.Unlock()
+	}
+
 	makePod := func(name, rv string) *examplev1.Pod {
 		return &examplev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
@@ -2368,6 +2386,16 @@ func testCachingObjects(t *testing.T, watchersCount int) {
 
 	// At this point, we already have dispatchedEvents fully propagated.
 
+	encodeCalls := 0
+	var encodeMu sync.Mutex
+	encode := func(obj runtime.Object, w io.Writer) error {
+		encodeMu.Lock()
+		encodeCalls++
+		encodeMu.Unlock()
+		_, err := fmt.Fprintf(w, "%v", obj)
+		return err
+	}
+
 	verifyEvents := func(w watch.Interface) {
 		var event watch.Event
 		for index := range dispatchedEvents {
@@ -2377,30 +2405,26 @@ func testCachingObjects(t *testing.T, watchersCount int) {
 				t.Fatalf("timeout watiching for the event")
 			}
 
-			var object runtime.Object
-			if _, ok := event.Object.(runtime.CacheableObject); !ok {
+			co, ok := event.Object.(runtime.CacheableObject)
+			if !ok {
 				t.Fatalf("Object in %s event should support caching: %#v", event.Type, event.Object)
 			}
-			object = event.Object.(runtime.CacheableObject).GetObject()
+			require.NoError(t, co.CacheEncode("test-encoder", encode, io.Discard))
+			object := co.GetObject()
 
-			if event.Type == watch.Deleted {
-				resourceVersion, err := cacher.versioner.ObjectResourceVersion(cacher.watchCache.history.cache[index].PrevObject)
-				if err != nil {
-					t.Fatalf("Failed to parse resource version: %v", err)
-				}
-				updateResourceVersion(object, cacher.versioner, resourceVersion)
-			}
-
-			var e runtime.Object
+			var expected runtime.Object
 			switch event.Type {
 			case watch.Added, watch.Modified:
-				e = cacher.watchCache.history.cache[index].Object
+				expected = cacher.watchCache.history.cache[index].Object
 			case watch.Deleted:
-				e = cacher.watchCache.history.cache[index].PrevObject
+				expected = cacher.watchCache.history.cache[index].PrevObject
 			default:
 				t.Errorf("unexpected watch event: %#v", event)
 			}
-			if a := object; !reflect.DeepEqual(a, e) {
+			if event.Object != expected {
+				t.Errorf("expected same cachingObject pointer for %s: got %p, want %p", event.Type, event.Object, expected)
+			}
+			if a, e := object, expected.(runtime.CacheableObject).GetObject(); !reflect.DeepEqual(a, e) {
 				t.Errorf("event object messed up for %s: %#v, expected: %#v", event.Type, a, e)
 			}
 		}
@@ -2409,6 +2433,19 @@ func testCachingObjects(t *testing.T, watchersCount int) {
 	for i := range watchers {
 		verifyEvents(watchers[i])
 	}
+
+	// A watch opened at an old resourceVersion replays from watchCache.history
+	// and must reuse the same cachingObject and cached serializations.
+	catchupWatch, err := cacher.Watch(context.Background(), "/pods/ns", storage.ListOptions{ResourceVersion: "1000", Predicate: storage.Everything, Recursive: true})
+	require.NoError(t, err)
+	defer catchupWatch.Stop()
+	verifyEvents(catchupWatch)
+
+	if stalledWatch != nil {
+		verifyEvents(stalledWatch)
+	}
+
+	require.Equal(t, len(dispatchedEvents), encodeCalls, "expected each history event to be serialized once across live, catchup, and stalled watchers")
 }
 
 func TestCachingObjects(t *testing.T) {

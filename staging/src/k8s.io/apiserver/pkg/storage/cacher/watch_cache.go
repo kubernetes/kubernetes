@@ -238,6 +238,7 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64) err
 			wcEvent.PrevObjFields = previous.Fields
 		}
 
+		setCachingObjects(wcEvent, w.config.versioner)
 		w.history.updateCache(wcEvent)
 		w.resourceVersion = resourceVersion
 		defer w.freshness.broadcast(resourceVersion)

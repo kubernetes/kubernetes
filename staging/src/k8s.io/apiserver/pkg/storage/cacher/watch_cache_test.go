@@ -315,7 +315,7 @@ func TestEvents(t *testing.T) {
 			t.Errorf("unexpected event type: %v", result[0].Type)
 		}
 		pod := makeTestPod("pod", uint64(3))
-		if !apiequality.Semantic.DeepEqual(pod, result[0].Object) {
+		if !apiequality.Semantic.DeepEqual(pod, baseObjectThreadUnsafe(result[0].Object)) {
 			t.Errorf("unexpected item: %v, expected: %v", result[0].Object, pod)
 		}
 		if result[0].PrevObject != nil {
@@ -346,7 +346,7 @@ func TestEvents(t *testing.T) {
 				t.Errorf("unexpected event type: %v", result[i].Type)
 			}
 			pod := makeTestPod("pod", uint64(i+4))
-			if !apiequality.Semantic.DeepEqual(pod, result[i].Object) {
+			if !apiequality.Semantic.DeepEqual(pod, baseObjectThreadUnsafe(result[i].Object)) {
 				t.Errorf("unexpected item: %v, expected: %v", result[i].Object, pod)
 			}
 			prevPod := makeTestPod("pod", uint64(i+3))
@@ -377,7 +377,7 @@ func TestEvents(t *testing.T) {
 		}
 		for i := 0; i < 5; i++ {
 			pod := makeTestPod("pod", uint64(i+5))
-			if !apiequality.Semantic.DeepEqual(pod, result[i].Object) {
+			if !apiequality.Semantic.DeepEqual(pod, baseObjectThreadUnsafe(result[i].Object)) {
 				t.Errorf("unexpected item: %v, expected: %v", result[i].Object, pod)
 			}
 		}
@@ -401,8 +401,8 @@ func TestEvents(t *testing.T) {
 		if !apiequality.Semantic.DeepEqual(pod, result[0].Object) {
 			t.Errorf("unexpected item: %v, expected: %v", result[0].Object, pod)
 		}
-		prevPod := makeTestPod("pod", uint64(9))
-		if !apiequality.Semantic.DeepEqual(prevPod, result[0].PrevObject) {
+		prevPod := makeTestPod("pod", uint64(10))
+		if !apiequality.Semantic.DeepEqual(prevPod, baseObjectThreadUnsafe(result[0].PrevObject)) {
 			t.Errorf("unexpected item: %v, expected: %v", result[0].PrevObject, prevPod)
 		}
 	}
@@ -439,7 +439,7 @@ func TestMarker(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(result) != 1 || !apiequality.Semantic.DeepEqual(result[0].Object, pod) {
+	if len(result) != 1 || !apiequality.Semantic.DeepEqual(baseObjectThreadUnsafe(result[0].Object), pod) {
 		t.Errorf("unexpected result: %#v, expected %v", result, pod)
 	}
 }
