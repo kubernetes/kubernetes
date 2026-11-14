@@ -27,6 +27,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 	watchtools "k8s.io/client-go/tools/watch"
@@ -44,6 +45,41 @@ import (
 )
 
 type podCondition func(pod *v1.Pod) (bool, error)
+
+// checkPodCPURequest checks that the CPU request of the pod's first container, as reported
+// in the pod status, is the expected one, and that no resize of the pod is pending or in progress.
+func checkPodCPURequest(ctx context.Context, f *framework.Framework, podName string, expected resource.Quantity) error {
+	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, podName, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	for _, condition := range pod.Status.Conditions {
+		if condition.Type == v1.PodResizePending || condition.Type == v1.PodResizeInProgress {
+			return fmt.Errorf("pod %s has condition %s: %s", podName, condition.Type, condition.Message)
+		}
+	}
+	if len(pod.Status.ContainerStatuses) == 0 || pod.Status.ContainerStatuses[0].Resources == nil {
+		return fmt.Errorf("pod %s does not report container resources", podName)
+	}
+	if actual := pod.Status.ContainerStatuses[0].Resources.Requests[v1.ResourceCPU]; !actual.Equal(expected) {
+		return fmt.Errorf("pod %s has CPU request %s, expected %s", podName, actual.String(), expected.String())
+	}
+	return nil
+}
+
+// restartAdmissionPod describes a pod in the test of pod admission after a kubelet restart.
+type restartAdmissionPod struct {
+	name string
+	// cpu is the CPU request.
+	cpu string
+	// resizedCPU, if not empty, is the CPU request after an in-place resize done before the restart.
+	resizedCPU string
+	// admitted pods are created bound to the node and are running before the restart.
+	// The other pods are created unbound and are bound to the node while the kubelet is stopped.
+	admitted bool
+	// expectRejected tells whether the kubelet rejects the pod after the restart.
+	expectRejected bool
+}
 
 // waitForPodsCondition waits for `podCount` number of pods to match a specific pod condition within a timeout duration.
 // If the timeout is hit, it returns the list of currently running pods.
@@ -437,6 +473,157 @@ var _ = SIGDescribe("Restart", framework.WithSerial(), framework.WithSlow(), fra
 				return checkMirrorPodDisappear(ctx, f.ClientSet, pod.Name, pod.Namespace)
 			}, f.Timeouts.PodDelete, f.Timeouts.Poll).Should(gomega.BeNil())
 		})
+		// The pods are created in the order in which they are listed, so the new pods
+		// listed before an admitted pod are older than it, as if they waited long to be scheduled.
+		ginkgo.DescribeTable("should admit the pods admitted before restart ahead of older new pods",
+			func(ctx context.Context, testPods []restartAdmissionPod) {
+				// The CPU requests in the entries are sized against this amount of available CPU.
+				availableCPU := resource.MustParse("1000m")
+				newPod := func(name string, cpu resource.Quantity) *v1.Pod {
+					return e2epod.MustMixinRestrictedPodSecurity(&v1.Pod{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: name + "-" + string(uuid.NewUUID()),
+						},
+						Spec: v1.PodSpec{
+							DNSPolicy: v1.DNSDefault,
+							Containers: []v1.Container{
+								{
+									Name:  name,
+									Image: imageutils.GetPauseImageName(),
+									Resources: v1.ResourceRequirements{
+										Requests: v1.ResourceList{v1.ResourceCPU: cpu},
+									},
+								},
+							},
+						},
+					})
+				}
+
+				nodeName := getNodeName(ctx, f)
+				requestedMilliCPU, _, err := getNodeRequestedMilliCPU(ctx, f, nodeName)
+				framework.ExpectNoError(err)
+				allocatableCPU := getLocalNode(ctx, f).Status.Allocatable[v1.ResourceCPU]
+				fillerMilliCPU := allocatableCPU.MilliValue() - requestedMilliCPU - availableCPU.MilliValue()
+				if fillerMilliCPU < 0 {
+					e2eskipper.Skipf("insufficient CPU available for kubelet restart test: need %s, got %dm",
+						availableCPU.String(), allocatableCPU.MilliValue()-requestedMilliCPU)
+				}
+				if fillerMilliCPU > 0 {
+					// Take the CPU above availableCPU, so the pods in the entry compete for availableCPU only.
+					filler := newPod("filler", *resource.NewMilliQuantity(fillerMilliCPU, resource.DecimalSI))
+					ginkgo.By(fmt.Sprintf("Creating a filler pod (%v/%v) requesting %dm CPU", f.Namespace.Name, filler.Name, fillerMilliCPU))
+					filler = e2epod.NewPodClient(f).CreateSync(ctx, filler)
+					ginkgo.DeferCleanup(deletePodsSync, f, []*v1.Pod{filler})
+				}
+
+				pods := make([]*v1.Pod, len(testPods))
+				for i, tp := range testPods {
+					if i > 0 {
+						// Creation timestamps have a resolution of one second.
+						time.Sleep(time.Second)
+					}
+					pod := newPod(tp.name, resource.MustParse(tp.cpu))
+					if tp.admitted {
+						ginkgo.By(fmt.Sprintf("Creating a pod (%v/%v) bound to the node", f.Namespace.Name, pod.Name))
+						pods[i] = e2epod.NewPodClient(f).CreateSync(ctx, pod)
+					} else {
+						// There is no scheduler in node e2e, so the pod stays pending until it is bound.
+						ginkgo.By(fmt.Sprintf("Creating an unbound pod (%v/%v)", f.Namespace.Name, pod.Name))
+						pods[i], err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, pod, metav1.CreateOptions{})
+						framework.ExpectNoError(err)
+					}
+				}
+				ginkgo.DeferCleanup(deletePodsSync, f, pods)
+
+				for i, tp := range testPods {
+					if !tp.admitted || tp.resizedCPU == "" {
+						continue
+					}
+
+					ginkgo.By(fmt.Sprintf("Resizing the pod (%v/%v) to %s CPU", f.Namespace.Name, pods[i].Name, tp.resizedCPU))
+					patch := fmt.Sprintf(`{"spec":{"containers":[{"name":%q,"resources":{"requests":{"cpu":%q}}}]}}`,
+						pods[i].Spec.Containers[0].Name, tp.resizedCPU)
+					_, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Patch(ctx, pods[i].Name,
+						types.StrategicMergePatchType, []byte(patch), metav1.PatchOptions{}, "resize")
+					framework.ExpectNoError(err)
+					gomega.Eventually(ctx, func(ctx context.Context) error {
+						return checkPodCPURequest(ctx, f, pods[i].Name, resource.MustParse(tp.resizedCPU))
+					}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.Succeed())
+				}
+
+				ginkgo.By("Stopping the kubelet")
+				restartKubelet := mustStopKubelet(ctx, f)
+
+				for i, tp := range testPods {
+					if tp.admitted {
+						continue
+					}
+					ginkgo.By(fmt.Sprintf("Binding the pod (%v/%v) to the node", f.Namespace.Name, pods[i].Name))
+					binding := &v1.Binding{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      pods[i].Name,
+							Namespace: pods[i].Namespace,
+							UID:       pods[i].UID,
+						},
+						Target: v1.ObjectReference{
+							Kind: "Node",
+							Name: nodeName,
+						},
+					}
+					err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Bind(ctx, binding, metav1.CreateOptions{})
+					framework.ExpectNoError(err)
+				}
+
+				ginkgo.By("Starting the kubelet")
+				restartKubelet(ctx)
+
+				for i, tp := range testPods {
+					if tp.expectRejected {
+						ginkgo.By(fmt.Sprintf("Verifying the pod (%v/%v) is rejected", f.Namespace.Name, pods[i].Name))
+						err := e2epod.WaitForPodFailedReason(ctx, f.ClientSet, pods[i], "OutOfcpu", f.Timeouts.PodStart)
+						framework.ExpectNoError(err)
+					} else {
+						ginkgo.By(fmt.Sprintf("Verifying the pod (%v/%v) is running", f.Namespace.Name, pods[i].Name))
+						err := e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, pods[i].Name, f.Namespace.Name)
+						framework.ExpectNoError(err)
+					}
+				}
+				ginkgo.By("Verifying the pods that were not rejected keep running")
+				gomega.Consistently(ctx, func(ctx context.Context) error {
+					for i, tp := range testPods {
+						if tp.expectRejected {
+							continue
+						}
+						pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, pods[i].Name, metav1.GetOptions{})
+						if err != nil {
+							return err
+						}
+						if pod.Status.Phase != v1.PodRunning {
+							return fmt.Errorf("pod %s is in phase %s, reason %q", pod.Name, pod.Status.Phase, pod.Status.Reason)
+						}
+						if tp.resizedCPU != "" {
+							if err := checkPodCPURequest(ctx, f, pod.Name, resource.MustParse(tp.resizedCPU)); err != nil {
+								return err
+							}
+						}
+					}
+					return nil
+				}, 30*time.Second, f.Timeouts.Poll).Should(gomega.Succeed())
+			},
+			ginkgo.Entry("when a new pod does not fit next to an admitted pod", []restartAdmissionPod{
+				{name: "new", cpu: "600m", expectRejected: true},
+				{name: "admitted", cpu: "600m", admitted: true},
+			}),
+			ginkgo.Entry("when a new pod does not fit next to an admitted pod after its resize", []restartAdmissionPod{
+				{name: "new", cpu: "600m", expectRejected: true},
+				{name: "admitted", cpu: "300m", resizedCPU: "600m", admitted: true},
+			}),
+			ginkgo.Entry("when only the older of two new pods fits next to an admitted pod", []restartAdmissionPod{
+				{name: "new-older", cpu: "400m"},
+				{name: "new-newer", cpu: "400m", expectRejected: true},
+				{name: "admitted", cpu: "500m", admitted: true},
+			}),
+		)
 	})
 
 })
