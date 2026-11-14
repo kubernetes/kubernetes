@@ -18,6 +18,8 @@ package mount
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
@@ -219,11 +221,23 @@ func TestSafeFormatAndMount(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		device := filepath.Join(t.TempDir(), "fake-device")
+		if err := os.WriteFile(device, []byte{}, 0600); err != nil {
+			t.Fatalf("failed to create fake device file: %v", err)
+		}
 		fakeMounter := ErrorMounter{NewFakeMounter(nil), 0, test.mountErrs}
 		fakeExec := &testingexec.FakeExec{ExactOrder: true}
 		for _, script := range test.execScripts {
+			args := make([]string, len(script.args))
+			for i, arg := range script.args {
+				if arg == "/dev/foo" {
+					args[i] = device
+				} else {
+					args[i] = arg
+				}
+			}
 			fakeCmd := &testingexec.FakeCmd{}
-			cmdAction := makeFakeCmd(fakeCmd, script.command, script.args...)
+			cmdAction := makeFakeCmd(fakeCmd, script.command, args...)
 			outputAction := makeFakeOutput(script.output, script.err)
 			fakeCmd.CombinedOutputScript = append(fakeCmd.CombinedOutputScript, outputAction)
 			fakeExec.CommandScript = append(fakeExec.CommandScript, cmdAction)
@@ -233,7 +247,6 @@ func TestSafeFormatAndMount(t *testing.T) {
 			Exec:      fakeExec,
 		}
 
-		device := "/dev/foo"
 		dest := t.TempDir()
 		var err error
 		if len(test.formatOptions) > 0 {
