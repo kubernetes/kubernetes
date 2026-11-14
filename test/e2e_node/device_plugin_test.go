@@ -519,6 +519,60 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			e2epod.NewPodClient(f).RemoveFinalizer(context.TODO(), podSpec.Name, testFinalizer)
 		})
 
+		// simulate kubelet restart for a running pod whose init container, already completed, and app container both request devices.
+		// The device plugin is removed before the kubelet restart, so it can't re-register before the pod is admitted again:
+		// the completed init container must not fail the admission of the running pod.
+		// See https://github.com/kubernetes/kubernetes/issues/138446
+		ginkgo.It("Keeps a running pod whose completed init container requested devices across kubelet restarts (device plugin removed)", func(ctx context.Context) {
+			podRECMD := "devs=$(ls /tmp/ | egrep '^Dev-[0-9]+$') && echo stub devices: $devs && sleep %s"
+			podSpec := makeBusyboxPod(e2enode.SampleDeviceResourceName, fmt.Sprintf(podRECMD, sleepIntervalForever))
+			podSpec.Spec.InitContainers = []v1.Container{
+				{
+					Image:     busyboxImage,
+					Name:      "init-1",
+					Command:   []string{"sh", "-c", fmt.Sprintf(podRECMD, "1s")},
+					Resources: podSpec.Spec.Containers[0].Resources,
+				},
+			}
+			pod := e2epod.NewPodClient(f).CreateSync(ctx, podSpec)
+
+			deviceIDRE := "stub devices: (Dev-[0-9]+)"
+			devID1, err := parseLog(ctx, f, pod.Name, pod.Spec.InitContainers[0].Name, deviceIDRE)
+			framework.ExpectNoError(err, "getting logs for pod %q/%q", pod.Name, pod.Spec.InitContainers[0].Name)
+			gomega.Expect(devID1).To(gomega.Not(gomega.Equal("")), "pod's init container requested a device but started successfully without")
+
+			devID2, err := parseLog(ctx, f, pod.Name, pod.Spec.Containers[0].Name, deviceIDRE)
+			framework.ExpectNoError(err, "getting logs for pod %q/%q", pod.Name, pod.Spec.Containers[0].Name)
+			gomega.Expect(devID2).To(gomega.Not(gomega.Equal("")), "pod's app container requested a device but started successfully without")
+
+			pod, err = e2epod.NewPodClient(f).Get(ctx, pod.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err)
+			framework.Logf("testing pod: pre-restart  UID=%s namespace=%s name=%s ready=%v", pod.UID, pod.Namespace, pod.Name, podutils.IsPodReady(pod))
+
+			ginkgo.By("Deleting the device plugin")
+			e2epod.NewPodClient(f).DeleteSync(ctx, devicePluginPod.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
+			waitForContainerRemoval(ctx, devicePluginPod.Spec.Containers[0].Name, devicePluginPod.Name, devicePluginPod.Namespace)
+
+			gomega.Eventually(getNodeResourceValues, devicePluginGracefulTimeout, f.Timeouts.Poll).WithContext(ctx).WithArguments(e2enode.SampleDeviceResourceName).Should(gomega.Equal(ResourceValue{Allocatable: 0, Capacity: int(e2enode.SampleDevsAmount)}))
+
+			ginkgo.By("Restarting Kubelet")
+			restartKubelet(ctx, true)
+
+			ginkgo.By("Wait for node to be ready again")
+			gomega.Expect(e2enode.WaitForAllNodesSchedulable(ctx, f.ClientSet, 5*time.Minute)).To(gomega.Succeed())
+
+			ginkgo.By("Checking the same instance of the pod is still running")
+			// The pod would be rejected with UnexpectedAdmissionError and move to the Failed phase if the kubelet
+			// tried to allocate devices again for the completed init container.
+			// There are no indication that the pod was re-admitted so we just wait for a minute after the node became ready.
+			gomega.Consistently(ctx, getPodByName).
+				WithArguments(f, pod.Name).
+				WithTimeout(time.Minute).
+				WithPolling(f.Timeouts.Poll).
+				Should(gomega.And(BeTheSamePodAs(pod.UID), BeAPodInPhase(v1.PodRunning)),
+					"the same pod instance not running across kubelet restarts, workload should not be perturbed by kubelet restarts")
+		})
+
 		// simulate device plugin re-registration, *but not* container and kubelet restart.
 		// After the device plugin has re-registered, the list healthy devices is repopulated based on the devices discovered.
 		// Once Pod2 is running we determine the device that was allocated it. As long as the device allocation succeeds the

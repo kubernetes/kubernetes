@@ -1396,6 +1396,100 @@ func TestDevicesToAllocateRollsBackPartialReservation(t *testing.T) {
 	assert.NotContains(t, testManager.podDevices.devs[podUID], containerName, "the partial reservation must be removed")
 }
 
+// sourcesNotReadyStub reports sources as not ready, as it happens while the kubelet is restarting.
+type sourcesNotReadyStub struct{}
+
+func (s *sourcesNotReadyStub) AddSource(_ string) {}
+func (s *sourcesNotReadyStub) AllReady() bool     { return false }
+
+// TestDevicesToAllocateOnKubeletRestart covers the kubelet restart flow, when sources are not ready yet and the
+// device plugin did not re-register yet, so the resource is known from the checkpoint but has no healthy devices.
+func TestDevicesToAllocateOnKubeletRestart(t *testing.T) {
+	const (
+		podUID          = "pod"
+		initContainer   = "init-container"
+		appContainer    = "app-container"
+		initContainerID = "init-container-id"
+		appContainerID  = "app-container-id"
+		resourceName    = "domain1.com/resource"
+		deviceID        = "dev0"
+	)
+
+	testCases := []struct {
+		description         string
+		containerName       string
+		containerMap        map[string]string // container name -> container ID, as reported by the runtime
+		containerRunningSet sets.Set[string]
+		checkpointed        bool
+		expectedErr         string
+	}{
+		{
+			description:         "running container",
+			containerName:       appContainer,
+			containerMap:        map[string]string{initContainer: initContainerID, appContainer: appContainerID},
+			containerRunningSet: sets.New(appContainerID),
+			checkpointed:        true,
+		},
+		{
+			// https://github.com/kubernetes/kubernetes/issues/138446
+			description:         "init container completed before the kubelet restart",
+			containerName:       initContainer,
+			containerMap:        map[string]string{initContainer: initContainerID, appContainer: appContainerID},
+			containerRunningSet: sets.New(appContainerID),
+			checkpointed:        true,
+		},
+		{
+			// https://github.com/kubernetes/kubernetes/issues/109595
+			description:         "node reboot, container not reported by the runtime",
+			containerName:       initContainer,
+			containerMap:        map[string]string{},
+			containerRunningSet: sets.New[string](),
+			checkpointed:        true,
+			expectedErr:         "no healthy devices present",
+		},
+		{
+			description:         "completed container without devices in the checkpoint",
+			containerName:       initContainer,
+			containerMap:        map[string]string{initContainer: initContainerID},
+			containerRunningSet: sets.New[string](),
+			checkpointed:        false,
+			expectedErr:         "no healthy devices present",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			logger := klog.FromContext(tCtx)
+
+			containerMap := containermap.NewContainerMap()
+			for name, id := range tc.containerMap {
+				containerMap.Add(podUID, name, id)
+			}
+			testManager := &ManagerImpl{
+				healthyDevices:        map[string]sets.Set[string]{resourceName: sets.New[string]()},
+				allocatedDevices:      make(map[string]sets.Set[string]),
+				podDevices:            newPodDevices(),
+				sourcesReady:          &sourcesNotReadyStub{},
+				containerMap:          containerMap,
+				containerRunningSet:   tc.containerRunningSet,
+				topologyAffinityStore: topologymanager.NewFakeManager(logger),
+			}
+			if tc.checkpointed {
+				testManager.podDevices.insert(podUID, tc.containerName, resourceName, constructDevices([]string{deviceID}), newContainerAllocateResponse())
+			}
+
+			devices, err := testManager.devicesToAllocate(tCtx, podUID, tc.containerName, resourceName, 1, sets.New[string]())
+			if tc.expectedErr != "" {
+				require.ErrorContains(t, err, tc.expectedErr)
+				return
+			}
+			require.NoError(t, err)
+			assert.Empty(t, devices)
+		})
+	}
+}
+
 func TestDevicesToAllocateRevalidatesPreferredDevices(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	logger := klog.FromContext(tCtx)
