@@ -73,7 +73,7 @@ func (ev *PodGroupEvaluator) evaluate(ctx context.Context, preemptorType fwk.Ent
 func (ev *PodGroupEvaluator) Preempt(ctx context.Context, pgInfo fwk.PodGroupInfo, podGroupSchedulingFunc fwk.PodGroupSchedulingFunc) (*fwk.PodGroupPostFilterResult, *fwk.Status) {
 	preemptionManager := ev.Handle.PreemptionManager()
 
-	if preemptionManager.Executor().IsPodGroupWaitingForVictims(pgInfo) {
+	if preemptionManager.Executor().IsPodGroupWaitingForVictims(ctx, pgInfo) {
 		return &fwk.PodGroupPostFilterResult{NominatingInfos: buildCurrentNominatingInfos(pgInfo)}, fwk.NewStatus(fwk.Success, "ongoing preemption on nominated nodes")
 	}
 
