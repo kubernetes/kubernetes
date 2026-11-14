@@ -3406,6 +3406,8 @@ const (
 	SchedulerEvaluationCompleted PodConditionType = "SchedulerEvaluationCompleted"
 	// AllContainersRestarting indicates that all containers of the pod is being restarted.
 	AllContainersRestarting PodConditionType = "AllContainersRestarting"
+
+	PodRejected PodConditionType = "PodRejected"	
 )
 
 // PodCondition represents pod's condition
