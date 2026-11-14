@@ -22,6 +22,7 @@ import (
 	goruntime "runtime"
 	"sort"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -31,6 +32,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
@@ -1047,5 +1049,81 @@ func TestPodDeletionsLatencyObservedInSeconds(t *testing.T) {
 	// Exactly one sample was added, so the difference of the sums is that sample's value.
 	if observed := sumAfter - sumBefore; observed < elapsed.Seconds() || observed > elapsed.Seconds()+1 {
 		t.Errorf("observed latency = %v seconds, want between %v and %v", observed, elapsed.Seconds(), elapsed.Seconds()+1)
+	}
+}
+
+// TestPodUpdateDuringEvictionDoesNotDuplicate covers pod updates caused by the eviction
+// itself (condition patch, deletionTimestamp), which used to start another eviction
+// goroutine for the same pod while the first was still waiting on the API.
+func TestPodUpdateDuringEvictionDoesNotDuplicate(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	pod := testutil.NewPod("pod1", "node1")
+	fakeClientset := fake.NewSimpleClientset(pod)
+	var gets atomic.Int32
+	getStarted := make(chan struct{}, 10)
+	release := make(chan struct{})
+	fakeClientset.PrependReactor("get", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
+		gets.Add(1)
+		getStarted <- struct{}{}
+		<-release
+		return false, nil, nil
+	})
+	controller, podIndexer, _ := setupNewController(ctx, fakeClientset)
+	controller.taintedNodes = map[string][]corev1.Taint{"node1": {createNoExecuteTaint(1)}}
+	if err := podIndexer.Add(pod); err != nil {
+		t.Fatal(err)
+	}
+
+	update := podUpdateItem{podName: pod.Name, podNamespace: pod.Namespace, nodeName: "node1"}
+	controller.handlePodUpdate(ctx, update)
+	<-getStarted
+	controller.handlePodUpdate(ctx, update)
+	close(release)
+	controller.taintEvictionQueue.CancelAndWait()
+
+	if got := gets.Load(); got != 1 {
+		t.Errorf("expected 1 pod get, got %d", got)
+	}
+}
+
+func TestTerminatingPodsAreNotEvictedAgain(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	pod := testutil.NewPod("pod1", "node1")
+	pod.DeletionTimestamp = &metav1.Time{Time: time.Now()}
+	node := testutil.NewNode("node1")
+	node.Spec.Taints = []corev1.Taint{createNoExecuteTaint(1)}
+
+	fakeClientset := fake.NewSimpleClientset(pod)
+	controller, podIndexer, nodeIndexer := setupNewController(ctx, fakeClientset)
+	if err := podIndexer.Add(pod); err != nil {
+		t.Fatal(err)
+	}
+	if err := nodeIndexer.Add(node); err != nil {
+		t.Fatal(err)
+	}
+
+	controller.handleNodeUpdate(ctx, nodeUpdateItem{nodeName: "node1"})
+	controller.handlePodUpdate(ctx, podUpdateItem{podName: pod.Name, podNamespace: pod.Namespace, nodeName: "node1"})
+
+	controller.taintEvictionQueue.Lock()
+	queued := len(controller.taintEvictionQueue.workers)
+	controller.taintEvictionQueue.Unlock()
+	if queued != 0 {
+		t.Errorf("expected no queued evictions for a terminating pod, got %d", queued)
+	}
+}
+
+func TestDeletePodHandlerPodNotFound(t *testing.T) {
+	fakeClientset := fake.NewSimpleClientset()
+	handler := deletePodHandler(fakeClientset, nil, "taint-eviction-controller")
+	if err := handler(context.Background(), time.Now(), NewWorkArgs("pod1", "default")); err != nil {
+		t.Errorf("expected no error for an already deleted pod, got %v", err)
+	}
+	if got := len(fakeClientset.Actions()); got != 1 {
+		t.Errorf("expected a single get without retries, got %d actions: %v", got, fakeClientset.Actions())
 	}
 }
