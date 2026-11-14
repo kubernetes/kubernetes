@@ -399,6 +399,16 @@ func (s *service) NodeGetCapabilities(
 		})
 	}
 
+	if s.config.NodeInfoFromController {
+		capabilities = append(capabilities, &csi.NodeServiceCapability{
+			Type: &csi.NodeServiceCapability_Rpc{
+				Rpc: &csi.NodeServiceCapability_RPC{
+					Type: csi.NodeServiceCapability_RPC_NODE_INFO_FROM_CONTROLLER,
+				},
+			},
+		})
+	}
+
 	return &csi.NodeGetCapabilitiesResponse{
 		Capabilities: capabilities,
 	}, nil
@@ -411,6 +421,10 @@ func (s *service) NodeGetInfo(ctx context.Context,
 	}
 	csiNodeResponse := &csi.NodeGetInfoResponse{
 		NodeId: s.nodeID,
+	}
+	if s.config.NodeInfoFromController && req.GetControllerGetNodeInfo() {
+		// The CO gets the topology and the attach limit from ControllerGetNodeInfo.
+		return csiNodeResponse, nil
 	}
 	if s.config.AttachLimit > 0 {
 		csiNodeResponse.MaxVolumesPerNode = s.config.AttachLimit

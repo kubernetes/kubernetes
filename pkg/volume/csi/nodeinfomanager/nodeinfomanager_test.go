@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -61,6 +62,8 @@ type testcase struct {
 	expectFail       bool
 	hasModified      bool
 	migratedPlugins  map[string](func() bool)
+	// specUpdates, if set, is the expected number of CSINode spec updates.
+	specUpdates *int
 }
 
 type nodeIDMap map[string]string
@@ -681,6 +684,123 @@ func TestInstallCSIDriver(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:       "pre-existing node info and driver registration from the same driver",
+			driverName: "com.example.csi.driver1",
+			existingNode: generateNode(
+				nodeIDMap{
+					"com.example.csi.driver1": "com.example.csi/csi-node1",
+				},
+				labelMap{
+					"com.example.csi/zone": "zoneA",
+				}, nil /*capacity*/),
+			existingCSINode: func() *storage.CSINode {
+				csiNode := generateCSINode(
+					nodeIDMap{
+						"com.example.csi.driver1": "com.example.csi/csi-node1",
+					},
+					generateVolumeLimits(10),
+					topologyKeyMap{
+						"com.example.csi.driver1": {"com.example.csi/zone"},
+					},
+				)
+				csiNode.Spec.DriverRegistrations = []storage.CSINodeDriverRegistration{
+					{Name: "com.example.csi.driver1", NodeID: "com.example.csi/csi-node1"},
+					{Name: "net.example.storage.other-driver", NodeID: "net.example.storage/test-node"},
+				}
+				return csiNode
+			}(),
+			inputNodeID: "com.example.csi/csi-node1",
+			inputTopology: map[string]string{
+				"com.example.csi/zone": "zoneA",
+			},
+			inputVolumeLimit: 10,
+			expectedNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "node1",
+					Annotations: map[string]string{annotationKeyNodeID: marshall(nodeIDMap{"com.example.csi.driver1": "com.example.csi/csi-node1"})},
+					Labels:      labelMap{"com.example.csi/zone": "zoneA"},
+				},
+			},
+			expectedCSINode: &storage.CSINode{
+				ObjectMeta: getCSINodeObjectMeta(),
+				Spec: storage.CSINodeSpec{
+					Drivers: []storage.CSINodeDriver{
+						{
+							Name:         "com.example.csi.driver1",
+							NodeID:       "com.example.csi/csi-node1",
+							TopologyKeys: []string{"com.example.csi/zone"},
+							Allocatable:  generateVolumeLimits(10),
+						},
+					},
+					// The drivers entry is unchanged, but the driver registration is removed.
+					DriverRegistrations: []storage.CSINodeDriverRegistration{
+						{Name: "net.example.storage.other-driver", NodeID: "net.example.storage/test-node"},
+					},
+				},
+			},
+			specUpdates: new(1),
+		},
+		{
+			name:       "pending driver registration from the same driver, and node info and driver registration from different driver",
+			driverName: "com.example.csi.driver1",
+			existingNode: generateNode(
+				nil, /* nodeIDs */
+				labelMap{
+					"net.example.storage/rack": "rack1",
+				}, nil /*capacity*/),
+			existingCSINode: func() *storage.CSINode {
+				csiNode := generateCSINode(
+					nodeIDMap{
+						"net.example.storage.other-driver": "net.example.storage/test-node",
+					},
+					nil, /* volumeLimits */
+					topologyKeyMap{
+						"net.example.storage.other-driver": {"net.example.storage/rack"},
+					},
+				)
+				csiNode.Spec.DriverRegistrations = []storage.CSINodeDriverRegistration{
+					{Name: "com.example.csi.driver1", NodeID: "com.example.csi/csi-node1"},
+					{Name: "net.example.storage.other-driver", NodeID: "net.example.storage/test-node"},
+				}
+				return csiNode
+			}(),
+			inputNodeID: "com.example.csi/csi-node1",
+			inputTopology: map[string]string{
+				"com.example.csi/zone": "zoneA",
+			},
+			expectedNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "node1",
+					Annotations: map[string]string{annotationKeyNodeID: marshall(nodeIDMap{"com.example.csi.driver1": "com.example.csi/csi-node1"})},
+					Labels: labelMap{
+						"com.example.csi/zone":     "zoneA",
+						"net.example.storage/rack": "rack1",
+					},
+				},
+			},
+			expectedCSINode: &storage.CSINode{
+				ObjectMeta: getCSINodeObjectMeta(),
+				Spec: storage.CSINodeSpec{
+					Drivers: []storage.CSINodeDriver{
+						{
+							Name:         "net.example.storage.other-driver",
+							NodeID:       "net.example.storage/test-node",
+							TopologyKeys: []string{"net.example.storage/rack"},
+						},
+						{
+							Name:         "com.example.csi.driver1",
+							NodeID:       "com.example.csi/csi-node1",
+							TopologyKeys: []string{"com.example.csi/zone"},
+						},
+					},
+					DriverRegistrations: []storage.CSINodeDriverRegistration{
+						{Name: "net.example.storage.other-driver", NodeID: "net.example.storage/test-node"},
+					},
+				},
+			},
+			specUpdates: new(1),
+		},
 	}
 
 	test(t, true /* addNodeInfo */, testcases)
@@ -815,6 +935,83 @@ func TestUninstallCSIDriver(t *testing.T) {
 				ObjectMeta: getCSINodeObjectMeta(),
 				Spec:       storage.CSINodeSpec{},
 			},
+		},
+		{
+			name:         "pending driver registration from the same driver",
+			driverName:   "com.example.csi.driver1",
+			existingNode: generateNode(nil /* nodeIDs */, nil /* labels */, nil /*capacity*/),
+			existingCSINode: func() *storage.CSINode {
+				csiNode := generateCSINode(nil /* nodeIDs */, nil /* volumeLimits */, nil /* topologyKeys */)
+				csiNode.Spec.DriverRegistrations = []storage.CSINodeDriverRegistration{
+					{Name: "com.example.csi.driver1", NodeID: "com.example.csi/csi-node1"},
+				}
+				return csiNode
+			}(),
+			expectedNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node1",
+				},
+			},
+			expectedCSINode: &storage.CSINode{
+				ObjectMeta: getCSINodeObjectMeta(),
+				Spec:       storage.CSINodeSpec{},
+			},
+			hasModified: true,
+			specUpdates: new(1),
+		},
+		{
+			name:       "pre-existing node info and driver registrations from the same driver and different driver",
+			driverName: "com.example.csi.driver1",
+			existingNode: generateNode(
+				nil, /* nodeIDs */
+				labelMap{
+					"com.example.csi/zone":     "zoneA",
+					"net.example.storage/rack": "rack1",
+				}, nil /*capacity*/),
+			existingCSINode: func() *storage.CSINode {
+				csiNode := generateCSINode(
+					nodeIDMap{
+						"com.example.csi.driver1":          "com.example.csi/csi-node1",
+						"net.example.storage.other-driver": "net.example.storage/test-node",
+					},
+					nil, /* volumeLimits */
+					topologyKeyMap{
+						"com.example.csi.driver1":          {"com.example.csi/zone"},
+						"net.example.storage.other-driver": {"net.example.storage/rack"},
+					},
+				)
+				csiNode.Spec.DriverRegistrations = []storage.CSINodeDriverRegistration{
+					{Name: "com.example.csi.driver1", NodeID: "com.example.csi/csi-node1"},
+					{Name: "net.example.storage.other-driver", NodeID: "net.example.storage/test-node"},
+				}
+				return csiNode
+			}(),
+			expectedNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node1",
+					Labels: labelMap{
+						"com.example.csi/zone":     "zoneA",
+						"net.example.storage/rack": "rack1",
+					},
+				},
+			},
+			expectedCSINode: &storage.CSINode{
+				ObjectMeta: getCSINodeObjectMeta(),
+				Spec: storage.CSINodeSpec{
+					Drivers: []storage.CSINodeDriver{
+						{
+							Name:         "net.example.storage.other-driver",
+							NodeID:       "net.example.storage/test-node",
+							TopologyKeys: []string{"net.example.storage/rack"},
+						},
+					},
+					DriverRegistrations: []storage.CSINodeDriverRegistration{
+						{Name: "net.example.storage.other-driver", NodeID: "net.example.storage/test-node"},
+					},
+				},
+			},
+			hasModified: true,
+			specUpdates: new(1),
 		},
 	}
 
@@ -1100,6 +1297,9 @@ func test(t *testing.T, addNodeInfo bool, testcases []testcase) {
 		}
 
 		actions := client.Actions()
+		if tc.specUpdates != nil {
+			assert.Equal(t, *tc.specUpdates, countSpecUpdates(actions), "CSINode spec updates")
+		}
 
 		var node *v1.Node
 		if action := hasPatchAction(actions); action != nil {
@@ -1533,6 +1733,18 @@ func TestNodeRecreatedSameNameRefreshesCSINodeOwnerUID(t *testing.T) {
 			},
 		},
 		{
+			name:            "InstallCSIDriverRegistration before GC deleted predecessor CSINode",
+			gcDeletedOldCSI: false,
+			act: func(nim Interface) error {
+				return nim.InstallCSIDriverRegistration(driverName, driverID)
+			},
+			verify: func(t *testing.T, csiNode *storage.CSINode, _ []clienttesting.Action) {
+				// Predecessor driver entry must be gone after replacing the old CSINode.
+				assert.Empty(t, csiNode.Spec.Drivers)
+				assert.Equal(t, []storage.CSINodeDriverRegistration{{Name: driverName, NodeID: driverID}}, csiNode.Spec.DriverRegistrations)
+			},
+		},
+		{
 			name:            "UpdateCSIDriver after GC deleted predecessor CSINode",
 			gcDeletedOldCSI: true,
 			act: func(nim Interface) error {
@@ -1736,6 +1948,331 @@ func TestUninstallCSIDriverRemovesStorageHealth(t *testing.T) {
 	}
 }
 
+func TestUninstallCSIDriverRemovesDriverRegistrationAndStorageHealth(t *testing.T) {
+	const (
+		driver1 = "com.example.csi.driver1"
+		driver2 = "com.example.csi.driver2"
+	)
+	health := func(driverName string) storage.StorageHealth {
+		return storage.StorageHealth{
+			Name: driverName,
+			HealthConditions: []storage.StorageHealthCondition{
+				{
+					Status: storage.StorageDegraded,
+					Reason: "DiskSlow",
+				},
+			},
+		}
+	}
+	csiNode := &storage.CSINode{
+		ObjectMeta: getCSINodeObjectMeta(),
+		Spec: storage.CSINodeSpec{
+			Drivers: []storage.CSINodeDriver{
+				{Name: driver1, NodeID: "node1"},
+				{Name: driver2, NodeID: "node1"},
+			},
+			DriverRegistrations: []storage.CSINodeDriverRegistration{
+				{Name: driver1, NodeID: "node1"},
+				{Name: driver2, NodeID: "node1"},
+			},
+		},
+		Status: storage.CSINodeStatus{
+			StorageHealth: []storage.StorageHealth{health(driver1), health(driver2)},
+		},
+	}
+	client := getClientSet(generateNode(nil /* nodeIDs */, nil /* labels */, nil /*capacity*/), csiNode)
+	host := volumetest.NewFakeVolumeHostWithCSINodeName(t, t.TempDir(), client, nil, csiNode.Name, nil, nil)
+	nim := NewNodeInfoManager(types.NodeName(csiNode.Name), host, nil)
+
+	if err := nim.UninstallCSIDriver(driver1); err != nil {
+		t.Fatalf("UninstallCSIDriver returned error: %v", err)
+	}
+
+	// The drivers and driverRegistrations entries are removed in one spec update, and the
+	// storage health in a separate status update.
+	actions := client.Actions()
+	assert.Equal(t, 1, countSpecUpdates(actions), "CSINode spec updates")
+	assert.Equal(t, 1, countStatusUpdates(actions), "CSINode status updates")
+	got, err := client.StorageV1().CSINodes().Get(context.TODO(), csiNode.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("error getting CSINode: %v", err)
+	}
+	assert.Equal(t, []storage.CSINodeDriver{{Name: driver2, NodeID: "node1"}}, got.Spec.Drivers)
+	assert.Equal(t, []storage.CSINodeDriverRegistration{{Name: driver2, NodeID: "node1"}}, got.Spec.DriverRegistrations)
+	assert.Equal(t, []storage.StorageHealth{health(driver2)}, got.Status.StorageHealth)
+}
+
+// TestInstallCSIDriverRegistration tests InstallCSIDriverRegistration with various existing CSINode
+// objects and kube-apiserver responses.
+func TestInstallCSIDriverRegistration(t *testing.T) {
+	const (
+		nodeName   = "node1"
+		driverName = "com.example.csi.driver1"
+		driverID   = "com.example.csi/csi-node1"
+	)
+	registration := storage.CSINodeDriverRegistration{Name: driverName, NodeID: driverID}
+	// The topology keys are not sorted, unlike when kubelet writes them, to show that the
+	// drivers entry is kept as is.
+	driver := storage.CSINodeDriver{
+		Name:         driverName,
+		NodeID:       driverID,
+		TopologyKeys: []string{"com.example.csi/zone", "com.example.csi/rack"},
+		Allocatable:  generateVolumeLimits(10),
+	}
+	otherRegistration := storage.CSINodeDriverRegistration{Name: "net.example.storage.other-driver", NodeID: "net.example.storage/test-node"}
+	otherDriver := storage.CSINodeDriver{
+		Name:         "net.example.storage.other-driver",
+		NodeID:       "net.example.storage/test-node",
+		TopologyKeys: []string{"net.example.storage/rack"},
+	}
+	csiNode := func(spec storage.CSINodeSpec) *storage.CSINode {
+		return &storage.CSINode{
+			ObjectMeta: getCSINodeObjectMeta(),
+			Spec:       spec,
+		}
+	}
+
+	testcases := []struct {
+		name         string
+		stored       *storage.CSINode
+		driverNodeID string
+		// reactor, if set, handles CSINode updates before the fake client stores them.
+		reactor func(tracker clienttesting.ObjectTracker) clienttesting.ReactionFunc
+		// want is the stored CSINode after the call. If it is nil, no API calls are expected.
+		want            *storage.CSINode
+		wantErr         string
+		wantSpecUpdates int
+	}{
+		{
+			name:            "no CSINode",
+			driverNodeID:    driverID,
+			want:            csiNode(storage.CSINodeSpec{DriverRegistrations: []storage.CSINodeDriverRegistration{registration}}),
+			wantSpecUpdates: 1,
+		},
+		{
+			name:         "pre-existing driver from the same driver",
+			stored:       csiNode(storage.CSINodeSpec{Drivers: []storage.CSINodeDriver{driver}}),
+			driverNodeID: driverID,
+			want: csiNode(storage.CSINodeSpec{
+				Drivers:             []storage.CSINodeDriver{driver},
+				DriverRegistrations: []storage.CSINodeDriverRegistration{registration},
+			}),
+			wantSpecUpdates: 1,
+		},
+		{
+			name: "pre-existing driver and driver registration from different driver",
+			stored: csiNode(storage.CSINodeSpec{
+				Drivers:             []storage.CSINodeDriver{otherDriver},
+				DriverRegistrations: []storage.CSINodeDriverRegistration{otherRegistration},
+			}),
+			driverNodeID: driverID,
+			want: csiNode(storage.CSINodeSpec{
+				Drivers:             []storage.CSINodeDriver{otherDriver},
+				DriverRegistrations: []storage.CSINodeDriverRegistration{otherRegistration, registration},
+			}),
+			wantSpecUpdates: 1,
+		},
+		{
+			name: "pre-existing driver and driver registration from the same driver",
+			stored: csiNode(storage.CSINodeSpec{
+				Drivers:             []storage.CSINodeDriver{driver},
+				DriverRegistrations: []storage.CSINodeDriverRegistration{registration},
+			}),
+			driverNodeID: driverID,
+			want: csiNode(storage.CSINodeSpec{
+				Drivers:             []storage.CSINodeDriver{driver},
+				DriverRegistrations: []storage.CSINodeDriverRegistration{registration},
+			}),
+			wantSpecUpdates: 0,
+		},
+		{
+			name: "pending driver registration from the same driver, but different node ID",
+			stored: csiNode(storage.CSINodeSpec{
+				DriverRegistrations: []storage.CSINodeDriverRegistration{
+					{Name: driverName, NodeID: "com.example.csi/other-node"},
+					otherRegistration,
+				},
+			}),
+			driverNodeID: driverID,
+			want: csiNode(storage.CSINodeSpec{
+				DriverRegistrations: []storage.CSINodeDriverRegistration{otherRegistration, registration},
+			}),
+			wantSpecUpdates: 1,
+		},
+		{
+			name:         "empty node ID",
+			driverNodeID: "",
+			wantErr:      "driverNodeID must not be empty",
+		},
+		{
+			// kube-apiserver has the CSIControllerGetNodeInfo feature gate disabled.
+			name:            "driver registrations dropped by kube-apiserver",
+			driverNodeID:    driverID,
+			reactor:         dropDriverRegistrationsReactor,
+			want:            csiNode(storage.CSINodeSpec{}),
+			wantErr:         string(features.CSIControllerGetNodeInfo),
+			wantSpecUpdates: 1,
+		},
+		{
+			// kube-apiserver rejects a driver registration whose node ID differs from the
+			// drivers entry of the same driver.
+			name:         "driver registration rejected by kube-apiserver",
+			stored:       csiNode(storage.CSINodeSpec{Drivers: []storage.CSINodeDriver{{Name: driverName, NodeID: "com.example.csi/other-node"}}}),
+			driverNodeID: driverID,
+			reactor:      invalidCSINodeReactor,
+			want:         csiNode(storage.CSINodeSpec{Drivers: []storage.CSINodeDriver{{Name: driverName, NodeID: "com.example.csi/other-node"}}}),
+			wantErr:      "is invalid",
+			// Every error is retried, like in InstallCSIDriver.
+			wantSpecUpdates: updateBackoff.Steps,
+		},
+		{
+			name:         "update conflict with external-attacher",
+			stored:       csiNode(storage.CSINodeSpec{DriverRegistrations: []storage.CSINodeDriverRegistration{otherRegistration}}),
+			driverNodeID: driverID,
+			// external-attacher adds the drivers entry of the other driver between the Get and
+			// the Update of kubelet, which must keep the entry when it retries.
+			reactor: func(tracker clienttesting.ObjectTracker) clienttesting.ReactionFunc {
+				return conflictOnceReactor(tracker, func(csiNode *storage.CSINode) {
+					csiNode.Spec.Drivers = append(csiNode.Spec.Drivers, otherDriver)
+				})
+			},
+			want: csiNode(storage.CSINodeSpec{
+				Drivers:             []storage.CSINodeDriver{otherDriver},
+				DriverRegistrations: []storage.CSINodeDriverRegistration{otherRegistration, registration},
+			}),
+			wantSpecUpdates: 2,
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			client := getClientSet(generateNode(nil /* nodeIDs */, nil /* labels */, nil /*capacity*/), tc.stored)
+			if tc.reactor != nil {
+				client.PrependReactor("update", "csinodes", tc.reactor(client.Tracker()))
+			}
+			host := volumetest.NewFakeVolumeHostWithCSINodeName(t, t.TempDir(), client, nil, nodeName, nil, nil)
+			nim := NewNodeInfoManager(nodeName, host, nil)
+
+			err := nim.InstallCSIDriverRegistration(driverName, tc.driverNodeID)
+			if tc.wantErr != "" {
+				require.ErrorContains(t, err, tc.wantErr)
+			} else {
+				require.NoError(t, err)
+			}
+
+			actions := client.Actions()
+			if tc.want == nil {
+				assert.Empty(t, actions, "API calls")
+				return
+			}
+			assert.Nil(t, hasPatchAction(actions), "Node must not be patched")
+			assert.Equal(t, tc.wantSpecUpdates, countSpecUpdates(actions), "CSINode spec updates")
+
+			got, err := client.StorageV1().CSINodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
+			if err != nil {
+				t.Fatalf("error getting CSINode: %v", err)
+			}
+			if !helper.Semantic.DeepEqual(got, tc.want) {
+				t.Errorf("expected CSINode %+v; got: %+v", tc.want, got)
+			}
+		})
+	}
+}
+
+// TestUpdateCSIDriver tests UpdateCSIDriver with and without a driver registration of the driver
+// in the CSINode object.
+func TestUpdateCSIDriver(t *testing.T) {
+	const (
+		nodeName   = "node1"
+		driverName = "com.example.csi.driver1"
+		driverID   = "com.example.csi/csi-node1"
+	)
+	topology := map[string]string{"com.example.csi/zone": "zoneA"}
+	registration := storage.CSINodeDriverRegistration{Name: driverName, NodeID: driverID}
+	otherRegistration := storage.CSINodeDriverRegistration{Name: "net.example.storage.other-driver", NodeID: "net.example.storage/test-node"}
+	driver := storage.CSINodeDriver{
+		Name:         driverName,
+		NodeID:       driverID,
+		TopologyKeys: []string{"com.example.csi/zone"},
+		Allocatable:  generateVolumeLimits(10),
+	}
+	updatedDriver := storage.CSINodeDriver{
+		Name:         driverName,
+		NodeID:       driverID,
+		TopologyKeys: []string{"com.example.csi/zone"},
+		Allocatable:  generateVolumeLimits(20),
+	}
+
+	testcases := []struct {
+		name            string
+		stored          storage.CSINodeSpec
+		want            storage.CSINodeSpec
+		wantSpecUpdates int
+	}{
+		{
+			name: "no driver registration",
+			stored: storage.CSINodeSpec{
+				Drivers:             []storage.CSINodeDriver{driver},
+				DriverRegistrations: []storage.CSINodeDriverRegistration{otherRegistration},
+			},
+			want: storage.CSINodeSpec{
+				Drivers:             []storage.CSINodeDriver{updatedDriver},
+				DriverRegistrations: []storage.CSINodeDriverRegistration{otherRegistration},
+			},
+			wantSpecUpdates: 1,
+		},
+		{
+			// external-attacher hasn't added the drivers entry yet.
+			name: "pending driver registration",
+			stored: storage.CSINodeSpec{
+				DriverRegistrations: []storage.CSINodeDriverRegistration{registration},
+			},
+			want: storage.CSINodeSpec{
+				DriverRegistrations: []storage.CSINodeDriverRegistration{registration},
+			},
+			wantSpecUpdates: 0,
+		},
+		{
+			// external-attacher updates the drivers entry.
+			name: "completed driver registration",
+			stored: storage.CSINodeSpec{
+				Drivers:             []storage.CSINodeDriver{driver},
+				DriverRegistrations: []storage.CSINodeDriverRegistration{registration},
+			},
+			want: storage.CSINodeSpec{
+				Drivers:             []storage.CSINodeDriver{driver},
+				DriverRegistrations: []storage.CSINodeDriverRegistration{registration},
+			},
+			wantSpecUpdates: 0,
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			stored := &storage.CSINode{
+				ObjectMeta: getCSINodeObjectMeta(),
+				Spec:       tc.stored,
+			}
+			client := getClientSet(generateNode(nil /* nodeIDs */, nil /* labels */, nil /*capacity*/), stored)
+			host := volumetest.NewFakeVolumeHostWithCSINodeName(t, t.TempDir(), client, nil, nodeName, nil, nil)
+			nim := NewNodeInfoManager(nodeName, host, nil)
+
+			if err := nim.UpdateCSIDriver(driverName, driverID, 20, topology); err != nil {
+				t.Fatalf("UpdateCSIDriver returned error: %v", err)
+			}
+
+			assert.Equal(t, tc.wantSpecUpdates, countSpecUpdates(client.Actions()), "CSINode spec updates")
+			got, err := client.StorageV1().CSINodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
+			if err != nil {
+				t.Fatalf("error getting CSINode: %v", err)
+			}
+			if !helper.Semantic.DeepEqual(got.Spec, tc.want) {
+				t.Errorf("expected CSINode spec %+v; got: %+v", tc.want, got.Spec)
+			}
+		})
+	}
+}
+
 // checkFreshTransitionTimes verifies that every condition whose expected
 // transition time is zero got a time within [before, after], then zeroes it in
 // got so the caller can compare the rest of the status exactly.
@@ -1791,4 +2328,74 @@ func countStatusUpdates(actions []clienttesting.Action) int {
 		}
 	}
 	return count
+}
+
+func countSpecUpdates(actions []clienttesting.Action) int {
+	count := 0
+	for _, action := range actions {
+		if action.GetVerb() == "update" && action.GetResource().Resource == "csinodes" && action.GetSubresource() == "" {
+			count++
+		}
+	}
+	return count
+}
+
+// dropDriverRegistrationsReactor stores CSINode spec updates without spec.driverRegistrations, like
+// kube-apiserver with the CSIControllerGetNodeInfo feature gate disabled does for a CSINode that
+// has no driver registrations yet.
+// Reactors run with the fake client locked, so they use the tracker instead of the client.
+func dropDriverRegistrationsReactor(tracker clienttesting.ObjectTracker) clienttesting.ReactionFunc {
+	return func(action clienttesting.Action) (bool, runtime.Object, error) {
+		if action.GetSubresource() != "" {
+			return false, nil, nil
+		}
+		csiNode := action.(clienttesting.UpdateAction).GetObject().(*storage.CSINode).DeepCopy()
+		csiNode.Spec.DriverRegistrations = nil
+		if err := tracker.Update(storage.SchemeGroupVersion.WithResource("csinodes"), csiNode, ""); err != nil {
+			return true, nil, err
+		}
+		return true, csiNode, nil
+	}
+}
+
+// invalidCSINodeReactor fails CSINode spec updates like kube-apiserver does when the CSINode
+// object is invalid.
+func invalidCSINodeReactor(clienttesting.ObjectTracker) clienttesting.ReactionFunc {
+	return func(action clienttesting.Action) (bool, runtime.Object, error) {
+		if action.GetSubresource() != "" {
+			return false, nil, nil
+		}
+		csiNode := action.(clienttesting.UpdateAction).GetObject().(*storage.CSINode)
+		return true, nil, errors.NewInvalid(storage.SchemeGroupVersion.WithKind("CSINode").GroupKind(), csiNode.Name, nil)
+	}
+}
+
+// conflictOnceReactor emulates another writer, such as external-attacher, that changes the stored
+// CSINode with update between the Get and the first spec update of the caller. That spec update
+// fails with a conflict, like it does in kube-apiserver because of the outdated resourceVersion.
+// Reactors run with the fake client locked, so they use the tracker instead of the client.
+func conflictOnceReactor(tracker clienttesting.ObjectTracker, update func(*storage.CSINode)) clienttesting.ReactionFunc {
+	conflicted := false
+	return func(action clienttesting.Action) (bool, runtime.Object, error) {
+		if action.GetSubresource() != "" {
+			return false, nil, nil
+		}
+		if conflicted {
+			return false, nil, nil
+		}
+		conflicted = true
+
+		resource := storage.SchemeGroupVersion.WithResource("csinodes")
+		name := action.(clienttesting.UpdateAction).GetObject().(*storage.CSINode).Name
+		obj, err := tracker.Get(resource, "", name)
+		if err != nil {
+			return true, nil, err
+		}
+		csiNode := obj.(*storage.CSINode)
+		update(csiNode)
+		if err := tracker.Update(resource, csiNode, ""); err != nil {
+			return true, nil, err
+		}
+		return true, nil, errors.NewConflict(storage.Resource("csinodes"), name, goerrors.New("the object has been modified"))
+	}
 }
