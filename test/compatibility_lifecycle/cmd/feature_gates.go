@@ -53,6 +53,7 @@ const (
 type featureSpec struct {
 	Default                 bool   `yaml:"default" json:"default"`
 	LockToDefault           bool   `yaml:"lockToDefault" json:"lockToDefault"`
+	EmulationExempt         bool   `yaml:"emulationExempt,omitempty" json:"emulationExempt,omitempty"`
 	PreRelease              string `yaml:"preRelease" json:"preRelease"`
 	Version                 string `yaml:"version" json:"version"`
 	MinCompatibilityVersion string `yaml:"minCompatibilityVersion,omitempty" json:"minCompatibilityVersion,omitempty"`
@@ -211,7 +212,9 @@ func dedupeFeatureList(featureList []featureInfo) ([]featureInfo, error) {
 //   - Beta features are removed (not allowed)
 //   - GA/Deprecated features are removed without being locked to default
 //   - GA/Deprecated features are removed before 3 minor versions have passed
-//     since locking (required for emulation support)
+//     since locking (required for emulation support).
+//     Note some gates pertaining only components which don't implement the emulation version
+//     (e.g. kubelet) are flagged exempt.
 func verifyFeatureRemoval(featureList []featureInfo, baseFeatureList []featureInfo,
 	currentVersion *version.Version) error {
 	baseFeatures := make(map[string]featureInfo)
@@ -251,7 +254,10 @@ func verifyFeatureRemoval(featureList []featureInfo, baseFeatureList []featureIn
 			}
 			minRemovalVer := specVer.AddMinor(3)
 			if currentVersion.LessThan(minRemovalVer) {
-				return fmt.Errorf("feature %s cannot be removed until version %s (required for emulation support)",
+				if lastSpec.EmulationExempt {
+					continue
+				}
+				return fmt.Errorf("feature %s cannot be removed until version %s (required for emulation support); kubelet-only gates excluded from KEP-4330 must have EmulationExempt set on their last spec",
 					name, minRemovalVer)
 			}
 		}
@@ -495,6 +501,13 @@ func parseFeatureSpec(variables map[string]ast.Expr, v ast.Expr) (featureSpec, e
 					return spec, err
 				}
 				spec.LockToDefault = boolValue
+
+			case "EmulationExempt":
+				boolValue, err := parseBool(variables, eltType.Value)
+				if err != nil {
+					return spec, err
+				}
+				spec.EmulationExempt = boolValue
 
 			case "PreRelease":
 				spec.PreRelease = identifierName(eltType.Value, true)
