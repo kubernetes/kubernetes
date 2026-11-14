@@ -17,6 +17,7 @@ limitations under the License.
 package validation
 
 import (
+	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -46,8 +47,8 @@ func ValidateResourcePoolStatusRequestStatusUpdate(request, oldRequest *resource
 func validateResourcePoolStatusRequestStatusUpdate(status, oldStatus *resource.ResourcePoolStatusRequestStatus, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 
-	// Once status is set, it becomes immutable (request is complete) — not DV covered
-	if oldStatus != nil {
+	// The final status is immutable; a waiting status may only be replaced, not cleared — not DV covered
+	if oldStatus != nil && (status == nil || !isWaitingForPools(oldStatus)) {
 		allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(status, oldStatus, fldPath)...)
 		return allErrs
 	}
@@ -60,5 +61,31 @@ func validateResourcePoolStatusRequestStatusUpdate(status, oldStatus *resource.R
 	// Validate conditions — not DV covered
 	allErrs = append(allErrs, metav1validation.ValidateConditions(status.Conditions, fldPath.Child("conditions"))...)
 
+	// A waiting status carries no results — not DV covered
+	if apimeta.IsStatusConditionTrue(status.Conditions, resource.ResourcePoolStatusRequestConditionWaitingForPools) {
+		if len(status.Pools) > 0 {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("pools"), "must be empty while WaitingForPools is True"))
+		}
+		if status.PoolCount != nil && *status.PoolCount != 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("poolCount"), *status.PoolCount, "must be 0 while WaitingForPools is True"))
+		}
+		for _, t := range []string{resource.ResourcePoolStatusRequestConditionComplete, resource.ResourcePoolStatusRequestConditionFailed} {
+			if apimeta.FindStatusCondition(status.Conditions, t) != nil {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("conditions"), t, "must not be set while WaitingForPools is True"))
+			}
+		}
+	}
+
 	return allErrs
+}
+
+// isWaitingForPools reports whether status is a waiting status set before the
+// final calculation: WaitingForPools is true, neither Complete nor Failed is
+// set, and there are no pool results.
+func isWaitingForPools(status *resource.ResourcePoolStatusRequestStatus) bool {
+	return apimeta.IsStatusConditionTrue(status.Conditions, resource.ResourcePoolStatusRequestConditionWaitingForPools) &&
+		apimeta.FindStatusCondition(status.Conditions, resource.ResourcePoolStatusRequestConditionComplete) == nil &&
+		apimeta.FindStatusCondition(status.Conditions, resource.ResourcePoolStatusRequestConditionFailed) == nil &&
+		len(status.Pools) == 0 &&
+		(status.PoolCount == nil || *status.PoolCount == 0)
 }

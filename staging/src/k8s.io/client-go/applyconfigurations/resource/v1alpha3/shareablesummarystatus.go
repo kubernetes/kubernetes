@@ -25,10 +25,11 @@ package v1alpha3
 // devices with AllowMultipleAllocations.
 type ShareableSummaryStatusApplyConfiguration struct {
 	// fullyAvailableDevices is the number of shareable devices with no
-	// capacity consumed.
+	// allocation other than for admin access.
 	FullyAvailableDevices *int32 `json:"fullyAvailableDevices,omitempty"`
-	// partiallyAvailableDevices is the number of shareable devices with some
-	// but not all capacity consumed.
+	// partiallyAvailableDevices is the number of shareable devices with at
+	// least one allocation other than for admin access, regardless of
+	// remaining capacity.
 	PartiallyAvailableDevices *int32 `json:"partiallyAvailableDevices,omitempty"`
 	// capacity reports aggregate total, consumed, and available amounts per
 	// shareable capacity key across the pool.
