@@ -110,13 +110,13 @@ func testAddRemovePods(tCtx ktesting.TContext) {
 	}
 
 	// Adding a pod with no probes should be a no-op.
-	m.SyncPod(tCtx, &noProbePod)
+	m.SyncPod(tCtx, &noProbePod, nil)
 	if err := expectProbes(m, nil); err != nil {
 		t.Error(err)
 	}
 
 	// Adding a pod with probes.
-	m.SyncPod(tCtx, &probePod)
+	m.SyncPod(tCtx, &probePod, nil)
 	probePaths := []probeKey{
 		{"probe_pod", "readiness", readiness},
 		{"probe_pod", "liveness", liveness},
@@ -178,7 +178,7 @@ func testSyncPodContinuesAfterExistingWorker(tCtx ktesting.TContext) {
 	defer cleanup(t, m)
 
 	// First SyncPod: registers workers for both containers.
-	m.SyncPod(ctx, &pod)
+	m.SyncPod(ctx, &pod, nil)
 	if err := expectProbes(m, []probeKey{
 		{"test_pod", "container_a", readiness},
 		{"test_pod", "container_b", readiness},
@@ -193,7 +193,7 @@ func testSyncPodContinuesAfterExistingWorker(tCtx ktesting.TContext) {
 	// Second SyncPod: should re-register container_b's missing worker.
 	// Previously, hitting container_a's existing worker caused an early return,
 	// so container_b was never re-registered.
-	m.SyncPod(ctx, &pod)
+	m.SyncPod(ctx, &pod, nil)
 
 	if err := expectProbes(m, []probeKey{
 		{"test_pod", "container_a", readiness},
@@ -245,8 +245,8 @@ func testSyncPodStopsRemovedContainerWorkers(tCtx ktesting.TContext) {
 	m := newTestManager()
 	defer cleanup(t, m)
 
-	m.SyncPod(ctx, pod)
-	m.SyncPod(ctx, otherPod)
+	m.SyncPod(ctx, pod, nil)
+	m.SyncPod(ctx, otherPod, nil)
 	remaining := []probeKey{
 		{"test_pod", "sidecar", readiness},
 		{"test_pod", "keep", readiness},
@@ -262,7 +262,7 @@ func testSyncPodStopsRemovedContainerWorkers(tCtx ktesting.TContext) {
 
 	updated := pod.DeepCopy()
 	updated.Spec.Containers = updated.Spec.Containers[:1]
-	m.SyncPod(ctx, updated)
+	m.SyncPod(ctx, updated, nil)
 	// The removed container's workers exit; workers of other containers and pods are kept.
 	waitForStoppedWorkers()
 	require.NoError(t, expectProbes(m, remaining))
@@ -287,15 +287,15 @@ func testSyncPodReaddedContainerGetsNewWorker(tCtx ktesting.TContext) {
 	m := newTestManager()
 	defer cleanup(t, m)
 
-	m.SyncPod(ctx, pod)
+	m.SyncPod(ctx, pod, nil)
 	require.NoError(t, expectProbes(m, []probeKey{key}))
 	oldWorker := m.workers[key]
 
 	removed := pod.DeepCopy()
 	removed.Spec.Containers = removed.Spec.Containers[:1]
-	m.SyncPod(ctx, removed)
+	m.SyncPod(ctx, removed, nil)
 	// Added back before the old worker exits.
-	m.SyncPod(ctx, pod)
+	m.SyncPod(ctx, pod, nil)
 	waitForStoppedWorkers()
 
 	require.NoError(t, expectProbes(m, []probeKey{key}))
@@ -323,7 +323,7 @@ func testStopProbesOfContainersMissingFromSpec(tCtx ktesting.TContext) {
 	}
 	m := newTestManager()
 	defer cleanup(t, m)
-	m.SyncPod(ctx, pod)
+	m.SyncPod(ctx, pod, nil)
 
 	// The pod starts terminating with a spec that no longer has "removed",
 	// before SyncPod has seen that spec.
@@ -427,7 +427,7 @@ func TestAddRemovePodsWithRestartableInitContainer(t *testing.T) {
 			}
 
 			// Adding a pod with probes.
-			m.SyncPod(tCtx, &probePod)
+			m.SyncPod(tCtx, &probePod, nil)
 			if err := expectProbes(m, tc.probePaths); err != nil {
 				t.Error(err)
 			}
@@ -488,7 +488,7 @@ func testStopLivenessAndStartup(tCtx ktesting.TContext) {
 		},
 	}
 
-	m.SyncPod(tCtx, &pod)
+	m.SyncPod(tCtx, &pod, nil)
 	allProbes := []probeKey{
 		{"stop_probe_pod", "sidecar", startup},
 		{"stop_probe_pod", "sidecar", liveness},
@@ -572,8 +572,8 @@ func testCleanupPods(tCtx ktesting.TContext) {
 			}},
 		},
 	}
-	m.SyncPod(tCtx, &podToCleanup)
-	m.SyncPod(tCtx, &podToKeep)
+	m.SyncPod(tCtx, &podToCleanup, nil)
+	m.SyncPod(tCtx, &podToKeep, nil)
 
 	desiredPods := map[types.UID]sets.Empty{}
 	desiredPods[podToKeep.UID] = sets.Empty{}
@@ -620,7 +620,7 @@ func testCleanupRepeated(tCtx ktesting.TContext) {
 	for i := 0; i < numTestPods; i++ {
 		pod := podTemplate
 		pod.UID = types.UID(strconv.Itoa(i))
-		m.SyncPod(tCtx, &pod)
+		m.SyncPod(tCtx, &pod, nil)
 	}
 
 	for i := 0; i < 10; i++ {
@@ -1117,7 +1117,7 @@ func testUpdateReadiness(tCtx ktesting.TContext) {
 
 	m.statusManager.SetPodStatus(logger, testPod, getTestRunningStatus())
 
-	m.SyncPod(tCtx, testPod)
+	m.SyncPod(tCtx, testPod, nil)
 	probePaths := []probeKey{{testPodUID, testContainerName, readiness}}
 	if err := expectProbes(m, probePaths); err != nil {
 		t.Error(err)
@@ -1271,7 +1271,7 @@ func testProbeWorkersSurviveSyncContextCancellation(tCtx ktesting.TContext) {
 	m.statusManager.SetPodStatus(logger, testPod, getTestRunningStatus())
 
 	ctx, cancel := context.WithCancel(tCtx)
-	m.SyncPod(ctx, testPod)
+	m.SyncPod(ctx, testPod, nil)
 	// Simulate the pod worker canceling the sync context at the start of
 	// pod termination.
 	cancel()

@@ -134,6 +134,9 @@ type kubeGenericRuntimeManager struct {
 	readinessManager proberesults.Manager
 	startupManager   proberesults.Manager
 
+	// probeLifecycle handles container start/stop events for the probe manager.
+	probeLifecycle kubecontainer.ContainerProbeLifecycle
+
 	// If false, pass "memory.oom.group" to container cgroups when using cgroups v2 to cause processes
 	// in those cgroups to be killed as a unit by the OOM killer.
 	// It must be nil except for linux
@@ -222,6 +225,7 @@ func NewKubeGenericRuntimeManager(
 	livenessManager proberesults.Manager,
 	readinessManager proberesults.Manager,
 	startupManager proberesults.Manager,
+	probeLifecycle kubecontainer.ContainerProbeLifecycle,
 	rootDirectory string,
 	podLogsDirectory string,
 	machineInfo *cadvisorapi.MachineInfo,
@@ -273,6 +277,7 @@ func NewKubeGenericRuntimeManager(
 		livenessManager:              livenessManager,
 		readinessManager:             readinessManager,
 		startupManager:               startupManager,
+		probeLifecycle:               probeLifecycle,
 		machineInfo:                  machineInfo,
 		osInterface:                  osInterface,
 		runtimeHelper:                runtimeHelper,

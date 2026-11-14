@@ -19,6 +19,7 @@ package prober
 import (
 	"context"
 	"math/rand"
+	"sync"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -64,23 +65,17 @@ type worker struct {
 
 	// The last known container ID for this worker.
 	containerID kubecontainer.ContainerID
-	// The last probe result for this worker.
-	lastResult results.Result
-	// How many times in a row the probe has returned the same result.
-	resultRun int
+	probeResultState
 
 	// If set, skip probing.
 	onHold bool
 
-	// proberResultsMetricLabels holds the labels attached to this worker
-	// for the ProberResults metric by result.
-	proberResultsSuccessfulMetricLabels metrics.Labels
-	proberResultsFailedMetricLabels     metrics.Labels
-	proberResultsUnknownMetricLabels    metrics.Labels
-	// proberDurationMetricLabels holds the labels attached to this worker
-	// for the ProberDuration metric by result.
-	proberDurationSuccessfulMetricLabels metrics.Labels
-	proberDurationUnknownMetricLabels    metrics.Labels
+	// mu guards cancel and stopped.
+	mu sync.Mutex
+	// cancel aborts an in-flight probe when stop() is called.
+	cancel context.CancelFunc
+	// stopped tracks whether stop() was called before run() initialized cancel.
+	stopped bool
 }
 
 // isInitContainer checks if the worker's container is in the pod's init containers
@@ -124,32 +119,7 @@ func newWorker(
 		w.initialValue = results.Unknown
 	}
 
-	basicMetricLabels := metrics.Labels{
-		"probe_type": w.probeType.String(),
-		"container":  w.container.Name,
-		"pod":        w.pod.Name,
-		"namespace":  w.pod.Namespace,
-		"pod_uid":    string(w.pod.UID),
-	}
-
-	proberDurationLabels := metrics.Labels{
-		"probe_type": w.probeType.String(),
-		"container":  w.container.Name,
-		"pod":        w.pod.Name,
-		"namespace":  w.pod.Namespace,
-	}
-
-	w.proberResultsSuccessfulMetricLabels = deepCopyPrometheusLabels(basicMetricLabels)
-	w.proberResultsSuccessfulMetricLabels["result"] = probeResultSuccessful
-
-	w.proberResultsFailedMetricLabels = deepCopyPrometheusLabels(basicMetricLabels)
-	w.proberResultsFailedMetricLabels["result"] = probeResultFailed
-
-	w.proberResultsUnknownMetricLabels = deepCopyPrometheusLabels(basicMetricLabels)
-	w.proberResultsUnknownMetricLabels["result"] = probeResultUnknown
-
-	w.proberDurationSuccessfulMetricLabels = deepCopyPrometheusLabels(proberDurationLabels)
-	w.proberDurationUnknownMetricLabels = deepCopyPrometheusLabels(proberDurationLabels)
+	w.probeResultState = newProbeResultState(probeType, pod, container)
 
 	return w
 }
@@ -159,18 +129,20 @@ func (w *worker) run(ctx context.Context) {
 	logger := klog.FromContext(ctx)
 	probeTickerPeriod := time.Duration(w.spec.PeriodSeconds) * time.Second
 
-	// If kubelet restarted the probes could be started in rapid succession.
-	// Let the worker wait for a random portion of tickerPeriod before probing.
-	// Do it only if the kubelet has started recently.
-	if probeTickerPeriod > time.Since(w.probeManager.start) {
-		time.Sleep(time.Duration(rand.Float64() * float64(probeTickerPeriod)))
+	// Derive a worker context so stop() can abort in-flight probes.
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	w.mu.Lock()
+	w.cancel = cancel
+	stopped := w.stopped
+	w.mu.Unlock()
+	if stopped {
+		// Honor stop() called before run() started.
+		cancel()
 	}
-
-	probeTicker := time.NewTicker(probeTickerPeriod)
 
 	defer func() {
 		// Clean up.
-		probeTicker.Stop()
 		if !w.containerID.IsEmpty() {
 			w.resultsManager.Remove(w.containerID)
 		}
@@ -180,15 +152,29 @@ func (w *worker) run(ctx context.Context) {
 			ProberResults.Delete(w.proberResultsSuccessfulMetricLabels)
 			ProberResults.Delete(w.proberResultsFailedMetricLabels)
 			ProberResults.Delete(w.proberResultsUnknownMetricLabels)
-			ProberDuration.Delete(w.proberDurationSuccessfulMetricLabels)
-			ProberDuration.Delete(w.proberDurationUnknownMetricLabels)
+			ProberDuration.Delete(w.proberDurationMetricLabels)
 		}
 	}()
 
+	// Jitter after kubelet restart without delaying cancellation and cleanup.
+	if probeTickerPeriod > time.Since(w.probeManager.start) {
+		timer := time.NewTimer(time.Duration(rand.Float64() * float64(probeTickerPeriod)))
+		defer timer.Stop()
+		select {
+		case <-ctx.Done():
+			return
+		case <-timer.C:
+		}
+	}
+	probeTicker := time.NewTicker(probeTickerPeriod)
+	defer probeTicker.Stop()
+
 probeLoop:
-	for w.doProbe(ctx) {
+	for ctx.Err() == nil && w.doProbe(ctx) {
 		// Wait for next probe tick.
 		select {
+		case <-ctx.Done():
+			break probeLoop
 		case <-w.stopCh:
 			break probeLoop
 		case <-probeTicker.C:
@@ -203,9 +189,18 @@ probeLoop:
 	}
 }
 
-// stop stops the probe worker. The worker handles cleanup and removes itself from its manager.
+// stop stops the probe worker, aborting any probe that is currently executing.
+// The worker handles cleanup and removes itself from its manager.
 // It is safe to call stop multiple times.
 func (w *worker) stop() {
+	w.mu.Lock()
+	w.stopped = true
+	cancel := w.cancel
+	w.mu.Unlock()
+	if cancel != nil {
+		cancel()
+	}
+
 	select {
 	case w.stopCh <- struct{}{}:
 	default: // Non-blocking.
@@ -361,33 +356,13 @@ func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 	}
 
 	// Note, exec probe does NOT have access to pod environment variables or downward API
-	result, err := w.probeManager.prober.probe(ctx, w.probeType, w.pod, status, w.container, w.containerID)
+	result, err := w.probeManager.prober.probe(ctx, w.probeType, w.pod, status.PodIP, w.container, w.containerID)
 	if err != nil {
 		// Prober error, throw away the result.
 		return true
 	}
 
-	switch result {
-	case results.Success:
-		ProberResults.With(w.proberResultsSuccessfulMetricLabels).Inc()
-		ProberDuration.With(w.proberDurationSuccessfulMetricLabels).Observe(time.Since(startTime).Seconds())
-	case results.Failure:
-		ProberResults.With(w.proberResultsFailedMetricLabels).Inc()
-	default:
-		ProberResults.With(w.proberResultsUnknownMetricLabels).Inc()
-		ProberDuration.With(w.proberDurationUnknownMetricLabels).Observe(time.Since(startTime).Seconds())
-	}
-
-	if w.lastResult == result {
-		w.resultRun++
-	} else {
-		w.lastResult = result
-		w.resultRun = 1
-	}
-
-	if (result == results.Failure && w.resultRun < int(w.spec.FailureThreshold)) ||
-		(result == results.Success && w.resultRun < int(w.spec.SuccessThreshold)) {
-		// Success or failure is below threshold - leave the probe state unchanged.
+	if !w.recordResult(result, w.spec, startTime) {
 		return true
 	}
 
