@@ -48,24 +48,92 @@ var (
 
 	// set of error we're expecting during port-forwarding
 	networkClosedError = "use of closed network connection"
+
+	// errPingUnsupported marks a transport that cannot verify peer liveness;
+	// session liveness monitoring is disabled rather than treating it as a
+	// dead session
+	errPingUnsupported = errors.New("transport does not support ping")
 )
+
+// connectionPinger is implemented by transports whose underlying protocol can
+// verify the peer is still reachable with a round trip. SPDY-based connections
+// support this via Ping frames.
+type connectionPinger interface {
+	Ping() (time.Duration, error)
+}
 
 // PortForwarder knows how to listen for local connections and forward them to
 // a remote pod via an upgraded HTTP request.
 type PortForwarder struct {
+	ctx       context.Context
 	addresses []listenAddress
 	ports     []ForwardedPort
 	stopChan  <-chan struct{}
 
-	logger        klog.Logger
-	dialer        httpstream.Dialer
-	streamConn    httpstream.Connection
-	listeners     []io.Closer
-	Ready         chan struct{}
-	requestIDLock sync.Mutex
-	requestID     int
-	out           io.Writer
-	errOut        io.Writer
+	logger            klog.Logger
+	dialer            httpstream.Dialer
+	streamConn        httpstream.Connection
+	listeners         []io.Closer
+	Ready             chan struct{}
+	errorHandler      func(ctx context.Context, port ForwardedPort, err error) (fatal bool)
+	keepaliveInterval time.Duration
+	keepaliveTimeout  time.Duration
+	requestIDLock     sync.Mutex
+	requestID         int
+	out               io.Writer
+	errOut            io.Writer
+}
+
+// Option configures optional PortForwarder behavior.
+type Option func(*PortForwarder)
+
+// WithErrorHandler sets a handler that decides, for an error the remote side
+// reported about a single forwarded connection, whether the whole forwarding
+// session must be torn down (fatal) or only that one connection is affected.
+//
+// The handler is called only for non-empty remote error messages successfully
+// read from a connection's error stream. Failure to read the error stream
+// bypasses the handler and closes the session.
+//
+// Returning false prevents this remote error from closing the session. It
+// does not prevent termination caused by transport closure or context
+// cancellation.
+//
+// The handler receives the session context and the local/remote port pair.
+// The context is canceled when forwarding stops; a blocking handler should
+// observe its cancellation. The handler may be called concurrently for
+// different forwarded connections.
+//
+// Without a handler every remote error is fatal, for backwards compatibility
+// with callers that rely on kubectl exiting when the target pod is gone.
+func WithErrorHandler(handler func(ctx context.Context, port ForwardedPort, err error) (fatal bool)) Option {
+	return func(pf *PortForwarder) {
+		pf.errorHandler = handler
+	}
+}
+
+// WithSessionKeepalive monitors the forwarding session's transport with
+// protocol-level pings sent every interval. A ping reply that does not arrive
+// within timeout — or a ping that outright fails — closes the session, making
+// ForwardPorts return ErrLostConnectionToPod.
+//
+// This detects a transport that died without the client being notified, for
+// example when the node hosting the pod stops responding while the pod object
+// still reports Running. A peer that is merely slow does not trip it: only a
+// missing reply within timeout does.
+//
+// Both values must be positive for the option to take effect. Monitoring is
+// silently skipped for transports without ping support (for example custom
+// httpstream.Dialer implementations); those sessions keep relying on transport
+// closure alone.
+func WithSessionKeepalive(interval, timeout time.Duration) Option {
+	return func(pf *PortForwarder) {
+		if interval <= 0 || timeout <= 0 {
+			return
+		}
+		pf.keepaliveInterval = interval
+		pf.keepaliveTimeout = timeout
+	}
 }
 
 // ForwardedPort contains a Local:Remote port pairing.
@@ -185,6 +253,12 @@ func NewOnAddresses(dialer httpstream.Dialer, addresses []string, ports []string
 
 // NewOnAddressesWithContext creates a new PortForwarder with custom listen addresses.
 func NewOnAddressesWithContext(ctx context.Context, dialer httpstream.Dialer, addresses []string, ports []string, readyChan chan struct{}, out, errOut io.Writer) (*PortForwarder, error) {
+	return NewOnAddressesWithOptions(ctx, dialer, addresses, ports, readyChan, out, errOut)
+}
+
+// NewOnAddressesWithOptions creates a new PortForwarder with custom listen
+// addresses and optional behavior, using ctx for cancellation and logging.
+func NewOnAddressesWithOptions(ctx context.Context, dialer httpstream.Dialer, addresses []string, ports []string, readyChan chan struct{}, out, errOut io.Writer, opts ...Option) (*PortForwarder, error) {
 	if len(addresses) == 0 {
 		return nil, errors.New("you must specify at least 1 address")
 	}
@@ -199,7 +273,8 @@ func NewOnAddressesWithContext(ctx context.Context, dialer httpstream.Dialer, ad
 	if err != nil {
 		return nil, err
 	}
-	return &PortForwarder{
+	pf := &PortForwarder{
+		ctx:       ctx,
 		logger:    klog.FromContext(ctx),
 		dialer:    dialer,
 		addresses: parsedAddresses,
@@ -208,7 +283,11 @@ func NewOnAddressesWithContext(ctx context.Context, dialer httpstream.Dialer, ad
 		Ready:     readyChan,
 		out:       out,
 		errOut:    errOut,
-	}, nil
+	}
+	for _, opt := range opts {
+		opt(pf)
+	}
+	return pf, nil
 }
 
 // NewOnAddressesForStreaming creates a new PortForwarder with custom listen
@@ -222,7 +301,14 @@ func NewOnAddressesForStreaming(dialer streamhttp.Dialer, addresses []string, po
 // NewOnAddressesForStreamingWithContext creates a new PortForwarder with custom listen
 // addresses for in-tree callers that use k8s.io/streaming/pkg/httpstream types.
 func NewOnAddressesForStreamingWithContext(ctx context.Context, dialer streamhttp.Dialer, addresses []string, ports []string, readyChan chan struct{}, out, errOut io.Writer) (*PortForwarder, error) {
-	return NewOnAddressesWithContext(ctx, &compatDialerAdapter{logger: klog.FromContext(ctx), delegate: dialer}, addresses, ports, readyChan, out, errOut)
+	return NewOnAddressesForStreamingWithOptions(ctx, dialer, addresses, ports, readyChan, out, errOut)
+}
+
+// NewOnAddressesForStreamingWithOptions creates a new PortForwarder with custom
+// listen addresses and optional behavior for in-tree callers that use
+// k8s.io/streaming/pkg/httpstream types, using ctx for cancellation and logging.
+func NewOnAddressesForStreamingWithOptions(ctx context.Context, dialer streamhttp.Dialer, addresses []string, ports []string, readyChan chan struct{}, out, errOut io.Writer, opts ...Option) (*PortForwarder, error) {
+	return NewOnAddressesWithOptions(ctx, &compatDialerAdapter{logger: klog.FromContext(ctx), delegate: dialer}, addresses, ports, readyChan, out, errOut, opts...)
 }
 
 type compatDialerAdapter struct {
@@ -253,6 +339,14 @@ func (c *compatConnectionAdapter) CreateStream(headers http.Header) (httpstream.
 
 func (c *compatConnectionAdapter) Close() error {
 	return c.delegate.Close()
+}
+
+func (c *compatConnectionAdapter) Ping() (time.Duration, error) {
+	pinger, ok := c.delegate.(connectionPinger)
+	if !ok {
+		return 0, fmt.Errorf("%w: %T", errPingUnsupported, c.delegate)
+	}
+	return pinger.Ping()
 }
 
 func (c *compatConnectionAdapter) CloseChan() <-chan bool {
@@ -313,6 +407,9 @@ func (s *compatStreamAdapter) Identifier() uint32 {
 // ForwardPorts formats and executes a port forwarding request. The connection will remain
 // open until stopChan is closed.
 func (pf *PortForwarder) ForwardPorts() error {
+	ctx, cancel := context.WithCancel(pf.ctx)
+	pf.ctx = ctx
+	defer cancel()
 	defer pf.Close()
 
 	var err error
@@ -357,6 +454,8 @@ func (pf *PortForwarder) forward() error {
 		close(pf.Ready)
 	}
 
+	pf.monitorSession()
+
 	// wait for interrupt or conn closure
 	select {
 	case <-pf.stopChan:
@@ -365,6 +464,62 @@ func (pf *PortForwarder) forward() error {
 	}
 
 	return nil
+}
+
+// monitorSession ends the session when the transport stops responding. Pings
+// run in the background of the listeners; whoever observes failure first —
+// this monitor, the transport itself via CloseChan, or the caller via the stop
+// channel — tears the session down.
+func (pf *PortForwarder) monitorSession() {
+	if pf.keepaliveInterval <= 0 {
+		return
+	}
+	pinger, ok := pf.streamConn.(connectionPinger)
+	if !ok {
+		pf.logger.V(4).Info("transport does not support session keepalive", "connectionType", fmt.Sprintf("%T", pf.streamConn))
+		return
+	}
+	go func() {
+		ticker := time.NewTicker(pf.keepaliveInterval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-pf.ctx.Done():
+				return
+			case <-pf.streamConn.CloseChan():
+				return
+			case <-ticker.C:
+			}
+			err := pingWithDeadline(pinger, pf.keepaliveTimeout)
+			if errors.Is(err, errPingUnsupported) {
+				pf.logger.V(4).Info("transport does not support session keepalive; monitoring disabled", "err", err)
+				return
+			}
+			if err != nil {
+				pf.logger.V(2).Info("Session transport is not answering keepalive pings; closing session", "err", err)
+				_ = pf.streamConn.Close()
+				return
+			}
+		}
+	}()
+}
+
+// pingWithDeadline waits at most timeout for the ping reply. The underlying
+// Ping blocks until it gets a reply or the connection closes, so the caller
+// must close the connection on deadline; that also unblocks the goroutine
+// left waiting here.
+func pingWithDeadline(pinger connectionPinger, timeout time.Duration) error {
+	result := make(chan error, 1)
+	go func() {
+		_, err := pinger.Ping()
+		result <- err
+	}()
+	select {
+	case err := <-result:
+		return err
+	case <-time.After(timeout):
+		return fmt.Errorf("no ping reply within %s", timeout)
+	}
 }
 
 // listenOnPort delegates listener creation and waits for connections on requested bind addresses.
@@ -541,13 +696,31 @@ func (pf *PortForwarder) handleConnection(conn net.Conn, port ForwardedPort) {
 
 	// always expect something on errorChan (it may be empty)
 	errResult := <-errorChan
+	// A session policy check may block; the failed local connection must not.
+	if errResult.err != nil || len(errResult.message) > 0 {
+		// An orderly close would make a failed remote transfer look like a
+		// successful EOF to the local client.
+		if tcpConn, ok := conn.(*net.TCPConn); ok {
+			if err := tcpConn.SetLinger(0); err != nil {
+				runtime.HandleErrorWithLogger(pf.logger, err, "Error configuring local connection reset", "localPort", port.Local, "remotePort", port.Remote)
+			}
+		}
+		_ = conn.Close()
+	}
 	switch {
 	case errResult.err != nil:
+		// failing to read the error stream means the session itself is broken
 		runtime.HandleErrorWithLogger(pf.logger, errResult.err, "Error reading from error stream", "localPort", port.Local, "remotePort", port.Remote)
-		pf.streamConn.Close()
+		_ = pf.streamConn.Close()
 	case len(errResult.message) > 0:
-		runtime.HandleErrorWithLogger(pf.logger, errors.New(string(errResult.message)), "An error occurred forwarding", "localPort", port.Local, "remotePort", port.Remote)
-		pf.streamConn.Close()
+		err := errors.New(string(errResult.message))
+		runtime.HandleErrorWithLogger(pf.logger, err, "An error occurred forwarding", "localPort", port.Local, "remotePort", port.Remote)
+		if pf.errorHandler == nil || pf.errorHandler(pf.ctx, port, err) {
+			_ = pf.streamConn.Close()
+		}
+		// Non-fatal: the error only describes this connection, and the remote
+		// side has already reset its stream pair, so the session stays usable
+		// for other and future connections.
 	}
 }
 

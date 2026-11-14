@@ -17,6 +17,7 @@ limitations under the License.
 package spdy
 
 import (
+	"fmt"
 	"net"
 	"net/http"
 	"sync"
@@ -203,4 +204,15 @@ func (c *connection) sendPings(period time.Duration) {
 			// actually closed.
 		}
 	}
+}
+
+// Ping sends a SPDY ping frame to the peer and waits for the reply, returning
+// the round-trip duration. Unlike the background pings started by
+// NewClientConnectionWithPings, callers control the deadline by canceling or
+// closing the connection, which unblocks an in-flight Ping.
+func (c *connection) Ping() (time.Duration, error) {
+	if c.ping == nil {
+		return 0, fmt.Errorf("connection does not support ping")
+	}
+	return c.ping()
 }
