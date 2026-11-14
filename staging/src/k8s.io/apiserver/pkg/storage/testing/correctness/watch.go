@@ -120,11 +120,8 @@ func checkWatchOptions(versioner storage.Versioner, request WatchRequest) error 
 		// etcd3 and the cacher call methods on both selectors.
 		panic("nil label or field selector is not supported, use storage.Everything to match everything")
 	}
-	if opts.WatchWithoutPrevKV && !opts.Predicate.Empty() {
-		return apierrors.NewInternalError(errors.New("watchWithoutPrevKV requires an empty predicate"))
-	}
-	if opts.Predicate.Limit != 0 || opts.Predicate.Continue != "" {
-		panic("pagination (limit, continue) is not supported")
+	if err := storage.ValidateWatchOptions(opts); err != nil {
+		return err
 	}
 	if !opts.Predicate.Empty() && opts.Predicate.GetAttrs == nil {
 		panic("selectors without GetAttrs are not supported")
