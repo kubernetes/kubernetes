@@ -234,6 +234,7 @@ func getPluginCompletions(executablePath string, cmdArgs, environment []string) 
 	directive := cobra.ShellCompDirectiveDefault
 	if err := prog.Run(); err == nil {
 		for _, comp := range strings.Split(buf.String(), "\n") {
+			comp = strings.TrimSuffix(comp, "\r")
 			// Remove any empty lines
 			if len(comp) > 0 {
 				comps = append(comps, comp)
