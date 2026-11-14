@@ -101,6 +101,8 @@ type Provider struct {
 type containerStatsProvider interface {
 	// PodCPUAndMemoryStats gets the latest CPU & Memory stats for the pod and all its running containers.
 	PodCPUAndMemoryStats(context.Context, *v1.Pod, *kubecontainer.PodStatus) (*statsapi.PodStats, error)
+	// PodSwapStats gets the latest swap usage for the pod and its running containers.
+	PodSwapStats(context.Context, *v1.Pod, *kubecontainer.PodStatus) (*statsapi.PodStats, error)
 	ListPodStats(ctx context.Context) ([]statsapi.PodStats, error)
 	ListPodStatsAndUpdateCPUNanoCoreUsage(ctx context.Context) ([]statsapi.PodStats, error)
 	ListPodCPUAndMemoryStats(ctx context.Context) ([]statsapi.PodStats, error)

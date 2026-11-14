@@ -87,6 +87,8 @@ type PodValidationOptions struct {
 	AllowSecurityProfileOCI bool
 	// Allow podCertificate volumes to specify ML-DSA algorithms in the keyType field
 	AllowMLDSAPodCertificateKeyTypes bool
+	// Allow containers and pods to specify swap resource limits (KEP-5359)
+	AllowWorkloadControlledSwap bool
 }
 
 func hasIndivisibleHugePagesValue(list core.ResourceList) bool {
@@ -210,6 +212,7 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *core.PodSpec, p
 		AllowSysAdminWhenPrivilegeEscalationFalse:               false,
 		AllowMLDSAPodCertificateKeyTypes:                        utilfeature.DefaultFeatureGate.Enabled(features.PodCertificateMLDSA),
 		AllowSecurityProfileOCI:                                 utilfeature.DefaultFeatureGate.Enabled(features.SecurityProfileOCI),
+		AllowWorkloadControlledSwap:                             utilfeature.DefaultFeatureGate.Enabled(features.WorkloadControlledSwap),
 	}
 
 	opts.AllowEnvFilesValidation = useAllowEnvFilesValidation(oldPodSpec)
@@ -266,6 +269,8 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *core.PodSpec, p
 
 		// If old spec uses a seccomp profile of type OCI, allow it
 		opts.AllowSecurityProfileOCI = opts.AllowSecurityProfileOCI || seccompProfileOCIInUse(oldPodSpec)
+		// If old spec already had swap limits configured, allow updates to the pod
+		opts.AllowWorkloadControlledSwap = opts.AllowWorkloadControlledSwap || swapLimitInUse(oldPodSpec)
 	}
 	if oldPodMeta != nil && !opts.AllowInvalidPodDeletionCost {
 		// This is an update, so validate only if the existing object was valid.
@@ -551,6 +556,28 @@ func seccompProfileOCIInUse(podSpec *core.PodSpec) bool {
 	var inUse bool
 	podutil.VisitContainers(podSpec, podutil.AllContainers, func(c *core.Container, containerType podutil.ContainerType) bool {
 		if c.SecurityContext != nil && usesOCI(c.SecurityContext.SeccompProfile) {
+			inUse = true
+			return false
+		}
+		return true
+	})
+	return inUse
+}
+
+// swapLimitInUse returns true if the pod spec sets limits.swap at pod level or
+// on any container.
+func swapLimitInUse(podSpec *core.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+	if podSpec.Resources != nil {
+		if _, ok := podSpec.Resources.Limits[core.ResourceSwap]; ok {
+			return true
+		}
+	}
+	var inUse bool
+	podutil.VisitContainers(podSpec, podutil.AllContainers, func(c *core.Container, _ podutil.ContainerType) bool {
+		if _, ok := c.Resources.Limits[core.ResourceSwap]; ok {
 			inUse = true
 			return false
 		}

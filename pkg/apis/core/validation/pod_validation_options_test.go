@@ -1411,3 +1411,97 @@ func TestSecurityProfileOCIValidationOption(t *testing.T) {
 		}
 	}
 }
+
+func TestGetValidationOptionsWorkloadControlledSwap(t *testing.T) {
+	containerSwapSpec := &core.PodSpec{
+		Containers: []core.Container{
+			{
+				Name: "c1",
+				Resources: core.ResourceRequirements{
+					Limits: core.ResourceList{
+						core.ResourceSwap: resource.MustParse("1Gi"),
+					},
+				},
+			},
+		},
+	}
+	initContainerSwapSpec := &core.PodSpec{
+		InitContainers: []core.Container{
+			{
+				Name: "init1",
+				Resources: core.ResourceRequirements{
+					Limits: core.ResourceList{
+						core.ResourceSwap: resource.MustParse("1Gi"),
+					},
+				},
+			},
+		},
+	}
+	podLevelSwapSpec := &core.PodSpec{
+		Resources: &core.ResourceRequirements{
+			Limits: core.ResourceList{
+				core.ResourceSwap: resource.MustParse("2Gi"),
+			},
+		},
+	}
+
+	testCases := []struct {
+		name          string
+		oldPodSpec    *core.PodSpec
+		gateEnabled   bool
+		wantAllowSwap bool
+	}{
+		{
+			name:          "create pod with gate disabled",
+			oldPodSpec:    nil,
+			gateEnabled:   false,
+			wantAllowSwap: false,
+		},
+		{
+			name:          "create pod with gate enabled",
+			oldPodSpec:    nil,
+			gateEnabled:   true,
+			wantAllowSwap: true,
+		},
+		{
+			name:          "update pod without existing swap when gate disabled",
+			oldPodSpec:    &core.PodSpec{},
+			gateEnabled:   false,
+			wantAllowSwap: false,
+		},
+		{
+			name:          "update pod with existing container swap when gate disabled",
+			oldPodSpec:    containerSwapSpec,
+			gateEnabled:   false,
+			wantAllowSwap: true,
+		},
+		{
+			name:          "update pod with existing initContainer swap when gate disabled",
+			oldPodSpec:    initContainerSwapSpec,
+			gateEnabled:   false,
+			wantAllowSwap: true,
+		},
+		{
+			name:          "update pod with existing pod-level swap when gate disabled",
+			oldPodSpec:    podLevelSwapSpec,
+			gateEnabled:   false,
+			wantAllowSwap: true,
+		},
+		{
+			name:          "update pod with existing container swap when gate re-enabled",
+			oldPodSpec:    containerSwapSpec,
+			gateEnabled:   true,
+			wantAllowSwap: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WorkloadControlledSwap, tc.gateEnabled)
+			gotOptions := GetValidationOptionsFromPodSpecAndMeta(&core.PodSpec{}, tc.oldPodSpec, nil, nil)
+			if gotOptions.AllowWorkloadControlledSwap != tc.wantAllowSwap {
+				t.Errorf("AllowWorkloadControlledSwap = %t, want %t", gotOptions.AllowWorkloadControlledSwap, tc.wantAllowSwap)
+			}
+		})
+	}
+}

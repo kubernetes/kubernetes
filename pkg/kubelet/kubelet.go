@@ -1695,6 +1695,11 @@ func (kl *Kubelet) PodCPUAndMemoryStats(ctx context.Context, pod *v1.Pod, podSta
 	return kl.StatsProvider.PodCPUAndMemoryStats(ctx, pod, podStatus)
 }
 
+// PodSwapStats is delegated to StatsProvider
+func (kl *Kubelet) PodSwapStats(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus) (*statsapi.PodStats, error) {
+	return kl.StatsProvider.PodSwapStats(ctx, pod, podStatus)
+}
+
 // ListPodStatsAndUpdateCPUNanoCoreUsage is delegated to StatsProvider, which implements stats.Provider interface
 func (kl *Kubelet) ListPodStatsAndUpdateCPUNanoCoreUsage(ctx context.Context) ([]statsapi.PodStats, error) {
 	return kl.StatsProvider.ListPodStatsAndUpdateCPUNanoCoreUsage(ctx)

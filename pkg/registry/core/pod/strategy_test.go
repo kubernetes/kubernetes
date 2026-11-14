@@ -5781,3 +5781,104 @@ func TestPodDynamicStrategyPodLevelResourcesDefaulting(t *testing.T) {
 		})
 	}
 }
+
+func TestWorkloadControlledSwapFeatureGateLifecycle(t *testing.T) {
+	ctx := genericapirequest.NewDefaultContext()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, true)
+
+	makeSwapPod := func() *api.Pod {
+		p := podtest.MakePod("swap-pod",
+			podtest.SetResourceVersion("1"),
+			podtest.SetGeneration(1),
+			podtest.SetContainers(podtest.MakeContainer("app",
+				podtest.SetContainerResources(api.ResourceRequirements{
+					Requests: api.ResourceList{
+						api.ResourceCPU:    resource.MustParse("100m"),
+						api.ResourceMemory: resource.MustParse("128Mi"),
+					},
+					Limits: api.ResourceList{
+						api.ResourceCPU:    resource.MustParse("100m"),
+						api.ResourceMemory: resource.MustParse("128Mi"),
+						api.ResourceSwap:   resource.MustParse("256Mi"),
+					},
+				}),
+			)),
+			podtest.SetPodResources(&api.ResourceRequirements{
+				Limits: api.ResourceList{
+					api.ResourceSwap: resource.MustParse("512Mi"),
+				},
+			}),
+		)
+		return p
+	}
+
+	// 1. Enable WorkloadControlledSwap and validate create.
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WorkloadControlledSwap, true)
+	createdPod := makeSwapPod()
+	Strategy.PrepareForCreate(ctx, createdPod)
+	if errs := Strategy.Validate(ctx, createdPod); len(errs) != 0 {
+		t.Fatalf("expected create with WorkloadControlledSwap=true to succeed, got: %v", errs)
+	}
+
+	// 2. Disable WorkloadControlledSwap: creating a new pod with limits.swap fails,
+	// but updating the existing pod (e.g., adding an annotation) succeeds via ratcheting.
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WorkloadControlledSwap, false)
+	newPodWhileDisabled := makeSwapPod()
+	Strategy.PrepareForCreate(ctx, newPodWhileDisabled)
+	if errs := Strategy.Validate(ctx, newPodWhileDisabled); len(errs) == 0 {
+		t.Fatalf("expected create with WorkloadControlledSwap=false to fail, got no errors")
+	}
+
+	updatedPodWhileDisabled := createdPod.DeepCopy()
+	updatedPodWhileDisabled.ResourceVersion = "2"
+	updatedPodWhileDisabled.Annotations = map[string]string{"updated": "true"}
+	Strategy.PrepareForUpdate(ctx, updatedPodWhileDisabled, createdPod)
+	if errs := Strategy.ValidateUpdate(ctx, updatedPodWhileDisabled, createdPod); len(errs) != 0 {
+		t.Fatalf("expected metadata update on existing swap pod with WorkloadControlledSwap=false to succeed, got: %v", errs)
+	}
+
+	// Ratcheting keeps existing swap limits valid but must not allow resizing them.
+	resizeSwap := func(old *api.Pod, mutate func(*api.Pod)) error {
+		p := old.DeepCopy()
+		p.ResourceVersion = "99"
+		mutate(p)
+		ResizeStrategy.PrepareForUpdate(ctx, p, old)
+		return ResizeStrategy.ValidateUpdate(ctx, p, old).ToAggregate()
+	}
+	if err := resizeSwap(updatedPodWhileDisabled, func(p *api.Pod) {
+		p.Spec.Containers[0].Resources.Limits[api.ResourceSwap] = resource.MustParse("512Mi")
+	}); err == nil {
+		t.Fatalf("expected container swap resize with WorkloadControlledSwap=false to fail, got no errors")
+	}
+	if err := resizeSwap(updatedPodWhileDisabled, func(p *api.Pod) {
+		p.Spec.Resources.Limits[api.ResourceSwap] = resource.MustParse("1Gi")
+	}); err == nil {
+		t.Fatalf("expected pod-level swap resize with WorkloadControlledSwap=false to fail, got no errors")
+	}
+	twoContainerPod := updatedPodWhileDisabled.DeepCopy()
+	twoContainerPod.Spec.Containers = append(twoContainerPod.Spec.Containers, podtest.MakeContainer("sidecar",
+		podtest.SetContainerResources(api.ResourceRequirements{
+			Requests: api.ResourceList{api.ResourceMemory: resource.MustParse("64Mi")},
+			Limits:   api.ResourceList{api.ResourceMemory: resource.MustParse("64Mi")},
+		})))
+	if err := resizeSwap(twoContainerPod, func(p *api.Pod) {
+		p.Spec.Containers[1].Resources.Limits[api.ResourceSwap] = resource.MustParse("64Mi")
+	}); err == nil {
+		t.Fatalf("expected adding swap to another container with WorkloadControlledSwap=false to fail, got no errors")
+	}
+
+	// 3. Re-enable WorkloadControlledSwap: updating the pod succeeds.
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WorkloadControlledSwap, true)
+	updatedPodReEnabled := updatedPodWhileDisabled.DeepCopy()
+	updatedPodReEnabled.ResourceVersion = "3"
+	updatedPodReEnabled.Annotations["reenabled"] = "true"
+	Strategy.PrepareForUpdate(ctx, updatedPodReEnabled, updatedPodWhileDisabled)
+	if errs := Strategy.ValidateUpdate(ctx, updatedPodReEnabled, updatedPodWhileDisabled); len(errs) != 0 {
+		t.Fatalf("expected update on existing swap pod with WorkloadControlledSwap re-enabled to succeed, got: %v", errs)
+	}
+	if err := resizeSwap(updatedPodReEnabled, func(p *api.Pod) {
+		p.Spec.Containers[0].Resources.Limits[api.ResourceSwap] = resource.MustParse("384Mi")
+	}); err != nil {
+		t.Fatalf("expected container swap resize with WorkloadControlledSwap re-enabled to succeed, got: %v", err)
+	}
+}
