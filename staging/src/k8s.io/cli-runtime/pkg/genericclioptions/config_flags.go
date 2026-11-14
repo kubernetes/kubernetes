@@ -34,6 +34,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/tools/clientcmd"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/util/homedir"
 	"k8s.io/utils/ptr"
 )
@@ -161,9 +162,6 @@ func (f *ConfigFlags) ToRawKubeConfigLoader() clientcmd.ClientConfig {
 
 func (f *ConfigFlags) toRawKubeConfigLoader() clientcmd.ClientConfig {
 	loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
-	// use the standard defaults for this client command
-	// DEPRECATED: remove and replace with something more accurate
-	loadingRules.DefaultClientConfig = &clientcmd.DefaultClientConfig
 
 	if f.KubeConfig != nil {
 		loadingRules.ExplicitPath = *f.KubeConfig
@@ -251,11 +249,31 @@ func (f *ConfigFlags) toRawKubeConfigLoader() clientcmd.ClientConfig {
 		overrides.Timeout = *f.Timeout
 	}
 
+	// use the standard defaults for this client command
+	// DEPRECATED: remove and replace with something more accurate
+	loadingRules.DefaultClientConfig = defaultClientConfig(overrides)
+
 	// we only have an interactive prompt when a password is allowed
 	if f.Password == nil {
 		return &clientConfig{clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, overrides)}
 	}
 	return &clientConfig{clientcmd.NewInteractiveDeferredLoadingClientConfig(loadingRules, overrides, os.Stdin)}
+}
+
+// defaultClientConfig returns the client configuration that the loaded
+// configuration is compared against to determine whether the in-cluster
+// configuration should be used instead. The overrides are applied to it so
+// that flags which do not select a different server (for example
+// --request-timeout or --as) do not prevent the use of the in-cluster
+// configuration.
+func defaultClientConfig(overrides *clientcmd.ConfigOverrides) clientcmd.ClientConfig {
+	defaultOverrides := *overrides
+	// --server and --proxy-url replace the server and the proxy of the
+	// configuration entirely, so they must keep taking precedence over the
+	// in-cluster configuration rather than making it the default one.
+	defaultOverrides.ClusterInfo.Server = ""
+	defaultOverrides.ClusterInfo.ProxyURL = ""
+	return clientcmd.NewDefaultClientConfig(*clientcmdapi.NewConfig(), &defaultOverrides)
 }
 
 // toRawKubePersistentConfigLoader binds config flag values to config overrides
