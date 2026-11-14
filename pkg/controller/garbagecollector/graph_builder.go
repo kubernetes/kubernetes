@@ -125,6 +125,14 @@ type monitor struct {
 	controller cache.Controller
 	store      cache.Store
 
+	// informer is the shared informer the monitor's event handler is
+	// registered on, and registration identifies that handler. They are kept
+	// so the handler can be removed when the monitor is torn down; the
+	// informer is cached per resource by the factory and outlives the monitor,
+	// so leaving the handler registered leaks it.
+	informer     cache.SharedIndexInformer
+	registration cache.ResourceEventHandlerRegistration
+
 	// stopCh stops Controller. If stopCh is nil, the monitor is considered to be
 	// not yet started.
 	stopCh chan struct{}
@@ -137,6 +145,19 @@ func (m *monitor) Run() {
 }
 
 type monitors map[schema.GroupVersionResource]*monitor
+
+// removeMonitorHandler unregisters the event handler that controllerFor added
+// to the monitor's shared informer, so the handler is not leaked once the
+// monitor is torn down. It is safe to call for monitors built before this field
+// was populated (informer/registration nil).
+func (gb *GraphBuilder) removeMonitorHandler(logger klog.Logger, m *monitor) {
+	if m == nil || m.informer == nil || m.registration == nil {
+		return
+	}
+	if err := m.informer.RemoveEventHandler(m.registration); err != nil {
+		logger.V(4).Info("unable to remove event handler for monitor", "err", err)
+	}
+}
 
 func NewDependencyGraphBuilder(
 	ctx context.Context,
@@ -189,7 +210,7 @@ func NewDependencyGraphBuilder(
 	return graphBuilder
 }
 
-func (gb *GraphBuilder) controllerFor(logger klog.Logger, resource schema.GroupVersionResource, kind schema.GroupVersionKind) (cache.Controller, cache.Store, error) {
+func (gb *GraphBuilder) controllerFor(logger klog.Logger, resource schema.GroupVersionResource, kind schema.GroupVersionKind) (cache.Controller, cache.Store, cache.SharedIndexInformer, cache.ResourceEventHandlerRegistration, error) {
 	handlers := cache.ResourceEventHandlerFuncs{
 		// add the event to the dependencyGraphBuilder's graphChanges.
 		AddFunc: func(obj interface{}) {
@@ -228,17 +249,18 @@ func (gb *GraphBuilder) controllerFor(logger klog.Logger, resource schema.GroupV
 	shared, err := gb.sharedInformers.ForResource(resource)
 	if err != nil {
 		logger.V(4).Info("unable to use a shared informer", "resource", resource, "kind", kind, "err", err)
-		return nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 	logger.V(4).Info("using a shared informer", "resource", resource, "kind", kind)
 	resyncPeriod := time.Duration(0)
-	if _, err := shared.Informer().AddEventHandlerWithOptions(handlers, cache.HandlerOptions{
+	registration, err := shared.Informer().AddEventHandlerWithOptions(handlers, cache.HandlerOptions{
 		Logger:       &logger,
 		ResyncPeriod: &resyncPeriod,
-	}); err != nil {
-		return nil, nil, err
+	})
+	if err != nil {
+		return nil, nil, nil, nil, err
 	}
-	return shared.Informer().GetController(), shared.Informer().GetStore(), nil
+	return shared.Informer().GetController(), shared.Informer().GetStore(), shared.Informer(), registration, nil
 }
 
 // syncMonitors rebuilds the monitor set according to the supplied resources,
@@ -274,12 +296,12 @@ func (gb *GraphBuilder) syncMonitors(logger klog.Logger, resources map[schema.Gr
 			errs = append(errs, fmt.Errorf("couldn't look up resource %q: %v", resource, err))
 			continue
 		}
-		c, s, err := gb.controllerFor(logger, resource, kind)
+		c, s, informer, registration, err := gb.controllerFor(logger, resource, kind)
 		if err != nil {
 			errs = append(errs, fmt.Errorf("couldn't start monitor for resource %q: %v", resource, err))
 			continue
 		}
-		current[resource] = &monitor{store: s, controller: c}
+		current[resource] = &monitor{store: s, controller: c, informer: informer, registration: registration}
 		added++
 	}
 	gb.monitors = current
@@ -288,6 +310,12 @@ func (gb *GraphBuilder) syncMonitors(logger klog.Logger, resources map[schema.Gr
 		if monitor.stopCh != nil {
 			close(monitor.stopCh)
 		}
+		// Remove the event handler that controllerFor registered on the shared
+		// informer. The factory caches the informer per resource, so it
+		// outlives the monitor (e.g. when a CRD is deleted and later recreated
+		// with the same GroupVersionResource); not removing the handler leaks
+		// it. See https://github.com/kubernetes/kubernetes/issues/114066.
+		gb.removeMonitorHandler(logger, monitor)
 	}
 
 	logger.V(4).Info("synced monitors", "added", added, "kept", kept, "removed", len(toRemove))
@@ -346,6 +374,7 @@ func (gb *GraphBuilder) stopMonitors(logger klog.Logger) {
 				stopped++
 				close(monitor.stopCh)
 			}
+			gb.removeMonitorHandler(logger, monitor)
 		}
 
 		// reset monitors so that the graph builder can be safely re-run/synced.
