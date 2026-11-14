@@ -322,7 +322,10 @@ func (le *LeaderElector) release(logger klog.Logger) bool {
 		return false
 	}
 
-	if !le.IsLeader() {
+	// Check the record just fetched as well as the cached one: after an
+	// outage the cache can still name this elector as the holder while the
+	// lease has changed hands, and releasing would clear the new holder.
+	if !le.IsLeader() || oldLeaderElectionRecord.HolderIdentity != le.config.Lock.Identity() {
 		return true
 	}
 	now := metav1.NewTime(le.clock.Now())
