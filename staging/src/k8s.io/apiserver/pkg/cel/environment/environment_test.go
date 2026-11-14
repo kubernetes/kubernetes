@@ -65,6 +65,26 @@ func TestBaseEnvironment(t *testing.T) {
 		}
 	}
 
+	var defaultCompatibilityNetworkInvalid []string
+	var defaultCompatibilityNetworkValid []string
+	if DefaultCompatibilityVersion().AtLeast(version.MajorMinor(1, 38)) {
+		defaultCompatibilityNetworkValid = []string{
+			"cidr('192.168.0.0/24').isMask() == true",
+		}
+		defaultCompatibilityNetworkInvalid = []string{
+			"false ? ip('invalid') == ip('127.0.0.1') : true",
+			"false ? cidr('invalid') == cidr('192.168.0.0/24') : true",
+		}
+	} else {
+		defaultCompatibilityNetworkInvalid = []string{
+			"cidr('192.168.0.0/24').isMask()",
+		}
+		defaultCompatibilityNetworkValid = []string{
+			"false ? ip('invalid') == ip('127.0.0.1') : true",
+			"false ? cidr('invalid') == cidr('192.168.0.0/24') : true",
+		}
+	}
+
 	cases := []struct {
 		name                    string
 		typeVersionCombinations []envTypeAndVersion
@@ -343,6 +363,51 @@ func TestBaseEnvironment(t *testing.T) {
 			},
 			validExpressions: []string{
 				"[1, 2].includes(2) == true",
+			},
+		},
+		{
+			name: "ext.Network version gating (default compatibility version)",
+			typeVersionCombinations: []envTypeAndVersion{
+				{version: DefaultCompatibilityVersion(), envType: NewExpressions},
+			},
+			invalidExpressions: defaultCompatibilityNetworkInvalid,
+			validExpressions:   defaultCompatibilityNetworkValid,
+		},
+		{
+			name: "ext.Network version gating (emulated version 1.37)",
+			typeVersionCombinations: []envTypeAndVersion{
+				{version: version.MajorMinor(1, 37), envType: NewExpressions},
+			},
+			invalidExpressions: []string{
+				"cidr('192.168.0.0/24').isMask()",
+			},
+			validExpressions: []string{
+				"cidr('192.168.0.0/24').masked() == cidr('192.168.0.0/24')",
+				"false ? ip('invalid') == ip('127.0.0.1') : true",
+				"false ? cidr('invalid') == cidr('192.168.0.0/24') : true",
+			},
+		},
+		{
+			name: "ext.Network available (emulated version 1.38)",
+			typeVersionCombinations: []envTypeAndVersion{
+				{version: version.MajorMinor(1, 38), envType: NewExpressions},
+			},
+			validExpressions: []string{
+				"cidr('192.168.0.0/24').isMask() == true",
+			},
+			invalidExpressions: []string{
+				"false ? ip('invalid') == ip('127.0.0.1') : true",
+				"false ? cidr('invalid') == cidr('192.168.0.0/24') : true",
+			},
+		},
+		{
+			name: "ext.Network available (stored expressions for default/1.37)",
+			typeVersionCombinations: []envTypeAndVersion{
+				{version: DefaultCompatibilityVersion(), envType: StoredExpressions},
+				{version: version.MajorMinor(1, 37), envType: StoredExpressions},
+			},
+			validExpressions: []string{
+				"cidr('192.168.0.0/24').isMask() == true",
 			},
 		},
 	}

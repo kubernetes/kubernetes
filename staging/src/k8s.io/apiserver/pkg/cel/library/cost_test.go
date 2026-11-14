@@ -1355,8 +1355,7 @@ func testCost(t *testing.T, expr string, expectEsimatedCost checker.CostEstimate
 		AuthzSelectors(),
 		Quantity(),
 		ext.Sets(),
-		IP(),
-		CIDR(),
+		ext.Network(ext.NetworkVersion(1)),
 		Format(),
 		JSONPatch(),
 		cel.OptionalTypes(cel.OptionalTypesVersion(2)),
@@ -1549,8 +1548,8 @@ func TestTypeEquality(t *testing.T) {
 		"kubernetes.authorization.Decision":      decisionVal{},
 		"kubernetes.URL":                         apiservercel.URL{},
 		"kubernetes.Quantity":                    apiservercel.Quantity{},
-		"net.IP":                                 apiservercel.IP{},
-		"net.CIDR":                               apiservercel.CIDR{},
+		"net.IP":                                 ext.IP{},
+		"net.CIDR":                               ext.CIDR{},
 		"kubernetes.NamedFormat":                 apiservercel.Format{},
 		"kubernetes.Semver":                      apiservercel.Semver{},
 	}
@@ -1572,6 +1571,9 @@ func TestTypeEquality(t *testing.T) {
 				est.CallCost("_==_", "", []ref.Val{ex, ex}, nil)
 			})
 		}
+	}
+	for _, ex := range []ref.Val{apiservercel.IP{}, apiservercel.CIDR{}} {
+		est.CallCost("_==_", "", []ref.Val{ex, ex}, nil)
 	}
 }
 
