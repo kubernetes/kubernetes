@@ -424,7 +424,7 @@ type LimitedPriorityLevelConfiguration struct {
 	// "jail" for this priority level that is used to hold some request(s)
 	//
 	// +optional
-	NominalConcurrencyShares int32
+	NominalConcurrencyShares *int32
 
 	// `limitResponse` indicates what to do with requests that can not be executed right now
 	LimitResponse LimitResponse

@@ -51,7 +51,7 @@ func TestConvert_v1beta3_PriorityLevelConfiguration_To_flowcontrol_PriorityLevel
 			Spec: flowcontrol.PriorityLevelConfigurationSpec{
 				Type: flowcontrol.PriorityLevelEnablementLimited,
 				Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
-					NominalConcurrencyShares: shares,
+					NominalConcurrencyShares: new(shares),
 					LimitResponse: flowcontrol.LimitResponse{
 						Type: flowcontrol.LimitResponseTypeReject,
 					},
@@ -131,7 +131,7 @@ func TestConvert_flowcontrol_PriorityLevelConfiguration_To_v1beta3_PriorityLevel
 			Spec: flowcontrol.PriorityLevelConfigurationSpec{
 				Type: flowcontrol.PriorityLevelEnablementLimited,
 				Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
-					NominalConcurrencyShares: shares,
+					NominalConcurrencyShares: new(shares),
 					LimitResponse: flowcontrol.LimitResponse{
 						Type: flowcontrol.LimitResponseTypeReject,
 					},
