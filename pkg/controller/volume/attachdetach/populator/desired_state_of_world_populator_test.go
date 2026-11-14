@@ -224,3 +224,212 @@ func TestFindAndRemoveNonattachableVolumes(t *testing.T) {
 			volumeExists)
 	}
 }
+
+func TestFindAndAddActivePods_SkipsTerminatingPodsOnUnhealthyNode(t *testing.T) {
+	fakeVolumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
+	fakeClient := &fake.Clientset{}
+
+	fakeInformerFactory := informers.NewSharedInformerFactory(fakeClient, controller.NoResyncPeriodFunc())
+	fakePodInformer := fakeInformerFactory.Core().V1().Pods()
+	fakeNodeInformer := fakeInformerFactory.Core().V1().Nodes()
+
+	fakesDSW := cache.NewDesiredStateOfWorld(fakeVolumePluginMgr)
+
+	now := metav1.Now()
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              "dswp-test-pod",
+			UID:               "dswp-test-pod-uid",
+			Namespace:         "dswp-test",
+			DeletionTimestamp: &now,
+		},
+		Spec: v1.PodSpec{
+			NodeName: "dswp-test-host",
+			Volumes: []v1.Volume{
+				{
+					Name: "dswp-test-volume-name",
+					VolumeSource: v1.VolumeSource{
+						RBD: &v1.RBDVolumeSource{
+							RBDImage: "dswp-test-fake-device",
+						},
+					},
+				},
+			},
+		},
+		Status: v1.PodStatus{
+			Phase: v1.PodPhase("Running"),
+			ContainerStatuses: []v1.ContainerStatus{
+				{
+					Name: "container",
+					State: v1.ContainerState{
+						Running: &v1.ContainerStateRunning{},
+					},
+				},
+			},
+		},
+	}
+
+	node := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "dswp-test-host",
+		},
+		Status: v1.NodeStatus{
+			Conditions: []v1.NodeCondition{
+				{
+					Type:   v1.NodeReady,
+					Status: v1.ConditionFalse,
+				},
+			},
+		},
+	}
+
+	fakePodInformer.Informer().GetStore().Add(pod)
+	fakeNodeInformer.Informer().GetStore().Add(node)
+
+	generatedVolumeName := "fake-plugin/" + pod.Spec.Volumes[0].RBD.RBDImage
+	expectedVolumeName := v1.UniqueVolumeName(generatedVolumeName)
+
+	pvcLister := fakeInformerFactory.Core().V1().PersistentVolumeClaims().Lister()
+	pvLister := fakeInformerFactory.Core().V1().PersistentVolumes().Lister()
+
+	csiTranslator := csitrans.New()
+	dswp := &desiredStateOfWorldPopulator{
+		loopSleepDuration:        100 * time.Millisecond,
+		listPodsRetryDuration:    3 * time.Second,
+		desiredStateOfWorld:      fakesDSW,
+		volumePluginMgr:          fakeVolumePluginMgr,
+		podLister:                fakePodInformer.Lister(),
+		pvcLister:                pvcLister,
+		pvLister:                 pvLister,
+		nodeLister:               fakeNodeInformer.Lister(),
+		csiMigratedPluginManager: csimigration.NewPluginManager(csiTranslator),
+		intreeToCSITranslator:    csiTranslator,
+	}
+
+	dswp.desiredStateOfWorld.AddNode(k8stypes.NodeName(pod.Spec.NodeName))
+	logger, _ := ktesting.NewTestContext(t)
+	dswp.findAndAddActivePods(logger)
+
+	// Since pod is terminating on an unhealthy node, volume should NOT be added to DSW
+	volumeExists := dswp.desiredStateOfWorld.VolumeExists(expectedVolumeName, k8stypes.NodeName(pod.Spec.NodeName))
+	if volumeExists {
+		t.Fatalf("VolumeExists(%q) should be false for terminating pod on unhealthy node, got true", expectedVolumeName)
+	}
+
+	// Now set node to Ready
+	node.Status.Conditions[0].Status = v1.ConditionTrue
+	fakeNodeInformer.Informer().GetStore().Update(node)
+
+	// Volume should now be added to DSW because node is healthy
+	dswp.findAndAddActivePods(logger)
+	volumeExists = dswp.desiredStateOfWorld.VolumeExists(expectedVolumeName, k8stypes.NodeName(pod.Spec.NodeName))
+	if !volumeExists {
+		t.Fatalf("VolumeExists(%q) should be true for terminating pod on healthy node, got false", expectedVolumeName)
+	}
+}
+
+func TestFindAndRemoveDeletedPods_RemovesTerminatingPodsOnUnhealthyNode(t *testing.T) {
+	fakeVolumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
+	fakeClient := &fake.Clientset{}
+
+	fakeInformerFactory := informers.NewSharedInformerFactory(fakeClient, controller.NoResyncPeriodFunc())
+	fakePodInformer := fakeInformerFactory.Core().V1().Pods()
+	fakeNodeInformer := fakeInformerFactory.Core().V1().Nodes()
+
+	fakesDSW := cache.NewDesiredStateOfWorld(fakeVolumePluginMgr)
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "dswp-test-pod",
+			UID:       "dswp-test-pod-uid",
+			Namespace: "dswp-test",
+		},
+		Spec: v1.PodSpec{
+			NodeName: "dswp-test-host",
+			Volumes: []v1.Volume{
+				{
+					Name: "dswp-test-volume-name",
+					VolumeSource: v1.VolumeSource{
+						RBD: &v1.RBDVolumeSource{
+							RBDImage: "dswp-test-fake-device",
+						},
+					},
+				},
+			},
+		},
+		Status: v1.PodStatus{
+			Phase: v1.PodPhase("Running"),
+			ContainerStatuses: []v1.ContainerStatus{
+				{
+					Name: "container",
+					State: v1.ContainerState{
+						Running: &v1.ContainerStateRunning{},
+					},
+				},
+			},
+		},
+	}
+
+	node := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "dswp-test-host",
+		},
+		Status: v1.NodeStatus{
+			Conditions: []v1.NodeCondition{
+				{
+					Type:   v1.NodeReady,
+					Status: v1.ConditionTrue,
+				},
+			},
+		},
+	}
+
+	fakePodInformer.Informer().GetStore().Add(pod)
+	fakeNodeInformer.Informer().GetStore().Add(node)
+
+	generatedVolumeName := "fake-plugin/" + pod.Spec.Volumes[0].RBD.RBDImage
+	expectedVolumeName := v1.UniqueVolumeName(generatedVolumeName)
+
+	pvcLister := fakeInformerFactory.Core().V1().PersistentVolumeClaims().Lister()
+	pvLister := fakeInformerFactory.Core().V1().PersistentVolumes().Lister()
+
+	csiTranslator := csitrans.New()
+	dswp := &desiredStateOfWorldPopulator{
+		loopSleepDuration:        100 * time.Millisecond,
+		listPodsRetryDuration:    3 * time.Second,
+		desiredStateOfWorld:      fakesDSW,
+		volumePluginMgr:          fakeVolumePluginMgr,
+		podLister:                fakePodInformer.Lister(),
+		pvcLister:                pvcLister,
+		pvLister:                 pvLister,
+		nodeLister:               fakeNodeInformer.Lister(),
+		csiMigratedPluginManager: csimigration.NewPluginManager(csiTranslator),
+		intreeToCSITranslator:    csiTranslator,
+	}
+
+	dswp.desiredStateOfWorld.AddNode(k8stypes.NodeName(pod.Spec.NodeName))
+	logger, _ := ktesting.NewTestContext(t)
+	dswp.findAndAddActivePods(logger)
+
+	// Verify volume exists in DSW
+	volumeExists := dswp.desiredStateOfWorld.VolumeExists(expectedVolumeName, k8stypes.NodeName(pod.Spec.NodeName))
+	if !volumeExists {
+		t.Fatalf("VolumeExists(%q) should be true, got false", expectedVolumeName)
+	}
+
+	// Now node crashes: node becomes NotReady, pod gets DeletionTimestamp
+	node.Status.Conditions[0].Status = v1.ConditionFalse
+	fakeNodeInformer.Informer().GetStore().Update(node)
+
+	now := metav1.Now()
+	pod.DeletionTimestamp = &now
+	fakePodInformer.Informer().GetStore().Update(pod)
+
+	// Running findAndRemoveDeletedPods should remove the terminating pod on the unhealthy node from DSW
+	dswp.findAndRemoveDeletedPods(logger)
+
+	volumeExists = dswp.desiredStateOfWorld.VolumeExists(expectedVolumeName, k8stypes.NodeName(pod.Spec.NodeName))
+	if volumeExists {
+		t.Fatalf("VolumeExists(%q) should be false after pod is terminating on unhealthy node, got true", expectedVolumeName)
+	}
+}
