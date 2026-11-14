@@ -689,3 +689,27 @@ func TestIsZeroCIDR(t *testing.T) {
 		})
 	}
 }
+
+func TestIsRouterMode(t *testing.T) {
+	ipModeRouter := v1.LoadBalancerIPModeRouter
+	ipModeVIP := v1.LoadBalancerIPModeVIP
+	ipModeProxy := v1.LoadBalancerIPModeProxy
+
+	testCases := []struct {
+		name     string
+		ing      v1.LoadBalancerIngress
+		expected bool
+	}{
+		{"router mode", v1.LoadBalancerIngress{IPMode: &ipModeRouter}, true},
+		{"vip mode", v1.LoadBalancerIngress{IPMode: &ipModeVIP}, false},
+		{"proxy mode", v1.LoadBalancerIngress{IPMode: &ipModeProxy}, false},
+		{"nil mode", v1.LoadBalancerIngress{}, false},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := IsRouterMode(tc.ing); got != tc.expected {
+				t.Errorf("IsRouterMode() = %t, want %t", got, tc.expected)
+			}
+		})
+	}
+}

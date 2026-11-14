@@ -217,3 +217,10 @@ func IsVIPMode(ing v1.LoadBalancerIngress) bool {
 	}
 	return *ing.IPMode == v1.LoadBalancerIPModeVIP
 }
+
+func IsRouterMode(ing v1.LoadBalancerIngress) bool {
+	if ing.IPMode == nil {
+		return false
+	}
+	return *ing.IPMode == v1.LoadBalancerIPModeRouter
+}
