@@ -31,7 +31,7 @@ import (
 	core "k8s.io/client-go/testing"
 	cmapi "k8s.io/metrics/pkg/apis/custom_metrics/v1beta2"
 	emapi "k8s.io/metrics/pkg/apis/external_metrics/v1beta1"
-	metricsapi "k8s.io/metrics/pkg/apis/metrics/v1beta1"
+	metricsapi "k8s.io/metrics/pkg/apis/metrics/v1"
 	metricsfake "k8s.io/metrics/pkg/client/clientset/versioned/fake"
 	cmfake "k8s.io/metrics/pkg/client/custom_metrics/fake"
 	emfake "k8s.io/metrics/pkg/client/external_metrics/fake"
@@ -262,7 +262,7 @@ func TestRESTClientResourceMetrics(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			fakeMetricsClient := &metricsfake.Clientset{}
 			AddListPodMetricsReactor(fakeMetricsClient, &tt.fixture)
-			metricsClient := NewRESTMetricsClient(fakeMetricsClient.MetricsV1beta1(), &cmfake.FakeCustomMetricsClient{}, &emfake.FakeExternalMetricsClient{})
+			metricsClient := NewRESTMetricsClient(fakeMetricsClient.MetricsV1(), &cmfake.FakeCustomMetricsClient{}, &emfake.FakeExternalMetricsClient{})
 			info, timestamp, err := metricsClient.GetResourceMetric(context.TODO(), v1.ResourceCPU, tt.fixture.namespace, tt.fixture.selector, tt.container)
 			if tt.expectedError != "" {
 				require.ErrorContains(t, err, tt.expectedError)
@@ -342,7 +342,7 @@ func TestRESTClientCustomMetrics(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			fakeCMClient := &cmfake.FakeCustomMetricsClient{}
 			AddGetCustomMetricsReactor(fakeCMClient, &tt.fixture)
-			metricsClient := NewRESTMetricsClient((&metricsfake.Clientset{}).MetricsV1beta1(), fakeCMClient, &emfake.FakeExternalMetricsClient{})
+			metricsClient := NewRESTMetricsClient((&metricsfake.Clientset{}).MetricsV1(), fakeCMClient, &emfake.FakeExternalMetricsClient{})
 
 			if tt.fixture.singleObject != nil {
 				val, timestamp, err := metricsClient.GetObjectMetric(tt.fixture.metricName, tt.fixture.namespace, tt.fixture.singleObject, tt.fixture.metricLabelSelector)
@@ -417,7 +417,7 @@ func TestRESTClientExternalMetrics(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			fakeEMClient := &emfake.FakeExternalMetricsClient{}
 			AddListExternalMetricsReactor(fakeEMClient, &tt.fixture)
-			metricsClient := NewRESTMetricsClient((&metricsfake.Clientset{}).MetricsV1beta1(), &cmfake.FakeCustomMetricsClient{}, fakeEMClient)
+			metricsClient := NewRESTMetricsClient((&metricsfake.Clientset{}).MetricsV1(), &cmfake.FakeCustomMetricsClient{}, fakeEMClient)
 			val, timestamp, err := metricsClient.GetExternalMetric(tt.fixture.metricName, tt.fixture.namespace, tt.fixture.metricLabelSelector)
 			if tt.expectedError != "" {
 				require.ErrorContains(t, err, tt.expectedError)
