@@ -23,7 +23,10 @@ import (
 	"time"
 
 	apps "k8s.io/api/apps/v1"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
@@ -679,6 +682,48 @@ func TestDeploymentController_generateReplicaSetName(t *testing.T) {
 		if deploymentPortion != test.wantDeploymentPortion {
 			t.Errorf("Deployment name portion mismatch: got %q, want %q", deploymentPortion, test.wantDeploymentPortion)
 		}
+	}
+}
+
+func TestDeploymentController_getNewReplicaSetWithDroppedFields(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+
+	d := newDeployment("foo", 1, nil, nil, nil, map[string]string{"foo": "bar"})
+	d.Spec.Template.Spec.Containers[0].RestartPolicy = ptr.To(v1.ContainerRestartPolicyNever)
+	podTemplateHash := controller.ComputeHash(&d.Spec.Template, d.Status.CollisionCount)
+
+	// The API server dropped restartPolicy when creating the ReplicaSet: its feature gate is disabled
+	// and a create has no previous object in which the field could be in use.
+	rs := newReplicaSet(d, generateReplicaSetName(d.Name, podTemplateHash), 1)
+	rs.Spec.Template = *d.Spec.Template.DeepCopy()
+	rs.Spec.Template.Labels = map[string]string{"foo": "bar", apps.DefaultDeploymentUniqueLabelKey: podTemplateHash}
+	rs.Spec.Template.Spec.Containers[0].RestartPolicy = nil
+
+	client := &fake.Clientset{}
+	// The ReplicaSet exists but was not in the list passed to getNewReplicaSet, as with a stale cache,
+	// so creating it reports AlreadyExists.
+	client.PrependReactor("create", "replicasets", func(action testclient.Action) (bool, runtime.Object, error) {
+		return true, nil, errors.NewAlreadyExists(apps.SchemeGroupVersion.WithResource("replicasets").GroupResource(), rs.Name)
+	})
+	informers := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
+	dc, err := NewDeploymentController(ctx, informers.Apps().V1().Deployments(), informers.Apps().V1().ReplicaSets(), informers.Core().V1().Pods(), client)
+	if err != nil {
+		t.Fatalf("error creating Deployment controller: %v", err)
+	}
+	dc.eventRecorder = &record.FakeRecorder{}
+	if err := informers.Apps().V1().ReplicaSets().Informer().GetIndexer().Add(rs); err != nil {
+		t.Fatalf("failed to add ReplicaSet to the informer: %v", err)
+	}
+
+	newRS, err := dc.getNewReplicaSet(ctx, d, nil, nil, true)
+	if err != nil {
+		t.Fatalf("expected the existing ReplicaSet to be used, got error: %v", err)
+	}
+	if newRS == nil || newRS.Name != rs.Name {
+		t.Fatalf("expected ReplicaSet %q, got %v", rs.Name, newRS)
+	}
+	if d.Status.CollisionCount != nil {
+		t.Errorf("expected no hash collision, got collisionCount %d", *d.Status.CollisionCount)
 	}
 }
 
