@@ -1,0 +1,59 @@
+# Minimal in-cluster example manifests showing how the Service, Deployment, and
+# ValidatingWebhookConfiguration values line up with WithServiceAudience("kittens", "/validate", 443)
+# in examples/main.go.
+apiVersion: v1
+kind: Service
+metadata:
+  name: kittens
+  namespace: webhook-system
+spec:
+  selector:
+    app: kittens-webhook
+  ports:
+    - name: https
+      port: 443        # servicePort (443) passed to WithServiceAudience
+      targetPort: 8443 # containerPort (:8443) where the HTTP server listens
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kittens-webhook
+  namespace: webhook-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kittens-webhook
+  template:
+    metadata:
+      labels:
+        app: kittens-webhook
+    spec:
+      serviceAccountName: kittens-webhook
+      automountServiceAccountToken: true # mounts projected token and namespace file
+      containers:
+        - name: webhook
+          image: example.com/kittens-webhook:latest
+          ports:
+            - containerPort: 8443
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: kittens.example.com
+webhooks:
+  - name: kittens.example.com
+    admissionReviewVersions: ["v1"]
+    sideEffects: None
+    failurePolicy: Fail
+    clientConfig:
+      service:
+        name: kittens             # serviceName ("kittens")
+        namespace: webhook-system # read from projected Pod namespace file
+        path: /validate           # servicePath ("/validate")
+        port: 443                 # servicePort (443)
+    rules:
+      - apiGroups: ["apps"]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["deployments", "deployments/scale"]
