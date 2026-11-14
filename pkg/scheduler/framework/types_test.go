@@ -3130,6 +3130,7 @@ func TestPodInfoCalculateResources(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.37"))
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 				features.PodLevelResources:           tc.podLevelResourcesEnabled,
 				features.DRANodeAllocatableResources: tc.nodeAllocatableResourcesDRAEnabled,
