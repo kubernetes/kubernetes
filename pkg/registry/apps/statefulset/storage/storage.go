@@ -43,6 +43,7 @@ import (
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
 	"k8s.io/kubernetes/pkg/registry/apps/statefulset"
+	"k8s.io/utils/ptr"
 )
 
 // StatefulSetStorage includes dummy storage for StatefulSets, and their Status and Scale subresource.
@@ -274,7 +275,7 @@ func scaleFromStatefulSet(ss *apps.StatefulSet) (*autoscaling.Scale, error) {
 			CreationTimestamp: ss.CreationTimestamp,
 		},
 		Spec: autoscaling.ScaleSpec{
-			Replicas: ss.Spec.Replicas,
+			Replicas: ptr.Deref(ss.Spec.Replicas, 0),
 		},
 		Status: autoscaling.ScaleStatus{
 			Replicas: ss.Status.Replicas,
@@ -359,7 +360,7 @@ func (i *scaleUpdatedObjectInfo) UpdatedObject(ctx context.Context, oldObj runti
 	}
 
 	// move replicas/resourceVersion fields to object and return
-	statefulset.Spec.Replicas = scale.Spec.Replicas
+	statefulset.Spec.Replicas = new(scale.Spec.Replicas)
 	statefulset.ResourceVersion = scale.ResourceVersion
 
 	updatedEntries, err := managedFieldsHandler.ToParent(scale.ManagedFields)

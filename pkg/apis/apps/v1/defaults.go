@@ -142,6 +142,12 @@ func SetDefaults_StatefulSet(obj *appsv1.StatefulSet) {
 		obj.Spec.RevisionHistoryLimit = new(int32)
 		*obj.Spec.RevisionHistoryLimit = 10
 	}
+	// Clear TypeMeta on embedded PersistentVolumeClaims to match protobuf serialization in storage.
+	// See https://issue.k8s.io/87583
+	for i := range obj.Spec.VolumeClaimTemplates {
+		obj.Spec.VolumeClaimTemplates[i].APIVersion = ""
+		obj.Spec.VolumeClaimTemplates[i].Kind = ""
+	}
 }
 func SetDefaults_ReplicaSet(obj *appsv1.ReplicaSet) {
 	if obj.Spec.Replicas == nil {

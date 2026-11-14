@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strconv"
 
 	"sigs.k8s.io/structured-merge-diff/v7/fieldpath"
 
@@ -49,6 +50,7 @@ import (
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
 	"k8s.io/kubernetes/pkg/registry/apps/deployment"
+	"k8s.io/utils/ptr"
 )
 
 // DeploymentStorage includes dummy storage for Deployments and for Scale subresource.
@@ -263,7 +265,11 @@ func (r *RollbackREST) setDeploymentRollback(ctx context.Context, deploymentID s
 		for k, v := range annotations {
 			d.Annotations[k] = v
 		}
-		d.Spec.RollbackTo = config
+		if config != nil {
+			d.Annotations[apps.DeprecatedRollbackTo] = strconv.FormatInt(config.Revision, 10)
+		} else {
+			delete(d.Annotations, apps.DeprecatedRollbackTo)
+		}
 		finalDeployment = d
 		return d, nil
 	}), dryRun, nil)
@@ -385,7 +391,7 @@ func scaleFromDeployment(deployment *apps.Deployment) (*autoscaling.Scale, error
 			CreationTimestamp: deployment.CreationTimestamp,
 		},
 		Spec: autoscaling.ScaleSpec{
-			Replicas: deployment.Spec.Replicas,
+			Replicas: ptr.Deref(deployment.Spec.Replicas, 0),
 		},
 		Status: autoscaling.ScaleStatus{
 			Replicas: deployment.Status.Replicas,
@@ -470,7 +476,7 @@ func (i *scaleUpdatedObjectInfo) UpdatedObject(ctx context.Context, oldObj runti
 	}
 
 	// move replicas/resourceVersion fields to object and return
-	deployment.Spec.Replicas = scale.Spec.Replicas
+	deployment.Spec.Replicas = new(scale.Spec.Replicas)
 	deployment.ResourceVersion = scale.ResourceVersion
 
 	updatedEntries, err := managedFieldsHandler.ToParent(scale.ManagedFields)
