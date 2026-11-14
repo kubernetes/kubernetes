@@ -60,6 +60,12 @@ const (
 	// immediateEvictionGracePeriodSeconds is how long we give pods to shut down when we
 	// need them to evict quickly due to resource pressure
 	immediateEvictionGracePeriodSeconds = 1
+	// evictionTypeHard is the eviction_type label value for evictions triggered by a hard
+	// eviction threshold, or by a local storage limit (which always evicts immediately).
+	evictionTypeHard = "hard"
+	// evictionTypeSoft is the eviction_type label value for evictions triggered by a soft
+	// eviction threshold that has met its grace period.
+	evictionTypeSoft = "soft"
 )
 
 // managerImpl implements Manager
@@ -448,7 +454,7 @@ func (m *managerImpl) synchronize(ctx context.Context, diskInfoProvider DiskInfo
 			Message:            message,
 		}
 		if m.evictPod(logger, pod, gracePeriodOverride, message, annotations, condition) {
-			metrics.Evictions.WithLabelValues(string(thresholdToReclaim.Signal)).Inc()
+			metrics.Evictions.WithLabelValues(string(thresholdToReclaim.Signal), evictionType(thresholdToReclaim)).Inc()
 			return []*v1.Pod{pod}, nil
 		}
 	}
@@ -560,7 +566,7 @@ func (m *managerImpl) emptyDirLimitEviction(logger klog.Logger, podStats statsap
 			if used != nil && size != nil && size.Sign() == 1 && used.Cmp(*size) > 0 {
 				// the emptyDir usage exceeds the size limit, evict the pod
 				if m.evictPod(logger, pod, immediateEvictionGracePeriodSeconds, fmt.Sprintf(emptyDirMessageFmt, pod.Spec.Volumes[i].Name, size.String()), nil, nil) {
-					metrics.Evictions.WithLabelValues(signalEmptyDirFsLimit).Inc()
+					metrics.Evictions.WithLabelValues(signalEmptyDirFsLimit, evictionTypeHard).Inc()
 					return true
 				}
 				return false
@@ -588,7 +594,7 @@ func (m *managerImpl) podEphemeralStorageLimitEviction(logger klog.Logger, podSt
 		// the total usage of pod exceeds the total size limit of containers, evict the pod
 		message := fmt.Sprintf(podEphemeralStorageMessageFmt, podEphemeralStorageLimit.String())
 		if m.evictPod(logger, pod, immediateEvictionGracePeriodSeconds, message, nil, nil) {
-			metrics.Evictions.WithLabelValues(signalEphemeralPodFsLimit).Inc()
+			metrics.Evictions.WithLabelValues(signalEphemeralPodFsLimit, evictionTypeHard).Inc()
 			return true
 		}
 		return false
@@ -627,7 +633,7 @@ func (m *managerImpl) containerEphemeralStorageLimitEviction(logger klog.Logger,
 		if ephemeralStorageThreshold, ok := thresholdsMap[containerStat.Name]; ok {
 			if ephemeralStorageThreshold.Cmp(*containerUsed) < 0 {
 				if m.evictPod(logger, pod, immediateEvictionGracePeriodSeconds, fmt.Sprintf(containerEphemeralStorageMessageFmt, containerStat.Name, ephemeralStorageThreshold.String()), nil, nil) {
-					metrics.Evictions.WithLabelValues(signalEphemeralContainerFsLimit).Inc()
+					metrics.Evictions.WithLabelValues(signalEphemeralContainerFsLimit, evictionTypeHard).Inc()
 					return true
 				}
 				return false

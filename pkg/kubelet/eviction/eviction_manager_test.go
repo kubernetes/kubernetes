@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	goruntime "runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -34,6 +35,8 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/ktesting"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	kubeapi "k8s.io/kubernetes/pkg/apis/core"
@@ -41,6 +44,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
+	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
 	testingclock "k8s.io/utils/clock/testing"
 	"k8s.io/utils/ptr"
@@ -650,6 +654,8 @@ func TestDiskPressureNodeFs_VerifyPodStatus(t *testing.T) {
 // TestMemoryPressure
 func TestMemoryPressure(t *testing.T) {
 	tCtx := ktesting.Init(t)
+	metrics.Register()
+	metrics.Evictions.Reset()
 	podMaker := makePodWithMemoryStats
 	summaryStatsMaker := makeMemoryStats
 	podsToMake := []podToMake{
@@ -780,6 +786,12 @@ func TestMemoryPressure(t *testing.T) {
 	if observedGracePeriod != manager.config.MaxPodGracePeriodSeconds {
 		t.Errorf("Manager chose to kill pod with incorrect grace period.  Expected: %d, actual: %d", manager.config.MaxPodGracePeriodSeconds, observedGracePeriod)
 	}
+	// verify the soft eviction was counted with eviction_type="soft"
+	if v, err := testutil.GetCounterMetricValue(metrics.Evictions.WithLabelValues("memory.available", "soft")); err != nil {
+		t.Errorf("Failed to get soft eviction metric: %v", err)
+	} else if v != 1 {
+		t.Errorf("Expected 1 soft eviction to be recorded, got: %v", v)
+	}
 	// reset state
 	podKiller.pod = nil
 	podKiller.gracePeriodOverride = nil
@@ -819,6 +831,17 @@ func TestMemoryPressure(t *testing.T) {
 	observedGracePeriod = *podKiller.gracePeriodOverride
 	if observedGracePeriod != int64(1) {
 		t.Errorf("Manager chose to kill pod with incorrect grace period.  Expected: %d, actual: %d", 1, observedGracePeriod)
+	}
+	// verify the hard eviction was counted with eviction_type="hard", and that the earlier
+	// soft eviction is still the only soft-labeled series.
+	expectedEvictionMetrics := `
+		# HELP kubelet_evictions [ALPHA] Cumulative number of pod evictions by eviction signal and eviction type (hard or soft). Local storage limit evictions are counted as hard.
+		# TYPE kubelet_evictions counter
+		kubelet_evictions{eviction_signal="memory.available",eviction_type="hard"} 1
+		kubelet_evictions{eviction_signal="memory.available",eviction_type="soft"} 1
+	`
+	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expectedEvictionMetrics), "kubelet_evictions"); err != nil {
+		t.Errorf("Unexpected eviction metrics: %v", err)
 	}
 
 	// the best-effort pod should not admit, burstable should
@@ -2663,14 +2686,20 @@ func TestStorageLimitEvictions(t *testing.T) {
 	volumeSizeLimit := resource.MustParse("1Gi")
 
 	testCases := map[string]struct {
-		pod     podToMake
-		volumes []v1.Volume
+		pod            podToMake
+		volumes        []v1.Volume
+		expectedSignal string
 	}{
+		// rootfs/logsfs usage is only reported in PodStats.Containers, not in
+		// PodStats.EphemeralStorage, so these go through the container ephemeral-storage
+		// limit path (containerEphemeralStorageLimitEviction), not the pod-level one.
 		"eviction due to rootfs above limit": {
-			pod: podToMake{name: "rootfs-above-limits", priority: defaultPriority, requests: newResourceList("", "", "1Gi"), limits: newResourceList("", "", "1Gi"), rootFsUsed: "2Gi"},
+			pod:            podToMake{name: "rootfs-above-limits", priority: defaultPriority, requests: newResourceList("", "", "1Gi"), limits: newResourceList("", "", "1Gi"), rootFsUsed: "2Gi"},
+			expectedSignal: signalEphemeralContainerFsLimit,
 		},
 		"eviction due to logsfs above limit": {
-			pod: podToMake{name: "logsfs-above-limits", priority: defaultPriority, requests: newResourceList("", "", "1Gi"), limits: newResourceList("", "", "1Gi"), logsFsUsed: "2Gi"},
+			pod:            podToMake{name: "logsfs-above-limits", priority: defaultPriority, requests: newResourceList("", "", "1Gi"), limits: newResourceList("", "", "1Gi"), logsFsUsed: "2Gi"},
+			expectedSignal: signalEphemeralContainerFsLimit,
 		},
 		"eviction due to local volume above limit": {
 			pod: podToMake{name: "localvolume-above-limits", priority: defaultPriority, requests: newResourceList("", "", ""), limits: newResourceList("", "", ""), perLocalVolumeUsed: "2Gi"},
@@ -2682,11 +2711,14 @@ func TestStorageLimitEvictions(t *testing.T) {
 					},
 				},
 			}},
+			expectedSignal: signalEmptyDirFsLimit,
 		},
 	}
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
 			tCtx := ktesting.Init(t)
+			metrics.Register()
+			metrics.Evictions.Reset()
 			podMaker := makePodWithDiskStats
 			summaryStatsMaker := makeDiskStats
 			podsToMake := []podToMake{
@@ -2760,6 +2792,15 @@ func TestStorageLimitEvictions(t *testing.T) {
 			}
 			if *podKiller.gracePeriodOverride != 1 {
 				t.Errorf("Manager should have evicted with gracePeriodOverride of 1, but used: %v", *podKiller.gracePeriodOverride)
+			}
+
+			expectedEvictionMetrics := fmt.Sprintf(`
+				# HELP kubelet_evictions [ALPHA] Cumulative number of pod evictions by eviction signal and eviction type (hard or soft). Local storage limit evictions are counted as hard.
+				# TYPE kubelet_evictions counter
+				kubelet_evictions{eviction_signal="%s",eviction_type="hard"} 1
+			`, tc.expectedSignal)
+			if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expectedEvictionMetrics), "kubelet_evictions"); err != nil {
+				t.Errorf("Unexpected eviction metrics: %v", err)
 			}
 		})
 	}
@@ -2880,6 +2921,64 @@ func TestEmptyDirLimitEviction(t *testing.T) {
 
 			if tc.expectEviction {
 				assert.NotNil(t, podKiller.pod, "Expected pod to be killed")
+			} else {
+				assert.Nil(t, podKiller.pod, "Expected pod killer to remain inactive")
+			}
+		})
+	}
+}
+
+func TestPodEphemeralStorageLimitEviction(t *testing.T) {
+	tests := []struct {
+		testName       string
+		usedBytes      uint64
+		expectEviction bool
+	}{
+		{
+			testName:       "pod ephemeral storage usage (2Gi) exceeds limit (1Gi) -> evict",
+			usedBytes:      2 * 1024 * 1024 * 1024,
+			expectEviction: true,
+		},
+		{
+			testName:       "pod ephemeral storage usage (500Mi) within limit (1Gi) -> NO evict",
+			usedBytes:      500 * 1024 * 1024,
+			expectEviction: false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.testName, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
+			metrics.Register()
+			metrics.Evictions.Reset()
+
+			pod := newPod("test-pod", defaultPriority, []v1.Container{
+				newContainer("test-container", v1.ResourceList{}, newResourceList("", "", "1Gi")),
+			}, nil)
+
+			podStats := statsapi.PodStats{
+				PodRef: statsapi.PodReference{
+					Name: pod.Name, Namespace: pod.Namespace, UID: string(pod.UID),
+				},
+				EphemeralStorage: &statsapi.FsStats{UsedBytes: &tc.usedBytes},
+			}
+
+			podKiller := &mockPodKiller{}
+			m := &managerImpl{
+				killPodFunc: podKiller.killPodNow,
+				recorder:    &record.FakeRecorder{},
+			}
+
+			evicted := m.podEphemeralStorageLimitEviction(logger, podStats, pod)
+			assert.Equal(t, tc.expectEviction, evicted, "Eviction decision boundary failed")
+
+			if tc.expectEviction {
+				assert.NotNil(t, podKiller.pod, "Expected pod to be killed")
+				if v, err := testutil.GetCounterMetricValue(metrics.Evictions.WithLabelValues(signalEphemeralPodFsLimit, evictionTypeHard)); err != nil {
+					t.Errorf("Failed to get eviction metric: %v", err)
+				} else if v != 1 {
+					t.Errorf("Expected 1 hard eviction for %s, got: %v", signalEphemeralPodFsLimit, v)
+				}
 			} else {
 				assert.Nil(t, podKiller.pod, "Expected pod killer to remain inactive")
 			}
@@ -3227,6 +3326,8 @@ func TestManagerWithLocalStorageCapacityIsolationOpen(t *testing.T) {
 
 func TestContainerEphemeralStorageLimitEvictionForRestartableInitContainers(t *testing.T) {
 	tCtx := ktesting.Init(t)
+	metrics.Register()
+	metrics.Evictions.Reset()
 
 	initContainer := newRestartableInitContainer("sidecar", newResourceList("", "", ""), newResourceList("", "", "10Mi"))
 	mainContainer := newContainer("main", newResourceList("", "", ""), newResourceList("", "", ""))
@@ -3298,5 +3399,14 @@ func TestContainerEphemeralStorageLimitEvictionForRestartableInitContainers(t *t
 	}
 	if len(evictedPods) != 1 || evictedPods[0].Name != pod.Name {
 		t.Fatalf("Expected evicted pod %q, got %v", pod.Name, evictedPods)
+	}
+
+	expectedEvictionMetrics := `
+		# HELP kubelet_evictions [ALPHA] Cumulative number of pod evictions by eviction signal and eviction type (hard or soft). Local storage limit evictions are counted as hard.
+		# TYPE kubelet_evictions counter
+		kubelet_evictions{eviction_signal="ephemeralcontainerfs.limit",eviction_type="hard"} 1
+	`
+	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expectedEvictionMetrics), "kubelet_evictions"); err != nil {
+		t.Errorf("Unexpected eviction metrics: %v", err)
 	}
 }
