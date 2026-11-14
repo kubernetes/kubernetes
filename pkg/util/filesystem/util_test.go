@@ -19,7 +19,9 @@ package filesystem
 import (
 	"net"
 	"os"
+	"path/filepath"
 	"runtime"
+	"syscall"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -84,6 +86,35 @@ func TestIsUnixDomainSocket(t *testing.T) {
 		}
 		assert.Equal(t, result, test.expectSocket, "Unexpected result from IsUnixDomainSocket: %v for %s", result, test.label)
 	}
+}
+
+func TestMkdirAll(t *testing.T) {
+	base := t.TempDir()
+
+	dir := filepath.Join(base, "dir")
+	require.NoError(t, MkdirAll(dir, 0755))
+	require.NoError(t, MkdirAll(dir, 0755), "MkdirAll on an existing directory should succeed")
+
+	// A path occupied by a file is not a directory on any platform, and callers
+	// go on to create files underneath what MkdirAll reported success for.
+	file := filepath.Join(base, "file")
+	require.NoError(t, os.WriteFile(file, []byte("hello"), 0600))
+	err := MkdirAll(file, 0755)
+	require.Error(t, err, "MkdirAll on a path that exists as a file should fail")
+	require.ErrorIs(t, err, syscall.ENOTDIR)
+
+	contents, err := os.ReadFile(file)
+	require.NoError(t, err)
+	assert.Equal(t, "hello", string(contents), "MkdirAll should leave an existing file alone")
+
+	// A path under an existing file must fail too. On Windows os.Stat fails
+	// with ERROR_PATH_NOT_FOUND, which os.IsNotExist accepts, so the check in
+	// MkdirAll falls through and os.MkdirAll's recursion reports the parent as
+	// ENOTDIR - the same error unix reports directly.
+	nested := filepath.Join(file, "sub", "deeper")
+	err = MkdirAll(nested, 0755)
+	require.Error(t, err, "MkdirAll under a path that exists as a file should fail")
+	require.ErrorIs(t, err, syscall.ENOTDIR)
 }
 
 func TestIsCleanPath(t *testing.T) {
