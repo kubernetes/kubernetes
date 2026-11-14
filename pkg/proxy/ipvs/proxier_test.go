@@ -3563,7 +3563,13 @@ func Test_syncService(t *testing.T) {
 				t.Errorf("Case [%d], unexpected add IPVS virtual server error: %v", i, err)
 			}
 		}
-		if err := proxier.syncService(testCases[i].svcName, testCases[i].newVirtualServer, testCases[i].bindAddr, testCases[i].alreadyBoundAddrs); err != nil {
+		appliedIPVSServices := map[string]*utilipvs.VirtualServer{}
+		if appliedSvcs, err := proxier.ipvs.GetVirtualServers(); err == nil {
+			for _, appliedSvc := range appliedSvcs {
+				appliedIPVSServices[appliedSvc.String()] = appliedSvc
+			}
+		}
+		if err := proxier.syncService(testCases[i].svcName, testCases[i].newVirtualServer, testCases[i].bindAddr, testCases[i].alreadyBoundAddrs, appliedIPVSServices); err != nil {
 			t.Errorf("Case [%d], unexpected sync IPVS virtual server error: %v", i, err)
 		}
 		// check
