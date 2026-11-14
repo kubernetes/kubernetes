@@ -180,6 +180,16 @@ func (m *EndpointConditions) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if m.Processing != nil {
+		i--
+		if *m.Processing {
+			dAtA[i] = 1
+		} else {
+			dAtA[i] = 0
+		}
+		i--
+		dAtA[i] = 0x20
+	}
 	if m.Terminating != nil {
 		i--
 		if *m.Terminating {
@@ -553,6 +563,9 @@ func (m *EndpointConditions) Size() (n int) {
 	if m.Terminating != nil {
 		n += 2
 	}
+	if m.Processing != nil {
+		n += 2
+	}
 	return n
 }
 
@@ -706,6 +719,7 @@ func (this *EndpointConditions) String() string {
 		`Ready:` + valueToStringGenerated(this.Ready) + `,`,
 		`Serving:` + valueToStringGenerated(this.Serving) + `,`,
 		`Terminating:` + valueToStringGenerated(this.Terminating) + `,`,
+		`Processing:` + valueToStringGenerated(this.Processing) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -1316,6 +1330,27 @@ func (m *EndpointConditions) Unmarshal(dAtA []byte) error {
 			}
 			b := bool(v != 0)
 			m.Terminating = &b
+		case 4:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Processing", wireType)
+			}
+			var v int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			b := bool(v != 0)
+			m.Processing = &b
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(dAtA[iNdEx:])

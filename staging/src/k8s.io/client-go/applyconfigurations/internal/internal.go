@@ -8916,6 +8916,9 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: io.k8s.api.discovery.v1.EndpointConditions
   map:
     fields:
+    - name: processing
+      type:
+        scalar: boolean
     - name: ready
       type:
         scalar: boolean
@@ -9032,6 +9035,9 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: io.k8s.api.discovery.v1beta1.EndpointConditions
   map:
     fields:
+    - name: processing
+      type:
+        scalar: boolean
     - name: ready
       type:
         scalar: boolean

@@ -39,6 +39,9 @@ type EndpointConditionsApplyConfiguration struct {
 	// terminating indicates that this endpoint is terminating. A nil value
 	// should be interpreted as "false".
 	Terminating *bool `json:"terminating,omitempty"`
+	// processing indicates that this endpoint is processing existing connections.
+	// A nil value should be interpreted as "true".
+	Processing *bool `json:"processing,omitempty"`
 }
 
 // EndpointConditionsApplyConfiguration constructs a declarative configuration of the EndpointConditions type for use with
@@ -68,5 +71,13 @@ func (b *EndpointConditionsApplyConfiguration) WithServing(value bool) *Endpoint
 // If called multiple times, the Terminating field is set to the value of the last call.
 func (b *EndpointConditionsApplyConfiguration) WithTerminating(value bool) *EndpointConditionsApplyConfiguration {
 	b.Terminating = &value
+	return b
+}
+
+// WithProcessing sets the Processing field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Processing field is set to the value of the last call.
+func (b *EndpointConditionsApplyConfiguration) WithProcessing(value bool) *EndpointConditionsApplyConfiguration {
+	b.Processing = &value
 	return b
 }

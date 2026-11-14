@@ -1532,9 +1532,9 @@ func TestCheckoutChanges(t *testing.T) {
 				previous: EndpointsMap{},
 				current: EndpointsMap{
 					svcPortName0: []Endpoint{
-						&BaseEndpointInfo{ip: "10.0.1.1", port: 80, endpoint: "10.0.1.1:80", ready: true, serving: true, terminating: false},
-						&BaseEndpointInfo{ip: "10.0.1.2", port: 80, endpoint: "10.0.1.2:80", ready: false, serving: true, terminating: true},
-						&BaseEndpointInfo{ip: "10.0.1.3", port: 80, endpoint: "10.0.1.3:80", ready: false, serving: false, terminating: false},
+						&BaseEndpointInfo{ip: "10.0.1.1", port: 80, endpoint: "10.0.1.1:80", ready: true, serving: true, terminating: false, processing: true},
+						&BaseEndpointInfo{ip: "10.0.1.2", port: 80, endpoint: "10.0.1.2:80", ready: false, serving: true, terminating: true, processing: true},
+						&BaseEndpointInfo{ip: "10.0.1.3", port: 80, endpoint: "10.0.1.3:80", ready: false, serving: false, terminating: false, processing: true},
 					},
 				},
 			}},
@@ -1548,21 +1548,21 @@ func TestCheckoutChanges(t *testing.T) {
 			expectedChanges: []*endpointsChange{{
 				previous: EndpointsMap{
 					svcPortName0: []Endpoint{
-						&BaseEndpointInfo{ip: "10.0.1.1", port: 80, endpoint: "10.0.1.1:80", ready: true, serving: true, terminating: false},
-						&BaseEndpointInfo{ip: "10.0.1.2", port: 80, endpoint: "10.0.1.2:80", ready: true, serving: true, terminating: false},
-						&BaseEndpointInfo{ip: "10.0.1.3", port: 80, endpoint: "10.0.1.3:80", ready: false, serving: false, terminating: false},
+						&BaseEndpointInfo{ip: "10.0.1.1", port: 80, endpoint: "10.0.1.1:80", ready: true, serving: true, terminating: false, processing: true},
+						&BaseEndpointInfo{ip: "10.0.1.2", port: 80, endpoint: "10.0.1.2:80", ready: true, serving: true, terminating: false, processing: true},
+						&BaseEndpointInfo{ip: "10.0.1.3", port: 80, endpoint: "10.0.1.3:80", ready: false, serving: false, terminating: false, processing: true},
 					},
 					svcPortName1: []Endpoint{
-						&BaseEndpointInfo{ip: "10.0.1.1", port: 443, endpoint: "10.0.1.1:443", ready: true, serving: true, terminating: false},
-						&BaseEndpointInfo{ip: "10.0.1.2", port: 443, endpoint: "10.0.1.2:443", ready: true, serving: true, terminating: false},
-						&BaseEndpointInfo{ip: "10.0.1.3", port: 443, endpoint: "10.0.1.3:443", ready: false, serving: false, terminating: false},
+						&BaseEndpointInfo{ip: "10.0.1.1", port: 443, endpoint: "10.0.1.1:443", ready: true, serving: true, terminating: false, processing: true},
+						&BaseEndpointInfo{ip: "10.0.1.2", port: 443, endpoint: "10.0.1.2:443", ready: true, serving: true, terminating: false, processing: true},
+						&BaseEndpointInfo{ip: "10.0.1.3", port: 443, endpoint: "10.0.1.3:443", ready: false, serving: false, terminating: false, processing: true},
 					},
 				},
 				current: EndpointsMap{
 					svcPortName0: []Endpoint{
-						&BaseEndpointInfo{ip: "10.0.1.1", port: 80, endpoint: "10.0.1.1:80", ready: true, serving: true, terminating: false},
-						&BaseEndpointInfo{ip: "10.0.1.2", port: 80, endpoint: "10.0.1.2:80", ready: true, serving: true, terminating: false},
-						&BaseEndpointInfo{ip: "10.0.1.3", port: 80, endpoint: "10.0.1.3:80", ready: false, serving: false, terminating: false},
+						&BaseEndpointInfo{ip: "10.0.1.1", port: 80, endpoint: "10.0.1.1:80", ready: true, serving: true, terminating: false, processing: true},
+						&BaseEndpointInfo{ip: "10.0.1.2", port: 80, endpoint: "10.0.1.2:80", ready: true, serving: true, terminating: false, processing: true},
+						&BaseEndpointInfo{ip: "10.0.1.3", port: 80, endpoint: "10.0.1.3:80", ready: false, serving: false, terminating: false, processing: true},
 					},
 				},
 			}},
