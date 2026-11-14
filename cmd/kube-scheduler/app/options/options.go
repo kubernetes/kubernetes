@@ -227,6 +227,10 @@ func (o *Options) ApplyTo(logger klog.Logger, c *schedulerappconfig.Config) erro
 	if err := o.ComponentGlobalsRegistry.SetFallback(); err != nil {
 		return err
 	}
+	// Propagate feature gate state to the metrics subsystem. This must be called
+	// after feature gates are set and before any histogram metrics are registered.
+	metricsfeatures.ApplyFeatureGates(utilfeature.DefaultFeatureGate)
+
 	if len(o.ConfigFile) == 0 {
 		// If the --config arg is not specified, honor the deprecated as well as leader election CLI args.
 		o.ApplyDeprecated()
@@ -267,7 +271,6 @@ func (o *Options) ApplyTo(logger klog.Logger, c *schedulerappconfig.Config) erro
 			return err
 		}
 	}
-	metricsfeatures.ApplyFeatureGates(utilfeature.DefaultFeatureGate)
 	o.Metrics.Apply()
 
 	// Apply value independently instead of using ApplyDeprecated() because it can't be configured via ComponentConfig.
