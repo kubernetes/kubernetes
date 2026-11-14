@@ -15,15 +15,470 @@ limitations under the License.
 */
 
 // Package datapol contains functions to determine if objects contain sensitive
-// data to e.g. make decisions on whether to log them or not.
+// data to e.g. make decisions on whether to log them or not, and to redact
+// datapolicy-tagged fields in place before such objects are logged or served
+// (see Redact). This package is not intended for hot paths: it uses reflection
+// to traverse arbitrary object graphs.
 package datapol
 
 import (
+	"fmt"
 	"reflect"
 	"strings"
 
 	"k8s.io/klog/v2"
 )
+
+// redacted is the placeholder value written over every field tagged with
+// `datapolicy`. It matches the flagz/zpages "CLASSIFIED" convention.
+const redacted = "CLASSIFIED"
+
+// Redact walks obj via reflection and overwrites the value of every field
+// tagged with `datapolicy` (regardless of the tag's value). Redaction happens
+// in place, so callers MUST pass a pointer to a deep copy of any object they do
+// not want mutated. Fields without a datapolicy tag are left untouched, but
+// nested structs, slices, and maps are traversed so that tagged fields nested
+// arbitrarily deep are still redacted.
+//
+// What a tagged field is overwritten with depends on its kind, so a caller
+// must not read a visible "CLASSIFIED" sentinel as proof that redaction ran:
+//   - strings, byte slices, and string slices become the "CLASSIFIED" sentinel;
+//   - a map keeps its keys and has its leaf values redacted;
+//   - every other scalar, and a struct, is zeroed rather than recursed into, so
+//     a tagged int64 becomes 0, indistinguishable from unset;
+//   - a nil pointer, interface, or slice is left nil, since an unset field
+//     holds nothing to redact and writing a sentinel over it would also defeat
+//     `omitempty` when the object is serialized.
+//
+// A nil obj (or a nil pointer) holds nothing to redact and succeeds. Anything
+// else that reflection cannot overwrite — a value passed by value, an
+// unexported field hiding a tag, a tag reached through a map key, a kind the
+// walk does not understand — returns an error, so redaction fails closed
+// instead of handing back a value that still carries secrets.
+func Redact(obj interface{}) (retErr error) {
+	defer func() {
+		if r := recover(); r != nil {
+			retErr = fmt.Errorf("panic while redacting sensitive data: %v", r)
+		}
+	}()
+	v := reflect.ValueOf(obj)
+	if !v.IsValid() {
+		return nil // nil interface
+	}
+	if v.Kind() == reflect.Pointer || v.Kind() == reflect.Interface {
+		if v.IsNil() {
+			return nil
+		}
+		v = v.Elem()
+	}
+	// A non-addressable value cannot be mutated in place, so any tagged field it
+	// carries would survive unredacted. Fail closed: returning nil here would
+	// let a caller that forgot the pointer log a secret silently.
+	if !v.CanSet() {
+		return fmt.Errorf("cannot redact value of type %s in place: Redact requires a pointer", reflect.TypeOf(obj))
+	}
+	return redactWalk(v, map[visitKey]struct{}{})
+}
+
+// visitKey identifies a value already visited during a walk. ptr is the value's
+// address via reflect.Value.Pointer(); length disambiguates slices that share a
+// backing array but span different ranges (e.g. s and s[:1]) so that aliased
+// sub-slices are still fully walked while a genuine self-referential slice is
+// still caught. For pointers and maps length is always 0.
+//
+// typ is part of the identity because an address alone does not identify a
+// traversal node: a pointer to a struct and a pointer to that struct's first
+// (or embedded) field share an address but have different types, as do *[N]T
+// and a *T aimed at element 0. Keying on the address alone would let whichever
+// alias is walked first mark the other as visited, skipping the rest of the
+// larger value unredacted while Redact still reported success — a fail-open
+// leak dependent on struct field order. The standard library keys its own
+// visited set the same way: reflect.DeepEqual's visit struct carries the type
+// alongside the two addresses.
+type visitKey struct {
+	typ    reflect.Type
+	ptr    uintptr
+	length int
+}
+
+// seen records the identity of pointers, maps, and slices already visited during
+// a walk so that a cyclic object graph short-circuits instead of recursing
+// forever. Without this guard a self-referential input (including a slice that
+// contains itself through an interface) overflows the stack, which is a fatal
+// error that Redact's recover() cannot catch. Returns true if v was already
+// visited (and records it otherwise). Only pointer, map, and slice kinds carry a
+// meaningful identity via Pointer(); other kinds return false.
+func seen(v reflect.Value, visited map[visitKey]struct{}) bool {
+	var key visitKey
+	switch v.Kind() {
+	case reflect.Pointer, reflect.Map:
+		if v.IsNil() {
+			return false
+		}
+		key = visitKey{typ: v.Type(), ptr: v.Pointer()}
+	case reflect.Slice:
+		if v.IsNil() {
+			return false
+		}
+		// A slice's identity is its backing-array address plus its length: a
+		// self-referential slice repeats both, while a distinct sub-slice of a
+		// shared backing array differs in length and must still be walked.
+		key = visitKey{typ: v.Type(), ptr: v.Pointer(), length: v.Len()}
+	default:
+		return false
+	}
+	if _, ok := visited[key]; ok {
+		return true
+	}
+	visited[key] = struct{}{}
+	return false
+}
+
+// redactWalk traverses untagged values looking for struct fields carrying a
+// datapolicy tag. When it finds one it hands the field to redactValue. It
+// returns an error if it encounters a value of a kind it does not know how to
+// traverse, so an unexpected shape fails closed rather than silently passing a
+// value that could hide an unredacted datapolicy-tagged field.
+func redactWalk(v reflect.Value, visited map[visitKey]struct{}) error {
+	if seen(v, visited) {
+		return nil
+	}
+	switch v.Kind() {
+	case reflect.Pointer:
+		if v.IsNil() {
+			return nil
+		}
+		return redactWalk(v.Elem(), visited)
+	case reflect.Interface:
+		if v.IsNil() {
+			return nil
+		}
+		// An interface's Elem() is not addressable, so walking it directly would
+		// leave any nested tagged fields unset (CanSet is false). Walk a settable
+		// copy and write it back so tagged fields reached through a by-value
+		// interface are still redacted.
+		ev := v.Elem()
+		cp := reflect.New(ev.Type()).Elem()
+		cp.Set(ev)
+		if err := redactWalk(cp, visited); err != nil {
+			return err
+		}
+		if v.CanSet() {
+			v.Set(cp)
+		}
+		return nil
+	case reflect.Struct:
+		t := v.Type()
+		for i := 0; i < t.NumField(); i++ {
+			fv := v.Field(i)
+			sf := t.Field(i)
+			if _, ok := sf.Tag.Lookup("datapolicy"); ok {
+				// A tagged field we cannot set (unexported) would leak its value
+				// unredacted. Fail closed rather than silently pass it through.
+				if !fv.CanSet() {
+					return fmt.Errorf("cannot redact datapolicy-tagged field %s.%s: field is unexported and cannot be set via reflection", t, sf.Name)
+				}
+				// Use a fresh visited set for the value redaction rather than
+				// sharing redactWalk's. The walk records the addresses of maps
+				// and pointers it merely traverses (without redacting); if a
+				// tagged field aliases one of those already-walked addresses,
+				// sharing the set would make seen() short-circuit and skip
+				// redaction entirely — a fail-open leak whose occurrence depends
+				// on struct field order. redactValue never re-enters redactWalk
+				// and zeroes structs instead of recursing into them, so its own
+				// cycle detection is self-contained within the fresh set.
+				if err := redactValue(fv, map[visitKey]struct{}{}); err != nil {
+					return err
+				}
+				continue
+			}
+			if !fv.CanSet() {
+				// Unexported field: reflection cannot overwrite anything beneath
+				// it, so we cannot recurse with redactWalk (which mutates). But
+				// skipping it blindly would silently leak a datapolicy-tagged
+				// field nested below. Inspect the subtree read-only and fail
+				// closed if it hides a tag we would be unable to redact.
+				if path := findDatapolicyTag(fv, sf.Name, map[visitKey]struct{}{}); path != "" {
+					return fmt.Errorf("cannot redact datapolicy-tagged field reached through unexported field %s.%s: found tag at %s", t, sf.Name, path)
+				}
+				continue
+			}
+			if err := redactWalk(fv, visited); err != nil {
+				return err
+			}
+		}
+		return nil
+	case reflect.Slice, reflect.Array:
+		for i := 0; i < v.Len(); i++ {
+			if err := redactWalk(v.Index(i), visited); err != nil {
+				return err
+			}
+		}
+		return nil
+	case reflect.Map:
+		if err := checkMapKeys(v); err != nil {
+			return err
+		}
+		iter := v.MapRange()
+		for iter.Next() {
+			// Map values are not addressable, so operate on a settable copy and
+			// write it back.
+			mv := iter.Value()
+			cp := reflect.New(mv.Type()).Elem()
+			cp.Set(mv)
+			if err := redactWalk(cp, visited); err != nil {
+				return err
+			}
+			v.SetMapIndex(iter.Key(), cp)
+		}
+		return nil
+	case reflect.Bool,
+		reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr,
+		reflect.Float32, reflect.Float64,
+		reflect.Complex64, reflect.Complex128,
+		reflect.String:
+		// Scalar leaf: it carries no datapolicy-tagged fields beneath it, so
+		// there is nothing to walk. A scalar reached here is untagged (tagged
+		// fields are handed to redactValue by the struct case above).
+		return nil
+	default:
+		// Chan, Func, UnsafePointer, Invalid, and any future kind we do not know
+		// how to traverse. Fail closed: error rather than silently passing a
+		// value that could hide an unredacted datapolicy-tagged field.
+		return fmt.Errorf("cannot redact value of unexpected kind %s", v.Kind())
+	}
+}
+
+// findDatapolicyTag scans v read-only for a struct field carrying a datapolicy
+// tag, descending through pointers, interfaces, structs, slices, arrays, and
+// maps. It exists to inspect subtrees that redactWalk cannot mutate — namely
+// those reached through an unexported field — so redaction can fail closed when
+// such a subtree hides a tagged field that should have been redacted. It only
+// reads values (it never calls Set or Interface), so it is safe on the
+// read-only reflect.Values that unexported fields yield, where a mutating walk
+// would panic. It returns a dotted field path to the first tag found, or "" if
+// the subtree carries none.
+//
+// Recursion is bounded by value identity (the same visited set redactWalk uses)
+// rather than by type. Memoizing per type would be wrong: whether a type
+// carries a tag is not a property of the type alone once an interface is in
+// play, because two values of the same type can hold different dynamic types
+// (one nil, one a tagged struct). Marking the type clean after the first value
+// would then skip the second and leak it. Value identity is safe because the
+// same pointer, map, or slice always yields the same answer, and struct nesting
+// by value is finite, so every cycle must pass through a guarded kind.
+func findDatapolicyTag(v reflect.Value, path string, visited map[visitKey]struct{}) string {
+	if seen(v, visited) {
+		return ""
+	}
+	switch v.Kind() {
+	case reflect.Pointer, reflect.Interface:
+		if v.IsNil() {
+			return ""
+		}
+		return findDatapolicyTag(v.Elem(), path, visited)
+	case reflect.Struct:
+		t := v.Type()
+		for i := 0; i < t.NumField(); i++ {
+			sf := t.Field(i)
+			fieldPath := path + "." + sf.Name
+			if _, ok := sf.Tag.Lookup("datapolicy"); ok {
+				return fieldPath
+			}
+			if p := findDatapolicyTag(v.Field(i), fieldPath, visited); p != "" {
+				return p
+			}
+		}
+		return ""
+	case reflect.Slice, reflect.Array:
+		// Walk every element: a slice/array of interfaces can hold differing
+		// dynamic types, so no single element is representative. An empty
+		// container holds no value to redact, so finding no tag is correct.
+		for i := 0; i < v.Len(); i++ {
+			if p := findDatapolicyTag(v.Index(i), path, visited); p != "" {
+				return p
+			}
+		}
+		return ""
+	case reflect.Map:
+		iter := v.MapRange()
+		for iter.Next() {
+			// Keys as well as values. A tag reached through a map key can never
+			// be redacted, because a key cannot be overwritten in place, so a
+			// subtree hiding one must be reported rather than look clean: the
+			// callers of this scan exist to fail closed on exactly that.
+			if p := findDatapolicyTag(iter.Key(), path, visited); p != "" {
+				return p
+			}
+			if p := findDatapolicyTag(iter.Value(), path, visited); p != "" {
+				return p
+			}
+		}
+		return ""
+	default:
+		// Scalars and other leaf kinds carry no nested tags.
+		return ""
+	}
+}
+
+// redactValue overwrites the value of a datapolicy-tagged field. Strings,
+// byte slices, and string slices are replaced with the "CLASSIFIED" sentinel;
+// maps preserve their keys but have their leaf values redacted; pointers and
+// interfaces are dereferenced; every other scalar, and a struct, is zeroed
+// rather than recursed into. Nil pointers, interfaces, and slices are left nil,
+// since an unset field holds nothing to redact.
+//
+// It returns an error if it cannot actually overwrite a value it was asked to
+// redact — for example a leaf that reflection reports as not settable. Every
+// terminal write is guarded so that an un-redactable value fails closed with a
+// descriptive error instead of silently leaking (or only surfacing as a
+// recovered panic).
+func redactValue(v reflect.Value, visited map[visitKey]struct{}) error {
+	switch v.Kind() {
+	case reflect.String:
+		if !v.CanSet() {
+			return notSettableErr(v)
+		}
+		v.SetString(redacted)
+		return nil
+	case reflect.Pointer:
+		// A nil pointer holds no value to redact; leave it nil rather than
+		// materializing an empty object that was not present in the input.
+		if v.IsNil() {
+			return nil
+		}
+		// Cycle guard: a pointer that (transitively) points back to itself must
+		// not recurse forever. Redaction of the pointee mutates shared storage
+		// in place, so skipping an already-visited pointer loses nothing.
+		if seen(v, visited) {
+			return nil
+		}
+		return redactValue(v.Elem(), visited)
+	case reflect.Interface:
+		if v.IsNil() {
+			return nil
+		}
+		ev := v.Elem()
+		cp := reflect.New(ev.Type()).Elem()
+		cp.Set(ev)
+		if err := redactValue(cp, visited); err != nil {
+			return err
+		}
+		if !v.CanSet() {
+			return notSettableErr(v)
+		}
+		v.Set(cp)
+		return nil
+	case reflect.Slice:
+		// A nil slice holds no value to redact; leave it nil rather than
+		// materializing a sentinel for a field that was not set, which would
+		// also defeat `omitempty` when the object is serialized.
+		if v.IsNil() {
+			return nil
+		}
+		switch v.Type().Elem().Kind() {
+		case reflect.Uint8:
+			// []byte — terminal replacement. This overwrites the slice header
+			// rather than mutating the shared backing array, so it must NOT be
+			// short-circuited by the seen() cycle guard: two tagged fields (or
+			// two map values) that alias the same slice each need their own
+			// replacement, otherwise the second alias leaks its original value.
+			if !v.CanSet() {
+				return notSettableErr(v)
+			}
+			v.SetBytes([]byte(redacted))
+			return nil
+		case reflect.String:
+			// []string (or a named type with string elements) — terminal
+			// replacement; same rationale as []byte above, so no seen() guard.
+			if !v.CanSet() {
+				return notSettableErr(v)
+			}
+			s := reflect.MakeSlice(v.Type(), 1, 1)
+			s.Index(0).SetString(redacted)
+			v.Set(s)
+			return nil
+		default:
+			// Recursive slice: redaction mutates each element in place through
+			// the shared backing array, so a cycle guard is both safe (aliases
+			// already share the mutation) and necessary (a self-referential
+			// slice would otherwise recurse forever).
+			if seen(v, visited) {
+				return nil
+			}
+			for i := 0; i < v.Len(); i++ {
+				if err := redactValue(v.Index(i), visited); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	case reflect.Array:
+		for i := 0; i < v.Len(); i++ {
+			if err := redactValue(v.Index(i), visited); err != nil {
+				return err
+			}
+		}
+		return nil
+	case reflect.Map:
+		// Cycle guard: a map reachable from its own values must not recurse
+		// forever. Values are rewritten via SetMapIndex on the shared map, so
+		// skipping an already-visited map loses nothing.
+		if seen(v, visited) {
+			return nil
+		}
+		// Keys are deliberately preserved — a tagged map keeps its shape and
+		// redacts its values — but a tag reached through the key type is a
+		// different matter, and checkMapKeys fails closed on it.
+		if err := checkMapKeys(v); err != nil {
+			return err
+		}
+		iter := v.MapRange()
+		for iter.Next() {
+			mv := iter.Value()
+			cp := reflect.New(mv.Type()).Elem()
+			cp.Set(mv)
+			if err := redactValue(cp, visited); err != nil {
+				return err
+			}
+			v.SetMapIndex(iter.Key(), cp)
+		}
+		return nil
+	default:
+		// Numbers, bools, and other scalars: clear the value.
+		if !v.CanSet() {
+			return notSettableErr(v)
+		}
+		v.Set(reflect.Zero(v.Type()))
+		return nil
+	}
+}
+
+// checkMapKeys scans the keys of map v read-only for a datapolicy tag and
+// returns an error if it finds one. A map key cannot be overwritten in place —
+// reflection offers no settable view of it — so a tag reached through the key
+// type could never be redacted, and returning nil would hand the caller a map
+// that still carries the secret in its keys while reporting success. Both
+// traversals call this so neither can report a clean map that datatypes (the
+// engine behind Verify, which does inspect keys) reports as sensitive.
+func checkMapKeys(v reflect.Value) error {
+	visited := map[visitKey]struct{}{}
+	iter := v.MapRange()
+	for iter.Next() {
+		if path := findDatapolicyTag(iter.Key(), "(map key)", visited); path != "" {
+			return fmt.Errorf("cannot redact datapolicy-tagged field reached through a key of map type %s: found tag at %s, and map keys cannot be overwritten in place", v.Type(), path)
+		}
+	}
+	return nil
+}
+
+// notSettableErr reports that reflection cannot overwrite v, so the
+// datapolicy-tagged value it holds cannot be redacted and redaction must fail
+// closed rather than leak the value.
+func notSettableErr(v reflect.Value) error {
+	return fmt.Errorf("cannot redact datapolicy-tagged value of kind %s: reflection reports it is not settable", v.Kind())
+}
 
 // Verify returns a list of the datatypes contained in the argument that can be
 // considered sensitive w.r.t. to logging
