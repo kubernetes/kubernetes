@@ -77,8 +77,6 @@ func (d *dispatcher) dispatchInvocations(
 	versionedAttributes webhookgeneric.VersionedAttributeAccessor,
 	invocations []generic.PolicyInvocation[*Policy, *PolicyBinding, PolicyEvaluator],
 ) ([]generic.PolicyError, *k8serrors.StatusError) {
-	var lastVersionedAttr *admission.VersionedAttributes
-
 	reinvokeCtx := a.GetReinvocationContext()
 	var policyReinvokeCtx *policyReinvokeContext
 	if v := reinvokeCtx.Value(PluginName); v != nil {
@@ -153,6 +151,9 @@ func (d *dispatcher) dispatchInvocations(
 			// accessors before starting the dispatcher
 			return nil, k8serrors.NewInternalError(err)
 		}
+		if err := syncVersionedAttributes(a, o, versionedAttr, invocation.Kind); err != nil {
+			return nil, k8serrors.NewInternalError(err)
+		}
 
 		if invocation.Evaluator.Matcher != nil {
 			matchResults := invocation.Evaluator.Matcher.Match(ctx, versionedAttr, invocation.Param, authz)
@@ -181,7 +182,6 @@ func (d *dispatcher) dispatchInvocations(
 		// Mutations for a single invocation of a MutatingAdmissionPolicy are evaluated
 		// in order.
 		for mutationIndex := range invocation.Policy.Spec.Mutations {
-			lastVersionedAttr = versionedAttr
 			if versionedAttr.VersionedObject.Object() == nil { // Do not call patchers if there is no object to patch.
 				continue
 			}
@@ -205,7 +205,11 @@ func (d *dispatcher) dispatchInvocations(
 				celmetrics.Metrics.ObserveAdmission(ctx, elapsed, invocation.Policy.Name, invocation.Binding.Name, celmetrics.MutationNoError)
 			}
 		}
-		if !apiequality.Semantic.DeepEqual(objectBeforeMutations, versionedAttr.VersionedObject.Object()) {
+		objectChanged := !apiequality.Semantic.DeepEqual(objectBeforeMutations, versionedAttr.VersionedObject.Object())
+		if err := writeBackVersionedAttributes(o, versionedAttr); err != nil {
+			return nil, k8serrors.NewInternalError(err)
+		}
+		if objectChanged {
 			// The mutation has changed the object. Prepare to reinvoke all previous mutations that are eligible for re-invocation.
 			policyReinvokeCtx.RequireReinvokingPreviouslyInvokedPlugins()
 			reinvokeCtx.SetShouldReinvoke()
@@ -215,15 +219,46 @@ func (d *dispatcher) dispatchInvocations(
 		}
 	}
 
-	if lastVersionedAttr != nil && lastVersionedAttr.VersionedObject.Object() != nil && lastVersionedAttr.Dirty {
-		policyReinvokeCtx.RequireReinvokingPreviouslyInvokedPlugins()
-		reinvokeCtx.SetShouldReinvoke()
-		if err := o.GetObjectConvertor().Convert(lastVersionedAttr.VersionedObject.Object(), lastVersionedAttr.Attributes.GetObject(), nil); err != nil {
-			return nil, k8serrors.NewInternalError(fmt.Errorf("failed to convert object: %w", err))
-		}
-	}
-
 	return policyErrors, nil
+}
+
+// syncVersionedAttributes refreshes a cached policy representation from the
+// current admission object. The generic policy dispatcher retains independent
+// per-GVK snapshots for validation and matching; mutating policies must instead
+// see mutations made by the preceding invocation in this dispatch.
+func syncVersionedAttributes(a admission.Attributes, o admission.ObjectInterfaces, attr *admission.VersionedAttributes, gvk schema.GroupVersionKind) error {
+	if oldObject := a.GetOldObject(); oldObject != nil {
+		converted, err := admission.ConvertToGVK(oldObject, gvk, o)
+		if err != nil {
+			return fmt.Errorf("failed to convert old object to %s: %w", gvk, err)
+		}
+		attr.VersionedOldObject.Set(converted)
+	} else {
+		attr.VersionedOldObject.Set(nil)
+	}
+	if object := a.GetObject(); object != nil {
+		converted, err := admission.ConvertToGVK(object, gvk, o)
+		if err != nil {
+			return fmt.Errorf("failed to convert object to %s: %w", gvk, err)
+		}
+		attr.VersionedObject.Set(converted)
+	} else {
+		attr.VersionedObject.Set(nil)
+	}
+	attr.VersionedKind = gvk
+	attr.Dirty = false
+	return nil
+}
+
+func writeBackVersionedAttributes(o admission.ObjectInterfaces, attr *admission.VersionedAttributes) error {
+	if attr.VersionedObject.Object() == nil || !attr.Dirty {
+		return nil
+	}
+	if err := o.GetObjectConvertor().Convert(attr.VersionedObject.Object(), attr.Attributes.GetObject(), nil); err != nil {
+		return fmt.Errorf("failed to convert object: %w", err)
+	}
+	attr.Dirty = false
+	return nil
 }
 
 func (d *dispatcher) dispatchOne(
