@@ -427,6 +427,19 @@ func TestResourceSliceStrategyCreate(t *testing.T) {
 				return obj
 			}(),
 		},
+		"keep-fields-list-type-attributes-by-default": {
+			obj: sliceWithListTypeAttributes,
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithListTypeAttributes.DeepCopy()
+				obj.Generation = 1
+				return obj
+			}(),
+		},
+		"drop-fields-list-type-attributes-1.37-default": {
+			obj:                     sliceWithListTypeAttributes,
+			emulatedVersion:         "1.37",
+			expectedValidationError: true,
+		},
 		"drop-fields-list-type-attributes": {
 			obj:                     sliceWithListTypeAttributes,
 			featureOverrides:        featuregatetesting.FeatureOverrides{features.DRAListTypeAttributes: false},
@@ -918,6 +931,20 @@ func TestResourceSliceStrategyUpdate(t *testing.T) {
 				return obj
 			}(),
 			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAListTypeAttributes: true},
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithListTypeAttributes.DeepCopy()
+				obj.ResourceVersion = "4"
+				obj.Generation = 1
+				return obj
+			}(),
+		},
+		"keep-new-list-type-attributes-by-default": {
+			oldObj: slice,
+			newObj: func() *resource.ResourceSlice {
+				obj := sliceWithListTypeAttributes.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
 			expectObj: func() *resource.ResourceSlice {
 				obj := sliceWithListTypeAttributes.DeepCopy()
 				obj.ResourceVersion = "4"

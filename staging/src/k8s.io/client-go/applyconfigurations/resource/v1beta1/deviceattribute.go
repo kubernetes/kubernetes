@@ -34,19 +34,21 @@ type DeviceAttributeApplyConfiguration struct {
 	VersionValue *string `json:"version,omitempty"`
 	// ints is a non-empty list of numbers.
 	//
-	// This is an alpha field and requires enabling the DRAListTypeAttributes feature gate.
+	// This is a beta field and requires enabling the DRAListTypeAttributes feature gate (enabled by default).
 	IntValues []int64 `json:"ints,omitempty"`
 	// bools is a non-empty list of true/false values.
+	//
+	// This is a beta field and requires enabling the DRAListTypeAttributes feature gate (enabled by default).
 	BoolValues []bool `json:"bools,omitempty"`
 	// strings is a non-empty list of strings.
 	// Each string must not be longer than 64 characters.
 	//
-	// This is an alpha field and requires enabling the DRAListTypeAttributes feature gate.
+	// This is a beta field and requires enabling the DRAListTypeAttributes feature gate (enabled by default).
 	StringValues []string `json:"strings,omitempty"`
 	// versions is a non-empty list of semantic versions according to semver.org spec 2.0.0.
 	// Each version string must not be longer than 64 characters.
 	//
-	// This is an alpha field and requires enabling the DRAListTypeAttributes feature gate.
+	// This is a beta field and requires enabling the DRAListTypeAttributes feature gate (enabled by default).
 	VersionValues []string `json:"versions,omitempty"`
 }
 
