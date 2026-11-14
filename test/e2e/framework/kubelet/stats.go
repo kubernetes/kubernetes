@@ -42,17 +42,13 @@ const (
 	// timeout for proxy requests.
 	proxyTimeout = 2 * time.Minute
 
-	// dockerOperationsKey is the key for docker operation metrics.
-	// copied from k8s.io/kubernetes/pkg/kubelet/dockershim/metrics
-	dockerOperationsKey = "docker_operations_total"
+	// runtimeOperationsKey is the key for runtime operation metrics.
+	// copied from k8s.io/kubernetes/pkg/kubelet/metrics
+	runtimeOperationsKey = "runtime_operations_total"
 
-	// dockerOperationsErrorsKey is the key for the operation error metrics.
-	// copied from k8s.io/kubernetes/pkg/kubelet/dockershim/metrics
-	dockerOperationsErrorsKey = "docker_operations_errors_total"
-
-	// dockerOperationsTimeoutKey is the key for the operation timeout metrics.
-	// copied from k8s.io/kubernetes/pkg/kubelet/dockershim/metrics
-	dockerOperationsTimeoutKey = "docker_operations_timeout_total"
+	// runtimeOperationsErrorsKey is the key for the operation error metrics.
+	// copied from k8s.io/kubernetes/pkg/kubelet/metrics
+	runtimeOperationsErrorsKey = "runtime_operations_errors_total"
 )
 
 // ContainerResourceUsage is a structure for gathering container resource usage.
@@ -81,7 +77,7 @@ type ContainersCPUSummary map[string]map[float64]float64
 // ContainersCPUSummary map.
 type NodesCPUSummary map[string]ContainersCPUSummary
 
-// RuntimeOperationMonitor is the tool getting and parsing docker operation metrics.
+// RuntimeOperationMonitor is the tool getting and parsing container runtime operation metrics.
 type RuntimeOperationMonitor struct {
 	client          clientset.Interface
 	nodesRuntimeOps map[string]NodeRuntimeOperationErrorRate
@@ -94,7 +90,6 @@ type NodeRuntimeOperationErrorRate map[string]*RuntimeOperationErrorRate
 type RuntimeOperationErrorRate struct {
 	TotalNumber float64
 	ErrorRate   float64
-	TimeoutRate float64
 }
 
 // ProxyRequest performs a get on a node proxy endpoint given the nodename and rest client.
@@ -152,7 +147,7 @@ func (m *RuntimeOperationMonitor) GetRuntimeOperationErrorRate(ctx context.Conte
 	return m.nodesRuntimeOps
 }
 
-// GetLatestRuntimeOperationErrorRate gets latest error rate and timeout rate from last observed RuntimeOperationErrorRate.
+// GetLatestRuntimeOperationErrorRate gets latest error rate from last observed RuntimeOperationErrorRate.
 func (m *RuntimeOperationMonitor) GetLatestRuntimeOperationErrorRate(ctx context.Context) map[string]NodeRuntimeOperationErrorRate {
 	result := make(map[string]NodeRuntimeOperationErrorRate)
 	for node := range m.nodesRuntimeOps {
@@ -166,9 +161,14 @@ func (m *RuntimeOperationMonitor) GetLatestRuntimeOperationErrorRate(ctx context
 		for op, cur := range curNodeResult {
 			t := *cur
 			if old, found := oldNodeResult[op]; found {
-				t.ErrorRate = (t.ErrorRate*t.TotalNumber - old.ErrorRate*old.TotalNumber) / (t.TotalNumber - old.TotalNumber)
-				t.TimeoutRate = (t.TimeoutRate*t.TotalNumber - old.TimeoutRate*old.TotalNumber) / (t.TotalNumber - old.TotalNumber)
-				t.TotalNumber -= old.TotalNumber
+				delta := t.TotalNumber - old.TotalNumber
+				if delta > 0 {
+					t.ErrorRate = (t.ErrorRate*t.TotalNumber - old.ErrorRate*old.TotalNumber) / delta
+				} else {
+					// No new operations since the last observation; avoid reporting NaN.
+					t.ErrorRate = 0
+				}
+				t.TotalNumber = delta
 			}
 			result[node][op] = &t
 		}
@@ -183,8 +183,8 @@ func FormatRuntimeOperationErrorRate(nodesResult map[string]NodeRuntimeOperation
 	for node, nodeResult := range nodesResult {
 		lines = append(lines, fmt.Sprintf("node %q runtime operation error rate:", node))
 		for op, result := range nodeResult {
-			line := fmt.Sprintf("operation %q: total - %.0f; error rate - %f; timeout rate - %f", op,
-				result.TotalNumber, result.ErrorRate, result.TimeoutRate)
+			line := fmt.Sprintf("operation %q: total - %.0f; error rate - %f", op,
+				result.TotalNumber, result.ErrorRate)
 			lines = append(lines, line)
 		}
 		lines = append(lines, fmt.Sprintln())
@@ -201,9 +201,8 @@ func getNodeRuntimeOperationErrorRate(ctx context.Context, c clientset.Interface
 	}
 	// If no corresponding metrics are found, the returned samples will be empty. Then the following
 	// loop will be skipped automatically.
-	allOps := ms[dockerOperationsKey]
-	errOps := ms[dockerOperationsErrorsKey]
-	timeoutOps := ms[dockerOperationsTimeoutKey]
+	allOps := ms[runtimeOperationsKey]
+	errOps := ms[runtimeOperationsErrorsKey]
 	for _, sample := range allOps {
 		operation := string(sample.Metric["operation_type"])
 		result[operation] = &RuntimeOperationErrorRate{TotalNumber: float64(sample.Value)}
@@ -213,12 +212,6 @@ func getNodeRuntimeOperationErrorRate(ctx context.Context, c clientset.Interface
 		// Should always find the corresponding item, just in case
 		if _, found := result[operation]; found {
 			result[operation].ErrorRate = float64(sample.Value) / result[operation].TotalNumber
-		}
-	}
-	for _, sample := range timeoutOps {
-		operation := string(sample.Metric["operation_type"])
-		if _, found := result[operation]; found {
-			result[operation].TimeoutRate = float64(sample.Value) / result[operation].TotalNumber
 		}
 	}
 	return result, nil

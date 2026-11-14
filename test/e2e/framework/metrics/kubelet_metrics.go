@@ -33,9 +33,9 @@ import (
 )
 
 const (
-	// dockerOperationsLatencyKey is the key for the operation latency metrics.
-	// Taken from k8s.io/kubernetes/pkg/kubelet/dockershim/metrics
-	dockerOperationsLatencyKey = "docker_operations_duration_seconds"
+	// runtimeOperationsLatencyKey is the key for the operation latency metrics.
+	// Taken from k8s.io/kubernetes/pkg/kubelet/metrics
+	runtimeOperationsLatencyKey = "runtime_operations_duration_seconds"
 	// Taken from k8s.io/kubernetes/pkg/kubelet/metrics
 	kubeletSubsystem = "kubelet"
 	// Taken from k8s.io/kubernetes/pkg/kubelet/metrics
@@ -156,7 +156,7 @@ func GetDefaultKubeletLatencyMetrics(ms KubeletMetrics) KubeletLatencyMetrics {
 		podStartDurationKey,
 		podStartSLIDurationKey,
 		cgroupManagerOperationsKey,
-		dockerOperationsLatencyKey,
+		runtimeOperationsLatencyKey,
 		podWorkerStartDurationKey,
 		plegRelistDurationKey,
 	)
