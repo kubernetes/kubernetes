@@ -1350,6 +1350,52 @@ func Test_isSchedulableAfterNodeChange(t *testing.T) {
 			newObj:       st.MakeNode().Label("foo", "bar").Obj(),
 			expectedHint: fwk.Queue,
 		},
+		"queue-on-labels-change-matches-scheduler-enforced-node-affinity": {
+			args: &config.NodeAffinityArgs{
+				AddedAffinity: &v1.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+						NodeSelectorTerms: []v1.NodeSelectorTerm{
+							{
+								MatchExpressions: []v1.NodeSelectorRequirement{
+									{
+										Key:      "zone",
+										Operator: v1.NodeSelectorOpIn,
+										Values:   []string{"a"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			pod:          podWithNodeAffinity.Obj(),
+			oldObj:       st.MakeNode().Label("foo", "bar").Obj(),
+			newObj:       st.MakeNode().Labels(map[string]string{"foo": "bar", "zone": "a"}).Obj(),
+			expectedHint: fwk.Queue,
+		},
+		"skip-unrelated-change-with-scheduler-enforced-node-affinity": {
+			args: &config.NodeAffinityArgs{
+				AddedAffinity: &v1.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+						NodeSelectorTerms: []v1.NodeSelectorTerm{
+							{
+								MatchExpressions: []v1.NodeSelectorRequirement{
+									{
+										Key:      "zone",
+										Operator: v1.NodeSelectorOpIn,
+										Values:   []string{"a"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			pod:          podWithNodeAffinity.Obj(),
+			oldObj:       st.MakeNode().Labels(map[string]string{"foo": "bar", "zone": "a"}).Obj(),
+			newObj:       st.MakeNode().Labels(map[string]string{"foo": "bar", "zone": "a", "k": "v"}).Obj(),
+			expectedHint: fwk.QueueSkip,
+		},
 	}
 
 	for name, tc := range testcases {
