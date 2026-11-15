@@ -18,6 +18,7 @@ package kuberuntime
 
 import (
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"testing"
@@ -31,6 +32,7 @@ import (
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/runtimeclass"
 	rctest "k8s.io/kubernetes/pkg/kubelet/runtimeclass/testing"
+	netutils "k8s.io/utils/net"
 	"k8s.io/utils/ptr"
 )
 
@@ -388,6 +390,141 @@ func TestGeneratePodSandboxWindowsConfig_HostProcess(t *testing.T) {
 
 			assert.Equal(t, testCase.expectedWindowsConfig, wc)
 			assert.Equal(t, testCase.expectedError, err)
+		})
+	}
+}
+
+func TestDeterminePodSandboxIPs(t *testing.T) {
+	testcases := []struct {
+		name        string
+		nodeIP      string
+		network     *runtimeapi.PodSandboxNetworkStatus
+		podIPs      []string
+		expectedIPs []string
+	}{
+		{
+			name:        "Nil network",
+			network:     nil,
+			expectedIPs: []string{},
+		},
+		{
+			name:        "Empty network",
+			network:     &runtimeapi.PodSandboxNetworkStatus{},
+			expectedIPs: []string{},
+		},
+		{
+			name: "Unparseable primary IP",
+			network: &runtimeapi.PodSandboxNetworkStatus{
+				Ip: "not-an-ip",
+			},
+			expectedIPs: nil,
+		},
+		{
+			name: "Unparseable additional IP",
+			network: &runtimeapi.PodSandboxNetworkStatus{
+				Ip:            "10.0.0.1",
+				AdditionalIps: []*runtimeapi.PodIP{{Ip: "not-an-ip"}},
+			},
+			expectedIPs: nil,
+		},
+		{
+			name:        "Simple",
+			nodeIP:      "",
+			podIPs:      []string{"10.0.0.1"},
+			expectedIPs: []string{"10.0.0.1"},
+		},
+		{
+			name:        "Dual-stack",
+			nodeIP:      "",
+			podIPs:      []string{"10.0.0.1", "fd01::1234"},
+			expectedIPs: []string{"10.0.0.1", "fd01::1234"},
+		},
+		{
+			name:        "Dual-stack with explicit node IP",
+			nodeIP:      "192.168.1.1",
+			podIPs:      []string{"10.0.0.1", "fd01::1234"},
+			expectedIPs: []string{"10.0.0.1", "fd01::1234"},
+		},
+		{
+			name:        "Dual-stack with CRI returning wrong family first",
+			nodeIP:      "",
+			podIPs:      []string{"fd01::1234", "10.0.0.1"},
+			expectedIPs: []string{"10.0.0.1", "fd01::1234"},
+		},
+		{
+			name:        "Dual-stack with explicit node IP with CRI returning wrong family first",
+			nodeIP:      "192.168.1.1",
+			podIPs:      []string{"fd01::1234", "10.0.0.1"},
+			expectedIPs: []string{"10.0.0.1", "fd01::1234"},
+		},
+		{
+			name:        "Dual-stack with IPv6 node IP",
+			nodeIP:      "fd00::5678",
+			podIPs:      []string{"10.0.0.1", "fd01::1234"},
+			expectedIPs: []string{"fd01::1234", "10.0.0.1"},
+		},
+		{
+			name:        "Dual-stack with IPv6 node IP, other CRI order",
+			nodeIP:      "fd00::5678",
+			podIPs:      []string{"fd01::1234", "10.0.0.1"},
+			expectedIPs: []string{"fd01::1234", "10.0.0.1"},
+		},
+		{
+			name:        "No Pod IP matching Node IP",
+			nodeIP:      "fd00::5678",
+			podIPs:      []string{"10.0.0.1"},
+			expectedIPs: []string{"10.0.0.1"},
+		},
+		{
+			name:        "No Pod IP matching (unspecified) Node IP",
+			nodeIP:      "",
+			podIPs:      []string{"fd01::1234"},
+			expectedIPs: []string{"fd01::1234"},
+		},
+		{
+			name:        "Multiple IPv4 IPs",
+			nodeIP:      "",
+			podIPs:      []string{"10.0.0.1", "10.0.0.2", "10.0.0.3"},
+			expectedIPs: []string{"10.0.0.1"},
+		},
+		{
+			name:        "Multiple Dual-Stack IPs",
+			nodeIP:      "",
+			podIPs:      []string{"10.0.0.1", "10.0.0.2", "fd01::1234", "10.0.0.3", "fd01::5678"},
+			expectedIPs: []string{"10.0.0.1", "fd01::1234"},
+		},
+		{
+			name:        "Badly-formatted IPs from CRI",
+			nodeIP:      "",
+			podIPs:      []string{"010.000.000.001", "fd01:0:0:0:0:0:0:1234"},
+			expectedIPs: []string{"10.0.0.1", "fd01::1234"},
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			_, _, m, err := createTestRuntimeManager(tCtx)
+			require.NoError(t, err)
+			if tc.nodeIP != "" {
+				m.nodeIPs = []net.IP{netutils.ParseIPSloppy(tc.nodeIP)}
+			}
+
+			network := tc.network
+			if len(tc.podIPs) > 0 {
+				network = &runtimeapi.PodSandboxNetworkStatus{
+					Ip: tc.podIPs[0],
+				}
+				for _, ip := range tc.podIPs[1:] {
+					network.AdditionalIps = append(network.AdditionalIps, &runtimeapi.PodIP{Ip: ip})
+				}
+			}
+			podSandbox := &runtimeapi.PodSandboxStatus{
+				Network: network,
+			}
+
+			podIPs := m.determinePodSandboxIPs(tCtx, "test-ns", "test-pod", podSandbox)
+			assert.Equal(t, tc.expectedIPs, podIPs)
 		})
 	}
 }

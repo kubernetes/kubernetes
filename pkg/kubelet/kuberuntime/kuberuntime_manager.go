@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"slices"
@@ -201,6 +202,9 @@ type kubeGenericRuntimeManager struct {
 	// Root directory used to store pod logs
 	podLogsDirectory string
 
+	// nodeIPs are the IP addresses of the node.
+	nodeIPs []net.IP
+
 	// Swap controller availability check function (Linux only)
 	// Uses sync.OnceValue for lazy initialization
 	getSwapControllerAvailable func() bool
@@ -259,6 +263,7 @@ func NewKubeGenericRuntimeManager(
 	getServiceAccount plugin.GetServiceAccountFunc,
 	podInitContainerTimeRecorder PodInitContainerTimeRecorder,
 	actuatedState state.State,
+	nodeIPs []net.IP,
 ) (KubeGenericRuntime, []images.PostImageGCHook, error) {
 	logger := klog.FromContext(ctx)
 
@@ -289,6 +294,7 @@ func NewKubeGenericRuntimeManager(
 		memoryThrottlingFactor:       memoryThrottlingFactor,
 		memoryReservationPolicy:      memoryReservationPolicy,
 		podLogsDirectory:             podLogsDirectory,
+		nodeIPs:                      nodeIPs,
 		podInitContainerTimeRecorder: podInitContainerTimeRecorder,
 	}
 

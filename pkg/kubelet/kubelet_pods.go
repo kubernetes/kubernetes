@@ -22,7 +22,6 @@ import (
 	goerrors "errors"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -1044,12 +1043,6 @@ func (kl *Kubelet) podFieldSelectorRuntimeValue(ctx context.Context, fs *v1.Obje
 	internalFieldPath, _, err := podshelper.ConvertDownwardAPIFieldLabel(fs.APIVersion, fs.FieldPath, "")
 	if err != nil {
 		return "", err
-	}
-
-	// make podIPs order match node IP family preference #97979
-	podIPs = kl.sortPodIPs(podIPs)
-	if len(podIPs) > 0 {
-		podIP = podIPs[0]
 	}
 
 	switch internalFieldPath {
@@ -2118,41 +2111,6 @@ func (kl *Kubelet) generateAPIPodStatus(ctx context.Context, pod *v1.Pod, podSta
 	return *s
 }
 
-// sortPodIPs return the PodIPs sorted and truncated by the cluster IP family preference.
-// The runtime pod status may have an arbitrary number of IPs, in an arbitrary order.
-// PodIPs are obtained by: func (m *kubeGenericRuntimeManager) determinePodSandboxIPs()
-// Pick out the first returned IP of the same IP family as the node IP
-// first, followed by the first IP of the opposite IP family (if any)
-// and use them for the Pod.Status.PodIPs and the Downward API environment variables
-func (kl *Kubelet) sortPodIPs(podIPs []string) []string {
-	ips := make([]string, 0, 2)
-	var validPrimaryIP, validSecondaryIP func(ip net.IP) bool
-	if len(kl.nodeIPs) == 0 || utilnet.IsIPv4(kl.nodeIPs[0]) {
-		validPrimaryIP = utilnet.IsIPv4
-		validSecondaryIP = utilnet.IsIPv6
-	} else {
-		validPrimaryIP = utilnet.IsIPv6
-		validSecondaryIP = utilnet.IsIPv4
-	}
-
-	// We parse and re-stringify the IPs in case the values from CRI use an irregular format.
-	for _, ipStr := range podIPs {
-		ip := utilnet.ParseIPSloppy(ipStr)
-		if validPrimaryIP(ip) {
-			ips = append(ips, ip.String())
-			break
-		}
-	}
-	for _, ipStr := range podIPs {
-		ip := utilnet.ParseIPSloppy(ipStr)
-		if validSecondaryIP(ip) {
-			ips = append(ips, ip.String())
-			break
-		}
-	}
-	return ips
-}
-
 // convertStatusToAPIStatus initialize an api PodStatus for the given pod from
 // the given internal pod status and the previous state of the pod from the API.
 // It is purely transformative and does not alter the kubelet state at all.
@@ -2160,13 +2118,7 @@ func (kl *Kubelet) convertStatusToAPIStatus(ctx context.Context, pod *v1.Pod, po
 	logger := klog.FromContext(ctx)
 	var apiPodStatus v1.PodStatus
 
-	// copy pod status IPs to avoid race conditions with PodStatus #102806
-	podIPs := make([]string, len(podStatus.IPs))
-	copy(podIPs, podStatus.IPs)
-
-	// make podIPs order match node IP family preference #97979
-	podIPs = kl.sortPodIPs(podIPs)
-	for _, ip := range podIPs {
+	for _, ip := range podStatus.IPs {
 		apiPodStatus.PodIPs = append(apiPodStatus.PodIPs, v1.PodIP{IP: ip})
 	}
 	if len(apiPodStatus.PodIPs) > 0 {
