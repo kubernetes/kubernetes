@@ -5896,9 +5896,15 @@ func RunTestCompactRevision(ctx context.Context, t *testing.T, store storage.Int
 		t.Errorf("Unexpected error: %v", err)
 	}
 	increaseRV(ctx, t)
+	// A consistent list returns once the watch is synced. Compacting past the watch start before
+	// that makes etcd cancel the watch with ErrCompacted and the cacher reinitializes.
+	if err := store.GetList(ctx, "/pods/", storage.ListOptions{Predicate: storage.Everything, Recursive: true}, &example.PodList{}); err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
 	increaseRV(ctx, t)
-	compactedFutureRV := currentRV + 1
-	expectCompactedRV := currentRV + 2
+	increaseRV(ctx, t)
+	compactedFutureRV := currentRV + 2
+	expectCompactedRV := currentRV + 3
 	compact(ctx, t, fmt.Sprintf("%d", expectCompactedRV))
 	if err := store.GetList(ctx, "/pods/", storage.ListOptions{
 		Predicate:            storage.Everything,
