@@ -29,11 +29,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/discovery"
 	coretesting "k8s.io/client-go/testing"
-	"k8s.io/klog/v2"
 	"k8s.io/ktesting"
 	metricsv1 "k8s.io/metrics/pkg/apis/metrics/v1"
 	metricsv1beta1 "k8s.io/metrics/pkg/apis/metrics/v1beta1"
@@ -193,106 +190,6 @@ func TestVersionedPodMetricsGetterConversion(t *testing.T) {
 	assert.Equal(t, expected.Timestamp, metrics.Timestamp)
 	assert.Equal(t, expected.Window, metrics.Window)
 	assert.Equal(t, expected.Containers, metrics.Containers)
-}
-
-func TestVersionedPodMetricsGetterWatch(t *testing.T) {
-	status := &metav1.Status{
-		Status:  metav1.StatusFailure,
-		Message: "watch failed",
-	}
-	v1Metric := v1PodMetrics("watched-via-v1")
-
-	testCases := []struct {
-		name             string
-		servedVersions   []string
-		sourceVersion    schema.GroupVersion
-		eventType        watch.EventType
-		input            runtime.Object
-		expected         runtime.Object
-		expectSameObject bool
-	}{
-		{
-			name:             "passes through v1 PodMetrics",
-			servedVersions:   []string{"v1", "v1beta1"},
-			sourceVersion:    metricsv1.SchemeGroupVersion,
-			eventType:        watch.Added,
-			input:            v1Metric,
-			expected:         v1Metric,
-			expectSameObject: true,
-		},
-		{
-			name:           "converts v1beta1 PodMetrics to v1",
-			servedVersions: []string{"v1beta1"},
-			sourceVersion:  metricsv1beta1.SchemeGroupVersion,
-			eventType:      watch.Added,
-			input:          v1beta1PodMetrics("watched-via-v1beta1"),
-			expected:       v1PodMetrics("watched-via-v1beta1"),
-		},
-		{
-			name:             "passes through non-PodMetrics events",
-			servedVersions:   []string{"v1beta1"},
-			sourceVersion:    metricsv1beta1.SchemeGroupVersion,
-			eventType:        watch.Error,
-			input:            status,
-			expected:         status,
-			expectSameObject: true,
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			tCtx := ktesting.Init(t)
-			logger := klog.FromContext(tCtx)
-			v1Source := watch.NewRaceFreeFakeWithLogger(logger)
-			v1beta1Source := watch.NewRaceFreeFakeWithLogger(logger)
-			defer v1Source.Stop()
-			defer v1beta1Source.Stop()
-
-			v1Clientset := &metricsfake.Clientset{}
-			v1Clientset.AddWatchReactor("pods", coretesting.DefaultWatchReactor(v1Source, nil))
-			v1beta1Clientset := &metricsfake.Clientset{}
-			v1beta1Clientset.AddWatchReactor("pods", coretesting.DefaultWatchReactor(v1beta1Source, nil))
-
-			getter := NewVersionedPodMetricsGetter(
-				v1Clientset.MetricsV1(),
-				v1beta1Clientset.MetricsV1beta1(),
-				discoveryFor(tc.servedVersions...),
-			)
-			result, err := getter.PodMetricses("test-ns").Watch(tCtx, metav1.ListOptions{})
-			require.NoError(t, err)
-			defer result.Stop()
-
-			switch tc.sourceVersion {
-			case metricsv1.SchemeGroupVersion:
-				v1Source.Action(tc.eventType, tc.input)
-			case metricsv1beta1.SchemeGroupVersion:
-				v1beta1Source.Action(tc.eventType, tc.input)
-			default:
-				t.Fatalf("unknown source version %q", tc.sourceVersion.String())
-			}
-
-			event := receiveWatchEvent(t, result)
-			assert.Equal(t, tc.eventType, event.Type)
-			if tc.expectSameObject {
-				assert.Same(t, tc.expected, event.Object)
-			} else {
-				assert.Equal(t, tc.expected, event.Object)
-			}
-		})
-	}
-}
-
-func receiveWatchEvent(t *testing.T, watcher watch.Interface) watch.Event {
-	t.Helper()
-
-	select {
-	case event, ok := <-watcher.ResultChan():
-		require.True(t, ok, "watch closed before receiving an event")
-		return event
-	case <-time.After(time.Second):
-		t.Fatal("timed out waiting for watch event")
-		return watch.Event{}
-	}
 }
 
 func TestVersionedPodMetricsGetterCachesAndInvalidates(t *testing.T) {

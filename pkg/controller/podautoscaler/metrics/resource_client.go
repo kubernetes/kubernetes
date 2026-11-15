@@ -190,32 +190,9 @@ func (m *versionedPodMetrics) List(ctx context.Context, opts metav1.ListOptions)
 	return convertV1beta1PodMetricsList(metrics)
 }
 
+// Watch is only here to satisfy PodMetricsInterface; the HPA only lists.
 func (m *versionedPodMetrics) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
-	version, err := m.getter.preferredVersion(ctx)
-	if err != nil {
-		return nil, err
-	}
-	if version == metricsv1.SchemeGroupVersion {
-		return m.getter.v1Client.PodMetricses(m.namespace).Watch(ctx, opts)
-	}
-	watcher, err := m.getter.v1beta1Client.PodMetricses(m.namespace).Watch(ctx, opts)
-	if err != nil {
-		return nil, err
-	}
-	return watch.Filter(watcher, func(in watch.Event) (watch.Event, bool) {
-		metrics, ok := in.Object.(*metricsv1beta1.PodMetrics)
-		if !ok {
-			// pass through non-PodMetrics objects (e.g. Status on error events)
-			return in, true
-		}
-		converted, err := convertV1beta1PodMetrics(metrics)
-		if err != nil {
-			klog.FromContext(ctx).Error(err, "Failed to convert v1beta1 PodMetrics to v1, dropping watch event")
-			return in, false
-		}
-		in.Object = converted
-		return in, true
-	}), nil
+	return nil, fmt.Errorf("watch is not supported by the versioned resource metrics (%s) client", metricsint.GroupName)
 }
 
 func convertV1beta1PodMetrics(in *metricsv1beta1.PodMetrics) (*metricsv1.PodMetrics, error) {
