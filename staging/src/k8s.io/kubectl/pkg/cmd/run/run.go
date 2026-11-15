@@ -668,7 +668,7 @@ func (o *RunOptions) createService(name string, labels map[string]string) *corev
 			Ports: []corev1.ServicePort{{
 				Port:       int32(portNo),
 				Protocol:   corev1.ProtocolTCP,
-				TargetPort: intstr.FromInt(portNo),
+				TargetPort: intstr.FromInt32(int32(portNo)),
 			}},
 		},
 	}

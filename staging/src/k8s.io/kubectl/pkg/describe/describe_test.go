@@ -6203,7 +6203,7 @@ Spec:
   Policy Types: Ingress, Egress
 `
 
-	port80 := intstr.FromInt(80)
+	port80 := intstr.FromInt32(80)
 	port82 := int32(82)
 	protoTCP := corev1.ProtocolTCP
 
