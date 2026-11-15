@@ -356,7 +356,8 @@ type Cacher struct {
 	// watchersBuffer is a list of watchers potentially interested in currently
 	// dispatched event.
 	watchersBuffer []*cacheWatcher
-	// unsyncedWatchers is a map that need to be synchronized before sending events.
+	// unsyncedWatchers holds stalled watchers that must catch up from history
+	// before they rejoin watchers.
 	unsyncedWatchers watchersMap
 	maxResyncEvents  int
 	// blockedWatchers is a list of watchers whose buffer is currently full.
@@ -595,21 +596,6 @@ func (c *Cacher) resyncWatchers() {
 			c.deleteUnsyncedWatcherLocked(watcher)
 			continue
 		}
-		if !watcher.synced.IsNotified() {
-			c.deleteUnsyncedWatcherLocked(watcher)
-			cacheInterval, err := c.initWatcherIntervalLocked(watcher)
-			if err != nil {
-				watcher.input <- watcherInput{err: err}
-				// Drain input so watcher.done stays open until process() delivers
-				// the queued watch.Error event; non-draining stop closes watcher.done
-				// immediately, causing sendWatchError to drop the error.
-				c.stopWatcherLocked(watcher, true)
-				continue
-			}
-			c.registerWatcherLocked(watcher, cacheInterval)
-			continue
-		}
-
 		if len(watcher.input) == cap(watcher.input) {
 			continue
 		}
@@ -687,16 +673,13 @@ func (c *Cacher) resyncStalledWatchersLocked(stalledWatchers *indexedWatchers, m
 	}
 }
 
-// deleteUnsyncedWatcherLocked removes the watcher from unsyncedWatchers, where it
-// is either stalled or still waiting for its first interval.
+// deleteUnsyncedWatcherLocked removes a stalled watcher from unsyncedWatchers.
 func (c *Cacher) deleteUnsyncedWatcherLocked(watcher *cacheWatcher) {
 	if _, ok := c.unsyncedWatchers[watcher.id]; !ok {
 		return
 	}
 	c.unsyncedWatchers.deleteWatcher(watcher)
-	if watcher.synced.IsNotified() {
-		c.resyncMetrics.StalledWatchers.Dec()
-	}
+	c.resyncMetrics.StalledWatchers.Dec()
 }
 
 func (i *indexedWatchers) empty() bool {
@@ -852,12 +835,9 @@ func (c *Cacher) watch(ctx context.Context, key string, requestedWatchRV uint64,
 		watcher.requiredResourceVersion = requiredResourceVersion
 	}
 
-	var cacheInterval *watchCacheInterval
-	if !utilfeature.DefaultFeatureGate.Enabled(features.WatchCacheStallResume) {
-		cacheInterval, err = c.initWatcherIntervalLocked(watcher)
-		if err != nil {
-			return nil, err
-		}
+	cacheInterval, err := c.initWatcherIntervalLocked(watcher)
+	if err != nil {
+		return nil, err
 	}
 
 	c.Lock()
@@ -881,11 +861,7 @@ func (c *Cacher) watch(ctx context.Context, key string, requestedWatchRV uint64,
 			originalForget(drainWatcher)
 		}
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.WatchCacheStallResume) {
-		c.unsyncedWatchers.addWatcher(watcher)
-	} else {
-		c.registerWatcherLocked(watcher, cacheInterval)
-	}
+	c.registerWatcherLocked(watcher, cacheInterval)
 	c.watcherIdx++
 	return watcher, nil
 }
