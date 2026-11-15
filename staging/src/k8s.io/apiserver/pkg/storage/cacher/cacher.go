@@ -1752,9 +1752,8 @@ func newWatchErrorEvent(err error) watch.Event {
 	}
 }
 
-func (c *Cacher) ShouldDelegateExactRV(resourceVersion string, recursive bool) (delegator.Result, error) {
-	// Not Recursive is not supported unitl exact RV is implemented for WaitUntilFreshAndGet.
-	if !recursive || !c.watchCache.storage.SnapshottingEnabled() {
+func (c *Cacher) ShouldDelegateExactRV(resourceVersion string) (delegator.Result, error) {
+	if !c.watchCache.storage.SnapshottingEnabled() {
 		return delegator.Result{ShouldDelegate: true}, nil
 	}
 	listRV, err := c.versioner.ParseResourceVersion(resourceVersion)
@@ -1764,9 +1763,8 @@ func (c *Cacher) ShouldDelegateExactRV(resourceVersion string, recursive bool) (
 	return c.shouldDelegateExactRV(listRV)
 }
 
-func (c *Cacher) ShouldDelegateContinue(continueToken string, recursive bool) (delegator.Result, error) {
-	// Not Recursive is not supported unitl exact RV is implemented for WaitUntilFreshAndGet.
-	if !recursive || !c.watchCache.storage.SnapshottingEnabled() {
+func (c *Cacher) ShouldDelegateContinue(continueToken string) (delegator.Result, error) {
+	if !c.watchCache.storage.SnapshottingEnabled() {
 		return delegator.Result{ShouldDelegate: true}, nil
 	}
 	_, continueRV, err := storage.DecodeContinue(continueToken, c.resourcePrefix)

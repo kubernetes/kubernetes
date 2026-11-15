@@ -39,17 +39,17 @@ func ShouldDelegateList(opts storage.ListOptions, cache Helper) (Result, error) 
 	// see https://kubernetes.io/docs/reference/using-api/api-concepts/#semantics-for-get-and-list
 	switch opts.ResourceVersionMatch {
 	case metav1.ResourceVersionMatchExact:
-		return cache.ShouldDelegateExactRV(opts.ResourceVersion, opts.Recursive)
+		return cache.ShouldDelegateExactRV(opts.ResourceVersion)
 	case metav1.ResourceVersionMatchNotOlderThan:
 		return Result{ShouldDelegate: false}, nil
 	case "":
 		// Continue
-		if len(opts.Predicate.Continue) > 0 {
-			return cache.ShouldDelegateContinue(opts.Predicate.Continue, opts.Recursive)
+		if opts.Recursive && len(opts.Predicate.Continue) > 0 {
+			return cache.ShouldDelegateContinue(opts.Predicate.Continue)
 		}
 		// Legacy exact match
-		if opts.Predicate.Limit > 0 && len(opts.ResourceVersion) > 0 && opts.ResourceVersion != "0" {
-			return cache.ShouldDelegateExactRV(opts.ResourceVersion, opts.Recursive)
+		if opts.Recursive && opts.Predicate.Limit > 0 && len(opts.ResourceVersion) > 0 && opts.ResourceVersion != "0" {
+			return cache.ShouldDelegateExactRV(opts.ResourceVersion)
 		}
 		// Consistent Read
 		if opts.ResourceVersion == "" {
@@ -62,8 +62,8 @@ func ShouldDelegateList(opts storage.ListOptions, cache Helper) (Result, error) 
 }
 
 type Helper interface {
-	ShouldDelegateExactRV(rv string, recursive bool) (Result, error)
-	ShouldDelegateContinue(continueToken string, recursive bool) (Result, error)
+	ShouldDelegateExactRV(rv string) (Result, error)
+	ShouldDelegateContinue(continueToken string) (Result, error)
 	ShouldDelegateConsistentRead() (Result, error)
 }
 
@@ -80,7 +80,7 @@ type CacheWithoutSnapshots struct{}
 
 var _ Helper = CacheWithoutSnapshots{}
 
-func (c CacheWithoutSnapshots) ShouldDelegateContinue(continueToken string, recursive bool) (Result, error) {
+func (c CacheWithoutSnapshots) ShouldDelegateContinue(continueToken string) (Result, error) {
 	return Result{
 		ShouldDelegate: true,
 		// Continue with negative RV is considered a consistent read, however token cannot be parsed without keyPrefix unavailable in staging/src/k8s.io/apiserver/pkg/util/flow_control/request/list_work_estimator.go.
@@ -88,7 +88,7 @@ func (c CacheWithoutSnapshots) ShouldDelegateContinue(continueToken string, recu
 	}, nil
 }
 
-func (c CacheWithoutSnapshots) ShouldDelegateExactRV(rv string, recursive bool) (Result, error) {
+func (c CacheWithoutSnapshots) ShouldDelegateExactRV(rv string) (Result, error) {
 	return Result{
 		ShouldDelegate: true,
 		ConsistentRead: false,

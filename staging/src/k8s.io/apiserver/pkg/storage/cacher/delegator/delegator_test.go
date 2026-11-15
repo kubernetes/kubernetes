@@ -293,6 +293,12 @@ func TestMarkConsistent(t *testing.T) {
 	if len(etcdRequests) != 0 {
 		t.Errorf("Expected no requests to etcd, got: %+v", etcdRequests)
 	}
+	require.Zero(t, etcdNonRecursiveListGets(t, ctx, cacher, recorder, storage.ListOptions{
+		Predicate:            storage.Everything,
+		ResourceVersionMatch: metav1.ResourceVersionMatchExact,
+		ResourceVersion:      resourceVersion1,
+		Recursive:            false,
+	}))
 
 	t.Log("Consistent cache marked consistent again keeps snapshots, list skips etcd")
 	rawCacher.MarkConsistent(true)
@@ -317,6 +323,12 @@ func TestMarkConsistent(t *testing.T) {
 	if len(etcdRequests) != 1 {
 		t.Errorf("Expected request to etcd, got: %+v", etcdRequests)
 	}
+	require.Equal(t, uint64(1), etcdNonRecursiveListGets(t, ctx, cacher, recorder, storage.ListOptions{
+		Predicate:            storage.Everything,
+		ResourceVersionMatch: metav1.ResourceVersionMatchExact,
+		ResourceVersion:      resourceVersion1,
+		Recursive:            false,
+	}))
 
 	t.Log("Inconsistent cache doesn't collect new snapshot, list hits etcd")
 	resourceVersion2 := createObject(t, ctx, cacher)
@@ -362,6 +374,16 @@ func etcdListRequests(t *testing.T, ctx context.Context, store storage.Interface
 		t.Fatalf("Unexpected error: %v", err)
 	}
 	return recorder.ListRequestForKey(key)
+}
+
+func etcdNonRecursiveListGets(t *testing.T, ctx context.Context, store storage.Interface, recorder *storagetesting.KubernetesRecorder, opts storage.ListOptions) uint64 {
+	key := rand.String(10)
+	listCtx := context.WithValue(ctx, storagetesting.RecorderContextKey, key)
+	listOut := &example.PodList{}
+	if err := store.GetList(listCtx, "/pods/default/missing", opts, listOut); err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	return recorder.StatsForKey(key).Gets
 }
 
 func TestCompactPastLastWrite(t *testing.T) {

@@ -207,13 +207,13 @@ func TestShouldDelegateList(t *testing.T) {
 	for _, continueToken := range []string{continueOnOldRV, continueOnCacheRV, continueOnEtcdRV, continueOnNegativeRV} {
 		testCases[opts{Continue: continueToken}] = true
 		testCases[opts{Limit: 100, Continue: continueToken}] = true
-		testCases[opts{ResourceVersion: "0", Continue: continueToken}] = true
-		testCases[opts{ResourceVersion: "0", Limit: 100, Continue: continueToken}] = true
+		testCases[opts{ResourceVersion: "0", Continue: continueToken}] = false
+		testCases[opts{ResourceVersion: "0", Limit: 100, Continue: continueToken}] = false
 	}
 	// With RV
 	for _, rv := range []string{oldRV, cacheRV, etcdRV} {
 		testCases[opts{ResourceVersion: rv}] = false
-		testCases[opts{ResourceVersion: rv, Limit: 100}] = true
+		testCases[opts{ResourceVersion: rv, Limit: 100}] = false
 		testCases[opts{ResourceVersion: rv, ResourceVersionMatch: metav1.ResourceVersionMatchExact}] = true
 		testCases[opts{ResourceVersion: rv, ResourceVersionMatch: metav1.ResourceVersionMatchExact, Limit: 100}] = true
 		testCases[opts{ResourceVersion: rv, ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan}] = false
@@ -225,11 +225,18 @@ func TestShouldDelegateList(t *testing.T) {
 		opts.Recursive = true
 		testCases[opts] = expectBypass
 	}
+	for _, continueToken := range []string{continueOnOldRV, continueOnCacheRV, continueOnEtcdRV, continueOnNegativeRV} {
+		testCases[opts{Recursive: true, ResourceVersion: "0", Continue: continueToken}] = true
+		testCases[opts{Recursive: true, ResourceVersion: "0", Limit: 100, Continue: continueToken}] = true
+	}
+	for _, rv := range []string{oldRV, cacheRV, etcdRV} {
+		testCases[opts{Recursive: true, ResourceVersion: rv, Limit: 100}] = true
+	}
 	// Continue is ignored on non recursive LIST
 	for _, rv := range []string{oldRV, etcdRV} {
 		for _, continueToken := range []string{continueOnOldRV, continueOnCacheRV, continueOnEtcdRV, continueOnNegativeRV} {
-			testCases[opts{ResourceVersion: rv, Continue: continueToken}] = true
-			testCases[opts{ResourceVersion: rv, Continue: continueToken, Limit: 100}] = true
+			testCases[opts{ResourceVersion: rv, Continue: continueToken}] = false
+			testCases[opts{ResourceVersion: rv, Continue: continueToken, Limit: 100}] = false
 		}
 	}
 
@@ -330,8 +337,10 @@ func TestShouldDelegateList(t *testing.T) {
 	// Exacts and continue on current cache RV.
 	listFromSnapshotEnabledOverrides := map[opts]bool{}
 	listFromSnapshotEnabledOverrides[opts{Recursive: true, ResourceVersion: cacheRV, Limit: 100}] = false
-	listFromSnapshotEnabledOverrides[opts{Recursive: true, ResourceVersion: cacheRV, ResourceVersionMatch: metav1.ResourceVersionMatchExact}] = false
-	listFromSnapshotEnabledOverrides[opts{Recursive: true, ResourceVersion: cacheRV, Limit: 100, ResourceVersionMatch: metav1.ResourceVersionMatchExact}] = false
+	for _, recursive := range []bool{true, false} {
+		listFromSnapshotEnabledOverrides[opts{Recursive: recursive, ResourceVersion: cacheRV, ResourceVersionMatch: metav1.ResourceVersionMatchExact}] = false
+		listFromSnapshotEnabledOverrides[opts{Recursive: recursive, ResourceVersion: cacheRV, Limit: 100, ResourceVersionMatch: metav1.ResourceVersionMatchExact}] = false
+	}
 	listFromSnapshotEnabledOverrides[opts{Recursive: true, ResourceVersion: "0", Limit: 100, Continue: continueOnCacheRV}] = false
 	listFromSnapshotEnabledOverrides[opts{Recursive: true, ResourceVersion: "0", Continue: continueOnCacheRV}] = false
 	listFromSnapshotEnabledOverrides[opts{Recursive: true, Limit: 100, Continue: continueOnCacheRV}] = false
@@ -344,8 +353,10 @@ func TestShouldDelegateList(t *testing.T) {
 	snapshotAvailableOverrides[opts{Recursive: true, ResourceVersion: "0", Continue: continueOnOldRV}] = false
 	snapshotAvailableOverrides[opts{Recursive: true, ResourceVersion: "0", Limit: 100, Continue: continueOnOldRV}] = false
 	snapshotAvailableOverrides[opts{Recursive: true, ResourceVersion: oldRV, Limit: 100}] = false
-	snapshotAvailableOverrides[opts{Recursive: true, ResourceVersion: oldRV, ResourceVersionMatch: metav1.ResourceVersionMatchExact}] = false
-	snapshotAvailableOverrides[opts{Recursive: true, ResourceVersion: oldRV, ResourceVersionMatch: metav1.ResourceVersionMatchExact, Limit: 100}] = false
+	for _, recursive := range []bool{true, false} {
+		snapshotAvailableOverrides[opts{Recursive: recursive, ResourceVersion: oldRV, ResourceVersionMatch: metav1.ResourceVersionMatchExact}] = false
+		snapshotAvailableOverrides[opts{Recursive: recursive, ResourceVersion: oldRV, ResourceVersionMatch: metav1.ResourceVersionMatchExact, Limit: 100}] = false
+	}
 
 	// TODO(p0lyn0mial): the following tests assume that etcdfeature.DefaultFeatureSupportChecker.Supports(storage.RequestWatchProgress)
 	// evaluates to true. Otherwise the cache will be bypassed and the test will fail.
@@ -359,6 +370,10 @@ func TestShouldDelegateList(t *testing.T) {
 	for _, recursive := range []bool{true, false} {
 		consistentListFromCacheOverrides[opts{Recursive: recursive}] = false
 		consistentListFromCacheOverrides[opts{Limit: 100, Recursive: recursive}] = false
+	}
+	for _, continueToken := range []string{continueOnOldRV, continueOnCacheRV, continueOnEtcdRV, continueOnNegativeRV} {
+		consistentListFromCacheOverrides[opts{Continue: continueToken}] = false
+		consistentListFromCacheOverrides[opts{Limit: 100, Continue: continueToken}] = false
 	}
 
 	t.Run("ListFromCacheSnapshot=false", func(t *testing.T) {
@@ -376,8 +391,10 @@ func TestShouldDelegateList(t *testing.T) {
 		consistentReadWithSnapshotOverrides[opts{Recursive: true, ResourceVersion: "0", Limit: 100, Continue: continueOnNegativeRV}] = false
 		// Exact on RV not yet observed by cache
 		consistentReadWithSnapshotOverrides[opts{Recursive: true, ResourceVersion: etcdRV, Limit: 100}] = false
-		consistentReadWithSnapshotOverrides[opts{Recursive: true, ResourceVersion: etcdRV, ResourceVersionMatch: metav1.ResourceVersionMatchExact}] = false
-		consistentReadWithSnapshotOverrides[opts{Recursive: true, ResourceVersion: etcdRV, ResourceVersionMatch: metav1.ResourceVersionMatchExact, Limit: 100}] = false
+		for _, recursive := range []bool{true, false} {
+			consistentReadWithSnapshotOverrides[opts{Recursive: recursive, ResourceVersion: etcdRV, ResourceVersionMatch: metav1.ResourceVersionMatchExact}] = false
+			consistentReadWithSnapshotOverrides[opts{Recursive: recursive, ResourceVersion: etcdRV, ResourceVersionMatch: metav1.ResourceVersionMatchExact, Limit: 100}] = false
+		}
 		consistentReadWithSnapshotOverrides[opts{Recursive: true, Continue: continueOnEtcdRV}] = false
 		consistentReadWithSnapshotOverrides[opts{Recursive: true, ResourceVersion: "0", Continue: continueOnEtcdRV}] = false
 		consistentReadWithSnapshotOverrides[opts{Recursive: true, Continue: continueOnEtcdRV, Limit: 100}] = false
