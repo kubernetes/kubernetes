@@ -152,6 +152,7 @@ var baseOpts = []VersionedOptions{
 	// IP Library
 	{
 		IntroducedVersion: version.MajorMinor(1, 30),
+		RemovedVersion:    version.MajorMinor(1, 38),
 		EnvOptions: []cel.EnvOption{
 			UnversionedLib(library.IP),
 		},
@@ -205,11 +206,13 @@ var baseOpts = []VersionedOptions{
 			library.Lists(library.ListsVersion(1)),
 		},
 	},
-	// CIDR Library v1
+	// cel-go network library. Replaces the IP Library and CIDR Library v0 above, which were
+	// upstreamed to cel-go. It keeps the same type names (net.IP, net.CIDR), functions, overload
+	// IDs and costs, and adds cidr.isMask() (as CIDR Library v1 did).
 	{
 		IntroducedVersion: version.MajorMinor(1, 38),
 		EnvOptions: []cel.EnvOption{
-			library.CIDR(library.CIDRVersion(1)),
+			ext.Network(ext.NetworkVersion(1)),
 		},
 	},
 	StrictCostOpt,

@@ -19,6 +19,7 @@ package library
 import (
 	"context"
 	"fmt"
+	"math"
 	"testing"
 
 	"cel.dev/cel-go/common/types/ref"
@@ -27,6 +28,7 @@ import (
 	"cel.dev/cel-go/checker"
 	"cel.dev/cel-go/common"
 	"cel.dev/cel-go/common/ast"
+	celcost "cel.dev/cel-go/common/cost"
 	"cel.dev/cel-go/common/types"
 	"cel.dev/cel-go/ext"
 	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
@@ -331,11 +333,11 @@ func TestIPCost(t *testing.T) {
 	for _, tc := range testCases {
 		for _, op := range tc.ops {
 			t.Run(ipv4+op, func(t *testing.T) {
-				testCost(t, ipv4+op, tc.expectEsimatedCost(ipv4BaseEstimatedCost), tc.expectRuntimeCost(ipv4BaseRuntimeCost))
+				testNetworkCost(t, ipv4+op, tc.expectEsimatedCost(ipv4BaseEstimatedCost), tc.expectRuntimeCost(ipv4BaseRuntimeCost))
 			})
 
 			t.Run(ipv6+op, func(t *testing.T) {
-				testCost(t, ipv6+op, tc.expectEsimatedCost(ipv6BaseEstimatedCost), tc.expectRuntimeCost(ipv6BaseRuntimeCost))
+				testNetworkCost(t, ipv6+op, tc.expectEsimatedCost(ipv6BaseEstimatedCost), tc.expectRuntimeCost(ipv6BaseRuntimeCost))
 			})
 		}
 	}
@@ -366,7 +368,7 @@ func TestIPIsCanonicalCost(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.op, func(t *testing.T) {
-			testCost(t, tc.op, tc.expectEsimatedCost, tc.expectRuntimeCost)
+			testNetworkCost(t, tc.op, tc.expectEsimatedCost, tc.expectRuntimeCost)
 		})
 	}
 }
@@ -549,7 +551,7 @@ func TestCIDRCost(t *testing.T) {
 	for _, tc := range ipv4Cases {
 		for _, op := range tc.ops {
 			t.Run(ipv4+op, func(t *testing.T) {
-				testCost(t, ipv4+op, tc.expectEsimatedCost(ipv4BaseEstimatedCost), tc.expectRuntimeCost(ipv4BaseRuntimeCost))
+				testNetworkCost(t, ipv4+op, tc.expectEsimatedCost(ipv4BaseEstimatedCost), tc.expectRuntimeCost(ipv4BaseRuntimeCost))
 			})
 		}
 	}
@@ -557,9 +559,128 @@ func TestCIDRCost(t *testing.T) {
 	for _, tc := range ipv6Cases {
 		for _, op := range tc.ops {
 			t.Run(ipv6+op, func(t *testing.T) {
-				testCost(t, ipv6+op, tc.expectEsimatedCost(ipv6BaseEstimatedCost), tc.expectRuntimeCost(ipv6BaseRuntimeCost))
+				testNetworkCost(t, ipv6+op, tc.expectEsimatedCost(ipv6BaseEstimatedCost), tc.expectRuntimeCost(ipv6BaseRuntimeCost))
 			})
 		}
+	}
+}
+
+// TestCIDRIsMaskCost tests the cost of cidr.isMask(), provided by CIDR library v1 and the cel-go
+// network library.
+func TestCIDRIsMaskCost(t *testing.T) {
+	for _, expr := range []string{"cidr('192.168.0.0/16').isMask()", "cidr('2001:db8::/32').isMask()"} {
+		t.Run(expr, func(t *testing.T) {
+			// The cost of parsing the CIDR (2) + 1.
+			testNetworkCost(t, expr, celcost.Estimate{Min: 3, Max: 3}, 3)
+		})
+	}
+}
+
+// TestNetworkResultSizeCost tests the cost of operations that depend on the size of values returned
+// by the network functions. The runtime cost is the same for both network libraries. The estimated
+// cost is lower with the cel-go network library because it estimates the size of the values returned
+// by ip(), cidr(), cidr.ip() and cidr.masked() (4 to 16 bytes) and by string() of an IP or CIDR (3 to
+// 45 characters), while the size of these values is unbounded with the kubernetes IP and CIDR
+// libraries. (== has a fixed cost for IP and CIDR values, see CostEstimator.)
+func TestNetworkResultSizeCost(t *testing.T) {
+	// Estimated cost of comparing arguments of unbounded size.
+	unboundedComparisonCost := uint64(math.Ceil(float64(math.MaxUint64) * celcost.StringTraversalCostFactor))
+	// No SizeEstimator: as with the CRD and DRA size estimators, the size of a value that is not read
+	// from a variable is unknown unless the function that returns it estimates it. (testCostEstimator
+	// assumes that every string, including those returned by string(), has at most 12 characters.)
+	est := &CostEstimator{}
+
+	cases := []struct {
+		expr                 string
+		expectRuntimeCost    uint64
+		expectEstimatedCosts map[string]celcost.Estimate // keyed by costNetworkLibraries name
+	}{
+		{
+			// 2 + 2 to parse the IPs, + 1 for != on two 4 byte IPs.
+			expr:              "ip('192.168.0.1') != ip('192.168.0.2')",
+			expectRuntimeCost: 5,
+			expectEstimatedCosts: map[string]celcost.Estimate{
+				"kubernetes": {Min: 5, Max: 4 + unboundedComparisonCost},
+				"cel-go":     {Min: 5, Max: 6},
+			},
+		},
+		{
+			// 4 + 2 to parse the IPs, + 2 for != on two 16 byte IPs.
+			expr:              "ip('2001:db8:3333:4444:5555:6666:7777:8888') != ip('2001:db8::1')",
+			expectRuntimeCost: 8,
+			expectEstimatedCosts: map[string]celcost.Estimate{
+				"kubernetes": {Min: 7, Max: 6 + unboundedComparisonCost},
+				"cel-go":     {Min: 7, Max: 8},
+			},
+		},
+		{
+			// 2 + 2 to parse the CIDRs, + 1 for != on CIDRs with 2 and 3 byte prefixes.
+			expr:              "cidr('192.168.0.0/16') != cidr('192.168.0.0/24')",
+			expectRuntimeCost: 5,
+			expectEstimatedCosts: map[string]celcost.Estimate{
+				"kubernetes": {Min: 5, Max: 4 + unboundedComparisonCost},
+				"cel-go":     {Min: 5, Max: 6},
+			},
+		},
+		{
+			// 2 + 2 to parse the CIDRs, + 1 for != on CIDRs with 4 and 8 byte prefixes.
+			expr:              "cidr('2001:db8::/32') != cidr('2001:db8::/64')",
+			expectRuntimeCost: 5,
+			expectEstimatedCosts: map[string]celcost.Estimate{
+				"kubernetes": {Min: 5, Max: 4 + unboundedComparisonCost},
+				"cel-go":     {Min: 5, Max: 6},
+			},
+		},
+		{
+			// 2 to parse the CIDR, + 1 for ip(), + 2 to parse the IP, + 1 for != on two 4 byte IPs.
+			expr:              "cidr('192.168.0.0/24').ip() != ip('192.168.0.1')",
+			expectRuntimeCost: 6,
+			expectEstimatedCosts: map[string]celcost.Estimate{
+				"kubernetes": {Min: 6, Max: 5 + unboundedComparisonCost},
+				"cel-go":     {Min: 6, Max: 7},
+			},
+		},
+		{
+			// 2 to parse the CIDR, + 1 for masked(), + 2 to parse the CIDR, + 1 for != on CIDRs with 3 and 2 byte prefixes.
+			expr:              "cidr('192.168.0.1/24').masked() != cidr('192.168.0.0/16')",
+			expectRuntimeCost: 6,
+			expectEstimatedCosts: map[string]celcost.Estimate{
+				"kubernetes": {Min: 6, Max: 5 + unboundedComparisonCost},
+				"cel-go":     {Min: 6, Max: 7},
+			},
+		},
+		{
+			// 2 + 2 to parse the IPs, + 1 + 1 for string(), + 2 for == on two 11 character strings.
+			expr:              "string(ip('192.168.0.1')) == string(ip('192.168.0.2'))",
+			expectRuntimeCost: 8,
+			expectEstimatedCosts: map[string]celcost.Estimate{
+				"kubernetes": {Min: 7, Max: 6 + unboundedComparisonCost},
+				"cel-go":     {Min: 7, Max: 11},
+			},
+		},
+		{
+			// 2 + 2 to parse the CIDRs, + 1 + 1 for string(), + 2 for == on two 13 character strings.
+			expr:              "string(cidr('2001:db8::/32')) == string(cidr('2001:db8::/64'))",
+			expectRuntimeCost: 8,
+			expectEstimatedCosts: map[string]celcost.Estimate{
+				"kubernetes": {Min: 7, Max: 6 + unboundedComparisonCost},
+				"cel-go":     {Min: 7, Max: 11},
+			},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.expr, func(t *testing.T) {
+			for _, lib := range costNetworkLibraries {
+				t.Run(lib.name, func(t *testing.T) {
+					testCostWithEstimator(t, est, lib.opts, tc.expr, tc.expectEstimatedCosts[lib.name], tc.expectRuntimeCost)
+				})
+			}
+			kubernetesCost, celGoCost := tc.expectEstimatedCosts["kubernetes"], tc.expectEstimatedCosts["cel-go"]
+			if celGoCost.Min > kubernetesCost.Min || celGoCost.Max > kubernetesCost.Max {
+				t.Errorf("Expected the estimated cost with the cel-go network library (%d..%d) to not exceed the estimated cost with the kubernetes IP and CIDR libraries (%d..%d)",
+					celGoCost.Min, celGoCost.Max, kubernetesCost.Min, kubernetesCost.Max)
+			}
+		})
 	}
 }
 
@@ -1341,12 +1462,40 @@ func TestTwoVariableComprehensionCost(t *testing.T) {
 }
 
 func testCost(t *testing.T, expr string, expectEsimatedCost checker.CostEstimate, expectRuntimeCost uint64) {
+	testCostWithNetworkLibrary(t, []cel.EnvOption{IP(), CIDR()}, expr, expectEsimatedCost, expectRuntimeCost)
+}
+
+// costNetworkLibraries are the libraries that provide the IP and CIDR functions in the base
+// environment: the kubernetes IP and CIDR libraries before Kubernetes 1.38, and the cel-go network
+// library from Kubernetes 1.38 and for stored expressions. Their costs must match, otherwise the
+// runtime cost of stored expressions changes when the base environment switches libraries.
+var costNetworkLibraries = []struct {
+	name string
+	opts []cel.EnvOption
+}{
+	{name: "kubernetes", opts: []cel.EnvOption{IP(), CIDR(CIDRVersion(1))}},
+	{name: "cel-go", opts: []cel.EnvOption{ext.Network(ext.NetworkVersion(1))}},
+}
+
+// testNetworkCost checks the estimated and runtime cost of expr with each of the costNetworkLibraries.
+func testNetworkCost(t *testing.T, expr string, expectEsimatedCost celcost.Estimate, expectRuntimeCost uint64) {
+	for _, lib := range costNetworkLibraries {
+		t.Run(lib.name, func(t *testing.T) {
+			testCostWithNetworkLibrary(t, lib.opts, expr, expectEsimatedCost, expectRuntimeCost)
+		})
+	}
+}
+
+func testCostWithNetworkLibrary(t *testing.T, networkLibrary []cel.EnvOption, expr string, expectEsimatedCost celcost.Estimate, expectRuntimeCost uint64) {
+	testCostWithEstimator(t, &CostEstimator{SizeEstimator: &testCostEstimator{}}, networkLibrary, expr, expectEsimatedCost, expectRuntimeCost)
+}
+
+func testCostWithEstimator(t *testing.T, est *CostEstimator, networkLibrary []cel.EnvOption, expr string, expectEsimatedCost celcost.Estimate, expectRuntimeCost uint64) {
 	originalPanicOnUnknown := panicOnUnknown
 	panicOnUnknown = true
 	t.Cleanup(func() { panicOnUnknown = originalPanicOnUnknown })
 
-	est := &CostEstimator{SizeEstimator: &testCostEstimator{}}
-	env, err := cel.NewEnv(
+	opts := []cel.EnvOption{
 		ext.Strings(ext.StringsVersion(2)),
 		URLs(),
 		Regex(),
@@ -1355,8 +1504,9 @@ func testCost(t *testing.T, expr string, expectEsimatedCost checker.CostEstimate
 		AuthzSelectors(),
 		Quantity(),
 		ext.Sets(),
-		IP(),
-		CIDR(),
+	}
+	opts = append(opts, networkLibrary...)
+	opts = append(opts,
 		Format(),
 		JSONPatch(),
 		cel.OptionalTypes(cel.OptionalTypesVersion(2)),
@@ -1367,6 +1517,7 @@ func testCost(t *testing.T, expr string, expectEsimatedCost checker.CostEstimate
 		ext.TwoVarComprehensions(),
 		SemverLib(SemverVersion(1)),
 	)
+	env, err := cel.NewEnv(opts...)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
