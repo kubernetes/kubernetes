@@ -12387,6 +12387,29 @@ func testSharedConsumableCapacity(tCtx ktesting.TContext,
 				return results, matchError, errorIs
 			},
 		},
+		"shared-consumable-capacity-counter-capacity-alias-conflict": {
+			features: Features{PartitionableDevices: true, ConsumableCapacity: true, SharedConsumableCapacity: true},
+			claimsToAllocate: objects(claim(claim0).withRequests(deviceRequest(req0, classA, 1).
+				withCapacityRequest(capacity0, one).
+				withCapacityRequest(resourceapi.QualifiedName(driverA+"/"+string(capacity0)), one))),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA, counterSet(counterSet1, map[string]resource.Quantity{counter0: one})),
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device1).withDeviceCounterConsumption(deviceCounterConsumptionValueFrom(counterSet1, map[string]resourceapi.QualifiedName{counter0: capacity0}))),
+			),
+			node:        node(node1, region1),
+			expectError: g.MatchError(g.ContainSubstring("requested both with and without the driver domain")),
+			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.ConsumableCapacity {
+					return nil, g.MatchError(g.ContainSubstring("feature is disabled")), nil
+				}
+				if !features.SharedConsumableCapacity {
+					return nil, nil, nil
+				}
+				return results, matchError, errorIs
+			},
+		},
 		"shared-consumable-capacity-alias-error-beats-missing-capacity": {
 			features: Features{
 				PartitionableDevices:     true,
@@ -12579,7 +12602,7 @@ func testSharedConsumableCapacity(tCtx ktesting.TContext,
 				return results, matchError, errorIs
 			},
 		},
-		"shared-consumable-capacity-removed-fixed-device-blocks-reconstruction": {
+		"shared-consumable-capacity-removed-fixed-device-does-not-block": {
 			features: Features{
 				PartitionableDevices:     true,
 				ConsumableCapacity:       true,
@@ -12615,10 +12638,10 @@ func testSharedConsumableCapacity(tCtx ktesting.TContext,
 				return []*resourceapi.ResourceSlice{deviceSlice, counterSlice}
 			}(),
 			node:          node(node1, region1),
-			expectResults: []any{},
+			expectResults: []any{matchAllocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool1, device1, false))},
 			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
-				if features.PartitionableDevices && !features.SharedConsumableCapacity {
-					return []any{matchAllocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool1, device1, false))}, nil, nil
+				if !features.PartitionableDevices {
+					return nil, nil, nil
 				}
 				return results, matchError, errorIs
 			},
@@ -13007,7 +13030,7 @@ func testSharedConsumableCapacity(tCtx ktesting.TContext,
 				return results, matchError, errorIs
 			},
 		},
-		"shared-consumable-capacity-disabled-consumable=true-node=node-1-allocated=true": {
+		"shared-consumable-capacity-disabled-consumable=true-node=node-1-allocated=true-without-snapshot-not-counted": {
 			features:         Features{PartitionableDevices: true, ConsumableCapacity: true, SharedConsumableCapacity: false},
 			claimsToAllocate: objects(claim(claim0).withRequests(deviceRequest(req0, classA, 1))),
 			classes:          objects(class(classA, driverA)),
@@ -13023,6 +13046,9 @@ func testSharedConsumableCapacity(tCtx ktesting.TContext,
 			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
 				if !features.PartitionableDevices {
 					return nil, nil, nil
+				}
+				if features.SharedConsumableCapacity {
+					return []any{matchAllocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool1, device2, false))}, nil, nil
 				}
 				return results, matchError, errorIs
 			},
@@ -13142,7 +13168,7 @@ func testSharedConsumableCapacity(tCtx ktesting.TContext,
 				return results, matchError, errorIs
 			},
 		},
-		"shared-consumable-capacity-disabled-consumable=true-node=node-2-allocated=true": {
+		"shared-consumable-capacity-disabled-consumable=true-node=node-2-allocated=true-without-snapshot-not-counted": {
 			features:         Features{PartitionableDevices: true, ConsumableCapacity: true, SharedConsumableCapacity: false},
 			claimsToAllocate: objects(claim(claim0).withRequests(deviceRequest(req0, classA, 1))),
 			classes:          objects(class(classA, driverA)),
@@ -13158,6 +13184,9 @@ func testSharedConsumableCapacity(tCtx ktesting.TContext,
 			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
 				if !features.PartitionableDevices {
 					return nil, nil, nil
+				}
+				if features.SharedConsumableCapacity {
+					return []any{matchAllocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool1, device2, false))}, nil, nil
 				}
 				return results, matchError, errorIs
 			},
@@ -13290,7 +13319,7 @@ func testSharedConsumableCapacity(tCtx ktesting.TContext,
 				return results, matchError, errorIs
 			},
 		},
-		"shared-consumable-capacity-slice-update-fixed-policy-rejects-existing-use": {
+		"shared-consumable-capacity-slice-update-fixed-policy-violation-existing-use-is-rounded": {
 			features:         Features{PartitionableDevices: true, ConsumableCapacity: true, SharedConsumableCapacity: true},
 			claimsToAllocate: objects(claim(claim0).withRequests(deviceRequest(req0, classB, 1))),
 			allocations:      []resourceapi.AllocationResult{allocationResult(resourceapi.DeviceRequestAllocationResult{Request: req0, Driver: driverA, Pool: pool1, Device: device1, ShareID: new(apitypes.UID("00000000-0000-4000-8000-000000000001"))})},
@@ -13301,12 +13330,9 @@ func testSharedConsumableCapacity(tCtx ktesting.TContext,
 					device(device1).withAllowMultipleAllocations().withDeviceCounterConsumption(deviceCounterConsumption(counterSet1, map[string]resource.Quantity{counter0: resource.MustParse("7")}))),
 			),
 			node:          node(node1, region1),
-			expectResults: nil,
+			expectResults: []any{matchAllocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool1, device2, false))},
 			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
-				if !features.PartitionableDevices {
-					return nil, nil, nil
-				}
-				if !features.SharedConsumableCapacity {
+				if !features.PartitionableDevices || !features.SharedConsumableCapacity {
 					return nil, nil, nil
 				}
 				return results, matchError, errorIs
@@ -13551,7 +13577,7 @@ func testSharedConsumableCapacity(tCtx ktesting.TContext,
 				return results, matchError, errorIs
 			},
 		},
-		"shared-consumable-capacity-slice-update-variable-partial-usage-blocks": {
+		"shared-consumable-capacity-slice-update-variable-partial-usage-missing-snapshot-is-ignored": {
 			features:         Features{PartitionableDevices: true, ConsumableCapacity: true, SharedConsumableCapacity: true},
 			claimsToAllocate: objects(claim(claim0).withRequests(deviceRequest(req0, classB, 1))),
 			allocations: []resourceapi.AllocationResult{allocationResult(resourceapi.DeviceRequestAllocationResult{Request: req0, Driver: driverA, Pool: pool1, Device: device1, ShareID: &fixedShareID, ConsumedCounters: []resourceapi.CounterSetConsumption{{CounterSet: counterSet1, Counters: map[string]resource.Quantity{counter0: resource.MustParse("1")}}}}),
@@ -13563,18 +13589,15 @@ func testSharedConsumableCapacity(tCtx ktesting.TContext,
 					device(device1).withAllowMultipleAllocations().withDeviceCounterConsumption(deviceCounterConsumptionValueFrom(counterSet1, map[string]resourceapi.QualifiedName{counter0: capacity0}))),
 			),
 			node:          node(node1, region1),
-			expectResults: nil,
+			expectResults: []any{matchAllocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool1, device2, false))},
 			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
-				if !features.PartitionableDevices {
-					return nil, nil, nil
-				}
-				if !features.SharedConsumableCapacity {
+				if !features.PartitionableDevices || !features.SharedConsumableCapacity {
 					return nil, nil, nil
 				}
 				return results, matchError, errorIs
 			},
 		},
-		"shared-consumable-capacity-slice-update-zero-partial-usage-blocks": {
+		"shared-consumable-capacity-slice-update-zero-partial-usage-missing-snapshot-is-ignored": {
 			features:         Features{PartitionableDevices: true, ConsumableCapacity: true, SharedConsumableCapacity: true},
 			claimsToAllocate: objects(claim(claim0).withRequests(deviceRequest(req0, classB, 1))),
 			allocations: []resourceapi.AllocationResult{allocationResult(resourceapi.DeviceRequestAllocationResult{Request: req0, Driver: driverA, Pool: pool1, Device: device1, ShareID: &fixedShareID, ConsumedCounters: []resourceapi.CounterSetConsumption{{CounterSet: counterSet1, Counters: map[string]resource.Quantity{counter0: resource.MustParse("0")}}}}),
@@ -13586,12 +13609,9 @@ func testSharedConsumableCapacity(tCtx ktesting.TContext,
 					device(device1).withAllowMultipleAllocations().withDeviceCounterConsumption(deviceCounterConsumptionValueFrom(counterSet1, map[string]resourceapi.QualifiedName{counter0: capacity0}))),
 			),
 			node:          node(node1, region1),
-			expectResults: nil,
+			expectResults: []any{matchAllocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool1, device2, false))},
 			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
-				if !features.PartitionableDevices {
-					return nil, nil, nil
-				}
-				if !features.SharedConsumableCapacity {
+				if !features.PartitionableDevices || !features.SharedConsumableCapacity {
 					return nil, nil, nil
 				}
 				return results, matchError, errorIs
@@ -13619,7 +13639,7 @@ func testSharedConsumableCapacity(tCtx ktesting.TContext,
 				return results, matchError, errorIs
 			},
 		},
-		"shared-consumable-capacity-slice-update-fixed-to-variable-without-snapshot-blocks": {
+		"shared-consumable-capacity-slice-update-fixed-to-variable-without-snapshot-is-ignored": {
 			features:         Features{PartitionableDevices: true, ConsumableCapacity: true, SharedConsumableCapacity: true},
 			claimsToAllocate: objects(claim(claim0).withRequests(deviceRequest(req0, classB, 1))),
 			allocations:      []resourceapi.AllocationResult{allocationResult(resourceapi.DeviceRequestAllocationResult{Request: req0, Driver: driverA, Pool: pool1, Device: device1, ShareID: new(apitypes.UID("00000000-0000-4000-8000-000000000001"))})},
@@ -13630,18 +13650,15 @@ func testSharedConsumableCapacity(tCtx ktesting.TContext,
 					device(device1).withAllowMultipleAllocations().withDeviceCounterConsumption(deviceCounterConsumptionValueFrom(counterSet1, map[string]resourceapi.QualifiedName{counter0: capacity0}))),
 			),
 			node:          node(node1, region1),
-			expectResults: nil,
+			expectResults: []any{matchAllocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool1, device2, false))},
 			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
-				if !features.PartitionableDevices {
-					return nil, nil, nil
-				}
-				if !features.SharedConsumableCapacity {
+				if !features.PartitionableDevices || !features.SharedConsumableCapacity {
 					return nil, nil, nil
 				}
 				return results, matchError, errorIs
 			},
 		},
-		"shared-consumable-capacity-slice-update-missing-saved-set-blocks": {
+		"shared-consumable-capacity-slice-update-missing-saved-set-is-ignored": {
 			features:         Features{PartitionableDevices: true, ConsumableCapacity: true, SharedConsumableCapacity: true},
 			claimsToAllocate: objects(claim(claim0).withRequests(deviceRequest(req0, classB, 1))),
 			allocations:      []resourceapi.AllocationResult{allocationResult(resourceapi.DeviceRequestAllocationResult{Request: req0, Driver: driverA, Pool: pool1, Device: device1, ShareID: new(apitypes.UID("00000000-0000-4000-8000-000000000001")), ConsumedCounters: []resourceapi.CounterSetConsumption{{CounterSet: "removed", Counters: map[string]resource.Quantity{counter0: resource.MustParse("1")}}}})},
@@ -13652,18 +13669,15 @@ func testSharedConsumableCapacity(tCtx ktesting.TContext,
 					device(device1).withAllowMultipleAllocations()),
 			),
 			node:          node(node1, region1),
-			expectResults: nil,
+			expectResults: []any{matchAllocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool1, device2, false))},
 			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
 				if !features.PartitionableDevices {
 					return nil, nil, nil
 				}
-				if !features.SharedConsumableCapacity {
-					return []any{matchAllocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool1, device2, false))}, nil, nil
-				}
 				return results, matchError, errorIs
 			},
 		},
-		"shared-consumable-capacity-slice-update-missing-saved-counter-blocks": {
+		"shared-consumable-capacity-slice-update-missing-saved-counter-is-ignored": {
 			features:         Features{PartitionableDevices: true, ConsumableCapacity: true, SharedConsumableCapacity: true},
 			claimsToAllocate: objects(claim(claim0).withRequests(deviceRequest(req0, classB, 1))),
 			allocations:      []resourceapi.AllocationResult{allocationResult(resourceapi.DeviceRequestAllocationResult{Request: req0, Driver: driverA, Pool: pool1, Device: device1, ShareID: new(apitypes.UID("00000000-0000-4000-8000-000000000001")), ConsumedCounters: []resourceapi.CounterSetConsumption{{CounterSet: counterSet1, Counters: map[string]resource.Quantity{"removed": resource.MustParse("1")}}}})},
@@ -13674,13 +13688,10 @@ func testSharedConsumableCapacity(tCtx ktesting.TContext,
 					device(device1).withAllowMultipleAllocations()),
 			),
 			node:          node(node1, region1),
-			expectResults: nil,
+			expectResults: []any{matchAllocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool1, device2, false))},
 			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
 				if !features.PartitionableDevices {
 					return nil, nil, nil
-				}
-				if !features.SharedConsumableCapacity {
-					return []any{matchAllocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool1, device2, false))}, nil, nil
 				}
 				return results, matchError, errorIs
 			},
@@ -13723,7 +13734,7 @@ func testSharedConsumableCapacity(tCtx ktesting.TContext,
 				return results, matchError, errorIs
 			},
 		},
-		"shared-consumable-capacity-slice-update-missing-device-with-snapshot-blocks": {
+		"shared-consumable-capacity-slice-update-missing-device-with-snapshot-is-ignored": {
 			features:         Features{PartitionableDevices: true, ConsumableCapacity: true, SharedConsumableCapacity: true},
 			claimsToAllocate: objects(claim(claim0).withRequests(deviceRequest(req0, classB, 1))),
 			allocations:      []resourceapi.AllocationResult{allocationResult(resourceapi.DeviceRequestAllocationResult{Request: req0, Driver: driverA, Pool: pool1, Device: device1, ShareID: new(apitypes.UID("00000000-0000-4000-8000-000000000001")), ConsumedCounters: []resourceapi.CounterSetConsumption{{CounterSet: counterSet1, Counters: map[string]resource.Quantity{counter0: resource.MustParse("1")}}}})},
@@ -13733,13 +13744,10 @@ func testSharedConsumableCapacity(tCtx ktesting.TContext,
 				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA, device(device2).withDeviceCounterConsumption(deviceCounterConsumption(counterSet1, map[string]resource.Quantity{counter0: resource.MustParse("4")}))),
 			),
 			node:          node(node1, region1),
-			expectResults: nil,
+			expectResults: []any{matchAllocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool1, device2, false))},
 			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
 				if !features.PartitionableDevices {
 					return nil, nil, nil
-				}
-				if !features.SharedConsumableCapacity {
-					return []any{matchAllocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool1, device2, false))}, nil, nil
 				}
 				return results, matchError, errorIs
 			},

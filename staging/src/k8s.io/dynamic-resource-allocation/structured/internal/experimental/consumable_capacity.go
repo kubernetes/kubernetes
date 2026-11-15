@@ -179,10 +179,21 @@ func resolveCapacityRequests(deviceRequestCapacity *resourceapi.CapacityRequirem
 	}
 	resolved := make(map[draapi.FullyQualifiedName]resource.Quantity, len(deviceRequestCapacity.Requests))
 	missing := false
+	counterRequests := make(map[draapi.FullyQualifiedName]struct{})
 	for reqName, reqVal := range deviceRequestCapacity.Requests {
 		key := draapi.MakeFullyQualifiedName(reqName, device.id.Driver, device.slice.LookupUniqueString)
 		_, ok := device.Capacity.Lookup(key)
 		if !ok {
+			if deviceConsumesCapacityName(device, reqName) {
+				// Satisfied by counters, not by a per-device capacity.
+				// Different spellings of the same name are ambiguous.
+				name := draapi.MakeFullyQualifiedName(reqName, device.id.Driver, draapi.MakeUniqueString)
+				if _, alreadySeen := counterRequests[name]; alreadySeen {
+					return nil, false, fmt.Errorf("capacity %q requested both with and without the driver domain", name.Identifier)
+				}
+				counterRequests[name] = struct{}{}
+				continue
+			}
 			// Keep going so that a conflict is an error regardless of map order.
 			missing = true
 			continue
@@ -203,6 +214,20 @@ func resolveCapacityRequests(deviceRequestCapacity *resourceapi.CapacityRequirem
 		return nil, false, nil
 	}
 	return resolved, true, nil
+}
+
+// deviceConsumesCapacityName reports whether a counter of the device
+// takes its value from the given capacity name.
+func deviceConsumesCapacityName(device deviceWithID, name resourceapi.QualifiedName) bool {
+	fullName := draapi.MakeFullyQualifiedName(name, device.id.Driver, draapi.MakeUniqueString)
+	for _, consumption := range device.ConsumesCounters {
+		for _, counter := range consumption.Counters {
+			if counter.ValueFrom != nil && draapi.MakeFullyQualifiedName(counter.ValueFrom.CapacityName, device.id.Driver, draapi.MakeUniqueString) == fullName {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // calculateConsumedCapacity returns valid capacity to be consumed regarding the requested capacity and device capacity policy.
