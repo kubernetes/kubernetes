@@ -28,6 +28,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/stretchr/testify/require"
@@ -4264,4 +4265,159 @@ func TestGetListWithShardedListAndWatch(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestResyncStalledWatchersRoundRobin(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchCacheStallResume, true)
+	cachertesting.ForceRequestWatchProgressSupport(t)
+
+	for _, tc := range []struct {
+		name            string
+		initialLagDrain int
+	}{
+		{
+			name:            "trickle reader with single free input slot",
+			initialLagDrain: 1,
+		},
+		{
+			name:            "drained reader with free input slots equal to maxResyncEvents",
+			initialLagDrain: 21,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			runResyncRoundRobinTest(t, tc.initialLagDrain)
+		})
+	}
+}
+
+func runResyncRoundRobinTest(t *testing.T, initialLagDrain int) {
+	synctest.Test(t, func(t *testing.T) {
+		cfg := newTestCacherConfig(&cachertesting.MockStorage{})
+		cfg.MaxResyncEvents = 10
+		c, err := NewCacherFromConfig(cfg)
+		require.NoError(t, err)
+		defer c.Stop()
+		require.NoError(t, c.Wait(t.Context()))
+
+		t.Log("Open lag and ahead watchers scoped to disjoint namespaces")
+		var (
+			lagWatcher, aheadWatcher watch.Interface
+			lagErr, aheadErr         error
+			watchesOpened            sync.WaitGroup
+		)
+		watchesOpened.Add(2)
+		go func() {
+			defer watchesOpened.Done()
+			lagWatcher, lagErr = c.Watch(t.Context(), "/pods/lag-ns", storage.ListOptions{
+				ResourceVersion: "100",
+				Recursive:       true,
+				Predicate: storage.SelectionPredicate{
+					Label: labels.Everything(),
+					Field: fields.OneTermEqualSelector("metadata.namespace", "lag-ns"),
+				},
+			})
+		}()
+		go func() {
+			defer watchesOpened.Done()
+			aheadWatcher, aheadErr = c.Watch(t.Context(), "/pods/ahead-ns", storage.ListOptions{
+				ResourceVersion: "100",
+				Recursive:       true,
+				Predicate: storage.SelectionPredicate{
+					Label: labels.Everything(),
+					Field: fields.OneTermEqualSelector("metadata.namespace", "ahead-ns"),
+				},
+			})
+		}()
+		synctest.Wait()
+		time.Sleep(watcherResyncPeriod)
+		watchesOpened.Wait()
+		require.NoError(t, lagErr)
+		require.NoError(t, aheadErr)
+		defer lagWatcher.Stop()
+		defer aheadWatcher.Stop()
+
+		t.Log("Stall both watchers separated by more than MaxResyncEvents")
+		var rv uint64 = 100
+		addPod := func(namespace, name string) uint64 {
+			rv++
+			pod := &example.Pod{ObjectMeta: metav1.ObjectMeta{
+				Namespace:       namespace,
+				Name:            name,
+				ResourceVersion: strconv.FormatUint(rv, 10),
+			}}
+			require.NoError(t, c.watchCache.Add(pod))
+			synctest.Wait()
+			return rv
+		}
+		for i := range 40 {
+			addPod("lag-ns", fmt.Sprintf("lag-%02d", i))
+		}
+		for i := range 25 {
+			addPod("ahead-ns", fmt.Sprintf("ahead-%02d", i))
+		}
+
+		var aheadRVs, lagRVs []uint64
+		drainN := func(w watch.Interface, n int) []uint64 {
+			out := make([]uint64, 0, n)
+			for range n {
+				ev := <-w.ResultChan()
+				require.Equal(t, watch.Added, ev.Type)
+				obj := ev.Object
+				if cacheable, ok := obj.(runtime.CacheableObject); ok {
+					obj = cacheable.GetObject()
+				}
+				parsedRV, parseErr := strconv.ParseUint(obj.(*example.Pod).ResourceVersion, 10, 64)
+				require.NoError(t, parseErr)
+				out = append(out, parsedRV)
+			}
+			return out
+		}
+
+		aheadRVs = append(aheadRVs, drainN(aheadWatcher, 21)...)
+		lagRVs = append(lagRVs, drainN(lagWatcher, initialLagDrain)...)
+		synctest.Wait()
+
+		t.Log("First resync tick serves lagWatcher up to MaxResyncEvents and advances round-robin cursor")
+		time.Sleep(watcherResyncPeriod)
+		synctest.Wait()
+		require.Empty(t, aheadWatcher.ResultChan())
+
+		lagRVs = append(lagRVs, drainN(lagWatcher, 1)...)
+		synctest.Wait()
+
+		t.Log("Second resync tick skips lagWatcher via cursor, catches up aheadWatcher, and promotes it back to synced")
+		time.Sleep(watcherResyncPeriod)
+		synctest.Wait()
+		aheadRVs = append(aheadRVs, drainN(aheadWatcher, 4)...)
+		require.Len(t, aheadRVs, 25)
+		for i, gotRV := range aheadRVs {
+			require.Equal(t, uint64(141+i), gotRV)
+		}
+
+		t.Log("Remaining resync ticks drain lagWatcher without gaps or duplicates")
+		for len(lagRVs) < 40 {
+			select {
+			case ev := <-lagWatcher.ResultChan():
+				obj := ev.Object
+				if cacheable, ok := obj.(runtime.CacheableObject); ok {
+					obj = cacheable.GetObject()
+				}
+				parsedRV, parseErr := strconv.ParseUint(obj.(*example.Pod).ResourceVersion, 10, 64)
+				require.NoError(t, parseErr)
+				lagRVs = append(lagRVs, parsedRV)
+			default:
+				time.Sleep(watcherResyncPeriod)
+				synctest.Wait()
+			}
+		}
+		for i, gotRV := range lagRVs {
+			require.Equal(t, uint64(101+i), gotRV)
+		}
+
+		t.Log("Live events stream immediately to both recovered watchers")
+		liveAheadRV := addPod("ahead-ns", "live-ahead")
+		liveLagRV := addPod("lag-ns", "live-lag")
+		require.Equal(t, []uint64{liveAheadRV}, drainN(aheadWatcher, 1))
+		require.Equal(t, []uint64{liveLagRV}, drainN(lagWatcher, 1))
+	})
 }

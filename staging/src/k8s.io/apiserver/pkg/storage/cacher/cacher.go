@@ -357,8 +357,9 @@ type Cacher struct {
 	// dispatched event.
 	watchersBuffer []*cacheWatcher
 	// unsyncedWatchers is a map that need to be synchronized before sending events.
-	unsyncedWatchers watchersMap
-	maxResyncEvents  int
+	unsyncedWatchers          watchersMap
+	maxResyncEvents           int
+	nextResyncResourceVersion uint64
 	// blockedWatchers is a list of watchers whose buffer is currently full.
 	blockedWatchers []*cacheWatcher
 	// watchersToStop is a list of watchers that were supposed to be stopped
@@ -587,8 +588,10 @@ func (c *Cacher) resyncWatchers() {
 		return
 	}
 
-	var stalledWatchers indexedWatchers
+	var eligibleWatchers []*cacheWatcher
 	var minResourceVersion uint64
+	var nextMinResourceVersion uint64
+	hasNextMin := false
 
 	for _, watcher := range c.unsyncedWatchers {
 		if watcher.stopped {
@@ -620,21 +623,34 @@ func (c *Cacher) resyncWatchers() {
 			c.stopWatcherLocked(watcher, true)
 			continue
 		}
-		if stalledWatchers.empty() {
-			stalledWatchers = indexedWatchers{
-				scopeWatchers: make(map[namespacedName]watchersMap),
-				indexWatchers: make(map[string]watchersMap),
-			}
-			minResourceVersion = watcher.dispatchedResourceVersion
-		} else if watcher.dispatchedResourceVersion < minResourceVersion {
+		if len(eligibleWatchers) == 0 || watcher.dispatchedResourceVersion < minResourceVersion {
 			minResourceVersion = watcher.dispatchedResourceVersion
 		}
-		stalledWatchers.addWatcher(watcher)
+		if watcher.dispatchedResourceVersion >= c.nextResyncResourceVersion &&
+			(!hasNextMin || watcher.dispatchedResourceVersion < nextMinResourceVersion) {
+			nextMinResourceVersion = watcher.dispatchedResourceVersion
+			hasNextMin = true
+		}
+		eligibleWatchers = append(eligibleWatchers, watcher)
 	}
 
-	if !stalledWatchers.empty() {
-		c.resyncStalledWatchersLocked(&stalledWatchers, minResourceVersion)
+	if len(eligibleWatchers) == 0 {
+		return
 	}
+	startResourceVersion := minResourceVersion
+	if hasNextMin {
+		startResourceVersion = nextMinResourceVersion
+	}
+	stalledWatchers := indexedWatchers{
+		scopeWatchers: make(map[namespacedName]watchersMap),
+		indexWatchers: make(map[string]watchersMap),
+	}
+	for _, watcher := range eligibleWatchers {
+		if watcher.dispatchedResourceVersion >= startResourceVersion {
+			stalledWatchers.addWatcher(watcher)
+		}
+	}
+	c.resyncStalledWatchersLocked(&stalledWatchers, startResourceVersion)
 }
 
 func (c *Cacher) resyncStalledWatchersLocked(stalledWatchers *indexedWatchers, minResourceVersion uint64) {
@@ -644,6 +660,7 @@ func (c *Cacher) resyncStalledWatchersLocked(stalledWatchers *indexedWatchers, m
 			for watcher := range stalledWatchers.allWatchers() {
 				watcher.dispatchedResourceVersion = max(watcher.dispatchedResourceVersion, rawEvent.ResourceVersion-1)
 			}
+			c.nextResyncResourceVersion = rawEvent.ResourceVersion
 			return
 		}
 		processedEvents++
@@ -676,10 +693,12 @@ func (c *Cacher) resyncStalledWatchersLocked(stalledWatchers *indexedWatchers, m
 			}
 		}
 		if stalledWatchers.empty() {
+			c.nextResyncResourceVersion = rawEvent.ResourceVersion + 1
 			return
 		}
 	}
 
+	c.nextResyncResourceVersion = 0
 	for watcher := range stalledWatchers.allWatchers() {
 		watcher.dispatchedResourceVersion = max(watcher.dispatchedResourceVersion, c.watchCache.resourceVersion)
 		c.deleteUnsyncedWatcherLocked(watcher)
@@ -1532,6 +1551,7 @@ func (c *Cacher) terminateAllWatchers() {
 		c.deleteUnsyncedWatcherLocked(watcher)
 		c.stopWatcherLocked(watcher, false)
 	}
+	c.nextResyncResourceVersion = 0
 }
 
 // watcherToStop is a stop deferred to the end of a dispatch. It keeps its own
