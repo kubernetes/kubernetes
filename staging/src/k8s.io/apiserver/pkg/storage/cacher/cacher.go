@@ -886,7 +886,6 @@ func (c *Cacher) watch(ctx context.Context, key string, requestedWatchRV uint64,
 	} else {
 		c.registerWatcherLocked(watcher, cacheInterval)
 	}
-	c.watcherIdx++
 	return watcher, nil
 }
 
