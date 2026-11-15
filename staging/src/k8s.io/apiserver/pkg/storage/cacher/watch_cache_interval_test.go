@@ -26,6 +26,7 @@ import (
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/watch"
@@ -332,8 +333,8 @@ func TestCacheIntervalNextFromWatchCache(t *testing.T) {
 						originalCacheStartIndex := wc.history.startIndex
 						wc.history.startIndex = src.startIndex + 1
 						event, err := src.next()
-						if err == nil {
-							t.Errorf("expected non-nil error")
+						if !apierrors.IsResourceExpired(err) {
+							t.Errorf("expected ResourceExpired error, got %v", err)
 						}
 						if event != nil {
 							t.Errorf("expected nil event, got %v", *event)

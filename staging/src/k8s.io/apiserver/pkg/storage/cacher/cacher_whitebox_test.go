@@ -2509,13 +2509,21 @@ func TestCacheIntervalInvalidationStopsWatch(t *testing.T) {
 	for event := range resChan {
 		received++
 		t.Logf("event type: %v, events received so far: %d", event.Type, received)
-		if event.Type != watch.Added {
-			t.Errorf("unexpected event type, expected: %s, got: %s, event: %v", watch.Added, event.Type, event)
+		if received <= bufferSize {
+			if event.Type != watch.Added {
+				t.Errorf("unexpected event type at %d, expected: %s, got: %s, event: %v", received, watch.Added, event.Type, event)
+			}
+			continue
+		}
+		if event.Type != watch.Error {
+			t.Errorf("unexpected terminal event type at %d, expected: %s, got: %s, event: %v", received, watch.Error, event.Type, event)
+		} else if !apierrors.IsResourceExpired(apierrors.FromObject(event.Object)) {
+			t.Errorf("expected ResourceExpired watch error, got: %#v", event.Object)
 		}
 	}
-	// Since the watch is stopped after the interval is invalidated,
-	// we should have processed exactly bufferSize number of elements.
-	if received != bufferSize {
+	// After serving bufferSize elements, interval invalidation emits a
+	// terminal ResourceExpired watch.Error before closing the channel.
+	if received != bufferSize+1 {
 		t.Errorf("unexpected number of events received, expected: %d, got: %d", bufferSize+1, received)
 	}
 }

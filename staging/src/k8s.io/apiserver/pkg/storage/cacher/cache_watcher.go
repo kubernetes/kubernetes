@@ -587,21 +587,14 @@ func (c *cacheWatcher) processInitialEvents(cacheInterval *watchCacheInterval) e
 	initEventCount := 0
 	for event, err := range cacheInterval.All() {
 		if err != nil {
-			// An error indicates that the cache interval
-			// has been invalidated and can no longer serve
-			// events.
-			//
-			// Initially we considered sending an "out-of-history"
-			// Error event in this case, but because historically
-			// such events weren't sent out of the watchCache, we
-			// decided not to. This is still ok, because on watch
-			// closure, the watcher will try to re-instantiate the
-			// watch and then will get an explicit "out-of-history"
-			// window. There is potential for optimization, but for
-			// now, in order to be on the safe side and not break
-			// custom clients, the cost of it is something that we
-			// are fully accepting.
+			// An error indicates that the cache interval has been
+			// invalidated by circular buffer compaction or a watch
+			// cache reset while serving initial historical events.
+			// Emit the ResourceExpired watch error before closing,
+			// matching mid-stream compaction in etcd3 and stalled
+			// watcher resync.
 			klog.Warningf("couldn't retrieve watch event to serve: %#v", err)
+			c.sendWatchError(err)
 			return err
 		}
 		if event.ResourceVersion < c.requiredResourceVersion || event.ResourceVersion > cacheInterval.resourceVersion {

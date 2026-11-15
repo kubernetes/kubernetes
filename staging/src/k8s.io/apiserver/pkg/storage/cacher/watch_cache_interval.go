@@ -21,6 +21,7 @@ import (
 	"iter"
 	"sync"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/storage/cacher/consistency"
 	"k8s.io/apiserver/pkg/storage/cacher/store"
@@ -210,7 +211,7 @@ func (s *historyCacheIntervalSource) next() (*watchCacheEvent, error) {
 	defer s.lock.Unlock()
 
 	if valid := s.indexValidator(s.startIndex); !valid {
-		return nil, fmt.Errorf("cache interval invalidated, interval startIndex: %d", s.startIndex)
+		return nil, apierrors.NewResourceExpired(fmt.Sprintf("cache interval invalidated, interval startIndex: %d", s.startIndex))
 	}
 
 	s.fillBuffer()
