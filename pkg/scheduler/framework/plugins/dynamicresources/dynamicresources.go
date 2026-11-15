@@ -1749,6 +1749,26 @@ func (pl *DynamicResources) PreBind(ctx context.Context, cs fwk.CycleState, pod 
 		}
 	}
 
+	// ResourceQuota can reject a patch with extra node allocatable resources, and claims allocated before
+	// the rejection would keep their devices.
+	// TODO(pravk03): patch before bindClaim for all pods, once stale pod status can be cleared.
+	// See https://github.com/kubernetes/kubernetes/issues/143533.
+	patchPodStatusBeforeClaimAllocation := pl.fts.EnableDRANodeAllocatableResources && state.extraNodeAllocatableResources != nil &&
+		len(state.extraNodeAllocatableResources.GetFromPlugin(nodeName, Name)) > 0
+	if patchPodStatusBeforeClaimAllocation {
+		extendedResourceClaim := state.claims.extendedResourceClaim()
+		// The patch names the extended resource claim, so it is created first. Unreserve deletes it if a
+		// later step fails.
+		if extendedResourceClaim != nil && isSpecialClaimName(extendedResourceClaim.Name) {
+			if _, err := pl.createExtendedResourceClaim(ctx, pod, nodeName, state); err != nil {
+				return statusError(logger, err)
+			}
+		}
+		if status := pl.patchPodStatus(ctx, pod, nodeName, state); status != nil {
+			return status
+		}
+	}
+
 	for index, claim := range state.claims.all() {
 		if !resourceclaim.IsReservedForPod(pod, claim, pl.fts.EnableDRAWorkloadResourceClaims) {
 			claim, successCleanup, err := pl.bindClaim(ctx, state, index, pod, nodeName)
@@ -1765,8 +1785,10 @@ func (pl *DynamicResources) PreBind(ctx context.Context, cs fwk.CycleState, pod 
 		}
 	}
 
-	if status := pl.patchPodStatus(ctx, pod, nodeName, state); status != nil {
-		return status
+	if !patchPodStatusBeforeClaimAllocation {
+		if status := pl.patchPodStatus(ctx, pod, nodeName, state); status != nil {
+			return status
+		}
 	}
 
 	if !pl.fts.EnableDRADeviceBindingConditions || !pl.fts.EnableDRAResourceClaimDeviceStatus {
@@ -1915,6 +1937,19 @@ func (pl *DynamicResources) PreBindPreFlight(ctx context.Context, cs fwk.CycleSt
 	return result, nil
 }
 
+// createExtendedResourceClaim creates the extended resource claim in the API server and tracks it
+// in the state from now on, so that bindClaim does not create it again and Unreserve deletes it.
+func (pl *DynamicResources) createExtendedResourceClaim(ctx context.Context, pod *v1.Pod, nodeName string, state *stateData) (*resourceapi.ResourceClaim, error) {
+	claim, err := pl.createExtendedResourceClaimInAPI(ctx, pod, nodeName, state)
+	if err != nil {
+		return nil, err
+	}
+	if err := state.claims.updateExtendedResourceClaim(claim); err != nil {
+		return nil, fmt.Errorf("internal error: update extended ResourceClaim: %w", err)
+	}
+	return claim, nil
+}
+
 // bindClaim gets called by PreBind for claim which is not reserved for the pod yet.
 // It might not even be allocated. bindClaim then ensures that the allocation
 // and reservation are recorded. This finishes the work started in Reserve.
@@ -1925,6 +1960,7 @@ func (pl *DynamicResources) bindClaim(ctx context.Context, state *stateData, ind
 	claim := state.claims.get(index)
 	binding := state.claims.getBinding(index, pod)
 	allocation := state.informationsForClaim[index].allocation
+	claimUID := claim.UID
 	isExtendedResourceClaim := false
 	if claim == state.claims.extendedResourceClaim() {
 		// extended resource requests satisfied by device plugin
@@ -1932,8 +1968,10 @@ func (pl *DynamicResources) bindClaim(ctx context.Context, state *stateData, ind
 			return claim, nil, nil
 		}
 		isExtendedResourceClaim = true
+		// Reserve keyed the pending allocation by the UID from PreFilter, which PreBind may have replaced.
+		claimUID = state.claims.getInitialExtendedResourceClaimUID()
 	}
-	claimUIDs := []types.UID{claim.UID}
+	claimUIDs := []types.UID{claimUID}
 	resourceClaimModified := false
 	var resourceVersion string
 	defer func() {
@@ -1982,20 +2020,16 @@ func (pl *DynamicResources) bindClaim(ctx context.Context, state *stateData, ind
 		}
 	}
 
-	// Create the special claim for extended resource backed by DRA
+	// Create the special claim for extended resource backed by DRA, unless PreBind already created it
+	// before patching the pod status. Then it no longer has the special name.
 	if isExtendedResourceClaim && isSpecialClaimName(claim.Name) {
 		var err error
-		claim, err = pl.createExtendedResourceClaimInAPI(ctx, pod, nodeName, state)
+		claim, err = pl.createExtendedResourceClaim(ctx, pod, nodeName, state)
 		if err != nil {
 			return nil, nil, err
 		}
 
 		resourceClaimModified = true
-		// Track the actual extended ResourceClaim from now.
-		// Relevant if we need to delete again in Unreserve.
-		if err := state.claims.updateExtendedResourceClaim(claim); err != nil {
-			return nil, nil, fmt.Errorf("internal error: update extended ResourceClaim: %w", err)
-		}
 	}
 
 	logger.V(5).Info("preparing claim status update", "claim", klog.KObj(state.claims.get(index)), "allocation", klog.Format(allocation))

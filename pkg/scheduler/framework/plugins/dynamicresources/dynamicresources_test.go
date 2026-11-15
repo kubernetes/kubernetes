@@ -4116,6 +4116,59 @@ func testPlugin(tCtx ktesting.TContext) {
 				},
 			},
 		},
+		"node-allocatable-status-rejected-before-claim-writes": {
+			// ResourceQuota can reject the status write, which then must not leave an allocation behind.
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRANodeAllocatableResources: true},
+			failPatch:        true,
+			nodes:            []*v1.Node{workerNodeWithCapacity},
+			pod:              podWithClaimReferenceInContainer,
+			patchTestCase: func(tc *testPluginCase) {
+				tc.pod = tc.pod.DeepCopy()
+				tc.pod.Status.ExtraNodeAllocatableResources = []v1.ExtraNodeAllocatableResource{
+					{
+						ContainerName: "",
+						Requests:      v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1")},
+						Limits:        v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1")},
+					},
+					{
+						ContainerName: tc.pod.Spec.Containers[0].Name,
+						Limits:        v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1")},
+					},
+				}
+			},
+			claims:  []*resourceapi.ResourceClaim{pendingClaim},
+			classes: []*resourceapi.DeviceClass{deviceClass},
+			objs: func() []apiruntime.Object {
+				slice := st.MakeResourceSlice(nodeName, driver).Device("instance-1").Obj()
+				slice.Spec.Devices[0].NodeAllocatableResources = map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+					v1.ResourceCPU: {Mapping: &resourceapi.NodeAllocatableMapping{DeviceMultiplier: new(apiresource.MustParse("1"))}},
+				}
+				return []apiruntime.Object{slice, podWithClaimReferenceInContainer}
+			}(),
+			want: want{
+				filter: perNodeResult{
+					workerNodeWithCapacity.Name: {
+						extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+							{
+								Requests: v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1")},
+								Limits:   v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1")},
+							},
+							{
+								ContainerName: podWithClaimReferenceInContainer.Spec.Containers[0].Name,
+								Limits:        v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1")},
+							},
+						},
+					},
+				},
+				reserve: result{
+					inFlightClaims: []metav1.Object{allocatedClaim},
+				},
+				prebind: result{
+					inFlightClaims: []metav1.Object{allocatedClaim},
+					status:         fwk.NewStatus(fwk.Error, `patch error`),
+				},
+			},
+		},
 		"node-allocatable-unreserve-without-prebind": {
 			// Unreserve also undoes simulations in which PreBind never ran, so it sends no request. The pod in
 			// the API server has entries only so that a request would show up as a change.
