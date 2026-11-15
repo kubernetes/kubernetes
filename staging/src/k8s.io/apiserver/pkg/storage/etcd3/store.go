@@ -246,6 +246,13 @@ func (s *store) Get(ctx context.Context, key string, opts storage.GetOptions, ou
 	if err != nil {
 		return err
 	}
+	var minimumRV uint64
+	if opts.ResourceVersion != "" {
+		minimumRV, err = s.versioner.ParseResourceVersion(opts.ResourceVersion)
+		if err != nil {
+			return err
+		}
+	}
 	ctx, span := tracing.Start(ctx, "Get etcd3",
 		attribute.String("audit-id", audit.GetAuditIDTruncated(ctx)),
 		attribute.String("key", key),
@@ -261,8 +268,8 @@ func (s *store) Get(ctx context.Context, key string, opts storage.GetOptions, ou
 		return err
 	}
 	span.AddEvent("Get call succeeded")
-	if err = s.validateMinimumResourceVersion(opts.ResourceVersion, uint64(getResp.Revision)); err != nil {
-		return err
+	if minimumRV > uint64(getResp.Revision) {
+		return storage.NewTooLargeResourceVersionError(minimumRV, uint64(getResp.Revision), 0)
 	}
 
 	if getResp.KV == nil {

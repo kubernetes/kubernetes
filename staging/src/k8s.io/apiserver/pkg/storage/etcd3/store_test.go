@@ -124,6 +124,14 @@ func TestCreateWithKeyExist(t *testing.T) {
 
 func TestGet(t *testing.T) {
 	ctx, store, client := testSetup(t)
+	recorder := client.Kubernetes.(*storagetesting.KubernetesRecorder)
+	invalidCtx := context.WithValue(ctx, storagetesting.RecorderContextKey, "invalid-rv")
+	if err := store.Get(invalidCtx, "/pods/non-existing", storage.GetOptions{ResourceVersion: "invalid"}, &example.Pod{}); err == nil {
+		t.Fatalf("expected invalid resource version error, got nil")
+	}
+	if stats := recorder.StatsForKey("invalid-rv"); stats.Gets != 0 {
+		t.Errorf("expected 0 etcd Get calls on invalid resourceVersion, got %d", stats.Gets)
+	}
 	storagetesting.RunTestGet(ctx, t, store, increaseRVFunc(client.Client))
 }
 
