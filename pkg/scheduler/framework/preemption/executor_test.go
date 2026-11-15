@@ -632,15 +632,12 @@ func TestPrepareCandidate(t *testing.T) {
 		},
 		{
 			name: "metrics: deferred resize pod preemptor with PDB violations",
-			candidate: &candidate{
-				name: node1Name,
-				victims: &extenderv1.Victims{
-					Pods: []*v1.Pod{
-						victim1,
-					},
-					NumPDBViolations: 3,
+			candidate: newCandidate(&extenderv1.Victims{
+				Pods: []*v1.Pod{
+					victim1,
 				},
-			},
+				NumPDBViolations: 3,
+			}, node1Name, nil, node1Name),
 			preemptor: st.MakePod().Name("preemptor").UID("preemptor").Node(node1Name).SchedulerName(defaultSchedulerName).
 				Condition(v1.PodResizePending, v1.ConditionTrue, v1.PodReasonDeferred).Obj(),
 			testPods: []*v1.Pod{
