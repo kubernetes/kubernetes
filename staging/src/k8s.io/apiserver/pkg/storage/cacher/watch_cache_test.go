@@ -497,6 +497,7 @@ func TestWaitUntilFreshAndGetList(t *testing.T) {
 		rv          string
 		rvMatch     metav1.ResourceVersionMatch
 		prefix      string
+		recursive   bool
 		pred        storage.SelectionPredicate
 		expectedOut []*v1.Pod
 		expectRV    uint64
@@ -505,15 +506,17 @@ func TestWaitUntilFreshAndGetList(t *testing.T) {
 		{
 			name:        "list by empty MatchValues",
 			prefix:      "/prefix/",
+			recursive:   true,
 			rv:          "5",
 			pred:        storage.Everything,
 			expectedOut: []*v1.Pod{pod1, pod2, pod3},
 			expectRV:    5,
 		},
 		{
-			name:   "list by label index",
-			prefix: "/prefix/",
-			rv:     "5",
+			name:      "list by label index",
+			prefix:    "/prefix/",
+			recursive: true,
+			rv:        "5",
 			pred: storage.SelectionPredicate{
 				Label: labels.SelectorFromSet(map[string]string{
 					"label": "value1",
@@ -528,9 +531,10 @@ func TestWaitUntilFreshAndGetList(t *testing.T) {
 			expectIndex: "l:label",
 		},
 		{
-			name:   "list with spec.nodeName index",
-			prefix: "/prefix/",
-			rv:     "5",
+			name:      "list with spec.nodeName index",
+			prefix:    "/prefix/",
+			recursive: true,
+			rv:        "5",
 			pred: storage.SelectionPredicate{
 				Label: labels.SelectorFromSet(map[string]string{
 					"not-exist-label": "whatever",
@@ -545,9 +549,10 @@ func TestWaitUntilFreshAndGetList(t *testing.T) {
 			expectIndex: "f:spec.nodeName",
 		},
 		{
-			name:   "list with index not exists",
-			prefix: "/prefix/",
-			rv:     "5",
+			name:      "list with index not exists",
+			prefix:    "/prefix/",
+			recursive: true,
+			rv:        "5",
 			pred: storage.SelectionPredicate{
 				Label: labels.SelectorFromSet(map[string]string{
 					"not-exist-label": "whatever",
@@ -559,8 +564,9 @@ func TestWaitUntilFreshAndGetList(t *testing.T) {
 			expectRV:    5,
 		},
 		{
-			name:   "list with spec.nodeName index and negative-RV continue",
-			prefix: "/prefix/",
+			name:      "list with spec.nodeName index and negative-RV continue",
+			prefix:    "/prefix/",
+			recursive: true,
 			pred: storage.SelectionPredicate{
 				Label:       labels.Everything(),
 				Field:       fields.SelectorFromSet(map[string]string{"spec.nodeName": "node1"}),
@@ -572,8 +578,9 @@ func TestWaitUntilFreshAndGetList(t *testing.T) {
 			expectIndex: "f:spec.nodeName",
 		},
 		{
-			name:   "list with spec.nodeName index and positive-RV continue",
-			prefix: "/prefix/",
+			name:      "list with spec.nodeName index and positive-RV continue",
+			prefix:    "/prefix/",
+			recursive: true,
 			pred: storage.SelectionPredicate{
 				Label:       labels.Everything(),
 				Field:       fields.SelectorFromSet(map[string]string{"spec.nodeName": "node1"}),
@@ -583,6 +590,47 @@ func TestWaitUntilFreshAndGetList(t *testing.T) {
 			expectedOut: []*v1.Pod{pod2, pod3},
 			expectRV:    5,
 			expectIndex: "",
+		},
+		{
+			name:        "non-recursive consistent get by key",
+			prefix:      "/prefix/ns/pod2",
+			pred:        storage.Everything,
+			expectedOut: []*v1.Pod{pod2},
+			expectRV:    5,
+		},
+		{
+			name:        "non-recursive missing key",
+			prefix:      "/prefix/ns/missing",
+			rv:          "5",
+			pred:        storage.Everything,
+			expectedOut: []*v1.Pod{},
+			expectRV:    5,
+		},
+		{
+			name:   "non-recursive ignores continue and index",
+			prefix: "/prefix/ns/pod1",
+			rv:     "5",
+			pred: storage.SelectionPredicate{
+				Label:       labels.Everything(),
+				Field:       fields.SelectorFromSet(map[string]string{"spec.nodeName": "node1"}),
+				IndexFields: []string{"spec.nodeName"},
+				Continue:    continueExactRV,
+			},
+			expectedOut: []*v1.Pod{pod1},
+			expectRV:    5,
+			expectIndex: "",
+		},
+		{
+			name:   "non-recursive with limit uses NotOlderThan instead of legacy exact",
+			prefix: "/prefix/ns/pod3",
+			rv:     "4",
+			pred: storage.SelectionPredicate{
+				Label: labels.Everything(),
+				Field: fields.Everything(),
+				Limit: 1,
+			},
+			expectedOut: []*v1.Pod{pod3},
+			expectRV:    5,
 		},
 	}
 
@@ -594,16 +642,16 @@ func TestWaitUntilFreshAndGetList(t *testing.T) {
 				ResourceVersion:      tt.rv,
 				ResourceVersionMatch: tt.rvMatch,
 				Predicate:            tt.pred,
-				Recursive:            true,
+				Recursive:            tt.recursive,
 			}
 			resp, indexUsed, err := s.WaitUntilFreshAndGetList(ctx, tt.prefix, opts)
 			require.NoError(t, err)
 			require.Equal(t, tt.expectRV, resp.ResourceVersion)
 			require.Equal(t, tt.expectIndex, indexUsed)
 
-			expectedElements := make([]*store.Element, len(tt.expectedOut))
-			for i, pod := range tt.expectedOut {
-				expectedElements[i] = makeTestStoreElement(pod)
+			var expectedElements []*store.Element
+			for _, pod := range tt.expectedOut {
+				expectedElements = append(expectedElements, makeTestStoreElement(pod))
 			}
 			require.Equal(t, expectedElements, itemsFromListResp(t, resp))
 		})
