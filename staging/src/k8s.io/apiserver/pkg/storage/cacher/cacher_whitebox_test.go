@@ -1142,6 +1142,9 @@ func testEmptyWatchEventCache(t *testing.T) {
 				Recursive:       true,
 			}
 			opts.Predicate.AllowWatchBookmarks = true
+			cacher.Lock()
+			watcherIdxBefore := cacher.watcherIdx
+			cacher.Unlock()
 			watcher, err := cacher.Watch(context.Background(), "/pods/test-ns", opts)
 			if err != nil {
 				t.Fatalf("Failed to create watch: %v", err)
@@ -1184,6 +1187,11 @@ func testEmptyWatchEventCache(t *testing.T) {
 					t.Errorf("Failed to get an event")
 				}
 				// watch remained established successfully
+				cacher.Lock()
+				if cacher.watcherIdx != watcherIdxBefore+1 {
+					t.Errorf("Expected watcherIdx=%d, got %d", watcherIdxBefore+1, cacher.watcherIdx)
+				}
+				cacher.Unlock()
 			}
 		})
 	}
