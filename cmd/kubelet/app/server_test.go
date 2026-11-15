@@ -768,14 +768,6 @@ func TestParseSystemPartition(t *testing.T) {
 			wantErr: `failed to parse evictionHard map["memory.available":"5x%"]: `,
 		},
 		{
-			name: "memory eviction threshold without memory limit",
-			input: &kubeletconfiginternal.SystemPartitionConfiguration{
-				EvictionHard: map[string]string{"memory.available": "200Mi"},
-				Namespaces:   []string{"kube-system"},
-			},
-			wantErr: `evictionHard requires memoryLimit to be set`,
-		},
-		{
 			name: "memory eviction threshold not below memory limit",
 			input: &kubeletconfiginternal.SystemPartitionConfiguration{
 				MemoryLimit:  "1Gi",
@@ -792,14 +784,6 @@ func TestParseSystemPartition(t *testing.T) {
 				Namespaces:   []string{"kube-system"},
 			},
 			wantErr: `evictionHard memory.available "100.0%" must be less than memoryLimit "1Gi"`,
-		},
-		{
-			name: "disabled eviction threshold without memory limit",
-			input: &kubeletconfiginternal.SystemPartitionConfiguration{
-				EvictionHard: map[string]string{"memory.available": "0%"},
-				Namespaces:   []string{"kube-system"},
-			},
-			wantErr: `evictionHard requires memoryLimit to be set`,
 		},
 		{
 			name: "cpuset naming offline CPUs",

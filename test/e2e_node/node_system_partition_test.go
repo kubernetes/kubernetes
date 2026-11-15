@@ -420,15 +420,24 @@ var _ = SIGDescribe("NodeSystemPartition", framework.WithSerial(), feature.NodeS
 		gomega.Eventually(ctx, readCPUs, time.Minute, podMovePollInterval).Should(
 			gomega.Equal(partitionCPUs.String()))
 
-		ginkgo.By("removing the memory limit and the cpuset from the config")
+		// A partition needs at least one of the two, so they are removed one at
+		// a time.
+		ginkgo.By("removing the cpuset from the config")
 		configureSystemPartitionWith(ctx, &kubeletconfig.SystemPartitionConfiguration{
+			MemoryLimit: systemPartitionMemoryLimit,
+			Namespaces:  []string{f.Namespace.Name},
+		})
+		gomega.Eventually(ctx, readCPUs, time.Minute, podMovePollInterval).Should(
+			gomega.Equal(onlineCPUs.String()),
+			"the partition should allow every online CPU once its cpuset is removed")
+
+		ginkgo.By("removing the memory limit from the config, keeping only a cpuset")
+		configureSystemPartitionWith(ctx, &kubeletconfig.SystemPartitionConfiguration{
+			CPUSet:     partitionCPUs.String(),
 			Namespaces: []string{f.Namespace.Name},
 		})
 		gomega.Eventually(ctx, readMemoryMax, time.Minute, podMovePollInterval).Should(
 			gomega.Equal("max"), "the memory limit set by the previous config should be lifted")
-		gomega.Eventually(ctx, readCPUs, time.Minute, podMovePollInterval).Should(
-			gomega.Equal(onlineCPUs.String()),
-			"the partition should allow every online CPU once its cpuset is removed")
 	})
 
 	ginkgo.It("places pods of the configured namespaces in the partition and leaves the others alone", func(ctx context.Context) {

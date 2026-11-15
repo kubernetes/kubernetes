@@ -475,6 +475,15 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featur
 				allErrors = append(allErrors, fmt.Errorf("invalid configuration: systemPartition.memoryLimit must be positive, got %q", sp.MemoryLimit))
 			}
 		}
+		// A partition with neither limit isolates nothing. To lift both limits,
+		// remove the partition instead.
+		if sp.MemoryLimit == "" && sp.CPUSet == "" {
+			allErrors = append(allErrors, fmt.Errorf("invalid configuration: systemPartition requires memoryLimit or cpuSet, or it does not isolate its Pods"))
+		}
+		// The memory left in the partition is measured against memoryLimit.
+		if len(sp.EvictionHard) > 0 && sp.MemoryLimit == "" {
+			allErrors = append(allErrors, fmt.Errorf("invalid configuration: systemPartition.evictionHard requires systemPartition.memoryLimit"))
+		}
 		if sp.CPUSet != "" {
 			partitionCPUs, err := cpuset.Parse(sp.CPUSet)
 			if err != nil {

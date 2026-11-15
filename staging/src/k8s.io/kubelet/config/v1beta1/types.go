@@ -1138,12 +1138,14 @@ type SystemPartitionConfiguration struct {
 	// root. It covers system partition Pods only, and is separate from kubeReserved
 	// and systemReserved, which cover host processes. There is no corresponding
 	// request, so the limit is not subtracted from Node Allocatable.
+	// At least one of memoryLimit and cpuSet is required.
 	// Default: ""
 	// +optional
 	MemoryLimit string `json:"memoryLimit,omitempty"`
 	// cpuSet is the set of CPUs dedicated to system partition Pods, in Linux CPU
 	// list format (e.g. "0-3"). It should typically match reservedSystemCPUs so
 	// that system Pods and host system services share the same cores.
+	// At least one of memoryLimit and cpuSet is required.
 	// Default: ""
 	// +optional
 	CPUSet string `json:"cpuSet,omitempty"`

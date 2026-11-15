@@ -1091,6 +1091,34 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 			},
 			errMsg: `invalid configuration: systemPartition.memoryLimit must be positive, got "0"`,
 		}, {
+			name: "systemPartition with neither memoryLimit nor cpuSet",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				if conf.FeatureGates == nil {
+					conf.FeatureGates = make(map[string]bool)
+				}
+				conf.FeatureGates[string(features.NodeSystemPartition)] = true
+				conf.SystemPartition = &kubeletconfig.SystemPartitionConfiguration{
+					Namespaces: []string{"kube-system"},
+				}
+				return conf
+			},
+			errMsg: "invalid configuration: systemPartition requires memoryLimit or cpuSet",
+		}, {
+			name: "systemPartition evictionHard without memoryLimit",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				if conf.FeatureGates == nil {
+					conf.FeatureGates = make(map[string]bool)
+				}
+				conf.FeatureGates[string(features.NodeSystemPartition)] = true
+				conf.SystemPartition = &kubeletconfig.SystemPartitionConfiguration{
+					CPUSet:       "0-1",
+					EvictionHard: map[string]string{"memory.available": "200Mi"},
+					Namespaces:   []string{"kube-system"},
+				}
+				return conf
+			},
+			errMsg: "invalid configuration: systemPartition.evictionHard requires systemPartition.memoryLimit",
+		}, {
 			name: "systemPartition with unparsable cpuset",
 			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
 				if conf.FeatureGates == nil {

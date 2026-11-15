@@ -1478,11 +1478,6 @@ func parseSystemPartition(logger klog.Logger, machineInfo *cadvisorapi.MachineIn
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse evictionHard %q: %w", sp.EvictionHard, err)
 	}
-	// The memory left in the partition is measured against memoryLimit, so
-	// there is nothing to measure without one.
-	if len(sp.EvictionHard) > 0 && parsed.MemoryLimit == nil {
-		return nil, fmt.Errorf("evictionHard requires memoryLimit to be set")
-	}
 	for _, threshold := range thresholds {
 		// A threshold at or above the limit is met all the time, and would keep
 		// evicting the partition's Pods however little they use.

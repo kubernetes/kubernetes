@@ -78358,14 +78358,14 @@ func schema_k8sio_kubelet_config_v1beta1_SystemPartitionConfiguration(ref common
 				Properties: map[string]spec.Schema{
 					"memoryLimit": {
 						SchemaProps: spec.SchemaProps{
-							Description: "memoryLimit is the hard memory limit applied to the system partition cgroup root. It covers system partition Pods only, and is separate from kubeReserved and systemReserved, which cover host processes. There is no corresponding request, so the limit is not subtracted from Node Allocatable. Default: \"\"",
+							Description: "memoryLimit is the hard memory limit applied to the system partition cgroup root. It covers system partition Pods only, and is separate from kubeReserved and systemReserved, which cover host processes. There is no corresponding request, so the limit is not subtracted from Node Allocatable. At least one of memoryLimit and cpuSet is required. Default: \"\"",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"cpuSet": {
 						SchemaProps: spec.SchemaProps{
-							Description: "cpuSet is the set of CPUs dedicated to system partition Pods, in Linux CPU list format (e.g. \"0-3\"). It should typically match reservedSystemCPUs so that system Pods and host system services share the same cores. Default: \"\"",
+							Description: "cpuSet is the set of CPUs dedicated to system partition Pods, in Linux CPU list format (e.g. \"0-3\"). It should typically match reservedSystemCPUs so that system Pods and host system services share the same cores. At least one of memoryLimit and cpuSet is required. Default: \"\"",
 							Type:        []string{"string"},
 							Format:      "",
 						},
