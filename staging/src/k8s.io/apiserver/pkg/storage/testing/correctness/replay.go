@@ -119,10 +119,7 @@ func (r *Replay) validateGet(req Request, resp Response) error {
 		if rv < reqRV {
 			continue
 		}
-		// Cacher returns NotFound errors without the underlying etcd prefix.
-		stateWithoutPrefix := *state
-		stateWithoutPrefix.Prefix = ""
-		if reflect.DeepEqual(state.get(req.Key, opts), resp) || reflect.DeepEqual(stateWithoutPrefix.get(req.Key, opts), resp) {
+		if reflect.DeepEqual(state.get(req.Key, opts), resp) {
 			return nil
 		}
 	}

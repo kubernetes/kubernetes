@@ -61,9 +61,8 @@ func NewModelFromStorage(prefix string, list runtime.Object, newFunc, newListFun
 }
 
 // NewEmptyModel returns a new Model with no items.
-func NewEmptyModel(prefix string, newFunc, newListFunc func() runtime.Object, versioner storage.Versioner) *Model {
+func NewEmptyModel(_ string, newFunc, newListFunc func() runtime.Object, versioner storage.Versioner) *Model {
 	return &Model{
-		Prefix:          prefix,
 		ResourceVersion: 1,
 		Items:           make(map[string]runtime.Object),
 		NewFunc:         newFunc,
@@ -77,7 +76,6 @@ type Model struct {
 	Items                  map[string]runtime.Object
 	ResourceVersion        uint64
 	CompactResourceVersion uint64
-	Prefix                 string
 	Versioner              storage.Versioner
 	NewFunc                func() runtime.Object
 	NewListFunc            func() runtime.Object
@@ -89,7 +87,6 @@ func (s *Model) Clone() *Model {
 		Items:                  make(map[string]runtime.Object, len(s.Items)),
 		ResourceVersion:        s.ResourceVersion,
 		CompactResourceVersion: s.CompactResourceVersion,
-		Prefix:                 s.Prefix,
 		NewFunc:                s.NewFunc,
 		NewListFunc:            s.NewListFunc,
 		Versioner:              s.Versioner,
@@ -104,7 +101,7 @@ func (s *Model) Clone() *Model {
 }
 
 func (s *Model) Equal(other *Model) bool {
-	return s.ResourceVersion == other.ResourceVersion && s.CompactResourceVersion == other.CompactResourceVersion && s.Prefix == other.Prefix && reflect.DeepEqual(s.Items, other.Items)
+	return s.ResourceVersion == other.ResourceVersion && s.CompactResourceVersion == other.CompactResourceVersion && reflect.DeepEqual(s.Items, other.Items)
 }
 
 // Step applies an operation to the sequential state machine. change is the
@@ -125,25 +122,11 @@ func (s *Model) Step(input Request, output Response) (ok bool, next *Model, chan
 	case OpList:
 		return s.validateList(input.Key, input.List.Options, expected, output), s, nil
 	default:
-		if !s.equalResponse(expected, output) {
+		if !reflect.DeepEqual(expected, output) {
 			return false, s, nil
 		}
 		return true, next, change
 	}
-}
-
-func (s *Model) equalResponse(expected, output Response) bool {
-	if reflect.DeepEqual(expected, output) {
-		return true
-	}
-	expErr, ok := expected.Err.(*storage.StorageError)
-	if !ok || expected.Object != nil || s.Prefix == "" || !strings.HasPrefix(expErr.Key, s.Prefix+"/") {
-		return false
-	}
-	// CacheDelegator returns storage errors keyed without etcd3's path prefix.
-	unprefixed := *expErr
-	unprefixed.Key = strings.TrimPrefix(expErr.Key, s.Prefix)
-	return reflect.DeepEqual(Response{Err: &unprefixed}, output)
 }
 
 // execute returns the response storage gives for input served from this
@@ -190,7 +173,7 @@ func (s *Model) validateGet(opts storage.GetOptions, expected, output Response) 
 	reqRV, _ := s.Versioner.ParseResourceVersion(opts.ResourceVersion)
 	switch GetReadConsistency(opts) {
 	case ConsistencyConsistent:
-		return s.equalResponse(expected, output)
+		return reflect.DeepEqual(expected, output)
 	case ConsistencyNotOlderThan:
 		if _, retry := apierrors.SuggestsClientDelay(output.Err); retry && reqRV > 0 && storage.IsTooLargeResourceVersion(output.Err) {
 			return true
@@ -325,7 +308,7 @@ func (s *Model) update(ctx context.Context, key string, ignoreNotFound bool, pre
 	var currentRV uint64
 	if !exists {
 		if !ignoreNotFound {
-			return Response{Object: nil, Err: storage.NewKeyNotFoundError(s.Prefix+key, int64(s.ResourceVersion))}, nil
+			return Response{Object: nil, Err: storage.NewKeyNotFoundError(key, int64(s.ResourceVersion))}, nil
 		}
 		if s.NewFunc == nil {
 			return Response{Object: nil, Err: fmt.Errorf("NewFunc must be provided when ignoreNotFound=true")}, nil
@@ -341,7 +324,7 @@ func (s *Model) update(ctx context.Context, key string, ignoreNotFound bool, pre
 		currentRV = rv
 	}
 
-	if err := preconditions.Check(s.Prefix+key, currentObj); err != nil {
+	if err := preconditions.Check(key, currentObj); err != nil {
 		return Response{Object: nil, Err: err}, nil
 	}
 
@@ -385,7 +368,7 @@ func (s *Model) create(key string, obj runtime.Object) (Response, *Change) {
 		return Response{Err: storage.ErrResourceVersionSetOnCreate}, nil
 	}
 	if _, exists := s.Items[key]; exists {
-		return Response{Object: nil, Err: storage.NewKeyExistsError(s.Prefix+key, 0)}, nil
+		return Response{Object: nil, Err: storage.NewKeyExistsError(key, 0)}, nil
 	}
 	s.ResourceVersion++
 	copied := obj.DeepCopyObject()
@@ -414,7 +397,7 @@ func (s *Model) get(key string, opts storage.GetOptions) Response {
 		if opts.IgnoreNotFound {
 			return Response{Object: s.NewFunc(), Err: nil}
 		}
-		return Response{Object: nil, Err: storage.NewKeyNotFoundError(s.Prefix+key, int64(s.ResourceVersion))}
+		return Response{Object: nil, Err: storage.NewKeyNotFoundError(key, int64(s.ResourceVersion))}
 	}
 	return Response{Object: stored.DeepCopyObject(), Err: nil}
 }
@@ -585,9 +568,9 @@ func (s *Model) delete(ctx context.Context, key string, preconditions *storage.P
 	}
 	stored, exists := s.Items[key]
 	if !exists {
-		return Response{Object: nil, Err: storage.NewKeyNotFoundError(s.Prefix+key, int64(s.ResourceVersion))}, nil
+		return Response{Object: nil, Err: storage.NewKeyNotFoundError(key, int64(s.ResourceVersion))}, nil
 	}
-	if err := preconditions.Check(s.Prefix+key, stored); err != nil {
+	if err := preconditions.Check(key, stored); err != nil {
 		return Response{Object: nil, Err: err}, nil
 	}
 	if validateDeletion != nil && stored != nil {

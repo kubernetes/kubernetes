@@ -90,14 +90,14 @@ func TestDeleteOnce(t *testing.T) {
 	t.Parallel()
 	ctx, cacher, terminate := setup.Setup(t)
 	t.Cleanup(terminate)
-	storagetesting.RunTestDeleteOnce(ctx, t, cacher, etcd3testing.PathPrefix(), cachertesting.Examplev1ProtoCodec)
+	storagetesting.RunTestDeleteOnce(ctx, t, cacher, cachertesting.Examplev1ProtoCodec)
 }
 
 func TestUpdateOnce(t *testing.T) {
 	t.Parallel()
 	ctx, cacher, terminate := setup.Setup(t)
 	t.Cleanup(terminate)
-	storagetesting.RunTestUpdateOnce(ctx, t, cacher, etcd3testing.PathPrefix(), cachertesting.Examplev1ProtoCodec)
+	storagetesting.RunTestUpdateOnce(ctx, t, cacher, cachertesting.Examplev1ProtoCodec)
 }
 
 type testTransformer struct {

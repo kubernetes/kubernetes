@@ -6414,7 +6414,7 @@ func runOptimisticConcurrencyOp(ctx context.Context, t *testing.T, store Interfa
 	}
 }
 
-func RunTestDeleteOnce(ctx context.Context, t *testing.T, store storage.Interface, prefix string, codec runtime.Codec) {
+func RunTestDeleteOnce(ctx context.Context, t *testing.T, store storage.Interface, codec runtime.Codec) {
 	mustState := func(obj runtime.Object) *storage.ObjState {
 		state, err := storage.GetStateFromObject(store.Versioner(), codec, obj, true)
 		require.NoError(t, err)
@@ -6441,7 +6441,7 @@ func RunTestDeleteOnce(ctx context.Context, t *testing.T, store storage.Interfac
 			name:         "conflicts on stale revision",
 			key:          key,
 			origState:    mustState(stale),
-			expectError:  storage.NewResourceVersionConflictsError(prefix+key, existingRev),
+			expectError:  storage.NewResourceVersionConflictsError(key, existingRev),
 			expectOut:    &example.Pod{},
 			expectStored: existing,
 		},
@@ -6449,7 +6449,7 @@ func RunTestDeleteOnce(ctx context.Context, t *testing.T, store storage.Interfac
 			name:         "conflicts when key does not exist",
 			key:          "/pods/test-ns/missing",
 			origState:    mustState(existing.DeepCopy()),
-			expectError:  storage.NewResourceVersionConflictsError(prefix+"/pods/test-ns/missing", existingRev),
+			expectError:  storage.NewResourceVersionConflictsError("/pods/test-ns/missing", existingRev),
 			expectOut:    &example.Pod{},
 			expectStored: nil,
 		},
@@ -6500,7 +6500,7 @@ func RunTestDeleteOnce(ctx context.Context, t *testing.T, store storage.Interfac
 	}
 }
 
-func RunTestUpdateOnce(ctx context.Context, t *testing.T, store storage.Interface, prefix string, codec runtime.Codec) {
+func RunTestUpdateOnce(ctx context.Context, t *testing.T, store storage.Interface, codec runtime.Codec) {
 	mustState := func(obj runtime.Object) *storage.ObjState {
 		state, err := storage.GetStateFromObject(store.Versioner(), codec, obj, true)
 		require.NoError(t, err)
@@ -6556,7 +6556,7 @@ func RunTestUpdateOnce(ctx context.Context, t *testing.T, store storage.Interfac
 			origState:    mustState(updated.DeepCopy()),
 			obj:          updated,
 			expectState:  mustStorageState(existing.DeepCopy()),
-			expectError:  storage.NewResourceVersionConflictsError(prefix+key, existingRev),
+			expectError:  storage.NewResourceVersionConflictsError(key, existingRev),
 			expectOut:    &example.Pod{},
 			expectStored: existing,
 		},
@@ -6565,7 +6565,7 @@ func RunTestUpdateOnce(ctx context.Context, t *testing.T, store storage.Interfac
 			key:          key,
 			origState:    mustState(stale),
 			obj:          updated,
-			expectError:  storage.NewResourceVersionConflictsError(prefix+key, existingRev),
+			expectError:  storage.NewResourceVersionConflictsError(key, existingRev),
 			expectOut:    &example.Pod{},
 			expectStored: existing,
 		},
@@ -6575,7 +6575,7 @@ func RunTestUpdateOnce(ctx context.Context, t *testing.T, store storage.Interfac
 			origState:      mustState(&example.Pod{}),
 			obj:            updated,
 			ignoreNotFound: true,
-			expectError:    storage.NewResourceVersionConflictsError(prefix+key, existingRev),
+			expectError:    storage.NewResourceVersionConflictsError(key, existingRev),
 			expectOut:      &example.Pod{},
 			expectStored:   existing,
 		},
@@ -6584,7 +6584,7 @@ func RunTestUpdateOnce(ctx context.Context, t *testing.T, store storage.Interfac
 			key:          "/pods/test-ns/missing",
 			origState:    mustState(existing.DeepCopy()),
 			obj:          updated,
-			expectError:  storage.NewResourceVersionConflictsError(prefix+"/pods/test-ns/missing", existingRev),
+			expectError:  storage.NewResourceVersionConflictsError("/pods/test-ns/missing", existingRev),
 			expectOut:    &example.Pod{},
 			expectStored: nil,
 		},
@@ -6593,7 +6593,7 @@ func RunTestUpdateOnce(ctx context.Context, t *testing.T, store storage.Interfac
 			key:          "/pods/test-ns/missing",
 			origState:    mustState(existing.DeepCopy()),
 			obj:          existing,
-			expectError:  storage.NewKeyNotFoundError(prefix+"/pods/test-ns/missing", existingRev),
+			expectError:  storage.NewKeyNotFoundError("/pods/test-ns/missing", existingRev),
 			expectOut:    &example.Pod{},
 			expectStored: nil,
 		},
