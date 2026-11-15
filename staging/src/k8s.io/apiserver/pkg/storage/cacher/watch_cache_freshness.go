@@ -84,6 +84,9 @@ func (w *freshnessWaiter) waitUntilFreshLockedWithLocker(ctx context.Context, re
 	if resourceVersion == 0 || resourceVersion <= w.latestRV {
 		return nil
 	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	w.progressRequester.Add()
 	defer w.progressRequester.Remove()
 	startTime := w.clock.Now()
@@ -102,6 +105,10 @@ func (w *freshnessWaiter) waitUntilFreshLockedWithLocker(ctx context.Context, re
 	case <-waiter.satisfiedCh:
 		locker.Lock()
 		return nil
+	case <-ctx.Done():
+		w.unregisterWaiter(waiter)
+		locker.Lock()
+		return ctx.Err()
 	case <-timer.C():
 		w.unregisterWaiter(waiter)
 		locker.Lock()

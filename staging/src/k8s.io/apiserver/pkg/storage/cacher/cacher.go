@@ -751,6 +751,9 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 
 	watcher, err := c.watch(ctx, key, requestedWatchRV, readyGeneration, opts)
 	if err != nil {
+		if ctx.Err() != nil {
+			return newImmediateCloseWatcher(), nil
+		}
 		// To match the uncached watch implementation, once we have passed authn/authz/admission,
 		// and successfully parsed a resource version, other errors must fail with a watch event of type ERROR,
 		// rather than a directly returned error.
@@ -863,6 +866,9 @@ func (c *Cacher) watch(ctx context.Context, key string, requestedWatchRV uint64,
 	c.Lock()
 	defer c.Unlock()
 
+	if ctx.Err() != nil {
+		return nil, nil
+	}
 	if generation, _, err := c.ready.checkAndReadGeneration(); generation != readyGeneration || err != nil {
 		// We went unready or are already on a different generation.
 		// Avoid registering and starting the watch as it will have to be

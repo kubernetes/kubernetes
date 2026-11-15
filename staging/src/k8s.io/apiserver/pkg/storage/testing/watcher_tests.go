@@ -546,20 +546,41 @@ func RunTestWatchWithUnsafeDelete(ctx context.Context, t *testing.T, store Inter
 }
 
 func RunTestWatchContextCancel(ctx context.Context, t *testing.T, store storage.Interface) {
+	testPropagateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "not-existing"}})
+
 	canceledCtx, cancel := context.WithCancel(ctx)
 	cancel()
+
+	sendInitialEvents := true
+	predWithBookmarks := storage.Everything
+	predWithBookmarks.AllowWatchBookmarks = true
+
 	// When we watch with a canceled context, we should detect that it's context canceled.
 	// We won't take it as error and also close the watcher.
-	w, err := store.Watch(canceledCtx, "/pods/not-existing", storage.ListOptions{
-		ResourceVersion: "0",
-		Predicate:       storage.Everything,
-		Recursive:       true,
-	})
-	if err != nil {
-		t.Fatal(err)
+	for _, opts := range []storage.ListOptions{
+		{
+			ResourceVersion: "0",
+			Predicate:       storage.Everything,
+			Recursive:       true,
+		},
+		{
+			ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan,
+			SendInitialEvents:    &sendInitialEvents,
+			Predicate:            predWithBookmarks,
+			Recursive:            true,
+		},
+		{
+			ResourceVersion:      "999999",
+			ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan,
+			SendInitialEvents:    &sendInitialEvents,
+			Predicate:            predWithBookmarks,
+			Recursive:            true,
+		},
+	} {
+		w, err := store.Watch(canceledCtx, "/pods/not-existing", opts)
+		require.NoError(t, err)
+		testCheckStop(t, w)
 	}
-
-	testCheckStop(t, w)
 }
 
 func RunTestWatcherTimeout(ctx context.Context, t *testing.T, store storage.Interface) {

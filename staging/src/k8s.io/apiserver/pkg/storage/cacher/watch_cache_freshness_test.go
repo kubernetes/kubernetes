@@ -43,8 +43,10 @@ func TestWaitUntilFreshLocked(t *testing.T) {
 		err      error
 	}
 	type waiter struct {
-		requestRV   uint64
-		wantOutcome outcome
+		requestRV        uint64
+		timeout          time.Duration
+		cancelBeforeWait bool
+		wantOutcome      outcome
 	}
 	type step struct {
 		at       time.Duration
@@ -177,6 +179,16 @@ func TestWaitUntilFreshLocked(t *testing.T) {
 				{at: blockTimeout + 200*time.Millisecond, updateRV: 15},
 			},
 		},
+		{
+			name: "context cancellation and deadline unblock waiter early without affecting sibling waiters",
+			steps: []step{
+				{updateRV: 5},
+				{waiter: &waiter{requestRV: 10, cancelBeforeWait: true, wantOutcome: outcome{rv: 5, duration: 0, err: context.Canceled}}},
+				{waiter: &waiter{requestRV: 10, timeout: 250 * time.Millisecond, wantOutcome: outcome{rv: 5, duration: 250 * time.Millisecond, err: context.DeadlineExceeded}}},
+				{waiter: &waiter{requestRV: 10, wantOutcome: outcome{rv: 10, duration: 500 * time.Millisecond}}},
+				{at: 500 * time.Millisecond, updateRV: 10},
+			},
+		},
 	}
 
 	for _, tc := range tests {
@@ -204,7 +216,17 @@ func TestWaitUntilFreshLocked(t *testing.T) {
 						go func() {
 							defer wg.Done()
 							waitStart := time.Now()
-							rv, err := fw.waitUntilFresh(context.Background(), s.waiter.requestRV)
+							waitCtx := context.Background()
+							if s.waiter.cancelBeforeWait {
+								var cancel context.CancelFunc
+								waitCtx, cancel = context.WithCancel(waitCtx)
+								cancel()
+							} else if s.waiter.timeout > 0 {
+								var cancel context.CancelFunc
+								waitCtx, cancel = context.WithTimeout(waitCtx, s.waiter.timeout)
+								defer cancel()
+							}
+							rv, err := fw.waitUntilFresh(waitCtx, s.waiter.requestRV)
 							outcomes[i] = outcome{
 								rv:       rv,
 								duration: time.Since(waitStart),
