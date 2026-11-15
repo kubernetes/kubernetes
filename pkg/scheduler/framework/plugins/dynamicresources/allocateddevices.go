@@ -29,22 +29,23 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/dynamic-resource-allocation/structured"
-	"k8s.io/dynamic-resource-allocation/structured/schedulerapi"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 	"k8s.io/utils/ptr"
 )
 
-// foreachConsumedCounters invokes callback for each non-admin allocation result,
-// including results with nil or empty ConsumedCounters. Empty snapshots let an
-// in-flight allocation replace previously cached consumption.
+// foreachConsumedCounters invokes callback for each non-admin allocation result
+// with recorded ConsumedCounters.
 func foreachConsumedCounters(allocation *resourceapi.AllocationResult, callback func(structured.SharedDeviceID, []resourceapi.CounterSetConsumption)) {
 	if allocation == nil || callback == nil {
 		return
 	}
 	for _, result := range allocation.Devices.Results {
 		if ptr.Deref(result.AdminAccess, false) {
+			continue
+		}
+		if len(result.ConsumedCounters) == 0 {
 			continue
 		}
 		id := structured.MakeDeviceID(result.Driver, result.Pool, result.Device)
@@ -116,18 +117,13 @@ func (a *allocatedDevices) get() (sets.Set[structured.DeviceID], int64) {
 	return a.ids.Clone(), a.revision
 }
 
-// getSharedDeviceIDs also collects status snapshots during the shared-device pass.
-func (a *allocatedDevices) getSharedDeviceIDs(consumption schedulerapi.CounterConsumptionByDevice, snapshots map[structured.SharedDeviceID][]resourceapi.CounterSetConsumption, inFlight sets.Set[structured.SharedDeviceID]) (sets.Set[structured.DeviceID], int64) {
+func (a *allocatedDevices) getSharedDeviceIDs() (sets.Set[structured.DeviceID], int64) {
 	a.mutex.RLock()
 	defer a.mutex.RUnlock()
 
 	result := make(sets.Set[structured.DeviceID], a.shareIDs.Len())
 	for sharedDeviceID := range a.shareIDs {
-		id := sharedDeviceID.GetDeviceID()
-		result.Insert(id)
-		if _, tracked := consumption[id]; tracked && !inFlight.Has(sharedDeviceID) {
-			consumption.Add(id, snapshots[sharedDeviceID])
-		}
+		result.Insert(sharedDeviceID.GetDeviceID())
 	}
 	return result, a.revision
 }
@@ -230,12 +226,10 @@ func (a *allocatedDevices) addDevices(claim *resourceapi.ResourceClaim) {
 	var counterCallback func(structured.SharedDeviceID, []resourceapi.CounterSetConsumption)
 	if a.enabledSharedConsumableCapacity {
 		counterCallback = func(id structured.SharedDeviceID, consumption []resourceapi.CounterSetConsumption) {
-			if len(consumption) > 0 {
-				if counters == nil {
-					counters = make(map[structured.SharedDeviceID][]resourceapi.CounterSetConsumption)
-				}
-				counters[id] = consumption
+			if counters == nil {
+				counters = make(map[structured.SharedDeviceID][]resourceapi.CounterSetConsumption)
 			}
+			counters[id] = consumption
 		}
 	}
 	if a.enabledConsumableCapacity {
@@ -305,10 +299,8 @@ func (a *allocatedDevices) removeDevices(claim *resourceapi.ResourceClaim) {
 	var counters []structured.SharedDeviceID
 	var counterCallback func(structured.SharedDeviceID, []resourceapi.CounterSetConsumption)
 	if a.enabledSharedConsumableCapacity {
-		counterCallback = func(id structured.SharedDeviceID, consumption []resourceapi.CounterSetConsumption) {
-			if len(consumption) > 0 {
-				counters = append(counters, id)
-			}
+		counterCallback = func(id structured.SharedDeviceID, _ []resourceapi.CounterSetConsumption) {
+			counters = append(counters, id)
 		}
 	}
 	if a.enabledConsumableCapacity {

@@ -458,27 +458,27 @@ func testGatherAllocatedStateConsumedCounters(tCtx ktesting.TContext) {
 		disabled  bool
 		want      []string
 	}{
-		"ordinary DRA":                                  {allocated: []*resourceapi.ResourceClaim{unknown}},
-		"disabled":                                      {allocated: []*resourceapi.ResourceClaim{first}, inFlight: []*resourceapi.ResourceClaim{second}, disabled: true},
-		"separate share snapshots":                      {allocated: []*resourceapi.ResourceClaim{first, second}, want: []string{"5", "3"}},
-		"cached and in-flight duplicate":                {allocated: []*resourceapi.ResourceClaim{first}, inFlight: []*resourceapi.ResourceClaim{first}, want: []string{"5"}},
-		"cached missing share duplicated in flight":     {allocated: []*resourceapi.ResourceClaim{unknown, first}, inFlight: []*resourceapi.ResourceClaim{unknown}, want: []string{"missing", "5"}},
-		"cached and in-flight shares including missing": {allocated: []*resourceapi.ResourceClaim{unknown, first, second}, inFlight: []*resourceapi.ResourceClaim{unknown, first, second}, want: []string{"missing", "5", "3"}},
-		"in-flight replaces cached snapshot":            {allocated: []*resourceapi.ResourceClaim{first}, inFlight: []*resourceapi.ResourceClaim{overridden}, want: []string{"7"}},
-		"in-flight replaces snapshot with unknown":      {allocated: []*resourceapi.ResourceClaim{first}, inFlight: []*resourceapi.ResourceClaim{missingOverride}},
-		"missing cached dedicated allocation":           {allocated: []*resourceapi.ResourceClaim{unknownDedicated, first}, want: []string{"missing", "5"}},
-		"missing in-flight dedicated allocation":        {allocated: []*resourceapi.ResourceClaim{first}, inFlight: []*resourceapi.ResourceClaim{unknownDedicated}, want: []string{"missing", "5"}},
-		"snapshot after cached dedicated allocation":    {allocated: []*resourceapi.ResourceClaim{unknownDedicated}, inFlight: []*resourceapi.ResourceClaim{first}, want: []string{"missing", "5"}},
-		"missing cached share":                          {allocated: []*resourceapi.ResourceClaim{unknown, first}, want: []string{"missing", "5"}},
-		"missing in-flight share":                       {allocated: []*resourceapi.ResourceClaim{first}, inFlight: []*resourceapi.ResourceClaim{unknown}, want: []string{"missing", "5"}},
-		"snapshot after missing in-flight share":        {inFlight: []*resourceapi.ResourceClaim{unknown, first}, want: []string{"missing", "5"}},
-		"release first share":                           {allocated: []*resourceapi.ResourceClaim{first, second}, removed: []*resourceapi.ResourceClaim{first}, want: []string{"3"}},
-		"release last share":                            {allocated: []*resourceapi.ResourceClaim{first}, removed: []*resourceapi.ResourceClaim{first}},
-		"release missing share":                         {allocated: []*resourceapi.ResourceClaim{unknown, zero}, removed: []*resourceapi.ResourceClaim{unknown}, want: []string{"0"}},
-		"known zero":                                    {allocated: []*resourceapi.ResourceClaim{zero}, want: []string{"0"}},
-		"zero and missing":                              {allocated: []*resourceapi.ResourceClaim{zero, unknown}, want: []string{"0", "missing"}},
-		"admin excluded":                                {allocated: []*resourceapi.ResourceClaim{admin, first}, want: []string{"5"}},
-		"dedicated allocation":                          {allocated: []*resourceapi.ResourceClaim{dedicated}, want: []string{"2"}},
+		"ordinary DRA":                   {allocated: []*resourceapi.ResourceClaim{unknown}},
+		"disabled":                       {allocated: []*resourceapi.ResourceClaim{first}, inFlight: []*resourceapi.ResourceClaim{second}, disabled: true},
+		"separate share snapshots":       {allocated: []*resourceapi.ResourceClaim{first, second}, want: []string{"5", "3"}},
+		"cached and in-flight duplicate": {allocated: []*resourceapi.ResourceClaim{first}, inFlight: []*resourceapi.ResourceClaim{first}, want: []string{"5"}},
+		"cached share without snapshot is ignored when duplicated in flight": {allocated: []*resourceapi.ResourceClaim{unknown, first}, inFlight: []*resourceapi.ResourceClaim{unknown}, want: []string{"5"}},
+		"shares without snapshot are ignored":                                {allocated: []*resourceapi.ResourceClaim{unknown, first, second}, inFlight: []*resourceapi.ResourceClaim{unknown, first, second}, want: []string{"5", "3"}},
+		"in-flight replaces cached snapshot":                                 {allocated: []*resourceapi.ResourceClaim{first}, inFlight: []*resourceapi.ResourceClaim{overridden}, want: []string{"7"}},
+		"in-flight without snapshot keeps cached snapshot":                   {allocated: []*resourceapi.ResourceClaim{first}, inFlight: []*resourceapi.ResourceClaim{missingOverride}, want: []string{"5"}},
+		"cached dedicated allocation without snapshot is ignored":            {allocated: []*resourceapi.ResourceClaim{unknownDedicated, first}, want: []string{"5"}},
+		"in-flight dedicated allocation without snapshot is ignored":         {allocated: []*resourceapi.ResourceClaim{first}, inFlight: []*resourceapi.ResourceClaim{unknownDedicated}, want: []string{"5"}},
+		"snapshot after cached dedicated allocation without snapshot":        {allocated: []*resourceapi.ResourceClaim{unknownDedicated}, inFlight: []*resourceapi.ResourceClaim{first}, want: []string{"5"}},
+		"cached share without snapshot is ignored":                           {allocated: []*resourceapi.ResourceClaim{unknown, first}, want: []string{"5"}},
+		"in-flight share without snapshot is ignored":                        {allocated: []*resourceapi.ResourceClaim{first}, inFlight: []*resourceapi.ResourceClaim{unknown}, want: []string{"5"}},
+		"snapshot after in-flight share without snapshot":                    {inFlight: []*resourceapi.ResourceClaim{unknown, first}, want: []string{"5"}},
+		"release first share":                                                {allocated: []*resourceapi.ResourceClaim{first, second}, removed: []*resourceapi.ResourceClaim{first}, want: []string{"3"}},
+		"release last share":                                                 {allocated: []*resourceapi.ResourceClaim{first}, removed: []*resourceapi.ResourceClaim{first}},
+		"release missing share":                                              {allocated: []*resourceapi.ResourceClaim{unknown, zero}, removed: []*resourceapi.ResourceClaim{unknown}, want: []string{"0"}},
+		"known zero":                                                         {allocated: []*resourceapi.ResourceClaim{zero}, want: []string{"0"}},
+		"known zero and share without snapshot":                              {allocated: []*resourceapi.ResourceClaim{zero, unknown}, want: []string{"0"}},
+		"admin excluded":                                                     {allocated: []*resourceapi.ResourceClaim{admin, first}, want: []string{"5"}},
+		"dedicated allocation":                                               {allocated: []*resourceapi.ResourceClaim{dedicated}, want: []string{"2"}},
 	}
 	for name, tc := range tests {
 		tCtx.Run(name, func(tCtx ktesting.TContext) {
@@ -503,10 +503,6 @@ func testGatherAllocatedStateConsumedCounters(tCtx ktesting.TContext) {
 			tCtx.Expect(state.ConsumedCounters).To(gomega.HaveLen(1))
 			var amounts []string
 			for _, snapshot := range state.ConsumedCounters[structured.MakeDeviceID(sharedDriver, sharedPool, sharedDevice)] {
-				if len(snapshot) == 0 {
-					amounts = append(amounts, "missing")
-					continue
-				}
 				tCtx.Expect(snapshot).To(gomega.HaveLen(1))
 				amount := snapshot[0].Counters["memory"]
 				amounts = append(amounts, amount.String())

@@ -402,12 +402,6 @@ func (c *claimTracker) GatherAllocatedState() (s *structured.AllocatedState, err
 		AllocatedDevices:   allocated,
 		AggregatedCapacity: aggregatedCapacity,
 	}
-	if len(counterSnapshots) > 0 {
-		state.ConsumedCounters = make(schedulerapi.CounterConsumptionByDevice)
-		for id := range counterSnapshots {
-			state.ConsumedCounters[id.GetDeviceID()] = nil
-		}
-	}
 
 	var inFlightIDs sets.Set[structured.SharedDeviceID]
 	var counterCallback func(structured.SharedDeviceID, []resourceapi.CounterSetConsumption)
@@ -443,27 +437,21 @@ func (c *claimTracker) GatherAllocatedState() (s *structured.AllocatedState, err
 	if inFlightErr != nil {
 		return nil, inFlightErr
 	}
-	for id := range state.ConsumedCounters {
-		dedicatedID := structured.MakeSharedDeviceID(id, nil)
-		if allocated.Has(id) && !inFlightIDs.Has(dedicatedID) {
-			state.ConsumedCounters.Add(id, counterSnapshots[dedicatedID])
+	for id, snapshot := range counterSnapshots {
+		if inFlightIDs.Has(id) {
+			continue
 		}
+		if state.ConsumedCounters == nil {
+			state.ConsumedCounters = make(schedulerapi.CounterConsumptionByDevice)
+		}
+		state.ConsumedCounters.Add(id.GetDeviceID(), snapshot)
 	}
-	allocatedSharedDeviceIDs, revision2 := c.allocatedDevices.getSharedDeviceIDs(state.ConsumedCounters, counterSnapshots, inFlightIDs)
+	allocatedSharedDeviceIDs, revision2 := c.allocatedDevices.getSharedDeviceIDs()
 	if revision1 != revision2 {
 		return nil, errClaimTrackerConcurrentModification
 	}
 	for id := range allocatedSharedDeviceIDs {
 		state.AllocatedSharedDeviceIDs.Insert(id)
-	}
-	// An empty in-flight replacement can remove the last saved snapshot for a device.
-	for id, snapshots := range state.ConsumedCounters {
-		if !slices.ContainsFunc(snapshots, func(snapshot schedulerapi.CounterConsumptionForAllocation) bool { return len(snapshot) > 0 }) {
-			delete(state.ConsumedCounters, id)
-		}
-	}
-	if len(state.ConsumedCounters) == 0 {
-		state.ConsumedCounters = nil
 	}
 	if !enabledConsumableCapacity {
 		for id := range state.AllocatedSharedDeviceIDs {

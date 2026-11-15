@@ -97,8 +97,6 @@ type AllocatedState struct {
 	// grouped by device and including allocations still in flight.
 	// Entries exist only for devices with at least one saved snapshot, including
 	// known zero usage. Each allocation result's snapshot is preserved separately.
-	// The allocator uses current ResourceSlices to decide whether missing
-	// snapshots make counter accounting unavailable.
 	// Snapshot contents remain immutable while the allocator uses this state.
 	// Fixed consumption is reconstructed from ResourceSlices instead.
 	// This field may be nil when DRASharedConsumableCapacity is disabled.
@@ -109,10 +107,9 @@ type AllocatedState struct {
 type CounterConsumptionByDevice map[DeviceID][]CounterConsumptionForAllocation
 
 // CounterConsumptionForAllocation contains one allocation result's counter snapshot.
-// An empty slice records an allocation without a snapshot.
 type CounterConsumptionForAllocation []resourceapi.CounterSetConsumption
 
-// Add appends an allocation's snapshot, including empty snapshots and known zeros.
+// Add appends an allocation's snapshot, including known zeros.
 func (c CounterConsumptionByDevice) Add(id DeviceID, consumption []resourceapi.CounterSetConsumption) {
 	c[id] = append(c[id], consumption)
 }

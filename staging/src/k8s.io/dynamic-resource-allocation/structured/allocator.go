@@ -107,11 +107,8 @@ func ForEachAllocatedDevice(allocation *resourceapi.AllocationResult,
 // is disabled in the features, all devices are treated as dedicated.
 //
 // With shared consumable capacity enabled, recorded counter snapshots are
-// appended per allocation. Empty snapshots are retained for devices with recorded
-// consumption, so provide all allocations of such a device together or preserve
-// their earlier snapshots in state.ConsumedCounters. The counter map is created
-// only when consumption was recorded. Admin access does not reserve resources and
-// is skipped.
+// appended per allocation. The counter map is created only when consumption was
+// recorded. Admin access does not reserve resources and is skipped.
 func AddToAllocatedState(state *AllocatedState, allocations iter.Seq[*resourceapi.AllocationResult], features Features) {
 	internal.AddToAllocatedState(state, allocations, features)
 }

@@ -137,7 +137,6 @@ func AddToAllocatedState(state *AllocatedState, allocations iter.Seq[*resourceap
 	if state.AggregatedCapacity == nil {
 		state.AggregatedCapacity = NewConsumedCapacityCollection()
 	}
-	var missing map[DeviceID]int
 	for allocation := range allocations {
 		ForEachAllocatedDevice(allocation,
 			func(deviceID DeviceID) {
@@ -160,24 +159,12 @@ func AddToAllocatedState(state *AllocatedState, allocations iter.Seq[*resourceap
 			}
 			id := MakeDeviceID(result.Driver, result.Pool, result.Device)
 			if len(result.ConsumedCounters) == 0 {
-				if missing == nil {
-					missing = make(map[DeviceID]int)
-				}
-				missing[id]++
 				continue
 			}
 			if state.ConsumedCounters == nil {
 				state.ConsumedCounters = make(schedulerapi.CounterConsumptionByDevice)
 			}
 			state.ConsumedCounters.Add(id, result.ConsumedCounters)
-		}
-	}
-	// Keep missing snapshots only for devices with saved consumption, regardless of input order.
-	for id, count := range missing {
-		if _, tracked := state.ConsumedCounters[id]; tracked {
-			for range count {
-				state.ConsumedCounters.Add(id, nil)
-			}
 		}
 	}
 }
