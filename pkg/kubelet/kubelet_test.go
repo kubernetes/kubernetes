@@ -563,6 +563,7 @@ func createGenericRuntimeManager(ctx context.Context, kubelet *Kubelet, kubeCfg 
 		func(string, string) (*v1.ServiceAccount, error) { return nil, nil },
 		kubelet.podStartupLatencyTracker,
 		kubelet.actuatedState,
+		kubelet.nodeIPs,
 	)
 }
 

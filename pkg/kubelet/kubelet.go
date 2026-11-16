@@ -878,6 +878,7 @@ func NewMainKubelet(ctx context.Context,
 		getServiceAccount,
 		klet.podStartupLatencyTracker,
 		actuatedState,
+		nodeIPs,
 	)
 	if err != nil {
 		return nil, err
