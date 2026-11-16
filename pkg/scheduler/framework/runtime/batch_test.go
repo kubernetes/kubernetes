@@ -203,6 +203,19 @@ func newTestNodes(n []string) *testSortedScoredNodes {
 	return &testSortedScoredNodes{Nodes: n}
 }
 
+type fakeBatchPodNominator struct {
+	fwk.PodNominator
+	nominatedNodeName string
+}
+
+func (n *fakeBatchPodNominator) NominatedNodeName(*v1.Pod) string {
+	return n.nominatedNodeName
+}
+
+func (n *fakeBatchPodNominator) TracksNominationInMemory(*v1.Pod) bool {
+	return true
+}
+
 const (
 	batchAttemptsHelp        = "Counts of results when we attempt to use batching, by scheduler profile. 'no_hint' covers every pod that asked for a hint and got none, including pods that later fail to schedule. 'hint_used' and 'hint_not_used' are recorded only when a node is selected, and say whether it was the hinted one."
 	batchCacheFlushedHelp    = "Counts of batch cache flushes by reason and scheduler profile. A flush is counted when an existing batch state is dropped instead of providing a hint. 'pod_skipped' means the previous pod was handled by another profile or failed to schedule, 'pod_nominated' means the pod has a nominated node, 'pod_incompatible' means the pod's signature is missing or differs from the batch's, 'expired' means the state is older than the maximum batch age, 'node_missing' means a node needed to reuse the state is no longer in the snapshot, and 'filter_error', 'prescore_error', 'rescore_error' and 'normalize_error' mean that phase failed while rescoring."
@@ -297,6 +310,8 @@ func TestBatchBasic(t *testing.T) {
 		skipPod                    bool
 		secondPodID                string
 		secondPodNominatedNodeName string
+		useInMemoryNomination      bool
+		inMemoryNominatedNodeName  string
 		secondSig                  string
 		secondChosenNode           string
 		secondOtherNodes           framework.SortedScoredNodes
@@ -467,6 +482,41 @@ func TestBatchBasic(t *testing.T) {
 			expectedFlushes:               map[string]int{metrics.BatchFlushPodNominated: 1},
 			expectedStoreResults:          map[string]int{metrics.StoreResultStored: 1, metrics.StoreResultEmptyList: 1},
 		},
+		{
+			name:                          "a second pod nominated only in memory does not get a hint",
+			firstPodID:                    blockingPodID("1"),
+			firstSig:                      "sig",
+			firstChosenNode:               "n3",
+			firstOtherNodes:               newTestNodes([]string{"n1"}),
+			firstPodScheduledSuccessfully: true,
+			secondPodID:                   blockingPodID("2"),
+			useInMemoryNomination:         true,
+			inMemoryNominatedNodeName:     "n1",
+			secondSig:                     "sig",
+			secondChosenNode:              "n1",
+			expectedHint:                  "",
+			expectedAttempts:              map[string]int{metrics.BatchAttemptNoHint: 2},
+			expectedFlushes:               map[string]int{metrics.BatchFlushPodNominated: 1},
+			expectedStoreResults:          map[string]int{metrics.StoreResultStored: 1, metrics.StoreResultEmptyList: 1},
+		},
+		{
+			name:                          "a second pod whose nomination was cleared in memory still gets a hint",
+			firstPodID:                    blockingPodID("1"),
+			firstSig:                      "sig",
+			firstChosenNode:               "n3",
+			firstOtherNodes:               newTestNodes([]string{"n1"}),
+			firstPodScheduledSuccessfully: true,
+			secondPodID:                   blockingPodID("2"),
+			secondPodNominatedNodeName:    "n1",
+			useInMemoryNomination:         true,
+			inMemoryNominatedNodeName:     "",
+			secondSig:                     "sig",
+			secondChosenNode:              "n1",
+			expectedHint:                  "n1",
+			expectedAttempts:              map[string]int{metrics.BatchAttemptNoHint: 1, metrics.BatchAttemptHintUsed: 1},
+			expectedFlushes:               nil,
+			expectedStoreResults:          map[string]int{metrics.StoreResultStored: 1},
+		},
 	}
 
 	for _, tt := range tests {
@@ -508,6 +558,9 @@ func TestBatchBasic(t *testing.T) {
 			}
 
 			// Run the second pod
+			if tt.useInMemoryNomination {
+				testFwk.SetPodNominator(&fakeBatchPodNominator{nominatedNodeName: tt.inMemoryNominatedNodeName})
+			}
 			pod2 := &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "pod2",
