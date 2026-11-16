@@ -17,6 +17,7 @@ limitations under the License.
 package qos
 
 import (
+	"fmt"
 	"strconv"
 	"testing"
 
@@ -1094,4 +1095,261 @@ func TestGetContainerOOMScoreAdjust(t *testing.T) {
 		})
 
 	}
+}
+
+const (
+	tieBreakMi = int64(1) << 20
+	tieBreakGi = int64(1) << 30
+	tieBreakTi = int64(1) << 40
+)
+
+// tieBreakContainer returns a container with the given memory request and
+// limit in bytes. A zero limit means unlimited.
+func tieBreakContainer(name string, request, limit int64) v1.Container {
+	res := v1.ResourceRequirements{
+		Requests: v1.ResourceList{v1.ResourceMemory: *resource.NewQuantity(request, resource.BinarySI)},
+	}
+	if limit > 0 {
+		res.Limits = v1.ResourceList{v1.ResourceMemory: *resource.NewQuantity(limit, resource.BinarySI)}
+	}
+	return v1.Container{Name: name, Resources: res}
+}
+
+func tieBreakPod(containers ...v1.Container) *v1.Pod {
+	return &v1.Pod{Spec: v1.PodSpec{Containers: containers}}
+}
+
+func TestGetContainerOOMScoreAdjustTieBreak(t *testing.T) {
+	sidecar := tieBreakContainer("sidecar", 50*tieBreakMi, 0)
+	sidecar.RestartPolicy = &restartPolicyAlways
+	sidecarPod := tieBreakPod(
+		tieBreakContainer("small-bounded", 50*tieBreakMi, 50*tieBreakMi),
+		tieBreakContainer("large-unbounded", 16*tieBreakGi, 0),
+	)
+	sidecarPod.Spec.InitContainers = []v1.Container{sidecar}
+
+	// Burstable through the container CPU request; memory is bounded only at
+	// the pod level. The single container's share of the request is 2Gi.
+	podLevelPod := func(limit string) *v1.Pod {
+		return &v1.Pod{Spec: v1.PodSpec{
+			Resources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("2Gi")},
+				Limits:   v1.ResourceList{v1.ResourceMemory: resource.MustParse(limit)},
+			},
+			Containers: []v1.Container{{Name: "c", Resources: v1.ResourceRequirements{
+				Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("100m")},
+			}}},
+		}}
+	}
+
+	// A 500Mi DRA memory claim shared by two containers adds 250Mi to each
+	// effective request but the full 500Mi to each cgroup limit.
+	sharedClaimPod := tieBreakPod(
+		tieBreakContainer("c", 500*tieBreakMi, 500*tieBreakMi),
+		tieBreakContainer("other", 500*tieBreakMi, 0),
+	)
+	sharedClaimPod.Status.NodeAllocatableResourceClaimStatuses = []v1.NodeAllocatableResourceClaimStatus{{
+		ResourceClaimName: "claim",
+		Containers:        []string{"c", "other"},
+		Mapping: []v1.NodeAllocatableMappedResources{{
+			Name: v1.ResourceMemory, Quantity: resource.NewQuantity(500*tieBreakMi, resource.BinarySI),
+		}},
+	}}
+
+	tests := []struct {
+		name      string
+		capacity  int64
+		pod       *v1.Pod
+		container *v1.Container
+		gateOff   int
+		gateOn    int
+	}{
+		// 16Gi: one adj point is ~16Mi, below the 64Mi floor, so no nudge.
+		{
+			name:     "16Gi node, 500Mi unlimited",
+			capacity: 16 * tieBreakGi,
+			pod:      tieBreakPod(tieBreakContainer("c", 500*tieBreakMi, 0)),
+			gateOff:  970,
+			gateOn:   970,
+		},
+		{
+			name:     "16Gi node, 500Mi request equals limit",
+			capacity: 16 * tieBreakGi,
+			pod:      tieBreakPod(tieBreakContainer("c", 500*tieBreakMi, 500*tieBreakMi)),
+			gateOff:  970,
+			gateOn:   969,
+		},
+		// 1Ti: one adj point is ~1Gi, nudge capped at 4 points.
+		{
+			name:     "1Ti node, 50Mi unlimited is below the floor",
+			capacity: tieBreakTi,
+			pod:      tieBreakPod(tieBreakContainer("c", 50*tieBreakMi, 0)),
+			gateOff:  999,
+			gateOn:   999,
+		},
+		{
+			name:     "1Ti node, 500Mi unlimited",
+			capacity: tieBreakTi,
+			pod:      tieBreakPod(tieBreakContainer("c", 500*tieBreakMi, 0)),
+			gateOff:  999,
+			gateOn:   998,
+		},
+		{
+			name:     "1Ti node, 4Gi unlimited hits the nudge cap",
+			capacity: tieBreakTi,
+			pod:      tieBreakPod(tieBreakContainer("c", 4*tieBreakGi, 0)),
+			gateOff:  997,
+			gateOn:   993,
+		},
+		{
+			name:     "1Ti node, 16Gi unlimited",
+			capacity: tieBreakTi,
+			pod:      tieBreakPod(tieBreakContainer("c", 16*tieBreakGi, 0)),
+			gateOff:  985,
+			gateOn:   981,
+		},
+		{
+			name:     "1Ti node, 500Mi request equals limit",
+			capacity: tieBreakTi,
+			pod:      tieBreakPod(tieBreakContainer("c", 500*tieBreakMi, 500*tieBreakMi)),
+			gateOff:  999,
+			gateOn:   993,
+		},
+		{
+			// Effective request 750Mi, cgroup limit 1000Mi.
+			name:     "1Ti node, shared DRA memory claim loses the bonus",
+			capacity: tieBreakTi,
+			pod:      sharedClaimPod,
+			gateOff:  999,
+			gateOn:   997,
+		},
+		// 4Ti: one adj point is ~4Gi, nudge capped at 6 points.
+		{
+			name:     "4Ti node, 500Mi unlimited",
+			capacity: 4 * tieBreakTi,
+			pod:      tieBreakPod(tieBreakContainer("c", 500*tieBreakMi, 0)),
+			gateOff:  999,
+			gateOn:   998,
+		},
+		{
+			name:     "4Ti node, 64Gi unlimited",
+			capacity: 4 * tieBreakTi,
+			pod:      tieBreakPod(tieBreakContainer("c", 64*tieBreakGi, 0)),
+			gateOff:  985,
+			gateOn:   979,
+		},
+		{
+			// Regulars score 995 (50Mi bounded) and 981 (16Gi). Legacy caps
+			// against the smallest request (1000 -> 999); the tie-break caps
+			// against the highest regular score instead.
+			name:      "1Ti node, sidecar capped at the highest regular container",
+			capacity:  tieBreakTi,
+			pod:       sidecarPod,
+			container: &sidecarPod.Spec.InitContainers[0],
+			gateOff:   999,
+			gateOn:    995,
+		},
+		{
+			name:     "1Ti node, pod-level limit above the container's share",
+			capacity: tieBreakTi,
+			pod:      podLevelPod("4Gi"),
+			gateOff:  999,
+			gateOn:   995,
+		},
+		{
+			name:     "1Ti node, pod-level limit equal to the container's share",
+			capacity: tieBreakTi,
+			pod:      podLevelPod("2Gi"),
+			gateOff:  999,
+			gateOn:   990,
+		},
+	}
+	for _, gate := range []bool{false, true} {
+		for _, tc := range tests {
+			t.Run(fmt.Sprintf("tieBreak=%v/%s", gate, tc.name), func(t *testing.T) {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletOOMScoreAdjTieBreak, gate)
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, true)
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRANodeAllocatableResources, true)
+				container := tc.container
+				if container == nil {
+					container = &tc.pod.Spec.Containers[0]
+				}
+				want := tc.gateOff
+				if gate {
+					want = tc.gateOn
+				}
+				if got := GetContainerOOMScoreAdjust(tc.pod, container, tc.capacity); got != want {
+					t.Errorf("oom_score_adj = %d, want %d", got, want)
+				}
+				if got := PossibleContainerOOMScoreAdjusts(tc.pod, container, tc.capacity); got[0] != tc.gateOff || got[1] != tc.gateOn {
+					t.Errorf("PossibleContainerOOMScoreAdjusts = %v, want [%d %d]", got, tc.gateOff, tc.gateOn)
+				}
+			})
+		}
+	}
+}
+
+// TestOOMScoreAdjTieBreakKillOrder checks the documented node OOM behavior
+// with the tie-break enabled: containers using the most memory relative to
+// their request are killed first. The kernel kills the process with the
+// highest oom_score_adj + usage*1000/capacity.
+func TestOOMScoreAdjTieBreakKillOrder(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletOOMScoreAdjTieBreak, true)
+
+	points := func(c v1.Container, usage, capacity int64) float64 {
+		pod := tieBreakPod(c)
+		adj := GetContainerOOMScoreAdjust(pod, &pod.Spec.Containers[0], capacity)
+		return float64(adj) + float64(usage)*1000/float64(capacity)
+	}
+
+	t.Run("over-request container is killed before one at its request", func(t *testing.T) {
+		requests := []int64{
+			16 * tieBreakMi, 50 * tieBreakMi, 100 * tieBreakMi, 250 * tieBreakMi, 500 * tieBreakMi,
+			tieBreakGi, 2 * tieBreakGi, 4 * tieBreakGi, 16 * tieBreakGi, 64 * tieBreakGi, 256 * tieBreakGi,
+		}
+		for _, capacity := range []int64{16 * tieBreakGi, 256 * tieBreakGi, tieBreakTi, 4 * tieBreakTi} {
+			// The tie-break may shift a container by at most maxNudge points,
+			// plus one point of integer truncation that legacy also has.
+			maxNudge := log2Floor(capacity / 1000 / oomScoreAdjTieBreakFloor)
+			slack := (maxNudge + 1) * capacity / 1000
+			for _, big := range requests {
+				for _, small := range requests {
+					if big <= small || big >= capacity {
+						continue
+					}
+					over := points(tieBreakContainer("big", big, 0), big+slack+tieBreakMi, capacity)
+					atRequest := points(tieBreakContainer("small", small, 0), small, capacity)
+					if over <= atRequest {
+						t.Errorf("capacity %dGi: %dMi request %dMi over (%.1f points) not killed before %dMi at request (%.1f points)",
+							capacity/tieBreakGi, big/tieBreakMi, (slack+tieBreakMi)/tieBreakMi, over, small/tieBreakMi, atRequest)
+					}
+				}
+			}
+		}
+	})
+
+	t.Run("cases from #142235 on a 1Ti node", func(t *testing.T) {
+		for _, tc := range []struct{ bigReq, bigUsage, smallReq int64 }{
+			{16 * tieBreakGi, 48 * tieBreakGi, 500 * tieBreakMi},
+			{64 * tieBreakGi, 84 * tieBreakGi, 500 * tieBreakMi},
+			{100 * tieBreakGi, 130 * tieBreakGi, 50 * tieBreakMi},
+		} {
+			over := points(tieBreakContainer("A", tc.bigReq, 0), tc.bigUsage, tieBreakTi)
+			atRequest := points(tieBreakContainer("B", tc.smallReq, 0), tc.smallReq, tieBreakTi)
+			if over <= atRequest {
+				t.Errorf("A (%dGi request, %dGi used) = %.1f points, B (%dMi at request) = %.1f points: B would be killed",
+					tc.bigReq/tieBreakGi, tc.bigUsage/tieBreakGi, over, tc.smallReq/tieBreakMi, atRequest)
+			}
+		}
+	})
+
+	t.Run("bounded orchestrator outlasts an executor worker on a 1Ti node", func(t *testing.T) {
+		// From #142230: same 500Mi request, the orchestrator cannot exceed
+		// it, while an executor worker process uses less than its request.
+		orchestrator := points(tieBreakContainer("orchestrator", 500*tieBreakMi, 500*tieBreakMi), 200*tieBreakMi, tieBreakTi)
+		worker := points(tieBreakContainer("executor", 500*tieBreakMi, 0), 100*tieBreakMi, tieBreakTi)
+		if orchestrator >= worker {
+			t.Errorf("orchestrator = %.1f points, executor worker = %.1f points: orchestrator would be killed", orchestrator, worker)
+		}
+	})
 }
