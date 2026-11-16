@@ -357,8 +357,16 @@ func (p *Plugin) admitPodStatus(nodeName string, a admission.Attributes) error {
 		if !ok {
 			return admission.NewForbidden(a, fmt.Errorf("unexpected type %T", a.GetObject()))
 		}
+		if !apiequality.Semantic.DeepEqual(oldPod.Finalizers, newPod.Finalizers) {
+			return admission.NewForbidden(a, fmt.Errorf("node %q cannot update finalizers through pod status", nodeName))
+		}
 		if !labels.Equals(oldPod.Labels, newPod.Labels) {
 			return admission.NewForbidden(a, fmt.Errorf("node %q cannot update labels through pod status", nodeName))
+		}
+		for annotation := range getModifiedLabels(oldPod.Annotations, newPod.Annotations) {
+			if strings.HasPrefix(annotation, "batch.kubernetes.io/job-") {
+				return admission.NewForbidden(a, fmt.Errorf("node %q cannot update controller-owned annotation %q through pod status", nodeName, annotation))
+			}
 		}
 		if !resourceClaimStatusesEqual(oldPod.Status.ResourceClaimStatuses, newPod.Status.ResourceClaimStatuses) {
 			return admission.NewForbidden(a, fmt.Errorf("node %q cannot update resource claim statues", nodeName))
