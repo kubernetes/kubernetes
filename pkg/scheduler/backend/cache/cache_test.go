@@ -1380,6 +1380,44 @@ func TestUpdatePodGroupStateSnapshot(t *testing.T) {
 	}
 }
 
+// TestUpdateSnapshotRevertsSnapshotPodGroupMemberChanges verifies that pod group member changes
+// made directly on the snapshot are reverted by the next UpdateSnapshot.
+func TestUpdateSnapshotRevertsSnapshotPodGroupMemberChanges(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, true)
+	pod1 := st.MakePod().Namespace("ns").Name("pod1").UID("uid1").PodGroupName("pg1").Obj()
+	pod1Bound := st.MakePod().Namespace("ns").Name("pod1").UID("uid1").PodGroupName("pg1").Node("node1").Obj()
+	pod2 := st.MakePod().Namespace("ns").Name("pod2").UID("uid2").PodGroupName("pg2").Obj()
+	pod3 := st.MakePod().Namespace("ns").Name("pod3").UID("uid3").PodGroupName("pg3").Obj()
+
+	logger, ctx := ktesting.NewTestContext(t)
+	cache := newCache(ctx, time.Second, nil, true, false)
+	cache.AddPodGroupMember(pod1)
+	cache.AddPodGroupMember(pod2)
+	snapshot := NewEmptySnapshot()
+	if err := cache.UpdateSnapshot(logger, snapshot); err != nil {
+		t.Fatalf("UpdateSnapshot failed: %v", err)
+	}
+
+	// Modify pg1, delete pg2 and create pg3 in the snapshot only.
+	if err := snapshot.UpdatePodGroupMember(pod1, pod1Bound); err != nil {
+		t.Fatalf("UpdatePodGroupMember failed: %v", err)
+	}
+	if err := snapshot.RemovePodGroupMember(pod2); err != nil {
+		t.Fatalf("RemovePodGroupMember failed: %v", err)
+	}
+	if err := snapshot.AddPodGroupMember(pod3); err != nil {
+		t.Fatalf("AddPodGroupMember failed: %v", err)
+	}
+
+	if err := cache.UpdateSnapshot(logger, snapshot); err != nil {
+		t.Fatalf("UpdateSnapshot failed: %v", err)
+	}
+	want := createPodGroupStates([]*v1.Pod{pod1, pod2})
+	if diff := cmp.Diff(want, snapshot.podGroupStates, podGroupStateCmpOpts...); diff != "" {
+		t.Errorf("Unexpected pod group states (-want +got):\n%s", diff)
+	}
+}
+
 // TestBindingPodGroupMember simulates binding and tests that when an assumed or
 // unscheduled pod gets bound, its state within pod group becomes assigned.
 func TestBindingPodGroupMember(t *testing.T) {
