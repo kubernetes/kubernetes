@@ -170,20 +170,20 @@ func TestDeclarativeValidate(t *testing.T) {
 						field.Invalid(field.NewPath("spec", "extendedResourceName"), "example.com/"+strings.Repeat("a", 64), "").WithOrigin("format=k8s-extended-resource-name").MarkBeta(),
 					},
 				},
-				// spec.extendedResourceCapacityRequests
-				"extendedResourceCapacityRequests: valid": {
+				// spec.extendedResourceRequest.capacity
+				"extendedResourceRequest-capacity: valid": {
 					input: mkDeviceClass(tweakExtendedResourceCapacityRequests(32, "1")),
 				},
-				"extendedResourceCapacityRequests: too many": {
+				"extendedResourceRequest-capacity: too many": {
 					input: mkDeviceClass(tweakExtendedResourceCapacityRequests(33, "1")),
 					expectedErrs: field.ErrorList{
-						field.TooMany(field.NewPath("spec", "extendedResourceCapacityRequests", "requests"), 33, 32).WithOrigin("maxProperties"),
+						field.TooMany(field.NewPath("spec", "extendedResourceRequest", "capacity", "requests"), 33, 32).WithOrigin("maxProperties"),
 					},
 				},
-				"extendedResourceCapacityRequests: negative": {
+				"extendedResourceRequest-capacity: negative": {
 					input: mkDeviceClass(tweakExtendedResourceCapacityRequests(1, "-1")),
 					expectedErrs: field.ErrorList{
-						field.Invalid(field.NewPath("spec", "extendedResourceCapacityRequests", "requests").Key("dra.example.com/cap0"), "-1", "").WithOrigin("minimum"),
+						field.Invalid(field.NewPath("spec", "extendedResourceRequest", "capacity", "requests").Key("dra.example.com/cap0"), "-1", "").WithOrigin("minimum"),
 					},
 				},
 				// TODO: Add more test cases
@@ -295,18 +295,18 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 						field.Invalid(field.NewPath("spec", "extendedResourceName"), "example.com/"+strings.Repeat("a", 64), "").WithOrigin("format=k8s-extended-resource-name").MarkBeta(),
 					},
 				},
-				"extendedResourceCapacityRequests: added, too many": {
+				"extendedResourceRequest-capacity: added, too many": {
 					old:    mkDeviceClass(),
 					update: mkDeviceClass(tweakExtendedResourceCapacityRequests(33, "1")),
 					expectedErrs: field.ErrorList{
-						field.TooMany(field.NewPath("spec", "extendedResourceCapacityRequests", "requests"), 33, 32).WithOrigin("maxProperties"),
+						field.TooMany(field.NewPath("spec", "extendedResourceRequest", "capacity", "requests"), 33, 32).WithOrigin("maxProperties"),
 					},
 				},
-				"extendedResourceCapacityRequests: changed to negative": {
+				"extendedResourceRequest-capacity: changed to negative": {
 					old:    mkDeviceClass(tweakExtendedResourceCapacityRequests(1, "1")),
 					update: mkDeviceClass(tweakExtendedResourceCapacityRequests(1, "-1")),
 					expectedErrs: field.ErrorList{
-						field.Invalid(field.NewPath("spec", "extendedResourceCapacityRequests", "requests").Key("dra.example.com/cap0"), "-1", "").WithOrigin("minimum"),
+						field.Invalid(field.NewPath("spec", "extendedResourceRequest", "capacity", "requests").Key("dra.example.com/cap0"), "-1", "").WithOrigin("minimum"),
 					},
 				},
 				// TODO: Add more test cases
@@ -427,6 +427,6 @@ func tweakExtendedResourceCapacityRequests(count int, quantity string) func(*res
 		for i := range count {
 			requests[resource.QualifiedName(fmt.Sprintf("dra.example.com/cap%d", i))] = apiresource.MustParse(quantity)
 		}
-		dc.Spec.ExtendedResourceCapacityRequests = &resource.CapacityRequirements{Requests: requests}
+		dc.Spec.ExtendedResourceRequest = &resource.ExtendedResourceRequest{Capacity: &resource.CapacityRequirements{Requests: requests}}
 	}
 }

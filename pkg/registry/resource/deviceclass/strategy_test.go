@@ -57,9 +57,11 @@ var objWithExtendedResourceCapacity = &resource.DeviceClass{
 	},
 	Spec: resource.DeviceClassSpec{
 		ExtendedResourceName: new("example.com/gpu.shared"),
-		ExtendedResourceCapacityRequests: &resource.CapacityRequirements{
-			Requests: map[resource.QualifiedName]apiresource.Quantity{
-				"shares": apiresource.MustParse("1"),
+		ExtendedResourceRequest: &resource.ExtendedResourceRequest{
+			Capacity: &resource.CapacityRequirements{
+				Requests: map[resource.QualifiedName]apiresource.Quantity{
+					"shares": apiresource.MustParse("1"),
+				},
 			},
 		},
 	},
@@ -67,7 +69,7 @@ var objWithExtendedResourceCapacity = &resource.DeviceClass{
 
 var objWithExtendedResourceCapacityDropped = func() *resource.DeviceClass {
 	obj := objWithExtendedResourceCapacity.DeepCopy()
-	obj.Spec.ExtendedResourceCapacityRequests = nil
+	obj.Spec.ExtendedResourceRequest = nil
 	return obj
 }()
 
@@ -238,13 +240,13 @@ func TestStrategyUpdate(t *testing.T) {
 			oldObj: objWithExtendedResourceCapacity,
 			newObj: func() *resource.DeviceClass {
 				obj := objWithExtendedResourceCapacity.DeepCopy()
-				obj.Spec.ExtendedResourceCapacityRequests.Requests["shares"] = apiresource.MustParse("2")
+				obj.Spec.ExtendedResourceRequest.Capacity.Requests["shares"] = apiresource.MustParse("2")
 				return obj
 			}(),
 			draExtendedResource: true,
 			expectObj: func() *resource.DeviceClass {
 				obj := objWithExtendedResourceCapacity.DeepCopy()
-				obj.Spec.ExtendedResourceCapacityRequests.Requests["shares"] = apiresource.MustParse("2")
+				obj.Spec.ExtendedResourceRequest.Capacity.Requests["shares"] = apiresource.MustParse("2")
 				obj.Generation += 1
 				return obj
 			}(),

@@ -812,20 +812,9 @@ message DeviceClassSpec {
   // +k8s:beta(since: "1.37")=+k8s:format=k8s-extended-resource-name
   optional string extendedResourceName = 4;
 
-  // extendedResourceCapacityRequests defines the fixed capacity
-  // amounts that the scheduler requests on every ResourceClaim it
-  // synthesizes to satisfy the extended resource of this class.
-  //
-  // The value is copied, unmodified, onto the capacity of each device
-  // request synthesized for this class, so it has the same
-  // semantics as DeviceRequest.capacity: it applies to each device
-  // allocation. A pod requesting more than one device through the
-  // extended resource gets that capacity once per device, not once
-  // per pod.
-  //
-  // The devices selected by this class must advertise the referenced
-  // capacities. Otherwise the extended resource requests cannot be
-  // satisfied, the same way as with a selector that matches no devices.
+  // extendedResourceRequest defines how the scheduler populates the
+  // device request of each ResourceClaim it synthesizes to satisfy
+  // the extended resource of this class.
   //
   // This is an alpha field and requires enabling the
   // DRAExtendedResourceCapacity feature gate, which depends on
@@ -834,7 +823,7 @@ message DeviceClassSpec {
   // +optional
   // +featureGate=DRAExtendedResourceCapacity
   // +k8s:optional
-  optional CapacityRequirements extendedResourceCapacityRequests = 5;
+  optional ExtendedResourceRequest extendedResourceRequest = 5;
 }
 
 // DeviceConfiguration must have exactly one field set. It gets embedded
@@ -1729,6 +1718,29 @@ message ExactDeviceRequest {
   // +k8s:optional
   // +k8s:maxItems=32
   repeated DeviceDerivedAttribute derivedAttributes = 8;
+}
+
+// ExtendedResourceRequest defines fields which the scheduler copies onto the
+// device request it synthesizes for an extended resource.
+message ExtendedResourceRequest {
+  // capacity defines the fixed capacity amounts that the scheduler
+  // requests on every ResourceClaim it synthesizes to satisfy the
+  // extended resource of this class.
+  //
+  // The value is copied, unmodified, onto the capacity of each device
+  // request synthesized for this class, so it has the same
+  // semantics as DeviceRequest.capacity: it applies to each device
+  // allocation. A pod requesting more than one device through the
+  // extended resource gets that capacity once per device, not once
+  // per pod.
+  //
+  // The devices selected by this class must advertise the referenced
+  // capacities. Otherwise the extended resource requests cannot be
+  // satisfied, the same way as with a selector that matches no devices.
+  //
+  // +optional
+  // +k8s:optional
+  optional CapacityRequirements capacity = 1;
 }
 
 // NetworkDeviceData provides network-related details for the allocated device.

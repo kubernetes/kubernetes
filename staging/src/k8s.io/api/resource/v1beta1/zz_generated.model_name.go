@@ -172,6 +172,11 @@ func (in DeviceToleration) OpenAPIModelName() string {
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
+func (in ExtendedResourceRequest) OpenAPIModelName() string {
+	return "io.k8s.api.resource.v1beta1.ExtendedResourceRequest"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in NetworkDeviceData) OpenAPIModelName() string {
 	return "io.k8s.api.resource.v1beta1.NetworkDeviceData"
 }

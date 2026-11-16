@@ -1358,10 +1358,10 @@ func Validate_DeviceClassSpec(
 		errs = append(errs, fn(fldPath.Child("extendedResourceName"), obj.ExtendedResourceName, oldVal, oldObj != nil)...)
 	}
 
-	{ // field DeviceClassSpec.ExtendedResourceCapacityRequests
+	{ // field DeviceClassSpec.ExtendedResourceRequest
 		fn := func(
 			fldPath *field.Path,
-			obj, oldObj *CapacityRequirements,
+			obj, oldObj *ExtendedResourceRequest,
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
@@ -1378,14 +1378,14 @@ func Validate_DeviceClassSpec(
 				return // do not proceed
 			}
 			// call the type's validation function
-			errs = append(errs, Validate_CapacityRequirements(ctx, op, fldPath, obj, oldObj)...)
+			errs = append(errs, Validate_ExtendedResourceRequest(ctx, op, fldPath, obj, oldObj)...)
 			return
 		}
 		oldVal := safe.Field(oldObj,
-			func(oldObj *DeviceClassSpec) *CapacityRequirements {
-				return oldObj.ExtendedResourceCapacityRequests
+			func(oldObj *DeviceClassSpec) *ExtendedResourceRequest {
+				return oldObj.ExtendedResourceRequest
 			})
-		errs = append(errs, fn(fldPath.Child("extendedResourceCapacityRequests"), obj.ExtendedResourceCapacityRequests, oldVal, oldObj != nil)...)
+		errs = append(errs, fn(fldPath.Child("extendedResourceRequest"), obj.ExtendedResourceRequest, oldVal, oldObj != nil)...)
 	}
 
 	return errs
@@ -2835,6 +2835,45 @@ func Validate_ExactDeviceRequest(
 				return oldObj.DerivedAttributes
 			})
 		errs = append(errs, fn(fldPath.Child("derivedAttributes"), obj.DerivedAttributes, oldVal, oldObj != nil)...)
+	}
+
+	return errs
+}
+
+// Validate_ExtendedResourceRequest validates an instance of ExtendedResourceRequest according
+// to declarative validation rules in the API schema.
+func Validate_ExtendedResourceRequest(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *ExtendedResourceRequest) (errs field.ErrorList) {
+
+	{ // field ExtendedResourceRequest.Capacity
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *CapacityRequirements,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if validate.SemanticDeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_CapacityRequirements(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *ExtendedResourceRequest) *CapacityRequirements {
+				return oldObj.Capacity
+			})
+		errs = append(errs, fn(fldPath.Child("capacity"), obj.Capacity, oldVal, oldObj != nil)...)
 	}
 
 	return errs

@@ -283,10 +283,10 @@ func (pl *DynamicResources) filterExtendedResources(state *stateData, pod *v1.Po
 // checkExtendedResourceCapacity aborts pod scheduling by returning a non-nil status if a referenced
 // class uses the extended resource capacity feature and that feature is disabled.
 func (pl *DynamicResources) checkExtendedResourceCapacity(logger klog.Logger, pod *v1.Pod, nodeInfo fwk.NodeInfo, rName v1.ResourceName, class *resourceapi.DeviceClass) *fwk.Status {
-	if pl.fts.EnableDRAExtendedResourceCapacity || class.Spec.ExtendedResourceCapacityRequests == nil {
+	if pl.fts.EnableDRAExtendedResourceCapacity || class.Spec.ExtendedResourceRequest == nil {
 		return nil
 	}
-	return statusUnschedulable(logger, fmt.Sprintf("device class %s sets extendedResourceCapacityRequests, which requires the DRAExtendedResourceCapacity feature", class.Name),
+	return statusUnschedulable(logger, fmt.Sprintf("device class %s sets extendedResourceRequest, which requires the DRAExtendedResourceCapacity feature", class.Name),
 		"pod", klog.KObj(pod), "node", klog.KObj(nodeInfo.Node()), "resource", rName, "deviceClass", klog.KObj(class))
 }
 
@@ -405,7 +405,7 @@ func createResourceRequestAndMappings(containerIndex int, container *v1.Containe
 			DeviceClassName: class.Name,
 			AllocationMode:  resourceapi.DeviceAllocationModeExactCount,
 			Count:           crq - sum, // the extra devices to request
-			Capacity:        class.Spec.ExtendedResourceCapacityRequests,
+			Capacity:        extendedResourceCapacity(class),
 		},
 	}
 	mappings = append(mappings, v1.ContainerExtendedResourceRequest{
@@ -626,4 +626,11 @@ func (pl *DynamicResources) unreserveExtendedResourceClaim(ctx context.Context, 
 	if err := pl.deleteClaim(ctx, extendedResourceClaim); err != nil {
 		logger.Error(err, "delete", "resourceclaim", klog.KObj(extendedResourceClaim))
 	}
+}
+
+func extendedResourceCapacity(class *resourceapi.DeviceClass) *resourceapi.CapacityRequirements {
+	if class.Spec.ExtendedResourceRequest == nil {
+		return nil
+	}
+	return class.Spec.ExtendedResourceRequest.Capacity
 }

@@ -99,7 +99,7 @@ func testExtendedResourceCapacity(tCtx ktesting.TContext, enabled bool) {
 			tCtx.Parallel()
 			namespace := createTestNamespace(tCtx, nil)
 			class, _ := createTestClassWithSpec(tCtx, namespace, sharesClassSpec("example.com/"+namespace, "shares"))
-			require.Nil(tCtx, class.Spec.ExtendedResourceCapacityRequests, "should strip ExtendedResourceCapacityRequests")
+			require.Nil(tCtx, class.Spec.ExtendedResourceRequest, "should strip ExtendedResourceRequest")
 		})
 		return
 	}
@@ -158,9 +158,11 @@ func testExtendedResourceCapacity(tCtx ktesting.TContext, enabled bool) {
 func sharesClassSpec(resourceName string, capacityName resourceapi.QualifiedName) *resourceapi.DeviceClassSpec {
 	return &resourceapi.DeviceClassSpec{
 		ExtendedResourceName: &resourceName,
-		ExtendedResourceCapacityRequests: &resourceapi.CapacityRequirements{
-			Requests: map[resourceapi.QualifiedName]resource.Quantity{
-				capacityName: resource.MustParse("1"),
+		ExtendedResourceRequest: &resourceapi.ExtendedResourceRequest{
+			Capacity: &resourceapi.CapacityRequirements{
+				Requests: map[resourceapi.QualifiedName]resource.Quantity{
+					capacityName: resource.MustParse("1"),
+				},
 			},
 		},
 	}

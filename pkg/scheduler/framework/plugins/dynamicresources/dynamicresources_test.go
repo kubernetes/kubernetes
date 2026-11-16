@@ -145,9 +145,11 @@ var (
 		},
 		Spec: resourceapi.DeviceClassSpec{
 			ExtendedResourceName: &extendedResourceName,
-			ExtendedResourceCapacityRequests: &resourceapi.CapacityRequirements{
-				Requests: map[resourceapi.QualifiedName]apiresource.Quantity{
-					"shares": apiresource.MustParse("1"),
+			ExtendedResourceRequest: &resourceapi.ExtendedResourceRequest{
+				Capacity: &resourceapi.CapacityRequirements{
+					Requests: map[resourceapi.QualifiedName]apiresource.Quantity{
+						"shares": apiresource.MustParse("1"),
+					},
 				},
 			},
 		},
@@ -1113,7 +1115,7 @@ var (
 // the device allocated for it.
 func withExtendedResourceCapacity(claim *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
 	claim = claim.DeepCopy()
-	capacity := deviceClassWithExtendedResourceCapacity.Spec.ExtendedResourceCapacityRequests
+	capacity := deviceClassWithExtendedResourceCapacity.Spec.ExtendedResourceRequest.Capacity
 	claim.Spec.Devices.Requests[0].Exactly.Capacity = capacity
 	claim.Status.Allocation.Devices.Results[0].ConsumedCapacity = capacity.Requests
 	return claim
@@ -2790,7 +2792,7 @@ func testPlugin(tCtx ktesting.TContext) {
 			want: want{
 				filter: perNodeResult{
 					nodeName: {
-						status: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "device class my-resource-class sets extendedResourceCapacityRequests, which requires the DRAExtendedResourceCapacity feature"),
+						status: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "device class my-resource-class sets extendedResourceRequest, which requires the DRAExtendedResourceCapacity feature"),
 					},
 				},
 				postfilter: result{

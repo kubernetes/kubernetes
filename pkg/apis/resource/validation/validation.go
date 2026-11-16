@@ -803,15 +803,17 @@ func validateDeviceClassSpec(spec, oldSpec *resource.DeviceClassSpec, fldPath *f
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("extendedResourceName"), *spec.ExtendedResourceName,
 			"must be a valid extended resource name").MarkCoveredByDeclarative().WithOrigin("format=k8s-extended-resource-name"))
 	}
-	allErrs = append(allErrs, validateCapacityRequirements(spec.ExtendedResourceCapacityRequests, oldExtendedResourceCapacityRequests(oldSpec), fldPath.Child("extendedResourceCapacityRequests"))...)
+	if spec.ExtendedResourceRequest != nil {
+		allErrs = append(allErrs, validateCapacityRequirements(spec.ExtendedResourceRequest.Capacity, oldExtendedResourceCapacity(oldSpec), fldPath.Child("extendedResourceRequest", "capacity"))...)
+	}
 	return allErrs
 }
 
-func oldExtendedResourceCapacityRequests(oldSpec *resource.DeviceClassSpec) *resource.CapacityRequirements {
-	if oldSpec == nil {
+func oldExtendedResourceCapacity(oldSpec *resource.DeviceClassSpec) *resource.CapacityRequirements {
+	if oldSpec == nil || oldSpec.ExtendedResourceRequest == nil {
 		return nil
 	}
-	return oldSpec.ExtendedResourceCapacityRequests
+	return oldSpec.ExtendedResourceRequest.Capacity
 }
 
 func validateDeviceClassConfiguration(config resource.DeviceClassConfiguration, fldPath *field.Path, stored bool) field.ErrorList {

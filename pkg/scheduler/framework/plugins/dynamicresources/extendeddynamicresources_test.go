@@ -303,8 +303,8 @@ func Test_createRequestsAndMappings_capacity(t *testing.T) {
 		sharedResource: {
 			ObjectMeta: metav1.ObjectMeta{Name: "shared-class"},
 			Spec: resourceapi.DeviceClassSpec{
-				ExtendedResourceName:             new(string(sharedResource)),
-				ExtendedResourceCapacityRequests: oneShare(),
+				ExtendedResourceName:    new(string(sharedResource)),
+				ExtendedResourceRequest: &resourceapi.ExtendedResourceRequest{Capacity: oneShare()},
 			},
 		},
 		defaultResource: {
