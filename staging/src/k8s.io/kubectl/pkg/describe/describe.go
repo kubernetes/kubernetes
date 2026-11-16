@@ -283,7 +283,7 @@ func (g *genericDescriber) Describe(namespace, name string, describerSettings De
 
 	var events *corev1.EventList
 	if describerSettings.ShowEvents {
-		events, _ = searchEvents(g.events, obj, describerSettings.ChunkSize)
+		events = searchEventsOrDefault(g.events, obj, describerSettings.ChunkSize)
 	}
 
 	return tabbedString(func(out io.Writer) error {
@@ -763,7 +763,7 @@ func (d *PodDescriber) Describe(namespace, name string, describerSettings Descri
 			if _, isMirrorPod := pod.Annotations[corev1.MirrorPodAnnotationKey]; isMirrorPod {
 				ref.UID = types.UID(pod.Annotations[corev1.MirrorPodAnnotationKey])
 			}
-			events, _ = searchEvents(d.CoreV1(), ref, describerSettings.ChunkSize)
+			events = searchEventsOrDefault(d.CoreV1(), ref, describerSettings.ChunkSize)
 		}
 	}
 
@@ -1504,7 +1504,7 @@ func (d *PersistentVolumeDescriber) Describe(namespace, name string, describerSe
 
 	var events *corev1.EventList
 	if describerSettings.ShowEvents {
-		events, _ = searchEvents(d.CoreV1(), pv, describerSettings.ChunkSize)
+		events = searchEventsOrDefault(d.CoreV1(), pv, describerSettings.ChunkSize)
 	}
 
 	return describePersistentVolume(pv, events)
@@ -1657,7 +1657,7 @@ func (d *PersistentVolumeClaimDescriber) Describe(namespace, name string, descri
 
 	var events *corev1.EventList
 	if describerSettings.ShowEvents {
-		events, _ = searchEvents(d.CoreV1(), pvc, describerSettings.ChunkSize)
+		events = searchEventsOrDefault(d.CoreV1(), pvc, describerSettings.ChunkSize)
 	}
 
 	return describePersistentVolumeClaim(pvc, events, pods)
@@ -2180,7 +2180,7 @@ func (d *ReplicationControllerDescriber) Describe(namespace, name string, descri
 
 	var events *corev1.EventList
 	if describerSettings.ShowEvents {
-		events, _ = searchEvents(d.CoreV1(), controller, describerSettings.ChunkSize)
+		events = searchEventsOrDefault(d.CoreV1(), controller, describerSettings.ChunkSize)
 	}
 
 	return describeReplicationController(controller, events, running, waiting, succeeded, failed)
@@ -2261,7 +2261,7 @@ func (d *ReplicaSetDescriber) Describe(namespace, name string, describerSettings
 
 	var events *corev1.EventList
 	if describerSettings.ShowEvents {
-		events, _ = searchEvents(d.CoreV1(), rs, describerSettings.ChunkSize)
+		events = searchEventsOrDefault(d.CoreV1(), rs, describerSettings.ChunkSize)
 	}
 
 	return describeReplicaSet(rs, events, running, waiting, succeeded, failed, getPodErr)
@@ -2313,7 +2313,7 @@ func (d *JobDescriber) Describe(namespace, name string, describerSettings Descri
 
 	var events *corev1.EventList
 	if describerSettings.ShowEvents {
-		events, _ = searchEvents(d.CoreV1(), job, describerSettings.ChunkSize)
+		events = searchEventsOrDefault(d.CoreV1(), job, describerSettings.ChunkSize)
 	}
 
 	return describeJob(job, events)
@@ -2412,7 +2412,7 @@ func (d *CronJobDescriber) Describe(namespace, name string, describerSettings De
 	}
 
 	if describerSettings.ShowEvents {
-		events, _ = searchEvents(d.client.CoreV1(), cronJob, describerSettings.ChunkSize)
+		events = searchEventsOrDefault(d.client.CoreV1(), cronJob, describerSettings.ChunkSize)
 	}
 	return describeCronJob(cronJob, events)
 }
@@ -2526,7 +2526,7 @@ func (d *DaemonSetDescriber) Describe(namespace, name string, describerSettings 
 
 	var events *corev1.EventList
 	if describerSettings.ShowEvents {
-		events, _ = searchEvents(d.CoreV1(), daemon, describerSettings.ChunkSize)
+		events = searchEventsOrDefault(d.CoreV1(), daemon, describerSettings.ChunkSize)
 	}
 
 	return describeDaemonSet(daemon, selector, events, running, waiting, succeeded, failed)
@@ -2605,7 +2605,7 @@ func (i *IngressDescriber) Describe(namespace, name string, describerSettings De
 		return "", err
 	}
 	if describerSettings.ShowEvents {
-		events, _ = searchEvents(i.client.CoreV1(), netV1, describerSettings.ChunkSize)
+		events = searchEventsOrDefault(i.client.CoreV1(), netV1, describerSettings.ChunkSize)
 	}
 	return i.describeIngressV1(netV1, events)
 }
@@ -2721,7 +2721,7 @@ func (i *IngressClassDescriber) Describe(namespace, name string, describerSettin
 		return "", err
 	}
 	if describerSettings.ShowEvents {
-		events, _ = searchEvents(i.client.CoreV1(), netV1, describerSettings.ChunkSize)
+		events = searchEventsOrDefault(i.client.CoreV1(), netV1, describerSettings.ChunkSize)
 	}
 	return i.describeIngressClassV1(netV1, events)
 }
@@ -2760,7 +2760,7 @@ func (c *ServiceCIDRDescriber) Describe(namespace, name string, describerSetting
 	svcV1, err := c.client.NetworkingV1().ServiceCIDRs().Get(context.TODO(), name, metav1.GetOptions{})
 	if err == nil {
 		if describerSettings.ShowEvents {
-			events, _ = searchEvents(c.client.CoreV1(), svcV1, describerSettings.ChunkSize)
+			events = searchEventsOrDefault(c.client.CoreV1(), svcV1, describerSettings.ChunkSize)
 		}
 		return c.describeServiceCIDRV1(svcV1, events)
 	}
@@ -2768,7 +2768,7 @@ func (c *ServiceCIDRDescriber) Describe(namespace, name string, describerSetting
 	svcV1beta1, err := c.client.NetworkingV1beta1().ServiceCIDRs().Get(context.TODO(), name, metav1.GetOptions{})
 	if err == nil {
 		if describerSettings.ShowEvents {
-			events, _ = searchEvents(c.client.CoreV1(), svcV1beta1, describerSettings.ChunkSize)
+			events = searchEventsOrDefault(c.client.CoreV1(), svcV1beta1, describerSettings.ChunkSize)
 		}
 		return c.describeServiceCIDRV1beta1(svcV1beta1, events)
 	}
@@ -2848,7 +2848,7 @@ func (c *IPAddressDescriber) Describe(namespace, name string, describerSettings 
 	ipV1, err := c.client.NetworkingV1().IPAddresses().Get(context.TODO(), name, metav1.GetOptions{})
 	if err == nil {
 		if describerSettings.ShowEvents {
-			events, _ = searchEvents(c.client.CoreV1(), ipV1, describerSettings.ChunkSize)
+			events = searchEventsOrDefault(c.client.CoreV1(), ipV1, describerSettings.ChunkSize)
 		}
 		return c.describeIPAddressV1(ipV1, events)
 	}
@@ -2856,7 +2856,7 @@ func (c *IPAddressDescriber) Describe(namespace, name string, describerSettings 
 	ipV1beta1, err := c.client.NetworkingV1beta1().IPAddresses().Get(context.TODO(), name, metav1.GetOptions{})
 	if err == nil {
 		if describerSettings.ShowEvents {
-			events, _ = searchEvents(c.client.CoreV1(), ipV1beta1, describerSettings.ChunkSize)
+			events = searchEventsOrDefault(c.client.CoreV1(), ipV1beta1, describerSettings.ChunkSize)
 		}
 		return c.describeIPAddressV1beta1(ipV1beta1, events)
 	}
@@ -2923,7 +2923,7 @@ func (d *ServiceDescriber) Describe(namespace, name string, describerSettings De
 	})
 	var events *corev1.EventList
 	if describerSettings.ShowEvents {
-		events, _ = searchEvents(d.CoreV1(), service, describerSettings.ChunkSize)
+		events = searchEventsOrDefault(d.CoreV1(), service, describerSettings.ChunkSize)
 	}
 	return describeService(service, endpointSliceList.Items, events)
 }
@@ -3049,7 +3049,7 @@ func (d *EndpointsDescriber) Describe(namespace, name string, describerSettings 
 
 	var events *corev1.EventList
 	if describerSettings.ShowEvents {
-		events, _ = searchEvents(d.CoreV1(), ep, describerSettings.ChunkSize)
+		events = searchEventsOrDefault(d.CoreV1(), ep, describerSettings.ChunkSize)
 	}
 
 	return describeEndpoints(ep, events)
@@ -3122,7 +3122,7 @@ func (d *EndpointSliceDescriber) Describe(namespace, name string, describerSetti
 		return "", err
 	}
 	if describerSettings.ShowEvents {
-		events, _ = searchEvents(d.CoreV1(), epsV1, describerSettings.ChunkSize)
+		events = searchEventsOrDefault(d.CoreV1(), epsV1, describerSettings.ChunkSize)
 	}
 	return describeEndpointSliceV1(epsV1, events)
 }
@@ -3222,7 +3222,7 @@ func (d *ServiceAccountDescriber) Describe(namespace, name string, describerSett
 
 	var events *corev1.EventList
 	if describerSettings.ShowEvents {
-		events, _ = searchEvents(d.CoreV1(), serviceAccount, describerSettings.ChunkSize)
+		events = searchEventsOrDefault(d.CoreV1(), serviceAccount, describerSettings.ChunkSize)
 	}
 
 	return describeServiceAccount(serviceAccount, events)
@@ -3471,10 +3471,10 @@ func (d *NodeDescriber) Describe(namespace, name string, describerSettings Descr
 			// controller use node.uid
 			// kubelet use node.name
 			// TODO: Uniform use of UID
-			events, _ = searchEvents(d.CoreV1(), ref, describerSettings.ChunkSize)
+			events = searchEventsOrDefault(d.CoreV1(), ref, describerSettings.ChunkSize)
 
 			ref.UID = types.UID(ref.Name)
-			eventsInvName, _ := searchEvents(d.CoreV1(), ref, describerSettings.ChunkSize)
+			eventsInvName := searchEventsOrDefault(d.CoreV1(), ref, describerSettings.ChunkSize)
 
 			// Merge the results of two queries
 			events.Items = append(events.Items, eventsInvName.Items...)
@@ -3691,7 +3691,7 @@ func (p *StatefulSetDescriber) Describe(namespace, name string, describerSetting
 
 	var events *corev1.EventList
 	if describerSettings.ShowEvents {
-		events, _ = searchEvents(p.client.CoreV1(), ps, describerSettings.ChunkSize)
+		events = searchEventsOrDefault(p.client.CoreV1(), ps, describerSettings.ChunkSize)
 	}
 
 	return describeStatefulSet(ps, selector, events, running, waiting, succeeded, failed)
@@ -3771,7 +3771,7 @@ func (p *CertificateSigningRequestDescriber) Describe(namespace, name string, de
 	expirationSeconds = csr.Spec.ExpirationSeconds
 	username = csr.Spec.Username
 	if describerSettings.ShowEvents {
-		events, _ = searchEvents(p.client.CoreV1(), csr, describerSettings.ChunkSize)
+		events = searchEventsOrDefault(p.client.CoreV1(), csr, describerSettings.ChunkSize)
 	}
 
 	cr, err := certificate.ParseCSR(crBytes)
@@ -3856,7 +3856,7 @@ func (d *HorizontalPodAutoscalerDescriber) Describe(namespace, name string, desc
 	hpaV2, err := d.client.AutoscalingV2().HorizontalPodAutoscalers(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err == nil {
 		if describerSettings.ShowEvents {
-			events, _ = searchEvents(d.client.CoreV1(), hpaV2, describerSettings.ChunkSize)
+			events = searchEventsOrDefault(d.client.CoreV1(), hpaV2, describerSettings.ChunkSize)
 		}
 		return describeHorizontalPodAutoscalerV2(hpaV2, events, d)
 	}
@@ -3864,7 +3864,7 @@ func (d *HorizontalPodAutoscalerDescriber) Describe(namespace, name string, desc
 	hpaV1, err := d.client.AutoscalingV1().HorizontalPodAutoscalers(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err == nil {
 		if describerSettings.ShowEvents {
-			events, _ = searchEvents(d.client.CoreV1(), hpaV1, describerSettings.ChunkSize)
+			events = searchEventsOrDefault(d.client.CoreV1(), hpaV1, describerSettings.ChunkSize)
 		}
 		return describeHorizontalPodAutoscalerV1(hpaV1, events, d)
 	}
@@ -4206,7 +4206,7 @@ func (dd *DeploymentDescriber) Describe(namespace, name string, describerSetting
 
 	var events *corev1.EventList
 	if describerSettings.ShowEvents {
-		events, _ = searchEvents(dd.client.CoreV1(), d, describerSettings.ChunkSize)
+		events = searchEventsOrDefault(dd.client.CoreV1(), d, describerSettings.ChunkSize)
 	}
 
 	var oldRSs, newRSs []*appsv1.ReplicaSet
@@ -4349,13 +4349,7 @@ func (d *ConfigMapDescriber) Describe(namespace, name string, describerSettings 
 		w.Write(LEVEL_0, "\n")
 
 		if describerSettings.ShowEvents {
-			events, err := searchEvents(d.CoreV1(), configMap, describerSettings.ChunkSize)
-			if err != nil {
-				return err
-			}
-			if events != nil {
-				DescribeEvents(events, w)
-			}
+			DescribeEvents(searchEventsOrDefault(d.CoreV1(), configMap, describerSettings.ChunkSize), w)
 		}
 		return nil
 	})
@@ -4536,7 +4530,7 @@ func (s *StorageClassDescriber) Describe(namespace, name string, describerSettin
 
 	var events *corev1.EventList
 	if describerSettings.ShowEvents {
-		events, _ = searchEvents(s.CoreV1(), sc, describerSettings.ChunkSize)
+		events = searchEventsOrDefault(s.CoreV1(), sc, describerSettings.ChunkSize)
 	}
 
 	return describeStorageClass(sc, events)
@@ -4588,7 +4582,7 @@ func (d *VolumeAttributesClassDescriber) Describe(namespace, name string, descri
 
 	var events *corev1.EventList
 	if describerSettings.ShowEvents {
-		events, _ = searchEvents(d.CoreV1(), vac, describerSettings.ChunkSize)
+		events = searchEventsOrDefault(d.CoreV1(), vac, describerSettings.ChunkSize)
 	}
 
 	return describeVolumeAttributesClass(vac, events)
@@ -4622,7 +4616,7 @@ func (c *CSINodeDescriber) Describe(namespace, name string, describerSettings De
 
 	var events *corev1.EventList
 	if describerSettings.ShowEvents {
-		events, _ = searchEvents(c.CoreV1(), csi, describerSettings.ChunkSize)
+		events = searchEventsOrDefault(c.CoreV1(), csi, describerSettings.ChunkSize)
 	}
 
 	return describeCSINode(csi, events)
@@ -4706,7 +4700,7 @@ func (p *PodDisruptionBudgetDescriber) Describe(namespace, name string, describe
 
 	var events *corev1.EventList
 	if describerSettings.ShowEvents {
-		events, _ = searchEvents(p.CoreV1(), pdbv1, describerSettings.ChunkSize)
+		events = searchEventsOrDefault(p.CoreV1(), pdbv1, describerSettings.ChunkSize)
 	}
 	return describePodDisruptionBudgetV1(pdbv1, events)
 }
@@ -4754,7 +4748,7 @@ func (s *PriorityClassDescriber) Describe(namespace, name string, describerSetti
 
 	var events *corev1.EventList
 	if describerSettings.ShowEvents {
-		events, _ = searchEvents(s.CoreV1(), pc, describerSettings.ChunkSize)
+		events = searchEventsOrDefault(s.CoreV1(), pc, describerSettings.ChunkSize)
 	}
 
 	return describePriorityClass(pc, events)
@@ -5421,4 +5415,20 @@ func searchEvents(client corev1client.EventsGetter, objOrRef runtime.Object, lim
 			return newEvents, nil
 		})
 	return eventList, err
+}
+
+// searchEventsOrDefault returns the events for objOrRef, or, when the search
+// fails, a synthetic warning event carrying the error. describe renders it in
+// the Events section so a failed lookup is visible instead of silently
+// reporting "Events: <none>".
+func searchEventsOrDefault(client corev1client.EventsGetter, objOrRef runtime.Object, limit int64) *corev1.EventList {
+	events, err := searchEvents(client, objOrRef, limit)
+	if err == nil {
+		return events
+	}
+	return &corev1.EventList{Items: []corev1.Event{{
+		Type:    corev1.EventTypeWarning,
+		Reason:  "EventsSearchFailed",
+		Message: err.Error(),
+	}}}
 }
