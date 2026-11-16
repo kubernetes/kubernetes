@@ -72,6 +72,51 @@ func TestImagePullDurationMetric(t *testing.T) {
 	})
 }
 
+// TestTopologyManagerNUMAScoreSelectionTotalMetric checks that the counter
+// reaches the registry: an unregistered component-base metric silently
+// discards every update and always reads back zero, so an increment which
+// survives a gather is what proves the registration. It also pins down the
+// label the series is broken down by, which is part of the metric's contract
+// with the operators reading it.
+func TestTopologyManagerNUMAScoreSelectionTotalMetric(t *testing.T) {
+	Register()
+	defer TopologyManagerNUMAScoreSelectionTotal.Reset()
+
+	TopologyManagerNUMAScoreSelectionTotal.WithLabelValues("most-allocated").Inc()
+
+	value, err := testutil.GetCounterMetricValue(TopologyManagerNUMAScoreSelectionTotal.WithLabelValues("most-allocated"))
+	if err != nil {
+		t.Fatalf("failed to read %s: %v", TopologyManagerNUMAScoreSelectionTotalKey, err)
+	}
+	if value != 1 {
+		t.Errorf("expected the counter to read back 1, got %v", value)
+	}
+
+	families, err := GetGather().Gather()
+	if err != nil {
+		t.Fatalf("failed to gather metrics: %v", err)
+	}
+
+	wantName := KubeletSubsystem + "_" + TopologyManagerNUMAScoreSelectionTotalKey
+	var found bool
+	for _, family := range families {
+		if family.GetName() != wantName {
+			continue
+		}
+		found = true
+		if got := family.GetType().String(); got != "COUNTER" {
+			t.Errorf("expected %s to be a counter, got %s", wantName, got)
+		}
+		labels := family.GetMetric()[0].GetLabel()
+		if len(labels) != 1 || labels[0].GetName() != TopologyManagerNUMAAllocationStrategyLabelKey {
+			t.Errorf("expected %s to carry the single label %q, got %v", wantName, TopologyManagerNUMAAllocationStrategyLabelKey, labels)
+		}
+	}
+	if !found {
+		t.Errorf("expected %s to be registered", wantName)
+	}
+}
+
 func clearMetrics() {
 	ImagePullDuration.Reset()
 }
