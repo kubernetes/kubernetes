@@ -260,9 +260,13 @@ func NewManager(logger klog.Logger, topology []cadvisorapi.Node, topologyPolicyN
 func (m *manager) initializeMetrics() {
 	// ensure the values exist
 	metrics.ContainerAlignedComputeResources.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedNUMANode).Add(0)
+	metrics.ContainerAlignedComputeResourcesTotal.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedNUMANode).Add(0)
 	metrics.ContainerAlignedComputeResources.WithLabelValues(metrics.AlignScopePod, metrics.AlignedNUMANode).Add(0)
+	metrics.ContainerAlignedComputeResourcesTotal.WithLabelValues(metrics.AlignScopePod, metrics.AlignedNUMANode).Add(0)
 	metrics.ContainerAlignedComputeResourcesFailure.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedNUMANode).Add(0)
+	metrics.ContainerAlignedComputeResourcesFailureTotal.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedNUMANode).Add(0)
 	metrics.ContainerAlignedComputeResourcesFailure.WithLabelValues(metrics.AlignScopePod, metrics.AlignedNUMANode).Add(0)
+	metrics.ContainerAlignedComputeResourcesFailureTotal.WithLabelValues(metrics.AlignScopePod, metrics.AlignedNUMANode).Add(0)
 }
 
 func (m *manager) GetAffinity(logger klog.Logger, podUID string, containerName string) TopologyHint {
@@ -299,6 +303,7 @@ func (m *manager) Admit(ctx context.Context, attrs *lifecycle.PodAdmitAttributes
 	// generating hints, but no hints are stored and no resources are allocated.
 	podAdmitResult := m.scope.Admit(ctx, attrs.Pod, attrs.Operation, attrs.DryRun)
 	metrics.TopologyManagerAdmissionDuration.Observe(float64(time.Since(startTime).Milliseconds()))
+	metrics.TopologyManagerAdmissionDurationSeconds.Observe(time.Since(startTime).Seconds())
 
 	logger.V(4).Info("Pod Admit Result", "Message", podAdmitResult.Message, "pod", klog.KObj(attrs.Pod))
 	return podAdmitResult
