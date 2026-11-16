@@ -495,6 +495,9 @@ func (r *Reflector) ListAndWatchWithContext(ctx context.Context) error {
 			)
 			fallbackToList = true
 			// ensure that we won't accidentally pass some garbage down the watch.
+			if w != nil {
+				w.Stop()
+			}
 			w = nil
 		}
 	}
@@ -901,7 +904,7 @@ func (r *Reflector) watchList(ctx context.Context) (watch.Interface, error) {
 	checkWatchListDataConsistencyIfRequested(ctx, r.name, resourceVersion, r.listerWatcher.ListWithContext, transformer, temporaryStore.List)
 
 	if err := r.store.Replace(temporaryStore.List(), resourceVersion); err != nil {
-		return nil, fmt.Errorf("unable to sync watch-list result: %w", err)
+		return w, fmt.Errorf("unable to sync watch-list result: %w", err)
 	}
 	initTrace.Step("SyncWith done")
 	r.setLastSyncResourceVersion(resourceVersion)

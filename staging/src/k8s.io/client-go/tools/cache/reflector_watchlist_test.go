@@ -54,6 +54,31 @@ func (lw *lwDoesNotSupportWatchListSemantics) IsWatchListSemanticsUnSupported() 
 
 type lwNoWatchListSemanticsUnSupportedExposed struct{ fakeListWatcher }
 
+func TestWatchListStopsWatcherOnReplaceError(t *testing.T) {
+	logger, ctx := ktesting.NewTestContext(t)
+	clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.WatchListClient, true)
+	w := watch.NewFakeWithOptions(watch.FakeOptions{Logger: &logger, ChannelSize: 2})
+	w.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod", ResourceVersion: "1"}})
+	w.Action(watch.Bookmark, &v1.Pod{ObjectMeta: metav1.ObjectMeta{
+		ResourceVersion: "1",
+		Annotations:     map[string]string{metav1.InitialEventsAnnotationKey: "true"},
+	}})
+
+	store := NewStore(func(interface{}) (string, error) { return "", errors.New("store key unavailable") })
+	lw := &ListWatch{
+		WatchFunc: func(metav1.ListOptions) (watch.Interface, error) {
+			return w, nil
+		},
+		ListFunc: func(metav1.ListOptions) (runtime.Object, error) {
+			return nil, errors.New("fallback list failed")
+		},
+	}
+	r := NewReflectorWithOptions(lw, &v1.Pod{}, store, ReflectorOptions{})
+
+	require.Error(t, r.ListAndWatchWithContext(ctx))
+	require.True(t, w.IsStopped(), "watcher must be stopped after Replace fails")
+}
+
 func TestNewReflectorWithDisablementWatchList(t *testing.T) {
 	scenarios := []struct {
 		name                    string
