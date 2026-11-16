@@ -197,6 +197,10 @@ var (
 		Group:    "",
 		Resource: "pods",
 	}
+	podGroupsGroupResource = schema.GroupResource{
+		Group:    schedulingv1beta1.GroupName,
+		Resource: "podgroups",
+	}
 )
 
 // NewController creates a new Job controller that keeps the relevant pods
@@ -223,9 +227,15 @@ func newControllerWithClock(ctx context.Context, kubeClient clientset.Interface,
 	var consistencyStore consistencyutil.ConsistencyStore
 	var podWriteCallback func(pod *v1.Pod, ds *metav1.OwnerReference)
 	if feature.DefaultFeatureGate.Enabled(features.StaleControllerConsistencyJob) {
+		// The PodGroup informer is nil when WorkloadWithJob is off
+		var podGroupsStore consistencyutil.LastSyncRVGetter
+		if podGroupInformer != nil {
+			podGroupsStore = podGroupInformer.Informer().GetStore()
+		}
 		consistencyStore = consistencyutil.NewConsistencyStore(map[schema.GroupResource]consistencyutil.LastSyncRVGetter{
-			podGroupResource: podInformer.Informer().GetStore(),
-			jobGroupResource: jobInformer.Informer().GetStore(),
+			podGroupResource:       podInformer.Informer().GetStore(),
+			jobGroupResource:       jobInformer.Informer().GetStore(),
+			podGroupsGroupResource: podGroupsStore,
 		})
 		podWriteCallback = func(pod *v1.Pod, job *metav1.OwnerReference) {
 			if job == nil {
@@ -1032,7 +1042,8 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (rErr error) {
 	var podGroup *schedulingv1beta1.PodGroup
 	var schedulingBlockedErr error
 	schedulingCondChanged := false
-	if shouldManageWorkloadForJob(&job) {
+	if shouldManageWorkloadForJob(&job) && satisfiedExpectations &&
+		job.DeletionTimestamp == nil && !hasTerminalCriteriaCondition(&job) {
 		podGroup, schedulingCondChanged, err = jm.ensureSchedulingObjectsAndCondition(ctx, &job, pods)
 		if _, ok := errors.AsType[*schedulingBlockedError](err); ok {
 			schedulingBlockedErr = err
@@ -1142,6 +1153,8 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (rErr error) {
 		manageJobErr = err
 	} else {
 		manageJobCalled := false
+		// Do not call manageJob when scheduling is blocked, unless the Job is
+		// suspended and manageJob needs to delete active pods.
 		if satisfiedExpectations && job.DeletionTimestamp == nil &&
 			(schedulingBlockedErr == nil || jobSuspended(&job)) {
 			active, action, manageJobErr = jm.manageJob(ctx, &job, jobCtx)
@@ -1840,6 +1853,12 @@ func (jm *Controller) manageJob(ctx context.Context, job *batch.Job, jobCtx *syn
 			return active, metrics.JobSyncActionPodsCreated, nil
 		}
 		podGroup := jobCtx.podGroup
+		if podGroup != nil && podGroup.DeletionTimestamp != nil {
+			// Pods must not join the old gang. The PodGroup is recreated once it is gone.
+			logger.V(2).Info("Waiting for terminating PodGroup before creating pods", "job", klog.KObj(job), "podGroup", klog.KObj(podGroup))
+			jm.enqueueSyncJobWithDelay(logger, job, DefaultJobApiBackOff)
+			return active, metrics.JobSyncActionPodsCreated, nil
+		}
 		if podGroup != nil &&
 			slices.ContainsFunc(jobCtx.activePods, func(p *v1.Pod) bool {
 				return p.Spec.SchedulingGroup == nil
@@ -2149,6 +2168,16 @@ func isPodFailed(p *v1.Pod, job *batch.Job) bool {
 	// Count deleted Pods as failures to account for orphan Pods that
 	// never have a chance to reach the Failed phase.
 	return p.DeletionTimestamp != nil && p.Status.Phase != v1.PodSucceeded
+}
+
+// hasTerminalCriteriaCondition reports whether an earlier sync already decided
+// the Job's outcome via SuccessCriteriaMet or FailureTarget.
+func hasTerminalCriteriaCondition(job *batch.Job) bool {
+	if hasSuccessCriteriaMetCondition(job) != nil {
+		return true
+	}
+	failureTarget := findConditionByType(job.Status.Conditions, batch.JobFailureTarget)
+	return failureTarget != nil && failureTarget.Status == v1.ConditionTrue
 }
 
 func findConditionByType(list []batch.JobCondition, cType batch.JobConditionType) *batch.JobCondition {
