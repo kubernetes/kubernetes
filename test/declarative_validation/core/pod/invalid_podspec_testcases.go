@@ -58,6 +58,14 @@ func InvalidPodSpecTestcases(fldPath *field.Path) []PodSpecTestcase {
 				field.NotSupported(fldPath.Child("initContainers").Index(0).Child("securityContext", "cgroupOptions", "mountMode"), "Invalid", []string{}),
 			},
 		},
+		{
+			ID:     "podNetwork_unsupported_value",
+			Tweaks: []podtest.Tweak{podtest.SetPodNetwork(core.PodNetwork("Bridge"))},
+			ExpectedErrs: field.ErrorList{
+				field.Forbidden(fldPath.Child("podNetwork"), "").MarkFromImperative(),
+				field.NotSupported(fldPath.Child("podNetwork"), core.PodNetwork("Bridge"), []core.PodNetwork{}),
+			},
+		},
 	}
 	return append(testcases, securityProfileOCITestcases(fldPath)...)
 }

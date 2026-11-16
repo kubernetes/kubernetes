@@ -126,6 +126,7 @@ func (deploymentStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime
 
 	deployment.DropDisabledFields(&newDeployment.Spec, &oldDeployment.Spec)
 	pod.DropDisabledTemplateFields(&newDeployment.Spec.Template, &oldDeployment.Spec.Template)
+	pod.SyncPodNetworkOnTemplateUpdate(&newDeployment.Spec.Template, &oldDeployment.Spec.Template)
 
 	// Spec updates bump the generation so that we can distinguish between
 	// scaling events and template changes, annotation updates bump the generation

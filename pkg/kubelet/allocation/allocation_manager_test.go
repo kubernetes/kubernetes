@@ -347,7 +347,7 @@ func testUpdatePodFromAllocationFieldClassification(t *testing.T, dynamicContain
 			"PriorityClassName", "Priority", "DNSConfig", "ReadinessGates", "RuntimeClassName",
 			"EnableServiceLinks", "PreemptionPolicy", "Overhead", "TopologySpreadConstraints",
 			"SetHostnameAsFQDN", "OS", "HostUsers", "SchedulingGates", "ResourceClaims", "Resources",
-			"HostnameOverride", "SchedulingGroup", "EvictionResponders",
+			"HostnameOverride", "SchedulingGroup", "EvictionResponders", "PodNetwork",
 		},
 	}
 	containerFields := map[category][]string{

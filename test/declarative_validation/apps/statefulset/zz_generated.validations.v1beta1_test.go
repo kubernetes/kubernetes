@@ -158,6 +158,9 @@ func init() {
 			"spec.template.spec.initContainers[*].securityContext.seccompProfile.type": {
 				{ErrorType: "FieldValueRequired"},
 			},
+			"spec.template.spec.podNetwork": {
+				{ErrorType: "FieldValueNotSupported"},
+			},
 			"spec.template.spec.restartPolicy": {
 				{ErrorType: "FieldValueNotSupported"},
 			},
