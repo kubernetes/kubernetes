@@ -74,7 +74,8 @@ func handleCrash(ctx context.Context, r interface{}, additionalHandlers ...func(
 	// function which deferred the variant.
 	logger := klog.FromContext(ctx).WithCallDepth(3)
 	// net/http panics with ErrAbortHandler to abort a handler quietly.
-	if r != http.ErrAbortHandler {
+	// It compares the panic value itself, so errors.Is does not apply.
+	if r != http.ErrAbortHandler { //nolint:errorlint
 		// Same buffer size as the net/http server.
 		stacktrace := make([]byte, 64<<10)
 		stacktrace = stacktrace[:runtime.Stack(stacktrace, false)]
