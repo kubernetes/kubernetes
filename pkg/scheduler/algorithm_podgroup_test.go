@@ -4767,14 +4767,14 @@ func (p *fakeAssumeAndReserveRecorderPlugin) Unreserve(_ context.Context, _ fwk.
 }
 
 func TestRunRootSchedulingAlgorithm_AssumeSubtrees(t *testing.T) {
-	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-		features.GenericWorkload:                 true,
-		features.TopologyAwareWorkloadScheduling: true,
-		features.CompositePodGroup:               true,
-	})
+	node1 := st.MakeNode().Name("node1").Obj()
+	node2 := st.MakeNode().Name("node2").Obj()
 
 	rootPodGroup := st.MakePodGroup().Name("pg").Namespace("default").MinCount(1).Obj()
 	podGroupPod := st.MakePod().Name("pod").Namespace("default").UID("pod").PodGroupName("pg").Obj()
+	pgPod1 := st.MakePod().Name("pg-pod1").Namespace("default").UID("pg-pod1").PodGroupName("pg").Obj()
+	pgPod2 := st.MakePod().Name("pg-pod2").Namespace("default").UID("pg-pod2").PodGroupName("pg").Obj()
+	pgPod3 := st.MakePod().Name("pg-pod3").Namespace("default").UID("pg-pod3").PodGroupName("pg").Obj()
 
 	rootCompositePodGroup := st.MakeCompositePodGroup().Name("cpg").Namespace("default").Obj()
 	childBasicPodGroup1 := st.MakePodGroup().Name("pg1").Namespace("default").ParentCompositePodGroup("cpg").BasicPolicy().Obj()
@@ -4800,6 +4800,8 @@ func TestRunRootSchedulingAlgorithm_AssumeSubtrees(t *testing.T) {
 
 	tests := []struct {
 		name                      string
+		enableTAS                 bool
+		nodes                     []*v1.Node
 		root                      *fwk.GenericPodGroup
 		cpgs                      []*schedulingv1beta1.CompositePodGroup
 		pgs                       []*schedulingv1beta1.PodGroup
@@ -4813,21 +4815,68 @@ func TestRunRootSchedulingAlgorithm_AssumeSubtrees(t *testing.T) {
 		wantChildStatus           map[fwk.EntityKey]fwk.Code
 	}{
 		{
-			name: "Root pod group is not assumed",
-			root: fwk.NewGenericPodGroup(rootPodGroup),
-			pgs:  []*schedulingv1beta1.PodGroup{rootPodGroup},
-			pods: []*v1.Pod{podGroupPod},
+			name:      "Root pod group is not assumed",
+			enableTAS: true,
+			root:      fwk.NewGenericPodGroup(rootPodGroup),
+			pgs:       []*schedulingv1beta1.PodGroup{rootPodGroup},
+			pods:      []*v1.Pod{podGroupPod},
 			wantAssumeEvents: []string{
 				"assume pod@node1",
 				"revert pod@node1",
 			},
 		},
 		{
-			name: "Pod group child with subsequent siblings within hierarchy is assumed, last child and root are not",
-			root: fwk.NewGenericCompositePodGroup(rootCompositePodGroup),
-			cpgs: []*schedulingv1beta1.CompositePodGroup{rootCompositePodGroup},
-			pgs:  []*schedulingv1beta1.PodGroup{childPodGroup1, childPodGroup2},
-			pods: []*v1.Pod{pg1Pod1, pg2Pod1},
+			name:  "Multi-pod root pod group with TAS disabled assumes pods and reverts them in LIFO order on success",
+			nodes: []*v1.Node{node1},
+			root:  fwk.NewGenericPodGroup(rootPodGroup),
+			pgs:   []*schedulingv1beta1.PodGroup{rootPodGroup},
+			pods:  []*v1.Pod{pgPod1, pgPod2, pgPod3},
+			wantAssumeEvents: []string{
+				"assume pg-pod1@node1",
+				"assume pg-pod2@node1",
+				"assume pg-pod3@node1",
+				"revert pg-pod3@node1",
+				"revert pg-pod2@node1",
+				"revert pg-pod1@node1",
+			},
+		},
+		{
+			name:                      "Multi-pod root pod group with TAS disabled becomes unschedulable due to a PlacementFeasible plugin rejection and reverts assumed pods in LIFO order",
+			nodes:                     []*v1.Node{node1},
+			root:                      fwk.NewGenericPodGroup(rootPodGroup),
+			pgs:                       []*schedulingv1beta1.PodGroup{rootPodGroup},
+			pods:                      []*v1.Pod{pgPod1, pgPod2, pgPod3},
+			placementFeasibleStatuses: [][]fwk.Code{{fwk.Success, fwk.Success, fwk.Unschedulable}},
+			wantStatus:                fwk.Unschedulable,
+			wantAssumeEvents: []string{
+				"assume pg-pod1@node1",
+				"assume pg-pod2@node1",
+				"revert pg-pod2@node1",
+				"revert pg-pod1@node1",
+			},
+		},
+		{
+			name:                      "Multi-pod root pod group with TAS disabled fails with an error returned by a PlacementFeasible plugin and reverts assumed pods in LIFO order",
+			nodes:                     []*v1.Node{node1},
+			root:                      fwk.NewGenericPodGroup(rootPodGroup),
+			pgs:                       []*schedulingv1beta1.PodGroup{rootPodGroup},
+			pods:                      []*v1.Pod{pgPod1, pgPod2, pgPod3},
+			placementFeasibleStatuses: [][]fwk.Code{{fwk.Success, fwk.Success, fwk.Error}},
+			wantStatus:                fwk.Error,
+			wantAssumeEvents: []string{
+				"assume pg-pod1@node1",
+				"assume pg-pod2@node1",
+				"revert pg-pod2@node1",
+				"revert pg-pod1@node1",
+			},
+		},
+		{
+			name:      "Pod group child with subsequent siblings within hierarchy is assumed, last child and root are not",
+			enableTAS: true,
+			root:      fwk.NewGenericCompositePodGroup(rootCompositePodGroup),
+			cpgs:      []*schedulingv1beta1.CompositePodGroup{rootCompositePodGroup},
+			pgs:       []*schedulingv1beta1.PodGroup{childPodGroup1, childPodGroup2},
+			pods:      []*v1.Pod{pg1Pod1, pg2Pod1},
 			wantAssumeEvents: []string{
 				"assume pg1-pod1@node1",
 				"revert pg1-pod1@node1",
@@ -4838,11 +4887,12 @@ func TestRunRootSchedulingAlgorithm_AssumeSubtrees(t *testing.T) {
 			},
 		},
 		{
-			name: "Multi-pod child pod group followed by a sibling assumes and reverts pods in LIFO order",
-			root: fwk.NewGenericCompositePodGroup(rootCompositePodGroup),
-			cpgs: []*schedulingv1beta1.CompositePodGroup{rootCompositePodGroup},
-			pgs:  []*schedulingv1beta1.PodGroup{childPodGroup1, childPodGroup2},
-			pods: []*v1.Pod{pg1Pod1, pg1Pod2, pg1Pod3, pg2Pod1},
+			name:      "Multi-pod child pod group followed by a sibling assumes and reverts pods in LIFO order",
+			enableTAS: true,
+			root:      fwk.NewGenericCompositePodGroup(rootCompositePodGroup),
+			cpgs:      []*schedulingv1beta1.CompositePodGroup{rootCompositePodGroup},
+			pgs:       []*schedulingv1beta1.PodGroup{childPodGroup1, childPodGroup2},
+			pods:      []*v1.Pod{pg1Pod1, pg1Pod2, pg1Pod3, pg2Pod1},
 			wantAssumeEvents: []string{
 				"assume pg1-pod1@node1",
 				"assume pg1-pod2@node1",
@@ -4861,22 +4911,24 @@ func TestRunRootSchedulingAlgorithm_AssumeSubtrees(t *testing.T) {
 			},
 		},
 		{
-			name: "Basic child pod group with a subsequent sibling skips subtree assume when it had no scheduled pods",
-			root: fwk.NewGenericCompositePodGroup(rootCompositePodGroup),
-			cpgs: []*schedulingv1beta1.CompositePodGroup{rootCompositePodGroup},
-			pgs:  []*schedulingv1beta1.PodGroup{childBasicPodGroup1, childPodGroup2},
-			pods: []*v1.Pod{pg2Pod1},
+			name:      "Basic child pod group with a subsequent sibling skips subtree assume when it had no scheduled pods",
+			enableTAS: true,
+			root:      fwk.NewGenericCompositePodGroup(rootCompositePodGroup),
+			cpgs:      []*schedulingv1beta1.CompositePodGroup{rootCompositePodGroup},
+			pgs:       []*schedulingv1beta1.PodGroup{childBasicPodGroup1, childPodGroup2},
+			pods:      []*v1.Pod{pg2Pod1},
 			wantAssumeEvents: []string{
 				"assume pg2-pod1@node1",
 				"revert pg2-pod1@node1",
 			},
 		},
 		{
-			name: "Composite pod group child with subsequent siblings is assumed, last child and root are not",
-			root: fwk.NewGenericCompositePodGroup(rootCompositePodGroup),
-			cpgs: []*schedulingv1beta1.CompositePodGroup{rootCompositePodGroup, childCompositePodGroup1, childCompositePodGroup2},
-			pgs:  []*schedulingv1beta1.PodGroup{childPodGroup3, childPodGroup4, childPodGroup5},
-			pods: []*v1.Pod{pg3Pod1, pg4Pod1, pg5Pod1},
+			name:      "Composite pod group child with subsequent siblings is assumed, last child and root are not",
+			enableTAS: true,
+			root:      fwk.NewGenericCompositePodGroup(rootCompositePodGroup),
+			cpgs:      []*schedulingv1beta1.CompositePodGroup{rootCompositePodGroup, childCompositePodGroup1, childCompositePodGroup2},
+			pgs:       []*schedulingv1beta1.PodGroup{childPodGroup3, childPodGroup4, childPodGroup5},
+			pods:      []*v1.Pod{pg3Pod1, pg4Pod1, pg5Pod1},
 			wantAssumeEvents: []string{
 				"assume pg3-pod1@node1",
 				"revert pg3-pod1@node1",
@@ -4894,6 +4946,7 @@ func TestRunRootSchedulingAlgorithm_AssumeSubtrees(t *testing.T) {
 		},
 		{
 			name:                      "Child is not assumed when PlacementFeasible rejects the parent",
+			enableTAS:                 true,
 			root:                      fwk.NewGenericCompositePodGroup(rootCompositePodGroup),
 			cpgs:                      []*schedulingv1beta1.CompositePodGroup{rootCompositePodGroup},
 			pgs:                       []*schedulingv1beta1.PodGroup{childPodGroup1, childPodGroup2},
@@ -4906,11 +4959,12 @@ func TestRunRootSchedulingAlgorithm_AssumeSubtrees(t *testing.T) {
 			},
 		},
 		{
-			name: "Child is assumed on its best-scored placement, not the last evaluated one",
-			root: fwk.NewGenericCompositePodGroup(rootCompositePodGroup),
-			cpgs: []*schedulingv1beta1.CompositePodGroup{rootCompositePodGroup},
-			pgs:  []*schedulingv1beta1.PodGroup{childPodGroup1, childPodGroup2},
-			pods: []*v1.Pod{pg1Pod1, pg2Pod1},
+			name:      "Child is assumed on its best-scored placement, not the last evaluated one",
+			enableTAS: true,
+			root:      fwk.NewGenericCompositePodGroup(rootCompositePodGroup),
+			cpgs:      []*schedulingv1beta1.CompositePodGroup{rootCompositePodGroup},
+			pgs:       []*schedulingv1beta1.PodGroup{childPodGroup1, childPodGroup2},
+			pods:      []*v1.Pod{pg1Pod1, pg2Pod1},
 			placements: map[fwk.EntityKey]map[string][]string{
 				rootCompositePodGroupKey: {"all": {"node1", "node2"}},
 				childPodGroup1Key:        {"on-node1": {"node1"}, "on-node2": {"node2"}},
@@ -4931,6 +4985,7 @@ func TestRunRootSchedulingAlgorithm_AssumeSubtrees(t *testing.T) {
 		},
 		{
 			name:          "Assume failure is attributed to the podgroup child",
+			enableTAS:     true,
 			root:          fwk.NewGenericCompositePodGroup(rootCompositePodGroup),
 			cpgs:          []*schedulingv1beta1.CompositePodGroup{rootCompositePodGroup},
 			pgs:           []*schedulingv1beta1.PodGroup{childPodGroup1, childPodGroup2},
@@ -4947,6 +5002,7 @@ func TestRunRootSchedulingAlgorithm_AssumeSubtrees(t *testing.T) {
 		},
 		{
 			name:          "Assume failure is attributed to the composite pod group child",
+			enableTAS:     true,
 			root:          fwk.NewGenericCompositePodGroup(rootCompositePodGroup),
 			cpgs:          []*schedulingv1beta1.CompositePodGroup{rootCompositePodGroup, childCompositePodGroup1, childCompositePodGroup2},
 			pgs:           []*schedulingv1beta1.PodGroup{childPodGroup3, childPodGroup4, childPodGroup5},
@@ -4971,14 +5027,30 @@ func TestRunRootSchedulingAlgorithm_AssumeSubtrees(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// CompositePodGroup requires TopologyAwareWorkloadScheduling, so both feature gates follow enableTAS.
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.GenericWorkload:                 true,
+				features.TopologyAwareWorkloadScheduling: tt.enableTAS,
+				features.CompositePodGroup:               tt.enableTAS,
+			})
+
 			_, ctx := ktesting.NewTestContext(t)
 			var root *framework.QueuedPodGroupInfo
 			if rootCPG := tt.root.GetCompositePodGroup(); rootCPG != nil {
 				root = buildHierarchicalQueuedPodGroupInfo(rootCPG, tt.cpgs, tt.pgs, tt.pods)
 			} else {
-				root = newQueuedPodGroupInfo(&framework.PodGroupInfo{GenericPodGroup: tt.root}, &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: tt.pods[0]}})
+				queuedPodInfos := make([]*framework.QueuedPodInfo, 0, len(tt.pods))
+				for _, pod := range tt.pods {
+					queuedPodInfos = append(queuedPodInfos, queuedPodInfoForPod(pod))
+				}
+				root = newQueuedPodGroupInfo(&framework.PodGroupInfo{GenericPodGroup: tt.root}, queuedPodInfos...)
 			}
-			nodes := []*v1.Node{st.MakeNode().Name("node1").Obj(), st.MakeNode().Name("node2").Obj()}
+			// nodes defaults to node1 and node2. Cases with TAS disabled should use only node1, because
+			// without placements pods could land on either node, making the expected events unpredictable.
+			nodes := tt.nodes
+			if nodes == nil {
+				nodes = []*v1.Node{node1, node2}
+			}
 			snapshot := internalcache.NewTestSnapshotWithPodGroups(nil, nodes, tt.pgs, tt.cpgs)
 
 			placements := map[fwk.EntityKey]map[string][]string{}
