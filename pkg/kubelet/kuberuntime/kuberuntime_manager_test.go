@@ -4506,6 +4506,9 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 		},
 	} {
 		t.Run(desc, func(t *testing.T) {
+			if !test.podLevelResizeEnabled {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.37"))
+			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodLevelResourcesVerticalScaling, test.podLevelResizeEnabled)
 			pod, status := makeBasePodAndStatus()
 			for idx := range pod.Spec.Containers {
@@ -5529,6 +5532,9 @@ func TestDoPodResizeAction(t *testing.T) {
 			require.NoError(t, err)
 			m.cpuCFSQuota = true // Enforce CPU Limits
 
+			if !tc.enablePLR {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.37"))
+			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodLevelResourcesVerticalScaling, tc.enablePLR)
 
 			mockCM := cmtesting.NewMockContainerManager(t)
@@ -7229,6 +7235,9 @@ func TestIsPodResizeInProgress(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			if !test.inplacePodLevelResizeEnabled {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.37"))
+			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodLevelResourcesVerticalScaling, test.inplacePodLevelResizeEnabled)
 			_, _, m, err := createTestRuntimeManager(tCtx)
 			require.NoError(t, err)
