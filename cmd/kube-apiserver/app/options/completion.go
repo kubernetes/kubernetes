@@ -22,12 +22,10 @@ import (
 	"net"
 	"strings"
 
-	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	_ "k8s.io/component-base/metrics/prometheus/workqueue"
 	netutils "k8s.io/utils/net"
 
 	cp "k8s.io/kubernetes/pkg/controlplane/apiserver/options"
-	"k8s.io/kubernetes/pkg/kubeapiserver"
 )
 
 // completedOptions is a private wrapper that enforces a call of Complete() before Run can be invoked.
@@ -69,22 +67,6 @@ func (s *ServerRunOptions) Complete(ctx context.Context) (CompletedOptions, erro
 	completed.PrimaryServiceClusterIPRange = primaryServiceIPRange
 	completed.SecondaryServiceClusterIPRange = secondaryServiceIPRange
 	completed.APIServerServiceIP = apiServerServiceIP
-
-	if completed.Etcd != nil && completed.Etcd.EnableWatchCache {
-		sizes := kubeapiserver.DefaultWatchCacheSizes()
-		// Ensure that overrides parse correctly.
-		userSpecified, err := apiserveroptions.ParseWatchCacheSizes(completed.Etcd.WatchCacheSizes)
-		if err != nil {
-			return CompletedOptions{}, err
-		}
-		for resource, size := range userSpecified {
-			sizes[resource] = size
-		}
-		completed.Etcd.WatchCacheSizes, err = apiserveroptions.WriteWatchCacheSizes(sizes)
-		if err != nil {
-			return CompletedOptions{}, err
-		}
-	}
 
 	return CompletedOptions{
 		completedOptions: &completed,

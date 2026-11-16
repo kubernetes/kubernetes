@@ -231,12 +231,36 @@ func TestEtcdOptionsValidate(t *testing.T) {
 			},
 			expectErr: "--watch-cache-max-events must be 0 or at least 100, got -1",
 		},
+		{
+			name: "invalid watch-cache-sizes",
+			testOptions: &EtcdOptions{
+				StorageConfig: storagebackend.Config{
+					Transport: storagebackend.TransportConfig{
+						ServerList: []string{"http://127.0.0.1"},
+					},
+				},
+				WatchCacheSizes: []string{"pods#-1"},
+			},
+			expectErr: "watch cache size cannot be negative: pods#-1",
+		},
+		{
+			name: "watch-cache-sizes enabled for events",
+			testOptions: &EtcdOptions{
+				StorageConfig: storagebackend.Config{
+					Transport: storagebackend.TransportConfig{
+						ServerList: []string{"http://127.0.0.1"},
+					},
+				},
+				WatchCacheSizes: []string{"events#1"},
+			},
+			expectErr: "watch cache cannot be enabled for events because resources with TTL are not supported",
+		},
 	}
 
 	for _, testcase := range testCases {
 		t.Run(testcase.name, func(t *testing.T) {
 			errs := testcase.testOptions.Validate()
-			if len(testcase.expectErr) != 0 && !strings.Contains(utilerrors.NewAggregate(errs).Error(), testcase.expectErr) {
+			if len(testcase.expectErr) != 0 && (len(errs) == 0 || !strings.Contains(utilerrors.NewAggregate(errs).Error(), testcase.expectErr)) {
 				t.Errorf("got err: %v, expected err: %s", errs, testcase.expectErr)
 			}
 			if len(testcase.expectErr) == 0 && len(errs) != 0 {
@@ -269,6 +293,24 @@ func TestParseWatchCacheSizes(t *testing.T) {
 			expectErr:  "watch cache size cannot be negative",
 		},
 		{
+			name:       "test when watch cache is enabled for core events",
+			cacheSizes: []string{"events#1"},
+			expectErr:  "watch cache cannot be enabled for events because resources with TTL are not supported",
+		},
+		{
+			name:       "test when watch cache is enabled for events.k8s.io events",
+			cacheSizes: []string{"events.events.k8s.io#100"},
+			expectErr:  "watch cache cannot be enabled for events.events.k8s.io because resources with TTL are not supported",
+		},
+		{
+			name:       "test when watch cache is disabled for events",
+			cacheSizes: []string{"events#0", "events.events.k8s.io#0"},
+			expectWatchCacheSizes: map[schema.GroupResource]int{
+				{Resource: "events"}:                         0,
+				{Group: "events.k8s.io", Resource: "events"}: 0,
+			},
+		},
+		{
 			name:       "test when parse watch cache size success",
 			cacheSizes: []string{"deployments.apps#65536", "replicasets.extensions#65536"},
 			expectWatchCacheSizes: map[schema.GroupResource]int{
@@ -281,7 +323,7 @@ func TestParseWatchCacheSizes(t *testing.T) {
 	for _, testcase := range testCases {
 		t.Run(testcase.name, func(t *testing.T) {
 			result, err := ParseWatchCacheSizes(testcase.cacheSizes)
-			if len(testcase.expectErr) != 0 && !strings.Contains(err.Error(), testcase.expectErr) {
+			if len(testcase.expectErr) != 0 && (err == nil || !strings.Contains(err.Error(), testcase.expectErr)) {
 				t.Errorf("got err: %v, expected err: %s", err, testcase.expectErr)
 			}
 			if len(testcase.expectErr) == 0 {
@@ -742,4 +784,61 @@ func (f *fakeMonitor) Monitor(ctx context.Context) (metrics.StorageMetrics, erro
 func (f *fakeMonitor) Close() error {
 	f.closeCalls.Add(1)
 	return nil
+}
+
+func TestGetRESTOptionsForResourcesWithTTL(t *testing.T) {
+	eventsGR := schema.GroupResource{Resource: "events"}
+	eventsGroupGR := schema.GroupResource{Group: "events.k8s.io", Resource: "events"}
+
+	tests := []struct {
+		name             string
+		enableWatchCache bool
+		watchCacheSizes  []string
+		resource         schema.GroupResource
+		expectErr        string
+	}{
+		{
+			name:             "watch cache enabled without disabling core events fails",
+			enableWatchCache: true,
+			resource:         eventsGR,
+			expectErr:        "watch cache cannot be enabled for events because resources with TTL are not supported",
+		},
+		{
+			name:             "watch cache enabled without disabling events.k8s.io events fails",
+			enableWatchCache: true,
+			resource:         eventsGroupGR,
+			expectErr:        "watch cache cannot be enabled for events.events.k8s.io because resources with TTL are not supported",
+		},
+		{
+			name:             "watch cache explicitly disabled for events succeeds",
+			enableWatchCache: true,
+			watchCacheSizes:  []string{"events#0", "events.events.k8s.io#0"},
+			resource:         eventsGR,
+		},
+		{
+			name:             "watch cache globally disabled succeeds",
+			enableWatchCache: false,
+			resource:         eventsGR,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			factory := &StorageFactoryRestOptionsFactory{
+				Options: EtcdOptions{
+					EnableWatchCache: tc.enableWatchCache,
+					WatchCacheSizes:  tc.watchCacheSizes,
+				},
+				StorageFactory: &SimpleStorageFactory{},
+			}
+			_, err := factory.GetRESTOptions(tc.resource, nil)
+			if tc.expectErr != "" {
+				if err == nil || !strings.Contains(err.Error(), tc.expectErr) {
+					t.Fatalf("got err %v, want substring %q", err, tc.expectErr)
+				}
+			} else if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+		})
+	}
 }

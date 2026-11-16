@@ -112,6 +112,10 @@ func (s *EtcdOptions) Validate() []error {
 		allErrors = append(allErrors, err)
 	}
 
+	if _, err := ParseWatchCacheSizes(s.WatchCacheSizes); err != nil {
+		allErrors = append(allErrors, err)
+	}
+
 	if len(s.EncryptionProviderConfigFilepath) == 0 && s.EncryptionProviderConfigAutomaticReload {
 		allErrors = append(allErrors, fmt.Errorf("--encryption-provider-config-automatic-reload must be set with --encryption-provider-config"))
 	}
@@ -534,12 +538,29 @@ func (f *StorageFactoryRestOptionsFactory) GetRESTOptions(resource schema.GroupR
 			klog.V(3).InfoS("Not using watch cache", "resource", resource)
 			ret.Decorator = generic.UndecoratedStorage
 		} else {
+			if resourcesWithTTL.Has(resource) {
+				return generic.RESTOptions{}, fmt.Errorf("watch cache cannot be enabled for %s because resources with TTL are not supported", resource)
+			}
 			klog.V(3).InfoS("Using watch cache", "resource", resource)
 			ret.Decorator = genericregistry.StorageWithCacher()
 		}
 	}
 
 	return ret, nil
+}
+
+// resourcesWithTTL lists built-in resources persisted with an etcd lease TTL.
+// Shared lease expiration deletes multiple keys in a single etcd revision,
+// violating watch cache resumability invariants.
+// Kept in sync with registered REST stores by TestResourcesWithTTL in pkg/controlplane.
+var resourcesWithTTL = sets.New(
+	schema.GroupResource{Resource: "events"},
+	schema.GroupResource{Group: "events.k8s.io", Resource: "events"},
+)
+
+// ResourcesWithTTL returns a copy of the set of built-in resources persisted with a storage TTL.
+func ResourcesWithTTL() sets.Set[schema.GroupResource] {
+	return resourcesWithTTL.Clone()
 }
 
 // ParseWatchCacheSizes turns a list of cache size values into a map of group resources
@@ -559,7 +580,11 @@ func ParseWatchCacheSizes(cacheSizes []string) (map[schema.GroupResource]int, er
 		if size < 0 {
 			return nil, fmt.Errorf("watch cache size cannot be negative: %s", c)
 		}
-		watchCacheSizes[schema.ParseGroupResource(tokens[0])] = size
+		resource := schema.ParseGroupResource(tokens[0])
+		if size > 0 && resourcesWithTTL.Has(resource) {
+			return nil, fmt.Errorf("watch cache cannot be enabled for %s because resources with TTL are not supported", resource)
+		}
+		watchCacheSizes[resource] = size
 	}
 	return watchCacheSizes, nil
 }
@@ -571,6 +596,9 @@ func WriteWatchCacheSizes(watchCacheSizes map[schema.GroupResource]int) ([]strin
 	for resource, size := range watchCacheSizes {
 		if size < 0 {
 			return nil, fmt.Errorf("watch cache size cannot be negative for resource %s", resource)
+		}
+		if size > 0 && resourcesWithTTL.Has(resource) {
+			return nil, fmt.Errorf("watch cache cannot be enabled for %s because resources with TTL are not supported", resource)
 		}
 		cacheSizes = append(cacheSizes, fmt.Sprintf("%s#%d", resource.String(), size))
 	}
