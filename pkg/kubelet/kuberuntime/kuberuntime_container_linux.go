@@ -20,11 +20,9 @@ package kuberuntime
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"math"
 	"os"
-	"path/filepath"
 	"strconv"
 	"sync"
 	"time"
@@ -114,7 +112,7 @@ func getCPULimit(pod *v1.Pod, container *v1.Container, draAllocations v1.Resourc
 	}
 	// Only add DRA values to limits if limits are explicitly specified in the container spec.
 	// If not, we retain the current defaults which is setting to pod-level limits if specified, or unlimited.
-	if origContainer := getContainerSpec(pod, container.Name); origContainer != nil && origContainer.Resources.Limits.Cpu().IsZero() {
+	if origContainer := kubecontainer.GetContainerSpec(pod, container.Name); origContainer != nil && origContainer.Resources.Limits.Cpu().IsZero() {
 		return limit
 	}
 	q := limit.DeepCopy()
@@ -140,27 +138,12 @@ func getMemoryLimit(pod *v1.Pod, container *v1.Container, draAllocations v1.Reso
 	}
 	// Only add DRA values to limits if limits are explicitly specified in the container spec.
 	// If not, we retain the current defaults which is setting to pod-level limits if specified, or unlimited.
-	if origContainer := getContainerSpec(pod, container.Name); origContainer != nil && origContainer.Resources.Limits.Memory().IsZero() {
+	if origContainer := kubecontainer.GetContainerSpec(pod, container.Name); origContainer != nil && origContainer.Resources.Limits.Memory().IsZero() {
 		return limit
 	}
 	q := limit.DeepCopy()
 	q.Add(draMemory)
 	return &q
-}
-
-// getContainerSpec returns the container spec with the given name from the pod spec.
-func getContainerSpec(pod *v1.Pod, containerName string) *v1.Container {
-	for i := range pod.Spec.Containers {
-		if pod.Spec.Containers[i].Name == containerName {
-			return &pod.Spec.Containers[i]
-		}
-	}
-	for i := range pod.Spec.InitContainers {
-		if pod.Spec.InitContainers[i].Name == containerName {
-			return &pod.Spec.InitContainers[i]
-		}
-	}
-	return nil
 }
 
 // generateLinuxContainerResources generates linux container resources config for runtime
@@ -281,7 +264,7 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerResources(ctx context.
 }
 
 // configureContainerSwapResources configures the swap resources for a specified (linux) container.
-// Swap is only configured if a swap cgroup controller is available and the NodeSwap feature gate is enabled.
+// Swap is only configured if a swap cgroup controller is available.
 func (m *kubeGenericRuntimeManager) configureContainerSwapResources(ctx context.Context, lcr *runtimeapi.LinuxContainerResources, pod *v1.Pod, container *v1.Container) {
 	if !m.getSwapControllerAvailable() {
 		return
@@ -294,7 +277,7 @@ func (m *kubeGenericRuntimeManager) configureContainerSwapResources(ctx context.
 	case types.NoSwap:
 		swapConfigurationHelper.ConfigureNoSwap(ctx, lcr)
 	case types.LimitedSwap:
-		swapConfigurationHelper.ConfigureLimitedSwap(ctx, lcr, pod, container)
+		swapConfigurationHelper.ConfigureLimitedSwap(ctx, lcr, container)
 	default:
 		swapConfigurationHelper.ConfigureNoSwap(ctx, lcr)
 	}
@@ -303,26 +286,12 @@ func (m *kubeGenericRuntimeManager) configureContainerSwapResources(ctx context.
 // GetContainerSwapBehavior checks what swap behavior should be configured for a container,
 // considering the requirements for enabling swap.
 func (m *kubeGenericRuntimeManager) GetContainerSwapBehavior(pod *v1.Pod, container *v1.Container) types.SwapBehavior {
-	c := types.SwapBehavior(m.memorySwapBehavior)
-	if c == types.LimitedSwap {
-		if !m.getSwapControllerAvailable() {
-			return types.NoSwap
-		}
-
-		if !isCgroup2UnifiedMode() {
-			return types.NoSwap
-		}
-
-		if types.IsCriticalPod(pod) {
-			return types.NoSwap
-		}
-		podQos := kubeapiqos.GetPodQOS(pod)
-		containerDoesNotRequestMemory := container.Resources.Requests.Memory().IsZero() && container.Resources.Limits.Memory().IsZero()
-		memoryRequestEqualsToLimit := container.Resources.Requests.Memory().Cmp(*container.Resources.Limits.Memory()) == 0
-		if podQos != v1.PodQOSBurstable || containerDoesNotRequestMemory || memoryRequestEqualsToLimit {
-			return types.NoSwap
-		}
-		return c
+	if types.SwapBehavior(m.memorySwapBehavior) == types.LimitedSwap &&
+		m.getSwapControllerAvailable != nil &&
+		m.getSwapControllerAvailable() &&
+		isCgroup2UnifiedMode() &&
+		cm.IsContainerEligibleForSwap(pod, container) {
+		return types.LimitedSwap
 	}
 	return types.NoSwap
 }
@@ -544,41 +513,11 @@ func (m *kubeGenericRuntimeManager) applyPodLevelMemoryHigh(pod *v1.Pod, rc *cm.
 	}
 }
 
-// checkSwapControllerAvailability checks if swap controller is available.
-// It returns true if the swap controller is available, false otherwise.
-func checkSwapControllerAvailability(ctx context.Context) bool {
-	// See https://github.com/containerd/containerd/pull/7838/
-	logger := klog.FromContext(ctx)
-	const warn = "Failed to detect the availability of the swap controller, assuming not available"
-	p := "/sys/fs/cgroup/memory/memory.memsw.limit_in_bytes"
-	if isCgroup2UnifiedMode() {
-		// memory.swap.max does not exist in the cgroup root, so we check /sys/fs/cgroup/<SELF>/memory.swap.max
-		cm, err := libcontainercgroups.ParseCgroupFile("/proc/self/cgroup")
-		if err != nil {
-			logger.V(5).Info(warn, "err", fmt.Errorf("failed to parse /proc/self/cgroup: %w", err))
-			return false
-		}
-		// For cgroup v2 unified hierarchy, there are no per-controller
-		// cgroup paths, so the cm map returned by ParseCgroupFile above
-		// has a single element where the key is empty string ("") and
-		// the value is the cgroup path the <pid> is in.
-		p = filepath.Join("/sys/fs/cgroup", cm[""], "memory.swap.max")
-	}
-	if _, err := os.Stat(p); err != nil {
-		if !errors.Is(err, os.ErrNotExist) {
-			logger.V(5).Info(warn, "err", err)
-		}
-		return false
-	}
-
-	return true
-}
-
 // initSwapControllerAvailabilityCheck returns a function that checks swap controller availability
 // with lazy initialization using sync.OnceValue
 func initSwapControllerAvailabilityCheck(ctx context.Context) func() bool {
 	return sync.OnceValue(func() bool {
-		return checkSwapControllerAvailability(ctx)
+		return cm.CheckSwapControllerAvailability(ctx, isCgroup2UnifiedMode())
 	})
 }
 
@@ -594,17 +533,25 @@ func newSwapConfigurationHelper(machineInfo cadvisorv1.MachineInfo, getSwapContr
 	}
 }
 
-func (m swapConfigurationHelper) ConfigureLimitedSwap(ctx context.Context, lcr *runtimeapi.LinuxContainerResources, pod *v1.Pod, container *v1.Container) {
+func (m swapConfigurationHelper) ConfigureLimitedSwap(ctx context.Context, lcr *runtimeapi.LinuxContainerResources, container *v1.Container) {
 	logger := klog.FromContext(ctx)
 	containerMemoryRequest := container.Resources.Requests.Memory()
-	swapLimit, err := calcSwapForBurstablePods(containerMemoryRequest.Value(), int64(m.machineInfo.MemoryCapacity), int64(m.machineInfo.SwapCapacity))
+	if containerMemoryRequest.IsZero() {
+		// Reached only when GetContainerSwapBehavior approved an unbounded container
+		// in a swap-eligible pod with pod-level resources set; the
+		// parent pod cgroup's memory.swap.max caps its swap usage.
+		m.configureSwap(ctx, lcr, cm.Cgroup2MaxSwapLimit)
+		return
+	}
+
+	swapLimit, err := cm.CalcSwapForBurstablePods(containerMemoryRequest.Value(), int64(m.machineInfo.MemoryCapacity), int64(m.machineInfo.SwapCapacity))
 	if err != nil {
 		logger.Error(err, "Cannot calculate swap allocation amount; disallowing swap")
 		m.ConfigureNoSwap(ctx, lcr)
 		return
 	}
 
-	m.configureSwap(ctx, lcr, swapLimit)
+	m.configureSwap(ctx, lcr, strconv.FormatInt(swapLimit, 10))
 }
 
 func (m swapConfigurationHelper) ConfigureNoSwap(ctx context.Context, lcr *runtimeapi.LinuxContainerResources) {
@@ -618,10 +565,10 @@ func (m swapConfigurationHelper) ConfigureNoSwap(ctx context.Context, lcr *runti
 		return
 	}
 
-	m.configureSwap(ctx, lcr, 0)
+	m.configureSwap(ctx, lcr, "0")
 }
 
-func (m swapConfigurationHelper) configureSwap(ctx context.Context, lcr *runtimeapi.LinuxContainerResources, swapMemory int64) {
+func (m swapConfigurationHelper) configureSwap(ctx context.Context, lcr *runtimeapi.LinuxContainerResources, swapMemory string) {
 	logger := klog.FromContext(ctx)
 	if !isCgroup2UnifiedMode() {
 		logger.Error(fmt.Errorf("swap configuration is not supported with cgroup v1"), "Swap configuration under cgroup v1 is unexpected")
@@ -632,23 +579,7 @@ func (m swapConfigurationHelper) configureSwap(ctx context.Context, lcr *runtime
 		lcr.Unified = map[string]string{}
 	}
 
-	lcr.Unified[cm.Cgroup2MaxSwapFilename] = fmt.Sprintf("%d", swapMemory)
-}
-
-// The swap limit is calculated as (<containerMemoryRequest>/<nodeTotalMemory>)*<totalPodsSwapAvailable>.
-// For more info, please look at the following KEP: https://kep.k8s.io/2400
-func calcSwapForBurstablePods(containerMemoryRequest, nodeTotalMemory, totalPodsSwapAvailable int64) (int64, error) {
-	if nodeTotalMemory <= 0 {
-		return 0, fmt.Errorf("total node memory is 0")
-	}
-	if containerMemoryRequest > nodeTotalMemory {
-		return 0, fmt.Errorf("container request %d is larger than total node memory %d", containerMemoryRequest, nodeTotalMemory)
-	}
-
-	containerMemoryProportion := float64(containerMemoryRequest) / float64(nodeTotalMemory)
-	swapAllocation := containerMemoryProportion * float64(totalPodsSwapAvailable)
-
-	return int64(swapAllocation), nil
+	lcr.Unified[cm.Cgroup2MaxSwapFilename] = swapMemory
 }
 
 func toKubeContainerUser(statusUser *runtimeapi.ContainerUser) *kubecontainer.ContainerUser {

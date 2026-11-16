@@ -141,9 +141,20 @@ func disallowResizeForMemoryBackedVolumes(desiredPod, allocatedPod *v1.Pod, cgro
 }
 
 func disallowResizeForSwappableContainers(runtime kubecontainer.Runtime, desiredPod, allocatedPod *v1.Pod) (bool, string) {
-	if desiredPod == nil || allocatedPod == nil {
+	if runtime == nil || desiredPod == nil || allocatedPod == nil {
 		return false, ""
 	}
+	// When pod-level resources are set, pod cgroup memory.swap.max is only configured on
+	// creation, so any transition to/from pod-level resources or change to pod swap
+	// eligibility or pod memory request is infeasible even if containers specify
+	// RestartContainer resize policies.
+	_, desiredPodSwapMemReq := cm.IsPodEligibleForSwap(desiredPod)
+	_, allocatedPodSwapMemReq := cm.IsPodEligibleForSwap(allocatedPod)
+	desiredPLR := resourcehelper.IsPodLevelResourcesSet(desiredPod)
+	allocatedPLR := resourcehelper.IsPodLevelResourcesSet(allocatedPod)
+	podSwapChanged := utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling) &&
+		(desiredPLR || allocatedPLR) &&
+		(desiredPLR != allocatedPLR || desiredPodSwapMemReq != allocatedPodSwapMemReq)
 	restartableMemoryResizePolicy := func(resizePolicies []v1.ContainerResizePolicy) bool {
 		for _, policy := range resizePolicies {
 			if policy.ResourceName == v1.ResourceMemory {
@@ -167,7 +178,8 @@ func disallowResizeForSwappableContainers(runtime kubecontainer.Runtime, desired
 		default:
 			origMemRequest := desiredContainer.Resources.Requests[v1.ResourceMemory]
 			newMemRequest := allocatedContainer.Resources.Requests[v1.ResourceMemory]
-			if !origMemRequest.Equal(newMemRequest) && !restartableMemoryResizePolicy(allocatedContainer.ResizePolicy) {
+			containerSwapChanged := !origMemRequest.Equal(newMemRequest) && !restartableMemoryResizePolicy(allocatedContainer.ResizePolicy)
+			if podSwapChanged || containerSwapChanged {
 				aSwapBehavior := runtime.GetContainerSwapBehavior(desiredPod, desiredContainer)
 				bSwapBehavior := runtime.GetContainerSwapBehavior(allocatedPod, allocatedContainer)
 				if aSwapBehavior != kubetypes.NoSwap || bSwapBehavior != kubetypes.NoSwap {
