@@ -43,7 +43,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	clientfeatures "k8s.io/client-go/features"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/ktesting"
 	clientset "k8s.io/client-go/kubernetes"
@@ -69,18 +68,6 @@ func init() {
 		string(features.DRAWorkloadResourceClaims): true,
 		string(features.GenericWorkload):           true, // Dependency of DRAWorkloadResourceClaims
 	}); err != nil {
-		panic(err)
-	}
-
-	// Disabled because we not only use the fake client, we also wrap it:
-	// that prevents auto-detection via IsWatchListSemanticsUnSupported.
-	// This here is simpler than implementing IsWatchListSemanticsUnSupported.
-	//
-	// We cannot use clientfeaturestesting.SetFeatureDuringTest (needs testing.TB),
-	// so here we just do it ourselves.
-	if err := clientfeatures.FeatureGates().(interface {
-		Set(clientfeatures.Feature, bool) error
-	}).Set(clientfeatures.WatchListClient, false); err != nil {
 		panic(err)
 	}
 }
@@ -2672,6 +2659,11 @@ func check(tCtx ktesting.TContext, prefix string, expectRules []*resourceapi.Dev
 type myFakeClient struct {
 	clientset.Interface
 	deletePodCallback func()
+}
+
+// The wrapper must preserve the fake client's opt-out of watch-list semantics.
+func (mf *myFakeClient) IsWatchListSemanticsUnSupported() bool {
+	return true
 }
 
 func (mf *myFakeClient) CoreV1() corev1.CoreV1Interface {

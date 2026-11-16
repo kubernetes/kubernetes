@@ -46,6 +46,7 @@ import (
 	cpoptions "k8s.io/cloud-provider/options"
 
 	eventv1 "k8s.io/api/events/v1"
+	"k8s.io/apiserver/pkg/util/compatibility"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientgofeaturegate "k8s.io/client-go/features"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -1636,6 +1637,8 @@ func TestControllerManagerAliases(t *testing.T) {
 }
 
 func TestWatchListClientFlagUsage(t *testing.T) {
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.37"))
+
 	fs := pflag.NewFlagSet("addflagstest", pflag.ContinueOnError)
 	s, _ := NewKubeControllerManagerOptions()
 	for _, f := range s.Flags([]string{""}, []string{""}, nil).FlagSets {
@@ -1647,11 +1650,19 @@ func TestWatchListClientFlagUsage(t *testing.T) {
 }
 
 func TestWatchListClientFlagChange(t *testing.T) {
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.37"))
+
 	fs := pflag.NewFlagSet("addflagstest", pflag.ContinueOnError)
 	s, err := NewKubeControllerManagerOptions()
 	if err != nil {
 		t.Fatal(fmt.Errorf("NewKubeControllerManagerOptions failed with %w", err))
 	}
+
+	featureGate := utilfeature.DefaultFeatureGate.DeepCopy()
+	effectiveVersion := compatibility.DefaultBuildEffectiveVersion()
+	effectiveVersion.SetEmulationVersion(featureGate.EmulationVersion())
+	s.ComponentGlobalsRegistry = basecompatibility.NewComponentGlobalsRegistry()
+	utilruntime.Must(s.ComponentGlobalsRegistry.Register(basecompatibility.DefaultKubeComponent, effectiveVersion, featureGate))
 
 	for _, f := range s.Flags([]string{""}, []string{""}, nil).FlagSets {
 		fs.AddFlagSet(f)
@@ -1660,20 +1671,22 @@ func TestWatchListClientFlagChange(t *testing.T) {
 	assertWatchListClientFeatureDefaultValue(t)
 	assertWatchListCommandLineDefaultValue(t, fs)
 
-	args := []string{fmt.Sprintf("--feature-gates=%v=true", clientgofeaturegate.WatchListClient)}
+	args := []string{
+		"--emulated-version=1.37",
+		fmt.Sprintf("--feature-gates=%v=false", clientgofeaturegate.WatchListClient),
+	}
 	if err := fs.Parse(args); err != nil {
 		t.Fatal(fmt.Errorf("FlatSet.Parse failed with %w", err))
 	}
 
-	// this is needed to Apply parsed flags to GlobalRegistry, so the DefaultFeatureGate values can be set from the flag
 	err = s.ComponentGlobalsRegistry.Set()
 	if err != nil {
 		t.Fatal(fmt.Errorf("ComponentGlobalsRegistry.Set failed with %w", err))
 	}
 
-	watchListClientValue := clientgofeaturegate.FeatureGates().Enabled(clientgofeaturegate.WatchListClient)
-	if !watchListClientValue {
-		t.Fatalf("expected %q feature gate to be enabled after setting the command line flag", clientgofeaturegate.WatchListClient)
+	watchListClientValue := featureGate.Enabled(featuregate.Feature(clientgofeaturegate.WatchListClient))
+	if watchListClientValue {
+		t.Fatalf("expected %q feature gate to be disabled after setting the command line flag", clientgofeaturegate.WatchListClient)
 	}
 }
 

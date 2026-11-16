@@ -121,6 +121,7 @@ const (
 
 	// owner: @p0lyn0mial
 	// beta: v1.30
+	// GA: v1.38
 	//
 	// Allow the client to get a stream of individual items instead of chunking from the server.
 	WatchListClient Feature = "WatchListClient"
@@ -178,6 +179,7 @@ var defaultVersionedKubernetesFeatureGates = map[Feature]VersionedSpecs{
 	WatchListClient: {
 		{Version: version.MustParse("1.30"), Default: false, PreRelease: Beta},
 		{Version: version.MustParse("1.35"), Default: true, PreRelease: Beta},
+		{Version: version.MustParse("1.38"), Default: true, PreRelease: GA, LockToDefault: true},
 	},
 	WatchListClientConcurrentDecoding: {
 		{Version: version.MustParse("1.38"), Default: true, PreRelease: Beta},

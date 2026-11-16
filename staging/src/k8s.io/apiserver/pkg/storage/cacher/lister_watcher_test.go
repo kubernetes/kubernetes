@@ -24,6 +24,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/apis/example"
 	"k8s.io/apiserver/pkg/features"
@@ -240,6 +241,7 @@ func TestCacherListerWatcherListWatch(t *testing.T) {
 }
 
 func TestCacherListerWatcherWhenListWatchDisabled(t *testing.T) {
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.37"))
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchList, false)
 
 	prefix := "/pods/"
@@ -268,13 +270,15 @@ func TestCacherListerWatcherWhenListWatchDisabled(t *testing.T) {
 func TestListerWatcherListResourceVersionPropagation(t *testing.T) {
 	scenarios := []struct {
 		name                             string
+		emulationVersion                 string
 		options                          metav1.ListOptions
 		watchListEnabled                 bool
 		watchListConsistencyCheckEnabled bool
 		expectedStorageResourceVer       string
 	}{
 		{
-			name: "WatchList FG disabled - RV not propagated",
+			name:             "WatchList FG disabled - RV not propagated",
+			emulationVersion: "1.37",
 			options: metav1.ListOptions{
 				ResourceVersion:      "123",
 				ResourceVersionMatch: metav1.ResourceVersionMatchExact,
@@ -317,6 +321,9 @@ func TestListerWatcherListResourceVersionPropagation(t *testing.T) {
 
 	for _, scenario := range scenarios {
 		t.Run(scenario.name, func(t *testing.T) {
+			if scenario.emulationVersion != "" {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse(scenario.emulationVersion))
+			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchList, scenario.watchListEnabled)
 
 			backingStorage := &cachertesting.MockStorage{}
