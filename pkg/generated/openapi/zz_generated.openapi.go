@@ -1065,6 +1065,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		resourcev1.DeviceTaintSelector{}.OpenAPIModelName():                                                             schema_k8sio_api_resource_v1_DeviceTaintSelector(ref),
 		resourcev1.DeviceToleration{}.OpenAPIModelName():                                                                schema_k8sio_api_resource_v1_DeviceToleration(ref),
 		resourcev1.ExactDeviceRequest{}.OpenAPIModelName():                                                              schema_k8sio_api_resource_v1_ExactDeviceRequest(ref),
+		resourcev1.ExtendedResourceRequest{}.OpenAPIModelName():                                                         schema_k8sio_api_resource_v1_ExtendedResourceRequest(ref),
 		resourcev1.NetworkDeviceData{}.OpenAPIModelName():                                                               schema_k8sio_api_resource_v1_NetworkDeviceData(ref),
 		resourcev1.NodeAllocatableMapping{}.OpenAPIModelName():                                                          schema_k8sio_api_resource_v1_NodeAllocatableMapping(ref),
 		resourcev1.NodeAllocatableOverhead{}.OpenAPIModelName():                                                         schema_k8sio_api_resource_v1_NodeAllocatableOverhead(ref),
@@ -1128,6 +1129,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		resourcev1beta1.DeviceSubRequest{}.OpenAPIModelName():                                                           schema_k8sio_api_resource_v1beta1_DeviceSubRequest(ref),
 		resourcev1beta1.DeviceTaint{}.OpenAPIModelName():                                                                schema_k8sio_api_resource_v1beta1_DeviceTaint(ref),
 		resourcev1beta1.DeviceToleration{}.OpenAPIModelName():                                                           schema_k8sio_api_resource_v1beta1_DeviceToleration(ref),
+		resourcev1beta1.ExtendedResourceRequest{}.OpenAPIModelName():                                                    schema_k8sio_api_resource_v1beta1_ExtendedResourceRequest(ref),
 		resourcev1beta1.NetworkDeviceData{}.OpenAPIModelName():                                                          schema_k8sio_api_resource_v1beta1_NetworkDeviceData(ref),
 		resourcev1beta1.NodeAllocatableMapping{}.OpenAPIModelName():                                                     schema_k8sio_api_resource_v1beta1_NodeAllocatableMapping(ref),
 		resourcev1beta1.NodeAllocatableOverhead{}.OpenAPIModelName():                                                    schema_k8sio_api_resource_v1beta1_NodeAllocatableOverhead(ref),
@@ -1180,6 +1182,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		resourcev1beta2.DeviceTaintSelector{}.OpenAPIModelName():                                                        schema_k8sio_api_resource_v1beta2_DeviceTaintSelector(ref),
 		resourcev1beta2.DeviceToleration{}.OpenAPIModelName():                                                           schema_k8sio_api_resource_v1beta2_DeviceToleration(ref),
 		resourcev1beta2.ExactDeviceRequest{}.OpenAPIModelName():                                                         schema_k8sio_api_resource_v1beta2_ExactDeviceRequest(ref),
+		resourcev1beta2.ExtendedResourceRequest{}.OpenAPIModelName():                                                    schema_k8sio_api_resource_v1beta2_ExtendedResourceRequest(ref),
 		resourcev1beta2.NetworkDeviceData{}.OpenAPIModelName():                                                          schema_k8sio_api_resource_v1beta2_NetworkDeviceData(ref),
 		resourcev1beta2.NodeAllocatableMapping{}.OpenAPIModelName():                                                     schema_k8sio_api_resource_v1beta2_NodeAllocatableMapping(ref),
 		resourcev1beta2.NodeAllocatableOverhead{}.OpenAPIModelName():                                                    schema_k8sio_api_resource_v1beta2_NodeAllocatableOverhead(ref),
@@ -49157,17 +49160,17 @@ func schema_k8sio_api_resource_v1_DeviceClassSpec(ref common.ReferenceCallback) 
 							Format:      "",
 						},
 					},
-					"extendedResourceCapacityRequests": {
+					"extendedResourceRequest": {
 						SchemaProps: spec.SchemaProps{
-							Description: "extendedResourceCapacityRequests defines the fixed capacity amounts that the scheduler requests on every ResourceClaim it synthesizes to satisfy the extended resource of this class.\n\nThe value is copied, unmodified, onto the capacity of each device request synthesized for this class, so it has the same semantics as DeviceRequest.capacity: it applies to each device allocation. A pod requesting more than one device through the extended resource gets that capacity once per device, not once per pod.\n\nThe devices selected by this class must advertise the referenced capacities. Otherwise the extended resource requests cannot be satisfied, the same way as with a selector that matches no devices.\n\nThis is an alpha field and requires enabling the DRAExtendedResourceCapacity feature gate, which depends on DRAConsumableCapacity.",
-							Ref:         ref(resourcev1.CapacityRequirements{}.OpenAPIModelName()),
+							Description: "extendedResourceRequest defines how the scheduler populates the device request of each ResourceClaim it synthesizes to satisfy the extended resource of this class.\n\nThis is an alpha field and requires enabling the DRAExtendedResourceCapacity feature gate, which depends on DRAConsumableCapacity.",
+							Ref:         ref(resourcev1.ExtendedResourceRequest{}.OpenAPIModelName()),
 						},
 					},
 				},
 			},
 		},
 		Dependencies: []string{
-			resourcev1.CapacityRequirements{}.OpenAPIModelName(), resourcev1.DeviceClassConfiguration{}.OpenAPIModelName(), resourcev1.DeviceSelector{}.OpenAPIModelName()},
+			resourcev1.DeviceClassConfiguration{}.OpenAPIModelName(), resourcev1.DeviceSelector{}.OpenAPIModelName(), resourcev1.ExtendedResourceRequest{}.OpenAPIModelName()},
 	}
 }
 
@@ -50062,6 +50065,27 @@ func schema_k8sio_api_resource_v1_ExactDeviceRequest(ref common.ReferenceCallbac
 		},
 		Dependencies: []string{
 			resourcev1.CapacityRequirements{}.OpenAPIModelName(), resourcev1.DeviceDerivedAttribute{}.OpenAPIModelName(), resourcev1.DeviceSelector{}.OpenAPIModelName(), resourcev1.DeviceToleration{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_resource_v1_ExtendedResourceRequest(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ExtendedResourceRequest defines fields which the scheduler copies onto the device request it synthesizes for an extended resource.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"capacity": {
+						SchemaProps: spec.SchemaProps{
+							Description: "capacity defines the fixed capacity amounts that the scheduler requests on every ResourceClaim it synthesizes to satisfy the extended resource of this class.\n\nThe value is copied, unmodified, onto the capacity of each device request synthesized for this class, so it has the same semantics as DeviceRequest.capacity: it applies to each device allocation. A pod requesting more than one device through the extended resource gets that capacity once per device, not once per pod.\n\nThe devices selected by this class must advertise the referenced capacities. Otherwise the extended resource requests cannot be satisfied, the same way as with a selector that matches no devices.",
+							Ref:         ref(resourcev1.CapacityRequirements{}.OpenAPIModelName()),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			resourcev1.CapacityRequirements{}.OpenAPIModelName()},
 	}
 }
 
@@ -52605,17 +52629,17 @@ func schema_k8sio_api_resource_v1beta1_DeviceClassSpec(ref common.ReferenceCallb
 							Format:      "",
 						},
 					},
-					"extendedResourceCapacityRequests": {
+					"extendedResourceRequest": {
 						SchemaProps: spec.SchemaProps{
-							Description: "extendedResourceCapacityRequests defines the fixed capacity amounts that the scheduler requests on every ResourceClaim it synthesizes to satisfy the extended resource of this class.\n\nThe value is copied, unmodified, onto the capacity of each device request synthesized for this class, so it has the same semantics as DeviceRequest.capacity: it applies to each device allocation. A pod requesting more than one device through the extended resource gets that capacity once per device, not once per pod.\n\nThe devices selected by this class must advertise the referenced capacities. Otherwise the extended resource requests cannot be satisfied, the same way as with a selector that matches no devices.\n\nThis is an alpha field and requires enabling the DRAExtendedResourceCapacity feature gate, which depends on DRAConsumableCapacity.",
-							Ref:         ref(resourcev1beta1.CapacityRequirements{}.OpenAPIModelName()),
+							Description: "extendedResourceRequest defines how the scheduler populates the device request of each ResourceClaim it synthesizes to satisfy the extended resource of this class.\n\nThis is an alpha field and requires enabling the DRAExtendedResourceCapacity feature gate, which depends on DRAConsumableCapacity.",
+							Ref:         ref(resourcev1beta1.ExtendedResourceRequest{}.OpenAPIModelName()),
 						},
 					},
 				},
 			},
 		},
 		Dependencies: []string{
-			resourcev1beta1.CapacityRequirements{}.OpenAPIModelName(), resourcev1beta1.DeviceClassConfiguration{}.OpenAPIModelName(), resourcev1beta1.DeviceSelector{}.OpenAPIModelName()},
+			resourcev1beta1.DeviceClassConfiguration{}.OpenAPIModelName(), resourcev1beta1.DeviceSelector{}.OpenAPIModelName(), resourcev1beta1.ExtendedResourceRequest{}.OpenAPIModelName()},
 	}
 }
 
@@ -53279,6 +53303,27 @@ func schema_k8sio_api_resource_v1beta1_DeviceToleration(ref common.ReferenceCall
 				},
 			},
 		},
+	}
+}
+
+func schema_k8sio_api_resource_v1beta1_ExtendedResourceRequest(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ExtendedResourceRequest defines fields which the scheduler copies onto the device request it synthesizes for an extended resource.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"capacity": {
+						SchemaProps: spec.SchemaProps{
+							Description: "capacity defines the fixed capacity amounts that the scheduler requests on every ResourceClaim it synthesizes to satisfy the extended resource of this class.\n\nThe value is copied, unmodified, onto the capacity of each device request synthesized for this class, so it has the same semantics as DeviceRequest.capacity: it applies to each device allocation. A pod requesting more than one device through the extended resource gets that capacity once per device, not once per pod.\n\nThe devices selected by this class must advertise the referenced capacities. Otherwise the extended resource requests cannot be satisfied, the same way as with a selector that matches no devices.",
+							Ref:         ref(resourcev1beta1.CapacityRequirements{}.OpenAPIModelName()),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			resourcev1beta1.CapacityRequirements{}.OpenAPIModelName()},
 	}
 }
 
@@ -55053,17 +55098,17 @@ func schema_k8sio_api_resource_v1beta2_DeviceClassSpec(ref common.ReferenceCallb
 							Format:      "",
 						},
 					},
-					"extendedResourceCapacityRequests": {
+					"extendedResourceRequest": {
 						SchemaProps: spec.SchemaProps{
-							Description: "extendedResourceCapacityRequests defines the fixed capacity amounts that the scheduler requests on every ResourceClaim it synthesizes to satisfy the extended resource of this class.\n\nThe value is copied, unmodified, onto the capacity of each device request synthesized for this class, so it has the same semantics as DeviceRequest.capacity: it applies to each device allocation. A pod requesting more than one device through the extended resource gets that capacity once per device, not once per pod.\n\nThe devices selected by this class must advertise the referenced capacities. Otherwise the extended resource requests cannot be satisfied, the same way as with a selector that matches no devices.\n\nThis is an alpha field and requires enabling the DRAExtendedResourceCapacity feature gate, which depends on DRAConsumableCapacity.",
-							Ref:         ref(resourcev1beta2.CapacityRequirements{}.OpenAPIModelName()),
+							Description: "extendedResourceRequest defines how the scheduler populates the device request of each ResourceClaim it synthesizes to satisfy the extended resource of this class.\n\nThis is an alpha field and requires enabling the DRAExtendedResourceCapacity feature gate, which depends on DRAConsumableCapacity.",
+							Ref:         ref(resourcev1beta2.ExtendedResourceRequest{}.OpenAPIModelName()),
 						},
 					},
 				},
 			},
 		},
 		Dependencies: []string{
-			resourcev1beta2.CapacityRequirements{}.OpenAPIModelName(), resourcev1beta2.DeviceClassConfiguration{}.OpenAPIModelName(), resourcev1beta2.DeviceSelector{}.OpenAPIModelName()},
+			resourcev1beta2.DeviceClassConfiguration{}.OpenAPIModelName(), resourcev1beta2.DeviceSelector{}.OpenAPIModelName(), resourcev1beta2.ExtendedResourceRequest{}.OpenAPIModelName()},
 	}
 }
 
@@ -55958,6 +56003,27 @@ func schema_k8sio_api_resource_v1beta2_ExactDeviceRequest(ref common.ReferenceCa
 		},
 		Dependencies: []string{
 			resourcev1beta2.CapacityRequirements{}.OpenAPIModelName(), resourcev1beta2.DeviceDerivedAttribute{}.OpenAPIModelName(), resourcev1beta2.DeviceSelector{}.OpenAPIModelName(), resourcev1beta2.DeviceToleration{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_resource_v1beta2_ExtendedResourceRequest(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ExtendedResourceRequest defines fields which the scheduler copies onto the device request it synthesizes for an extended resource.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"capacity": {
+						SchemaProps: spec.SchemaProps{
+							Description: "capacity defines the fixed capacity amounts that the scheduler requests on every ResourceClaim it synthesizes to satisfy the extended resource of this class.\n\nThe value is copied, unmodified, onto the capacity of each device request synthesized for this class, so it has the same semantics as DeviceRequest.capacity: it applies to each device allocation. A pod requesting more than one device through the extended resource gets that capacity once per device, not once per pod.\n\nThe devices selected by this class must advertise the referenced capacities. Otherwise the extended resource requests cannot be satisfied, the same way as with a selector that matches no devices.",
+							Ref:         ref(resourcev1beta2.CapacityRequirements{}.OpenAPIModelName()),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			resourcev1beta2.CapacityRequirements{}.OpenAPIModelName()},
 	}
 }
 

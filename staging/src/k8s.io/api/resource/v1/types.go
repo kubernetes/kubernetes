@@ -2495,9 +2495,26 @@ type DeviceClassSpec struct {
 	// +k8s:beta(since: "1.37")=+k8s:format=k8s-extended-resource-name
 	ExtendedResourceName *string `json:"extendedResourceName,omitempty" protobuf:"bytes,4,opt,name=extendedResourceName"`
 
-	// extendedResourceCapacityRequests defines the fixed capacity
-	// amounts that the scheduler requests on every ResourceClaim it
-	// synthesizes to satisfy the extended resource of this class.
+	// extendedResourceRequest defines how the scheduler populates the
+	// device request of each ResourceClaim it synthesizes to satisfy
+	// the extended resource of this class.
+	//
+	// This is an alpha field and requires enabling the
+	// DRAExtendedResourceCapacity feature gate, which depends on
+	// DRAConsumableCapacity.
+	//
+	// +optional
+	// +featureGate=DRAExtendedResourceCapacity
+	// +k8s:optional
+	ExtendedResourceRequest *ExtendedResourceRequest `json:"extendedResourceRequest,omitempty" protobuf:"bytes,5,opt,name=extendedResourceRequest"`
+}
+
+// ExtendedResourceRequest defines fields which the scheduler copies onto the
+// device request it synthesizes for an extended resource.
+type ExtendedResourceRequest struct {
+	// capacity defines the fixed capacity amounts that the scheduler
+	// requests on every ResourceClaim it synthesizes to satisfy the
+	// extended resource of this class.
 	//
 	// The value is copied, unmodified, onto the capacity of each device
 	// request synthesized for this class, so it has the same
@@ -2510,14 +2527,9 @@ type DeviceClassSpec struct {
 	// capacities. Otherwise the extended resource requests cannot be
 	// satisfied, the same way as with a selector that matches no devices.
 	//
-	// This is an alpha field and requires enabling the
-	// DRAExtendedResourceCapacity feature gate, which depends on
-	// DRAConsumableCapacity.
-	//
 	// +optional
-	// +featureGate=DRAExtendedResourceCapacity
 	// +k8s:optional
-	ExtendedResourceCapacityRequests *CapacityRequirements `json:"extendedResourceCapacityRequests,omitempty" protobuf:"bytes,5,opt,name=extendedResourceCapacityRequests"`
+	Capacity *CapacityRequirements `json:"capacity,omitempty" protobuf:"bytes,1,opt,name=capacity"`
 }
 
 // DeviceClassConfiguration is used in DeviceClass.

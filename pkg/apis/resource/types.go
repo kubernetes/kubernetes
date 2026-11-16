@@ -2103,9 +2103,21 @@ type DeviceClassSpec struct {
 	// +featureGate=DRAExtendedResource
 	ExtendedResourceName *string
 
-	// ExtendedResourceCapacityRequests defines the fixed capacity
-	// amounts that the scheduler requests on every ResourceClaim it
-	// synthesizes to satisfy the extended resource of this class.
+	// ExtendedResourceRequest defines how the scheduler populates the
+	// ExactDeviceRequest of each ResourceClaim it synthesizes to satisfy
+	// the extended resource of this class.
+	//
+	// +optional
+	// +featureGate=DRAExtendedResourceCapacity
+	ExtendedResourceRequest *ExtendedResourceRequest
+}
+
+// ExtendedResourceRequest defines fields which the scheduler copies onto the
+// ExactDeviceRequest it synthesizes for an extended resource.
+type ExtendedResourceRequest struct {
+	// Capacity defines the fixed capacity amounts that the scheduler
+	// requests on every ResourceClaim it synthesizes to satisfy the
+	// extended resource of this class.
 	//
 	// The value is copied, unmodified, onto the Capacity field of each
 	// ExactDeviceRequest synthesized for this class, so it has the same
@@ -2119,8 +2131,7 @@ type DeviceClassSpec struct {
 	// satisfied, the same way as with a selector that matches no devices.
 	//
 	// +optional
-	// +featureGate=DRAExtendedResourceCapacity
-	ExtendedResourceCapacityRequests *CapacityRequirements
+	Capacity *CapacityRequirements
 }
 
 // DeviceClassConfiguration is used in DeviceClass.

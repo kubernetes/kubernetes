@@ -1694,6 +1694,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsresourcev1.DeviceTolerationApplyConfiguration{}
 	case resourcev1.SchemeGroupVersion.WithKind("ExactDeviceRequest"):
 		return &applyconfigurationsresourcev1.ExactDeviceRequestApplyConfiguration{}
+	case resourcev1.SchemeGroupVersion.WithKind("ExtendedResourceRequest"):
+		return &applyconfigurationsresourcev1.ExtendedResourceRequestApplyConfiguration{}
 	case resourcev1.SchemeGroupVersion.WithKind("NetworkDeviceData"):
 		return &applyconfigurationsresourcev1.NetworkDeviceDataApplyConfiguration{}
 	case resourcev1.SchemeGroupVersion.WithKind("NodeAllocatableMapping"):
@@ -1808,6 +1810,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsresourcev1beta1.DeviceTaintApplyConfiguration{}
 	case resourcev1beta1.SchemeGroupVersion.WithKind("DeviceToleration"):
 		return &applyconfigurationsresourcev1beta1.DeviceTolerationApplyConfiguration{}
+	case resourcev1beta1.SchemeGroupVersion.WithKind("ExtendedResourceRequest"):
+		return &applyconfigurationsresourcev1beta1.ExtendedResourceRequestApplyConfiguration{}
 	case resourcev1beta1.SchemeGroupVersion.WithKind("NetworkDeviceData"):
 		return &applyconfigurationsresourcev1beta1.NetworkDeviceDataApplyConfiguration{}
 	case resourcev1beta1.SchemeGroupVersion.WithKind("NodeAllocatableMapping"):
@@ -1904,6 +1908,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsresourcev1beta2.DeviceTolerationApplyConfiguration{}
 	case resourcev1beta2.SchemeGroupVersion.WithKind("ExactDeviceRequest"):
 		return &applyconfigurationsresourcev1beta2.ExactDeviceRequestApplyConfiguration{}
+	case resourcev1beta2.SchemeGroupVersion.WithKind("ExtendedResourceRequest"):
+		return &applyconfigurationsresourcev1beta2.ExtendedResourceRequestApplyConfiguration{}
 	case resourcev1beta2.SchemeGroupVersion.WithKind("NetworkDeviceData"):
 		return &applyconfigurationsresourcev1beta2.NetworkDeviceDataApplyConfiguration{}
 	case resourcev1beta2.SchemeGroupVersion.WithKind("NodeAllocatableMapping"):

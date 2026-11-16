@@ -203,16 +203,16 @@ func TestValidateClass(t *testing.T) {
 			class: func() *resource.DeviceClass {
 				class := testClass(goodName)
 				class.Spec.ExtendedResourceName = ptr.To("example.com/gpu.shared")
-				class.Spec.ExtendedResourceCapacityRequests = testCapacityRequests("shares", "dra.example.com/memory")
+				class.Spec.ExtendedResourceRequest = &resource.ExtendedResourceRequest{Capacity: testCapacityRequests("shares", "dra.example.com/memory")}
 				return class
 			}(),
 		},
 		"bad-extended-resource-capacity-requests-name": {
-			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "extendedResourceCapacityRequests", "requests"), "1shares", badCapacityNameMessage)},
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "extendedResourceRequest", "capacity", "requests"), "1shares", badCapacityNameMessage)},
 			class: func() *resource.DeviceClass {
 				class := testClass(goodName)
 				class.Spec.ExtendedResourceName = ptr.To("example.com/gpu.shared")
-				class.Spec.ExtendedResourceCapacityRequests = testCapacityRequests("1shares")
+				class.Spec.ExtendedResourceRequest = &resource.ExtendedResourceRequest{Capacity: testCapacityRequests("1shares")}
 				return class
 			}(),
 		},
@@ -413,17 +413,17 @@ func TestValidateClassUpdate(t *testing.T) {
 			},
 		},
 		"invalid-extended-resource-capacity-requests-name": {
-			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "extendedResourceCapacityRequests", "requests"), "1shares", badCapacityNameMessage)},
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "extendedResourceRequest", "capacity", "requests"), "1shares", badCapacityNameMessage)},
 			oldClass:     validClass,
 			update: func(class *resource.DeviceClass) *resource.DeviceClass {
-				class.Spec.ExtendedResourceCapacityRequests = testCapacityRequests("1shares")
+				class.Spec.ExtendedResourceRequest = &resource.ExtendedResourceRequest{Capacity: testCapacityRequests("1shares")}
 				return class
 			},
 		},
 		"bad-extended-resource-capacity-requests-name-valid-if-stored": {
 			oldClass: func() *resource.DeviceClass {
 				class := validClass.DeepCopy()
-				class.Spec.ExtendedResourceCapacityRequests = testCapacityRequests("1shares")
+				class.Spec.ExtendedResourceRequest = &resource.ExtendedResourceRequest{Capacity: testCapacityRequests("1shares")}
 				return class
 			}(),
 			update: func(class *resource.DeviceClass) *resource.DeviceClass {
@@ -432,14 +432,14 @@ func TestValidateClassUpdate(t *testing.T) {
 			},
 		},
 		"bad-extended-resource-capacity-requests-name-revalidated-when-changed": {
-			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "extendedResourceCapacityRequests", "requests"), "1shares", badCapacityNameMessage)},
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "extendedResourceRequest", "capacity", "requests"), "1shares", badCapacityNameMessage)},
 			oldClass: func() *resource.DeviceClass {
 				class := validClass.DeepCopy()
-				class.Spec.ExtendedResourceCapacityRequests = testCapacityRequests("1shares")
+				class.Spec.ExtendedResourceRequest = &resource.ExtendedResourceRequest{Capacity: testCapacityRequests("1shares")}
 				return class
 			}(),
 			update: func(class *resource.DeviceClass) *resource.DeviceClass {
-				class.Spec.ExtendedResourceCapacityRequests.Requests["memory"] = apiresource.MustParse("1Gi")
+				class.Spec.ExtendedResourceRequest.Capacity.Requests["memory"] = apiresource.MustParse("1Gi")
 				return class
 			},
 		},

@@ -123,7 +123,7 @@ func dropDisabledDRAExtendedResourceCapacityFields(newClass, oldClass *resource.
 	if utilfeature.DefaultFeatureGate.Enabled(features.DRAExtendedResourceCapacity) || draExtendedResourceCapacityInUse(oldClass) {
 		return
 	}
-	newClass.Spec.ExtendedResourceCapacityRequests = nil
+	newClass.Spec.ExtendedResourceRequest = nil
 }
 
 func draExtendedResourceCapacityInUse(class *resource.DeviceClass) bool {
@@ -131,7 +131,7 @@ func draExtendedResourceCapacityInUse(class *resource.DeviceClass) bool {
 		return false
 	}
 
-	if class.Spec.ExtendedResourceCapacityRequests != nil {
+	if class.Spec.ExtendedResourceRequest != nil {
 		return true
 	}
 

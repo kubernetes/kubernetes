@@ -13192,12 +13192,12 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             namedType: io.k8s.api.resource.v1.DeviceClassConfiguration
           elementRelationship: atomic
-    - name: extendedResourceCapacityRequests
-      type:
-        namedType: io.k8s.api.resource.v1.CapacityRequirements
     - name: extendedResourceName
       type:
         scalar: string
+    - name: extendedResourceRequest
+      type:
+        namedType: io.k8s.api.resource.v1.ExtendedResourceRequest
     - name: selectors
       type:
         list:
@@ -13492,6 +13492,12 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             namedType: io.k8s.api.resource.v1.DeviceToleration
           elementRelationship: atomic
+- name: io.k8s.api.resource.v1.ExtendedResourceRequest
+  map:
+    fields:
+    - name: capacity
+      type:
+        namedType: io.k8s.api.resource.v1.CapacityRequirements
 - name: io.k8s.api.resource.v1.NetworkDeviceData
   map:
     fields:
@@ -14257,12 +14263,12 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             namedType: io.k8s.api.resource.v1beta1.DeviceClassConfiguration
           elementRelationship: atomic
-    - name: extendedResourceCapacityRequests
-      type:
-        namedType: io.k8s.api.resource.v1beta1.CapacityRequirements
     - name: extendedResourceName
       type:
         scalar: string
+    - name: extendedResourceRequest
+      type:
+        namedType: io.k8s.api.resource.v1beta1.ExtendedResourceRequest
     - name: selectors
       type:
         list:
@@ -14494,6 +14500,12 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: value
       type:
         scalar: string
+- name: io.k8s.api.resource.v1beta1.ExtendedResourceRequest
+  map:
+    fields:
+    - name: capacity
+      type:
+        namedType: io.k8s.api.resource.v1beta1.CapacityRequirements
 - name: io.k8s.api.resource.v1beta1.NetworkDeviceData
   map:
     fields:
@@ -15034,12 +15046,12 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             namedType: io.k8s.api.resource.v1beta2.DeviceClassConfiguration
           elementRelationship: atomic
-    - name: extendedResourceCapacityRequests
-      type:
-        namedType: io.k8s.api.resource.v1beta2.CapacityRequirements
     - name: extendedResourceName
       type:
         scalar: string
+    - name: extendedResourceRequest
+      type:
+        namedType: io.k8s.api.resource.v1beta2.ExtendedResourceRequest
     - name: selectors
       type:
         list:
@@ -15334,6 +15346,12 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             namedType: io.k8s.api.resource.v1beta2.DeviceToleration
           elementRelationship: atomic
+- name: io.k8s.api.resource.v1beta2.ExtendedResourceRequest
+  map:
+    fields:
+    - name: capacity
+      type:
+        namedType: io.k8s.api.resource.v1beta2.CapacityRequirements
 - name: io.k8s.api.resource.v1beta2.NetworkDeviceData
   map:
     fields:

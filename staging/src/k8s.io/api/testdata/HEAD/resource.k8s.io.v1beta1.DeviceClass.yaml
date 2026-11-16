@@ -43,10 +43,11 @@ spec:
           replicas: 1
         status:
           available: 1
-  extendedResourceCapacityRequests:
-    requests:
-      requestsKey: "0"
   extendedResourceName: extendedResourceNameValue
+  extendedResourceRequest:
+    capacity:
+      requests:
+        requestsKey: "0"
   selectors:
   - cel:
       expression: expressionValue

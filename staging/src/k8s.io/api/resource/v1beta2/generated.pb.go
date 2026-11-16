@@ -108,6 +108,8 @@ func (m *DeviceToleration) Reset() { *m = DeviceToleration{} }
 
 func (m *ExactDeviceRequest) Reset() { *m = ExactDeviceRequest{} }
 
+func (m *ExtendedResourceRequest) Reset() { *m = ExtendedResourceRequest{} }
+
 func (m *NetworkDeviceData) Reset() { *m = NetworkDeviceData{} }
 
 func (m *NodeAllocatableMapping) Reset() { *m = NodeAllocatableMapping{} }
@@ -1264,9 +1266,9 @@ func (m *DeviceClassSpec) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
-	if m.ExtendedResourceCapacityRequests != nil {
+	if m.ExtendedResourceRequest != nil {
 		{
-			size, err := m.ExtendedResourceCapacityRequests.MarshalToSizedBuffer(dAtA[:i])
+			size, err := m.ExtendedResourceRequest.MarshalToSizedBuffer(dAtA[:i])
 			if err != nil {
 				return 0, err
 			}
@@ -2239,6 +2241,41 @@ func (m *ExactDeviceRequest) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	i = encodeVarintGenerated(dAtA, i, uint64(len(m.DeviceClassName)))
 	i--
 	dAtA[i] = 0xa
+	return len(dAtA) - i, nil
+}
+
+func (m *ExtendedResourceRequest) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *ExtendedResourceRequest) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *ExtendedResourceRequest) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if m.Capacity != nil {
+		{
+			size, err := m.Capacity.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintGenerated(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0xa
+	}
 	return len(dAtA) - i, nil
 }
 
@@ -3538,8 +3575,8 @@ func (m *DeviceClassSpec) Size() (n int) {
 		l = len(*m.ExtendedResourceName)
 		n += 1 + l + sovGenerated(uint64(l))
 	}
-	if m.ExtendedResourceCapacityRequests != nil {
-		l = m.ExtendedResourceCapacityRequests.Size()
+	if m.ExtendedResourceRequest != nil {
+		l = m.ExtendedResourceRequest.Size()
 		n += 1 + l + sovGenerated(uint64(l))
 	}
 	return n
@@ -3909,6 +3946,19 @@ func (m *ExactDeviceRequest) Size() (n int) {
 			l = e.Size()
 			n += 1 + l + sovGenerated(uint64(l))
 		}
+	}
+	return n
+}
+
+func (m *ExtendedResourceRequest) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if m.Capacity != nil {
+		l = m.Capacity.Size()
+		n += 1 + l + sovGenerated(uint64(l))
 	}
 	return n
 }
@@ -4565,7 +4615,7 @@ func (this *DeviceClassSpec) String() string {
 		`Selectors:` + repeatedStringForSelectors + `,`,
 		`Config:` + repeatedStringForConfig + `,`,
 		`ExtendedResourceName:` + valueToStringGenerated(this.ExtendedResourceName) + `,`,
-		`ExtendedResourceCapacityRequests:` + strings.Replace(this.ExtendedResourceCapacityRequests.String(), "CapacityRequirements", "CapacityRequirements", 1) + `,`,
+		`ExtendedResourceRequest:` + strings.Replace(this.ExtendedResourceRequest.String(), "ExtendedResourceRequest", "ExtendedResourceRequest", 1) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -4828,6 +4878,16 @@ func (this *ExactDeviceRequest) String() string {
 		`Tolerations:` + repeatedStringForTolerations + `,`,
 		`Capacity:` + strings.Replace(this.Capacity.String(), "CapacityRequirements", "CapacityRequirements", 1) + `,`,
 		`DerivedAttributes:` + repeatedStringForDerivedAttributes + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *ExtendedResourceRequest) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&ExtendedResourceRequest{`,
+		`Capacity:` + strings.Replace(this.Capacity.String(), "CapacityRequirements", "CapacityRequirements", 1) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -8584,7 +8644,7 @@ func (m *DeviceClassSpec) Unmarshal(dAtA []byte) error {
 			iNdEx = postIndex
 		case 5:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field ExtendedResourceCapacityRequests", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field ExtendedResourceRequest", wireType)
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
@@ -8611,10 +8671,10 @@ func (m *DeviceClassSpec) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			if m.ExtendedResourceCapacityRequests == nil {
-				m.ExtendedResourceCapacityRequests = &CapacityRequirements{}
+			if m.ExtendedResourceRequest == nil {
+				m.ExtendedResourceRequest = &ExtendedResourceRequest{}
 			}
-			if err := m.ExtendedResourceCapacityRequests.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+			if err := m.ExtendedResourceRequest.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
@@ -11549,6 +11609,92 @@ func (m *ExactDeviceRequest) Unmarshal(dAtA []byte) error {
 			}
 			m.DerivedAttributes = append(m.DerivedAttributes, DeviceDerivedAttribute{})
 			if err := m.DerivedAttributes[len(m.DerivedAttributes)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *ExtendedResourceRequest) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: ExtendedResourceRequest: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: ExtendedResourceRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Capacity", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Capacity == nil {
+				m.Capacity = &CapacityRequirements{}
+			}
+			if err := m.Capacity.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
