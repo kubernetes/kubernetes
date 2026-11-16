@@ -574,6 +574,16 @@ device.attributes["dra.example.com"]["version"].isGreaterThan(semver("0.0.1"))
 		expectMatch: true,
 		expectCost:  18,
 	},
+	"split_driver_index_regexp": {
+		// Indexing a split() result and running a string operation on the
+		// element must stay bounded by the size of the input string. Before
+		// the element size was propagated, this estimate saturated at
+		// math.MaxUint64 and the selector was rejected as too complex.
+		expression:  `device.driver.split(".")[0].matches("^[a-z]+$")`,
+		driver:      "dra.example.com",
+		expectMatch: true,
+		expectCost:  30,
+	},
 	"check_capacity_domains": {
 		expression:  `device.capacity.exists_one(x, x == "dra.example.com")`,
 		capacity:    map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{"memory": {Value: resource.MustParse("1Mi")}},
