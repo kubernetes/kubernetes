@@ -47,6 +47,9 @@ const (
 
 	formatErrorsMetric         = "apiserver_storage_compression_format_errors_total"
 	unsupportedAlgorithmMetric = "apiserver_storage_compression_unsupported_algorithm_total"
+	operationsMetric           = "apiserver_storage_compression_operations_total"
+	rewritesNeededMetric       = "apiserver_storage_compression_rewrites_needed_total"
+	lastConfigInfoMetric       = "apiserver_storage_compression_last_config_info"
 
 	pinnedSecretNamespace = "storage-compression"
 	pinnedSecretName      = "pinned-deflate-frame"
@@ -159,28 +162,66 @@ func (e *transformTest) plantSecret(t *testing.T, namespace, name string, v []by
 	}
 }
 
-// secretsCounter returns a storage compression counter's value for secrets, or 0
-// before its first sample. The test apiserver runs in this process and records
-// into legacyregistry.
-func secretsCounter(t *testing.T, name string) float64 {
+// metricSample is one series of a metric family.
+type metricSample struct {
+	labels map[string]string
+	value  float64
+}
+
+// gatherSamples returns all series of the given metric, with their labels.
+// All test apiservers in this process share legacyregistry, so a counter
+// includes what earlier apiservers recorded. Compare values before and after,
+// not absolutes.
+func gatherSamples(t *testing.T, name string) []metricSample {
 	t.Helper()
 	families, err := legacyregistry.DefaultGatherer.Gather()
 	if err != nil {
 		t.Fatal(err)
 	}
+	var samples []metricSample
 	for _, family := range families {
 		if family.GetName() != name {
 			continue
 		}
 		for _, m := range family.GetMetric() {
-			for _, label := range m.GetLabel() {
-				if label.GetName() == "resource" && label.GetValue() == secretsGR.String() {
-					return m.GetCounter().GetValue()
-				}
+			s := metricSample{labels: map[string]string{}, value: m.GetCounter().GetValue()}
+			if m.GetGauge() != nil {
+				s.value = m.GetGauge().GetValue()
 			}
+			for _, label := range m.GetLabel() {
+				s.labels[label.GetName()] = label.GetValue()
+			}
+			samples = append(samples, s)
 		}
 	}
-	return 0
+	return samples
+}
+
+// counterValue adds up every series of counter name whose labels include all of
+// labels. It returns 0 if no series matches, which is also what a counter reads
+// before its first increment.
+func counterValue(t *testing.T, name string, labels map[string]string) float64 {
+	t.Helper()
+	var sum float64
+	for _, s := range gatherSamples(t, name) {
+		matches := true
+		for k, v := range labels {
+			if s.labels[k] != v {
+				matches = false
+				break
+			}
+		}
+		if matches {
+			sum += s.value
+		}
+	}
+	return sum
+}
+
+// secretsCounter returns a storage compression counter's value for secrets.
+func secretsCounter(t *testing.T, name string) float64 {
+	t.Helper()
+	return counterValue(t, name, map[string]string{"resource": secretsGR.String()})
 }
 
 // TestIntactFramesAreNotCorruptObjects plants intact frames that can't be read: an

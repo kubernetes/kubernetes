@@ -17,8 +17,11 @@ limitations under the License.
 package transformation
 
 import (
+	"os"
 	"strconv"
 	"testing"
+
+	genericapiserver "k8s.io/apiserver/pkg/server"
 )
 
 // TestStorageCompressionConfigStartup starts kube-apiserver with files at the edges
@@ -56,5 +59,53 @@ func TestStorageCompressionConfigStartup(t *testing.T) {
 			test.mustCreateConfigMap(t, cm)
 			test.wantForm(t, configMapsGVR, cm.Name, tc.wantForm)
 		})
+	}
+}
+
+// TestStorageCompressionConfigHashAcrossFleet checks that apiservers loading
+// identical files report the same hash, and one with a different file doesn't.
+func TestStorageCompressionConfigHashAcrossFleet(t *testing.T) {
+	hostname, err := os.Hostname()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The apiserver ID is derived from the hostname, which every apiserver in
+	// this process shares. Set it per replica, and put the real one back after.
+	t.Cleanup(func() { genericapiserver.SetHostnameFuncForTests(hostname) })
+
+	// last_config_info only shows the apiserver that started last, because one
+	// provider serves the whole process. So the replicas run one at a time, and
+	// each one's series is read while it's up.
+	report := func(t *testing.T, host, config string) metricSample {
+		t.Helper()
+		genericapiserver.SetHostnameFuncForTests(host)
+		test, err := newTransformTest(t, transformTestConfig{extraFlags: compressionFlags(t, config, "1.38")})
+		if err != nil {
+			t.Fatalf("failed to start kube-apiserver: %v", err)
+		}
+		defer test.cleanUp()
+		samples := gatherSamples(t, lastConfigInfoMetric)
+		if len(samples) != 1 {
+			t.Fatalf("%s has %d series after %s started, want 1", lastConfigInfoMetric, len(samples), host)
+		}
+		if samples[0].labels["apiserver_id_hash"] == "" || samples[0].labels["hash"] == "" {
+			t.Fatalf("%s series %v is missing a label", lastConfigInfoMetric, samples[0].labels)
+		}
+		return samples[0]
+	}
+	policy := compressionConfig(compressionEntry("configmaps", "Deflate", ""))
+	first := report(t, "compression-replica-1", policy)
+	other := report(t, "compression-replica-2", compressionConfig(compressionEntry("configmaps", "Deflate", "2Ki")))
+	same := report(t, "compression-replica-3", policy)
+
+	ids := map[string]bool{first.labels["apiserver_id_hash"]: true, other.labels["apiserver_id_hash"]: true, same.labels["apiserver_id_hash"]: true}
+	if len(ids) != 3 {
+		t.Errorf("three replicas reported %d apiserver_id_hash values, want 3", len(ids))
+	}
+	if first.labels["hash"] == other.labels["hash"] {
+		t.Errorf("replicas with different policies both reported hash %s", first.labels["hash"])
+	}
+	if first.labels["hash"] != same.labels["hash"] {
+		t.Errorf("replicas with identical files reported hashes %s and %s, want them equal", first.labels["hash"], same.labels["hash"])
 	}
 }

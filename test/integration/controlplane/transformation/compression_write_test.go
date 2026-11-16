@@ -41,9 +41,10 @@ var configMapsGVR = gvr("", "v1", "configmaps")
 type storedForm string
 
 const (
-	formUnframed    storedForm = "unframed protobuf"
-	formDeflate     storedForm = "deflate frame"
-	formStoredFrame storedForm = "stored frame"
+	formUnframed     storedForm = "unframed protobuf"
+	formUnframedJSON storedForm = "unframed JSON"
+	formDeflate      storedForm = "deflate frame"
+	formStoredFrame  storedForm = "stored frame"
 )
 
 func formOf(raw []byte) storedForm {
@@ -54,6 +55,9 @@ func formOf(raw []byte) storedForm {
 		return formStoredFrame
 	case bytes.HasPrefix(raw, []byte(protobufPrefix)):
 		return formUnframed
+	case bytes.HasPrefix(raw, []byte("{")):
+		// Custom resources are stored as JSON.
+		return formUnframedJSON
 	}
 	return storedForm(fmt.Sprintf("unrecognized value %q", raw[:min(len(raw), 16)]))
 }
@@ -86,12 +90,19 @@ func compressionFlags(t *testing.T, config, minCompatibilityVersion string) []st
 	return []string{"--storage-compression-config=" + path, "--min-compatibility-version=" + minCompatibilityVersion}
 }
 
+// compressibleText returns n bytes of repeated text, which DEFLATE squeezes
+// almost all of the way out.
+func compressibleText(n int) string {
+	const unit = "compress me "
+	return strings.Repeat(unit, n/len(unit)+1)[:n]
+}
+
 // compressibleConfigMap holds 2400 bytes of repeated text, well above the
-// default 1Ki floor, and DEFLATE squeezes most of it out.
+// default 1Ki floor.
 func compressibleConfigMap(name string) *corev1.ConfigMap {
 	return &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{Name: name},
-		Data:       map[string]string{"data": strings.Repeat("compress me ", 200)},
+		Data:       map[string]string{"data": compressibleText(2400)},
 	}
 }
 
