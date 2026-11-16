@@ -199,6 +199,9 @@ func (flags *WaitFlags) ToOptions(args []string) (*WaitOptions, error) {
 }
 
 func conditionFuncsFor(conditions []string, errOut io.Writer) ([]ConditionFunc, error) {
+	if len(conditions) == 0 {
+		return nil, fmt.Errorf("you must specify the condition to wait for with --for")
+	}
 	var condFuncs []ConditionFunc
 	for _, cond := range conditions {
 		lowercaseCond := strings.ToLower(cond)
@@ -242,9 +245,6 @@ func conditionFuncsFor(conditions []string, errOut io.Writer) ([]ConditionFunc, 
 		default:
 			return nil, fmt.Errorf("unrecognized condition: %q", cond)
 		}
-	}
-	if condFuncs == nil {
-		return nil, fmt.Errorf("unrecognized condition: %q", conditions)
 	}
 
 	return condFuncs, nil

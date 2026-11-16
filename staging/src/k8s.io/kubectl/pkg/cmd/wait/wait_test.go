@@ -1741,6 +1741,11 @@ func TestConditionFuncFor(t *testing.T) {
 			expectedErr: "unrecognized condition: \"cond=invalid\"",
 		},
 		{
+			name:        "empty condition",
+			condition:   []string{},
+			expectedErr: "you must specify the condition to wait for with --for",
+		},
+		{
 			name:        "multiple conditions - two status conditions",
 			condition:   []string{"condition=Ready", "condition=Available"},
 			expectedErr: None,
