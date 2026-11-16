@@ -306,7 +306,8 @@ type Cacher struct {
 	ready *ready
 
 	// Underlying storage.Interface.
-	storage storage.Interface
+	storage                storage.Interface
+	resourceVersionBatcher *currentResourceVersionBatcher
 
 	// Expected type of objects in the underlying cache.
 	objectType reflect.Type
@@ -477,10 +478,11 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 		return nil, fmt.Errorf("config.EventsHistoryWindow (%v) must not be below %v", eventFreshDuration, DefaultEventFreshDuration)
 	}
 
+	cacher.resourceVersionBatcher = newCurrentResourVersionBatcher(config.Storage.GetCurrentResourceVersion, config.Clock)
 	progressRequester := progress.NewConditionalProgressRequester(config.Storage.RequestWatchProgress, config.Clock, contextMetadata)
 	watchCache := newWatchCache(
 		config.KeyFunc, cacher.processEvent, config.GetAttrsFunc, config.Versioner, config.Indexers,
-		config.Clock, eventFreshDuration, config.GroupResource, progressRequester, config.Storage.GetCurrentResourceVersion)
+		config.Clock, eventFreshDuration, config.GroupResource, progressRequester, cacher.GetCurrentResourceVersion)
 	listerWatcher := NewListerWatcher(config.Storage, resourcePrefix, config.NewListFunc, contextMetadata)
 	reflectorName := "storage/cacher.go:" + resourcePrefix
 
@@ -1668,8 +1670,7 @@ func (c *Cacher) getWatchCacheResourceVersion(ctx context.Context, parsedWatchRe
 	if opts.SendInitialEvents == nil && opts.ResourceVersion == "" {
 		return 0, nil
 	}
-	rv, err := c.storage.GetCurrentResourceVersion(ctx)
-	return rv, err
+	return c.resourceVersionBatcher.GetCurrentResourceVersion(ctx)
 }
 
 // Wait blocks until the cacher is Ready or Stopped, it returns an error if Stopped.
@@ -1700,7 +1701,7 @@ func (c *Cacher) getKeys(ctx context.Context) ([]string, error) {
 	ctx, span := tracing.Start(ctx, "cacher.getKeys",
 		attribute.String("audit-id", audit.GetAuditIDTruncated(ctx)))
 	defer span.End(500 * time.Millisecond)
-	rev, err := c.storage.GetCurrentResourceVersion(ctx)
+	rev, err := c.resourceVersionBatcher.GetCurrentResourceVersion(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -1793,6 +1794,10 @@ func (c *Cacher) ShouldDelegateConsistentRead() (delegator.Result, error) {
 		ConsistentRead: true,
 		ShouldDelegate: !delegator.ConsistentReadSupported(),
 	}, nil
+}
+
+func (c *Cacher) GetCurrentResourceVersion(ctx context.Context) (uint64, error) {
+	return c.resourceVersionBatcher.GetCurrentResourceVersion(ctx)
 }
 
 // Implements watch.Interface.
