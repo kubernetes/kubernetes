@@ -837,6 +837,7 @@ func NewMainKubelet(ctx context.Context,
 		return nil, fmt.Errorf("failed to initialize actuated state checkpoint: %w", err)
 	}
 	klet.actuatedState = actuatedState
+	allocatedPodMgr := &allocatedPodManager{baseManager: klet.podManager, allocationManager: klet.allocationManager}
 
 	klet.runner = kubecontainer.NewCommandRunner(kubeDeps.RemoteRuntimeService)
 	klet.probeManager = newProbeManager(ctx, klet, kubeDeps)
@@ -1100,16 +1101,11 @@ func NewMainKubelet(ctx context.Context,
 	}
 
 	// setup volumeManager
-	var vmPodManager volumemanager.PodManager = klet.podManager
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingMemoryBackedVolumes) {
-		// The volume manager should only ever be aware of the 'allocated' pod.
-		vmPodManager = &allocatedPodManager{baseManager: klet.podManager, allocationManager: klet.allocationManager}
-	}
-
+	// The volume manager should only ever be aware of the 'allocated' pod.
 	klet.volumeManager = volumemanager.NewVolumeManager(
 		kubeCfg.EnableControllerAttachDetach,
 		nodeName,
-		vmPodManager,
+		allocatedPodMgr,
 		klet.podWorkers,
 		klet.kubeClient,
 		klet.volumePluginMgr,
@@ -3887,30 +3883,22 @@ func (kl *Kubelet) OnPodSandboxReady(ctx context.Context, pod *v1.Pod) error {
 	return nil
 }
 
-// allocatedPodManager decorates the base volumemanager.PodManager to intercept pod lookups
+// allocatedPodManager decorates the base kubepod.Manager to intercept pod lookups
 // and return their active allocated state as computed by the allocationManager.
 //
 // This should be used as the pod manager for any components that need to be aware only of the
 // allocated pod.
 type allocatedPodManager struct {
-	baseManager       volumemanager.PodManager
+	baseManager       kubepod.Manager
 	allocationManager allocation.Manager
 }
 
 func (a *allocatedPodManager) getAllocatedPod(pod *v1.Pod) (*v1.Pod, bool) {
-	// TODO: Add a method on the allocation manager for volumeManager to read the allocated pod
-	// without requiring a deep copy or DeepEqual check, especially in preparation for dynamic volumes.
 	if pod == nil {
 		return nil, false
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingMemoryBackedVolumes) && allocation.PodHasMemoryBackedEmptyDir(pod) {
-		if allocatedPod, ok := a.allocationManager.UpdatePodFromAllocation(pod); ok {
-			return allocatedPod, true
-		}
-	}
-	// When the feature gate is disabled, the pod has no memory-backed emptyDir volumes, or there is
-	// no allocation stored for this pod, return the pod as-is.
-	return pod, true
+	allocatedPod, _ := a.allocationManager.GetAllocatedPod(pod)
+	return allocatedPod, true
 }
 
 func (a *allocatedPodManager) GetPodByUID(uid types.UID) (*v1.Pod, bool) {
@@ -3921,9 +3909,17 @@ func (a *allocatedPodManager) GetPodByUID(uid types.UID) (*v1.Pod, bool) {
 	return a.getAllocatedPod(pod)
 }
 
+func (a *allocatedPodManager) GetPodByName(namespace, name string) (*v1.Pod, bool) {
+	pod, found := a.baseManager.GetPodByName(namespace, name)
+	if !found || pod == nil {
+		return pod, found
+	}
+	return a.getAllocatedPod(pod)
+}
+
 func (a *allocatedPodManager) GetPods() []*v1.Pod {
 	pods := a.baseManager.GetPods()
-	var allocatedPods []*v1.Pod
+	allocatedPods := make([]*v1.Pod, 0, len(pods))
 	for _, pod := range pods {
 		if allocatedPod, podFound := a.getAllocatedPod(pod); podFound {
 			allocatedPods = append(allocatedPods, allocatedPod)

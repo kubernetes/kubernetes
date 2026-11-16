@@ -6540,3 +6540,106 @@ func TestDynamicVolumeUpdateAllocation(t *testing.T) {
 		})
 	}
 }
+
+func TestGetAllocatedPod(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	allocationManager := makeAllocationManager(t, &containertest.FakeRuntime{}, nil, nil)
+
+	gotNil, gotNilGen := allocationManager.GetAllocatedPod(nil)
+	assert.Nil(t, gotNil)
+	assert.Zero(t, gotNilGen)
+
+	cpu100m := resource.MustParse("100m")
+	cpu200m := resource.MustParse("200m")
+	grace30 := int64(30)
+	grace60 := int64(60)
+	allocated := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{UID: "pod-get-alloc", Name: "pod", Namespace: "default", Generation: 3},
+		Spec: v1.PodSpec{
+			TerminationGracePeriodSeconds: &grace30,
+			Volumes:                       []v1.Volume{{Name: "vol-1", VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}}},
+			Containers: []v1.Container{{
+				Name:      "c1",
+				Image:     "img:v1",
+				Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: cpu100m}},
+			}},
+		},
+	}
+
+	// Unallocated pod returns desired pod as-is with unknown generation (0).
+	gotUnalloc, gotUnallocGen := allocationManager.GetAllocatedPod(allocated)
+	assert.Same(t, allocated, gotUnalloc)
+	assert.Zero(t, gotUnallocGen)
+
+	require.NoError(t, allocationManager.SetAllocatedPod(logger, allocated))
+	storedBefore, ok := allocationManager.(*manager).allocated.GetPodReadOnly(allocated.UID)
+	require.True(t, ok)
+	storedSnapshot := storedBefore.DeepCopy()
+
+	desired := allocated.DeepCopy()
+	desired.Generation = 4
+	desired.Spec.TerminationGracePeriodSeconds = &grace60
+	desired.Spec.Volumes = append(desired.Spec.Volumes, v1.Volume{Name: "vol-unalloc", VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}})
+	desired.Spec.Containers[0].Image = "img:v2"
+	desired.Spec.Containers[0].Resources.Requests[v1.ResourceCPU] = cpu200m
+
+	got, gotGen := allocationManager.GetAllocatedPod(desired)
+	require.NotNil(t, got)
+	assert.Equal(t, int64(3), gotGen, "allocated generation should come from stored allocation")
+	assert.Equal(t, int64(60), *got.Spec.TerminationGracePeriodSeconds, "passthrough fields should come from desired pod")
+	assert.Equal(t, "img:v2", got.Spec.Containers[0].Image, "container image should pass through when DynamicContainers is disabled")
+	assert.Len(t, got.Spec.Volumes, 1, "gated volumes should come from allocated pod")
+	assert.True(t, cpu100m.Equal(got.Spec.Containers[0].Resources.Requests[v1.ResourceCPU]), "gated resources should come from allocated pod")
+	assert.Equal(t, storedSnapshot, storedBefore, "GetAllocatedPod must not mutate stored read-only pod")
+}
+
+func BenchmarkGetAllocatedPod(b *testing.B) {
+	logger, _ := ktesting.NewTestContext(b)
+	var allocationManager Manager = &manager{allocated: state.NewStateMemory(logger, nil, nil)}
+	cpu100m := resource.MustParse("100m")
+	mem128Mi := resource.MustParse("128Mi")
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{UID: "bench-pod", Name: "bench-pod", Namespace: "default"},
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{
+				{Name: "v1", VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}},
+				{Name: "v2", VolumeSource: v1.VolumeSource{ConfigMap: &v1.ConfigMapVolumeSource{LocalObjectReference: v1.LocalObjectReference{Name: "cm"}}}},
+				{Name: "v3", VolumeSource: v1.VolumeSource{Secret: &v1.SecretVolumeSource{SecretName: "sec"}}},
+			},
+			Containers: []v1.Container{
+				{
+					Name:         "c1",
+					Image:        "registry.k8s.io/pause:3.10",
+					VolumeMounts: []v1.VolumeMount{{Name: "v1", MountPath: "/v1"}, {Name: "v2", MountPath: "/v2"}},
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceCPU: cpu100m, v1.ResourceMemory: mem128Mi},
+						Limits:   v1.ResourceList{v1.ResourceCPU: cpu100m, v1.ResourceMemory: mem128Mi},
+					},
+				},
+				{
+					Name:         "c2",
+					Image:        "registry.k8s.io/pause:3.10",
+					VolumeMounts: []v1.VolumeMount{{Name: "v3", MountPath: "/v3"}},
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceCPU: cpu100m, v1.ResourceMemory: mem128Mi},
+						Limits:   v1.ResourceList{v1.ResourceCPU: cpu100m, v1.ResourceMemory: mem128Mi},
+					},
+				},
+			},
+		},
+	}
+	require.NoError(b, allocationManager.SetAllocatedPod(logger, pod))
+
+	b.Run("GetAllocatedPod", func(b *testing.B) {
+		b.ReportAllocs()
+		for b.Loop() {
+			_, _ = allocationManager.GetAllocatedPod(pod)
+		}
+	})
+	b.Run("UpdatePodFromAllocation", func(b *testing.B) {
+		b.ReportAllocs()
+		for b.Loop() {
+			_, _ = allocationManager.UpdatePodFromAllocation(pod)
+		}
+	})
+}

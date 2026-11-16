@@ -7482,7 +7482,6 @@ func TestHandlePodUpdates_ResizeTerminatingPods(t *testing.T) {
 }
 
 func TestAllocatedPodManager(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingMemoryBackedVolumes, true)
 	logger, _ := ktesting.NewTestContext(t)
 	testKubelet := newTestKubelet(t, false)
 	defer testKubelet.Cleanup()
@@ -7493,7 +7492,27 @@ func TestAllocatedPodManager(t *testing.T) {
 		allocationManager: kl.allocationManager,
 	}
 
-	// Pod without a memory-backed emptyDir should bypass UpdatePodFromAllocation and return the desired pod directly.
+	// Unallocated pod falls back to returning the desired pod as-is.
+	unallocatedPod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "pod-unallocated",
+			Name:      "pod-unallocated",
+			Namespace: "default",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{{Name: "c1"}},
+		},
+	}
+	kl.podManager.SetPods([]*v1.Pod{unallocatedPod})
+	gotPod, found := apm.GetPodByUID(unallocatedPod.UID)
+	require.True(t, found)
+	assert.Same(t, unallocatedPod, gotPod)
+
+	// Allocated pod returns the allocated view regardless of feature gates, including across
+	// kubelet feature-gate rollback.
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingMemoryBackedVolumes, false)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicNodeLocalEphemeralVolumes, false)
+
 	podWithoutMemVol := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			UID:       "pod-no-mem-vol",
@@ -7523,15 +7542,21 @@ func TestAllocatedPodManager(t *testing.T) {
 	}
 	require.NoError(t, kl.allocationManager.SetAllocatedPod(logger, podWithoutMemVol))
 
-	desiredPodWithoutMemVol := podWithoutMemVol.DeepCopy()
-	desiredPodWithoutMemVol.Spec.Containers[0].Resources.Limits[v1.ResourceMemory] = resource.MustParse("200Mi")
-	kl.podManager.SetPods([]*v1.Pod{desiredPodWithoutMemVol})
+	desiredWithDynVol := podWithoutMemVol.DeepCopy()
+	desiredWithDynVol.Spec.Volumes = append(desiredWithDynVol.Spec.Volumes, v1.Volume{
+		Name: "dyn-secret",
+		VolumeSource: v1.VolumeSource{
+			Secret: &v1.SecretVolumeSource{SecretName: "my-secret"},
+		},
+	})
+	kl.podManager.SetPods([]*v1.Pod{desiredWithDynVol})
 
-	gotPod, found := apm.GetPodByUID(podWithoutMemVol.UID)
+	gotPod, found = apm.GetPodByUID(podWithoutMemVol.UID)
 	require.True(t, found)
-	assert.Same(t, desiredPodWithoutMemVol, gotPod)
+	require.Len(t, gotPod.Spec.Volumes, 1)
+	assert.Equal(t, "disk-vol", gotPod.Spec.Volumes[0].Name)
 
-	// Pod with a memory-backed emptyDir should consult UpdatePodFromAllocation and return the allocated pod.
+	// Pod with a memory-backed emptyDir also returns the allocated SizeLimit.
 	size100Mi := resource.MustParse("100Mi")
 	size200Mi := resource.MustParse("200Mi")
 	podWithMemVol := &v1.Pod{
