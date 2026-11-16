@@ -226,6 +226,8 @@ type Config struct {
 	ResourceTransformers storagevalue.ResourceTransformers
 	// StorageCompressionRules gives each resource's store its compression Rule.
 	// When it's nil, every store gets the zero Rule and writes nothing compressed.
+	// EtcdOptions.ApplyTo fills it from --storage-compression-config only while it's
+	// nil, so a value set before then takes precedence over the flag.
 	StorageCompressionRules compression.ResourceRules
 	// RESTOptionsGetter is used to construct RESTStorage types via the generic registry.
 	RESTOptionsGetter genericregistry.RESTOptionsGetter

@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apiserver/pkg/apis/apiserver"
 	apiserverv1alpha1 "k8s.io/apiserver/pkg/apis/apiserver/v1alpha1"
 	"k8s.io/apiserver/pkg/internal/storagecompression"
@@ -41,6 +42,11 @@ var (
 	configScheme = runtime.NewScheme()
 	codecs       serializer.CodecFactory
 )
+
+// firstReadingVersion is the first release that reads compressed values. A
+// configuration that compresses anything needs --min-compatibility-version to be
+// at least this, because an older apiserver can't read what it writes.
+var firstReadingVersion = version.MajorMinor(1, 38)
 
 func init() {
 	utilruntime.Must(apiserver.AddToScheme(configScheme))
@@ -88,6 +94,40 @@ func (c *CompressionConfiguration) RuleFor(gr schema.GroupResource) compression.
 		}
 	}
 	return compression.Rule{}
+}
+
+// compresses reports whether any entry writes compressed values.
+func (c *CompressionConfiguration) compresses() bool {
+	if c == nil {
+		return false
+	}
+	for _, r := range c.rules {
+		if r.Algorithm != compression.AlgorithmNone {
+			return true
+		}
+	}
+	return false
+}
+
+// CompressesSecrets reports whether core secrets get compressed.
+func (c *CompressionConfiguration) CompressesSecrets() bool {
+	return c.RuleFor(storagecompression.SecretsGroupResource()).Algorithm != compression.AlgorithmNone
+}
+
+// CheckMinCompatibility returns an error if c compresses anything and
+// minCompatibility, the server's --min-compatibility-version, is older than
+// firstReadingVersion, or unknown.
+func (c *CompressionConfiguration) CheckMinCompatibility(minCompatibility *version.Version) error {
+	if !c.compresses() {
+		return nil
+	}
+	if minCompatibility == nil {
+		return fmt.Errorf("compressing resources requires --min-compatibility-version %s or later, but the server's minimum compatibility version is unknown", firstReadingVersion)
+	}
+	if minCompatibility.LessThan(firstReadingVersion) {
+		return fmt.Errorf("compressing resources requires --min-compatibility-version %s or later, because older apiservers can't read compressed values; the server's is %s", firstReadingVersion, minCompatibility)
+	}
+	return nil
 }
 
 // newCompressionConfiguration defaults and validates the versioned object, and

@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apimachinery/pkg/util/version"
 	apiserverv1alpha1 "k8s.io/apiserver/pkg/apis/apiserver/v1alpha1"
 	"k8s.io/apiserver/pkg/storage/value"
 	"k8s.io/apiserver/pkg/storage/value/compression"
@@ -614,6 +615,74 @@ func TestNewCompressionConfigurationValidates(t *testing.T) {
 			c, err := newCompressionConfiguration(config, "")
 			if err == nil || c != nil {
 				t.Fatalf("newCompressionConfiguration() = %+v, %v, want only a validation error", c, err)
+			}
+		})
+	}
+}
+
+func TestCheckMinCompatibility(t *testing.T) {
+	const noneOnly = `
+apiVersion: apiserver.config.k8s.io/v1alpha1
+kind: StorageCompressionConfiguration
+compressionResources:
+- resources: ["*.*"]
+  algorithm: None
+`
+	tests := []struct {
+		name             string
+		config           string
+		minCompatibility *version.Version
+		wantErr          string
+	}{
+		{name: "None only at 1.37", config: noneOnly, minCompatibility: version.MajorMinor(1, 37)},
+		{name: "None only with no version", config: noneOnly},
+		{name: "Deflate at 1.37", config: validConfig, minCompatibility: version.MajorMinor(1, 37), wantErr: "the server's is 1.37"},
+		{name: "Deflate at 1.38", config: validConfig, minCompatibility: version.MajorMinor(1, 38)},
+		{name: "Deflate at 1.39", config: validConfig, minCompatibility: version.MajorMinor(1, 39)},
+		{name: "Deflate with no version", config: validConfig, wantErr: "minimum compatibility version is unknown"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			c, err := LoadCompressionConfig(writeConfig(t, tc.config))
+			if err != nil {
+				t.Fatal(err)
+			}
+			err = c.CheckMinCompatibility(tc.minCompatibility)
+			if tc.wantErr == "" {
+				if err != nil {
+					t.Errorf("got %v, want no error", err)
+				}
+				return
+			}
+			if err == nil || !strings.Contains(err.Error(), tc.wantErr) {
+				t.Errorf("got %v, want an error containing %q", err, tc.wantErr)
+			}
+		})
+	}
+	var unloaded *CompressionConfiguration
+	if err := unloaded.CheckMinCompatibility(nil); err != nil {
+		t.Errorf("a nil configuration: got %v, want no error", err)
+	}
+}
+
+func TestCompressesSecrets(t *testing.T) {
+	tests := []struct {
+		name    string
+		entries string
+		want    bool
+	}{
+		{name: "secrets named with Deflate", entries: "- resources: [\"secrets\"]\n  algorithm: Deflate\n", want: true},
+		{name: "secrets named with None", entries: "- resources: [\"secrets\"]\n  algorithm: None\n"},
+		{name: "every resource by wildcard", entries: "- resources: [\"*.*\"]\n  algorithm: Deflate\n"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			c, err := LoadCompressionConfig(writeConfig(t, "apiVersion: apiserver.config.k8s.io/v1alpha1\nkind: StorageCompressionConfiguration\ncompressionResources:\n"+tc.entries))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := c.CompressesSecrets(); got != tc.want {
+				t.Errorf("got %t, want %t", got, tc.want)
 			}
 		})
 	}

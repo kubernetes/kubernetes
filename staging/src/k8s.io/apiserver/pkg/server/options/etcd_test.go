@@ -18,6 +18,10 @@ package options
 
 import (
 	"context"
+	"crypto/sha256"
+	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -29,16 +33,21 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/options/compressionconfig"
+	compressionconfigmetrics "k8s.io/apiserver/pkg/server/options/compressionconfig/metrics"
 	"k8s.io/apiserver/pkg/storage/etcd3/metrics"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	storagevalue "k8s.io/apiserver/pkg/storage/value"
 	"k8s.io/apiserver/pkg/storage/value/compression"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	basecompatibility "k8s.io/component-base/compatibility"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/component-base/metrics/testutil"
 )
 
 func TestEtcdOptionsValidate(t *testing.T) {
@@ -564,6 +573,160 @@ func TestRESTOptionsCarryCompressionRule(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// writeStorageCompressionConfig writes a StorageCompressionConfiguration with
+// the given compressionResources entries and returns its path.
+func writeStorageCompressionConfig(t *testing.T, entries string) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "storage-compression.yaml")
+	content := "apiVersion: apiserver.config.k8s.io/v1alpha1\nkind: StorageCompressionConfiguration\ncompressionResources:\n" + entries
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+// TestApplyStorageCompressionConfig checks that ApplyTo loads --storage-compression-config
+// into the rules and last_config_info, and fails when the min compatibility version is
+// below 1.38 or unknown.
+func TestApplyStorageCompressionConfig(t *testing.T) {
+	configMaps := schema.GroupResource{Resource: "configmaps"}
+	secrets := schema.GroupResource{Resource: "secrets"}
+	deflate := compression.Rule{Algorithm: compression.AlgorithmDeflate, MinSize: 1024}
+	const (
+		deflateConfigMaps = "- resources: [\"configmaps\"]\n  algorithm: Deflate\n"
+		deflateSecrets    = "- resources: [\"secrets\"]\n  algorithm: Deflate\n"
+	)
+	tests := []struct {
+		name string
+		// entries is the compressionResources YAML. With none, the flag stays unset.
+		entries          string
+		minCompatibility string // empty leaves EffectiveVersion nil
+		wantErr          string
+		wantRules        map[schema.GroupResource]compression.Rule
+	}{
+		{name: "unset", minCompatibility: "1.37"},
+		{name: "Deflate at 1.37", entries: deflateConfigMaps, minCompatibility: "1.37", wantErr: "the server's is 1.37"},
+		{name: "Deflate without an effective version", entries: deflateConfigMaps, wantErr: "minimum compatibility version is unknown"},
+		{name: "Deflate at 1.38", entries: deflateConfigMaps, minCompatibility: "1.38", wantRules: map[schema.GroupResource]compression.Rule{configMaps: deflate}},
+		{name: "Deflate for secrets at 1.38", entries: deflateSecrets, minCompatibility: "1.38", wantRules: map[schema.GroupResource]compression.Rule{secrets: deflate}},
+		{
+			name: "None at 1.37", entries: "- resources: [\"*.*\"]\n  algorithm: None\n", minCompatibility: "1.37",
+			wantRules: map[schema.GroupResource]compression.Rule{configMaps: {Algorithm: compression.AlgorithmNone, MinSize: 1024}},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			// A series from an earlier apiserver shows whether this ApplyTo replaced it.
+			compressionconfigmetrics.RecordLastConfigInfo("earlier-apiserver", "sha256:earlier")
+
+			// The etcd health checks would start clients that keep running into later tests.
+			etcdOptions := &EtcdOptions{SkipHealthEndpoints: true}
+			if tc.entries != "" {
+				etcdOptions.StorageCompressionConfigFilepath = writeStorageCompressionConfig(t, tc.entries)
+			}
+			path := etcdOptions.StorageCompressionConfigFilepath
+			serverConfig := server.NewConfig(codecs)
+			// The binary stays at 1.38, so only the min compatibility version decides.
+			if tc.minCompatibility != "" {
+				effectiveVersion := basecompatibility.NewEffectiveVersionFromString("1.38", "", "")
+				effectiveVersion.SetMinCompatibilityVersion(version.MustParse(tc.minCompatibility))
+				serverConfig.EffectiveVersion = effectiveVersion
+			}
+
+			err := etcdOptions.ApplyTo(serverConfig)
+			// Only a file that loads replaces the earlier series.
+			wantID, wantHash := "earlier-apiserver", "sha256:earlier"
+			switch {
+			case tc.wantErr != "":
+				if err == nil || !strings.Contains(err.Error(), tc.wantErr) || !strings.Contains(err.Error(), path) {
+					t.Errorf("got %v, want an error naming %s and containing %q", err, path, tc.wantErr)
+				}
+				if serverConfig.StorageCompressionRules != nil {
+					t.Errorf("StorageCompressionRules is %T even though loading failed", serverConfig.StorageCompressionRules)
+				}
+			case err != nil:
+				t.Fatal(err)
+			case path == "":
+				if serverConfig.StorageCompressionRules != nil {
+					t.Errorf("the flag is unset, but StorageCompressionRules is %T", serverConfig.StorageCompressionRules)
+				}
+			default:
+				loaded, ok := serverConfig.StorageCompressionRules.(*compressionconfig.CompressionConfiguration)
+				if !ok || loaded == nil {
+					t.Fatalf("StorageCompressionRules is %T, want the loaded configuration", serverConfig.StorageCompressionRules)
+				}
+				wantID, wantHash = serverConfig.APIServerID, loaded.CompressionFileContentHash
+			}
+
+			want := `
+# HELP apiserver_storage_compression_last_config_info [ALPHA] Information about the last loaded storage compression configuration, with its hash as a label, split by apiserver identity.
+# TYPE apiserver_storage_compression_last_config_info gauge
+apiserver_storage_compression_last_config_info{apiserver_id_hash="` + fmt.Sprintf("sha256:%x", sha256.Sum256([]byte(wantID))) + `",hash="` + wantHash + `"} 1
+`
+			if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(want), "apiserver_storage_compression_last_config_info"); err != nil {
+				t.Error(err)
+			}
+			if tc.wantErr != "" {
+				return
+			}
+
+			// Each case selects at most one of these, so the other one checks that its
+			// store keeps the zero Rule.
+			for _, gr := range []schema.GroupResource{configMaps, secrets} {
+				restOptions, err := serverConfig.RESTOptionsGetter.GetRESTOptions(gr, nil)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if got := restOptions.StorageConfig.CompressionRule; got != tc.wantRules[gr] {
+					t.Errorf("%s: got Rule %+v, want %+v", gr, got, tc.wantRules[gr])
+				}
+			}
+		})
+	}
+}
+
+// TestStorageCompressionConfigLoadsBeforeEncryption checks that a bad compression
+// file fails ApplyTo before it sets up the encryption transformers.
+func TestStorageCompressionConfigLoadsBeforeEncryption(t *testing.T) {
+	etcdOptions := &EtcdOptions{
+		SkipHealthEndpoints:              true,
+		StorageCompressionConfigFilepath: filepath.Join(t.TempDir(), "missing.yaml"),
+		EncryptionProviderConfigFilepath: "testdata/encryption-configs/no-kms-provider.yaml",
+	}
+	serverConfig := server.NewConfig(codecs)
+	if err := etcdOptions.ApplyTo(serverConfig); err == nil || !strings.Contains(err.Error(), "error reading") {
+		t.Fatalf("got %v, want an error reading the compression config", err)
+	}
+	if serverConfig.ResourceTransformers != nil {
+		t.Errorf("ResourceTransformers is %T, want encryption left unset when the compression config fails", serverConfig.ResourceTransformers)
+	}
+}
+
+// TestApplyKeepsStorageCompressionRules checks that ApplyTo leaves rules that are
+// already set alone. kube-apiserver relies on this when it applies the same options
+// to shallow copies for its apiextensions and aggregator configs. The file doesn't
+// exist, so reading it would fail.
+func TestApplyKeepsStorageCompressionRules(t *testing.T) {
+	configMaps := schema.GroupResource{Resource: "configmaps"}
+	deflate := compression.Rule{Algorithm: compression.AlgorithmDeflate, MinSize: 1024}
+	serverConfig := server.NewConfig(codecs)
+	serverConfig.StorageCompressionRules = fakeResourceRules{configMaps: deflate}
+	etcdOptions := &EtcdOptions{
+		SkipHealthEndpoints:              true,
+		StorageCompressionConfigFilepath: filepath.Join(t.TempDir(), "missing.yaml"),
+	}
+	if err := etcdOptions.ApplyTo(serverConfig); err != nil {
+		t.Fatal(err)
+	}
+	restOptions, err := serverConfig.RESTOptionsGetter.GetRESTOptions(configMaps, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := restOptions.StorageConfig.CompressionRule; got != deflate {
+		t.Errorf("got Rule %+v, want %+v", got, deflate)
 	}
 }
 
