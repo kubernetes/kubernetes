@@ -45,7 +45,7 @@ type CompositePodGroupStatusApplyConfiguration struct {
 	// that occurred during scheduling.
 	// - "CompositePodGroupError": The CompositePodGroup cannot be scheduled due to an invalid group layout
 	// detected during runtime validation. The `message` field details the specific layout violation (such as
-	// a detected cycle, exceeding the maximum depth of 4, or referencing multiple distinct Workloads).
+	// a detected cycle, exceeding the maximum depth of 5, or referencing multiple distinct Workloads).
 	//
 	// Known reasons for the DisruptionTarget condition:
 	// - "PreemptionByScheduler": The CompositePodGroup was preempted by the scheduler to make room for
