@@ -406,6 +406,44 @@ var objWithAllocationTimestamp = &resource.ResourceClaim{
 	},
 }
 
+var objWithSharedConsumableCapacityStatus = &resource.ResourceClaim{
+	ObjectMeta: metav1.ObjectMeta{
+		Name:      "valid-claim",
+		Namespace: "kube-system",
+	},
+	Spec: resource.ResourceClaimSpec{
+		Devices: resource.DeviceClaim{
+			Requests: []resource.DeviceRequest{
+				{
+					Name: "req-0",
+					Exactly: &resource.ExactDeviceRequest{
+						DeviceClassName: "class",
+						AllocationMode:  resource.DeviceAllocationModeAll,
+					},
+				},
+			},
+		},
+	},
+	Status: resource.ResourceClaimStatus{
+		Allocation: &resource.AllocationResult{
+			Devices: resource.DeviceAllocationResult{
+				Results: []resource.DeviceRequestAllocationResult{
+					{
+						Request: "req-0",
+						Driver:  "dra.example.com",
+						Pool:    "pool-0",
+						Device:  "device-0",
+						ConsumedCounters: []resource.CounterSetConsumption{{
+							CounterSet: "pool-0",
+							Counters:   map[string]apiresource.Quantity{"memory": apiresource.MustParse("1")},
+						}},
+					},
+				},
+			},
+		},
+	},
+}
+
 var objWithCapacityRequests = &resource.ResourceClaim{
 	ObjectMeta: metav1.ObjectMeta{
 		Name:      "valid-claim",
@@ -752,6 +790,25 @@ func TestStrategyCreate(t *testing.T) {
 				modifySpecDeviceRequestWithCapacityRequests(obj, nil, true)
 				return obj
 			}(),
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+		},
+		"drop-fields-shared-consumable-capacity-status": {
+			obj:       objWithSharedConsumableCapacityStatus,
+			expectObj: obj,
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+		},
+		"drop-fields-shared-consumable-capacity-status-enabled-feature": {
+			obj:              objWithSharedConsumableCapacityStatus,
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAConsumableCapacity: true, features.DRASharedConsumableCapacity: true},
+			expectObj:        obj,
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 0 {
 					t.Errorf("expected no action to be taken")
@@ -1263,6 +1320,9 @@ func TestStrategyUpdateWithDerivedAttributes(t *testing.T) {
 }
 
 func TestStatusStrategyUpdate(t *testing.T) {
+	objWithZeroCounterConsumption := objWithSharedConsumableCapacityStatus.DeepCopy()
+	objWithZeroCounterConsumption.Status.Allocation.Devices.Results[0].ConsumedCounters[0].Counters["memory"] = apiresource.MustParse("0")
+
 	ctx := genericapirequest.NewDefaultContext()
 	ctx = genericapirequest.WithUser(ctx, &user.DefaultInfo{
 		Name:   testUser,
@@ -1917,6 +1977,50 @@ func TestStatusStrategyUpdate(t *testing.T) {
 				addStatusDevices(obj, testDriver, testPool, testDevice, testShareID)
 				return obj
 			}(),
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+		},
+		"keep-fields-shared-consumable-capacity-with-device-status": {
+			oldObj:           obj,
+			newObj:           objWithSharedConsumableCapacityStatus,
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAResourceClaimDeviceStatus: true, features.DRAConsumableCapacity: true, features.DRASharedConsumableCapacity: true},
+			expectObj:        objWithSharedConsumableCapacityStatus,
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+		},
+		"drop-fields-shared-consumable-capacity-disabled-feature-gate-with-device-status": {
+			oldObj:           obj,
+			newObj:           objWithSharedConsumableCapacityStatus,
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAResourceClaimDeviceStatus: true, features.DRAConsumableCapacity: true},
+			expectObj:        objWithStatus,
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+		},
+		"keep-fields-shared-consumable-capacity-with-device-status-disabled-feature-gate": {
+			oldObj:           objWithSharedConsumableCapacityStatus,
+			newObj:           objWithSharedConsumableCapacityStatus,
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAResourceClaimDeviceStatus: true, features.DRAConsumableCapacity: true},
+			expectObj:        objWithSharedConsumableCapacityStatus,
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+		},
+		"keep-zero-counter-consumption-disabled-feature-gate": {
+			oldObj:           objWithZeroCounterConsumption,
+			newObj:           objWithZeroCounterConsumption,
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAResourceClaimDeviceStatus: true, features.DRAConsumableCapacity: true, features.DRASharedConsumableCapacity: false},
+			expectObj:        objWithZeroCounterConsumption,
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 0 {
 					t.Errorf("expected no action to be taken")

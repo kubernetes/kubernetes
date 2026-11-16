@@ -83,3 +83,24 @@ func TestNewDeviceConsumedCapacity(t *testing.T) {
 		})
 	}
 }
+
+// TestCounterConsumptionByDeviceAdd preserves missing, zero and large saved amounts.
+func TestCounterConsumptionByDeviceAdd(t *testing.T) {
+	id := DeviceID{Driver: draapi.MakeUniqueString("driver"), Pool: draapi.MakeUniqueString("pool"), Device: draapi.MakeUniqueString("device")}
+	source := CounterConsumptionForAllocation{{CounterSet: "set", Counters: map[string]resource.Quantity{
+		"large": resource.MustParse("10000000000000000000"), "zero": resource.MustParse("0"),
+	}}}
+	collection := CounterConsumptionByDevice{}
+	collection.Add(id, nil)
+	collection.Add(id, source)
+	collection.Add(id, source)
+	usage := collection[id]
+	require.Len(t, usage, 3)
+	require.Nil(t, usage[0])
+	require.Equal(t, source, usage[1])
+	require.Equal(t, source, usage[2])
+	_, present := usage[1][0].Counters["zero"]
+	require.True(t, present)
+	original := source[0].Counters["large"]
+	require.Zero(t, original.Cmp(resource.MustParse("10000000000000000000")))
+}

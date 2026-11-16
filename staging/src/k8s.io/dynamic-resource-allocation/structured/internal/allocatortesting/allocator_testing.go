@@ -629,14 +629,31 @@ func (in wrapDevice) withCapacityRequestPolicyValidValues(defaultValue resource.
 func deviceCounterConsumption(counterSet string, counters map[string]resource.Quantity) resourceapi.DeviceCounterConsumption {
 	return resourceapi.DeviceCounterConsumption{
 		CounterSet: counterSet,
-		Counters:   toCounters(counters),
+		Counters:   toConsumeCounters(counters),
+	}
+}
+
+// deviceCounterConsumptionValueFrom creates a DeviceCounterConsumption that
+// resolves one or more counters from claim capacity requests.
+func deviceCounterConsumptionValueFrom(counterSet string, capacityNames map[string]resourceapi.QualifiedName) resourceapi.DeviceCounterConsumption {
+	counters := make(map[string]resourceapi.CounterRequirement, len(capacityNames))
+	for counterName, capacityName := range capacityNames {
+		counters[counterName] = resourceapi.CounterRequirement{
+			ValueFrom: &resourceapi.CounterValueFrom{
+				CapacityName: capacityName,
+			},
+		}
+	}
+	return resourceapi.DeviceCounterConsumption{
+		CounterSet: counterSet,
+		Counters:   counters,
 	}
 }
 
 func deviceCounterConsumptionWithGroups(counterSet string, counters map[string]resource.Quantity, compatibilityGroups ...string) resourceapi.DeviceCounterConsumption {
 	return resourceapi.DeviceCounterConsumption{
 		CounterSet:          counterSet,
-		Counters:            toCounters(counters),
+		Counters:            toConsumeCounters(counters),
 		CompatibilityGroups: compatibilityGroups,
 	}
 }
@@ -791,6 +808,11 @@ func (in wrapDeviceRequestAllocationResult) withConsumedCapacity(shareID *apityp
 	out.ShareID = shareID
 	out.ConsumedCapacity = consumedCapacity
 	return *out
+}
+
+func withConsumedCounters(in resourceapi.DeviceRequestAllocationResult, counters ...resourceapi.CounterSetConsumption) resourceapi.DeviceRequestAllocationResult {
+	in.ConsumedCounters = counters
+	return in
 }
 
 func withAdminAccess(in resourceapi.DeviceRequestAllocationResult) resourceapi.DeviceRequestAllocationResult {
@@ -958,14 +980,24 @@ func sliceWithMultipleDevices(name string, nodeSelection, pool any, driver strin
 func counterSet(name string, counters map[string]resource.Quantity) resourceapi.CounterSet {
 	return resourceapi.CounterSet{
 		Name:     name,
-		Counters: toCounters(counters),
+		Counters: toSharedCounters(counters),
 	}
 }
 
-func toCounters(counters map[string]resource.Quantity) map[string]resourceapi.Counter {
+// toSharedCounters converts shared counter quantities into Counter values.
+func toSharedCounters(counters map[string]resource.Quantity) map[string]resourceapi.Counter {
 	out := make(map[string]resourceapi.Counter, len(counters))
 	for name, quantity := range counters {
-		out[name] = resourceapi.Counter{Value: quantity}
+		out[string(name)] = resourceapi.Counter{Value: quantity}
+	}
+	return out
+}
+
+// toConsumeCounters converts static consumed counter quantities into CounterRequirement values.
+func toConsumeCounters(counters map[string]resource.Quantity) map[string]resourceapi.CounterRequirement {
+	out := make(map[string]resourceapi.CounterRequirement, len(counters))
+	for name, quantity := range counters {
+		out[string(name)] = resourceapi.CounterRequirement{Value: &quantity}
 	}
 	return out
 }
@@ -1046,18 +1078,18 @@ func requestWithDerivedAttributes(name, class string, count int64, derivedAttrs 
 	return req
 }
 
+type newAllocator func(
+	ctx context.Context,
+	features Features,
+	allocateState AllocatedState,
+	classLister DeviceClassLister,
+	slices []*draapi.ResourceSlice,
+	celCache *cel.Cache,
+) (Allocator, error)
+
 // TestAllocator runs as many of the shared tests against a specific allocator implementation as possible.
 // Test cases which depend on features that are not supported by the implementation are expected to fail or to produce different results.
-func TestAllocator(t *testing.T,
-	supportedFeatures Features,
-	newAllocator func(
-		ctx context.Context,
-		features Features,
-		allocateState AllocatedState,
-		classLister DeviceClassLister,
-		slices []*draapi.ResourceSlice,
-		celCache *cel.Cache,
-	) (Allocator, error)) {
+func TestAllocator(t *testing.T, supportedFeatures Features, newAllocator newAllocator) {
 	tCtx := ktesting.Init(t)
 	nonExistentAttribute := resourceapi.FullyQualifiedName(driverA + "/" + "NonExistentAttribute")
 	boolAttribute := resourceapi.FullyQualifiedName(driverA + "/" + "boolAttribute")
@@ -1124,6 +1156,48 @@ func TestAllocator(t *testing.T,
 			),
 			node: node(node1, region1),
 			// A claim does not get the same device twice, so the regular request uses device2.
+			expectResults: []any{matchAllocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device1, true),
+				deviceAllocationResult(req1, driverA, pool1, device2, false),
+			)},
+			expectWithFeatures: func(expectResults []any, expectError types.GomegaMatcher, expectErrorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.AdminAccess {
+					return nil, g.MatchError(g.ContainSubstring("admin access is requested, but the feature is disabled")), nil
+				}
+				if !features.PartitionableDevices || !features.CompatibilityGroups {
+					return nil, nil, nil
+				}
+				return expectResults, expectError, expectErrorIs
+			},
+		},
+		// Like the test above, but the admin request's class and device allow multiple allocations.
+		"compatibility-groups-admin-access-allow-multiple-does-not-restrict-normal-request": {
+			features: Features{
+				PartitionableDevices: true,
+				CompatibilityGroups:  true,
+				AdminAccess:          true,
+				ConsumableCapacity:   true,
+			},
+			claimsToAllocate: objects(claim(claim0).withRequests(
+				deviceRequest(req0, classA, 1).withAdminAccess(),
+				deviceRequest(req1, classB, 1),
+			)),
+			classes: objects(classWithAllowMultipleAllocations(classA, driverA, true), classWithAllowMultipleAllocations(classB, driverA, false)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device1).withAllowMultipleAllocations().withDeviceCounterConsumption(
+						deviceCounterConsumptionWithGroups(counterSet1, map[string]resource.Quantity{counter0: two}, "mig"),
+					),
+					device(device2).withDeviceCounterConsumption(
+						deviceCounterConsumptionWithGroups(counterSet1, map[string]resource.Quantity{counter0: two}, "vgpu"),
+					),
+				),
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1, map[string]resource.Quantity{counter0: four}),
+				),
+			),
+			node: node(node1, region1),
 			expectResults: []any{matchAllocationResult(
 				localNodeSelector(node1),
 				deviceAllocationResult(req0, driverA, pool1, device1, true),
@@ -4814,6 +4888,22 @@ func TestAllocator(t *testing.T,
 				deviceAllocationResult(req0, driverA, pool1, device2, false),
 				deviceAllocationResult(req0, driverA, pool1, device3, false),
 			)},
+		},
+		// A shared counter without a value must not break allocation of a device consuming it.
+		"partitionable-device-counter-without-value": {
+			features:         Features{PartitionableDevices: true},
+			claimsToAllocate: objects(claim(claim0).withRequests(deviceRequest(req0, classA, 1))),
+			classes:          objects(class(classA, driverA)),
+			slices: func() []*resourceapi.ResourceSlice {
+				counterSlice := sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1, map[string]resource.Quantity{counter0: one}),
+				).obj()
+				counterSlice.Spec.SharedCounters[0].Counters[counter0] = resourceapi.Counter{}
+				return append(unwrapResourceSlices(sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device1).withDeviceCounterConsumption(deviceCounterConsumption(counterSet1, map[string]resource.Quantity{counter0: one})),
+				)), counterSlice)
+			}(),
+			node: node(node1, region1),
 		},
 		"partitionable-devices-no-capacity-available": {
 			features: Features{
@@ -10192,6 +10282,42 @@ func TestAllocator(t *testing.T,
 				return expectResults, expectError, expectErrorIs
 			},
 		},
+		// Unlike the test above, which only has admin requests, an ordinary claim must
+		// still get a device after admin claims used the same device.
+		"partitionable-admin-exclusive-does-not-block-ordinary-claim": {
+			features: Features{
+				AdminAccess:          true,
+				PartitionableDevices: true,
+			},
+			claimsToAllocate: objects(
+				claim(claim0).withRequests(deviceRequest(req0, classA, 1).withAdminAccess()),
+				claim(claim1).withRequests(deviceRequest(req0, classA, 1).withAdminAccess()),
+				claim("third").withRequests(deviceRequest(req0, classA, 1).withSelectors(resourceapi.DeviceSelector{CEL: &resourceapi.CELDeviceSelector{Expression: `device.attributes["driver-a"].pick == "a"`}})),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device1).withAttribute("pick", "a").withDeviceCounterConsumption(deviceCounterConsumption(counterSet1, map[string]resource.Quantity{counter0: one})),
+					device(device2).withAttribute("pick", "b").withDeviceCounterConsumption(deviceCounterConsumption(counterSet1, map[string]resource.Quantity{counter0: one})),
+				),
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA, counterSet(counterSet1, map[string]resource.Quantity{counter0: three})),
+			),
+			node: node(node1, region1),
+			expectResults: []any{
+				matchAllocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool1, device1, true)),
+				matchAllocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool1, device1, true)),
+				matchAllocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool1, device1, false)),
+			},
+			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.AdminAccess {
+					return nil, g.MatchError(g.ContainSubstring("admin access is requested, but the feature is disabled")), nil
+				}
+				if !features.PartitionableDevices {
+					return nil, nil, nil
+				}
+				return results, matchError, errorIs
+			},
+		},
 		"consumable-capacity-backtrack-releases-capacity": {
 			features: Features{ConsumableCapacity: true},
 			claimsToAllocate: objects(
@@ -11040,6 +11166,22 @@ func TestAllocator(t *testing.T,
 		},
 	}
 
+	// Newer test cases get defined elsewhere because the table above became too large.
+	// Having them in separate function also provides nicer diffs because the chunk context
+	// includes the function name.
+	//
+	// Accidental duplicates get caught here at runtime.
+	for _, moreCases := range []func() map[string]AllocatorTestCase{
+		sharedConsumableCapacityCases,
+	} {
+		for name, tc := range moreCases() {
+			if _, exists := testcases[name]; exists {
+				t.Fatalf("duplicate test case: %s", name)
+			}
+			testcases[name] = tc
+		}
+	}
+
 	runTestAllocator(tCtx, supportedFeatures, newAllocator, testcases)
 
 	tCtx.Run("interrupt", func(tCtx ktesting.TContext) {
@@ -11099,6 +11241,8 @@ func TestAllocator(t *testing.T,
 			})
 		}
 	})
+
+	testSharedConsumableCapacity(tCtx, supportedFeatures, newAllocator)
 }
 
 func withSleepyLogger(tCtx ktesting.TContext) ktesting.TContext {
@@ -11265,7 +11409,6 @@ func runTestAllocator(tCtx ktesting.TContext,
 				tCtx.Require(err).To(g.MatchError(expectErrorIs))
 			}
 
-			// replace any share id with fixed value for testing
 			for ri, result := range results {
 				for ai, allocation := range result.Devices.Results {
 					if allocation.ShareID != nil {
@@ -11422,4 +11565,2890 @@ func (l informerLister[T]) Get(name string) (*T, error) {
 		}
 	}
 	return nil, apierrors.NewNotFound(schema.GroupResource{}, "not found")
+}
+
+func sharedConsumableCapacityCases() map[string]AllocatorTestCase {
+	return map[string]AllocatorTestCase{
+		"shared-consumable-capacity-admin-request-exceeds-total": {
+			features: Features{
+				AdminAccess:              true,
+				PartitionableDevices:     true,
+				ConsumableCapacity:       true,
+				SharedConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(
+				claim(claim0).withRequests(deviceRequest(req0, classA, 1).withAdminAccess().withCapacityRequest(capacity0, three)),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device1).withDeviceCounterConsumption(deviceCounterConsumptionValueFrom(counterSet1, map[string]resourceapi.QualifiedName{counter0: capacity0})),
+				),
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1, map[string]resource.Quantity{counter0: two}),
+				),
+			),
+			node: node(node1, region1),
+			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.AdminAccess || !features.ConsumableCapacity {
+					return nil, g.MatchError(g.ContainSubstring("feature is disabled")), nil
+				}
+				if !features.PartitionableDevices {
+					return nil, nil, nil
+				}
+				return results, matchError, errorIs
+			},
+		},
+		"shared-consumable-capacity-admin-negative-request": {
+			features: Features{
+				AdminAccess:              true,
+				PartitionableDevices:     true,
+				ConsumableCapacity:       true,
+				SharedConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(
+				claim(claim0).withRequests(deviceRequest(req0, classA, 1).withAdminAccess().withCapacityRequest(capacity0, resource.MustParse("-1"))),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device1).withDeviceCounterConsumption(deviceCounterConsumptionValueFrom(counterSet1, map[string]resourceapi.QualifiedName{counter0: capacity0})),
+				),
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1, map[string]resource.Quantity{counter0: two}),
+				),
+			),
+			node:        node(node1, region1),
+			expectError: g.MatchError(g.ContainSubstring("negative")),
+			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.AdminAccess || !features.ConsumableCapacity {
+					return nil, g.MatchError(g.ContainSubstring("feature is disabled")), nil
+				}
+				if !features.PartitionableDevices || !features.SharedConsumableCapacity {
+					return nil, nil, nil
+				}
+				return results, matchError, errorIs
+			},
+		},
+		"shared-consumable-capacity-all-filters-total": {
+			features: Features{
+				PartitionableDevices:     true,
+				ConsumableCapacity:       true,
+				SharedConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(
+				claim(claim0).withRequests(allDeviceRequest(req0, classA).withCapacityRequest(capacity0, three)),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device1).withDeviceCounterConsumption(deviceCounterConsumptionValueFrom(counterSet1, map[string]resourceapi.QualifiedName{counter0: capacity0})),
+					device(device2).withDeviceCounterConsumption(deviceCounterConsumptionValueFrom(counterSet2, map[string]resourceapi.QualifiedName{counter0: capacity0})),
+				),
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1, map[string]resource.Quantity{counter0: two}),
+					counterSet(counterSet2, map[string]resource.Quantity{counter0: four}),
+				),
+			),
+			node: node(node1, region1),
+			expectResults: []any{
+				matchAllocationResult(localNodeSelector(node1), withConsumedCounters(deviceAllocationResult(req0, driverA, pool1, device2, false), resourceapi.CounterSetConsumption{CounterSet: counterSet2, Counters: map[string]resource.Quantity{counter0: three}})),
+			},
+			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.ConsumableCapacity {
+					return nil, g.MatchError(g.ContainSubstring("feature is disabled")), nil
+				}
+				if !features.PartitionableDevices {
+					return nil, nil, nil
+				}
+				if !features.SharedConsumableCapacity {
+					return nil, g.MatchError(g.ContainSubstring("currently being updated")), internal.ErrFailedAllocationOnNode
+				}
+				return results, matchError, errorIs
+			},
+		},
+		"shared-consumable-capacity-all-filters-rounded-total": {
+			features: Features{
+				PartitionableDevices:     true,
+				ConsumableCapacity:       true,
+				SharedConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(
+				claim(claim0).withRequests(allDeviceRequest(req0, classA).withCapacityRequest(capacity0, two)),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device1).withDeviceCounterConsumption(deviceCounterConsumptionValueFrom(counterSet1, map[string]resourceapi.QualifiedName{counter0: capacity0})),
+					device(device2).withDeviceCounterConsumption(deviceCounterConsumptionValueFrom(counterSet2, map[string]resourceapi.QualifiedName{counter0: capacity0})),
+				),
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					resourceapi.CounterSet{Name: counterSet1, Counters: map[string]resourceapi.Counter{counter0: {
+						Value: two, ConsumptionPolicy: &resourceapi.CapacityRequestPolicy{ValidRange: &resourceapi.CapacityRequestPolicyRange{
+							Min: new(resource.MustParse("1")), Step: new(resource.MustParse("2")),
+						}},
+					}}},
+					resourceapi.CounterSet{Name: counterSet2, Counters: map[string]resourceapi.Counter{counter0: {
+						Value: four, ConsumptionPolicy: &resourceapi.CapacityRequestPolicy{ValidRange: &resourceapi.CapacityRequestPolicyRange{
+							Min: new(resource.MustParse("1")), Step: new(resource.MustParse("2")),
+						}},
+					}}},
+				),
+			),
+			node: node(node1, region1),
+			expectResults: []any{
+				matchAllocationResult(localNodeSelector(node1), withConsumedCounters(deviceAllocationResult(req0, driverA, pool1, device2, false), resourceapi.CounterSetConsumption{CounterSet: counterSet2, Counters: map[string]resource.Quantity{counter0: *resource.NewQuantity(3, resource.DecimalSI)}})),
+			},
+			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.ConsumableCapacity {
+					return nil, g.MatchError(g.ContainSubstring("feature is disabled")), nil
+				}
+				if !features.PartitionableDevices {
+					return nil, nil, nil
+				}
+				if !features.SharedConsumableCapacity {
+					return nil, nil, nil
+				}
+				return results, matchError, errorIs
+			},
+		},
+		"shared-consumable-capacity-all-keeps-capacity-blocked-device": {
+			features: Features{
+				PartitionableDevices:     true,
+				ConsumableCapacity:       true,
+				SharedConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(
+				claim(claim0).withRequests(allDeviceRequest(req0, classA).withCapacityRequest(capacity0, three)),
+			),
+			allocations: []resourceapi.AllocationResult{func() resourceapi.AllocationResult {
+				result := deviceRequestAllocationResult(req0, driverA, pool1, device2).withConsumedCapacity(&fixedShareID, nil)
+				result.ConsumedCounters = []resourceapi.CounterSetConsumption{{CounterSet: counterSet2, Counters: map[string]resource.Quantity{counter0: two}}}
+				return allocationResult(result)
+			}()},
+			classes: objects(classWithAllowMultipleAllocations(classA, driverA, true)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device1).withAllowMultipleAllocations().withDeviceCounterConsumption(deviceCounterConsumptionValueFrom(counterSet1, map[string]resourceapi.QualifiedName{counter0: capacity0})),
+					device(device2).withAllowMultipleAllocations().withDeviceCounterConsumption(deviceCounterConsumptionValueFrom(counterSet2, map[string]resourceapi.QualifiedName{counter0: capacity0})),
+				),
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1, map[string]resource.Quantity{counter0: two}),
+					counterSet(counterSet2, map[string]resource.Quantity{counter0: four}),
+				),
+			),
+			node: node(node1, region1),
+			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.ConsumableCapacity {
+					return nil, g.MatchError(g.ContainSubstring("feature is disabled")), nil
+				}
+				if !features.PartitionableDevices {
+					return nil, nil, nil
+				}
+				if !features.SharedConsumableCapacity {
+					return nil, g.MatchError(g.ContainSubstring("currently being updated")), internal.ErrFailedAllocationOnNode
+				}
+				return results, matchError, errorIs
+			},
+		},
+		"shared-consumable-capacity-admin-all-filters-total": {
+			features: Features{
+				AdminAccess:              true,
+				PartitionableDevices:     true,
+				ConsumableCapacity:       true,
+				SharedConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(
+				claim(claim0).withRequests(allDeviceRequest(req0, classA).withAdminAccess().withCapacityRequest(capacity0, three)),
+			),
+			allocations: []resourceapi.AllocationResult{func() resourceapi.AllocationResult {
+				result := deviceAllocationResult(req0, driverA, pool1, device2, false)
+				result.ShareID = &fixedShareID
+				result.ConsumedCounters = []resourceapi.CounterSetConsumption{{CounterSet: counterSet2, Counters: map[string]resource.Quantity{counter0: four}}}
+				return allocationResult(result)
+			}()},
+			classes: objects(classWithAllowMultipleAllocations(classA, driverA, true)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device1).withAllowMultipleAllocations().withDeviceCounterConsumption(deviceCounterConsumptionValueFrom(counterSet1, map[string]resourceapi.QualifiedName{counter0: capacity0})),
+					device(device2).withAllowMultipleAllocations().withDeviceCounterConsumption(deviceCounterConsumptionValueFrom(counterSet2, map[string]resourceapi.QualifiedName{counter0: capacity0})),
+				),
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1, map[string]resource.Quantity{counter0: two}),
+					resourceapi.CounterSet{Name: counterSet2, Counters: map[string]resourceapi.Counter{counter0: {
+						Value: four, ConsumptionPolicy: &resourceapi.CapacityRequestPolicy{ValidValues: []resource.Quantity{four}},
+					}}},
+				),
+			),
+			node: node(node1, region1),
+			expectResults: []any{
+				matchAllocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool1, device2, true)),
+			},
+			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.AdminAccess || !features.ConsumableCapacity {
+					return nil, g.MatchError(g.ContainSubstring("feature is disabled")), nil
+				}
+				if !features.PartitionableDevices {
+					return nil, nil, nil
+				}
+				if !features.SharedConsumableCapacity {
+					return nil, nil, nil
+				}
+				return results, matchError, errorIs
+			},
+		},
+		"shared-consumable-capacity-basic-allocation": {
+			features: Features{
+				PartitionableDevices:     true,
+				ConsumableCapacity:       true,
+				SharedConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(
+				claim(claim0).withRequests(deviceRequest(req0, classA, 1).withCapacityRequest(capacity0, one)),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: func() []*resourceapi.ResourceSlice {
+				counterSlice := sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1, map[string]resource.Quantity{
+						counter0: two,
+					}),
+				).obj()
+				deviceSlice := sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device1).withDeviceCounterConsumption(
+						deviceCounterConsumptionValueFrom(counterSet1, map[string]resourceapi.QualifiedName{
+							counter0: capacity0,
+						}),
+					),
+				).obj()
+				return []*resourceapi.ResourceSlice{deviceSlice, counterSlice}
+			}(),
+			node: node(node1, region1),
+			expectResults: []any{
+				matchAllocationResult(localNodeSelector(node1), withConsumedCounters(deviceAllocationResult(req0, driverA, pool1, device1, false), resourceapi.CounterSetConsumption{CounterSet: counterSet1, Counters: map[string]resource.Quantity{counter0: one}})),
+			},
+			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.ConsumableCapacity {
+					return nil, g.MatchError(g.ContainSubstring("feature is disabled")), nil
+				}
+				if !features.PartitionableDevices {
+					return nil, nil, nil
+				}
+				if !features.SharedConsumableCapacity {
+					return nil, nil, nil
+				}
+				return results, matchError, errorIs
+			},
+		},
+		"shared-consumable-capacity-explicit-zero-variable-snapshot": {
+			features: Features{
+				PartitionableDevices:     true,
+				ConsumableCapacity:       true,
+				SharedConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(claim(claim0).withRequests(deviceRequest(req0, classA, 1).withCapacityRequest(capacity0, zero))),
+			classes:          objects(class(classA, driverA)),
+			slices: func() []*resourceapi.ResourceSlice {
+				counterSlice := sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1, map[string]resource.Quantity{
+						counter0: two,
+					}),
+				).obj()
+				deviceSlice := sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device1).withDeviceCounterConsumption(
+						deviceCounterConsumptionValueFrom(counterSet1, map[string]resourceapi.QualifiedName{
+							counter0: capacity0,
+						}),
+					),
+				).obj()
+				return []*resourceapi.ResourceSlice{deviceSlice, counterSlice}
+			}(),
+			node: node(node1, region1),
+			expectResults: []any{
+				matchAllocationResult(localNodeSelector(node1), withConsumedCounters(deviceAllocationResult(req0, driverA, pool1, device1, false), resourceapi.CounterSetConsumption{CounterSet: counterSet1, Counters: map[string]resource.Quantity{counter0: zero}})),
+			},
+			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.ConsumableCapacity {
+					return nil, g.MatchError(g.ContainSubstring("feature is disabled")), nil
+				}
+				if !features.PartitionableDevices {
+					return nil, nil, nil
+				}
+				if !features.SharedConsumableCapacity {
+					return nil, nil, nil
+				}
+				return results, matchError, errorIs
+			},
+		},
+		"shared-consumable-capacity-same-device-static-share-counted-once": {
+			features: Features{
+				PartitionableDevices:     true,
+				ConsumableCapacity:       true,
+				SharedConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(
+				claim(claim0).withRequests(deviceRequest(req0, classA, 1)),
+				claim(claim1).withRequests(deviceRequest(req0, classA, 1)),
+			),
+			classes: objects(classWithAllowMultipleAllocations(classA, driverA, true)),
+			slices: func() []*resourceapi.ResourceSlice {
+				counterSlice := sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1, map[string]resource.Quantity{
+						counter0: one,
+					}),
+				).obj()
+				deviceSlice := sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device1).withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet1, map[string]resource.Quantity{
+							counter0: one,
+						}),
+					).withAllowMultipleAllocations(),
+				).obj()
+				return []*resourceapi.ResourceSlice{deviceSlice, counterSlice}
+			}(),
+			node: node(node1, region1),
+			expectResults: []any{
+				matchAllocationResult(localNodeSelector(node1), deviceRequestAllocationResult(req0, driverA, pool1, device1).withConsumedCapacity(&fixedShareID, nil)),
+				matchAllocationResult(localNodeSelector(node1), deviceRequestAllocationResult(req0, driverA, pool1, device1).withConsumedCapacity(&fixedShareID, nil)),
+			},
+			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.PartitionableDevices || !features.ConsumableCapacity {
+					return nil, nil, nil
+				}
+				return results, matchError, errorIs
+			},
+		},
+		// Rounding each fixed cost from one to two exhausts the budget of three.
+		"shared-consumable-capacity-static-policy-shared=false": {
+			features: Features{
+				PartitionableDevices:     true,
+				ConsumableCapacity:       true,
+				SharedConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(
+				claim(claim0).withRequests(deviceRequest(req0, classA, 1)),
+				claim(claim1).withRequests(deviceRequest(req0, classA, 1)),
+			),
+			classes: objects(classWithAllowMultipleAllocations(classA, driverA, false)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device1).withDeviceCounterConsumption(deviceCounterConsumption(counterSet1, map[string]resource.Quantity{counter0: one})),
+					device(device2).withDeviceCounterConsumption(deviceCounterConsumption(counterSet1, map[string]resource.Quantity{counter0: one}))),
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA, resourceapi.CounterSet{Name: counterSet1, Counters: map[string]resourceapi.Counter{counter0: {Value: three, ConsumptionPolicy: &resourceapi.CapacityRequestPolicy{Default: new(two), ValidValues: []resource.Quantity{two}}}}}),
+			),
+			node:          node(node1, region1),
+			expectResults: nil,
+			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.PartitionableDevices {
+					return nil, nil, nil
+				}
+				if !features.SharedConsumableCapacity {
+					return nil, nil, nil
+				}
+				return results, matchError, errorIs
+			},
+		},
+		// The second claim must use a different counter after rounding exhausts the first.
+		"shared-consumable-capacity-static-policy-selects-other-counter": {
+			features: Features{
+				PartitionableDevices:     true,
+				ConsumableCapacity:       true,
+				SharedConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(
+				claim(claim0).withRequests(deviceRequest(req0, classA, 1)),
+				claim(claim1).withRequests(deviceRequest(req0, classA, 1)),
+			),
+			classes: objects(classWithAllowMultipleAllocations(classA, driverA, false)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device1).withDeviceCounterConsumption(deviceCounterConsumption(counterSet1, map[string]resource.Quantity{counter0: one})),
+					device(device2).withDeviceCounterConsumption(deviceCounterConsumption(counterSet1, map[string]resource.Quantity{counter0: one})),
+					device(device3).withDeviceCounterConsumption(deviceCounterConsumption(counterSet2, map[string]resource.Quantity{counter0: one}))),
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA, resourceapi.CounterSet{Name: counterSet1, Counters: map[string]resourceapi.Counter{counter0: {Value: three, ConsumptionPolicy: &resourceapi.CapacityRequestPolicy{Default: new(two), ValidValues: []resource.Quantity{two}}}}}, counterSet(counterSet2, map[string]resource.Quantity{counter0: one})),
+			),
+			node: node(node1, region1),
+			expectResults: []any{
+				matchAllocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool1, device1, false)),
+				matchAllocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool1, device3, false)),
+			},
+			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.PartitionableDevices {
+					return nil, nil, nil
+				}
+				if !features.SharedConsumableCapacity {
+					return nil, nil, nil
+				}
+				return results, matchError, errorIs
+			},
+		},
+		"shared-consumable-capacity-static-policy-shared=true": {
+			features: Features{
+				PartitionableDevices:     true,
+				ConsumableCapacity:       true,
+				SharedConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(
+				claim(claim0).withRequests(deviceRequest(req0, classA, 1)),
+				claim(claim1).withRequests(deviceRequest(req0, classA, 1)),
+			),
+			classes: objects(classWithAllowMultipleAllocations(classA, driverA, true)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device1).withAllowMultipleAllocations().withDeviceCounterConsumption(deviceCounterConsumption(counterSet1, map[string]resource.Quantity{counter0: one}))),
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA, resourceapi.CounterSet{Name: counterSet1, Counters: map[string]resourceapi.Counter{counter0: {Value: two, ConsumptionPolicy: &resourceapi.CapacityRequestPolicy{Default: new(two), ValidValues: []resource.Quantity{two}}}}}),
+			),
+			node: node(node1, region1),
+			expectResults: []any{
+				matchAllocationResult(localNodeSelector(node1), deviceRequestAllocationResult(req0, driverA, pool1, device1).withConsumedCapacity(&fixedShareID, nil)),
+				matchAllocationResult(localNodeSelector(node1), deviceRequestAllocationResult(req0, driverA, pool1, device1).withConsumedCapacity(&fixedShareID, nil)),
+			},
+			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.PartitionableDevices {
+					return nil, nil, nil
+				}
+				if !features.SharedConsumableCapacity {
+					return nil, nil, nil
+				}
+				if !features.ConsumableCapacity {
+					return nil, nil, nil
+				}
+				return results, matchError, errorIs
+			},
+		},
+		"shared-consumable-capacity-large-static-counter": {
+			features: Features{
+				PartitionableDevices:     true,
+				ConsumableCapacity:       true,
+				SharedConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(
+				claim(claim0).withRequests(deviceRequest(req0, classA, 1)),
+				claim(claim1).withRequests(deviceRequest(req0, classA, 1)),
+			),
+			classes: objects(classWithAllowMultipleAllocations(classA, driverA, true)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device1).withAllowMultipleAllocations().withDeviceCounterConsumption(deviceCounterConsumption(counterSet1, map[string]resource.Quantity{counter0: resource.MustParse("10000000000000000000")}))),
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA, counterSet(counterSet1, map[string]resource.Quantity{counter0: resource.MustParse("10000000000000000000")})),
+			),
+			node: node(node1, region1),
+			expectResults: []any{
+				matchAllocationResult(localNodeSelector(node1), deviceRequestAllocationResult(req0, driverA, pool1, device1).withConsumedCapacity(&fixedShareID, nil)),
+				matchAllocationResult(localNodeSelector(node1), deviceRequestAllocationResult(req0, driverA, pool1, device1).withConsumedCapacity(&fixedShareID, nil)),
+			},
+			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.PartitionableDevices || !features.ConsumableCapacity {
+					return nil, nil, nil
+				}
+				return results, matchError, errorIs
+			},
+		},
+		"shared-consumable-capacity-admin-exhausted-counter-static-minimum": {
+			features: Features{
+				AdminAccess:              true,
+				PartitionableDevices:     true,
+				ConsumableCapacity:       true,
+				SharedConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(claim(claim0).withRequests(deviceRequest(req0, classA, 1).withAdminAccess())),
+			classes:          objects(classWithAllowMultipleAllocations(classA, driverA, false)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device1).withDeviceCounterConsumption(deviceCounterConsumption(counterSet1, map[string]resource.Quantity{counter0: one}))),
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA, resourceapi.CounterSet{Name: counterSet1, Counters: map[string]resourceapi.Counter{counter0: {Value: one, ConsumptionPolicy: &resourceapi.CapacityRequestPolicy{ValidRange: &resourceapi.CapacityRequestPolicyRange{Min: new(resource.MustParse("1"))}}}}}),
+			),
+			node:          node(node1, region1),
+			expectResults: []any{matchAllocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool1, device1, true))},
+			allocations:   []resourceapi.AllocationResult{allocationResult(resourceapi.DeviceRequestAllocationResult{Request: req0, Driver: driverA, Pool: pool1, Device: device1})},
+			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.AdminAccess {
+					return nil, g.MatchError(g.ContainSubstring("feature is disabled")), nil
+				}
+				if !features.PartitionableDevices {
+					return nil, nil, nil
+				}
+				if !features.SharedConsumableCapacity {
+					return nil, nil, nil
+				}
+				return results, matchError, errorIs
+			},
+		},
+		"shared-consumable-capacity-admin-exhausted-counter-variable-minimum": {
+			features: Features{
+				AdminAccess:              true,
+				PartitionableDevices:     true,
+				ConsumableCapacity:       true,
+				SharedConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(claim(claim0).withRequests(deviceRequest(req0, classA, 1).withAdminAccess())),
+			classes:          objects(classWithAllowMultipleAllocations(classA, driverA, false)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device1).withDeviceCounterConsumption(deviceCounterConsumptionValueFrom(counterSet1, map[string]resourceapi.QualifiedName{counter0: capacity0}))),
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA, resourceapi.CounterSet{Name: counterSet1, Counters: map[string]resourceapi.Counter{counter0: {Value: one, ConsumptionPolicy: &resourceapi.CapacityRequestPolicy{ValidRange: &resourceapi.CapacityRequestPolicyRange{Min: new(resource.MustParse("1"))}}}}}),
+			),
+			node:          node(node1, region1),
+			expectResults: []any{matchAllocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool1, device1, true))},
+			allocations:   []resourceapi.AllocationResult{allocationResult(resourceapi.DeviceRequestAllocationResult{Request: req0, Driver: driverA, Pool: pool1, Device: device1, ConsumedCounters: []resourceapi.CounterSetConsumption{{CounterSet: counterSet1, Counters: map[string]resource.Quantity{counter0: one}}}})},
+			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.AdminAccess {
+					return nil, g.MatchError(g.ContainSubstring("feature is disabled")), nil
+				}
+				if !features.PartitionableDevices {
+					return nil, nil, nil
+				}
+				if !features.SharedConsumableCapacity {
+					return nil, nil, nil
+				}
+				return results, matchError, errorIs
+			},
+		},
+		"shared-consumable-capacity-admin-static-exhaustion-admin-first=true": {
+			features: Features{
+				AdminAccess:              true,
+				PartitionableDevices:     true,
+				ConsumableCapacity:       true,
+				SharedConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(claim(claim0).withRequests(deviceRequest(req0, classA, 1).withAdminAccess()),
+				claim(claim1).withRequests(deviceRequest(req0, classA, 1)),
+				claim("third").withRequests(deviceRequest(req0, classB, 1))),
+			classes: objects(classWithAllowMultipleAllocations(classA, driverA, true), classWithAllowMultipleAllocations(classB, driverA, false)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device1).withAllowMultipleAllocations().withDeviceCounterConsumption(deviceCounterConsumption(counterSet1, map[string]resource.Quantity{counter0: one})),
+					device(device2).withDeviceCounterConsumption(deviceCounterConsumption(counterSet1, map[string]resource.Quantity{counter0: one}))),
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA, counterSet(counterSet1, map[string]resource.Quantity{counter0: one})),
+			),
+			node:          node(node1, region1),
+			expectResults: nil,
+			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.AdminAccess {
+					return nil, g.MatchError(g.ContainSubstring("feature is disabled")), nil
+				}
+				if !features.PartitionableDevices {
+					return nil, nil, nil
+				}
+				if !features.SharedConsumableCapacity {
+					return nil, nil, nil
+				}
+				return results, matchError, errorIs
+			},
+		},
+		"shared-consumable-capacity-admin-static-backtrack-admin-first=true": {
+			features: Features{
+				AdminAccess:              true,
+				PartitionableDevices:     true,
+				ConsumableCapacity:       true,
+				SharedConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(claim(claim0).withRequests(deviceRequest(req0, classA, 1).withAdminAccess()),
+				claim(claim1).withRequests(deviceRequest(req0, classA, 1)),
+				claim("third").withRequests(deviceRequest(req0, classB, 1))),
+			classes: objects(classWithAllowMultipleAllocations(classA, driverA, true), classWithAllowMultipleAllocations(classB, driverA, false)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device1).withAllowMultipleAllocations().withDeviceCounterConsumption(deviceCounterConsumption(counterSet1, map[string]resource.Quantity{counter0: one})),
+					device(device2).withDeviceCounterConsumption(deviceCounterConsumption(counterSet1, map[string]resource.Quantity{counter0: one})),
+					device(device3).withAllowMultipleAllocations().withDeviceCounterConsumption(deviceCounterConsumption(counterSet2, map[string]resource.Quantity{counter0: one}))),
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA, counterSet(counterSet1, map[string]resource.Quantity{counter0: one}), counterSet(counterSet2, map[string]resource.Quantity{counter0: one})),
+			),
+			node: node(node1, region1),
+			expectResults: []any{matchAllocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool1, device1, true)),
+				matchAllocationResult(localNodeSelector(node1), deviceRequestAllocationResult(req0, driverA, pool1, device3).withConsumedCapacity(&fixedShareID, nil)),
+				matchAllocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool1, device2, false))},
+			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.AdminAccess {
+					return nil, g.MatchError(g.ContainSubstring("feature is disabled")), nil
+				}
+
+				if !features.PartitionableDevices {
+					return nil, nil, nil
+				}
+				admin := deviceAllocationResult(req0, driverA, pool1, device1, true)
+				normal := deviceAllocationResult(req0, driverA, pool1, device3, false)
+				if features.ConsumableCapacity {
+					normal.ShareID = &fixedShareID
+				}
+				return []any{matchAllocationResult(localNodeSelector(node1), admin), matchAllocationResult(localNodeSelector(node1), normal), matchAllocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool1, device2, false))}, nil, nil
+			},
+		},
+		"shared-consumable-capacity-admin-static-exhaustion-admin-first=false": {
+			features: Features{
+				AdminAccess:              true,
+				PartitionableDevices:     true,
+				ConsumableCapacity:       true,
+				SharedConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(claim(claim1).withRequests(deviceRequest(req0, classA, 1)),
+				claim(claim0).withRequests(deviceRequest(req0, classA, 1).withAdminAccess()),
+				claim("third").withRequests(deviceRequest(req0, classB, 1))),
+			classes: objects(classWithAllowMultipleAllocations(classA, driverA, true), classWithAllowMultipleAllocations(classB, driverA, false)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device1).withAllowMultipleAllocations().withDeviceCounterConsumption(deviceCounterConsumption(counterSet1, map[string]resource.Quantity{counter0: one})),
+					device(device2).withDeviceCounterConsumption(deviceCounterConsumption(counterSet1, map[string]resource.Quantity{counter0: one}))),
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA, counterSet(counterSet1, map[string]resource.Quantity{counter0: one})),
+			),
+			node:          node(node1, region1),
+			expectResults: nil,
+			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.AdminAccess {
+					return nil, g.MatchError(g.ContainSubstring("feature is disabled")), nil
+				}
+				if !features.PartitionableDevices {
+					return nil, nil, nil
+				}
+				if !features.SharedConsumableCapacity {
+					return nil, nil, nil
+				}
+				return results, matchError, errorIs
+			},
+		},
+		"shared-consumable-capacity-admin-static-backtrack-admin-first=false": {
+			features: Features{
+				AdminAccess:              true,
+				PartitionableDevices:     true,
+				ConsumableCapacity:       true,
+				SharedConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(claim(claim1).withRequests(deviceRequest(req0, classA, 1)),
+				claim(claim0).withRequests(deviceRequest(req0, classA, 1).withAdminAccess()),
+				claim("third").withRequests(deviceRequest(req0, classB, 1))),
+			classes: objects(classWithAllowMultipleAllocations(classA, driverA, true), classWithAllowMultipleAllocations(classB, driverA, false)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device1).withAllowMultipleAllocations().withDeviceCounterConsumption(deviceCounterConsumption(counterSet1, map[string]resource.Quantity{counter0: one})),
+					device(device2).withDeviceCounterConsumption(deviceCounterConsumption(counterSet1, map[string]resource.Quantity{counter0: one})),
+					device(device3).withAllowMultipleAllocations().withDeviceCounterConsumption(deviceCounterConsumption(counterSet2, map[string]resource.Quantity{counter0: one}))),
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA, counterSet(counterSet1, map[string]resource.Quantity{counter0: one}), counterSet(counterSet2, map[string]resource.Quantity{counter0: one})),
+			),
+			node: node(node1, region1),
+			expectResults: []any{matchAllocationResult(localNodeSelector(node1), deviceRequestAllocationResult(req0, driverA, pool1, device3).withConsumedCapacity(&fixedShareID, nil)),
+				matchAllocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool1, device1, true)),
+				matchAllocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool1, device2, false))},
+			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.AdminAccess {
+					return nil, g.MatchError(g.ContainSubstring("feature is disabled")), nil
+				}
+
+				if !features.PartitionableDevices {
+					return nil, nil, nil
+				}
+				admin := deviceAllocationResult(req0, driverA, pool1, device1, true)
+				normal := deviceAllocationResult(req0, driverA, pool1, device3, false)
+				if features.ConsumableCapacity {
+					normal.ShareID = &fixedShareID
+				}
+				return []any{matchAllocationResult(localNodeSelector(node1), admin), matchAllocationResult(localNodeSelector(node1), normal), matchAllocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool1, device2, false))}, nil, nil
+			},
+		},
+		"shared-consumable-capacity-same-device-dynamic-shares-exhaust-counter": {
+			features: Features{
+				PartitionableDevices:     true,
+				ConsumableCapacity:       true,
+				SharedConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(
+				claim(claim0).withRequests(deviceRequest(req0, classA, 1).withCapacityRequest(capacity0, one)),
+				claim(claim1).withRequests(deviceRequest(req0, classA, 1).withCapacityRequest(capacity0, one)),
+			),
+			classes: objects(classWithAllowMultipleAllocations(classA, driverA, true)),
+			slices: func() []*resourceapi.ResourceSlice {
+				counterSlice := sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1, map[string]resource.Quantity{
+						counter0: one,
+					}),
+				).obj()
+				deviceSlice := sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device1).withDeviceCounterConsumption(
+						deviceCounterConsumptionValueFrom(counterSet1, map[string]resourceapi.QualifiedName{
+							counter0: capacity0,
+						}),
+					).withAllowMultipleAllocations(),
+				).obj()
+				return []*resourceapi.ResourceSlice{deviceSlice, counterSlice}
+			}(),
+			node:          node(node1, region1),
+			expectResults: []any{},
+			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.ConsumableCapacity {
+					return nil, g.MatchError(g.ContainSubstring("feature is disabled")), nil
+				}
+				if !features.PartitionableDevices {
+					return nil, nil, nil
+				}
+				if !features.SharedConsumableCapacity {
+					return nil, nil, nil
+				}
+				return results, matchError, errorIs
+			},
+		},
+		"shared-consumable-capacity-mixed-device-and-shared-accounting-same-device": {
+			features: Features{
+				PartitionableDevices:     true,
+				ConsumableCapacity:       true,
+				SharedConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(
+				claim(claim0).withRequests(deviceRequest(req0, classA, 1).withCapacityRequest(capacity0, one)),
+				claim(claim1).withRequests(deviceRequest(req0, classA, 1).withCapacityRequest(capacity0, one)),
+			),
+			classes: objects(classWithAllowMultipleAllocations(classA, driverA, true)),
+			slices: func() []*resourceapi.ResourceSlice {
+				counterSlice := sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1, map[string]resource.Quantity{
+						counter0: two,
+					}),
+				).obj()
+				deviceSlice := sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device1).withCapacity(capacity0, two).withDeviceCounterConsumption(
+						deviceCounterConsumptionValueFrom(counterSet1, map[string]resourceapi.QualifiedName{
+							counter0: capacity0,
+						}),
+					).withAllowMultipleAllocations(),
+				).obj()
+				return []*resourceapi.ResourceSlice{deviceSlice, counterSlice}
+			}(),
+			node: node(node1, region1),
+			expectResults: []any{
+				matchAllocationResult(localNodeSelector(node1), withConsumedCounters(deviceRequestAllocationResult(req0, driverA, pool1, device1).withConsumedCapacity(&fixedShareID, map[resourceapi.QualifiedName]resource.Quantity{capacity0: one}), resourceapi.CounterSetConsumption{CounterSet: counterSet1, Counters: map[string]resource.Quantity{counter0: one}})),
+				matchAllocationResult(localNodeSelector(node1), withConsumedCounters(deviceRequestAllocationResult(req0, driverA, pool1, device1).withConsumedCapacity(&fixedShareID, map[resourceapi.QualifiedName]resource.Quantity{capacity0: one}), resourceapi.CounterSetConsumption{CounterSet: counterSet1, Counters: map[string]resource.Quantity{counter0: one}})),
+			},
+			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.ConsumableCapacity {
+					return nil, g.MatchError(g.ContainSubstring("feature is disabled")), nil
+				}
+				if !features.PartitionableDevices {
+					return nil, nil, nil
+				}
+				if !features.SharedConsumableCapacity {
+					return nil, nil, nil
+				}
+				return results, matchError, errorIs
+			},
+		},
+		"shared-consumable-capacity-mixed-device-total-exceeded": {
+			features: Features{
+				PartitionableDevices:     true,
+				ConsumableCapacity:       true,
+				SharedConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(claim(claim0).withRequests(deviceRequest(req0, classA, 1).withCapacityRequest(capacity0, three))),
+			classes:          objects(classWithAllowMultipleAllocations(classA, driverA, true)),
+			slices: func() []*resourceapi.ResourceSlice {
+				counterSlice := sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1, map[string]resource.Quantity{
+						counter0: four,
+					}),
+				).obj()
+				deviceSlice := sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device1).withCapacity(capacity0, two).withDeviceCounterConsumption(
+						deviceCounterConsumptionValueFrom(counterSet1, map[string]resourceapi.QualifiedName{
+							counter0: capacity0,
+						}),
+					).withAllowMultipleAllocations(),
+				).obj()
+				return []*resourceapi.ResourceSlice{deviceSlice, counterSlice}
+			}(),
+			node:          node(node1, region1),
+			expectResults: nil,
+			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.ConsumableCapacity {
+					return nil, g.MatchError(g.ContainSubstring("feature is disabled")), nil
+				}
+				if !features.PartitionableDevices {
+					return nil, nil, nil
+				}
+				if !features.SharedConsumableCapacity {
+					return nil, nil, nil
+				}
+				return results, matchError, errorIs
+			},
+		},
+		"shared-consumable-capacity-mixed-shared-total-exceeded": {
+			features: Features{
+				PartitionableDevices:     true,
+				ConsumableCapacity:       true,
+				SharedConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(claim(claim0).withRequests(deviceRequest(req0, classA, 1).withCapacityRequest(capacity0, three))),
+			classes:          objects(classWithAllowMultipleAllocations(classA, driverA, true)),
+			slices: func() []*resourceapi.ResourceSlice {
+				counterSlice := sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1, map[string]resource.Quantity{
+						counter0: two,
+					}),
+				).obj()
+				deviceSlice := sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device1).withCapacity(capacity0, four).withDeviceCounterConsumption(
+						deviceCounterConsumptionValueFrom(counterSet1, map[string]resourceapi.QualifiedName{
+							counter0: capacity0,
+						}),
+					).withAllowMultipleAllocations(),
+				).obj()
+				return []*resourceapi.ResourceSlice{deviceSlice, counterSlice}
+			}(),
+			node:          node(node1, region1),
+			expectResults: nil,
+			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.ConsumableCapacity {
+					return nil, g.MatchError(g.ContainSubstring("feature is disabled")), nil
+				}
+				if !features.PartitionableDevices {
+					return nil, nil, nil
+				}
+				if !features.SharedConsumableCapacity {
+					return nil, nil, nil
+				}
+				return results, matchError, errorIs
+			},
+		},
+		"shared-consumable-capacity-mixed-device-remaining-exceeded": {
+			features: Features{
+				PartitionableDevices:     true,
+				ConsumableCapacity:       true,
+				SharedConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(claim(claim0).withRequests(deviceRequest(req0, classA, 1).withCapacityRequest(capacity0, one)), claim(claim1).withRequests(deviceRequest(req0, classA, 1).withCapacityRequest(capacity0, one))),
+			classes:          objects(classWithAllowMultipleAllocations(classA, driverA, true)),
+			slices: func() []*resourceapi.ResourceSlice {
+				counterSlice := sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1, map[string]resource.Quantity{
+						counter0: two,
+					}),
+				).obj()
+				deviceSlice := sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device1).withCapacity(capacity0, one).withDeviceCounterConsumption(
+						deviceCounterConsumptionValueFrom(counterSet1, map[string]resourceapi.QualifiedName{
+							counter0: capacity0,
+						}),
+					).withAllowMultipleAllocations(),
+				).obj()
+				return []*resourceapi.ResourceSlice{deviceSlice, counterSlice}
+			}(),
+			node:          node(node1, region1),
+			expectResults: nil,
+			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.ConsumableCapacity {
+					return nil, g.MatchError(g.ContainSubstring("feature is disabled")), nil
+				}
+				if !features.PartitionableDevices {
+					return nil, nil, nil
+				}
+				if !features.SharedConsumableCapacity {
+					return nil, nil, nil
+				}
+				return results, matchError, errorIs
+			},
+		},
+		"shared-consumable-capacity-mixed-shared-remaining-exceeded": {
+			features: Features{
+				PartitionableDevices:     true,
+				ConsumableCapacity:       true,
+				SharedConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(claim(claim0).withRequests(deviceRequest(req0, classA, 1).withCapacityRequest(capacity0, one)), claim(claim1).withRequests(deviceRequest(req0, classA, 1).withCapacityRequest(capacity0, one))),
+			classes:          objects(classWithAllowMultipleAllocations(classA, driverA, true)),
+			slices: func() []*resourceapi.ResourceSlice {
+				counterSlice := sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1, map[string]resource.Quantity{
+						counter0: one,
+					}),
+				).obj()
+				deviceSlice := sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device1).withCapacity(capacity0, two).withDeviceCounterConsumption(
+						deviceCounterConsumptionValueFrom(counterSet1, map[string]resourceapi.QualifiedName{
+							counter0: capacity0,
+						}),
+					).withAllowMultipleAllocations(),
+				).obj()
+				return []*resourceapi.ResourceSlice{deviceSlice, counterSlice}
+			}(),
+			node:          node(node1, region1),
+			expectResults: nil,
+			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.ConsumableCapacity {
+					return nil, g.MatchError(g.ContainSubstring("feature is disabled")), nil
+				}
+				if !features.PartitionableDevices {
+					return nil, nil, nil
+				}
+				if !features.SharedConsumableCapacity {
+					return nil, nil, nil
+				}
+				return results, matchError, errorIs
+			},
+		},
+		"shared-consumable-capacity-mixed-existing-claim-exhausts-counter": {
+			features: Features{
+				PartitionableDevices:     true,
+				ConsumableCapacity:       true,
+				SharedConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(claim(claim0).withRequests(deviceRequest(req0, classA, 1).withCapacityRequest(capacity0, one))),
+			// The existing share leaves device capacity but uses up the shared counter.
+			allocations: []resourceapi.AllocationResult{{
+				Devices: resourceapi.DeviceAllocationResult{
+					Results: []resourceapi.DeviceRequestAllocationResult{
+						withConsumedCounters(
+							deviceRequestAllocationResult(req0, driverA, pool1, device1).withConsumedCapacity(&fixedShareID, map[resourceapi.QualifiedName]resource.Quantity{capacity0: one}),
+							resourceapi.CounterSetConsumption{CounterSet: counterSet1, Counters: map[string]resource.Quantity{counter0: one}},
+						),
+					},
+				},
+				NodeSelector: localNodeSelector(node1),
+			}},
+			classes: objects(classWithAllowMultipleAllocations(classA, driverA, true)),
+			slices: func() []*resourceapi.ResourceSlice {
+				counterSlice := sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1, map[string]resource.Quantity{
+						counter0: one,
+					}),
+				).obj()
+				deviceSlice := sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device1).withCapacity(capacity0, two).withDeviceCounterConsumption(
+						deviceCounterConsumptionValueFrom(counterSet1, map[string]resourceapi.QualifiedName{
+							counter0: capacity0,
+						}),
+					).withAllowMultipleAllocations(),
+				).obj()
+				return []*resourceapi.ResourceSlice{deviceSlice, counterSlice}
+			}(),
+			node:          node(node1, region1),
+			expectResults: nil,
+			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.ConsumableCapacity {
+					return nil, g.MatchError(g.ContainSubstring("feature is disabled")), nil
+				}
+				if !features.PartitionableDevices || !features.SharedConsumableCapacity {
+					return nil, nil, nil
+				}
+				return results, matchError, errorIs
+			},
+		},
+		"shared-consumable-capacity-mixed-independent-rounding": {
+			features: Features{
+				PartitionableDevices:     true,
+				ConsumableCapacity:       true,
+				SharedConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(
+				claim(claim0).withRequests(deviceRequest(req0, classA, 1).withCapacityRequest(capacity0, one)),
+				claim(claim1).withRequests(deviceRequest(req0, classA, 1).withCapacityRequest(capacity0, one)),
+			),
+			classes: objects(classWithAllowMultipleAllocations(classA, driverA, true)),
+			slices: func() []*resourceapi.ResourceSlice {
+				counterSlice := sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1, map[string]resource.Quantity{
+						counter0: two,
+					}),
+				).obj()
+				deviceSlice := sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device1).withCapacity(capacity0, resourceapi.DeviceCapacity{Value: four, RequestPolicy: &resourceapi.CapacityRequestPolicy{Default: new(two), ValidValues: []resource.Quantity{two}}}).withDeviceCounterConsumption(
+						deviceCounterConsumptionValueFrom(counterSet1, map[string]resourceapi.QualifiedName{
+							counter0: capacity0,
+						}),
+					).withAllowMultipleAllocations(),
+				).obj()
+				return []*resourceapi.ResourceSlice{deviceSlice, counterSlice}
+			}(),
+			node: node(node1, region1),
+			expectResults: []any{matchAllocationResult(localNodeSelector(node1), withConsumedCounters(deviceRequestAllocationResult(req0, driverA, pool1, device1).withConsumedCapacity(&fixedShareID, map[resourceapi.QualifiedName]resource.Quantity{capacity0: two}), resourceapi.CounterSetConsumption{CounterSet: counterSet1, Counters: map[string]resource.Quantity{counter0: one}})),
+				matchAllocationResult(localNodeSelector(node1), withConsumedCounters(deviceRequestAllocationResult(req0, driverA, pool1, device1).withConsumedCapacity(&fixedShareID, map[resourceapi.QualifiedName]resource.Quantity{capacity0: two}), resourceapi.CounterSetConsumption{CounterSet: counterSet1, Counters: map[string]resource.Quantity{counter0: one}}))},
+			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.ConsumableCapacity {
+					return nil, g.MatchError(g.ContainSubstring("feature is disabled")), nil
+				}
+				if !features.PartitionableDevices {
+					return nil, nil, nil
+				}
+				if !features.SharedConsumableCapacity {
+					return nil, nil, nil
+				}
+				return results, matchError, errorIs
+			},
+		},
+		"shared-consumable-capacity-capacity-name-uses-driver-domain": {
+			features: Features{
+				PartitionableDevices:     true,
+				ConsumableCapacity:       true,
+				SharedConsumableCapacity: true,
+			},
+			claimsToAllocate: func() []wrapResourceClaim {
+				claimObj := claim(claim0).withRequests(deviceRequest(req0, classA, 1).withCapacityRequest(capacity0, one)).obj().DeepCopy()
+				claimObj.Spec.Devices.Requests[0].Exactly.Capacity = &resourceapi.CapacityRequirements{
+					Requests: map[resourceapi.QualifiedName]resource.Quantity{
+						resourceapi.QualifiedName(driverA + "/" + string(capacity0)): one,
+					},
+				}
+				return []wrapResourceClaim{{claimObj}}
+			}(),
+			classes: objects(class(classA, driverA)),
+			slices: func() []*resourceapi.ResourceSlice {
+				counterSlice := sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1, map[string]resource.Quantity{
+						counter0: two,
+					}),
+				).obj()
+				deviceSlice := sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device1).withDeviceCounterConsumption(
+						deviceCounterConsumptionValueFrom(counterSet1, map[string]resourceapi.QualifiedName{
+							counter0: capacity0,
+						}),
+					),
+				).obj()
+				return []*resourceapi.ResourceSlice{deviceSlice, counterSlice}
+			}(),
+			node: node(node1, region1),
+			expectResults: []any{
+				matchAllocationResult(localNodeSelector(node1), withConsumedCounters(deviceAllocationResult(req0, driverA, pool1, device1, false), resourceapi.CounterSetConsumption{CounterSet: counterSet1, Counters: map[string]resource.Quantity{counter0: one}})),
+			},
+			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.ConsumableCapacity {
+					return nil, g.MatchError(g.ContainSubstring("feature is disabled")), nil
+				}
+				if !features.PartitionableDevices {
+					return nil, nil, nil
+				}
+				if !features.SharedConsumableCapacity {
+					return nil, nil, nil
+				}
+				return results, matchError, errorIs
+			},
+		},
+		"shared-consumable-capacity-ambiguous-request-exact": {
+			features: Features{
+				PartitionableDevices:     true,
+				ConsumableCapacity:       true,
+				SharedConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(claim(claim0).withRequests(deviceRequest(req0, classA, 1).withCapacityRequest(resourceapi.QualifiedName(driverA+"/"+string(capacity0)), one).withCapacityRequest(capacity0, two))),
+			classes:          objects(class(classA, driverA)),
+			slices: func() []*resourceapi.ResourceSlice {
+				counterSlice := sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1, map[string]resource.Quantity{
+						counter0: two,
+					}),
+				).obj()
+				deviceSlice := sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device1).withDeviceCounterConsumption(
+						deviceCounterConsumptionValueFrom(counterSet1, map[string]resourceapi.QualifiedName{
+							counter0: capacity0,
+						}),
+					),
+				).obj()
+				return []*resourceapi.ResourceSlice{deviceSlice, counterSlice}
+			}(),
+			node:          node(node1, region1),
+			expectResults: nil,
+			expectError:   g.MatchError(g.ContainSubstring("requested both")),
+			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.ConsumableCapacity {
+					return nil, g.MatchError(g.ContainSubstring("feature is disabled")), nil
+				}
+
+				if !features.SharedConsumableCapacity || (!features.PartitionableDevices && matchError == nil) {
+					return nil, nil, nil
+				}
+				return results, matchError, errorIs
+			},
+		},
+		"shared-consumable-capacity-capacity-name-uses-driver-domain-all": {
+			features: Features{
+				PartitionableDevices:     true,
+				ConsumableCapacity:       true,
+				SharedConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(claim(claim0).withRequests(allDeviceRequest(req0, classA).withCapacityRequest(resourceapi.QualifiedName(driverA+"/"+string(capacity0)), one))),
+			classes:          objects(class(classA, driverA)),
+			slices: func() []*resourceapi.ResourceSlice {
+				counterSlice := sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1, map[string]resource.Quantity{
+						counter0: two,
+					}),
+				).obj()
+				deviceSlice := sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device1).withDeviceCounterConsumption(
+						deviceCounterConsumptionValueFrom(counterSet1, map[string]resourceapi.QualifiedName{
+							counter0: capacity0,
+						}),
+					),
+				).obj()
+				return []*resourceapi.ResourceSlice{deviceSlice, counterSlice}
+			}(),
+			node: node(node1, region1),
+			expectResults: []any{
+				matchAllocationResult(localNodeSelector(node1), withConsumedCounters(deviceAllocationResult(req0, driverA, pool1, device1, false), resourceapi.CounterSetConsumption{CounterSet: counterSet1, Counters: map[string]resource.Quantity{counter0: one}})),
+			},
+			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.ConsumableCapacity {
+					return nil, g.MatchError(g.ContainSubstring("feature is disabled")), nil
+				}
+
+				if features.PartitionableDevices && !features.SharedConsumableCapacity {
+					return nil, g.MatchError(g.ContainSubstring("currently being updated")), internal.ErrFailedAllocationOnNode
+				}
+				if !features.SharedConsumableCapacity || (!features.PartitionableDevices && matchError == nil) {
+					return nil, nil, nil
+				}
+				return results, matchError, errorIs
+			},
+		},
+		"shared-consumable-capacity-ambiguous-request-all": {
+			features: Features{
+				PartitionableDevices:     true,
+				ConsumableCapacity:       true,
+				SharedConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(claim(claim0).withRequests(allDeviceRequest(req0, classA).withCapacityRequest(resourceapi.QualifiedName(driverA+"/"+string(capacity0)), one).withCapacityRequest(capacity0, two))),
+			classes:          objects(class(classA, driverA)),
+			slices: func() []*resourceapi.ResourceSlice {
+				counterSlice := sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1, map[string]resource.Quantity{
+						counter0: two,
+					}),
+				).obj()
+				deviceSlice := sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device1).withDeviceCounterConsumption(
+						deviceCounterConsumptionValueFrom(counterSet1, map[string]resourceapi.QualifiedName{
+							counter0: capacity0,
+						}),
+					),
+				).obj()
+				return []*resourceapi.ResourceSlice{deviceSlice, counterSlice}
+			}(),
+			node:          node(node1, region1),
+			expectResults: nil,
+			expectError:   g.MatchError(g.ContainSubstring("requested both")),
+			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.ConsumableCapacity {
+					return nil, g.MatchError(g.ContainSubstring("feature is disabled")), nil
+				}
+
+				if features.PartitionableDevices && !features.SharedConsumableCapacity {
+					return nil, g.MatchError(g.ContainSubstring("currently being updated")), internal.ErrFailedAllocationOnNode
+				}
+				if !features.SharedConsumableCapacity || (!features.PartitionableDevices && matchError == nil) {
+					return nil, nil, nil
+				}
+				return results, matchError, errorIs
+			},
+		},
+		"shared-consumable-capacity-alias-error-beats-missing-capacity": {
+			features: Features{
+				PartitionableDevices:     true,
+				ConsumableCapacity:       true,
+				SharedConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(claim(claim0).withRequests(deviceRequest(req0, classA, 1).
+				withCapacityRequest(capacity0, one).
+				withCapacityRequest(resourceapi.QualifiedName(driverA+"/"+string(capacity0)), one).
+				withCapacityRequest("unavailable", one))),
+			classes: objects(&resourceapi.DeviceClass{ObjectMeta: metav1.ObjectMeta{Name: classA}}),
+			slices: unwrapResourceSlices(
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1, map[string]resource.Quantity{counter0: one})),
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device1).withDeviceCounterConsumption(deviceCounterConsumptionValueFrom(counterSet1,
+						map[string]resourceapi.QualifiedName{counter0: capacity0}))),
+				sliceWithDevices(slice3, node1, resourcePool(pool1, 1), driverB,
+					device(device2).withCapacity(capacity0, one).
+						withCapacity(resourceapi.QualifiedName(driverA+"/"+string(capacity0)), one).
+						withCapacity("unavailable", one)),
+			),
+			expectError: g.MatchError(g.ContainSubstring("requested both with and without the driver domain")),
+			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.ConsumableCapacity {
+					return nil, g.MatchError(g.ContainSubstring("feature is disabled")), nil
+				}
+
+				if !features.SharedConsumableCapacity {
+					return []any{matchAllocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverB, pool1, device2, false))}, nil, nil
+				}
+				return results, matchError, errorIs
+			},
+		},
+		"shared-consumable-capacity-mixed-omitted-request-uses-independent-defaults": {
+			features: Features{
+				PartitionableDevices:     true,
+				ConsumableCapacity:       true,
+				SharedConsumableCapacity: true,
+			},
+			// No capacity request: each side falls back to its own default.
+			claimsToAllocate: objects(claim(claim0).withRequests(deviceRequest(req0, classA, 1))),
+			classes:          objects(classWithAllowMultipleAllocations(classA, driverA, true)),
+			slices: func() []*resourceapi.ResourceSlice {
+				counterSlice := sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1, map[string]resource.Quantity{
+						counter0: four,
+					}),
+				).obj()
+				counter := counterSlice.Spec.SharedCounters[0].Counters[counter0]
+				counter.ConsumptionPolicy = &resourceapi.CapacityRequestPolicy{
+					Default: new(two),
+					ValidRange: &resourceapi.CapacityRequestPolicyRange{
+						Min:  new(one),
+						Max:  new(two),
+						Step: new(one),
+					},
+				}
+				counterSlice.Spec.SharedCounters[0].Counters[counter0] = counter
+				deviceSlice := sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device1).withCapacity(capacity0, resourceapi.DeviceCapacity{Value: four, RequestPolicy: &resourceapi.CapacityRequestPolicy{Default: new(one), ValidValues: []resource.Quantity{one}}}).withDeviceCounterConsumption(
+						deviceCounterConsumptionValueFrom(counterSet1, map[string]resourceapi.QualifiedName{
+							counter0: capacity0,
+						}),
+					).withAllowMultipleAllocations(),
+				).obj()
+				return []*resourceapi.ResourceSlice{deviceSlice, counterSlice}
+			}(),
+			node: node(node1, region1),
+			expectResults: []any{matchAllocationResult(localNodeSelector(node1), withConsumedCounters(
+				deviceRequestAllocationResult(req0, driverA, pool1, device1).withConsumedCapacity(&fixedShareID, map[resourceapi.QualifiedName]resource.Quantity{capacity0: one}),
+				resourceapi.CounterSetConsumption{CounterSet: counterSet1, Counters: map[string]resource.Quantity{counter0: two}},
+			))},
+			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.PartitionableDevices || !features.SharedConsumableCapacity {
+					return nil, nil, nil
+				}
+				if !features.ConsumableCapacity {
+					// Only the counter side is evaluated.
+					return []any{matchAllocationResult(localNodeSelector(node1), withConsumedCounters(
+						deviceAllocationResult(req0, driverA, pool1, device1, false),
+						resourceapi.CounterSetConsumption{CounterSet: counterSet1, Counters: map[string]resource.Quantity{counter0: two}},
+					))}, matchError, errorIs
+				}
+				return results, matchError, errorIs
+			},
+		},
+		"shared-consumable-capacity-default-consumption-policy-across-claims": {
+			features: Features{
+				PartitionableDevices:     true,
+				ConsumableCapacity:       true,
+				SharedConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(
+				claim(claim0).withRequests(deviceRequest(req0, classA, 1)),
+				claim(claim1).withRequests(deviceRequest(req0, classA, 1)),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: func() []*resourceapi.ResourceSlice {
+				counterSlice := sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1, map[string]resource.Quantity{
+						counter0: four,
+					}),
+				).obj()
+				counter := counterSlice.Spec.SharedCounters[0].Counters[counter0]
+				counter.ConsumptionPolicy = &resourceapi.CapacityRequestPolicy{
+					Default: new(two),
+					ValidRange: &resourceapi.CapacityRequestPolicyRange{
+						Min:  new(one),
+						Max:  new(two),
+						Step: new(one),
+					},
+				}
+				counterSlice.Spec.SharedCounters[0].Counters[counter0] = counter
+				deviceSlice := sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device1).withDeviceCounterConsumption(
+						deviceCounterConsumptionValueFrom(counterSet1, map[string]resourceapi.QualifiedName{
+							counter0: capacity0,
+						}),
+					),
+					device(device2).withDeviceCounterConsumption(
+						deviceCounterConsumptionValueFrom(counterSet1, map[string]resourceapi.QualifiedName{
+							counter0: capacity0,
+						}),
+					),
+				).obj()
+				return []*resourceapi.ResourceSlice{deviceSlice, counterSlice}
+			}(),
+			node: node(node1, region1),
+			expectResults: []any{
+				matchAllocationResult(localNodeSelector(node1), withConsumedCounters(deviceAllocationResult(req0, driverA, pool1, device1, false), resourceapi.CounterSetConsumption{CounterSet: counterSet1, Counters: map[string]resource.Quantity{counter0: two}})),
+				matchAllocationResult(localNodeSelector(node1), withConsumedCounters(deviceAllocationResult(req0, driverA, pool1, device2, false), resourceapi.CounterSetConsumption{CounterSet: counterSet1, Counters: map[string]resource.Quantity{counter0: two}})),
+			},
+			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.PartitionableDevices {
+					return nil, nil, nil
+				}
+				if !features.SharedConsumableCapacity {
+					return nil, nil, nil
+				}
+				return results, matchError, errorIs
+			},
+		},
+		"shared-consumable-capacity-negative-default-aborts": {
+			features: Features{
+				PartitionableDevices:     true,
+				ConsumableCapacity:       true,
+				SharedConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(
+				claim(claim0).withRequests(deviceRequest(req0, classA, 1)),
+				claim(claim1).withRequests(deviceRequest(req0, classA, 1).withCapacityRequest(capacity0, two)),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: func() []*resourceapi.ResourceSlice {
+				counterSlice := sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1, map[string]resource.Quantity{counter0: one}),
+				).obj()
+				counterSlice.Spec.SharedCounters[0].Counters[counter0] = resourceapi.Counter{
+					Value: one,
+					ConsumptionPolicy: &resourceapi.CapacityRequestPolicy{
+						Default: new(resource.MustParse("-1")),
+					},
+				}
+				consumption := deviceCounterConsumptionValueFrom(counterSet1, map[string]resourceapi.QualifiedName{
+					counter0: capacity0,
+				})
+				deviceSlice := sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device1).withDeviceCounterConsumption(consumption),
+					device(device2).withDeviceCounterConsumption(consumption),
+				).obj()
+				return []*resourceapi.ResourceSlice{deviceSlice, counterSlice}
+			}(),
+			node:        node(node1, region1),
+			expectError: g.MatchError(g.ContainSubstring("negative")),
+			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.ConsumableCapacity {
+					return nil, g.MatchError(g.ContainSubstring("feature is disabled")), nil
+				}
+				if !features.PartitionableDevices {
+					return nil, nil, nil
+				}
+				if !features.SharedConsumableCapacity {
+					return nil, nil, nil
+				}
+				return results, matchError, errorIs
+			},
+		},
+		"shared-consumable-capacity-existing-claim-exhausts-counter": {
+			features: Features{
+				PartitionableDevices:     true,
+				ConsumableCapacity:       true,
+				SharedConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(
+				claim(claim0).withRequests(deviceRequest(req0, classA, 1).withCapacityRequest(capacity0, one)),
+			),
+			allocations: func() []resourceapi.AllocationResult {
+				result := deviceAllocationResult(req0, driverA, pool1, device1, false)
+				result.ConsumedCounters = []resourceapi.CounterSetConsumption{
+					{CounterSet: counterSet1, Counters: map[string]resource.Quantity{counter0: two}},
+				}
+				return []resourceapi.AllocationResult{{
+					Devices: resourceapi.DeviceAllocationResult{
+						Results: []resourceapi.DeviceRequestAllocationResult{result},
+					},
+					NodeSelector: localNodeSelector(node1),
+				}}
+			}(),
+			classes: objects(class(classA, driverA)),
+			slices: func() []*resourceapi.ResourceSlice {
+				counterSlice := sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1, map[string]resource.Quantity{
+						counter0: two,
+					}),
+				).obj()
+				deviceSlice := sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device1).withDeviceCounterConsumption(
+						deviceCounterConsumptionValueFrom(counterSet1, map[string]resourceapi.QualifiedName{
+							counter0: capacity0,
+						}),
+					),
+					device(device2).withDeviceCounterConsumption(
+						deviceCounterConsumptionValueFrom(counterSet1, map[string]resourceapi.QualifiedName{
+							counter0: capacity0,
+						}),
+					),
+				).obj()
+				return []*resourceapi.ResourceSlice{deviceSlice, counterSlice}
+			}(),
+			node:          node(node1, region1),
+			expectResults: []any{},
+			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.ConsumableCapacity {
+					return nil, g.MatchError(g.ContainSubstring("feature is disabled")), nil
+				}
+				if !features.PartitionableDevices {
+					return nil, nil, nil
+				}
+				if !features.SharedConsumableCapacity {
+					return nil, nil, nil
+				}
+				return results, matchError, errorIs
+			},
+		},
+		"shared-consumable-capacity-removed-fixed-device-does-not-block": {
+			features: Features{
+				PartitionableDevices:     true,
+				ConsumableCapacity:       true,
+				SharedConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(
+				claim(claim0).withRequests(deviceRequest(req0, classA, 1)),
+			),
+			allocations: func() []resourceapi.AllocationResult {
+				result := deviceAllocationResult(req0, driverA, pool1, "removed-device", false)
+				result.ConsumedCounters = nil
+				return []resourceapi.AllocationResult{{
+					Devices: resourceapi.DeviceAllocationResult{
+						Results: []resourceapi.DeviceRequestAllocationResult{result},
+					},
+					NodeSelector: localNodeSelector(node1),
+				}}
+			}(),
+			classes: objects(class(classA, driverA)),
+			slices: func() []*resourceapi.ResourceSlice {
+				counterSlice := sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1, map[string]resource.Quantity{
+						counter0: one,
+					}),
+				).obj()
+				deviceSlice := sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device1).withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet1, map[string]resource.Quantity{
+							counter0: one,
+						}),
+					),
+				).obj()
+				return []*resourceapi.ResourceSlice{deviceSlice, counterSlice}
+			}(),
+			node:          node(node1, region1),
+			expectResults: []any{matchAllocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool1, device1, false))},
+			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.PartitionableDevices {
+					return nil, nil, nil
+				}
+				return results, matchError, errorIs
+			},
+		},
+		"shared-consumable-capacity-valid-values-round-up-rejects": {
+			features: Features{
+				PartitionableDevices:     true,
+				ConsumableCapacity:       true,
+				SharedConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(
+				claim(claim0).withRequests(deviceRequest(req0, classA, 1).withCapacityRequest(capacity0, three)),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: func() []*resourceapi.ResourceSlice {
+				counterSlice := sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1, map[string]resource.Quantity{
+						counter0: three,
+					}),
+				).obj()
+				counter := counterSlice.Spec.SharedCounters[0].Counters[counter0]
+				counter.ConsumptionPolicy = &resourceapi.CapacityRequestPolicy{
+					Default:     new(one),
+					ValidValues: []resource.Quantity{one, two, four},
+				}
+				counterSlice.Spec.SharedCounters[0].Counters[counter0] = counter
+				deviceSlice := sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device1).withDeviceCounterConsumption(
+						deviceCounterConsumptionValueFrom(counterSet1, map[string]resourceapi.QualifiedName{
+							counter0: capacity0,
+						}),
+					),
+				).obj()
+				return []*resourceapi.ResourceSlice{deviceSlice, counterSlice}
+			}(),
+			node:          node(node1, region1),
+			expectResults: []any{},
+			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.ConsumableCapacity {
+					return nil, g.MatchError(g.ContainSubstring("feature is disabled")), nil
+				}
+				if !features.PartitionableDevices {
+					return nil, nil, nil
+				}
+				if !features.SharedConsumableCapacity {
+					return nil, nil, nil
+				}
+				return results, matchError, errorIs
+			},
+		},
+		"shared-consumable-capacity-range-policy-overflow-aborts-not-skip": {
+			features: Features{
+				PartitionableDevices:     true,
+				ConsumableCapacity:       true,
+				SharedConsumableCapacity: true,
+			},
+			// device-1 consumes a shared counter via ValueFrom and that counter has a
+			// step range policy. A request above MaxInt64 cannot be rounded in the
+			// integer step path, so allocation must fail closed with an error instead
+			// of skipping device-1 and allocating device-2.,
+			claimsToAllocate: objects(
+				claim(claim0).withRequests(deviceRequest(req0, classA, 1).withCapacityRequest(capacity0, resource.MustParse("18446744073709551616"))),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: func() []*resourceapi.ResourceSlice {
+				counterSlice := sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1, map[string]resource.Quantity{
+						counter0: four,
+					}),
+					counterSet(counterSet2, map[string]resource.Quantity{
+						counter0: resource.MustParse("36893488147419103232"),
+					}),
+				).obj()
+				counter := counterSlice.Spec.SharedCounters[0].Counters[counter0]
+				counter.ConsumptionPolicy = &resourceapi.CapacityRequestPolicy{
+					Default: new(one),
+					ValidRange: &resourceapi.CapacityRequestPolicyRange{
+						Min:  new(two),
+						Max:  new(four),
+						Step: new(two),
+					},
+				}
+				counterSlice.Spec.SharedCounters[0].Counters[counter0] = counter
+				deviceSlice := sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device1).withDeviceCounterConsumption(
+						deviceCounterConsumptionValueFrom(counterSet1, map[string]resourceapi.QualifiedName{
+							counter0: capacity0,
+						}),
+					),
+					device(device2).withDeviceCounterConsumption(
+						deviceCounterConsumptionValueFrom(counterSet2, map[string]resourceapi.QualifiedName{
+							counter0: capacity0,
+						}),
+					),
+				).obj()
+				return []*resourceapi.ResourceSlice{deviceSlice, counterSlice}
+			}(),
+			node:        node(node1, region1),
+			expectError: g.MatchError(g.ContainSubstring("cannot be represented")),
+			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.ConsumableCapacity {
+					return nil, g.MatchError(g.ContainSubstring("feature is disabled")), nil
+				}
+				if !features.PartitionableDevices {
+					return nil, nil, nil
+				}
+				if !features.SharedConsumableCapacity {
+					return nil, nil, nil
+				}
+				return results, matchError, errorIs
+			},
+		},
+		"shared-consumable-capacity-mixed-static-and-dynamic-accounting": {
+			features: Features{
+				PartitionableDevices:     true,
+				ConsumableCapacity:       true,
+				SharedConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(
+				claim(claim0).withRequests(deviceRequest(req0, classA, 1).withCapacityRequest(capacity0, two)),
+			),
+			allocations: func() []resourceapi.AllocationResult {
+				result := deviceAllocationResult(req0, driverA, pool1, device1, false)
+				result.ConsumedCounters = nil
+				return []resourceapi.AllocationResult{{
+					Devices: resourceapi.DeviceAllocationResult{
+						Results: []resourceapi.DeviceRequestAllocationResult{result},
+					},
+					NodeSelector: localNodeSelector(node1),
+				}}
+			}(),
+			classes: objects(class(classA, driverA)),
+			slices: func() []*resourceapi.ResourceSlice {
+				counterSlice := sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1, map[string]resource.Quantity{
+						counter0: three,
+					}),
+				).obj()
+				deviceSlice := sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device1).withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet1, map[string]resource.Quantity{
+							counter0: one,
+						}),
+					),
+					device(device2).withDeviceCounterConsumption(
+						deviceCounterConsumptionValueFrom(counterSet1, map[string]resourceapi.QualifiedName{
+							counter0: capacity0,
+						}),
+					),
+				).obj()
+				return []*resourceapi.ResourceSlice{deviceSlice, counterSlice}
+			}(),
+			node: node(node1, region1),
+			expectResults: []any{
+				matchAllocationResult(localNodeSelector(node1), withConsumedCounters(deviceAllocationResult(req0, driverA, pool1, device2, false), resourceapi.CounterSetConsumption{CounterSet: counterSet1, Counters: map[string]resource.Quantity{counter0: two}})),
+			},
+			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.ConsumableCapacity {
+					return nil, g.MatchError(g.ContainSubstring("feature is disabled")), nil
+				}
+				if !features.PartitionableDevices {
+					return nil, nil, nil
+				}
+				if !features.SharedConsumableCapacity {
+					return nil, nil, nil
+				}
+				return results, matchError, errorIs
+			},
+		},
+		"shared-consumable-capacity-mixed-static-and-dynamic-exhausts-counter": {
+			features: Features{
+				PartitionableDevices:     true,
+				ConsumableCapacity:       true,
+				SharedConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(
+				claim(claim0).withRequests(deviceRequest(req0, classA, 1).withCapacityRequest(capacity0, three)),
+			),
+			allocations: func() []resourceapi.AllocationResult {
+				result := deviceAllocationResult(req0, driverA, pool1, device1, false)
+				result.ConsumedCounters = nil
+				return []resourceapi.AllocationResult{{
+					Devices: resourceapi.DeviceAllocationResult{
+						Results: []resourceapi.DeviceRequestAllocationResult{result},
+					},
+					NodeSelector: localNodeSelector(node1),
+				}}
+			}(),
+			classes: objects(class(classA, driverA)),
+			slices: func() []*resourceapi.ResourceSlice {
+				counterSlice := sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1, map[string]resource.Quantity{
+						counter0: three,
+					}),
+				).obj()
+				deviceSlice := sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device1).withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet1, map[string]resource.Quantity{
+							counter0: one,
+						}),
+					),
+					device(device2).withDeviceCounterConsumption(
+						deviceCounterConsumptionValueFrom(counterSet1, map[string]resourceapi.QualifiedName{
+							counter0: capacity0,
+						}),
+					),
+				).obj()
+				return []*resourceapi.ResourceSlice{deviceSlice, counterSlice}
+			}(),
+			node:          node(node1, region1),
+			expectResults: []any{},
+			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.ConsumableCapacity {
+					return nil, g.MatchError(g.ContainSubstring("feature is disabled")), nil
+				}
+				if !features.PartitionableDevices {
+					return nil, nil, nil
+				}
+				if !features.SharedConsumableCapacity {
+					return nil, nil, nil
+				}
+				return results, matchError, errorIs
+			},
+		},
+		"shared-consumable-capacity-known-zero": {
+			features: Features{
+				PartitionableDevices:     true,
+				ConsumableCapacity:       true,
+				SharedConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(claim(claim0).withRequests(deviceRequest(req0, classB, 1))),
+			allocations:      []resourceapi.AllocationResult{allocationResult(resourceapi.DeviceRequestAllocationResult{Request: req0, Driver: driverA, Pool: pool1, Device: device1, ShareID: &fixedShareID, ConsumedCounters: []resourceapi.CounterSetConsumption{{CounterSet: counterSet1, Counters: map[string]resource.Quantity{counter0: zero}}}})},
+			classes:          objects(classWithAllowMultipleAllocations(classB, driverA, false)),
+			slices: unwrapResourceSlices(
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA, counterSet(counterSet1, map[string]resource.Quantity{counter0: one})),
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device2).withDeviceCounterConsumption(deviceCounterConsumption(counterSet1, map[string]resource.Quantity{counter0: one})),
+					device(device1).withAllowMultipleAllocations().withDeviceCounterConsumption(deviceCounterConsumptionValueFrom(counterSet1, map[string]resourceapi.QualifiedName{counter0: capacity0}))),
+			),
+			node:          node(node1, region1),
+			expectResults: []any{matchAllocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool1, device2, false))},
+			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.PartitionableDevices {
+					return nil, nil, nil
+				}
+				if !features.SharedConsumableCapacity {
+					return nil, nil, nil
+				}
+				return results, matchError, errorIs
+			},
+		},
+		"shared-consumable-capacity-fixed-costs-deduplicated": {
+			features: Features{
+				PartitionableDevices:     true,
+				ConsumableCapacity:       true,
+				SharedConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(claim(claim0).withRequests(deviceRequest(req0, classB, 1))),
+			allocations: []resourceapi.AllocationResult{allocationResult(resourceapi.DeviceRequestAllocationResult{Request: req0, Driver: driverA, Pool: pool1, Device: device1, ShareID: &fixedShareID}),
+				allocationResult(resourceapi.DeviceRequestAllocationResult{Request: req0, Driver: driverA, Pool: pool1, Device: device1, ShareID: new(apitypes.UID("00000000-0000-4000-8000-000000000002"))})},
+			classes: objects(classWithAllowMultipleAllocations(classB, driverA, false)),
+			slices: unwrapResourceSlices(
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA, counterSet(counterSet1, map[string]resource.Quantity{counter0: three})),
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device2).withDeviceCounterConsumption(deviceCounterConsumption(counterSet1, map[string]resource.Quantity{counter0: two})),
+					device(device1).withAllowMultipleAllocations().withDeviceCounterConsumption(deviceCounterConsumption(counterSet1, map[string]resource.Quantity{counter0: one}))),
+			),
+			node:          node(node1, region1),
+			expectResults: []any{matchAllocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool1, device2, false))},
+			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.PartitionableDevices {
+					return nil, nil, nil
+				}
+				return results, matchError, errorIs
+			},
+		},
+		"shared-consumable-capacity-pool-index-dynamic=1": {
+			features: Features{
+				AdminAccess:              true,
+				PartitionableDevices:     true,
+				ConsumableCapacity:       true,
+				SharedConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(claim(claim0).withRequests(deviceRequest(req0, classB, 1))),
+			allocations: []resourceapi.AllocationResult{allocationResult(resourceapi.DeviceRequestAllocationResult{Request: req0, Driver: driverA, Pool: pool1, Device: device1, ShareID: &fixedShareID, ConsumedCounters: []resourceapi.CounterSetConsumption{{CounterSet: counterSet1, Counters: map[string]resource.Quantity{counter0: one}}}}),
+				allocationResult(resourceapi.DeviceRequestAllocationResult{Request: req0, Driver: driverA, Pool: pool1, Device: device1, ShareID: new(apitypes.UID("00000000-0000-4000-8000-000000000002")), ConsumedCounters: []resourceapi.CounterSetConsumption{{CounterSet: counterSet1, Counters: map[string]resource.Quantity{counter0: one}}}}),
+				allocationResult(resourceapi.DeviceRequestAllocationResult{Request: req0, Driver: driverA, Pool: pool2, Device: device1, ShareID: &fixedShareID, ConsumedCounters: []resourceapi.CounterSetConsumption{{CounterSet: counterSet1, Counters: map[string]resource.Quantity{counter0: resource.MustParse("10")}}}}),
+				allocationResult(resourceapi.DeviceRequestAllocationResult{Request: req0, Driver: driverA, Pool: pool2, Device: device2}),
+				allocationResult(resourceapi.DeviceRequestAllocationResult{Request: req0, Driver: driverA, Pool: pool1, Device: device1, ShareID: &fixedShareID, ConsumedCounters: []resourceapi.CounterSetConsumption{{CounterSet: counterSet1, Counters: map[string]resource.Quantity{counter0: resource.MustParse("10")}}}, AdminAccess: new(true)})},
+			classes: objects(classWithAllowMultipleAllocations(classB, driverA, false)),
+			slices: unwrapResourceSlices(
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA, counterSet(counterSet1, map[string]resource.Quantity{counter0: resource.MustParse("5")})),
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device2).withDeviceCounterConsumption(deviceCounterConsumption(counterSet1, map[string]resource.Quantity{counter0: two})),
+					device(device1).withAllowMultipleAllocations().withDeviceCounterConsumption(deviceCounterConsumption(counterSet1, map[string]resource.Quantity{counter0: one}))),
+			),
+			node:          node(node1, region1),
+			expectResults: []any{matchAllocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool1, device2, false))},
+			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.PartitionableDevices {
+					return nil, nil, nil
+				}
+				return []any{matchAllocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool1, device2, false))}, nil, nil
+			},
+		},
+		"shared-consumable-capacity-pool-index-dynamic=2": {
+			features: Features{
+				AdminAccess:              true,
+				PartitionableDevices:     true,
+				ConsumableCapacity:       true,
+				SharedConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(claim(claim0).withRequests(deviceRequest(req0, classB, 1))),
+			allocations: []resourceapi.AllocationResult{allocationResult(resourceapi.DeviceRequestAllocationResult{Request: req0, Driver: driverA, Pool: pool1, Device: device1, ShareID: &fixedShareID, ConsumedCounters: []resourceapi.CounterSetConsumption{{CounterSet: counterSet1, Counters: map[string]resource.Quantity{counter0: two}}}}),
+				allocationResult(resourceapi.DeviceRequestAllocationResult{Request: req0, Driver: driverA, Pool: pool1, Device: device1, ShareID: new(apitypes.UID("00000000-0000-4000-8000-000000000002")), ConsumedCounters: []resourceapi.CounterSetConsumption{{CounterSet: counterSet1, Counters: map[string]resource.Quantity{counter0: two}}}}),
+				allocationResult(resourceapi.DeviceRequestAllocationResult{Request: req0, Driver: driverA, Pool: pool2, Device: device1, ShareID: &fixedShareID, ConsumedCounters: []resourceapi.CounterSetConsumption{{CounterSet: counterSet1, Counters: map[string]resource.Quantity{counter0: resource.MustParse("10")}}}}),
+				allocationResult(resourceapi.DeviceRequestAllocationResult{Request: req0, Driver: driverA, Pool: pool2, Device: device2}),
+				allocationResult(resourceapi.DeviceRequestAllocationResult{Request: req0, Driver: driverA, Pool: pool1, Device: device1, ShareID: &fixedShareID, ConsumedCounters: []resourceapi.CounterSetConsumption{{CounterSet: counterSet1, Counters: map[string]resource.Quantity{counter0: resource.MustParse("10")}}}, AdminAccess: new(true)})},
+			classes: objects(classWithAllowMultipleAllocations(classB, driverA, false)),
+			slices: unwrapResourceSlices(
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA, counterSet(counterSet1, map[string]resource.Quantity{counter0: resource.MustParse("5")})),
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device2).withDeviceCounterConsumption(deviceCounterConsumption(counterSet1, map[string]resource.Quantity{counter0: two})),
+					device(device1).withAllowMultipleAllocations().withDeviceCounterConsumption(deviceCounterConsumption(counterSet1, map[string]resource.Quantity{counter0: one}))),
+			),
+			node:          node(node1, region1),
+			expectResults: nil,
+			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.PartitionableDevices {
+					return nil, nil, nil
+				}
+				if !features.SharedConsumableCapacity {
+					return []any{matchAllocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool1, device2, false))}, nil, nil
+				}
+				return nil, nil, nil
+			},
+		},
+		"shared-consumable-capacity-disabled-consumable=true-node=node-1-allocated=false": {
+			features: Features{
+				PartitionableDevices:     true,
+				ConsumableCapacity:       true,
+				SharedConsumableCapacity: false,
+			},
+			claimsToAllocate: objects(claim(claim0).withRequests(deviceRequest(req0, classA, 1))),
+			classes:          objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 3), driverA, device(device1).withDeviceCounterConsumption(deviceCounterConsumptionValueFrom(counterSet1, map[string]resourceapi.QualifiedName{counter0: capacity0}))),
+				sliceWithDevices(slice2, node1, resourcePool(pool1, 3), driverA, device(device2).withDeviceCounterConsumption(deviceCounterConsumption(counterSet1, map[string]resource.Quantity{counter0: one}))),
+				sliceWithCounterSets(slice3, node1, resourcePool(pool1, 3), driverA, counterSet(counterSet1, map[string]resource.Quantity{counter0: two})),
+				sliceWithDevices(slice4, node1, resourcePool(pool2, 2), driverA, device(device3).withDeviceCounterConsumption(deviceCounterConsumption(counterSet2, map[string]resource.Quantity{counter0: one}))),
+				sliceWithCounterSets("static-counters", node1, resourcePool(pool2, 2), driverA, counterSet(counterSet2, map[string]resource.Quantity{counter0: two})),
+			),
+			node:          node(node1, region1),
+			expectResults: []any{matchAllocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool2, device3, false))},
+			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.PartitionableDevices {
+					return nil, nil, nil
+				}
+				if features.SharedConsumableCapacity {
+					return []any{matchAllocationResult(localNodeSelector(node1), withConsumedCounters(deviceAllocationResult(req0, driverA, pool1, device1, false), resourceapi.CounterSetConsumption{CounterSet: counterSet1, Counters: map[string]resource.Quantity{counter0: two}}))}, nil, nil
+				}
+				return results, matchError, errorIs
+			},
+		},
+		"shared-consumable-capacity-disabled-policy-counter=counter0-consumable=true-node=node-1-allocated=false": {
+			features: Features{
+				PartitionableDevices:     true,
+				ConsumableCapacity:       true,
+				SharedConsumableCapacity: false,
+			},
+			claimsToAllocate: objects(claim(claim0).withRequests(deviceRequest(req0, classA, 1))),
+			classes:          objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 3), driverA, device(device1).withDeviceCounterConsumption(deviceCounterConsumption(counterSet1, map[string]resource.Quantity{counter0: one}))),
+				sliceWithDevices(slice2, node1, resourcePool(pool1, 3), driverA, device(device2).withDeviceCounterConsumption(deviceCounterConsumption(counterSet1, map[string]resource.Quantity{counter0: one}))),
+				sliceWithCounterSets(slice3, node1, resourcePool(pool1, 3), driverA, resourceapi.CounterSet{Name: counterSet1, Counters: map[string]resourceapi.Counter{counter0: {Value: two, ConsumptionPolicy: &resourceapi.CapacityRequestPolicy{Default: new(two), ValidValues: []resource.Quantity{two}}}}}),
+				sliceWithDevices(slice4, node1, resourcePool(pool2, 2), driverA, device(device3).withDeviceCounterConsumption(deviceCounterConsumption(counterSet2, map[string]resource.Quantity{counter0: one}))),
+				sliceWithCounterSets("static-counters", node1, resourcePool(pool2, 2), driverA, counterSet(counterSet2, map[string]resource.Quantity{counter0: two})),
+			),
+			node:          node(node1, region1),
+			expectResults: []any{matchAllocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool2, device3, false))},
+			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.PartitionableDevices {
+					return nil, nil, nil
+				}
+				if features.SharedConsumableCapacity {
+					return []any{matchAllocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool1, device1, false))}, nil, nil
+				}
+				return results, matchError, errorIs
+			},
+		},
+		"shared-consumable-capacity-disabled-policy-counter=counter1-consumable=true-node=node-1-allocated=false": {
+			features: Features{
+				PartitionableDevices:     true,
+				ConsumableCapacity:       true,
+				SharedConsumableCapacity: false,
+			},
+			claimsToAllocate: objects(claim(claim0).withRequests(deviceRequest(req0, classA, 1))),
+			classes:          objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 3), driverA, device(device1).withDeviceCounterConsumption(deviceCounterConsumption(counterSet1, map[string]resource.Quantity{counter0: one}))),
+				sliceWithDevices(slice2, node1, resourcePool(pool1, 3), driverA, device(device2).withDeviceCounterConsumption(deviceCounterConsumption(counterSet1, map[string]resource.Quantity{counter0: one}))),
+				sliceWithCounterSets(slice3, node1, resourcePool(pool1, 3), driverA, resourceapi.CounterSet{Name: counterSet1, Counters: map[string]resourceapi.Counter{counter0: {Value: two}, counter1: {Value: two, ConsumptionPolicy: &resourceapi.CapacityRequestPolicy{Default: new(two), ValidValues: []resource.Quantity{two}}}}}),
+				sliceWithDevices(slice4, node1, resourcePool(pool2, 2), driverA, device(device3).withDeviceCounterConsumption(deviceCounterConsumption(counterSet2, map[string]resource.Quantity{counter0: one}))),
+				sliceWithCounterSets("static-counters", node1, resourcePool(pool2, 2), driverA, counterSet(counterSet2, map[string]resource.Quantity{counter0: two})),
+			),
+			node:          node(node1, region1),
+			expectResults: []any{matchAllocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool1, device1, false))},
+			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.PartitionableDevices {
+					return nil, nil, nil
+				}
+				if !features.SharedConsumableCapacity {
+					return []any{matchAllocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool2, device3, false))}, nil, nil
+				}
+				return results, matchError, errorIs
+			},
+		},
+		"shared-consumable-capacity-disabled-consumable=true-node=node-1-allocated=true-without-snapshot-not-counted": {
+			features: Features{
+				PartitionableDevices:     true,
+				ConsumableCapacity:       true,
+				SharedConsumableCapacity: false,
+			},
+			claimsToAllocate: objects(claim(claim0).withRequests(deviceRequest(req0, classA, 1))),
+			classes:          objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 3), driverA, device(device1).withDeviceCounterConsumption(deviceCounterConsumptionValueFrom(counterSet1, map[string]resourceapi.QualifiedName{counter0: capacity0}))),
+				sliceWithDevices(slice2, node1, resourcePool(pool1, 3), driverA, device(device2).withDeviceCounterConsumption(deviceCounterConsumption(counterSet1, map[string]resource.Quantity{counter0: one}))),
+				sliceWithCounterSets(slice3, node1, resourcePool(pool1, 3), driverA, counterSet(counterSet1, map[string]resource.Quantity{counter0: two})),
+				sliceWithDevices(slice4, node1, resourcePool(pool2, 2), driverA, device(device3).withDeviceCounterConsumption(deviceCounterConsumption(counterSet2, map[string]resource.Quantity{counter0: one}))),
+				sliceWithCounterSets("static-counters", node1, resourcePool(pool2, 2), driverA, counterSet(counterSet2, map[string]resource.Quantity{counter0: two})),
+			),
+			node:          node(node1, region1),
+			expectResults: []any{matchAllocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool2, device3, false))},
+			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.PartitionableDevices {
+					return nil, nil, nil
+				}
+				if features.SharedConsumableCapacity {
+					return []any{matchAllocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool1, device2, false))}, nil, nil
+				}
+				return results, matchError, errorIs
+			},
+			allocations: []resourceapi.AllocationResult{allocationResult(resourceapi.DeviceRequestAllocationResult{Request: req0, Driver: driverA, Pool: pool1, Device: device1})},
+		},
+		"shared-consumable-capacity-disabled-policy-counter=counter0-consumable=true-node=node-1-allocated=true": {
+			features: Features{
+				PartitionableDevices:     true,
+				ConsumableCapacity:       true,
+				SharedConsumableCapacity: false,
+			},
+			claimsToAllocate: objects(claim(claim0).withRequests(deviceRequest(req0, classA, 1))),
+			classes:          objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 3), driverA, device(device1).withDeviceCounterConsumption(deviceCounterConsumption(counterSet1, map[string]resource.Quantity{counter0: one}))),
+				sliceWithDevices(slice2, node1, resourcePool(pool1, 3), driverA, device(device2).withDeviceCounterConsumption(deviceCounterConsumption(counterSet1, map[string]resource.Quantity{counter0: one}))),
+				sliceWithCounterSets(slice3, node1, resourcePool(pool1, 3), driverA, resourceapi.CounterSet{Name: counterSet1, Counters: map[string]resourceapi.Counter{counter0: {Value: two, ConsumptionPolicy: &resourceapi.CapacityRequestPolicy{Default: new(two), ValidValues: []resource.Quantity{two}}}}}),
+				sliceWithDevices(slice4, node1, resourcePool(pool2, 2), driverA, device(device3).withDeviceCounterConsumption(deviceCounterConsumption(counterSet2, map[string]resource.Quantity{counter0: one}))),
+				sliceWithCounterSets("static-counters", node1, resourcePool(pool2, 2), driverA, counterSet(counterSet2, map[string]resource.Quantity{counter0: two})),
+			),
+			node:          node(node1, region1),
+			expectResults: []any{matchAllocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool2, device3, false))},
+			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.PartitionableDevices {
+					return nil, nil, nil
+				}
+				return results, matchError, errorIs
+			},
+			allocations: []resourceapi.AllocationResult{allocationResult(resourceapi.DeviceRequestAllocationResult{Request: req0, Driver: driverA, Pool: pool1, Device: device1})},
+		},
+		"shared-consumable-capacity-disabled-policy-counter=counter1-consumable=true-node=node-1-allocated=true": {
+			features: Features{
+				PartitionableDevices:     true,
+				ConsumableCapacity:       true,
+				SharedConsumableCapacity: false,
+			},
+			claimsToAllocate: objects(claim(claim0).withRequests(deviceRequest(req0, classA, 1))),
+			classes:          objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 3), driverA, device(device1).withDeviceCounterConsumption(deviceCounterConsumption(counterSet1, map[string]resource.Quantity{counter0: one}))),
+				sliceWithDevices(slice2, node1, resourcePool(pool1, 3), driverA, device(device2).withDeviceCounterConsumption(deviceCounterConsumption(counterSet1, map[string]resource.Quantity{counter0: one}))),
+				sliceWithCounterSets(slice3, node1, resourcePool(pool1, 3), driverA, resourceapi.CounterSet{Name: counterSet1, Counters: map[string]resourceapi.Counter{counter0: {Value: two}, counter1: {Value: two, ConsumptionPolicy: &resourceapi.CapacityRequestPolicy{Default: new(two), ValidValues: []resource.Quantity{two}}}}}),
+				sliceWithDevices(slice4, node1, resourcePool(pool2, 2), driverA, device(device3).withDeviceCounterConsumption(deviceCounterConsumption(counterSet2, map[string]resource.Quantity{counter0: one}))),
+				sliceWithCounterSets("static-counters", node1, resourcePool(pool2, 2), driverA, counterSet(counterSet2, map[string]resource.Quantity{counter0: two})),
+			),
+			node:          node(node1, region1),
+			expectResults: []any{matchAllocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool1, device2, false))},
+			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.PartitionableDevices {
+					return nil, nil, nil
+				}
+				if !features.SharedConsumableCapacity {
+					return []any{matchAllocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool2, device3, false))}, nil, nil
+				}
+				return results, matchError, errorIs
+			},
+			allocations: []resourceapi.AllocationResult{allocationResult(resourceapi.DeviceRequestAllocationResult{Request: req0, Driver: driverA, Pool: pool1, Device: device1})},
+		},
+		"shared-consumable-capacity-disabled-consumable=true-node=node-2-allocated=false": {
+			features: Features{
+				PartitionableDevices:     true,
+				ConsumableCapacity:       true,
+				SharedConsumableCapacity: false,
+			},
+			claimsToAllocate: objects(claim(claim0).withRequests(deviceRequest(req0, classA, 1))),
+			classes:          objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node2, resourcePool(pool1, 3), driverA, device(device1).withDeviceCounterConsumption(deviceCounterConsumptionValueFrom(counterSet1, map[string]resourceapi.QualifiedName{counter0: capacity0}))),
+				sliceWithDevices(slice2, node1, resourcePool(pool1, 3), driverA, device(device2).withDeviceCounterConsumption(deviceCounterConsumption(counterSet1, map[string]resource.Quantity{counter0: one}))),
+				sliceWithCounterSets(slice3, node1, resourcePool(pool1, 3), driverA, counterSet(counterSet1, map[string]resource.Quantity{counter0: two})),
+				sliceWithDevices(slice4, node1, resourcePool(pool2, 2), driverA, device(device3).withDeviceCounterConsumption(deviceCounterConsumption(counterSet2, map[string]resource.Quantity{counter0: one}))),
+				sliceWithCounterSets("static-counters", node1, resourcePool(pool2, 2), driverA, counterSet(counterSet2, map[string]resource.Quantity{counter0: two})),
+			),
+			node:          node(node1, region1),
+			expectResults: []any{matchAllocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool2, device3, false))},
+			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.PartitionableDevices {
+					return nil, nil, nil
+				}
+				if features.SharedConsumableCapacity {
+					return []any{matchAllocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool1, device2, false))}, nil, nil
+				}
+				return results, matchError, errorIs
+			},
+		},
+		"shared-consumable-capacity-disabled-policy-counter=counter0-consumable=true-node=node-2-allocated=false": {
+			features: Features{
+				PartitionableDevices:     true,
+				ConsumableCapacity:       true,
+				SharedConsumableCapacity: false,
+			},
+			claimsToAllocate: objects(claim(claim0).withRequests(deviceRequest(req0, classA, 1))),
+			classes:          objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node2, resourcePool(pool1, 3), driverA, device(device1).withDeviceCounterConsumption(deviceCounterConsumption(counterSet1, map[string]resource.Quantity{counter0: one}))),
+				sliceWithDevices(slice2, node1, resourcePool(pool1, 3), driverA, device(device2).withDeviceCounterConsumption(deviceCounterConsumption(counterSet1, map[string]resource.Quantity{counter0: one}))),
+				sliceWithCounterSets(slice3, node1, resourcePool(pool1, 3), driverA, resourceapi.CounterSet{Name: counterSet1, Counters: map[string]resourceapi.Counter{counter0: {Value: two, ConsumptionPolicy: &resourceapi.CapacityRequestPolicy{Default: new(two), ValidValues: []resource.Quantity{two}}}}}),
+				sliceWithDevices(slice4, node1, resourcePool(pool2, 2), driverA, device(device3).withDeviceCounterConsumption(deviceCounterConsumption(counterSet2, map[string]resource.Quantity{counter0: one}))),
+				sliceWithCounterSets("static-counters", node1, resourcePool(pool2, 2), driverA, counterSet(counterSet2, map[string]resource.Quantity{counter0: two})),
+			),
+			node:          node(node1, region1),
+			expectResults: []any{matchAllocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool2, device3, false))},
+			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.PartitionableDevices {
+					return nil, nil, nil
+				}
+				if features.SharedConsumableCapacity {
+					return []any{matchAllocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool1, device2, false))}, nil, nil
+				}
+				return results, matchError, errorIs
+			},
+		},
+		"shared-consumable-capacity-disabled-policy-counter=counter1-consumable=true-node=node-2-allocated=false": {
+			features: Features{
+				PartitionableDevices:     true,
+				ConsumableCapacity:       true,
+				SharedConsumableCapacity: false,
+			},
+			claimsToAllocate: objects(claim(claim0).withRequests(deviceRequest(req0, classA, 1))),
+			classes:          objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node2, resourcePool(pool1, 3), driverA, device(device1).withDeviceCounterConsumption(deviceCounterConsumption(counterSet1, map[string]resource.Quantity{counter0: one}))),
+				sliceWithDevices(slice2, node1, resourcePool(pool1, 3), driverA, device(device2).withDeviceCounterConsumption(deviceCounterConsumption(counterSet1, map[string]resource.Quantity{counter0: one}))),
+				sliceWithCounterSets(slice3, node1, resourcePool(pool1, 3), driverA, resourceapi.CounterSet{Name: counterSet1, Counters: map[string]resourceapi.Counter{counter0: {Value: two}, counter1: {Value: two, ConsumptionPolicy: &resourceapi.CapacityRequestPolicy{Default: new(two), ValidValues: []resource.Quantity{two}}}}}),
+				sliceWithDevices(slice4, node1, resourcePool(pool2, 2), driverA, device(device3).withDeviceCounterConsumption(deviceCounterConsumption(counterSet2, map[string]resource.Quantity{counter0: one}))),
+				sliceWithCounterSets("static-counters", node1, resourcePool(pool2, 2), driverA, counterSet(counterSet2, map[string]resource.Quantity{counter0: two})),
+			),
+			node:          node(node1, region1),
+			expectResults: []any{matchAllocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool1, device2, false))},
+			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.PartitionableDevices {
+					return nil, nil, nil
+				}
+				if !features.SharedConsumableCapacity {
+					return []any{matchAllocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool2, device3, false))}, nil, nil
+				}
+				return results, matchError, errorIs
+			},
+		},
+		"shared-consumable-capacity-disabled-consumable=true-node=node-2-allocated=true-without-snapshot-not-counted": {
+			features: Features{
+				PartitionableDevices:     true,
+				ConsumableCapacity:       true,
+				SharedConsumableCapacity: false,
+			},
+			claimsToAllocate: objects(claim(claim0).withRequests(deviceRequest(req0, classA, 1))),
+			classes:          objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node2, resourcePool(pool1, 3), driverA, device(device1).withDeviceCounterConsumption(deviceCounterConsumptionValueFrom(counterSet1, map[string]resourceapi.QualifiedName{counter0: capacity0}))),
+				sliceWithDevices(slice2, node1, resourcePool(pool1, 3), driverA, device(device2).withDeviceCounterConsumption(deviceCounterConsumption(counterSet1, map[string]resource.Quantity{counter0: one}))),
+				sliceWithCounterSets(slice3, node1, resourcePool(pool1, 3), driverA, counterSet(counterSet1, map[string]resource.Quantity{counter0: two})),
+				sliceWithDevices(slice4, node1, resourcePool(pool2, 2), driverA, device(device3).withDeviceCounterConsumption(deviceCounterConsumption(counterSet2, map[string]resource.Quantity{counter0: one}))),
+				sliceWithCounterSets("static-counters", node1, resourcePool(pool2, 2), driverA, counterSet(counterSet2, map[string]resource.Quantity{counter0: two})),
+			),
+			node:          node(node1, region1),
+			expectResults: []any{matchAllocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool2, device3, false))},
+			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.PartitionableDevices {
+					return nil, nil, nil
+				}
+				if features.SharedConsumableCapacity {
+					return []any{matchAllocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool1, device2, false))}, nil, nil
+				}
+				return results, matchError, errorIs
+			},
+			allocations: []resourceapi.AllocationResult{allocationResult(resourceapi.DeviceRequestAllocationResult{Request: req0, Driver: driverA, Pool: pool1, Device: device1})},
+		},
+		"shared-consumable-capacity-disabled-policy-counter=counter0-consumable=true-node=node-2-allocated=true": {
+			features: Features{
+				PartitionableDevices:     true,
+				ConsumableCapacity:       true,
+				SharedConsumableCapacity: false,
+			},
+			claimsToAllocate: objects(claim(claim0).withRequests(deviceRequest(req0, classA, 1))),
+			classes:          objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node2, resourcePool(pool1, 3), driverA, device(device1).withDeviceCounterConsumption(deviceCounterConsumption(counterSet1, map[string]resource.Quantity{counter0: one}))),
+				sliceWithDevices(slice2, node1, resourcePool(pool1, 3), driverA, device(device2).withDeviceCounterConsumption(deviceCounterConsumption(counterSet1, map[string]resource.Quantity{counter0: one}))),
+				sliceWithCounterSets(slice3, node1, resourcePool(pool1, 3), driverA, resourceapi.CounterSet{Name: counterSet1, Counters: map[string]resourceapi.Counter{counter0: {Value: two, ConsumptionPolicy: &resourceapi.CapacityRequestPolicy{Default: new(two), ValidValues: []resource.Quantity{two}}}}}),
+				sliceWithDevices(slice4, node1, resourcePool(pool2, 2), driverA, device(device3).withDeviceCounterConsumption(deviceCounterConsumption(counterSet2, map[string]resource.Quantity{counter0: one}))),
+				sliceWithCounterSets("static-counters", node1, resourcePool(pool2, 2), driverA, counterSet(counterSet2, map[string]resource.Quantity{counter0: two})),
+			),
+			node:          node(node1, region1),
+			expectResults: []any{matchAllocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool2, device3, false))},
+			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.PartitionableDevices {
+					return nil, nil, nil
+				}
+				return results, matchError, errorIs
+			},
+			allocations: []resourceapi.AllocationResult{allocationResult(resourceapi.DeviceRequestAllocationResult{Request: req0, Driver: driverA, Pool: pool1, Device: device1})},
+		},
+		"shared-consumable-capacity-disabled-policy-counter=counter1-consumable=true-node=node-2-allocated=true": {
+			features: Features{
+				PartitionableDevices:     true,
+				ConsumableCapacity:       true,
+				SharedConsumableCapacity: false,
+			},
+			claimsToAllocate: objects(claim(claim0).withRequests(deviceRequest(req0, classA, 1))),
+			classes:          objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node2, resourcePool(pool1, 3), driverA, device(device1).withDeviceCounterConsumption(deviceCounterConsumption(counterSet1, map[string]resource.Quantity{counter0: one}))),
+				sliceWithDevices(slice2, node1, resourcePool(pool1, 3), driverA, device(device2).withDeviceCounterConsumption(deviceCounterConsumption(counterSet1, map[string]resource.Quantity{counter0: one}))),
+				sliceWithCounterSets(slice3, node1, resourcePool(pool1, 3), driverA, resourceapi.CounterSet{Name: counterSet1, Counters: map[string]resourceapi.Counter{counter0: {Value: two}, counter1: {Value: two, ConsumptionPolicy: &resourceapi.CapacityRequestPolicy{Default: new(two), ValidValues: []resource.Quantity{two}}}}}),
+				sliceWithDevices(slice4, node1, resourcePool(pool2, 2), driverA, device(device3).withDeviceCounterConsumption(deviceCounterConsumption(counterSet2, map[string]resource.Quantity{counter0: one}))),
+				sliceWithCounterSets("static-counters", node1, resourcePool(pool2, 2), driverA, counterSet(counterSet2, map[string]resource.Quantity{counter0: two})),
+			),
+			node:          node(node1, region1),
+			expectResults: []any{matchAllocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool1, device2, false))},
+			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.PartitionableDevices {
+					return nil, nil, nil
+				}
+				if !features.SharedConsumableCapacity {
+					return []any{matchAllocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool2, device3, false))}, nil, nil
+				}
+				return results, matchError, errorIs
+			},
+			allocations: []resourceapi.AllocationResult{allocationResult(resourceapi.DeviceRequestAllocationResult{Request: req0, Driver: driverA, Pool: pool1, Device: device1})},
+		},
+		"shared-consumable-capacity-slice-update-overdrawn-existing-device-adds-no-charge": {
+			features: Features{
+				PartitionableDevices:     true,
+				ConsumableCapacity:       true,
+				SharedConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(claim(claim0).withRequests(deviceRequest(req0, classB, 1))),
+			allocations:      []resourceapi.AllocationResult{allocationResult(resourceapi.DeviceRequestAllocationResult{Request: req0, Driver: driverA, Pool: pool1, Device: device1, ShareID: new(apitypes.UID("00000000-0000-4000-8000-000000000001"))})},
+			classes:          objects(classWithAllowMultipleAllocations(classB, driverA, true)),
+			slices: unwrapResourceSlices(
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA, resourceapi.CounterSet{Name: counterSet1, Counters: map[string]resourceapi.Counter{counter0: {Value: resource.MustParse("4")}}}, counterSet(counterSet2, map[string]resource.Quantity{counter0: resource.MustParse("10")})),
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA, device(device2).withDeviceCounterConsumption(deviceCounterConsumption(counterSet1, map[string]resource.Quantity{counter0: resource.MustParse("4")})),
+					device(device1).withAllowMultipleAllocations().withDeviceCounterConsumption(deviceCounterConsumption(counterSet1, map[string]resource.Quantity{counter0: resource.MustParse("7")}))),
+			),
+			node:          node(node1, region1),
+			expectResults: []any{matchAllocationResult(localNodeSelector(node1), deviceRequestAllocationResult(req0, driverA, pool1, device1).withConsumedCapacity(&fixedShareID, nil))},
+			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.PartitionableDevices {
+					return nil, nil, nil
+				}
+				if !features.ConsumableCapacity {
+					return nil, nil, nil
+				}
+				return results, matchError, errorIs
+			},
+		},
+		"shared-consumable-capacity-slice-update-fixed-decrease": {
+			features: Features{
+				PartitionableDevices:     true,
+				ConsumableCapacity:       true,
+				SharedConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(claim(claim0).withRequests(deviceRequest(req0, classB, 1))),
+			allocations:      []resourceapi.AllocationResult{allocationResult(resourceapi.DeviceRequestAllocationResult{Request: req0, Driver: driverA, Pool: pool1, Device: device1, ShareID: new(apitypes.UID("00000000-0000-4000-8000-000000000001"))})},
+			classes:          objects(classWithAllowMultipleAllocations(classB, driverA, false)),
+			slices: unwrapResourceSlices(
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA, resourceapi.CounterSet{Name: counterSet1, Counters: map[string]resourceapi.Counter{counter0: {Value: resource.MustParse("10")}}}, counterSet(counterSet2, map[string]resource.Quantity{counter0: resource.MustParse("10")})),
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA, device(device2).withDeviceCounterConsumption(deviceCounterConsumption(counterSet1, map[string]resource.Quantity{counter0: resource.MustParse("4")})),
+					device(device1).withAllowMultipleAllocations().withDeviceCounterConsumption(deviceCounterConsumption(counterSet1, map[string]resource.Quantity{counter0: resource.MustParse("2")}))),
+			),
+			node:          node(node1, region1),
+			expectResults: []any{matchAllocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool1, device2, false))},
+			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.PartitionableDevices {
+					return nil, nil, nil
+				}
+				return results, matchError, errorIs
+			},
+		},
+		"shared-consumable-capacity-slice-update-fixed-increase": {
+			features: Features{
+				PartitionableDevices:     true,
+				ConsumableCapacity:       true,
+				SharedConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(claim(claim0).withRequests(deviceRequest(req0, classB, 1))),
+			allocations:      []resourceapi.AllocationResult{allocationResult(resourceapi.DeviceRequestAllocationResult{Request: req0, Driver: driverA, Pool: pool1, Device: device1, ShareID: new(apitypes.UID("00000000-0000-4000-8000-000000000001"))})},
+			classes:          objects(classWithAllowMultipleAllocations(classB, driverA, false)),
+			slices: unwrapResourceSlices(
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA, resourceapi.CounterSet{Name: counterSet1, Counters: map[string]resourceapi.Counter{counter0: {Value: resource.MustParse("10")}}}, counterSet(counterSet2, map[string]resource.Quantity{counter0: resource.MustParse("10")})),
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA, device(device2).withDeviceCounterConsumption(deviceCounterConsumption(counterSet1, map[string]resource.Quantity{counter0: resource.MustParse("4")})),
+					device(device1).withAllowMultipleAllocations().withDeviceCounterConsumption(deviceCounterConsumption(counterSet1, map[string]resource.Quantity{counter0: resource.MustParse("7")}))),
+			),
+			node:          node(node1, region1),
+			expectResults: nil,
+			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.PartitionableDevices {
+					return nil, nil, nil
+				}
+				return results, matchError, errorIs
+			},
+		},
+		"shared-consumable-capacity-slice-update-fixed-policy-rounds-existing-use": {
+			features: Features{
+				PartitionableDevices:     true,
+				ConsumableCapacity:       true,
+				SharedConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(claim(claim0).withRequests(deviceRequest(req0, classB, 1))),
+			allocations:      []resourceapi.AllocationResult{allocationResult(resourceapi.DeviceRequestAllocationResult{Request: req0, Driver: driverA, Pool: pool1, Device: device1, ShareID: new(apitypes.UID("00000000-0000-4000-8000-000000000001"))})},
+			classes:          objects(classWithAllowMultipleAllocations(classB, driverA, false)),
+			slices: unwrapResourceSlices(
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA, resourceapi.CounterSet{Name: counterSet1, Counters: map[string]resourceapi.Counter{counter0: {Value: resource.MustParse("8"), ConsumptionPolicy: &resourceapi.CapacityRequestPolicy{Default: new(two), ValidValues: []resource.Quantity{two, resource.MustParse("7")}}}}}, counterSet(counterSet2, map[string]resource.Quantity{counter0: resource.MustParse("10")})),
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA, device(device2).withDeviceCounterConsumption(deviceCounterConsumption(counterSet1, map[string]resource.Quantity{counter0: resource.MustParse("2")})),
+					device(device1).withAllowMultipleAllocations().withDeviceCounterConsumption(deviceCounterConsumption(counterSet1, map[string]resource.Quantity{counter0: resource.MustParse("5")}))),
+			),
+			node:          node(node1, region1),
+			expectResults: nil,
+			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.PartitionableDevices {
+					return nil, nil, nil
+				}
+				if !features.SharedConsumableCapacity {
+					return nil, nil, nil
+				}
+				return results, matchError, errorIs
+			},
+		},
+		"shared-consumable-capacity-slice-update-fixed-policy-violation-existing-use-does-not-block": {
+			features: Features{
+				PartitionableDevices:     true,
+				ConsumableCapacity:       true,
+				SharedConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(claim(claim0).withRequests(deviceRequest(req0, classB, 1))),
+			allocations:      []resourceapi.AllocationResult{allocationResult(resourceapi.DeviceRequestAllocationResult{Request: req0, Driver: driverA, Pool: pool1, Device: device1, ShareID: new(apitypes.UID("00000000-0000-4000-8000-000000000001"))})},
+			classes:          objects(classWithAllowMultipleAllocations(classB, driverA, false)),
+			slices: unwrapResourceSlices(
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA, resourceapi.CounterSet{Name: counterSet1, Counters: map[string]resourceapi.Counter{counter0: {Value: resource.MustParse("10"), ConsumptionPolicy: &resourceapi.CapacityRequestPolicy{Default: new(two), ValidValues: []resource.Quantity{two}}}}}, counterSet(counterSet2, map[string]resource.Quantity{counter0: resource.MustParse("10")})),
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA, device(device2).withDeviceCounterConsumption(deviceCounterConsumption(counterSet1, map[string]resource.Quantity{counter0: resource.MustParse("2")})),
+					device(device1).withAllowMultipleAllocations().withDeviceCounterConsumption(deviceCounterConsumption(counterSet1, map[string]resource.Quantity{counter0: resource.MustParse("7")}))),
+			),
+			node:          node(node1, region1),
+			expectResults: []any{matchAllocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool1, device2, false))},
+			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.PartitionableDevices || !features.SharedConsumableCapacity {
+					return nil, nil, nil
+				}
+				return results, matchError, errorIs
+			},
+		},
+		"shared-consumable-capacity-slice-update-fixed-remap-frees-original-set": {
+			features: Features{
+				PartitionableDevices:     true,
+				ConsumableCapacity:       true,
+				SharedConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(claim(claim0).withRequests(deviceRequest(req0, classB, 1))),
+			allocations:      []resourceapi.AllocationResult{allocationResult(resourceapi.DeviceRequestAllocationResult{Request: req0, Driver: driverA, Pool: pool1, Device: device1, ShareID: new(apitypes.UID("00000000-0000-4000-8000-000000000001"))})},
+			classes:          objects(classWithAllowMultipleAllocations(classB, driverA, false)),
+			slices: unwrapResourceSlices(
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA, resourceapi.CounterSet{Name: counterSet1, Counters: map[string]resourceapi.Counter{counter0: {Value: resource.MustParse("10")}}}, counterSet(counterSet2, map[string]resource.Quantity{counter0: resource.MustParse("10")})),
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA, device(device2).withDeviceCounterConsumption(deviceCounterConsumption(counterSet1, map[string]resource.Quantity{counter0: resource.MustParse("4")})),
+					device(device1).withAllowMultipleAllocations().withDeviceCounterConsumption(deviceCounterConsumption(counterSet2, map[string]resource.Quantity{counter0: resource.MustParse("7")}))),
+			),
+			node:          node(node1, region1),
+			expectResults: []any{matchAllocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool1, device2, false))},
+			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.PartitionableDevices {
+					return nil, nil, nil
+				}
+				return results, matchError, errorIs
+			},
+		},
+		"shared-consumable-capacity-slice-update-fixed-removed": {
+			features: Features{
+				PartitionableDevices:     true,
+				ConsumableCapacity:       true,
+				SharedConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(claim(claim0).withRequests(deviceRequest(req0, classB, 1))),
+			allocations:      []resourceapi.AllocationResult{allocationResult(resourceapi.DeviceRequestAllocationResult{Request: req0, Driver: driverA, Pool: pool1, Device: device1, ShareID: new(apitypes.UID("00000000-0000-4000-8000-000000000001"))})},
+			classes:          objects(classWithAllowMultipleAllocations(classB, driverA, false)),
+			slices: unwrapResourceSlices(
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA, resourceapi.CounterSet{Name: counterSet1, Counters: map[string]resourceapi.Counter{counter0: {Value: resource.MustParse("10")}}}, counterSet(counterSet2, map[string]resource.Quantity{counter0: resource.MustParse("10")})),
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA, device(device2).withDeviceCounterConsumption(deviceCounterConsumption(counterSet1, map[string]resource.Quantity{counter0: resource.MustParse("4")})),
+					device(device1).withAllowMultipleAllocations()),
+			),
+			node:          node(node1, region1),
+			expectResults: []any{matchAllocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool1, device2, false))},
+			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.PartitionableDevices {
+					return nil, nil, nil
+				}
+				return results, matchError, errorIs
+			},
+		},
+		"shared-consumable-capacity-slice-update-variable-budget-increase": {
+			features: Features{
+				PartitionableDevices:     true,
+				ConsumableCapacity:       true,
+				SharedConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(claim(claim0).withRequests(deviceRequest(req0, classB, 1))),
+			allocations:      []resourceapi.AllocationResult{allocationResult(resourceapi.DeviceRequestAllocationResult{Request: req0, Driver: driverA, Pool: pool1, Device: device1, ShareID: new(apitypes.UID("00000000-0000-4000-8000-000000000001")), ConsumedCounters: []resourceapi.CounterSetConsumption{{CounterSet: counterSet1, Counters: map[string]resource.Quantity{counter0: resource.MustParse("8")}}}})},
+			classes:          objects(classWithAllowMultipleAllocations(classB, driverA, false)),
+			slices: unwrapResourceSlices(
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA, resourceapi.CounterSet{Name: counterSet1, Counters: map[string]resourceapi.Counter{counter0: {Value: resource.MustParse("14")}}}, counterSet(counterSet2, map[string]resource.Quantity{counter0: resource.MustParse("10")})),
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA, device(device2).withDeviceCounterConsumption(deviceCounterConsumption(counterSet1, map[string]resource.Quantity{counter0: resource.MustParse("4")})),
+					device(device1).withAllowMultipleAllocations().withDeviceCounterConsumption(deviceCounterConsumptionValueFrom(counterSet1, map[string]resourceapi.QualifiedName{counter0: capacity0}))),
+			),
+			node:          node(node1, region1),
+			expectResults: []any{matchAllocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool1, device2, false))},
+			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.PartitionableDevices {
+					return nil, nil, nil
+				}
+				if !features.SharedConsumableCapacity {
+					return nil, nil, nil
+				}
+				return results, matchError, errorIs
+			},
+		},
+		"shared-consumable-capacity-slice-update-variable-budget-decrease": {
+			features: Features{
+				PartitionableDevices:     true,
+				ConsumableCapacity:       true,
+				SharedConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(claim(claim0).withRequests(deviceRequest(req0, classB, 1))),
+			allocations:      []resourceapi.AllocationResult{allocationResult(resourceapi.DeviceRequestAllocationResult{Request: req0, Driver: driverA, Pool: pool1, Device: device1, ShareID: new(apitypes.UID("00000000-0000-4000-8000-000000000001")), ConsumedCounters: []resourceapi.CounterSetConsumption{{CounterSet: counterSet1, Counters: map[string]resource.Quantity{counter0: resource.MustParse("8")}}}})},
+			classes:          objects(classWithAllowMultipleAllocations(classB, driverA, false)),
+			slices: unwrapResourceSlices(
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA, resourceapi.CounterSet{Name: counterSet1, Counters: map[string]resourceapi.Counter{counter0: {Value: resource.MustParse("10")}}}, counterSet(counterSet2, map[string]resource.Quantity{counter0: resource.MustParse("10")})),
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA, device(device2).withDeviceCounterConsumption(deviceCounterConsumption(counterSet1, map[string]resource.Quantity{counter0: resource.MustParse("4")})),
+					device(device1).withAllowMultipleAllocations().withDeviceCounterConsumption(deviceCounterConsumptionValueFrom(counterSet1, map[string]resourceapi.QualifiedName{counter0: capacity0}))),
+			),
+			node:          node(node1, region1),
+			expectResults: nil,
+			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.PartitionableDevices {
+					return nil, nil, nil
+				}
+				if !features.SharedConsumableCapacity {
+					return nil, nil, nil
+				}
+				return results, matchError, errorIs
+			},
+		},
+		"shared-consumable-capacity-slice-update-variable-budget-below-existing-use": {
+			features: Features{
+				PartitionableDevices:     true,
+				ConsumableCapacity:       true,
+				SharedConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(claim(claim0).withRequests(deviceRequest(req0, classB, 1))),
+			allocations:      []resourceapi.AllocationResult{allocationResult(resourceapi.DeviceRequestAllocationResult{Request: req0, Driver: driverA, Pool: pool1, Device: device1, ShareID: new(apitypes.UID("00000000-0000-4000-8000-000000000001")), ConsumedCounters: []resourceapi.CounterSetConsumption{{CounterSet: counterSet1, Counters: map[string]resource.Quantity{counter0: resource.MustParse("6")}}}})},
+			classes:          objects(classWithAllowMultipleAllocations(classB, driverA, false)),
+			slices: unwrapResourceSlices(
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA, resourceapi.CounterSet{Name: counterSet1, Counters: map[string]resourceapi.Counter{counter0: {Value: resource.MustParse("4")}}}, counterSet(counterSet2, map[string]resource.Quantity{counter0: resource.MustParse("10")})),
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA, device(device2).withDeviceCounterConsumption(deviceCounterConsumption(counterSet1, map[string]resource.Quantity{counter0: resource.MustParse("4")})),
+					device(device1).withAllowMultipleAllocations().withDeviceCounterConsumption(deviceCounterConsumptionValueFrom(counterSet1, map[string]resourceapi.QualifiedName{counter0: capacity0}))),
+			),
+			node:          node(node1, region1),
+			expectResults: nil,
+			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.PartitionableDevices {
+					return nil, nil, nil
+				}
+				if !features.SharedConsumableCapacity {
+					return nil, nil, nil
+				}
+				return results, matchError, errorIs
+			},
+		},
+		"shared-consumable-capacity-slice-update-variable-remap-retains-original-set": {
+			features: Features{
+				PartitionableDevices:     true,
+				ConsumableCapacity:       true,
+				SharedConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(claim(claim0).withRequests(deviceRequest(req0, classB, 1))),
+			allocations:      []resourceapi.AllocationResult{allocationResult(resourceapi.DeviceRequestAllocationResult{Request: req0, Driver: driverA, Pool: pool1, Device: device1, ShareID: new(apitypes.UID("00000000-0000-4000-8000-000000000001")), ConsumedCounters: []resourceapi.CounterSetConsumption{{CounterSet: counterSet1, Counters: map[string]resource.Quantity{counter0: resource.MustParse("7")}}}})},
+			classes:          objects(classWithAllowMultipleAllocations(classB, driverA, false)),
+			slices: unwrapResourceSlices(
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA, resourceapi.CounterSet{Name: counterSet1, Counters: map[string]resourceapi.Counter{counter0: {Value: resource.MustParse("10")}}}, counterSet(counterSet2, map[string]resource.Quantity{counter0: resource.MustParse("10")})),
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA, device(device2).withDeviceCounterConsumption(deviceCounterConsumption(counterSet1, map[string]resource.Quantity{counter0: resource.MustParse("4")})),
+					device(device1).withAllowMultipleAllocations().withDeviceCounterConsumption(deviceCounterConsumptionValueFrom(counterSet2, map[string]resourceapi.QualifiedName{counter0: capacity0}))),
+			),
+			node:          node(node1, region1),
+			expectResults: nil,
+			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.PartitionableDevices {
+					return nil, nil, nil
+				}
+				if !features.SharedConsumableCapacity {
+					return nil, nil, nil
+				}
+				return results, matchError, errorIs
+			},
+		},
+		"shared-consumable-capacity-slice-update-variable-policy-drift-keeps-saved-value": {
+			features: Features{
+				PartitionableDevices:     true,
+				ConsumableCapacity:       true,
+				SharedConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(claim(claim0).withRequests(deviceRequest(req0, classB, 1))),
+			allocations:      []resourceapi.AllocationResult{allocationResult(resourceapi.DeviceRequestAllocationResult{Request: req0, Driver: driverA, Pool: pool1, Device: device1, ShareID: new(apitypes.UID("00000000-0000-4000-8000-000000000001")), ConsumedCounters: []resourceapi.CounterSetConsumption{{CounterSet: counterSet1, Counters: map[string]resource.Quantity{counter0: resource.MustParse("4")}}}})},
+			classes:          objects(classWithAllowMultipleAllocations(classB, driverA, false)),
+			slices: unwrapResourceSlices(
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA, resourceapi.CounterSet{Name: counterSet1, Counters: map[string]resourceapi.Counter{counter0: {Value: resource.MustParse("10"), ConsumptionPolicy: &resourceapi.CapacityRequestPolicy{Default: new(two), ValidValues: []resource.Quantity{two, resource.MustParse("6")}}}}}, counterSet(counterSet2, map[string]resource.Quantity{counter0: resource.MustParse("10")})),
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA, device(device2).withDeviceCounterConsumption(deviceCounterConsumption(counterSet1, map[string]resource.Quantity{counter0: resource.MustParse("4")})),
+					device(device1).withAllowMultipleAllocations().withDeviceCounterConsumption(deviceCounterConsumptionValueFrom(counterSet1, map[string]resourceapi.QualifiedName{counter0: capacity0}))),
+			),
+			node:          node(node1, region1),
+			expectResults: []any{matchAllocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool1, device2, false))},
+			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.PartitionableDevices {
+					return nil, nil, nil
+				}
+				if !features.SharedConsumableCapacity {
+					return nil, nil, nil
+				}
+				return results, matchError, errorIs
+			},
+		},
+		"shared-consumable-capacity-slice-update-variable-two-shares-are-summed": {
+			features: Features{
+				PartitionableDevices:     true,
+				ConsumableCapacity:       true,
+				SharedConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(claim(claim0).withRequests(deviceRequest(req0, classB, 1))),
+			allocations: []resourceapi.AllocationResult{allocationResult(resourceapi.DeviceRequestAllocationResult{Request: req0, Driver: driverA, Pool: pool1, Device: device1, ShareID: new(apitypes.UID("00000000-0000-4000-8000-000000000001")), ConsumedCounters: []resourceapi.CounterSetConsumption{{CounterSet: counterSet1, Counters: map[string]resource.Quantity{counter0: resource.MustParse("4")}}}}),
+				allocationResult(resourceapi.DeviceRequestAllocationResult{Request: req0, Driver: driverA, Pool: pool1, Device: device1, ShareID: new(apitypes.UID("00000000-0000-4000-8000-000000000002")), ConsumedCounters: []resourceapi.CounterSetConsumption{{CounterSet: counterSet1, Counters: map[string]resource.Quantity{counter0: resource.MustParse("4")}}}})},
+			classes: objects(classWithAllowMultipleAllocations(classB, driverA, false)),
+			slices: unwrapResourceSlices(
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA, resourceapi.CounterSet{Name: counterSet1, Counters: map[string]resourceapi.Counter{counter0: {Value: resource.MustParse("10")}}}, counterSet(counterSet2, map[string]resource.Quantity{counter0: resource.MustParse("10")})),
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA, device(device2).withDeviceCounterConsumption(deviceCounterConsumption(counterSet1, map[string]resource.Quantity{counter0: resource.MustParse("4")})),
+					device(device1).withAllowMultipleAllocations().withDeviceCounterConsumption(deviceCounterConsumptionValueFrom(counterSet1, map[string]resourceapi.QualifiedName{counter0: capacity0}))),
+			),
+			node:          node(node1, region1),
+			expectResults: nil,
+			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.PartitionableDevices {
+					return nil, nil, nil
+				}
+				if !features.SharedConsumableCapacity {
+					return nil, nil, nil
+				}
+				return results, matchError, errorIs
+			},
+		},
+		"shared-consumable-capacity-slice-update-variable-removed-retains-saved-value": {
+			features: Features{
+				PartitionableDevices:     true,
+				ConsumableCapacity:       true,
+				SharedConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(claim(claim0).withRequests(deviceRequest(req0, classB, 1))),
+			allocations:      []resourceapi.AllocationResult{allocationResult(resourceapi.DeviceRequestAllocationResult{Request: req0, Driver: driverA, Pool: pool1, Device: device1, ShareID: new(apitypes.UID("00000000-0000-4000-8000-000000000001")), ConsumedCounters: []resourceapi.CounterSetConsumption{{CounterSet: counterSet1, Counters: map[string]resource.Quantity{counter0: resource.MustParse("7")}}}})},
+			classes:          objects(classWithAllowMultipleAllocations(classB, driverA, false)),
+			slices: unwrapResourceSlices(
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA, resourceapi.CounterSet{Name: counterSet1, Counters: map[string]resourceapi.Counter{counter0: {Value: resource.MustParse("10")}}}, counterSet(counterSet2, map[string]resource.Quantity{counter0: resource.MustParse("10")})),
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA, device(device2).withDeviceCounterConsumption(deviceCounterConsumption(counterSet1, map[string]resource.Quantity{counter0: resource.MustParse("4")})),
+					device(device1).withAllowMultipleAllocations()),
+			),
+			node:          node(node1, region1),
+			expectResults: nil,
+			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.PartitionableDevices {
+					return nil, nil, nil
+				}
+				if !features.SharedConsumableCapacity {
+					return []any{matchAllocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool1, device2, false))}, nil, nil
+				}
+				return results, matchError, errorIs
+			},
+		},
+		"shared-consumable-capacity-slice-update-variable-removed-keeps-partial-usage": {
+			features: Features{
+				PartitionableDevices:     true,
+				ConsumableCapacity:       true,
+				SharedConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(claim(claim0).withRequests(deviceRequest(req0, classB, 1))),
+			allocations: []resourceapi.AllocationResult{allocationResult(resourceapi.DeviceRequestAllocationResult{Request: req0, Driver: driverA, Pool: pool1, Device: device1, ShareID: &fixedShareID, ConsumedCounters: []resourceapi.CounterSetConsumption{{CounterSet: counterSet1, Counters: map[string]resource.Quantity{counter0: resource.MustParse("7")}}}}),
+				allocationResult(resourceapi.DeviceRequestAllocationResult{Request: req0, Driver: driverA, Pool: pool1, Device: device1, ShareID: new(apitypes.UID("00000000-0000-4000-8000-000000000002"))})},
+			classes: objects(classWithAllowMultipleAllocations(classB, driverA, false)),
+			slices: unwrapResourceSlices(
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA, resourceapi.CounterSet{Name: counterSet1, Counters: map[string]resourceapi.Counter{counter0: {Value: resource.MustParse("10")}}}, counterSet(counterSet2, map[string]resource.Quantity{counter0: resource.MustParse("10")})),
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA, device(device2).withDeviceCounterConsumption(deviceCounterConsumption(counterSet1, map[string]resource.Quantity{counter0: resource.MustParse("4")})),
+					device(device1).withAllowMultipleAllocations()),
+			),
+			node:          node(node1, region1),
+			expectResults: nil,
+			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.PartitionableDevices {
+					return nil, nil, nil
+				}
+				if !features.SharedConsumableCapacity {
+					return []any{matchAllocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool1, device2, false))}, nil, nil
+				}
+				return results, matchError, errorIs
+			},
+		},
+		"shared-consumable-capacity-slice-update-variable-to-fixed-keeps-partial-usage": {
+			features: Features{
+				PartitionableDevices:     true,
+				ConsumableCapacity:       true,
+				SharedConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(claim(claim0).withRequests(deviceRequest(req0, classB, 1))),
+			allocations: []resourceapi.AllocationResult{allocationResult(resourceapi.DeviceRequestAllocationResult{Request: req0, Driver: driverA, Pool: pool1, Device: device1, ShareID: &fixedShareID, ConsumedCounters: []resourceapi.CounterSetConsumption{{CounterSet: counterSet1, Counters: map[string]resource.Quantity{counter0: resource.MustParse("4")}}}}),
+				allocationResult(resourceapi.DeviceRequestAllocationResult{Request: req0, Driver: driverA, Pool: pool1, Device: device1, ShareID: new(apitypes.UID("00000000-0000-4000-8000-000000000002"))})},
+			classes: objects(classWithAllowMultipleAllocations(classB, driverA, false)),
+			slices: unwrapResourceSlices(
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA, resourceapi.CounterSet{Name: counterSet1, Counters: map[string]resourceapi.Counter{counter0: {Value: resource.MustParse("10")}}}, counterSet(counterSet2, map[string]resource.Quantity{counter0: resource.MustParse("10")})),
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA, device(device2).withDeviceCounterConsumption(deviceCounterConsumption(counterSet1, map[string]resource.Quantity{counter0: resource.MustParse("4")})),
+					device(device1).withAllowMultipleAllocations().withDeviceCounterConsumption(deviceCounterConsumption(counterSet1, map[string]resource.Quantity{counter0: resource.MustParse("4")}))),
+			),
+			node:          node(node1, region1),
+			expectResults: nil,
+			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.PartitionableDevices {
+					return nil, nil, nil
+				}
+				if !features.SharedConsumableCapacity {
+					return []any{matchAllocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool1, device2, false))}, nil, nil
+				}
+				return results, matchError, errorIs
+			},
+		},
+		"shared-consumable-capacity-slice-update-variable-partial-usage-missing-snapshot-is-ignored": {
+			features: Features{
+				PartitionableDevices:     true,
+				ConsumableCapacity:       true,
+				SharedConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(claim(claim0).withRequests(deviceRequest(req0, classB, 1))),
+			allocations: []resourceapi.AllocationResult{allocationResult(resourceapi.DeviceRequestAllocationResult{Request: req0, Driver: driverA, Pool: pool1, Device: device1, ShareID: &fixedShareID, ConsumedCounters: []resourceapi.CounterSetConsumption{{CounterSet: counterSet1, Counters: map[string]resource.Quantity{counter0: resource.MustParse("1")}}}}),
+				allocationResult(resourceapi.DeviceRequestAllocationResult{Request: req0, Driver: driverA, Pool: pool1, Device: device1, ShareID: new(apitypes.UID("00000000-0000-4000-8000-000000000002"))})},
+			classes: objects(classWithAllowMultipleAllocations(classB, driverA, false)),
+			slices: unwrapResourceSlices(
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA, resourceapi.CounterSet{Name: counterSet1, Counters: map[string]resourceapi.Counter{counter0: {Value: resource.MustParse("10")}}}, counterSet(counterSet2, map[string]resource.Quantity{counter0: resource.MustParse("10")})),
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA, device(device2).withDeviceCounterConsumption(deviceCounterConsumption(counterSet1, map[string]resource.Quantity{counter0: resource.MustParse("4")})),
+					device(device1).withAllowMultipleAllocations().withDeviceCounterConsumption(deviceCounterConsumptionValueFrom(counterSet1, map[string]resourceapi.QualifiedName{counter0: capacity0}))),
+			),
+			node:          node(node1, region1),
+			expectResults: []any{matchAllocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool1, device2, false))},
+			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.PartitionableDevices || !features.SharedConsumableCapacity {
+					return nil, nil, nil
+				}
+				return results, matchError, errorIs
+			},
+		},
+		"shared-consumable-capacity-slice-update-zero-partial-usage-missing-snapshot-is-ignored": {
+			features: Features{
+				PartitionableDevices:     true,
+				ConsumableCapacity:       true,
+				SharedConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(claim(claim0).withRequests(deviceRequest(req0, classB, 1))),
+			allocations: []resourceapi.AllocationResult{allocationResult(resourceapi.DeviceRequestAllocationResult{Request: req0, Driver: driverA, Pool: pool1, Device: device1, ShareID: &fixedShareID, ConsumedCounters: []resourceapi.CounterSetConsumption{{CounterSet: counterSet1, Counters: map[string]resource.Quantity{counter0: resource.MustParse("0")}}}}),
+				allocationResult(resourceapi.DeviceRequestAllocationResult{Request: req0, Driver: driverA, Pool: pool1, Device: device1, ShareID: new(apitypes.UID("00000000-0000-4000-8000-000000000002"))})},
+			classes: objects(classWithAllowMultipleAllocations(classB, driverA, false)),
+			slices: unwrapResourceSlices(
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA, resourceapi.CounterSet{Name: counterSet1, Counters: map[string]resourceapi.Counter{counter0: {Value: resource.MustParse("10")}}}, counterSet(counterSet2, map[string]resource.Quantity{counter0: resource.MustParse("10")})),
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA, device(device2).withDeviceCounterConsumption(deviceCounterConsumption(counterSet1, map[string]resource.Quantity{counter0: resource.MustParse("4")})),
+					device(device1).withAllowMultipleAllocations().withDeviceCounterConsumption(deviceCounterConsumptionValueFrom(counterSet1, map[string]resourceapi.QualifiedName{counter0: capacity0}))),
+			),
+			node:          node(node1, region1),
+			expectResults: []any{matchAllocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool1, device2, false))},
+			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.PartitionableDevices || !features.SharedConsumableCapacity {
+					return nil, nil, nil
+				}
+				return results, matchError, errorIs
+			},
+		},
+		"shared-consumable-capacity-slice-update-variable-to-fixed-adds-current-fixed-use": {
+			features: Features{
+				PartitionableDevices:     true,
+				ConsumableCapacity:       true,
+				SharedConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(claim(claim0).withRequests(deviceRequest(req0, classB, 1))),
+			allocations:      []resourceapi.AllocationResult{allocationResult(resourceapi.DeviceRequestAllocationResult{Request: req0, Driver: driverA, Pool: pool1, Device: device1, ShareID: new(apitypes.UID("00000000-0000-4000-8000-000000000001")), ConsumedCounters: []resourceapi.CounterSetConsumption{{CounterSet: counterSet1, Counters: map[string]resource.Quantity{counter0: resource.MustParse("4")}}}})},
+			classes:          objects(classWithAllowMultipleAllocations(classB, driverA, false)),
+			slices: unwrapResourceSlices(
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA, resourceapi.CounterSet{Name: counterSet1, Counters: map[string]resourceapi.Counter{counter0: {Value: resource.MustParse("10")}}}, counterSet(counterSet2, map[string]resource.Quantity{counter0: resource.MustParse("10")})),
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA, device(device2).withDeviceCounterConsumption(deviceCounterConsumption(counterSet1, map[string]resource.Quantity{counter0: resource.MustParse("4")})),
+					device(device1).withAllowMultipleAllocations().withDeviceCounterConsumption(deviceCounterConsumption(counterSet1, map[string]resource.Quantity{counter0: resource.MustParse("4")}))),
+			),
+			node:          node(node1, region1),
+			expectResults: nil,
+			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.PartitionableDevices {
+					return nil, nil, nil
+				}
+				if !features.SharedConsumableCapacity {
+					return []any{matchAllocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool1, device2, false))}, nil, nil
+				}
+				return results, matchError, errorIs
+			},
+		},
+		"shared-consumable-capacity-slice-update-fixed-to-variable-without-snapshot-is-ignored": {
+			features: Features{
+				PartitionableDevices:     true,
+				ConsumableCapacity:       true,
+				SharedConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(claim(claim0).withRequests(deviceRequest(req0, classB, 1))),
+			allocations:      []resourceapi.AllocationResult{allocationResult(resourceapi.DeviceRequestAllocationResult{Request: req0, Driver: driverA, Pool: pool1, Device: device1, ShareID: new(apitypes.UID("00000000-0000-4000-8000-000000000001"))})},
+			classes:          objects(classWithAllowMultipleAllocations(classB, driverA, false)),
+			slices: unwrapResourceSlices(
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA, resourceapi.CounterSet{Name: counterSet1, Counters: map[string]resourceapi.Counter{counter0: {Value: resource.MustParse("10")}}}, counterSet(counterSet2, map[string]resource.Quantity{counter0: resource.MustParse("10")})),
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA, device(device2).withDeviceCounterConsumption(deviceCounterConsumption(counterSet1, map[string]resource.Quantity{counter0: resource.MustParse("4")})),
+					device(device1).withAllowMultipleAllocations().withDeviceCounterConsumption(deviceCounterConsumptionValueFrom(counterSet1, map[string]resourceapi.QualifiedName{counter0: capacity0}))),
+			),
+			node:          node(node1, region1),
+			expectResults: []any{matchAllocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool1, device2, false))},
+			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.PartitionableDevices || !features.SharedConsumableCapacity {
+					return nil, nil, nil
+				}
+				return results, matchError, errorIs
+			},
+		},
+		"shared-consumable-capacity-slice-update-missing-saved-set-is-ignored": {
+			features: Features{
+				PartitionableDevices:     true,
+				ConsumableCapacity:       true,
+				SharedConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(claim(claim0).withRequests(deviceRequest(req0, classB, 1))),
+			allocations:      []resourceapi.AllocationResult{allocationResult(resourceapi.DeviceRequestAllocationResult{Request: req0, Driver: driverA, Pool: pool1, Device: device1, ShareID: new(apitypes.UID("00000000-0000-4000-8000-000000000001")), ConsumedCounters: []resourceapi.CounterSetConsumption{{CounterSet: "removed", Counters: map[string]resource.Quantity{counter0: resource.MustParse("10")}}}})},
+			classes:          objects(classWithAllowMultipleAllocations(classB, driverA, false)),
+			slices: unwrapResourceSlices(
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA, resourceapi.CounterSet{Name: counterSet1, Counters: map[string]resourceapi.Counter{counter0: {Value: resource.MustParse("10")}}}, counterSet(counterSet2, map[string]resource.Quantity{counter0: resource.MustParse("10")})),
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA, device(device2).withDeviceCounterConsumption(deviceCounterConsumption(counterSet1, map[string]resource.Quantity{counter0: resource.MustParse("4")})),
+					device(device1).withAllowMultipleAllocations()),
+			),
+			node:          node(node1, region1),
+			expectResults: []any{matchAllocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool1, device2, false))},
+			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.PartitionableDevices {
+					return nil, nil, nil
+				}
+				return results, matchError, errorIs
+			},
+		},
+		"shared-consumable-capacity-slice-update-missing-saved-counter-is-ignored": {
+			features: Features{
+				PartitionableDevices:     true,
+				ConsumableCapacity:       true,
+				SharedConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(claim(claim0).withRequests(deviceRequest(req0, classB, 1))),
+			allocations:      []resourceapi.AllocationResult{allocationResult(resourceapi.DeviceRequestAllocationResult{Request: req0, Driver: driverA, Pool: pool1, Device: device1, ShareID: new(apitypes.UID("00000000-0000-4000-8000-000000000001")), ConsumedCounters: []resourceapi.CounterSetConsumption{{CounterSet: counterSet1, Counters: map[string]resource.Quantity{"removed": resource.MustParse("10")}}}})},
+			classes:          objects(classWithAllowMultipleAllocations(classB, driverA, false)),
+			slices: unwrapResourceSlices(
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA, resourceapi.CounterSet{Name: counterSet1, Counters: map[string]resourceapi.Counter{counter0: {Value: resource.MustParse("10")}}}, counterSet(counterSet2, map[string]resource.Quantity{counter0: resource.MustParse("10")})),
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA, device(device2).withDeviceCounterConsumption(deviceCounterConsumption(counterSet1, map[string]resource.Quantity{counter0: resource.MustParse("4")})),
+					device(device1).withAllowMultipleAllocations()),
+			),
+			node:          node(node1, region1),
+			expectResults: []any{matchAllocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool1, device2, false))},
+			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.PartitionableDevices {
+					return nil, nil, nil
+				}
+				return results, matchError, errorIs
+			},
+		},
+		"shared-consumable-capacity-slice-update-missing-saved-definitions-keep-known-consumption": {
+			features: Features{
+				PartitionableDevices:     true,
+				ConsumableCapacity:       true,
+				SharedConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(claim(claim0).withRequests(deviceRequest(req0, classB, 1))),
+			allocations:      []resourceapi.AllocationResult{allocationResult(resourceapi.DeviceRequestAllocationResult{Request: req0, Driver: driverA, Pool: pool1, Device: device1, ShareID: new(apitypes.UID("00000000-0000-4000-8000-000000000001")), ConsumedCounters: []resourceapi.CounterSetConsumption{{CounterSet: "removed", Counters: map[string]resource.Quantity{counter0: resource.MustParse("10")}}, {CounterSet: counterSet1, Counters: map[string]resource.Quantity{counter0: resource.MustParse("7"), "removed": resource.MustParse("10")}}}})},
+			classes:          objects(classWithAllowMultipleAllocations(classB, driverA, false)),
+			slices: unwrapResourceSlices(
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA, resourceapi.CounterSet{Name: counterSet1, Counters: map[string]resourceapi.Counter{counter0: {Value: resource.MustParse("10")}}}, counterSet(counterSet2, map[string]resource.Quantity{counter0: resource.MustParse("10")})),
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA, device(device2).withDeviceCounterConsumption(deviceCounterConsumption(counterSet1, map[string]resource.Quantity{counter0: resource.MustParse("4")})),
+					device(device1).withAllowMultipleAllocations()),
+			),
+			node:          node(node1, region1),
+			expectResults: nil,
+			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.PartitionableDevices {
+					return nil, nil, nil
+				}
+				if !features.SharedConsumableCapacity {
+					return []any{matchAllocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool1, device2, false))}, nil, nil
+				}
+				return results, matchError, errorIs
+			},
+		},
+		"shared-consumable-capacity-slice-update-missing-zero-saved-set-is-harmless": {
+			features: Features{
+				PartitionableDevices:     true,
+				ConsumableCapacity:       true,
+				SharedConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(claim(claim0).withRequests(deviceRequest(req0, classB, 1))),
+			allocations:      []resourceapi.AllocationResult{allocationResult(resourceapi.DeviceRequestAllocationResult{Request: req0, Driver: driverA, Pool: pool1, Device: device1, ShareID: new(apitypes.UID("00000000-0000-4000-8000-000000000001")), ConsumedCounters: []resourceapi.CounterSetConsumption{{CounterSet: "removed", Counters: map[string]resource.Quantity{counter0: resource.MustParse("0")}}}})},
+			classes:          objects(classWithAllowMultipleAllocations(classB, driverA, false)),
+			slices: unwrapResourceSlices(
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA, resourceapi.CounterSet{Name: counterSet1, Counters: map[string]resourceapi.Counter{counter0: {Value: resource.MustParse("10")}}}, counterSet(counterSet2, map[string]resource.Quantity{counter0: resource.MustParse("10")})),
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA, device(device2).withDeviceCounterConsumption(deviceCounterConsumption(counterSet1, map[string]resource.Quantity{counter0: resource.MustParse("4")})),
+					device(device1).withAllowMultipleAllocations()),
+			),
+			node:          node(node1, region1),
+			expectResults: []any{matchAllocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool1, device2, false))},
+			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.PartitionableDevices {
+					return nil, nil, nil
+				}
+				return results, matchError, errorIs
+			},
+		},
+		"shared-consumable-capacity-slice-update-missing-zero-saved-counter-is-harmless": {
+			features: Features{
+				PartitionableDevices:     true,
+				ConsumableCapacity:       true,
+				SharedConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(claim(claim0).withRequests(deviceRequest(req0, classB, 1))),
+			allocations:      []resourceapi.AllocationResult{allocationResult(resourceapi.DeviceRequestAllocationResult{Request: req0, Driver: driverA, Pool: pool1, Device: device1, ShareID: new(apitypes.UID("00000000-0000-4000-8000-000000000001")), ConsumedCounters: []resourceapi.CounterSetConsumption{{CounterSet: counterSet1, Counters: map[string]resource.Quantity{"removed": resource.MustParse("0")}}}})},
+			classes:          objects(classWithAllowMultipleAllocations(classB, driverA, false)),
+			slices: unwrapResourceSlices(
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA, resourceapi.CounterSet{Name: counterSet1, Counters: map[string]resourceapi.Counter{counter0: {Value: resource.MustParse("10")}}}, counterSet(counterSet2, map[string]resource.Quantity{counter0: resource.MustParse("10")})),
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA, device(device2).withDeviceCounterConsumption(deviceCounterConsumption(counterSet1, map[string]resource.Quantity{counter0: resource.MustParse("4")})),
+					device(device1).withAllowMultipleAllocations()),
+			),
+			node:          node(node1, region1),
+			expectResults: []any{matchAllocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool1, device2, false))},
+			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.PartitionableDevices {
+					return nil, nil, nil
+				}
+				return results, matchError, errorIs
+			},
+		},
+		"shared-consumable-capacity-slice-update-missing-device-with-snapshot-retains-spare-capacity": {
+			features: Features{
+				PartitionableDevices:     true,
+				ConsumableCapacity:       true,
+				SharedConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(claim(claim0).withRequests(deviceRequest(req0, classB, 1))),
+			allocations:      []resourceapi.AllocationResult{allocationResult(resourceapi.DeviceRequestAllocationResult{Request: req0, Driver: driverA, Pool: pool1, Device: device1, ShareID: new(apitypes.UID("00000000-0000-4000-8000-000000000001")), ConsumedCounters: []resourceapi.CounterSetConsumption{{CounterSet: counterSet1, Counters: map[string]resource.Quantity{counter0: resource.MustParse("1")}}}})},
+			classes:          objects(classWithAllowMultipleAllocations(classB, driverA, false)),
+			slices: unwrapResourceSlices(
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA, resourceapi.CounterSet{Name: counterSet1, Counters: map[string]resourceapi.Counter{counter0: {Value: resource.MustParse("10")}}}, counterSet(counterSet2, map[string]resource.Quantity{counter0: resource.MustParse("10")})),
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA, device(device2).withDeviceCounterConsumption(deviceCounterConsumption(counterSet1, map[string]resource.Quantity{counter0: resource.MustParse("4")}))),
+			),
+			node:          node(node1, region1),
+			expectResults: []any{matchAllocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool1, device2, false))},
+			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.PartitionableDevices {
+					return nil, nil, nil
+				}
+				return results, matchError, errorIs
+			},
+		},
+		"shared-consumable-capacity-slice-update-missing-device-with-snapshot-exhausts-counter": {
+			features: Features{
+				PartitionableDevices:     true,
+				ConsumableCapacity:       true,
+				SharedConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(claim(claim0).withRequests(deviceRequest(req0, classB, 1))),
+			allocations:      []resourceapi.AllocationResult{allocationResult(resourceapi.DeviceRequestAllocationResult{Request: req0, Driver: driverA, Pool: pool1, Device: device1, ShareID: new(apitypes.UID("00000000-0000-4000-8000-000000000001")), ConsumedCounters: []resourceapi.CounterSetConsumption{{CounterSet: counterSet1, Counters: map[string]resource.Quantity{counter0: resource.MustParse("7")}}}})},
+			classes:          objects(classWithAllowMultipleAllocations(classB, driverA, false)),
+			slices: unwrapResourceSlices(
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA, resourceapi.CounterSet{Name: counterSet1, Counters: map[string]resourceapi.Counter{counter0: {Value: resource.MustParse("10")}}}, counterSet(counterSet2, map[string]resource.Quantity{counter0: resource.MustParse("10")})),
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA, device(device2).withDeviceCounterConsumption(deviceCounterConsumption(counterSet1, map[string]resource.Quantity{counter0: resource.MustParse("4")}))),
+			),
+			node:          node(node1, region1),
+			expectResults: nil,
+			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.PartitionableDevices {
+					return nil, nil, nil
+				}
+				if !features.SharedConsumableCapacity {
+					return []any{matchAllocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool1, device2, false))}, nil, nil
+				}
+				return results, matchError, errorIs
+			},
+		},
+	}
+}
+
+func testSharedConsumableCapacity(tCtx ktesting.TContext, supportedFeatures Features, newAllocator newAllocator) {
+	features := Features{
+		PartitionableDevices:     true,
+		ConsumableCapacity:       true,
+		SharedConsumableCapacity: true,
+	}
+	if !supportedFeatures.Set().IsSuperset(features.Set()) {
+		return
+	}
+
+	// A surviving share must keep the device's fixed cost reserved, regardless of
+	// allocation or release order. Only the released share's variable cost is freed.
+	tCtx.Run("shared-consumable-capacity-lifecycle", func(tCtx ktesting.TContext) {
+		for _, mixed := range []bool{false, true} {
+			for _, together := range []bool{false, true} {
+				for _, releaseFirst := range []bool{false, true} {
+					tCtx.Run(fmt.Sprintf("mixed=%t-together=%t-release-first=%t", mixed, together, releaseFirst), func(tCtx ktesting.TContext) {
+
+						static := deviceCounterConsumption(counterSet1, map[string]resource.Quantity{counter0: one})
+						shared := device(device1).withAllowMultipleAllocations().withDeviceCounterConsumption(*static.DeepCopy())
+						set := counterSet(counterSet1, map[string]resource.Quantity{counter0: one})
+						set.Counters[counter0] = resourceapi.Counter{
+							Value: one,
+							ConsumptionPolicy: &resourceapi.CapacityRequestPolicy{
+								Default: new(one), ValidValues: []resource.Quantity{one},
+							},
+						}
+						request := deviceRequest(req0, classA, 1)
+						if mixed {
+							shared.Device.ConsumesCounters[0].Counters[counter1] = resourceapi.CounterRequirement{ValueFrom: &resourceapi.CounterValueFrom{CapacityName: capacity0}}
+							set.Counters[counter1] = resourceapi.Counter{Value: two}
+							request = request.withCapacityRequest(capacity0, one)
+						}
+						sourceSlices := unwrapResourceSlices(
+							sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA, set),
+							sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA, shared, device(device2).withDeviceCounterConsumption(static)),
+						)
+						classLister := informerLister[resourceapi.DeviceClass]{objs: []*resourceapi.DeviceClass{
+							classWithAllowMultipleAllocations(classA, driverA, true),
+							classWithAllowMultipleAllocations(classB, driverA, false),
+						}}
+						// Reconstruct a fresh allocator after every change, as after a
+						// scheduler restart. No in-memory owner can preserve the charge.
+						allocate := func(allocated, pending []*resourceapi.ResourceClaim) []resourceapi.AllocationResult {
+							var state AllocatedState
+							internal.AddToAllocatedState(&state, func(yield func(*resourceapi.AllocationResult) bool) {
+								for _, claim := range allocated {
+									if !yield(claim.Status.Allocation) {
+										return
+									}
+								}
+							}, features)
+
+							a, err := newAllocator(tCtx, features, state, classLister, apiSlices(sourceSlices), cel.NewCache(10, cel.Features{EnableConsumableCapacity: true}))
+							tCtx.Require(err).NotTo(g.HaveOccurred())
+							results, err := a.Allocate(tCtx, node(node1, region1), pending)
+							tCtx.Require(err).NotTo(g.HaveOccurred())
+							return results
+						}
+						claims := []*resourceapi.ResourceClaim{claim(claim0).withRequests(request).obj(), claim(claim1).withRequests(request).obj()}
+						if together {
+							results := allocate(nil, claims)
+							tCtx.Require(results).To(g.HaveLen(2))
+							for i := range claims {
+								claims[i].Status.Allocation = &results[i]
+							}
+						} else {
+							for i := range claims {
+								results := allocate(claims[:i], claims[i:i+1])
+								tCtx.Require(results).To(g.HaveLen(1))
+								claims[i].Status.Allocation = &results[0]
+
+							}
+						}
+						for _, c := range claims {
+							snapshot := c.Status.Allocation.Devices.Results[0].ConsumedCounters
+							if mixed {
+								tCtx.Require(snapshot).To(g.Equal([]resourceapi.CounterSetConsumption{{CounterSet: counterSet1, Counters: map[string]resource.Quantity{counter1: one}}}))
+							} else {
+								tCtx.Require(snapshot).To(g.BeEmpty())
+							}
+						}
+						other := []*resourceapi.ResourceClaim{claim("competing-claim").withRequests(deviceRequest(req0, classB, 1)).obj()}
+						tCtx.Require(allocate(claims, other)).To(g.BeEmpty())
+						if mixed {
+							tCtx.Require(allocate(claims, []*resourceapi.ResourceClaim{claim("replacement-share").withRequests(request).obj()})).To(g.BeEmpty(), "both shares exhaust the variable counter")
+						}
+						survivor := claims[0]
+						if releaseFirst {
+							survivor = claims[1]
+						}
+						tCtx.Require(allocate([]*resourceapi.ResourceClaim{survivor}, other)).To(g.BeEmpty(), "a surviving share must keep the device cost reserved")
+						if mixed {
+							tCtx.Require(allocate([]*resourceapi.ResourceClaim{survivor}, []*resourceapi.ResourceClaim{claim("replacement-share").withRequests(request).obj()})).To(g.HaveLen(1), "releasing a share frees only its allocation cost")
+						}
+						tCtx.Require(allocate(nil, other)).To(g.HaveLen(1), "the last share releases the device cost")
+					})
+				}
+			}
+		}
+	})
 }
