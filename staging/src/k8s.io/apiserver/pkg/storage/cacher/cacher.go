@@ -358,7 +358,14 @@ type Cacher struct {
 	watchersBuffer []*cacheWatcher
 	// unsyncedWatchers is a map that need to be synchronized before sending events.
 	unsyncedWatchers watchersMap
-	maxResyncEvents  int
+	// stalledResyncCh wakes background resynchronization when a stalled watcher
+	// drains its input buffer or a resync pass hits maxResyncEvents.
+	stalledResyncCh chan struct{}
+	// nextResyncResourceVersion is the round-robin cursor across stalled watcher
+	// resync passes: watchers at or above this resourceVersion are served before
+	// wrapping around to watchers below it.
+	nextResyncResourceVersion uint64
+	maxResyncEvents           int
 	// blockedWatchers is a list of watchers whose buffer is currently full.
 	blockedWatchers []*cacheWatcher
 	// watchersToStop is a list of watchers that were supposed to be stopped
@@ -451,6 +458,7 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 		clock:                         config.Clock,
 		timer:                         time.NewTimer(time.Duration(0)),
 		unsyncedWatchers:              make(watchersMap),
+		stalledResyncCh:               make(chan struct{}, 1),
 		maxResyncEvents:               maxResyncEvents,
 		bookmarkWatchers:              newTimeBucketWatchers(config.Clock, defaultBookmarkFrequency),
 		watcherMetrics:                metrics.NewWatcherMetricsObservers(config.GroupResource),
@@ -564,6 +572,8 @@ func (c *Cacher) startBackgroundResync() {
 				return
 			case <-ticker.C():
 				c.resyncWatchers()
+			case <-c.stalledResyncCh:
+				c.resyncWatchers()
 			}
 		}
 	}()
@@ -587,9 +597,33 @@ func (c *Cacher) resyncWatchers() {
 		return
 	}
 
-	var stalledWatchers indexedWatchers
-	var minResourceVersion uint64
+	stalledWatchersList := c.rsyncInitialWatchersAndReturnStalledLocked()
+	if len(stalledWatchersList) == 0 {
+		return
+	}
 
+	rsyncMinResourceVersion := rsyncMinResourceVersion(stalledWatchersList, c.nextResyncResourceVersion)
+	stalledWatchers := indexedWatchers{
+		scopeWatchers: make(map[namespacedName]watchersMap),
+		indexWatchers: make(map[string]watchersMap),
+	}
+	skippedWatcher := false
+	for _, watcher := range stalledWatchersList {
+		if watcher.dispatchedResourceVersion < rsyncMinResourceVersion {
+			skippedWatcher = skippedWatcher || len(watcher.input) == 0
+			continue
+		}
+		stalledWatchers.addWatcher(watcher)
+	}
+
+	c.resyncStalledWatchersLocked(&stalledWatchers, rsyncMinResourceVersion)
+	if skippedWatcher {
+		c.triggerStalledResync()
+	}
+}
+
+func (c *Cacher) rsyncInitialWatchersAndReturnStalledLocked() []*cacheWatcher {
+	var stalled []*cacheWatcher
 	for _, watcher := range c.unsyncedWatchers {
 		if watcher.stopped {
 			c.deleteUnsyncedWatcherLocked(watcher)
@@ -620,21 +654,32 @@ func (c *Cacher) resyncWatchers() {
 			c.stopWatcherLocked(watcher, true)
 			continue
 		}
-		if stalledWatchers.empty() {
-			stalledWatchers = indexedWatchers{
-				scopeWatchers: make(map[namespacedName]watchersMap),
-				indexWatchers: make(map[string]watchersMap),
-			}
-			minResourceVersion = watcher.dispatchedResourceVersion
-		} else if watcher.dispatchedResourceVersion < minResourceVersion {
-			minResourceVersion = watcher.dispatchedResourceVersion
-		}
-		stalledWatchers.addWatcher(watcher)
+		stalled = append(stalled, watcher)
 	}
+	return stalled
+}
 
-	if !stalledWatchers.empty() {
-		c.resyncStalledWatchersLocked(&stalledWatchers, minResourceVersion)
+func rsyncMinResourceVersion(candidates []*cacheWatcher, cursorRV uint64) uint64 {
+	if minRV, ok := minDispatchedResourceVersion(candidates, cursorRV); ok {
+		return minRV
 	}
+	minRV, _ := minDispatchedResourceVersion(candidates, 0)
+	return minRV
+}
+
+func minDispatchedResourceVersion(watchers []*cacheWatcher, floorRV uint64) (uint64, bool) {
+	var minRV uint64
+	found := false
+	for _, watcher := range watchers {
+		if watcher.dispatchedResourceVersion < floorRV {
+			continue
+		}
+		if !found || watcher.dispatchedResourceVersion < minRV {
+			minRV = watcher.dispatchedResourceVersion
+			found = true
+		}
+	}
+	return minRV, found
 }
 
 func (c *Cacher) resyncStalledWatchersLocked(stalledWatchers *indexedWatchers, minResourceVersion uint64) {
@@ -644,6 +689,8 @@ func (c *Cacher) resyncStalledWatchersLocked(stalledWatchers *indexedWatchers, m
 			for watcher := range stalledWatchers.allWatchers() {
 				watcher.dispatchedResourceVersion = max(watcher.dispatchedResourceVersion, rawEvent.ResourceVersion-1)
 			}
+			c.nextResyncResourceVersion = rawEvent.ResourceVersion - 1
+			c.triggerStalledResync()
 			return
 		}
 		processedEvents++
@@ -654,6 +701,7 @@ func (c *Cacher) resyncStalledWatchersLocked(stalledWatchers *indexedWatchers, m
 			if consistency.PanicOnCacheInconsistency {
 				panic(fmt.Sprintf("Failed to access object metadata during stalled watcher resync, resource: %q, resourceVersion: %d, err: %v", c.groupResource, rawEvent.ResourceVersion, err))
 			}
+			c.nextResyncResourceVersion = rawEvent.ResourceVersion
 			return
 		}
 		namespace := accessor.GetNamespace()
@@ -668,7 +716,7 @@ func (c *Cacher) resyncStalledWatchersLocked(stalledWatchers *indexedWatchers, m
 			if eventToSend == nil {
 				eventToSend = c.prepareEventForDispatch(rawEvent)
 			}
-			if !watcher.nonblockingAdd(eventToSend) {
+			if !watcher.nonblockingAddWithResync(eventToSend, c.stalledResyncCh) {
 				stalledWatchers.deleteWatcher(watcher)
 				if stalledWatchers.empty() {
 					break
@@ -676,10 +724,12 @@ func (c *Cacher) resyncStalledWatchersLocked(stalledWatchers *indexedWatchers, m
 			}
 		}
 		if stalledWatchers.empty() {
+			c.nextResyncResourceVersion = rawEvent.ResourceVersion
 			return
 		}
 	}
 
+	c.nextResyncResourceVersion = 0
 	for watcher := range stalledWatchers.allWatchers() {
 		watcher.dispatchedResourceVersion = max(watcher.dispatchedResourceVersion, c.watchCache.resourceVersion)
 		c.deleteUnsyncedWatcherLocked(watcher)
@@ -696,6 +746,13 @@ func (c *Cacher) deleteUnsyncedWatcherLocked(watcher *cacheWatcher) {
 	c.unsyncedWatchers.deleteWatcher(watcher)
 	if watcher.synced.IsNotified() {
 		c.resyncMetrics.StalledWatchers.Dec()
+	}
+}
+
+func (c *Cacher) triggerStalledResync() {
+	select {
+	case c.stalledResyncCh <- struct{}{}:
+	default:
 	}
 }
 
@@ -1519,6 +1576,7 @@ func (c *Cacher) finishDispatching() {
 func (c *Cacher) terminateAllWatchers() {
 	c.Lock()
 	defer c.Unlock()
+	c.nextResyncResourceVersion = 0
 	c.watchers.terminateAll(c.groupResource, func(watcher *cacheWatcher) {
 		c.stopWatcherLocked(watcher, false)
 	})

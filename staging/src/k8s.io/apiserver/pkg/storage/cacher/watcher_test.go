@@ -235,16 +235,6 @@ func TestWatchResyncSingleTick(t *testing.T) {
 	}()
 	time.Sleep(50 * time.Millisecond)
 	fakeClock.Step(100 * time.Millisecond)
-	time.Sleep(50 * time.Millisecond)
-	select {
-	case <-done:
-		t.Fatal("expected single resync tick not to finish catchup")
-	default:
-	}
-	for range 10 {
-		fakeClock.Step(100 * time.Millisecond)
-		time.Sleep(20 * time.Millisecond)
-	}
 	<-done
 
 	livePod := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "live", Namespace: "ns"}}
