@@ -2099,6 +2099,32 @@ func TestCelEstimatedCostStability(t *testing.T) {
 				`url(self.val1).getEscapedPath().matches('^/[a-z]+$')`: 1206,
 			},
 		},
+		// A has() style presence check returns a bool and comparison operations of the result are cheap.
+		{name: "has() test comparisons",
+			schema: objectTypePtr(map[string]schema.Structural{
+				"str1":   stringType,
+				"str2":   stringType,
+				"short1": withMaxLength(stringType, ptr.To[int64](10)),
+				"short2": withMaxLength(stringType, ptr.To[int64](10)),
+				"items":  listType(&stringType),
+				"labels": mapType(&stringType),
+				"count":  integerType,
+				"child":  objectType(map[string]schema.Structural{"str": stringType}),
+				"budgets": withMaxItems(listType(objectTypePtr(map[string]schema.Structural{
+					"schedule": stringType,
+					"duration": stringType,
+				})), ptr.To[int64](50)),
+			}),
+			expectCost: map[string]uint64{
+				"has(self.str1) == has(self.str2)":                        314575,   // regression: was 3 in v1.37
+				"has(self.str1) != has(self.str2)":                        314575,   // regression: was 3 in v1.37
+				"has(self.str1) == has(oldSelf.str1)":                     314575,   // regression: was 3 in v1.37
+				"has(self.short1) == has(self.short2)":                    6,        // regression: was 3 in v1.37
+				"has(self.items) != has(self.labels)":                     39324,    // regression: was 3 in v1.37
+				"has(self.count) == has(self.child)":                      2,        // regression: was 3 in v1.37
+				"self.budgets.all(b, has(b.schedule) == has(b.duration))": 15728903, // regression: was 303 in v1.37
+			},
+		},
 	}
 
 	for _, tt := range cases {

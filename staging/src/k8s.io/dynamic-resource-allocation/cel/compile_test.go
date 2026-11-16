@@ -487,6 +487,16 @@ var testcases = map[string]struct {
 		expectMatch: true,
 		expectCost:  11,
 	},
+	"presence-test-comparison": {
+		expression: `has(device.attributes["dra.example.com"].model) == has(device.attributes["dra.example.com"].vendor)`,
+		attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+			"model":  {StringValue: new("a")},
+			"vendor": {StringValue: new("b")},
+		},
+		driver:      "dra.example.com",
+		expectMatch: true,
+		expectCost:  13, // regression: was 7 in v1.37
+	},
 	"quantity-compare-to-dec-then-is-integer": {
 		expression:  `device.capacity["dra.example.com"].memory.compareTo(quantity("1.5Gi")) >= 0 && device.capacity["dra.example.com"].memory.isInteger()`,
 		capacity:    map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{"memory": {Value: resource.MustParse("2Gi")}},
