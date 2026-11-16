@@ -30,6 +30,7 @@ import (
 	resourcehelper "k8s.io/component-helpers/resource"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
@@ -114,6 +115,10 @@ type Manager interface {
 
 	// GetResourceIsolationLevel returns the isolation level of the container.
 	GetResourceIsolationLevel(pod *v1.Pod, container *v1.Container) cmqos.ResourceIsolationLevel
+
+	// CanAllocateExclusively reports whether the configured policy supports exclusive
+	// assignment of the resource for eligible workloads, regardless of available capacity.
+	CanAllocateExclusively(res v1.ResourceName) bool
 }
 
 type manager struct {
@@ -406,7 +411,7 @@ func (m *manager) removeStaleState(rootLogger klog.Logger) {
 	activeContainers := make(map[string]map[string]struct{})
 	for _, pod := range activePods {
 		activeContainers[string(pod.UID)] = make(map[string]struct{})
-		for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
+		for container := range podutil.ContainerIter(&pod.Spec, podutil.InitContainers|podutil.Containers) {
 			activeContainers[string(pod.UID)][container.Name] = struct{}{}
 		}
 	}
@@ -462,9 +467,7 @@ func (m *manager) reconcileState(ctx context.Context) (success []reconciledConta
 			continue
 		}
 
-		allContainers := pod.Spec.InitContainers
-		allContainers = append(allContainers, pod.Spec.Containers...)
-		for _, container := range allContainers {
+		for container := range podutil.ContainerIter(&pod.Spec, podutil.InitContainers|podutil.Containers) {
 			logger := klog.LoggerWithValues(podLogger, "containerName", container.Name)
 
 			containerID, err := findContainerIDByName(&pstatus, container.Name)
@@ -611,4 +614,11 @@ func (m *manager) GetResourceIsolationLevel(pod *v1.Pod, container *v1.Container
 	}
 
 	return cmqos.ResourceIsolationContainer
+}
+
+func (m *manager) CanAllocateExclusively(res v1.ResourceName) bool {
+	if res != v1.ResourceCPU {
+		return false
+	}
+	return m.policy.CanAllocateExclusively()
 }

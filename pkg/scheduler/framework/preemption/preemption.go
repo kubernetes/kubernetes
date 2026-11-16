@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	policylisters "k8s.io/client-go/listers/policy/v1"
+	compresource "k8s.io/component-helpers/resource"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
@@ -65,12 +66,10 @@ type Interface interface {
 
 // Evaluator is a preemption evaluator. It runs preemption logic with a given Interface.
 type Evaluator struct {
-	PluginName                string
-	Handler                   fwk.Handle
-	PodLister                 corelisters.PodLister
-	PdbLister                 policylisters.PodDisruptionBudgetLister
-	podGroupSnapshot          fwk.PodGroupLister
-	compositePodGroupSnapshot fwk.CompositePodGroupLister
+	PluginName string
+	Handler    fwk.Handle
+	PodLister  corelisters.PodLister
+	PdbLister  policylisters.PodDisruptionBudgetLister
 
 	Interface
 	executor fwk.PreemptionExecutor
@@ -79,7 +78,7 @@ type Evaluator struct {
 
 // NewEvaluator creates a new Evaluator.
 func NewEvaluator(pluginName string, fh fwk.Handle, i Interface, fts feature.Features) *Evaluator {
-	ev := &Evaluator{
+	return &Evaluator{
 		PluginName: pluginName,
 		Handler:    fh,
 		PodLister:  fh.SharedInformerFactory().Core().V1().Pods().Lister(),
@@ -88,32 +87,32 @@ func NewEvaluator(pluginName string, fh fwk.Handle, i Interface, fts feature.Fea
 		executor:   fh.PreemptionManager().Executor(),
 		fts:        fts,
 	}
-	if fts.EnableGenericWorkload {
-		ev.podGroupSnapshot = fh.MutableSnapshotSharedLister().PodGroups()
-	}
-	if fts.EnableCompositePodGroup {
-		ev.compositePodGroupSnapshot = fh.MutableSnapshotSharedLister().CompositePodGroups()
-	}
-	return ev
 }
 
 // evaluate determines victims for preemption, without actuation.
 func (ev *Evaluator) evaluate(ctx context.Context, state fwk.CycleState, pod *v1.Pod, m fwk.NodeToStatusReader) (_ fwk.PreemptionCandidate, _ *fwk.PostFilterResult, status *fwk.Status) {
 	logger := klog.FromContext(ctx)
 	startTime := time.Now()
+	isResize := ev.fts.EnableInPlacePodVerticalScalingSchedulerPreemption && compresource.IsPodResizeDeferred(pod)
 	defer func() {
-		metrics.PreemptionEvaluationDuration.WithLabelValues("pod", status.Code().String()).Observe(metrics.SinceInSeconds(startTime))
+		metrics.PreemptionEvaluationDuration.WithLabelValues(metrics.Pod, status.Code().String(), metrics.OperationToLabel(isResize)).Observe(metrics.SinceInSeconds(startTime))
 	}()
 
 	// 0) Fetch the latest version of <pod>.
 	// It's safe to directly fetch pod here. Because the informer cache has already been
 	// initialized when creating the Scheduler obj.
 	// However, tests may need to manually initialize the shared pod informer.
+	evaluatedUID := pod.UID
 	podNamespace, podName := pod.Namespace, pod.Name
 	pod, err := ev.PodLister.Pods(podNamespace).Get(podName)
 	if err != nil {
 		logger.Error(err, "Could not get the updated preemptor pod object", "pod", klog.KRef(podNamespace, podName))
 		return nil, nil, fwk.AsStatus(err)
+	}
+	// The queued copy of a deferred resize pod can be stale. Don't preempt for a resize that was
+	// resolved or already evaluated since, or for a recreated pod.
+	if isResize && (pod.UID != evaluatedUID || !compresource.IsPodResizeDeferred(pod) || util.IsPodResizeSchedulerEvaluationCompleted(pod)) {
+		return nil, nil, fwk.NewStatus(fwk.Unschedulable, fmt.Sprintf("pod resize on node %v is no longer deferred or already evaluated", pod.Spec.NodeName))
 	}
 
 	// 1) Ensure the preemptor is eligible to preempt other pods.
@@ -145,7 +144,13 @@ func (ev *Evaluator) evaluate(ctx context.Context, state fwk.CycleState, pod *v1
 				// Leave UnschedulablePlugins or PendingPlugins as nil as it won't be used on moving Pods.
 			},
 		}
-		fitError.Diagnosis.NodeToStatus.SetAbsentNodesStatus(fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "Preemption is not helpful for scheduling"))
+		absentMsg := "Preemption is not helpful for scheduling"
+		if isResize {
+			// A deferred resize pod can only stay on its assigned node, so report on that node alone.
+			fitError.NumAllNodes = 1
+			absentMsg = "Preemption is not helpful for pod resize"
+		}
+		fitError.Diagnosis.NodeToStatus.SetAbsentNodesStatus(fwk.NewStatus(fwk.UnschedulableAndUnresolvable, absentMsg))
 		// Specify nominatedNodeName to clear the pod's nominatedNodeName status, if applicable.
 		return nil, framework.NewPostFilterResultWithNominatedNode(""), fwk.NewStatus(fwk.Unschedulable, fitError.Error())
 	}
@@ -196,6 +201,10 @@ func (ev *Evaluator) Preempt(ctx context.Context, state fwk.CycleState, pod *v1.
 		return nil, status
 	}
 
+	if ev.fts.EnableInPlacePodVerticalScalingSchedulerPreemption && compresource.IsPodResizeDeferred(pod) {
+		return framework.NewPostFilterResultWithNominatedNode(bestCandidate.Name()), fwk.NewStatus(fwk.Success, fmt.Sprintf("found potential victims for pod resize on node %v, preempting %d victims", bestCandidate.Name(), len(bestCandidate.Victims().Pods)))
+	}
+
 	return framework.NewPostFilterResultWithNominatedNode(bestCandidate.Name()), fwk.NewStatus(fwk.Success, fmt.Sprintf("found a potential placement for pod on node %v, preempting %d victims", bestCandidate.Name(), len(bestCandidate.Victims().Pods)))
 }
 
@@ -235,6 +244,9 @@ func (ev *Evaluator) findCandidates(ctx context.Context, state fwk.CycleState, a
 // or omit the node to reject it. Candidates that still have no victims after all extenders
 // run are dropped.
 func (ev *Evaluator) callExtenders(logger klog.Logger, pod *v1.Pod, candidates []fwk.PreemptionCandidate) ([]fwk.PreemptionCandidate, *fwk.Status) {
+	if ev.fts.EnableInPlacePodVerticalScalingSchedulerPreemption && compresource.IsPodResizeDeferred(pod) {
+		return candidates, nil
+	}
 	extenders := ev.Handler.Extenders()
 	nodeLister := ev.Handler.MutableSnapshotSharedLister().NodeInfos()
 	if len(extenders) == 0 {
@@ -299,10 +311,7 @@ func (ev *Evaluator) callExtenders(logger klog.Logger, pod *v1.Pod, candidates [
 			logger.V(2).Info("Dropped node because no preemption extender reported victims", "node", klog.KRef("", nodeName))
 			continue
 		}
-		newCandidates = append(newCandidates, &candidate{
-			victims: victims,
-			name:    nodeName,
-		})
+		newCandidates = append(newCandidates, newCandidate(victims, nodeName, nil, nodeName))
 	}
 	return newCandidates, nil
 }
@@ -312,6 +321,9 @@ func (ev *Evaluator) callExtenders(logger klog.Logger, pod *v1.Pod, candidates [
 // via ProcessPreemption, which is the only HTTP extender API that can observe
 // proposed victims.
 func (ev *Evaluator) hasInterestedPreemptExtender(pod *v1.Pod) bool {
+	if ev.fts.EnableInPlacePodVerticalScalingSchedulerPreemption && compresource.IsPodResizeDeferred(pod) {
+		return false
+	}
 	for _, extender := range ev.Handler.Extenders() {
 		if extender.SupportsPreemption() && extender.IsInterested(pod) {
 			return true
@@ -339,10 +351,7 @@ func (ev *Evaluator) SelectCandidate(ctx context.Context, candidates []fwk.Preem
 	// Same as candidatesToVictimsMap, this logic is not applicable for out-of-tree
 	// preemption plugins that exercise different candidates on the same nominated node.
 	if victims := victimsMap[candidateNode]; victims != nil {
-		return &candidate{
-			victims: victims,
-			name:    candidateNode,
-		}
+		return newCandidate(victims, candidateNode, nil, candidateNode)
 	}
 
 	// We shouldn't reach here.
@@ -505,10 +514,7 @@ func (ev *Evaluator) DryRunPreemption(ctx context.Context, state fwk.CycleState,
 				Pods:             pods,
 				NumPDBViolations: int64(numPDBViolations),
 			}
-			c := &candidate{
-				victims: &victims,
-				name:    nodeInfo.Node().Name,
-			}
+			c := newCandidate(&victims, nodeInfo.Node().Name, nil, nodeInfo.Node().Name)
 			if numPDBViolations == 0 {
 				nonViolatingCandidates.add(c)
 			} else {
@@ -539,22 +545,21 @@ func (ev *Evaluator) DryRunPreemption(ctx context.Context, state fwk.CycleState,
 // (with disruption mode All) across the cluster into a single victim.
 // If GenericWorkload is disabled, it treats each pod on the node as an individual victim.
 func (ev *Evaluator) GetVictimsOnNode(ctx context.Context, nodeInfo fwk.NodeInfo) ([]*DomainVictim, error) {
-	fh := ev.Handler
+	snapshot := ev.Handler.MutableSnapshotSharedLister()
 
-	// If GenericWorkload is disabled, we treat each pod on the node
-	// as an individual preemption victim. We bypass getCrossNodesVictims and call NewPodVictim
-	// with a nil pgLister to force using the pod's own priority. Otherwise, if we used the
-	// pgLister, it would resolve to the PodGroup's priority, which might be nil (treated as 0)
-	// when GenericWorkload is disabled.
+	// With GenericWorkload disabled, pod groups are not a scheduling concept: every pod on the node
+	// is an individual PodKeyType victim, so skip the hierarchy lookups altogether.
 	if !ev.fts.EnableGenericWorkload {
 		var victims []Victim
 		for _, podInfo := range nodeInfo.GetPods() {
-			victims = append(victims, NewPodVictim(podInfo, nil, nil))
+			// NewVictim only fails for an empty pod list or key type, neither of which can happen here.
+			victim, _ := NewVictim([]fwk.PodInfo{podInfo}, corev1helpers.PodPriority(podInfo.GetPod()), fwk.PodKeyType)
+			victims = append(victims, victim)
 		}
-		return createDomainVictims(fh.MutableSnapshotSharedLister(), victims)
+		return createDomainVictims(snapshot, victims)
 	}
 
 	logger := klog.FromContext(ctx)
-	victims := getCrossNodesVictims(logger, fh.MutableSnapshotSharedLister(), ev.podGroupSnapshot, ev.compositePodGroupSnapshot, []fwk.NodeInfo{nodeInfo})
-	return createDomainVictims(fh.SnapshotSharedLister(), victims)
+	victims := getCrossNodesVictims(logger, snapshot, []fwk.NodeInfo{nodeInfo})
+	return createDomainVictims(snapshot, victims)
 }

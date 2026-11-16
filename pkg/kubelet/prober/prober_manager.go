@@ -18,6 +18,7 @@ package prober
 
 import (
 	"context"
+	"slices"
 
 	"sync"
 	"time"
@@ -69,13 +70,14 @@ var ProberDuration = metrics.NewHistogramVec(
 )
 
 // Manager manages pod probing. It creates a probe "worker" for every container that specifies a
-// probe (AddPod). The worker periodically probes its assigned container and caches the results. The
+// probe (SyncPod). The worker periodically probes its assigned container and caches the results. The
 // manager use the cached probe results to set the appropriate Ready state in the PodStatus when
 // requested (UpdatePodStatus). Updating probe parameters is not currently supported.
 type Manager interface {
-	// AddPod creates new probe workers for every container probe. This should be called for every
-	// pod created.
-	AddPod(ctx context.Context, pod *v1.Pod)
+	// SyncPod creates probe workers for every container probe in the pod spec that doesn't have
+	// one yet, and stops the workers of containers that are no longer in the spec. This should be
+	// called on every pod sync with the allocated pod.
+	SyncPod(ctx context.Context, pod *v1.Pod)
 
 	// StopLivenessAndStartup handles stopping liveness and startup probes during termination.
 	StopLivenessAndStartup(pod *v1.Pod)
@@ -172,17 +174,7 @@ func (t probeType) String() string {
 	}
 }
 
-func getRestartableInitContainers(pod *v1.Pod) []v1.Container {
-	var restartableInitContainers []v1.Container
-	for _, c := range pod.Spec.InitContainers {
-		if podutil.IsRestartableInitContainer(&c) {
-			restartableInitContainers = append(restartableInitContainers, c)
-		}
-	}
-	return restartableInitContainers
-}
-
-func (m *manager) AddPod(ctx context.Context, pod *v1.Pod) {
+func (m *manager) SyncPod(ctx context.Context, pod *v1.Pod) {
 	m.workerLock.Lock()
 	defer m.workerLock.Unlock()
 
@@ -199,45 +191,51 @@ func (m *manager) AddPod(ctx context.Context, pod *v1.Pod) {
 	// own TimeoutSeconds elapses. The fix is a per-worker cancellable context
 	// cancelled by stop(), not the pod sync context, which cancels too early.
 	ctx = context.WithoutCancel(ctx)
+	wanted := sets.New[probeKey]()
 	key := probeKey{podUID: pod.UID}
-	for _, c := range append(pod.Spec.Containers, getRestartableInitContainers(pod)...) {
+	for c, containerType := range podutil.ContainerIter(&pod.Spec, podutil.InitContainers|podutil.Containers) {
+		if containerType == podutil.InitContainers && !podutil.IsRestartableInitContainer(c) {
+			continue
+		}
 		key.containerName = c.Name
-
-		if c.StartupProbe != nil {
-			key.probeType = startup
-			if _, ok := m.workers[key]; ok {
-				logger.V(8).Info("Startup probe already exists for container",
-					"pod", klog.KObj(pod), "containerName", c.Name)
+		for _, probeType := range [...]probeType{startup, readiness, liveness} {
+			probe := getProbe(c, probeType)
+			if probe == nil {
 				continue
 			}
-			w := newWorker(m, startup, pod, c)
-			m.workers[key] = w
-			go w.run(ctx)
-		}
-
-		if c.ReadinessProbe != nil {
-			key.probeType = readiness
-			if _, ok := m.workers[key]; ok {
-				logger.V(8).Info("Readiness probe already exists for container",
-					"pod", klog.KObj(pod), "containerName", c.Name)
-				continue
+			key.probeType = probeType
+			wanted.Insert(key)
+			if _, ok := m.workers[key]; !ok {
+				w := newWorker(m, probeType, pod, *c)
+				m.workers[key] = w
+				go w.run(ctx)
 			}
-			w := newWorker(m, readiness, pod, c)
-			m.workers[key] = w
-			go w.run(ctx)
 		}
+	}
 
-		if c.LivenessProbe != nil {
-			key.probeType = liveness
-			if _, ok := m.workers[key]; ok {
-				logger.V(8).Info("Liveness probe already exists for container",
-					"pod", klog.KObj(pod), "containerName", c.Name)
-				continue
-			}
-			w := newWorker(m, liveness, pod, c)
-			m.workers[key] = w
-			go w.run(ctx)
+	// Stop workers for containers that were removed from the spec.
+	for key, w := range m.workers {
+		if key.podUID != pod.UID || wanted.Has(key) {
+			continue
 		}
+		logger.V(4).Info("Stopping probe for container removed from pod spec",
+			"pod", klog.KObj(pod), "containerName", key.containerName, "probeType", key.probeType)
+		w.stop()
+		// A container added back under the same name gets a new worker, even before this one exits.
+		delete(m.workers, key)
+	}
+}
+
+func getProbe(c *v1.Container, probeType probeType) *v1.Probe {
+	switch probeType {
+	case startup:
+		return c.StartupProbe
+	case readiness:
+		return c.ReadinessProbe
+	case liveness:
+		return c.LivenessProbe
+	default:
+		return nil
 	}
 }
 
@@ -245,14 +243,9 @@ func (m *manager) StopLivenessAndStartup(pod *v1.Pod) {
 	m.workerLock.RLock()
 	defer m.workerLock.RUnlock()
 
-	key := probeKey{podUID: pod.UID}
-	for _, c := range append(pod.Spec.Containers, getRestartableInitContainers(pod)...) {
-		key.containerName = c.Name
-		for _, probeType := range [...]probeType{liveness, startup} {
-			key.probeType = probeType
-			if worker, ok := m.workers[key]; ok {
-				worker.stop()
-			}
+	for key, worker := range m.workers {
+		if key.podUID == pod.UID && (key.probeType == liveness || key.probeType == startup) {
+			worker.stop()
 		}
 	}
 }
@@ -261,14 +254,9 @@ func (m *manager) RemovePod(pod *v1.Pod) {
 	m.workerLock.RLock()
 	defer m.workerLock.RUnlock()
 
-	key := probeKey{podUID: pod.UID}
-	for _, c := range append(pod.Spec.Containers, getRestartableInitContainers(pod)...) {
-		key.containerName = c.Name
-		for _, probeType := range [...]probeType{readiness, liveness, startup} {
-			key.probeType = probeType
-			if worker, ok := m.workers[key]; ok {
-				worker.stop()
-			}
+	for key, worker := range m.workers {
+		if key.podUID == pod.UID {
+			worker.stop()
 		}
 	}
 }
@@ -360,6 +348,12 @@ func (m *manager) UpdatePodStatus(ctx context.Context, pod *v1.Pod, podStatus *v
 			continue
 		}
 
+		// A container removed from the spec is being killed, so it isn't ready.
+		if !slices.ContainsFunc(pod.Spec.Containers, func(sc v1.Container) bool { return sc.Name == c.Name }) {
+			podStatus.ContainerStatuses[i].Ready = false
+			continue
+		}
+
 		var ready bool
 		if c.State.Running == nil {
 			ready = false
@@ -448,10 +442,17 @@ func (m *manager) getWorker(podUID types.UID, containerName string, probeType pr
 }
 
 // Called by the worker after exiting.
-func (m *manager) removeWorker(podUID types.UID, containerName string, probeType probeType) {
+// removeWorker removes the worker from the map, unless another worker has replaced it, and returns
+// whether one has.
+func (m *manager) removeWorker(w *worker) (replaced bool) {
 	m.workerLock.Lock()
 	defer m.workerLock.Unlock()
-	delete(m.workers, probeKey{podUID, containerName, probeType})
+	key := probeKey{w.pod.UID, w.container.Name, w.probeType}
+	if current, ok := m.workers[key]; ok && current != w {
+		return true
+	}
+	delete(m.workers, key)
+	return false
 }
 
 // workerCount returns the total number of probe workers. For testing.

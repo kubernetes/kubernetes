@@ -263,7 +263,7 @@ func (r *CorrelatedObject) Key(field string) *CorrelatedObject {
 	}
 
 	var propertySchema Schema
-	if prop, exists := r.Schema.Properties()[field]; exists {
+	if prop, exists := r.Schema.Property(field); exists {
 		propertySchema = prop
 	} else if addP := r.Schema.AdditionalProperties(); addP != nil && addP.Schema() != nil {
 		propertySchema = addP.Schema()

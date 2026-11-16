@@ -21,14 +21,19 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	v1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/klog/v2"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/ktesting"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 )
 
 func TestStateMemory_EmptyDirVolumeLimits(t *testing.T) {
-	logger := klog.TODO()
-	state := NewStateMemory(logger, PodResourceInfoMap{})
+	logger, _ := ktesting.NewTestContext(t)
+	state := NewStateMemory(logger, PodMap{}, nil)
 
 	podUID := types.UID("pod-1")
 	volName := "volume-1"
@@ -40,7 +45,7 @@ func TestStateMemory_EmptyDirVolumeLimits(t *testing.T) {
 
 	// Set volume limit on nonexistent pod should implicitly initialize the pod and insert it
 	targetLimit := resource.MustParse("256Mi")
-	err := state.SetEmptyDirVolumeLimit(podUID, volName, &targetLimit)
+	err := state.SetEmptyDirVolumeLimit(logger, podUID, volName, &v1.EmptyDirVolumeSource{Medium: v1.StorageMediumMemory, SizeLimit: &targetLimit})
 	require.NoError(t, err)
 
 	// Get volume limit should return the parsed value and true
@@ -63,7 +68,7 @@ func TestStateMemory_EmptyDirVolumeLimits(t *testing.T) {
 	// Set another volume on the same pod should keep existing limits intact
 	anotherVolName := "volume-2"
 	anotherLimit := resource.MustParse("128Mi")
-	err = state.SetEmptyDirVolumeLimit(podUID, anotherVolName, &anotherLimit)
+	err = state.SetEmptyDirVolumeLimit(logger, podUID, anotherVolName, &v1.EmptyDirVolumeSource{Medium: v1.StorageMediumMemory, SizeLimit: &anotherLimit})
 	require.NoError(t, err)
 
 	// Verify both volumes are present and correct
@@ -74,4 +79,643 @@ func TestStateMemory_EmptyDirVolumeLimits(t *testing.T) {
 	qty2, exists2 := state.GetEmptyDirVolumeLimit(podUID, anotherVolName)
 	assert.True(t, exists2)
 	assert.True(t, anotherLimit.Equal(*qty2))
+
+	// Setting a volume limit to nil (removing size limit) should return (nil, true)
+	err = state.SetEmptyDirVolumeLimit(logger, podUID, volName, &v1.EmptyDirVolumeSource{Medium: v1.StorageMediumMemory, SizeLimit: nil})
+	require.NoError(t, err)
+
+	nilQty, nilExists := state.GetEmptyDirVolumeLimit(podUID, volName)
+	assert.True(t, nilExists)
+	assert.Nil(t, nilQty)
+}
+
+func TestStateMemory_ResourceIsolation(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	state := NewStateMemory(logger, PodMap{}, nil)
+
+	podUID := types.UID("pod-1")
+	containerName := "container-1"
+	volumeName := "volume-1"
+
+	// Set container resources
+	containerResources := v1.ResourceRequirements{
+		Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("250m")},
+	}
+	require.NoError(t, state.SetContainerResources(logger, podUID, containerName, podutil.Containers, containerResources))
+
+	// Verify container resources are set, and others are not
+	res, found := state.GetContainerResources(podUID, containerName)
+	assert.True(t, found)
+	assert.True(t, containerResources.Requests.Cpu().Equal(*res.Requests.Cpu()))
+	podRes, _ := state.GetPodLevelResources(podUID)
+	assert.Nil(t, podRes)
+	volLimit, exists := state.GetEmptyDirVolumeLimit(podUID, volumeName)
+	assert.Nil(t, volLimit)
+	assert.False(t, exists)
+
+	// Set pod-level resources
+	podResources := &v1.ResourceRequirements{
+		Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("512Mi")},
+	}
+	require.NoError(t, state.SetPodLevelResources(logger, podUID, podResources))
+
+	// Verify pod-level resources are set, AND container resources are still intact
+	podRes, _ = state.GetPodLevelResources(podUID)
+	require.NotNil(t, podRes)
+	assert.True(t, podResources.Requests.Memory().Equal(*podRes.Requests.Memory()))
+	res, found = state.GetContainerResources(podUID, containerName)
+	assert.True(t, found)
+	assert.True(t, containerResources.Requests.Cpu().Equal(*res.Requests.Cpu()))
+	volLimit, exists = state.GetEmptyDirVolumeLimit(podUID, volumeName)
+	assert.Nil(t, volLimit)
+	assert.False(t, exists)
+
+	// Set emptyDir volume limit
+	targetLimit := resource.MustParse("256Mi")
+	require.NoError(t, state.SetEmptyDirVolumeLimit(logger, podUID, volumeName, &v1.EmptyDirVolumeSource{Medium: v1.StorageMediumMemory, SizeLimit: &targetLimit}))
+
+	// Verify volume limit is set, AND both container and pod-level resources are still intact
+	volLimit, exists = state.GetEmptyDirVolumeLimit(podUID, volumeName)
+	require.True(t, exists)
+	require.NotNil(t, volLimit)
+	assert.True(t, targetLimit.Equal(*volLimit))
+	res, found = state.GetContainerResources(podUID, containerName)
+	assert.True(t, found)
+	assert.True(t, containerResources.Requests.Cpu().Equal(*res.Requests.Cpu()))
+	podRes, _ = state.GetPodLevelResources(podUID)
+	require.NotNil(t, podRes)
+	assert.True(t, podResources.Requests.Memory().Equal(*podRes.Requests.Memory()))
+
+	// Update container resources again
+	updatedContainerResources := v1.ResourceRequirements{
+		Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("500m")},
+	}
+	require.NoError(t, state.SetContainerResources(logger, podUID, containerName, podutil.Containers, updatedContainerResources))
+
+	// Verify container resources are updated, AND both pod-level resources and volume limits are still intact
+	res, found = state.GetContainerResources(podUID, containerName)
+	assert.True(t, found)
+	assert.True(t, updatedContainerResources.Requests.Cpu().Equal(*res.Requests.Cpu()))
+	podRes, _ = state.GetPodLevelResources(podUID)
+	require.NotNil(t, podRes)
+	assert.True(t, podResources.Requests.Memory().Equal(*podRes.Requests.Memory()))
+	volLimit, exists = state.GetEmptyDirVolumeLimit(podUID, volumeName)
+	require.True(t, exists)
+	require.NotNil(t, volLimit)
+	assert.True(t, targetLimit.Equal(*volLimit))
+}
+
+func TestStateMemory_SetContainerResources_ContainerTypes(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	state := NewStateMemory(logger, PodMap{}, nil)
+	podUID := types.UID("pod-1")
+
+	resources := func(cpu string) v1.ResourceRequirements {
+		return v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse(cpu)}}
+	}
+	cpuOf := func(name string) resource.Quantity {
+		res, found := state.GetContainerResources(podUID, name)
+		require.True(t, found, name)
+		return *res.Requests.Cpu()
+	}
+
+	require.NoError(t, state.SetContainerResources(logger, podUID, "init", podutil.InitContainers, resources("1")))
+	require.NoError(t, state.SetContainerResources(logger, podUID, "main", podutil.Containers, resources("2")))
+	require.NoError(t, state.SetContainerResources(logger, podUID, "debug", podutil.EphemeralContainers, resources("3")))
+
+	pod, ok := state.GetPod(podUID)
+	require.True(t, ok)
+	require.Len(t, pod.Spec.InitContainers, 1)
+	assert.Equal(t, "init", pod.Spec.InitContainers[0].Name)
+	require.Len(t, pod.Spec.Containers, 1)
+	assert.Equal(t, "main", pod.Spec.Containers[0].Name)
+	require.Len(t, pod.Spec.EphemeralContainers, 1)
+	assert.Equal(t, "debug", pod.Spec.EphemeralContainers[0].Name)
+
+	// A container found in another list is moved to the list for containerType instead of duplicated.
+	// That matters for a pod migrated from a V1 checkpoint, which initially has all of its containers in Spec.Containers.
+	for _, tc := range []struct {
+		containerType  podutil.ContainerType
+		wantInit       int
+		wantContainers int
+		wantEphemeral  int
+	}{
+		{podutil.InitContainers, 3, 0, 0},
+		{podutil.Containers, 0, 3, 0},
+	} {
+		for _, name := range []string{"init", "main", "debug"} {
+			require.NoError(t, state.SetContainerResources(logger, podUID, name, tc.containerType, resources("4")))
+			expected := resource.MustParse("4")
+			assert.True(t, expected.Equal(cpuOf(name)), "%s as %d", name, tc.containerType)
+		}
+		pod, _ = state.GetPod(podUID)
+		assert.Len(t, pod.Spec.InitContainers, tc.wantInit)
+		assert.Len(t, pod.Spec.Containers, tc.wantContainers)
+		assert.Len(t, pod.Spec.EphemeralContainers, tc.wantEphemeral)
+	}
+
+	// A container that is not stored cannot be added with a type that does not say where it belongs.
+	err := state.SetContainerResources(logger, "pod-2", "main", podutil.Containers|podutil.InitContainers, resources("1"))
+	require.Error(t, err)
+	assert.False(t, state.HasPod("pod-2"), "a failed update should not create the pod")
+	err = state.SetContainerResources(logger, podUID, "new", 0, resources("1"))
+	require.Error(t, err)
+	_, found := state.GetContainerResources(podUID, "new")
+	assert.False(t, found)
+}
+
+func TestStateMemory_SetPod(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	state := NewStateMemory(logger, PodMap{}, nil)
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{UID: "pod-1", Name: "name", Namespace: "namespace", Labels: map[string]string{"a": "b"}},
+		Spec: v1.PodSpec{
+			NodeName: "node",
+			Containers: []v1.Container{{
+				Name:      "main",
+				Image:     "image",
+				Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")}},
+			}},
+		},
+		Status: v1.PodStatus{Phase: v1.PodRunning},
+	}
+	require.NoError(t, state.SetPod(logger, pod))
+
+	// Only the identity and the spec are stored.
+	stored, ok := state.GetPod(pod.UID)
+	require.True(t, ok)
+	expected := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{UID: pod.UID, Name: pod.Name, Namespace: pod.Namespace},
+		Spec:       *pod.Spec.DeepCopy(),
+	}
+	assert.True(t, apiequality.Semantic.DeepEqual(expected, stored))
+
+	// The stored pod does not change when the pod it was made from does.
+	pod.Spec.Containers[0].Resources.Requests[v1.ResourceCPU] = resource.MustParse("2")
+	pod.Spec.NodeName = "other"
+	res, found := state.GetContainerResources(pod.UID, "main")
+	require.True(t, found)
+	assert.True(t, resource.MustParse("1").Equal(*res.Requests.Cpu()))
+	stored, _ = state.GetPod(pod.UID)
+	assert.Equal(t, "node", stored.Spec.NodeName)
+
+	// Setting a pod replaces what was stored for it.
+	require.NoError(t, state.SetPod(logger, &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: pod.UID}}))
+	_, found = state.GetContainerResources(pod.UID, "main")
+	assert.False(t, found)
+
+	// When a maskFn is configured, it is applied to the stored copy without mutating the input pod.
+	maskedState := NewStateMemory(logger, PodMap{}, func(p *v1.Pod) {
+		p.Spec.NodeName = ""
+		p.Spec.Volumes = nil
+	})
+	vol := v1.Volume{Name: "mounted-vol", VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}}
+	require.NoError(t, maskedState.SetPodVolume(logger, "pod-2", vol))
+	inputPod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{UID: "pod-2", Name: "pod2", Namespace: "ns"},
+		Spec: v1.PodSpec{
+			NodeName: "node",
+			Volumes:  []v1.Volume{{Name: "unmounted-vol", VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}}},
+		},
+	}
+	require.NoError(t, maskedState.SetPod(logger, inputPod))
+	assert.Equal(t, "node", inputPod.Spec.NodeName)
+	storedMasked, ok := maskedState.GetPod("pod-2")
+	require.True(t, ok)
+	assert.Empty(t, storedMasked.Spec.NodeName)
+	assert.Equal(t, []v1.Volume{vol}, storedMasked.Spec.Volumes, "SetPod should preserve existing volumes when maskFn strips Spec.Volumes")
+}
+
+func TestStateMemory_SettersCopyTheirInput(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+
+	state := NewStateMemory(logger, PodMap{}, nil)
+	podUID := types.UID("pod-1")
+
+	containerResources := v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")}}
+	require.NoError(t, state.SetContainerResources(logger, podUID, "main", podutil.Containers, containerResources))
+	podResources := &v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("1Gi")}}
+	require.NoError(t, state.SetPodLevelResources(logger, podUID, podResources))
+	limit := resource.MustParse("1Gi")
+	require.NoError(t, state.SetEmptyDirVolumeLimit(logger, podUID, "volume", &v1.EmptyDirVolumeSource{Medium: v1.StorageMediumMemory, SizeLimit: &limit}))
+
+	containerResources.Requests[v1.ResourceCPU] = resource.MustParse("2")
+	podResources.Requests[v1.ResourceMemory] = resource.MustParse("2Gi")
+	limit.Set(2 << 30)
+
+	res, _ := state.GetContainerResources(podUID, "main")
+	assert.True(t, resource.MustParse("1").Equal(*res.Requests.Cpu()))
+	podRes, _ := state.GetPodLevelResources(podUID)
+	assert.True(t, resource.MustParse("1Gi").Equal(*podRes.Requests.Memory()))
+	volLimit, _ := state.GetEmptyDirVolumeLimit(podUID, "volume")
+	assert.True(t, resource.MustParse("1Gi").Equal(*volLimit))
+
+	// Nor does what the getters return share anything with the state.
+	res.Requests[v1.ResourceCPU] = resource.MustParse("3")
+	podRes.Requests[v1.ResourceMemory] = resource.MustParse("3Gi")
+	volLimit.Set(3 << 30)
+	pod, _ := state.GetPod(podUID)
+	pod.Spec.Containers[0].Resources.Requests[v1.ResourceCPU] = resource.MustParse("3")
+	pod.Spec.Resources.Requests[v1.ResourceMemory] = resource.MustParse("3Gi")
+	pod.Spec.Volumes[0].EmptyDir.SizeLimit.Set(3 << 30)
+	res, _ = state.GetContainerResources(podUID, "main")
+	assert.True(t, resource.MustParse("1").Equal(*res.Requests.Cpu()))
+	podRes, _ = state.GetPodLevelResources(podUID)
+	assert.True(t, resource.MustParse("1Gi").Equal(*podRes.Requests.Memory()))
+	volLimit, _ = state.GetEmptyDirVolumeLimit(podUID, "volume")
+	assert.True(t, resource.MustParse("1Gi").Equal(*volLimit))
+}
+
+// A stored pod is shared with toPodList, so every update has to leave it, and anything it refers to, alone.
+func TestStateMemory_UpdatesDoNotModifyStoredPods(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+
+	sm := newStateMemory(logger, PodMap{}, nil)
+	podUID := types.UID("pod-1")
+
+	cpu := func(q string) v1.ResourceRequirements {
+		return v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse(q)}}
+	}
+	limit := resource.MustParse("2Gi")
+	require.NoError(t, sm.SetPod(logger, &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{UID: podUID},
+		Spec: v1.PodSpec{
+			InitContainers:      []v1.Container{{Name: "init", Resources: cpu("1")}},
+			Containers:          []v1.Container{{Name: "main", Resources: cpu("1")}},
+			EphemeralContainers: []v1.EphemeralContainer{{EphemeralContainerCommon: v1.EphemeralContainerCommon{Name: "debug", Resources: cpu("1")}}},
+			Resources:           &v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("1Gi")}},
+			Volumes: []v1.Volume{{
+				Name:         "volume",
+				VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{Medium: v1.StorageMediumMemory, SizeLimit: &limit}},
+			}},
+		},
+	}))
+
+	newLimit := resource.MustParse("4Gi")
+	updates := map[string]func() error{
+		"init container": func() error {
+			return sm.SetContainerResources(logger, podUID, "init", podutil.InitContainers, cpu("2"))
+		},
+		"container": func() error { return sm.SetContainerResources(logger, podUID, "main", podutil.Containers, cpu("2")) },
+		"ephemeral container": func() error {
+			return sm.SetContainerResources(logger, podUID, "debug", podutil.EphemeralContainers, cpu("2"))
+		},
+		"new container": func() error { return sm.SetContainerResources(logger, podUID, "new", podutil.Containers, cpu("2")) },
+		"pod-level resources": func() error {
+			return sm.SetPodLevelResources(logger, podUID, &v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("2Gi")}})
+		},
+		"volume limit": func() error {
+			return sm.SetEmptyDirVolumeLimit(logger, podUID, "volume", &v1.EmptyDirVolumeSource{Medium: v1.StorageMediumMemory, SizeLimit: &newLimit})
+		},
+		"new volume limit": func() error {
+			return sm.SetEmptyDirVolumeLimit(logger, podUID, "new-volume", &v1.EmptyDirVolumeSource{Medium: v1.StorageMediumMemory, SizeLimit: &newLimit})
+		},
+		"full container": func() error {
+			return sm.SetContainer(logger, podUID, podutil.Containers, v1.Container{Name: "main", Image: "image", Resources: cpu("3")})
+		},
+		"new full container": func() error {
+			return sm.SetContainer(logger, podUID, podutil.Containers, v1.Container{Name: "other", Image: "image"})
+		},
+		"remove containers": func() error { return sm.RemoveContainers(logger, podUID, podutil.Containers, "new", "other") },
+	}
+	for _, name := range []string{"init container", "container", "ephemeral container", "new container", "pod-level resources", "volume limit", "new volume limit", "full container", "new full container", "remove containers"} {
+		// Not GetPod: that returns a copy, which would never show a modification.
+		stored := sm.pods[podUID]
+		storedBefore := stored.DeepCopy()
+		podListBefore := sm.toPodList()
+		podListCopy := podListBefore.DeepCopy()
+
+		require.NoError(t, updates[name](), name)
+
+		assert.True(t, apiequality.Semantic.DeepEqual(storedBefore, stored), "%s: the stored pod was modified", name)
+		assert.True(t, apiequality.Semantic.DeepEqual(podListCopy, podListBefore), "%s: the pod list handed out earlier was modified", name)
+		updated, _ := sm.GetPod(podUID)
+		assert.False(t, apiequality.Semantic.DeepEqual(storedBefore, updated), "%s: the update was not applied", name)
+	}
+
+	// Both updated and newly added volumes preserve their medium.
+	pod, _ := sm.GetPod(podUID)
+	assert.Equal(t, v1.StorageMediumMemory, pod.Spec.Volumes[0].EmptyDir.Medium)
+	assert.Equal(t, v1.StorageMediumMemory, pod.Spec.Volumes[1].EmptyDir.Medium)
+}
+
+func TestStateMemory_GetPodUIDs(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	state := NewStateMemory(logger, PodMap{}, nil)
+
+	assert.Empty(t, state.GetPodUIDs())
+
+	pod1 := types.UID("pod-1")
+	pod2 := types.UID("pod-2")
+	require.NoError(t, state.SetPod(logger, &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: pod1}}))
+	require.NoError(t, state.SetPod(logger, &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: pod2}}))
+	assert.ElementsMatch(t, []types.UID{pod1, pod2}, state.GetPodUIDs())
+
+	require.NoError(t, state.RemovePod(logger, pod1))
+	assert.Equal(t, []types.UID{pod2}, state.GetPodUIDs())
+}
+
+func TestStateMemory_HasPod(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	state := NewStateMemory(logger, PodMap{}, nil)
+
+	podUID := types.UID("pod-1")
+	assert.False(t, state.HasPod(podUID))
+
+	// A pod is created by the first update of any kind.
+	require.NoError(t, state.SetPodLevelResources(logger, podUID, nil))
+	assert.True(t, state.HasPod(podUID))
+
+	require.NoError(t, state.RemovePod(logger, podUID))
+	assert.False(t, state.HasPod(podUID))
+}
+
+func TestStateMemory_RemoveOrphanedPods(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	state := NewStateMemory(logger, PodMap{}, nil)
+	for _, uid := range []types.UID{"pod-1", "pod-2", "pod-3"} {
+		require.NoError(t, state.SetPod(logger, &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: uid}}))
+	}
+
+	state.RemoveOrphanedPods(sets.New[types.UID]("pod-2"))
+	assert.Equal(t, []types.UID{"pod-2"}, state.GetPodUIDs())
+}
+
+func TestStateMemory_PodVolumes(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	state := NewStateMemory(logger, PodMap{}, nil)
+	podUID := types.UID("pod-1")
+
+	vols, found := state.GetPodVolumes(podUID)
+	assert.Nil(t, vols)
+	assert.False(t, found)
+
+	size100 := resource.MustParse("100Mi")
+	size200 := resource.MustParse("200Mi")
+	vol1 := v1.Volume{
+		Name: "secret-vol",
+		VolumeSource: v1.VolumeSource{
+			Secret: &v1.SecretVolumeSource{SecretName: "my-secret"},
+		},
+	}
+	vol2 := v1.Volume{
+		Name: "mem-vol",
+		VolumeSource: v1.VolumeSource{
+			EmptyDir: &v1.EmptyDirVolumeSource{
+				Medium:    v1.StorageMediumMemory,
+				SizeLimit: &size100,
+			},
+		},
+	}
+
+	require.NoError(t, state.SetPodVolume(logger, podUID, vol1))
+	require.NoError(t, state.SetPodVolume(logger, podUID, vol2))
+
+	// Mutating input does not affect stored state.
+	vol1.Secret.SecretName = "mutated"
+	gotVols, found := state.GetPodVolumes(podUID)
+	require.True(t, found)
+	require.Len(t, gotVols, 2)
+	assert.Equal(t, "my-secret", gotVols[0].Secret.SecretName)
+	assert.True(t, size100.Equal(*gotVols[1].EmptyDir.SizeLimit))
+
+	// Re-setting an existing memory-backed emptyDir volume preserves an already-actuated SizeLimit.
+	vol2Updated := v1.Volume{
+		Name: "mem-vol",
+		VolumeSource: v1.VolumeSource{
+			EmptyDir: &v1.EmptyDirVolumeSource{
+				Medium:    v1.StorageMediumMemory,
+				SizeLimit: &size200,
+			},
+		},
+	}
+	require.NoError(t, state.SetPodVolume(logger, podUID, vol2Updated))
+	limit, found := state.GetEmptyDirVolumeLimit(podUID, "mem-vol")
+	require.True(t, found)
+	assert.True(t, size100.Equal(*limit))
+
+	// Re-setting an identical volume or removing a non-existent volume is a no-op.
+	changed, err := state.(*stateMemory).setPodVolume(logger, podUID, vol2Updated)
+	require.NoError(t, err)
+	assert.False(t, changed, "re-setting an unchanged volume should report changed=false")
+	changed, err = state.(*stateMemory).removePodVolume(logger, podUID, "non-existent")
+	require.NoError(t, err)
+	assert.False(t, changed, "removing a non-existent volume should report changed=false")
+
+	// SetEmptyDirVolumeLimit updates the actuated SizeLimit.
+	require.NoError(t, state.SetEmptyDirVolumeLimit(logger, podUID, "mem-vol", &v1.EmptyDirVolumeSource{
+		Medium:    v1.StorageMediumMemory,
+		SizeLimit: &size200,
+	}))
+	limit, found = state.GetEmptyDirVolumeLimit(podUID, "mem-vol")
+	require.True(t, found)
+	assert.True(t, size200.Equal(*limit))
+
+	// RemovePodVolume removes only the target volume.
+	require.NoError(t, state.RemovePodVolume(logger, podUID, "secret-vol"))
+	gotVols, found = state.GetPodVolumes(podUID)
+	require.True(t, found)
+	require.Len(t, gotVols, 1)
+	assert.Equal(t, "mem-vol", gotVols[0].Name)
+
+	require.NoError(t, state.RemovePodVolume(logger, podUID, "mem-vol"))
+	gotVols, found = state.GetPodVolumes(podUID)
+	assert.Nil(t, gotVols)
+	assert.False(t, found)
+}
+
+func TestStateMemory_ContainerVolumeMounts(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	state := NewStateMemory(logger, PodMap{}, nil)
+	podUID := types.UID("pod-1")
+
+	mounts, found := state.GetContainerVolumeMounts(podUID, "main")
+	assert.Nil(t, mounts)
+	assert.False(t, found)
+
+	rro := v1.RecursiveReadOnlyEnabled
+	inputMounts := []v1.VolumeMount{
+		{Name: "vol1", MountPath: "/mnt/vol1", ReadOnly: true, RecursiveReadOnly: &rro},
+		{Name: "vol2", MountPath: "/mnt/vol2", SubPath: "sub"},
+	}
+	cpuReq := v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("100m")}}
+	require.NoError(t, state.SetContainer(logger, podUID, podutil.Containers, v1.Container{
+		Name:         "main",
+		Resources:    cpuReq,
+		VolumeMounts: inputMounts,
+	}))
+
+	// Mutating input slice or pointer fields does not affect stored state.
+	rroChanged := v1.RecursiveReadOnlyDisabled
+	inputMounts[0].RecursiveReadOnly = &rroChanged
+	inputMounts[0].Name = "mutated"
+
+	gotMounts, found := state.GetContainerVolumeMounts(podUID, "main")
+	require.True(t, found)
+	require.Len(t, gotMounts, 2)
+	assert.Equal(t, "vol1", gotMounts[0].Name)
+	require.NotNil(t, gotMounts[0].RecursiveReadOnly)
+	assert.Equal(t, v1.RecursiveReadOnlyEnabled, *gotMounts[0].RecursiveReadOnly)
+
+	// Mutating returned slice does not affect stored state.
+	gotMounts[0].Name = "mutated-return"
+	gotMountsAgain, found := state.GetContainerVolumeMounts(podUID, "main")
+	require.True(t, found)
+	assert.Equal(t, "vol1", gotMountsAgain[0].Name)
+
+	// Container resources remain intact.
+	gotRes, found := state.GetContainerResources(podUID, "main")
+	require.True(t, found)
+	assert.True(t, resource.MustParse("100m").Equal(*gotRes.Requests.Cpu()))
+
+	// Setting container with empty volume mounts clears mounts while keeping container resources.
+	require.NoError(t, state.SetContainer(logger, podUID, podutil.Containers, v1.Container{
+		Name:      "main",
+		Resources: cpuReq,
+	}))
+	mounts, found = state.GetContainerVolumeMounts(podUID, "main")
+	assert.Nil(t, mounts)
+	assert.True(t, found)
+
+	gotRes, found = state.GetContainerResources(podUID, "main")
+	require.True(t, found)
+	assert.True(t, resource.MustParse("100m").Equal(*gotRes.Requests.Cpu()))
+}
+
+func TestStateMemory_ToPodList(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	sm := newStateMemory(logger, PodMap{}, nil)
+	assert.Empty(t, sm.toPodList().Items)
+
+	require.NoError(t, sm.SetPod(logger, &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: "pod-1"}}))
+	require.NoError(t, sm.SetPod(logger, &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: "pod-2"}}))
+
+	uids := []types.UID{}
+	for _, pod := range sm.toPodList().Items {
+		uids = append(uids, pod.UID)
+	}
+	assert.ElementsMatch(t, []types.UID{"pod-1", "pod-2"}, uids)
+}
+
+func TestStateMemory_GetPodReadOnly(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	sm := newStateMemory(logger, PodMap{}, nil)
+
+	got, ok := sm.GetPodReadOnly("missing")
+	assert.Nil(t, got)
+	assert.False(t, ok)
+
+	cpu100m := resource.MustParse("100m")
+	cpu200m := resource.MustParse("200m")
+	size100Mi := resource.MustParse("100Mi")
+	size200Mi := resource.MustParse("200Mi")
+	initial := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{UID: "pod-ro", Name: "pod-ro", Namespace: "default"},
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{{
+				Name: "vol-1",
+				VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{
+					Medium:    v1.StorageMediumMemory,
+					SizeLimit: &size100Mi,
+				}},
+			}},
+			Containers: []v1.Container{{
+				Name:      "c1",
+				Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: cpu100m}},
+			}},
+		},
+	}
+	require.NoError(t, sm.SetPod(logger, initial))
+
+	readOnly1, ok := sm.GetPodReadOnly("pod-ro")
+	require.True(t, ok)
+	readOnly2, ok := sm.GetPodReadOnly("pod-ro")
+	require.True(t, ok)
+	assert.Same(t, readOnly1, readOnly2, "GetPodReadOnly should return the stored pointer without copying")
+	snapshot := readOnly1.DeepCopy()
+
+	// Subsequent copy-on-write mutations must not modify a previously returned read-only pod.
+	require.NoError(t, sm.SetContainerResources(logger, "pod-ro", "c1", podutil.Containers, v1.ResourceRequirements{
+		Requests: v1.ResourceList{v1.ResourceCPU: cpu200m},
+	}))
+	require.NoError(t, sm.SetPodLevelResources(logger, "pod-ro", &v1.ResourceRequirements{
+		Requests: v1.ResourceList{v1.ResourceCPU: cpu200m},
+	}))
+	require.NoError(t, sm.SetEmptyDirVolumeLimit(logger, "pod-ro", "vol-1", &v1.EmptyDirVolumeSource{
+		Medium:    v1.StorageMediumMemory,
+		SizeLimit: &size200Mi,
+	}))
+	require.NoError(t, sm.SetPodVolume(logger, "pod-ro", v1.Volume{
+		Name:         "vol-2",
+		VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}},
+	}))
+	require.NoError(t, sm.RemovePodVolume(logger, "pod-ro", "vol-1"))
+	assert.Equal(t, snapshot, readOnly1, "previously returned read-only pod must remain immutable across updates")
+}
+
+func TestStateMemory_Containers(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	state := NewStateMemory(logger, PodMap{}, nil)
+	podUID := types.UID("pod-1")
+	cpu := func(q string) v1.ResourceRequirements {
+		return v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse(q)}}
+	}
+
+	_, ok := state.GetContainer(podUID, "main", podutil.Containers)
+	assert.False(t, ok)
+	require.NoError(t, state.RemoveContainers(logger, podUID, podutil.Containers, "main"))
+	assert.False(t, state.HasPod(podUID), "removing from an unknown pod doesn't add it")
+
+	require.NoError(t, state.SetContainerResources(logger, podUID, "init", podutil.InitContainers, cpu("1")))
+	main := &v1.Container{
+		Name:         "main",
+		Image:        "image",
+		Resources:    cpu("1"),
+		VolumeMounts: []v1.VolumeMount{{Name: "vol", MountPath: "/vol"}},
+	}
+	debug := &v1.Container{Name: "debug", Image: "debug-image"}
+	require.NoError(t, state.SetContainer(logger, podUID, podutil.Containers, *main))
+	require.NoError(t, state.SetContainer(logger, podUID, podutil.Containers, v1.Container{Name: "other", Image: "image"}))
+	require.NoError(t, state.SetContainer(logger, podUID, podutil.EphemeralContainers, *debug))
+
+	got, ok := state.GetContainer(podUID, "main", podutil.Containers)
+	require.True(t, ok)
+	assert.Equal(t, main, got)
+	got, ok = state.GetContainer(podUID, "debug", podutil.EphemeralContainers)
+	require.True(t, ok)
+	assert.Equal(t, debug, got)
+	_, ok = state.GetContainer(podUID, "init", podutil.Containers)
+	assert.False(t, ok, "only containers of the given type")
+
+	// SetContainer replaces the whole container, and SetContainerResources only its resources.
+	require.NoError(t, state.SetContainer(logger, podUID, podutil.InitContainers, v1.Container{Name: "init", Image: "image"}))
+	require.NoError(t, state.SetContainer(logger, podUID, podutil.Containers, v1.Container{Name: "main", Image: "image2", Resources: cpu("2")}))
+	require.NoError(t, state.SetContainerResources(logger, podUID, "main", podutil.Containers, cpu("3")))
+	got, _ = state.GetContainer(podUID, "init", podutil.InitContainers)
+	assert.Equal(t, &v1.Container{Name: "init", Image: "image"}, got)
+	got, _ = state.GetContainer(podUID, "main", podutil.Containers)
+	assert.Equal(t, &v1.Container{Name: "main", Image: "image2", Resources: cpu("3")}, got)
+
+	require.NoError(t, state.RemoveContainers(logger, podUID, podutil.Containers, "main", "debug", "missing"))
+	_, ok = state.GetContainer(podUID, "main", podutil.Containers)
+	assert.False(t, ok)
+	_, ok = state.GetContainer(podUID, "other", podutil.Containers)
+	assert.True(t, ok)
+	_, ok = state.GetContainer(podUID, "debug", podutil.EphemeralContainers)
+	assert.True(t, ok, "only containers of the given type are removed")
+	require.NoError(t, state.RemoveContainers(logger, podUID, podutil.EphemeralContainers, "debug"))
+	_, ok = state.GetContainer(podUID, "debug", podutil.EphemeralContainers)
+	assert.False(t, ok)
+	_, ok = state.GetContainerResources(podUID, "init")
+	assert.True(t, ok)
+
+	// removeContainers reports whether anything was removed, so the checkpoint can skip the write.
+	sm := state.(*stateMemory)
+	removed, err := sm.removeContainers(logger, podUID, podutil.Containers, "missing")
+	require.NoError(t, err)
+	assert.False(t, removed)
+	removed, err = sm.removeContainers(logger, podUID, podutil.Containers, "other")
+	require.NoError(t, err)
+	assert.True(t, removed)
 }

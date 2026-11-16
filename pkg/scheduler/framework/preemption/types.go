@@ -21,6 +21,7 @@ import (
 	"sync/atomic"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	fwk "k8s.io/kube-scheduler/framework"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
@@ -30,9 +31,9 @@ import (
 // It abstracts individual Pods and PodGroup, ensuring that
 // atomic entities are treated as a single unit during eviction.
 type Victim interface {
-	// Priority returns the priority of the preemption unit.
-	// For a single Pod, this is the Pod's priority.
-	// For a PodGroup, this is the priority of the PodGroup.
+	// Priority returns the priority of the preemption unit, which is the priority of its Pods.
+	// For a PodGroup or CompositePodGroup this is also the group's priority: the scheduling cycle
+	// guarantees that every Pod in a hierarchy shares the priority of the hierarchy's root.
 	Priority() int32
 
 	// Pods returns the list of all Pods that belong to this preemption unit.
@@ -64,9 +65,9 @@ func (v *victim) Pods() []fwk.PodInfo {
 	return v.pods
 }
 
-// Priority returns the priority of the preemption unit.
-// For a single Pod, this is the Pod's priority.
-// For a PodGroup, this is the priority of the PodGroup.
+// Priority returns the priority of the preemption unit, which is the priority of its Pods.
+// For a PodGroup or CompositePodGroup this is also the group's priority: the scheduling cycle
+// guarantees that every Pod in a hierarchy shares the priority of the hierarchy's root.
 func (v *victim) Priority() int32 {
 	return v.priority
 }
@@ -82,23 +83,11 @@ func (v *victim) Type() fwk.EntityKeyType {
 }
 
 // NewPodVictim creates a new Victim representing a single Pod.
-// It calculates the priority of the pod, taking into account its scheduling group if applicable.
 // It ignores the error from NewVictim internally as it is guaranteed to succeed for a single valid pod.
-// TODO: what we do below is not ideal:
-//   - From the victim's importance POV, individual Pods should always have the PodKeyType.
-//   - On the other hand, we need to store the information that the Pod victim belongs to the "single"
-//     disruption mode PodGroup due to WAP-related metrics bookkeeping.
-//   - Ideally, we should store another bit of information denoting the type of top-level group the victim
-//     Pod belongs to.
-//
-// We should fix this on the occasion of adding support for CompositePodGroup WAP-related metrics.
-func NewPodVictim(podInfo fwk.PodInfo, pgLister fwk.PodGroupLister, cpgLister fwk.CompositePodGroupLister) Victim {
-	priority := getPodPriority(podInfo.GetPod(), pgLister, cpgLister)
-	keyType := fwk.PodKeyType
-	if podInfo.GetPod().Spec.SchedulingGroup != nil && pgLister != nil {
-		keyType = fwk.PodGroupKeyType
-	}
-	vi, _ := NewVictim([]fwk.PodInfo{podInfo}, priority, keyType)
+// The victim is always of PodKeyType, even if the pod belongs to a PodGroup or CompositePodGroup with
+// disruption mode Single: it is evicted alone, so it ranks and is reported in metrics as an individual pod.
+func NewPodVictim(podInfo fwk.PodInfo) Victim {
+	vi, _ := NewVictim([]fwk.PodInfo{podInfo}, corev1helpers.PodPriority(podInfo.GetPod()), fwk.PodKeyType)
 	return vi
 }
 
@@ -180,12 +169,24 @@ type candidate struct {
 	victims *extenderv1.Victims
 	// name returns the target domain(for pod group)/node name where the preemptor gets nominated to run.
 	name string
-	// numPodGroupDisruptions returns the number of preemption units that affect pod groups.
-	// A single preemption unit can be all pods in a pod group (for DisruptionMode=all) or a single pod (for DisruptionMode=single).
-	numPodGroupDisruptions int
+	// disruptions is the number of preemption units per victim type. Used only for metrics.
+	disruptions map[fwk.EntityKeyType]int
+	// nodes returns a list of nodes where the preemptor pods get nominated to run.
+	// For a single pod preemption it's equal Name but for pod group preemption
+	// it contains a set of nodes for all preemptor pods.
+	nodes []string
 }
 
 var _ fwk.PreemptionCandidate = &candidate{}
+
+func newCandidate(victims *extenderv1.Victims, name string, disruptions map[fwk.EntityKeyType]int, nodes ...string) *candidate {
+	return &candidate{
+		victims:     victims,
+		name:        name,
+		disruptions: disruptions,
+		nodes:       nodes,
+	}
+}
 
 // Victims returns s.victims.
 func (s *candidate) Victims() *extenderv1.Victims {
@@ -197,9 +198,16 @@ func (s *candidate) Name() string {
 	return s.name
 }
 
-// NumPodGroupDisruptions returns s.numPodGroupDisruptions.
-func (s *candidate) NumPodGroupDisruptions() int {
-	return s.numPodGroupDisruptions
+// NumDisruptionsByVictimType returns s.disruptions.
+func (s *candidate) NumDisruptionsByVictimType() map[fwk.EntityKeyType]int {
+	return s.disruptions
+}
+
+// Nodes returns a list of nodes where the preemptor pods get nominated to run.
+// For a single pod preemption it's equal Name but for pod group preemption
+// it contains a set of nodes for all preemptor pods.
+func (s *candidate) Nodes() []string {
+	return s.nodes
 }
 
 type candidateList struct {

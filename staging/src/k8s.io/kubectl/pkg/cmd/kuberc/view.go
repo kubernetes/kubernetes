@@ -127,13 +127,16 @@ func (o *ViewOptions) Run() error {
 			return nil
 		}
 
-		if strings.EqualFold(input, "y") {
-			pref := kuberc.CreateDefaultPreference()
-			return kuberc.SavePreference(pref, o.KubeRCFile, o.Out)
+		if !strings.EqualFold(input, "y") {
+			// The user declined to generate a default kuberc file,
+			// so there is nothing to print.
+			return nil
 		}
-		// The user declined to generate a default kuberc file,
-		// so there is nothing to print.
-		return nil
+
+		pref = kuberc.CreateDefaultPreference()
+		if err := kuberc.SavePreference(pref, o.KubeRCFile, o.Out); err != nil {
+			return err
+		}
 	}
 
 	if pref.Aliases == nil {

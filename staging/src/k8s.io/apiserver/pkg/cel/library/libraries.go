@@ -17,7 +17,7 @@ limitations under the License.
 package library
 
 import (
-	"github.com/google/cel-go/cel"
+	"cel.dev/cel-go/cel"
 )
 
 // Library represents a CEL library used by kubernetes.

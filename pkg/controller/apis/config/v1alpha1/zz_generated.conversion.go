@@ -41,7 +41,9 @@ import (
 	endpointconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/endpoint/config/v1alpha1"
 	endpointsliceconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/endpointslice/config/v1alpha1"
 	endpointslicemirroringconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/endpointslicemirroring/config/v1alpha1"
+	evictionrequestconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/evictionrequest/config/v1alpha1"
 	garbagecollectorconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/garbagecollector/config/v1alpha1"
+	imperativeevictionresponderconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/imperativeevictionresponder/config/v1alpha1"
 	jobconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/job/config/v1alpha1"
 	namespaceconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/namespace/config/v1alpha1"
 	nodeipamconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/nodeipam/config/v1alpha1"
@@ -181,10 +183,16 @@ func autoConvert_v1alpha1_KubeControllerManagerConfiguration_To_config_KubeContr
 	if err := ephemeralconfigv1alpha1.Convert_v1alpha1_EphemeralVolumeControllerConfiguration_To_config_EphemeralVolumeControllerConfiguration(&in.EphemeralVolumeController, &out.EphemeralVolumeController, s); err != nil {
 		return err
 	}
+	if err := evictionrequestconfigv1alpha1.Convert_v1alpha1_EvictionRequestControllerConfiguration_To_config_EvictionRequestControllerConfiguration(&in.EvictionRequestController, &out.EvictionRequestController, s); err != nil {
+		return err
+	}
 	if err := garbagecollectorconfigv1alpha1.Convert_v1alpha1_GarbageCollectorControllerConfiguration_To_config_GarbageCollectorControllerConfiguration(&in.GarbageCollectorController, &out.GarbageCollectorController, s); err != nil {
 		return err
 	}
 	if err := podautoscalerconfigv1alpha1.Convert_v1alpha1_HPAControllerConfiguration_To_config_HPAControllerConfiguration(&in.HPAController, &out.HPAController, s); err != nil {
+		return err
+	}
+	if err := imperativeevictionresponderconfigv1alpha1.Convert_v1alpha1_ImperativeEvictionResponderControllerConfiguration_To_config_ImperativeEvictionResponderControllerConfiguration(&in.ImperativeEvictionResponderController, &out.ImperativeEvictionResponderController, s); err != nil {
 		return err
 	}
 	if err := jobconfigv1alpha1.Convert_v1alpha1_JobControllerConfiguration_To_config_JobControllerConfiguration(&in.JobController, &out.JobController, s); err != nil {
@@ -289,10 +297,16 @@ func autoConvert_config_KubeControllerManagerConfiguration_To_v1alpha1_KubeContr
 	if err := ephemeralconfigv1alpha1.Convert_config_EphemeralVolumeControllerConfiguration_To_v1alpha1_EphemeralVolumeControllerConfiguration(&in.EphemeralVolumeController, &out.EphemeralVolumeController, s); err != nil {
 		return err
 	}
+	if err := evictionrequestconfigv1alpha1.Convert_config_EvictionRequestControllerConfiguration_To_v1alpha1_EvictionRequestControllerConfiguration(&in.EvictionRequestController, &out.EvictionRequestController, s); err != nil {
+		return err
+	}
 	if err := garbagecollectorconfigv1alpha1.Convert_config_GarbageCollectorControllerConfiguration_To_v1alpha1_GarbageCollectorControllerConfiguration(&in.GarbageCollectorController, &out.GarbageCollectorController, s); err != nil {
 		return err
 	}
 	if err := podautoscalerconfigv1alpha1.Convert_config_HPAControllerConfiguration_To_v1alpha1_HPAControllerConfiguration(&in.HPAController, &out.HPAController, s); err != nil {
+		return err
+	}
+	if err := imperativeevictionresponderconfigv1alpha1.Convert_config_ImperativeEvictionResponderControllerConfiguration_To_v1alpha1_ImperativeEvictionResponderControllerConfiguration(&in.ImperativeEvictionResponderController, &out.ImperativeEvictionResponderController, s); err != nil {
 		return err
 	}
 	if err := jobconfigv1alpha1.Convert_config_JobControllerConfiguration_To_v1alpha1_JobControllerConfiguration(&in.JobController, &out.JobController, s); err != nil {

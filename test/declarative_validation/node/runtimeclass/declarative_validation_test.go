@@ -124,7 +124,7 @@ func TestRuntimeClass_DeclarativeValidate_Create(t *testing.T) {
 						}
 					}),
 					expectedErrs: field.ErrorList{
-						field.Invalid(field.NewPath("scheduling", "tolerations").Index(0).Child("key"), nil, "").WithOrigin("format=k8s-label-key").MarkAlpha(),
+						field.Invalid(field.NewPath("scheduling", "tolerations").Index(0).Child("key"), nil, "").WithOrigin("format=k8s-label-key").MarkBeta(),
 					},
 				},
 			}

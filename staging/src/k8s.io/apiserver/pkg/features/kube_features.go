@@ -56,6 +56,16 @@ const (
 	// Enables serving watch requests in separate goroutines.
 	APIServingWithRoutine featuregate.Feature = "APIServingWithRoutine"
 
+	// owner: @seans3
+	//
+	// Bounds the capacity of the encode buffers that the apiserver retains in
+	// its protobuf serialization pool (runtime.AllocatorPool). Without the
+	// bound every pooled buffer grows to the largest response it ever
+	// encoded and is kept for the life of the process. While enabled, encode
+	// buffers also grow to max(n, 2*cap) instead of 2*cap+n, so a buffer is
+	// never more than twice the largest object it has encoded.
+	AllocatorPoolBufferCap featuregate.Feature = "AllocatorPoolBufferCap"
+
 	// owner: @modulitos
 	//
 	// Allow user.DefaultInfo.UID to be set from x509 cert during cert auth.
@@ -88,6 +98,12 @@ const (
 	// (residual expressions) that depend on the request/stored object. These
 	// conditions are enforced during the validating admission phase.
 	ConditionalAuthorization featuregate.Feature = "ConditionalAuthorization"
+
+	// owner: @serathius
+	// kep: https://kep.k8s.io/6404
+	//
+	// Enables serving consistent GET requests from watch cache.
+	ConsistentGetFromCache featuregate.Feature = "ConsistentGetFromCache"
 
 	// owner: @yedou37
 	//
@@ -169,7 +185,6 @@ const (
 
 	// owner: @aramase
 	// kep: https://kep.k8s.io/3299
-	// deprecated: v1.28
 	//
 	// Enables KMS v1 API for encryption at rest.
 	KMSv1 featuregate.Feature = "KMSv1"
@@ -210,12 +225,32 @@ const (
 	// in the spec returned from kube-apiserver.
 	OpenAPIEnums featuregate.Feature = "OpenAPIEnums"
 
+	// owner: @seans3
+	//
+	// Defers building the /openapi/v2 spec until the first request instead
+	// of building it eagerly at server startup, reducing apiserver memory on
+	// clusters where the endpoint is not exercised. Served content, ETags
+	// and update semantics are unchanged once built. A spec that fails to
+	// build no longer fails startup: the server's own /openapi/v2 serves 503,
+	// and the aggregated /openapi/v2 omits that server's APIs, as it does for
+	// any delegate whose spec is unavailable. With this feature enabled
+	// GenericAPIServer.StaticOpenAPISpec builds the spec on its first Get
+	// rather than during PrepareRun.
+	OpenAPIV2LazyBuild featuregate.Feature = "OpenAPIV2LazyBuild"
+
 	// owner: @stlaz
 	//
 	// Enable kube-apiserver to accept UIDs via request header authentication.
 	// This will also make the kube-apiserver's API aggregator add UIDs via standard
 	// headers when forwarding requests to the servers serving the aggregated API.
 	RemoteRequestHeaderUID featuregate.Feature = "RemoteRequestHeaderUID"
+
+	// owner: @serathius @siarkowicz
+	// kep: https://kep.k8s.io/6315
+	//
+	// Enables Open Request Cost Aggregation (ORCA) endpoint load metrics reporting
+	// via HTTP response headers when --enable-endpoint-load-metrics is set.
+	RequestCostAggregation featuregate.Feature = "RequestCostAggregation"
 
 	// owner: @cici37
 	//
@@ -296,6 +331,17 @@ const (
 	// Enables post-start-hook for storage readiness
 	WatchCacheInitializationPostStartHook featuregate.Feature = "WatchCacheInitializationPostStartHook"
 
+	// owner: @serathius
+	// kep: https://kep.k8s.io/6268
+	//
+	// Enables watch cache to pause and resume stalled watchers instead of closing them.
+	WatchCacheStallResume featuregate.Feature = "WatchCacheStallResume"
+
+	// owner: @shadowofs
+	//
+	// Enables watch cache ingestion without fetching previous values from etcd.
+	WatchFromStorageWithoutPrevKV featuregate.Feature = "WatchFromStorageWithoutPrevKV"
+
 	// owner: @p0lyn0mial
 	//
 	// Allow the API server to stream individual items instead of chunking
@@ -345,6 +391,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
+	AllocatorPoolBufferCap: {
+		{Version: version.MustParse("1.38"), Default: true, PreRelease: featuregate.Beta},
+	},
+
 	AllowParsingUserUIDFromCertAuth: {
 		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.Beta},
 	},
@@ -365,6 +415,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 
 	ConditionalAuthorization: {
 		{Version: version.MustParse("1.38"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
+	ConsistentGetFromCache: {
+		{Version: version.MustParse("1.38"), Default: true, PreRelease: featuregate.Beta},
 	},
 
 	ConsistentListFromCacheSkipTimeoutFallback: {
@@ -439,9 +493,17 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.24"), Default: true, PreRelease: featuregate.Beta},
 	},
 
+	OpenAPIV2LazyBuild: {
+		{Version: version.MustParse("1.38"), Default: true, PreRelease: featuregate.Beta},
+	},
+
 	RemoteRequestHeaderUID: {
 		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	RequestCostAggregation: {
+		{Version: version.MustParse("1.38"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
 	SeparateCacheWatchRPC: {
@@ -452,6 +514,7 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 
 	ShardedListAndWatch: {
 		{Version: version.MustParse("1.36"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.38"), Default: true, PreRelease: featuregate.Beta},
 	},
 
 	SizeBasedListCostEstimate: {
@@ -493,6 +556,14 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Beta},
 		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.Beta},
 		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
+	},
+
+	WatchCacheStallResume: {
+		{Version: version.MustParse("1.38"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
+	WatchFromStorageWithoutPrevKV: {
+		{Version: version.MustParse("1.38"), Default: true, PreRelease: featuregate.Beta},
 	},
 
 	WatchList: {

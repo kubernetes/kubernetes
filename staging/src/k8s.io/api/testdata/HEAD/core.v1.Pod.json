@@ -778,11 +778,21 @@
           "procMount": "procMountValue",
           "seccompProfile": {
             "type": "typeValue",
-            "localhostProfile": "localhostProfileValue"
+            "localhostProfile": "localhostProfileValue",
+            "oci": {
+              "ref": "refValue",
+              "baseProfile": {
+                "type": "typeValue",
+                "localhostProfile": "localhostProfileValue"
+              }
+            }
           },
           "appArmorProfile": {
             "type": "typeValue",
             "localhostProfile": "localhostProfileValue"
+          },
+          "cgroupOptions": {
+            "mountMode": "mountModeValue"
           }
         },
         "stdin": true,
@@ -1103,11 +1113,21 @@
           "procMount": "procMountValue",
           "seccompProfile": {
             "type": "typeValue",
-            "localhostProfile": "localhostProfileValue"
+            "localhostProfile": "localhostProfileValue",
+            "oci": {
+              "ref": "refValue",
+              "baseProfile": {
+                "type": "typeValue",
+                "localhostProfile": "localhostProfileValue"
+              }
+            }
           },
           "appArmorProfile": {
             "type": "typeValue",
             "localhostProfile": "localhostProfileValue"
+          },
+          "cgroupOptions": {
+            "mountMode": "mountModeValue"
           }
         },
         "stdin": true,
@@ -1428,11 +1448,21 @@
           "procMount": "procMountValue",
           "seccompProfile": {
             "type": "typeValue",
-            "localhostProfile": "localhostProfileValue"
+            "localhostProfile": "localhostProfileValue",
+            "oci": {
+              "ref": "refValue",
+              "baseProfile": {
+                "type": "typeValue",
+                "localhostProfile": "localhostProfileValue"
+              }
+            }
           },
           "appArmorProfile": {
             "type": "typeValue",
             "localhostProfile": "localhostProfileValue"
+          },
+          "cgroupOptions": {
+            "mountMode": "mountModeValue"
           }
         },
         "stdin": true,
@@ -1486,7 +1516,14 @@
       "fsGroupChangePolicy": "fsGroupChangePolicyValue",
       "seccompProfile": {
         "type": "typeValue",
-        "localhostProfile": "localhostProfileValue"
+        "localhostProfile": "localhostProfileValue",
+        "oci": {
+          "ref": "refValue",
+          "baseProfile": {
+            "type": "typeValue",
+            "localhostProfile": "localhostProfileValue"
+          }
+        }
       },
       "appArmorProfile": {
         "type": "typeValue",
@@ -2229,17 +2266,19 @@
         ]
       }
     ],
-    "volumeHealth": [
+    "volumeStatuses": [
       {
         "name": "nameValue",
-        "healthConditions": [
-          {
-            "status": "statusValue",
-            "reason": "reasonValue",
-            "message": "messageValue"
-          }
-        ],
-        "lastTransitionTime": "2003-01-01T01:01:01Z"
+        "healthStatus": {
+          "healthConditions": [
+            {
+              "status": "statusValue",
+              "reason": "reasonValue",
+              "message": "messageValue"
+            }
+          ],
+          "lastTransitionTime": "2002-01-01T01:01:01Z"
+        }
       }
     ]
   }

@@ -1,0 +1,12 @@
+- testname: Service, named targetPorts that resolve to different ports
+  codename: '[sig-network] Services should support named targetPorts that resolve
+    to different ports on different endpoints [FutureConformance]'
+  description: Create a Service with a named port and 2 endpoint pods (which map the
+    named port to the same container port). Replace one of the pods with a new pod
+    that maps the named port to a different container port. The Service must still
+    send traffic to both endpoints. Replace the other pod with a new pod that likewise
+    maps to the same new container port. The Service must still send traffic to both
+    endpoints.
+  release: v1.41
+  file: test/e2e/network/service.go
+

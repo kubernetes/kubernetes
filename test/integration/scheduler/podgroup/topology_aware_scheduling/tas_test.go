@@ -28,8 +28,8 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
+	schedulerutils "k8s.io/kubernetes/test/integration/scheduler"
 	stepsframework "k8s.io/kubernetes/test/integration/scheduler/podgroup/stepsframework"
-	testutils "k8s.io/kubernetes/test/integration/util"
 )
 
 func makeGangPodGroup(podGroupName, topologyKey string, minCount int32) *schedulingapi.PodGroup {
@@ -45,11 +45,19 @@ func makeBasicPodGroup(podGroupName, topologyKey string) *schedulingapi.PodGroup
 }
 
 func makeNode(nodeName, rackLabel, zoneLabel string) *v1.Node {
-	return st.MakeNode().Name(nodeName).Label("rack", rackLabel).Label("zone", zoneLabel).Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Obj()
+	return makeNodeWithCPU(nodeName, rackLabel, zoneLabel, "2")
+}
+
+func makeNodeWithCPU(nodeName, rackLabel, zoneLabel, cpu string) *v1.Node {
+	return st.MakeNode().Name(nodeName).Label("rack", rackLabel).Label("zone", zoneLabel).Capacity(map[v1.ResourceName]string{v1.ResourceCPU: cpu}).Obj()
 }
 
 func makePod(podName, podGroupName string) *v1.Pod {
-	return st.MakePod().Name(podName).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").
+	return makePodWithCPU(podName, podGroupName, "1")
+}
+
+func makePodWithCPU(podName, podGroupName, cpu string) *v1.Pod {
+	return st.MakePod().Name(podName).Req(map[v1.ResourceName]string{v1.ResourceCPU: cpu}).Container("image").
 		PodGroupName(podGroupName).Priority(100).ZeroTerminationGracePeriod().Obj()
 }
 
@@ -240,8 +248,11 @@ func TestTopologyAwareSchedulingWithGangPolicy(t *testing.T) {
 					WaitForPodsScheduled: []string{"p1", "p2", "p3"},
 				},
 				{
-					Name:               "Verify that low prio pods are removed",
-					WaitForPodsRemoved: []string{"existing1", "existing2"},
+					Name: "Verify that one low prio pod is removed",
+					WaitForAnyPodsRemoved: &stepsframework.WaitForAnyPodsRemoved{
+						Pods:       []string{"existing1", "existing2"},
+						NumRemoved: 1,
+					},
 				},
 			},
 		},
@@ -902,6 +913,51 @@ func TestTopologyAwareSchedulingWithGangPolicy(t *testing.T) {
 				{
 					Name:                     "Verify the entire gang is unschedulable",
 					WaitForPodsUnschedulable: []string{"p1", "p2", "p3"},
+				},
+			},
+		},
+		{
+			name: "gang with heterogeneous pod sizes schedules on the rack whose node capacities match the pod shapes",
+			steps: []stepsframework.Step{
+				{
+					Name: "Create two racks with equal aggregate CPU (4 CPU) but different per-node shapes (2+2 vs 3+1)",
+					CreateNodes: []*v1.Node{
+						makeNode("node1-rack1", "rack-1", "zone-1"),
+						makeNode("node2-rack1", "rack-1", "zone-1"),
+						makeNodeWithCPU("node3-rack2", "rack-2", "zone-1", "3"),
+						makeNodeWithCPU("node4-rack2", "rack-2", "zone-1", "1"),
+					},
+				},
+				{
+					Name:           "Create the PodGroup object (Gang with minCount=2) constrained to a single rack",
+					CreatePodGroup: makeGangPodGroup("pg1", "rack", 2),
+				},
+				// p-large (3 CPU) must be evaluated before p-small (1 CPU) via CreatePodsInOrder,
+				// otherwise LeastAllocated places p-small on node3-rack2 (3 CPU), leaving only 2 CPU for p-large.
+				{
+					Name: "Create one 3-CPU pod and one 1-CPU pod belonging to the gang in order",
+					CreatePodsInOrder: []*v1.Pod{
+						makePodWithCPU("p-large", "pg1", "3"),
+						makePod("p-small", "pg1"),
+					},
+				},
+				{
+					Name:                 "Verify both gang pods schedule",
+					WaitForPodsScheduled: []string{"p-large", "p-small"},
+				},
+				{
+					Name: "Verify p-large lands on node3-rack2",
+					VerifyAssignments: &stepsframework.VerifyAssignments{
+						Pods:  []string{"p-large"},
+						Nodes: sets.New("node3-rack2"),
+					},
+				},
+				{
+					Name: "Verify p-small lands on node4-rack2",
+					VerifyAssignments: &stepsframework.VerifyAssignments{
+						Pods:  []string{"p-small"},
+						Nodes: sets.New("node4-rack2"),
+					},
 				},
 			},
 		},
@@ -1589,8 +1645,7 @@ func TestTopologyAwareSchedulingNominatedNode(t *testing.T) {
 					Name: "Create one node per rack. rack-1's node is smaller so MostAllocated scores it higher; rack-2 (nominated) fits the gang but scores lower, so without the NNN fix the gang deterministically lands on rack-1",
 					CreateNodes: []*v1.Node{
 						makeNode("node-rack1", "rack-1", "zone-1"),
-						st.MakeNode().Name("node-rack2").Label("rack", "rack-2").Label("zone", "zone-1").
-							Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj(),
+						makeNodeWithCPU("node-rack2", "rack-2", "zone-1", "4"),
 					},
 				},
 				{
@@ -1644,10 +1699,8 @@ func TestTopologyAwareSchedulingNominatedNode(t *testing.T) {
 				{
 					Name: "Create a one-CPU node in rack-1 and a four-CPU node in rack-2",
 					CreateNodes: []*v1.Node{
-						st.MakeNode().Name("node-rack1").Label("rack", "rack-1").Label("zone", "zone-1").
-							Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
-						st.MakeNode().Name("node-rack2").Label("rack", "rack-2").Label("zone", "zone-1").
-							Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj(),
+						makeNodeWithCPU("node-rack1", "rack-1", "zone-1", "1"),
+						makeNodeWithCPU("node-rack2", "rack-2", "zone-1", "4"),
 					},
 				},
 				{
@@ -1734,7 +1787,7 @@ func runTestScenario(t *testing.T, tt scenario, cpgEnabled bool) {
 		features.TopologyAwareWorkloadScheduling: true,
 	})
 
-	testCtx := testutils.InitTestSchedulerWithNS(t, "tas",
+	testCtx := schedulerutils.InitTestSchedulerWithNS(t, "tas",
 		scheduler.WithPodMaxBackoffSeconds(0),
 		scheduler.WithPodInitialBackoffSeconds(0))
 	ns := testCtx.NS.Name
@@ -1853,7 +1906,7 @@ func TestTopologyAwareSchedulingWithPlacementLimit(t *testing.T) {
 				features.TopologyAwareWorkloadScheduling: true,
 			})
 
-			testCtx := testutils.InitTestSchedulerWithNS(t, "tas-placement-limit",
+			testCtx := schedulerutils.InitTestSchedulerWithNS(t, "tas-placement-limit",
 				scheduler.WithPodMaxBackoffSeconds(0),
 				scheduler.WithPodInitialBackoffSeconds(0),
 				scheduler.WithPercentageOfPlacementsToScore(new(percentageLimit)))

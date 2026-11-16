@@ -202,3 +202,73 @@ func benchmarkMatchingPodsParallel(b *testing.B, tracker hpaSelectorTracker) {
 		})
 	}
 }
+
+func TestHPASelectorStoreRepeatedLabels(t *testing.T) {
+	cases := []struct {
+		name string
+		sets []map[string]string
+		want []string
+	}{
+		{name: "no pods"},
+		{name: "empty labels", sets: []map[string]string{nil, {}, nil}, want: []string{"other"}},
+		{name: "repeated", sets: []map[string]string{{"app": "one"}, {"app": "one"}, {"app": "one"}}, want: []string{"one"}},
+		{name: "alternating", sets: []map[string]string{{"app": "one"}, {"app": "two"}, {"app": "one"}}, want: []string{"one", "two"}},
+		{name: "additional label", sets: []map[string]string{{"app": "one"}, {"app": "one", "version": "v2"}}, want: []string{"one", "v2"}},
+		{name: "repeated prefix then different", sets: []map[string]string{{"app": "one"}, {"app": "one"}, {"app": "two"}, {"app": "one"}}, want: []string{"one", "two"}},
+		{name: "empty between matches", sets: []map[string]string{{"app": "one"}, nil, {"app": "one"}}, want: []string{"one", "other"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			store := newHPASelectorStore()
+			for name, expr := range map[string]string{"one": "app=one", "two": "app=two", "other": "app notin (one,two)", "v2": "version=v2"} {
+				sel, err := labels.Parse(expr)
+				if err != nil {
+					t.Fatal(err)
+				}
+				store.PutIfAbsent("ns", selectors.Key{Namespace: "ns", Name: name}, sel)
+			}
+			var pods []*v1.Pod
+			for _, set := range tc.sets {
+				pods = append(pods, &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: set}})
+			}
+			got := store.HPAsMatchingPods("ns", pods, 0)
+			var names []string
+			for _, key := range got {
+				names = append(names, key.Name)
+			}
+			assert.ElementsMatch(t, tc.want, names)
+		})
+	}
+}
+
+func BenchmarkHPAsMatchingPodsRepeatedLabels(b *testing.B) {
+	for _, mode := range []string{"same", "alternating", "unique"} {
+		for _, count := range []int{100, 1000} {
+			b.Run(fmt.Sprintf("%s/%d", mode, count), func(b *testing.B) {
+				store := newHPASelectorStore()
+				for i := range 100 {
+					key := selectors.Key{Namespace: "ns", Name: fmt.Sprint(i)}
+					store.PutIfAbsent("ns", key, labels.SelectorFromSet(labels.Set{"app": fmt.Sprint(i)}))
+				}
+				pods := make([]*v1.Pod, count)
+				for i := range count {
+					set := map[string]string{"app": "0"}
+					for j := range 9 {
+						set[fmt.Sprintf("example.com/label-%d", j)] = "production"
+					}
+					if mode == "alternating" {
+						set["app"] = fmt.Sprint(i % 2)
+					}
+					if mode == "unique" {
+						set["example.com/pod-id"] = fmt.Sprint(i)
+					}
+					pods[i] = &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: set}}
+				}
+				b.ReportAllocs()
+				for b.Loop() {
+					store.HPAsMatchingPods("ns", pods, 2)
+				}
+			})
+		}
+	}
+}

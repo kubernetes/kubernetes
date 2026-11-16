@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+	apiresource "k8s.io/apimachinery/pkg/api/resource"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -594,6 +595,39 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		"valid firstAvailable derived attributes, max allowed": {
 			input: mkValidResourceClaim(tweakFirstAvailableDerivedAttributesCount(32)),
 		},
+		"valid exactly capacity requests, max allowed": {
+			input: mkValidResourceClaim(tweakExactlyCapacityRequests(mkCapacityRequests(32, "1"))),
+		},
+		"valid exactly capacity requests, zero": {
+			input: mkValidResourceClaim(tweakExactlyCapacityRequests(mkCapacityRequests(1, "0"))),
+		},
+		"invalid exactly capacity requests, too many": {
+			input: mkValidResourceClaim(tweakExactlyCapacityRequests(mkCapacityRequests(33, "1"))),
+			expectedErrs: field.ErrorList{
+				field.TooMany(field.NewPath("spec", "devices", "requests").Index(0).Child("exactly", "capacity", "requests"), 33, 32).WithOrigin("maxProperties"),
+			},
+		},
+		"invalid exactly capacity requests, negative": {
+			input: mkValidResourceClaim(tweakExactlyCapacityRequests(mkCapacityRequests(1, "-1"))),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices", "requests").Index(0).Child("exactly", "capacity", "requests").Key("dra.example.com/cap0"), "-1", "").WithOrigin("minimum"),
+			},
+		},
+		"valid firstAvailable capacity requests, max allowed": {
+			input: mkValidResourceClaim(tweakFirstAvailableCapacityRequests(mkCapacityRequests(32, "1"))),
+		},
+		"invalid firstAvailable capacity requests, too many": {
+			input: mkValidResourceClaim(tweakFirstAvailableCapacityRequests(mkCapacityRequests(33, "1"))),
+			expectedErrs: field.ErrorList{
+				field.TooMany(field.NewPath("spec", "devices", "requests").Index(0).Child("firstAvailable").Index(0).Child("capacity", "requests"), 33, 32).WithOrigin("maxProperties"),
+			},
+		},
+		"invalid firstAvailable capacity requests, negative": {
+			input: mkValidResourceClaim(tweakFirstAvailableCapacityRequests(mkCapacityRequests(1, "-1"))),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices", "requests").Index(0).Child("firstAvailable").Index(0).Child("capacity", "requests").Key("dra.example.com/cap0"), "-1", "").WithOrigin("minimum"),
+			},
+		},
 		// TODO: Add more test cases
 	}
 	for k, tc := range testCases {
@@ -744,6 +778,33 @@ func tweakFirstAvailable(items int) func(*resource.ResourceClaim) {
 	}
 }
 
+func mkCapacityRequests(count int, value string) map[resource.QualifiedName]apiresource.Quantity {
+	requests := make(map[resource.QualifiedName]apiresource.Quantity, count)
+	for i := range count {
+		requests[resource.QualifiedName(fmt.Sprintf("dra.example.com/cap%d", i))] = apiresource.MustParse(value)
+	}
+	return requests
+}
+
+func tweakExactlyCapacityRequests(requests map[resource.QualifiedName]apiresource.Quantity) func(*resource.ResourceClaim) {
+	return func(rc *resource.ResourceClaim) {
+		rc.Spec.Devices.Requests[0].Exactly.Capacity = &resource.CapacityRequirements{Requests: requests}
+	}
+}
+
+func tweakFirstAvailableCapacityRequests(requests map[resource.QualifiedName]apiresource.Quantity) func(*resource.ResourceClaim) {
+	return func(rc *resource.ResourceClaim) {
+		tweakFirstAvailable(1)(rc)
+		rc.Spec.Devices.Requests[0].FirstAvailable[0].Capacity = &resource.CapacityRequirements{Requests: requests}
+	}
+}
+
+func tweakLabels(labels map[string]string) func(*resource.ResourceClaim) {
+	return func(rc *resource.ResourceClaim) {
+		rc.Labels = labels
+	}
+}
+
 func tweakExactlyAllocationMode(mode resource.DeviceAllocationMode, count int64) func(*resource.ResourceClaim) {
 	return func(rc *resource.ResourceClaim) {
 		if len(rc.Spec.Devices.Requests) > 0 && rc.Spec.Devices.Requests[0].Exactly != nil {
@@ -831,6 +892,10 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 		"valid": {
 			update: validClaim,
 			old:    validClaim,
+		},
+		"valid update with unchanged negative capacity requests": {
+			update: mkValidResourceClaim(tweakExactlyCapacityRequests(mkCapacityRequests(1, "-1")), tweakLabels(map[string]string{"foo": "bar"})),
+			old:    mkValidResourceClaim(tweakExactlyCapacityRequests(mkCapacityRequests(1, "-1"))),
 		},
 		"spec immutable: modify request class name": {
 			update: mkValidResourceClaim(tweakSpecChangeClassName("another-class")),
@@ -1169,6 +1234,32 @@ func testDeclarativeValidateStatusUpdate(t *testing.T, apiVersion string) {
 		"valid status.allocation cleared (Unset is allowed)": {
 			old:    mkResourceClaimWithStatus(),
 			update: mkValidResourceClaim(),
+		},
+		"valid status.allocation.devices.results[].consumedCapacity, max allowed": {
+			old:    mkValidResourceClaim(),
+			update: mkResourceClaimWithStatus(tweakStatusConsumedCapacity(mkCapacityRequests(32, "1"))),
+		},
+		"valid status.allocation.devices.results[].consumedCapacity, zero": {
+			old:    mkValidResourceClaim(),
+			update: mkResourceClaimWithStatus(tweakStatusConsumedCapacity(mkCapacityRequests(1, "0"))),
+		},
+		"valid status.allocation.devices.results[].consumedCapacity, negative but unchanged": {
+			old:    mkResourceClaimWithStatus(tweakStatusConsumedCapacity(mkCapacityRequests(1, "-1"))),
+			update: mkResourceClaimWithStatus(tweakStatusConsumedCapacity(mkCapacityRequests(1, "-1"))),
+		},
+		"invalid status.allocation.devices.results[].consumedCapacity, too many": {
+			old:    mkValidResourceClaim(),
+			update: mkResourceClaimWithStatus(tweakStatusConsumedCapacity(mkCapacityRequests(33, "1"))),
+			expectedErrs: field.ErrorList{
+				field.TooMany(field.NewPath("status", "allocation", "devices", "results").Index(0).Child("consumedCapacity"), 33, 32).WithOrigin("maxProperties"),
+			},
+		},
+		"invalid status.allocation.devices.results[].consumedCapacity, negative": {
+			old:    mkValidResourceClaim(),
+			update: mkResourceClaimWithStatus(tweakStatusConsumedCapacity(mkCapacityRequests(1, "-1"))),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("status", "allocation", "devices", "results").Index(0).Child("consumedCapacity").Key("dra.example.com/cap0"), "-1", "").WithOrigin("minimum"),
+			},
 		},
 		"invalid status.allocation changed device (NoModify)": {
 			old:    mkResourceClaimWithStatus(),
@@ -1730,6 +1821,14 @@ func tweakStatusDeviceRequestAllocationResultDriver(driver string) func(rc *reso
 	return func(rc *resource.ResourceClaim) {
 		for i := range rc.Status.Allocation.Devices.Results {
 			rc.Status.Allocation.Devices.Results[i].Driver = driver
+		}
+	}
+}
+
+func tweakStatusConsumedCapacity(consumed map[resource.QualifiedName]apiresource.Quantity) func(rc *resource.ResourceClaim) {
+	return func(rc *resource.ResourceClaim) {
+		for i := range rc.Status.Allocation.Devices.Results {
+			rc.Status.Allocation.Devices.Results[i].ConsumedCapacity = consumed
 		}
 	}
 }

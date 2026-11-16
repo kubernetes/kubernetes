@@ -22,7 +22,6 @@ import (
 	"sort"
 	"strings"
 	"sync"
-	"testing"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -114,7 +113,7 @@ var featureNodeSetups = map[featuregate.Feature]func(tCtx ktesting.TContext, nod
 	},
 }
 
-func Run(t *testing.T, whatRE string) { run(ktesting.Init(t), whatRE) }
+func Run(t ktesting.TB, whatRE string) { run(ktesting.Init(t), whatRE) }
 func run(tCtx ktesting.TContext, whatRE string) {
 	re, err := regexp.Compile(whatRE)
 	if err != nil {
@@ -157,6 +156,7 @@ func run(tCtx ktesting.TContext, whatRE string) {
 				// without a timeout, the test doesn't run too long, but long enough that a short timeout triggers.
 				runSubTest(tCtx, "FilterTimeout", func(tCtx ktesting.TContext) { testFilterTimeout(tCtx, 21) })
 				runSubTest(tCtx, "UsesAllResources", testUsesAllResources)
+				runSubTest(tCtx, "ExtendedResourceCapacity", func(tCtx ktesting.TContext) { testExtendedResourceCapacity(tCtx, false) })
 			},
 		},
 		// Compatibility groups with consumable capacity explicitly disabled.
@@ -190,16 +190,16 @@ func run(tCtx ktesting.TContext, whatRE string) {
 				runSubTest(tCtx, "EvictClusterWithSlices", func(tCtx ktesting.TContext) { testEvictCluster(tCtx, useNoRule) })
 				runSubTest(tCtx, "NoScheduleWithV1Rule", func(tCtx ktesting.TContext) { testNoScheduleRule(tCtx, useV1Rule) })
 				runSubTest(tCtx, "NoScheduleWithSlices", func(tCtx ktesting.TContext) { testNoScheduleRule(tCtx, useNoRule) })
-				runSubTest(tCtx, "PartitionableDevices", func(tCtx ktesting.TContext) { testPartitionableDevices(tCtx, false) })
+				runSubTest(tCtx, "PartitionableDevices", func(tCtx ktesting.TContext) { testPartitionableDevices(tCtx, true) })
 				runSubTest(tCtx, "PrioritizedList", func(tCtx ktesting.TContext) { testPrioritizedList(tCtx, true) })
 				runSubTest(tCtx, "Pod", testPod)
 				runSubTest(tCtx, "PublishResourceSlices", func(tCtx ktesting.TContext) {
-					testPublishResourceSlices(tCtx, true, features.DRAPartitionableDevices, features.DRADeviceBindingConditions, features.DRAOptionalNodeOperations)
+					testPublishResourceSlices(tCtx, true, features.DRADeviceCompatibilityGroups, features.DRAOptionalNodeOperations)
 				})
 				runSubTest(tCtx, "ExplicitExtendedResource", func(tCtx ktesting.TContext) { testExtendedResource(tCtx, true, true) })
 				runSubTest(tCtx, "ImplicitExtendedResource", func(tCtx ktesting.TContext) { testExtendedResource(tCtx, true, false) })
 				runSubTest(tCtx, "ResourceClaimDeviceStatus", func(tCtx ktesting.TContext) { testResourceClaimDeviceStatus(tCtx, true) })
-				runSubTest(tCtx, "DeviceBindingConditions", func(tCtx ktesting.TContext) { testDeviceBindingConditions(tCtx, false) })
+				runSubTest(tCtx, "DeviceBindingConditions", func(tCtx ktesting.TContext) { testDeviceBindingConditions(tCtx, true) })
 				runSubTest(tCtx, "ResourceSliceController", func(tCtx ktesting.TContext) {
 					namespace := createTestNamespace(tCtx, nil)
 					tCtx = tCtx.WithNamespace(namespace)
@@ -244,12 +244,14 @@ func run(tCtx ktesting.TContext, whatRE string) {
 			version: "1.36",
 			apis:    map[schema.GroupVersion]bool{},
 			features: map[featuregate.Feature]bool{
-				features.DRAResourceClaimDeviceStatus: false,
+				features.DRAPartitionableDevices:      false,
 				features.DRAPrioritizedList:           false,
+				features.DRAResourceClaimDeviceStatus: false,
 			},
 			f: func(tCtx ktesting.TContext) {
-				runSubTest(tCtx, "ResourceClaimDeviceStatus", func(tCtx ktesting.TContext) { testResourceClaimDeviceStatus(tCtx, false) })
+				runSubTest(tCtx, "PartitionableDevices", func(tCtx ktesting.TContext) { testPartitionableDevices(tCtx, false) })
 				runSubTest(tCtx, "PrioritizedList", func(tCtx ktesting.TContext) { testPrioritizedList(tCtx, false) })
+				runSubTest(tCtx, "ResourceClaimDeviceStatus", func(tCtx ktesting.TContext) { testResourceClaimDeviceStatus(tCtx, false) })
 			},
 		},
 		"v1beta2": {
@@ -289,6 +291,7 @@ func run(tCtx ktesting.TContext, whatRE string) {
 				features.DRAPrioritizedList:           true,
 				features.DRAResourceClaimDeviceStatus: true,
 				features.DRAExtendedResource:          true,
+				features.DRAExtendedResourceCapacity:  true,
 				features.DRANodeAllocatableResources:  true,
 				features.DRAWorkloadResourceClaims:    true,
 				features.GenericWorkload:              true, // dependency of DRAWorkloadResourceClaims
@@ -299,6 +302,7 @@ func run(tCtx ktesting.TContext, whatRE string) {
 
 				runSubTest(tCtx, "AdminAccess", func(tCtx ktesting.TContext) { testAdminAccess(tCtx, true) })
 				runSubTest(tCtx, "Convert", testConvert)
+				runSubTest(tCtx, "OpaqueParametersMetadataUpdates", testOpaqueParametersMetadataUpdates)
 				runSubTest(tCtx, "ControllerManagerMetrics", testControllerManagerMetrics)
 				runSubTest(tCtx, "ResourceSliceFieldSelectors", testResourceSliceFieldSelectors)
 				runSubTest(tCtx, "DerivedAttributes", testDerivedAttributes)
@@ -306,11 +310,13 @@ func run(tCtx ktesting.TContext, whatRE string) {
 				runSubTest(tCtx, "OptionalNodeOperations", func(tCtx ktesting.TContext) { testOptionalNodeOperations(tCtx, true) })
 				runSubTest(tCtx, "PartitionableDevices", func(tCtx ktesting.TContext) { testPartitionableDevices(tCtx, true) })
 				runSubTest(tCtx, "CompatibilityGroups", func(tCtx ktesting.TContext) { testCompatibilityGroups(tCtx, true) })
+				runSubTest(tCtx, "ListTypeAttributes", testListTypeAttributes)
 				runSubTest(tCtx, "PrioritizedList", func(tCtx ktesting.TContext) { testPrioritizedList(tCtx, true) })
 				runSubTest(tCtx, "PrioritizedListScoring", func(tCtx ktesting.TContext) { testPrioritizedListScoring(tCtx) })
 				runSubTest(tCtx, "PublishResourceSlices", func(tCtx ktesting.TContext) { testPublishResourceSlices(tCtx, true) })
 				runSubTest(tCtx, "ExplicitExtendedResource", func(tCtx ktesting.TContext) { testExtendedResource(tCtx, true, true) })
 				runSubTest(tCtx, "ImplicitExtendedResource", func(tCtx ktesting.TContext) { testExtendedResource(tCtx, true, false) })
+				runSubTest(tCtx, "ExtendedResourceCapacity", func(tCtx ktesting.TContext) { testExtendedResourceCapacity(tCtx, true) })
 				runSubTest(tCtx, "ResourceClaimDeviceStatus", func(tCtx ktesting.TContext) { testResourceClaimDeviceStatus(tCtx, true) })
 				runSubTest(tCtx, "MaxResourceSlice", testMaxResourceSlice)
 				runSubTest(tCtx, "EvictClusterWithV1alpha3Rule", func(tCtx ktesting.TContext) { testEvictCluster(tCtx, useV1alpha3Rule) })
@@ -373,6 +379,7 @@ func run(tCtx ktesting.TContext, whatRE string) {
 				server.TearDownFn()
 			})
 			tCtx = tCtx.WithRESTConfig(server.ClientConfig)
+			tCtx = tCtx.WithValue(apiServerKey, &server)
 
 			nodes := createNodes(tCtx)
 			for feature, setup := range featureNodeSetups {
@@ -678,7 +685,7 @@ func (claimController *claimControllerSingleton) start(tCtx ktesting.TContext) {
 
 	claimController.informerFactory.Start(claimControllerCtx.Done())
 	claimController.wg.Go(func() {
-		controller.Run(claimControllerCtx, 1 /* one worker to get more readable log output without interleaving */)
+		controller.Run(claimControllerCtx, 50 /* default ConcurrentSyncs in KCM */)
 	})
 	tCtx.Logf("Started the claimController for test %s.", tCtx.Name())
 }
@@ -706,3 +713,7 @@ func (claimController *claimControllerSingleton) stop(tCtx ktesting.TContext) {
 type claimControllerKeyType int
 
 var claimControllerKey claimControllerKeyType
+
+type apiServerKeyType int
+
+var apiServerKey apiServerKeyType

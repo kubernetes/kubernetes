@@ -52,14 +52,7 @@ func (m *kubeGenericRuntimeManager) PullImage(ctx context.Context, image kubecon
 
 	var pullErrs []error
 	for _, currentCreds := range credentials {
-		auth := &runtimeapi.AuthConfig{
-			Username:      currentCreds.Username,
-			Password:      currentCreds.Password,
-			Auth:          currentCreds.Auth,
-			ServerAddress: currentCreds.ServerAddress,
-			IdentityToken: currentCreds.IdentityToken,
-			RegistryToken: currentCreds.RegistryToken,
-		}
+		auth := toRuntimeAuthConfig(currentCreds)
 
 		imageRef, err := m.imageService.PullImage(ctx, imgSpec, auth, podSandboxConfig)
 		// If there was no error, return success
@@ -71,6 +64,56 @@ func (m *kubeGenericRuntimeManager) PullImage(ctx context.Context, image kubecon
 	}
 
 	return "", nil, utilerrors.NewAggregate(pullErrs)
+}
+
+// PullSecurityProfile pulls a security profile with the supplied credentials,
+// trying them in order, and returns whether the profile was already present.
+func (m *kubeGenericRuntimeManager) PullSecurityProfile(ctx context.Context, image kubecontainer.ImageSpec, credentials []crededentialprovider.TrackedAuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig, kind runtimeapi.SecurityProfileKind) (bool, error) {
+	logger := klog.FromContext(ctx)
+	imgSpec := ToRuntimeAPIImageSpec(image)
+	// Profile references are canonical, so the reference as written in the
+	// pod spec is the one passed as image.
+	imgSpec.UserSpecifiedImage = image.Image
+
+	if len(credentials) == 0 {
+		resp, err := m.imageService.PullSecurityProfile(ctx, imgSpec, nil, podSandboxConfig, kind)
+		if err != nil {
+			logger.Error(err, "Failed to pull security profile", "ref", image.Image)
+			return false, err
+		}
+		return resp.GetCached(), nil
+	}
+
+	// The caller classifies the error by its gRPC code and well-known message
+	// prefix, so the last error is returned as is rather than aggregated.
+	var lastErr error
+	for _, currentCreds := range credentials {
+		auth := toRuntimeAuthConfig(currentCreds)
+
+		resp, err := m.imageService.PullSecurityProfile(ctx, imgSpec, auth, podSandboxConfig, kind)
+		if err == nil {
+			return resp.GetCached(), nil
+		}
+		// A rejection is a property of the profile or of the runtime, not of
+		// the credentials used, so the other credentials cannot change it.
+		if images.IsSecurityProfileRejected(err) {
+			return false, err
+		}
+		logger.V(3).Info("Failed to pull security profile with credentials, trying the next", "ref", image.Image, "err", err)
+		lastErr = err
+	}
+
+	return false, lastErr
+}
+
+// ListSecurityProfiles lists the security profiles in the runtime's storage.
+func (m *kubeGenericRuntimeManager) ListSecurityProfiles(ctx context.Context) ([]*runtimeapi.SecurityProfileInfo, error) {
+	return m.imageService.ListSecurityProfiles(ctx)
+}
+
+// RemoveSecurityProfile removes a security profile by its digest.
+func (m *kubeGenericRuntimeManager) RemoveSecurityProfile(ctx context.Context, digest string) error {
+	return m.imageService.RemoveSecurityProfile(ctx, digest)
 }
 
 // GetImageRef gets the ID of the image which has already been in
@@ -177,34 +220,13 @@ func (m *kubeGenericRuntimeManager) ImageFsInfo(ctx context.Context) (*runtimeap
 	return allImages, nil
 }
 
-// ensureImageInUse is EnsureImageExists that also keeps image GC from removing
-// the image until release is called. Callers release the image once the
-// container using it exists in the runtime, because from then on image GC sees
-// the container itself. release is never nil.
-func (m *kubeGenericRuntimeManager) ensureImageInUse(ctx context.Context, objRef *v1.ObjectReference, pod *v1.Pod, image string, pullSecrets []v1.Secret, podSandboxConfig *runtimeapi.PodSandboxConfig, runtimeHandler string, pullPolicy v1.PullPolicy) (imageRef, msg string, release func(), err error) {
-	for {
-		removals := m.imageUseTracker.Removals()
-		imageRef, msg, err = m.imagePuller.EnsureImageExists(ctx, objRef, pod, image, pullSecrets, podSandboxConfig, runtimeHandler, pullPolicy)
-		if err != nil {
-			return "", msg, func() {}, err
-		}
-
-		release = m.imageUseTracker.Acquire(imageRef, runtimeHandler)
-		if m.imageUseTracker.Removals() == removals {
-			return imageRef, msg, release, nil
-		}
-
-		// Image GC removed some image while EnsureImageExists was running, so
-		// this one may be gone. It can't be removed any more, check it's there.
-		presentRef, err := m.GetImageRef(ctx, kubecontainer.ImageSpec{Image: imageRef, RuntimeHandler: runtimeHandler})
-		if err != nil {
-			release()
-			return "", fmt.Sprintf("Failed to inspect image %q: %v", imageRef, err), func() {}, images.ErrImageInspect
-		}
-		if presentRef != "" {
-			return imageRef, msg, release, nil
-		}
-		klog.FromContext(ctx).V(2).Info("Image was removed by image garbage collection, ensuring it again", "pod", klog.KObj(pod), "image", image, "imageRef", imageRef)
-		release()
+func toRuntimeAuthConfig(creds crededentialprovider.TrackedAuthConfig) *runtimeapi.AuthConfig {
+	return &runtimeapi.AuthConfig{
+		Username:      creds.Username,
+		Password:      creds.Password,
+		Auth:          creds.Auth,
+		ServerAddress: creds.ServerAddress,
+		IdentityToken: creds.IdentityToken,
+		RegistryToken: creds.RegistryToken,
 	}
 }

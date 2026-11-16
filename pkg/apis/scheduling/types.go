@@ -273,9 +273,7 @@ type PodGroupTemplate struct {
 	// PreemptionPolicy is the Policy for preempting pods/podgroups with lower priority.
 	// One of Never, PreemptLowerPriority.
 	// This field is immutable.
-	// This field is available only when the PodGroupPreemptionPolicy feature gate is enabled.
 	//
-	// +featureGate=PodGroupPreemptionPolicy
 	// +optional
 	PreemptionPolicy *PreemptionPolicy
 }
@@ -307,10 +305,7 @@ type CompositePodGroupTemplate struct {
 	DisruptionMode *CompositeDisruptionMode
 
 	// PriorityClassName indicates the priority that should be considered when scheduling
-	// a composite pod group created from this template. If no priority class is specified,
-	// admission control can set this to the global default priority class if it exists.
-	// Otherwise, composite pod groups created from this template will have the priority set
-	// to zero.
+	// a composite pod group created from this template.
 	// This field is immutable.
 	//
 	// +optional
@@ -318,8 +313,6 @@ type CompositePodGroupTemplate struct {
 
 	// Priority is the value of priority of composite pod groups created from this template.
 	// Various system components use this field to find the priority of the composite pod group.
-	// When Priority Admission Controller is enabled, it prevents users from setting this field.
-	// The admission controller populates this field from PriorityClassName.
 	// The higher the value, the higher the priority.
 	// This field is immutable.
 	//
@@ -329,9 +322,7 @@ type CompositePodGroupTemplate struct {
 	// PreemptionPolicy is the Policy for preempting pods/podgroups with lower priority.
 	// One of Never, PreemptLowerPriority.
 	// This field is immutable.
-	// This field is available only when the PodGroupPreemptionPolicy feature gate is enabled.
 	//
-	// +featureGate=PodGroupPreemptionPolicy
 	// +optional
 	PreemptionPolicy *PreemptionPolicy
 
@@ -575,7 +566,7 @@ type PodGroupSpec struct {
 
 	// PriorityClassName defines the priority that should be considered when scheduling this pod group.
 	// Controllers are expected to fill this field by copying it from a PodGroupTemplate.
-	// Otherwise, it is validated and resolved similarly to the PriorityClassName on PodGroupTemplate
+	// Otherwise, it is validated and resolved similarly to the PriorityClassName in Pods
 	// (i.e. if no priority class is specified, admission control can set this to the global default
 	// priority class if it exists. Otherwise, the pod group's priority will be zero).
 	// This field is immutable.
@@ -598,11 +589,8 @@ type PodGroupSpec struct {
 	// When Priority Admission Controller is enabled, it populates this field from PriorityClassName,
 	// and defaults to PreemptLowerPriority if value is unset in PriorityClass.
 	// This field is immutable.
-	// This field is available only when the PodGroupPreemptionPolicy feature gate is enabled.
 	//
-	// +featureGate=PodGroupPreemptionPolicy
 	// +optional
-
 	PreemptionPolicy *PreemptionPolicy
 }
 
@@ -730,6 +718,8 @@ type TopologyConstraint struct {
 	// Key specifies the key of the node label representing the topology domain.
 	// All pods within the PodGroup must be colocated within the same domain instance.
 	// Different PodGroups can land on different domain instances even if they derive from the same PodGroupTemplate.
+	// Nodes where this label is missing or has an empty value do not belong to any domain instance,
+	// so pods within the PodGroup cannot be scheduled onto them.
 	// Examples: "topology.kubernetes.io/rack"
 	//
 	// +required
@@ -841,9 +831,7 @@ type CompositePodGroupSpec struct {
 	// When Priority Admission Controller is enabled, it populates this field from PriorityClassName,
 	// and defaults to PreemptLowerPriority if value is unset in PriorityClass.
 	// This field is immutable.
-	// This field is available only when the PodGroupPreemptionPolicy feature gate is enabled.
 	//
-	// +featureGate=PodGroupPreemptionPolicy
 	// +optional
 	PreemptionPolicy *PreemptionPolicy
 }

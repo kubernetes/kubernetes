@@ -28,7 +28,7 @@ import (
 
 	v1 "k8s.io/api/admission/v1"
 	corev1 "k8s.io/api/core/v1"
-	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	apiextensionsclientset "k8s.io/apiextensions-api/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/ktesting"
@@ -37,6 +37,7 @@ import (
 	admissionregistrationv1apis "k8s.io/kubernetes/pkg/apis/admissionregistration/v1"
 	"k8s.io/kubernetes/test/integration/etcd"
 	"k8s.io/kubernetes/test/integration/framework"
+	testutils "k8s.io/kubernetes/test/utils"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -500,7 +501,7 @@ type policyExpectationHolder struct {
 	warnings          []string
 }
 
-func (p *policyExpectationHolder) reset(t *testing.T) {
+func (p *policyExpectationHolder) reset(t testutils.TB) {
 	p.warningLock.Lock()
 	defer p.warningLock.Unlock()
 	p.warnings = nil
@@ -524,7 +525,7 @@ func (p *policyExpectationHolder) expect(gvr schema.GroupVersionResource, gvk, o
 	}
 }
 
-func (p *policyExpectationHolder) verify(t *testing.T) {
+func (p *policyExpectationHolder) verify(t testutils.TB) {
 	p.warningLock.Lock()
 	defer p.warningLock.Unlock()
 

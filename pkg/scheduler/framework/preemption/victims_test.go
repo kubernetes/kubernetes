@@ -23,7 +23,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	v1 "k8s.io/api/core/v1"
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -41,7 +40,7 @@ func TestGetHighestAllAncestor(t *testing.T) {
 		name               string
 		pod                *v1.Pod
 		podGroups          map[string]*schedulingv1beta1.PodGroup
-		compositePodGroups map[string]*schedulingv1alpha3.CompositePodGroup
+		compositePodGroups map[string]*schedulingv1beta1.CompositePodGroup
 		wantHighestAllKey  fwk.EntityKey
 		wantHasAll         bool
 	}{
@@ -85,11 +84,11 @@ func TestGetHighestAllAncestor(t *testing.T) {
 					},
 				},
 			},
-			compositePodGroups: map[string]*schedulingv1alpha3.CompositePodGroup{
+			compositePodGroups: map[string]*schedulingv1beta1.CompositePodGroup{
 				"cpg1": {
 					ObjectMeta: metav1.ObjectMeta{Name: "cpg1", Namespace: "default"},
-					Spec: schedulingv1alpha3.CompositePodGroupSpec{
-						DisruptionMode: &schedulingv1alpha3.CompositeDisruptionMode{All: &schedulingv1alpha3.AllCompositeDisruptionMode{}},
+					Spec: schedulingv1beta1.CompositePodGroupSpec{
+						DisruptionMode: &schedulingv1beta1.CompositeDisruptionMode{All: &schedulingv1beta1.AllCompositeDisruptionMode{}},
 					},
 				},
 			},
@@ -108,18 +107,18 @@ func TestGetHighestAllAncestor(t *testing.T) {
 					},
 				},
 			},
-			compositePodGroups: map[string]*schedulingv1alpha3.CompositePodGroup{
+			compositePodGroups: map[string]*schedulingv1beta1.CompositePodGroup{
 				"cpg1": {
 					ObjectMeta: metav1.ObjectMeta{Name: "cpg1", Namespace: "default"},
-					Spec: schedulingv1alpha3.CompositePodGroupSpec{
-						DisruptionMode:              &schedulingv1alpha3.CompositeDisruptionMode{Single: &schedulingv1alpha3.SingleCompositeDisruptionMode{}},
+					Spec: schedulingv1beta1.CompositePodGroupSpec{
+						DisruptionMode:              &schedulingv1beta1.CompositeDisruptionMode{Single: &schedulingv1beta1.SingleCompositeDisruptionMode{}},
 						ParentCompositePodGroupName: new("cpg2"),
 					},
 				},
 				"cpg2": {
 					ObjectMeta: metav1.ObjectMeta{Name: "cpg2", Namespace: "default"},
-					Spec: schedulingv1alpha3.CompositePodGroupSpec{
-						DisruptionMode: &schedulingv1alpha3.CompositeDisruptionMode{All: &schedulingv1alpha3.AllCompositeDisruptionMode{}},
+					Spec: schedulingv1beta1.CompositePodGroupSpec{
+						DisruptionMode: &schedulingv1beta1.CompositeDisruptionMode{All: &schedulingv1beta1.AllCompositeDisruptionMode{}},
 					},
 				},
 			},
@@ -138,11 +137,11 @@ func TestGetHighestAllAncestor(t *testing.T) {
 					},
 				},
 			},
-			compositePodGroups: map[string]*schedulingv1alpha3.CompositePodGroup{
+			compositePodGroups: map[string]*schedulingv1beta1.CompositePodGroup{
 				"cpg1": {
 					ObjectMeta: metav1.ObjectMeta{Name: "cpg1", Namespace: "default"},
-					Spec: schedulingv1alpha3.CompositePodGroupSpec{
-						DisruptionMode: &schedulingv1alpha3.CompositeDisruptionMode{All: &schedulingv1alpha3.AllCompositeDisruptionMode{}},
+					Spec: schedulingv1beta1.CompositePodGroupSpec{
+						DisruptionMode: &schedulingv1beta1.CompositeDisruptionMode{All: &schedulingv1beta1.AllCompositeDisruptionMode{}},
 					},
 				},
 			},
@@ -167,7 +166,7 @@ func TestGetHighestAllAncestor(t *testing.T) {
 					},
 				},
 			},
-			compositePodGroups: map[string]*schedulingv1alpha3.CompositePodGroup{},
+			compositePodGroups: map[string]*schedulingv1beta1.CompositePodGroup{},
 			wantHighestAllKey:  fwk.PodGroupKey("default", "pg1"),
 			wantHasAll:         true,
 		},
@@ -175,12 +174,22 @@ func TestGetHighestAllAncestor(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			pgLister := &mockPodGroupLister{podGroups: tt.podGroups}
-			var cpgLister fwk.CompositePodGroupLister
-			if tt.compositePodGroups != nil {
-				cpgLister = &mockCompositePodGroupLister{compositePodGroups: tt.compositePodGroups}
+			// The snapshot's listers enforce the feature gates; this test exercises the traversal itself.
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.GenericWorkload:                 true,
+				features.TopologyAwareWorkloadScheduling: true,
+				features.CompositePodGroup:               true,
+			})
+			var pgs []*schedulingv1beta1.PodGroup
+			for _, pg := range tt.podGroups {
+				pgs = append(pgs, pg)
 			}
-			gotKey, gotHasAll := getHighestAllAncestor(tt.pod, pgLister, cpgLister)
+			var cpgs []*schedulingv1beta1.CompositePodGroup
+			for _, cpg := range tt.compositePodGroups {
+				cpgs = append(cpgs, cpg)
+			}
+			snapshot := internalcache.NewTestSnapshotWithPodGroups(nil, nil, pgs, cpgs)
+			gotKey, gotHasAll := getHighestAllAncestor(tt.pod, snapshot)
 			if gotHasAll != tt.wantHasAll {
 				t.Errorf("hasAll mismatch: got %v, want %v", gotHasAll, tt.wantHasAll)
 			}
@@ -202,7 +211,7 @@ func TestGetWorkloadPreemptionVictims(t *testing.T) {
 		nodes                   []*v1.Node
 		pods                    []*v1.Pod
 		podGroups               map[string]*schedulingv1beta1.PodGroup
-		compositePodGroups      map[string]*schedulingv1alpha3.CompositePodGroup
+		compositePodGroups      map[string]*schedulingv1beta1.CompositePodGroup
 		enableCompositePodGroup bool
 		wantVictims             []expectedVictim
 	}{
@@ -238,11 +247,28 @@ func TestGetWorkloadPreemptionVictims(t *testing.T) {
 				st.MakeNode().Name("node2").Obj(),
 			},
 			pods: []*v1.Pod{
-				st.MakePod().Name("p1").UID("p1").Node("node1").PodGroupName("pg1").Priority(10).Obj(),
-				st.MakePod().Name("p2").UID("p2").Node("node2").PodGroupName("pg1").Priority(10).Obj(),
+				st.MakePod().Name("p1").UID("p1").Node("node1").PodGroupName("pg1").Priority(50).Obj(),
+				st.MakePod().Name("p2").UID("p2").Node("node2").PodGroupName("pg1").Priority(50).Obj(),
 			},
 			podGroups: map[string]*schedulingv1beta1.PodGroup{
-				"pg1": st.MakePodGroup().Name("pg1").UID("pg1").DisruptionModeAll().Priority(50).Obj(),
+				"pg1": st.MakePodGroup().Name("pg1").UID("pg1").MinCount(2).DisruptionModeAll().Priority(50).Obj(),
+			},
+			wantVictims: []expectedVictim{
+				{pods: sets.New("p1", "p2"), priority: 50},
+			},
+		},
+		{
+			name: "pods with basic pod group (DisruptionModeAll)",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Obj(),
+				st.MakeNode().Name("node2").Obj(),
+			},
+			pods: []*v1.Pod{
+				st.MakePod().Name("p1").UID("p1").Node("node1").PodGroupName("pg1").Priority(50).Obj(),
+				st.MakePod().Name("p2").UID("p2").Node("node2").PodGroupName("pg1").Priority(50).Obj(),
+			},
+			podGroups: map[string]*schedulingv1beta1.PodGroup{
+				"pg1": st.MakePodGroup().Name("pg1").UID("pg1").BasicPolicy().DisruptionModeAll().Priority(50).Obj(),
 			},
 			wantVictims: []expectedVictim{
 				{pods: sets.New("p1", "p2"), priority: 50},
@@ -255,8 +281,8 @@ func TestGetWorkloadPreemptionVictims(t *testing.T) {
 				st.MakeNode().Name("node2").Obj(),
 			},
 			pods: []*v1.Pod{
-				st.MakePod().Name("p1").UID("p1").Node("node1").PodGroupName("pg1").Priority(10).Obj(),
-				st.MakePod().Name("p2").UID("p2").Node("node2").PodGroupName("pg1").Priority(20).Obj(),
+				st.MakePod().Name("p1").UID("p1").Node("node1").PodGroupName("pg1").Priority(50).Obj(),
+				st.MakePod().Name("p2").UID("p2").Node("node2").PodGroupName("pg1").Priority(50).Obj(),
 			},
 			podGroups: map[string]*schedulingv1beta1.PodGroup{
 				"pg1": st.MakePodGroup().Name("pg1").UID("pg1").DisruptionModeSingle().Priority(50).Obj(),
@@ -273,9 +299,9 @@ func TestGetWorkloadPreemptionVictims(t *testing.T) {
 				st.MakeNode().Name("node2").Obj(),
 			},
 			pods: []*v1.Pod{
-				st.MakePod().Name("p1").UID("p1").Node("node1").PodGroupName("pg1").Priority(10).Obj(),
-				st.MakePod().Name("p2").UID("p2").Node("node2").PodGroupName("pg1").Priority(10).Obj(),
-				st.MakePod().Name("p3").UID("p3").Node("node1").PodGroupName("pg2").Priority(20).Obj(),
+				st.MakePod().Name("p1").UID("p1").Node("node1").PodGroupName("pg1").Priority(50).Obj(),
+				st.MakePod().Name("p2").UID("p2").Node("node2").PodGroupName("pg1").Priority(50).Obj(),
+				st.MakePod().Name("p3").UID("p3").Node("node1").PodGroupName("pg2").Priority(60).Obj(),
 				st.MakePod().Name("p4").UID("p4").Node("node2").Priority(30).Obj(),
 			},
 			podGroups: map[string]*schedulingv1beta1.PodGroup{
@@ -319,7 +345,7 @@ func TestGetWorkloadPreemptionVictims(t *testing.T) {
 				"pg1": st.MakePodGroup().Name("pg1").UID("pg1").DisruptionModeAll().ParentCompositePodGroup("cpg1").Priority(10).Obj(),
 				"pg2": st.MakePodGroup().Name("pg2").UID("pg2").DisruptionModeAll().ParentCompositePodGroup("cpg1").Priority(10).Obj(),
 			},
-			compositePodGroups: map[string]*schedulingv1alpha3.CompositePodGroup{
+			compositePodGroups: map[string]*schedulingv1beta1.CompositePodGroup{
 				"cpg1": st.MakeCompositePodGroup().Name("cpg1").UID("cpg1").DisruptionModeAll().Priority(10).Obj(),
 			},
 			enableCompositePodGroup: true,
@@ -343,7 +369,7 @@ func TestGetWorkloadPreemptionVictims(t *testing.T) {
 				"pg1": st.MakePodGroup().Name("pg1").UID("pg1").DisruptionModeAll().ParentCompositePodGroup("cpg1").Priority(10).Obj(),
 				"pg2": st.MakePodGroup().Name("pg2").UID("pg2").DisruptionModeAll().ParentCompositePodGroup("cpg1").Priority(10).Obj(),
 			},
-			compositePodGroups: map[string]*schedulingv1alpha3.CompositePodGroup{
+			compositePodGroups: map[string]*schedulingv1beta1.CompositePodGroup{
 				"cpg1": st.MakeCompositePodGroup().Name("cpg1").UID("cpg1").DisruptionModeAll().Priority(10).Obj(),
 			},
 			enableCompositePodGroup: false,
@@ -368,7 +394,7 @@ func TestGetWorkloadPreemptionVictims(t *testing.T) {
 				"pg1": st.MakePodGroup().Name("pg1").UID("pg1").DisruptionModeSingle().ParentCompositePodGroup("cpg1").Priority(10).Obj(),
 				"pg2": st.MakePodGroup().Name("pg2").UID("pg2").DisruptionModeAll().ParentCompositePodGroup("cpg1").Priority(10).Obj(),
 			},
-			compositePodGroups: map[string]*schedulingv1alpha3.CompositePodGroup{
+			compositePodGroups: map[string]*schedulingv1beta1.CompositePodGroup{
 				"cpg1": st.MakeCompositePodGroup().Name("cpg1").UID("cpg1").DisruptionModeSingle().Priority(10).Obj(),
 			},
 			enableCompositePodGroup: true,
@@ -394,7 +420,7 @@ func TestGetWorkloadPreemptionVictims(t *testing.T) {
 				"pg1": st.MakePodGroup().Name("pg1").UID("pg1").DisruptionModeSingle().ParentCompositePodGroup("cpg1").Priority(10).Obj(),
 				"pg2": st.MakePodGroup().Name("pg2").UID("pg2").DisruptionModeAll().ParentCompositePodGroup("cpg1").Priority(10).Obj(),
 			},
-			compositePodGroups: map[string]*schedulingv1alpha3.CompositePodGroup{
+			compositePodGroups: map[string]*schedulingv1beta1.CompositePodGroup{
 				"cpg1": st.MakeCompositePodGroup().Name("cpg1").UID("cpg1").DisruptionModeSingle().Priority(10).Obj(),
 			},
 			enableCompositePodGroup: false,
@@ -426,7 +452,7 @@ func TestGetWorkloadPreemptionVictims(t *testing.T) {
 				"pg3": st.MakePodGroup().Name("pg3").UID("pg3").DisruptionModeAll().ParentCompositePodGroup("cpg3").Priority(10).Obj(),
 				"pg4": st.MakePodGroup().Name("pg4").UID("pg4").DisruptionModeAll().ParentCompositePodGroup("cpg3").Priority(10).Obj(),
 			},
-			compositePodGroups: map[string]*schedulingv1alpha3.CompositePodGroup{
+			compositePodGroups: map[string]*schedulingv1beta1.CompositePodGroup{
 				"cpg1": st.MakeCompositePodGroup().Name("cpg1").UID("cpg1").DisruptionModeAll().Priority(10).Obj(),
 				"cpg2": st.MakeCompositePodGroup().Name("cpg2").UID("cpg2").DisruptionModeAll().ParentCompositePodGroup("cpg1").Priority(10).Obj(),
 				"cpg3": st.MakeCompositePodGroup().Name("cpg3").UID("cpg3").DisruptionModeAll().ParentCompositePodGroup("cpg1").Priority(10).Obj(),
@@ -458,7 +484,7 @@ func TestGetWorkloadPreemptionVictims(t *testing.T) {
 				"pg3": st.MakePodGroup().Name("pg3").UID("pg3").DisruptionModeAll().ParentCompositePodGroup("cpg3").Priority(10).Obj(),
 				"pg4": st.MakePodGroup().Name("pg4").UID("pg4").DisruptionModeAll().ParentCompositePodGroup("cpg3").Priority(10).Obj(),
 			},
-			compositePodGroups: map[string]*schedulingv1alpha3.CompositePodGroup{
+			compositePodGroups: map[string]*schedulingv1beta1.CompositePodGroup{
 				"cpg1": st.MakeCompositePodGroup().Name("cpg1").UID("cpg1").DisruptionModeAll().Priority(10).Obj(),
 				"cpg2": st.MakeCompositePodGroup().Name("cpg2").UID("cpg2").DisruptionModeAll().ParentCompositePodGroup("cpg1").Priority(10).Obj(),
 				"cpg3": st.MakeCompositePodGroup().Name("cpg3").UID("cpg3").DisruptionModeAll().ParentCompositePodGroup("cpg1").Priority(10).Obj(),
@@ -493,7 +519,7 @@ func TestGetWorkloadPreemptionVictims(t *testing.T) {
 				"pg3": st.MakePodGroup().Name("pg3").UID("pg3").DisruptionModeSingle().ParentCompositePodGroup("cpg3").Priority(10).Obj(),
 				"pg4": st.MakePodGroup().Name("pg4").UID("pg4").DisruptionModeSingle().ParentCompositePodGroup("cpg3").Priority(10).Obj(),
 			},
-			compositePodGroups: map[string]*schedulingv1alpha3.CompositePodGroup{
+			compositePodGroups: map[string]*schedulingv1beta1.CompositePodGroup{
 				"cpg1": st.MakeCompositePodGroup().Name("cpg1").UID("cpg1").DisruptionModeSingle().Priority(10).Obj(),
 				"cpg2": st.MakeCompositePodGroup().Name("cpg2").UID("cpg2").DisruptionModeAll().ParentCompositePodGroup("cpg1").Priority(10).Obj(),
 				"cpg3": st.MakeCompositePodGroup().Name("cpg3").UID("cpg3").DisruptionModeSingle().ParentCompositePodGroup("cpg1").Priority(10).Obj(),
@@ -529,7 +555,7 @@ func TestGetWorkloadPreemptionVictims(t *testing.T) {
 				"pg3": st.MakePodGroup().Name("pg3").UID("pg3").DisruptionModeSingle().ParentCompositePodGroup("cpg3").Priority(10).Obj(),
 				"pg4": st.MakePodGroup().Name("pg4").UID("pg4").DisruptionModeSingle().ParentCompositePodGroup("cpg3").Priority(10).Obj(),
 			},
-			compositePodGroups: map[string]*schedulingv1alpha3.CompositePodGroup{
+			compositePodGroups: map[string]*schedulingv1beta1.CompositePodGroup{
 				"cpg1": st.MakeCompositePodGroup().Name("cpg1").UID("cpg1").DisruptionModeSingle().Priority(10).Obj(),
 				"cpg2": st.MakeCompositePodGroup().Name("cpg2").UID("cpg2").DisruptionModeAll().ParentCompositePodGroup("cpg1").Priority(10).Obj(),
 				"cpg3": st.MakeCompositePodGroup().Name("cpg3").UID("cpg3").DisruptionModeSingle().ParentCompositePodGroup("cpg1").Priority(10).Obj(),
@@ -560,7 +586,7 @@ func TestGetWorkloadPreemptionVictims(t *testing.T) {
 				"pg1": st.MakePodGroup().Name("pg1").UID("pg1").DisruptionModeAll().ParentCompositePodGroup("cpg1").Priority(10).Obj(),
 				"pg2": st.MakePodGroup().Name("pg2").UID("pg2").DisruptionModeAll().ParentCompositePodGroup("cpg1").Priority(10).Obj(),
 			},
-			compositePodGroups: map[string]*schedulingv1alpha3.CompositePodGroup{
+			compositePodGroups: map[string]*schedulingv1beta1.CompositePodGroup{
 				"cpg1": st.MakeCompositePodGroup().Name("cpg1").UID("cpg1").DisruptionModeAll().MinGroupCount(2).Priority(10).Obj(),
 			},
 			enableCompositePodGroup: true,
@@ -584,7 +610,7 @@ func TestGetWorkloadPreemptionVictims(t *testing.T) {
 				"pg1": st.MakePodGroup().Name("pg1").UID("pg1").DisruptionModeAll().ParentCompositePodGroup("cpg1").Priority(10).Obj(),
 				"pg2": st.MakePodGroup().Name("pg2").UID("pg2").DisruptionModeAll().ParentCompositePodGroup("cpg1").Priority(10).Obj(),
 			},
-			compositePodGroups: map[string]*schedulingv1alpha3.CompositePodGroup{
+			compositePodGroups: map[string]*schedulingv1beta1.CompositePodGroup{
 				"cpg1": st.MakeCompositePodGroup().Name("cpg1").UID("cpg1").DisruptionModeAll().MinGroupCount(2).Priority(10).Obj(),
 			},
 			enableCompositePodGroup: false,
@@ -609,7 +635,7 @@ func TestGetWorkloadPreemptionVictims(t *testing.T) {
 				"pg1": st.MakePodGroup().Name("pg1").UID("pg1").DisruptionModeSingle().ParentCompositePodGroup("cpg1").Priority(10).Obj(),
 				"pg2": st.MakePodGroup().Name("pg2").UID("pg2").DisruptionModeSingle().ParentCompositePodGroup("cpg1").Priority(10).Obj(),
 			},
-			compositePodGroups: map[string]*schedulingv1alpha3.CompositePodGroup{
+			compositePodGroups: map[string]*schedulingv1beta1.CompositePodGroup{
 				"cpg1": st.MakeCompositePodGroup().Name("cpg1").UID("cpg1").DisruptionModeSingle().MinGroupCount(2).Priority(10).Obj(),
 			},
 			enableCompositePodGroup: true,
@@ -636,7 +662,7 @@ func TestGetWorkloadPreemptionVictims(t *testing.T) {
 				"pg1": st.MakePodGroup().Name("pg1").UID("pg1").DisruptionModeSingle().ParentCompositePodGroup("cpg1").Priority(10).Obj(),
 				"pg2": st.MakePodGroup().Name("pg2").UID("pg2").DisruptionModeSingle().ParentCompositePodGroup("cpg1").Priority(10).Obj(),
 			},
-			compositePodGroups: map[string]*schedulingv1alpha3.CompositePodGroup{
+			compositePodGroups: map[string]*schedulingv1beta1.CompositePodGroup{
 				"cpg1": st.MakeCompositePodGroup().Name("cpg1").UID("cpg1").DisruptionModeSingle().MinGroupCount(2).Priority(10).Obj(),
 			},
 			enableCompositePodGroup: false,
@@ -663,7 +689,7 @@ func TestGetWorkloadPreemptionVictims(t *testing.T) {
 				"pg1": st.MakePodGroup().Name("pg1").UID("pg1").DisruptionModeSingle().ParentCompositePodGroup("cpg1").Priority(10).Obj(),
 				"pg2": st.MakePodGroup().Name("pg2").UID("pg2").DisruptionModeAll().ParentCompositePodGroup("cpg1").Priority(10).Obj(),
 			},
-			compositePodGroups: map[string]*schedulingv1alpha3.CompositePodGroup{
+			compositePodGroups: map[string]*schedulingv1beta1.CompositePodGroup{
 				"cpg1": st.MakeCompositePodGroup().Name("cpg1").UID("cpg1").DisruptionModeAll().Priority(10).Obj(),
 			},
 			enableCompositePodGroup: true,
@@ -687,7 +713,7 @@ func TestGetWorkloadPreemptionVictims(t *testing.T) {
 				"pg1": st.MakePodGroup().Name("pg1").UID("pg1").DisruptionModeSingle().ParentCompositePodGroup("cpg1").Priority(10).Obj(),
 				"pg2": st.MakePodGroup().Name("pg2").UID("pg2").DisruptionModeAll().ParentCompositePodGroup("cpg1").Priority(10).Obj(),
 			},
-			compositePodGroups: map[string]*schedulingv1alpha3.CompositePodGroup{
+			compositePodGroups: map[string]*schedulingv1beta1.CompositePodGroup{
 				"cpg1": st.MakeCompositePodGroup().Name("cpg1").UID("cpg1").DisruptionModeAll().Priority(10).Obj(),
 			},
 			enableCompositePodGroup: false,
@@ -719,7 +745,7 @@ func TestGetWorkloadPreemptionVictims(t *testing.T) {
 				"pg3": st.MakePodGroup().Name("pg3").UID("pg3").DisruptionModeAll().ParentCompositePodGroup("cpg-mid2").Priority(10).Obj(),
 				"pg4": st.MakePodGroup().Name("pg4").UID("pg4").DisruptionModeAll().ParentCompositePodGroup("cpg-mid2").Priority(10).Obj(),
 			},
-			compositePodGroups: map[string]*schedulingv1alpha3.CompositePodGroup{
+			compositePodGroups: map[string]*schedulingv1beta1.CompositePodGroup{
 				"cpg-root": st.MakeCompositePodGroup().Name("cpg-root").UID("cpg-root").DisruptionModeAll().Priority(10).Obj(),
 				"cpg-mid2": st.MakeCompositePodGroup().Name("cpg-mid2").UID("cpg-mid2").DisruptionModeAll().ParentCompositePodGroup("cpg-root").Priority(10).Obj(),
 			},
@@ -745,7 +771,7 @@ func TestGetWorkloadPreemptionVictims(t *testing.T) {
 			for _, pg := range tt.podGroups {
 				pgs = append(pgs, pg)
 			}
-			var cpgs []*schedulingv1alpha3.CompositePodGroup
+			var cpgs []*schedulingv1beta1.CompositePodGroup
 			for _, cpg := range tt.compositePodGroups {
 				cpgs = append(cpgs, cpg)
 			}
@@ -780,12 +806,7 @@ func TestGetWorkloadPreemptionVictims(t *testing.T) {
 			if err := cache.UpdateSnapshot(logger, snapshot); err != nil {
 				t.Fatalf("Failed to update snapshot: %v", err)
 			}
-			pgLister := &mockPodGroupLister{podGroups: tt.podGroups}
-			var cpgLister fwk.CompositePodGroupLister
-			if tt.enableCompositePodGroup {
-				cpgLister = &mockCompositePodGroupLister{compositePodGroups: tt.compositePodGroups}
-			}
-			victims, err := getWorkloadPreemptionVictims(logger, snapshot, pgLister, cpgLister)
+			victims, err := getWorkloadPreemptionVictims(logger, snapshot)
 			if err != nil {
 				t.Fatalf("Failed to create victims: %v", err)
 			}

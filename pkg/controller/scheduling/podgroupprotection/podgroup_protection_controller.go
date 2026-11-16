@@ -23,17 +23,14 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	coreinformers "k8s.io/client-go/informers/core/v1"
-	schedulinginformersv1alpha3 "k8s.io/client-go/informers/scheduling/v1alpha3"
 	schedulinginformersv1beta1 "k8s.io/client-go/informers/scheduling/v1beta1"
 	clientset "k8s.io/client-go/kubernetes"
-	schedulinglistersv1alpha3 "k8s.io/client-go/listers/scheduling/v1alpha3"
 	schedulinglistersv1beta1 "k8s.io/client-go/listers/scheduling/v1beta1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
@@ -78,7 +75,7 @@ type Controller struct {
 	podGroupQueue workqueue.TypedRateLimitingInterface[string]
 
 	isCompositePodGroupEnabled bool
-	compositePodGroupLister    schedulinglistersv1alpha3.CompositePodGroupLister
+	compositePodGroupLister    schedulinglistersv1beta1.CompositePodGroupLister
 	compositePodGroupSynced    cache.InformerSynced
 	compositePodGroupIndexer   cache.Indexer
 
@@ -89,7 +86,7 @@ type Controller struct {
 func NewPodGroupProtectionController(
 	logger klog.Logger,
 	podGroupInformer schedulinginformersv1beta1.PodGroupInformer,
-	compositePodGroupInformer schedulinginformersv1alpha3.CompositePodGroupInformer,
+	compositePodGroupInformer schedulinginformersv1beta1.CompositePodGroupInformer,
 	podInformer coreinformers.PodInformer,
 	kubeClient clientset.Interface,
 	isCompositePodGroupEnabled bool,
@@ -193,7 +190,7 @@ func podGroupParent(pg *schedulingv1beta1.PodGroup) (string, *string) {
 
 // compositePodGroupParent extracts the namespace and parent CompositePodGroup name from a CompositePodGroup
 // for hierarchical relationship indexing.
-func compositePodGroupParent(cpg *schedulingv1alpha3.CompositePodGroup) (string, *string) {
+func compositePodGroupParent(cpg *schedulingv1beta1.CompositePodGroup) (string, *string) {
 	return cpg.Namespace, cpg.Spec.ParentCompositePodGroupName
 }
 
@@ -390,12 +387,12 @@ func (c *Controller) removePodGroupFinalizer(ctx context.Context, pg *scheduling
 	return nil
 }
 
-func (c *Controller) removeCompositePodGroupFinalizer(ctx context.Context, cpg *schedulingv1alpha3.CompositePodGroup) error {
+func (c *Controller) removeCompositePodGroupFinalizer(ctx context.Context, cpg *schedulingv1beta1.CompositePodGroup) error {
 	logger := klog.FromContext(ctx)
 	cpgClone := cpg.DeepCopy()
 
 	cpgClone.Finalizers = slice.RemoveString(cpgClone.Finalizers, scheduling.CompositePodGroupProtectionFinalizer, nil)
-	_, err := c.kubeClient.SchedulingV1alpha3().CompositePodGroups(cpgClone.Namespace).Update(ctx, cpgClone, metav1.UpdateOptions{})
+	_, err := c.kubeClient.SchedulingV1beta1().CompositePodGroups(cpgClone.Namespace).Update(ctx, cpgClone, metav1.UpdateOptions{})
 	if err != nil {
 		return err
 	}
@@ -427,7 +424,7 @@ func (c *Controller) hasActivePods(ctx context.Context, pg *schedulingv1beta1.Po
 
 // hasChildGroups returns true if any child PodGroups or child CompositePodGroups
 // reference the parent CompositePodGroup via spec.parentCompositePodGroupName.
-func (c *Controller) hasChildGroups(ctx context.Context, cpg *schedulingv1alpha3.CompositePodGroup) (bool, error) {
+func (c *Controller) hasChildGroups(ctx context.Context, cpg *schedulingv1beta1.CompositePodGroup) (bool, error) {
 	logger := klog.FromContext(ctx)
 	indexKey := namespacedKey(cpg.Namespace, cpg.Name)
 
@@ -445,7 +442,7 @@ func (c *Controller) hasChildGroups(ctx context.Context, cpg *schedulingv1alpha3
 		return false, fmt.Errorf("index-based list of child CompositePodGroups failed for CompositePodGroup %s: %w", indexKey, err)
 	}
 	if len(cpgObjs) > 0 {
-		logger.V(4).Info("Child CompositePodGroup is using CompositePodGroup", "childCompositePodGroup", klog.KObj(cpgObjs[0].(*schedulingv1alpha3.CompositePodGroup)), "compositePodGroup", klog.KObj(cpg))
+		logger.V(4).Info("Child CompositePodGroup is using CompositePodGroup", "childCompositePodGroup", klog.KObj(cpgObjs[0].(*schedulingv1beta1.CompositePodGroup)), "compositePodGroup", klog.KObj(cpg))
 		return true, nil
 	}
 
@@ -484,8 +481,8 @@ func (c *Controller) handleCompositePodGroupUpdate(logger klog.Logger, old, new 
 	if !c.isCompositePodGroupEnabled {
 		return
 	}
-	cpg := objectOf[*schedulingv1alpha3.CompositePodGroup](new)
-	oldCpg := objectOf[*schedulingv1alpha3.CompositePodGroup](old)
+	cpg := objectOf[*schedulingv1beta1.CompositePodGroup](new)
+	oldCpg := objectOf[*schedulingv1beta1.CompositePodGroup](old)
 
 	if cpg != nil && protectionutil.IsDeletionCandidate(cpg, scheduling.CompositePodGroupProtectionFinalizer) {
 		logger.V(4).Info("Got event on CompositePodGroup", "compositePodGroup", klog.KObj(cpg))

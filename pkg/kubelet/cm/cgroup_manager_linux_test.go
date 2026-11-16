@@ -19,6 +19,7 @@ limitations under the License.
 package cm
 
 import (
+	"maps"
 	"os"
 	"path"
 	"path/filepath"
@@ -175,6 +176,61 @@ func TestParseSystemdToCgroupName(t *testing.T) {
 		if actual := ParseSystemdToCgroupName(testCase.input); !reflect.DeepEqual(actual, testCase.expected) {
 			t.Errorf("Unexpected result, input: %v, expected: %v, actual: %v", testCase.input, testCase.expected, actual)
 		}
+	}
+}
+
+func TestMaybeSetHugetlb(t *testing.T) {
+	m := &cgroupCommon{subsystems: &CgroupSubsystems{MountPoints: map[string]string{"hugetlb": "/sys/fs/cgroup/hugetlb"}}}
+	if m.isCgroup2UnifiedMode() && !getSupportedUnifiedControllers().Has("hugetlb") {
+		t.Skip("hugetlb controller is not available")
+	}
+	if len(libcontainercgroups.HugePageSizes()) == 0 {
+		t.Skip("no supported hugepage sizes")
+	}
+
+	const pageSize2MB = 2 * 1024 * 1024
+	zeroLimits := map[string]uint64{}
+	for _, pageSize := range libcontainercgroups.HugePageSizes() {
+		zeroLimits[pageSize] = 0
+	}
+	with2MBLimit := maps.Clone(zeroLimits)
+	with2MBLimit["2MB"] = 2 * pageSize2MB
+
+	testCases := []struct {
+		name          string
+		hugePageLimit map[int64]int64
+		expected      map[string]uint64
+	}{
+		{
+			name:          "nil map writes no limits",
+			hugePageLimit: nil,
+			expected:      map[string]uint64{},
+		},
+		{
+			name:          "empty map zeroes every supported page size",
+			hugePageLimit: map[int64]int64{},
+			expected:      zeroLimits,
+		},
+		{
+			name:          "set sizes keep their limit and omitted sizes are zeroed",
+			hugePageLimit: map[int64]int64{pageSize2MB: 2 * pageSize2MB},
+			expected:      with2MBLimit,
+		},
+	}
+
+	logger, _ := ktesting.NewTestContext(t)
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			resources := &libcontainercgroups.Resources{}
+			m.maybeSetHugetlb(logger, &ResourceConfig{HugePageLimit: testCase.hugePageLimit}, resources)
+			actual := map[string]uint64{}
+			for _, limit := range resources.HugetlbLimit {
+				actual[limit.Pagesize] = limit.Limit
+			}
+			if !reflect.DeepEqual(actual, testCase.expected) {
+				t.Errorf("hugetlb limits: got %v, want %v", actual, testCase.expected)
+			}
+		})
 	}
 }
 
@@ -562,4 +618,87 @@ func TestCgroupManagerGetCgroupConfig(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestCgroupNsdelegateEnabled(t *testing.T) {
+	tests := []struct {
+		name      string
+		mountinfo string
+		want      bool
+		wantErr   bool
+	}{
+		{
+			name:      "nsdelegate present",
+			mountinfo: "35 25 0:30 / /sys/fs/cgroup rw,nosuid,nodev,noexec,relatime shared:9 - cgroup2 cgroup2 rw,nsdelegate,memory_recursiveprot\n",
+			want:      true,
+		},
+		{
+			name:      "nsdelegate absent",
+			mountinfo: "35 25 0:30 / /sys/fs/cgroup rw,nosuid,nodev,noexec,relatime shared:9 - cgroup2 cgroup2 rw,memory_recursiveprot\n",
+			want:      false,
+		},
+		{
+			name:      "nsdelegate only in the per-mount options",
+			mountinfo: "35 25 0:30 / /sys/fs/cgroup rw,nsdelegate shared:9 - cgroup2 cgroup2 rw\n",
+			want:      false,
+		},
+		{
+			name: "nsdelegate on a cgroup v1 mount only",
+			mountinfo: "35 25 0:30 / /sys/fs/cgroup ro,nosuid,nodev,noexec shared:9 - tmpfs tmpfs ro,mode=755\n" +
+				"36 35 0:31 / /sys/fs/cgroup/memory rw,relatime shared:10 - cgroup cgroup rw,nsdelegate,memory\n",
+			want: false,
+		},
+		{
+			name: "nsdelegate on another cgroup2 mount only",
+			mountinfo: "34 25 0:29 / /run rw,nosuid,nodev shared:8 - tmpfs tmpfs rw,size=1024k\n" +
+				"35 25 0:30 / /sys/fs/cgroup rw,relatime shared:9 - cgroup2 cgroup2 rw\n" +
+				"36 25 0:30 / /host/cgroup rw,relatime shared:9 - cgroup2 cgroup2 rw,nsdelegate\n",
+			want: false,
+		},
+		{
+			name: "later mount at the same path has nsdelegate",
+			mountinfo: "35 25 0:30 / /sys/fs/cgroup rw,relatime shared:9 - cgroup2 cgroup2 rw\n" +
+				"36 35 0:31 / /sys/fs/cgroup rw,relatime shared:10 - cgroup2 cgroup2 rw,nsdelegate\n",
+			want: true,
+		},
+		{
+			name: "later mount at the same path lacks nsdelegate",
+			mountinfo: "35 25 0:30 / /sys/fs/cgroup rw,relatime shared:9 - cgroup2 cgroup2 rw,nsdelegate\n" +
+				"36 35 0:31 / /sys/fs/cgroup rw,relatime shared:10 - cgroup2 cgroup2 rw\n",
+			want: false,
+		},
+		{
+			name:      "no mount at /sys/fs/cgroup",
+			mountinfo: "34 25 0:29 / /run rw,nosuid,nodev shared:8 - tmpfs tmpfs rw,size=1024k\n",
+			wantErr:   true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mountInfoPath := filepath.Join(t.TempDir(), "mountinfo")
+			if err := os.WriteFile(mountInfoPath, []byte(tt.mountinfo), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			got, err := cgroupNsdelegateEnabled(mountInfoPath)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatalf("cgroupNsdelegateEnabled should fail for mountinfo %q", tt.mountinfo)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("cgroupNsdelegateEnabled should read the fixture, got error: %v", err)
+			}
+			if got != tt.want {
+				t.Errorf("nsdelegate should be reported as %v for mountinfo %q, got %v", tt.want, tt.mountinfo, got)
+			}
+		})
+	}
+
+	t.Run("unreadable mountinfo", func(t *testing.T) {
+		if _, err := cgroupNsdelegateEnabled(filepath.Join(t.TempDir(), "missing")); err == nil {
+			t.Error("cgroupNsdelegateEnabled should fail when mountinfo cannot be read")
+		}
+	})
 }

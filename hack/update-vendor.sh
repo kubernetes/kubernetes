@@ -44,6 +44,19 @@ fi
 
 kube::util::require-jq
 
+# Staging modules kept one Go minor version below the root module, so importers
+# are not forced onto the newest Go (kubernetes/kubernetes#130799).
+# Dependency order: a module comes after the listed modules it requires.
+staging_go_floor_modules=(
+  cri-api
+  streaming
+  cri-streaming
+  externaljwt
+  kms
+  ktesting
+  mount-utils
+)
+
 TMP_DIR="${TMP_DIR:-$(mktemp -d /tmp/update-vendor.XXXX)}"
 LOG_FILE="${LOG_FILE:-${TMP_DIR}/update-vendor.log}"
 kube::log::status "logfile at ${LOG_FILE}"
@@ -172,6 +185,11 @@ if [[ -z "${godebug_directive_value}" ]]; then
   exit 1
 fi
 
+# === Derive the lower go directive for the listed staging modules
+IFS=. read -r go_major_value go_minor_value _ <<< "${go_directive_value}"
+staging_go_floor="${go_major_value}.$((go_minor_value - 1)).0"
+staging_go_floor_godebug="default=go${staging_go_floor%.*}"
+
 # === Ensure staging go.mod files exist
 for repo in $(kube::util::list_staging_repos); do
   (
@@ -237,9 +255,53 @@ for repo in $(kube::util::list_staging_repos); do
     group_directives
   )
 done
+
+# === Lower the go directive of the listed modules
+# After the first tidy: the temporary requires on every staging module would
+# raise it again. One pass, because the list is in dependency order.
+for repo in "${staging_go_floor_modules[@]}"; do
+  (
+    cd "staging/src/k8s.io/${repo}"
+    go mod edit -go "${staging_go_floor}" -godebug "${staging_go_floor_godebug}"
+  )
+done
+listed=" ${staging_go_floor_modules[*]} "
+tidied=" "
+for repo in "${staging_go_floor_modules[@]}"; do
+  (
+    echo "=== tidying k8s.io/${repo} at ${staging_go_floor}"
+    cd "staging/src/k8s.io/${repo}"
+    go mod tidy -v
+    group_directives
+  )
+  for dep in $(go mod edit -json "staging/src/k8s.io/${repo}/go.mod" | jq -r '.Require[]?.Path | select(startswith("k8s.io/")) | ltrimstr("k8s.io/")'); do
+    if [[ "${listed}" == *" ${dep} "* && "${tidied}" != *" ${dep} "* ]]; then
+      kube::log::error "k8s.io/${repo} requires k8s.io/${dep}: list ${dep} before ${repo} in staging_go_floor_modules" >&22 2>&1
+      exit 1
+    fi
+  done
+  tidied+="${repo} "
+done
+
 echo "=== tidying root"
 go mod tidy -v
 group_directives
+
+# === Check that tidy left the listed modules at the floor
+# Major and minor only: a dependency can force a patch version (1.26.3).
+for repo in "${staging_go_floor_modules[@]}"; do
+  actual=$(grep '^go ' "staging/src/k8s.io/${repo}/go.mod" | awk '{print $2}')
+  IFS=. read -r actual_major actual_minor _ <<< "${actual}"
+  if [[ "${actual_major}.${actual_minor}" != "${staging_go_floor%.*}" ]]; then
+    kube::log::error "k8s.io/${repo}: go directive is ${actual}, expected ${staging_go_floor}. The dependencies below need a newer Go: keep them at versions that build with Go ${staging_go_floor%.*}, or remove ${repo} from staging_go_floor_modules in hack/update-vendor.sh" >&22 2>&1
+    (
+      cd "staging/src/k8s.io/${repo}"
+      go list -m -f '{{if and (not .Main) .GoVersion}}{{.Path}} {{.GoVersion}}{{end}}' all \
+        | awk -v floor_minor="$((go_minor_value - 1))" 'NF { split($2, v, "."); sub(/[^0-9].*/, "", v[2]); if (v[2] + 0 > floor_minor + 0) print "  " $0 }'
+    ) >&22
+    exit 1
+  fi
+done
 
 # === Prune unused replace directives, format modules
 kube::log::status "go.mod: prune" >&11

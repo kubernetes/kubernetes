@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/initializer"
 	admissiontesting "k8s.io/apiserver/pkg/admission/testing"
@@ -303,4 +304,22 @@ func newHandlerForTest() (*Plugin, error) {
 	pluginInitializer := initializer.New(nil, nil, nil, nil, nil, nil, nil, nil)
 	pluginInitializer.Initialize(handler)
 	return handler, admission.ValidateInitialization(handler)
+}
+
+func TestDynamicSubresource(t *testing.T) {
+	plugin, err := newHandlerForTest()
+	if err != nil {
+		t.Fatalf("unexpected error initializing handler: %v", err)
+	}
+	handler := admissiontesting.WithReinvocationTesting(t, plugin)
+	for subresource, expectTolerations := range map[string]int{"": 2, "dynamic": 2, "status": 0} {
+		pod := &api.Pod{}
+		attrs := admission.NewAttributesRecord(pod, pod.DeepCopy(), api.Kind("Pod").WithVersion("version"), "foo", "name", api.Resource("pods").WithVersion("version"), subresource, admission.Update, &metav1.UpdateOptions{}, false, nil)
+		if err := handler.Admit(t.Context(), attrs, nil); err != nil {
+			t.Fatalf("subresource %q: unexpected error %v", subresource, err)
+		}
+		if len(pod.Spec.Tolerations) != expectTolerations {
+			t.Errorf("subresource %q: expected %d tolerations, got %v", subresource, expectTolerations, pod.Spec.Tolerations)
+		}
+	}
 }

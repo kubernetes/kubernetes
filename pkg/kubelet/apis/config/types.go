@@ -258,6 +258,7 @@ type KubeletConfiguration struct {
 	ClusterDNS []string
 	// streamingConnectionIdleTimeout is the maximum time a streaming connection
 	// can be idle before the connection is automatically closed.
+	//
 	// Deprecated: no longer has any effect.
 	StreamingConnectionIdleTimeout metav1.Duration
 	// nodeStatusUpdateFrequency is the frequency that kubelet computes node
@@ -280,6 +281,8 @@ type KubeletConfiguration struct {
 	// ImageMaximumGCAge is the maximum age an image can be unused before it is garbage collected.
 	// The default of this field is "0s", which disables this field--meaning images won't be garbage
 	// collected based on being unused for too long.
+	// It also applies to the seccomp profiles of type OCI that the kubelet pulled (SecurityProfileOCI
+	// feature gate), which are removed once no pod has referenced them for this long.
 	ImageMaximumGCAge metav1.Duration
 	// imageGCHighThresholdPercent is the percent of disk usage after which
 	// image garbage collection is always run. The percent is calculated as
@@ -359,6 +362,7 @@ type KubeletConfiguration struct {
 	ResolverConfig string
 	// RunOnce causes the Kubelet to check the API server once for pods,
 	// run those in addition to the pods specified by static pod files, and exit.
+	//
 	// Deprecated: no longer has any effect.
 	RunOnce bool
 	// cpuCFSQuota enables CPU CFS quota enforcement for containers that
@@ -421,9 +425,11 @@ type KubeletConfiguration struct {
 	MakeIPTablesUtilChains bool
 	// iptablesMasqueradeBit formerly controlled the creation of the KUBE-MARK-MASQ
 	// chain.
+	//
 	// Deprecated: no longer has any effect.
 	IPTablesMasqueradeBit int32
 	// iptablesDropBit formerly controlled the creation of the KUBE-MARK-DROP chain.
+	//
 	// Deprecated: no longer has any effect.
 	IPTablesDropBit int32
 	// featureGates is a map of feature names to bools that enable or disable alpha/experimental

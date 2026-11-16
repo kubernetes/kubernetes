@@ -39,26 +39,27 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/features"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
+	schedulerutils "k8s.io/kubernetes/test/integration/scheduler"
 	testutils "k8s.io/kubernetes/test/integration/util"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	"k8s.io/utils/ptr"
 )
 
 var (
-	createAndWaitForNodesInCache = testutils.CreateAndWaitForNodesInCache
-	createNamespacesWithLabels   = testutils.CreateNamespacesWithLabels
-	createNode                   = testutils.CreateNode
-	updateNode                   = testutils.UpdateNode
+	createAndWaitForNodesInCache = schedulerutils.CreateAndWaitForNodesInCache
+	createNamespacesWithLabels   = schedulerutils.CreateNamespacesWithLabels
+	createNode                   = schedulerutils.CreateNode
+	updateNode                   = schedulerutils.UpdateNode
 	createPausePod               = testutils.CreatePausePod
-	deletePod                    = testutils.DeletePod
-	getPod                       = testutils.GetPod
-	runPausePod                  = testutils.RunPausePod
+	deletePod                    = schedulerutils.DeletePod
+	getPod                       = schedulerutils.GetPod
+	runPausePod                  = schedulerutils.RunPausePod
 	initPausePod                 = testutils.InitPausePod
-	initTest                     = testutils.InitTestSchedulerWithNS
-	podScheduledIn               = testutils.PodScheduledIn
-	podScheduled                 = testutils.PodScheduled
-	podUnschedulable             = testutils.PodUnschedulable
-	waitForPodUnschedulable      = testutils.WaitForPodUnschedulable
+	initTest                     = schedulerutils.InitTestSchedulerWithNS
+	podScheduledIn               = schedulerutils.PodScheduledIn
+	podScheduled                 = schedulerutils.PodScheduled
+	podUnschedulable             = schedulerutils.PodUnschedulable
+	waitForPodUnschedulable      = schedulerutils.WaitForPodUnschedulable
 )
 
 // This file tests the scheduler predicates functionality.
@@ -1142,7 +1143,7 @@ func TestInterPodAffinity(t *testing.T) {
 						t.Fatalf("Error while creating pod: %v", err)
 					}
 					err = wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, false,
-						testutils.PodScheduled(cs, createdPod.Namespace, createdPod.Name))
+						schedulerutils.PodScheduled(cs, createdPod.Namespace, createdPod.Name))
 					if err != nil {
 						t.Errorf("Error while creating pod: %v", err)
 					}
@@ -1168,7 +1169,7 @@ func TestInterPodAffinity(t *testing.T) {
 
 				if test.fits {
 					err = wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, false,
-						testutils.PodScheduled(cs, testPod.Namespace, testPod.Name))
+						schedulerutils.PodScheduled(cs, testPod.Namespace, testPod.Name))
 				} else {
 					err = wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, false,
 						podUnschedulable(cs, testPod.Namespace, testPod.Name))
@@ -1184,7 +1185,7 @@ func TestInterPodAffinity(t *testing.T) {
 						t.Fatalf("Error while creating nextPod: %v", err)
 					}
 					err = wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, false,
-						testutils.PodScheduled(cs, testNextPod.Namespace, testNextPod.Name))
+						schedulerutils.PodScheduled(cs, testNextPod.Namespace, testNextPod.Name))
 					if err != nil {
 						t.Errorf("Error while trying to fit nextPod: %v", err)
 						return
@@ -1356,7 +1357,7 @@ func TestInterPodAffinityWithNamespaceSelector(t *testing.T) {
 						t.Fatalf("Error while creating pod: %v", err)
 					}
 					err = wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, false,
-						testutils.PodScheduled(cs, createdPod.Namespace, createdPod.Name))
+						schedulerutils.PodScheduled(cs, createdPod.Namespace, createdPod.Name))
 					if err != nil {
 						t.Errorf("Error while creating pod: %v", err)
 					}
@@ -1374,7 +1375,7 @@ func TestInterPodAffinityWithNamespaceSelector(t *testing.T) {
 
 					if test.fits {
 						err = wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, false,
-							testutils.PodScheduled(cs, testPod.Namespace, testPod.Name))
+							schedulerutils.PodScheduled(cs, testPod.Namespace, testPod.Name))
 					} else {
 						err = wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, false,
 							podUnschedulable(cs, testPod.Namespace, testPod.Name))
@@ -2230,7 +2231,7 @@ func TestPodTopologySpreadFilter(t *testing.T) {
 					t.Fatalf("Error while creating pod during test: %v", err)
 				}
 				err = wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, false,
-					testutils.PodScheduled(cs, createdPod.Namespace, createdPod.Name))
+					schedulerutils.PodScheduled(cs, createdPod.Namespace, createdPod.Name))
 				if err != nil {
 					t.Errorf("Error while waiting for pod during test: %v", err)
 				}
@@ -2419,7 +2420,7 @@ func TestUnschedulablePodBecomesSchedulable(t *testing.T) {
 			},
 			update: func(cs kubernetes.Interface, _ string) error {
 				taint := v1.Taint{Key: "test", Value: "test", Effect: v1.TaintEffectNoSchedule}
-				if err := testutils.RemoveTaintOffNode(cs, "node-tainted", taint); err != nil {
+				if err := schedulerutils.RemoveTaintOffNode(cs, "node-tainted", taint); err != nil {
 					return fmt.Errorf("cannot remove taint off node: %v", err)
 				}
 				return nil
@@ -2540,7 +2541,7 @@ func TestUnschedulablePodBecomesSchedulable(t *testing.T) {
 
 				storage := v1.VolumeResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}}
 				volType := v1.HostPathDirectoryOrCreate
-				pv, err := testutils.CreatePV(cs, st.MakePersistentVolume().
+				pv, err := schedulerutils.CreatePV(cs, st.MakePersistentVolume().
 					Name("pv-with-read-write-once-pod").
 					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteOncePod}).
 					Capacity(storage.Requests).
@@ -2549,7 +2550,7 @@ func TestUnschedulablePodBecomesSchedulable(t *testing.T) {
 				if err != nil {
 					return fmt.Errorf("cannot create pv: %v", err)
 				}
-				pvc, err := testutils.CreatePVC(cs, st.MakePersistentVolumeClaim().
+				pvc, err := schedulerutils.CreatePVC(cs, st.MakePersistentVolumeClaim().
 					Name("pvc-with-read-write-once-pod").
 					Namespace(ns).
 					// Annotation and volume name required for PVC to be considered bound.
@@ -2599,7 +2600,7 @@ func TestUnschedulablePodBecomesSchedulable(t *testing.T) {
 			init: func(cs kubernetes.Interface, ns string) error {
 				storage := v1.VolumeResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}}
 				volType := v1.HostPathDirectoryOrCreate
-				pv, err := testutils.CreatePV(cs, st.MakePersistentVolume().
+				pv, err := schedulerutils.CreatePV(cs, st.MakePersistentVolume().
 					Name("pv-has-non-existent-nodes").
 					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteOncePod}).
 					Capacity(storage.Requests).
@@ -2609,7 +2610,7 @@ func TestUnschedulablePodBecomesSchedulable(t *testing.T) {
 				if err != nil {
 					return fmt.Errorf("cannot create pv: %w", err)
 				}
-				_, err = testutils.CreatePVC(cs, st.MakePersistentVolumeClaim().
+				_, err = schedulerutils.CreatePVC(cs, st.MakePersistentVolumeClaim().
 					Name("pvc-has-non-existent-nodes").
 					Namespace(ns).
 					Annotation(volume.AnnBindCompleted, "true").
@@ -2650,7 +2651,7 @@ func TestUnschedulablePodBecomesSchedulable(t *testing.T) {
 				}
 				storage := v1.VolumeResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}}
 				volType := v1.HostPathDirectoryOrCreate
-				pv, err := testutils.CreatePV(cs, st.MakePersistentVolume().
+				pv, err := schedulerutils.CreatePV(cs, st.MakePersistentVolume().
 					Name("pv-foo").
 					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteOncePod}).
 					Capacity(storage.Requests).
@@ -2660,7 +2661,7 @@ func TestUnschedulablePodBecomesSchedulable(t *testing.T) {
 				if err != nil {
 					return fmt.Errorf("cannot create pv: %w", err)
 				}
-				_, err = testutils.CreatePVC(cs, st.MakePersistentVolumeClaim().
+				_, err = schedulerutils.CreatePVC(cs, st.MakePersistentVolumeClaim().
 					Name("pvc-foo").
 					Namespace(ns).
 					Annotation(volume.AnnBindCompleted, "true").
@@ -2720,7 +2721,7 @@ func TestUnschedulablePodBecomesSchedulable(t *testing.T) {
 			if err := tt.update(testCtx.ClientSet, testCtx.NS.Name); err != nil {
 				t.Fatal(err)
 			}
-			if err := testutils.WaitForPodToSchedule(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
+			if err := schedulerutils.WaitForPodToSchedule(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
 				t.Errorf("Pod %v was not scheduled: %v", pod.Name, err)
 			}
 			// Make sure pending queue is empty.
@@ -3132,16 +3133,16 @@ func TestNodeDeclaredFeaturesFilter(t *testing.T) {
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.36"))
 				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, false)
 			}
-			testCtx := testutils.InitTestSchedulerWithNS(t, "node-features-filter")
+			testCtx := schedulerutils.InitTestSchedulerWithNS(t, "node-features-filter")
 			cs := testCtx.ClientSet
 			ns := testCtx.NS.Name
 			for _, node := range tt.nodes {
-				if _, err := testutils.CreateNode(testCtx.ClientSet, node); err != nil {
+				if _, err := schedulerutils.CreateNode(testCtx.ClientSet, node); err != nil {
 					t.Fatalf("Failed to create node %v: %v", node.Name, err)
 				}
 			}
 			// Ensure nodes are present in scheduler cache.
-			if err := testutils.WaitForNodesInCache(testCtx.Ctx, testCtx.Scheduler, len(tt.nodes)); err != nil {
+			if err := schedulerutils.WaitForNodesInCache(testCtx.Ctx, testCtx.Scheduler, len(tt.nodes)); err != nil {
 				t.Fatalf("Failed to wait for nodes in cache: %v", err)
 			}
 
@@ -3150,12 +3151,12 @@ func TestNodeDeclaredFeaturesFilter(t *testing.T) {
 				t.Fatalf("Failed to create pod %v: %v", tt.pod.Name, err)
 			}
 			if tt.expectedNode != "" {
-				err := wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, false, testutils.PodScheduledIn(cs, tt.pod.Namespace, tt.pod.Name, []string{tt.expectedNode}))
+				err := wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, false, schedulerutils.PodScheduledIn(cs, tt.pod.Namespace, tt.pod.Name, []string{tt.expectedNode}))
 				if err != nil {
 					t.Errorf("Expected pod to be scheduled, but it was not: %v", err)
 				}
 			} else {
-				err := wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, false, testutils.PodUnschedulable(cs, tt.pod.Namespace, tt.pod.Name))
+				err := wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, false, schedulerutils.PodUnschedulable(cs, tt.pod.Namespace, tt.pod.Name))
 				if err != nil {
 					t.Errorf("Expected pod to be unschedulable, but it was not: %v", err)
 				}

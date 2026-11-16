@@ -698,8 +698,9 @@ func testPublishResourceSlices(tCtx ktesting.TContext, haveLatestAPI bool, disab
 	})
 }
 
-// testMaxResourceSlice creates ResourceSlices that are as large as possible
-// and prints some information about it.
+// testMaxResourceSlice creates ResourceSlices that are as large as possible,
+// prints some information about them and checks that they stay within the
+// object size budget documented in objects.go.
 func testMaxResourceSlice(tCtx ktesting.TContext) {
 	for name, slice := range NewMaxResourceSlices() {
 		runSubTest(tCtx, name, func(tCtx ktesting.TContext) {
@@ -717,6 +718,9 @@ func testMaxResourceSlice(tCtx ktesting.TContext) {
 				resource.NewQuantity(int64(specSize), resource.BinarySI), float64(specSize)*100/float64(totalSize),
 				klog.Format(createdSlice.ManagedFields),
 			)
+			if totalSize > maxObjectSize {
+				tCtx.Errorf("ResourceSlice is too large: %d bytes, must not exceed %d bytes", totalSize, maxObjectSize)
+			}
 			if diff := cmp.Diff(slice.Spec, createdSlice.Spec); diff != "" {
 				tCtx.Errorf("ResourceSliceSpec got modified during Create (- want, + got):\n%s", diff)
 			}

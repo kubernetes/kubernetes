@@ -76,13 +76,11 @@ func init() {
 				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
 			},
 			"spec.preemptionPolicy": {
-				{ErrorType: "FieldValueForbidden"},
 				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
 				{ErrorType: "FieldValueNotSupported"},
 			},
 			"spec.priority": {
 				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
-				{ErrorType: "FieldValueInvalid", Origin: "maximum"},
 			},
 			"spec.priorityClassName": {
 				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-long-name"},

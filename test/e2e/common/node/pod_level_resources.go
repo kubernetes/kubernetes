@@ -56,7 +56,9 @@ var _ = SIGDescribe("Pod Level Resources", framework.WithSerial(), feature.PodLe
 		}
 
 		// skip the test on nodes with cgroupv2 not enabled.
-		if !isCgroupv2Node(f, ctx) {
+		onCgroupV2, err := isCgroupv2Node(f, ctx)
+		framework.ExpectNoError(err)
+		if !onCgroupV2 {
 			e2eskipper.Skipf("not supported on cgroupv1 -- skipping")
 		}
 	})
@@ -67,7 +69,7 @@ var _ = SIGDescribe("Pod Level Resources", framework.WithSerial(), feature.PodLe
 // with cgroupv2 enabled.
 // TODO: refactor to mark this test with cgroupv2 label, and rather check
 // the label in the test job, to tun this test on a node with cgroupv2.
-func isCgroupv2Node(f *framework.Framework, ctx context.Context) bool {
+func isCgroupv2Node(f *framework.Framework, ctx context.Context) (bool, error) {
 	podClient := e2epod.NewPodClient(f)
 	containerResources := cgroups.ContainerResources{CPULim: "1m", MemReq: "1Mi"}
 	cgroupv2Testpod := &v1.Pod{
@@ -91,7 +93,7 @@ func isCgroupv2Node(f *framework.Framework, ctx context.Context) bool {
 		framework.ExpectNoError(delErr, "delete pod %s", delErr)
 	}()
 
-	return cgroups.IsPodOnCgroupv2Node(f, pod.Name, pod.Spec.Containers[0].Name)
+	return cgroups.IsPodOnCgroupv2Node(f, pod, pod.Spec.Containers[0].Name)
 }
 
 func makeObjectMetadata(name, namespace string) metav1.ObjectMeta {
@@ -556,7 +558,9 @@ var _ = SIGDescribe("Pod Level Resources Fix Defaulting", framework.WithSerial()
 			e2eskipper.Skipf("not supported on windows -- skipping")
 		}
 
-		if !isCgroupv2Node(f, ctx) {
+		onCgroupV2, err := isCgroupv2Node(f, ctx)
+		framework.ExpectNoError(err)
+		if !onCgroupV2 {
 			e2eskipper.Skipf("not supported on cgroupv1 -- skipping")
 		}
 	})

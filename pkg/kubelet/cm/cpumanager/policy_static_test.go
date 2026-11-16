@@ -35,6 +35,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/ktesting"
 	"k8s.io/ktesting/initoption"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	pkgfeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm/admission"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
@@ -494,7 +495,7 @@ func TestStaticPolicyAdd(t *testing.T) {
 			stAssignments:   state.ContainerCPUAssignments{},
 			stDefaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7),
 			pod:             makePod("fakePod", "fakeContainer2", "8000m", "8000m"),
-			expErr:          fmt.Errorf("not enough cpus available to satisfy request: requested=8, available=7"),
+			expErr:          admission.NewOutOfResourceError(v1.ResourceCPU, fmt.Errorf("not enough cpus available to satisfy request: requested=8, available=7")),
 			expCPUAlloc:     false,
 			expCSet:         cpuset.New(),
 		},
@@ -524,7 +525,7 @@ func TestStaticPolicyAdd(t *testing.T) {
 			},
 			stDefaultCPUSet: cpuset.New(0, 4, 5, 6, 7, 8, 9, 10, 11),
 			pod:             makePod("fakePod", "fakeContainer5", "10000m", "10000m"),
-			expErr:          fmt.Errorf("not enough cpus available to satisfy request: requested=10, available=8"),
+			expErr:          admission.NewOutOfResourceError(v1.ResourceCPU, fmt.Errorf("not enough cpus available to satisfy request: requested=10, available=8")),
 			expCPUAlloc:     false,
 			expCSet:         cpuset.New(),
 		},
@@ -539,7 +540,7 @@ func TestStaticPolicyAdd(t *testing.T) {
 			},
 			stDefaultCPUSet: cpuset.New(0, 7),
 			pod:             makePod("fakePod", "fakeContainer5", "2000m", "2000m"),
-			expErr:          fmt.Errorf("not enough cpus available to satisfy request: requested=2, available=1"),
+			expErr:          admission.NewOutOfResourceError(v1.ResourceCPU, fmt.Errorf("not enough cpus available to satisfy request: requested=2, available=1")),
 			expCPUAlloc:     false,
 			expCSet:         cpuset.New(),
 		},
@@ -556,7 +557,7 @@ func TestStaticPolicyAdd(t *testing.T) {
 			},
 			stDefaultCPUSet: cpuset.New(10, 11, 53, 37, 55, 67, 52),
 			pod:             makePod("fakePod", "fakeContainer5", "76000m", "76000m"),
-			expErr:          fmt.Errorf("not enough cpus available to satisfy request: requested=76, available=7"),
+			expErr:          admission.NewOutOfResourceError(v1.ResourceCPU, fmt.Errorf("not enough cpus available to satisfy request: requested=76, available=7")),
 			expCPUAlloc:     false,
 			expCSet:         cpuset.New(),
 		},
@@ -870,8 +871,8 @@ func TestStaticPolicyReuseCPUs(t *testing.T) {
 		pod := testCase.pod
 
 		// allocate
-		for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
-			_ = policy.Allocate(logger, st, pod, &container, lifecycle.AddOperation)
+		for container := range podutil.ContainerIter(&pod.Spec, podutil.InitContainers|podutil.Containers) {
+			_ = policy.Allocate(logger, st, pod, container, lifecycle.AddOperation)
 		}
 		if !st.defaultCPUSet.Equals(testCase.expCSetAfterAlloc) {
 			t.Errorf("StaticPolicy Allocate() error (%v). expected default cpuset %s but got %s",
@@ -927,8 +928,8 @@ func TestStaticPolicyDoNotReuseCPUs(t *testing.T) {
 		pod := testCase.pod
 
 		// allocate
-		for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
-			err := policy.Allocate(logger, st, pod, &container, lifecycle.AddOperation)
+		for container := range podutil.ContainerIter(&pod.Spec, podutil.InitContainers|podutil.Containers) {
+			err := policy.Allocate(logger, st, pod, container, lifecycle.AddOperation)
 			if err != nil {
 				t.Errorf("StaticPolicy Allocate() error (%v). expected no error but got %v",
 					testCase.description, err)
@@ -1238,7 +1239,7 @@ func TestStaticPolicyAddWithResvList(t *testing.T) {
 			stAssignments:   state.ContainerCPUAssignments{},
 			stDefaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7),
 			pod:             makePod("fakePod", "fakeContainer2", "8000m", "8000m"),
-			expErr:          fmt.Errorf("not enough cpus available to satisfy request: requested=8, available=7"),
+			expErr:          admission.NewOutOfResourceError(v1.ResourceCPU, fmt.Errorf("not enough cpus available to satisfy request: requested=8, available=7")),
 			expCPUAlloc:     false,
 			expCSet:         cpuset.New(),
 		},
@@ -3147,8 +3148,8 @@ func TestStaticPolicyLifecycleAllocate(t *testing.T) {
 			skipped:     false,
 		},
 		{
-			description: "CPUManager static policy skips ResizeOperation",
-			operation:   lifecycle.ResizeOperation,
+			description: "CPUManager static policy skips UpdateOperation",
+			operation:   lifecycle.UpdateOperation,
 			skipped:     true,
 		},
 		{
@@ -3210,8 +3211,8 @@ func TestStaticPolicyLifecycleAllocatePod(t *testing.T) {
 			skipped:     false,
 		},
 		{
-			description: "CPUManager static policy skips ResizeOperation",
-			operation:   lifecycle.ResizeOperation,
+			description: "CPUManager static policy skips UpdateOperation",
+			operation:   lifecycle.UpdateOperation,
 			skipped:     true,
 		},
 		{
@@ -3272,8 +3273,8 @@ func TestStaticPolicyLifecycleGetTopologyHints(t *testing.T) {
 			skipped:     false,
 		},
 		{
-			description: "CPUManager static policy skips ResizeOperation",
-			operation:   lifecycle.ResizeOperation,
+			description: "CPUManager static policy skips UpdateOperation",
+			operation:   lifecycle.UpdateOperation,
 			skipped:     true,
 		},
 		{
@@ -3325,6 +3326,261 @@ func TestStaticPolicyLifecycleGetTopologyHints(t *testing.T) {
 	}
 }
 
+func findHintForMask(hints []topologymanager.TopologyHint, mask bitmask.BitMask) *topologymanager.TopologyHint {
+	for i := range hints {
+		if hints[i].NUMANodeAffinity.IsEqual(mask) {
+			return &hints[i]
+		}
+	}
+	return nil
+}
+
+// expectedHintScore is the Score the hint for a given NUMA mask should carry.
+type expectedHintScore struct {
+	mask  bitmask.BitMask
+	score int64
+}
+
+// scoringTopologyStore returns a topology manager store whose policy reads
+// hint scores. Hint providers skip computing a score when the configured
+// policy selects no NUMA allocation strategy, which is the default, so a test
+// that asserts scores has to ask for one.
+func scoringTopologyStore(logger klog.Logger) topologymanager.Store {
+	return topologymanager.NewFakeManagerWithPolicy(logger, topologymanager.NewBestEffortPolicy(nil, topologymanager.PolicyOptions{
+		NUMAAllocationStrategy: topologymanager.NUMAAllocationStrategyMostAllocated,
+	}))
+}
+
+func TestGenerateCPUTopologyHintsScore(t *testing.T) {
+	// topoDualSocketNoHT: 8 CPUs, 2 NUMA nodes, 4 CPUs each
+	// NUMA 0: CPUs {0,1,2,3}, NUMA 1: CPUs {4,5,6,7}
+
+	testCases := []struct {
+		description    string
+		topo           *topology.CPUTopology
+		reservedCPUs   cpuset.CPUSet
+		usableCPUs     cpuset.CPUSet
+		reusableCPUs   cpuset.CPUSet
+		freeCPUs       cpuset.CPUSet
+		request        int
+		expectedScores []expectedHintScore
+	}{
+		{
+			description:  "nothing assigned, symmetric NUMA, all scores are 1",
+			topo:         topoDualSocketNoHT,
+			reservedCPUs: cpuset.New(),
+			usableCPUs:   cpuset.New(0, 1, 2, 3, 4, 5, 6, 7),
+			reusableCPUs: cpuset.New(),
+			freeCPUs:     cpuset.New(0, 1, 2, 3, 4, 5, 6, 7),
+			request:      1,
+			expectedScores: []expectedHintScore{
+				{mask: newNUMAAffinity(0), score: 1},
+				{mask: newNUMAAffinity(1), score: 1},
+				{mask: newNUMAAffinity(0, 1), score: 1},
+			},
+		},
+		{
+			description:  "2 of 4 assigned on NUMA 0, score reflects utilization",
+			topo:         topoDualSocketNoHT,
+			reservedCPUs: cpuset.New(),
+			usableCPUs:   cpuset.New(2, 3, 4, 5, 6, 7),
+			reusableCPUs: cpuset.New(),
+			freeCPUs:     cpuset.New(2, 3, 4, 5, 6, 7),
+			request:      1,
+			// NUMA 0: 4 allocatable, 2 free, 2 assigned → 2*100/4 = 50
+			// NUMA 1: 4 allocatable, 4 free, 0 assigned → max(1, 0) = 1
+			// NUMA {0,1}: 8 allocatable, 6 free, 2 assigned → 2*100/8 = 25
+			expectedScores: []expectedHintScore{
+				{mask: newNUMAAffinity(0), score: 50},
+				{mask: newNUMAAffinity(1), score: 1},
+				{mask: newNUMAAffinity(0, 1), score: 25},
+			},
+		},
+		{
+			description:  "asymmetric reserved CPUs, partial assignment",
+			topo:         topoDualSocketNoHT,
+			reservedCPUs: cpuset.New(0, 1),
+			usableCPUs:   cpuset.New(3, 4, 5, 6, 7),
+			reusableCPUs: cpuset.New(),
+			freeCPUs:     cpuset.New(3, 4, 5, 6, 7),
+			request:      1,
+			// NUMA 0: allocatable={2,3}=2, free_on_0={3}=1, assigned=1 → 1*100/2 = 50
+			// NUMA 1: allocatable={4,5,6,7}=4, free_on_1={4,5,6,7}=4, assigned=0 → max(1,0)=1
+			// NUMA {0,1}: allocatable=6, free=5, assigned=1 → 1*100/6 = 16
+			//
+			// This case pins the cross-NUMA semantic: a hint spanning both nodes
+			// scores the span as one pool (16), not the mean of the per-node
+			// scores (25). The span weights each node by the capacity it
+			// contributes, so the larger and emptier node 1 dominates, which is
+			// right: a container placed on {0,1} allocates from both nodes as a
+			// single pool. Reserving CPUs on one node only is what makes the two
+			// readings diverge here; with equally sized nodes they coincide,
+			// which is why every other case in this table agrees with both.
+			expectedScores: []expectedHintScore{
+				{mask: newNUMAAffinity(0), score: 50},
+				{mask: newNUMAAffinity(1), score: 1},
+				{mask: newNUMAAffinity(0, 1), score: 16},
+			},
+		},
+		{
+			description:  "full utilization via reusable CPUs, score 100",
+			topo:         topoSingleSocketHT,
+			reservedCPUs: cpuset.New(),
+			usableCPUs:   cpuset.New(),
+			reusableCPUs: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7),
+			freeCPUs:     cpuset.New(),
+			request:      1,
+			// NUMA 0: 8 allocatable, 0 free, 8 assigned → 8*100/8 = 100
+			expectedScores: []expectedHintScore{
+				{mask: newNUMAAffinity(0), score: 100},
+			},
+		},
+		{
+			description:  "3 of 4 assigned on each NUMA, high utilization",
+			topo:         topoDualSocketNoHT,
+			reservedCPUs: cpuset.New(),
+			usableCPUs:   cpuset.New(3, 7),
+			reusableCPUs: cpuset.New(),
+			freeCPUs:     cpuset.New(3, 7),
+			request:      1,
+			// NUMA 0: 4 allocatable, 1 free, 3 assigned → 3*100/4 = 75
+			// NUMA 1: 4 allocatable, 1 free, 3 assigned → 3*100/4 = 75
+			// NUMA {0,1}: 8 allocatable, 2 free, 6 assigned → 6*100/8 = 75
+			expectedScores: []expectedHintScore{
+				{mask: newNUMAAffinity(0), score: 75},
+				{mask: newNUMAAffinity(1), score: 75},
+				{mask: newNUMAAffinity(0, 1), score: 75},
+			},
+		},
+		{
+			// Hint regeneration: the usable set is the allocation the container
+			// already holds, which is not free. Scoring off it would report
+			// NUMA 0 as 50% used when it is in fact full.
+			description:  "regeneration, usable set differs from free set",
+			topo:         topoDualSocketNoHT,
+			reservedCPUs: cpuset.New(),
+			usableCPUs:   cpuset.New(0, 1),
+			reusableCPUs: cpuset.New(),
+			freeCPUs:     cpuset.New(4, 5, 6, 7),
+			request:      2,
+			// NUMA 0: 4 allocatable, 0 free, 4 assigned → 4*100/4 = 100
+			// NUMA {0,1}: 8 allocatable, 4 free, 4 assigned → 4*100/8 = 50
+			// NUMA 1 generates no hint: none of the usable CPUs live there.
+			expectedScores: []expectedHintScore{
+				{mask: newNUMAAffinity(0), score: 100},
+				{mask: newNUMAAffinity(0, 1), score: 50},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
+			p := staticPolicy{
+				topology:     tc.topo,
+				reservedCPUs: tc.reservedCPUs,
+				numaNodes:    tc.topo.CPUDetails.NUMANodes().List(),
+				affinity:     scoringTopologyStore(logger),
+			}
+			hints := p.generateCPUTopologyHints(tc.usableCPUs, tc.reusableCPUs, tc.freeCPUs, tc.request)
+
+			if len(hints) != len(tc.expectedScores) {
+				t.Errorf("expected %d hints, got %d: %v", len(tc.expectedScores), len(hints), hints)
+			}
+			for _, expected := range tc.expectedScores {
+				hint := findHintForMask(hints, expected.mask)
+				if hint == nil {
+					t.Errorf("expected a hint for NUMA %v but found none", expected.mask.GetBits())
+					continue
+				}
+				if hint.Score != expected.score {
+					t.Errorf("NUMA %v: expected Score %d, got %d", expected.mask.GetBits(), expected.score, hint.Score)
+				}
+			}
+		})
+	}
+}
+
+// TestRegeneratedCPUTopologyHintsScore covers the hint regeneration path taken
+// after a kubelet restart, when the container already holds an allocation. The
+// Score has to describe the node, not the caller: the already allocated CPUs are
+// passed in as the usable set, but they are assigned, not free.
+func TestRegeneratedCPUTopologyHintsScore(t *testing.T) {
+	// topoDualSocketNoHT: 8 CPUs, 2 NUMA nodes, 4 CPUs each.
+	// NUMA 0: CPUs {0,1,2,3}, NUMA 1: CPUs {4,5,6,7}.
+	//
+	// The container holds {0,1}; another pod holds {2,3}. NUMA 0 is therefore
+	// full and NUMA 1 entirely free.
+	//
+	// NUMA 0:     4 allocatable, 0 free, 4 assigned → 4*100/4 = 100
+	// NUMA {0,1}: 8 allocatable, 4 free, 4 assigned → 4*100/8 = 50
+	//
+	// Scoring off the usable set instead would claim 50 and 75: NUMA 0 half
+	// empty when it is full.
+	// NUMA 1 generates no hint: the container holds nothing there.
+	expectedHints := []topologymanager.TopologyHint{
+		{NUMANodeAffinity: newNUMAAffinity(0), Preferred: true, Score: 100},
+		{NUMANodeAffinity: newNUMAAffinity(0, 1), Preferred: false, Score: 50},
+	}
+
+	newState := func() *mockState {
+		return &mockState{
+			assignments: state.ContainerCPUAssignments{
+				"fakePod": map[string]cpuset.CPUSet{
+					"fakeContainer": cpuset.New(0, 1),
+				},
+			},
+			defaultCPUSet: cpuset.New(4, 5, 6, 7),
+		}
+	}
+
+	testCases := []struct {
+		description string
+		getHints    func(logger klog.Logger, p Policy, st state.State, pod *v1.Pod) map[string][]topologymanager.TopologyHint
+	}{
+		{
+			description: "container scope",
+			getHints: func(logger klog.Logger, p Policy, st state.State, pod *v1.Pod) map[string][]topologymanager.TopologyHint {
+				return p.GetTopologyHints(logger, st, pod, &pod.Spec.Containers[0], lifecycle.AddOperation)
+			},
+		},
+		{
+			description: "pod scope",
+			getHints: func(logger klog.Logger, p Policy, st state.State, pod *v1.Pod) map[string][]topologymanager.TopologyHint {
+				return p.GetPodTopologyHints(logger, st, pod, lifecycle.AddOperation)
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			logger := tCtx.Logger()
+
+			policy, err := NewStaticPolicy(logger, topoDualSocketNoHT, 0, cpuset.New(), scoringTopologyStore(logger), nil)
+			if err != nil {
+				t.Fatalf("NewStaticPolicy() failed: %v", err)
+			}
+
+			pod := makePod("fakePod", "fakeContainer", "2", "2")
+			hints := tc.getHints(logger, policy, newState(), pod)[string(v1.ResourceCPU)]
+
+			if len(hints) != len(expectedHints) {
+				t.Fatalf("expected %d regenerated hints, got %d: %v", len(expectedHints), len(hints), hints)
+			}
+			for i, expected := range expectedHints {
+				// Asserting on Preferred too: the regenerated hints must still
+				// point at the existing allocation.
+				if !hints[i].NUMANodeAffinity.IsEqual(expected.NUMANodeAffinity) ||
+					hints[i].Preferred != expected.Preferred ||
+					hints[i].Score != expected.Score {
+					t.Errorf("hint %d: expected %v, got %v", i, expected, hints[i])
+				}
+			}
+		})
+	}
+}
+
 func TestStaticPolicyLifecycleGetPodTopologyHints(t *testing.T) {
 	testCases := []struct {
 		description string
@@ -3337,8 +3593,8 @@ func TestStaticPolicyLifecycleGetPodTopologyHints(t *testing.T) {
 			skipped:     false,
 		},
 		{
-			description: "CPUManager static policy skips ResizeOperation",
-			operation:   lifecycle.ResizeOperation,
+			description: "CPUManager static policy skips UpdateOperation",
+			operation:   lifecycle.UpdateOperation,
 			skipped:     true,
 		},
 		{
@@ -3384,6 +3640,66 @@ func TestStaticPolicyLifecycleGetPodTopologyHints(t *testing.T) {
 				if strings.Contains(logs, expectedLog) {
 					t.Errorf("Unexpected log '%s' found in logs: %s", expectedLog, logs)
 				}
+			}
+		})
+	}
+}
+
+func TestStaticPolicyAdmissionRejectionType(t *testing.T) {
+	testCases := []struct {
+		description      string
+		reservedCPUs     cpuset.CPUSet
+		options          map[string]string
+		defaultCPUSet    cpuset.CPUSet
+		request          string
+		expReason        string
+		expRejectionType lifecycle.RejectionType
+	}{{
+		description:      "not enough free CPUs",
+		reservedCPUs:     cpuset.New(),
+		defaultCPUSet:    cpuset.New(0, 1, 2, 3, 4, 5, 6, 7),
+		request:          "8000m",
+		expReason:        lifecycle.OutOfCPU,
+		expRejectionType: lifecycle.RejectionBlocked,
+	}, {
+		description:      "not enough free physical CPUs",
+		reservedCPUs:     cpuset.New(0),
+		options:          map[string]string{FullPCPUsOnlyOption: "true"},
+		defaultCPUSet:    cpuset.New(1, 2, 3, 4, 5, 6, 7),
+		request:          "8000m",
+		expReason:        ErrorSMTAlignment,
+		expRejectionType: lifecycle.RejectionBlocked,
+	}, {
+		description:      "request not a multiple of the CPUs per core",
+		reservedCPUs:     cpuset.New(0),
+		options:          map[string]string{FullPCPUsOnlyOption: "true"},
+		defaultCPUSet:    cpuset.New(1, 2, 3, 4, 5, 6, 7),
+		request:          "1000m",
+		expReason:        ErrorSMTAlignment,
+		expRejectionType: lifecycle.RejectionInfeasible,
+	}}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
+			policy, err := NewStaticPolicy(logger, topoSingleSocketHT, 1, tc.reservedCPUs, topologymanager.NewFakeManager(logger), tc.options)
+			if err != nil {
+				t.Fatalf("NewStaticPolicy() failed: %v", err)
+			}
+			st := &mockState{
+				assignments:   state.ContainerCPUAssignments{},
+				defaultCPUSet: tc.defaultCPUSet,
+			}
+			pod := makePod("fakePod", "fakeContainer", tc.request, tc.request)
+			res := admission.GetPodAdmitResult(policy.Allocate(logger, st, pod, &pod.Spec.Containers[0], lifecycle.AddOperation))
+			if res.Admit {
+				t.Fatalf("expected Admit=false, got %+v", res)
+			}
+			if res.Reason != tc.expReason {
+				t.Errorf("expected Reason=%q, got %q", tc.expReason, res.Reason)
+			}
+			if res.RejectionType != tc.expRejectionType {
+				t.Errorf("expected RejectionType=%v, got %v", tc.expRejectionType, res.RejectionType)
 			}
 		})
 	}

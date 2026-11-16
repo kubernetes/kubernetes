@@ -34,6 +34,7 @@ var _ fwk.PreFilterPlugin = &NodeName{}
 var _ fwk.FilterPlugin = &NodeName{}
 var _ fwk.EnqueueExtensions = &NodeName{}
 var _ fwk.SignPlugin = &NodeName{}
+var _ fwk.RelevancePlugin = &NodeName{}
 
 const (
 	// Name is the name of the plugin used in the plugin registry and configurations.
@@ -56,6 +57,12 @@ func (pl *NodeName) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWithH
 // Name returns name of the plugin. It is used in logs, etc.
 func (pl *NodeName) Name() string {
 	return Name
+}
+
+// IsRelevantForPodResize returns true to indicate that NodeName is relevant for pod resizes,
+// as it restricts evaluation to the pod's assigned node.
+func (pl *NodeName) IsRelevantForPodResize() bool {
+	return true
 }
 
 // NodeName scoring and feasibility are dependent on the NodeName field.

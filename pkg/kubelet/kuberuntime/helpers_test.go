@@ -817,3 +817,47 @@ func TestPodSandboxByCreatedThenID(t *testing.T) {
 		})
 	}
 }
+
+func TestToKubeRuntimeStatusCgroupMountMode(t *testing.T) {
+	testCases := []struct {
+		name                  string
+		features              *runtimeapi.RuntimeFeatures
+		expectedFeatures      bool
+		expectedCgroupSupport bool
+	}{
+		{
+			name:             "nil features",
+			features:         nil,
+			expectedFeatures: false,
+		},
+		{
+			name:                  "supports cgroup mount mode",
+			features:              &runtimeapi.RuntimeFeatures{CgroupMountMode: true},
+			expectedFeatures:      true,
+			expectedCgroupSupport: true,
+		},
+		{
+			name:                  "does not support cgroup mount mode",
+			features:              &runtimeapi.RuntimeFeatures{CgroupMountMode: false},
+			expectedFeatures:      true,
+			expectedCgroupSupport: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			status := &runtimeapi.RuntimeStatus{
+				Conditions: []*runtimeapi.RuntimeCondition{
+					{Type: "RuntimeReady", Status: true},
+				},
+			}
+			result := toKubeRuntimeStatus(status, nil, tc.features)
+			if !tc.expectedFeatures {
+				assert.Nil(t, result.Features)
+				return
+			}
+			assert.NotNil(t, result.Features)
+			assert.Equal(t, tc.expectedCgroupSupport, result.Features.CgroupMountMode)
+		})
+	}
+}

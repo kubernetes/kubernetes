@@ -300,6 +300,59 @@ func TestDisableCompression(t *testing.T) {
 	matchBoolArg(true, actualCfg.DisableCompression, t)
 }
 
+func TestMinConnectionPoolSize(t *testing.T) {
+	kubeconfig := []byte(`apiVersion: v1
+kind: Config
+clusters:
+- name: clean
+  cluster:
+    server: https://localhost:8443
+    min-connection-pool-size: 4
+contexts:
+- name: clean
+  context:
+    cluster: clean
+current-context: clean
+`)
+	config, err := Load(kubeconfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	matchIntArg(4, int(config.Clusters["clean"].MinConnectionPoolSize), t)
+
+	// Writing and loading the kubeconfig again keeps the value.
+	written, err := Write(*config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	config, err = Load(written)
+	if err != nil {
+		t.Fatal(err)
+	}
+	matchIntArg(4, int(config.Clusters["clean"].MinConnectionPoolSize), t)
+
+	restConfig, err := NewNonInteractiveClientConfig(*config, "clean", &ConfigOverrides{}, nil).ClientConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	matchIntArg(4, restConfig.MinConnectionPoolSize, t)
+
+	for _, size := range []int32{0, 1, 100} {
+		cluster := *config.Clusters["clean"]
+		cluster.MinConnectionPoolSize = size
+		if errs := validateClusterInfo("clean", cluster); len(errs) != 0 {
+			t.Errorf("unexpected validation errors for min-connection-pool-size %d: %v", size, errs)
+		}
+	}
+	for _, size := range []int32{-1, 101} {
+		cluster := *config.Clusters["clean"]
+		cluster.MinConnectionPoolSize = size
+		if errs := validateClusterInfo("clean", cluster); len(errs) != 1 {
+			t.Errorf("expected one validation error for min-connection-pool-size %d, got %v", size, errs)
+		}
+	}
+}
+
 func TestInsecureOverridesCA(t *testing.T) {
 	config := createCAValidTestConfig()
 	clientBuilder := NewNonInteractiveClientConfig(*config, "clean", &ConfigOverrides{

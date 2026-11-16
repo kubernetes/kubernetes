@@ -754,3 +754,87 @@ func TestCorrelation(t *testing.T) {
 		})
 	}
 }
+
+func TestCorrelatedObjectKeyPropertyLookup(t *testing.T) {
+	str := spec.StringProperty()
+	integer := spec.Int64Property()
+
+	withBoth := objSchema(map[string]spec.Schema{"declared": *str})
+	withBoth.AdditionalProperties = &spec.SchemaOrBool{Allows: true, Schema: integer}
+
+	cases := []struct {
+		name       string
+		schema     *spec.Schema
+		field      string
+		wantSchema *spec.Schema // nil means Key() should return nil
+	}{
+		{
+			name:       "declared property",
+			schema:     objSchema(map[string]spec.Schema{"declared": *str}),
+			field:      "declared",
+			wantSchema: str,
+		},
+		{
+			name:   "undeclared property without additionalProperties",
+			schema: objSchema(map[string]spec.Schema{"declared": *str}),
+			field:  "other",
+		},
+		{
+			name:       "declared property takes precedence over additionalProperties",
+			schema:     withBoth,
+			field:      "declared",
+			wantSchema: str,
+		},
+		{
+			name:       "undeclared property falls back to additionalProperties",
+			schema:     withBoth,
+			field:      "other",
+			wantSchema: integer,
+		},
+		{
+			name:   "nil properties without additionalProperties",
+			schema: objSchema(nil),
+			field:  "declared",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			obj := map[string]interface{}{"declared": "x", "other": "y"}
+			old := map[string]interface{}{"declared": "x", "other": "y"}
+			child := common.NewCorrelatedObject(obj, old, &openapi.Schema{Schema: tc.schema}).Key(tc.field)
+			if tc.wantSchema == nil {
+				if child != nil {
+					t.Fatalf("Key(%q) = %+v, want nil", tc.field, child)
+				}
+				return
+			}
+			if child == nil {
+				t.Fatalf("Key(%q) = nil, want child with schema type %v", tc.field, tc.wantSchema.Type)
+			}
+			if child.Value != obj[tc.field] || child.OldValue != old[tc.field] {
+				t.Errorf("Key(%q) values = (%v, %v), want (%v, %v)", tc.field, child.Value, child.OldValue, obj[tc.field], old[tc.field])
+			}
+			got, ok := child.Schema.(*openapi.Schema)
+			if !ok {
+				t.Fatalf("Key(%q).Schema = %T, want *openapi.Schema", tc.field, child.Schema)
+			}
+			if !reflect.DeepEqual(got.Schema, tc.wantSchema) {
+				t.Errorf("Key(%q).Schema = %#v, want %#v", tc.field, got.Schema, tc.wantSchema)
+			}
+		})
+	}
+}
+
+// TestCorrelatedObjectKeyAvoidsProperties guards against regressing to
+// Properties() on hot paths, which copies the whole properties map per call.
+func TestCorrelatedObjectKeyAvoidsProperties(t *testing.T) {
+	s := &countingSchema{Schema: &openapi.Schema{Schema: objSchema(map[string]spec.Schema{"name": *spec.StringProperty()})}}
+	obj := map[string]interface{}{"name": "a"}
+	if common.NewCorrelatedObject(obj, obj, s).Key("name") == nil {
+		t.Fatal("Key(\"name\") = nil, want child")
+	}
+	if s.propertiesCalls != 0 {
+		t.Errorf("Properties() called %d times, want 0", s.propertiesCalls)
+	}
+}

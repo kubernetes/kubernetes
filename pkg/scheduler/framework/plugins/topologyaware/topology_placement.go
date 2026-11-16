@@ -37,16 +37,14 @@ const (
 // TopologyPlacement is a plugin that generates placements for a pod group based on its topology constraints.
 type TopologyPlacement struct {
 	handle fwk.Handle
-	fts    feature.Features
 }
 
 var _ fwk.PlacementGeneratePlugin = &TopologyPlacement{}
 
 // New initializes a new plugin and returns it.
-func New(_ context.Context, _ runtime.Object, fh fwk.Handle, fts feature.Features) (*TopologyPlacement, error) {
+func New(_ context.Context, _ runtime.Object, fh fwk.Handle, _ feature.Features) (*TopologyPlacement, error) {
 	return &TopologyPlacement{
 		handle: fh,
-		fts:    fts,
 	}, nil
 }
 
@@ -79,7 +77,7 @@ func (pl *TopologyPlacement) GeneratePlacements(ctx context.Context, state fwk.P
 
 	nodesPerTopologyDomain := make(map[string][]fwk.NodeInfo)
 	for _, node := range parentPlacement.Nodes {
-		if domain, ok := node.Node().Labels[topologyKey]; ok {
+		if domain, ok := node.Node().Labels[topologyKey]; ok && domain != "" {
 			if requiredDomain == nil || *requiredDomain == domain {
 				nodesPerTopologyDomain[domain] = append(nodesPerTopologyDomain[domain], node)
 			}
@@ -110,8 +108,12 @@ func (pl *TopologyPlacement) getScheduledPodsTopologyDomain(topologyKey string, 
 		if !ok {
 			return "", fmt.Errorf("no topology domain found for pod %v", klog.KObj(pod))
 		}
+		// An empty label value is treated as a node labeling mistake, not as a domain.
+		if domain == "" {
+			return "", fmt.Errorf("empty topology domain found for pod %v", klog.KObj(pod))
+		}
 		if topologyDomain != "" && topologyDomain != domain {
-			return "", fmt.Errorf("more than 1 domain found for pod group: %v, %v", topologyDomain, domain)
+			return "", fmt.Errorf("more than 1 domain found for pod group: %q, %q", topologyDomain, domain)
 		}
 		topologyDomain = domain
 	}
@@ -135,20 +137,12 @@ func (pl *TopologyPlacement) getTopologyKey(pgi fwk.PodGroupInfo) (string, bool)
 }
 
 func (pl *TopologyPlacement) getScheduledPods(podGroup fwk.PodGroupInfo) ([]*v1.Pod, error) {
-	if pl.fts.EnableCompositePodGroup {
-		var results []*v1.Pod
-		for podGroupState, err := range helper.GetPodGroupStates(pl.handle.SnapshotSharedLister(), podGroup.GetKey()) {
-			if err != nil {
-				return nil, err
-			}
-			results = append(results, podGroupState.ScheduledPods()...)
+	var results []*v1.Pod
+	for podGroupState, err := range helper.GetPodGroupStates(pl.handle.SnapshotSharedLister(), podGroup.GetKey()) {
+		if err != nil {
+			return nil, err
 		}
-		return results, nil
+		results = append(results, podGroupState.ScheduledPods()...)
 	}
-	name := podGroup.GetName()
-	podGroupState, err := pl.handle.SnapshotSharedLister().PodGroupStates().Get(podGroup.GetNamespace(), name)
-	if err != nil {
-		return nil, err
-	}
-	return podGroupState.ScheduledPods(), nil
+	return results, nil
 }

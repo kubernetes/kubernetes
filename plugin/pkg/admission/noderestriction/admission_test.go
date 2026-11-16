@@ -37,7 +37,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
@@ -2530,17 +2529,14 @@ func TestAdmitPVCStatus(t *testing.T) {
 	mynode := &user.DefaultInfo{Name: "system:node:mynode", Groups: []string{"system:nodes"}}
 
 	nodeExpansionFailed := api.PersistentVolumeClaimNodeResizeInfeasible
-	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, version.MustParse("1.33"))
 
 	tests := []struct {
-		name                    string
-		resource                schema.GroupVersionResource
-		subresource             string
-		newObj                  runtime.Object
-		oldObj                  runtime.Object
-		expansionFeatureEnabled bool
-		recoveryFeatureEnabled  bool
-		expectError             string
+		name        string
+		resource    schema.GroupVersionResource
+		subresource string
+		newObj      runtime.Object
+		oldObj      runtime.Object
+		expectError string
 	}{
 		{
 			name: "should not allow full pvc update from nodes",
@@ -2555,13 +2551,12 @@ func TestAdmitPVCStatus(t *testing.T) {
 			expectError: "is forbidden: may only update PVC status",
 		},
 		{
-			name: "should allow capacity and condition updates, if expansion is enabled",
+			name: "should allow capacity and condition updates",
 			oldObj: makeTestPVC(
 				api.PersistentVolumeClaimResizing,
 				"10G", nil,
 			),
-			expansionFeatureEnabled: true,
-			subresource:             "status",
+			subresource: "status",
 			newObj: makeTestPVC(
 				api.PersistentVolumeClaimFileSystemResizePending,
 				"10G", nil,
@@ -2569,28 +2564,12 @@ func TestAdmitPVCStatus(t *testing.T) {
 			expectError: "",
 		},
 		{
-			name: "should not allow updates to allocatedResources with just expansion enabled",
+			name: "should allow updates to allocatedResources",
 			oldObj: makeTestPVC(
 				api.PersistentVolumeClaimResizing,
 				"10G", nil,
 			),
-			subresource:             "status",
-			expansionFeatureEnabled: true,
-			newObj: makeTestPVC(
-				api.PersistentVolumeClaimFileSystemResizePending,
-				"15G", nil,
-			),
-			expectError: "is not allowed to update fields other than",
-		},
-		{
-			name: "should allow updates to allocatedResources with expansion and recovery enabled",
-			oldObj: makeTestPVC(
-				api.PersistentVolumeClaimResizing,
-				"10G", nil,
-			),
-			subresource:             "status",
-			expansionFeatureEnabled: true,
-			recoveryFeatureEnabled:  true,
+			subresource: "status",
 			newObj: makeTestPVC(
 				api.PersistentVolumeClaimFileSystemResizePending,
 				"15G", nil,
@@ -2598,14 +2577,12 @@ func TestAdmitPVCStatus(t *testing.T) {
 			expectError: "",
 		},
 		{
-			name: "should allow updates to resizeStatus with expansion and recovery enabled",
+			name: "should allow updates to resizeStatus",
 			oldObj: makeTestPVC(
 				api.PersistentVolumeClaimResizing,
 				"10G", nil,
 			),
-			subresource:             "status",
-			expansionFeatureEnabled: true,
-			recoveryFeatureEnabled:  true,
+			subresource: "status",
 			newObj: makeTestPVC(
 				api.PersistentVolumeClaimResizing,
 				"10G", &nodeExpansionFailed,
@@ -2622,7 +2599,6 @@ func TestAdmitPVCStatus(t *testing.T) {
 			attributes := admission.NewAttributesRecord(
 				test.newObj, test.oldObj, schema.GroupVersionKind{},
 				metav1.NamespaceDefault, "foo", apiResource, test.subresource, operation, &metav1.CreateOptions{}, false, mynode)
-			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.RecoverVolumeExpansionFailure, test.recoveryFeatureEnabled)
 			a := &admitTestCase{
 				name:        test.name,
 				podsGetter:  noExistingPods,

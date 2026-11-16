@@ -1,33 +1,15 @@
-diff --git a/staging/src/k8s.io/apiserver/pkg/storage/etcd3/store.go b/staging/src/k8s.io/apiserver/pkg/storage/etcd3/store.go
-index 0cb165fb4ec..2b7f8c31a02 100644
---- a/staging/src/k8s.io/apiserver/pkg/storage/etcd3/store.go
-+++ b/staging/src/k8s.io/apiserver/pkg/storage/etcd3/store.go
-@@ -406,29 +406,10 @@ func (s *store) conditionalDelete(
+diff --git a/staging/src/k8s.io/apiserver/pkg/storage/txn.go b/staging/src/k8s.io/apiserver/pkg/storage/txn.go
+index d082ebe9eb7..1a7c1a2a5d9 100644
+--- a/staging/src/k8s.io/apiserver/pkg/storage/txn.go
++++ b/staging/src/k8s.io/apiserver/pkg/storage/txn.go
+@@ -85,11 +85,10 @@ func ConditionalDelete(ctx context.Context, d TxnDelegator, key string, out runt
  	for {
  		if preconditions != nil {
- 			if err := preconditions.Check(key, origState.obj); err != nil {
--				if origStateIsCurrent {
--					return err
--				}
--
--				// It's possible we're working with stale data.
--				// Remember the revision of the potentially stale data and the resulting update error
--				cachedRev := origState.rev
--				cachedUpdateErr := err
--
--				// Actually fetch
--				origState, err = getCurrentState()
+ 			if err := preconditions.Check(key, origState.Obj); err != nil {
+-				origState, err = refreshOnError(ctx, origState, err, false, d.GetCurrentState)
 -				if err != nil {
 -					return err
 -				}
--				origStateIsCurrent = true
--
--				// it turns out our cached data was not stale, return the error
--				if cachedRev == origState.rev {
--					return cachedUpdateErr
--				}
--
--				// Retry
 -				continue
 +				// BUG REVERT (7bab6a9c6ed): the delete-with-suggestion optimization
 +				// without its stale-data recheck. A precondition evaluated against a
@@ -35,4 +17,4 @@ index 0cb165fb4ec..2b7f8c31a02 100644
 +				return err
  			}
  		}
- 		if err := validateDeletion(ctx, origState.obj); err != nil {
+ 		if err := validateDeletion(ctx, origState.Obj); err != nil {

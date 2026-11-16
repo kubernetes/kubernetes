@@ -23,10 +23,10 @@ package contract
 import (
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
-	schedulingapi "k8s.io/api/scheduling/v1beta1"
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	draapi "k8s.io/dynamic-resource-allocation/api"
 	"k8s.io/dynamic-resource-allocation/structured/schedulerapi"
 	fwk "k8s.io/kube-scheduler/framework"
 )
@@ -102,7 +102,7 @@ func (c *shareListerContract) CompositePodGroups() fwk.CompositePodGroupLister {
 
 type podGroupListerContract struct{}
 
-func (c *podGroupListerContract) Get(_ string, _ string) (*schedulingapi.PodGroup, error) {
+func (c *podGroupListerContract) Get(_ string, _ string) (*schedulingv1beta1.PodGroup, error) {
 	return nil, nil
 }
 
@@ -144,7 +144,7 @@ func (c *podGroupStateContract) ScheduledPods() []*v1.Pod {
 
 type compositePodGroupListerContract struct{}
 
-func (c *compositePodGroupListerContract) Get(_ string, _ string) (*schedulingv1alpha3.CompositePodGroup, error) {
+func (c *compositePodGroupListerContract) Get(_ string, _ string) (*schedulingv1beta1.CompositePodGroup, error) {
 	return nil, nil
 }
 
@@ -162,7 +162,7 @@ func (c *compositePodGroupStateContract) GetChildren() []fwk.EntityKey {
 
 type resourceSliceListerContract struct{}
 
-func (c *resourceSliceListerContract) ListWithDeviceTaintRules() ([]*resourceapi.ResourceSlice, error) {
+func (c *resourceSliceListerContract) ListWithDeviceTaintRules() ([]*draapi.ResourceSlice, error) {
 	return nil, nil
 }
 

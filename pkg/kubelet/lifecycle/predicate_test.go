@@ -18,6 +18,7 @@ package lifecycle
 
 import (
 	"context"
+	"fmt"
 	goruntime "runtime"
 	"testing"
 
@@ -780,95 +781,304 @@ func TestPodAdmissionBasedOnSupplementalGroupsPolicy(t *testing.T) {
 		},
 	}}
 	tests := []struct {
-		name             string
-		emulationVersion *utilversion.Version
-		node             *v1.Node
-		pod              *v1.Pod
-		expectRejection  bool
+		name            string
+		node            *v1.Node
+		pod             *v1.Pod
+		expectRejection bool
 	}{
-		// The feature is Beta in v1.33
 		{
-			name:             "feature=Beta, node=feature not supported, pod=in use: it should REJECT",
-			emulationVersion: utilversion.MustParse("1.33"),
-			node:             nodeWithoutFeature,
-			pod:              podUsingFeature,
-			expectRejection:  true,
+			name:            "node=feature not supported, pod=in use: it should REJECT",
+			node:            nodeWithoutFeature,
+			pod:             podUsingFeature,
+			expectRejection: true,
 		},
 		{
-			name:             "feature=Beta, node=feature supported, pod=in use: it should ADMIT",
-			emulationVersion: utilversion.MustParse("1.33"),
-			node:             nodeWithFeature,
-			pod:              podUsingFeature,
-			expectRejection:  false,
+			name:            "node=feature supported, pod=in use: it should ADMIT",
+			node:            nodeWithFeature,
+			pod:             podUsingFeature,
+			expectRejection: false,
 		},
 		{
-			name:             "feature=Beta, node=feature not supported, pod=not in use: it should ADMIT",
-			emulationVersion: utilversion.MustParse("1.33"),
-			node:             nodeWithoutFeature,
-			pod:              podNotUsingFeature,
-			expectRejection:  false,
+			name:            "node=feature not supported, pod=not in use: it should ADMIT",
+			node:            nodeWithoutFeature,
+			pod:             podNotUsingFeature,
+			expectRejection: false,
 		},
 		{
-			name:             "feature=Beta, node=feature supported, pod=not in use: it should ADMIT",
-			emulationVersion: utilversion.MustParse("1.33"),
-			node:             nodeWithFeature,
-			pod:              podNotUsingFeature,
-			expectRejection:  false,
-		},
-		// The feature is Alpha(v1.31, v1.32) in emulated version
-		// Note: When the feature is alpha in emulated version, it should always admit for backward compatibility
-		{
-			name:             "feature=Alpha, node=feature not supported, pod=feature used: it should ADMIT",
-			emulationVersion: utilversion.MustParse("1.32"),
-			node:             nodeWithoutFeature,
-			pod:              podUsingFeature,
-			expectRejection:  false,
-		},
-		{
-			name:             "feature=Alpha, node=feature not supported, pod=feature not used: it should ADMIT",
-			emulationVersion: utilversion.MustParse("1.32"),
-			node:             nodeWithoutFeature,
-			pod:              podNotUsingFeature,
-			expectRejection:  false,
-		},
-		{
-			name:             "feature=Alpha, node=feature supported, pod=feature used: it should ADMIT",
-			emulationVersion: utilversion.MustParse("1.32"),
-			node:             nodeWithFeature,
-			pod:              podUsingFeature,
-			expectRejection:  false,
-		},
-		{
-			name:             "feature=Alpha, node=feature supported, pod=feature not used: it should ADMIT",
-			emulationVersion: utilversion.MustParse("1.32"),
-			node:             nodeWithFeature,
-			pod:              podNotUsingFeature,
-			expectRejection:  false,
-		},
-		// The feature is not yet released (< v1.31) in emulated version (this can happen when only kubelet downgraded).
-		// Note: When the feature is not yet released in emulated version, it should always admit for backward compatibility
-		{
-			name:             "feature=NotReleased, node=feature not supported, pod=feature used: it should ADMIT",
-			emulationVersion: utilversion.MustParse("1.30"),
-			node:             nodeWithoutFeature,
-			pod:              podUsingFeature,
-			expectRejection:  false,
-		},
-		{
-			name:             "feature=NotReleased, node=feature not supported, pod=feature not used: it should ADMIT",
-			emulationVersion: utilversion.MustParse("1.30"),
-			node:             nodeWithoutFeature,
-			pod:              podNotUsingFeature,
-			expectRejection:  false,
+			name:            "node=feature supported, pod=not in use: it should ADMIT",
+			node:            nodeWithFeature,
+			pod:             podNotUsingFeature,
+			expectRejection: false,
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, test.emulationVersion)
 			actualResult := rejectPodAdmissionBasedOnSupplementalGroupsPolicy(test.pod, test.node)
 			if test.expectRejection != actualResult {
 				t.Errorf("unexpected result, expected %v but got %v", test.expectRejection, actualResult)
 			}
 		})
+	}
+}
+
+type recordingFailureHandler struct {
+	recordedAttrs *PodAdmitAttributes
+}
+
+func (f *recordingFailureHandler) HandleAdmissionFailure(_ context.Context, _ *v1.Pod, failureReasons []PredicateFailureReason, attrs *PodAdmitAttributes) ([]PredicateFailureReason, error) {
+	f.recordedAttrs = attrs
+	return failureReasons, nil
+}
+
+func TestPredicateAdmitHandlerPassesPodAdmitAttributes(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	node := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
+		Status:     v1.NodeStatus{Capacity: makeResources(1000, 1000, 32, 0, 0, 0), Allocatable: makeAllocatableResources(1000, 1000, 32, 0, 0, 0)},
+	}
+	pod := newResourcePod(v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(2000, resource.DecimalSI)})
+	allocatedPod := newResourcePod(v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(1000, resource.DecimalSI)})
+
+	var pluginUpdateAttrs *PodAdmitAttributes
+	failureHandler := &recordingFailureHandler{}
+	handler := NewPredicateAdmitHandler(
+		func(_ context.Context, _ bool) (*v1.Node, error) { return node, nil },
+		failureHandler,
+		func(_ *schedulerframework.NodeInfo, attrs *PodAdmitAttributes) error {
+			pluginUpdateAttrs = attrs
+			return nil
+		},
+	)
+
+	attrs := &PodAdmitAttributes{
+		Pod:       pod,
+		Operation: UpdateOperation,
+		Update: &PodUpdate{
+			AllocatedPod: allocatedPod,
+			Resize:       true,
+		},
+	}
+	res := handler.Admit(tCtx, attrs)
+	if res.Admit {
+		t.Fatalf("expected admission failure due to insufficient CPU, got Admit=true")
+	}
+	if pluginUpdateAttrs != attrs {
+		t.Errorf("expected pluginResourceUpdateFunc to receive attrs %v, got %v", attrs, pluginUpdateAttrs)
+	}
+	if failureHandler.recordedAttrs != attrs {
+		t.Errorf("expected HandleAdmissionFailure to receive attrs %v, got %v", attrs, failureHandler.recordedAttrs)
+	}
+}
+
+type stubFailureHandler struct {
+	err error
+}
+
+func (s *stubFailureHandler) HandleAdmissionFailure(_ context.Context, _ *v1.Pod, failureReasons []PredicateFailureReason, _ *PodAdmitAttributes) ([]PredicateFailureReason, error) {
+	if s.err != nil {
+		return nil, s.err
+	}
+	return failureReasons, nil
+}
+
+func TestPredicateAdmitHandlerRejectionType(t *testing.T) {
+	baseNode := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
+		Status:     v1.NodeStatus{Capacity: makeResources(1000, 1000, 32, 0, 0, 0), Allocatable: makeAllocatableResources(1000, 1000, 32, 0, 0, 0)},
+	}
+	taintedNode := baseNode.DeepCopy()
+	taintedNode.Spec.Taints = []v1.Taint{{Key: "example.com/maintenance", Effect: v1.TaintEffectNoExecute}}
+
+	fittingPod := newResourcePod(v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(500, resource.DecimalSI)})
+	fittingPod.Spec.NodeName = "machine1"
+
+	oversizedPod := fittingPod.DeepCopy()
+	oversizedPod.Spec.Containers[0].Resources.Requests[v1.ResourceCPU] = *resource.NewMilliQuantity(2000, resource.DecimalSI)
+
+	wrongNodePod := fittingPod.DeepCopy()
+	wrongNodePod.Spec.NodeName = "other-machine"
+
+	oversizedAndWrongNodePod := oversizedPod.DeepCopy()
+	oversizedAndWrongNodePod.Spec.NodeName = "other-machine"
+
+	nodeSelectorPod := fittingPod.DeepCopy()
+	nodeSelectorPod.Spec.NodeSelector = map[string]string{"pool": "a"}
+
+	osSelectorMismatchPod := fittingPod.DeepCopy()
+	osSelectorMismatchPod.Labels = map[string]string{v1.LabelOSStable: "dummyOS"}
+
+	osFieldMismatchPod := fittingPod.DeepCopy()
+	osFieldMismatchPod.Spec.OS = &v1.PodOS{Name: "dummyOS"}
+
+	strictGroupsPod := fittingPod.DeepCopy()
+	strictGroupsPod.Spec.SecurityContext = &v1.PodSecurityContext{
+		SupplementalGroupsPolicy: ptr.To(v1.SupplementalGroupsPolicyStrict),
+	}
+
+	tests := []struct {
+		name              string
+		pod               *v1.Pod
+		node              *v1.Node
+		operation         Operation
+		getNodeErr        error
+		pluginErr         error
+		preemptionErr     error
+		wantAdmit         bool
+		wantReason        string
+		wantRejectionType RejectionType
+	}{{
+		name:      "admitted",
+		pod:       fittingPod,
+		wantAdmit: true,
+	}, {
+		name:              "node info unavailable",
+		pod:               fittingPod,
+		getNodeErr:        fmt.Errorf("node not found"),
+		wantReason:        InvalidNodeInfo,
+		wantRejectionType: RejectionTransient,
+	}, {
+		name:              "plugin resource update error",
+		pod:               fittingPod,
+		pluginErr:         fmt.Errorf("plugin update failed"),
+		wantReason:        UnexpectedAdmissionError,
+		wantRejectionType: RejectionTransient,
+	}, {
+		name:              "admission failure handler error",
+		pod:               oversizedPod,
+		preemptionErr:     fmt.Errorf("preemption failed"),
+		wantReason:        UnexpectedAdmissionError,
+		wantRejectionType: RejectionTransient,
+	}, {
+		name:              "OS selector doesn't match the node label",
+		pod:               osSelectorMismatchPod,
+		wantReason:        PodOSSelectorNodeLabelDoesNotMatch,
+		wantRejectionType: RejectionBlocked,
+	}, {
+		name:              "OS field doesn't match the node",
+		pod:               osFieldMismatchPod,
+		wantReason:        PodOSNotSupported,
+		wantRejectionType: RejectionInfeasible,
+	}, {
+		name:              "SupplementalGroupsPolicy not supported",
+		pod:               strictGroupsPod,
+		wantReason:        SupplementalGroupsPolicyNotSupported,
+		wantRejectionType: RejectionInfeasible,
+	}, {
+		name:              "resource shortage",
+		pod:               oversizedPod,
+		wantReason:        OutOfCPU,
+		wantRejectionType: RejectionResourceShortage,
+	}, {
+		name:              "resize resource shortage",
+		pod:               oversizedPod,
+		operation:         UpdateOperation,
+		wantReason:        OutOfCPU,
+		wantRejectionType: RejectionResourceShortage,
+	}, {
+		name:              "node name mismatch",
+		pod:               wrongNodePod,
+		wantReason:        nodename.Name,
+		wantRejectionType: RejectionInfeasible,
+	}, {
+		name:              "resource shortage and node name mismatch",
+		pod:               oversizedAndWrongNodePod,
+		wantReason:        nodename.Name,
+		wantRejectionType: RejectionInfeasible,
+	}, {
+		name:              "node affinity mismatch on update",
+		pod:               nodeSelectorPod,
+		operation:         UpdateOperation,
+		wantReason:        nodeaffinity.Name,
+		wantRejectionType: RejectionBlocked,
+	}, {
+		name:              "untolerated NoExecute taint on update",
+		pod:               fittingPod,
+		node:              taintedNode,
+		operation:         UpdateOperation,
+		wantReason:        tainttoleration.Name,
+		wantRejectionType: RejectionBlocked,
+	}}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			node := baseNode
+			if tc.node != nil {
+				node = tc.node
+			}
+			handler := NewPredicateAdmitHandler(
+				func(_ context.Context, _ bool) (*v1.Node, error) {
+					if tc.getNodeErr != nil {
+						return nil, tc.getNodeErr
+					}
+					return node.DeepCopy(), nil
+				},
+				&stubFailureHandler{err: tc.preemptionErr},
+				func(_ *schedulerframework.NodeInfo, _ *PodAdmitAttributes) error {
+					return tc.pluginErr
+				},
+			)
+			attrs := &PodAdmitAttributes{Pod: tc.pod, Operation: AddOperation}
+			if tc.operation == UpdateOperation {
+				attrs.Operation = UpdateOperation
+				attrs.Update = &PodUpdate{AllocatedPod: fittingPod, Resize: true}
+			}
+			res := handler.Admit(tCtx, attrs)
+			if res.Admit != tc.wantAdmit {
+				t.Fatalf("expected Admit=%v, got %v (reason=%q, message=%q)", tc.wantAdmit, res.Admit, res.Reason, res.Message)
+			}
+			if res.Reason != tc.wantReason {
+				t.Errorf("expected Reason=%q, got %q", tc.wantReason, res.Reason)
+			}
+			if res.RejectionType != tc.wantRejectionType {
+				t.Errorf("expected RejectionType=%v, got %v", tc.wantRejectionType, res.RejectionType)
+			}
+		})
+	}
+}
+
+type recordingStubFailureHandler struct {
+	called bool
+}
+
+func (s *recordingStubFailureHandler) HandleAdmissionFailure(_ context.Context, _ *v1.Pod, failureReasons []PredicateFailureReason, _ *PodAdmitAttributes) ([]PredicateFailureReason, error) {
+	s.called = true
+	return nil, nil
+}
+
+func TestPredicateAdmitHandlerDryRun(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	node := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
+		Status:     v1.NodeStatus{Capacity: makeResources(1000, 1000, 32, 0, 0, 0), Allocatable: makeAllocatableResources(1000, 1000, 32, 0, 0, 0)},
+	}
+	pod := newResourcePod(v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(500, resource.DecimalSI)})
+	pod.Spec.NodeName = "other-machine"
+	allocatedPod := newResourcePod(v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(200, resource.DecimalSI)})
+	allocatedPod.Spec.NodeName = "other-machine"
+
+	failureHandler := &recordingStubFailureHandler{}
+	handler := NewPredicateAdmitHandler(
+		func(_ context.Context, _ bool) (*v1.Node, error) { return node, nil },
+		failureHandler,
+		func(_ *schedulerframework.NodeInfo, _ *PodAdmitAttributes) error { return nil },
+	)
+	res := handler.Admit(tCtx, &PodAdmitAttributes{
+		Pod:       pod,
+		Operation: UpdateOperation,
+		Update:    &PodUpdate{AllocatedPod: allocatedPod, Resize: true},
+		DryRun:    true,
+	})
+	if res.Admit {
+		t.Fatalf("expected Admit=false, got true")
+	}
+	if res.Reason != nodename.Name {
+		t.Errorf("expected Reason=%q, got %q", nodename.Name, res.Reason)
+	}
+	if res.RejectionType != RejectionInfeasible {
+		t.Errorf("expected RejectionType=%v, got %v", RejectionInfeasible, res.RejectionType)
+	}
+	if failureHandler.called {
+		t.Errorf("expected the admission failure handler not to be called in dry run")
 	}
 }

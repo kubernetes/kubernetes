@@ -736,7 +736,7 @@ func (nc *Controller) monitorNodeHealth(ctx context.Context) error {
 		if currentReadyCondition != nil {
 			pods, err := nc.getPodsAssignedToNode(node.Name)
 			if err != nil {
-				utilruntime.HandleErrorWithContext(ctx, err, "Unable to list pods of node", node.Name)
+				utilruntime.HandleErrorWithContext(ctx, err, "Unable to list pods", "node", klog.KObj(node))
 				if currentReadyCondition.Status != v1.ConditionTrue && observedReadyCondition.Status == v1.ConditionTrue {
 					// If error happened during node status transition (Ready -> NotReady)
 					// we need to mark node for retry to force MarkPodsNotReady execution

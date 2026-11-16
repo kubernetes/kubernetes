@@ -22,7 +22,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/component-helpers/resource"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
@@ -31,9 +30,7 @@ import (
 )
 
 // NodePorts is a plugin that checks if a node has free ports for the requested pod ports.
-type NodePorts struct {
-	enableInPlacePodVerticalScalingSchedulerPreemption bool
-}
+type NodePorts struct{}
 
 var _ fwk.PreFilterPlugin = &NodePorts{}
 var _ fwk.FilterPlugin = &NodePorts{}
@@ -74,9 +71,6 @@ func (pl *NodePorts) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.SignFragme
 
 // PreFilter invoked at the prefilter extension point.
 func (pl *NodePorts) PreFilter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) (*fwk.PreFilterResult, *fwk.Status) {
-	if pl.enableInPlacePodVerticalScalingSchedulerPreemption && resource.IsPodResizeDeferred(pod) {
-		return nil, fwk.NewStatus(fwk.Skip)
-	}
 	s := util.GetHostPorts(pod)
 	// Skip if a pod has no ports.
 	if len(s) == 0 {
@@ -154,9 +148,6 @@ func (pl *NodePorts) isSchedulableAfterAssignedPodDeleted(logger klog.Logger, po
 
 // Filter invoked at the filter extension point.
 func (pl *NodePorts) Filter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
-	if pl.enableInPlacePodVerticalScalingSchedulerPreemption && resource.IsPodResizeDeferred(pod) {
-		return nil
-	}
 	wantPorts, err := getPreFilterState(cycleState)
 	if err != nil {
 		return fwk.AsStatus(err)
@@ -188,5 +179,5 @@ func fitsPorts(wantPorts []v1.ContainerPort, portsInUse fwk.HostPortInfo) bool {
 
 // New initializes a new plugin and returns it.
 func New(_ context.Context, _ runtime.Object, _ fwk.Handle, fts feature.Features) (fwk.Plugin, error) {
-	return &NodePorts{enableInPlacePodVerticalScalingSchedulerPreemption: fts.EnableInPlacePodVerticalScalingSchedulerPreemption}, nil
+	return &NodePorts{}, nil
 }

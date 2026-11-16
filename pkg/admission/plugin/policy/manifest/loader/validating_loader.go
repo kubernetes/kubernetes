@@ -19,6 +19,7 @@ limitations under the License.
 package loader
 
 import (
+	"context"
 	"fmt"
 
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
@@ -26,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	policyloader "k8s.io/apiserver/pkg/admission/plugin/policy/manifest/loader"
+	"k8s.io/apiserver/pkg/registry/rest"
 	admissionregistration "k8s.io/kubernetes/pkg/apis/admissionregistration"
 	admissionregistrationinstall "k8s.io/kubernetes/pkg/apis/admissionregistration/install"
 	"k8s.io/kubernetes/pkg/apis/admissionregistration/validation"
@@ -126,7 +128,9 @@ func defaultAndValidateVAP(policy *admissionregistrationv1.ValidatingAdmissionPo
 	if err := scheme.Convert(policy, internalObj, nil); err != nil {
 		return fmt.Errorf("ValidatingAdmissionPolicy %q: conversion error: %w", policy.Name, err)
 	}
-	if errs := validation.ValidateValidatingAdmissionPolicy(internalObj); len(errs) > 0 {
+	errs := validation.ValidateValidatingAdmissionPolicy(internalObj)
+	errs = rest.ValidateDeclarativelyForManifest(context.Background(), scheme, admissionregistrationv1.SchemeGroupVersion, internalObj, errs, rest.DeclarativeValidationConfig{})
+	if len(errs) > 0 {
 		return fmt.Errorf("ValidatingAdmissionPolicy %q: %w", policy.Name, errs.ToAggregate())
 	}
 	resultObj := &admissionregistrationv1.ValidatingAdmissionPolicy{}
@@ -145,7 +149,9 @@ func defaultAndValidateVAPB(binding *admissionregistrationv1.ValidatingAdmission
 	if err := scheme.Convert(binding, internalObj, nil); err != nil {
 		return fmt.Errorf("ValidatingAdmissionPolicyBinding %q: conversion error: %w", binding.Name, err)
 	}
-	if errs := validation.ValidateValidatingAdmissionPolicyBinding(internalObj); len(errs) > 0 {
+	errs := validation.ValidateValidatingAdmissionPolicyBinding(internalObj)
+	errs = rest.ValidateDeclarativelyForManifest(context.Background(), scheme, admissionregistrationv1.SchemeGroupVersion, internalObj, errs, rest.DeclarativeValidationConfig{})
+	if len(errs) > 0 {
 		return fmt.Errorf("ValidatingAdmissionPolicyBinding %q: %w", binding.Name, errs.ToAggregate())
 	}
 	resultObj := &admissionregistrationv1.ValidatingAdmissionPolicyBinding{}

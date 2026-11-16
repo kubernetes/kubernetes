@@ -328,6 +328,8 @@ spec:
         - addValue
         drop:
         - dropValue
+      cgroupOptions:
+        mountMode: mountModeValue
       privileged: true
       procMount: procMountValue
       readOnlyRootFilesystem: true
@@ -341,6 +343,11 @@ spec:
         user: userValue
       seccompProfile:
         localhostProfile: localhostProfileValue
+        oci:
+          baseProfile:
+            localhostProfile: localhostProfileValue
+            type: typeValue
+          ref: refValue
         type: typeValue
       windowsOptions:
         gmsaCredentialSpec: gmsaCredentialSpecValue
@@ -566,6 +573,8 @@ spec:
         - addValue
         drop:
         - dropValue
+      cgroupOptions:
+        mountMode: mountModeValue
       privileged: true
       procMount: procMountValue
       readOnlyRootFilesystem: true
@@ -579,6 +588,11 @@ spec:
         user: userValue
       seccompProfile:
         localhostProfile: localhostProfileValue
+        oci:
+          baseProfile:
+            localhostProfile: localhostProfileValue
+            type: typeValue
+          ref: refValue
         type: typeValue
       windowsOptions:
         gmsaCredentialSpec: gmsaCredentialSpecValue
@@ -810,6 +824,8 @@ spec:
         - addValue
         drop:
         - dropValue
+      cgroupOptions:
+        mountMode: mountModeValue
       privileged: true
       procMount: procMountValue
       readOnlyRootFilesystem: true
@@ -823,6 +839,11 @@ spec:
         user: userValue
       seccompProfile:
         localhostProfile: localhostProfileValue
+        oci:
+          baseProfile:
+            localhostProfile: localhostProfileValue
+            type: typeValue
+          ref: refValue
         type: typeValue
       windowsOptions:
         gmsaCredentialSpec: gmsaCredentialSpecValue
@@ -922,6 +943,11 @@ spec:
       user: userValue
     seccompProfile:
       localhostProfile: localhostProfileValue
+      oci:
+        baseProfile:
+          localhostProfile: localhostProfileValue
+          type: typeValue
+        ref: refValue
       type: typeValue
     supplementalGroups:
     - 4
@@ -1528,10 +1554,11 @@ status:
     requests:
       requestsKey: "0"
   startTime: "2007-01-01T01:01:01Z"
-  volumeHealth:
-  - healthConditions:
-    - message: messageValue
-      reason: reasonValue
-      status: statusValue
-    lastTransitionTime: "2003-01-01T01:01:01Z"
+  volumeStatuses:
+  - healthStatus:
+      healthConditions:
+      - message: messageValue
+        reason: reasonValue
+        status: statusValue
+      lastTransitionTime: "2002-01-01T01:01:01Z"
     name: nameValue

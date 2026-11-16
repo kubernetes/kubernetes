@@ -19,7 +19,6 @@ package storageclass
 import (
 	"testing"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
@@ -202,9 +201,7 @@ func mkValidStorageClass(tweaks ...func(obj *storage.StorageClass)) storage.Stor
 	reclaimPolicy := api.PersistentVolumeReclaimDelete
 	volumeBindingMode := storage.VolumeBindingImmediate
 	obj := storage.StorageClass{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "valid-storage-class",
-		},
+		Name:              "valid-storage-class",
 		Provisioner:       "kubernetes.io/gce-pd",
 		ReclaimPolicy:     &reclaimPolicy,
 		VolumeBindingMode: &volumeBindingMode,

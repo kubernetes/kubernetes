@@ -35,7 +35,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	schedulingapi "k8s.io/api/scheduling/v1beta1"
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -46,7 +46,7 @@ import (
 	cacheddiscovery "k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/dynamic"
 	coreinformers "k8s.io/client-go/informers/core/v1"
-	schedulinginformers "k8s.io/client-go/informers/scheduling/v1beta1"
+	schedulingv1beta1informers "k8s.io/client-go/informers/scheduling/v1beta1"
 	"k8s.io/client-go/ktesting"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/restmapper"
@@ -67,7 +67,8 @@ type WorkloadExecutor struct {
 	dataItems                    []DataItem
 	numPodsScheduledPerNamespace map[string]int
 	podInformer                  coreinformers.PodInformer
-	podGroupInformer             schedulinginformers.PodGroupInformer
+	podGroupInformer             schedulingv1beta1informers.PodGroupInformer
+	compositePodGroupInformer    schedulingv1beta1informers.CompositePodGroupInformer
 	throughputErrorMargin        float64
 	testCase                     *testCase
 	workload                     *Workload
@@ -100,6 +101,8 @@ func (e *WorkloadExecutor) runOp(tCtx ktesting.TContext, op realOp, opIndex int)
 		return e.runSleepOp(tCtx, concreteOp)
 	case *createPodGroups:
 		return e.runCreatePodGroupsOp(tCtx, concreteOp)
+	case *createCompositePodGroups:
+		return e.runCreateCompositePodGroupsOp(tCtx, concreteOp)
 	case *startCollectingMetricsOp:
 		return e.runStartCollectingMetricsOp(tCtx, opIndex, concreteOp)
 	case *stopCollectingMetricsOp:
@@ -212,7 +215,7 @@ func (e *WorkloadExecutor) runCreatePodGroupsOp(tCtx ktesting.TContext, op *crea
 		maps.Copy(env, op.TemplateParams)
 		env["Index"] = index
 
-		obj := &schedulingapi.PodGroup{}
+		obj := &schedulingv1beta1.PodGroup{}
 		if _, err := getSpecFromTextTemplateFile(op.TemplatePath, env, obj); err != nil {
 			return fmt.Errorf("%s: %w", op.TemplatePath, err)
 		}
@@ -242,12 +245,103 @@ func (e *WorkloadExecutor) runCreatePodGroupsOp(tCtx ktesting.TContext, op *crea
 	return nil
 }
 
-func (e *WorkloadExecutor) createPodGroupWithRetry(tCtx ktesting.TContext, obj *schedulingapi.PodGroup, namespace, templatePath string) error {
+func (e *WorkloadExecutor) createPodGroupWithRetry(tCtx ktesting.TContext, obj *schedulingv1beta1.PodGroup, namespace, templatePath string) error {
 	ctx, cancel := context.WithTimeout(tCtx, 20*time.Second)
 
 	defer cancel()
 	for {
 		_, err := tCtx.Client().SchedulingV1beta1().PodGroups(namespace).Create(ctx, obj, metav1.CreateOptions{
+			FieldValidation: "Strict",
+		})
+
+		if err == nil {
+			return nil
+		}
+
+		// Fail fast on non-retriable client errors (invalid specs, bad requests, forbidden access).
+		if apierrors.IsInvalid(err) || apierrors.IsBadRequest(err) || apierrors.IsForbidden(err) {
+			return err
+		}
+
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("%s: timed out (%w) while creating %q, last error was: %w", templatePath, context.Cause(ctx), klog.KObj(obj), err)
+		case <-time.After(time.Second):
+		}
+	}
+}
+
+// runCreateCompositePodGroupsOp executes the createCompositePodGroups operation.
+// It creates the configured CompositePodGroups from a template and then waits for them to be visible in the scheduler's informer cache.
+// This ensures that subsequent operations (like creating PodGroups that reference these CompositePodGroups) won't fail due to cache lag.
+func (e *WorkloadExecutor) runCreateCompositePodGroupsOp(tCtx ktesting.TContext, op *createCompositePodGroups) error {
+	if err := createNamespaceIfNotPresent(tCtx, op.Namespace, &e.numPodsScheduledPerNamespace); err != nil {
+		return err
+	}
+	totalCompositePodGroupCount := 0
+
+	// Number of composite podgroups at current level, always starts with roots count at level 1.
+	levelCompositePodGroupCount := op.RootCount
+	compositePodGroupLevels := op.Depth - 1
+	for level := 1; level <= compositePodGroupLevels; level++ {
+		tCtx.Logf("creating %d CompositePodGroups at level %d in namespace %q", levelCompositePodGroupCount, level, op.Namespace)
+
+		for index := range levelCompositePodGroupCount {
+			env := make(map[string]any)
+			maps.Copy(env, op.TemplateParams)
+			env["Index"] = index
+			env["Level"] = level
+
+			if level > 1 {
+				env["ParentLevel"] = level - 1
+				env["ParentIndex"] = index / op.ChildrenCompositePodGroupsPerCPG
+			}
+
+			childrenCount := op.ChildrenCompositePodGroupsPerCPG
+			if level == compositePodGroupLevels {
+				childrenCount = op.ChildrenPodGroupsPerCPG
+			}
+			env["ChildrenCount"] = childrenCount
+
+			obj := &schedulingv1beta1.CompositePodGroup{}
+			if _, err := getSpecFromTextTemplateFile(op.TemplatePath, env, obj); err != nil {
+				return fmt.Errorf("%s: %w", op.TemplatePath, err)
+			}
+
+			if err := e.createCompositePodGroupWithRetry(tCtx, obj, op.Namespace, op.TemplatePath); err != nil {
+				return err
+			}
+		}
+		totalCompositePodGroupCount += levelCompositePodGroupCount
+		levelCompositePodGroupCount *= op.ChildrenCompositePodGroupsPerCPG
+	}
+
+	// Wait for composite pod groups to be visible in the scheduler's informer cache.
+	// It times out after 10 seconds if the condition is not met.
+	tCtx.Logf("waiting for %d CompositePodGroups in namespace %q", totalCompositePodGroupCount, op.Namespace)
+	err := wait.PollUntilContextTimeout(tCtx, 100*time.Millisecond, 10*time.Second, true, func(ctx context.Context) (bool, error) {
+		compositePodGroups, err := e.compositePodGroupInformer.Lister().CompositePodGroups(op.Namespace).List(labels.Everything())
+		if err != nil {
+			return false, err
+		}
+		if len(compositePodGroups) >= totalCompositePodGroupCount {
+			return true, nil
+		}
+		return false, nil
+	})
+	if err != nil {
+		return fmt.Errorf("timed out waiting for CompositePodGroups to be cached: %w", err)
+	}
+
+	return nil
+}
+
+func (e *WorkloadExecutor) createCompositePodGroupWithRetry(tCtx ktesting.TContext, obj *schedulingv1beta1.CompositePodGroup, namespace, templatePath string) error {
+	ctx, cancel := context.WithTimeout(tCtx, 20*time.Second)
+
+	defer cancel()
+	for {
+		_, err := tCtx.Client().SchedulingV1beta1().CompositePodGroups(namespace).Create(ctx, obj, metav1.CreateOptions{
 			FieldValidation: "Strict",
 		})
 

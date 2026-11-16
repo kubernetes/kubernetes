@@ -20,7 +20,7 @@ import (
 	"context"
 	"sync"
 
-	"k8s.io/apiserver/pkg/authorization/cel"
+	authorizationmetrics "k8s.io/apiserver/pkg/authorization/metrics"
 	compbasemetrics "k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
 )
@@ -32,13 +32,13 @@ type AuthorizerMetrics interface {
 	// Webhook count, latency, and fail open metrics
 	WebhookMetrics
 	// match condition metrics
-	cel.MatcherMetrics
+	authorizationmetrics.MatcherMetrics
 }
 
 type NoopAuthorizerMetrics struct {
 	NoopRequestMetrics
 	NoopWebhookMetrics
-	cel.NoopMatcherMetrics
+	authorizationmetrics.NoopMatcherMetrics
 }
 
 type RequestMetrics interface {

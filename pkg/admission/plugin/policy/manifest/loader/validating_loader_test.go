@@ -258,6 +258,52 @@ spec:
 			wantErr:        true,
 			wantErrContain: "paramRef",
 		},
+		{
+			name: "binding without validationActions",
+			files: map[string]string{
+				"policy.yaml": `
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: ref-policy.static.k8s.io
+spec:
+  matchConstraints:
+    resourceRules:
+    - apiGroups: [""]
+      apiVersions: ["v1"]
+      operations: ["CREATE"]
+      resources: ["pods"]
+  validations:
+  - expression: "true"
+`,
+				"binding.yaml": `
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: ref-binding.static.k8s.io
+spec:
+  policyName: ref-policy.static.k8s.io
+`,
+			},
+			wantErr:        true,
+			wantErrContain: "spec.validationActions: Required value",
+		},
+		{
+			name: "binding without policyName",
+			files: map[string]string{
+				"binding.yaml": `
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: ref-binding.static.k8s.io
+spec:
+  validationActions:
+  - Deny
+`,
+			},
+			wantErr:        true,
+			wantErrContain: "spec.policyName: Required value",
+		},
 	}
 
 	for _, tt := range tests {

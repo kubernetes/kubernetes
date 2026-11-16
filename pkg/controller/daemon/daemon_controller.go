@@ -50,7 +50,7 @@ import (
 	consistencyutil "k8s.io/client-go/util/consistency"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/client-go/util/workqueue"
-	v1helper "k8s.io/component-helpers/scheduling/corev1"
+	daemonsethelper "k8s.io/component-helpers/apps/daemonset"
 	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
@@ -1411,39 +1411,8 @@ func daemonPodTolerations(ds *apps.DaemonSet) []v1.Toleration {
 // dominates the cost of this check, and the sync paths run it for every node
 // in the cluster.
 func nodeShouldRunDaemonPod(logger klog.Logger, node *v1.Node, ds *apps.DaemonSet, tolerations []v1.Toleration, requiredNodeAffinity nodeaffinity.RequiredNodeAffinity) (bool, bool) {
-	// If the daemon set specifies a node name, check that it matches with node.Name.
-	if !(ds.Spec.Template.Spec.NodeName == "" || ds.Spec.Template.Spec.NodeName == node.Name) {
-		return false, false
-	}
-
-	taints := node.Spec.Taints
-	fitsNodeAffinity, fitsTaints := predicates(logger, node, taints, tolerations, requiredNodeAffinity)
-	if !fitsNodeAffinity {
-		return false, false
-	}
-
-	if !fitsTaints {
-		// Scheduled daemon pods should continue running if they tolerate NoExecute taint.
-		_, hasUntoleratedTaint := v1helper.FindMatchingUntoleratedTaint(logger, taints, tolerations, func(t *v1.Taint) bool {
-			return t.Effect == v1.TaintEffectNoExecute
-		}, utilfeature.DefaultFeatureGate.Enabled(features.TaintTolerationComparisonOperators))
-		return false, !hasUntoleratedTaint
-	}
-
-	return true, true
-}
-
-// predicates checks if a DaemonSet's pod can run on a node. tolerations and
-// requiredNodeAffinity must be derived from the DaemonSet's pod template
-// (see NodeShouldRunDaemonPod).
-func predicates(logger klog.Logger, node *v1.Node, taints []v1.Taint, tolerations []v1.Toleration, requiredNodeAffinity nodeaffinity.RequiredNodeAffinity) (fitsNodeAffinity, fitsTaints bool) {
-	// Ignore parsing errors for backwards compatibility.
-	fitsNodeAffinity, _ = requiredNodeAffinity.Match(node)
-	_, hasUntoleratedTaint := v1helper.FindMatchingUntoleratedTaint(logger, taints, tolerations, func(t *v1.Taint) bool {
-		return t.Effect == v1.TaintEffectNoExecute || t.Effect == v1.TaintEffectNoSchedule
-	}, utilfeature.DefaultFeatureGate.Enabled(features.TaintTolerationComparisonOperators))
-	fitsTaints = !hasUntoleratedTaint
-	return
+	return daemonsethelper.NodeShouldRunDaemonPodWithPrecomputed(logger, node, ds, tolerations, requiredNodeAffinity,
+		utilfeature.DefaultFeatureGate.Enabled(features.TaintTolerationComparisonOperators))
 }
 
 // NewPod creates a new pod

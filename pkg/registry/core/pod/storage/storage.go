@@ -19,6 +19,7 @@ package storage
 import (
 	"context"
 	"fmt"
+	"maps"
 	"net/http"
 	"net/url"
 
@@ -26,9 +27,12 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
@@ -59,6 +63,7 @@ type PodStorage struct {
 	Status              *StatusREST
 	EphemeralContainers *EphemeralContainersREST
 	Resize              *ResizeREST
+	Dynamic             *DynamicREST
 	Log                 *podrest.LogREST
 	Proxy               *podrest.ProxyREST
 	Exec                *podrest.ExecREST
@@ -111,6 +116,8 @@ func NewStorage(optsGetter generic.RESTOptionsGetter, k client.ConnectionInfoGet
 	ephemeralContainersStore.UpdateStrategy = registrypod.EphemeralContainersStrategy
 	resizeStore := *store
 	resizeStore.UpdateStrategy = registrypod.ResizeStrategy
+	dynamicStore := *store
+	dynamicStore.UpdateStrategy = registrypod.DynamicStrategy
 
 	bindingREST := &BindingREST{store: store}
 	return PodStorage{
@@ -121,6 +128,7 @@ func NewStorage(optsGetter generic.RESTOptionsGetter, k client.ConnectionInfoGet
 		Status:              &StatusREST{store: &statusStore},
 		EphemeralContainers: &EphemeralContainersREST{store: &ephemeralContainersStore},
 		Resize:              &ResizeREST{store: &resizeStore},
+		Dynamic:             &DynamicREST{store: &dynamicStore},
 		Log:                 &podrest.LogREST{Store: store, KubeletConn: k},
 		Proxy:               &podrest.ProxyREST{Store: store, ProxyTransport: proxyTransport},
 		Exec:                &podrest.ExecREST{Store: store, KubeletConn: k, Authorizer: authorizer},
@@ -263,6 +271,10 @@ func (r *BindingREST) setPodNodeAndMetadata(ctx context.Context, podUID types.UI
 		if pod.Annotations == nil {
 			pod.Annotations = make(map[string]string)
 		}
+		var oldAnnotations map[string]string
+		if len(annotations) > 0 {
+			oldAnnotations = maps.Clone(pod.Annotations)
+		}
 		for k, v := range annotations {
 			pod.Annotations[k] = v
 		}
@@ -278,6 +290,18 @@ func (r *BindingREST) setPodNodeAndMetadata(ctx context.Context, podUID types.UI
 			Type:   api.PodScheduled,
 			Status: api.ConditionTrue,
 		})
+
+		if len(annotations) > 0 {
+			// validate updated annotations
+			fldPath := field.NewPath("metadata", "annotations")
+			allErrs := validation.ValidatePodSpecificAnnotationUpdates(pod, oldAnnotations, fldPath, validation.PodValidationOptions{})
+			if err := apimachineryvalidation.ValidateAnnotationsSize(pod.Annotations); err != nil {
+				allErrs = append(allErrs, field.TooLong(fldPath, "" /*unused*/, apimachineryvalidation.TotalAnnotationSizeLimitB))
+			}
+			if len(allErrs) > 0 {
+				return nil, errors.NewInvalid(schema.GroupKind{Group: "", Kind: "Binding"}, "", allErrs)
+			}
+		}
 
 		return pod, nil
 	}), dryRun, nil)
@@ -438,6 +462,40 @@ func (r *ResizeREST) Destroy() {
 
 // Update alters the resource fields in PodSpec
 func (r *ResizeREST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, forceAllowCreate bool, options *metav1.UpdateOptions) (runtime.Object, bool, error) {
+	// We are explicitly setting forceAllowCreate to false in the call to the underlying storage because
+	// subresources should never allow create on update.
+	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation, false, options)
+}
+
+// DynamicREST implements the REST endpoint for dynamically adding and removing
+// Pod containers, in addition to the changes allowed by pod updates and resizes.
+type DynamicREST struct {
+	store *genericregistry.Store
+}
+
+var _ = rest.Patcher(&DynamicREST{})
+
+// Get retrieves the object from the storage. It is required to support Patch.
+func (r *DynamicREST) Get(ctx context.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
+	return r.store.Get(ctx, name, options)
+}
+
+// New creates a new pod resource
+func (r *DynamicREST) New() runtime.Object {
+	return &api.Pod{}
+}
+
+// Destroy cleans up resources on shutdown.
+func (r *DynamicREST) Destroy() {
+	// Given that underlying store is shared with REST,
+	// we don't destroy it here explicitly.
+}
+
+// Update alters the PodSpec, including adding and removing containers.
+func (r *DynamicREST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, forceAllowCreate bool, options *metav1.UpdateOptions) (runtime.Object, bool, error) {
+	// TODO: Once fail-closed admission (https://github.com/kubernetes/kubernetes/pull/142810) merges,
+	// require that admission plugins and policies intercepting pod updates also cover this subresource.
+
 	// We are explicitly setting forceAllowCreate to false in the call to the underlying storage because
 	// subresources should never allow create on update.
 	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation, false, options)

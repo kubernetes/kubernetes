@@ -44,6 +44,7 @@ import (
 	v1 "k8s.io/kubernetes/pkg/apis/scheduling/v1"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/utils/ptr"
 )
 
 func addPriorityClasses(ctrl *Plugin, priorityClasses []*scheduling.PriorityClass) error {
@@ -826,16 +827,15 @@ func TestAdmitPodGroup(t *testing.T) {
 	}
 
 	testCases := []struct {
-		name                           string
-		priorityClasses                []*scheduling.PriorityClass
-		preparePodGroup                *scheduling.PodGroup
-		operation                      admission.Operation
-		expectedPriorityClass          string
-		expectedPriority               int32
-		enableGenericWorkload          bool
-		enablePodGroupPreemptionPolicy bool
-		expectError                    bool
-		expectedPreemptionPolicy       *scheduling.PreemptionPolicy
+		name                     string
+		priorityClasses          []*scheduling.PriorityClass
+		preparePodGroup          *scheduling.PodGroup
+		operation                admission.Operation
+		expectedPriorityClass    string
+		expectedPriority         int32
+		enableGenericWorkload    bool
+		expectError              bool
+		expectedPreemptionPolicy *scheduling.PreemptionPolicy
 	}{
 		{
 			name:                  "pod group with empty priorityClassName, accepted and set to global default",
@@ -903,53 +903,38 @@ func TestAdmitPodGroup(t *testing.T) {
 			enableGenericWorkload: true,
 		},
 		{
-			name:                  "pod group with any preemptionPolicy but PodGroupPreemptionPolicy gate disabled, skips validation",
+			name:                     "pod group with nil preemption policy",
+			priorityClasses:          []*scheduling.PriorityClass{preemptionPolicyClass},
+			preparePodGroup:          podGroupWithPreemptionPolicy(preemptionPolicyClass.Name, nil),
+			operation:                admission.Create,
+			expectedPriorityClass:    "nopreemptionpolicy",
+			expectedPriority:         preemptionPolicyClass.Value,
+			enableGenericWorkload:    true,
+			expectedPreemptionPolicy: &schedulingPreemptLowerPriority,
+		},
+		{
+			name:                     "pod group with preemption policy that matches preemption policy resolved from priority class",
+			priorityClasses:          []*scheduling.PriorityClass{preemptionPolicyClass},
+			preparePodGroup:          podGroupWithPreemptionPolicy(preemptionPolicyClass.Name, &schedulingPreemptLowerPriority),
+			operation:                admission.Create,
+			expectedPriorityClass:    "nopreemptionpolicy",
+			expectedPriority:         preemptionPolicyClass.Value,
+			enableGenericWorkload:    true,
+			expectedPreemptionPolicy: &schedulingPreemptLowerPriority,
+		},
+		{
+			name:                  "pod group with preemption policy that doesn't match preemption policy resolved from priority class",
 			priorityClasses:       []*scheduling.PriorityClass{preemptionPolicyClass},
 			preparePodGroup:       podGroupWithPreemptionPolicy(preemptionPolicyClass.Name, &schedulingPreemptNever),
 			operation:             admission.Create,
-			expectedPriorityClass: "nopreemptionpolicy",
-			expectedPriority:      preemptionPolicyClass.Value,
 			enableGenericWorkload: true,
-		},
-		{
-			name:                           "pod group with nil preemption policy",
-			priorityClasses:                []*scheduling.PriorityClass{preemptionPolicyClass},
-			preparePodGroup:                podGroupWithPreemptionPolicy(preemptionPolicyClass.Name, nil),
-			operation:                      admission.Create,
-			expectedPriorityClass:          "nopreemptionpolicy",
-			expectedPriority:               preemptionPolicyClass.Value,
-			enableGenericWorkload:          true,
-			enablePodGroupPreemptionPolicy: true,
-			expectedPreemptionPolicy:       &schedulingPreemptLowerPriority,
-		},
-		{
-			name:                           "pod group with preemption policy that matches preemption policy resolved from priority class",
-			priorityClasses:                []*scheduling.PriorityClass{preemptionPolicyClass},
-			preparePodGroup:                podGroupWithPreemptionPolicy(preemptionPolicyClass.Name, &schedulingPreemptLowerPriority),
-			operation:                      admission.Create,
-			expectedPriorityClass:          "nopreemptionpolicy",
-			expectedPriority:               preemptionPolicyClass.Value,
-			enableGenericWorkload:          true,
-			enablePodGroupPreemptionPolicy: true,
-			expectedPreemptionPolicy:       &schedulingPreemptLowerPriority,
-		},
-		{
-			name:                           "pod group with preemption policy that doesn't match preemption policy resolved from priority class",
-			priorityClasses:                []*scheduling.PriorityClass{preemptionPolicyClass},
-			preparePodGroup:                podGroupWithPreemptionPolicy(preemptionPolicyClass.Name, &schedulingPreemptNever),
-			operation:                      admission.Create,
-			enableGenericWorkload:          true,
-			enablePodGroupPreemptionPolicy: true,
-			expectError:                    true,
+			expectError:           true,
 		},
 	}
 
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.GenericWorkload:          tt.enableGenericWorkload,
-				features.PodGroupPreemptionPolicy: tt.enablePodGroupPreemptionPolicy,
-			})
+			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.GenericWorkload, tt.enableGenericWorkload)
 
 			admissionPlugin := NewPlugin()
 			if err := addPriorityClasses(admissionPlugin, tt.priorityClasses); err != nil {
@@ -1111,10 +1096,10 @@ func TestAdmitCompositePodGroup(t *testing.T) {
 		return admission.NewAttributesRecord(
 			cpg,
 			oldCpg,
-			scheduling.Kind("CompositePodGroup").WithVersion("v1alpha3"),
+			scheduling.Kind("CompositePodGroup").WithVersion("v1beta1"),
 			cpg.ObjectMeta.Namespace,
 			"",
-			scheduling.Resource("compositepodgroups").WithVersion("v1alpha3"),
+			scheduling.Resource("compositepodgroups").WithVersion("v1beta1"),
 			"",
 			operation,
 			options,
@@ -1124,16 +1109,15 @@ func TestAdmitCompositePodGroup(t *testing.T) {
 	}
 
 	testCases := []struct {
-		name                           string
-		priorityClasses                []*scheduling.PriorityClass
-		prepareCpg                     *scheduling.CompositePodGroup
-		operation                      admission.Operation
-		expectedPriorityClass          string
-		expectedPriority               int32
-		expectedPreemptionPolicy       *scheduling.PreemptionPolicy
-		enableCompositePodGroup        bool
-		enablePodGroupPreemptionPolicy bool
-		expectError                    bool
+		name                     string
+		priorityClasses          []*scheduling.PriorityClass
+		prepareCpg               *scheduling.CompositePodGroup
+		operation                admission.Operation
+		expectedPriorityClass    string
+		expectedPriority         int32
+		expectedPreemptionPolicy *scheduling.PreemptionPolicy
+		enableCompositePodGroup  bool
+		expectError              bool
 	}{
 		{
 			name:                    "composite pod group with empty priorityClassName, accepted and set to global default",
@@ -1201,44 +1185,32 @@ func TestAdmitCompositePodGroup(t *testing.T) {
 			enableCompositePodGroup: true,
 		},
 		{
-			name:                    "composite pod group with any preemptionPolicy but PodGroupPreemptionPolicy gate disabled, skips validation",
+			name:                     "composite pod group with nil preemption policy",
+			priorityClasses:          []*scheduling.PriorityClass{preemptionPolicyClass},
+			prepareCpg:               cpgWithPreemptionPolicy(preemptionPolicyClass.Name, nil),
+			operation:                admission.Create,
+			expectedPriorityClass:    "nopreemptionpolicy",
+			expectedPriority:         preemptionPolicyClass.Value,
+			enableCompositePodGroup:  true,
+			expectedPreemptionPolicy: &schedulingPreemptLowerPriority,
+		},
+		{
+			name:                     "composite pod group with preemption policy that matches preemption policy resolved from priority class",
+			priorityClasses:          []*scheduling.PriorityClass{preemptionPolicyClass},
+			prepareCpg:               cpgWithPreemptionPolicy(preemptionPolicyClass.Name, &schedulingPreemptLowerPriority),
+			operation:                admission.Create,
+			expectedPriorityClass:    "nopreemptionpolicy",
+			expectedPriority:         preemptionPolicyClass.Value,
+			enableCompositePodGroup:  true,
+			expectedPreemptionPolicy: &schedulingPreemptLowerPriority,
+		},
+		{
+			name:                    "composite pod group with preemption policy that doesn't match preemption policy resolved from priority class",
 			priorityClasses:         []*scheduling.PriorityClass{preemptionPolicyClass},
 			prepareCpg:              cpgWithPreemptionPolicy(preemptionPolicyClass.Name, &schedulingPreemptNever),
 			operation:               admission.Create,
-			expectedPriorityClass:   "nopreemptionpolicy",
-			expectedPriority:        preemptionPolicyClass.Value,
 			enableCompositePodGroup: true,
-		},
-		{
-			name:                           "composite pod group with nil preemption policy",
-			priorityClasses:                []*scheduling.PriorityClass{preemptionPolicyClass},
-			prepareCpg:                     cpgWithPreemptionPolicy(preemptionPolicyClass.Name, nil),
-			operation:                      admission.Create,
-			expectedPriorityClass:          "nopreemptionpolicy",
-			expectedPriority:               preemptionPolicyClass.Value,
-			enableCompositePodGroup:        true,
-			enablePodGroupPreemptionPolicy: true,
-			expectedPreemptionPolicy:       &schedulingPreemptLowerPriority,
-		},
-		{
-			name:                           "composite pod group with preemption policy that matches preemption policy resolved from priority class",
-			priorityClasses:                []*scheduling.PriorityClass{preemptionPolicyClass},
-			prepareCpg:                     cpgWithPreemptionPolicy(preemptionPolicyClass.Name, &schedulingPreemptLowerPriority),
-			operation:                      admission.Create,
-			expectedPriorityClass:          "nopreemptionpolicy",
-			expectedPriority:               preemptionPolicyClass.Value,
-			enableCompositePodGroup:        true,
-			enablePodGroupPreemptionPolicy: true,
-			expectedPreemptionPolicy:       &schedulingPreemptLowerPriority,
-		},
-		{
-			name:                           "composite pod group with preemption policy that doesn't match preemption policy resolved from priority class",
-			priorityClasses:                []*scheduling.PriorityClass{preemptionPolicyClass},
-			prepareCpg:                     cpgWithPreemptionPolicy(preemptionPolicyClass.Name, &schedulingPreemptNever),
-			operation:                      admission.Create,
-			enableCompositePodGroup:        true,
-			enablePodGroupPreemptionPolicy: true,
-			expectError:                    true,
+			expectError:             true,
 		},
 	}
 
@@ -1248,7 +1220,6 @@ func TestAdmitCompositePodGroup(t *testing.T) {
 				features.GenericWorkload:                 tt.enableCompositePodGroup,
 				features.TopologyAwareWorkloadScheduling: tt.enableCompositePodGroup,
 				features.CompositePodGroup:               tt.enableCompositePodGroup,
-				features.PodGroupPreemptionPolicy:        tt.enablePodGroupPreemptionPolicy,
 			})
 
 			admissionPlugin := NewPlugin()
@@ -1281,5 +1252,30 @@ func TestAdmitCompositePodGroup(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// TestPodUpdatePreservesPriority verifies that updates through the main resource and pods/dynamic
+// keep the stored priority.
+func TestPodUpdatePreservesPriority(t *testing.T) {
+	ctrl := NewPlugin()
+	oldPod := &api.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "pod", Namespace: "namespace"},
+		Spec: api.PodSpec{
+			Containers:        []api.Container{{Name: "container"}},
+			PriorityClassName: "default1",
+			Priority:          ptr.To[int32](1000),
+		},
+	}
+	for subresource, expectPriority := range map[string]*int32{"": ptr.To[int32](1000), "dynamic": ptr.To[int32](1000), "status": nil} {
+		pod := oldPod.DeepCopy()
+		pod.Spec.Priority = nil
+		attrs := admission.NewAttributesRecord(pod, oldPod, api.Kind("Pod").WithVersion("version"), pod.Namespace, pod.Name, api.Resource("pods").WithVersion("version"), subresource, admission.Update, &metav1.UpdateOptions{}, false, nil)
+		if err := ctrl.Admit(t.Context(), attrs, nil); err != nil {
+			t.Fatalf("subresource %q: unexpected error %v", subresource, err)
+		}
+		if diff := cmp.Diff(expectPriority, pod.Spec.Priority); diff != "" {
+			t.Errorf("subresource %q: expected priority %v, got %v", subresource, ptr.Deref(expectPriority, -1), ptr.Deref(pod.Spec.Priority, -1))
+		}
 	}
 }

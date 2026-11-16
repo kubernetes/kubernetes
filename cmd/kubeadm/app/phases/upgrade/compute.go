@@ -24,6 +24,7 @@ import (
 	"k8s.io/klog/v2"
 
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
 )
 
@@ -72,7 +73,7 @@ type ClusterState struct {
 
 // GetAvailableUpgrades fetches all versions from the specified VersionGetter and computes which
 // kinds of upgrades can be performed
-func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesAllowed, rcUpgradesAllowed bool, printer output.Printer) ([]Upgrade, error) {
+func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesAllowed, rcUpgradesAllowed bool, targetDNSVersion string, printer output.Printer) ([]Upgrade, error) {
 	printer.Printf("[upgrade] Fetching available versions to upgrade to\n")
 
 	// Collect the upgrades kubeadm can do in this list
@@ -199,7 +200,7 @@ func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesA
 					Before:      beforeState,
 					After: ClusterState{
 						KubeVersion:    patchVersionStr,
-						DNSVersion:     kubeadmconstants.CoreDNSVersion,
+						DNSVersion:     targetDNSVersion,
 						KubeadmVersion: newKubeadmVer,
 						EtcdVersion:    getSuggestedEtcdVersion(isExternalEtcd, patchVersionStr),
 					},
@@ -214,7 +215,7 @@ func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesA
 			Before:      beforeState,
 			After: ClusterState{
 				KubeVersion:    stableVersionStr,
-				DNSVersion:     kubeadmconstants.CoreDNSVersion,
+				DNSVersion:     targetDNSVersion,
 				KubeadmVersion: stableVersionStr,
 				EtcdVersion:    getSuggestedEtcdVersion(isExternalEtcd, stableVersionStr),
 			},
@@ -260,7 +261,7 @@ func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesA
 				Before:      beforeState,
 				After: ClusterState{
 					KubeVersion:    previousBranchLatestVersionStr,
-					DNSVersion:     kubeadmconstants.CoreDNSVersion,
+					DNSVersion:     targetDNSVersion,
 					KubeadmVersion: previousBranchLatestVersionStr,
 					EtcdVersion:    getSuggestedEtcdVersion(isExternalEtcd, previousBranchLatestVersionStr),
 				},
@@ -283,7 +284,7 @@ func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesA
 				Before:      beforeState,
 				After: ClusterState{
 					KubeVersion:    unstableKubeVersion,
-					DNSVersion:     kubeadmconstants.CoreDNSVersion,
+					DNSVersion:     targetDNSVersion,
 					KubeadmVersion: unstableKubeVersion,
 					EtcdVersion:    getSuggestedEtcdVersion(isExternalEtcd, unstableKubeVersion),
 				},
@@ -343,6 +344,9 @@ func getLatestClusterVersion(kubeAPIServerVersions map[string][]string) (*versio
 		if latestVersion == nil || ver.AtLeast(latestVersion) {
 			latestVersion = ver
 		}
+	}
+	if latestVersion == nil {
+		return nil, errors.New("couldn't get the latest kube-apiserver version from the existing nodes")
 	}
 
 	return latestVersion, nil

@@ -296,7 +296,10 @@ func addResourceList(des, src v1.ResourceList) {
 func VerifyPodContainersCgroupValues(ctx context.Context, f *framework.Framework, pod *v1.Pod, tcInfo []ResizableContainerInfo) error {
 	ginkgo.GinkgoHelper()
 
-	onCgroupv2 := cgroups.IsPodOnCgroupv2Node(f, pod.Name, pod.Spec.Containers[0].Name)
+	onCgroupv2, err := cgroups.IsPodOnCgroupv2Node(f, pod, pod.Spec.Containers[0].Name)
+	if err != nil {
+		return err
+	}
 
 	var errs []error
 	for _, ci := range tcInfo {

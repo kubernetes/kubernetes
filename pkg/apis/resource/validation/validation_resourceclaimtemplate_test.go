@@ -19,6 +19,7 @@ package validation
 import (
 	"testing"
 
+	apiresource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/apis/resource"
@@ -210,6 +211,42 @@ func TestValidateClaimTemplate(t *testing.T) {
 				return template
 			}(),
 		},
+		"capacity-valid": {
+			wantFailures: nil,
+			template: func() *resource.ResourceClaimTemplate {
+				template := testClaimTemplate(goodName, goodNS, validClaimSpec)
+				template.Spec.Spec.Devices.Requests[0].Exactly.Capacity = &resource.CapacityRequirements{
+					Requests: map[resource.QualifiedName]apiresource.Quantity{
+						"dra.example.com/cores": apiresource.MustParse("2"),
+					},
+				}
+				return template
+			}(),
+		},
+		"capacity-bad-key": {
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "spec", "devices", "requests").Index(0).Child("exactly", "capacity", "requests"), "1bad", "a valid C identifier must start with alphabetic character or '_', followed by a string of alphanumeric characters or '_' (e.g. 'my_name',  or 'MY_NAME',  or 'MyName', regex used for validation is '[A-Za-z_][A-Za-z0-9_]*')")},
+			template: func() *resource.ResourceClaimTemplate {
+				template := testClaimTemplate(goodName, goodNS, validClaimSpec)
+				template.Spec.Spec.Devices.Requests[0].Exactly.Capacity = &resource.CapacityRequirements{
+					Requests: map[resource.QualifiedName]apiresource.Quantity{
+						"1bad": apiresource.MustParse("1"),
+					},
+				}
+				return template
+			}(),
+		},
+		"capacity-bad-key-in-subrequest": {
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "spec", "devices", "requests").Index(0).Child("firstAvailable").Index(0).Child("capacity", "requests"), "1bad", "a valid C identifier must start with alphabetic character or '_', followed by a string of alphanumeric characters or '_' (e.g. 'my_name',  or 'MY_NAME',  or 'MyName', regex used for validation is '[A-Za-z_][A-Za-z0-9_]*')")},
+			template: func() *resource.ResourceClaimTemplate {
+				template := testClaimTemplate(goodName, goodNS, validClaimSpecWithFirstAvailable)
+				template.Spec.Spec.Devices.Requests[0].FirstAvailable[0].Capacity = &resource.CapacityRequirements{
+					Requests: map[resource.QualifiedName]apiresource.Quantity{
+						"1bad": apiresource.MustParse("1"),
+					},
+				}
+				return template
+			}(),
+		},
 	}
 
 	for name, scenario := range scenarios {
@@ -253,6 +290,51 @@ func TestValidateClaimTemplateUpdate(t *testing.T) {
 			oldClaimTemplate: testClaimTemplate(goodName, goodNS, validClaimSpecWithFirstAvailable),
 			update: func(template *resource.ResourceClaimTemplate) *resource.ResourceClaimTemplate {
 				template.Spec.Spec.Devices.Requests[0].FirstAvailable[0].DeviceClassName += "2"
+				return template
+			},
+		},
+		"valid-metadata-update-with-stored-invalid-capacity-name": {
+			oldClaimTemplate: func() *resource.ResourceClaimTemplate {
+				template := testClaimTemplate(goodName, goodNS, validClaimSpec)
+				template.Spec.Spec.Devices.Requests[0].Exactly.Capacity = &resource.CapacityRequirements{
+					Requests: map[resource.QualifiedName]apiresource.Quantity{"test-capacity": apiresource.MustParse("1")},
+				}
+				return template
+			}(),
+			update: func(template *resource.ResourceClaimTemplate) *resource.ResourceClaimTemplate {
+				template.Labels = map[string]string{"foo": "bar"}
+				return template
+			},
+		},
+		"valid-metadata-update-with-stored-invalid-capacity-name-in-subrequest": {
+			oldClaimTemplate: func() *resource.ResourceClaimTemplate {
+				template := testClaimTemplate(goodName, goodNS, validClaimSpecWithFirstAvailable)
+				template.Spec.Spec.Devices.Requests[0].FirstAvailable[0].Capacity = &resource.CapacityRequirements{
+					Requests: map[resource.QualifiedName]apiresource.Quantity{"test-capacity": apiresource.MustParse("1")},
+				}
+				return template
+			}(),
+			update: func(template *resource.ResourceClaimTemplate) *resource.ResourceClaimTemplate {
+				template.Labels = map[string]string{"foo": "bar"}
+				return template
+			},
+		},
+		"invalid-update-to-invalid-capacity-name": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "spec", "devices", "requests").Index(0).Child("exactly", "capacity", "requests"), "test-capacity", "a valid C identifier must start with alphabetic character or '_', followed by a string of alphanumeric characters or '_' (e.g. 'my_name',  or 'MY_NAME',  or 'MyName', regex used for validation is '[A-Za-z_][A-Za-z0-9_]*')"),
+				field.Invalid(field.NewPath("spec"), func() resource.ResourceClaimTemplateSpec {
+					spec := validClaimTemplate.Spec.DeepCopy()
+					spec.Spec.Devices.Requests[0].Exactly.Capacity = &resource.CapacityRequirements{
+						Requests: map[resource.QualifiedName]apiresource.Quantity{"test-capacity": apiresource.MustParse("1")},
+					}
+					return *spec
+				}(), "field is immutable"),
+			},
+			oldClaimTemplate: validClaimTemplate,
+			update: func(template *resource.ResourceClaimTemplate) *resource.ResourceClaimTemplate {
+				template.Spec.Spec.Devices.Requests[0].Exactly.Capacity = &resource.CapacityRequirements{
+					Requests: map[resource.QualifiedName]apiresource.Quantity{"test-capacity": apiresource.MustParse("1")},
+				}
 				return template
 			},
 		},

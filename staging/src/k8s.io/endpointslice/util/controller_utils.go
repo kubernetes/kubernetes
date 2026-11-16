@@ -62,6 +62,10 @@ func GetPodUpdateProjectionKey(oldObj, newObj interface{}) *PodProjectionKey {
 		utilruntime.HandleError(fmt.Errorf("unexpected pod event with both old/new values as nil, ignoring"))
 		return nil
 	}
+	// A pod that cannot be in endpoints before or after the event cannot affect any endpoints.
+	if !podEligibleForEndpoints(oldPod) && !podEligibleForEndpoints(newPod) {
+		return nil
+	}
 	if oldPod == nil {
 		return &PodProjectionKey{
 			Namespace: newPod.Namespace,
@@ -202,6 +206,12 @@ func ShouldSetHostname(pod *v1.Pod, svc *v1.Service) bool {
 	return len(pod.Spec.Hostname) > 0 && pod.Spec.Subdomain == svc.Name && svc.Namespace == pod.Namespace
 }
 
+// podEligibleForEndpoints returns true if pod exists and could be included in an
+// Endpoints or EndpointSlice resource for some Service.
+func podEligibleForEndpoints(pod *v1.Pod) bool {
+	return pod != nil && ShouldPodBeInEndpoints(pod, true)
+}
+
 // podEndpointsChanged returns two boolean values. The first is true if the pod has
 // changed in a way that may change existing endpoints. The second value is true if the
 // pod has changed in a way that may affect which Services it matches.
@@ -212,6 +222,12 @@ func podEndpointsChanged(oldPod, newPod *v1.Pod) (bool, bool) {
 	if !reflect.DeepEqual(newPod.Labels, oldPod.Labels) ||
 		!hostNameAndDomainAreEqual(newPod, oldPod) {
 		labelsChanged = true
+	}
+
+	// If the pod became eligible or ineligible for endpoints (for example, it reached a
+	// terminal phase without any other relevant change), its endpoints must be updated.
+	if ShouldPodBeInEndpoints(oldPod, true) != ShouldPodBeInEndpoints(newPod, true) {
+		return true, labelsChanged
 	}
 
 	// If the pod's deletion timestamp is set, remove endpoint from ready address.

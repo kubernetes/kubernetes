@@ -821,11 +821,21 @@
             "procMount": "procMountValue",
             "seccompProfile": {
               "type": "typeValue",
-              "localhostProfile": "localhostProfileValue"
+              "localhostProfile": "localhostProfileValue",
+              "oci": {
+                "ref": "refValue",
+                "baseProfile": {
+                  "type": "typeValue",
+                  "localhostProfile": "localhostProfileValue"
+                }
+              }
             },
             "appArmorProfile": {
               "type": "typeValue",
               "localhostProfile": "localhostProfileValue"
+            },
+            "cgroupOptions": {
+              "mountMode": "mountModeValue"
             }
           },
           "stdin": true,
@@ -1146,11 +1156,21 @@
             "procMount": "procMountValue",
             "seccompProfile": {
               "type": "typeValue",
-              "localhostProfile": "localhostProfileValue"
+              "localhostProfile": "localhostProfileValue",
+              "oci": {
+                "ref": "refValue",
+                "baseProfile": {
+                  "type": "typeValue",
+                  "localhostProfile": "localhostProfileValue"
+                }
+              }
             },
             "appArmorProfile": {
               "type": "typeValue",
               "localhostProfile": "localhostProfileValue"
+            },
+            "cgroupOptions": {
+              "mountMode": "mountModeValue"
             }
           },
           "stdin": true,
@@ -1471,11 +1491,21 @@
             "procMount": "procMountValue",
             "seccompProfile": {
               "type": "typeValue",
-              "localhostProfile": "localhostProfileValue"
+              "localhostProfile": "localhostProfileValue",
+              "oci": {
+                "ref": "refValue",
+                "baseProfile": {
+                  "type": "typeValue",
+                  "localhostProfile": "localhostProfileValue"
+                }
+              }
             },
             "appArmorProfile": {
               "type": "typeValue",
               "localhostProfile": "localhostProfileValue"
+            },
+            "cgroupOptions": {
+              "mountMode": "mountModeValue"
             }
           },
           "stdin": true,
@@ -1529,7 +1559,14 @@
         "fsGroupChangePolicy": "fsGroupChangePolicyValue",
         "seccompProfile": {
           "type": "typeValue",
-          "localhostProfile": "localhostProfileValue"
+          "localhostProfile": "localhostProfileValue",
+          "oci": {
+            "ref": "refValue",
+            "baseProfile": {
+              "type": "typeValue",
+              "localhostProfile": "localhostProfileValue"
+            }
+          }
         },
         "appArmorProfile": {
           "type": "typeValue",

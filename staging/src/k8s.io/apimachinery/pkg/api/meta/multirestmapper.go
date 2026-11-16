@@ -131,9 +131,9 @@ func (m MultiRESTMapper) RESTMappings(gk schema.GroupKind, versions ...string) (
 	return ToMultiRESTMapperWithContext(m).RESTMappingsWithContext(context.Background(), gk, versions...)
 }
 
-// MultiRESTMapperWithContext.Reset is a better alternative because it supports contextual logging and cancellation.
+// MultiRESTMapperWithContext.ResetWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use MultiRESTMapperWithContext.Reset instead.
+// Contextual logging: Use MultiRESTMapperWithContext.ResetWithContext instead.
 func (m MultiRESTMapper) Reset() {
 	for _, t := range m {
 		MaybeResetRESTMapper(t)

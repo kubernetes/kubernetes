@@ -636,6 +636,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.CephFSPersistentVolumeSourceApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("CephFSVolumeSource"):
 		return &applyconfigurationscorev1.CephFSVolumeSourceApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("CgroupOptions"):
+		return &applyconfigurationscorev1.CgroupOptionsApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("CinderPersistentVolumeSource"):
 		return &applyconfigurationscorev1.CinderPersistentVolumeSourceApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("CinderVolumeSource"):
@@ -912,8 +914,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.PodTemplateApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("PodTemplateSpec"):
 		return &applyconfigurationscorev1.PodTemplateSpecApplyConfiguration{}
-	case corev1.SchemeGroupVersion.WithKind("PodVolumeHealth"):
-		return &applyconfigurationscorev1.PodVolumeHealthApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("PodVolumeStatus"):
+		return &applyconfigurationscorev1.PodVolumeStatusApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("PortStatus"):
 		return &applyconfigurationscorev1.PortStatusApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("PortworxVolumeSource"):
@@ -980,6 +982,10 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.SecretVolumeSourceApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("SecurityContext"):
 		return &applyconfigurationscorev1.SecurityContextApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("SecurityProfileOCI"):
+		return &applyconfigurationscorev1.SecurityProfileOCIApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("SecurityProfileOCIBase"):
+		return &applyconfigurationscorev1.SecurityProfileOCIBaseApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("SELinuxOptions"):
 		return &applyconfigurationscorev1.SELinuxOptionsApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("Service"):
@@ -1930,6 +1936,18 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		// Group=scheduling.k8s.io, Version=v1
 	case schedulingv1.SchemeGroupVersion.WithKind("PriorityClass"):
 		return &applyconfigurationsschedulingv1.PriorityClassApplyConfiguration{}
+	case schedulingv1.SchemeGroupVersion.WithKind("WorkloadPodGroupDisruptionMode"):
+		return &applyconfigurationsschedulingv1.WorkloadPodGroupDisruptionModeApplyConfiguration{}
+	case schedulingv1.SchemeGroupVersion.WithKind("WorkloadPodGroupGangSchedulingPolicy"):
+		return &applyconfigurationsschedulingv1.WorkloadPodGroupGangSchedulingPolicyApplyConfiguration{}
+	case schedulingv1.SchemeGroupVersion.WithKind("WorkloadPodGroupResourceClaim"):
+		return &applyconfigurationsschedulingv1.WorkloadPodGroupResourceClaimApplyConfiguration{}
+	case schedulingv1.SchemeGroupVersion.WithKind("WorkloadPodGroupSchedulingConstraints"):
+		return &applyconfigurationsschedulingv1.WorkloadPodGroupSchedulingConstraintsApplyConfiguration{}
+	case schedulingv1.SchemeGroupVersion.WithKind("WorkloadPodGroupSchedulingPolicy"):
+		return &applyconfigurationsschedulingv1.WorkloadPodGroupSchedulingPolicyApplyConfiguration{}
+	case schedulingv1.SchemeGroupVersion.WithKind("WorkloadTopologyConstraint"):
+		return &applyconfigurationsschedulingv1.WorkloadTopologyConstraintApplyConfiguration{}
 
 		// Group=scheduling.k8s.io, Version=v1alpha3
 	case schedulingv1alpha3.SchemeGroupVersion.WithKind("CompositeDisruptionMode"):
@@ -1974,16 +1992,6 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsschedulingv1alpha3.TypedLocalObjectReferenceApplyConfiguration{}
 	case schedulingv1alpha3.SchemeGroupVersion.WithKind("Workload"):
 		return &applyconfigurationsschedulingv1alpha3.WorkloadApplyConfiguration{}
-	case schedulingv1alpha3.SchemeGroupVersion.WithKind("WorkloadPodGroupDisruptionMode"):
-		return &applyconfigurationsschedulingv1alpha3.WorkloadPodGroupDisruptionModeApplyConfiguration{}
-	case schedulingv1alpha3.SchemeGroupVersion.WithKind("WorkloadPodGroupGangSchedulingPolicy"):
-		return &applyconfigurationsschedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicyApplyConfiguration{}
-	case schedulingv1alpha3.SchemeGroupVersion.WithKind("WorkloadPodGroupResourceClaim"):
-		return &applyconfigurationsschedulingv1alpha3.WorkloadPodGroupResourceClaimApplyConfiguration{}
-	case schedulingv1alpha3.SchemeGroupVersion.WithKind("WorkloadPodGroupSchedulingConstraints"):
-		return &applyconfigurationsschedulingv1alpha3.WorkloadPodGroupSchedulingConstraintsApplyConfiguration{}
-	case schedulingv1alpha3.SchemeGroupVersion.WithKind("WorkloadPodGroupSchedulingPolicy"):
-		return &applyconfigurationsschedulingv1alpha3.WorkloadPodGroupSchedulingPolicyApplyConfiguration{}
 	case schedulingv1alpha3.SchemeGroupVersion.WithKind("WorkloadReference"):
 		return &applyconfigurationsschedulingv1alpha3.WorkloadReferenceApplyConfiguration{}
 	case schedulingv1alpha3.SchemeGroupVersion.WithKind("WorkloadSpec"):
@@ -1994,10 +2002,16 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsschedulingv1beta1.CompositeDisruptionModeApplyConfiguration{}
 	case schedulingv1beta1.SchemeGroupVersion.WithKind("CompositeGangSchedulingPolicy"):
 		return &applyconfigurationsschedulingv1beta1.CompositeGangSchedulingPolicyApplyConfiguration{}
+	case schedulingv1beta1.SchemeGroupVersion.WithKind("CompositePodGroup"):
+		return &applyconfigurationsschedulingv1beta1.CompositePodGroupApplyConfiguration{}
 	case schedulingv1beta1.SchemeGroupVersion.WithKind("CompositePodGroupSchedulingConstraints"):
 		return &applyconfigurationsschedulingv1beta1.CompositePodGroupSchedulingConstraintsApplyConfiguration{}
 	case schedulingv1beta1.SchemeGroupVersion.WithKind("CompositePodGroupSchedulingPolicy"):
 		return &applyconfigurationsschedulingv1beta1.CompositePodGroupSchedulingPolicyApplyConfiguration{}
+	case schedulingv1beta1.SchemeGroupVersion.WithKind("CompositePodGroupSpec"):
+		return &applyconfigurationsschedulingv1beta1.CompositePodGroupSpecApplyConfiguration{}
+	case schedulingv1beta1.SchemeGroupVersion.WithKind("CompositePodGroupStatus"):
+		return &applyconfigurationsschedulingv1beta1.CompositePodGroupStatusApplyConfiguration{}
 	case schedulingv1beta1.SchemeGroupVersion.WithKind("CompositePodGroupTemplate"):
 		return &applyconfigurationsschedulingv1beta1.CompositePodGroupTemplateApplyConfiguration{}
 	case schedulingv1beta1.SchemeGroupVersion.WithKind("DisruptionMode"):

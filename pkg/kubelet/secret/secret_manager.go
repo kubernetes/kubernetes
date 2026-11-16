@@ -121,9 +121,9 @@ const (
 //   - every GetObject() call tries to fetch the value from local cache; if it is
 //     not there, invalidated or too old, we fetch it from apiserver and refresh the
 //     value in cache; otherwise it is just fetched from cache
-func NewCachingSecretManager(kubeClient clientset.Interface, getTTL manager.GetObjectTTLFunc) Manager {
+func NewCachingSecretManager(ctx context.Context, kubeClient clientset.Interface, getTTL manager.GetObjectTTLFunc) Manager {
 	getSecret := func(namespace, name string, opts metav1.GetOptions) (runtime.Object, error) {
-		return kubeClient.CoreV1().Secrets(namespace).Get(context.TODO(), name, opts)
+		return kubeClient.CoreV1().Secrets(namespace).Get(ctx, name, opts)
 	}
 	secretStore := manager.NewObjectStore(getSecret, clock.RealClock{}, getTTL, defaultTTL)
 	return &secretManager{
@@ -137,12 +137,12 @@ func NewCachingSecretManager(kubeClient clientset.Interface, getTTL manager.GetO
 //   - whenever a pod is created or updated, we start individual watches for all
 //     referenced objects that aren't referenced from other registered pods
 //   - every GetObject() returns a value from local cache propagated via watches
-func NewWatchingSecretManager(kubeClient clientset.Interface, resyncInterval time.Duration) Manager {
+func NewWatchingSecretManager(ctx context.Context, kubeClient clientset.Interface, resyncInterval time.Duration) Manager {
 	listSecret := func(namespace string, opts metav1.ListOptions) (runtime.Object, error) {
-		return kubeClient.CoreV1().Secrets(namespace).List(context.TODO(), opts)
+		return kubeClient.CoreV1().Secrets(namespace).List(ctx, opts)
 	}
 	watchSecret := func(namespace string, opts metav1.ListOptions) (watch.Interface, error) {
-		return kubeClient.CoreV1().Secrets(namespace).Watch(context.TODO(), opts)
+		return kubeClient.CoreV1().Secrets(namespace).Watch(ctx, opts)
 	}
 	newSecret := func() runtime.Object {
 		return &v1.Secret{}

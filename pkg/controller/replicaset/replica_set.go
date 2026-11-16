@@ -616,7 +616,7 @@ func (rsc *ReplicaSetController) deletePod(logger klog.Logger, obj interface{}) 
 		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %#v: %v", rs, err))
 		return
 	}
-	logger.V(4).Info("Pod deleted", "delete_by", utilruntime.GetCaller(), "deletion_timestamp", pod.DeletionTimestamp, "pod", klog.KObj(pod))
+	logger.V(4).Info("Pod deleted", "delete_by", utilruntime.GetCaller(), "deletion_timestamp", klog.SafePtr(pod.DeletionTimestamp), "pod", klog.KObj(pod))
 	rsc.expectations.DeletionObserved(logger, rsKey, controller.PodKey(pod))
 	rsc.queue.Add(rsKey)
 }

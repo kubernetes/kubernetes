@@ -63,7 +63,6 @@ type PodGroupTemplateApplyConfiguration struct {
 	// preemptionPolicy is the Policy for preempting pods/podgroups with lower priority.
 	// One of Never, PreemptLowerPriority.
 	// This field is immutable.
-	// This field is available only when the PodGroupPreemptionPolicy feature gate is enabled.
 	PreemptionPolicy *schedulingv1alpha3.PreemptionPolicy `json:"preemptionPolicy,omitempty"`
 }
 

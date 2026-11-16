@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	appsvalidation "k8s.io/kubernetes/pkg/apis/apps/validation"
+	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/features"
 )
 
@@ -83,7 +84,7 @@ func (deploymentStrategy) PrepareForCreate(ctx context.Context, obj runtime.Obje
 // Validate validates a new deployment.
 func (deploymentStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	deployment := obj.(*apps.Deployment)
-	opts := pod.GetValidationOptionsFromPodTemplate(&deployment.Spec.Template, nil)
+	opts := corevalidation.GetValidationOptionsFromPodTemplate(&deployment.Spec.Template, nil)
 	return appsvalidation.ValidateDeployment(deployment, opts)
 }
 
@@ -129,7 +130,7 @@ func (deploymentStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.O
 	newDeployment := obj.(*apps.Deployment)
 	oldDeployment := old.(*apps.Deployment)
 
-	opts := pod.GetValidationOptionsFromPodTemplate(&newDeployment.Spec.Template, &oldDeployment.Spec.Template)
+	opts := corevalidation.GetValidationOptionsFromPodTemplate(&newDeployment.Spec.Template, &oldDeployment.Spec.Template)
 	allErrs := appsvalidation.ValidateDeploymentUpdate(newDeployment, oldDeployment, opts)
 
 	return allErrs

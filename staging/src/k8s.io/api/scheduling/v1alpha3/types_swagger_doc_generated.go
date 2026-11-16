@@ -127,7 +127,7 @@ var map_CompositePodGroupSpec = map[string]string{
 	"disruptionMode":              "disruptionMode defines the mode in which a given CompositePodGroup can be disrupted. Controllers are expected to fill this field by copying it from a CompositePodGroupTemplate. One of Single, All. Defaults to Single if unset. This field is immutable.",
 	"priorityClassName":           "priorityClassName defines the priority that should be considered when scheduling this CompositePodGroup. Controllers are expected to fill this field by copying it from a CompositePodGroupTemplate. If left unspecified, it is validated and resolved similarly to the PriorityClassName field in Pods (i.e. if no priority class is specified, admission control can set this to the global default priority class if it exists. Otherwise, the composite pod group's priority will be zero). This field is immutable.",
 	"priority":                    "priority is the value of priority of this composite pod group. Various system components use this field to find the priority of the composite pod group. When Priority Admission Controller is enabled, it prevents users from setting this field. The admission controller populates this field from PriorityClassName. The higher the value, the higher the priority. This field is immutable.",
-	"preemptionPolicy":            "preemptionPolicy is the Policy for preempting pods/podgroups with lower priority. One of Never, PreemptLowerPriority. Defaults to PreemptLowerPriority if unset. When Priority Admission Controller is enabled, it populates this field from PriorityClassName, and defaults to PreemptLowerPriority if value is unset in PriorityClass. This field is immutable. This field is available only when the PodGroupPreemptionPolicy feature gate is enabled.",
+	"preemptionPolicy":            "preemptionPolicy is the Policy for preempting pods/podgroups with lower priority. One of Never, PreemptLowerPriority. Defaults to PreemptLowerPriority if unset. When Priority Admission Controller is enabled, it populates this field from PriorityClassName, and defaults to PreemptLowerPriority if value is unset in PriorityClass. This field is immutable.",
 }
 
 func (CompositePodGroupSpec) SwaggerDoc() map[string]string {
@@ -149,9 +149,9 @@ var map_CompositePodGroupTemplate = map[string]string{
 	"schedulingPolicy":           "schedulingPolicy defines the scheduling policy for this template.",
 	"schedulingConstraints":      "schedulingConstraints defines optional scheduling constraints (e.g. topology) for this CompositePodGroupTemplate. This field is immutable.",
 	"disruptionMode":             "disruptionMode defines the mode in which a given CompositePodGroup can be disrupted. One of Single, All. This field is immutable.",
-	"priorityClassName":          "priorityClassName indicates the priority that should be considered when scheduling a composite pod group created from this template. If no priority class is specified, admission control can set this to the global default priority class if it exists. Otherwise, composite pod groups created from this template will have the priority set to zero. This field is immutable.",
-	"priority":                   "priority is the value of priority of composite pod groups created from this template. Various system components use this field to find the priority of the composite pod group. When Priority Admission Controller is enabled, it prevents users from setting this field. The admission controller populates this field from PriorityClassName. The higher the value, the higher the priority. This field is immutable.",
-	"preemptionPolicy":           "preemptionPolicy is the Policy for preempting pods/podgroups with lower priority. One of Never, PreemptLowerPriority. This field is immutable. This field is available only when the PodGroupPreemptionPolicy feature gate is enabled.",
+	"priorityClassName":          "priorityClassName indicates the priority that should be considered when scheduling a composite pod group created from this template. This field is immutable.",
+	"priority":                   "priority is the value of priority of composite pod groups created from this template. Various system components use this field to find the priority of the composite pod group. The higher the value, the higher the priority. This field is immutable.",
+	"preemptionPolicy":           "preemptionPolicy is the Policy for preempting pods/podgroups with lower priority. One of Never, PreemptLowerPriority. This field is immutable.",
 	"podGroupTemplates":          "podGroupTemplates is the list of templates for children PodGroups. The maximum number of templates is 8. At least one entry in CompositePodGroupTemplates or PodGroupTemplates must be set.",
 	"compositePodGroupTemplates": "compositePodGroupTemplates is the list of templates for children CompositePodGroups. The maximum number of templates is 8. At least one entry in CompositePodGroupTemplates or PodGroupTemplates must be set.",
 }
@@ -248,9 +248,9 @@ var map_PodGroupSpec = map[string]string{
 	"schedulingConstraints":       "schedulingConstraints defines optional scheduling constraints (e.g. topology) for this PodGroup. Controllers are expected to fill this field by copying it from a PodGroupTemplate. This field is immutable. This field is only available when the TopologyAwareWorkloadScheduling feature gate is enabled.",
 	"resourceClaims":              "resourceClaims defines which ResourceClaims may be shared among Pods in the group. Pods consume the devices allocated to a PodGroup's claim by defining a claim in its own Spec.ResourceClaims that matches the PodGroup's claim exactly. The claim must have the same name and refer to the same ResourceClaim or ResourceClaimTemplate.\n\nThis is a beta-level field and requires that the DRAWorkloadResourceClaims feature gate is enabled.\n\nThis field is immutable.",
 	"disruptionMode":              "disruptionMode defines the mode in which a given PodGroup can be disrupted. Controllers are expected to fill this field by copying it from a PodGroupTemplate. One of Single, All. Defaults to Single if unset. This field is immutable.",
-	"priorityClassName":           "priorityClassName defines the priority that should be considered when scheduling this pod group. Controllers are expected to fill this field by copying it from a PodGroupTemplate. Otherwise, it is validated and resolved similarly to the PriorityClassName on PodGroupTemplate (i.e. if no priority class is specified, admission control can set this to the global default priority class if it exists. Otherwise, the pod group's priority will be zero). This field is immutable.",
+	"priorityClassName":           "priorityClassName defines the priority that should be considered when scheduling this pod group. Controllers are expected to fill this field by copying it from a PodGroupTemplate. Otherwise, it is validated and resolved similarly to the PriorityClassName in Pods (i.e. if no priority class is specified, admission control can set this to the global default priority class if it exists. Otherwise, the pod group's priority will be zero). This field is immutable.",
 	"priority":                    "priority is the value of priority of this pod group. Various system components use this field to find the priority of the pod group. When Priority Admission Controller is enabled, it prevents users from setting this field. The admission controller populates this field from PriorityClassName. The higher the value, the higher the priority. This field is immutable.",
-	"preemptionPolicy":            "preemptionPolicy is the Policy for preempting pods/podgroups with lower priority. One of Never, PreemptLowerPriority. Defaults to PreemptLowerPriority if unset. When Priority Admission Controller is enabled, it populates this field from PriorityClassName, and defaults to PreemptLowerPriority if value is unset in PriorityClass. This field is immutable. This field is available only when the PodGroupPreemptionPolicy feature gate is enabled.",
+	"preemptionPolicy":            "preemptionPolicy is the Policy for preempting pods/podgroups with lower priority. One of Never, PreemptLowerPriority. Defaults to PreemptLowerPriority if unset. When Priority Admission Controller is enabled, it populates this field from PriorityClassName, and defaults to PreemptLowerPriority if value is unset in PriorityClass. This field is immutable.",
 }
 
 func (PodGroupSpec) SwaggerDoc() map[string]string {
@@ -276,7 +276,7 @@ var map_PodGroupTemplate = map[string]string{
 	"disruptionMode":        "disruptionMode defines the mode in which a given PodGroup can be disrupted. One of Single, All. This field is immutable.",
 	"priorityClassName":     "priorityClassName indicates the priority that should be considered when scheduling a pod group created from this template. This field is immutable.",
 	"priority":              "priority is the value of priority of pod groups created from this template. Various system components use this field to find the priority of the pod group. The higher the value, the higher the priority. This field is immutable.",
-	"preemptionPolicy":      "preemptionPolicy is the Policy for preempting pods/podgroups with lower priority. One of Never, PreemptLowerPriority. This field is immutable. This field is available only when the PodGroupPreemptionPolicy feature gate is enabled.",
+	"preemptionPolicy":      "preemptionPolicy is the Policy for preempting pods/podgroups with lower priority. One of Never, PreemptLowerPriority. This field is immutable.",
 }
 
 func (PodGroupTemplate) SwaggerDoc() map[string]string {
@@ -301,7 +301,7 @@ func (SingleDisruptionMode) SwaggerDoc() map[string]string {
 
 var map_TopologyConstraint = map[string]string{
 	"":    "TopologyConstraint defines a topology constraint for a PodGroup.",
-	"key": "key specifies the key of the node label representing the topology domain. All pods within the PodGroup must be colocated within the same domain instance. Different PodGroups can land on different domain instances even if they derive from the same PodGroupTemplate. Examples: \"topology.kubernetes.io/rack\"",
+	"key": "key specifies the key of the node label representing the topology domain. All pods within the PodGroup must be colocated within the same domain instance. Different PodGroups can land on different domain instances even if they derive from the same PodGroupTemplate. Nodes where this label is missing or has an empty value do not belong to any domain instance, so pods within the PodGroup cannot be scheduled onto them. Examples: \"topology.kubernetes.io/rack\"",
 }
 
 func (TopologyConstraint) SwaggerDoc() map[string]string {
@@ -329,68 +329,6 @@ func (Workload) SwaggerDoc() map[string]string {
 	return map_Workload
 }
 
-var map_WorkloadCompositePodGroupAllDisruptionMode = map[string]string{
-	"": "WorkloadCompositePodGroupAllDisruptionMode indicates that all child groups must be disrupted together.",
-}
-
-func (WorkloadCompositePodGroupAllDisruptionMode) SwaggerDoc() map[string]string {
-	return map_WorkloadCompositePodGroupAllDisruptionMode
-}
-
-var map_WorkloadCompositePodGroupBasicSchedulingPolicy = map[string]string{
-	"": "WorkloadCompositePodGroupBasicSchedulingPolicy indicates that the child groups of a composite group should be scheduled independently.",
-}
-
-func (WorkloadCompositePodGroupBasicSchedulingPolicy) SwaggerDoc() map[string]string {
-	return map_WorkloadCompositePodGroupBasicSchedulingPolicy
-}
-
-var map_WorkloadCompositePodGroupDisruptionMode = map[string]string{
-	"":       "WorkloadCompositePodGroupDisruptionMode defines how the child groups of a composite group can be disrupted. Exactly one mode must be set.",
-	"single": "single specifies that child groups can be disrupted independently from each other.",
-	"all":    "all specifies that all child groups must be disrupted together.",
-}
-
-func (WorkloadCompositePodGroupDisruptionMode) SwaggerDoc() map[string]string {
-	return map_WorkloadCompositePodGroupDisruptionMode
-}
-
-var map_WorkloadCompositePodGroupGangSchedulingPolicy = map[string]string{
-	"":              "WorkloadCompositePodGroupGangSchedulingPolicy defines the parameters for gang scheduling of a composite group's child groups.",
-	"minGroupCount": "minGroupCount is the minimum number of child groups that must be schedulable at the same time for the scheduler to admit the entire composite group. This field is optional. If it is not specified, the controller should inject a context-specific sane default (e.g., the number of child groups). If set, it must be a positive integer.",
-}
-
-func (WorkloadCompositePodGroupGangSchedulingPolicy) SwaggerDoc() map[string]string {
-	return map_WorkloadCompositePodGroupGangSchedulingPolicy
-}
-
-var map_WorkloadCompositePodGroupSchedulingConstraints = map[string]string{
-	"":         "WorkloadCompositePodGroupSchedulingConstraints defines composite-level scheduling constraints, such as topology, for a CompositePodGroup (a group of groups) managed by a workload controller.",
-	"topology": "topology specifies desired topological placements for all child groups within the composite group. If unset, no topology placement is requested.",
-}
-
-func (WorkloadCompositePodGroupSchedulingConstraints) SwaggerDoc() map[string]string {
-	return map_WorkloadCompositePodGroupSchedulingConstraints
-}
-
-var map_WorkloadCompositePodGroupSchedulingPolicy = map[string]string{
-	"":      "WorkloadCompositePodGroupSchedulingPolicy defines the scheduling policy for a CompositePodGroup (a group of groups) managed by a workload controller. Exactly one policy must be set.",
-	"basic": "basic specifies that the child groups of this composite group should be scheduled independently.",
-	"gang":  "gang specifies that the child groups of this composite group should be scheduled using all-or-nothing semantics.",
-}
-
-func (WorkloadCompositePodGroupSchedulingPolicy) SwaggerDoc() map[string]string {
-	return map_WorkloadCompositePodGroupSchedulingPolicy
-}
-
-var map_WorkloadCompositePodGroupSingleDisruptionMode = map[string]string{
-	"": "WorkloadCompositePodGroupSingleDisruptionMode indicates that child groups can be disrupted independently.",
-}
-
-func (WorkloadCompositePodGroupSingleDisruptionMode) SwaggerDoc() map[string]string {
-	return map_WorkloadCompositePodGroupSingleDisruptionMode
-}
-
 var map_WorkloadList = map[string]string{
 	"":         "WorkloadList contains a list of Workload resources.",
 	"metadata": "Standard list metadata.",
@@ -399,79 +337,6 @@ var map_WorkloadList = map[string]string{
 
 func (WorkloadList) SwaggerDoc() map[string]string {
 	return map_WorkloadList
-}
-
-var map_WorkloadPodGroupAllDisruptionMode = map[string]string{
-	"": "WorkloadPodGroupAllDisruptionMode indicates that all pods in the group must be disrupted together.",
-}
-
-func (WorkloadPodGroupAllDisruptionMode) SwaggerDoc() map[string]string {
-	return map_WorkloadPodGroupAllDisruptionMode
-}
-
-var map_WorkloadPodGroupBasicSchedulingPolicy = map[string]string{
-	"": "WorkloadPodGroupBasicSchedulingPolicy indicates standard Kubernetes scheduling behavior.",
-}
-
-func (WorkloadPodGroupBasicSchedulingPolicy) SwaggerDoc() map[string]string {
-	return map_WorkloadPodGroupBasicSchedulingPolicy
-}
-
-var map_WorkloadPodGroupDisruptionMode = map[string]string{
-	"":       "WorkloadPodGroupDisruptionMode defines how individual pods within a group can be disrupted. Exactly one mode must be set.",
-	"single": "single specifies that pods can be disrupted independently from each other.",
-	"all":    "all specifies that all pods in the group must be disrupted together.",
-}
-
-func (WorkloadPodGroupDisruptionMode) SwaggerDoc() map[string]string {
-	return map_WorkloadPodGroupDisruptionMode
-}
-
-var map_WorkloadPodGroupGangSchedulingPolicy = map[string]string{
-	"":         "WorkloadPodGroupGangSchedulingPolicy defines the parameters for gang (all-or-nothing) scheduling.",
-	"minCount": "minCount is the minimum number of pods that must be scheduled at the same time for the scheduler to admit the entire group. This field is optional. If it is not specified, the controller should inject a context-specific sane default (e.g., parallelism for a Job). If set, it must be a positive integer.",
-}
-
-func (WorkloadPodGroupGangSchedulingPolicy) SwaggerDoc() map[string]string {
-	return map_WorkloadPodGroupGangSchedulingPolicy
-}
-
-var map_WorkloadPodGroupResourceClaim = map[string]string{
-	"":                          "WorkloadPodGroupResourceClaim references a dynamic resource claim that is shared across pods in the group.",
-	"name":                      "name uniquely identifies this resource claim inside the group. This field is required. It must be a DNS_LABEL.",
-	"resourceClaimName":         "resourceClaimName is the name of a ResourceClaim object in the same namespace. This field is optional. If it is not specified, no resource claim is used. If set, it must be a DNS subdomain.",
-	"resourceClaimTemplateName": "resourceClaimTemplateName is the name of a ResourceClaimTemplate object in the same namespace. This field is optional. If it is not specified, no resource claim template is used. If set, it must be a DNS subdomain.",
-}
-
-func (WorkloadPodGroupResourceClaim) SwaggerDoc() map[string]string {
-	return map_WorkloadPodGroupResourceClaim
-}
-
-var map_WorkloadPodGroupSchedulingConstraints = map[string]string{
-	"":         "WorkloadPodGroupSchedulingConstraints defines leaf-level scheduling constraints, such as topology.",
-	"topology": "topology specifies desired topological placements for all pods within the pod group. If unset, no topology placement is requested.",
-}
-
-func (WorkloadPodGroupSchedulingConstraints) SwaggerDoc() map[string]string {
-	return map_WorkloadPodGroupSchedulingConstraints
-}
-
-var map_WorkloadPodGroupSchedulingPolicy = map[string]string{
-	"":      "WorkloadPodGroupSchedulingPolicy defines the scheduling policy for a group of pods managed by a workload controller. Exactly one policy must be set.",
-	"basic": "basic specifies that standard, pod-by-pod Kubernetes scheduling behavior should be used.",
-	"gang":  "gang specifies all-or-nothing scheduling semantics.",
-}
-
-func (WorkloadPodGroupSchedulingPolicy) SwaggerDoc() map[string]string {
-	return map_WorkloadPodGroupSchedulingPolicy
-}
-
-var map_WorkloadPodGroupSingleDisruptionMode = map[string]string{
-	"": "WorkloadPodGroupSingleDisruptionMode indicates that individual pods can be disrupted independently.",
-}
-
-func (WorkloadPodGroupSingleDisruptionMode) SwaggerDoc() map[string]string {
-	return map_WorkloadPodGroupSingleDisruptionMode
 }
 
 var map_WorkloadReference = map[string]string{

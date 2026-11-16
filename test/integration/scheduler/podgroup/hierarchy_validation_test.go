@@ -25,8 +25,8 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
+	schedulerutils "k8s.io/kubernetes/test/integration/scheduler"
 	stepsframework "k8s.io/kubernetes/test/integration/scheduler/podgroup/stepsframework"
-	testutils "k8s.io/kubernetes/test/integration/util"
 )
 
 func TestHierarchyValidation(t *testing.T) {
@@ -183,11 +183,11 @@ func TestHierarchyValidation(t *testing.T) {
 			steps: []stepsframework.Step{
 				{
 					Name:                    "Create root composite pod group with All disruption mode",
-					CreateCompositePodGroup: st.MakeCompositePodGroup().Name("cpg-root").WorkloadRef("wl", "root-t").BasicPolicy().DisruptionModeAll().Priority(100).Obj(),
+					CreateCompositePodGroup: st.MakeCompositePodGroup().Name("cpg-root").WorkloadRef("wl", "root-t").MinGroupCount(1).DisruptionModeAll().Priority(100).Obj(),
 				},
 				{
 					Name:           "Create child pod group with Single disruption mode",
-					CreatePodGroup: st.MakePodGroup().Name("pg1").WorkloadRef("wl", "tmpl").ParentCompositePodGroup("cpg-root").BasicPolicy().DisruptionModeSingle().Priority(100).Obj(),
+					CreatePodGroup: st.MakePodGroup().Name("pg1").WorkloadRef("wl", "tmpl").ParentCompositePodGroup("cpg-root").MinCount(1).DisruptionModeSingle().Priority(100).Obj(),
 				},
 				{
 					Name:       "Create pod for pg1",
@@ -210,7 +210,7 @@ func TestHierarchyValidation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			testCtx := testutils.InitTestSchedulerWithNS(t, "hierarchy-val",
+			testCtx := schedulerutils.InitTestSchedulerWithNS(t, "hierarchy-val",
 				scheduler.WithPodMaxBackoffSeconds(1),
 				scheduler.WithPodInitialBackoffSeconds(1),
 			)

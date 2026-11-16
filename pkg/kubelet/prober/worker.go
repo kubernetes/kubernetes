@@ -175,12 +175,14 @@ func (w *worker) run(ctx context.Context) {
 			w.resultsManager.Remove(w.containerID)
 		}
 
-		w.probeManager.removeWorker(w.pod.UID, w.container.Name, w.probeType)
-		ProberResults.Delete(w.proberResultsSuccessfulMetricLabels)
-		ProberResults.Delete(w.proberResultsFailedMetricLabels)
-		ProberResults.Delete(w.proberResultsUnknownMetricLabels)
-		ProberDuration.Delete(w.proberDurationSuccessfulMetricLabels)
-		ProberDuration.Delete(w.proberDurationUnknownMetricLabels)
+		// A replacement worker has the same metric labels, and keeps the metrics.
+		if replaced := w.probeManager.removeWorker(w); !replaced {
+			ProberResults.Delete(w.proberResultsSuccessfulMetricLabels)
+			ProberResults.Delete(w.proberResultsFailedMetricLabels)
+			ProberResults.Delete(w.proberResultsUnknownMetricLabels)
+			ProberDuration.Delete(w.proberDurationSuccessfulMetricLabels)
+			ProberDuration.Delete(w.proberDurationUnknownMetricLabels)
+		}
 	}()
 
 probeLoop:

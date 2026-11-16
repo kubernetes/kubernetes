@@ -32,6 +32,10 @@ type RateLimiter interface {
 // instance of a RateLimiter that will be used to rate limit the return rate
 // of the active number of request(s). 'count' is the number of requests in
 // flight that are expected to invoke 'Done' on this wait group.
+//
+// Wait invokes the factory with the wait group locked, and enters waiting
+// mode before unlocking, so any Done after the factory is invoked is rate
+// limited. The factory must not block or call into the wait group.
 type RateLimiterFactoryFunc func(count int) (RateLimiter, context.Context, context.CancelFunc)
 
 // RateLimitedSafeWaitGroup must not be copied after first use.

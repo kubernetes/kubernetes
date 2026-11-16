@@ -20,12 +20,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"sync"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
+	apimeta "k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -1065,7 +1067,7 @@ type compositePodGroupListerImpl struct {
 }
 
 // Get returns the cached pod group object.
-func (l *compositePodGroupListerImpl) Get(namespace, name string) (*schedulingv1alpha3.CompositePodGroup, error) {
+func (l *compositePodGroupListerImpl) Get(namespace, name string) (*schedulingv1beta1.CompositePodGroup, error) {
 	if !l.cache.compositePodGroupEnabled {
 		return nil, fmt.Errorf("composite pod group feature gate is disabled")
 	}
@@ -1242,132 +1244,97 @@ func (cache *cacheImpl) RemoveGenericPodGroup(logger klog.Logger, gpg *fwk.Gener
 	}
 }
 
-// BuildHierarchySnapshotFromPod returns a snapshot of the pod group hierarchy for the given pod.
-func (cache *cacheImpl) BuildHierarchySnapshotFromPod(pod *v1.Pod) (fwk.PodGroupManager, error) {
-	if pod.Spec.SchedulingGroup == nil {
-		return nil, fmt.Errorf("pod has no scheduling group")
-	}
-
-	cache.mu.RLock()
-	defer cache.mu.RUnlock()
-
-	// 1. Find root CPG/PG by traversing upwards
-	currentKey := fwk.PodGroupKey(pod.Namespace, *pod.Spec.SchedulingGroup.PodGroupName)
-	pgs, exists := cache.podGroupStates[currentKey]
-	if !exists {
-		return nil, fmt.Errorf("pod group state not found for %s", currentKey.String())
-	}
-
-	pg := pgs.podGroup
-	if pg == nil {
-		return nil, fmt.Errorf("pod group object not found in state for %s", currentKey.String())
-	}
-
-	if cache.compositePodGroupEnabled && pg.Spec.ParentCompositePodGroupName != nil {
-		currentKey = fwk.CompositePodGroupKey(pod.Namespace, *pg.Spec.ParentCompositePodGroupName)
-		for range schedulingv1alpha3.WorkloadMaxTreeDepth - 1 {
-			cpgs, exists := cache.compositePodGroupStates[currentKey]
-			if !exists {
-				return nil, fmt.Errorf("parent composite pod group state not found for %s", currentKey.String())
-			}
-			cpg := cpgs.compositePodGroup
-			if cpg == nil {
-				return nil, fmt.Errorf("composite pod group object not found in state for %s", currentKey.String())
-			}
-			if cpg.Spec.ParentCompositePodGroupName == nil {
-				break
-			}
-			currentKey = fwk.CompositePodGroupKey(pod.Namespace, *cpg.Spec.ParentCompositePodGroupName)
-		}
-	}
-
-	// 2. We have the root key. Now traverse downwards and update the snapshot.
-	snapshot := NewEmptySnapshot()
-	visited := sets.New[fwk.EntityKey]()
-	err := cache.buildPodGroupStateSnapshotTree(currentKey, snapshot, visited)
-	if err != nil {
-		return nil, err
-	}
-	return snapshot, nil
-}
-
-// buildPodGroupStateSnapshotTree recursively builds a snapshot of the pod group state tree starting from the given key.
-// It assumes that the cache lock is held by the caller.
-func (cache *cacheImpl) buildPodGroupStateSnapshotTree(key fwk.EntityKey, snapshot *Snapshot, visited sets.Set[fwk.EntityKey]) error {
-	if visited.Has(key) {
-		return fmt.Errorf("cycle detected in composite pod group hierarchy: %s", key.String())
-	}
-	visited.Insert(key)
-
-	switch key.Type {
-	case fwk.PodGroupKeyType:
-		pgs, exists := cache.podGroupStates[key]
-		if !exists {
-			return fmt.Errorf("pod group state not found for %s", key.String())
-		}
-		snapshot.podGroupStates[key] = &podGroupStateSnapshot{podGroupStateData: pgs.podGroupStateData.clone()}
-
-	case fwk.CompositePodGroupKeyType:
-		cpgs, exists := cache.compositePodGroupStates[key]
-		if !exists {
-			return fmt.Errorf("composite pod group state not found for %s", key.String())
-		}
-		snapshot.compositePodGroupStates[key] = &compositePodGroupStateSnapshot{compositePodGroupStateData: cpgs.compositePodGroupStateData.clone()}
-
-		children := cpgs.children.Clone()
-		for childKey := range children {
-			if err := cache.buildPodGroupStateSnapshotTree(childKey, snapshot, visited); err != nil {
-				return err
-			}
-		}
-	}
-
-	return nil
-}
-
-// GetRootKeyForGroup returns the root key of the given EntityKey.
+// FindRootGroup returns the root *fwk.GenericPodGroup of the hierarchy for the given EntityKey,
+// or nil if the root group was not found (i.e. does not exist).
 // The key must be of PodGroupKey or CompositePodGroupKey type.
-func (cache *cacheImpl) GetRootKeyForGroup(key fwk.EntityKey) (fwk.EntityKey, bool, error) {
+func (cache *cacheImpl) FindRootGroup(key fwk.EntityKey) (*fwk.GenericPodGroup, error) {
 	cache.mu.RLock()
 	defer cache.mu.RUnlock()
 
 	currentKey := key
-	visited := sets.New[fwk.EntityKey]()
+	var visited []fwk.EntityKey
 	for {
-		if visited.Has(currentKey) {
-			return fwk.EntityKey{}, false, fmt.Errorf("cycle detected in the hierarchy: %v", visited.UnsortedList())
+		if slices.Contains(visited, currentKey) {
+			visited = append(visited, currentKey)
+			return nil, fmt.Errorf("cycle detected in the hierarchy: %v", visited)
 		}
-		visited.Insert(currentKey)
+		visited = append(visited, currentKey)
 
 		switch currentKey.Type {
 		case fwk.PodGroupKeyType:
 			pgs, exists := cache.podGroupStates[currentKey]
 			if !exists {
-				return fwk.EntityKey{}, false, nil
+				return nil, nil
 			}
 			pg := pgs.podGroup
 			if pg == nil {
-				return fwk.EntityKey{}, false, nil
+				return nil, nil
 			}
 			if !cache.compositePodGroupEnabled || pg.Spec.ParentCompositePodGroupName == nil {
-				return currentKey, true, nil
+				return fwk.NewGenericPodGroup(pg), nil
 			}
 			currentKey = fwk.CompositePodGroupKey(pg.Namespace, *pg.Spec.ParentCompositePodGroupName)
 		case fwk.CompositePodGroupKeyType:
 			cpgs, exists := cache.compositePodGroupStates[currentKey]
 			if !exists {
-				return fwk.EntityKey{}, false, nil
+				return nil, nil
 			}
 			cpg := cpgs.compositePodGroup
 			if cpg == nil {
-				return fwk.EntityKey{}, false, nil
+				return nil, nil
 			}
 			if cpg.Spec.ParentCompositePodGroupName == nil {
-				return currentKey, true, nil
+				return fwk.NewGenericCompositePodGroup(cpg), nil
 			}
 			currentKey = fwk.CompositePodGroupKey(cpg.Namespace, *cpg.Spec.ParentCompositePodGroupName)
 		case fwk.PodKeyType:
-			return fwk.EntityKey{}, false, fmt.Errorf("pod key type not supported in GetRootKeyForGroup for %s", currentKey.String())
+			return nil, fmt.Errorf("pod key type not supported in FindRootGroup for %s", currentKey.String())
 		}
 	}
+}
+
+// AssumeGroupInitiallyScheduled records that the InitiallyScheduled condition of the group with the given key and UID is set to True.
+func (cache *cacheImpl) AssumeGroupInitiallyScheduled(logger klog.Logger, key fwk.EntityKey, uid types.UID) {
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+
+	switch key.Type {
+	case fwk.PodGroupKeyType:
+		if pgs, exists := cache.podGroupStates[key]; exists {
+			pgs.setInitiallyScheduledUID(uid)
+		}
+	case fwk.CompositePodGroupKeyType:
+		if cpgs, exists := cache.compositePodGroupStates[key]; exists {
+			cpgs.setInitiallyScheduledUID(uid)
+		}
+	default:
+		utilruntime.HandleErrorWithLogger(logger, nil, "Unsupported entity key type", "key", key)
+	}
+}
+
+// IsGroupInitiallyScheduled returns the cached group with the given key, or nil if it isn't in the cache,
+// and whether its InitiallyScheduled condition is True in the cached object or was set to True by the scheduler.
+func (cache *cacheImpl) IsGroupInitiallyScheduled(logger klog.Logger, key fwk.EntityKey) (*fwk.GenericPodGroup, bool) {
+	cache.mu.RLock()
+	defer cache.mu.RUnlock()
+
+	switch key.Type {
+	case fwk.PodGroupKeyType:
+		if pgs, exists := cache.podGroupStates[key]; exists {
+			if pg := pgs.PodGroup(); pg != nil {
+				return fwk.NewGenericPodGroup(pg), apimeta.IsStatusConditionTrue(pg.Status.Conditions, schedulingv1beta1.PodGroupInitiallyScheduled) ||
+					(pg.UID != "" && pgs.getInitiallyScheduledUID() == pg.UID)
+			}
+		}
+	case fwk.CompositePodGroupKeyType:
+		if cpgs, exists := cache.compositePodGroupStates[key]; exists {
+			if cpg := cpgs.CompositePodGroup(); cpg != nil {
+				return fwk.NewGenericCompositePodGroup(cpg), apimeta.IsStatusConditionTrue(cpg.Status.Conditions, schedulingv1beta1.CompositePodGroupInitiallyScheduled) ||
+					(cpg.UID != "" && cpgs.getInitiallyScheduledUID() == cpg.UID)
+			}
+		}
+	default:
+		utilruntime.HandleErrorWithLogger(logger, nil, "Unsupported entity key type", "key", key)
+	}
+	return nil, false
 }

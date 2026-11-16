@@ -32,8 +32,11 @@ import (
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/healthz"
+	"k8s.io/apiserver/pkg/server/options/compressionconfig"
 	"k8s.io/apiserver/pkg/storage/etcd3/metrics"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
+	storagevalue "k8s.io/apiserver/pkg/storage/value"
+	"k8s.io/apiserver/pkg/storage/value/compression"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 )
@@ -474,6 +477,58 @@ func TestRestOptionsStorageObjectCountTracker(t *testing.T) {
 	}
 	if restOptions.StorageConfig.StorageObjectCountTracker != serverConfig.StorageObjectCountTracker {
 		t.Errorf("There are different StorageObjectCountTracker in restOptions and serverConfig")
+	}
+}
+
+var _ compression.ResourceRules = (*compressionconfig.CompressionConfiguration)(nil)
+
+type fakeResourceRules map[schema.GroupResource]compression.Rule
+
+func (f fakeResourceRules) RuleFor(gr schema.GroupResource) compression.Rule { return f[gr] }
+
+type fakeResourceTransformers struct{ transformer storagevalue.Transformer }
+
+func (f fakeResourceTransformers) TransformerForResource(schema.GroupResource) storagevalue.Transformer {
+	return f.transformer
+}
+
+// TestRESTOptionsCarryCompressionRule checks that a resource's REST options
+// carry the Rule StorageCompressionRules has for it, or the zero Rule if it has
+// none, and that the encryption transformer is still set.
+func TestRESTOptionsCarryCompressionRule(t *testing.T) {
+	configMaps := schema.GroupResource{Resource: "configmaps"}
+	secrets := schema.GroupResource{Resource: "secrets"}
+	deflate := compression.Rule{Algorithm: compression.AlgorithmDeflate, MinSize: 1024}
+	tests := []struct {
+		name  string
+		rules compression.ResourceRules
+		want  map[schema.GroupResource]compression.Rule
+	}{
+		{name: "no rules", want: map[schema.GroupResource]compression.Rule{configMaps: {}, secrets: {}}},
+		{name: "rules", rules: fakeResourceRules{configMaps: deflate}, want: map[schema.GroupResource]compression.Rule{configMaps: deflate, secrets: {}}},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			transformer := storagevalue.NewPrefixTransformers(nil)
+			serverConfig := server.NewConfig(codecs)
+			serverConfig.ResourceTransformers = fakeResourceTransformers{transformer: transformer}
+			serverConfig.StorageCompressionRules = tc.rules
+			if err := (&EtcdOptions{}).ApplyTo(serverConfig); err != nil {
+				t.Fatal(err)
+			}
+			for gr, want := range tc.want {
+				restOptions, err := serverConfig.RESTOptionsGetter.GetRESTOptions(gr, nil)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if got := restOptions.StorageConfig.CompressionRule; got != want {
+					t.Errorf("%s: got Rule %+v, want %+v", gr, got, want)
+				}
+				if restOptions.StorageConfig.Transformer != transformer {
+					t.Errorf("%s: the encryption transformer is missing", gr)
+				}
+			}
+		})
 	}
 }
 

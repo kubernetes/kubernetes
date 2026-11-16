@@ -414,17 +414,15 @@ var _ = SIGDescribe("CPU Manager Metrics", framework.WithSerial(), feature.CPUMa
 
 			framework.Logf("numaNodes on the system %d", numaNodes)
 
-			keys := make(map[interface{}]types.GomegaMatcher)
+			numaCPUs, err := getNumaNodeCPUs()
+			framework.ExpectNoError(err, "Error retrieving NUMA nodes")
+
 			idFn := makeCustomLabelID(metrics.AlignedNUMANode)
+			perNUMA := perNUMAMetricElements(numaCPUs, cpuset.New())
 
-			for i := range numaNodes {
-				keys["kubelet_cpu_manager_allocation_per_numa"] = gstruct.MatchAllElements(idFn, gstruct.Elements{
-					fmt.Sprintf("%d", i): timelessSample(0),
-				})
-
-			}
-
-			matchSpreadMetrics := gstruct.MatchKeys(gstruct.IgnoreExtras, keys)
+			matchSpreadMetrics := gstruct.MatchKeys(gstruct.IgnoreExtras, gstruct.Keys{
+				"kubelet_cpu_manager_allocation_per_numa": gstruct.MatchAllElements(idFn, perNUMA),
+			})
 
 			ginkgo.By("Giving the Kubelet time to start up and produce metrics")
 			gomega.Eventually(ctx, getKubeletMetrics, 1*time.Minute, 15*time.Second).Should(matchSpreadMetrics)
@@ -485,22 +483,31 @@ var _ = SIGDescribe("CPU Manager Metrics", framework.WithSerial(), feature.CPUMa
 			}
 
 			ginkgo.By("Creating the test pod")
-			testPod = e2epod.NewPodClient(f).Create(ctx, makeGuaranteedCPUExclusiveSleeperPod("test-pod-allocation-per-numa", cpuRequest))
+			testPod = e2epod.NewPodClient(f).CreateSync(ctx, makeGuaranteedCPUExclusiveSleeperPod("test-pod-allocation-per-numa", cpuRequest))
 
 			ginkgo.By("Checking the cpumanager metrics after pod creation")
 
-			keys := make(map[interface{}]types.GomegaMatcher)
+			// This spec can run without the other CPU Manager suites.
+			e2enodeCgroupV2Enabled = IsCgroup2UnifiedMode()
+			e2enodeCgroupDriver = newCfg.CgroupDriver
+			runtime, _, err := getCRIClient(ctx)
+			framework.ExpectNoError(err, "Failed to get CRI client")
+			version, err := runtime.Version(ctx, "")
+			framework.ExpectNoError(err, "Failed to get runtime version")
+			e2enodeRuntimeName = version.GetRuntimeName()
+
+			allocatedCPUs, err := getContainerAllowedCPUs(testPod, testPod.Spec.Containers[0].Name, false)
+			framework.ExpectNoError(err)
+			gomega.Expect(allocatedCPUs.Size()).To(gomega.Equal(cpuRequest))
+			numaCPUs, err := getNumaNodeCPUs()
+			framework.ExpectNoError(err, "Error retrieving NUMA nodes")
+
 			idFn := makeCustomLabelID(metrics.AlignedNUMANode)
+			perNUMA := perNUMAMetricElements(numaCPUs, allocatedCPUs)
 
-			// On a clean environment with no other pods running if distribute-across-numa policy option is enabled
-			for i := range numaNodes {
-				keys["kubelet_cpu_manager_allocation_per_numa"] = gstruct.MatchAllElements(idFn, gstruct.Elements{
-					fmt.Sprintf("%d", i): timelessSample(2),
-				})
-
-			}
-
-			matchSpreadMetrics := gstruct.MatchKeys(gstruct.IgnoreExtras, keys)
+			matchSpreadMetrics := gstruct.MatchKeys(gstruct.IgnoreExtras, gstruct.Keys{
+				"kubelet_cpu_manager_allocation_per_numa": gstruct.MatchAllElements(idFn, perNUMA),
+			})
 
 			ginkgo.By("Giving the Kubelet time to start up and produce metrics")
 			gomega.Eventually(ctx, getKubeletMetrics, 1*time.Minute, 15*time.Second).Should(matchSpreadMetrics)
@@ -547,6 +554,17 @@ func timelessSample(value interface{}) types.GomegaMatcher {
 		"Timestamp": gstruct.Ignore(),
 		"Histogram": gstruct.Ignore(),
 	}))
+}
+
+func perNUMAMetricElements(numaCPUs map[int]cpuset.CPUSet, allocatedCPUs cpuset.CPUSet) gstruct.Elements {
+	perNUMA := gstruct.Elements{}
+	for node, cpus := range numaCPUs {
+		if cpus.IsEmpty() {
+			continue
+		}
+		perNUMA[strconv.Itoa(node)] = timelessSample(cpus.Intersection(allocatedCPUs).Size())
+	}
+	return perNUMA
 }
 
 var _ = SIGDescribe("CPU Manager Metrics Pod Level Resources", ginkgo.Ordered, ginkgo.ContinueOnFailure, framework.WithSerial(), feature.CPUManager, feature.PodLevelResources, feature.PodLevelResourceManagers, framework.WithFeatureGate(features.PodLevelResources), framework.WithFeatureGate(features.PodLevelResourceManagers), func() {

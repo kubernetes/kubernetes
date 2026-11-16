@@ -106,6 +106,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	kubeletcertificate "k8s.io/kubernetes/pkg/kubelet/certificate"
 	"k8s.io/kubernetes/pkg/kubelet/certificate/bootstrap"
+	"k8s.io/kubernetes/pkg/kubelet/certificate/keyalgorithm"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
 	"k8s.io/kubernetes/pkg/kubelet/config"
@@ -910,15 +911,13 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 			return fmt.Errorf("topology manager policy options %v require feature gates %q enabled",
 				s.TopologyManagerPolicyOptions, features.TopologyManagerPolicyOptions)
 		}
-		if utilfeature.DefaultFeatureGate.Enabled(features.NodeSwap) {
-			if !kubeletutil.IsCgroup2UnifiedMode() && s.MemorySwap.SwapBehavior == string(kubelettypes.LimitedSwap) {
-				// This feature is not supported for cgroupv1 so we are failing early.
-				return fmt.Errorf("swap feature is enabled and LimitedSwap but it is only supported with cgroupv2")
-			}
-			if !s.FailSwapOn && s.MemorySwap.SwapBehavior == "" {
-				// This is just a log because we are using a default of NoSwap.
-				logger.Info("NoSwap is set due to memorySwapBehavior not specified", "memorySwapBehavior", s.MemorySwap.SwapBehavior, "FailSwapOn", s.FailSwapOn)
-			}
+		if !kubeletutil.IsCgroup2UnifiedMode() && s.MemorySwap.SwapBehavior == string(kubelettypes.LimitedSwap) {
+			// LimitedSwap is not supported for cgroupv1 so we are failing early.
+			return fmt.Errorf("LimitedSwap is only supported with cgroupv2")
+		}
+		if !s.FailSwapOn && s.MemorySwap.SwapBehavior == "" {
+			// This is just a log because we are using a default of NoSwap.
+			logger.Info("NoSwap is set due to memorySwapBehavior not specified", "memorySwapBehavior", s.MemorySwap.SwapBehavior, "FailSwapOn", s.FailSwapOn)
 		}
 
 		kubeDeps.ContainerManager, err = cm.NewContainerManager(
@@ -1202,7 +1201,10 @@ func InitializeTLS(ctx context.Context, kf *options.KubeletFlags, kc *kubeletcon
 			if err != nil {
 				return nil, err
 			}
-			cert, key, err := certutil.GenerateSelfSignedCertKey(hostName, nil, nil)
+			cert, key, err := certutil.GenerateSelfSignedCertKeyWithOptions(certutil.SelfSignedCertKeyOptions{
+				Host:        hostName,
+				GenerateKey: keyalgorithm.KeyGeneratorFunc(kc.ServerCertificateKeyAlgorithm),
+			})
 			if err != nil {
 				return nil, fmt.Errorf("unable to generate self signed cert: %w", err)
 			}

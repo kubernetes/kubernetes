@@ -32,7 +32,6 @@ import (
 	"strings"
 	"sync"
 	"syscall"
-	"testing"
 	"time"
 
 	"go.uber.org/goleak"
@@ -41,6 +40,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/util/env"
+	testutils "k8s.io/kubernetes/test/utils"
 )
 
 const installEtcd = `
@@ -312,7 +312,7 @@ func GetEtcdURL() string {
 //
 // Starting etcd multiple times per test run instead of once with EtcdMain
 // provides better separation between different tests.
-func StartEtcd(logger klog.Logger, tb testing.TB, forceCreate bool) {
+func StartEtcd(logger klog.Logger, tb testutils.TB, forceCreate bool) {
 	stop, err := startEtcd(logger, forceCreate)
 	if err != nil {
 		tb.Fatalf("unable to start etcd: %v", err)

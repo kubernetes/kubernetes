@@ -18,6 +18,8 @@ package correctness
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -37,8 +39,22 @@ func TestStorageCreate(t *testing.T) {
 	storagetesting.RunTestCreate(t.Context(), t, newTestStorage(), func(context.Context, *testing.T, string) {})
 }
 
+func increaseRVFunc(s *ModelStorage) storagetesting.IncreaseRVFunc {
+	return func(ctx context.Context, t *testing.T) int64 {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		return int64(s.replay.increaseRV())
+	}
+}
+
 func TestStorageGet(t *testing.T) {
-	storagetesting.RunTestGet(t.Context(), t, newTestStorage())
+	s := newTestStorage()
+	storagetesting.RunTestGet(t.Context(), t, s, increaseRVFunc(s))
+}
+
+func TestStorageGetListNonRecursive(t *testing.T) {
+	s := newTestStorage()
+	storagetesting.RunTestGetListNonRecursive(t.Context(), t, increaseRVFunc(s), s)
 }
 
 func TestStorageGetListRecursivePrefix(t *testing.T) {
@@ -95,14 +111,134 @@ func TestStorageGuaranteedUpdateWithSuggestionAndConflict(t *testing.T) {
 
 func TestStorageCompactRevision(t *testing.T) {
 	s := newTestStorage()
-	increaseRV := func(ctx context.Context, t *testing.T) int64 {
-		s.mu.Lock()
-		defer s.mu.Unlock()
-		s.state.ResourceVersion++
-		return int64(s.state.ResourceVersion)
-	}
 	compact := func(ctx context.Context, t *testing.T, resourceVersion string) {
 		require.NoError(t, s.Compact(resourceVersion))
 	}
-	storagetesting.RunTestCompactRevision(t.Context(), t, s, increaseRV, compact)
+	storagetesting.RunTestCompactRevision(t.Context(), t, s, increaseRVFunc(s), compact)
+}
+
+func TestStorageListContinuation(t *testing.T) {
+	storagetesting.RunTestListContinuation(t.Context(), t, newTestStorage(), nil)
+}
+
+func TestStorageListContinuationWithFilter(t *testing.T) {
+	storagetesting.RunTestListContinuationWithFilter(t.Context(), t, newTestStorage(), nil)
+}
+
+func TestStorageListPaginationRareObject(t *testing.T) {
+	storagetesting.RunTestListPaginationRareObject(t.Context(), t, newTestStorage(), nil)
+}
+
+func TestStorageListPaging(t *testing.T) {
+	storagetesting.RunTestListPaging(t.Context(), t, newTestStorage())
+}
+
+func TestStorageConsistentList(t *testing.T) {
+	s := newTestStorage()
+	storagetesting.RunTestConsistentList(t.Context(), t, s, increaseRVFunc(s), false, true, false)
+}
+
+func compactFunc(s *ModelStorage) storagetesting.Compaction {
+	return func(ctx context.Context, t *testing.T, resourceVersion string) {
+		require.NoError(t, s.Compact(resourceVersion))
+	}
+}
+
+func TestStorageWatch(t *testing.T) {
+	storagetesting.RunTestWatch(t.Context(), t, newTestStorage())
+}
+
+func TestStorageWatchWithoutPrevKVReverseError(t *testing.T) {
+	wantErr := errors.New("invalid resource key")
+	model := NewEmptyModel("", func() runtime.Object { return &example.Pod{} }, func() runtime.Object { return &example.PodList{} }, storage.APIObjectVersioner{})
+	model.ReverseKeyFunc = func(string) (string, string, error) {
+		return "", "", wantErr
+	}
+	storagetesting.RunTestWatchWithoutPrevKVReverseError(t.Context(), t, NewStorage(model), wantErr)
+}
+
+func TestStorageWatchFromZero(t *testing.T) {
+	s := newTestStorage()
+	storagetesting.RunTestWatchFromZero(t.Context(), t, s, compactFunc(s))
+}
+
+func TestStorageDeleteTriggerWatch(t *testing.T) {
+	storagetesting.RunTestDeleteTriggerWatch(t.Context(), t, newTestStorage())
+}
+
+func TestStorageWatchFromNonZero(t *testing.T) {
+	storagetesting.RunTestWatchFromNonZero(t.Context(), t, newTestStorage())
+}
+
+func TestStorageDelayedWatchDelivery(t *testing.T) {
+	storagetesting.RunTestDelayedWatchDelivery(t.Context(), t, newTestStorage())
+}
+
+func TestStorageWatchContextCancel(t *testing.T) {
+	storagetesting.RunTestWatchContextCancel(t.Context(), t, newTestStorage())
+}
+
+func TestStorageWatcherTimeout(t *testing.T) {
+	storagetesting.RunTestWatcherTimeout(t.Context(), t, newTestStorage())
+}
+
+func TestStorageWatchDeleteEventObjectHaveLatestRV(t *testing.T) {
+	for _, isNamespaceScoped := range []bool{false, true} {
+		for _, watchWithoutPrevKV := range []bool{false, true} {
+			t.Run(fmt.Sprintf("namespaced=%v/watchWithoutPrevKV=%v", isNamespaceScoped, watchWithoutPrevKV), func(t *testing.T) {
+				model := NewEmptyModel("", func() runtime.Object { return &example.Pod{} }, func() runtime.Object { return &example.PodList{} }, storage.APIObjectVersioner{})
+				if watchWithoutPrevKV {
+					model.ReverseKeyFunc = storagetesting.PodReverseKeyFunc("/pods", isNamespaceScoped)
+				}
+				storagetesting.RunTestWatchDeleteEventObjectHaveLatestRV(t.Context(), t, NewStorage(model), isNamespaceScoped, watchWithoutPrevKV, nil)
+			})
+		}
+	}
+}
+
+func TestStorageWatchInitializationSignal(t *testing.T) {
+	storagetesting.RunTestWatchInitializationSignal(t.Context(), t, newTestStorage())
+}
+
+func TestStorageWatchProgressNotify(t *testing.T) {
+	s := newTestStorage()
+	storagetesting.RunOptionalTestProgressNotify(t.Context(), t, s, increaseRVFunc(s))
+}
+
+func TestStorageClusterScopedWatch(t *testing.T) {
+	storagetesting.RunTestClusterScopedWatch(t.Context(), t, newTestStorage())
+}
+
+func TestStorageNamespaceScopedWatch(t *testing.T) {
+	storagetesting.RunTestNamespaceScopedWatch(t.Context(), t, newTestStorage())
+}
+
+func TestStorageWatchDispatchBookmarkEvents(t *testing.T) {
+	storagetesting.RunTestWatchDispatchBookmarkEvents(t.Context(), t, newTestStorage(), false)
+}
+
+func TestStorageSendInitialEventsBackwardCompatibility(t *testing.T) {
+	storagetesting.RunSendInitialEventsBackwardCompatibility(t.Context(), t, newTestStorage())
+}
+
+func TestStorageWatchSemantics(t *testing.T) {
+	storagetesting.RunWatchSemantics(t.Context(), t, newTestStorage())
+}
+
+func TestStorageWatchSemanticInitialEventsExtended(t *testing.T) {
+	storagetesting.RunWatchSemanticInitialEventsExtended(t.Context(), t, newTestStorage())
+}
+
+func TestStorageWatchListMatchSingle(t *testing.T) {
+	storagetesting.RunWatchListMatchSingle(t.Context(), t, newTestStorage())
+}
+
+func TestStorageWatchResync(t *testing.T) {
+	s := newTestStorage()
+	storagetesting.RunTestWatchResync(t.Context(), t, s, false, false, compactFunc(s), nil, nil)
+}
+
+func TestStorageCorrectness(t *testing.T) {
+	s := newTestStorage()
+	RunTestCorrectness(t.Context(), t, s, "", getKey, compactFunc(s))
 }

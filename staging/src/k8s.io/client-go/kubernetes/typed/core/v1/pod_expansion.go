@@ -33,6 +33,7 @@ type PodExpansion interface {
 	Bind(ctx context.Context, binding *v1.Binding, opts metav1.CreateOptions) error
 	// Evict submits a policy/v1beta1 Eviction request to the pod's eviction subresource.
 	// Equivalent to calling EvictV1beta1.
+	//
 	// Deprecated: Use EvictV1() (supported in 1.22+) or EvictV1beta1().
 	Evict(ctx context.Context, eviction *policyv1beta1.Eviction) error
 	// EvictV1 submits a policy/v1 Eviction request to the pod's eviction subresource.
@@ -52,6 +53,7 @@ func (c *pods) Bind(ctx context.Context, binding *v1.Binding, opts metav1.Create
 
 // Evict submits a policy/v1beta1 Eviction request to the pod's eviction subresource.
 // Equivalent to calling EvictV1beta1.
+//
 // Deprecated: Use EvictV1() (supported in 1.22+) or EvictV1beta1().
 func (c *pods) Evict(ctx context.Context, eviction *policyv1beta1.Eviction) error {
 	return c.GetClient().Post().Namespace(c.GetNamespace()).Resource("pods").Name(eviction.Name).SubResource("eviction").Body(eviction).Do(ctx).Error()

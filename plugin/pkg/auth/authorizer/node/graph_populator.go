@@ -25,6 +25,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
 	storagev1 "k8s.io/api/storage/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -42,6 +43,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	"k8s.io/klog/v2"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/utils/ptr"
 )
 
@@ -170,19 +172,40 @@ func (g *graphPopulator) updatePod(oldObj, obj interface{}) {
 		return
 	}
 	if oldPod, ok := oldObj.(*corev1.Pod); ok && oldPod != nil {
-		// Ephemeral containers can add new secret or config map references to the pod.
-		hasNewEphemeralContainers := len(pod.Spec.EphemeralContainers) > len(oldPod.Spec.EphemeralContainers)
 		if (pod.Spec.NodeName == oldPod.Spec.NodeName) && (pod.UID == oldPod.UID) &&
-			!hasNewEphemeralContainers &&
+			!podSpecChanged(oldPod, pod) &&
 			resourceclaim.PodStatusEqual(oldPod.Status.ResourceClaimStatuses, pod.Status.ResourceClaimStatuses) &&
 			resourceclaim.PodExtendedStatusEqual(oldPod.Status.ExtendedResourceClaimStatus, pod.Status.ExtendedResourceClaimStatus) {
-			// Node and uid are unchanged, all object references in the pod spec are immutable respectively unmodified (claim statuses).
+			// Node and uid are unchanged, and all object references in the pod spec and status are unmodified.
 			klog.V(5).Infof("updatePod %s/%s, node unchanged", pod.Namespace, pod.Name)
 			return
 		}
 	}
 
 	g.podQueue.Add(types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name})
+}
+
+// podSpecChanged returns true if the pod spec changed in a way that can affect
+// object references in the authorization graph.
+func podSpecChanged(oldPod, newPod *corev1.Pod) bool {
+	if newPod.Generation == oldPod.Generation {
+		return false
+	}
+	// Ephemeral containers can add new secret or config map references to the pod.
+	if len(newPod.Spec.EphemeralContainers) > len(oldPod.Spec.EphemeralContainers) {
+		return true
+	}
+	// Containers added through pods/dynamic can reference new secrets or config maps, and the
+	// references of removed containers must be dropped.
+	for pair := range podutil.ContainerPairs(newPod, oldPod, podutil.Containers) {
+		if pair.New == nil || pair.Old == nil || !apiequality.Semantic.DeepEqual(pair.New, pair.Old) {
+			return true
+		}
+	}
+	if !apiequality.Semantic.DeepEqual(oldPod.Spec.Volumes, newPod.Spec.Volumes) {
+		return true
+	}
+	return false
 }
 
 func (g *graphPopulator) deletePod(obj interface{}) {

@@ -29,11 +29,11 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
-	"testing"
 
 	"github.com/go-jose/go-jose/v4"
 	"github.com/stretchr/testify/require"
 
+	testutils "k8s.io/kubernetes/test/utils"
 	"k8s.io/kubernetes/test/utils/oidc/handlers"
 )
 
@@ -81,7 +81,7 @@ func (ts *TestServer) TokenURL() (string, error) {
 }
 
 // BuildAndRunTestServer configures OIDC TLS server and its routing
-func BuildAndRunTestServer(t *testing.T, caPath, caKeyPath, issuerOverride string) *TestServer {
+func BuildAndRunTestServer(t testutils.TB, caPath, caKeyPath, issuerOverride string) *TestServer {
 	t.Helper()
 
 	certContent, err := os.ReadFile(caPath)
@@ -161,7 +161,7 @@ func BuildAndRunTestServer(t *testing.T, caPath, caKeyPath, issuerOverride strin
 	return oidcServer
 }
 
-func discoveryDocHandler(t *testing.T, writer http.ResponseWriter, httpServerURL, issuer string) {
+func discoveryDocHandler(t testutils.TB, writer http.ResponseWriter, httpServerURL, issuer string) {
 	authURL, err := url.JoinPath(httpServerURL + authWebPath)
 	require.NoError(t, err)
 	tokenURL, err := url.JoinPath(httpServerURL + tokenWebPath)
@@ -196,7 +196,7 @@ type JosePrivateKey interface {
 // TokenHandlerBehaviorReturningPredefinedJWT describes the scenario when signed JWT token is being created.
 // This behavior should being applied to the MockTokenHandler.
 func TokenHandlerBehaviorReturningPredefinedJWT[K JosePrivateKey](
-	t *testing.T,
+	t testutils.TB,
 	privateKey K,
 	claims map[string]interface{}, accessToken, refreshToken string,
 ) func() (handlers.Token, error) {
@@ -228,7 +228,7 @@ type JosePublicKey interface {
 
 // DefaultJwksHandlerBehavior describes the scenario when JSON Web Key Set token is being returned.
 // This behavior should being applied to the MockJWKsHandler.
-func DefaultJwksHandlerBehavior[K JosePublicKey](t *testing.T, verificationPublicKey K) func() jose.JSONWebKeySet {
+func DefaultJwksHandlerBehavior[K JosePublicKey](t testutils.TB, verificationPublicKey K) func() jose.JSONWebKeySet {
 	t.Helper()
 
 	return func() jose.JSONWebKeySet {
@@ -259,7 +259,7 @@ func GetSignatureAlgorithm[K JoseKey](key K) jose.SignatureAlgorithm {
 
 // WriteTempFile writes content to a temporary file and returns its path.
 // The file is automatically cleaned up when the test completes.
-func WriteTempFile(t *testing.T, content string) string {
+func WriteTempFile(t testutils.TB, content string) string {
 	t.Helper()
 	file, err := os.CreateTemp("", "oidc-test")
 	if err != nil {

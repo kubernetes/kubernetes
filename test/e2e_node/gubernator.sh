@@ -46,17 +46,18 @@ if ! gcloud auth list | grep -q "ACTIVE"; then
   exit 1
 fi
 
+# gcloud storage only accepts the JSON API name, not gsutil's "public-read"
 readonly gcs_acl="publicRead"
 bucket_name="${USER}-g8r-logs"
 echo ""
 V=2 kube::log::status "Using bucket ${bucket_name}"
 
 # Check if the bucket exists
-if ! gcloud storage ls | grep -q "gs://${bucket_name}/"; then
+if ! gcloud storage buckets describe "gs://${bucket_name}" >/dev/null 2>&1; then
   V=2 kube::log::status "Creating public bucket ${bucket_name}"
   gcloud storage buckets create "gs://${bucket_name}"
   # Make all files in the bucket publicly readable
-  gcloud storage buckets update "gs://${bucket_name}" --add-acl-grant=entity=allUsers,role=READER
+  gcloud storage buckets update --add-acl-grant=entity=allUsers,role=READER "gs://${bucket_name}"
 else
   V=2 kube::log::status "Bucket already exists"
 fi
@@ -187,16 +188,16 @@ json_file="${GCS_LOGS_PATH}/started.json"
 
 for upload_attempt in $(seq 3); do
   V=2 kube::log::status "Uploading started.json to ${json_file} (attempt ${upload_attempt})"
-  gcloud storage cp --no-user-output-enabled --content-type=application/json --predefined-acl="${gcs_acl}" \
-    "${ARTIFACTS}/started.json" "${json_file}" || continue
+  gcloud storage cp --no-user-output-enabled --content-type=application/json \
+    --predefined-acl="${gcs_acl}" "${ARTIFACTS}/started.json" "${json_file}" || continue
   break
 done
 
 # Upload finished.json
 for upload_attempt in $(seq 3); do
   V=2 kube::log::status "Uploading finished.json to ${GCS_LOGS_PATH} (attempt ${upload_attempt})"
-  gcloud storage cp --no-user-output-enabled --content-type=application/json --predefined-acl="${gcs_acl}" \
-    "${ARTIFACTS}/finished.json" "${GCS_LOGS_PATH}/finished.json" || continue
+  gcloud storage cp --no-user-output-enabled --content-type=application/json \
+    --predefined-acl="${gcs_acl}" "${ARTIFACTS}/finished.json" "${GCS_LOGS_PATH}/finished.json" || continue
   break
 done
 

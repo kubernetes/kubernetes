@@ -56,6 +56,13 @@ func TestValidateConfiguration(t *testing.T) {
 		},
 		testName:   "Invalid case",
 		testStatus: false,
+	}, {
+		// Add declarative validation to this config before removing the handwritten key check.
+		config: internalapi.Configuration{
+			Default: []api.Toleration{{Key: "foo bar", Operator: "Exists", Effect: "NoSchedule"}},
+		},
+		testName:   "Invalid key",
+		testStatus: false,
 	}}
 
 	for i := range tests {

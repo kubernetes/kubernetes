@@ -17,7 +17,6 @@ limitations under the License.
 package memorymanager
 
 import (
-	"context"
 	"reflect"
 	"testing"
 
@@ -87,7 +86,7 @@ func bestEffortTestMachineState() state.NUMANodeMap {
 // manager's NUMA decision (it owns exclusive CPUs), and otherwise extends like
 // the static policy.
 func TestBestEffortPolicyAllocateFollowsCPUManager(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	logger, tCtx := ktesting.NewTestContext(t)
 
 	machineInfo := &cadvisorapi.MachineInfo{
 		Topology: []cadvisorapi.Node{
@@ -144,7 +143,7 @@ func TestBestEffortPolicyAllocateFollowsCPUManager(t *testing.T) {
 			s.SetMachineState(bestEffortTestMachineState())
 
 			pod := getPod("pod1", "container1", requirements)
-			if err := p.Allocate(context.Background(), s, pod, &pod.Spec.Containers[0], lifecycle.AddOperation); err != nil {
+			if err := p.Allocate(tCtx, s, pod, &pod.Spec.Containers[0], lifecycle.AddOperation); err != nil {
 				t.Fatalf("Allocate() failed: %v", err)
 			}
 

@@ -694,11 +694,11 @@ var _ = SIGDescribe("Memory Manager", "[LinuxOnly]", framework.WithDisruptive(),
 						return false
 					}
 
-					if tmpPod.Status.Reason != "UnexpectedAdmissionError" {
+					if tmpPod.Status.Reason != "OutOfmemory" {
 						return false
 					}
 
-					if !strings.Contains(tmpPod.Status.Message, "Allocate failed due to [memorymanager]") {
+					if !strings.Contains(tmpPod.Status.Message, "[memorymanager] failed to get the default NUMA affinity") {
 						return false
 					}
 

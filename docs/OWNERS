@@ -4,11 +4,9 @@ options:
   # make root approval non-recursive
   no_parent_owners: true
 reviewers:
-  - smarterclayton
   - thockin
 approvers:
   - sig-docs-approvers
-  - smarterclayton
   - thockin
   - pwittrock
 emeritus_approvers:

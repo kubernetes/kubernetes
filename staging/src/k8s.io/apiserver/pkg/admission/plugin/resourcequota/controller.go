@@ -259,7 +259,8 @@ func (e *quotaEvaluator) checkQuotas(quotas []corev1.ResourceQuota, admissionAtt
 			}
 		}
 
-		if !atLeastOneChangeForThisWaiter {
+		// keep determined results: a conflict retry re-runs this loop with only the conflicted subset
+		if !atLeastOneChangeForThisWaiter && IsDefaultDeny(admissionAttribute.result) {
 			admissionAttribute.result = nil
 		}
 

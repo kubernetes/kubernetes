@@ -873,6 +873,56 @@ func TestContainerCombinations(t *testing.T) {
 			subresource: "ephemeralcontainers",
 			operation:   admission.Update,
 		},
+		{
+			test: "Good container, bad added container when updating dynamic subresource",
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					ServiceAccountName: "default",
+					SecurityContext:    &api.PodSecurityContext{},
+					Containers: []api.Container{
+						{
+							Name:            "existing",
+							Image:           "good",
+							SecurityContext: &api.SecurityContext{},
+						},
+						{
+							Name:            "added",
+							Image:           "bad",
+							SecurityContext: &api.SecurityContext{},
+						},
+					},
+				},
+			},
+			wantAllowed: false,
+			wantErr:     true,
+			subresource: "dynamic",
+			operation:   admission.Update,
+		},
+		{
+			test: "Good containers when updating dynamic subresource",
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					ServiceAccountName: "default",
+					SecurityContext:    &api.PodSecurityContext{},
+					Containers: []api.Container{
+						{
+							Name:            "existing",
+							Image:           "good",
+							SecurityContext: &api.SecurityContext{},
+						},
+						{
+							Name:            "added",
+							Image:           "good",
+							SecurityContext: &api.SecurityContext{},
+						},
+					},
+				},
+			},
+			wantAllowed: true,
+			wantErr:     false,
+			subresource: "dynamic",
+			operation:   admission.Update,
+		},
 	}
 	for _, tt := range tests {
 		// Use a closure so defer statements trigger between loop iterations.

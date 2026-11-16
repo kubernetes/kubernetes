@@ -34,8 +34,6 @@ package v1
 //
 // a: [ 10.10.1.1:8675, 10.10.2.2:8675 ],
 // b: [ 10.10.1.1:309, 10.10.2.2:309 ]
-//
-// Deprecated: This API is deprecated in v1.33+.
 type EndpointSubsetApplyConfiguration struct {
 	// IP addresses which offer the related ports that are marked as ready. These endpoints
 	// should be considered safe for load balancers and clients to utilize.

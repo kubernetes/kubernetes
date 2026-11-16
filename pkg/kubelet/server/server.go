@@ -86,6 +86,7 @@ import (
 	podsv1alpha1 "k8s.io/kubelet/pkg/apis/pods/v1alpha1"
 	kubelettypes "k8s.io/kubelet/pkg/types"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/v1/validation"
 	"k8s.io/kubernetes/pkg/features"
@@ -539,7 +540,10 @@ func (s *Server) InstallAuthNotRequiredHandlers(ctx context.Context) {
 	r := compbasemetrics.NewKubeRegistry()
 	r.RawMustRegister(metrics.NewPrometheusMachineCollector(prometheusHostAdapter{s.host}, includedMetrics))
 	if utilfeature.DefaultFeatureGate.Enabled(features.PodAndContainerStatsFromCRI) {
-		r.CustomRegister(collectors.NewCRIMetricsCollector(context.TODO(), s.host.ListPodSandboxMetrics, s.host.ListMetricDescriptors))
+		err := r.CustomRegister(collectors.NewCRIMetricsCollector(ctx, s.host.ListPodSandboxMetrics, s.host.ListMetricDescriptors))
+		if err != nil {
+			logger.Error(err, "Failed to register CRI metrics collector")
+		}
 		servermetrics.SetMetricsProvider(servermetrics.CRIMetricsProvider)
 	} else {
 		cadvisorOpts := cadvisorapi.RequestOptions{
@@ -817,6 +821,16 @@ func (s *Server) InstallProfilingHandler(enableProfilingLogHandler bool, enableC
 	}
 }
 
+// isRemovedContainer returns whether the pod reports the status of a container that was removed
+// from the pod spec, whose logs are still available.
+func isRemovedContainer(pod *v1.Pod, containerName string) bool {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DynamicContainers) {
+		return false
+	}
+	_, ok := podutil.GetContainerStatus(pod.Status.ContainerStatuses, containerName)
+	return ok
+}
+
 // getContainerLogs handles containerLogs request against the Kubelet
 func (s *Server) getContainerLogs(request *restful.Request, response *restful.Response) {
 	podNamespace := request.PathParameter("podNamespace")
@@ -875,7 +889,7 @@ func (s *Server) getContainerLogs(request *restful.Request, response *restful.Re
 		return
 	}
 	// Check if containerName is valid.
-	if kubecontainer.GetContainerSpec(pod, containerName) == nil {
+	if kubecontainer.GetContainerSpec(pod, containerName) == nil && !isRemovedContainer(pod, containerName) {
 		response.WriteError(http.StatusNotFound, fmt.Errorf("container %q not found in pod %q", containerName, podID))
 		return
 	}

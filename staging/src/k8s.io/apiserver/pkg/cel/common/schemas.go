@@ -19,8 +19,8 @@ package common
 import (
 	"time"
 
-	"github.com/google/cel-go/cel"
-	"github.com/google/cel-go/common/types"
+	"cel.dev/cel-go/cel"
+	"cel.dev/cel-go/common/types"
 
 	apiservercel "k8s.io/apiserver/pkg/cel"
 	"k8s.io/kube-openapi/pkg/validation/spec"
@@ -107,7 +107,8 @@ func SchemaDeclType(s Schema, isResourceRoot bool) *apiservercel.DeclType {
 			}
 			return nil
 		}
-		fields := make(map[string]*apiservercel.DeclField, len(s.Properties()))
+		props := s.Properties()
+		fields := make(map[string]*apiservercel.DeclField, len(props))
 
 		required := map[string]bool{}
 		if s.Required() != nil {
@@ -117,7 +118,7 @@ func SchemaDeclType(s Schema, isResourceRoot bool) *apiservercel.DeclType {
 		}
 		// an object will always be serialized at least as {}, so account for that
 		minSerializedSize := int64(2)
-		for name, prop := range s.Properties() {
+		for name, prop := range props {
 			var enumValues []interface{}
 			if prop.Enum() != nil {
 				for _, e := range prop.Enum() {

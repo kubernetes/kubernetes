@@ -81,8 +81,9 @@ var _ = SIGDescribe(feature.HPA, "Horizontal pod autoscaling (non-default behavi
 			// making sure HPA is ready, doing its job and already has a recommendation recorded
 			// for stabilization logic before lowering the consumption
 			ginkgo.By("triggering scale up to record a recommendation")
-			rc.ConsumeCPU(usageForReplicas(3))
-			rc.WaitForReplicas(ctx, 3, maxHPAReactionTime+maxResourceConsumerDelay+waitBuffer)
+			// Keep demand above maxReplicas to maintain the high recommendation.
+			rc.ConsumeCPU(usageForReplicas(6))
+			rc.WaitForReplicas(ctx, 5, maxHPAReactionTime+maxResourceConsumerDelay+waitBuffer)
 
 			ginkgo.By("triggering scale down by lowering consumption")
 			rc.ConsumeCPU(usageForReplicas(2))

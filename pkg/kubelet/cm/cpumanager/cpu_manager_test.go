@@ -199,6 +199,10 @@ func (p *mockPolicy) GetAllocatableCPUs(_ state.State) cpuset.CPUSet {
 	return cpuset.New()
 }
 
+func (p *mockPolicy) CanAllocateExclusively() bool {
+	return false
+}
+
 type mockRuntimeService struct {
 	err error
 }
@@ -1870,7 +1874,7 @@ func TestCPUManagerAddResize(t *testing.T) {
 				},
 				{
 					description:      "then resize operation - no error - skip resize",
-					operation:        lifecycle.ResizeOperation,
+					operation:        lifecycle.UpdateOperation,
 					expDefaultCPUSet: cpuset.New(3, 4),
 					expAllocateErr:   nil,
 					expContainerErr:  nil,
@@ -1884,7 +1888,7 @@ func TestCPUManagerAddResize(t *testing.T) {
 			testSteps: []testStep{
 				{
 					description:      "no error - skip allocation",
-					operation:        lifecycle.ResizeOperation,
+					operation:        lifecycle.UpdateOperation,
 					expDefaultCPUSet: cpuset.New(1, 2, 3, 4),
 					expAllocateErr:   nil,
 					expContainerErr:  nil,
@@ -1912,7 +1916,7 @@ func TestCPUManagerAddResize(t *testing.T) {
 			testSteps: []testStep{
 				{
 					description:      "first resize operation - no error - skip resize",
-					operation:        lifecycle.ResizeOperation,
+					operation:        lifecycle.UpdateOperation,
 					expDefaultCPUSet: cpuset.New(1, 2, 3, 4),
 					expAllocateErr:   nil,
 					expContainerErr:  nil,

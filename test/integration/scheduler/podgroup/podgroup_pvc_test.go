@@ -31,8 +31,8 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
+	schedulerutils "k8s.io/kubernetes/test/integration/scheduler"
 	stepsframework "k8s.io/kubernetes/test/integration/scheduler/podgroup/stepsframework"
-	testutils "k8s.io/kubernetes/test/integration/util"
 )
 
 // createBoundRWOPPVC creates a HostPath PV and a PVC bound to it, both with the
@@ -40,7 +40,7 @@ import (
 func createBoundRWOPPVC(cs kubernetes.Interface, ns, name string) error {
 	storage := v1.VolumeResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}}
 	volType := v1.HostPathDirectoryOrCreate
-	pv, err := testutils.CreatePV(cs, st.MakePersistentVolume().
+	pv, err := schedulerutils.CreatePV(cs, st.MakePersistentVolume().
 		Name(fmt.Sprintf("pv-%s-%s", ns, name)).
 		AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteOncePod}).
 		Capacity(storage.Requests).
@@ -49,7 +49,7 @@ func createBoundRWOPPVC(cs kubernetes.Interface, ns, name string) error {
 	if err != nil {
 		return fmt.Errorf("cannot create pv: %w", err)
 	}
-	_, err = testutils.CreatePVC(cs, st.MakePersistentVolumeClaim().
+	_, err = schedulerutils.CreatePVC(cs, st.MakePersistentVolumeClaim().
 		Name(name).
 		Namespace(ns).
 		// Annotation and volume name required for PVC to be considered bound.
@@ -133,7 +133,7 @@ func TestPodGroupSchedulingWithReadWriteOncePodPVC(t *testing.T) {
 					features.CompositePodGroup:               cpgEnabled,
 				})
 
-				testCtx := testutils.InitTestSchedulerWithNS(t, "podgroup-pvc",
+				testCtx := schedulerutils.InitTestSchedulerWithNS(t, "podgroup-pvc",
 					// disable backoff
 					scheduler.WithPodMaxBackoffSeconds(0),
 					scheduler.WithPodInitialBackoffSeconds(0))

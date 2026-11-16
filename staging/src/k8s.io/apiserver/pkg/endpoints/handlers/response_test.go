@@ -338,6 +338,9 @@ func TestAsPartialObjectMetadataList(t *testing.T) {
 			ResourceVersion:    "10",
 			Continue:           "continuetoken",
 			RemainingItemCount: &remainingItemCount,
+			ShardInfo: &metav1.ShardInfo{
+				Selector: "shardRange(object.metadata.uid, '0x0000000000000000', '0x8000000000000000')",
+			},
 		},
 	}
 

@@ -58,6 +58,32 @@ func (f *RemoteRuntime) PullImage(ctx context.Context, req *kubeapi.PullImageReq
 	}, nil
 }
 
+// PullSecurityProfile pulls a security profile with authentication config.
+func (f *RemoteRuntime) PullSecurityProfile(ctx context.Context, req *kubeapi.PullSecurityProfileRequest) (*kubeapi.PullSecurityProfileResponse, error) {
+	return f.ImageService.PullSecurityProfile(ctx, req.Image, req.Auth, req.SandboxConfig, req.ProfileKind)
+}
+
+// ListSecurityProfiles lists the pulled security profiles.
+func (f *RemoteRuntime) ListSecurityProfiles(ctx context.Context, req *kubeapi.ListSecurityProfilesRequest) (*kubeapi.ListSecurityProfilesResponse, error) {
+	profiles, err := f.ImageService.ListSecurityProfiles(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return &kubeapi.ListSecurityProfilesResponse{
+		Profiles: profiles,
+	}, nil
+}
+
+// RemoveSecurityProfile removes a pulled security profile.
+func (f *RemoteRuntime) RemoveSecurityProfile(ctx context.Context, req *kubeapi.RemoveSecurityProfileRequest) (*kubeapi.RemoveSecurityProfileResponse, error) {
+	if err := f.ImageService.RemoveSecurityProfile(ctx, req.Digest); err != nil {
+		return nil, err
+	}
+
+	return &kubeapi.RemoveSecurityProfileResponse{}, nil
+}
+
 // RemoveImage removes the image.
 // This call is idempotent, and must not return an error if the image has
 // already been removed.

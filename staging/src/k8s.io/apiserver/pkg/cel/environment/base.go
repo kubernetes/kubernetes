@@ -21,10 +21,10 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/google/cel-go/cel"
-	"github.com/google/cel-go/checker"
-	"github.com/google/cel-go/ext"
-	"github.com/google/cel-go/interpreter"
+	"cel.dev/cel-go/cel"
+	"cel.dev/cel-go/checker"
+	"cel.dev/cel-go/ext"
+	"cel.dev/cel-go/interpreter"
 	"golang.org/x/sync/singleflight"
 
 	"k8s.io/apimachinery/pkg/util/version"
@@ -66,6 +66,18 @@ var baseOpts = []VersionedOptions{
 			// This is a relatively expensive operation.
 			cel.EagerlyValidateDeclarations(true),
 			cel.DefaultUTCTimeZone(true),
+			cel.CostModelVersion(0),
+			// cel-go v0.33.0 introduced a default limit of 100,000 AST nodes (including nodes
+			// created by macro expansion). Disable it to keep parsing behavior unchanged for
+			// existing expressions; expression size remains bounded by the parser's 100,000
+			// code point limit.
+			cel.ExpressionNodeLimit(-1),
+			// cel-go v0.30.0 made timestamp(string) accept only strict RFC 3339 strings, and v0.31.0
+			// started range checking numeric timezone offsets in the timestamp accessors. Restore the
+			// earlier parsing so that stored expressions with such timestamp literals still compile
+			// (ValidateTimestampLiterals applies to stored expressions) and previously accepted
+			// data keeps evaluating.
+			cel.StrictTimestampParsing(false),
 
 			UnversionedLib(library.URLs),
 			UnversionedLib(library.Regex),
@@ -100,7 +112,7 @@ var baseOpts = []VersionedOptions{
 		IntroducedVersion: version.MajorMinor(1, 28),
 		EnvOptions: []cel.EnvOption{
 			cel.CrossTypeNumericComparisons(true),
-			cel.OptionalTypes(),
+			cel.OptionalTypes(cel.OptionalTypesVersion(2)),
 			UnversionedLib(library.Quantity),
 		},
 	},

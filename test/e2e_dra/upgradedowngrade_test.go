@@ -89,7 +89,7 @@ func waitForSlices(tCtx ktesting.TContext, name string, b *drautils.Builder, dri
 var repoRoot = repoRootDefault()
 
 const (
-	localUpClusterRuntimeConfig = "resource.k8s.io/v1beta1,resource.k8s.io/v1beta2,resource.k8s.io/v1alpha3"
+	localUpClusterRuntimeConfig = "resource.k8s.io/v1beta2,resource.k8s.io/v1alpha3"
 )
 
 func currentBinDir() (envName, content string) {
@@ -220,8 +220,8 @@ func testUpgradeDowngrade(tCtx ktesting.TContext) {
 	})
 	tCtx.Step(fmt.Sprintf("bring up v%d.%d", major, previousMinor), func(tCtx ktesting.TContext) {
 		localUpClusterEnv := map[string]string{
-			"RUNTIME_CONFIG": localUpClusterRuntimeConfig,
-			"FEATURE_GATES":  "DRADeviceTaintRules=true,DRADeviceTaints=true,DRAExtendedResource=true,DRAPartitionableDevices=true",
+			"RUNTIME_CONFIG": localUpClusterRuntimeConfig + ",scheduling.k8s.io/v1beta1",
+			"FEATURE_GATES":  "DRADeviceTaintRules=true,DRADeviceTaints=true,DRAExtendedResource=true,DRAPartitionableDevices=true,DRAWorkloadResourceClaims=true,GenericWorkload=true",
 			// *not* needed because driver will run in "local filesystem" mode (= driver.IsLocal): "ALLOW_PRIVILEGED": "1",
 		}
 		cluster.Start(tCtx, fmt.Sprintf("0-initial-%d.%d", major, previousMinor), binDir, localUpClusterEnv, "")
@@ -298,6 +298,10 @@ func testUpgradeDowngrade(tCtx ktesting.TContext) {
 				d.ReconcilePoolWithName = poolNameFieldSelectorFallbackPool
 				d.UsePrivilegedClient = true
 			},
+		},
+		"workload-resourceclaims": {
+			test:            workloadResourceClaimsUpgradeDowngrade,
+			driverResources: workloadResourceClaimsDriverResources(nodes),
 		},
 	}
 

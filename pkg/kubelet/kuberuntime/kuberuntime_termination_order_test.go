@@ -22,8 +22,14 @@ import (
 	"testing/synctest"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/klog/v2"
+	"k8s.io/ktesting"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 )
 
 func TestTerminationOrderingSidecarStopAfterMain(t *testing.T) {
@@ -291,6 +297,80 @@ func testTerminationOrderingObeysGrace(t *testing.T) {
 			t.Errorf("expected delay for container %s = %d, got %d", tc.containerName, tc.expectedDelay, got)
 		}
 	}
+}
+
+func TestTerminationOrderingPod(t *testing.T) {
+	restartPolicy := v1.ContainerRestartPolicyAlways
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{UID: "12345678", Name: "bar", Namespace: "new"},
+		Spec: v1.PodSpec{
+			InitContainers: []v1.Container{{Name: "sidecar", Image: "busybox", RestartPolicy: &restartPolicy}},
+			Containers:     []v1.Container{{Name: "main", Image: "busybox"}},
+		},
+	}
+	removed := v1.Container{Name: "removed", Image: "busybox"}
+	running := []string{"sidecar", "main", "removed"}
+
+	for name, tc := range map[string]struct {
+		disabled bool
+		// record sets up the actuated state.
+		record  func(t *testing.T, m *kubeGenericRuntimeManager)
+		running []string
+		// wantRemoved is whether the removed container is added to the pod.
+		wantRemoved bool
+	}{
+		"running removed container": {
+			record: func(t *testing.T, m *kubeGenericRuntimeManager) {
+				require.NoError(t, m.actuatedState.SetContainer(klog.Background(), pod.UID, podutil.Containers, removed))
+			},
+			running:     running,
+			wantRemoved: true,
+		},
+		"removed container not running": {
+			record: func(t *testing.T, m *kubeGenericRuntimeManager) {
+				require.NoError(t, m.actuatedState.SetContainer(klog.Background(), pod.UID, podutil.Containers, removed))
+			},
+			running: []string{"sidecar", "main"},
+		},
+		"no record": {
+			running: running,
+		},
+		"resources-only record": {
+			// e.g. written by an older kubelet.
+			record: func(t *testing.T, m *kubeGenericRuntimeManager) {
+				require.NoError(t, m.actuatedState.SetContainerResources(klog.Background(), pod.UID, "removed", podutil.Containers, v1.ResourceRequirements{}))
+			},
+			running: running,
+		},
+		"gate disabled": {
+			disabled: true,
+			record: func(t *testing.T, m *kubeGenericRuntimeManager) {
+				require.NoError(t, m.actuatedState.SetContainer(klog.Background(), pod.UID, podutil.Containers, removed))
+			},
+			running:     running,
+			wantRemoved: true,
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			setDynamicContainersGate(t, !tc.disabled)
+			_, _, m, err := createTestRuntimeManager(ktesting.Init(t))
+			require.NoError(t, err)
+			if tc.record != nil {
+				tc.record(t, m)
+			}
+
+			got := m.terminationOrderingPod(pod, tc.running)
+			if tc.wantRemoved {
+				// The removed container is added as a main container, so sidecars wait for it.
+				assert.Equal(t, []v1.Container{pod.Spec.Containers[0], removed}, got.Spec.Containers)
+				assert.Equal(t, pod.Spec.InitContainers, got.Spec.InitContainers)
+				assert.Len(t, pod.Spec.Containers, 1, "the given pod is unchanged")
+			} else {
+				assert.Same(t, pod, got)
+			}
+		})
+	}
+	assert.Nil(t, (&kubeGenericRuntimeManager{}).terminationOrderingPod(nil, running))
 }
 
 func getContainerNames(p *v1.Pod) []string {

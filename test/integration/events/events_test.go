@@ -132,8 +132,12 @@ func TestEventSeries(t *testing.T) {
 	broadcaster.StartRecordingToSink(stopCh)
 	recorder.Eventf(regarding, related, v1.EventTypeNormal, "memoryPressure", "killed", "memory pressure")
 	recorder.Eventf(regarding, related, v1.EventTypeNormal, "memoryPressure", "killed", "memory pressure")
+	selector := fields.SelectorFromSet(fields.Set{
+		"regarding.name": testPod.Name,
+		"regarding.uid":  string(testPod.UID),
+	}).String()
 	err = wait.PollImmediate(100*time.Millisecond, 20*time.Second, func() (done bool, err error) {
-		events, err := client.EventsV1().Events("").List(context.TODO(), metav1.ListOptions{})
+		events, err := client.EventsV1().Events(testPod.Namespace).List(context.TODO(), metav1.ListOptions{FieldSelector: selector})
 		if err != nil {
 			return false, err
 		}

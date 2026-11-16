@@ -70,7 +70,8 @@ func TestConfigToExecCluster(t *testing.T) {
 					Insecure:   true,
 					CAData:     []byte("some-ca-data"),
 				},
-				Proxy: proxy,
+				Proxy:                 proxy,
+				MinConnectionPoolSize: 4,
 			},
 			wantOut: clientauthenticationapi.Cluster{
 				Server:                   "some-host",
@@ -78,6 +79,7 @@ func TestConfigToExecCluster(t *testing.T) {
 				InsecureSkipTLSVerify:    true,
 				CertificateAuthorityData: []byte("some-ca-data"),
 				ProxyURL:                 proxyURL,
+				MinConnectionPoolSize:    4,
 				Config: &runtime.Unknown{
 					Raw: []byte("stuff"),
 				},
@@ -301,6 +303,8 @@ func TestConfigToExecClusterRoundtrip(t *testing.T) {
 		expected.WarningHandlerWithContext = nil
 		expected.Timeout = 0
 		expected.Dial = nil
+		// MinConnectionPoolSize is an int32 in the exec cluster info.
+		expected.MinConnectionPoolSize = int(int32(expected.MinConnectionPoolSize))
 
 		// Manually set URLs so we don't get an error when parsing these during the roundtrip.
 		if expected.Host != "" {

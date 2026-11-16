@@ -94,6 +94,12 @@ type SecurityContextApplyConfiguration struct {
 	// overrides the pod's appArmorProfile.
 	// Note that this field cannot be set when spec.os.name is windows.
 	AppArmorProfile *AppArmorProfileApplyConfiguration `json:"appArmorProfile,omitempty"`
+	// cgroupOptions holds the cgroup options for this container.
+	// If mountMode is specified, the scheduler only places the pod on a node
+	// whose status.declaredFeatures includes CgroupOptions.
+	// (Alpha) This field requires the CgroupOptions feature gate to be enabled.
+	// This field cannot be set for ephemeral containers or when spec.os.name is windows.
+	CgroupOptions *CgroupOptionsApplyConfiguration `json:"cgroupOptions,omitempty"`
 }
 
 // SecurityContextApplyConfiguration constructs a declarative configuration of the SecurityContext type for use with
@@ -195,5 +201,13 @@ func (b *SecurityContextApplyConfiguration) WithSeccompProfile(value *SeccompPro
 // If called multiple times, the AppArmorProfile field is set to the value of the last call.
 func (b *SecurityContextApplyConfiguration) WithAppArmorProfile(value *AppArmorProfileApplyConfiguration) *SecurityContextApplyConfiguration {
 	b.AppArmorProfile = value
+	return b
+}
+
+// WithCgroupOptions sets the CgroupOptions field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the CgroupOptions field is set to the value of the last call.
+func (b *SecurityContextApplyConfiguration) WithCgroupOptions(value *CgroupOptionsApplyConfiguration) *SecurityContextApplyConfiguration {
+	b.CgroupOptions = value
 	return b
 }

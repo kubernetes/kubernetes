@@ -53,7 +53,7 @@ func TestCorrectness(t *testing.T) {
 			require.True(t, ok, "valid response should return ok=true: req=%+v resp=%+v", step.Request, step.CorrectResponse)
 			model = next
 			if change != nil {
-				event, err := change.toWatchEvent(storage.APIObjectVersioner{}, storage.Everything)
+				event, err := change.toWatchEvent(newPod, storage.APIObjectVersioner{}, nil, storage.ListOptions{Predicate: storage.Everything})
 				require.NoError(t, err)
 				gotEvents = append(gotEvents, *event)
 			}
@@ -85,11 +85,12 @@ func TestCorrectness(t *testing.T) {
 	validator := NewWatchValidator(versioner, replay, getKey)
 	for _, tc := range watchTestCases() {
 		t.Run(tc.Name, func(t *testing.T) {
+			events, err := replay.Watch(tc.Request, initialState.ResourceVersion)
 			if tc.ExpectError != nil {
-				require.NoError(t, validator.ValidateWatch(tc.Request, WatchResponse{Err: tc.ExpectError}))
+				require.EqualError(t, err, tc.ExpectError.Error())
+				require.NoError(t, validator.ValidateWatch(tc.Request, WatchResponse{Err: err}))
 				return
 			}
-			events, err := replay.Watch(tc.Request)
 			require.NoError(t, err)
 			require.NoError(t, validator.ValidateWatch(tc.Request, WatchResponse{Events: events}))
 		})

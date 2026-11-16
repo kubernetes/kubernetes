@@ -431,6 +431,12 @@ const (
 	//
 	// Improved kubectl apply --prune behavior.
 	ApplySet FeatureGate = "KUBECTL_APPLYSET"
+
+	// owner: @rthallisey
+	// kep: https://kep.k8s.io/5683
+	//
+	// Publish kubectl drain lifecycle conditions on Nodes.
+	DrainNodeConditions FeatureGate = "KUBECTL_DRAIN_NODE_CONDITIONS"
 )
 
 // IsEnabled returns true iff environment variable is set to true.

@@ -139,6 +139,7 @@ func (*resourceclaimStrategy) PrepareForUpdate(ctx context.Context, obj, old run
 	newClaim.Status = oldClaim.Status
 
 	dropDisabledSpecFields(newClaim, oldClaim)
+	resourceclaimspec.PreserveOpaqueParameters(&newClaim.Spec, &oldClaim.Spec)
 }
 
 func (s *resourceclaimStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {

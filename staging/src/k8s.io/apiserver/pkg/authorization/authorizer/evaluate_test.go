@@ -442,3 +442,108 @@ func snapshotCondition(c authorizer.Condition) snapCondition {
 		Description: c.GetDescription(),
 	}
 }
+
+func TestCouldBenefitFromBuiltinEvaluation(t *testing.T) {
+	known := authorizer.GenericCondition{ID: "example.com/known", Type: "example.com/known"}
+	opaque := authorizer.GenericCondition{ID: "example.com/opaque", Type: "example.com/opaque"}
+	opaque2 := authorizer.GenericCondition{ID: "example.com/opaque2", Type: "example.com/opaque"}
+	opaque3 := authorizer.GenericCondition{ID: "example.com/opaque3", Type: "example.com/opaque"}
+	recognizes := func(c authorizer.Condition) bool { return c.GetType() == known.Type }
+	conds := func(cs ...authorizer.Condition) []authorizer.Condition { return cs }
+	cm := authorizer.ConditionsAwareDecisionConditionsMap
+	noOpinion := authorizer.ConditionsAwareDecisionNoOpinion("", nil)
+	allow := authorizer.ConditionsAwareDecisionAllow("", nil)
+
+	tests := []struct {
+		name       string
+		decision   authorizer.ConditionsAwareDecision
+		recognizes func(authorizer.Condition) bool
+		want       bool
+	}{
+		{
+			name:     "recognized deny condition",
+			decision: cm(conds(opaque, known), nil, conds(opaque2)),
+			want:     true,
+		},
+		{
+			name:     "unrecognized deny conditions shadow recognized allow condition",
+			decision: cm(conds(opaque), nil, conds(known)),
+		},
+		{
+			name:     "unrecognized deny conditions shadow recognized noOpinion condition",
+			decision: cm(conds(opaque), conds(known), nil),
+		},
+		{
+			name:     "no deny conditions, recognized noOpinion condition",
+			decision: cm(nil, conds(known), conds(opaque)),
+			want:     true,
+		},
+		{
+			name:     "unrecognized noOpinion conditions shadow recognized allow condition",
+			decision: cm(nil, conds(opaque), conds(known)),
+		},
+		{
+			name:     "only allow conditions, recognized",
+			decision: cm(nil, nil, conds(opaque, known)),
+			want:     true,
+		},
+		{
+			name:     "nothing recognized",
+			decision: cm(conds(opaque), conds(opaque2), conds(opaque3)),
+		},
+		{
+			name:     "union: NoOpinion is skipped, first ConditionsMap recognized",
+			decision: unionDecision(noOpinion, cm(nil, nil, conds(known))),
+			want:     true,
+		},
+		{
+			name:     "union: first ConditionsMap unrecognized shadows later recognized ConditionsMap",
+			decision: unionDecision(cm(nil, nil, conds(opaque)), cm(nil, nil, conds(known))),
+		},
+		{
+			name:     "union: recognized ConditionsMap before Allow",
+			decision: unionDecision(cm(conds(known), nil, nil), allow),
+			want:     true,
+		},
+		{
+			name:     "union: unrecognized ConditionsMap before Allow",
+			decision: unionDecision(cm(conds(opaque), nil, nil), allow),
+		},
+		{
+			name:     "nested union: first ConditionsMap recognized",
+			decision: unionDecision(noOpinion, unionDecision(noOpinion, cm(nil, nil, conds(known))), cm(nil, nil, conds(opaque))),
+			want:     true,
+		},
+		{
+			name:     "nested union: first ConditionsMap unrecognized",
+			decision: unionDecision(unionDecision(noOpinion, cm(nil, nil, conds(opaque))), cm(nil, nil, conds(known))),
+		},
+		{
+			name:     "unconditional decision",
+			decision: allow,
+		},
+		{
+			name:       "recognizes nothing",
+			decision:   cm(nil, nil, conds(known)),
+			recognizes: func(authorizer.Condition) bool { return false },
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			r := recognizes
+			if tc.recognizes != nil {
+				r = tc.recognizes
+			}
+			// Guard against vacuous passes due to invalid decisions folding into an unconditional Deny.
+			if tc.decision.IsUnconditional() != (tc.name == "unconditional decision") {
+				t.Fatalf("unexpected decision under test: %+v", tc.decision)
+			}
+			if got := authorizer.CouldBenefitFromBuiltinEvaluation(tc.decision, r); got != tc.want {
+				t.Errorf("got %v, want %v", got, tc.want)
+			}
+		})
+	}
+	if authorizer.CouldBenefitFromBuiltinEvaluation(cm(nil, nil, conds(known)), nil) {
+		t.Error("expected false for a nil recognizes function")
+	}
+}

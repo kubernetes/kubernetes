@@ -19,6 +19,7 @@ package collectors
 import (
 	"context"
 	"fmt"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -81,6 +82,7 @@ func TestCollectResourceMetrics(t *testing.T) {
 					},
 					Memory: &statsapi.MemoryStats{
 						Time:            testTime,
+						UsageBytes:      ptr.To[uint64](1000),
 						WorkingSetBytes: ptr.To[uint64](1000),
 					},
 					Swap: &statsapi.SwapStats{
@@ -94,7 +96,7 @@ func TestCollectResourceMetrics(t *testing.T) {
 				# HELP node_cpu_usage_seconds_total [STABLE] Cumulative cpu time consumed by the node in core-seconds
 				# TYPE node_cpu_usage_seconds_total counter
 				node_cpu_usage_seconds_total 10 1624396278302
-				# HELP node_memory_working_set_bytes [STABLE] Current working set of the node in bytes
+				# HELP node_memory_working_set_bytes [STABLE] Current memory usage of the node in bytes: committed memory on Windows, working set on other platforms
 				# TYPE node_memory_working_set_bytes gauge
 				node_memory_working_set_bytes 1000 1624396278302
 				# HELP node_swap_usage_bytes [ALPHA] Current swap usage of the node in bytes. Reported only on non-windows systems
@@ -118,6 +120,7 @@ func TestCollectResourceMetrics(t *testing.T) {
 					},
 					Memory: &statsapi.MemoryStats{
 						Time:            testTime,
+						UsageBytes:      ptr.To[uint64](1000),
 						WorkingSetBytes: ptr.To[uint64](1000),
 					},
 					Swap: &statsapi.SwapStats{
@@ -131,7 +134,7 @@ func TestCollectResourceMetrics(t *testing.T) {
 				# HELP node_cpu_usage_seconds_total [STABLE] Cumulative cpu time consumed by the node in core-seconds
 				# TYPE node_cpu_usage_seconds_total counter
 				node_cpu_usage_seconds_total 10 1624396278302
-				# HELP node_memory_working_set_bytes [STABLE] Current working set of the node in bytes
+				# HELP node_memory_working_set_bytes [STABLE] Current memory usage of the node in bytes: committed memory on Windows, working set on other platforms
 				# TYPE node_memory_working_set_bytes gauge
 				node_memory_working_set_bytes 1000 1624396278302
 				# HELP node_swap_usage_bytes [ALPHA] Current swap usage of the node in bytes. Reported only on non-windows systems
@@ -188,6 +191,7 @@ func TestCollectResourceMetrics(t *testing.T) {
 								},
 								Memory: &statsapi.MemoryStats{
 									Time:            testTime,
+									UsageBytes:      ptr.To[uint64](1000),
 									WorkingSetBytes: ptr.To[uint64](1000),
 								},
 								Swap: &statsapi.SwapStats{
@@ -205,6 +209,7 @@ func TestCollectResourceMetrics(t *testing.T) {
 								},
 								Memory: &statsapi.MemoryStats{
 									Time:            testTime,
+									UsageBytes:      ptr.To[uint64](1000),
 									WorkingSetBytes: ptr.To[uint64](1000),
 								},
 							},
@@ -225,6 +230,7 @@ func TestCollectResourceMetrics(t *testing.T) {
 								},
 								Memory: &statsapi.MemoryStats{
 									Time:            testTime,
+									UsageBytes:      ptr.To[uint64](1000),
 									WorkingSetBytes: ptr.To[uint64](1000),
 								},
 							},
@@ -245,7 +251,7 @@ func TestCollectResourceMetrics(t *testing.T) {
 				container_cpu_usage_seconds_total{container="container_a",namespace="namespace_a",pod="pod_a"} 10 1624396278302
 				container_cpu_usage_seconds_total{container="container_a",namespace="namespace_b",pod="pod_b"} 10 1624396278302
 				container_cpu_usage_seconds_total{container="container_b",namespace="namespace_a",pod="pod_a"} 10 1624396278302
-				# HELP container_memory_working_set_bytes [STABLE] Current working set of the container in bytes
+				# HELP container_memory_working_set_bytes [STABLE] Current memory usage of the container in bytes: committed memory on Windows, working set on other platforms
 				# TYPE container_memory_working_set_bytes gauge
 				container_memory_working_set_bytes{container="container_a",namespace="namespace_a",pod="pod_a"} 1000 1624396278302
 				container_memory_working_set_bytes{container="container_a",namespace="namespace_b",pod="pod_b"} 1000 1624396278302
@@ -282,6 +288,7 @@ func TestCollectResourceMetrics(t *testing.T) {
 								},
 								Memory: &statsapi.MemoryStats{
 									Time:            testTime,
+									UsageBytes:      ptr.To[uint64](1000),
 									WorkingSetBytes: ptr.To[uint64](1000),
 								},
 							},
@@ -300,7 +307,7 @@ func TestCollectResourceMetrics(t *testing.T) {
 				# HELP container_cpu_usage_seconds_total [STABLE] Cumulative cpu time consumed by the container in core-seconds
 				# TYPE container_cpu_usage_seconds_total counter
 				container_cpu_usage_seconds_total{container="container_a",namespace="namespace_a",pod="pod_a"} 10 1624396278302
-				# HELP container_memory_working_set_bytes [STABLE] Current working set of the container in bytes
+				# HELP container_memory_working_set_bytes [STABLE] Current memory usage of the container in bytes: committed memory on Windows, working set on other platforms
 				# TYPE container_memory_working_set_bytes gauge
 				container_memory_working_set_bytes{container="container_a",namespace="namespace_a",pod="pod_a"} 1000 1624396278302
 			`,
@@ -344,6 +351,7 @@ func TestCollectResourceMetrics(t *testing.T) {
 								},
 								Memory: &statsapi.MemoryStats{
 									Time:            testTime,
+									UsageBytes:      ptr.To[uint64](1000),
 									WorkingSetBytes: ptr.To[uint64](1000),
 								},
 							},
@@ -356,7 +364,7 @@ func TestCollectResourceMetrics(t *testing.T) {
 				# HELP container_cpu_usage_seconds_total [STABLE] Cumulative cpu time consumed by the container in core-seconds
 				# TYPE container_cpu_usage_seconds_total counter
 				container_cpu_usage_seconds_total{container="container_a",namespace="namespace_b",pod="pod_b"} 10 1624396278302
-				# HELP container_memory_working_set_bytes [STABLE] Current working set of the container in bytes
+				# HELP container_memory_working_set_bytes [STABLE] Current memory usage of the container in bytes: committed memory on Windows, working set on other platforms
 				# TYPE container_memory_working_set_bytes gauge
 				container_memory_working_set_bytes{container="container_a",namespace="namespace_b",pod="pod_b"} 1000 1624396278302
 				# HELP container_start_time_seconds [STABLE] Start time of the container since unix epoch in seconds
@@ -386,6 +394,7 @@ func TestCollectResourceMetrics(t *testing.T) {
 						},
 						Memory: &statsapi.MemoryStats{
 							Time:            testTime,
+							UsageBytes:      ptr.To[uint64](1000),
 							WorkingSetBytes: ptr.To[uint64](1000),
 						},
 						Swap: &statsapi.SwapStats{
@@ -406,7 +415,7 @@ func TestCollectResourceMetrics(t *testing.T) {
 				# HELP pod_cpu_usage_seconds_total [STABLE] Cumulative cpu time consumed by the pod in core-seconds
 				# TYPE pod_cpu_usage_seconds_total counter
 				pod_cpu_usage_seconds_total{namespace="namespace_a",pod="pod_a"} 10 1624396278302
-				# HELP pod_memory_working_set_bytes [STABLE] Current working set of the pod in bytes
+				# HELP pod_memory_working_set_bytes [STABLE] Current memory usage of the pod in bytes: committed memory on Windows, working set on other platforms
 				# TYPE pod_memory_working_set_bytes gauge
 				pod_memory_working_set_bytes{namespace="namespace_a",pod="pod_a"} 1000 1624396278302
 				# HELP pod_swap_usage_bytes [ALPHA] Current amount of the pod swap usage in bytes. Reported only on non-windows systems
@@ -455,6 +464,107 @@ func TestCollectResourceMetrics(t *testing.T) {
 			collector := NewResourceMetricsCollector(provider)
 
 			if err := testutil.CustomCollectAndCompare(collector, strings.NewReader(tc.expectedMetrics), interestedMetrics...); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
+func TestCollectResourceMemoryMetrics(t *testing.T) {
+	tests := []struct {
+		name           string
+		memory         *statsapi.MemoryStats
+		wantWindows    *uint64
+		wantNonWindows *uint64
+	}{
+		{
+			name: "different committed memory and working set",
+			memory: &statsapi.MemoryStats{
+				UsageBytes:      ptr.To[uint64](200),
+				WorkingSetBytes: ptr.To[uint64](100),
+			},
+			wantWindows:    ptr.To[uint64](200),
+			wantNonWindows: ptr.To[uint64](100),
+		},
+		{
+			name: "missing committed memory",
+			memory: &statsapi.MemoryStats{
+				WorkingSetBytes: ptr.To[uint64](100),
+			},
+			wantNonWindows: ptr.To[uint64](100),
+		},
+		{
+			name: "missing working set",
+			memory: &statsapi.MemoryStats{
+				UsageBytes: ptr.To[uint64](200),
+			},
+			wantWindows: ptr.To[uint64](200),
+		},
+		{
+			name: "zero committed memory",
+			memory: &statsapi.MemoryStats{
+				UsageBytes:      ptr.To[uint64](0),
+				WorkingSetBytes: ptr.To[uint64](100),
+			},
+			wantWindows:    ptr.To[uint64](0),
+			wantNonWindows: ptr.To[uint64](100),
+		},
+		{
+			name: "zero working set",
+			memory: &statsapi.MemoryStats{
+				UsageBytes:      ptr.To[uint64](200),
+				WorkingSetBytes: ptr.To[uint64](0),
+			},
+			wantWindows:    ptr.To[uint64](200),
+			wantNonWindows: ptr.To[uint64](0),
+		},
+		{
+			name:   "missing memory values",
+			memory: &statsapi.MemoryStats{},
+		},
+		{
+			name: "missing memory stats",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.memory != nil {
+				tc.memory.Time = metav1.NewTime(time.Unix(123, 0))
+			}
+			summary := &statsapi.Summary{
+				Node: statsapi.NodeStats{Memory: tc.memory},
+				Pods: []statsapi.PodStats{{
+					PodRef: statsapi.PodReference{Name: "pod", Namespace: "namespace"},
+					Memory: tc.memory,
+					Containers: []statsapi.ContainerStats{{
+						Name: "container", Memory: tc.memory,
+					}},
+				}},
+			}
+			want := tc.wantNonWindows
+			if runtime.GOOS == "windows" {
+				want = tc.wantWindows
+			}
+			expected := ""
+			if want != nil {
+				expected = fmt.Sprintf(`
+					# HELP node_memory_working_set_bytes [STABLE] Current memory usage of the node in bytes: committed memory on Windows, working set on other platforms
+					# TYPE node_memory_working_set_bytes gauge
+					node_memory_working_set_bytes %d 123000
+					# HELP pod_memory_working_set_bytes [STABLE] Current memory usage of the pod in bytes: committed memory on Windows, working set on other platforms
+					# TYPE pod_memory_working_set_bytes gauge
+					pod_memory_working_set_bytes{namespace="namespace",pod="pod"} %d 123000
+					# HELP container_memory_working_set_bytes [STABLE] Current memory usage of the container in bytes: committed memory on Windows, working set on other platforms
+					# TYPE container_memory_working_set_bytes gauge
+					container_memory_working_set_bytes{container="container",namespace="namespace",pod="pod"} %d 123000
+				`, *want, *want, *want)
+			}
+			provider := summaryprovidertest.NewMockSummaryProvider(t)
+			provider.EXPECT().GetCPUAndMemoryStats(context.TODO()).Return(summary, nil)
+			collector := NewResourceMetricsCollector(provider)
+			if err := testutil.CustomCollectAndCompare(collector, strings.NewReader(expected),
+				"node_memory_working_set_bytes", "pod_memory_working_set_bytes", "container_memory_working_set_bytes"); err != nil {
 				t.Fatal(err)
 			}
 		})

@@ -73,6 +73,16 @@ func WithPreRunFn(preRunFn PreRunFn) SchedulerPerfOption {
 	}
 }
 
+// WithOutOfTreePluginRegistry sets the out-of-tree plugin registry used when starting the
+// scheduler. RunBenchmarkPerfScheduling takes the registry as a positional argument; this
+// option lets the integration-test path (RunIntegrationPerfScheduling) register the same
+// custom plugins.
+func WithOutOfTreePluginRegistry(registry frameworkruntime.Registry) SchedulerPerfOption {
+	return func(s *schedulerPerfOptions) {
+		s.outOfTreePluginRegistry = registry
+	}
+}
+
 // WithPodsSchedulingTimeout is the option to set a custom timeout
 // specifically for waiting for pods to be scheduled.
 func WithPodsSchedulingTimeout(timeout time.Duration) SchedulerPerfOption {

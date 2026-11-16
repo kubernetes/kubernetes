@@ -21,7 +21,7 @@ import (
 	"fmt"
 
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	schedulinginformers "k8s.io/client-go/informers/scheduling/v1alpha3"
+	schedulinginformers "k8s.io/client-go/informers/scheduling/v1beta1"
 	"k8s.io/component-base/featuregate"
 	"k8s.io/klog/v2"
 
@@ -52,7 +52,7 @@ func newPodGroupProtectionController(ctx context.Context, controllerContext Cont
 	var compositePodGroupInformer schedulinginformers.CompositePodGroupInformer
 	isCompositePodGroupEnabled := utilfeature.DefaultFeatureGate.Enabled(features.CompositePodGroup)
 	if isCompositePodGroupEnabled {
-		compositePodGroupInformer = controllerContext.InformerFactory.Scheduling().V1alpha3().CompositePodGroups()
+		compositePodGroupInformer = controllerContext.InformerFactory.Scheduling().V1beta1().CompositePodGroups()
 	}
 
 	pgProtectionController, err := podgroupprotection.NewPodGroupProtectionController(

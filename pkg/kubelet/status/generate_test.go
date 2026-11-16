@@ -27,6 +27,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -92,6 +93,21 @@ func TestGenerateContainersReadyCondition(t *testing.T) {
 			},
 			podPhase:    v1.PodRunning,
 			expectReady: getPodCondition(v1.ContainersReady, v1.ConditionFalse, ContainersNotReady, "containers with unknown status: [5678]"),
+		},
+		{
+			spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{Name: "1234"},
+				},
+			},
+			containerStatuses: []v1.ContainerStatus{
+				getReadyStatus("1234"),
+				// A container removed from the spec is unready while it is killed, but doesn't
+				// make the pod unready.
+				getNotReadyStatus("removed"),
+			},
+			podPhase:    v1.PodRunning,
+			expectReady: getPodCondition(v1.ContainersReady, v1.ConditionTrue, "", ""),
 		},
 		{
 			spec: v1.PodSpec{
@@ -195,6 +211,70 @@ func TestGenerateContainersReadyCondition(t *testing.T) {
 		if !reflect.DeepEqual(ready, test.expectReady) {
 			t.Errorf("On test case %v, expectReady:\n%+v\ngot\n%+v\n", i, test.expectReady, ready)
 		}
+	}
+}
+
+func TestGeneratePodReadyConditionUnallocatedContainers(t *testing.T) {
+	unallocated := func(name string) v1.ContainerStatus {
+		return v1.ContainerStatus{
+			Name:  name,
+			State: v1.ContainerState{Waiting: &v1.ContainerStateWaiting{Reason: kubecontainer.ContainerReasonUnallocated}},
+		}
+	}
+	waiting := func(name string) v1.ContainerStatus {
+		return v1.ContainerStatus{
+			Name:  name,
+			State: v1.ContainerState{Waiting: &v1.ContainerStateWaiting{Reason: "ContainerCreating"}},
+		}
+	}
+	// The spec is the one from the API, which has the containers that aren't allocated yet.
+	spec := v1.PodSpec{Containers: []v1.Container{{Name: "c1"}, {Name: "c2"}}}
+
+	tests := []struct {
+		name              string
+		dynamicContainers bool
+		statuses          []v1.ContainerStatus
+		expectReady       v1.ConditionStatus
+		expectMessage     string
+	}{{
+		name:              "unallocated container is ignored",
+		dynamicContainers: true,
+		statuses:          []v1.ContainerStatus{getReadyStatus("c1"), unallocated("c2")},
+		expectReady:       v1.ConditionTrue,
+	}, {
+		name:              "unallocated container counts with the gate disabled",
+		dynamicContainers: false,
+		statuses:          []v1.ContainerStatus{getReadyStatus("c1"), unallocated("c2")},
+		expectReady:       v1.ConditionFalse,
+		expectMessage:     "containers with unready status: [c2]",
+	}, {
+		name:              "allocated container that is waiting counts",
+		dynamicContainers: true,
+		statuses:          []v1.ContainerStatus{getReadyStatus("c1"), waiting("c2")},
+		expectReady:       v1.ConditionFalse,
+		expectMessage:     "containers with unready status: [c2]",
+	}, {
+		name:              "other containers still count",
+		dynamicContainers: true,
+		statuses:          []v1.ContainerStatus{getNotReadyStatus("c1"), unallocated("c2")},
+		expectReady:       v1.ConditionFalse,
+		expectMessage:     "containers with unready status: [c1]",
+	}}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if test.dynamicContainers {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, true)
+			}
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicContainers, test.dynamicContainers)
+			pod := &v1.Pod{Spec: spec}
+
+			containersReady := GenerateContainersReadyCondition(pod, &v1.PodStatus{}, test.statuses, v1.PodRunning)
+			assert.Equal(t, test.expectReady, containersReady.Status, "ContainersReady")
+			assert.Equal(t, test.expectMessage, containersReady.Message, "ContainersReady message")
+
+			ready := GeneratePodReadyCondition(pod, &v1.PodStatus{}, nil, test.statuses, v1.PodRunning)
+			assert.Equal(t, test.expectReady, ready.Status, "Ready")
+		})
 	}
 }
 
@@ -581,6 +661,7 @@ func TestGeneratePodInitializedCondition(t *testing.T) {
 }
 
 func TestGeneratePodReadyToStartContainersCondition(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	for desc, test := range map[string]struct {
 		pod      *v1.Pod
 		status   *kubecontainer.PodStatus
@@ -706,7 +787,7 @@ func TestGeneratePodReadyToStartContainersCondition(t *testing.T) {
 	} {
 		t.Run(desc, func(t *testing.T) {
 			test.expected.Type = v1.PodReadyToStartContainers
-			condition := GeneratePodReadyToStartContainersCondition(test.pod, &v1.PodStatus{}, test.status)
+			condition := GeneratePodReadyToStartContainersCondition(logger, test.pod, &v1.PodStatus{}, test.status)
 			require.Equal(t, test.expected.Type, condition.Type)
 			require.Equal(t, test.expected.Status, condition.Status)
 			require.Equal(t, test.expected.Reason, condition.Reason)

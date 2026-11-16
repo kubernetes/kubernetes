@@ -25,6 +25,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"slices"
 	"testing"
 	"time"
 
@@ -33,6 +34,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	authorizationcel "k8s.io/apiserver/pkg/authorization/cel"
@@ -129,11 +131,11 @@ func newTestWebhookAuthorizer(
 		0, // unauthorizedTTL
 		testRetryBackoff,
 		decisionOnError,
-		nil, // matchConditions
+		nil, // matcher
 		noopAuthorizerMetrics(),
-		authorizationcel.NewDefaultCompiler(),
 		"test",
 		acrReviewer,
+		nil, // builtinConditionsEvaluatorBuilder
 	)
 	if err != nil {
 		panic(fmt.Sprintf("newWithBackoff failed: %v", err))
@@ -1336,7 +1338,7 @@ func TestConditionalResponseCaching(t *testing.T) {
 		t.Helper()
 		wh, err := newWithBackoff(sarReviewer, time.Hour, 0, testRetryBackoff,
 			authorizer.DecisionNoOpinion, nil, noopAuthorizerMetrics(),
-			authorizationcel.NewDefaultCompiler(), "test", &fakeAuthorizationConditionsReviewer{})
+			"test", &fakeAuthorizationConditionsReviewer{}, nil)
 		if err != nil {
 			t.Fatalf("newWithBackoff failed: %v", err)
 		}
@@ -1397,4 +1399,164 @@ func TestConditionalResponseCaching(t *testing.T) {
 			t.Errorf("expected the entry to have expired and the webhook to be called again, got %d webhook calls", reviewer.calls)
 		}
 	})
+}
+
+// fakeBuiltinConditionsEvaluatorBuilder resolves conditions by ID; unknown IDs are Unevaluatable.
+// All conditions are recognized, except the IDs in unrecognized.
+type fakeBuiltinConditionsEvaluatorBuilder struct {
+	results      map[string]authorizer.ConditionEvaluationResult
+	unrecognized sets.Set[string]
+	err          error
+	builds       int
+}
+
+func (f *fakeBuiltinConditionsEvaluatorBuilder) Recognizes(condition authorizer.Condition) bool {
+	return !f.unrecognized.Has(condition.GetID())
+}
+
+func (f *fakeBuiltinConditionsEvaluatorBuilder) EvaluatorForData(_ context.Context, _ authorizer.ConditionsData) (authorizer.BuiltinConditionsEvaluator, error) {
+	f.builds++
+	if f.err != nil {
+		return nil, f.err
+	}
+	return f, nil
+}
+
+func (f *fakeBuiltinConditionsEvaluatorBuilder) EvaluateCondition(_ context.Context, condition authorizer.Condition) authorizer.ConditionEvaluationResult {
+	if res, ok := f.results[condition.GetID()]; ok {
+		return res
+	}
+	return authorizer.ConditionsEvaluationResultUnevaluatable()
+}
+
+func TestEvaluateConditions_Builtins(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ConditionalAuthorization, true)
+
+	denyCond := authorizer.GenericCondition{ID: "example.com/deny", Type: authorizer.ConditionTypeAuthorizationCEL, Condition: "false"}
+	allowCond := authorizer.GenericCondition{ID: "example.com/allow", Type: "example.com/opaque"}
+	decision := authorizer.ConditionsAwareDecisionConditionsMap([]authorizer.Condition{denyCond}, nil, []authorizer.Condition{allowCond})
+	webhookAllow := &authorizationv1alpha1.AuthorizationConditionsReview{
+		Response: &authorizationv1alpha1.AuthorizationConditionsResponse{
+			Decision: authorizationv1.ConditionsAwareDecision{
+				Type:  authorizationv1.ConditionsAwareDecisionTypeAllow,
+				Allow: &authorizationv1.UnconditionalDecision{Reason: "allowed by webhook"},
+			},
+		},
+	}
+
+	tests := []struct {
+		name         string
+		builder      *fakeBuiltinConditionsEvaluatorBuilder
+		wantDecision authorizer.Decision
+		wantWebhook  bool
+		wantNoBuild  bool
+		// wantSentDenyIDs are the deny condition IDs that are left for the webhook to evaluate.
+		wantSentDenyIDs []string
+	}{
+		{
+			name: "fully evaluated in-process: webhook not called",
+			builder: &fakeBuiltinConditionsEvaluatorBuilder{results: map[string]authorizer.ConditionEvaluationResult{
+				denyCond.ID: authorizer.ConditionEvaluationResultBoolean(true),
+			}},
+			wantDecision: authorizer.DecisionDeny,
+		},
+		{
+			name: "partially evaluated in-process: webhook gets the refined decision",
+			builder: &fakeBuiltinConditionsEvaluatorBuilder{results: map[string]authorizer.ConditionEvaluationResult{
+				denyCond.ID: authorizer.ConditionEvaluationResultBoolean(false),
+			}},
+			wantDecision: authorizer.DecisionAllow,
+			wantWebhook:  true,
+		},
+		{
+			// An in-process error might be due to version skew, so the webhook gets the final say.
+			name: "in-process evaluation error: webhook gets the original decision",
+			builder: &fakeBuiltinConditionsEvaluatorBuilder{results: map[string]authorizer.ConditionEvaluationResult{
+				denyCond.ID: authorizer.ConditionEvaluationResultError(fmt.Errorf("undeclared reference")),
+			}},
+			wantDecision:    authorizer.DecisionAllow,
+			wantWebhook:     true,
+			wantSentDenyIDs: []string{denyCond.ID},
+		},
+		{
+			name:            "evaluator cannot be built: webhook gets the original decision",
+			builder:         &fakeBuiltinConditionsEvaluatorBuilder{err: fmt.Errorf("unsupported data")},
+			wantDecision:    authorizer.DecisionAllow,
+			wantWebhook:     true,
+			wantSentDenyIDs: []string{denyCond.ID},
+		},
+		{
+			// The deny conditions are evaluated first, so a recognized allow condition cannot make progress.
+			name: "highest-priority conditions unrecognized: evaluator not built, webhook gets the original decision",
+			builder: &fakeBuiltinConditionsEvaluatorBuilder{
+				unrecognized: sets.New(denyCond.ID),
+				results:      map[string]authorizer.ConditionEvaluationResult{allowCond.ID: authorizer.ConditionEvaluationResultBoolean(true)},
+			},
+			wantDecision:    authorizer.DecisionAllow,
+			wantWebhook:     true,
+			wantNoBuild:     true,
+			wantSentDenyIDs: []string{denyCond.ID},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			acr := &fakeAuthorizationConditionsReviewer{response: webhookAllow.DeepCopy()}
+			wh, err := newWithBackoff(&fakeSubjectAccessReviewer{}, 0, 0, testRetryBackoff,
+				authorizer.DecisionNoOpinion, nil, noopAuthorizerMetrics(), "test", acr, tc.builder)
+			if err != nil {
+				t.Fatalf("newWithBackoff failed: %v", err)
+			}
+
+			d, _, err := wh.EvaluateConditions(testCtx, decision, fakeConditionsData{})
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if d != tc.wantDecision {
+				t.Errorf("got decision %s, want %s", d, tc.wantDecision)
+			}
+			if gotNoBuild := tc.builder.builds == 0; gotNoBuild != tc.wantNoBuild {
+				t.Errorf("evaluator not built: got %v, want %v", gotNoBuild, tc.wantNoBuild)
+			}
+			if gotWebhook := acr.received != nil; gotWebhook != tc.wantWebhook {
+				t.Fatalf("webhook called: got %v, want %v", gotWebhook, tc.wantWebhook)
+			}
+			if !tc.wantWebhook {
+				return
+			}
+			cm := acr.received.Request.Decision.ConditionsMap
+			if cm == nil {
+				t.Fatalf("expected a ConditionsMap to be sent to the webhook, got %+v", acr.received.Request.Decision)
+			}
+			var gotDenyIDs []string
+			for _, c := range cm.DenyConditions {
+				gotDenyIDs = append(gotDenyIDs, c.ID)
+			}
+			if !slices.Equal(gotDenyIDs, tc.wantSentDenyIDs) {
+				t.Errorf("deny conditions sent to the webhook: got %v, want %v", gotDenyIDs, tc.wantSentDenyIDs)
+			}
+		})
+	}
+}
+
+func TestEvaluateConditions_BuiltinsWithoutConditionsReviewer(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ConditionalAuthorization, true)
+
+	// Even though the builder could resolve the condition, a webhook without a conditions review client
+	// does not support conditional decisions, so it fails closed without building an evaluator.
+	builder := &fakeBuiltinConditionsEvaluatorBuilder{
+		results: map[string]authorizer.ConditionEvaluationResult{"example.com/allow": authorizer.ConditionEvaluationResultBoolean(true)},
+	}
+	wh, err := newWithBackoff(&fakeSubjectAccessReviewer{}, 0, 0, testRetryBackoff,
+		authorizer.DecisionNoOpinion, nil, noopAuthorizerMetrics(), "test", nil, builder)
+	if err != nil {
+		t.Fatalf("newWithBackoff failed: %v", err)
+	}
+	decision := authorizer.ConditionsAwareDecisionConditionsMap(nil, nil, []authorizer.Condition{authorizer.GenericCondition{ID: "example.com/allow"}})
+	if d, _, err := wh.EvaluateConditions(testCtx, decision, fakeConditionsData{}); d != authorizer.DecisionNoOpinion || err == nil {
+		t.Fatalf("got decision %s and err %v, want NoOpinion and an error", d, err)
+	}
+	if builder.builds != 0 {
+		t.Errorf("expected no evaluator to be built, got %d builds", builder.builds)
+	}
 }

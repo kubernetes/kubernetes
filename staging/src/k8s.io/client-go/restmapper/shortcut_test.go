@@ -136,7 +136,7 @@ func TestReplaceAliases(t *testing.T) {
 		ds.serverResourcesHandler = func() ([]*metav1.APIResourceList, error) {
 			return test.srvRes, nil
 		}
-		mapper := NewShortcutExpander(&fakeRESTMapper{}, ds, nil).(shortcutExpander)
+		mapper := NewShortcutExpanderWithContext(meta.ToRESTMapperWithContext(&fakeRESTMapper{}), discovery.ToDiscoveryInterfaceWithContext(ds), nil).(shortcutExpander)
 
 		actual := mapper.expandResourceShortcut(ctx, schema.GroupVersionResource{Resource: test.arg})
 		if actual != test.expected {
@@ -183,6 +183,7 @@ func TestKindFor(t *testing.T) {
 		},
 	}
 
+	_, ctx := ktesting.NewTestContext(t)
 	for i, test := range tests {
 		ds := &fakeDiscoveryClient{}
 		ds.serverResourcesHandler = func() ([]*metav1.APIResourceList, error) {
@@ -190,11 +191,11 @@ func TestKindFor(t *testing.T) {
 		}
 
 		delegate := &fakeRESTMapper{}
-		mapper := NewShortcutExpander(delegate, ds, func(a string) {
+		mapper := NewShortcutExpanderWithContext(meta.ToRESTMapperWithContext(delegate), discovery.ToDiscoveryInterfaceWithContext(ds), func(a string) {
 			t.Fatalf("unexpected warning message %s", a)
 		})
 
-		mapper.KindFor(test.in)
+		_, _ = mapper.KindForWithContext(ctx, test.in)
 		if delegate.kindForInput != test.expected {
 			t.Errorf("%d: unexpected data returned %#v, expected %#v", i, delegate.kindForInput, test.expected)
 		}
@@ -246,12 +247,14 @@ func TestKindForWithNewCRDs(t *testing.T) {
 			// in real world the discovery client is fronted with a cache which
 			// will answer the initial request, only failure to match will trigger
 			// the cache invalidation and live discovery call
-			delegate := NewDeferredDiscoveryRESTMapper(fakeCachedDiscovery)
-			mapper := NewShortcutExpander(delegate, fakeCachedDiscovery, func(a string) {
+			cachedDiscoveryWithContext := discovery.ToCachedDiscoveryInterfaceWithContext(fakeCachedDiscovery)
+			delegate := NewDeferredDiscoveryRESTMapperWithContext(cachedDiscoveryWithContext)
+			mapper := NewShortcutExpanderWithContext(delegate, cachedDiscoveryWithContext, func(a string) {
 				t.Fatalf("unexpected warning message %s", a)
 			})
 
-			gvk, err := mapper.KindFor(test.in)
+			_, ctx := ktesting.NewTestContext(t)
+			gvk, err := mapper.KindForWithContext(ctx, test.in)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -440,7 +443,7 @@ func TestWarnAmbigious(t *testing.T) {
 		}
 
 		var actualWarnings []string
-		mapper := NewShortcutExpander(&fakeRESTMapper{}, ds, func(a string) {
+		mapper := NewShortcutExpanderWithContext(meta.ToRESTMapperWithContext(&fakeRESTMapper{}), discovery.ToDiscoveryInterfaceWithContext(ds), func(a string) {
 			actualWarnings = append(actualWarnings, a)
 		}).(shortcutExpander)
 

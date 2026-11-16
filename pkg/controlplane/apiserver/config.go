@@ -25,6 +25,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/runtime/serializer/cbor"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
@@ -59,6 +60,7 @@ import (
 	"k8s.io/kubernetes/pkg/controlplane/apiserver/options"
 	"k8s.io/kubernetes/pkg/controlplane/controller/clusterauthenticationtrust"
 	"k8s.io/kubernetes/pkg/kubeapiserver"
+	"k8s.io/kubernetes/pkg/kubeapiserver/admission/exclusion"
 	"k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
 	rbacrest "k8s.io/kubernetes/pkg/registry/rbac/rest"
 	"k8s.io/kubernetes/pkg/serviceaccount"
@@ -233,6 +235,7 @@ func BuildGenericConfig(
 		genericConfig.EgressSelector,
 		genericConfig.APIServerID,
 		versionedInformers,
+		clientgoExternalClient,
 	)
 	if err != nil {
 		lastErr = fmt.Errorf("invalid authorization config: %w", err)
@@ -240,6 +243,10 @@ func BuildGenericConfig(
 	}
 	if s.Authorization != nil && !enablesRBAC {
 		genericConfig.DisabledPostStartHooks.Insert(rbacrest.PostStartHookName)
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.ConditionalAuthorization) {
+		genericConfig.Authorization.ConditionalAuthorizationRequestClassifier = conditionalRequestClassifier
 	}
 
 	lastErr = s.Audit.ApplyTo(genericConfig)
@@ -253,8 +260,8 @@ func BuildGenericConfig(
 }
 
 // BuildAuthorizer constructs the authorizer. If authorization is not set in s, it returns nil, nil, false, nil
-func BuildAuthorizer(ctx context.Context, s options.CompletedOptions, egressSelector *egressselector.EgressSelector, apiserverID string, versionedInformers clientgoinformers.SharedInformerFactory) (authorizer.Authorizer, authorizer.RuleResolver, bool, error) {
-	authorizationConfig, err := s.Authorization.ToAuthorizationConfig(versionedInformers)
+func BuildAuthorizer(ctx context.Context, s options.CompletedOptions, egressSelector *egressselector.EgressSelector, apiserverID string, versionedInformers clientgoinformers.SharedInformerFactory, client clientgoclientset.Interface) (authorizer.Authorizer, authorizer.RuleResolver, bool, error) {
+	authorizationConfig, err := s.Authorization.ToAuthorizationConfig(versionedInformers, client)
 	if err != nil {
 		return nil, nil, false, err
 	}
@@ -281,6 +288,34 @@ func BuildAuthorizer(ctx context.Context, s options.CompletedOptions, egressSele
 	authorizer, ruleResolver, err := authorizationConfig.New(ctx, apiserverID)
 
 	return authorizer, ruleResolver, enablesRBAC, err
+}
+
+// the verbs for which admission control applies to in kube-apiserver
+var admissionVerbs = sets.New("create", "update", "patch", "delete", "deletecollection")
+
+var excludedFromAdmission = sets.New(exclusion.Excluded()...)
+
+// conditionalRequestClassifier returns true if admission runs for the given request
+func conditionalRequestClassifier(attrs authorizer.Attributes) bool {
+	// admission only runs for resource requests
+	if !attrs.IsResourceRequest() {
+		return false
+	}
+	gr := schema.GroupResource{
+		Group:    attrs.GetAPIGroup(),
+		Resource: attrs.GetResource(),
+	}
+	// if the GroupResource is excluded from admission, we cannot enforce conditions
+	if excludedFromAdmission.Has(gr) {
+		return false
+	}
+	// If the verb is one which is subject to admission, the ConditionsEnforcer will catch the
+	// request, and thus is the request conditions-aware.
+	// TODO(luxas): Inspect whether the API group belongs to an aggregated API server, and in that case,
+	// always consider the request to be conditions-aware, as the aggregated API server could support
+	// conditions for any kind of request.
+	// Also, support connect requests that are accessed through the GET HTTP verb.
+	return admissionVerbs.Has(attrs.GetVerb())
 }
 
 // CreateConfig takes the generic controlplane apiserver options and

@@ -47,10 +47,9 @@ const (
 var bdpPing = &ping{data: [8]byte{2, 4, 16, 16, 9, 14, 7, 7}}
 
 type bdpEstimator struct {
+	mu sync.Mutex
 	// sentAt is the time when the ping was sent.
 	sentAt time.Time
-
-	mu sync.Mutex
 	// bdp is the current bdp estimate.
 	bdp uint32
 	// sample is the number of bytes received in one measurement cycle.
@@ -75,7 +74,9 @@ func (b *bdpEstimator) timesnap(d [8]byte) {
 	if bdpPing.data != d {
 		return
 	}
+	b.mu.Lock()
 	b.sentAt = time.Now()
+	b.mu.Unlock()
 }
 
 // add adds bytes to the current sample for calculating bdp.

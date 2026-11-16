@@ -247,7 +247,11 @@ func (kvh *kubeletVolumeHost) GetSecretFunc() func(namespace, name string) (*v1.
 
 func (kvh *kubeletVolumeHost) GetConfigMapFunc() func(namespace, name string) (*v1.ConfigMap, error) {
 	if kvh.configMapManager != nil {
-		return kvh.configMapManager.GetConfigMap
+		return func(namespace, name string) (*v1.ConfigMap, error) {
+			// Use context.TODO() because we currently do not have a proper context to pass in.
+			// This should be replaced with an appropriate context when refactoring this function to accept a context parameter.
+			return kvh.configMapManager.GetConfigMap(context.TODO(), namespace, name)
+		}
 	}
 	return func(namespace, name string) (*v1.ConfigMap, error) {
 		return nil, fmt.Errorf("not supported due to running kubelet in standalone mode")

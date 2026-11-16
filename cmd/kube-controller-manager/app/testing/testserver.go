@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"testing"
 	"time"
 
 	"github.com/spf13/pflag"
@@ -38,6 +37,7 @@ import (
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app"
 	kubecontrollerconfig "k8s.io/kubernetes/cmd/kube-controller-manager/app/config"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
+	testutils "k8s.io/kubernetes/test/utils"
 )
 
 func init() {
@@ -64,7 +64,7 @@ type TestServer struct {
 // Note: we return a tear-down func instead of a stop channel because the later will leak temporary
 // files that because Golang testing's call to os.Exit will not give a stop channel go routine
 // enough time to remove temporary files.
-func StartTestServer(t *testing.T, ctx context.Context, customFlags []string) (result TestServer, err error) {
+func StartTestServer(t testutils.TB, ctx context.Context, customFlags []string) (result TestServer, err error) {
 	logger := klog.FromContext(ctx)
 	ctx, cancel := context.WithCancel(ctx)
 	var errCh chan error
@@ -191,7 +191,7 @@ func StartTestServer(t *testing.T, ctx context.Context, customFlags []string) (r
 }
 
 // StartTestServerOrDie calls StartTestServer t.Fatal if it does not succeed.
-func StartTestServerOrDie(t *testing.T, ctx context.Context, flags []string) *TestServer {
+func StartTestServerOrDie(t testutils.TB, ctx context.Context, flags []string) *TestServer {
 	result, err := StartTestServer(t, ctx, flags)
 	if err != nil {
 		t.Fatalf("failed to launch server: %v", err)

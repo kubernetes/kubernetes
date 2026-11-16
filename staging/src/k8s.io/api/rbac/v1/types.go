@@ -154,7 +154,7 @@ type RoleBinding struct {
 	// If the RoleRef cannot be resolved, the Authorizer must return an error.
 	// This field is immutable.
 	// +required
-	// +k8s:alpha(since:"1.37")=+k8s:immutable
+	// +k8s:beta(since:"1.38")=+k8s:immutable
 	RoleRef RoleRef `json:"roleRef" protobuf:"bytes,3,opt,name=roleRef"`
 }
 
@@ -243,7 +243,7 @@ type ClusterRoleBinding struct {
 	// If the RoleRef cannot be resolved, the Authorizer must return an error.
 	// This field is immutable.
 	// +required
-	// +k8s:alpha(since:"1.37")=+k8s:immutable
+	// +k8s:beta(since:"1.38")=+k8s:immutable
 	RoleRef RoleRef `json:"roleRef" protobuf:"bytes,3,opt,name=roleRef"`
 }
 

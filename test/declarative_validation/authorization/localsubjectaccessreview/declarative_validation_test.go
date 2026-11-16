@@ -79,11 +79,11 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		},
 		"neither": {
 			obj:          mkLocalSAR(clearResourceAttributes()),
-			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec"), "", "").WithOrigin("union").MarkAlpha()},
+			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec"), "", "").WithOrigin("union").MarkBeta()},
 		},
 		"both": {
 			obj: mkLocalSAR(setNonResourceAttributes()),
-			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec"), "", "").WithOrigin("union").MarkAlpha(),
+			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec"), "", "").WithOrigin("union").MarkBeta(),
 				field.Invalid(field.NewPath("spec.nonResourceAttributes"), "", "disallowed on this kind of request").MarkFromImperative(),
 			},
 		},

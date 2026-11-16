@@ -1843,7 +1843,7 @@ func (g *genValidations) toGolangSourceDataLiteral(sw *generator.SnippetWriter, 
 	case *validators.PrivateVar:
 		sw.Do("$.|private$", c.Universe.Type(types.Name(*v)))
 	case validators.WrapperFunction:
-		if extraArgs := v.Function.Args; len(extraArgs) == 0 {
+		if extraArgs := v.Function.Args; len(extraArgs) == 0 && !v.Function.Flags.IsSet(validators.VariadicArgs) {
 			// If the function to be wrapped has no additional arguments, we can
 			// just use it directly.
 			targs := generator.Args{

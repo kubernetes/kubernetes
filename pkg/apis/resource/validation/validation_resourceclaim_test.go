@@ -1275,6 +1275,46 @@ func TestValidateClaim(t *testing.T) {
 				return claim
 			}(),
 		},
+		"capacity-requests-bad-key": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices", "requests").Index(0).Child("exactly", "capacity", "requests"), "1bad", "a valid C identifier must start with alphabetic character or '_', followed by a string of alphanumeric characters or '_' (e.g. 'my_name',  or 'MY_NAME',  or 'MyName', regex used for validation is '[A-Za-z_][A-Za-z0-9_]*')"),
+			},
+			claim: func() *resource.ResourceClaim {
+				claim := testClaim(goodName, goodNS, validClaimSpec)
+				claim.Spec.Devices.Requests[0].Exactly.Capacity = &resource.CapacityRequirements{
+					Requests: map[resource.QualifiedName]apiresource.Quantity{
+						"1bad": apiresource.MustParse("1"),
+					},
+				}
+				return claim
+			}(),
+		},
+		"capacity-requests-bad-key-in-subrequest": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices", "requests").Index(0).Child("firstAvailable").Index(0).Child("capacity", "requests"), "1bad", "a valid C identifier must start with alphabetic character or '_', followed by a string of alphanumeric characters or '_' (e.g. 'my_name',  or 'MY_NAME',  or 'MyName', regex used for validation is '[A-Za-z_][A-Za-z0-9_]*')"),
+			},
+			claim: func() *resource.ResourceClaim {
+				claim := testClaim(goodName, goodNS, validClaimSpecWithFirstAvailable)
+				claim.Spec.Devices.Requests[0].FirstAvailable[0].Capacity = &resource.CapacityRequirements{
+					Requests: map[resource.QualifiedName]apiresource.Quantity{
+						"1bad": apiresource.MustParse("1"),
+					},
+				}
+				return claim
+			}(),
+		},
+		"capacity-requests-valid": {
+			wantFailures: nil,
+			claim: func() *resource.ResourceClaim {
+				claim := testClaim(goodName, goodNS, validClaimSpec)
+				claim.Spec.Devices.Requests[0].Exactly.Capacity = &resource.CapacityRequirements{
+					Requests: map[resource.QualifiedName]apiresource.Quantity{
+						"dra.example.com/cores": apiresource.MustParse("4"),
+					},
+				}
+				return claim
+			}(),
+		},
 	}
 
 	for name, scenario := range scenarios {
@@ -2592,6 +2632,33 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 								AdminAccess: ptr.To(false),
 								ConsumedCapacity: map[resource.QualifiedName]apiresource.Quantity{
 									goodName: apiresource.MustParse("1"),
+								},
+							},
+						},
+					},
+				}
+				return claim
+			},
+			consumableCapacityFeatureGate: true,
+		},
+		"invalid-add-consumed-capacity-bad-key": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("status", "allocation", "devices", "results").Index(0).Child("consumedCapacity"), "1bad", "a valid C identifier must start with alphabetic character or '_', followed by a string of alphanumeric characters or '_' (e.g. 'my_name',  or 'MY_NAME',  or 'MyName', regex used for validation is '[A-Za-z_][A-Za-z0-9_]*')"),
+			},
+			oldClaim: testClaim(goodName, goodNS, validClaimSpec),
+			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
+				claim.Status.Allocation = &resource.AllocationResult{
+					Devices: resource.DeviceAllocationResult{
+						Results: []resource.DeviceRequestAllocationResult{
+							{
+								Request:     goodName,
+								Driver:      goodName,
+								Pool:        goodName,
+								Device:      goodName,
+								ShareID:     ptr.To(goodShareID),
+								AdminAccess: ptr.To(false),
+								ConsumedCapacity: map[resource.QualifiedName]apiresource.Quantity{
+									"1bad": apiresource.MustParse("1"),
 								},
 							},
 						},

@@ -123,9 +123,9 @@ type ValidatingAdmissionPolicyStatus struct {
 	// +optional
 	// +listType=map
 	// +listMapKey=type
-	// +k8s:alpha(since: "1.37")=+k8s:optional
-	// +k8s:alpha(since: "1.37")=+k8s:listType=map
-	// +k8s:alpha(since: "1.37")=+k8s:listMapKey=type
+	// +k8s:beta(since: "1.38")=+k8s:optional
+	// +k8s:beta(since: "1.38")=+k8s:listType=map
+	// +k8s:beta(since: "1.38")=+k8s:listMapKey=type
 	Conditions []metav1.Condition `json:"conditions,omitempty" protobuf:"bytes,3,rep,name=conditions"`
 }
 
@@ -434,7 +434,7 @@ type ValidatingAdmissionPolicyBindingSpec struct {
 	// If the referenced resource does not exist, this binding is considered invalid and will be ignored
 	// Required.
 	// +required
-	// +k8s:beta(since: "1.37")=+k8s:required
+	// +k8s:required
 	PolicyName string `json:"policyName,omitempty" protobuf:"bytes,1,rep,name=policyName"`
 
 	// paramRef specifies the parameter resource used to configure the admission control policy.
@@ -493,7 +493,7 @@ type ValidatingAdmissionPolicyBindingSpec struct {
 	// Required.
 	// +listType=set
 	// +required
-	// +k8s:beta(since: "1.37")=+k8s:required
+	// +k8s:required
 	ValidationActions []ValidationAction `json:"validationActions,omitempty" protobuf:"bytes,4,rep,name=validationActions"`
 }
 
@@ -686,7 +686,6 @@ type NamedRuleWithOperations struct {
 // +k8s:prerelease-lifecycle-gen:replacement=admissionregistration.k8s.io,v1,ValidatingWebhookConfiguration
 
 // ValidatingWebhookConfiguration describes the configuration of and admission webhook that accept or reject and object without changing it.
-// Deprecated in v1.16, planned for removal in v1.19. Use admissionregistration.k8s.io/v1 ValidatingWebhookConfiguration instead.
 type ValidatingWebhookConfiguration struct {
 	metav1.TypeMeta `json:""`
 	// metadata is the standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
@@ -727,7 +726,6 @@ type ValidatingWebhookConfigurationList struct {
 // +k8s:prerelease-lifecycle-gen:replacement=admissionregistration.k8s.io,v1,MutatingWebhookConfiguration
 
 // MutatingWebhookConfiguration describes the configuration of and admission webhook that accept or reject and may change the object.
-// Deprecated in v1.16, planned for removal in v1.19. Use admissionregistration.k8s.io/v1 MutatingWebhookConfiguration instead.
 type MutatingWebhookConfiguration struct {
 	metav1.TypeMeta `json:""`
 	// metadata is the standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.

@@ -693,7 +693,7 @@ var _ = SIGDescribe("FileKeyRef", feature.EnvFiles, framework.WithFeatureGate(fe
 					{
 						Name:    "use-envfile",
 						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
-						Command: []string{"sh", "-c", "env | grep -E '(EXISTING_KEY|OPTIONAL_MISSING_KEY)' | sort"},
+						Command: []string{"sh", "-c", "env | grep -E '(EXISTING_KEY|OPTIONAL_MISSING_KEY|OPTIONAL_MISSING_FILE)' | sort"},
 						Env: []v1.EnvVar{
 							{
 								Name: "EXISTING_KEY",
@@ -716,6 +716,17 @@ var _ = SIGDescribe("FileKeyRef", feature.EnvFiles, framework.WithFeatureGate(fe
 									},
 								},
 							},
+							{
+								Name: "OPTIONAL_MISSING_FILE",
+								ValueFrom: &v1.EnvVarSource{
+									FileKeyRef: &v1.FileKeySelector{
+										VolumeName: "config",
+										Path:       "missing.env",
+										Key:        "OPTIONAL_MISSING_FILE",
+										Optional:   new(true),
+									},
+								},
+							},
 						},
 					},
 				},
@@ -731,9 +742,136 @@ var _ = SIGDescribe("FileKeyRef", feature.EnvFiles, framework.WithFeatureGate(fe
 			},
 		}
 
-		e2epodoutput.TestContainerOutput(ctx, f, "consume FileKeyRef with optional missing key", pod, 0, []string{
+		e2epodoutput.TestContainerOutput(ctx, f, "consume FileKeyRef with optional missing file or key", pod, 0, []string{
 			"EXISTING_KEY=value",
 		})
+	})
+
+	// Regression test for https://github.com/kubernetes/kubernetes/issues/142662.
+	// A key with an empty value is present, so the container must start with
+	// the variable set to the empty string rather than fail as a missing key.
+	framework.It("should publish a key with an empty value", func(ctx context.Context) {
+		podName := "filekeyref-empty-value-" + string(uuid.NewUUID())
+
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: podName,
+			},
+			Spec: v1.PodSpec{
+				InitContainers: []v1.Container{
+					{
+						Name:    "setup-envfile",
+						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+						Command: []string{"sh", "-c", `echo EMPTY_KEY=\'\' > /data/config.env`},
+						VolumeMounts: []v1.VolumeMount{
+							{
+								Name:      "config",
+								MountPath: "/data",
+							},
+						},
+					},
+				},
+				Containers: []v1.Container{
+					{
+						Name:    "use-envfile",
+						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+						Command: []string{"sh", "-c", `echo "EMPTY_KEY=[${EMPTY_KEY-unset}]"`},
+						Env: []v1.EnvVar{
+							{
+								Name: "EMPTY_KEY",
+								ValueFrom: &v1.EnvVarSource{
+									FileKeyRef: &v1.FileKeySelector{
+										VolumeName: "config",
+										Path:       "config.env",
+										Key:        "EMPTY_KEY",
+									},
+								},
+							},
+						},
+					},
+				},
+				RestartPolicy: v1.RestartPolicyNever,
+				Volumes: []v1.Volume{
+					{
+						Name: "config",
+						VolumeSource: v1.VolumeSource{
+							EmptyDir: &v1.EmptyDirVolumeSource{},
+						},
+					},
+				},
+			},
+		}
+
+		e2epodoutput.TestContainerOutput(ctx, f, "consume FileKeyRef with empty value", pod, 0, []string{
+			"EMPTY_KEY=[]",
+		})
+	})
+
+	// optional only covers a missing file or key. A syntax error in the file
+	// must still fail the container, so that a typo cannot silently drop a value.
+	framework.It("should fail when the file has invalid syntax even if the key is optional", func(ctx context.Context) {
+		podName := "filekeyref-invalid-syntax-" + string(uuid.NewUUID())
+
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: podName,
+			},
+			Spec: v1.PodSpec{
+				InitContainers: []v1.Container{
+					{
+						Name:    "setup-envfile",
+						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+						Command: []string{"sh", "-c", `echo "BAD_KEY= 'value'" > /data/config.env`},
+						VolumeMounts: []v1.VolumeMount{
+							{
+								Name:      "config",
+								MountPath: "/data",
+							},
+						},
+					},
+				},
+				Containers: []v1.Container{
+					{
+						Name:    "use-envfile",
+						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+						Command: []string{"sh", "-c", "echo $BAD_KEY"},
+						Env: []v1.EnvVar{
+							{
+								Name: "BAD_KEY",
+								ValueFrom: &v1.EnvVarSource{
+									FileKeyRef: &v1.FileKeySelector{
+										VolumeName: "config",
+										Path:       "config.env",
+										Key:        "BAD_KEY",
+										Optional:   new(true),
+									},
+								},
+							},
+						},
+					},
+				},
+				RestartPolicy: v1.RestartPolicyNever,
+				Volumes: []v1.Volume{
+					{
+						Name: "config",
+						VolumeSource: v1.VolumeSource{
+							EmptyDir: &v1.EmptyDirVolumeSource{},
+						},
+					},
+				},
+			},
+		}
+
+		podClient := e2epod.NewPodClient(f)
+		pod = podClient.Create(ctx, pod)
+		framework.ExpectNoError(e2epod.WaitForPodCondition(ctx, f.ClientSet, f.Namespace.Name, pod.Name, "container not ready", time.Minute, func(pod *v1.Pod) (bool, error) {
+			for _, c := range pod.Status.ContainerStatuses {
+				if c.Name == "use-envfile" && c.State.Waiting != nil && c.State.Waiting.Reason == "CreateContainerConfigError" {
+					return true, nil
+				}
+			}
+			return false, nil
+		}))
 	})
 
 	/*

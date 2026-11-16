@@ -67,15 +67,6 @@ func (t TTY) IsTerminalOut() bool {
 	return printers.IsTerminal(t.Out)
 }
 
-// IsTerminal returns whether the passed object is a terminal or not.
-// Deprecated: use printers.IsTerminal instead.
-var IsTerminal = printers.IsTerminal
-
-// AllowsColorOutput returns true if the specified writer is a terminal and
-// the process environment indicates color output is supported and desired.
-// Deprecated: use printers.AllowsColorOutput instead.
-var AllowsColorOutput = printers.AllowsColorOutput
-
 // Safe invokes the provided function and will attempt to ensure that when the
 // function returns (or a termination signal is sent) that the terminal state
 // is reset to the condition it was in prior to the function being invoked. If

@@ -18,8 +18,10 @@ package storage
 
 import (
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -30,10 +32,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apiserver/pkg/registry/generic"
-	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
+	"k8s.io/apiserver/pkg/storage/cacher"
 	"k8s.io/apiserver/pkg/storage/testing/correctness"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/ktesting"
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
@@ -76,9 +81,9 @@ var (
 				{Choice: RVZero, Weight: 15},
 				{Choice: RVOne, Weight: 10},
 				{Choice: RVCached, Weight: 15},
-				{Choice: RVCurrent, Weight: 10},
-				{Choice: RVPast, Weight: 10},
-				{Choice: RVFuture, Weight: 10},
+				{Choice: RVCurrent, Weight: 14},
+				{Choice: RVPast, Weight: 14},
+				{Choice: RVFuture, Weight: 2},
 			},
 		},
 		List: ListDistribution{
@@ -87,22 +92,38 @@ var (
 				{Choice: ScopeNamespace, Weight: 25},
 				{Choice: ScopeObject, Weight: 25},
 			},
+			Recursive: []ChoiceWeight[bool]{
+				{Choice: true, Weight: 70},
+				{Choice: false, Weight: 30},
+			},
 			FieldSelector: []ChoiceWeight[FieldSelector]{
-				{Choice: FieldEverything, Weight: 25},
-				{Choice: FieldByName, Weight: 15},
-				{Choice: FieldByNamespace, Weight: 15},
-				{Choice: FieldByNode, Weight: 20},
-				{Choice: FieldByEmptyNode, Weight: 15},
+				{Choice: FieldEverything, Weight: 20},
+				{Choice: FieldByName, Weight: 10},
+				{Choice: FieldNotByName, Weight: 10},
+				{Choice: FieldByNamespace, Weight: 10},
+				{Choice: FieldNotByNamespace, Weight: 10},
+				{Choice: FieldByNode, Weight: 10},
+				{Choice: FieldNotByNode, Weight: 10},
+				{Choice: FieldByEmptyNode, Weight: 10},
 				{Choice: FieldCombined, Weight: 10},
 			},
 			LabelSelector: []ChoiceWeight[LabelSelector]{
-				{Choice: LabelEverything, Weight: 60},
-				{Choice: LabelByApp, Weight: 40},
+				{Choice: LabelEverything, Weight: 40},
+				{Choice: LabelByApp, Weight: 15},
+				{Choice: LabelNotByApp, Weight: 15},
+				{Choice: LabelAppIn, Weight: 10},
+				{Choice: LabelAppNotIn, Weight: 10},
+				{Choice: LabelAppExists, Weight: 5},
+				{Choice: LabelAppDoesNotExist, Weight: 5},
 			},
 			ResourceVersion: []ChoiceWeight[RVType]{
-				{Choice: RVEmpty, Weight: 50},
-				{Choice: RVZero, Weight: 20},
-				{Choice: RVCached, Weight: 30},
+				{Choice: RVEmpty, Weight: 30},
+				{Choice: RVZero, Weight: 15},
+				{Choice: RVOne, Weight: 10},
+				{Choice: RVCached, Weight: 15},
+				{Choice: RVCurrent, Weight: 14},
+				{Choice: RVPast, Weight: 14},
+				{Choice: RVFuture, Weight: 2},
 			},
 			ResourceVersionMatch: []ChoiceWeight[metav1.ResourceVersionMatch]{
 				{Choice: "", Weight: 50},
@@ -113,6 +134,31 @@ var (
 				{Choice: 0, Weight: 70},
 				{Choice: 1, Weight: 15},
 				{Choice: 2, Weight: 15},
+			},
+			Continue: ContinueDistribution{
+				Enabled: []ChoiceWeight[bool]{
+					{Choice: false, Weight: 70},
+					{Choice: true, Weight: 30},
+				},
+				Start: []ChoiceWeight[ContinueStart]{
+					{Choice: ContinueStartFirst, Weight: 15},
+					{Choice: ContinueStartAtKey, Weight: 35},
+					{Choice: ContinueStartAfterKey, Weight: 35},
+					{Choice: ContinueStartEnd, Weight: 15},
+				},
+				KeyTarget: []ChoiceWeight[KeyTarget]{
+					{Choice: KeyExisting, Weight: 80},
+					{Choice: KeyNonExistingNS, Weight: 10},
+					{Choice: KeyNonExistingObject, Weight: 10},
+				},
+				ResourceVersion: []ChoiceWeight[RVType]{
+					{Choice: RVNegative, Weight: 25},
+					{Choice: RVOne, Weight: 15},
+					{Choice: RVCached, Weight: 20},
+					{Choice: RVCurrent, Weight: 18},
+					{Choice: RVPast, Weight: 20},
+					{Choice: RVFuture, Weight: 2},
+				},
 			},
 		},
 		Update: UpdateDistribution{
@@ -147,7 +193,7 @@ var (
 
 	unaryCfg = UnaryConfig{
 		Concurrency:         8,
-		MaxOperations:       10000,
+		SucceededOperations: 5000,
 		RequestDistribution: requestDistribution,
 	}
 
@@ -162,17 +208,29 @@ var (
 			{Choice: ScopeNamespace, Weight: 30},
 			{Choice: ScopeObject, Weight: 30},
 		},
+		Recursive: []ChoiceWeight[bool]{
+			{Choice: true, Weight: 70},
+			{Choice: false, Weight: 30},
+		},
 		FieldSelector: []ChoiceWeight[FieldSelector]{
-			{Choice: FieldEverything, Weight: 25},
-			{Choice: FieldByName, Weight: 15},
-			{Choice: FieldByNamespace, Weight: 15},
-			{Choice: FieldByNode, Weight: 20},
-			{Choice: FieldByEmptyNode, Weight: 15},
+			{Choice: FieldEverything, Weight: 20},
+			{Choice: FieldByName, Weight: 10},
+			{Choice: FieldNotByName, Weight: 10},
+			{Choice: FieldByNamespace, Weight: 10},
+			{Choice: FieldNotByNamespace, Weight: 10},
+			{Choice: FieldByNode, Weight: 10},
+			{Choice: FieldNotByNode, Weight: 10},
+			{Choice: FieldByEmptyNode, Weight: 10},
 			{Choice: FieldCombined, Weight: 10},
 		},
 		LabelSelector: []ChoiceWeight[LabelSelector]{
-			{Choice: LabelEverything, Weight: 60},
-			{Choice: LabelByApp, Weight: 40},
+			{Choice: LabelEverything, Weight: 40},
+			{Choice: LabelByApp, Weight: 15},
+			{Choice: LabelNotByApp, Weight: 15},
+			{Choice: LabelAppIn, Weight: 10},
+			{Choice: LabelAppNotIn, Weight: 10},
+			{Choice: LabelAppExists, Weight: 5},
+			{Choice: LabelAppDoesNotExist, Weight: 5},
 		},
 		SendInitialEvents: []ChoiceWeight[bool]{
 			{Choice: false, Weight: 70},
@@ -201,7 +259,8 @@ var (
 
 	watchCfg = WatchConfig{
 		Concurrency:         16,
-		Duration:            500 * time.Millisecond,
+		MinOperations:       128,
+		Duration:            250 * time.Millisecond,
 		SlowDelay:           2 * time.Millisecond,
 		HiccupDuration:      150 * time.Millisecond,
 		MaxEvents:           200,
@@ -211,25 +270,134 @@ var (
 
 func TestCorrectness(t *testing.T) {
 	storages := []struct {
-		name string
-		fn   func(t *testing.T) (storage.Interface, string)
+		name                   string
+		setupStorage           func(tCtx ktesting.TContext) (storage.Interface, string)
+		validateFaultInjection func(tCtx ktesting.TContext, ops []correctness.Operation, watches []correctness.WatchOperation)
 	}{
-		{"etcd3", func(t *testing.T) (storage.Interface, string) {
-			return setupStore(t, generic.UndecoratedStorage)
-		}},
-		{"cacher", func(t *testing.T) (storage.Interface, string) {
-			return setupStore(t, genericregistry.StorageWithCacher())
-		}},
+		{
+			name: "etcd3",
+			setupStorage: func(tCtx ktesting.TContext) (storage.Interface, string) {
+				return setupStore(tCtx, nil)
+			},
+		},
+		{
+			name: "etcd3 with prefix transformer",
+			setupStorage: func(tCtx ktesting.TContext) (storage.Interface, string) {
+				return setupStore(tCtx, prefixTransformer{})
+			},
+		},
+		{
+			name: "cacher",
+			setupStorage: func(tCtx ktesting.TContext) (storage.Interface, string) {
+				store, prefix := setupStore(tCtx, nil)
+				return setupCacher(tCtx, store), prefix
+			},
+		},
+		{
+			name: "cacher with ConsistentGetFromCache",
+			setupStorage: func(tCtx ktesting.TContext) (storage.Interface, string) {
+				featuregatetesting.SetFeatureGateDuringTest(tCtx, utilfeature.DefaultFeatureGate, features.ConsistentGetFromCache, true)
+				store, prefix := setupStore(tCtx, nil)
+				return setupCacher(tCtx, store), prefix
+			},
+		},
+		{
+			name: "cacher with prefix transformer",
+			setupStorage: func(tCtx ktesting.TContext) (storage.Interface, string) {
+				store, prefix := setupStore(tCtx, prefixTransformer{})
+				return setupCacher(tCtx, store), prefix
+			},
+		},
+		{
+			name: "cacher without WatchFromStorageWithoutPrevKV",
+			setupStorage: func(tCtx ktesting.TContext) (storage.Interface, string) {
+				featuregatetesting.SetFeatureGateDuringTest(tCtx, utilfeature.DefaultFeatureGate, features.WatchFromStorageWithoutPrevKV, false)
+				store, prefix := setupStore(tCtx, nil)
+				return setupCacher(tCtx, store), prefix
+			},
+		},
+		{
+			// Covers cacher reinitialization and unready (Pending) state handling:
+			// - Watch expiration (410 Gone) and reconnect failure (cacher.startCaching WatchCacheInitializationErrors)
+			// - Reflector fallback from WatchList to listerWatcher.List and watchCache.Replace
+			// - CacheDelegator fallback to etcd on Get and bounded unfiltered GetList when !cacher.Ready()
+			// - Cacher 429 TooManyRequests rejection on non-delegated GetList and Watch when !cacher.Ready()
+			name: "cacher with watch-breaking etcd",
+			setupStorage: func(tCtx ktesting.TContext) (storage.Interface, string) {
+				store, prefix := setupStore(tCtx, nil)
+				return setupCacher(tCtx, &watchBreakingStore{Interface: store, expireAfter: 200 * time.Millisecond}), prefix
+			},
+			validateFaultInjection: func(tCtx ktesting.TContext, ops []correctness.Operation, watches []correctness.WatchOperation) {
+				require.True(tCtx, hasUnreadyListError(ops), "expected cacher.GetList to reject requests with 429 TooManyRequests while unready")
+				require.True(tCtx, hasWatchTooManyRequestsError(watches), "expected cacher.Watch to reject watches with 429 TooManyRequests while unready")
+			},
+		},
+		{
+			// Covers watch delivery lag exceeding blockTimeout (3s):
+			// - watchCache.waitUntilFreshLocked timing out with TooLargeResourceVersionError
+			// - CacheDelegator.GetList catching TooLargeResourceVersionError on consistent reads (RV="") and falling back to etcd
+			// - Cacher.GetList (non-consistent RVCached) and Cacher.Get returning TooLargeResourceVersionError
+			// - Cacher.Watch (SendInitialEvents=true) timing out in waitUntilWatchCacheFreshAndForceAllEvents and returning errWatcher
+			name: "cacher with watch-delaying etcd",
+			setupStorage: func(tCtx ktesting.TContext) (storage.Interface, string) {
+				store, prefix := setupStore(tCtx, nil)
+				return setupCacher(tCtx, &watchDelayingStore{Interface: store, delay: 3600 * time.Millisecond}), prefix
+			},
+			validateFaultInjection: func(tCtx ktesting.TContext, ops []correctness.Operation, watches []correctness.WatchOperation) {
+				require.True(tCtx, hasConsistentListFallback(ops) || hasUnaryTimeoutError(ops),
+					"expected >3s watch delay to trigger consistent List fallback to etcd or unary TooLargeResourceVersionError")
+			},
+		},
+		{
+			// Covers broken watch progress notifications when etcd revision advances outside the watched prefix:
+			// - ConditionalProgressRequester requesting watch progress every 100ms and handling RequestWatchProgress errors
+			// - Dropped progress bookmarks preventing watchCache.resourceVersion from advancing during an idle window (>3s),
+			//   causing waitUntilFreshLocked timeouts on GetList (falling back to etcd on consistent reads) and WatchList
+			name: "cacher with bookmark-dropping etcd",
+			setupStorage: func(tCtx ktesting.TContext) (storage.Interface, string) {
+				store, prefix := setupStore(tCtx, nil)
+				return setupCacher(tCtx, &bookmarkDroppingStore{Interface: store, stallDuration: 4700 * time.Millisecond}), prefix
+			},
+			validateFaultInjection: func(tCtx ktesting.TContext, ops []correctness.Operation, watches []correctness.WatchOperation) {
+				require.True(tCtx, hasConsistentListFallback(ops) || hasUnaryTimeoutError(ops),
+					"expected dropped progress bookmarks during >3s idle window to trigger consistent List fallback to etcd or unary TooLargeResourceVersionError")
+				require.True(tCtx, hasWatchEventReason(watches, metav1.StatusReasonTimeout),
+					"expected dropped progress bookmarks during >3s idle window to trigger WatchList StatusReasonTimeout error events")
+			},
+		},
+		{
+			// Covers watch history cyclic buffer eviction and snapshot compaction under a short freshness window (10ms):
+			// - watchCacheHistory dynamic capacity resize (grow and shrink), event eviction, and B-tree snapshot compaction
+			// - watchCacheHistory.GetIntervalLocked returning 410 ResourceExpired when a watch requests an evicted RV
+			name: "cacher_small_history",
+			setupStorage: func(tCtx ktesting.TContext) (storage.Interface, string) {
+				origFreshDuration := cacher.DefaultEventFreshDuration
+				cacher.DefaultEventFreshDuration = 10 * time.Millisecond
+				tCtx.Cleanup(func() {
+					cacher.DefaultEventFreshDuration = origFreshDuration
+				})
+				store, prefix := setupStore(tCtx, nil)
+				return setupCacher(tCtx, store), prefix
+			},
+			validateFaultInjection: func(tCtx ktesting.TContext, _ []correctness.Operation, watches []correctness.WatchOperation) {
+				require.True(tCtx, hasWatchEventReason(watches, metav1.StatusReasonExpired),
+					"expected small history window to expire old watch resource versions with StatusReasonExpired")
+			},
+		},
 	}
 	for _, s := range storages {
 		t.Run(s.name, func(t *testing.T) {
-			store, storagePrefix := s.fn(t)
-			testCorrectness(t, store, storagePrefix)
+			tCtx := ktesting.Init(t)
+			store, storagePrefix := s.setupStorage(tCtx)
+			ops, watches := testCorrectness(t, store, storagePrefix)
+			if s.validateFaultInjection != nil {
+				s.validateFaultInjection(tCtx, ops, watches)
+			}
 		})
 	}
 }
 
-func testCorrectness(t *testing.T, store storage.Interface, storagePrefix string) {
+func testCorrectness(t *testing.T, store storage.Interface, storagePrefix string) ([]correctness.Operation, []correctness.WatchOperation) {
 	ctx := t.Context()
 	versioner := store.Versioner()
 
@@ -259,12 +427,15 @@ func testCorrectness(t *testing.T, store storage.Interface, storagePrefix string
 	})
 	wg.Wait()
 	require.NoError(t, err)
-	watchEvents := 0
-	for _, w := range watches {
-		watchEvents += len(w.Response.Events)
+	unaryTotal, unaryByOp := summarizeUnaryOperations(operations)
+	watchTotal, watchEvents := summarizeWatchOperations(watches)
+	t.Logf("Unary operations: %s", unaryTotal)
+	for _, op := range slices.Sorted(maps.Keys(unaryByOp)) {
+		t.Logf("  %-7s %s", op+":", *unaryByOp[op])
 	}
-	t.Logf("Collected %d unary operations and %d watches with %d events",
-		len(operations), len(watches), watchEvents)
+	t.Logf("Watches: %s events=%d", watchTotal, watchEvents)
+	require.GreaterOrEqual(t, unaryTotal.succeeded, unaryCfg.SucceededOperations, "expected at least %d succeeded unary operations", unaryCfg.SucceededOperations)
+	require.GreaterOrEqual(t, watchTotal.executed, watchCfg.MinOperations, "expected at least %d watch operations", watchCfg.MinOperations)
 
 	model := ToPorcupineModel(initialState)
 	res, info := porcupine.CheckOperationsVerbose(model, toPorcupineOperations(operations), time.Minute)
@@ -298,6 +469,7 @@ func testCorrectness(t *testing.T, store storage.Interface, storagePrefix string
 		require.NoError(t, validator.ValidateWatch(w.Request, w.Response))
 	}
 	require.Positive(t, watchEvents, "expected at least one watch event across %d watches", len(watches))
+	return operations, watches
 }
 
 func orderByLinearization(ops []correctness.Operation, linearization []int) []correctness.Operation {

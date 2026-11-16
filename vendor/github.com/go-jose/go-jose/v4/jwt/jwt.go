@@ -85,7 +85,12 @@ func (t *NestedJSONWebToken) Decrypt(decryptionKey interface{}) (*JSONWebToken, 
 	return sig, nil
 }
 
-// ParseSigned parses token from JWS form.
+// ParseSigned parses a JWT in the JWS Compact Serialization.
+//
+// https://datatracker.ietf.org/doc/html/rfc7515#section-3.1
+//
+// The signatureAlgorithms parameter contains the allowable algorithms in the "alg" header parameter.
+// It must be non-empty. Non-matching algorithms cause a parse error.
 func ParseSigned(s string, signatureAlgorithms []jose.SignatureAlgorithm) (*JSONWebToken, error) {
 	sig, err := jose.ParseSignedCompact(s, signatureAlgorithms)
 	if err != nil {
@@ -142,13 +147,10 @@ func parseEncryptedCompact(
 	return enc, nil
 }
 
-// ParseEncrypted parses token from JWE form.
+// ParseEncrypted parses a JWT in the JWE Compact Serialization.
 //
-// The keyAlgorithms and contentEncryption parameters are used to validate the "alg" and "enc"
-// header parameters respectively. They must be nonempty, and each "alg" or "enc" header in
-// parsed data must contain a value that is present in the corresponding parameter. That
-// includes the protected and unprotected headers as well as all recipients. To accept
-// multiple algorithms, pass a slice of all the algorithms you want to accept.
+// The keyAlgorithms and contentEncryption parameters contain the allowable algorithms in the "alg" and "enc"
+// header parameters respectively. They must be non-empty. Non-matching algorithms cause a parse error.
 func ParseEncrypted(s string,
 	keyAlgorithms []jose.KeyAlgorithm,
 	contentEncryption []jose.ContentEncryption,
@@ -164,17 +166,10 @@ func ParseEncrypted(s string,
 	}, nil
 }
 
-// ParseSignedAndEncrypted parses signed-then-encrypted token from JWE form.
+// ParseSignedAndEncrypted parses a signed-then-encrypted token in the JWE Compact Serialization.
 //
-// The encryptionKeyAlgorithms and contentEncryption parameters are used to validate the "alg" and "enc"
-// header parameters, respectively, of the outer JWE. They must be nonempty, and each "alg" or "enc"
-// header in parsed data must contain a value that is present in the corresponding parameter. That
-// includes the protected and unprotected headers as well as all recipients. To accept
-// multiple algorithms, pass a slice of all the algorithms you want to accept.
-//
-// The signatureAlgorithms parameter is used to validate the "alg" header parameter of the
-// inner JWS. It must be nonempty, and the "alg" header in the inner JWS must contain a value
-// that is present in the parameter.
+// The encryptionKeyAlgorithms, contentEncryption, and signatureAlgorithms parameters contain the allowable
+// algorithms. They must be non-empty. Non-matching algorithms cause a parse error.
 func ParseSignedAndEncrypted(s string,
 	encryptionKeyAlgorithms []jose.KeyAlgorithm,
 	contentEncryption []jose.ContentEncryption,

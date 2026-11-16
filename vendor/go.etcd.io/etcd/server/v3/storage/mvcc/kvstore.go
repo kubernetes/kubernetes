@@ -157,11 +157,21 @@ func (s *store) hash() (hash uint32, revision int64, err error) {
 	// TODO: hash and revision could be inconsistent, one possible fix is to add s.revMu.RLock() at the beginning of function, which is costly
 	start := time.Now()
 
-	s.b.ForceCommit()
-	h, err := s.b.Hash(schema.DefaultIgnores)
+	// Restore replaces s.b under s.mu. Commit before releasing s.mu so that
+	// ForceCommit never runs on a backend that was replaced and closed.
+	s.mu.RLock()
+	b := s.b
+	b.ForceCommit()
+	s.mu.RUnlock()
+
+	h, err := b.Hash(schema.DefaultIgnores)
+
+	s.revMu.RLock()
+	revision = s.currentRev
+	s.revMu.RUnlock()
 
 	hashSec.Observe(time.Since(start).Seconds())
-	return h, s.currentRev, err
+	return h, revision, err
 }
 
 func (s *store) hashByRev(rev int64) (hash KeyValueHash, currentRev int64, err error) {

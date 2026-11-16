@@ -22,8 +22,15 @@ source "${KUBE_ROOT}/cluster/gce/config-common.sh"
 # Specifying KUBE_GCE_API_ENDPOINT will override the default GCE Compute API endpoint (https://www.googleapis.com/compute/v1/).
 # This endpoint has to be pointing to v1 api. For example, https://www.googleapis.com/compute/staging_v1/
 export GCE_API_ENDPOINT=${KUBE_GCE_API_ENDPOINT:-}
-ZONE=${KUBE_GCE_ZONE:-us-central1-b}
-export REGION=${ZONE%-*}
+# Without KUBE_GCE_ZONE, ZONE and REGION are resolved later by detect-zone-in-region.
+if [[ -z "${KUBE_GCE_ZONE:-}" ]]; then
+  ZONE=""
+  # kubetest passes --gcp-region as REGION, kubetest2 as KUBE_GCE_REGION.
+  export REGION=${KUBE_GCE_REGION:-${REGION:-}}
+else
+  ZONE=${KUBE_GCE_ZONE}
+  export REGION=${ZONE%-*}
+fi
 RELEASE_REGION_FALLBACK=${RELEASE_REGION_FALLBACK:-false}
 REGIONAL_KUBE_ADDONS=${REGIONAL_KUBE_ADDONS:-true}
 NODE_SIZE=${NODE_SIZE:-e2-standard-2}

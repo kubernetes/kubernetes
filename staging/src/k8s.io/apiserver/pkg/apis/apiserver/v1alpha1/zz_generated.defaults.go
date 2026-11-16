@@ -30,6 +30,9 @@ import (
 // All generated defaulters are covering - they call all nested defaulters.
 func RegisterDefaults(scheme *runtime.Scheme) error {
 	scheme.AddTypeDefaultingFunc(&AuthorizationConfiguration{}, func(obj interface{}) { SetObjectDefaults_AuthorizationConfiguration(obj.(*AuthorizationConfiguration)) })
+	scheme.AddTypeDefaultingFunc(&StorageCompressionConfiguration{}, func(obj interface{}) {
+		SetObjectDefaults_StorageCompressionConfiguration(obj.(*StorageCompressionConfiguration))
+	})
 	return nil
 }
 
@@ -39,5 +42,12 @@ func SetObjectDefaults_AuthorizationConfiguration(in *AuthorizationConfiguration
 		if a.Webhook != nil {
 			SetDefaults_WebhookConfiguration(a.Webhook)
 		}
+	}
+}
+
+func SetObjectDefaults_StorageCompressionConfiguration(in *StorageCompressionConfiguration) {
+	for i := range in.CompressionResources {
+		a := &in.CompressionResources[i]
+		SetDefaults_CompressionResourceConfiguration(a)
 	}
 }

@@ -20,6 +20,7 @@ import (
 	"strings"
 	"testing"
 
+	apiresource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -34,6 +35,16 @@ func testClass(name string) *resource.DeviceClass {
 		},
 	}
 }
+
+func testCapacityRequests(names ...resource.QualifiedName) *resource.CapacityRequirements {
+	requests := make(map[resource.QualifiedName]apiresource.Quantity, len(names))
+	for _, name := range names {
+		requests[name] = apiresource.MustParse("1")
+	}
+	return &resource.CapacityRequirements{Requests: requests}
+}
+
+const badCapacityNameMessage = "a valid C identifier must start with alphabetic character or '_', followed by a string of alphanumeric characters or '_' (e.g. 'my_name',  or 'MY_NAME',  or 'MyName', regex used for validation is '[A-Za-z_][A-Za-z0-9_]*')"
 
 func TestValidateClass(t *testing.T) {
 	goodName := "foo"
@@ -188,10 +199,27 @@ func TestValidateClass(t *testing.T) {
 				return class
 			}(),
 		},
+		"good-extended-resource-capacity-requests": {
+			class: func() *resource.DeviceClass {
+				class := testClass(goodName)
+				class.Spec.ExtendedResourceName = ptr.To("example.com/gpu.shared")
+				class.Spec.ExtendedResourceCapacityRequests = testCapacityRequests("shares", "dra.example.com/memory")
+				return class
+			}(),
+		},
+		"bad-extended-resource-capacity-requests-name": {
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "extendedResourceCapacityRequests", "requests"), "1shares", badCapacityNameMessage)},
+			class: func() *resource.DeviceClass {
+				class := testClass(goodName)
+				class.Spec.ExtendedResourceName = ptr.To("example.com/gpu.shared")
+				class.Spec.ExtendedResourceCapacityRequests = testCapacityRequests("1shares")
+				return class
+			}(),
+		},
 		"selectors": {
 			wantFailures: field.ErrorList{
 				field.Required(field.NewPath("spec", "selectors").Index(1).Child("cel"), ""),
-				field.Invalid(field.NewPath("spec", "selectors").Index(2).Child("cel", "expression"), "noSuchVar", "compilation failed: ERROR: <input>:1:1: undeclared reference to 'noSuchVar' (in container '')\n | noSuchVar\n | ^"),
+				field.Invalid(field.NewPath("spec", "selectors").Index(2).Child("cel", "expression"), "noSuchVar", "compilation failed: ERROR: <input>:1:1: undeclared reference to 'noSuchVar'\n | noSuchVar\n | ^"),
 			},
 			class: func() *resource.DeviceClass {
 				class := testClass(goodName)
@@ -381,6 +409,37 @@ func TestValidateClassUpdate(t *testing.T) {
 						},
 					},
 				}}
+				return class
+			},
+		},
+		"invalid-extended-resource-capacity-requests-name": {
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "extendedResourceCapacityRequests", "requests"), "1shares", badCapacityNameMessage)},
+			oldClass:     validClass,
+			update: func(class *resource.DeviceClass) *resource.DeviceClass {
+				class.Spec.ExtendedResourceCapacityRequests = testCapacityRequests("1shares")
+				return class
+			},
+		},
+		"bad-extended-resource-capacity-requests-name-valid-if-stored": {
+			oldClass: func() *resource.DeviceClass {
+				class := validClass.DeepCopy()
+				class.Spec.ExtendedResourceCapacityRequests = testCapacityRequests("1shares")
+				return class
+			}(),
+			update: func(class *resource.DeviceClass) *resource.DeviceClass {
+				// No changes -> remains valid.
+				return class
+			},
+		},
+		"bad-extended-resource-capacity-requests-name-revalidated-when-changed": {
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "extendedResourceCapacityRequests", "requests"), "1shares", badCapacityNameMessage)},
+			oldClass: func() *resource.DeviceClass {
+				class := validClass.DeepCopy()
+				class.Spec.ExtendedResourceCapacityRequests = testCapacityRequests("1shares")
+				return class
+			}(),
+			update: func(class *resource.DeviceClass) *resource.DeviceClass {
+				class.Spec.ExtendedResourceCapacityRequests.Requests["memory"] = apiresource.MustParse("1Gi")
 				return class
 			},
 		},

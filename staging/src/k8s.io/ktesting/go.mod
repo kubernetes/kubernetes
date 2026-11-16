@@ -2,9 +2,9 @@
 
 module k8s.io/ktesting
 
-go 1.27.0
+go 1.26.0
 
-godebug default=go1.27
+godebug default=go1.26
 
 require (
 	github.com/onsi/gomega v1.44.0
@@ -19,6 +19,6 @@ require (
 	github.com/stretchr/testify v1.12.1 // indirect
 	go.yaml.in/yaml/v2 v2.4.4 // indirect
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
-	golang.org/x/net v0.59.0 // indirect
-	golang.org/x/text v0.42.0 // indirect
+	golang.org/x/net v0.62.0 // indirect
+	golang.org/x/text v0.43.0 // indirect
 )

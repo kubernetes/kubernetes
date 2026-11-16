@@ -18,13 +18,13 @@ package harness
 
 import (
 	"os"
-	"testing"
 
 	"k8s.io/klog/v2"
+	testutils "k8s.io/kubernetes/test/utils"
 )
 
 // Harness adds some functionality to testing.T, in particular resource cleanup.
-// It embeds testing.T, so should have the same signature.
+// It embeds testutils.TB, so should have the same signature.
 //
 // Example usage:
 // ```
@@ -37,14 +37,14 @@ import (
 //
 // ```
 type Harness struct {
-	*testing.T
+	testutils.TB
 	defers []func() error
 }
 
-// For creates a Harness from a testing.T
+// For creates a Harness from a testutils.TB
 // Callers must call Close on the Harness so that resources can be cleaned up
-func For(t *testing.T) *Harness {
-	h := &Harness{T: t}
+func For(t testutils.TB) *Harness {
+	h := &Harness{TB: t}
 	return h
 }
 

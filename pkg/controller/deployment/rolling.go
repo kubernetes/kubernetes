@@ -35,34 +35,28 @@ func (dc *DeploymentController) rolloutRolling(ctx context.Context, d *apps.Depl
 	}
 	allRSs := append(oldRSs, newRS)
 
+	err = dc.reconcileRollingReplicaSets(ctx, d, allRSs, oldRSs, newRS)
+	return dc.syncRolloutStatusAfter(ctx, err, allRSs, newRS, d)
+}
+
+func (dc *DeploymentController) reconcileRollingReplicaSets(ctx context.Context, d *apps.Deployment, allRSs, oldRSs []*apps.ReplicaSet, newRS *apps.ReplicaSet) error {
 	// Scale up, if we can.
 	scaledUp, err := dc.reconcileNewReplicaSet(ctx, allRSs, newRS, d)
-	if err != nil {
+	if err != nil || scaledUp {
 		return err
-	}
-	if scaledUp {
-		// Update DeploymentStatus
-		return dc.syncRolloutStatus(ctx, allRSs, newRS, d)
 	}
 
 	// Scale down, if we can.
 	scaledDown, err := dc.reconcileOldReplicaSets(ctx, allRSs, controller.FilterActiveReplicaSets(oldRSs), newRS, d)
-	if err != nil {
+	if err != nil || scaledDown {
 		return err
-	}
-	if scaledDown {
-		// Update DeploymentStatus
-		return dc.syncRolloutStatus(ctx, allRSs, newRS, d)
 	}
 
 	if deploymentutil.DeploymentComplete(d, &d.Status) {
-		if err := dc.cleanupDeployment(ctx, oldRSs, d); err != nil {
-			return err
-		}
+		return dc.cleanupDeployment(ctx, oldRSs, d)
 	}
 
-	// Sync deployment status
-	return dc.syncRolloutStatus(ctx, allRSs, newRS, d)
+	return nil
 }
 
 func (dc *DeploymentController) reconcileNewReplicaSet(ctx context.Context, allRSs []*apps.ReplicaSet, newRS *apps.ReplicaSet, deployment *apps.Deployment) (bool, error) {

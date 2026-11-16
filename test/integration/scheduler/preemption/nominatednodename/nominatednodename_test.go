@@ -40,6 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
+	schedulerutils "k8s.io/kubernetes/test/integration/scheduler"
 	testutils "k8s.io/kubernetes/test/integration/util"
 	"k8s.io/utils/ptr"
 )
@@ -47,11 +48,11 @@ import (
 // imported from testutils
 var (
 	initPausePod   = testutils.InitPausePod
-	createNode     = testutils.CreateNode
+	createNode     = schedulerutils.CreateNode
 	createPausePod = testutils.CreatePausePod
-	runPausePod    = testutils.RunPausePod
-	deletePod      = testutils.DeletePod
-	initTest       = testutils.InitTestSchedulerWithNS
+	runPausePod    = schedulerutils.RunPausePod
+	deletePod      = schedulerutils.DeletePod
+	initTest       = schedulerutils.InitTestSchedulerWithNS
 )
 
 var lowPriority, mediumPriority, highPriority = int32(100), int32(200), int32(300)
@@ -123,11 +124,11 @@ func TestNominatedNode(t *testing.T) {
 				},
 			},
 			postChecks: []func(ctx context.Context, cs clientset.Interface, pod *v1.Pod) error{
-				testutils.WaitForPodToSchedule,
+				schedulerutils.WaitForPodToSchedule,
 				// Expect NNN to be set on "medium" pod after starting preemption.
-				testutils.WaitForNominatedNodeName,
+				schedulerutils.WaitForNominatedNodeName,
 				// Expect NNN to be set on "high" pod after starting preemption.
-				testutils.WaitForNominatedNodeName,
+				schedulerutils.WaitForNominatedNodeName,
 			},
 			podNamesToDelete: []string{"low-1", "low-2", "low-3", "low-4"},
 		},
@@ -146,11 +147,11 @@ func TestNominatedNode(t *testing.T) {
 				},
 			},
 			postChecks: []func(ctx context.Context, cs clientset.Interface, pod *v1.Pod) error{
-				testutils.WaitForPodToSchedule,
+				schedulerutils.WaitForPodToSchedule,
 				// Expect NNN to be set on "medium" pod after starting preemption.
-				testutils.WaitForNominatedNodeName,
+				schedulerutils.WaitForNominatedNodeName,
 				// Expect "high" pod to get scheduled before "medium" re-enters the scheduling cycle.
-				testutils.WaitForPodToSchedule,
+				schedulerutils.WaitForPodToSchedule,
 			},
 			podNamesToDelete: []string{"low"},
 		},
@@ -166,8 +167,8 @@ func TestNominatedNode(t *testing.T) {
 				},
 			},
 			postChecks: []func(ctx context.Context, cs clientset.Interface, pod *v1.Pod) error{
-				testutils.WaitForPodToSchedule,
-				testutils.WaitForNominatedNodeName,
+				schedulerutils.WaitForPodToSchedule,
+				schedulerutils.WaitForNominatedNodeName,
 			},
 			// Delete the fake node to simulate an ErrNoNodesAvailable error.
 			deleteFakeNode:   true,
@@ -197,8 +198,8 @@ func TestNominatedNode(t *testing.T) {
 				},
 			},
 			postChecks: []func(ctx context.Context, cs clientset.Interface, pod *v1.Pod) error{
-				testutils.WaitForPodToSchedule,
-				testutils.WaitForNominatedNodeName,
+				schedulerutils.WaitForPodToSchedule,
+				schedulerutils.WaitForNominatedNodeName,
 			},
 			// Delete the fake node to trigger the `UnschedulableAndUnresolvable` condition in `findCandidates`.
 			deleteFakeNode:   true,
@@ -216,8 +217,8 @@ func TestNominatedNode(t *testing.T) {
 				},
 			},
 			postChecks: []func(ctx context.Context, cs clientset.Interface, pod *v1.Pod) error{
-				testutils.WaitForPodToSchedule,
-				testutils.WaitForNominatedNodeName,
+				schedulerutils.WaitForPodToSchedule,
+				schedulerutils.WaitForNominatedNodeName,
 			},
 			podNamesToDelete: []string{fmt.Sprintf("low-%v", doNotFailMe)},
 			customPlugins: &configv1.Plugins{

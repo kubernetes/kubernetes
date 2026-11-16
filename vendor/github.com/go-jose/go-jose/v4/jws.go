@@ -27,6 +27,12 @@ import (
 	"github.com/go-jose/go-jose/v4/json"
 )
 
+// MaxSignatures is the maximum number of signatures in a JWS at parse time.
+// Higher values mean more potential work done across untrusted input.
+//
+// If modifying MaxSignatures, do it before any parsing occurs.
+var MaxSignatures = 32
+
 // rawJSONWebSignature represents a raw JWS JSON object. Used for parsing/serializing.
 type rawJSONWebSignature struct {
 	Payload    *byteBuffer        `json:"payload,omitempty"`
@@ -86,6 +92,11 @@ type Signature struct {
 // Verify() after parsing to validate the signature and obtain the payload.
 //
 // https://datatracker.ietf.org/doc/html/rfc7515#section-7
+//
+// The signatureAlgorithms parameter contains the allowable algorithms in the "alg" header parameter.
+// It must be non-empty. Non-matching algorithms cause a parse error.
+//
+// Deprecated: call ParseSignedJSON or ParseSignedCompact depending on which serialization you expect.
 func ParseSigned(
 	signature string,
 	signatureAlgorithms []SignatureAlgorithm,
@@ -108,6 +119,9 @@ func ParseSigned(
 // Verify() after parsing to validate the signature and obtain the payload.
 //
 // https://datatracker.ietf.org/doc/html/rfc7515#section-7.1
+//
+// The signatureAlgorithms parameter contains the allowable algorithms in the "alg" header parameter.
+// It must be non-empty. Non-matching algorithms cause a parse error.
 func ParseSignedCompact(
 	signature string,
 	signatureAlgorithms []SignatureAlgorithm,
@@ -125,6 +139,9 @@ func ParseSignedCompact(
 // parsing. Call Verify() after parsing to validate the signature and obtain the payload.
 //
 // https://datatracker.ietf.org/doc/html/rfc7515#appendix-F
+//
+// The signatureAlgorithms parameter contains the allowable algorithms in the "alg" header parameter.
+// It must be non-empty. Any non-allowed algorithms will cause parsing to fail.
 func ParseDetached(
 	signature string,
 	payload []byte,
@@ -157,7 +174,11 @@ func (obj JSONWebSignature) computeAuthData(payload []byte, signature *Signature
 		authData.WriteString(signature.original.Protected.base64())
 	} else if signature.protected != nil {
 		protectedHeader = signature.protected
-		authData.WriteString(base64.RawURLEncoding.EncodeToString(mustSerializeJSON(protectedHeader)))
+		serializedProtected, err := json.Marshal(protectedHeader)
+		if err != nil {
+			return nil, err
+		}
+		authData.WriteString(base64.RawURLEncoding.EncodeToString(serializedProtected))
 	}
 
 	needsBase64 := true
@@ -180,9 +201,13 @@ func (obj JSONWebSignature) computeAuthData(payload []byte, signature *Signature
 	return authData.Bytes(), nil
 }
 
-// ParseSignedJSON parses a message in JWS JSON Serialization.
+// ParseSignedJSON parses a message in JWS JSON Serialization. Messages with
+// more than [MaxSignatures] signatures are rejected.
 //
 // https://datatracker.ietf.org/doc/html/rfc7515#section-7.2
+//
+// The signatureAlgorithms parameter contains the allowable algorithms in the "alg" header parameter.
+// It must be non-empty. Non-matching algorithms cause a parse error.
 func ParseSignedJSON(
 	input string,
 	signatureAlgorithms []SignatureAlgorithm,
@@ -236,6 +261,9 @@ func (parsed *rawJSONWebSignature) sanitized(signatureAlgorithms []SignatureAlgo
 	if parsed.Payload == nil {
 		return nil, fmt.Errorf("go-jose/go-jose: missing payload in JWS message")
 	}
+	if len(parsed.Signatures) > MaxSignatures {
+		return nil, fmt.Errorf("go-jose/go-jose: too many signatures in JWS; maximum is %d", MaxSignatures)
+	}
 
 	obj := &JSONWebSignature{
 		payload:    parsed.Payload.bytes(),
@@ -245,13 +273,12 @@ func (parsed *rawJSONWebSignature) sanitized(signatureAlgorithms []SignatureAlgo
 	if len(parsed.Signatures) == 0 {
 		// No signatures array, must be flattened serialization
 		signature := Signature{}
-		if parsed.Protected != nil && len(parsed.Protected.bytes()) > 0 {
-			signature.protected = &rawHeader{}
-			err := json.Unmarshal(parsed.Protected.bytes(), signature.protected)
-			if err != nil {
-				return nil, err
-			}
+		prot, err := parseProtectedHeader(parsed.Protected)
+		if err != nil {
+			return nil, err
 		}
+
+		signature.protected = prot
 
 		// Check that there is not a nonce in the unprotected header
 		if parsed.Header != nil && parsed.Header.getNonce() != "" {
@@ -275,15 +302,15 @@ func (parsed *rawJSONWebSignature) sanitized(signatureAlgorithms []SignatureAlgo
 			Signature: parsed.Signature,
 		}
 
-		var err error
-		signature.Header, err = signature.mergedHeaders().sanitized()
-		if err != nil {
-			return nil, err
-		}
-
-		alg := SignatureAlgorithm(signature.Header.Algorithm)
+		mergedHeaders := signature.mergedHeaders()
+		alg := mergedHeaders.getSignatureAlgorithm()
 		if !containsSignatureAlgorithm(signatureAlgorithms, alg) {
 			return nil, newErrUnexpectedSignatureAlgorithm(alg, signatureAlgorithms)
+		}
+
+		signature.Header, err = mergedHeaders.sanitized()
+		if err != nil {
+			return nil, err
 		}
 
 		if signature.header != nil {
@@ -310,28 +337,29 @@ func (parsed *rawJSONWebSignature) sanitized(signatureAlgorithms []SignatureAlgo
 	}
 
 	for i, sig := range parsed.Signatures {
-		if sig.Protected != nil && len(sig.Protected.bytes()) > 0 {
-			obj.Signatures[i].protected = &rawHeader{}
-			err := json.Unmarshal(sig.Protected.bytes(), obj.Signatures[i].protected)
-			if err != nil {
-				return nil, err
-			}
+		prot, err := parseProtectedHeader(sig.Protected)
+		if err != nil {
+			return nil, err
 		}
+
+		obj.Signatures[i].protected = prot
 
 		// Check that there is not a nonce in the unprotected header
 		if sig.Header != nil && sig.Header.getNonce() != "" {
 			return nil, ErrUnprotectedNonce
 		}
 
-		var err error
-		obj.Signatures[i].Header, err = obj.Signatures[i].mergedHeaders().sanitized()
-		if err != nil {
-			return nil, err
-		}
+		obj.Signatures[i].header = sig.Header
 
-		alg := SignatureAlgorithm(obj.Signatures[i].Header.Algorithm)
+		mergedHeaders := obj.Signatures[i].mergedHeaders()
+		alg := mergedHeaders.getSignatureAlgorithm()
 		if !containsSignatureAlgorithm(signatureAlgorithms, alg) {
 			return nil, newErrUnexpectedSignatureAlgorithm(alg, signatureAlgorithms)
+		}
+
+		obj.Signatures[i].Header, err = mergedHeaders.sanitized()
+		if err != nil {
+			return nil, err
 		}
 
 		if obj.Signatures[i].header != nil {
@@ -359,7 +387,6 @@ func (parsed *rawJSONWebSignature) sanitized(signatureAlgorithms []SignatureAlgo
 		// Copy value of sig
 		original := sig
 
-		obj.Signatures[i].header = sig.Header
 		obj.Signatures[i].original = &original
 	}
 
@@ -424,7 +451,10 @@ func (obj JSONWebSignature) compactSerialize(detached bool) (string, error) {
 		return "", ErrNotSupported
 	}
 
-	serializedProtected := mustSerializeJSON(obj.Signatures[0].protected)
+	serializedProtected, err := json.Marshal(obj.Signatures[0].protected)
+	if err != nil {
+		return "", err
+	}
 
 	var payload []byte
 	if !detached {
@@ -449,14 +479,23 @@ func (obj JSONWebSignature) DetachedCompactSerialize() (string, error) {
 }
 
 // FullSerialize serializes an object using the full JSON serialization format.
+//
+// It returns "" if obj cannot be serialized.
 func (obj JSONWebSignature) FullSerialize() string {
 	raw := rawJSONWebSignature{
 		Payload: newBuffer(obj.payload),
 	}
 
+	if len(obj.Signatures) == 0 {
+		return ""
+	}
+
 	if len(obj.Signatures) == 1 {
 		if obj.Signatures[0].protected != nil {
-			serializedProtected := mustSerializeJSON(obj.Signatures[0].protected)
+			serializedProtected, err := json.Marshal(obj.Signatures[0].protected)
+			if err != nil {
+				return ""
+			}
 			raw.Protected = newBuffer(serializedProtected)
 		}
 		raw.Header = obj.Signatures[0].header
@@ -470,10 +509,18 @@ func (obj JSONWebSignature) FullSerialize() string {
 			}
 
 			if signature.protected != nil {
-				raw.Signatures[i].Protected = newBuffer(mustSerializeJSON(signature.protected))
+				serializedProtected, err := json.Marshal(signature.protected)
+				if err != nil {
+					return ""
+				}
+				raw.Signatures[i].Protected = newBuffer(serializedProtected)
 			}
 		}
 	}
 
-	return string(mustSerializeJSON(raw))
+	out, err := json.Marshal(raw)
+	if err != nil {
+		return ""
+	}
+	return string(out)
 }

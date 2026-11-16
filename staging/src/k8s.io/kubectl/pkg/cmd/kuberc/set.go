@@ -26,6 +26,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
+	"k8s.io/client-go/plugin/pkg/client/auth/exec"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	v1 "k8s.io/kubectl/pkg/config/v1"
 	"k8s.io/kubectl/pkg/kuberc"
@@ -159,8 +161,13 @@ func (o *SetOptions) Validate() error {
 		return fmt.Errorf("--section must be %q, %q, or %q, got: %s", sectionDefaults, sectionAliases, sectionCredentialPlugin, o.Section)
 	}
 
-	if o.Section == sectionAliases && o.AliasName == "" {
-		return fmt.Errorf("--name is required when --section=%s", sectionAliases)
+	if o.Section == sectionAliases {
+		if o.AliasName == "" {
+			return fmt.Errorf("--name is required when --section=%s", sectionAliases)
+		}
+		if err := kuberc.ValidateAliasName(o.AliasName); err != nil {
+			return err
+		}
 	}
 
 	if o.Section == sectionDefaults && o.AliasName != "" {
@@ -362,6 +369,16 @@ func (o *SetOptions) setCredentialPlugin(pref *v1.Preference, options []v1.Comma
 	case v1.PluginPolicyAllowlist:
 		entries, err := getAllowlistEntries(o)
 		if err != nil {
+			return err
+		}
+		allowlist := make([]clientcmdapi.AllowlistEntry, len(entries))
+		for i, entry := range entries {
+			allowlist[i] = clientcmdapi.AllowlistEntry{Command: entry.Command}
+		}
+		if err := exec.ValidatePluginPolicy(clientcmdapi.PluginPolicy{
+			PolicyType: clientcmdapi.PolicyType(policy),
+			Allowlist:  allowlist,
+		}); err != nil {
 			return err
 		}
 		pref.CredentialPluginAllowlist = entries

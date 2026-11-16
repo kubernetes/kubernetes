@@ -22,6 +22,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	apiresource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/version"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -49,6 +50,27 @@ var objWithExtendedResourceName = &resource.DeviceClass{
 	},
 }
 
+var objWithExtendedResourceCapacity = &resource.DeviceClass{
+	ObjectMeta: metav1.ObjectMeta{
+		Name:       "valid-class",
+		Generation: 1,
+	},
+	Spec: resource.DeviceClassSpec{
+		ExtendedResourceName: new("example.com/gpu.shared"),
+		ExtendedResourceCapacityRequests: &resource.CapacityRequirements{
+			Requests: map[resource.QualifiedName]apiresource.Quantity{
+				"shares": apiresource.MustParse("1"),
+			},
+		},
+	},
+}
+
+var objWithExtendedResourceCapacityDropped = func() *resource.DeviceClass {
+	obj := objWithExtendedResourceCapacity.DeepCopy()
+	obj.Spec.ExtendedResourceCapacityRequests = nil
+	return obj
+}()
+
 func TestStrategy(t *testing.T) {
 	if Strategy.NamespaceScoped() {
 		t.Errorf("DeviceClass must not be namespace scoped")
@@ -62,10 +84,11 @@ func TestStrategyCreate(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
 
 	testcases := map[string]struct {
-		obj                   *resource.DeviceClass
-		draExtendedResource   bool
-		expectValidationError bool
-		expectObj             *resource.DeviceClass
+		obj                         *resource.DeviceClass
+		draExtendedResource         bool
+		draExtendedResourceCapacity bool
+		expectValidationError       bool
+		expectObj                   *resource.DeviceClass
 	}{
 		"simple": {
 			obj:       obj,
@@ -89,12 +112,26 @@ func TestStrategyCreate(t *testing.T) {
 			draExtendedResource: true,
 			expectObj:           objWithExtendedResourceName,
 		},
+		"drop-extended-resource-capacity-requests": {
+			obj:                 objWithExtendedResourceCapacity,
+			draExtendedResource: true,
+			expectObj:           objWithExtendedResourceCapacityDropped,
+		},
+		"keep-extended-resource-capacity-requests": {
+			obj:                         objWithExtendedResourceCapacity,
+			draExtendedResource:         true,
+			draExtendedResourceCapacity: true,
+			expectObj:                   objWithExtendedResourceCapacity,
+		},
 	}
 
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
 			obj := tc.obj.DeepCopy()
-			if !tc.draExtendedResource {
+			if tc.draExtendedResource {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAExtendedResourceCapacity, tc.draExtendedResourceCapacity)
+			} else {
+				// DRAExtendedResource can only be disabled in 1.36, which predates DRAExtendedResourceCapacity.
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.36"))
 			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, tc.draExtendedResource)
@@ -121,11 +158,12 @@ func TestStrategyUpdate(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
 
 	testcases := map[string]struct {
-		oldObj                *resource.DeviceClass
-		newObj                *resource.DeviceClass
-		draExtendedResource   bool
-		expectValidationError bool
-		expectObj             *resource.DeviceClass
+		oldObj                      *resource.DeviceClass
+		newObj                      *resource.DeviceClass
+		draExtendedResource         bool
+		draExtendedResourceCapacity bool
+		expectValidationError       bool
+		expectObj                   *resource.DeviceClass
 	}{
 		"no-changes-okay": {
 			oldObj:    obj,
@@ -169,6 +207,48 @@ func TestStrategyUpdate(t *testing.T) {
 			draExtendedResource: false,
 			expectObj:           objWithExtendedResourceName,
 		},
+		"drop-extended-resource-capacity-requests": {
+			oldObj:              objWithExtendedResourceName,
+			newObj:              objWithExtendedResourceCapacity,
+			draExtendedResource: true,
+			expectObj: func() *resource.DeviceClass {
+				obj := objWithExtendedResourceCapacityDropped.DeepCopy()
+				obj.Generation += 1
+				return obj
+			}(),
+		},
+		"keep-extended-resource-capacity-requests": {
+			oldObj:                      objWithExtendedResourceName,
+			newObj:                      objWithExtendedResourceCapacity,
+			draExtendedResource:         true,
+			draExtendedResourceCapacity: true,
+			expectObj: func() *resource.DeviceClass {
+				obj := objWithExtendedResourceCapacity.DeepCopy()
+				obj.Generation += 1
+				return obj
+			}(),
+		},
+		"keep-existing-extended-resource-capacity-requests-disabled-feature": {
+			oldObj:              objWithExtendedResourceCapacity,
+			newObj:              objWithExtendedResourceCapacity,
+			draExtendedResource: true,
+			expectObj:           objWithExtendedResourceCapacity,
+		},
+		"update-existing-extended-resource-capacity-requests-disabled-feature": {
+			oldObj: objWithExtendedResourceCapacity,
+			newObj: func() *resource.DeviceClass {
+				obj := objWithExtendedResourceCapacity.DeepCopy()
+				obj.Spec.ExtendedResourceCapacityRequests.Requests["shares"] = apiresource.MustParse("2")
+				return obj
+			}(),
+			draExtendedResource: true,
+			expectObj: func() *resource.DeviceClass {
+				obj := objWithExtendedResourceCapacity.DeepCopy()
+				obj.Spec.ExtendedResourceCapacityRequests.Requests["shares"] = apiresource.MustParse("2")
+				obj.Generation += 1
+				return obj
+			}(),
+		},
 	}
 
 	for name, tc := range testcases {
@@ -176,7 +256,10 @@ func TestStrategyUpdate(t *testing.T) {
 			oldObj := tc.oldObj.DeepCopy()
 			newObj := tc.newObj.DeepCopy()
 			newObj.ResourceVersion = "4"
-			if !tc.draExtendedResource {
+			if tc.draExtendedResource {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAExtendedResourceCapacity, tc.draExtendedResourceCapacity)
+			} else {
+				// DRAExtendedResource can only be disabled in 1.36, which predates DRAExtendedResourceCapacity.
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.36"))
 			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, tc.draExtendedResource)

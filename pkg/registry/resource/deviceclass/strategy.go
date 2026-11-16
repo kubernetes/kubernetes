@@ -94,6 +94,7 @@ func (deviceClassStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 // dropDisabledFields removes fields which are covered by a feature gate.
 func dropDisabledFields(newClass, oldClass *resource.DeviceClass) {
 	dropDisabledDRAExtendedResourceFields(newClass, oldClass)
+	dropDisabledDRAExtendedResourceCapacityFields(newClass, oldClass)
 }
 
 func dropDisabledDRAExtendedResourceFields(newClass, oldClass *resource.DeviceClass) {
@@ -112,6 +113,25 @@ func draExtendedResourceFeatureInUse(class *resource.DeviceClass) bool {
 	}
 
 	if class.Spec.ExtendedResourceName != nil {
+		return true
+	}
+
+	return false
+}
+
+func dropDisabledDRAExtendedResourceCapacityFields(newClass, oldClass *resource.DeviceClass) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRAExtendedResourceCapacity) || draExtendedResourceCapacityInUse(oldClass) {
+		return
+	}
+	newClass.Spec.ExtendedResourceCapacityRequests = nil
+}
+
+func draExtendedResourceCapacityInUse(class *resource.DeviceClass) bool {
+	if class == nil {
+		return false
+	}
+
+	if class.Spec.ExtendedResourceCapacityRequests != nil {
 		return true
 	}
 

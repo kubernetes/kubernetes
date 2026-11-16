@@ -23,7 +23,10 @@ import (
 	batch "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/ptr"
 )
 
@@ -809,6 +812,107 @@ func TestMatchPodFailurePolicy(t *testing.T) {
 			}
 			if diff := cmp.Diff(tc.wantAction, action); diff != "" {
 				t.Errorf("Unexpected failure policy action: %s", diff)
+			}
+		})
+	}
+}
+
+func TestGetFailJobMessage(t *testing.T) {
+	failedPod := func(name string, exitCode int32) *v1.Pod {
+		return &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: name},
+			Status: v1.PodStatus{
+				Phase: v1.PodFailed,
+				ContainerStatuses: []v1.ContainerStatus{{
+					Name:  "main",
+					State: v1.ContainerState{Terminated: &v1.ContainerStateTerminated{ExitCode: exitCode}},
+				}},
+			},
+		}
+	}
+	rule := func(name *string, action batch.PodFailurePolicyAction, exitCode int32) batch.PodFailurePolicyRule {
+		return batch.PodFailurePolicyRule{
+			Name:   name,
+			Action: action,
+			OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
+				Operator: batch.PodFailurePolicyOnExitCodesOpIn,
+				Values:   []int32{exitCode},
+			},
+		}
+	}
+	rules := []batch.PodFailurePolicyRule{
+		rule(new("retriable"), batch.PodFailurePolicyActionIgnore, 1),
+		rule(new("out-of-quota"), batch.PodFailurePolicyActionFailJob, 2),
+		rule(nil, batch.PodFailurePolicyActionFailJob, 3),
+		rule(nil, batch.PodFailurePolicyActionCount, 4),
+		{
+			Name:   new("disruption-target"),
+			Action: batch.PodFailurePolicyActionFailJob,
+			OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{{
+				Type: v1.DisruptionTarget, Status: v1.ConditionTrue,
+			}},
+		},
+	}
+
+	cases := map[string]struct {
+		enableFeature bool
+		pods          []*v1.Pod
+		wantMessage   *string
+	}{
+		"feature enabled, named FailJob rule": {
+			enableFeature: true,
+			pods:          []*v1.Pod{failedPod("p", 2)},
+			wantMessage:   new("Container main for pod default/p failed with exit code 2 matching FailJob rule at index 1 (out-of-quota)"),
+		},
+		"feature enabled, unnamed FailJob rule uses the rule index": {
+			enableFeature: true,
+			pods:          []*v1.Pod{failedPod("p", 3)},
+			wantMessage:   new("Container main for pod default/p failed with exit code 3 matching FailJob rule at index 2"),
+		},
+		"feature enabled, pods matching non-FailJob rules are skipped": {
+			enableFeature: true,
+			pods:          []*v1.Pod{failedPod("ignored", 1), failedPod("counted", 4), failedPod("p", 2)},
+			wantMessage:   new("Container main for pod default/p failed with exit code 2 matching FailJob rule at index 1 (out-of-quota)"),
+		},
+		"feature enabled, no FailJob match": {
+			enableFeature: true,
+			pods:          []*v1.Pod{failedPod("ignored", 1), failedPod("counted", 4)},
+		},
+		"feature enabled, named pod condition rule": {
+			enableFeature: true,
+			pods: []*v1.Pod{{
+				ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "p"},
+				Status: v1.PodStatus{Phase: v1.PodFailed, Conditions: []v1.PodCondition{{
+					Type: v1.DisruptionTarget, Status: v1.ConditionTrue,
+				}}},
+			}},
+			wantMessage: new("Pod default/p has condition DisruptionTarget matching FailJob rule at index 4 (disruption-target)"),
+		},
+		"feature disabled, named pod condition rule": {
+			pods: []*v1.Pod{{
+				ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "p"},
+				Status: v1.PodStatus{Phase: v1.PodFailed, Conditions: []v1.PodCondition{{
+					Type: v1.DisruptionTarget, Status: v1.ConditionTrue,
+				}}},
+			}},
+			wantMessage: new("Pod default/p has condition DisruptionTarget matching FailJob rule at index 4"),
+		},
+		"feature disabled, named FailJob rule uses the legacy message": {
+			pods:        []*v1.Pod{failedPod("p", 2)},
+			wantMessage: new("Container main for pod default/p failed with exit code 2 matching FailJob rule at index 1"),
+		},
+		"feature disabled, unnamed FailJob rule uses the legacy message": {
+			pods:        []*v1.Pod{failedPod("p", 3)},
+			wantMessage: new("Container main for pod default/p failed with exit code 3 matching FailJob rule at index 2"),
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PodFailurePolicyName, tc.enableFeature)
+			job := &batch.Job{Spec: batch.JobSpec{PodFailurePolicy: &batch.PodFailurePolicy{Rules: rules}}}
+			gotMessage := getFailJobMessage(job, tc.pods)
+			if diff := cmp.Diff(tc.wantMessage, gotMessage); diff != "" {
+				t.Errorf("Unexpected message (-want,+got):\n%s", diff)
 			}
 		})
 	}

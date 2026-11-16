@@ -280,3 +280,62 @@ func PartiallyEvaluateConditionsAwareDecision(ctx context.Context, unevaluatedDe
 		return unevaluatedDecision
 	}
 }
+
+// CouldBenefitFromBuiltinEvaluation reports whether PartiallyEvaluateConditionsAwareDecision with a builtin
+// evaluator whose Recognizes function is recognizes could possibly return a different decision than d.
+// It mirrors the evaluation order: unions are walked depth-first, skipping NoOpinion leaves and stopping
+// at Allow/Deny leaves, up to the first ConditionsMap. Of that ConditionsMap, only the highest-priority
+// non-empty effect (Deny > NoOpinion > Allow) is inspected first; if none of those conditions is recognized,
+// the ConditionsMap is returned unrefined, and the rest of the chain is left untouched.
+//
+// TODO(luxas): Conditions that can evaluate themselves through Condition.Evaluate() could make progress too,
+// but there is currently no way of telling whether a condition can do that without calling Evaluate. Taking
+// them into account requires adding such a capability signal to the Condition interface.
+func CouldBenefitFromBuiltinEvaluation(d ConditionsAwareDecision, recognizes func(Condition) bool) bool {
+	if recognizes == nil {
+		return false
+	}
+	if d.IsUnconditional() {
+		return false
+	}
+	cm, ok := firstConditionsMapToEvaluate(d)
+	if !ok {
+		return false
+	}
+	switch {
+	case len(cm.denyConditions) != 0:
+		return recognizesAny(cm.DenyConditions(), recognizes)
+	case len(cm.noOpinionConditions) != 0:
+		return recognizesAny(cm.NoOpinionConditions(), recognizes)
+	case len(cm.allowConditions) != 0:
+		return recognizesAny(cm.AllowConditions(), recognizes)
+	default:
+		return false // should be unreachable, as a ConditionsMap has at least one deny or allow condition, but to be safe
+	}
+}
+
+func recognizesAny(conditions iter.Seq[Condition], recognizes func(Condition) bool) bool {
+	for cond := range conditions {
+		if recognizes(cond) {
+			return true
+		}
+	}
+	return false
+}
+
+// firstConditionsMapToEvaluate returns the first ConditionsMap that PartiallyEvaluateConditionsAwareDecision
+// would evaluate, if any.
+func firstConditionsMapToEvaluate(d ConditionsAwareDecision) (ConditionsMap, bool) {
+	switch {
+	case d.IsConditionsMap():
+		return d.ConditionsMap(), true
+	case d.IsUnion():
+		for _, subDecision := range d.UnionedDecisions() {
+			cm, ok := firstConditionsMapToEvaluate(subDecision)
+			if ok {
+				return cm, ok
+			}
+		}
+	}
+	return ConditionsMap{}, false
+}

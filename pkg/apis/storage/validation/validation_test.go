@@ -2757,6 +2757,18 @@ func TestValidateCSINodeStatusUpdate(t *testing.T) {
 			}}),
 		},
 		{
+			name: "valid status with StorageHealthUnknown",
+			new: newNode(storage.StorageHealth{Name: "driver1", HealthConditions: []storage.StorageHealthCondition{
+				{Status: storage.StorageHealthUnknown, Reason: "UnrecognizedStatus"},
+			}}),
+		},
+		{
+			name: "valid status with Healthy",
+			new: newNode(storage.StorageHealth{Name: "driver1", HealthConditions: []storage.StorageHealthCondition{
+				{Status: storage.StorageHealthy, Reason: "BackendHealthy"},
+			}}),
+		},
+		{
 			name: "valid status with StorageDegraded",
 			new: newNode(storage.StorageHealth{Name: "driver1", HealthConditions: []storage.StorageHealthCondition{
 				{Status: storage.StorageDegraded, Reason: "HighLatency"},

@@ -27,6 +27,7 @@ import (
 	"k8s.io/apiserver/pkg/server/egressselector"
 	"k8s.io/apiserver/pkg/storage/etcd3"
 	"k8s.io/apiserver/pkg/storage/value"
+	"k8s.io/apiserver/pkg/storage/value/compression"
 	flowcontrolrequest "k8s.io/apiserver/pkg/util/flowcontrol/request"
 )
 
@@ -102,6 +103,10 @@ type ConfigForResource struct {
 
 	// GroupResource is the relevant one
 	GroupResource schema.GroupResource
+
+	// CompressionRule says how the store writes this resource's values. The zero
+	// Rule writes them uncompressed. Reads don't depend on it.
+	CompressionRule compression.Rule
 }
 
 // ForResource specializes to the given resource

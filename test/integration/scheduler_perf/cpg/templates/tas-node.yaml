@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: Node
+metadata:
+  name: node-{{.Index}}
+  labels:
+    kubernetes.io/hostname: node-{{.Index}}
+    # nodesPerZone must be a multiple of nodesPerRack, so that each rack belongs to a single zone.
+    topology.kubernetes.io/zone: zone-{{DivideInt .Index .nodesPerZone}}
+    topology.kubernetes.io/rack: rack-{{DivideInt .Index .nodesPerRack}}
+status:
+  capacity:
+    cpu: "4"
+    memory: 32Gi
+    pods: "110"
+  allocatable:
+    cpu: "4"
+    memory: 32Gi
+    pods: "110"
+  phase: Running
+  conditions:
+  - type: Ready
+    status: "True"
