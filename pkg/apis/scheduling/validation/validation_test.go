@@ -442,6 +442,29 @@ func TestValidateWorkload(t *testing.T) {
 				}
 			}
 		}),
+		"max tree height": mkWorkload(func(w *scheduling.Workload) {
+			w.Spec.PodGroupTemplates = nil
+			w.Spec.CompositePodGroupTemplates = []scheduling.CompositePodGroupTemplate{
+				{ // depth 1
+					Name: "cpg1",
+					CompositePodGroupTemplates: []scheduling.CompositePodGroupTemplate{
+						{ // depth 2
+							Name: "cpg2",
+							CompositePodGroupTemplates: []scheduling.CompositePodGroupTemplate{
+								{ // depth 3
+									Name: "cpg3",
+									CompositePodGroupTemplates: []scheduling.CompositePodGroupTemplate{
+										{ // depth 4
+											Name: "cpg4", PodGroupTemplates: []scheduling.PodGroupTemplate{{Name: "leaf"}},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			}
+		}),
 	}
 	for name, workload := range successCases {
 		errs := ValidateWorkload(workload)
@@ -1134,7 +1157,12 @@ func TestValidateWorkload(t *testing.T) {
 										Name: "cpg3",
 										CompositePodGroupTemplates: []scheduling.CompositePodGroupTemplate{
 											{ // depth 4
-												Name: "cpg4", PodGroupTemplates: []scheduling.PodGroupTemplate{{Name: "leaf"}},
+												Name: "cpg4",
+												CompositePodGroupTemplates: []scheduling.CompositePodGroupTemplate{
+													{ // depth 5
+														Name: "cpg5", PodGroupTemplates: []scheduling.PodGroupTemplate{{Name: "leaf"}},
+													},
+												},
 											},
 										},
 									},
@@ -1145,7 +1173,7 @@ func TestValidateWorkload(t *testing.T) {
 				}
 			}),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "compositePodGroupTemplates").Index(0), nil, "maximum template hierarchy depth is 4"),
+				field.Invalid(field.NewPath("spec", "compositePodGroupTemplates").Index(0), nil, "maximum template hierarchy depth is 5"),
 			},
 		},
 		"no namespace": {

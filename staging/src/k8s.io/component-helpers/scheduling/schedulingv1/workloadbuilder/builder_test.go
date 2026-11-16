@@ -505,7 +505,13 @@ func TestBuildWorkload(t *testing.T) {
 								Name:          "cpg-3",
 								DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}},
 								Children: []*WorkloadItem{
-									{Name: "leaf", DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}}},
+									{
+										Name:          "cpg-4",
+										DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}},
+										Children: []*WorkloadItem{
+											{Name: "leaf", DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}}},
+										},
+									},
 								},
 							},
 						},
@@ -531,7 +537,13 @@ func TestBuildWorkload(t *testing.T) {
 										Name:          "cpg-4",
 										DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}},
 										Children: []*WorkloadItem{
-											{Name: "leaf", DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}}},
+											{
+												Name:          "cpg-5",
+												DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}},
+												Children: []*WorkloadItem{
+													{Name: "leaf", DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}}},
+												},
+											},
 										},
 									},
 								},

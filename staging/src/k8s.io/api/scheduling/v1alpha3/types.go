@@ -60,7 +60,7 @@ const (
 	// WorkloadMaxPodGroupTemplates is the maximum number of pod group templates per Workload.
 	WorkloadMaxPodGroupTemplates = 8
 	// WorkloadMaxTreeDepth is the maximum allowed depth for a tree of (composite) pod group templates in a Workload.
-	WorkloadMaxTreeDepth = 4
+	WorkloadMaxTreeDepth = 5
 )
 
 // WorkloadSpec defines the desired state of a Workload.
@@ -1138,7 +1138,7 @@ type CompositePodGroupStatus struct {
 	//   that occurred during scheduling.
 	// - "CompositePodGroupError": The CompositePodGroup cannot be scheduled due to an invalid group layout
 	//   detected during runtime validation. The `message` field details the specific layout violation (such as
-	//   a detected cycle, exceeding the maximum depth of 4, or referencing multiple distinct Workloads).
+	//   a detected cycle, exceeding the maximum depth of 5, or referencing multiple distinct Workloads).
 	//
 	// Known reasons for the DisruptionTarget condition:
 	// - "PreemptionByScheduler": The CompositePodGroup was preempted by the scheduler to make room for
