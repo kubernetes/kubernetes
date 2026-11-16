@@ -10862,6 +10862,7 @@ func TestGenerateAPIPodStatusResizeConditionsByPodWorkerState(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicContainers, true)
 			tCtx := ktesting.Init(t)
 			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 			defer testKubelet.Cleanup()
@@ -10890,31 +10891,37 @@ func TestGenerateAPIPodStatusResizeConditionsByPodWorkerState(t *testing.T) {
 			}
 
 			kl.statusManager.SetPodResizeInProgressCondition(pod.UID, "", "", 2)
-			kl.statusManager.SetPodResizePendingCondition(pod.UID, v1.PodReasonDeferred, "insufficient cpu", 3)
+			kl.statusManager.SetPodAllocationPendingCondition(pod.UID, v1.PodReasonInsufficientResources, "insufficient cpu", 3, true)
 
 			apiStatus := kl.generateAPIPodStatus(tCtx, pod, criStatus, tc.podState)
 
-			var gotPending, gotInProgress bool
+			var gotAllocPending, gotPending, gotInProgress bool
 			for _, c := range apiStatus.Conditions {
 				switch c.Type {
+				case v1.PodAllocationPending:
+					gotAllocPending = true
 				case v1.PodResizePending:
 					gotPending = true
 				case v1.PodResizeInProgress:
 					gotInProgress = true
 				}
 			}
+			assert.Equal(t, tc.expectPending, gotAllocPending, "PodAllocationPending in generated status")
 			assert.Equal(t, tc.expectPending, gotPending, "PodResizePending in generated status")
 			assert.Equal(t, tc.expectInProgress, gotInProgress, "PodResizeInProgress in generated status")
 
-			var cachedPending, cachedInProgress bool
+			var cachedAllocPending, cachedPending, cachedInProgress bool
 			for _, c := range kl.statusManager.GetPodResizeConditions(pod.UID) {
 				switch c.Type {
+				case v1.PodAllocationPending:
+					cachedAllocPending = true
 				case v1.PodResizePending:
 					cachedPending = true
 				case v1.PodResizeInProgress:
 					cachedInProgress = true
 				}
 			}
+			assert.Equal(t, tc.expectPending, cachedAllocPending, "PodAllocationPending in statusManager")
 			assert.Equal(t, tc.expectPending, cachedPending, "PodResizePending in statusManager")
 			assert.Equal(t, tc.expectInProgress, cachedInProgress, "PodResizeInProgress in statusManager")
 		})

@@ -21,6 +21,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
@@ -289,4 +290,66 @@ func TestPodInfoWithAllocatedResources(t *testing.T) {
 			t.Errorf("Memory = %d, want %d", gotRes.GetMemory(), mem200Mi.Value())
 		}
 	})
+}
+
+func TestEffectiveRequestedForResize(t *testing.T) {
+	evaluatedPod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{UID: "evaluated-pod", Name: "evaluated-pod"},
+		Spec: v1.PodSpec{
+			NodeName: "node1",
+			Containers: []v1.Container{{
+				Name: "c1",
+				Resources: v1.ResourceRequirements{
+					Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("500m")},
+				},
+			}},
+		},
+		Status: v1.PodStatus{
+			Conditions: []v1.PodCondition{
+				{Type: v1.PodAllocationPending, Status: v1.ConditionTrue, Reason: v1.PodReasonInsufficientResources},
+				{Type: v1.PodResizePending, Status: v1.ConditionTrue, Reason: v1.PodReasonDeferred},
+			},
+			ContainerStatuses: []v1.ContainerStatus{{
+				Name:               "c1",
+				AllocatedResources: v1.ResourceList{v1.ResourceCPU: resource.MustParse("200m")},
+				Resources:          &v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("200m")}},
+			}},
+		},
+	}
+
+	otherBlockedPod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{UID: "other-blocked-pod", Name: "other-blocked-pod"},
+		Spec: v1.PodSpec{
+			NodeName: "node1",
+			Containers: []v1.Container{{
+				Name: "c1",
+				Resources: v1.ResourceRequirements{
+					Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("600m")},
+				},
+			}},
+		},
+		Status: v1.PodStatus{
+			Conditions: []v1.PodCondition{
+				{Type: v1.PodAllocationPending, Status: v1.ConditionTrue, Reason: v1.PodReasonBlocked},
+				{Type: v1.PodResizePending, Status: v1.ConditionTrue, Reason: v1.PodReasonDeferred},
+			},
+			ContainerStatuses: []v1.ContainerStatus{{
+				Name:               "c1",
+				AllocatedResources: v1.ResourceList{v1.ResourceCPU: resource.MustParse("100m")},
+				Resources:          &v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("100m")}},
+			}},
+		},
+	}
+
+	nodeInfo := framework.NewNodeInfo(evaluatedPod, otherBlockedPod)
+	// NodeInfo.Requested counts both pods at desired: 500m + 600m = 1100m.
+	if got := nodeInfo.GetRequested().GetMilliCPU(); got != 1100 {
+		t.Fatalf("nodeInfo.GetRequested().GetMilliCPU() = %d, want 1100", got)
+	}
+
+	// effectiveRequestedForResize counts evaluatedPod at desired (500m) and otherBlockedPod at allocated (100m) -> 600m.
+	effective := effectiveRequestedForResize(nodeInfo, evaluatedPod)
+	if got := effective.GetMilliCPU(); got != 600 {
+		t.Errorf("effectiveRequestedForResize().GetMilliCPU() = %d, want 600", got)
+	}
 }

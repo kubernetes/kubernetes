@@ -246,7 +246,7 @@ func (m *manager) retryPendingAllocations(ctx context.Context, trigger string) [
 		// The pod may have started terminating after its allocation was queued.
 		if m.podProvider.IsPodTerminatingOrTerminal(pod) {
 			logger.V(4).Info("Pod is terminating or terminal; removing from pending allocations", "pod", klog.KObj(pod))
-			m.statusManager.ClearPodResizePendingCondition(uid, metrics.DeferredResizeResolutionTerminated)
+			m.statusManager.ClearPodAllocationPendingCondition(uid, metrics.DeferredResizeResolutionTerminated)
 			if !apiequality.Semantic.DeepEqual(oldResizeStatus, m.statusManager.GetPodResizeConditions(uid)) {
 				m.podProvider.SyncPodNow(ctx, pod)
 			}
@@ -368,22 +368,10 @@ func (m *manager) sortPendingAllocations(logger klog.Logger) {
 			return 1
 		}
 
-		// If all else is the same, resize requests that have been pending longer will be
+		// If all else is the same, allocations that have been pending longer will be
 		// evaluated first.
-		var firstPodLastTransitionTime *metav1.Time
-		firstPodResizeConditions := m.statusManager.GetPodResizeConditions(firstPod.UID)
-		for _, c := range firstPodResizeConditions {
-			if c.Type == v1.PodResizePending {
-				firstPodLastTransitionTime = &c.LastTransitionTime
-			}
-		}
-		var secondPodLastTransitionTime *metav1.Time
-		secondPodResizeConditions := m.statusManager.GetPodResizeConditions(secondPod.UID)
-		for _, c := range secondPodResizeConditions {
-			if c.Type == v1.PodResizePending {
-				secondPodLastTransitionTime = &c.LastTransitionTime
-			}
-		}
+		firstPodLastTransitionTime := m.pendingTransitionTime(firstPod.UID)
+		secondPodLastTransitionTime := m.pendingTransitionTime(secondPod.UID)
 		if firstPodLastTransitionTime == nil {
 			return 1
 		}
@@ -400,6 +388,21 @@ func (m *manager) sortPendingAllocations(logger klog.Logger) {
 	for i, pod := range pendingPods {
 		m.podsWithPendingAllocations[i] = pod.UID
 	}
+}
+
+// pendingTransitionTime returns the LastTransitionTime of the pod's PodAllocationPending condition,
+// or of its PodResizePending condition if PodAllocationPending is absent.
+func (m *manager) pendingTransitionTime(uid types.UID) *metav1.Time {
+	var resizePending *metav1.Time
+	for _, c := range m.statusManager.GetPodResizeConditions(uid) {
+		switch c.Type {
+		case v1.PodAllocationPending:
+			return &c.LastTransitionTime
+		case v1.PodResizePending:
+			resizePending = &c.LastTransitionTime
+		}
+	}
+	return resizePending
 }
 
 // isResizeIncreasingRequests returns true if any of the resource requests are increasing.
@@ -581,15 +584,11 @@ func (m *manager) handlePendingAllocation(ctx context.Context, pod *v1.Pod) (lif
 	allocatedPod, updated := m.UpdatePodFromAllocation(pod)
 	if !updated {
 		// Desired resources == allocated resources. Pod allocation does not need to be updated.
-		m.statusManager.ClearPodResizePendingCondition(pod.UID, metrics.DeferredResizeResolutionReverted)
+		m.statusManager.ClearPodAllocationPendingCondition(pod.UID, metrics.DeferredResizeResolutionReverted)
 		return lifecycle.PodAdmitResult{Admit: true}, false, nil
 	}
 
 	resizeRequested := isResizeRequested(pod, allocatedPod)
-	dynamicContainers := utilfeature.DefaultFeatureGate.Enabled(features.DynamicContainers)
-	if !resizeRequested && !dynamicContainers {
-		m.statusManager.ClearPodResizePendingCondition(pod.UID, metrics.DeferredResizeResolutionReverted)
-	}
 
 	// Desired pod != allocated pod. Can we update the allocation to the desired pod?
 	allocatedPods := slices.DeleteFunc(m.getAllocatedPods(m.podProvider.GetActivePods()), func(p *v1.Pod) bool { return p.UID == pod.UID })
@@ -612,7 +611,7 @@ func (m *manager) handlePendingAllocation(ctx context.Context, pod *v1.Pod) (lif
 			// Any resize that was pending has been reverted, even if other changes were allocated.
 			resolution = metrics.DeferredResizeResolutionReverted
 		}
-		m.statusManager.ClearPodResizePendingCondition(pod.UID, resolution)
+		m.statusManager.ClearPodAllocationPendingCondition(pod.UID, resolution)
 
 		if resizeRequested {
 			// Clear any errors that may have been surfaced from a previous resize and update the
@@ -626,31 +625,31 @@ func (m *manager) handlePendingAllocation(ctx context.Context, pod *v1.Pod) (lif
 		return result, true, nil
 	}
 
-	// With DynamicContainers, a blocked change that isn't a resize (e.g. an image update, or adding a
-	// container without resources) is reported too, so that it doesn't go unnoticed.
-	// TODO(KEP-5972): Revisit reporting blocked changes that aren't resizes as PodResizePending.
-	if resizeRequested || dynamicContainers {
-		// TODO: Distinguish resource shortages, which scheduler preemption can resolve, from other
-		// deferred rejections in the pod status.
-		reason := v1.PodReasonDeferred
-		if result.RejectionType == lifecycle.RejectionInfeasible {
-			reason = v1.PodReasonInfeasible
-			// podResizesAdmitHandler counts its own rejections with a more specific reason.
-			if resizeRequested && result.Reason != v1.PodReasonInfeasible {
-				metrics.PodInfeasibleResizes.WithLabelValues(result.Reason).Inc()
-			}
+	var reason string
+	switch result.RejectionType {
+	case lifecycle.RejectionResourceShortage:
+		reason = v1.PodReasonInsufficientResources
+	case lifecycle.RejectionBlocked:
+		reason = v1.PodReasonBlocked
+	case lifecycle.RejectionInfeasible:
+		reason = v1.PodReasonInfeasible
+		// podResizesAdmitHandler counts its own rejections with a more specific reason.
+		if resizeRequested && result.Reason != v1.PodReasonInfeasible {
+			metrics.PodInfeasibleResizes.WithLabelValues(result.Reason).Inc()
 		}
-		if m.statusManager.SetPodResizePendingCondition(pod.UID, reason, result.Message, pod.Generation) {
-			eventType := events.ResizeDeferred
-			if reason == v1.PodReasonInfeasible {
-				eventType = events.ResizeInfeasible
-			}
-			msg := events.PodResizePendingMsg(logger, pod, result.Reason, result.Message, pod.Generation)
-			m.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeWarning, eventType, "%s", msg)
+	default:
+		reason = v1.PodReasonError
+	}
+	if m.statusManager.SetPodAllocationPendingCondition(pod.UID, reason, result.Message, pod.Generation, resizeRequested) {
+		eventType := events.ResizeDeferred
+		if reason == v1.PodReasonInfeasible {
+			eventType = events.ResizeInfeasible
 		}
-		if result.RejectionType == lifecycle.RejectionResourceShortage {
-			m.statusManager.ClearSchedulerEvaluationCompletedCondition(pod.UID)
-		}
+		msg := events.PodResizePendingMsg(logger, pod, result.Reason, result.Message, pod.Generation)
+		m.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeWarning, eventType, "%s", msg)
+	}
+	if result.RejectionType == lifecycle.RejectionResourceShortage {
+		m.statusManager.ClearSchedulerEvaluationCompletedCondition(pod.UID)
 	}
 
 	return result, false, nil

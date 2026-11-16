@@ -35,6 +35,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/retry"
+	"k8s.io/component-helpers/resource"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
@@ -329,4 +330,16 @@ func IsPodResizeSchedulerEvaluationCompleted(pod *v1.Pod) bool {
 		}
 	}
 	return false
+}
+
+// IsPodResizePreemptable returns true if the pod has a pending allocation condition
+// indicating insufficient resources (PodAllocationPending with reason InsufficientResources,
+// or PodResizePending with reason Deferred if PodAllocationPending is absent).
+func IsPodResizePreemptable(pod *v1.Pod) bool {
+	for _, condition := range pod.Status.Conditions {
+		if condition.Type == v1.PodAllocationPending {
+			return condition.Reason == v1.PodReasonInsufficientResources
+		}
+	}
+	return resource.IsPodResizeDeferred(pod)
 }

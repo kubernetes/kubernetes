@@ -3127,8 +3127,8 @@ func (kl *Kubelet) HandlePodUpdates(ctx context.Context, pods []*v1.Pod) {
 			kl.allocationManager.RetryPendingAllocations(ctx, allocation.TriggerReasonPodUpdated)
 		} else {
 			// We can hit this case if a pending resize has been reverted,
-			// so we need to clear the pending resize condition.
-			kl.statusManager.ClearPodResizePendingCondition(pod.UID, metrics.DeferredResizeResolutionReverted)
+			// so we need to clear the pending allocation conditions.
+			kl.statusManager.ClearPodAllocationPendingCondition(pod.UID, metrics.DeferredResizeResolutionReverted)
 		}
 
 		kl.podWorkers.UpdatePod(ctx, UpdatePodOptions{

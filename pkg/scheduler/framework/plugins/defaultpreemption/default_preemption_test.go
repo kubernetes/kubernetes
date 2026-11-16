@@ -51,7 +51,6 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	componentmetrics "k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/testutil"
-	resourcehelper "k8s.io/component-helpers/resource"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
@@ -966,7 +965,7 @@ func TestPostFilter(t *testing.T) {
 
 				preemptionAttemptsAfter, _ := testutil.GetCounterMetricValue(metrics.PreemptionAttempts)
 				resizePreemptionAttemptsAfter, _ := testutil.GetCounterMetricValue(metrics.ResizePreemptionAttempts)
-				if tt.features.EnableInPlacePodVerticalScalingSchedulerPreemption && resourcehelper.IsPodResizeDeferred(tt.pod) {
+				if tt.features.EnableInPlacePodVerticalScalingSchedulerPreemption && util.IsPodResizePreemptable(tt.pod) {
 					if diff := resizePreemptionAttemptsAfter - resizePreemptionAttemptsBefore; diff != 1 {
 						t.Errorf("Expected ResizePreemptionAttempts delta to be 1, got %v", diff)
 					}

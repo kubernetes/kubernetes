@@ -3895,6 +3895,10 @@ const (
 	SchedulerEvaluationCompleted PodConditionType = "SchedulerEvaluationCompleted"
 	// AllContainersRestarting indicates that all containers of the pod is being restarted.
 	AllContainersRestarting PodConditionType = "AllContainersRestarting"
+	// PodAllocationPending indicates that the pod spec has been updated, but the kubelet has
+	// not yet allocated the update. This is an alpha condition gated by the DynamicContainers
+	// feature gate.
+	PodAllocationPending PodConditionType = "PodAllocationPending"
 )
 
 // These are reasons for a pod's transition to a condition.
@@ -3923,12 +3927,22 @@ const (
 	// theory (it fits on this node) but is not possible right now.
 	PodReasonDeferred = "Deferred"
 
-	// PodReasonInfeasible reason in PodResizePending pod condition indicates the proposed resize is not
-	// feasible and is rejected; it may not be re-evaluated
+	// PodReasonInfeasible reason in PodResizePending or PodAllocationPending pod condition indicates the
+	// proposed update cannot be satisfied on this node and will not be retried by the kubelet until the pod is updated.
 	PodReasonInfeasible = "Infeasible"
 
+	// PodReasonInsufficientResources reason in PodAllocationPending pod condition indicates the proposed
+	// update fits on the node, but other pods are currently using the needed resources.
+	PodReasonInsufficientResources = "InsufficientResources"
+
+	// PodReasonBlocked reason in PodAllocationPending pod condition indicates the proposed update is blocked
+	// by node state, such as resource alignment or node pressure, that preempting pods based on aggregate
+	// resource requests is not expected to resolve; the kubelet retries it.
+	PodReasonBlocked = "Blocked"
+
 	// PodReasonError reason in PodResizeInProgress pod condition indicates that an error occurred while
-	// actuating the resize.
+	// actuating the resize, and in PodAllocationPending pod condition indicates a transient error occurred
+	// while evaluating the update.
 	PodReasonError = "Error"
 
 	// PodReasonDeferredPodResize reason in SchedulerEvaluationCompleted pod condition indicates

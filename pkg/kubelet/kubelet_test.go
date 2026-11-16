@@ -5963,7 +5963,7 @@ func TestHandlePodReconcile_RetryPendingResizes(t *testing.T) {
 			kubelet.podManager.AddPod(tc.oldPod)
 			kubelet.allocationManager.PushPendingAllocation(logger, pendingResizeDesired.UID)
 
-			kubelet.statusManager.ClearPodResizePendingCondition(pendingResizeDesired.UID, metrics.DeferredResizeResolutionAccepted)
+			kubelet.statusManager.ClearPodAllocationPendingCondition(pendingResizeDesired.UID, metrics.DeferredResizeResolutionAccepted)
 			kubelet.HandlePodReconcile(tCtx, []*v1.Pod{tc.newPod})
 			require.Equal(t, tc.shouldRetryPendingResize, kubelet.statusManager.IsPodResizeDeferred(pendingResizeDesired.UID))
 
@@ -6273,18 +6273,18 @@ func TestHandlePodUpdatesDynamicContainers(t *testing.T) {
 	tests := []struct {
 		name string
 		// addedCPU is the CPU request of the added container.
-		addedCPU          string
-		expectAllocated   bool
-		expectedCondition v1.PodConditionType
+		addedCPU           string
+		expectAllocated    bool
+		expectedConditions []v1.PodConditionType
 	}{{
-		name:              "fits",
-		addedCPU:          "1",
-		expectAllocated:   true,
-		expectedCondition: v1.PodResizeInProgress,
+		name:               "fits",
+		addedCPU:           "1",
+		expectAllocated:    true,
+		expectedConditions: []v1.PodConditionType{v1.PodResizeInProgress},
 	}, {
-		name:              "deferred",
-		addedCPU:          "10",
-		expectedCondition: v1.PodResizePending,
+		name:               "deferred",
+		addedCPU:           "10",
+		expectedConditions: []v1.PodConditionType{v1.PodAllocationPending, v1.PodResizePending},
 	}}
 
 	for _, tc := range tests {
@@ -6340,10 +6340,11 @@ func TestHandlePodUpdatesDynamicContainers(t *testing.T) {
 				assert.Equal(t, initialPod.Spec, allocatedPod.Spec)
 			}
 			assert.Equal(t, !tc.expectAllocated, kl.allocationManager.HasPendingAllocations(), "pending resizes")
-			conditions := kl.statusManager.GetPodResizeConditions(updatedPod.UID)
-			if assert.Len(t, conditions, 1) {
-				assert.Equal(t, tc.expectedCondition, conditions[0].Type)
+			var gotTypes []v1.PodConditionType
+			for _, c := range kl.statusManager.GetPodResizeConditions(updatedPod.UID) {
+				gotTypes = append(gotTypes, c.Type)
 			}
+			assert.Equal(t, tc.expectedConditions, gotTypes)
 		})
 	}
 }
@@ -6720,7 +6721,7 @@ func TestHandlePodUpdates_ResizeTerminatingPods(t *testing.T) {
 			t.Run("already queued resize", func(t *testing.T) {
 				resizedPod := newPod(2, cpu200m)
 				logger, tCtx, kl := setup(t, resizedPod)
-				kl.statusManager.SetPodResizePendingCondition(podUID, v1.PodReasonDeferred, "deferred", resizedPod.Generation)
+				kl.statusManager.SetPodAllocationPendingCondition(podUID, v1.PodReasonInsufficientResources, "deferred", resizedPod.Generation, true)
 				kl.allocationManager.PushPendingAllocation(logger, podUID)
 				require.True(t, kl.allocationManager.HasPendingAllocations())
 

@@ -24,6 +24,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
@@ -3050,7 +3051,7 @@ func TestPodResizeConditions(t *testing.T) {
 		{
 			name: "set pod resize pending condition to deferred with message",
 			updateFunc: func(podUID types.UID) bool {
-				return m.SetPodResizePendingCondition(podUID, "some-reason", "some-message", 1)
+				return m.SetPodAllocationPendingCondition(podUID, v1.PodReasonError, "some-message", 1, true)
 			},
 			expectedUpdateFuncReturnVal: true,
 			expected: []*v1.PodCondition{
@@ -3072,7 +3073,7 @@ func TestPodResizeConditions(t *testing.T) {
 		{
 			name: "change the deferred message",
 			updateFunc: func(podUID types.UID) bool {
-				return m.SetPodResizePendingCondition(podUID, v1.PodReasonDeferred, "some-other-message", 1)
+				return m.SetPodAllocationPendingCondition(podUID, v1.PodReasonInsufficientResources, "some-other-message", 1, true)
 			},
 			expectedUpdateFuncReturnVal: false,
 			expected: []*v1.PodCondition{
@@ -3094,7 +3095,7 @@ func TestPodResizeConditions(t *testing.T) {
 		{
 			name: "set pod resize pending condition to infeasible with message",
 			updateFunc: func(podUID types.UID) bool {
-				return m.SetPodResizePendingCondition(podUID, v1.PodReasonInfeasible, "some-message", 3)
+				return m.SetPodAllocationPendingCondition(podUID, v1.PodReasonInfeasible, "some-message", 3, true)
 			},
 			expectedUpdateFuncReturnVal: true,
 			expected: []*v1.PodCondition{
@@ -3134,7 +3135,7 @@ func TestPodResizeConditions(t *testing.T) {
 		{
 			name: "clear pod resize pending condition",
 			updateFunc: func(podUID types.UID) bool {
-				m.ClearPodResizePendingCondition(podUID, metrics.DeferredResizeResolutionAccepted)
+				m.ClearPodAllocationPendingCondition(podUID, metrics.DeferredResizeResolutionAccepted)
 				return false
 			},
 			expected: nil,
@@ -3842,7 +3843,7 @@ func TestPodDeferredResizeDurationSeconds(t *testing.T) {
 
 			switch tc.action {
 			case "clear":
-				manager.ClearPodResizePendingCondition(tc.podUID, tc.resolution)
+				manager.ClearPodAllocationPendingCondition(tc.podUID, tc.resolution)
 			case "delete":
 				manager.deletePodStatus(tc.podUID)
 			case "orphan":
@@ -3914,22 +3915,31 @@ func TestSyncBatch_EvictionPublishedAfterCleanExit(t *testing.T) {
 
 func TestMergePodStatusSchedulerEvaluationCompleted(t *testing.T) {
 	testCases := []struct {
-		desc           string
-		featureEnabled bool
-		reason         string
-		dropSEC        bool
-		deferred       bool
-		expectSEC      bool
+		desc              string
+		featureEnabled    bool
+		dynamicContainers bool
+		reason            string
+		pendingReason     string
+		isResize          bool
+		dropSEC           bool
+		clearPending      bool
+		expectSEC         bool
 	}{
-		{desc: "removed when the resize was re-evaluated due to insufficient resources", featureEnabled: true, reason: v1.PodReasonDeferredPodResize, dropSEC: true, deferred: true},
-		{desc: "kept while the resize is deferred", featureEnabled: true, reason: v1.PodReasonDeferredPodResize, deferred: true, expectSEC: true},
+		{desc: "removed when the resize was re-evaluated due to insufficient resources", featureEnabled: true, reason: v1.PodReasonDeferredPodResize, pendingReason: v1.PodReasonInsufficientResources, isResize: true, dropSEC: true},
+		{desc: "kept while the resize is deferred", featureEnabled: true, reason: v1.PodReasonDeferredPodResize, pendingReason: v1.PodReasonInsufficientResources, isResize: true, expectSEC: true},
 		{desc: "removed when the resize is not deferred", featureEnabled: true, reason: v1.PodReasonDeferredPodResize},
-		{desc: "kept when reason is not DeferredPodResize", featureEnabled: true, reason: "Other", dropSEC: true, deferred: true, expectSEC: true},
+		{desc: "kept when reason is not DeferredPodResize", featureEnabled: true, reason: "Other", pendingReason: v1.PodReasonInsufficientResources, isResize: true, dropSEC: true, expectSEC: true},
 		{desc: "kept when the feature is disabled", reason: v1.PodReasonDeferredPodResize, dropSEC: true, expectSEC: true},
+		{desc: "kept when PodAllocationPending is InsufficientResources", featureEnabled: true, dynamicContainers: true, reason: v1.PodReasonDeferredPodResize, pendingReason: v1.PodReasonInsufficientResources, isResize: false, expectSEC: true},
+		{desc: "removed when PodAllocationPending is Error even though PodResizePending is Deferred", featureEnabled: true, dynamicContainers: true, reason: v1.PodReasonDeferredPodResize, pendingReason: v1.PodReasonError, isResize: true, expectSEC: false},
+		{desc: "removed when PodAllocationPending is Blocked", featureEnabled: true, dynamicContainers: true, reason: v1.PodReasonDeferredPodResize, pendingReason: v1.PodReasonBlocked, isResize: true, expectSEC: false},
+		{desc: "removed when PodAllocationPending is Infeasible", featureEnabled: true, dynamicContainers: true, reason: v1.PodReasonDeferredPodResize, pendingReason: v1.PodReasonInfeasible, isResize: true, expectSEC: false},
+		{desc: "removed when non-resize PodAllocationPending is cleared", featureEnabled: true, dynamicContainers: true, reason: v1.PodReasonDeferredPodResize, pendingReason: v1.PodReasonInsufficientResources, isResize: false, clearPending: true, expectSEC: false},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingSchedulerPreemption, tc.featureEnabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicContainers, tc.dynamicContainers)
 
 			oldPodStatus := getPodStatus()
 			oldPodStatus.Conditions = append(oldPodStatus.Conditions, v1.PodCondition{Type: v1.SchedulerEvaluationCompleted, Status: v1.ConditionTrue, Reason: tc.reason})
@@ -3937,10 +3947,13 @@ func TestMergePodStatusSchedulerEvaluationCompleted(t *testing.T) {
 			pod.Status = oldPodStatus
 			m := newTestManager(fake.NewSimpleClientset())
 			m.podManager.(mutablePodManager).AddPod(pod)
-			if tc.deferred {
-				m.SetPodResizePendingCondition(pod.UID, v1.PodReasonDeferred, "", pod.Generation)
+			if tc.pendingReason != "" {
+				m.SetPodAllocationPendingCondition(pod.UID, tc.pendingReason, "", pod.Generation, tc.isResize)
 				if tc.dropSEC {
 					m.ClearSchedulerEvaluationCompletedCondition(pod.UID)
+				}
+				if tc.clearPending {
+					m.ClearPodAllocationPendingCondition(pod.UID, metrics.DeferredResizeResolutionAccepted)
 				}
 			}
 
@@ -3973,13 +3986,13 @@ func TestSchedulerEvaluationCompletedRemoval(t *testing.T) {
 		m.podManager.(mutablePodManager).AddPod(pod)
 
 		// Initial kubelet status before the scheduler sets SchedulerEvaluationCompleted.
-		m.SetPodResizePendingCondition(pod.UID, v1.PodReasonDeferred, "insufficient cpu", pod.Generation)
+		m.SetPodAllocationPendingCondition(pod.UID, v1.PodReasonInsufficientResources, "insufficient cpu", pod.Generation, true)
 		m.ClearSchedulerEvaluationCompletedCondition(pod.UID)
 		m.SetPodStatus(logger, pod, v1.PodStatus{Phase: v1.PodRunning, Conditions: []v1.PodCondition{deferred}})
 		m.syncBatch(ctx, false)
 
 		// Re-evaluating the deferred resize before SchedulerEvaluationCompleted is set must not arm clearSchedEvalCond.
-		m.SetPodResizePendingCondition(pod.UID, v1.PodReasonDeferred, "insufficient cpu", pod.Generation)
+		m.SetPodAllocationPendingCondition(pod.UID, v1.PodReasonInsufficientResources, "insufficient cpu", pod.Generation, true)
 		m.ClearSchedulerEvaluationCompletedCondition(pod.UID)
 		m.SetPodStatus(logger, pod, v1.PodStatus{Phase: v1.PodRunning, Conditions: []v1.PodCondition{deferred}})
 		m.syncBatch(ctx, false)
@@ -3998,7 +4011,7 @@ func TestSchedulerEvaluationCompletedRemoval(t *testing.T) {
 
 		// Re-evaluating the resize sets clearSchedEvalCond; generateAPIPodStatus copies non-kubelet conditions
 		// from apiPod, and SetPodStatus strips SchedulerEvaluationCompleted and forces an immediate status sync.
-		m.SetPodResizePendingCondition(pod.UID, v1.PodReasonDeferred, "insufficient cpu", pod.Generation)
+		m.SetPodAllocationPendingCondition(pod.UID, v1.PodReasonInsufficientResources, "insufficient cpu", pod.Generation, true)
 		m.ClearSchedulerEvaluationCompletedCondition(pod.UID)
 		m.SetPodStatus(logger, apiPod, v1.PodStatus{Phase: v1.PodRunning, Conditions: []v1.PodCondition{deferred, sec}})
 
@@ -4025,7 +4038,7 @@ func TestSchedulerEvaluationCompletedRemoval(t *testing.T) {
 		m := newTestManager(client)
 		m.podManager.(mutablePodManager).AddPod(pod)
 
-		m.SetPodResizePendingCondition(pod.UID, "TopologyAffinityError", "Resources cannot be allocated with Topology locality", pod.Generation)
+		m.SetPodAllocationPendingCondition(pod.UID, v1.PodReasonBlocked, "Resources cannot be allocated with Topology locality", pod.Generation, true)
 		m.SetPodStatus(logger, pod, v1.PodStatus{Phase: v1.PodRunning, Conditions: []v1.PodCondition{deferred}})
 		m.syncBatch(ctx, false)
 
@@ -4037,7 +4050,7 @@ func TestSchedulerEvaluationCompletedRemoval(t *testing.T) {
 		m.podManager.(mutablePodManager).UpdatePod(apiPod)
 
 		// Re-evaluating with a non-capacity deferral reason does not set clearSchedEvalCond.
-		m.SetPodResizePendingCondition(pod.UID, "TopologyAffinityError", "Resources cannot be allocated with Topology locality", pod.Generation)
+		m.SetPodAllocationPendingCondition(pod.UID, v1.PodReasonBlocked, "Resources cannot be allocated with Topology locality", pod.Generation, true)
 		m.SetPodStatus(logger, apiPod, v1.PodStatus{Phase: v1.PodRunning, Conditions: []v1.PodCondition{deferred, sec}})
 		m.syncBatch(ctx, true)
 		assert.True(t, hasSEC(t, ctx, client, pod), "expected the condition to be kept when deferral is not due to insufficient resources")
@@ -4073,7 +4086,7 @@ func TestSchedulerEvaluationCompletedRemoval(t *testing.T) {
 		m := newTestManager(client)
 		m.podManager.(mutablePodManager).AddPod(pod)
 
-		m.SetPodResizePendingCondition(pod.UID, v1.PodReasonDeferred, "insufficient cpu", pod.Generation)
+		m.SetPodAllocationPendingCondition(pod.UID, v1.PodReasonInsufficientResources, "insufficient cpu", pod.Generation, true)
 		m.ClearSchedulerEvaluationCompletedCondition(pod.UID)
 		m.SetPodStatus(logger, pod, v1.PodStatus{Phase: v1.PodRunning, Conditions: []v1.PodCondition{otherSEC}})
 		m.syncBatch(ctx, true)
@@ -4116,4 +4129,154 @@ func TestSyncPodDropsRemovedContainerStatus(t *testing.T) {
 		names = append(names, s.Name)
 	}
 	assert.Equal(t, []string{"main"}, names)
+}
+
+func TestPodAllocationPendingCondition(t *testing.T) {
+	metrics.Register()
+
+	t.Run("reason mapping, transition times, and resize revert while non-resize change remains pending", func(t *testing.T) {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicContainers, true)
+		metrics.PodDeferredResizeDurationSeconds.Reset()
+
+		synctest.Test(t, func(t *testing.T) {
+			m := newTestManager(&fake.Clientset{})
+			podUID := types.UID("alloc-pending-pod")
+			pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "alloc-pending-pod", UID: podUID}}
+			m.podManager.(mutablePodManager).AddPod(pod)
+
+			// 1. Resize rejected with InsufficientResources -> sets both PodAllocationPending(InsufficientResources) and PodResizePending(Deferred).
+			changed := m.SetPodAllocationPendingCondition(podUID, v1.PodReasonInsufficientResources, "insufficient cpu", 1, true)
+			require.True(t, changed)
+			require.True(t, m.IsPodResizeDeferred(podUID))
+			require.False(t, m.IsPodResizeInfeasible(podUID))
+
+			conds := m.GetPodResizeConditions(podUID)
+			require.Len(t, conds, 2)
+			require.Equal(t, v1.PodAllocationPending, conds[0].Type)
+			require.Equal(t, v1.PodReasonInsufficientResources, conds[0].Reason)
+			require.Equal(t, v1.PodResizePending, conds[1].Type)
+			require.Equal(t, v1.PodReasonDeferred, conds[1].Reason)
+			initialAllocLTT := conds[0].LastTransitionTime
+			initialResizeLTT := conds[1].LastTransitionTime
+
+			// 2. Flip from InsufficientResources to Error while still a resize:
+			// PodAllocationPending and PodResizePending (still Deferred) both preserve their LTT.
+			time.Sleep(time.Second)
+			changed = m.SetPodAllocationPendingCondition(podUID, v1.PodReasonError, "transient error", 1, true)
+			require.False(t, changed, "PodResizePending remained Deferred so resizeChanged must be false")
+			conds = m.GetPodResizeConditions(podUID)
+			require.Len(t, conds, 2)
+			require.Equal(t, v1.PodReasonError, conds[0].Reason)
+			require.Equal(t, initialAllocLTT, conds[0].LastTransitionTime, "PodAllocationPending LTT should be preserved when reason changes")
+			require.Equal(t, v1.PodReasonDeferred, conds[1].Reason)
+			require.Equal(t, initialResizeLTT, conds[1].LastTransitionTime, "PodResizePending LTT should be preserved when mapped reason stays Deferred")
+
+			// 3. Flip from Error to Blocked while still a resize (same generation):
+			// PodAllocationPending and PodResizePending (still Deferred) both preserve their LTT.
+			time.Sleep(time.Second)
+			changed = m.SetPodAllocationPendingCondition(podUID, v1.PodReasonBlocked, "nodeSelector mismatch", 1, true)
+			require.False(t, changed, "PodResizePending remained Deferred so resizeChanged must be false")
+			require.True(t, m.IsPodResizeDeferred(podUID))
+			require.False(t, m.IsPodResizeInfeasible(podUID))
+			conds = m.GetPodResizeConditions(podUID)
+			require.Len(t, conds, 2)
+			require.Equal(t, v1.PodReasonBlocked, conds[0].Reason)
+			require.Equal(t, initialAllocLTT, conds[0].LastTransitionTime, "PodAllocationPending LTT should be preserved when reason changes")
+			require.Equal(t, v1.PodReasonDeferred, conds[1].Reason)
+			require.Equal(t, initialResizeLTT, conds[1].LastTransitionTime, "PodResizePending LTT should be preserved when mapped reason stays Deferred")
+
+			// 4. Flip from Blocked to Infeasible while still a resize:
+			// Both PodAllocationPending and PodResizePending become Infeasible and resizeChanged is true.
+			// Only PodResizePending's LTT advances.
+			time.Sleep(time.Second)
+			changed = m.SetPodAllocationPendingCondition(podUID, v1.PodReasonInfeasible, "requests > node allocatable", 2, true)
+			require.True(t, changed)
+			require.True(t, m.IsPodResizeInfeasible(podUID))
+			conds = m.GetPodResizeConditions(podUID)
+			require.Len(t, conds, 2)
+			require.Equal(t, v1.PodReasonInfeasible, conds[0].Reason)
+			require.Equal(t, initialAllocLTT, conds[0].LastTransitionTime, "PodAllocationPending LTT should be preserved when reason changes")
+			require.Equal(t, v1.PodReasonInfeasible, conds[1].Reason)
+			require.True(t, conds[1].LastTransitionTime.After(initialResizeLTT.Time), "PodResizePending LTT should advance when reason changes to Infeasible")
+
+			// 5. Switch back to InsufficientResources with isResize=true, then revert resize while non-resize change remains pending (isResize=false):
+			changed = m.SetPodAllocationPendingCondition(podUID, v1.PodReasonInsufficientResources, "insufficient cpu", 3, true)
+			require.True(t, changed)
+			conds = m.GetPodResizeConditions(podUID)
+			require.Len(t, conds, 2)
+
+			time.Sleep(time.Second)
+			changed = m.SetPodAllocationPendingCondition(podUID, v1.PodReasonInsufficientResources, "insufficient cpu for new container", 4, false)
+			require.False(t, changed)
+			conds = m.GetPodResizeConditions(podUID)
+			require.Len(t, conds, 1, "PodResizePending must be cleared when isResize becomes false")
+			require.Equal(t, v1.PodAllocationPending, conds[0].Type)
+			require.Equal(t, v1.PodReasonInsufficientResources, conds[0].Reason)
+			require.Equal(t, int64(4), conds[0].ObservedGeneration)
+			require.Equal(t, initialAllocLTT, conds[0].LastTransitionTime, "PodAllocationPending LTT must be preserved while the condition remains set")
+
+			revertedCount, err := testutil.GetHistogramMetricCount(
+				metrics.PodDeferredResizeDurationSeconds.WithLabelValues(string(metrics.DeferredResizeResolutionReverted), string(metrics.PriorityBucketNormal)),
+			)
+			require.NoError(t, err)
+			require.Equal(t, uint64(1), revertedCount, "reverting resize while non-resize change stays pending must record reverted deferred resize duration")
+
+			// 6. ClearPodAllocationPendingCondition clears PodAllocationPending even when PodResizePending is already nil.
+			m.ClearPodAllocationPendingCondition(podUID, metrics.DeferredResizeResolutionAccepted)
+			require.Nil(t, m.GetPodResizeConditions(podUID))
+		})
+	})
+
+	t.Run("feature gate disabled drops PodAllocationPending", func(t *testing.T) {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicContainers, true)
+		m := newTestManager(&fake.Clientset{})
+		podUID := types.UID("gate-toggle-pod")
+		m.SetPodAllocationPendingCondition(podUID, v1.PodReasonInsufficientResources, "msg", 1, true)
+		require.Len(t, m.GetPodResizeConditions(podUID), 2)
+
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicContainers, false)
+		m.SetPodAllocationPendingCondition(podUID, v1.PodReasonInsufficientResources, "msg", 1, true)
+		conds := m.GetPodResizeConditions(podUID)
+		require.Len(t, conds, 1)
+		require.Equal(t, v1.PodResizePending, conds[0].Type)
+	})
+}
+
+func TestBackfillPodResizeConditionsWithDynamicContainers(t *testing.T) {
+	for _, dynamicContainers := range []bool{true, false} {
+		t.Run(fmt.Sprintf("DynamicContainers=%v", dynamicContainers), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicContainers, dynamicContainers)
+
+			pod := getTestPod()
+			pod.Status = v1.PodStatus{
+				Phase: v1.PodRunning,
+				Conditions: []v1.PodCondition{
+					{
+						Type:               v1.PodAllocationPending,
+						Status:             v1.ConditionTrue,
+						ObservedGeneration: 2,
+						Reason:             v1.PodReasonBlocked,
+						Message:            "blocked",
+					},
+				},
+			}
+
+			m := newTestManager(&fake.Clientset{})
+			m.podManager.(mutablePodManager).AddPod(pod)
+			m.BackfillPodResizeConditions([]*v1.Pod{pod})
+
+			conds := m.GetPodResizeConditions(pod.UID)
+			if dynamicContainers {
+				require.Len(t, conds, 1)
+				require.Equal(t, v1.PodAllocationPending, conds[0].Type)
+				require.Equal(t, v1.PodReasonBlocked, conds[0].Reason)
+			} else {
+				require.Nil(t, conds)
+				// Also verify mergePodStatus drops stale PodAllocationPending when kubelet does not report it.
+				merged := mergePodStatus(pod, pod.Status, getPodStatus(), false, false)
+				_, cond := podutil.GetPodCondition(&merged, v1.PodAllocationPending)
+				require.Nil(t, cond, "stale PodAllocationPending must be dropped by mergePodStatus when not in newStatus")
+			}
+		})
+	}
 }

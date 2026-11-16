@@ -27,7 +27,6 @@ import (
 	policy "k8s.io/api/policy/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	resourcehelper "k8s.io/component-helpers/resource"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
@@ -39,6 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	"k8s.io/kubernetes/pkg/scheduler/framework/preemption"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
+	"k8s.io/kubernetes/pkg/scheduler/util"
 )
 
 const (
@@ -162,7 +162,7 @@ func New(_ context.Context, dpArgs runtime.Object, fh fwk.Handle, fts feature.Fe
 // PostFilter invoked at the postFilter extension point.
 func (pl *DefaultPreemption) PostFilter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, m fwk.NodeToStatusReader) (*fwk.PostFilterResult, *fwk.Status) {
 	defer func() {
-		if pl.fts.EnableInPlacePodVerticalScalingSchedulerPreemption && resourcehelper.IsPodResizeDeferred(pod) {
+		if pl.fts.EnableInPlacePodVerticalScalingSchedulerPreemption && util.IsPodResizePreemptable(pod) {
 			metrics.ResizePreemptionAttempts.Inc()
 		} else {
 			metrics.PreemptionAttempts.Inc()
@@ -183,7 +183,7 @@ func (pl *DefaultPreemption) PreEnqueue(ctx context.Context, p *v1.Pod) *fwk.Sta
 	}
 	// A deferred resize preempts as an individual pod (see PriorityQueue.isPodGroupMember),
 	// so its preemption is tracked under the pod's UID, not the group's.
-	isResize := pl.fts.EnableInPlacePodVerticalScalingSchedulerPreemption && resourcehelper.IsPodResizeDeferred(p)
+	isResize := pl.fts.EnableInPlacePodVerticalScalingSchedulerPreemption && util.IsPodResizePreemptable(p)
 	if p.Spec.SchedulingGroup != nil && pl.fts.EnableGenericWorkload && !isResize {
 		var rootUID types.UID
 		if !pl.fts.EnableCompositePodGroup {
@@ -348,7 +348,7 @@ func (pl *DefaultPreemption) SelectVictimsOnNode(
 
 	// No preemption victims found for incoming preemptor, and so we don't need to evaluate the node again since its state didn't change.
 	if len(potentialVictims) == 0 {
-		if pl.fts.EnableInPlacePodVerticalScalingSchedulerPreemption && resourcehelper.IsPodResizeDeferred(preemptor) {
+		if pl.fts.EnableInPlacePodVerticalScalingSchedulerPreemption && util.IsPodResizePreemptable(preemptor) {
 			return nil, 0, fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "No preemption victims found for pod resize")
 		}
 		return nil, 0, fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "No preemption victims found for incoming pod")
@@ -460,7 +460,7 @@ func (pl *DefaultPreemption) PodEligibleToPreemptOthers(_ context.Context, pod *
 
 	nodeInfos := pl.fh.MutableSnapshotSharedLister().NodeInfos()
 	nomNodeName := pod.Status.NominatedNodeName
-	isResize := pl.fts.EnableInPlacePodVerticalScalingSchedulerPreemption && len(pod.Spec.NodeName) > 0 && resourcehelper.IsPodResizeDeferred(pod)
+	isResize := pl.fts.EnableInPlacePodVerticalScalingSchedulerPreemption && len(pod.Spec.NodeName) > 0 && util.IsPodResizePreemptable(pod)
 	targetNodeName := nomNodeName
 	if isResize {
 		// Deferred resize pods are already bound to a node. Check their assigned node (even if a

@@ -29,7 +29,6 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	compresource "k8s.io/component-helpers/resource"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/features"
@@ -39,6 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/dynamicresources"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
+	"k8s.io/kubernetes/pkg/scheduler/util"
 	utiltrace "k8s.io/utils/trace"
 )
 
@@ -768,7 +768,7 @@ func (a *SchedulingAlgorithm) AssumeAndReserveInCache(ctx context.Context, state
 	schedFramework framework.Framework, podInfo *framework.QueuedPodInfo,
 	scheduleResult ScheduleResult) (*framework.QueuedPodInfo, *fwk.Status) {
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption) && compresource.IsPodResizeDeferred(podInfo.Pod) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption) && util.IsPodResizePreemptable(podInfo.Pod) {
 		// A deferred resize pod is already bound, and the cache already counts its resources.
 		return podInfo.DeepCopy(), nil
 	}
@@ -794,7 +794,7 @@ func (a *SchedulingAlgorithm) AssumeAndReserveInCache(ctx context.Context, state
 func (a *SchedulingAlgorithm) UnreserveAndForgetFromCache(ctx context.Context, state fwk.CycleState,
 	schedFramework framework.Framework, assumedPodInfo *framework.QueuedPodInfo, nodeName string) error {
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption) && compresource.IsPodResizeDeferred(assumedPodInfo.Pod) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption) && util.IsPodResizePreemptable(assumedPodInfo.Pod) {
 		// AssumeAndReserveInCache neither assumed nor reserved a deferred resize pod.
 		return nil
 	}
