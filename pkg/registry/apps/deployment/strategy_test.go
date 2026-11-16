@@ -105,12 +105,12 @@ func TestStatusUpdatesWithDeploymentReplicaSetTerminatingReplicas(t *testing.T) 
 			ctx := genericapirequest.NewDefaultContext()
 			validSelector := map[string]string{"a": "b"}
 			oldDeploy := newDeploymentWithSelectorLabels(validSelector)
-			oldDeploy.Spec.Replicas = 3
+			oldDeploy.Spec.Replicas = new(int32(3))
 			oldDeploy.Status.Replicas = 3
 			oldDeploy.Status.TerminatingReplicas = tc.terminatingReplicas
 
 			newDeploy := newDeploymentWithSelectorLabels(validSelector)
-			newDeploy.Spec.Replicas = 3
+			newDeploy.Spec.Replicas = new(int32(3))
 			newDeploy.Status.Replicas = 2
 			newDeploy.Status.TerminatingReplicas = tc.terminatingReplicasUpdate
 
@@ -139,7 +139,7 @@ func newDeployment(labels, annotations map[string]string) *apps.Deployment {
 			Annotations: annotations,
 		},
 		Spec: apps.DeploymentSpec{
-			Replicas: 1,
+			Replicas: new(int32(1)),
 			Strategy: apps.DeploymentStrategy{
 				Type: apps.RecreateDeploymentStrategyType,
 			},
@@ -236,8 +236,8 @@ func newDeploymentWithSelectorLabels(selectorLabels map[string]string) *apps.Dep
 			Strategy: apps.DeploymentStrategy{
 				Type: apps.RollingUpdateDeploymentStrategyType,
 				RollingUpdate: &apps.RollingUpdateDeployment{
-					MaxSurge:       intstr.FromInt32(1),
-					MaxUnavailable: intstr.FromInt32(1),
+					MaxSurge:       new(intstr.FromInt32(1)),
+					MaxUnavailable: new(intstr.FromInt32(1)),
 				},
 			},
 			Template: api.PodTemplateSpec{
@@ -265,8 +265,8 @@ func newDeploymentWithHugePageValue(resourceName api.ResourceName, value resourc
 			Strategy: apps.DeploymentStrategy{
 				Type: apps.RollingUpdateDeploymentStrategyType,
 				RollingUpdate: &apps.RollingUpdateDeployment{
-					MaxSurge:       intstr.FromInt32(1),
-					MaxUnavailable: intstr.FromInt32(1),
+					MaxSurge:       new(intstr.FromInt32(1)),
+					MaxUnavailable: new(intstr.FromInt32(1)),
 				},
 			},
 			Template: api.PodTemplateSpec{

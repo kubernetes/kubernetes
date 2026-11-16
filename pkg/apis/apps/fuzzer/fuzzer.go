@@ -18,6 +18,7 @@ package fuzzer
 
 import (
 	"fmt"
+	"strconv"
 
 	"sigs.k8s.io/randfill"
 
@@ -42,9 +43,6 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			if len(s.Labels) == 0 {
 				s.Labels = s.Spec.Template.Labels
 			}
-			if s.Status.ObservedGeneration == nil {
-				s.Status.ObservedGeneration = new(int64)
-			}
 			if s.Status.CollisionCount == nil {
 				s.Status.CollisionCount = new(int32)
 			}
@@ -52,6 +50,9 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 		func(s *apps.StatefulSetSpec, c randfill.Continue) {
 			c.FillNoCustom(s)
 
+			if s.Replicas == nil {
+				s.Replicas = new(int32(1))
+			}
 			if s.Selector == nil {
 				s.Selector = &metav1.LabelSelector{MatchLabels: s.Template.Labels}
 			}
@@ -89,8 +90,13 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 				s.RollingUpdate = nil
 			}
 
-			if s.RollingUpdate != nil && s.RollingUpdate.MaxUnavailable == nil {
-				s.RollingUpdate.MaxUnavailable = new(intstr.FromInt32(1))
+			if s.RollingUpdate != nil {
+				if s.RollingUpdate.Partition == nil {
+					s.RollingUpdate.Partition = new(int32(0))
+				}
+				if s.RollingUpdate.MaxUnavailable == nil {
+					s.RollingUpdate.MaxUnavailable = new(intstr.FromInt32(1))
+				}
 			}
 		},
 		func(j *apps.Deployment, c randfill.Continue) {
@@ -103,9 +109,16 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			if len(j.Labels) == 0 {
 				j.Labels = j.Spec.Template.Labels
 			}
+			if j.Annotations == nil {
+				j.Annotations = make(map[string]string)
+			}
+			j.Annotations[apps.DeprecatedRollbackTo] = strconv.FormatInt(c.Int63(), 10)
 		},
 		func(j *apps.DeploymentSpec, c randfill.Continue) {
 			c.FillNoCustom(j) // fuzz self without calling this function again
+			if j.Replicas == nil {
+				j.Replicas = new(int32(1))
+			}
 			rhl := int32(c.Rand.Int31())
 			pds := int32(c.Rand.Int31())
 			j.RevisionHistoryLimit = &rhl
@@ -121,10 +134,11 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			} else {
 				rollingUpdate := apps.RollingUpdateDeployment{}
 				if c.Bool() {
-					rollingUpdate.MaxUnavailable = intstr.FromInt32(c.Rand.Int31())
-					rollingUpdate.MaxSurge = intstr.FromInt32(c.Rand.Int31())
+					rollingUpdate.MaxUnavailable = new(intstr.FromInt32(c.Rand.Int31()))
+					rollingUpdate.MaxSurge = new(intstr.FromInt32(c.Rand.Int31()))
 				} else {
-					rollingUpdate.MaxSurge = intstr.FromString(fmt.Sprintf("%d%%", c.Rand.Int31()))
+					rollingUpdate.MaxUnavailable = new(intstr.FromString(fmt.Sprintf("%d%%", c.Rand.Int31())))
+					rollingUpdate.MaxSurge = new(intstr.FromString(fmt.Sprintf("%d%%", c.Rand.Int31())))
 				}
 				j.RollingUpdate = &rollingUpdate
 			}
@@ -137,6 +151,10 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			if len(j.ObjectMeta.Labels) == 0 {
 				j.ObjectMeta.Labels = j.Spec.Template.ObjectMeta.Labels
 			}
+			if j.Annotations == nil {
+				j.Annotations = make(map[string]string)
+			}
+			j.Annotations[apps.DeprecatedTemplateGeneration] = strconv.FormatInt(c.Int63(), 10)
 		},
 		func(j *apps.DaemonSetSpec, c randfill.Continue) {
 			c.FillNoCustom(j) // fuzz self without calling this function again
@@ -151,23 +169,25 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			if j.Type != apps.RollingUpdateDaemonSetStrategyType {
 				j.RollingUpdate = nil
 			} else {
-				rollingUpdate := apps.RollingUpdateDaemonSet{}
+				rollingUpdate := &apps.RollingUpdateDaemonSet{}
 				if c.Bool() {
-					if c.Bool() {
-						rollingUpdate.MaxUnavailable = intstr.FromInt32(c.Rand.Int31())
-						rollingUpdate.MaxSurge = intstr.FromInt32(c.Rand.Int31())
-					} else {
-						rollingUpdate.MaxSurge = intstr.FromString(fmt.Sprintf("%d%%", c.Rand.Int31()))
-					}
+					rollingUpdate.MaxUnavailable = new(intstr.FromInt32(c.Rand.Int31()))
+					rollingUpdate.MaxSurge = new(intstr.FromInt32(c.Rand.Int31()))
+				} else {
+					rollingUpdate.MaxUnavailable = new(intstr.FromString(fmt.Sprintf("%d%%", c.Rand.Int31())))
+					rollingUpdate.MaxSurge = new(intstr.FromString(fmt.Sprintf("%d%%", c.Rand.Int31())))
 				}
 
-				j.RollingUpdate = &rollingUpdate
+				j.RollingUpdate = rollingUpdate
 			}
 		},
 		func(j *apps.ReplicaSet, c randfill.Continue) {
 			c.FillNoCustom(j)
 
 			// match defaulter
+			if j.Spec.Replicas == nil {
+				j.Spec.Replicas = new(int32(1))
+			}
 			if j.Spec.Selector == nil {
 				j.Spec.Selector = &metav1.LabelSelector{MatchLabels: j.Spec.Template.Labels}
 			}

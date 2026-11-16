@@ -300,7 +300,7 @@ func TestStatefulSetStatusStrategy(t *testing.T) {
 	oldPS := &apps.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault, ResourceVersion: "10"},
 		Spec: apps.StatefulSetSpec{
-			Replicas:       3,
+			Replicas:       new(int32(3)),
 			Selector:       &metav1.LabelSelector{MatchLabels: validSelector},
 			Template:       validPodTemplate.Template,
 			UpdateStrategy: apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
@@ -312,7 +312,7 @@ func TestStatefulSetStatusStrategy(t *testing.T) {
 	newPS := &apps.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault, ResourceVersion: "9"},
 		Spec: apps.StatefulSetSpec{
-			Replicas:       1,
+			Replicas:       new(int32(1)),
 			Selector:       &metav1.LabelSelector{MatchLabels: validSelector},
 			Template:       validPodTemplate.Template,
 			UpdateStrategy: apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
@@ -325,7 +325,7 @@ func TestStatefulSetStatusStrategy(t *testing.T) {
 	if newPS.Status.Replicas != 2 {
 		t.Errorf("StatefulSet status updates should allow change of pods: %v", newPS.Status.Replicas)
 	}
-	if newPS.Spec.Replicas != 3 {
+	if ptr.Deref(newPS.Spec.Replicas, 0) != 3 {
 		t.Errorf("StatefulSet status updates should not clobber spec: %v", newPS.Spec)
 	}
 	errs := StatusStrategy.ValidateUpdate(ctx, newPS, oldPS)
