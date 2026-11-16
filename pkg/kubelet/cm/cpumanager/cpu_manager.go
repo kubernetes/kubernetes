@@ -168,9 +168,6 @@ type manager struct {
 	// allocatableCPUs is the set of online CPUs as reported by the system,
 	// and available for allocation, minus the reserved set
 	allocatableCPUs cpuset.CPUSet
-
-	// sharedPoolOnly reports pods that must never be given exclusive CPUs.
-	sharedPoolOnly SharedPoolOnlyFunc
 }
 
 // SharedPoolOnlyFunc reports whether the pod must stay in the shared pool.
@@ -226,7 +223,7 @@ func NewManager(logger klog.Logger, cpuPolicyName string, cpuPolicyOptions map[s
 		// exclusively allocated.
 		reservedCPUsFloat := float64(reservedCPUs.MilliValue()) / 1000
 		numReservedCPUs := int(math.Ceil(reservedCPUsFloat))
-		policy, err = NewStaticPolicy(logger, topo, numReservedCPUs, specificCPUs, affinity, cpuPolicyOptions)
+		policy, err = newStaticPolicy(logger, topo, numReservedCPUs, specificCPUs, affinity, cpuPolicyOptions, sharedPoolOnly)
 		if err != nil {
 			return nil, fmt.Errorf("new static policy error: %w", err)
 		}
@@ -243,7 +240,6 @@ func NewManager(logger klog.Logger, cpuPolicyName string, cpuPolicyOptions map[s
 		nodeAllocatableReservation: nodeAllocatableReservation,
 		stateFileDirectory:         stateFileDirectory,
 		allCPUs:                    topo.CPUDetails.CPUs(),
-		sharedPoolOnly:             sharedPoolOnly,
 	}
 	manager.sourcesReady = &sourcesReadyStub{}
 	return manager, nil
@@ -294,11 +290,6 @@ func (m *manager) Allocate(ctx context.Context, p *v1.Pod, c *v1.Container, oper
 	m.Lock()
 	defer m.Unlock()
 
-	if m.isSharedPoolOnly(p) {
-		m.releaseSharedPoolOnly(logger, p, c)
-		return nil
-	}
-
 	// Call down into the policy to assign this container CPUs if required.
 	err := m.policy.Allocate(logger, m.state, p, c, operation)
 	if err != nil {
@@ -315,13 +306,6 @@ func (m *manager) AllocatePod(logger klog.Logger, pod *v1.Pod, operation lifecyc
 
 	m.Lock()
 	defer m.Unlock()
-
-	if m.isSharedPoolOnly(pod) {
-		for c := range podutil.ContainerIter(&pod.Spec, podutil.InitContainers|podutil.Containers) {
-			m.releaseSharedPoolOnly(logger, pod, c)
-		}
-		return nil
-	}
 
 	// Call down into the policy to assign this container CPUs if required.
 	if err := m.policy.AllocatePod(logger, m.state, pod, operation); err != nil {
@@ -379,28 +363,6 @@ func (m *manager) policyRemoveContainerByRef(logger klog.Logger, podUID string, 
 	return err
 }
 
-func (m *manager) isSharedPoolOnly(pod *v1.Pod) bool {
-	return m.sharedPoolOnly != nil && m.sharedPoolOnly(pod)
-}
-
-// releaseSharedPoolOnly frees exclusive CPUs a shared pool only container still
-// holds in the checkpoint. It got them before it became shared pool only, e.g.
-// before the system partition was turned on, and pod admission reruns on every
-// kubelet restart, so this is where they are handed back instead of staying out
-// of the shared pool until the pod is deleted.
-func (m *manager) releaseSharedPoolOnly(logger klog.Logger, pod *v1.Pod, container *v1.Container) {
-	podUID := string(pod.UID)
-	if _, ok := m.state.GetCPUSet(podUID, container.Name); !ok {
-		logger.V(4).Info("Exclusive CPU allocation skipped, pod must stay in the shared pool", "pod", klog.KObj(pod), "containerName", container.Name)
-		return
-	}
-	if err := m.policyRemoveContainerByRef(logger, podUID, container.Name); err != nil {
-		logger.Error(err, "Failed to release exclusive CPUs of a pod that must stay in the shared pool", "pod", klog.KObj(pod), "containerName", container.Name)
-		return
-	}
-	logger.Info("Released exclusive CPUs, pod must stay in the shared pool", "pod", klog.KObj(pod), "containerName", container.Name)
-}
-
 func (m *manager) State() state.Reader {
 	return m.state
 }
@@ -408,10 +370,6 @@ func (m *manager) State() state.Reader {
 func (m *manager) GetTopologyHints(logger klog.Logger, pod *v1.Pod, container *v1.Container, operation lifecycle.Operation) map[string][]topologymanager.TopologyHint {
 	// Garbage collect any stranded resources before providing TopologyHints
 	m.removeStaleState(logger)
-	// A shared pool container has no NUMA preference, same as the policies report it.
-	if m.isSharedPoolOnly(pod) {
-		return nil
-	}
 	// Delegate to active policy
 	return m.policy.GetTopologyHints(logger, m.state, pod, container, operation)
 }
@@ -419,9 +377,6 @@ func (m *manager) GetTopologyHints(logger klog.Logger, pod *v1.Pod, container *v
 func (m *manager) GetPodTopologyHints(logger klog.Logger, pod *v1.Pod, operation lifecycle.Operation) map[string][]topologymanager.TopologyHint {
 	// Garbage collect any stranded resources before providing TopologyHints
 	m.removeStaleState(logger)
-	if m.isSharedPoolOnly(pod) {
-		return nil
-	}
 	// Delegate to active policy
 	return m.policy.GetPodTopologyHints(logger, m.state, pod, operation)
 }

@@ -1983,7 +1983,7 @@ func TestCPUManagerSharedPoolOnly(t *testing.T) {
 
 	testCases := []struct {
 		name string
-		// sharedPoolOnly is the predicate given to the manager.
+		// sharedPoolOnly is the predicate given to the policy.
 		sharedPoolOnly SharedPoolOnlyFunc
 		// held is the exclusive cpuset the container already holds in the
 		// checkpoint, e.g. from before the pod became shared pool only.
@@ -2012,25 +2012,20 @@ func TestCPUManagerSharedPoolOnly(t *testing.T) {
 			wantIsolation:  cmqos.ResourceIsolationHost,
 		},
 		{
-			name:           "exclusive CPUs held from before are handed back",
-			sharedPoolOnly: func(*v1.Pod) bool { return true },
-			held:           cpuset.New(1, 2),
-			wantDefault:    allCPUs,
-			wantIsolation:  cmqos.ResourceIsolationHost,
-		},
-		{
-			name:           "exclusive CPUs held from before are handed back in pod scope",
-			sharedPoolOnly: func(*v1.Pod) bool { return true },
-			held:           cpuset.New(1, 2),
-			allocatePod:    true,
-			wantDefault:    allCPUs,
-			wantIsolation:  cmqos.ResourceIsolationHost,
+			// They stay out of the shared pool until the pod is recreated.
+			name:            "exclusive CPUs held from before are kept",
+			sharedPoolOnly:  func(*v1.Pod) bool { return true },
+			held:            cpuset.New(1, 2),
+			allocatePod:     true,
+			wantAssigned:    true,
+			wantIsolation:   cmqos.ResourceIsolationContainer,
+			wantLastUpdated: true,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			policy, err := NewStaticPolicy(logger, topo, 0, cpuset.New(), topologymanager.NewFakeManager(logger), nil)
+			policy, err := newStaticPolicy(logger, topo, 0, cpuset.New(), topologymanager.NewFakeManager(logger), nil, tc.sharedPoolOnly)
 			require.NoError(t, err)
 
 			pod := makePod("fakePod", "fakeContainer", "2", "2")
@@ -2054,7 +2049,6 @@ func TestCPUManagerSharedPoolOnly(t *testing.T) {
 				podStatusProvider: mockPodStatusProvider{},
 				sourcesReady:      &sourcesReadyStub{},
 				activePods:        func() []*v1.Pod { return []*v1.Pod{pod} },
-				sharedPoolOnly:    tc.sharedPoolOnly,
 			}
 
 			hints := mgr.GetTopologyHints(logger, pod, container, lifecycle.AddOperation)
@@ -2078,6 +2072,50 @@ func TestCPUManagerSharedPoolOnly(t *testing.T) {
 
 			_, lastUpdated := mgr.lastUpdateState.GetCPUSet(string(pod.UID), container.Name)
 			require.Equal(t, tc.wantLastUpdated, lastUpdated, "assignment in lastUpdateState")
+		})
+	}
+}
+
+func TestStaticPolicySharedPoolOnlyPodLevelResources(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourceManagers, true)
+
+	topo := topoSingleSocketHT
+	allCPUs := topo.CPUDetails.CPUs()
+	pod := makePodWithPodLevelResources("fakePod", "2", "2", "fakeContainer", "2", "2")
+
+	testCases := []struct {
+		name           string
+		sharedPoolOnly bool
+		wantPinned     bool
+	}{
+		{
+			name:       "pod-level resources are pinned outside the shared pool only pods",
+			wantPinned: true,
+		},
+		{
+			name:           "shared pool only pod with pod-level resources gets no exclusive CPUs",
+			sharedPoolOnly: true,
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			policy, err := newStaticPolicy(logger, topo, 0, cpuset.New(), topologymanager.NewFakeManager(logger), nil,
+				func(*v1.Pod) bool { return tc.sharedPoolOnly })
+			require.NoError(t, err)
+			st := state.NewMemoryState(logger)
+			st.SetDefaultCPUSet(allCPUs)
+
+			hints := policy.GetPodTopologyHints(logger, st, pod, lifecycle.AddOperation)
+			require.Equal(t, tc.wantPinned, len(hints) > 0, "pod topology hints: %v", hints)
+
+			require.NoError(t, policy.AllocatePod(logger, st, pod, lifecycle.AddOperation))
+			_, pinned := st.GetPodCPUSet(string(pod.UID))
+			require.Equal(t, tc.wantPinned, pinned, "pod-level CPU set in state")
+			if !tc.wantPinned {
+				require.True(t, allCPUs.Equals(st.GetDefaultCPUSet()), "the shared pool should be untouched, got %v", st.GetDefaultCPUSet())
+			}
 		})
 	}
 }
