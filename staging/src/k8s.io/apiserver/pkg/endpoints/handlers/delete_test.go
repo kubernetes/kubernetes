@@ -422,12 +422,33 @@ func (n *fakeSerializer) DecoderToVersion(serializer runtime.Decoder, gv runtime
 
 func TestAuthorizeUnsafeDelete(t *testing.T) {
 	const verbWant = "unsafe-delete-ignore-read-errors"
+	allow := authorizer.ConditionsAwareDecisionAllow("", nil)
+	conditionsMap := authorizer.ConditionsAwareDecisionConditionsMap(nil, nil, []authorizer.Condition{
+		authorizer.GenericCondition{ID: "example.com/owner-only", Condition: "object.metadata.labels.owner == request.user"},
+	})
+	// sanity check to ensure updates to the conditionmap constructor don't fold to a non-conditional decision
+	if !conditionsMap.IsConditionsMap() || !conditionsMap.PossibleDecisions().Has(authorizer.DecisionAllow) {
+		t.Fatalf("test fixture is not a ConditionsMap with a possible Allow: %s", conditionsMap)
+	}
+	unsafeDeleteAttrs := func(ignoreReadErr bool) admission.Attributes {
+		return newAttributes(attributes{
+			operation: admission.Delete,
+			operationOptions: &metav1.DeleteOptions{
+				IgnoreStoreReadErrorWithClusterBreakingPotential: ptr.To(ignoreReadErr),
+			},
+			userInfo: &user.DefaultInfo{Name: "foo"},
+		})
+	}
 	tests := []struct {
 		name    string
 		reqInfo *request.RequestInfo
 		attr    admission.Attributes
 		authz   authorizer.UnconditionalAuthorizer
-		err     func(admission.Attributes) error
+		// state of the ConditionalAuthorization feature gate, and the decision
+		// the authorization filter left in the request context (nil: none)
+		conditionalAuthz bool
+		decision         *authorizer.ConditionsAwareDecision
+		err              func(admission.Attributes) error
 	}{
 		{
 			name:  "operation is not delete, admit",
@@ -575,7 +596,7 @@ func TestAuthorizeUnsafeDelete(t *testing.T) {
 				operation:   admission.Delete,
 				subresource: "",
 				operationOptions: &metav1.DeleteOptions{
-					IgnoreStoreReadErrorWithClusterBreakingPotential: ptr.To[bool](true),
+					IgnoreStoreReadErrorWithClusterBreakingPotential: ptr.To(true),
 				},
 				userInfo: &user.DefaultInfo{Name: "foo"},
 			}),
@@ -584,10 +605,52 @@ func TestAuthorizeUnsafeDelete(t *testing.T) {
 				reason:   "permitted",
 			},
 		},
+		{
+			name:             "conditional authorization enabled, conditions map, refused before consulting the authorizer",
+			reqInfo:          &request.RequestInfo{IsResourceRequest: true},
+			attr:             unsafeDeleteAttrs(true),
+			authz:            &fakeAuthorizer{decision: authorizer.DecisionDeny, reason: "not permitted"}, // a different error than expected
+			conditionalAuthz: true,
+			decision:         &conditionsMap,
+			err: func(attr admission.Attributes) error {
+				return admission.NewForbidden(attr, fmt.Errorf("%s", conditionalUnsafeDeleteRefusal))
+			},
+		},
+		{
+			name:             "conditional authorization enabled, unconditional allow, authorizer denies, forbid",
+			reqInfo:          &request.RequestInfo{IsResourceRequest: true},
+			attr:             unsafeDeleteAttrs(true),
+			authz:            &fakeAuthorizer{decision: authorizer.DecisionDeny, reason: "not permitted"},
+			conditionalAuthz: true,
+			decision:         &allow,
+			err: func(attr admission.Attributes) error {
+				return admission.NewForbidden(attr, fmt.Errorf("not permitted to do %q, reason: %s", verbWant, "not permitted"))
+			},
+		},
+		{
+			name:             "conditional authorization enabled, conditions map, IgnoreStoreReadErrorWithClusterBreakingPotential is false, admit",
+			reqInfo:          &request.RequestInfo{IsResourceRequest: true},
+			attr:             unsafeDeleteAttrs(false),
+			authz:            nil, // Authorize should not be invoked
+			conditionalAuthz: true,
+			decision:         &conditionsMap,
+		},
+		{
+			name:             "conditional authorization enabled, no decision in the context, error",
+			reqInfo:          &request.RequestInfo{IsResourceRequest: true},
+			attr:             unsafeDeleteAttrs(true),
+			authz:            &fakeAuthorizer{decision: authorizer.DecisionAllow, reason: "permitted"},
+			conditionalAuthz: true,
+			decision:         nil, // intentional
+			err: func(admission.Attributes) error {
+				return errors.NewInternalError(fmt.Errorf("when the ConditionalAuthorization feature gate is on, a decision must be part of the context"))
+			},
+		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConditionalAuthorization, test.conditionalAuthz)
 			var want error
 			if test.err != nil {
 				want = test.err(test.attr)
@@ -596,6 +659,12 @@ func TestAuthorizeUnsafeDelete(t *testing.T) {
 			ctx := context.Background()
 			if test.reqInfo != nil {
 				ctx = request.WithRequestInfo(ctx, test.reqInfo)
+			}
+			if test.decision != nil {
+				var err error
+				if ctx, err = request.WithConditionallyAuthorizedDecision(ctx, nil, *test.decision); err != nil {
+					t.Fatal(err)
+				}
 			}
 
 			// wrap the attributes so we can access the annotations set during admission
@@ -667,21 +736,30 @@ func (authorizer fakeAuthorizer) Authorize(ctx context.Context, a authorizer.Att
 
 func TestDeleteResourceWithUnsafeDeletionFlow(t *testing.T) {
 	success := metav1.Status{Status: "Success", Code: 200, Details: &metav1.StatusDetails{}}
-	newInternalError := func(err error) metav1.Status {
-		status := errors.NewInternalError(err).ErrStatus
+	statusFromError := func(err error) metav1.Status {
+		status := err.(errors.APIStatus).Status()
 		status.Kind = "Status"
 		status.APIVersion = "v1"
 		return status
 	}
-	newForbiddenError := func() metav1.Status {
-		status := errors.NewForbidden(schema.GroupResource{}, "Unknown",
-			fmt.Errorf("not permitted to do %q, reason: %s", "unsafe-delete-ignore-read-errors", "not permitted")).ErrStatus
-		status.Kind = "Status"
-		status.APIVersion = "v1"
-		return status
+	notPermitted := statusFromError(errors.NewForbidden(schema.GroupResource{}, "Unknown",
+		fmt.Errorf("not permitted to do %q, reason: %s", "unsafe-delete-ignore-read-errors", "not permitted")))
+	refused := statusFromError(errors.NewForbidden(schema.GroupResource{}, "Unknown", fmt.Errorf("%s", conditionalUnsafeDeleteRefusal)))
+	refusalAnnotations := map[string]string{
+		"authorization.k8s.io/decision": "forbid",
+		"authorization.k8s.io/reason":   conditionalUnsafeDeleteRefusal,
 	}
 
-	tests := []struct {
+	allow := authorizer.ConditionsAwareDecisionAllow("", nil)
+	conditionsMap := authorizer.ConditionsAwareDecisionConditionsMap(nil, nil, []authorizer.Condition{
+		authorizer.GenericCondition{ID: "example.com/owner-only", Condition: "object.metadata.labels.owner == request.user"},
+	})
+	// sanity check to ensure updates to the conditionmap constructor don't fold to a non-conditional decision
+	if !conditionsMap.IsConditionsMap() || !conditionsMap.PossibleDecisions().Has(authorizer.DecisionAllow) {
+		t.Fatalf("test fixture is not a ConditionsMap with a possible Allow: %s", conditionsMap)
+	}
+
+	type testCase struct {
 		name           string
 		featureEnabled bool
 		// whether the registry implements rest.CorruptObjectDeleterProvider, and provides an unsafe deleter:
@@ -691,13 +769,20 @@ func TestDeleteResourceWithUnsafeDeletionFlow(t *testing.T) {
 		registryHasUnsafeDeleter *bool
 		// what the user passes in the delete options for ignoreStoreReadErrorWithClusterBreakingPotential
 		ignoreReadErr *bool
+		dryRun        bool
 		authorizer    authorizer.UnconditionalAuthorizer
+		// state of the ConditionalAuthorization feature gate, and the decision
+		// the authorization filter left in the request context (nil: none)
+		conditionalAuthz bool
+		decision         *authorizer.ConditionsAwareDecision
 		// want
 		normalFlowWant       *deletionFlowTracker // what the normal deletion flow should observe
 		unsafeFlowWant       *deletionFlowTracker // what the unsafe deletion flow should observe
 		unsafeAnnotationWant bool                 // whether the unsafe audit annotation should be added
+		authzAnnotationsWant map[string]string    // authorization.k8s.io/{decision,reason} audit annotations
 		status               metav1.Status        // status we expect from the HTTP response
-	}{
+	}
+	tests := []testCase{
 		{
 			name:                     "feature disabled, registry does not implement CorruptObjectDeleterProvider, ignore is false, should invoke the normal deletion flow",
 			featureEnabled:           false,
@@ -780,7 +865,7 @@ func TestDeleteResourceWithUnsafeDeletionFlow(t *testing.T) {
 			normalFlowWant:           &deletionFlowTracker{},
 			unsafeFlowWant:           &deletionFlowTracker{},
 			unsafeAnnotationWant:     true,
-			status:                   newInternalError(fmt.Errorf("no unsafe deleter provided, can not honor ignoreStoreReadErrorWithClusterBreakingPotential")),
+			status:                   statusFromError(errors.NewInternalError(fmt.Errorf("no unsafe deleter provided, can not honor ignoreStoreReadErrorWithClusterBreakingPotential"))),
 		},
 		{
 			name:                     "feature enabled, registry provides a nil unsafe deleter, ignore not set, should invoke the normal deletion flow",
@@ -808,7 +893,7 @@ func TestDeleteResourceWithUnsafeDeletionFlow(t *testing.T) {
 			normalFlowWant:           &deletionFlowTracker{},
 			unsafeFlowWant:           &deletionFlowTracker{},
 			unsafeAnnotationWant:     true,
-			status:                   newInternalError(fmt.Errorf("no unsafe deleter provided, can not honor ignoreStoreReadErrorWithClusterBreakingPotential")),
+			status:                   statusFromError(errors.NewInternalError(fmt.Errorf("no unsafe deleter provided, can not honor ignoreStoreReadErrorWithClusterBreakingPotential"))),
 		},
 		{
 			name:                     "feature enabled, registry provides a valid unsafe deleter, ignore is not set, should invoke the normal deletion flow",
@@ -838,7 +923,7 @@ func TestDeleteResourceWithUnsafeDeletionFlow(t *testing.T) {
 			normalFlowWant:           &deletionFlowTracker{},
 			unsafeFlowWant:           &deletionFlowTracker{},
 			unsafeAnnotationWant:     true,
-			status:                   newInternalError(fmt.Errorf("no authorizer provided, unable to authorize unsafe delete")),
+			status:                   statusFromError(errors.NewInternalError(fmt.Errorf("no authorizer provided, unable to authorize unsafe delete"))),
 		},
 		{
 			name:                     "feature enabled, registry provides a valid unsafe deleter, ignore is true, not authorized, error expected",
@@ -849,7 +934,7 @@ func TestDeleteResourceWithUnsafeDeletionFlow(t *testing.T) {
 			normalFlowWant:           &deletionFlowTracker{},
 			unsafeFlowWant:           &deletionFlowTracker{},
 			unsafeAnnotationWant:     true,
-			status:                   newForbiddenError(),
+			status:                   notPermitted,
 		},
 		{
 			name:                     "feature enabled, registry provides a valid unsafe deleter, ignore is true, authorized, should invoke the unsafe deletion flow",
@@ -862,78 +947,174 @@ func TestDeleteResourceWithUnsafeDeletionFlow(t *testing.T) {
 			unsafeAnnotationWant:     true,
 			status:                   success,
 		},
+
+		// ConditionalAuthorization: an unsafe delete must be refused unless the
+		// decision in the request context is an unconditional Allow
+		{
+			name:                     "conditional authorization enabled, conditions map, ignore is true, should be refused",
+			featureEnabled:           true,
+			registryHasUnsafeDeleter: ptr.To(true),
+			ignoreReadErr:            ptr.To(true),
+			authorizer:               &fakeAuthorizer{decision: authorizer.DecisionAllow, reason: "permitted"},
+			conditionalAuthz:         true,
+			decision:                 &conditionsMap,
+			normalFlowWant:           &deletionFlowTracker{},
+			unsafeFlowWant:           &deletionFlowTracker{},
+			unsafeAnnotationWant:     true,
+			authzAnnotationsWant:     refusalAnnotations,
+			status:                   refused,
+		},
+		{
+			name:                     "conditional authorization enabled, conditions map, dry run, ignore is true, should be refused",
+			featureEnabled:           true,
+			registryHasUnsafeDeleter: ptr.To(true),
+			ignoreReadErr:            ptr.To(true),
+			dryRun:                   true,
+			authorizer:               &fakeAuthorizer{decision: authorizer.DecisionAllow, reason: "permitted"},
+			conditionalAuthz:         true,
+			decision:                 &conditionsMap,
+			normalFlowWant:           &deletionFlowTracker{},
+			unsafeFlowWant:           &deletionFlowTracker{},
+			unsafeAnnotationWant:     true,
+			authzAnnotationsWant:     refusalAnnotations,
+			status:                   refused,
+		},
+		{
+			name:                     "conditional authorization enabled, no decision in the context, ignore is true, error expected",
+			featureEnabled:           true,
+			registryHasUnsafeDeleter: ptr.To(true),
+			ignoreReadErr:            ptr.To(true),
+			authorizer:               &fakeAuthorizer{decision: authorizer.DecisionAllow, reason: "permitted"},
+			conditionalAuthz:         true,
+			normalFlowWant:           &deletionFlowTracker{},
+			unsafeFlowWant:           &deletionFlowTracker{},
+			unsafeAnnotationWant:     true,
+			status:                   statusFromError(errors.NewInternalError(fmt.Errorf("when the ConditionalAuthorization feature gate is on, a decision must be part of the context"))),
+		},
+		{
+			name:                     "conditional authorization enabled, conditions map, ignore is false, should invoke the normal deletion flow",
+			featureEnabled:           true,
+			registryHasUnsafeDeleter: ptr.To(true),
+			ignoreReadErr:            ptr.To(false),
+			authorizer:               &fakeAuthorizer{decision: authorizer.DecisionAllow, reason: "permitted"},
+			conditionalAuthz:         true,
+			decision:                 &conditionsMap,
+			normalFlowWant:           &deletionFlowTracker{Invoked: 1, Ignore: ptr.To(false)},
+			unsafeFlowWant:           &deletionFlowTracker{},
+			status:                   success,
+		},
+	}
+
+	run := func(t *testing.T, test testCase) {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AllowUnsafeMalformedObjectDeletion, test.featureEnabled)
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConditionalAuthorization, test.conditionalAuthz)
+
+		scope := &RequestScope{
+			Namer:            &mockNamer{},
+			Serializer:       newMetav1Serializer(t),
+			Authorizer:       test.authorizer,
+			MetaGroupVersion: metav1.SchemeGroupVersion,
+		}
+
+		// create a fake deleter that will be used for the normal deletion
+		// flow, and it will record the normal deletion activities
+		normalFlowObserved, unsafeFlowObserved := &deletionFlowTracker{}, &deletionFlowTracker{}
+		var deleter rest.GracefulDeleter = &fakeRegistry{tracker: normalFlowObserved}
+		if provider := test.registryHasUnsafeDeleter; provider != nil {
+			r := &fakeRegistryWithCorruptObjDeleter{GracefulDeleter: deleter}
+			if *provider {
+				// create a fake deleter that will be used for the unsafe deletion
+				// flow, and it will record the unsafe deletion activities
+				r.unsafeDeleter = &fakeRegistry{tracker: unsafeFlowObserved}
+			}
+			deleter = r
+		}
+
+		handler := DeleteResource(deleter, true, scope, &fakeAdmitter{})
+		req := newRequest(t, test.ignoreReadErr)
+		if test.dryRun {
+			q := req.URL.Query()
+			q.Add("dryRun", metav1.DryRunAll)
+			req.URL.RawQuery = q.Encode()
+		}
+		if test.decision != nil {
+			ctx, err := request.WithConditionallyAuthorizedDecision(req.Context(), nil, *test.decision)
+			if err != nil {
+				t.Fatal(err)
+			}
+			req = req.WithContext(ctx)
+		}
+
+		recorder := httptest.NewRecorder()
+		handler.ServeHTTP(recorder, req)
+
+		// the status we have received in the response should match expectation
+		resp := recorder.Result()
+		status := toStatus(t, resp)
+		if want, got := test.status, status; !cmp.Equal(want, got) {
+			t.Errorf("expected the unsafe deletion flow observation to match, diff: %s", cmp.Diff(want, got))
+		}
+
+		// normal deletion flow
+		if want, got := test.normalFlowWant, normalFlowObserved; !cmp.Equal(want, got) {
+			t.Errorf("expected the normal deletion flow observation to match, diff: %s", cmp.Diff(want, got))
+		}
+		// this is an invariant; if the feature is disabled the normal deletion
+		// flow should never see the ignore option set.
+		if got := normalFlowObserved; !test.featureEnabled && got.Invoked == 1 && got.Ignore != nil {
+			t.Errorf("IgnoreStoreReadErrorWithClusterBreakingPotential should always be nil when the feature is disabled, but got: %t", *got.Ignore)
+		}
+
+		// unsafe deletion flow
+		if want, got := test.unsafeFlowWant, unsafeFlowObserved; !cmp.Equal(want, got) {
+			t.Errorf("expected the unsafe deletion flow observation to match, diff: %s", cmp.Diff(want, got))
+		}
+		// this is an invariant; when invoked, the unsafe deletion flow should always see the option enabled
+		if got := ptr.Deref(unsafeFlowObserved.Ignore, false); unsafeFlowObserved.Invoked == 1 && !got {
+			t.Errorf("Invariant failed, IgnoreStoreReadErrorWithClusterBreakingPotential should always be set to %t for the unsafe deletion flow, but got: %t", true, got)
+		}
+
+		// certain annotation should be added in unsafe delete
+		const keyWant = "apiserver.k8s.io/unsafe-delete-ignore-read-error"
+		ac := audit.AuditContextFrom(req.Context())
+		switch test.unsafeAnnotationWant {
+		case true:
+			if value, ok := ac.GetEventAnnotation(keyWant); !ok || len(value) > 0 {
+				t.Errorf("expected annotation %q to exist with an empty value, but got exists: %t, value: %q", keyWant, ok, value)
+			}
+		default:
+			if value, ok := ac.GetEventAnnotation(keyWant); ok {
+				t.Errorf("did not expect annotation %q to exist, but got exists: %t, value: %q", keyWant, ok, value)
+			}
+		}
+
+		gotAuthzAnnotations := map[string]string{}
+		for _, key := range []string{"authorization.k8s.io/decision", "authorization.k8s.io/reason"} {
+			if value, ok := ac.GetEventAnnotation(key); ok {
+				gotAuthzAnnotations[key] = value
+			}
+		}
+		wantAuthzAnnotations := test.authzAnnotationsWant
+		if wantAuthzAnnotations == nil {
+			wantAuthzAnnotations = map[string]string{}
+		}
+		if !cmp.Equal(wantAuthzAnnotations, gotAuthzAnnotations) {
+			t.Errorf("unexpected authorization audit annotations, diff: %s", cmp.Diff(wantAuthzAnnotations, gotAuthzAnnotations))
+		}
 	}
 
 	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AllowUnsafeMalformedObjectDeletion, test.featureEnabled)
-
-			scope := &RequestScope{
-				Namer:            &mockNamer{},
-				Serializer:       newMetav1Serializer(t),
-				Authorizer:       test.authorizer,
-				MetaGroupVersion: metav1.SchemeGroupVersion,
-			}
-
-			// create a fake deleter that will be used for the normal deletion
-			// flow, and it will record the normal deletion activities
-			normalFlowObserved, unsafeFlowObserved := &deletionFlowTracker{}, &deletionFlowTracker{}
-			var deleter rest.GracefulDeleter = &fakeRegistry{tracker: normalFlowObserved}
-			if provider := test.registryHasUnsafeDeleter; provider != nil {
-				r := &fakeRegistryWithCorruptObjDeleter{GracefulDeleter: deleter}
-				if *provider {
-					// create a fake deleter that will be used for the unsafe deletion
-					// flow, and it will record the unsafe deletion activities
-					r.unsafeDeleter = &fakeRegistry{tracker: unsafeFlowObserved}
-				}
-				deleter = r
-			}
-
-			handler := DeleteResource(deleter, true, scope, &fakeAdmitter{})
-			req := newRequest(t, test.ignoreReadErr)
-			recorder := httptest.NewRecorder()
-			handler.ServeHTTP(recorder, req)
-
-			// the status we have received in the response should match expectation
-			resp := recorder.Result()
-			status := toStatus(t, resp)
-			if want, got := test.status, status; !cmp.Equal(want, got) {
-				t.Errorf("expected the unsafe deletion flow observation to match, diff: %s", cmp.Diff(want, got))
-			}
-
-			// normal deletion flow
-			if want, got := test.normalFlowWant, normalFlowObserved; !cmp.Equal(want, got) {
-				t.Errorf("expected the normal deletion flow observation to match, diff: %s", cmp.Diff(want, got))
-			}
-			// this is an invariant; if the feature is disabled the normal deletion
-			// flow should never see the ignore option set.
-			if got := normalFlowObserved; !test.featureEnabled && got.Invoked == 1 && got.Ignore != nil {
-				t.Errorf("IgnoreStoreReadErrorWithClusterBreakingPotential should always be nil when the feature is disabled, but got: %t", *got.Ignore)
-			}
-
-			// unsafe deletion flow
-			if want, got := test.unsafeFlowWant, unsafeFlowObserved; !cmp.Equal(want, got) {
-				t.Errorf("expected the unsafe deletion flow observation to match, diff: %s", cmp.Diff(want, got))
-			}
-			// this is an invariant; when invoked, the unsafe deletion flow should always see the option enabled
-			if got := ptr.Deref(unsafeFlowObserved.Ignore, false); unsafeFlowObserved.Invoked == 1 && !got {
-				t.Errorf("Invariant failed, IgnoreStoreReadErrorWithClusterBreakingPotential should always be set to %t for the unsafe deletion flow, but got: %t", true, got)
-			}
-
-			// certain annotation should be added in unsafe delete
-			const keyWant = "apiserver.k8s.io/unsafe-delete-ignore-read-error"
-			ac := audit.AuditContextFrom(req.Context())
-			switch test.unsafeAnnotationWant {
-			case true:
-				if value, ok := ac.GetEventAnnotation(keyWant); !ok || len(value) > 0 {
-					t.Errorf("expected annotation %q to exist with an empty value, but got exists: %t, value: %q", keyWant, ok, value)
-				}
-			default:
-				if value, ok := ac.GetEventAnnotation(keyWant); ok {
-					t.Errorf("did not expect annotation %q to exist, but got exists: %t, value: %q", keyWant, ok, value)
-				}
-			}
-		})
+		t.Run(test.name, func(t *testing.T) { run(t, test) })
+		// Run all tests with test.conditionalAuthz=false also with test.conditionalAuthz=true below to ensure
+		// equal behavior with the feature gate paired with an unconditional allow. No need to do vice versa though.
+		if test.conditionalAuthz {
+			continue
+		}
+		// An unconditional Allow in the context must not change the outcome
+		// compared to the ConditionalAuthorization feature gate being off.
+		withAllow := test
+		withAllow.conditionalAuthz, withAllow.decision = true, &allow
+		t.Run(test.name+"/ConditionalAuthorization=on/unconditional-allow", func(t *testing.T) { run(t, withAllow) })
 	}
 }
 

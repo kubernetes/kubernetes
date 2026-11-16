@@ -26,6 +26,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -1011,6 +1012,10 @@ authorizers:
 		})
 	}
 
+	t.Run("unsafe delete requires an unconditional decision", func(t *testing.T) {
+		testUnsafeDeleteRequiresUnconditionalDecision(t, server, adminClient, webhookServer, conditionalAuthorizationActive)
+	})
+
 	// The SubjectAccessReview endpoints and the fold-down only depend on the feature gate, not on the
 	// admission plugin, so they behave the same whether or not the AuthorizationConditionsEnforcer is enabled.
 	if featureEnabled {
@@ -1517,6 +1522,156 @@ var compoundAuthzCondition = authorizer.GenericCondition{
 		`authorizer.group('example.com').resource('protectedlabels').name('protected-label').check('use').allowed()`,
 	Type:        builtinCELConditionType,
 	Description: "compound authorization: require 'use' permission on protectedlabels resource when protected-label is set",
+}
+
+// testUnsafeDeleteRequiresUnconditionalDecision verifies that a delete with
+// ignoreStoreReadErrorWithClusterBreakingPotential=true is refused when the
+// delete itself was only conditionally authorized: the corrupt-object deleter
+// skips admission, so the conditions would otherwise never be enforced.
+func testUnsafeDeleteRequiresUnconditionalDecision(t *testing.T, server *kubeapiservertesting.TestServer, adminClient *clientset.Clientset, webhookServer *webhookServer, conditionalAuthorizationActive bool) {
+	const (
+		namespace         = "test-ns"
+		unsafeDeleteVerb  = "unsafe-delete-ignore-read-errors"
+		conditionalUser   = "unsafe-delete-conditional-user"
+		unconditionalUser = "unsafe-delete-unconditional-user"
+		guardMessage      = "ignoreStoreReadErrorWithClusterBreakingPotential is not allowed for a conditionally authorized request"
+	)
+	webhookServer.handler.setAuthorizer(t, testAuthorizer(func(_ context.Context, a authorizer.Attributes) authorizer.ConditionsAwareDecision {
+		if a.GetResource() != "configmaps" || a.GetNamespace() != namespace {
+			return authorizer.ConditionsAwareDecisionNoOpinion("", nil)
+		}
+		switch {
+		case a.GetVerb() == unsafeDeleteVerb && (a.GetUser().GetName() == conditionalUser || a.GetUser().GetName() == unconditionalUser):
+			return authorizer.ConditionsAwareDecisionAllow("may unsafe-delete", nil)
+		case a.GetVerb() == "delete" && a.GetUser().GetName() == unconditionalUser:
+			return authorizer.ConditionsAwareDecisionAllow("may delete", nil)
+		case a.GetVerb() == "delete" && a.GetUser().GetName() == conditionalUser:
+			return authorizer.ConditionsAwareDecisionConditionsMap(nil, nil, []authorizer.Condition{
+				authorizer.GenericCondition{
+					ID:          "example.com/always-allow",
+					Condition:   "true",
+					Type:        opaqueCELConditionType,
+					Description: "would allow, if it could be evaluated",
+				},
+			})
+		}
+		return authorizer.ConditionsAwareDecisionNoOpinion("", nil)
+	}))
+
+	etcdKey := func(name string) string {
+		return "/" + path.Join(server.EtcdStoragePrefix, "configmaps", namespace, name)
+	}
+
+	type verifyFunc func(t *testing.T, err error)
+	expectSuccess := func(t *testing.T, err error) {
+		t.Helper()
+		if err != nil {
+			t.Fatalf("expected the unsafe delete to succeed, got: %v", err)
+		}
+	}
+	expectGuardRefusal := func(t *testing.T, err error) {
+		t.Helper()
+		if !apierrors.IsForbidden(err) || !strings.Contains(err.Error(), guardMessage) {
+			t.Fatalf("expected a Forbidden error containing %q, got: %v", guardMessage, err)
+		}
+	}
+	// When conditional authorization is not active, the conditional decision folds to
+	// NoOpinion, RBAC has no opinion either, and the authorization filter refuses the request.
+	expectFilterRefusal := func(t *testing.T, err error) {
+		t.Helper()
+		if !apierrors.IsForbidden(err) || strings.Contains(err.Error(), guardMessage) {
+			t.Fatalf("expected a Forbidden error from the authorization filter, got: %v", err)
+		}
+	}
+	// The corrupt-object deleter refuses decodable objects. Getting this error for a
+	// conditional user would mean the guard did not run before the deleter.
+	expectNotCorruptConflict := func(t *testing.T, err error) {
+		t.Helper()
+		if !apierrors.IsConflict(err) {
+			t.Fatalf("expected a Conflict from the corrupt-object deleter, got: %v", err)
+		}
+	}
+
+	objects := []struct {
+		name   string
+		create func(t *testing.T, name string)
+	}{
+		{
+			name: "readable",
+			create: func(t *testing.T, name string) {
+				if _, err := adminClient.CoreV1().ConfigMaps(namespace).Create(t.Context(), &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: name}}, metav1.CreateOptions{}); err != nil {
+					t.Fatal(err)
+				}
+			},
+		},
+		{
+			name: "unreadable",
+			create: func(t *testing.T, name string) {
+				if _, err := server.EtcdClient.Put(t.Context(), etcdKey(name), "undecodable"); err != nil {
+					t.Fatal(err)
+				}
+				if _, err := adminClient.CoreV1().ConfigMaps(namespace).Get(t.Context(), name, metav1.GetOptions{}); !apierrors.IsInternalError(err) {
+					t.Fatalf("expected the corrupt object to be unreadable, got: %v", err)
+				}
+			},
+		},
+	}
+	type expectation struct {
+		active   verifyFunc // ConditionalAuthorization gate on and AuthorizationConditionsEnforcer enabled
+		inactive verifyFunc // otherwise
+	}
+	expectations := map[string]map[string]expectation{
+		"readable": {
+			unconditionalUser: {active: expectNotCorruptConflict, inactive: expectNotCorruptConflict},
+			conditionalUser:   {active: expectGuardRefusal, inactive: expectFilterRefusal},
+		},
+		"unreadable": {
+			unconditionalUser: {active: expectSuccess, inactive: expectSuccess},
+			conditionalUser:   {active: expectGuardRefusal, inactive: expectFilterRefusal},
+		},
+	}
+
+	for _, object := range objects {
+		for _, userName := range []string{unconditionalUser, conditionalUser} {
+			t.Run(object.name+"/"+userName, func(t *testing.T) {
+				expect := expectations[object.name][userName]
+				verify := expect.inactive
+				if conditionalAuthorizationActive {
+					verify = expect.active
+				}
+
+				name := "unsafe-delete-" + object.name + "-" + strings.TrimPrefix(userName, "unsafe-delete-")
+				t.Cleanup(func() {
+					_, _ = server.EtcdClient.Delete(context.Background(), etcdKey(name))
+				})
+				object.create(t, name)
+
+				config := rest.CopyConfig(server.ClientConfig)
+				config.Impersonate.UserName = userName
+				client := clientset.NewForConfigOrDie(config)
+
+				var err error
+				for _, dryRun := range []bool{true, false} {
+					opts := metav1.DeleteOptions{IgnoreStoreReadErrorWithClusterBreakingPotential: new(true)}
+					if dryRun {
+						opts.DryRun = []string{metav1.DryRunAll}
+					}
+					err = client.CoreV1().ConfigMaps(namespace).Delete(t.Context(), name, opts)
+					t.Logf("dryRun=%t: %v", dryRun, err)
+					verify(t, err)
+				}
+
+				// The object must be gone from storage if and only if the real delete succeeded.
+				resp, getErr := server.EtcdClient.Get(t.Context(), etcdKey(name))
+				if getErr != nil {
+					t.Fatal(getErr)
+				}
+				if want, got := err != nil, len(resp.Kvs) == 1; want != got {
+					t.Fatalf("expected the object to be in storage: %t, got: %t", want, got)
+				}
+			})
+		}
+	}
 }
 
 // configmapsConditionalAllow returns an authorizer that conditionally allows configmaps requests using the given
