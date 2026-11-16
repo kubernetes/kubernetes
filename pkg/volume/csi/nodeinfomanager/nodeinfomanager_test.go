@@ -22,14 +22,16 @@ import (
 	goerrors "errors"
 	"fmt"
 	"math"
-	"os"
 	"reflect"
+	"slices"
 	"testing"
 	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/ktesting"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -40,7 +42,6 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
-	utiltesting "k8s.io/client-go/util/testing"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 	"k8s.io/kubernetes/pkg/features"
@@ -958,16 +959,18 @@ func TestSetMigrationAnnotation(t *testing.T) {
 	}
 
 	for _, tc := range testcases {
-		t.Logf("test case: %s", tc.name)
+		t.Run(tc.name, func(t *testing.T) {
+			t.Logf("test case: %s", tc.name)
 
-		modified := setMigrationAnnotation(tc.migratedPlugins, tc.existingNode)
-		if modified != tc.expectModified {
-			t.Errorf("Expected modified to be %v but got %v instead", tc.expectModified, modified)
-		}
+			modified := setMigrationAnnotation(tc.migratedPlugins, tc.existingNode)
+			if modified != tc.expectModified {
+				t.Errorf("Expected modified to be %v but got %v instead", tc.expectModified, modified)
+			}
 
-		if !reflect.DeepEqual(tc.expectedNode, tc.existingNode) {
-			t.Errorf("Expected CSINode: %v, but got: %v", tc.expectedNode, tc.existingNode)
-		}
+			if !reflect.DeepEqual(tc.expectedNode, tc.existingNode) {
+				t.Errorf("Expected CSINode: %v, but got: %v", tc.expectedNode, tc.existingNode)
+			}
+		})
 	}
 }
 
@@ -998,51 +1001,47 @@ func TestInstallCSIDriverExistingAnnotation(t *testing.T) {
 	}
 
 	for _, tc := range testcases {
-		t.Logf("test case: %q", tc.name)
+		t.Run(tc.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			t.Logf("test case: %q", tc.name)
 
-		// Arrange
-		nodeName := tc.existingNode.Name
-		client := fake.NewSimpleClientset(tc.existingNode)
+			// Arrange
+			nodeName := tc.existingNode.Name
+			client := fake.NewSimpleClientset(tc.existingNode)
 
-		tmpDir, err := utiltesting.MkTmpdir("nodeinfomanager-test")
-		if err != nil {
-			t.Fatalf("can't create temp dir: %v", err)
-		}
-		defer os.RemoveAll(tmpDir)
-		host := volumetest.NewFakeVolumeHostWithCSINodeName(t,
-			tmpDir,
-			client,
-			nil,
-			nodeName,
-			nil,
-			nil,
-		)
+			tmpDir := t.TempDir()
+			host := volumetest.NewFakeVolumeHostWithCSINodeName(t,
+				tmpDir,
+				client,
+				nil,
+				nodeName,
+				nil,
+				nil,
+			)
 
-		nim := NewNodeInfoManager(types.NodeName(nodeName), host, nil)
+			nim := NewNodeInfoManager(types.NodeName(nodeName), host, nil)
 
-		// Act
-		_, err = nim.CreateCSINode()
-		if err != nil {
-			t.Errorf("expected no error from creating CSINodeinfo but got: %v", err)
-			continue
-		}
-		err = nim.InstallCSIDriver(driverName, nodeID, 0 /* maxVolumeLimit */, nil) // TODO test maxVolumeLimit
-		if err != nil {
-			t.Errorf("expected no error from InstallCSIDriver call but got: %v", err)
-			continue
-		}
+			// Act
+			_, err := nim.CreateCSINode(tCtx)
+			if err != nil {
+				t.Fatalf("expected no error from creating CSINodeinfo but got: %v", err)
+			}
+			err = nim.InstallCSIDriver(tCtx, driverName, nodeID, 0 /* maxVolumeLimit */, nil) // TODO test maxVolumeLimit
+			if err != nil {
+				t.Fatalf("expected no error from InstallCSIDriver call but got: %v", err)
+			}
 
-		// Assert
-		nodeInfo, err := client.StorageV1().CSINodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
-		if err != nil {
-			t.Errorf("error getting CSINode: %v", err)
-			continue
-		}
+			// Assert
+			nodeInfo, err := client.StorageV1().CSINodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
+			if err != nil {
+				t.Fatalf("error getting CSINode: %v", err)
+			}
 
-		driver := nodeInfo.Spec.Drivers[0]
-		if driver.Name != driverName || driver.NodeID != nodeID {
-			t.Errorf("expected Driver to be %q and NodeID to be %q, but got: %q:%q", driverName, nodeID, driver.Name, driver.NodeID)
-		}
+			driver := nodeInfo.Spec.Drivers[0]
+			if driver.Name != driverName || driver.NodeID != nodeID {
+				t.Fatalf("expected Driver to be %q and NodeID to be %q, but got: %q:%q", driverName, nodeID, driver.Name, driver.NodeID)
+			}
+		})
 	}
 }
 
@@ -1059,86 +1058,87 @@ func getClientSet(existingNode *v1.Node, existingCSINode *storage.CSINode) *fake
 
 func test(t *testing.T, addNodeInfo bool, testcases []testcase) {
 	for _, tc := range testcases {
-		t.Logf("test case: %q", tc.name)
+		t.Run(tc.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			t.Logf("test case: %q", tc.name)
 
-		//// Arrange
-		nodeName := tc.existingNode.Name
-		client := getClientSet(tc.existingNode, tc.existingCSINode)
+			//// Arrange
+			nodeName := tc.existingNode.Name
+			client := getClientSet(tc.existingNode, tc.existingCSINode)
 
-		tmpDir, err := utiltesting.MkTmpdir("nodeinfomanager-test")
-		if err != nil {
-			t.Fatalf("can't create temp dir: %v", err)
-		}
-		defer os.RemoveAll(tmpDir)
-		host := volumetest.NewFakeVolumeHostWithCSINodeName(t,
-			tmpDir,
-			client,
-			nil,
-			nodeName,
-			nil,
-			nil,
-		)
-		nim := NewNodeInfoManager(types.NodeName(nodeName), host, tc.migratedPlugins)
+			tmpDir := t.TempDir()
+			host := volumetest.NewFakeVolumeHostWithCSINodeName(t,
+				tmpDir,
+				client,
+				nil,
+				nodeName,
+				nil,
+				nil,
+			)
+			nim := NewNodeInfoManager(types.NodeName(nodeName), host, tc.migratedPlugins)
 
-		//// Act
-		nim.CreateCSINode()
-		if addNodeInfo {
-			err = nim.InstallCSIDriver(tc.driverName, tc.inputNodeID, tc.inputVolumeLimit, tc.inputTopology)
-		} else {
-			err = nim.UninstallCSIDriver(tc.driverName)
-		}
-
-		//// Assert
-		if tc.expectFail {
-			if err == nil {
-				t.Errorf("expected an error from InstallCSIDriver call but got none")
+			//// Act
+			// Some cases start with a CSINode that already exists.
+			if _, err := nim.CreateCSINode(tCtx); err != nil && !errors.IsAlreadyExists(err) {
+				t.Fatalf("expected no error from creating CSINode but got: %v", err)
 			}
-			continue
-		} else if err != nil {
-			t.Errorf("expected no error from InstallCSIDriver call but got: %v", err)
-			continue
-		}
-
-		actions := client.Actions()
-
-		var node *v1.Node
-		if action := hasPatchAction(actions); action != nil {
-			node, err = applyNodeStatusPatch(tc.existingNode, action.(clienttesting.PatchActionImpl).GetPatch())
-			assert.NoError(t, err)
-		} else {
-			node, err = client.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
-			assert.NoError(t, err)
-		}
-
-		if node == nil {
-			t.Errorf("error getting node: %v", err)
-			continue
-		}
-
-		if !helper.Semantic.DeepEqual(node, tc.expectedNode) {
-			t.Errorf("expected Node %v; got: %v", tc.expectedNode, node)
-		}
-
-		// CSINode validation
-		nodeInfo, err := client.StorageV1().CSINodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
-		if err != nil {
-			if !errors.IsNotFound(err) {
-				t.Errorf("error getting CSINode: %v", err)
+			var err error
+			if addNodeInfo {
+				err = nim.InstallCSIDriver(tCtx, tc.driverName, tc.inputNodeID, tc.inputVolumeLimit, tc.inputTopology)
+			} else {
+				err = nim.UninstallCSIDriver(tCtx, tc.driverName)
 			}
-			continue
-		}
-		if !helper.Semantic.DeepEqual(nodeInfo, tc.expectedCSINode) {
-			t.Errorf("expected CSINode %v; got: %v", tc.expectedCSINode, nodeInfo)
-		}
 
-		if !addNodeInfo && tc.existingCSINode != nil && tc.existingNode != nil {
-			if tc.hasModified && helper.Semantic.DeepEqual(nodeInfo, tc.existingCSINode) {
-				t.Errorf("existing CSINode %v; got: %v", tc.existingCSINode, nodeInfo)
+			//// Assert
+			if tc.expectFail {
+				if err == nil {
+					t.Fatalf("expected an error from InstallCSIDriver call but got none")
+				}
+				return
+			} else if err != nil {
+				t.Fatalf("expected no error from InstallCSIDriver call but got: %v", err)
 			}
-			if !tc.hasModified && !helper.Semantic.DeepEqual(nodeInfo, tc.existingCSINode) {
-				t.Errorf("existing CSINode %v; got: %v", tc.existingCSINode, nodeInfo)
+
+			actions := client.Actions()
+
+			var node *v1.Node
+			if action := hasPatchAction(actions); action != nil {
+				node, err = applyNodeStatusPatch(tc.existingNode, action.(clienttesting.PatchActionImpl).GetPatch())
+				assert.NoError(t, err)
+			} else {
+				node, err = client.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
+				assert.NoError(t, err)
 			}
-		}
+
+			if node == nil {
+				t.Fatalf("error getting node: %v", err)
+			}
+
+			if !helper.Semantic.DeepEqual(node, tc.expectedNode) {
+				t.Errorf("expected Node %v; got: %v", tc.expectedNode, node)
+			}
+
+			// CSINode validation
+			nodeInfo, err := client.StorageV1().CSINodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
+			if err != nil {
+				if !errors.IsNotFound(err) {
+					t.Fatalf("error getting CSINode: %v", err)
+				}
+				return
+			}
+			if !helper.Semantic.DeepEqual(nodeInfo, tc.expectedCSINode) {
+				t.Errorf("expected CSINode %v; got: %v", tc.expectedCSINode, nodeInfo)
+			}
+
+			if !addNodeInfo && tc.existingCSINode != nil && tc.existingNode != nil {
+				if tc.hasModified && helper.Semantic.DeepEqual(nodeInfo, tc.existingCSINode) {
+					t.Errorf("existing CSINode %v; got: %v", tc.existingCSINode, nodeInfo)
+				}
+				if !tc.hasModified && !helper.Semantic.DeepEqual(nodeInfo, tc.existingCSINode) {
+					t.Errorf("existing CSINode %v; got: %v", tc.existingCSINode, nodeInfo)
+				}
+			}
+		})
 	}
 }
 
@@ -1506,14 +1506,14 @@ func TestNodeRecreatedSameNameRefreshesCSINodeOwnerUID(t *testing.T) {
 		gcDeletedOldCSI    bool
 		preCreateNewCSI    bool
 		enableVolumeHealth bool
-		act                func(nim Interface) error
+		act                func(ctx context.Context, nim *NodeInfoManager) error
 		verify             func(t *testing.T, csiNode *storage.CSINode, actions []clienttesting.Action)
 	}{
 		{
 			name:            "InstallCSIDriver after GC deleted predecessor CSINode",
 			gcDeletedOldCSI: true,
-			act: func(nim Interface) error {
-				return nim.InstallCSIDriver(driverName, driverID, 0, nil)
+			act: func(ctx context.Context, nim *NodeInfoManager) error {
+				return nim.InstallCSIDriver(ctx, driverName, driverID, 0, nil)
 			},
 			verify: func(t *testing.T, csiNode *storage.CSINode, _ []clienttesting.Action) {
 				assert.Len(t, csiNode.Spec.Drivers, 1)
@@ -1523,8 +1523,8 @@ func TestNodeRecreatedSameNameRefreshesCSINodeOwnerUID(t *testing.T) {
 		{
 			name:            "InstallCSIDriver before GC deleted predecessor CSINode",
 			gcDeletedOldCSI: false,
-			act: func(nim Interface) error {
-				return nim.InstallCSIDriver(driverName, driverID, 0, nil)
+			act: func(ctx context.Context, nim *NodeInfoManager) error {
+				return nim.InstallCSIDriver(ctx, driverName, driverID, 0, nil)
 			},
 			verify: func(t *testing.T, csiNode *storage.CSINode, _ []clienttesting.Action) {
 				// Predecessor driver entry must be gone after replacing the old CSINode.
@@ -1535,8 +1535,8 @@ func TestNodeRecreatedSameNameRefreshesCSINodeOwnerUID(t *testing.T) {
 		{
 			name:            "UpdateCSIDriver after GC deleted predecessor CSINode",
 			gcDeletedOldCSI: true,
-			act: func(nim Interface) error {
-				return nim.UpdateCSIDriver(driverName, driverID, 16, nil)
+			act: func(ctx context.Context, nim *NodeInfoManager) error {
+				return nim.UpdateCSIDriver(ctx, driverName, driverID, 16, nil)
 			},
 		},
 		{
@@ -1544,8 +1544,8 @@ func TestNodeRecreatedSameNameRefreshesCSINodeOwnerUID(t *testing.T) {
 			gcDeletedOldCSI:    true,
 			preCreateNewCSI:    true,
 			enableVolumeHealth: true,
-			act: func(nim Interface) error {
-				return nim.UpdateCSINodeStorageHealth(t.Context(), driverName, healthConds)
+			act: func(ctx context.Context, nim *NodeInfoManager) error {
+				return nim.UpdateCSINodeStorageHealth(ctx, driverName, healthConds)
 			},
 			verify: func(t *testing.T, csiNode *storage.CSINode, actions []clienttesting.Action) {
 				for _, action := range actions {
@@ -1560,6 +1560,7 @@ func TestNodeRecreatedSameNameRefreshesCSINodeOwnerUID(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
 			if tc.enableVolumeHealth {
 				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIVolumeHealth, true)
 			}
@@ -1571,7 +1572,7 @@ func TestNodeRecreatedSameNameRefreshesCSINodeOwnerUID(t *testing.T) {
 
 			client := getClientSet(oldNode, oldCSINode)
 			host := volumetest.NewFakeVolumeHostWithCSINodeName(t, t.TempDir(), client, nil, nodeName, nil, nil)
-			nim := NewNodeInfoManager(nodeName, host, nil).(*nodeInfoManager)
+			nim := NewNodeInfoManager(nodeName, host, nil)
 
 			if err := nim.InitializeCSINodeWithAnnotation(); err != nil {
 				t.Fatalf("InitializeCSINodeWithAnnotation failed: %v", err)
@@ -1601,7 +1602,7 @@ func TestNodeRecreatedSameNameRefreshesCSINodeOwnerUID(t *testing.T) {
 
 			// 3. Execute operation with stale nim.nodeID and verify resulting CSINode owns newNodeUID.
 			actionsBefore := len(client.Actions())
-			if err := tc.act(nim); err != nil {
+			if err := tc.act(tCtx, nim); err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
 
@@ -1715,9 +1716,10 @@ func TestUninstallCSIDriverRemovesStorageHealth(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
 			nim, client, nodeName := newStorageHealthTestManager(t, tc.installed, tc.stored)
 
-			if err := nim.uninstallDriverFromCSINode(driver1); err != nil {
+			if err := nim.uninstallDriverFromCSINode(tCtx, driver1); err != nil {
 				t.Fatalf("uninstallDriverFromCSINode returned error: %v", err)
 			}
 
@@ -1755,11 +1757,10 @@ func checkFreshTransitionTimes(t *testing.T, got, want []storage.StorageHealth, 
 	}
 }
 
-// newStorageHealthTestManager returns a nodeInfoManager backed by a fake client
+// newStorageHealthTestManager returns a NodeInfoManager backed by a fake client
 // holding a CSINode with the given drivers installed and the given storage health.
-func newStorageHealthTestManager(t *testing.T, installed []string, stored []storage.StorageHealth) (*nodeInfoManager, *fake.Clientset, string) {
+func newStorageHealthTestManager(t *testing.T, installed []string, stored []storage.StorageHealth) (*NodeInfoManager, *fake.Clientset, string) {
 	t.Helper()
-	node := generateNode(nil, nil, nil)
 	drivers := make([]storage.CSINodeDriver, 0, len(installed))
 	for _, name := range installed {
 		drivers = append(drivers, storage.CSINodeDriver{
@@ -1767,6 +1768,7 @@ func newStorageHealthTestManager(t *testing.T, installed []string, stored []stor
 			NodeID: "node1",
 		})
 	}
+
 	csiNode := &storage.CSINode{
 		ObjectMeta: getCSINodeObjectMeta(),
 		Spec: storage.CSINodeSpec{
@@ -1776,11 +1778,9 @@ func newStorageHealthTestManager(t *testing.T, installed []string, stored []stor
 			StorageHealth: stored,
 		},
 	}
-	client := getClientSet(node, csiNode)
-	host := volumetest.NewFakeVolumeHostWithCSINodeName(t, t.TempDir(), client, nil, node.Name, nil, nil)
-	nim := NewNodeInfoManager(types.NodeName(node.Name), host, nil).(*nodeInfoManager)
-	nim.nodeID = node.UID
-	return nim, client, node.Name
+
+	nim, client := newTestNodeInfoManager(t, csiNode)
+	return nim, client, csiNode.Name
 }
 
 func countStatusUpdates(actions []clienttesting.Action) int {
@@ -1791,4 +1791,247 @@ func countStatusUpdates(actions []clienttesting.Action) int {
 		}
 	}
 	return count
+}
+
+func newTestNodeInfoManager(t *testing.T, csiNode *storage.CSINode) (*NodeInfoManager, *fake.Clientset) {
+	t.Helper()
+
+	node := generateNode(nil, nil, nil)
+	client := getClientSet(node, csiNode)
+	host := volumetest.NewFakeVolumeHostWithCSINodeName(t, t.TempDir(), client, nil, node.Name, nil, nil)
+	nim := NewNodeInfoManager(types.NodeName(node.Name), host, nil)
+	nim.nodeID = node.UID
+	return nim, client
+}
+
+func csiNodeSpecUpdates(client *fake.Clientset) []*storage.CSINode {
+	var updates []*storage.CSINode
+	for _, action := range client.Actions() {
+		if action.Matches("update", "csinodes") && action.GetSubresource() == "" {
+			update := action.(clienttesting.UpdateAction)
+			updates = append(updates, update.GetObject().(*storage.CSINode))
+		}
+	}
+	return updates
+}
+
+func TestRegisterCSIDriver(t *testing.T) {
+	const (
+		driver = "com.example.csi.driver1"
+		nodeID = "i-instance1"
+	)
+	other := storage.CSINodeDriverRegistration{
+		Name:   "other.csi.example.com",
+		NodeID: "other-node",
+	}
+	testcases := []struct {
+		name        string
+		inputID     string
+		existingID  *string
+		published   bool
+		wantUpdates int
+		wantErr     string
+	}{
+		{
+			name:        "new registration",
+			inputID:     nodeID,
+			wantUpdates: 1,
+		},
+		{
+			name:       "idempotent registration",
+			inputID:    nodeID,
+			existingID: new(nodeID),
+		},
+		{
+			name:        "update pending registration",
+			inputID:     nodeID,
+			existingID:  new("i-old"),
+			wantUpdates: 1,
+		},
+		{
+			name:        "preserve published entry",
+			inputID:     nodeID,
+			published:   true,
+			wantUpdates: 1,
+		},
+		{
+			name:    "empty node ID",
+			wantErr: "driverNodeID must not be empty",
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			csiNode := generateCSINode(nodeIDMap{other.Name: other.NodeID}, nil, nil)
+			if tc.published {
+				csiNode.Spec.Drivers = append(csiNode.Spec.Drivers, storage.CSINodeDriver{
+					Name:         driver,
+					NodeID:       nodeID,
+					TopologyKeys: []string{"topology.example.com/zone"},
+					Allocatable:  generateVolumeLimits(6),
+				})
+			}
+			if tc.existingID != nil {
+				csiNode.Spec.DriverRegistrations = append(csiNode.Spec.DriverRegistrations, storage.CSINodeDriverRegistration{
+					Name:   driver,
+					NodeID: *tc.existingID,
+				})
+			}
+			csiNode.Spec.DriverRegistrations = append(csiNode.Spec.DriverRegistrations, other)
+			original := csiNode.DeepCopy()
+			nim, client := newTestNodeInfoManager(t, csiNode)
+
+			err := nim.RegisterCSIDriver(tCtx, driver, tc.inputID)
+
+			wantRegistrations := original.Spec.DriverRegistrations
+			if tc.wantErr != "" {
+				require.ErrorContains(t, err, tc.wantErr)
+			} else {
+				require.NoError(t, err)
+				wantRegistrations = []storage.CSINodeDriverRegistration{
+					other,
+					{
+						Name:   driver,
+						NodeID: nodeID,
+					},
+				}
+			}
+			assert.Len(t, csiNodeSpecUpdates(client), tc.wantUpdates)
+
+			got, err := client.StorageV1().CSINodes().Get(tCtx, csiNode.Name, metav1.GetOptions{})
+			require.NoError(t, err)
+			assert.ElementsMatch(t, wantRegistrations, got.Spec.DriverRegistrations)
+			assert.Equal(t, original.Spec.Drivers, got.Spec.Drivers)
+		})
+	}
+}
+
+func TestRegisterCSIDriverCancelled(t *testing.T) {
+	nim, client := newTestNodeInfoManager(t, generateCSINode(nil, nil, nil))
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	err := nim.RegisterCSIDriver(ctx, "com.example.csi.driver1", "i-instance1")
+
+	require.ErrorIs(t, err, context.Canceled)
+	assert.Empty(t, client.Actions())
+}
+
+func TestRegisterCSIDriverResponse(t *testing.T) {
+	testcases := []struct {
+		name   string
+		mutate func(*storage.CSINode)
+	}{
+		{
+			name: "missing registration",
+			mutate: func(csiNode *storage.CSINode) {
+				csiNode.Spec.DriverRegistrations = nil
+			},
+		},
+		{
+			name: "wrong driver",
+			mutate: func(csiNode *storage.CSINode) {
+				csiNode.Spec.DriverRegistrations[0].Name = "other.csi.example.com"
+			},
+		},
+		{
+			name: "wrong node ID",
+			mutate: func(csiNode *storage.CSINode) {
+				csiNode.Spec.DriverRegistrations[0].NodeID = "i-other"
+			},
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			nim, client := newTestNodeInfoManager(t, generateCSINode(nil, nil, nil))
+			client.PrependReactor("update", "csinodes", func(action clienttesting.Action) (bool, runtime.Object, error) {
+				response := action.(clienttesting.UpdateAction).GetObject().(*storage.CSINode).DeepCopy()
+				tc.mutate(response)
+				return true, response, nil
+			})
+
+			err := nim.RegisterCSIDriver(tCtx, "com.example.csi.driver1", "i-instance1")
+
+			require.ErrorContains(t, err, "did not retain registration")
+		})
+	}
+}
+
+func TestCSIDriverRegistrationRemoval(t *testing.T) {
+	const (
+		driver  = "com.example.csi.driver1"
+		nodeID  = "i-instance1"
+		zoneKey = "topology.example.com/zone"
+	)
+	other := storage.CSINodeDriverRegistration{
+		Name:   "other.csi.example.com",
+		NodeID: "other-node",
+	}
+	testcases := []struct {
+		name      string
+		published bool
+		uninstall bool
+	}{
+		{
+			name: "install pending driver",
+		},
+		{
+			name:      "install unchanged published driver",
+			published: true,
+		},
+		{
+			name:      "uninstall pending driver",
+			uninstall: true,
+		},
+		{
+			name:      "uninstall published driver",
+			published: true,
+			uninstall: true,
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			csiNode := generateCSINode(nodeIDMap{other.Name: other.NodeID}, nil, nil)
+			otherDrivers := slices.Clone(csiNode.Spec.Drivers)
+			target := storage.CSINodeDriver{
+				Name:         driver,
+				NodeID:       nodeID,
+				TopologyKeys: []string{zoneKey},
+				Allocatable:  generateVolumeLimits(6),
+			}
+			if tc.published {
+				csiNode.Spec.Drivers = append(csiNode.Spec.Drivers, target)
+			}
+			csiNode.Spec.DriverRegistrations = []storage.CSINodeDriverRegistration{
+				{
+					Name:   driver,
+					NodeID: nodeID,
+				},
+				other,
+			}
+			nim, client := newTestNodeInfoManager(t, csiNode)
+
+			wantDrivers := otherDrivers
+			if tc.uninstall {
+				require.NoError(t, nim.UninstallCSIDriver(tCtx, driver))
+			} else {
+				require.NoError(t, nim.InstallCSIDriver(tCtx, driver, nodeID, 6, map[string]string{zoneKey: "zone-a"}))
+				wantDrivers = append(wantDrivers, target)
+			}
+
+			updates := csiNodeSpecUpdates(client)
+			require.Len(t, updates, 1)
+			assert.Equal(t, []storage.CSINodeDriverRegistration{other}, updates[0].Spec.DriverRegistrations)
+			assert.ElementsMatch(t, wantDrivers, updates[0].Spec.Drivers)
+
+			got, err := client.StorageV1().CSINodes().Get(tCtx, csiNode.Name, metav1.GetOptions{})
+			require.NoError(t, err)
+			assert.Equal(t, updates[0].Spec, got.Spec)
+		})
+	}
 }

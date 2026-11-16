@@ -16765,9 +16765,28 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             scalar: string
           elementRelationship: atomic
+- name: io.k8s.api.storage.v1.CSINodeDriverRegistration
+  map:
+    fields:
+    - name: name
+      type:
+        scalar: string
+      default: ""
+    - name: nodeID
+      type:
+        scalar: string
+      default: ""
 - name: io.k8s.api.storage.v1.CSINodeSpec
   map:
     fields:
+    - name: driverRegistrations
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.storage.v1.CSINodeDriverRegistration
+          elementRelationship: associative
+          keys:
+          - name
     - name: drivers
       type:
         list:
@@ -17228,9 +17247,28 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             scalar: string
           elementRelationship: atomic
+- name: io.k8s.api.storage.v1beta1.CSINodeDriverRegistration
+  map:
+    fields:
+    - name: name
+      type:
+        scalar: string
+      default: ""
+    - name: nodeID
+      type:
+        scalar: string
+      default: ""
 - name: io.k8s.api.storage.v1beta1.CSINodeSpec
   map:
     fields:
+    - name: driverRegistrations
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.storage.v1beta1.CSINodeDriverRegistration
+          elementRelationship: associative
+          keys:
+          - name
     - name: drivers
       type:
         list:

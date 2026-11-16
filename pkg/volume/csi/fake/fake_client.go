@@ -88,6 +88,8 @@ type NodeClient struct {
 	singleNodeMultiWriterSet bool
 	volumeMountGroupSet      bool
 	nodeGetInfoResp          *csipb.NodeGetInfoResponse
+	nodeGetInfoRequests      []*csipb.NodeGetInfoRequest
+	nodeInfoFromController   bool
 	nodeVolumeStatsResp      *csipb.NodeGetVolumeStatsResponse
 	FakeNodeExpansionRequest *csipb.NodeExpandVolumeRequest
 	nextErr                  error
@@ -159,6 +161,17 @@ func (f *NodeClient) SetGetCapabilitiesErr(err error) {
 
 func (f *NodeClient) SetNodeGetInfoResp(resp *csipb.NodeGetInfoResponse) {
 	f.nodeGetInfoResp = resp
+}
+
+// SetNodeInfoFromControllerCapability makes NodeGetCapabilities advertise the
+// NODE_INFO_FROM_CONTROLLER capability.
+func (f *NodeClient) SetNodeInfoFromControllerCapability(enabled bool) {
+	f.nodeInfoFromController = enabled
+}
+
+// NodeGetInfoRequests returns the NodeGetInfo requests received so far.
+func (f *NodeClient) NodeGetInfoRequests() []*csipb.NodeGetInfoRequest {
+	return f.nodeGetInfoRequests
 }
 
 func (f *NodeClient) SetNodeVolumeStatsResp(resp *csipb.NodeGetVolumeStatsResponse) {
@@ -350,6 +363,7 @@ func (f *NodeClient) NodeExpandVolume(ctx context.Context, req *csipb.NodeExpand
 
 // NodeGetId implements csi method
 func (f *NodeClient) NodeGetInfo(ctx context.Context, in *csipb.NodeGetInfoRequest, opts ...grpc.CallOption) (*csipb.NodeGetInfoResponse, error) {
+	f.nodeGetInfoRequests = append(f.nodeGetInfoRequests, in)
 	if f.nextErr != nil {
 		return nil, f.nextErr
 	}
@@ -429,6 +443,16 @@ func (f *NodeClient) NodeGetCapabilities(ctx context.Context, in *csipb.NodeGetC
 			Type: &csipb.NodeServiceCapability_Rpc{
 				Rpc: &csipb.NodeServiceCapability_RPC{
 					Type: csipb.NodeServiceCapability_RPC_VOLUME_MOUNT_GROUP,
+				},
+			},
+		})
+	}
+
+	if f.nodeInfoFromController {
+		resp.Capabilities = append(resp.Capabilities, &csipb.NodeServiceCapability{
+			Type: &csipb.NodeServiceCapability_Rpc{
+				Rpc: &csipb.NodeServiceCapability_RPC{
+					Type: csipb.NodeServiceCapability_RPC_NODE_INFO_FROM_CONTROLLER,
 				},
 			},
 		})

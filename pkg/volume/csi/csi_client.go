@@ -181,6 +181,15 @@ func newV1NodeClient(addr csiAddr, metricsManager *MetricsManager) (nodeClient c
 	return nodeClient, conn, nil
 }
 
+func newCsiDriverClientFromAddr(driverName csiDriverName, addr csiAddr) *csiDriverClient {
+	return &csiDriverClient{
+		driverName:          driverName,
+		addr:                addr,
+		nodeV1ClientCreator: newV1NodeClient,
+		metricsManager:      NewCSIMetricsManager(string(driverName)),
+	}
+}
+
 func newCsiDriverClient(driverName csiDriverName) (*csiDriverClient, error) {
 	if driverName == "" {
 		return nil, fmt.Errorf("driver name is empty")
@@ -191,13 +200,11 @@ func newCsiDriverClient(driverName csiDriverName) (*csiDriverClient, error) {
 		return nil, fmt.Errorf("driver name %s not found in the list of registered CSI drivers", driverName)
 	}
 
-	nodeV1ClientCreator := newV1NodeClient
-	return &csiDriverClient{
-		driverName:          driverName,
-		addr:                csiAddr(existingDriver.endpoint),
-		nodeV1ClientCreator: nodeV1ClientCreator,
-		metricsManager:      NewCSIMetricsManager(string(driverName)),
-	}, nil
+	return newCsiDriverClientFromAddr(driverName, csiAddr(existingDriver.endpoint)), nil
+}
+
+func (c *csiDriverClient) NodeSupportsNodeInfoFromController(ctx context.Context) (bool, error) {
+	return c.nodeSupportsCapability(ctx, csipbv1.NodeServiceCapability_RPC_NODE_INFO_FROM_CONTROLLER)
 }
 
 func (c *csiDriverClient) NodeGetInfo(ctx context.Context) (
@@ -237,6 +244,26 @@ func (c *csiDriverClient) nodeGetInfoV1(ctx context.Context) (
 		accessibleTopology = topology.Segments
 	}
 	return res.GetNodeId(), res.GetMaxVolumesPerNode(), accessibleTopology, nil
+}
+
+func (c *csiDriverClient) NodeGetInfoForController(ctx context.Context) (nodeID string, err error) {
+	klog.V(4).InfoS(log("calling NodeGetInfo rpc (ControllerGetNodeInfo)"))
+
+	nodeClient, closer, err := c.nodeV1ClientCreator(c.addr, c.metricsManager)
+	if err != nil {
+		return "", err
+	}
+	defer func() {
+		if err := closer.Close(); err != nil {
+			klog.Errorf("error closing node client: %v", err)
+		}
+	}()
+
+	res, err := nodeClient.NodeGetInfo(ctx, &csipbv1.NodeGetInfoRequest{ControllerGetNodeInfo: true})
+	if err != nil {
+		return "", err
+	}
+	return res.GetNodeId(), nil
 }
 
 func (c *csiDriverClient) NodePublishVolume(

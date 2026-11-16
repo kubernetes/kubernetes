@@ -48,7 +48,7 @@ func ListRegisteredDrivers() []string {
 
 // GetNodeInfoManager returns the CSI node info manager used to update CSINode objects.
 // It may be nil before the CSI plugin is initialized.
-func GetNodeInfoManager() nodeinfomanager.Interface {
+func GetNodeInfoManager() *nodeinfomanager.NodeInfoManager {
 	return nim
 }
 

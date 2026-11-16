@@ -120,7 +120,10 @@ func newManager(statusUpdater StatusUpdater, probeInterval time.Duration, worker
 		clientFactory: csi.NewHealthClient,
 		listDrivers:   csi.ListRegisteredDrivers,
 		csiNodeUpdater: func() CSINodeUpdater {
-			return csi.GetNodeInfoManager()
+			if nim := csi.GetNodeInfoManager(); nim != nil {
+				return nim
+			}
+			return nil
 		},
 	}
 }
