@@ -1829,3 +1829,90 @@ func TestRollingUpdateAndProportionalScalingForDeploymentPodReplacement(t *testi
 		})
 	}
 }
+
+// TestDeploymentRolloutWithDisabledFieldInUse verifies that a Deployment converges when the feature
+// gate of a pod template field it uses is disabled. The API server keeps the field on the Deployment
+// because it is in use, but drops it from ReplicaSets created afterwards; the controller must not
+// treat that ReplicaSet as a hash collision and create another one.
+func TestDeploymentRolloutWithDisabledFieldInUse(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ContainerRestartRules, true)
+
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	closeFn, rm, dc, informers, c := dcSetup(ctx, t)
+	defer closeFn()
+
+	name := "test-deployment-disabled-field-in-use"
+	ns := framework.CreateNamespaceOrDie(c, name, t)
+	defer framework.DeleteNamespaceOrDie(c, ns, t)
+
+	stopControllers := runControllersAndInformers(t, rm, dc, informers)
+	defer stopControllers()
+
+	tester := &deploymentTester{t: t, c: c, deployment: newDeployment(name, ns.Name, 2)}
+	container := &tester.deployment.Spec.Template.Spec.Containers[0]
+	container.RestartPolicy = ptr.To(v1.ContainerRestartPolicyNever)
+	container.RestartPolicyRules = []v1.ContainerRestartRule{{
+		Action: v1.ContainerRestartRuleActionRestart,
+		ExitCodes: &v1.ContainerRestartRuleOnExitCodes{
+			Operator: v1.ContainerRestartRuleOnExitCodesOpIn,
+			Values:   []int32{42},
+		},
+	}}
+
+	var err error
+	tester.deployment, err = c.AppsV1().Deployments(ns.Name).Create(ctx, tester.deployment, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("failed to create deployment %s: %v", tester.deployment.Name, err)
+	}
+	if err := tester.waitForDeploymentRevisionAndImage("1", fakeImage); err != nil {
+		t.Fatal(err)
+	}
+	if err := tester.waitForDeploymentCompleteAndMarkPodsReady(); err != nil {
+		t.Fatal(err)
+	}
+
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ContainerRestartRules, false)
+
+	// Trigger a rollout the way "kubectl rollout restart" does.
+	tester.deployment, err = tester.updateDeployment(func(update *apps.Deployment) {
+		update.Spec.Template.Annotations = map[string]string{"kubectl.kubernetes.io/restartedAt": "2026-09-14T00:00:00Z"}
+	})
+	if err != nil {
+		t.Fatalf("failed to update deployment %s: %v", tester.deployment.Name, err)
+	}
+	if tester.deployment.Spec.Template.Spec.Containers[0].RestartPolicy == nil {
+		t.Fatalf("deployment %s lost restartPolicy, which was in use", tester.deployment.Name)
+	}
+	if err := tester.waitForDeploymentRevisionAndImage("2", fakeImage); err != nil {
+		t.Fatal(err)
+	}
+	if err := tester.waitForDeploymentCompleteAndMarkPodsReady(); err != nil {
+		t.Fatal(err)
+	}
+
+	newRS, err := tester.expectNewReplicaSet()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if newRS.Spec.Template.Spec.Containers[0].RestartPolicy != nil {
+		t.Fatalf("expected restartPolicy to be dropped from new replicaset %s", newRS.Name)
+	}
+
+	rsList, err := c.AppsV1().ReplicaSets(ns.Name).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		t.Fatalf("failed to list replicasets: %v", err)
+	}
+	if len(rsList.Items) != 2 {
+		t.Errorf("expected 2 replicasets after one rollout, got %d", len(rsList.Items))
+	}
+	d, err := c.AppsV1().Deployments(ns.Name).Get(ctx, name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("failed to get deployment %s: %v", name, err)
+	}
+	if collisionCount := ptr.Deref(d.Status.CollisionCount, 0); collisionCount != 0 {
+		t.Errorf("expected no hash collisions, got collisionCount %d", collisionCount)
+	}
+}
