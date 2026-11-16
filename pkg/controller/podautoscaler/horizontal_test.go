@@ -6558,7 +6558,12 @@ func TestMultipleHPAs(t *testing.T) {
 
 			return true, obj, nil
 		}()
-		processed <- obj.Name
+		// Non-blocking: after the test reads all HPAs the buffer may be full, and a blocked
+		// worker would leak past test cleanup.
+		select {
+		case processed <- obj.Name:
+		default:
+		}
 
 		return handled, obj, err
 	})
