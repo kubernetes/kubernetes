@@ -69,11 +69,28 @@ var (
 	castagnoli  = crc32.MakeTable(crc32.Castagnoli)
 )
 
+// These mirror unexported constants in compression's format.go. A frame opens
+// with 0x00 "k8s", names its algorithm in byte 4 and keeps its CRC32C in bytes
+// 5-8, while a bare protobuf value opens with "k8s" 0x00.
+const (
+	frameMagic      = "\x00k8s"
+	protobufPrefix  = "k8s\x00"
+	crcOffset       = 5
+	frameHeaderSize = 9
+	algStored       = 0x00
+	algDeflate      = 0x01
+
+	// maxPlaintextBytes mirrors storagecompression.MaxPlaintextBytes, which is
+	// internal to k8s.io/apiserver. The policy never frames a value above it, and
+	// minSize has to be below it.
+	maxPlaintextBytes = 1536*1024 - 64*1024
+)
+
 // sealFrame writes the CRC32C that compression's format.go defines into bytes
 // 5-8, so a hand-built frame passes its checksum whatever else is wrong with it.
 func sealFrame(frame []byte) []byte {
-	crc := crc32.Update(crc32.Checksum(frame[:5], castagnoli), castagnoli, frame[9:])
-	binary.LittleEndian.PutUint32(frame[5:9], crc)
+	crc := crc32.Update(crc32.Checksum(frame[:crcOffset], castagnoli), castagnoli, frame[frameHeaderSize:])
+	binary.LittleEndian.PutUint32(frame[crcOffset:frameHeaderSize], crc)
 	return frame
 }
 
@@ -92,7 +109,7 @@ func lyingLengthFrame(t *testing.T, plaintext []byte) []byte {
 	if err := zw.Close(); err != nil {
 		t.Fatal(err)
 	}
-	frame := binary.AppendUvarint([]byte{0x00, 'k', '8', 's', 0x01, 0, 0, 0, 0}, uint64(len(plaintext)+1))
+	frame := binary.AppendUvarint(append([]byte(frameMagic), algDeflate, 0, 0, 0, 0), uint64(len(plaintext)+1))
 	return sealFrame(append(frame, stream.Bytes()...))
 }
 
@@ -111,17 +128,28 @@ func (e *transformTest) aesCBCTransformer(t *testing.T) value.Transformer {
 	return value.NewPrefixTransformers(nil, value.PrefixTransformer{Prefix: []byte(aesCBCPrefix), Transformer: aestransformer.NewCBCTransformer(block)})
 }
 
-// rawSecret returns the value etcd holds for a secret, or nil if there's none.
-func (e *transformTest) rawSecret(t *testing.T, namespace, name string) []byte {
+// rawValue returns the value etcd holds at exactly this object's key, or nil if
+// there's none. readRawRecordFromETCD matches by prefix, so it also returns any
+// object whose name starts with this one's.
+func (e *transformTest) rawValue(t *testing.T, gr schema.GroupResource, namespace, name string) []byte {
 	t.Helper()
-	resp, err := e.readRawRecordFromETCD(e.getETCDPathForResource(e.storageConfig.Prefix, "", "secrets", name, namespace))
+	key := e.getETCDPathForResource(e.storageConfig.Prefix, gr.Group, gr.Resource, name, namespace)
+	resp, err := e.readRawRecordFromETCD(key)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(resp.Kvs) == 0 {
-		return nil
+	for _, kv := range resp.Kvs {
+		if string(kv.Key) == key {
+			return kv.Value
+		}
 	}
-	return resp.Kvs[0].Value
+	return nil
+}
+
+// rawSecret returns the value etcd holds for a secret, or nil if there's none.
+func (e *transformTest) rawSecret(t *testing.T, namespace, name string) []byte {
+	t.Helper()
+	return e.rawValue(t, secretsGR, namespace, name)
 }
 
 func (e *transformTest) plantSecret(t *testing.T, namespace, name string, v []byte) {
@@ -170,7 +198,7 @@ func TestIntactFramesAreNotCorruptObjects(t *testing.T) {
 		{
 			namespace: "unknown-algorithm",
 			frame: func(*testing.T, []byte) []byte {
-				return sealFrame([]byte{0x00, 'k', '8', 's', 0xfe, 0, 0, 0, 0})
+				return sealFrame(append([]byte(frameMagic), 0xfe, 0, 0, 0, 0))
 			},
 			wantCounter:  unsupportedAlgorithmMetric,
 			quietCounter: formatErrorsMetric,
