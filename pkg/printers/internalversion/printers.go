@@ -1164,12 +1164,8 @@ func getJobCondition(conditions []batch.JobCondition, conditionType batch.JobCon
 }
 
 func hasJobCondition(conditions []batch.JobCondition, conditionType batch.JobConditionType) bool {
-	for _, condition := range conditions {
-		if condition.Type == conditionType {
-			return condition.Status == api.ConditionTrue
-		}
-	}
-	return false
+	condition := getJobCondition(conditions, conditionType)
+	return condition != nil && condition.Status == api.ConditionTrue
 }
 
 func printPodTemplate(obj *api.PodTemplate, options printers.GenerateOptions) ([]metav1.TableRow, error) {
