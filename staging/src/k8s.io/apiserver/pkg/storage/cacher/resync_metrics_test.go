@@ -214,42 +214,24 @@ func TestStalledWatchersMetrics(t *testing.T) {
 	}
 }
 
-// openUnsynced opens a watch on a Cacher whose clock does not tick, so it stays
-// unsynced. The watch is sent to the channel once it is synced or canceled.
-func (c *resyncMetricsTest) openUnsynced(ctx context.Context) <-chan watch.Interface {
-	c.t.Helper()
-	opened := make(chan watch.Interface, 1)
-	go func() {
-		w, err := c.Watch(ctx, "/pods/ns", c.options())
-		if err != nil && ctx.Err() == nil {
-			c.t.Error(err)
-		}
-		opened <- w
-	}()
-	c.waitUnsynced(1)
-	return opened
-}
-
-func (c *resyncMetricsTest) waitUnsynced(want int) {
-	c.t.Helper()
-	if err := wait.PollUntilContextTimeout(context.Background(), time.Millisecond, wait.ForeverTestTimeout, true, func(context.Context) (bool, error) {
-		c.RLock()
-		defer c.RUnlock()
-		return len(c.unsyncedWatchers) == want, nil
-	}); err != nil {
-		c.t.Fatalf("waiting for %d unsynced watchers: %v", want, err)
-	}
-}
-
-func TestStalledWatchersMetricIgnoresNewWatchers(t *testing.T) {
+// A new watch must be registered by Watch itself, not by the background resync.
+func TestWatchRegistersWithoutResyncTick(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchCacheStallResume, true)
+	// The clock does not tick, so resyncWatchers never runs.
 	c := newResyncMetricsTest(t, newResyncMetricsRegistry(t), testingclock.NewFakeClock(time.Now()))
-	ctx, cancel := context.WithCancel(context.Background())
-	opened := c.openUnsynced(ctx)
-	c.expectMetrics(0, 0, 0)
-	cancel()
-	<-opened
-	c.waitUnsynced(0)
+	w := c.open()
+	defer w.Stop()
+	c.RLock()
+	registered, unsynced := 0, len(c.unsyncedWatchers)
+	for range c.watchers.allWatchers() {
+		registered++
+	}
+	c.RUnlock()
+	if registered != 1 || unsynced != 0 {
+		t.Fatalf("got %d registered and %d unsynced watchers, want 1 and 0", registered, unsynced)
+	}
+	c.add(1)
+	c.read(w, c.rv)
 	c.expectMetrics(0, 0, 0)
 }
 
@@ -264,12 +246,7 @@ func TestStalledWatchersMetricStopDuringDispatch(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			// The clock does not tick, so the test is the only dispatcher.
 			c := newResyncMetricsTest(t, newResyncMetricsRegistry(t), testingclock.NewFakeClock(time.Now()))
-			opened := c.openUnsynced(context.Background())
-			c.resyncWatchers()
-			w := <-opened
-			if w == nil {
-				t.Fatal("the watch failed")
-			}
+			w := c.open()
 			defer w.Stop()
 
 			c.startDispatching(&watchCacheEvent{ObjFields: map[string]string{"metadata.namespace": "ns"}, ResourceVersion: c.rv + 1})
