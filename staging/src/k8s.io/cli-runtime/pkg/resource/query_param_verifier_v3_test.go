@@ -18,10 +18,12 @@ package resource
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 	"sync/atomic"
 	"testing"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/openapi/cached"
 	"k8s.io/client-go/openapi/openapitest"
@@ -291,6 +293,7 @@ func TestQueryParamVerifierV3_CachesGroupVersionAcrossKinds(t *testing.T) {
 
 type fakeV3GroupVersion struct {
 	spec        []byte
+	err         error
 	relativeURL string
 	schemaCalls *atomic.Int32
 }
@@ -299,9 +302,53 @@ func (f fakeV3GroupVersion) Schema(contentType string) ([]byte, error) {
 	if f.schemaCalls != nil {
 		f.schemaCalls.Add(1)
 	}
-	return f.spec, nil
+	return f.spec, f.err
 }
 
 func (f fakeV3GroupVersion) ServerRelativeURL() string {
 	return f.relativeURL
+}
+
+// TestQueryParamVerifierV3_ListedButUnservedGroupVersion covers a CRD
+// GroupVersion that is listed in the OpenAPI V3 root document but whose
+// document returns 404 or an empty body, as happens when a CRD is deleted and
+// re-created before the server's root listing refreshes. The verifier must take
+// the same CRD fallback as for a GroupVersion missing from the root document.
+func TestQueryParamVerifierV3_ListedButUnservedGroupVersion(t *testing.T) {
+	embeddedPaths, err := openapitest.NewEmbeddedFileClient().Paths()
+	if err != nil {
+		t.Fatal(err)
+	}
+	gvk := schema.GroupVersionKind{Group: "test.com", Version: "v1", Kind: "Example"}
+	url := "/openapi/v3/apis/test.com/v1?hash=test"
+	unserved := map[string]fakeV3GroupVersion{
+		"404":        {err: apierrors.NewNotFound(schema.GroupResource{}, ""), relativeURL: url},
+		"empty body": {spec: []byte{}, relativeURL: url},
+	}
+	for name, gv := range unserved {
+		for _, isCRD := range []bool{true, false} {
+			t.Run(fmt.Sprintf("%s/crd=%t", name, isCRD), func(t *testing.T) {
+				fakeClient := openapitest.NewFakeClient()
+				fakeClient.PathsMap["api/v1"] = embeddedPaths["api/v1"]
+				fakeClient.PathsMap["apis/test.com/v1"] = gv
+				verifier := &queryParamVerifierV3{
+					finder: NewCRDFinder(func() ([]schema.GroupKind, error) {
+						if isCRD {
+							return []schema.GroupKind{gvk.GroupKind()}, nil
+						}
+						return nil, nil
+					}),
+					resources:  openapi3.NewRootAndResources(fakeClient),
+					queryParam: QueryParamFieldValidation,
+				}
+				err := verifier.HasSupport(gvk)
+				if isCRD && err != nil {
+					t.Errorf("expected supported via the Namespace fallback, got: %v", err)
+				}
+				if !isCRD && !IsParamUnsupportedError(err) {
+					t.Errorf("expected ParamUnsupportedError, got: %v", err)
+				}
+			})
+		}
+	}
 }

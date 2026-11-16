@@ -18,12 +18,12 @@ package openapi3
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"slices"
 	"strings"
 
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/openapi"
 	"k8s.io/kube-openapi/pkg/spec3"
@@ -248,8 +248,11 @@ func (r *root) getGVEntry(gv schema.GroupVersion) (*gvCacheEntry, error) {
 		}
 	}
 
-	openAPISchemaBytes, err := gvOpenAPI.Schema(runtime.ContentTypeJSON)
+	openAPISchemaBytes, err := fetchGVBytes(gv, gvOpenAPI)
 	if err != nil {
+		if _, ok := errors.AsType[*GroupVersionNotFoundError](err); ok {
+			delete(r.cache, gv)
+		}
 		return nil, err
 	}
 	var parsedV3Schema spec3.OpenAPI
