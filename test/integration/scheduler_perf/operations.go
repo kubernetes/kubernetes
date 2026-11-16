@@ -754,7 +754,7 @@ type createCompositePodGroups struct {
 	// The first level is always the root CompositePodGroup level.
 	// The last level is always the leaf PodGroup level.
 	// The levels in-between are all CompositePodGroups levels.
-	// The minimum depth is 2, and the maximum depth is 4.
+	// The minimum depth is 2, and the maximum depth is 5.
 	Depth int
 	// ChildrenCompositePodGroupsPerCPG is the number of child CompositePodGroups per parent.
 	// It must be set if and only if depth > 2.
@@ -780,8 +780,8 @@ func (ccpg *createCompositePodGroups) isValid(allowParameterization bool) error 
 	if !allowParameterization && ccpg.RootCount < 1 {
 		return fmt.Errorf("rootCount must be greater than 0, got %d", ccpg.RootCount)
 	}
-	if ccpg.Depth < 2 || ccpg.Depth > 4 {
-		return fmt.Errorf("depth must be between 2 and 4, got %d", ccpg.Depth)
+	if ccpg.Depth < 2 || ccpg.Depth > 5 {
+		return fmt.Errorf("depth must be between 2 and 5, got %d", ccpg.Depth)
 	}
 	if ccpg.Depth == 2 {
 		if ccpg.ChildrenCompositePodGroupsPerCPG != 0 || ccpg.ChildrenCompositePodGroupsPerCPGParam != "" {

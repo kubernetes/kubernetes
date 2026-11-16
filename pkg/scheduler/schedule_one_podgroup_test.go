@@ -990,23 +990,7 @@ func TestValidatePodGroup(t *testing.T) {
 			wantErr:                 `all pod groups in a hierarchy should have the same preemption policy, got PreemptLowerPriority ("podgroup//pg1") and Never`,
 		},
 		{
-			name:              "CPG success when tree depth is exactly WorkloadMaxTreeDepth (4 levels)",
-			compositePodGroup: st.MakeCompositePodGroup().Name("cpg-root").Priority(10).Obj(),
-			compositePodGroups: []*schedulingv1beta1.CompositePodGroup{
-				st.MakeCompositePodGroup().Name("cpg-root").Priority(10).Obj(),
-				st.MakeCompositePodGroup().Name("cpg-1").ParentCompositePodGroup("cpg-root").Priority(10).Obj(),
-				st.MakeCompositePodGroup().Name("cpg-2").ParentCompositePodGroup("cpg-1").Priority(10).Obj(),
-			},
-			podGroups: []*schedulingv1beta1.PodGroup{
-				st.MakePodGroup().Name("pg1").ParentCompositePodGroup("cpg-2").Priority(10).Obj(),
-			},
-			pods: []*v1.Pod{
-				st.MakePod().Name("p1").PodGroupName("pg1").Priority(10).Obj(),
-			},
-			enableCompositePodGroup: true,
-		},
-		{
-			name:              "CPG failure when tree depth exceeds WorkloadMaxTreeDepth (5 levels)",
+			name:              "CPG success when tree depth is exactly WorkloadMaxTreeDepth (5 levels)",
 			compositePodGroup: st.MakeCompositePodGroup().Name("cpg-root").Priority(10).Obj(),
 			compositePodGroups: []*schedulingv1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Name("cpg-root").Priority(10).Obj(),
@@ -1021,10 +1005,48 @@ func TestValidatePodGroup(t *testing.T) {
 				st.MakePod().Name("p1").PodGroupName("pg1").Priority(10).Obj(),
 			},
 			enableCompositePodGroup: true,
-			wantErr:                 `hierarchy depth exceeds maximum allowed depth 4 at "compositepodgroup//cpg-3"`,
+		},
+		{
+			name:              "CPG failure when tree depth exceeds WorkloadMaxTreeDepth (6 levels)",
+			compositePodGroup: st.MakeCompositePodGroup().Name("cpg-root").Priority(10).Obj(),
+			compositePodGroups: []*schedulingv1beta1.CompositePodGroup{
+				st.MakeCompositePodGroup().Name("cpg-root").Priority(10).Obj(),
+				st.MakeCompositePodGroup().Name("cpg-1").ParentCompositePodGroup("cpg-root").Priority(10).Obj(),
+				st.MakeCompositePodGroup().Name("cpg-2").ParentCompositePodGroup("cpg-1").Priority(10).Obj(),
+				st.MakeCompositePodGroup().Name("cpg-3").ParentCompositePodGroup("cpg-2").Priority(10).Obj(),
+				st.MakeCompositePodGroup().Name("cpg-4").ParentCompositePodGroup("cpg-3").Priority(10).Obj(),
+			},
+			podGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Name("pg1").ParentCompositePodGroup("cpg-4").Priority(10).Obj(),
+			},
+			pods: []*v1.Pod{
+				st.MakePod().Name("p1").PodGroupName("pg1").Priority(10).Obj(),
+			},
+			enableCompositePodGroup: true,
+			wantErr:                 `hierarchy depth exceeds maximum allowed depth 5 at "compositepodgroup//cpg-4"`,
 		},
 		{
 			name:              "CPG failure when child branch exceeds WorkloadMaxTreeDepth without pods in that branch",
+			compositePodGroup: st.MakeCompositePodGroup().Name("cpg-root").Priority(10).Obj(),
+			compositePodGroups: []*schedulingv1beta1.CompositePodGroup{
+				st.MakeCompositePodGroup().Name("cpg-root").Priority(10).Obj(),
+				st.MakeCompositePodGroup().Name("cpg-1").ParentCompositePodGroup("cpg-root").Priority(10).Obj(),
+				st.MakeCompositePodGroup().Name("cpg-2").ParentCompositePodGroup("cpg-1").Priority(10).Obj(),
+				st.MakeCompositePodGroup().Name("cpg-3").ParentCompositePodGroup("cpg-2").Priority(10).Obj(),
+				st.MakeCompositePodGroup().Name("cpg-4").ParentCompositePodGroup("cpg-3").Priority(10).Obj(),
+				st.MakeCompositePodGroup().Name("cpg-5").ParentCompositePodGroup("cpg-4").Priority(10).Obj(),
+			},
+			podGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Name("pg1").ParentCompositePodGroup("cpg-root").Priority(10).Obj(),
+			},
+			pods: []*v1.Pod{
+				st.MakePod().Name("p1").PodGroupName("pg1").Priority(10).Obj(),
+			},
+			enableCompositePodGroup: true,
+			wantErr:                 `hierarchy depth exceeds maximum allowed depth 5 at "compositepodgroup//cpg-4"`,
+		},
+		{
+			name:              "CPG failure when child branch has a CompositePodGroup at depth 5 without level-6 children",
 			compositePodGroup: st.MakeCompositePodGroup().Name("cpg-root").Priority(10).Obj(),
 			compositePodGroups: []*schedulingv1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Name("cpg-root").Priority(10).Obj(),
@@ -1040,25 +1062,7 @@ func TestValidatePodGroup(t *testing.T) {
 				st.MakePod().Name("p1").PodGroupName("pg1").Priority(10).Obj(),
 			},
 			enableCompositePodGroup: true,
-			wantErr:                 `hierarchy depth exceeds maximum allowed depth 4 at "compositepodgroup//cpg-3"`,
-		},
-		{
-			name:              "CPG failure when child branch has a CompositePodGroup at depth 4 without level-5 children",
-			compositePodGroup: st.MakeCompositePodGroup().Name("cpg-root").Priority(10).Obj(),
-			compositePodGroups: []*schedulingv1beta1.CompositePodGroup{
-				st.MakeCompositePodGroup().Name("cpg-root").Priority(10).Obj(),
-				st.MakeCompositePodGroup().Name("cpg-1").ParentCompositePodGroup("cpg-root").Priority(10).Obj(),
-				st.MakeCompositePodGroup().Name("cpg-2").ParentCompositePodGroup("cpg-1").Priority(10).Obj(),
-				st.MakeCompositePodGroup().Name("cpg-3").ParentCompositePodGroup("cpg-2").Priority(10).Obj(),
-			},
-			podGroups: []*schedulingv1beta1.PodGroup{
-				st.MakePodGroup().Name("pg1").ParentCompositePodGroup("cpg-root").Priority(10).Obj(),
-			},
-			pods: []*v1.Pod{
-				st.MakePod().Name("p1").PodGroupName("pg1").Priority(10).Obj(),
-			},
-			enableCompositePodGroup: true,
-			wantErr:                 `hierarchy depth exceeds maximum allowed depth 4 at "compositepodgroup//cpg-3"`,
+			wantErr:                 `hierarchy depth exceeds maximum allowed depth 5 at "compositepodgroup//cpg-4"`,
 		},
 		{
 			name:              "CPG failure when child group references a different workload than root group",

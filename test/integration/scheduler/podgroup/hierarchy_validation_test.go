@@ -43,6 +43,46 @@ func TestHierarchyValidation(t *testing.T) {
 		steps []stepsframework.Step
 	}{
 		{
+			name: "Pod group hierarchy at WorkloadMaxTreeDepth succeeds in scheduling cycle",
+			steps: []stepsframework.Step{
+				{
+					Name:                    "Create root composite pod group",
+					CreateCompositePodGroup: st.MakeCompositePodGroup().Name("cpg-root").WorkloadRef("wl", "root-t").BasicPolicy().Priority(100).Obj(),
+				},
+				{
+					Name:                    "Create level 2 composite pod group",
+					CreateCompositePodGroup: st.MakeCompositePodGroup().Name("cpg1").WorkloadRef("wl", "cpg1-t").ParentCompositePodGroup("cpg-root").BasicPolicy().Priority(100).Obj(),
+				},
+				{
+					Name:                    "Create level 3 composite pod group",
+					CreateCompositePodGroup: st.MakeCompositePodGroup().Name("cpg2").WorkloadRef("wl", "cpg2-t").ParentCompositePodGroup("cpg1").BasicPolicy().Priority(100).Obj(),
+				},
+				{
+					Name:                    "Create level 4 composite pod group",
+					CreateCompositePodGroup: st.MakeCompositePodGroup().Name("cpg3").WorkloadRef("wl", "cpg3-t").ParentCompositePodGroup("cpg2").BasicPolicy().Priority(100).Obj(),
+				},
+				{
+					Name:           "Create level 5 pod group at maximum depth of 5",
+					CreatePodGroup: st.MakePodGroup().Name("pg1").WorkloadRef("wl", "tmpl").ParentCompositePodGroup("cpg3").BasicPolicy().Priority(100).Obj(),
+				},
+				{
+					Name:       "Create pod for pg1",
+					CreatePods: makeTestPods("pg1", "1"),
+				},
+				{
+					Name: "Verify groups are scheduled",
+					WaitForGroupsScheduled: &stepsframework.Groups{
+						CompositePodGroups: []string{"cpg-root", "cpg1", "cpg2", "cpg3"},
+						PodGroups:          []string{"pg1"},
+					},
+				},
+				{
+					Name:                 "Verify pod is scheduled",
+					WaitForPodsScheduled: []string{"pg1-pod-0"},
+				},
+			},
+		},
+		{
 			name: "Pod group hierarchy exceeding WorkloadMaxTreeDepth fails validation in scheduling cycle",
 			steps: []stepsframework.Step{
 				{
@@ -62,8 +102,12 @@ func TestHierarchyValidation(t *testing.T) {
 					CreateCompositePodGroup: st.MakeCompositePodGroup().Name("cpg3").WorkloadRef("wl", "cpg3-t").ParentCompositePodGroup("cpg2").BasicPolicy().Priority(100).Obj(),
 				},
 				{
-					Name:           "Create level 5 pod group exceeding maximum depth of 4",
-					CreatePodGroup: st.MakePodGroup().Name("pg1").WorkloadRef("wl", "tmpl").ParentCompositePodGroup("cpg3").BasicPolicy().Priority(100).Obj(),
+					Name:                    "Create level 5 composite pod group",
+					CreateCompositePodGroup: st.MakeCompositePodGroup().Name("cpg4").WorkloadRef("wl", "cpg4-t").ParentCompositePodGroup("cpg3").BasicPolicy().Priority(100).Obj(),
+				},
+				{
+					Name:           "Create level 6 pod group exceeding maximum depth of 5",
+					CreatePodGroup: st.MakePodGroup().Name("pg1").WorkloadRef("wl", "tmpl").ParentCompositePodGroup("cpg4").BasicPolicy().Priority(100).Obj(),
 				},
 				{
 					Name:       "Create pod for pg1",
@@ -72,7 +116,7 @@ func TestHierarchyValidation(t *testing.T) {
 				{
 					Name: "Verify groups have error condition",
 					WaitForGroupsError: &stepsframework.Groups{
-						CompositePodGroups: []string{"cpg-root", "cpg1", "cpg2", "cpg3"},
+						CompositePodGroups: []string{"cpg-root", "cpg1", "cpg2", "cpg3", "cpg4"},
 						PodGroups:          []string{"pg1"},
 					},
 				},
@@ -83,7 +127,7 @@ func TestHierarchyValidation(t *testing.T) {
 			},
 		},
 		{
-			name: "CompositePodGroup at depth 4 (exceeding max composite depth 3) fails validation in scheduling cycle",
+			name: "CompositePodGroup at depth 5 (exceeding max composite depth 4) fails validation in scheduling cycle",
 			steps: []stepsframework.Step{
 				{
 					Name:                    "Create root composite pod group",
@@ -102,6 +146,10 @@ func TestHierarchyValidation(t *testing.T) {
 					CreateCompositePodGroup: st.MakeCompositePodGroup().Name("cpg3").WorkloadRef("wl", "cpg3-t").ParentCompositePodGroup("cpg2").BasicPolicy().Priority(100).Obj(),
 				},
 				{
+					Name:                    "Create level 5 composite pod group",
+					CreateCompositePodGroup: st.MakeCompositePodGroup().Name("cpg4").WorkloadRef("wl", "cpg4-t").ParentCompositePodGroup("cpg3").BasicPolicy().Priority(100).Obj(),
+				},
+				{
 					Name:           "Create sibling pod group under root",
 					CreatePodGroup: st.MakePodGroup().Name("pg1").WorkloadRef("wl", "tmpl").ParentCompositePodGroup("cpg-root").BasicPolicy().Priority(100).Obj(),
 				},
@@ -112,7 +160,7 @@ func TestHierarchyValidation(t *testing.T) {
 				{
 					Name: "Verify groups have error condition",
 					WaitForGroupsError: &stepsframework.Groups{
-						CompositePodGroups: []string{"cpg-root", "cpg1", "cpg2", "cpg3"},
+						CompositePodGroups: []string{"cpg-root", "cpg1", "cpg2", "cpg3", "cpg4"},
 						PodGroups:          []string{"pg1"},
 					},
 				},

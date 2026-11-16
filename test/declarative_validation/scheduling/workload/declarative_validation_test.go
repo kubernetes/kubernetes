@@ -752,12 +752,17 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 			enableCompositePodGroup:       true,
 			expectedErrs:                  field.ErrorList{field.Invalid(field.NewPath("spec", "compositePodGroupTemplates").Index(0).Child("podGroupTemplates").Index(0).Child("schedulingPolicy", "gang", "minCount"), nil, "").WithOrigin("minimum")},
 		},
-		"cpg tree depth exceeds limit": {
+		"cpg tree depth at limit": {
 			input:                         mkValidWorkload(setCompositePodGroupTreeDepth(4)),
 			enableTopologyAwareScheduling: true,
 			enableCompositePodGroup:       true,
+		},
+		"cpg tree depth exceeds limit": {
+			input:                         mkValidWorkload(setCompositePodGroupTreeDepth(5)),
+			enableTopologyAwareScheduling: true,
+			enableCompositePodGroup:       true,
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "compositePodGroupTemplates").Index(0), nil, "maximum template hierarchy depth is 4").MarkFromImperative(),
+				field.Invalid(field.NewPath("spec", "compositePodGroupTemplates").Index(0), nil, "maximum template hierarchy depth is 5").MarkFromImperative(),
 			},
 		},
 		"mismatched PriorityClassName in root podGroupTemplates": {

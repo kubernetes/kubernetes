@@ -122,7 +122,7 @@ func ValidateWorkloadUpdate(workload, oldWorkload *scheduling.Workload) field.Er
 
 // ValidateWorkloadSpec tests if the following conditions are satisfied:
 // - All template names are unique.
-// - Depth of the CompositePodGroupTemplates tree is not higher than 4.
+// - Depth of the CompositePodGroupTemplates tree is not higher than 5.
 // - All templates in the hierarchy share the same priority and PriorityClassName.
 // - All templates in the hierarchy share the same PreemptionPolicy unless opts.AllowMismatchedPreemptionPolicy is set.
 // - All composite pod group templates in the hierarchy have at least one child.
