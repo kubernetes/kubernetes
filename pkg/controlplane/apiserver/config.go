@@ -309,8 +309,16 @@ func conditionalRequestClassifier(attrs authorizer.Attributes) bool {
 	if excludedFromAdmission.Has(gr) {
 		return false
 	}
+
 	// If the verb is one which is subject to admission, the ConditionsEnforcer will catch the
 	// request, and thus is the request conditions-aware.
+	//
+	// There is one special case, however. Delete options might be specified in the
+	// request body, and an "unsafe delete" might allow deleting an object that cannot be
+	// read, which skips the whole admission chain. We cannot know whether that is the case
+	// here, but if that happens, we reject conditional decisions in the unsafe delete code.
+	// For more info see: k8s.io/apiserver/pkg/endpoints/handlers/delete.go
+	//
 	// TODO(luxas): Inspect whether the API group belongs to an aggregated API server, and in that case,
 	// always consider the request to be conditions-aware, as the aggregated API server could support
 	// conditions for any kind of request.
