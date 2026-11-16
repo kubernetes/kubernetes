@@ -209,20 +209,22 @@ func TestControllerRoleVerbsConsistency(t *testing.T) {
 }
 
 func TestJobControllerSchedulingRules(t *testing.T) {
+	roleName := saRolePrefix + "job-controller"
 	cases := []struct {
-		name                string
-		workloadWithJob     bool
-		wantSchedulingRules bool
+		name               string
+		workloadWithJob    bool
+		wantWorkloadsVerbs []string
+		wantPodGroupsVerbs []string
 	}{
 		{
-			name:                "feature gate disabled",
-			workloadWithJob:     false,
-			wantSchedulingRules: false,
+			name:            "feature gate disabled",
+			workloadWithJob: false,
 		},
 		{
-			name:                "feature gate enabled",
-			workloadWithJob:     true,
-			wantSchedulingRules: true,
+			name:               "feature gate enabled",
+			workloadWithJob:    true,
+			wantWorkloadsVerbs: []string{"create", "get", "list", "patch", "update", "watch"},
+			wantPodGroupsVerbs: []string{"create", "delete", "get", "list", "patch", "update", "watch"},
 		},
 	}
 
@@ -232,9 +234,12 @@ func TestJobControllerSchedulingRules(t *testing.T) {
 				features.GenericWorkload: tc.workloadWithJob,
 				features.WorkloadWithJob: tc.workloadWithJob,
 			})
-			got := hasSchedulingRules(ControllerRoles())
-			if got != tc.wantSchedulingRules {
-				t.Errorf("hasSchedulingRules() = %v, want %v", got, tc.wantSchedulingRules)
+			roles := ControllerRoles()
+			if got := resourceRuleVerbs(roles, roleName, "workloads"); !slices.Equal(got, tc.wantWorkloadsVerbs) {
+				t.Errorf("job-controller workloads verbs = %v, want %v", got, tc.wantWorkloadsVerbs)
+			}
+			if got := resourceRuleVerbs(roles, roleName, "podgroups"); !slices.Equal(got, tc.wantPodGroupsVerbs) {
+				t.Errorf("job-controller podgroups verbs = %v, want %v", got, tc.wantPodGroupsVerbs)
 			}
 		})
 	}
@@ -274,31 +279,19 @@ func TestDeploymentReplicaSetControllerSchedulingRules(t *testing.T) {
 }
 
 func hasResourceRule(roles []rbacv1.ClusterRole, roleName, resource string) bool {
+	return len(resourceRuleVerbs(roles, roleName, resource)) > 0
+}
+
+func resourceRuleVerbs(roles []rbacv1.ClusterRole, roleName, resource string) []string {
 	for _, role := range roles {
 		if role.Name != roleName {
 			continue
 		}
 		for _, rule := range role.Rules {
 			if slices.Contains(rule.APIGroups, "scheduling.k8s.io") && slices.Contains(rule.Resources, resource) {
-				return true
+				return rule.Verbs
 			}
 		}
 	}
-	return false
-}
-
-func hasSchedulingRules(roles []rbacv1.ClusterRole) bool {
-	for _, role := range roles {
-		if role.Name != saRolePrefix+"job-controller" {
-			continue
-		}
-		for _, rule := range role.Rules {
-			if slices.Contains(rule.APIGroups, "scheduling.k8s.io") &&
-				slices.Contains(rule.Resources, "workloads") &&
-				slices.Contains(rule.Resources, "podgroups") {
-				return true
-			}
-		}
-	}
-	return false
+	return nil
 }
