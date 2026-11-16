@@ -31,11 +31,14 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/healthz"
+	"k8s.io/apiserver/pkg/server/options/compressionconfig"
+	compressionconfigmetrics "k8s.io/apiserver/pkg/server/options/compressionconfig/metrics"
 	"k8s.io/apiserver/pkg/server/options/encryptionconfig"
 	encryptionconfigcontroller "k8s.io/apiserver/pkg/server/options/encryptionconfig/controller"
 	encryptionconfigmetrics "k8s.io/apiserver/pkg/server/options/encryptionconfig/metrics"
@@ -52,6 +55,7 @@ type EtcdOptions struct {
 	StorageConfig                           storagebackend.Config
 	EncryptionProviderConfigFilepath        string
 	EncryptionProviderConfigAutomaticReload bool
+	StorageCompressionConfigFilepath        string
 
 	EtcdServersOverrides []string
 
@@ -190,6 +194,9 @@ func (s *EtcdOptions) AddFlags(fs *pflag.FlagSet) {
 		"Determines if the file set by --encryption-provider-config should be automatically reloaded if the disk contents change. "+
 			"Setting this to true disables the ability to uniquely identify distinct KMS plugins via the API server healthz endpoints.")
 
+	fs.StringVar(&s.StorageCompressionConfigFilepath, "storage-compression-config", s.StorageCompressionConfigFilepath,
+		"The file containing the StorageCompressionConfiguration that chooses which resources are compressed before they're stored in etcd.")
+
 	fs.DurationVar(&s.StorageConfig.CompactionInterval, "etcd-compaction-interval", s.StorageConfig.CompactionInterval,
 		"The interval of compaction requests. If 0, the compaction request from apiserver is disabled.")
 
@@ -227,6 +234,11 @@ func (s *EtcdOptions) ApplyTo(c *server.Config) error {
 func (s *EtcdOptions) ApplyWithStorageFactoryTo(factory serverstorage.StorageFactory, c *server.Config) error {
 	if s == nil {
 		return nil
+	}
+
+	// Runs first, so a bad file fails startup before etcd health checks or any KMS plugins start.
+	if err := s.maybeApplyCompressionRules(c); err != nil {
+		return err
 	}
 
 	if !s.SkipHealthEndpoints {
@@ -350,6 +362,34 @@ func (s *EtcdOptions) CreateRESTOptionsGetter(factory serverstorage.StorageFacto
 		}
 	}
 	return &StorageFactoryRestOptionsFactory{Options: *s, StorageFactory: factory}
+}
+
+// maybeApplyCompressionRules loads --storage-compression-config into
+// c.StorageCompressionRules unless c already has rules. kube-apiserver's
+// apiextensions and aggregator configs are shallow copies of an applied config,
+// so they reuse its rules and don't read the file again.
+func (s *EtcdOptions) maybeApplyCompressionRules(c *server.Config) error {
+	if c.StorageCompressionRules != nil || len(s.StorageCompressionConfigFilepath) == 0 {
+		return nil
+	}
+	path := s.StorageCompressionConfigFilepath
+	cfg, err := compressionconfig.LoadCompressionConfig(path)
+	if err != nil {
+		return err
+	}
+	var minCompatibility *version.Version
+	if c.EffectiveVersion != nil {
+		minCompatibility = c.EffectiveVersion.MinCompatibilityVersion()
+	}
+	if err := cfg.CheckMinCompatibility(minCompatibility); err != nil {
+		return fmt.Errorf("--storage-compression-config %q: %w", path, err)
+	}
+	if cfg.CompressesSecrets() {
+		klog.Warningf("--storage-compression-config=%s compresses secrets. A Secret's size in etcd shows how compressible its contents are, even when encryption at rest is configured.", path)
+	}
+	compressionconfigmetrics.RecordLastConfigInfo(c.APIServerID, cfg.CompressionFileContentHash)
+	c.StorageCompressionRules = cfg
+	return nil
 }
 
 func (s *EtcdOptions) maybeApplyResourceTransformers(c *server.Config) (err error) {
