@@ -51,11 +51,12 @@ const (
 	initialRetryDelay = 30 * time.Second
 	retryDelay        = 3 * time.Minute
 
-	TriggerReasonPodResized    = "pod_resized"
-	TriggerReasonPodUpdated    = "pod_updated"
-	TriggerReasonPodsAdded     = "pods_added"
-	TriggerReasonPodsRemoved   = "pods_removed"
-	TriggerReasonPodTerminated = "pod_terminated"
+	TriggerReasonPodResized          = "pod_resized"
+	TriggerReasonPodUpdated          = "pod_updated"
+	TriggerReasonPodsAdded           = "pods_added"
+	TriggerReasonPodsRemoved         = "pods_removed"
+	TriggerReasonPodTerminated       = "pod_terminated"
+	TriggerReasonNodeCapacityChanged = "node_capacity_changed"
 
 	triggerReasonPeriodic = "periodic_retry"
 )
