@@ -5475,7 +5475,7 @@ func TestAllocatorSelection(t *testing.T) {
 		"default": {
 			features:             "",
 			usingFeatureGroup:    true,
-			expectImplementation: "stable",
+			expectImplementation: "incubating",
 		},
 
 		// Alpha features may need the experimental implementation, if there are any

@@ -438,7 +438,7 @@
             "type": "boolean"
           },
           "bools": {
-            "description": "bools is a non-empty list of true/false values.",
+            "description": "bools is a non-empty list of true/false values.\n\nThis is a beta field and requires enabling the DRAListTypeAttributes feature gate (enabled by default).",
             "items": {
               "type": "boolean"
             },
@@ -451,7 +451,7 @@
             "type": "integer"
           },
           "ints": {
-            "description": "ints is a non-empty list of numbers.\n\nThis is an alpha field and requires enabling the DRAListTypeAttributes feature gate.",
+            "description": "ints is a non-empty list of numbers.\n\nThis is a beta field and requires enabling the DRAListTypeAttributes feature gate (enabled by default).",
             "items": {
               "format": "int64",
               "type": "integer"
@@ -464,7 +464,7 @@
             "type": "string"
           },
           "strings": {
-            "description": "strings is a non-empty list of strings. Each string must not be longer than 64 characters.\n\nThis is an alpha field and requires enabling the DRAListTypeAttributes feature gate.",
+            "description": "strings is a non-empty list of strings. Each string must not be longer than 64 characters.\n\nThis is a beta field and requires enabling the DRAListTypeAttributes feature gate (enabled by default).",
             "items": {
               "type": "string"
             },
@@ -476,7 +476,7 @@
             "type": "string"
           },
           "versions": {
-            "description": "versions is a non-empty list of semantic versions according to semver.org spec 2.0.0. Each version string must not be longer than 64 characters.\n\nThis is an alpha field and requires enabling the DRAListTypeAttributes feature gate.",
+            "description": "versions is a non-empty list of semantic versions according to semver.org spec 2.0.0. Each version string must not be longer than 64 characters.\n\nThis is a beta field and requires enabling the DRAListTypeAttributes feature gate (enabled by default).",
             "items": {
               "type": "string"
             },

@@ -112,7 +112,7 @@ func testListTypeAttributes(tCtx ktesting.TContext) {
 	tCtx.Parallel()
 
 	// distinctAttribute is guarded by the DRAConsumableCapacity feature gate,
-	// which the "all" configuration enables explicitly.
+	// which is enabled by default.
 	matchAttrValues := resourceapi.DeviceConstraint{MatchAttribute: &listAttrValuesConstraintAttribute}
 	distinctAttrValues := resourceapi.DeviceConstraint{DistinctAttribute: &listAttrValuesConstraintAttribute}
 

@@ -29,8 +29,6 @@
 # incompatible checks before the allocator can complete an exact-fit
 # allocation from the matching suffix.
 - name: SchedulingWithResourceClaimTemplateListAttributes
-  featureGates:
-    DRAListTypeAttributes: true
   workloadTemplate:
   - opcode: createNodes
     nodeTemplatePath: ../templates/node-with-dra-test-driver.yaml
