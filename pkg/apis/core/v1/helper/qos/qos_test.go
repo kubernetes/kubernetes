@@ -41,6 +41,7 @@ func TestComputePodQOS(t *testing.T) {
 		expected                                   v1.PodQOSClass
 		podLevelResourcesEnabled                   bool
 		podLevelResourcesFixKubeletQOSClassEnabled bool
+		podLevelResourcesEphemeralStorageEnabled   bool
 	}
 
 	guaranteedResources := v1.ResourceRequirements{
@@ -192,7 +193,7 @@ func TestComputePodQOS(t *testing.T) {
 		pod.Spec.Resources = pod.Spec.Containers[0].Resources.DeepCopy()
 		pod.Spec.Containers[0].Resources = guaranteedResources
 		expectedQOS := tc.expected
-		if !resourcehelper.IsPodLevelResourcesSet(pod) {
+		if !resourcehelper.IsPodLevelComputeResourcesSet(pod) {
 			expectedQOS = v1.PodQOSGuaranteed
 			pod.Name += "-fallback"
 		}
@@ -373,6 +374,98 @@ func TestComputePodQOS(t *testing.T) {
 			podLevelResourcesEnabled: true,
 			podLevelResourcesFixKubeletQOSClassEnabled: true,
 		},
+		{
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "guaranteed-with-pod-level-resources-and-ephemeral-storage"},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: "best-effort"},
+					},
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:              resource.MustParse("10m"),
+							v1.ResourceMemory:           resource.MustParse("100Mi"),
+							v1.ResourceEphemeralStorage: resource.MustParse("10Gi"),
+						},
+						Limits: v1.ResourceList{
+							v1.ResourceCPU:              resource.MustParse("10m"),
+							v1.ResourceMemory:           resource.MustParse("100Mi"),
+							v1.ResourceEphemeralStorage: resource.MustParse("20Gi"),
+						},
+					},
+				},
+			},
+			expected:                 v1.PodQOSGuaranteed,
+			podLevelResourcesEnabled: true,
+			podLevelResourcesFixKubeletQOSClassEnabled: true,
+			podLevelResourcesEphemeralStorageEnabled:   true,
+		},
+		{
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "guaranteed-fallback-with-pod-level-ephemeral-storage-only-gate-enabled"},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: "guaranteed", Resources: v1.ResourceRequirements{Requests: getResourceList("100m", "100Mi"), Limits: getResourceList("100m", "100Mi")}},
+					},
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceEphemeralStorage: resource.MustParse("10Gi"),
+						},
+						Limits: v1.ResourceList{
+							v1.ResourceEphemeralStorage: resource.MustParse("20Gi"),
+						},
+					},
+				},
+			},
+			expected:                 v1.PodQOSGuaranteed,
+			podLevelResourcesEnabled: true,
+			podLevelResourcesFixKubeletQOSClassEnabled: true,
+			podLevelResourcesEphemeralStorageEnabled:   true,
+		},
+		{
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "best-effort-with-pod-level-ephemeral-storage-only-and-best-effort-container"},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: "best-effort"},
+					},
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceEphemeralStorage: resource.MustParse("10Gi"),
+						},
+						Limits: v1.ResourceList{
+							v1.ResourceEphemeralStorage: resource.MustParse("10Gi"),
+						},
+					},
+				},
+			},
+			expected:                 v1.PodQOSBestEffort,
+			podLevelResourcesEnabled: true,
+			podLevelResourcesFixKubeletQOSClassEnabled: true,
+			podLevelResourcesEphemeralStorageEnabled:   true,
+		},
+		{
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "guaranteed-fallback-with-pod-level-ephemeral-storage-only-gate-disabled"},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: "guaranteed", Resources: v1.ResourceRequirements{Requests: getResourceList("100m", "100Mi"), Limits: getResourceList("100m", "100Mi")}},
+					},
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceEphemeralStorage: resource.MustParse("10Gi"),
+						},
+						Limits: v1.ResourceList{
+							v1.ResourceEphemeralStorage: resource.MustParse("20Gi"),
+						},
+					},
+				},
+			},
+			expected:                 v1.PodQOSGuaranteed,
+			podLevelResourcesEnabled: true,
+			podLevelResourcesFixKubeletQOSClassEnabled: true,
+			podLevelResourcesEphemeralStorageEnabled:   false,
+		},
 	}
 	tests = append(tests, explicitPLRTests...)
 
@@ -380,6 +473,7 @@ func TestComputePodQOS(t *testing.T) {
 		t.Run(testCase.pod.Name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, testCase.podLevelResourcesEnabled)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourcesFixKubeletQOSClass, testCase.podLevelResourcesFixKubeletQOSClassEnabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourcesEphemeralStorage, testCase.podLevelResourcesEphemeralStorageEnabled)
 			if actual := ComputePodQOS(testCase.pod); testCase.expected != actual {
 				t.Errorf("ComputePodQOS error: expected: %s, actual: %s;\npod = %s", testCase.expected, actual, prettyPrintPod(testCase.pod))
 			}
