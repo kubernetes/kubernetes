@@ -41,6 +41,16 @@ var (
 		[]string{"verb", "host"},
 	)
 
+	watchListLatency = k8smetrics.NewHistogramVec(
+		&k8smetrics.HistogramOpts{
+			Name:           "rest_client_watch_list_duration_seconds",
+			Help:           "Watch list latency from request start through decoding the initial-events-end bookmark in seconds. Broken down by verb, and host.",
+			StabilityLevel: k8smetrics.ALPHA,
+			Buckets:        []float64{0.005, 0.025, 0.1, 0.25, 0.5, 1.0, 2.0, 4.0, 8.0, 15.0, 30.0, 60.0},
+		},
+		[]string{"verb", "host"},
+	)
+
 	// resolverLatency is a Prometheus Histogram metric type partitioned by
 	// "host" labels. It is used for the rest client DNS resolver latency metrics.
 	resolverLatency = k8smetrics.NewHistogramVec(
@@ -231,6 +241,7 @@ func init() {
 		ClientCertExpiry:             execPluginCertTTLAdapter,
 		ClientCertRotationAge:        &rotationAdapter{m: execPluginCertRotation},
 		RequestLatency:               &latencyAdapter{m: requestLatency},
+		WatchListLatency:             &latencyAdapter{m: watchListLatency},
 		ResolverLatency:              &resolverLatencyAdapter{m: resolverLatency},
 		RequestSize:                  &sizeAdapter{m: requestSize},
 		ResponseSize:                 &sizeAdapter{m: responseSize},
@@ -246,6 +257,7 @@ func init() {
 		TransportCacheGCCalls:        &transportCacheGCCallsAdapter{m: transportCacheGCCalls},
 		RegisterFn: func() {
 			legacyregistry.MustRegister(requestLatency)
+			legacyregistry.MustRegister(watchListLatency)
 			legacyregistry.MustRegister(resolverLatency)
 			legacyregistry.MustRegister(requestSize)
 			legacyregistry.MustRegister(responseSize)

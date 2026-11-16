@@ -2121,6 +2121,88 @@ func TestNewWatchEventDecoder(t *testing.T) {
 	}
 }
 
+type latencyMetricFunc func(context.Context, string, url.URL, time.Duration)
+
+func (f latencyMetricFunc) Observe(ctx context.Context, verb string, u url.URL, latency time.Duration) {
+	f(ctx, verb, u, latency)
+}
+
+func TestWatchListLatency(t *testing.T) {
+	annotated := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{metav1.InitialEventsAnnotationKey: "true"}}}
+	ordinary := &v1.Pod{}
+	for _, concurrent := range []bool{false, true} {
+		for _, tt := range []struct {
+			name          string
+			initialEvents string
+			events        []watch.Event
+			wantSamples   int
+		}{
+			{
+				name: "initial events complete", initialEvents: "true", wantSamples: 1,
+				events: []watch.Event{{Type: watch.Added, Object: annotated}, {Type: watch.Bookmark, Object: ordinary}, {Type: watch.Bookmark, Object: annotated}, {Type: watch.Bookmark, Object: annotated}},
+			},
+			{
+				name: "incomplete stream", initialEvents: "true",
+				events: []watch.Event{{Type: watch.Added, Object: annotated}, {Type: watch.Bookmark, Object: ordinary}},
+			},
+			{
+				name: "false annotation", initialEvents: "true",
+				events: []watch.Event{{Type: watch.Bookmark, Object: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{metav1.InitialEventsAnnotationKey: "false"}}}}},
+			},
+			{
+				name:   "regular watch",
+				events: []watch.Event{{Type: watch.Bookmark, Object: annotated}},
+			},
+			{
+				name: "initial events disabled", initialEvents: "false",
+				events: []watch.Event{{Type: watch.Bookmark, Object: annotated}},
+			},
+		} {
+			t.Run(fmt.Sprintf("concurrent=%t/%s", concurrent, tt.name), func(t *testing.T) {
+				clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.WatchListClientConcurrentDecoding, concurrent)
+				var body bytes.Buffer
+				encoder := restclientwatch.NewEncoder(streaming.NewEncoder(&body, scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion)), scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion))
+				for i := range tt.events {
+					require.NoError(t, encoder.Encode(&tt.events[i]))
+				}
+				var requestDuration time.Duration
+				client := clientForFunc(func(req *http.Request) (*http.Response, error) {
+					requestStart := time.Now()
+					requestDuration = time.Since(requestStart)
+					return &http.Response{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": {"application/json"}}, Body: io.NopCloser(&body)}, nil
+				})
+				r := NewRequestWithClient(&url.URL{Scheme: "https", Host: "watch.example"}, "", defaultContentConfig(), client).
+					Verb("GET").Param("watch", "true")
+				if tt.initialEvents != "" {
+					r.Param("sendInitialEvents", tt.initialEvents)
+				}
+				samples := 0
+				previous := metrics.WatchListLatency
+				defer func() { metrics.WatchListLatency = previous }()
+				metrics.WatchListLatency = latencyMetricFunc(func(ctx context.Context, verb string, u url.URL, latency time.Duration) {
+					samples++
+					assert.Equal(t, "GET", verb)
+					assert.Equal(t, "watch.example", u.Host)
+					assert.GreaterOrEqual(t, latency, requestDuration)
+				})
+				w, err := r.Watch(context.Background())
+				require.NoError(t, err)
+				defer w.Stop()
+				var received []watch.Event
+				for event := range w.ResultChan() {
+					received = append(received, event)
+				}
+				require.Len(t, received, len(tt.events))
+				for i := range received {
+					assert.Equal(t, tt.events[i].Type, received[i].Type)
+					assert.True(t, apiequality.Semantic.DeepDerivative(tt.events[i].Object, received[i].Object))
+				}
+				assert.Equal(t, tt.wantSamples, samples)
+			})
+		}
+	}
+}
+
 func TestWatch(t *testing.T) {
 	tests := []struct {
 		name       string

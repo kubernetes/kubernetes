@@ -38,6 +38,7 @@ import (
 	"golang.org/x/net/http2"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -762,6 +763,7 @@ func (b *throttledLogger) info(logger klog.Logger, message string, kv ...any) {
 // Watch attempts to begin watching the requested location.
 // Returns a watch.Interface, or an error.
 func (r *Request) Watch(ctx context.Context) (watch.Interface, error) {
+	start := time.Now()
 	if r.body == nil {
 		logBody(klog.FromContext(ctx), 2, "Request Body", r.bodyBytes)
 	}
@@ -800,7 +802,7 @@ func (r *Request) Watch(ctx context.Context) (watch.Interface, error) {
 		resp, err := client.Do(req)
 		retry.After(ctx, r, resp, err)
 		if err == nil && resp.StatusCode == http.StatusOK {
-			return r.newStreamWatcher(ctx, resp)
+			return r.newStreamWatcher(ctx, resp, start)
 		}
 
 		done, transformErr := func() (bool, error) {
@@ -834,7 +836,7 @@ func (r *Request) Watch(ctx context.Context) (watch.Interface, error) {
 	}
 }
 
-func (r *Request) newStreamWatcher(ctx context.Context, resp *http.Response) (watch.Interface, error) {
+func (r *Request) newStreamWatcher(ctx context.Context, resp *http.Response, start time.Time) (watch.Interface, error) {
 	contentType := resp.Header.Get("Content-Type")
 	mediaType, params, err := mime.ParseMediaType(contentType)
 	if err != nil {
@@ -850,13 +852,46 @@ func (r *Request) newStreamWatcher(ctx context.Context, resp *http.Response) (wa
 	frameReader := framer.NewFrameReader(resp.Body)
 	watchEventDecoder := streaming.NewDecoder(frameReader, streamingSerializer)
 
+	decoder := r.newWatchEventDecoder(watchEventDecoder, objectDecoder)
+	if r.params.Get("sendInitialEvents") == "true" {
+		u := *r.URL()
+		decoder = &watchListLatencyRecordingDecoder{
+			Decoder: decoder,
+			record: func() {
+				metrics.WatchListLatency.Observe(ctx, r.verb, u, time.Since(start))
+			},
+		}
+	}
+
 	return watch.NewStreamWatcherWithLogger(
 		klog.FromContext(ctx),
-		r.newWatchEventDecoder(watchEventDecoder, objectDecoder),
+		decoder,
 		// use 500 to indicate that the cause of the error is unknown - other error codes
 		// are more specific to HTTP interactions, and set a reason
 		errors.NewClientErrorReporter(http.StatusInternalServerError, r.verb, "ClientWatchDecoding"),
 	), nil
+}
+
+// watchListLatencyRecordingDecoder observes completion in stream order, after all
+// initial objects have been decoded by either decoder implementation.
+// The measured latency depends on the underlying decoder's buffering: a concurrent
+// decoder may finish decoding the bookmark before returning it from Decode.
+// It also depends on how quickly the caller drains the watch stream, since caller
+// backpressure can delay both decoding and delivery of the bookmark.
+type watchListLatencyRecordingDecoder struct {
+	watch.Decoder
+	record func()
+}
+
+func (d *watchListLatencyRecordingDecoder) Decode() (watch.EventType, runtime.Object, error) {
+	eventType, obj, err := d.Decoder.Decode()
+	if err == nil && eventType == watch.Bookmark && d.record != nil {
+		if accessor, err := meta.Accessor(obj); err == nil && accessor.GetAnnotations()[metav1.InitialEventsAnnotationKey] == "true" {
+			d.record()
+			d.record = nil
+		}
+	}
+	return eventType, obj, err
 }
 
 func (r *Request) newWatchEventDecoder(streamDecoder streaming.Decoder, objectDecoder runtime.Decoder) watch.Decoder {

@@ -18,6 +18,7 @@ package restclient
 
 import (
 	"context"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -46,6 +47,33 @@ func TestClientGOMetrics(t *testing.T) {
 		update      func()
 		want        string
 	}{
+		{
+			description: "Watch list latency through the initial-events-end bookmark",
+			name:        "rest_client_watch_list_duration_seconds",
+			metric:      watchListLatency,
+			update: func() {
+				metrics.WatchListLatency.Observe(context.TODO(), "GET", url.URL{Host: "www.foo.com"}, time.Second)
+			},
+			want: `
+            # HELP rest_client_watch_list_duration_seconds [ALPHA] Watch list latency from request start through decoding the initial-events-end bookmark in seconds. Broken down by verb, and host.
+            # TYPE rest_client_watch_list_duration_seconds histogram
+            rest_client_watch_list_duration_seconds_bucket{host="www.foo.com",verb="GET",le="0.005"} 0
+            rest_client_watch_list_duration_seconds_bucket{host="www.foo.com",verb="GET",le="0.025"} 0
+            rest_client_watch_list_duration_seconds_bucket{host="www.foo.com",verb="GET",le="0.1"} 0
+            rest_client_watch_list_duration_seconds_bucket{host="www.foo.com",verb="GET",le="0.25"} 0
+            rest_client_watch_list_duration_seconds_bucket{host="www.foo.com",verb="GET",le="0.5"} 0
+            rest_client_watch_list_duration_seconds_bucket{host="www.foo.com",verb="GET",le="1"} 1
+            rest_client_watch_list_duration_seconds_bucket{host="www.foo.com",verb="GET",le="2"} 1
+            rest_client_watch_list_duration_seconds_bucket{host="www.foo.com",verb="GET",le="4"} 1
+            rest_client_watch_list_duration_seconds_bucket{host="www.foo.com",verb="GET",le="8"} 1
+            rest_client_watch_list_duration_seconds_bucket{host="www.foo.com",verb="GET",le="15"} 1
+            rest_client_watch_list_duration_seconds_bucket{host="www.foo.com",verb="GET",le="30"} 1
+            rest_client_watch_list_duration_seconds_bucket{host="www.foo.com",verb="GET",le="60"} 1
+            rest_client_watch_list_duration_seconds_bucket{host="www.foo.com",verb="GET",le="+Inf"} 1
+            rest_client_watch_list_duration_seconds_sum{host="www.foo.com",verb="GET"} 1
+            rest_client_watch_list_duration_seconds_count{host="www.foo.com",verb="GET"} 1
+            `,
+		},
 		{
 			description: "Number of HTTP requests, partitioned by status code, verb, and host.",
 			name:        "rest_client_requests_total",
