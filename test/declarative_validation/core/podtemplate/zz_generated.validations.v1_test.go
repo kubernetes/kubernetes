@@ -172,6 +172,9 @@ func init() {
 			"template.spec.tolerations[*].key": {
 				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-label-key"},
 			},
+			"template.spec.volumes[*].ephemeral.volumeClaimTemplate.spec.volumeName": {
+				{ErrorType: "FieldValueInvalid", Origin: "update"},
+			},
 		},
 	)
 }

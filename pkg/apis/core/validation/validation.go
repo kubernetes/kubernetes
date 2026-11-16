@@ -2572,12 +2572,11 @@ func ValidatePersistentVolumeClaimUpdate(newPvc, oldPvc *core.PersistentVolumeCl
 	newPvcClone := newPvc.DeepCopy()
 	oldPvcClone := oldPvc.DeepCopy()
 
-	// PVController needs to update PVC.Spec w/ VolumeName.
-	// Claims are immutable in order to enforce quota, range limits, etc. without gaming the system.
-	if len(oldPvc.Spec.VolumeName) == 0 {
-		// volumeName changes are allowed once.
-		oldPvcClone.Spec.VolumeName = newPvcClone.Spec.VolumeName // +k8s:verify-mutation:reason=clone
-	}
+	// VolumeName set-once immutability is now enforced declaratively
+	// (+k8s:update=NoModify,NoUnset on the versioned type).
+	// Neutralize VolumeName in the clones so the blanket DeepEqual below
+	// does not duplicate the declarative error.
+	oldPvcClone.Spec.VolumeName = newPvcClone.Spec.VolumeName // +k8s:verify-mutation:reason=clone
 
 	if validateStorageClassUpgradeFromAnnotation(oldPvcClone.Annotations, newPvcClone.Annotations,
 		oldPvcClone.Spec.StorageClassName, newPvcClone.Spec.StorageClassName) {

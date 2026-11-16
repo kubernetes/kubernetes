@@ -19,6 +19,7 @@ package daemonset
 import (
 	"testing"
 
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -137,6 +138,29 @@ func TestDeclarativeValidate(t *testing.T) {
 	}
 }
 
+func tweakEphemeralVolumeName(volumeName string) func(*apps.DaemonSet) {
+	return func(ds *apps.DaemonSet) {
+		ds.Spec.Template.Spec.Volumes = []api.Volume{
+			{
+				Name: "ephemeral-vol",
+				VolumeSource: api.VolumeSource{
+					Ephemeral: &api.EphemeralVolumeSource{
+						VolumeClaimTemplate: &api.PersistentVolumeClaimTemplate{
+							Spec: api.PersistentVolumeClaimSpec{
+								VolumeName:  volumeName,
+								AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+								Resources: api.VolumeResourceRequirements{
+									Requests: api.ResourceList{api.ResourceStorage: resource.MustParse("1Gi")},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+	}
+}
+
 func TestDeclarativeValidateUpdate(t *testing.T) {
 	for _, apiVersion := range apiVersions {
 		ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
@@ -148,5 +172,27 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 		meta.RunObjectMetaUpdateTestCases(t, ctx, mkDaemonSet(), registry.Strategy,
 			meta.WithStringentFinalizerValidation(),
 		)
+
+		testCases := map[string]struct {
+			old          *apps.DaemonSet
+			update       *apps.DaemonSet
+			expectedErrs field.ErrorList
+		}{
+			"ephemeral volume volumeName modified": {
+				old:    mkDaemonSet(tweakEphemeralVolumeName("pv-old")),
+				update: mkDaemonSet(tweakEphemeralVolumeName("pv-new")),
+				expectedErrs: field.ErrorList{
+					field.Invalid(field.NewPath("spec", "template", "spec", "volumes").Index(0).Child("ephemeral", "volumeClaimTemplate", "spec", "volumeName"), "", "").WithOrigin("update"),
+					field.Invalid(field.NewPath("spec", "templateGeneration"), nil, "").MarkFromImperative(),
+				},
+			},
+		}
+		for k, tc := range testCases {
+			t.Run(k, func(t *testing.T) {
+				tc.old.ResourceVersion = "1"
+				tc.update.ResourceVersion = "1"
+				apitesting.VerifyUpdateValidationEquivalence(t, ctx, tc.update, tc.old, registry.Strategy, tc.expectedErrs)
+			})
+		}
 	}
 }
