@@ -27,6 +27,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"strings"
+"crypto/tls"
 	"testing"
 	"time"
 
@@ -704,4 +705,65 @@ func TestConfigWarningHandler(t *testing.T) {
 		assert.NotNil(t, client.warningHandler)
 		assert.Equal(t, handlerWithContext, client.warningHandler)
 	})
+}
+func TestTLSClientConfigMinMaxVersion(t *testing.T) {
+	tests := []struct {
+		name      string
+		config    TLSClientConfig
+		wantMin   uint16
+		wantMax   uint16
+	}{
+		{
+			name: "TLS versions are unset",
+			config: TLSClientConfig{},
+			wantMin: 0,
+			wantMax: 0,
+		},
+		{
+			name: "TLS 1.2 minimum version",
+			config: TLSClientConfig{
+				MinVersion: tls.VersionTLS12,
+			},
+			wantMin: tls.VersionTLS12,
+			wantMax: 0,
+		},
+		{
+			name: "TLS 1.3 minimum version",
+			config: TLSClientConfig{
+				MinVersion: tls.VersionTLS13,
+			},
+			wantMin: tls.VersionTLS13,
+			wantMax: 0,
+		},
+		{
+			name: "TLS 1.3 minimum and maximum version",
+			config: TLSClientConfig{
+				MinVersion: tls.VersionTLS13,
+				MaxVersion: tls.VersionTLS13,
+			},
+			wantMin: tls.VersionTLS13,
+			wantMax: tls.VersionTLS13,
+		},
+		{
+			name: "TLS 1.2 minimum and TLS 1.3 maximum",
+			config: TLSClientConfig{
+				MinVersion: tls.VersionTLS12,
+				MaxVersion: tls.VersionTLS13,
+			},
+			wantMin: tls.VersionTLS12,
+			wantMax: tls.VersionTLS13,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.config.MinVersion; got != tt.wantMin {
+				t.Errorf("MinVersion = %v, want %v", got, tt.wantMin)
+			}
+
+			if got := tt.config.MaxVersion; got != tt.wantMax {
+				t.Errorf("MaxVersion = %v, want %v", got, tt.wantMax)
+			}
+		})
+	}
 }
