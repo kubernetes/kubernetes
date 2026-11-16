@@ -24,6 +24,7 @@ import (
 	"sync"
 
 	resourceapi "k8s.io/api/resource/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -32,6 +33,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
+	"k8s.io/utils/ptr"
 )
 
 // consumedCapacityError checks the consumed capacity of each allocation result.
@@ -161,15 +163,39 @@ func (a *allocatedDevices) onUpdate(oldObj, newObj any) {
 		return
 	}
 
-	switch {
-	case originalClaim.Status.Allocation == nil && modifiedClaim.Status.Allocation != nil:
-		a.addDevices(modifiedClaim)
-	case originalClaim.Status.Allocation != nil && modifiedClaim.Status.Allocation == nil:
-		a.removeDevices(originalClaim)
-	default:
-		// Nothing to do. Either both nil or both non-nil, in which case the content
-		// also must be the same (immutable!).
+	if originalClaim.UID == modifiedClaim.UID && a.allocationsEqual(originalClaim.Status.Allocation, modifiedClaim.Status.Allocation) {
+		return
 	}
+
+	// Informers can skip deletion/recreation or the cleared allocation between
+	// uses of the same claim, so two non-nil allocations may still differ.
+	a.updateDevices(originalClaim, modifiedClaim)
+}
+
+// allocationsEqual compares the allocation fields used by collectDevices and
+// consumedCapacityError. onUpdate checks the claim UID separately.
+// Only device identity, admin access, share IDs, and consumed quantities affect
+// accounting or capacity validation. Configuration, node selectors, and other
+// allocation fields do not affect the tracker, so a semantic deep comparison of
+// the entire allocation is unnecessary. Direct comparisons avoid reflection;
+// Quantity.Equal preserves numeric equality across quantity representations.
+// Capacity fields are irrelevant when consumable capacity is disabled.
+// Keep this comparison in sync with the fields consumed by those helpers.
+func (a *allocatedDevices) allocationsEqual(old, new *resourceapi.AllocationResult) bool {
+	if old == new {
+		return true
+	}
+	if old == nil || new == nil {
+		return false
+	}
+	return slices.EqualFunc(old.Devices.Results, new.Devices.Results, func(x, y resourceapi.DeviceRequestAllocationResult) bool {
+		if x.Driver != y.Driver || x.Pool != y.Pool || x.Device != y.Device ||
+			ptr.Deref(x.AdminAccess, false) != ptr.Deref(y.AdminAccess, false) {
+			return false
+		}
+		return !a.enabledConsumableCapacity ||
+			(ptr.Equal(x.ShareID, y.ShareID) && maps.EqualFunc(x.ConsumedCapacity, y.ConsumedCapacity, resource.Quantity.Equal))
+	})
 }
 
 func (a *allocatedDevices) onDelete(obj any) {
@@ -183,111 +209,100 @@ func (a *allocatedDevices) onDelete(obj any) {
 	a.removeDevices(claim)
 }
 
+// addDevices calls updateDevices with no old claim, so only the new allocation
+// is added to the tracker.
 func (a *allocatedDevices) addDevices(claim *resourceapi.ResourceClaim) {
-	if claim.Status.Allocation == nil {
-		return
+	a.updateDevices(nil, claim)
+}
+
+// removeDevices calls updateDevices with no new claim, so only the old allocation
+// is removed from the tracker.
+func (a *allocatedDevices) removeDevices(claim *resourceapi.ResourceClaim) {
+	a.updateDevices(claim, nil)
+}
+
+type allocatedClaimDevices struct {
+	deviceIDs   []structured.DeviceID
+	shareIDs    []structured.SharedDeviceID
+	capacities  []structured.DeviceConsumedCapacity
+	capacityErr error
+}
+
+// collectDevices prepares a claim's device IDs, share IDs and consumed capacity
+// without changing the tracker, so this work can happen outside its lock.
+// If capacity is invalid, it records the error and omits the capacity amounts.
+func (a *allocatedDevices) collectDevices(claim *resourceapi.ResourceClaim, operation string) allocatedClaimDevices {
+	var devices allocatedClaimDevices
+	if claim == nil || claim.Status.Allocation == nil {
+		return devices
 	}
-	// Locking of the mutex gets minimized by pre-computing what needs to be done
-	// without holding the lock.
-	deviceIDs := make([]structured.DeviceID, 0, 20)
-	var shareIDs []structured.SharedDeviceID
-	var deviceCapacities []structured.DeviceConsumedCapacity
-	var capacityErr error
+	devices.deviceIDs = make([]structured.DeviceID, 0, 20)
 	if a.enabledConsumableCapacity {
-		shareIDs = make([]structured.SharedDeviceID, 0, 20)
-		deviceCapacities = make([]structured.DeviceConsumedCapacity, 0, 20)
-		capacityErr = consumedCapacityError(claim)
+		devices.shareIDs = make([]structured.SharedDeviceID, 0, 20)
+		devices.capacities = make([]structured.DeviceConsumedCapacity, 0, 20)
+		devices.capacityErr = consumedCapacityError(claim)
 	}
 	structured.ForEachAllocatedDevice(claim.Status.Allocation,
 		func(deviceID structured.DeviceID) {
-			a.logger.V(6).Info("Observed device allocation", "device", deviceID, "claim", klog.KObj(claim))
-			deviceIDs = append(deviceIDs, deviceID)
+			a.logger.V(6).Info("Observed device "+operation, "device", deviceID, "claim", klog.KObj(claim))
+			devices.deviceIDs = append(devices.deviceIDs, deviceID)
 		},
 		a.enabledConsumableCapacity,
 		func(sharedDeviceID structured.SharedDeviceID) {
-			a.logger.V(6).Info("Observed shared device allocation", "shared device", sharedDeviceID, "claim", klog.KObj(claim))
-			shareIDs = append(shareIDs, sharedDeviceID)
+			a.logger.V(6).Info("Observed shared device "+operation, "shared device", sharedDeviceID, "claim", klog.KObj(claim))
+			devices.shareIDs = append(devices.shareIDs, sharedDeviceID)
 		},
 		func(capacity structured.DeviceConsumedCapacity) {
-			a.logger.V(6).Info("Observed consumed capacity", "device", capacity.DeviceID, "consumed capacity", capacity.ConsumedCapacity, "claim", klog.KObj(claim))
-			// A negative value can bring the aggregated capacity of a device to zero
-			// while valid claims still consume it, and Remove then deletes the entry.
-			if capacityErr == nil {
-				deviceCapacities = append(deviceCapacities, capacity)
+			a.logger.V(6).Info("Observed consumed capacity "+operation, "device", capacity.DeviceID, "consumed capacity", capacity.ConsumedCapacity, "claim", klog.KObj(claim))
+			// A negative value can hide valid consumption during aggregation.
+			// Invalid claims must neither add nor subtract capacity.
+			if devices.capacityErr == nil {
+				devices.capacities = append(devices.capacities, capacity)
 			}
 		},
 	)
-
-	if len(deviceIDs) == 0 && len(shareIDs) == 0 && len(deviceCapacities) == 0 && capacityErr == nil {
-		return
-	}
-
-	a.mutex.Lock()
-	defer a.mutex.Unlock()
-	a.revision++
-	for _, deviceID := range deviceIDs {
-		a.ids.Insert(deviceID)
-	}
-	for _, shareID := range shareIDs {
-		a.shareIDs.Insert(shareID)
-	}
-	for _, capacity := range deviceCapacities {
-		a.capacities.Insert(capacity)
-	}
-	if capacityErr != nil {
-		a.invalidCapacities[claim.UID] = capacityErr
-	}
+	return devices
 }
 
-func (a *allocatedDevices) removeDevices(claim *resourceapi.ResourceClaim) {
-	if claim.Status.Allocation == nil {
-		return
-	}
-
-	// Locking of the mutex gets minimized by pre-computing what needs to be done
-	// without holding the lock.
-	deviceIDs := make([]structured.DeviceID, 0, 20)
-	var shareIDs []structured.SharedDeviceID
-	var deviceCapacities []structured.DeviceConsumedCapacity
-	var capacityErr error
-	if a.enabledConsumableCapacity {
-		shareIDs = make([]structured.SharedDeviceID, 0, 20)
-		deviceCapacities = make([]structured.DeviceConsumedCapacity, 0, 20)
-		capacityErr = consumedCapacityError(claim)
-	}
-	structured.ForEachAllocatedDevice(claim.Status.Allocation,
-		func(deviceID structured.DeviceID) {
-			a.logger.V(6).Info("Observed device deallocation", "device", deviceID, "claim", klog.KObj(claim))
-			deviceIDs = append(deviceIDs, deviceID)
-		},
-		a.enabledConsumableCapacity,
-		func(sharedDeviceID structured.SharedDeviceID) {
-			a.logger.V(6).Info("Observed shared device deallocation", "shared device", sharedDeviceID, "claim", klog.KObj(claim))
-			shareIDs = append(shareIDs, sharedDeviceID)
-		},
-		func(capacity structured.DeviceConsumedCapacity) {
-			a.logger.V(6).Info("Observed consumed capacity release", "device id", capacity.DeviceID, "consumed capacity", capacity.ConsumedCapacity, "claim", klog.KObj(claim))
-			// addDevices did not insert the capacities of an invalid claim.
-			if capacityErr == nil {
-				deviceCapacities = append(deviceCapacities, capacity)
-			}
-		})
-
-	if len(deviceIDs) == 0 && len(shareIDs) == 0 && len(deviceCapacities) == 0 && capacityErr == nil {
+// updateDevices atomically replaces oldClaim's accounting with newClaim's.
+// Either claim may be nil for an add or removal. Collection happens before
+// locking, removal and insertion share one lock and revision change so readers
+// cannot observe a temporarily free device during replacement.
+func (a *allocatedDevices) updateDevices(oldClaim, newClaim *resourceapi.ResourceClaim) {
+	oldDevices := a.collectDevices(oldClaim, "deallocation")
+	newDevices := a.collectDevices(newClaim, "allocation")
+	if len(oldDevices.deviceIDs)+len(newDevices.deviceIDs) == 0 &&
+		len(oldDevices.shareIDs)+len(newDevices.shareIDs) == 0 &&
+		len(oldDevices.capacities)+len(newDevices.capacities) == 0 &&
+		oldDevices.capacityErr == nil && newDevices.capacityErr == nil {
 		return
 	}
 
 	a.mutex.Lock()
 	defer a.mutex.Unlock()
 	a.revision++
-	for _, deviceID := range deviceIDs {
+	for _, deviceID := range oldDevices.deviceIDs {
 		a.ids.Delete(deviceID)
 	}
-	for _, shareID := range shareIDs {
+	for _, shareID := range oldDevices.shareIDs {
 		a.shareIDs.Delete(shareID)
 	}
-	for _, capacity := range deviceCapacities {
+	for _, capacity := range oldDevices.capacities {
 		a.capacities.Remove(capacity)
 	}
-	delete(a.invalidCapacities, claim.UID)
+	if oldClaim != nil {
+		delete(a.invalidCapacities, oldClaim.UID)
+	}
+	for _, deviceID := range newDevices.deviceIDs {
+		a.ids.Insert(deviceID)
+	}
+	for _, shareID := range newDevices.shareIDs {
+		a.shareIDs.Insert(shareID)
+	}
+	for _, capacity := range newDevices.capacities {
+		a.capacities.Insert(capacity)
+	}
+	if newDevices.capacityErr != nil {
+		a.invalidCapacities[newClaim.UID] = newDevices.capacityErr
+	}
 }

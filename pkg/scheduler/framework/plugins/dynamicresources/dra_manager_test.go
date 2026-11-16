@@ -17,11 +17,13 @@ limitations under the License.
 package dynamicresources
 
 import (
+	"fmt"
 	"maps"
 	"testing"
 
 	"github.com/onsi/gomega"
 	resourceapi "k8s.io/api/resource/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -423,5 +425,198 @@ func testGatherAllocatedStateConsumedCapacity(tCtx ktesting.TContext) {
 				tCtx.Expect(memory.Cmp(resource.MustParse(test.expectMemory))).To(gomega.BeZero(), "aggregated memory %s", memory)
 			}
 		})
+	}
+}
+
+// TestAllocatedDevicesReplacesAllocation covers informer updates that skip a
+// cleared allocation or claim deletion, including cleanup of the replacement.
+func TestAllocatedDevicesReplacesAllocation(t *testing.T) {
+	testAllocatedDevicesReplacesAllocation(ktesting.Init(t))
+}
+
+func testAllocatedDevicesReplacesAllocation(tCtx ktesting.TContext) {
+	original := claimWithConsumedCapacity("original", "1")
+	original.ResourceVersion = "1"
+	replacement := claimWithConsumedCapacity("replacement", "2")
+	replacement.Name = original.Name
+	replacement.ResourceVersion = "3"
+	sameUID := replacement.DeepCopy()
+	sameUID.UID = original.UID
+	other := claimWithConsumedCapacity("other", "3")
+	other.ResourceVersion = "1"
+
+	oldDedicated := original.DeepCopy()
+	oldDedicated.Status.Allocation.Devices.Results[0].ShareID = nil
+	oldDedicated.Status.Allocation.Devices.Results[0].Device = "old-device"
+	newDedicated := replacement.DeepCopy()
+	newDedicated.Status.Allocation.Devices.Results[0].ShareID = nil
+	newDedicated.Status.Allocation.Devices.Results[0].Device = "new-device"
+	newSharedDevice := replacement.DeepCopy()
+	newSharedDevice.Status.Allocation.Devices.Results[0].Device = "new-device"
+	admin := replacement.DeepCopy()
+	admin.Status.Allocation.Devices.Results[0].AdminAccess = new(true)
+	oldInvalid := original.DeepCopy()
+	oldInvalid.Status.Allocation.Devices.Results[0].ConsumedCapacity["memory"] = resource.MustParse("-1")
+	newInvalid := replacement.DeepCopy()
+	newInvalid.Status.Allocation.Devices.Results[0].ConsumedCapacity["memory"] = resource.MustParse("-2")
+
+	for name, tc := range map[string]struct {
+		old, replacement *resourceapi.ResourceClaim
+		disabled         bool
+		expectErr        string
+	}{
+		"recreated claim":              {old: original, replacement: replacement},
+		"reallocated claim":            {old: original, replacement: sameUID},
+		"different dedicated device":   {old: oldDedicated, replacement: newDedicated},
+		"admin replacement":            {old: original, replacement: admin},
+		"invalid allocation removed":   {old: oldInvalid, replacement: replacement},
+		"invalid replacement":          {old: original, replacement: newInvalid, expectErr: "claim default/original"},
+		"consumable capacity disabled": {old: oldDedicated, replacement: newSharedDevice, disabled: true},
+	} {
+		tCtx.Run(name, func(tCtx ktesting.TContext) {
+			featuregatetesting.SetFeatureGateDuringTest(tCtx, utilfeature.DefaultFeatureGate, features.DRAConsumableCapacity, !tc.disabled)
+			informer := &testInformer{}
+			tracker := &claimTracker{
+				logger:              tCtx.Logger(),
+				allocatedDevices:    newAllocatedDevices(tCtx.Logger()),
+				inFlightAllocations: make(map[types.UID]inFlightAllocation),
+			}
+			tracker.cache = assumecache.NewAssumeCache(tCtx.Logger(), informer, "", "", nil)
+			tracker.cache.AddEventHandler(tracker.allocatedDevices.handlers())
+			informer.add(other)
+			informer.add(tc.old)
+			revision := tracker.allocatedDevices.getRevision()
+
+			// Informers may skip deletion/recreation or an intermediate cleared allocation.
+			informer.handler.OnUpdate(tc.old, tc.replacement)
+			cached, err := tracker.Get(tc.replacement.Namespace, tc.replacement.Name)
+			tCtx.ExpectNoError(err)
+			tCtx.Expect(cached).To(gomega.Equal(tc.replacement))
+
+			expectAllocations := func(claims ...*resourceapi.ResourceClaim) {
+				tCtx.Helper()
+				var expected structured.AllocatedState
+				structured.AddToAllocatedState(&expected, func(yield func(*resourceapi.AllocationResult) bool) {
+					for _, claim := range claims {
+						if !yield(claim.Status.Allocation) {
+							return
+						}
+					}
+				}, structured.Features{ConsumableCapacity: !tc.disabled})
+				actual, err := tracker.GatherAllocatedState()
+				tCtx.ExpectNoError(err)
+				tCtx.Expect(apiequality.Semantic.DeepEqual(actual, &expected)).To(gomega.BeTrue(), "actual allocation state: %v, expected: %v", actual, &expected)
+			}
+			if tc.expectErr != "" {
+				_, err := tracker.GatherAllocatedState()
+				tCtx.Expect(err).To(gomega.MatchError(gomega.ContainSubstring(tc.expectErr)))
+			} else {
+				expectAllocations(other, tc.replacement)
+			}
+
+			tCtx.Expect(tracker.allocatedDevices.getRevision()).To(gomega.Equal(revision + 1))
+
+			unchanged := tc.replacement.DeepCopy()
+			unchanged.ResourceVersion = "4"
+			unchanged.Labels = map[string]string{"metadata": "updated"}
+			revision = tracker.allocatedDevices.getRevision()
+			informer.handler.OnUpdate(tc.replacement, unchanged)
+			tCtx.Expect(tracker.allocatedDevices.getRevision()).To(gomega.Equal(revision))
+
+			informer.handler.OnDelete(unchanged)
+			expectAllocations(other)
+		})
+	}
+}
+
+// TestAllocatedDevicesAllocationsEqual checks the accounting boundary without reflection.
+func TestAllocatedDevicesAllocationsEqual(t *testing.T) {
+	for _, enabled := range []bool{false, true} {
+		a := &allocatedDevices{enabledConsumableCapacity: enabled}
+		original := claimWithConsumedCapacity("original", "1").Status.Allocation
+		for name, tc := range map[string]struct {
+			mutate func(*resourceapi.AllocationResult)
+			equal  bool
+		}{
+			"unchanged":     {func(x *resourceapi.AllocationResult) {}, true},
+			"driver":        {func(x *resourceapi.AllocationResult) { x.Devices.Results[0].Driver = "other" }, false},
+			"pool":          {func(x *resourceapi.AllocationResult) { x.Devices.Results[0].Pool = "other" }, false},
+			"device":        {func(x *resourceapi.AllocationResult) { x.Devices.Results[0].Device = "other" }, false},
+			"admin":         {func(x *resourceapi.AllocationResult) { x.Devices.Results[0].AdminAccess = new(true) }, false},
+			"default admin": {func(x *resourceapi.AllocationResult) { x.Devices.Results[0].AdminAccess = new(false) }, true},
+			"share":         {func(x *resourceapi.AllocationResult) { x.Devices.Results[0].ShareID = new(types.UID("other")) }, !enabled},
+			"dedicated":     {func(x *resourceapi.AllocationResult) { x.Devices.Results[0].ShareID = nil }, !enabled},
+			"capacity": {func(x *resourceapi.AllocationResult) {
+				x.Devices.Results[0].ConsumedCapacity["memory"] = resource.MustParse("2")
+			}, !enabled},
+			"negative capacity": {func(x *resourceapi.AllocationResult) {
+				x.Devices.Results[0].ConsumedCapacity["memory"] = resource.MustParse("-1")
+			}, !enabled},
+			"equal quantity": {func(x *resourceapi.AllocationResult) {
+				x.Devices.Results[0].ConsumedCapacity["memory"] = resource.MustParse("1000m")
+			}, true},
+			"capacity key": {func(x *resourceapi.AllocationResult) {
+				x.Devices.Results[0].ConsumedCapacity = map[resourceapi.QualifiedName]resource.Quantity{"other": resource.MustParse("1")}
+			}, !enabled},
+			"added zero capacity": {func(x *resourceapi.AllocationResult) {
+				x.Devices.Results[0].ConsumedCapacity["other"] = resource.MustParse("0")
+			}, !enabled},
+			"results removed": {func(x *resourceapi.AllocationResult) { x.Devices.Results = nil }, false},
+			"untracked fields": {func(x *resourceapi.AllocationResult) {
+				x.AllocationTimestamp = &metav1.Time{}
+				x.Devices.Results[0].Request = "other"
+				x.Devices.Results[0].BindingConditions = []string{"Ready"}
+			}, true},
+		} {
+			t.Run(fmt.Sprintf("capacity=%t/%s", enabled, name), func(t *testing.T) {
+				modified := original.DeepCopy()
+				tc.mutate(modified)
+				if got := a.allocationsEqual(original, modified); got != tc.equal {
+					t.Fatalf("equal = %t, want %t", got, tc.equal)
+				}
+			})
+		}
+		if !a.allocationsEqual(nil, nil) || a.allocationsEqual(nil, original) || a.allocationsEqual(original, nil) {
+			t.Fatal("incorrect nil allocation comparison")
+		}
+		empty := &resourceapi.AllocationResult{}
+		emptySlice := &resourceapi.AllocationResult{Devices: resourceapi.DeviceAllocationResult{Results: []resourceapi.DeviceRequestAllocationResult{}}}
+		if !a.allocationsEqual(empty, emptySlice) {
+			t.Fatal("nil and empty results differ")
+		}
+	}
+}
+
+// BenchmarkAllocatedDevicesAllocationsEqual compares deep-copied unchanged informer allocations.
+func BenchmarkAllocatedDevicesAllocationsEqual(b *testing.B) {
+	for _, count := range []int{1, 32} {
+		for _, capacities := range []int{0, 1, 32} {
+			original := claimWithConsumedCapacity("original", "1").Status.Allocation
+			result := original.Devices.Results[0]
+			result.ConsumedCapacity = make(map[resourceapi.QualifiedName]resource.Quantity)
+			for i := 0; i < capacities; i++ {
+				result.ConsumedCapacity[resourceapi.QualifiedName(fmt.Sprintf("capacity%d", i))] = resource.MustParse("1")
+			}
+			original.Devices.Results = make([]resourceapi.DeviceRequestAllocationResult, count)
+			for i := range original.Devices.Results {
+				original.Devices.Results[i] = result
+				original.Devices.Results[i].Device = fmt.Sprintf("device%d", i)
+			}
+			modified := original.DeepCopy()
+			a := &allocatedDevices{enabledConsumableCapacity: true}
+			for name, compare := range map[string]func() bool{
+				"semantic": func() bool { return apiequality.Semantic.DeepEqual(original, modified) },
+				"typed":    func() bool { return a.allocationsEqual(original, modified) },
+			} {
+				b.Run(fmt.Sprintf("devices=%d/capacities=%d/%s", count, capacities, name), func(b *testing.B) {
+					b.ReportAllocs()
+					for b.Loop() {
+						if !compare() {
+							b.Fatal("unequal allocations")
+						}
+					}
+				})
+			}
+		}
 	}
 }
