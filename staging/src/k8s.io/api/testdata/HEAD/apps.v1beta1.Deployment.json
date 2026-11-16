@@ -1956,7 +1956,33 @@
     "rollbackTo": {
       "revision": 1
     },
-    "progressDeadlineSeconds": 9
+    "progressDeadlineSeconds": 9,
+    "scheduling": {
+      "schedulingPolicy": {
+        "basic": {},
+        "gang": {
+          "minCount": 1
+        }
+      },
+      "schedulingConstraints": {
+        "topology": [
+          {
+            "key": "keyValue"
+          }
+        ]
+      },
+      "disruptionMode": {
+        "single": {},
+        "all": {}
+      },
+      "resourceClaims": [
+        {
+          "name": "nameValue",
+          "resourceClaimName": "resourceClaimNameValue",
+          "resourceClaimTemplateName": "resourceClaimTemplateNameValue"
+        }
+      ]
+    }
   },
   "status": {
     "observedGeneration": 1,

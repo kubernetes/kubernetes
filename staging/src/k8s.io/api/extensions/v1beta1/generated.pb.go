@@ -27,6 +27,7 @@ import (
 
 	k8s_io_api_core_v1 "k8s.io/api/core/v1"
 	v11 "k8s.io/api/core/v1"
+	v12 "k8s.io/api/scheduling/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	math_bits "math/bits"
@@ -55,6 +56,8 @@ func (m *DeploymentCondition) Reset() { *m = DeploymentCondition{} }
 func (m *DeploymentList) Reset() { *m = DeploymentList{} }
 
 func (m *DeploymentRollback) Reset() { *m = DeploymentRollback{} }
+
+func (m *DeploymentSchedulingConfiguration) Reset() { *m = DeploymentSchedulingConfiguration{} }
 
 func (m *DeploymentSpec) Reset() { *m = DeploymentSpec{} }
 
@@ -676,6 +679,79 @@ func (m *DeploymentRollback) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	return len(dAtA) - i, nil
 }
 
+func (m *DeploymentSchedulingConfiguration) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *DeploymentSchedulingConfiguration) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *DeploymentSchedulingConfiguration) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if len(m.ResourceClaims) > 0 {
+		for iNdEx := len(m.ResourceClaims) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.ResourceClaims[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintGenerated(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0x22
+		}
+	}
+	if m.DisruptionMode != nil {
+		{
+			size, err := m.DisruptionMode.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintGenerated(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x1a
+	}
+	if m.SchedulingConstraints != nil {
+		{
+			size, err := m.SchedulingConstraints.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintGenerated(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x12
+	}
+	if m.SchedulingPolicy != nil {
+		{
+			size, err := m.SchedulingPolicy.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintGenerated(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0xa
+	}
+	return len(dAtA) - i, nil
+}
+
 func (m *DeploymentSpec) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
@@ -696,6 +772,18 @@ func (m *DeploymentSpec) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if m.Scheduling != nil {
+		{
+			size, err := m.Scheduling.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintGenerated(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x52
+	}
 	if m.ProgressDeadlineSeconds != nil {
 		i = encodeVarintGenerated(dAtA, i, uint64(*m.ProgressDeadlineSeconds))
 		i--
@@ -2562,6 +2650,33 @@ func (m *DeploymentRollback) Size() (n int) {
 	return n
 }
 
+func (m *DeploymentSchedulingConfiguration) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if m.SchedulingPolicy != nil {
+		l = m.SchedulingPolicy.Size()
+		n += 1 + l + sovGenerated(uint64(l))
+	}
+	if m.SchedulingConstraints != nil {
+		l = m.SchedulingConstraints.Size()
+		n += 1 + l + sovGenerated(uint64(l))
+	}
+	if m.DisruptionMode != nil {
+		l = m.DisruptionMode.Size()
+		n += 1 + l + sovGenerated(uint64(l))
+	}
+	if len(m.ResourceClaims) > 0 {
+		for _, e := range m.ResourceClaims {
+			l = e.Size()
+			n += 1 + l + sovGenerated(uint64(l))
+		}
+	}
+	return n
+}
+
 func (m *DeploymentSpec) Size() (n int) {
 	if m == nil {
 		return 0
@@ -2590,6 +2705,10 @@ func (m *DeploymentSpec) Size() (n int) {
 	}
 	if m.ProgressDeadlineSeconds != nil {
 		n += 1 + sovGenerated(uint64(*m.ProgressDeadlineSeconds))
+	}
+	if m.Scheduling != nil {
+		l = m.Scheduling.Size()
+		n += 1 + l + sovGenerated(uint64(l))
 	}
 	return n
 }
@@ -3354,6 +3473,24 @@ func (this *DeploymentRollback) String() string {
 	}, "")
 	return s
 }
+func (this *DeploymentSchedulingConfiguration) String() string {
+	if this == nil {
+		return "nil"
+	}
+	repeatedStringForResourceClaims := "[]WorkloadPodGroupResourceClaim{"
+	for _, f := range this.ResourceClaims {
+		repeatedStringForResourceClaims += fmt.Sprintf("%v", f) + ","
+	}
+	repeatedStringForResourceClaims += "}"
+	s := strings.Join([]string{`&DeploymentSchedulingConfiguration{`,
+		`SchedulingPolicy:` + strings.Replace(fmt.Sprintf("%v", this.SchedulingPolicy), "WorkloadPodGroupSchedulingPolicy", "v12.WorkloadPodGroupSchedulingPolicy", 1) + `,`,
+		`SchedulingConstraints:` + strings.Replace(fmt.Sprintf("%v", this.SchedulingConstraints), "WorkloadPodGroupSchedulingConstraints", "v12.WorkloadPodGroupSchedulingConstraints", 1) + `,`,
+		`DisruptionMode:` + strings.Replace(fmt.Sprintf("%v", this.DisruptionMode), "WorkloadPodGroupDisruptionMode", "v12.WorkloadPodGroupDisruptionMode", 1) + `,`,
+		`ResourceClaims:` + repeatedStringForResourceClaims + `,`,
+		`}`,
+	}, "")
+	return s
+}
 func (this *DeploymentSpec) String() string {
 	if this == nil {
 		return "nil"
@@ -3368,6 +3505,7 @@ func (this *DeploymentSpec) String() string {
 		`Paused:` + fmt.Sprintf("%v", this.Paused) + `,`,
 		`RollbackTo:` + strings.Replace(this.RollbackTo.String(), "RollbackConfig", "RollbackConfig", 1) + `,`,
 		`ProgressDeadlineSeconds:` + valueToStringGenerated(this.ProgressDeadlineSeconds) + `,`,
+		`Scheduling:` + strings.Replace(this.Scheduling.String(), "DeploymentSchedulingConfiguration", "DeploymentSchedulingConfiguration", 1) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -5682,6 +5820,198 @@ func (m *DeploymentRollback) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+func (m *DeploymentSchedulingConfiguration) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: DeploymentSchedulingConfiguration: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: DeploymentSchedulingConfiguration: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field SchedulingPolicy", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.SchedulingPolicy == nil {
+				m.SchedulingPolicy = &v12.WorkloadPodGroupSchedulingPolicy{}
+			}
+			if err := m.SchedulingPolicy.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field SchedulingConstraints", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.SchedulingConstraints == nil {
+				m.SchedulingConstraints = &v12.WorkloadPodGroupSchedulingConstraints{}
+			}
+			if err := m.SchedulingConstraints.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field DisruptionMode", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.DisruptionMode == nil {
+				m.DisruptionMode = &v12.WorkloadPodGroupDisruptionMode{}
+			}
+			if err := m.DisruptionMode.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 4:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ResourceClaims", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.ResourceClaims = append(m.ResourceClaims, v12.WorkloadPodGroupResourceClaim{})
+			if err := m.ResourceClaims[len(m.ResourceClaims)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
 func (m *DeploymentSpec) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -5948,6 +6278,42 @@ func (m *DeploymentSpec) Unmarshal(dAtA []byte) error {
 				}
 			}
 			m.ProgressDeadlineSeconds = &v
+		case 10:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Scheduling", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Scheduling == nil {
+				m.Scheduling = &DeploymentSchedulingConfiguration{}
+			}
+			if err := m.Scheduling.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(dAtA[iNdEx:])

@@ -240,6 +240,53 @@ func TestJobControllerSchedulingRules(t *testing.T) {
 	}
 }
 
+func TestDeploymentReplicaSetControllerSchedulingRules(t *testing.T) {
+	cases := []struct {
+		name                   string
+		workloadWithDeployment bool
+		wantSchedulingRules    bool
+	}{
+		{name: "feature gate disabled", workloadWithDeployment: false, wantSchedulingRules: false},
+		{name: "feature gate enabled", workloadWithDeployment: true, wantSchedulingRules: true},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.GenericWorkload:        tc.workloadWithDeployment,
+				features.WorkloadWithDeployment: tc.workloadWithDeployment,
+			})
+			roles := ControllerRoles()
+			if got := hasResourceRule(roles, saRolePrefix+"deployment-controller", "workloads"); got != tc.wantSchedulingRules {
+				t.Errorf("deployment-controller workloads rule = %v, want %v", got, tc.wantSchedulingRules)
+			}
+			if got := hasResourceRule(roles, saRolePrefix+"replicaset-controller", "workloads"); got != tc.wantSchedulingRules {
+				t.Errorf("replicaset-controller workloads rule = %v, want %v", got, tc.wantSchedulingRules)
+			}
+			if got := hasResourceRule(roles, saRolePrefix+"replicaset-controller", "podgroups"); got != tc.wantSchedulingRules {
+				t.Errorf("replicaset-controller podgroups rule = %v, want %v", got, tc.wantSchedulingRules)
+			}
+			if hasResourceRule(roles, saRolePrefix+"deployment-controller", "podgroups") {
+				t.Errorf("deployment-controller should not have a podgroups rule")
+			}
+		})
+	}
+}
+
+func hasResourceRule(roles []rbacv1.ClusterRole, roleName, resource string) bool {
+	for _, role := range roles {
+		if role.Name != roleName {
+			continue
+		}
+		for _, rule := range role.Rules {
+			if slices.Contains(rule.APIGroups, "scheduling.k8s.io") && slices.Contains(rule.Resources, resource) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func hasSchedulingRules(roles []rbacv1.ClusterRole) bool {
 	for _, role := range roles {
 		if role.Name != saRolePrefix+"job-controller" {

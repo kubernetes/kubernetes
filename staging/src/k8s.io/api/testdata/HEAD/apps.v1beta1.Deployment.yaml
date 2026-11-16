@@ -40,6 +40,21 @@ spec:
   revisionHistoryLimit: 6
   rollbackTo:
     revision: 1
+  scheduling:
+    disruptionMode:
+      all: {}
+      single: {}
+    resourceClaims:
+    - name: nameValue
+      resourceClaimName: resourceClaimNameValue
+      resourceClaimTemplateName: resourceClaimTemplateNameValue
+    schedulingConstraints:
+      topology:
+      - key: keyValue
+    schedulingPolicy:
+      basic: {}
+      gang:
+        minCount: 1
   selector:
     matchExpressions:
     - key: keyValue

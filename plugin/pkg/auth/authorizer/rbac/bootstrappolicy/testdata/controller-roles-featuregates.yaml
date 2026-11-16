@@ -352,6 +352,17 @@ items:
     - create
     - patch
     - update
+  - apiGroups:
+    - scheduling.k8s.io
+    resources:
+    - workloads
+    verbs:
+    - create
+    - get
+    - list
+    - patch
+    - update
+    - watch
 - apiVersion: rbac.authorization.k8s.io/v1
   kind: ClusterRole
   metadata:
@@ -1433,6 +1444,26 @@ items:
     - create
     - patch
     - update
+  - apiGroups:
+    - scheduling.k8s.io
+    resources:
+    - workloads
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - scheduling.k8s.io
+    resources:
+    - podgroups
+    verbs:
+    - create
+    - delete
+    - get
+    - list
+    - patch
+    - update
+    - watch
 - apiVersion: rbac.authorization.k8s.io/v1
   kind: ClusterRole
   metadata:
