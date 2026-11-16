@@ -142,6 +142,9 @@ type staticPolicy struct {
 	// sorted list of NUMA nodes known to the topology; computed once at initialization
 	// and reused for metric updates and deterministic topology hints generation.
 	numaNodes []int
+	// sharedPoolOnly reports pods that are not eligible for exclusive CPUs,
+	// whatever their QoS class and CPU requests. It may be nil.
+	sharedPoolOnly SharedPoolOnlyFunc
 }
 
 // Ensure staticPolicy implements Policy interface
@@ -151,6 +154,12 @@ var _ Policy = &staticPolicy{}
 // assignments for exclusively pinned guaranteed containers after the main
 // container process starts.
 func NewStaticPolicy(logger klog.Logger, topology *topology.CPUTopology, numReservedCPUs int, reservedCPUs cpuset.CPUSet, affinity topologymanager.Store, cpuPolicyOptions map[string]string) (Policy, error) {
+	return newStaticPolicy(logger, topology, numReservedCPUs, reservedCPUs, affinity, cpuPolicyOptions, nil)
+}
+
+// newStaticPolicy is NewStaticPolicy with a predicate for the pods that must
+// stay in the shared pool.
+func newStaticPolicy(logger klog.Logger, topology *topology.CPUTopology, numReservedCPUs int, reservedCPUs cpuset.CPUSet, affinity topologymanager.Store, cpuPolicyOptions map[string]string, sharedPoolOnly SharedPoolOnlyFunc) (Policy, error) {
 	opts, err := NewStaticPolicyOptions(cpuPolicyOptions)
 	if err != nil {
 		return nil, err
@@ -165,12 +174,13 @@ func NewStaticPolicy(logger klog.Logger, topology *topology.CPUTopology, numRese
 	logger.Info("created with configuration", "options", opts, "cpuGroupSize", cpuGroupSize, "numaNodes", numaNodes)
 
 	policy := &staticPolicy{
-		topology:     topology,
-		affinity:     affinity,
-		cpusToReuse:  make(map[string]cpuset.CPUSet),
-		options:      opts,
-		cpuGroupSize: cpuGroupSize,
-		numaNodes:    numaNodes,
+		topology:       topology,
+		affinity:       affinity,
+		cpusToReuse:    make(map[string]cpuset.CPUSet),
+		options:        opts,
+		cpuGroupSize:   cpuGroupSize,
+		numaNodes:      numaNodes,
+		sharedPoolOnly: sharedPoolOnly,
 	}
 
 	allCPUs := topology.CPUDetails.CPUs()
@@ -1059,6 +1069,11 @@ func isIntegralCPUAmount(cpuQuantity resource.Quantity) bool {
 }
 
 func (p *staticPolicy) guaranteedCPUs(logger klog.Logger, pod *v1.Pod, container *v1.Container) int {
+	if p.isSharedPoolOnly(pod) {
+		logger.V(5).Info("Exclusive CPU allocation skipped, pod must stay in the shared pool", "pod", klog.KObj(pod), "containerName", container.Name)
+		return 0
+	}
+
 	qos := v1qos.GetPodQOS(pod)
 	if qos != v1.PodQOSGuaranteed {
 		logger.V(5).Info("Exclusive CPU allocation skipped, pod QoS is not guaranteed", "qos", qos)
@@ -1086,7 +1101,17 @@ func (p *staticPolicy) guaranteedCPUs(logger klog.Logger, pod *v1.Pod, container
 	return int(cpuValue)
 }
 
+// isSharedPoolOnly reports whether the pod is not eligible for exclusive CPUs.
+func (p *staticPolicy) isSharedPoolOnly(pod *v1.Pod) bool {
+	return p.sharedPoolOnly != nil && p.sharedPoolOnly(pod)
+}
+
 func (p *staticPolicy) podGuaranteedCPUs(logger klog.Logger, pod *v1.Pod) int {
+	if p.isSharedPoolOnly(pod) {
+		logger.V(5).Info("Exclusive CPU allocation skipped, pod must stay in the shared pool", "pod", klog.KObj(pod))
+		return 0
+	}
+
 	// If pod-level resources are set, use them directly.
 	// This check is important because this function is called from GetPodTopologyHints,
 	// which runs before the main feature gate check in AllocatePod.

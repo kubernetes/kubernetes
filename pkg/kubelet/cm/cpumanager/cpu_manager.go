@@ -170,6 +170,12 @@ type manager struct {
 	allocatableCPUs cpuset.CPUSet
 }
 
+// SharedPoolOnlyFunc reports whether the pod must stay in the shared pool.
+// Pods in the node's system partition are limited to the partition's cpuset.
+// If such a pod is given exclusive CPUs outside that cpuset, cgroup v2 runs it
+// on the partition's cpuset anyway, and the exclusive CPUs sit unused.
+type SharedPoolOnlyFunc func(pod *v1.Pod) bool
+
 var _ Manager = &manager{}
 
 type sourcesReadyStub struct{}
@@ -178,7 +184,7 @@ func (s *sourcesReadyStub) AddSource(_ string) {}
 func (s *sourcesReadyStub) AllReady() bool     { return true }
 
 // NewManager creates new cpu manager based on provided policy
-func NewManager(logger klog.Logger, cpuPolicyName string, cpuPolicyOptions map[string]string, reconcilePeriod time.Duration, machineInfo *cadvisorapi.MachineInfo, specificCPUs cpuset.CPUSet, nodeAllocatableReservation v1.ResourceList, stateFileDirectory string, affinity topologymanager.Store) (Manager, error) {
+func NewManager(logger klog.Logger, cpuPolicyName string, cpuPolicyOptions map[string]string, reconcilePeriod time.Duration, machineInfo *cadvisorapi.MachineInfo, specificCPUs cpuset.CPUSet, nodeAllocatableReservation v1.ResourceList, stateFileDirectory string, affinity topologymanager.Store, sharedPoolOnly SharedPoolOnlyFunc) (Manager, error) {
 	var topo *topology.CPUTopology
 	var policy Policy
 	var err error
@@ -217,7 +223,7 @@ func NewManager(logger klog.Logger, cpuPolicyName string, cpuPolicyOptions map[s
 		// exclusively allocated.
 		reservedCPUsFloat := float64(reservedCPUs.MilliValue()) / 1000
 		numReservedCPUs := int(math.Ceil(reservedCPUsFloat))
-		policy, err = NewStaticPolicy(logger, topo, numReservedCPUs, specificCPUs, affinity, cpuPolicyOptions)
+		policy, err = newStaticPolicy(logger, topo, numReservedCPUs, specificCPUs, affinity, cpuPolicyOptions, sharedPoolOnly)
 		if err != nil {
 			return nil, fmt.Errorf("new static policy error: %w", err)
 		}
