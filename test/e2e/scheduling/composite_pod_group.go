@@ -99,7 +99,7 @@ var _ = SIGDescribe("CompositePodGroup", framework.WithFeatureGate(features.Comp
 		return pg
 	}
 
-	// hierarchyConfig configures the Workload hierarchy of depth 4 (root -> child -> grandchild -> leaf podgroups).
+	// hierarchyConfig configures the Workload hierarchy of depth 5 (root -> child -> grandchild -> great-grandchild -> leaf podgroups).
 	type hierarchyConfig struct {
 		policy                  schedulingv1beta1.CompositePodGroupSchedulingPolicy
 		rootConstraints         *schedulingv1beta1.CompositePodGroupSchedulingConstraints
@@ -115,16 +115,17 @@ var _ = SIGDescribe("CompositePodGroup", framework.WithFeatureGate(features.Comp
 		}
 		root := createCompositePodGroup(ctx, nil, "root", parentPolicy, hierarchyConfig.rootConstraints, hierarchyConfig.priorityClassName)
 		child := createCompositePodGroup(ctx, root, "child", parentPolicy, nil, hierarchyConfig.priorityClassName)
-		grandchild := createCompositePodGroup(ctx, child, "grandchild", hierarchyConfig.policy, nil, hierarchyConfig.priorityClassName)
+		grandchild := createCompositePodGroup(ctx, child, "grandchild", parentPolicy, nil, hierarchyConfig.priorityClassName)
+		greatGrandchild := createCompositePodGroup(ctx, grandchild, "great-grandchild", hierarchyConfig.policy, nil, hierarchyConfig.priorityClassName)
 
 		pgs := make([]*schedulingv1beta1.PodGroup, len(hierarchyConfig.leafPodGroupSizes))
 		var pods []*v1.Pod
 		for i, size := range hierarchyConfig.leafPodGroupSizes {
-			pg := createChildPodGroup(ctx, grandchild, fmt.Sprintf("leaf-%d", i+1), newGangPolicy(int32(size)), hierarchyConfig.leafPodGroupConstraints)
+			pg := createChildPodGroup(ctx, greatGrandchild, fmt.Sprintf("leaf-%d", i+1), newGangPolicy(int32(size)), hierarchyConfig.leafPodGroupConstraints)
 			pgs[i] = pg
 			pods = append(pods, createPodGroupPods(ctx, f, pg, size)...)
 		}
-		return []*schedulingv1beta1.CompositePodGroup{root, child, grandchild}, pgs, pods
+		return []*schedulingv1beta1.CompositePodGroup{root, child, grandchild, greatGrandchild}, pgs, pods
 	}
 
 	// expectCompositePodGroupCondition waits until the CompositePodGroup's
