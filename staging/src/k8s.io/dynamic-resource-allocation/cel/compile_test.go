@@ -495,7 +495,7 @@ var testcases = map[string]struct {
 		},
 		driver:      "dra.example.com",
 		expectMatch: true,
-		expectCost:  13, // regression: was 7 in v1.37
+		expectCost:  7,
 	},
 	"quantity-compare-to-dec-then-is-integer": {
 		expression:  `device.capacity["dra.example.com"].memory.compareTo(quantity("1.5Gi")) >= 0 && device.capacity["dra.example.com"].memory.isInteger()`,

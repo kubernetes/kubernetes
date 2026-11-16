@@ -2116,13 +2116,13 @@ func TestCelEstimatedCostStability(t *testing.T) {
 				})), ptr.To[int64](50)),
 			}),
 			expectCost: map[string]uint64{
-				"has(self.str1) == has(self.str2)":                        314575,   // regression: was 3 in v1.37
-				"has(self.str1) != has(self.str2)":                        314575,   // regression: was 3 in v1.37
-				"has(self.str1) == has(oldSelf.str1)":                     314575,   // regression: was 3 in v1.37
-				"has(self.short1) == has(self.short2)":                    6,        // regression: was 3 in v1.37
-				"has(self.items) != has(self.labels)":                     39324,    // regression: was 3 in v1.37
-				"has(self.count) == has(self.child)":                      2,        // regression: was 3 in v1.37
-				"self.budgets.all(b, has(b.schedule) == has(b.duration))": 15728903, // regression: was 303 in v1.37
+				"has(self.str1) == has(self.str2)":                        3,
+				"has(self.str1) != has(self.str2)":                        3,
+				"has(self.str1) == has(oldSelf.str1)":                     3,
+				"has(self.short1) == has(self.short2)":                    3,
+				"has(self.items) != has(self.labels)":                     3,
+				"has(self.count) == has(self.child)":                      3,
+				"self.budgets.all(b, has(b.schedule) == has(b.duration))": 303,
 			},
 		},
 	}
