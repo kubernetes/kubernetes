@@ -380,7 +380,7 @@ func (c *claimTracker) GatherAllocatedState() (s *structured.AllocatedState, err
 	enabledConsumableCapacity := utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity)
 
 	allocated, revision1 := c.allocatedDevices.get()
-	allocatedSharedDeviceIDs, revision2 := c.allocatedDevices.getSharedDeviceIDs()
+	allocatedShares, revision2 := c.allocatedDevices.getSharedDeviceIDs()
 	aggregatedCapacity, revision3, err := c.allocatedDevices.getCapacities()
 	if err != nil {
 		return nil, err
@@ -389,6 +389,11 @@ func (c *claimTracker) GatherAllocatedState() (s *structured.AllocatedState, err
 	if revision1 != revision2 || revision2 != revision3 {
 		// Already not consistent. Try again.
 		return nil, errClaimTrackerConcurrentModification
+	}
+
+	allocatedSharedDeviceIDs := sets.New[structured.DeviceID]()
+	for id := range allocatedShares {
+		allocatedSharedDeviceIDs.Insert(id.GetDeviceID())
 	}
 
 	if !enabledConsumableCapacity {
@@ -410,6 +415,13 @@ func (c *claimTracker) GatherAllocatedState() (s *structured.AllocatedState, err
 		AggregatedCapacity:       aggregatedCapacity,
 	}
 
+	// A persisted allocation can remain in flight while PreBind waits for binding
+	// conditions. Its capacity is already included in the cached totals.
+	isCachedShare := func(result resourceapi.DeviceRequestAllocationResult) bool {
+		id := structured.MakeDeviceID(result.Driver, result.Pool, result.Device)
+		return result.ShareID != nil && allocatedShares.Has(structured.MakeSharedDeviceID(id, result.ShareID))
+	}
+
 	// Whatever is in flight also has to be checked.
 	var inFlightErr error
 	structured.AddToAllocatedState(state,
@@ -420,7 +432,13 @@ func (c *claimTracker) GatherAllocatedState() (s *structured.AllocatedState, err
 						return
 					}
 				}
-				if !yield(inFlight.claim.Status.Allocation) {
+				allocation := inFlight.claim.Status.Allocation
+				if enabledConsumableCapacity && allocation != nil && slices.ContainsFunc(allocation.Devices.Results, isCachedShare) {
+					filtered := *allocation
+					filtered.Devices.Results = slices.DeleteFunc(slices.Clone(allocation.Devices.Results), isCachedShare)
+					allocation = &filtered
+				}
+				if !yield(allocation) {
 					return
 				}
 			}

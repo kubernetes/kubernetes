@@ -331,6 +331,16 @@ func testGatherAllocatedStateConsumedCapacity(tCtx ktesting.TContext) {
 			allocated:    []*resourceapi.ResourceClaim{valid, otherValid},
 			expectMemory: "6",
 		},
+		"cached-and-in-flight": {
+			allocated:    []*resourceapi.ResourceClaim{valid},
+			inFlight:     []*resourceapi.ResourceClaim{valid},
+			expectMemory: "5",
+		},
+		"cached-and-in-flight-with-distinct-shares": {
+			allocated:    []*resourceapi.ResourceClaim{valid, otherValid},
+			inFlight:     []*resourceapi.ResourceClaim{valid, small},
+			expectMemory: "8",
+		},
 		"negative-alone": {
 			allocated: []*resourceapi.ResourceClaim{negative},
 			expectErr: "claim default/negative, device driver.example.com/pool-0/device-0: consumed capacity \"memory\" must not be negative, got -2",

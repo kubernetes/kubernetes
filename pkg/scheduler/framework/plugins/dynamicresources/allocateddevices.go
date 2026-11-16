@@ -95,15 +95,11 @@ func (a *allocatedDevices) get() (sets.Set[structured.DeviceID], int64) {
 	return a.ids.Clone(), a.revision
 }
 
-func (a *allocatedDevices) getSharedDeviceIDs() (sets.Set[structured.DeviceID], int64) {
+func (a *allocatedDevices) getSharedDeviceIDs() (sets.Set[structured.SharedDeviceID], int64) {
 	a.mutex.RLock()
 	defer a.mutex.RUnlock()
 
-	result := make(sets.Set[structured.DeviceID], a.shareIDs.Len())
-	for sharedDeviceID := range a.shareIDs {
-		result.Insert(sharedDeviceID.GetDeviceID())
-	}
-	return result, a.revision
+	return a.shareIDs.Clone(), a.revision
 }
 
 // getCapacities returns an error instead of the capacities if some allocated claim

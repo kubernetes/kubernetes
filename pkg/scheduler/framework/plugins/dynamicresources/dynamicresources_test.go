@@ -1334,6 +1334,49 @@ type testPluginCase struct {
 	metrics          func(ktesting.TContext, compbasemetrics.Gatherer)
 }
 
+// TestConsumedCapacityPreBindHandoff checks that a second claim fits before,
+// during, and after the first allocation moves from pending to persisted.
+// PreBind can defer pending-allocation cleanup while waiting for binding conditions.
+func TestConsumedCapacityPreBindHandoff(t *testing.T) {
+	testConsumedCapacityPreBindHandoff(ktesting.Init(t))
+}
+
+func testConsumedCapacityPreBindHandoff(tCtx ktesting.TContext) {
+	featuregatetesting.SetFeatureGateDuringTest(tCtx, utilfeature.DefaultFeatureGate, features.DRAConsumableCapacity, true)
+	first, second := pendingClaim.DeepCopy(), pendingClaim2.DeepCopy()
+	for _, claim := range []*resourceapi.ResourceClaim{first, second} {
+		claim.Spec.Devices.Requests[0].Exactly.Capacity = &resourceapi.CapacityRequirements{Requests: map[resourceapi.QualifiedName]apiresource.Quantity{"shares": apiresource.MustParse("2")}}
+	}
+	tc := setup(tCtx, nil, []*v1.Node{workerNode}, []*resourceapi.ResourceClaim{first, second}, []*resourceapi.DeviceClass{deviceClass}, nil, []apiruntime.Object{workerNodeSliceWithShares.DeepCopy()}, feature.NewSchedulerFeaturesFromGates(utilfeature.DefaultFeatureGate), false, nil)
+	secondPod := podWithClaimName.DeepCopy()
+	secondPod.Name += "-second"
+	secondPod.UID += "-second"
+	secondPod.Spec.ResourceClaims[0].ResourceClaimName = &claimName2
+	filter := func(pod *v1.Pod) (fwk.CycleState, *fwk.Status) {
+		state := framework.NewCycleState()
+		_, status := tc.p.PreFilter(tCtx, state, pod, tc.nodeInfos)
+		require.True(tCtx, status.IsSuccess(), "PreFilter: %v", status)
+		return state, tc.p.Filter(tCtx, state, pod, tc.nodeInfos[0])
+	}
+	cycle, status := filter(podWithClaimName)
+	require.True(tCtx, status.IsSuccess())
+	require.True(tCtx, tc.p.Reserve(tCtx, cycle, podWithClaimName, nodeName).IsSuccess())
+	_, status = filter(secondPod)
+	require.True(tCtx, status.IsSuccess(), "one pending allocation consumes two of four shares: %v", status)
+	state, err := getStateData(cycle)
+	require.NoError(tCtx, err)
+	// PreBind may wait for binding conditions after persisting the allocation.
+	persisted, cleanup, err := tc.p.bindClaim(tCtx, state, 0, podWithClaimName, nodeName)
+	require.NoError(tCtx, err)
+	require.NotNil(tCtx, persisted.Status.Allocation)
+	require.NotNil(tCtx, cleanup)
+	_, status = filter(secondPod)
+	require.True(tCtx, status.IsSuccess(), "the persisted allocation must not be counted again while still pending: %v", status)
+	cleanup()
+	_, status = filter(secondPod)
+	require.True(tCtx, status.IsSuccess(), "the persisted allocation remains counted once after cleanup: %v", status)
+}
+
 func TestPlugin(t *testing.T) {
 	testPlugin(ktesting.Init(t))
 }
