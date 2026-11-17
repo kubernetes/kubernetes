@@ -265,6 +265,15 @@ type PodWorkers interface {
 	IsPodForMirrorPodTerminatingByFullName(podFullname string) bool
 }
 
+// podRelistSuspender suspends PLEG relist observations for a pod while the pod worker syncs it.
+// Changes made by the sync itself are then observed once, after the sync, instead of once per
+// intermediate runtime event.
+type podRelistSuspender interface {
+	SuspendRelist(podUID types.UID)
+	ResumeRelist(podUID types.UID) (relistDeferred bool)
+	RequestPodRelist(logger klog.Logger, podUID types.UID)
+}
+
 // podSyncer describes the core lifecyle operations of the pod state machine. A pod is first
 // synced until it naturally reaches termination (true is returned) or an external agent decides
 // the pod should be terminated. Once a pod should be terminating, SyncTerminatingPod is invoked
@@ -606,6 +615,9 @@ type podWorkers struct {
 	// different pods at the same time.
 	podSyncer podSyncer
 
+	// relistSuspender, if set, suspends PLEG relist observations for a pod while SyncPod runs.
+	relistSuspender podRelistSuspender
+
 	// workerChannelFn is exposed for testing to allow unit tests to impose delays
 	// in channel communication. The function is invoked once each time a new worker
 	// goroutine starts.
@@ -637,6 +649,7 @@ func newPodWorkers(
 	resyncInterval, backOffPeriod time.Duration,
 	podCache kubecontainer.ROCache,
 	allocationManager allocation.Manager,
+	relistSuspender podRelistSuspender,
 ) PodWorkers {
 	return &podWorkers{
 		podSyncStatuses:                    map[types.UID]*podSyncStatus{},
@@ -650,6 +663,7 @@ func newPodWorkers(
 		backOffPeriod:                      backOffPeriod,
 		podCache:                           podCache,
 		allocationManager:                  allocationManager,
+		relistSuspender:                    relistSuspender,
 		clock:                              clock.RealClock{},
 	}
 }
@@ -1304,6 +1318,7 @@ func (p *podWorkers) podWorkerLoop(parentCtx context.Context, podUID types.UID, 
 
 			// Take the appropriate action (illegal phases are prevented by UpdatePod)
 			var postSync func()
+			var relistSuspended bool
 			switch {
 			case update.WorkType == TerminatedPod:
 				err = p.podSyncer.SyncTerminatedPod(ctx, update.Options.Pod, status)
@@ -1323,12 +1338,28 @@ func (p *podWorkers) podWorkerLoop(parentCtx context.Context, podUID types.UID, 
 				}
 
 			default:
+				if p.relistSuspender != nil {
+					p.relistSuspender.SuspendRelist(podUID)
+					relistSuspended = true
+				}
 				isTerminal, postSync, err = p.podSyncer.SyncPod(ctx, update.Options.UpdateType, update.Options.Pod, update.Options.MirrorPod, status)
 			}
 
+			// Resume *before* setting lastSyncTime: any relist that starts after lastSyncTime then
+			// sees the pod as unsuspended and reconciles it, so a relist that skipped the pod can
+			// never advance a cache timestamp past lastSyncTime. Request the follow-up relist
+			// *after* setting lastSyncTime, so its cache update unblocks the next sync. A non-nil
+			// postSync means the sync changed the pod and requests its own relist, which also
+			// observes anything deferred during the suspension.
+			var relistDeferred bool
+			if relistSuspended {
+				relistDeferred = p.relistSuspender.ResumeRelist(podUID)
+			}
 			lastSyncTime = p.clock.Now()
 			if postSync != nil {
 				postSync()
+			} else if relistDeferred {
+				p.relistSuspender.RequestPodRelist(logger, podUID)
 			}
 
 			return err
