@@ -105,7 +105,9 @@ type Manager interface {
 
 	// UpdatePodStatus modifies the given PodStatus with the appropriate Ready state for each
 	// container based on container running status, cached probe results and worker states.
-	UpdatePodStatus(context.Context, *v1.Pod, *v1.PodStatus)
+	// oldPodStatus is read-only and supplies the previous API status for preserving
+	// readiness after a kubelet restart.
+	UpdatePodStatus(ctx context.Context, pod *v1.Pod, oldPodStatus, podStatus *v1.PodStatus)
 }
 
 type manager struct {
@@ -311,7 +313,7 @@ func (m *manager) isContainerStarted(logger klog.Logger, pod *v1.Pod, containerS
 // setReadyStateOnKubeletRestart sets the ready state of a container to false if it was started
 // before kubelet restarted and has a readiness probe, but the pod is not ready yet.
 // This is to avoid flapping ready status of containers that were ready before kubelet restarted.
-func (m *manager) setReadyStateOnKubeletRestart(logger klog.Logger, ready *bool, pod *v1.Pod, apiContainerStatuses []v1.ContainerStatus, containerStatus *v1.ContainerStatus, containerSpec *v1.Container) {
+func (m *manager) setReadyStateOnKubeletRestart(logger klog.Logger, ready *bool, oldPodStatus *v1.PodStatus, apiContainerStatuses []v1.ContainerStatus, containerStatus *v1.ContainerStatus, containerSpec *v1.Container) {
 	if !canInheritProbeState(apiContainerStatuses, containerStatus.Name, containerStatus.ContainerID) {
 		// The caller defaults to ready while no readiness worker is registered, which is
 		// the case on the first sync after a kubelet restart, so clear it explicitly.
@@ -338,7 +340,7 @@ func (m *manager) setReadyStateOnKubeletRestart(logger klog.Logger, ready *bool,
 		}
 		if containerSpec.ReadinessProbe != nil {
 			podIsReady := false
-			for _, c := range pod.Status.Conditions {
+			for _, c := range oldPodStatus.Conditions {
 				if c.Type == v1.PodReady && c.Status == v1.ConditionTrue {
 					podIsReady = true
 					break
@@ -351,7 +353,7 @@ func (m *manager) setReadyStateOnKubeletRestart(logger klog.Logger, ready *bool,
 	}
 }
 
-func (m *manager) UpdatePodStatus(ctx context.Context, pod *v1.Pod, podStatus *v1.PodStatus) {
+func (m *manager) UpdatePodStatus(ctx context.Context, pod *v1.Pod, oldPodStatus, podStatus *v1.PodStatus) {
 	logger := klog.FromContext(ctx)
 	for i, c := range podStatus.ContainerStatuses {
 		started := m.isContainerStarted(logger, pod, &podStatus.ContainerStatuses[i])
@@ -395,7 +397,7 @@ func (m *manager) UpdatePodStatus(ctx context.Context, pod *v1.Pod, podStatus *v
 					}
 				}
 				if containerSpec != nil {
-					m.setReadyStateOnKubeletRestart(logger, &ready, pod, pod.Status.ContainerStatuses, &podStatus.ContainerStatuses[i], containerSpec)
+					m.setReadyStateOnKubeletRestart(logger, &ready, oldPodStatus, oldPodStatus.ContainerStatuses, &podStatus.ContainerStatuses[i], containerSpec)
 				}
 			}
 		}
@@ -440,7 +442,7 @@ func (m *manager) UpdatePodStatus(ctx context.Context, pod *v1.Pod, podStatus *v
 				}
 			}
 			if !utilfeature.DefaultFeatureGate.Enabled(features.ChangeContainerStatusOnKubeletRestart) {
-				m.setReadyStateOnKubeletRestart(logger, &ready, pod, pod.Status.InitContainerStatuses, &podStatus.InitContainerStatuses[i], &initContainer)
+				m.setReadyStateOnKubeletRestart(logger, &ready, oldPodStatus, oldPodStatus.InitContainerStatuses, &podStatus.InitContainerStatuses[i], &initContainer)
 			}
 		}
 		podStatus.InitContainerStatuses[i].Ready = ready

@@ -19,6 +19,7 @@ package prober
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"slices"
 	"strconv"
 	"testing"
@@ -361,7 +362,7 @@ func TestUpdatePodStatusRemovedContainerNotReady(t *testing.T) {
 		{Name: "main", ContainerID: "test://main", State: running},
 		{Name: "removed", ContainerID: "test://removed", State: running},
 	}}
-	m.UpdatePodStatus(tCtx, pod, status)
+	m.UpdatePodStatus(tCtx, pod, &pod.Status, status)
 	assert.True(t, status.ContainerStatuses[0].Ready, "main")
 	assert.False(t, status.ContainerStatuses[1].Ready, "removed")
 }
@@ -720,7 +721,7 @@ func TestUpdatePodStatus(t *testing.T) {
 				{Name: terminated.Name},
 			},
 		},
-	}, &podStatus)
+	}, &v1.PodStatus{}, &podStatus)
 
 	expectedReadiness := map[probeKey]bool{
 		{testPodUID, unprobed.Name, readiness}:              true,
@@ -851,7 +852,7 @@ func TestUpdatePodStatusWithInitContainers(t *testing.T) {
 						},
 					},
 				},
-			}, &podStatus)
+			}, &v1.PodStatus{}, &podStatus)
 
 			for _, c := range podStatus.InitContainerStatuses {
 				{
@@ -987,7 +988,18 @@ func TestUpdatePodStatusOnKubeletRestart(t *testing.T) {
 				},
 			}
 
-			m.UpdatePodStatus(ctx, pod, &podStatus)
+			// Static pods receive their previous API status separately from the manifest.
+			oldPodStatus := pod.Status
+			pod.Status = v1.PodStatus{}
+			originalOldStatus := oldPodStatus.DeepCopy()
+			originalPod := pod.DeepCopy()
+			m.UpdatePodStatus(ctx, pod, &oldPodStatus, &podStatus)
+			if !reflect.DeepEqual(originalOldStatus, &oldPodStatus) {
+				t.Error("UpdatePodStatus modified the previous API status")
+			}
+			if !reflect.DeepEqual(originalPod, pod) {
+				t.Error("UpdatePodStatus modified the pod")
+			}
 
 			if got := podStatus.ContainerStatuses[0].Ready; got != tc.expectedReady {
 				t.Errorf("Unexpected readiness for container %v: expected %v but got %v", containerName, tc.expectedReady, got)
@@ -1059,7 +1071,7 @@ func TestUpdatePodStatusOnKubeletRestartWithMultipleContainers(t *testing.T) {
 		},
 	}
 
-	m.UpdatePodStatus(ctx, pod, &podStatus)
+	m.UpdatePodStatus(ctx, pod, &pod.Status, &podStatus)
 
 	if !podStatus.ContainerStatuses[0].Ready {
 		t.Errorf("Expected container %v to keep its readiness across the kubelet restart", survivedContainer)
@@ -1074,7 +1086,7 @@ func TestUpdatePodStatusOnKubeletRestartWithMultipleContainers(t *testing.T) {
 	// because its own readiness probe still has not produced a result.
 	pod.Status.Conditions[0].Status = v1.ConditionFalse
 
-	m.UpdatePodStatus(ctx, pod, &podStatus)
+	m.UpdatePodStatus(ctx, pod, &pod.Status, &podStatus)
 
 	for _, c := range podStatus.ContainerStatuses {
 		if c.Ready {
