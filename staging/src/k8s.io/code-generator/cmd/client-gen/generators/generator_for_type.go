@@ -151,50 +151,50 @@ func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w i
 		extendedMethods = append(extendedMethods, extendedMethod)
 	}
 	m := map[string]interface{}{
-		"type":                      t,
-		"inputType":                 t,
-		"resultType":                t,
-		"package":                   pkg,
-		"Package":                   namer.IC(pkg),
-		"namespaced":                !tags.NonNamespaced,
-		"Group":                     namer.IC(g.group),
-		"subresource":               false,
-		"subresourcePath":           "",
-		"GroupGoName":               g.groupGoName,
-		"prefersProtobuf":           g.prefersProtobuf,
-		"Version":                   namer.IC(g.version),
-		"runtimeObject":             c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/runtime", Name: "Object"}),
-		"APIResult":                 c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "APIResult"}),
-		"CreateOptions":             c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "CreateOptions"}),
-		"DeleteOptions":             c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "DeleteOptions"}),
-		"GetOptions":                c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "GetOptions"}),
-		"ListOptions":               c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "ListOptions"}),
-		"PatchOptions":              c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "PatchOptions"}),
-		"ApplyOptions":              c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "ApplyOptions"}),
-		"UpdateOptions":             c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "UpdateOptions"}),
-		"PatchType":                 c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/types", Name: "PatchType"}),
-		"watchInterface":            c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/watch", Name: "Interface"}),
-		"RESTClientInterface":       c.Universe.Type(types.Name{Package: "k8s.io/client-go/rest", Name: "Interface"}),
-		"schemeParameterCodec":      c.Universe.Variable(types.Name{Package: path.Join(g.clientsetPackage, "scheme"), Name: "ParameterCodec"}),
-		"fmtErrorf":                 c.Universe.Function(types.Name{Package: "fmt", Name: "Errorf"}),
-		"klogWarningf":              c.Universe.Function(types.Name{Package: "k8s.io/klog/v2", Name: "Warningf"}),
-		"context":                   c.Universe.Type(types.Name{Package: "context", Name: "Context"}),
-		"timeDuration":              c.Universe.Type(types.Name{Package: "time", Name: "Duration"}),
-		"timeSecond":                c.Universe.Type(types.Name{Package: "time", Name: "Second"}),
-		"applyNewRequest":           c.Universe.Function(types.Name{Package: "k8s.io/client-go/util/apply", Name: "NewRequest"}),
-		"Client":                    c.Universe.Type(types.Name{Package: "k8s.io/client-go/gentype/v2", Name: "Client"}),
-		"ClientWithList":            c.Universe.Type(types.Name{Package: "k8s.io/client-go/gentype/v2", Name: "ClientWithList"}),
-		"ClientWithApply":           c.Universe.Type(types.Name{Package: "k8s.io/client-go/gentype/v2", Name: "ClientWithApply"}),
-		"ClientWithListAndApply":    c.Universe.Type(types.Name{Package: "k8s.io/client-go/gentype/v2", Name: "ClientWithListAndApply"}),
-		"NewClient":                 c.Universe.Function(types.Name{Package: "k8s.io/client-go/gentype/v2", Name: "NewClient"}),
-		"NewClientWithApply":        c.Universe.Function(types.Name{Package: "k8s.io/client-go/gentype/v2", Name: "NewClientWithApply"}),
-		"NewClientWithList":         c.Universe.Function(types.Name{Package: "k8s.io/client-go/gentype/v2", Name: "NewClientWithList"}),
-		"NewClientWithListAndApply": c.Universe.Function(types.Name{Package: "k8s.io/client-go/gentype/v2", Name: "NewClientWithListAndApply"}),
-		"ForResource":               c.Universe.Function(types.Name{Package: "k8s.io/client-go/gentype/v2", Name: "ForResource"}),
-		"InNamespace":               c.Universe.Function(types.Name{Package: "k8s.io/client-go/gentype/v2", Name: "InNamespace"}),
-		"PrefersProtobuf":           c.Universe.Function(types.Name{Package: "k8s.io/client-go/gentype/v2", Name: "PrefersProtobuf"}),
-		"UsingClient":               c.Universe.Function(types.Name{Package: "k8s.io/client-go/gentype/v2", Name: "UsingClient"}),
-		"UsingParameterCodec":       c.Universe.Function(types.Name{Package: "k8s.io/client-go/gentype/v2", Name: "UsingParameterCodec"}),
+		"type":                           t,
+		"inputType":                      t,
+		"resultType":                     t,
+		"package":                        pkg,
+		"Package":                        namer.IC(pkg),
+		"namespaced":                     !tags.NonNamespaced,
+		"Group":                          namer.IC(g.group),
+		"subresource":                    false,
+		"subresourcePath":                "",
+		"GroupGoName":                    g.groupGoName,
+		"prefersProtobuf":                g.prefersProtobuf,
+		"Version":                        namer.IC(g.version),
+		"runtimeObject":                  c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/runtime", Name: "Object"}),
+		"APIResult":                      c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "APIResult"}),
+		"CreateOptions":                  c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "CreateOptions"}),
+		"DeleteOptions":                  c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "DeleteOptions"}),
+		"GetOptions":                     c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "GetOptions"}),
+		"ListOptions":                    c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "ListOptions"}),
+		"PatchOptions":                   c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "PatchOptions"}),
+		"ApplyOptions":                   c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "ApplyOptions"}),
+		"UpdateOptions":                  c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "UpdateOptions"}),
+		"PatchType":                      c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/types", Name: "PatchType"}),
+		"watchInterface":                 c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/watch", Name: "Interface"}),
+		"RESTClientInterface":            c.Universe.Type(types.Name{Package: "k8s.io/client-go/rest", Name: "Interface"}),
+		"schemeParameterCodec":           c.Universe.Variable(types.Name{Package: path.Join(g.clientsetPackage, "scheme"), Name: "ParameterCodec"}),
+		"fmtErrorf":                      c.Universe.Function(types.Name{Package: "fmt", Name: "Errorf"}),
+		"klogWarningf":                   c.Universe.Function(types.Name{Package: "k8s.io/klog/v2", Name: "Warningf"}),
+		"context":                        c.Universe.Type(types.Name{Package: "context", Name: "Context"}),
+		"timeDuration":                   c.Universe.Type(types.Name{Package: "time", Name: "Duration"}),
+		"timeSecond":                     c.Universe.Type(types.Name{Package: "time", Name: "Second"}),
+		"applyNewRequest":                c.Universe.Function(types.Name{Package: "k8s.io/client-go/util/apply", Name: "NewRequest"}),
+		"TypedClient":                    c.Universe.Type(types.Name{Package: "k8s.io/client-go/gentype/v2", Name: "TypedClient"}),
+		"TypedClientWithList":            c.Universe.Type(types.Name{Package: "k8s.io/client-go/gentype/v2", Name: "TypedClientWithList"}),
+		"TypedClientWithApply":           c.Universe.Type(types.Name{Package: "k8s.io/client-go/gentype/v2", Name: "TypedClientWithApply"}),
+		"TypedClientWithListAndApply":    c.Universe.Type(types.Name{Package: "k8s.io/client-go/gentype/v2", Name: "TypedClientWithListAndApply"}),
+		"NewTypedClient":                 c.Universe.Function(types.Name{Package: "k8s.io/client-go/gentype/v2", Name: "NewTypedClient"}),
+		"NewTypedClientWithApply":        c.Universe.Function(types.Name{Package: "k8s.io/client-go/gentype/v2", Name: "NewTypedClientWithApply"}),
+		"NewTypedClientWithList":         c.Universe.Function(types.Name{Package: "k8s.io/client-go/gentype/v2", Name: "NewTypedClientWithList"}),
+		"NewTypedClientWithListAndApply": c.Universe.Function(types.Name{Package: "k8s.io/client-go/gentype/v2", Name: "NewTypedClientWithListAndApply"}),
+		"ForResource":                    c.Universe.Function(types.Name{Package: "k8s.io/client-go/gentype/v2", Name: "ForResource"}),
+		"InNamespace":                    c.Universe.Function(types.Name{Package: "k8s.io/client-go/gentype/v2", Name: "InNamespace"}),
+		"PrefersProtobuf":                c.Universe.Function(types.Name{Package: "k8s.io/client-go/gentype/v2", Name: "PrefersProtobuf"}),
+		"UsingClient":                    c.Universe.Function(types.Name{Package: "k8s.io/client-go/gentype/v2", Name: "UsingClient"}),
+		"UsingParameterCodec":            c.Universe.Function(types.Name{Package: "k8s.io/client-go/gentype/v2", Name: "UsingParameterCodec"}),
 	}
 
 	if generateApply {
@@ -440,25 +440,25 @@ var structType = []string{
 	noList | noApply: `
 	// $.type|privatePlural$ implements $.type|public$Interface
 	type $.type|privatePlural$ struct {
-		*$.Client|raw$[$.resultType|raw$, *$.resultType|raw$]
+		*$.TypedClient|raw$[$.resultType|raw$, *$.resultType|raw$]
 	}
 	`,
 	withList | noApply: `
 	// $.type|privatePlural$ implements $.type|public$Interface
 	type $.type|privatePlural$ struct {
-		*$.ClientWithList|raw$[$.resultType|raw$, $.resultType|raw$List, *$.resultType|raw$, *$.resultType|raw$List]
+		*$.TypedClientWithList|raw$[$.resultType|raw$, $.resultType|raw$List, *$.resultType|raw$, *$.resultType|raw$List]
 	}
 	`,
 	noList | withApply: `
 	// $.type|privatePlural$ implements $.type|public$Interface
 	type $.type|privatePlural$ struct {
-		*$.ClientWithApply|raw$[$.resultType|raw$, $.inputApplyConfig|raw$, *$.resultType|raw$, *$.inputApplyConfig|raw$]
+		*$.TypedClientWithApply|raw$[$.resultType|raw$, $.inputApplyConfig|raw$, *$.resultType|raw$, *$.inputApplyConfig|raw$]
 	}
 	`,
 	withList | withApply: `
 	// $.type|privatePlural$ implements $.type|public$Interface
 	type $.type|privatePlural$ struct {
-		*$.ClientWithListAndApply|raw$[$.resultType|raw$, $.resultType|raw$List, $.inputApplyConfig|raw$, *$.resultType|raw$, *$.resultType|raw$List, *$.inputApplyConfig|raw$]
+		*$.TypedClientWithListAndApply|raw$[$.resultType|raw$, $.resultType|raw$List, $.inputApplyConfig|raw$, *$.resultType|raw$, *$.resultType|raw$List, *$.inputApplyConfig|raw$]
 	}
 	`,
 }
@@ -469,7 +469,7 @@ var newStruct = []string{
 	// new$.type|publicPlural$ returns a $.type|publicPlural$
 	func new$.type|publicPlural$(c *$.GroupGoName$$.Version$Client$if .namespaced$, namespace string$end$) *$.type|privatePlural$ {
 		return &$.type|privatePlural${
-			$.NewClient|raw$[$.resultType|raw$](
+			$.NewTypedClient|raw$[$.resultType|raw$](
 				$.ForResource|raw$("$.type|resource$"),
 				$.UsingClient|raw$(c.RESTClient()),
 				$.UsingParameterCodec|raw$($.schemeParameterCodec|raw$),$if .namespaced$
@@ -483,7 +483,7 @@ var newStruct = []string{
 	// new$.type|publicPlural$ returns a $.type|publicPlural$
 	func new$.type|publicPlural$(c *$.GroupGoName$$.Version$Client$if .namespaced$, namespace string$end$) *$.type|privatePlural$ {
 		return &$.type|privatePlural${
-			$.NewClientWithApply|raw$[$.resultType|raw$, $.inputApplyConfig|raw$](
+			$.NewTypedClientWithApply|raw$[$.resultType|raw$, $.inputApplyConfig|raw$](
 				$.ForResource|raw$("$.type|resource$"),
 				$.UsingClient|raw$(c.RESTClient()),
 				$.UsingParameterCodec|raw$($.schemeParameterCodec|raw$),$if .namespaced$
@@ -497,7 +497,7 @@ var newStruct = []string{
 	// new$.type|publicPlural$ returns a $.type|publicPlural$
 	func new$.type|publicPlural$(c *$.GroupGoName$$.Version$Client$if .namespaced$, namespace string$end$) *$.type|privatePlural$ {
 		return &$.type|privatePlural${
-			$.NewClientWithList|raw$[$.resultType|raw$, $.resultType|raw$List](
+			$.NewTypedClientWithList|raw$[$.resultType|raw$, $.resultType|raw$List](
 				$.ForResource|raw$("$.type|resource$"),
 				$.UsingClient|raw$(c.RESTClient()),
 				$.UsingParameterCodec|raw$($.schemeParameterCodec|raw$),$if .namespaced$
@@ -511,7 +511,7 @@ var newStruct = []string{
 	// new$.type|publicPlural$ returns a $.type|publicPlural$
 	func new$.type|publicPlural$(c *$.GroupGoName$$.Version$Client$if .namespaced$, namespace string$end$) *$.type|privatePlural$ {
 		return &$.type|privatePlural${
-			$.NewClientWithListAndApply|raw$[$.resultType|raw$, $.resultType|raw$List, $.inputApplyConfig|raw$](
+			$.NewTypedClientWithListAndApply|raw$[$.resultType|raw$, $.resultType|raw$List, $.inputApplyConfig|raw$](
 				$.ForResource|raw$("$.type|resource$"),
 				$.UsingClient|raw$(c.RESTClient()),
 				$.UsingParameterCodec|raw$($.schemeParameterCodec|raw$),$if .namespaced$
@@ -525,21 +525,8 @@ var newStruct = []string{
 
 var listTemplate = `
 // $.verb$ takes label and field selectors, and returns the list of $.resultType|publicPlural$ that match those selectors.
-func (c *$.type|privatePlural$) $.verb$(ctx $.context|raw$, opts $.ListOptions|raw$) (result *$.resultType|raw$List, err error) {
-	var timeout $.timeDuration|raw$
-	if opts.TimeoutSeconds != nil{
-		timeout = $.timeDuration|raw$(*opts.TimeoutSeconds) * $.timeSecond|raw$
-	}
-	result = &$.resultType|raw$List{}
-	err = c.GetClient().Get().
-		$if .prefersProtobuf$UseProtobufAsDefault().$end$
-		$if .namespaced$Namespace(c.GetNamespace()).$end$
-		Resource("$.type|resource$").
-		VersionedParams(&opts, $.schemeParameterCodec|raw$).
-		Timeout(timeout).
-		Do(ctx).
-		Into(result)
-	return
+func (c *$.type|privatePlural$) $.verb$(ctx $.context|raw$, opts $.ListOptions|raw$) (*$.resultType|raw$List, error) {
+	return c.Client.List[$.resultType|raw$List](ctx, opts)
 }
 `
 
@@ -552,17 +539,8 @@ func (c *$.type|privatePlural$) $.verb$(ctx $.context|raw$, $.type|private$Name 
 
 var getTemplate = `
 // $.verb$ takes name of the $.type|private$, and returns the corresponding $.resultType|private$ object, and an error if there is any.
-func (c *$.type|privatePlural$) $.verb$(ctx $.context|raw$, name string, opts $.GetOptions|raw$) (result *$.resultType|raw$, err error) {
-	result = &$.resultType|raw${}
-	err = c.GetClient().Get().
-		$if .prefersProtobuf$UseProtobufAsDefault().$end$
-		$if .namespaced$Namespace(c.GetNamespace()).$end$
-		Resource("$.type|resource$").
-		Name(name).
-		VersionedParams(&opts, $.schemeParameterCodec|raw$).
-		Do(ctx).
-		Into(result)
-	return
+func (c *$.type|privatePlural$) $.verb$(ctx $.context|raw$, name string, opts $.GetOptions|raw$) (*$.resultType|raw$, error) {
+	return c.Client.Get[$.resultType|raw$](ctx, name, opts)
 }
 `
 
@@ -576,14 +554,7 @@ func (c *$.type|privatePlural$) $.verb$(ctx $.context|raw$, $.type|private$Name 
 var deleteTemplate = `
 // $.verb$ takes name of the $.type|private$ and deletes it. Returns an error if one occurs.
 func (c *$.type|privatePlural$) $.verb$(ctx $.context|raw$, name string, opts $.DeleteOptions|raw$) error {
-	return c.GetClient().Delete().
-		$if .prefersProtobuf$UseProtobufAsDefault().$end$
-		$if .namespaced$Namespace(c.GetNamespace()).$end$
-		Resource("$.type|resource$").
-		Name(name).
-		Body(&opts).
-		Do(ctx).
-		Error()
+	return c.Client.Delete(ctx, name, opts)
 }
 `
 
@@ -596,17 +567,8 @@ func (c *$.type|privatePlural$) $.verb$(ctx $.context|raw$, $.type|private$Name 
 
 var createTemplate = `
 // $.verb$ takes the representation of a $.inputType|private$ and creates it.  Returns the server's representation of the $.resultType|private$, and an error, if there is any.
-func (c *$.type|privatePlural$) $.verb$(ctx $.context|raw$, $.inputType|private$ *$.inputType|raw$, opts $.CreateOptions|raw$) (result *$.resultType|raw$, err error) {
-	result = &$.resultType|raw${}
-	err = c.GetClient().Post().
-		$if .prefersProtobuf$UseProtobufAsDefault().$end$
-		$if .namespaced$Namespace(c.GetNamespace()).$end$
-		Resource("$.type|resource$").
-		VersionedParams(&opts, $.schemeParameterCodec|raw$).
-		Body($.inputType|private$).
-		Do(ctx).
-		Into(result)
-	return
+func (c *$.type|privatePlural$) $.verb$(ctx $.context|raw$, $.inputType|private$ *$.inputType|raw$, opts $.CreateOptions|raw$) (*$.resultType|raw$, error) {
+	return c.Client.Create(ctx, $.inputType|private$, opts)
 }
 `
 
@@ -619,87 +581,35 @@ func (c *$.type|privatePlural$) $.verb$(ctx $.context|raw$, $.type|private$Name 
 
 var updateTemplate = `
 // $.verb$ takes the representation of a $.inputType|private$ and updates it. Returns the server's representation of the $.resultType|private$, and an error, if there is any.
-func (c *$.type|privatePlural$) $.verb$(ctx $.context|raw$, $.inputType|private$ *$.inputType|raw$, opts $.UpdateOptions|raw$) (result *$.resultType|raw$, err error) {
-	result = &$.resultType|raw${}
-	err = c.GetClient().Put().
-		$if .prefersProtobuf$UseProtobufAsDefault().$end$
-		$if .namespaced$Namespace(c.GetNamespace()).$end$
-		Resource("$.type|resource$").
-		Name($.inputType|private$.Name).
-		VersionedParams(&opts, $.schemeParameterCodec|raw$).
-		Body($.inputType|private$).
-		Do(ctx).
-		Into(result)
-	return
+func (c *$.type|privatePlural$) $.verb$(ctx $.context|raw$, $.inputType|private$ *$.inputType|raw$, opts $.UpdateOptions|raw$) (*$.resultType|raw$, error) {
+	return c.Client.Update(ctx, $.inputType|private$, opts)
 }
 `
 
 var watchTemplate = `
 // $.verb$ returns a $.watchInterface|raw$ that watches the requested $.type|privatePlural$.
 func (c *$.type|privatePlural$) $.verb$(ctx $.context|raw$, opts $.ListOptions|raw$) ($.watchInterface|raw$, error) {
-	var timeout $.timeDuration|raw$
-	if opts.TimeoutSeconds != nil{
-		timeout = $.timeDuration|raw$(*opts.TimeoutSeconds) * $.timeSecond|raw$
-	}
-	opts.Watch = true
-	return c.GetClient().Get().
-		$if .prefersProtobuf$UseProtobufAsDefault().$end$
-		$if .namespaced$Namespace(c.GetNamespace()).$end$
-		VersionedParams(&opts, $.schemeParameterCodec|raw$).
-		Timeout(timeout).
-		Watch(ctx)
+	return c.Client.Watch(ctx, opts)
 }
 `
 var patchTemplate = `
 // $.verb$ applies the patch and returns the patched $.resultType|private$.
-func (c *$.type|privatePlural$) $.verb$(ctx $.context|raw$, name string, pt $.PatchType|raw$, data []byte, opts $.PatchOptions|raw$, subresources ...string) (result *$.resultType|raw$, err error) {
-	result = &$.resultType|raw${}
-	err = c.GetClient().Patch(pt).
-		$if .prefersProtobuf$UseProtobufAsDefault().$end$
-		$if .namespaced$Namespace(c.GetNamespace()).$end$
-		Resource("$.type|resource$").
-		Name(name).
-		SubResource(subresources...).
-		VersionedParams(&opts, $.schemeParameterCodec|raw$).
-		Body(data).
-		Do(ctx).
-		Into(result)
-	return
+func (c *$.type|privatePlural$) $.verb$(ctx $.context|raw$, name string, pt $.PatchType|raw$, data []byte, opts $.PatchOptions|raw$, subresources ...string) (*$.resultType|raw$, error) {
+	return c.Client.Patch[$.resultType|raw$](ctx, name, pt, data, opts, subresources...)
 }
 `
 
 var applyTemplate = `
 // $.verb$ takes the given apply declarative configuration, applies it and returns the applied $.resultType|private$.
-func (c *$.type|privatePlural$) $.verb$(ctx $.context|raw$, $.inputType|private$ *$.inputApplyConfig|raw$, opts $.ApplyOptions|raw$) (result *$.resultType|raw$, err error) {
-	if $.inputType|private$ == nil {
-		return nil, $.fmtErrorf|raw$("$.inputType|private$ provided to $.verb$ must not be nil")
-	}
-	patchOpts := opts.ToPatchOptions()
-	name := $.inputType|private$.Name
-	if name == nil {
-		return nil, $.fmtErrorf|raw$("$.inputType|private$.Name must be provided to $.verb$")
-	}
-	request, err := $.applyNewRequest|raw$(c.GetClient(), $.inputType|private$)
-	if err != nil {
-		return nil, err
-	}
-	result = &$.resultType|raw${}
-	err = request.
-		$if .prefersProtobuf$UseProtobufAsDefault().$end$
-		$if .namespaced$Namespace(c.GetNamespace()).$end$
-		Resource("$.type|resource$").
-		Name(*name).
-		VersionedParams(&patchOpts, $.schemeParameterCodec|raw$).
-		Do(ctx).
-		Into(result)
-	return
+func (c *$.type|privatePlural$) $.verb$(ctx $.context|raw$, $.inputType|private$ *$.inputApplyConfig|raw$, opts $.ApplyOptions|raw$) (*$.resultType|raw$, error) {
+	return c.Client.Apply[$.resultType|raw$](ctx, $.inputType|private$, opts)
 }
 `
 
 var applySubresourceTemplate = `
 // $.verb$ takes top resource name and the apply declarative configuration for $.subresourcePath$,
 // applies it and returns the applied $.resultType|private$, and an error, if there is any.
-func (c *$.type|privatePlural$) $.verb$(ctx $.context|raw$, $.type|private$Name string, $.inputType|private$ *$.inputApplyConfig|raw$, opts $.ApplyOptions|raw$) (result *$.resultType|raw$, err error) {
+func (c *$.type|privatePlural$) $.verb$(ctx $.context|raw$, $.type|private$Name string, $.inputType|private$ *$.inputApplyConfig|raw$, opts $.ApplyOptions|raw$) (*$.resultType|raw$, error) {
 	return c.SubResourceApply[$.resultType|raw$](ctx, $.type|private$Name, "$.subresourcePath$", $.inputType|private$, opts)
 }
 `
