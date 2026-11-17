@@ -2226,3 +2226,41 @@ func TestSyncServiceServiceRecreated(t *testing.T) {
 		t.Fatalf("Expected no error syncing recreated service, got: %v", err)
 	}
 }
+
+// Pod events that resolve to the same services must collapse in podQueue.
+func TestPodQueueDeduplicates(t *testing.T) {
+	_, esController := newController(t, []string{"node-1"}, 0)
+	t.Cleanup(func() {
+		esController.serviceQueue.ShutDown()
+		esController.podQueue.ShutDown()
+		esController.topologyQueue.ShutDown()
+		esController.eventBroadcaster.Shutdown()
+	})
+
+	ns := metav1.NamespaceDefault
+	const replicas = 50
+	for i := range replicas {
+		pod := newPod(i, ns, true, 0, false)
+		pod.Labels = map[string]string{"app": "web", "pod-template-hash": "abc"}
+		esController.onPodUpdate(nil, pod)
+
+		updated := pod.DeepCopy()
+		updated.ResourceVersion = pod.ResourceVersion + "-updated"
+		updated.Status.PodIPs = []v1.PodIP{{IP: fmt.Sprintf("10.200.0.%d", i)}}
+		if _, ok := endpointsliceutil.GetPodUpdateProjectionKey(pod, updated); !ok {
+			t.Fatal("expected the pod IP change to produce a projection key")
+		}
+		esController.onPodUpdate(pod, updated)
+		esController.onPodUpdate(updated, nil)
+	}
+	if got := esController.podQueue.Len(); got != 1 {
+		t.Fatalf("expected %d pod events with identical labels to collapse into 1 queue item, got %d", 3*replicas, got)
+	}
+
+	other := newPod(replicas, ns, true, 0, false)
+	other.Labels = map[string]string{"app": "db"}
+	esController.onPodUpdate(nil, other)
+	if got := esController.podQueue.Len(); got != 2 {
+		t.Fatalf("expected a pod with different labels to add a queue item, got %d", got)
+	}
+}

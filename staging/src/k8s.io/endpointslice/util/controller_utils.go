@@ -22,7 +22,9 @@ import (
 	"hash"
 	"hash/fnv"
 	"reflect"
+	"slices"
 	"sort"
+	"strings"
 
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
@@ -49,80 +51,125 @@ var semanticIgnoreResourceVersion = conversion.EqualitiesOrDie(
 
 // PodProjectionKey encapsulates all pod information required to find services that may need their endpoints to be updated.
 type PodProjectionKey struct {
-	Namespace  string
-	Labels     labels.Set // this is set to the pod's current labels
-	OldLabels  labels.Set // this is set if the pod's labels changed (in an Update event)
-	PodChanged bool       // set to true if the pod's fields changed in a way that may affect its endpoints membership
+	Namespace     string
+	Labels        PodLabelsKey // the pod's current labels
+	OldLabels     PodLabelsKey // the pod's previous labels, only meaningful if LabelsChanged is set
+	LabelsChanged bool         // set to true if the pod's labels changed (in an Update event)
+	PodChanged    bool         // set to true if the pod's fields changed in a way that may affect its endpoints membership
 }
 
-func GetPodUpdateProjectionKey(oldObj, newObj interface{}) *PodProjectionKey {
+// PodLabelsKey is the canonical, comparable encoding of a pod's label set: "k1=v1,k2=v2" with keys sorted.
+type PodLabelsKey string
+
+// NewPodLabelsKey returns the canonical encoding of the given label set.
+func NewPodLabelsKey(set labels.Set) PodLabelsKey {
+	if len(set) == 0 {
+		return ""
+	}
+
+	// This runs for every pod event, so it encodes with a single allocation
+	// for typical label counts instead of going through labels.Set.String.
+	var buf [16]string
+	keys := buf[:0]
+	size := len(set) - 1
+	for k, v := range set {
+		keys = append(keys, k)
+		size += len(k) + 1 + len(v)
+	}
+	slices.Sort(keys)
+	var b strings.Builder
+	b.Grow(size)
+	for i, k := range keys {
+		if i > 0 {
+			b.WriteByte(',')
+		}
+		b.WriteString(k)
+		b.WriteByte('=')
+		b.WriteString(set[k])
+	}
+	return PodLabelsKey(b.String())
+}
+
+// Set decodes the key back into a label set.
+func (k PodLabelsKey) Set() labels.Set {
+	set := labels.Set{}
+	for rest := string(k); rest != ""; {
+		var pair string
+		pair, rest, _ = strings.Cut(rest, ",")
+		key, value, _ := strings.Cut(pair, "=")
+		set[key] = value
+	}
+	return set
+}
+
+// GetPodUpdateProjectionKey returns the projection key for a pod event, or
+// false if the event cannot affect any service's endpoints.
+func GetPodUpdateProjectionKey(oldObj, newObj any) (PodProjectionKey, bool) {
 	newPod := getPodFromObject(newObj)
 	oldPod := getPodFromObject(oldObj)
 	if newPod == nil && oldPod == nil {
 		utilruntime.HandleError(fmt.Errorf("unexpected pod event with both old/new values as nil, ignoring"))
-		return nil
+		return PodProjectionKey{}, false
 	}
 	// A pod that cannot be in endpoints before or after the event cannot affect any endpoints.
 	if !podEligibleForEndpoints(oldPod) && !podEligibleForEndpoints(newPod) {
-		return nil
+		return PodProjectionKey{}, false
 	}
 	if oldPod == nil {
-		return &PodProjectionKey{
+		return PodProjectionKey{
 			Namespace: newPod.Namespace,
-			Labels:    labels.Set(newPod.Labels),
-		}
+			Labels:    NewPodLabelsKey(newPod.Labels),
+		}, true
 	}
 	if newPod == nil {
-		return &PodProjectionKey{
+		return PodProjectionKey{
 			Namespace: oldPod.Namespace,
-			Labels:    labels.Set(oldPod.Labels),
-		}
+			Labels:    NewPodLabelsKey(oldPod.Labels),
+		}, true
 	}
 
 	// If we reached here, both old/new pod objects are non-nil, so it's an update event.
 	// Safe to ignore pod informer resync events as service informer already handles resync for all services.
 	if newPod.ResourceVersion == oldPod.ResourceVersion {
-		return nil
+		return PodProjectionKey{}, false
 	}
 
 	podChanged, labelsChanged := podEndpointsChanged(oldPod, newPod)
 
 	// If both the pod and labels are unchanged, no update is needed.
 	if !podChanged && !labelsChanged {
-		return nil
+		return PodProjectionKey{}, false
 	}
 
 	// If only the pod has changed, projection key can be created with just the new pod.
 	if !labelsChanged {
-		return &PodProjectionKey{
+		return PodProjectionKey{
 			Namespace: newPod.Namespace,
-			Labels:    labels.Set(newPod.Labels),
-		}
+			Labels:    NewPodLabelsKey(newPod.Labels),
+		}, true
 	}
 
 	// The pod labels have changed, so the projection key needs to include both its old/new labels.
 	// Additionally, PodChanged field indicates if union/diff of matching services should be reconciled.
-	return &PodProjectionKey{
-		Namespace:  newPod.Namespace,
-		Labels:     labels.Set(newPod.Labels),
-		OldLabels:  labels.Set(oldPod.Labels),
-		PodChanged: podChanged,
-	}
+	return PodProjectionKey{
+		Namespace:     newPod.Namespace,
+		Labels:        NewPodLabelsKey(newPod.Labels),
+		OldLabels:     NewPodLabelsKey(oldPod.Labels),
+		LabelsChanged: true,
+		PodChanged:    podChanged,
+	}, true
 }
 
-func GetServicesToUpdate(serviceLister v1listers.ServiceLister, key *PodProjectionKey) (sets.Set[string], error) {
-	if key == nil {
-		return nil, nil
-	}
-
-	services, err := getServicesForPod(serviceLister, key.Namespace, key.Labels)
+// GetServicesToUpdate returns the keys of the services whose endpoints may be affected by the pod event behind key.
+func GetServicesToUpdate(serviceLister v1listers.ServiceLister, key PodProjectionKey) (sets.Set[string], error) {
+	services, err := getServicesForPod(serviceLister, key.Namespace, key.Labels.Set())
 	if err != nil {
 		return nil, err
 	}
 
 	// If the pod's labels changed in an update event, we'll need to consider all the affected services.
-	if key.OldLabels != nil {
-		oldServices, err := getServicesForPod(serviceLister, key.Namespace, key.OldLabels)
+	if key.LabelsChanged {
+		oldServices, err := getServicesForPod(serviceLister, key.Namespace, key.OldLabels.Set())
 		if err != nil {
 			return nil, err
 		}
