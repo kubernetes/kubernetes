@@ -45,8 +45,10 @@ type CheckpointData struct {
 }
 
 // NewCheckpointV2 creates a V2 checkpoint holding the given pods, along with their legacy V1
-// representation for rollbacks.
-func NewCheckpointV2(podList *v1.PodList) (*Checkpoint, error) {
+// representation for rollbacks, which leaves out the pod-level resources if omitV1PodLevelResources
+// is set.
+// TODO: Remove omitV1PodLevelResources in v1.39 when the V1 checkpoint format is no longer supported.
+func NewCheckpointV2(podList *v1.PodList, omitV1PodLevelResources bool) (*Checkpoint, error) {
 	if podList == nil {
 		podList = &v1.PodList{}
 	}
@@ -70,7 +72,7 @@ func NewCheckpointV2(podList *v1.PodList) (*Checkpoint, error) {
 
 	data, err := json.Marshal(CheckpointData{
 		PodListProto: protoBytes,
-		Entries:      podListToV1Entries(sorted),
+		Entries:      podListToV1Entries(sorted, omitV1PodLevelResources),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to serialize checkpoint data: %w", err)

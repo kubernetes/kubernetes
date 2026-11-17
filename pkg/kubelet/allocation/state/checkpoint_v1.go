@@ -130,8 +130,9 @@ func migrateV1ToV2(data string) (*v1.PodList, error) {
 // The result is a superset of what V1 recorded (V1 skipped, for example, non-resizable containers),
 // which V1 readers tolerate because they only look entries up by name. Non-memory emptyDir volumes
 // and volumes without a size limit are left out, since legacy kubelet only stored sizeLimits for
-// memory-backed volumes and dereferences the stored limit.
-func podListToV1Entries(podList *v1.PodList) PodResourceInfoMap {
+// memory-backed volumes and dereferences the stored limit. Pod-level resources are left out if
+// omitPodLevelResources is set.
+func podListToV1Entries(podList *v1.PodList, omitPodLevelResources bool) PodResourceInfoMap {
 	entries := make(PodResourceInfoMap, len(podList.Items))
 	for _, pod := range podList.Items {
 		info := PodResourceInfo{
@@ -146,7 +147,7 @@ func podListToV1Entries(podList *v1.PodList) PodResourceInfoMap {
 		for _, c := range pod.Spec.EphemeralContainers {
 			info.ContainerResources[c.Name] = *c.Resources.DeepCopy()
 		}
-		if pod.Spec.Resources != nil {
+		if pod.Spec.Resources != nil && !omitPodLevelResources {
 			info.PodLevelResources = pod.Spec.Resources.DeepCopy()
 		}
 		for _, vol := range pod.Spec.Volumes {
