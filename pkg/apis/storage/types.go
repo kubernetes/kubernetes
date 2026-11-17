@@ -558,6 +558,8 @@ const (
 // they use the node-driver-registrar sidecar container, the kubelet will
 // automatically populate the CSINode object for the CSI driver as part of
 // kubelet plugin registration.
+// For a driver in spec.driverRegistrations, the kubelet only adds the
+// registration, and external-attacher populates its spec.drivers entry.
 // CSINode has the same name as a node. If the object is missing, it means either
 // there are no CSI Drivers available on the node, or the Kubelet version is low
 // enough that it doesn't create this object.
@@ -582,9 +584,24 @@ type CSINode struct {
 type CSINodeSpec struct {
 	// drivers is a list of information of all CSI Drivers existing on a node.
 	// If all drivers in the list are uninstalled, this can become empty.
+	// A driver in driverRegistrations may be missing from this list until
+	// external-attacher adds it.
 	// +patchMergeKey=name
 	// +patchStrategy=merge
 	Drivers []CSINodeDriver
+
+	// driverRegistrations lists CSI drivers on this node whose topology and volume
+	// attachment limit are reported by the CSI controller instead of the node.
+	// kubelet adds an entry with the node ID returned by the driver's NodeGetInfo call,
+	// and external-attacher then adds the driver to drivers using ControllerGetNodeInfo.
+	// An entry's nodeID must match the nodeID of the drivers entry with the same name,
+	// if one exists.
+	// This is an alpha field and requires enabling the CSIControllerGetNodeInfo feature gate.
+	// +optional
+	// +patchMergeKey=name
+	// +patchStrategy=merge
+	// +featureGate=CSIControllerGetNodeInfo
+	DriverRegistrations []CSINodeDriverRegistration
 }
 
 // CSINodeDriver holds information about the specification of one CSI driver installed on a node
@@ -610,6 +627,8 @@ type CSINodeDriver struct {
 	// When a driver is initialized on a node, it provides the same topology keys
 	// along with values. Kubelet will expose these topology keys as labels
 	// on its own node object.
+	// For a driver in spec.driverRegistrations, external-attacher adds these
+	// labels instead.
 	// When Kubernetes does topology aware provisioning, it can use this list to
 	// determine which labels it should retrieve from the node object and pass
 	// back to the driver.
@@ -631,6 +650,18 @@ type VolumeNodeResources struct {
 	// If this field is not specified, then the supported number of volumes on this node is unbounded.
 	// +optional
 	Count *int32
+}
+
+// CSINodeDriverRegistration holds the node ID of a CSI driver whose topology and
+// volume attachment limit are reported by the CSI controller.
+type CSINodeDriverRegistration struct {
+	// name is the name of the CSI driver. This MUST be the same name returned by
+	// the CSI GetPluginInfo() call for that driver. This field is required.
+	Name string
+
+	// nodeID is the ID of the node from the driver's point of view, as returned
+	// by the driver's NodeGetInfo call. This field is required.
+	NodeID string
 }
 
 // StorageHealthStatusType describes the health status category of a storage backend.

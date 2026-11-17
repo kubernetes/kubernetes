@@ -37,6 +37,8 @@ import (
 // they use the node-driver-registrar sidecar container, the kubelet will
 // automatically populate the CSINode object for the CSI driver as part of
 // kubelet plugin registration.
+// For a driver in spec.driverRegistrations, the kubelet only adds the
+// registration, and external-attacher populates its spec.drivers entry.
 // CSINode has the same name as a node. If the object is missing, it means either
 // there are no CSI Drivers available on the node, or the Kubelet version is low
 // enough that it doesn't create this object.

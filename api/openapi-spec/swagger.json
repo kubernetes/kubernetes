@@ -21735,7 +21735,7 @@
       "type": "object"
     },
     "io.k8s.api.storage.v1.CSINode": {
-      "description": "CSINode holds information about all CSI drivers installed on a node. CSI drivers do not need to create the CSINode object directly. As long as they use the node-driver-registrar sidecar container, the kubelet will automatically populate the CSINode object for the CSI driver as part of kubelet plugin registration. CSINode has the same name as a node. If the object is missing, it means either there are no CSI Drivers available on the node, or the Kubelet version is low enough that it doesn't create this object. CSINode has an OwnerReference that points to the corresponding node object.",
+      "description": "CSINode holds information about all CSI drivers installed on a node. CSI drivers do not need to create the CSINode object directly. As long as they use the node-driver-registrar sidecar container, the kubelet will automatically populate the CSINode object for the CSI driver as part of kubelet plugin registration. For a driver in spec.driverRegistrations, the kubelet only adds the registration, and external-attacher populates its spec.drivers entry. CSINode has the same name as a node. If the object is missing, it means either there are no CSI Drivers available on the node, or the Kubelet version is low enough that it doesn't create this object. CSINode has an OwnerReference that points to the corresponding node object.",
       "properties": {
         "apiVersion": {
           "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
@@ -21783,12 +21783,30 @@
           "type": "string"
         },
         "topologyKeys": {
-          "description": "topologyKeys is the list of keys supported by the driver. When a driver is initialized on a cluster, it provides a set of topology keys that it understands (e.g. \"company.com/zone\", \"company.com/region\"). When a driver is initialized on a node, it provides the same topology keys along with values. Kubelet will expose these topology keys as labels on its own node object. When Kubernetes does topology aware provisioning, it can use this list to determine which labels it should retrieve from the node object and pass back to the driver. It is possible for different nodes to use different topology keys. This can be empty if driver does not support topology.",
+          "description": "topologyKeys is the list of keys supported by the driver. When a driver is initialized on a cluster, it provides a set of topology keys that it understands (e.g. \"company.com/zone\", \"company.com/region\"). When a driver is initialized on a node, it provides the same topology keys along with values. Kubelet will expose these topology keys as labels on its own node object. For a driver in spec.driverRegistrations, external-attacher adds these labels instead. When Kubernetes does topology aware provisioning, it can use this list to determine which labels it should retrieve from the node object and pass back to the driver. It is possible for different nodes to use different topology keys. This can be empty if driver does not support topology.",
           "items": {
             "type": "string"
           },
           "type": "array",
           "x-kubernetes-list-type": "atomic"
+        }
+      },
+      "required": [
+        "name",
+        "nodeID"
+      ],
+      "type": "object"
+    },
+    "io.k8s.api.storage.v1.CSINodeDriverRegistration": {
+      "description": "CSINodeDriverRegistration holds the node ID of a CSI driver whose topology and volume attachment limit are reported by the CSI controller.",
+      "properties": {
+        "name": {
+          "description": "name is the name of the CSI driver. This MUST be the same name returned by the CSI GetPluginInfo() call for that driver. This field is required.",
+          "type": "string"
+        },
+        "nodeID": {
+          "description": "nodeID is the ID of the node from the driver's point of view, as returned by the driver's NodeGetInfo call. This field is required.",
+          "type": "string"
         }
       },
       "required": [
@@ -21835,8 +21853,21 @@
     "io.k8s.api.storage.v1.CSINodeSpec": {
       "description": "CSINodeSpec holds information about the specification of all CSI drivers installed on a node",
       "properties": {
+        "driverRegistrations": {
+          "description": "driverRegistrations lists CSI drivers on this node whose topology and volume attachment limit are reported by the CSI controller instead of the node. kubelet adds an entry with the node ID returned by the driver's NodeGetInfo call, and external-attacher then adds the driver to drivers using ControllerGetNodeInfo. An entry's nodeID must match the nodeID of the drivers entry with the same name, if one exists. This is an alpha field and requires enabling the CSIControllerGetNodeInfo feature gate.",
+          "items": {
+            "$ref": "#/definitions/io.k8s.api.storage.v1.CSINodeDriverRegistration"
+          },
+          "type": "array",
+          "x-kubernetes-list-map-keys": [
+            "name"
+          ],
+          "x-kubernetes-list-type": "map",
+          "x-kubernetes-patch-merge-key": "name",
+          "x-kubernetes-patch-strategy": "merge"
+        },
         "drivers": {
-          "description": "drivers is a list of information of all CSI Drivers existing on a node. If all drivers in the list are uninstalled, this can become empty.",
+          "description": "drivers is a list of information of all CSI Drivers existing on a node. If all drivers in the list are uninstalled, this can become empty. A driver in driverRegistrations may be missing from this list until external-attacher adds it.",
           "items": {
             "$ref": "#/definitions/io.k8s.api.storage.v1.CSINodeDriver"
           },

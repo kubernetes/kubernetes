@@ -41,7 +41,11 @@ import (
 )
 
 type csiClient interface {
-	NodeGetInfo(ctx context.Context) (
+	// NodeGetInfo sets controller_get_node_info in the request to controllerGetNodeInfo.
+	// The caller is responsible for checking that the driver has the NODE_INFO_FROM_CONTROLLER
+	// node capability before setting it. If it is true, the caller must ignore maxVolumePerNode
+	// and accessibleTopology.
+	NodeGetInfo(ctx context.Context, controllerGetNodeInfo bool) (
 		nodeID string,
 		maxVolumePerNode int64,
 		accessibleTopology map[string]string,
@@ -181,6 +185,10 @@ func newV1NodeClient(addr csiAddr, metricsManager *MetricsManager) (nodeClient c
 	return nodeClient, conn, nil
 }
 
+// defaultNodeV1ClientCreator is the nodeV1ClientCreator used by newCsiDriverClient.
+// Unit tests replace it with a fake.
+var defaultNodeV1ClientCreator nodeV1ClientCreator = newV1NodeClient
+
 func newCsiDriverClient(driverName csiDriverName) (*csiDriverClient, error) {
 	if driverName == "" {
 		return nil, fmt.Errorf("driver name is empty")
@@ -191,16 +199,19 @@ func newCsiDriverClient(driverName csiDriverName) (*csiDriverClient, error) {
 		return nil, fmt.Errorf("driver name %s not found in the list of registered CSI drivers", driverName)
 	}
 
-	nodeV1ClientCreator := newV1NodeClient
-	return &csiDriverClient{
-		driverName:          driverName,
-		addr:                csiAddr(existingDriver.endpoint),
-		nodeV1ClientCreator: nodeV1ClientCreator,
-		metricsManager:      NewCSIMetricsManager(string(driverName)),
-	}, nil
+	return newCsiDriverClientForEndpoint(driverName, existingDriver.endpoint), nil
 }
 
-func (c *csiDriverClient) NodeGetInfo(ctx context.Context) (
+func newCsiDriverClientForEndpoint(driverName csiDriverName, endpoint string) *csiDriverClient {
+	return &csiDriverClient{
+		driverName:          driverName,
+		addr:                csiAddr(endpoint),
+		nodeV1ClientCreator: defaultNodeV1ClientCreator,
+		metricsManager:      NewCSIMetricsManager(string(driverName)),
+	}
+}
+
+func (c *csiDriverClient) NodeGetInfo(ctx context.Context, controllerGetNodeInfo bool) (
 	nodeID string,
 	maxVolumePerNode int64,
 	accessibleTopology map[string]string,
@@ -208,14 +219,14 @@ func (c *csiDriverClient) NodeGetInfo(ctx context.Context) (
 	klog.V(4).InfoS(log("calling NodeGetInfo rpc"))
 
 	var getNodeInfoError error
-	nodeID, maxVolumePerNode, accessibleTopology, getNodeInfoError = c.nodeGetInfoV1(ctx)
+	nodeID, maxVolumePerNode, accessibleTopology, getNodeInfoError = c.nodeGetInfoV1(ctx, controllerGetNodeInfo)
 	if getNodeInfoError != nil {
 		klog.InfoS("Error calling CSI NodeGetInfo()", "err", getNodeInfoError.Error())
 	}
 	return nodeID, maxVolumePerNode, accessibleTopology, getNodeInfoError
 }
 
-func (c *csiDriverClient) nodeGetInfoV1(ctx context.Context) (
+func (c *csiDriverClient) nodeGetInfoV1(ctx context.Context, controllerGetNodeInfo bool) (
 	nodeID string,
 	maxVolumePerNode int64,
 	accessibleTopology map[string]string,
@@ -227,7 +238,7 @@ func (c *csiDriverClient) nodeGetInfoV1(ctx context.Context) (
 	}
 	defer closer.Close()
 
-	res, err := nodeClient.NodeGetInfo(ctx, &csipbv1.NodeGetInfoRequest{})
+	res, err := nodeClient.NodeGetInfo(ctx, &csipbv1.NodeGetInfoRequest{ControllerGetNodeInfo: controllerGetNodeInfo})
 	if err != nil {
 		return "", 0, nil, err
 	}
@@ -897,6 +908,10 @@ func mapStorageHealthStatus(status csipbv1.StorageHealthErrorType) storagev1.Sto
 
 func (c *csiDriverClient) NodeSupportsVolumeMountGroup(ctx context.Context) (bool, error) {
 	return c.nodeSupportsCapability(ctx, csipbv1.NodeServiceCapability_RPC_VOLUME_MOUNT_GROUP)
+}
+
+func (c *csiDriverClient) NodeSupportsNodeInfoFromController(ctx context.Context) (bool, error) {
+	return c.nodeSupportsCapability(ctx, csipbv1.NodeServiceCapability_RPC_NODE_INFO_FROM_CONTROLLER)
 }
 
 func (c *csiDriverClient) nodeSupportsCapability(ctx context.Context, capabilityType csipbv1.NodeServiceCapability_RPC_Type) (bool, error) {

@@ -62,6 +62,7 @@ type Config struct {
 	DisableOnlineExpansion      bool
 	PermissiveTargetPath        bool
 	EnableTopology              bool
+	NodeInfoFromController      bool
 	IO                          DirIO
 }
 

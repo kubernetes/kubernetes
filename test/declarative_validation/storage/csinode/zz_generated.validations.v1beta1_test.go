@@ -66,6 +66,18 @@ func init() {
 			"metadata.uid": {
 				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
 			},
+			"spec.driverRegistrations[*]": {
+				{ErrorType: "FieldValueDuplicate"},
+			},
+			"spec.driverRegistrations[*].name": {
+				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-long-name-caseless"},
+				{ErrorType: "FieldValueRequired"},
+				{ErrorType: "FieldValueTooLong", Origin: "maxLength"},
+			},
+			"spec.driverRegistrations[*].nodeID": {
+				{ErrorType: "FieldValueRequired"},
+				{ErrorType: "FieldValueTooLong", Origin: "maxBytes"},
+			},
 			"status.storageHealth[*].healthConditions": {
 				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
 			},

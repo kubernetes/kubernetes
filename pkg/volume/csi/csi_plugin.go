@@ -23,6 +23,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"google.golang.org/grpc/codes"
@@ -100,6 +101,16 @@ var csiNodeUpdaterVar *csiNodeUpdater
 // pluginwatcher module in kubelet
 var PluginHandler = &RegistrationHandler{}
 
+// driverLocks serializes the registration, unregistration and node info flow changes of each CSI driver.
+var driverLocks sync.Map
+
+func lockDriver(driverName string) (unlock func()) {
+	l, _ := driverLocks.LoadOrStore(driverName, &sync.Mutex{})
+	mu := l.(*sync.Mutex)
+	mu.Lock()
+	return mu.Unlock
+}
+
 // ValidatePlugin is called by kubelet's plugin watcher upon detection
 // of a new registration socket opened by CSI Driver registrar side car.
 func (h *RegistrationHandler) ValidatePlugin(ctx context.Context, pluginName string, endpoint string, versions []string) error {
@@ -123,19 +134,6 @@ func (h *RegistrationHandler) RegisterPlugin(ctx context.Context, pluginName str
 		return err
 	}
 
-	// Storing endpoint of newly registered CSI driver into the map, where CSI driver name will be the key
-	// all other CSI components will be able to get the actual socket of CSI drivers by its name.
-	csiDrivers.Set(pluginName, Driver{
-		endpoint:                endpoint,
-		highestSupportedVersion: highestSupportedVersion,
-	})
-
-	// Get node info from the driver.
-	csi, err := newCsiDriverClient(csiDriverName(pluginName))
-	if err != nil {
-		return err
-	}
-
 	var timeout time.Duration
 	if pluginClientTimeout == nil {
 		timeout = csiTimeout
@@ -146,7 +144,15 @@ func (h *RegistrationHandler) RegisterPlugin(ctx context.Context, pluginName str
 	newCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	driverNodeID, maxVolumePerNode, accessibleTopology, err := csi.NodeGetInfo(newCtx)
+	if pluginName == "" {
+		return errors.New("driver name is empty")
+	}
+	unlock := lockDriver(pluginName)
+	defer unlock()
+	csi := newCsiDriverClientForEndpoint(csiDriverName(pluginName), endpoint)
+
+	// Choose the flow before storing the driver, so that node info updates see the right flow.
+	nodeInfoFromController, err := h.nodeInfoFromController(newCtx, csi, pluginName)
 	if err != nil {
 		if unregErr := unregisterDriver(pluginName); unregErr != nil {
 			klog.Error(log("registrationHandler.RegisterPlugin failed to unregister plugin due to previous error: %v", unregErr))
@@ -154,7 +160,16 @@ func (h *RegistrationHandler) RegisterPlugin(ctx context.Context, pluginName str
 		return err
 	}
 
-	err = nim.InstallCSIDriver(pluginName, driverNodeID, maxVolumePerNode, accessibleTopology)
+	// Storing endpoint of newly registered CSI driver into the map, where CSI driver name will be the key
+	// all other CSI components will be able to get the actual socket of CSI drivers by its name.
+	driver := Driver{
+		endpoint:                endpoint,
+		highestSupportedVersion: highestSupportedVersion,
+		nodeInfoFromController:  nodeInfoFromController,
+	}
+	csiDrivers.Set(pluginName, driver)
+
+	err = h.installDriver(newCtx, csi, pluginName, nodeInfoFromController)
 	if err != nil {
 		if unregErr := unregisterDriver(pluginName); unregErr != nil {
 			klog.Error(log("registrationHandler.RegisterPlugin failed to unregister plugin due to previous error: %v", unregErr))
@@ -169,7 +184,88 @@ func (h *RegistrationHandler) RegisterPlugin(ctx context.Context, pluginName str
 	return nil
 }
 
+// installDriver gets the node information of a newly registered CSI driver and records it in
+// the cluster.
+func (h *RegistrationHandler) installDriver(ctx context.Context, csi *csiDriverClient, pluginName string, nodeInfoFromController bool) error {
+	driverNodeID, maxVolumePerNode, accessibleTopology, err := csi.NodeGetInfo(ctx, nodeInfoFromController)
+	if err != nil {
+		return fmt.Errorf("NodeGetInfo failed: %w", err)
+	}
+
+	if nodeInfoFromController {
+		klog.Info(log("CSI driver %s reports its topology and volume attachment limit through ControllerGetNodeInfo", pluginName))
+		// external-attacher gets the topology and volume attachment limit with ControllerGetNodeInfo.
+		return nim.InstallCSIDriverRegistration(ctx, pluginName, driverNodeID)
+	}
+	return nim.InstallCSIDriver(pluginName, driverNodeID, maxVolumePerNode, accessibleTopology)
+}
+
+// nodeInfoFromController returns true if the topology and volume attachment limit of the CSI
+// driver are reported by its controller through ControllerGetNodeInfo instead of NodeGetInfo.
+func (h *RegistrationHandler) nodeInfoFromController(ctx context.Context, csi *csiDriverClient, pluginName string) (bool, error) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIControllerGetNodeInfo) {
+		return false, nil
+	}
+
+	supported, err := csi.NodeSupportsNodeInfoFromController(ctx)
+	if err != nil {
+		return false, fmt.Errorf("failed to check for NODE_INFO_FROM_CONTROLLER capability: %w", err)
+	}
+	if !supported {
+		return false, nil
+	}
+
+	// ControllerGetNodeInfo is called by external-attacher, which handles only drivers that
+	// require attach. A missing CSIDriver object means that attach is required.
+	skipAttach, err := h.csiPlugin.skipAttach(pluginName)
+	if err != nil {
+		return false, err
+	}
+	return !skipAttach, nil
+}
+
+// syncNodeInfoFromController chooses the flow of a registered CSI driver again when its CSIDriver
+// object is created. CSIDriver.attachRequired is immutable, so only a new object can change the flow.
+func (h *RegistrationHandler) syncNodeInfoFromController(pluginName string) {
+	unlock := lockDriver(pluginName)
+	defer unlock()
+
+	driver, ok := csiDrivers.Get(pluginName)
+	if !ok {
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), csiTimeout)
+	defer cancel()
+	csi := newCsiDriverClientForEndpoint(csiDriverName(pluginName), driver.endpoint)
+	nodeInfoFromController, err := h.nodeInfoFromController(ctx, csi, pluginName)
+	if err != nil {
+		klog.Error(log("failed to choose the node info flow of CSI driver %s: %v", pluginName, err))
+		return
+	}
+	if nodeInfoFromController == driver.nodeInfoFromController {
+		return
+	}
+
+	if err := h.installDriver(ctx, csi, pluginName, nodeInfoFromController); err != nil {
+		klog.Error(log("failed to switch the node info flow of CSI driver %s: %v", pluginName, err))
+		return
+	}
+	driver.nodeInfoFromController = nodeInfoFromController
+	csiDrivers.Set(pluginName, driver)
+	if csiNodeUpdaterVar != nil {
+		csiNodeUpdaterVar.syncDriverUpdater(pluginName)
+	}
+}
+
 func updateCSIDriver(pluginName string) error {
+	driver, ok := csiDrivers.Get(pluginName)
+	if ok && driver.nodeInfoFromController {
+		// external-attacher updates the volume attachment limit of this driver.
+		klog.V(4).Info(log("skipping NodeGetInfo for CSI driver %s, it reports its node info through ControllerGetNodeInfo", pluginName))
+		return nil
+	}
+
 	csi, err := newCsiDriverClient(csiDriverName(pluginName))
 	if err != nil {
 		return fmt.Errorf("failed to create CSI client for driver %q: %w", pluginName, err)
@@ -178,7 +274,7 @@ func updateCSIDriver(pluginName string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), csiTimeout)
 	defer cancel()
 
-	driverNodeID, maxVolumePerNode, accessibleTopology, err := csi.NodeGetInfo(ctx)
+	driverNodeID, maxVolumePerNode, accessibleTopology, err := csi.NodeGetInfo(ctx, false /* controllerGetNodeInfo */)
 	if err != nil {
 		return fmt.Errorf("failed to get NodeGetInfo from driver %q: %w", pluginName, err)
 	}
@@ -269,6 +365,8 @@ func (h *RegistrationHandler) validateVersions(callerName, pluginName string, en
 // it is no longer available
 func (h *RegistrationHandler) DeRegisterPlugin(ctx context.Context, pluginName, endpoint string) {
 	klog.Info(log("registrationHandler.DeRegisterPlugin request for plugin %s, endpoint %s", pluginName, endpoint))
+	unlock := lockDriver(pluginName)
+	defer unlock()
 	if err := unregisterDriver(pluginName); err != nil {
 		klog.Error(log("registrationHandler.DeRegisterPlugin failed: %v", err))
 	}

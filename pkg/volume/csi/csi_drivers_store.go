@@ -27,6 +27,9 @@ import (
 type Driver struct {
 	endpoint                string
 	highestSupportedVersion *utilversion.Version
+	// nodeInfoFromController is true if the CSI controller reports the topology
+	// and volume attachment limit of this driver through ControllerGetNodeInfo.
+	nodeInfoFromController bool
 }
 
 // DriversStore holds a list of CSI Drivers
