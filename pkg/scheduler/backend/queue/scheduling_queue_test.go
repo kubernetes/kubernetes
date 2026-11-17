@@ -271,6 +271,266 @@ func TestPriorityQueue_Add(t *testing.T) {
 	}
 }
 
+// A Pod that is deleted while its scheduling attempt is running can still be requeued before
+// a replacement Pod with the same name is created. If the name is reused afterwards, Add of
+// the new Pod has to evict that leftover from backoffQ and drop its unschedulable reason metrics.
+func TestPriorityQueue_Add_EvictsStaleBackoffEntry(t *testing.T) {
+	logger, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	const rejectorPlugin = "fakePlugin"
+	oldPod := st.MakePod().Name("foo").Namespace("ns").UID("old-uid").Obj()
+	recreatedPod := st.MakePod().Name("foo").Namespace("ns").UID("new-uid").Obj()
+
+	metrics.UnschedulableReason(rejectorPlugin, oldPod.Spec.SchedulerName).Set(0)
+
+	c := testingclock.NewFakeClock(time.Now())
+	q := NewTestQueue(ctx, newDefaultQueueSort(), WithClock(c))
+
+	q.Add(ctx, oldPod)
+	if _, err := q.Pop(logger); err != nil {
+		t.Fatalf("Pop failed: %v", err)
+	}
+	// The Pod is deleted while it is in flight, which the queue cannot observe, and its failure
+	// handler requeues it anyway. A cluster event during the same scheduling cycle routes the
+	// requeue to the backoffQ rather than to unschedulableEntities.
+	q.MoveAllToActiveOrBackoffQueue(logger, framework.EventUnschedulableTimeout, nil, nil, nil)
+	if err := q.AddUnschedulablePodIfNotPresent(ctx, newQueuedPodInfoForLookup(oldPod, rejectorPlugin), q.SchedulingCycle()); err != nil {
+		t.Fatalf("unexpected error from AddUnschedulablePodIfNotPresent: %v", err)
+	}
+	if !q.backoffQ.has(newQueuedPodInfoForLookup(oldPod)) {
+		t.Fatalf("Expected the deleted pod to be in the backoffQ")
+	}
+	if val, _ := testutil.GetGaugeMetricValue(metrics.UnschedulableReason(rejectorPlugin, oldPod.Spec.SchedulerName)); val != 1 {
+		t.Fatalf("Expected the unschedulable reason metric to be 1, got %v", val)
+	}
+
+	// The name is reused by a new Pod.
+	q.Add(ctx, recreatedPod)
+
+	if q.backoffQ.has(newQueuedPodInfoForLookup(recreatedPod)) {
+		t.Errorf("Expected the stale entry to be evicted from the backoffQ")
+	}
+	if val, _ := testutil.GetGaugeMetricValue(metrics.UnschedulableReason(rejectorPlugin, oldPod.Spec.SchedulerName)); val != 0 {
+		t.Errorf("Expected the unschedulable reason metric of the evicted entry to be dropped, got %v", val)
+	}
+
+	// Completing the backoff must not resurrect the stale entry. moveToActiveQ would push it
+	// into the activeQ heap, which is keyed by namespace/name, and overwrite the live Pod.
+	c.Step(2 * time.Minute)
+	q.flushBackoffQCompleted(logger)
+	popped, err := q.Pop(logger)
+	if err != nil {
+		t.Fatalf("Pop failed: %v", err)
+	}
+	if got := popped.(*framework.QueuedPodInfo).Pod.UID; got != recreatedPod.UID {
+		t.Errorf("Popped pod UID = %v, want %v", got, recreatedPod.UID)
+	}
+}
+
+func TestPriorityQueue_Add_EvictsStaleUnschedulableEntry(t *testing.T) {
+	logger, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	const rejectorPlugin = "fakePlugin"
+	oldPod := st.MakePod().Name("foo").Namespace("ns").UID("old-uid").Obj()
+	recreatedPod := st.MakePod().Name("foo").Namespace("ns").UID("new-uid").Obj()
+
+	metrics.UnschedulableReason(rejectorPlugin, oldPod.Spec.SchedulerName).Set(0)
+
+	q := NewTestQueue(ctx, newDefaultQueueSort())
+
+	q.Add(ctx, oldPod)
+	if _, err := q.Pop(logger); err != nil {
+		t.Fatalf("Pop failed: %v", err)
+	}
+	// The Pod is deleted while it is in flight, which the queue cannot observe, and its failure
+	// handler requeues it into unschedulableEntities anyway.
+	if err := q.AddUnschedulablePodIfNotPresent(ctx, newQueuedPodInfoForLookup(oldPod, rejectorPlugin), q.SchedulingCycle()); err != nil {
+		t.Fatalf("unexpected error from AddUnschedulablePodIfNotPresent: %v", err)
+	}
+	if q.unschedulableEntities.get(newQueuedPodInfoForLookup(oldPod)) == nil {
+		t.Fatalf("Expected the deleted pod to be in unschedulableEntities")
+	}
+	if val, _ := testutil.GetGaugeMetricValue(metrics.UnschedulableReason(rejectorPlugin, oldPod.Spec.SchedulerName)); val != 1 {
+		t.Fatalf("Expected the unschedulable reason metric to be 1, got %v", val)
+	}
+
+	// The name is reused by a new Pod.
+	q.Add(ctx, recreatedPod)
+
+	if q.unschedulableEntities.get(newQueuedPodInfoForLookup(recreatedPod)) != nil {
+		t.Errorf("Expected the stale entry to be evicted from unschedulableEntities")
+	}
+	if val, _ := testutil.GetGaugeMetricValue(metrics.UnschedulableReason(rejectorPlugin, oldPod.Spec.SchedulerName)); val != 0 {
+		t.Errorf("Expected the unschedulable reason metric of the evicted entry to be dropped, got %v", val)
+	}
+
+	popped, err := q.Pop(logger)
+	if err != nil {
+		t.Fatalf("Pop failed: %v", err)
+	}
+	if got := popped.(*framework.QueuedPodInfo).Pod.UID; got != recreatedPod.UID {
+		t.Errorf("Popped pod UID = %v, want %v", got, recreatedPod.UID)
+	}
+}
+
+func TestPriorityQueue_Add_EvictsStalePodGroupMember(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, true)
+	logger, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	const (
+		podGroupName   = "pg1"
+		rejectorPlugin = "fakePlugin"
+	)
+	oldPod := withPodGroupName(st.MakePod().Name("foo").Namespace("ns").UID("old-uid").Obj(), podGroupName)
+	recreatedPod := withPodGroupName(st.MakePod().Name("foo").Namespace("ns").UID("new-uid").Obj(), podGroupName)
+
+	metrics.UnschedulableReason(rejectorPlugin, oldPod.Spec.SchedulerName).Set(0)
+
+	q := NewTestQueue(ctx, newDefaultQueueSort())
+	q.AddGenericPodGroup(logger, fwk.NewGenericPodGroup(st.MakePodGroup().Name(podGroupName).Namespace(oldPod.Namespace).Priority(midPriority).Obj()))
+
+	q.Add(ctx, oldPod)
+	popped, err := q.Pop(logger)
+	if err != nil {
+		t.Fatalf("Pop failed: %v", err)
+	}
+	// The Pod is deleted in flight (unobserved by the queue) and requeued with its PodGroup
+	// into unschedulableEntities.
+	if err := q.AddUnschedulablePodIfNotPresent(ctx, newQueuedPodInfoForLookup(oldPod, rejectorPlugin), q.SchedulingCycle()); err != nil {
+		t.Fatalf("unexpected error from AddUnschedulablePodIfNotPresent: %v", err)
+	}
+	if err := q.AddAttemptedPodGroupIfNeeded(logger, popped.(*framework.QueuedPodGroupInfo), q.SchedulingCycle(), fwk.NewStatus(fwk.Unschedulable, "rejected")); err != nil {
+		t.Fatalf("unexpected error from AddAttemptedPodGroupIfNeeded: %v", err)
+	}
+	if val, _ := testutil.GetGaugeMetricValue(metrics.UnschedulableReason(rejectorPlugin, oldPod.Spec.SchedulerName)); val != 1 {
+		t.Fatalf("Expected the unschedulable reason metric to be 1, got %v", val)
+	}
+
+	// Recreating the Pod under the same name in the same PodGroup must evict the stale member,
+	// drop its metric, and move the fresh group into activeQ instead of keeping it unschedulable.
+	q.Add(ctx, recreatedPod)
+
+	if val, _ := testutil.GetGaugeMetricValue(metrics.UnschedulableReason(rejectorPlugin, oldPod.Spec.SchedulerName)); val != 0 {
+		t.Errorf("Expected the unschedulable reason metric of the evicted member to be dropped, got %v", val)
+	}
+	popped, err = q.Pop(logger)
+	if err != nil {
+		t.Fatalf("Pop failed: %v", err)
+	}
+	var gotUIDs []types.UID
+	for pInfo := range popped.ForEachPodInfo() {
+		gotUIDs = append(gotUIDs, pInfo.Pod.UID)
+	}
+	if diff := cmp.Diff([]types.UID{recreatedPod.UID}, gotUIDs); diff != "" {
+		t.Errorf("Popped pod group member UIDs mismatch (-want, +got):\n%s", diff)
+	}
+}
+
+func TestPriorityQueue_Add_EvictsStalePodGroupMemberWithSibling(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, true)
+	logger, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	const (
+		podGroupName   = "pg1"
+		rejectorPlugin = "fakePlugin"
+	)
+	oldPod := withPodGroupName(st.MakePod().Name("foo").Namespace("ns").UID("old-uid").Obj(), podGroupName)
+	recreatedPod := withPodGroupName(st.MakePod().Name("foo").Namespace("ns").UID("new-uid").Obj(), podGroupName)
+	siblingPod := withPodGroupName(st.MakePod().Name("bar").Namespace("ns").UID("sibling-uid").Obj(), podGroupName)
+
+	metrics.UnschedulableReason(rejectorPlugin, oldPod.Spec.SchedulerName).Set(0)
+
+	q := NewTestQueue(ctx, newDefaultQueueSort())
+	q.AddGenericPodGroup(logger, fwk.NewGenericPodGroup(st.MakePodGroup().Name(podGroupName).Namespace(oldPod.Namespace).Priority(midPriority).Obj()))
+
+	q.Add(ctx, oldPod)
+	q.Add(ctx, siblingPod)
+	popped, err := q.Pop(logger)
+	if err != nil {
+		t.Fatalf("Pop failed: %v", err)
+	}
+	if err := q.AddUnschedulablePodIfNotPresent(ctx, newQueuedPodInfoForLookup(oldPod, rejectorPlugin), q.SchedulingCycle()); err != nil {
+		t.Fatalf("unexpected error from AddUnschedulablePodIfNotPresent(oldPod): %v", err)
+	}
+	if err := q.AddUnschedulablePodIfNotPresent(ctx, newQueuedPodInfoForLookup(siblingPod, rejectorPlugin), q.SchedulingCycle()); err != nil {
+		t.Fatalf("unexpected error from AddUnschedulablePodIfNotPresent(siblingPod): %v", err)
+	}
+	if err := q.AddAttemptedPodGroupIfNeeded(logger, popped.(*framework.QueuedPodGroupInfo), q.SchedulingCycle(), fwk.NewStatus(fwk.Unschedulable, "rejected")); err != nil {
+		t.Fatalf("unexpected error from AddAttemptedPodGroupIfNeeded: %v", err)
+	}
+	if val, _ := testutil.GetGaugeMetricValue(metrics.UnschedulableReason(rejectorPlugin, oldPod.Spec.SchedulerName)); val != 2 {
+		t.Fatalf("Expected the unschedulable reason metric to be 2, got %v", val)
+	}
+
+	q.Add(ctx, recreatedPod)
+
+	if val, _ := testutil.GetGaugeMetricValue(metrics.UnschedulableReason(rejectorPlugin, oldPod.Spec.SchedulerName)); val != 1 {
+		t.Errorf("Expected the unschedulable reason metric to be 1, got %v", val)
+	}
+	gotPods, _ := q.PendingPods()
+	gotUIDs := make(sets.Set[types.UID], len(gotPods))
+	for _, p := range gotPods {
+		gotUIDs.Insert(p.UID)
+	}
+	wantUIDs := sets.New(recreatedPod.UID, siblingPod.UID)
+	if diff := cmp.Diff(wantUIDs, gotUIDs); diff != "" {
+		t.Errorf("Queued pod group member UIDs mismatch (-want, +got):\n%s", diff)
+	}
+	if len(gotPods) != 2 {
+		t.Errorf("Expected 2 pods in pod group (no duplicate), got %d", len(gotPods))
+	}
+}
+
+func TestPriorityQueue_Add_EvictsStaleIncompleteAndPendingPodGroupMember(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, true)
+	logger, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	const podGroupName = "pg1"
+	oldPod := withPodGroupName(st.MakePod().Name("foo").Namespace("ns").UID("old-uid").Obj(), podGroupName)
+	recreatedPod := withPodGroupName(st.MakePod().Name("foo").Namespace("ns").UID("new-uid").Obj(), podGroupName)
+	siblingPod := withPodGroupName(st.MakePod().Name("bar").Namespace("ns").UID("sibling-uid").Obj(), podGroupName)
+
+	metrics.IncompletePodGroupPods().Set(0)
+	metrics.PendingPodGroupPods().Set(0)
+
+	q := NewTestQueue(ctx, newDefaultQueueSort())
+
+	// Case 1: incompletePodGroupPods (PodGroup object not yet observed).
+	q.Add(ctx, oldPod)
+	q.Add(ctx, recreatedPod)
+	if val, _ := testutil.GetGaugeMetricValue(metrics.IncompletePodGroupPods()); val != 1 {
+		t.Errorf("IncompletePodGroupPods metric = %v, want 1", val)
+	}
+	if pInfo, ok := q.GetPod(ctx, recreatedPod.Name, recreatedPod.Namespace, recreatedPod.Spec.SchedulingGroup); !ok || pInfo.Pod.UID != recreatedPod.UID {
+		t.Fatalf("Expected recreated pod %v in incompletePodGroupPods, got ok=%v pInfo=%v", recreatedPod.UID, ok, pInfo)
+	}
+
+	// Case 2: pendingPodGroupPods (PodGroup is currently popped).
+	q.AddGenericPodGroup(logger, fwk.NewGenericPodGroup(st.MakePodGroup().Name(podGroupName).Namespace(oldPod.Namespace).Priority(midPriority).Obj()))
+	q.Add(ctx, siblingPod)
+	if _, err := q.Pop(logger); err != nil {
+		t.Fatalf("Pop failed: %v", err)
+	}
+	q.Add(ctx, oldPod)
+	q.Add(ctx, recreatedPod)
+	if val, _ := testutil.GetGaugeMetricValue(metrics.PendingPodGroupPods()); val != 1 {
+		t.Errorf("PendingPodGroupPods metric = %v, want 1", val)
+	}
+	if pInfo, ok := q.GetPod(ctx, recreatedPod.Name, recreatedPod.Namespace, recreatedPod.Spec.SchedulingGroup); !ok || pInfo.Pod.UID != recreatedPod.UID {
+		t.Fatalf("Expected recreated pod %v in pendingPodGroupPods, got ok=%v pInfo=%v", recreatedPod.UID, ok, pInfo)
+	}
+}
+
 func TestPriorityQueue_AddNominatedGatedPod(t *testing.T) {
 	gatedPod := st.MakePod().Name("pod-gated").Namespace("ns1").UID("pod-gated").NominatedNodeName("node1").Obj()
 	objs := []runtime.Object{gatedPod}
