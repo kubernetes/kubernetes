@@ -56,6 +56,8 @@ type LoadedValidatingPolicyManifests struct {
 // LoadManifestsFromDirectory reads all YAML and JSON files from the specified directory
 // and parses them as ValidatingAdmissionPolicy or ValidatingAdmissionPolicyBinding resources.
 // Files are processed in alphabetical order for deterministic behavior.
+// The returned result is never nil. On error it only carries the Hash of the
+// content that failed to load, which is empty if the content could not be read.
 func LoadValidatingManifestsFromDirectory(dir string) (*LoadedValidatingPolicyManifests, error) {
 	policies, bindings, hash, err := policyloader.LoadPolicyManifests(
 		dir,
@@ -67,7 +69,7 @@ func LoadValidatingManifestsFromDirectory(dir string) (*LoadedValidatingPolicyMa
 		},
 	)
 	if err != nil {
-		return nil, err
+		return &LoadedValidatingPolicyManifests{Hash: hash}, err
 	}
 	return &LoadedValidatingPolicyManifests{
 		Policies: policies,

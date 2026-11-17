@@ -21,6 +21,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"k8s.io/apiserver/pkg/admission/plugin/manifest"
 )
 
 func TestLoadValidatingManifestsFromDirectory(t *testing.T) {
@@ -324,11 +326,13 @@ spec:
 
 			if tt.wantErr {
 				if err == nil {
-					t.Error("expected error but got none")
-				} else if tt.wantErrContain != "" {
-					if !strings.Contains(err.Error(), tt.wantErrContain) {
-						t.Errorf("expected error containing %q, got %q", tt.wantErrContain, err.Error())
-					}
+					t.Fatal("expected error but got none")
+				}
+				if tt.wantErrContain != "" && !strings.Contains(err.Error(), tt.wantErrContain) {
+					t.Errorf("expected error containing %q, got %q", tt.wantErrContain, err.Error())
+				}
+				if _, wantHash, _ := manifest.LoadFiles(dir); len(wantHash) == 0 || result.Hash != wantHash {
+					t.Errorf("result hash = %q, want the content hash %q", result.Hash, wantHash)
 				}
 				return
 			}
@@ -345,6 +349,16 @@ spec:
 				t.Errorf("expected %d bindings, got %d", tt.wantBindings, len(result.Bindings))
 			}
 		})
+	}
+}
+
+func TestLoadValidatingManifestsFromDirectory_NonExistentDirectory(t *testing.T) {
+	result, err := LoadValidatingManifestsFromDirectory("/nonexistent/directory/path")
+	if err == nil {
+		t.Fatal("expected error for non-existent directory, got nil")
+	}
+	if result.Hash != "" {
+		t.Errorf("result hash = %q, want empty for content that could not be read", result.Hash)
 	}
 }
 
