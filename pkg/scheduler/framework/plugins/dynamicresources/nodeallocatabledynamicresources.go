@@ -529,13 +529,17 @@ func (pl *DynamicResources) validatePodLevelResourcesCoverDRA(pod *v1.Pod) *fwk.
 			}
 		}
 
-		// Individual Container limits + DRA overheads must be <= Pod-level limits.
-		containerExtraNodeAllocatableLimits := make(map[string]v1.ResourceList, len(pod.Spec.Containers))
-		for _, ctr := range pod.Spec.Containers {
-			containerExtraNodeAllocatableLimits[ctr.Name] = resourcehelper.GetExtraNodeAllocatableResourcesLimits(pod, ctr.Name)
+		// Individual container limits + extra node allocatable resources (like DRA allocations) must be <= pod-level limits.
+		containers := podutil.Containers
+		if pl.fts.EnablePodLevelResourcesFixInitContainerLimits {
+			containers |= podutil.InitContainers
 		}
 
-		for _, ctr := range pod.Spec.Containers {
+		for ctr := range podutil.ContainerIter(&pod.Spec, containers) {
+			if len(ctr.Resources.Limits) == 0 {
+				continue
+			}
+			extraNodeAllocatableLimits := resourcehelper.GetExtraNodeAllocatableResourcesLimits(pod, ctr.Name)
 			for resourceName, ctrLimit := range ctr.Resources.Limits {
 				if v1helper.IsHugePageResourceName(resourceName) {
 					continue
@@ -547,7 +551,7 @@ func (pl *DynamicResources) validatePodLevelResourcesCoverDRA(pod *v1.Pod) *fwk.
 					continue
 				}
 
-				extraNodeAllocatableLimit := containerExtraNodeAllocatableLimits[ctr.Name][resourceName]
+				extraNodeAllocatableLimit := extraNodeAllocatableLimits[resourceName]
 				effectiveLimit := ctrLimit.DeepCopy()
 				effectiveLimit.Add(extraNodeAllocatableLimit)
 
