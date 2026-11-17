@@ -118,6 +118,47 @@ func IsContainerEligibleForSwap(pod *v1.Pod, container *v1.Container) bool {
 	return isMemoryRangeEligibleForSwap(memReq, memLimit)
 }
 
+// EffectivePodResources returns the CPU and memory requests and limits that size the pod cgroup:
+// explicit pod-level resources when set, or the container aggregate (including extra
+// node-allocatable resources as in ResourceConfigForPod) otherwise. Pod overhead is excluded
+// because it is immutable and added on top, so it cannot change between resizes.
+func EffectivePodResources(pod *v1.Pod) *v1.ResourceRequirements {
+	opts := resourcehelper.PodResourcesOptions{
+		SkipPodLevelResources:            !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodLevelResources),
+		ExcludeOverhead:                  true,
+		UseExtraNodeAllocatableResources: utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DRANodeAllocatableResources),
+	}
+	return ResizableResources(&v1.ResourceRequirements{
+		Requests: resourcehelper.PodRequests(pod, opts),
+		Limits:   resourcehelper.PodLimits(pod, opts),
+	})
+}
+
+// ResizableResources returns a copy of the non-zero CPU and memory requests and limits in reqs,
+// which are the pod-level resources that size the pod cgroup and can be resized.
+func ResizableResources(reqs *v1.ResourceRequirements) *v1.ResourceRequirements {
+	if reqs == nil {
+		return nil
+	}
+	return &v1.ResourceRequirements{
+		Requests: resizableResources(reqs.Requests),
+		Limits:   resizableResources(reqs.Limits),
+	}
+}
+
+func resizableResources(rl v1.ResourceList) v1.ResourceList {
+	var out v1.ResourceList
+	for _, rName := range []v1.ResourceName{v1.ResourceCPU, v1.ResourceMemory} {
+		if qty, ok := rl[rName]; ok && !qty.IsZero() {
+			if out == nil {
+				out = make(v1.ResourceList)
+			}
+			out[rName] = qty
+		}
+	}
+	return out
+}
+
 // hardEvictionReservation returns a resourcelist that includes reservation of resources based on hard eviction thresholds.
 func hardEvictionReservation(thresholds []evictionapi.Threshold, capacity v1.ResourceList) v1.ResourceList {
 	if len(thresholds) == 0 {
