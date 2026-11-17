@@ -229,14 +229,9 @@ func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w i
 	}
 	sw.Do(interfaceTemplate4, m)
 
-	structNamespaced := namespaced
-	if tags.NonNamespaced {
-		structNamespaced = nonNamespaced
-	}
-
 	if tags.NoVerbs {
 		sw.Do(structType[noList|noApply], m)
-		sw.Do(newStruct[structNamespaced|noList|noApply], m)
+		sw.Do(newStruct[noList|noApply], m)
 
 		return sw.Error()
 	}
@@ -252,7 +247,7 @@ func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w i
 	}
 
 	sw.Do(structType[listableOrAppliable], m)
-	sw.Do(newStruct[structNamespaced|listableOrAppliable], m)
+	sw.Do(newStruct[listableOrAppliable], m)
 
 	// generate expansion methods
 	for _, e := range tags.Extensions {
@@ -425,11 +420,9 @@ const (
 	// The values which can be set indicate namespace support, list support, and apply support;
 	// to make the declarations easier to read (like a truth table), corresponding zero-values
 	// are also declared.
-	namespaced    = 0
-	noList        = 0
-	noApply       = 0
-	nonNamespaced = 1 << iota
-	withList
+	noList   = 0
+	noApply  = 0
+	withList = 1 << iota
 	withApply
 )
 
@@ -440,12 +433,9 @@ const (
 // * withList, noApply: index 2;
 // * noList, withApply: index 4;
 // * withList, withApply: index 6.
-// When namespacedness matters, the namespaced variants are the same as the above, and
-// the non-namespaced variants are offset by 1.
 // Go enforces index unicity in these kinds of declarations.
 
 // struct declarations
-// Namespacedness does not matter
 var structType = []string{
 	noList | noApply: `
 	// $.type|privatePlural$ implements $.type|public$Interface
@@ -474,112 +464,59 @@ var structType = []string{
 }
 
 // Constructors for the struct, in all variants
-// Namespacedness matters
 var newStruct = []string{
-	namespaced | noList | noApply: `
+	noList | noApply: `
 	// new$.type|publicPlural$ returns a $.type|publicPlural$
-	func new$.type|publicPlural$(c *$.GroupGoName$$.Version$Client, namespace string) *$.type|privatePlural$ {
+	func new$.type|publicPlural$(c *$.GroupGoName$$.Version$Client$if .namespaced$, namespace string$end$) *$.type|privatePlural$ {
 		return &$.type|privatePlural${
 			$.NewClient|raw$[$.resultType|raw$](
 				$.ForResource|raw$("$.type|resource$"),
 				$.UsingClient|raw$(c.RESTClient()),
-				$.UsingParameterCodec|raw$($.schemeParameterCodec|raw$),
-				$.InNamespace|raw$(namespace),
-				$if .prefersProtobuf$$.PrefersProtobuf|raw$(),$end$
+				$.UsingParameterCodec|raw$($.schemeParameterCodec|raw$),$if .namespaced$
+				$.InNamespace|raw$(namespace),$end$$if .prefersProtobuf$
+				$.PrefersProtobuf|raw$(),$end$
 			),
 		}
 	}
 	`,
-	namespaced | noList | withApply: `
+	noList | withApply: `
 	// new$.type|publicPlural$ returns a $.type|publicPlural$
-	func new$.type|publicPlural$(c *$.GroupGoName$$.Version$Client, namespace string) *$.type|privatePlural$ {
+	func new$.type|publicPlural$(c *$.GroupGoName$$.Version$Client$if .namespaced$, namespace string$end$) *$.type|privatePlural$ {
 		return &$.type|privatePlural${
 			$.NewClientWithApply|raw$[$.resultType|raw$, $.inputApplyConfig|raw$](
 				$.ForResource|raw$("$.type|resource$"),
 				$.UsingClient|raw$(c.RESTClient()),
-				$.UsingParameterCodec|raw$($.schemeParameterCodec|raw$),
-				$.InNamespace|raw$(namespace),
-				$if .prefersProtobuf$$.PrefersProtobuf|raw$(),$end$
+				$.UsingParameterCodec|raw$($.schemeParameterCodec|raw$),$if .namespaced$
+				$.InNamespace|raw$(namespace),$end$$if .prefersProtobuf$
+				$.PrefersProtobuf|raw$(),$end$
 			),
 		}
 	}
 	`,
-	namespaced | withList | noApply: `
+	withList | noApply: `
 	// new$.type|publicPlural$ returns a $.type|publicPlural$
-	func new$.type|publicPlural$(c *$.GroupGoName$$.Version$Client, namespace string) *$.type|privatePlural$ {
+	func new$.type|publicPlural$(c *$.GroupGoName$$.Version$Client$if .namespaced$, namespace string$end$) *$.type|privatePlural$ {
 		return &$.type|privatePlural${
 			$.NewClientWithList|raw$[$.resultType|raw$, $.resultType|raw$List](
 				$.ForResource|raw$("$.type|resource$"),
 				$.UsingClient|raw$(c.RESTClient()),
-				$.UsingParameterCodec|raw$($.schemeParameterCodec|raw$),
-				$.InNamespace|raw$(namespace),
-				$if .prefersProtobuf$$.PrefersProtobuf|raw$(),$end$
+				$.UsingParameterCodec|raw$($.schemeParameterCodec|raw$),$if .namespaced$
+				$.InNamespace|raw$(namespace),$end$$if .prefersProtobuf$
+				$.PrefersProtobuf|raw$(),$end$
 			),
 		}
 	}
 	`,
-	namespaced | withList | withApply: `
+	withList | withApply: `
 	// new$.type|publicPlural$ returns a $.type|publicPlural$
-	func new$.type|publicPlural$(c *$.GroupGoName$$.Version$Client, namespace string) *$.type|privatePlural$ {
+	func new$.type|publicPlural$(c *$.GroupGoName$$.Version$Client$if .namespaced$, namespace string$end$) *$.type|privatePlural$ {
 		return &$.type|privatePlural${
 			$.NewClientWithListAndApply|raw$[$.resultType|raw$, $.resultType|raw$List, $.inputApplyConfig|raw$](
 				$.ForResource|raw$("$.type|resource$"),
 				$.UsingClient|raw$(c.RESTClient()),
-				$.UsingParameterCodec|raw$($.schemeParameterCodec|raw$),
-				$.InNamespace|raw$(namespace),
-				$if .prefersProtobuf$$.PrefersProtobuf|raw$(),$end$
-			),
-		}
-	}
-	`,
-	nonNamespaced | noList | noApply: `
-	// new$.type|publicPlural$ returns a $.type|publicPlural$
-	func new$.type|publicPlural$(c *$.GroupGoName$$.Version$Client) *$.type|privatePlural$ {
-		return &$.type|privatePlural${
-			$.NewClient|raw$[$.resultType|raw$](
-				$.ForResource|raw$("$.type|resource$"),
-				$.UsingClient|raw$(c.RESTClient()),
-				$.UsingParameterCodec|raw$($.schemeParameterCodec|raw$),
-				$if .prefersProtobuf$$.PrefersProtobuf|raw$(),$end$
-			),
-		}
-	}
-	`,
-	nonNamespaced | noList | withApply: `
-	// new$.type|publicPlural$ returns a $.type|publicPlural$
-	func new$.type|publicPlural$(c *$.GroupGoName$$.Version$Client) *$.type|privatePlural$ {
-		return &$.type|privatePlural${
-			$.NewClientWithApply|raw$[$.resultType|raw$, $.inputApplyConfig|raw$](
-				$.ForResource|raw$("$.type|resource$"),
-				$.UsingClient|raw$(c.RESTClient()),
-				$.UsingParameterCodec|raw$($.schemeParameterCodec|raw$),
-				$if .prefersProtobuf$$.PrefersProtobuf|raw$(),$end$
-			),
-		}
-	}
-	`,
-	nonNamespaced | withList | noApply: `
-	// new$.type|publicPlural$ returns a $.type|publicPlural$
-	func new$.type|publicPlural$(c *$.GroupGoName$$.Version$Client) *$.type|privatePlural$ {
-		return &$.type|privatePlural${
-			$.NewClientWithList|raw$[$.resultType|raw$, $.resultType|raw$List](
-				$.ForResource|raw$("$.type|resource$"),
-				$.UsingClient|raw$(c.RESTClient()),
-				$.UsingParameterCodec|raw$($.schemeParameterCodec|raw$),
-				$if .prefersProtobuf$$.PrefersProtobuf|raw$(),$end$
-			),
-		}
-	}
-	`,
-	nonNamespaced | withList | withApply: `
-	// new$.type|publicPlural$ returns a $.type|publicPlural$
-	func new$.type|publicPlural$(c *$.GroupGoName$$.Version$Client) *$.type|privatePlural$ {
-		return &$.type|privatePlural${
-			$.NewClientWithListAndApply|raw$[$.resultType|raw$, $.resultType|raw$List, $.inputApplyConfig|raw$](
-				$.ForResource|raw$("$.type|resource$"),
-				$.UsingClient|raw$(c.RESTClient()),
-				$.UsingParameterCodec|raw$($.schemeParameterCodec|raw$),
-				$if .prefersProtobuf$$.PrefersProtobuf|raw$(),$end$
+				$.UsingParameterCodec|raw$($.schemeParameterCodec|raw$),$if .namespaced$
+				$.InNamespace|raw$(namespace),$end$$if .prefersProtobuf$
+				$.PrefersProtobuf|raw$(),$end$
 			),
 		}
 	}
