@@ -26,6 +26,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
@@ -399,7 +400,8 @@ func TestGetPodServicesToUpdate(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			services, err := GetServicesToUpdate(fakeInformerFactory.Core().V1().Services().Lister(), GetPodUpdateProjectionKey(test.pod, nil))
+			key, _ := GetPodUpdateProjectionKey(test.pod, nil)
+			services, err := GetServicesToUpdate(fakeInformerFactory.Core().V1().Services().Lister(), key)
 			if err != nil {
 				t.Errorf("Error from cache.GetServicesToUpdate: %v", err)
 			} else if !services.Equal(test.expect) {
@@ -441,9 +443,10 @@ func BenchmarkGetPodServicesToUpdate(b *testing.B) {
 	}
 
 	expect := sets.NewString("test/service-0")
+	key, _ := GetPodUpdateProjectionKey(pod, nil)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		services, err := GetServicesToUpdate(fakeInformerFactory.Core().V1().Services().Lister(), GetPodUpdateProjectionKey(pod, nil))
+		services, err := GetServicesToUpdate(fakeInformerFactory.Core().V1().Services().Lister(), key)
 		if err != nil {
 			b.Fatalf("Error from GetServicesToUpdate(): %v", err)
 		}
@@ -514,7 +517,7 @@ func TestGetPodUpdateProjectionKey(t *testing.T) {
 
 	podKey := &PodProjectionKey{
 		Namespace: "test-ns",
-		Labels:    map[string]string{"app": "foo"},
+		Labels:    labels.Set{"app": "foo"}.String(),
 	}
 
 	tests := []struct {
@@ -600,10 +603,11 @@ func TestGetPodUpdateProjectionKey(t *testing.T) {
 			oldObj: podWithIP,
 			newObj: podWithIPChangedLabels,
 			expected: &PodProjectionKey{
-				Namespace:  "test-ns",
-				Labels:     map[string]string{"app": "bar"},
-				OldLabels:  map[string]string{"app": "foo"},
-				PodChanged: false,
+				Namespace:     "test-ns",
+				Labels:        labels.Set{"app": "bar"}.String(),
+				OldLabels:     labels.Set{"app": "foo"}.String(),
+				LabelsChanged: true,
+				PodChanged:    false,
 			},
 		},
 		{
@@ -622,8 +626,11 @@ func TestGetPodUpdateProjectionKey(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			key := GetPodUpdateProjectionKey(tc.oldObj, tc.newObj)
-			if diff := cmp.Diff(tc.expected, key); diff != "" {
+			var got *PodProjectionKey
+			if key, ok := GetPodUpdateProjectionKey(tc.oldObj, tc.newObj); ok {
+				got = &key
+			}
+			if diff := cmp.Diff(tc.expected, got); diff != "" {
 				t.Errorf("unexpected PodProjectionKey (-want +got):\n%s", diff)
 			}
 		})

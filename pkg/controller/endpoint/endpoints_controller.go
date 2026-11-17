@@ -93,8 +93,8 @@ func NewEndpointController(ctx context.Context, podInformer coreinformers.PodInf
 			},
 		),
 		podQueue: workqueue.NewTypedRateLimitingQueueWithConfig(
-			workqueue.DefaultTypedControllerRateLimiter[*endpointsliceutil.PodProjectionKey](),
-			workqueue.TypedRateLimitingQueueConfig[*endpointsliceutil.PodProjectionKey]{
+			workqueue.DefaultTypedControllerRateLimiter[endpointsliceutil.PodProjectionKey](),
+			workqueue.TypedRateLimitingQueueConfig[endpointsliceutil.PodProjectionKey]{
 				Logger: &logger,
 			},
 		),
@@ -174,7 +174,7 @@ type Controller struct {
 	// podQueue is used to compute pod->services mapping and drive matching services into the service queue.
 	// This operation can be expensive when large number of services exist in the pod's namespace and
 	// label selection logic has to be evaluated against each service.
-	podQueue workqueue.TypedRateLimitingInterface[*endpointsliceutil.PodProjectionKey]
+	podQueue workqueue.TypedRateLimitingInterface[endpointsliceutil.PodProjectionKey]
 
 	// workerLoopPeriod is the time between worker runs. The workers process the queue of service and pod changes.
 	workerLoopPeriod time.Duration
@@ -292,8 +292,7 @@ func (e *Controller) onServiceDelete(obj interface{}) {
 
 // onPodUpdate enqueues the pod's projection key on Add/Update/Delete events, to find matching services later.
 func (e *Controller) onPodUpdate(old, cur interface{}) {
-	key := endpointsliceutil.GetPodUpdateProjectionKey(old, cur)
-	if key != nil {
+	if key, ok := endpointsliceutil.GetPodUpdateProjectionKey(old, cur); ok {
 		e.podQueue.Add(key)
 	}
 }
@@ -582,27 +581,27 @@ func (e *Controller) processNextPodWorkItem(ctx context.Context) bool {
 	return true
 }
 
-func (e *Controller) handlePodErr(logger klog.Logger, err error, key *endpointsliceutil.PodProjectionKey) {
+func (e *Controller) handlePodErr(logger klog.Logger, err error, key endpointsliceutil.PodProjectionKey) {
 	if err == nil {
 		e.podQueue.Forget(key)
 		return
 	}
 
 	if e.podQueue.NumRequeues(key) < maxRetries {
-		logger.V(2).Info("Error syncing pod, retrying", "PodProjectionKey", *key)
+		logger.V(2).Info("Error syncing pod, retrying", "PodProjectionKey", key)
 		e.podQueue.AddRateLimited(key)
 		return
 	}
 
-	logger.Info("Dropping pod out of the queue", "PodProjectionKey", *key)
+	logger.Info("Dropping pod out of the queue", "PodProjectionKey", key)
 	e.podQueue.Forget(key)
 	utilruntime.HandleError(err)
 }
 
-func (e *Controller) syncPod(logger klog.Logger, key *endpointsliceutil.PodProjectionKey) error {
+func (e *Controller) syncPod(logger klog.Logger, key endpointsliceutil.PodProjectionKey) error {
 	startTime := time.Now()
 	defer func() {
-		logger.V(4).Info("Finished syncing pod", "PodProjectionKey", *key, "elapsedTime", time.Since(startTime))
+		logger.V(4).Info("Finished syncing pod", "PodProjectionKey", key, "elapsedTime", time.Since(startTime))
 	}()
 
 	servicesToUpdate, err := endpointsliceutil.GetServicesToUpdate(e.serviceLister, key)
