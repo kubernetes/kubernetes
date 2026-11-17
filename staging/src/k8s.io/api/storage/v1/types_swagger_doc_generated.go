@@ -67,7 +67,7 @@ func (CSIDriverSpec) SwaggerDoc() map[string]string {
 }
 
 var map_CSINode = map[string]string{
-	"":         "CSINode holds information about all CSI drivers installed on a node. CSI drivers do not need to create the CSINode object directly. As long as they use the node-driver-registrar sidecar container, the kubelet will automatically populate the CSINode object for the CSI driver as part of kubelet plugin registration. CSINode has the same name as a node. If the object is missing, it means either there are no CSI Drivers available on the node, or the Kubelet version is low enough that it doesn't create this object. CSINode has an OwnerReference that points to the corresponding node object.",
+	"":         "CSINode holds information about all CSI drivers installed on a node. CSI drivers do not need to create the CSINode object directly. As long as they use the node-driver-registrar sidecar container, the kubelet will automatically populate the CSINode object for the CSI driver as part of kubelet plugin registration. For a driver in spec.driverRegistrations, the kubelet only adds the registration, and external-attacher populates its spec.drivers entry. CSINode has the same name as a node. If the object is missing, it means either there are no CSI Drivers available on the node, or the Kubelet version is low enough that it doesn't create this object. CSINode has an OwnerReference that points to the corresponding node object.",
 	"metadata": "metadata is the standard object metadata. metadata.name must be the Kubernetes node name.",
 	"spec":     "spec is the specification of CSINode",
 	"status":   "status contains health and status information for the node's storage.",
@@ -81,12 +81,22 @@ var map_CSINodeDriver = map[string]string{
 	"":             "CSINodeDriver holds information about the specification of one CSI driver installed on a node",
 	"name":         "name represents the name of the CSI driver that this object refers to. This MUST be the same name returned by the CSI GetPluginName() call for that driver.",
 	"nodeID":       "nodeID of the node from the driver point of view. This field enables Kubernetes to communicate with storage systems that do not share the same nomenclature for nodes. For example, Kubernetes may refer to a given node as \"node1\", but the storage system may refer to the same node as \"nodeA\". When Kubernetes issues a command to the storage system to attach a volume to a specific node, it can use this field to refer to the node name using the ID that the storage system will understand, e.g. \"nodeA\" instead of \"node1\". This field is required.",
-	"topologyKeys": "topologyKeys is the list of keys supported by the driver. When a driver is initialized on a cluster, it provides a set of topology keys that it understands (e.g. \"company.com/zone\", \"company.com/region\"). When a driver is initialized on a node, it provides the same topology keys along with values. Kubelet will expose these topology keys as labels on its own node object. When Kubernetes does topology aware provisioning, it can use this list to determine which labels it should retrieve from the node object and pass back to the driver. It is possible for different nodes to use different topology keys. This can be empty if driver does not support topology.",
+	"topologyKeys": "topologyKeys is the list of keys supported by the driver. When a driver is initialized on a cluster, it provides a set of topology keys that it understands (e.g. \"company.com/zone\", \"company.com/region\"). When a driver is initialized on a node, it provides the same topology keys along with values. Kubelet will expose these topology keys as labels on its own node object. For a driver in spec.driverRegistrations, external-attacher adds these labels instead. When Kubernetes does topology aware provisioning, it can use this list to determine which labels it should retrieve from the node object and pass back to the driver. It is possible for different nodes to use different topology keys. This can be empty if driver does not support topology.",
 	"allocatable":  "allocatable represents the volume resources of a node that are available for scheduling. This field is beta.",
 }
 
 func (CSINodeDriver) SwaggerDoc() map[string]string {
 	return map_CSINodeDriver
+}
+
+var map_CSINodeDriverRegistration = map[string]string{
+	"":       "CSINodeDriverRegistration holds the node ID of a CSI driver whose topology and volume attachment limit are reported by the CSI controller.",
+	"name":   "name is the name of the CSI driver. This MUST be the same name returned by the CSI GetPluginInfo() call for that driver. This field is required.",
+	"nodeID": "nodeID is the ID of the node from the driver's point of view, as returned by the driver's NodeGetInfo call. This field is required.",
+}
+
+func (CSINodeDriverRegistration) SwaggerDoc() map[string]string {
+	return map_CSINodeDriverRegistration
 }
 
 var map_CSINodeList = map[string]string{
@@ -100,8 +110,9 @@ func (CSINodeList) SwaggerDoc() map[string]string {
 }
 
 var map_CSINodeSpec = map[string]string{
-	"":        "CSINodeSpec holds information about the specification of all CSI drivers installed on a node",
-	"drivers": "drivers is a list of information of all CSI Drivers existing on a node. If all drivers in the list are uninstalled, this can become empty.",
+	"":                    "CSINodeSpec holds information about the specification of all CSI drivers installed on a node",
+	"drivers":             "drivers is a list of information of all CSI Drivers existing on a node. If all drivers in the list are uninstalled, this can become empty. A driver in driverRegistrations may be missing from this list until external-attacher adds it.",
+	"driverRegistrations": "driverRegistrations lists CSI drivers on this node whose topology and volume attachment limit are reported by the CSI controller instead of the node. kubelet adds an entry with the node ID returned by the driver's NodeGetInfo call, and external-attacher then adds the driver to drivers using ControllerGetNodeInfo. An entry's nodeID must match the nodeID of the drivers entry with the same name, if one exists. This is an alpha field and requires enabling the CSIControllerGetNodeInfo feature gate.",
 }
 
 func (CSINodeSpec) SwaggerDoc() map[string]string {

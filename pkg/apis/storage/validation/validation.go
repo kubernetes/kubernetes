@@ -367,6 +367,30 @@ func ValidateCSINodeStatusUpdate(new, old *storage.CSINode) field.ErrorList {
 func validateCSINodeSpec(spec *storage.CSINodeSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, validateCSINodeDrivers(spec.Drivers, fldPath.Child("drivers"))...)
+	allErrs = append(allErrs, validateCSINodeDriverRegistrations(spec.DriverRegistrations, spec.Drivers, fldPath.Child("driverRegistrations"))...)
+	return allErrs
+}
+
+// validateCSINodeDriverRegistrations checks that the node ID of each registration matches the
+// drivers entry with the same name.
+func validateCSINodeDriverRegistrations(registrations []storage.CSINodeDriverRegistration, drivers []storage.CSINodeDriver, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	driverNodeIDs := make(map[string]string, len(drivers))
+	for _, driver := range drivers {
+		driverNodeIDs[driver.Name] = driver.NodeID
+	}
+
+	for i, registration := range registrations {
+		if len(registration.NodeID) == 0 {
+			continue
+		}
+		driverNodeID, ok := driverNodeIDs[registration.Name]
+		if ok && driverNodeID != registration.NodeID {
+			allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("nodeID"), registration.NodeID, "must match the nodeID of the drivers entry with the same name"))
+		}
+	}
+
 	return allErrs
 }
 
