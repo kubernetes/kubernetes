@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	apiextensionsv1 "k8s.io/apiextensions-api/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
@@ -349,6 +350,96 @@ func Test_convertor_ConvertToTable(t *testing.T) {
 			},
 		},
 		{
+			name: "Return table with array printer columns",
+			fields: fields{
+				headers: []metav1.TableColumnDefinition{
+					{Name: "name", Type: "string"},
+					{Name: "egressIPs", Type: "array"},
+					{Name: "nodes", Type: "array"},
+					{Name: "hosts", Type: "array"},
+					{Name: "missing", Type: "array"},
+				},
+				additionalColumns: []columnPrinter{
+					newJSONPath("egressIPs", "{.spec.egressIPs}"),
+					newJSONPath("nodes", "{.status.items[*].node}"),
+					newJSONPath("hosts", "{.spec.servers[*].hosts}"),
+					newJSONPath("missing", "{.spec.missing[*]}"),
+				},
+			},
+			args: args{
+				obj: &unstructured.Unstructured{
+					Object: map[string]interface{}{
+						"apiVersion": "example.istio.io/v1alpha1",
+						"kind":       "Blah",
+						"metadata": map[string]interface{}{
+							"name": "blah",
+						},
+						"spec": map[string]interface{}{
+							"egressIPs": []interface{}{"10.0.0.1", "10.0.0.2"},
+							"servers": []interface{}{
+								map[string]interface{}{"hosts": []interface{}{"foo"}},
+								map[string]interface{}{"hosts": []interface{}{"bar", "baz"}},
+							},
+						},
+						"status": map[string]interface{}{
+							"items": []interface{}{
+								map[string]interface{}{"node": "worker-1"},
+								map[string]interface{}{"node": "worker-0"},
+							},
+						},
+					},
+				},
+				tableOptions: nil,
+			},
+			want: &metav1.Table{
+				ColumnDefinitions: []metav1.TableColumnDefinition{
+					{Name: "name", Type: "string"},
+					{Name: "egressIPs", Type: "array"},
+					{Name: "nodes", Type: "array"},
+					{Name: "hosts", Type: "array"},
+					{Name: "missing", Type: "array"},
+				},
+				Rows: []metav1.TableRow{
+					{
+						Cells: []interface{}{
+							"blah",
+							[]interface{}{"10.0.0.1", "10.0.0.2"},
+							[]interface{}{"worker-1", "worker-0"},
+							[]interface{}{
+								[]interface{}{"foo"},
+								[]interface{}{"bar", "baz"},
+							},
+							nil,
+						},
+						Object: runtime.RawExtension{
+							Object: &unstructured.Unstructured{
+								Object: map[string]interface{}{
+									"apiVersion": "example.istio.io/v1alpha1",
+									"kind":       "Blah",
+									"metadata": map[string]interface{}{
+										"name": "blah",
+									},
+									"spec": map[string]interface{}{
+										"egressIPs": []interface{}{"10.0.0.1", "10.0.0.2"},
+										"servers": []interface{}{
+											map[string]interface{}{"hosts": []interface{}{"foo"}},
+											map[string]interface{}{"hosts": []interface{}{"bar", "baz"}},
+										},
+									},
+									"status": map[string]interface{}{
+										"items": []interface{}{
+											map[string]interface{}{"node": "worker-1"},
+											map[string]interface{}{"node": "worker-0"},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
 			name: "Return table with additional column containing multiple integer values",
 			fields: fields{
 				headers: []metav1.TableColumnDefinition{
@@ -435,6 +526,44 @@ func Test_convertor_ConvertToTable(t *testing.T) {
 			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("convertor.ConvertToTable() = %s", cmp.Diff(tt.want, got))
+			}
+		})
+	}
+}
+
+func TestArrayColumnPreservesSingleMatchNesting(t *testing.T) {
+	obj := &unstructured.Unstructured{Object: map[string]interface{}{
+		"apiVersion": "example.com/v1",
+		"kind":       "Example",
+		"metadata":   map[string]interface{}{"name": "example"},
+		"spec": map[string]interface{}{
+			"egressIPs": []interface{}{"10.0.0.1", "10.0.0.2"},
+			"servers":   []interface{}{map[string]interface{}{"hosts": []interface{}{"foo"}}},
+		},
+	}}
+
+	tests := []struct {
+		name     string
+		jsonPath string
+		want     interface{}
+	}{
+		{name: "direct array field", jsonPath: ".spec.egressIPs", want: []interface{}{"10.0.0.1", "10.0.0.2"}},
+		{name: "indexed array field", jsonPath: ".spec.servers[0].hosts", want: []interface{}{"foo"}},
+		{name: "wildcard array match", jsonPath: ".spec.servers[*].hosts", want: []interface{}{[]interface{}{"foo"}}},
+		{name: "slice array match", jsonPath: ".spec.servers[0:1].hosts", want: []interface{}{[]interface{}{"foo"}}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c, err := New([]apiextensionsv1.CustomResourceColumnDefinition{{Name: "Hosts", Type: "array", JSONPath: tt.jsonPath}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			table, err := c.ConvertToTable(context.Background(), obj, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := table.Rows[0].Cells[1]; !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("array cell = %#v, want %#v", got, tt.want)
 			}
 		})
 	}

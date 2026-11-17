@@ -19,6 +19,7 @@ package integration
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"testing"
 	"time"
 
@@ -74,6 +75,8 @@ func newTableCRD() *apiextensionsv1.CustomResourceDefinition {
 						{Name: "Gamma", Type: "integer", Description: "a column with wrongly typed values", JSONPath: ".spec.gamma"},
 						{Name: "Epsilon", Type: "string", Description: "an array of integers as string", JSONPath: ".spec.epsilon"},
 						{Name: "Zeta", Type: "integer", Description: "the zeta field", Format: "int64", Priority: 42, JSONPath: ".spec.zeta"},
+						{Name: "Eta", Type: "array", Description: "an array of integers", JSONPath: ".spec.eta"},
+						{Name: "Theta", Type: "array", Description: "a nested array of strings", JSONPath: ".spec.theta[*]"},
 					},
 					Schema: fixtures.AllowAllSchema(),
 				},
@@ -97,6 +100,11 @@ func newTableInstance(name string) *unstructured.Unstructured {
 				"delta":   "hello",
 				"epsilon": []int64{1, 2, 3},
 				"zeta":    5,
+				"eta":     []interface{}{int64(1), int64(2), int64(3)},
+				"theta": []interface{}{
+					[]interface{}{"foo"},
+					[]interface{}{"bar", "baz"},
+				},
 			},
 		},
 	}
@@ -217,6 +225,16 @@ func TestTableGet(t *testing.T) {
 					if got, expected := tbl.ColumnDefinitions[6], zeta; got != expected {
 						t.Errorf("expected column definition %#v, got %#v", expected, got)
 					}
+
+					eta := metav1beta1.TableColumnDefinition{Name: "Eta", Type: "array", Description: "an array of integers"}
+					if got, expected := tbl.ColumnDefinitions[7], eta; got != expected {
+						t.Errorf("expected column definition %#v, got %#v", expected, got)
+					}
+
+					theta := metav1beta1.TableColumnDefinition{Name: "Theta", Type: "array", Description: "a nested array of strings"}
+					if got, expected := tbl.ColumnDefinitions[8], theta; got != expected {
+						t.Errorf("expected column definition %#v, got %#v", expected, got)
+					}
 				}
 			}
 			if got, expected := len(tbl.Rows), 1; got != expected {
@@ -253,6 +271,15 @@ func TestTableGet(t *testing.T) {
 				if i == 1 {
 					if got, expected := tbl.Rows[0].Cells[6], int64(5); got != expected {
 						t.Errorf("expected cell[6] to equal %v, got %v", expected, got)
+					}
+					if got, expected := tbl.Rows[0].Cells[7], []interface{}{int64(1), int64(2), int64(3)}; !reflect.DeepEqual(got, expected) {
+						t.Errorf("expected cell[7] to equal %#v, got %#v", expected, got)
+					}
+					if got, expected := tbl.Rows[0].Cells[8], []interface{}{
+						[]interface{}{"foo"},
+						[]interface{}{"bar", "baz"},
+					}; !reflect.DeepEqual(got, expected) {
+						t.Errorf("expected cell[8] to equal %#v, got %#v", expected, got)
 					}
 				}
 			}
@@ -315,6 +342,16 @@ func TestTableGet(t *testing.T) {
 					if got, expected := tbl.ColumnDefinitions[6], zeta; got != expected {
 						t.Errorf("expected column definition %#v, got %#v", expected, got)
 					}
+
+					eta := metav1.TableColumnDefinition{Name: "Eta", Type: "array", Description: "an array of integers"}
+					if got, expected := tbl.ColumnDefinitions[7], eta; got != expected {
+						t.Errorf("expected column definition %#v, got %#v", expected, got)
+					}
+
+					theta := metav1.TableColumnDefinition{Name: "Theta", Type: "array", Description: "a nested array of strings"}
+					if got, expected := tbl.ColumnDefinitions[8], theta; got != expected {
+						t.Errorf("expected column definition %#v, got %#v", expected, got)
+					}
 				}
 			}
 			if got, expected := len(tbl.Rows), 1; got != expected {
@@ -351,6 +388,15 @@ func TestTableGet(t *testing.T) {
 				if i == 1 {
 					if got, expected := tbl.Rows[0].Cells[6], int64(5); got != expected {
 						t.Errorf("expected cell[6] to equal %v, got %v", expected, got)
+					}
+					if got, expected := tbl.Rows[0].Cells[7], []interface{}{int64(1), int64(2), int64(3)}; !reflect.DeepEqual(got, expected) {
+						t.Errorf("expected cell[7] to equal %#v, got %#v", expected, got)
+					}
+					if got, expected := tbl.Rows[0].Cells[8], []interface{}{
+						[]interface{}{"foo"},
+						[]interface{}{"bar", "baz"},
+					}; !reflect.DeepEqual(got, expected) {
+						t.Errorf("expected cell[8] to equal %#v, got %#v", expected, got)
 					}
 				}
 			}

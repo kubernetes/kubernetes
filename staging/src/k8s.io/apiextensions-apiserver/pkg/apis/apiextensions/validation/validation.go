@@ -52,7 +52,7 @@ import (
 )
 
 var (
-	printerColumnDatatypes                = sets.NewString("integer", "number", "string", "boolean", "date")
+	printerColumnDatatypes                = sets.NewString("integer", "number", "string", "boolean", "date", "array")
 	customResourceColumnDefinitionFormats = sets.NewString("int32", "int64", "float", "double", "byte", "date", "date-time", "password")
 	openapiV3Types                        = sets.NewString("string", "number", "integer", "boolean", "array", "object")
 )

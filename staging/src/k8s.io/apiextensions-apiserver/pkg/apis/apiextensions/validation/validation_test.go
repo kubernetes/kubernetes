@@ -4475,6 +4475,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 							Properties: map[string]apiextensions.JSONSchemaProps{
 								"shortName": {Type: "string", Format: "k8s-short-name"},
 								"longName":  {Type: "string", Format: "k8s-long-name"},
+								"values":    {Type: "array", Items: &apiextensions.JSONSchemaPropsOrArray{Schema: &apiextensions.JSONSchemaProps{Type: "string"}}},
 							},
 						},
 					},
@@ -4493,6 +4494,11 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 							Name:     "longName",
 							Type:     "string",
 							JSONPath: ".spec.longName",
+						},
+						{
+							Name:     "values",
+							Type:     "array",
+							JSONPath: ".spec.values",
 						},
 					},
 					PreserveUnknownFields: ptr.To(false),
