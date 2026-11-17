@@ -2680,6 +2680,110 @@ func TestGetPerPodUsage(t *testing.T) {
 	}
 }
 
+func TestCalculateFallbackUsage(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		request     int64
+		utilization int64
+		want        int64
+		wantError   bool
+	}{
+		{
+			name:        "request above multiplication limit still fits at 100 percent",
+			request:     math.MaxInt64,
+			utilization: 100,
+			want:        math.MaxInt64,
+		},
+		{
+			name:        "result just below limit",
+			request:     math.MaxInt64 / 2,
+			utilization: 200,
+			want:        math.MaxInt64 - 1,
+		},
+		{
+			name:        "result exceeds limit",
+			request:     math.MaxInt64/2 + 1,
+			utilization: 200,
+			wantError:   true,
+		},
+		{
+			name:        "fractional percentage result keeps integer division semantics",
+			request:     101,
+			utilization: 150,
+			want:        151,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := calculateFallbackUsage(tc.request, tc.utilization)
+			if tc.wantError {
+				require.Error(t, err)
+				assert.ErrorContains(t, err, "exceeds the int64 milli-unit range")
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tc.want, got)
+		})
+	}
+}
+
+func TestCalculateRequestsOverflow(t *testing.T) {
+	for _, resourceName := range []v1.ResourceName{v1.ResourceCPU, v1.ResourceMemory} {
+		t.Run(string(resourceName), func(t *testing.T) {
+			for _, tc := range []struct {
+				name      string
+				values    []string
+				podLevel  bool
+				sidecar   bool
+				container string
+				want      int64
+				wantError bool
+			}{
+				{name: "sum at limit", values: []string{"9223372036854775806m", "1m"}, want: math.MaxInt64},
+				{name: "sum exceeds limit", values: []string{"4611686018427387904m", "4611686018427387904m"}, wantError: true},
+				{name: "sidecar sum exceeds limit", values: []string{"4611686018427387904m", "4611686018427387904m"}, sidecar: true, wantError: true},
+				{name: "container exceeds limit", values: []string{"9223372036854775808m"}, wantError: true},
+				{name: "pod request at limit", values: []string{"9223372036854775807m"}, podLevel: true, want: math.MaxInt64},
+				{name: "pod request exceeds limit", values: []string{"9223372036854775808m"}, podLevel: true, wantError: true},
+				{name: "selected container excludes other requests", values: []string{"1m", "9223372036854775808m"}, container: "c0", want: 1},
+			} {
+				t.Run(tc.name, func(t *testing.T) {
+					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, tc.podLevel)
+					pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-pod"}}
+					for i, value := range tc.values {
+						c := v1.Container{Name: fmt.Sprintf("c%d", i), Resources: v1.ResourceRequirements{Requests: v1.ResourceList{resourceName: resource.MustParse(value)}}}
+						if tc.podLevel {
+							pod.Spec.Resources = &c.Resources
+						} else if tc.sidecar && i == 1 {
+							policy := v1.ContainerRestartPolicyAlways
+							c.RestartPolicy = &policy
+							pod.Spec.InitContainers = append(pod.Spec.InitContainers, c)
+						} else {
+							pod.Spec.Containers = append(pod.Spec.Containers, c)
+						}
+					}
+					got, err := calculateRequests([]*v1.Pod{pod}, tc.container, resourceName)
+					if tc.wantError {
+						if err == nil {
+							t.Fatalf("expected unrepresentable request to return an error, got %v", got)
+						}
+						assert.ErrorContains(t, err, "exceeds the int64 milli-unit range")
+						if got != nil {
+							t.Fatalf("expected no requests on error, got %v", got)
+						}
+						return
+					}
+					if err != nil {
+						t.Fatal(err)
+					}
+					if got[pod.Name] != tc.want {
+						t.Fatalf("request = %d, want %d", got[pod.Name], tc.want)
+					}
+				})
+			}
+		})
+	}
+}
+
 func TestCeilToInt32(t *testing.T) {
 	testCases := []struct {
 		name     string
