@@ -607,11 +607,6 @@ func (l *CostEstimator) listElementNode(list celcost.AstNode) celcost.AstNode {
 }
 
 func (l *CostEstimator) EstimateSize(element celcost.AstNode) *celcost.SizeEstimate {
-	// Check if this is a has() style presence check (IsTestOnly()). If so, the result is a bool, which has a fixed size of 1.
-	// Return nil to defer to cel-go's type-based size estimate.
-	if e := element.Expr(); e != nil && e.Kind() == ast.SelectKind && e.AsSelect().IsTestOnly() {
-		return nil
-	}
 	if l.SizeEstimator != nil {
 		return l.SizeEstimator.EstimateSize(element)
 	}
