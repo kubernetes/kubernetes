@@ -656,7 +656,7 @@ func (alloc *allocator) validateDeviceRequest(request requestAccessor, parentReq
 							if err != nil {
 								return requestData, fmt.Errorf("claim %s, request %s: checking capacity for device %s: %w", klog.KObj(claim), requestData.request.name(), apiDevice.Name, err)
 							}
-							if success && alloc.features.PartitionableDevices {
+							if success && alloc.features.PartitionableDevices && alloc.features.SharedConsumableCapacity {
 								// Likewise for counters whose consumption depends on the request.
 								var consumed counterSets
 								consumed, _, success, err = alloc.resolveConsumedCounters(device, requestData.request, true)
@@ -722,6 +722,9 @@ type allocator struct {
 	// that are in the process of being allocated.
 	// The keys in the map are resource pool IDs (driver name and pool name).
 	consumedCounters map[PoolID]counterSets
+	// staticCounters caches the result of staticConsumedCounters per device.
+	// Created lazily.
+	staticCounters map[DeviceID]counterSets
 	// consumedCompatibilityGroups tracks the rolling compatibility-group
 	// intersection per counter set for each pool across the devices being
 	// allocated in the current attempt. It is seeded from the already-allocated
@@ -1672,7 +1675,21 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 	// only consume counters with a value taken from the request.
 	var recordedCounters []resourceapi.CounterSetConsumption
 	if len(device.ConsumesCounters) > 0 {
-		consumed, recorded, ok, err := alloc.resolveConsumedCounters(device, request, skipCounterCheck)
+		var consumed counterSets
+		var recorded []resourceapi.CounterSetConsumption
+		var ok bool
+		var err error
+		switch {
+		case !alloc.features.SharedConsumableCapacity && !skipCounterCheck:
+			// Same as before that feature existed.
+			consumed = alloc.staticConsumedCounters(device)
+			ok = true
+		case !alloc.features.SharedConsumableCapacity:
+			// Nothing to charge for an already allocated device.
+			ok = true
+		default:
+			consumed, recorded, ok, err = alloc.resolveConsumedCounters(device, request, skipCounterCheck)
+		}
 		if err == nil && ok {
 			if request.adminAccess() {
 				// Admin access does not reserve counters.
@@ -1914,7 +1931,7 @@ func taintTolerated(taint resourceapi.DeviceTaint, request requestAccessor) bool
 // skips slices which depend on that feature when disabled. The additional code
 // paths for the feature are only taken when needed.
 func (alloc *allocator) resolveConsumedCounters(device deviceWithID, request requestAccessor, skipStatic bool) (counterSets, []resourceapi.CounterSetConsumption, bool, error) {
-	consumed := make(counterSets, len(device.ConsumesCounters))
+	var consumed counterSets
 	var recorded []resourceapi.CounterSetConsumption
 	allowed := true
 	for _, deviceCounterConsumption := range device.ConsumesCounters {
@@ -1945,6 +1962,9 @@ func (alloc *allocator) resolveConsumedCounters(device deviceWithID, request req
 			if !ok {
 				allowed = false
 			}
+			if consumed == nil {
+				consumed = make(counterSets, len(device.ConsumesCounters))
+			}
 			if consumed[counterSet] == nil {
 				consumed[counterSet] = make(map[string]resourceapi.Counter)
 			}
@@ -1961,6 +1981,30 @@ func (alloc *allocator) resolveConsumedCounters(device deviceWithID, request req
 		}
 	}
 	return consumed, recorded, allowed, nil
+}
+
+// staticConsumedCounters returns the fixed consumption of a device.
+// Only valid if shared consumable capacity is disabled: then all counters have
+// a fixed value and no consumption policy, so nothing depends on the request.
+// The result is cached because backtracking evaluates the same device repeatedly.
+// It must not be modified.
+func (alloc *allocator) staticConsumedCounters(device deviceWithID) counterSets {
+	if consumed, found := alloc.staticCounters[device.id]; found {
+		return consumed
+	}
+	consumed := make(counterSets, len(device.ConsumesCounters))
+	for _, deviceCounterConsumption := range device.ConsumesCounters {
+		counters := make(map[string]resourceapi.Counter, len(deviceCounterConsumption.Counters))
+		for name, requirement := range deviceCounterConsumption.Counters {
+			counters[name] = resourceapi.Counter{Value: *requirement.Value}
+		}
+		consumed[deviceCounterConsumption.CounterSet] = counters
+	}
+	if alloc.staticCounters == nil {
+		alloc.staticCounters = make(map[DeviceID]counterSets)
+	}
+	alloc.staticCounters[device.id] = consumed
+	return consumed
 }
 
 // countersFitTotal checks that the consumption does not exceed
