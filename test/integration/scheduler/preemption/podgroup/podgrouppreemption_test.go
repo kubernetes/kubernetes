@@ -1054,10 +1054,14 @@ func TestPodGroupPreemption(t *testing.T) {
 			expectedCandidatesForPreemption: []string{"low-1"},
 			expectedPodsPreemptedByWAP:      1,
 			tempRemovePG:                    true,
-			// both preemptor pods will become schedulable at once, but there will be only place for 1 pod without preemption
-			// the scheduling cycle should prefer binding this pod over preempting to make room for both pods
-			// preemption will be called in the subsequent cycle to make room for the second pod.
-			expectedEventOrder: []string{"Bind:high-1", "PodGroupPostFilter:pg1", "Bind:high-2"},
+			// node1 has room for one more pod. When both preemptors reach the same pod
+			// group cycle, that cycle binds high-1 (member order is fixed) instead of
+			// preempting to fit both, and the next cycle preempts low-1 for high-2.
+			// pg1 may also be popped before both preemptor pods are re-queued. The lone
+			// pod then binds only because it is alone and the other preempts low-1 later,
+			// so either pod may bind first and Bind entries omit pod names. Both paths
+			// emit the same event sequence, so this check cannot tell them apart.
+			expectedEventOrder: []string{"Bind", "PodGroupPostFilter:pg1", "Bind"},
 		},
 		{
 			name: "Binding first before preemption for basic policy",
@@ -1080,10 +1084,14 @@ func TestPodGroupPreemption(t *testing.T) {
 			expectedCandidatesForPreemption: []string{"low-1"},
 			expectedPodsPreemptedByWAP:      1,
 			tempRemovePG:                    true,
-			// both preemptor pods will become schedulable at once, but there will be only place for 1 pod without preemption
-			// the scheduling cycle should prefer binding this pod over preempting to make room for both pods
-			// preemption will be called in the subsequent cycle to make room for the second pod.
-			expectedEventOrder: []string{"Bind:high-1", "PodGroupPostFilter:pg1", "Bind:high-2"},
+			// node1 has room for one more pod. When both preemptors reach the same pod
+			// group cycle, that cycle binds high-1 (member order is fixed) instead of
+			// preempting to fit both, and the next cycle preempts low-1 for high-2.
+			// pg1 may also be popped before both preemptor pods are re-queued. The lone
+			// pod then binds only because it is alone and the other preempts low-1 later,
+			// so either pod may bind first and Bind entries omit pod names. Both paths
+			// emit the same event sequence, so this check cannot tell them apart.
+			expectedEventOrder: []string{"Bind", "PodGroupPostFilter:pg1", "Bind"},
 		},
 		{
 			name: "Topology-Aware Preemption: single topology domain",
@@ -1595,11 +1603,23 @@ func TestPodGroupPreemption(t *testing.T) {
 					}
 				}
 
-				// 10. Verify event order
+				// 10. Verify event order.
+				// Entries without ":" match any event of that type (e.g. "Bind" matches "Bind:pod-1");
+				// entries with ":" require an exact Type:Name match.
 				if len(tt.expectedEventOrder) > 0 {
 					actualEvents := recorder.GetEvents()
+					for i, want := range tt.expectedEventOrder {
+						if i >= len(actualEvents) {
+							break
+						}
+						if !strings.Contains(want, ":") {
+							if actual, _, ok := strings.Cut(actualEvents[i], ":"); ok && actual == want {
+								actualEvents[i] = want
+							}
+						}
+					}
 					if diff := cmp.Diff(tt.expectedEventOrder, actualEvents); diff != "" {
-						t.Errorf("Unexpected event order (-want,+got):\n%s", diff)
+						t.Errorf("Unexpected event order (-want,+got):\n%s\nrecorder events: %v", diff, recorder.GetEvents())
 					}
 				}
 
