@@ -17,6 +17,7 @@ limitations under the License.
 package qos
 
 import (
+	"fmt"
 	"slices"
 
 	v1 "k8s.io/api/core/v1"
@@ -44,18 +45,22 @@ const (
 // See https://lwn.net/Articles/391222/ for more information.
 // OOMScoreAdjust should be calculated based on the allocated resources, so the pod argument should
 // contain the allocated resources in the spec.
-func GetContainerOOMScoreAdjust(pod *v1.Pod, container *v1.Container, memoryCapacity int64) int {
+// It returns an error if a Burstable pod's score cannot be calculated because memoryCapacity is not positive.
+func GetContainerOOMScoreAdjust(pod *v1.Pod, container *v1.Container, memoryCapacity int64) (int, error) {
 	if types.IsNodeCriticalPod(pod) {
 		// Only node critical pod should be the last to get killed.
-		return guaranteedOOMScoreAdj
+		return guaranteedOOMScoreAdj, nil
 	}
 
 	switch v1qos.GetPodQOS(pod) {
 	case v1.PodQOSGuaranteed:
 		// Guaranteed containers should be the last to get killed.
-		return guaranteedOOMScoreAdj
+		return guaranteedOOMScoreAdj, nil
 	case v1.PodQOSBestEffort:
-		return besteffortOOMScoreAdj
+		return besteffortOOMScoreAdj, nil
+	}
+	if memoryCapacity <= 0 {
+		return 0, fmt.Errorf("memory capacity must be positive, got %d", memoryCapacity)
 	}
 
 	// Burstable containers are a middle tier, between Guaranteed and Best-Effort. Ideally,
@@ -112,13 +117,13 @@ func GetContainerOOMScoreAdjust(pod *v1.Pod, container *v1.Container, memoryCapa
 	// A guaranteed pod using 100% of memory can have an OOM score of 10. Ensure
 	// that burstable pods have a higher OOM score adjustment.
 	if int(oomScoreAdjust) < (1000 + guaranteedOOMScoreAdj) {
-		return (1000 + guaranteedOOMScoreAdj)
+		return (1000 + guaranteedOOMScoreAdj), nil
 	}
 	// Give burstable pods a higher chance of survival over besteffort pods.
 	if int(oomScoreAdjust) == besteffortOOMScoreAdj {
-		return int(oomScoreAdjust - 1)
+		return int(oomScoreAdjust - 1), nil
 	}
-	return int(oomScoreAdjust)
+	return int(oomScoreAdjust), nil
 }
 
 // isSidecarContainer returns a boolean indicating whether a container is a sidecar or not.
