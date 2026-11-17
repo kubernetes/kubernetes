@@ -1279,8 +1279,29 @@ func (e *Store) Delete(ctx context.Context, name string, deleteValidation rest.V
 	}
 	obj := e.NewFunc()
 	qualifiedResource := e.qualifiedResourceFromContext(ctx)
-	if err = e.Storage.Get(ctx, key, storage.GetOptions{}, obj); err != nil {
-		return nil, false, storeerr.InterpretDeleteError(err, qualifiedResource, name)
+	// Try reading from cache first (ResourceVersion: "0") when deleting gracefully (e.g. pods) without
+	// explicit ResourceVersion or UID preconditions, to avoid blocking on watchCache freshness wait
+	// under high delete churn when ConsistentGetFromCache is enabled.
+	// For objects without graceful deletion, or when preconditions or unsafe corrupt-object options
+	// are specified, a consistent Get is required to ensure fresh state, accurate finalizer checks,
+	// and exact precondition enforcement.
+	_, isGracefulStrategy := e.DeleteStrategy.(rest.RESTGracefulDeleteStrategy)
+	hasPreconditions := options != nil && options.Preconditions != nil && (options.Preconditions.ResourceVersion != nil || options.Preconditions.UID != nil)
+	isUnsafeCorruptDelete := options != nil && options.IgnoreStoreReadErrorWithClusterBreakingPotential != nil && *options.IgnoreStoreReadErrorWithClusterBreakingPotential
+
+	if isGracefulStrategy && !hasPreconditions && !isUnsafeCorruptDelete {
+		if err = e.Storage.Get(ctx, key, storage.GetOptions{ResourceVersion: "0"}, obj); err != nil {
+			if storage.IsNotFound(err) {
+				err = e.Storage.Get(ctx, key, storage.GetOptions{}, obj)
+			}
+			if err != nil {
+				return nil, false, storeerr.InterpretDeleteError(err, qualifiedResource, name)
+			}
+		}
+	} else {
+		if err = e.Storage.Get(ctx, key, storage.GetOptions{}, obj); err != nil {
+			return nil, false, storeerr.InterpretDeleteError(err, qualifiedResource, name)
+		}
 	}
 
 	// support older consumers of delete by treating "nil" as delete immediately

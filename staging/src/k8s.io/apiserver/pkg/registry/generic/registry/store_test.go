@@ -43,6 +43,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/selection"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/resourceversion"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -1642,6 +1643,152 @@ func TestStoreDelete(t *testing.T) {
 	_, err = registry.Get(testContext, podA.Name, &metav1.GetOptions{})
 	if !errors.IsNotFound(err) {
 		t.Errorf("Unexpected error: %v", err)
+	}
+}
+
+type fallbackGetDeleteStorage struct {
+	storage.Interface
+	getFn func(ctx context.Context, key string, opts storage.GetOptions, objPtr runtime.Object) error
+}
+
+func (s *fallbackGetDeleteStorage) Get(ctx context.Context, key string, opts storage.GetOptions, objPtr runtime.Object) error {
+	if s.getFn != nil {
+		return s.getFn(ctx, key, opts, objPtr)
+	}
+	return s.Interface.Get(ctx, key, opts, objPtr)
+}
+
+func TestStoreDeleteWithCacheFallback(t *testing.T) {
+	podA := &example.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "fallback-pod"},
+		Spec:       example.PodSpec{NodeName: "machine"},
+	}
+
+	testContext := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
+	destroyFunc, registry := NewTestGenericStoreRegistry(t)
+	defer destroyFunc()
+
+	defaultDeleteStrategy := testRESTStrategy{scheme, names.SimpleNameGenerator, true, false, true}
+	registry.DeleteStrategy = testGracefulStrategy{defaultDeleteStrategy}
+
+	_, err := registry.Create(testContext, podA, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Unexpected create error: %v", err)
+	}
+
+	origStorage := registry.Storage.Storage
+	rv0Called := false
+	consistentGetCalled := false
+
+	mockStorage := &fallbackGetDeleteStorage{
+		Interface: origStorage,
+		getFn: func(ctx context.Context, key string, opts storage.GetOptions, objPtr runtime.Object) error {
+			if opts.ResourceVersion == "0" {
+				rv0Called = true
+				// Simulate cache miss (e.g. watchCache lag)
+				return storage.NewKeyNotFoundError(key, 0)
+			}
+			consistentGetCalled = true
+			return origStorage.Get(ctx, key, opts, objPtr)
+		},
+	}
+	registry.Storage.Storage = mockStorage
+
+	_, wasDeleted, err := registry.Delete(testContext, podA.Name, rest.ValidateAllObjectFunc, nil)
+	if err != nil {
+		t.Fatalf("Unexpected delete error: %v", err)
+	}
+	if !wasDeleted {
+		t.Errorf("Expected pod to be deleted")
+	}
+	if !rv0Called {
+		t.Errorf("Expected Delete to query cache first with ResourceVersion=0")
+	}
+	if !consistentGetCalled {
+		t.Errorf("Expected Delete to fall back to consistent Get upon cache miss")
+	}
+}
+
+func TestStoreDeleteBypassesCache(t *testing.T) {
+	testCases := []struct {
+		name             string
+		gracefulStrategy bool
+		options          *metav1.DeleteOptions
+	}{
+		{
+			name:             "non-graceful strategy",
+			gracefulStrategy: false,
+			options:          nil,
+		},
+		{
+			name:             "graceful strategy with resourceVersion precondition",
+			gracefulStrategy: true,
+			options: &metav1.DeleteOptions{
+				Preconditions: &metav1.Preconditions{ResourceVersion: new("123")},
+			},
+		},
+		{
+			name:             "graceful strategy with UID precondition",
+			gracefulStrategy: true,
+			options: &metav1.DeleteOptions{
+				Preconditions: &metav1.Preconditions{UID: new(types.UID("abc"))},
+			},
+		},
+		{
+			name:             "graceful strategy with corrupt object option",
+			gracefulStrategy: true,
+			options: &metav1.DeleteOptions{
+				IgnoreStoreReadErrorWithClusterBreakingPotential: new(true),
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			podA := &example.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "bypass-pod"},
+				Spec:       example.PodSpec{NodeName: "machine"},
+			}
+
+			testContext := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
+			destroyFunc, registry := NewTestGenericStoreRegistry(t)
+			defer destroyFunc()
+
+			defaultDeleteStrategy := testRESTStrategy{scheme, names.SimpleNameGenerator, true, false, true}
+			if tc.gracefulStrategy {
+				registry.DeleteStrategy = testGracefulStrategy{defaultDeleteStrategy}
+			}
+
+			_, err := registry.Create(testContext, podA, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+			if err != nil {
+				t.Fatalf("Unexpected create error: %v", err)
+			}
+
+			origStorage := registry.Storage.Storage
+			rv0Called := false
+			consistentGetCalled := false
+
+			mockStorage := &fallbackGetDeleteStorage{
+				Interface: origStorage,
+				getFn: func(ctx context.Context, key string, opts storage.GetOptions, objPtr runtime.Object) error {
+					if opts.ResourceVersion == "0" {
+						rv0Called = true
+					} else {
+						consistentGetCalled = true
+					}
+					return origStorage.Get(ctx, key, opts, objPtr)
+				},
+			}
+			registry.Storage.Storage = mockStorage
+
+			_, _, _ = registry.Delete(testContext, podA.Name, rest.ValidateAllObjectFunc, tc.options)
+			if rv0Called {
+				t.Errorf("Expected ResourceVersion=0 NOT to be called")
+			}
+			if !consistentGetCalled {
+				t.Errorf("Expected consistent Get to be called")
+			}
+		})
 	}
 }
 
