@@ -99,7 +99,8 @@ func TestPodCheckpointDataSweep(t *testing.T) {
 		require.NoError(t, os.MkdirAll(dir, 0o700))
 	}
 	kl.startPodCheckpoint(types.UID("capturing-source-uid"), types.UID("capturing"))
-	kl.setCheckpointPublication("publishing", true)
+	kl.startPodCheckpoint(types.UID("publishing-source-uid"), types.UID("publishing"))
+	kl.setPodCheckpointPublishing(types.UID("publishing-source-uid"))
 
 	require.NoError(t, kl.sweepPodCheckpointData(ctx))
 	require.NoDirExists(t, dataPath("deleted"))
@@ -112,7 +113,7 @@ func TestPodCheckpointDataSweep(t *testing.T) {
 
 	// Data released after its PodCheckpoint was deleted goes on a later pass.
 	kl.finishPodCheckpoint("capturing-source-uid", "capturing")
-	kl.setCheckpointPublication("publishing", false)
+	kl.finishPodCheckpoint("publishing-source-uid", "publishing")
 	require.NoError(t, kl.sweepPodCheckpointData(ctx))
 	for _, uid := range []types.UID{"capturing", "publishing"} {
 		require.NoDirExists(t, dataPath(uid))
@@ -149,7 +150,7 @@ func TestPodCheckpointDataSweepWaitsForCacheSync(t *testing.T) {
 	kl := fixture.manager
 	kl.kubeClient = fake.NewClientset()
 	seedCheckpointCache(t, kl)
-	kl.podCheckpointWatch.Load().hasSynced = func() bool { return false }
+	kl.podCheckpointWatch.hasSynced = func() bool { return false }
 	_, path, err := kl.podCheckpointOutputPath("deleted")
 	require.NoError(t, err)
 	require.NoError(t, os.MkdirAll(path, 0o700))
@@ -162,6 +163,8 @@ func TestPodCheckpointStorageRejectionPrecedesProbeSuspension(t *testing.T) {
 	for _, reason := range []string{"storage headroom", "missing policy"} {
 		t.Run(reason, func(t *testing.T) {
 			kl, runtime, pod, pc := checkpointFixture(t)
+			seedCheckpointCache(t, kl)
+			startCheckpointOutcomeWorker(t, kl)
 			var runtimeCalls, probeCalls atomic.Int32
 			kl.containerRuntime = &checkpointRuntime{Runtime: runtime, checkpointPod: func(context.Context, *runtimeapi.CheckpointPodRequest) error { runtimeCalls.Add(1); return nil }}
 			kl.probeManager = &checkpointProbeManager{suspend: func(context.Context, types.UID) error { probeCalls.Add(1); return nil }, resumed: make(chan types.UID, 1)}

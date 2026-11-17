@@ -77,6 +77,9 @@ func (m *manager) recordPodCheckpointStarted(ctx context.Context, pod *v1.Pod, n
 }
 
 func podCheckpointTerminal(pc *nodev1alpha1.PodCheckpoint) bool {
+	if pc.Status == nil {
+		return false
+	}
 	cond := apimeta.FindStatusCondition(pc.Status.Conditions, nodev1alpha1.PodCheckpointConditionReady)
 	return cond != nil && (cond.Status == metav1.ConditionTrue || cond.Reason == nodev1alpha1.PodCheckpointReasonFailed || cond.Reason == nodev1alpha1.PodCheckpointReasonSourcePodReplaced)
 }
@@ -130,7 +133,14 @@ func (m *manager) runPodCheckpointWatch(ctx context.Context) {
 // nodes, including their captured Pod specs, never enter this cache. Run starts
 // it.
 func newPodCheckpointWatch(logger klog.Logger, m *manager) *podCheckpointWatchState {
-	queue := workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[string]())
+	logger = klog.LoggerWithName(logger, "podcheckpoint-watch")
+	queue := workqueue.NewTypedRateLimitingQueueWithConfig(
+		workqueue.DefaultTypedControllerRateLimiter[string](),
+		workqueue.TypedRateLimitingQueueConfig[string]{
+			Name:   "podcheckpoint-watch",
+			Logger: &logger,
+		},
+	)
 	factory := informers.NewSharedInformerFactoryWithOptions(m.kubeClient, 0, informers.WithTweakListOptions(func(options *metav1.ListOptions) {
 		options.FieldSelector = fields.OneTermEqualSelector("status.nodeName", string(m.nodeName)).String()
 	}))
@@ -263,10 +273,14 @@ func (s *podCheckpointWatchState) processNext(ctx context.Context) bool {
 		// name arrives as another watch event.
 		s.queue.Forget(key)
 	case apierrors.IsInvalid(err):
-		// Validation rejects the same status again; the next change to the
-		// object queues it again.
-		utilruntime.HandleErrorWithLogger(klog.FromContext(ctx), err, "PodCheckpoint status was rejected; waiting for the object to change", "key", key)
-		s.queue.Forget(key)
+		if _, pending := s.manager.pendingPodCheckpointOutcome(key); pending {
+			s.queue.AddRateLimited(key)
+		} else {
+			// Validation rejects the same status again; the next change to the
+			// object queues it again.
+			utilruntime.HandleErrorWithLogger(klog.FromContext(ctx), err, "PodCheckpoint status was rejected; waiting for the object to change", "key", key)
+			s.queue.Forget(key)
+		}
 	default:
 		// Forbidden is retried as well: the node authorizer allows the status
 		// write only after it observes the assignment to this node.
@@ -293,18 +307,31 @@ func (m *manager) syncPodCheckpoint(ctx context.Context, key string) error {
 	}
 	pc, err := state.lister.PodCheckpoints(namespace).Get(name)
 	if apierrors.IsNotFound(err) {
+		if outcome, ok := m.pendingPodCheckpointOutcome(key); ok {
+			return m.syncPendingPodCheckpointOutcome(ctx, key, outcome)
+		}
 		return nil
 	}
 	if err != nil {
 		return err
 	}
+	if outcome, ok := m.pendingPodCheckpointOutcome(key); ok {
+		return m.syncPendingPodCheckpointOutcome(ctx, key, outcome)
+	}
+	checkpointStatus := pc.Status
+	if checkpointStatus == nil {
+		checkpointStatus = &nodev1alpha1.PodCheckpointStatus{}
+	}
 	if podCheckpointTerminal(pc) {
 		m.setCheckpointInterrupted(pc.UID, false)
 		return nil
 	}
+	if checkpointStatus.NodeName == nil || *checkpointStatus.NodeName != string(m.nodeName) {
+		return nil
+	}
 	if m.checkpointInterrupted(pc.UID) {
 		err := m.writePodCheckpointStatus(ctx, namespace, name, pc.UID, metav1.ConditionFalse,
-			nodev1alpha1.PodCheckpointReasonFailed, "checkpoint failed: interrupted by a kubelet restart", nil, pc.Status.SourcePodUID)
+			nodev1alpha1.PodCheckpointReasonFailed, "checkpoint failed: interrupted by a kubelet restart", nil, checkpointStatus.SourcePodUID)
 		if err == nil || apierrors.IsNotFound(err) || errors.Is(err, errPodCheckpointNotPending) {
 			m.setCheckpointInterrupted(pc.UID, false)
 		}
@@ -314,17 +341,14 @@ func (m *manager) syncPodCheckpoint(ctx context.Context, key string) error {
 	sourcePodName := pc.Spec.SourcePod.Name
 	pod, ok := m.podProvider.GetPodByName(namespace, sourcePodName)
 	if !ok {
-		if pc.Status.NodeName == nil || *pc.Status.NodeName != string(m.nodeName) {
-			return nil
-		}
 		// A capture of the deleted source fails when its Pod terminates.
-		if pc.Status.SourcePodUID != nil && m.podCheckpointInFlight(*pc.Status.SourcePodUID) {
+		if checkpointStatus.SourcePodUID != nil && m.podCheckpointInFlight(*checkpointStatus.SourcePodUID) {
 			return errPodCheckpointInFlight
 		}
 		// Admission requires a Running source Pod and the watch starts after the
 		// Pod sources are ready, so the source Pod is no longer on this node.
 		return m.writePodCheckpointStatus(ctx, namespace, name, pc.UID, metav1.ConditionFalse,
-			nodev1alpha1.PodCheckpointReasonFailed, fmt.Sprintf("source Pod %q is not running on node %q", sourcePodName, m.nodeName), nil, pc.Status.SourcePodUID)
+			nodev1alpha1.PodCheckpointReasonFailed, fmt.Sprintf("source Pod %q is not running on node %q", sourcePodName, m.nodeName), nil, checkpointStatus.SourcePodUID)
 	}
 
 	// Pin the source pod instance by UID. A pod name can be reused, so a recorded
@@ -332,7 +356,7 @@ func (m *manager) syncPodCheckpoint(ctx context.Context, key string) error {
 	// replaced; fail rather than checkpoint the wrong instance.
 	if uid := pc.Spec.SourcePod.UID; uid != nil && *uid != pod.UID {
 		// Keep an existing claim; a first rejection identifies the observed replacement.
-		sourcePodUID := pc.Status.SourcePodUID
+		sourcePodUID := checkpointStatus.SourcePodUID
 		if sourcePodUID == nil {
 			sourcePodUID = new(pod.UID)
 		}
@@ -341,11 +365,11 @@ func (m *manager) syncPodCheckpoint(ctx context.Context, key string) error {
 			fmt.Sprintf("source pod %q has UID %q but spec.sourcePod.uid pins it to %q; the original instance was replaced", sourcePodName, pod.UID, *uid),
 			nil, sourcePodUID)
 	}
-	if pc.Status.SourcePodUID != nil && *pc.Status.SourcePodUID != pod.UID {
+	if checkpointStatus.SourcePodUID != nil && *checkpointStatus.SourcePodUID != pod.UID {
 		return m.writePodCheckpointStatus(ctx, namespace, name, pc.UID, metav1.ConditionFalse,
 			nodev1alpha1.PodCheckpointReasonSourcePodReplaced,
-			fmt.Sprintf("source pod %q UID changed from %q to %q; the original instance was replaced", sourcePodName, *pc.Status.SourcePodUID, pod.UID),
-			nil, pc.Status.SourcePodUID)
+			fmt.Sprintf("source pod %q UID changed from %q to %q; the original instance was replaced", sourcePodName, *checkpointStatus.SourcePodUID, pod.UID),
+			nil, checkpointStatus.SourcePodUID)
 	}
 
 	// A checkpoint of this pod is already pending or running; wait for it to finalize.
@@ -402,6 +426,9 @@ func (m *manager) writePodCheckpointStatus(ctx context.Context, namespace, name 
 	if pc.UID != checkpointUID || podCheckpointTerminal(pc) {
 		return errPodCheckpointNotPending
 	}
+	if pc.Status == nil {
+		pc.Status = &nodev1alpha1.PodCheckpointStatus{}
+	}
 
 	if pc.Status.NodeName != nil && *pc.Status.NodeName != string(m.nodeName) {
 		return errPodCheckpointNotPending
@@ -457,7 +484,7 @@ func (m *manager) publishPodCheckpointTemplate(ctx context.Context, namespace, n
 		container.Image = repository + "@" + digest
 		return nil
 	}
-	for container := range kubecontainer.CheckpointContainers(&template.Spec) {
+	for container := range kubecontainer.CheckpointableContainers(&template.Spec) {
 		if err := pinImage(container); err != nil {
 			return err
 		}
@@ -480,7 +507,7 @@ func (m *manager) publishPodCheckpointTemplate(ctx context.Context, namespace, n
 // covers restartable init and regular containers.
 func checkpointedContainerStatuses(spec *v1.PodSpec) []nodev1alpha1.PodCheckpointContainerStatus {
 	out := make([]nodev1alpha1.PodCheckpointContainerStatus, 0, len(spec.InitContainers)+len(spec.Containers))
-	for container := range kubecontainer.CheckpointContainers(spec) {
+	for container := range kubecontainer.CheckpointableContainers(spec) {
 		out = append(out, nodev1alpha1.PodCheckpointContainerStatus{Name: container.Name})
 	}
 	if len(out) == 0 {

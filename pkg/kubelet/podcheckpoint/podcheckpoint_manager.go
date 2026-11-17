@@ -100,7 +100,8 @@ type manager struct {
 	kubeletConfiguration *kubeletconfig.KubeletConfiguration
 	checkpointsDir       string
 
-	// stateLock guards podCheckpoints and checkpointsInterrupted.
+	// stateLock guards podCheckpoints, pendingOutcomes and
+	// checkpointsInterrupted.
 	stateLock sync.Mutex
 	// podCheckpoints holds the checkpoint in flight for each source Pod, keyed
 	// by Pod UID, from the time the watch hands it to the pod worker until its
@@ -109,6 +110,9 @@ type manager struct {
 	// This state does not survive restart; startup fails interrupted
 	// checkpoints (see finalizeInterruptedCheckpoints).
 	podCheckpoints map[types.UID]*podCheckpointState
+	// pendingOutcomes holds capture results, keyed by namespace/name, until the
+	// watch confirms their status.
+	pendingOutcomes map[string]*pendingPodCheckpointOutcome
 
 	// podCheckpointWatch is built with the manager and started by Run. It is
 	// nil when the kubelet has no API client.
@@ -140,6 +144,13 @@ type podCheckpointState struct {
 	phase         podCheckpointPhase
 	// request is what SyncPod captures next. It is set only while pending.
 	request *podCheckpointRequest
+}
+
+type pendingPodCheckpointOutcome struct {
+	run       *podCheckpointRun
+	succeeded bool
+	location  string
+	message   string
 }
 
 // Manager captures the PodCheckpoints assigned to this node during Pod syncs.
@@ -493,59 +504,46 @@ func (m *manager) finishPodCheckpointCapture(ctx context.Context, run *podCheckp
 	return true, relLocation, ""
 }
 
-// publishPodCheckpointOutcome writes the outcome to the PodCheckpoint status.
-// An update error does not establish that the API server rejected the write,
-// so it retains successful data and retries the same result until confirmed.
-// The in-flight marker stays set until it returns, so watch events cannot
-// repeat the capture.
+// publishPodCheckpointOutcome queues the known capture result for the watch
+// worker to write. The in-flight marker stays set until that write is confirmed.
 func (m *manager) publishPodCheckpointOutcome(ctx context.Context, run *podCheckpointRun, succeeded bool, relLocation, message string) {
+	key := run.namespace + "/" + run.name
+	outcome := &pendingPodCheckpointOutcome{run: run, succeeded: succeeded, location: relLocation, message: message}
 	m.stateLock.Lock()
 	if state := m.podCheckpoints[run.pod.UID]; state != nil && state.checkpointUID == run.uid {
 		state.phase = podCheckpointPublishing
 	}
+	if m.pendingOutcomes == nil {
+		m.pendingOutcomes = make(map[string]*pendingPodCheckpointOutcome)
+	}
+	m.pendingOutcomes[key] = outcome
 	m.stateLock.Unlock()
-	go m.doPublishPodCheckpointOutcome(ctx, run, succeeded, relLocation, message)
+	if state := m.podCheckpointWatch; state != nil {
+		state.queue.Add(key)
+	} else {
+		klog.FromContext(ctx).Error(errors.New("PodCheckpoint watch is not running"), "Unable to queue PodCheckpoint outcome", "podCheckpoint", klog.KRef(run.namespace, run.name))
+	}
 }
 
-func (m *manager) doPublishPodCheckpointOutcome(ctx context.Context, run *podCheckpointRun, succeeded bool, relLocation, message string) {
-	defer m.finishPodCheckpoint(run.pod.UID, run.uid)
-	logger := klog.FromContext(ctx)
-	delay := time.Second
-	lastError := ""
-	for ctx.Err() == nil {
-		err := m.finalizePodCheckpointOutcome(ctx, run.namespace, run.name, run.uid, succeeded, relLocation, message)
-		if err == nil {
-			return
-		}
-		if apierrors.IsNotFound(err) || errors.Is(err, errPodCheckpointNotPending) {
-			// The PodCheckpoint was deleted or replaced, so nothing can use this data.
-			if succeeded {
-				m.removePodCheckpointOutput(ctx, run, "checkpoint object removed or replaced")
-			}
-			return
-		}
-		if err.Error() != lastError {
-			logMessage := "Failed to publish PodCheckpoint result; retrying"
-			switch {
-			case apierrors.IsForbidden(err):
-				logMessage = "Cannot publish PodCheckpoint result; check status update permissions and admission errors"
-			case apierrors.IsInvalid(err):
-				logMessage = "PodCheckpoint status was rejected; check the reported validation errors"
-			}
-			logger.Error(err, logMessage, "podCheckpoint", klog.KRef(run.namespace, run.name), "podCheckpointUID", run.uid)
-			lastError = err.Error()
-		}
-		// The capture outcome is already known. Keep retrying the same outcome
-		// without flooding an API server that continues denying the status write.
-		timer := time.NewTimer(min(wait.Jitter(delay, 0.1), time.Minute))
-		select {
-		case <-ctx.Done():
-			timer.Stop()
-			return
-		case <-timer.C:
-		}
-		delay = min(2*delay, time.Minute)
+func (m *manager) syncPendingPodCheckpointOutcome(ctx context.Context, key string, outcome *pendingPodCheckpointOutcome) error {
+	run := outcome.run
+	err := m.finalizePodCheckpointOutcome(ctx, run.namespace, run.name, run.uid, outcome.succeeded, outcome.location, outcome.message)
+	if err != nil && !apierrors.IsNotFound(err) && !errors.Is(err, errPodCheckpointNotPending) {
+		return err
 	}
+	if err != nil && outcome.succeeded {
+		m.removePodCheckpointOutput(ctx, run, "checkpoint object removed or replaced")
+	}
+	m.stateLock.Lock()
+	current := m.pendingOutcomes[key] == outcome
+	if current {
+		delete(m.pendingOutcomes, key)
+	}
+	m.stateLock.Unlock()
+	if current {
+		m.finishPodCheckpoint(run.pod.UID, run.uid)
+	}
+	return nil
 }
 
 // removePodCheckpointOutput removes the output directory after a failed or
@@ -603,7 +601,7 @@ func checkpointPodContainerIDs(pod *v1.Pod, podStatus *kubecontainer.PodStatus) 
 		return nil
 	}
 
-	for container := range kubecontainer.CheckpointContainers(&pod.Spec) {
+	for container := range kubecontainer.CheckpointableContainers(&pod.Spec) {
 		if err := appendRunningID(container.Name); err != nil {
 			return nil, err
 		}
@@ -714,6 +712,13 @@ func (m *manager) takePodCheckpointRequest(podUID types.UID) (*podCheckpointRequ
 	state.phase = podCheckpointCapturing
 	state.request = nil
 	return request, true
+}
+
+func (m *manager) pendingPodCheckpointOutcome(key string) (*pendingPodCheckpointOutcome, bool) {
+	m.stateLock.Lock()
+	defer m.stateLock.Unlock()
+	outcome, ok := m.pendingOutcomes[key]
+	return outcome, ok
 }
 
 func (m *manager) setCheckpointInterrupted(checkpointUID types.UID, interrupted bool) {

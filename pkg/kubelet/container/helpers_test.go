@@ -1730,7 +1730,7 @@ func TestSecurityProfileOCIRefs(t *testing.T) {
 	}
 }
 
-func TestCheckpointContainers(t *testing.T) {
+func TestCheckpointableContainers(t *testing.T) {
 	always := v1.ContainerRestartPolicyAlways
 	spec := &v1.PodSpec{
 		InitContainers: []v1.Container{
@@ -1745,7 +1745,7 @@ func TestCheckpointContainers(t *testing.T) {
 		containerType podutil.ContainerType
 	}
 	var got []selected
-	for container, containerType := range CheckpointContainers(spec) {
+	for container, containerType := range CheckpointableContainers(spec) {
 		got = append(got, selected{container.Name, containerType})
 		container.Image = "pinned"
 	}
@@ -1755,9 +1755,9 @@ func TestCheckpointContainers(t *testing.T) {
 		{"worker", podutil.Containers},
 	}
 	if !reflect.DeepEqual(want, got) {
-		t.Fatalf("CheckpointContainers() = %v, want %v", got, want)
+		t.Fatalf("CheckpointableContainers() = %v, want %v", got, want)
 	}
 	if spec.InitContainers[1].Image != "pinned" || spec.Containers[0].Image != "pinned" || spec.InitContainers[0].Image != "" {
-		t.Fatal("CheckpointContainers must yield pointers into the spec for the selected containers only")
+		t.Fatal("CheckpointableContainers must yield pointers into the spec for the selected containers only")
 	}
 }
