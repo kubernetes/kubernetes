@@ -3133,6 +3133,8 @@ func (b *stopDuringDispatchBudget) returnUnused(_ time.Duration) {
 // Stop, a draining close would leave the watcher goroutine waiting forever to
 // send to a client that is gone.
 func TestWatchListStopDuringDispatch(t *testing.T) {
+	// Exercises dispatchTimeoutBudget, which is unused when WatchCacheStallResume is enabled.
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchCacheStallResume, false)
 	cachertesting.ForceRequestWatchProgressSupport(t)
 	// Only this goroutine counts. Etcd clients of earlier tests can start
 	// goroutines at any time, so goleak may report those as well.
