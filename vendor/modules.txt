@@ -262,7 +262,7 @@ github.com/golang/protobuf/proto
 # github.com/google/btree v1.1.3
 ## explicit; go 1.18
 github.com/google/btree
-# github.com/google/cadvisor/lib v0.61.0
+# github.com/google/cadvisor/lib v0.61.1
 ## explicit; go 1.25.0
 github.com/google/cadvisor/lib/cache/memory
 github.com/google/cadvisor/lib/cadvisorflags
@@ -444,13 +444,14 @@ github.com/onsi/gomega/matchers/support/goraph/edge
 github.com/onsi/gomega/matchers/support/goraph/node
 github.com/onsi/gomega/matchers/support/goraph/util
 github.com/onsi/gomega/types
-# github.com/opencontainers/cgroups v0.1.0
-## explicit; go 1.24.0
+# github.com/opencontainers/cgroups v0.1.1
+## explicit; go 1.25.0
 github.com/opencontainers/cgroups
 github.com/opencontainers/cgroups/devices/config
 github.com/opencontainers/cgroups/fs
 github.com/opencontainers/cgroups/fs2
 github.com/opencontainers/cgroups/fscommon
+github.com/opencontainers/cgroups/internal/delegate
 github.com/opencontainers/cgroups/internal/path
 github.com/opencontainers/cgroups/manager
 github.com/opencontainers/cgroups/systemd
