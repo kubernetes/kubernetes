@@ -179,6 +179,21 @@ func (c *Client[T, PT]) Get(ctx context.Context, name string, opts metav1.GetOpt
 	return result, err
 }
 
+// SubResourceGet takes name of the resource and subresource, and returns the corresponding subresource, and an error if there is any.
+func (u *untypedClient) SubResourceGet[S any, PS runtimeObject[S]](ctx context.Context, name, subresource string, opts metav1.GetOptions) (PS, error) {
+	result := PS(new(S))
+	err := u.client.Get().
+		UseProtobufAsDefaultIfPreferred(u.prefersProtobuf).
+		NamespaceIfScoped(u.namespace, u.namespace != "").
+		Resource(u.resource).
+		Name(name).
+		SubResource(subresource).
+		VersionedParams(&opts, u.parameterCodec).
+		Do(ctx).
+		Into(result)
+	return result, err
+}
+
 // List takes label and field selectors, and returns the list of resources that match those selectors.
 func (l *alsoLister[T, L, PT, PL]) List(ctx context.Context, opts metav1.ListOptions) (PL, error) {
 	list := PL(new(L))
@@ -191,6 +206,26 @@ func (l *alsoLister[T, L, PT, PL]) List(ctx context.Context, opts metav1.ListOpt
 		NamespaceIfScoped(l.namespace, l.namespace != "").
 		Resource(l.resource).
 		VersionedParams(&opts, l.parameterCodec).
+		Timeout(timeout).
+		Do(ctx).
+		Into(list)
+	return list, err
+}
+
+// SubResourceList takes label and field selectors, resource and subresource names, and returns the list of subresources that match those selectors.
+func (u *untypedClient) SubResourceList[L any, PL runtimeObject[L]](ctx context.Context, name, subresource string, opts metav1.ListOptions) (PL, error) {
+	list := PL(new(L))
+	var timeout time.Duration
+	if opts.TimeoutSeconds != nil {
+		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
+	}
+	err := u.client.Get().
+		UseProtobufAsDefaultIfPreferred(u.prefersProtobuf).
+		NamespaceIfScoped(u.namespace, u.namespace != "").
+		Resource(u.resource).
+		Name(name).
+		SubResource(subresource).
+		VersionedParams(&opts, u.parameterCodec).
 		Timeout(timeout).
 		Do(ctx).
 		Into(list)
@@ -227,6 +262,22 @@ func (c *Client[T, PT]) Create(ctx context.Context, obj PT, opts metav1.CreateOp
 	return result, err
 }
 
+// SubResourceCreate takes the representation of a subresource and creates it.  Returns the server's representation of the subresource, and an error, if there is any.
+func (u *untypedClient) SubResourceCreate[S any, PS runtimeObject[S]](ctx context.Context, name, subresource string, obj PS, opts metav1.CreateOptions) (PS, error) {
+	result := PS(new(S))
+	err := u.client.Post().
+		UseProtobufAsDefaultIfPreferred(u.prefersProtobuf).
+		NamespaceIfScoped(u.namespace, u.namespace != "").
+		Resource(u.resource).
+		Name(name).
+		SubResource(subresource).
+		VersionedParams(&opts, u.parameterCodec).
+		Body(obj).
+		Do(ctx).
+		Into(result)
+	return result, err
+}
+
 // Update takes the representation of a resource and updates it. Returns the server's representation of the resource, and an error, if there is any.
 func (c *Client[T, PT]) Update(ctx context.Context, obj PT, opts metav1.UpdateOptions) (PT, error) {
 	result := PT(new(T))
@@ -242,20 +293,25 @@ func (c *Client[T, PT]) Update(ctx context.Context, obj PT, opts metav1.UpdateOp
 	return result, err
 }
 
-// UpdateStatus updates the status subresource of a resource. Returns the server's representation of the resource, and an error, if there is any.
-func (c *Client[T, PT]) UpdateStatus(ctx context.Context, obj PT, opts metav1.UpdateOptions) (PT, error) {
-	result := PT(new(T))
-	err := c.client.Put().
-		UseProtobufAsDefaultIfPreferred(c.prefersProtobuf).
-		NamespaceIfScoped(c.namespace, c.namespace != "").
-		Resource(c.resource).
-		Name(obj.GetName()).
-		SubResource("status").
-		VersionedParams(&opts, c.parameterCodec).
+// SubResourceUpdate takes the representation of a subresource and updates it.  Returns the server's representation of the subresource, and an error, if there is any.
+func (u *untypedClient) SubResourceUpdate[S any, PS runtimeObject[S]](ctx context.Context, name, subresource string, obj PS, opts metav1.UpdateOptions) (PS, error) {
+	result := PS(new(S))
+	err := u.client.Put().
+		UseProtobufAsDefaultIfPreferred(u.prefersProtobuf).
+		NamespaceIfScoped(u.namespace, u.namespace != "").
+		Resource(u.resource).
+		Name(name).
+		SubResource(subresource).
+		VersionedParams(&opts, u.parameterCodec).
 		Body(obj).
 		Do(ctx).
 		Into(result)
 	return result, err
+}
+
+// UpdateStatus updates the status subresource of a resource. Returns the server's representation of the resource, and an error, if there is any.
+func (c *Client[T, PT]) UpdateStatus(ctx context.Context, obj PT, opts metav1.UpdateOptions) (PT, error) {
+	return c.SubResourceUpdate(ctx, obj.GetName(), "status", obj, opts)
 }
 
 // Delete takes name of the resource and deletes it. Returns an error if one occurs.
@@ -342,31 +398,31 @@ func (a *alsoApplier[T, C, PT, PC]) Apply(ctx context.Context, obj PC, opts meta
 	return result, err
 }
 
-// ApplyStatus takes the given apply declarative configuration, applies it to the status subresource and returns the applied resource.
-func (a *alsoApplier[T, C, PT, PC]) ApplyStatus(ctx context.Context, obj PC, opts metav1.ApplyOptions) (PT, error) {
-	result := PT(new(T))
+// Apply takes the given apply declarative configuration, applies it and returns the applied subresource.
+func (u *untypedClient) SubResourceApply[S, C any, PS runtimeObject[S], PC *C](ctx context.Context, name, subresource string, obj PC, opts metav1.ApplyOptions) (PS, error) {
+	result := PS(new(S))
 	if obj == nil {
 		return result, fmt.Errorf("object provided to Apply must not be nil")
 	}
 	patchOpts := opts.ToPatchOptions()
-
-	if obj.GetName() == nil {
-		return result, fmt.Errorf("obj.Name must be provided to Apply")
-	}
-
-	request, err := apply.NewRequest(a.client, obj)
+	request, err := apply.NewRequest(u.client, obj)
 	if err != nil {
 		return result, err
 	}
 
 	err = request.
-		UseProtobufAsDefaultIfPreferred(a.prefersProtobuf).
-		NamespaceIfScoped(a.namespace, a.namespace != "").
-		Resource(a.resource).
-		Name(*obj.GetName()).
-		SubResource("status").
-		VersionedParams(&patchOpts, a.parameterCodec).
+		UseProtobufAsDefaultIfPreferred(u.prefersProtobuf).
+		NamespaceIfScoped(u.namespace, u.namespace != "").
+		Resource(u.resource).
+		Name(name).
+		SubResource(subresource).
+		VersionedParams(&patchOpts, u.parameterCodec).
 		Do(ctx).
 		Into(result)
 	return result, err
+}
+
+// ApplyStatus takes the given apply declarative configuration, applies it to the status subresource and returns the applied resource.
+func (a *alsoApplier[T, C, PT, PC]) ApplyStatus(ctx context.Context, obj PC, opts metav1.ApplyOptions) (PT, error) {
+	return a.SubResourceApply[T, C, PT](ctx, *obj.GetName(), "status", obj, opts)
 }

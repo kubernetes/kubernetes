@@ -608,23 +608,8 @@ func (c *$.type|privatePlural$) $.verb$(ctx $.context|raw$, opts $.ListOptions|r
 
 var listSubresourceTemplate = `
 // $.verb$ takes $.type|raw$ name, label and field selectors, and returns the list of $.resultType|publicPlural$ that match those selectors.
-func (c *$.type|privatePlural$) $.verb$(ctx $.context|raw$, $.type|private$Name string, opts $.ListOptions|raw$) (result *$.resultType|raw$List, err error) {
-	var timeout $.timeDuration|raw$
-	if opts.TimeoutSeconds != nil{
-		timeout = $.timeDuration|raw$(*opts.TimeoutSeconds) * $.timeSecond|raw$
-	}
-	result = &$.resultType|raw$List{}
-	err = c.GetClient().Get().
-		$if .prefersProtobuf$UseProtobufAsDefault().$end$
-		$if .namespaced$Namespace(c.GetNamespace()).$end$
-		Resource("$.type|resource$").
-		Name($.type|private$Name).
-		SubResource("$.subresourcePath$").
-		VersionedParams(&opts, $.schemeParameterCodec|raw$).
-		Timeout(timeout).
-		Do(ctx).
-		Into(result)
-	return
+func (c *$.type|privatePlural$) $.verb$(ctx $.context|raw$, $.type|private$Name string, opts $.ListOptions|raw$) (*$.resultType|raw$List, error) {
+	return c.SubResourceList[$.resultType|raw$List](ctx, $.type|privateName$, "$.subresourcePath$", opts)
 }
 `
 
@@ -646,18 +631,8 @@ func (c *$.type|privatePlural$) $.verb$(ctx $.context|raw$, name string, opts $.
 
 var getSubresourceTemplate = `
 // $.verb$ takes name of the $.type|private$, and returns the corresponding $.resultType|raw$ object, and an error if there is any.
-func (c *$.type|privatePlural$) $.verb$(ctx $.context|raw$, $.type|private$Name string, opts $.GetOptions|raw$) (result *$.resultType|raw$, err error) {
-	result = &$.resultType|raw${}
-	err = c.GetClient().Get().
-		$if .prefersProtobuf$UseProtobufAsDefault().$end$
-		$if .namespaced$Namespace(c.GetNamespace()).$end$
-		Resource("$.type|resource$").
-		Name($.type|private$Name).
-		SubResource("$.subresourcePath$").
-		VersionedParams(&opts, $.schemeParameterCodec|raw$).
-		Do(ctx).
-		Into(result)
-	return
+func (c *$.type|privatePlural$) $.verb$(ctx $.context|raw$, $.type|private$Name string, opts $.GetOptions|raw$) (*$.resultType|raw$, error) {
+	return c.SubResourceGet[$.resultType|raw$](ctx, $.type|private$Name, "$.subresourcePath$", opts)
 }
 `
 
@@ -677,19 +652,8 @@ func (c *$.type|privatePlural$) $.verb$(ctx $.context|raw$, name string, opts $.
 
 var createSubresourceTemplate = `
 // $.verb$ takes the representation of a $.inputType|private$ and creates it.  Returns the server's representation of the $.resultType|private$, and an error, if there is any.
-func (c *$.type|privatePlural$) $.verb$(ctx $.context|raw$, $.type|private$Name string, $.inputType|private$ *$.inputType|raw$, opts $.CreateOptions|raw$) (result *$.resultType|raw$, err error) {
-	result = &$.resultType|raw${}
-	err = c.GetClient().Post().
-		$if .prefersProtobuf$UseProtobufAsDefault().$end$
-		$if .namespaced$Namespace(c.GetNamespace()).$end$
-		Resource("$.type|resource$").
-		Name($.type|private$Name).
-		SubResource("$.subresourcePath$").
-		VersionedParams(&opts, $.schemeParameterCodec|raw$).
-		Body($.inputType|private$).
-		Do(ctx).
-		Into(result)
-	return
+func (c *$.type|privatePlural$) $.verb$(ctx $.context|raw$, $.type|private$Name string, $.inputType|private$ *$.inputType|raw$, opts $.CreateOptions|raw$) (*$.resultType|raw$, error) {
+	return c.SubResourceCreate(ctx, $.type|private$Name, "$.subresourcePath$", $.inputType|private$, opts)
 }
 `
 
@@ -711,19 +675,8 @@ func (c *$.type|privatePlural$) $.verb$(ctx $.context|raw$, $.inputType|private$
 
 var updateSubresourceTemplate = `
 // $.verb$ takes the top resource name and the representation of a $.inputType|private$ and updates it. Returns the server's representation of the $.resultType|private$, and an error, if there is any.
-func (c *$.type|privatePlural$) $.verb$(ctx $.context|raw$, $.type|private$Name string, $.inputType|private$ *$.inputType|raw$, opts $.UpdateOptions|raw$) (result *$.resultType|raw$, err error) {
-	result = &$.resultType|raw${}
-	err = c.GetClient().Put().
-		$if .prefersProtobuf$UseProtobufAsDefault().$end$
-		$if .namespaced$Namespace(c.GetNamespace()).$end$
-		Resource("$.type|resource$").
-		Name($.type|private$Name).
-		SubResource("$.subresourcePath$").
-		VersionedParams(&opts, $.schemeParameterCodec|raw$).
-		Body($.inputType|private$).
-		Do(ctx).
-		Into(result)
-	return
+func (c *$.type|privatePlural$) $.verb$(ctx $.context|raw$, $.type|private$Name string, $.inputType|private$ *$.inputType|raw$, opts $.UpdateOptions|raw$) (*$.resultType|raw$, error) {
+	return c.SubResourceUpdate(ctx, $.type|private$Name, "$.subresourcePath$", $.inputType|private$, opts)
 }
 `
 
@@ -810,25 +763,6 @@ var applySubresourceTemplate = `
 // $.verb$ takes top resource name and the apply declarative configuration for $.subresourcePath$,
 // applies it and returns the applied $.resultType|private$, and an error, if there is any.
 func (c *$.type|privatePlural$) $.verb$(ctx $.context|raw$, $.type|private$Name string, $.inputType|private$ *$.inputApplyConfig|raw$, opts $.ApplyOptions|raw$) (result *$.resultType|raw$, err error) {
-	if $.inputType|private$ == nil {
-		return nil, $.fmtErrorf|raw$("$.inputType|private$ provided to $.verb$ must not be nil")
-	}
-	patchOpts := opts.ToPatchOptions()
-	request, err := $.applyNewRequest|raw$(c.GetClient(), $.inputType|private$)
-	if err != nil {
-		return nil, err
-	}
-
-	result = &$.resultType|raw${}
-	err = request.
-		$if .prefersProtobuf$UseProtobufAsDefault().$end$
-		$if .namespaced$Namespace(c.GetNamespace()).$end$
-		Resource("$.type|resource$").
-		Name($.type|private$Name).
-		SubResource("$.subresourcePath$").
-		VersionedParams(&patchOpts, $.schemeParameterCodec|raw$).
-		Do(ctx).
-		Into(result)
-	return
+	return c.SubResourceApply[$.resultType|raw$](ctx, $.type|private$Name, "$.subresourcePath$", $.inputType|private$, opts)
 }
 `
