@@ -9579,11 +9579,14 @@ func TestAddGenericPodGroupAddsWaitingPodsAtOnce(t *testing.T) {
 		initialCPGs      []*schedulingv1beta1.CompositePodGroup
 		initialPodGroups []*schedulingv1beta1.PodGroup
 		initialPods      []*v1.Pod
-		popRoot          bool
+		rootInFlight     bool
+		rootInBackoffQ   bool
 		pgToAdd          *schedulingv1beta1.PodGroup
 		// expectedAddedSizes are the sizes of the root at each addition to activeQ caused by adding pgToAdd.
 		expectedAddedSizes []int
-		expectedPending    []string
+		// expectedBackoffSize is the size of the root in backoffQ after pgToAdd is added, or 0 if the root is not expected there.
+		expectedBackoffSize int
+		expectedPending     []string
 	}{
 		{
 			name:               "root is not queued yet",
@@ -9604,9 +9607,18 @@ func TestAddGenericPodGroupAddsWaitingPodsAtOnce(t *testing.T) {
 			initialCPGs:      []*schedulingv1beta1.CompositePodGroup{rootCPG},
 			initialPodGroups: []*schedulingv1beta1.PodGroup{queuedChild},
 			initialPods:      append(makePods(queuedChild.Name, "queued1", "queued2"), makePods("pg", "pod1", "pod2", "pod3")...),
-			popRoot:          true,
+			rootInFlight:     true,
 			pgToAdd:          st.MakePodGroup().Name("pg").Namespace(ns).ParentCompositePodGroup(rootCPG.Name).Obj(),
 			expectedPending:  []string{"pod1", "pod2", "pod3"},
+		},
+		{
+			name:                "root is in backoffQ",
+			initialCPGs:         []*schedulingv1beta1.CompositePodGroup{rootCPG},
+			initialPodGroups:    []*schedulingv1beta1.PodGroup{queuedChild},
+			initialPods:         append(makePods(queuedChild.Name, "queued1", "queued2"), makePods("pg", "pod1", "pod2", "pod3")...),
+			rootInBackoffQ:      true,
+			pgToAdd:             st.MakePodGroup().Name("pg").Namespace(ns).ParentCompositePodGroup(rootCPG.Name).Obj(),
+			expectedBackoffSize: 5,
 		},
 	}
 
@@ -9631,10 +9643,24 @@ func TestAddGenericPodGroupAddsWaitingPodsAtOnce(t *testing.T) {
 			for _, pod := range tt.initialPods {
 				q.Add(ctx, pod)
 			}
-			if tt.popRoot {
+			if tt.rootInFlight {
 				if _, err := q.Pop(logger); err != nil {
 					t.Fatalf("Unexpected error from Pop: %v", err)
 				}
+			}
+			rootLookup := newQueuedPodGroupInfoForLookup(ns, rootCPG.Name, fwk.CompositePodGroupKeyType)
+			if tt.rootInBackoffQ {
+				// Place the root in backoffQ directly instead of failing a scheduling attempt:
+				// the test only needs a root that is still backing off when pgToAdd arrives.
+				root := q.activeQ.delete(rootLookup)
+				if root == nil {
+					t.Fatalf("Expected root %q in activeQ", rootCPG.Name)
+				}
+				rootInfo := root.(*framework.QueuedPodGroupInfo)
+				rootInfo.UnschedulableCount = 1
+				rootInfo.Timestamp = q.clock.Now()
+				rootInfo.UnschedulablePlugins = sets.New("fooPlugin")
+				q.backoffQ.add(logger, rootInfo, framework.EventUnscheduledPodAdd.Label(), nil)
 			}
 
 			recorder := &addRecordingActiveQueue{activeQueuer: q.activeQ}
@@ -9644,6 +9670,14 @@ func TestAddGenericPodGroupAddsWaitingPodsAtOnce(t *testing.T) {
 
 			if diff := cmp.Diff(tt.expectedAddedSizes, recorder.addedSizes, cmpopts.EquateEmpty()); diff != "" {
 				t.Errorf("Unexpected sizes of the root when it was added to activeQ (-want,+got):\n%s", diff)
+			}
+
+			gotBackoffSize := 0
+			if root, ok := q.backoffQ.get(rootLookup); ok {
+				gotBackoffSize = root.Size()
+			}
+			if gotBackoffSize != tt.expectedBackoffSize {
+				t.Errorf("Expected the root in backoffQ to have %d pods, got %d", tt.expectedBackoffSize, gotBackoffSize)
 			}
 
 			var gotPending []string
