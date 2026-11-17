@@ -10201,6 +10201,33 @@ func TestAllocator(t *testing.T, supportedFeatures Features, newAllocator newAll
 			node:        node(node1, region1),
 			expectError: g.MatchError(g.ContainSubstring("invalid resource pools were encountered")),
 		},
+		"partitionable-devices-device-counter-consumption-negative-value": {
+			features: Features{
+				PartitionableDevices: true,
+			},
+			claimsToAllocate: objects(
+				claim(claim0).withRequests(
+					deviceRequest(req0, classA, 1),
+				),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device1).withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet1, map[string]resource.Quantity{
+							"memory": resource.MustParse("-8Gi"),
+						}),
+					),
+				),
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1, map[string]resource.Quantity{
+						"memory": resource.MustParse("8Gi"),
+					}),
+				),
+			),
+			node:        node(node1, region1),
+			expectError: g.MatchError(g.ContainSubstring("invalid resource pools were encountered")),
+		},
 		"partitionable-devices-backtrack-releases-counters": {
 			features: Features{PartitionableDevices: true},
 			claimsToAllocate: objects(
