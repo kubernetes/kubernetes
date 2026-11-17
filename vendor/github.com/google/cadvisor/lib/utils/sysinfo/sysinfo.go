@@ -339,6 +339,12 @@ func getCpusByPhysicalPackageID(sysFs sysfs.SysFs, cpusPaths []string) (map[int]
 
 // addCacheInfo adds information about cache for NUMA node
 func addCacheInfo(sysFs sysfs.SysFs, node *info.Node) error {
+	// Cores can have a different number of threads (hybrid CPUs), so count them all.
+	numThreadsPerNode := 0
+	for _, core := range node.Cores {
+		numThreadsPerNode += len(core.Threads)
+	}
+
 	for coreID, core := range node.Cores {
 		threadID := core.Threads[0] //get any thread for core
 		caches, err := GetCacheInfo(sysFs, threadID)
@@ -347,7 +353,6 @@ func addCacheInfo(sysFs sysfs.SysFs, node *info.Node) error {
 		}
 
 		numThreadsPerCore := len(core.Threads)
-		numThreadsPerNode := len(node.Cores) * numThreadsPerCore
 
 		for _, cache := range caches {
 			c := info.Cache{
@@ -356,7 +361,9 @@ func addCacheInfo(sysFs sysfs.SysFs, node *info.Node) error {
 				Level: cache.Level,
 				Type:  cache.Type,
 			}
-			if cache.Level > cacheLevel2 {
+			// A cache shared by more than one core, at any level, is not private to a
+			// core: it is a node level or an uncore cache.
+			if cache.Level > cacheLevel2 || cache.Cpus > numThreadsPerCore {
 				if cache.Cpus == numThreadsPerNode {
 					// Add a node level cache.
 					cacheFound := false
@@ -369,7 +376,8 @@ func addCacheInfo(sysFs sysfs.SysFs, node *info.Node) error {
 						node.Caches = append(node.Caches, c)
 					}
 				} else {
-					// Add uncore cache, for architecture in which l3 cache only shared among some cores.
+					// Add uncore cache, for architecture in which l3 cache (or an l2 cache
+					// shared by a cluster of cores) is only shared among some cores.
 					uncoreCacheFound := false
 					for _, uncoreCache := range node.Cores[coreID].UncoreCaches {
 						if uncoreCache == c {

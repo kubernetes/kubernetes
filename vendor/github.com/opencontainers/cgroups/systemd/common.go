@@ -24,6 +24,12 @@ const (
 	// v1: https://www.kernel.org/doc/html/latest/scheduler/sched-bwc.html and
 	// v2: https://www.kernel.org/doc/html/latest/admin-guide/cgroup-v2.html
 	defCPUQuotaPeriod = uint64(100000)
+
+	// maxCPUQuota is the maximum CPU quota (in microseconds) accepted by the
+	// kernel (see max_cfs_runtime in kernel/sched/core.c and MAX_BW in
+	// kernel/sched/sched.h). A larger quota is treated as unlimited.
+	// Note that maxCPUQuota * 1000000 does not overflow uint64.
+	maxCPUQuota = 1<<44 - 1
 )
 
 var (
@@ -299,9 +305,8 @@ func systemdVersionAtoi(str string) (int, error) {
 // along with round-up during calculation in order to write the same value to cgroupfs later.
 func addCPUQuota(cm *dbusConnManager, properties *[]systemdDbus.Property, quota *int64, period uint64) {
 	if period != 0 {
-		// systemd only supports CPUQuotaPeriodUSec since v242
 		sdVer := systemdVersion(cm)
-		if sdVer >= 242 {
+		if sdVer >= cpuQuotaPeriodSupportedVersion {
 			*properties = append(*properties,
 				newProp("CPUQuotaPeriodUSec", period))
 		} else {
@@ -321,11 +326,22 @@ func addCPUQuota(cm *dbusConnManager, properties *[]systemdDbus.Property, quota 
 			// (integer percentage of CPU) internally.  This means that if a fractional percent of
 			// CPU is indicated by Resources.CpuQuota, we need to round up to the nearest
 			// 10ms (1% of a second) such that child cgroups can set the cpu.cfs_quota_us they expect.
-			cpuQuotaPerSecUSec = uint64(*quota*1000000) / period
-			if cpuQuotaPerSecUSec%10000 != 0 {
-				cpuQuotaPerSecUSec = ((cpuQuotaPerSecUSec / 10000) + 1) * 10000
-				// Update the requested quota along with the round-up in order to write the same value to cgroupfs.
-				*quota = int64(cpuQuotaPerSecUSec) * int64(period) / 1000000
+			if *quota <= maxCPUQuota {
+				// No overflow is possible here since *quota <= maxCPUQuota.
+				cpuQuotaPerSecUSec = uint64(*quota) * 1000000 / period
+				if cpuQuotaPerSecUSec%10000 != 0 {
+					cpuQuotaPerSecUSec = ((cpuQuotaPerSecUSec / 10000) + 1) * 10000
+					// Update the requested quota along with the round-up in order to write the same value to cgroupfs.
+					// This is cpuQuotaPerSecUSec * period / 1000000, rearranged to avoid overflow.
+					*quota = int64(cpuQuotaPerSecUSec / 10000 * period / 100)
+				}
+			}
+			if *quota > maxCPUQuota {
+				// The quota (possibly after the round-up above) is too large
+				// for the kernel to accept. Since it is effectively unlimited,
+				// treat it as such, for both systemd and cgroupfs.
+				cpuQuotaPerSecUSec = math.MaxUint64
+				*quota = -1
 			}
 		}
 		*properties = append(*properties,
@@ -338,9 +354,8 @@ func addCpuset(cm *dbusConnManager, props *[]systemdDbus.Property, cpus, mems st
 		return nil
 	}
 
-	// systemd only supports AllowedCPUs/AllowedMemoryNodes since v244
 	sdVer := systemdVersion(cm)
-	if sdVer < 244 {
+	if sdVer < allowedCPUsSupportedVersion {
 		logrus.Debugf("systemd v%d is too old to support AllowedCPUs/AllowedMemoryNodes"+
 			" (settings will still be applied to cgroupfs)", sdVer)
 		return nil

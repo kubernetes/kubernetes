@@ -9,6 +9,7 @@ import (
 
 	"github.com/opencontainers/cgroups"
 	"github.com/opencontainers/cgroups/fscommon"
+	"github.com/opencontainers/cgroups/internal/delegate"
 )
 
 type parseError = fscommon.ParseError
@@ -77,6 +78,11 @@ func (m *Manager) Apply(pid int) error {
 			}
 		}
 		return err
+	}
+	if m.config.OwnerUID != nil {
+		if err := delegate.Chown(m.dirPath, *m.config.OwnerUID); err != nil {
+			return err
+		}
 	}
 	if err := cgroups.WriteCgroupProc(m.dirPath, pid); err != nil {
 		return err

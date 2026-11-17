@@ -48,11 +48,23 @@ func newUserSystemdDbus() (*systemdDbus.Conn, error) {
 
 // DetectUID detects UID from the OwnerUID field of `busctl --user status`
 // if running in userNS. The value corresponds to sd_bus_creds_get_owner_uid(3) .
+// If running under RootlessKit, the value of $ROOTLESSKIT_PARENT_EUID is
+// used instead.
 //
 // Otherwise returns os.Getuid() .
 func DetectUID() (int, error) {
 	if !userns.RunningInUserNS() {
 		return os.Getuid(), nil
+	}
+	// RootlessKit sets $ROOTLESSKIT_PARENT_EUID for its child process.
+	// Prefer it to busctl, which fails to obtain the OwnerUID when
+	// /proc is mounted with hidepid=2 (or hidepid=invisible).
+	if env := os.Getenv("ROOTLESSKIT_PARENT_EUID"); env != "" {
+		uid, err := strconv.Atoi(env)
+		if err != nil {
+			return -1, fmt.Errorf("invalid $ROOTLESSKIT_PARENT_EUID value %q: %w", env, err)
+		}
+		return uid, nil
 	}
 	b, err := exec.Command("busctl", "--user", "--no-pager", "status").CombinedOutput()
 	if err != nil {
