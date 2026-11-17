@@ -6415,6 +6415,53 @@
     endpoint: /metrics
   - component: kubelet
     endpoint: /metrics
+- name: rest_client_watch_list_duration_seconds
+  help: Watch list latency from request start through decoding the initial-events-end
+    bookmark in seconds. Broken down by verb and host.
+  type: Histogram
+  stabilityLevel: ALPHA
+  labels:
+  - host
+  - verb
+  buckets:
+  - 0.05
+  - 0.1
+  - 0.2
+  - 0.4
+  - 0.6
+  - 0.8
+  - 1
+  - 1.25
+  - 1.5
+  - 2
+  - 3
+  - 4
+  - 5
+  - 6
+  - 8
+  - 10
+  - 15
+  - 20
+  - 30
+  - 45
+  - 60
+  - 90
+  - 120
+  - 180
+  - 300
+  componentEndpoints:
+  - component: cloud-controller-manager
+    endpoint: /metrics
+  - component: kube-apiserver
+    endpoint: /metrics
+  - component: kube-controller-manager
+    endpoint: /metrics
+  - component: kube-proxy
+    endpoint: /metrics
+  - component: kube-scheduler
+    endpoint: /metrics
+  - component: kubelet
+    endpoint: /metrics
 - name: retroactive_storageclass_errors_total
   help: Total number of failed retroactive StorageClass assignments to persistent
     volume claim
