@@ -39,6 +39,7 @@ import (
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
 	cmqos "k8s.io/kubernetes/pkg/kubelet/cm/qos"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/mount-utils"
 	"k8s.io/utils/cpuset"
 )
@@ -305,7 +306,8 @@ func TestNewPodContainerManager(t *testing.T) {
 		Burstable:  CgroupName{"burstable"},
 	}
 	QosEnabled := NodeConfig{
-		CgroupsPerQOS: true,
+		CgroupsPerQOS:      true,
+		MemorySwapBehavior: kubetypes.LimitedSwap,
 	}
 	QosDisabled := NodeConfig{
 		CgroupsPerQOS: false,
@@ -333,7 +335,10 @@ func TestNewPodContainerManager(t *testing.T) {
 					qosContainersInfo: info,
 					cgroupManager:     NewCgroupManager(logger, &CgroupSubsystems{}, ""),
 				},
-
+				internalCapacity: v1.ResourceList{
+					v1.ResourceMemory:        *resource.NewQuantity(40*1024*1024*1024, resource.BinarySI),
+					internalSwapResourceName: *resource.NewQuantity(5*1024*1024*1024, resource.BinarySI),
+				},
 				NodeConfig: QosEnabled,
 			},
 		},
@@ -344,7 +349,10 @@ func TestNewPodContainerManager(t *testing.T) {
 					qosContainersInfo: info,
 					cgroupManager:     NewCgroupManager(logger, &CgroupSubsystems{}, "systemd"),
 				},
-
+				internalCapacity: v1.ResourceList{
+					v1.ResourceMemory:        *resource.NewQuantity(40*1024*1024*1024, resource.BinarySI),
+					internalSwapResourceName: *resource.NewQuantity(5*1024*1024*1024, resource.BinarySI),
+				},
 				NodeConfig: QosEnabled,
 			},
 		},
@@ -373,6 +381,9 @@ func TestNewPodContainerManager(t *testing.T) {
 				assert.Equal(t, c.cm.PodPidsLimit, got.podPidsLimit)
 				assert.Equal(t, c.cm.EnforceCPULimits, got.enforceCPULimits)
 				assert.Equal(t, uint64(c.cm.CPUCFSQuotaPeriod/time.Microsecond), got.cpuCFSQuotaPeriod)
+				assert.Equal(t, c.cm.MemorySwapBehavior, got.memorySwapBehavior)
+				assert.Equal(t, c.cm.internalCapacity.Memory().Value(), got.memoryCapacity)
+				assert.Equal(t, c.cm.internalCapacity.Name(internalSwapResourceName, resource.BinarySI).Value(), got.swapCapacity)
 
 			} else {
 				assert.IsType(t, &podContainerManagerNoop{}, pcm)
