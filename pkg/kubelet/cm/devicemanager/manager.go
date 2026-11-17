@@ -468,13 +468,54 @@ func (m *ManagerImpl) Allocate(ctx context.Context, pod *v1.Pod, container *v1.C
 func (m *ManagerImpl) UpdatePluginResources(node *schedulerframework.NodeInfo, attrs *lifecycle.PodAdmitAttributes) error {
 	pod := attrs.Pod
 
-	// quick return if no pluginResources requested
 	if !m.podDevices.hasPod(string(pod.UID)) {
+		// Overhead is accounted for by the scheduler but never allocated by the
+		// device manager, so a pod that only consumes a device plugin resource
+		// through overhead has no allocation to sanitize against. Without this,
+		// such pods are rejected on kubelet restart, while the plugin has not
+		// re-registered yet and the node advertises zero capacity.
+		m.sanitizeNodeAllocatableForOverhead(node, pod)
 		return nil
 	}
 
 	m.sanitizeNodeAllocatable(node)
 	return nil
+}
+
+// sanitizeNodeAllocatableForOverhead raises the allocatable of device plugin
+// resources charged through pod overhead so that an already started pod still
+// fits after a kubelet restart. Pods that were never started are left alone and
+// wait for the plugin to re-register like any new pod.
+func (m *ManagerImpl) sanitizeNodeAllocatableForOverhead(node *schedulerframework.NodeInfo, pod *v1.Pod) {
+	if pod.Status.StartTime == nil || len(pod.Spec.Overhead) == 0 {
+		return
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	var newAllocatable *schedulerframework.Resource
+	for name, quantity := range pod.Spec.Overhead {
+		resource := string(name)
+		_, registered := m.healthyDevices[resource]
+		_, allocated := m.allocatedDevices[resource]
+		if !registered && !allocated {
+			continue
+		}
+		needed := node.Requested.ScalarResources[name] + quantity.Value()
+		if node.Allocatable.ScalarResources[name] >= needed {
+			continue
+		}
+		if newAllocatable == nil {
+			newAllocatable = node.Allocatable.Clone()
+		}
+		if newAllocatable.ScalarResources == nil {
+			newAllocatable.ScalarResources = make(map[v1.ResourceName]int64)
+		}
+		newAllocatable.ScalarResources[name] = needed
+	}
+	if newAllocatable != nil {
+		node.Allocatable = newAllocatable
+	}
 }
 
 func (m *ManagerImpl) markResourceUnhealthy(logger klog.Logger, resourceName string) {
