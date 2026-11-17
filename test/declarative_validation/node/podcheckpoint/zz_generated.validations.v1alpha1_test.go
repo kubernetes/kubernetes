@@ -81,6 +81,12 @@ func init() {
 				{ErrorType: "FieldValueInvalid", Origin: "maximum"},
 				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
 			},
+			"status": {
+				{ErrorType: "FieldValueInvalid", Origin: "update"},
+			},
+			"status.checkpointLocation": {
+				{ErrorType: "FieldValueInvalid", Origin: "update"},
+			},
 			"status.checkpointLocation.nodeLocal": {
 				{ErrorType: "FieldValueInvalid", Origin: "union"},
 			},
@@ -90,6 +96,9 @@ func init() {
 			"status.checkpointLocation.type": {
 				{ErrorType: "FieldValueNotSupported"},
 				{ErrorType: "FieldValueRequired"},
+			},
+			"status.checkpointedContainers": {
+				{ErrorType: "FieldValueForbidden", Origin: "update"},
 			},
 			"status.checkpointedContainers[*]": {
 				{ErrorType: "FieldValueDuplicate"},
@@ -183,6 +192,9 @@ func init() {
 			"status.checkpointedPodTemplate.spec.initContainers[*].securityContext.seccompProfile.type": {
 				{ErrorType: "FieldValueRequired"},
 			},
+			"status.checkpointedPodTemplate.spec.podNetwork": {
+				{ErrorType: "FieldValueNotSupported"},
+			},
 			"status.checkpointedPodTemplate.spec.schedulingGroup": {
 				{ErrorType: "FieldValueForbidden", Origin: "dependentForbidden"},
 			},
@@ -206,6 +218,9 @@ func init() {
 			},
 			"status.checkpointedPodTemplate.spec.tolerations[*].key": {
 				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-label-key"},
+			},
+			"status.completionTime": {
+				{ErrorType: "FieldValueInvalid", Origin: "update"},
 			},
 			"status.conditions[*]": {
 				{ErrorType: "FieldValueDuplicate"},

@@ -373,6 +373,8 @@ status:
             - addValue
             drop:
             - dropValue
+          cgroupOptions:
+            mountMode: mountModeValue
           privileged: true
           procMount: procMountValue
           readOnlyRootFilesystem: true
@@ -616,6 +618,8 @@ status:
             - addValue
             drop:
             - dropValue
+          cgroupOptions:
+            mountMode: mountModeValue
           privileged: true
           procMount: procMountValue
           readOnlyRootFilesystem: true
@@ -865,6 +869,8 @@ status:
             - addValue
             drop:
             - dropValue
+          cgroupOptions:
+            mountMode: mountModeValue
           privileged: true
           procMount: procMountValue
           readOnlyRootFilesystem: true
@@ -941,6 +947,7 @@ status:
         name: nameValue
       overhead:
         overheadKey: "0"
+      podNetwork: podNetworkValue
       preemptionPolicy: preemptionPolicyValue
       priority: 25
       priorityClassName: priorityClassNameValue
