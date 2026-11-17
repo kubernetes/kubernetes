@@ -438,15 +438,19 @@ func newQueuedPodInfoForLookup(pod *v1.Pod, plugins ...string) *framework.Queued
 // newQueuedPodGroupInfoFromRootLookup builds a QueuedPodGroupInfo object for lookup.
 // It assumes that the given rootLookup actually refers to a root in the workload forest
 // and therefore never returns nil.
-func (p *PriorityQueue) newQueuedPodGroupInfoFromRootLookup(logger klog.Logger, pInfo *framework.QueuedPodInfo, rootLookup *framework.QueuedPodGroupInfo) *framework.QueuedPodGroupInfo {
+func (p *PriorityQueue) newQueuedPodGroupInfoFromRootLookup(logger klog.Logger, pInfos []*framework.QueuedPodInfo, rootLookup *framework.QueuedPodGroupInfo) *framework.QueuedPodGroupInfo {
 	rootInfo := p.workloadForest.buildQueuedPodGroupInfo(logger, rootLookup)
 	if rootInfo == nil {
 		// This should never happen as rootLookup is guaranteed to be a root in the workload forest.
 		return nil
 	}
-	rootInfo.AddPod(pInfo)
-	rootInfo.QueueingParams.Timestamp = pInfo.GetTimestamp()
-	rootInfo.QueueingParams.InitialAttemptTimestamp = pInfo.GetInitialAttemptTimestamp()
+	for _, pInfo := range pInfos {
+		rootInfo.AddPod(pInfo)
+	}
+	if len(pInfos) > 0 {
+		rootInfo.QueueingParams.Timestamp = pInfos[0].GetTimestamp()
+		rootInfo.QueueingParams.InitialAttemptTimestamp = pInfos[0].GetInitialAttemptTimestamp()
+	}
 	return rootInfo
 }
 
@@ -1113,10 +1117,7 @@ func (p *PriorityQueue) addPodGroupMembers(logger klog.Logger, rootInfoLookup *f
 	}
 
 	// Create a new group as these are the first member pods in the queue.
-	rootInfo := p.newQueuedPodGroupInfoFromRootLookup(logger, pInfos[0], rootInfoLookup)
-	for _, pInfo := range pInfos[1:] {
-		rootInfo.AddPod(pInfo)
-	}
+	rootInfo := p.newQueuedPodGroupInfoFromRootLookup(logger, pInfos, rootInfoLookup)
 	if added := p.moveToActiveQ(logger, rootInfo, framework.EventUnscheduledPodAdd.Label(), false, nil); added {
 		p.activeQ.broadcast()
 	}
