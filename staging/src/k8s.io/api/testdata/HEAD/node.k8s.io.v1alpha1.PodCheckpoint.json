@@ -860,8 +860,12 @@
               "appArmorProfile": {
                 "type": "typeValue",
                 "localhostProfile": "localhostProfileValue"
+              },
+              "cgroupOptions": {
+                "mountMode": "mountModeValue"
               }
             },
+            "hostCgroupNamespace": true,
             "stdin": true,
             "stdinOnce": true,
             "tty": true
@@ -1192,8 +1196,12 @@
               "appArmorProfile": {
                 "type": "typeValue",
                 "localhostProfile": "localhostProfileValue"
+              },
+              "cgroupOptions": {
+                "mountMode": "mountModeValue"
               }
             },
+            "hostCgroupNamespace": true,
             "stdin": true,
             "stdinOnce": true,
             "tty": true
@@ -1524,8 +1532,12 @@
               "appArmorProfile": {
                 "type": "typeValue",
                 "localhostProfile": "localhostProfileValue"
+              },
+              "cgroupOptions": {
+                "mountMode": "mountModeValue"
               }
             },
+            "hostCgroupNamespace": true,
             "stdin": true,
             "stdinOnce": true,
             "tty": true,
@@ -1942,7 +1954,8 @@
             "name": "nameValue",
             "priority": 2
           }
-        ]
+        ],
+        "podNetwork": "podNetworkValue"
       }
     },
     "checkpointedContainers": [

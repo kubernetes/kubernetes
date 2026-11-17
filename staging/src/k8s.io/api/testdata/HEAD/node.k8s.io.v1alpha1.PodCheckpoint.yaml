@@ -246,6 +246,7 @@ status:
           secretRef:
             name: nameValue
             optional: true
+        hostCgroupNamespace: true
         image: imageValue
         imagePullPolicy: imagePullPolicyValue
         lifecycle:
@@ -373,6 +374,8 @@ status:
             - addValue
             drop:
             - dropValue
+          cgroupOptions:
+            mountMode: mountModeValue
           privileged: true
           procMount: procMountValue
           readOnlyRootFilesystem: true
@@ -489,6 +492,7 @@ status:
           secretRef:
             name: nameValue
             optional: true
+        hostCgroupNamespace: true
         image: imageValue
         imagePullPolicy: imagePullPolicyValue
         lifecycle:
@@ -616,6 +620,8 @@ status:
             - addValue
             drop:
             - dropValue
+          cgroupOptions:
+            mountMode: mountModeValue
           privileged: true
           procMount: procMountValue
           readOnlyRootFilesystem: true
@@ -738,6 +744,7 @@ status:
           secretRef:
             name: nameValue
             optional: true
+        hostCgroupNamespace: true
         image: imageValue
         imagePullPolicy: imagePullPolicyValue
         lifecycle:
@@ -865,6 +872,8 @@ status:
             - addValue
             drop:
             - dropValue
+          cgroupOptions:
+            mountMode: mountModeValue
           privileged: true
           procMount: procMountValue
           readOnlyRootFilesystem: true
@@ -941,6 +950,7 @@ status:
         name: nameValue
       overhead:
         overheadKey: "0"
+      podNetwork: podNetworkValue
       preemptionPolicy: preemptionPolicyValue
       priority: 25
       priorityClassName: priorityClassNameValue
