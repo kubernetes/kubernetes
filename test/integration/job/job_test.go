@@ -6062,7 +6062,11 @@ func TestJobGangSchedulingSuspendResume(t *testing.T) {
 			if tc.holdPodGroupOnSuspend {
 				// The controller requeues the Job while the PodGroup is terminating;
 				// cover a couple of requeues before releasing it.
-				err := wait.PollUntilContextTimeout(ctx, waitInterval, 2*jobcontroller.DefaultJobApiBackOff+waitInterval, true, func(ctx context.Context) (bool, error) {
+				err := wait.PollUntilContextTimeout(ctx, waitInterval, 2*jobcontroller.DefaultJobApiBackOff+waitInterval, true, func(_ context.Context) (bool, error) {
+					// This poll is expected to run into its deadline. Use the test ctx
+					// rather than the poll ctx. A List started right before the deadline
+					// can fail with a client rate-limiter error, which wait.Interrupted
+					// does not recognize.
 					pods, err := getJobPods(ctx, t, clientSet, jobObj, func(v1.PodStatus) bool { return true })
 					if err != nil {
 						return false, err
