@@ -43,9 +43,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/workqueue"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
@@ -53,7 +55,6 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	checkpointutil "k8s.io/kubernetes/pkg/apis/node/util"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/pkg/kubelet/allocation"
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -65,8 +66,6 @@ import (
 	statustest "k8s.io/kubernetes/pkg/kubelet/status/testing"
 	kubeletutil "k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/mount-utils"
-	"k8s.io/utils/clock"
-	testingclock "k8s.io/utils/clock/testing"
 	"k8s.io/utils/ptr"
 )
 
@@ -80,10 +79,10 @@ type testManager struct {
 func (*testManager) Cleanup() {}
 
 // newTestManager returns a manager whose dependencies are fakes or in-memory
-// kubelet managers. Pod syncs run through checkpointPodWorkers.
+// kubelet managers. Pod syncs run through checkpointPodProvider.
 func newTestManager(t *testing.T) *testManager {
 	t.Helper()
-	logger := klog.FromContext(ktesting.Init(t))
+	ctx := ktesting.Init(t)
 	client := fake.NewClientset()
 	podManager := kubepod.NewBasicPodManager()
 	statusManager := status.NewManager(client, podManager, &statustest.FakePodDeletionSafetyProvider{}, kubeletutil.NewPodStartupLatencyTracker())
@@ -92,14 +91,12 @@ func newTestManager(t *testing.T) *testManager {
 	fakeRuntime := &containertest.FakeRuntime{T: t}
 	checkpointsDir := filepath.Join(t.TempDir(), "pod-checkpoints")
 	require.NoError(t, os.MkdirAll(checkpointsDir, 0o700))
-	workers := &checkpointPodWorkers{}
-	m := NewManager(Config{
+	pods := &checkpointPodProvider{Manager: podManager}
+	m := newManager(ctx, Config{
 		KubeClient:           client,
 		NodeName:             testNodeName,
 		Recorder:             recorder,
-		PodManager:           podManager,
-		PodWorkers:           workers,
-		AllocationManager:    allocation.NewInMemoryManager(logger, statusManager, testPodProvider{podManager}, sourcesReady, recorder),
+		PodProvider:          pods,
 		ContainerRuntime:     fakeRuntime,
 		ProbeManager:         probetest.FakeManager{},
 		StatusManager:        statusManager,
@@ -108,21 +105,9 @@ func newTestManager(t *testing.T) *testManager {
 		CheckpointsDir:       checkpointsDir,
 		Mounter:              mount.NewFakeMounter(nil),
 	})
-	workers.manager = m
+	pods.manager = m
 	return &testManager{manager: m, fakeRuntime: fakeRuntime}
 }
-
-// testPodProvider serves the Pods of the Pod manager to the allocation manager.
-type testPodProvider struct {
-	podManager kubepod.Manager
-}
-
-func (p testPodProvider) GetActivePods() []*v1.Pod { return p.podManager.GetPods() }
-func (p testPodProvider) GetPodByUID(uid types.UID) (*v1.Pod, bool) {
-	return p.podManager.GetPodByUID(uid)
-}
-func (testPodProvider) IsPodTerminatingOrTerminal(*v1.Pod) bool { return false }
-func (testPodProvider) SyncPodNow(context.Context, *v1.Pod)     {}
 
 type checkpointRuntime struct {
 	kubecontainer.Runtime
@@ -155,22 +140,23 @@ func (m *checkpointProbeManager) ResumeProbes(uid types.UID) {
 	m.resumed <- uid
 }
 
-// checkpointPodWorkers stands in for the pod workers in checkpoint tests. A
+// checkpointPodProvider stands in for the Kubelet in checkpoint tests. A
 // sync runs only the step of SyncPod that captures a requested checkpoint,
 // with the status that the runtime reports. It runs before SyncPodNow returns
 // unless async is set. onSync, if set, replaces the capture.
-type checkpointPodWorkers struct {
+type checkpointPodProvider struct {
+	kubepod.Manager
 	manager              *manager
 	async                bool
 	terminationRequested map[types.UID]bool
 	onSync               func(pod *v1.Pod)
 }
 
-func (w *checkpointPodWorkers) IsPodTerminationRequested(uid types.UID) bool {
-	return w.terminationRequested[uid]
+func (w *checkpointPodProvider) IsPodTerminatingOrTerminal(pod *v1.Pod) bool {
+	return pod.DeletionTimestamp != nil || w.terminationRequested[pod.UID]
 }
 
-func (w *checkpointPodWorkers) SyncPodNow(ctx context.Context, pod *v1.Pod) {
+func (w *checkpointPodProvider) SyncPodNow(ctx context.Context, pod *v1.Pod) {
 	if w.onSync != nil {
 		w.onSync(pod)
 		return
@@ -227,7 +213,7 @@ func useCheckpointStorage(kl *manager) {
 
 func useCheckpointPodWorkers(kl *manager) {
 	useCheckpointStorage(kl)
-	kl.podWorkers = &checkpointPodWorkers{manager: kl}
+	kl.podProvider = &checkpointPodProvider{Manager: testPods(kl), manager: kl}
 }
 
 // checkpointPod hands a checkpoint of pod to its pod worker, as the watch does.
@@ -255,7 +241,7 @@ func TestCheckpointPod(t *testing.T) {
 				Containers: []v1.Container{{Name: "containerFoo"}},
 			},
 		}
-		kubelet.podManager.SetPods([]*v1.Pod{pod})
+		testPods(kubelet).SetPods([]*v1.Pod{pod})
 		fakeRuntime.PodList = []*containertest.FakePod{
 			{Pod: &kubecontainer.Pod{ID: pod.UID, Name: pod.Name, Namespace: pod.Namespace}},
 		}
@@ -267,6 +253,8 @@ func TestCheckpointPod(t *testing.T) {
 		}
 		kubelet.kubeClient = fake.NewClientset()
 		useCheckpointPodWorkers(kubelet)
+		seedCheckpointCache(t, kubelet)
+		startCheckpointOutcomeWorker(t, kubelet)
 		return kubelet, fakeRuntime, pod
 	}
 	// addCheckpoint stores a pending PodCheckpoint for pod and returns its name.
@@ -274,24 +262,47 @@ func TestCheckpointPod(t *testing.T) {
 		t.Helper()
 		pc := &nodev1alpha1.PodCheckpoint{ObjectMeta: metav1.ObjectMeta{Name: "ckpt-" + string(checkpointUID), Namespace: pod.Namespace, UID: checkpointUID}}
 		require.NoError(t, kubelet.kubeClient.(*fake.Clientset).Tracker().Add(pc))
+		if state := kubelet.podCheckpointWatch; state != nil {
+			require.NoError(t, state.indexer.Add(pc))
+		}
 		return pc.Name
 	}
-	setupCheckpoint := func(kubelet *manager, pod *v1.Pod, checkpointUID string, failTerminalStatus bool) {
+	setupCheckpoint := func(kubelet *manager, pod *v1.Pod, checkpointUID string, failTerminalStatus bool) *atomic.Bool {
 		pc := &nodev1alpha1.PodCheckpoint{
 			ObjectMeta: metav1.ObjectMeta{Name: "ckpt", Namespace: pod.Namespace, UID: types.UID(checkpointUID)},
 		}
 		client := fake.NewClientset(pc)
+		failStatus := &atomic.Bool{}
+		failStatus.Store(failTerminalStatus)
 		if failTerminalStatus {
 			client.PrependReactor("update", "podcheckpoints", func(action core.Action) (bool, apiruntime.Object, error) {
 				obj := action.(core.UpdateAction).GetObject().(*nodev1alpha1.PodCheckpoint)
 				condition := apimeta.FindStatusCondition(obj.Status.Conditions, nodev1alpha1.PodCheckpointConditionReady)
-				if condition != nil && condition.Reason != nodev1alpha1.PodCheckpointReasonInProgress {
+				if failStatus.Load() && condition != nil && condition.Reason != nodev1alpha1.PodCheckpointReasonInProgress {
 					return true, nil, errors.New("injected terminal status failure")
 				}
 				return false, nil, nil
 			})
 		}
 		kubelet.kubeClient = client
+		if state := kubelet.podCheckpointWatch; state != nil {
+			require.NoError(t, state.indexer.Add(pc))
+		}
+		return failStatus
+	}
+	syncPodStatus := func(t *testing.T, kubelet *manager, podUID types.UID) {
+		t.Helper()
+		pod, found := testPods(kubelet).GetPodByUID(podUID)
+		require.True(t, found)
+		cached, _ := kubelet.statusManager.GetPodStatus(podUID)
+		conditions := cached.Conditions[:0]
+		for _, condition := range cached.Conditions {
+			if condition.Type != v1.PodCheckpointing {
+				conditions = append(conditions, condition)
+			}
+		}
+		cached.Conditions = conditions
+		kubelet.statusManager.SetPodStatus(klog.FromContext(ktesting.Init(t)), pod, cached)
 	}
 	waitForCompletion := func(t *testing.T, kubelet *manager, podUID types.UID) {
 		t.Helper()
@@ -299,9 +310,10 @@ func TestCheckpointPod(t *testing.T) {
 			inFlight := kubelet.podCheckpointInFlight(podUID)
 			return !inFlight
 		}, 5*time.Second, 10*time.Millisecond)
+		syncPodStatus(t, kubelet, podUID)
 		cached, _ := kubelet.statusManager.GetPodStatus(podUID)
 		_, condition := podutil.GetPodCondition(&cached, v1.PodCheckpointing)
-		require.Nil(t, condition, "checkpoint completion must clear the source condition")
+		require.Nil(t, condition, "the next Pod sync must clear the checkpointing condition")
 	}
 	requireCheckpointFailure := func(t *testing.T, kubelet *manager, pod *v1.Pod, name, message string) {
 		t.Helper()
@@ -377,7 +389,7 @@ func TestCheckpointPod(t *testing.T) {
 			case "drained":
 				other := pod.DeepCopy()
 				other.UID, other.Name = "other-pod", "other"
-				kl.podManager.AddPod(other)
+				testPods(kl).AddPod(other)
 				fakeRuntime.PodList = append(fakeRuntime.PodList, &containertest.FakePod{Pod: &kubecontainer.Pod{ID: other.UID, Name: other.Name, Namespace: other.Namespace}})
 				require.NoError(t, checkpointPod(ctx, kl, other, addCheckpoint(t, kl, other, "other-uid"), "other-uid", 0))
 				receiveRequest(t, requests)
@@ -488,9 +500,6 @@ func TestCheckpointPod(t *testing.T) {
 				if state == "settled" || state == "missing allocation" {
 					allocated = pod.DeepCopy()
 				}
-				if state != "missing allocation" {
-					require.NoError(t, kl.allocationManager.SetAllocatedPod(klog.Background(), allocated))
-				}
 				original := pod.DeepCopy()
 				setupCheckpoint(kl, pod, "resize-checkpoint", false)
 				called := make(chan struct{}, 1)
@@ -506,6 +515,13 @@ func TestCheckpointPod(t *testing.T) {
 					checkpointPod: func(context.Context, *runtimeapi.CheckpointPodRequest) error { called <- struct{}{}; return nil },
 				}
 				ctx := ktesting.Init(t)
+				workers := kl.podProvider.(*checkpointPodProvider)
+				workers.onSync = func(_ *v1.Pod) {
+					podStatus, err := kl.containerRuntime.GetPodStatus(ctx, &kubecontainer.Pod{ID: allocated.UID, Name: allocated.Name, Namespace: allocated.Namespace})
+					require.NoError(t, err)
+					markContainersStarted(ctx, kl, allocated, podStatus)
+					kl.syncPodCheckpointRequest(ctx, allocated, podStatus)
+				}
 				require.NoError(t, checkpointPod(ctx, kl, pod, "ckpt", "resize-checkpoint", time.Second))
 				if resizing {
 					require.Empty(t, called)
@@ -513,7 +529,7 @@ func TestCheckpointPod(t *testing.T) {
 					require.True(t, pending, "a resize in progress must leave the checkpoint for a later sync")
 					require.True(t, kl.podCheckpointInFlight(pod.UID))
 					resizing = false
-					kl.podWorkers.SyncPodNow(ctx, pod)
+					kl.podProvider.SyncPodNow(ctx, pod)
 				}
 				waitForCompletion(t, kl, pod.UID)
 				require.Len(t, called, 1)
@@ -534,7 +550,7 @@ func TestCheckpointPod(t *testing.T) {
 
 	t.Run("condition clears before status publication", func(t *testing.T) {
 		kl, fakeRuntime, pod := setup(t)
-		setupCheckpoint(kl, pod, "observability-uid", true)
+		failStatus := setupCheckpoint(kl, pod, "observability-uid", true)
 		ctx, cancel := context.WithCancel(ktesting.Init(t))
 		defer cancel()
 		recorder := record.NewFakeRecorder(20)
@@ -563,17 +579,16 @@ func TestCheckpointPod(t *testing.T) {
 		require.Equal(t, v1.ConditionTrue, condition.Status)
 		require.Contains(t, condition.Message, "ckpt")
 		close(finish)
-		require.Eventually(t, func() bool {
-			cached, _ := kl.statusManager.GetPodStatus(pod.UID)
-			_, condition := podutil.GetPodCondition(&cached, v1.PodCheckpointing)
-			return condition == nil
-		}, 5*time.Second, time.Millisecond)
 		select {
 		case err := <-returned:
 			require.NoError(t, err)
 		case <-time.After(5 * time.Second):
 			t.Fatal("status publication held the pod worker")
 		}
+		syncPodStatus(t, kl, pod.UID)
+		cached, _ = kl.statusManager.GetPodStatus(pod.UID)
+		_, condition = podutil.GetPodCondition(&cached, v1.PodCheckpointing)
+		require.Nil(t, condition, "the next Pod sync must clear the checkpointing condition before outcome publication")
 		require.True(t, kl.podCheckpointInFlight(pod.UID), "status publication must still be pending")
 		for _, reason := range []string{events.PodCheckpointStarted, events.SourcePodCheckpointing} {
 			select {
@@ -584,6 +599,7 @@ func TestCheckpointPod(t *testing.T) {
 			}
 		}
 		cancel()
+		failStatus.Store(false)
 		waitForCompletion(t, kl, pod.UID)
 	})
 
@@ -638,6 +654,7 @@ func TestCheckpointPod(t *testing.T) {
 			require.NoError(t, err)
 			require.NotNil(t, pending.Status.CheckpointedPodTemplate)
 			captured := pending.Status.CheckpointedPodTemplate.DeepCopy()
+			syncPodStatus(t, kl, pod.UID)
 			cached, _ := kl.statusManager.GetPodStatus(pod.UID)
 			_, condition := podutil.GetPodCondition(&cached, v1.PodCheckpointing)
 			require.Nil(t, condition)
@@ -646,8 +663,8 @@ func TestCheckpointPod(t *testing.T) {
 
 			changed := pod.DeepCopy()
 			change.mutate(changed)
-			kl.podManager.SetPods([]*v1.Pod{changed})
-			kl.podWorkers.SyncPodNow(ctx, changed)
+			testPods(kl).SetPods([]*v1.Pod{changed})
+			kl.podProvider.SyncPodNow(ctx, changed)
 			require.Equal(t, 1, captureCalls, "a source update must not repeat a completed capture")
 			close(allowPublication)
 			waitForCompletion(t, kl, pod.UID)
@@ -714,11 +731,11 @@ func TestCheckpointPod(t *testing.T) {
 		pending := kubelet.hasPodCheckpointRequest(pod.UID)
 		require.True(t, pending, "a resize in progress defers the request")
 
-		state := kubelet.podCheckpointWatch.Load()
+		state := kubelet.podCheckpointWatch
 		cached, err := state.lister.PodCheckpoints(pod.Namespace).Get(name)
 		require.NoError(t, err)
 		require.NoError(t, state.indexer.Delete(cached))
-		kubelet.podWorkers.SyncPodNow(ctx, pod)
+		kubelet.podProvider.SyncPodNow(ctx, pod)
 		pending = kubelet.hasPodCheckpointRequest(pod.UID)
 		require.False(t, pending, "a deferred request must not outlive its PodCheckpoint")
 		require.False(t, kubelet.podCheckpointInFlight(pod.UID))
@@ -1048,7 +1065,7 @@ func TestCheckpointPod(t *testing.T) {
 	t.Run("retains successful output when status publication is canceled", func(t *testing.T) {
 		kubelet, fakeRuntime, pod := setup(t)
 		requests := make(chan *runtimeapi.CheckpointPodRequest, 1)
-		setupCheckpoint(kubelet, pod, "status-failure-uid", true)
+		setupCheckpoint(kubelet, pod, "status-failure-uid", false)
 		kubelet.containerRuntime = &checkpointRuntime{
 			Runtime: fakeRuntime,
 			checkpointPod: func(_ context.Context, request *runtimeapi.CheckpointPodRequest) error {
@@ -1182,7 +1199,7 @@ func TestSyncPodCheckpoint(t *testing.T) {
 		pc := &nodev1alpha1.PodCheckpoint{
 			ObjectMeta: metav1.ObjectMeta{Name: "ckpt", Namespace: "ns", UID: "checkpoint-uid"},
 			Spec:       nodev1alpha1.PodCheckpointSpec{SourcePod: nodev1alpha1.PodReference{Name: "src"}},
-			Status:     &nodev1alpha1.PodCheckpointStatus{},
+			Status:     &nodev1alpha1.PodCheckpointStatus{NodeName: ptr.To(thisNode)},
 		}
 		if specUID != "" {
 			pc.Spec.SourcePod.UID = new(types.UID(specUID))
@@ -1232,7 +1249,7 @@ func TestSyncPodCheckpoint(t *testing.T) {
 			kl.nodeName = thisNode
 
 			if tc.register {
-				kl.podManager.SetPods([]*v1.Pod{localPod()})
+				testPods(kl).SetPods([]*v1.Pod{localPod()})
 			}
 			if tc.inFlight {
 				kl.startPodCheckpoint("pod-uid", "")
@@ -1246,6 +1263,9 @@ func TestSyncPodCheckpoint(t *testing.T) {
 
 			seedCheckpointCache(t, kl)
 			err := kl.syncPodCheckpoint(tCtx, "ns/ckpt")
+			if _, pending := kl.pendingPodCheckpointOutcome("ns/ckpt"); pending {
+				require.True(t, kl.podCheckpointWatch.processNext(tCtx))
+			}
 			if tc.apiPod != nil {
 				for _, action := range kl.kubeClient.(*fake.Clientset).Actions() {
 					require.NotEqual(t, "pods", action.GetResource().Resource, "routing must not issue source Pod GETs")
@@ -1374,9 +1394,9 @@ func TestPodCheckpointRequestSyncsCurrentPod(t *testing.T) {
 	observed := podWithUIDNameNsSpec("pod-uid", "source", "ns", v1.PodSpec{NodeName: "testNode", Containers: []v1.Container{{Name: "app"}}})
 	current := observed.DeepCopy()
 	current.Generation = 2
-	kl.podManager.SetPods([]*v1.Pod{current})
+	testPods(kl).SetPods([]*v1.Pod{current})
 	var synced []*v1.Pod
-	kl.podWorkers = &checkpointPodWorkers{manager: kl, onSync: func(pod *v1.Pod) { synced = append(synced, pod) }}
+	kl.podProvider = &checkpointPodProvider{Manager: testPods(kl), manager: kl, onSync: func(pod *v1.Pod) { synced = append(synced, pod) }}
 
 	require.NoError(t, kl.requestPodCheckpoint(tCtx, observed, &podCheckpointRequest{ctx: tCtx, namespace: "ns", name: "checkpoint", uid: "checkpoint-uid"}))
 	require.Len(t, synced, 1)
@@ -1401,12 +1421,18 @@ func TestPodCheckpointRequestFailsForTerminatingPod(t *testing.T) {
 			kl := testKubelet.manager
 			pod := podWithUIDNameNsSpec("pod-uid", "source", "ns", v1.PodSpec{NodeName: "testNode", Containers: []v1.Container{{Name: "app"}}})
 			if !tc.deleted {
-				kl.podManager.SetPods([]*v1.Pod{pod})
+				testPods(kl).SetPods([]*v1.Pod{pod})
 			}
-			pc := &nodev1alpha1.PodCheckpoint{ObjectMeta: metav1.ObjectMeta{Name: "checkpoint", Namespace: pod.Namespace, UID: "checkpoint-uid"}}
+			pc := &nodev1alpha1.PodCheckpoint{
+				ObjectMeta: metav1.ObjectMeta{Name: "checkpoint", Namespace: pod.Namespace, UID: "checkpoint-uid"},
+				Status:     &nodev1alpha1.PodCheckpointStatus{NodeName: new(string(kl.nodeName))},
+			}
 			kl.kubeClient = fake.NewClientset(pc)
+			seedCheckpointCache(t, kl)
+			startCheckpointOutcomeWorker(t, kl)
 			syncs := 0
-			kl.podWorkers = &checkpointPodWorkers{
+			kl.podProvider = &checkpointPodProvider{
+				Manager:              testPods(kl),
 				manager:              kl,
 				terminationRequested: map[types.UID]bool{pod.UID: tc.terminating},
 				onSync:               func(*v1.Pod) { syncs++ },
@@ -1672,7 +1698,7 @@ func TestCheckpointPodPreservesDataAfterLostStatusResponse(t *testing.T) {
 	pod := podWithUIDNameNsSpec("pod-uid", "source", "ns", v1.PodSpec{})
 	pod.Spec.NodeName = "testNode"
 	pod.Spec.Containers = []v1.Container{{Name: "app"}}
-	kl.podManager.SetPods([]*v1.Pod{pod})
+	testPods(kl).SetPods([]*v1.Pod{pod})
 	fr.PodList = []*containertest.FakePod{{Pod: &kubecontainer.Pod{ID: pod.UID, Name: pod.Name, Namespace: pod.Namespace}}}
 	fr.PodStatus = kubecontainer.PodStatus{
 		SandboxStatuses:   []*runtimeapi.PodSandboxStatus{{Id: "sandbox"}},
@@ -1680,6 +1706,8 @@ func TestCheckpointPodPreservesDataAfterLostStatusResponse(t *testing.T) {
 	pc := &nodev1alpha1.PodCheckpoint{ObjectMeta: metav1.ObjectMeta{Name: "cp", Namespace: "ns", UID: "cp-uid"}}
 	client := fake.NewSimpleClientset(pc)
 	kl.kubeClient = client
+	seedCheckpointCache(t, kl)
+	startCheckpointOutcomeWorker(t, kl)
 	client.PrependReactor("update", "podcheckpoints", func(action core.Action) (bool, apiruntime.Object, error) {
 		obj := action.(core.UpdateAction).GetObject().(*nodev1alpha1.PodCheckpoint)
 		for _, c := range obj.Status.Conditions {
@@ -1717,21 +1745,19 @@ func TestCheckpointPodPreservesDataAfterLostStatusResponse(t *testing.T) {
 	require.Equal(t, 1, counts[events.CheckpointSucceeded], "lost status response must not lose the completion event")
 }
 
-func TestCheckpointPublicationBackoffRetainsOutcome(t *testing.T) {
+func TestCheckpointPublicationUsesWatchQueueRetries(t *testing.T) {
 	for _, denied := range []error{
 		apierrors.NewForbidden(schema.GroupResource{Group: "node.k8s.io", Resource: "podcheckpoints"}, "checkpoint", errors.New("status permission denied")),
 		apierrors.NewInvalid(schema.GroupKind{Group: "node.k8s.io", Kind: "PodCheckpoint"}, "checkpoint", field.ErrorList{field.Invalid(field.NewPath("status"), "invalid", "injected validation error")}),
 	} {
 		t.Run(string(apierrors.ReasonForError(denied)), func(t *testing.T) {
-			ctx, cancel := context.WithCancel(ktesting.Init(t))
+			ctx := ktesting.Init(t)
 			kl, _, source, pc := checkpointFixture(t)
-			clock := testingclock.NewFakeClock(time.Now())
-			kl.clock = clock
 			client := kl.kubeClient.(*fake.Clientset)
-			attempts := make(chan struct{}, 16)
+			attempts := 0
 			var allowed atomic.Bool
 			client.PrependReactor("update", "podcheckpoints", func(core.Action) (bool, apiruntime.Object, error) {
-				attempts <- struct{}{}
+				attempts++
 				if !allowed.Load() {
 					return true, nil, denied
 				}
@@ -1741,47 +1767,26 @@ func TestCheckpointPublicationBackoffRetainsOutcome(t *testing.T) {
 			require.NoError(t, err)
 			require.NoError(t, os.WriteFile(filepath.Join(output, "saved"), []byte("captured state"), 0600))
 			kl.startPodCheckpoint(source.UID, pc.UID)
-			kl.setCheckpointPublication(pc.UID, true)
-			done := make(chan struct{})
-			go func() {
-				defer close(done)
-				kl.doPublishPodCheckpointOutcome(ctx, &podCheckpointRun{pod: source, namespace: pc.Namespace, name: pc.Name, uid: pc.UID, outputPath: output}, true, filepath.Base(output), "")
-			}()
-			t.Cleanup(func() {
-				cancel()
-				select {
-				case <-done:
-				case <-time.After(5 * time.Second):
-					t.Error("publisher ignored cancellation")
-				}
-			})
-			receive := func() {
-				t.Helper()
-				select {
-				case <-attempts:
-				case <-time.After(5 * time.Second):
-					t.Fatal("publication attempt did not run")
-				}
-			}
-			receive()
-			for _, delay := range []time.Duration{time.Second, 2 * time.Second, 4 * time.Second, 8 * time.Second, 16 * time.Second, 32 * time.Second, time.Minute, time.Minute} {
-				require.Eventually(t, clock.HasWaiters, 5*time.Second, time.Millisecond)
-				clock.Step(delay - time.Nanosecond)
-				require.Empty(t, attempts, "retry must honor exponential backoff")
-				clock.Step(delay/10 + 2*time.Nanosecond)
-				receive()
-				require.FileExists(t, filepath.Join(output, "saved"))
-				require.True(t, kl.podCheckpointInFlight(source.UID))
-			}
+			seedCheckpointCache(t, kl)
+			state := kl.podCheckpointWatch
+			state.queue = workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[string]())
+			defer state.queue.ShutDown()
+			run := &podCheckpointRun{pod: source, namespace: pc.Namespace, name: pc.Name, uid: pc.UID, outputPath: output}
+			kl.publishPodCheckpointOutcome(ctx, run, true, filepath.Base(output), "")
+			key := pc.Namespace + "/" + pc.Name
+			require.True(t, state.processNext(ctx))
+			require.Equal(t, 1, attempts)
+			require.Equal(t, 1, state.queue.NumRequeues(key))
+			_, pending := kl.pendingPodCheckpointOutcome(key)
+			require.True(t, pending)
+			require.FileExists(t, filepath.Join(output, "saved"))
+			require.True(t, kl.podCheckpointInFlight(source.UID))
 			allowed.Store(true)
-			require.Eventually(t, clock.HasWaiters, 5*time.Second, time.Millisecond)
-			clock.Step(66 * time.Second)
-			receive()
-			select {
-			case <-done:
-			case <-time.After(5 * time.Second):
-				t.Fatal("publisher did not finish after permission recovered")
-			}
+			state.queue.Add(key)
+			require.True(t, state.processNext(ctx))
+			require.Equal(t, 2, attempts)
+			_, pending = kl.pendingPodCheckpointOutcome(key)
+			require.False(t, pending)
 			require.FileExists(t, filepath.Join(output, "saved"))
 			require.False(t, kl.podCheckpointInFlight(source.UID))
 		})
@@ -1790,4 +1795,71 @@ func TestCheckpointPublicationBackoffRetainsOutcome(t *testing.T) {
 
 func podWithUIDNameNsSpec(uid types.UID, name, namespace string, spec v1.PodSpec) *v1.Pod {
 	return &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: uid, Name: name, Namespace: namespace}, Spec: spec}
+}
+
+func TestPodCheckpointStatePhases(t *testing.T) {
+	kl := &manager{}
+	request := &podCheckpointRequest{uid: "checkpoint-uid"}
+	require.True(t, kl.startPodCheckpoint("pod-uid", "checkpoint-uid"))
+	require.False(t, kl.startPodCheckpoint("pod-uid", "other-uid"), "one checkpoint per Pod")
+	_, ok := kl.takePodCheckpointRequest("pod-uid")
+	require.False(t, ok, "no request was handed to SyncPod yet")
+
+	kl.setPodCheckpointRequest("pod-uid", request)
+	taken, ok := kl.takePodCheckpointRequest("pod-uid")
+	require.True(t, ok)
+	require.Same(t, request, taken)
+	_, ok = kl.takePodCheckpointRequest("pod-uid")
+	require.False(t, ok, "a capturing checkpoint is not taken again")
+
+	// A deferred capture is handed back to the next SyncPod.
+	kl.setPodCheckpointRequest("pod-uid", request)
+	_, ok = kl.takePodCheckpointRequest("pod-uid")
+	require.True(t, ok)
+	kl.setPodCheckpointRequest("pod-uid", &podCheckpointRequest{uid: "other-uid"})
+	require.False(t, kl.hasPodCheckpointRequest("pod-uid"), "a request for another checkpoint is ignored")
+
+	require.True(t, kl.podCheckpointDataInUse().Has("checkpoint-uid"))
+	kl.finishPodCheckpoint("pod-uid", "other-uid")
+	require.True(t, kl.podCheckpointInFlight("pod-uid"), "only the checkpoint in flight can finish it")
+	kl.finishPodCheckpoint("pod-uid", "checkpoint-uid")
+	require.False(t, kl.podCheckpointInFlight("pod-uid"))
+	require.Empty(t, kl.podCheckpointDataInUse())
+}
+
+// testPods returns the Pod manager behind the test Pod provider.
+func testPods(kl *manager) kubepod.Manager {
+	return kl.podProvider.(*checkpointPodProvider).Manager
+}
+
+// useTestClient replaces the API client and rebuilds the watch around it.
+func useTestClient(t *testing.T, kl *manager, client clientset.Interface) {
+	t.Helper()
+	kl.kubeClient = client
+	kl.podCheckpointWatch = newPodCheckpointWatch(klog.FromContext(ktesting.Init(t)), kl)
+	t.Cleanup(kl.podCheckpointWatch.queue.ShutDown)
+}
+
+func TestNewManagerFeatureGate(t *testing.T) {
+	for _, enabled := range []bool{false, true} {
+		t.Run(fmt.Sprintf("enabled=%t", enabled), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelCheckpointRestore, enabled)
+			client := fake.NewClientset()
+			m := NewManager(ktesting.Init(t), Config{KubeClient: client, NodeName: testNodeName})
+			if enabled {
+				real, ok := m.(*manager)
+				require.True(t, ok)
+				t.Cleanup(real.podCheckpointWatch.queue.ShutDown)
+				return
+			}
+			require.IsType(t, noopManager{}, m)
+			// The kubelet calls these unconditionally; they must not touch the API.
+			ctx, cancel := context.WithCancel(ktesting.Init(t))
+			cancel()
+			m.Run(ctx)
+			require.False(t, m.SyncPod(ctx, &v1.Pod{}, &kubecontainer.PodStatus{}))
+			m.AbandonPod(&v1.Pod{})
+			require.Empty(t, client.Actions())
+		})
+	}
 }

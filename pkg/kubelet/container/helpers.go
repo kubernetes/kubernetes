@@ -582,11 +582,11 @@ func nonRegularContainerNames(spec *v1.PodSpec) sets.Set[string] {
 	return names
 }
 
-// CheckpointContainers yields the containers that a Pod-level checkpoint
+// CheckpointableContainers yields the containers that a Pod-level checkpoint
 // captures and a restore recreates: restartable init (sidecar) containers in
 // spec order, followed by regular containers. Completed init containers and
 // ephemeral containers are not part of a checkpoint.
-func CheckpointContainers(spec *v1.PodSpec) iter.Seq2[*v1.Container, podutil.ContainerType] {
+func CheckpointableContainers(spec *v1.PodSpec) iter.Seq2[*v1.Container, podutil.ContainerType] {
 	return func(yield func(*v1.Container, podutil.ContainerType) bool) {
 		for container, containerType := range podutil.ContainerIter(spec, podutil.InitContainers|podutil.Containers) {
 			if containerType == podutil.InitContainers && !podutil.IsRestartableInitContainer(container) {

@@ -4392,6 +4392,17 @@ func TestPodCheckpointingPreservesConcurrentStatus(t *testing.T) {
 		if active {
 			require.NotNil(t, checkpointing)
 		} else {
+			conditions := got.Conditions[:0]
+			for _, condition := range got.Conditions {
+				if condition.Type != v1.PodCheckpointing {
+					conditions = append(conditions, condition)
+				}
+			}
+			got.Conditions = conditions
+			m.SetPodStatus(logger, pod, got)
+			got, found = m.GetPodStatus(pod.UID)
+			require.True(t, found)
+			_, checkpointing = podutil.GetPodCondition(&got, v1.PodCheckpointing)
 			require.Nil(t, checkpointing)
 		}
 		require.Equal(t, "new status from SyncPod", got.Message)

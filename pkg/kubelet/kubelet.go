@@ -2473,14 +2473,6 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 		kl.probeManager.SyncPod(ctx, pod, podStatus)
 	}
 
-	// Capture a requested checkpoint before the runtime sync can start, stop,
-	// or resize containers. A capture can take minutes, so podStatus may be
-	// stale afterwards. Sync again with a newer status instead of acting on it.
-	if kl.podCheckpointManager.SyncPod(ctx, pod, podStatus) {
-		kl.SyncPodNow(ctx, pod)
-		return false, nil, nil
-	}
-
 	restartingAllContainers := false
 	if utilfeature.DefaultFeatureGate.Enabled(features.RestartAllContainersOnContainerExits) {
 		for _, cond := range apiPodStatus.Conditions {
@@ -2500,6 +2492,13 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 	}
 	if syncErr := result.Error(); wait.Interrupted(syncErr) {
 		return false, nil, syncErr
+	}
+	// Wait until the runtime reports no actions before capturing. Dynamic
+	// containers, volumes, and resource changes must finish their runtime sync
+	// before the checkpoint observes the Pod's state.
+	if result.Error() == nil && len(result.SyncResults) == 0 && kl.podCheckpointManager.SyncPod(ctx, pod, podStatus) {
+		kl.SyncPodNow(ctx, pod)
+		return false, nil, nil
 	}
 	kl.reasonCache.Update(pod.UID, result)
 
