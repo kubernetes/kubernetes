@@ -33,6 +33,7 @@ import (
 	configtesting "k8s.io/kubernetes/pkg/scheduler/apis/config/testing"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
+	schedulerutils "k8s.io/kubernetes/test/integration/scheduler"
 	stepsframework "k8s.io/kubernetes/test/integration/scheduler/podgroup/stepsframework"
 	testutils "k8s.io/kubernetes/test/integration/util"
 	"k8s.io/utils/ptr"
@@ -94,17 +95,17 @@ func TestTopologyAwareSchedulingWithMultiplePlacementPlugins(t *testing.T) {
 	})
 	registry := frameworkruntime.Registry{nodePoolPlacementName: newNodePoolPlacement}
 
-	testCtx := testutils.InitTestSchedulerWithOptions(
+	testCtx := schedulerutils.InitTestSchedulerWithOptions(
 		t, testutils.InitTestAPIServer(t, "tas-merge", nil), 0,
 		scheduler.WithProfiles(cfg.Profiles...),
 		scheduler.WithFrameworkOutOfTreeRegistry(registry),
 		scheduler.WithPodMaxBackoffSeconds(0),
 		scheduler.WithPodInitialBackoffSeconds(0),
 	)
-	testutils.SyncSchedulerInformerFactory(testCtx)
+	schedulerutils.SyncSchedulerInformerFactory(testCtx)
 	go testCtx.Scheduler.Run(testCtx.SchedulerCtx)
 
-	ns := testCtx.NS.Name
+	ns := testCtx.Namespace()
 	workload := st.MakeWorkload().Name("workload").Namespace(ns).
 		PodGroupTemplate(st.MakePodGroupTemplate().Name("t1").MinCount(1).Obj()).Obj()
 

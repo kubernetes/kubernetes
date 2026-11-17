@@ -1790,7 +1790,7 @@ func runTestScenario(t *testing.T, tt scenario, cpgEnabled bool) {
 	testCtx := schedulerutils.InitTestSchedulerWithNS(t, "tas",
 		scheduler.WithPodMaxBackoffSeconds(0),
 		scheduler.WithPodInitialBackoffSeconds(0))
-	ns := testCtx.NS.Name
+	ns := testCtx.Namespace()
 
 	workload := st.MakeWorkload().Name("workload").Namespace(ns).
 		PodGroupTemplate(st.MakePodGroupTemplate().Name("t1").MinCount(1).Obj()).
@@ -1910,7 +1910,7 @@ func TestTopologyAwareSchedulingWithPlacementLimit(t *testing.T) {
 				scheduler.WithPodMaxBackoffSeconds(0),
 				scheduler.WithPodInitialBackoffSeconds(0),
 				scheduler.WithPercentageOfPlacementsToScore(new(percentageLimit)))
-			ns := testCtx.NS.Name
+			ns := testCtx.Namespace()
 
 			workload := st.MakeWorkload().Name("workload").Namespace(ns).
 				PodGroupTemplate(st.MakePodGroupTemplate().Name("t1").MinCount(1).Obj()).

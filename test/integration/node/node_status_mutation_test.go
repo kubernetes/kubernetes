@@ -35,7 +35,7 @@ import (
 // the node resource validation that rejects malformed capacity values.
 func TestNodeStatusCapacityMutation(t *testing.T) {
 	testCtx := testutils.InitTestAPIServer(t, "node-status-mutation", nil)
-	cs := testCtx.ClientSet
+	cs := testCtx.Client()
 
 	const gpu = v1.ResourceName("example.com/gpu")
 	baseResources := func() v1.ResourceList {
@@ -140,12 +140,12 @@ func TestNodeStatusCapacityMutation(t *testing.T) {
 					},
 				},
 			}
-			created, err := cs.CoreV1().Nodes().Create(testCtx.Ctx, node, metav1.CreateOptions{})
+			created, err := cs.CoreV1().Nodes().Create(testCtx, node, metav1.CreateOptions{})
 			if err != nil {
 				t.Fatalf("failed to create node: %v", err)
 			}
 
-			_, err = tc.mutate(testCtx.Ctx, cs, created)
+			_, err = tc.mutate(testCtx, cs, created)
 			if tc.wantErr {
 				if err == nil {
 					t.Fatal("expected mutation to be rejected by validation, but it succeeded")
@@ -156,7 +156,7 @@ func TestNodeStatusCapacityMutation(t *testing.T) {
 				t.Fatalf("mutation rejected unexpectedly: %v", err)
 			}
 
-			got, err := cs.CoreV1().Nodes().Get(testCtx.Ctx, created.Name, metav1.GetOptions{})
+			got, err := cs.CoreV1().Nodes().Get(testCtx, created.Name, metav1.GetOptions{})
 			if err != nil {
 				t.Fatalf("failed to get node after mutation: %v", err)
 			}
