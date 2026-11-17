@@ -17,6 +17,7 @@ limitations under the License.
 package kuberuntime
 
 import (
+	goruntime "runtime"
 	"testing"
 	"time"
 
@@ -24,8 +25,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/util/flowcontrol"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -60,10 +63,10 @@ func TestInitializeActuatedPodSeedsResources(t *testing.T) {
 	m.InitializeActuatedPod(klog.Background(), pod)
 	seeded, ok := m.actuatedState.GetContainer(pod.UID, "main", podutil.Containers)
 	require.True(t, ok)
-	assert.Equal(t, &v1.Container{Name: "main", Resources: resources}, seeded)
+	assert.True(t, apiequality.Semantic.DeepEqual(&v1.Container{Name: "main", Resources: resources}, seeded), "%+v", seeded)
 	seeded, ok = m.actuatedState.GetContainer(pod.UID, "sidecar", podutil.InitContainers)
 	require.True(t, ok)
-	assert.Equal(t, &v1.Container{Name: "sidecar", Resources: resources}, seeded)
+	assert.True(t, apiequality.Semantic.DeepEqual(&v1.Container{Name: "sidecar", Resources: resources}, seeded), "%+v", seeded)
 }
 
 // cgroupContainerManager provides pod cgroup configs, which the fake pod container manager lacks,
@@ -161,7 +164,11 @@ func TestRemovedContainerActuatedRecordLifecycle(t *testing.T) {
 
 	// Adding the name back is treated as a new container, which resizes the pod.
 	actions := m.computePodActions(tCtx, withRemoved, podStatus(), false)
-	assert.True(t, actions.UpdatePodResources, "a re-added container should resize the pod")
+	if goruntime.GOOS == "linux" {
+		assert.Equal(t, sets.New(v1.ResourceCPU), actions.PodCgroupResourcesToUpdate, "a re-added container should resize the pod")
+	} else {
+		assert.Empty(t, actions.PodCgroupResourcesToUpdate, "pods are not resized on this platform")
+	}
 	syncPod(withRemoved, podStatus())
 	_, ok = m.getActuatedContainer(pod.UID, "removed", podutil.Containers)
 	assert.True(t, ok)
@@ -175,6 +182,7 @@ func TestRemovedContainerNeverStarted(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	_, _, m, err := createTestRuntimeManager(tCtx)
 	require.NoError(t, err)
+	m.containerManager = &cgroupContainerManager{ContainerManager: m.containerManager}
 
 	resources := v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("100m")}}
 	pod := &v1.Pod{
