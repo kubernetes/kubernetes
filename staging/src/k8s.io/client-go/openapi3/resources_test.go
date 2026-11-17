@@ -17,8 +17,10 @@ limitations under the License.
 package openapi3
 
 import (
+	"errors"
 	"fmt"
 	"maps"
+	"net/http"
 	"slices"
 	"sync"
 	"sync/atomic"
@@ -27,6 +29,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/openapi"
 	"k8s.io/client-go/openapi/openapitest"
@@ -736,5 +739,72 @@ func TestResources_ErrorAndEdgeCases(t *testing.T) {
 		ok, err := r.SupportsQueryParam(gvk, "PATCH", "fieldValidation")
 		require.NoError(t, err)
 		assert.True(t, ok)
+	})
+}
+
+// TestUnservedGroupVersionIsNotFound covers a GroupVersion that is listed in
+// the root document but whose document is not served (a 404 or an empty body),
+// as happens when a CRD is deleted or re-created before the server's root
+// listing refreshes. Every lookup must report *GroupVersionNotFoundError so
+// callers take their GroupVersion-not-found fallback; other errors pass through.
+func TestUnservedGroupVersionIsNotFound(t *testing.T) {
+	gv := schema.GroupVersion{Group: "example.com", Version: "v1"}
+	gvk := gv.WithKind("Widget")
+	notFound := apierrors.NewNotFound(schema.GroupResource{}, "")
+	internal := apierrors.NewInternalError(errors.New("boom"))
+
+	lookups := map[string]func(r *root) error{
+		"SchemaForGVK": func(r *root) error { _, err := r.SchemaForGVK(gvk); return err },
+		"SchemasForGV": func(r *root) error { _, err := r.SchemasForGV(gv); return err },
+		"GetConsumes":  func(r *root) error { _, err := r.GetConsumes(gvk, http.MethodPatch); return err },
+		"SupportsQueryParam": func(r *root) error {
+			_, err := r.SupportsQueryParam(gvk, http.MethodPatch, "fieldValidation")
+			return err
+		},
+		"GVSpec":      func(r *root) error { _, err := r.GVSpec(gv); return err },
+		"GVSpecAsMap": func(r *root) error { _, err := r.GVSpecAsMap(gv); return err },
+	}
+	served := map[string]struct {
+		gv           fakeGroupVersion
+		wantNotFound bool
+		wantCause    error
+	}{
+		"404":        {gv: fakeGroupVersion{err: notFound, relativeURL: "/openapi/v3/apis/example.com/v1?hash=A"}, wantNotFound: true, wantCause: notFound},
+		"empty body": {gv: fakeGroupVersion{spec: []byte{}, relativeURL: "/openapi/v3/apis/example.com/v1?hash=A"}, wantNotFound: true},
+		"500":        {gv: fakeGroupVersion{err: internal, relativeURL: "/openapi/v3/apis/example.com/v1?hash=A"}, wantCause: internal},
+	}
+	for servedName, s := range served {
+		for lookupName, lookup := range lookups {
+			t.Run(servedName+"/"+lookupName, func(t *testing.T) {
+				client := openapitest.NewFakeClient()
+				client.PathsMap["apis/example.com/v1"] = s.gv
+				err := lookup(&root{client: client})
+				require.Error(t, err)
+				_, isNotFound := errors.AsType[*GroupVersionNotFoundError](err)
+				assert.Equal(t, s.wantNotFound, isNotFound, "error: %v", err)
+				if s.wantCause != nil {
+					assert.ErrorIs(t, err, s.wantCause)
+				}
+			})
+		}
+	}
+
+	t.Run("404 evicts the cached entry", func(t *testing.T) {
+		spec := `{"openapi": "3.0.0", "paths": {}, "components": {"schemas": {}}}`
+		client := &dynamicFakeClient{pathsMap: map[string]openapi.GroupVersion{
+			"apis/example.com/v1": fakeGroupVersion{spec: []byte(spec), relativeURL: "/openapi/v3/apis/example.com/v1?hash=A"},
+		}}
+		r := &root{client: client}
+		_, err := r.SchemasForGV(gv)
+		require.NoError(t, err)
+		require.Contains(t, r.cache, gv)
+
+		client.mu.Lock()
+		client.pathsMap["apis/example.com/v1"] = fakeGroupVersion{err: notFound, relativeURL: "/openapi/v3/apis/example.com/v1?hash=B"}
+		client.mu.Unlock()
+		_, err = r.SchemasForGV(gv)
+		_, isNotFound := errors.AsType[*GroupVersionNotFoundError](err)
+		require.True(t, isNotFound, "error: %v", err)
+		assert.NotContains(t, r.cache, gv)
 	})
 }
