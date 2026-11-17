@@ -1252,6 +1252,9 @@ type result struct {
 	// allocatable resources expected to be recorded in CycleState for the node
 	// during Filter.
 	extraNodeAllocatableResources []v1.ExtraNodeAllocatableResource
+
+	// allocations, when set, checks per-claim cycle results without ignoring device identity.
+	allocations []*resourceapi.AllocationResult
 }
 
 // change contains functions for modifying objects of a certain type. These
@@ -1326,6 +1329,15 @@ type prepare struct {
 }
 
 type testPluginCase struct {
+	// pods runs ordered attempts in one environment, with independent CycleStates.
+	// Environment configuration belongs to the outer case; each entry supplies
+	// its Pod, phase preparation and expectations, and whether to stop at Reserve.
+	// Attempts stopped at Reserve keep their allocations pending for later Pods.
+	pods []testPluginCase
+
+	// reserveOnly stops before binding so a later Pod can reuse pending allocations.
+	reserveOnly bool
+
 	// patchTestCase gets called right before the test case is tested.
 	// It can be used to update time stamps in those test cases
 	// which are sensitive to the current time.
@@ -1717,76 +1729,6 @@ func TestFilterReusesPendingAllocationRequiresDRAOptionalNodeOperations(t *testi
 	assert.True(t, statusWithFeature.IsSuccess(), "expected success when node has DRAOptionalNodeOperations feature")
 }
 
-// TestReserveMixedPendingAndFreshClaims covers a Pod whose first claim reuses
-// a pending allocation made by another Pod of the same PodGroup, while its
-// second claim needs a fresh allocation. Reserve maps the results collected in
-// Filter onto the claims by position, so each result must end up on its own
-// claim: the pending claim keeps the pending allocation's device, the fresh
-// claim gets a different one.
-func TestReserveMixedPendingAndFreshClaims(t *testing.T) {
-	tCtx := ktesting.Init(t)
-	featuregatetesting.SetFeatureGatesDuringTest(tCtx, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-		features.DRAWorkloadResourceClaims: true,
-		features.GenericWorkload:           true,
-	})
-
-	feats := feature.Features{
-		EnableDRAWorkloadResourceClaims: true,
-	}
-
-	pod := st.MakePod().Name(podName).Namespace(namespace).
-		UID(podUID).
-		PodResourceClaims(v1.PodResourceClaim{Name: resourceName, ResourceClaimName: &claimName}).
-		PodResourceClaims(v1.PodResourceClaim{Name: resourceName2, ResourceClaimName: &claimName2}).
-		PodGroupName(podGroupName).
-		Obj()
-
-	testCtx := setup(tCtx, &config.DynamicResourcesArgs{}, []*v1.Node{workerNode}, []*resourceapi.ResourceClaim{pendingPodGroupClaim, claim2}, []*resourceapi.DeviceClass{deviceClass}, []*schedulingapi.PodGroup{podGroupWithClaimName}, []apiruntime.Object{largeWorkerNodeSlice}, feats, false, nil)
-
-	pendingClaim, err := testCtx.draManager.ResourceClaims().Get(namespace, claimName)
-	if err != nil {
-		t.Fatalf("Get claim: %v", err)
-	}
-	pendingClaimAllocated := pendingClaim.DeepCopy()
-	// "instance-1" is the device the other Pod reserved for the shared claim.
-	pendingClaimAllocated.Status.Allocation = allocationResult.DeepCopy()
-	tCtx.ExpectNoError(testCtx.draManager.ResourceClaims().SignalClaimPendingAllocation(pendingClaimAllocated.UID, pendingClaimAllocated))
-
-	podGroupCycleState := framework.NewCycleState()
-	podGroupCycleState.Write(stateKey, &podGroupStateData{
-		pendingAllocations: map[types.UID]sets.Set[types.UID]{
-			pendingClaimAllocated.UID: sets.New(types.UID("previous-pod")),
-		},
-	})
-	cycleState := framework.NewCycleState()
-	cycleState.SetPodGroupCycleState(podGroupCycleState)
-	testCtx.state = cycleState
-
-	nodeInfo := framework.NewNodeInfo()
-	nodeInfo.SetNode(workerNode)
-
-	if _, status := testCtx.p.PreFilter(tCtx, testCtx.state, pod, []fwk.NodeInfo{nodeInfo}); !status.IsSuccess() {
-		t.Fatalf("PreFilter status: %v", status)
-	}
-	if status := testCtx.p.Filter(tCtx, testCtx.state, pod, nodeInfo); !status.IsSuccess() {
-		t.Fatalf("Filter status: %v", status)
-	}
-	if status := testCtx.p.Reserve(tCtx, testCtx.state, pod, nodeName); !status.IsSuccess() {
-		t.Fatalf("Reserve status: %v", status)
-	}
-
-	pluginState, err := getStateData(testCtx.state)
-	if err != nil {
-		t.Fatalf("getStateData: %v", err)
-	}
-	if got := pluginState.informationsForClaim[0].allocation.Devices.Results[0].Device; got != "instance-1" {
-		t.Errorf("claim with pending allocation: got device %q, want instance-1", got)
-	}
-	if got := pluginState.informationsForClaim[1].allocation.Devices.Results[0].Device; got != "instance-2" {
-		t.Errorf("claim needing fresh allocation: got device %q, want instance-2", got)
-	}
-}
-
 // TestUnreserveSharedPendingAllocation covers two Pods of a PodGroup which
 // share a pending allocation. The first Pod stores the allocation in PreBind
 // and then times out waiting for binding conditions. The second Pod fails in
@@ -1919,6 +1861,50 @@ func TestUnreserveExtendedResourceClaimAfterAllocationInPreBind(t *testing.T) {
 
 func testPlugin(tCtx ktesting.TContext, preemption bool) {
 	testcases := map[string]testPluginCase{
+		"reserve-mixed-pending-and-fresh-claims": func() testPluginCase {
+			pod := st.MakePod().Name(podName).Namespace(namespace).UID(podUID).
+				PodResourceClaims(v1.PodResourceClaim{Name: resourceName, ResourceClaimName: &claimName}).
+				PodResourceClaims(v1.PodResourceClaim{Name: resourceName2, ResourceClaimName: &claimName2}).
+				PodGroupName(podGroupName).Obj()
+			previousPod := pod.DeepCopy()
+			previousPod.Name += "-previous"
+			previousPod.UID += "-previous"
+			previousPod.Spec.ResourceClaims = previousPod.Spec.ResourceClaims[:1]
+			freshAllocation := allocationResult.DeepCopy()
+			freshAllocation.Devices.Results[0].Device = "instance-2"
+			freshClaim := st.FromResourceClaim(claim2).Allocation(freshAllocation).Obj()
+			pending := result{inFlightClaims: []metav1.Object{allocatedPodGroupClaim}}
+			return testPluginCase{
+				featureOverrides: featuregatetesting.FeatureOverrides{features.DRAWorkloadResourceClaims: true, features.GenericWorkload: true},
+				claims:           []*resourceapi.ResourceClaim{pendingPodGroupClaim, claim2},
+				classes:          []*resourceapi.DeviceClass{deviceClass},
+				podGroups:        []*schedulingapi.PodGroup{podGroupWithClaimName},
+				objs:             []apiruntime.Object{largeWorkerNodeSlice},
+				pods: []testPluginCase{
+					{
+						pod:         previousPod,
+						reserveOnly: true,
+						want: want{reserve: result{
+							inFlightClaims: pending.inFlightClaims,
+							allocations:    []*resourceapi.AllocationResult{allocationResult},
+						}},
+					},
+					{
+						pod:         pod,
+						reserveOnly: true,
+						want: want{
+							preenqueue: pending,
+							prefilter:  pending,
+							filter:     perNodeResult{nodeName: pending},
+							reserve: result{
+								inFlightClaims: []metav1.Object{allocatedPodGroupClaim, freshClaim},
+								allocations:    []*resourceapi.AllocationResult{allocationResult, freshAllocation},
+							},
+						},
+					},
+				},
+			}
+		}(),
 		"empty-with-extended-resources-disabled": {
 			emulatedVersion:  "1.36",
 			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAExtendedResource: false},
@@ -5364,205 +5350,234 @@ func testPlugin(tCtx ktesting.TContext, preemption bool) {
 				tCtx.ExpectNoError(testCtx.draManager.ResourceClaims().SignalClaimPendingAllocation(claim.UID, claim))
 			}
 
-			initialObjects := testCtx.listAll(tCtx)
-			var registry compbasemetrics.KubeRegistry
-			if tc.metrics != nil {
-				registry = setupMetrics(feats)
-			}
-
-			status := testCtx.p.PreEnqueue(tCtx, tc.pod)
-			tCtx.Run("PreEnqueue", func(tCtx ktesting.TContext) {
-				testCtx.verify(tCtx, tc.want.preenqueue, initialObjects, tc.pod, nil, status)
-			})
-			if !status.IsSuccess() {
+			if len(tc.pods) == 0 {
+				testCtx.runPod(tCtx, tc, feats, preemption)
 				return
 			}
-
-			nodeInfo := framework.NewNodeInfo()
-			result, status := testCtx.p.PreFilter(tCtx, testCtx.state, tc.pod, []fwk.NodeInfo{nodeInfo})
-			tCtx.Run("prefilter", func(tCtx ktesting.TContext) {
-				assert.Equal(tCtx, tc.want.preFilterResult, result)
-				testCtx.verify(tCtx, tc.want.prefilter, initialObjects, tc.pod, result, status)
-			})
-			unschedulable := status.IsRejected()
-
-			var potentialNodes []fwk.NodeInfo
-
-			initialObjects = testCtx.listAll(tCtx)
-			testCtx.updateAPIServer(tCtx, initialObjects, tc.prepare.filter)
-			for nodeName, entries := range tc.otherPluginNodeAllocatableEntries {
-				framework.GetExtraNodeAllocatableResourcesState(testCtx.state).Set(nodeName, "OtherPlugin", entries)
-			}
-			if !unschedulable {
-				for _, nodeInfo := range testCtx.nodeInfos {
-					var status *fwk.Status
-					tCtx.Run(fmt.Sprintf("filter/%s", nodeInfo.Node().Name), func(tCtx ktesting.TContext) {
-						initialObjects = testCtx.listAll(tCtx)
-						ctx := context.Context(tCtx)
-						if tc.cancelFilter {
-							c, cancel := context.WithCancelCause(ctx)
-							ctx = c
-							cancel(errors.New("test canceling Filter"))
-						}
-						status = testCtx.p.Filter(ctx, testCtx.state, tc.pod, nodeInfo)
-						nodeName := nodeInfo.Node().Name
-						nodeResult := tc.want.filter.forNode(nodeName)
-						testCtx.verify(tCtx, nodeResult, initialObjects, tc.pod, nil, status)
-						var gotResources []v1.ExtraNodeAllocatableResource
-						if state := framework.GetExtraNodeAllocatableResourcesState(testCtx.state); state != nil {
-							gotResources = state.Get(nodeName)
-						}
-						if diff := cmp.Diff(nodeResult.extraNodeAllocatableResources, gotResources, cmpopts.EquateEmpty()); diff != "" {
-							tCtx.Errorf("ExtraNodeAllocatableResourcesState for node %s mismatch (-want +got):\n%s", nodeName, diff)
-						}
-					})
-					if status.Code() == fwk.Success {
-						potentialNodes = append(potentialNodes, nodeInfo)
-					}
-					if status.Code() == fwk.Error {
-						// An error aborts scheduling.
-						return
-					}
-				}
-				if len(potentialNodes) == 0 {
-					unschedulable = true
-				}
-			}
-
-			var scores fwk.NodeScoreList
-			if !unschedulable && len(potentialNodes) > 1 {
-				initialObjects = testCtx.listAll(tCtx)
-				initialObjects = testCtx.updateAPIServer(tCtx, initialObjects, tc.prepare.prescore)
-
-				for _, potentialNode := range potentialNodes {
-					initialObjects = testCtx.listAll(tCtx)
-					score, status := testCtx.p.Score(tCtx, testCtx.state, tc.pod, potentialNode)
-					nodeName := potentialNode.Node().Name
-					tCtx.Run(fmt.Sprintf("score/%s", nodeName), func(tCtx ktesting.TContext) {
-						assert.Equal(tCtx, tc.want.scoreResult.forNode(nodeName), score)
-						testCtx.verify(tCtx, tc.want.score.forNode(nodeName), initialObjects, tc.pod, nil, status)
-					})
-					scores = append(scores, fwk.NodeScore{Name: nodeName, Score: score})
-				}
-
-				initialObjects = testCtx.listAll(tCtx)
-				status := testCtx.p.NormalizeScore(tCtx, testCtx.state, tc.pod, scores)
-				tCtx.Run("normalizeScore", func(tCtx ktesting.TContext) {
-					assert.Equal(tCtx, tc.want.normalizeScoreResult, scores)
-					testCtx.verify(tCtx, tc.want.normalizeScore, initialObjects, tc.pod, nil, status)
+			podGroupState := testCtx.state.GetPodGroupCycleState()
+			for _, podCase := range tc.pods {
+				podCtx := *testCtx
+				state := framework.NewCycleState()
+				state.SetPodGroupCycleState(podGroupState)
+				podCtx.state = state
+				var selectedNodeName string
+				tCtx.Run(podCase.pod.Name, func(tCtx ktesting.TContext) {
+					selectedNodeName = podCtx.runPod(tCtx, podCase, feats, preemption)
 				})
-			}
-
-			var selectedNodeName string
-			if !unschedulable && len(potentialNodes) > 0 {
-				if len(scores) > 0 {
-					nodeScore := scores[0]
-					for _, score := range scores {
-						if score.Score > nodeScore.Score {
-							nodeScore = score
-						}
-					}
-					selectedNodeName = nodeScore.Name
-				} else {
-					selectedNodeName = potentialNodes[0].Node().Name
+				if podCase.reserveOnly && selectedNodeName != "" {
+					defer podCtx.p.Unreserve(tCtx, state, podCase.pod, selectedNodeName)
 				}
-
-				initialObjects = testCtx.listAll(tCtx)
-				initialObjects = testCtx.updateAPIServer(tCtx, initialObjects, tc.prepare.reserve)
-				status := testCtx.p.Reserve(tCtx, testCtx.state, tc.pod, selectedNodeName)
-				tCtx.Run("reserve", func(tCtx ktesting.TContext) {
-					testCtx.verify(tCtx, tc.want.reserve, initialObjects, tc.pod, nil, status)
-				})
-				if status.Code() != fwk.Success {
-					unschedulable = true
+				if tCtx.Failed() {
+					return
 				}
-			}
-
-			if selectedNodeName != "" {
-				if unschedulable {
-					initialObjects = testCtx.listAll(tCtx)
-					initialObjects = testCtx.updateAPIServer(tCtx, initialObjects, tc.prepare.unreserve)
-					testCtx.p.Unreserve(tCtx, testCtx.state, tc.pod, selectedNodeName)
-					tCtx.Run("unreserve", func(tCtx ktesting.TContext) {
-						testCtx.verify(tCtx, tc.want.unreserve, initialObjects, tc.pod, nil, status)
-					})
-				} else {
-					// PodGroup cycle state is cleared before asynchronous binding.
-					testCtx.state.(*framework.CycleState).SetPodGroupCycleState(nil)
-
-					if tc.want.unreserveBeforePreBind != nil {
-						initialObjects = testCtx.listAll(tCtx)
-						testCtx.p.Unreserve(tCtx, testCtx.state, tc.pod, selectedNodeName)
-						tCtx.Run("unreserveBeforePreBind", func(tCtx ktesting.TContext) {
-							testCtx.verify(tCtx, *tc.want.unreserveBeforePreBind, initialObjects, tc.pod, nil, status)
-						})
-						return
-					}
-
-					initialObjects = testCtx.listAll(tCtx)
-					initialObjects = testCtx.updateAPIServer(tCtx, initialObjects, tc.prepare.prebind)
-					preBindPreFlightResult, preBindPreFlightStatus := testCtx.p.PreBindPreFlight(tCtx, testCtx.state, tc.pod, selectedNodeName)
-					tCtx.Run("preBindPreFlightStatus", func(tContext ktesting.TContext) {
-						assert.Equal(tCtx, tc.want.preBindPreFlightStatus, preBindPreFlightStatus)
-					})
-					tCtx.Run("preBindPreFlightResult", func(tContext ktesting.TContext) {
-						assert.Equal(tCtx, &fwk.PreBindPreFlightResult{AllowParallel: true}, preBindPreFlightResult)
-					})
-					preBindStatus := testCtx.p.PreBind(tCtx, testCtx.state, tc.pod, selectedNodeName)
-					tCtx.Run("prebind", func(tCtx ktesting.TContext) {
-						testCtx.verify(tCtx, tc.want.prebind, initialObjects, tc.pod, nil, preBindStatus)
-					})
-					wantUnreserve := tc.want.unreserveAfterBindFailure
-					if preemption && tc.want.unreserveAfterBindFailureWithPreemption != nil {
-						wantUnreserve = tc.want.unreserveAfterBindFailureWithPreemption
-					}
-					if wantUnreserve != nil {
-						initialObjects = testCtx.listAll(tCtx)
-						testCtx.p.Unreserve(tCtx, testCtx.state, tc.pod, selectedNodeName)
-						tCtx.Run("unreserverAfterBindFailure", func(tCtx ktesting.TContext) {
-							testCtx.verify(tCtx, *wantUnreserve, initialObjects, tc.pod, nil, status)
-						})
-					} else if status.IsSuccess() {
-						initialObjects = testCtx.listAll(tCtx)
-						initialObjects = testCtx.updateAPIServer(tCtx, initialObjects, tc.prepare.postbind)
-					}
-				}
-			} else if len(potentialNodes) == 0 {
-				initialObjects = testCtx.listAll(tCtx)
-				initialObjects = testCtx.updateAPIServer(tCtx, initialObjects, tc.prepare.postfilter)
-				if len(tc.podGroups) > 0 {
-					pgInfo := &framework.PodGroupInfo{
-						GenericPodGroup: fwk.NewGenericPodGroup(tc.podGroups[0]),
-						UnscheduledPods: []*v1.Pod{tc.pod},
-					}
-					mockSchedulingFunc := func(ctx context.Context, _ fwk.PodGroupCycleState) (*fwk.PodGroupAssignments, *fwk.Status) {
-						return nil, fwk.NewStatus(fwk.Unschedulable)
-					}
-					podGroupCycleState := testCtx.state.GetPodGroupCycleState()
-					result, status := testCtx.p.PodGroupPostFilter(tCtx, podGroupCycleState, pgInfo, mockSchedulingFunc)
-					tCtx.Run("postfilter", func(tCtx ktesting.TContext) {
-						assert.Equal(tCtx, tc.want.podGroupPostFilterResult, result)
-						testCtx.verify(tCtx, tc.want.postfilter, initialObjects, tc.pod, nil, status)
-					})
-				} else {
-					result, status := testCtx.p.PostFilter(tCtx, testCtx.state, tc.pod, nil /* filteredNodeStatusMap not used by plugin */)
-					wantPostFilter := tc.want.postfilter
-					if preemption && wantPostFilter.status != nil && wantPostFilter.status.Code() == fwk.Unschedulable && len(wantPostFilter.status.Reasons()) > 0 {
-						// Under DRAPreemption, PostFilter returns UnschedulableAndUnresolvable
-						// after deallocating or deleting a claim to skip preemption for the cycle.
-						wantPostFilter.status = fwk.NewStatus(fwk.UnschedulableAndUnresolvable, wantPostFilter.status.Reasons()...)
-					}
-					tCtx.Run("postfilter", func(tCtx ktesting.TContext) {
-						assert.Equal(tCtx, tc.want.postFilterResult, result)
-						testCtx.verify(tCtx, wantPostFilter, initialObjects, tc.pod, nil, status)
-					})
-				}
-			}
-			if tc.metrics != nil {
-				tc.metrics(tCtx, registry)
 			}
 		})
 	}
+}
+
+func (testCtx *testContext) runPod(tCtx ktesting.TContext, tc testPluginCase, feats feature.Features, preemption bool) (selectedNodeName string) {
+	tCtx.Helper()
+	initialObjects := testCtx.listAll(tCtx)
+	var registry compbasemetrics.KubeRegistry
+	if tc.metrics != nil {
+		registry = setupMetrics(feats)
+	}
+
+	status := testCtx.p.PreEnqueue(tCtx, tc.pod)
+	tCtx.Run("PreEnqueue", func(tCtx ktesting.TContext) {
+		testCtx.verify(tCtx, tc.want.preenqueue, initialObjects, tc.pod, nil, status)
+	})
+	if !status.IsSuccess() {
+		return
+	}
+
+	nodeInfo := framework.NewNodeInfo()
+	result, status := testCtx.p.PreFilter(tCtx, testCtx.state, tc.pod, []fwk.NodeInfo{nodeInfo})
+	tCtx.Run("prefilter", func(tCtx ktesting.TContext) {
+		assert.Equal(tCtx, tc.want.preFilterResult, result)
+		testCtx.verify(tCtx, tc.want.prefilter, initialObjects, tc.pod, result, status)
+	})
+	unschedulable := status.IsRejected()
+
+	var potentialNodes []fwk.NodeInfo
+
+	initialObjects = testCtx.listAll(tCtx)
+	testCtx.updateAPIServer(tCtx, initialObjects, tc.prepare.filter)
+	for nodeName, entries := range tc.otherPluginNodeAllocatableEntries {
+		framework.GetExtraNodeAllocatableResourcesState(testCtx.state).Set(nodeName, "OtherPlugin", entries)
+	}
+	if !unschedulable {
+		for _, nodeInfo := range testCtx.nodeInfos {
+			var status *fwk.Status
+			tCtx.Run(fmt.Sprintf("filter/%s", nodeInfo.Node().Name), func(tCtx ktesting.TContext) {
+				initialObjects = testCtx.listAll(tCtx)
+				ctx := context.Context(tCtx)
+				if tc.cancelFilter {
+					c, cancel := context.WithCancelCause(ctx)
+					ctx = c
+					cancel(errors.New("test canceling Filter"))
+				}
+				status = testCtx.p.Filter(ctx, testCtx.state, tc.pod, nodeInfo)
+				nodeName := nodeInfo.Node().Name
+				nodeResult := tc.want.filter.forNode(nodeName)
+				testCtx.verify(tCtx, nodeResult, initialObjects, tc.pod, nil, status)
+				var gotResources []v1.ExtraNodeAllocatableResource
+				if state := framework.GetExtraNodeAllocatableResourcesState(testCtx.state); state != nil {
+					gotResources = state.Get(nodeName)
+				}
+				if diff := cmp.Diff(nodeResult.extraNodeAllocatableResources, gotResources, cmpopts.EquateEmpty()); diff != "" {
+					tCtx.Errorf("ExtraNodeAllocatableResourcesState for node %s mismatch (-want +got):\n%s", nodeName, diff)
+				}
+			})
+			if status.Code() == fwk.Success {
+				potentialNodes = append(potentialNodes, nodeInfo)
+			}
+			if status.Code() == fwk.Error {
+				// An error aborts scheduling.
+				return
+			}
+		}
+		if len(potentialNodes) == 0 {
+			unschedulable = true
+		}
+	}
+
+	var scores fwk.NodeScoreList
+	if !unschedulable && len(potentialNodes) > 1 {
+		initialObjects = testCtx.listAll(tCtx)
+		initialObjects = testCtx.updateAPIServer(tCtx, initialObjects, tc.prepare.prescore)
+
+		for _, potentialNode := range potentialNodes {
+			initialObjects = testCtx.listAll(tCtx)
+			score, status := testCtx.p.Score(tCtx, testCtx.state, tc.pod, potentialNode)
+			nodeName := potentialNode.Node().Name
+			tCtx.Run(fmt.Sprintf("score/%s", nodeName), func(tCtx ktesting.TContext) {
+				assert.Equal(tCtx, tc.want.scoreResult.forNode(nodeName), score)
+				testCtx.verify(tCtx, tc.want.score.forNode(nodeName), initialObjects, tc.pod, nil, status)
+			})
+			scores = append(scores, fwk.NodeScore{Name: nodeName, Score: score})
+		}
+
+		initialObjects = testCtx.listAll(tCtx)
+		status := testCtx.p.NormalizeScore(tCtx, testCtx.state, tc.pod, scores)
+		tCtx.Run("normalizeScore", func(tCtx ktesting.TContext) {
+			assert.Equal(tCtx, tc.want.normalizeScoreResult, scores)
+			testCtx.verify(tCtx, tc.want.normalizeScore, initialObjects, tc.pod, nil, status)
+		})
+	}
+
+	if !unschedulable && len(potentialNodes) > 0 {
+		if len(scores) > 0 {
+			nodeScore := scores[0]
+			for _, score := range scores {
+				if score.Score > nodeScore.Score {
+					nodeScore = score
+				}
+			}
+			selectedNodeName = nodeScore.Name
+		} else {
+			selectedNodeName = potentialNodes[0].Node().Name
+		}
+
+		initialObjects = testCtx.listAll(tCtx)
+		initialObjects = testCtx.updateAPIServer(tCtx, initialObjects, tc.prepare.reserve)
+		status := testCtx.p.Reserve(tCtx, testCtx.state, tc.pod, selectedNodeName)
+		tCtx.Run("reserve", func(tCtx ktesting.TContext) {
+			testCtx.verify(tCtx, tc.want.reserve, initialObjects, tc.pod, nil, status)
+		})
+		if status.Code() != fwk.Success {
+			unschedulable = true
+		}
+	}
+
+	if tc.reserveOnly && selectedNodeName != "" && !unschedulable {
+		return
+	}
+
+	if selectedNodeName != "" {
+		if unschedulable {
+			initialObjects = testCtx.listAll(tCtx)
+			initialObjects = testCtx.updateAPIServer(tCtx, initialObjects, tc.prepare.unreserve)
+			testCtx.p.Unreserve(tCtx, testCtx.state, tc.pod, selectedNodeName)
+			tCtx.Run("unreserve", func(tCtx ktesting.TContext) {
+				testCtx.verify(tCtx, tc.want.unreserve, initialObjects, tc.pod, nil, status)
+			})
+		} else {
+			// PodGroup cycle state is cleared before asynchronous binding.
+			testCtx.state.(*framework.CycleState).SetPodGroupCycleState(nil)
+
+			if tc.want.unreserveBeforePreBind != nil {
+				initialObjects = testCtx.listAll(tCtx)
+				testCtx.p.Unreserve(tCtx, testCtx.state, tc.pod, selectedNodeName)
+				tCtx.Run("unreserveBeforePreBind", func(tCtx ktesting.TContext) {
+					testCtx.verify(tCtx, *tc.want.unreserveBeforePreBind, initialObjects, tc.pod, nil, status)
+				})
+				return
+			}
+
+			initialObjects = testCtx.listAll(tCtx)
+			initialObjects = testCtx.updateAPIServer(tCtx, initialObjects, tc.prepare.prebind)
+			preBindPreFlightResult, preBindPreFlightStatus := testCtx.p.PreBindPreFlight(tCtx, testCtx.state, tc.pod, selectedNodeName)
+			tCtx.Run("preBindPreFlightStatus", func(tContext ktesting.TContext) {
+				assert.Equal(tCtx, tc.want.preBindPreFlightStatus, preBindPreFlightStatus)
+			})
+			tCtx.Run("preBindPreFlightResult", func(tContext ktesting.TContext) {
+				assert.Equal(tCtx, &fwk.PreBindPreFlightResult{AllowParallel: true}, preBindPreFlightResult)
+			})
+			preBindStatus := testCtx.p.PreBind(tCtx, testCtx.state, tc.pod, selectedNodeName)
+			tCtx.Run("prebind", func(tCtx ktesting.TContext) {
+				testCtx.verify(tCtx, tc.want.prebind, initialObjects, tc.pod, nil, preBindStatus)
+			})
+			wantUnreserve := tc.want.unreserveAfterBindFailure
+			if preemption && tc.want.unreserveAfterBindFailureWithPreemption != nil {
+				wantUnreserve = tc.want.unreserveAfterBindFailureWithPreemption
+			}
+			if wantUnreserve != nil {
+				initialObjects = testCtx.listAll(tCtx)
+				testCtx.p.Unreserve(tCtx, testCtx.state, tc.pod, selectedNodeName)
+				tCtx.Run("unreserverAfterBindFailure", func(tCtx ktesting.TContext) {
+					testCtx.verify(tCtx, *wantUnreserve, initialObjects, tc.pod, nil, status)
+				})
+			} else if status.IsSuccess() {
+				initialObjects = testCtx.listAll(tCtx)
+				initialObjects = testCtx.updateAPIServer(tCtx, initialObjects, tc.prepare.postbind)
+			}
+		}
+	} else if len(potentialNodes) == 0 {
+		initialObjects = testCtx.listAll(tCtx)
+		initialObjects = testCtx.updateAPIServer(tCtx, initialObjects, tc.prepare.postfilter)
+		if len(tc.podGroups) > 0 {
+			pgInfo := &framework.PodGroupInfo{
+				GenericPodGroup: fwk.NewGenericPodGroup(tc.podGroups[0]),
+				UnscheduledPods: []*v1.Pod{tc.pod},
+			}
+			mockSchedulingFunc := func(ctx context.Context, _ fwk.PodGroupCycleState) (*fwk.PodGroupAssignments, *fwk.Status) {
+				return nil, fwk.NewStatus(fwk.Unschedulable)
+			}
+			podGroupCycleState := testCtx.state.GetPodGroupCycleState()
+			result, status := testCtx.p.PodGroupPostFilter(tCtx, podGroupCycleState, pgInfo, mockSchedulingFunc)
+			tCtx.Run("postfilter", func(tCtx ktesting.TContext) {
+				assert.Equal(tCtx, tc.want.podGroupPostFilterResult, result)
+				testCtx.verify(tCtx, tc.want.postfilter, initialObjects, tc.pod, nil, status)
+			})
+		} else {
+			result, status := testCtx.p.PostFilter(tCtx, testCtx.state, tc.pod, nil /* filteredNodeStatusMap not used by plugin */)
+			wantPostFilter := tc.want.postfilter
+			if preemption && wantPostFilter.status != nil && wantPostFilter.status.Code() == fwk.Unschedulable && len(wantPostFilter.status.Reasons()) > 0 {
+				// Under DRAPreemption, PostFilter returns UnschedulableAndUnresolvable
+				// after deallocating or deleting a claim to skip preemption for the cycle.
+				wantPostFilter.status = fwk.NewStatus(fwk.UnschedulableAndUnresolvable, wantPostFilter.status.Reasons()...)
+			}
+			tCtx.Run("postfilter", func(tCtx ktesting.TContext) {
+				assert.Equal(tCtx, tc.want.postFilterResult, result)
+				testCtx.verify(tCtx, wantPostFilter, initialObjects, tc.pod, nil, status)
+			})
+		}
+	}
+	if tc.metrics != nil {
+		tc.metrics(tCtx, registry)
+	}
+	return ""
 }
 
 func setupMetrics(features feature.Features) compbasemetrics.KubeRegistry {
@@ -5604,6 +5619,15 @@ func (tc *testContext) verify(tCtx ktesting.TContext, expected result, initialOb
 		assert.Equal(tCtx, expected.status.Code().String(), status.Code().String(), "status code")
 	} else {
 		assert.Equal(tCtx, expected.status, status)
+	}
+	if expected.allocations != nil {
+		state, err := getStateData(tc.state)
+		require.NoError(tCtx, err)
+		var allocations []*resourceapi.AllocationResult
+		for _, info := range state.informationsForClaim {
+			allocations = append(allocations, info.allocation)
+		}
+		assert.Equal(tCtx, expected.allocations, allocations, "per-claim allocations")
 	}
 	objects := tc.listAll(tCtx)
 	wantObjects := update(initialObjects, expected.changes)
