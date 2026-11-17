@@ -2046,11 +2046,11 @@ func TestValidateResourceSlice(t *testing.T) {
 				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResources").Key("kubernetes.io/foo"), v1.ResourceName("kubernetes.io/foo"), "must be a node allocatable resource name"),
 			},
 		},
-		"ephemeral-storage is rejected": {
+		"valid ephemeral-storage resource": {
 			slice: func() *resourceapi.ResourceSlice {
 				slice := testResourceSliceWithNodeAllocatableResources(goodName, goodName, driverName, 1)
 				slice.Spec.Devices[0].NodeAllocatableResources = map[v1.ResourceName]resourceapi.NodeAllocatableResource{
-					v1.ResourceName("ephemeral-storage"): {
+					v1.ResourceEphemeralStorage: {
 						Overhead: &resourceapi.NodeAllocatableOverhead{
 							PerPod: ptr.To(resource.MustParse("2Gi")),
 						},
@@ -2059,9 +2059,6 @@ func TestValidateResourceSlice(t *testing.T) {
 				return slice
 			}(),
 			enableDRANodeAllocatableResourcesFeatureGate: true,
-			wantFailures: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResources").Key("ephemeral-storage"), v1.ResourceName("ephemeral-storage"), "must be a node allocatable resource name"),
-			},
 		},
 		"valid hugepages resource": {
 			slice: func() *resourceapi.ResourceSlice {

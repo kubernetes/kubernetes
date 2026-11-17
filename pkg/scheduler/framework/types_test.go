@@ -2502,15 +2502,16 @@ var (
 
 func TestPodInfoCalculateResources(t *testing.T) {
 	testCases := []struct {
-		name                                 string
-		containers                           []v1.Container
-		podResources                         *v1.ResourceRequirements
-		podLevelResourcesEnabled             bool
-		nodeAllocatableResourcesDRAEnabled   bool
-		nodeAllocatableResourceClaimStatuses []v1.NodeAllocatableResourceClaimStatus
-		expectedResource                     fwk.PodResource
-		initContainers                       []v1.Container
-		overhead                             *v1.ResourceList
+		name                               string
+		containers                         []v1.Container
+		podResources                       *v1.ResourceRequirements
+		podLevelResourcesEnabled           bool
+		nodeAllocatableResourcesDRAEnabled bool
+		extraNodeAllocatableResources      []v1.ExtraNodeAllocatableResource
+		unbound                            bool
+		expectedResource                   fwk.PodResource
+		initContainers                     []v1.Container
+		overhead                           *v1.ResourceList
 	}{
 		{
 			name:       "requestless container",
@@ -2755,13 +2756,41 @@ func TestPodInfoCalculateResources(t *testing.T) {
 					},
 				},
 			},
-			nodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+			extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 				{
-					ResourceClaimName: "node-allocatable-claim",
-					Mapping: []v1.NodeAllocatableMappedResources{
-						{Name: v1.ResourceCPU, Quantity: new(cpu100m)},
-						{Name: v1.ResourceMemory, Quantity: new(mem200M)},
+					ContainerName: "",
+					Requests:      v1.ResourceList{v1.ResourceCPU: cpu100m, v1.ResourceMemory: mem200M},
+					Limits:        v1.ResourceList{v1.ResourceCPU: cpu100m, v1.ResourceMemory: mem200M},
+				},
+			},
+			expectedResource: fwk.PodResource{
+				Resource: &Resource{
+					MilliCPU: cpu500m.MilliValue(),
+					Memory:   mem500M.Value(),
+				},
+				Non0CPU: cpu500m.MilliValue(),
+				Non0Mem: mem500M.Value(),
+			},
+		},
+		{
+			name:                               "unbound pod ignores stale extra node allocatable resources",
+			nodeAllocatableResourcesDRAEnabled: true,
+			unbound:                            true,
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    cpu500m,
+							v1.ResourceMemory: mem500M,
+						},
 					},
+				},
+			},
+			extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+				{
+					ContainerName: "",
+					Requests:      v1.ResourceList{v1.ResourceCPU: cpu100m, v1.ResourceMemory: mem200M},
+					Limits:        v1.ResourceList{v1.ResourceCPU: cpu100m, v1.ResourceMemory: mem200M},
 				},
 			},
 			expectedResource: fwk.PodResource{
@@ -2791,13 +2820,11 @@ func TestPodInfoCalculateResources(t *testing.T) {
 					},
 				},
 			},
-			nodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+			extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 				{
-					ResourceClaimName: "node-allocatable-claim",
-					Mapping: []v1.NodeAllocatableMappedResources{
-						{Name: v1.ResourceCPU, Quantity: new(cpu100m)},
-						{Name: v1.ResourceMemory, Quantity: new(mem200M)},
-					},
+					ContainerName: "",
+					Requests:      v1.ResourceList{v1.ResourceCPU: cpu100m, v1.ResourceMemory: mem200M},
+					Limits:        v1.ResourceList{v1.ResourceCPU: cpu100m, v1.ResourceMemory: mem200M},
 				},
 			},
 			expectedResource: fwk.PodResource{
@@ -2830,19 +2857,11 @@ func TestPodInfoCalculateResources(t *testing.T) {
 					},
 				},
 			},
-			nodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+			extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 				{
-					ResourceClaimName: "node-allocatable-claim-1",
-					Mapping: []v1.NodeAllocatableMappedResources{
-						{Name: v1.ResourceCPU, Quantity: new(cpu100m)},
-						{Name: v1.ResourceMemory, Quantity: new(mem200M)},
-					},
-				},
-				{
-					ResourceClaimName: "node-allocatable-claim-2",
-					Mapping: []v1.NodeAllocatableMappedResources{
-						{Name: v1.ResourceCPU, Quantity: new(cpu100m)},
-					},
+					ContainerName: "",
+					Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("200m"), v1.ResourceMemory: mem200M},
+					Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("200m"), v1.ResourceMemory: mem200M},
 				},
 			},
 			expectedResource: fwk.PodResource{
@@ -2872,13 +2891,11 @@ func TestPodInfoCalculateResources(t *testing.T) {
 					},
 				},
 			},
-			nodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+			extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 				{
-					ResourceClaimName: "node-allocatable-claim-1",
-					Mapping: []v1.NodeAllocatableMappedResources{
-						{Name: v1.ResourceCPU, Quantity: new(cpu1000m)},
-						{Name: v1.ResourceMemory, Quantity: new(mem200M)},
-					},
+					ContainerName: "",
+					Requests:      v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem200M},
+					Limits:        v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem200M},
 				},
 			},
 			expectedResource: fwk.PodResource{
@@ -2923,13 +2940,11 @@ func TestPodInfoCalculateResources(t *testing.T) {
 					},
 				},
 			},
-			nodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+			extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 				{
-					ResourceClaimName: "node-allocatable-claim-1",
-					Mapping: []v1.NodeAllocatableMappedResources{
-						{Name: v1.ResourceCPU, Quantity: new(cpu100m)},
-						{Name: v1.ResourceMemory, Quantity: new(mem200M)},
-					},
+					ContainerName: "",
+					Requests:      v1.ResourceList{v1.ResourceCPU: cpu100m, v1.ResourceMemory: mem200M},
+					Limits:        v1.ResourceList{v1.ResourceCPU: cpu100m, v1.ResourceMemory: mem200M},
 				},
 			},
 			expectedResource: fwk.PodResource{
@@ -2966,13 +2981,11 @@ func TestPodInfoCalculateResources(t *testing.T) {
 					v1.ResourceMemory: mem800M,
 				},
 			},
-			nodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+			extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 				{
-					ResourceClaimName: "node-allocatable-claim-1",
-					Mapping: []v1.NodeAllocatableMappedResources{
-						{Name: v1.ResourceCPU, Quantity: new(cpu100m)},
-						{Name: v1.ResourceMemory, Quantity: new(mem200M)},
-					},
+					ContainerName: "",
+					Requests:      v1.ResourceList{v1.ResourceCPU: cpu100m, v1.ResourceMemory: mem200M},
+					Limits:        v1.ResourceList{v1.ResourceCPU: cpu100m, v1.ResourceMemory: mem200M},
 				},
 			},
 			expectedResource: fwk.PodResource{
@@ -3002,13 +3015,11 @@ func TestPodInfoCalculateResources(t *testing.T) {
 					},
 				},
 			},
-			nodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+			extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 				{
-					ResourceClaimName: "node-allocatable-claim-1",
-					Mapping: []v1.NodeAllocatableMappedResources{
-						{Name: v1.ResourceCPU, Quantity: new(cpu100m)},
-						{Name: v1.ResourceMemory, Quantity: new(mem200M)},
-					},
+					ContainerName: "",
+					Requests:      v1.ResourceList{v1.ResourceCPU: cpu100m, v1.ResourceMemory: mem200M},
+					Limits:        v1.ResourceList{v1.ResourceCPU: cpu100m, v1.ResourceMemory: mem200M},
 				},
 			},
 			// Pod Overhead
@@ -3044,22 +3055,16 @@ func TestPodInfoCalculateResources(t *testing.T) {
 					},
 				},
 			},
-			nodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+			extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 				{
-					ResourceClaimName: "node-allocatable-claim",
-					Containers:        []string{"c1"},
-					Overhead: []v1.NodeAllocatableOverheadResources{
-						{
-							Name:         v1.ResourceCPU,
-							PerPod:       &cpu100m,
-							PerContainer: &cpu100m,
-						},
-						{
-							Name:         v1.ResourceMemory,
-							PerPod:       &mem200M,
-							PerContainer: &mem200M,
-						},
-					},
+					ContainerName: "",
+					Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("200m"), v1.ResourceMemory: resource.MustParse("400Mi")},
+					Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("200m"), v1.ResourceMemory: resource.MustParse("400Mi")},
+				},
+				{
+					ContainerName: "c1",
+					Requests:      v1.ResourceList{v1.ResourceCPU: cpu100m, v1.ResourceMemory: mem200M},
+					Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("200m"), v1.ResourceMemory: resource.MustParse("400Mi")},
 				},
 			},
 			expectedResource: fwk.PodResource{
@@ -3090,32 +3095,16 @@ func TestPodInfoCalculateResources(t *testing.T) {
 					},
 				},
 			},
-			nodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+			extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 				{
-					ResourceClaimName: "node-allocatable-claim",
-					Containers:        []string{"c1"},
-					Mapping: []v1.NodeAllocatableMappedResources{
-						{
-							Name:     v1.ResourceCPU,
-							Quantity: new(cpu100m),
-						},
-						{
-							Name:     v1.ResourceMemory,
-							Quantity: new(mem200M),
-						},
-					},
-					Overhead: []v1.NodeAllocatableOverheadResources{
-						{
-							Name:         v1.ResourceCPU,
-							PerPod:       &cpu100m,
-							PerContainer: &cpu100m,
-						},
-						{
-							Name:         v1.ResourceMemory,
-							PerPod:       &mem200M,
-							PerContainer: &mem200M,
-						},
-					},
+					ContainerName: "",
+					Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("300m"), v1.ResourceMemory: resource.MustParse("600Mi")},
+					Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("300m"), v1.ResourceMemory: resource.MustParse("600Mi")},
+				},
+				{
+					ContainerName: "c1",
+					Requests:      v1.ResourceList{v1.ResourceCPU: cpu100m, v1.ResourceMemory: mem200M},
+					Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("300m"), v1.ResourceMemory: resource.MustParse("600Mi")},
 				},
 			},
 			expectedResource: fwk.PodResource{
@@ -3139,6 +3128,9 @@ func TestPodInfoCalculateResources(t *testing.T) {
 				Containers:     tc.containers,
 				InitContainers: tc.initContainers,
 			}
+			if !tc.unbound {
+				podSpec.NodeName = "node"
+			}
 			if tc.overhead != nil {
 				podSpec.Overhead = *tc.overhead
 			}
@@ -3146,7 +3138,7 @@ func TestPodInfoCalculateResources(t *testing.T) {
 				Pod: &v1.Pod{
 					Spec: podSpec,
 					Status: v1.PodStatus{
-						NodeAllocatableResourceClaimStatuses: tc.nodeAllocatableResourceClaimStatuses,
+						ExtraNodeAllocatableResources: tc.extraNodeAllocatableResources,
 					},
 				},
 			}

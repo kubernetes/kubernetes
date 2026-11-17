@@ -28,7 +28,6 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
-	apiresource "k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/diff"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -366,9 +365,6 @@ func (p *Plugin) admitPodStatus(nodeName string, a admission.Attributes) error {
 		if !extendedResourceClaimStatusEqual(oldPod.Status.ExtendedResourceClaimStatus, newPod.Status.ExtendedResourceClaimStatus) {
 			return admission.NewForbidden(a, fmt.Errorf("node %q cannot update extended resource claim status", nodeName))
 		}
-		if !nodeAllocatableResourceClaimStatusesEqual(oldPod.Status.NodeAllocatableResourceClaimStatuses, newPod.Status.NodeAllocatableResourceClaimStatuses) {
-			return admission.NewForbidden(a, fmt.Errorf("node %q cannot update node allocatable resource claim statuses", nodeName))
-		}
 		return nil
 
 	default:
@@ -413,44 +409,6 @@ func extendedResourceClaimStatusEqual(statusA, statusB *api.PodExtendedResourceC
 	// But this cannot be guaranteed, so for the sake of correctness in all
 	// cases this code here has to check.
 	return slices.Equal(statusA.RequestMappings, statusB.RequestMappings)
-}
-
-func nodeAllocatableResourceClaimStatusesEqual(statusA, statusB []api.NodeAllocatableResourceClaimStatus) bool {
-	if len(statusA) != len(statusB) {
-		return false
-	}
-	// In most cases, status entries only get added once and not modified.
-	// But this cannot be guaranteed, so for the sake of correctness in all
-	// cases this code here has to check.
-	for i := range statusA {
-		if statusA[i].ResourceClaimName != statusB[i].ResourceClaimName {
-			return false
-		}
-		if !slices.Equal(statusA[i].Containers, statusB[i].Containers) {
-			return false
-		}
-		if !nodeAllocatableMappedResourcesEqual(statusA[i].Mapping, statusB[i].Mapping) {
-			return false
-		}
-		if !nodeAllocatableOverheadResourcesEqual(statusA[i].Overhead, statusB[i].Overhead) {
-			return false
-		}
-	}
-	return true
-}
-
-func nodeAllocatableMappedResourcesEqual(a, b []api.NodeAllocatableMappedResources) bool {
-	itemEqual := func(x, y api.NodeAllocatableMappedResources) bool {
-		return x.Name == y.Name && apiresource.QuantityPtrEqual(x.Quantity, y.Quantity)
-	}
-	return slices.EqualFunc(a, b, itemEqual)
-}
-
-func nodeAllocatableOverheadResourcesEqual(a, b []api.NodeAllocatableOverheadResources) bool {
-	itemEqual := func(x, y api.NodeAllocatableOverheadResources) bool {
-		return x.Name == y.Name && apiresource.QuantityPtrEqual(x.PerPod, y.PerPod) && apiresource.QuantityPtrEqual(x.PerContainer, y.PerContainer)
-	}
-	return slices.EqualFunc(a, b, itemEqual)
 }
 
 // admitPodEviction allows to evict a pod if it is assigned to the current node.

@@ -649,10 +649,13 @@ func TestGeneralPredicatesDRANodeAllocatableResources(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	// The claim maps 8 CPUs to the pod on top of its 1 CPU request; the node has 8.
 	pod := newResourcePod(v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(1000, resource.DecimalSI)})
-	pod.Status.NodeAllocatableResourceClaimStatuses = []v1.NodeAllocatableResourceClaimStatus{{
-		ResourceClaimName: "claim",
-		Mapping:           []v1.NodeAllocatableMappedResources{{Name: v1.ResourceCPU, Quantity: ptr.To(resource.MustParse("8"))}},
-	}}
+	pod.Status.ExtraNodeAllocatableResources = []v1.ExtraNodeAllocatableResource{
+		{
+			ContainerName: "",
+			Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("8")},
+			Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("8")},
+		},
+	}
 	node := &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
 		Status:     v1.NodeStatus{Capacity: makeResources(8000, 20, 32, 0, 0, 0), Allocatable: makeAllocatableResources(8000, 20, 32, 0, 0, 0)},
