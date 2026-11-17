@@ -204,6 +204,8 @@ type coster struct {
 	localVars scopes
 	// computedSizes tracks the computed sizes of call results.
 	computedSizes map[int64]SizeEstimate
+	// legacyTracked records expression IDs whose element size was derived from expression shape.
+	legacyTracked map[int64]struct{}
 
 	checkedAST *ast.AST
 	estimator  Estimator
@@ -223,6 +225,9 @@ type localVar struct {
 	exprID int64
 	path   []string
 	size   *SizeEstimate
+	// legacyElem records whether cost-model 0 tracked the element size of the value bound to
+	// the variable. See legacyTracksElem.
+	legacyElem bool
 }
 
 // scopes is a stack of variable name to integer id stack to handle scopes created by cel.bind() like macros
@@ -262,7 +267,7 @@ func (c *coster) pushIterKey(varName string, rangeExpr ast.Expr) {
 		s := FixedSizeEstimate(1)
 		size = &s
 		subpath = "@indices"
-	} else if rangeSize.Key != nil {
+	} else if rangeSize.Key != nil && (c.modelVersion >= 1 || c.isLegacyTracked(rangeExpr)) {
 		size = rangeSize.Key
 	}
 	var varPath []string
@@ -276,7 +281,7 @@ func (c *coster) pushIterKey(varName string, rangeExpr ast.Expr) {
 func (c *coster) pushIterValue(varName string, rangeExpr ast.Expr) {
 	rangeSize := c.sizeOrUnknown(rangeExpr)
 	var size *SizeEstimate
-	if rangeSize.Elem != nil {
+	if rangeSize.Elem != nil && (c.modelVersion >= 1 || c.isLegacyTracked(rangeExpr)) {
 		size = rangeSize.Elem
 	}
 	container := c.getType(rangeExpr).Kind()
@@ -303,6 +308,11 @@ func (c *coster) pushIterSingle(varName string, rangeExpr ast.Expr) {
 	} else {
 		size = rangeSize.Key
 	}
+	// Before ModelVersion(1), the cost model only sized the iteration variable from the range's
+	// entries for tracked expression shapes, falling back to the path hint otherwise.
+	if c.modelVersion < 1 && !c.isLegacyTracked(rangeExpr) {
+		size = nil
+	}
 	var varPath []string
 	if path := c.getPath(rangeExpr); len(path) > 0 || c.modelVersion < 1 {
 		varPath = append(path, subpath)
@@ -314,6 +324,11 @@ func (c *coster) pushIterSingle(varName string, rangeExpr ast.Expr) {
 func (c *coster) pushLocalVar(varName string, e ast.Expr) {
 	path := c.getPath(e)
 	c.localVars.push(varName, e, path, ownedSize(c.computeSize(e)))
+	if c.modelVersion < 1 {
+		if v, ok := c.localVars.peek(varName); ok {
+			v.legacyElem = c.isLegacyTracked(e)
+		}
+	}
 }
 
 // peekLocalVar looks up the top of the scope stack for a local variable name.
@@ -379,6 +394,11 @@ func (c *coster) costSelect(e ast.Expr) CostEstimate {
 	}
 	sum = sum.Add(c.cost(sel.Operand()))
 	sum = sum.Add(c.relativeAttributeCost(sel.Operand()))
+	if sel.IsTestOnly() {
+		// A presence test yields a bool, not the field it tests, so it must not carry the field's
+		// path: an Estimator would otherwise report the field's size as the size of the bool.
+		return sum
+	}
 	targetPath := c.getPath(sel.Operand())
 	if len(targetPath) > 0 {
 		c.addPath(e, append(targetPath, sel.FieldName()))
@@ -476,28 +496,29 @@ func (c *coster) costCall(e ast.Expr) CostEstimate {
 	// Continue estimating the cost of all other calls.
 	call := e.AsCall()
 	args := call.Args()
+	argCount := len(args)
 	var sum CostEstimate
 
 	// Index-like operators qualify their first argument, which requires a relative attribute
 	// when the operand is a computed value rather than a named one.
 	switch call.FunctionName() {
 	case operators.Index, operators.OptIndex, operators.OptSelect:
-		if len(args) > 0 {
+		if argCount > 0 {
 			sum = sum.Add(c.relativeAttributeCost(args[0]))
 		}
 	}
 
 	var argCostBuf [4]CostEstimate
 	var argCosts []CostEstimate
-	if len(args) <= len(argCostBuf) {
-		argCosts = argCostBuf[:len(args)]
+	if argCount <= len(argCostBuf) {
+		argCosts = argCostBuf[:argCount]
 	} else {
-		argCosts = make([]CostEstimate, len(args))
+		argCosts = make([]CostEstimate, argCount)
 	}
 	for i, arg := range args {
 		argCosts[i] = c.cost(arg)
 	}
-	if call.FunctionName() == operators.Conditional && len(args) == 3 && c.modelVersion >= 1 {
+	if call.FunctionName() == operators.Conditional && argCount == 3 && c.modelVersion >= 1 {
 		argCosts[1] = conditionalBranchCost(args[1], argCosts[1])
 		argCosts[2] = conditionalBranchCost(args[2], argCosts[2])
 	}
@@ -518,10 +539,10 @@ func (c *coster) costCall(e ast.Expr) CostEstimate {
 	var targetNode AstNode
 	var targetType *AstNode
 	if c.needsCallNodes(overloadIDs) {
-		if len(args) <= len(argTypeBuf) {
-			argTypes = argTypeBuf[:len(args)]
+		if argCount <= len(argTypeBuf) {
+			argTypes = argTypeBuf[:argCount]
 		} else {
-			argTypes = make([]AstNode, len(args))
+			argTypes = make([]AstNode, argCount)
 		}
 		for i, arg := range args {
 			argTypes[i] = c.newAstNode(arg)
@@ -540,13 +561,8 @@ func (c *coster) costCall(e ast.Expr) CostEstimate {
 		overloadSize := overloadCost.ResultSize
 		optIndex := c.modelVersion >= 1 && isOptionalIndex(overload)
 		// build and track the field path for index operations
-		if field, ok := c.indexFieldPath(overload); ok && len(args) > 0 {
-			if targetPath := c.getPath(args[0]); len(targetPath) > 0 {
-				c.addPath(e, append(targetPath, field))
-			} else if containerSize := c.indexedContainerSize(overload, args[0]); containerSize != nil && containerSize.Elem != nil {
-				elemSize := *containerSize.Elem
-				overloadSize = &elemSize
-			}
+		if field, ok := c.indexFieldPath(overload); ok && argCount > 0 {
+			overloadSize = c.indexResultSize(e, args[0], overload, field, overloadSize)
 		}
 		if overloadSize == nil {
 			if optIndex {
@@ -562,7 +578,71 @@ func (c *coster) costCall(e ast.Expr) CostEstimate {
 		resultSize = mergeSizeEstimatePtr(resultSize, overloadSize)
 	}
 	c.setSize(e, resultSize)
+	if c.modelVersion < 1 {
+		switch call.FunctionName() {
+		case operators.Conditional:
+			if argCount == 3 && c.isLegacyTracked(args[1]) && c.isLegacyTracked(args[2]) {
+				c.markLegacyTracked(e)
+			}
+		case operators.Add:
+			if argCount == 2 && c.isLegacyTracked(args[0]) && c.isLegacyTracked(args[1]) {
+				c.markLegacyTracked(e)
+			}
+		}
+	}
 	return sum.Add(fnCost)
+}
+
+// indexResultSize tracks the field path and resolves the element size of an index operation
+// (l[i], m[k], or their optional variants).
+//
+// Under legacy behavior (ModelVersion(0)), the operand's path is always qualified even when it
+// is empty (producing a bare `@items` / `@values` path), the container's element size is taken
+// only for tracked expression shapes (see isLegacyTracked), and otherwise it falls back to the
+// path hint.
+func (c *coster) indexResultSize(e, operand ast.Expr, overloadID, field string, fallback *SizeEstimate) *SizeEstimate {
+	targetPath := c.getPath(operand)
+	if c.modelVersion < 1 {
+		c.addPath(e, append(targetPath, field))
+		if c.isLegacyTracked(operand) {
+			if container := c.indexedContainerSize(overloadID, operand); container != nil && container.Elem != nil {
+				size := *container.Elem
+				return &size
+			}
+		}
+		return c.computeSize(e)
+	}
+	if len(targetPath) > 0 {
+		c.addPath(e, append(targetPath, field))
+		return fallback
+	}
+	if container := c.indexedContainerSize(overloadID, operand); container != nil && container.Elem != nil {
+		size := *container.Elem
+		return &size
+	}
+	return fallback
+}
+
+func (c *coster) markLegacyTracked(e ast.Expr) {
+	if c.legacyTracked == nil {
+		c.legacyTracked = map[int64]struct{}{}
+	}
+	c.legacyTracked[e.ID()] = struct{}{}
+}
+
+// isLegacyTracked reports whether the legacy cost model derived the element size of the container
+// from the shape of the expression, rather than from a size hint for its path.
+func (c *coster) isLegacyTracked(e ast.Expr) bool {
+	switch e.Kind() {
+	case ast.ListKind, ast.MapKind:
+		return true
+	case ast.IdentKind:
+		v, ok := c.peekLocalVar(e.AsIdent())
+		return ok && v.legacyElem
+	default:
+		_, ok := c.legacyTracked[e.ID()]
+		return ok
+	}
 }
 
 // isOptionalIndex reports whether an overload is an optional index operation, l[?i] or m[?k], which
@@ -649,6 +729,9 @@ func (c *coster) maybeUnwrapDynCall(e ast.Expr) *CostEstimate {
 	arg := call.Args()[0]
 	argCost := c.cost(arg)
 	c.copySizeEstimates(e, arg)
+	if c.modelVersion < 1 && c.isLegacyTracked(arg) {
+		c.markLegacyTracked(e)
+	}
 	callCost := FixedCostEstimate(1).Add(argCost)
 	return &callCost
 }
@@ -778,6 +861,9 @@ func (c *coster) costComprehension(e ast.Expr) CostEstimate {
 		sized.Key, sized.Elem = accuSize.Key, accuSize.Elem
 		accuSize = sized
 		c.setSize(e, &accuSize)
+		if c.modelVersion < 1 && c.isLegacyTracked(comp.LoopStep()) {
+			c.markLegacyTracked(e)
+		}
 	}
 	return sum
 }
@@ -847,11 +933,27 @@ func (c *coster) costBind(e ast.Expr) CostEstimate {
 
 	c.pushLocalVar(comp.AccuVar(), comp.AccuInit())
 	sum = sum.Add(c.cost(comp.Result()))
-	if p := c.getPath(comp.Result()); len(p) > 0 {
-		c.addPath(e, p)
+	// Under legacy behavior (ModelVersion(0)), the bind has no path of its own, so indexing
+	// its result falls back to a bare path, as for any other value without one.
+	if c.modelVersion >= 1 {
+		if p := c.getPath(comp.Result()); len(p) > 0 {
+			c.addPath(e, p)
+		}
 	}
 	// Associate the bind output size with the result size before popping the bound variable.
 	c.copySizeEstimates(e, comp.Result())
+	if c.modelVersion < 1 {
+		// Under legacy behavior, a bind whose result is the bound variable itself did not
+		// propagate the variable's element size to the outer bind expression (though uses of the
+		// variable inside the body still saw it). Clear legacyElem so only shapes independent of
+		// the bound variable mark the bind result as tracked.
+		if v, ok := c.peekLocalVar(comp.AccuVar()); ok {
+			v.legacyElem = false
+		}
+		if c.isLegacyTracked(comp.Result()) {
+			c.markLegacyTracked(e)
+		}
+	}
 	c.popLocalVar(comp.AccuVar())
 
 	return sum
