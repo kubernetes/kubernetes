@@ -2556,6 +2556,12 @@ func TestPodLevelResourcesValidationAndDefaulting(t *testing.T) {
 		}
 		t.Run(testName, func(t *testing.T) {
 			if len(test.featureOverrides) > 0 {
+				for fg, enabled := range test.featureOverrides {
+					if !enabled && (fg == features.PodLevelResources || fg == features.PodLevelResourcesFixDefaulting || fg == features.PodLevelResourcesFixKubeletQOSClass) {
+						featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.37"))
+						break
+					}
+				}
 				featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, test.featureOverrides)
 			}
 

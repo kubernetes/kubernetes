@@ -35,6 +35,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -1302,16 +1303,21 @@ func TestGetHugepageLimitsFromResources(t *testing.T) {
 			}
 		}
 
-		testPod := &v1.Pod{}
-		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, test.podLevelResourcesEnabled)
-		if test.podLevelResourcesEnabled {
-			testPod.Spec.Resources = &test.podResources
-		}
+		t.Run(test.name, func(t *testing.T) {
+			testPod := &v1.Pod{}
+			if !test.podLevelResourcesEnabled {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.37"))
+			}
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, test.podLevelResourcesEnabled)
+			if test.podLevelResourcesEnabled {
+				testPod.Spec.Resources = &test.podResources
+			}
 
-		results := GetHugepageLimitsFromResources(tCtx, testPod, test.resources, nil)
-		if !reflect.DeepEqual(expectedHugepages, results) {
-			t.Errorf("%s test failed. Expected %v but got %v", test.name, expectedHugepages, results)
-		}
+			results := GetHugepageLimitsFromResources(tCtx, testPod, test.resources, nil)
+			if !reflect.DeepEqual(expectedHugepages, results) {
+				t.Errorf("%s test failed. Expected %v but got %v", test.name, expectedHugepages, results)
+			}
+		})
 
 		for _, hugepage := range baseHugepage {
 			hugepage.Limit = uint64(0)
@@ -1917,6 +1923,9 @@ func TestGenerateLinuxContainerResourcesWithDRA(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			if !tc.podLevelResources {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.37"))
+			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRANodeAllocatableResources, tc.draNodeAllocatable)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, tc.podLevelResources)
 
@@ -3042,6 +3051,9 @@ func TestGenerateLinuxContainerResourcesWithPodLevelSwap(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			if !tc.plrEnabled {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.37"))
+			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, tc.plrEnabled)
 			setCgroupVersionDuringTest(tc.cgroupVersion)
 			m.getSwapControllerAvailable = func() bool { return !tc.swapDisabledOnNode }
