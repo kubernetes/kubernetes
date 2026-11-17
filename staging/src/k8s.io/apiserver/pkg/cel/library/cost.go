@@ -383,7 +383,14 @@ func (l *CostEstimator) EstimateCallCost(function, overloadID string, target *ce
 				}
 			}
 			// Cost is the traversal plus the construction of the result.
-			return &celcost.CallEstimate{CostEstimate: sz.MultiplyByCostFactor(2 * celcost.StringTraversalCostFactor), ResultSize: &celcost.SizeEstimate{Min: 0, Max: max}}
+			return &celcost.CallEstimate{
+				CostEstimate: sz.MultiplyByCostFactor(2 * celcost.StringTraversalCostFactor),
+				ResultSize: &celcost.SizeEstimate{
+					Min:  0,
+					Max:  max,
+					Elem: &celcost.SizeEstimate{Min: 0, Max: sz.Max},
+				},
+			}
 		}
 	case "join":
 		if target != nil {
@@ -422,7 +429,11 @@ func (l *CostEstimator) EstimateCallCost(function, overloadID string, target *ce
 			// in length.
 			regexCost := l.sizeEstimate(args[0]).MultiplyByCostFactor(celcost.RegexStringLengthCostFactor)
 			// worst case size of result is that every char is returned as separate find result.
-			return &celcost.CallEstimate{CostEstimate: strCost.Multiply(regexCost), ResultSize: &celcost.SizeEstimate{Min: 0, Max: sz.Max}}
+			resultSize := celcost.SizeEstimate{Min: 0, Max: sz.Max}
+			if function == "findAll" {
+				resultSize.Elem = &celcost.SizeEstimate{Min: 0, Max: sz.Max}
+			}
+			return &celcost.CallEstimate{CostEstimate: strCost.Multiply(regexCost), ResultSize: &resultSize}
 		}
 	case "cidr", "isIP", "isCIDR":
 		if len(args) >= 1 {
