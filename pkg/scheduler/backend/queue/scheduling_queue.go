@@ -28,6 +28,7 @@ package queue
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/rand"
 	"sync"
@@ -1253,6 +1254,16 @@ func (p *PriorityQueue) AddUnschedulablePodIfNotPresent(ctx context.Context, pIn
 	}()
 
 	pod := pInfo.Pod
+	// Reject a Pod that was recreated under the same name while in flight. The presence
+	// checks below are keyed by type/namespace/name, so they miss a recreated Pod once it
+	// has been popped (letting the stale Pod take its slot) and never match PodGroup members.
+	if p.podSuperseded(logger, pod) {
+		// Use the private nominator helper while holding p.lock; calling public
+		// DeleteNominatedPodIfExists would re-acquire p.lock and deadlock under DRAPreemption.
+		p.nominator.deleteNominatedPodIfExists(pod, false /* assumed */)
+		p.processNominationChangesUnlocked(logger)
+		return ErrPodSuperseded
+	}
 	if p.unschedulableEntities.get(pInfo) != nil {
 		return fmt.Errorf("Pod %v is already present in unschedulable queue", klog.KObj(pod))
 	}
@@ -1541,6 +1552,11 @@ func (p *PriorityQueue) Update(ctx context.Context, oldPod, newPod *v1.Pod) {
 
 func (p *PriorityQueue) updatePod(ctx context.Context, oldPod, newPod *v1.Pod) {
 	logger := klog.FromContext(ctx)
+	if p.podSuperseded(logger, newPod) {
+		// Update() calls processNominationChangesUnlocked after updatePod returns.
+		p.nominator.deleteNominatedPodIfExists(oldPod, false /* assumed */)
+		return
+	}
 
 	// Because the pod itself is being updated here, events are associated with the resource TargetPod.
 	events := framework.PodSchedulingPropertiesChange(newPod, oldPod, true)
@@ -1740,6 +1756,30 @@ func (p *PriorityQueue) deletePodGroupMember(logger klog.Logger, pod *v1.Pod) {
 	if queue == activeQ || (p.isPopFromBackoffQEnabled && queue == backoffQ) {
 		p.activeQ.broadcast()
 	}
+}
+
+// ErrPodSuperseded is returned by AddUnschedulablePodIfNotPresent when the Pod that finished
+// this scheduling attempt is no longer the Pod that owns its namespace/name.
+var ErrPodSuperseded = errors.New("pod was recreated during its scheduling attempt")
+
+// podSuperseded reports whether podLister holds a different Pod UID for pod's
+// namespace/name. Missing pods (NotFound or nil podLister) return false.
+//
+// Callers must hold p.lock. Because the informer updates its indexer before
+// invoking queue Add/Delete handlers (which also acquire p.lock), once a
+// replacement Pod is in the indexer this check observes its UID under p.lock.
+func (p *PriorityQueue) podSuperseded(logger klog.Logger, pod *v1.Pod) bool {
+	if p.podLister == nil {
+		// Only unit tests build the queue without a lister.
+		return false
+	}
+	livePod, err := p.podLister.Pods(pod.Namespace).Get(pod.Name)
+	if err != nil || livePod.UID == pod.UID {
+		return false
+	}
+	logger.V(2).Info("Pod was recreated with a different UID, ignoring stale queue operation for the previous instance",
+		"pod", klog.KObj(pod), "staleUID", pod.UID, "currentUID", livePod.UID)
+	return true
 }
 
 // deletePod removes an individual pod from the queue.

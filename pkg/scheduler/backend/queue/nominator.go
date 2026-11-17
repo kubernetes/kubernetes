@@ -105,8 +105,6 @@ func newPodNominator(podLister listersv1.PodLister, draPreemption, genericWorklo
 //     of using pod.Status.NominatedNodeName.
 //   - UpdateNominatedPod keeps the node from the nominator if the old and the
 //     new pod object have the same nominated node name.
-//   - A pod object with the name of the pod and a different UID does not
-//     allow nominating the pod.
 //   - The nominator records every change of the nomination in changes, so
 //     that the PriorityQueue can requeue the pods blocked by the nomination.
 func (npm *nominator) TracksNominationInMemory(pod *v1.Pod) bool {
@@ -205,11 +203,11 @@ func (npm *nominator) addNominatedPodUnlocked(logger klog.Logger, pi fwk.PodInfo
 			logger.V(4).Info("Pod is already scheduled to a node, aborted adding it to the nominator", "pod", klog.KObj(pi.GetPod()), "node", updatedPod.Spec.NodeName)
 			return
 		}
-		if updatedPod.UID != pi.GetPod().UID && npm.TracksNominationInMemory(pi.GetPod()) {
-			// The pod was deleted and created again with the same name.
-			// The deletion of the old pod is not going to remove a
-			// nomination which gets added after it.
-			logger.V(4).Info("Pod was recreated in podLister, aborted adding the old UID to the nominator", "pod", klog.KObj(pi.GetPod()), "oldUID", pi.GetPod().UID, "newUID", updatedPod.UID)
+		if updatedPod.UID != pi.GetPod().UID {
+			// Nominations are keyed by UID and cleaned up on informer events, which now carry
+			// updatedPod.UID. Recording the old UID would leak permanently, and nominatedPodToInfo
+			// (which looks up by namespace/name) would charge the recreated Pod against the node.
+			logger.V(4).Info("Pod was recreated with a different UID, aborted adding the previous instance to the nominator", "pod", klog.KObj(pi.GetPod()), "staleUID", pi.GetPod().UID, "currentUID", updatedPod.UID)
 			return
 		}
 	}
