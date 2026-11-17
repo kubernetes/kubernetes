@@ -465,13 +465,13 @@ func TestDeferredResizePodPreemption(t *testing.T) {
 			// Create and run existing pods (if any) on nodeName
 			var pods []*v1.Pod
 			t.Cleanup(func() {
-				testutils.CleanupPods(testCtx.Ctx, cs, t, pods)
+				cleanupPods(testCtx.Ctx, cs, t, pods)
 			})
 			for _, p := range tt.existingPods {
 				podCopy := p.DeepCopy()
 				podCopy.Namespace = testCtx.NS.Name
 				podCopy.Spec.NodeName = nodeName
-				runningPod, err := runPausePod(cs, podCopy)
+				runningPod, err := runPausePod(testCtx.Ctx, cs, podCopy)
 				if err != nil {
 					t.Fatalf("Failed running pause pod %v: %v", podCopy.Name, err)
 				}
@@ -842,7 +842,7 @@ func setUpPreemptionTestWithContext(t *testing.T, testCtx *testutils.TestContext
 		},
 	})
 	other.Namespace = testCtx.NS.Name
-	other, err := runPausePod(cs, other)
+	other, err := runPausePod(testCtx.Ctx, cs, other)
 	if err != nil {
 		t.Fatalf("Failed to run other pod: %v", err)
 	}
@@ -857,7 +857,7 @@ func setUpPreemptionTestWithContext(t *testing.T, testCtx *testutils.TestContext
 		},
 	})
 	irrelevant.Namespace = testCtx.NS.Name
-	irrelevant, err = runPausePod(cs, irrelevant)
+	irrelevant, err = runPausePod(testCtx.Ctx, cs, irrelevant)
 	if err != nil {
 		t.Fatalf("Failed to run irrelevant pod: %v", err)
 	}
@@ -877,7 +877,7 @@ func setUpPreemptionTestWithContext(t *testing.T, testCtx *testutils.TestContext
 		t.Fatalf("Failed to create pod: %v", err)
 	}
 	t.Cleanup(func() {
-		testutils.CleanupPods(testCtx.Ctx, cs, t, []*v1.Pod{pod, other, irrelevant})
+		cleanupPods(testCtx.Ctx, cs, t, []*v1.Pod{pod, other, irrelevant})
 	})
 
 	pod.Status.Phase = v1.PodRunning
@@ -1286,7 +1286,7 @@ func TestDeferredResizeAddPodHandlerOnStartup(t *testing.T) {
 				t.Fatalf("Failed to create pod: %v", err)
 			}
 			t.Cleanup(func() {
-				testutils.CleanupPods(childCtx.Ctx, cs, t, []*v1.Pod{pod})
+				cleanupPods(childCtx.Ctx, cs, t, []*v1.Pod{pod})
 			})
 
 			pod.Status.Phase = v1.PodRunning
@@ -1430,7 +1430,7 @@ func TestDeferredResizeQueueingHandlers(t *testing.T) {
 				t.Fatalf("Failed to create pod: %v", err)
 			}
 			t.Cleanup(func() {
-				testutils.CleanupPods(testCtx.Ctx, cs, t, []*v1.Pod{pod})
+				cleanupPods(testCtx.Ctx, cs, t, []*v1.Pod{pod})
 			})
 
 			pod.Status.Phase = v1.PodRunning

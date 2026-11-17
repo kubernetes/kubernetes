@@ -115,7 +115,7 @@ func TestUpdateNodeEvent(t *testing.T) {
 	)
 	defer teardown()
 
-	node, err := schedulerutils.CreateNode(testCtx.ClientSet, nodeWrapper)
+	node, err := schedulerutils.CreateNode(testCtx.Ctx, testCtx.ClientSet, nodeWrapper)
 	if err != nil {
 		t.Fatalf("Creating node error: %v", err)
 	}
@@ -203,7 +203,7 @@ func TestUpdateNominatedNodeName(t *testing.T) {
 		{
 			name: "Remove nominated pod",
 			updateFunc: func(testCtx *testutils.TestContext) {
-				if err := schedulerutils.DeletePod(testCtx.ClientSet, podMidNominated.Name, podMidNominated.Namespace); err != nil {
+				if err := schedulerutils.DeletePod(testCtx.Ctx, testCtx.ClientSet, podMidNominated.Name, podMidNominated.Namespace); err != nil {
 					t.Fatalf("Deleting pod error: %v", err)
 				}
 			},
@@ -227,7 +227,7 @@ func TestUpdateNominatedNodeName(t *testing.T) {
 				)
 				defer teardown()
 
-				_, err := schedulerutils.CreateNode(testCtx.ClientSet, testNode)
+				_, err := schedulerutils.CreateNode(testCtx.Ctx, testCtx.ClientSet, testNode)
 				if err != nil {
 					t.Fatalf("Creating node error: %v", err)
 				}
@@ -259,7 +259,7 @@ func TestUpdateNominatedNodeName(t *testing.T) {
 				}
 
 				// Remove the initial low-priority pod, which will move the nominated unschedulable pod back to the backoff queue.
-				if err := schedulerutils.DeletePod(testCtx.ClientSet, podLow.Name, podLow.Namespace); err != nil {
+				if err := schedulerutils.DeletePod(testCtx.Ctx, testCtx.ClientSet, podLow.Name, podLow.Namespace); err != nil {
 					t.Fatalf("Deleting pod error: %v", err)
 				}
 

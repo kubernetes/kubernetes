@@ -57,12 +57,9 @@ import (
 	"k8s.io/utils/ptr"
 )
 
-// imported from testutils
-var (
-	initRegistryAndConfig = func(t *testing.T, plugins ...fwk.Plugin) (frameworkruntime.Registry, schedulerconfig.KubeSchedulerProfile) {
-		return schedulerutils.InitRegistryAndConfig(t, newPlugin, plugins...)
-	}
-)
+func initRegistryAndConfig(t *testing.T, plugins ...fwk.Plugin) (frameworkruntime.Registry, schedulerconfig.KubeSchedulerProfile) {
+	return schedulerutils.InitRegistryAndConfig(t, newPlugin, plugins...)
+}
 
 // newPlugin returns a plugin factory with specified Plugin.
 func newPlugin(plugin fwk.Plugin) frameworkruntime.PluginFactory {
@@ -1132,7 +1129,7 @@ func TestScorePlugin(t *testing.T) {
 				if err = schedulerutils.WaitForPodToSchedule(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
 					t.Errorf("Expected the pod to be scheduled. error: %v", err)
 				} else {
-					p, err := schedulerutils.GetPod(testCtx.ClientSet, pod.Name, pod.Namespace)
+					p, err := schedulerutils.GetPod(testCtx.Ctx, testCtx.ClientSet, pod.Name, pod.Namespace)
 					if err != nil {
 						t.Errorf("Failed to retrieve the pod. error: %v", err)
 					} else if p.Spec.NodeName != scorePlugin.highScoreNode {
@@ -2629,7 +2626,7 @@ func TestPreemptWithPermitPlugin(t *testing.T) {
 				}
 				// Delete the waiting pod if specified.
 				if w := tt.waitingPod; w != nil && tt.deleteWaitingPod {
-					if err := schedulerutils.DeletePod(testCtx.ClientSet, w.Name, w.Namespace); err != nil {
+					if err := schedulerutils.DeletePod(testCtx.Ctx, testCtx.ClientSet, w.Name, w.Namespace); err != nil {
 						t.Fatalf("Error while deleting the waiting pod: %v", err)
 					}
 				}
@@ -2655,7 +2652,7 @@ func TestPreemptWithPermitPlugin(t *testing.T) {
 
 				if !tt.deleteWaitingPod {
 					// Expect the waitingPod to be still present.
-					if _, err := schedulerutils.GetPod(testCtx.ClientSet, w.Name, w.Namespace); err != nil {
+					if _, err := schedulerutils.GetPod(testCtx.Ctx, testCtx.ClientSet, w.Name, w.Namespace); err != nil {
 						t.Error("Get waiting pod in waiting pod failed.")
 					}
 				}
@@ -2667,7 +2664,7 @@ func TestPreemptWithPermitPlugin(t *testing.T) {
 
 			if r := tt.runningPod; r != nil {
 				// Expect the runningPod to be deleted physically.
-				if _, err = schedulerutils.GetPod(testCtx.ClientSet, r.Name, r.Namespace); err == nil {
+				if _, err = schedulerutils.GetPod(testCtx.Ctx, testCtx.ClientSet, r.Name, r.Namespace); err == nil {
 					t.Error("The running pod still exists.")
 				} else if !errors.IsNotFound(err) {
 					t.Errorf("Get running pod failed: %v", err)

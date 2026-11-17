@@ -154,7 +154,7 @@ func TestReScheduling(t *testing.T) {
 			name:   "Rescheduling pod rejected by Permit Plugin",
 			plugin: &PermitPlugin{name: "permit", statusCode: fwk.Unschedulable},
 			action: func() error {
-				_, err := CreateNode(testContext.ClientSet, st.MakeNode().Name("fake-node").Obj())
+				_, err := CreateNode(testContext.Ctx, testContext.ClientSet, st.MakeNode().Name("fake-node").Obj())
 				return err
 			},
 			wantScheduled: true,
@@ -179,7 +179,7 @@ func TestReScheduling(t *testing.T) {
 			name:   "Rescheduling pod failed by Permit Plugin",
 			plugin: &PermitPlugin{name: "permit", statusCode: fwk.Error},
 			action: func() error {
-				_, err := CreateNode(testContext.ClientSet, st.MakeNode().Name("fake-node").Obj())
+				_, err := CreateNode(testContext.Ctx, testContext.ClientSet, st.MakeNode().Name("fake-node").Obj())
 				return err
 			},
 			wantFirstSchedulingError: true,
@@ -189,7 +189,7 @@ func TestReScheduling(t *testing.T) {
 			name:   "Rescheduling pod rejected by Reserve Plugin",
 			plugin: &ReservePlugin{name: "reserve", statusCode: fwk.Unschedulable},
 			action: func() error {
-				_, err := CreateNode(testContext.ClientSet, st.MakeNode().Name("fake-node").Obj())
+				_, err := CreateNode(testContext.Ctx, testContext.ClientSet, st.MakeNode().Name("fake-node").Obj())
 				return err
 			},
 			wantScheduled: true,
@@ -208,7 +208,7 @@ func TestReScheduling(t *testing.T) {
 			name:   "Rescheduling pod failed by Reserve Plugin",
 			plugin: &ReservePlugin{name: "reserve", statusCode: fwk.Error},
 			action: func() error {
-				_, err := CreateNode(testContext.ClientSet, st.MakeNode().Name("fake-node").Obj())
+				_, err := CreateNode(testContext.Ctx, testContext.ClientSet, st.MakeNode().Name("fake-node").Obj())
 				return err
 			},
 			wantFirstSchedulingError: true,
@@ -235,7 +235,7 @@ func TestReScheduling(t *testing.T) {
 						scheduler.WithFrameworkOutOfTreeRegistry(registry))
 					defer teardown()
 
-					pod, err := createPausePod(testCtx.ClientSet,
+					pod, err := createPausePod(testCtx.Ctx, testCtx.ClientSet,
 						testutils.InitPausePod(&testutils.PausePodConfig{Name: "test-pod", Namespace: testCtx.NS.Name}), scheduleAsPodGroup)
 					if err != nil {
 						t.Fatalf("Error while creating a test pod: %v", err)

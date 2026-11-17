@@ -2693,14 +2693,14 @@ func RunTestCoreResourceEnqueue(t *testing.T, tt *CoreResourceEnqueueTestCase) {
 	}
 
 	for _, pv := range tt.InitialPVs {
-		if _, err := schedulerutils.CreatePV(cs, pv); err != nil {
+		if _, err := schedulerutils.CreatePV(testCtx.Ctx, cs, pv); err != nil {
 			t.Fatalf("Failed to create a PV %q: %v", pv.Name, err)
 		}
 	}
 
 	for _, pvc := range tt.InitialPVCs {
 		pvc.Namespace = ns
-		if _, err := schedulerutils.CreatePVC(cs, pvc); err != nil {
+		if _, err := schedulerutils.CreatePVC(testCtx.Ctx, cs, pvc); err != nil {
 			t.Fatalf("Failed to create a PVC %q: %v", pvc.Name, err)
 		}
 	}

@@ -138,7 +138,7 @@ func TestUnschedulableNodes(t *testing.T) {
 			}
 
 			for i, mod := range nodeModifications {
-				unSchedNode, err := CreateNode(testCtx.ClientSet, node)
+				unSchedNode, err := CreateNode(testCtx.Ctx, testCtx.ClientSet, node)
 				if err != nil {
 					t.Fatalf("Failed to create node: %v", err)
 				}
@@ -148,7 +148,7 @@ func TestUnschedulableNodes(t *testing.T) {
 
 				// Create the new pod, note that this needs to happen post unschedulable
 				// modification or we have a race in the test.
-				myPod, err := createPausePodWithResource(testCtx.ClientSet, "node-scheduling-test-pod", testCtx.NS.Name, nil, scheduleAsPodGroup)
+				myPod, err := createPausePodWithResource(testCtx.Ctx, testCtx.ClientSet, "node-scheduling-test-pod", testCtx.NS.Name, nil, scheduleAsPodGroup)
 				if err != nil {
 					t.Fatalf("Failed to create pod: %v", err)
 				}
@@ -178,7 +178,7 @@ func TestUnschedulableNodes(t *testing.T) {
 					t.Logf("Test %d: Pod got scheduled on a schedulable node", i)
 				}
 				// Clean up.
-				if err := DeletePod(testCtx.ClientSet, myPod.Name, myPod.Namespace); err != nil {
+				if err := DeletePod(testCtx.Ctx, testCtx.ClientSet, myPod.Name, myPod.Namespace); err != nil {
 					t.Errorf("Failed to delete pod: %v", err)
 				}
 				err = testCtx.ClientSet.CoreV1().Nodes().Delete(context.TODO(), schedNode.Name, metav1.DeleteOptions{})
@@ -224,25 +224,25 @@ func TestMultipleSchedulers(t *testing.T) {
 					},
 				},
 			}
-			if _, err := CreateNode(testCtx.ClientSet, node); err != nil {
+			if _, err := CreateNode(testCtx.Ctx, testCtx.ClientSet, node); err != nil {
 				t.Fatalf("Failed to create node: %v", err)
 			}
 
 			// 3. create 3 pods for testing
 			t.Logf("create 3 pods for testing")
-			testPod, err := createPausePodWithResource(testCtx.ClientSet, "pod-without-scheduler-name", testCtx.NS.Name, nil, scheduleAsPodGroup)
+			testPod, err := createPausePodWithResource(testCtx.Ctx, testCtx.ClientSet, "pod-without-scheduler-name", testCtx.NS.Name, nil, scheduleAsPodGroup)
 			if err != nil {
 				t.Fatalf("Failed to create pod: %v", err)
 			}
 
 			defaultScheduler := "default-scheduler"
-			testPodFitsDefault, err := createPausePod(testCtx.ClientSet, testutils.InitPausePod(&testutils.PausePodConfig{Name: "pod-fits-default", Namespace: testCtx.NS.Name, SchedulerName: defaultScheduler}), scheduleAsPodGroup)
+			testPodFitsDefault, err := createPausePod(testCtx.Ctx, testCtx.ClientSet, testutils.InitPausePod(&testutils.PausePodConfig{Name: "pod-fits-default", Namespace: testCtx.NS.Name, SchedulerName: defaultScheduler}), scheduleAsPodGroup)
 			if err != nil {
 				t.Fatalf("Failed to create pod: %v", err)
 			}
 
 			fooScheduler := "foo-scheduler"
-			testPodFitsFoo, err := createPausePod(testCtx.ClientSet, testutils.InitPausePod(&testutils.PausePodConfig{Name: "pod-fits-foo", Namespace: testCtx.NS.Name, SchedulerName: fooScheduler}), scheduleAsPodGroup)
+			testPodFitsFoo, err := createPausePod(testCtx.Ctx, testCtx.ClientSet, testutils.InitPausePod(&testutils.PausePodConfig{Name: "pod-fits-foo", Namespace: testCtx.NS.Name, SchedulerName: fooScheduler}), scheduleAsPodGroup)
 			if err != nil {
 				t.Fatalf("Failed to create pod: %v", err)
 			}
@@ -327,7 +327,7 @@ func TestMultipleSchedulingProfiles(t *testing.T) {
 					},
 				},
 			}
-			if _, err := CreateNode(testCtx.ClientSet, node); err != nil {
+			if _, err := CreateNode(testCtx.Ctx, testCtx.ClientSet, node); err != nil {
 				t.Fatal(err)
 			}
 
@@ -343,7 +343,7 @@ func TestMultipleSchedulingProfiles(t *testing.T) {
 				{Name: "baz", Namespace: testCtx.NS.Name, SchedulerName: "default-scheduler"},
 				{Name: "zet", Namespace: testCtx.NS.Name, SchedulerName: "custom-scheduler"},
 			} {
-				if _, err := createPausePod(testCtx.ClientSet, testutils.InitPausePod(pc), scheduleAsPodGroup); err != nil {
+				if _, err := createPausePod(testCtx.Ctx, testCtx.ClientSet, testutils.InitPausePod(pc), scheduleAsPodGroup); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -398,7 +398,7 @@ func TestAllocatable(t *testing.T) {
 				v1.ResourceCPU:    "30m",
 				v1.ResourceMemory: "30",
 			}
-			allocNode, err := CreateNode(testCtx.ClientSet, st.MakeNode().Name("node-allocatable-scheduler-test-node").Capacity(nodeRes).Obj())
+			allocNode, err := CreateNode(testCtx.Ctx, testCtx.ClientSet, st.MakeNode().Name("node-allocatable-scheduler-test-node").Capacity(nodeRes).Obj())
 			if err != nil {
 				t.Fatalf("Failed to create node: %v", err)
 			}
@@ -409,7 +409,7 @@ func TestAllocatable(t *testing.T) {
 				v1.ResourceCPU:    *resource.NewMilliQuantity(20, resource.DecimalSI),
 				v1.ResourceMemory: *resource.NewQuantity(20, resource.BinarySI),
 			}
-			testAllocPod, err := createPausePodWithResource(testCtx.ClientSet, podName, testCtx.NS.Name, podRes, scheduleAsPodGroup)
+			testAllocPod, err := createPausePodWithResource(testCtx.Ctx, testCtx.ClientSet, podName, testCtx.NS.Name, podRes, scheduleAsPodGroup)
 			if err != nil {
 				t.Fatalf("Test allocatable unawareness failed to create pod: %v", err)
 			}
@@ -441,13 +441,13 @@ func TestAllocatable(t *testing.T) {
 				t.Fatalf("Failed to update node with Status.Allocatable: %v", err)
 			}
 
-			if err := DeletePod(testCtx.ClientSet, testAllocPod.Name, testCtx.NS.Name); err != nil {
+			if err := DeletePod(testCtx.Ctx, testCtx.ClientSet, testAllocPod.Name, testCtx.NS.Name); err != nil {
 				t.Fatalf("Failed to remove the first pod: %v", err)
 			}
 
 			// 6. Make another pod with different name, same resource request
 			podName2 := "pod-test-allocatable2"
-			testAllocPod2, err := createPausePodWithResource(testCtx.ClientSet, podName2, testCtx.NS.Name, podRes, scheduleAsPodGroup)
+			testAllocPod2, err := createPausePodWithResource(testCtx.Ctx, testCtx.ClientSet, podName2, testCtx.NS.Name, podRes, scheduleAsPodGroup)
 			if err != nil {
 				t.Fatalf("Test allocatable awareness failed to create pod: %v", err)
 			}
@@ -570,7 +570,7 @@ func TestSchedulerInformers(t *testing.T) {
 			for _, test := range tests {
 				t.Run(test.name, func(t *testing.T) {
 					for _, nodeConf := range test.nodes {
-						_, err := CreateNode(cs, st.MakeNode().Name(nodeConf.name).Capacity(nodeConf.res).Obj())
+						_, err := CreateNode(testCtx.Ctx, cs, st.MakeNode().Name(nodeConf.name).Capacity(nodeConf.res).Obj())
 						if err != nil {
 							t.Fatalf("Error creating node %v: %v", nodeConf.name, err)
 						}
@@ -584,12 +584,12 @@ func TestSchedulerInformers(t *testing.T) {
 					var err error
 					// Create and run existingPods.
 					for i, p := range test.existingPods {
-						if pods[i], err = RunPausePod(cs, p); err != nil {
+						if pods[i], err = RunPausePod(testCtx.Ctx, cs, p); err != nil {
 							t.Fatalf("Error running pause pod: %v", err)
 						}
 					}
 					// Create the new "pod".
-					unschedulable, err := createPausePod(cs, test.pod, scheduleAsPodGroup)
+					unschedulable, err := createPausePod(testCtx.Ctx, cs, test.pod, scheduleAsPodGroup)
 					if err != nil {
 						t.Errorf("Error while creating new pod: %v", err)
 					}
@@ -630,7 +630,7 @@ func TestNodeEvents(t *testing.T) {
 			testCtx := InitTestSchedulerWithNS(t, "node-events")
 
 			// 1.1 create pod1
-			pod1, err := createPausePodWithResource(testCtx.ClientSet, "pod1", testCtx.NS.Name, &v1.ResourceList{
+			pod1, err := createPausePodWithResource(testCtx.Ctx, testCtx.ClientSet, "pod1", testCtx.NS.Name, &v1.ResourceList{
 				v1.ResourceCPU: *resource.NewMilliQuantity(80, resource.DecimalSI),
 			}, scheduleAsPodGroup)
 			if err != nil {
@@ -638,7 +638,7 @@ func TestNodeEvents(t *testing.T) {
 			}
 
 			// 1.2 Create node1
-			node1, err := CreateNode(testCtx.ClientSet, st.MakeNode().
+			node1, err := CreateNode(testCtx.Ctx, testCtx.ClientSet, st.MakeNode().
 				Name("node-events-test-node1").
 				Capacity(map[v1.ResourceName]string{
 					v1.ResourcePods:   "32",
@@ -656,7 +656,7 @@ func TestNodeEvents(t *testing.T) {
 			}
 
 			// 2. create pod2
-			pod2, err := createPausePodWithResource(testCtx.ClientSet, "pod2", testCtx.NS.Name, &v1.ResourceList{
+			pod2, err := createPausePodWithResource(testCtx.Ctx, testCtx.ClientSet, "pod2", testCtx.NS.Name, &v1.ResourceList{
 				v1.ResourceCPU: *resource.NewMilliQuantity(40, resource.DecimalSI),
 			}, scheduleAsPodGroup)
 			if err != nil {
@@ -677,7 +677,7 @@ func TestNodeEvents(t *testing.T) {
 				}).
 				Label("affinity-key", "affinity-value").
 				Taints([]v1.Taint{{Key: "taint-key", Effect: v1.TaintEffectNoSchedule}}).Obj()
-			node2, err = CreateNode(testCtx.ClientSet, node2)
+			node2, err = CreateNode(testCtx.Ctx, testCtx.ClientSet, node2)
 			if err != nil {
 				t.Fatalf("Failed to create %s: %v", node2.Name, err)
 			}
@@ -686,7 +686,7 @@ func TestNodeEvents(t *testing.T) {
 				Req(map[v1.ResourceName]string{v1.ResourceCPU: "40m"}).
 				NodeAffinityIn("affinity-key", []string{"affinity-value"}, st.NodeSelectorTypeMatchExpressions).
 				Toleration("taint-key").Obj()
-			plugPod, err = createPausePod(testCtx.ClientSet, plugPod, scheduleAsPodGroup)
+			plugPod, err = createPausePod(testCtx.Ctx, testCtx.ClientSet, plugPod, scheduleAsPodGroup)
 			if err != nil {
 				t.Fatalf("Failed to create pod %v: %v", plugPod.Name, err)
 			}
@@ -702,7 +702,7 @@ func TestNodeEvents(t *testing.T) {
 
 			// 4. Remove node taint, pod2 should schedule
 			node2.Spec.Taints = nil
-			node2, err = UpdateNode(testCtx.ClientSet, node2)
+			node2, err = UpdateNode(testCtx.Ctx, testCtx.ClientSet, node2)
 			if err != nil {
 				t.Fatalf("Failed to update %s: %v", node2.Name, err)
 			}
@@ -1058,14 +1058,14 @@ func TestHostPorts(t *testing.T) {
 				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, true)
 			}
 			testCtx := InitTestSchedulerWithNS(t, "conflicting-host-ports")
-			node, err := CreateNode(testCtx.ClientSet, st.MakeNode().
+			node, err := CreateNode(testCtx.Ctx, testCtx.ClientSet, st.MakeNode().
 				Name("conflicting-host-ports-node").Obj())
 			if err != nil {
 				t.Fatalf("Failed to create %s: %v", node.Name, err)
 			}
 			for _, tc := range tests {
 				t.Run(tc.name, func(t *testing.T) {
-					p1, err := createPausePod(testCtx.ClientSet, testutils.InitPausePod(&testutils.PausePodConfig{
+					p1, err := createPausePod(testCtx.Ctx, testCtx.ClientSet, testutils.InitPausePod(&testutils.PausePodConfig{
 						Name:                             "p1",
 						Namespace:                        testCtx.NS.Name,
 						ContainerPorts:                   tc.firstPorts.container,
@@ -1080,7 +1080,7 @@ func TestHostPorts(t *testing.T) {
 						t.Errorf("Pod %s didn't schedule: %v", p1.Name, err)
 					}
 
-					p2, err := createPausePod(testCtx.ClientSet, testutils.InitPausePod(&testutils.PausePodConfig{
+					p2, err := createPausePod(testCtx.Ctx, testCtx.ClientSet, testutils.InitPausePod(&testutils.PausePodConfig{
 						Name:                             "p2",
 						Namespace:                        testCtx.NS.Name,
 						ContainerPorts:                   tc.secondPorts.container,
@@ -1149,7 +1149,7 @@ func TestTaintTolerationGtLtIntegration(t *testing.T) {
 					},
 				}).Obj()
 			node1.Status.Conditions = []v1.NodeCondition{goodCondition}
-			_, err := CreateNode(testCtx.ClientSet, node1)
+			_, err := CreateNode(testCtx.Ctx, testCtx.ClientSet, node1)
 			if err != nil {
 				t.Fatalf("Failed to create node1: %v", err)
 			}
@@ -1165,7 +1165,7 @@ func TestTaintTolerationGtLtIntegration(t *testing.T) {
 					},
 				}).Obj()
 			node2.Status.Conditions = []v1.NodeCondition{goodCondition}
-			node2, err = CreateNode(testCtx.ClientSet, node2)
+			node2, err = CreateNode(testCtx.Ctx, testCtx.ClientSet, node2)
 			if err != nil {
 				t.Fatalf("Failed to create node2: %v", err)
 			}
@@ -1187,7 +1187,7 @@ func TestTaintTolerationGtLtIntegration(t *testing.T) {
 						Effect:   v1.TaintEffectNoSchedule,
 					},
 				}).Obj()
-			pod1, err = createPausePod(testCtx.ClientSet, pod1, scheduleAsPodGroup)
+			pod1, err = createPausePod(testCtx.Ctx, testCtx.ClientSet, pod1, scheduleAsPodGroup)
 			if err != nil {
 				t.Fatalf("Failed to create pod1: %v", err)
 			}
@@ -1209,7 +1209,7 @@ func TestTaintTolerationGtLtIntegration(t *testing.T) {
 						Effect:   v1.TaintEffectNoSchedule,
 					},
 				}).Obj()
-			pod2, err = createPausePod(testCtx.ClientSet, pod2, scheduleAsPodGroup)
+			pod2, err = createPausePod(testCtx.Ctx, testCtx.ClientSet, pod2, scheduleAsPodGroup)
 			if err != nil {
 				t.Fatalf("Failed to create pod2: %v", err)
 			}
@@ -1264,7 +1264,7 @@ func TestTaintTolerationGtLtIntegration(t *testing.T) {
 					},
 				}).Obj()
 			node3.Status.Conditions = []v1.NodeCondition{goodCondition}
-			node3, err = CreateNode(testCtx.ClientSet, node3)
+			node3, err = CreateNode(testCtx.Ctx, testCtx.ClientSet, node3)
 			if err != nil {
 				t.Fatalf("Failed to create node3: %v", err)
 			}
@@ -1286,7 +1286,7 @@ func TestTaintTolerationGtLtIntegration(t *testing.T) {
 						Effect:   v1.TaintEffectNoSchedule,
 					},
 				}).Obj()
-			pod3, err = createPausePod(testCtx.ClientSet, pod3, scheduleAsPodGroup)
+			pod3, err = createPausePod(testCtx.Ctx, testCtx.ClientSet, pod3, scheduleAsPodGroup)
 			if err != nil {
 				t.Fatalf("Failed to create pod3: %v", err)
 			}
