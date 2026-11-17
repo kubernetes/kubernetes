@@ -73,6 +73,11 @@ type Manager interface {
 	// field that is gated on allocation is pending. Callers must not mutate the returned pod.
 	UpdatePodFromAllocation(pod *v1.Pod) (*v1.Pod, bool)
 
+	// GetAllocatedPod returns the pod as it is allocated without running a DeepEqual check
+	// for whether a gated change is pending, and the generation of the allocation (0 if unknown).
+	// Callers must not mutate the returned pod.
+	GetAllocatedPod(pod *v1.Pod) (*v1.Pod, int64)
+
 	// SetAllocatedPod checkpoints the allocation for a pod, including its generation.
 	SetAllocatedPod(logger klog.Logger, allocatedPod *v1.Pod) error
 
@@ -459,30 +464,45 @@ func (m *manager) GetPodLevelResourceAllocation(podUID types.UID) (*v1.ResourceR
 // Pods migrated from a V1 checkpoint only have their resources until they are added again, so for
 // them those resources are overlaid onto the pod instead, and only a change to them can be pending.
 func (m *manager) UpdatePodFromAllocation(pod *v1.Pod) (*v1.Pod, bool) {
-	if pod == nil {
+	allocatedPod, _ := m.getAllocatedPod(pod)
+	if allocatedPod == pod {
 		return pod, false
+	}
+	// The passthrough fields have the same value in both specs by now, so only a gated field can
+	// make them differ.
+	if apiequality.Semantic.DeepEqual(&pod.Spec, &allocatedPod.Spec) {
+		return pod, false
+	}
+	return allocatedPod, true
+}
+
+// GetAllocatedPod returns the pod as it is allocated without running a DeepEqual check
+// for whether a gated change is pending, and the generation of the allocation (0 if unknown), from
+// the same read of the allocation. Callers must not mutate the returned pod.
+func (m *manager) GetAllocatedPod(pod *v1.Pod) (*v1.Pod, int64) {
+	return m.getAllocatedPod(pod)
+}
+
+func (m *manager) getAllocatedPod(pod *v1.Pod) (*v1.Pod, int64) {
+	if pod == nil {
+		return nil, 0
 	}
 
 	allocated, ok := m.allocated.GetPodReadOnly(pod.UID)
 	if !ok {
-		return pod, false
+		return pod, 0
 	}
 
 	// TODO: Remove in v1.39 when the V1 checkpoint format is no longer supported (see migrateV1ToV2).
 	if state.IsMigratedFromV1(allocated) {
-		return state.UpdatePodFromV1(pod, allocated)
+		updated, _ := state.UpdatePodFromV1(pod, allocated)
+		return updated, allocated.Generation
 	}
 
 	result := *pod
 	result.Spec = allocated.Spec
 	copyPassthroughFields(&result.Spec, &pod.Spec)
-	// The passthrough fields have the same value in both specs by now, so only a gated field can
-	// make them differ.
-	pending := !apiequality.Semantic.DeepEqual(&pod.Spec, &result.Spec)
-	if !pending {
-		return pod, false
-	}
-	return &result, true
+	return &result, allocated.Generation
 }
 
 // copyPassthroughFields sets the fields of spec that take effect as soon as they change in the pod

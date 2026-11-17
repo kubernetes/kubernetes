@@ -99,6 +99,9 @@ type UpdatePodOptions struct {
 	// and later kills have an opportunity to override the status (i.e. a preemption
 	// may be later turned into an eviction).
 	KillPodOptions *KillPodOptions
+	// AllocatedGeneration is the generation of the allocation that Pod was updated from, or 0 if
+	// unknown. It is set by the pod worker.
+	AllocatedGeneration int64
 }
 
 // PodWorkType classifies the status of pod as seen by the pod worker - setup (sync),
@@ -285,7 +288,7 @@ type podSyncer interface {
 	// pod has reached a terminal state and the presence of the error indicates succeeded or failed.
 	// If an error is returned, the sync was not successful and should be rerun in the future. This
 	// is a long running method and should exit early with context.Canceled if the context is canceled.
-	SyncPod(ctx context.Context, updateType kubetypes.SyncPodType, pod *v1.Pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus) (bool, func(), error)
+	SyncPod(ctx context.Context, updateType kubetypes.SyncPodType, pod *v1.Pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus, allocatedGeneration int64) (bool, func(), error)
 	// SyncTerminatingPod attempts to ensure the pod's containers are no longer running and to collect
 	// any final status. This method is repeatedly invoked with diminishing grace periods until it exits
 	// without error. Once this method exits with no error other components are allowed to tear down
@@ -303,7 +306,7 @@ type podSyncer interface {
 	SyncTerminatedPod(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus) error
 }
 
-type syncPodFnType func(ctx context.Context, updateType kubetypes.SyncPodType, pod *v1.Pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus) (bool, func(), error)
+type syncPodFnType func(ctx context.Context, updateType kubetypes.SyncPodType, pod *v1.Pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus, allocatedGeneration int64) (bool, func(), error)
 type syncTerminatingPodFnType func(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, gracePeriod *int64, podStatusFn func(*v1.PodStatus)) error
 type syncTerminatingRuntimePodFnType func(ctx context.Context, runningPod *kubecontainer.Pod) error
 type syncTerminatedPodFnType func(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus) error
@@ -327,8 +330,8 @@ func newPodSyncerFuncs(s podSyncer) podSyncerFuncs {
 
 var _ podSyncer = podSyncerFuncs{}
 
-func (f podSyncerFuncs) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType, pod *v1.Pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus) (bool, func(), error) {
-	return f.syncPod(ctx, updateType, pod, mirrorPod, podStatus)
+func (f podSyncerFuncs) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType, pod *v1.Pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus, allocatedGeneration int64) (bool, func(), error) {
+	return f.syncPod(ctx, updateType, pod, mirrorPod, podStatus, allocatedGeneration)
 }
 func (f podSyncerFuncs) SyncTerminatingPod(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, gracePeriod *int64, podStatusFn func(*v1.PodStatus)) error {
 	return f.syncTerminatingPod(ctx, pod, podStatus, gracePeriod, podStatusFn)
@@ -1010,7 +1013,7 @@ func (p *podWorkers) UpdatePod(ctx context.Context, options UpdatePodOptions) {
 
 	// notify the pod worker there is a pending update
 	status.pendingUpdate = &options
-	status.pendingUpdate.Pod, _ = p.allocationManager.UpdatePodFromAllocation(options.Pod)
+	status.pendingUpdate.Pod, status.pendingUpdate.AllocatedGeneration = p.allocationManager.GetAllocatedPod(options.Pod)
 	status.working = true
 	updateLogger.V(4).Info("Notifying pod of pending update", "workType", status.WorkType())
 	select {
@@ -1342,7 +1345,7 @@ func (p *podWorkers) podWorkerLoop(parentCtx context.Context, podUID types.UID, 
 					p.relistSuspender.SuspendRelist(podUID)
 					relistSuspended = true
 				}
-				isTerminal, postSync, err = p.podSyncer.SyncPod(ctx, update.Options.UpdateType, update.Options.Pod, update.Options.MirrorPod, status)
+				isTerminal, postSync, err = p.podSyncer.SyncPod(ctx, update.Options.UpdateType, update.Options.Pod, update.Options.MirrorPod, status, update.Options.AllocatedGeneration)
 			}
 
 			// Resume *before* setting lastSyncTime: any relist that starts after lastSyncTime then

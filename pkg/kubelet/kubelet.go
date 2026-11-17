@@ -2149,13 +2149,16 @@ func (kl *Kubelet) Run(ctx context.Context, updates <-chan kubetypes.PodUpdate) 
 //   - Call the container runtime's SyncPod callback
 //   - Update the traffic shaping for the pod's ingress and egress limits
 //
+// allocatedGeneration is the generation of the allocation that pod was updated from, or 0 if
+// unknown.
+//
 // If any step of this workflow errors, the error is returned, and is repeated
 // on the next SyncPod call.
 //
 // This operation writes all events that are dispatched in order to provide
 // the most accurate information possible about an error situation to aid debugging.
 // Callers should not write an event if this operation returns an error.
-func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType, pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus) (isTerminal bool, postSync func(), err error) {
+func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType, pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus, allocatedGeneration int64) (isTerminal bool, postSync func(), err error) {
 	ctx, otelSpan := kl.tracer.Start(ctx, "syncPod", trace.WithAttributes(
 		semconv.K8SPodUIDKey.String(string(pod.UID)),
 		attribute.String("k8s.pod", klog.KObj(pod).String()),
