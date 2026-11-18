@@ -23,7 +23,9 @@ import (
 
 	cadvisorapi "github.com/google/cadvisor/lib/model"
 	v1 "k8s.io/api/core/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
@@ -44,11 +46,13 @@ const (
 )
 
 // TopologyAffinityError represents an resource alignment error
-type TopologyAffinityError struct{}
+type TopologyAffinityError struct {
+	operation lifecycle.Operation
+}
 
-// NewTopologyAffinityError returns a new TopologyAffinityError.
-func NewTopologyAffinityError() *TopologyAffinityError {
-	return &TopologyAffinityError{}
+// NewTopologyAffinityError returns a new TopologyAffinityError for the given operation.
+func NewTopologyAffinityError(operation lifecycle.Operation) *TopologyAffinityError {
+	return &TopologyAffinityError{operation: operation}
 }
 
 func (e TopologyAffinityError) Error() string {
@@ -59,21 +63,30 @@ func (e TopologyAffinityError) Type() string {
 	return ErrorTopologyAffinity
 }
 
-// RejectionType returns RejectionBlocked because topology hints are generated from the currently
-// available resources, so alignment may succeed once other pods release resources.
+// RejectionType returns RejectionBlocked for a pod add because topology hints are generated from
+// the currently available resources, so alignment may succeed once other pods release resources.
+// It returns RejectionInfeasible for a pod update when InPlacePodVerticalScalingExclusiveCPUs is
+// enabled, so a resize that can't be aligned is rejected and not retried. With the feature gate
+// disabled, a pod update is rejected with RejectionBlocked, like a pod add.
 // TODO: Return RejectionInfeasible when the resources can't be aligned even on an otherwise empty node.
+// TODO: Return RejectionBlocked for a pod update when alignment may succeed once other pods
+// release resources.
+// TODO: Return RejectionInfeasible only for a pod update that resizes exclusive CPUs. With the
+// feature gate enabled, other pod updates get it as well, e.g. a container added with
+// DynamicContainers or a resize with InPlacePodVerticalScalingExclusiveMemory.
 func (e TopologyAffinityError) RejectionType() lifecycle.RejectionType {
-	return lifecycle.RejectionBlocked
+	return rejectionTypeForOperation(e.operation)
 }
 
 // PodLevelTopologyAffinityError represents a pod-level resource alignment error.
 type PodLevelTopologyAffinityError struct {
-	message string
+	message   string
+	operation lifecycle.Operation
 }
 
-// NewPodLevelTopologyAffinityError returns a new PodLevelTopologyAffinityError.
-func NewPodLevelTopologyAffinityError(message string) *PodLevelTopologyAffinityError {
-	return &PodLevelTopologyAffinityError{message: message}
+// NewPodLevelTopologyAffinityError returns a new PodLevelTopologyAffinityError for the given operation.
+func NewPodLevelTopologyAffinityError(message string, operation lifecycle.Operation) *PodLevelTopologyAffinityError {
+	return &PodLevelTopologyAffinityError{message: message, operation: operation}
 }
 
 func (e *PodLevelTopologyAffinityError) Error() string {
@@ -87,8 +100,18 @@ func (e *PodLevelTopologyAffinityError) Type() string {
 	return ErrorTopologyAffinity
 }
 
-// RejectionType returns RejectionBlocked for the same reason as TopologyAffinityError.RejectionType.
+// RejectionType returns the same rejection type as TopologyAffinityError.RejectionType, for the
+// same reasons.
 func (e *PodLevelTopologyAffinityError) RejectionType() lifecycle.RejectionType {
+	return rejectionTypeForOperation(e.operation)
+}
+
+// rejectionTypeForOperation returns the rejection type of a resource alignment error raised by
+// the given operation.
+func rejectionTypeForOperation(operation lifecycle.Operation) lifecycle.RejectionType {
+	if operation == lifecycle.UpdateOperation && utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingExclusiveCPUs) {
+		return lifecycle.RejectionInfeasible
+	}
 	return lifecycle.RejectionBlocked
 }
 
