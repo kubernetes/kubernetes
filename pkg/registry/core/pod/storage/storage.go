@@ -28,15 +28,21 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
+	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	genericfeatures "k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
+	"k8s.io/apiserver/pkg/sharding"
 	"k8s.io/apiserver/pkg/storage"
 	storeerr "k8s.io/apiserver/pkg/storage/errors"
 	"k8s.io/apiserver/pkg/util/dryrun"
@@ -44,6 +50,7 @@ import (
 	policyclient "k8s.io/client-go/kubernetes/typed/policy/v1"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/apis/core/lazypod"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/client"
@@ -96,7 +103,7 @@ func NewStorage(optsGetter generic.RESTOptionsGetter, k client.ConnectionInfoGet
 		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
 	options := &generic.StoreOptions{
-		RESTOptions: optsGetter,
+		RESTOptions: lazyRESTOptionsGetter{delegate: optsGetter},
 		AttrFunc:    registrypod.GetAttrs,
 		TriggerFunc: map[string]storage.IndexerFunc{"spec.nodeName": registrypod.NodeNameTriggerFunc},
 		Indexers:    registrypod.Indexers(),
@@ -135,6 +142,114 @@ func NewStorage(optsGetter generic.RESTOptionsGetter, k client.ConnectionInfoGet
 		Attach:              &podrest.AttachREST{Store: store, KubeletConn: k, Authorizer: authorizer},
 		PortForward:         &podrest.PortForwardREST{Store: store, KubeletConn: k, Authorizer: authorizer},
 	}, nil
+}
+
+// Get retrieves a Pod from storage as a read-optimized *lazypod.Pod so Protobuf
+// responses avoid struct decoding, conversion, and re-encoding allocations.
+func (r *REST) Get(ctx context.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
+	key, err := r.Store.KeyFunc(ctx, name)
+	if err != nil {
+		return nil, err
+	}
+	rv := ""
+	if options != nil {
+		rv = options.ResourceVersion
+	}
+	obj := &lazypod.Pod{}
+	if err := r.Store.Storage.Get(ctx, key, storage.GetOptions{ResourceVersion: rv}, obj); err != nil {
+		return nil, storeerr.InterpretGetError(err, r.qualifiedResourceFromContext(ctx), name)
+	}
+	return obj, nil
+}
+
+// List returns matching Pods as a *lazypod.PodList so Protobuf list responses
+// stream pre-framed Pod wire bytes directly without copying []core.Pod / []v1.Pod.
+func (r *REST) List(ctx context.Context, options *metainternalversion.ListOptions) (runtime.Object, error) {
+	label := labels.Everything()
+	if options != nil && options.LabelSelector != nil {
+		label = options.LabelSelector
+	}
+	field := fields.Everything()
+	if options != nil && options.FieldSelector != nil {
+		field = options.FieldSelector
+	}
+	return r.listLazyPredicate(ctx, r.Store.PredicateFunc(label, field), options)
+}
+
+// ConvertToTable materializes lazy Pods/PodLists before delegating to the
+// concrete *core.Pod / *core.PodList table printer.
+func (r *REST) ConvertToTable(ctx context.Context, object runtime.Object, tableOptions runtime.Object) (*metav1.Table, error) {
+	switch obj := object.(type) {
+	case *lazypod.Pod:
+		object = obj.GetObject()
+	case *lazypod.PodList:
+		object = obj.GetObject()
+	}
+	return r.Store.ConvertToTable(ctx, object, tableOptions)
+}
+
+func (r *REST) listLazyPredicate(ctx context.Context, p storage.SelectionPredicate, options *metainternalversion.ListOptions) (runtime.Object, error) {
+	if options == nil {
+		options = &metainternalversion.ListOptions{ResourceVersion: ""}
+	}
+	p.Limit = options.Limit
+	p.Continue = options.Continue
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.ShardedListAndWatch) && options.ShardSelector != "" {
+		sel, err := sharding.Parse(options.ShardSelector)
+		if err != nil {
+			return nil, errors.NewBadRequest(fmt.Sprintf("invalid shard selector: %v", err))
+		}
+		p.ShardSelector = sel
+	}
+	list := &lazypod.PodList{}
+	qualifiedResource := r.qualifiedResourceFromContext(ctx)
+	storageOpts := storage.ListOptions{
+		ResourceVersion:      options.ResourceVersion,
+		ResourceVersionMatch: options.ResourceVersionMatch,
+		Predicate:            p,
+		Recursive:            true,
+	}
+
+	if requestNamespace, _ := genericapirequest.NamespaceFrom(ctx); len(requestNamespace) == 0 {
+		if selectorNamespace, ok := p.MatchesSingleNamespace(); ok {
+			if len(apimachineryvalidation.ValidateNamespaceName(selectorNamespace, false)) == 0 {
+				ctx = genericapirequest.WithNamespace(ctx, selectorNamespace)
+			}
+		}
+	}
+
+	if name, ok := p.MatchesSingle(); ok {
+		if key, err := r.Store.KeyFunc(ctx, name); err == nil {
+			storageOpts.Recursive = false
+			err := r.Store.Storage.GetList(ctx, key, storageOpts, list)
+			return list, storeerr.InterpretListError(err, qualifiedResource)
+		}
+	}
+
+	err := r.Store.Storage.GetList(ctx, r.Store.KeyRootFunc(ctx), storageOpts, list)
+	return list, storeerr.InterpretListError(err, qualifiedResource)
+}
+
+func (r *REST) qualifiedResourceFromContext(ctx context.Context) schema.GroupResource {
+	if info, ok := genericapirequest.RequestInfoFrom(ctx); ok {
+		return schema.GroupResource{Group: info.APIGroup, Resource: info.Resource}
+	}
+	return r.Store.DefaultQualifiedResource
+}
+
+type lazyRESTOptionsGetter struct {
+	delegate generic.RESTOptionsGetter
+}
+
+func (g lazyRESTOptionsGetter) GetRESTOptions(resource schema.GroupResource, example runtime.Object) (generic.RESTOptions, error) {
+	opts, err := g.delegate.GetRESTOptions(resource, example)
+	if err != nil || opts.StorageConfig == nil || opts.StorageConfig.Codec == nil {
+		return opts, err
+	}
+	cfg := *opts.StorageConfig
+	cfg.Codec = lazypod.NewStorageCodec(cfg.Codec)
+	opts.StorageConfig = &cfg
+	return opts, nil
 }
 
 // Implement Redirector.

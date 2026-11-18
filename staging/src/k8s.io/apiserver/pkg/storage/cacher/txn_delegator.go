@@ -49,7 +49,13 @@ func (d *txnDelegator) getInitialState(ctx context.Context, ignoreNotFound bool)
 		return d.GetCurrentState(ctx, ignoreNotFound)
 	}
 	// DeepCopy before GetStateFromObject clears and restores ResourceVersion for encoding.
-	return storage.GetStateFromObject(d.cacher.versioner, d.cacher.codec, obj.DeepCopyObject(), false)
+	// Unwrap CacheableObject so storage callbacks receive the underlying concrete type.
+	if co, ok := obj.(runtime.CacheableObject); ok {
+		obj = co.GetObject()
+	} else {
+		obj = obj.DeepCopyObject()
+	}
+	return storage.GetStateFromObject(d.cacher.versioner, d.cacher.codec, obj, false)
 }
 
 // DeleteOnce implements storage.TxnDelegator.
@@ -111,7 +117,11 @@ func (d *txnDelegator) getStateNotOlderThan(ctx context.Context, resourceVersion
 		return nil, err
 	}
 	if exists {
-		obj = obj.DeepCopyObject()
+		if co, ok := obj.(runtime.CacheableObject); ok {
+			obj = co.GetObject()
+		} else {
+			obj = obj.DeepCopyObject()
+		}
 	} else {
 		obj = d.cacher.newFunc()
 		if err := runtime.SetZeroValue(obj); err != nil {

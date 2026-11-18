@@ -1048,11 +1048,29 @@ func (c *Cacher) Get(ctx context.Context, key string, opts storage.GetOptions, o
 	defer span.End(500 * time.Millisecond)
 
 	if exists {
-		objVal.Set(reflect.ValueOf(obj).Elem())
+		assignCachedObject(objVal, obj)
 	} else {
 		objVal.Set(reflect.Zero(objVal.Type()))
 	}
 	return err
+}
+
+func assignCachedObject(dst reflect.Value, src runtime.Object) {
+	srcVal := reflect.ValueOf(src).Elem()
+	if dst.Type() == srcVal.Type() {
+		dst.Set(srcVal)
+		return
+	}
+	if co, ok := src.(runtime.CacheableObject); ok {
+		dst.Set(reflect.ValueOf(co.GetObject()).Elem())
+		return
+	}
+	if dst.CanAddr() {
+		if setter, ok := dst.Addr().Interface().(interface{ SetObject(runtime.Object) bool }); ok && setter.SetObject(src) {
+			return
+		}
+	}
+	dst.Set(srcVal)
 }
 
 func (c *Cacher) get(ctx context.Context, key string, resourceVersion string, ignoreNotFound bool) (runtime.Object, bool, error) {
@@ -1152,7 +1170,7 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 			if err != nil {
 				return err
 			}
-			listVal.Index(numFetched).Set(reflect.ValueOf(elem.Object).Elem())
+			assignCachedObject(listVal.Index(numFetched), elem.Object)
 			lastSelectedObjectKey = elem.Key
 			numFetched++
 			if numFetched == count {
@@ -1196,7 +1214,7 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 			listVal.Set(reflect.MakeSlice(listVal.Type(), len(selectedObjects), len(selectedObjects)))
 			span.AddEvent("Resized result")
 			for i, o := range selectedObjects {
-				listVal.Index(i).Set(reflect.ValueOf(o).Elem())
+				assignCachedObject(listVal.Index(i), o)
 			}
 		}
 	}
