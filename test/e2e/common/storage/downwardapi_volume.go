@@ -263,6 +263,37 @@ var _ = SIGDescribe("Downward API volume", func() {
 		})
 	})
 
+	f.It("should provide pod CPU and memory limits when container limits are unset [LinuxOnly]", func(ctx context.Context) {
+		e2eskipper.SkipIfNodeOSDistroIs("windows")
+		podName := "downwardapi-volume-" + string(uuid.NewUUID())
+		pod := downwardAPIVolumeBasePod(podName, nil, nil)
+		// Whole-core rounding could make the node and pod CPU limits look the same.
+		for _, item := range pod.Spec.Volumes[0].DownwardAPI.Items {
+			if ref := item.ResourceFieldRef; ref != nil && ref.Resource == "limits.cpu" {
+				ref.Divisor = resource.MustParse("1m")
+			}
+		}
+		pod.Spec.NodeSelector = map[string]string{v1.LabelOSStable: "linux"}
+		pod.Spec.Resources = &v1.ResourceRequirements{
+			Requests: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("100m"),
+				v1.ResourceMemory: resource.MustParse("32Mi"),
+			},
+			Limits: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("1250m"),
+				v1.ResourceMemory: resource.MustParse("64Mi"),
+			},
+		}
+		pod.Spec.Containers = []v1.Container{{
+			Name:         "client-container",
+			Image:        imageutils.GetE2EImage(imageutils.BusyBox),
+			Command:      []string{"sh", "-c", `echo "cpu=$(cat /etc/podinfo/cpu_limit) memory=$(cat /etc/podinfo/memory_limit)"`},
+			VolumeMounts: []v1.VolumeMount{{Name: "podinfo", MountPath: "/etc/podinfo", ReadOnly: true}},
+		}}
+
+		e2epodoutput.TestContainerOutput(ctx, f, "pod limits in a downward API volume", pod, 0, []string{"cpu=1250 memory=67108864\n"})
+	})
+
 	/*
 		Release: v1.9
 		Testname: DownwardAPI volume, CPU limit, default node allocatable
