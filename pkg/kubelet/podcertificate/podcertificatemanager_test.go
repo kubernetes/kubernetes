@@ -42,6 +42,7 @@ import (
 	corelistersv1 "k8s.io/client-go/listers/core/v1"
 	k8stesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
 	"k8s.io/ktesting"
 	"k8s.io/kubernetes/test/utils/hermeticpodcertificatesigner"
@@ -738,4 +739,220 @@ func mustRFC3339(t *testing.T, stamp string) time.Time {
 		t.Fatalf("Error while parsing timestamp: %v", err)
 	}
 	return got
+}
+
+func TestDynamicVolumeProjectionAddReplaceAndRemove(t *testing.T) {
+	ctx, cancel := context.WithCancel(ktesting.Init(t))
+	defer cancel()
+
+	kc := fake.NewSimpleClientset()
+	var pcrSeq int
+	kc.Fake.PrependReactor("create", "podcertificaterequests", func(action k8stesting.Action) (bool, runtime.Object, error) {
+		ca := action.(k8stesting.CreateAction)
+		pcr := ca.GetObject().(*certsv1.PodCertificateRequest)
+		if pcr.Name == "" && pcr.GenerateName != "" {
+			pcrSeq++
+			pcr.Name = fmt.Sprintf("%s%d", pcr.GenerateName, pcrSeq)
+		}
+		return false, pcr, nil
+	})
+	clock := testclock.NewFakeClock(mustRFC3339(t, "2010-01-01T00:00:00Z"))
+
+	pcrStore := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
+	pcrLister := certlistersv1.NewPodCertificateRequestLister(pcrStore)
+
+	nodeStore := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
+	nodeLister := corelistersv1.NewNodeLister(nodeStore)
+	if err := nodeStore.Add(&corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{Name: "node1", UID: "node1-uid"},
+	}); err != nil {
+		t.Fatalf("Unexpected error adding node: %v", err)
+	}
+
+	workloadSA, err := kc.CoreV1().ServiceAccounts("ns1").Create(ctx, &corev1.ServiceAccount{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "ns1", Name: "workload", UID: "sa-uid"},
+	}, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Unexpected error creating serviceaccount: %v", err)
+	}
+
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "ns1",
+			Name:      "workload",
+			UID:       "pod-uid-1",
+		},
+		Spec: corev1.PodSpec{
+			ServiceAccountName: workloadSA.Name,
+			NodeName:           "node1",
+			Containers:         []corev1.Container{{Name: "main", Image: "busybox"}},
+		},
+	}
+
+	podMgr := &FakeSynchronousPodManager{pods: []*corev1.Pod{pod}}
+	queue := workqueue.NewTypedRateLimitingQueueWithConfig(
+		workqueue.NewTypedItemExponentialFailureRateLimiter[projectionKey](10*time.Second, time.Minute),
+		workqueue.TypedRateLimitingQueueConfig[projectionKey]{Name: "test", Clock: clock},
+	)
+	defer queue.ShutDown()
+	mgr := &IssuingManager{
+		kc:              kc,
+		podManager:      podMgr,
+		projectionQueue: queue,
+		pcrLister:       pcrLister,
+		nodeLister:      nodeLister,
+		nodeName:        types.NodeName("node1"),
+		clock:           clock,
+		credStore:       map[projectionKey]*projectionRecord{},
+	}
+
+	drainQueue := func() {
+		for queue.Len() > 0 {
+			item, _ := queue.Get()
+			queue.Done(item)
+			queue.Forget(item)
+		}
+	}
+
+	// Initially the pod has no podCertificate volumes (and nil pod is a safe no-op).
+	mgr.TrackPod(ctx, nil)
+	mgr.TrackPod(ctx, pod)
+
+	// Dynamically add a podCertificate projected volume: TrackPod enqueues the new key once.
+	pod.Spec.Volumes = []corev1.Volume{{
+		Name: "dyn-cert",
+		VolumeSource: corev1.VolumeSource{
+			Projected: &corev1.ProjectedVolumeSource{
+				Sources: []corev1.VolumeProjection{{
+					PodCertificate: &corev1.PodCertificateProjection{
+						SignerName:           "foo.com/signer-a",
+						KeyType:              "ED25519",
+						CredentialBundlePath: "creds.pem",
+						MaxExpirationSeconds: new(int32(86400)),
+					},
+				}},
+			},
+		},
+	}}
+	key := projectionKey{
+		Namespace:   pod.Namespace,
+		PodName:     pod.Name,
+		PodUID:      string(pod.UID),
+		VolumeName:  "dyn-cert",
+		SourceIndex: 0,
+	}
+	mgr.TrackPod(ctx, pod)
+	if queue.Len() != 1 {
+		t.Fatalf("Expected TrackPod to enqueue newly added projection once, got queue len %d", queue.Len())
+	}
+	drainQueue()
+	if err := mgr.handleProjection(ctx, key); err != nil {
+		t.Fatalf("Unexpected error handling added projection: %v", err)
+	}
+	pcrs, err := kc.CertificatesV1().PodCertificateRequests("ns1").List(ctx, metav1.ListOptions{})
+	if err != nil || len(pcrs.Items) != 1 {
+		t.Fatalf("Expected 1 PCR after dynamic add, got %d (err=%v)", len(pcrs.Items), err)
+	}
+	if pcrs.Items[0].Spec.SignerName != "foo.com/signer-a" {
+		t.Fatalf("Expected signer foo.com/signer-a, got %q", pcrs.Items[0].Spec.SignerName)
+	}
+
+	// Simulate signer-a issuing credentials so rec.curState is credStateFresh.
+	issuedPCR := pcrs.Items[0].DeepCopy()
+	now := metav1.NewTime(clock.Now())
+	beginRefresh := metav1.NewTime(clock.Now().Add(12 * time.Hour))
+	notAfter := metav1.NewTime(clock.Now().Add(24 * time.Hour))
+	issuedPCR.Status.CertificateChain = "-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----\n"
+	issuedPCR.Status.BeginRefreshAt = &beginRefresh
+	issuedPCR.Status.NotAfter = &notAfter
+	issuedPCR.Status.Conditions = []metav1.Condition{{
+		Type:               certsv1.PodCertificateRequestConditionTypeIssued,
+		Status:             metav1.ConditionTrue,
+		LastTransitionTime: now,
+	}}
+	if err := pcrStore.Add(issuedPCR); err != nil {
+		t.Fatalf("Unexpected error adding issued PCR to store: %v", err)
+	}
+	if err := mgr.handleProjection(ctx, key); err != nil {
+		t.Fatalf("Unexpected error transitioning signer-a to credStateFresh: %v", err)
+	}
+	if _, _, err := mgr.GetPodCertificateCredentialBundle(ctx, pod.Namespace, pod.Name, string(pod.UID), "dyn-cert", 0); err != nil {
+		t.Fatalf("Expected valid credentials for signer-a, got: %v", err)
+	}
+
+	// Replace the volume under the same name with a different SignerName: even before TrackPod or
+	// handleProjection runs asynchronously, GetPodCertificateCredentialBundle must refuse to return
+	// signer-a's stale credentials, and TrackPod must synchronously replace credStore[key] and enqueue it once.
+	pod.Spec.Volumes[0].Projected.Sources[0].PodCertificate.SignerName = "foo.com/signer-b"
+	if _, _, err := mgr.GetPodCertificateCredentialBundle(ctx, pod.Namespace, pod.Name, string(pod.UID), "dyn-cert", 0); err == nil {
+		t.Fatalf("Expected GetPodCertificateCredentialBundle to reject stale signer-a credentials immediately after signer replacement")
+	}
+	mgr.TrackPod(ctx, pod)
+	if queue.Len() != 1 {
+		t.Fatalf("Expected TrackPod to enqueue invalidated projection once, got queue len %d", queue.Len())
+	}
+	drainQueue()
+	if _, _, err := mgr.GetPodCertificateCredentialBundle(ctx, pod.Namespace, pod.Name, string(pod.UID), "dyn-cert", 0); err == nil {
+		t.Fatalf("Expected GetPodCertificateCredentialBundle to report no credentials after synchronous TrackPod reset")
+	}
+	if err := mgr.handleProjection(ctx, key); err != nil {
+		t.Fatalf("Unexpected error handling replaced projection: %v", err)
+	}
+	pcrs, err = kc.CertificatesV1().PodCertificateRequests("ns1").List(ctx, metav1.ListOptions{})
+	if err != nil || len(pcrs.Items) != 2 {
+		t.Fatalf("Expected 2 PCRs after signer replacement, got %d (err=%v)", len(pcrs.Items), err)
+	}
+	if !slices.ContainsFunc(pcrs.Items, func(r certsv1.PodCertificateRequest) bool { return r.Spec.SignerName == "foo.com/signer-b" }) {
+		t.Fatalf("Expected second PCR for foo.com/signer-b, got %+v", pcrs.Items)
+	}
+
+	// Repeated TrackPod calls for an unchanged projection that is backing off in projectionQueue
+	// must not bypass AddRateLimited exponential backoff, while new keys and runRefreshPass still enqueue.
+	queue.AddRateLimited(key)
+	if queue.Len() != 0 {
+		t.Fatalf("Expected rate-limited item to wait for backoff delay, got immediate queue len %d", queue.Len())
+	}
+	mgr.TrackPod(ctx, pod)
+	mgr.TrackPod(ctx, pod)
+	if queue.Len() != 0 {
+		t.Fatalf("Expected repeated TrackPod calls not to bypass AddRateLimited backoff, got immediate queue len %d", queue.Len())
+	}
+	pod.Spec.Volumes = append(pod.Spec.Volumes, corev1.Volume{
+		Name: "dyn-cert-2",
+		VolumeSource: corev1.VolumeSource{
+			Projected: &corev1.ProjectedVolumeSource{
+				Sources: []corev1.VolumeProjection{{
+					PodCertificate: &corev1.PodCertificateProjection{
+						SignerName:           "foo.com/signer-c",
+						KeyType:              "ED25519",
+						CredentialBundlePath: "creds.pem",
+						MaxExpirationSeconds: new(int32(86400)),
+					},
+				}},
+			},
+		},
+	})
+	mgr.TrackPod(ctx, pod)
+	if queue.Len() != 1 {
+		t.Fatalf("Expected TrackPod to enqueue only newly added projection while existing key backs off, got queue len %d", queue.Len())
+	}
+	drainQueue()
+	mgr.runRefreshPass(ctx)
+	if queue.Len() != 2 {
+		t.Fatalf("Expected runRefreshPass to enqueue all %d active projections, got queue len %d", 2, queue.Len())
+	}
+	drainQueue()
+
+	// Dynamically remove the volume: TrackPod must prune the stale credStore entry.
+	pod.Spec.Volumes = nil
+	mgr.TrackPod(ctx, pod)
+	if _, _, err := mgr.GetPodCertificateCredentialBundle(ctx, pod.Namespace, pod.Name, string(pod.UID), "dyn-cert", 0); err == nil {
+		t.Fatalf("Expected error retrieving credentials after volume removal, got nil")
+	}
+	mgr.lock.Lock()
+	remaining := len(mgr.credStore)
+	mgr.lock.Unlock()
+	if remaining != 0 {
+		t.Fatalf("Expected credStore to be empty after volume removal, got %d entries", remaining)
+	}
 }

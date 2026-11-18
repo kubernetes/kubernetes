@@ -1063,7 +1063,7 @@ func NewMainKubelet(ctx context.Context,
 		podCertificateManager := podcertificate.NewIssuingManager(
 			klog.FromContext(ctx),
 			kubeDeps.KubeClient,
-			klet.podManager,
+			allocatedPodMgr,
 			kubeDeps.Recorder,
 			kubeInformers.Certificates().V1().PodCertificateRequests(),
 			nodeInformer,
@@ -2381,6 +2381,12 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 		return false, nil, err
 	}
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicNodeLocalEphemeralVolumes) {
+		// Ensure any dynamically added or newly allocated podCertificate projections are queued
+		// before waiting for volumes to mount.
+		kl.podCertificateManager.TrackPod(ctx, pod)
+	}
+
 	// Wait for volumes to attach/mount
 	if err := kl.volumeManager.WaitForAttachAndMount(ctx, pod); err != nil {
 		var volumeAttachLimitErr *volumemanager.VolumeAttachLimitExceededError
@@ -3152,7 +3158,8 @@ func (kl *Kubelet) HandlePodAdditions(ctx context.Context, pods []*v1.Pod) {
 			}
 			recordPodLevelResourcesAdmission(pod)
 
-			kl.podCertificateManager.TrackPod(ctx, pod)
+			allocatedPod, _ := kl.allocationManager.GetAllocatedPod(pod)
+			kl.podCertificateManager.TrackPod(ctx, allocatedPod)
 
 			// Backfill the queue of pending allocations, but only after all the pods have
 			// been added. This ensures that no pending allocations get resolved until all the
@@ -3239,6 +3246,11 @@ func (kl *Kubelet) HandlePodUpdates(ctx context.Context, pods []*v1.Pod) {
 			// We can hit this case if a pending resize has been reverted,
 			// so we need to clear the pending resize condition.
 			kl.statusManager.ClearPodResizePendingCondition(pod.UID, metrics.DeferredResizeResolutionReverted)
+		}
+
+		if utilfeature.DefaultFeatureGate.Enabled(features.DynamicNodeLocalEphemeralVolumes) {
+			allocatedPod, _ := kl.allocationManager.GetAllocatedPod(pod)
+			kl.podCertificateManager.TrackPod(ctx, allocatedPod)
 		}
 
 		kl.podWorkers.UpdatePod(ctx, UpdatePodOptions{
