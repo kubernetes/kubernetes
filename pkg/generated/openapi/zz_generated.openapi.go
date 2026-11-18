@@ -29880,7 +29880,7 @@ func schema_k8sio_api_core_v1_PodStatus(ref common.ReferenceCallback) common.Ope
 					},
 					"allocatedResources": {
 						SchemaProps: spec.SchemaProps{
-							Description: "AllocatedResources is the total requests allocated for this pod by the node. If pod-level requests are not set, this will be the total requests aggregated across containers in the pod.",
+							Description: "AllocatedResources is the total requests allocated for this pod by the node, including pod.spec.overhead. If pod-level requests are not set, this will be the total requests aggregated across containers in the pod, plus pod.spec.overhead.",
 							Type:        []string{"object"},
 							AdditionalProperties: &spec.SchemaOrBool{
 								Allows: true,
@@ -29894,7 +29894,7 @@ func schema_k8sio_api_core_v1_PodStatus(ref common.ReferenceCallback) common.Ope
 					},
 					"resources": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Resources represents the compute resource requests and limits that have been applied at the pod level if pod-level requests or limits are set in PodSpec.Resources",
+							Description: "Resources represents the compute resource requests and limits that have been applied at the pod level if pod-level requests or limits are set in PodSpec.Resources, plus pod.spec.overhead if specified.",
 							Ref:         ref(corev1.ResourceRequirements{}.OpenAPIModelName()),
 						},
 					},

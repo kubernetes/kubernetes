@@ -2439,6 +2439,43 @@ func TestPodLevelResourceRequests(t *testing.T) {
 				v1.ResourceMemory: resource.MustParse("210Mi"),
 			},
 		},
+		{
+			name: "status requests with overhead excluded",
+			opts: PodResourcesOptions{
+				UseStatusResources: true,
+				InPlacePodLevelResourcesVerticalScalingEnabled: true,
+				ExcludeOverhead: true,
+			},
+			podResources: v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU: resource.MustParse("1"),
+				},
+			},
+			overhead: v1.ResourceList{
+				v1.ResourceCPU:              resource.MustParse("100m"),
+				v1.ResourceMemory:           resource.MustParse("50Mi"),
+				v1.ResourceEphemeralStorage: resource.MustParse("1Gi"),
+			},
+			containers: []v1.Container{
+				{
+					Name: "c1",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("200Mi"),
+						},
+					},
+				},
+			},
+			statusRequests: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU: resource.MustParse("2100m"),
+				},
+			},
+			expectedRequests: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("2"),
+				v1.ResourceMemory: resource.MustParse("200Mi"),
+			},
+		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -3044,6 +3081,42 @@ func TestPodLevelResourceLimits(t *testing.T) {
 			expectedLimits: v1.ResourceList{
 				v1.ResourceCPU:    resource.MustParse("1100m"),
 				v1.ResourceMemory: resource.MustParse("110Mi"),
+			},
+		},
+		{
+			name: "status limits with overhead excluded",
+			opts: PodResourcesOptions{
+				UseStatusResources: true,
+				InPlacePodLevelResourcesVerticalScalingEnabled: true,
+				ExcludeOverhead: true,
+			},
+			podResources: v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					v1.ResourceCPU: resource.MustParse("1"),
+				},
+			},
+			overhead: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("100m"),
+				v1.ResourceMemory: resource.MustParse("50Mi"),
+			},
+			containers: []v1.Container{
+				{
+					Name: "c1",
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("200Mi"),
+						},
+					},
+				},
+			},
+			statusResources: &v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					v1.ResourceCPU: resource.MustParse("2100m"),
+				},
+			},
+			expectedLimits: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("2"),
+				v1.ResourceMemory: resource.MustParse("200Mi"),
 			},
 		},
 	}

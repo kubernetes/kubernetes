@@ -153,29 +153,52 @@ func PodRequests(pod *v1.Pod, opts PodResourcesOptions) v1.ResourceList {
 		reqs = AggregateContainerRequests(pod, opts)
 	}
 
+	var effectiveReqs v1.ResourceList
+	var effectiveReqsIncludesOverhead bool
 	if !opts.SkipPodLevelResources && IsPodLevelRequestsSet(pod) {
-		effectiveReqs := pod.Spec.Resources.Requests
+		effectiveReqs = pod.Spec.Resources.Requests
 		if opts.InPlacePodLevelResourcesVerticalScalingEnabled && opts.UseStatusResources && (pod.Status.Resources != nil || pod.Status.AllocatedResources != nil) {
-			var statusRequests, allocatedRequests v1.ResourceList
+			var statusRequests v1.ResourceList
 			if pod.Status.Resources != nil {
 				statusRequests = pod.Status.Resources.Requests
 			}
-			if pod.Status.AllocatedResources != nil {
-				allocatedRequests = pod.Status.AllocatedResources
-			}
-			if pod.Spec.Overhead != nil {
-				statusRequests = subtractResourceList(statusRequests, pod.Spec.Overhead)
-				allocatedRequests = subtractResourceList(allocatedRequests, pod.Spec.Overhead)
-			}
-			effectiveReqs = effectivePodLevelResources(pod, pod.Spec.Resources.Requests, statusRequests, allocatedRequests)
+			// Status.Resources.Requests and Status.AllocatedResources include pod.Spec.Overhead;
+			// add overhead to spec requests so all inputs to max are compared with overhead included.
+			specRequests := addOverheadToExisting(pod.Spec.Resources.Requests, pod.Spec.Overhead, false)
+			effectiveReqs = effectivePodLevelResources(pod, specRequests, statusRequests, pod.Status.AllocatedResources)
+			effectiveReqsIncludesOverhead = true
 		}
 
 		applyPodLevelResources(reqs, effectiveReqs)
 	}
 
-	// Add overhead for running a pod to the sum of requests if requested:
-	if !opts.ExcludeOverhead && pod.Spec.Overhead != nil {
-		addResourceList(reqs, pod.Spec.Overhead)
+	// Reconcile pod overhead for each resource. Supported pod-level resources populated from
+	// effectiveReqs include overhead when effectiveReqsIncludesOverhead is true; container-level
+	// resources from AggregateContainerRequests never include overhead.
+	for name, quantity := range pod.Spec.Overhead {
+		_, fromEffectiveReqs := effectiveReqs[name]
+		reqIncludesOverhead := effectiveReqsIncludesOverhead && fromEffectiveReqs && IsSupportedPodLevelResource(name)
+		switch {
+		case opts.ExcludeOverhead && !reqIncludesOverhead:
+			// no-op, already excluded
+		case opts.ExcludeOverhead && reqIncludesOverhead:
+			// Safe because pod.Spec.Overhead is immutable; revisit if it ever becomes mutable.
+			value := reqs[name]
+			value.Sub(quantity)
+			if value.Sign() < 0 {
+				value.Set(0)
+			}
+			reqs[name] = value
+		case !opts.ExcludeOverhead && reqIncludesOverhead:
+			// Already included; floor at overhead if status reported less than overhead.
+			if quantity.Cmp(reqs[name]) > 0 {
+				reqs[name] = quantity
+			}
+		case !opts.ExcludeOverhead && !reqIncludesOverhead:
+			value := reqs[name]
+			value.Add(quantity)
+			reqs[name] = value
+		}
 	}
 
 	return reqs
@@ -325,8 +348,9 @@ func aggregateContainerResourcesByFn(pod *v1.Pod, opts PodResourcesOptions, getR
 }
 
 // AggregateContainerRequests computes the total resource requests of all the containers
-// in a pod. This computation folows the formula defined in the KEP for sidecar
-// containers. See https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/753-sidecar-containers#resources-calculation-for-scheduling-and-pod-admission
+// in a pod. pod.Spec.Overhead is never included in the result. This computation follows the
+// formula defined in the KEP for sidecar containers. See
+// https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/753-sidecar-containers#resources-calculation-for-scheduling-and-pod-admission
 // for more details.
 func AggregateContainerRequests(pod *v1.Pod, opts PodResourcesOptions) v1.ResourceList {
 	// attempt to reuse the maps if passed, or allocate otherwise
@@ -348,15 +372,13 @@ func AggregateContainerRequests(pod *v1.Pod, opts PodResourcesOptions) v1.Resour
 		// Once InPlacePodLevelResourcesVerticalScaling is GA and its feature gate is removed,
 		// container-level fallback becomes redundant because max(spec, actuated, allocated) naturally evaluates to spec at creation time.
 		if opts.InPlacePodLevelResourcesVerticalScalingEnabled && pod.Status.AllocatedResources != nil && pod.Status.Resources != nil && pod.Status.Resources.Requests != nil {
-			allocatedReqs = pod.Status.AllocatedResources
-			actuatedReqs = pod.Status.Resources.Requests
 			// DRA values are not added to allocatedReqs and actuatedReqs because
 			// 1. Kubelet adds DRA allocations when setting pod.Status.AllocatedResources.
 			// 2. Kubelet adds DRA allocations when configuring pod-level cgroups. Since pod.Status.Resources.Requests is read from cgroup settings, it already contains DRA values.
-			if pod.Spec.Overhead != nil {
-				allocatedReqs = subtractResourceList(allocatedReqs, pod.Spec.Overhead)
-				actuatedReqs = subtractResourceList(actuatedReqs, pod.Spec.Overhead)
-			}
+			// Pod overhead is subtracted (safe because pod.Spec.Overhead is immutable) because
+			// AggregateContainerRequests never includes pod.Spec.Overhead.
+			allocatedReqs = subtractResourceList(pod.Status.AllocatedResources, pod.Spec.Overhead)
+			actuatedReqs = subtractResourceList(pod.Status.Resources.Requests, pod.Spec.Overhead)
 		} else {
 			// DRA allocations are added to allocatedReqs here because Kubelet does not include DRA in pod.Status.ContainerStatuses[].AllocatedResources. Adding them prevents under-reporting.
 			// This is a temporary fallback until InPlacePodLevelResourcesVerticalScaling is Beta/GA on all nodes and pod-level status fields which natively include DRA are always available.
@@ -446,25 +468,49 @@ func containerActuatedLimits(c *v1.Container, cs *v1.ContainerStatus, isResizeIn
 func PodLimits(pod *v1.Pod, opts PodResourcesOptions) v1.ResourceList {
 	// attempt to reuse the maps if passed, or allocate otherwise
 	limits := AggregateContainerLimits(pod, opts)
+	var effectiveLims v1.ResourceList
+	var effectiveLimsIncludesOverhead bool
 	if !opts.SkipPodLevelResources && IsPodLevelResourcesSet(pod) {
-		effectiveLims := pod.Spec.Resources.Limits
+		effectiveLims = pod.Spec.Resources.Limits
 		if opts.InPlacePodLevelResourcesVerticalScalingEnabled && opts.UseStatusResources && pod.Status.Resources != nil {
-			statusLimits := pod.Status.Resources.Limits
-			if pod.Spec.Overhead != nil {
-				statusLimits = subtractResourceList(statusLimits, pod.Spec.Overhead)
-			}
-			effectiveLims = effectivePodLevelResources(pod, pod.Spec.Resources.Limits, statusLimits)
+			// Status.Resources.Limits includes pod.Spec.Overhead on non-zero limits;
+			// add overhead to non-zero spec limits so both inputs are compared with overhead included.
+			specLimits := addOverheadToExisting(pod.Spec.Resources.Limits, pod.Spec.Overhead, true)
+			effectiveLims = effectivePodLevelResources(pod, specLimits, pod.Status.Resources.Limits)
+			effectiveLimsIncludesOverhead = true
 		}
 		applyPodLevelResources(limits, effectiveLims)
 	}
 
-	// Add overhead to non-zero limits if requested:
-	if !opts.ExcludeOverhead && pod.Spec.Overhead != nil {
-		for name, quantity := range pod.Spec.Overhead {
-			if value, ok := limits[name]; ok && !value.IsZero() {
-				value.Add(quantity)
+	// Reconcile pod overhead for each non-zero limit. Supported pod-level limits populated from
+	// effectiveLims include overhead when effectiveLimsIncludesOverhead is true; container-level
+	// limits from AggregateContainerLimits never include overhead.
+	for name, quantity := range pod.Spec.Overhead {
+		value, ok := limits[name]
+		if !ok || value.IsZero() {
+			continue
+		}
+		_, fromEffectiveLims := effectiveLims[name]
+		limIncludesOverhead := effectiveLimsIncludesOverhead && fromEffectiveLims && IsSupportedPodLevelResource(name)
+		switch {
+		case opts.ExcludeOverhead && !limIncludesOverhead:
+			// no-op, already excluded
+		case opts.ExcludeOverhead && limIncludesOverhead:
+			// Safe because pod.Spec.Overhead is immutable; revisit if it ever becomes mutable.
+			value.Sub(quantity)
+			if value.Sign() < 0 {
+				value.Set(0)
+			}
+			limits[name] = value
+		case !opts.ExcludeOverhead && limIncludesOverhead:
+			// Already included; if a status limit does not exceed overhead, its pre-overhead limit is zero.
+			if value.Cmp(quantity) <= 0 {
+				value.Set(0)
 				limits[name] = value
 			}
+		case !opts.ExcludeOverhead && !limIncludesOverhead:
+			value.Add(quantity)
+			limits[name] = value
 		}
 	}
 
@@ -518,8 +564,9 @@ func omitPartiallySetEphemeralStorageLimit(pod *v1.Pod, limits v1.ResourceList, 
 }
 
 // AggregateContainerLimits computes the aggregated resource limits of all the containers
-// in a pod. This computation follows the formula defined in the KEP for sidecar
-// containers. See https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/753-sidecar-containers#resources-calculation-for-scheduling-and-pod-admission
+// in a pod. pod.Spec.Overhead is never included in the result. This computation follows the
+// formula defined in the KEP for sidecar containers. See
+// https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/753-sidecar-containers#resources-calculation-for-scheduling-and-pod-admission
 // for more details.
 //
 // If any container does not set a cpu or memory limit, or sets it to zero, that limit is
@@ -547,11 +594,10 @@ func AggregateContainerLimits(pod *v1.Pod, opts PodResourcesOptions) v1.Resource
 		// Once InPlacePodLevelResourcesVerticalScaling is GA and its feature gate is removed,
 		// container-level fallback becomes redundant because max(spec, actuated) naturally evaluates to spec at creation time.
 		if opts.InPlacePodLevelResourcesVerticalScalingEnabled && pod.Status.Resources != nil && pod.Status.Resources.Limits != nil {
-			actuatedLimits = pod.Status.Resources.Limits
 			// Kubelet includes DRA values when populating pod limits. Since pod.Status.Resources.Limits is updated based on cgroup settings, it already contains DRA values, so we should not add them again here.
-			if pod.Spec.Overhead != nil {
-				actuatedLimits = subtractResourceList(actuatedLimits, pod.Spec.Overhead)
-			}
+			// Pod overhead is subtracted (safe because pod.Spec.Overhead is immutable) because
+			// AggregateContainerLimits never includes pod.Spec.Overhead.
+			actuatedLimits = subtractResourceList(pod.Status.Resources.Limits, pod.Spec.Overhead)
 		} else {
 			// Kubelet considers DRA values while updating container limits. We should not be adding it here again.
 			actuatedLimits = aggregateContainerResourcesByFn(pod, opts, containerActuatedLimits)
@@ -581,11 +627,28 @@ func addResourceList(list, newList v1.ResourceList) {
 	}
 }
 
+// addOverheadToExisting returns a copy of list with matching overhead added to keys already
+// present in list (and non-zero when nonZeroOnly is true), without introducing absent keys.
+func addOverheadToExisting(list, overhead v1.ResourceList, nonZeroOnly bool) v1.ResourceList {
+	if len(list) == 0 || len(overhead) == 0 {
+		return list
+	}
+	result := list.DeepCopy()
+	for name, quantity := range overhead {
+		if value, ok := result[name]; ok && (!nonZeroOnly || !value.IsZero()) {
+			value.Add(quantity)
+			result[name] = value
+		}
+	}
+	return result
+}
+
 // subtractResourceList returns a copy of list with the resources in newList subtracted.
-// If list is nil, it returns nil. If subtraction results in a value less than zero, it sets it to zero.
+// If either list or newList is empty, it returns list. If subtraction results in a value
+// less than zero, it sets it to zero.
 func subtractResourceList(list, newList v1.ResourceList) v1.ResourceList {
-	if list == nil {
-		return nil
+	if len(list) == 0 || len(newList) == 0 {
+		return list
 	}
 	result := list.DeepCopy()
 	for name, quantity := range newList {
