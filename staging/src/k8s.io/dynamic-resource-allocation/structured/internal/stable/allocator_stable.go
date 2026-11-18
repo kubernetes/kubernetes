@@ -1321,7 +1321,7 @@ func (alloc *allocator) isSelectable(r requestIndices, requestData requestData, 
 	}
 
 	if ptr.Deref(slice.Spec.PerDeviceNodeSelection, false) {
-		matches, err := NodeMatches(alloc.node, ptr.Deref(device.NodeName, ""), ptr.Deref(device.AllNodes, false), device.NodeSelector)
+		matches, err := nodeMatches(alloc.node, ptr.Deref(device.NodeName, ""), ptr.Deref(device.AllNodes, false), device.NodeSelector)
 		if err != nil {
 			return false, err
 		}
@@ -1869,10 +1869,10 @@ func (alloc *allocator) createNodeSelector(result []internalDeviceResult, target
 		var nodeSelector *v1.NodeSelector
 		if ptr.Deref(slice.Spec.PerDeviceNodeSelection, false) {
 			nodeName = result[i].NodeName
-			nodeSelector = result[i].NodeSelector
+			nodeSelector = result[i].NodeSelector.Original()
 		} else {
 			nodeName = slice.Spec.NodeName
-			nodeSelector = slice.Spec.NodeSelector
+			nodeSelector = slice.Spec.NodeSelector.Original()
 		}
 		if nodeName != nil || result[i].BindsToNode {
 			// At least one device is local to one node or binds to a node,

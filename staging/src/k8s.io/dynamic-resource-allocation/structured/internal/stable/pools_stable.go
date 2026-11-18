@@ -49,6 +49,25 @@ func NodeMatches(node *v1.Node, nodeNameToMatch string, allNodesMatch bool, node
 	return false, nil
 }
 
+// nodeMatches is like NodeMatches, but uses the node selector which was
+// already compiled when converting the ResourceSlice.
+func nodeMatches(node *v1.Node, nodeNameToMatch string, allNodesMatch bool, nodeSelector *draapi.NodeSelector) (bool, error) {
+	switch {
+	case nodeNameToMatch != "":
+		return node != nil && node.Name == nodeNameToMatch, nil
+	case allNodesMatch:
+		return true, nil
+	case nodeSelector != nil:
+		match, err := nodeSelector.Match(node)
+		if err != nil {
+			return false, fmt.Errorf("failed to parse node selector %s: %w", nodeSelector.String(), err)
+		}
+		return match, nil
+	}
+
+	return false, nil
+}
+
 // GatherPools collects information about all resource pools which provide
 // devices that are accessible from the given node.
 //
@@ -87,14 +106,14 @@ func GatherPools(ctx context.Context, slicesForNode []*draapi.ResourceSlice, nod
 		// checkSlicesInPool will be called to fetch all slices in the pool, ensuring that the required
 		// shared counter slice is collected and included during pool construction.
 		if nodeName, allNodes := ptr.Deref(slice.Spec.NodeName, ""), slice.Spec.AllNodes; nodeName != "" || allNodes || slice.Spec.NodeSelector != nil {
-			match, err := NodeMatches(node, nodeName, allNodes, slice.Spec.NodeSelector)
+			match, err := nodeMatches(node, nodeName, allNodes, slice.Spec.NodeSelector)
 			if err != nil {
 				return nil, fmt.Errorf("failed to perform node selection for slice %s: %w", slice.Name, err)
 			}
 			relevant = match
 		} else if ptr.Deref(slice.Spec.PerDeviceNodeSelection, false) {
 			for _, device := range slice.Spec.Devices {
-				match, err := NodeMatches(node, ptr.Deref(device.NodeName, ""), ptr.Deref(device.AllNodes, false), device.NodeSelector)
+				match, err := nodeMatches(node, ptr.Deref(device.NodeName, ""), ptr.Deref(device.AllNodes, false), device.NodeSelector)
 				if err != nil {
 					return nil, fmt.Errorf("failed to perform node selection for device %s in slice %s: %w",
 						device.Name, slice.Name, err)

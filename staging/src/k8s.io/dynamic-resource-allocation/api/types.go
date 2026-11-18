@@ -113,7 +113,7 @@ type ResourceSliceSpec struct {
 	Driver                 UniqueString
 	Pool                   ResourcePool
 	NodeName               *string                         `json:",omitempty"`
-	NodeSelector           *v1.NodeSelector                `json:",omitempty"`
+	NodeSelector           *NodeSelector                   `json:",omitempty"`
 	AllNodes               bool                            `json:",omitempty"`
 	Devices                []Device                        `json:",omitempty"`
 	PerDeviceNodeSelection *bool                           `json:",omitempty"`
@@ -139,7 +139,7 @@ type Device struct {
 	Capacity                 DeviceCapacities                                        `json:",omitempty"`
 	ConsumesCounters         []DeviceCounterConsumption                              `json:",omitempty"`
 	NodeName                 *string                                                 `json:",omitempty"`
-	NodeSelector             *v1.NodeSelector                                        `json:",omitempty"`
+	NodeSelector             *NodeSelector                                           `json:",omitempty"`
 	AllNodes                 *bool                                                   `json:",omitempty"`
 	Taints                   []resourceapi.DeviceTaint                               `json:",omitempty"`
 	BindsToNode              bool                                                    `json:",omitempty"`
