@@ -4003,6 +4003,15 @@
   componentEndpoints:
   - component: kubelet
     endpoint: /metrics
+- name: image_volume_digest_missing_total
+  subsystem: kubelet
+  help: Total number of image volumes for which the container runtime did not report
+    an image reference when generating the pod status.
+  type: Counter
+  stabilityLevel: ALPHA
+  componentEndpoints:
+  - component: kubelet
+    endpoint: /metrics
 - name: imagemanager_image_mustpull_checks_total
   subsystem: kubelet
   help: Counter for how many times kubelet checked whether credentials need to be

@@ -83,9 +83,15 @@ func (p *RemoteRuntime) AddInjector(injector func(string) error) {
 	p.injectors = append(p.injectors, injector)
 }
 
-// ResetInjectors resets all registered injectors.
+// AddContainerStatusModifier registers a function that modifies successful ContainerStatus responses.
+func (p *RemoteRuntime) AddContainerStatusModifier(modifier func(*runtimeapi.ContainerStatusResponse)) {
+	p.containerStatusModifiers = append(p.containerStatusModifiers, modifier)
+}
+
+// ResetInjectors resets all registered injectors and response modifiers.
 func (p *RemoteRuntime) ResetInjectors() {
 	p.injectors = []func(string) error{}
+	p.containerStatusModifiers = nil
 }
 
 func (p *RemoteRuntime) runInjectors(apiName string) error {
@@ -99,10 +105,11 @@ func (p *RemoteRuntime) runInjectors(apiName string) error {
 
 // RemoteRuntime represents a proxy for remote container runtime.
 type RemoteRuntime struct {
-	server         *grpc.Server
-	injectors      []func(string) error
-	runtimeService internalapi.RuntimeService
-	imageService   internalapi.ImageManagerService
+	server                   *grpc.Server
+	injectors                []func(string) error
+	containerStatusModifiers []func(*runtimeapi.ContainerStatusResponse)
+	runtimeService           internalapi.RuntimeService
+	imageService             internalapi.ImageManagerService
 	runtimeapi.UnsafeImageServiceServer
 	runtimeapi.UnsafeRuntimeServiceServer
 }
@@ -301,6 +308,9 @@ func (p *RemoteRuntime) ContainerStatus(ctx context.Context, req *runtimeapi.Con
 	resp, err := p.runtimeService.ContainerStatus(ctx, req.ContainerId, false)
 	if err != nil {
 		return nil, err
+	}
+	for _, modifier := range p.containerStatusModifiers {
+		modifier(resp)
 	}
 	return resp, nil
 }

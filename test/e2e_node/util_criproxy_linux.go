@@ -21,6 +21,7 @@ package e2enode
 import (
 	"fmt"
 
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/kubernetes/test/e2e_node/criproxy"
 )
 
@@ -30,6 +31,15 @@ func addCRIProxyInjector(proxy *criproxy.RemoteRuntime, injector func(apiName st
 		return fmt.Errorf("failed to add injector because the CRI Proxy is undefined")
 	}
 	proxy.AddInjector(injector)
+	return nil
+}
+
+// addCRIProxyContainerStatusModifier registers a function that modifies ContainerStatus responses of the CRIProxy.
+func addCRIProxyContainerStatusModifier(proxy *criproxy.RemoteRuntime, modifier func(*runtimeapi.ContainerStatusResponse)) error {
+	if proxy == nil {
+		return fmt.Errorf("failed to add container status modifier because the CRI Proxy is undefined")
+	}
+	proxy.AddContainerStatusModifier(modifier)
 	return nil
 }
 
