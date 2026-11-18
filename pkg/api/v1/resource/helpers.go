@@ -42,11 +42,12 @@ func GetResourceRequestQuantity(pod *v1.Pod, resourceName v1.ResourceName) resou
 		requestQuantity = resource.Quantity{Format: resource.DecimalSI}
 	}
 
-	// Supported pod level resources will be used instead of container level ones when available
-	hasPodLevelResources := utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) && resourcehelper.IsPodLevelResourcesSet(pod)
-
+	// PodRequests aggregates the containers and then overwrites, resource by resource,
+	// whatever is set at pod level, so the container aggregate is what the resources
+	// that pod level does not set are requesting. That includes every resource pod-level
+	// resources cannot express at all, such as ephemeral-storage.
 	if rQuantity, ok := resourcehelper.PodRequests(pod, resourcehelper.PodResourcesOptions{
-		SkipContainerLevelResources:      hasPodLevelResources,
+		SkipPodLevelResources:            !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
 		ExcludeOverhead:                  true,
 		UseExtraNodeAllocatableResources: utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources),
 	})[resourceName]; ok {

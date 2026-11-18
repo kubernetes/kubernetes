@@ -882,6 +882,72 @@ func TestOrderedByExceedsRequestDisk(t *testing.T) {
 	}
 }
 
+// TestOrderedByExceedsRequestDiskWithPodLevelResources verifies that a pod which
+// declares pod-level resources still has its ephemeral-storage request taken from
+// its containers. ephemeral-storage is not a pod-level resource, so if it were
+// dropped the pod would always look like it exceeded its request.
+func TestOrderedByExceedsRequestDiskWithPodLevelResources(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, true)
+
+	below := newPod("below-requests", -1, []v1.Container{
+		newContainer("below-requests", v1.ResourceList{v1.ResourceEphemeralStorage: resource.MustParse("200Mi")}, newResourceList("", "", "")),
+	}, nil)
+	below.Spec.Resources = &v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")}}
+	exceeds := newPod("exceeds-requests", 1, []v1.Container{
+		newContainer("exceeds-requests", v1.ResourceList{v1.ResourceEphemeralStorage: resource.MustParse("100Mi")}, newResourceList("", "", "")),
+	}, nil)
+	stats := map[*v1.Pod]statsapi.PodStats{
+		below:   newPodDiskStats(below, resource.MustParse("100Mi"), resource.MustParse("99Mi"), resource.MustParse("0Mi")),  // -1 relative to request
+		exceeds: newPodDiskStats(exceeds, resource.MustParse("90Mi"), resource.MustParse("11Mi"), resource.MustParse("0Mi")), // 1 relative to request
+	}
+	statsFn := func(pod *v1.Pod) (statsapi.PodStats, bool) {
+		result, found := stats[pod]
+		return result, found
+	}
+	pods := []*v1.Pod{below, exceeds}
+	orderedBy(exceedDiskRequests(statsFn, []fsStatsType{fsStatsRoot, fsStatsLogs, fsStatsLocalVolumeSource}, v1.ResourceEphemeralStorage)).Sort(pods)
+
+	expected := []*v1.Pod{exceeds, below}
+	for i := range expected {
+		if pods[i] != expected[i] {
+			t.Errorf("Expected pod: %s, but got: %s", expected[i].Name, pods[i].Name)
+		}
+	}
+}
+
+// TestRankMemoryPressureWithPodLevelResources verifies that declaring pod-level
+// resources does not make a pod lose to a lower priority pod. Both pods are within
+// their memory requests here, so priority alone decides, and the pod-level pod gets
+// its memory request from its containers because it only sets cpu at pod level.
+func TestRankMemoryPressureWithPodLevelResources(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, true)
+
+	highPriorityPodLevel := newPod("high-priority-pod-level", 100, []v1.Container{
+		newContainer("high-priority-pod-level", newResourceList("", "200Mi", ""), newResourceList("", "", "")),
+	}, nil)
+	highPriorityPodLevel.Spec.Resources = &v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")}}
+	lowPriority := newPod("low-priority", 1, []v1.Container{
+		newContainer("low-priority", newResourceList("", "200Mi", ""), newResourceList("", "", "")),
+	}, nil)
+	stats := map[*v1.Pod]statsapi.PodStats{
+		highPriorityPodLevel: newPodMemoryStats(highPriorityPodLevel, resource.MustParse("150Mi")), // within its request
+		lowPriority:          newPodMemoryStats(lowPriority, resource.MustParse("150Mi")),          // within its request
+	}
+	statsFn := func(pod *v1.Pod) (statsapi.PodStats, bool) {
+		result, found := stats[pod]
+		return result, found
+	}
+	pods := []*v1.Pod{highPriorityPodLevel, lowPriority}
+	rankMemoryPressure(pods, statsFn)
+
+	expected := []*v1.Pod{lowPriority, highPriorityPodLevel}
+	for i := range expected {
+		if pods[i] != expected[i] {
+			t.Errorf("Expected pod: %s, but got: %s", expected[i].Name, pods[i].Name)
+		}
+	}
+}
+
 func TestOrderedByPriority(t *testing.T) {
 	low := newPod("low-priority", -134, []v1.Container{
 		newContainer("low-priority", newResourceList("", "", ""), newResourceList("", "", "")),
