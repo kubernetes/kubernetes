@@ -557,6 +557,7 @@ func (ssc *StatefulSetController) sync(ctx context.Context, key string) error {
 	set, err := ssc.setLister.StatefulSets(namespace).Get(name)
 	if apierrors.IsNotFound(err) {
 		ssc.consistencyStore.Clear(ssNamespacedName, "")
+		metrics.DeleteStatefulSetMetrics(namespace, name)
 		logger.Info("StatefulSet has been deleted", "key", key)
 		return nil
 	}

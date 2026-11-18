@@ -75,6 +75,24 @@ var (
 	)
 )
 
+// DeleteStatefulSetMetrics removes the per-StatefulSet series for a deleted StatefulSet.
+// Without this, every StatefulSet ever seen keeps its series for the lifetime of the
+// process, so memory grows with StatefulSet churn rather than with the live object count.
+// It matches on namespace and name only, because pod_management_policy is no longer
+// known once the object is gone.
+func DeleteStatefulSetMetrics(namespace, name string) {
+	labels := map[string]string{
+		"statefulset_namespace": namespace,
+		"statefulset_name":      name,
+	}
+	for _, vec := range []*metrics.GaugeVec{MaxUnavailable, UnavailableReplicas} {
+		// The embedded prometheus vec is nil until the metric is registered.
+		if vec.IsCreated() {
+			vec.DeletePartialMatch(labels)
+		}
+	}
+}
+
 var registerMetrics sync.Once
 
 func Register() {

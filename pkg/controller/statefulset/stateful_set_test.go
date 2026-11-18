@@ -35,14 +35,19 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2"
 	"k8s.io/ktesting"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/history"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 var parentKind = apps.SchemeGroupVersion.WithKind("StatefulSet")
@@ -218,6 +223,84 @@ func TestStatefulSetControllerDeletionTimestamp(t *testing.T) {
 	if got, want := len(pods), 0; got != want {
 		t.Errorf("len(pods) = %v, want %v", got, want)
 	}
+}
+
+func TestStatefulSetControllerDeletesMetricsOnStatefulSetDeletion(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MaxUnavailableStatefulSet, true)
+	logger, ctx := ktesting.NewTestContext(t)
+	set := newStatefulSet(3)
+	set.Namespace = "metrics-cleanup"
+	ssc, spc, om, _ := newFakeStatefulSetController(ctx, set)
+	if err := scaleUpStatefulSetController(logger, set, ssc, spc, om); err != nil {
+		t.Fatalf("Failed to turn up StatefulSet: %v", err)
+	}
+
+	// Bystanders share the deleted set's namespace or name, so a cleanup that
+	// matched on a prefix or on only one of the two labels would remove them.
+	samePrefix := newStatefulSet(0)
+	samePrefix.Namespace = set.Namespace
+	samePrefix.Name = set.Name + "-2"
+	samePrefix.UID = "same-prefix"
+	sameName := newStatefulSet(0)
+	sameName.Namespace = set.Namespace + "-other"
+	sameName.UID = "same-name"
+	bystanders := []*apps.StatefulSet{samePrefix, sameName}
+	for _, b := range bystanders {
+		if err := om.setsIndexer.Add(b); err != nil {
+			t.Fatal(err)
+		}
+		ssc.enqueueStatefulSet(logger, b)
+		fakeWorker(ssc)
+	}
+
+	metricNames := []string{
+		"statefulset_controller_statefulset_max_unavailable",
+		"statefulset_controller_statefulset_unavailable_replicas",
+	}
+	for _, s := range append([]*apps.StatefulSet{set}, bystanders...) {
+		for _, name := range metricNames {
+			if got := countStatefulSetSeries(t, name, s.Namespace, s.Name); got == 0 {
+				t.Fatalf("expected %s series for %s/%s before deletion, got none", name, s.Namespace, s.Name)
+			}
+		}
+	}
+
+	if err := om.setsIndexer.Delete(set); err != nil {
+		t.Fatal(err)
+	}
+	ssc.enqueueStatefulSet(logger, set)
+	fakeWorker(ssc)
+
+	for _, name := range metricNames {
+		if got := countStatefulSetSeries(t, name, set.Namespace, set.Name); got != 0 {
+			t.Errorf("expected no %s series for deleted StatefulSet %s/%s, got %d", name, set.Namespace, set.Name, got)
+		}
+		for _, b := range bystanders {
+			if got := countStatefulSetSeries(t, name, b.Namespace, b.Name); got != 1 {
+				t.Errorf("expected 1 %s series for live StatefulSet %s/%s, got %d", name, b.Namespace, b.Name, got)
+			}
+		}
+	}
+}
+
+func countStatefulSetSeries(t *testing.T, metricName, namespace, name string) int {
+	t.Helper()
+	families, err := legacyregistry.DefaultGatherer.Gather()
+	if err != nil {
+		t.Fatal(err)
+	}
+	count := 0
+	for _, mf := range families {
+		if mf.GetName() != metricName {
+			continue
+		}
+		for _, m := range mf.GetMetric() {
+			if testutil.LabelsMatch(m, map[string]string{"statefulset_namespace": namespace, "statefulset_name": name}) {
+				count++
+			}
+		}
+	}
+	return count
 }
 
 func TestStatefulSetControllerDeletionTimestampRace(t *testing.T) {
