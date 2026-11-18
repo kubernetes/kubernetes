@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/sharding"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/internal/listoptions"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/util/watchlist"
 	"k8s.io/klog/v2"
@@ -253,6 +254,7 @@ func NewFilteredListWatchFromClient(c Getter, resource string, namespace string,
 	}
 	listFuncWithContext := func(ctx context.Context, options metav1.ListOptions) (runtime.Object, error) {
 		optionsModifier(&options)
+		listoptions.PreserveFullList(ctx, &options)
 		return c.Get().
 			Namespace(namespace).
 			Resource(resource).

@@ -26,15 +26,20 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/client-go/internal/listoptions"
 )
 
 const defaultPageSize = 500
 const defaultPageBufferSize = 10
 
 // ListPageFunc returns a list object for the given list options.
+// Implementations should pass ctx to client list calls so full-list fallback
+// requests remain unlimited even if the list options are modified.
 type ListPageFunc func(ctx context.Context, opts metav1.ListOptions) (runtime.Object, error)
 
 // SimplePageFunc adapts a context-less list function into one that accepts a context.
+// The adapted function cannot propagate the full-list fallback context to client
+// requests. Incomplete fallback responses are still rejected.
 func SimplePageFunc(fn func(opts metav1.ListOptions) (runtime.Object, error)) ListPageFunc {
 	return func(ctx context.Context, opts metav1.ListOptions) (runtime.Object, error) {
 		return fn(opts)
@@ -120,8 +125,20 @@ func (p *ListPager) list(ctx context.Context, options metav1.ListOptions, allocN
 			options.Continue = ""
 			options.ResourceVersion = requestedResourceVersion
 			options.ResourceVersionMatch = requestedResourceVersionMatch
-			result, err := p.PageFn(ctx, options)
-			return result, paginatedResult, err
+			result, err := p.PageFn(listoptions.WithFullList(ctx), options)
+			if err != nil {
+				return nil, paginatedResult, err
+			}
+			m, err := meta.ListAccessor(result)
+			if err != nil {
+				return nil, paginatedResult, fmt.Errorf("invalid full-list fallback response: %w", err)
+			}
+			// PageFn may override the requested limit. Returning a partial list as
+			// complete could cause consumers to treat missing objects as deleted.
+			if m.GetContinue() != "" {
+				return nil, paginatedResult, fmt.Errorf("full-list fallback returned a continue token despite requesting limit=0")
+			}
+			return result, paginatedResult, nil
 		}
 		m, err := meta.ListAccessor(obj)
 		if err != nil {
