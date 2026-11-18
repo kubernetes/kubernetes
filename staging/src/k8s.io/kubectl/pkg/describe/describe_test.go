@@ -1447,6 +1447,36 @@ func VerifyDatesInOrder(
 	}
 }
 
+func TestFormatQuantity(t *testing.T) {
+	testCases := []struct {
+		name     corev1.ResourceName
+		quantity string
+		expected string
+	}{
+		{name: corev1.ResourceMemory, quantity: "0.1Gi", expected: "107374183"},
+		{name: corev1.ResourceMemory, quantity: "107374182400m", expected: "107374183"},
+		{name: corev1.ResourceMemory, quantity: "500m", expected: "1"},
+		{name: corev1.ResourceMemory, quantity: "100Mi", expected: "100Mi"},
+		{name: corev1.ResourceMemory, quantity: "1.5Gi", expected: "1536Mi"},
+		{name: corev1.ResourceMemory, quantity: "0", expected: "0"},
+		{name: corev1.ResourceStorage, quantity: "0.1Gi", expected: "107374183"},
+		{name: corev1.ResourceEphemeralStorage, quantity: "0.5", expected: "1"},
+		{name: "hugepages-2Mi", quantity: "0.1Gi", expected: "107374183"},
+		{name: "requests.memory", quantity: "0.1Gi", expected: "107374183"},
+		{name: "limits.ephemeral-storage", quantity: "0.1Gi", expected: "107374183"},
+		{name: corev1.ResourceCPU, quantity: "100m", expected: "100m"},
+		{name: "requests.cpu", quantity: "1500m", expected: "1500m"},
+		{name: "example.com/foo", quantity: "500m", expected: "500m"},
+	}
+	for _, tc := range testCases {
+		t.Run(string(tc.name)+"="+tc.quantity, func(t *testing.T) {
+			if got := formatQuantity(tc.name, resource.MustParse(tc.quantity)); got != tc.expected {
+				t.Errorf("formatQuantity(%s, %s) = %q, want %q", tc.name, tc.quantity, got, tc.expected)
+			}
+		})
+	}
+}
+
 func TestDescribeResources(t *testing.T) {
 	testCases := []struct {
 		resources        *corev1.ResourceRequirements
@@ -1486,6 +1516,15 @@ func TestDescribeResources(t *testing.T) {
 				},
 			},
 			expectedElements: map[string]int{"cpu": 1, "memory": 1, "Requests": 1, "1k": 1, "100Mi": 1},
+		},
+		{
+			resources: &corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("100m"),
+					corev1.ResourceMemory: resource.MustParse("0.1Gi"),
+				},
+			},
+			expectedElements: map[string]int{"cpu": 1, "memory": 1, "Requests": 1, "100m": 1, "107374183": 1},
 		},
 	}
 

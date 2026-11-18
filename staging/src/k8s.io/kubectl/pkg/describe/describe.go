@@ -562,22 +562,22 @@ func describeLimitRangeSpec(spec corev1.LimitRangeSpec, prefix string, w PrefixW
 
 			maxQuantity, maxQuantityFound := maxResources[k]
 			if maxQuantityFound {
-				maxValue = maxQuantity.String()
+				maxValue = formatQuantity(k, maxQuantity)
 			}
 
 			minQuantity, minQuantityFound := minResources[k]
 			if minQuantityFound {
-				minValue = minQuantity.String()
+				minValue = formatQuantity(k, minQuantity)
 			}
 
 			defaultLimitQuantity, defaultLimitQuantityFound := defaultLimitResources[k]
 			if defaultLimitQuantityFound {
-				defaultLimitValue = defaultLimitQuantity.String()
+				defaultLimitValue = formatQuantity(k, defaultLimitQuantity)
 			}
 
 			defaultRequestQuantity, defaultRequestQuantityFound := defaultRequestResources[k]
 			if defaultRequestQuantityFound {
-				defaultRequestValue = defaultRequestQuantity.String()
+				defaultRequestValue = formatQuantity(k, defaultRequestQuantity)
 			}
 
 			ratioQuantity, ratioQuantityFound := ratio[k]
@@ -642,7 +642,7 @@ func DescribeResourceQuotas(quotas *corev1.ResourceQuotaList, w PrefixWriter) {
 		for _, resource := range resources {
 			hardQuantity := q.Status.Hard[resource]
 			usedQuantity := q.Status.Used[resource]
-			w.Write(LEVEL_1, "%s\t%s\t%s\n", string(resource), usedQuantity.String(), hardQuantity.String())
+			w.Write(LEVEL_1, "%s\t%s\t%s\n", string(resource), formatQuantity(resource, usedQuantity), formatQuantity(resource, hardQuantity))
 		}
 	}
 }
@@ -736,7 +736,7 @@ func describeQuota(resourceQuota *corev1.ResourceQuota) (string, error) {
 			if hardQuantity.Format != usedQuantity.Format {
 				usedQuantity = *resource.NewQuantity(usedQuantity.Value(), hardQuantity.Format)
 			}
-			w.Write(LEVEL_0, msg, resourceName, usedQuantity.String(), hardQuantity.String())
+			w.Write(LEVEL_0, msg, resourceName, formatQuantity(resourceName, usedQuantity), formatQuantity(resourceName, hardQuantity))
 		}
 		return nil
 	})
@@ -1022,7 +1022,7 @@ func printHostPathVolumeSource(hostPath *corev1.HostPathVolumeSource, w PrefixWr
 func printEmptyDirVolumeSource(emptyDir *corev1.EmptyDirVolumeSource, w PrefixWriter) {
 	var sizeLimit string
 	if emptyDir.SizeLimit != nil && emptyDir.SizeLimit.Cmp(resource.Quantity{}) > 0 {
-		sizeLimit = fmt.Sprintf("%v", emptyDir.SizeLimit)
+		sizeLimit = formatQuantity(corev1.ResourceStorage, *emptyDir.SizeLimit)
 	} else {
 		sizeLimit = "<unset>"
 	}
@@ -1576,7 +1576,7 @@ func describePersistentVolume(pv *corev1.PersistentVolume, events *corev1.EventL
 			w.Write(LEVEL_0, "VolumeMode:\t%v\n", *pv.Spec.VolumeMode)
 		}
 		storage := pv.Spec.Capacity[corev1.ResourceStorage]
-		w.Write(LEVEL_0, "Capacity:\t%s\n", storage.String())
+		w.Write(LEVEL_0, "Capacity:\t%s\n", formatQuantity(corev1.ResourceStorage, storage))
 		printVolumeNodeAffinity(w, pv.Spec.NodeAffinity)
 		w.Write(LEVEL_0, "Message:\t%s\n", pv.Status.Message)
 		w.Write(LEVEL_0, "Source:\n")
@@ -1765,7 +1765,7 @@ func printPersistentVolumeClaim(w PrefixWriter, pvc *corev1.PersistentVolumeClai
 	if pvc.Spec.VolumeName != "" {
 		accessModes = storageutil.GetAccessModesAsString(pvc.Status.AccessModes)
 		storage = pvc.Status.Capacity[corev1.ResourceStorage]
-		capacity = storage.String()
+		capacity = formatQuantity(corev1.ResourceStorage, storage)
 	}
 	w.Write(LEVEL_0, "Capacity:\t%s\n", capacity)
 	w.Write(LEVEL_0, "Access Modes:\t%s\n", accessModes)
@@ -1902,7 +1902,7 @@ func describeResources(resources *corev1.ResourceRequirements, w PrefixWriter, l
 	}
 	for _, name := range SortedResourceNames(resources.Limits) {
 		quantity := resources.Limits[name]
-		w.Write(level+1, "%s:\t%s\n", name, quantity.String())
+		w.Write(level+1, "%s:\t%s\n", name, formatQuantity(name, quantity))
 	}
 
 	if len(resources.Requests) > 0 {
@@ -1910,8 +1910,33 @@ func describeResources(resources *corev1.ResourceRequirements, w PrefixWriter, l
 	}
 	for _, name := range SortedResourceNames(resources.Requests) {
 		quantity := resources.Requests[name]
-		w.Write(level+1, "%s:\t%s\n", name, quantity.String())
+		w.Write(level+1, "%s:\t%s\n", name, formatQuantity(name, quantity))
 	}
+}
+
+// formatQuantity renders q for display. A byte can't be split, but a value such
+// as 0.1Gi has no whole-byte form, so the API server stores it as
+// 107374182400m. Show byte-sized resources like that rounded up to whole bytes,
+// the same way the kubelet and scheduler treat them.
+func formatQuantity(name corev1.ResourceName, q resource.Quantity) string {
+	if !isByteResource(name) {
+		return q.String()
+	}
+	if _, exact := q.AsScale(0); exact {
+		return q.String()
+	}
+	return resource.NewQuantity(q.Value(), q.Format).String()
+}
+
+// isByteResource reports whether name is measured in bytes. Quota names such as
+// requests.memory and limits.ephemeral-storage count too.
+func isByteResource(name corev1.ResourceName) bool {
+	n := strings.TrimPrefix(strings.TrimPrefix(string(name), "requests."), "limits.")
+	switch corev1.ResourceName(n) {
+	case corev1.ResourceMemory, corev1.ResourceStorage, corev1.ResourceEphemeralStorage:
+		return true
+	}
+	return strings.HasPrefix(n, corev1.ResourceHugePagesPrefix)
 }
 
 func describeContainerState(status corev1.ContainerStatus, w PrefixWriter) {
@@ -2135,7 +2160,7 @@ func describeVolumeClaimTemplates(templates []corev1.PersistentVolumeClaim, w Pr
 		printLabelsMultilineWithIndent(w, "  ", "Labels", "\t", pvc.Labels, sets.New[string]())
 		printLabelsMultilineWithIndent(w, "  ", "Annotations", "\t", pvc.Annotations, sets.New[string]())
 		if capacity, ok := pvc.Spec.Resources.Requests[corev1.ResourceStorage]; ok {
-			w.Write(LEVEL_1, "Capacity:\t%s\n", capacity.String())
+			w.Write(LEVEL_1, "Capacity:\t%s\n", formatQuantity(corev1.ResourceStorage, capacity))
 		} else {
 			w.Write(LEVEL_1, "Capacity:\t%s\n", "<default>")
 		}
@@ -3547,7 +3572,7 @@ func describeNode(node *corev1.Node, nodeNonTerminatedPodsList *corev1.PodList, 
 			sort.Sort(SortableResourceNames(resources))
 			for _, resource := range resources {
 				value := resourceList[resource]
-				w.Write(LEVEL_0, "  %s:\t%s\n", resource, value.String())
+				w.Write(LEVEL_0, "  %s:\t%s\n", resource, formatQuantity(resource, value))
 			}
 		}
 
@@ -4085,7 +4110,7 @@ func describeNodeResource(nodeNonTerminatedPodsList *corev1.PodList, node *corev
 		fractionMemoryLimit := percentOf(memoryLimit.Value(), allocatable.Memory().Value())
 		w.Write(LEVEL_1, "%s\t%s\t\t%s (%d%%)\t%s (%d%%)\t%s (%d%%)\t%s (%d%%)\t%s\n", pod.Namespace, pod.Name,
 			cpuReq.String(), fractionCpuReq, cpuLimit.String(), fractionCpuLimit,
-			memoryReq.String(), fractionMemoryReq, memoryLimit.String(), fractionMemoryLimit, translateTimestampSince(pod.CreationTimestamp))
+			formatQuantity(corev1.ResourceMemory, memoryReq), fractionMemoryReq, formatQuantity(corev1.ResourceMemory, memoryLimit), fractionMemoryLimit, translateTimestampSince(pod.CreationTimestamp))
 	}
 
 	w.Write(LEVEL_0, "Allocated resources:\n  (Total limits may be over 100 percent, i.e., overcommitted.)\n")
@@ -4097,9 +4122,9 @@ func describeNodeResource(nodeNonTerminatedPodsList *corev1.PodList, node *corev
 	w.Write(LEVEL_1, "%s\t%s (%d%%)\t%s (%d%%)\n",
 		corev1.ResourceCPU, cpuReqs.String(), percentOf(cpuReqs.MilliValue(), allocatable.Cpu().MilliValue()), cpuLimits.String(), percentOf(cpuLimits.MilliValue(), allocatable.Cpu().MilliValue()))
 	w.Write(LEVEL_1, "%s\t%s (%d%%)\t%s (%d%%)\n",
-		corev1.ResourceMemory, memoryReqs.String(), percentOf(memoryReqs.Value(), allocatable.Memory().Value()), memoryLimits.String(), percentOf(memoryLimits.Value(), allocatable.Memory().Value()))
+		corev1.ResourceMemory, formatQuantity(corev1.ResourceMemory, memoryReqs), percentOf(memoryReqs.Value(), allocatable.Memory().Value()), formatQuantity(corev1.ResourceMemory, memoryLimits), percentOf(memoryLimits.Value(), allocatable.Memory().Value()))
 	w.Write(LEVEL_1, "%s\t%s (%d%%)\t%s (%d%%)\n",
-		corev1.ResourceEphemeralStorage, ephemeralstorageReqs.String(), percentOf(ephemeralstorageReqs.Value(), allocatable.StorageEphemeral().Value()), ephemeralstorageLimits.String(), percentOf(ephemeralstorageLimits.Value(), allocatable.StorageEphemeral().Value()))
+		corev1.ResourceEphemeralStorage, formatQuantity(corev1.ResourceEphemeralStorage, ephemeralstorageReqs), percentOf(ephemeralstorageReqs.Value(), allocatable.StorageEphemeral().Value()), formatQuantity(corev1.ResourceEphemeralStorage, ephemeralstorageLimits), percentOf(ephemeralstorageLimits.Value(), allocatable.StorageEphemeral().Value()))
 
 	extResources := make([]string, 0, len(allocatable))
 	hugePageResources := make([]string, 0, len(allocatable))
@@ -4117,7 +4142,7 @@ func describeNodeResource(nodeNonTerminatedPodsList *corev1.PodList, node *corev
 	for _, resource := range hugePageResources {
 		hugePageSizeRequests, hugePageSizeLimits, hugePageSizeAllocable := reqs[corev1.ResourceName(resource)], limits[corev1.ResourceName(resource)], allocatable[corev1.ResourceName(resource)]
 		w.Write(LEVEL_1, "%s\t%s (%d%%)\t%s (%d%%)\n",
-			resource, hugePageSizeRequests.String(), percentOf(hugePageSizeRequests.Value(), hugePageSizeAllocable.Value()), hugePageSizeLimits.String(), percentOf(hugePageSizeLimits.Value(), hugePageSizeAllocable.Value()))
+			resource, formatQuantity(corev1.ResourceName(resource), hugePageSizeRequests), percentOf(hugePageSizeRequests.Value(), hugePageSizeAllocable.Value()), formatQuantity(corev1.ResourceName(resource), hugePageSizeLimits), percentOf(hugePageSizeLimits.Value(), hugePageSizeAllocable.Value()))
 	}
 
 	for _, ext := range extResources {
