@@ -39,6 +39,62 @@ func TestArgs(t *testing.T) {
 	}
 }
 
+func TestDefaultEnvEditor(t *testing.T) {
+	t.Setenv("SHELL", "test-shell")
+	tests := []struct {
+		name   string
+		editor string
+		args   []string
+		shell  bool
+	}{
+		{
+			name:   "bare command",
+			editor: "code",
+			args:   []string{"code"},
+		},
+		{
+			name:   "single space",
+			editor: "code --wait",
+			args:   []string{"code", "--wait"},
+		},
+		{
+			name:   "repeated spaces",
+			editor: "code  --wait",
+			args:   []string{"code", "--wait"},
+		},
+		{
+			name:   "tab separator",
+			editor: "code\t--wait",
+			args:   []string{"code", "--wait"},
+		},
+		{
+			name:   "leading and trailing whitespace",
+			editor: " \tcode --wait\t ",
+			args:   []string{"code", "--wait"},
+		},
+		{
+			name:   "multiple arguments",
+			editor: "code  --wait\t--new-window",
+			args:   []string{"code", "--wait", "--new-window"},
+		},
+		{
+			name:   "quoted argument",
+			editor: `code --profile "my profile" --wait`,
+			args:   []string{"test-shell", "-c", `code --profile "my profile" --wait`},
+			shell:  true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("KUBE_EDITOR", tt.editor)
+			args, shell := defaultEnvEditor([]string{"KUBE_EDITOR"})
+			if !reflect.DeepEqual(args, tt.args) || shell != tt.shell {
+				t.Errorf("defaultEnvEditor() = (%q, %t), want (%q, %t)", args, shell, tt.args, tt.shell)
+			}
+		})
+	}
+}
+
 func TestEditor(t *testing.T) {
 	edit := Editor{Args: []string{"cat"}}
 	testStr := "test something\n"
