@@ -97,7 +97,7 @@ func ExtractResourceValueByContainerNameAndNodeAllocatable(fs *v1.ResourceFieldS
 
 	container := realContainer.DeepCopy()
 
-	MergeContainerResourceLimits(container, nodeAllocatable)
+	MergeContainerResourceLimits(container, DownwardAPIDefaultLimits(pod, nodeAllocatable))
 
 	return ExtractContainerResourceValue(fs, container)
 }
@@ -186,6 +186,28 @@ func findContainerInPod(pod *v1.Pod, containerName string) (*v1.Container, error
 	return nil, fmt.Errorf("container %s not found", containerName)
 }
 
+// Huge pages are never overcommitted, so their limits do not need a default.
+var downwardAPIDefaultableResources = []v1.ResourceName{v1.ResourceCPU, v1.ResourceMemory, v1.ResourceEphemeralStorage}
+
+// DownwardAPIDefaultLimits returns the limits to use when a container has no
+// limit of its own. The result may be the node's allocatable list and must not be modified.
+func DownwardAPIDefaultLimits(pod *v1.Pod, nodeAllocatable v1.ResourceList) v1.ResourceList {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) || pod.Spec.Resources == nil {
+		return nodeAllocatable
+	}
+
+	defaults := nodeAllocatable.DeepCopy()
+	for _, name := range downwardAPIDefaultableResources {
+		if _, ok := defaults[name]; !ok {
+			continue
+		}
+		if limit := pod.Spec.Resources.Limits[name]; !limit.IsZero() {
+			defaults[name] = limit.DeepCopy()
+		}
+	}
+	return defaults
+}
+
 // MergeContainerResourceLimits checks if a limit is applied for
 // the container, and if not, it sets the limit to the passed resource list.
 func MergeContainerResourceLimits(container *v1.Container,
@@ -193,9 +215,7 @@ func MergeContainerResourceLimits(container *v1.Container,
 	if container.Resources.Limits == nil {
 		container.Resources.Limits = make(v1.ResourceList)
 	}
-	// NOTE: we exclude hugepages-* resources because hugepages are never overcommitted.
-	// This means that the container always has a limit specified.
-	for _, resource := range []v1.ResourceName{v1.ResourceCPU, v1.ResourceMemory, v1.ResourceEphemeralStorage} {
+	for _, resource := range downwardAPIDefaultableResources {
 		if quantity, exists := container.Resources.Limits[resource]; !exists || quantity.IsZero() {
 			if cap, exists := allocatable[resource]; exists {
 				container.Resources.Limits[resource] = cap.DeepCopy()
