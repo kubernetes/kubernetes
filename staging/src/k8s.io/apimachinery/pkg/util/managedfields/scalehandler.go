@@ -17,6 +17,7 @@ limitations under the License.
 package managedfields
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"sigs.k8s.io/structured-merge-diff/v7/fieldpath"
@@ -90,6 +91,26 @@ func (h *ScaleHandler) ToSubresource() ([]metav1.ManagedFieldsEntry, error) {
 	return managedFieldsEntries(internal.NewManaged(f, t))
 }
 
+// managerIdentity identifies a managed fields entry by manager, operation
+// and subresource, ignoring the apiVersion. The identifier of an Update
+// entry includes its apiVersion, so the same manager's ownership of a
+// field looks different when viewed through the main resource (apps/v1)
+// and through the scale subresource (autoscaling/v1). The apiVersion must
+// not distinguish them when merging scale entries back into the parent.
+type managerIdentity struct {
+	manager     string
+	operation   metav1.ManagedFieldsOperationType
+	subresource string
+}
+
+func managerIdentityFromIdentifier(identifier string) (managerIdentity, error) {
+	entry := &metav1.ManagedFieldsEntry{}
+	if err := json.Unmarshal([]byte(identifier), entry); err != nil {
+		return managerIdentity{}, fmt.Errorf("error unmarshalling manager identifier %v: %v", identifier, err)
+	}
+	return managerIdentity{manager: entry.Manager, operation: entry.Operation, subresource: entry.Subresource}, nil
+}
+
 // ToParent merges `scaleEntries` with the entries of the main resource and
 // transforms them accordingly
 func (h *ScaleHandler) ToParent(scaleEntries []metav1.ManagedFieldsEntry) ([]metav1.ManagedFieldsEntry, error) {
@@ -104,6 +125,18 @@ func (h *ScaleHandler) ToParent(scaleEntries []metav1.ManagedFieldsEntry) ([]met
 		return nil, err
 	}
 	scaleFields := decodedScaleEntries.Fields()
+
+	// Index the scale entries by manager identity, ignoring the
+	// apiVersion, so a scale entry is recognised as the same manager's
+	// ownership even though its identifier names the scale apiVersion.
+	scaleByIdentity := make(map[managerIdentity]string, len(scaleFields))
+	for identifier := range scaleFields {
+		identity, err := managerIdentityFromIdentifier(identifier)
+		if err != nil {
+			return nil, err
+		}
+		scaleByIdentity[identity] = identifier
+	}
 
 	f := fieldpath.ManagedFields{}
 	t := map[string]*metav1.Time{}
@@ -125,7 +158,12 @@ func (h *ScaleHandler) ToParent(scaleEntries []metav1.ManagedFieldsEntry) ([]met
 			continue
 		}
 
-		if _, ok := scaleFields[manager]; !ok {
+		parentIdentity, err := managerIdentityFromIdentifier(manager)
+		if err != nil {
+			return nil, err
+		}
+		scaleIdentifier, ok := scaleByIdentity[parentIdentity]
+		if !ok {
 			// "Steal" the replicas path from the main resource entry
 			newSet := versionedSet.Set().Difference(fieldpath.NewSet(path))
 
@@ -142,7 +180,7 @@ func (h *ScaleHandler) ToParent(scaleEntries []metav1.ManagedFieldsEntry) ([]met
 			// Field wasn't stolen, let's keep the entry as it is.
 			f[manager] = versionedSet
 			t[manager] = decodedParentEntries.Times()[manager]
-			delete(scaleFields, manager)
+			delete(scaleFields, scaleIdentifier)
 		}
 	}
 

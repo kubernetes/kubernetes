@@ -150,12 +150,56 @@ func TestTransformManagedFieldsToSubresource(t *testing.T) {
 }
 
 func TestTransformingManagedFieldsToParent(t *testing.T) {
+	testTime, _ := time.ParseInLocation("2006-Jan-02", "2013-Feb-03", time.Local)
+	managedFieldTime := metav1.NewTime(testTime)
+
 	tests := []struct {
 		desc        string
 		parent      []metav1.ManagedFieldsEntry
 		subresource []metav1.ManagedFieldsEntry
 		expected    []metav1.ManagedFieldsEntry
 	}{
+		{
+			// A no-op scale write by the manager that created the object
+			// must keep that manager's entry as it is. The scale entry
+			// names the scale apiVersion (autoscaling/v1) while the
+			// parent entry names apps/v1, but it is the same manager's
+			// ownership of spec.replicas. Matching on the apiVersion
+			// used to steal the field and re-add it as a second entry
+			// with no time, which a second scale write then dropped,
+			// leaving spec.replicas owned by nobody.
+			desc: "same manager update entry keeps replicas owned after a no-op scale write",
+			parent: []metav1.ManagedFieldsEntry{
+				{
+					Manager:    "kubectl-create",
+					Operation:  metav1.ManagedFieldsOperationUpdate,
+					APIVersion: "apps/v1",
+					FieldsType: "FieldsV1",
+					FieldsV1:   metav1.NewFieldsV1(`{"f:spec":{"f:replicas":{},"f:selector":{}}}`),
+					Time:       &managedFieldTime,
+				},
+			},
+			subresource: []metav1.ManagedFieldsEntry{
+				{
+					Manager:    "kubectl-create",
+					Operation:  metav1.ManagedFieldsOperationUpdate,
+					APIVersion: "autoscaling/v1",
+					FieldsType: "FieldsV1",
+					FieldsV1:   metav1.NewFieldsV1(`{"f:spec":{"f:replicas":{}}}`),
+					Time:       &managedFieldTime,
+				},
+			},
+			expected: []metav1.ManagedFieldsEntry{
+				{
+					Manager:    "kubectl-create",
+					Operation:  metav1.ManagedFieldsOperationUpdate,
+					APIVersion: "apps/v1",
+					FieldsType: "FieldsV1",
+					FieldsV1:   metav1.NewFieldsV1(`{"f:spec":{"f:replicas":{},"f:selector":{}}}`),
+					Time:       &managedFieldTime,
+				},
+			},
+		},
 		{
 			desc: "different-managers: apply -> update",
 			parent: []metav1.ManagedFieldsEntry{
@@ -631,6 +675,56 @@ func TestTransformingManagedFieldsToParent(t *testing.T) {
 				t.Fatalf("test: %q - expected output to be:\n%v\n\nbut got:\n%v", test.desc, test.expected, parentEntries)
 			}
 		})
+	}
+}
+
+// Two consecutive no-op scale writes must leave the parent entries
+// untouched: the first write used to split the creating manager's entry
+// into a second, timeless entry owning only spec.replicas, and the
+// second write dropped that entry, leaving spec.replicas owned by
+// nobody so a later server-side apply could take it over without a
+// conflict.
+func TestScaleHandlerNoOpScaleWritesPreserveOwnership(t *testing.T) {
+	testTime, _ := time.ParseInLocation("2006-Jan-02", "2013-Feb-03", time.Local)
+	managedFieldTime := metav1.NewTime(testTime)
+
+	parent := []metav1.ManagedFieldsEntry{
+		{
+			Manager:    "kubectl-create",
+			Operation:  metav1.ManagedFieldsOperationUpdate,
+			APIVersion: "apps/v1",
+			FieldsType: "FieldsV1",
+			FieldsV1:   metav1.NewFieldsV1(`{"f:spec":{"f:replicas":{},"f:selector":{}}}`),
+			Time:       &managedFieldTime,
+		},
+	}
+
+	roundTrip := func(entries []metav1.ManagedFieldsEntry) []metav1.ManagedFieldsEntry {
+		t.Helper()
+		handler := NewScaleHandler(
+			entries,
+			schema.GroupVersion{Group: "apps", Version: "v1"},
+			defaultMappings(),
+		)
+		scaleEntries, err := handler.ToSubresource()
+		if err != nil {
+			t.Fatalf("ToSubresource - expected no error but got %v", err)
+		}
+		parentEntries, err := handler.ToParent(scaleEntries)
+		if err != nil {
+			t.Fatalf("ToParent - expected no error but got %v", err)
+		}
+		return parentEntries
+	}
+
+	afterFirst := roundTrip(parent)
+	if !reflect.DeepEqual(afterFirst, parent) {
+		t.Fatalf("after first no-op scale write - expected entries to be unchanged:\n%v\n\nbut got:\n%v", parent, afterFirst)
+	}
+
+	afterSecond := roundTrip(afterFirst)
+	if !reflect.DeepEqual(afterSecond, parent) {
+		t.Fatalf("after second no-op scale write - expected entries to be unchanged:\n%v\n\nbut got:\n%v", parent, afterSecond)
 	}
 }
 
