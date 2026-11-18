@@ -21,22 +21,12 @@ import (
 
 	certificates "k8s.io/api/certificates/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	scheme "k8s.io/client-go/kubernetes/scheme"
 )
 
 type CertificateSigningRequestExpansion interface {
 	UpdateApproval(ctx context.Context, certificateSigningRequest *certificates.CertificateSigningRequest, opts metav1.UpdateOptions) (result *certificates.CertificateSigningRequest, err error)
 }
 
-func (c *certificateSigningRequests) UpdateApproval(ctx context.Context, certificateSigningRequest *certificates.CertificateSigningRequest, opts metav1.UpdateOptions) (result *certificates.CertificateSigningRequest, err error) {
-	result = &certificates.CertificateSigningRequest{}
-	err = c.GetClient().Put().
-		Resource("certificatesigningrequests").
-		Name(certificateSigningRequest.Name).
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(certificateSigningRequest).
-		SubResource("approval").
-		Do(ctx).
-		Into(result)
-	return
+func (c *certificateSigningRequests) UpdateApproval(ctx context.Context, certificateSigningRequest *certificates.CertificateSigningRequest, opts metav1.UpdateOptions) (*certificates.CertificateSigningRequest, error) {
+	return c.SubResourceUpdate(ctx, certificateSigningRequest.Name, "approval", certificateSigningRequest, opts)
 }
