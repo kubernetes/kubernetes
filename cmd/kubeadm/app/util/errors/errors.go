@@ -82,12 +82,14 @@ func Unwrap(err error) error {
 }
 
 // WithMessage includes formats an error with a message and includes stack trace.
+// The wrapped error is kept, so that Unwrap, Is and As can find it.
 func WithMessage(err error, message string) error {
 	if err == nil {
 		return nil
 	}
 	return &errorWithStack{
-		msg:   fmt.Errorf("%s: %s", message, err.Error()),
+		msg:   fmt.Errorf("%s: %w", message, err),
+		cause: err,
 		stack: callStack(),
 	}
 }
@@ -98,7 +100,8 @@ func WithMessagef(err error, format string, args ...any) error {
 		return nil
 	}
 	return &errorWithStack{
-		msg:   fmt.Errorf("%s: %s", fmt.Sprintf(format, args...), err.Error()),
+		msg:   fmt.Errorf("%s: %w", fmt.Sprintf(format, args...), err),
+		cause: err,
 		stack: callStack(),
 	}
 }
@@ -112,9 +115,22 @@ func New(message string) error {
 }
 
 // Errorf is calls the stdlib errors.Errorf and includes a stack trace.
+// An error passed with the %w verb is kept, so that Unwrap, Is and As can
+// find it.
 func Errorf(format string, args ...any) error {
+	msg := fmt.Errorf(format, args...)
+	cause := errors.Unwrap(msg)
+	if cause == nil {
+		// A format with more than one %w produces an error that unwraps to a
+		// slice, which errors.Unwrap does not follow. Keep the message as the
+		// cause, so that Is and As can walk into it.
+		if _, ok := msg.(interface{ Unwrap() []error }); ok {
+			cause = msg
+		}
+	}
 	return &errorWithStack{
-		msg:   fmt.Errorf(format, args...),
+		msg:   msg,
+		cause: cause,
 		stack: callStack(),
 	}
 }
