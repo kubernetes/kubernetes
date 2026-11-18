@@ -27,6 +27,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"go.uber.org/goleak"
 
 	v1 "k8s.io/api/core/v1"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
@@ -6492,4 +6493,57 @@ func pluginNames[T fwk.Plugin](plugins []T) []string {
 		names = append(names, pl.Name())
 	}
 	return names
+}
+
+func TestNewFrameworkWithMetricsRecorderNoLeak(t *testing.T) {
+	ignore := goleak.IgnoreCurrent()
+
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	customRecorder := &metrics.MetricAsyncRecorder{}
+	f, err := NewFramework(ctx, Registry{}, nil, WithMetricsRecorder(customRecorder))
+	if err != nil {
+		t.Fatalf("NewFramework failed: %v", err)
+	}
+	defer func() {
+		if err := f.Close(); err != nil {
+			t.Errorf("framework Close failed: %v", err)
+		}
+	}()
+
+	if got := f.(*frameworkImpl).metricsRecorder; got != customRecorder {
+		t.Fatalf("metricsRecorder = %p, want custom recorder %p", got, customRecorder)
+	}
+
+	// Verify before canceling ctx that no default MetricAsyncRecorder goroutine was spawned.
+	goleak.VerifyNone(t, ignore)
+}
+
+func TestNewFrameworkDefaultMetricsRecorder(t *testing.T) {
+	ignore := goleak.IgnoreCurrent()
+
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+
+	f, err := NewFramework(ctx, Registry{}, nil)
+	if err != nil {
+		cancel()
+		t.Fatalf("NewFramework failed: %v", err)
+	}
+	defer func() {
+		if err := f.Close(); err != nil {
+			t.Errorf("framework Close failed: %v", err)
+		}
+	}()
+
+	if f.(*frameworkImpl).metricsRecorder == nil {
+		cancel()
+		t.Fatal("expected default metricsRecorder to be initialized, got nil")
+	}
+
+	cancel()
+	WaitForShutdown(f)
+	goleak.VerifyNone(t, ignore)
 }
