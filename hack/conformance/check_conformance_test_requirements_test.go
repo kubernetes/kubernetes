@@ -46,7 +46,7 @@ func TestCheckFile(t *testing.T) {
 		framework.ConformanceIt("b", func(ctx context.Context) {})
 	})
 })`,
-			want: 2,
+			want: 1,
 		},
 		{
 			name: "skips that do not reach a conformance test",
@@ -68,13 +68,12 @@ func TestCheckFile(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			fset := token.NewFileSet()
-			file, err := parser.ParseFile(fset, "x.go", "package x\n"+tt.src, 0)
+			file, err := parser.ParseFile(token.NewFileSet(), "x.go", "package x\n"+tt.src, 0)
 			if err != nil {
 				t.Fatal(err)
 			}
-			if got := checkFile(fset, file); len(got) != tt.want {
-				t.Errorf("got %d problems, want %d: %v", len(got), tt.want, got)
+			if got := len(checkFile(file)); got != tt.want {
+				t.Errorf("got %d skips, want %d", got, tt.want)
 			}
 		})
 	}
