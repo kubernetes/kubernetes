@@ -22,6 +22,7 @@ import (
 
 	"github.com/blang/semver/v4"
 
+	corev1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -82,6 +83,20 @@ func Convert_string_To_api_UniqueString(in *string, out *UniqueString, s convers
 	*out = rs.slice.MakeUniqueString(*in)
 	return nil
 }
+func Convert_v1_NodeSelector_To_api_NodeSelector(in *corev1.NodeSelector, out *NodeSelector, s conversion.Scope) error {
+	rs, ok := s.(*resourceSliceScope)
+	if !ok {
+		return errors.New("Convert_v1_NodeSelector_To_api_NodeSelector may only be called when converting a ResourceSlice")
+	}
+	*out = *newNodeSelector(in, rs.slice.MakeUniqueString)
+	return nil
+}
+
+func Convert_api_NodeSelector_To_v1_NodeSelector(in *NodeSelector, out *corev1.NodeSelector, s conversion.Scope) error {
+	*out = *in.Source
+	return nil
+}
+
 func Convert_Map_v1_QualifiedName_To_v1_DeviceAttribute_To_api_DeviceAttributes(in *map[resourceapi.QualifiedName]resourceapi.DeviceAttribute, out *DeviceAttributes, s conversion.Scope) error {
 	rs, ok := s.(*resourceSliceScope)
 	if !ok {

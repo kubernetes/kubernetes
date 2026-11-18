@@ -407,7 +407,7 @@ func (r *resourceAllocationScorer) calculateDRAResourceTotals(ctx context.Contex
 
 				// Slow path: only if we have a node selector
 				if device.NodeSelector != nil {
-					deviceMatches, err := r.nodeMatches(node, deviceNodeName, deviceAllNodes, device.NodeSelector)
+					deviceMatches, err := r.nodeMatches(node, deviceNodeName, deviceAllNodes, device.NodeSelector.Original())
 					if err != nil {
 						return 0, 0, err
 					}
@@ -424,7 +424,7 @@ func (r *resourceAllocationScorer) calculateDRAResourceTotals(ctx context.Contex
 			// Fast path: check AllNodes or exact name match first
 			if !sliceAllNodes && sliceNodeName != nodeName && slice.Spec.NodeSelector != nil {
 				// Need to check node selector
-				matches, err := r.nodeMatches(node, sliceNodeName, sliceAllNodes, slice.Spec.NodeSelector)
+				matches, err := r.nodeMatches(node, sliceNodeName, sliceAllNodes, slice.Spec.NodeSelector.Original())
 				if err != nil {
 					return 0, 0, err
 				}
