@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	errorsutil "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/kubernetes/fake"
+	k8stesting "k8s.io/client-go/testing"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
@@ -119,15 +120,19 @@ containerRuntimeEndpoint: unix:///var/run/existing.sock
 	}
 
 	testCases := []struct {
-		name          string
-		patchesDir    string
-		expectedError bool
-		cfg           *kubeadmapi.InitConfiguration
-		setup         func(t *testing.T, kubeletDir string)
-		verify        func(t *testing.T, kubeletDir string)
+		name              string
+		patchesDir        string
+		dryRun            bool
+		kubeletDirNotADir bool
+		expectedErrMsg    string
+		expectedError     bool
+		cfg               *kubeadmapi.InitConfiguration
+		setup             func(t *testing.T, kubeletDir string)
+		verify            func(t *testing.T, kubeletDir string)
 	}{
 		{
-			name: "write kubelet config file successfully",
+			name:   "write kubelet config file successfully",
+			dryRun: true,
 			cfg: &kubeadmapi.InitConfiguration{
 				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
 					ComponentConfigs: kubeadmapi.ComponentConfigMap{
@@ -138,12 +143,14 @@ containerRuntimeEndpoint: unix:///var/run/existing.sock
 		},
 		{
 			name:          "aggregate errs: no kubelet config file and cannot read config file",
+			dryRun:        true,
 			expectedError: true,
 			cfg:           &kubeadmapi.InitConfiguration{},
 		},
 		{
 			name:          "only one err: patch dir does not exist",
 			patchesDir:    "Bogus",
+			dryRun:        true,
 			expectedError: true,
 			cfg: &kubeadmapi.InitConfiguration{
 				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
@@ -154,7 +161,8 @@ containerRuntimeEndpoint: unix:///var/run/existing.sock
 			},
 		},
 		{
-			name: "missing instance config file is created with defaults",
+			name:   "missing instance config file is created with defaults",
+			dryRun: true,
 			cfg: &kubeadmapi.InitConfiguration{
 				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
 					ComponentConfigs: kubeadmapi.ComponentConfigMap{
@@ -170,7 +178,8 @@ containerRuntimeEndpoint: unix:///var/run/existing.sock
 			},
 		},
 		{
-			name: "existing instance config file is left alone",
+			name:   "existing instance config file is left alone",
+			dryRun: true,
 			cfg: &kubeadmapi.InitConfiguration{
 				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
 					ComponentConfigs: kubeadmapi.ComponentConfigMap{
@@ -196,16 +205,83 @@ containerRuntimeEndpoint: unix:///var/run/existing.sock
 				}
 			},
 		},
+		{
+			name: "kubelet config file is backed up before being rewritten",
+			cfg: &kubeadmapi.InitConfiguration{
+				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+					ComponentConfigs: kubeadmapi.ComponentConfigMap{
+						componentconfigs.KubeletGroup: &componentConfig{},
+					},
+				},
+			},
+			setup: func(t *testing.T, kubeletDir string) {
+				if err := os.WriteFile(filepath.Join(kubeletDir, constants.KubeletConfigurationFileName), []byte(existingInstanceConfig), 0644); err != nil {
+					t.Fatalf("failed to write %s: %v", constants.KubeletConfigurationFileName, err)
+				}
+			},
+			verify: func(t *testing.T, kubeletDir string) {
+				backups, err := filepath.Glob(filepath.Join(kubeletDir, constants.TempDir, "kubeadm-kubelet-config-*", constants.KubeletConfigurationFileName))
+				if err != nil {
+					t.Fatalf("failed to look up the kubelet config backup: %v", err)
+				}
+				if len(backups) != 1 {
+					t.Fatalf("expected exactly one kubelet config backup, got %v", backups)
+				}
+				got, err := os.ReadFile(backups[0])
+				if err != nil {
+					t.Fatalf("failed to read the kubelet config backup: %v", err)
+				}
+				if string(got) != existingInstanceConfig {
+					t.Fatalf("expected the backup to contain the previous config, got:\n%s", got)
+				}
+			},
+		},
+		{
+			name:          "backing up a missing kubelet config file fails",
+			expectedError: true,
+			cfg: &kubeadmapi.InitConfiguration{
+				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+					ComponentConfigs: kubeadmapi.ComponentConfigMap{
+						componentconfigs.KubeletGroup: &componentConfig{},
+					},
+				},
+			},
+		},
+		{
+			name:              "stating the instance config file fails with an error other than not-exist",
+			kubeletDirNotADir: true,
+			dryRun:            true,
+			expectedError:     true,
+			expectedErrMsg:    "stat error for the kubelet instance configuration file",
+			cfg: &kubeadmapi.InitConfiguration{
+				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+					ComponentConfigs: kubeadmapi.ComponentConfigMap{
+						componentconfigs.KubeletGroup: &componentConfig{},
+					},
+				},
+			},
+		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			kubeletDir := t.TempDir()
+			kubeConfigDir := kubeletDir
+			if tc.kubeletDirNotADir {
+				notADir := filepath.Join(t.TempDir(), "not-a-dir")
+				if err := os.WriteFile(notADir, []byte("not a directory"), 0644); err != nil {
+					t.Fatalf("failed to create %s: %v", notADir, err)
+				}
+				kubeletDir = filepath.Join(notADir, "kubelet")
+			}
 			if tc.setup != nil {
 				tc.setup(t, kubeletDir)
 			}
-			err := WriteKubeletConfigFiles(tc.cfg, kubeletDir, kubeletDir, tc.patchesDir, true, io.Discard)
+			err := WriteKubeletConfigFiles(tc.cfg, kubeletDir, kubeConfigDir, tc.patchesDir, tc.dryRun, io.Discard)
 			if (err != nil) != tc.expectedError {
 				t.Fatalf("expected error: %v, got: %v, error: %v", tc.expectedError, err != nil, err)
+			}
+			if tc.expectedErrMsg != "" && !strings.Contains(err.Error(), tc.expectedErrMsg) {
+				t.Fatalf("expected error containing %q, got: %v", tc.expectedErrMsg, err)
 			}
 			if tc.verify != nil {
 				tc.verify(t, kubeletDir)
@@ -219,9 +295,35 @@ func TestRemoveKubeletArgsFromFile(t *testing.T) {
 		name            string
 		kubeletFlags    []kubeadmapi.Arg
 		unwantedFlags   []string
+		dryRun          bool
+		skipWrite       bool
 		wantErr         bool
+		wantUnchanged   bool
 		wantFileContent string
 	}{
+		{
+			name: "no unwanted flags leaves the file untouched",
+			kubeletFlags: []kubeadmapi.Arg{
+				{Name: "node-ip", Value: "172.18.0.2"},
+			},
+			wantUnchanged: true,
+		},
+		{
+			name: "dry run leaves the file untouched",
+			kubeletFlags: []kubeadmapi.Arg{
+				{Name: "node-ip", Value: "172.18.0.2"},
+				{Name: "pod-infra-container-image", Value: "registry.k8s.io/pause:ver"},
+			},
+			unwantedFlags: []string{"pod-infra-container-image"},
+			dryRun:        true,
+			wantUnchanged: true,
+		},
+		{
+			name:          "missing kubelet env file",
+			unwantedFlags: []string{"pod-infra-container-image"},
+			skipWrite:     true,
+			wantErr:       true,
+		},
 		{
 			name: "remove an existing flag",
 			kubeletFlags: []kubeadmapi.Arg{
@@ -290,14 +392,25 @@ func TestRemoveKubeletArgsFromFile(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			tempDir := t.TempDir()
 
-			err := kubeletphase.WriteKubeletArgsToFile(tc.kubeletFlags, nil, tempDir)
-			if err != nil {
-				t.Fatalf("Failed to write kubeadm-flags.env file: %v", err)
+			before := ""
+			if !tc.skipWrite {
+				err := kubeletphase.WriteKubeletArgsToFile(tc.kubeletFlags, nil, tempDir)
+				if err != nil {
+					t.Fatalf("Failed to write kubeadm-flags.env file: %v", err)
+				}
+				data, err := os.ReadFile(filepath.Join(tempDir, constants.KubeletEnvFileName))
+				if err != nil {
+					t.Fatalf("Failed to read kubelet.env file: %v", err)
+				}
+				before = string(data)
 			}
 
-			err = RemoveKubeletArgsFromFile(tempDir, tempDir, tc.unwantedFlags, false, io.Discard)
+			err := RemoveKubeletArgsFromFile(tempDir, tempDir, tc.unwantedFlags, tc.dryRun, io.Discard)
 			if (err != nil) != tc.wantErr {
 				t.Fatalf("expected error: %v, got: %v, error: %v", tc.wantErr, err != nil, err)
+			}
+			if tc.wantErr {
+				return
 			}
 
 			kubeletEnvFilePath := filepath.Join(tempDir, constants.KubeletEnvFileName)
@@ -305,8 +418,12 @@ func TestRemoveKubeletArgsFromFile(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Failed to read kubelet.env file: %v", err)
 			}
-			if gotOut := string(fileContent); gotOut != tc.wantFileContent {
-				t.Fatalf("Actual modified content of RemoveKubeletArgsFromFile() does not match expected.\nActual:  %v\nExpected: %v\n, Diff: %v", gotOut, tc.wantFileContent, diff.Diff(gotOut, tc.wantFileContent))
+			want := tc.wantFileContent
+			if tc.wantUnchanged {
+				want = before
+			}
+			if gotOut := string(fileContent); gotOut != want {
+				t.Fatalf("Actual modified content of RemoveKubeletArgsFromFile() does not match expected.\nActual:  %v\nExpected: %v\n, Diff: %v", gotOut, want, diff.Diff(gotOut, want))
 			}
 		})
 	}
@@ -317,9 +434,61 @@ func TestUnupgradedControlPlaneInstances(t *testing.T) {
 		name          string
 		pods          []corev1.Pod
 		currentNode   string
+		listErr       error
 		expectedNodes []string
 		expectError   bool
 	}{
+		{
+			name:        "cannot list kube-apiserver Pods",
+			pods:        []corev1.Pod{},
+			currentNode: "node-1",
+			listErr:     errors.New("list failed"),
+			expectError: true,
+		},
+		{
+			name: "Pod without a kube-apiserver container",
+			pods: []corev1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "kube-apiserver-1",
+						Namespace: metav1.NamespaceSystem,
+						Labels: map[string]string{
+							"component": constants.KubeAPIServer,
+						},
+					},
+					Spec: corev1.PodSpec{
+						NodeName: "node-1",
+						Containers: []corev1.Container{
+							{Name: "not-kube-apiserver", Image: "registry.kl8s.io/kube-apiserver:v2"},
+						},
+					},
+				},
+			},
+			currentNode: "node-1",
+			expectError: true,
+		},
+		{
+			name: "Pod for the current control plane instance is missing",
+			pods: []corev1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "kube-apiserver-1",
+						Namespace: metav1.NamespaceSystem,
+						Labels: map[string]string{
+							"component": constants.KubeAPIServer,
+						},
+					},
+					Spec: corev1.PodSpec{
+						NodeName: "node-1",
+						Containers: []corev1.Container{
+							{Name: constants.KubeAPIServer, Image: "registry.kl8s.io/kube-apiserver:v2"},
+						},
+					},
+				},
+			},
+			currentNode: "node-2",
+			expectError: true,
+		},
 		{
 			name: "two nodes, one needs upgrade",
 			pods: []corev1.Pod{
@@ -435,6 +604,11 @@ func TestUnupgradedControlPlaneInstances(t *testing.T) {
 				runtimeObjs = append(runtimeObjs, &pod) // Use pointer
 			}
 			client := fake.NewSimpleClientset(runtimeObjs...)
+			if tc.listErr != nil {
+				client.PrependReactor("list", "pods", func(k8stesting.Action) (bool, runtime.Object, error) {
+					return true, nil, tc.listErr
+				})
+			}
 
 			nodes, err := UnupgradedControlPlaneInstances(client, tc.currentNode)
 			if tc.expectError != (err != nil) {
