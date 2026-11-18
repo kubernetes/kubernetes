@@ -679,10 +679,6 @@ enum PodNetwork {
     //   DEL on Linux).
     // - PodSandboxStatus.network MUST NOT report any IP: the field MAY be
     //   omitted, or set with an empty ip and no additional_ips.
-    // - The sandbox resolver configuration (/etc/resolv.conf) MUST be
-    //   generated from PodSandboxConfig.dns_config exactly as given, even
-    //   when it is empty. The runtime MUST NOT fall back to the host's
-    //   configuration.
     // Sandboxes with this value only run on nodes whose runtime reports
     // RuntimeFeatures.pod_network_isolated; a runtime that does not support it
     // never receives it from a kubelet.
