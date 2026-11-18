@@ -680,7 +680,7 @@ func TestDispatchWorkOfCompletedPod(t *testing.T) {
 	kubelet := testKubelet.kubelet
 	var got bool
 	kubelet.podWorkers = &fakePodWorkers{
-		syncPodFn: func(ctx context.Context, updateType kubetypes.SyncPodType, pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus) (bool, func(), error) {
+		syncPodFn: func(ctx context.Context, updateType kubetypes.SyncPodType, pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus, _ int64) (bool, func(), error) {
 			got = true
 			return false, nil, nil
 		},
@@ -764,7 +764,7 @@ func TestDispatchWorkOfActivePod(t *testing.T) {
 	kubelet := testKubelet.kubelet
 	var got bool
 	kubelet.podWorkers = &fakePodWorkers{
-		syncPodFn: func(ctx context.Context, updateType kubetypes.SyncPodType, pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus) (bool, func(), error) {
+		syncPodFn: func(ctx context.Context, updateType kubetypes.SyncPodType, pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus, _ int64) (bool, func(), error) {
 			got = true
 			return false, nil, nil
 		},
@@ -1689,7 +1689,7 @@ func TestCreateMirrorPod(t *testing.T) {
 			pod.Annotations[kubetypes.ConfigSourceAnnotationKey] = "file"
 			pods := []*v1.Pod{pod}
 			kl.podManager.SetPods(pods)
-			isTerminal, _, err := kl.SyncPod(tCtx, tt.updateType, pod, nil, &kubecontainer.PodStatus{})
+			isTerminal, _, err := kl.SyncPod(tCtx, tt.updateType, pod, nil, &kubecontainer.PodStatus{}, 0)
 			assert.NoError(t, err)
 			if isTerminal {
 				t.Fatalf("pod should not be terminal: %#v", pod)
@@ -1726,7 +1726,7 @@ func TestDeleteOutdatedMirrorPod(t *testing.T) {
 
 	pods := []*v1.Pod{pod, mirrorPod}
 	kl.podManager.SetPods(pods)
-	isTerminal, _, err := kl.SyncPod(tCtx, kubetypes.SyncPodUpdate, pod, mirrorPod, &kubecontainer.PodStatus{})
+	isTerminal, _, err := kl.SyncPod(tCtx, kubetypes.SyncPodUpdate, pod, mirrorPod, &kubecontainer.PodStatus{}, 0)
 	assert.NoError(t, err)
 	if isTerminal {
 		t.Fatalf("pod should not be terminal: %#v", pod)
@@ -1824,7 +1824,7 @@ func TestNetworkErrorsWithoutHostNetwork(t *testing.T) {
 	})
 
 	kubelet.podManager.SetPods([]*v1.Pod{pod})
-	isTerminal, _, err := kubelet.SyncPod(tCtx, kubetypes.SyncPodUpdate, pod, nil, &kubecontainer.PodStatus{})
+	isTerminal, _, err := kubelet.SyncPod(tCtx, kubetypes.SyncPodUpdate, pod, nil, &kubecontainer.PodStatus{}, 0)
 	assert.Error(t, err, "expected pod with hostNetwork=false to fail when network in error")
 	if isTerminal {
 		t.Fatalf("pod should not be terminal: %#v", pod)
@@ -1832,7 +1832,7 @@ func TestNetworkErrorsWithoutHostNetwork(t *testing.T) {
 
 	pod.Annotations[kubetypes.ConfigSourceAnnotationKey] = kubetypes.FileSource
 	pod.Spec.HostNetwork = true
-	isTerminal, _, err = kubelet.SyncPod(tCtx, kubetypes.SyncPodUpdate, pod, nil, &kubecontainer.PodStatus{})
+	isTerminal, _, err = kubelet.SyncPod(tCtx, kubetypes.SyncPodUpdate, pod, nil, &kubecontainer.PodStatus{}, 0)
 	assert.NoError(t, err, "expected pod with hostNetwork=true to succeed when network in error")
 	if isTerminal {
 		t.Fatalf("pod should not be terminal: %#v", pod)
@@ -1841,7 +1841,7 @@ func TestNetworkErrorsWithoutHostNetwork(t *testing.T) {
 	// A pod that is not attached to the pod network does not depend on it.
 	pod.Spec.HostNetwork = false
 	pod.Spec.PodNetwork = new(v1.PodNetworkIsolated)
-	isTerminal, _, err = kubelet.SyncPod(tCtx, kubetypes.SyncPodUpdate, pod, nil, &kubecontainer.PodStatus{})
+	isTerminal, _, err = kubelet.SyncPod(tCtx, kubetypes.SyncPodUpdate, pod, nil, &kubecontainer.PodStatus{}, 0)
 	require.NoError(t, err, "expected pod with podNetwork=Isolated to succeed when network in error")
 	if isTerminal {
 		t.Fatalf("pod should not be terminal: %#v", pod)
@@ -3199,7 +3199,7 @@ func TestPodResourceAllocationReset(t *testing.T) {
 	// fakePodWorkers triggers syncPodFn synchronously on update. We overwrite it here to
 	// avoid calling kubelet.SyncPod, which performs resize resource allocation.
 	kubelet.podWorkers.(*fakePodWorkers).syncPodFn =
-		func(_ context.Context, _ kubetypes.SyncPodType, _, _ *v1.Pod, _ *kubecontainer.PodStatus) (bool, func(), error) {
+		func(_ context.Context, _ kubetypes.SyncPodType, _, _ *v1.Pod, _ *kubecontainer.PodStatus, _ int64) (bool, func(), error) {
 			return false, nil, nil
 		}
 
@@ -3775,7 +3775,7 @@ func TestSyncPodCancellationDuringVolumeMount(t *testing.T) {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		isTerminal, _, err = kl.SyncPod(ctx, kubetypes.SyncPodCreate, pod, nil, podStatus)
+		isTerminal, _, err = kl.SyncPod(ctx, kubetypes.SyncPodCreate, pod, nil, podStatus, 0)
 	}()
 
 	select {
@@ -3836,7 +3836,7 @@ func TestSyncPodCancellationDuringContainerSync(t *testing.T) {
 			done := make(chan struct{})
 			go func() {
 				defer close(done)
-				isTerminal, _, err = kl.SyncPod(ctx, kubetypes.SyncPodCreate, pod, nil, podStatus)
+				isTerminal, _, err = kl.SyncPod(ctx, kubetypes.SyncPodCreate, pod, nil, podStatus, 0)
 			}()
 
 			if tc.cancelContext {
@@ -4080,7 +4080,7 @@ func TestPullErrorReportsMissingSecrets(t *testing.T) {
 		},
 		EnableServiceLinks: new(false),
 	})
-	_, _, err = kubelet.SyncPod(tCtx, kubetypes.SyncPodCreate, pod, nil, &kubecontainer.PodStatus{})
+	_, _, err = kubelet.SyncPod(tCtx, kubetypes.SyncPodCreate, pod, nil, &kubecontainer.PodStatus{}, 0)
 	require.ErrorContains(t, err, "ErrImagePull", "Image pull must fail for missing pull secret event to be emitted")
 
 	events := make([]string, 0, 10)
@@ -4159,7 +4159,7 @@ func TestMissingSecretsNotReportedWithoutPullError(t *testing.T) {
 		},
 		EnableServiceLinks: new(false),
 	})
-	_, _, err = kubelet.SyncPod(tCtx, kubetypes.SyncPodCreate, pod, nil, &kubecontainer.PodStatus{})
+	_, _, err = kubelet.SyncPod(tCtx, kubetypes.SyncPodCreate, pod, nil, &kubecontainer.PodStatus{}, 0)
 	if err != nil {
 		require.NotContains(t, err.Error(), "ErrImagePull", "Image pull must not fail to check missing pull secret event is not emitted")
 	}
@@ -4737,7 +4737,7 @@ func TestSyncPodSpans(t *testing.T) {
 		EnableServiceLinks: new(false),
 	})
 
-	_, _, err = kubelet.SyncPod(tCtx, kubetypes.SyncPodCreate, pod, nil, &kubecontainer.PodStatus{})
+	_, _, err = kubelet.SyncPod(tCtx, kubetypes.SyncPodCreate, pod, nil, &kubecontainer.PodStatus{}, 0)
 	require.NoError(t, err)
 
 	assert.NotEmpty(t, exp.GetSpans())
@@ -5083,6 +5083,10 @@ func TestSyncPodWithErrorsDuringInPlacePodResize(t *testing.T) {
 	})
 	pod.Generation = 2
 	kubelet.podManager.SetPods([]*v1.Pod{pod})
+	// The resize in progress was allocated at generation 1.
+	allocatedPod := pod.DeepCopy()
+	allocatedPod.Generation = 1
+	require.NoError(t, kubelet.allocationManager.SetAllocatedPod(tCtx.Logger(), allocatedPod))
 	kubelet.statusManager.SetPodResizeInProgressCondition(pod.UID, "", "", 1)
 
 	testCases := []struct {
@@ -5163,7 +5167,7 @@ func TestSyncPodWithErrorsDuringInPlacePodResize(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			testKubelet.fakeRuntime.SyncResults = tc.syncResults
 			testKubelet.fakeRuntime.PodResizeInProgress = tc.podResizeInProgress
-			isTerminal, _, err := kubelet.SyncPod(tCtx, kubetypes.SyncPodUpdate, pod, nil, &kubecontainer.PodStatus{})
+			isTerminal, _, err := kubelet.SyncPod(tCtx, kubetypes.SyncPodUpdate, pod, nil, &kubecontainer.PodStatus{}, 1)
 			require.False(t, isTerminal)
 			if tc.expectedErr == "" {
 				require.NoError(t, err)
@@ -5194,6 +5198,148 @@ func TestSyncPodWithErrorsDuringInPlacePodResize(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestSyncPodResizeInProgressCondition checks how SyncPod updates the PodResizeInProgress condition
+// that the allocation manager sets when it allocates a resize, depending on the allocation the sync
+// actuates.
+func TestSyncPodResizeInProgressCondition(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+	kubelet := testKubelet.kubelet
+	fakeRecorder := record.NewFakeRecorder(20)
+	kubelet.recorder = fakeRecorder
+
+	pod := podWithUIDNameNsSpec("12345678", "foo", "new", v1.PodSpec{
+		Containers: []v1.Container{{Name: "bar"}},
+	})
+	kubelet.podManager.SetPods([]*v1.Pod{pod})
+	// allocate records an allocation at the given generation, and starts its resize as the
+	// allocation manager does.
+	allocate := func(generation int64) {
+		t.Helper()
+		pod.Generation = generation
+		require.NoError(t, kubelet.allocationManager.SetAllocatedPod(tCtx.Logger(), pod))
+		kubelet.statusManager.SetPodResizeInProgressCondition(pod.UID, "", "", generation)
+	}
+	syncPod := func(allocatedGeneration int64, resizeInProgress bool, syncResults *kubecontainer.PodSyncResult) {
+		t.Helper()
+		testKubelet.fakeRuntime.PodResizeInProgress = resizeInProgress
+		testKubelet.fakeRuntime.SyncResults = syncResults
+		_, _, _ = kubelet.SyncPod(tCtx, kubetypes.SyncPodUpdate, pod, nil, &kubecontainer.PodStatus{}, allocatedGeneration)
+	}
+	expectCondition := func(expected *v1.PodCondition) {
+		t.Helper()
+		conditions := kubelet.statusManager.GetPodResizeConditions(pod.UID)
+		if expected == nil {
+			assert.Empty(t, conditions)
+			return
+		}
+		require.Len(t, conditions, 1)
+		conditions[0].LastProbeTime = metav1.Time{}
+		conditions[0].LastTransitionTime = metav1.Time{}
+		assert.Equal(t, expected, conditions[0])
+	}
+	expectEvents := func(expected ...string) {
+		t.Helper()
+		var events []string
+		for len(fakeRecorder.Events) > 0 {
+			if event := <-fakeRecorder.Events; strings.Contains(event, "Resize") {
+				events = append(events, event)
+			}
+		}
+		assert.Equal(t, expected, events)
+	}
+	inProgress := func(generation int64, reason, message string) *v1.PodCondition {
+		return &v1.PodCondition{Type: v1.PodResizeInProgress, Status: v1.ConditionTrue, ObservedGeneration: generation, Reason: reason, Message: message}
+	}
+	resizeError := &kubecontainer.PodSyncResult{SyncResults: []*kubecontainer.SyncResult{{
+		Action:  kubecontainer.ResizePodInPlace,
+		Target:  pod.UID,
+		Error:   kubecontainer.ErrResizePodInPlace,
+		Message: "could not resize pod",
+	}}}
+	completed := func(generation int64) string {
+		return fmt.Sprintf(`Normal ResizeCompleted Pod resize completed: {"containers":[{"name":"bar","resources":{}}],"generation":%d}`, generation)
+	}
+
+	// A resize that the runtime doesn't need to actuate, e.g. of a container that isn't running,
+	// completes with the sync of its allocation.
+	allocate(1)
+	syncPod(1, false, nil)
+	expectCondition(nil)
+	expectEvents(completed(1))
+
+	// A sync of an allocation that a newer one superseded neither completes the newer resize nor
+	// records errors for it.
+	allocate(2)
+	syncPod(1, false, nil)
+	expectCondition(inProgress(2, "", ""))
+	syncPod(1, true, resizeError)
+	expectCondition(inProgress(2, "", ""))
+	expectEvents()
+
+	// The sync of the current allocation records its errors, and keeps them while in progress.
+	syncPod(2, true, resizeError)
+	expectCondition(inProgress(2, v1.PodReasonError, "could not resize pod"))
+	expectEvents(`Warning ResizeError Pod resize error: {"containers":[{"name":"bar","resources":{}}],"generation":2,"error":"could not resize pod"}`)
+	syncPod(2, true, nil)
+	expectCondition(inProgress(2, v1.PodReasonError, "could not resize pod"))
+	expectEvents()
+
+	// A new allocation resets the error, and completes with the sync of its allocation.
+	allocate(3)
+	syncPod(3, true, nil)
+	expectCondition(inProgress(3, "", ""))
+	syncPod(3, false, nil)
+	expectCondition(nil)
+	expectEvents(completed(3))
+
+	// A resize in progress without a condition, e.g. after a restart, is started by the sync.
+	syncPod(3, true, nil)
+	expectCondition(inProgress(3, "", ""))
+	expectEvents(`Normal ResizeStarted Pod resize started: {"containers":[{"name":"bar","resources":{}}],"generation":3}`)
+
+	// If the allocated generation is unknown, e.g. recorded by an older kubelet, the generation of
+	// the resize in progress is kept, and the sync can complete it.
+	unknownGeneration := pod.DeepCopy()
+	unknownGeneration.Generation = 0
+	require.NoError(t, kubelet.allocationManager.SetAllocatedPod(tCtx.Logger(), unknownGeneration))
+	pod.Generation = 4
+	syncPod(0, true, nil)
+	expectCondition(inProgress(3, "", ""))
+	syncPod(0, false, nil)
+	expectCondition(nil)
+	expectEvents(completed(0))
+}
+
+// TestHandlePodAdditionsBackfillsResizeConditionsBeforeSync checks that the resize conditions of
+// pods added (e.g. on a kubelet restart) are restored before their first sync.
+func TestHandlePodAdditionsBackfillsResizeConditionsBeforeSync(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+	kl := testKubelet.kubelet
+	kl.nodeLister = testNodeLister{nodes: []*v1.Node{{
+		ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
+		Status:     v1.NodeStatus{Allocatable: v1.ResourceList{v1.ResourcePods: *resource.NewQuantity(110, resource.DecimalSI)}},
+	}}}
+
+	pod := podWithUIDNameNsSpec("12345678", "foo", "new", v1.PodSpec{Containers: []v1.Container{{Name: "bar"}}})
+	pod.Status.Conditions = []v1.PodCondition{{Type: v1.PodResizeInProgress, Status: v1.ConditionTrue, ObservedGeneration: 1}}
+	var synced []*v1.PodCondition
+	syncCalled := false
+	kl.podWorkers.(*fakePodWorkers).syncPodFn = func(_ context.Context, _ kubetypes.SyncPodType, pod, _ *v1.Pod, _ *kubecontainer.PodStatus, _ int64) (bool, func(), error) {
+		syncCalled = true
+		synced = kl.statusManager.GetPodResizeConditions(pod.UID)
+		return false, nil, nil
+	}
+	kl.HandlePodAdditions(tCtx, []*v1.Pod{pod})
+	require.True(t, syncCalled)
+	require.Len(t, synced, 1, "the resize condition should be backfilled before the sync")
+	assert.Equal(t, v1.PodResizeInProgress, synced[0].Type)
+	assert.Equal(t, int64(1), synced[0].ObservedGeneration)
 }
 
 func TestHandlePodUpdates_RecordContainerRequestedResizes(t *testing.T) {
@@ -6914,7 +7060,7 @@ func TestHandlePodUpdatesDynamicContainers(t *testing.T) {
 					},
 				},
 			}}}
-			kl.podWorkers.(*fakePodWorkers).syncPodFn = func(context.Context, kubetypes.SyncPodType, *v1.Pod, *v1.Pod, *kubecontainer.PodStatus) (bool, func(), error) {
+			kl.podWorkers.(*fakePodWorkers).syncPodFn = func(context.Context, kubetypes.SyncPodType, *v1.Pod, *v1.Pod, *kubecontainer.PodStatus, int64) (bool, func(), error) {
 				return false, nil, nil
 			}
 
@@ -7038,12 +7184,12 @@ func TestSyncPodRestartAllContainersRequeue(t *testing.T) {
 
 	callCount := 0
 	kubelet.podWorkers = &fakePodWorkers{
-		syncPodFn: func(ctx context.Context, updateType kubetypes.SyncPodType, pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus) (bool, func(), error) {
+		syncPodFn: func(ctx context.Context, updateType kubetypes.SyncPodType, pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus, _ int64) (bool, func(), error) {
 			callCount++
 			// The requeued sync removes nothing, since all containers were removed already.
 			// Any successful removal requeues the pod, so this ensures no infinite loop.
 			testKubelet.fakeRuntime.SyncResults = &kubecontainer.PodSyncResult{}
-			return kubelet.SyncPod(ctx, updateType, pod, mirrorPod, podStatus)
+			return kubelet.SyncPod(ctx, updateType, pod, mirrorPod, podStatus, 0)
 		},
 		cache: kubelet.podCache,
 		t:     t,
@@ -7057,7 +7203,7 @@ func TestSyncPodRestartAllContainersRequeue(t *testing.T) {
 		},
 	}
 
-	isTerminal, _, err := kubelet.SyncPod(tCtx, kubetypes.SyncPodUpdate, pod, nil, podStatus)
+	isTerminal, _, err := kubelet.SyncPod(tCtx, kubetypes.SyncPodUpdate, pod, nil, podStatus, 0)
 	require.False(t, isTerminal)
 	require.NoError(t, err)
 
@@ -7097,18 +7243,18 @@ func TestSyncPodPrunedContainersRequeue(t *testing.T) {
 
 			requeued := 0
 			kubelet.podWorkers = &fakePodWorkers{
-				syncPodFn: func(ctx context.Context, updateType kubetypes.SyncPodType, pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus) (bool, func(), error) {
+				syncPodFn: func(ctx context.Context, updateType kubetypes.SyncPodType, pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus, _ int64) (bool, func(), error) {
 					requeued++
 					// Nothing is left to prune in the requeued sync.
 					testKubelet.fakeRuntime.SyncResults = &kubecontainer.PodSyncResult{}
-					return kubelet.SyncPod(ctx, updateType, pod, mirrorPod, podStatus)
+					return kubelet.SyncPod(ctx, updateType, pod, mirrorPod, podStatus, 0)
 				},
 				cache: kubelet.podCache,
 				t:     t,
 			}
 
 			podStatus := &kubecontainer.PodStatus{ContainerStatuses: []*kubecontainer.Status{{Name: "bar"}}}
-			_, _, err := kubelet.SyncPod(tCtx, kubetypes.SyncPodUpdate, pod, nil, podStatus)
+			_, _, err := kubelet.SyncPod(tCtx, kubetypes.SyncPodUpdate, pod, nil, podStatus, 0)
 			if tc.removeErr != nil {
 				require.Error(t, err)
 				assert.Equal(t, 0, requeued, "a failed removal is retried with backoff instead")
@@ -7231,7 +7377,7 @@ func TestHandlePodUpdates_ResizeTerminatingPods(t *testing.T) {
 			}},
 		}}}
 		// Keep UpdatePod from running SyncPod, which would clear PodResizeInProgress.
-		kl.podWorkers.(*fakePodWorkers).syncPodFn = func(context.Context, kubetypes.SyncPodType, *v1.Pod, *v1.Pod, *kubecontainer.PodStatus) (bool, func(), error) {
+		kl.podWorkers.(*fakePodWorkers).syncPodFn = func(context.Context, kubetypes.SyncPodType, *v1.Pod, *v1.Pod, *kubecontainer.PodStatus, int64) (bool, func(), error) {
 			return false, nil, nil
 		}
 
@@ -7505,7 +7651,7 @@ func TestSyncPodSecurityProfileOCI(t *testing.T) {
 			if podStatus == nil {
 				podStatus = &kubecontainer.PodStatus{}
 			}
-			isTerminal, _, err := kubelet.SyncPod(tCtx, kubetypes.SyncPodCreate, pod, nil, podStatus)
+			isTerminal, _, err := kubelet.SyncPod(tCtx, kubetypes.SyncPodCreate, pod, nil, podStatus, 0)
 			assert.Equal(t, tc.expectedTerminal, isTerminal)
 			assert.Equal(t, tc.expectedErr, err != nil, "error: %v", err)
 			assert.Equal(t, tc.expectedEnsure, slices.Contains(fakeRuntime.CalledFunctions, "EnsureSecurityProfiles"))
@@ -7527,7 +7673,7 @@ func TestSyncPodSecurityProfileOCIDisabled(t *testing.T) {
 	defer testKubelet.Cleanup()
 	pod := podWithUIDNameNsSpec("12345678", "oci", "new", v1.PodSpec{Containers: []v1.Container{{Name: "foo"}}})
 	testKubelet.kubelet.podManager.SetPods([]*v1.Pod{pod})
-	_, _, err := testKubelet.kubelet.SyncPod(tCtx, kubetypes.SyncPodCreate, pod, nil, &kubecontainer.PodStatus{})
+	_, _, err := testKubelet.kubelet.SyncPod(tCtx, kubetypes.SyncPodCreate, pod, nil, &kubecontainer.PodStatus{}, 0)
 	require.NoError(t, err)
 	assert.NotContains(t, testKubelet.fakeRuntime.CalledFunctions, "EnsureSecurityProfiles")
 }

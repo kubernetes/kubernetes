@@ -1943,7 +1943,7 @@ func (kl *Kubelet) determinePodResizeStatus(allocatedPod *v1.Pod, podState PodWo
 	switch podState {
 	case TerminatedPod:
 		// If pod is terminal, clear the resize status.
-		kl.statusManager.ClearPodResizeInProgressCondition(allocatedPod.UID)
+		kl.statusManager.ClearPodResizeInProgressCondition(allocatedPod.UID, 0)
 		kl.statusManager.ClearPodResizePendingCondition(allocatedPod.UID, metrics.DeferredResizeResolutionTerminated)
 		return nil
 	case TerminatingPod:

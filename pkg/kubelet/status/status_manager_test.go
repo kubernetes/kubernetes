@@ -660,6 +660,18 @@ func TestIsPodStatusByKubeletEqualFutureProof(t *testing.T) {
 			t.Error("Conditions: change should be detected but was ignored")
 		}
 
+		// Test a condition's ObservedGeneration, e.g. of PodResizeInProgress for a new resize.
+		base.Conditions = append(base.Conditions, v1.PodCondition{
+			Type:               v1.PodResizeInProgress,
+			Status:             v1.ConditionTrue,
+			ObservedGeneration: 1,
+		})
+		modified = base.DeepCopy()
+		modified.Conditions[len(modified.Conditions)-1].ObservedGeneration = 2
+		if isPodStatusByKubeletEqual(base, modified) {
+			t.Error("Conditions: a change of observedGeneration should be detected but was ignored")
+		}
+
 		// Test Message
 		modified = base.DeepCopy()
 		modified.Message = "test message"
@@ -2964,6 +2976,98 @@ func TestContainerTerminationMetric(t *testing.T) {
 	assert.InDelta(t, 1.0, count, 0)
 }
 
+// TestSetPodResizeInProgressCondition checks when setting the PodResizeInProgress condition starts
+// a new resize, and what it keeps of the previous condition.
+func TestSetPodResizeInProgressCondition(t *testing.T) {
+	m := NewManager(&fake.Clientset{}, kubepod.NewBasicPodManager(), &statustest.FakePodDeletionSafetyProvider{}, util.NewPodStartupLatencyTracker()).(*manager)
+	podUID := types.UID("12345")
+	condition := func() v1.PodCondition {
+		t.Helper()
+		c := m.podResizeConditions[podUID].PodResizeInProgress
+		require.NotNil(t, c)
+		return *c
+	}
+	past := metav1.NewTime(time.Now().Add(-time.Hour))
+	backdate := func() {
+		m.podResizeConditions[podUID].PodResizeInProgress.LastTransitionTime = past
+	}
+
+	updated, started := m.SetPodResizeInProgressCondition(podUID, "", "", 1)
+	assert.True(t, updated, "created")
+	assert.True(t, started, "a new condition starts a resize")
+
+	backdate()
+	updated, started = m.SetPodResizeInProgressCondition(podUID, "", "", 1)
+	assert.False(t, updated, "unchanged")
+	assert.False(t, started, "same generation")
+	assert.Equal(t, past, condition().LastTransitionTime, "the same resize keeps the transition time")
+
+	updated, started = m.SetPodResizeInProgressCondition(podUID, v1.PodReasonError, "failed", 1)
+	assert.True(t, updated, "error set")
+	assert.False(t, started, "same generation")
+
+	updated, started = m.SetPodResizeInProgressCondition(podUID, "", "", 1)
+	assert.False(t, updated, "the error of the same resize is kept")
+	assert.False(t, started)
+	assert.Equal(t, v1.PodReasonError, condition().Reason)
+	assert.Equal(t, "failed", condition().Message)
+
+	backdate()
+	updated, started = m.SetPodResizeInProgressCondition(podUID, "", "", 2)
+	assert.True(t, updated, "new generation")
+	assert.True(t, started, "a new generation starts a resize")
+	assert.Empty(t, condition().Reason, "a new resize resets the error")
+	assert.Empty(t, condition().Message)
+	assert.Equal(t, int64(2), condition().ObservedGeneration)
+
+	updated, started = m.SetPodResizeInProgressCondition(podUID, v1.PodReasonError, "failed again", 3)
+	assert.True(t, updated)
+	assert.True(t, started, "an error for a new generation starts a resize too")
+	assert.Equal(t, v1.PodReasonError, condition().Reason)
+	assert.Equal(t, int64(3), condition().ObservedGeneration)
+
+	updated, started = m.SetPodResizeInProgressCondition(podUID, "", "", 4)
+	assert.True(t, updated)
+	assert.True(t, started)
+	backdate()
+	updated, started = m.SetPodResizeInProgressCondition(podUID, v1.PodReasonError, "stale", 3)
+	assert.False(t, updated, "an update for an older generation is ignored")
+	assert.False(t, started)
+	assert.Empty(t, condition().Reason)
+	assert.Equal(t, int64(4), condition().ObservedGeneration)
+
+	updated, started = m.SetPodResizeInProgressCondition(podUID, "", "", 0)
+	assert.False(t, updated, "an update for an unknown generation applies to the resize in progress")
+	assert.False(t, started, "an unknown generation doesn't start a resize")
+	assert.Equal(t, past, condition().LastTransitionTime)
+	assert.Equal(t, int64(4), condition().ObservedGeneration)
+
+	updated, started = m.SetPodResizeInProgressCondition(podUID, v1.PodReasonError, "unknown", 0)
+	assert.True(t, updated, "an update for an unknown generation applies to the resize in progress")
+	assert.False(t, started, "an unknown generation doesn't start a resize")
+	assert.Equal(t, "unknown", condition().Message)
+	assert.Equal(t, int64(4), condition().ObservedGeneration)
+
+	_, cleared := m.ClearPodResizeInProgressCondition(podUID, 3)
+	assert.False(t, cleared, "a clear for an older generation is ignored")
+	generation, cleared := m.ClearPodResizeInProgressCondition(podUID, 0)
+	assert.True(t, cleared, "a clear for an unknown generation clears the condition")
+	assert.Equal(t, int64(4), generation)
+
+	updated, started = m.SetPodResizeInProgressCondition(podUID, "", "", 0)
+	assert.True(t, updated, "created")
+	assert.True(t, started)
+	assert.Equal(t, int64(0), condition().ObservedGeneration)
+
+	backdate()
+	updated, started = m.SetPodResizeInProgressCondition(podUID, "", "", 5)
+	assert.True(t, updated)
+	assert.True(t, started)
+	assert.True(t, condition().LastTransitionTime.After(past.Time), "a new resize resets the transition time")
+	_, cleared = m.ClearPodResizeInProgressCondition(podUID, 6)
+	assert.True(t, cleared, "a clear for a newer generation clears the condition")
+}
+
 func TestPodResizeConditions(t *testing.T) {
 	m := NewManager(&fake.Clientset{}, kubepod.NewBasicPodManager(), &statustest.FakePodDeletionSafetyProvider{}, util.NewPodStartupLatencyTracker())
 	podUID := types.UID("12345")
@@ -2984,7 +3088,7 @@ func TestPodResizeConditions(t *testing.T) {
 		{
 			name: "set pod resize in progress condition with reason and message",
 			updateFunc: func(podUID types.UID) bool {
-				_, b := m.SetPodResizeInProgressCondition(podUID, "some-reason", "some-message", 1)
+				b, _ := m.SetPodResizeInProgressCondition(podUID, "some-reason", "some-message", 1)
 				return b
 			},
 			expectedUpdateFuncReturnVal: true,
@@ -3001,7 +3105,7 @@ func TestPodResizeConditions(t *testing.T) {
 		{
 			name: "set pod resize in progress condition without reason and message",
 			updateFunc: func(podUID types.UID) bool {
-				_, b := m.SetPodResizeInProgressCondition(podUID, "", "", 1)
+				b, _ := m.SetPodResizeInProgressCondition(podUID, "", "", 1)
 				return b
 			},
 			expectedUpdateFuncReturnVal: false,
@@ -3016,28 +3120,26 @@ func TestPodResizeConditions(t *testing.T) {
 			},
 		},
 		{
-			name: "attempt to overwrite pod resize in progress condition with a new observedGeneration",
+			name: "set pod resize in progress condition with a new observedGeneration resets reason and message",
 			updateFunc: func(podUID types.UID) bool {
-				_, b := m.SetPodResizeInProgressCondition(podUID, "", "", 2)
+				b, _ := m.SetPodResizeInProgressCondition(podUID, "", "", 2)
 				return b
 			},
-			expectedUpdateFuncReturnVal: false,
+			expectedUpdateFuncReturnVal: true,
 			expected: []*v1.PodCondition{
 				{
 					Type:               v1.PodResizeInProgress,
 					Status:             v1.ConditionTrue,
-					Reason:             "some-reason",
-					Message:            "some-message",
-					ObservedGeneration: 1,
+					ObservedGeneration: 2,
 				},
 			},
 		},
 		{
 			name: "clear the pod resize in progress condition and set a new one",
 			updateFunc: func(podUID types.UID) bool {
-				m.ClearPodResizeInProgressCondition(podUID)
+				m.ClearPodResizeInProgressCondition(podUID, 0)
 				// Set a new condition with a different observedGeneration
-				_, b := m.SetPodResizeInProgressCondition(podUID, "", "", 2)
+				b, _ := m.SetPodResizeInProgressCondition(podUID, "", "", 2)
 				return b
 			},
 			expectedUpdateFuncReturnVal: true,
@@ -3118,7 +3220,7 @@ func TestPodResizeConditions(t *testing.T) {
 		{
 			name: "clear pod resize in progress condition",
 			updateFunc: func(podUID types.UID) bool {
-				_, b := m.ClearPodResizeInProgressCondition(podUID)
+				_, b := m.ClearPodResizeInProgressCondition(podUID, 0)
 				return b
 			},
 			expectedUpdateFuncReturnVal: true,
@@ -3198,7 +3300,7 @@ func TestClearPodResizeInProgressCondition(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			m.(*manager).podResizeConditions[podUID] = tc.existingConditions
-			gen, b := m.ClearPodResizeInProgressCondition(podUID)
+			gen, b := m.ClearPodResizeInProgressCondition(podUID, 0)
 			assert.Equal(t, tc.expectedGeneration, gen)
 			assert.Equal(t, tc.expectedBool, b)
 			resizeConditions := m.GetPodResizeConditions(podUID)

@@ -191,19 +191,24 @@ type Manager interface {
 	SetPodResizePendingCondition(podUID types.UID, reason, message string, observedGeneration int64) bool
 
 	// SetPodResizeInProgressCondition caches the last PodResizeInProgress condition for the pod.
-	// This function does not update observedGeneration if the condition already exists, nor does
-	// it allow the reason or message to be cleared.
-	// It returns true if the condition is modified as a result of this call, and it returns
-	// the observedGeneration of the condition.
-	SetPodResizeInProgressCondition(podUID types.UID, reason, message string, observedGeneration int64) (int64, bool)
+	// The observedGeneration is the generation of the resize in progress. A newer generation starts
+	// a new resize, which resets the reason and message to the given ones. Otherwise an empty
+	// reason and message keep those of the condition (e.g. an error). A call for an older
+	// generation than the condition's is ignored. A generation of 0 is unknown, and keeps the
+	// generation of the condition.
+	// It returns whether the condition is modified as a result of this call, and whether this call
+	// started a new resize: the condition didn't exist, or had an older observedGeneration.
+	SetPodResizeInProgressCondition(podUID types.UID, reason, message string, observedGeneration int64) (updated, started bool)
 
 	// ClearPodResizePendingCondition clears the PodResizePending condition for the pod from the cache.
 	ClearPodResizePendingCondition(podUID types.UID, resolution metrics.DeferredResizeResolution)
 
-	// ClearPodResizeInProgressCondition clears the PodResizeInProgress condition for the pod from the cache.
+	// ClearPodResizeInProgressCondition clears the PodResizeInProgress condition for the pod from the cache,
+	// unless it is for a newer generation than observedGeneration. A generation of 0 is unknown, and
+	// clears any condition.
 	// If the condition was cleared, it returns the observedGeneration of the cleared condition and true.
 	// Otherwise it returns zero and false.
-	ClearPodResizeInProgressCondition(podUID types.UID) (int64, bool)
+	ClearPodResizeInProgressCondition(podUID types.UID, observedGeneration int64) (int64, bool)
 
 	// IsPodResizeDeferred returns true if the pod resize is currently deferred.
 	IsPodResizeDeferred(podUID types.UID) bool
@@ -266,7 +271,8 @@ func isPodStatusByKubeletEqual(oldStatus, status *v1.PodStatus) bool {
 	}
 	for _, newCondition := range newConditions {
 		oldCondition := oldConditions[newCondition.Type]
-		if oldCondition == nil || oldCondition.Status != newCondition.Status || oldCondition.Message != newCondition.Message || oldCondition.Reason != newCondition.Reason {
+		if oldCondition == nil || oldCondition.Status != newCondition.Status || oldCondition.Message != newCondition.Message || oldCondition.Reason != newCondition.Reason ||
+			oldCondition.ObservedGeneration != newCondition.ObservedGeneration {
 			return false
 		}
 	}
@@ -352,28 +358,39 @@ func (m *manager) SetPodResizePendingCondition(podUID types.UID, reason, message
 	}
 }
 
-// This function does not update observedGeneration if the condition already exists, nor does
-// it allow the reason or message to be cleared.
-// It returns true if the condition is modified as a result of this call, and it returns
-// the observedGeneration of the condition.
-func (m *manager) SetPodResizeInProgressCondition(podUID types.UID, reason, message string, observedGeneration int64) (int64, bool) {
+// SetPodResizeInProgressCondition caches the last PodResizeInProgress condition for the pod.
+// The observedGeneration is the generation of the resize in progress. A newer generation starts
+// a new resize, which resets the reason and message to the given ones. Otherwise an empty
+// reason and message keep those of the condition (e.g. an error). A call for an older
+// generation than the condition's is ignored. A generation of 0 is unknown, and keeps the
+// generation of the condition.
+// It returns whether the condition is modified as a result of this call, and whether this call
+// started a new resize: the condition didn't exist, or had an older observedGeneration.
+func (m *manager) SetPodResizeInProgressCondition(podUID types.UID, reason, message string, observedGeneration int64) (updated, started bool) {
 	m.podStatusesLock.Lock()
 	defer m.podStatusesLock.Unlock()
 
 	previousCondition := m.podResizeConditions[podUID].PodResizeInProgress
-	if c := m.podResizeConditions[podUID].PodResizeInProgress; c != nil {
-		// Preserve the old reason, message if they exist.
-		if reason == "" && message == "" {
-			reason = c.Reason
-			message = c.Message
+	if previousCondition != nil {
+		if observedGeneration == 0 {
+			observedGeneration = previousCondition.ObservedGeneration
+		} else if observedGeneration < previousCondition.ObservedGeneration {
+			// A newer resize has started since, e.g. while a sync actuated an older one.
+			return false, false
 		}
-		// The observedGeneration is always preserved. To update it, the caller must
-		// clear the existing condition first.
-		observedGeneration = c.ObservedGeneration
+	}
+	started = previousCondition == nil || previousCondition.ObservedGeneration != observedGeneration
+	oldCondition := previousCondition
+	if started {
+		// A new resize starts a new transition.
+		oldCondition = nil
+	} else if reason == "" && message == "" {
+		reason = previousCondition.Reason
+		message = previousCondition.Message
 	}
 
 	m.podResizeConditions[podUID] = podResizeConditions{
-		PodResizeInProgress: updatedPodResizeCondition(v1.PodResizeInProgress, m.podResizeConditions[podUID].PodResizeInProgress, reason, message, observedGeneration),
+		PodResizeInProgress: updatedPodResizeCondition(v1.PodResizeInProgress, oldCondition, reason, message, observedGeneration),
 		PodResizePending:    m.podResizeConditions[podUID].PodResizePending,
 		clearSchedEvalCond:  m.podResizeConditions[podUID].clearSchedEvalCond,
 	}
@@ -386,7 +403,7 @@ func (m *manager) SetPodResizeInProgressCondition(podUID types.UID, reason, mess
 		previousCondition.LastTransitionTime = m.podResizeConditions[podUID].PodResizeInProgress.LastTransitionTime
 	}
 
-	return observedGeneration, !reflect.DeepEqual(previousCondition, m.podResizeConditions[podUID].PodResizeInProgress)
+	return !reflect.DeepEqual(previousCondition, m.podResizeConditions[podUID].PodResizeInProgress), started
 }
 
 func (m *manager) observeDeferredResizeDuration(podUID types.UID, cond *v1.PodCondition, resolution metrics.DeferredResizeResolution) {
@@ -422,14 +439,21 @@ func (m *manager) ClearPodResizePendingCondition(podUID types.UID, resolution me
 	m.observePendingResizeCount()
 }
 
-// ClearPodResizeInProgressCondition clears the PodResizeInProgress condition for the pod from the cache.
+// ClearPodResizeInProgressCondition clears the PodResizeInProgress condition for the pod from the cache,
+// unless it is for a newer generation than observedGeneration. A generation of 0 is unknown, and
+// clears any condition.
 // If the condition was cleared, it returns the observedGeneration of the cleared condition and true.
 // Otherwise it returns zero and false.
-func (m *manager) ClearPodResizeInProgressCondition(podUID types.UID) (int64, bool) {
+func (m *manager) ClearPodResizeInProgressCondition(podUID types.UID, observedGeneration int64) (int64, bool) {
 	m.podStatusesLock.Lock()
 	defer m.podStatusesLock.Unlock()
 
-	if m.podResizeConditions[podUID].PodResizeInProgress == nil {
+	condition := m.podResizeConditions[podUID].PodResizeInProgress
+	if condition == nil {
+		return 0, false
+	}
+	if observedGeneration != 0 && observedGeneration < condition.ObservedGeneration {
+		// A newer resize has started since, e.g. while a sync actuated an older one.
 		return 0, false
 	}
 
