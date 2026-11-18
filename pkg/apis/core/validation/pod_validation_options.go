@@ -89,6 +89,8 @@ type PodValidationOptions struct {
 	AllowSecurityProfileOCI bool
 	// Allow podCertificate volumes to specify ML-DSA algorithms in the keyType field
 	AllowMLDSAPodCertificateKeyTypes bool
+	// Allow FQDN with trailing dot in HostAliases.
+	AllowHostAliasesFQDN bool
 }
 
 func hasIndivisibleHugePagesValue(list core.ResourceList) bool {
@@ -211,6 +213,7 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *core.PodSpec, p
 		AllowExistingRestartContainerForNonSidecarInitContainer: hasRestartContainerForNonSidecarInitContainer(oldPodSpec),
 		AllowSysAdminWhenPrivilegeEscalationFalse:               false,
 		AllowMLDSAPodCertificateKeyTypes:                        utilfeature.DefaultFeatureGate.Enabled(features.PodCertificateMLDSA),
+		AllowHostAliasesFQDN:                                    utilfeature.DefaultFeatureGate.Enabled(features.HostAliasesAllowFQDN),
 		AllowSecurityProfileOCI:                                 utilfeature.DefaultFeatureGate.Enabled(features.SecurityProfileOCI),
 	}
 
