@@ -3492,7 +3492,7 @@ func TestSyncTerminatingPodKillPod(t *testing.T) {
 	kl.podManager.SetPods(pods)
 	podStatus := &kubecontainer.PodStatus{ID: pod.UID}
 	gracePeriodOverride := int64(0)
-	err := kl.SyncTerminatingPod(tCtx, pod, podStatus, &gracePeriodOverride, func(podStatus *v1.PodStatus) {
+	_, err := kl.SyncTerminatingPod(tCtx, pod, podStatus, &gracePeriodOverride, time.Time{}, func(podStatus *v1.PodStatus) {
 		podStatus.Phase = v1.PodFailed
 		podStatus.Reason = "reason"
 		podStatus.Message = "message"
@@ -3553,7 +3553,7 @@ func TestSyncTerminatingPodKeepsFailedStatusAfterCleanExit(t *testing.T) {
 	gracePeriodOverride := int64(0)
 	const message = "Pod ephemeral local storage usage exceeds the total limit of containers 1Gi."
 	applied := 0
-	err := kl.SyncTerminatingPod(tCtx, pod, running, &gracePeriodOverride, func(podStatus *v1.PodStatus) {
+	_, err := kl.SyncTerminatingPod(tCtx, pod, running, &gracePeriodOverride, time.Time{}, func(podStatus *v1.PodStatus) {
 		applied++
 		podStatus.Phase = v1.PodFailed
 		podStatus.Reason = "Evicted"
@@ -3625,7 +3625,7 @@ func TestSyncTerminatingPodShutdownCallbackAfterCleanExit(t *testing.T) {
 	}
 	gracePeriodOverride := int64(0)
 	const message = "Pod was terminated in response to imminent node shutdown."
-	err := kl.SyncTerminatingPod(tCtx, pod, running, &gracePeriodOverride, func(podStatus *v1.PodStatus) {
+	_, err := kl.SyncTerminatingPod(tCtx, pod, running, &gracePeriodOverride, time.Time{}, func(podStatus *v1.PodStatus) {
 		if podStatus.Phase != v1.PodSucceeded {
 			podStatus.Phase = v1.PodFailed
 		}
@@ -3897,12 +3897,13 @@ func TestSyncTerminatingPodCancellation(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(tCtx)
 	defer cancel()
+	var complete bool
 	var err error
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
 		gracePeriod := int64(30)
-		err = kl.SyncTerminatingPod(ctx, pod, podStatus, &gracePeriod, nil)
+		complete, err = kl.SyncTerminatingPod(ctx, pod, podStatus, &gracePeriod, time.Time{}, nil)
 	}()
 
 	select {
@@ -3916,6 +3917,7 @@ func TestSyncTerminatingPodCancellation(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("SyncTerminatingPod did not return after its context was cancelled")
 	}
+	require.False(t, complete)
 	require.True(t, wait.Interrupted(err), "expected an interruption error, got %v", err)
 	select {
 	case event := <-recorder.Events:

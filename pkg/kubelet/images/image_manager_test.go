@@ -1661,3 +1661,217 @@ func ensureExistsMetricForLabels(pullPolicy, imagePresentLocally, pullRequired s
 		pullRequired,
 	)
 }
+
+// stalledImageService models a runtime which does not finish an image pull when
+// its caller cancels, so unrelated pulls must not depend on it for cancellation.
+type stalledImageService struct {
+	kubecontainer.ImageService
+	started chan string
+	release chan struct{}
+}
+
+func (s *stalledImageService) PullImage(_ context.Context, spec kubecontainer.ImageSpec, _ []credentialprovider.TrackedAuthConfig, _ *runtimeapi.PodSandboxConfig) (string, *credentialprovider.TrackedAuthConfig, error) {
+	s.started <- spec.Image
+	if spec.Image == "blocked:latest" {
+		<-s.release
+	}
+	return spec.Image, nil, nil
+}
+
+func TestEnsureImageExistsCancellation(t *testing.T) {
+	for _, serialized := range []bool{true, false} {
+		for _, cancelQueued := range []bool{true, false} {
+			t.Run(fmt.Sprintf("serialized=%t/cancelQueued=%t", serialized, cancelQueued), func(t *testing.T) {
+				manager, _, runtime, _, _, _ := pullerTestEnv(t, pullerTestCase{}, serialized, new(int32(1)))
+				service := &stalledImageService{ImageService: runtime, started: make(chan string, 3), release: make(chan struct{})}
+				release := sync.OnceFunc(func() { close(service.release) })
+				defer release()
+				if serialized {
+					manager.(*imageManager).puller = newSerialImagePuller(service)
+				} else {
+					manager.(*imageManager).puller = newParallelImagePuller(service, new(int32(1)))
+				}
+				ctx, cancel := context.WithCancel(context.Background())
+				defer cancel()
+				pull := func(ctx context.Context, image string) <-chan error {
+					done := make(chan error, 1)
+					go func() {
+						ref, _, err := manager.EnsureImageExists(ctx, nil, &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: types.UID(image)}}, image, nil, &runtimeapi.PodSandboxConfig{Metadata: &runtimeapi.PodSandboxMetadata{}}, "", v1.PullAlways)
+						if err != nil && ref != "" {
+							done <- fmt.Errorf("failed pull returned image reference %q", ref)
+							return
+						}
+						done <- err
+					}()
+					return done
+				}
+				firstCtx := ctx
+				if cancelQueued {
+					firstCtx = context.Background()
+				}
+				first := pull(firstCtx, "blocked")
+				select {
+				case image := <-service.started:
+					require.Equal(t, "blocked:latest", image)
+				case <-time.After(5 * time.Second):
+					t.Fatal("first image pull did not start")
+				}
+				canceled := first
+				if cancelQueued {
+					canceled = pull(ctx, "queued")
+					if serialized {
+						requests := manager.(*imageManager).puller.(*serialImagePuller).pullRequests
+						require.Eventually(t, func() bool { return len(requests) == 1 }, 5*time.Second, time.Millisecond)
+					}
+				}
+				cancel()
+				select {
+				case err := <-canceled:
+					require.ErrorIs(t, err, context.Canceled)
+				case <-time.After(time.Second):
+					t.Fatal("canceled image pull waited for an unrelated or stalled runtime pull")
+				}
+				release()
+				if cancelQueued {
+					require.NoError(t, <-first)
+				}
+				last := pull(context.Background(), "last")
+				select {
+				case err := <-last:
+					require.NoError(t, err)
+				case <-time.After(5 * time.Second):
+					t.Fatal("image puller was stranded by a late result")
+				}
+				require.Equal(t, "last:latest", <-service.started, "canceled queued image must not reach the runtime")
+			})
+		}
+	}
+}
+
+func TestImagePullAdmissionCancellation(t *testing.T) {
+	for _, serialized := range []bool{true, false} {
+		t.Run(fmt.Sprintf("serialized=%t", serialized), func(t *testing.T) {
+			ktesting.Init(t).SyncTest("", func(tCtx ktesting.TContext) {
+				var puller imagePuller
+				if serialized {
+					requests := make(chan *imagePullRequest, 1)
+					requests <- &imagePullRequest{}
+					puller = &serialImagePuller{pullRequests: requests}
+				} else {
+					tokens := make(chan struct{}, 1)
+					tokens <- struct{}{}
+					puller = &parallelImagePuller{tokens: tokens}
+				}
+				ctx, cancel := context.WithCancel(tCtx)
+				defer cancel()
+				done := make(chan struct{})
+				result := make(chan pullResult, 1)
+				go func() {
+					defer close(done)
+					puller.pullImage(ctx, kubecontainer.ImageSpec{}, nil, result, nil)
+				}()
+				// Inside SyncTest, sleeping waits for the admission goroutine to block.
+				time.Sleep(time.Second)
+				select {
+				case <-done:
+					tCtx.Fatal("pull did not wait for admission")
+				default:
+				}
+				cancel()
+				select {
+				case <-done:
+					require.ErrorIs(tCtx, (<-result).err, context.Canceled)
+				case <-time.After(time.Second):
+					tCtx.Fatal("cancellation stranded an admission goroutine")
+				}
+			})
+		})
+	}
+}
+
+type imagePullerFunc func(context.Context, chan<- pullResult)
+
+func (f imagePullerFunc) pullImage(ctx context.Context, _ kubecontainer.ImageSpec, _ []credentialprovider.TrackedAuthConfig, result chan<- pullResult, _ *runtimeapi.PodSandboxConfig) {
+	f(ctx, result)
+}
+
+func (f imagePullerFunc) pullSecurityProfile(context.Context, kubecontainer.ImageSpec, []credentialprovider.TrackedAuthConfig, *runtimeapi.PodSandboxConfig, runtimeapi.SecurityProfileKind) (bool, error) {
+	return false, fmt.Errorf("unexpected security-profile pull in image pull test")
+}
+
+func TestCanceledImagePullPreservesCredentials(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletEnsureSecretPulledImages, true)
+	for _, cancelWithResult := range []bool{false, true} {
+		t.Run(fmt.Sprintf("cancelWithResult=%t", cancelWithResult), func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			manager, _, runtime, _, _, _ := pullerTestEnv(t, pullerTestCase{}, false, nil)
+			m := manager.(*imageManager)
+			accessor, err := pullmanager.NewFSPullRecordsAccessor(tCtx.Logger(), t.TempDir())
+			require.NoError(t, err)
+			provenance, err := pullmanager.NewImagePullManager(tCtx, accessor, pullmanager.NeverVerifyPreloadedPullPolicy(), runtime, 1)
+			require.NoError(t, err)
+			m.imagePullManager = provenance
+			const image = "registry.example/private:latest"
+			const imageRef = "private-image-ref"
+			credentials := &credentialprovider.TrackedAuthConfig{
+				AuthConfigHash: "private-credentials",
+				Source: &credentialprovider.CredentialSource{ServiceAccount: &credentialprovider.ServiceAccountCoordinates{
+					Namespace: "private", Name: "owner", UID: "owner-uid",
+				}},
+			}
+			ctx, cancel := context.WithCancel(tCtx)
+			defer cancel()
+			started, release := make(chan struct{}), make(chan struct{})
+			unblock := sync.OnceFunc(func() { close(release) })
+			defer unblock()
+			m.puller = imagePullerFunc(func(_ context.Context, result chan<- pullResult) {
+				close(started)
+				<-release
+				if cancelWithResult {
+					cancel()
+				}
+				result <- pullResult{imageRef: imageRef, credentialsUsed: credentials}
+			})
+			done := make(chan error, 1)
+			go func() {
+				ref, _, err := m.pullImage(ctx, "", nil, "pod", image, kubecontainer.ImageSpec{Image: image}, nil, nil)
+				if ref != "" {
+					done <- fmt.Errorf("canceled pull returned image reference %q", ref)
+					return
+				}
+				done <- err
+			}()
+			<-started
+			if cancelWithResult {
+				unblock()
+			} else {
+				cancel()
+			}
+			select {
+			case err := <-done:
+				require.ErrorIs(t, err, context.Canceled)
+			case <-time.After(time.Second):
+				t.Fatal("canceled caller did not return")
+			}
+			if !cancelWithResult {
+				exists, err := accessor.ImagePullIntentExists(image)
+				require.NoError(t, err)
+				require.True(t, exists, "unfinished pull must retain its provenance")
+				unblock()
+			}
+			require.Eventually(t, func() bool {
+				record, exists, err := accessor.GetImagePulledRecord(imageRef)
+				intentExists, intentErr := accessor.ImagePullIntentExists(image)
+				return err == nil && exists && record != nil && intentErr == nil && !intentExists
+			}, time.Second, time.Millisecond, "late success must record image provenance")
+			record, _, err := accessor.GetImagePulledRecord(imageRef)
+			require.NoError(t, err)
+			require.Equal(t, *trackedToImagePullCreds(credentials), record.CredentialMapping["registry.example/private"])
+			mustPull, err := provenance.MustAttemptImagePull(tCtx, image, imageRef, func() ([]kubeletconfiginternal.ImagePullSecret, *kubeletconfiginternal.ImagePullServiceAccount, error) {
+				return nil, nil, nil
+			})
+			require.NoError(t, err)
+			require.True(t, mustPull, "unauthenticated pod must not treat the private image as preloaded")
+		})
+	}
+}
