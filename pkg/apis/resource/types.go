@@ -2602,7 +2602,7 @@ type DeviceTaintRuleList struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ResourcePoolStatusRequest triggers a one-time calculation of resource pool status
-// based on the provided filters. Once status is set, the request is considered complete and will not be reprocessed.
+// based on the provided filters. Once status has a Complete or Failed condition, the request will not be reprocessed.
 // Users should delete and recreate requests to get updated information.
 type ResourcePoolStatusRequest struct {
 	metav1.TypeMeta
@@ -2670,8 +2670,9 @@ type ResourcePoolStatusRequestStatus struct {
 	Pools []PoolStatus
 
 	// Conditions provide information about the state of the request.
-	// A condition with type=Complete or type=Failed will always be set
-	// when the status is populated.
+	// The final status always has a condition with type=Complete or
+	// type=Failed. A status with only a type=WaitingForPools,status=True condition means the
+	// controller is waiting for incomplete pools.
 	// +optional
 	Conditions []metav1.Condition
 }
@@ -2761,12 +2762,13 @@ type PartitionTypeStatus struct {
 // devices with AllowMultipleAllocations.
 type ShareableSummaryStatus struct {
 	// FullyAvailableDevices is the number of shareable devices with no
-	// capacity consumed.
+	// allocation other than for admin access.
 	// +required
 	FullyAvailableDevices *int32
 
-	// PartiallyAvailableDevices is the number of shareable devices with some
-	// but not all capacity consumed.
+	// PartiallyAvailableDevices is the number of shareable devices with at
+	// least one allocation other than for admin access, regardless of
+	// remaining capacity.
 	// +required
 	PartiallyAvailableDevices *int32
 
@@ -2801,6 +2803,11 @@ const ResourcePoolStatusRequestConditionComplete = "Complete"
 
 // ResourcePoolStatusRequestConditionFailed is the condition type for failed requests.
 const ResourcePoolStatusRequestConditionFailed = "Failed"
+
+// ResourcePoolStatusRequestConditionWaitingForPools is the condition type for
+// requests waiting for incomplete pools to finish publishing. Its
+// lastTransitionTime marks when the wait started.
+const ResourcePoolStatusRequestConditionWaitingForPools = "WaitingForPools"
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 

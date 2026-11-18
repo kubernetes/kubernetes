@@ -31,7 +31,7 @@ import (
 // with apply.
 //
 // ResourcePoolStatusRequest triggers a one-time calculation of resource pool status
-// based on the provided filters. Once status is set, the request is considered complete and will not be reprocessed.
+// based on the provided filters. Once status has a Complete or Failed condition, the request will not be reprocessed.
 // Users should delete and recreate requests to get updated information.
 type ResourcePoolStatusRequestApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration `json:""`
@@ -41,8 +41,9 @@ type ResourcePoolStatusRequestApplyConfiguration struct {
 	// The spec is immutable once created.
 	Spec *ResourcePoolStatusRequestSpecApplyConfiguration `json:"spec,omitempty"`
 	// status is populated by the controller with the calculated pool status.
-	// When status is non-nil, the request is considered complete and the
-	// entire object becomes immutable.
+	// While pools are still being published, the controller may first set a
+	// status with only a WaitingForPools condition. Once status has a
+	// Complete or Failed condition, the entire object becomes immutable.
 	Status *ResourcePoolStatusRequestStatusApplyConfiguration `json:"status,omitempty"`
 }
 
