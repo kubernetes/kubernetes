@@ -21,32 +21,26 @@ package fake
 import (
 	v1beta1 "k8s.io/api/scheduling/v1beta1"
 	schedulingv1beta1 "k8s.io/client-go/applyconfigurations/scheduling/v1beta1"
-	gentype "k8s.io/client-go/gentype"
+	v2fake "k8s.io/client-go/gentype/v2/fake"
 	typedschedulingv1beta1 "k8s.io/client-go/kubernetes/typed/scheduling/v1beta1"
 )
 
 // fakeCompositePodGroups implements CompositePodGroupInterface
 type fakeCompositePodGroups struct {
-	*gentype.FakeClientWithListAndApply[*v1beta1.CompositePodGroup, *v1beta1.CompositePodGroupList, *schedulingv1beta1.CompositePodGroupApplyConfiguration]
+	*v2fake.FakeClientWithListAndApply[v1beta1.CompositePodGroup, v1beta1.CompositePodGroupList, schedulingv1beta1.CompositePodGroupApplyConfiguration, *v1beta1.CompositePodGroup, *v1beta1.CompositePodGroupList, *schedulingv1beta1.CompositePodGroupApplyConfiguration]
 	Fake *FakeSchedulingV1beta1
 }
 
 func newFakeCompositePodGroups(fake *FakeSchedulingV1beta1, namespace string) typedschedulingv1beta1.CompositePodGroupInterface {
 	return &fakeCompositePodGroups{
-		gentype.NewFakeClientWithListAndApply[*v1beta1.CompositePodGroup, *v1beta1.CompositePodGroupList, *schedulingv1beta1.CompositePodGroupApplyConfiguration](
+		v2fake.NewFakeClientWithListAndApply[v1beta1.CompositePodGroup, v1beta1.CompositePodGroupList, schedulingv1beta1.CompositePodGroupApplyConfiguration](
 			fake.Fake,
-			namespace,
-			v1beta1.SchemeGroupVersion.WithResource("compositepodgroups"),
-			v1beta1.SchemeGroupVersion.WithKind("CompositePodGroup"),
-			func() *v1beta1.CompositePodGroup { return &v1beta1.CompositePodGroup{} },
-			func() *v1beta1.CompositePodGroupList { return &v1beta1.CompositePodGroupList{} },
-			func(dst, src *v1beta1.CompositePodGroupList) { dst.ListMeta = src.ListMeta },
-			func(list *v1beta1.CompositePodGroupList) []*v1beta1.CompositePodGroup {
-				return gentype.ToPointerSlice(list.Items)
-			},
-			func(list *v1beta1.CompositePodGroupList, items []*v1beta1.CompositePodGroup) {
-				list.Items = gentype.FromPointerSlice(items)
-			},
+			v2fake.InNamespace(namespace),
+			v2fake.ForResource(v1beta1.SchemeGroupVersion.WithResource("compositepodgroups")),
+			v2fake.ForKind(v1beta1.SchemeGroupVersion.WithKind("CompositePodGroup")),
+			v2fake.WithListMetaCopier[v1beta1.CompositePodGroup](func(dst, src *v1beta1.CompositePodGroupList) { dst.ListMeta = src.ListMeta }),
+			v2fake.WithItemsGetter(func(list *v1beta1.CompositePodGroupList) []v1beta1.CompositePodGroup { return list.Items }),
+			v2fake.WithItemsSetter(func(list *v1beta1.CompositePodGroupList, items []v1beta1.CompositePodGroup) { list.Items = items }),
 		),
 		fake,
 	}

@@ -21,28 +21,26 @@ package fake
 import (
 	v1 "k8s.io/api/core/v1"
 	corev1 "k8s.io/client-go/applyconfigurations/core/v1"
-	gentype "k8s.io/client-go/gentype"
+	v2fake "k8s.io/client-go/gentype/v2/fake"
 	typedcorev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 )
 
 // fakeEvents implements EventInterface
 type fakeEvents struct {
-	*gentype.FakeClientWithListAndApply[*v1.Event, *v1.EventList, *corev1.EventApplyConfiguration]
+	*v2fake.FakeClientWithListAndApply[v1.Event, v1.EventList, corev1.EventApplyConfiguration, *v1.Event, *v1.EventList, *corev1.EventApplyConfiguration]
 	Fake *FakeCoreV1
 }
 
 func newFakeEvents(fake *FakeCoreV1, namespace string) typedcorev1.EventInterface {
 	return &fakeEvents{
-		gentype.NewFakeClientWithListAndApply[*v1.Event, *v1.EventList, *corev1.EventApplyConfiguration](
+		v2fake.NewFakeClientWithListAndApply[v1.Event, v1.EventList, corev1.EventApplyConfiguration](
 			fake.Fake,
-			namespace,
-			v1.SchemeGroupVersion.WithResource("events"),
-			v1.SchemeGroupVersion.WithKind("Event"),
-			func() *v1.Event { return &v1.Event{} },
-			func() *v1.EventList { return &v1.EventList{} },
-			func(dst, src *v1.EventList) { dst.ListMeta = src.ListMeta },
-			func(list *v1.EventList) []*v1.Event { return gentype.ToPointerSlice(list.Items) },
-			func(list *v1.EventList, items []*v1.Event) { list.Items = gentype.FromPointerSlice(items) },
+			v2fake.InNamespace(namespace),
+			v2fake.ForResource(v1.SchemeGroupVersion.WithResource("events")),
+			v2fake.ForKind(v1.SchemeGroupVersion.WithKind("Event")),
+			v2fake.WithListMetaCopier[v1.Event](func(dst, src *v1.EventList) { dst.ListMeta = src.ListMeta }),
+			v2fake.WithItemsGetter(func(list *v1.EventList) []v1.Event { return list.Items }),
+			v2fake.WithItemsSetter(func(list *v1.EventList, items []v1.Event) { list.Items = items }),
 		),
 		fake,
 	}

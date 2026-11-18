@@ -26,7 +26,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	applyconfigurationsresourcev1 "k8s.io/client-go/applyconfigurations/resource/v1"
-	gentype "k8s.io/client-go/gentype"
+	v2 "k8s.io/client-go/gentype/v2"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
 
@@ -53,20 +53,18 @@ type ResourceClaimTemplateInterface interface {
 
 // resourceClaimTemplates implements ResourceClaimTemplateInterface
 type resourceClaimTemplates struct {
-	*gentype.ClientWithListAndApply[*resourcev1.ResourceClaimTemplate, *resourcev1.ResourceClaimTemplateList, *applyconfigurationsresourcev1.ResourceClaimTemplateApplyConfiguration]
+	*v2.TypedClientWithListAndApply[resourcev1.ResourceClaimTemplate, resourcev1.ResourceClaimTemplateList, applyconfigurationsresourcev1.ResourceClaimTemplateApplyConfiguration, *resourcev1.ResourceClaimTemplate, *resourcev1.ResourceClaimTemplateList, *applyconfigurationsresourcev1.ResourceClaimTemplateApplyConfiguration]
 }
 
 // newResourceClaimTemplates returns a ResourceClaimTemplates
 func newResourceClaimTemplates(c *ResourceV1Client, namespace string) *resourceClaimTemplates {
 	return &resourceClaimTemplates{
-		gentype.NewClientWithListAndApply[*resourcev1.ResourceClaimTemplate, *resourcev1.ResourceClaimTemplateList, *applyconfigurationsresourcev1.ResourceClaimTemplateApplyConfiguration](
-			"resourceclaimtemplates",
-			c.RESTClient(),
-			scheme.ParameterCodec,
-			namespace,
-			func() *resourcev1.ResourceClaimTemplate { return &resourcev1.ResourceClaimTemplate{} },
-			func() *resourcev1.ResourceClaimTemplateList { return &resourcev1.ResourceClaimTemplateList{} },
-			gentype.PrefersProtobuf[*resourcev1.ResourceClaimTemplate](),
+		v2.NewTypedClientWithListAndApply[resourcev1.ResourceClaimTemplate, resourcev1.ResourceClaimTemplateList, applyconfigurationsresourcev1.ResourceClaimTemplateApplyConfiguration](
+			v2.ForResource("resourceclaimtemplates"),
+			v2.UsingClient(c.RESTClient()),
+			v2.UsingParameterCodec(scheme.ParameterCodec),
+			v2.InNamespace(namespace),
+			v2.PrefersProtobuf(),
 		),
 	}
 }

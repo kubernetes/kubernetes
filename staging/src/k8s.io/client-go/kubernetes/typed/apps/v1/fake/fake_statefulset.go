@@ -29,29 +29,27 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	appsv1 "k8s.io/client-go/applyconfigurations/apps/v1"
 	applyconfigurationsautoscalingv1 "k8s.io/client-go/applyconfigurations/autoscaling/v1"
-	gentype "k8s.io/client-go/gentype"
+	v2fake "k8s.io/client-go/gentype/v2/fake"
 	typedappsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
 	testing "k8s.io/client-go/testing"
 )
 
 // fakeStatefulSets implements StatefulSetInterface
 type fakeStatefulSets struct {
-	*gentype.FakeClientWithListAndApply[*v1.StatefulSet, *v1.StatefulSetList, *appsv1.StatefulSetApplyConfiguration]
+	*v2fake.FakeClientWithListAndApply[v1.StatefulSet, v1.StatefulSetList, appsv1.StatefulSetApplyConfiguration, *v1.StatefulSet, *v1.StatefulSetList, *appsv1.StatefulSetApplyConfiguration]
 	Fake *FakeAppsV1
 }
 
 func newFakeStatefulSets(fake *FakeAppsV1, namespace string) typedappsv1.StatefulSetInterface {
 	return &fakeStatefulSets{
-		gentype.NewFakeClientWithListAndApply[*v1.StatefulSet, *v1.StatefulSetList, *appsv1.StatefulSetApplyConfiguration](
+		v2fake.NewFakeClientWithListAndApply[v1.StatefulSet, v1.StatefulSetList, appsv1.StatefulSetApplyConfiguration](
 			fake.Fake,
-			namespace,
-			v1.SchemeGroupVersion.WithResource("statefulsets"),
-			v1.SchemeGroupVersion.WithKind("StatefulSet"),
-			func() *v1.StatefulSet { return &v1.StatefulSet{} },
-			func() *v1.StatefulSetList { return &v1.StatefulSetList{} },
-			func(dst, src *v1.StatefulSetList) { dst.ListMeta = src.ListMeta },
-			func(list *v1.StatefulSetList) []*v1.StatefulSet { return gentype.ToPointerSlice(list.Items) },
-			func(list *v1.StatefulSetList, items []*v1.StatefulSet) { list.Items = gentype.FromPointerSlice(items) },
+			v2fake.InNamespace(namespace),
+			v2fake.ForResource(v1.SchemeGroupVersion.WithResource("statefulsets")),
+			v2fake.ForKind(v1.SchemeGroupVersion.WithKind("StatefulSet")),
+			v2fake.WithListMetaCopier[v1.StatefulSet](func(dst, src *v1.StatefulSetList) { dst.ListMeta = src.ListMeta }),
+			v2fake.WithItemsGetter(func(list *v1.StatefulSetList) []v1.StatefulSet { return list.Items }),
+			v2fake.WithItemsSetter(func(list *v1.StatefulSetList, items []v1.StatefulSet) { list.Items = items }),
 		),
 		fake,
 	}

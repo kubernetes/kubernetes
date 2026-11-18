@@ -24,7 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	gentype "k8s.io/client-go/gentype"
+	v2 "k8s.io/client-go/gentype/v2"
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	applyconfigurationapiregistrationv1 "k8s.io/kube-aggregator/pkg/client/applyconfiguration/apiregistration/v1"
 	scheme "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/scheme"
@@ -57,20 +57,17 @@ type APIServiceInterface interface {
 
 // aPIServices implements APIServiceInterface
 type aPIServices struct {
-	*gentype.ClientWithListAndApply[*apiregistrationv1.APIService, *apiregistrationv1.APIServiceList, *applyconfigurationapiregistrationv1.APIServiceApplyConfiguration]
+	*v2.TypedClientWithListAndApply[apiregistrationv1.APIService, apiregistrationv1.APIServiceList, applyconfigurationapiregistrationv1.APIServiceApplyConfiguration, *apiregistrationv1.APIService, *apiregistrationv1.APIServiceList, *applyconfigurationapiregistrationv1.APIServiceApplyConfiguration]
 }
 
 // newAPIServices returns a APIServices
 func newAPIServices(c *ApiregistrationV1Client) *aPIServices {
 	return &aPIServices{
-		gentype.NewClientWithListAndApply[*apiregistrationv1.APIService, *apiregistrationv1.APIServiceList, *applyconfigurationapiregistrationv1.APIServiceApplyConfiguration](
-			"apiservices",
-			c.RESTClient(),
-			scheme.ParameterCodec,
-			"",
-			func() *apiregistrationv1.APIService { return &apiregistrationv1.APIService{} },
-			func() *apiregistrationv1.APIServiceList { return &apiregistrationv1.APIServiceList{} },
-			gentype.PrefersProtobuf[*apiregistrationv1.APIService](),
+		v2.NewTypedClientWithListAndApply[apiregistrationv1.APIService, apiregistrationv1.APIServiceList, applyconfigurationapiregistrationv1.APIServiceApplyConfiguration](
+			v2.ForResource("apiservices"),
+			v2.UsingClient(c.RESTClient()),
+			v2.UsingParameterCodec(scheme.ParameterCodec),
+			v2.PrefersProtobuf(),
 		),
 	}
 }

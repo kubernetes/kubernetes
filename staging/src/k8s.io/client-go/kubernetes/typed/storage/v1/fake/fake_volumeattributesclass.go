@@ -21,32 +21,25 @@ package fake
 import (
 	v1 "k8s.io/api/storage/v1"
 	storagev1 "k8s.io/client-go/applyconfigurations/storage/v1"
-	gentype "k8s.io/client-go/gentype"
+	v2fake "k8s.io/client-go/gentype/v2/fake"
 	typedstoragev1 "k8s.io/client-go/kubernetes/typed/storage/v1"
 )
 
 // fakeVolumeAttributesClasses implements VolumeAttributesClassInterface
 type fakeVolumeAttributesClasses struct {
-	*gentype.FakeClientWithListAndApply[*v1.VolumeAttributesClass, *v1.VolumeAttributesClassList, *storagev1.VolumeAttributesClassApplyConfiguration]
+	*v2fake.FakeClientWithListAndApply[v1.VolumeAttributesClass, v1.VolumeAttributesClassList, storagev1.VolumeAttributesClassApplyConfiguration, *v1.VolumeAttributesClass, *v1.VolumeAttributesClassList, *storagev1.VolumeAttributesClassApplyConfiguration]
 	Fake *FakeStorageV1
 }
 
 func newFakeVolumeAttributesClasses(fake *FakeStorageV1) typedstoragev1.VolumeAttributesClassInterface {
 	return &fakeVolumeAttributesClasses{
-		gentype.NewFakeClientWithListAndApply[*v1.VolumeAttributesClass, *v1.VolumeAttributesClassList, *storagev1.VolumeAttributesClassApplyConfiguration](
+		v2fake.NewFakeClientWithListAndApply[v1.VolumeAttributesClass, v1.VolumeAttributesClassList, storagev1.VolumeAttributesClassApplyConfiguration](
 			fake.Fake,
-			"",
-			v1.SchemeGroupVersion.WithResource("volumeattributesclasses"),
-			v1.SchemeGroupVersion.WithKind("VolumeAttributesClass"),
-			func() *v1.VolumeAttributesClass { return &v1.VolumeAttributesClass{} },
-			func() *v1.VolumeAttributesClassList { return &v1.VolumeAttributesClassList{} },
-			func(dst, src *v1.VolumeAttributesClassList) { dst.ListMeta = src.ListMeta },
-			func(list *v1.VolumeAttributesClassList) []*v1.VolumeAttributesClass {
-				return gentype.ToPointerSlice(list.Items)
-			},
-			func(list *v1.VolumeAttributesClassList, items []*v1.VolumeAttributesClass) {
-				list.Items = gentype.FromPointerSlice(items)
-			},
+			v2fake.ForResource(v1.SchemeGroupVersion.WithResource("volumeattributesclasses")),
+			v2fake.ForKind(v1.SchemeGroupVersion.WithKind("VolumeAttributesClass")),
+			v2fake.WithListMetaCopier[v1.VolumeAttributesClass](func(dst, src *v1.VolumeAttributesClassList) { dst.ListMeta = src.ListMeta }),
+			v2fake.WithItemsGetter(func(list *v1.VolumeAttributesClassList) []v1.VolumeAttributesClass { return list.Items }),
+			v2fake.WithItemsSetter(func(list *v1.VolumeAttributesClassList, items []v1.VolumeAttributesClass) { list.Items = items }),
 		),
 		fake,
 	}

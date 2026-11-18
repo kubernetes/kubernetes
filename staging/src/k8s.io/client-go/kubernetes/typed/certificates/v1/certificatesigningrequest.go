@@ -26,7 +26,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	applyconfigurationscertificatesv1 "k8s.io/client-go/applyconfigurations/certificates/v1"
-	gentype "k8s.io/client-go/gentype"
+	v2 "k8s.io/client-go/gentype/v2"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
 
@@ -59,37 +59,22 @@ type CertificateSigningRequestInterface interface {
 
 // certificateSigningRequests implements CertificateSigningRequestInterface
 type certificateSigningRequests struct {
-	*gentype.ClientWithListAndApply[*certificatesv1.CertificateSigningRequest, *certificatesv1.CertificateSigningRequestList, *applyconfigurationscertificatesv1.CertificateSigningRequestApplyConfiguration]
+	*v2.TypedClientWithListAndApply[certificatesv1.CertificateSigningRequest, certificatesv1.CertificateSigningRequestList, applyconfigurationscertificatesv1.CertificateSigningRequestApplyConfiguration, *certificatesv1.CertificateSigningRequest, *certificatesv1.CertificateSigningRequestList, *applyconfigurationscertificatesv1.CertificateSigningRequestApplyConfiguration]
 }
 
 // newCertificateSigningRequests returns a CertificateSigningRequests
 func newCertificateSigningRequests(c *CertificatesV1Client) *certificateSigningRequests {
 	return &certificateSigningRequests{
-		gentype.NewClientWithListAndApply[*certificatesv1.CertificateSigningRequest, *certificatesv1.CertificateSigningRequestList, *applyconfigurationscertificatesv1.CertificateSigningRequestApplyConfiguration](
-			"certificatesigningrequests",
-			c.RESTClient(),
-			scheme.ParameterCodec,
-			"",
-			func() *certificatesv1.CertificateSigningRequest { return &certificatesv1.CertificateSigningRequest{} },
-			func() *certificatesv1.CertificateSigningRequestList {
-				return &certificatesv1.CertificateSigningRequestList{}
-			},
-			gentype.PrefersProtobuf[*certificatesv1.CertificateSigningRequest](),
+		v2.NewTypedClientWithListAndApply[certificatesv1.CertificateSigningRequest, certificatesv1.CertificateSigningRequestList, applyconfigurationscertificatesv1.CertificateSigningRequestApplyConfiguration](
+			v2.ForResource("certificatesigningrequests"),
+			v2.UsingClient(c.RESTClient()),
+			v2.UsingParameterCodec(scheme.ParameterCodec),
+			v2.PrefersProtobuf(),
 		),
 	}
 }
 
 // UpdateApproval takes the top resource name and the representation of a certificateSigningRequest and updates it. Returns the server's representation of the certificateSigningRequest, and an error, if there is any.
-func (c *certificateSigningRequests) UpdateApproval(ctx context.Context, certificateSigningRequestName string, certificateSigningRequest *certificatesv1.CertificateSigningRequest, opts metav1.UpdateOptions) (result *certificatesv1.CertificateSigningRequest, err error) {
-	result = &certificatesv1.CertificateSigningRequest{}
-	err = c.GetClient().Put().
-		UseProtobufAsDefault().
-		Resource("certificatesigningrequests").
-		Name(certificateSigningRequestName).
-		SubResource("approval").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(certificateSigningRequest).
-		Do(ctx).
-		Into(result)
-	return
+func (c *certificateSigningRequests) UpdateApproval(ctx context.Context, certificateSigningRequestName string, certificateSigningRequest *certificatesv1.CertificateSigningRequest, opts metav1.UpdateOptions) (*certificatesv1.CertificateSigningRequest, error) {
+	return c.SubResourceUpdate(ctx, certificateSigningRequestName, "approval", certificateSigningRequest, opts)
 }

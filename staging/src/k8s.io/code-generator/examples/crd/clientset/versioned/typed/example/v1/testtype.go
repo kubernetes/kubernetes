@@ -24,7 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	gentype "k8s.io/client-go/gentype"
+	v2 "k8s.io/client-go/gentype/v2"
 	examplev1 "k8s.io/code-generator/examples/crd/apis/example/v1"
 	applyconfigurationexamplev1 "k8s.io/code-generator/examples/crd/applyconfiguration/example/v1"
 	scheme "k8s.io/code-generator/examples/crd/clientset/versioned/scheme"
@@ -59,32 +59,22 @@ type TestTypeInterface interface {
 
 // testTypes implements TestTypeInterface
 type testTypes struct {
-	*gentype.ClientWithListAndApply[*examplev1.TestType, *examplev1.TestTypeList, *applyconfigurationexamplev1.TestTypeApplyConfiguration]
+	*v2.TypedClientWithListAndApply[examplev1.TestType, examplev1.TestTypeList, applyconfigurationexamplev1.TestTypeApplyConfiguration, *examplev1.TestType, *examplev1.TestTypeList, *applyconfigurationexamplev1.TestTypeApplyConfiguration]
 }
 
 // newTestTypes returns a TestTypes
 func newTestTypes(c *ExampleV1Client, namespace string) *testTypes {
 	return &testTypes{
-		gentype.NewClientWithListAndApply[*examplev1.TestType, *examplev1.TestTypeList, *applyconfigurationexamplev1.TestTypeApplyConfiguration](
-			"testtypes",
-			c.RESTClient(),
-			scheme.ParameterCodec,
-			namespace,
-			func() *examplev1.TestType { return &examplev1.TestType{} },
-			func() *examplev1.TestTypeList { return &examplev1.TestTypeList{} },
+		v2.NewTypedClientWithListAndApply[examplev1.TestType, examplev1.TestTypeList, applyconfigurationexamplev1.TestTypeApplyConfiguration](
+			v2.ForResource("testtypes"),
+			v2.UsingClient(c.RESTClient()),
+			v2.UsingParameterCodec(scheme.ParameterCodec),
+			v2.InNamespace(namespace),
 		),
 	}
 }
 
 // GetClusterTestType takes name of the testType, and returns the corresponding testType object, and an error if there is any.
-func (c *testTypes) GetClusterTestType(ctx context.Context, name string, options metav1.GetOptions) (result *examplev1.TestType, err error) {
-	result = &examplev1.TestType{}
-	err = c.GetClient().Get().
-		Namespace(c.GetNamespace()).
-		Resource("testtypes").
-		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
-		Do(ctx).
-		Into(result)
-	return
+func (c *testTypes) GetClusterTestType(ctx context.Context, name string, opts metav1.GetOptions) (*examplev1.TestType, error) {
+	return c.Client.Get[examplev1.TestType](ctx, name, opts)
 }

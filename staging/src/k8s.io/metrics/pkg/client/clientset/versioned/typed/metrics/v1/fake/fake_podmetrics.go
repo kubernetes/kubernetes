@@ -19,29 +19,27 @@ limitations under the License.
 package fake
 
 import (
-	gentype "k8s.io/client-go/gentype"
+	v2fake "k8s.io/client-go/gentype/v2/fake"
 	v1 "k8s.io/metrics/pkg/apis/metrics/v1"
 	metricsv1 "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1"
 )
 
 // fakePodMetricses implements PodMetricsInterface
 type fakePodMetricses struct {
-	*gentype.FakeClientWithList[*v1.PodMetrics, *v1.PodMetricsList]
+	*v2fake.FakeClientWithList[v1.PodMetrics, v1.PodMetricsList, *v1.PodMetrics, *v1.PodMetricsList]
 	Fake *FakeMetricsV1
 }
 
 func newFakePodMetricses(fake *FakeMetricsV1, namespace string) metricsv1.PodMetricsInterface {
 	return &fakePodMetricses{
-		gentype.NewFakeClientWithList[*v1.PodMetrics, *v1.PodMetricsList](
+		v2fake.NewFakeClientWithList[v1.PodMetrics, v1.PodMetricsList](
 			fake.Fake,
-			namespace,
-			v1.SchemeGroupVersion.WithResource("pods"),
-			v1.SchemeGroupVersion.WithKind("PodMetrics"),
-			func() *v1.PodMetrics { return &v1.PodMetrics{} },
-			func() *v1.PodMetricsList { return &v1.PodMetricsList{} },
-			func(dst, src *v1.PodMetricsList) { dst.ListMeta = src.ListMeta },
-			func(list *v1.PodMetricsList) []*v1.PodMetrics { return gentype.ToPointerSlice(list.Items) },
-			func(list *v1.PodMetricsList, items []*v1.PodMetrics) { list.Items = gentype.FromPointerSlice(items) },
+			v2fake.InNamespace(namespace),
+			v2fake.ForResource(v1.SchemeGroupVersion.WithResource("pods")),
+			v2fake.ForKind(v1.SchemeGroupVersion.WithKind("PodMetrics")),
+			v2fake.WithListMetaCopier[v1.PodMetrics](func(dst, src *v1.PodMetricsList) { dst.ListMeta = src.ListMeta }),
+			v2fake.WithItemsGetter(func(list *v1.PodMetricsList) []v1.PodMetrics { return list.Items }),
+			v2fake.WithItemsSetter(func(list *v1.PodMetricsList, items []v1.PodMetrics) { list.Items = items }),
 		),
 		fake,
 	}

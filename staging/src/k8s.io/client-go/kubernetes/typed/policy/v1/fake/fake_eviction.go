@@ -20,24 +20,23 @@ package fake
 
 import (
 	v1 "k8s.io/api/policy/v1"
-	gentype "k8s.io/client-go/gentype"
+	v2fake "k8s.io/client-go/gentype/v2/fake"
 	policyv1 "k8s.io/client-go/kubernetes/typed/policy/v1"
 )
 
 // fakeEvictions implements EvictionInterface
 type fakeEvictions struct {
-	*gentype.FakeClient[*v1.Eviction]
+	*v2fake.FakeClient[v1.Eviction, *v1.Eviction]
 	Fake *FakePolicyV1
 }
 
 func newFakeEvictions(fake *FakePolicyV1, namespace string) policyv1.EvictionInterface {
 	return &fakeEvictions{
-		gentype.NewFakeClient[*v1.Eviction](
+		v2fake.NewFakeClient[v1.Eviction](
 			fake.Fake,
-			namespace,
-			v1.SchemeGroupVersion.WithResource("evictions"),
-			v1.SchemeGroupVersion.WithKind("Eviction"),
-			func() *v1.Eviction { return &v1.Eviction{} },
+			v2fake.InNamespace(namespace),
+			v2fake.ForResource(v1.SchemeGroupVersion.WithResource("evictions")),
+			v2fake.ForKind(v1.SchemeGroupVersion.WithKind("Eviction")),
 		),
 		fake,
 	}

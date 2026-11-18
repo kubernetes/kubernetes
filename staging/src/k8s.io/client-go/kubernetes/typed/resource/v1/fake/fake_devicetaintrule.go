@@ -21,30 +21,25 @@ package fake
 import (
 	v1 "k8s.io/api/resource/v1"
 	resourcev1 "k8s.io/client-go/applyconfigurations/resource/v1"
-	gentype "k8s.io/client-go/gentype"
+	v2fake "k8s.io/client-go/gentype/v2/fake"
 	typedresourcev1 "k8s.io/client-go/kubernetes/typed/resource/v1"
 )
 
 // fakeDeviceTaintRules implements DeviceTaintRuleInterface
 type fakeDeviceTaintRules struct {
-	*gentype.FakeClientWithListAndApply[*v1.DeviceTaintRule, *v1.DeviceTaintRuleList, *resourcev1.DeviceTaintRuleApplyConfiguration]
+	*v2fake.FakeClientWithListAndApply[v1.DeviceTaintRule, v1.DeviceTaintRuleList, resourcev1.DeviceTaintRuleApplyConfiguration, *v1.DeviceTaintRule, *v1.DeviceTaintRuleList, *resourcev1.DeviceTaintRuleApplyConfiguration]
 	Fake *FakeResourceV1
 }
 
 func newFakeDeviceTaintRules(fake *FakeResourceV1) typedresourcev1.DeviceTaintRuleInterface {
 	return &fakeDeviceTaintRules{
-		gentype.NewFakeClientWithListAndApply[*v1.DeviceTaintRule, *v1.DeviceTaintRuleList, *resourcev1.DeviceTaintRuleApplyConfiguration](
+		v2fake.NewFakeClientWithListAndApply[v1.DeviceTaintRule, v1.DeviceTaintRuleList, resourcev1.DeviceTaintRuleApplyConfiguration](
 			fake.Fake,
-			"",
-			v1.SchemeGroupVersion.WithResource("devicetaintrules"),
-			v1.SchemeGroupVersion.WithKind("DeviceTaintRule"),
-			func() *v1.DeviceTaintRule { return &v1.DeviceTaintRule{} },
-			func() *v1.DeviceTaintRuleList { return &v1.DeviceTaintRuleList{} },
-			func(dst, src *v1.DeviceTaintRuleList) { dst.ListMeta = src.ListMeta },
-			func(list *v1.DeviceTaintRuleList) []*v1.DeviceTaintRule { return gentype.ToPointerSlice(list.Items) },
-			func(list *v1.DeviceTaintRuleList, items []*v1.DeviceTaintRule) {
-				list.Items = gentype.FromPointerSlice(items)
-			},
+			v2fake.ForResource(v1.SchemeGroupVersion.WithResource("devicetaintrules")),
+			v2fake.ForKind(v1.SchemeGroupVersion.WithKind("DeviceTaintRule")),
+			v2fake.WithListMetaCopier[v1.DeviceTaintRule](func(dst, src *v1.DeviceTaintRuleList) { dst.ListMeta = src.ListMeta }),
+			v2fake.WithItemsGetter(func(list *v1.DeviceTaintRuleList) []v1.DeviceTaintRule { return list.Items }),
+			v2fake.WithItemsSetter(func(list *v1.DeviceTaintRuleList, items []v1.DeviceTaintRule) { list.Items = items }),
 		),
 		fake,
 	}

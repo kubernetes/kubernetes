@@ -22,31 +22,24 @@ import (
 	v1 "k8s.io/apiextensions-api/pkg/apis/apiextensions/v1"
 	apiextensionsv1 "k8s.io/apiextensions-api/pkg/client/applyconfiguration/apiextensions/v1"
 	typedapiextensionsv1 "k8s.io/apiextensions-api/pkg/client/clientset/clientset/typed/apiextensions/v1"
-	gentype "k8s.io/client-go/gentype"
+	v2fake "k8s.io/client-go/gentype/v2/fake"
 )
 
 // fakeCustomResourceDefinitions implements CustomResourceDefinitionInterface
 type fakeCustomResourceDefinitions struct {
-	*gentype.FakeClientWithListAndApply[*v1.CustomResourceDefinition, *v1.CustomResourceDefinitionList, *apiextensionsv1.CustomResourceDefinitionApplyConfiguration]
+	*v2fake.FakeClientWithListAndApply[v1.CustomResourceDefinition, v1.CustomResourceDefinitionList, apiextensionsv1.CustomResourceDefinitionApplyConfiguration, *v1.CustomResourceDefinition, *v1.CustomResourceDefinitionList, *apiextensionsv1.CustomResourceDefinitionApplyConfiguration]
 	Fake *FakeApiextensionsV1
 }
 
 func newFakeCustomResourceDefinitions(fake *FakeApiextensionsV1) typedapiextensionsv1.CustomResourceDefinitionInterface {
 	return &fakeCustomResourceDefinitions{
-		gentype.NewFakeClientWithListAndApply[*v1.CustomResourceDefinition, *v1.CustomResourceDefinitionList, *apiextensionsv1.CustomResourceDefinitionApplyConfiguration](
+		v2fake.NewFakeClientWithListAndApply[v1.CustomResourceDefinition, v1.CustomResourceDefinitionList, apiextensionsv1.CustomResourceDefinitionApplyConfiguration](
 			fake.Fake,
-			"",
-			v1.SchemeGroupVersion.WithResource("customresourcedefinitions"),
-			v1.SchemeGroupVersion.WithKind("CustomResourceDefinition"),
-			func() *v1.CustomResourceDefinition { return &v1.CustomResourceDefinition{} },
-			func() *v1.CustomResourceDefinitionList { return &v1.CustomResourceDefinitionList{} },
-			func(dst, src *v1.CustomResourceDefinitionList) { dst.ListMeta = src.ListMeta },
-			func(list *v1.CustomResourceDefinitionList) []*v1.CustomResourceDefinition {
-				return gentype.ToPointerSlice(list.Items)
-			},
-			func(list *v1.CustomResourceDefinitionList, items []*v1.CustomResourceDefinition) {
-				list.Items = gentype.FromPointerSlice(items)
-			},
+			v2fake.ForResource(v1.SchemeGroupVersion.WithResource("customresourcedefinitions")),
+			v2fake.ForKind(v1.SchemeGroupVersion.WithKind("CustomResourceDefinition")),
+			v2fake.WithListMetaCopier[v1.CustomResourceDefinition](func(dst, src *v1.CustomResourceDefinitionList) { dst.ListMeta = src.ListMeta }),
+			v2fake.WithItemsGetter(func(list *v1.CustomResourceDefinitionList) []v1.CustomResourceDefinition { return list.Items }),
+			v2fake.WithItemsSetter(func(list *v1.CustomResourceDefinitionList, items []v1.CustomResourceDefinition) { list.Items = items }),
 		),
 		fake,
 	}

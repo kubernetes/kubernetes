@@ -21,32 +21,26 @@ package fake
 import (
 	v1beta2 "k8s.io/api/resource/v1beta2"
 	resourcev1beta2 "k8s.io/client-go/applyconfigurations/resource/v1beta2"
-	gentype "k8s.io/client-go/gentype"
+	v2fake "k8s.io/client-go/gentype/v2/fake"
 	typedresourcev1beta2 "k8s.io/client-go/kubernetes/typed/resource/v1beta2"
 )
 
 // fakeResourceClaims implements ResourceClaimInterface
 type fakeResourceClaims struct {
-	*gentype.FakeClientWithListAndApply[*v1beta2.ResourceClaim, *v1beta2.ResourceClaimList, *resourcev1beta2.ResourceClaimApplyConfiguration]
+	*v2fake.FakeClientWithListAndApply[v1beta2.ResourceClaim, v1beta2.ResourceClaimList, resourcev1beta2.ResourceClaimApplyConfiguration, *v1beta2.ResourceClaim, *v1beta2.ResourceClaimList, *resourcev1beta2.ResourceClaimApplyConfiguration]
 	Fake *FakeResourceV1beta2
 }
 
 func newFakeResourceClaims(fake *FakeResourceV1beta2, namespace string) typedresourcev1beta2.ResourceClaimInterface {
 	return &fakeResourceClaims{
-		gentype.NewFakeClientWithListAndApply[*v1beta2.ResourceClaim, *v1beta2.ResourceClaimList, *resourcev1beta2.ResourceClaimApplyConfiguration](
+		v2fake.NewFakeClientWithListAndApply[v1beta2.ResourceClaim, v1beta2.ResourceClaimList, resourcev1beta2.ResourceClaimApplyConfiguration](
 			fake.Fake,
-			namespace,
-			v1beta2.SchemeGroupVersion.WithResource("resourceclaims"),
-			v1beta2.SchemeGroupVersion.WithKind("ResourceClaim"),
-			func() *v1beta2.ResourceClaim { return &v1beta2.ResourceClaim{} },
-			func() *v1beta2.ResourceClaimList { return &v1beta2.ResourceClaimList{} },
-			func(dst, src *v1beta2.ResourceClaimList) { dst.ListMeta = src.ListMeta },
-			func(list *v1beta2.ResourceClaimList) []*v1beta2.ResourceClaim {
-				return gentype.ToPointerSlice(list.Items)
-			},
-			func(list *v1beta2.ResourceClaimList, items []*v1beta2.ResourceClaim) {
-				list.Items = gentype.FromPointerSlice(items)
-			},
+			v2fake.InNamespace(namespace),
+			v2fake.ForResource(v1beta2.SchemeGroupVersion.WithResource("resourceclaims")),
+			v2fake.ForKind(v1beta2.SchemeGroupVersion.WithKind("ResourceClaim")),
+			v2fake.WithListMetaCopier[v1beta2.ResourceClaim](func(dst, src *v1beta2.ResourceClaimList) { dst.ListMeta = src.ListMeta }),
+			v2fake.WithItemsGetter(func(list *v1beta2.ResourceClaimList) []v1beta2.ResourceClaim { return list.Items }),
+			v2fake.WithItemsSetter(func(list *v1beta2.ResourceClaimList, items []v1beta2.ResourceClaim) { list.Items = items }),
 		),
 		fake,
 	}

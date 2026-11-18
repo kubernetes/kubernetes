@@ -26,7 +26,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	applyconfigurationsrbacv1beta1 "k8s.io/client-go/applyconfigurations/rbac/v1beta1"
-	gentype "k8s.io/client-go/gentype"
+	v2 "k8s.io/client-go/gentype/v2"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
 
@@ -53,20 +53,18 @@ type RoleBindingInterface interface {
 
 // roleBindings implements RoleBindingInterface
 type roleBindings struct {
-	*gentype.ClientWithListAndApply[*rbacv1beta1.RoleBinding, *rbacv1beta1.RoleBindingList, *applyconfigurationsrbacv1beta1.RoleBindingApplyConfiguration]
+	*v2.TypedClientWithListAndApply[rbacv1beta1.RoleBinding, rbacv1beta1.RoleBindingList, applyconfigurationsrbacv1beta1.RoleBindingApplyConfiguration, *rbacv1beta1.RoleBinding, *rbacv1beta1.RoleBindingList, *applyconfigurationsrbacv1beta1.RoleBindingApplyConfiguration]
 }
 
 // newRoleBindings returns a RoleBindings
 func newRoleBindings(c *RbacV1beta1Client, namespace string) *roleBindings {
 	return &roleBindings{
-		gentype.NewClientWithListAndApply[*rbacv1beta1.RoleBinding, *rbacv1beta1.RoleBindingList, *applyconfigurationsrbacv1beta1.RoleBindingApplyConfiguration](
-			"rolebindings",
-			c.RESTClient(),
-			scheme.ParameterCodec,
-			namespace,
-			func() *rbacv1beta1.RoleBinding { return &rbacv1beta1.RoleBinding{} },
-			func() *rbacv1beta1.RoleBindingList { return &rbacv1beta1.RoleBindingList{} },
-			gentype.PrefersProtobuf[*rbacv1beta1.RoleBinding](),
+		v2.NewTypedClientWithListAndApply[rbacv1beta1.RoleBinding, rbacv1beta1.RoleBindingList, applyconfigurationsrbacv1beta1.RoleBindingApplyConfiguration](
+			v2.ForResource("rolebindings"),
+			v2.UsingClient(c.RESTClient()),
+			v2.UsingParameterCodec(scheme.ParameterCodec),
+			v2.InNamespace(namespace),
+			v2.PrefersProtobuf(),
 		),
 	}
 }

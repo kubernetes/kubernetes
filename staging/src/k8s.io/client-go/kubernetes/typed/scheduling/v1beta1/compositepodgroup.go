@@ -26,7 +26,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	applyconfigurationsschedulingv1beta1 "k8s.io/client-go/applyconfigurations/scheduling/v1beta1"
-	gentype "k8s.io/client-go/gentype"
+	v2 "k8s.io/client-go/gentype/v2"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
 
@@ -57,20 +57,18 @@ type CompositePodGroupInterface interface {
 
 // compositePodGroups implements CompositePodGroupInterface
 type compositePodGroups struct {
-	*gentype.ClientWithListAndApply[*schedulingv1beta1.CompositePodGroup, *schedulingv1beta1.CompositePodGroupList, *applyconfigurationsschedulingv1beta1.CompositePodGroupApplyConfiguration]
+	*v2.TypedClientWithListAndApply[schedulingv1beta1.CompositePodGroup, schedulingv1beta1.CompositePodGroupList, applyconfigurationsschedulingv1beta1.CompositePodGroupApplyConfiguration, *schedulingv1beta1.CompositePodGroup, *schedulingv1beta1.CompositePodGroupList, *applyconfigurationsschedulingv1beta1.CompositePodGroupApplyConfiguration]
 }
 
 // newCompositePodGroups returns a CompositePodGroups
 func newCompositePodGroups(c *SchedulingV1beta1Client, namespace string) *compositePodGroups {
 	return &compositePodGroups{
-		gentype.NewClientWithListAndApply[*schedulingv1beta1.CompositePodGroup, *schedulingv1beta1.CompositePodGroupList, *applyconfigurationsschedulingv1beta1.CompositePodGroupApplyConfiguration](
-			"compositepodgroups",
-			c.RESTClient(),
-			scheme.ParameterCodec,
-			namespace,
-			func() *schedulingv1beta1.CompositePodGroup { return &schedulingv1beta1.CompositePodGroup{} },
-			func() *schedulingv1beta1.CompositePodGroupList { return &schedulingv1beta1.CompositePodGroupList{} },
-			gentype.PrefersProtobuf[*schedulingv1beta1.CompositePodGroup](),
+		v2.NewTypedClientWithListAndApply[schedulingv1beta1.CompositePodGroup, schedulingv1beta1.CompositePodGroupList, applyconfigurationsschedulingv1beta1.CompositePodGroupApplyConfiguration](
+			v2.ForResource("compositepodgroups"),
+			v2.UsingClient(c.RESTClient()),
+			v2.UsingParameterCodec(scheme.ParameterCodec),
+			v2.InNamespace(namespace),
+			v2.PrefersProtobuf(),
 		),
 	}
 }

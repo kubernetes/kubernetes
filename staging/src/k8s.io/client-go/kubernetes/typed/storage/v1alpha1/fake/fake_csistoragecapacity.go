@@ -21,32 +21,26 @@ package fake
 import (
 	v1alpha1 "k8s.io/api/storage/v1alpha1"
 	storagev1alpha1 "k8s.io/client-go/applyconfigurations/storage/v1alpha1"
-	gentype "k8s.io/client-go/gentype"
+	v2fake "k8s.io/client-go/gentype/v2/fake"
 	typedstoragev1alpha1 "k8s.io/client-go/kubernetes/typed/storage/v1alpha1"
 )
 
 // fakeCSIStorageCapacities implements CSIStorageCapacityInterface
 type fakeCSIStorageCapacities struct {
-	*gentype.FakeClientWithListAndApply[*v1alpha1.CSIStorageCapacity, *v1alpha1.CSIStorageCapacityList, *storagev1alpha1.CSIStorageCapacityApplyConfiguration]
+	*v2fake.FakeClientWithListAndApply[v1alpha1.CSIStorageCapacity, v1alpha1.CSIStorageCapacityList, storagev1alpha1.CSIStorageCapacityApplyConfiguration, *v1alpha1.CSIStorageCapacity, *v1alpha1.CSIStorageCapacityList, *storagev1alpha1.CSIStorageCapacityApplyConfiguration]
 	Fake *FakeStorageV1alpha1
 }
 
 func newFakeCSIStorageCapacities(fake *FakeStorageV1alpha1, namespace string) typedstoragev1alpha1.CSIStorageCapacityInterface {
 	return &fakeCSIStorageCapacities{
-		gentype.NewFakeClientWithListAndApply[*v1alpha1.CSIStorageCapacity, *v1alpha1.CSIStorageCapacityList, *storagev1alpha1.CSIStorageCapacityApplyConfiguration](
+		v2fake.NewFakeClientWithListAndApply[v1alpha1.CSIStorageCapacity, v1alpha1.CSIStorageCapacityList, storagev1alpha1.CSIStorageCapacityApplyConfiguration](
 			fake.Fake,
-			namespace,
-			v1alpha1.SchemeGroupVersion.WithResource("csistoragecapacities"),
-			v1alpha1.SchemeGroupVersion.WithKind("CSIStorageCapacity"),
-			func() *v1alpha1.CSIStorageCapacity { return &v1alpha1.CSIStorageCapacity{} },
-			func() *v1alpha1.CSIStorageCapacityList { return &v1alpha1.CSIStorageCapacityList{} },
-			func(dst, src *v1alpha1.CSIStorageCapacityList) { dst.ListMeta = src.ListMeta },
-			func(list *v1alpha1.CSIStorageCapacityList) []*v1alpha1.CSIStorageCapacity {
-				return gentype.ToPointerSlice(list.Items)
-			},
-			func(list *v1alpha1.CSIStorageCapacityList, items []*v1alpha1.CSIStorageCapacity) {
-				list.Items = gentype.FromPointerSlice(items)
-			},
+			v2fake.InNamespace(namespace),
+			v2fake.ForResource(v1alpha1.SchemeGroupVersion.WithResource("csistoragecapacities")),
+			v2fake.ForKind(v1alpha1.SchemeGroupVersion.WithKind("CSIStorageCapacity")),
+			v2fake.WithListMetaCopier[v1alpha1.CSIStorageCapacity](func(dst, src *v1alpha1.CSIStorageCapacityList) { dst.ListMeta = src.ListMeta }),
+			v2fake.WithItemsGetter(func(list *v1alpha1.CSIStorageCapacityList) []v1alpha1.CSIStorageCapacity { return list.Items }),
+			v2fake.WithItemsSetter(func(list *v1alpha1.CSIStorageCapacityList, items []v1alpha1.CSIStorageCapacity) { list.Items = items }),
 		),
 		fake,
 	}

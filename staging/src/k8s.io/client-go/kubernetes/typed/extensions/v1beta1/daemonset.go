@@ -26,7 +26,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	applyconfigurationsextensionsv1beta1 "k8s.io/client-go/applyconfigurations/extensions/v1beta1"
-	gentype "k8s.io/client-go/gentype"
+	v2 "k8s.io/client-go/gentype/v2"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
 
@@ -57,20 +57,18 @@ type DaemonSetInterface interface {
 
 // daemonSets implements DaemonSetInterface
 type daemonSets struct {
-	*gentype.ClientWithListAndApply[*extensionsv1beta1.DaemonSet, *extensionsv1beta1.DaemonSetList, *applyconfigurationsextensionsv1beta1.DaemonSetApplyConfiguration]
+	*v2.TypedClientWithListAndApply[extensionsv1beta1.DaemonSet, extensionsv1beta1.DaemonSetList, applyconfigurationsextensionsv1beta1.DaemonSetApplyConfiguration, *extensionsv1beta1.DaemonSet, *extensionsv1beta1.DaemonSetList, *applyconfigurationsextensionsv1beta1.DaemonSetApplyConfiguration]
 }
 
 // newDaemonSets returns a DaemonSets
 func newDaemonSets(c *ExtensionsV1beta1Client, namespace string) *daemonSets {
 	return &daemonSets{
-		gentype.NewClientWithListAndApply[*extensionsv1beta1.DaemonSet, *extensionsv1beta1.DaemonSetList, *applyconfigurationsextensionsv1beta1.DaemonSetApplyConfiguration](
-			"daemonsets",
-			c.RESTClient(),
-			scheme.ParameterCodec,
-			namespace,
-			func() *extensionsv1beta1.DaemonSet { return &extensionsv1beta1.DaemonSet{} },
-			func() *extensionsv1beta1.DaemonSetList { return &extensionsv1beta1.DaemonSetList{} },
-			gentype.PrefersProtobuf[*extensionsv1beta1.DaemonSet](),
+		v2.NewTypedClientWithListAndApply[extensionsv1beta1.DaemonSet, extensionsv1beta1.DaemonSetList, applyconfigurationsextensionsv1beta1.DaemonSetApplyConfiguration](
+			v2.ForResource("daemonsets"),
+			v2.UsingClient(c.RESTClient()),
+			v2.UsingParameterCodec(scheme.ParameterCodec),
+			v2.InNamespace(namespace),
+			v2.PrefersProtobuf(),
 		),
 	}
 }

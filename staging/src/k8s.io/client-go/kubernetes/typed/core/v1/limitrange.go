@@ -26,7 +26,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	applyconfigurationscorev1 "k8s.io/client-go/applyconfigurations/core/v1"
-	gentype "k8s.io/client-go/gentype"
+	v2 "k8s.io/client-go/gentype/v2"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
 
@@ -53,20 +53,18 @@ type LimitRangeInterface interface {
 
 // limitRanges implements LimitRangeInterface
 type limitRanges struct {
-	*gentype.ClientWithListAndApply[*corev1.LimitRange, *corev1.LimitRangeList, *applyconfigurationscorev1.LimitRangeApplyConfiguration]
+	*v2.TypedClientWithListAndApply[corev1.LimitRange, corev1.LimitRangeList, applyconfigurationscorev1.LimitRangeApplyConfiguration, *corev1.LimitRange, *corev1.LimitRangeList, *applyconfigurationscorev1.LimitRangeApplyConfiguration]
 }
 
 // newLimitRanges returns a LimitRanges
 func newLimitRanges(c *CoreV1Client, namespace string) *limitRanges {
 	return &limitRanges{
-		gentype.NewClientWithListAndApply[*corev1.LimitRange, *corev1.LimitRangeList, *applyconfigurationscorev1.LimitRangeApplyConfiguration](
-			"limitranges",
-			c.RESTClient(),
-			scheme.ParameterCodec,
-			namespace,
-			func() *corev1.LimitRange { return &corev1.LimitRange{} },
-			func() *corev1.LimitRangeList { return &corev1.LimitRangeList{} },
-			gentype.PrefersProtobuf[*corev1.LimitRange](),
+		v2.NewTypedClientWithListAndApply[corev1.LimitRange, corev1.LimitRangeList, applyconfigurationscorev1.LimitRangeApplyConfiguration](
+			v2.ForResource("limitranges"),
+			v2.UsingClient(c.RESTClient()),
+			v2.UsingParameterCodec(scheme.ParameterCodec),
+			v2.InNamespace(namespace),
+			v2.PrefersProtobuf(),
 		),
 	}
 }

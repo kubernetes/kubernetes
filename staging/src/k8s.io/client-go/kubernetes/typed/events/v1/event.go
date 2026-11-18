@@ -26,7 +26,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	applyconfigurationseventsv1 "k8s.io/client-go/applyconfigurations/events/v1"
-	gentype "k8s.io/client-go/gentype"
+	v2 "k8s.io/client-go/gentype/v2"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
 
@@ -53,20 +53,18 @@ type EventInterface interface {
 
 // events implements EventInterface
 type events struct {
-	*gentype.ClientWithListAndApply[*eventsv1.Event, *eventsv1.EventList, *applyconfigurationseventsv1.EventApplyConfiguration]
+	*v2.TypedClientWithListAndApply[eventsv1.Event, eventsv1.EventList, applyconfigurationseventsv1.EventApplyConfiguration, *eventsv1.Event, *eventsv1.EventList, *applyconfigurationseventsv1.EventApplyConfiguration]
 }
 
 // newEvents returns a Events
 func newEvents(c *EventsV1Client, namespace string) *events {
 	return &events{
-		gentype.NewClientWithListAndApply[*eventsv1.Event, *eventsv1.EventList, *applyconfigurationseventsv1.EventApplyConfiguration](
-			"events",
-			c.RESTClient(),
-			scheme.ParameterCodec,
-			namespace,
-			func() *eventsv1.Event { return &eventsv1.Event{} },
-			func() *eventsv1.EventList { return &eventsv1.EventList{} },
-			gentype.PrefersProtobuf[*eventsv1.Event](),
+		v2.NewTypedClientWithListAndApply[eventsv1.Event, eventsv1.EventList, applyconfigurationseventsv1.EventApplyConfiguration](
+			v2.ForResource("events"),
+			v2.UsingClient(c.RESTClient()),
+			v2.UsingParameterCodec(scheme.ParameterCodec),
+			v2.InNamespace(namespace),
+			v2.PrefersProtobuf(),
 		),
 	}
 }

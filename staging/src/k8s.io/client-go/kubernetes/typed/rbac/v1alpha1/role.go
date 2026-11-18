@@ -26,7 +26,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	applyconfigurationsrbacv1alpha1 "k8s.io/client-go/applyconfigurations/rbac/v1alpha1"
-	gentype "k8s.io/client-go/gentype"
+	v2 "k8s.io/client-go/gentype/v2"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
 
@@ -53,20 +53,18 @@ type RoleInterface interface {
 
 // roles implements RoleInterface
 type roles struct {
-	*gentype.ClientWithListAndApply[*rbacv1alpha1.Role, *rbacv1alpha1.RoleList, *applyconfigurationsrbacv1alpha1.RoleApplyConfiguration]
+	*v2.TypedClientWithListAndApply[rbacv1alpha1.Role, rbacv1alpha1.RoleList, applyconfigurationsrbacv1alpha1.RoleApplyConfiguration, *rbacv1alpha1.Role, *rbacv1alpha1.RoleList, *applyconfigurationsrbacv1alpha1.RoleApplyConfiguration]
 }
 
 // newRoles returns a Roles
 func newRoles(c *RbacV1alpha1Client, namespace string) *roles {
 	return &roles{
-		gentype.NewClientWithListAndApply[*rbacv1alpha1.Role, *rbacv1alpha1.RoleList, *applyconfigurationsrbacv1alpha1.RoleApplyConfiguration](
-			"roles",
-			c.RESTClient(),
-			scheme.ParameterCodec,
-			namespace,
-			func() *rbacv1alpha1.Role { return &rbacv1alpha1.Role{} },
-			func() *rbacv1alpha1.RoleList { return &rbacv1alpha1.RoleList{} },
-			gentype.PrefersProtobuf[*rbacv1alpha1.Role](),
+		v2.NewTypedClientWithListAndApply[rbacv1alpha1.Role, rbacv1alpha1.RoleList, applyconfigurationsrbacv1alpha1.RoleApplyConfiguration](
+			v2.ForResource("roles"),
+			v2.UsingClient(c.RESTClient()),
+			v2.UsingParameterCodec(scheme.ParameterCodec),
+			v2.InNamespace(namespace),
+			v2.PrefersProtobuf(),
 		),
 	}
 }

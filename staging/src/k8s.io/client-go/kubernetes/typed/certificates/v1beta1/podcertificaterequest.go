@@ -26,7 +26,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	applyconfigurationscertificatesv1beta1 "k8s.io/client-go/applyconfigurations/certificates/v1beta1"
-	gentype "k8s.io/client-go/gentype"
+	v2 "k8s.io/client-go/gentype/v2"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
 
@@ -57,22 +57,18 @@ type PodCertificateRequestInterface interface {
 
 // podCertificateRequests implements PodCertificateRequestInterface
 type podCertificateRequests struct {
-	*gentype.ClientWithListAndApply[*certificatesv1beta1.PodCertificateRequest, *certificatesv1beta1.PodCertificateRequestList, *applyconfigurationscertificatesv1beta1.PodCertificateRequestApplyConfiguration]
+	*v2.TypedClientWithListAndApply[certificatesv1beta1.PodCertificateRequest, certificatesv1beta1.PodCertificateRequestList, applyconfigurationscertificatesv1beta1.PodCertificateRequestApplyConfiguration, *certificatesv1beta1.PodCertificateRequest, *certificatesv1beta1.PodCertificateRequestList, *applyconfigurationscertificatesv1beta1.PodCertificateRequestApplyConfiguration]
 }
 
 // newPodCertificateRequests returns a PodCertificateRequests
 func newPodCertificateRequests(c *CertificatesV1beta1Client, namespace string) *podCertificateRequests {
 	return &podCertificateRequests{
-		gentype.NewClientWithListAndApply[*certificatesv1beta1.PodCertificateRequest, *certificatesv1beta1.PodCertificateRequestList, *applyconfigurationscertificatesv1beta1.PodCertificateRequestApplyConfiguration](
-			"podcertificaterequests",
-			c.RESTClient(),
-			scheme.ParameterCodec,
-			namespace,
-			func() *certificatesv1beta1.PodCertificateRequest { return &certificatesv1beta1.PodCertificateRequest{} },
-			func() *certificatesv1beta1.PodCertificateRequestList {
-				return &certificatesv1beta1.PodCertificateRequestList{}
-			},
-			gentype.PrefersProtobuf[*certificatesv1beta1.PodCertificateRequest](),
+		v2.NewTypedClientWithListAndApply[certificatesv1beta1.PodCertificateRequest, certificatesv1beta1.PodCertificateRequestList, applyconfigurationscertificatesv1beta1.PodCertificateRequestApplyConfiguration](
+			v2.ForResource("podcertificaterequests"),
+			v2.UsingClient(c.RESTClient()),
+			v2.UsingParameterCodec(scheme.ParameterCodec),
+			v2.InNamespace(namespace),
+			v2.PrefersProtobuf(),
 		),
 	}
 }

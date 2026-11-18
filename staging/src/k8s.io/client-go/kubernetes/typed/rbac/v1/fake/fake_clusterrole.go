@@ -21,28 +21,25 @@ package fake
 import (
 	v1 "k8s.io/api/rbac/v1"
 	rbacv1 "k8s.io/client-go/applyconfigurations/rbac/v1"
-	gentype "k8s.io/client-go/gentype"
+	v2fake "k8s.io/client-go/gentype/v2/fake"
 	typedrbacv1 "k8s.io/client-go/kubernetes/typed/rbac/v1"
 )
 
 // fakeClusterRoles implements ClusterRoleInterface
 type fakeClusterRoles struct {
-	*gentype.FakeClientWithListAndApply[*v1.ClusterRole, *v1.ClusterRoleList, *rbacv1.ClusterRoleApplyConfiguration]
+	*v2fake.FakeClientWithListAndApply[v1.ClusterRole, v1.ClusterRoleList, rbacv1.ClusterRoleApplyConfiguration, *v1.ClusterRole, *v1.ClusterRoleList, *rbacv1.ClusterRoleApplyConfiguration]
 	Fake *FakeRbacV1
 }
 
 func newFakeClusterRoles(fake *FakeRbacV1) typedrbacv1.ClusterRoleInterface {
 	return &fakeClusterRoles{
-		gentype.NewFakeClientWithListAndApply[*v1.ClusterRole, *v1.ClusterRoleList, *rbacv1.ClusterRoleApplyConfiguration](
+		v2fake.NewFakeClientWithListAndApply[v1.ClusterRole, v1.ClusterRoleList, rbacv1.ClusterRoleApplyConfiguration](
 			fake.Fake,
-			"",
-			v1.SchemeGroupVersion.WithResource("clusterroles"),
-			v1.SchemeGroupVersion.WithKind("ClusterRole"),
-			func() *v1.ClusterRole { return &v1.ClusterRole{} },
-			func() *v1.ClusterRoleList { return &v1.ClusterRoleList{} },
-			func(dst, src *v1.ClusterRoleList) { dst.ListMeta = src.ListMeta },
-			func(list *v1.ClusterRoleList) []*v1.ClusterRole { return gentype.ToPointerSlice(list.Items) },
-			func(list *v1.ClusterRoleList, items []*v1.ClusterRole) { list.Items = gentype.FromPointerSlice(items) },
+			v2fake.ForResource(v1.SchemeGroupVersion.WithResource("clusterroles")),
+			v2fake.ForKind(v1.SchemeGroupVersion.WithKind("ClusterRole")),
+			v2fake.WithListMetaCopier[v1.ClusterRole](func(dst, src *v1.ClusterRoleList) { dst.ListMeta = src.ListMeta }),
+			v2fake.WithItemsGetter(func(list *v1.ClusterRoleList) []v1.ClusterRole { return list.Items }),
+			v2fake.WithItemsSetter(func(list *v1.ClusterRoleList, items []v1.ClusterRole) { list.Items = items }),
 		),
 		fake,
 	}

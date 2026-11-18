@@ -26,7 +26,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	applyconfigurationsstoragemigrationv1 "k8s.io/client-go/applyconfigurations/storagemigration/v1"
-	gentype "k8s.io/client-go/gentype"
+	v2 "k8s.io/client-go/gentype/v2"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
 
@@ -57,24 +57,17 @@ type StorageVersionMigrationInterface interface {
 
 // storageVersionMigrations implements StorageVersionMigrationInterface
 type storageVersionMigrations struct {
-	*gentype.ClientWithListAndApply[*storagemigrationv1.StorageVersionMigration, *storagemigrationv1.StorageVersionMigrationList, *applyconfigurationsstoragemigrationv1.StorageVersionMigrationApplyConfiguration]
+	*v2.TypedClientWithListAndApply[storagemigrationv1.StorageVersionMigration, storagemigrationv1.StorageVersionMigrationList, applyconfigurationsstoragemigrationv1.StorageVersionMigrationApplyConfiguration, *storagemigrationv1.StorageVersionMigration, *storagemigrationv1.StorageVersionMigrationList, *applyconfigurationsstoragemigrationv1.StorageVersionMigrationApplyConfiguration]
 }
 
 // newStorageVersionMigrations returns a StorageVersionMigrations
 func newStorageVersionMigrations(c *StoragemigrationV1Client) *storageVersionMigrations {
 	return &storageVersionMigrations{
-		gentype.NewClientWithListAndApply[*storagemigrationv1.StorageVersionMigration, *storagemigrationv1.StorageVersionMigrationList, *applyconfigurationsstoragemigrationv1.StorageVersionMigrationApplyConfiguration](
-			"storageversionmigrations",
-			c.RESTClient(),
-			scheme.ParameterCodec,
-			"",
-			func() *storagemigrationv1.StorageVersionMigration {
-				return &storagemigrationv1.StorageVersionMigration{}
-			},
-			func() *storagemigrationv1.StorageVersionMigrationList {
-				return &storagemigrationv1.StorageVersionMigrationList{}
-			},
-			gentype.PrefersProtobuf[*storagemigrationv1.StorageVersionMigration](),
+		v2.NewTypedClientWithListAndApply[storagemigrationv1.StorageVersionMigration, storagemigrationv1.StorageVersionMigrationList, applyconfigurationsstoragemigrationv1.StorageVersionMigrationApplyConfiguration](
+			v2.ForResource("storageversionmigrations"),
+			v2.UsingClient(c.RESTClient()),
+			v2.UsingParameterCodec(scheme.ParameterCodec),
+			v2.PrefersProtobuf(),
 		),
 	}
 }

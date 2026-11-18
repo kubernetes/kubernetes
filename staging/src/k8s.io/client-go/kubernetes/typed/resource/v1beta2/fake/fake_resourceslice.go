@@ -21,32 +21,25 @@ package fake
 import (
 	v1beta2 "k8s.io/api/resource/v1beta2"
 	resourcev1beta2 "k8s.io/client-go/applyconfigurations/resource/v1beta2"
-	gentype "k8s.io/client-go/gentype"
+	v2fake "k8s.io/client-go/gentype/v2/fake"
 	typedresourcev1beta2 "k8s.io/client-go/kubernetes/typed/resource/v1beta2"
 )
 
 // fakeResourceSlices implements ResourceSliceInterface
 type fakeResourceSlices struct {
-	*gentype.FakeClientWithListAndApply[*v1beta2.ResourceSlice, *v1beta2.ResourceSliceList, *resourcev1beta2.ResourceSliceApplyConfiguration]
+	*v2fake.FakeClientWithListAndApply[v1beta2.ResourceSlice, v1beta2.ResourceSliceList, resourcev1beta2.ResourceSliceApplyConfiguration, *v1beta2.ResourceSlice, *v1beta2.ResourceSliceList, *resourcev1beta2.ResourceSliceApplyConfiguration]
 	Fake *FakeResourceV1beta2
 }
 
 func newFakeResourceSlices(fake *FakeResourceV1beta2) typedresourcev1beta2.ResourceSliceInterface {
 	return &fakeResourceSlices{
-		gentype.NewFakeClientWithListAndApply[*v1beta2.ResourceSlice, *v1beta2.ResourceSliceList, *resourcev1beta2.ResourceSliceApplyConfiguration](
+		v2fake.NewFakeClientWithListAndApply[v1beta2.ResourceSlice, v1beta2.ResourceSliceList, resourcev1beta2.ResourceSliceApplyConfiguration](
 			fake.Fake,
-			"",
-			v1beta2.SchemeGroupVersion.WithResource("resourceslices"),
-			v1beta2.SchemeGroupVersion.WithKind("ResourceSlice"),
-			func() *v1beta2.ResourceSlice { return &v1beta2.ResourceSlice{} },
-			func() *v1beta2.ResourceSliceList { return &v1beta2.ResourceSliceList{} },
-			func(dst, src *v1beta2.ResourceSliceList) { dst.ListMeta = src.ListMeta },
-			func(list *v1beta2.ResourceSliceList) []*v1beta2.ResourceSlice {
-				return gentype.ToPointerSlice(list.Items)
-			},
-			func(list *v1beta2.ResourceSliceList, items []*v1beta2.ResourceSlice) {
-				list.Items = gentype.FromPointerSlice(items)
-			},
+			v2fake.ForResource(v1beta2.SchemeGroupVersion.WithResource("resourceslices")),
+			v2fake.ForKind(v1beta2.SchemeGroupVersion.WithKind("ResourceSlice")),
+			v2fake.WithListMetaCopier[v1beta2.ResourceSlice](func(dst, src *v1beta2.ResourceSliceList) { dst.ListMeta = src.ListMeta }),
+			v2fake.WithItemsGetter(func(list *v1beta2.ResourceSliceList) []v1beta2.ResourceSlice { return list.Items }),
+			v2fake.WithItemsSetter(func(list *v1beta2.ResourceSliceList, items []v1beta2.ResourceSlice) { list.Items = items }),
 		),
 		fake,
 	}

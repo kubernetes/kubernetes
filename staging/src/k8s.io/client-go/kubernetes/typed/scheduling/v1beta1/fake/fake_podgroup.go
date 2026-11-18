@@ -21,30 +21,26 @@ package fake
 import (
 	v1beta1 "k8s.io/api/scheduling/v1beta1"
 	schedulingv1beta1 "k8s.io/client-go/applyconfigurations/scheduling/v1beta1"
-	gentype "k8s.io/client-go/gentype"
+	v2fake "k8s.io/client-go/gentype/v2/fake"
 	typedschedulingv1beta1 "k8s.io/client-go/kubernetes/typed/scheduling/v1beta1"
 )
 
 // fakePodGroups implements PodGroupInterface
 type fakePodGroups struct {
-	*gentype.FakeClientWithListAndApply[*v1beta1.PodGroup, *v1beta1.PodGroupList, *schedulingv1beta1.PodGroupApplyConfiguration]
+	*v2fake.FakeClientWithListAndApply[v1beta1.PodGroup, v1beta1.PodGroupList, schedulingv1beta1.PodGroupApplyConfiguration, *v1beta1.PodGroup, *v1beta1.PodGroupList, *schedulingv1beta1.PodGroupApplyConfiguration]
 	Fake *FakeSchedulingV1beta1
 }
 
 func newFakePodGroups(fake *FakeSchedulingV1beta1, namespace string) typedschedulingv1beta1.PodGroupInterface {
 	return &fakePodGroups{
-		gentype.NewFakeClientWithListAndApply[*v1beta1.PodGroup, *v1beta1.PodGroupList, *schedulingv1beta1.PodGroupApplyConfiguration](
+		v2fake.NewFakeClientWithListAndApply[v1beta1.PodGroup, v1beta1.PodGroupList, schedulingv1beta1.PodGroupApplyConfiguration](
 			fake.Fake,
-			namespace,
-			v1beta1.SchemeGroupVersion.WithResource("podgroups"),
-			v1beta1.SchemeGroupVersion.WithKind("PodGroup"),
-			func() *v1beta1.PodGroup { return &v1beta1.PodGroup{} },
-			func() *v1beta1.PodGroupList { return &v1beta1.PodGroupList{} },
-			func(dst, src *v1beta1.PodGroupList) { dst.ListMeta = src.ListMeta },
-			func(list *v1beta1.PodGroupList) []*v1beta1.PodGroup { return gentype.ToPointerSlice(list.Items) },
-			func(list *v1beta1.PodGroupList, items []*v1beta1.PodGroup) {
-				list.Items = gentype.FromPointerSlice(items)
-			},
+			v2fake.InNamespace(namespace),
+			v2fake.ForResource(v1beta1.SchemeGroupVersion.WithResource("podgroups")),
+			v2fake.ForKind(v1beta1.SchemeGroupVersion.WithKind("PodGroup")),
+			v2fake.WithListMetaCopier[v1beta1.PodGroup](func(dst, src *v1beta1.PodGroupList) { dst.ListMeta = src.ListMeta }),
+			v2fake.WithItemsGetter(func(list *v1beta1.PodGroupList) []v1beta1.PodGroup { return list.Items }),
+			v2fake.WithItemsSetter(func(list *v1beta1.PodGroupList, items []v1beta1.PodGroup) { list.Items = items }),
 		),
 		fake,
 	}

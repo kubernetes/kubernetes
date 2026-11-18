@@ -27,7 +27,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	gentype "k8s.io/client-go/gentype"
+	v2 "k8s.io/client-go/gentype/v2"
 )
 
 // CustomResourceDefinitionsGetter has a method to return a CustomResourceDefinitionInterface.
@@ -57,24 +57,17 @@ type CustomResourceDefinitionInterface interface {
 
 // customResourceDefinitions implements CustomResourceDefinitionInterface
 type customResourceDefinitions struct {
-	*gentype.ClientWithListAndApply[*apiextensionsv1beta1.CustomResourceDefinition, *apiextensionsv1beta1.CustomResourceDefinitionList, *applyconfigurationapiextensionsv1beta1.CustomResourceDefinitionApplyConfiguration]
+	*v2.TypedClientWithListAndApply[apiextensionsv1beta1.CustomResourceDefinition, apiextensionsv1beta1.CustomResourceDefinitionList, applyconfigurationapiextensionsv1beta1.CustomResourceDefinitionApplyConfiguration, *apiextensionsv1beta1.CustomResourceDefinition, *apiextensionsv1beta1.CustomResourceDefinitionList, *applyconfigurationapiextensionsv1beta1.CustomResourceDefinitionApplyConfiguration]
 }
 
 // newCustomResourceDefinitions returns a CustomResourceDefinitions
 func newCustomResourceDefinitions(c *ApiextensionsV1beta1Client) *customResourceDefinitions {
 	return &customResourceDefinitions{
-		gentype.NewClientWithListAndApply[*apiextensionsv1beta1.CustomResourceDefinition, *apiextensionsv1beta1.CustomResourceDefinitionList, *applyconfigurationapiextensionsv1beta1.CustomResourceDefinitionApplyConfiguration](
-			"customresourcedefinitions",
-			c.RESTClient(),
-			scheme.ParameterCodec,
-			"",
-			func() *apiextensionsv1beta1.CustomResourceDefinition {
-				return &apiextensionsv1beta1.CustomResourceDefinition{}
-			},
-			func() *apiextensionsv1beta1.CustomResourceDefinitionList {
-				return &apiextensionsv1beta1.CustomResourceDefinitionList{}
-			},
-			gentype.PrefersProtobuf[*apiextensionsv1beta1.CustomResourceDefinition](),
+		v2.NewTypedClientWithListAndApply[apiextensionsv1beta1.CustomResourceDefinition, apiextensionsv1beta1.CustomResourceDefinitionList, applyconfigurationapiextensionsv1beta1.CustomResourceDefinitionApplyConfiguration](
+			v2.ForResource("customresourcedefinitions"),
+			v2.UsingClient(c.RESTClient()),
+			v2.UsingParameterCodec(scheme.ParameterCodec),
+			v2.PrefersProtobuf(),
 		),
 	}
 }

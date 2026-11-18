@@ -21,30 +21,26 @@ package fake
 import (
 	v1 "k8s.io/api/core/v1"
 	corev1 "k8s.io/client-go/applyconfigurations/core/v1"
-	gentype "k8s.io/client-go/gentype"
+	v2fake "k8s.io/client-go/gentype/v2/fake"
 	typedcorev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 )
 
 // fakeResourceQuotas implements ResourceQuotaInterface
 type fakeResourceQuotas struct {
-	*gentype.FakeClientWithListAndApply[*v1.ResourceQuota, *v1.ResourceQuotaList, *corev1.ResourceQuotaApplyConfiguration]
+	*v2fake.FakeClientWithListAndApply[v1.ResourceQuota, v1.ResourceQuotaList, corev1.ResourceQuotaApplyConfiguration, *v1.ResourceQuota, *v1.ResourceQuotaList, *corev1.ResourceQuotaApplyConfiguration]
 	Fake *FakeCoreV1
 }
 
 func newFakeResourceQuotas(fake *FakeCoreV1, namespace string) typedcorev1.ResourceQuotaInterface {
 	return &fakeResourceQuotas{
-		gentype.NewFakeClientWithListAndApply[*v1.ResourceQuota, *v1.ResourceQuotaList, *corev1.ResourceQuotaApplyConfiguration](
+		v2fake.NewFakeClientWithListAndApply[v1.ResourceQuota, v1.ResourceQuotaList, corev1.ResourceQuotaApplyConfiguration](
 			fake.Fake,
-			namespace,
-			v1.SchemeGroupVersion.WithResource("resourcequotas"),
-			v1.SchemeGroupVersion.WithKind("ResourceQuota"),
-			func() *v1.ResourceQuota { return &v1.ResourceQuota{} },
-			func() *v1.ResourceQuotaList { return &v1.ResourceQuotaList{} },
-			func(dst, src *v1.ResourceQuotaList) { dst.ListMeta = src.ListMeta },
-			func(list *v1.ResourceQuotaList) []*v1.ResourceQuota { return gentype.ToPointerSlice(list.Items) },
-			func(list *v1.ResourceQuotaList, items []*v1.ResourceQuota) {
-				list.Items = gentype.FromPointerSlice(items)
-			},
+			v2fake.InNamespace(namespace),
+			v2fake.ForResource(v1.SchemeGroupVersion.WithResource("resourcequotas")),
+			v2fake.ForKind(v1.SchemeGroupVersion.WithKind("ResourceQuota")),
+			v2fake.WithListMetaCopier[v1.ResourceQuota](func(dst, src *v1.ResourceQuotaList) { dst.ListMeta = src.ListMeta }),
+			v2fake.WithItemsGetter(func(list *v1.ResourceQuotaList) []v1.ResourceQuota { return list.Items }),
+			v2fake.WithItemsSetter(func(list *v1.ResourceQuotaList, items []v1.ResourceQuota) { list.Items = items }),
 		),
 		fake,
 	}

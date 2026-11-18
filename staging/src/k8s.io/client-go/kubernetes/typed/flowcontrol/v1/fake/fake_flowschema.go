@@ -21,28 +21,25 @@ package fake
 import (
 	v1 "k8s.io/api/flowcontrol/v1"
 	flowcontrolv1 "k8s.io/client-go/applyconfigurations/flowcontrol/v1"
-	gentype "k8s.io/client-go/gentype"
+	v2fake "k8s.io/client-go/gentype/v2/fake"
 	typedflowcontrolv1 "k8s.io/client-go/kubernetes/typed/flowcontrol/v1"
 )
 
 // fakeFlowSchemas implements FlowSchemaInterface
 type fakeFlowSchemas struct {
-	*gentype.FakeClientWithListAndApply[*v1.FlowSchema, *v1.FlowSchemaList, *flowcontrolv1.FlowSchemaApplyConfiguration]
+	*v2fake.FakeClientWithListAndApply[v1.FlowSchema, v1.FlowSchemaList, flowcontrolv1.FlowSchemaApplyConfiguration, *v1.FlowSchema, *v1.FlowSchemaList, *flowcontrolv1.FlowSchemaApplyConfiguration]
 	Fake *FakeFlowcontrolV1
 }
 
 func newFakeFlowSchemas(fake *FakeFlowcontrolV1) typedflowcontrolv1.FlowSchemaInterface {
 	return &fakeFlowSchemas{
-		gentype.NewFakeClientWithListAndApply[*v1.FlowSchema, *v1.FlowSchemaList, *flowcontrolv1.FlowSchemaApplyConfiguration](
+		v2fake.NewFakeClientWithListAndApply[v1.FlowSchema, v1.FlowSchemaList, flowcontrolv1.FlowSchemaApplyConfiguration](
 			fake.Fake,
-			"",
-			v1.SchemeGroupVersion.WithResource("flowschemas"),
-			v1.SchemeGroupVersion.WithKind("FlowSchema"),
-			func() *v1.FlowSchema { return &v1.FlowSchema{} },
-			func() *v1.FlowSchemaList { return &v1.FlowSchemaList{} },
-			func(dst, src *v1.FlowSchemaList) { dst.ListMeta = src.ListMeta },
-			func(list *v1.FlowSchemaList) []*v1.FlowSchema { return gentype.ToPointerSlice(list.Items) },
-			func(list *v1.FlowSchemaList, items []*v1.FlowSchema) { list.Items = gentype.FromPointerSlice(items) },
+			v2fake.ForResource(v1.SchemeGroupVersion.WithResource("flowschemas")),
+			v2fake.ForKind(v1.SchemeGroupVersion.WithKind("FlowSchema")),
+			v2fake.WithListMetaCopier[v1.FlowSchema](func(dst, src *v1.FlowSchemaList) { dst.ListMeta = src.ListMeta }),
+			v2fake.WithItemsGetter(func(list *v1.FlowSchemaList) []v1.FlowSchema { return list.Items }),
+			v2fake.WithItemsSetter(func(list *v1.FlowSchemaList, items []v1.FlowSchema) { list.Items = items }),
 		),
 		fake,
 	}

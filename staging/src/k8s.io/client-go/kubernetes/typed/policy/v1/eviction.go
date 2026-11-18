@@ -20,7 +20,7 @@ package v1
 
 import (
 	policyv1 "k8s.io/api/policy/v1"
-	gentype "k8s.io/client-go/gentype"
+	v2 "k8s.io/client-go/gentype/v2"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
 
@@ -37,19 +37,18 @@ type EvictionInterface interface {
 
 // evictions implements EvictionInterface
 type evictions struct {
-	*gentype.Client[*policyv1.Eviction]
+	*v2.TypedClient[policyv1.Eviction, *policyv1.Eviction]
 }
 
 // newEvictions returns a Evictions
 func newEvictions(c *PolicyV1Client, namespace string) *evictions {
 	return &evictions{
-		gentype.NewClient[*policyv1.Eviction](
-			"evictions",
-			c.RESTClient(),
-			scheme.ParameterCodec,
-			namespace,
-			func() *policyv1.Eviction { return &policyv1.Eviction{} },
-			gentype.PrefersProtobuf[*policyv1.Eviction](),
+		v2.NewTypedClient[policyv1.Eviction](
+			v2.ForResource("evictions"),
+			v2.UsingClient(c.RESTClient()),
+			v2.UsingParameterCodec(scheme.ParameterCodec),
+			v2.InNamespace(namespace),
+			v2.PrefersProtobuf(),
 		),
 	}
 }

@@ -26,7 +26,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	applyconfigurationsbatchv1 "k8s.io/client-go/applyconfigurations/batch/v1"
-	gentype "k8s.io/client-go/gentype"
+	v2 "k8s.io/client-go/gentype/v2"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
 
@@ -57,20 +57,18 @@ type JobInterface interface {
 
 // jobs implements JobInterface
 type jobs struct {
-	*gentype.ClientWithListAndApply[*batchv1.Job, *batchv1.JobList, *applyconfigurationsbatchv1.JobApplyConfiguration]
+	*v2.TypedClientWithListAndApply[batchv1.Job, batchv1.JobList, applyconfigurationsbatchv1.JobApplyConfiguration, *batchv1.Job, *batchv1.JobList, *applyconfigurationsbatchv1.JobApplyConfiguration]
 }
 
 // newJobs returns a Jobs
 func newJobs(c *BatchV1Client, namespace string) *jobs {
 	return &jobs{
-		gentype.NewClientWithListAndApply[*batchv1.Job, *batchv1.JobList, *applyconfigurationsbatchv1.JobApplyConfiguration](
-			"jobs",
-			c.RESTClient(),
-			scheme.ParameterCodec,
-			namespace,
-			func() *batchv1.Job { return &batchv1.Job{} },
-			func() *batchv1.JobList { return &batchv1.JobList{} },
-			gentype.PrefersProtobuf[*batchv1.Job](),
+		v2.NewTypedClientWithListAndApply[batchv1.Job, batchv1.JobList, applyconfigurationsbatchv1.JobApplyConfiguration](
+			v2.ForResource("jobs"),
+			v2.UsingClient(c.RESTClient()),
+			v2.UsingParameterCodec(scheme.ParameterCodec),
+			v2.InNamespace(namespace),
+			v2.PrefersProtobuf(),
 		),
 	}
 }

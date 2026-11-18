@@ -23,7 +23,7 @@ import (
 
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	gentype "k8s.io/client-go/gentype"
+	v2fake "k8s.io/client-go/gentype/v2/fake"
 	testing "k8s.io/client-go/testing"
 	v1 "k8s.io/code-generator/examples/crd/apis/example/v1"
 	examplev1 "k8s.io/code-generator/examples/crd/applyconfiguration/example/v1"
@@ -32,24 +32,19 @@ import (
 
 // fakeClusterTestTypes implements ClusterTestTypeInterface
 type fakeClusterTestTypes struct {
-	*gentype.FakeClientWithListAndApply[*v1.ClusterTestType, *v1.ClusterTestTypeList, *examplev1.ClusterTestTypeApplyConfiguration]
+	*v2fake.FakeClientWithListAndApply[v1.ClusterTestType, v1.ClusterTestTypeList, examplev1.ClusterTestTypeApplyConfiguration, *v1.ClusterTestType, *v1.ClusterTestTypeList, *examplev1.ClusterTestTypeApplyConfiguration]
 	Fake *FakeExampleV1
 }
 
 func newFakeClusterTestTypes(fake *FakeExampleV1) typedexamplev1.ClusterTestTypeInterface {
 	return &fakeClusterTestTypes{
-		gentype.NewFakeClientWithListAndApply[*v1.ClusterTestType, *v1.ClusterTestTypeList, *examplev1.ClusterTestTypeApplyConfiguration](
+		v2fake.NewFakeClientWithListAndApply[v1.ClusterTestType, v1.ClusterTestTypeList, examplev1.ClusterTestTypeApplyConfiguration](
 			fake.Fake,
-			"",
-			v1.SchemeGroupVersion.WithResource("clustertesttypes"),
-			v1.SchemeGroupVersion.WithKind("ClusterTestType"),
-			func() *v1.ClusterTestType { return &v1.ClusterTestType{} },
-			func() *v1.ClusterTestTypeList { return &v1.ClusterTestTypeList{} },
-			func(dst, src *v1.ClusterTestTypeList) { dst.ListMeta = src.ListMeta },
-			func(list *v1.ClusterTestTypeList) []*v1.ClusterTestType { return gentype.ToPointerSlice(list.Items) },
-			func(list *v1.ClusterTestTypeList, items []*v1.ClusterTestType) {
-				list.Items = gentype.FromPointerSlice(items)
-			},
+			v2fake.ForResource(v1.SchemeGroupVersion.WithResource("clustertesttypes")),
+			v2fake.ForKind(v1.SchemeGroupVersion.WithKind("ClusterTestType")),
+			v2fake.WithListMetaCopier[v1.ClusterTestType](func(dst, src *v1.ClusterTestTypeList) { dst.ListMeta = src.ListMeta }),
+			v2fake.WithItemsGetter(func(list *v1.ClusterTestTypeList) []v1.ClusterTestType { return list.Items }),
+			v2fake.WithItemsSetter(func(list *v1.ClusterTestTypeList, items []v1.ClusterTestType) { list.Items = items }),
 		),
 		fake,
 	}

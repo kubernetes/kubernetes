@@ -23,7 +23,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	watch "k8s.io/apimachinery/pkg/watch"
-	gentype "k8s.io/client-go/gentype"
+	v2 "k8s.io/client-go/gentype/v2"
 	metricsv1 "k8s.io/metrics/pkg/apis/metrics/v1"
 	scheme "k8s.io/metrics/pkg/client/clientset/versioned/scheme"
 )
@@ -44,20 +44,18 @@ type PodMetricsInterface interface {
 
 // podMetricses implements PodMetricsInterface
 type podMetricses struct {
-	*gentype.ClientWithList[*metricsv1.PodMetrics, *metricsv1.PodMetricsList]
+	*v2.TypedClientWithList[metricsv1.PodMetrics, metricsv1.PodMetricsList, *metricsv1.PodMetrics, *metricsv1.PodMetricsList]
 }
 
 // newPodMetricses returns a PodMetricses
 func newPodMetricses(c *MetricsV1Client, namespace string) *podMetricses {
 	return &podMetricses{
-		gentype.NewClientWithList[*metricsv1.PodMetrics, *metricsv1.PodMetricsList](
-			"pods",
-			c.RESTClient(),
-			scheme.ParameterCodec,
-			namespace,
-			func() *metricsv1.PodMetrics { return &metricsv1.PodMetrics{} },
-			func() *metricsv1.PodMetricsList { return &metricsv1.PodMetricsList{} },
-			gentype.PrefersProtobuf[*metricsv1.PodMetrics](),
+		v2.NewTypedClientWithList[metricsv1.PodMetrics, metricsv1.PodMetricsList](
+			v2.ForResource("pods"),
+			v2.UsingClient(c.RESTClient()),
+			v2.UsingParameterCodec(scheme.ParameterCodec),
+			v2.InNamespace(namespace),
+			v2.PrefersProtobuf(),
 		),
 	}
 }

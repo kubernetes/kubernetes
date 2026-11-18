@@ -21,32 +21,25 @@ package fake
 import (
 	v1alpha1 "k8s.io/api/storage/v1alpha1"
 	storagev1alpha1 "k8s.io/client-go/applyconfigurations/storage/v1alpha1"
-	gentype "k8s.io/client-go/gentype"
+	v2fake "k8s.io/client-go/gentype/v2/fake"
 	typedstoragev1alpha1 "k8s.io/client-go/kubernetes/typed/storage/v1alpha1"
 )
 
 // fakeVolumeAttachments implements VolumeAttachmentInterface
 type fakeVolumeAttachments struct {
-	*gentype.FakeClientWithListAndApply[*v1alpha1.VolumeAttachment, *v1alpha1.VolumeAttachmentList, *storagev1alpha1.VolumeAttachmentApplyConfiguration]
+	*v2fake.FakeClientWithListAndApply[v1alpha1.VolumeAttachment, v1alpha1.VolumeAttachmentList, storagev1alpha1.VolumeAttachmentApplyConfiguration, *v1alpha1.VolumeAttachment, *v1alpha1.VolumeAttachmentList, *storagev1alpha1.VolumeAttachmentApplyConfiguration]
 	Fake *FakeStorageV1alpha1
 }
 
 func newFakeVolumeAttachments(fake *FakeStorageV1alpha1) typedstoragev1alpha1.VolumeAttachmentInterface {
 	return &fakeVolumeAttachments{
-		gentype.NewFakeClientWithListAndApply[*v1alpha1.VolumeAttachment, *v1alpha1.VolumeAttachmentList, *storagev1alpha1.VolumeAttachmentApplyConfiguration](
+		v2fake.NewFakeClientWithListAndApply[v1alpha1.VolumeAttachment, v1alpha1.VolumeAttachmentList, storagev1alpha1.VolumeAttachmentApplyConfiguration](
 			fake.Fake,
-			"",
-			v1alpha1.SchemeGroupVersion.WithResource("volumeattachments"),
-			v1alpha1.SchemeGroupVersion.WithKind("VolumeAttachment"),
-			func() *v1alpha1.VolumeAttachment { return &v1alpha1.VolumeAttachment{} },
-			func() *v1alpha1.VolumeAttachmentList { return &v1alpha1.VolumeAttachmentList{} },
-			func(dst, src *v1alpha1.VolumeAttachmentList) { dst.ListMeta = src.ListMeta },
-			func(list *v1alpha1.VolumeAttachmentList) []*v1alpha1.VolumeAttachment {
-				return gentype.ToPointerSlice(list.Items)
-			},
-			func(list *v1alpha1.VolumeAttachmentList, items []*v1alpha1.VolumeAttachment) {
-				list.Items = gentype.FromPointerSlice(items)
-			},
+			v2fake.ForResource(v1alpha1.SchemeGroupVersion.WithResource("volumeattachments")),
+			v2fake.ForKind(v1alpha1.SchemeGroupVersion.WithKind("VolumeAttachment")),
+			v2fake.WithListMetaCopier[v1alpha1.VolumeAttachment](func(dst, src *v1alpha1.VolumeAttachmentList) { dst.ListMeta = src.ListMeta }),
+			v2fake.WithItemsGetter(func(list *v1alpha1.VolumeAttachmentList) []v1alpha1.VolumeAttachment { return list.Items }),
+			v2fake.WithItemsSetter(func(list *v1alpha1.VolumeAttachmentList, items []v1alpha1.VolumeAttachment) { list.Items = items }),
 		),
 		fake,
 	}

@@ -26,7 +26,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	applyconfigurationsresourcev1beta1 "k8s.io/client-go/applyconfigurations/resource/v1beta1"
-	gentype "k8s.io/client-go/gentype"
+	v2 "k8s.io/client-go/gentype/v2"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
 
@@ -53,20 +53,17 @@ type ResourceSliceInterface interface {
 
 // resourceSlices implements ResourceSliceInterface
 type resourceSlices struct {
-	*gentype.ClientWithListAndApply[*resourcev1beta1.ResourceSlice, *resourcev1beta1.ResourceSliceList, *applyconfigurationsresourcev1beta1.ResourceSliceApplyConfiguration]
+	*v2.TypedClientWithListAndApply[resourcev1beta1.ResourceSlice, resourcev1beta1.ResourceSliceList, applyconfigurationsresourcev1beta1.ResourceSliceApplyConfiguration, *resourcev1beta1.ResourceSlice, *resourcev1beta1.ResourceSliceList, *applyconfigurationsresourcev1beta1.ResourceSliceApplyConfiguration]
 }
 
 // newResourceSlices returns a ResourceSlices
 func newResourceSlices(c *ResourceV1beta1Client) *resourceSlices {
 	return &resourceSlices{
-		gentype.NewClientWithListAndApply[*resourcev1beta1.ResourceSlice, *resourcev1beta1.ResourceSliceList, *applyconfigurationsresourcev1beta1.ResourceSliceApplyConfiguration](
-			"resourceslices",
-			c.RESTClient(),
-			scheme.ParameterCodec,
-			"",
-			func() *resourcev1beta1.ResourceSlice { return &resourcev1beta1.ResourceSlice{} },
-			func() *resourcev1beta1.ResourceSliceList { return &resourcev1beta1.ResourceSliceList{} },
-			gentype.PrefersProtobuf[*resourcev1beta1.ResourceSlice](),
+		v2.NewTypedClientWithListAndApply[resourcev1beta1.ResourceSlice, resourcev1beta1.ResourceSliceList, applyconfigurationsresourcev1beta1.ResourceSliceApplyConfiguration](
+			v2.ForResource("resourceslices"),
+			v2.UsingClient(c.RESTClient()),
+			v2.UsingParameterCodec(scheme.ParameterCodec),
+			v2.PrefersProtobuf(),
 		),
 	}
 }

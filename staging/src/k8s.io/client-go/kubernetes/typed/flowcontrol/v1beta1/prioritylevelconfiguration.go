@@ -26,7 +26,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	applyconfigurationsflowcontrolv1beta1 "k8s.io/client-go/applyconfigurations/flowcontrol/v1beta1"
-	gentype "k8s.io/client-go/gentype"
+	v2 "k8s.io/client-go/gentype/v2"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
 
@@ -57,24 +57,17 @@ type PriorityLevelConfigurationInterface interface {
 
 // priorityLevelConfigurations implements PriorityLevelConfigurationInterface
 type priorityLevelConfigurations struct {
-	*gentype.ClientWithListAndApply[*flowcontrolv1beta1.PriorityLevelConfiguration, *flowcontrolv1beta1.PriorityLevelConfigurationList, *applyconfigurationsflowcontrolv1beta1.PriorityLevelConfigurationApplyConfiguration]
+	*v2.TypedClientWithListAndApply[flowcontrolv1beta1.PriorityLevelConfiguration, flowcontrolv1beta1.PriorityLevelConfigurationList, applyconfigurationsflowcontrolv1beta1.PriorityLevelConfigurationApplyConfiguration, *flowcontrolv1beta1.PriorityLevelConfiguration, *flowcontrolv1beta1.PriorityLevelConfigurationList, *applyconfigurationsflowcontrolv1beta1.PriorityLevelConfigurationApplyConfiguration]
 }
 
 // newPriorityLevelConfigurations returns a PriorityLevelConfigurations
 func newPriorityLevelConfigurations(c *FlowcontrolV1beta1Client) *priorityLevelConfigurations {
 	return &priorityLevelConfigurations{
-		gentype.NewClientWithListAndApply[*flowcontrolv1beta1.PriorityLevelConfiguration, *flowcontrolv1beta1.PriorityLevelConfigurationList, *applyconfigurationsflowcontrolv1beta1.PriorityLevelConfigurationApplyConfiguration](
-			"prioritylevelconfigurations",
-			c.RESTClient(),
-			scheme.ParameterCodec,
-			"",
-			func() *flowcontrolv1beta1.PriorityLevelConfiguration {
-				return &flowcontrolv1beta1.PriorityLevelConfiguration{}
-			},
-			func() *flowcontrolv1beta1.PriorityLevelConfigurationList {
-				return &flowcontrolv1beta1.PriorityLevelConfigurationList{}
-			},
-			gentype.PrefersProtobuf[*flowcontrolv1beta1.PriorityLevelConfiguration](),
+		v2.NewTypedClientWithListAndApply[flowcontrolv1beta1.PriorityLevelConfiguration, flowcontrolv1beta1.PriorityLevelConfigurationList, applyconfigurationsflowcontrolv1beta1.PriorityLevelConfigurationApplyConfiguration](
+			v2.ForResource("prioritylevelconfigurations"),
+			v2.UsingClient(c.RESTClient()),
+			v2.UsingParameterCodec(scheme.ParameterCodec),
+			v2.PrefersProtobuf(),
 		),
 	}
 }

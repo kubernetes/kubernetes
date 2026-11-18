@@ -21,30 +21,25 @@ package fake
 import (
 	v1beta2 "k8s.io/api/flowcontrol/v1beta2"
 	flowcontrolv1beta2 "k8s.io/client-go/applyconfigurations/flowcontrol/v1beta2"
-	gentype "k8s.io/client-go/gentype"
+	v2fake "k8s.io/client-go/gentype/v2/fake"
 	typedflowcontrolv1beta2 "k8s.io/client-go/kubernetes/typed/flowcontrol/v1beta2"
 )
 
 // fakeFlowSchemas implements FlowSchemaInterface
 type fakeFlowSchemas struct {
-	*gentype.FakeClientWithListAndApply[*v1beta2.FlowSchema, *v1beta2.FlowSchemaList, *flowcontrolv1beta2.FlowSchemaApplyConfiguration]
+	*v2fake.FakeClientWithListAndApply[v1beta2.FlowSchema, v1beta2.FlowSchemaList, flowcontrolv1beta2.FlowSchemaApplyConfiguration, *v1beta2.FlowSchema, *v1beta2.FlowSchemaList, *flowcontrolv1beta2.FlowSchemaApplyConfiguration]
 	Fake *FakeFlowcontrolV1beta2
 }
 
 func newFakeFlowSchemas(fake *FakeFlowcontrolV1beta2) typedflowcontrolv1beta2.FlowSchemaInterface {
 	return &fakeFlowSchemas{
-		gentype.NewFakeClientWithListAndApply[*v1beta2.FlowSchema, *v1beta2.FlowSchemaList, *flowcontrolv1beta2.FlowSchemaApplyConfiguration](
+		v2fake.NewFakeClientWithListAndApply[v1beta2.FlowSchema, v1beta2.FlowSchemaList, flowcontrolv1beta2.FlowSchemaApplyConfiguration](
 			fake.Fake,
-			"",
-			v1beta2.SchemeGroupVersion.WithResource("flowschemas"),
-			v1beta2.SchemeGroupVersion.WithKind("FlowSchema"),
-			func() *v1beta2.FlowSchema { return &v1beta2.FlowSchema{} },
-			func() *v1beta2.FlowSchemaList { return &v1beta2.FlowSchemaList{} },
-			func(dst, src *v1beta2.FlowSchemaList) { dst.ListMeta = src.ListMeta },
-			func(list *v1beta2.FlowSchemaList) []*v1beta2.FlowSchema { return gentype.ToPointerSlice(list.Items) },
-			func(list *v1beta2.FlowSchemaList, items []*v1beta2.FlowSchema) {
-				list.Items = gentype.FromPointerSlice(items)
-			},
+			v2fake.ForResource(v1beta2.SchemeGroupVersion.WithResource("flowschemas")),
+			v2fake.ForKind(v1beta2.SchemeGroupVersion.WithKind("FlowSchema")),
+			v2fake.WithListMetaCopier[v1beta2.FlowSchema](func(dst, src *v1beta2.FlowSchemaList) { dst.ListMeta = src.ListMeta }),
+			v2fake.WithItemsGetter(func(list *v1beta2.FlowSchemaList) []v1beta2.FlowSchema { return list.Items }),
+			v2fake.WithItemsSetter(func(list *v1beta2.FlowSchemaList, items []v1beta2.FlowSchema) { list.Items = items }),
 		),
 		fake,
 	}

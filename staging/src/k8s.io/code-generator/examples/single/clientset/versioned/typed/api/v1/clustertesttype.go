@@ -25,7 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	gentype "k8s.io/client-go/gentype"
+	v2 "k8s.io/client-go/gentype/v2"
 	apiv1 "k8s.io/code-generator/examples/single/api/v1"
 	applyconfigurationapiv1 "k8s.io/code-generator/examples/single/applyconfiguration/api/v1"
 	scheme "k8s.io/code-generator/examples/single/clientset/versioned/scheme"
@@ -53,7 +53,7 @@ type ClusterTestTypeInterface interface {
 	Apply(ctx context.Context, clusterTestType *applyconfigurationapiv1.ClusterTestTypeApplyConfiguration, opts metav1.ApplyOptions) (result *apiv1.ClusterTestType, err error)
 	// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
 	ApplyStatus(ctx context.Context, clusterTestType *applyconfigurationapiv1.ClusterTestTypeApplyConfiguration, opts metav1.ApplyOptions) (result *apiv1.ClusterTestType, err error)
-	GetScale(ctx context.Context, clusterTestTypeName string, options metav1.GetOptions) (*autoscalingv1.Scale, error)
+	GetScale(ctx context.Context, clusterTestTypeName string, opts metav1.GetOptions) (*autoscalingv1.Scale, error)
 	UpdateScale(ctx context.Context, clusterTestTypeName string, scale *autoscalingv1.Scale, opts metav1.UpdateOptions) (*autoscalingv1.Scale, error)
 
 	ClusterTestTypeExpansion
@@ -61,46 +61,26 @@ type ClusterTestTypeInterface interface {
 
 // clusterTestTypes implements ClusterTestTypeInterface
 type clusterTestTypes struct {
-	*gentype.ClientWithListAndApply[*apiv1.ClusterTestType, *apiv1.ClusterTestTypeList, *applyconfigurationapiv1.ClusterTestTypeApplyConfiguration]
+	*v2.TypedClientWithListAndApply[apiv1.ClusterTestType, apiv1.ClusterTestTypeList, applyconfigurationapiv1.ClusterTestTypeApplyConfiguration, *apiv1.ClusterTestType, *apiv1.ClusterTestTypeList, *applyconfigurationapiv1.ClusterTestTypeApplyConfiguration]
 }
 
 // newClusterTestTypes returns a ClusterTestTypes
 func newClusterTestTypes(c *ExampleV1Client) *clusterTestTypes {
 	return &clusterTestTypes{
-		gentype.NewClientWithListAndApply[*apiv1.ClusterTestType, *apiv1.ClusterTestTypeList, *applyconfigurationapiv1.ClusterTestTypeApplyConfiguration](
-			"clustertesttypes",
-			c.RESTClient(),
-			scheme.ParameterCodec,
-			"",
-			func() *apiv1.ClusterTestType { return &apiv1.ClusterTestType{} },
-			func() *apiv1.ClusterTestTypeList { return &apiv1.ClusterTestTypeList{} },
+		v2.NewTypedClientWithListAndApply[apiv1.ClusterTestType, apiv1.ClusterTestTypeList, applyconfigurationapiv1.ClusterTestTypeApplyConfiguration](
+			v2.ForResource("clustertesttypes"),
+			v2.UsingClient(c.RESTClient()),
+			v2.UsingParameterCodec(scheme.ParameterCodec),
 		),
 	}
 }
 
 // GetScale takes name of the clusterTestType, and returns the corresponding autoscalingv1.Scale object, and an error if there is any.
-func (c *clusterTestTypes) GetScale(ctx context.Context, clusterTestTypeName string, options metav1.GetOptions) (result *autoscalingv1.Scale, err error) {
-	result = &autoscalingv1.Scale{}
-	err = c.GetClient().Get().
-		Resource("clustertesttypes").
-		Name(clusterTestTypeName).
-		SubResource("scale").
-		VersionedParams(&options, scheme.ParameterCodec).
-		Do(ctx).
-		Into(result)
-	return
+func (c *clusterTestTypes) GetScale(ctx context.Context, clusterTestTypeName string, opts metav1.GetOptions) (*autoscalingv1.Scale, error) {
+	return c.SubResourceGet[autoscalingv1.Scale](ctx, clusterTestTypeName, "scale", opts)
 }
 
 // UpdateScale takes the top resource name and the representation of a scale and updates it. Returns the server's representation of the scale, and an error, if there is any.
-func (c *clusterTestTypes) UpdateScale(ctx context.Context, clusterTestTypeName string, scale *autoscalingv1.Scale, opts metav1.UpdateOptions) (result *autoscalingv1.Scale, err error) {
-	result = &autoscalingv1.Scale{}
-	err = c.GetClient().Put().
-		Resource("clustertesttypes").
-		Name(clusterTestTypeName).
-		SubResource("scale").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(scale).
-		Do(ctx).
-		Into(result)
-	return
+func (c *clusterTestTypes) UpdateScale(ctx context.Context, clusterTestTypeName string, scale *autoscalingv1.Scale, opts metav1.UpdateOptions) (*autoscalingv1.Scale, error) {
+	return c.SubResourceUpdate(ctx, clusterTestTypeName, "scale", scale, opts)
 }

@@ -21,30 +21,26 @@ package fake
 import (
 	v1 "k8s.io/api/resource/v1"
 	resourcev1 "k8s.io/client-go/applyconfigurations/resource/v1"
-	gentype "k8s.io/client-go/gentype"
+	v2fake "k8s.io/client-go/gentype/v2/fake"
 	typedresourcev1 "k8s.io/client-go/kubernetes/typed/resource/v1"
 )
 
 // fakeResourceClaims implements ResourceClaimInterface
 type fakeResourceClaims struct {
-	*gentype.FakeClientWithListAndApply[*v1.ResourceClaim, *v1.ResourceClaimList, *resourcev1.ResourceClaimApplyConfiguration]
+	*v2fake.FakeClientWithListAndApply[v1.ResourceClaim, v1.ResourceClaimList, resourcev1.ResourceClaimApplyConfiguration, *v1.ResourceClaim, *v1.ResourceClaimList, *resourcev1.ResourceClaimApplyConfiguration]
 	Fake *FakeResourceV1
 }
 
 func newFakeResourceClaims(fake *FakeResourceV1, namespace string) typedresourcev1.ResourceClaimInterface {
 	return &fakeResourceClaims{
-		gentype.NewFakeClientWithListAndApply[*v1.ResourceClaim, *v1.ResourceClaimList, *resourcev1.ResourceClaimApplyConfiguration](
+		v2fake.NewFakeClientWithListAndApply[v1.ResourceClaim, v1.ResourceClaimList, resourcev1.ResourceClaimApplyConfiguration](
 			fake.Fake,
-			namespace,
-			v1.SchemeGroupVersion.WithResource("resourceclaims"),
-			v1.SchemeGroupVersion.WithKind("ResourceClaim"),
-			func() *v1.ResourceClaim { return &v1.ResourceClaim{} },
-			func() *v1.ResourceClaimList { return &v1.ResourceClaimList{} },
-			func(dst, src *v1.ResourceClaimList) { dst.ListMeta = src.ListMeta },
-			func(list *v1.ResourceClaimList) []*v1.ResourceClaim { return gentype.ToPointerSlice(list.Items) },
-			func(list *v1.ResourceClaimList, items []*v1.ResourceClaim) {
-				list.Items = gentype.FromPointerSlice(items)
-			},
+			v2fake.InNamespace(namespace),
+			v2fake.ForResource(v1.SchemeGroupVersion.WithResource("resourceclaims")),
+			v2fake.ForKind(v1.SchemeGroupVersion.WithKind("ResourceClaim")),
+			v2fake.WithListMetaCopier[v1.ResourceClaim](func(dst, src *v1.ResourceClaimList) { dst.ListMeta = src.ListMeta }),
+			v2fake.WithItemsGetter(func(list *v1.ResourceClaimList) []v1.ResourceClaim { return list.Items }),
+			v2fake.WithItemsSetter(func(list *v1.ResourceClaimList, items []v1.ResourceClaim) { list.Items = items }),
 		),
 		fake,
 	}

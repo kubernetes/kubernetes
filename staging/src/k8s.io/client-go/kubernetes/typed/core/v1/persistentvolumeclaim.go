@@ -26,7 +26,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	applyconfigurationscorev1 "k8s.io/client-go/applyconfigurations/core/v1"
-	gentype "k8s.io/client-go/gentype"
+	v2 "k8s.io/client-go/gentype/v2"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
 
@@ -57,20 +57,18 @@ type PersistentVolumeClaimInterface interface {
 
 // persistentVolumeClaims implements PersistentVolumeClaimInterface
 type persistentVolumeClaims struct {
-	*gentype.ClientWithListAndApply[*corev1.PersistentVolumeClaim, *corev1.PersistentVolumeClaimList, *applyconfigurationscorev1.PersistentVolumeClaimApplyConfiguration]
+	*v2.TypedClientWithListAndApply[corev1.PersistentVolumeClaim, corev1.PersistentVolumeClaimList, applyconfigurationscorev1.PersistentVolumeClaimApplyConfiguration, *corev1.PersistentVolumeClaim, *corev1.PersistentVolumeClaimList, *applyconfigurationscorev1.PersistentVolumeClaimApplyConfiguration]
 }
 
 // newPersistentVolumeClaims returns a PersistentVolumeClaims
 func newPersistentVolumeClaims(c *CoreV1Client, namespace string) *persistentVolumeClaims {
 	return &persistentVolumeClaims{
-		gentype.NewClientWithListAndApply[*corev1.PersistentVolumeClaim, *corev1.PersistentVolumeClaimList, *applyconfigurationscorev1.PersistentVolumeClaimApplyConfiguration](
-			"persistentvolumeclaims",
-			c.RESTClient(),
-			scheme.ParameterCodec,
-			namespace,
-			func() *corev1.PersistentVolumeClaim { return &corev1.PersistentVolumeClaim{} },
-			func() *corev1.PersistentVolumeClaimList { return &corev1.PersistentVolumeClaimList{} },
-			gentype.PrefersProtobuf[*corev1.PersistentVolumeClaim](),
+		v2.NewTypedClientWithListAndApply[corev1.PersistentVolumeClaim, corev1.PersistentVolumeClaimList, applyconfigurationscorev1.PersistentVolumeClaimApplyConfiguration](
+			v2.ForResource("persistentvolumeclaims"),
+			v2.UsingClient(c.RESTClient()),
+			v2.UsingParameterCodec(scheme.ParameterCodec),
+			v2.InNamespace(namespace),
+			v2.PrefersProtobuf(),
 		),
 	}
 }

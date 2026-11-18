@@ -27,7 +27,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	applyconfigurationscorev1 "k8s.io/client-go/applyconfigurations/core/v1"
-	gentype "k8s.io/client-go/gentype"
+	v2 "k8s.io/client-go/gentype/v2"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
 
@@ -56,36 +56,23 @@ type ServiceAccountInterface interface {
 
 // serviceAccounts implements ServiceAccountInterface
 type serviceAccounts struct {
-	*gentype.ClientWithListAndApply[*corev1.ServiceAccount, *corev1.ServiceAccountList, *applyconfigurationscorev1.ServiceAccountApplyConfiguration]
+	*v2.TypedClientWithListAndApply[corev1.ServiceAccount, corev1.ServiceAccountList, applyconfigurationscorev1.ServiceAccountApplyConfiguration, *corev1.ServiceAccount, *corev1.ServiceAccountList, *applyconfigurationscorev1.ServiceAccountApplyConfiguration]
 }
 
 // newServiceAccounts returns a ServiceAccounts
 func newServiceAccounts(c *CoreV1Client, namespace string) *serviceAccounts {
 	return &serviceAccounts{
-		gentype.NewClientWithListAndApply[*corev1.ServiceAccount, *corev1.ServiceAccountList, *applyconfigurationscorev1.ServiceAccountApplyConfiguration](
-			"serviceaccounts",
-			c.RESTClient(),
-			scheme.ParameterCodec,
-			namespace,
-			func() *corev1.ServiceAccount { return &corev1.ServiceAccount{} },
-			func() *corev1.ServiceAccountList { return &corev1.ServiceAccountList{} },
-			gentype.PrefersProtobuf[*corev1.ServiceAccount](),
+		v2.NewTypedClientWithListAndApply[corev1.ServiceAccount, corev1.ServiceAccountList, applyconfigurationscorev1.ServiceAccountApplyConfiguration](
+			v2.ForResource("serviceaccounts"),
+			v2.UsingClient(c.RESTClient()),
+			v2.UsingParameterCodec(scheme.ParameterCodec),
+			v2.InNamespace(namespace),
+			v2.PrefersProtobuf(),
 		),
 	}
 }
 
 // CreateToken takes the representation of a tokenRequest and creates it.  Returns the server's representation of the tokenRequest, and an error, if there is any.
-func (c *serviceAccounts) CreateToken(ctx context.Context, serviceAccountName string, tokenRequest *authenticationv1.TokenRequest, opts metav1.CreateOptions) (result *authenticationv1.TokenRequest, err error) {
-	result = &authenticationv1.TokenRequest{}
-	err = c.GetClient().Post().
-		UseProtobufAsDefault().
-		Namespace(c.GetNamespace()).
-		Resource("serviceaccounts").
-		Name(serviceAccountName).
-		SubResource("token").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(tokenRequest).
-		Do(ctx).
-		Into(result)
-	return
+func (c *serviceAccounts) CreateToken(ctx context.Context, serviceAccountName string, tokenRequest *authenticationv1.TokenRequest, opts metav1.CreateOptions) (*authenticationv1.TokenRequest, error) {
+	return c.SubResourceCreate(ctx, serviceAccountName, "token", tokenRequest, opts)
 }

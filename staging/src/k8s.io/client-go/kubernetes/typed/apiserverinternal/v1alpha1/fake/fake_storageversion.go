@@ -21,32 +21,25 @@ package fake
 import (
 	v1alpha1 "k8s.io/api/apiserverinternal/v1alpha1"
 	apiserverinternalv1alpha1 "k8s.io/client-go/applyconfigurations/apiserverinternal/v1alpha1"
-	gentype "k8s.io/client-go/gentype"
+	v2fake "k8s.io/client-go/gentype/v2/fake"
 	typedapiserverinternalv1alpha1 "k8s.io/client-go/kubernetes/typed/apiserverinternal/v1alpha1"
 )
 
 // fakeStorageVersions implements StorageVersionInterface
 type fakeStorageVersions struct {
-	*gentype.FakeClientWithListAndApply[*v1alpha1.StorageVersion, *v1alpha1.StorageVersionList, *apiserverinternalv1alpha1.StorageVersionApplyConfiguration]
+	*v2fake.FakeClientWithListAndApply[v1alpha1.StorageVersion, v1alpha1.StorageVersionList, apiserverinternalv1alpha1.StorageVersionApplyConfiguration, *v1alpha1.StorageVersion, *v1alpha1.StorageVersionList, *apiserverinternalv1alpha1.StorageVersionApplyConfiguration]
 	Fake *FakeInternalV1alpha1
 }
 
 func newFakeStorageVersions(fake *FakeInternalV1alpha1) typedapiserverinternalv1alpha1.StorageVersionInterface {
 	return &fakeStorageVersions{
-		gentype.NewFakeClientWithListAndApply[*v1alpha1.StorageVersion, *v1alpha1.StorageVersionList, *apiserverinternalv1alpha1.StorageVersionApplyConfiguration](
+		v2fake.NewFakeClientWithListAndApply[v1alpha1.StorageVersion, v1alpha1.StorageVersionList, apiserverinternalv1alpha1.StorageVersionApplyConfiguration](
 			fake.Fake,
-			"",
-			v1alpha1.SchemeGroupVersion.WithResource("storageversions"),
-			v1alpha1.SchemeGroupVersion.WithKind("StorageVersion"),
-			func() *v1alpha1.StorageVersion { return &v1alpha1.StorageVersion{} },
-			func() *v1alpha1.StorageVersionList { return &v1alpha1.StorageVersionList{} },
-			func(dst, src *v1alpha1.StorageVersionList) { dst.ListMeta = src.ListMeta },
-			func(list *v1alpha1.StorageVersionList) []*v1alpha1.StorageVersion {
-				return gentype.ToPointerSlice(list.Items)
-			},
-			func(list *v1alpha1.StorageVersionList, items []*v1alpha1.StorageVersion) {
-				list.Items = gentype.FromPointerSlice(items)
-			},
+			v2fake.ForResource(v1alpha1.SchemeGroupVersion.WithResource("storageversions")),
+			v2fake.ForKind(v1alpha1.SchemeGroupVersion.WithKind("StorageVersion")),
+			v2fake.WithListMetaCopier[v1alpha1.StorageVersion](func(dst, src *v1alpha1.StorageVersionList) { dst.ListMeta = src.ListMeta }),
+			v2fake.WithItemsGetter(func(list *v1alpha1.StorageVersionList) []v1alpha1.StorageVersion { return list.Items }),
+			v2fake.WithItemsSetter(func(list *v1alpha1.StorageVersionList, items []v1alpha1.StorageVersion) { list.Items = items }),
 		),
 		fake,
 	}

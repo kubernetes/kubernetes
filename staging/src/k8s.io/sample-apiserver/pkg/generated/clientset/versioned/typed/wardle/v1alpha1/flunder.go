@@ -24,7 +24,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	gentype "k8s.io/client-go/gentype"
+	v2 "k8s.io/client-go/gentype/v2"
 	wardlev1alpha1 "k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1"
 	applyconfigurationwardlev1alpha1 "k8s.io/sample-apiserver/pkg/generated/applyconfiguration/wardle/v1alpha1"
 	scheme "k8s.io/sample-apiserver/pkg/generated/clientset/versioned/scheme"
@@ -57,19 +57,17 @@ type FlunderInterface interface {
 
 // flunders implements FlunderInterface
 type flunders struct {
-	*gentype.ClientWithListAndApply[*wardlev1alpha1.Flunder, *wardlev1alpha1.FlunderList, *applyconfigurationwardlev1alpha1.FlunderApplyConfiguration]
+	*v2.TypedClientWithListAndApply[wardlev1alpha1.Flunder, wardlev1alpha1.FlunderList, applyconfigurationwardlev1alpha1.FlunderApplyConfiguration, *wardlev1alpha1.Flunder, *wardlev1alpha1.FlunderList, *applyconfigurationwardlev1alpha1.FlunderApplyConfiguration]
 }
 
 // newFlunders returns a Flunders
 func newFlunders(c *WardleV1alpha1Client, namespace string) *flunders {
 	return &flunders{
-		gentype.NewClientWithListAndApply[*wardlev1alpha1.Flunder, *wardlev1alpha1.FlunderList, *applyconfigurationwardlev1alpha1.FlunderApplyConfiguration](
-			"flunders",
-			c.RESTClient(),
-			scheme.ParameterCodec,
-			namespace,
-			func() *wardlev1alpha1.Flunder { return &wardlev1alpha1.Flunder{} },
-			func() *wardlev1alpha1.FlunderList { return &wardlev1alpha1.FlunderList{} },
+		v2.NewTypedClientWithListAndApply[wardlev1alpha1.Flunder, wardlev1alpha1.FlunderList, applyconfigurationwardlev1alpha1.FlunderApplyConfiguration](
+			v2.ForResource("flunders"),
+			v2.UsingClient(c.RESTClient()),
+			v2.UsingParameterCodec(scheme.ParameterCodec),
+			v2.InNamespace(namespace),
 		),
 	}
 }

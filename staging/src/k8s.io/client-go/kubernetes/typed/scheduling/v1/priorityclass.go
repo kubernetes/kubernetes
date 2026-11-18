@@ -26,7 +26,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	applyconfigurationsschedulingv1 "k8s.io/client-go/applyconfigurations/scheduling/v1"
-	gentype "k8s.io/client-go/gentype"
+	v2 "k8s.io/client-go/gentype/v2"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
 
@@ -53,20 +53,17 @@ type PriorityClassInterface interface {
 
 // priorityClasses implements PriorityClassInterface
 type priorityClasses struct {
-	*gentype.ClientWithListAndApply[*schedulingv1.PriorityClass, *schedulingv1.PriorityClassList, *applyconfigurationsschedulingv1.PriorityClassApplyConfiguration]
+	*v2.TypedClientWithListAndApply[schedulingv1.PriorityClass, schedulingv1.PriorityClassList, applyconfigurationsschedulingv1.PriorityClassApplyConfiguration, *schedulingv1.PriorityClass, *schedulingv1.PriorityClassList, *applyconfigurationsschedulingv1.PriorityClassApplyConfiguration]
 }
 
 // newPriorityClasses returns a PriorityClasses
 func newPriorityClasses(c *SchedulingV1Client) *priorityClasses {
 	return &priorityClasses{
-		gentype.NewClientWithListAndApply[*schedulingv1.PriorityClass, *schedulingv1.PriorityClassList, *applyconfigurationsschedulingv1.PriorityClassApplyConfiguration](
-			"priorityclasses",
-			c.RESTClient(),
-			scheme.ParameterCodec,
-			"",
-			func() *schedulingv1.PriorityClass { return &schedulingv1.PriorityClass{} },
-			func() *schedulingv1.PriorityClassList { return &schedulingv1.PriorityClassList{} },
-			gentype.PrefersProtobuf[*schedulingv1.PriorityClass](),
+		v2.NewTypedClientWithListAndApply[schedulingv1.PriorityClass, schedulingv1.PriorityClassList, applyconfigurationsschedulingv1.PriorityClassApplyConfiguration](
+			v2.ForResource("priorityclasses"),
+			v2.UsingClient(c.RESTClient()),
+			v2.UsingParameterCodec(scheme.ParameterCodec),
+			v2.PrefersProtobuf(),
 		),
 	}
 }

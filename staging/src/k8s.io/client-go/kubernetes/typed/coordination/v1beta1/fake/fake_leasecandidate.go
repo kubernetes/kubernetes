@@ -21,32 +21,26 @@ package fake
 import (
 	v1beta1 "k8s.io/api/coordination/v1beta1"
 	coordinationv1beta1 "k8s.io/client-go/applyconfigurations/coordination/v1beta1"
-	gentype "k8s.io/client-go/gentype"
+	v2fake "k8s.io/client-go/gentype/v2/fake"
 	typedcoordinationv1beta1 "k8s.io/client-go/kubernetes/typed/coordination/v1beta1"
 )
 
 // fakeLeaseCandidates implements LeaseCandidateInterface
 type fakeLeaseCandidates struct {
-	*gentype.FakeClientWithListAndApply[*v1beta1.LeaseCandidate, *v1beta1.LeaseCandidateList, *coordinationv1beta1.LeaseCandidateApplyConfiguration]
+	*v2fake.FakeClientWithListAndApply[v1beta1.LeaseCandidate, v1beta1.LeaseCandidateList, coordinationv1beta1.LeaseCandidateApplyConfiguration, *v1beta1.LeaseCandidate, *v1beta1.LeaseCandidateList, *coordinationv1beta1.LeaseCandidateApplyConfiguration]
 	Fake *FakeCoordinationV1beta1
 }
 
 func newFakeLeaseCandidates(fake *FakeCoordinationV1beta1, namespace string) typedcoordinationv1beta1.LeaseCandidateInterface {
 	return &fakeLeaseCandidates{
-		gentype.NewFakeClientWithListAndApply[*v1beta1.LeaseCandidate, *v1beta1.LeaseCandidateList, *coordinationv1beta1.LeaseCandidateApplyConfiguration](
+		v2fake.NewFakeClientWithListAndApply[v1beta1.LeaseCandidate, v1beta1.LeaseCandidateList, coordinationv1beta1.LeaseCandidateApplyConfiguration](
 			fake.Fake,
-			namespace,
-			v1beta1.SchemeGroupVersion.WithResource("leasecandidates"),
-			v1beta1.SchemeGroupVersion.WithKind("LeaseCandidate"),
-			func() *v1beta1.LeaseCandidate { return &v1beta1.LeaseCandidate{} },
-			func() *v1beta1.LeaseCandidateList { return &v1beta1.LeaseCandidateList{} },
-			func(dst, src *v1beta1.LeaseCandidateList) { dst.ListMeta = src.ListMeta },
-			func(list *v1beta1.LeaseCandidateList) []*v1beta1.LeaseCandidate {
-				return gentype.ToPointerSlice(list.Items)
-			},
-			func(list *v1beta1.LeaseCandidateList, items []*v1beta1.LeaseCandidate) {
-				list.Items = gentype.FromPointerSlice(items)
-			},
+			v2fake.InNamespace(namespace),
+			v2fake.ForResource(v1beta1.SchemeGroupVersion.WithResource("leasecandidates")),
+			v2fake.ForKind(v1beta1.SchemeGroupVersion.WithKind("LeaseCandidate")),
+			v2fake.WithListMetaCopier[v1beta1.LeaseCandidate](func(dst, src *v1beta1.LeaseCandidateList) { dst.ListMeta = src.ListMeta }),
+			v2fake.WithItemsGetter(func(list *v1beta1.LeaseCandidateList) []v1beta1.LeaseCandidate { return list.Items }),
+			v2fake.WithItemsSetter(func(list *v1beta1.LeaseCandidateList, items []v1beta1.LeaseCandidate) { list.Items = items }),
 		),
 		fake,
 	}

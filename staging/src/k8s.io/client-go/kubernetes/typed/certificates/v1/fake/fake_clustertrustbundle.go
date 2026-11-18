@@ -21,32 +21,25 @@ package fake
 import (
 	v1 "k8s.io/api/certificates/v1"
 	certificatesv1 "k8s.io/client-go/applyconfigurations/certificates/v1"
-	gentype "k8s.io/client-go/gentype"
+	v2fake "k8s.io/client-go/gentype/v2/fake"
 	typedcertificatesv1 "k8s.io/client-go/kubernetes/typed/certificates/v1"
 )
 
 // fakeClusterTrustBundles implements ClusterTrustBundleInterface
 type fakeClusterTrustBundles struct {
-	*gentype.FakeClientWithListAndApply[*v1.ClusterTrustBundle, *v1.ClusterTrustBundleList, *certificatesv1.ClusterTrustBundleApplyConfiguration]
+	*v2fake.FakeClientWithListAndApply[v1.ClusterTrustBundle, v1.ClusterTrustBundleList, certificatesv1.ClusterTrustBundleApplyConfiguration, *v1.ClusterTrustBundle, *v1.ClusterTrustBundleList, *certificatesv1.ClusterTrustBundleApplyConfiguration]
 	Fake *FakeCertificatesV1
 }
 
 func newFakeClusterTrustBundles(fake *FakeCertificatesV1) typedcertificatesv1.ClusterTrustBundleInterface {
 	return &fakeClusterTrustBundles{
-		gentype.NewFakeClientWithListAndApply[*v1.ClusterTrustBundle, *v1.ClusterTrustBundleList, *certificatesv1.ClusterTrustBundleApplyConfiguration](
+		v2fake.NewFakeClientWithListAndApply[v1.ClusterTrustBundle, v1.ClusterTrustBundleList, certificatesv1.ClusterTrustBundleApplyConfiguration](
 			fake.Fake,
-			"",
-			v1.SchemeGroupVersion.WithResource("clustertrustbundles"),
-			v1.SchemeGroupVersion.WithKind("ClusterTrustBundle"),
-			func() *v1.ClusterTrustBundle { return &v1.ClusterTrustBundle{} },
-			func() *v1.ClusterTrustBundleList { return &v1.ClusterTrustBundleList{} },
-			func(dst, src *v1.ClusterTrustBundleList) { dst.ListMeta = src.ListMeta },
-			func(list *v1.ClusterTrustBundleList) []*v1.ClusterTrustBundle {
-				return gentype.ToPointerSlice(list.Items)
-			},
-			func(list *v1.ClusterTrustBundleList, items []*v1.ClusterTrustBundle) {
-				list.Items = gentype.FromPointerSlice(items)
-			},
+			v2fake.ForResource(v1.SchemeGroupVersion.WithResource("clustertrustbundles")),
+			v2fake.ForKind(v1.SchemeGroupVersion.WithKind("ClusterTrustBundle")),
+			v2fake.WithListMetaCopier[v1.ClusterTrustBundle](func(dst, src *v1.ClusterTrustBundleList) { dst.ListMeta = src.ListMeta }),
+			v2fake.WithItemsGetter(func(list *v1.ClusterTrustBundleList) []v1.ClusterTrustBundle { return list.Items }),
+			v2fake.WithItemsSetter(func(list *v1.ClusterTrustBundleList, items []v1.ClusterTrustBundle) { list.Items = items }),
 		),
 		fake,
 	}

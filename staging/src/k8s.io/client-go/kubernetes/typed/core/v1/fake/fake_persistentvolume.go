@@ -21,30 +21,25 @@ package fake
 import (
 	v1 "k8s.io/api/core/v1"
 	corev1 "k8s.io/client-go/applyconfigurations/core/v1"
-	gentype "k8s.io/client-go/gentype"
+	v2fake "k8s.io/client-go/gentype/v2/fake"
 	typedcorev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 )
 
 // fakePersistentVolumes implements PersistentVolumeInterface
 type fakePersistentVolumes struct {
-	*gentype.FakeClientWithListAndApply[*v1.PersistentVolume, *v1.PersistentVolumeList, *corev1.PersistentVolumeApplyConfiguration]
+	*v2fake.FakeClientWithListAndApply[v1.PersistentVolume, v1.PersistentVolumeList, corev1.PersistentVolumeApplyConfiguration, *v1.PersistentVolume, *v1.PersistentVolumeList, *corev1.PersistentVolumeApplyConfiguration]
 	Fake *FakeCoreV1
 }
 
 func newFakePersistentVolumes(fake *FakeCoreV1) typedcorev1.PersistentVolumeInterface {
 	return &fakePersistentVolumes{
-		gentype.NewFakeClientWithListAndApply[*v1.PersistentVolume, *v1.PersistentVolumeList, *corev1.PersistentVolumeApplyConfiguration](
+		v2fake.NewFakeClientWithListAndApply[v1.PersistentVolume, v1.PersistentVolumeList, corev1.PersistentVolumeApplyConfiguration](
 			fake.Fake,
-			"",
-			v1.SchemeGroupVersion.WithResource("persistentvolumes"),
-			v1.SchemeGroupVersion.WithKind("PersistentVolume"),
-			func() *v1.PersistentVolume { return &v1.PersistentVolume{} },
-			func() *v1.PersistentVolumeList { return &v1.PersistentVolumeList{} },
-			func(dst, src *v1.PersistentVolumeList) { dst.ListMeta = src.ListMeta },
-			func(list *v1.PersistentVolumeList) []*v1.PersistentVolume { return gentype.ToPointerSlice(list.Items) },
-			func(list *v1.PersistentVolumeList, items []*v1.PersistentVolume) {
-				list.Items = gentype.FromPointerSlice(items)
-			},
+			v2fake.ForResource(v1.SchemeGroupVersion.WithResource("persistentvolumes")),
+			v2fake.ForKind(v1.SchemeGroupVersion.WithKind("PersistentVolume")),
+			v2fake.WithListMetaCopier[v1.PersistentVolume](func(dst, src *v1.PersistentVolumeList) { dst.ListMeta = src.ListMeta }),
+			v2fake.WithItemsGetter(func(list *v1.PersistentVolumeList) []v1.PersistentVolume { return list.Items }),
+			v2fake.WithItemsSetter(func(list *v1.PersistentVolumeList, items []v1.PersistentVolume) { list.Items = items }),
 		),
 		fake,
 	}

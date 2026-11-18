@@ -21,30 +21,26 @@ package fake
 import (
 	v1 "k8s.io/api/discovery/v1"
 	discoveryv1 "k8s.io/client-go/applyconfigurations/discovery/v1"
-	gentype "k8s.io/client-go/gentype"
+	v2fake "k8s.io/client-go/gentype/v2/fake"
 	typeddiscoveryv1 "k8s.io/client-go/kubernetes/typed/discovery/v1"
 )
 
 // fakeEndpointSlices implements EndpointSliceInterface
 type fakeEndpointSlices struct {
-	*gentype.FakeClientWithListAndApply[*v1.EndpointSlice, *v1.EndpointSliceList, *discoveryv1.EndpointSliceApplyConfiguration]
+	*v2fake.FakeClientWithListAndApply[v1.EndpointSlice, v1.EndpointSliceList, discoveryv1.EndpointSliceApplyConfiguration, *v1.EndpointSlice, *v1.EndpointSliceList, *discoveryv1.EndpointSliceApplyConfiguration]
 	Fake *FakeDiscoveryV1
 }
 
 func newFakeEndpointSlices(fake *FakeDiscoveryV1, namespace string) typeddiscoveryv1.EndpointSliceInterface {
 	return &fakeEndpointSlices{
-		gentype.NewFakeClientWithListAndApply[*v1.EndpointSlice, *v1.EndpointSliceList, *discoveryv1.EndpointSliceApplyConfiguration](
+		v2fake.NewFakeClientWithListAndApply[v1.EndpointSlice, v1.EndpointSliceList, discoveryv1.EndpointSliceApplyConfiguration](
 			fake.Fake,
-			namespace,
-			v1.SchemeGroupVersion.WithResource("endpointslices"),
-			v1.SchemeGroupVersion.WithKind("EndpointSlice"),
-			func() *v1.EndpointSlice { return &v1.EndpointSlice{} },
-			func() *v1.EndpointSliceList { return &v1.EndpointSliceList{} },
-			func(dst, src *v1.EndpointSliceList) { dst.ListMeta = src.ListMeta },
-			func(list *v1.EndpointSliceList) []*v1.EndpointSlice { return gentype.ToPointerSlice(list.Items) },
-			func(list *v1.EndpointSliceList, items []*v1.EndpointSlice) {
-				list.Items = gentype.FromPointerSlice(items)
-			},
+			v2fake.InNamespace(namespace),
+			v2fake.ForResource(v1.SchemeGroupVersion.WithResource("endpointslices")),
+			v2fake.ForKind(v1.SchemeGroupVersion.WithKind("EndpointSlice")),
+			v2fake.WithListMetaCopier[v1.EndpointSlice](func(dst, src *v1.EndpointSliceList) { dst.ListMeta = src.ListMeta }),
+			v2fake.WithItemsGetter(func(list *v1.EndpointSliceList) []v1.EndpointSlice { return list.Items }),
+			v2fake.WithItemsSetter(func(list *v1.EndpointSliceList, items []v1.EndpointSlice) { list.Items = items }),
 		),
 		fake,
 	}

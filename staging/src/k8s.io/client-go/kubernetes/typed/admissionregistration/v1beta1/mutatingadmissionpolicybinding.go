@@ -26,7 +26,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	applyconfigurationsadmissionregistrationv1beta1 "k8s.io/client-go/applyconfigurations/admissionregistration/v1beta1"
-	gentype "k8s.io/client-go/gentype"
+	v2 "k8s.io/client-go/gentype/v2"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
 
@@ -53,24 +53,17 @@ type MutatingAdmissionPolicyBindingInterface interface {
 
 // mutatingAdmissionPolicyBindings implements MutatingAdmissionPolicyBindingInterface
 type mutatingAdmissionPolicyBindings struct {
-	*gentype.ClientWithListAndApply[*admissionregistrationv1beta1.MutatingAdmissionPolicyBinding, *admissionregistrationv1beta1.MutatingAdmissionPolicyBindingList, *applyconfigurationsadmissionregistrationv1beta1.MutatingAdmissionPolicyBindingApplyConfiguration]
+	*v2.TypedClientWithListAndApply[admissionregistrationv1beta1.MutatingAdmissionPolicyBinding, admissionregistrationv1beta1.MutatingAdmissionPolicyBindingList, applyconfigurationsadmissionregistrationv1beta1.MutatingAdmissionPolicyBindingApplyConfiguration, *admissionregistrationv1beta1.MutatingAdmissionPolicyBinding, *admissionregistrationv1beta1.MutatingAdmissionPolicyBindingList, *applyconfigurationsadmissionregistrationv1beta1.MutatingAdmissionPolicyBindingApplyConfiguration]
 }
 
 // newMutatingAdmissionPolicyBindings returns a MutatingAdmissionPolicyBindings
 func newMutatingAdmissionPolicyBindings(c *AdmissionregistrationV1beta1Client) *mutatingAdmissionPolicyBindings {
 	return &mutatingAdmissionPolicyBindings{
-		gentype.NewClientWithListAndApply[*admissionregistrationv1beta1.MutatingAdmissionPolicyBinding, *admissionregistrationv1beta1.MutatingAdmissionPolicyBindingList, *applyconfigurationsadmissionregistrationv1beta1.MutatingAdmissionPolicyBindingApplyConfiguration](
-			"mutatingadmissionpolicybindings",
-			c.RESTClient(),
-			scheme.ParameterCodec,
-			"",
-			func() *admissionregistrationv1beta1.MutatingAdmissionPolicyBinding {
-				return &admissionregistrationv1beta1.MutatingAdmissionPolicyBinding{}
-			},
-			func() *admissionregistrationv1beta1.MutatingAdmissionPolicyBindingList {
-				return &admissionregistrationv1beta1.MutatingAdmissionPolicyBindingList{}
-			},
-			gentype.PrefersProtobuf[*admissionregistrationv1beta1.MutatingAdmissionPolicyBinding](),
+		v2.NewTypedClientWithListAndApply[admissionregistrationv1beta1.MutatingAdmissionPolicyBinding, admissionregistrationv1beta1.MutatingAdmissionPolicyBindingList, applyconfigurationsadmissionregistrationv1beta1.MutatingAdmissionPolicyBindingApplyConfiguration](
+			v2.ForResource("mutatingadmissionpolicybindings"),
+			v2.UsingClient(c.RESTClient()),
+			v2.UsingParameterCodec(scheme.ParameterCodec),
+			v2.PrefersProtobuf(),
 		),
 	}
 }

@@ -21,28 +21,26 @@ package fake
 import (
 	v1 "k8s.io/api/batch/v1"
 	batchv1 "k8s.io/client-go/applyconfigurations/batch/v1"
-	gentype "k8s.io/client-go/gentype"
+	v2fake "k8s.io/client-go/gentype/v2/fake"
 	typedbatchv1 "k8s.io/client-go/kubernetes/typed/batch/v1"
 )
 
 // fakeCronJobs implements CronJobInterface
 type fakeCronJobs struct {
-	*gentype.FakeClientWithListAndApply[*v1.CronJob, *v1.CronJobList, *batchv1.CronJobApplyConfiguration]
+	*v2fake.FakeClientWithListAndApply[v1.CronJob, v1.CronJobList, batchv1.CronJobApplyConfiguration, *v1.CronJob, *v1.CronJobList, *batchv1.CronJobApplyConfiguration]
 	Fake *FakeBatchV1
 }
 
 func newFakeCronJobs(fake *FakeBatchV1, namespace string) typedbatchv1.CronJobInterface {
 	return &fakeCronJobs{
-		gentype.NewFakeClientWithListAndApply[*v1.CronJob, *v1.CronJobList, *batchv1.CronJobApplyConfiguration](
+		v2fake.NewFakeClientWithListAndApply[v1.CronJob, v1.CronJobList, batchv1.CronJobApplyConfiguration](
 			fake.Fake,
-			namespace,
-			v1.SchemeGroupVersion.WithResource("cronjobs"),
-			v1.SchemeGroupVersion.WithKind("CronJob"),
-			func() *v1.CronJob { return &v1.CronJob{} },
-			func() *v1.CronJobList { return &v1.CronJobList{} },
-			func(dst, src *v1.CronJobList) { dst.ListMeta = src.ListMeta },
-			func(list *v1.CronJobList) []*v1.CronJob { return gentype.ToPointerSlice(list.Items) },
-			func(list *v1.CronJobList, items []*v1.CronJob) { list.Items = gentype.FromPointerSlice(items) },
+			v2fake.InNamespace(namespace),
+			v2fake.ForResource(v1.SchemeGroupVersion.WithResource("cronjobs")),
+			v2fake.ForKind(v1.SchemeGroupVersion.WithKind("CronJob")),
+			v2fake.WithListMetaCopier[v1.CronJob](func(dst, src *v1.CronJobList) { dst.ListMeta = src.ListMeta }),
+			v2fake.WithItemsGetter(func(list *v1.CronJobList) []v1.CronJob { return list.Items }),
+			v2fake.WithItemsSetter(func(list *v1.CronJobList, items []v1.CronJob) { list.Items = items }),
 		),
 		fake,
 	}

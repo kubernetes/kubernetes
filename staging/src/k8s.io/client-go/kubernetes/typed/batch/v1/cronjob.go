@@ -26,7 +26,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	applyconfigurationsbatchv1 "k8s.io/client-go/applyconfigurations/batch/v1"
-	gentype "k8s.io/client-go/gentype"
+	v2 "k8s.io/client-go/gentype/v2"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
 
@@ -57,20 +57,18 @@ type CronJobInterface interface {
 
 // cronJobs implements CronJobInterface
 type cronJobs struct {
-	*gentype.ClientWithListAndApply[*batchv1.CronJob, *batchv1.CronJobList, *applyconfigurationsbatchv1.CronJobApplyConfiguration]
+	*v2.TypedClientWithListAndApply[batchv1.CronJob, batchv1.CronJobList, applyconfigurationsbatchv1.CronJobApplyConfiguration, *batchv1.CronJob, *batchv1.CronJobList, *applyconfigurationsbatchv1.CronJobApplyConfiguration]
 }
 
 // newCronJobs returns a CronJobs
 func newCronJobs(c *BatchV1Client, namespace string) *cronJobs {
 	return &cronJobs{
-		gentype.NewClientWithListAndApply[*batchv1.CronJob, *batchv1.CronJobList, *applyconfigurationsbatchv1.CronJobApplyConfiguration](
-			"cronjobs",
-			c.RESTClient(),
-			scheme.ParameterCodec,
-			namespace,
-			func() *batchv1.CronJob { return &batchv1.CronJob{} },
-			func() *batchv1.CronJobList { return &batchv1.CronJobList{} },
-			gentype.PrefersProtobuf[*batchv1.CronJob](),
+		v2.NewTypedClientWithListAndApply[batchv1.CronJob, batchv1.CronJobList, applyconfigurationsbatchv1.CronJobApplyConfiguration](
+			v2.ForResource("cronjobs"),
+			v2.UsingClient(c.RESTClient()),
+			v2.UsingParameterCodec(scheme.ParameterCodec),
+			v2.InNamespace(namespace),
+			v2.PrefersProtobuf(),
 		),
 	}
 }

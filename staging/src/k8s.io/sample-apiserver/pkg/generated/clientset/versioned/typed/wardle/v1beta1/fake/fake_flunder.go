@@ -19,7 +19,7 @@ limitations under the License.
 package fake
 
 import (
-	gentype "k8s.io/client-go/gentype"
+	v2fake "k8s.io/client-go/gentype/v2/fake"
 	v1beta1 "k8s.io/sample-apiserver/pkg/apis/wardle/v1beta1"
 	wardlev1beta1 "k8s.io/sample-apiserver/pkg/generated/applyconfiguration/wardle/v1beta1"
 	typedwardlev1beta1 "k8s.io/sample-apiserver/pkg/generated/clientset/versioned/typed/wardle/v1beta1"
@@ -27,24 +27,20 @@ import (
 
 // fakeFlunders implements FlunderInterface
 type fakeFlunders struct {
-	*gentype.FakeClientWithListAndApply[*v1beta1.Flunder, *v1beta1.FlunderList, *wardlev1beta1.FlunderApplyConfiguration]
+	*v2fake.FakeClientWithListAndApply[v1beta1.Flunder, v1beta1.FlunderList, wardlev1beta1.FlunderApplyConfiguration, *v1beta1.Flunder, *v1beta1.FlunderList, *wardlev1beta1.FlunderApplyConfiguration]
 	Fake *FakeWardleV1beta1
 }
 
 func newFakeFlunders(fake *FakeWardleV1beta1, namespace string) typedwardlev1beta1.FlunderInterface {
 	return &fakeFlunders{
-		gentype.NewFakeClientWithListAndApply[*v1beta1.Flunder, *v1beta1.FlunderList, *wardlev1beta1.FlunderApplyConfiguration](
+		v2fake.NewFakeClientWithListAndApply[v1beta1.Flunder, v1beta1.FlunderList, wardlev1beta1.FlunderApplyConfiguration](
 			fake.Fake,
-			namespace,
-			v1beta1.SchemeGroupVersion.WithResource("flunders"),
-			v1beta1.SchemeGroupVersion.WithKind("Flunder"),
-			func() *v1beta1.Flunder { return &v1beta1.Flunder{} },
-			func() *v1beta1.FlunderList { return &v1beta1.FlunderList{} },
-			func(dst, src *v1beta1.FlunderList) { dst.ListMeta = src.ListMeta },
-			func(list *v1beta1.FlunderList) []*v1beta1.Flunder { return gentype.ToPointerSlice(list.Items) },
-			func(list *v1beta1.FlunderList, items []*v1beta1.Flunder) {
-				list.Items = gentype.FromPointerSlice(items)
-			},
+			v2fake.InNamespace(namespace),
+			v2fake.ForResource(v1beta1.SchemeGroupVersion.WithResource("flunders")),
+			v2fake.ForKind(v1beta1.SchemeGroupVersion.WithKind("Flunder")),
+			v2fake.WithListMetaCopier[v1beta1.Flunder](func(dst, src *v1beta1.FlunderList) { dst.ListMeta = src.ListMeta }),
+			v2fake.WithItemsGetter(func(list *v1beta1.FlunderList) []v1beta1.Flunder { return list.Items }),
+			v2fake.WithItemsSetter(func(list *v1beta1.FlunderList, items []v1beta1.Flunder) { list.Items = items }),
 		),
 		fake,
 	}
