@@ -45,13 +45,16 @@ import (
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
+	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/utils/ptr"
 )
 
@@ -1370,6 +1373,49 @@ func TestDescribeService(t *testing.T) {
 
 			assert.Equal(t, tc.expected, out)
 		})
+	}
+}
+
+func TestDescribeServiceEndpointSliceListError(t *testing.T) {
+	service := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{Name: "bar", Namespace: "foo"},
+		Spec: corev1.ServiceSpec{
+			Type: corev1.ServiceTypeClusterIP,
+			Ports: []corev1.ServicePort{{
+				Name:     "port-tcp",
+				Port:     8080,
+				Protocol: corev1.ProtocolTCP,
+			}},
+			ClusterIP: "1.2.3.4",
+		},
+	}
+	fakeClient := fake.NewClientset(service)
+	fakeClient.PrependReactor("list", "endpointslices", func(action clienttesting.Action) (bool, runtime.Object, error) {
+		return true, nil, apierrors.NewForbidden(schema.GroupResource{Group: "discovery.k8s.io", Resource: "endpointslices"}, "", fmt.Errorf("not allowed"))
+	})
+	d := ServiceDescriber{&describeClient{T: t, Namespace: "foo", Interface: fakeClient}}
+
+	out, err := d.Describe("foo", "bar", DescriberSettings{ShowEvents: false})
+	if err != nil {
+		t.Fatalf("Describe() unexpected error: %v", err)
+	}
+	foundEndpointsError := false
+	for _, line := range strings.Split(out, "\n") {
+		if !strings.HasPrefix(strings.TrimLeft(line, " \t"), "Endpoints:") {
+			continue
+		}
+		if strings.Contains(line, "<none>") {
+			t.Fatalf("Describe() output still claims no endpoints when EndpointSlice list failed:\n%s", out)
+		}
+		if strings.Contains(line, "<error:") {
+			foundEndpointsError = true
+		}
+	}
+	if !foundEndpointsError {
+		t.Fatalf("Describe() output missing Endpoints error; got:\n%s", out)
+	}
+	if !strings.Contains(out, "Name:") || !strings.Contains(out, "bar") {
+		t.Fatalf("Describe() should still print the Service when EndpointSlice list fails:\n%s", out)
 	}
 }
 

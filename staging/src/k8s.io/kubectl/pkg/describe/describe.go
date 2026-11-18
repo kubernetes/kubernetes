@@ -2918,14 +2918,18 @@ func (d *ServiceDescriber) Describe(namespace, name string, describerSettings De
 		return "", err
 	}
 
-	endpointSliceList, _ := d.DiscoveryV1().EndpointSlices(service.Namespace).List(context.TODO(), metav1.ListOptions{
+	endpointSliceList, endpointSlicesErr := d.DiscoveryV1().EndpointSlices(service.Namespace).List(context.TODO(), metav1.ListOptions{
 		LabelSelector: fmt.Sprintf("%s=%s", discoveryv1.LabelServiceName, service.Name),
 	})
+	var endpointSlices []discoveryv1.EndpointSlice
+	if endpointSlicesErr == nil && endpointSliceList != nil {
+		endpointSlices = endpointSliceList.Items
+	}
 	var events *corev1.EventList
 	if describerSettings.ShowEvents {
 		events, _ = searchEvents(d.CoreV1(), service, describerSettings.ChunkSize)
 	}
-	return describeService(service, endpointSliceList.Items, events)
+	return describeService(service, endpointSlices, endpointSlicesErr, events)
 }
 
 func buildIngressString(ingress []corev1.LoadBalancerIngress) string {
@@ -2947,7 +2951,7 @@ func buildIngressString(ingress []corev1.LoadBalancerIngress) string {
 	return buffer.String()
 }
 
-func describeService(service *corev1.Service, endpointSlices []discoveryv1.EndpointSlice, events *corev1.EventList) (string, error) {
+func describeService(service *corev1.Service, endpointSlices []discoveryv1.EndpointSlice, endpointSlicesErr error, events *corev1.EventList) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
 		w.Write(LEVEL_0, "Name:\t%s\n", service.Name)
@@ -3011,7 +3015,13 @@ func describeService(service *corev1.Service, endpointSlices []discoveryv1.Endpo
 			if sp.NodePort != 0 {
 				w.Write(LEVEL_0, "NodePort:\t%s\t%d/%s\n", name, sp.NodePort, sp.Protocol)
 			}
-			w.Write(LEVEL_0, "Endpoints:\t%s\n", formatEndpointSlices(endpointSlices, sets.New(sp.Name)))
+			// Match IngressDescriber: surface EndpointSlice list failures inline so
+			// describe still works when the caller can get Services but not list slices.
+			if endpointSlicesErr != nil {
+				w.Write(LEVEL_0, "Endpoints:\t<error: %v>\n", endpointSlicesErr)
+			} else {
+				w.Write(LEVEL_0, "Endpoints:\t%s\n", formatEndpointSlices(endpointSlices, sets.New(sp.Name)))
+			}
 		}
 		w.Write(LEVEL_0, "Session Affinity:\t%s\n", service.Spec.SessionAffinity)
 		if service.Spec.ExternalTrafficPolicy != "" {
