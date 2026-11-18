@@ -1494,6 +1494,14 @@ func TestDeferredResizeQueueingHandlers(t *testing.T) {
 					t.Fatalf("Expected pod to be removed from both queue and cache after deletion: %v", err)
 				}
 			} else {
+				if tc.expectInitiallyInQueue {
+					if err := wait.PollUntilContextTimeout(testCtx, 20*time.Millisecond, 2*time.Second, true, func(ctx context.Context) (bool, error) {
+						_, found := queue.GetPod(ctx, pod.Name, pod.Namespace, nil)
+						return !found, nil
+					}); err != nil {
+						t.Fatalf("Expected pod to be removed from scheduling queue: %v", err)
+					}
+				}
 				assertPodConsistentlyNotQueued(t, testCtx, pod)
 			}
 		})
