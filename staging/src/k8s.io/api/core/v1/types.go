@@ -6024,14 +6024,16 @@ type PodStatus struct {
 
 	// AllocatedResources is the total requests allocated for this pod by the node, including pod.spec.overhead.
 	// If pod-level requests are not set, this will be the total requests aggregated
-	// across containers in the pod, plus pod.spec.overhead.
+	// across containers in the pod, plus pod.spec.overhead if specified.
 	// +featureGate=InPlacePodLevelResourcesVerticalScaling
 	// +optional
 	AllocatedResources ResourceList `json:"allocatedResources,omitempty" protobuf:"bytes,19,rep,name=allocatedResources,casttype=ResourceList,castkey=ResourceName"`
 
 	// Resources represents the compute resource requests and limits that have been
 	// applied at the pod level if pod-level requests or limits are set in
-	// PodSpec.Resources, plus pod.spec.overhead if specified.
+	// PodSpec.Resources, plus pod.spec.overhead if specified (for limits, only added
+	// to non-zero limits; kubelets prior to v1.38 may omit overhead from memory and
+	// hugepages requests when set in PodSpec.Resources).
 	// +featureGate=InPlacePodLevelResourcesVerticalScaling
 	// +optional
 	Resources *ResourceRequirements `json:"resources,omitempty" protobuf:"bytes,20,opt,name=resources"`

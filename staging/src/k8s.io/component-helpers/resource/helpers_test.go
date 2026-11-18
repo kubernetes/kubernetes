@@ -2476,6 +2476,88 @@ func TestPodLevelResourceRequests(t *testing.T) {
 				v1.ResourceMemory: resource.MustParse("200Mi"),
 			},
 		},
+		{
+			name: "status requests with non-pod-level overhead resource",
+			opts: PodResourcesOptions{
+				UseStatusResources: true,
+				InPlacePodLevelResourcesVerticalScalingEnabled: true,
+			},
+			podResources: v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("1"),
+					v1.ResourceMemory: resource.MustParse("1Gi"),
+				},
+			},
+			overhead: v1.ResourceList{
+				v1.ResourceCPU:              resource.MustParse("100m"),
+				v1.ResourceMemory:           resource.MustParse("64Mi"),
+				v1.ResourceEphemeralStorage: resource.MustParse("512Mi"),
+			},
+			containers: []v1.Container{
+				{
+					Name: "c1",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceEphemeralStorage: resource.MustParse("1Gi"),
+						},
+					},
+				},
+			},
+			statusRequests: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU:              resource.MustParse("1100m"),
+					v1.ResourceMemory:           resource.MustParse("1088Mi"),
+					v1.ResourceEphemeralStorage: resource.MustParse("1536Mi"),
+				},
+			},
+			allocated: v1.ResourceList{
+				v1.ResourceCPU:              resource.MustParse("1100m"),
+				v1.ResourceMemory:           resource.MustParse("1088Mi"),
+				v1.ResourceEphemeralStorage: resource.MustParse("1536Mi"),
+			},
+			expectedRequests: v1.ResourceList{
+				v1.ResourceCPU:              resource.MustParse("1100m"),
+				v1.ResourceMemory:           resource.MustParse("1088Mi"),
+				v1.ResourceEphemeralStorage: resource.MustParse("1536Mi"),
+			},
+		},
+		{
+			name: "status requests with overhead when pod-level spec is unset and actuated exceeds allocated",
+			opts: PodResourcesOptions{
+				UseStatusResources: true,
+				InPlacePodLevelResourcesVerticalScalingEnabled: true,
+			},
+			podResources: v1.ResourceRequirements{},
+			overhead: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("100m"),
+				v1.ResourceMemory: resource.MustParse("10Mi"),
+			},
+			containers: []v1.Container{
+				{
+					Name: "c1",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("1"),
+							v1.ResourceMemory: resource.MustParse("100Mi"),
+						},
+					},
+				},
+			},
+			statusRequests: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("2100m"),
+					v1.ResourceMemory: resource.MustParse("210Mi"),
+				},
+			},
+			allocated: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("1100m"),
+				v1.ResourceMemory: resource.MustParse("110Mi"),
+			},
+			expectedRequests: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("2100m"),
+				v1.ResourceMemory: resource.MustParse("210Mi"),
+			},
+		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
