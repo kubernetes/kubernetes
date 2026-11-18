@@ -2002,6 +2002,10 @@ var _ = SIGDescribe("POD Resources API", framework.WithSerial(), feature.PodReso
 
 	f.Context("when querying /metrics", f.WithNodeConformance(), func() {
 		ginkgo.BeforeEach(func(ctx context.Context) {
+			// A previous serial test may have restarted the kubelet without
+			// waiting for the podresources socket to come back.
+			waitForPodResourcesV1Serving(ctx)
+
 			// ensure APIs have been called at least once
 			endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
 			framework.ExpectNoError(err, "LocalEndpoint() failed err %v", err)
