@@ -257,7 +257,8 @@ func AllValidSigningAlgorithms() []string {
 // allowlist of signing algorithms to ensure users don't mistakenly pass something goofy.
 //
 // IMPORTANT: The algorithms in this list must support at least the algorithms
-// that we support for serviceaccount tokens (pkg/serviceaccount/jwt.go AcceptableServiceAccountSignatureAlgorithms).
+// that we support for serviceaccount tokens (pkg/serviceaccount/jwt.go AcceptableServiceAccountSignatureAlgorithms),
+// and must be kept in sync with staging/src/k8s.io/component-helpers/auth/admission/verifier.go allowedSigningAlgs.
 var allowedSigningAlgs = map[string]bool{
 	oidc.RS256:           true,
 	oidc.RS384:           true,
