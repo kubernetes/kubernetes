@@ -119,11 +119,14 @@ func loadSystemLanguage() string {
 		klog.V(3).Infof("Couldn't find the LC_ALL, LC_MESSAGES or LANG environment variables, defaulting to en_US")
 		return "default"
 	}
-	pieces := strings.Split(langStr, ".")
-	if len(pieces) != 2 {
-		if langStr != "C" {
-			klog.V(3).Infof("Unexpected system language (%s), defaulting to en_US", langStr)
-		}
+	// Locale names have the form language[_territory][.codeset][@modifier].
+	locale, _, _ := strings.Cut(langStr, "@")
+	pieces := strings.Split(locale, ".")
+	if len(pieces) > 2 || pieces[0] == "" {
+		klog.V(3).Infof("Unexpected system language (%s), defaulting to en_US", langStr)
+		return "default"
+	}
+	if pieces[0] == "C" || pieces[0] == "POSIX" {
 		return "default"
 	}
 	return pieces[0]
