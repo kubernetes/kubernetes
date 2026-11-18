@@ -70,7 +70,7 @@ func NewCmdConfigGetContexts(streams genericiooptions.IOStreams, configAccess cl
 	}
 
 	cmd := &cobra.Command{
-		Use:                   "get-contexts [(-o|--output=)name)]",
+		Use:                   "get-contexts [(-o|--output=)name]",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Describe one or many contexts"),
 		Long:                  getContextsLong,
