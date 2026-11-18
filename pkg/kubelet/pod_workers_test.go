@@ -1767,6 +1767,31 @@ func (w *WorkChannel) Intercept(uid types.UID, ch chan struct{}) (outCh <-chan s
 	return channel.out
 }
 
+func TestEvictedPodContentRemovalWaitsForTermination(t *testing.T) {
+	logger, ctx := ktesting.NewTestContext(t)
+	workers, _, _ := createPodWorkers(logger)
+	pod := newNamedPod("1", "ns", "evicted-pod", false)
+
+	// A container can exit and trigger cleanup while SyncTerminatingPod is
+	// still collecting the exit status from the runtime.
+	var retainedDuringTermination bool
+	workers.podSyncer.(*podSyncerFuncs).syncTerminatingPod = func(context.Context, *v1.Pod, *kubecontainer.PodStatus, *int64, func(*v1.PodStatus)) error {
+		retainedDuringTermination = !workers.ShouldPodContentBeRemoved(pod.UID)
+		return nil
+	}
+	workers.UpdatePod(ctx, UpdatePodOptions{Pod: pod, UpdateType: kubetypes.SyncPodCreate})
+	drainAllWorkers(workers)
+	workers.UpdatePod(ctx, UpdatePodOptions{
+		Pod:            pod,
+		UpdateType:     kubetypes.SyncPodKill,
+		KillPodOptions: &KillPodOptions{Evict: true},
+	})
+	drainAllWorkers(workers)
+
+	require.True(t, retainedDuringTermination, "cleanup must wait for the final container status")
+	require.True(t, workers.ShouldPodContentBeRemoved(pod.UID), "evicted pod content should be reclaimed after termination")
+}
+
 func TestSyncKnownPods(t *testing.T) {
 	logger, tCtx := ktesting.NewTestContext(t)
 	podWorkers, _, _ := createPodWorkers(logger)
