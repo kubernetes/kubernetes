@@ -157,8 +157,10 @@ function download_tarball() {
   url="${DOWNLOAD_URL_PREFIX}/${file}"
   mkdir -p "${download_path}"
 
-  if [[ $(which gcloud) ]] && [[ "$url" =~ ^https://storage.googleapis.com/.* ]]; then
-    gcloud storage cp "${url//'https://storage.googleapis.com/'/gs://}" "${download_path}/${file}"
+  # gcloud needs an active account even for a public bucket, so fall back if it fails.
+  if [[ $(which gcloud) ]] && [[ "$url" =~ ^https://storage.googleapis.com/.* ]] &&
+     gcloud storage cp "${url//'https://storage.googleapis.com/'/gs://}" "${download_path}/${file}"; then
+    :
   elif [[ $(which curl) ]]; then
     # if the url belongs to GCS API we should use oauth2_token in the headers
     curl_headers=""

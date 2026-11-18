@@ -242,8 +242,10 @@ if [[ -z "${KUBERNETES_SKIP_CONFIRM-}" ]]; then
 fi
 
 if "${need_download}"; then
-  if [[ $(which gcloud) ]] && [[ "$kubernetes_tar_url" =~ ^https://storage.googleapis.com/.* ]]; then
-    gcloud storage cp "${kubernetes_tar_url//'https://storage.googleapis.com/'/gs://}" "${file}"
+  # gcloud needs an active account even for a public bucket, so fall back if it fails.
+  if [[ $(which gcloud) ]] && [[ "$kubernetes_tar_url" =~ ^https://storage.googleapis.com/.* ]] &&
+     gcloud storage cp "${kubernetes_tar_url//'https://storage.googleapis.com/'/gs://}" "${file}"; then
+    :
   elif [[ $(which curl) ]]; then
     # if the url belongs to GCS API we should use oauth2_token in the headers
     curl_headers=""
