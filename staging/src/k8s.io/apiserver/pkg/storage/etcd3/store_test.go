@@ -350,13 +350,13 @@ func TestOptimisticConcurrency(t *testing.T) {
 }
 
 func TestDeleteOnce(t *testing.T) {
-	ctx, store, _ := testSetup(t)
-	storagetesting.RunTestDeleteOnce(ctx, t, store, "", store.codec)
+	ctx, store, _ := testSetup(t, withPrefix("/registry"))
+	storagetesting.RunTestDeleteOnce(ctx, t, store, store.codec)
 }
 
 func TestUpdateOnce(t *testing.T) {
-	ctx, store, _ := testSetup(t)
-	storagetesting.RunTestUpdateOnce(ctx, t, store, "", store.codec)
+	ctx, store, _ := testSetup(t, withPrefix("/registry"))
+	storagetesting.RunTestUpdateOnce(ctx, t, store, store.codec)
 }
 
 func TestList(t *testing.T) {
@@ -812,7 +812,7 @@ func TestPrefix(t *testing.T) {
 				}
 				return "pod", "ns", nil
 			}
-			_, store, _ := testSetup(t, withPrefix(configuredPrefix), withResourcePrefix("/pods"), withReverseKeyFunc(reverseKeyFunc))
+			ctx, store, _ := testSetup(t, withPrefix(configuredPrefix), withResourcePrefix("/pods"), withReverseKeyFunc(reverseKeyFunc))
 			if store.pathPrefix != effectivePrefix {
 				t.Errorf("expected effective prefix %q, got %q", effectivePrefix, store.pathPrefix)
 			}
@@ -838,6 +838,11 @@ func TestPrefix(t *testing.T) {
 			name, namespace, err := store.watcher.reverseKeyFunc(storageKey(key))
 			if err != nil || name != "pod" || namespace != "ns" {
 				t.Fatalf("reverse key round trip returned name=%q namespace=%q err=%v", name, namespace, err)
+			}
+			err = store.Get(ctx, "/pods/ns/pod", storage.GetOptions{}, &example.Pod{})
+			var storageErr *storage.StorageError
+			if !errors.As(err, &storageErr) || storageErr.Key != "/pods/ns/pod" {
+				t.Fatalf("expected StorageError with resource key %q, got %v", "/pods/ns/pod", err)
 			}
 			// Root prefixes must also work when the store passes them to the estimator.
 			if err := store.EnableResourceSizeEstimation(store.getKeys); err != nil {
@@ -1551,8 +1556,8 @@ func TestPrefixStats(t *testing.T) {
 }
 
 func TestCorrectness(t *testing.T) {
-	ctx, store, client := testSetup(t)
-	correctness.RunTestCorrectness(ctx, t, store, "", func(obj runtime.Object) (string, error) {
+	ctx, store, client := testSetup(t, withPrefix("/registry"))
+	correctness.RunTestCorrectness(ctx, t, store, func(obj runtime.Object) (string, error) {
 		pod := obj.(*example.Pod)
 		return computePodKey(pod), nil
 	}, compactStorage(store, client.Client))

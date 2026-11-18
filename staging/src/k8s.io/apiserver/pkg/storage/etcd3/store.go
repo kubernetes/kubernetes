@@ -269,7 +269,7 @@ func (s *store) Get(ctx context.Context, key string, opts storage.GetOptions, ou
 		if opts.IgnoreNotFound {
 			return runtime.SetZeroValue(out)
 		}
-		return storage.NewKeyNotFoundError(preparedKey, getResp.Revision)
+		return storage.NewKeyNotFoundError(s.resourceKey(preparedKey), getResp.Revision)
 	}
 
 	data, _, err := s.transformer.TransformFromStorage(ctx, getResp.KV.Value, authenticatedDataString(preparedKey))
@@ -342,7 +342,7 @@ func (s *store) Create(ctx context.Context, key string, obj, out runtime.Object,
 	span.AddEvent("Txn call succeeded")
 
 	if !txnResp.Succeeded {
-		return storage.NewKeyExistsError(preparedKey, 0)
+		return storage.NewKeyExistsError(s.resourceKey(preparedKey), 0)
 	}
 
 	if out != nil {
@@ -387,7 +387,7 @@ func (s *store) Delete(
 	if err != nil {
 		return err
 	}
-	return storage.ConditionalDelete(ctx, d, preparedKey, out, preconditions, validateDeletion, origState)
+	return storage.ConditionalDelete(ctx, d, s.resourceKey(preparedKey), out, preconditions, validateDeletion, origState)
 }
 
 // DeleteOnce implements storage.Interface.
@@ -417,7 +417,7 @@ func (s *store) deleteOnce(ctx context.Context, key string, out runtime.Object, 
 	if !success {
 		klog.V(4).Infof("deletion of %s failed because of a conflict, going to retry", key)
 		if !getOnFailure {
-			return nil, false, storage.NewResourceVersionConflictsError(key, txnResp.Revision)
+			return nil, false, storage.NewResourceVersionConflictsError(s.resourceKey(key), txnResp.Revision)
 		}
 		origState, err = s.stateFromEtcdResponse(ctx, txnResp.KV, txnResp.Revision, key, v, false, expectTransformOrDecodeError)
 		return origState, success, err
@@ -465,7 +465,7 @@ func (s *store) GuaranteedUpdate(
 	}
 	span.AddEvent("initial value restored")
 
-	return storage.GuaranteedUpdate(ctx, d, preparedKey, destination, ignoreNotFound, preconditions, tryUpdate, origState)
+	return storage.GuaranteedUpdate(ctx, d, s.resourceKey(preparedKey), destination, ignoreNotFound, preconditions, tryUpdate, origState)
 }
 
 // UpdateOnce implements storage.Interface.
@@ -508,7 +508,7 @@ func (s *store) updateOnce(ctx context.Context, preparedKey string, destination 
 			if !bytes.Equal(data, origState.Data) {
 				// original data changed, restart loop
 				if !getOnFailure {
-					return origState, false, storage.NewResourceVersionConflictsError(preparedKey, origState.Rev)
+					return origState, false, storage.NewResourceVersionConflictsError(s.resourceKey(preparedKey), origState.Rev)
 				}
 				return origState, false, nil
 			}
@@ -557,7 +557,7 @@ func (s *store) updateOnce(ctx context.Context, preparedKey string, destination 
 	if !success {
 		klog.V(4).Infof("GuaranteedUpdate of %s failed because of a conflict, going to retry", preparedKey)
 		if !getOnFailure {
-			return nil, false, storage.NewResourceVersionConflictsError(preparedKey, txnResp.Revision)
+			return nil, false, storage.NewResourceVersionConflictsError(s.resourceKey(preparedKey), txnResp.Revision)
 		}
 		origState, err = s.stateFromEtcdResponse(ctx, txnResp.KV, txnResp.Revision, preparedKey, v, ignoreNotFound, false)
 		if err != nil {
@@ -1164,7 +1164,7 @@ func (s *store) stateFromEtcdResponse(ctx context.Context, kv *mvccpb.KeyValue, 
 
 	if kv == nil {
 		if !ignoreNotFound {
-			return nil, storage.NewKeyNotFoundError(key, rev)
+			return nil, storage.NewKeyNotFoundError(s.resourceKey(key), rev)
 		}
 		if err := runtime.SetZeroValue(state.Obj); err != nil {
 			return nil, err
@@ -1205,7 +1205,7 @@ func (s *store) stateFromEtcdResponse(ctx context.Context, kv *mvccpb.KeyValue, 
 	}
 
 	if expectTransformOrDecodeError {
-		return nil, storage.NewInvalidObjError(key, "unsafe deletion is not allowed because the object is decodable from storage")
+		return nil, storage.NewInvalidObjError(s.resourceKey(key), "unsafe deletion is not allowed because the object is decodable from storage")
 	}
 
 	return state, nil
@@ -1236,6 +1236,13 @@ func (s *store) prepareKey(key string, recursive bool) (string, error) {
 	}
 	// key starts with '/' because PrepareKey checks it against the validated resourcePrefix.
 	return s.pathPrefix + key, nil
+}
+
+func (s *store) resourceKey(preparedKey string) string {
+	if resourceKey, found := strings.CutPrefix(preparedKey, s.pathPrefix); found && strings.HasPrefix(resourceKey, "/") {
+		return resourceKey
+	}
+	return preparedKey
 }
 
 // recordDecodeError record decode error split by object type.

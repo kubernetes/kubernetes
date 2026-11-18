@@ -31,7 +31,7 @@ import (
 )
 
 func newTestStorage() *ModelStorage {
-	return NewStorage(NewEmptyModel("", func() runtime.Object { return &example.Pod{} }, func() runtime.Object { return &example.PodList{} }, storage.APIObjectVersioner{}))
+	return NewStorage(NewEmptyModel(func() runtime.Object { return &example.Pod{} }, func() runtime.Object { return &example.PodList{} }, storage.APIObjectVersioner{}))
 }
 
 func TestStorageCreate(t *testing.T) {
@@ -150,7 +150,7 @@ func TestStorageWatch(t *testing.T) {
 
 func TestStorageWatchWithoutPrevKVReverseError(t *testing.T) {
 	wantErr := errors.New("invalid resource key")
-	model := NewEmptyModel("", func() runtime.Object { return &example.Pod{} }, func() runtime.Object { return &example.PodList{} }, storage.APIObjectVersioner{})
+	model := NewEmptyModel(func() runtime.Object { return &example.Pod{} }, func() runtime.Object { return &example.PodList{} }, storage.APIObjectVersioner{})
 	model.ReverseKeyFunc = func(string) (string, string, error) {
 		return "", "", wantErr
 	}
@@ -186,7 +186,7 @@ func TestStorageWatchDeleteEventObjectHaveLatestRV(t *testing.T) {
 	for _, isNamespaceScoped := range []bool{false, true} {
 		for _, watchWithoutPrevKV := range []bool{false, true} {
 			t.Run(fmt.Sprintf("namespaced=%v/watchWithoutPrevKV=%v", isNamespaceScoped, watchWithoutPrevKV), func(t *testing.T) {
-				model := NewEmptyModel("", func() runtime.Object { return &example.Pod{} }, func() runtime.Object { return &example.PodList{} }, storage.APIObjectVersioner{})
+				model := NewEmptyModel(func() runtime.Object { return &example.Pod{} }, func() runtime.Object { return &example.PodList{} }, storage.APIObjectVersioner{})
 				if watchWithoutPrevKV {
 					model.ReverseKeyFunc = storagetesting.PodReverseKeyFunc("/pods", isNamespaceScoped)
 				}
@@ -240,5 +240,5 @@ func TestStorageWatchResync(t *testing.T) {
 
 func TestStorageCorrectness(t *testing.T) {
 	s := newTestStorage()
-	RunTestCorrectness(t.Context(), t, s, "", getKey, compactFunc(s))
+	RunTestCorrectness(t.Context(), t, s, getKey, compactFunc(s))
 }
