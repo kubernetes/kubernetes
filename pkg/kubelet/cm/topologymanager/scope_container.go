@@ -63,9 +63,9 @@ func (s *containerScope) Admit(ctx context.Context, pod *v1.Pod, operation lifec
 			}
 			metrics.TopologyManagerAdmissionErrorsTotal.Inc()
 			if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) && resourcehelper.IsPodLevelResourcesSet(pod) {
-				return admission.GetPodAdmitResult(NewPodLevelTopologyAffinityError("pod with pod-level resources failed admission with a container-level topology manager"))
+				return admission.GetPodAdmitResult(NewPodLevelTopologyAffinityError("pod with pod-level resources failed admission with a container-level topology manager", operation))
 			}
-			return admission.GetPodAdmitResult(&TopologyAffinityError{})
+			return admission.GetPodAdmitResult(NewTopologyAffinityError(operation))
 		}
 		if dryRun {
 			// Without allocating, the hints of the next containers don't account for the

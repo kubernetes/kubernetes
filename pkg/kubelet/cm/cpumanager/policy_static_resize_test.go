@@ -19,6 +19,7 @@ package cpumanager
 import (
 	"fmt"
 	"reflect"
+	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -1024,6 +1025,18 @@ func runStaticPolicyTestCaseWithInPlacePodVerticalScalingExclusiveCPUs(t *testin
 			t.Errorf("StaticPolicy Allocate() error (%v). expected cpuset %s to be disoint from the shared cpuset %s",
 				testCase.description, original.Baseline, st.defaultCPUSet)
 		}
+
+		// On Add, allocated CPUs are the "baseline CPUs”, the cpuset container is admitted for the first time.
+		assigned, found := st.GetCPUSet(string(testCase.pod.UID), container.Name)
+		if !found {
+			t.Errorf("StaticPolicy Allocate() error (%v). expected container %v to be present in assignments %v",
+				testCase.description, container.Name, st.GetCPUAssignments())
+		}
+
+		if !assigned.Equals(testCase.expCSet) {
+			t.Errorf("StaticPolicy Allocate() error (%v). expected allocated cpuset %s but got %s",
+				testCase.description, testCase.expCSet, assigned)
+		}
 	}
 
 	if !testCase.expCPUAlloc {
@@ -1077,7 +1090,7 @@ func TestStaticPolicyPodResizeCPUsSingleContainerPod(t *testing.T) {
 				pod: makeMultiContainerPodWithOptions(
 					nil,
 					[]*containerOptions{
-						{request: "2000m", limit: "2000m", restartPolicy: v1.ContainerRestartPolicy("Never")}}, // 0, 4
+						{request: "2000m", limit: "2000m"}}, // 0, 4
 				),
 				qosClass:        v1.PodQOSGuaranteed,
 				podAllocated:    "2000m",
@@ -1099,7 +1112,7 @@ func TestStaticPolicyPodResizeCPUsSingleContainerPod(t *testing.T) {
 				pod: makeMultiContainerPodWithOptions(
 					nil,
 					[]*containerOptions{
-						{request: "4000m", limit: "4000m", restartPolicy: v1.ContainerRestartPolicy("Never")}}, // 0-1, 4-5
+						{request: "4000m", limit: "4000m"}}, // 0-1, 4-5
 				),
 				qosClass:        v1.PodQOSGuaranteed,
 				podAllocated:    "4000m",
@@ -1122,12 +1135,41 @@ func TestStaticPolicyPodResizeCPUsSingleContainerPod(t *testing.T) {
 		},
 		{
 			staticPolicyResizeTest: staticPolicyResizeTest{
+				description: "SingleSocketHT, PodResize, Container in exclusively allocated pool, Decrease allocated CPUs below baseline to a fractional request",
+				topo:        topoSingleSocketHT,
+				pod: makeMultiContainerPodWithOptions(
+					nil,
+					[]*containerOptions{
+						{request: "4000m", limit: "4000m"}}, // 0-1, 4-5
+				),
+				qosClass:        v1.PodQOSGuaranteed,
+				podAllocated:    "4000m",
+				resizeLimit:     "2500m",
+				resizeRequest:   "2500m",
+				containerName:   "appContainer-0",
+				stAssignments:   state.ContainerCPUAssignments{},
+				stBaselines:     state.ContainerCPUBaselines{},
+				stDefaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7),
+			},
+			// The fractional request is reported, not the baseline with the request rounded up to 3 CPUs.
+			expAllocErr: resizeFeasibilityError{
+				PodUID:        "podUID",
+				ContainerName: "appContainer-0",
+				CausedBy:      "cannot move container from exclusive to shared pool, (requested CPUs = 2500m)",
+			},
+			expDefaultCPUSetAfterAdd:        cpuset.New(2, 3, 6, 7),
+			expDefaultCPUSetAfterUpdate:     cpuset.New(2, 3, 6, 7),
+			expDefaultCPUSetSizeAfterResize: 4,
+			expDefaultCPUSetAfterRemove:     cpuset.New(0, 1, 2, 3, 4, 5, 6, 7),
+		},
+		{
+			staticPolicyResizeTest: staticPolicyResizeTest{
 				description: "SingleSocketHT, PodResize, Container in shared pool with more than one core, Attempt to move to exclusively allocated pool",
 				topo:        topoSingleSocketHT,
 				pod: makeMultiContainerPodWithOptions(
 					nil,
 					[]*containerOptions{
-						{request: "2100m", limit: "2100m", restartPolicy: v1.ContainerRestartPolicy("Never")}}, // 0-7
+						{request: "2100m", limit: "2100m"}}, // 0-7
 				),
 				qosClass:        v1.PodQOSGuaranteed,
 				podAllocated:    "2100m",
@@ -1154,7 +1196,7 @@ func TestStaticPolicyPodResizeCPUsSingleContainerPod(t *testing.T) {
 				pod: makeMultiContainerPodWithOptions(
 					nil,
 					[]*containerOptions{
-						{request: "100m", limit: "100m", restartPolicy: v1.ContainerRestartPolicy("Never")}}, // 0-7
+						{request: "100m", limit: "100m"}}, // 0-7
 				),
 				qosClass:        v1.PodQOSGuaranteed,
 				podAllocated:    "100m",
@@ -1176,7 +1218,7 @@ func TestStaticPolicyPodResizeCPUsSingleContainerPod(t *testing.T) {
 				pod: makeMultiContainerPodWithOptions(
 					nil,
 					[]*containerOptions{
-						{request: "1100m", limit: "1100m", restartPolicy: v1.ContainerRestartPolicy("Never")}}, // 0-7
+						{request: "1100m", limit: "1100m"}}, // 0-7
 				),
 				qosClass:        v1.PodQOSGuaranteed,
 				podAllocated:    "1100m",
@@ -1198,7 +1240,7 @@ func TestStaticPolicyPodResizeCPUsSingleContainerPod(t *testing.T) {
 				pod: makeMultiContainerPodWithOptions(
 					nil,
 					[]*containerOptions{
-						{request: "200m", limit: "200m", restartPolicy: v1.ContainerRestartPolicy("Never")}}, // 0-7
+						{request: "200m", limit: "200m"}}, // 0-7
 				),
 				qosClass:        v1.PodQOSGuaranteed,
 				podAllocated:    "200m",
@@ -1220,7 +1262,7 @@ func TestStaticPolicyPodResizeCPUsSingleContainerPod(t *testing.T) {
 				pod: makeMultiContainerPodWithOptions(
 					nil,
 					[]*containerOptions{
-						{request: "1200m", limit: "1200m", restartPolicy: v1.ContainerRestartPolicy("Never")}}, // 0-7
+						{request: "1200m", limit: "1200m"}}, // 0-7
 				),
 				qosClass:        v1.PodQOSGuaranteed,
 				podAllocated:    "1200m",
@@ -1242,7 +1284,7 @@ func TestStaticPolicyPodResizeCPUsSingleContainerPod(t *testing.T) {
 				pod: makeMultiContainerPodWithOptions(
 					nil,
 					[]*containerOptions{
-						{request: "2000m", limit: "2000m", restartPolicy: v1.ContainerRestartPolicy("Never")}}, // 0-1, 4-5
+						{request: "2000m", limit: "2000m"}}, // 0-1, 4-5
 				),
 				qosClass:        v1.PodQOSGuaranteed,
 				podAllocated:    "2000m",
@@ -1269,7 +1311,7 @@ func TestStaticPolicyPodResizeCPUsSingleContainerPod(t *testing.T) {
 				pod: makeMultiContainerPodWithOptions(
 					nil,
 					[]*containerOptions{
-						{request: "2000m", limit: "2000m", restartPolicy: v1.ContainerRestartPolicy("Never")}}, // 0, 4
+						{request: "2000m", limit: "2000m"}}, // 0, 4
 				),
 				qosClass:            v1.PodQOSGuaranteed,
 				podAllocated:        "2000m",
@@ -1296,7 +1338,7 @@ func TestStaticPolicyPodResizeCPUsSingleContainerPod(t *testing.T) {
 				pod: makeMultiContainerPodWithOptions(
 					nil,
 					[]*containerOptions{
-						{request: "2000m", limit: "2000m", restartPolicy: v1.ContainerRestartPolicy("Never")}}, // 0-4
+						{request: "2000m", limit: "2000m"}}, // 0-4
 				),
 				qosClass:            v1.PodQOSGuaranteed,
 				podAllocated:        "2000m",
@@ -1323,7 +1365,7 @@ func TestStaticPolicyPodResizeCPUsSingleContainerPod(t *testing.T) {
 				pod: makeMultiContainerPodWithOptions(
 					nil,
 					[]*containerOptions{
-						{request: "4000m", limit: "4000m", restartPolicy: v1.ContainerRestartPolicy("Never")}}, // 0-1, 4-5
+						{request: "4000m", limit: "4000m"}}, // 0-1, 4-5
 				),
 				qosClass:            v1.PodQOSGuaranteed,
 				podAllocated:        "4000m",
@@ -1356,7 +1398,7 @@ func TestStaticPolicyPodResizeCPUsSingleContainerPod(t *testing.T) {
 				pod: makeMultiContainerPodWithOptions(
 					nil,
 					[]*containerOptions{
-						{request: "4000m", limit: "4000m", restartPolicy: v1.ContainerRestartPolicy("Never")}}, // 0-1, 4-5
+						{request: "4000m", limit: "4000m"}}, // 0-1, 4-5
 				),
 				qosClass:                    v1.PodQOSGuaranteed,
 				podAllocated:                "4000m",
@@ -1394,7 +1436,7 @@ func TestStaticPolicyPodResizeCPUsSingleContainerPod(t *testing.T) {
 				pod: makeMultiContainerPodWithOptions(
 					nil,
 					[]*containerOptions{
-						{request: "4000m", limit: "4000m", restartPolicy: v1.ContainerRestartPolicy("Never")}}, // 0-1, 4-5
+						{request: "4000m", limit: "4000m"}}, // 0-1, 4-5
 				),
 				qosClass:          v1.PodQOSGuaranteed,
 				podAllocated:      "4000m",
@@ -1434,7 +1476,7 @@ func TestStaticPolicyPodResizeCPUsSingleContainerPod(t *testing.T) {
 				pod: makeMultiContainerPodWithOptions(
 					nil,
 					[]*containerOptions{
-						{request: "4000m", limit: "4000m", restartPolicy: v1.ContainerRestartPolicy("Never")}}, // 0-1, 4-5
+						{request: "4000m", limit: "4000m"}}, // 0-1, 4-5
 				),
 				qosClass:          v1.PodQOSGuaranteed,
 				podAllocated:      "4000m",
@@ -1474,7 +1516,7 @@ func TestStaticPolicyPodResizeCPUsSingleContainerPod(t *testing.T) {
 				pod: makeMultiContainerPodWithOptions(
 					nil,
 					[]*containerOptions{
-						{request: "4000m", limit: "4000m", restartPolicy: v1.ContainerRestartPolicy("Never")}}, // 0-1, 4-5
+						{request: "4000m", limit: "4000m"}}, // 0-1, 4-5
 				),
 				qosClass:          v1.PodQOSGuaranteed,
 				podAllocated:      "4000m",
@@ -1665,6 +1707,8 @@ func TestStaticPolicyPodResizeCPUsSingleContainerPod(t *testing.T) {
 			}
 
 			// remove
+			// After the resize RemoveContainer must release all CPUs of the container to the shared
+			// pool, including the ones added on scale up, not only its baseline CPUs.
 			err = policy.RemoveContainer(logger, stConsistent, string(pod.UID), testCase.containerName)
 			if err != nil {
 				t.Errorf("StaticPolicy RemoveContainer() error (%v) after pod resize. expected no error but got %v",
@@ -1700,8 +1744,8 @@ func TestStaticPolicyPodResizeCPUsMultiContainerPod(t *testing.T) {
 				pod: makeMultiContainerPodWithOptions(
 					nil,
 					[]*containerOptions{
-						{request: "2000m", limit: "2000m", restartPolicy: v1.ContainerRestartPolicy("Never")},  // 0, 4
-						{request: "2000m", limit: "2000m", restartPolicy: v1.ContainerRestartPolicy("Never")}}, // 1, 5
+						{request: "2000m", limit: "2000m"},  // 0, 4
+						{request: "2000m", limit: "2000m"}}, // 1, 5
 				),
 				qosClass:        v1.PodQOSGuaranteed,
 				podAllocated:    "2000m",
@@ -1724,8 +1768,8 @@ func TestStaticPolicyPodResizeCPUsMultiContainerPod(t *testing.T) {
 				pod: makeMultiContainerPodWithOptions(
 					nil,
 					[]*containerOptions{
-						{request: "2000m", limit: "2000m", restartPolicy: v1.ContainerRestartPolicy("Never")},  // 0, 4
-						{request: "2000m", limit: "2000m", restartPolicy: v1.ContainerRestartPolicy("Never")}}, // 1, 5
+						{request: "2000m", limit: "2000m"},  // 0, 4
+						{request: "2000m", limit: "2000m"}}, // 1, 5
 				),
 				qosClass:        v1.PodQOSGuaranteed,
 				podAllocated:    "2000m",
@@ -1749,8 +1793,8 @@ func TestStaticPolicyPodResizeCPUsMultiContainerPod(t *testing.T) {
 				pod: makeMultiContainerPodWithOptions(
 					nil,
 					[]*containerOptions{
-						{request: "4000m", limit: "4000m", restartPolicy: v1.ContainerRestartPolicy("Never")},  // appContainer-0 CPUs 0, 4, 1, 5
-						{request: "4000m", limit: "4000m", restartPolicy: v1.ContainerRestartPolicy("Never")}}, // appContainer-1 CPUS 2, 6, 3, 7
+						{request: "4000m", limit: "4000m"},  // appContainer-0 CPUs 0, 4, 1, 5
+						{request: "4000m", limit: "4000m"}}, // appContainer-1 CPUS 2, 6, 3, 7
 				),
 				qosClass:        v1.PodQOSGuaranteed,
 				podAllocated:    "4000m",
@@ -1778,8 +1822,8 @@ func TestStaticPolicyPodResizeCPUsMultiContainerPod(t *testing.T) {
 				pod: makeMultiContainerPodWithOptions(
 					nil,
 					[]*containerOptions{
-						{request: "2100m", limit: "2100m", restartPolicy: v1.ContainerRestartPolicy("Never")},  // 0-7
-						{request: "2100m", limit: "2100m", restartPolicy: v1.ContainerRestartPolicy("Never")}}, // 0-7
+						{request: "2100m", limit: "2100m"},  // 0-7
+						{request: "2100m", limit: "2100m"}}, // 0-7
 				),
 				qosClass:        v1.PodQOSGuaranteed,
 				podAllocated:    "2100m",
@@ -1807,8 +1851,8 @@ func TestStaticPolicyPodResizeCPUsMultiContainerPod(t *testing.T) {
 				pod: makeMultiContainerPodWithOptions(
 					nil,
 					[]*containerOptions{
-						{request: "100m", limit: "100m", restartPolicy: v1.ContainerRestartPolicy("Never")},    // 2-3, 6-7
-						{request: "4000m", limit: "4000m", restartPolicy: v1.ContainerRestartPolicy("Never")}}, // 0-1, 4-5
+						{request: "100m", limit: "100m"},    // 2-3, 6-7
+						{request: "4000m", limit: "4000m"}}, // 0-1, 4-5
 				),
 				qosClass:        v1.PodQOSGuaranteed,
 				podAllocated:    "100m",
@@ -1831,8 +1875,8 @@ func TestStaticPolicyPodResizeCPUsMultiContainerPod(t *testing.T) {
 				pod: makeMultiContainerPodWithOptions(
 					nil,
 					[]*containerOptions{
-						{request: "1100m", limit: "1100m", restartPolicy: v1.ContainerRestartPolicy("Never")},  // 0-7
-						{request: "4000m", limit: "4000m", restartPolicy: v1.ContainerRestartPolicy("Never")}}, // 0-1, 4-5
+						{request: "1100m", limit: "1100m"},  // 0-7
+						{request: "4000m", limit: "4000m"}}, // 0-1, 4-5
 				),
 				qosClass:        v1.PodQOSGuaranteed,
 				podAllocated:    "1100m",
@@ -1855,8 +1899,8 @@ func TestStaticPolicyPodResizeCPUsMultiContainerPod(t *testing.T) {
 				pod: makeMultiContainerPodWithOptions(
 					nil,
 					[]*containerOptions{
-						{request: "200m", limit: "200m", restartPolicy: v1.ContainerRestartPolicy("Never")},    // 0-7
-						{request: "4000m", limit: "4000m", restartPolicy: v1.ContainerRestartPolicy("Never")}}, // 0-1, 4-5
+						{request: "200m", limit: "200m"},    // 0-7
+						{request: "4000m", limit: "4000m"}}, // 0-1, 4-5
 				),
 				qosClass:        v1.PodQOSGuaranteed,
 				podAllocated:    "200m",
@@ -1879,8 +1923,8 @@ func TestStaticPolicyPodResizeCPUsMultiContainerPod(t *testing.T) {
 				pod: makeMultiContainerPodWithOptions(
 					nil,
 					[]*containerOptions{
-						{request: "2000m", limit: "2000m", restartPolicy: v1.ContainerRestartPolicy("Never")}, // 0-1, 4-5
-						{request: "200m", limit: "200m", restartPolicy: v1.ContainerRestartPolicy("Never")}},  // 0-7
+						{request: "2000m", limit: "2000m"}, // 0-1, 4-5
+						{request: "200m", limit: "200m"}},  // 0-7
 				),
 				qosClass:        v1.PodQOSGuaranteed,
 				podAllocated:    "2000m",
@@ -1908,8 +1952,8 @@ func TestStaticPolicyPodResizeCPUsMultiContainerPod(t *testing.T) {
 				pod: makeMultiContainerPodWithOptions(
 					nil,
 					[]*containerOptions{
-						{request: "1500m", limit: "1500m", restartPolicy: v1.ContainerRestartPolicy("Never")},  // 0-7
-						{request: "1500m", limit: "1500m", restartPolicy: v1.ContainerRestartPolicy("Never")}}, // 0-7
+						{request: "1500m", limit: "1500m"},  // 0-7
+						{request: "1500m", limit: "1500m"}}, // 0-7
 				),
 				qosClass:        v1.PodQOSGuaranteed,
 				podAllocated:    "1500m",
@@ -2007,6 +2051,8 @@ func TestStaticPolicyPodResizeCPUsMultiContainerPod(t *testing.T) {
 			}
 
 			// remove
+			// After the resize RemoveContainer must release all CPUs of the containers to the shared
+			// pool, including the ones added on scale up, not only their baseline CPUs.
 			err := policy.RemoveContainer(logger, st, string(pod.UID), testCase.containerName)
 			if err != nil {
 				t.Errorf("StaticPolicy RemoveContainer() error (%v) after pod resize. expected no error but got %v",
@@ -2038,6 +2084,8 @@ func TestStaticPolicyPodResizeReusableCPUs(t *testing.T) {
 		containerName string
 		cpus          string
 		expErr        bool
+		// expErrCausedBy is the expected cause of the resize feasibility error, checked when not empty.
+		expErrCausedBy string
 		// expCPUs is the expected allocation of the resized container, checked when not empty.
 		expCPUs cpuset.CPUSet
 		// expSkipped is whether the policy is expected to skip the resize, which keeps the
@@ -2053,8 +2101,9 @@ func TestStaticPolicyPodResizeReusableCPUs(t *testing.T) {
 		// runTogether lists pairs of containers that run at the same time, so must never share CPUs.
 		runTogether                     [][2]string
 		steps                           []resizeStep
-		podLevelResourcesEnabled        bool
 		podLevelResourceManagersEnabled bool
+		options                         map[string]string
+		cpusTakenAfterAddByAnotherPod   cpuset.CPUSet
 	}{
 		// The policy skips the resizes of pods with pod-level resources. The resizes that would
 		// change the exclusive CPUs of such a pod are rejected by the resize admit handler.
@@ -2070,7 +2119,6 @@ func TestStaticPolicyPodResizeReusableCPUs(t *testing.T) {
 			steps: []resizeStep{
 				{containerName: "appContainer-0", cpus: "2000m", expSkipped: true},
 			},
-			podLevelResourcesEnabled:        true,
 			podLevelResourceManagersEnabled: true,
 		},
 		{
@@ -2085,11 +2133,10 @@ func TestStaticPolicyPodResizeReusableCPUs(t *testing.T) {
 			steps: []resizeStep{
 				{containerName: "appContainer-0", cpus: "6000m", expSkipped: true},
 			},
-			podLevelResourcesEnabled:        true,
 			podLevelResourceManagersEnabled: true,
 		},
 		{
-			description:     "Resize of exclusive CPUs keeping same CPUs in a pod with pod-level resources should be accepted",
+			description:     "Resize of exclusive CPUs keeping same CPUs in a pod with pod-level resources should be skipped",
 			pod:             makePodWithPodLevelResources("pod1", "8", "8", "appContainer-0", "4", "4"),
 			stAssignments:   state.ContainerCPUAssignments{},
 			stBaselines:     state.ContainerCPUBaselines{},
@@ -2098,9 +2145,8 @@ func TestStaticPolicyPodResizeReusableCPUs(t *testing.T) {
 				{"appContainer-0"},
 			},
 			steps: []resizeStep{
-				{containerName: "appContainer-0", cpus: "4000m", expErr: false},
+				{containerName: "appContainer-0", cpus: "4000m", expSkipped: true},
 			},
-			podLevelResourcesEnabled:        true,
 			podLevelResourceManagersEnabled: true,
 		},
 		{
@@ -2196,15 +2242,62 @@ func TestStaticPolicyPodResizeReusableCPUs(t *testing.T) {
 				{containerName: "appContainer-0", cpus: "4000m", expCPUs: cpuset.New(0, 1, 4, 5)},
 			},
 		},
+		{
+			description: "Scale up takes over the init container CPUs no sibling uses, an additional scale up fails because another pod after add uses CPUs, full-pcpus-only",
+			pod: makeMultiContainerPodWithOptions(
+				[]*containerOptions{
+					{request: "4000m", limit: "4000m"},
+				},
+				[]*containerOptions{
+					{request: "2000m", limit: "2000m"},
+				},
+			),
+			stAssignments:   state.ContainerCPUAssignments{},
+			stBaselines:     state.ContainerCPUBaselines{},
+			stDefaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7),
+			options: map[string]string{
+				FullPCPUsOnlyOption: "true",
+			},
+			cpusTakenAfterAddByAnotherPod: cpuset.New(2, 3, 6, 7),
+			// initContainer-0 terminates before appContainer-0 starts, so they may share CPUs.
+			runTogether: nil,
+			steps: []resizeStep{
+				// The shared pool is empty, only the CPUs of initContainer-0 can be used.
+				{containerName: "appContainer-0", cpus: "4000m", expCPUs: cpuset.New(0, 1, 4, 5)},
+				// The CPUs of initContainer-0 are all taken over, there are no CPUs left in the shared
+				// pool, 4 CPUs are taken by another pod.
+				{containerName: "appContainer-0", cpus: "6000m", expErr: true},
+			},
+		},
+		{
+			description: "Resize of a non-restartable init container with exclusive CPUs is rejected, also to a fractional request",
+			pod: makeMultiContainerPodWithOptions(
+				[]*containerOptions{
+					{request: "2000m", limit: "2000m"},
+				},
+				[]*containerOptions{
+					{request: "2000m", limit: "2000m"},
+				},
+			),
+			stAssignments:   state.ContainerCPUAssignments{},
+			stBaselines:     state.ContainerCPUBaselines{},
+			stDefaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7),
+			// initContainer-0 terminates before appContainer-0 starts, so they may share CPUs.
+			runTogether: nil,
+			steps: []resizeStep{
+				{containerName: "initContainer-0", cpus: "4000m", expErr: true, expErrCausedBy: "not allowed to resize non-restartable init-container with exclusively allocated pool, (requestedCPUs = 4, assignedCPUs = 0,4)"},
+				// 1500m rounds up to 2 CPUs, the number of the assigned CPUs.
+				{containerName: "initContainer-0", cpus: "1500m", expErr: true, expErrCausedBy: "not allowed to resize non-restartable init-container with exclusively allocated pool, (requestedCPUs = 1500m, assignedCPUs = 0,4)"},
+			},
+		},
 	}
 
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.PodLevelResources, testCase.podLevelResourcesEnabled)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.PodLevelResourceManagers, testCase.podLevelResourceManagersEnabled)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.InPlacePodVerticalScalingExclusiveCPUs, true)
 			logger, _ := ktesting.NewTestContext(t)
-			policy, err := NewStaticPolicy(logger, topoSingleSocketHT, 0, cpuset.New(), topologymanager.NewFakeManager(logger), nil)
+			policy, err := NewStaticPolicy(logger, topoSingleSocketHT, 0, cpuset.New(), topologymanager.NewFakeManager(logger), testCase.options)
 			require.NoError(t, err)
 
 			st := &mockState{
@@ -2217,6 +2310,11 @@ func TestStaticPolicyPodResizeReusableCPUs(t *testing.T) {
 
 			for container := range podutil.ContainerIter(&pod.Spec, podutil.InitContainers|podutil.Containers) {
 				require.NoError(t, policy.Allocate(logger, st, pod, container, lifecycle.AddOperation), "Allocate() of container %s", container.Name)
+			}
+			if !testCase.cpusTakenAfterAddByAnotherPod.IsEmpty() {
+				require.True(t, testCase.cpusTakenAfterAddByAnotherPod.IsSubsetOf(st.GetDefaultCPUSet()), "CPUs %s are not in the shared pool %s", testCase.cpusTakenAfterAddByAnotherPod, st.GetDefaultCPUSet())
+				st.SetDefaultCPUSet(st.GetDefaultCPUSet().Difference(testCase.cpusTakenAfterAddByAnotherPod))
+				st.SetCPUSet("otherPod", "otherContainer", testCase.cpusTakenAfterAddByAnotherPod)
 			}
 			checkCPUs := func(t *testing.T) {
 				t.Helper()
@@ -2259,6 +2357,10 @@ func TestStaticPolicyPodResizeReusableCPUs(t *testing.T) {
 				}
 				if step.expErr {
 					require.Error(t, err, "resize of %s to %s: expected an error, assignments %v", step.containerName, step.cpus, st.GetCPUAssignments())
+					if step.expErrCausedBy != "" {
+						expErr := resizeFeasibilityError{PodUID: podUID, ContainerName: step.containerName, CausedBy: step.expErrCausedBy}
+						require.Equal(t, expErr, err, "resize of %s to %s", step.containerName, step.cpus)
+					}
 				} else if step.expSkipped {
 					require.NoError(t, err, "resize of %s to %s", step.containerName, step.cpus)
 					pod = resized
@@ -2275,6 +2377,112 @@ func TestStaticPolicyPodResizeReusableCPUs(t *testing.T) {
 					}
 				}
 				checkCPUs(t)
+			}
+		})
+	}
+}
+
+func TestStaticPolicyPodResizeMultipleContainersWithTopologyManager(t *testing.T) {
+	testCases := []struct {
+		description string
+		scope       string
+		policy      topologymanager.Policy
+		// resized lists the containers resized from 2 to 4 CPUs in a single operation.
+		resized []string
+		expErr  bool
+	}{
+		{
+			description: "resize of two containers is rejected with the pod scope and the restricted policy",
+			scope:       topologymanager.PodTopologyScope,
+			policy:      topologymanager.NewRestrictedPolicy(nil, topologymanager.PolicyOptions{}),
+			resized:     []string{"appContainer-0", "appContainer-1"},
+			expErr:      true,
+		},
+		{
+			description: "resize of two containers is rejected with the pod scope and the single-numa-node policy",
+			scope:       topologymanager.PodTopologyScope,
+			policy:      topologymanager.NewSingleNumaNodePolicy(nil, topologymanager.PolicyOptions{}),
+			resized:     []string{"appContainer-0", "appContainer-1"},
+			expErr:      true,
+		},
+		{
+			description: "resize of two containers is allowed with the pod scope and the best-effort policy",
+			scope:       topologymanager.PodTopologyScope,
+			policy:      topologymanager.NewBestEffortPolicy(nil, topologymanager.PolicyOptions{}),
+			resized:     []string{"appContainer-0", "appContainer-1"},
+		},
+		{
+			description: "resize of two containers is allowed with the pod scope and the none policy",
+			scope:       topologymanager.PodTopologyScope,
+			policy:      topologymanager.NewNonePolicy(),
+			resized:     []string{"appContainer-0", "appContainer-1"},
+		},
+		{
+			description: "resize of two containers is allowed with the container scope and the restricted policy",
+			scope:       topologymanager.ContainerTopologyScope,
+			policy:      topologymanager.NewRestrictedPolicy(nil, topologymanager.PolicyOptions{}),
+			resized:     []string{"appContainer-0", "appContainer-1"},
+		},
+		{
+			description: "resize of one container is allowed with the pod scope and the restricted policy",
+			scope:       topologymanager.PodTopologyScope,
+			policy:      topologymanager.NewRestrictedPolicy(nil, topologymanager.PolicyOptions{}),
+			resized:     []string{"appContainer-1"},
+		},
+		{
+			description: "resize of one container is allowed with the pod scope and the single-numa-node policy",
+			scope:       topologymanager.PodTopologyScope,
+			policy:      topologymanager.NewSingleNumaNodePolicy(nil, topologymanager.PolicyOptions{}),
+			resized:     []string{"appContainer-1"},
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.description, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.InPlacePodVerticalScalingExclusiveCPUs, true)
+			logger, _ := ktesting.NewTestContext(t)
+			policy, err := NewStaticPolicy(logger, topoSingleSocketHT, 0, cpuset.New(), topologymanager.NewFakeManagerWithScopeAndPolicy(testCase.scope, testCase.policy), nil)
+			require.NoError(t, err)
+
+			st := &mockState{
+				assignments:   state.ContainerCPUAssignments{},
+				baselines:     state.ContainerCPUBaselines{},
+				defaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7),
+			}
+			pod := makeMultiContainerPodWithOptions(nil, []*containerOptions{
+				{request: "2000m", limit: "2000m"},
+				{request: "2000m", limit: "2000m"},
+			})
+			podUID := string(pod.UID)
+			for container := range podutil.ContainerIter(&pod.Spec, podutil.InitContainers|podutil.Containers) {
+				require.NoError(t, policy.Allocate(logger, st, pod, container, lifecycle.AddOperation), "Allocate() of container %s", container.Name)
+			}
+			assignmentsBefore := st.GetCPUAssignments()
+
+			resized := pod.DeepCopy()
+			for container := range podutil.ContainerIter(&resized.Spec, podutil.InitContainers|podutil.Containers) {
+				if slices.Contains(testCase.resized, container.Name) {
+					container.Resources.Requests[v1.ResourceCPU] = resource.MustParse("4000m")
+					container.Resources.Limits[v1.ResourceCPU] = resource.MustParse("4000m")
+				}
+			}
+			// Like the topology manager, stop at the first container that fails.
+			for container := range podutil.ContainerIter(&resized.Spec, podutil.InitContainers|podutil.Containers) {
+				if err = policy.Allocate(logger, st, resized, container, lifecycle.UpdateOperation); err != nil {
+					break
+				}
+			}
+
+			if testCase.expErr {
+				require.Error(t, err)
+				require.Equal(t, lifecycle.RejectionInfeasible, admission.GetPodAdmitResult(err).RejectionType, "error %v", err)
+				require.Equal(t, assignmentsBefore, st.GetCPUAssignments(), "a rejected resize must not change the assignments")
+				return
+			}
+			require.NoError(t, err)
+			for _, name := range testCase.resized {
+				cset, _ := st.GetCPUSet(podUID, name)
+				require.Equal(t, 4, cset.Size(), "container %s, got CPUs %s", name, cset)
 			}
 		})
 	}
@@ -2698,7 +2906,7 @@ func TestStaticPolicyAllocateCPUsForResize(t *testing.T) {
 			expCSet:      cpuset.New(0, 2, 6, 8),
 		},
 		{
-			description:  "scale down above baseline, NUMA affinity has not enough CPUs, remaining CPUs taken from other NUMA node",
+			description:  "scale down above baseline from 6 to 4 CPUs with NUMA node 0 affinity, the container holds only 2 CPUs on NUMA node 0, so it keeps 2 of its other CPUs on NUMA node 1 instead of taking free CPUs on NUMA node 0",
 			currentCPUs:  cpuset.New(0, 1, 3, 6, 7, 9),
 			baselineCPUs: cpuset.New(0, 6),
 			otherCPUs:    cpuset.New(),
@@ -2951,7 +3159,6 @@ func TestStaticPolicyAllocatePodWithInPlacePodVerticalScalingExclusiveCPUs(t *te
 				},
 			},
 			expDefaultCPUSet:                cpuset.New(0, 1, 3, 4, 5, 6, 7, 9, 10, 11),
-			podLevelResourcesEnabled:        true,
 			podLevelResourceManagersEnabled: true,
 			requiredMetrics: requiredMetrics{
 				expTotalAllocs:              1,
@@ -2976,7 +3183,6 @@ func TestStaticPolicyAllocatePodWithInPlacePodVerticalScalingExclusiveCPUs(t *te
 				},
 			},
 			expDefaultCPUSet:                cpuset.New(0, 1, 3, 4, 5, 6, 7, 9, 10, 11),
-			podLevelResourcesEnabled:        true,
 			podLevelResourceManagersEnabled: true,
 			requiredMetrics: requiredMetrics{
 				expTotalAllocs:              1,
@@ -3003,7 +3209,6 @@ func TestStaticPolicyAllocatePodWithInPlacePodVerticalScalingExclusiveCPUs(t *te
 				},
 			},
 			expDefaultCPUSet:                cpuset.New(0, 1, 2, 3, 4, 5, 7, 8, 9, 10, 11),
-			podLevelResourcesEnabled:        true,
 			podLevelResourceManagersEnabled: true,
 			requiredMetrics: requiredMetrics{
 				expTotalAllocs:              1,
@@ -3034,7 +3239,6 @@ func TestStaticPolicyAllocatePodWithInPlacePodVerticalScalingExclusiveCPUs(t *te
 				},
 			},
 			expDefaultCPUSet:                cpuset.New(0, 1, 3, 4, 5, 7, 9, 10, 11),
-			podLevelResourcesEnabled:        true,
 			podLevelResourceManagersEnabled: true,
 			requiredMetrics: requiredMetrics{
 				expTotalAllocs:              3,
@@ -3068,7 +3272,6 @@ func TestStaticPolicyAllocatePodWithInPlacePodVerticalScalingExclusiveCPUs(t *te
 				},
 			},
 			expDefaultCPUSet:                cpuset.New(0, 1, 3, 4, 5, 6, 7, 9, 10, 11),
-			podLevelResourcesEnabled:        true,
 			podLevelResourceManagersEnabled: true,
 			requiredMetrics: requiredMetrics{
 				expTotalAllocs:              4,
@@ -3104,7 +3307,6 @@ func TestStaticPolicyAllocatePodWithInPlacePodVerticalScalingExclusiveCPUs(t *te
 				},
 			},
 			expDefaultCPUSet:                cpuset.New(0, 1, 3, 4, 5, 7, 9, 10, 11),
-			podLevelResourcesEnabled:        true,
 			podLevelResourceManagersEnabled: true,
 			requiredMetrics: requiredMetrics{
 				expTotalAllocs:              5,
@@ -3140,7 +3342,6 @@ func TestStaticPolicyAllocatePodWithInPlacePodVerticalScalingExclusiveCPUs(t *te
 				},
 			},
 			expDefaultCPUSet:                cpuset.New(0, 1, 3, 4, 5, 7, 9, 10, 11),
-			podLevelResourcesEnabled:        true,
 			podLevelResourceManagersEnabled: true,
 			requiredMetrics: requiredMetrics{
 				expTotalAllocs:              5,
@@ -3165,7 +3366,6 @@ func TestStaticPolicyAllocatePodWithInPlacePodVerticalScalingExclusiveCPUs(t *te
 			expErr:                          admission.NewEmptyPodSharedPoolError(fmt.Errorf("pod rejected, sum of exclusive container cpu requests equals pod budget, leaving no cpus for shared containers")),
 			expPodBaselines:                 state.ContainerCPUBaselines{},
 			expDefaultCPUSet:                cpuset.New(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
-			podLevelResourcesEnabled:        true,
 			podLevelResourceManagersEnabled: true,
 			requiredMetrics: requiredMetrics{
 				expTotalErrors: 1,
@@ -3186,7 +3386,6 @@ func TestStaticPolicyAllocatePodWithInPlacePodVerticalScalingExclusiveCPUs(t *te
 			expErr:                          nil,
 			expPodBaselines:                 state.ContainerCPUBaselines{},
 			expDefaultCPUSet:                cpuset.New(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
-			podLevelResourcesEnabled:        true,
 			podLevelResourceManagersEnabled: true,
 			requiredMetrics: requiredMetrics{
 				expTotalErrors: 0,
@@ -3196,7 +3395,6 @@ func TestStaticPolicyAllocatePodWithInPlacePodVerticalScalingExclusiveCPUs(t *te
 
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.PodLevelResources, testCase.podLevelResourcesEnabled)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.PodLevelResourceManagers, testCase.podLevelResourceManagersEnabled)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.InPlacePodVerticalScalingExclusiveCPUs, true)
 
@@ -3537,10 +3735,12 @@ func TestGenerateCPUTopologyHintsForResize(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.InPlacePodVerticalScalingExclusiveCPUs, true)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.CPUManagerPolicyAlphaOptions, true)
 
+			logger, _ := ktesting.NewTestContext(t)
 			p := staticPolicy{
 				topology:     testCase.topo,
 				reservedCPUs: testCase.reservedCPUs,
 				numaNodes:    testCase.topo.CPUDetails.NUMANodes().List(),
+				affinity:     scoringTopologyStore(logger),
 			}
 
 			hints := p.generateCPUTopologyHintsForResize(testCase.availableCPUs, testCase.reusableCPUs, testCase.retainedCPUs, testCase.freeCPUs, testCase.request)

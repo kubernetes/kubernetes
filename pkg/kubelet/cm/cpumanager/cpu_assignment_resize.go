@@ -309,11 +309,6 @@ func newCPUAccumulatorForResize(logger klog.Logger, topo *topology.CPUTopology, 
 		// at admission time, prior to any resize, if those exist.
 		if numCPUs < currentlyAllocatedCPUs.Size() {
 			if !baselineCPUs.IsEmpty() {
-				// If explicitly CPUs to keep
-				// during scale down is given ( this requires
-				// addition in container[].resources ... which
-				// could be possible to patch ? Esotsal Note This means
-				// modifying API code
 				acc.take(baselineCPUs.Clone())
 			}
 		}
@@ -326,9 +321,9 @@ func newCPUAccumulatorForResize(logger klog.Logger, topo *topology.CPUTopology, 
 	}
 
 	if topo.NumSockets >= topo.NumNUMANodes {
-		// If sockets are higher or same in the memory hierarchy than NUMA nodes , then we take
+		// If NUMA nodes are higher or same in the memory hierarchy than sockets, then we take
 		// from the set of NUMA Nodes as the first level for resize, and from the set of sockets
-		//  as the second level for resize.
+		// as the second level for resize.
 		acc.numaOrSocketsFirst = &numaFirstForResize{
 			acc: acc,
 			resizeTakeOrder: resizeTakeOrder{
@@ -337,9 +332,9 @@ func newCPUAccumulatorForResize(logger klog.Logger, topo *topology.CPUTopology, 
 			},
 		}
 	} else {
-		// If NUMA nodes are higher in the memory hierarchy than NUMA nodes , then we take
+		// If sockets are higher in the memory hierarchy than NUMA nodes, then we take
 		// from the set of sockets as the first level for resize, and from the set of NUMA Nodes
-		//  as the second level for resize.
+		// as the second level for resize.
 		acc.numaOrSocketsFirst = &socketsFirstForResize{
 			acc: acc,
 			resizeTakeOrder: resizeTakeOrder{
@@ -398,7 +393,10 @@ func (a *cpuAccumulatorForResize) sortAvailableCPUsPacked() []int {
 //     once every physical core has contributed a CPU.
 //
 // Same as cpuAccumulator.sortAvailableCPUsSpread, except sockets are ordered with
-// cpuAccumulatorForResize.sortAvailableSockets to keep retained CPUs' sockets first.
+// cpuAccumulatorForResize.sortAvailableSockets to keep retained CPUs' sockets first,
+// and CPUs already taken by this container count as the first CPUs of their core,
+// so a free sibling of a retained CPU is only used once every other core has
+// contributed a CPU.
 func (a *cpuAccumulatorForResize) sortAvailableCPUsSpread() []int {
 	var result []int
 	for _, socket := range a.sortAvailableSockets() {
@@ -408,18 +406,22 @@ func (a *cpuAccumulatorForResize) sortAvailableCPUsSpread() []int {
 		// this stage only cares about physical-core coverage.
 		a.sort(cores, a.details.CPUsInCores)
 		cpusPerCore := make([][]int, 0, len(cores))
+		takenPerCore := make([]int, 0, len(cores))
 		maxCPUsPerCore := 0
 		for _, core := range cores {
 			cpus := a.details.CPUsInCores(core).List()
+			taken := a.resultDetails.CPUsInCores(core).Size()
 			cpusPerCore = append(cpusPerCore, cpus)
-			if len(cpus) > maxCPUsPerCore {
-				maxCPUsPerCore = len(cpus)
+			takenPerCore = append(takenPerCore, taken)
+			if taken+len(cpus) > maxCPUsPerCore {
+				maxCPUsPerCore = taken + len(cpus)
 			}
 		}
 		for cpuIndex := 0; cpuIndex < maxCPUsPerCore; cpuIndex++ {
-			for _, cpus := range cpusPerCore {
-				if cpuIndex < len(cpus) {
-					result = append(result, cpus[cpuIndex])
+			for i, cpus := range cpusPerCore {
+				// A core joins the round-robin after as many passes as CPUs it already holds for this container.
+				if freeIndex := cpuIndex - takenPerCore[i]; freeIndex >= 0 && freeIndex < len(cpus) {
+					result = append(result, cpus[freeIndex])
 				}
 			}
 		}
@@ -925,6 +927,11 @@ func takeByTopologyNUMADistributedForResize(logger klog.Logger, topo *topology.C
 
 					return Continue
 				})
+			}
+
+			// No subset can allocate the remainder, so this combo should be skip.
+			if remainder > 0 && bestLocalBalance == math.MaxFloat64 {
+				return Continue
 			}
 
 			// If alignBySocket is enabled, prefer combinations whose NUMA nodes

@@ -594,6 +594,7 @@ func commonTakeByTopologyTestCasesForResize(t *testing.T) []takeByTopologyTestCa
 			expResult:     mustParseCPUSet(t, "112-127,240-255"),
 		},
 		// DistributeCPUsAcrossCores for resize: distribute CPUs across cores in the socket with availableCPUs first, then other socket
+		// A free sibling of a retained CPU is used only after every other core in the socket has contributed a CPU.
 		{
 			description:   "Scale-up: 1 to 3 CPUs with spread, distribute across cores in the socket with availableCPUs from single socket with HT",
 			topo:          topoSingleSocketHT,
@@ -603,7 +604,7 @@ func commonTakeByTopologyTestCasesForResize(t *testing.T) []takeByTopologyTestCa
 			baselineCPUs:  cpuset.New(7),
 			numCPUs:       3,
 			expErr:        "",
-			expResult:     mustParseCPUSet(t, "0,3,7"),
+			expResult:     mustParseCPUSet(t, "0,1,7"),
 		},
 		{
 			description:   "Scale-up: 1 to 3 CPUs with spread, distribute across cores in the socket with availableCPUs from dual socket with HT",
@@ -614,7 +615,7 @@ func commonTakeByTopologyTestCasesForResize(t *testing.T) []takeByTopologyTestCa
 			baselineCPUs:  cpuset.New(11),
 			numCPUs:       3,
 			expErr:        "",
-			expResult:     mustParseCPUSet(t, "1,5,11"),
+			expResult:     mustParseCPUSet(t, "1,3,11"),
 		},
 		{
 			description:   "Scale-up: 1 to 6 CPUs with spread, take the full socket with availableCPUs from dual socket with HT",
@@ -661,7 +662,7 @@ func commonTakeByTopologyTestCasesForResize(t *testing.T) []takeByTopologyTestCa
 			baselineCPUs:  cpuset.New(39),
 			numCPUs:       8,
 			expErr:        "",
-			expResult:     mustParseCPUSet(t, "20-25,39,79"),
+			expResult:     mustParseCPUSet(t, "20-26,39"),
 		},
 		// Socket 0 (NUMA0+NUMA1) is fully available.
 		// Socket 1 (NUMA2+NUMA3) has allocatedCPUs CPU 39. NUMA3 is partially consumed (CPUs 70-79 unavailable).
@@ -693,7 +694,21 @@ func commonTakeByTopologyTestCasesForResize(t *testing.T) []takeByTopologyTestCa
 			baselineCPUs:  cpuset.New(60),
 			numCPUs:       4,
 			expErr:        "",
-			expResult:     mustParseCPUSet(t, "51,52,60,120"),
+			expResult:     mustParseCPUSet(t, "51,52,59,60"),
+		},
+		// core10={59,119,179,239} and core11={60,120,180,240} in socket 1.
+		// Retain 2 CPUs of core11 and scale up by 2 CPUs with spread: core11 gets its third CPU
+		// only after core10 holds 2 CPUs too, so both new CPUs land on core10.
+		{
+			description:   "Scale-up: 2 to 4 CPUs with spread, core with 2 allocatedCPUs gets no CPU before the other core holds 2 from quad socket four-way with HT",
+			topo:          topoQuadSocketFourWayHT,
+			opts:          StaticPolicyOptions{DistributeCPUsAcrossCores: true},
+			availableCPUs: mustParseCPUSet(t, "59,60,119,120,179,180,239,240"),
+			allocatedCPUs: cpuset.New(60, 120),
+			baselineCPUs:  cpuset.New(60, 120),
+			numCPUs:       4,
+			expErr:        "",
+			expResult:     mustParseCPUSet(t, "59,60,119,120"),
 		},
 		// topoTripleSocketHT is enumerated core-major (sibling threads are adjacent):
 		// core0={0,1}, core1={2,3}, core2={4,5} in socket1; core3={6,7}, core4={8,9},
@@ -861,7 +876,7 @@ func commonTakeByTopologyTestCasesForResize(t *testing.T) []takeByTopologyTestCa
 			baselineCPUs:  cpuset.New(0),
 			numCPUs:       3,
 			expErr:        "",
-			expResult:     cpuset.New(0, 2, 4),
+			expResult:     cpuset.New(0, 2, 3),
 		},
 		{
 			description:   "Scale-down: 6 to 4 CPUs, take baselineCPUs first, other CPUs distribute across cores from dual socket with HT, spread",
@@ -1364,6 +1379,22 @@ func commonTakeByTopologyExtendedTestCasesForResize(t *testing.T) []takeByTopolo
 			cpuGroupSize:  1,
 			expErr:        "",
 			expResult:     mustParseCPUSet(t, "43-47,75-79,96,101-105,171-174,203-206,229-232"),
+		},
+		// NUMA 0, 1 and 2 are in socket 0. Only the three NUMA nodes combination
+		// has enough CPUs, but none of its nodes has a full CPU group available
+		// for the remainder after accounting for retained and distributed CPUs.
+		// The combination must be rejected so allocation can fall back to packing.
+		{
+			description:   "Scale-up: 8 to 10 CPUs with alignBySocket, reject NUMA combination without a feasible remainder subset",
+			topo:          topoDualSocketMultiNumaPerSocketHTLarge,
+			availableCPUs: mustParseCPUSet(t, "0-1,16-19,32-35"),
+			allocatedCPUs: mustParseCPUSet(t, "0-1,16-18,32-34"),
+			baselineCPUs:  mustParseCPUSet(t, "0-1,16-18,32-34"),
+			numCPUs:       10,
+			cpuGroupSize:  2,
+			alignBySocket: true,
+			expErr:        "",
+			expResult:     mustParseCPUSet(t, "0-1,16-19,32-35"),
 		},
 		{
 			description:   "Scale-up: 16 to 48 CPUs, distribute 24 full cores across 3 NUMA nodes (1 NUMAs with allocatedCPUs + 2 more NUMA) from dual socket with multi-NUMA with HT",

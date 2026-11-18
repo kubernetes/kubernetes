@@ -2873,8 +2873,12 @@ func TestRetryPendingResizesDynamicContainersExclusiveResources(t *testing.T) {
 	addC3 := func(pod *v1.Pod) {
 		pod.Spec.Containers = append(pod.Spec.Containers, v1.Container{Name: "c3", Image: "i3", Resources: guaranteed("1", "1Gi")})
 	}
+	addC3WithoutExclusiveCPUs := func(pod *v1.Pod) {
+		pod.Spec.Containers = append(pod.Spec.Containers, v1.Container{Name: "c3", Image: "i3", Resources: guaranteed("500m", "1Gi")})
+	}
 	cpuInfeasible := "Resize is infeasible for Guaranteed Pods when CPU allocation mode is exclusive"
 	memoryInfeasible := "Resize is infeasible for Guaranteed Pods when memory allocation mode is exclusive"
+	exclusiveCPUsInfeasible := "Adding or removing containers with exclusive CPUs is infeasible for Guaranteed Pods when CPU allocation mode is exclusive"
 
 	tests := []struct {
 		name            string
@@ -2891,19 +2895,40 @@ func TestRetryPendingResizesDynamicContainersExclusiveResources(t *testing.T) {
 		name:               "container removed with InPlacePodVerticalScalingExclusiveCPUs",
 		change:             removeC2,
 		exclusiveCPUs:      true,
-		expectedInfeasible: memoryInfeasible,
+		expectedInfeasible: exclusiveCPUsInfeasible,
 	}, {
-		name:            "container removed with both exclusive resize gates",
-		change:          removeC2,
-		exclusiveCPUs:   true,
-		exclusiveMemory: true,
+		name:               "container removed with both exclusive resize gates",
+		change:             removeC2,
+		exclusiveCPUs:      true,
+		exclusiveMemory:    true,
+		expectedInfeasible: exclusiveCPUsInfeasible,
 	}, {
 		name:               "container added",
 		change:             addC3,
 		expectedInfeasible: cpuInfeasible,
 	}, {
-		name:            "container added with both exclusive resize gates",
-		change:          addC3,
+		name:               "container added with InPlacePodVerticalScalingExclusiveCPUs",
+		change:             addC3,
+		exclusiveCPUs:      true,
+		expectedInfeasible: exclusiveCPUsInfeasible,
+	}, {
+		name:               "container added with both exclusive resize gates",
+		change:             addC3,
+		exclusiveCPUs:      true,
+		exclusiveMemory:    true,
+		expectedInfeasible: exclusiveCPUsInfeasible,
+	}, {
+		name:               "container without exclusive CPUs added",
+		change:             addC3WithoutExclusiveCPUs,
+		expectedInfeasible: cpuInfeasible,
+	}, {
+		name:               "container without exclusive CPUs added with InPlacePodVerticalScalingExclusiveCPUs",
+		change:             addC3WithoutExclusiveCPUs,
+		exclusiveCPUs:      true,
+		expectedInfeasible: memoryInfeasible,
+	}, {
+		name:            "container without exclusive CPUs added with both exclusive resize gates",
+		change:          addC3WithoutExclusiveCPUs,
 		exclusiveCPUs:   true,
 		exclusiveMemory: true,
 	}}
@@ -3182,6 +3207,40 @@ func TestRetryPendingResizesPodLevelResourcesExclusiveCPUs(t *testing.T) {
 			pod.Spec.Containers = pod.Spec.Containers[:ineligible]
 		},
 		change: func(pod *v1.Pod) { setCPU(&pod.Spec.Containers[exclusive].Resources, "2", "2") },
+	}, {
+		name: "pod-level resources added with exclusive CPUs and without PodLevelResourceManagers",
+		prepare: func(pod *v1.Pod) {
+			pod.Spec.Resources = nil
+			pod.Spec.Containers = pod.Spec.Containers[:ineligible]
+		},
+		change: func(pod *v1.Pod) {
+			podLevelResources := resources("4", "4", "4Gi", "4Gi")
+			pod.Spec.Resources = &podLevelResources
+		},
+		podLevelResourceManagersDisabled: true,
+		expectInfeasible:                 true,
+	}, {
+		name: "pod-level resources with a non-integral CPU request added with exclusive CPUs",
+		prepare: func(pod *v1.Pod) {
+			pod.Spec.Resources = nil
+			pod.Spec.Containers = pod.Spec.Containers[:ineligible]
+		},
+		change: func(pod *v1.Pod) {
+			podLevelResources := resources("3500m", "3500m", "4Gi", "4Gi")
+			pod.Spec.Resources = &podLevelResources
+		},
+		expectInfeasible: true,
+	}, {
+		name: "pod-level resources added without exclusive CPUs and without PodLevelResourceManagers",
+		prepare: func(pod *v1.Pod) {
+			pod.Spec.Resources = nil
+			pod.Spec.Containers = pod.Spec.Containers[shared:ineligible]
+		},
+		change: func(pod *v1.Pod) {
+			podLevelResources := resources("4", "4", "4Gi", "4Gi")
+			pod.Spec.Resources = &podLevelResources
+		},
+		podLevelResourceManagersDisabled: true,
 	}, {
 		name:                             "container scaled up without PodLevelResourceManagers",
 		change:                           func(pod *v1.Pod) { setCPU(&pod.Spec.Containers[exclusive].Resources, "2", "2") },

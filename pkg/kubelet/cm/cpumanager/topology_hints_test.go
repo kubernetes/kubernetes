@@ -1169,6 +1169,35 @@ func TestGetTopologyHintsForResize(t *testing.T) {
 			},
 			topology: topoDualSocketHT,
 		},
+		// appContainer-0 runs in the shared pool, so it has no assigned CPUs. The resize is not
+		// feasible, so no hints are generated and Allocate reports the reason. Otherwise the
+		// hints would be generated from the free CPUs, as for a new container.
+		{
+			description: "Container moves from the shared to the exclusive pool, no hints are generated",
+			pod: makeMultiContainerPodWithOptions(nil, []*containerOptions{
+				{request: "2", limit: "2"},
+			}),
+			defaultCPUSet: mustParseCPUSet(t, "0-11"),
+			expectedHints: nil,
+			topology:      topoDualSocketHT,
+		},
+		// The resize is not feasible, so no hints are generated and Allocate reports the reason.
+		// Otherwise the hints would be generated from the baseline CPUs.
+		{
+			description: "Scale-down container 4->2 below the baseline, no hints are generated",
+			pod: makeMultiContainerPodWithOptions(nil, []*containerOptions{
+				{request: "2", limit: "2"},
+			}),
+			assignments: state.ContainerCPUAssignments{"podUID": {
+				"appContainer-0": mustParseCPUSet(t, "0,2,6,8"),
+			}},
+			baselines: state.ContainerCPUBaselines{"podUID": {
+				"appContainer-0": {Baseline: mustParseCPUSet(t, "0,2,6,8")},
+			}},
+			defaultCPUSet: mustParseCPUSet(t, "1,3-5,7,9-11"),
+			expectedHints: nil,
+			topology:      topoDualSocketHT,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -1191,6 +1220,7 @@ func TestGetTopologyHintsForResize(t *testing.T) {
 					topology:    tc.topology,
 					numaNodes:   tc.topology.CPUDetails.NUMANodes().List(),
 					cpusToReuse: tc.cpusToReuse,
+					affinity:    scoringTopologyStore(logger),
 				},
 				state: &mockState{
 					assignments:   tc.assignments,
@@ -1387,6 +1417,64 @@ func TestGetPodTopologyHintsForResize(t *testing.T) {
 			},
 			topology: topoDualSocketHT,
 		},
+		// appContainer-1 runs in the shared pool, so it has no assigned CPUs and is not counted
+		// as a resizing container. The resize is not feasible, so no pod-level hints are
+		// generated and Allocate reports the reason. Otherwise an empty list of hints would be
+		// generated, because the CPUs of appContainer-0 alone can't satisfy the request of the pod.
+		{
+			description: "One container moves from the shared to the exclusive pool, no pod-level hints are generated",
+			pod: makeMultiContainerPodWithOptions(nil, []*containerOptions{
+				{request: "4", limit: "4"},
+				{request: "2", limit: "2"},
+			}),
+			assignments: state.ContainerCPUAssignments{"podUID": {
+				"appContainer-0": mustParseCPUSet(t, "0,2,6,8"),
+			}},
+			baselines: state.ContainerCPUBaselines{"podUID": {
+				"appContainer-0": {Baseline: mustParseCPUSet(t, "0,2,6,8")},
+			}},
+			defaultCPUSet: mustParseCPUSet(t, "1,3-5,7,9-11"),
+			expectedHints: nil,
+			topology:      topoDualSocketHT,
+		},
+		// The resize is not feasible, so no pod-level hints are generated and Allocate reports
+		// the reason. Otherwise the hints would be generated from the baseline CPUs.
+		{
+			description: "One container scales down from 4 to 2 below the baseline, no pod-level hints are generated",
+			pod: makeMultiContainerPodWithOptions(nil, []*containerOptions{
+				{request: "2", limit: "2"},
+			}),
+			assignments: state.ContainerCPUAssignments{"podUID": {
+				"appContainer-0": mustParseCPUSet(t, "0,2,6,8"),
+			}},
+			baselines: state.ContainerCPUBaselines{"podUID": {
+				"appContainer-0": {Baseline: mustParseCPUSet(t, "0,2,6,8")},
+			}},
+			defaultCPUSet: mustParseCPUSet(t, "1,3-5,7,9-11"),
+			expectedHints: nil,
+			topology:      topoDualSocketHT,
+		},
+		// A non-restartable init container with exclusive CPUs can't be resized, so no pod-level
+		// hints are generated and Allocate reports the reason. Otherwise the hints would be
+		// generated as for a scale up.
+		{
+			description: "Non-restartable init container scales up from 2 to 4, no pod-level hints are generated",
+			pod: makeMultiContainerPodWithOptions(
+				[]*containerOptions{{request: "4", limit: "4"}},
+				[]*containerOptions{{request: "2", limit: "2"}},
+			),
+			assignments: state.ContainerCPUAssignments{"podUID": {
+				"initContainer-0": mustParseCPUSet(t, "0,6"),
+				"appContainer-0":  mustParseCPUSet(t, "0,6"),
+			}},
+			baselines: state.ContainerCPUBaselines{"podUID": {
+				"initContainer-0": {Baseline: mustParseCPUSet(t, "0,6")},
+				"appContainer-0":  {Baseline: mustParseCPUSet(t, "0,6")},
+			}},
+			defaultCPUSet: mustParseCPUSet(t, "1-5,7-11"),
+			expectedHints: nil,
+			topology:      topoDualSocketHT,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -1408,6 +1496,7 @@ func TestGetPodTopologyHintsForResize(t *testing.T) {
 				policy: &staticPolicy{
 					topology:  tc.topology,
 					numaNodes: tc.topology.CPUDetails.NUMANodes().List(),
+					affinity:  scoringTopologyStore(logger),
 				},
 				state: &mockState{
 					assignments:   tc.assignments,

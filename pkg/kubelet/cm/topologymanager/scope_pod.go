@@ -65,7 +65,7 @@ func (s *podScope) admitUsingContainerResources(ctx context.Context, pod *v1.Pod
 
 	bestHint, admit := s.checkAffinity(logger, pod, operation)
 	if !admit {
-		return admission.GetPodAdmitResult(NewTopologyAffinityError())
+		return admission.GetPodAdmitResult(NewTopologyAffinityError(operation))
 	}
 	if dryRun {
 		return admission.GetPodAdmitResult(nil)
@@ -91,7 +91,7 @@ func (s *podScope) admitUsingPodResources(ctx context.Context, pod *v1.Pod, oper
 
 	bestHint, admit := s.checkAffinity(logger, pod, operation)
 	if !admit {
-		return admission.GetPodAdmitResult(NewPodLevelTopologyAffinityError("pod with pod-level resources failed admission under pod-scope topology manager"))
+		return admission.GetPodAdmitResult(NewPodLevelTopologyAffinityError("pod with pod-level resources failed admission under pod-scope topology manager", operation))
 	}
 	if dryRun {
 		return admission.GetPodAdmitResult(nil)
