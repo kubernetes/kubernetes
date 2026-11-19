@@ -349,6 +349,10 @@ konnectivity_network_proxy_client_client_connections{status="dialing"} 1
 	}
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
+			// These are process-global metrics: a second run in the same process
+			// (-count=N, or an earlier test that touched them) would already
+			// carry observations, and the counters below are absolute.
+			clientmetrics.Metrics.Reset()
 			tc.trigger()
 			if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(tc.want), tc.metrics...); err != nil {
 				t.Errorf("GatherAndCompare error: %v", err)
