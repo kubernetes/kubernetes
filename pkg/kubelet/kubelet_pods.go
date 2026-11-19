@@ -467,6 +467,14 @@ func makeMounts(logger klog.Logger, pod *v1.Pod, podDir string, container *v1.Co
 	return mounts, cleanupAction, nil
 }
 
+// CleanContainerSubPaths unmounts and removes any host subPath bind mounts for a container.
+func (kl *Kubelet) CleanContainerSubPaths(podUID types.UID, containerName string) error {
+	if cleaner, ok := kl.subpather.(subpath.ContainerSubPathCleaner); ok {
+		return cleaner.CleanContainerSubPaths(kl.getPodDir(podUID), containerName)
+	}
+	return nil
+}
+
 // translateMountPropagation transforms v1.MountPropagationMode to
 // runtimeapi.MountPropagation.
 func translateMountPropagation(mountMode *v1.MountPropagationMode) (runtimeapi.MountPropagation, error) {
