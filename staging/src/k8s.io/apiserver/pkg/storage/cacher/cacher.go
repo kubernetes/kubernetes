@@ -1048,7 +1048,7 @@ func (c *Cacher) Get(ctx context.Context, key string, opts storage.GetOptions, o
 	defer span.End(500 * time.Millisecond)
 
 	if exists {
-		objVal.Set(reflect.ValueOf(obj).Elem())
+		objVal.Set(reflect.ValueOf(obj.DeepCopyObject()).Elem())
 	} else {
 		objVal.Set(reflect.Zero(objVal.Type()))
 	}
