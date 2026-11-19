@@ -528,6 +528,7 @@ func createGenericRuntimeManager(ctx context.Context, kubelet *Kubelet, kubeCfg 
 		kubelet.livenessManager,
 		kubelet.readinessManager,
 		kubelet.startupManager,
+		kubelet.probeManager,
 		kubelet.rootDirectory,
 		kubelet.podLogsDirectory,
 		kubelet.machineInfo,
@@ -2366,16 +2367,8 @@ func TestGenerateAPIPodStatusForStaticPodAfterKubeletRestart(t *testing.T) {
 						for sync := range 2 {
 							if sync == 1 {
 								// SyncPod caches the initial status before registering workers.
-								kl.probeManager.SyncPod(tCtx, pod)
-								t.Cleanup(func() {
-									// Wait for worker cleanup before the subtest's logger and feature gates expire.
-									kl.readinessManager.Set(containerID, proberesults.Unknown, pod)
-									kl.probeManager.RemovePod(pod)
-									require.NoError(t, wait.PollUntilContextTimeout(context.WithoutCancel(tCtx), 10*time.Millisecond, wait.ForeverTestTimeout, true, func(context.Context) (bool, error) {
-										_, found := kl.readinessManager.Get(containerID)
-										return !found, nil
-									}), "readiness worker did not remove its result after stopping")
-								})
+								kl.probeManager.SyncPod(tCtx, pod, runtimeStatus)
+								t.Cleanup(func() { kl.probeManager.RemovePod(pod) })
 								if featureEnabled {
 									// Let the worker seed Failure before installing the controlled result.
 									require.NoError(t, wait.PollUntilContextTimeout(tCtx, 10*time.Millisecond, wait.ForeverTestTimeout, true, func(context.Context) (bool, error) {
@@ -2384,7 +2377,7 @@ func TestGenerateAPIPodStatusForStaticPodAfterKubeletRestart(t *testing.T) {
 									}), "readiness worker did not initialize its result")
 								}
 								if tc.probeResult != nil {
-									kl.readinessManager.Set(containerID, *tc.probeResult, pod)
+									kl.readinessManager.Set(tCtx, containerID, *tc.probeResult, pod)
 								}
 							}
 							expectedReady := tc.expectedReady

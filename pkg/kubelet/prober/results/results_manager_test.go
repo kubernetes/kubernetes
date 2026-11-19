@@ -17,10 +17,13 @@ limitations under the License.
 package results
 
 import (
+	"context"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -37,7 +40,7 @@ func TestCacheOperations(t *testing.T) {
 	_, found := m.Get(unsetID)
 	assert.False(t, found, "unset result found")
 
-	m.Set(setID, Success, &corev1.Pod{})
+	m.Set(t.Context(), setID, Success, &corev1.Pod{})
 	result, found := m.Get(setID)
 	assert.Equal(t, Success, result, "set result")
 	assert.True(t, found, "set result found")
@@ -78,25 +81,63 @@ func TestUpdates(t *testing.T) {
 	}
 
 	// New result should always push an update.
-	m.Set(fooID, Success, pod)
+	m.Set(t.Context(), fooID, Success, pod)
 	expectUpdate(Update{fooID, Success, pod.UID}, "new success")
 
-	m.Set(barID, Failure, pod)
+	m.Set(t.Context(), barID, Failure, pod)
 	expectUpdate(Update{barID, Failure, pod.UID}, "new failure")
 
 	// Unchanged results should not send an update.
-	m.Set(fooID, Success, pod)
+	m.Set(t.Context(), fooID, Success, pod)
 	expectNoUpdate("unchanged foo")
 
-	m.Set(barID, Failure, pod)
+	m.Set(t.Context(), barID, Failure, pod)
 	expectNoUpdate("unchanged bar")
 
 	// Changed results should send an update.
-	m.Set(fooID, Failure, pod)
+	m.Set(t.Context(), fooID, Failure, pod)
 	expectUpdate(Update{fooID, Failure, pod.UID}, "changed foo")
 
-	m.Set(barID, Success, pod)
+	m.Set(t.Context(), barID, Success, pod)
 	expectUpdate(Update{barID, Success, pod.UID}, "changed bar")
+}
+
+func TestSeed(t *testing.T) {
+	m := NewManager()
+
+	pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-pod", UID: "test-uid"}}
+	fooID := kubecontainer.ContainerID{Type: "test", ID: "foo"}
+
+	expectNoUpdate := func(msg string) {
+		require.Empty(t, m.Updates(), msg)
+	}
+
+	// Seeding populates the cache like Set does...
+	m.Seed(fooID, Success)
+	result, found := m.Get(fooID)
+	assert.True(t, found, "seeded result found")
+	assert.Equal(t, Success, result, "seeded result")
+
+	// ...but never sends an update, even when it changes the cached value.
+	expectNoUpdate("new seed")
+	m.Seed(fooID, Failure)
+	expectNoUpdate("changed seed")
+	result, found = m.Get(fooID)
+	assert.True(t, found, "reseeded result found")
+	assert.Equal(t, Failure, result, "reseeded result")
+
+	// A subsequent Set matching the seeded value must not send an update.
+	m.Set(t.Context(), fooID, Failure, pod)
+	expectNoUpdate("set matching seeded value")
+
+	// A subsequent Set with a new result reports a change against the seeded value.
+	m.Set(t.Context(), fooID, Success, pod)
+	select {
+	case u := <-m.Updates():
+		assert.Equal(t, Update{fooID, Success, pod.UID}, u, "set after seed")
+	default:
+		t.Error("Expected update after Set, got none")
+	}
 }
 
 func TestResult_ToPrometheusType(t *testing.T) {
@@ -159,4 +200,36 @@ func TestResult_String(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestSetCancellationWithFullChannel(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		m := NewManager().(*manager)
+		id := kubecontainer.ContainerID{Type: "test", ID: "blocked"}
+		pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{UID: "test-uid"}}
+		for range cap(m.updates) {
+			m.updates <- Update{}
+		}
+
+		ctx, cancel := context.WithCancel(t.Context())
+		defer cancel()
+		done := make(chan struct{})
+		go func() {
+			m.Set(ctx, id, Success, pod)
+			close(done)
+		}()
+		synctest.Wait()
+		select {
+		case <-done:
+			t.Fatal("Set returned before cancellation with a full updates channel")
+		default:
+		}
+
+		cancel()
+		<-done
+		assert.Len(t, m.updates, cap(m.updates))
+		result, found := m.Get(id)
+		assert.True(t, found, "cancellation should preserve the cached result")
+		assert.Equal(t, Success, result)
+	})
 }

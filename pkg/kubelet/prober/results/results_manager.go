@@ -17,6 +17,7 @@ limitations under the License.
 package results
 
 import (
+	"context"
 	"sync"
 
 	v1 "k8s.io/api/core/v1"
@@ -29,8 +30,12 @@ type Manager interface {
 	// Get returns the cached result for the container with the given ID.
 	Get(kubecontainer.ContainerID) (Result, bool)
 	// Set sets the cached result for the container with the given ID.
+	// Cancellation stops waiting to send the update, but does not undo the cache change.
 	// The pod is only included to be sent with the update.
-	Set(kubecontainer.ContainerID, Result, *v1.Pod)
+	Set(context.Context, kubecontainer.ContainerID, Result, *v1.Pod)
+	// Seed sets the cached result for the container with the given ID without
+	// sending anything on Updates(), for populating cache after Kubelet restart.
+	Seed(kubecontainer.ContainerID, Result)
 	// Remove clears the cached result for the container with the given ID.
 	Remove(kubecontainer.ContainerID)
 	// Updates creates a channel that receives an Update whenever its result changes (but not
@@ -110,10 +115,17 @@ func (m *manager) Get(id kubecontainer.ContainerID) (Result, bool) {
 	return result, found
 }
 
-func (m *manager) Set(id kubecontainer.ContainerID, result Result, pod *v1.Pod) {
+func (m *manager) Set(ctx context.Context, id kubecontainer.ContainerID, result Result, pod *v1.Pod) {
 	if m.setInternal(id, result) {
-		m.updates <- Update{id, result, pod.UID}
+		select {
+		case m.updates <- Update{id, result, pod.UID}:
+		case <-ctx.Done():
+		}
 	}
+}
+
+func (m *manager) Seed(id kubecontainer.ContainerID, result Result) {
+	m.setInternal(id, result)
 }
 
 // Internal helper for locked portion of set. Returns whether an update should be sent.

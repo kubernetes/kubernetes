@@ -1537,7 +1537,7 @@ func TestComputePodActions(t *testing.T) {
 				pod.Spec.RestartPolicy = v1.RestartPolicyAlways
 			},
 			mutateStatusFn: func(status *kubecontainer.PodStatus) {
-				m.livenessManager.Set(status.ContainerStatuses[1].ID, proberesults.Failure, basePod)
+				m.livenessManager.Set(t.Context(), status.ContainerStatuses[1].ID, proberesults.Failure, basePod)
 			},
 			actions: podActions{
 				SandboxID:         baseStatus.SandboxStatuses[0].Id,
@@ -1553,7 +1553,7 @@ func TestComputePodActions(t *testing.T) {
 				pod.Spec.RestartPolicy = v1.RestartPolicyAlways
 			},
 			mutateStatusFn: func(status *kubecontainer.PodStatus) {
-				m.startupManager.Set(status.ContainerStatuses[1].ID, proberesults.Failure, basePod)
+				m.startupManager.Set(t.Context(), status.ContainerStatuses[1].ID, proberesults.Failure, basePod)
 			},
 			actions: podActions{
 				SandboxID:         baseStatus.SandboxStatuses[0].Id,
@@ -2744,7 +2744,7 @@ func TestComputePodActionsWithRestartableInitContainers(t *testing.T) {
 		"livenessProbe in progress; start the next": {
 			mutatePodFn: func(pod *v1.Pod) { pod.Spec.RestartPolicy = v1.RestartPolicyAlways },
 			mutateStatusFn: func(pod *v1.Pod, status *kubecontainer.PodStatus) {
-				m.livenessManager.Set(status.ContainerStatuses[1].ID, proberesults.Unknown, basePod)
+				m.livenessManager.Set(t.Context(), status.ContainerStatuses[1].ID, proberesults.Unknown, basePod)
 				status.ContainerStatuses = status.ContainerStatuses[:2]
 				status.ActiveContainerStatuses = status.ContainerStatuses
 			},
@@ -2774,7 +2774,7 @@ func TestComputePodActionsWithRestartableInitContainers(t *testing.T) {
 		"kill and recreate the restartable init container if the liveness check has failed": {
 			mutatePodFn: func(pod *v1.Pod) { pod.Spec.RestartPolicy = v1.RestartPolicyAlways },
 			mutateStatusFn: func(pod *v1.Pod, status *kubecontainer.PodStatus) {
-				m.livenessManager.Set(status.ContainerStatuses[2].ID, proberesults.Failure, basePod)
+				m.livenessManager.Set(t.Context(), status.ContainerStatuses[2].ID, proberesults.Failure, basePod)
 			},
 			actions: podActions{
 				SandboxID:             baseStatus.SandboxStatuses[0].Id,
@@ -2798,7 +2798,7 @@ func TestComputePodActionsWithRestartableInitContainers(t *testing.T) {
 		"startupProbe in progress; do nothing": {
 			mutatePodFn: func(pod *v1.Pod) { pod.Spec.RestartPolicy = v1.RestartPolicyAlways },
 			mutateStatusFn: func(pod *v1.Pod, status *kubecontainer.PodStatus) {
-				m.startupManager.Set(status.ContainerStatuses[1].ID, proberesults.Unknown, basePod)
+				m.startupManager.Set(t.Context(), status.ContainerStatuses[1].ID, proberesults.Unknown, basePod)
 				status.ContainerStatuses = status.ContainerStatuses[:2]
 				status.ActiveContainerStatuses = status.ContainerStatuses
 			},
@@ -2826,7 +2826,7 @@ func TestComputePodActionsWithRestartableInitContainers(t *testing.T) {
 				pod.Spec.InitContainers[2].StartupProbe = &v1.Probe{}
 			},
 			mutateStatusFn: func(pod *v1.Pod, status *kubecontainer.PodStatus) {
-				m.startupManager.Set(status.ContainerStatuses[2].ID, proberesults.Failure, basePod)
+				m.startupManager.Set(t.Context(), status.ContainerStatuses[2].ID, proberesults.Failure, basePod)
 			},
 			actions: podActions{
 				SandboxID:             baseStatus.SandboxStatuses[0].Id,
@@ -3047,10 +3047,10 @@ func TestComputePodActionsWithRestartableInitContainers(t *testing.T) {
 	} {
 		t.Run(desc, func(t *testing.T) {
 			pod, status := makeBasePodAndStatusWithRestartableInitContainers()
-			m.livenessManager.Set(status.ContainerStatuses[1].ID, proberesults.Success, basePod)
-			m.startupManager.Set(status.ContainerStatuses[1].ID, proberesults.Success, basePod)
-			m.livenessManager.Set(status.ContainerStatuses[2].ID, proberesults.Success, basePod)
-			m.startupManager.Set(status.ContainerStatuses[2].ID, proberesults.Success, basePod)
+			m.livenessManager.Set(t.Context(), status.ContainerStatuses[1].ID, proberesults.Success, basePod)
+			m.startupManager.Set(t.Context(), status.ContainerStatuses[1].ID, proberesults.Success, basePod)
+			m.livenessManager.Set(t.Context(), status.ContainerStatuses[2].ID, proberesults.Success, basePod)
+			m.startupManager.Set(t.Context(), status.ContainerStatuses[2].ID, proberesults.Success, basePod)
 			if test.mutatePodFn != nil {
 				test.mutatePodFn(pod)
 			}
