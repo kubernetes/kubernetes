@@ -1115,8 +1115,10 @@ func TestUpdatePodStatusStartupProbeOnKubeletRestart(t *testing.T) {
 		// from the API server.
 		readyBeforeRestart v1.ConditionStatus
 		readinessProbe     *v1.Probe
-		expectedStarted    bool
-		expectedReady      bool
+		// replacedContainer gives the runtime a different container ID than the API status.
+		replacedContainer bool
+		expectedStarted   bool
+		expectedReady     bool
 	}{
 		{
 			name:                 "feature is disabled, the container is still in its startup period",
@@ -1146,6 +1148,14 @@ func TestUpdatePodStatusStartupProbeOnKubeletRestart(t *testing.T) {
 			readyBeforeRestart:   v1.ConditionTrue,
 			expectedStarted:      true,
 			expectedReady:        true,
+		},
+		{
+			name:                 "feature is disabled, the container was replaced after passing its startup probe",
+			startedBeforeRestart: new(true),
+			readyBeforeRestart:   v1.ConditionTrue,
+			replacedContainer:    true,
+			expectedStarted:      false,
+			expectedReady:        false,
 		},
 		// The feature gate restores the legacy behavior: the startup probe is
 		// verified again after a restart, but the first sync, which runs before
@@ -1197,7 +1207,7 @@ func TestUpdatePodStatusStartupProbeOnKubeletRestart(t *testing.T) {
 				var generatedStarted *bool
 				// A static pod manifest carries no container statuses, so nothing is
 				// preserved for it.
-				if !tc.featureEnabled && !staticPod {
+				if !tc.featureEnabled && !staticPod && !tc.replacedContainer {
 					generatedStarted = tc.startedBeforeRestart
 				}
 				podStatus := v1.PodStatus{
@@ -1212,6 +1222,10 @@ func TestUpdatePodStatusStartupProbeOnKubeletRestart(t *testing.T) {
 					}},
 				}
 
+				apiContainerID := containerID
+				if tc.replacedContainer {
+					apiContainerID = "test://replaced_container_id"
+				}
 				pod := &v1.Pod{
 					ObjectMeta: metav1.ObjectMeta{UID: testPodUID},
 					Spec: v1.PodSpec{
@@ -1228,20 +1242,20 @@ func TestUpdatePodStatusStartupProbeOnKubeletRestart(t *testing.T) {
 						}},
 						ContainerStatuses: []v1.ContainerStatus{{
 							Name:        containerName,
-							ContainerID: containerID,
+							ContainerID: apiContainerID,
 							Ready:       tc.readyBeforeRestart == v1.ConditionTrue,
 							Started:     tc.startedBeforeRestart,
 						}},
 					},
 				}
 
-				// The pod passed to the probe manager carries the API status. For a
-				// static pod, that is the status of its mirror pod.
+				oldPodStatus := pod.Status
 				if staticPod {
 					pod.Annotations = map[string]string{kubetypes.ConfigSourceAnnotationKey: kubetypes.FileSource}
+					// A static pod manifest has no status, so generateAPIPodStatus passes the mirror pod status instead.
+					pod.Status = v1.PodStatus{}
 				}
-
-				m.UpdatePodStatus(ctx, pod, &podStatus)
+				m.UpdatePodStatus(ctx, pod, &oldPodStatus, &podStatus)
 
 				got := podStatus.ContainerStatuses[0]
 				if got.Started == nil {
