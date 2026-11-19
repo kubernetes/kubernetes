@@ -32,10 +32,14 @@ func subtractOverheadFromResourceConfig(resCfg *cm.ResourceConfig, pod *v1.Pod) 
 
 	if pod.Spec.Overhead != nil {
 		if cpu, found := pod.Spec.Overhead[v1.ResourceCPU]; found {
-			if rc.CPUPeriod != nil {
+			// An unlimited quota, -1, stays unlimited; nothing is subtracted from it,
+			// and an overhead that itself converts to -1 subtracts nothing.
+			if rc.CPUPeriod != nil && rc.CPUQuota != nil && *rc.CPUQuota != -1 {
 				cpuPeriod := int64(*rc.CPUPeriod)
-				cpuQuota := *rc.CPUQuota - cm.MilliCPUToQuota(cpu.MilliValue(), cpuPeriod)
-				rc.CPUQuota = &cpuQuota
+				if overheadQuota := cm.MilliCPUToQuota(cpu.MilliValue(), cpuPeriod); overheadQuota != -1 {
+					cpuQuota := *rc.CPUQuota - overheadQuota
+					rc.CPUQuota = &cpuQuota
+				}
 			}
 
 			if rc.CPUShares != nil {

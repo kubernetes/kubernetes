@@ -8442,6 +8442,12 @@ func TestDoPodResizeAction_PodCgroupLimits(t *testing.T) {
 		expectedWrites:  []string{"memory=314572800", "cpu.quota=30000"},
 		checkOrder:      true,
 		containersFirst: true,
+	}, {
+		name:           "a CPU limit too large for a quota makes the pod unlimited, written first",
+		before:         podResources{containers: []v1.ResourceRequirements{limited}},
+		after:          podResources{containers: []v1.ResourceRequirements{res("100m", "100Mi", "92233720", "200Mi")}},
+		expectedWrites: []string{"cpu.quota=-1"},
+		checkOrder:     true,
 	}} {
 		t.Run(tc.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
