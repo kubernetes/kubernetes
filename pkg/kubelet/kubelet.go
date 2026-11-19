@@ -770,7 +770,6 @@ func NewMainKubelet(ctx context.Context,
 		logger,
 	)
 
-	klet.resourceAnalyzer = serverstats.NewResourceAnalyzer(ctx, klet, kubeCfg.VolumeStatsAggPeriod.Duration, kubeDeps.Recorder)
 	klet.runtimeService = kubeDeps.RemoteRuntimeService
 
 	if kubeDeps.KubeClient != nil {
@@ -849,6 +848,16 @@ func NewMainKubelet(ctx context.Context,
 	}
 	klet.actuatedState = actuatedState
 	allocatedPodMgr := &allocatedPodManager{baseManager: klet.podManager, allocationManager: klet.allocationManager}
+	klet.resourceAnalyzer = serverstats.NewResourceAnalyzer(
+		ctx,
+		&allocatedStatsProvider{
+			Provider:   klet,
+			podManager: allocatedPodMgr,
+		},
+		kubeCfg.VolumeStatsAggPeriod.Duration,
+		kubeDeps.Recorder,
+		actuatedState,
+	)
 
 	klet.runner = kubecontainer.NewCommandRunner(kubeDeps.RemoteRuntimeService)
 	klet.probeManager = newProbeManager(ctx, klet, kubeDeps)
@@ -4024,4 +4033,19 @@ func (a *allocatedStatusPodManager) GetPodByUID(uid types.UID) (*v1.Pod, bool) {
 	}
 	pod, _ = a.kl.allocationManager.UpdatePodFromAllocation(pod)
 	return pod, true
+}
+
+// allocatedStatsProvider decorates serverstats.Provider so volume stats classification
+// observes the allocated pod spec rather than unallocated desired updates.
+type allocatedStatsProvider struct {
+	serverstats.Provider
+	podManager *allocatedPodManager
+}
+
+func (p *allocatedStatsProvider) GetPods() []*v1.Pod {
+	return p.podManager.GetPods()
+}
+
+func (p *allocatedStatsProvider) GetPodByName(namespace, name string) (*v1.Pod, bool) {
+	return p.podManager.GetPodByName(namespace, name)
 }

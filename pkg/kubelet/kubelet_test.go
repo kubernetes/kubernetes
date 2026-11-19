@@ -352,7 +352,16 @@ func newTestKubeletWithImageList(
 	)
 	kubelet.actuatedState = state.NewStateMemory(logger, nil, kuberuntime.KeepOnlyResourceValues)
 	volumeStatsAggPeriod := time.Second * 10
-	kubelet.resourceAnalyzer = serverstats.NewResourceAnalyzer(tCtx, kubelet, volumeStatsAggPeriod, kubelet.recorder)
+	kubelet.resourceAnalyzer = serverstats.NewResourceAnalyzer(
+		tCtx,
+		&allocatedStatsProvider{
+			Provider:   kubelet,
+			podManager: &allocatedPodManager{baseManager: kubelet.podManager, allocationManager: kubelet.allocationManager},
+		},
+		volumeStatsAggPeriod,
+		kubelet.recorder,
+		kubelet.actuatedState,
+	)
 
 	fakeHostStatsProvider := stats.NewFakeHostStatsProvider(&containertest.FakeOS{})
 
@@ -7557,6 +7566,13 @@ func TestAllocatedPodManager(t *testing.T) {
 	require.Len(t, gotPod.Spec.Volumes, 1)
 	assert.Equal(t, "disk-vol", gotPod.Spec.Volumes[0].Name)
 
+	asp := &allocatedStatsProvider{Provider: kl, podManager: apm}
+	gotByName, found := asp.GetPodByName(podWithoutMemVol.Namespace, podWithoutMemVol.Name)
+	require.True(t, found)
+	require.Len(t, gotByName.Spec.Volumes, 1)
+	assert.Equal(t, "disk-vol", gotByName.Spec.Volumes[0].Name)
+	require.Len(t, asp.GetPods(), 1)
+	assert.Equal(t, "disk-vol", asp.GetPods()[0].Spec.Volumes[0].Name)
 	// Pod with a memory-backed emptyDir also returns the allocated SizeLimit.
 	size100Mi := resource.MustParse("100Mi")
 	size200Mi := resource.MustParse("200Mi")
