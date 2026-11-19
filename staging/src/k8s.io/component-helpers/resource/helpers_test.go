@@ -7276,3 +7276,148 @@ func TestContainerStatusPairs(t *testing.T) {
 		t.Errorf("expected no allocations, got %v", allocs)
 	}
 }
+
+func TestPodRequestsPreferActualPodLevelResources(t *testing.T) {
+	podWith := func(spec v1.ResourceList, status *v1.ResourceRequirements) *v1.Pod {
+		return &v1.Pod{
+			Spec: v1.PodSpec{
+				Resources: &v1.ResourceRequirements{Requests: spec},
+				Overhead:  v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
+			},
+			Status: v1.PodStatus{Resources: status},
+		}
+	}
+	spec := v1.ResourceList{
+		v1.ResourceCPU:    resource.MustParse("4"),
+		v1.ResourceMemory: resource.MustParse("4Gi"),
+	}
+
+	tests := []struct {
+		name    string
+		pod     *v1.Pod
+		enabled bool
+		want    v1.ResourceList
+	}{
+		{
+			name:    "status value wins per resource, spec fills the gaps",
+			pod:     podWith(spec, &v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")}}),
+			enabled: true,
+			want:    v1.ResourceList{v1.ResourceCPU: resource.MustParse("2"), v1.ResourceMemory: resource.MustParse("4Gi")},
+		},
+		{
+			name:    "status lower than spec is honored (actual, not max)",
+			pod:     podWith(spec, &v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("1Gi")}}),
+			enabled: true,
+			want:    v1.ResourceList{v1.ResourceCPU: resource.MustParse("4"), v1.ResourceMemory: resource.MustParse("1Gi")},
+		},
+		{
+			name:    "nil status falls back to spec",
+			pod:     podWith(spec, nil),
+			enabled: true,
+			want:    spec,
+		},
+		{
+			name:    "status-only resources are ignored",
+			pod:     podWith(spec, &v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceName("hugepages-2Mi"): resource.MustParse("2Mi")}}),
+			enabled: true,
+			want:    spec,
+		},
+		{
+			name:    "feature disabled uses spec",
+			pod:     podWith(spec, &v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")}}),
+			enabled: false,
+			want:    spec,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := PodRequests(tc.pod, PodResourcesOptions{
+				SkipContainerLevelResources:                    true,
+				ExcludeOverhead:                                true,
+				InPlacePodLevelResourcesVerticalScalingEnabled: tc.enabled,
+				PreferActualPodLevelResources:                  true,
+			})
+			if !equality.Semantic.DeepEqual(got, tc.want) {
+				t.Errorf("got %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestContainerActualRequests(t *testing.T) {
+	c := &v1.Container{
+		Name: "c1",
+		Resources: v1.ResourceRequirements{
+			Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("100m")},
+		},
+	}
+
+	tests := []struct {
+		name string
+		pod  *v1.Pod
+		want v1.ResourceList
+	}{
+		{
+			name: "actuated status.resources takes priority",
+			pod: &v1.Pod{
+				Status: v1.PodStatus{
+					ContainerStatuses: []v1.ContainerStatus{
+						{
+							Name: "c1",
+							Resources: &v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("200m")},
+							},
+							AllocatedResources: v1.ResourceList{v1.ResourceCPU: resource.MustParse("300m")},
+						},
+					},
+				},
+			},
+			want: v1.ResourceList{v1.ResourceCPU: resource.MustParse("200m")},
+		},
+		{
+			name: "allocatedResources used when status.resources is nil",
+			pod: &v1.Pod{
+				Status: v1.PodStatus{
+					ContainerStatuses: []v1.ContainerStatus{
+						{
+							Name:               "c1",
+							AllocatedResources: v1.ResourceList{v1.ResourceCPU: resource.MustParse("300m")},
+						},
+					},
+				},
+			},
+			want: v1.ResourceList{v1.ResourceCPU: resource.MustParse("300m")},
+		},
+		{
+			name: "spec used when no status reported",
+			pod: &v1.Pod{
+				Status: v1.PodStatus{},
+			},
+			want: v1.ResourceList{v1.ResourceCPU: resource.MustParse("100m")},
+		},
+		{
+			name: "infeasible resize returns nil",
+			pod: &v1.Pod{
+				Status: v1.PodStatus{
+					Conditions: []v1.PodCondition{
+						{
+							Type:   v1.PodResizePending,
+							Status: v1.ConditionTrue,
+							Reason: v1.PodReasonInfeasible,
+						},
+					},
+				},
+			},
+			want: nil,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := ContainerActualRequests(tc.pod, c)
+			if !equality.Semantic.DeepEqual(got, tc.want) {
+				t.Errorf("got %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
