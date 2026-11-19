@@ -257,8 +257,9 @@ func (pl *DynamicResources) filterExtendedResources(state *stateData, pod *v1.Po
 	// The pod may have extended resources, but they are all backed by device
 	// plugin, hence the noderesources plugin should have checked if the node
 	// can fit the pod.
-	// This dynamic resources plugin Filter phase has nothing left to do.
-	if state.claims.noUserClaim() && !hasExtendedResource {
+	// This dynamic resources plugin Filter phase has nothing left to do
+	// for the special claim, even when the pod also has user claims.
+	if !hasExtendedResource {
 		// It cannot be allocated when reaching here, as the claim from prior scheduling cycle
 		// would return unschedulable earlier in this function.
 		return nil, nil, nil
