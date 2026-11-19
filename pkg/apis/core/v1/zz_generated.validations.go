@@ -417,6 +417,7 @@ func Validate_Container(
 		errs = append(errs, fn(fldPath.Child("securityContext"), obj.SecurityContext, oldVal, oldObj != nil)...)
 	}
 
+	// field corev1.Container.HostCgroupNamespace has no validation
 	// field corev1.Container.Stdin has no validation
 	// field corev1.Container.StdinOnce has no validation
 	// field corev1.Container.TTY has no validation
@@ -547,6 +548,7 @@ func Validate_EphemeralContainerCommon(
 		errs = append(errs, fn(fldPath.Child("securityContext"), obj.SecurityContext, oldVal, oldObj != nil)...)
 	}
 
+	// field corev1.EphemeralContainerCommon.HostCgroupNamespace has no validation
 	// field corev1.EphemeralContainerCommon.Stdin has no validation
 	// field corev1.EphemeralContainerCommon.StdinOnce has no validation
 	// field corev1.EphemeralContainerCommon.TTY has no validation

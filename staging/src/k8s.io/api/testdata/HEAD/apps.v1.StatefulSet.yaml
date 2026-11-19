@@ -253,6 +253,7 @@ spec:
           secretRef:
             name: nameValue
             optional: true
+        hostCgroupNamespace: true
         image: imageValue
         imagePullPolicy: imagePullPolicyValue
         lifecycle:
@@ -498,6 +499,7 @@ spec:
           secretRef:
             name: nameValue
             optional: true
+        hostCgroupNamespace: true
         image: imageValue
         imagePullPolicy: imagePullPolicyValue
         lifecycle:
@@ -749,6 +751,7 @@ spec:
           secretRef:
             name: nameValue
             optional: true
+        hostCgroupNamespace: true
         image: imageValue
         imagePullPolicy: imagePullPolicyValue
         lifecycle:

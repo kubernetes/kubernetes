@@ -4026,6 +4026,24 @@ func validateContainerCommon(ctr *core.Container, volumes map[string]core.Volume
 	allErrs = append(allErrs, ValidateContainerResourceRequirements(&ctr.Resources, podClaimNames, path.Child("resources"), opts)...)
 	allErrs = append(allErrs, validateResizePolicy(ctr.ResizePolicy, path.Child("resizePolicy"), podRestartPolicy)...)
 	allErrs = append(allErrs, ValidateSecurityContext(ctr.SecurityContext, path.Child("securityContext"), hostUsers, opts.AllowSysAdminWhenPrivilegeEscalationFalse, opts.AllowSecurityProfileOCI)...)
+	allErrs = append(allErrs, validateHostCgroupNamespaceCgroupMountMode(ctr, path)...)
+	return allErrs
+}
+
+// validateHostCgroupNamespaceCgroupMountMode rejects a writable cgroup mount in the host cgroup namespace
+// for a non-privileged container, as it would expose the node's entire cgroup hierarchy as writable.
+func validateHostCgroupNamespaceCgroupMountMode(ctr *core.Container, path *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if ctr.HostCgroupNamespace == nil || !*ctr.HostCgroupNamespace {
+		return allErrs
+	}
+	sc := ctr.SecurityContext
+	if sc == nil || sc.CgroupOptions == nil || (sc.Privileged != nil && *sc.Privileged) {
+		return allErrs
+	}
+	if mountMode := sc.CgroupOptions.MountMode; mountMode != nil && *mountMode == core.CgroupMountModeReadWrite {
+		allErrs = append(allErrs, field.Invalid(path.Child("securityContext", "cgroupOptions", "mountMode"), *mountMode, "cannot be set to ReadWrite when `hostCgroupNamespace` is true, unless `privileged` is true"))
+	}
 	return allErrs
 }
 
@@ -4067,6 +4085,12 @@ func validateHostUsers(spec *core.PodSpec, fldPath *field.Path, opts PodValidati
 	if spec.HostIPC {
 		allErrs = append(allErrs, field.Forbidden(fldPath.Child("HostIPC"), "when `hostUsers` is false"))
 	}
+	podshelper.VisitContainersWithPath(spec, fldPath, func(c *core.Container, containerPath *field.Path) bool {
+		if c.HostCgroupNamespace != nil && *c.HostCgroupNamespace {
+			allErrs = append(allErrs, field.Forbidden(containerPath.Child("hostCgroupNamespace"), "when `hostUsers` is false"))
+		}
+		return true
+	})
 	if !opts.AllowUserNamespacesWithVolumeDevices {
 		// volumeDevices won't work, as they don't support idmap mounts nor we are chown-ing them.
 		// Let's return a clear error in this case.
@@ -5148,6 +5172,9 @@ func validateWindows(spec *core.PodSpec, fldPath *field.Path) field.ErrorList {
 	podshelper.VisitContainersWithPath(spec, fldPath, func(c *core.Container, cFldPath *field.Path) bool {
 		if _, ok := c.Resources.Limits[core.ResourceSwap]; ok {
 			allErrs = append(allErrs, field.Forbidden(cFldPath.Child("resources", "limits").Key(string(core.ResourceSwap)), "cannot be set for a windows pod"))
+		}
+		if c.HostCgroupNamespace != nil {
+			allErrs = append(allErrs, field.Forbidden(cFldPath.Child("hostCgroupNamespace"), "cannot be set for a windows pod"))
 		}
 		// validate container security context
 		sc := c.SecurityContext

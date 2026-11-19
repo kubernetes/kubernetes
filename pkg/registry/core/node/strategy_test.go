@@ -628,3 +628,82 @@ func TestDropPodPreemptionPolicy(t *testing.T) {
 		})
 	}
 }
+
+func TestDropRuntimeHandlerCgroupNamespaces(t *testing.T) {
+	nodeWith := func(cgroupNamespaces *bool) *api.Node {
+		return &api.Node{
+			ObjectMeta: metav1.ObjectMeta{Name: "node", ResourceVersion: "1"},
+			Status: api.NodeStatus{
+				RuntimeHandlers: []api.NodeRuntimeHandler{{
+					Name: "runc",
+					Features: &api.NodeRuntimeHandlerFeatures{
+						RecursiveReadOnlyMounts: new(true),
+						UserNamespaces:          new(true),
+						CgroupNamespaces:        cgroupNamespaces,
+					},
+				}},
+			},
+		}
+	}
+
+	testCases := []struct {
+		name               string
+		featureGateEnabled bool
+		oldNode            *api.Node
+		newNode            *api.Node
+		expected           *bool
+	}{
+		{
+			name:               "feature gate enabled, create",
+			featureGateEnabled: true,
+			newNode:            nodeWith(new(true)),
+			expected:           new(true),
+		},
+		{
+			name:               "feature gate disabled, create",
+			featureGateEnabled: false,
+			newNode:            nodeWith(new(true)),
+			expected:           nil,
+		},
+		{
+			name:               "feature gate disabled, update, not in use",
+			featureGateEnabled: false,
+			oldNode:            nodeWith(nil),
+			newNode:            nodeWith(new(true)),
+			expected:           nil,
+		},
+		{
+			name:               "feature gate disabled, update, in use",
+			featureGateEnabled: false,
+			oldNode:            nodeWith(new(false)),
+			newNode:            nodeWith(new(true)),
+			expected:           new(true),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CgroupNamespacesSupport, tc.featureGateEnabled)
+
+			check := func(t *testing.T, node *api.Node) {
+				t.Helper()
+				features := node.Status.RuntimeHandlers[0].Features
+				if diff := cmp.Diff(tc.expected, features.CgroupNamespaces); diff != "" {
+					t.Errorf("unexpected cgroupNamespaces (-want, +got):\n%s", diff)
+				}
+				if !*features.RecursiveReadOnlyMounts || !*features.UserNamespaces {
+					t.Errorf("unrelated features must not be dropped: %+v", features)
+				}
+			}
+
+			newNode := tc.newNode.DeepCopy()
+			if tc.oldNode == nil {
+				Strategy.PrepareForCreate(context.TODO(), newNode)
+				check(t, newNode)
+				return
+			}
+			StatusStrategy.PrepareForUpdate(context.TODO(), newNode, tc.oldNode)
+			check(t, newNode)
+		})
+	}
+}

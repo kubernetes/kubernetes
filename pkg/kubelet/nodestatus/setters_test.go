@@ -37,9 +37,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/version"
 	"k8s.io/klog/v2"
 	"k8s.io/ktesting"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubecontainertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
@@ -1939,5 +1942,48 @@ func makeDiskPressureCondition(pressure bool, transition, heartbeat time.Time) *
 		Message:            "kubelet has no disk pressure",
 		LastTransitionTime: metav1.NewTime(transition),
 		LastHeartbeatTime:  metav1.NewTime(heartbeat),
+	}
+}
+
+func TestRuntimeHandlersCgroupNamespaces(t *testing.T) {
+	handlers := []kubecontainer.RuntimeHandler{
+		{Name: "supported", SupportsRecursiveReadOnlyMounts: true, SupportsUserNamespaces: true, SupportsCgroupNamespaces: true},
+		{Name: "unsupported"},
+	}
+	for _, enabled := range []bool{true, false} {
+		t.Run(fmt.Sprintf("CgroupNamespacesSupport=%v", enabled), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CgroupNamespacesSupport, enabled)
+			tCtx := ktesting.Init(t)
+			node := &v1.Node{}
+			require.NoError(t, RuntimeHandlers(func() []kubecontainer.RuntimeHandler { return handlers })(tCtx, node))
+
+			cgroupNamespaces := func(b bool) *bool {
+				if !enabled {
+					return nil
+				}
+				return new(b)
+			}
+			expected := []v1.NodeRuntimeHandler{
+				{
+					Name: "supported",
+					Features: &v1.NodeRuntimeHandlerFeatures{
+						RecursiveReadOnlyMounts: new(true),
+						UserNamespaces:          new(true),
+						CgroupNamespaces:        cgroupNamespaces(true),
+					},
+				},
+				{
+					Name: "unsupported",
+					Features: &v1.NodeRuntimeHandlerFeatures{
+						RecursiveReadOnlyMounts: new(false),
+						UserNamespaces:          new(false),
+						CgroupNamespaces:        cgroupNamespaces(false),
+					},
+				},
+			}
+			if diff := cmp.Diff(expected, node.Status.RuntimeHandlers); diff != "" {
+				t.Errorf("unexpected runtime handlers (-want, +got):\n%s", diff)
+			}
+		})
 	}
 }

@@ -681,6 +681,9 @@ func (kl *Kubelet) EffectiveEphemeralVolumeLimit(pod *v1.Pod, volumeName string)
 // the container runtime to set parameters for launching a container.
 func (kl *Kubelet) GenerateRunContainerOptions(ctx context.Context, pod *v1.Pod, container *v1.Container, podIP string, podIPs []string, imageVolumes kubecontainer.ImageVolumes) (*kubecontainer.RunContainerOptions, func(), error) {
 	logger := klog.FromContext(ctx)
+	if err := kl.checkCgroupNamespaceSupport(pod, container); err != nil {
+		return nil, nil, err
+	}
 	supportsRRO := kl.runtimeClassSupportsRecursiveReadOnlyMounts(logger, pod)
 
 	opts, err := kl.containerManager.GetResources(ctx, pod, container)
@@ -3140,6 +3143,38 @@ func runtimeHandlerSupportsRecursiveReadOnlyMounts(logger klog.Logger, runtimeHa
 		}
 	}
 	logger.Error(nil, "Unknown runtime handler", "runtimeHandlerName", runtimeHandlerName)
+	return false
+}
+
+// checkCgroupNamespaceSupport returns an error if the container specifies hostCgroupNamespace
+// but the kubelet or the runtime handler cannot honor it, so that the field is not silently ignored.
+func (kl *Kubelet) checkCgroupNamespaceSupport(pod *v1.Pod, container *v1.Container) error {
+	if container.HostCgroupNamespace == nil {
+		return nil
+	}
+	if !utilfeature.DefaultFeatureGate.Enabled(features.CgroupNamespacesSupport) {
+		return fmt.Errorf("container %q specifies hostCgroupNamespace, but the %s feature gate is disabled on the kubelet", container.Name, features.CgroupNamespacesSupport)
+	}
+	var runtimeHandlerName string
+	if kl.runtimeClassManager != nil {
+		var err error
+		runtimeHandlerName, err = kl.runtimeClassManager.LookupRuntimeHandler(pod.Spec.RuntimeClassName)
+		if err != nil {
+			return fmt.Errorf("failed to look up the runtime handler: %w", err)
+		}
+	}
+	if !runtimeHandlerSupportsCgroupNamespaces(runtimeHandlerName, kl.runtimeState.runtimeHandlers()) {
+		return fmt.Errorf("container %q specifies hostCgroupNamespace, but the runtime handler %q does not support cgroup namespaces", container.Name, runtimeHandlerName)
+	}
+	return nil
+}
+
+func runtimeHandlerSupportsCgroupNamespaces(runtimeHandlerName string, runtimeHandlers []kubecontainer.RuntimeHandler) bool {
+	for _, h := range runtimeHandlers {
+		if h.Name == runtimeHandlerName {
+			return h.SupportsCgroupNamespaces
+		}
+	}
 	return false
 }
 

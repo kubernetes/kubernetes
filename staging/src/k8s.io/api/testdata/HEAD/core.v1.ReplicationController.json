@@ -844,6 +844,7 @@
                 "mountMode": "mountModeValue"
               }
             },
+            "hostCgroupNamespace": true,
             "stdin": true,
             "stdinOnce": true,
             "tty": true
@@ -1179,6 +1180,7 @@
                 "mountMode": "mountModeValue"
               }
             },
+            "hostCgroupNamespace": true,
             "stdin": true,
             "stdinOnce": true,
             "tty": true
@@ -1514,6 +1516,7 @@
                 "mountMode": "mountModeValue"
               }
             },
+            "hostCgroupNamespace": true,
             "stdin": true,
             "stdinOnce": true,
             "tty": true,

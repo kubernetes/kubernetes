@@ -234,6 +234,7 @@ template:
         secretRef:
           name: nameValue
           optional: true
+      hostCgroupNamespace: true
       image: imageValue
       imagePullPolicy: imagePullPolicyValue
       lifecycle:
@@ -479,6 +480,7 @@ template:
         secretRef:
           name: nameValue
           optional: true
+      hostCgroupNamespace: true
       image: imageValue
       imagePullPolicy: imagePullPolicyValue
       lifecycle:
@@ -730,6 +732,7 @@ template:
         secretRef:
           name: nameValue
           optional: true
+      hostCgroupNamespace: true
       image: imageValue
       imagePullPolicy: imagePullPolicyValue
       lifecycle:
