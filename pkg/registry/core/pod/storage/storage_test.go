@@ -55,6 +55,18 @@ import (
 	"k8s.io/utils/ptr"
 )
 
+func asCorePod(t *testing.T, obj runtime.Object) *api.Pod {
+	t.Helper()
+	if co, ok := obj.(runtime.CacheableObject); ok {
+		obj = co.GetObject()
+	}
+	pod, ok := obj.(*api.Pod)
+	if !ok {
+		t.Fatalf("expected *api.Pod, got %T", obj)
+	}
+	return pod
+}
+
 func newStorage(t *testing.T) (*REST, *BindingREST, *StatusREST, *etcd3testing.EtcdTestServer) {
 	etcdStorage, server := registrytest.NewEtcdStorage(t, "")
 	restOptions := generic.RESTOptions{
@@ -236,7 +248,7 @@ func TestCreateSetsFields(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	actual := object.(*api.Pod)
+	actual := asCorePod(t, object)
 	if actual.Name != pod.Name {
 		t.Errorf("unexpected pod: %#v", actual)
 	}
@@ -668,7 +680,7 @@ func TestEtcdCreateClearsNominatedNodeName(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Unexpected error %v", err)
 			}
-			boundPod := obj.(*api.Pod)
+			boundPod := asCorePod(t, obj)
 
 			if featureGateEnabled {
 				if boundPod.Status.NominatedNodeName != "" {
@@ -759,7 +771,7 @@ func TestEtcdCreateWithContainersNotFound(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error %v", err)
 	}
-	pod := obj.(*api.Pod)
+	pod := asCorePod(t, obj)
 
 	if !(pod.Annotations != nil && pod.Annotations["annotation1"] == "value1") {
 		t.Fatalf("Pod annotations don't match the expected: %v", pod.Annotations)
@@ -971,10 +983,10 @@ func TestEtcdCreateBindingWithUIDAndResourceVersion(t *testing.T) {
 			t.Errorf("%s: unexpected error: %v", k, err)
 		}
 
-		if pod, err := storage.Get(ctx, pod.Name, &metav1.GetOptions{}); err != nil {
+		if podObj, err := storage.Get(ctx, pod.Name, &metav1.GetOptions{}); err != nil {
 			t.Errorf("%s: unexpected error: %v", k, err)
-		} else if pod.(*api.Pod).Spec.NodeName != testCase.expectedNodeName {
-			t.Errorf("%s: expected: %v, got: %v", k, pod.(*api.Pod).Spec.NodeName, testCase.expectedNodeName)
+		} else if gotPod := asCorePod(t, podObj); gotPod.Spec.NodeName != testCase.expectedNodeName {
+			t.Errorf("%s: expected: %v, got: %v", k, gotPod.Spec.NodeName, testCase.expectedNodeName)
 		}
 	}
 }
@@ -1070,11 +1082,12 @@ func TestEtcdCreateBinding(t *testing.T) {
 			if err != nil {
 				t.Errorf("%s: unexpected error: %v", k, err)
 			} else {
-				if pod.(*api.Pod).Spec.NodeName != test.binding.Target.Name {
-					t.Errorf("%s: expected: %v, got: %v", k, pod.(*api.Pod).Spec.NodeName, test.binding.Target.Name)
+				gotPod := asCorePod(t, pod)
+				if gotPod.Spec.NodeName != test.binding.Target.Name {
+					t.Errorf("%s: expected: %v, got: %v", k, gotPod.Spec.NodeName, test.binding.Target.Name)
 				}
-				if out.(*metav1.Status).ResourceVersion != pod.(*api.Pod).ResourceVersion {
-					t.Errorf("%s: expected ResourceVersion: %v, got: %v", k, pod.(*api.Pod).ResourceVersion, out.(*metav1.Status).ResourceVersion)
+				if out.(*metav1.Status).ResourceVersion != gotPod.ResourceVersion {
+					t.Errorf("%s: expected ResourceVersion: %v, got: %v", k, gotPod.ResourceVersion, out.(*metav1.Status).ResourceVersion)
 				}
 			}
 		}
@@ -1100,7 +1113,7 @@ func TestEtcdUpdateNotScheduled(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	podOut := obj.(*api.Pod)
+	podOut := asCorePod(t, obj)
 	// validChangedPod only changes the Labels, so were checking the update was valid
 	if !apiequality.Semantic.DeepEqual(podIn.Labels, podOut.Labels) {
 		t.Errorf("objects differ: %v", cmp.Diff(podOut, podIn))
@@ -1173,7 +1186,7 @@ func TestEtcdUpdateScheduled(t *testing.T) {
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
-	podOut := obj.(*api.Pod)
+	podOut := asCorePod(t, obj)
 	// Check to verify the Spec and Label updates match from change above.  Those are the fields changed.
 	if !apiequality.Semantic.DeepEqual(podOut.Spec, podIn.Spec) || !apiequality.Semantic.DeepEqual(podOut.Labels, podIn.Labels) {
 		t.Errorf("objects differ: %v", cmp.Diff(podOut, podIn))
@@ -1289,7 +1302,7 @@ func TestEtcdUpdateStatus(t *testing.T) {
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
-		podOut := obj.(*api.Pod)
+		podOut := asCorePod(t, obj)
 		// Check to verify the Label, and Status updates match from change above.  Those are the fields changed.
 		if !apiequality.Semantic.DeepEqual(podOut.Spec, expected.Spec) ||
 			!apiequality.Semantic.DeepEqual(podOut.Labels, expected.Labels) ||
@@ -1332,7 +1345,7 @@ func TestEtcdTerminationGracePeriodSecondsCompatibility(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	served := obj.(*api.Pod)
+	served := asCorePod(t, obj)
 	if served.Spec.TerminationGracePeriodSeconds == nil || *served.Spec.TerminationGracePeriodSeconds != 1 {
 		t.Fatalf("expected stored negative grace period clamped to 1 by storage-decode defaulting, got %v", served.Spec.TerminationGracePeriodSeconds)
 	}
@@ -1345,7 +1358,7 @@ func TestEtcdTerminationGracePeriodSecondsCompatibility(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	healed := obj.(*api.Pod)
+	healed := asCorePod(t, obj)
 	if healed.Spec.TerminationGracePeriodSeconds == nil || *healed.Spec.TerminationGracePeriodSeconds != 1 {
 		t.Fatalf("expected grace period of 1 after rewrite, got %v", healed.Spec.TerminationGracePeriodSeconds)
 	}
@@ -1369,7 +1382,7 @@ func TestEtcdPodIPsReadCompatibility(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	served := obj.(*api.Pod)
+	served := asCorePod(t, obj)
 	if served.Status.PodIP != "10.0.0.1" {
 		t.Errorf("expected podIP 10.0.0.1, got %q", served.Status.PodIP)
 	}
@@ -1409,7 +1422,7 @@ func TestEtcdCreateBindingScrubsLegacyAnnotations(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	pod := obj.(*api.Pod)
+	pod := asCorePod(t, obj)
 	if _, ok := pod.Annotations["pod.beta.kubernetes.io/init-containers"]; ok {
 		t.Errorf("expected legacy init-container annotation to be scrubbed from binding, got %v", pod.Annotations)
 	}
@@ -1555,15 +1568,16 @@ func TestEtcdUpdateDynamic(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	gotPod := asCorePod(t, obj)
 	var names []string
-	for _, c := range obj.(*api.Pod).Spec.Containers {
+	for _, c := range gotPod.Spec.Containers {
 		names = append(names, c.Name)
 	}
 	if diff := cmp.Diff([]string{"foo", "bar"}, names); diff != "" {
 		t.Errorf("unexpected containers (-want, +got):\n%s", diff)
 	}
 
-	removed := obj.(*api.Pod).DeepCopy()
+	removed := gotPod.DeepCopy()
 	removed.Spec.Containers = removed.Spec.Containers[1:]
 	if _, _, err := podStorage.Pod.Update(ctx, removed.Name, rest.DefaultUpdatedObjectInfo(removed), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{}); err == nil {
 		t.Error("expected the pods resource to reject removing a container")

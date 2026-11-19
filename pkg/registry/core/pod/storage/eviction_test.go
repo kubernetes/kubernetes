@@ -214,7 +214,7 @@ func TestEvictionWithETCD(t *testing.T) {
 				if err != nil {
 					t.Fatalf("unexpected error getting pod before eviction: %v", err)
 				}
-				rvBeforeEviction := podBeforeEviction.(*api.Pod).ResourceVersion
+				rvBeforeEviction := asCorePod(t, podBeforeEviction).ResourceVersion
 
 				client := fake.NewSimpleClientset(pdbsCopy...)
 				evictionRest := newEvictionStorage(storage.Store, client.PolicyV1())
@@ -270,11 +270,12 @@ func TestEvictionWithETCD(t *testing.T) {
 					return
 				}
 
-				if existingPod.(*api.Pod).DeletionTimestamp == nil {
+				existing := asCorePod(t, existingPod)
+				if existing.DeletionTimestamp == nil {
 					t.Errorf("expected gracefully deleted pod with deletionTimestamp set, got %#v", existingPod)
 				}
-				if status.ResourceVersion != existingPod.(*api.Pod).ResourceVersion {
-					t.Errorf("expected Status ResourceVersion %q to match gracefully deleted pod ResourceVersion %q", status.ResourceVersion, existingPod.(*api.Pod).ResourceVersion)
+				if status.ResourceVersion != existing.ResourceVersion {
+					t.Errorf("expected Status ResourceVersion %q to match gracefully deleted pod ResourceVersion %q", status.ResourceVersion, existing.ResourceVersion)
 				}
 			})
 		}

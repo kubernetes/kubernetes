@@ -322,6 +322,9 @@ func (c *CacheDelegator) cachedSuggestion(ctx context.Context, key string, preco
 	} else if exists && preconditions.Check(key, obj) == nil {
 		// DeepCopy the object since we modify resource version when serializing the
 		// current object.
+		if co, ok := obj.(runtime.CacheableObject); ok {
+			return co.GetObject()
+		}
 		return obj.DeepCopyObject()
 	}
 	// If we couldn't get the object, fallback to no-suggestion.

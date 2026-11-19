@@ -4275,3 +4275,122 @@ func TestGetListWithShardedListAndWatch(t *testing.T) {
 		})
 	}
 }
+
+type fakePodSetter struct {
+	metav1.TypeMeta
+	pod *example.Pod
+}
+
+func (f *fakePodSetter) DeepCopyObject() runtime.Object {
+	if f == nil || f.pod == nil {
+		return &fakePodSetter{}
+	}
+	return &fakePodSetter{pod: f.pod.DeepCopy()}
+}
+
+func (f *fakePodSetter) SetObject(obj runtime.Object) bool {
+	pod, ok := obj.(*example.Pod)
+	if !ok {
+		return false
+	}
+	f.pod = pod.DeepCopy()
+	return true
+}
+
+func TestCacherCacheableObjectUnwrap(t *testing.T) {
+	backingStorage := &cachertesting.MockStorage{}
+	cacher, _, err := newTestCacher(backingStorage)
+	if err != nil {
+		t.Fatalf("failed to create cacher: %v", err)
+	}
+	defer cacher.Stop()
+
+	pod := &example.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace:       "default",
+			Name:            "pod-0",
+			ResourceVersion: "105",
+			Labels:          map[string]string{"app": "web"},
+		},
+	}
+	wrapped, err := newCachingObject(pod)
+	if err != nil {
+		t.Fatalf("newCachingObject failed: %v", err)
+	}
+
+	// Verify assignCachedObject handles: exact match, CacheableObject unwrap, and SetObject wrap.
+	var exactOut example.Pod
+	assignCachedObject(reflect.ValueOf(&exactOut).Elem(), pod)
+	if exactOut.Name != "pod-0" {
+		t.Fatalf("exact match failed: got %q", exactOut.Name)
+	}
+
+	var unwrappedOut example.Pod
+	assignCachedObject(reflect.ValueOf(&unwrappedOut).Elem(), wrapped)
+	if unwrappedOut.Name != "pod-0" || unwrappedOut.ResourceVersion != "105" {
+		t.Fatalf("CacheableObject unwrap failed: got %+v", unwrappedOut.ObjectMeta)
+	}
+	unwrappedOut.Labels["app"] = "mutated"
+	if pod.Labels["app"] != "web" {
+		t.Fatalf("mutating unwrapped object leaked into cached pod")
+	}
+
+	var setterOut fakePodSetter
+	assignCachedObject(reflect.ValueOf(&setterOut).Elem(), pod)
+	if setterOut.pod == nil || setterOut.pod.Name != "pod-0" {
+		t.Fatalf("SetObject wrap failed: got %+v", setterOut.pod)
+	}
+
+	// Verify CacheDelegator.cachedSuggestion unwraps CacheableObject to *example.Pod.
+	if err := cacher.watchCache.Add(wrapped); err != nil {
+		t.Fatalf("watchCache.Add failed: %v", err)
+	}
+	d := NewCacheDelegator(cacher, backingStorage)
+	defer d.Stop()
+
+	suggested := d.cachedSuggestion(context.Background(), "/pods/default/pod-0", nil)
+	gotPod, ok := suggested.(*example.Pod)
+	if !ok {
+		t.Fatalf("cachedSuggestion expected *example.Pod, got %T", suggested)
+	}
+	if gotPod.Name != "pod-0" || gotPod.ResourceVersion != "105" {
+		t.Fatalf("cachedSuggestion metadata mismatch: %+v", gotPod.ObjectMeta)
+	}
+
+	// Verify Cacher.Get unwraps *cachingObject into *example.Pod.
+	var fetched example.Pod
+	if err := cacher.Get(context.Background(), "/pods/default/pod-0", storage.GetOptions{ResourceVersion: "0"}, &fetched); err != nil {
+		t.Fatalf("cacher.Get failed: %v", err)
+	}
+	if fetched.Name != "pod-0" || fetched.ResourceVersion != "105" {
+		t.Fatalf("cacher.Get mismatch: %+v", fetched.ObjectMeta)
+	}
+
+	// Verify Cacher.GetList unwraps *cachingObject into *example.PodList (both empty and filtered predicates).
+	for _, pred := range []storage.SelectionPredicate{
+		storage.Everything,
+		{Label: labels.SelectorFromSet(labels.Set{"app": "web"}), Field: fields.Everything()},
+	} {
+		var list example.PodList
+		if err := cacher.GetList(context.Background(), "/pods/default", storage.ListOptions{
+			ResourceVersion: "0",
+			Predicate:       pred,
+			Recursive:       true,
+		}, &list); err != nil {
+			t.Fatalf("cacher.GetList failed: %v", err)
+		}
+		if len(list.Items) != 1 || list.Items[0].Name != "pod-0" {
+			t.Fatalf("cacher.GetList unexpected items: %+v", list.Items)
+		}
+	}
+
+	// Verify txnDelegator unwraps CacheableObject when loading initial state.
+	txn := &txnDelegator{cacher: cacher, storage: backingStorage, key: "/pods/default/pod-0"}
+	state, err := txn.getInitialState(context.Background(), false)
+	if err != nil {
+		t.Fatalf("txn.getInitialState failed: %v", err)
+	}
+	if _, ok := state.Obj.(*example.Pod); !ok {
+		t.Fatalf("txn.getInitialState expected *example.Pod, got %T", state.Obj)
+	}
+}
