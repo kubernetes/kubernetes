@@ -364,6 +364,7 @@ func NewContainerManager(ctx context.Context, mountUtil mount.Interface, cadviso
 	cm.memoryManager, err = memorymanager.NewManager(
 		logger,
 		nodeConfig.MemoryManagerPolicy,
+		nodeConfig.MemoryManagerPolicyOptions,
 		machineInfo,
 		cm.GetNodeAllocatableReservation(),
 		nodeConfig.MemoryManagerReservedMemory,

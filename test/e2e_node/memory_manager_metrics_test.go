@@ -22,11 +22,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	"github.com/onsi/gomega/gstruct"
+	"github.com/onsi/gomega/types"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,7 +36,11 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	"k8s.io/kubernetes/pkg/kubelet/apis/podresources"
+	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
+	"k8s.io/kubernetes/pkg/kubelet/metrics"
+	"k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
@@ -517,3 +523,149 @@ var _ = SIGDescribe("Memory Manager Metrics Pod Level Resources", ginkgo.Ordered
 		}).WithTimeout(2 * time.Minute).WithPolling(10 * time.Second).Should(gomega.Succeed())
 	})
 })
+
+const (
+	memoryDriftToleranceBytes = 128 * 1024 * 1024
+	memoryDriftGraceBytes     = 64 * 1024 * 1024
+)
+
+var _ = SIGDescribe("Memory Manager Drift Tolerance Metrics", framework.WithDisruptive(), framework.WithSerial(), feature.MemoryManager, framework.WithFeatureGate(features.MemoryManagerDriftTolerance), func() {
+	f := framework.NewDefaultFramework("memorymanager-drift-metrics")
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+
+	var oldCfg *kubeletconfig.KubeletConfiguration
+
+	ginkgo.BeforeEach(func(ctx context.Context) {
+		var err error
+		if oldCfg == nil {
+			oldCfg, err = getCurrentKubeletConfig(ctx)
+			framework.ExpectNoError(err)
+		}
+		ginkgo.DeferCleanup(func(ctx context.Context) {
+			updateKubeletConfig(ctx, f, oldCfg, true)
+		})
+	})
+
+	ginkgo.It("should report the tolerance and a zero drift for every NUMA node after a fresh start", func(ctx context.Context) {
+		ginkgo.By("Setting memory-drift-tolerance to 128Mi")
+		setMemoryDriftTolerance(ctx, f, oldCfg, "128Mi")
+
+		ginkgo.By("Checking the drift metrics")
+		gomega.Eventually(ctx, getKubeletMetrics, time.Minute, 15*time.Second).Should(
+			matchMemoryDriftMetrics(timelessSample(memoryDriftToleranceBytes)))
+	})
+
+	ginkgo.It("should start again and keep the memory assignments after a kubelet restart with the tolerance set to auto", func(ctx context.Context) {
+		ginkgo.By("Setting memory-drift-tolerance to auto")
+		setMemoryDriftTolerance(ctx, f, oldCfg, "auto")
+
+		ginkgo.By("Creating the test pod")
+		pod := createMemoryDriftTestPod(ctx, f)
+		assigned := getContainerMemoryAssignment(ctx, pod)
+
+		ginkgo.By("Restarting the kubelet")
+		restartKubelet(ctx, true)
+		waitForKubeletToStart(ctx, f)
+
+		ginkgo.By("Checking the drift metrics")
+		gomega.Eventually(ctx, getKubeletMetrics, time.Minute, 15*time.Second).Should(
+			matchMemoryDriftMetrics(timelessSampleAtLeast(memoryDriftGraceBytes + 1)))
+
+		ginkgo.By("Checking that the memory assignment of the test pod is kept")
+		framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace))
+		gomega.Expect(getContainerMemoryAssignment(ctx, pod)).To(gomega.Equal(assigned))
+	})
+})
+
+func setMemoryDriftTolerance(ctx context.Context, f *framework.Framework, oldCfg *kubeletconfig.KubeletConfiguration, tolerance string) {
+	ginkgo.GinkgoHelper()
+
+	newCfg := oldCfg.DeepCopy()
+	updateKubeletConfigWithMemoryManagerParams(newCfg,
+		&memoryManagerKubeletParams{
+			policy: staticPolicy,
+			systemReservedMemory: []kubeletconfig.MemoryReservation{
+				{
+					NumaNode: 0,
+					Limits: v1.ResourceList{
+						resourceMemory: resource.MustParse("1100Mi"),
+					},
+				},
+			},
+			systemReserved: map[string]string{resourceMemory: "500Mi"},
+			kubeReserved:   map[string]string{resourceMemory: "500Mi"},
+			evictionHard:   map[string]string{evictionHardMemory: "100Mi"},
+		},
+	)
+	newCfg.FeatureGates[string(features.MemoryManagerDriftTolerance)] = true
+	newCfg.MemoryManagerPolicyOptions = map[string]string{memorymanager.MemoryDriftTolerance: tolerance}
+	updateKubeletConfig(ctx, f, newCfg, true)
+}
+
+func createMemoryDriftTestPod(ctx context.Context, f *framework.Framework) *v1.Pod {
+	ginkgo.GinkgoHelper()
+
+	pod := e2epod.NewPodClient(f).CreateSync(ctx, makeMemoryManagerPod("memmngrpod", nil,
+		[]memoryManagerCtnAttributes{
+			{
+				ctnName: "memmngrcnt",
+				cpus:    "100m",
+				memory:  "64Mi",
+			},
+		}),
+	)
+	ginkgo.DeferCleanup(func(ctx context.Context) {
+		deletePodSyncByName(ctx, f, pod.Name)
+	})
+	return pod
+}
+
+func getContainerMemoryAssignment(ctx context.Context, pod *v1.Pod) []string {
+	ginkgo.GinkgoHelper()
+
+	endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
+	framework.ExpectNoError(err)
+	cli, conn, err := podresources.GetV1Client(ctx, endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
+	framework.ExpectNoError(err)
+	defer conn.Close() //nolint:errcheck
+
+	var assignment []string
+	gomega.Eventually(ctx, func(ctx context.Context) error {
+		podResources, err := getPodResourcesFromList(ctx, cli, pod.Name, pod.Namespace)
+		if err != nil {
+			return err
+		}
+		for _, container := range podResources.GetContainers() {
+			if container.GetName() != pod.Spec.Containers[0].Name {
+				continue
+			}
+			assignment = nil
+			for _, memory := range container.GetMemory() {
+				var numaNodes []int64
+				for _, numaNode := range memory.GetTopology().GetNodes() {
+					numaNodes = append(numaNodes, numaNode.GetID())
+				}
+				assignment = append(assignment, fmt.Sprintf("%s:%d:%v", memory.GetMemoryType(), memory.GetSize(), numaNodes))
+			}
+			if len(assignment) == 0 {
+				return fmt.Errorf("container %s of pod %s/%s has no memory assignment", container.GetName(), pod.Namespace, pod.Name)
+			}
+			return nil
+		}
+		return fmt.Errorf("container %s of pod %s/%s not found in List() response", pod.Spec.Containers[0].Name, pod.Namespace, pod.Name)
+	}).WithTimeout(time.Minute).WithPolling(5 * time.Second).Should(gomega.Succeed())
+	return assignment
+}
+
+func matchMemoryDriftMetrics(tolerance types.GomegaMatcher) types.GomegaMatcher {
+	drift := gstruct.Elements{}
+	for _, numaNode := range getAllNUMANodes() {
+		drift[strconv.Itoa(numaNode)] = timelessSample(0)
+	}
+	return gstruct.MatchKeys(gstruct.IgnoreExtras, gstruct.Keys{
+		"kubelet_memory_manager_drift_tolerance_bytes": gstruct.MatchAllElements(nodeID, gstruct.Elements{
+			"": tolerance,
+		}),
+		"kubelet_memory_manager_drift_bytes": gstruct.MatchAllElements(makeCustomLabelID(metrics.AlignedNUMANode), drift),
+	})
+}
