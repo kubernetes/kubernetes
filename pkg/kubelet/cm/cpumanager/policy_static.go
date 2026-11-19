@@ -1138,14 +1138,6 @@ func (p *staticPolicy) allocateForResize(logger klog.Logger, s state.State, pod 
 	return nil
 }
 
-// allocateForResize changes the CPU assignment of a container to its allocated
-// resources. The static policy does not support it yet, so it keeps the
-// assignment unchanged.
-func (p *staticPolicy) allocateForResize(logger klog.Logger, _ state.State, _ *v1.Pod, _ *v1.Container) error {
-	logger.V(2).Info("CPU Manager container-level resource allocation skipped, operation not supported by the static CPU manager policy")
-	return nil
-}
-
 // getAssignedCPUsOfSiblings returns assigned cpus of given container's siblings(all containers other than the given container) in the given pod `podUID`.
 func getAssignedCPUsOfSiblings(s state.State, podUID string, containerName string) cpuset.CPUSet {
 	assignments := s.GetCPUAssignments()
@@ -1518,20 +1510,6 @@ func (p *staticPolicy) getTopologyHintsForAdd(logger klog.Logger, s state.State,
 	return map[string][]topologymanager.TopologyHint{
 		string(v1.ResourceCPU): cpuHints,
 	}
-}
-
-// getTopologyHintsForResize generates the hints for a resize of a container.
-// The static policy does not support resize yet, so it has no preference.
-func (p *staticPolicy) getTopologyHintsForResize(logger klog.Logger, _ state.State, _ *v1.Pod, _ *v1.Container) map[string][]topologymanager.TopologyHint {
-	logger.V(2).Info("CPU Manager container-level hint generation skipped, operation not supported by the static CPU manager policy")
-	return nil
-}
-
-// getPodTopologyHintsForResize generates the hints for a resize of a pod.
-// The static policy does not support resize yet, so it has no preference.
-func (p *staticPolicy) getPodTopologyHintsForResize(logger klog.Logger, _ state.State, _ *v1.Pod) map[string][]topologymanager.TopologyHint {
-	logger.V(2).Info("CPU Manager pod hint generation skipped, operation not supported by the static CPU manager policy")
-	return nil
 }
 
 func (p *staticPolicy) GetPodTopologyHints(logger klog.Logger, s state.State, pod *v1.Pod, operation lifecycle.Operation) map[string][]topologymanager.TopologyHint {
