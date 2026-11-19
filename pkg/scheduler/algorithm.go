@@ -148,18 +148,17 @@ func NewSchedulingAlgorithm(snapshot *internalcache.Snapshot, cache internalcach
 }
 
 // opportunisticBatchingEnabled reports whether opportunistic batching can run. It needs the
-// feature gate, a cycle provider (batch state is keyed by scheduling cycle, so without a real
-// counter the batch cannot tell consecutive cycles apart), and batching not to be disabled on
-// the framework.
-func (a *SchedulingAlgorithm) opportunisticBatchingEnabled(schedFramework framework.Framework) bool {
-	return a.cycleProvider != nil && utilfeature.DefaultFeatureGate.Enabled(features.OpportunisticBatching) && !schedFramework.IsBatchingDisabled()
+// feature gate and a cycle provider (batch state is keyed by scheduling cycle, so without a real
+// counter the batch cannot tell consecutive cycles apart).
+func (a *SchedulingAlgorithm) opportunisticBatchingEnabled() bool {
+	return a.cycleProvider != nil && utilfeature.DefaultFeatureGate.Enabled(features.OpportunisticBatching)
 }
 
 // cachesScheduleResults reports whether opportunistic batching is going to keep the nodes found
 // for the pod for the pods that follow. Pods without a signature never start a batch, and neither
 // does firstFit, which skips scoring.
-func (a *SchedulingAlgorithm) cachesScheduleResults(schedFramework framework.Framework, podInfo *framework.QueuedPodInfo) bool {
-	return !a.firstFit && podInfo.PodSignature != nil && a.opportunisticBatchingEnabled(schedFramework)
+func (a *SchedulingAlgorithm) cachesScheduleResults(podInfo *framework.QueuedPodInfo) bool {
+	return !a.firstFit && podInfo.PodSignature != nil && a.opportunisticBatchingEnabled()
 }
 
 // SchedulePod runs PreFilter, Filter, filter extenders and Score, and returns the
@@ -176,7 +175,7 @@ func (a *SchedulingAlgorithm) SchedulePod(ctx context.Context, schedFramework fr
 	}
 
 	// A pod that seeds a batch keeps the nodes of all ranks for the pods that follow.
-	cacheResults := a.cachesScheduleResults(schedFramework, podInfo)
+	cacheResults := a.cachesScheduleResults(podInfo)
 	fit, err := a.findNodesThatFitPod(ctx, schedFramework, state, podInfo, cacheResults)
 	if err != nil {
 		return result, err
@@ -201,7 +200,7 @@ func (a *SchedulingAlgorithm) SchedulePod(ctx context.Context, schedFramework fr
 			}
 		}
 		node := bestNode.NodeInfo.Node().Name
-		if a.opportunisticBatchingEnabled(schedFramework) {
+		if a.opportunisticBatchingEnabled() {
 			schedFramework.StoreScheduleResults(ctx, podInfo.PodSignature, nodeHint, node, nil, a.cycleProvider())
 		}
 		return ScheduleResult{
@@ -226,7 +225,7 @@ func (a *SchedulingAlgorithm) SchedulePod(ctx context.Context, schedFramework fr
 	node := sortedPrioritizedNodes.Pop().Name
 	trace.Step("Prioritizing done")
 
-	if a.opportunisticBatchingEnabled(schedFramework) {
+	if a.opportunisticBatchingEnabled() {
 		schedFramework.StoreScheduleResults(ctx, podInfo.PodSignature, nodeHint, node, sortedPrioritizedNodes, a.cycleProvider())
 	}
 
@@ -421,7 +420,7 @@ func (a *SchedulingAlgorithm) findNodesThatFitPod(ctx context.Context, schedFram
 		return fit, status.AsError()
 	}
 
-	if a.opportunisticBatchingEnabled(schedFramework) {
+	if a.opportunisticBatchingEnabled() {
 		// We get the node hint even if we have a nominated name for simplicity, but we could potentially avoid it
 		// in this scenario in the future.
 		fit.nodeHint = schedFramework.GetNodeHint(ctx, pod, podInfo.PodSignature, state, a.cycleProvider())

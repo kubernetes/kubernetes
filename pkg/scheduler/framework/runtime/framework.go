@@ -1407,12 +1407,14 @@ func (f *frameworkImpl) RunPodGroupPostFilterPlugins(ctx context.Context, state 
 		metrics.FrameworkExtensionPointDuration.WithLabelValues(metrics.PodGroupPostFilter, status.Code().String(), f.profileName).Observe(metrics.SinceInSeconds(startTime))
 	}()
 
-	// Disable opportunistic batching during PodGroupPostFilter so preemption evaluations
-	// neither reuse node hints cached from the normal pass nor bypass RankNodes when
-	// dynamic victim condemnations change node ranks across pods in the group.
-	// TODO(#142718): Implement support for batching with RankNodes during preemption.
-	f.batch.SetDisabled(true)
-	defer f.batch.SetDisabled(false)
+	// Plugins call pgSchedulingFunc on a snapshot they changed, e.g. with victims removed.
+	// What opportunistic batching cached in the regular pass doesn't hold there, and what
+	// it caches there holds neither for the next call nor back in the regular pass.
+	defer f.batch.flush()
+	schedulingFunc := func(ctx context.Context, state fwk.PodGroupCycleState) (*fwk.PodGroupAssignments, *fwk.Status) {
+		f.batch.flush()
+		return pgSchedulingFunc(ctx, state)
+	}
 
 	logger := klog.FromContext(ctx)
 	verboseLogs := logger.V(4).Enabled()
@@ -1428,7 +1430,7 @@ func (f *frameworkImpl) RunPodGroupPostFilterPlugins(ctx context.Context, state 
 			logger := klog.LoggerWithName(logger, pl.Name())
 			ctx = klog.NewContext(ctx, logger)
 		}
-		res, status := f.runPodGroupPostFilterPlugin(ctx, pl, state, podGroupInfo, pgSchedulingFunc)
+		res, status := f.runPodGroupPostFilterPlugin(ctx, pl, state, podGroupInfo, schedulingFunc)
 		if status.IsSuccess() {
 			return res, status
 		} else if status.Code() == fwk.UnschedulableAndUnresolvable {
@@ -1954,14 +1956,6 @@ func (f *frameworkImpl) GetNodeHint(ctx context.Context, pod *v1.Pod, signature 
 
 func (f *frameworkImpl) StoreScheduleResults(ctx context.Context, signature fwk.PodSignature, hintedNode, chosenNode string, otherNodes framework.SortedScoredNodes, cycleCount int64) {
 	f.batch.StoreScheduleResults(ctx, signature, hintedNode, chosenNode, otherNodes, cycleCount)
-}
-
-func (f *frameworkImpl) IsBatchingDisabled() bool {
-	return f.batch.IsDisabled()
-}
-
-func (f *frameworkImpl) SetBatchingDisabled(disabled bool) {
-	f.batch.SetDisabled(disabled)
 }
 
 func (f *frameworkImpl) FlushBatch() {

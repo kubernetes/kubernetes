@@ -50,7 +50,6 @@ type OpportunisticBatch struct {
 	lastCycle   schedulingCycle
 	handle      batchHandle
 	maxBatchAge time.Duration
-	disabled    bool
 
 	// ranksInvalidated tells that a plugin reported changed node ranks since the last hint.
 	// Unlike the rest of the batch it is atomic, because plugins may report from binding cycles.
@@ -79,21 +78,6 @@ const (
 	DefaultMaxBatchAge = 500 * time.Millisecond
 )
 
-// SetDisabled disables or re-enables opportunistic batching and clears any cached batch state.
-func (b *OpportunisticBatch) SetDisabled(disabled bool) {
-	if b == nil {
-		return
-	}
-	b.disabled = disabled
-	b.state = nil
-	b.lastCycle = schedulingCycle{}
-}
-
-// IsDisabled reports whether opportunistic batching is currently disabled.
-func (b *OpportunisticBatch) IsDisabled() bool {
-	return b == nil || b.disabled
-}
-
 // flush drops the cached results without counting a flush in the metrics. It is meant for
 // callers that switch to scheduling pods against another view of the cluster: nothing is
 // wrong with the results, they just don't describe that view.
@@ -120,7 +104,7 @@ func (b *OpportunisticBatch) InvalidateNodeRanks() {
 // chosen for the previous pod is re-checked first: if it is still feasible it is ranked and rescored and competes with
 // the cached candidates, otherwise the cached order is reused as it stands. Returns "" and drops the state when it can't be used.
 func (b *OpportunisticBatch) GetNodeHint(ctx context.Context, pod *v1.Pod, signature fwk.PodSignature, state fwk.CycleState, cycleCount int64) string {
-	if b.disabled {
+	if b == nil {
 		return ""
 	}
 	logger := klog.FromContext(ctx)
@@ -168,7 +152,7 @@ func (b *OpportunisticBatch) GetNodeHint(ctx context.Context, pod *v1.Pod, signa
 
 // StoreScheduleResults stores results from scheduling for use as a batch later.
 func (b *OpportunisticBatch) StoreScheduleResults(ctx context.Context, signature fwk.PodSignature, hintedNode, chosenNode string, otherNodes framework.SortedScoredNodes, cycleCount int64) {
-	if b.disabled {
+	if b == nil {
 		return
 	}
 	logger := klog.FromContext(ctx)

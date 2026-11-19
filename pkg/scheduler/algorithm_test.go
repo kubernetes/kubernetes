@@ -1262,6 +1262,7 @@ type rankNodesTestPlugin struct {
 	rejectedNodes    sets.Set[string]
 	scoresByNode     map[string]int64
 	filterHook       func(ctx context.Context, nodeName string)
+	rankInvalidator  framework.NodeRankInvalidator
 	rankInputOrder   []string
 	filteredNodes    []string
 	rankNodesInvoked bool
@@ -1280,11 +1281,16 @@ func (p *rankNodesTestPlugin) PodGroupPostFilter(ctx context.Context, state fwk.
 	return nil, nil
 }
 
+// Reserve reports nothing: like DefaultPreemption with victims on a single node, it only
+// changes the rank of the node it reserves.
 func (p *rankNodesTestPlugin) Reserve(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) *fwk.Status {
 	return nil
 }
 
 func (p *rankNodesTestPlugin) Unreserve(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) {
+	if p.rankInvalidator != nil {
+		p.rankInvalidator.InvalidateNodeRanks()
+	}
 }
 
 func (p *rankNodesTestPlugin) RankNodes(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) ([]framework.NodeWithRank, *fwk.Status) {
@@ -1597,7 +1603,6 @@ func TestSchedulePodWithRankNodes(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Failed to create framework: %v", err)
 			}
-			schedFwk.SetBatchingDisabled(true)
 
 			algo, err := NewSchedulingAlgorithm(snapshot, internalcache.New(ctx, nil, true, false), WithCurrentCycleProvider(func() int64 { return 1 }))
 			if err != nil {
