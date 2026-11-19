@@ -836,6 +836,17 @@ func NewMainKubelet(ctx context.Context,
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize actuated state checkpoint: %w", err)
 	}
+	var triggerPodSync func(klog.Logger, types.UID)
+	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicNodeLocalEphemeralVolumes) {
+		klet.volumeSyncCh = make(chan struct{}, 1)
+		triggerPodSync = func(_ klog.Logger, podUID types.UID) {
+			if klet.podWorkers != nil && klet.podWorkers.ShouldPodRuntimeBeRemoved(podUID) {
+				return
+			}
+			klet.enqueueVolumePodSync(podUID)
+		}
+		actuatedState = volumemanager.NewNotifyingActuatedState(actuatedState, triggerPodSync)
+	}
 	klet.actuatedState = actuatedState
 	allocatedPodMgr := &allocatedPodManager{baseManager: klet.podManager, allocationManager: klet.allocationManager}
 
@@ -1116,7 +1127,8 @@ func NewMainKubelet(ctx context.Context,
 		volumepathhandler.NewBlockVolumePathHandler(),
 		klet.statusManager,
 		kubeCfg.VolumeStatsAggPeriod.Duration,
-		actuatedState)
+		actuatedState,
+		triggerPodSync)
 
 	boMax, base := newCrashLoopBackOff(kubeCfg)
 
@@ -1650,6 +1662,10 @@ type Kubelet struct {
 	lastNodeUnschedulableLock sync.Mutex
 	// maintains Node.Spec.Unschedulable value from previous run of tryUpdateNodeStatus()
 	lastNodeUnschedulable bool
+
+	volumeSyncMu   sync.Mutex
+	volumeSyncPods sets.Set[types.UID]
+	volumeSyncCh   chan struct{}
 
 	// the list of handlers to call during pod sync loop.
 	lifecycle.PodSyncLoopHandlers
@@ -2750,6 +2766,16 @@ func (kl *Kubelet) SyncTerminatedPod(ctx context.Context, pod *v1.Pod, podStatus
 	}
 	logger.V(3).Info("Pod termination cleaned up volume paths", "pod", klog.KObj(pod), "podUID", pod.UID)
 
+	if kl.actuatedState != nil {
+		if vols, ok := kl.actuatedState.GetPodVolumes(pod.UID); ok {
+			for _, vol := range vols {
+				if err := kl.actuatedState.RemovePodVolume(logger, pod.UID, vol.Name); err != nil {
+					logger.Error(err, "Failed to remove volume from actuated state for terminated pod", "pod", klog.KObj(pod), "podUID", pod.UID, "volumeName", vol.Name)
+				}
+			}
+		}
+	}
+
 	// After volume unmount is complete, let the secret and configmap managers know we're done with this pod
 	if kl.secretManager != nil {
 		kl.secretManager.UnregisterPod(pod)
@@ -3050,6 +3076,10 @@ func (kl *Kubelet) syncLoopIteration(ctx context.Context, configCh <-chan kubety
 			// We do not apply the optimization by updating the status directly, but can do it later
 			handler.HandlePodSyncs(ctx, pods)
 		}
+	case <-kl.volumeSyncCh:
+		if pods := kl.drainVolumePodSyncs(); len(pods) > 0 {
+			handler.HandlePodSyncs(ctx, pods)
+		}
 	case <-housekeepingCh:
 		if !kl.sourcesReady.AllReady() {
 			// If the sources aren't ready or volume manager has not yet synced the states,
@@ -3082,6 +3112,36 @@ func handleProbeSync(ctx context.Context, kl *Kubelet, update proberesults.Updat
 	}
 	logger.V(1).Info("SyncLoop (probe)", "probe", probe, "status", status, "pod", klog.KObj(pod))
 	handler.HandlePodSyncs(ctx, []*v1.Pod{pod})
+}
+
+func (kl *Kubelet) enqueueVolumePodSync(podUID types.UID) {
+	kl.volumeSyncMu.Lock()
+	if kl.volumeSyncPods == nil {
+		kl.volumeSyncPods = sets.New[types.UID]()
+	}
+	kl.volumeSyncPods.Insert(podUID)
+	ch := kl.volumeSyncCh
+	kl.volumeSyncMu.Unlock()
+	if ch != nil {
+		select {
+		case ch <- struct{}{}:
+		default:
+		}
+	}
+}
+
+func (kl *Kubelet) drainVolumePodSyncs() []*v1.Pod {
+	kl.volumeSyncMu.Lock()
+	uids := kl.volumeSyncPods
+	kl.volumeSyncPods = nil
+	kl.volumeSyncMu.Unlock()
+	var pods []*v1.Pod
+	for uid := range uids {
+		if pod, ok := kl.podManager.GetPodByUID(uid); ok {
+			pods = append(pods, pod)
+		}
+	}
+	return pods
 }
 
 // sortPodsForAdmission sorts pods for admission. Pods that were admitted

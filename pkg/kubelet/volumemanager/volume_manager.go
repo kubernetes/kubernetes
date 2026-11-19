@@ -170,6 +170,9 @@ type VolumeManager interface {
 
 	// EffectiveEphemeralVolumeLimit returns the effective size limit for the specified volume.
 	EffectiveEphemeralVolumeLimit(pod *v1.Pod, volumeName string) (*resource.Quantity, error)
+
+	// GetPodVolumeStatuses returns the host-level mount status of supported dynamic volumes for the pod.
+	GetPodVolumeStatuses(allocatedPod, desiredPod *v1.Pod, podIsTerminal bool) []v1.PodVolumeStatus
 }
 
 // podStateProvider can determine if a pod is going to be terminated
@@ -207,7 +210,10 @@ func NewVolumeManager(
 	blockVolumePathHandler volumepathhandler.BlockVolumePathHandler,
 	volumeHealthStatusUpdater volumehealth.StatusUpdater,
 	volumeHealthProbeInterval time.Duration,
-	actuatedState state.State) VolumeManager {
+	actuatedState state.State,
+	triggerPodSync func(klog.Logger, k8stypes.UID)) VolumeManager {
+
+	actuatedState = NewNotifyingActuatedState(actuatedState, triggerPodSync)
 
 	seLinuxTranslator := util.NewSELinuxLabelTranslator()
 	vm := &volumeManager{
@@ -220,7 +226,18 @@ func NewVolumeManager(
 			volumePluginMgr,
 			recorder,
 			blockVolumePathHandler)),
-		actuatedState: actuatedState,
+		actuatedState:    actuatedState,
+		podStateProvider: podStateProvider,
+	}
+	if triggerPodSync != nil {
+		onDynamicVolumeRemoved := func(podUID k8stypes.UID) {
+			if podStateProvider != nil && podStateProvider.ShouldPodRuntimeBeRemoved(podUID) {
+				return
+			}
+			triggerPodSync(klog.TODO(), podUID)
+		}
+		vm.desiredStateOfWorld.SetOnDynamicVolumeRemoved(onDynamicVolumeRemoved)
+		vm.actualStateOfWorld.SetOnDynamicVolumeRemoved(onDynamicVolumeRemoved)
 	}
 
 	intreeToCSITranslator := csitrans.New()
@@ -317,6 +334,9 @@ type volumeManager struct {
 
 	// actuatedState tracks the actuated pod state on the node.
 	actuatedState state.Reader
+
+	// podStateProvider reports whether a pod's runtime and volumes are being torn down.
+	podStateProvider PodStateProvider
 }
 
 type VolumeAttachLimitExceededError struct {
@@ -793,6 +813,53 @@ func findVolumeInPodSpec(pod *v1.Pod, volumeName string) *v1.Volume {
 	return nil
 }
 
+// NewNotifyingActuatedState wraps state.State so the kubelet sync loop is notified
+// whenever a pod's recorded host volume membership changes (mount, image pull, or unmount
+// completion), without firing on periodic remounts of already-recorded volumes.
+// Wrapping an already-wrapped state is a no-op so kuberuntime and VolumeManager can share
+// the same notifying wrapper.
+func NewNotifyingActuatedState(base state.State, triggerPodSync func(klog.Logger, k8stypes.UID)) state.State {
+	if base == nil || triggerPodSync == nil {
+		return base
+	}
+	if _, ok := base.(*notifyingActuatedState); ok {
+		return base
+	}
+	return &notifyingActuatedState{
+		State:          base,
+		triggerPodSync: triggerPodSync,
+	}
+}
+
+type notifyingActuatedState struct {
+	state.State
+	triggerPodSync func(klog.Logger, k8stypes.UID)
+}
+
+func (s *notifyingActuatedState) SetPodVolume(logger klog.Logger, podUID k8stypes.UID, volume v1.Volume) error {
+	actuatedPod, _ := s.State.GetPodReadOnly(podUID)
+	alreadyPresent := hasPodVolume(actuatedPod, volume.Name)
+	if err := s.State.SetPodVolume(logger, podUID, volume); err != nil {
+		return err
+	}
+	if !alreadyPresent && s.triggerPodSync != nil {
+		s.triggerPodSync(logger, podUID)
+	}
+	return nil
+}
+
+func (s *notifyingActuatedState) RemovePodVolume(logger klog.Logger, podUID k8stypes.UID, volumeName string) error {
+	actuatedPod, _ := s.State.GetPodReadOnly(podUID)
+	wasPresent := hasPodVolume(actuatedPod, volumeName)
+	if err := s.State.RemovePodVolume(logger, podUID, volumeName); err != nil {
+		return err
+	}
+	if wasPresent && s.triggerPodSync != nil {
+		s.triggerPodSync(logger, podUID)
+	}
+	return nil
+}
+
 func hasPodVolume(pod *v1.Pod, volumeName string) bool {
 	if pod == nil {
 		return false
@@ -800,4 +867,120 @@ func hasPodVolume(pod *v1.Pod, volumeName string) bool {
 	return slices.ContainsFunc(pod.Spec.Volumes, func(v v1.Volume) bool {
 		return v.Name == volumeName
 	})
+}
+
+// GetPodVolumeStatuses returns the host-level mount status of supported dynamic volumes for the pod.
+// TODO(KEP-6395): Revisit reporting VolumeStatuses for other volume types prior to beta.
+func (vm *volumeManager) GetPodVolumeStatuses(allocatedPod, desiredPod *v1.Pod, podIsTerminal bool) []v1.PodVolumeStatus {
+	if allocatedPod == nil {
+		return nil
+	}
+
+	var actuatedPod *v1.Pod
+	if vm.actuatedState != nil {
+		actuatedPod, _ = vm.actuatedState.GetPodReadOnly(allocatedPod.UID)
+	}
+
+	var statuses []v1.PodVolumeStatus
+	if podIsTerminal || podutil.IsPodPhaseTerminal(allocatedPod.Status.Phase) ||
+		(vm.podStateProvider != nil && vm.podStateProvider.ShouldPodRuntimeBeRemoved(allocatedPod.UID)) {
+		if actuatedPod == nil {
+			return nil
+		}
+		for i := range actuatedPod.Spec.Volumes {
+			vol := &actuatedPod.Spec.Volumes[i]
+			if !podutil.IsSupportedDynamicVolumeSource(&vol.VolumeSource) {
+				continue
+			}
+			statuses = append(statuses, v1.PodVolumeStatus{
+				Name:      vol.Name,
+				HostPhase: v1.PodVolumeHostUnmounting,
+			})
+		}
+		slices.SortFunc(statuses, func(a, b v1.PodVolumeStatus) int {
+			return strings.Compare(a.Name, b.Name)
+		})
+		return statuses
+	}
+
+	uniquePodName := util.GetUniquePodName(allocatedPod)
+	var dswDynamicNames, aswDynamicNames sets.Set[string]
+	if vm.desiredStateOfWorld != nil {
+		dswDynamicNames = vm.desiredStateOfWorld.GetDynamicVolumeNamesForPod(uniquePodName)
+	}
+	if vm.actualStateOfWorld != nil {
+		aswDynamicNames = vm.actualStateOfWorld.GetDynamicVolumeNamesForPod(uniquePodName)
+	}
+
+	emitted := sets.New[string]()
+	for i := range allocatedPod.Spec.Volumes {
+		vol := &allocatedPod.Spec.Volumes[i]
+		if !podutil.IsSupportedDynamicVolumeSource(&vol.VolumeSource) {
+			continue
+		}
+		mountedInActuated := hasPodVolume(actuatedPod, vol.Name) ||
+			(vol.Image != nil && actuatedPod != nil && isVolumeMountedInPod(&actuatedPod.Spec, vol.Name))
+		trackedInVolumeManager := dswDynamicNames.Has(vol.Name) || aswDynamicNames.Has(vol.Name)
+		// Unreferenced volumes are never added to desiredStateOfWorld by the populator,
+		// so omit them unless they remain mounted on the host or still tracked in DSW/ASW.
+		if !mountedInActuated && !trackedInVolumeManager && !isVolumeMountedInPod(&allocatedPod.Spec, vol.Name) {
+			continue
+		}
+		phase := v1.PodVolumeHostPending
+		if mountedInActuated {
+			phase = v1.PodVolumeHostMounted
+		}
+		statuses = append(statuses, v1.PodVolumeStatus{
+			Name:      vol.Name,
+			HostPhase: phase,
+		})
+		emitted.Insert(vol.Name)
+	}
+
+	unmountingNames := sets.New[string]()
+	if actuatedPod != nil {
+		for i := range actuatedPod.Spec.Volumes {
+			vol := &actuatedPod.Spec.Volumes[i]
+			if podutil.IsSupportedDynamicVolumeSource(&vol.VolumeSource) && !hasPodVolume(allocatedPod, vol.Name) {
+				unmountingNames.Insert(vol.Name)
+			}
+		}
+	}
+	for name := range dswDynamicNames {
+		if !hasPodVolume(allocatedPod, name) {
+			unmountingNames.Insert(name)
+		}
+	}
+	for name := range aswDynamicNames {
+		if !hasPodVolume(allocatedPod, name) {
+			unmountingNames.Insert(name)
+		}
+	}
+	for name := range unmountingNames {
+		statuses = append(statuses, v1.PodVolumeStatus{
+			Name:      name,
+			HostPhase: v1.PodVolumeHostUnmounting,
+		})
+		emitted.Insert(name)
+	}
+
+	if desiredPod != nil && desiredPod != allocatedPod {
+		for i := range desiredPod.Spec.Volumes {
+			vol := &desiredPod.Spec.Volumes[i]
+			if !podutil.IsSupportedDynamicVolumeSource(&vol.VolumeSource) ||
+				emitted.Has(vol.Name) ||
+				!isVolumeMountedInPod(&desiredPod.Spec, vol.Name) {
+				continue
+			}
+			statuses = append(statuses, v1.PodVolumeStatus{
+				Name:      vol.Name,
+				HostPhase: v1.PodVolumeHostPending,
+			})
+		}
+	}
+
+	slices.SortFunc(statuses, func(a, b v1.PodVolumeStatus) int {
+		return strings.Compare(a.Name, b.Name)
+	})
+	return statuses
 }

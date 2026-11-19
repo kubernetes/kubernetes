@@ -1977,7 +1977,7 @@ func (kl *Kubelet) generateAPIPodStatus(ctx context.Context, pod *v1.Pod, podSta
 	if !found {
 		oldPodStatus = pod.Status
 	}
-	s := kl.convertStatusToAPIStatus(ctx, pod, podStatus, oldPodStatus)
+	s := kl.convertStatusToAPIStatus(ctx, pod, podStatus, oldPodStatus, podIsTerminal)
 	// calculate the next phase and preserve reason
 	allStatus := append(append([]v1.ContainerStatus{}, s.ContainerStatuses...), s.InitContainerStatuses...)
 	s.Phase = getPhase(logger, pod, allStatus, podIsTerminal, kubecontainer.HasAnyActiveRegularContainerStarted(&pod.Spec, podStatus), oldPodStatus.Phase)
@@ -2155,7 +2155,7 @@ func (kl *Kubelet) generateAPIPodStatus(ctx context.Context, pod *v1.Pod, podSta
 // convertStatusToAPIStatus initialize an api PodStatus for the given pod from
 // the given internal pod status and the previous state of the pod from the API.
 // It is purely transformative and does not alter the kubelet state at all.
-func (kl *Kubelet) convertStatusToAPIStatus(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, oldPodStatus v1.PodStatus) *v1.PodStatus {
+func (kl *Kubelet) convertStatusToAPIStatus(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, oldPodStatus v1.PodStatus, podIsTerminal bool) *v1.PodStatus {
 	var apiPodStatus v1.PodStatus
 
 	for _, ip := range podStatus.IPs {
@@ -2181,6 +2181,15 @@ func (kl *Kubelet) convertStatusToAPIStatus(ctx context.Context, pod *v1.Pod, po
 				continue
 			}
 			imageVolumeNames.Insert(podVolume.Name)
+		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.DynamicNodeLocalEphemeralVolumes) && kl.actuatedState != nil {
+			if actuatedVols, ok := kl.actuatedState.GetPodVolumes(pod.UID); ok {
+				for _, podVolume := range actuatedVols {
+					if podVolume.Image != nil {
+						imageVolumeNames.Insert(podVolume.Name)
+					}
+				}
+			}
 		}
 	}
 
@@ -2226,7 +2235,32 @@ func (kl *Kubelet) convertStatusToAPIStatus(ctx context.Context, pod *v1.Pod, po
 		podRestarting,
 	)
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicNodeLocalEphemeralVolumes) && kl.volumeManager != nil {
+		desiredPod, _ := kl.podManager.GetPodByUID(pod.UID)
+		apiPodStatus.VolumeStatuses = kl.volumeManager.GetPodVolumeStatuses(pod, desiredPod, podIsTerminal)
+	}
 	return &apiPodStatus
+}
+
+func (kl *Kubelet) actuatedContainerVolumeMounts(podUID types.UID, containerName string) ([]v1.VolumeMount, bool) {
+	if kl.actuatedState == nil {
+		return nil, false
+	}
+	actuatedPod, ok := kl.actuatedState.GetPodReadOnly(podUID)
+	if !ok || actuatedPod == nil {
+		return nil, false
+	}
+	for c := range podutil.ContainerIter(&actuatedPod.Spec, podutil.AllContainers) {
+		if c.Name == containerName {
+			// A record written by KeepOnlyResourceValues or migrated from V1 holds only resources
+			// (Image == "" and empty VolumeMounts), so treat it as unrecorded until SetContainer populates the spec.
+			if c.Image == "" && len(c.VolumeMounts) == 0 {
+				return nil, false
+			}
+			return c.VolumeMounts, true
+		}
+	}
+	return nil, false
 }
 
 // unallocatedContainerStatuses returns a Waiting status for each main container that was added to
@@ -2426,6 +2460,17 @@ func makeVolumeMountStatuses(logger klog.Logger, volumeMounts []v1.VolumeMount, 
 	return mountStatuses
 }
 
+func cloneVolumeMountStatuses(in []v1.VolumeMountStatus) []v1.VolumeMountStatus {
+	if in == nil {
+		return nil
+	}
+	out := make([]v1.VolumeMountStatus, len(in))
+	for i := range in {
+		in[i].DeepCopyInto(&out[i])
+	}
+	return out
+}
+
 // hasContainer returns whether the pod spec has a container with the given name among the
 // container types in mask.
 func hasContainer(pod *v1.Pod, name string, mask podutil.ContainerType) bool {
@@ -2456,8 +2501,12 @@ func logPodCgroupReadError(logger klog.Logger, err error, msg string, pod *v1.Po
 func (kl *Kubelet) convertToAPIContainerStatuses(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, previousStatus []v1.ContainerStatus, containers []v1.Container, imageVolumeNames sets.Set[string], hasInitContainers bool, containerType podutil.ContainerType, podRestarting bool) []v1.ContainerStatus {
 	logger := klog.FromContext(ctx)
 	supportsRRO := kl.runtimeClassSupportsRecursiveReadOnlyMounts(logger, pod)
+	specContainers := make(map[string]*v1.Container, len(containers))
+	for i := range containers {
+		specContainers[containers[i].Name] = &containers[i]
+	}
 
-	convertContainerStatus := func(cs *kubecontainer.Status, oldStatus *v1.ContainerStatus) *v1.ContainerStatus {
+	convertContainerStatus := func(cs *kubecontainer.Status, oldStatus *v1.ContainerStatus, removed bool) *v1.ContainerStatus {
 		cid := cs.ID.String()
 		status := &v1.ContainerStatus{
 			Name:         cs.Name,
@@ -2470,16 +2519,18 @@ func (kl *Kubelet) convertToAPIContainerStatuses(ctx context.Context, pod *v1.Po
 			ContainerID: cid,
 		}
 		if utilfeature.DefaultFeatureGate.Enabled(features.DynamicNodeLocalEphemeralVolumes) {
-			var actuatedVolumeMounts []v1.VolumeMount
-			if kl.actuatedState != nil {
-				actuatedVolumeMounts, _ = kl.actuatedState.GetContainerVolumeMounts(pod.UID, cs.Name)
-			}
-			if len(actuatedVolumeMounts) > 0 {
+			if removed {
+				if podStatus.HasRunningOrUnknownContainer(cs.Name) {
+					if oldStatus != nil && len(oldStatus.VolumeMounts) > 0 {
+						status.VolumeMounts = cloneVolumeMountStatuses(oldStatus.VolumeMounts)
+					} else if actuatedVolumeMounts, hasActuatedMounts := kl.actuatedContainerVolumeMounts(pod.UID, cs.Name); hasActuatedMounts {
+						status.VolumeMounts = makeVolumeMountStatuses(logger, actuatedVolumeMounts, supportsRRO)
+					}
+				}
+			} else if actuatedVolumeMounts, hasActuatedMounts := kl.actuatedContainerVolumeMounts(pod.UID, cs.Name); hasActuatedMounts {
 				status.VolumeMounts = makeVolumeMountStatuses(logger, actuatedVolumeMounts, supportsRRO)
-			} else if oldStatus != nil && ((status.ContainerID != "" && oldStatus.ContainerID == status.ContainerID) || (oldStatus.ContainerID == "" && oldStatus.State.Waiting == nil)) {
-				// Preserve previously reported VolumeMounts for the same container instance if
-				// actuatedState does not have an entry (e.g., on the first sync after a kubelet upgrade).
-				status.VolumeMounts = oldStatus.VolumeMounts
+			} else if specContainer, ok := specContainers[cs.Name]; ok {
+				status.VolumeMounts = makeVolumeMountStatuses(logger, specContainer.VolumeMounts, supportsRRO)
 			}
 		} else if oldStatus != nil {
 			status.VolumeMounts = oldStatus.VolumeMounts // immutable
@@ -2500,6 +2551,22 @@ func (kl *Kubelet) convertToAPIContainerStatuses(ctx context.Context, pod *v1.Po
 			}
 		}
 		if utilfeature.DefaultFeatureGate.Enabled(features.ImageVolumeWithDigest) && imageVolumeNames.Len() > 0 {
+			preserveOldVolumeStatus := func(mount *v1.VolumeMountStatus) {
+				if mount.VolumeStatus != nil ||
+					!utilfeature.DefaultFeatureGate.Enabled(features.DynamicNodeLocalEphemeralVolumes) ||
+					oldStatus == nil ||
+					(status.ContainerID != oldStatus.ContainerID && cs.State != kubecontainer.ContainerStateUnknown) {
+					return
+				}
+				for j := range oldStatus.VolumeMounts {
+					if oldStatus.VolumeMounts[j].Name == mount.Name &&
+						oldStatus.VolumeMounts[j].MountPath == mount.MountPath &&
+						oldStatus.VolumeMounts[j].VolumeStatus != nil {
+						mount.VolumeStatus = oldStatus.VolumeMounts[j].VolumeStatus.DeepCopy()
+						return
+					}
+				}
+			}
 			for i := range status.VolumeMounts {
 				volumeName := status.VolumeMounts[i].Name
 				if !imageVolumeNames.Has(volumeName) {
@@ -2519,12 +2586,14 @@ func (kl *Kubelet) convertToAPIContainerStatuses(ctx context.Context, pod *v1.Po
 				}
 
 				if imageSpec.Image == "" {
+					preserveOldVolumeStatus(&status.VolumeMounts[i])
 					logger.Error(fmt.Errorf("image was not found"), "", "pod", pod.Name, "container", cs.Name, "volume", volumeName)
 					continue
 				}
 
 				imageRef, err := kl.containerRuntime.GetImageRef(ctx, imageSpec)
 				if err != nil {
+					preserveOldVolumeStatus(&status.VolumeMounts[i])
 					logger.Error(err, "error getting image volume digest", "volume", volumeName)
 					continue
 				}
@@ -2855,7 +2924,7 @@ func (kl *Kubelet) convertToAPIContainerStatuses(ctx context.Context, pod *v1.Po
 		if oldStatus, ok := oldStatuses[cName]; ok {
 			oldStatusPtr = &oldStatus
 		}
-		status := convertContainerStatus(cStatus, oldStatusPtr)
+		status := convertContainerStatus(cStatus, oldStatusPtr, removed)
 		if !utilfeature.DefaultFeatureGate.Enabled(features.ChangeContainerStatusOnKubeletRestart) {
 			if cStatus.State == kubecontainer.ContainerStateRunning {
 				if oldStatus, ok := oldStatuses[status.Name]; ok && oldStatus.Started != nil {

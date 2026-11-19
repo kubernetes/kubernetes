@@ -10978,7 +10978,7 @@ func TestConvertStatusToAPIStatusRemovedContainers(t *testing.T) {
 		{Name: "gc", ContainerID: "test://gc", State: terminated},
 	}}
 
-	status := testKubelet.kubelet.convertStatusToAPIStatus(tCtx, pod, podStatus, oldStatus)
+	status := testKubelet.kubelet.convertStatusToAPIStatus(tCtx, pod, podStatus, oldStatus, false)
 	var names []string
 	for _, s := range status.ContainerStatuses {
 		names = append(names, s.Name)
@@ -11213,4 +11213,294 @@ func TestCheckCgroupNamespaceSupport(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestConvertStatusToAPIStatusFirstStartFailurePreservesVolumeMounts(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicNodeLocalEphemeralVolumes, true)
+	tCtx := ktesting.Init(t)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+
+	pod := podWithUIDNameNs("first-start-uid", "test-pod", "test-namespace")
+	pod.Spec = v1.PodSpec{
+		Volumes: []v1.Volume{{Name: "vol1", VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}}},
+		InitContainers: []v1.Container{{
+			Name:  "init-rro",
+			Image: "busybox",
+			VolumeMounts: []v1.VolumeMount{{
+				Name:      "vol1",
+				MountPath: "/mnt/rro",
+				ReadOnly:  true,
+			}},
+		}},
+		Containers: []v1.Container{{
+			Name:         "c-immutable",
+			Image:        "busybox",
+			VolumeMounts: []v1.VolumeMount{{Name: "vol1", MountPath: "/mnt/immutable"}},
+		}},
+		RestartPolicy: v1.RestartPolicyOnFailure,
+	}
+
+	// Step 1: Pod sandbox ready before CreateContainer populates Waiting(PodInitializing) with VolumeMounts.
+	initialStatus := testKubelet.kubelet.convertStatusToAPIStatus(tCtx, pod, &kubecontainer.PodStatus{
+		ID:        pod.UID,
+		Name:      pod.Name,
+		Namespace: pod.Namespace,
+	}, v1.PodStatus{}, false)
+	require.Len(t, initialStatus.InitContainerStatuses, 1)
+	require.Len(t, initialStatus.InitContainerStatuses[0].VolumeMounts, 1)
+	require.Len(t, initialStatus.ContainerStatuses, 1)
+	assert.Equal(t, "c-immutable", initialStatus.ContainerStatuses[0].Name)
+	require.Len(t, initialStatus.ContainerStatuses[0].VolumeMounts, 1)
+	assert.Equal(t, "/mnt/immutable", initialStatus.ContainerStatuses[0].VolumeMounts[0].MountPath)
+
+	// Step 2: Resource-only actuatedState entry (Image == "", e.g. V1 checkpoint upgrade before
+	// InitializeActuatedPod runs) populates VolumeMounts from pod.Spec even when ContainerID changed
+	// or oldStatus was Waiting with empty VolumeMounts.
+	require.NoError(t, testKubelet.kubelet.actuatedState.SetContainerResources(tCtx.Logger(), pod.UID, "c-immutable", podutil.Containers, v1.ResourceRequirements{}))
+	oldDiffCID := v1.PodStatus{
+		ContainerStatuses: []v1.ContainerStatus{{
+			Name:        "c-immutable",
+			ContainerID: "test://old-cid",
+			State:       v1.ContainerState{Running: &v1.ContainerStateRunning{}},
+		}},
+	}
+	v1RunningDiffCID := testKubelet.kubelet.convertStatusToAPIStatus(tCtx, pod, &kubecontainer.PodStatus{
+		ID:        pod.UID,
+		Name:      pod.Name,
+		Namespace: pod.Namespace,
+		ContainerStatuses: []*kubecontainer.Status{{
+			ID:    kubecontainer.ContainerID{Type: "test", ID: "new-cid"},
+			Name:  "c-immutable",
+			Image: "busybox",
+			State: kubecontainer.ContainerStateRunning,
+		}},
+	}, oldDiffCID, false)
+	require.Len(t, v1RunningDiffCID.ContainerStatuses, 1)
+	assert.Equal(t, initialStatus.ContainerStatuses[0].VolumeMounts, v1RunningDiffCID.ContainerStatuses[0].VolumeMounts,
+		"in-spec running container with resource-only actuated record and changed ContainerID must build VolumeMounts from spec")
+
+	oldWaitingNoMounts := v1.PodStatus{
+		ContainerStatuses: []v1.ContainerStatus{{
+			Name:  "c-immutable",
+			State: v1.ContainerState{Waiting: &v1.ContainerStateWaiting{Reason: "Unallocated"}},
+		}},
+	}
+	createdStatus := testKubelet.kubelet.convertStatusToAPIStatus(tCtx, pod, &kubecontainer.PodStatus{
+		ID:        pod.UID,
+		Name:      pod.Name,
+		Namespace: pod.Namespace,
+		ContainerStatuses: []*kubecontainer.Status{{
+			ID:    kubecontainer.ContainerID{Type: "test", ID: "created-cid"},
+			Name:  "c-immutable",
+			Image: "busybox",
+			State: kubecontainer.ContainerStateCreated,
+		}},
+	}, oldWaitingNoMounts, false)
+	require.Len(t, createdStatus.ContainerStatuses, 1)
+	assert.Equal(t, initialStatus.ContainerStatuses[0].VolumeMounts, createdStatus.ContainerStatuses[0].VolumeMounts,
+		"in-spec container with resource-only actuated record and old Waiting status must build VolumeMounts from spec")
+
+	// Step 3: Containers still in pod.Spec retain their actuated VolumeMounts on exit, while a
+	// removed dynamic container (c-removed) drops ContainerStatus.VolumeMounts immediately on exit
+	// even if actuatedState still records its VolumeMounts (before reconcileNonRunningActuatedContainers runs).
+	require.NoError(t, testKubelet.kubelet.actuatedState.SetContainer(tCtx.Logger(), pod.UID, podutil.InitContainers, pod.Spec.InitContainers[0]))
+	require.NoError(t, testKubelet.kubelet.actuatedState.SetContainer(tCtx.Logger(), pod.UID, podutil.Containers, pod.Spec.Containers[0]))
+	require.NoError(t, testKubelet.kubelet.actuatedState.SetContainer(tCtx.Logger(), pod.UID, podutil.Containers, v1.Container{
+		Name:         "c-removed",
+		Image:        "busybox",
+		VolumeMounts: []v1.VolumeMount{{Name: "vol1", MountPath: "/mnt/removed"}},
+	}))
+	runningOld := *createdStatus
+	runningOld.ContainerStatuses = append(runningOld.ContainerStatuses, v1.ContainerStatus{
+		Name:         "c-removed",
+		ContainerID:  "test://ran-removed",
+		VolumeMounts: []v1.VolumeMountStatus{{Name: "vol1", MountPath: "/mnt/removed"}},
+	})
+	exitedStatus := testKubelet.kubelet.convertStatusToAPIStatus(tCtx, pod, &kubecontainer.PodStatus{
+		ID:        pod.UID,
+		Name:      pod.Name,
+		Namespace: pod.Namespace,
+		ContainerStatuses: []*kubecontainer.Status{
+			{
+				ID:       kubecontainer.ContainerID{Type: "test", ID: "ran-init"},
+				Name:     "init-rro",
+				Image:    "busybox",
+				State:    kubecontainer.ContainerStateExited,
+				ExitCode: 0,
+			},
+			{
+				ID:       kubecontainer.ContainerID{Type: "test", ID: "ran-imm"},
+				Name:     "c-immutable",
+				Image:    "busybox",
+				State:    kubecontainer.ContainerStateExited,
+				ExitCode: 0,
+			},
+			{
+				ID:       kubecontainer.ContainerID{Type: "test", ID: "ran-removed"},
+				Name:     "c-removed",
+				Image:    "busybox",
+				State:    kubecontainer.ContainerStateExited,
+				ExitCode: 0,
+			},
+		},
+	}, runningOld, false)
+	require.Len(t, exitedStatus.InitContainerStatuses, 1)
+	assert.Equal(t, initialStatus.InitContainerStatuses[0].VolumeMounts, exitedStatus.InitContainerStatuses[0].VolumeMounts,
+		"completed initContainer must preserve InitContainerStatuses.VolumeMounts")
+	require.Len(t, exitedStatus.ContainerStatuses, 2)
+	assert.Equal(t, "c-immutable", exitedStatus.ContainerStatuses[0].Name)
+	assert.Equal(t, initialStatus.ContainerStatuses[0].VolumeMounts, exitedStatus.ContainerStatuses[0].VolumeMounts,
+		"completed container in pod.Spec must preserve ContainerStatus.VolumeMounts")
+	assert.Equal(t, "c-removed", exitedStatus.ContainerStatuses[1].Name)
+	assert.Empty(t, exitedStatus.ContainerStatuses[1].VolumeMounts,
+		"exited removed container must report no VolumeMounts even before reconcileNonRunningActuatedContainers clears actuatedState")
+
+	// Step 4: A removed container with [Exited (newer), Unknown (older)] retains VolumeMounts while
+	// the older instance is still Unknown/Running, and drops them once no Running/Unknown instance remains.
+	now := time.Now()
+	multiInstanceRemoved := testKubelet.kubelet.convertStatusToAPIStatus(tCtx, pod, &kubecontainer.PodStatus{
+		ID:        pod.UID,
+		Name:      pod.Name,
+		Namespace: pod.Namespace,
+		ContainerStatuses: []*kubecontainer.Status{
+			{
+				ID:        kubecontainer.ContainerID{Type: "test", ID: "removed-newer-exited"},
+				Name:      "c-removed",
+				Image:     "busybox",
+				State:     kubecontainer.ContainerStateExited,
+				CreatedAt: now,
+			},
+			{
+				ID:        kubecontainer.ContainerID{Type: "test", ID: "removed-older-unknown"},
+				Name:      "c-removed",
+				Image:     "busybox",
+				State:     kubecontainer.ContainerStateUnknown,
+				CreatedAt: now.Add(-time.Minute),
+			},
+		},
+	}, runningOld, false)
+	require.Len(t, multiInstanceRemoved.ContainerStatuses, 2)
+	assert.Equal(t, "c-removed", multiInstanceRemoved.ContainerStatuses[1].Name)
+	assert.Equal(t, []v1.VolumeMountStatus{{Name: "vol1", MountPath: "/mnt/removed"}}, multiInstanceRemoved.ContainerStatuses[1].VolumeMounts,
+		"removed container with an older Unknown instance must keep VolumeMounts until all instances stop")
+
+	// Step 5: Running removed container with ImageVolumeWithDigest enabled preserves VolumeStatus.Image.ImageRef
+	// from oldStatus even after the OCI Image volume has been removed from pod.Spec.Volumes.
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ImageVolume, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ImageVolumeWithDigest, true)
+	expectedImgMounts := []v1.VolumeMountStatus{{
+		Name:      "removed-img-vol",
+		MountPath: "/mnt/img",
+		VolumeStatus: &v1.VolumeStatus{
+			Image: &v1.ImageVolumeStatus{ImageRef: "registry.k8s.io/example@sha256:123456"},
+		},
+	}}
+	imgOld := v1.PodStatus{
+		ContainerStatuses: []v1.ContainerStatus{{
+			Name:         "c-removed-img",
+			ContainerID:  "test://removed-img-cid",
+			State:        v1.ContainerState{Running: &v1.ContainerStateRunning{}},
+			VolumeMounts: expectedImgMounts,
+		}},
+	}
+	require.NoError(t, testKubelet.kubelet.actuatedState.SetContainer(tCtx.Logger(), pod.UID, podutil.Containers, v1.Container{
+		Name:         "c-removed-img",
+		Image:        "busybox",
+		VolumeMounts: []v1.VolumeMount{{Name: "removed-img-vol", MountPath: "/mnt/img"}},
+	}))
+	removedImgRunning := testKubelet.kubelet.convertStatusToAPIStatus(tCtx, pod, &kubecontainer.PodStatus{
+		ID:        pod.UID,
+		Name:      pod.Name,
+		Namespace: pod.Namespace,
+		ContainerStatuses: []*kubecontainer.Status{{
+			ID:    kubecontainer.ContainerID{Type: "test", ID: "removed-img-cid"},
+			Name:  "c-removed-img",
+			Image: "busybox",
+			State: kubecontainer.ContainerStateRunning,
+		}},
+	}, imgOld, false)
+	require.Len(t, removedImgRunning.ContainerStatuses, 2)
+	assert.Equal(t, "c-removed-img", removedImgRunning.ContainerStatuses[1].Name)
+	assert.Equal(t, expectedImgMounts, removedImgRunning.ContainerStatuses[1].VolumeMounts,
+		"running removed container must preserve VolumeStatus.Image.ImageRef when image volume was removed from pod.Spec")
+
+	// Step 5b: Joint container + Image volume removal where oldStatus had not yet recorded ImageRef
+	// populates ImageRef via actuatedState.GetPodVolumes without mutating oldStatus.VolumeMounts in place.
+	testKubelet.kubelet.containerRuntime = &imageDigestRuntime{
+		FakeRuntime: testKubelet.fakeRuntime,
+		digest:      "registry.k8s.io/example@sha256:abcdef",
+	}
+	require.NoError(t, testKubelet.kubelet.actuatedState.SetPodVolume(tCtx.Logger(), pod.UID, v1.Volume{
+		Name:         "removed-img-vol",
+		VolumeSource: v1.VolumeSource{Image: &v1.ImageVolumeSource{Reference: "registry.k8s.io/example:v1"}},
+	}))
+	imgOldNoDigest := v1.PodStatus{
+		ContainerStatuses: []v1.ContainerStatus{{
+			Name:         "c-removed-img",
+			ContainerID:  "test://removed-img-cid",
+			State:        v1.ContainerState{Running: &v1.ContainerStateRunning{}},
+			VolumeMounts: []v1.VolumeMountStatus{{Name: "removed-img-vol", MountPath: "/mnt/img"}},
+		}},
+	}
+	jointRemovedImg := testKubelet.kubelet.convertStatusToAPIStatus(tCtx, pod, &kubecontainer.PodStatus{
+		ID:        pod.UID,
+		Name:      pod.Name,
+		Namespace: pod.Namespace,
+		ContainerStatuses: []*kubecontainer.Status{{
+			ID:    kubecontainer.ContainerID{Type: "test", ID: "removed-img-cid"},
+			Name:  "c-removed-img",
+			Image: "busybox",
+			State: kubecontainer.ContainerStateRunning,
+			Mounts: []kubecontainer.Mount{{
+				Name:          "removed-img-vol",
+				ContainerPath: "/mnt/img",
+				Image:         &runtimeapi.ImageSpec{Image: "registry.k8s.io/example:v1"},
+			}},
+		}},
+	}, imgOldNoDigest, false)
+	require.Len(t, jointRemovedImg.ContainerStatuses, 2)
+	require.NotNil(t, jointRemovedImg.ContainerStatuses[1].VolumeMounts[0].VolumeStatus)
+	assert.Equal(t, "registry.k8s.io/example@sha256:abcdef", jointRemovedImg.ContainerStatuses[1].VolumeMounts[0].VolumeStatus.Image.ImageRef)
+	assert.Nil(t, imgOldNoDigest.ContainerStatuses[0].VolumeMounts[0].VolumeStatus,
+		"populating ImageRef on a removed container must not mutate oldStatus.VolumeMounts in place")
+
+	// Step 5c: An in-spec container preserves oldStatus's VolumeStatus.Image.ImageRef when CRI status
+	// transiently omits Mounts (e.g. ContainerStateUnknown).
+	podWithImgSpec := pod.DeepCopy()
+	podWithImgSpec.Spec.Volumes = append(podWithImgSpec.Spec.Volumes, v1.Volume{
+		Name:         "spec-img-vol",
+		VolumeSource: v1.VolumeSource{Image: &v1.ImageVolumeSource{Reference: "registry.k8s.io/example:v1"}},
+	})
+	podWithImgSpec.Spec.Containers[0].VolumeMounts = []v1.VolumeMount{{Name: "spec-img-vol", MountPath: "/mnt/spec-img"}}
+	require.NoError(t, testKubelet.kubelet.actuatedState.SetContainer(tCtx.Logger(), podWithImgSpec.UID, podutil.Containers, podWithImgSpec.Spec.Containers[0]))
+	inSpecImgOld := v1.PodStatus{
+		ContainerStatuses: []v1.ContainerStatus{{
+			Name:        "c-immutable",
+			ContainerID: "test://c-immutable-cid",
+			State:       v1.ContainerState{Running: &v1.ContainerStateRunning{}},
+			VolumeMounts: []v1.VolumeMountStatus{{
+				Name:      "spec-img-vol",
+				MountPath: "/mnt/spec-img",
+				VolumeStatus: &v1.VolumeStatus{
+					Image: &v1.ImageVolumeStatus{ImageRef: "registry.k8s.io/example@sha256:abcdef"},
+				},
+			}},
+		}},
+	}
+	unknownImgStatus := testKubelet.kubelet.convertStatusToAPIStatus(tCtx, podWithImgSpec, &kubecontainer.PodStatus{
+		ID:        podWithImgSpec.UID,
+		Name:      podWithImgSpec.Name,
+		Namespace: podWithImgSpec.Namespace,
+		ContainerStatuses: []*kubecontainer.Status{{
+			ID:    kubecontainer.ContainerID{Type: "test", ID: "c-immutable-cid"},
+			Name:  "c-immutable",
+			Image: "busybox",
+			State: kubecontainer.ContainerStateUnknown,
+		}},
+	}, inSpecImgOld, false)
+	require.Len(t, unknownImgStatus.ContainerStatuses, 1)
+	require.NotNil(t, unknownImgStatus.ContainerStatuses[0].VolumeMounts[0].VolumeStatus)
+	assert.Equal(t, "registry.k8s.io/example@sha256:abcdef", unknownImgStatus.ContainerStatuses[0].VolumeMounts[0].VolumeStatus.Image.ImageRef,
+		"in-spec container must preserve oldStatus VolumeStatus.Image.ImageRef across ContainerStateUnknown")
 }
