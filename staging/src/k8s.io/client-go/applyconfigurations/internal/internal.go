@@ -4673,6 +4673,12 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             scalar: string
           elementRelationship: atomic
+    - name: ambient
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: atomic
     - name: drop
       type:
         list:

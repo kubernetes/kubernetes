@@ -315,6 +315,16 @@ message Capabilities {
   // +optional
   // +listType=atomic
   repeated string drop = 2;
+
+  // Ambient capabilities to add to the ambient, inheritable, permitted,
+  // effective and bounding sets. Uses the same capability names and add/drop
+  // semantics as Add: ALL selects all capabilities, Drop ALL resets defaults
+  // before individual additions, and individual drops take precedence.
+  // Requires the AmbientCapabilities feature gate and a supporting runtime.
+  // +featureGate=AmbientCapabilities
+  // +optional
+  // +listType=atomic
+  repeated string ambient = 3;
 }
 
 // Represents a Ceph Filesystem mount that lasts the lifetime of a pod
