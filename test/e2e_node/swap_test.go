@@ -241,9 +241,9 @@ var _ = SIGDescribe("Swap", "[LinuxOnly]", ginkgo.Ordered, feature.Swap, framewo
 						return nil
 					}, 5*time.Minute, 1*time.Second).Should(gomega.Succeed(), "swap usage is above zero: %s", swapUsage.String())
 
-					// Better to delete the stress pod ASAP to avoid node failures
-					err := podClient.Delete(context.Background(), stressPod.Name, metav1.DeleteOptions{})
-					framework.ExpectNoError(err)
+					// The pod allocates the whole node memory. Wait until it is gone: the kubelet
+					// restarts after this test, and a pod that survives the restart starves the node.
+					podClient.DeleteSync(context.Background(), stressPod.Name, *metav1.NewDeleteOptions(0), f.Timeouts.PodDelete)
 				})
 
 				ginkgo.It("should be able to use more memory than memory limits", func() {
