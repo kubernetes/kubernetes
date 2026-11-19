@@ -66,6 +66,33 @@ func init() {
 			"metadata.uid": {
 				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
 			},
+			"spec.driverRegistrations[*]": {
+				{ErrorType: "FieldValueDuplicate"},
+			},
+			"spec.driverRegistrations[*].name": {
+				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-long-name-caseless"},
+				{ErrorType: "FieldValueRequired"},
+				{ErrorType: "FieldValueTooLong", Origin: "maxLength"},
+			},
+			"spec.driverRegistrations[*].nodeID": {
+				{ErrorType: "FieldValueRequired"},
+				{ErrorType: "FieldValueTooLong", Origin: "maxBytes"},
+			},
+			"status.storageHealth[*].healthConditions": {
+				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
+			},
+			"status.storageHealth[*].healthConditions[*].message": {
+				{ErrorType: "FieldValueTooLong", Origin: "maxBytes"},
+			},
+			"status.storageHealth[*].healthConditions[*].reason": {
+				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-condition-reason"},
+				{ErrorType: "FieldValueRequired"},
+				{ErrorType: "FieldValueTooLong", Origin: "maxBytes"},
+			},
+			"status.storageHealth[*].healthConditions[*].status": {
+				{ErrorType: "FieldValueNotSupported"},
+				{ErrorType: "FieldValueRequired"},
+			},
 			"status.storageHealth[*].name": {
 				{ErrorType: "FieldValueRequired"},
 			},

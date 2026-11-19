@@ -782,6 +782,18 @@ func TestHistogramVec_Quantile_NativeHistogram(t *testing.T) {
 				{1, 2, 3},
 			},
 		},
+		"overlapping-close-values": {
+			// Several histograms observe values that fall into the same
+			// native histogram buckets, which previously caused duplicate
+			// (unmerged) buckets with identical bounds to be passed to
+			// nonCumulativeBucketQuantile, skewing the within-bucket
+			// interpolation.
+			samples: [][]float64{
+				{1.0, 1.01, 1.02, 1.03},
+				{1.005, 1.015, 1.025, 1.035},
+				{1.002, 1.012, 1.022, 1.032},
+			},
+		},
 	}
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -795,11 +807,16 @@ func TestHistogramVec_Quantile_NativeHistogram(t *testing.T) {
 			sort.Float64s(all)
 			min, max := all[0], all[len(all)-1]
 
-			for _, q := range []float64{0.5, 0.9, 0.99} {
+			var prev float64
+			for _, q := range []float64{0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.99} {
 				got := vec.Quantile(q)
 				if got < min*0.9 || got > max*1.1 {
 					t.Errorf("Quantile(%v) = %v, want value within [%v, %v]", q, got, min, max)
 				}
+				if got < prev {
+					t.Errorf("Quantile(%v) = %v, want quantiles to be monotonically increasing, previous was %v", q, got, prev)
+				}
+				prev = got
 			}
 		})
 	}

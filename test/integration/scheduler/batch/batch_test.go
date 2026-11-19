@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
+	schedulerutils "k8s.io/kubernetes/test/integration/scheduler"
 	testutil "k8s.io/kubernetes/test/integration/util"
 )
 
@@ -389,7 +390,7 @@ func TestBatchScenarios(t *testing.T) {
 	for _, tt := range table {
 		t.Run(tt.name, func(t *testing.T) {
 			profiles, registry := initSchedulerProfiles(t)
-			testCtx := testutil.InitTestSchedulerWithNS(t, "batch",
+			testCtx := schedulerutils.InitTestSchedulerWithNS(t, "batch",
 				scheduler.WithProfiles(profiles...),
 				scheduler.WithFrameworkOutOfTreeRegistry(registry),
 				scheduler.WithMaxBatchAge(time.Minute),
@@ -401,10 +402,10 @@ func TestBatchScenarios(t *testing.T) {
 			if !ok {
 				t.Fatal("Profile default-scheduler does not implement batchGetter")
 			}
-			cs := testCtx.ClientSet
+			cs := testCtx.Client()
 
 			for _, n := range tt.nodes {
-				_, err := testutil.CreateNode(cs, newNode(&n))
+				_, err := schedulerutils.CreateNode(testCtx, cs, newNode(&n))
 				if err != nil {
 					t.Fatal("Failed adding node", "node", n, err)
 				}
@@ -415,14 +416,14 @@ func TestBatchScenarios(t *testing.T) {
 			for _, pd := range tt.pods {
 				prevBatched := getter.TotalBatchedPods()
 
-				p := newPod(&pd, testCtx.NS.Name)
-				createdPod, err := cs.CoreV1().Pods(p.Namespace).Create(testCtx.Ctx, p, metav1.CreateOptions{})
+				p := newPod(&pd, testCtx.Namespace())
+				createdPod, err := cs.CoreV1().Pods(p.Namespace).Create(testCtx, p, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatalf("Failed to create pod %s/%s, error: %v",
 						p.Namespace, p.Name, err)
 				}
 
-				if err := testutil.WaitForPodToScheduleWithTimeout(testCtx.Ctx, cs, createdPod, 5*time.Second); err != nil {
+				if err := schedulerutils.WaitForPodToScheduleWithTimeout(testCtx, cs, createdPod, 5*time.Second); err != nil {
 					if !pd.expectUnschedulable {
 						t.Errorf("Failed to schedule pod %s/%s on the node, err: %v",
 							p.Namespace, p.Name, err)
@@ -435,7 +436,7 @@ func TestBatchScenarios(t *testing.T) {
 					t.Fatalf("Expected pod to be unschedulable but it was scheduled")
 				}
 
-				finalPod, err := cs.CoreV1().Pods(p.Namespace).Get(testCtx.Ctx, p.Name, metav1.GetOptions{})
+				finalPod, err := cs.CoreV1().Pods(p.Namespace).Get(testCtx, p.Name, metav1.GetOptions{})
 				if err != nil {
 					t.Fatalf("Failed to get pod %v", err)
 				}
@@ -510,7 +511,7 @@ func resources(maxPods int) v1.ResourceList {
 func newNode(d *nodeDef) *v1.Node {
 	n := st.MakeNode()
 	n.Name(d.name)
-	n.Labels = d.labels
+	n.Labels(d.labels)
 	n.Status.Capacity = resources(d.maxPods)
 	n.Status.Allocatable = resources(d.maxPods)
 	return n.Obj()

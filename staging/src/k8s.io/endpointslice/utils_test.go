@@ -1100,26 +1100,6 @@ func TestSupportedServiceAddressType(t *testing.T) {
 		expectedAddressTypes []discovery.AddressType
 	}{
 		{
-			name:                 "v4 service with no ip families (cluster upgrade)",
-			expectedAddressTypes: []discovery.AddressType{discovery.AddressTypeIPv4},
-			service: v1.Service{
-				Spec: v1.ServiceSpec{
-					ClusterIP:  "10.0.0.10",
-					IPFamilies: nil,
-				},
-			},
-		},
-		{
-			name:                 "v6 service with no ip families (cluster upgrade)",
-			expectedAddressTypes: []discovery.AddressType{discovery.AddressTypeIPv6},
-			service: v1.Service{
-				Spec: v1.ServiceSpec{
-					ClusterIP:  "2000::1",
-					IPFamilies: nil,
-				},
-			},
-		},
-		{
 			name:                 "v4 service",
 			expectedAddressTypes: []discovery.AddressType{discovery.AddressTypeIPv4},
 			service: v1.Service{
@@ -1156,28 +1136,6 @@ func TestSupportedServiceAddressType(t *testing.T) {
 			},
 		},
 		{
-			name:                 "headless with no selector and no families (old api-server)",
-			expectedAddressTypes: []discovery.AddressType{discovery.AddressTypeIPv6, discovery.AddressTypeIPv4},
-			service: v1.Service{
-				Spec: v1.ServiceSpec{
-					ClusterIP:  v1.ClusterIPNone,
-					IPFamilies: nil,
-				},
-			},
-		},
-		{
-			name:                 "headless with selector and no families (old api-server)",
-			expectedAddressTypes: []discovery.AddressType{discovery.AddressTypeIPv6, discovery.AddressTypeIPv4},
-			service: v1.Service{
-				Spec: v1.ServiceSpec{
-					Selector:   map[string]string{"foo": "bar"},
-					ClusterIP:  v1.ClusterIPNone,
-					IPFamilies: nil,
-				},
-			},
-		},
-
-		{
 			name:                 "headless with no selector with families",
 			expectedAddressTypes: []discovery.AddressType{discovery.AddressTypeIPv4, discovery.AddressTypeIPv6},
 			service: v1.Service{
@@ -1202,8 +1160,7 @@ func TestSupportedServiceAddressType(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			logger, _ := ktesting.NewTestContext(t)
-			addressTypes := getAddressTypesForService(logger, &testCase.service)
+			addressTypes := getAddressTypesForService(&testCase.service)
 			if len(addressTypes) != len(testCase.expectedAddressTypes) {
 				t.Fatalf("expected count address types %v got %v", len(testCase.expectedAddressTypes), len(addressTypes))
 			}

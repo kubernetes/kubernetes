@@ -115,6 +115,10 @@ func (s *hpaSelectorStore) HPAsMatchingPods(namespace string, pods []*v1.Pod, li
 	// Pods from the same ReplicaSet typically share identical labels.
 	uniqueLabels := make(map[string]labels.Set)
 	for _, pod := range pods {
+		// Avoid serializing the same labels again while there is only one distinct set.
+		if len(uniqueLabels) == 1 && maps.Equal(pods[0].Labels, pod.Labels) {
+			continue
+		}
 		key := labels.Set(pod.Labels).String()
 		if _, seen := uniqueLabels[key]; !seen {
 			uniqueLabels[key] = labels.Set(pod.Labels)

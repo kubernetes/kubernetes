@@ -1015,3 +1015,72 @@ func requireUnblocked[T any](t *testing.T, ch <-chan T) (received T) {
 		return
 	}
 }
+
+func TestSuspendRelist(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PLEGOnDemandRelist, true)
+	tCtx := ktesting.Init(t)
+	testPleg := newTestGenericPLEG()
+	pleg, runtime := testPleg.pleg, testPleg.runtime
+	ch := pleg.Watch()
+
+	setPods := func(state1, state2 kubecontainer.State) {
+		runtime.AllPodList = []*containertest.FakePod{
+			{Pod: &kubecontainer.Pod{ID: "1234", Containers: []*kubecontainer.Container{createTestContainer("c1", state1)}}},
+			{Pod: &kubecontainer.Pod{ID: "4567", Containers: []*kubecontainer.Container{createTestContainer("c2", state2)}}},
+		}
+	}
+	drainRelistRequests := func() int {
+		n := 0
+		for len(pleg.relistRequests) > 0 {
+			<-pleg.relistRequests
+			n++
+		}
+		return n
+	}
+
+	setPods(kubecontainer.ContainerStateRunning, kubecontainer.ContainerStateRunning)
+	pleg.Relist(tCtx)
+	getEventsFromChannel(ch)
+
+	t.Log("A global relist skips the suspended pod but still reports other pods.")
+	pleg.SuspendRelist("1234")
+	setPods(kubecontainer.ContainerStateExited, kubecontainer.ContainerStateExited)
+	pleg.Relist(tCtx)
+	verifyEvents(t, []*PodLifecycleEvent{{ID: "4567", Type: ContainerDied, Data: "c2"}}, getEventsFromChannel(ch))
+
+	t.Log("An on-demand relist of the suspended pod is deferred.")
+	pleg.relistPod(tCtx, "1234")
+	assert.Empty(t, getEventsFromChannel(ch))
+
+	t.Log("Resuming reports the deferred relist, and leaves requesting it to the caller.")
+	assert.True(t, pleg.ResumeRelist("1234"))
+	assert.Equal(t, 0, drainRelistRequests())
+	assert.Empty(t, pleg.suspendedPods)
+	pleg.Relist(tCtx)
+	verifyEvents(t, []*PodLifecycleEvent{{ID: "1234", Type: ContainerDied, Data: "c1"}}, getEventsFromChannel(ch))
+
+	t.Log("A deferred change is not lost, even if the caller does not request a relist.")
+	pleg.SuspendRelist("1234")
+	setPods(kubecontainer.ContainerStateRunning, kubecontainer.ContainerStateExited)
+	pleg.Relist(tCtx)
+	assert.Empty(t, getEventsFromChannel(ch))
+	assert.True(t, pleg.ResumeRelist("1234"))
+	pleg.Relist(tCtx)
+	verifyEvents(t, []*PodLifecycleEvent{{ID: "1234", Type: ContainerStarted, Data: "c1"}}, getEventsFromChannel(ch))
+
+	t.Log("Resuming without any deferred relist reports false.")
+	pleg.SuspendRelist("1234")
+	assert.False(t, pleg.ResumeRelist("1234"))
+
+	t.Log("The reinspect flag is preserved while the pod is suspended.")
+	pleg.SuspendRelist("1234")
+	pleg.RequestReinspect("1234")
+	pleg.Relist(tCtx)
+	_, reinspect := pleg.podsToReinspect.Load(types.UID("1234"))
+	assert.True(t, reinspect)
+	assert.True(t, pleg.ResumeRelist("1234"))
+	pleg.Relist(tCtx)
+	verifyEvents(t, []*PodLifecycleEvent{{ID: "1234", Type: PodSync}}, getEventsFromChannel(ch))
+	_, reinspect = pleg.podsToReinspect.Load(types.UID("1234"))
+	assert.False(t, reinspect)
+}

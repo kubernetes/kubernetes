@@ -33,6 +33,7 @@ import (
 type batchHandle interface {
 	ProfileName() string
 	SnapshotSharedLister() fwk.SharedLister
+	NominatedNodeName(pod *v1.Pod) string
 	RunFilterPlugins(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status
 	RunPreScorePlugins(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) *fwk.Status
 	RunRawScorePlugins(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) ([]fwk.PluginScore, *fwk.Status)
@@ -46,6 +47,7 @@ type OpportunisticBatch struct {
 	lastCycle   schedulingCycle
 	handle      batchHandle
 	maxBatchAge time.Duration
+	disabled    bool
 
 	// Used primarily for tests, count the total pods we
 	// have successfully batched.
@@ -63,7 +65,6 @@ type batchState struct {
 type schedulingCycle struct {
 	cycleCount int64
 	chosenNode string
-	succeeded  bool
 }
 
 const (
@@ -71,11 +72,29 @@ const (
 	DefaultMaxBatchAge = 500 * time.Millisecond
 )
 
-// GetNodeHint provides a hint for the pod based on filtering a scoring results of previous cycles. Caching works only for consecutive pods
-// with the same signature that are scheduled in 1-pod-per-node manner (otherwise previous scores could not be reused).
-// It's assured by checking the top-rated node is no longer feasible (meaning the previous pod was successfully scheduled and the
-// current one does not fit).
+// SetDisabled disables or re-enables opportunistic batching and clears any cached batch state.
+func (b *OpportunisticBatch) SetDisabled(disabled bool) {
+	if b == nil {
+		return
+	}
+	b.disabled = disabled
+	b.state = nil
+	b.lastCycle = schedulingCycle{}
+}
+
+// IsDisabled reports whether opportunistic batching is currently disabled.
+func (b *OpportunisticBatch) IsDisabled() bool {
+	return b == nil || b.disabled
+}
+
+// GetNodeHint provides a hint for the pod based on the filtering and scoring results of previous cycles. Caching works
+// only for consecutive pods with the same signature (pods of one PodGroup scheduling cycle also qualify). The node
+// chosen for the previous pod is re-checked first: if it is still feasible it is rescored and competes with the cached
+// candidates, otherwise the cached ranking is reused as it stands. Returns "" and drops the state when it can't be used.
 func (b *OpportunisticBatch) GetNodeHint(ctx context.Context, pod *v1.Pod, signature fwk.PodSignature, state fwk.CycleState, cycleCount int64) string {
+	if b.disabled {
+		return ""
+	}
 	logger := klog.FromContext(ctx)
 	var hint string
 
@@ -92,12 +111,16 @@ func (b *OpportunisticBatch) GetNodeHint(ctx context.Context, pod *v1.Pod, signa
 	}()
 
 	// If we don't have state that we can use, then return an empty hint.
+	// The state is dropped, otherwise the following pods would find it unusable again and
+	// report the same incompatibility.
 	if !b.batchStateCompatible(ctx, pod, signature, cycleCount) {
+		b.state = nil
 		return ""
 	}
 
 	// Re-check the previously chosen node and re-score it if still feasible.
 	if !b.refreshHintCandidates(ctx, pod, cycleCount, state) {
+		b.state = nil
 		return ""
 	}
 
@@ -113,6 +136,9 @@ func (b *OpportunisticBatch) GetNodeHint(ctx context.Context, pod *v1.Pod, signa
 
 // StoreScheduleResults stores results from scheduling for use as a batch later.
 func (b *OpportunisticBatch) StoreScheduleResults(ctx context.Context, signature fwk.PodSignature, hintedNode, chosenNode string, otherNodes framework.SortedScoredNodes, cycleCount int64) {
+	if b.disabled {
+		return
+	}
 	logger := klog.FromContext(ctx)
 
 	defer metrics.StoreScheduleResultsDuration.ObserveSince(time.Now(), b.handle.ProfileName())()
@@ -120,7 +146,6 @@ func (b *OpportunisticBatch) StoreScheduleResults(ctx context.Context, signature
 	b.lastCycle = schedulingCycle{
 		cycleCount: cycleCount,
 		chosenNode: chosenNode,
-		succeeded:  true,
 	}
 	logger.V(4).Info("OpportunisticBatch set cycle state",
 		"profile", b.handle.ProfileName(), "cycleCount", cycleCount, "hintedNode", hintedNode, "chosenNode", chosenNode)
@@ -150,6 +175,7 @@ func (b *OpportunisticBatch) StoreScheduleResults(ctx context.Context, signature
 			sortedNodes:  otherNodes,
 			creationTime: time.Now(),
 		}
+		metrics.StoreScheduleResultsTotal.WithLabelValues(b.handle.ProfileName(), metrics.StoreResultStored).Inc()
 		if loggerV := logger.V(6); loggerV.Enabled() {
 			loggerV.Info("OpportunisticBatch set batch information",
 				"profile", b.handle.ProfileName(), "signature", b.state.signature, "nodes", otherNodes.Len(), "cycleCount", cycleCount)
@@ -158,12 +184,11 @@ func (b *OpportunisticBatch) StoreScheduleResults(ctx context.Context, signature
 				"profile", b.handle.ProfileName(), "nodes", otherNodes.Len(), "cycleCount", cycleCount)
 		}
 	} else {
-		reason := metrics.BatchFlushPodNotBatchable
-		if otherNodes == nil || otherNodes.Len() == 0 {
-			reason = metrics.BatchFlushEmptyList
+		result := metrics.StoreResultEmptyList
+		if signature == nil {
+			result = metrics.StoreResultPodNotBatchable
 		}
-
-		b.logUnusableState(logger, cycleCount, reason)
+		metrics.StoreScheduleResultsTotal.WithLabelValues(b.handle.ProfileName(), result).Inc()
 		b.state = nil
 	}
 }
@@ -188,7 +213,8 @@ func (b *OpportunisticBatch) batchStateCompatible(ctx context.Context, pod *v1.P
 	}
 	logger := klog.FromContext(ctx)
 
-	// In this case, a previous pod was scheduled by another profile, meaning we can't use the state anymore.
+	// In this case, a previous pod was scheduled by another profile or failed to schedule,
+	// meaning we can't use the state anymore.
 	if cycleCount != b.lastCycle.cycleCount+1 {
 		// In case of PodGroup scheduling cycle, multiple pods can share the same cycle count.
 		// The batch state can be reused in that case.
@@ -198,14 +224,8 @@ func (b *OpportunisticBatch) batchStateCompatible(ctx context.Context, pod *v1.P
 		}
 	}
 
-	// If our last pod failed we can't use the state.
-	if !b.lastCycle.succeeded {
-		b.logUnusableState(logger, cycleCount, metrics.BatchFlushPodFailed)
-		return false
-	}
-
 	// Pods with a nominated node should bypass opportunistic batching.
-	if pod.Status.NominatedNodeName != "" {
+	if b.handle.NominatedNodeName(pod) != "" {
 		b.logUnusableState(logger, cycleCount, metrics.BatchFlushPodNominated)
 		return false
 	}

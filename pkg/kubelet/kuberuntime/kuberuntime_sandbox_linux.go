@@ -48,12 +48,17 @@ func (m *kubeGenericRuntimeManager) convertOverheadToLinuxResources(pod *v1.Pod)
 func (m *kubeGenericRuntimeManager) calculateSandboxResources(ctx context.Context, pod *v1.Pod) *runtimeapi.LinuxContainerResources {
 	logger := klog.FromContext(ctx)
 	opts := resourcehelper.PodResourcesOptions{
-		ExcludeOverhead:                          true,
-		SkipPodLevelResources:                    !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
-		UseDRANodeAllocatableResourceClaimStatus: utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources),
+		ExcludeOverhead:                  true,
+		SkipPodLevelResources:            !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
+		UseExtraNodeAllocatableResources: utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources),
 	}
 	req := resourcehelper.PodRequests(pod, opts)
+
+	// PodLimits() omits a cpu or memory limit that any container leaves unset when no
+	// pod-level limit is declared, so the sandbox is unlimited in that case, the same way
+	// ResourceConfigForPod() leaves the pod cgroup unlimited.
 	lim := resourcehelper.PodLimits(pod, opts)
+
 	var cpuRequest *resource.Quantity
 	if _, cpuRequestExists := req[v1.ResourceCPU]; cpuRequestExists {
 		cpuRequest = req.Cpu()

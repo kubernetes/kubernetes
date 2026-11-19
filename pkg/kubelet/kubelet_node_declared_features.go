@@ -42,6 +42,9 @@ func (kl *Kubelet) discoverNodeDeclaredFeatures() []string {
 	if features := kl.runtimeState.runtimeFeatures(); features != nil {
 		runtimeFeatures.UserNamespacesHostNetwork = features.UserNamespacesHostNetwork
 		runtimeFeatures.MountOptions = features.MountOptions
+		runtimeFeatures.SeccompProfileOCI = features.SeccompProfileOCI
+		runtimeFeatures.CgroupMountMode = features.CgroupMountMode
+		runtimeFeatures.PodNetworkIsolated = features.PodNetworkIsolated
 	}
 
 	cfg := &nodedeclaredfeatures.NodeConfiguration{

@@ -20,7 +20,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/prometheus/procfs/internal/util"
+	"github.com/prometheus/procfs/internal/parsers"
 )
 
 // A ConntrackStatEntry represents one line from net/stat/nf_conntrack
@@ -49,7 +49,7 @@ func (fs FS) ConntrackStat() ([]ConntrackStatEntry, error) {
 // Parses a slice of ConntrackStatEntries from the given filepath.
 func readConntrackStat(path string) ([]ConntrackStatEntry, error) {
 	// This file is small and can be read with one syscall.
-	b, err := util.ReadFileNoStat(path)
+	b, err := parsers.ReadFileNoStat(path)
 	if err != nil {
 		// Do not wrap this error so the caller can detect os.IsNotExist and
 		// similar conditions.
@@ -84,7 +84,7 @@ func parseConntrackStat(r io.Reader) ([]ConntrackStatEntry, error) {
 
 // Parses a ConntrackStatEntry from given array of fields.
 func parseConntrackStatEntry(fields []string) (*ConntrackStatEntry, error) {
-	entries, err := util.ParseHexUint64s(fields)
+	entries, err := parsers.ParseHexUint64s(fields)
 	if err != nil {
 		return nil, fmt.Errorf("%w: Cannot parse entry: %d: %w", ErrFileParse, entries, err)
 	}

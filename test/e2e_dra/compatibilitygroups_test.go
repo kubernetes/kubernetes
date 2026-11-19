@@ -51,7 +51,7 @@ func compatibilityGroupsDevice(name string) resourceapi.Device {
 		Name: name,
 		ConsumesCounters: []resourceapi.DeviceCounterConsumption{{
 			CounterSet:          "gpu",
-			Counters:            map[string]resourceapi.Counter{"mem": {Value: resource.MustParse("1")}},
+			Counters:            map[string]resourceapi.CounterRequirement{"mem": {Value: new(resource.MustParse("1"))}},
 			CompatibilityGroups: []string{"mig"},
 		}},
 	}

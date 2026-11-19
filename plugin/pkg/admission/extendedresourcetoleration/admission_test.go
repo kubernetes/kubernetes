@@ -382,3 +382,24 @@ func TestHandles(t *testing.T) {
 		}
 	}
 }
+
+func TestDynamicSubresource(t *testing.T) {
+	plugin := admissiontesting.WithReinvocationTesting(t, newExtendedResourceToleration())
+	container := core.Container{
+		Name: "added",
+		Resources: core.ResourceRequirements{
+			Requests: core.ResourceList{"example.com/device": *resource.NewQuantity(1, resource.DecimalSI)},
+		},
+	}
+	for subresource, expectTolerations := range map[string]int{"": 1, "dynamic": 1, "status": 0} {
+		oldPod := &core.Pod{}
+		pod := &core.Pod{Spec: core.PodSpec{Containers: []core.Container{container}}}
+		attrs := admission.NewAttributesRecord(pod, oldPod, core.Kind("Pod").WithVersion("version"), "foo", "name", core.Resource("pods").WithVersion("version"), subresource, admission.Update, nil, false, nil)
+		if err := plugin.Admit(t.Context(), attrs, nil); err != nil {
+			t.Fatalf("subresource %q: unexpected error %v", subresource, err)
+		}
+		if len(pod.Spec.Tolerations) != expectTolerations {
+			t.Errorf("subresource %q: expected %d tolerations, got %v", subresource, expectTolerations, pod.Spec.Tolerations)
+		}
+	}
+}

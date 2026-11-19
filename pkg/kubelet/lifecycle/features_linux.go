@@ -29,9 +29,10 @@ func isPodLevelResourcesSupported(pod *v1.Pod) PodAdmitResult {
 	podLevelResourcesEnabled := utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources)
 	if resource.IsPodLevelResourcesSet(pod) && !podLevelResourcesEnabled {
 		return PodAdmitResult{
-			Admit:   false,
-			Reason:  PodLevelResourcesNotAdmittedReason,
-			Message: "PodLevelResources feature gate is disabled",
+			Admit:         false,
+			Reason:        PodLevelResourcesNotAdmittedReason,
+			Message:       "PodLevelResources feature gate is disabled",
+			RejectionType: RejectionInfeasible,
 		}
 	}
 	return PodAdmitResult{Admit: true}

@@ -20,7 +20,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"math/rand"
 	"net"
 	"strconv"
 	"testing"
@@ -47,8 +46,29 @@ func makeServicePortName(ns, name, port string) proxy.ServicePortName {
 	}
 }
 
-func randomNodePort() int {
-	return 30000 + rand.Intn(2767)
+// freePorts reserves n distinct free loopback ports. Every listener stays open until
+// all n are picked so the kernel cannot hand out the same port twice.
+func freePorts(t *testing.T, network string, n int) []int {
+	t.Helper()
+	addr := "127.0.0.1:0"
+	if network == "tcp6" {
+		addr = "[::1]:0"
+	}
+	ports := make([]int, 0, n)
+	for range n {
+		l, err := net.Listen(network, addr)
+		if err != nil {
+			t.Fatalf("Failed to reserve a free port: %v", err)
+		}
+		defer l.Close() //nolint:errcheck
+		ports = append(ports, l.Addr().(*net.TCPAddr).Port)
+	}
+	return ports
+}
+
+func freePort(t *testing.T, network string) int {
+	t.Helper()
+	return freePorts(t, network, 1)[0]
 }
 
 // startTCPEchoServer starts a TCP server that echoes back everything it receives.
@@ -107,7 +127,7 @@ func TestSyncNodePorts_AddAndRemove(t *testing.T) {
 
 	ep := net.JoinHostPort("127.0.0.1", strconv.Itoa(backendPort))
 
-	nodePort := randomNodePort()
+	nodePort := freePort(t, "tcp4")
 
 	desired := []NodePortSpec{{
 		ServicePortName: svcName,
@@ -158,7 +178,7 @@ func TestSyncNodePorts_UpdateEndpoints(t *testing.T) {
 
 	svcName := makeServicePortName("default", "test-svc", "http")
 
-	nodePort := randomNodePort()
+	nodePort := freePort(t, "tcp4")
 
 	// Start with ep1 only
 	p.SyncNodePorts([]NodePortSpec{{
@@ -198,7 +218,7 @@ func TestNoEndpoints(t *testing.T) {
 	defer backend.Close() //nolint:errcheck
 	ep := net.JoinHostPort("127.0.0.1", strconv.Itoa(backend.Addr().(*net.TCPAddr).Port))
 
-	nodePort := randomNodePort()
+	nodePort := freePort(t, "tcp4")
 
 	spec := NodePortSpec{
 		ServicePortName: makeServicePortName("default", "svc", "http"),
@@ -265,7 +285,7 @@ func TestBackendConnectionFailure(t *testing.T) {
 	// Use an endpoint that isn't listening
 	ep := "127.0.0.1:1" // port 1 is almost certainly not listening
 
-	nodePort := randomNodePort()
+	nodePort := freePort(t, "tcp4")
 
 	p.SyncNodePorts([]NodePortSpec{{
 		ServicePortName: makeServicePortName("default", "fail-svc", "http"),
@@ -293,12 +313,9 @@ func TestShutdown(t *testing.T) {
 	p := NewLocalNodePortProxy(ctx, v1.IPv4Protocol)
 
 	// Create multiple listeners
-	var ports []int
+	ports := freePorts(t, "tcp4", 3)
 	var desired []NodePortSpec
-	for range 3 {
-		port := randomNodePort()
-		ports = append(ports, port)
-
+	for _, port := range ports {
 		desired = append(desired, NodePortSpec{
 			ServicePortName: makeServicePortName("default", fmt.Sprintf("svc-%d", port), "http"),
 			Protocol:        v1.ProtocolTCP,
@@ -336,7 +353,7 @@ func TestShutdownClosesInFlightConnections(t *testing.T) {
 
 	ep := net.JoinHostPort("127.0.0.1", strconv.Itoa(backendPort))
 
-	nodePort := randomNodePort()
+	nodePort := freePort(t, "tcp4")
 
 	p.SyncNodePorts([]NodePortSpec{{
 		ServicePortName: makeServicePortName("default", "inflight-svc", "http"),
@@ -398,7 +415,7 @@ func TestIPv6(t *testing.T) {
 
 	ep := net.JoinHostPort("::1", strconv.Itoa(backendPort))
 
-	nodePort := randomNodePort()
+	nodePort := freePort(t, "tcp6")
 
 	p.SyncNodePorts([]NodePortSpec{{
 		ServicePortName: makeServicePortName("default", "v6-svc", "http"),
@@ -480,7 +497,7 @@ func TestSessionAffinity_PinsToSingleEndpoint(t *testing.T) {
 		}
 	}()
 
-	nodePort := randomNodePort()
+	nodePort := freePort(t, "tcp4")
 
 	p.SyncNodePorts([]NodePortSpec{{
 		ServicePortName:     makeServicePortName("default", "sticky-svc", "http"),
@@ -511,7 +528,7 @@ func TestSessionAffinity_PinnedEndpointRemoved(t *testing.T) {
 	b2, port2, ep2 := startPortReportingServer(t, "tcp4")
 	defer b2.Close() //nolint:errcheck
 
-	nodePort := randomNodePort()
+	nodePort := freePort(t, "tcp4")
 
 	svcName := makeServicePortName("default", "sticky-svc", "http")
 	p.SyncNodePorts([]NodePortSpec{{
@@ -565,7 +582,7 @@ func TestSessionAffinity_Expires(t *testing.T) {
 		}
 	}()
 
-	nodePort := randomNodePort()
+	nodePort := freePort(t, "tcp4")
 
 	const affinitySeconds = 10800
 	p.SyncNodePorts([]NodePortSpec{{
@@ -613,7 +630,7 @@ func TestNoSessionAffinity_SpreadsAcrossEndpoints(t *testing.T) {
 		}
 	}()
 
-	nodePort := randomNodePort()
+	nodePort := freePort(t, "tcp4")
 
 	p.SyncNodePorts([]NodePortSpec{{
 		ServicePortName: makeServicePortName("default", "roundrobin-svc", "http"),
@@ -647,7 +664,8 @@ func TestSyncNodePorts_ListenersGaugeReflectsActiveCount(t *testing.T) {
 	defer backend.Close() //nolint:errcheck
 	ep := net.JoinHostPort("127.0.0.1", strconv.Itoa(backend.Addr().(*net.TCPAddr).Port))
 
-	p1, p2 := randomNodePort(), randomNodePort()
+	ports := freePorts(t, "tcp4", 2)
+	p1, p2 := ports[0], ports[1]
 
 	p.SyncNodePorts([]NodePortSpec{
 		{ServicePortName: makeServicePortName("ns", "svc1", "p"), Protocol: v1.ProtocolTCP, NodePort: p1, Endpoints: []string{ep}},

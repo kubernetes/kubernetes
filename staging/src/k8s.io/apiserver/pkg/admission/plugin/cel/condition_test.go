@@ -24,8 +24,8 @@ import (
 	"strings"
 	"testing"
 
-	celgo "github.com/google/cel-go/cel"
-	celtypes "github.com/google/cel-go/common/types"
+	celgo "cel.dev/cel-go/cel"
+	celtypes "cel.dev/cel-go/common/types"
 	"github.com/stretchr/testify/require"
 
 	corev1 "k8s.io/api/core/v1"

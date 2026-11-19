@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	defaultLog "log"
+	"math"
 	"net"
 	"net/http"
 	"strings"
@@ -30,7 +31,6 @@ import (
 	"github.com/soheilhy/cmux"
 	"github.com/tmc/grpc-websocket-proxy/wsproxy"
 	"go.uber.org/zap"
-	"golang.org/x/net/http2"
 	"golang.org/x/net/trace"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -178,10 +178,7 @@ func (sctx *serveCtx) serve(
 				ReadHeaderTimeout: 5 * time.Minute,
 				ErrorLog:          logger, // do not log user error
 			}
-			if err = configureHTTPServer(srv, s.Cfg); err != nil {
-				sctx.lg.Error("Configure http server failed", zap.Error(err))
-				return err
-			}
+			configureHTTPServer(srv, s.Cfg)
 		}
 		if grpcEnabled {
 			gs = v3rpc.Server(s, nil, nil, gopts...)
@@ -270,10 +267,7 @@ func (sctx *serveCtx) serve(
 				ReadHeaderTimeout: 5 * time.Minute,
 				ErrorLog:          logger, // do not log user error
 			}
-			if err = configureHTTPServer(srv, s.Cfg); err != nil {
-				sctx.lg.Error("Configure https server failed", zap.Error(err))
-				return err
-			}
+			configureHTTPServer(srv, s.Cfg)
 		}
 
 		if onlyGRPC {
@@ -304,11 +298,15 @@ func (sctx *serveCtx) serve(
 	return err
 }
 
-func configureHTTPServer(srv *http.Server, cfg config.ServerConfig) error {
+func configureHTTPServer(srv *http.Server, cfg config.ServerConfig) {
 	// todo (ahrtr): should we support configuring other parameters in the future as well?
-	return http2.ConfigureServer(srv, &http2.Server{
-		MaxConcurrentStreams: cfg.MaxConcurrentStreams,
-	})
+	// net/http replaces any MaxConcurrentStreams above math.MaxInt32 with its
+	// default (250), so clamp the uint32 value (default math.MaxUint32) to keep
+	// it effectively unlimited.
+	maxStreams := int(min(cfg.MaxConcurrentStreams, math.MaxInt32))
+	srv.HTTP2 = &http.HTTP2Config{
+		MaxConcurrentStreams: maxStreams,
+	}
 }
 
 // grpcHandlerFunc returns an http.Handler that delegates to grpcServer on incoming gRPC

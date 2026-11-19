@@ -191,7 +191,7 @@ func (nodes *Nodes) init(tCtx ktesting.TContext, minNodes, maxNodes int) {
 		cancel(errors.New("test has completed"))
 		wg.Wait()
 	})
-	_, err = claimInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, err = claimInformer.AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj any) {
 			claim := obj.(*resourceapi.ResourceClaim)
 			resourceClaimLogger.Info("New claim", "claim", format.Object(claim, 0))
@@ -210,7 +210,7 @@ func (nodes *Nodes) init(tCtx ktesting.TContext, minNodes, maxNodes int) {
 			claim := obj.(*resourceapi.ResourceClaim)
 			resourceClaimLogger.Info("Deleted claim", "claim", format.Object(claim, 0))
 		},
-	})
+	}, cache.HandlerOptions{Logger: &resourceClaimLogger})
 	tCtx.ExpectNoError(err, "AddEventHandler")
 	wg.Add(1)
 	go func() {
@@ -545,6 +545,7 @@ func (d *Driver) SetUp(tCtx ktesting.TContext, kubeletRootDir string, nodes *Nod
 						SharedCounters:         slice.SharedCounters,
 						PerDeviceNodeSelection: slice.PerDeviceNodeSelection,
 						PartitionTypeAttribute: slice.PartitionTypeAttribute,
+						SkipNodeOperations:     slice.SkipNodeOperations,
 					},
 				}
 				_, err := tCtx.Client().ResourceV1().ResourceSlices().Create(tCtx, resourceSlice, metav1.CreateOptions{})

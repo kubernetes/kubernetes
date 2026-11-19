@@ -36,13 +36,9 @@ import (
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	"k8s.io/kubernetes/pkg/scheduler"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
+	schedulerutils "k8s.io/kubernetes/test/integration/scheduler"
 	testutils "k8s.io/kubernetes/test/integration/util"
 	imageutils "k8s.io/kubernetes/test/utils/image"
-)
-
-// imported from testutils
-var (
-	createNode = testutils.CreateNode
 )
 
 const (
@@ -286,8 +282,8 @@ func machine3Prioritizer(pod *v1.Pod, nodes *v1.NodeList) (*extenderv1.HostPrior
 }
 
 func TestSchedulerExtender(t *testing.T) {
-	testCtx := testutils.InitTestAPIServer(t, "scheduler-extender", nil)
-	clientSet := testCtx.ClientSet
+	serverCtx := testutils.InitTestAPIServer(t, "scheduler-extender", nil)
+	clientSet := serverCtx.Client()
 
 	extender1 := &Extender{
 		name:         "extender1",
@@ -353,17 +349,21 @@ func TestSchedulerExtender(t *testing.T) {
 		},
 	}
 
-	testCtx = testutils.InitTestSchedulerWithOptions(t, testCtx, 0, scheduler.WithExtenders(extenders...))
-	testutils.SyncSchedulerInformerFactory(testCtx)
-	go testCtx.Scheduler.Run(testCtx.Ctx)
+	testCtx := schedulerutils.InitTestSchedulerWithOptions(t, serverCtx, 0, scheduler.WithExtenders(extenders...))
+	schedulerutils.SyncSchedulerInformerFactory(testCtx)
+	go testCtx.Scheduler.Run(testCtx.SchedulerCtx)
 
-	DoTestPodScheduling(testCtx.NS, t, clientSet)
+	DoTestPodScheduling(testCtx, testCtx.Namespace(), t, clientSet)
 }
 
-func DoTestPodScheduling(ns *v1.Namespace, t *testing.T, cs clientset.Interface) {
+func DoTestPodScheduling(ctx context.Context, ns string, t *testing.T, cs clientset.Interface) {
 	// NOTE: This test cannot run in parallel, because it is creating and deleting
 	// non-namespaced objects (Nodes).
-	defer cs.CoreV1().Nodes().DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
+	defer func() {
+		if err := cs.CoreV1().Nodes().DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{}); err != nil {
+			t.Errorf("Failed to delete nodes: %v", err)
+		}
+	}()
 
 	goodCondition := v1.NodeCondition{
 		Type:              v1.NodeReady,
@@ -383,7 +383,7 @@ func DoTestPodScheduling(ns *v1.Namespace, t *testing.T, cs clientset.Interface)
 
 	for ii := range 5 {
 		node.Name = fmt.Sprintf("machine%d", ii+1)
-		if _, err := createNode(cs, node); err != nil {
+		if _, err := schedulerutils.CreateNode(ctx, cs, node); err != nil {
 			t.Fatalf("Failed to create nodes: %v", err)
 		}
 	}
@@ -405,28 +405,28 @@ func DoTestPodScheduling(ns *v1.Namespace, t *testing.T, cs clientset.Interface)
 		},
 	}
 
-	myPod, err := cs.CoreV1().Pods(ns.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
+	myPod, err := cs.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Failed to create pod: %v", err)
 	}
 
 	err = wait.PollUntilContextTimeout(context.TODO(), time.Second, wait.ForeverTestTimeout, false,
-		testutils.PodScheduled(cs, myPod.Namespace, myPod.Name))
+		schedulerutils.PodScheduled(cs, myPod.Namespace, myPod.Name))
 	if err != nil {
 		t.Fatalf("Failed to schedule pod: %v", err)
 	}
 
-	myPod, err = cs.CoreV1().Pods(ns.Name).Get(context.TODO(), myPod.Name, metav1.GetOptions{})
+	myPod, err = cs.CoreV1().Pods(ns).Get(context.TODO(), myPod.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("Failed to get pod: %v", err)
 	} else if myPod.Spec.NodeName != "machine2" {
 		t.Fatalf("Failed to schedule using extender, expected machine2, got %v", myPod.Spec.NodeName)
 	}
 	var gracePeriod int64
-	if err := cs.CoreV1().Pods(ns.Name).Delete(context.TODO(), myPod.Name, metav1.DeleteOptions{GracePeriodSeconds: &gracePeriod}); err != nil {
+	if err := cs.CoreV1().Pods(ns).Delete(context.TODO(), myPod.Name, metav1.DeleteOptions{GracePeriodSeconds: &gracePeriod}); err != nil {
 		t.Fatalf("Failed to delete pod: %v", err)
 	}
-	_, err = cs.CoreV1().Pods(ns.Name).Get(context.TODO(), myPod.Name, metav1.GetOptions{})
+	_, err = cs.CoreV1().Pods(ns).Get(context.TODO(), myPod.Name, metav1.GetOptions{})
 	if err == nil {
 		t.Fatalf("Failed to delete pod: %v", err)
 	}

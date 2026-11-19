@@ -30,30 +30,6 @@ import (
 	"github.com/go-jose/go-jose/v4/json"
 )
 
-// Helper function to serialize known-good objects.
-// Precondition: value is not a nil pointer.
-func mustSerializeJSON(value interface{}) []byte {
-	out, err := json.Marshal(value)
-	if err != nil {
-		panic(err)
-	}
-	// We never want to serialize the top-level value "null," since it's not a
-	// valid JOSE message. But if a caller passes in a nil pointer to this method,
-	// MarshalJSON will happily serialize it as the top-level value "null". If
-	// that value is then embedded in another operation, for instance by being
-	// base64-encoded and fed as input to a signing algorithm
-	// (https://github.com/go-jose/go-jose/issues/22), the result will be
-	// incorrect. Because this method is intended for known-good objects, and a nil
-	// pointer is not a known-good object, we are free to panic in this case.
-	// Note: It's not possible to directly check whether the data pointed at by an
-	// interface is a nil pointer, so we do this hacky workaround.
-	// https://groups.google.com/forum/#!topic/golang-nuts/wnH302gBa4I
-	if string(out) == "null" {
-		panic("Tried to serialize a nil pointer.")
-	}
-	return out
-}
-
 // Strip all newlines and whitespace
 func stripWhitespace(data string) string {
 	buf := strings.Builder{}
@@ -122,6 +98,8 @@ func inflate(input []byte) ([]byte, error) {
 }
 
 // byteBuffer represents a slice of bytes that can be serialized to url-safe base64.
+//
+// A nil byteBuffer represents an empty slice of bytes.
 type byteBuffer struct {
 	data []byte
 }
@@ -169,13 +147,13 @@ func (b *byteBuffer) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
-	*b = *newBuffer(decoded)
+	b.data = decoded
 
 	return nil
 }
 
 func (b *byteBuffer) base64() string {
-	return base64.RawURLEncoding.EncodeToString(b.data)
+	return base64.RawURLEncoding.EncodeToString(b.bytes())
 }
 
 func (b *byteBuffer) bytes() []byte {
@@ -186,12 +164,8 @@ func (b *byteBuffer) bytes() []byte {
 	return b.data
 }
 
-func (b byteBuffer) bigInt() *big.Int {
-	return new(big.Int).SetBytes(b.data)
-}
-
-func (b byteBuffer) toInt() int {
-	return int(b.bigInt().Int64())
+func (b *byteBuffer) bigInt() *big.Int {
+	return new(big.Int).SetBytes(b.bytes())
 }
 
 func base64EncodeLen(sl []byte) int {

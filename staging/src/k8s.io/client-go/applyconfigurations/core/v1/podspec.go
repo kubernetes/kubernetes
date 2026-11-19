@@ -87,6 +87,7 @@ type PodSpecApplyConfiguration struct {
 	// More info: https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/
 	ServiceAccountName *string `json:"serviceAccountName,omitempty"`
 	// serviceAccount is a deprecated alias for ServiceAccountName.
+	//
 	// Deprecated: Use serviceAccountName instead.
 	DeprecatedServiceAccount *string `json:"serviceAccount,omitempty"`
 	// automountServiceAccountToken indicates whether a service account token should be automatically mounted.
@@ -102,6 +103,8 @@ type PodSpecApplyConfiguration struct {
 	// When `hostNetwork` is true, specified `hostPort` fields in port definitions must match `containerPort`,
 	// and unspecified `hostPort` fields in port definitions are defaulted to match `containerPort`.
 	// Default to false.
+	// When true, podNetwork may not be set: the pod has no network namespace
+	// of its own.
 	HostNetwork *bool `json:"hostNetwork,omitempty"`
 	// hostPID uses the host's pid namespace.
 	// Optional: Default to false.
@@ -227,6 +230,7 @@ type PodSpecApplyConfiguration struct {
 	// - spec.containers[*].securityContext.procMount
 	// - spec.containers[*].securityContext.runAsUser
 	// - spec.containers[*].securityContext.runAsGroup
+	// - spec.containers[*].securityContext.cgroupOptions
 	OS *PodOSApplyConfiguration `json:"os,omitempty"`
 	// hostUsers specifies whether to use the host's user namespace.
 	// Optional: Default to true.
@@ -255,10 +259,14 @@ type PodSpecApplyConfiguration struct {
 	//
 	// This field enables fine-grained control over resource allocation for the
 	// entire pod, allowing resource sharing among containers in a pod.
-	// TODO: For beta graduation, expand this comment with a detailed explanation.
 	//
-	// This is an alpha field and requires enabling the PodLevelResources feature
-	// gate.
+	// If a limit is not specified at the pod level, the pod is limited by the aggregate of
+	// its container limits:
+	// - For cpu and memory, the aggregate is used only if every init and regular container
+	// specifies a limit; otherwise the pod is not limited for that resource.
+	// - For hugepages, the container limits are summed and unspecified values are treated as 0.
+	//
+	// More details: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
 	Resources *ResourceRequirementsApplyConfiguration `json:"resources,omitempty"`
 	// hostnameOverride specifies an explicit override for the pod's hostname as perceived by the pod.
 	// This field only specifies the pod's hostname and does not affect its DNS records.
@@ -279,9 +287,11 @@ type PodSpecApplyConfiguration struct {
 	// the Pod is treated as a single unit in all of these aspects.
 	// The group object referenced by this field may not exist at the time the
 	// Pod is created.
-	// This field is immutable, but a group object with the same name may be
-	// recreated with different policies. Doing this during pod scheduling
-	// may result in the placement not conforming to the expected policies.
+	// This field is immutable. The scheduler cannot distinguish PodGroup runtime
+	// instances that reuse the same namespace and name. Controllers should use a
+	// new PodGroup name for each runtime instance. Reusing a name for a PodGroup
+	// with different policies may result in Pod placement not conforming to the
+	// expected policies.
 	SchedulingGroup *PodSchedulingGroupApplyConfiguration `json:"schedulingGroup,omitempty"`
 	// evictionResponders reference responders that react to Evictions based on EvictionRequests.
 	// Responders should observe and communicate through the Eviction Resource API to help with
@@ -299,6 +309,16 @@ type PodSpecApplyConfiguration struct {
 	// Responders are not supported when the pod is part of a PodGroup (.spec.schedulingGroup is set).
 	// This field can only be set on creation and is immutable afterwards.
 	EvictionResponders []EvictionResponderApplyConfiguration `json:"evictionResponders,omitempty"`
+	// podNetwork selects whether a non-hostNetwork pod is attached to the pod network.
+	// "Default" attaches the pod to the pod network. "Isolated" gives
+	// the pod an isolated network namespace with only the loopback interface
+	// configured, not attached to the pod network.
+	// This field must be unset if hostNetwork is true. For non-hostNetwork
+	// pods, this behaves as if it was set to "Default" if it is not set.
+	// If a pod is "Isolated", hostPort and network-based probes and lifecycle
+	// handlers are not allowed.
+	// This field is immutable on Pods.
+	PodNetwork *corev1.PodNetwork `json:"podNetwork,omitempty"`
 }
 
 // PodSpecApplyConfiguration constructs a declarative configuration of the PodSpec type for use with
@@ -714,5 +734,13 @@ func (b *PodSpecApplyConfiguration) WithEvictionResponders(values ...*EvictionRe
 		}
 		b.EvictionResponders = append(b.EvictionResponders, *values[i])
 	}
+	return b
+}
+
+// WithPodNetwork sets the PodNetwork field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the PodNetwork field is set to the value of the last call.
+func (b *PodSpecApplyConfiguration) WithPodNetwork(value corev1.PodNetwork) *PodSpecApplyConfiguration {
+	b.PodNetwork = &value
 	return b
 }

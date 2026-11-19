@@ -328,6 +328,8 @@ spec:
         - addValue
         drop:
         - dropValue
+      cgroupOptions:
+        mountMode: mountModeValue
       privileged: true
       procMount: procMountValue
       readOnlyRootFilesystem: true
@@ -341,6 +343,11 @@ spec:
         user: userValue
       seccompProfile:
         localhostProfile: localhostProfileValue
+        oci:
+          baseProfile:
+            localhostProfile: localhostProfileValue
+            type: typeValue
+          ref: refValue
         type: typeValue
       windowsOptions:
         gmsaCredentialSpec: gmsaCredentialSpecValue
@@ -566,6 +573,8 @@ spec:
         - addValue
         drop:
         - dropValue
+      cgroupOptions:
+        mountMode: mountModeValue
       privileged: true
       procMount: procMountValue
       readOnlyRootFilesystem: true
@@ -579,6 +588,11 @@ spec:
         user: userValue
       seccompProfile:
         localhostProfile: localhostProfileValue
+        oci:
+          baseProfile:
+            localhostProfile: localhostProfileValue
+            type: typeValue
+          ref: refValue
         type: typeValue
       windowsOptions:
         gmsaCredentialSpec: gmsaCredentialSpecValue
@@ -810,6 +824,8 @@ spec:
         - addValue
         drop:
         - dropValue
+      cgroupOptions:
+        mountMode: mountModeValue
       privileged: true
       procMount: procMountValue
       readOnlyRootFilesystem: true
@@ -823,6 +839,11 @@ spec:
         user: userValue
       seccompProfile:
         localhostProfile: localhostProfileValue
+        oci:
+          baseProfile:
+            localhostProfile: localhostProfileValue
+            type: typeValue
+          ref: refValue
         type: typeValue
       windowsOptions:
         gmsaCredentialSpec: gmsaCredentialSpecValue
@@ -881,6 +902,7 @@ spec:
     name: nameValue
   overhead:
     overheadKey: "0"
+  podNetwork: podNetworkValue
   preemptionPolicy: preemptionPolicyValue
   priority: 25
   priorityClassName: priorityClassNameValue
@@ -922,6 +944,11 @@ spec:
       user: userValue
     seccompProfile:
       localhostProfile: localhostProfileValue
+      oci:
+        baseProfile:
+          localhostProfile: localhostProfileValue
+          type: typeValue
+        ref: refValue
       type: typeValue
     supplementalGroups:
     - 4
@@ -1425,6 +1452,12 @@ status:
       requestName: requestNameValue
       resourceName: resourceNameValue
     resourceClaimName: resourceClaimNameValue
+  extraNodeAllocatableResources:
+  - containerName: containerNameValue
+    limits:
+      limitsKey: "0"
+    requests:
+      requestsKey: "0"
   hostIP: hostIPValue
   hostIPs:
   - ip: ipValue
@@ -1496,17 +1529,6 @@ status:
         image:
           imageRef: imageRefValue
   message: messageValue
-  nodeAllocatableResourceClaimStatuses:
-  - containers:
-    - containersValue
-    mapping:
-    - name: nameValue
-      quantity: "0"
-    overhead:
-    - name: nameValue
-      perContainer: "0"
-      perPod: "0"
-    resourceClaimName: resourceClaimNameValue
   nominatedNodeName: nominatedNodeNameValue
   observedGeneration: 17
   phase: phaseValue
@@ -1528,10 +1550,11 @@ status:
     requests:
       requestsKey: "0"
   startTime: "2007-01-01T01:01:01Z"
-  volumeHealth:
-  - healthConditions:
-    - message: messageValue
-      reason: reasonValue
-      status: statusValue
-    lastTransitionTime: "2003-01-01T01:01:01Z"
+  volumeStatuses:
+  - healthStatus:
+      healthConditions:
+      - message: messageValue
+        reason: reasonValue
+        status: statusValue
+      lastTransitionTime: "2002-01-01T01:01:01Z"
     name: nameValue

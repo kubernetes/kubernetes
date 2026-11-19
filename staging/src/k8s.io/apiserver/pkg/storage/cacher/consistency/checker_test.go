@@ -304,7 +304,7 @@ func TestConsistencyCheckerListOpts(t *testing.T) {
 			Predicate: storage.SelectionPredicate{
 				Label: labels.Everything(),
 				Field: fields.Everything(),
-				Limit: checkerListPageSize,
+				Limit: CheckerListPageSize,
 			},
 			Recursive: true,
 		},

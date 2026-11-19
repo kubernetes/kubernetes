@@ -30,7 +30,6 @@ import (
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
-	"k8s.io/client-go/kubernetes"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scale"
 	"k8s.io/kubectl/pkg/util/completion"
@@ -65,10 +64,36 @@ var (
 		kubectl scale --replicas=3 statefulset/web`))
 )
 
-type ScaleOptions struct {
+// ScaleFlags directly reflect the information that CLI is gathering via flags.
+type ScaleFlags struct {
 	FilenameOptions resource.FilenameOptions
 	RecordFlags     *genericclioptions.RecordFlags
 	PrintFlags      *genericclioptions.PrintFlags
+
+	Selector        string
+	All             bool
+	Replicas        int
+	ResourceVersion string
+	CurrentReplicas int
+	Timeout         time.Duration
+
+	genericiooptions.IOStreams
+}
+
+// NewScaleFlags returns a default ScaleFlags
+func NewScaleFlags(streams genericiooptions.IOStreams) *ScaleFlags {
+	return &ScaleFlags{
+		PrintFlags:  genericclioptions.NewPrintFlags("scaled"),
+		RecordFlags: genericclioptions.NewRecordFlags(),
+
+		CurrentReplicas: -1,
+
+		IOStreams: streams,
+	}
+}
+
+type ScaleOptions struct {
+	FilenameOptions resource.FilenameOptions
 	PrintObj        printers.ResourcePrinterFunc
 
 	Selector        string
@@ -83,29 +108,88 @@ type ScaleOptions struct {
 	namespace                    string
 	enforceNamespace             bool
 	args                         []string
-	shortOutput                  bool
-	clientSet                    kubernetes.Interface
 	scaler                       scale.Scaler
 	unstructuredClientForMapping func(mapping *meta.RESTMapping) (resource.RESTClient, error)
-	parent                       string
 	dryRunStrategy               cmdutil.DryRunStrategy
 
 	genericiooptions.IOStreams
 }
 
-func NewScaleOptions(ioStreams genericiooptions.IOStreams) *ScaleOptions {
-	return &ScaleOptions{
-		PrintFlags:      genericclioptions.NewPrintFlags("scaled"),
-		RecordFlags:     genericclioptions.NewRecordFlags(),
-		CurrentReplicas: -1,
-		Recorder:        genericclioptions.NoopRecorder{},
-		IOStreams:       ioStreams,
+// ToOptions converts from CLI inputs to runtime inputs.
+func (flags *ScaleFlags) ToOptions(f cmdutil.Factory, cmd *cobra.Command, args []string) (*ScaleOptions, error) {
+	err := flags.RecordFlags.Complete(cmd)
+	if err != nil {
+		return nil, err
 	}
+	recorder, err := flags.RecordFlags.ToRecorder()
+	if err != nil {
+		return nil, err
+	}
+
+	dryRunStrategy, err := cmdutil.GetDryRunStrategy(cmd)
+	if err != nil {
+		return nil, err
+	}
+
+	cmdutil.PrintFlagsWithDryRunStrategy(flags.PrintFlags, dryRunStrategy)
+	printer, err := flags.PrintFlags.ToPrinter()
+	if err != nil {
+		return nil, err
+	}
+
+	namespace, enforceNamespace, err := f.ToRawKubeConfigLoader().Namespace()
+	if err != nil {
+		return nil, err
+	}
+
+	scaler, err := scaler(f)
+	if err != nil {
+		return nil, err
+	}
+
+	o := &ScaleOptions{
+		FilenameOptions: flags.FilenameOptions,
+		PrintObj:        printer.PrintObj,
+
+		Selector:        flags.Selector,
+		All:             flags.All,
+		Replicas:        flags.Replicas,
+		ResourceVersion: flags.ResourceVersion,
+		CurrentReplicas: flags.CurrentReplicas,
+		Timeout:         flags.Timeout,
+
+		Recorder:                     recorder,
+		builder:                      f.NewBuilder(),
+		namespace:                    namespace,
+		enforceNamespace:             enforceNamespace,
+		args:                         args,
+		scaler:                       scaler,
+		unstructuredClientForMapping: f.UnstructuredClientForMapping,
+		dryRunStrategy:               dryRunStrategy,
+
+		IOStreams: flags.IOStreams,
+	}
+	return o, nil
+}
+
+func (flags *ScaleFlags) AddFlags(cmd *cobra.Command) {
+	flags.RecordFlags.AddFlags(cmd)
+	flags.PrintFlags.AddFlags(cmd)
+
+	cmd.Flags().BoolVar(&flags.All, "all", flags.All, "Select all resources in the namespace of the specified resource types")
+	cmd.Flags().StringVar(&flags.ResourceVersion, "resource-version", flags.ResourceVersion, i18n.T("Precondition for resource version. Requires that the current resource version match this value in order to scale."))
+	cmd.Flags().IntVar(&flags.CurrentReplicas, "current-replicas", flags.CurrentReplicas, "Precondition for current size. Requires that the current size of the resource match this value in order to scale. -1 (default) for no condition.")
+	cmd.Flags().IntVar(&flags.Replicas, "replicas", flags.Replicas, "The new desired number of replicas. Required.")
+	cmd.MarkFlagRequired("replicas") // nolint:errcheck
+	cmd.Flags().DurationVar(&flags.Timeout, "timeout", 0, "The length of time to wait before giving up on a scale operation, zero means don't wait. Any other values should contain a corresponding time unit (e.g. 1s, 2m, 3h).")
+	cmdutil.AddFilenameOptionFlags(cmd, &flags.FilenameOptions, "identifying the resource to set a new size")
+	cmdutil.AddDryRunFlag(cmd)
+	cmdutil.AddLabelSelectorFlagVar(cmd, &flags.Selector)
 }
 
 // NewCmdScale returns a cobra command with the appropriate configuration and flags to run scale
 func NewCmdScale(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra.Command {
-	o := NewScaleOptions(ioStreams)
+	flags := NewScaleFlags(ioStreams)
 
 	validArgs := []string{"deployment", "replicaset", "replicationcontroller", "statefulset"}
 
@@ -117,65 +201,16 @@ func NewCmdScale(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra
 		Example:               scaleExample,
 		ValidArgsFunction:     completion.SpecifiedResourceTypeAndNameCompletionFunc(f, validArgs),
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(o.Complete(f, cmd, args))
+			o, err := flags.ToOptions(f, cmd, args)
+			cmdutil.CheckErr(err)
 			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.RunScale())
 		},
 	}
 
-	o.RecordFlags.AddFlags(cmd)
-	o.PrintFlags.AddFlags(cmd)
+	flags.AddFlags(cmd)
 
-	cmd.Flags().BoolVar(&o.All, "all", o.All, "Select all resources in the namespace of the specified resource types")
-	cmd.Flags().StringVar(&o.ResourceVersion, "resource-version", o.ResourceVersion, i18n.T("Precondition for resource version. Requires that the current resource version match this value in order to scale."))
-	cmd.Flags().IntVar(&o.CurrentReplicas, "current-replicas", o.CurrentReplicas, "Precondition for current size. Requires that the current size of the resource match this value in order to scale. -1 (default) for no condition.")
-	cmd.Flags().IntVar(&o.Replicas, "replicas", o.Replicas, "The new desired number of replicas. Required.")
-	cmd.MarkFlagRequired("replicas")
-	cmd.Flags().DurationVar(&o.Timeout, "timeout", 0, "The length of time to wait before giving up on a scale operation, zero means don't wait. Any other values should contain a corresponding time unit (e.g. 1s, 2m, 3h).")
-	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, "identifying the resource to set a new size")
-	cmdutil.AddDryRunFlag(cmd)
-	cmdutil.AddLabelSelectorFlagVar(cmd, &o.Selector)
 	return cmd
-}
-
-func (o *ScaleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
-	var err error
-	o.RecordFlags.Complete(cmd)
-	o.Recorder, err = o.RecordFlags.ToRecorder()
-	if err != nil {
-		return err
-	}
-
-	o.dryRunStrategy, err = cmdutil.GetDryRunStrategy(cmd)
-	if err != nil {
-		return err
-	}
-	cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, o.dryRunStrategy)
-	printer, err := o.PrintFlags.ToPrinter()
-	if err != nil {
-		return err
-	}
-	o.PrintObj = printer.PrintObj
-
-	o.namespace, o.enforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
-	if err != nil {
-		return err
-	}
-	o.builder = f.NewBuilder()
-	o.args = args
-	o.shortOutput = cmdutil.GetFlagString(cmd, "output") == "name"
-	o.clientSet, err = f.KubernetesClientSet()
-	if err != nil {
-		return err
-	}
-	o.scaler, err = scaler(f)
-	if err != nil {
-		return err
-	}
-	o.unstructuredClientForMapping = f.UnstructuredClientForMapping
-	o.parent = cmd.Parent().Name()
-
-	return nil
 }
 
 func (o *ScaleOptions) Validate() error {

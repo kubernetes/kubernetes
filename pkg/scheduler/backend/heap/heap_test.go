@@ -45,6 +45,10 @@ func (obj testHeapObject) Type() fwk.EntityKeyType {
 	return fwk.EntityKeyType("test")
 }
 
+func (obj testHeapObject) IsResize() bool {
+	return false
+}
+
 type testMetricRecorder int
 
 func (tmr *testMetricRecorder) Add(entity metrics.Entity) {

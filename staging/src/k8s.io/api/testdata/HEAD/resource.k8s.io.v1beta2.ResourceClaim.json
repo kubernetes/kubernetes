@@ -180,6 +180,14 @@
             },
             "skipNodeOperations": [
               "skipNodeOperationsValue"
+            ],
+            "consumedCounters": [
+              {
+                "counterSet": "counterSetValue",
+                "counters": {
+                  "countersKey": "0"
+                }
+              }
             ]
           }
         ],

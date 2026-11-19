@@ -37,6 +37,7 @@ import (
 	"k8s.io/apiserver/pkg/admission/plugin/cel"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/config"
+	"k8s.io/apiserver/pkg/admission/plugin/webhook/config/apis/webhookadmission"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/predicates/namespace"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/predicates/object"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/predicates/rules"
@@ -60,7 +61,10 @@ type Webhook struct {
 
 	// Configuration provided via admission config file and initializers.
 	staticManifestsDir string // path to static webhook manifest directory (optional)
-	apiServerID        string // identity of this API server instance, used for metrics
+	// staticOrder is the merge order between manifest-based and API-based webhooks.
+	// It is never empty: an unset value is normalized to webhookadmission.StaticFirst.
+	staticOrder webhookadmission.StaticOrder
+	apiServerID string // identity of this API server instance, used for metrics
 
 	// hookSource is the webhook source used at admission time. When staticManifestsDir
 	// is configured, this is a composite source combining staticSource (loaded from disk)
@@ -144,10 +148,16 @@ func NewWebhook(handler *admission.Handler, configFile io.Reader, sourceFactory 
 	cm.SetAuthenticationInfoResolver(authInfoResolver)
 	cm.SetServiceResolver(webhookutil.NewDefaultServiceResolver())
 
+	staticOrder := cfg.StaticOrder
+	if len(staticOrder) == 0 {
+		staticOrder = webhookadmission.StaticFirst
+	}
+
 	return &Webhook{
 		Handler:                    handler,
 		apiSourceFactory:           sourceFactory,
 		staticManifestsDir:         cfg.StaticManifestsDir,
+		staticOrder:                staticOrder,
 		clientManager:              &cm,
 		namespaceMatcher:           &namespace.Matcher{},
 		objectMatcher:              &object.Matcher{},
@@ -186,6 +196,18 @@ func (a *Webhook) SetAPIServerID(id string) {
 // GetAPIServerID returns the stored API server ID.
 func (a *Webhook) GetAPIServerID() string {
 	return a.apiServerID
+}
+
+// GetStaticManifestsDir returns the directory manifest-based webhooks are loaded from,
+// or the empty string if none is configured.
+func (a *Webhook) GetStaticManifestsDir() string {
+	return a.staticManifestsDir
+}
+
+// GetStaticOrder returns the merge order between manifest-based and API-based webhooks.
+// An unset configuration value is reported as webhookadmission.StaticFirst.
+func (a *Webhook) GetStaticOrder() webhookadmission.StaticOrder {
+	return a.staticOrder
 }
 
 // SetDrainedNotification implements the WantsDrainedNotification interface.
@@ -280,7 +302,7 @@ func (a *Webhook) ValidateInitialization() error {
 			}()
 			go staticSource.RunReloadLoop(staticCtx)
 			// Use composite source that combines static + API sources
-			a.hookSource = NewCompositeWebhookSource(staticSource, a.apiSource)
+			a.hookSource = newCompositeWebhookSource(staticSource, a.apiSource, a.staticOrder)
 		}
 	} else {
 		a.hookSource = a.apiSource

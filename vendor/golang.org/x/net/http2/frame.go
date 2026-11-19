@@ -1711,7 +1711,8 @@ func (fr *Framer) readMetaFrame(hf *HeadersFrame) (Frame, error) {
 	mh := &MetaHeadersFrame{
 		HeadersFrame: hf,
 	}
-	var remainSize = fr.maxHeaderListSize()
+	var headersRemainSize = fr.maxHeaderListSize()
+	var trailersRemainSize = fr.maxHeaderListSize()
 	var sawRegular bool
 
 	var invalid error // pseudo header field errors
@@ -1743,14 +1744,29 @@ func (fr *Framer) readMetaFrame(hf *HeadersFrame) (Frame, error) {
 			return
 		}
 
-		size := hf.Size()
-		if size > remainSize {
+		var remainSize *uint32
+		var size uint32
+		if hf.Name == "trailer" {
+			remainSize = &trailersRemainSize
+			fieldCount := strings.Count(hf.Value, ",") + 1
+			// Rather than actually constructing hpack.HeaderField for each
+			// trailer field and cumulatively adding its Size, just do the math
+			// manually to avoid unnecessary work. This does make it so
+			// whitespaces after comma are counted against the budget, but that
+			// should be innocuous.
+			size = uint32(len(hf.Value)-fieldCount+1) + uint32(fieldCount)*hpack.HeaderField{}.Size()
+		} else {
+			remainSize = &headersRemainSize
+			size = hf.Size()
+		}
+		if size > *remainSize {
 			hdec.SetEmitEnabled(false)
 			mh.Truncated = true
-			remainSize = 0
+			headersRemainSize = 0
+			trailersRemainSize = 0
 			return
 		}
-		remainSize -= size
+		*remainSize -= size
 
 		mh.Fields = append(mh.Fields, hf)
 	})
@@ -1766,10 +1782,10 @@ func (fr *Framer) readMetaFrame(hf *HeadersFrame) (Frame, error) {
 		// skip parsing the fragment and close the connection.
 		//
 		// "Too much" is either any CONTINUATION frame after we've already
-		// exceeded the max header list size (in which case remainSize is 0),
-		// or a frame whose encoded size is more than twice the remaining
-		// header list bytes we're willing to accept.
-		if int64(len(frag)) > int64(2*remainSize) {
+		// exceeded the max header list size (if so, both budgets are 0), or a
+		// frame whose encoded size is more than twice the remaining header
+		// list bytes we're willing to accept.
+		if int64(len(frag)) > 2*int64(headersRemainSize+trailersRemainSize) {
 			if VerboseLogs {
 				log.Printf("http2: header list too large")
 			}

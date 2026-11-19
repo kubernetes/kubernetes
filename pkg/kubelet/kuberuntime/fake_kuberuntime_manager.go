@@ -104,6 +104,7 @@ func newFakeKubeRuntimeManager(ctx context.Context, runtimeService internalapi.R
 		cpuCFSQuotaPeriod:  metav1.Duration{Duration: time.Millisecond * 100},
 		livenessManager:    proberesults.NewManager(),
 		startupManager:     proberesults.NewManager(),
+		probeLifecycle:     kubecontainer.NoopContainerProbeLifecycle{},
 		machineInfo:        machineInfo,
 		osInterface:        osInterface,
 		containerManager:   cm.NewFakeContainerManager(logger),
@@ -115,7 +116,7 @@ func newFakeKubeRuntimeManager(ctx context.Context, runtimeService internalapi.R
 		logReduction:       logreduction.NewLogReduction(identicalErrorDelay),
 		logManager:         logs.NewStubContainerLogManager(),
 		podLogsDirectory:   fakePodLogsDirectory,
-		actuatedState:      state.NewStateMemory(logger, nil),
+		actuatedState:      state.NewStateMemory(logger, nil, KeepOnlyResourceValues),
 	}
 
 	// Initialize swap controller availability check (always false for tests)

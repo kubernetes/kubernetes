@@ -21,14 +21,15 @@ import (
 	"fmt"
 	"math"
 	"sync"
-	"testing"
 	"time"
 
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
+	"k8s.io/client-go/ktesting"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
@@ -36,6 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/deployment"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/pkg/controller/replicaset"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/integration/framework"
 	testutil "k8s.io/kubernetes/test/utils"
 	"k8s.io/utils/ptr"
@@ -58,7 +60,7 @@ var resumeFn = func(update *apps.Deployment) {
 }
 
 type deploymentTester struct {
-	t          *testing.T
+	t          testutil.TB
 	c          clientset.Interface
 	deployment *apps.Deployment
 }
@@ -103,15 +105,30 @@ func newDeployment(name, ns string, replicas int32) *apps.Deployment {
 }
 
 // dcSetup sets up necessities for Deployment integration test, including control plane, apiserver, informers, and clientset
-func dcSetup(ctx context.Context, t *testing.T) (kubeapiservertesting.TearDownFunc, *replicaset.ReplicaSetController, *deployment.DeploymentController, informers.SharedInformerFactory, clientset.Interface) {
+func dcSetup(ctx context.Context, t ktesting.TB) (kubeapiservertesting.TearDownFunc, *replicaset.ReplicaSetController, *deployment.DeploymentController, informers.SharedInformerFactory, clientset.Interface) {
+	teardown, config, clientSet := startDeploymentAPIServer(t)
+	rm, dc, informers := newDeploymentControllers(ctx, t, config)
+	return teardown, rm, dc, informers, clientSet
+}
+
+func startDeploymentAPIServer(t ktesting.TB) (kubeapiservertesting.TearDownFunc, *restclient.Config, clientset.Interface) {
 	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
-	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
+	flags := framework.DefaultTestServerFlags()
+	// Workload and PodGroup APIs require explicit runtime enablement.
+	if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
+		flags = append(flags, "--runtime-config=scheduling.k8s.io/v1beta1=true")
+	}
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, flags, framework.SharedEtcd())
 
 	config := restclient.CopyConfig(server.ClientConfig)
 	clientSet, err := clientset.NewForConfig(config)
 	if err != nil {
 		t.Fatalf("error in create clientset: %v", err)
 	}
+	return server.TearDownFn, config, clientSet
+}
+
+func newDeploymentControllers(ctx context.Context, t ktesting.TB, config *restclient.Config) (*replicaset.ReplicaSetController, *deployment.DeploymentController, informers.SharedInformerFactory) {
 	resyncPeriod := 12 * time.Hour
 	informers := informers.NewSharedInformerFactory(clientset.NewForConfigOrDie(restclient.AddUserAgent(config, "deployment-informers")), resyncPeriod)
 
@@ -120,24 +137,30 @@ func dcSetup(ctx context.Context, t *testing.T) (kubeapiservertesting.TearDownFu
 		informers.Apps().V1().Deployments(),
 		informers.Apps().V1().ReplicaSets(),
 		informers.Core().V1().Pods(),
+		informers.Scheduling().V1beta1().Workloads(),
 		clientset.NewForConfigOrDie(restclient.AddUserAgent(config, "deployment-controller")),
 	)
 	if err != nil {
 		t.Fatalf("error creating Deployment controller: %v", err)
 	}
-	rm := replicaset.NewReplicaSetController(
+	rm, err := replicaset.NewReplicaSetController(
 		ctx,
 		informers.Apps().V1().ReplicaSets(),
 		informers.Core().V1().Pods(),
+		informers.Scheduling().V1beta1().Workloads(),
+		informers.Scheduling().V1beta1().PodGroups(),
 		clientset.NewForConfigOrDie(restclient.AddUserAgent(config, "replicaset-controller")),
 		replicaset.BurstReplicas,
 	)
-	return server.TearDownFn, rm, dc, informers, clientSet
+	if err != nil {
+		t.Fatalf("error creating ReplicaSet controller: %v", err)
+	}
+	return rm, dc, informers
 }
 
 // dcSimpleSetup sets up necessities for Deployment integration test, including control plane, apiserver,
 // and clientset, but not controllers and informers
-func dcSimpleSetup(t *testing.T) (kubeapiservertesting.TearDownFunc, clientset.Interface) {
+func dcSimpleSetup(t ktesting.TB) (kubeapiservertesting.TearDownFunc, clientset.Interface) {
 	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 
@@ -150,7 +173,7 @@ func dcSimpleSetup(t *testing.T) (kubeapiservertesting.TearDownFunc, clientset.I
 }
 
 // runControllersAndInformers runs RS and deployment controllers and informers
-func runControllersAndInformers(t *testing.T, rm *replicaset.ReplicaSetController, dc *deployment.DeploymentController, informers informers.SharedInformerFactory) func() {
+func runControllersAndInformers(t testutil.TB, rm *replicaset.ReplicaSetController, dc *deployment.DeploymentController, informers informers.SharedInformerFactory) func() {
 	ctx, cancelFn := context.WithCancel(context.Background())
 	informers.Start(ctx.Done())
 	go rm.Run(ctx, 5)

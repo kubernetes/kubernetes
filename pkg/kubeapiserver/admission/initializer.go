@@ -58,28 +58,28 @@ func newManifestLoaders() *initializer.ManifestLoaders {
 		LoadValidatingWebhookManifests: func(dir string) ([]*admissionregistrationv1.ValidatingWebhookConfiguration, string, error) {
 			result, err := webhookloader.LoadValidatingManifests(dir)
 			if err != nil {
-				return nil, "", err
+				return nil, result.Hash, err
 			}
 			return result.Configurations, result.Hash, nil
 		},
 		LoadMutatingWebhookManifests: func(dir string) ([]*admissionregistrationv1.MutatingWebhookConfiguration, string, error) {
 			result, err := webhookloader.LoadMutatingManifests(dir)
 			if err != nil {
-				return nil, "", err
+				return nil, result.Hash, err
 			}
 			return result.Configurations, result.Hash, nil
 		},
 		LoadValidatingPolicyManifests: func(dir string) ([]*admissionregistrationv1.ValidatingAdmissionPolicy, []*admissionregistrationv1.ValidatingAdmissionPolicyBinding, string, error) {
 			manifests, err := policyloader.LoadValidatingManifestsFromDirectory(dir)
 			if err != nil {
-				return nil, nil, "", err
+				return nil, nil, manifests.Hash, err
 			}
 			return manifests.Policies, manifests.Bindings, manifests.Hash, nil
 		},
 		LoadMutatingPolicyManifests: func(dir string) ([]*admissionregistrationv1.MutatingAdmissionPolicy, []*admissionregistrationv1.MutatingAdmissionPolicyBinding, string, error) {
 			manifests, err := policyloader.LoadMutatingManifestsFromDirectory(dir)
 			if err != nil {
-				return nil, nil, "", err
+				return nil, nil, manifests.Hash, err
 			}
 			return manifests.Policies, manifests.Bindings, manifests.Hash, nil
 		},

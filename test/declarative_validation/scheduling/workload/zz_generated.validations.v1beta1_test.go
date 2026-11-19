@@ -111,13 +111,11 @@ func init() {
 				{ErrorType: "FieldValueRequired"},
 			},
 			"spec.compositePodGroupTemplates[*].podGroupTemplates[*].preemptionPolicy": {
-				{ErrorType: "FieldValueForbidden"},
 				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
 				{ErrorType: "FieldValueNotSupported"},
 			},
 			"spec.compositePodGroupTemplates[*].podGroupTemplates[*].priority": {
 				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
-				{ErrorType: "FieldValueInvalid", Origin: "maximum"},
 			},
 			"spec.compositePodGroupTemplates[*].podGroupTemplates[*].priorityClassName": {
 				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-long-name"},
@@ -166,13 +164,11 @@ func init() {
 				{ErrorType: "FieldValueRequired"},
 			},
 			"spec.compositePodGroupTemplates[*].preemptionPolicy": {
-				{ErrorType: "FieldValueForbidden"},
 				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
 				{ErrorType: "FieldValueNotSupported"},
 			},
 			"spec.compositePodGroupTemplates[*].priority": {
 				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
-				{ErrorType: "FieldValueInvalid", Origin: "maximum"},
 			},
 			"spec.compositePodGroupTemplates[*].priorityClassName": {
 				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-long-name"},
@@ -232,13 +228,11 @@ func init() {
 				{ErrorType: "FieldValueRequired"},
 			},
 			"spec.podGroupTemplates[*].preemptionPolicy": {
-				{ErrorType: "FieldValueForbidden"},
 				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
 				{ErrorType: "FieldValueNotSupported"},
 			},
 			"spec.podGroupTemplates[*].priority": {
 				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
-				{ErrorType: "FieldValueInvalid", Origin: "maximum"},
 			},
 			"spec.podGroupTemplates[*].priorityClassName": {
 				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-long-name"},

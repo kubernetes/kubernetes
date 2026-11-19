@@ -53,11 +53,14 @@ func recordOperation(operation string, start time.Time) {
 	metrics.RuntimeOperationsDuration.WithLabelValues(operation).Observe(metrics.SinceInSeconds(start))
 }
 
-// recordError records error for metric if an error occurred.
+// recordError records error for metric. It always observes the label so the
+// metric is present from the first operation, even when no errors have occurred.
 func recordError(operation string, err error) {
+	var n float64
 	if err != nil {
-		metrics.RuntimeOperationsErrors.WithLabelValues(operation).Inc()
+		n = 1
 	}
+	metrics.RuntimeOperationsErrors.WithLabelValues(operation).Add(n)
 }
 
 func (in instrumentedRuntimeService) Version(ctx context.Context, apiVersion string) (*runtimeapi.VersionResponse, error) {
@@ -315,6 +318,33 @@ func (in instrumentedImageManagerService) PullImage(ctx context.Context, image *
 	imageRef, err := in.service.PullImage(ctx, image, auth, podSandboxConfig)
 	recordError(operation, err)
 	return imageRef, err
+}
+
+func (in instrumentedImageManagerService) PullSecurityProfile(ctx context.Context, image *runtimeapi.ImageSpec, auth *runtimeapi.AuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig, kind runtimeapi.SecurityProfileKind) (*runtimeapi.PullSecurityProfileResponse, error) {
+	const operation = "pull_security_profile"
+	defer recordOperation(operation, time.Now())
+
+	resp, err := in.service.PullSecurityProfile(ctx, image, auth, podSandboxConfig, kind)
+	recordError(operation, err)
+	return resp, err
+}
+
+func (in instrumentedImageManagerService) ListSecurityProfiles(ctx context.Context) ([]*runtimeapi.SecurityProfileInfo, error) {
+	const operation = "list_security_profiles"
+	defer recordOperation(operation, time.Now())
+
+	out, err := in.service.ListSecurityProfiles(ctx)
+	recordError(operation, err)
+	return out, err
+}
+
+func (in instrumentedImageManagerService) RemoveSecurityProfile(ctx context.Context, digest string) error {
+	const operation = "remove_security_profile"
+	defer recordOperation(operation, time.Now())
+
+	err := in.service.RemoveSecurityProfile(ctx, digest)
+	recordError(operation, err)
+	return err
 }
 
 func (in instrumentedImageManagerService) RemoveImage(ctx context.Context, image *runtimeapi.ImageSpec) error {

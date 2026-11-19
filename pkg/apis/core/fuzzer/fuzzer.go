@@ -100,6 +100,15 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 				enableServiceLinks := v1.DefaultEnableServiceLinks
 				s.EnableServiceLinks = &enableServiceLinks
 			}
+			// podNetwork may not be set on a host network pod.
+			switch {
+			case s.HostNetwork || c.Bool():
+				s.PodNetwork = nil
+			case c.Bool():
+				s.PodNetwork = new(core.PodNetworkDefault)
+			default:
+				s.PodNetwork = new(core.PodNetworkIsolated)
+			}
 		},
 		func(s *core.PodStatus, c randfill.Continue) {
 			c.Fill(&s)
@@ -520,6 +529,17 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			c.FillNoCustom(http)            // fuzz self without calling this function again
 			http.Path = "/" + http.Path     // can't be blank
 			http.Scheme = "x" + http.Scheme // can't be blank
+			// Protocol must never be left nil: SetDefaults_PodSpec defaults a nil
+			// Protocol to HTTP1 when H2CContainerProbe is enabled, which would
+			// otherwise break round-trip equality.
+			switch c.Intn(2) {
+			case 0:
+				protocol := core.HTTPProtocolHTTP1
+				http.Protocol = &protocol
+			default:
+				protocol := core.HTTPProtocolHTTP2
+				http.Protocol = &protocol
+			}
 		},
 		func(ss *core.ServiceSpec, c randfill.Continue) {
 			c.FillNoCustom(ss) // fuzz self without calling this function again

@@ -19,6 +19,8 @@ package storage
 import (
 	"context"
 	"fmt"
+	"path"
+
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
@@ -37,7 +39,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	admissionapi "k8s.io/pod-security-admission/api"
-	"path"
 )
 
 var _ = utils.SIGDescribe(feature.Flexvolumes, "Mounted flexvolume expand", framework.WithSlow(), framework.WithProvider("aws", "gce", "local"), func() {
@@ -107,10 +108,12 @@ var _ = utils.SIGDescribe(feature.Flexvolumes, "Mounted flexvolume expand", fram
 
 	ginkgo.It("Should verify mounted flex volumes can be resized", func(ctx context.Context) {
 		driver := "dummy-attachable"
+		hostExec := utils.NewHostExec(f)
+		ginkgo.DeferCleanup(hostExec.Cleanup)
 		ginkgo.By(fmt.Sprintf("installing flexvolume %s on node %s as %s", path.Join(driverDir, driver), node.Name, driver))
-		installFlex(ctx, c, node, "k8s", driver, path.Join(driverDir, driver))
+		installFlex(ctx, c, hostExec, node, "k8s", driver, path.Join(driverDir, driver))
 		ginkgo.By(fmt.Sprintf("installing flexvolume %s on (master) node %s as %s", path.Join(driverDir, driver), node.Name, driver))
-		installFlex(ctx, c, nil, "k8s", driver, path.Join(driverDir, driver))
+		installFlex(ctx, c, hostExec, nil, "k8s", driver, path.Join(driverDir, driver))
 
 		pv := e2epv.MakePersistentVolume(e2epv.PersistentVolumeConfig{
 			PVSource: v1.PersistentVolumeSource{

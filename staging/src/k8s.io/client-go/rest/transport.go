@@ -85,10 +85,11 @@ func HTTPWrappersForConfig(config *Config, rt http.RoundTripper) (http.RoundTrip
 func (c *Config) TransportConfig() (*transport.Config, error) {
 	metrics.EnsureRegistered()
 	conf := &transport.Config{
-		UserAgent:          c.UserAgent,
-		Transport:          c.Transport,
-		WrapTransport:      c.WrapTransport,
-		DisableCompression: c.DisableCompression,
+		UserAgent:             c.UserAgent,
+		Transport:             c.Transport,
+		WrapTransport:         c.WrapTransport,
+		DisableCompression:    c.DisableCompression,
+		MinConnectionPoolSize: c.MinConnectionPoolSize,
 		TLS: transport.TLSConfig{
 			Insecure:   c.Insecure,
 			ServerName: c.ServerName,

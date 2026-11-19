@@ -19,6 +19,8 @@ package dranodeallocatableresources
 import (
 	"testing"
 
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/component-helpers/nodedeclaredfeatures/types"
 )
 
@@ -32,8 +34,8 @@ func TestRequirements(t *testing.T) {
 		t.Fatalf("Feature %s returned nil Requirements", feature.Name())
 	}
 
-	if len(reqs.EnabledFeatureGates) != 1 || reqs.EnabledFeatureGates[0] != DRANodeAllocatableResourcesFeature {
-		t.Fatalf("Feature %s Requirements should declare exactly the %s feature gate", feature.Name(), DRANodeAllocatableResourcesFeature)
+	if len(reqs.EnabledFeatureGates) != 1 || reqs.EnabledFeatureGates[0] != DRANodeAllocatableResourcesFeatureGate {
+		t.Fatalf("Feature %s Requirements should declare exactly the %s feature gate", feature.Name(), DRANodeAllocatableResourcesFeatureGate)
 	}
 }
 
@@ -59,7 +61,7 @@ func TestDiscover(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			config := &types.NodeConfiguration{
-				FeatureGates: types.FeatureGateMap{DRANodeAllocatableResourcesFeature: tc.featureGateEnabled},
+				FeatureGates: types.FeatureGateMap{DRANodeAllocatableResourcesFeatureGate: tc.featureGateEnabled},
 			}
 			enabled := feature.Discover(config)
 			if want, got := tc.expected, enabled; want != got {
@@ -69,13 +71,46 @@ func TestDiscover(t *testing.T) {
 	}
 }
 
-func TestInferForSchedulingAndUpdate(t *testing.T) {
-	feature := &draNodeAllocatableResourcesFeature{}
-	podInfo := &types.PodInfo{}
-	if feature.InferForScheduling(podInfo) {
-		t.Fatalf("expect InferForScheduling to be false")
+func TestInferForScheduling(t *testing.T) {
+	tests := []struct {
+		name     string
+		podInfo  *types.PodInfo
+		expected bool
+	}{
+		{
+			name:     "no status",
+			podInfo:  &types.PodInfo{Spec: &v1.PodSpec{}},
+			expected: false,
+		},
+		{
+			name:     "no extra node allocatable resources",
+			podInfo:  &types.PodInfo{Spec: &v1.PodSpec{}, Status: &v1.PodStatus{}},
+			expected: false,
+		},
+		{
+			name: "extra node allocatable resources",
+			podInfo: &types.PodInfo{Spec: &v1.PodSpec{}, Status: &v1.PodStatus{
+				ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{{
+					Limits: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
+				}},
+			}},
+			expected: true,
+		},
 	}
-	if feature.InferForUpdate(nil, podInfo) {
+
+	feature := &draNodeAllocatableResourcesFeature{}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := feature.InferForScheduling(tc.podInfo); got != tc.expected {
+				t.Fatalf("InferForScheduling() = %v, want %v", got, tc.expected)
+			}
+		})
+	}
+}
+
+func TestInferForUpdate(t *testing.T) {
+	feature := &draNodeAllocatableResourcesFeature{}
+	if feature.InferForUpdate(nil, &types.PodInfo{}) {
 		t.Fatalf("expect InferForUpdate to be false")
 	}
 }

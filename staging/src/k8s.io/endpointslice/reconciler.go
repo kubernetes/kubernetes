@@ -89,7 +89,7 @@ func (r *Reconciler) Reconcile(logger klog.Logger, service *corev1.Service, pods
 	slicesByAddressType := make(map[discovery.AddressType][]*discovery.EndpointSlice) // slices by address type
 
 	// addresses that this service supports [o(1) find]
-	serviceSupportedAddressesTypes := getAddressTypesForService(logger, service)
+	serviceSupportedAddressesTypes := getAddressTypesForService(service)
 
 	// loop through slices identifying their address type.
 	// slices that no longer match address type supported by services

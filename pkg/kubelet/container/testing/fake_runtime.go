@@ -21,6 +21,7 @@ import (
 	"io"
 	"net/url"
 	"reflect"
+	"slices"
 	"sync"
 	"time"
 
@@ -66,8 +67,15 @@ type FakeRuntime struct {
 	PodResizeInProgress bool
 	SyncResults         *kubecontainer.PodSyncResult
 	Err                 error
-	InspectErr          error
-	StatusErr           error
+	// EnsureSecurityProfilesErr is returned by EnsureSecurityProfiles.
+	EnsureSecurityProfilesErr error
+	// PulledSecurityProfiles records the references passed to PullSecurityProfile.
+	PulledSecurityProfiles []string
+	// SecurityProfiles is returned by ListSecurityProfiles and updated by
+	// RemoveSecurityProfile.
+	SecurityProfiles []*runtimeapi.SecurityProfileInfo
+	InspectErr       error
+	StatusErr        error
 	// If BlockImagePulls is true, then all PullImage() calls will be blocked until
 	// UnblockImagePulls() is called. This is used to simulate image pull latency
 	// from container runtime.
@@ -79,6 +87,12 @@ type FakeRuntime struct {
 	imagePullErrBucket chan error
 	SwapBehavior       map[string]kubetypes.SwapBehavior
 	T                  TB
+	// Blocking hooks let cancellation tests verify that kubelet forwards the
+	// pod worker context into runtime operations that are already in flight.
+	BlockSyncPod   bool
+	BlockKillPod   bool
+	SyncPodStarted chan struct{}
+	KillPodStarted chan struct{}
 }
 
 const FakeHost = "localhost:12345"
@@ -259,7 +273,73 @@ func (f *FakeRuntime) GetPod(_ context.Context, podUID types.UID) (*kubecontaine
 	return nil, kubecontainer.ErrPodNotFound
 }
 
-func (f *FakeRuntime) SyncPod(_ context.Context, pod *v1.Pod, _ *kubecontainer.PodStatus, _ []v1.Secret, backOff *flowcontrol.Backoff, _ bool) (result kubecontainer.PodSyncResult) {
+func (f *FakeRuntime) EnsureSecurityProfiles(_ context.Context, _ *v1.Pod, _ *kubecontainer.PodStatus, _ []v1.Secret) error {
+	f.Lock()
+	defer f.Unlock()
+
+	f.CalledFunctions = append(f.CalledFunctions, "EnsureSecurityProfiles")
+	return f.EnsureSecurityProfilesErr
+}
+
+func (f *FakeRuntime) PullSecurityProfile(_ context.Context, image kubecontainer.ImageSpec, _ []credentialprovider.TrackedAuthConfig, _ *runtimeapi.PodSandboxConfig, _ runtimeapi.SecurityProfileKind) (bool, error) {
+	f.Lock()
+	defer f.Unlock()
+
+	f.CalledFunctions = append(f.CalledFunctions, "PullSecurityProfile")
+	if f.Err != nil {
+		return false, f.Err
+	}
+	cached := slices.Contains(f.PulledSecurityProfiles, image.Image)
+	f.PulledSecurityProfiles = append(f.PulledSecurityProfiles, image.Image)
+	return cached, nil
+}
+
+func (f *FakeRuntime) ListSecurityProfiles(_ context.Context) ([]*runtimeapi.SecurityProfileInfo, error) {
+	f.Lock()
+	defer f.Unlock()
+
+	f.CalledFunctions = append(f.CalledFunctions, "ListSecurityProfiles")
+	if f.Err != nil {
+		return nil, f.Err
+	}
+	return slices.Clone(f.SecurityProfiles), nil
+}
+
+func (f *FakeRuntime) RemoveSecurityProfile(_ context.Context, digest string) error {
+	f.Lock()
+	defer f.Unlock()
+
+	f.CalledFunctions = append(f.CalledFunctions, "RemoveSecurityProfile")
+	if f.Err != nil {
+		return f.Err
+	}
+	f.SecurityProfiles = slices.DeleteFunc(f.SecurityProfiles, func(p *runtimeapi.SecurityProfileInfo) bool {
+		return p.Digest == digest
+	})
+	return nil
+}
+
+func (f *FakeRuntime) SyncPod(ctx context.Context, pod *v1.Pod, _ *kubecontainer.PodStatus, _ []v1.Secret, backOff *flowcontrol.Backoff, _ bool) (result kubecontainer.PodSyncResult) {
+	f.Lock()
+	blockSyncPod := f.BlockSyncPod
+	syncPodStarted := f.SyncPodStarted
+	syncResults := f.SyncResults
+	f.Unlock()
+	if blockSyncPod {
+		if syncPodStarted != nil {
+			select {
+			case syncPodStarted <- struct{}{}:
+			default:
+			}
+		}
+		<-ctx.Done()
+		if syncResults != nil {
+			return *syncResults
+		}
+		result.Fail(ctx.Err())
+		return result
+	}
+
 	f.Lock()
 	defer f.Unlock()
 
@@ -278,7 +358,22 @@ func (f *FakeRuntime) SyncPod(_ context.Context, pod *v1.Pod, _ *kubecontainer.P
 	return
 }
 
-func (f *FakeRuntime) KillPod(_ context.Context, pod *v1.Pod, runningPod kubecontainer.Pod, gracePeriodOverride *int64) error {
+func (f *FakeRuntime) KillPod(ctx context.Context, pod *v1.Pod, runningPod kubecontainer.Pod, gracePeriodOverride *int64) error {
+	f.Lock()
+	blockKillPod := f.BlockKillPod
+	killPodStarted := f.KillPodStarted
+	f.Unlock()
+	if blockKillPod {
+		if killPodStarted != nil {
+			select {
+			case killPodStarted <- struct{}{}:
+			default:
+			}
+		}
+		<-ctx.Done()
+		return ctx.Err()
+	}
+
 	f.Lock()
 	defer f.Unlock()
 

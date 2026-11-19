@@ -18,7 +18,6 @@ package integration
 
 import (
 	"context"
-	"testing"
 	"time"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
@@ -30,10 +29,11 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	coreclient "k8s.io/client-go/kubernetes/typed/core/v1"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
+	testutils "k8s.io/kubernetes/test/utils"
 )
 
 // DeletePodOrErrorf deletes a pod or fails with a call to t.Errorf.
-func DeletePodOrErrorf(t *testing.T, c clientset.Interface, ns, name string) {
+func DeletePodOrErrorf(t testutils.TB, c clientset.Interface, ns, name string) {
 	if err := c.CoreV1().Pods(ns).Delete(context.TODO(), name, metav1.DeleteOptions{}); err != nil {
 		t.Errorf("unable to delete pod %v: %v", name, err)
 	}

@@ -1,0 +1,67 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+package(
+    default_visibility = ["//visibility:public"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "aggregate_strategy.go",
+        "cost.go",
+        "default_strategy.go",
+        "estimator.go",
+        "helper.go",
+        "model.go",
+        "standard.go",
+        "strategy.go",
+        "tracker.go",
+        "validate.go",
+        "version.go",
+    ],
+    importpath = "cel.dev/cel-go/common/cost",
+    deps = [
+        "//common/ast:go_default_library",
+        "//common/operators:go_default_library",
+        "//common/overloads:go_default_library",
+        "//common/types:go_default_library",
+        "//common/types/ref:go_default_library",
+        "//common/types/traits:go_default_library",
+    ],
+)
+
+go_test(
+    name = "go_default_test",
+    size = "small",
+    srcs = [
+        "aggregate_strategy_test.go",
+        "algebra_test.go",
+        "cost_bounds_test.go",
+        "cost_test.go",
+        "default_strategy_test.go",
+        "length_test.go",
+        "model_test.go",
+        "optional_cost_test.go",
+        "optional_test.go",
+        "standard_test.go",
+        "totals_test.go",
+        "tracker_test.go",
+        "validate_test.go",
+        "version_test.go",
+    ],
+    embed = [
+        ":go_default_library",
+    ],
+    deps = [
+        "//cel:go_default_library",
+        "//common/ast:go_default_library",
+        "//common/decls:go_default_library",
+        "//common/operators:go_default_library",
+        "//common/overloads:go_default_library",
+        "//common/types:go_default_library",
+        "//common/types/ref:go_default_library",
+        "//ext:go_default_library",
+        "//test/proto3pb:go_default_library",
+    ],
+)

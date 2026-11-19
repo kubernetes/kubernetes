@@ -28,7 +28,10 @@ import (
 //
 // NodeAllocatableMapping defines how a DRA allocation directly translates into a node allocatable resource quantity.
 // The mapping can be derived from either the count of allocated devices or the specific capacity consumed. These options are mutually exclusive.
-// Kubelet adds this mapped resource quantity from claim to both requests and limits at the pod-level cgroup, and to limits at the container-level cgroup for each container referencing the claim.
+// The scheduler records the mapped quantity in the pod's `status.extraNodeAllocatableResources`: once in the
+// requests and limits of the pod level entry, and in the limits of the container entry of each container
+// referencing the claim, so that each of these containers can use all of it while the pod level entry caps
+// their total usage.
 type NodeAllocatableMappingApplyConfiguration struct {
 	// capacityKey references a capacity name defined as a key in the
 	// `spec.devices[*].capacity` map. When this field is set, the value associated with

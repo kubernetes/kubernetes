@@ -588,6 +588,87 @@ func getFixes(ctx context.Context, fset *token.FileSet, f *ast.File, filename st
 }
 
 func getFixesWithSource(ctx context.Context, fset *token.FileSet, f *ast.File, filename string, goroot string, logf func(string, ...any), source Source) ([]*ImportFix, error) {
+	fixes, err := computeFixesWithSource(ctx, fset, f, filename, goroot, logf, source)
+	if err != nil {
+		return nil, err
+	}
+	return ensureEmbedImport(f, fixes), nil
+}
+
+// ensureEmbedImport makes sure a file containing a //go:embed directive
+// imports "embed" once fixes are applied. The compiler requires the import
+// whenever a //go:embed directive is present, even when the embedded
+// variable's type (string or []byte) means the package is never referenced by
+// name. Any import of "embed" (renamed or blank) satisfies it.
+func ensureEmbedImport(f *ast.File, fixes []*ImportFix) []*ImportFix {
+	if !hasEmbedDirective(f) {
+		return fixes
+	}
+	// Work out the state of the "embed" import once fixes are applied. It may
+	// already be imported (under any name), be added by normal resolution (as
+	// for an embed.FS variable), or be deleted as an unused import.
+	imported := importsEmbed(f)
+	deleteFix := -1
+	for i, fix := range fixes {
+		if fix.StmtInfo.ImportPath != "embed" {
+			continue
+		}
+		switch fix.FixType {
+		case AddImport:
+			imported = true
+		case DeleteImport:
+			imported = false
+			deleteFix = i
+		}
+	}
+	if imported {
+		return fixes
+	}
+	blankEmbed := &ImportFix{
+		StmtInfo:  ImportInfo{ImportPath: "embed", Name: "_"},
+		IdentName: "_",
+		Relevance: MaxRelevance,
+	}
+	if deleteFix >= 0 {
+		// The file imports "embed" but the import is about to be removed as
+		// unused. Keep it as a blank import instead of deleting it and adding
+		// a new one back.
+		blankEmbed.FixType = SetImportName
+		fixes[deleteFix] = blankEmbed
+		return fixes
+	}
+	blankEmbed.FixType = AddImport
+	return append(fixes, blankEmbed)
+}
+
+// hasEmbedDirective reports whether f contains a //go:embed directive.
+func hasEmbedDirective(f *ast.File) bool {
+	for _, cg := range f.Comments {
+		for _, c := range cg.List {
+			// A //go:embed directive is the text "//go:embed" followed by
+			// whitespace and the patterns (see go/build.parseGoEmbed). The
+			// whitespace is what distinguishes it from an ordinary comment
+			// such as "//go:embedded".
+			if rest, ok := strings.CutPrefix(c.Text, "//go:embed"); ok &&
+				len(rest) > 0 && (rest[0] == ' ' || rest[0] == '\t') {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// importsEmbed reports whether f imports the "embed" package under any name.
+func importsEmbed(f *ast.File) bool {
+	for _, imp := range f.Imports {
+		if imp.Path.Value == `"embed"` {
+			return true
+		}
+	}
+	return false
+}
+
+func computeFixesWithSource(ctx context.Context, fset *token.FileSet, f *ast.File, filename string, goroot string, logf func(string, ...any), source Source) ([]*ImportFix, error) {
 	// This logic is defensively duplicated from getFixes.
 	abs, err := filepath.Abs(filename)
 	if err != nil {

@@ -36,4 +36,53 @@ type WebhookAdmission struct {
 	// feature gate to be enabled.
 	// +optional
 	StaticManifestsDir string `json:"staticManifestsDir,omitempty"`
+
+	// StaticOrder determines where the webhooks loaded from staticManifestsDir are
+	// placed relative to the webhooks read from the API. Mutating webhooks are
+	// dispatched sequentially, so this controls the order in which they observe and
+	// mutate an object.
+	//
+	// Allowed values are:
+	//   - "StaticFirst": manifest-based webhooks run before all API-based webhooks.
+	//   - "StaticLast": manifest-based webhooks run after all API-based webhooks.
+	//   - "ByName": manifest-based and API-based webhooks are interleaved and stably
+	//     sorted together by the name of the webhook configuration that contains them,
+	//     which is how API-based webhooks are already ordered relative to each other.
+	//
+	// Empty means "StaticFirst", which preserves the behavior from before this field
+	// existed.
+	// "StaticFirst" also guarantees that manifest-based webhooks observe an object
+	// before any webhook registered through the API does. "StaticLast" and "ByName"
+	// give up that guarantee: a webhook registered by anyone with write access to
+	// mutatingwebhookconfigurations can then mutate the object first.
+	// May only be set when staticManifestsDir is set.
+	// This field is only honored by the MutatingAdmissionWebhook plugin. Setting it to
+	// any value other than "StaticFirst" on the ValidatingAdmissionWebhook plugin is a
+	// configuration error, because validating webhooks are dispatched in parallel
+	// against the same object and cannot have ordering dependencies.
+	// Using this field requires the ManifestBasedAdmissionControlConfig feature gate
+	// to be enabled.
+	// +optional
+	StaticOrder StaticOrder `json:"staticOrder,omitempty"`
 }
+
+// StaticOrder determines where manifest-based webhooks are placed relative to
+// webhooks read from the API.
+type StaticOrder string
+
+const (
+	// StaticFirst runs manifest-based webhooks before all API-based webhooks.
+	StaticFirst StaticOrder = "StaticFirst"
+	// StaticLast runs manifest-based webhooks after all API-based webhooks.
+	StaticLast StaticOrder = "StaticLast"
+	// ByName interleaves manifest-based and API-based webhooks, stably sorting them
+	// together by the name of the webhook configuration that contains them. This is
+	// how API-based webhooks are already ordered relative to each other, so naming a
+	// manifest-based configuration after the API-based configuration it replaces
+	// usually preserves that configuration's position.
+	// It does not preserve the position relative to a configuration whose name starts
+	// with "<replaced-name>-", or starts with "<replaced-name>." and sorts before
+	// "<replaced-name>.static.k8s.io". For example, "foo-bar" and "foo.bar.io"
+	// both sort after "foo" but before "foo.static.k8s.io".
+	ByName StaticOrder = "ByName"
+)

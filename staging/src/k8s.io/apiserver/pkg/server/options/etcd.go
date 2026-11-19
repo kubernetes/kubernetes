@@ -31,19 +31,24 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/healthz"
+	"k8s.io/apiserver/pkg/server/options/compressionconfig"
+	compressionconfigmetrics "k8s.io/apiserver/pkg/server/options/compressionconfig/metrics"
 	"k8s.io/apiserver/pkg/server/options/encryptionconfig"
 	encryptionconfigcontroller "k8s.io/apiserver/pkg/server/options/encryptionconfig/controller"
 	encryptionconfigmetrics "k8s.io/apiserver/pkg/server/options/encryptionconfig/metrics"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
+	cacherstorage "k8s.io/apiserver/pkg/storage/cacher"
 	"k8s.io/apiserver/pkg/storage/etcd3/metrics"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	storagefactory "k8s.io/apiserver/pkg/storage/storagebackend/factory"
 	storagevalue "k8s.io/apiserver/pkg/storage/value"
+	"k8s.io/apiserver/pkg/storage/value/compression"
 	"k8s.io/klog/v2"
 )
 
@@ -51,6 +56,7 @@ type EtcdOptions struct {
 	StorageConfig                           storagebackend.Config
 	EncryptionProviderConfigFilepath        string
 	EncryptionProviderConfigAutomaticReload bool
+	StorageCompressionConfigFilepath        string
 
 	EtcdServersOverrides []string
 
@@ -118,6 +124,10 @@ func (s *EtcdOptions) Validate() []error {
 		allErrors = append(allErrors, fmt.Errorf("--storage-media-type %q invalid, allowed values: %s", s.DefaultStorageMediaType, strings.Join(sets.List(storageMediaTypes), ", ")))
 	}
 
+	if m := s.StorageConfig.WatchCacheMaxEvents; m != 0 && m < cacherstorage.MinWatchCacheMaxEvents {
+		allErrors = append(allErrors, fmt.Errorf("--watch-cache-max-events must be 0 or at least %d, got %d", cacherstorage.MinWatchCacheMaxEvents, m))
+	}
+
 	return allErrors
 }
 
@@ -164,6 +174,11 @@ func (s *EtcdOptions) AddFlags(fs *pflag.FlagSet) {
 		"disable watch caching for the associated resource; all non-zero values are equivalent and mean "+
 		"to not disable watch caching for that resource")
 
+	fs.IntVar(&s.StorageConfig.WatchCacheMaxEvents, "watch-cache-max-events", s.StorageConfig.WatchCacheMaxEvents, ""+
+		"Maximum number of events the watch cache keeps in its history per resource. "+
+		"The history still starts small and grows on demand up to this limit. "+
+		"If zero, the limit is derived from the events history window.")
+
 	fs.StringVar(&s.StorageConfig.Type, "storage-backend", s.StorageConfig.Type,
 		"The storage backend for persistence. Options: 'etcd3' (default).")
 
@@ -188,6 +203,9 @@ func (s *EtcdOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&s.EncryptionProviderConfigAutomaticReload, "encryption-provider-config-automatic-reload", s.EncryptionProviderConfigAutomaticReload,
 		"Determines if the file set by --encryption-provider-config should be automatically reloaded if the disk contents change. "+
 			"Setting this to true disables the ability to uniquely identify distinct KMS plugins via the API server healthz endpoints.")
+
+	fs.StringVar(&s.StorageCompressionConfigFilepath, "storage-compression-config", s.StorageCompressionConfigFilepath,
+		"The file containing the StorageCompressionConfiguration that chooses which resources are compressed before they're stored in etcd.")
 
 	fs.DurationVar(&s.StorageConfig.CompactionInterval, "etcd-compaction-interval", s.StorageConfig.CompactionInterval,
 		"The interval of compaction requests. If 0, the compaction request from apiserver is disabled.")
@@ -228,6 +246,11 @@ func (s *EtcdOptions) ApplyWithStorageFactoryTo(factory serverstorage.StorageFac
 		return nil
 	}
 
+	// Runs first, so a bad file fails startup before etcd health checks or any KMS plugins start.
+	if err := s.maybeApplyCompressionRules(c); err != nil {
+		return err
+	}
+
 	if !s.SkipHealthEndpoints {
 		if err := s.addEtcdHealthEndpoint(c); err != nil {
 			return err
@@ -245,7 +268,7 @@ func (s *EtcdOptions) ApplyWithStorageFactoryTo(factory serverstorage.StorageFac
 	}
 	metrics.SetStorageMonitorGetter(monitorCache.get)
 
-	c.RESTOptionsGetter = s.CreateRESTOptionsGetter(factory, c.ResourceTransformers)
+	c.RESTOptionsGetter = s.CreateRESTOptionsGetter(factory, c.ResourceTransformers, c.StorageCompressionRules)
 	return nil
 }
 
@@ -335,14 +358,48 @@ func (c *monitorCache) close() {
 	c.monitors = nil
 }
 
-func (s *EtcdOptions) CreateRESTOptionsGetter(factory serverstorage.StorageFactory, resourceTransformers storagevalue.ResourceTransformers) generic.RESTOptionsGetter {
+func (s *EtcdOptions) CreateRESTOptionsGetter(factory serverstorage.StorageFactory, resourceTransformers storagevalue.ResourceTransformers, compressionRules compression.ResourceRules) generic.RESTOptionsGetter {
 	if resourceTransformers != nil {
 		factory = &transformerStorageFactory{
 			delegate:             factory,
 			resourceTransformers: resourceTransformers,
 		}
 	}
+	if compressionRules != nil {
+		factory = &compressionStorageFactory{
+			StorageFactory:   factory,
+			compressionRules: compressionRules,
+		}
+	}
 	return &StorageFactoryRestOptionsFactory{Options: *s, StorageFactory: factory}
+}
+
+// maybeApplyCompressionRules loads --storage-compression-config into
+// c.StorageCompressionRules unless c already has rules. kube-apiserver's
+// apiextensions and aggregator configs are shallow copies of an applied config,
+// so they reuse its rules and don't read the file again.
+func (s *EtcdOptions) maybeApplyCompressionRules(c *server.Config) error {
+	if c.StorageCompressionRules != nil || len(s.StorageCompressionConfigFilepath) == 0 {
+		return nil
+	}
+	path := s.StorageCompressionConfigFilepath
+	cfg, err := compressionconfig.LoadCompressionConfig(path)
+	if err != nil {
+		return err
+	}
+	var minCompatibility *version.Version
+	if c.EffectiveVersion != nil {
+		minCompatibility = c.EffectiveVersion.MinCompatibilityVersion()
+	}
+	if err := cfg.CheckMinCompatibility(minCompatibility); err != nil {
+		return fmt.Errorf("--storage-compression-config %q: %w", path, err)
+	}
+	if cfg.CompressesSecrets() {
+		klog.Warningf("--storage-compression-config=%s compresses secrets. A Secret's size in etcd shows how compressible its contents are, even when encryption at rest is configured.", path)
+	}
+	compressionconfigmetrics.RecordLastConfigInfo(c.APIServerID, cfg.CompressionFileContentHash)
+	c.StorageCompressionRules = cfg
+	return nil
 }
 
 func (s *EtcdOptions) maybeApplyResourceTransformers(c *server.Config) (err error) {
@@ -618,6 +675,26 @@ func (t *transformerStorageFactory) Configs() []storagebackend.Config {
 
 func (t *transformerStorageFactory) Backends() []serverstorage.Backend {
 	return t.delegate.Backends()
+}
+
+var _ serverstorage.StorageFactory = &compressionStorageFactory{}
+
+// compressionStorageFactory sets the compression Rule on each config its
+// delegate returns.
+type compressionStorageFactory struct {
+	serverstorage.StorageFactory
+	compressionRules compression.ResourceRules
+}
+
+func (c *compressionStorageFactory) NewConfig(resource schema.GroupResource, example runtime.Object) (*storagebackend.ConfigForResource, error) {
+	config, err := c.StorageFactory.NewConfig(resource, example)
+	if err != nil {
+		return nil, err
+	}
+
+	configCopy := *config
+	configCopy.CompressionRule = c.compressionRules.RuleFor(resource)
+	return &configCopy, nil
 }
 
 type EtcdServerOverride struct {

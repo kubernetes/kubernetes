@@ -24,7 +24,9 @@ type suffix string
 
 // suffixer can interpret and construct suffixes.
 type suffixer interface {
-	interpret(suffix) (base, exponent int32, fmt Format, ok bool)
+	// interpret returns the suffix's exponent as a plain integer. It counts
+	// powers of base, which for base 2 is not a Scale.
+	interpret(suffix) (base int32, exponent int64, fmt Format, ok bool)
 	construct(base, exponent int32, fmt Format) (s suffix, ok bool)
 	constructBytes(base, exponent int32, fmt Format) (s []byte, ok bool)
 }
@@ -85,7 +87,10 @@ type fastLookup struct {
 	*suffixHandler
 }
 
-func (l fastLookup) interpret(s suffix) (base, exponent int32, format Format, ok bool) {
+// interpret extracts the suffix into its parts. DecimalExponent exponents can be any valid int64.
+// DecimalSI exponents are -9 to 18, and BinarySI exponents are 10 to 60.
+// If the suffix fails to parse or the exponent is out of range, ok is returned as false.
+func (l fastLookup) interpret(s suffix) (base int32, exponent int64, format Format, ok bool) {
 	switch s {
 	case "":
 		return 10, 0, DecimalSI, true
@@ -177,13 +182,13 @@ func (sh *suffixHandler) constructBytes(base, exponent int32, format Format) (s 
 	return nil, false
 }
 
-func (sh *suffixHandler) interpret(suffix suffix) (base, exponent int32, fmt Format, ok bool) {
+func (sh *suffixHandler) interpret(suffix suffix) (base int32, exponent int64, fmt Format, ok bool) {
 	// Try lookup tables first
 	if b, e, ok := sh.decSuffixes.lookup(suffix); ok {
-		return b, e, DecimalSI, true
+		return b, int64(e), DecimalSI, true
 	}
 	if b, e, ok := sh.binSuffixes.lookup(suffix); ok {
-		return b, e, BinarySI, true
+		return b, int64(e), BinarySI, true
 	}
 
 	if len(suffix) > 1 && (suffix[0] == 'E' || suffix[0] == 'e') {
@@ -191,9 +196,7 @@ func (sh *suffixHandler) interpret(suffix suffix) (base, exponent int32, fmt For
 		if err != nil {
 			return 0, 0, DecimalExponent, false
 		}
-		// Stored objects keep the spelling they were given, so narrowing
-		// rather than rejecting is what keeps them decodable.
-		return 10, int32(parsed), DecimalExponent, true
+		return 10, parsed, DecimalExponent, true
 	}
 
 	return 0, 0, DecimalExponent, false

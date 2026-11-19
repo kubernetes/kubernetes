@@ -66,10 +66,11 @@ func TestDeclarativeValidate(t *testing.T) {
 			APIGroup:   "apps",
 			APIVersion: apiVersion,
 		})
-		testCases := map[string]struct {
+		type testCase struct {
 			input        *apps.ReplicaSet
 			expectedErrs field.ErrorList
-		}{
+		}
+		testCases := map[string]testCase{
 			"valid": {
 				input: mkReplicaSet(),
 			},
@@ -82,7 +83,7 @@ func TestDeclarativeValidate(t *testing.T) {
 			"invalid toleration key format": {
 				input: mkReplicaSet(tweakPodSpec(podtest.SetTolerations(api.Toleration{Key: "invalid key", Operator: api.TolerationOpExists}))),
 				expectedErrs: field.ErrorList{
-					field.Invalid(field.NewPath("spec", "template", "spec", "tolerations").Index(0).Child("key"), nil, "").WithOrigin("format=k8s-label-key").MarkAlpha(),
+					field.Invalid(field.NewPath("spec", "template", "spec", "tolerations").Index(0).Child("key"), nil, "").WithOrigin("format=k8s-label-key").MarkBeta(),
 				},
 			},
 			"activeDeadlineSeconds minimum boundary violation": {
@@ -106,6 +107,14 @@ func TestDeclarativeValidate(t *testing.T) {
 				},
 			},
 		}
+
+		for _, tc := range poddeclarativevalidation.InvalidPodSpecTestcases(field.NewPath("spec", "template", "spec")) {
+			testCases["podspec:"+tc.ID] = testCase{
+				input:        mkReplicaSet(tweakPodSpec(tc.Tweaks...)),
+				expectedErrs: tc.ExpectedErrs,
+			}
+		}
+
 		for k, tc := range testCases {
 			t.Run(k, func(t *testing.T) {
 				apitesting.VerifyValidationEquivalence(t, ctx, tc.input, registry.Strategy, tc.expectedErrs)

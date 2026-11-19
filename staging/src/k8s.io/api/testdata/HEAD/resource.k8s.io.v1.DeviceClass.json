@@ -68,6 +68,13 @@
         }
       }
     ],
-    "extendedResourceName": "extendedResourceNameValue"
+    "extendedResourceName": "extendedResourceNameValue",
+    "extendedResourceRequest": {
+      "capacity": {
+        "requests": {
+          "requestsKey": "0"
+        }
+      }
+    }
   }
 }

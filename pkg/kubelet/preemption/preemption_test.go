@@ -109,6 +109,7 @@ func TestHandleAdmissionFailure(t *testing.T) {
 
 		featureGateEnabled bool
 		operation          lifecycle.Operation
+		update             *lifecycle.PodUpdate
 	}
 	allPods := getTestPods()
 	runs := []testRun{
@@ -196,7 +197,21 @@ func TestHandleAdmissionFailure(t *testing.T) {
 			expectedOutput:       nil,
 			expectReasons:        getPredicateFailureReasons(0, 100, 0, false),
 			featureGateEnabled:   true,
-			operation:            lifecycle.ResizeOperation,
+			operation:            lifecycle.UpdateOperation,
+			update:               &lifecycle.PodUpdate{Resize: true},
+		},
+		{
+			testName:             "critical pod non-resize update -> bypass preemption (no pods evicted, reasons returned)",
+			isPodKillerWithError: false,
+			inputPods:            []*v1.Pod{allPods[highRequestBurstable]},
+			admitPodType:         clusterCritical,
+			failReasons:          getPredicateFailureReasons(0, 100, 0, false),
+			expectErr:            false,
+			expectedOutput:       nil,
+			expectReasons:        getPredicateFailureReasons(0, 100, 0, false),
+			featureGateEnabled:   false,
+			operation:            lifecycle.UpdateOperation,
+			update:               &lifecycle.PodUpdate{Resize: false},
 		},
 		{
 			testName:             "critical pod resize, feature gate disabled -> perform preemption (evicts best effort pod)",
@@ -208,7 +223,8 @@ func TestHandleAdmissionFailure(t *testing.T) {
 			expectedOutput:       []*v1.Pod{allPods[highRequestBurstable]},
 			expectReasons:        getPredicateFailureReasons(0, 0, 0, false),
 			featureGateEnabled:   false,
-			operation:            lifecycle.ResizeOperation,
+			operation:            lifecycle.UpdateOperation,
+			update:               &lifecycle.PodUpdate{Resize: true},
 		},
 	}
 	for _, r := range runs {
@@ -220,7 +236,8 @@ func TestHandleAdmissionFailure(t *testing.T) {
 			criticalPodAdmissionHandler := getTestCriticalPodAdmissionHandler(podProvider, podKiller)
 			podProvider.setPods(r.inputPods)
 			admitPodRef := allPods[r.admitPodType]
-			filteredReason, outErr := criticalPodAdmissionHandler.HandleAdmissionFailure(tCtx, admitPodRef, r.failReasons, r.operation)
+			attrs := &lifecycle.PodAdmitAttributes{Pod: admitPodRef, Operation: r.operation, Update: r.update}
+			filteredReason, outErr := criticalPodAdmissionHandler.HandleAdmissionFailure(tCtx, admitPodRef, r.failReasons, attrs)
 			outputPods := podKiller.getKilledPods()
 			if !r.expectErr && outErr != nil {
 				t.Errorf("HandleAdmissionFailure returned an unexpected error during the %s test.  Err: %v", r.testName, outErr)
@@ -266,6 +283,19 @@ func TestGetPodsToPreempt(t *testing.T) {
 		expectedOutput        []*v1.Pod
 	}
 	allPods := getTestPods()
+	podWithDRARes := allPods[burstable].DeepCopy()
+	podWithDRARes.Status.ExtraNodeAllocatableResources = []v1.ExtraNodeAllocatableResource{
+		{
+			ContainerName: "",
+			Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("200m"), v1.ResourceMemory: resource.MustParse("200Mi")},
+			Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("200m"), v1.ResourceMemory: resource.MustParse("200Mi")},
+		},
+		{
+			ContainerName: podWithDRARes.Spec.Containers[0].Name,
+			Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("200m")},
+			Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("200m"), v1.ResourceMemory: resource.MustParse("200Mi")},
+		},
+	}
 	runs := []testRun{
 		{
 			testName:              "no requirements",
@@ -363,8 +393,16 @@ func TestGetPodsToPreempt(t *testing.T) {
 			expectErr:             true,
 			expectedOutput:        nil,
 		},
+		{
+			testName:              "pod with extra node allocatable overhead meets requirements",
+			preemptor:             allPods[clusterCritical],
+			inputPods:             []*v1.Pod{podWithDRARes, allPods[guaranteed]},
+			insufficientResources: getAdmissionRequirementList(250, 250, 0),
+			expectErr:             false,
+			expectedOutput:        []*v1.Pod{podWithDRARes},
+		},
 	}
-
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRANodeAllocatableResources, true)
 	for _, r := range runs {
 		t.Run(r.testName, func(t *testing.T) {
 			outputPods, outErr := getPodsToPreempt(r.preemptor, r.inputPods, r.insufficientResources)

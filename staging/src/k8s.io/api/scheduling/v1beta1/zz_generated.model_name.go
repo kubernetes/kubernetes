@@ -52,6 +52,16 @@ func (in CompositeGangSchedulingPolicy) OpenAPIModelName() string {
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
+func (in CompositePodGroup) OpenAPIModelName() string {
+	return "io.k8s.api.scheduling.v1beta1.CompositePodGroup"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in CompositePodGroupList) OpenAPIModelName() string {
+	return "io.k8s.api.scheduling.v1beta1.CompositePodGroupList"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in CompositePodGroupSchedulingConstraints) OpenAPIModelName() string {
 	return "io.k8s.api.scheduling.v1beta1.CompositePodGroupSchedulingConstraints"
 }
@@ -59,6 +69,16 @@ func (in CompositePodGroupSchedulingConstraints) OpenAPIModelName() string {
 // OpenAPIModelName returns the OpenAPI model name for this type.
 func (in CompositePodGroupSchedulingPolicy) OpenAPIModelName() string {
 	return "io.k8s.api.scheduling.v1beta1.CompositePodGroupSchedulingPolicy"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in CompositePodGroupSpec) OpenAPIModelName() string {
+	return "io.k8s.api.scheduling.v1beta1.CompositePodGroupSpec"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in CompositePodGroupStatus) OpenAPIModelName() string {
+	return "io.k8s.api.scheduling.v1beta1.CompositePodGroupStatus"
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.

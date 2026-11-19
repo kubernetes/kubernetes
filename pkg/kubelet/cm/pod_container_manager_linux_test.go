@@ -19,13 +19,18 @@ limitations under the License.
 package cm
 
 import (
+	"strconv"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2/ktesting"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -292,6 +297,317 @@ func TestGetPodContainerName(t *testing.T) {
 			actualCgroupName, actualLiteralCgroupfs := pcm.GetPodContainerName(tt.args.pod)
 			require.Equalf(t, tt.wantCgroupName, actualCgroupName, "Unexpected cgroup name for pod with UID %s, container resources: %v", tt.args.pod.UID, tt.args.pod.Spec.Containers[0].Resources)
 			require.Equalf(t, tt.wantLiteralCgroupfs, actualLiteralCgroupfs, "Unexpected literal cgroupfs for pod with UID %s, container resources: %v", tt.args.pod.UID, tt.args.pod.Spec.Containers[0].Resources)
+		})
+	}
+}
+
+func TestPodRequestsWritableCgroups(t *testing.T) {
+	readWrite := v1.CgroupMountModeReadWrite
+	readOnly := v1.CgroupMountModeReadOnly
+	scWith := func(mode *v1.CgroupMountMode) *v1.SecurityContext {
+		return &v1.SecurityContext{CgroupOptions: &v1.CgroupOptions{MountMode: mode}}
+	}
+
+	tests := []struct {
+		name string
+		pod  *v1.Pod
+		want bool
+	}{
+		{
+			name: "no security context",
+			pod:  &v1.Pod{Spec: v1.PodSpec{Containers: []v1.Container{{Name: "c"}}}},
+			want: false,
+		},
+		{
+			name: "read-only mount mode",
+			pod:  &v1.Pod{Spec: v1.PodSpec{Containers: []v1.Container{{Name: "c", SecurityContext: scWith(&readOnly)}}}},
+			want: false,
+		},
+		{
+			name: "read-write on a container",
+			pod:  &v1.Pod{Spec: v1.PodSpec{Containers: []v1.Container{{Name: "c", SecurityContext: scWith(&readWrite)}}}},
+			want: true,
+		},
+		{
+			name: "read-write on an init container",
+			pod:  &v1.Pod{Spec: v1.PodSpec{InitContainers: []v1.Container{{Name: "i", SecurityContext: scWith(&readWrite)}}}},
+			want: true,
+		},
+		{
+			name: "read-write on an ephemeral container",
+			pod: &v1.Pod{Spec: v1.PodSpec{EphemeralContainers: []v1.EphemeralContainer{{
+				EphemeralContainerCommon: v1.EphemeralContainerCommon{Name: "debug", SecurityContext: scWith(&readWrite)},
+			}}}},
+			want: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.want, podRequestsWritableCgroups(tt.pod))
+		})
+	}
+}
+
+func TestEnsureExistsWritableCgroupLimits(t *testing.T) {
+	tests := []struct {
+		name                 string
+		cgroupOptionsEnabled bool
+		mountMode            v1.CgroupMountMode
+		wantLimits           bool
+	}{
+		{
+			name:                 "limits the pod cgroup when a container requests writable cgroups",
+			cgroupOptionsEnabled: true,
+			mountMode:            v1.CgroupMountModeReadWrite,
+			wantLimits:           true,
+		},
+		{
+			name:                 "no limits with CgroupOptions disabled",
+			cgroupOptionsEnabled: false,
+			mountMode:            v1.CgroupMountModeReadWrite,
+		},
+		{
+			name:                 "no limits for a read-only mount",
+			cgroupOptionsEnabled: true,
+			mountMode:            v1.CgroupMountModeReadOnly,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeatures.CgroupOptions, tt.cgroupOptionsEnabled)
+			logger, _ := ktesting.NewTestContext(t)
+			pod := &v1.Pod{
+				Spec: v1.PodSpec{Containers: []v1.Container{{
+					Name: "c",
+					SecurityContext: &v1.SecurityContext{
+						CgroupOptions: &v1.CgroupOptions{MountMode: &tt.mountMode},
+					},
+				}}},
+			}
+			fake := &fakeCgroupManager{}
+			m := &podContainerManagerImpl{
+				cgroupManager:       fake,
+				podContainerManager: NewStubContainerManager(),
+			}
+
+			require.NoError(t, m.EnsureExists(logger, pod))
+			require.Len(t, fake.created, 1)
+			unified := fake.created[0].ResourceParameters.Unified
+			if tt.wantLimits {
+				require.Equal(t, "250", unified["cgroup.max.descendants"])
+				require.Equal(t, "50", unified["cgroup.max.depth"])
+				return
+			}
+			require.NotContains(t, unified, "cgroup.max.descendants")
+			require.NotContains(t, unified, "cgroup.max.depth")
+		})
+	}
+}
+
+func TestEnsureExistsWithPodLevelSwap(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeatures.PodLevelResources, true)
+
+	origIsCgroup2 := isCgroup2UnifiedMode
+	t.Cleanup(func() { isCgroup2UnifiedMode = origIsCgroup2 })
+
+	const (
+		gi             = 1024 * 1024 * 1024
+		nodeMem  int64 = 40 * gi
+		nodeSwap int64 = 5 * gi
+	)
+
+	qosContainersInfo := QOSContainersInfo{
+		Guaranteed: RootCgroupName,
+		Burstable:  NewCgroupName(RootCgroupName, strings.ToLower(string(v1.PodQOSBurstable))),
+		BestEffort: NewCgroupName(RootCgroupName, strings.ToLower(string(v1.PodQOSBestEffort))),
+	}
+
+	containerStub := NewStubContainerManager()
+
+	burstablePod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{UID: "pod-swap-1"},
+		Spec: v1.PodSpec{
+			Resources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("2Gi")},
+				Limits:   v1.ResourceList{v1.ResourceMemory: resource.MustParse("4Gi")},
+			},
+			Containers: []v1.Container{{Name: "c1"}},
+		},
+	}
+	ineligibleBurstablePod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{UID: "pod-swap-2"},
+		Spec: v1.PodSpec{
+			Resources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1"), v1.ResourceMemory: resource.MustParse("2Gi")},
+				Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("2"), v1.ResourceMemory: resource.MustParse("2Gi")},
+			},
+			Containers: []v1.Container{
+				{
+					Name: "c1",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("1Gi")},
+						Limits:   v1.ResourceList{v1.ResourceMemory: resource.MustParse("2Gi")},
+					},
+				},
+			},
+		},
+	}
+
+	containerOnlyBurstablePod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{UID: "pod-swap-ctr-only"},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name: "c1",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("2Gi")},
+						Limits:   v1.ResourceList{v1.ResourceMemory: resource.MustParse("4Gi")},
+					},
+				},
+			},
+		},
+	}
+	plrCPUOnlyPod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{UID: "pod-swap-plr-cpu"},
+		Spec: v1.PodSpec{
+			Resources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("500m")},
+				Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
+			},
+			Containers: []v1.Container{{Name: "c1"}},
+		},
+	}
+
+	expectedSwapBytes, err := CalcSwapForBurstablePods(2*gi, nodeMem, nodeSwap)
+	require.NoError(t, err)
+	expectedSwap2Gi := strconv.FormatInt(expectedSwapBytes, 10)
+
+	tests := []struct {
+		name                      string
+		pod                       *v1.Pod
+		swapBehavior              kubetypes.SwapBehavior
+		isCgroup2                 bool
+		alreadyExists             bool
+		nilSwapControllerCallback bool
+		swapControllerAvailable   bool
+		expectedSwapMax           *string
+	}{
+		{
+			name:                    "LimitedSwap eligible pod sets proportional memory.swap.max",
+			pod:                     burstablePod,
+			swapBehavior:            kubetypes.LimitedSwap,
+			isCgroup2:               true,
+			swapControllerAvailable: true,
+			expectedSwapMax:         &expectedSwap2Gi,
+		},
+		{
+			name:                    "LimitedSwap ineligible pod (PodMemoryRequest == PodMemoryLimit) sets memory.swap.max to 0",
+			pod:                     ineligibleBurstablePod,
+			swapBehavior:            kubetypes.LimitedSwap,
+			isCgroup2:               true,
+			swapControllerAvailable: true,
+			expectedSwapMax:         new("0"),
+		},
+		{
+			name:                    "LimitedSwap pod with pod-level CPU only and no memory sets memory.swap.max to 0",
+			pod:                     plrCPUOnlyPod,
+			swapBehavior:            kubetypes.LimitedSwap,
+			isCgroup2:               true,
+			swapControllerAvailable: true,
+			expectedSwapMax:         new("0"),
+		},
+		{
+			name:                    "NoSwap sets memory.swap.max to 0 on pod with pod-level resources",
+			pod:                     burstablePod,
+			swapBehavior:            kubetypes.NoSwap,
+			isCgroup2:               true,
+			swapControllerAvailable: true,
+			expectedSwapMax:         new("0"),
+		},
+		{
+			name:                    "container-only pod under LimitedSwap omits pod cgroup memory.swap.max",
+			pod:                     containerOnlyBurstablePod,
+			swapBehavior:            kubetypes.LimitedSwap,
+			isCgroup2:               true,
+			swapControllerAvailable: true,
+			expectedSwapMax:         nil,
+		},
+		{
+			name:                    "container-only pod under NoSwap omits pod cgroup memory.swap.max",
+			pod:                     containerOnlyBurstablePod,
+			swapBehavior:            kubetypes.NoSwap,
+			isCgroup2:               true,
+			swapControllerAvailable: true,
+			expectedSwapMax:         nil,
+		},
+		{
+			name:                    "swap controller unavailable omits memory.swap.max",
+			pod:                     burstablePod,
+			swapBehavior:            kubetypes.LimitedSwap,
+			isCgroup2:               true,
+			swapControllerAvailable: false,
+			expectedSwapMax:         nil,
+		},
+		{
+			name:                      "nil getSwapControllerAvailable callback omits memory.swap.max",
+			pod:                       burstablePod,
+			swapBehavior:              kubetypes.LimitedSwap,
+			isCgroup2:                 true,
+			nilSwapControllerCallback: true,
+			expectedSwapMax:           nil,
+		},
+		{
+			name:                    "cgroup v1 omits memory.swap.max",
+			pod:                     burstablePod,
+			swapBehavior:            kubetypes.LimitedSwap,
+			isCgroup2:               false,
+			swapControllerAvailable: true,
+			expectedSwapMax:         nil,
+		},
+		{
+			name:                    "existing pod cgroup skips cgroup creation",
+			pod:                     burstablePod,
+			swapBehavior:            kubetypes.LimitedSwap,
+			isCgroup2:               true,
+			alreadyExists:           true,
+			swapControllerAvailable: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			isCgroup2UnifiedMode = func() bool { return tt.isCgroup2 }
+			fakeCM := &fakeCgroupManager{exists: tt.alreadyExists}
+			var swapAvailableFn func() bool
+			if !tt.nilSwapControllerCallback {
+				swapAvailableFn = func() bool { return tt.swapControllerAvailable }
+			}
+			pcm := &podContainerManagerImpl{
+				qosContainersInfo:          qosContainersInfo,
+				cgroupManager:              fakeCM,
+				enforceCPULimits:           true,
+				cpuCFSQuotaPeriod:          QuotaPeriod,
+				podContainerManager:        containerStub,
+				memorySwapBehavior:         tt.swapBehavior,
+				memoryCapacity:             nodeMem,
+				swapCapacity:               nodeSwap,
+				getSwapControllerAvailable: swapAvailableFn,
+			}
+			require.NoError(t, pcm.EnsureExists(logger, tt.pod))
+			if tt.alreadyExists {
+				require.Empty(t, fakeCM.created)
+				return
+			}
+			require.Len(t, fakeCM.created, 1)
+			gotUnified := fakeCM.created[0].ResourceParameters.Unified
+			if tt.expectedSwapMax == nil {
+				require.NotContains(t, gotUnified, Cgroup2MaxSwapFilename)
+			} else {
+				require.Equal(t, *tt.expectedSwapMax, gotUnified[Cgroup2MaxSwapFilename])
+			}
 		})
 	}
 }

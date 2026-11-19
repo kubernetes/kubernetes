@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apiserver/pkg/admission/plugin/manifest"
 )
 
 var (
@@ -294,6 +295,21 @@ spec:
 			wantErr:        true,
 			wantErrContain: "must end with",
 		},
+		{
+			name: "strict decoding error",
+			files: map[string]string{
+				"policy.yaml": `
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: test-policy.static.k8s.io
+spec:
+  unknownField: true
+`,
+			},
+			wantErr:        true,
+			wantErrContain: "unknown field",
+		},
 	}
 
 	for _, tt := range tests {
@@ -305,7 +321,7 @@ spec:
 				}
 			}
 
-			policies, bindings, _, err := LoadPolicyManifests(
+			policies, bindings, hash, err := LoadPolicyManifests(
 				dir,
 				testCodecs.UniversalDeserializer(),
 				acceptTestPolicy,
@@ -317,10 +333,12 @@ spec:
 
 			if tt.wantErr {
 				if err == nil {
-					t.Error("expected error but got none")
-				} else if tt.wantErrContain != "" && !strings.Contains(err.Error(), tt.wantErrContain) {
+					t.Fatal("expected error but got none")
+				}
+				if tt.wantErrContain != "" && !strings.Contains(err.Error(), tt.wantErrContain) {
 					t.Errorf("expected error containing %q, got %q", tt.wantErrContain, err.Error())
 				}
+				assertContentHash(t, dir, hash)
 				return
 			}
 			if err != nil {
@@ -359,5 +377,15 @@ func TestValidateBindingReferences(t *testing.T) {
 
 	if err := validateBindingReferences(policies, badBindings, getBindPolicy); err == nil {
 		t.Error("expected error for binding referencing non-existent policy")
+	}
+}
+
+// assertContentHash checks that hash identifies the manifest content in dir,
+// so that reload callers can skip the same invalid content.
+func assertContentHash(t *testing.T, dir, hash string) {
+	t.Helper()
+	_, wantHash, _ := manifest.LoadFiles(dir)
+	if len(wantHash) == 0 || hash != wantHash {
+		t.Errorf("hash = %q, want the content hash %q", hash, wantHash)
 	}
 }

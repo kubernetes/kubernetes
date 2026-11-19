@@ -70,7 +70,13 @@ func TestSchedulerPerf(t *testing.T) {
 					// off (pre-alpha = feature doesn't event exist).
 					if gate.EmulationVersion().AtLeast(version.MustParse("1.34")) {
 						overrides[features.DRAConsumableCapacity] = false
-						overrides[features.DRADeviceBindingConditions] = false
+					}
+					if gate.EmulationVersion().AtLeast(version.MustParse("1.36")) {
+						overrides[features.DRAListTypeAttributes] = false
+					}
+					// "stable" does not support DRAOptionalNodeOperations (on by default since 1.38).
+					if gate.EmulationVersion().AtLeast(version.MustParse("1.38")) {
+						overrides[features.DRAOptionalNodeOperations] = false
 					}
 					featuregatetesting.SetFeatureGatesDuringTest(tCtx, utilfeature.DefaultFeatureGate, overrides)
 					return nil, nil

@@ -30,7 +30,9 @@
 // most appropriate use is not so much testing instrumentation of your code, but
 // testing custom prometheus.Collector implementations and in particular whole
 // exporters, i.e. programs that retrieve telemetry data from a 3rd party source
-// and convert it into Prometheus metrics.
+// and convert it into Prometheus metrics. CollectAndFormat and GatherAndFormat
+// return the same exposition bytes when you need to inspect a subset without a
+// full expected fixture.
 //
 // In a similar pattern, CollectAndLint and GatherAndLint can be used to detect
 // metrics that have issues with their name, type, or metadata without being
@@ -43,12 +45,12 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"slices"
 
 	"github.com/kylelemons/godebug/diff"
 	dto "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/expfmt"
 	"github.com/prometheus/common/model"
-	"google.golang.org/protobuf/proto"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/internal"
@@ -240,8 +242,17 @@ func CollectAndFormat(c prometheus.Collector, format expfmt.FormatType, metricNa
 	if err := reg.Register(c); err != nil {
 		return nil, fmt.Errorf("registering collector failed: %w", err)
 	}
+	return GatherAndFormat(reg, format, metricNames...)
+}
 
-	gotFiltered, err := reg.Gather()
+// GatherAndFormat gathers metrics from the provided Gatherer, optionally
+// filtered to metricNames, and returns them encoded in the given format.
+//
+// Unlike CollectAndFormat, this works with any Gatherer, so tests can inspect
+// metrics that were registered elsewhere (for example prometheus.DefaultGatherer)
+// without holding a reference to the Collector.
+func GatherAndFormat(g prometheus.Gatherer, format expfmt.FormatType, metricNames ...string) ([]byte, error) {
+	gotFiltered, err := g.Gather()
 	if err != nil {
 		return nil, fmt.Errorf("gathering metrics failed: %w", err)
 	}
@@ -253,6 +264,11 @@ func CollectAndFormat(c prometheus.Collector, format expfmt.FormatType, metricNa
 	for _, mf := range gotFiltered {
 		if err := enc.Encode(mf); err != nil {
 			return nil, fmt.Errorf("encoding gathered metrics failed: %w", err)
+		}
+	}
+	if closer, ok := enc.(expfmt.Closer); ok {
+		if err := closer.Close(); err != nil {
+			return nil, fmt.Errorf("finalizing gathered metrics failed: %w", err)
 		}
 	}
 
@@ -278,7 +294,7 @@ func convertReaderToMetricFamily(reader io.Reader) ([]*dto.MetricFamily, error) 
 	// when we compare text encodings, the results are consistent.
 	for _, metric := range notNormalized {
 		if metric.Help == nil {
-			metric.Help = proto.String("")
+			metric.Help = new("")
 		}
 	}
 
@@ -323,11 +339,8 @@ func compare(got, want []*dto.MetricFamily) error {
 func filterMetrics(metrics []*dto.MetricFamily, names []string) []*dto.MetricFamily {
 	var filtered []*dto.MetricFamily
 	for _, m := range metrics {
-		for _, name := range names {
-			if m.GetName() == name {
-				filtered = append(filtered, m)
-				break
-			}
+		if slices.Contains(names, m.GetName()) {
+			filtered = append(filtered, m)
 		}
 	}
 	return filtered

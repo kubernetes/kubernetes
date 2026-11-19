@@ -26,6 +26,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	genericfeatures "k8s.io/apiserver/pkg/features"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
@@ -46,6 +47,7 @@ import (
 	netutils "k8s.io/utils/net"
 
 	// add the related feature gates
+	cmfeatures "k8s.io/controller-manager/pkg/features"
 	_ "k8s.io/controller-manager/pkg/features/register"
 )
 
@@ -262,6 +264,14 @@ func (o *CloudControllerManagerOptions) Validate(allControllers []string, disabl
 	errors := []error{}
 
 	errors = append(errors, o.Generic.Validate(allControllers, disabledByDefaultControllers, controllerAliases)...)
+	if o.Generic.LeaderElectionRecoveryDeadline.Duration != 0 {
+		if !utilfeature.DefaultFeatureGate.Enabled(cmfeatures.LeaderElectionRecovery) {
+			errors = append(errors, fmt.Errorf("leader-elect-recovery-deadline requires the LeaderElectionRecovery feature gate"))
+		}
+		if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.CoordinatedLeaderElection) {
+			errors = append(errors, fmt.Errorf("leader-elect-recovery-deadline is not yet supported with the CoordinatedLeaderElection feature gate"))
+		}
+	}
 	errors = append(errors, o.KubeCloudShared.Validate()...)
 	errors = append(errors, o.NodeLifecycleController.Validate()...)
 	errors = append(errors, o.ServiceController.Validate()...)

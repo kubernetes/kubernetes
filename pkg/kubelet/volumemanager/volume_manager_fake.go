@@ -133,6 +133,11 @@ func (f *FakeVolumeManager) GetVolumesReportedInUse() []v1.UniqueVolumeName {
 }
 
 // ResizeEphemeralVolume is not implemented
-func (f *FakeVolumeManager) ResizeEphemeralVolume(pod *v1.Pod, volumeName string, newSize *resource.Quantity) error {
+func (f *FakeVolumeManager) ResizeEphemeralVolume(pod *v1.Pod, volumeName string) error {
 	return nil
+}
+
+// EffectiveEphemeralVolumeLimit is not implemented
+func (f *FakeVolumeManager) EffectiveEphemeralVolumeLimit(pod *v1.Pod, volumeName string) (*resource.Quantity, error) {
+	return nil, nil
 }

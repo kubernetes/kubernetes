@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"sync"
-	"testing"
 	"time"
 
 	"k8s.io/ktesting"
@@ -44,6 +43,7 @@ import (
 	//svc "k8s.io/kubernetes/pkg/api/v1/service"
 	"k8s.io/kubernetes/pkg/controller/statefulset"
 	"k8s.io/kubernetes/test/integration/framework"
+	testutils "k8s.io/kubernetes/test/utils"
 )
 
 const (
@@ -163,7 +163,7 @@ func newStatefulSetPVC(name string) v1.PersistentVolumeClaim {
 }
 
 // scSetup sets up necessities for Statefulset integration test, including control plane, apiserver, informers, and clientset
-func scSetup(t *testing.T) (context.Context, *statefulset.StatefulSetController, informers.SharedInformerFactory, clientset.Interface) {
+func scSetup(t ktesting.TB) (context.Context, *statefulset.StatefulSetController, informers.SharedInformerFactory, clientset.Interface) {
 	tCtx := ktesting.Init(t)
 	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
@@ -200,14 +200,14 @@ func runControllerAndInformers(ctx context.Context, sc *statefulset.StatefulSetC
 	return cancel
 }
 
-func createHeadlessService(t *testing.T, clientSet clientset.Interface, headlessService *v1.Service) {
+func createHeadlessService(t testutils.TB, clientSet clientset.Interface, headlessService *v1.Service) {
 	_, err := clientSet.CoreV1().Services(headlessService.Namespace).Create(context.TODO(), headlessService, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("failed creating headless service: %v", err)
 	}
 }
 
-func createSTSs(t *testing.T, clientSet clientset.Interface, stss []*appsv1.StatefulSet) []*appsv1.StatefulSet {
+func createSTSs(t testutils.TB, clientSet clientset.Interface, stss []*appsv1.StatefulSet) []*appsv1.StatefulSet {
 	var createdSTSs []*appsv1.StatefulSet
 	for _, sts := range stss {
 		createdSTS, err := clientSet.AppsV1().StatefulSets(sts.Namespace).Create(context.TODO(), sts, metav1.CreateOptions{})
@@ -219,7 +219,7 @@ func createSTSs(t *testing.T, clientSet clientset.Interface, stss []*appsv1.Stat
 	return createdSTSs
 }
 
-func createPods(t *testing.T, clientSet clientset.Interface, pods []*v1.Pod) []*v1.Pod {
+func createPods(t testutils.TB, clientSet clientset.Interface, pods []*v1.Pod) []*v1.Pod {
 	var createdPods []*v1.Pod
 	for _, pod := range pods {
 		createdPod, err := clientSet.CoreV1().Pods(pod.Namespace).Create(context.TODO(), pod, metav1.CreateOptions{})
@@ -232,12 +232,12 @@ func createPods(t *testing.T, clientSet clientset.Interface, pods []*v1.Pod) []*
 	return createdPods
 }
 
-func createSTSsPods(t *testing.T, clientSet clientset.Interface, stss []*appsv1.StatefulSet, pods []*v1.Pod) ([]*appsv1.StatefulSet, []*v1.Pod) {
+func createSTSsPods(t testutils.TB, clientSet clientset.Interface, stss []*appsv1.StatefulSet, pods []*v1.Pod) ([]*appsv1.StatefulSet, []*v1.Pod) {
 	return createSTSs(t, clientSet, stss), createPods(t, clientSet, pods)
 }
 
 // Verify .Status.Replicas is equal to .Spec.Replicas
-func waitSTSStable(t *testing.T, clientSet clientset.Interface, sts *appsv1.StatefulSet) {
+func waitSTSStable(t testutils.TB, clientSet clientset.Interface, sts *appsv1.StatefulSet) {
 	stsClient := clientSet.AppsV1().StatefulSets(sts.Namespace)
 	desiredGeneration := sts.Generation
 	if err := wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
@@ -251,7 +251,7 @@ func waitSTSStable(t *testing.T, clientSet clientset.Interface, sts *appsv1.Stat
 	}
 }
 
-func updatePod(t *testing.T, podClient typedv1.PodInterface, podName string, updateFunc func(*v1.Pod)) *v1.Pod {
+func updatePod(t testutils.TB, podClient typedv1.PodInterface, podName string, updateFunc func(*v1.Pod)) *v1.Pod {
 	var pod *v1.Pod
 	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		newPod, err := podClient.Get(context.TODO(), podName, metav1.GetOptions{})
@@ -267,7 +267,7 @@ func updatePod(t *testing.T, podClient typedv1.PodInterface, podName string, upd
 	return pod
 }
 
-func updatePodStatus(t *testing.T, podClient typedv1.PodInterface, podName string, updateStatusFunc func(*v1.Pod)) *v1.Pod {
+func updatePodStatus(t testutils.TB, podClient typedv1.PodInterface, podName string, updateStatusFunc func(*v1.Pod)) *v1.Pod {
 	var pod *v1.Pod
 	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		newPod, err := podClient.Get(context.TODO(), podName, metav1.GetOptions{})
@@ -283,7 +283,7 @@ func updatePodStatus(t *testing.T, podClient typedv1.PodInterface, podName strin
 	return pod
 }
 
-func getPods(t *testing.T, podClient typedv1.PodInterface, labelMap map[string]string) *v1.PodList {
+func getPods(t testutils.TB, podClient typedv1.PodInterface, labelMap map[string]string) *v1.PodList {
 	podSelector := labels.Set(labelMap).AsSelector()
 	options := metav1.ListOptions{LabelSelector: podSelector.String()}
 	pods, err := podClient.List(context.TODO(), options)
@@ -296,7 +296,7 @@ func getPods(t *testing.T, podClient typedv1.PodInterface, labelMap map[string]s
 	return pods
 }
 
-func getStatefulSetPVCs(t *testing.T, pvcClient typedv1.PersistentVolumeClaimInterface, sts *appsv1.StatefulSet) []*v1.PersistentVolumeClaim {
+func getStatefulSetPVCs(t testutils.TB, pvcClient typedv1.PersistentVolumeClaimInterface, sts *appsv1.StatefulSet) []*v1.PersistentVolumeClaim {
 	pvcs := []*v1.PersistentVolumeClaim{}
 	for i := int32(0); i < *sts.Spec.Replicas; i++ {
 		pvcName := fmt.Sprintf("%s-%s-%d", sts.Spec.VolumeClaimTemplates[0].Name, sts.Name, i)
@@ -309,7 +309,7 @@ func getStatefulSetPVCs(t *testing.T, pvcClient typedv1.PersistentVolumeClaimInt
 	return pvcs
 }
 
-func verifyOwnerRef(t *testing.T, pvc *v1.PersistentVolumeClaim, kind string, expected bool) {
+func verifyOwnerRef(t testutils.TB, pvc *v1.PersistentVolumeClaim, kind string, expected bool) {
 	found := false
 	for _, ref := range pvc.GetOwnerReferences() {
 		if ref.Kind == kind {
@@ -325,7 +325,7 @@ func verifyOwnerRef(t *testing.T, pvc *v1.PersistentVolumeClaim, kind string, ex
 	}
 }
 
-func updateSTS(t *testing.T, stsClient typedappsv1.StatefulSetInterface, stsName string, updateFunc func(*appsv1.StatefulSet)) *appsv1.StatefulSet {
+func updateSTS(t testutils.TB, stsClient typedappsv1.StatefulSetInterface, stsName string, updateFunc func(*appsv1.StatefulSet)) *appsv1.StatefulSet {
 	var sts *appsv1.StatefulSet
 	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		newSTS, err := stsClient.Get(context.TODO(), stsName, metav1.GetOptions{})
@@ -342,7 +342,7 @@ func updateSTS(t *testing.T, stsClient typedappsv1.StatefulSetInterface, stsName
 }
 
 // Update .Spec.Replicas to replicas and verify .Status.Replicas is changed accordingly
-func scaleSTS(t *testing.T, c clientset.Interface, sts *appsv1.StatefulSet, replicas int32) {
+func scaleSTS(t testutils.TB, c clientset.Interface, sts *appsv1.StatefulSet, replicas int32) {
 	stsClient := c.AppsV1().StatefulSets(sts.Namespace)
 	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		newSTS, err := stsClient.Get(context.TODO(), sts.Name, metav1.GetOptions{})

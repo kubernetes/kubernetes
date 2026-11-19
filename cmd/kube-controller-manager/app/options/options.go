@@ -44,6 +44,7 @@ import (
 	"k8s.io/component-base/metrics"
 	metricsfeatures "k8s.io/component-base/metrics/features"
 	cmoptions "k8s.io/controller-manager/options"
+	cmfeatures "k8s.io/controller-manager/pkg/features"
 	kubectrlmgrconfigv1alpha1 "k8s.io/kube-controller-manager/config/v1alpha1"
 	kubecontrollerconfig "k8s.io/kubernetes/cmd/kube-controller-manager/app/config"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
@@ -56,7 +57,7 @@ import (
 	netutils "k8s.io/utils/net"
 
 	// add the kubernetes feature gates
-	_ "k8s.io/kubernetes/pkg/features"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
 )
 
 const (
@@ -82,8 +83,10 @@ type KubeControllerManagerOptions struct {
 	EndpointSliceController                   *EndpointSliceControllerOptions
 	EndpointSliceMirroringController          *EndpointSliceMirroringControllerOptions
 	EphemeralVolumeController                 *EphemeralVolumeControllerOptions
+	EvictionRequestController                 *EvictionRequestControllerOptions
 	GarbageCollectorController                *GarbageCollectorControllerOptions
 	HPAController                             *HPAControllerOptions
+	ImperativeEvictionResponderController     *ImperativeEvictionResponderControllerOptions
 	JobController                             *JobControllerOptions
 	CronJobController                         *CronJobControllerOptions
 	LegacySATokenCleaner                      *LegacySATokenCleanerOptions
@@ -96,6 +99,7 @@ type KubeControllerManagerOptions struct {
 	ReplicationController                     *ReplicationControllerOptions
 	ResourceQuotaController                   *ResourceQuotaControllerOptions
 	SAController                              *SAControllerOptions
+	ServiceServingSigner                      *ServiceServingSignerOptions
 	TTLAfterFinishedController                *TTLAfterFinishedControllerOptions
 	ValidatingAdmissionPolicyStatusController *ValidatingAdmissionPolicyStatusControllerOptions
 
@@ -174,11 +178,17 @@ func NewKubeControllerManagerOptions() (*KubeControllerManagerOptions, error) {
 		EphemeralVolumeController: &EphemeralVolumeControllerOptions{
 			&componentConfig.EphemeralVolumeController,
 		},
+		EvictionRequestController: &EvictionRequestControllerOptions{
+			&componentConfig.EvictionRequestController,
+		},
 		GarbageCollectorController: &GarbageCollectorControllerOptions{
 			&componentConfig.GarbageCollectorController,
 		},
 		HPAController: &HPAControllerOptions{
 			&componentConfig.HPAController,
+		},
+		ImperativeEvictionResponderController: &ImperativeEvictionResponderControllerOptions{
+			&componentConfig.ImperativeEvictionResponderController,
 		},
 		JobController: &JobControllerOptions{
 			&componentConfig.JobController,
@@ -215,6 +225,9 @@ func NewKubeControllerManagerOptions() (*KubeControllerManagerOptions, error) {
 		},
 		SAController: &SAControllerOptions{
 			&componentConfig.SAController,
+		},
+		ServiceServingSigner: &ServiceServingSignerOptions{
+			&componentConfig.ServiceServingSigner,
 		},
 		TTLAfterFinishedController: &TTLAfterFinishedControllerOptions{
 			&componentConfig.TTLAfterFinishedController,
@@ -285,8 +298,10 @@ func (s *KubeControllerManagerOptions) Flags(allControllers []string, disabledBy
 	s.EndpointSliceController.AddFlags(fss.FlagSet(names.EndpointSliceController))
 	s.EndpointSliceMirroringController.AddFlags(fss.FlagSet(names.EndpointSliceMirroringController))
 	s.EphemeralVolumeController.AddFlags(fss.FlagSet(names.EphemeralVolumeController))
+	s.EvictionRequestController.AddFlags(fss.FlagSet(names.EvictionRequestController))
 	s.GarbageCollectorController.AddFlags(fss.FlagSet(names.GarbageCollectorController))
 	s.HPAController.AddFlags(fss.FlagSet(names.HorizontalPodAutoscalerController))
+	s.ImperativeEvictionResponderController.AddFlags(fss.FlagSet(names.ImperativeEvictionResponderController))
 	s.JobController.AddFlags(fss.FlagSet(names.JobController))
 	s.CronJobController.AddFlags(fss.FlagSet(names.CronJobController))
 	s.LegacySATokenCleaner.AddFlags(fss.FlagSet(names.LegacyServiceAccountTokenCleanerController))
@@ -299,6 +314,7 @@ func (s *KubeControllerManagerOptions) Flags(allControllers []string, disabledBy
 	s.ReplicationController.AddFlags(fss.FlagSet(names.ReplicationControllerController))
 	s.ResourceQuotaController.AddFlags(fss.FlagSet(names.ResourceQuotaController))
 	s.SAController.AddFlags(fss.FlagSet(names.ServiceAccountController))
+	s.ServiceServingSigner.AddFlags(fss.FlagSet(names.ServiceServingSigner))
 	s.TTLAfterFinishedController.AddFlags(fss.FlagSet(names.TTLAfterFinishedController))
 	s.ValidatingAdmissionPolicyStatusController.AddFlags(fss.FlagSet(names.ValidatingAdmissionPolicyStatusController))
 
@@ -367,10 +383,16 @@ func (s *KubeControllerManagerOptions) ApplyTo(c *kubecontrollerconfig.Config, a
 	if err := s.EphemeralVolumeController.ApplyTo(&c.ComponentConfig.EphemeralVolumeController); err != nil {
 		return err
 	}
+	if err := s.EvictionRequestController.ApplyTo(&c.ComponentConfig.EvictionRequestController); err != nil {
+		return err
+	}
 	if err := s.GarbageCollectorController.ApplyTo(&c.ComponentConfig.GarbageCollectorController); err != nil {
 		return err
 	}
 	if err := s.HPAController.ApplyTo(&c.ComponentConfig.HPAController); err != nil {
+		return err
+	}
+	if err := s.ImperativeEvictionResponderController.ApplyTo(&c.ComponentConfig.ImperativeEvictionResponderController); err != nil {
 		return err
 	}
 	if err := s.JobController.ApplyTo(&c.ComponentConfig.JobController); err != nil {
@@ -409,6 +431,9 @@ func (s *KubeControllerManagerOptions) ApplyTo(c *kubecontrollerconfig.Config, a
 	if err := s.SAController.ApplyTo(&c.ComponentConfig.SAController); err != nil {
 		return err
 	}
+	if err := s.ServiceServingSigner.ApplyTo(&c.ComponentConfig.ServiceServingSigner); err != nil {
+		return err
+	}
 	if err := s.TTLAfterFinishedController.ApplyTo(&c.ComponentConfig.TTLAfterFinishedController); err != nil {
 		return err
 	}
@@ -440,6 +465,14 @@ func (s *KubeControllerManagerOptions) Validate(allControllers []string, disable
 
 	errs = append(errs, s.ComponentGlobalsRegistry.Validate()...)
 	errs = append(errs, s.Generic.Validate(allControllers, disabledByDefaultControllers, controllerAliases)...)
+	if s.Generic.LeaderElectionRecoveryDeadline.Duration != 0 {
+		if !utilfeature.DefaultFeatureGate.Enabled(cmfeatures.LeaderElectionRecovery) {
+			errs = append(errs, fmt.Errorf("leader-elect-recovery-deadline requires the LeaderElectionRecovery feature gate"))
+		}
+		if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CoordinatedLeaderElection) {
+			errs = append(errs, fmt.Errorf("leader-elect-recovery-deadline is not yet supported with the CoordinatedLeaderElection feature gate"))
+		}
+	}
 	errs = append(errs, s.KubeCloudShared.Validate()...)
 	errs = append(errs, s.AttachDetachController.Validate()...)
 	errs = append(errs, s.CSRSigningController.Validate()...)
@@ -454,8 +487,10 @@ func (s *KubeControllerManagerOptions) Validate(allControllers []string, disable
 	errs = append(errs, s.EndpointSliceController.Validate()...)
 	errs = append(errs, s.EndpointSliceMirroringController.Validate()...)
 	errs = append(errs, s.EphemeralVolumeController.Validate()...)
+	errs = append(errs, s.EvictionRequestController.Validate()...)
 	errs = append(errs, s.GarbageCollectorController.Validate()...)
 	errs = append(errs, s.HPAController.Validate()...)
+	errs = append(errs, s.ImperativeEvictionResponderController.Validate()...)
 	errs = append(errs, s.JobController.Validate()...)
 	errs = append(errs, s.CronJobController.Validate()...)
 	errs = append(errs, s.LegacySATokenCleaner.Validate()...)
@@ -468,6 +503,7 @@ func (s *KubeControllerManagerOptions) Validate(allControllers []string, disable
 	errs = append(errs, s.ReplicationController.Validate()...)
 	errs = append(errs, s.ResourceQuotaController.Validate()...)
 	errs = append(errs, s.SAController.Validate()...)
+	errs = append(errs, s.ServiceServingSigner.Validate()...)
 	errs = append(errs, s.TTLAfterFinishedController.Validate()...)
 	errs = append(errs, s.SecureServing.Validate()...)
 	errs = append(errs, s.Authentication.Validate()...)

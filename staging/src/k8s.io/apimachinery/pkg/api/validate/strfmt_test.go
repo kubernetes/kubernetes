@@ -974,3 +974,34 @@ func TestResourceFullyQualifiedName(t *testing.T) {
 		})
 	}
 }
+
+func TestConditionReason(t *testing.T) {
+	ctx := context.Background()
+	fldPath := field.NewPath("test")
+
+	testCases := []struct {
+		name     string
+		input    string
+		wantErrs field.ErrorList
+	}{{
+		name:     "regular condition reason message",
+		input:    "node_failed",
+		wantErrs: nil,
+	}, {
+		name:  "invalid condition reason message",
+		input: "$123E4567-E89B-12D3-A456-426614174000",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, "$123E4567-E89B-12D3-A456-426614174000",
+				"a condition reason must start with alphabetic character, optionally followed by a string of alphanumeric characters or '_,:', and must end with an alphanumeric character or '_' (e.g. 'my_name',  or 'MY_NAME',  or 'MyName',  or 'ReasonA,ReasonB',  or 'ReasonA:ReasonB', regex used for validation is '[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?')").WithOrigin("format=k8s-condition-reason"),
+		},
+	}}
+
+	matcher := field.ErrorMatcher{}.ByType().ByField().ByOrigin().ByDetailExact()
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			value := tc.input
+			gotErrs := ConditionReason(ctx, operation.Operation{}, fldPath, &value, nil)
+			matcher.Test(t, tc.wantErrs, gotErrs)
+		})
+	}
+}

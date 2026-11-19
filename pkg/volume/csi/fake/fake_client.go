@@ -92,6 +92,12 @@ type NodeClient struct {
 	FakeNodeExpansionRequest *csipb.NodeExpandVolumeRequest
 	nextErr                  error
 	getCapabilitiesErr       error
+
+	nodeInfoFromControllerSet bool
+	// FakeNodeGetInfoRequest is the last NodeGetInfo request.
+	FakeNodeGetInfoRequest *csipb.NodeGetInfoRequest
+	// GetCapabilitiesCallCount is the number of NodeGetCapabilities calls.
+	GetCapabilitiesCallCount int
 }
 
 // NewNodeClient returns fake node client
@@ -145,6 +151,13 @@ func NewNodeClientWithVolumeMountGroup(stageUnstageSet, volumeMountGroupSet bool
 		nodeStagedVolumes:    make(map[string]CSIVolume),
 		stageUnstageSet:      stageUnstageSet,
 		volumeMountGroupSet:  volumeMountGroupSet,
+	}
+}
+
+// NewNodeClientWithNodeInfoFromController returns a fake node client with NODE_INFO_FROM_CONTROLLER capability.
+func NewNodeClientWithNodeInfoFromController(nodeInfoFromControllerSet bool) *NodeClient {
+	return &NodeClient{
+		nodeInfoFromControllerSet: nodeInfoFromControllerSet,
 	}
 }
 
@@ -350,6 +363,7 @@ func (f *NodeClient) NodeExpandVolume(ctx context.Context, req *csipb.NodeExpand
 
 // NodeGetId implements csi method
 func (f *NodeClient) NodeGetInfo(ctx context.Context, in *csipb.NodeGetInfoRequest, opts ...grpc.CallOption) (*csipb.NodeGetInfoResponse, error) {
+	f.FakeNodeGetInfoRequest = in
 	if f.nextErr != nil {
 		return nil, f.nextErr
 	}
@@ -358,6 +372,7 @@ func (f *NodeClient) NodeGetInfo(ctx context.Context, in *csipb.NodeGetInfoReque
 
 // NodeGetCapabilities implements csi method
 func (f *NodeClient) NodeGetCapabilities(ctx context.Context, in *csipb.NodeGetCapabilitiesRequest, opts ...grpc.CallOption) (*csipb.NodeGetCapabilitiesResponse, error) {
+	f.GetCapabilitiesCallCount++
 	resp := &csipb.NodeGetCapabilitiesResponse{
 		Capabilities: []*csipb.NodeServiceCapability{},
 	}
@@ -429,6 +444,16 @@ func (f *NodeClient) NodeGetCapabilities(ctx context.Context, in *csipb.NodeGetC
 			Type: &csipb.NodeServiceCapability_Rpc{
 				Rpc: &csipb.NodeServiceCapability_RPC{
 					Type: csipb.NodeServiceCapability_RPC_VOLUME_MOUNT_GROUP,
+				},
+			},
+		})
+	}
+
+	if f.nodeInfoFromControllerSet {
+		resp.Capabilities = append(resp.Capabilities, &csipb.NodeServiceCapability{
+			Type: &csipb.NodeServiceCapability_Rpc{
+				Rpc: &csipb.NodeServiceCapability_RPC{
+					Type: csipb.NodeServiceCapability_RPC_NODE_INFO_FROM_CONTROLLER,
 				},
 			},
 		})

@@ -22,65 +22,43 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 )
 
-// PodResourceInfo stores resource requirements for containers within a pod.
-type PodResourceInfo struct {
-	// ContainerResources maps container names to their respective ResourceRequirements.
-	ContainerResources map[string]v1.ResourceRequirements
-
-	// PodLevelResources represents resource requirements that apply to the entire pod, if any.
-	PodLevelResources *v1.ResourceRequirements
-
-	// EmptyDirVolumeLimits maps emptyDir volume names to their respective resource limits, if any.
-	EmptyDirVolumeLimits map[string]*resource.Quantity
-}
-
-// PodResourceInfoMap maps pod UIDs to their corresponding PodResourceInfo,
-// tracking resource requirements for all containers within each pod.
-type PodResourceInfoMap map[types.UID]PodResourceInfo
-
-// Clone returns a copy of PodResourceInfoMap
-func (pr PodResourceInfoMap) Clone() PodResourceInfoMap {
-	prCopy := make(PodResourceInfoMap)
-	for podUID, podInfo := range pr {
-		newPodInfo := PodResourceInfo{
-			ContainerResources: make(map[string]v1.ResourceRequirements),
-			PodLevelResources:  podInfo.PodLevelResources.DeepCopy(),
-		}
-		for containerName, containerInfo := range podInfo.ContainerResources {
-			newPodInfo.ContainerResources[containerName] = *containerInfo.DeepCopy()
-		}
-		if podInfo.EmptyDirVolumeLimits != nil {
-			newPodInfo.EmptyDirVolumeLimits = make(map[string]*resource.Quantity)
-			for volumeName, volumeLimit := range podInfo.EmptyDirVolumeLimits {
-				if volumeLimit == nil {
-					newPodInfo.EmptyDirVolumeLimits[volumeName] = nil
-				} else {
-					vl := volumeLimit.DeepCopy()
-					newPodInfo.EmptyDirVolumeLimits[volumeName] = &vl
-				}
-			}
-		}
-		prCopy[podUID] = newPodInfo
-	}
-	return prCopy
-}
+// PodMap maps pod UIDs to their corresponding pods, tracking resource requirements
+// for all containers within each pod.
+type PodMap map[types.UID]*v1.Pod
 
 // Reader interface used to read current pod resource state
 type Reader interface {
 	GetContainerResources(podUID types.UID, containerName string) (v1.ResourceRequirements, bool)
-	GetPodResourceInfoMap() PodResourceInfoMap
-	GetPodResourceInfo(podUID types.UID) (PodResourceInfo, bool)
+	GetContainerVolumeMounts(podUID types.UID, containerName string) ([]v1.VolumeMount, bool)
+	GetPodVolumes(podUID types.UID) ([]v1.Volume, bool)
+	// GetContainer returns a copy of the stored container of the given type. What it holds depends
+	// on what was stored, e.g. only the resources.
+	GetContainer(podUID types.UID, containerName string, containerType podutil.ContainerType) (*v1.Container, bool)
+	GetPodUIDs() []types.UID
+	GetPod(podUID types.UID) (*v1.Pod, bool)
+	// GetPodReadOnly returns a read-only reference to the stored pod without copying.
+	// Callers must not mutate the returned pod or any of its nested fields.
+	GetPodReadOnly(podUID types.UID) (*v1.Pod, bool)
+	HasPod(podUID types.UID) bool
 	GetPodLevelResources(podUID types.UID) (*v1.ResourceRequirements, bool)
 	GetEmptyDirVolumeLimit(podUID types.UID, volumeName string) (*resource.Quantity, bool)
 }
 
 type writer interface {
-	SetContainerResources(logger klog.Logger, podUID types.UID, containerName string, resources v1.ResourceRequirements) error
-	SetPodResourceInfo(logger klog.Logger, podUID types.UID, resourceInfo PodResourceInfo) error
+	// SetContainer stores a copy of the given container as a container of the given type, replacing
+	// any container with the same name.
+	SetContainer(logger klog.Logger, podUID types.UID, containerType podutil.ContainerType, container v1.Container) error
+	SetContainerResources(logger klog.Logger, podUID types.UID, containerName string, containerType podutil.ContainerType, resources v1.ResourceRequirements) error
+	SetPodVolume(logger klog.Logger, podUID types.UID, volume v1.Volume) error
+	RemovePodVolume(logger klog.Logger, podUID types.UID, volumeName string) error
+	// RemoveContainers removes the named containers of the given type.
+	RemoveContainers(logger klog.Logger, podUID types.UID, containerType podutil.ContainerType, containerNames ...string) error
+	SetPod(logger klog.Logger, pod *v1.Pod) error
 	SetPodLevelResources(logger klog.Logger, podUID types.UID, alloc *v1.ResourceRequirements) error
-	SetEmptyDirVolumeLimit(podUID types.UID, volumeName string, limit *resource.Quantity) error
+	SetEmptyDirVolumeLimit(logger klog.Logger, podUID types.UID, volumeName string, emptyDir *v1.EmptyDirVolumeSource) error
 	RemovePod(logger klog.Logger, podUID types.UID) error
 	// RemoveOrphanedPods removes the stored state for any pods not included in the set of remaining pods.
 	RemoveOrphanedPods(remainingPods sets.Set[types.UID])

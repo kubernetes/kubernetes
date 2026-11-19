@@ -22,7 +22,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -36,31 +35,59 @@ import (
 )
 
 func TestGetConntrackMax(t *testing.T) {
-	ncores := runtime.NumCPU()
 	const maxLimit = 1048576
 	testCases := []struct {
+		numCPU     int
 		min        int32
 		maxPerCore int32
 		expected   int
 		err        string
 	}{
 		{
+			numCPU:   8,
 			expected: 0,
 		},
 		{
+			numCPU:     8,
 			maxPerCore: 67890, // use this if Max is 0
 			min:        1,     // avoid 0 default
-			expected:   min(67890*ncores, maxLimit),
+			expected:   min(67890*8, maxLimit),
 		},
 		{
+			numCPU:     8,
 			maxPerCore: 1, // ensure that Min is considered
 			min:        123456,
 			expected:   123456,
 		},
 		{
+			numCPU:     8,
 			maxPerCore: 0, // leave system setting
 			min:        123456,
 			expected:   0,
+		},
+		{
+			numCPU:     128,
+			maxPerCore: 32768,
+			min:        8 * maxLimit,
+			expected:   8 * maxLimit,
+		},
+		{
+			numCPU:     8,
+			maxPerCore: 32768,
+			min:        8 * maxLimit,
+			expected:   8 * maxLimit,
+		},
+		{
+			numCPU:     128,
+			maxPerCore: 32768,
+			min:        131072,
+			expected:   maxLimit,
+		},
+		{
+			numCPU:     8,
+			maxPerCore: 32768,
+			min:        524288,
+			expected:   524288,
 		},
 	}
 
@@ -70,7 +97,7 @@ func TestGetConntrackMax(t *testing.T) {
 			MaxPerCore: ptr.To(tc.maxPerCore),
 		}
 		_, ctx := ktesting.NewTestContext(t)
-		x, e := getConntrackMax(ctx, &cfg, ncores)
+		x, e := getConntrackMax(ctx, &cfg, tc.numCPU)
 		if e != nil {
 			if tc.err == "" {
 				t.Errorf("[%d] unexpected error: %v", i, e)

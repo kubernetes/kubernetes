@@ -101,6 +101,12 @@ type Cluster struct {
 	// compression (server-side) and decompression (client-side): https://github.com/kubernetes/kubernetes/issues/112296.
 	// +optional
 	DisableCompression bool `json:"disable-compression,omitempty"`
+	// MinConnectionPoolSize, if greater than 1, spreads requests to the server across at least this many independent
+	// transports, each with its own connections, preferring the one with fewer requests in flight. More connections may be
+	// opened, for example when a connection reaches the server's limit of concurrent HTTP/2 streams. Values <= 1 keep the
+	// default of a single shared transport. Ignored if the ClientsAllowConnectionPool feature gate is disabled.
+	// +optional
+	MinConnectionPoolSize int32 `json:"min-connection-pool-size,omitempty"`
 	// Config holds additional config data that is specific to the exec
 	// plugin with regards to the cluster being authenticated to.
 	//

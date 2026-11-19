@@ -23,6 +23,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
@@ -285,31 +286,130 @@ func TestThreadSafeStoreRV(t *testing.T) {
 	})
 }
 
-func BenchmarkIndexer(b *testing.B) {
-	testIndexer := "testIndexer"
+func TestThreadSafeStoreTransactionRepeatedKeys(t *testing.T) {
+	newIndexers := func(indexed *[]string) Indexers {
+		return Indexers{
+			"byValue": func(obj interface{}) ([]string, error) {
+				if indexed != nil {
+					*indexed = append(*indexed, obj.(string))
+				}
+				return strings.Split(obj.(string), ","), nil
+			},
+		}
+	}
+	update := func(key, obj string) ThreadSafeStoreTransaction {
+		return ThreadSafeStoreTransaction{Transaction{Type: TransactionTypeUpdate, Object: obj}, key}
+	}
+	del := func(key string) ThreadSafeStoreTransaction {
+		return ThreadSafeStoreTransaction{Transaction{Type: TransactionTypeDelete}, key}
+	}
 
-	indexers := Indexers{
-		testIndexer: func(obj interface{}) (strings []string, e error) {
-			indexes := []string{obj.(string)}
-			return indexes, nil
+	testCases := []struct {
+		name    string
+		initial map[string]string
+		txns    []ThreadSafeStoreTransaction
+		// expectedIndexed are the objects passed to the index function by the transaction:
+		// only the original and the final object of every key, never an intermediate one.
+		expectedIndexed []string
+	}{
+		{
+			name:            "repeated updates of a new key",
+			txns:            []ThreadSafeStoreTransaction{update("a", "x"), update("a", "y,z"), update("a", "z")},
+			expectedIndexed: []string{"z"},
+		},
+		{
+			name:            "repeated updates of a stored key back to its original object",
+			initial:         map[string]string{"a": "x"},
+			txns:            []ThreadSafeStoreTransaction{update("a", "y"), update("a", "x")},
+			expectedIndexed: []string{"x", "x"},
+		},
+		{
+			name: "add then delete",
+			txns: []ThreadSafeStoreTransaction{update("a", "x"), del("a")},
+		},
+		{
+			name:            "delete then add",
+			initial:         map[string]string{"a": "x,y"},
+			txns:            []ThreadSafeStoreTransaction{del("a"), update("a", "y,z")},
+			expectedIndexed: []string{"x,y", "y,z"},
+		},
+		{
+			name:            "interleaved keys sharing index values",
+			initial:         map[string]string{"b": "x"},
+			txns:            []ThreadSafeStoreTransaction{update("a", "x"), update("b", "y"), update("a", "y"), del("b"), update("a", "x,y")},
+			expectedIndexed: []string{"x", "x,y"},
 		},
 	}
 
-	indices := Indices{}
-	store := NewThreadSafeStore(indexers, indices).(*threadSafeMap)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			var indexed []string
+			store := NewThreadSafeStore(newIndexers(&indexed), Indices{}).(*threadSafeMap)
+			individual := NewThreadSafeStore(newIndexers(nil), Indices{}).(*threadSafeMap)
+			for key, obj := range tc.initial {
+				store.Add(key, obj)
+				individual.Add(key, obj)
+			}
+			indexed = nil // ignore the calls made by the initial Adds
 
+			store.Transaction(tc.txns...)
+			for _, txn := range tc.txns {
+				if txn.Type == TransactionTypeDelete {
+					individual.Delete(txn.Key)
+				} else {
+					individual.Update(txn.Key, txn.Object)
+				}
+			}
+
+			assert.ElementsMatch(t, tc.expectedIndexed, indexed)
+			assert.Equal(t, individual.items, store.items)
+			values := individual.ListIndexFuncValues("byValue")
+			assert.ElementsMatch(t, values, store.ListIndexFuncValues("byValue"))
+			for _, value := range values {
+				want, err := individual.IndexKeys("byValue", value)
+				require.NoError(t, err)
+				got, err := store.IndexKeys("byValue", value)
+				require.NoError(t, err)
+				assert.ElementsMatch(t, want, got, "index value %q", value)
+			}
+		})
+	}
+}
+
+func BenchmarkIndexer(b *testing.B) {
 	// The following benchmark imitates what is happening in indexes
 	// used in storage layer, where indexing is mostly static (e.g.
 	// indexing objects by their (namespace, name)).
 	// The 5000 number imitates indexing nodes in 5000-node cluster.
-	objectCount := 5000
-	objects := make([]string, 0, 5000)
-	for i := 0; i < objectCount; i++ {
-		objects = append(objects, fmt.Sprintf("object-number-%d", i))
-	}
+	for _, valuesPerObject := range []int{1, 10} {
+		b.Run(fmt.Sprintf("valuesPerObject=%d", valuesPerObject), func(b *testing.B) {
+			testIndexer := "testIndexer"
+			indexers := Indexers{
+				testIndexer: func(obj interface{}) ([]string, error) {
+					return append([]string(nil), obj.([]string)...), nil
+				},
+			}
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		store.Update(objects[i%objectCount], objects[i%objectCount])
+			store := NewThreadSafeStore(indexers, Indices{}).(*threadSafeMap)
+			objectCount := 5000
+			keys := make([]string, objectCount)
+			objects := make([][]string, objectCount)
+			for i := range objectCount {
+				keys[i] = fmt.Sprintf("object-number-%d", i)
+				vals := make([]string, valuesPerObject)
+				for v := range valuesPerObject {
+					vals[v] = fmt.Sprintf("object-number-%d-val-%d", i, v)
+				}
+				objects[i] = vals
+				store.Add(keys[i], objects[i])
+			}
+
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				idx := i % objectCount
+				store.Update(keys[idx], objects[idx])
+			}
+		})
 	}
 }

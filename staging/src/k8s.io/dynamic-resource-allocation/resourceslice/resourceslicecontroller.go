@@ -290,6 +290,8 @@ type Options struct {
 	// a problem while trying to publish ResourceSlices. The controller
 	// will retry transient errors once the handler returns. Publishing
 	// of invalid ResourceSlices stops until the slices are replaced.
+	// API validation failures are recognized by [apierrors.IsInvalid],
+	// and are not reported as [DroppedFieldsError].
 	//
 	// What the handler does with
 	// that information is up to the handler. It could log the error,
@@ -448,6 +450,43 @@ compatibilityGroups:
 		}
 	}
 
+	// Dropped fields for shared consumable capacity can be found in shared counter
+	// consumptionPolicy values or in consumed counters that use valueFrom.
+	detectedSharedConsumableCapacity := false
+	for i := 0; i < len(err.DesiredSlice.Spec.SharedCounters) && i < len(err.ActualSlice.Spec.SharedCounters) && !detectedSharedConsumableCapacity; i++ {
+		actualCounters := err.ActualSlice.Spec.SharedCounters[i].Counters
+		for counterName, desiredCounter := range err.DesiredSlice.Spec.SharedCounters[i].Counters {
+			if desiredCounter.ConsumptionPolicy == nil {
+				continue
+			}
+			actualCounter, found := actualCounters[counterName]
+			if !found || actualCounter.ConsumptionPolicy == nil {
+				disabled = append(disabled, "DRASharedConsumableCapacity")
+				detectedSharedConsumableCapacity = true
+				break
+			}
+		}
+	}
+	for i := 0; i < len(err.DesiredSlice.Spec.Devices) && i < len(err.ActualSlice.Spec.Devices) && !detectedSharedConsumableCapacity; i++ {
+		for j := 0; j < len(err.DesiredSlice.Spec.Devices[i].ConsumesCounters) && j < len(err.ActualSlice.Spec.Devices[i].ConsumesCounters); j++ {
+			actualCounters := err.ActualSlice.Spec.Devices[i].ConsumesCounters[j].Counters
+			for counterName, desiredCounter := range err.DesiredSlice.Spec.Devices[i].ConsumesCounters[j].Counters {
+				if desiredCounter.ValueFrom == nil {
+					continue
+				}
+				actualCounter, found := actualCounters[counterName]
+				if !found || actualCounter.ValueFrom == nil {
+					disabled = append(disabled, "DRASharedConsumableCapacity")
+					detectedSharedConsumableCapacity = true
+					break
+				}
+			}
+			if detectedSharedConsumableCapacity {
+				break
+			}
+		}
+	}
+
 	return disabled
 }
 
@@ -555,7 +594,10 @@ func newController(ctx context.Context, options Options) (*Controller, error) {
 	if c.queue == nil {
 		c.queue = workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
-			workqueue.TypedRateLimitingQueueConfig[string]{Name: "node_resource_slices"},
+			workqueue.TypedRateLimitingQueueConfig[string]{
+				Logger: new(klog.FromContext(ctx)),
+				Name:   "node_resource_slices",
+			},
 		)
 	}
 	if c.errorHandler == nil {

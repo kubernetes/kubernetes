@@ -165,7 +165,7 @@ func newInformerManager[T clusterTrustBundle](ctx context.Context, handlers clus
 	logger := klog.FromContext(ctx)
 	// Have the informer bust cache entries when it sees updates that could
 	// apply to them.
-	_, err := m.ctbInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, err := m.ctbInformer.AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj any) {
 			ctb, ok := obj.(*T)
 			if !ok {
@@ -197,7 +197,7 @@ func newInformerManager[T clusterTrustBundle](ctx context.Context, handlers clus
 			logger.Info("Dropping cache for ClusterTrustBundle", "signerName", m.ctbHandlers.GetSignerName(ctb))
 			m.dropCacheFor(ctb)
 		},
-	})
+	}, cache.HandlerOptions{Logger: &logger})
 	if err != nil {
 		return nil, fmt.Errorf("while registering event handler on informer: %w", err)
 	}
@@ -206,13 +206,14 @@ func newInformerManager[T clusterTrustBundle](ctx context.Context, handlers clus
 }
 
 func (m *InformerManager[T]) dropCacheFor(ctb *T) {
+	ctbName := m.ctbHandlers.GetName(ctb)
 	if ctbSignerName := m.ctbHandlers.GetSignerName(ctb); ctbSignerName != "" {
 		m.normalizationCache.RemoveAll(func(key any) bool {
-			return key.(cacheKeyType).signerName == ctbSignerName
+			return key.(cacheKeyType).signerName == ctbSignerName || key.(cacheKeyType).ctbName == ctbName
 		})
 	} else {
 		m.normalizationCache.RemoveAll(func(key any) bool {
-			return key.(cacheKeyType).ctbName == m.ctbHandlers.GetName(ctb)
+			return key.(cacheKeyType).ctbName == ctbName
 		})
 	}
 }
@@ -452,7 +453,7 @@ func (m *LazyInformerManager) ensureManagerSet(ctx context.Context) error {
 	}
 
 	m.manager = clusterTrustBundleManager
-	kubeInformers.Start(m.contextWithLogger.Done())
+	kubeInformers.StartWithContext(m.contextWithLogger)
 	m.logger.Info("Started ClusterTrustBundle informer", "apiGroup", foundGV)
 
 	// a cache fetch will likely follow right after, wait for the freshly started
@@ -461,7 +462,7 @@ func (m *LazyInformerManager) ensureManagerSet(ctx context.Context) error {
 	timeoutContext, cancel := context.WithTimeout(m.contextWithLogger, 10*time.Second)
 	defer cancel()
 	m.logger.Info("Waiting for ClusterTrustBundle informer to sync")
-	for _, ok := range kubeInformers.WaitForCacheSync(timeoutContext.Done()) {
+	for _, ok := range kubeInformers.WaitForCacheSyncWithContext(timeoutContext).Synced {
 		synced = synced && ok
 	}
 	if synced {

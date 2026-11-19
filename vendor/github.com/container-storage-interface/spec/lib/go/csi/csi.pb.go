@@ -215,9 +215,10 @@ const (
 	// VOLUME_ACCESSIBILITY_CONSTRAINTS indicates that the volumes for
 	// this plugin MAY NOT be equally accessible by all nodes in the
 	// cluster. The CO MUST use the topology information returned by
-	// CreateVolumeRequest along with the topology information
-	// returned by NodeGetInfo to ensure that a given volume is
-	// accessible from a given node when scheduling workloads.
+	// CreateVolume along with the node topology information returned
+	// by NodeGetInfo or ControllerGetNodeInfo to ensure that a given
+	// volume is accessible from a given node when scheduling
+	// workloads.
 	PluginCapability_Service_VOLUME_ACCESSIBILITY_CONSTRAINTS PluginCapability_Service_Type = 2
 	// GROUP_CONTROLLER_SERVICE indicates that the Plugin provides
 	// RPCs for operating on groups of volumes. Plugins MAY provide
@@ -461,6 +462,76 @@ func (VolumeCapability_AccessMode_Mode) EnumDescriptor() ([]byte, []int) {
 	return file_csi_proto_rawDescGZIP(), []int{10, 2, 0}
 }
 
+type ControllerUnpublishVolumeRequest_Reason int32
+
+const (
+	ControllerUnpublishVolumeRequest_UNKNOWN ControllerUnpublishVolumeRequest_Reason = 0
+	// All `NodeUnstageVolume` and `NodeUnpublishVolume` calls for the
+	// volume on the node succeeded. This is the normal case.
+	ControllerUnpublishVolumeRequest_NODE_CLEANUP_SUCCEEDED ControllerUnpublishVolumeRequest_Reason = 1
+	// The CO stopped waiting for `NodeUnstageVolume` and
+	// `NodeUnpublishVolume` to succeed, for example because the node
+	// is unreachable and a timeout expired. The CO makes no guarantees
+	// about whether the node can still access the volume and the node
+	// MAY retain cached state which could result in stale reads or
+	// stale writes if the SP does not take precautions to prevent
+	// improper or corrupted I/O.
+	// This reason is inherently dangerous and COs SHOULD NOT use it.
+	// It is included here to allow SPs to know that the CO is doing
+	// something dangerous in the case when the CO can't avoid it.
+	ControllerUnpublishVolumeRequest_NODE_CLEANUP_TIMEOUT ControllerUnpublishVolumeRequest_Reason = 2
+	// The CO is asserting that the node is either permanently
+	// removed from the cluster, powered down, or rebooting.
+	// This reason MUST NOT be used if it is possible that the node
+	// may retain any open connection to the volume such that
+	// stale cached reads or stale cached writes to the volume
+	// could occur from the node.
+	ControllerUnpublishVolumeRequest_NODE_OUT_OF_SERVICE ControllerUnpublishVolumeRequest_Reason = 3
+)
+
+// Enum value maps for ControllerUnpublishVolumeRequest_Reason.
+var (
+	ControllerUnpublishVolumeRequest_Reason_name = map[int32]string{
+		0: "UNKNOWN",
+		1: "NODE_CLEANUP_SUCCEEDED",
+		2: "NODE_CLEANUP_TIMEOUT",
+		3: "NODE_OUT_OF_SERVICE",
+	}
+	ControllerUnpublishVolumeRequest_Reason_value = map[string]int32{
+		"UNKNOWN":                0,
+		"NODE_CLEANUP_SUCCEEDED": 1,
+		"NODE_CLEANUP_TIMEOUT":   2,
+		"NODE_OUT_OF_SERVICE":    3,
+	}
+)
+
+func (x ControllerUnpublishVolumeRequest_Reason) Enum() *ControllerUnpublishVolumeRequest_Reason {
+	p := new(ControllerUnpublishVolumeRequest_Reason)
+	*p = x
+	return p
+}
+
+func (x ControllerUnpublishVolumeRequest_Reason) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (ControllerUnpublishVolumeRequest_Reason) Descriptor() protoreflect.EnumDescriptor {
+	return file_csi_proto_enumTypes[6].Descriptor()
+}
+
+func (ControllerUnpublishVolumeRequest_Reason) Type() protoreflect.EnumType {
+	return &file_csi_proto_enumTypes[6]
+}
+
+func (x ControllerUnpublishVolumeRequest_Reason) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use ControllerUnpublishVolumeRequest_Reason.Descriptor instead.
+func (ControllerUnpublishVolumeRequest_Reason) EnumDescriptor() ([]byte, []int) {
+	return file_csi_proto_rawDescGZIP(), []int{19, 0}
+}
+
 type ControllerServiceCapability_RPC_Type int32
 
 const (
@@ -519,6 +590,12 @@ const (
 	// A plugin which supports the LIST_VOLUME_HEALTH capability
 	// MUST also support the GET_VOLUME_HEALTH capability.
 	ControllerServiceCapability_RPC_LIST_VOLUME_HEALTH ControllerServiceCapability_RPC_Type = 17
+	// Indicates the SP supports the ControllerGetNodeInfo RPC.
+	// This enables COs to fetch node topology and per-node volume
+	// limits from the controller plugin, which may be able to access
+	// such information more securely than the node plugin.
+	// The SP MUST also support PUBLISH_UNPUBLISH_VOLUME.
+	ControllerServiceCapability_RPC_GET_NODE_INFO ControllerServiceCapability_RPC_Type = 18
 )
 
 // Enum value maps for ControllerServiceCapability_RPC_Type.
@@ -541,6 +618,7 @@ var (
 		15: "GET_SNAPSHOT",
 		16: "GET_VOLUME_HEALTH",
 		17: "LIST_VOLUME_HEALTH",
+		18: "GET_NODE_INFO",
 	}
 	ControllerServiceCapability_RPC_Type_value = map[string]int32{
 		"UNKNOWN":                      0,
@@ -560,6 +638,7 @@ var (
 		"GET_SNAPSHOT":                 15,
 		"GET_VOLUME_HEALTH":            16,
 		"LIST_VOLUME_HEALTH":           17,
+		"GET_NODE_INFO":                18,
 	}
 )
 
@@ -574,11 +653,11 @@ func (x ControllerServiceCapability_RPC_Type) String() string {
 }
 
 func (ControllerServiceCapability_RPC_Type) Descriptor() protoreflect.EnumDescriptor {
-	return file_csi_proto_enumTypes[6].Descriptor()
+	return file_csi_proto_enumTypes[7].Descriptor()
 }
 
 func (ControllerServiceCapability_RPC_Type) Type() protoreflect.EnumType {
-	return &file_csi_proto_enumTypes[6]
+	return &file_csi_proto_enumTypes[7]
 }
 
 func (x ControllerServiceCapability_RPC_Type) Number() protoreflect.EnumNumber {
@@ -587,7 +666,7 @@ func (x ControllerServiceCapability_RPC_Type) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use ControllerServiceCapability_RPC_Type.Descriptor instead.
 func (ControllerServiceCapability_RPC_Type) EnumDescriptor() ([]byte, []int) {
-	return file_csi_proto_rawDescGZIP(), []int{38, 0, 0}
+	return file_csi_proto_rawDescGZIP(), []int{40, 0, 0}
 }
 
 type VolumeUsage_Unit int32
@@ -623,11 +702,11 @@ func (x VolumeUsage_Unit) String() string {
 }
 
 func (VolumeUsage_Unit) Descriptor() protoreflect.EnumDescriptor {
-	return file_csi_proto_enumTypes[7].Descriptor()
+	return file_csi_proto_enumTypes[8].Descriptor()
 }
 
 func (VolumeUsage_Unit) Type() protoreflect.EnumType {
-	return &file_csi_proto_enumTypes[7]
+	return &file_csi_proto_enumTypes[8]
 }
 
 func (x VolumeUsage_Unit) Number() protoreflect.EnumNumber {
@@ -636,7 +715,7 @@ func (x VolumeUsage_Unit) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use VolumeUsage_Unit.Descriptor instead.
 func (VolumeUsage_Unit) EnumDescriptor() ([]byte, []int) {
-	return file_csi_proto_rawDescGZIP(), []int{60, 0}
+	return file_csi_proto_rawDescGZIP(), []int{62, 0}
 }
 
 type NodeServiceCapability_RPC_Type int32
@@ -672,6 +751,13 @@ const (
 	// This enables COs to fetch health of entire storage subsystem
 	// from node's perspective.
 	NodeServiceCapability_RPC_GET_STORAGE_HEALTH NodeServiceCapability_RPC_Type = 8
+	// Indicates the SP supports the controller_get_node_info field
+	// in NodeGetInfoRequest. When the CO sets that field, it will
+	// obtain accessible_topology and max_volumes_per_node via
+	// ControllerGetNodeInfo.
+	// If the SP supports NODE_INFO_FROM_CONTROLLER, it MUST also
+	// support the GET_NODE_INFO controller capability.
+	NodeServiceCapability_RPC_NODE_INFO_FROM_CONTROLLER NodeServiceCapability_RPC_Type = 9
 )
 
 // Enum value maps for NodeServiceCapability_RPC_Type.
@@ -685,16 +771,18 @@ var (
 		6: "VOLUME_MOUNT_GROUP",
 		7: "GET_VOLUME_HEALTH",
 		8: "GET_STORAGE_HEALTH",
+		9: "NODE_INFO_FROM_CONTROLLER",
 	}
 	NodeServiceCapability_RPC_Type_value = map[string]int32{
-		"UNKNOWN":                  0,
-		"STAGE_UNSTAGE_VOLUME":     1,
-		"GET_VOLUME_STATS":         2,
-		"EXPAND_VOLUME":            3,
-		"SINGLE_NODE_MULTI_WRITER": 5,
-		"VOLUME_MOUNT_GROUP":       6,
-		"GET_VOLUME_HEALTH":        7,
-		"GET_STORAGE_HEALTH":       8,
+		"UNKNOWN":                   0,
+		"STAGE_UNSTAGE_VOLUME":      1,
+		"GET_VOLUME_STATS":          2,
+		"EXPAND_VOLUME":             3,
+		"SINGLE_NODE_MULTI_WRITER":  5,
+		"VOLUME_MOUNT_GROUP":        6,
+		"GET_VOLUME_HEALTH":         7,
+		"GET_STORAGE_HEALTH":        8,
+		"NODE_INFO_FROM_CONTROLLER": 9,
 	}
 )
 
@@ -709,11 +797,11 @@ func (x NodeServiceCapability_RPC_Type) String() string {
 }
 
 func (NodeServiceCapability_RPC_Type) Descriptor() protoreflect.EnumDescriptor {
-	return file_csi_proto_enumTypes[8].Descriptor()
+	return file_csi_proto_enumTypes[9].Descriptor()
 }
 
 func (NodeServiceCapability_RPC_Type) Type() protoreflect.EnumType {
-	return &file_csi_proto_enumTypes[8]
+	return &file_csi_proto_enumTypes[9]
 }
 
 func (x NodeServiceCapability_RPC_Type) Number() protoreflect.EnumNumber {
@@ -722,7 +810,7 @@ func (x NodeServiceCapability_RPC_Type) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use NodeServiceCapability_RPC_Type.Descriptor instead.
 func (NodeServiceCapability_RPC_Type) EnumDescriptor() ([]byte, []int) {
-	return file_csi_proto_rawDescGZIP(), []int{67, 0, 0}
+	return file_csi_proto_rawDescGZIP(), []int{69, 0, 0}
 }
 
 type GroupControllerServiceCapability_RPC_Type int32
@@ -758,11 +846,11 @@ func (x GroupControllerServiceCapability_RPC_Type) String() string {
 }
 
 func (GroupControllerServiceCapability_RPC_Type) Descriptor() protoreflect.EnumDescriptor {
-	return file_csi_proto_enumTypes[9].Descriptor()
+	return file_csi_proto_enumTypes[10].Descriptor()
 }
 
 func (GroupControllerServiceCapability_RPC_Type) Type() protoreflect.EnumType {
-	return &file_csi_proto_enumTypes[9]
+	return &file_csi_proto_enumTypes[10]
 }
 
 func (x GroupControllerServiceCapability_RPC_Type) Number() protoreflect.EnumNumber {
@@ -771,7 +859,7 @@ func (x GroupControllerServiceCapability_RPC_Type) Number() protoreflect.EnumNum
 
 // Deprecated: Use GroupControllerServiceCapability_RPC_Type.Descriptor instead.
 func (GroupControllerServiceCapability_RPC_Type) EnumDescriptor() ([]byte, []int) {
-	return file_csi_proto_rawDescGZIP(), []int{74, 0, 0}
+	return file_csi_proto_rawDescGZIP(), []int{76, 0, 0}
 }
 
 type GetPluginInfoRequest struct {
@@ -1646,9 +1734,10 @@ type Volume struct {
 	// VOLUME_ACCESSIBILITY_CONSTRAINTS plugin capability.
 	// An SP MAY specify multiple topologies to indicate the volume is
 	// accessible from multiple locations.
-	// COs MAY use this information along with the topology information
-	// returned by NodeGetInfo to ensure that a given volume is accessible
-	// from a given node when scheduling workloads.
+	// COs MAY use this information along with the node topology
+	// information returned by NodeGetInfo or ControllerGetNodeInfo to
+	// ensure that a given volume is accessible from a given node when
+	// scheduling workloads.
 	// This field is OPTIONAL. If it is not specified, the CO MAY assume
 	// the volume is equally accessible from all nodes in the cluster and
 	// MAY schedule workloads referencing the volume on any available
@@ -2282,7 +2371,17 @@ type ControllerUnpublishVolumeRequest struct {
 	// ControllerPublishVolume call for the specified volume.
 	// This field is OPTIONAL. Refer to the `Secrets Requirements`
 	// section on how to use this field.
-	Secrets       map[string]string `protobuf:"bytes,3,rep,name=secrets,proto3" json:"secrets,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	Secrets map[string]string `protobuf:"bytes,3,rep,name=secrets,proto3" json:"secrets,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	// Indicates why the CO is calling `ControllerUnpublishVolume`.
+	// If `node_id` is set, the CO SHOULD set this field, including when
+	// all `NodeUnstageVolume` and `NodeUnpublishVolume` calls for the
+	// volume on the node have succeeded. The SP MAY use this information
+	// when deciding how to unpublish the volume. Older plugins may
+	// ignore this field. The CO MUST NOT assume that setting this field
+	// causes the SP to take any particular precautions.
+	// This field is OPTIONAL. If it is unset, the CO is not indicating
+	// a reason. The CO MUST NOT set this field if `node_id` is unset.
+	Reason        ControllerUnpublishVolumeRequest_Reason `protobuf:"varint,4,opt,name=reason,proto3,enum=csi.v1.ControllerUnpublishVolumeRequest_Reason" json:"reason,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2336,6 +2435,13 @@ func (x *ControllerUnpublishVolumeRequest) GetSecrets() map[string]string {
 		return x.Secrets
 	}
 	return nil
+}
+
+func (x *ControllerUnpublishVolumeRequest) GetReason() ControllerUnpublishVolumeRequest_Reason {
+	if x != nil {
+		return x.Reason
+	}
+	return ControllerUnpublishVolumeRequest_UNKNOWN
 }
 
 type ControllerUnpublishVolumeResponse struct {
@@ -2807,8 +2913,9 @@ type VolumeHealth struct {
 	// ones, but MUST NOT remove an older error entry from
 	// health_statuses until that condition is no longer present.
 	//
-	// COs MUST ignore unknown VolumeHealthErrorType values, that they
-	// don't know about.
+	// The CO MUST NOT infer semantics or take automated action based on
+	// an unknown VolumeHealthErrorType value and MAY report it for
+	// observability purposes.
 	//
 	// For example:
 	//   - CSI spec v1.12.3
@@ -3183,6 +3290,147 @@ func (*ControllerModifyVolumeResponse) Descriptor() ([]byte, []int) {
 	return file_csi_proto_rawDescGZIP(), []int{33}
 }
 
+type ControllerGetNodeInfoRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The identifier of the node as understood by the SP.
+	// This field is REQUIRED.
+	// This field MUST match the node_id returned by `NodeGetInfo`.
+	// This field overrides the general CSI size limit.
+	// The size of this field SHALL NOT exceed 256 bytes.
+	NodeId        string `protobuf:"bytes,1,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ControllerGetNodeInfoRequest) Reset() {
+	*x = ControllerGetNodeInfoRequest{}
+	mi := &file_csi_proto_msgTypes[34]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ControllerGetNodeInfoRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ControllerGetNodeInfoRequest) ProtoMessage() {}
+
+func (x *ControllerGetNodeInfoRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_csi_proto_msgTypes[34]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ControllerGetNodeInfoRequest.ProtoReflect.Descriptor instead.
+func (*ControllerGetNodeInfoRequest) Descriptor() ([]byte, []int) {
+	return file_csi_proto_rawDescGZIP(), []int{34}
+}
+
+func (x *ControllerGetNodeInfoRequest) GetNodeId() string {
+	if x != nil {
+		return x.NodeId
+	}
+	return ""
+}
+
+type ControllerGetNodeInfoResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Maximum number of volumes that controller can publish to the node.
+	// If value is not set or zero CO SHALL decide how many volumes of
+	// this type can be published by the controller to the node. The
+	// plugin MUST NOT set negative values here.
+	// This field is OPTIONAL.
+	MaxVolumesPerNode int64 `protobuf:"varint,1,opt,name=max_volumes_per_node,json=maxVolumesPerNode,proto3" json:"max_volumes_per_node,omitempty"`
+	// Specifies where (regions, zones, racks, etc.) the node is
+	// accessible from.
+	// A plugin that returns this field MUST also set the
+	// VOLUME_ACCESSIBILITY_CONSTRAINTS plugin capability.
+	// COs MAY use this information along with the topology information
+	// returned in CreateVolumeResponse to ensure that a given volume is
+	// accessible from a given node when scheduling workloads.
+	// This field is OPTIONAL. If it is not specified, the CO MAY assume
+	// the node is not subject to any topological constraint, and MAY
+	// schedule workloads that reference any volume V, such that there are
+	// no topological constraints declared for V.
+	//
+	// Example 1:
+	//
+	//	accessible_topology =
+	//	  {"region": "R1", "zone": "Z2"}
+	//
+	// Indicates the node exists within the "region" "R1" and the "zone"
+	// "Z2".
+	AccessibleTopology *Topology `protobuf:"bytes,2,opt,name=accessible_topology,json=accessibleTopology,proto3" json:"accessible_topology,omitempty"`
+	// The volumes that are currently published to this node.
+	// This MAY include volumes not published by the CO.
+	// max_volumes_per_node is the limit on the union of these volumes
+	// and the volumes published to the node by the CO.
+	// This field is OPTIONAL.
+	//
+	// The CO MUST NOT attempt to unpublish or otherwise operate on
+	// volumes it did not publish.
+	PublishedVolumes []*ControllerGetNodeInfoResponse_PublishedVolume `protobuf:"bytes,3,rep,name=published_volumes,json=publishedVolumes,proto3" json:"published_volumes,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *ControllerGetNodeInfoResponse) Reset() {
+	*x = ControllerGetNodeInfoResponse{}
+	mi := &file_csi_proto_msgTypes[35]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ControllerGetNodeInfoResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ControllerGetNodeInfoResponse) ProtoMessage() {}
+
+func (x *ControllerGetNodeInfoResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_csi_proto_msgTypes[35]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ControllerGetNodeInfoResponse.ProtoReflect.Descriptor instead.
+func (*ControllerGetNodeInfoResponse) Descriptor() ([]byte, []int) {
+	return file_csi_proto_rawDescGZIP(), []int{35}
+}
+
+func (x *ControllerGetNodeInfoResponse) GetMaxVolumesPerNode() int64 {
+	if x != nil {
+		return x.MaxVolumesPerNode
+	}
+	return 0
+}
+
+func (x *ControllerGetNodeInfoResponse) GetAccessibleTopology() *Topology {
+	if x != nil {
+		return x.AccessibleTopology
+	}
+	return nil
+}
+
+func (x *ControllerGetNodeInfoResponse) GetPublishedVolumes() []*ControllerGetNodeInfoResponse_PublishedVolume {
+	if x != nil {
+		return x.PublishedVolumes
+	}
+	return nil
+}
+
 type GetCapacityRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// If specified, the Plugin SHALL report the capacity of the storage
@@ -3209,7 +3457,7 @@ type GetCapacityRequest struct {
 
 func (x *GetCapacityRequest) Reset() {
 	*x = GetCapacityRequest{}
-	mi := &file_csi_proto_msgTypes[34]
+	mi := &file_csi_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3221,7 +3469,7 @@ func (x *GetCapacityRequest) String() string {
 func (*GetCapacityRequest) ProtoMessage() {}
 
 func (x *GetCapacityRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_csi_proto_msgTypes[34]
+	mi := &file_csi_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3234,7 +3482,7 @@ func (x *GetCapacityRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetCapacityRequest.ProtoReflect.Descriptor instead.
 func (*GetCapacityRequest) Descriptor() ([]byte, []int) {
-	return file_csi_proto_rawDescGZIP(), []int{34}
+	return file_csi_proto_rawDescGZIP(), []int{36}
 }
 
 func (x *GetCapacityRequest) GetVolumeCapabilities() []*VolumeCapability {
@@ -3305,7 +3553,7 @@ type GetCapacityResponse struct {
 
 func (x *GetCapacityResponse) Reset() {
 	*x = GetCapacityResponse{}
-	mi := &file_csi_proto_msgTypes[35]
+	mi := &file_csi_proto_msgTypes[37]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3317,7 +3565,7 @@ func (x *GetCapacityResponse) String() string {
 func (*GetCapacityResponse) ProtoMessage() {}
 
 func (x *GetCapacityResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_csi_proto_msgTypes[35]
+	mi := &file_csi_proto_msgTypes[37]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3330,7 +3578,7 @@ func (x *GetCapacityResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetCapacityResponse.ProtoReflect.Descriptor instead.
 func (*GetCapacityResponse) Descriptor() ([]byte, []int) {
-	return file_csi_proto_rawDescGZIP(), []int{35}
+	return file_csi_proto_rawDescGZIP(), []int{37}
 }
 
 func (x *GetCapacityResponse) GetAvailableCapacity() int64 {
@@ -3362,7 +3610,7 @@ type ControllerGetCapabilitiesRequest struct {
 
 func (x *ControllerGetCapabilitiesRequest) Reset() {
 	*x = ControllerGetCapabilitiesRequest{}
-	mi := &file_csi_proto_msgTypes[36]
+	mi := &file_csi_proto_msgTypes[38]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3374,7 +3622,7 @@ func (x *ControllerGetCapabilitiesRequest) String() string {
 func (*ControllerGetCapabilitiesRequest) ProtoMessage() {}
 
 func (x *ControllerGetCapabilitiesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_csi_proto_msgTypes[36]
+	mi := &file_csi_proto_msgTypes[38]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3387,7 +3635,7 @@ func (x *ControllerGetCapabilitiesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ControllerGetCapabilitiesRequest.ProtoReflect.Descriptor instead.
 func (*ControllerGetCapabilitiesRequest) Descriptor() ([]byte, []int) {
-	return file_csi_proto_rawDescGZIP(), []int{36}
+	return file_csi_proto_rawDescGZIP(), []int{38}
 }
 
 type ControllerGetCapabilitiesResponse struct {
@@ -3401,7 +3649,7 @@ type ControllerGetCapabilitiesResponse struct {
 
 func (x *ControllerGetCapabilitiesResponse) Reset() {
 	*x = ControllerGetCapabilitiesResponse{}
-	mi := &file_csi_proto_msgTypes[37]
+	mi := &file_csi_proto_msgTypes[39]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3413,7 +3661,7 @@ func (x *ControllerGetCapabilitiesResponse) String() string {
 func (*ControllerGetCapabilitiesResponse) ProtoMessage() {}
 
 func (x *ControllerGetCapabilitiesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_csi_proto_msgTypes[37]
+	mi := &file_csi_proto_msgTypes[39]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3426,7 +3674,7 @@ func (x *ControllerGetCapabilitiesResponse) ProtoReflect() protoreflect.Message 
 
 // Deprecated: Use ControllerGetCapabilitiesResponse.ProtoReflect.Descriptor instead.
 func (*ControllerGetCapabilitiesResponse) Descriptor() ([]byte, []int) {
-	return file_csi_proto_rawDescGZIP(), []int{37}
+	return file_csi_proto_rawDescGZIP(), []int{39}
 }
 
 func (x *ControllerGetCapabilitiesResponse) GetCapabilities() []*ControllerServiceCapability {
@@ -3449,7 +3697,7 @@ type ControllerServiceCapability struct {
 
 func (x *ControllerServiceCapability) Reset() {
 	*x = ControllerServiceCapability{}
-	mi := &file_csi_proto_msgTypes[38]
+	mi := &file_csi_proto_msgTypes[40]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3461,7 +3709,7 @@ func (x *ControllerServiceCapability) String() string {
 func (*ControllerServiceCapability) ProtoMessage() {}
 
 func (x *ControllerServiceCapability) ProtoReflect() protoreflect.Message {
-	mi := &file_csi_proto_msgTypes[38]
+	mi := &file_csi_proto_msgTypes[40]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3474,7 +3722,7 @@ func (x *ControllerServiceCapability) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ControllerServiceCapability.ProtoReflect.Descriptor instead.
 func (*ControllerServiceCapability) Descriptor() ([]byte, []int) {
-	return file_csi_proto_rawDescGZIP(), []int{38}
+	return file_csi_proto_rawDescGZIP(), []int{40}
 }
 
 func (x *ControllerServiceCapability) GetType() isControllerServiceCapability_Type {
@@ -3551,7 +3799,7 @@ type CreateSnapshotRequest struct {
 
 func (x *CreateSnapshotRequest) Reset() {
 	*x = CreateSnapshotRequest{}
-	mi := &file_csi_proto_msgTypes[39]
+	mi := &file_csi_proto_msgTypes[41]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3563,7 +3811,7 @@ func (x *CreateSnapshotRequest) String() string {
 func (*CreateSnapshotRequest) ProtoMessage() {}
 
 func (x *CreateSnapshotRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_csi_proto_msgTypes[39]
+	mi := &file_csi_proto_msgTypes[41]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3576,7 +3824,7 @@ func (x *CreateSnapshotRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateSnapshotRequest.ProtoReflect.Descriptor instead.
 func (*CreateSnapshotRequest) Descriptor() ([]byte, []int) {
-	return file_csi_proto_rawDescGZIP(), []int{39}
+	return file_csi_proto_rawDescGZIP(), []int{41}
 }
 
 func (x *CreateSnapshotRequest) GetSourceVolumeId() string {
@@ -3626,7 +3874,7 @@ type CreateSnapshotResponse struct {
 
 func (x *CreateSnapshotResponse) Reset() {
 	*x = CreateSnapshotResponse{}
-	mi := &file_csi_proto_msgTypes[40]
+	mi := &file_csi_proto_msgTypes[42]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3638,7 +3886,7 @@ func (x *CreateSnapshotResponse) String() string {
 func (*CreateSnapshotResponse) ProtoMessage() {}
 
 func (x *CreateSnapshotResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_csi_proto_msgTypes[40]
+	mi := &file_csi_proto_msgTypes[42]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3651,7 +3899,7 @@ func (x *CreateSnapshotResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateSnapshotResponse.ProtoReflect.Descriptor instead.
 func (*CreateSnapshotResponse) Descriptor() ([]byte, []int) {
-	return file_csi_proto_rawDescGZIP(), []int{40}
+	return file_csi_proto_rawDescGZIP(), []int{42}
 }
 
 func (x *CreateSnapshotResponse) GetSnapshot() *Snapshot {
@@ -3728,7 +3976,7 @@ type Snapshot struct {
 
 func (x *Snapshot) Reset() {
 	*x = Snapshot{}
-	mi := &file_csi_proto_msgTypes[41]
+	mi := &file_csi_proto_msgTypes[43]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3740,7 +3988,7 @@ func (x *Snapshot) String() string {
 func (*Snapshot) ProtoMessage() {}
 
 func (x *Snapshot) ProtoReflect() protoreflect.Message {
-	mi := &file_csi_proto_msgTypes[41]
+	mi := &file_csi_proto_msgTypes[43]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3753,7 +4001,7 @@ func (x *Snapshot) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Snapshot.ProtoReflect.Descriptor instead.
 func (*Snapshot) Descriptor() ([]byte, []int) {
-	return file_csi_proto_rawDescGZIP(), []int{41}
+	return file_csi_proto_rawDescGZIP(), []int{43}
 }
 
 func (x *Snapshot) GetSizeBytes() int64 {
@@ -3820,7 +4068,7 @@ type DeleteSnapshotRequest struct {
 
 func (x *DeleteSnapshotRequest) Reset() {
 	*x = DeleteSnapshotRequest{}
-	mi := &file_csi_proto_msgTypes[42]
+	mi := &file_csi_proto_msgTypes[44]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3832,7 +4080,7 @@ func (x *DeleteSnapshotRequest) String() string {
 func (*DeleteSnapshotRequest) ProtoMessage() {}
 
 func (x *DeleteSnapshotRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_csi_proto_msgTypes[42]
+	mi := &file_csi_proto_msgTypes[44]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3845,7 +4093,7 @@ func (x *DeleteSnapshotRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteSnapshotRequest.ProtoReflect.Descriptor instead.
 func (*DeleteSnapshotRequest) Descriptor() ([]byte, []int) {
-	return file_csi_proto_rawDescGZIP(), []int{42}
+	return file_csi_proto_rawDescGZIP(), []int{44}
 }
 
 func (x *DeleteSnapshotRequest) GetSnapshotId() string {
@@ -3870,7 +4118,7 @@ type DeleteSnapshotResponse struct {
 
 func (x *DeleteSnapshotResponse) Reset() {
 	*x = DeleteSnapshotResponse{}
-	mi := &file_csi_proto_msgTypes[43]
+	mi := &file_csi_proto_msgTypes[45]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3882,7 +4130,7 @@ func (x *DeleteSnapshotResponse) String() string {
 func (*DeleteSnapshotResponse) ProtoMessage() {}
 
 func (x *DeleteSnapshotResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_csi_proto_msgTypes[43]
+	mi := &file_csi_proto_msgTypes[45]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3895,7 +4143,7 @@ func (x *DeleteSnapshotResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteSnapshotResponse.ProtoReflect.Descriptor instead.
 func (*DeleteSnapshotResponse) Descriptor() ([]byte, []int) {
-	return file_csi_proto_rawDescGZIP(), []int{43}
+	return file_csi_proto_rawDescGZIP(), []int{45}
 }
 
 // List all snapshots on the storage system regardless of how they were
@@ -3935,7 +4183,7 @@ type ListSnapshotsRequest struct {
 
 func (x *ListSnapshotsRequest) Reset() {
 	*x = ListSnapshotsRequest{}
-	mi := &file_csi_proto_msgTypes[44]
+	mi := &file_csi_proto_msgTypes[46]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3947,7 +4195,7 @@ func (x *ListSnapshotsRequest) String() string {
 func (*ListSnapshotsRequest) ProtoMessage() {}
 
 func (x *ListSnapshotsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_csi_proto_msgTypes[44]
+	mi := &file_csi_proto_msgTypes[46]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3960,7 +4208,7 @@ func (x *ListSnapshotsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListSnapshotsRequest.ProtoReflect.Descriptor instead.
 func (*ListSnapshotsRequest) Descriptor() ([]byte, []int) {
-	return file_csi_proto_rawDescGZIP(), []int{44}
+	return file_csi_proto_rawDescGZIP(), []int{46}
 }
 
 func (x *ListSnapshotsRequest) GetMaxEntries() int32 {
@@ -4014,7 +4262,7 @@ type ListSnapshotsResponse struct {
 
 func (x *ListSnapshotsResponse) Reset() {
 	*x = ListSnapshotsResponse{}
-	mi := &file_csi_proto_msgTypes[45]
+	mi := &file_csi_proto_msgTypes[47]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4026,7 +4274,7 @@ func (x *ListSnapshotsResponse) String() string {
 func (*ListSnapshotsResponse) ProtoMessage() {}
 
 func (x *ListSnapshotsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_csi_proto_msgTypes[45]
+	mi := &file_csi_proto_msgTypes[47]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4039,7 +4287,7 @@ func (x *ListSnapshotsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListSnapshotsResponse.ProtoReflect.Descriptor instead.
 func (*ListSnapshotsResponse) Descriptor() ([]byte, []int) {
-	return file_csi_proto_rawDescGZIP(), []int{45}
+	return file_csi_proto_rawDescGZIP(), []int{47}
 }
 
 func (x *ListSnapshotsResponse) GetEntries() []*ListSnapshotsResponse_Entry {
@@ -4071,7 +4319,7 @@ type GetSnapshotRequest struct {
 
 func (x *GetSnapshotRequest) Reset() {
 	*x = GetSnapshotRequest{}
-	mi := &file_csi_proto_msgTypes[46]
+	mi := &file_csi_proto_msgTypes[48]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4083,7 +4331,7 @@ func (x *GetSnapshotRequest) String() string {
 func (*GetSnapshotRequest) ProtoMessage() {}
 
 func (x *GetSnapshotRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_csi_proto_msgTypes[46]
+	mi := &file_csi_proto_msgTypes[48]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4096,7 +4344,7 @@ func (x *GetSnapshotRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetSnapshotRequest.ProtoReflect.Descriptor instead.
 func (*GetSnapshotRequest) Descriptor() ([]byte, []int) {
-	return file_csi_proto_rawDescGZIP(), []int{46}
+	return file_csi_proto_rawDescGZIP(), []int{48}
 }
 
 func (x *GetSnapshotRequest) GetSnapshotId() string {
@@ -4123,7 +4371,7 @@ type GetSnapshotResponse struct {
 
 func (x *GetSnapshotResponse) Reset() {
 	*x = GetSnapshotResponse{}
-	mi := &file_csi_proto_msgTypes[47]
+	mi := &file_csi_proto_msgTypes[49]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4135,7 +4383,7 @@ func (x *GetSnapshotResponse) String() string {
 func (*GetSnapshotResponse) ProtoMessage() {}
 
 func (x *GetSnapshotResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_csi_proto_msgTypes[47]
+	mi := &file_csi_proto_msgTypes[49]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4148,7 +4396,7 @@ func (x *GetSnapshotResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetSnapshotResponse.ProtoReflect.Descriptor instead.
 func (*GetSnapshotResponse) Descriptor() ([]byte, []int) {
-	return file_csi_proto_rawDescGZIP(), []int{47}
+	return file_csi_proto_rawDescGZIP(), []int{49}
 }
 
 func (x *GetSnapshotResponse) GetSnapshot() *Snapshot {
@@ -4182,7 +4430,7 @@ type ControllerExpandVolumeRequest struct {
 
 func (x *ControllerExpandVolumeRequest) Reset() {
 	*x = ControllerExpandVolumeRequest{}
-	mi := &file_csi_proto_msgTypes[48]
+	mi := &file_csi_proto_msgTypes[50]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4194,7 +4442,7 @@ func (x *ControllerExpandVolumeRequest) String() string {
 func (*ControllerExpandVolumeRequest) ProtoMessage() {}
 
 func (x *ControllerExpandVolumeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_csi_proto_msgTypes[48]
+	mi := &file_csi_proto_msgTypes[50]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4207,7 +4455,7 @@ func (x *ControllerExpandVolumeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ControllerExpandVolumeRequest.ProtoReflect.Descriptor instead.
 func (*ControllerExpandVolumeRequest) Descriptor() ([]byte, []int) {
-	return file_csi_proto_rawDescGZIP(), []int{48}
+	return file_csi_proto_rawDescGZIP(), []int{50}
 }
 
 func (x *ControllerExpandVolumeRequest) GetVolumeId() string {
@@ -4252,7 +4500,7 @@ type ControllerExpandVolumeResponse struct {
 
 func (x *ControllerExpandVolumeResponse) Reset() {
 	*x = ControllerExpandVolumeResponse{}
-	mi := &file_csi_proto_msgTypes[49]
+	mi := &file_csi_proto_msgTypes[51]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4264,7 +4512,7 @@ func (x *ControllerExpandVolumeResponse) String() string {
 func (*ControllerExpandVolumeResponse) ProtoMessage() {}
 
 func (x *ControllerExpandVolumeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_csi_proto_msgTypes[49]
+	mi := &file_csi_proto_msgTypes[51]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4277,7 +4525,7 @@ func (x *ControllerExpandVolumeResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ControllerExpandVolumeResponse.ProtoReflect.Descriptor instead.
 func (*ControllerExpandVolumeResponse) Descriptor() ([]byte, []int) {
-	return file_csi_proto_rawDescGZIP(), []int{49}
+	return file_csi_proto_rawDescGZIP(), []int{51}
 }
 
 func (x *ControllerExpandVolumeResponse) GetCapacityBytes() int64 {
@@ -4338,7 +4586,7 @@ type NodeStageVolumeRequest struct {
 
 func (x *NodeStageVolumeRequest) Reset() {
 	*x = NodeStageVolumeRequest{}
-	mi := &file_csi_proto_msgTypes[50]
+	mi := &file_csi_proto_msgTypes[52]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4350,7 +4598,7 @@ func (x *NodeStageVolumeRequest) String() string {
 func (*NodeStageVolumeRequest) ProtoMessage() {}
 
 func (x *NodeStageVolumeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_csi_proto_msgTypes[50]
+	mi := &file_csi_proto_msgTypes[52]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4363,7 +4611,7 @@ func (x *NodeStageVolumeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NodeStageVolumeRequest.ProtoReflect.Descriptor instead.
 func (*NodeStageVolumeRequest) Descriptor() ([]byte, []int) {
-	return file_csi_proto_rawDescGZIP(), []int{50}
+	return file_csi_proto_rawDescGZIP(), []int{52}
 }
 
 func (x *NodeStageVolumeRequest) GetVolumeId() string {
@@ -4416,7 +4664,7 @@ type NodeStageVolumeResponse struct {
 
 func (x *NodeStageVolumeResponse) Reset() {
 	*x = NodeStageVolumeResponse{}
-	mi := &file_csi_proto_msgTypes[51]
+	mi := &file_csi_proto_msgTypes[53]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4428,7 +4676,7 @@ func (x *NodeStageVolumeResponse) String() string {
 func (*NodeStageVolumeResponse) ProtoMessage() {}
 
 func (x *NodeStageVolumeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_csi_proto_msgTypes[51]
+	mi := &file_csi_proto_msgTypes[53]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4441,7 +4689,7 @@ func (x *NodeStageVolumeResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NodeStageVolumeResponse.ProtoReflect.Descriptor instead.
 func (*NodeStageVolumeResponse) Descriptor() ([]byte, []int) {
-	return file_csi_proto_rawDescGZIP(), []int{51}
+	return file_csi_proto_rawDescGZIP(), []int{53}
 }
 
 type NodeUnstageVolumeRequest struct {
@@ -4462,7 +4710,7 @@ type NodeUnstageVolumeRequest struct {
 
 func (x *NodeUnstageVolumeRequest) Reset() {
 	*x = NodeUnstageVolumeRequest{}
-	mi := &file_csi_proto_msgTypes[52]
+	mi := &file_csi_proto_msgTypes[54]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4474,7 +4722,7 @@ func (x *NodeUnstageVolumeRequest) String() string {
 func (*NodeUnstageVolumeRequest) ProtoMessage() {}
 
 func (x *NodeUnstageVolumeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_csi_proto_msgTypes[52]
+	mi := &file_csi_proto_msgTypes[54]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4487,7 +4735,7 @@ func (x *NodeUnstageVolumeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NodeUnstageVolumeRequest.ProtoReflect.Descriptor instead.
 func (*NodeUnstageVolumeRequest) Descriptor() ([]byte, []int) {
-	return file_csi_proto_rawDescGZIP(), []int{52}
+	return file_csi_proto_rawDescGZIP(), []int{54}
 }
 
 func (x *NodeUnstageVolumeRequest) GetVolumeId() string {
@@ -4512,7 +4760,7 @@ type NodeUnstageVolumeResponse struct {
 
 func (x *NodeUnstageVolumeResponse) Reset() {
 	*x = NodeUnstageVolumeResponse{}
-	mi := &file_csi_proto_msgTypes[53]
+	mi := &file_csi_proto_msgTypes[55]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4524,7 +4772,7 @@ func (x *NodeUnstageVolumeResponse) String() string {
 func (*NodeUnstageVolumeResponse) ProtoMessage() {}
 
 func (x *NodeUnstageVolumeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_csi_proto_msgTypes[53]
+	mi := &file_csi_proto_msgTypes[55]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4537,7 +4785,7 @@ func (x *NodeUnstageVolumeResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NodeUnstageVolumeResponse.ProtoReflect.Descriptor instead.
 func (*NodeUnstageVolumeResponse) Descriptor() ([]byte, []int) {
-	return file_csi_proto_rawDescGZIP(), []int{53}
+	return file_csi_proto_rawDescGZIP(), []int{55}
 }
 
 type NodePublishVolumeRequest struct {
@@ -4601,7 +4849,7 @@ type NodePublishVolumeRequest struct {
 
 func (x *NodePublishVolumeRequest) Reset() {
 	*x = NodePublishVolumeRequest{}
-	mi := &file_csi_proto_msgTypes[54]
+	mi := &file_csi_proto_msgTypes[56]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4613,7 +4861,7 @@ func (x *NodePublishVolumeRequest) String() string {
 func (*NodePublishVolumeRequest) ProtoMessage() {}
 
 func (x *NodePublishVolumeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_csi_proto_msgTypes[54]
+	mi := &file_csi_proto_msgTypes[56]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4626,7 +4874,7 @@ func (x *NodePublishVolumeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NodePublishVolumeRequest.ProtoReflect.Descriptor instead.
 func (*NodePublishVolumeRequest) Descriptor() ([]byte, []int) {
-	return file_csi_proto_rawDescGZIP(), []int{54}
+	return file_csi_proto_rawDescGZIP(), []int{56}
 }
 
 func (x *NodePublishVolumeRequest) GetVolumeId() string {
@@ -4693,7 +4941,7 @@ type NodePublishVolumeResponse struct {
 
 func (x *NodePublishVolumeResponse) Reset() {
 	*x = NodePublishVolumeResponse{}
-	mi := &file_csi_proto_msgTypes[55]
+	mi := &file_csi_proto_msgTypes[57]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4705,7 +4953,7 @@ func (x *NodePublishVolumeResponse) String() string {
 func (*NodePublishVolumeResponse) ProtoMessage() {}
 
 func (x *NodePublishVolumeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_csi_proto_msgTypes[55]
+	mi := &file_csi_proto_msgTypes[57]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4718,7 +4966,7 @@ func (x *NodePublishVolumeResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NodePublishVolumeResponse.ProtoReflect.Descriptor instead.
 func (*NodePublishVolumeResponse) Descriptor() ([]byte, []int) {
-	return file_csi_proto_rawDescGZIP(), []int{55}
+	return file_csi_proto_rawDescGZIP(), []int{57}
 }
 
 type NodeUnpublishVolumeRequest struct {
@@ -4740,7 +4988,7 @@ type NodeUnpublishVolumeRequest struct {
 
 func (x *NodeUnpublishVolumeRequest) Reset() {
 	*x = NodeUnpublishVolumeRequest{}
-	mi := &file_csi_proto_msgTypes[56]
+	mi := &file_csi_proto_msgTypes[58]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4752,7 +5000,7 @@ func (x *NodeUnpublishVolumeRequest) String() string {
 func (*NodeUnpublishVolumeRequest) ProtoMessage() {}
 
 func (x *NodeUnpublishVolumeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_csi_proto_msgTypes[56]
+	mi := &file_csi_proto_msgTypes[58]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4765,7 +5013,7 @@ func (x *NodeUnpublishVolumeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NodeUnpublishVolumeRequest.ProtoReflect.Descriptor instead.
 func (*NodeUnpublishVolumeRequest) Descriptor() ([]byte, []int) {
-	return file_csi_proto_rawDescGZIP(), []int{56}
+	return file_csi_proto_rawDescGZIP(), []int{58}
 }
 
 func (x *NodeUnpublishVolumeRequest) GetVolumeId() string {
@@ -4790,7 +5038,7 @@ type NodeUnpublishVolumeResponse struct {
 
 func (x *NodeUnpublishVolumeResponse) Reset() {
 	*x = NodeUnpublishVolumeResponse{}
-	mi := &file_csi_proto_msgTypes[57]
+	mi := &file_csi_proto_msgTypes[59]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4802,7 +5050,7 @@ func (x *NodeUnpublishVolumeResponse) String() string {
 func (*NodeUnpublishVolumeResponse) ProtoMessage() {}
 
 func (x *NodeUnpublishVolumeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_csi_proto_msgTypes[57]
+	mi := &file_csi_proto_msgTypes[59]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4815,7 +5063,7 @@ func (x *NodeUnpublishVolumeResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NodeUnpublishVolumeResponse.ProtoReflect.Descriptor instead.
 func (*NodeUnpublishVolumeResponse) Descriptor() ([]byte, []int) {
-	return file_csi_proto_rawDescGZIP(), []int{57}
+	return file_csi_proto_rawDescGZIP(), []int{59}
 }
 
 type NodeGetVolumeStatsRequest struct {
@@ -4848,7 +5096,7 @@ type NodeGetVolumeStatsRequest struct {
 
 func (x *NodeGetVolumeStatsRequest) Reset() {
 	*x = NodeGetVolumeStatsRequest{}
-	mi := &file_csi_proto_msgTypes[58]
+	mi := &file_csi_proto_msgTypes[60]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4860,7 +5108,7 @@ func (x *NodeGetVolumeStatsRequest) String() string {
 func (*NodeGetVolumeStatsRequest) ProtoMessage() {}
 
 func (x *NodeGetVolumeStatsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_csi_proto_msgTypes[58]
+	mi := &file_csi_proto_msgTypes[60]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4873,7 +5121,7 @@ func (x *NodeGetVolumeStatsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NodeGetVolumeStatsRequest.ProtoReflect.Descriptor instead.
 func (*NodeGetVolumeStatsRequest) Descriptor() ([]byte, []int) {
-	return file_csi_proto_rawDescGZIP(), []int{58}
+	return file_csi_proto_rawDescGZIP(), []int{60}
 }
 
 func (x *NodeGetVolumeStatsRequest) GetVolumeId() string {
@@ -4907,7 +5155,7 @@ type NodeGetVolumeStatsResponse struct {
 
 func (x *NodeGetVolumeStatsResponse) Reset() {
 	*x = NodeGetVolumeStatsResponse{}
-	mi := &file_csi_proto_msgTypes[59]
+	mi := &file_csi_proto_msgTypes[61]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4919,7 +5167,7 @@ func (x *NodeGetVolumeStatsResponse) String() string {
 func (*NodeGetVolumeStatsResponse) ProtoMessage() {}
 
 func (x *NodeGetVolumeStatsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_csi_proto_msgTypes[59]
+	mi := &file_csi_proto_msgTypes[61]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4932,7 +5180,7 @@ func (x *NodeGetVolumeStatsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NodeGetVolumeStatsResponse.ProtoReflect.Descriptor instead.
 func (*NodeGetVolumeStatsResponse) Descriptor() ([]byte, []int) {
-	return file_csi_proto_rawDescGZIP(), []int{59}
+	return file_csi_proto_rawDescGZIP(), []int{61}
 }
 
 func (x *NodeGetVolumeStatsResponse) GetUsage() []*VolumeUsage {
@@ -4961,7 +5209,7 @@ type VolumeUsage struct {
 
 func (x *VolumeUsage) Reset() {
 	*x = VolumeUsage{}
-	mi := &file_csi_proto_msgTypes[60]
+	mi := &file_csi_proto_msgTypes[62]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4973,7 +5221,7 @@ func (x *VolumeUsage) String() string {
 func (*VolumeUsage) ProtoMessage() {}
 
 func (x *VolumeUsage) ProtoReflect() protoreflect.Message {
-	mi := &file_csi_proto_msgTypes[60]
+	mi := &file_csi_proto_msgTypes[62]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4986,7 +5234,7 @@ func (x *VolumeUsage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use VolumeUsage.ProtoReflect.Descriptor instead.
 func (*VolumeUsage) Descriptor() ([]byte, []int) {
-	return file_csi_proto_rawDescGZIP(), []int{60}
+	return file_csi_proto_rawDescGZIP(), []int{62}
 }
 
 func (x *VolumeUsage) GetAvailable() int64 {
@@ -5048,7 +5296,7 @@ type NodeGetVolumeHealthRequest struct {
 
 func (x *NodeGetVolumeHealthRequest) Reset() {
 	*x = NodeGetVolumeHealthRequest{}
-	mi := &file_csi_proto_msgTypes[61]
+	mi := &file_csi_proto_msgTypes[63]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5060,7 +5308,7 @@ func (x *NodeGetVolumeHealthRequest) String() string {
 func (*NodeGetVolumeHealthRequest) ProtoMessage() {}
 
 func (x *NodeGetVolumeHealthRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_csi_proto_msgTypes[61]
+	mi := &file_csi_proto_msgTypes[63]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5073,7 +5321,7 @@ func (x *NodeGetVolumeHealthRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NodeGetVolumeHealthRequest.ProtoReflect.Descriptor instead.
 func (*NodeGetVolumeHealthRequest) Descriptor() ([]byte, []int) {
-	return file_csi_proto_rawDescGZIP(), []int{61}
+	return file_csi_proto_rawDescGZIP(), []int{63}
 }
 
 func (x *NodeGetVolumeHealthRequest) GetVolumeId() string {
@@ -5108,7 +5356,7 @@ type NodeGetVolumeHealthResponse struct {
 
 func (x *NodeGetVolumeHealthResponse) Reset() {
 	*x = NodeGetVolumeHealthResponse{}
-	mi := &file_csi_proto_msgTypes[62]
+	mi := &file_csi_proto_msgTypes[64]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5120,7 +5368,7 @@ func (x *NodeGetVolumeHealthResponse) String() string {
 func (*NodeGetVolumeHealthResponse) ProtoMessage() {}
 
 func (x *NodeGetVolumeHealthResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_csi_proto_msgTypes[62]
+	mi := &file_csi_proto_msgTypes[64]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5133,7 +5381,7 @@ func (x *NodeGetVolumeHealthResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NodeGetVolumeHealthResponse.ProtoReflect.Descriptor instead.
 func (*NodeGetVolumeHealthResponse) Descriptor() ([]byte, []int) {
-	return file_csi_proto_rawDescGZIP(), []int{62}
+	return file_csi_proto_rawDescGZIP(), []int{64}
 }
 
 func (x *NodeGetVolumeHealthResponse) GetVolumeHealth() *VolumeHealth {
@@ -5155,7 +5403,7 @@ type NodeGetStorageHealthRequest struct {
 
 func (x *NodeGetStorageHealthRequest) Reset() {
 	*x = NodeGetStorageHealthRequest{}
-	mi := &file_csi_proto_msgTypes[63]
+	mi := &file_csi_proto_msgTypes[65]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5167,7 +5415,7 @@ func (x *NodeGetStorageHealthRequest) String() string {
 func (*NodeGetStorageHealthRequest) ProtoMessage() {}
 
 func (x *NodeGetStorageHealthRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_csi_proto_msgTypes[63]
+	mi := &file_csi_proto_msgTypes[65]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5180,7 +5428,7 @@ func (x *NodeGetStorageHealthRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NodeGetStorageHealthRequest.ProtoReflect.Descriptor instead.
 func (*NodeGetStorageHealthRequest) Descriptor() ([]byte, []int) {
-	return file_csi_proto_rawDescGZIP(), []int{63}
+	return file_csi_proto_rawDescGZIP(), []int{65}
 }
 
 func (x *NodeGetStorageHealthRequest) GetSecrets() map[string]string {
@@ -5202,7 +5450,7 @@ type NodeGetStorageHealthResponse struct {
 
 func (x *NodeGetStorageHealthResponse) Reset() {
 	*x = NodeGetStorageHealthResponse{}
-	mi := &file_csi_proto_msgTypes[64]
+	mi := &file_csi_proto_msgTypes[66]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5214,7 +5462,7 @@ func (x *NodeGetStorageHealthResponse) String() string {
 func (*NodeGetStorageHealthResponse) ProtoMessage() {}
 
 func (x *NodeGetStorageHealthResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_csi_proto_msgTypes[64]
+	mi := &file_csi_proto_msgTypes[66]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5227,7 +5475,7 @@ func (x *NodeGetStorageHealthResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NodeGetStorageHealthResponse.ProtoReflect.Descriptor instead.
 func (*NodeGetStorageHealthResponse) Descriptor() ([]byte, []int) {
-	return file_csi_proto_rawDescGZIP(), []int{64}
+	return file_csi_proto_rawDescGZIP(), []int{66}
 }
 
 func (x *NodeGetStorageHealthResponse) GetBackendHealth() []*NodeGetStorageHealthResponse_StorageBackendHealth {
@@ -5245,7 +5493,7 @@ type NodeGetCapabilitiesRequest struct {
 
 func (x *NodeGetCapabilitiesRequest) Reset() {
 	*x = NodeGetCapabilitiesRequest{}
-	mi := &file_csi_proto_msgTypes[65]
+	mi := &file_csi_proto_msgTypes[67]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5257,7 +5505,7 @@ func (x *NodeGetCapabilitiesRequest) String() string {
 func (*NodeGetCapabilitiesRequest) ProtoMessage() {}
 
 func (x *NodeGetCapabilitiesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_csi_proto_msgTypes[65]
+	mi := &file_csi_proto_msgTypes[67]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5270,7 +5518,7 @@ func (x *NodeGetCapabilitiesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NodeGetCapabilitiesRequest.ProtoReflect.Descriptor instead.
 func (*NodeGetCapabilitiesRequest) Descriptor() ([]byte, []int) {
-	return file_csi_proto_rawDescGZIP(), []int{65}
+	return file_csi_proto_rawDescGZIP(), []int{67}
 }
 
 type NodeGetCapabilitiesResponse struct {
@@ -5284,7 +5532,7 @@ type NodeGetCapabilitiesResponse struct {
 
 func (x *NodeGetCapabilitiesResponse) Reset() {
 	*x = NodeGetCapabilitiesResponse{}
-	mi := &file_csi_proto_msgTypes[66]
+	mi := &file_csi_proto_msgTypes[68]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5296,7 +5544,7 @@ func (x *NodeGetCapabilitiesResponse) String() string {
 func (*NodeGetCapabilitiesResponse) ProtoMessage() {}
 
 func (x *NodeGetCapabilitiesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_csi_proto_msgTypes[66]
+	mi := &file_csi_proto_msgTypes[68]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5309,7 +5557,7 @@ func (x *NodeGetCapabilitiesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NodeGetCapabilitiesResponse.ProtoReflect.Descriptor instead.
 func (*NodeGetCapabilitiesResponse) Descriptor() ([]byte, []int) {
-	return file_csi_proto_rawDescGZIP(), []int{66}
+	return file_csi_proto_rawDescGZIP(), []int{68}
 }
 
 func (x *NodeGetCapabilitiesResponse) GetCapabilities() []*NodeServiceCapability {
@@ -5332,7 +5580,7 @@ type NodeServiceCapability struct {
 
 func (x *NodeServiceCapability) Reset() {
 	*x = NodeServiceCapability{}
-	mi := &file_csi_proto_msgTypes[67]
+	mi := &file_csi_proto_msgTypes[69]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5344,7 +5592,7 @@ func (x *NodeServiceCapability) String() string {
 func (*NodeServiceCapability) ProtoMessage() {}
 
 func (x *NodeServiceCapability) ProtoReflect() protoreflect.Message {
-	mi := &file_csi_proto_msgTypes[67]
+	mi := &file_csi_proto_msgTypes[69]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5357,7 +5605,7 @@ func (x *NodeServiceCapability) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NodeServiceCapability.ProtoReflect.Descriptor instead.
 func (*NodeServiceCapability) Descriptor() ([]byte, []int) {
-	return file_csi_proto_rawDescGZIP(), []int{67}
+	return file_csi_proto_rawDescGZIP(), []int{69}
 }
 
 func (x *NodeServiceCapability) GetType() isNodeServiceCapability_Type {
@@ -5388,14 +5636,25 @@ type NodeServiceCapability_Rpc struct {
 func (*NodeServiceCapability_Rpc) isNodeServiceCapability_Type() {}
 
 type NodeGetInfoRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// When true, the CO will obtain accessible_topology and
+	// max_volumes_per_node from the controller plugin using
+	// ControllerGetNodeInfo.
+	// The CO MUST ignore the accessible_topology and
+	// max_volumes_per_node in NodeGetInfoResponse if this field
+	// is true. The SP MAY omit those two fields from
+	// NodeGetInfoResponse and return only node_id in that case.
+	// The CO MUST NOT set this field to true unless the SP has the
+	// NODE_INFO_FROM_CONTROLLER node capability.
+	// This field is OPTIONAL.
+	ControllerGetNodeInfo bool `protobuf:"varint,1,opt,name=controller_get_node_info,json=controllerGetNodeInfo,proto3" json:"controller_get_node_info,omitempty"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
 }
 
 func (x *NodeGetInfoRequest) Reset() {
 	*x = NodeGetInfoRequest{}
-	mi := &file_csi_proto_msgTypes[68]
+	mi := &file_csi_proto_msgTypes[70]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5407,7 +5666,7 @@ func (x *NodeGetInfoRequest) String() string {
 func (*NodeGetInfoRequest) ProtoMessage() {}
 
 func (x *NodeGetInfoRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_csi_proto_msgTypes[68]
+	mi := &file_csi_proto_msgTypes[70]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5420,7 +5679,14 @@ func (x *NodeGetInfoRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NodeGetInfoRequest.ProtoReflect.Descriptor instead.
 func (*NodeGetInfoRequest) Descriptor() ([]byte, []int) {
-	return file_csi_proto_rawDescGZIP(), []int{68}
+	return file_csi_proto_rawDescGZIP(), []int{70}
+}
+
+func (x *NodeGetInfoRequest) GetControllerGetNodeInfo() bool {
+	if x != nil {
+		return x.ControllerGetNodeInfo
+	}
+	return false
 }
 
 type NodeGetInfoResponse struct {
@@ -5470,7 +5736,7 @@ type NodeGetInfoResponse struct {
 
 func (x *NodeGetInfoResponse) Reset() {
 	*x = NodeGetInfoResponse{}
-	mi := &file_csi_proto_msgTypes[69]
+	mi := &file_csi_proto_msgTypes[71]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5482,7 +5748,7 @@ func (x *NodeGetInfoResponse) String() string {
 func (*NodeGetInfoResponse) ProtoMessage() {}
 
 func (x *NodeGetInfoResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_csi_proto_msgTypes[69]
+	mi := &file_csi_proto_msgTypes[71]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5495,7 +5761,7 @@ func (x *NodeGetInfoResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NodeGetInfoResponse.ProtoReflect.Descriptor instead.
 func (*NodeGetInfoResponse) Descriptor() ([]byte, []int) {
-	return file_csi_proto_rawDescGZIP(), []int{69}
+	return file_csi_proto_rawDescGZIP(), []int{71}
 }
 
 func (x *NodeGetInfoResponse) GetNodeId() string {
@@ -5566,7 +5832,7 @@ type NodeExpandVolumeRequest struct {
 
 func (x *NodeExpandVolumeRequest) Reset() {
 	*x = NodeExpandVolumeRequest{}
-	mi := &file_csi_proto_msgTypes[70]
+	mi := &file_csi_proto_msgTypes[72]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5578,7 +5844,7 @@ func (x *NodeExpandVolumeRequest) String() string {
 func (*NodeExpandVolumeRequest) ProtoMessage() {}
 
 func (x *NodeExpandVolumeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_csi_proto_msgTypes[70]
+	mi := &file_csi_proto_msgTypes[72]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5591,7 +5857,7 @@ func (x *NodeExpandVolumeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NodeExpandVolumeRequest.ProtoReflect.Descriptor instead.
 func (*NodeExpandVolumeRequest) Descriptor() ([]byte, []int) {
-	return file_csi_proto_rawDescGZIP(), []int{70}
+	return file_csi_proto_rawDescGZIP(), []int{72}
 }
 
 func (x *NodeExpandVolumeRequest) GetVolumeId() string {
@@ -5646,7 +5912,7 @@ type NodeExpandVolumeResponse struct {
 
 func (x *NodeExpandVolumeResponse) Reset() {
 	*x = NodeExpandVolumeResponse{}
-	mi := &file_csi_proto_msgTypes[71]
+	mi := &file_csi_proto_msgTypes[73]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5658,7 +5924,7 @@ func (x *NodeExpandVolumeResponse) String() string {
 func (*NodeExpandVolumeResponse) ProtoMessage() {}
 
 func (x *NodeExpandVolumeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_csi_proto_msgTypes[71]
+	mi := &file_csi_proto_msgTypes[73]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5671,7 +5937,7 @@ func (x *NodeExpandVolumeResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NodeExpandVolumeResponse.ProtoReflect.Descriptor instead.
 func (*NodeExpandVolumeResponse) Descriptor() ([]byte, []int) {
-	return file_csi_proto_rawDescGZIP(), []int{71}
+	return file_csi_proto_rawDescGZIP(), []int{73}
 }
 
 func (x *NodeExpandVolumeResponse) GetCapacityBytes() int64 {
@@ -5689,7 +5955,7 @@ type GroupControllerGetCapabilitiesRequest struct {
 
 func (x *GroupControllerGetCapabilitiesRequest) Reset() {
 	*x = GroupControllerGetCapabilitiesRequest{}
-	mi := &file_csi_proto_msgTypes[72]
+	mi := &file_csi_proto_msgTypes[74]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5701,7 +5967,7 @@ func (x *GroupControllerGetCapabilitiesRequest) String() string {
 func (*GroupControllerGetCapabilitiesRequest) ProtoMessage() {}
 
 func (x *GroupControllerGetCapabilitiesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_csi_proto_msgTypes[72]
+	mi := &file_csi_proto_msgTypes[74]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5714,7 +5980,7 @@ func (x *GroupControllerGetCapabilitiesRequest) ProtoReflect() protoreflect.Mess
 
 // Deprecated: Use GroupControllerGetCapabilitiesRequest.ProtoReflect.Descriptor instead.
 func (*GroupControllerGetCapabilitiesRequest) Descriptor() ([]byte, []int) {
-	return file_csi_proto_rawDescGZIP(), []int{72}
+	return file_csi_proto_rawDescGZIP(), []int{74}
 }
 
 type GroupControllerGetCapabilitiesResponse struct {
@@ -5728,7 +5994,7 @@ type GroupControllerGetCapabilitiesResponse struct {
 
 func (x *GroupControllerGetCapabilitiesResponse) Reset() {
 	*x = GroupControllerGetCapabilitiesResponse{}
-	mi := &file_csi_proto_msgTypes[73]
+	mi := &file_csi_proto_msgTypes[75]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5740,7 +6006,7 @@ func (x *GroupControllerGetCapabilitiesResponse) String() string {
 func (*GroupControllerGetCapabilitiesResponse) ProtoMessage() {}
 
 func (x *GroupControllerGetCapabilitiesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_csi_proto_msgTypes[73]
+	mi := &file_csi_proto_msgTypes[75]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5753,7 +6019,7 @@ func (x *GroupControllerGetCapabilitiesResponse) ProtoReflect() protoreflect.Mes
 
 // Deprecated: Use GroupControllerGetCapabilitiesResponse.ProtoReflect.Descriptor instead.
 func (*GroupControllerGetCapabilitiesResponse) Descriptor() ([]byte, []int) {
-	return file_csi_proto_rawDescGZIP(), []int{73}
+	return file_csi_proto_rawDescGZIP(), []int{75}
 }
 
 func (x *GroupControllerGetCapabilitiesResponse) GetCapabilities() []*GroupControllerServiceCapability {
@@ -5776,7 +6042,7 @@ type GroupControllerServiceCapability struct {
 
 func (x *GroupControllerServiceCapability) Reset() {
 	*x = GroupControllerServiceCapability{}
-	mi := &file_csi_proto_msgTypes[74]
+	mi := &file_csi_proto_msgTypes[76]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5788,7 +6054,7 @@ func (x *GroupControllerServiceCapability) String() string {
 func (*GroupControllerServiceCapability) ProtoMessage() {}
 
 func (x *GroupControllerServiceCapability) ProtoReflect() protoreflect.Message {
-	mi := &file_csi_proto_msgTypes[74]
+	mi := &file_csi_proto_msgTypes[76]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5801,7 +6067,7 @@ func (x *GroupControllerServiceCapability) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GroupControllerServiceCapability.ProtoReflect.Descriptor instead.
 func (*GroupControllerServiceCapability) Descriptor() ([]byte, []int) {
-	return file_csi_proto_rawDescGZIP(), []int{74}
+	return file_csi_proto_rawDescGZIP(), []int{76}
 }
 
 func (x *GroupControllerServiceCapability) GetType() isGroupControllerServiceCapability_Type {
@@ -5860,7 +6126,7 @@ type CreateVolumeGroupSnapshotRequest struct {
 
 func (x *CreateVolumeGroupSnapshotRequest) Reset() {
 	*x = CreateVolumeGroupSnapshotRequest{}
-	mi := &file_csi_proto_msgTypes[75]
+	mi := &file_csi_proto_msgTypes[77]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5872,7 +6138,7 @@ func (x *CreateVolumeGroupSnapshotRequest) String() string {
 func (*CreateVolumeGroupSnapshotRequest) ProtoMessage() {}
 
 func (x *CreateVolumeGroupSnapshotRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_csi_proto_msgTypes[75]
+	mi := &file_csi_proto_msgTypes[77]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5885,7 +6151,7 @@ func (x *CreateVolumeGroupSnapshotRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateVolumeGroupSnapshotRequest.ProtoReflect.Descriptor instead.
 func (*CreateVolumeGroupSnapshotRequest) Descriptor() ([]byte, []int) {
-	return file_csi_proto_rawDescGZIP(), []int{75}
+	return file_csi_proto_rawDescGZIP(), []int{77}
 }
 
 func (x *CreateVolumeGroupSnapshotRequest) GetName() string {
@@ -5927,7 +6193,7 @@ type CreateVolumeGroupSnapshotResponse struct {
 
 func (x *CreateVolumeGroupSnapshotResponse) Reset() {
 	*x = CreateVolumeGroupSnapshotResponse{}
-	mi := &file_csi_proto_msgTypes[76]
+	mi := &file_csi_proto_msgTypes[78]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5939,7 +6205,7 @@ func (x *CreateVolumeGroupSnapshotResponse) String() string {
 func (*CreateVolumeGroupSnapshotResponse) ProtoMessage() {}
 
 func (x *CreateVolumeGroupSnapshotResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_csi_proto_msgTypes[76]
+	mi := &file_csi_proto_msgTypes[78]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5952,7 +6218,7 @@ func (x *CreateVolumeGroupSnapshotResponse) ProtoReflect() protoreflect.Message 
 
 // Deprecated: Use CreateVolumeGroupSnapshotResponse.ProtoReflect.Descriptor instead.
 func (*CreateVolumeGroupSnapshotResponse) Descriptor() ([]byte, []int) {
-	return file_csi_proto_rawDescGZIP(), []int{76}
+	return file_csi_proto_rawDescGZIP(), []int{78}
 }
 
 func (x *CreateVolumeGroupSnapshotResponse) GetGroupSnapshot() *VolumeGroupSnapshot {
@@ -5996,7 +6262,7 @@ type VolumeGroupSnapshot struct {
 
 func (x *VolumeGroupSnapshot) Reset() {
 	*x = VolumeGroupSnapshot{}
-	mi := &file_csi_proto_msgTypes[77]
+	mi := &file_csi_proto_msgTypes[79]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6008,7 +6274,7 @@ func (x *VolumeGroupSnapshot) String() string {
 func (*VolumeGroupSnapshot) ProtoMessage() {}
 
 func (x *VolumeGroupSnapshot) ProtoReflect() protoreflect.Message {
-	mi := &file_csi_proto_msgTypes[77]
+	mi := &file_csi_proto_msgTypes[79]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6021,7 +6287,7 @@ func (x *VolumeGroupSnapshot) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use VolumeGroupSnapshot.ProtoReflect.Descriptor instead.
 func (*VolumeGroupSnapshot) Descriptor() ([]byte, []int) {
-	return file_csi_proto_rawDescGZIP(), []int{77}
+	return file_csi_proto_rawDescGZIP(), []int{79}
 }
 
 func (x *VolumeGroupSnapshot) GetGroupSnapshotId() string {
@@ -6080,7 +6346,7 @@ type DeleteVolumeGroupSnapshotRequest struct {
 
 func (x *DeleteVolumeGroupSnapshotRequest) Reset() {
 	*x = DeleteVolumeGroupSnapshotRequest{}
-	mi := &file_csi_proto_msgTypes[78]
+	mi := &file_csi_proto_msgTypes[80]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6092,7 +6358,7 @@ func (x *DeleteVolumeGroupSnapshotRequest) String() string {
 func (*DeleteVolumeGroupSnapshotRequest) ProtoMessage() {}
 
 func (x *DeleteVolumeGroupSnapshotRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_csi_proto_msgTypes[78]
+	mi := &file_csi_proto_msgTypes[80]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6105,7 +6371,7 @@ func (x *DeleteVolumeGroupSnapshotRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteVolumeGroupSnapshotRequest.ProtoReflect.Descriptor instead.
 func (*DeleteVolumeGroupSnapshotRequest) Descriptor() ([]byte, []int) {
-	return file_csi_proto_rawDescGZIP(), []int{78}
+	return file_csi_proto_rawDescGZIP(), []int{80}
 }
 
 func (x *DeleteVolumeGroupSnapshotRequest) GetGroupSnapshotId() string {
@@ -6137,7 +6403,7 @@ type DeleteVolumeGroupSnapshotResponse struct {
 
 func (x *DeleteVolumeGroupSnapshotResponse) Reset() {
 	*x = DeleteVolumeGroupSnapshotResponse{}
-	mi := &file_csi_proto_msgTypes[79]
+	mi := &file_csi_proto_msgTypes[81]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6149,7 +6415,7 @@ func (x *DeleteVolumeGroupSnapshotResponse) String() string {
 func (*DeleteVolumeGroupSnapshotResponse) ProtoMessage() {}
 
 func (x *DeleteVolumeGroupSnapshotResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_csi_proto_msgTypes[79]
+	mi := &file_csi_proto_msgTypes[81]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6162,7 +6428,7 @@ func (x *DeleteVolumeGroupSnapshotResponse) ProtoReflect() protoreflect.Message 
 
 // Deprecated: Use DeleteVolumeGroupSnapshotResponse.ProtoReflect.Descriptor instead.
 func (*DeleteVolumeGroupSnapshotResponse) Descriptor() ([]byte, []int) {
-	return file_csi_proto_rawDescGZIP(), []int{79}
+	return file_csi_proto_rawDescGZIP(), []int{81}
 }
 
 type GetVolumeGroupSnapshotRequest struct {
@@ -6194,7 +6460,7 @@ type GetVolumeGroupSnapshotRequest struct {
 
 func (x *GetVolumeGroupSnapshotRequest) Reset() {
 	*x = GetVolumeGroupSnapshotRequest{}
-	mi := &file_csi_proto_msgTypes[80]
+	mi := &file_csi_proto_msgTypes[82]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6206,7 +6472,7 @@ func (x *GetVolumeGroupSnapshotRequest) String() string {
 func (*GetVolumeGroupSnapshotRequest) ProtoMessage() {}
 
 func (x *GetVolumeGroupSnapshotRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_csi_proto_msgTypes[80]
+	mi := &file_csi_proto_msgTypes[82]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6219,7 +6485,7 @@ func (x *GetVolumeGroupSnapshotRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetVolumeGroupSnapshotRequest.ProtoReflect.Descriptor instead.
 func (*GetVolumeGroupSnapshotRequest) Descriptor() ([]byte, []int) {
-	return file_csi_proto_rawDescGZIP(), []int{80}
+	return file_csi_proto_rawDescGZIP(), []int{82}
 }
 
 func (x *GetVolumeGroupSnapshotRequest) GetGroupSnapshotId() string {
@@ -6253,7 +6519,7 @@ type GetVolumeGroupSnapshotResponse struct {
 
 func (x *GetVolumeGroupSnapshotResponse) Reset() {
 	*x = GetVolumeGroupSnapshotResponse{}
-	mi := &file_csi_proto_msgTypes[81]
+	mi := &file_csi_proto_msgTypes[83]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6265,7 +6531,7 @@ func (x *GetVolumeGroupSnapshotResponse) String() string {
 func (*GetVolumeGroupSnapshotResponse) ProtoMessage() {}
 
 func (x *GetVolumeGroupSnapshotResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_csi_proto_msgTypes[81]
+	mi := &file_csi_proto_msgTypes[83]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6278,7 +6544,7 @@ func (x *GetVolumeGroupSnapshotResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetVolumeGroupSnapshotResponse.ProtoReflect.Descriptor instead.
 func (*GetVolumeGroupSnapshotResponse) Descriptor() ([]byte, []int) {
-	return file_csi_proto_rawDescGZIP(), []int{81}
+	return file_csi_proto_rawDescGZIP(), []int{83}
 }
 
 func (x *GetVolumeGroupSnapshotResponse) GetGroupSnapshot() *VolumeGroupSnapshot {
@@ -6305,7 +6571,7 @@ type BlockMetadata struct {
 
 func (x *BlockMetadata) Reset() {
 	*x = BlockMetadata{}
-	mi := &file_csi_proto_msgTypes[82]
+	mi := &file_csi_proto_msgTypes[84]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6317,7 +6583,7 @@ func (x *BlockMetadata) String() string {
 func (*BlockMetadata) ProtoMessage() {}
 
 func (x *BlockMetadata) ProtoReflect() protoreflect.Message {
-	mi := &file_csi_proto_msgTypes[82]
+	mi := &file_csi_proto_msgTypes[84]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6330,7 +6596,7 @@ func (x *BlockMetadata) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BlockMetadata.ProtoReflect.Descriptor instead.
 func (*BlockMetadata) Descriptor() ([]byte, []int) {
-	return file_csi_proto_rawDescGZIP(), []int{82}
+	return file_csi_proto_rawDescGZIP(), []int{84}
 }
 
 func (x *BlockMetadata) GetByteOffset() int64 {
@@ -6387,7 +6653,7 @@ type GetMetadataAllocatedRequest struct {
 
 func (x *GetMetadataAllocatedRequest) Reset() {
 	*x = GetMetadataAllocatedRequest{}
-	mi := &file_csi_proto_msgTypes[83]
+	mi := &file_csi_proto_msgTypes[85]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6399,7 +6665,7 @@ func (x *GetMetadataAllocatedRequest) String() string {
 func (*GetMetadataAllocatedRequest) ProtoMessage() {}
 
 func (x *GetMetadataAllocatedRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_csi_proto_msgTypes[83]
+	mi := &file_csi_proto_msgTypes[85]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6412,7 +6678,7 @@ func (x *GetMetadataAllocatedRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetMetadataAllocatedRequest.ProtoReflect.Descriptor instead.
 func (*GetMetadataAllocatedRequest) Descriptor() ([]byte, []int) {
-	return file_csi_proto_rawDescGZIP(), []int{83}
+	return file_csi_proto_rawDescGZIP(), []int{85}
 }
 
 func (x *GetMetadataAllocatedRequest) GetSnapshotId() string {
@@ -6480,7 +6746,7 @@ type GetMetadataAllocatedResponse struct {
 
 func (x *GetMetadataAllocatedResponse) Reset() {
 	*x = GetMetadataAllocatedResponse{}
-	mi := &file_csi_proto_msgTypes[84]
+	mi := &file_csi_proto_msgTypes[86]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6492,7 +6758,7 @@ func (x *GetMetadataAllocatedResponse) String() string {
 func (*GetMetadataAllocatedResponse) ProtoMessage() {}
 
 func (x *GetMetadataAllocatedResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_csi_proto_msgTypes[84]
+	mi := &file_csi_proto_msgTypes[86]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6505,7 +6771,7 @@ func (x *GetMetadataAllocatedResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetMetadataAllocatedResponse.ProtoReflect.Descriptor instead.
 func (*GetMetadataAllocatedResponse) Descriptor() ([]byte, []int) {
-	return file_csi_proto_rawDescGZIP(), []int{84}
+	return file_csi_proto_rawDescGZIP(), []int{86}
 }
 
 func (x *GetMetadataAllocatedResponse) GetBlockMetadataType() BlockMetadataType {
@@ -6572,7 +6838,7 @@ type GetMetadataDeltaRequest struct {
 
 func (x *GetMetadataDeltaRequest) Reset() {
 	*x = GetMetadataDeltaRequest{}
-	mi := &file_csi_proto_msgTypes[85]
+	mi := &file_csi_proto_msgTypes[87]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6584,7 +6850,7 @@ func (x *GetMetadataDeltaRequest) String() string {
 func (*GetMetadataDeltaRequest) ProtoMessage() {}
 
 func (x *GetMetadataDeltaRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_csi_proto_msgTypes[85]
+	mi := &file_csi_proto_msgTypes[87]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6597,7 +6863,7 @@ func (x *GetMetadataDeltaRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetMetadataDeltaRequest.ProtoReflect.Descriptor instead.
 func (*GetMetadataDeltaRequest) Descriptor() ([]byte, []int) {
-	return file_csi_proto_rawDescGZIP(), []int{85}
+	return file_csi_proto_rawDescGZIP(), []int{87}
 }
 
 func (x *GetMetadataDeltaRequest) GetBaseSnapshotId() string {
@@ -6673,7 +6939,7 @@ type GetMetadataDeltaResponse struct {
 
 func (x *GetMetadataDeltaResponse) Reset() {
 	*x = GetMetadataDeltaResponse{}
-	mi := &file_csi_proto_msgTypes[86]
+	mi := &file_csi_proto_msgTypes[88]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6685,7 +6951,7 @@ func (x *GetMetadataDeltaResponse) String() string {
 func (*GetMetadataDeltaResponse) ProtoMessage() {}
 
 func (x *GetMetadataDeltaResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_csi_proto_msgTypes[86]
+	mi := &file_csi_proto_msgTypes[88]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6698,7 +6964,7 @@ func (x *GetMetadataDeltaResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetMetadataDeltaResponse.ProtoReflect.Descriptor instead.
 func (*GetMetadataDeltaResponse) Descriptor() ([]byte, []int) {
-	return file_csi_proto_rawDescGZIP(), []int{86}
+	return file_csi_proto_rawDescGZIP(), []int{88}
 }
 
 func (x *GetMetadataDeltaResponse) GetBlockMetadataType() BlockMetadataType {
@@ -6731,7 +6997,7 @@ type PluginCapability_Service struct {
 
 func (x *PluginCapability_Service) Reset() {
 	*x = PluginCapability_Service{}
-	mi := &file_csi_proto_msgTypes[88]
+	mi := &file_csi_proto_msgTypes[90]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6743,7 +7009,7 @@ func (x *PluginCapability_Service) String() string {
 func (*PluginCapability_Service) ProtoMessage() {}
 
 func (x *PluginCapability_Service) ProtoReflect() protoreflect.Message {
-	mi := &file_csi_proto_msgTypes[88]
+	mi := &file_csi_proto_msgTypes[90]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6775,7 +7041,7 @@ type PluginCapability_VolumeExpansion struct {
 
 func (x *PluginCapability_VolumeExpansion) Reset() {
 	*x = PluginCapability_VolumeExpansion{}
-	mi := &file_csi_proto_msgTypes[89]
+	mi := &file_csi_proto_msgTypes[91]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6787,7 +7053,7 @@ func (x *PluginCapability_VolumeExpansion) String() string {
 func (*PluginCapability_VolumeExpansion) ProtoMessage() {}
 
 func (x *PluginCapability_VolumeExpansion) ProtoReflect() protoreflect.Message {
-	mi := &file_csi_proto_msgTypes[89]
+	mi := &file_csi_proto_msgTypes[91]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6823,7 +7089,7 @@ type VolumeContentSource_SnapshotSource struct {
 
 func (x *VolumeContentSource_SnapshotSource) Reset() {
 	*x = VolumeContentSource_SnapshotSource{}
-	mi := &file_csi_proto_msgTypes[93]
+	mi := &file_csi_proto_msgTypes[95]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6835,7 +7101,7 @@ func (x *VolumeContentSource_SnapshotSource) String() string {
 func (*VolumeContentSource_SnapshotSource) ProtoMessage() {}
 
 func (x *VolumeContentSource_SnapshotSource) ProtoReflect() protoreflect.Message {
-	mi := &file_csi_proto_msgTypes[93]
+	mi := &file_csi_proto_msgTypes[95]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6870,7 +7136,7 @@ type VolumeContentSource_VolumeSource struct {
 
 func (x *VolumeContentSource_VolumeSource) Reset() {
 	*x = VolumeContentSource_VolumeSource{}
-	mi := &file_csi_proto_msgTypes[94]
+	mi := &file_csi_proto_msgTypes[96]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6882,7 +7148,7 @@ func (x *VolumeContentSource_VolumeSource) String() string {
 func (*VolumeContentSource_VolumeSource) ProtoMessage() {}
 
 func (x *VolumeContentSource_VolumeSource) ProtoReflect() protoreflect.Message {
-	mi := &file_csi_proto_msgTypes[94]
+	mi := &file_csi_proto_msgTypes[96]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6914,7 +7180,7 @@ type VolumeCapability_BlockVolume struct {
 
 func (x *VolumeCapability_BlockVolume) Reset() {
 	*x = VolumeCapability_BlockVolume{}
-	mi := &file_csi_proto_msgTypes[95]
+	mi := &file_csi_proto_msgTypes[97]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6926,7 +7192,7 @@ func (x *VolumeCapability_BlockVolume) String() string {
 func (*VolumeCapability_BlockVolume) ProtoMessage() {}
 
 func (x *VolumeCapability_BlockVolume) ProtoReflect() protoreflect.Message {
-	mi := &file_csi_proto_msgTypes[95]
+	mi := &file_csi_proto_msgTypes[97]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6972,7 +7238,7 @@ type VolumeCapability_MountVolume struct {
 
 func (x *VolumeCapability_MountVolume) Reset() {
 	*x = VolumeCapability_MountVolume{}
-	mi := &file_csi_proto_msgTypes[96]
+	mi := &file_csi_proto_msgTypes[98]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6984,7 +7250,7 @@ func (x *VolumeCapability_MountVolume) String() string {
 func (*VolumeCapability_MountVolume) ProtoMessage() {}
 
 func (x *VolumeCapability_MountVolume) ProtoReflect() protoreflect.Message {
-	mi := &file_csi_proto_msgTypes[96]
+	mi := &file_csi_proto_msgTypes[98]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7032,7 +7298,7 @@ type VolumeCapability_AccessMode struct {
 
 func (x *VolumeCapability_AccessMode) Reset() {
 	*x = VolumeCapability_AccessMode{}
-	mi := &file_csi_proto_msgTypes[97]
+	mi := &file_csi_proto_msgTypes[99]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7044,7 +7310,7 @@ func (x *VolumeCapability_AccessMode) String() string {
 func (*VolumeCapability_AccessMode) ProtoMessage() {}
 
 func (x *VolumeCapability_AccessMode) ProtoReflect() protoreflect.Message {
-	mi := &file_csi_proto_msgTypes[97]
+	mi := &file_csi_proto_msgTypes[99]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7087,7 +7353,7 @@ type ValidateVolumeCapabilitiesResponse_Confirmed struct {
 
 func (x *ValidateVolumeCapabilitiesResponse_Confirmed) Reset() {
 	*x = ValidateVolumeCapabilitiesResponse_Confirmed{}
-	mi := &file_csi_proto_msgTypes[109]
+	mi := &file_csi_proto_msgTypes[111]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7099,7 +7365,7 @@ func (x *ValidateVolumeCapabilitiesResponse_Confirmed) String() string {
 func (*ValidateVolumeCapabilitiesResponse_Confirmed) ProtoMessage() {}
 
 func (x *ValidateVolumeCapabilitiesResponse_Confirmed) ProtoReflect() protoreflect.Message {
-	mi := &file_csi_proto_msgTypes[109]
+	mi := &file_csi_proto_msgTypes[111]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7162,7 +7428,7 @@ type ListVolumesResponse_VolumeStatus struct {
 
 func (x *ListVolumesResponse_VolumeStatus) Reset() {
 	*x = ListVolumesResponse_VolumeStatus{}
-	mi := &file_csi_proto_msgTypes[113]
+	mi := &file_csi_proto_msgTypes[115]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7174,7 +7440,7 @@ func (x *ListVolumesResponse_VolumeStatus) String() string {
 func (*ListVolumesResponse_VolumeStatus) ProtoMessage() {}
 
 func (x *ListVolumesResponse_VolumeStatus) ProtoReflect() protoreflect.Message {
-	mi := &file_csi_proto_msgTypes[113]
+	mi := &file_csi_proto_msgTypes[115]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7211,7 +7477,7 @@ type ListVolumesResponse_Entry struct {
 
 func (x *ListVolumesResponse_Entry) Reset() {
 	*x = ListVolumesResponse_Entry{}
-	mi := &file_csi_proto_msgTypes[114]
+	mi := &file_csi_proto_msgTypes[116]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7223,7 +7489,7 @@ func (x *ListVolumesResponse_Entry) String() string {
 func (*ListVolumesResponse_Entry) ProtoMessage() {}
 
 func (x *ListVolumesResponse_Entry) ProtoReflect() protoreflect.Message {
-	mi := &file_csi_proto_msgTypes[114]
+	mi := &file_csi_proto_msgTypes[116]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7275,7 +7541,7 @@ type VolumeHealth_VolumeHealthEntry struct {
 
 func (x *VolumeHealth_VolumeHealthEntry) Reset() {
 	*x = VolumeHealth_VolumeHealthEntry{}
-	mi := &file_csi_proto_msgTypes[116]
+	mi := &file_csi_proto_msgTypes[118]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7287,7 +7553,7 @@ func (x *VolumeHealth_VolumeHealthEntry) String() string {
 func (*VolumeHealth_VolumeHealthEntry) ProtoMessage() {}
 
 func (x *VolumeHealth_VolumeHealthEntry) ProtoReflect() protoreflect.Message {
-	mi := &file_csi_proto_msgTypes[116]
+	mi := &file_csi_proto_msgTypes[118]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7340,7 +7606,7 @@ type ControllerGetVolumeResponse_VolumeStatus struct {
 
 func (x *ControllerGetVolumeResponse_VolumeStatus) Reset() {
 	*x = ControllerGetVolumeResponse_VolumeStatus{}
-	mi := &file_csi_proto_msgTypes[118]
+	mi := &file_csi_proto_msgTypes[120]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7352,7 +7618,7 @@ func (x *ControllerGetVolumeResponse_VolumeStatus) String() string {
 func (*ControllerGetVolumeResponse_VolumeStatus) ProtoMessage() {}
 
 func (x *ControllerGetVolumeResponse_VolumeStatus) ProtoReflect() protoreflect.Message {
-	mi := &file_csi_proto_msgTypes[118]
+	mi := &file_csi_proto_msgTypes[120]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7375,6 +7641,54 @@ func (x *ControllerGetVolumeResponse_VolumeStatus) GetPublishedNodeIds() []strin
 	return nil
 }
 
+type ControllerGetNodeInfoResponse_PublishedVolume struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The unique identifier of a volume published to the node.
+	// For volumes published by the CO, this MUST be the same volume_id
+	// value used in ControllerPublishVolume.
+	// This field is REQUIRED.
+	VolumeId      string `protobuf:"bytes,1,opt,name=volume_id,json=volumeId,proto3" json:"volume_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ControllerGetNodeInfoResponse_PublishedVolume) Reset() {
+	*x = ControllerGetNodeInfoResponse_PublishedVolume{}
+	mi := &file_csi_proto_msgTypes[123]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ControllerGetNodeInfoResponse_PublishedVolume) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ControllerGetNodeInfoResponse_PublishedVolume) ProtoMessage() {}
+
+func (x *ControllerGetNodeInfoResponse_PublishedVolume) ProtoReflect() protoreflect.Message {
+	mi := &file_csi_proto_msgTypes[123]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ControllerGetNodeInfoResponse_PublishedVolume.ProtoReflect.Descriptor instead.
+func (*ControllerGetNodeInfoResponse_PublishedVolume) Descriptor() ([]byte, []int) {
+	return file_csi_proto_rawDescGZIP(), []int{35, 0}
+}
+
+func (x *ControllerGetNodeInfoResponse_PublishedVolume) GetVolumeId() string {
+	if x != nil {
+		return x.VolumeId
+	}
+	return ""
+}
+
 type ControllerServiceCapability_RPC struct {
 	state         protoimpl.MessageState               `protogen:"open.v1"`
 	Type          ControllerServiceCapability_RPC_Type `protobuf:"varint,1,opt,name=type,proto3,enum=csi.v1.ControllerServiceCapability_RPC_Type" json:"type,omitempty"`
@@ -7384,7 +7698,7 @@ type ControllerServiceCapability_RPC struct {
 
 func (x *ControllerServiceCapability_RPC) Reset() {
 	*x = ControllerServiceCapability_RPC{}
-	mi := &file_csi_proto_msgTypes[122]
+	mi := &file_csi_proto_msgTypes[125]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7396,7 +7710,7 @@ func (x *ControllerServiceCapability_RPC) String() string {
 func (*ControllerServiceCapability_RPC) ProtoMessage() {}
 
 func (x *ControllerServiceCapability_RPC) ProtoReflect() protoreflect.Message {
-	mi := &file_csi_proto_msgTypes[122]
+	mi := &file_csi_proto_msgTypes[125]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7409,7 +7723,7 @@ func (x *ControllerServiceCapability_RPC) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ControllerServiceCapability_RPC.ProtoReflect.Descriptor instead.
 func (*ControllerServiceCapability_RPC) Descriptor() ([]byte, []int) {
-	return file_csi_proto_rawDescGZIP(), []int{38, 0}
+	return file_csi_proto_rawDescGZIP(), []int{40, 0}
 }
 
 func (x *ControllerServiceCapability_RPC) GetType() ControllerServiceCapability_RPC_Type {
@@ -7428,7 +7742,7 @@ type ListSnapshotsResponse_Entry struct {
 
 func (x *ListSnapshotsResponse_Entry) Reset() {
 	*x = ListSnapshotsResponse_Entry{}
-	mi := &file_csi_proto_msgTypes[127]
+	mi := &file_csi_proto_msgTypes[130]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7440,7 +7754,7 @@ func (x *ListSnapshotsResponse_Entry) String() string {
 func (*ListSnapshotsResponse_Entry) ProtoMessage() {}
 
 func (x *ListSnapshotsResponse_Entry) ProtoReflect() protoreflect.Message {
-	mi := &file_csi_proto_msgTypes[127]
+	mi := &file_csi_proto_msgTypes[130]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7453,7 +7767,7 @@ func (x *ListSnapshotsResponse_Entry) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListSnapshotsResponse_Entry.ProtoReflect.Descriptor instead.
 func (*ListSnapshotsResponse_Entry) Descriptor() ([]byte, []int) {
-	return file_csi_proto_rawDescGZIP(), []int{45, 0}
+	return file_csi_proto_rawDescGZIP(), []int{47, 0}
 }
 
 func (x *ListSnapshotsResponse_Entry) GetSnapshot() *Snapshot {
@@ -7486,7 +7800,7 @@ type NodeGetStorageHealthResponse_StorageBackendHealth struct {
 
 func (x *NodeGetStorageHealthResponse_StorageBackendHealth) Reset() {
 	*x = NodeGetStorageHealthResponse_StorageBackendHealth{}
-	mi := &file_csi_proto_msgTypes[137]
+	mi := &file_csi_proto_msgTypes[140]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7498,7 +7812,7 @@ func (x *NodeGetStorageHealthResponse_StorageBackendHealth) String() string {
 func (*NodeGetStorageHealthResponse_StorageBackendHealth) ProtoMessage() {}
 
 func (x *NodeGetStorageHealthResponse_StorageBackendHealth) ProtoReflect() protoreflect.Message {
-	mi := &file_csi_proto_msgTypes[137]
+	mi := &file_csi_proto_msgTypes[140]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7511,7 +7825,7 @@ func (x *NodeGetStorageHealthResponse_StorageBackendHealth) ProtoReflect() proto
 
 // Deprecated: Use NodeGetStorageHealthResponse_StorageBackendHealth.ProtoReflect.Descriptor instead.
 func (*NodeGetStorageHealthResponse_StorageBackendHealth) Descriptor() ([]byte, []int) {
-	return file_csi_proto_rawDescGZIP(), []int{64, 0}
+	return file_csi_proto_rawDescGZIP(), []int{66, 0}
 }
 
 func (x *NodeGetStorageHealthResponse_StorageBackendHealth) GetStatus() StorageHealthErrorType {
@@ -7551,7 +7865,7 @@ type NodeServiceCapability_RPC struct {
 
 func (x *NodeServiceCapability_RPC) Reset() {
 	*x = NodeServiceCapability_RPC{}
-	mi := &file_csi_proto_msgTypes[138]
+	mi := &file_csi_proto_msgTypes[141]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7563,7 +7877,7 @@ func (x *NodeServiceCapability_RPC) String() string {
 func (*NodeServiceCapability_RPC) ProtoMessage() {}
 
 func (x *NodeServiceCapability_RPC) ProtoReflect() protoreflect.Message {
-	mi := &file_csi_proto_msgTypes[138]
+	mi := &file_csi_proto_msgTypes[141]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7576,7 +7890,7 @@ func (x *NodeServiceCapability_RPC) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NodeServiceCapability_RPC.ProtoReflect.Descriptor instead.
 func (*NodeServiceCapability_RPC) Descriptor() ([]byte, []int) {
-	return file_csi_proto_rawDescGZIP(), []int{67, 0}
+	return file_csi_proto_rawDescGZIP(), []int{69, 0}
 }
 
 func (x *NodeServiceCapability_RPC) GetType() NodeServiceCapability_RPC_Type {
@@ -7595,7 +7909,7 @@ type GroupControllerServiceCapability_RPC struct {
 
 func (x *GroupControllerServiceCapability_RPC) Reset() {
 	*x = GroupControllerServiceCapability_RPC{}
-	mi := &file_csi_proto_msgTypes[140]
+	mi := &file_csi_proto_msgTypes[143]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7607,7 +7921,7 @@ func (x *GroupControllerServiceCapability_RPC) String() string {
 func (*GroupControllerServiceCapability_RPC) ProtoMessage() {}
 
 func (x *GroupControllerServiceCapability_RPC) ProtoReflect() protoreflect.Message {
-	mi := &file_csi_proto_msgTypes[140]
+	mi := &file_csi_proto_msgTypes[143]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7620,7 +7934,7 @@ func (x *GroupControllerServiceCapability_RPC) ProtoReflect() protoreflect.Messa
 
 // Deprecated: Use GroupControllerServiceCapability_RPC.ProtoReflect.Descriptor instead.
 func (*GroupControllerServiceCapability_RPC) Descriptor() ([]byte, []int) {
-	return file_csi_proto_rawDescGZIP(), []int{74, 0}
+	return file_csi_proto_rawDescGZIP(), []int{76, 0}
 }
 
 func (x *GroupControllerServiceCapability_RPC) GetType() GroupControllerServiceCapability_RPC_Type {
@@ -7893,14 +8207,20 @@ const file_csi_proto_rawDesc = "" +
 	"\x0fpublish_context\x18\x01 \x03(\v2;.csi.v1.ControllerPublishVolumeResponse.PublishContextEntryR\x0epublishContext\x1aA\n" +
 	"\x13PublishContextEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xea\x01\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x9e\x03\n" +
 	" ControllerUnpublishVolumeRequest\x12\x1b\n" +
 	"\tvolume_id\x18\x01 \x01(\tR\bvolumeId\x12\x17\n" +
 	"\anode_id\x18\x02 \x01(\tR\x06nodeId\x12T\n" +
-	"\asecrets\x18\x03 \x03(\v25.csi.v1.ControllerUnpublishVolumeRequest.SecretsEntryB\x03\x98B\x01R\asecrets\x1a:\n" +
+	"\asecrets\x18\x03 \x03(\v25.csi.v1.ControllerUnpublishVolumeRequest.SecretsEntryB\x03\x98B\x01R\asecrets\x12L\n" +
+	"\x06reason\x18\x04 \x01(\x0e2/.csi.v1.ControllerUnpublishVolumeRequest.ReasonB\x03\xa0B\x01R\x06reason\x1a:\n" +
 	"\fSecretsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"#\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"d\n" +
+	"\x06Reason\x12\v\n" +
+	"\aUNKNOWN\x10\x00\x12\x1a\n" +
+	"\x16NODE_CLEANUP_SUCCEEDED\x10\x01\x12\x18\n" +
+	"\x14NODE_CLEANUP_TIMEOUT\x10\x02\x12\x17\n" +
+	"\x13NODE_OUT_OF_SERVICE\x10\x03\"#\n" +
 	"!ControllerUnpublishVolumeResponse\"\x96\x06\n" +
 	"!ValidateVolumeCapabilitiesRequest\x12\x1b\n" +
 	"\tvolume_id\x18\x01 \x01(\tR\bvolumeId\x12c\n" +
@@ -7999,7 +8319,15 @@ const file_csi_proto_rawDesc = "" +
 	"\x16MutableParametersEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\" \n" +
-	"\x1eControllerModifyVolumeResponse\"\xad\x02\n" +
+	"\x1eControllerModifyVolumeResponse\"<\n" +
+	"\x1cControllerGetNodeInfoRequest\x12\x17\n" +
+	"\anode_id\x18\x01 \x01(\tR\x06nodeId:\x03\xa0B\x01\"\xac\x02\n" +
+	"\x1dControllerGetNodeInfoResponse\x12/\n" +
+	"\x14max_volumes_per_node\x18\x01 \x01(\x03R\x11maxVolumesPerNode\x12A\n" +
+	"\x13accessible_topology\x18\x02 \x01(\v2\x10.csi.v1.TopologyR\x12accessibleTopology\x12b\n" +
+	"\x11published_volumes\x18\x03 \x03(\v25.csi.v1.ControllerGetNodeInfoResponse.PublishedVolumeR\x10publishedVolumes\x1a.\n" +
+	"\x0fPublishedVolume\x12\x1b\n" +
+	"\tvolume_id\x18\x01 \x01(\tR\bvolumeId:\x03\xa0B\x01\"\xad\x02\n" +
 	"\x12GetCapacityRequest\x12I\n" +
 	"\x13volume_capabilities\x18\x01 \x03(\v2\x18.csi.v1.VolumeCapabilityR\x12volumeCapabilities\x12J\n" +
 	"\n" +
@@ -8015,11 +8343,11 @@ const file_csi_proto_rawDesc = "" +
 	"\x13minimum_volume_size\x18\x03 \x01(\v2\x1b.google.protobuf.Int64ValueB\x03\xa0B\x01R\x11minimumVolumeSize\"\"\n" +
 	" ControllerGetCapabilitiesRequest\"l\n" +
 	"!ControllerGetCapabilitiesResponse\x12G\n" +
-	"\fcapabilities\x18\x01 \x03(\v2#.csi.v1.ControllerServiceCapabilityR\fcapabilities\"\xcc\x04\n" +
+	"\fcapabilities\x18\x01 \x03(\v2#.csi.v1.ControllerServiceCapabilityR\fcapabilities\"\xe4\x04\n" +
 	"\x1bControllerServiceCapability\x12;\n" +
-	"\x03rpc\x18\x01 \x01(\v2'.csi.v1.ControllerServiceCapability.RPCH\x00R\x03rpc\x1a\xe7\x03\n" +
+	"\x03rpc\x18\x01 \x01(\v2'.csi.v1.ControllerServiceCapability.RPCH\x00R\x03rpc\x1a\xff\x03\n" +
 	"\x03RPC\x12@\n" +
-	"\x04type\x18\x01 \x01(\x0e2,.csi.v1.ControllerServiceCapability.RPC.TypeR\x04type\"\x9d\x03\n" +
+	"\x04type\x18\x01 \x01(\x0e2,.csi.v1.ControllerServiceCapability.RPC.TypeR\x04type\"\xb5\x03\n" +
 	"\x04Type\x12\v\n" +
 	"\aUNKNOWN\x10\x00\x12\x18\n" +
 	"\x14CREATE_DELETE_VOLUME\x10\x01\x12\x1c\n" +
@@ -8039,7 +8367,8 @@ const file_csi_proto_rawDesc = "" +
 	"\rMODIFY_VOLUME\x10\x0e\x12\x15\n" +
 	"\fGET_SNAPSHOT\x10\x0f\x1a\x03\xa0B\x01\x12\x1a\n" +
 	"\x11GET_VOLUME_HEALTH\x10\x10\x1a\x03\xa0B\x01\x12\x1b\n" +
-	"\x12LIST_VOLUME_HEALTH\x10\x11\x1a\x03\xa0B\x01\"\x04\b\v\x10\vB\x06\n" +
+	"\x12LIST_VOLUME_HEALTH\x10\x11\x1a\x03\xa0B\x01\x12\x16\n" +
+	"\rGET_NODE_INFO\x10\x12\x1a\x03\xa0B\x01\"\x04\b\v\x10\vB\x06\n" +
 	"\x04type\"\xcb\x03\n" +
 	"\x15CreateSnapshotRequest\x12(\n" +
 	"\x10source_volume_id\x18\x01 \x01(\tR\x0esourceVolumeId\x12\x12\n" +
@@ -8196,11 +8525,11 @@ const file_csi_proto_rawDesc = "" +
 	"\x11volume_capability\x18\x04 \x01(\v2\x18.csi.v1.VolumeCapabilityR\x10volumeCapability:\x03\xa0B\x01\"\x1c\n" +
 	"\x1aNodeGetCapabilitiesRequest\"`\n" +
 	"\x1bNodeGetCapabilitiesResponse\x12A\n" +
-	"\fcapabilities\x18\x01 \x03(\v2\x1d.csi.v1.NodeServiceCapabilityR\fcapabilities\"\xed\x02\n" +
+	"\fcapabilities\x18\x01 \x03(\v2\x1d.csi.v1.NodeServiceCapabilityR\fcapabilities\"\x91\x03\n" +
 	"\x15NodeServiceCapability\x125\n" +
-	"\x03rpc\x18\x01 \x01(\v2!.csi.v1.NodeServiceCapability.RPCH\x00R\x03rpc\x1a\x94\x02\n" +
+	"\x03rpc\x18\x01 \x01(\v2!.csi.v1.NodeServiceCapability.RPCH\x00R\x03rpc\x1a\xb8\x02\n" +
 	"\x03RPC\x12:\n" +
-	"\x04type\x18\x01 \x01(\x0e2&.csi.v1.NodeServiceCapability.RPC.TypeR\x04type\"\xd0\x01\n" +
+	"\x04type\x18\x01 \x01(\x0e2&.csi.v1.NodeServiceCapability.RPC.TypeR\x04type\"\xf4\x01\n" +
 	"\x04Type\x12\v\n" +
 	"\aUNKNOWN\x10\x00\x12\x18\n" +
 	"\x14STAGE_UNSTAGE_VOLUME\x10\x01\x12\x14\n" +
@@ -8209,9 +8538,11 @@ const file_csi_proto_rawDesc = "" +
 	"\x18SINGLE_NODE_MULTI_WRITER\x10\x05\x1a\x03\xa0B\x01\x12\x16\n" +
 	"\x12VOLUME_MOUNT_GROUP\x10\x06\x12\x1a\n" +
 	"\x11GET_VOLUME_HEALTH\x10\a\x1a\x03\xa0B\x01\x12\x1b\n" +
-	"\x12GET_STORAGE_HEALTH\x10\b\x1a\x03\xa0B\x01\"\x04\b\x04\x10\x04B\x06\n" +
-	"\x04type\"\x14\n" +
-	"\x12NodeGetInfoRequest\"\xa2\x01\n" +
+	"\x12GET_STORAGE_HEALTH\x10\b\x1a\x03\xa0B\x01\x12\"\n" +
+	"\x19NODE_INFO_FROM_CONTROLLER\x10\t\x1a\x03\xa0B\x01\"\x04\b\x04\x10\x04B\x06\n" +
+	"\x04type\"R\n" +
+	"\x12NodeGetInfoRequest\x12<\n" +
+	"\x18controller_get_node_info\x18\x01 \x01(\bB\x03\xa0B\x01R\x15controllerGetNodeInfo\"\xa2\x01\n" +
 	"\x13NodeGetInfoResponse\x12\x17\n" +
 	"\anode_id\x18\x01 \x01(\tR\x06nodeId\x12/\n" +
 	"\x14max_volumes_per_node\x18\x02 \x01(\x03R\x11maxVolumesPerNode\x12A\n" +
@@ -8327,7 +8658,7 @@ const file_csi_proto_rawDesc = "" +
 	"\bIdentity\x12N\n" +
 	"\rGetPluginInfo\x12\x1c.csi.v1.GetPluginInfoRequest\x1a\x1d.csi.v1.GetPluginInfoResponse\"\x00\x12f\n" +
 	"\x15GetPluginCapabilities\x12$.csi.v1.GetPluginCapabilitiesRequest\x1a%.csi.v1.GetPluginCapabilitiesResponse\"\x00\x126\n" +
-	"\x05Probe\x12\x14.csi.v1.ProbeRequest\x1a\x15.csi.v1.ProbeResponse\"\x002\xf6\f\n" +
+	"\x05Probe\x12\x14.csi.v1.ProbeRequest\x1a\x15.csi.v1.ProbeResponse\"\x002\xe1\r\n" +
 	"\n" +
 	"Controller\x12K\n" +
 	"\fCreateVolume\x12\x1b.csi.v1.CreateVolumeRequest\x1a\x1c.csi.v1.CreateVolumeResponse\"\x00\x12K\n" +
@@ -8346,7 +8677,8 @@ const file_csi_proto_rawDesc = "" +
 	"\vGetSnapshot\x12\x1a.csi.v1.GetSnapshotRequest\x1a\x1b.csi.v1.GetSnapshotResponse\"\x03\xa0B\x01\x12i\n" +
 	"\x16ControllerExpandVolume\x12%.csi.v1.ControllerExpandVolumeRequest\x1a&.csi.v1.ControllerExpandVolumeResponse\"\x00\x12c\n" +
 	"\x13ControllerGetVolume\x12\".csi.v1.ControllerGetVolumeRequest\x1a#.csi.v1.ControllerGetVolumeResponse\"\x03\xa0B\x01\x12i\n" +
-	"\x16ControllerModifyVolume\x12%.csi.v1.ControllerModifyVolumeRequest\x1a&.csi.v1.ControllerModifyVolumeResponse\"\x002\xe8\x03\n" +
+	"\x16ControllerModifyVolume\x12%.csi.v1.ControllerModifyVolumeRequest\x1a&.csi.v1.ControllerModifyVolumeResponse\"\x00\x12i\n" +
+	"\x15ControllerGetNodeInfo\x12$.csi.v1.ControllerGetNodeInfoRequest\x1a%.csi.v1.ControllerGetNodeInfoResponse\"\x03\xa0B\x012\xe8\x03\n" +
 	"\x0fGroupController\x12\x81\x01\n" +
 	"\x1eGroupControllerGetCapabilities\x12-.csi.v1.GroupControllerGetCapabilitiesRequest\x1a..csi.v1.GroupControllerGetCapabilitiesResponse\"\x00\x12r\n" +
 	"\x19CreateVolumeGroupSnapshot\x12(.csi.v1.CreateVolumeGroupSnapshotRequest\x1a).csi.v1.CreateVolumeGroupSnapshotResponse\"\x00\x12r\n" +
@@ -8389,8 +8721,8 @@ func file_csi_proto_rawDescGZIP() []byte {
 	return file_csi_proto_rawDescData
 }
 
-var file_csi_proto_enumTypes = make([]protoimpl.EnumInfo, 10)
-var file_csi_proto_msgTypes = make([]protoimpl.MessageInfo, 147)
+var file_csi_proto_enumTypes = make([]protoimpl.EnumInfo, 11)
+var file_csi_proto_msgTypes = make([]protoimpl.MessageInfo, 150)
 var file_csi_proto_goTypes = []any{
 	(VolumeHealthErrorType)(0),                           // 0: csi.v1.VolumeHealthErrorType
 	(StorageHealthErrorType)(0),                          // 1: csi.v1.StorageHealthErrorType
@@ -8398,370 +8730,379 @@ var file_csi_proto_goTypes = []any{
 	(PluginCapability_Service_Type)(0),                   // 3: csi.v1.PluginCapability.Service.Type
 	(PluginCapability_VolumeExpansion_Type)(0),           // 4: csi.v1.PluginCapability.VolumeExpansion.Type
 	(VolumeCapability_AccessMode_Mode)(0),                // 5: csi.v1.VolumeCapability.AccessMode.Mode
-	(ControllerServiceCapability_RPC_Type)(0),            // 6: csi.v1.ControllerServiceCapability.RPC.Type
-	(VolumeUsage_Unit)(0),                                // 7: csi.v1.VolumeUsage.Unit
-	(NodeServiceCapability_RPC_Type)(0),                  // 8: csi.v1.NodeServiceCapability.RPC.Type
-	(GroupControllerServiceCapability_RPC_Type)(0),       // 9: csi.v1.GroupControllerServiceCapability.RPC.Type
-	(*GetPluginInfoRequest)(nil),                         // 10: csi.v1.GetPluginInfoRequest
-	(*GetPluginInfoResponse)(nil),                        // 11: csi.v1.GetPluginInfoResponse
-	(*GetPluginCapabilitiesRequest)(nil),                 // 12: csi.v1.GetPluginCapabilitiesRequest
-	(*GetPluginCapabilitiesResponse)(nil),                // 13: csi.v1.GetPluginCapabilitiesResponse
-	(*PluginCapability)(nil),                             // 14: csi.v1.PluginCapability
-	(*ProbeRequest)(nil),                                 // 15: csi.v1.ProbeRequest
-	(*ProbeResponse)(nil),                                // 16: csi.v1.ProbeResponse
-	(*CreateVolumeRequest)(nil),                          // 17: csi.v1.CreateVolumeRequest
-	(*VolumeContentSource)(nil),                          // 18: csi.v1.VolumeContentSource
-	(*CreateVolumeResponse)(nil),                         // 19: csi.v1.CreateVolumeResponse
-	(*VolumeCapability)(nil),                             // 20: csi.v1.VolumeCapability
-	(*CapacityRange)(nil),                                // 21: csi.v1.CapacityRange
-	(*Volume)(nil),                                       // 22: csi.v1.Volume
-	(*TopologyRequirement)(nil),                          // 23: csi.v1.TopologyRequirement
-	(*Topology)(nil),                                     // 24: csi.v1.Topology
-	(*DeleteVolumeRequest)(nil),                          // 25: csi.v1.DeleteVolumeRequest
-	(*DeleteVolumeResponse)(nil),                         // 26: csi.v1.DeleteVolumeResponse
-	(*ControllerPublishVolumeRequest)(nil),               // 27: csi.v1.ControllerPublishVolumeRequest
-	(*ControllerPublishVolumeResponse)(nil),              // 28: csi.v1.ControllerPublishVolumeResponse
-	(*ControllerUnpublishVolumeRequest)(nil),             // 29: csi.v1.ControllerUnpublishVolumeRequest
-	(*ControllerUnpublishVolumeResponse)(nil),            // 30: csi.v1.ControllerUnpublishVolumeResponse
-	(*ValidateVolumeCapabilitiesRequest)(nil),            // 31: csi.v1.ValidateVolumeCapabilitiesRequest
-	(*ValidateVolumeCapabilitiesResponse)(nil),           // 32: csi.v1.ValidateVolumeCapabilitiesResponse
-	(*ListVolumesRequest)(nil),                           // 33: csi.v1.ListVolumesRequest
-	(*ListVolumesResponse)(nil),                          // 34: csi.v1.ListVolumesResponse
-	(*ControllerListVolumeHealthRequest)(nil),            // 35: csi.v1.ControllerListVolumeHealthRequest
-	(*ControllerListVolumeHealthResponse)(nil),           // 36: csi.v1.ControllerListVolumeHealthResponse
-	(*VolumeHealth)(nil),                                 // 37: csi.v1.VolumeHealth
-	(*ControllerGetVolumeHealthRequest)(nil),             // 38: csi.v1.ControllerGetVolumeHealthRequest
-	(*ControllerGetVolumeHealthResponse)(nil),            // 39: csi.v1.ControllerGetVolumeHealthResponse
-	(*ControllerGetVolumeRequest)(nil),                   // 40: csi.v1.ControllerGetVolumeRequest
-	(*ControllerGetVolumeResponse)(nil),                  // 41: csi.v1.ControllerGetVolumeResponse
-	(*ControllerModifyVolumeRequest)(nil),                // 42: csi.v1.ControllerModifyVolumeRequest
-	(*ControllerModifyVolumeResponse)(nil),               // 43: csi.v1.ControllerModifyVolumeResponse
-	(*GetCapacityRequest)(nil),                           // 44: csi.v1.GetCapacityRequest
-	(*GetCapacityResponse)(nil),                          // 45: csi.v1.GetCapacityResponse
-	(*ControllerGetCapabilitiesRequest)(nil),             // 46: csi.v1.ControllerGetCapabilitiesRequest
-	(*ControllerGetCapabilitiesResponse)(nil),            // 47: csi.v1.ControllerGetCapabilitiesResponse
-	(*ControllerServiceCapability)(nil),                  // 48: csi.v1.ControllerServiceCapability
-	(*CreateSnapshotRequest)(nil),                        // 49: csi.v1.CreateSnapshotRequest
-	(*CreateSnapshotResponse)(nil),                       // 50: csi.v1.CreateSnapshotResponse
-	(*Snapshot)(nil),                                     // 51: csi.v1.Snapshot
-	(*DeleteSnapshotRequest)(nil),                        // 52: csi.v1.DeleteSnapshotRequest
-	(*DeleteSnapshotResponse)(nil),                       // 53: csi.v1.DeleteSnapshotResponse
-	(*ListSnapshotsRequest)(nil),                         // 54: csi.v1.ListSnapshotsRequest
-	(*ListSnapshotsResponse)(nil),                        // 55: csi.v1.ListSnapshotsResponse
-	(*GetSnapshotRequest)(nil),                           // 56: csi.v1.GetSnapshotRequest
-	(*GetSnapshotResponse)(nil),                          // 57: csi.v1.GetSnapshotResponse
-	(*ControllerExpandVolumeRequest)(nil),                // 58: csi.v1.ControllerExpandVolumeRequest
-	(*ControllerExpandVolumeResponse)(nil),               // 59: csi.v1.ControllerExpandVolumeResponse
-	(*NodeStageVolumeRequest)(nil),                       // 60: csi.v1.NodeStageVolumeRequest
-	(*NodeStageVolumeResponse)(nil),                      // 61: csi.v1.NodeStageVolumeResponse
-	(*NodeUnstageVolumeRequest)(nil),                     // 62: csi.v1.NodeUnstageVolumeRequest
-	(*NodeUnstageVolumeResponse)(nil),                    // 63: csi.v1.NodeUnstageVolumeResponse
-	(*NodePublishVolumeRequest)(nil),                     // 64: csi.v1.NodePublishVolumeRequest
-	(*NodePublishVolumeResponse)(nil),                    // 65: csi.v1.NodePublishVolumeResponse
-	(*NodeUnpublishVolumeRequest)(nil),                   // 66: csi.v1.NodeUnpublishVolumeRequest
-	(*NodeUnpublishVolumeResponse)(nil),                  // 67: csi.v1.NodeUnpublishVolumeResponse
-	(*NodeGetVolumeStatsRequest)(nil),                    // 68: csi.v1.NodeGetVolumeStatsRequest
-	(*NodeGetVolumeStatsResponse)(nil),                   // 69: csi.v1.NodeGetVolumeStatsResponse
-	(*VolumeUsage)(nil),                                  // 70: csi.v1.VolumeUsage
-	(*NodeGetVolumeHealthRequest)(nil),                   // 71: csi.v1.NodeGetVolumeHealthRequest
-	(*NodeGetVolumeHealthResponse)(nil),                  // 72: csi.v1.NodeGetVolumeHealthResponse
-	(*NodeGetStorageHealthRequest)(nil),                  // 73: csi.v1.NodeGetStorageHealthRequest
-	(*NodeGetStorageHealthResponse)(nil),                 // 74: csi.v1.NodeGetStorageHealthResponse
-	(*NodeGetCapabilitiesRequest)(nil),                   // 75: csi.v1.NodeGetCapabilitiesRequest
-	(*NodeGetCapabilitiesResponse)(nil),                  // 76: csi.v1.NodeGetCapabilitiesResponse
-	(*NodeServiceCapability)(nil),                        // 77: csi.v1.NodeServiceCapability
-	(*NodeGetInfoRequest)(nil),                           // 78: csi.v1.NodeGetInfoRequest
-	(*NodeGetInfoResponse)(nil),                          // 79: csi.v1.NodeGetInfoResponse
-	(*NodeExpandVolumeRequest)(nil),                      // 80: csi.v1.NodeExpandVolumeRequest
-	(*NodeExpandVolumeResponse)(nil),                     // 81: csi.v1.NodeExpandVolumeResponse
-	(*GroupControllerGetCapabilitiesRequest)(nil),        // 82: csi.v1.GroupControllerGetCapabilitiesRequest
-	(*GroupControllerGetCapabilitiesResponse)(nil),       // 83: csi.v1.GroupControllerGetCapabilitiesResponse
-	(*GroupControllerServiceCapability)(nil),             // 84: csi.v1.GroupControllerServiceCapability
-	(*CreateVolumeGroupSnapshotRequest)(nil),             // 85: csi.v1.CreateVolumeGroupSnapshotRequest
-	(*CreateVolumeGroupSnapshotResponse)(nil),            // 86: csi.v1.CreateVolumeGroupSnapshotResponse
-	(*VolumeGroupSnapshot)(nil),                          // 87: csi.v1.VolumeGroupSnapshot
-	(*DeleteVolumeGroupSnapshotRequest)(nil),             // 88: csi.v1.DeleteVolumeGroupSnapshotRequest
-	(*DeleteVolumeGroupSnapshotResponse)(nil),            // 89: csi.v1.DeleteVolumeGroupSnapshotResponse
-	(*GetVolumeGroupSnapshotRequest)(nil),                // 90: csi.v1.GetVolumeGroupSnapshotRequest
-	(*GetVolumeGroupSnapshotResponse)(nil),               // 91: csi.v1.GetVolumeGroupSnapshotResponse
-	(*BlockMetadata)(nil),                                // 92: csi.v1.BlockMetadata
-	(*GetMetadataAllocatedRequest)(nil),                  // 93: csi.v1.GetMetadataAllocatedRequest
-	(*GetMetadataAllocatedResponse)(nil),                 // 94: csi.v1.GetMetadataAllocatedResponse
-	(*GetMetadataDeltaRequest)(nil),                      // 95: csi.v1.GetMetadataDeltaRequest
-	(*GetMetadataDeltaResponse)(nil),                     // 96: csi.v1.GetMetadataDeltaResponse
-	nil,                                                  // 97: csi.v1.GetPluginInfoResponse.ManifestEntry
-	(*PluginCapability_Service)(nil),                     // 98: csi.v1.PluginCapability.Service
-	(*PluginCapability_VolumeExpansion)(nil),             // 99: csi.v1.PluginCapability.VolumeExpansion
-	nil,                                                  // 100: csi.v1.CreateVolumeRequest.ParametersEntry
-	nil,                                                  // 101: csi.v1.CreateVolumeRequest.SecretsEntry
-	nil,                                                  // 102: csi.v1.CreateVolumeRequest.MutableParametersEntry
-	(*VolumeContentSource_SnapshotSource)(nil),           // 103: csi.v1.VolumeContentSource.SnapshotSource
-	(*VolumeContentSource_VolumeSource)(nil),             // 104: csi.v1.VolumeContentSource.VolumeSource
-	(*VolumeCapability_BlockVolume)(nil),                 // 105: csi.v1.VolumeCapability.BlockVolume
-	(*VolumeCapability_MountVolume)(nil),                 // 106: csi.v1.VolumeCapability.MountVolume
-	(*VolumeCapability_AccessMode)(nil),                  // 107: csi.v1.VolumeCapability.AccessMode
-	nil,                                                  // 108: csi.v1.Volume.VolumeContextEntry
-	nil,                                                  // 109: csi.v1.Topology.SegmentsEntry
-	nil,                                                  // 110: csi.v1.DeleteVolumeRequest.SecretsEntry
-	nil,                                                  // 111: csi.v1.ControllerPublishVolumeRequest.SecretsEntry
-	nil,                                                  // 112: csi.v1.ControllerPublishVolumeRequest.VolumeContextEntry
-	nil,                                                  // 113: csi.v1.ControllerPublishVolumeResponse.PublishContextEntry
-	nil,                                                  // 114: csi.v1.ControllerUnpublishVolumeRequest.SecretsEntry
-	nil,                                                  // 115: csi.v1.ValidateVolumeCapabilitiesRequest.VolumeContextEntry
-	nil,                                                  // 116: csi.v1.ValidateVolumeCapabilitiesRequest.ParametersEntry
-	nil,                                                  // 117: csi.v1.ValidateVolumeCapabilitiesRequest.SecretsEntry
-	nil,                                                  // 118: csi.v1.ValidateVolumeCapabilitiesRequest.MutableParametersEntry
-	(*ValidateVolumeCapabilitiesResponse_Confirmed)(nil), // 119: csi.v1.ValidateVolumeCapabilitiesResponse.Confirmed
-	nil,                                      // 120: csi.v1.ValidateVolumeCapabilitiesResponse.Confirmed.VolumeContextEntry
-	nil,                                      // 121: csi.v1.ValidateVolumeCapabilitiesResponse.Confirmed.ParametersEntry
-	nil,                                      // 122: csi.v1.ValidateVolumeCapabilitiesResponse.Confirmed.MutableParametersEntry
-	(*ListVolumesResponse_VolumeStatus)(nil), // 123: csi.v1.ListVolumesResponse.VolumeStatus
-	(*ListVolumesResponse_Entry)(nil),        // 124: csi.v1.ListVolumesResponse.Entry
-	nil,                                      // 125: csi.v1.ControllerListVolumeHealthRequest.SecretsEntry
-	(*VolumeHealth_VolumeHealthEntry)(nil),   // 126: csi.v1.VolumeHealth.VolumeHealthEntry
-	nil,                                      // 127: csi.v1.ControllerGetVolumeHealthRequest.SecretsEntry
-	(*ControllerGetVolumeResponse_VolumeStatus)(nil), // 128: csi.v1.ControllerGetVolumeResponse.VolumeStatus
-	nil,                                     // 129: csi.v1.ControllerModifyVolumeRequest.SecretsEntry
-	nil,                                     // 130: csi.v1.ControllerModifyVolumeRequest.MutableParametersEntry
-	nil,                                     // 131: csi.v1.GetCapacityRequest.ParametersEntry
-	(*ControllerServiceCapability_RPC)(nil), // 132: csi.v1.ControllerServiceCapability.RPC
-	nil,                                     // 133: csi.v1.CreateSnapshotRequest.SecretsEntry
-	nil,                                     // 134: csi.v1.CreateSnapshotRequest.ParametersEntry
-	nil,                                     // 135: csi.v1.DeleteSnapshotRequest.SecretsEntry
-	nil,                                     // 136: csi.v1.ListSnapshotsRequest.SecretsEntry
-	(*ListSnapshotsResponse_Entry)(nil),     // 137: csi.v1.ListSnapshotsResponse.Entry
-	nil,                                     // 138: csi.v1.GetSnapshotRequest.SecretsEntry
-	nil,                                     // 139: csi.v1.ControllerExpandVolumeRequest.SecretsEntry
-	nil,                                     // 140: csi.v1.NodeStageVolumeRequest.PublishContextEntry
-	nil,                                     // 141: csi.v1.NodeStageVolumeRequest.SecretsEntry
-	nil,                                     // 142: csi.v1.NodeStageVolumeRequest.VolumeContextEntry
-	nil,                                     // 143: csi.v1.NodePublishVolumeRequest.PublishContextEntry
-	nil,                                     // 144: csi.v1.NodePublishVolumeRequest.SecretsEntry
-	nil,                                     // 145: csi.v1.NodePublishVolumeRequest.VolumeContextEntry
-	nil,                                     // 146: csi.v1.NodeGetStorageHealthRequest.SecretsEntry
-	(*NodeGetStorageHealthResponse_StorageBackendHealth)(nil), // 147: csi.v1.NodeGetStorageHealthResponse.StorageBackendHealth
-	(*NodeServiceCapability_RPC)(nil),                         // 148: csi.v1.NodeServiceCapability.RPC
-	nil,                                                       // 149: csi.v1.NodeExpandVolumeRequest.SecretsEntry
-	(*GroupControllerServiceCapability_RPC)(nil),              // 150: csi.v1.GroupControllerServiceCapability.RPC
-	nil,                                   // 151: csi.v1.CreateVolumeGroupSnapshotRequest.SecretsEntry
-	nil,                                   // 152: csi.v1.CreateVolumeGroupSnapshotRequest.ParametersEntry
-	nil,                                   // 153: csi.v1.DeleteVolumeGroupSnapshotRequest.SecretsEntry
-	nil,                                   // 154: csi.v1.GetVolumeGroupSnapshotRequest.SecretsEntry
-	nil,                                   // 155: csi.v1.GetMetadataAllocatedRequest.SecretsEntry
-	nil,                                   // 156: csi.v1.GetMetadataDeltaRequest.SecretsEntry
-	(*wrapperspb.BoolValue)(nil),          // 157: google.protobuf.BoolValue
-	(*wrapperspb.Int64Value)(nil),         // 158: google.protobuf.Int64Value
-	(*timestamppb.Timestamp)(nil),         // 159: google.protobuf.Timestamp
-	(*descriptorpb.EnumOptions)(nil),      // 160: google.protobuf.EnumOptions
-	(*descriptorpb.EnumValueOptions)(nil), // 161: google.protobuf.EnumValueOptions
-	(*descriptorpb.FieldOptions)(nil),     // 162: google.protobuf.FieldOptions
-	(*descriptorpb.MessageOptions)(nil),   // 163: google.protobuf.MessageOptions
-	(*descriptorpb.MethodOptions)(nil),    // 164: google.protobuf.MethodOptions
-	(*descriptorpb.ServiceOptions)(nil),   // 165: google.protobuf.ServiceOptions
+	(ControllerUnpublishVolumeRequest_Reason)(0),         // 6: csi.v1.ControllerUnpublishVolumeRequest.Reason
+	(ControllerServiceCapability_RPC_Type)(0),            // 7: csi.v1.ControllerServiceCapability.RPC.Type
+	(VolumeUsage_Unit)(0),                                // 8: csi.v1.VolumeUsage.Unit
+	(NodeServiceCapability_RPC_Type)(0),                  // 9: csi.v1.NodeServiceCapability.RPC.Type
+	(GroupControllerServiceCapability_RPC_Type)(0),       // 10: csi.v1.GroupControllerServiceCapability.RPC.Type
+	(*GetPluginInfoRequest)(nil),                         // 11: csi.v1.GetPluginInfoRequest
+	(*GetPluginInfoResponse)(nil),                        // 12: csi.v1.GetPluginInfoResponse
+	(*GetPluginCapabilitiesRequest)(nil),                 // 13: csi.v1.GetPluginCapabilitiesRequest
+	(*GetPluginCapabilitiesResponse)(nil),                // 14: csi.v1.GetPluginCapabilitiesResponse
+	(*PluginCapability)(nil),                             // 15: csi.v1.PluginCapability
+	(*ProbeRequest)(nil),                                 // 16: csi.v1.ProbeRequest
+	(*ProbeResponse)(nil),                                // 17: csi.v1.ProbeResponse
+	(*CreateVolumeRequest)(nil),                          // 18: csi.v1.CreateVolumeRequest
+	(*VolumeContentSource)(nil),                          // 19: csi.v1.VolumeContentSource
+	(*CreateVolumeResponse)(nil),                         // 20: csi.v1.CreateVolumeResponse
+	(*VolumeCapability)(nil),                             // 21: csi.v1.VolumeCapability
+	(*CapacityRange)(nil),                                // 22: csi.v1.CapacityRange
+	(*Volume)(nil),                                       // 23: csi.v1.Volume
+	(*TopologyRequirement)(nil),                          // 24: csi.v1.TopologyRequirement
+	(*Topology)(nil),                                     // 25: csi.v1.Topology
+	(*DeleteVolumeRequest)(nil),                          // 26: csi.v1.DeleteVolumeRequest
+	(*DeleteVolumeResponse)(nil),                         // 27: csi.v1.DeleteVolumeResponse
+	(*ControllerPublishVolumeRequest)(nil),               // 28: csi.v1.ControllerPublishVolumeRequest
+	(*ControllerPublishVolumeResponse)(nil),              // 29: csi.v1.ControllerPublishVolumeResponse
+	(*ControllerUnpublishVolumeRequest)(nil),             // 30: csi.v1.ControllerUnpublishVolumeRequest
+	(*ControllerUnpublishVolumeResponse)(nil),            // 31: csi.v1.ControllerUnpublishVolumeResponse
+	(*ValidateVolumeCapabilitiesRequest)(nil),            // 32: csi.v1.ValidateVolumeCapabilitiesRequest
+	(*ValidateVolumeCapabilitiesResponse)(nil),           // 33: csi.v1.ValidateVolumeCapabilitiesResponse
+	(*ListVolumesRequest)(nil),                           // 34: csi.v1.ListVolumesRequest
+	(*ListVolumesResponse)(nil),                          // 35: csi.v1.ListVolumesResponse
+	(*ControllerListVolumeHealthRequest)(nil),            // 36: csi.v1.ControllerListVolumeHealthRequest
+	(*ControllerListVolumeHealthResponse)(nil),           // 37: csi.v1.ControllerListVolumeHealthResponse
+	(*VolumeHealth)(nil),                                 // 38: csi.v1.VolumeHealth
+	(*ControllerGetVolumeHealthRequest)(nil),             // 39: csi.v1.ControllerGetVolumeHealthRequest
+	(*ControllerGetVolumeHealthResponse)(nil),            // 40: csi.v1.ControllerGetVolumeHealthResponse
+	(*ControllerGetVolumeRequest)(nil),                   // 41: csi.v1.ControllerGetVolumeRequest
+	(*ControllerGetVolumeResponse)(nil),                  // 42: csi.v1.ControllerGetVolumeResponse
+	(*ControllerModifyVolumeRequest)(nil),                // 43: csi.v1.ControllerModifyVolumeRequest
+	(*ControllerModifyVolumeResponse)(nil),               // 44: csi.v1.ControllerModifyVolumeResponse
+	(*ControllerGetNodeInfoRequest)(nil),                 // 45: csi.v1.ControllerGetNodeInfoRequest
+	(*ControllerGetNodeInfoResponse)(nil),                // 46: csi.v1.ControllerGetNodeInfoResponse
+	(*GetCapacityRequest)(nil),                           // 47: csi.v1.GetCapacityRequest
+	(*GetCapacityResponse)(nil),                          // 48: csi.v1.GetCapacityResponse
+	(*ControllerGetCapabilitiesRequest)(nil),             // 49: csi.v1.ControllerGetCapabilitiesRequest
+	(*ControllerGetCapabilitiesResponse)(nil),            // 50: csi.v1.ControllerGetCapabilitiesResponse
+	(*ControllerServiceCapability)(nil),                  // 51: csi.v1.ControllerServiceCapability
+	(*CreateSnapshotRequest)(nil),                        // 52: csi.v1.CreateSnapshotRequest
+	(*CreateSnapshotResponse)(nil),                       // 53: csi.v1.CreateSnapshotResponse
+	(*Snapshot)(nil),                                     // 54: csi.v1.Snapshot
+	(*DeleteSnapshotRequest)(nil),                        // 55: csi.v1.DeleteSnapshotRequest
+	(*DeleteSnapshotResponse)(nil),                       // 56: csi.v1.DeleteSnapshotResponse
+	(*ListSnapshotsRequest)(nil),                         // 57: csi.v1.ListSnapshotsRequest
+	(*ListSnapshotsResponse)(nil),                        // 58: csi.v1.ListSnapshotsResponse
+	(*GetSnapshotRequest)(nil),                           // 59: csi.v1.GetSnapshotRequest
+	(*GetSnapshotResponse)(nil),                          // 60: csi.v1.GetSnapshotResponse
+	(*ControllerExpandVolumeRequest)(nil),                // 61: csi.v1.ControllerExpandVolumeRequest
+	(*ControllerExpandVolumeResponse)(nil),               // 62: csi.v1.ControllerExpandVolumeResponse
+	(*NodeStageVolumeRequest)(nil),                       // 63: csi.v1.NodeStageVolumeRequest
+	(*NodeStageVolumeResponse)(nil),                      // 64: csi.v1.NodeStageVolumeResponse
+	(*NodeUnstageVolumeRequest)(nil),                     // 65: csi.v1.NodeUnstageVolumeRequest
+	(*NodeUnstageVolumeResponse)(nil),                    // 66: csi.v1.NodeUnstageVolumeResponse
+	(*NodePublishVolumeRequest)(nil),                     // 67: csi.v1.NodePublishVolumeRequest
+	(*NodePublishVolumeResponse)(nil),                    // 68: csi.v1.NodePublishVolumeResponse
+	(*NodeUnpublishVolumeRequest)(nil),                   // 69: csi.v1.NodeUnpublishVolumeRequest
+	(*NodeUnpublishVolumeResponse)(nil),                  // 70: csi.v1.NodeUnpublishVolumeResponse
+	(*NodeGetVolumeStatsRequest)(nil),                    // 71: csi.v1.NodeGetVolumeStatsRequest
+	(*NodeGetVolumeStatsResponse)(nil),                   // 72: csi.v1.NodeGetVolumeStatsResponse
+	(*VolumeUsage)(nil),                                  // 73: csi.v1.VolumeUsage
+	(*NodeGetVolumeHealthRequest)(nil),                   // 74: csi.v1.NodeGetVolumeHealthRequest
+	(*NodeGetVolumeHealthResponse)(nil),                  // 75: csi.v1.NodeGetVolumeHealthResponse
+	(*NodeGetStorageHealthRequest)(nil),                  // 76: csi.v1.NodeGetStorageHealthRequest
+	(*NodeGetStorageHealthResponse)(nil),                 // 77: csi.v1.NodeGetStorageHealthResponse
+	(*NodeGetCapabilitiesRequest)(nil),                   // 78: csi.v1.NodeGetCapabilitiesRequest
+	(*NodeGetCapabilitiesResponse)(nil),                  // 79: csi.v1.NodeGetCapabilitiesResponse
+	(*NodeServiceCapability)(nil),                        // 80: csi.v1.NodeServiceCapability
+	(*NodeGetInfoRequest)(nil),                           // 81: csi.v1.NodeGetInfoRequest
+	(*NodeGetInfoResponse)(nil),                          // 82: csi.v1.NodeGetInfoResponse
+	(*NodeExpandVolumeRequest)(nil),                      // 83: csi.v1.NodeExpandVolumeRequest
+	(*NodeExpandVolumeResponse)(nil),                     // 84: csi.v1.NodeExpandVolumeResponse
+	(*GroupControllerGetCapabilitiesRequest)(nil),        // 85: csi.v1.GroupControllerGetCapabilitiesRequest
+	(*GroupControllerGetCapabilitiesResponse)(nil),       // 86: csi.v1.GroupControllerGetCapabilitiesResponse
+	(*GroupControllerServiceCapability)(nil),             // 87: csi.v1.GroupControllerServiceCapability
+	(*CreateVolumeGroupSnapshotRequest)(nil),             // 88: csi.v1.CreateVolumeGroupSnapshotRequest
+	(*CreateVolumeGroupSnapshotResponse)(nil),            // 89: csi.v1.CreateVolumeGroupSnapshotResponse
+	(*VolumeGroupSnapshot)(nil),                          // 90: csi.v1.VolumeGroupSnapshot
+	(*DeleteVolumeGroupSnapshotRequest)(nil),             // 91: csi.v1.DeleteVolumeGroupSnapshotRequest
+	(*DeleteVolumeGroupSnapshotResponse)(nil),            // 92: csi.v1.DeleteVolumeGroupSnapshotResponse
+	(*GetVolumeGroupSnapshotRequest)(nil),                // 93: csi.v1.GetVolumeGroupSnapshotRequest
+	(*GetVolumeGroupSnapshotResponse)(nil),               // 94: csi.v1.GetVolumeGroupSnapshotResponse
+	(*BlockMetadata)(nil),                                // 95: csi.v1.BlockMetadata
+	(*GetMetadataAllocatedRequest)(nil),                  // 96: csi.v1.GetMetadataAllocatedRequest
+	(*GetMetadataAllocatedResponse)(nil),                 // 97: csi.v1.GetMetadataAllocatedResponse
+	(*GetMetadataDeltaRequest)(nil),                      // 98: csi.v1.GetMetadataDeltaRequest
+	(*GetMetadataDeltaResponse)(nil),                     // 99: csi.v1.GetMetadataDeltaResponse
+	nil,                                                  // 100: csi.v1.GetPluginInfoResponse.ManifestEntry
+	(*PluginCapability_Service)(nil),                     // 101: csi.v1.PluginCapability.Service
+	(*PluginCapability_VolumeExpansion)(nil),             // 102: csi.v1.PluginCapability.VolumeExpansion
+	nil,                                                  // 103: csi.v1.CreateVolumeRequest.ParametersEntry
+	nil,                                                  // 104: csi.v1.CreateVolumeRequest.SecretsEntry
+	nil,                                                  // 105: csi.v1.CreateVolumeRequest.MutableParametersEntry
+	(*VolumeContentSource_SnapshotSource)(nil),           // 106: csi.v1.VolumeContentSource.SnapshotSource
+	(*VolumeContentSource_VolumeSource)(nil),             // 107: csi.v1.VolumeContentSource.VolumeSource
+	(*VolumeCapability_BlockVolume)(nil),                 // 108: csi.v1.VolumeCapability.BlockVolume
+	(*VolumeCapability_MountVolume)(nil),                 // 109: csi.v1.VolumeCapability.MountVolume
+	(*VolumeCapability_AccessMode)(nil),                  // 110: csi.v1.VolumeCapability.AccessMode
+	nil,                                                  // 111: csi.v1.Volume.VolumeContextEntry
+	nil,                                                  // 112: csi.v1.Topology.SegmentsEntry
+	nil,                                                  // 113: csi.v1.DeleteVolumeRequest.SecretsEntry
+	nil,                                                  // 114: csi.v1.ControllerPublishVolumeRequest.SecretsEntry
+	nil,                                                  // 115: csi.v1.ControllerPublishVolumeRequest.VolumeContextEntry
+	nil,                                                  // 116: csi.v1.ControllerPublishVolumeResponse.PublishContextEntry
+	nil,                                                  // 117: csi.v1.ControllerUnpublishVolumeRequest.SecretsEntry
+	nil,                                                  // 118: csi.v1.ValidateVolumeCapabilitiesRequest.VolumeContextEntry
+	nil,                                                  // 119: csi.v1.ValidateVolumeCapabilitiesRequest.ParametersEntry
+	nil,                                                  // 120: csi.v1.ValidateVolumeCapabilitiesRequest.SecretsEntry
+	nil,                                                  // 121: csi.v1.ValidateVolumeCapabilitiesRequest.MutableParametersEntry
+	(*ValidateVolumeCapabilitiesResponse_Confirmed)(nil), // 122: csi.v1.ValidateVolumeCapabilitiesResponse.Confirmed
+	nil,                                      // 123: csi.v1.ValidateVolumeCapabilitiesResponse.Confirmed.VolumeContextEntry
+	nil,                                      // 124: csi.v1.ValidateVolumeCapabilitiesResponse.Confirmed.ParametersEntry
+	nil,                                      // 125: csi.v1.ValidateVolumeCapabilitiesResponse.Confirmed.MutableParametersEntry
+	(*ListVolumesResponse_VolumeStatus)(nil), // 126: csi.v1.ListVolumesResponse.VolumeStatus
+	(*ListVolumesResponse_Entry)(nil),        // 127: csi.v1.ListVolumesResponse.Entry
+	nil,                                      // 128: csi.v1.ControllerListVolumeHealthRequest.SecretsEntry
+	(*VolumeHealth_VolumeHealthEntry)(nil),   // 129: csi.v1.VolumeHealth.VolumeHealthEntry
+	nil,                                      // 130: csi.v1.ControllerGetVolumeHealthRequest.SecretsEntry
+	(*ControllerGetVolumeResponse_VolumeStatus)(nil), // 131: csi.v1.ControllerGetVolumeResponse.VolumeStatus
+	nil, // 132: csi.v1.ControllerModifyVolumeRequest.SecretsEntry
+	nil, // 133: csi.v1.ControllerModifyVolumeRequest.MutableParametersEntry
+	(*ControllerGetNodeInfoResponse_PublishedVolume)(nil), // 134: csi.v1.ControllerGetNodeInfoResponse.PublishedVolume
+	nil,                                     // 135: csi.v1.GetCapacityRequest.ParametersEntry
+	(*ControllerServiceCapability_RPC)(nil), // 136: csi.v1.ControllerServiceCapability.RPC
+	nil,                                     // 137: csi.v1.CreateSnapshotRequest.SecretsEntry
+	nil,                                     // 138: csi.v1.CreateSnapshotRequest.ParametersEntry
+	nil,                                     // 139: csi.v1.DeleteSnapshotRequest.SecretsEntry
+	nil,                                     // 140: csi.v1.ListSnapshotsRequest.SecretsEntry
+	(*ListSnapshotsResponse_Entry)(nil),     // 141: csi.v1.ListSnapshotsResponse.Entry
+	nil,                                     // 142: csi.v1.GetSnapshotRequest.SecretsEntry
+	nil,                                     // 143: csi.v1.ControllerExpandVolumeRequest.SecretsEntry
+	nil,                                     // 144: csi.v1.NodeStageVolumeRequest.PublishContextEntry
+	nil,                                     // 145: csi.v1.NodeStageVolumeRequest.SecretsEntry
+	nil,                                     // 146: csi.v1.NodeStageVolumeRequest.VolumeContextEntry
+	nil,                                     // 147: csi.v1.NodePublishVolumeRequest.PublishContextEntry
+	nil,                                     // 148: csi.v1.NodePublishVolumeRequest.SecretsEntry
+	nil,                                     // 149: csi.v1.NodePublishVolumeRequest.VolumeContextEntry
+	nil,                                     // 150: csi.v1.NodeGetStorageHealthRequest.SecretsEntry
+	(*NodeGetStorageHealthResponse_StorageBackendHealth)(nil), // 151: csi.v1.NodeGetStorageHealthResponse.StorageBackendHealth
+	(*NodeServiceCapability_RPC)(nil),                         // 152: csi.v1.NodeServiceCapability.RPC
+	nil,                                                       // 153: csi.v1.NodeExpandVolumeRequest.SecretsEntry
+	(*GroupControllerServiceCapability_RPC)(nil),              // 154: csi.v1.GroupControllerServiceCapability.RPC
+	nil,                                   // 155: csi.v1.CreateVolumeGroupSnapshotRequest.SecretsEntry
+	nil,                                   // 156: csi.v1.CreateVolumeGroupSnapshotRequest.ParametersEntry
+	nil,                                   // 157: csi.v1.DeleteVolumeGroupSnapshotRequest.SecretsEntry
+	nil,                                   // 158: csi.v1.GetVolumeGroupSnapshotRequest.SecretsEntry
+	nil,                                   // 159: csi.v1.GetMetadataAllocatedRequest.SecretsEntry
+	nil,                                   // 160: csi.v1.GetMetadataDeltaRequest.SecretsEntry
+	(*wrapperspb.BoolValue)(nil),          // 161: google.protobuf.BoolValue
+	(*wrapperspb.Int64Value)(nil),         // 162: google.protobuf.Int64Value
+	(*timestamppb.Timestamp)(nil),         // 163: google.protobuf.Timestamp
+	(*descriptorpb.EnumOptions)(nil),      // 164: google.protobuf.EnumOptions
+	(*descriptorpb.EnumValueOptions)(nil), // 165: google.protobuf.EnumValueOptions
+	(*descriptorpb.FieldOptions)(nil),     // 166: google.protobuf.FieldOptions
+	(*descriptorpb.MessageOptions)(nil),   // 167: google.protobuf.MessageOptions
+	(*descriptorpb.MethodOptions)(nil),    // 168: google.protobuf.MethodOptions
+	(*descriptorpb.ServiceOptions)(nil),   // 169: google.protobuf.ServiceOptions
 }
 var file_csi_proto_depIdxs = []int32{
-	97,  // 0: csi.v1.GetPluginInfoResponse.manifest:type_name -> csi.v1.GetPluginInfoResponse.ManifestEntry
-	14,  // 1: csi.v1.GetPluginCapabilitiesResponse.capabilities:type_name -> csi.v1.PluginCapability
-	98,  // 2: csi.v1.PluginCapability.service:type_name -> csi.v1.PluginCapability.Service
-	99,  // 3: csi.v1.PluginCapability.volume_expansion:type_name -> csi.v1.PluginCapability.VolumeExpansion
-	157, // 4: csi.v1.ProbeResponse.ready:type_name -> google.protobuf.BoolValue
-	21,  // 5: csi.v1.CreateVolumeRequest.capacity_range:type_name -> csi.v1.CapacityRange
-	20,  // 6: csi.v1.CreateVolumeRequest.volume_capabilities:type_name -> csi.v1.VolumeCapability
-	100, // 7: csi.v1.CreateVolumeRequest.parameters:type_name -> csi.v1.CreateVolumeRequest.ParametersEntry
-	101, // 8: csi.v1.CreateVolumeRequest.secrets:type_name -> csi.v1.CreateVolumeRequest.SecretsEntry
-	18,  // 9: csi.v1.CreateVolumeRequest.volume_content_source:type_name -> csi.v1.VolumeContentSource
-	23,  // 10: csi.v1.CreateVolumeRequest.accessibility_requirements:type_name -> csi.v1.TopologyRequirement
-	102, // 11: csi.v1.CreateVolumeRequest.mutable_parameters:type_name -> csi.v1.CreateVolumeRequest.MutableParametersEntry
-	103, // 12: csi.v1.VolumeContentSource.snapshot:type_name -> csi.v1.VolumeContentSource.SnapshotSource
-	104, // 13: csi.v1.VolumeContentSource.volume:type_name -> csi.v1.VolumeContentSource.VolumeSource
-	22,  // 14: csi.v1.CreateVolumeResponse.volume:type_name -> csi.v1.Volume
-	105, // 15: csi.v1.VolumeCapability.block:type_name -> csi.v1.VolumeCapability.BlockVolume
-	106, // 16: csi.v1.VolumeCapability.mount:type_name -> csi.v1.VolumeCapability.MountVolume
-	107, // 17: csi.v1.VolumeCapability.access_mode:type_name -> csi.v1.VolumeCapability.AccessMode
-	108, // 18: csi.v1.Volume.volume_context:type_name -> csi.v1.Volume.VolumeContextEntry
-	18,  // 19: csi.v1.Volume.content_source:type_name -> csi.v1.VolumeContentSource
-	24,  // 20: csi.v1.Volume.accessible_topology:type_name -> csi.v1.Topology
-	24,  // 21: csi.v1.TopologyRequirement.requisite:type_name -> csi.v1.Topology
-	24,  // 22: csi.v1.TopologyRequirement.preferred:type_name -> csi.v1.Topology
-	109, // 23: csi.v1.Topology.segments:type_name -> csi.v1.Topology.SegmentsEntry
-	110, // 24: csi.v1.DeleteVolumeRequest.secrets:type_name -> csi.v1.DeleteVolumeRequest.SecretsEntry
-	20,  // 25: csi.v1.ControllerPublishVolumeRequest.volume_capability:type_name -> csi.v1.VolumeCapability
-	111, // 26: csi.v1.ControllerPublishVolumeRequest.secrets:type_name -> csi.v1.ControllerPublishVolumeRequest.SecretsEntry
-	112, // 27: csi.v1.ControllerPublishVolumeRequest.volume_context:type_name -> csi.v1.ControllerPublishVolumeRequest.VolumeContextEntry
-	113, // 28: csi.v1.ControllerPublishVolumeResponse.publish_context:type_name -> csi.v1.ControllerPublishVolumeResponse.PublishContextEntry
-	114, // 29: csi.v1.ControllerUnpublishVolumeRequest.secrets:type_name -> csi.v1.ControllerUnpublishVolumeRequest.SecretsEntry
-	115, // 30: csi.v1.ValidateVolumeCapabilitiesRequest.volume_context:type_name -> csi.v1.ValidateVolumeCapabilitiesRequest.VolumeContextEntry
-	20,  // 31: csi.v1.ValidateVolumeCapabilitiesRequest.volume_capabilities:type_name -> csi.v1.VolumeCapability
-	116, // 32: csi.v1.ValidateVolumeCapabilitiesRequest.parameters:type_name -> csi.v1.ValidateVolumeCapabilitiesRequest.ParametersEntry
-	117, // 33: csi.v1.ValidateVolumeCapabilitiesRequest.secrets:type_name -> csi.v1.ValidateVolumeCapabilitiesRequest.SecretsEntry
-	118, // 34: csi.v1.ValidateVolumeCapabilitiesRequest.mutable_parameters:type_name -> csi.v1.ValidateVolumeCapabilitiesRequest.MutableParametersEntry
-	119, // 35: csi.v1.ValidateVolumeCapabilitiesResponse.confirmed:type_name -> csi.v1.ValidateVolumeCapabilitiesResponse.Confirmed
-	124, // 36: csi.v1.ListVolumesResponse.entries:type_name -> csi.v1.ListVolumesResponse.Entry
-	125, // 37: csi.v1.ControllerListVolumeHealthRequest.secrets:type_name -> csi.v1.ControllerListVolumeHealthRequest.SecretsEntry
-	37,  // 38: csi.v1.ControllerListVolumeHealthResponse.entries:type_name -> csi.v1.VolumeHealth
-	126, // 39: csi.v1.VolumeHealth.health_statuses:type_name -> csi.v1.VolumeHealth.VolumeHealthEntry
-	127, // 40: csi.v1.ControllerGetVolumeHealthRequest.secrets:type_name -> csi.v1.ControllerGetVolumeHealthRequest.SecretsEntry
-	37,  // 41: csi.v1.ControllerGetVolumeHealthResponse.volume_health:type_name -> csi.v1.VolumeHealth
-	22,  // 42: csi.v1.ControllerGetVolumeResponse.volume:type_name -> csi.v1.Volume
-	128, // 43: csi.v1.ControllerGetVolumeResponse.status:type_name -> csi.v1.ControllerGetVolumeResponse.VolumeStatus
-	129, // 44: csi.v1.ControllerModifyVolumeRequest.secrets:type_name -> csi.v1.ControllerModifyVolumeRequest.SecretsEntry
-	130, // 45: csi.v1.ControllerModifyVolumeRequest.mutable_parameters:type_name -> csi.v1.ControllerModifyVolumeRequest.MutableParametersEntry
-	20,  // 46: csi.v1.GetCapacityRequest.volume_capabilities:type_name -> csi.v1.VolumeCapability
-	131, // 47: csi.v1.GetCapacityRequest.parameters:type_name -> csi.v1.GetCapacityRequest.ParametersEntry
-	24,  // 48: csi.v1.GetCapacityRequest.accessible_topology:type_name -> csi.v1.Topology
-	158, // 49: csi.v1.GetCapacityResponse.maximum_volume_size:type_name -> google.protobuf.Int64Value
-	158, // 50: csi.v1.GetCapacityResponse.minimum_volume_size:type_name -> google.protobuf.Int64Value
-	48,  // 51: csi.v1.ControllerGetCapabilitiesResponse.capabilities:type_name -> csi.v1.ControllerServiceCapability
-	132, // 52: csi.v1.ControllerServiceCapability.rpc:type_name -> csi.v1.ControllerServiceCapability.RPC
-	133, // 53: csi.v1.CreateSnapshotRequest.secrets:type_name -> csi.v1.CreateSnapshotRequest.SecretsEntry
-	134, // 54: csi.v1.CreateSnapshotRequest.parameters:type_name -> csi.v1.CreateSnapshotRequest.ParametersEntry
-	23,  // 55: csi.v1.CreateSnapshotRequest.accessibility_requirements:type_name -> csi.v1.TopologyRequirement
-	51,  // 56: csi.v1.CreateSnapshotResponse.snapshot:type_name -> csi.v1.Snapshot
-	159, // 57: csi.v1.Snapshot.creation_time:type_name -> google.protobuf.Timestamp
-	24,  // 58: csi.v1.Snapshot.accessible_topology:type_name -> csi.v1.Topology
-	135, // 59: csi.v1.DeleteSnapshotRequest.secrets:type_name -> csi.v1.DeleteSnapshotRequest.SecretsEntry
-	136, // 60: csi.v1.ListSnapshotsRequest.secrets:type_name -> csi.v1.ListSnapshotsRequest.SecretsEntry
-	137, // 61: csi.v1.ListSnapshotsResponse.entries:type_name -> csi.v1.ListSnapshotsResponse.Entry
-	138, // 62: csi.v1.GetSnapshotRequest.secrets:type_name -> csi.v1.GetSnapshotRequest.SecretsEntry
-	51,  // 63: csi.v1.GetSnapshotResponse.snapshot:type_name -> csi.v1.Snapshot
-	21,  // 64: csi.v1.ControllerExpandVolumeRequest.capacity_range:type_name -> csi.v1.CapacityRange
-	139, // 65: csi.v1.ControllerExpandVolumeRequest.secrets:type_name -> csi.v1.ControllerExpandVolumeRequest.SecretsEntry
-	20,  // 66: csi.v1.ControllerExpandVolumeRequest.volume_capability:type_name -> csi.v1.VolumeCapability
-	140, // 67: csi.v1.NodeStageVolumeRequest.publish_context:type_name -> csi.v1.NodeStageVolumeRequest.PublishContextEntry
-	20,  // 68: csi.v1.NodeStageVolumeRequest.volume_capability:type_name -> csi.v1.VolumeCapability
-	141, // 69: csi.v1.NodeStageVolumeRequest.secrets:type_name -> csi.v1.NodeStageVolumeRequest.SecretsEntry
-	142, // 70: csi.v1.NodeStageVolumeRequest.volume_context:type_name -> csi.v1.NodeStageVolumeRequest.VolumeContextEntry
-	143, // 71: csi.v1.NodePublishVolumeRequest.publish_context:type_name -> csi.v1.NodePublishVolumeRequest.PublishContextEntry
-	20,  // 72: csi.v1.NodePublishVolumeRequest.volume_capability:type_name -> csi.v1.VolumeCapability
-	144, // 73: csi.v1.NodePublishVolumeRequest.secrets:type_name -> csi.v1.NodePublishVolumeRequest.SecretsEntry
-	145, // 74: csi.v1.NodePublishVolumeRequest.volume_context:type_name -> csi.v1.NodePublishVolumeRequest.VolumeContextEntry
-	70,  // 75: csi.v1.NodeGetVolumeStatsResponse.usage:type_name -> csi.v1.VolumeUsage
-	7,   // 76: csi.v1.VolumeUsage.unit:type_name -> csi.v1.VolumeUsage.Unit
-	37,  // 77: csi.v1.NodeGetVolumeHealthResponse.volume_health:type_name -> csi.v1.VolumeHealth
-	146, // 78: csi.v1.NodeGetStorageHealthRequest.secrets:type_name -> csi.v1.NodeGetStorageHealthRequest.SecretsEntry
-	147, // 79: csi.v1.NodeGetStorageHealthResponse.backend_health:type_name -> csi.v1.NodeGetStorageHealthResponse.StorageBackendHealth
-	77,  // 80: csi.v1.NodeGetCapabilitiesResponse.capabilities:type_name -> csi.v1.NodeServiceCapability
-	148, // 81: csi.v1.NodeServiceCapability.rpc:type_name -> csi.v1.NodeServiceCapability.RPC
-	24,  // 82: csi.v1.NodeGetInfoResponse.accessible_topology:type_name -> csi.v1.Topology
-	21,  // 83: csi.v1.NodeExpandVolumeRequest.capacity_range:type_name -> csi.v1.CapacityRange
-	20,  // 84: csi.v1.NodeExpandVolumeRequest.volume_capability:type_name -> csi.v1.VolumeCapability
-	149, // 85: csi.v1.NodeExpandVolumeRequest.secrets:type_name -> csi.v1.NodeExpandVolumeRequest.SecretsEntry
-	84,  // 86: csi.v1.GroupControllerGetCapabilitiesResponse.capabilities:type_name -> csi.v1.GroupControllerServiceCapability
-	150, // 87: csi.v1.GroupControllerServiceCapability.rpc:type_name -> csi.v1.GroupControllerServiceCapability.RPC
-	151, // 88: csi.v1.CreateVolumeGroupSnapshotRequest.secrets:type_name -> csi.v1.CreateVolumeGroupSnapshotRequest.SecretsEntry
-	152, // 89: csi.v1.CreateVolumeGroupSnapshotRequest.parameters:type_name -> csi.v1.CreateVolumeGroupSnapshotRequest.ParametersEntry
-	87,  // 90: csi.v1.CreateVolumeGroupSnapshotResponse.group_snapshot:type_name -> csi.v1.VolumeGroupSnapshot
-	51,  // 91: csi.v1.VolumeGroupSnapshot.snapshots:type_name -> csi.v1.Snapshot
-	159, // 92: csi.v1.VolumeGroupSnapshot.creation_time:type_name -> google.protobuf.Timestamp
-	153, // 93: csi.v1.DeleteVolumeGroupSnapshotRequest.secrets:type_name -> csi.v1.DeleteVolumeGroupSnapshotRequest.SecretsEntry
-	154, // 94: csi.v1.GetVolumeGroupSnapshotRequest.secrets:type_name -> csi.v1.GetVolumeGroupSnapshotRequest.SecretsEntry
-	87,  // 95: csi.v1.GetVolumeGroupSnapshotResponse.group_snapshot:type_name -> csi.v1.VolumeGroupSnapshot
-	155, // 96: csi.v1.GetMetadataAllocatedRequest.secrets:type_name -> csi.v1.GetMetadataAllocatedRequest.SecretsEntry
-	2,   // 97: csi.v1.GetMetadataAllocatedResponse.block_metadata_type:type_name -> csi.v1.BlockMetadataType
-	92,  // 98: csi.v1.GetMetadataAllocatedResponse.block_metadata:type_name -> csi.v1.BlockMetadata
-	156, // 99: csi.v1.GetMetadataDeltaRequest.secrets:type_name -> csi.v1.GetMetadataDeltaRequest.SecretsEntry
-	2,   // 100: csi.v1.GetMetadataDeltaResponse.block_metadata_type:type_name -> csi.v1.BlockMetadataType
-	92,  // 101: csi.v1.GetMetadataDeltaResponse.block_metadata:type_name -> csi.v1.BlockMetadata
-	3,   // 102: csi.v1.PluginCapability.Service.type:type_name -> csi.v1.PluginCapability.Service.Type
-	4,   // 103: csi.v1.PluginCapability.VolumeExpansion.type:type_name -> csi.v1.PluginCapability.VolumeExpansion.Type
-	5,   // 104: csi.v1.VolumeCapability.AccessMode.mode:type_name -> csi.v1.VolumeCapability.AccessMode.Mode
-	120, // 105: csi.v1.ValidateVolumeCapabilitiesResponse.Confirmed.volume_context:type_name -> csi.v1.ValidateVolumeCapabilitiesResponse.Confirmed.VolumeContextEntry
-	20,  // 106: csi.v1.ValidateVolumeCapabilitiesResponse.Confirmed.volume_capabilities:type_name -> csi.v1.VolumeCapability
-	121, // 107: csi.v1.ValidateVolumeCapabilitiesResponse.Confirmed.parameters:type_name -> csi.v1.ValidateVolumeCapabilitiesResponse.Confirmed.ParametersEntry
-	122, // 108: csi.v1.ValidateVolumeCapabilitiesResponse.Confirmed.mutable_parameters:type_name -> csi.v1.ValidateVolumeCapabilitiesResponse.Confirmed.MutableParametersEntry
-	22,  // 109: csi.v1.ListVolumesResponse.Entry.volume:type_name -> csi.v1.Volume
-	123, // 110: csi.v1.ListVolumesResponse.Entry.status:type_name -> csi.v1.ListVolumesResponse.VolumeStatus
-	0,   // 111: csi.v1.VolumeHealth.VolumeHealthEntry.status:type_name -> csi.v1.VolumeHealthErrorType
-	6,   // 112: csi.v1.ControllerServiceCapability.RPC.type:type_name -> csi.v1.ControllerServiceCapability.RPC.Type
-	51,  // 113: csi.v1.ListSnapshotsResponse.Entry.snapshot:type_name -> csi.v1.Snapshot
-	1,   // 114: csi.v1.NodeGetStorageHealthResponse.StorageBackendHealth.status:type_name -> csi.v1.StorageHealthErrorType
-	20,  // 115: csi.v1.NodeGetStorageHealthResponse.StorageBackendHealth.volume_capability:type_name -> csi.v1.VolumeCapability
-	8,   // 116: csi.v1.NodeServiceCapability.RPC.type:type_name -> csi.v1.NodeServiceCapability.RPC.Type
-	9,   // 117: csi.v1.GroupControllerServiceCapability.RPC.type:type_name -> csi.v1.GroupControllerServiceCapability.RPC.Type
-	160, // 118: csi.v1.alpha_enum:extendee -> google.protobuf.EnumOptions
-	161, // 119: csi.v1.alpha_enum_value:extendee -> google.protobuf.EnumValueOptions
-	162, // 120: csi.v1.csi_secret:extendee -> google.protobuf.FieldOptions
-	162, // 121: csi.v1.alpha_field:extendee -> google.protobuf.FieldOptions
-	163, // 122: csi.v1.alpha_message:extendee -> google.protobuf.MessageOptions
-	164, // 123: csi.v1.alpha_method:extendee -> google.protobuf.MethodOptions
-	165, // 124: csi.v1.alpha_service:extendee -> google.protobuf.ServiceOptions
-	10,  // 125: csi.v1.Identity.GetPluginInfo:input_type -> csi.v1.GetPluginInfoRequest
-	12,  // 126: csi.v1.Identity.GetPluginCapabilities:input_type -> csi.v1.GetPluginCapabilitiesRequest
-	15,  // 127: csi.v1.Identity.Probe:input_type -> csi.v1.ProbeRequest
-	17,  // 128: csi.v1.Controller.CreateVolume:input_type -> csi.v1.CreateVolumeRequest
-	25,  // 129: csi.v1.Controller.DeleteVolume:input_type -> csi.v1.DeleteVolumeRequest
-	27,  // 130: csi.v1.Controller.ControllerPublishVolume:input_type -> csi.v1.ControllerPublishVolumeRequest
-	29,  // 131: csi.v1.Controller.ControllerUnpublishVolume:input_type -> csi.v1.ControllerUnpublishVolumeRequest
-	31,  // 132: csi.v1.Controller.ValidateVolumeCapabilities:input_type -> csi.v1.ValidateVolumeCapabilitiesRequest
-	33,  // 133: csi.v1.Controller.ListVolumes:input_type -> csi.v1.ListVolumesRequest
-	35,  // 134: csi.v1.Controller.ControllerListVolumeHealth:input_type -> csi.v1.ControllerListVolumeHealthRequest
-	38,  // 135: csi.v1.Controller.ControllerGetVolumeHealth:input_type -> csi.v1.ControllerGetVolumeHealthRequest
-	44,  // 136: csi.v1.Controller.GetCapacity:input_type -> csi.v1.GetCapacityRequest
-	46,  // 137: csi.v1.Controller.ControllerGetCapabilities:input_type -> csi.v1.ControllerGetCapabilitiesRequest
-	49,  // 138: csi.v1.Controller.CreateSnapshot:input_type -> csi.v1.CreateSnapshotRequest
-	52,  // 139: csi.v1.Controller.DeleteSnapshot:input_type -> csi.v1.DeleteSnapshotRequest
-	54,  // 140: csi.v1.Controller.ListSnapshots:input_type -> csi.v1.ListSnapshotsRequest
-	56,  // 141: csi.v1.Controller.GetSnapshot:input_type -> csi.v1.GetSnapshotRequest
-	58,  // 142: csi.v1.Controller.ControllerExpandVolume:input_type -> csi.v1.ControllerExpandVolumeRequest
-	40,  // 143: csi.v1.Controller.ControllerGetVolume:input_type -> csi.v1.ControllerGetVolumeRequest
-	42,  // 144: csi.v1.Controller.ControllerModifyVolume:input_type -> csi.v1.ControllerModifyVolumeRequest
-	82,  // 145: csi.v1.GroupController.GroupControllerGetCapabilities:input_type -> csi.v1.GroupControllerGetCapabilitiesRequest
-	85,  // 146: csi.v1.GroupController.CreateVolumeGroupSnapshot:input_type -> csi.v1.CreateVolumeGroupSnapshotRequest
-	88,  // 147: csi.v1.GroupController.DeleteVolumeGroupSnapshot:input_type -> csi.v1.DeleteVolumeGroupSnapshotRequest
-	90,  // 148: csi.v1.GroupController.GetVolumeGroupSnapshot:input_type -> csi.v1.GetVolumeGroupSnapshotRequest
-	93,  // 149: csi.v1.SnapshotMetadata.GetMetadataAllocated:input_type -> csi.v1.GetMetadataAllocatedRequest
-	95,  // 150: csi.v1.SnapshotMetadata.GetMetadataDelta:input_type -> csi.v1.GetMetadataDeltaRequest
-	60,  // 151: csi.v1.Node.NodeStageVolume:input_type -> csi.v1.NodeStageVolumeRequest
-	62,  // 152: csi.v1.Node.NodeUnstageVolume:input_type -> csi.v1.NodeUnstageVolumeRequest
-	64,  // 153: csi.v1.Node.NodePublishVolume:input_type -> csi.v1.NodePublishVolumeRequest
-	66,  // 154: csi.v1.Node.NodeUnpublishVolume:input_type -> csi.v1.NodeUnpublishVolumeRequest
-	68,  // 155: csi.v1.Node.NodeGetVolumeStats:input_type -> csi.v1.NodeGetVolumeStatsRequest
-	71,  // 156: csi.v1.Node.NodeGetVolumeHealth:input_type -> csi.v1.NodeGetVolumeHealthRequest
-	73,  // 157: csi.v1.Node.NodeGetStorageHealth:input_type -> csi.v1.NodeGetStorageHealthRequest
-	80,  // 158: csi.v1.Node.NodeExpandVolume:input_type -> csi.v1.NodeExpandVolumeRequest
-	75,  // 159: csi.v1.Node.NodeGetCapabilities:input_type -> csi.v1.NodeGetCapabilitiesRequest
-	78,  // 160: csi.v1.Node.NodeGetInfo:input_type -> csi.v1.NodeGetInfoRequest
-	11,  // 161: csi.v1.Identity.GetPluginInfo:output_type -> csi.v1.GetPluginInfoResponse
-	13,  // 162: csi.v1.Identity.GetPluginCapabilities:output_type -> csi.v1.GetPluginCapabilitiesResponse
-	16,  // 163: csi.v1.Identity.Probe:output_type -> csi.v1.ProbeResponse
-	19,  // 164: csi.v1.Controller.CreateVolume:output_type -> csi.v1.CreateVolumeResponse
-	26,  // 165: csi.v1.Controller.DeleteVolume:output_type -> csi.v1.DeleteVolumeResponse
-	28,  // 166: csi.v1.Controller.ControllerPublishVolume:output_type -> csi.v1.ControllerPublishVolumeResponse
-	30,  // 167: csi.v1.Controller.ControllerUnpublishVolume:output_type -> csi.v1.ControllerUnpublishVolumeResponse
-	32,  // 168: csi.v1.Controller.ValidateVolumeCapabilities:output_type -> csi.v1.ValidateVolumeCapabilitiesResponse
-	34,  // 169: csi.v1.Controller.ListVolumes:output_type -> csi.v1.ListVolumesResponse
-	36,  // 170: csi.v1.Controller.ControllerListVolumeHealth:output_type -> csi.v1.ControllerListVolumeHealthResponse
-	39,  // 171: csi.v1.Controller.ControllerGetVolumeHealth:output_type -> csi.v1.ControllerGetVolumeHealthResponse
-	45,  // 172: csi.v1.Controller.GetCapacity:output_type -> csi.v1.GetCapacityResponse
-	47,  // 173: csi.v1.Controller.ControllerGetCapabilities:output_type -> csi.v1.ControllerGetCapabilitiesResponse
-	50,  // 174: csi.v1.Controller.CreateSnapshot:output_type -> csi.v1.CreateSnapshotResponse
-	53,  // 175: csi.v1.Controller.DeleteSnapshot:output_type -> csi.v1.DeleteSnapshotResponse
-	55,  // 176: csi.v1.Controller.ListSnapshots:output_type -> csi.v1.ListSnapshotsResponse
-	57,  // 177: csi.v1.Controller.GetSnapshot:output_type -> csi.v1.GetSnapshotResponse
-	59,  // 178: csi.v1.Controller.ControllerExpandVolume:output_type -> csi.v1.ControllerExpandVolumeResponse
-	41,  // 179: csi.v1.Controller.ControllerGetVolume:output_type -> csi.v1.ControllerGetVolumeResponse
-	43,  // 180: csi.v1.Controller.ControllerModifyVolume:output_type -> csi.v1.ControllerModifyVolumeResponse
-	83,  // 181: csi.v1.GroupController.GroupControllerGetCapabilities:output_type -> csi.v1.GroupControllerGetCapabilitiesResponse
-	86,  // 182: csi.v1.GroupController.CreateVolumeGroupSnapshot:output_type -> csi.v1.CreateVolumeGroupSnapshotResponse
-	89,  // 183: csi.v1.GroupController.DeleteVolumeGroupSnapshot:output_type -> csi.v1.DeleteVolumeGroupSnapshotResponse
-	91,  // 184: csi.v1.GroupController.GetVolumeGroupSnapshot:output_type -> csi.v1.GetVolumeGroupSnapshotResponse
-	94,  // 185: csi.v1.SnapshotMetadata.GetMetadataAllocated:output_type -> csi.v1.GetMetadataAllocatedResponse
-	96,  // 186: csi.v1.SnapshotMetadata.GetMetadataDelta:output_type -> csi.v1.GetMetadataDeltaResponse
-	61,  // 187: csi.v1.Node.NodeStageVolume:output_type -> csi.v1.NodeStageVolumeResponse
-	63,  // 188: csi.v1.Node.NodeUnstageVolume:output_type -> csi.v1.NodeUnstageVolumeResponse
-	65,  // 189: csi.v1.Node.NodePublishVolume:output_type -> csi.v1.NodePublishVolumeResponse
-	67,  // 190: csi.v1.Node.NodeUnpublishVolume:output_type -> csi.v1.NodeUnpublishVolumeResponse
-	69,  // 191: csi.v1.Node.NodeGetVolumeStats:output_type -> csi.v1.NodeGetVolumeStatsResponse
-	72,  // 192: csi.v1.Node.NodeGetVolumeHealth:output_type -> csi.v1.NodeGetVolumeHealthResponse
-	74,  // 193: csi.v1.Node.NodeGetStorageHealth:output_type -> csi.v1.NodeGetStorageHealthResponse
-	81,  // 194: csi.v1.Node.NodeExpandVolume:output_type -> csi.v1.NodeExpandVolumeResponse
-	76,  // 195: csi.v1.Node.NodeGetCapabilities:output_type -> csi.v1.NodeGetCapabilitiesResponse
-	79,  // 196: csi.v1.Node.NodeGetInfo:output_type -> csi.v1.NodeGetInfoResponse
-	161, // [161:197] is the sub-list for method output_type
-	125, // [125:161] is the sub-list for method input_type
-	125, // [125:125] is the sub-list for extension type_name
-	118, // [118:125] is the sub-list for extension extendee
-	0,   // [0:118] is the sub-list for field type_name
+	100, // 0: csi.v1.GetPluginInfoResponse.manifest:type_name -> csi.v1.GetPluginInfoResponse.ManifestEntry
+	15,  // 1: csi.v1.GetPluginCapabilitiesResponse.capabilities:type_name -> csi.v1.PluginCapability
+	101, // 2: csi.v1.PluginCapability.service:type_name -> csi.v1.PluginCapability.Service
+	102, // 3: csi.v1.PluginCapability.volume_expansion:type_name -> csi.v1.PluginCapability.VolumeExpansion
+	161, // 4: csi.v1.ProbeResponse.ready:type_name -> google.protobuf.BoolValue
+	22,  // 5: csi.v1.CreateVolumeRequest.capacity_range:type_name -> csi.v1.CapacityRange
+	21,  // 6: csi.v1.CreateVolumeRequest.volume_capabilities:type_name -> csi.v1.VolumeCapability
+	103, // 7: csi.v1.CreateVolumeRequest.parameters:type_name -> csi.v1.CreateVolumeRequest.ParametersEntry
+	104, // 8: csi.v1.CreateVolumeRequest.secrets:type_name -> csi.v1.CreateVolumeRequest.SecretsEntry
+	19,  // 9: csi.v1.CreateVolumeRequest.volume_content_source:type_name -> csi.v1.VolumeContentSource
+	24,  // 10: csi.v1.CreateVolumeRequest.accessibility_requirements:type_name -> csi.v1.TopologyRequirement
+	105, // 11: csi.v1.CreateVolumeRequest.mutable_parameters:type_name -> csi.v1.CreateVolumeRequest.MutableParametersEntry
+	106, // 12: csi.v1.VolumeContentSource.snapshot:type_name -> csi.v1.VolumeContentSource.SnapshotSource
+	107, // 13: csi.v1.VolumeContentSource.volume:type_name -> csi.v1.VolumeContentSource.VolumeSource
+	23,  // 14: csi.v1.CreateVolumeResponse.volume:type_name -> csi.v1.Volume
+	108, // 15: csi.v1.VolumeCapability.block:type_name -> csi.v1.VolumeCapability.BlockVolume
+	109, // 16: csi.v1.VolumeCapability.mount:type_name -> csi.v1.VolumeCapability.MountVolume
+	110, // 17: csi.v1.VolumeCapability.access_mode:type_name -> csi.v1.VolumeCapability.AccessMode
+	111, // 18: csi.v1.Volume.volume_context:type_name -> csi.v1.Volume.VolumeContextEntry
+	19,  // 19: csi.v1.Volume.content_source:type_name -> csi.v1.VolumeContentSource
+	25,  // 20: csi.v1.Volume.accessible_topology:type_name -> csi.v1.Topology
+	25,  // 21: csi.v1.TopologyRequirement.requisite:type_name -> csi.v1.Topology
+	25,  // 22: csi.v1.TopologyRequirement.preferred:type_name -> csi.v1.Topology
+	112, // 23: csi.v1.Topology.segments:type_name -> csi.v1.Topology.SegmentsEntry
+	113, // 24: csi.v1.DeleteVolumeRequest.secrets:type_name -> csi.v1.DeleteVolumeRequest.SecretsEntry
+	21,  // 25: csi.v1.ControllerPublishVolumeRequest.volume_capability:type_name -> csi.v1.VolumeCapability
+	114, // 26: csi.v1.ControllerPublishVolumeRequest.secrets:type_name -> csi.v1.ControllerPublishVolumeRequest.SecretsEntry
+	115, // 27: csi.v1.ControllerPublishVolumeRequest.volume_context:type_name -> csi.v1.ControllerPublishVolumeRequest.VolumeContextEntry
+	116, // 28: csi.v1.ControllerPublishVolumeResponse.publish_context:type_name -> csi.v1.ControllerPublishVolumeResponse.PublishContextEntry
+	117, // 29: csi.v1.ControllerUnpublishVolumeRequest.secrets:type_name -> csi.v1.ControllerUnpublishVolumeRequest.SecretsEntry
+	6,   // 30: csi.v1.ControllerUnpublishVolumeRequest.reason:type_name -> csi.v1.ControllerUnpublishVolumeRequest.Reason
+	118, // 31: csi.v1.ValidateVolumeCapabilitiesRequest.volume_context:type_name -> csi.v1.ValidateVolumeCapabilitiesRequest.VolumeContextEntry
+	21,  // 32: csi.v1.ValidateVolumeCapabilitiesRequest.volume_capabilities:type_name -> csi.v1.VolumeCapability
+	119, // 33: csi.v1.ValidateVolumeCapabilitiesRequest.parameters:type_name -> csi.v1.ValidateVolumeCapabilitiesRequest.ParametersEntry
+	120, // 34: csi.v1.ValidateVolumeCapabilitiesRequest.secrets:type_name -> csi.v1.ValidateVolumeCapabilitiesRequest.SecretsEntry
+	121, // 35: csi.v1.ValidateVolumeCapabilitiesRequest.mutable_parameters:type_name -> csi.v1.ValidateVolumeCapabilitiesRequest.MutableParametersEntry
+	122, // 36: csi.v1.ValidateVolumeCapabilitiesResponse.confirmed:type_name -> csi.v1.ValidateVolumeCapabilitiesResponse.Confirmed
+	127, // 37: csi.v1.ListVolumesResponse.entries:type_name -> csi.v1.ListVolumesResponse.Entry
+	128, // 38: csi.v1.ControllerListVolumeHealthRequest.secrets:type_name -> csi.v1.ControllerListVolumeHealthRequest.SecretsEntry
+	38,  // 39: csi.v1.ControllerListVolumeHealthResponse.entries:type_name -> csi.v1.VolumeHealth
+	129, // 40: csi.v1.VolumeHealth.health_statuses:type_name -> csi.v1.VolumeHealth.VolumeHealthEntry
+	130, // 41: csi.v1.ControllerGetVolumeHealthRequest.secrets:type_name -> csi.v1.ControllerGetVolumeHealthRequest.SecretsEntry
+	38,  // 42: csi.v1.ControllerGetVolumeHealthResponse.volume_health:type_name -> csi.v1.VolumeHealth
+	23,  // 43: csi.v1.ControllerGetVolumeResponse.volume:type_name -> csi.v1.Volume
+	131, // 44: csi.v1.ControllerGetVolumeResponse.status:type_name -> csi.v1.ControllerGetVolumeResponse.VolumeStatus
+	132, // 45: csi.v1.ControllerModifyVolumeRequest.secrets:type_name -> csi.v1.ControllerModifyVolumeRequest.SecretsEntry
+	133, // 46: csi.v1.ControllerModifyVolumeRequest.mutable_parameters:type_name -> csi.v1.ControllerModifyVolumeRequest.MutableParametersEntry
+	25,  // 47: csi.v1.ControllerGetNodeInfoResponse.accessible_topology:type_name -> csi.v1.Topology
+	134, // 48: csi.v1.ControllerGetNodeInfoResponse.published_volumes:type_name -> csi.v1.ControllerGetNodeInfoResponse.PublishedVolume
+	21,  // 49: csi.v1.GetCapacityRequest.volume_capabilities:type_name -> csi.v1.VolumeCapability
+	135, // 50: csi.v1.GetCapacityRequest.parameters:type_name -> csi.v1.GetCapacityRequest.ParametersEntry
+	25,  // 51: csi.v1.GetCapacityRequest.accessible_topology:type_name -> csi.v1.Topology
+	162, // 52: csi.v1.GetCapacityResponse.maximum_volume_size:type_name -> google.protobuf.Int64Value
+	162, // 53: csi.v1.GetCapacityResponse.minimum_volume_size:type_name -> google.protobuf.Int64Value
+	51,  // 54: csi.v1.ControllerGetCapabilitiesResponse.capabilities:type_name -> csi.v1.ControllerServiceCapability
+	136, // 55: csi.v1.ControllerServiceCapability.rpc:type_name -> csi.v1.ControllerServiceCapability.RPC
+	137, // 56: csi.v1.CreateSnapshotRequest.secrets:type_name -> csi.v1.CreateSnapshotRequest.SecretsEntry
+	138, // 57: csi.v1.CreateSnapshotRequest.parameters:type_name -> csi.v1.CreateSnapshotRequest.ParametersEntry
+	24,  // 58: csi.v1.CreateSnapshotRequest.accessibility_requirements:type_name -> csi.v1.TopologyRequirement
+	54,  // 59: csi.v1.CreateSnapshotResponse.snapshot:type_name -> csi.v1.Snapshot
+	163, // 60: csi.v1.Snapshot.creation_time:type_name -> google.protobuf.Timestamp
+	25,  // 61: csi.v1.Snapshot.accessible_topology:type_name -> csi.v1.Topology
+	139, // 62: csi.v1.DeleteSnapshotRequest.secrets:type_name -> csi.v1.DeleteSnapshotRequest.SecretsEntry
+	140, // 63: csi.v1.ListSnapshotsRequest.secrets:type_name -> csi.v1.ListSnapshotsRequest.SecretsEntry
+	141, // 64: csi.v1.ListSnapshotsResponse.entries:type_name -> csi.v1.ListSnapshotsResponse.Entry
+	142, // 65: csi.v1.GetSnapshotRequest.secrets:type_name -> csi.v1.GetSnapshotRequest.SecretsEntry
+	54,  // 66: csi.v1.GetSnapshotResponse.snapshot:type_name -> csi.v1.Snapshot
+	22,  // 67: csi.v1.ControllerExpandVolumeRequest.capacity_range:type_name -> csi.v1.CapacityRange
+	143, // 68: csi.v1.ControllerExpandVolumeRequest.secrets:type_name -> csi.v1.ControllerExpandVolumeRequest.SecretsEntry
+	21,  // 69: csi.v1.ControllerExpandVolumeRequest.volume_capability:type_name -> csi.v1.VolumeCapability
+	144, // 70: csi.v1.NodeStageVolumeRequest.publish_context:type_name -> csi.v1.NodeStageVolumeRequest.PublishContextEntry
+	21,  // 71: csi.v1.NodeStageVolumeRequest.volume_capability:type_name -> csi.v1.VolumeCapability
+	145, // 72: csi.v1.NodeStageVolumeRequest.secrets:type_name -> csi.v1.NodeStageVolumeRequest.SecretsEntry
+	146, // 73: csi.v1.NodeStageVolumeRequest.volume_context:type_name -> csi.v1.NodeStageVolumeRequest.VolumeContextEntry
+	147, // 74: csi.v1.NodePublishVolumeRequest.publish_context:type_name -> csi.v1.NodePublishVolumeRequest.PublishContextEntry
+	21,  // 75: csi.v1.NodePublishVolumeRequest.volume_capability:type_name -> csi.v1.VolumeCapability
+	148, // 76: csi.v1.NodePublishVolumeRequest.secrets:type_name -> csi.v1.NodePublishVolumeRequest.SecretsEntry
+	149, // 77: csi.v1.NodePublishVolumeRequest.volume_context:type_name -> csi.v1.NodePublishVolumeRequest.VolumeContextEntry
+	73,  // 78: csi.v1.NodeGetVolumeStatsResponse.usage:type_name -> csi.v1.VolumeUsage
+	8,   // 79: csi.v1.VolumeUsage.unit:type_name -> csi.v1.VolumeUsage.Unit
+	38,  // 80: csi.v1.NodeGetVolumeHealthResponse.volume_health:type_name -> csi.v1.VolumeHealth
+	150, // 81: csi.v1.NodeGetStorageHealthRequest.secrets:type_name -> csi.v1.NodeGetStorageHealthRequest.SecretsEntry
+	151, // 82: csi.v1.NodeGetStorageHealthResponse.backend_health:type_name -> csi.v1.NodeGetStorageHealthResponse.StorageBackendHealth
+	80,  // 83: csi.v1.NodeGetCapabilitiesResponse.capabilities:type_name -> csi.v1.NodeServiceCapability
+	152, // 84: csi.v1.NodeServiceCapability.rpc:type_name -> csi.v1.NodeServiceCapability.RPC
+	25,  // 85: csi.v1.NodeGetInfoResponse.accessible_topology:type_name -> csi.v1.Topology
+	22,  // 86: csi.v1.NodeExpandVolumeRequest.capacity_range:type_name -> csi.v1.CapacityRange
+	21,  // 87: csi.v1.NodeExpandVolumeRequest.volume_capability:type_name -> csi.v1.VolumeCapability
+	153, // 88: csi.v1.NodeExpandVolumeRequest.secrets:type_name -> csi.v1.NodeExpandVolumeRequest.SecretsEntry
+	87,  // 89: csi.v1.GroupControllerGetCapabilitiesResponse.capabilities:type_name -> csi.v1.GroupControllerServiceCapability
+	154, // 90: csi.v1.GroupControllerServiceCapability.rpc:type_name -> csi.v1.GroupControllerServiceCapability.RPC
+	155, // 91: csi.v1.CreateVolumeGroupSnapshotRequest.secrets:type_name -> csi.v1.CreateVolumeGroupSnapshotRequest.SecretsEntry
+	156, // 92: csi.v1.CreateVolumeGroupSnapshotRequest.parameters:type_name -> csi.v1.CreateVolumeGroupSnapshotRequest.ParametersEntry
+	90,  // 93: csi.v1.CreateVolumeGroupSnapshotResponse.group_snapshot:type_name -> csi.v1.VolumeGroupSnapshot
+	54,  // 94: csi.v1.VolumeGroupSnapshot.snapshots:type_name -> csi.v1.Snapshot
+	163, // 95: csi.v1.VolumeGroupSnapshot.creation_time:type_name -> google.protobuf.Timestamp
+	157, // 96: csi.v1.DeleteVolumeGroupSnapshotRequest.secrets:type_name -> csi.v1.DeleteVolumeGroupSnapshotRequest.SecretsEntry
+	158, // 97: csi.v1.GetVolumeGroupSnapshotRequest.secrets:type_name -> csi.v1.GetVolumeGroupSnapshotRequest.SecretsEntry
+	90,  // 98: csi.v1.GetVolumeGroupSnapshotResponse.group_snapshot:type_name -> csi.v1.VolumeGroupSnapshot
+	159, // 99: csi.v1.GetMetadataAllocatedRequest.secrets:type_name -> csi.v1.GetMetadataAllocatedRequest.SecretsEntry
+	2,   // 100: csi.v1.GetMetadataAllocatedResponse.block_metadata_type:type_name -> csi.v1.BlockMetadataType
+	95,  // 101: csi.v1.GetMetadataAllocatedResponse.block_metadata:type_name -> csi.v1.BlockMetadata
+	160, // 102: csi.v1.GetMetadataDeltaRequest.secrets:type_name -> csi.v1.GetMetadataDeltaRequest.SecretsEntry
+	2,   // 103: csi.v1.GetMetadataDeltaResponse.block_metadata_type:type_name -> csi.v1.BlockMetadataType
+	95,  // 104: csi.v1.GetMetadataDeltaResponse.block_metadata:type_name -> csi.v1.BlockMetadata
+	3,   // 105: csi.v1.PluginCapability.Service.type:type_name -> csi.v1.PluginCapability.Service.Type
+	4,   // 106: csi.v1.PluginCapability.VolumeExpansion.type:type_name -> csi.v1.PluginCapability.VolumeExpansion.Type
+	5,   // 107: csi.v1.VolumeCapability.AccessMode.mode:type_name -> csi.v1.VolumeCapability.AccessMode.Mode
+	123, // 108: csi.v1.ValidateVolumeCapabilitiesResponse.Confirmed.volume_context:type_name -> csi.v1.ValidateVolumeCapabilitiesResponse.Confirmed.VolumeContextEntry
+	21,  // 109: csi.v1.ValidateVolumeCapabilitiesResponse.Confirmed.volume_capabilities:type_name -> csi.v1.VolumeCapability
+	124, // 110: csi.v1.ValidateVolumeCapabilitiesResponse.Confirmed.parameters:type_name -> csi.v1.ValidateVolumeCapabilitiesResponse.Confirmed.ParametersEntry
+	125, // 111: csi.v1.ValidateVolumeCapabilitiesResponse.Confirmed.mutable_parameters:type_name -> csi.v1.ValidateVolumeCapabilitiesResponse.Confirmed.MutableParametersEntry
+	23,  // 112: csi.v1.ListVolumesResponse.Entry.volume:type_name -> csi.v1.Volume
+	126, // 113: csi.v1.ListVolumesResponse.Entry.status:type_name -> csi.v1.ListVolumesResponse.VolumeStatus
+	0,   // 114: csi.v1.VolumeHealth.VolumeHealthEntry.status:type_name -> csi.v1.VolumeHealthErrorType
+	7,   // 115: csi.v1.ControllerServiceCapability.RPC.type:type_name -> csi.v1.ControllerServiceCapability.RPC.Type
+	54,  // 116: csi.v1.ListSnapshotsResponse.Entry.snapshot:type_name -> csi.v1.Snapshot
+	1,   // 117: csi.v1.NodeGetStorageHealthResponse.StorageBackendHealth.status:type_name -> csi.v1.StorageHealthErrorType
+	21,  // 118: csi.v1.NodeGetStorageHealthResponse.StorageBackendHealth.volume_capability:type_name -> csi.v1.VolumeCapability
+	9,   // 119: csi.v1.NodeServiceCapability.RPC.type:type_name -> csi.v1.NodeServiceCapability.RPC.Type
+	10,  // 120: csi.v1.GroupControllerServiceCapability.RPC.type:type_name -> csi.v1.GroupControllerServiceCapability.RPC.Type
+	164, // 121: csi.v1.alpha_enum:extendee -> google.protobuf.EnumOptions
+	165, // 122: csi.v1.alpha_enum_value:extendee -> google.protobuf.EnumValueOptions
+	166, // 123: csi.v1.csi_secret:extendee -> google.protobuf.FieldOptions
+	166, // 124: csi.v1.alpha_field:extendee -> google.protobuf.FieldOptions
+	167, // 125: csi.v1.alpha_message:extendee -> google.protobuf.MessageOptions
+	168, // 126: csi.v1.alpha_method:extendee -> google.protobuf.MethodOptions
+	169, // 127: csi.v1.alpha_service:extendee -> google.protobuf.ServiceOptions
+	11,  // 128: csi.v1.Identity.GetPluginInfo:input_type -> csi.v1.GetPluginInfoRequest
+	13,  // 129: csi.v1.Identity.GetPluginCapabilities:input_type -> csi.v1.GetPluginCapabilitiesRequest
+	16,  // 130: csi.v1.Identity.Probe:input_type -> csi.v1.ProbeRequest
+	18,  // 131: csi.v1.Controller.CreateVolume:input_type -> csi.v1.CreateVolumeRequest
+	26,  // 132: csi.v1.Controller.DeleteVolume:input_type -> csi.v1.DeleteVolumeRequest
+	28,  // 133: csi.v1.Controller.ControllerPublishVolume:input_type -> csi.v1.ControllerPublishVolumeRequest
+	30,  // 134: csi.v1.Controller.ControllerUnpublishVolume:input_type -> csi.v1.ControllerUnpublishVolumeRequest
+	32,  // 135: csi.v1.Controller.ValidateVolumeCapabilities:input_type -> csi.v1.ValidateVolumeCapabilitiesRequest
+	34,  // 136: csi.v1.Controller.ListVolumes:input_type -> csi.v1.ListVolumesRequest
+	36,  // 137: csi.v1.Controller.ControllerListVolumeHealth:input_type -> csi.v1.ControllerListVolumeHealthRequest
+	39,  // 138: csi.v1.Controller.ControllerGetVolumeHealth:input_type -> csi.v1.ControllerGetVolumeHealthRequest
+	47,  // 139: csi.v1.Controller.GetCapacity:input_type -> csi.v1.GetCapacityRequest
+	49,  // 140: csi.v1.Controller.ControllerGetCapabilities:input_type -> csi.v1.ControllerGetCapabilitiesRequest
+	52,  // 141: csi.v1.Controller.CreateSnapshot:input_type -> csi.v1.CreateSnapshotRequest
+	55,  // 142: csi.v1.Controller.DeleteSnapshot:input_type -> csi.v1.DeleteSnapshotRequest
+	57,  // 143: csi.v1.Controller.ListSnapshots:input_type -> csi.v1.ListSnapshotsRequest
+	59,  // 144: csi.v1.Controller.GetSnapshot:input_type -> csi.v1.GetSnapshotRequest
+	61,  // 145: csi.v1.Controller.ControllerExpandVolume:input_type -> csi.v1.ControllerExpandVolumeRequest
+	41,  // 146: csi.v1.Controller.ControllerGetVolume:input_type -> csi.v1.ControllerGetVolumeRequest
+	43,  // 147: csi.v1.Controller.ControllerModifyVolume:input_type -> csi.v1.ControllerModifyVolumeRequest
+	45,  // 148: csi.v1.Controller.ControllerGetNodeInfo:input_type -> csi.v1.ControllerGetNodeInfoRequest
+	85,  // 149: csi.v1.GroupController.GroupControllerGetCapabilities:input_type -> csi.v1.GroupControllerGetCapabilitiesRequest
+	88,  // 150: csi.v1.GroupController.CreateVolumeGroupSnapshot:input_type -> csi.v1.CreateVolumeGroupSnapshotRequest
+	91,  // 151: csi.v1.GroupController.DeleteVolumeGroupSnapshot:input_type -> csi.v1.DeleteVolumeGroupSnapshotRequest
+	93,  // 152: csi.v1.GroupController.GetVolumeGroupSnapshot:input_type -> csi.v1.GetVolumeGroupSnapshotRequest
+	96,  // 153: csi.v1.SnapshotMetadata.GetMetadataAllocated:input_type -> csi.v1.GetMetadataAllocatedRequest
+	98,  // 154: csi.v1.SnapshotMetadata.GetMetadataDelta:input_type -> csi.v1.GetMetadataDeltaRequest
+	63,  // 155: csi.v1.Node.NodeStageVolume:input_type -> csi.v1.NodeStageVolumeRequest
+	65,  // 156: csi.v1.Node.NodeUnstageVolume:input_type -> csi.v1.NodeUnstageVolumeRequest
+	67,  // 157: csi.v1.Node.NodePublishVolume:input_type -> csi.v1.NodePublishVolumeRequest
+	69,  // 158: csi.v1.Node.NodeUnpublishVolume:input_type -> csi.v1.NodeUnpublishVolumeRequest
+	71,  // 159: csi.v1.Node.NodeGetVolumeStats:input_type -> csi.v1.NodeGetVolumeStatsRequest
+	74,  // 160: csi.v1.Node.NodeGetVolumeHealth:input_type -> csi.v1.NodeGetVolumeHealthRequest
+	76,  // 161: csi.v1.Node.NodeGetStorageHealth:input_type -> csi.v1.NodeGetStorageHealthRequest
+	83,  // 162: csi.v1.Node.NodeExpandVolume:input_type -> csi.v1.NodeExpandVolumeRequest
+	78,  // 163: csi.v1.Node.NodeGetCapabilities:input_type -> csi.v1.NodeGetCapabilitiesRequest
+	81,  // 164: csi.v1.Node.NodeGetInfo:input_type -> csi.v1.NodeGetInfoRequest
+	12,  // 165: csi.v1.Identity.GetPluginInfo:output_type -> csi.v1.GetPluginInfoResponse
+	14,  // 166: csi.v1.Identity.GetPluginCapabilities:output_type -> csi.v1.GetPluginCapabilitiesResponse
+	17,  // 167: csi.v1.Identity.Probe:output_type -> csi.v1.ProbeResponse
+	20,  // 168: csi.v1.Controller.CreateVolume:output_type -> csi.v1.CreateVolumeResponse
+	27,  // 169: csi.v1.Controller.DeleteVolume:output_type -> csi.v1.DeleteVolumeResponse
+	29,  // 170: csi.v1.Controller.ControllerPublishVolume:output_type -> csi.v1.ControllerPublishVolumeResponse
+	31,  // 171: csi.v1.Controller.ControllerUnpublishVolume:output_type -> csi.v1.ControllerUnpublishVolumeResponse
+	33,  // 172: csi.v1.Controller.ValidateVolumeCapabilities:output_type -> csi.v1.ValidateVolumeCapabilitiesResponse
+	35,  // 173: csi.v1.Controller.ListVolumes:output_type -> csi.v1.ListVolumesResponse
+	37,  // 174: csi.v1.Controller.ControllerListVolumeHealth:output_type -> csi.v1.ControllerListVolumeHealthResponse
+	40,  // 175: csi.v1.Controller.ControllerGetVolumeHealth:output_type -> csi.v1.ControllerGetVolumeHealthResponse
+	48,  // 176: csi.v1.Controller.GetCapacity:output_type -> csi.v1.GetCapacityResponse
+	50,  // 177: csi.v1.Controller.ControllerGetCapabilities:output_type -> csi.v1.ControllerGetCapabilitiesResponse
+	53,  // 178: csi.v1.Controller.CreateSnapshot:output_type -> csi.v1.CreateSnapshotResponse
+	56,  // 179: csi.v1.Controller.DeleteSnapshot:output_type -> csi.v1.DeleteSnapshotResponse
+	58,  // 180: csi.v1.Controller.ListSnapshots:output_type -> csi.v1.ListSnapshotsResponse
+	60,  // 181: csi.v1.Controller.GetSnapshot:output_type -> csi.v1.GetSnapshotResponse
+	62,  // 182: csi.v1.Controller.ControllerExpandVolume:output_type -> csi.v1.ControllerExpandVolumeResponse
+	42,  // 183: csi.v1.Controller.ControllerGetVolume:output_type -> csi.v1.ControllerGetVolumeResponse
+	44,  // 184: csi.v1.Controller.ControllerModifyVolume:output_type -> csi.v1.ControllerModifyVolumeResponse
+	46,  // 185: csi.v1.Controller.ControllerGetNodeInfo:output_type -> csi.v1.ControllerGetNodeInfoResponse
+	86,  // 186: csi.v1.GroupController.GroupControllerGetCapabilities:output_type -> csi.v1.GroupControllerGetCapabilitiesResponse
+	89,  // 187: csi.v1.GroupController.CreateVolumeGroupSnapshot:output_type -> csi.v1.CreateVolumeGroupSnapshotResponse
+	92,  // 188: csi.v1.GroupController.DeleteVolumeGroupSnapshot:output_type -> csi.v1.DeleteVolumeGroupSnapshotResponse
+	94,  // 189: csi.v1.GroupController.GetVolumeGroupSnapshot:output_type -> csi.v1.GetVolumeGroupSnapshotResponse
+	97,  // 190: csi.v1.SnapshotMetadata.GetMetadataAllocated:output_type -> csi.v1.GetMetadataAllocatedResponse
+	99,  // 191: csi.v1.SnapshotMetadata.GetMetadataDelta:output_type -> csi.v1.GetMetadataDeltaResponse
+	64,  // 192: csi.v1.Node.NodeStageVolume:output_type -> csi.v1.NodeStageVolumeResponse
+	66,  // 193: csi.v1.Node.NodeUnstageVolume:output_type -> csi.v1.NodeUnstageVolumeResponse
+	68,  // 194: csi.v1.Node.NodePublishVolume:output_type -> csi.v1.NodePublishVolumeResponse
+	70,  // 195: csi.v1.Node.NodeUnpublishVolume:output_type -> csi.v1.NodeUnpublishVolumeResponse
+	72,  // 196: csi.v1.Node.NodeGetVolumeStats:output_type -> csi.v1.NodeGetVolumeStatsResponse
+	75,  // 197: csi.v1.Node.NodeGetVolumeHealth:output_type -> csi.v1.NodeGetVolumeHealthResponse
+	77,  // 198: csi.v1.Node.NodeGetStorageHealth:output_type -> csi.v1.NodeGetStorageHealthResponse
+	84,  // 199: csi.v1.Node.NodeExpandVolume:output_type -> csi.v1.NodeExpandVolumeResponse
+	79,  // 200: csi.v1.Node.NodeGetCapabilities:output_type -> csi.v1.NodeGetCapabilitiesResponse
+	82,  // 201: csi.v1.Node.NodeGetInfo:output_type -> csi.v1.NodeGetInfoResponse
+	165, // [165:202] is the sub-list for method output_type
+	128, // [128:165] is the sub-list for method input_type
+	128, // [128:128] is the sub-list for extension type_name
+	121, // [121:128] is the sub-list for extension extendee
+	0,   // [0:121] is the sub-list for field type_name
 }
 
 func init() { file_csi_proto_init() }
@@ -8781,13 +9122,13 @@ func file_csi_proto_init() {
 		(*VolumeCapability_Block)(nil),
 		(*VolumeCapability_Mount)(nil),
 	}
-	file_csi_proto_msgTypes[38].OneofWrappers = []any{
+	file_csi_proto_msgTypes[40].OneofWrappers = []any{
 		(*ControllerServiceCapability_Rpc)(nil),
 	}
-	file_csi_proto_msgTypes[67].OneofWrappers = []any{
+	file_csi_proto_msgTypes[69].OneofWrappers = []any{
 		(*NodeServiceCapability_Rpc)(nil),
 	}
-	file_csi_proto_msgTypes[74].OneofWrappers = []any{
+	file_csi_proto_msgTypes[76].OneofWrappers = []any{
 		(*GroupControllerServiceCapability_Rpc)(nil),
 	}
 	type x struct{}
@@ -8795,8 +9136,8 @@ func file_csi_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_csi_proto_rawDesc), len(file_csi_proto_rawDesc)),
-			NumEnums:      10,
-			NumMessages:   147,
+			NumEnums:      11,
+			NumMessages:   150,
 			NumExtensions: 7,
 			NumServices:   5,
 		},

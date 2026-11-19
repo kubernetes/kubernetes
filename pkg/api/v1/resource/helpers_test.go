@@ -24,6 +24,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
@@ -74,11 +75,12 @@ func TestDefaultResourceHelpers(t *testing.T) {
 
 func TestGetResourceRequest(t *testing.T) {
 	cases := []struct {
-		pod                      *v1.Pod
-		cName                    string
-		resourceName             v1.ResourceName
-		expectedValue            int64
-		podLevelResourcesEnabled bool
+		pod                                *v1.Pod
+		cName                              string
+		resourceName                       v1.ResourceName
+		expectedValue                      int64
+		podLevelResourcesEnabled           bool
+		draNodeAllocatableResourcesEnabled bool
 	}{
 		{
 			pod:           getPod(containerName, resources{cpuRequest: "9"}),
@@ -157,6 +159,27 @@ func TestGetResourceRequest(t *testing.T) {
 			podLevelResourcesEnabled: true,
 		},
 		{
+			cName:                    "pod level cpu req only, container cpu, mem and ephemeral-storage req: cpu",
+			pod:                      getPodWithPodLevelResources(containerName, resources{cpuRequest: "10"}, resources{cpuRequest: "8", memoryRequest: "50Mi", ephemeralStorageRequest: "1Gi"}),
+			resourceName:             v1.ResourceCPU,
+			expectedValue:            10000,
+			podLevelResourcesEnabled: true,
+		},
+		{
+			cName:                    "pod level cpu req only, container cpu, mem and ephemeral-storage req: mem",
+			pod:                      getPodWithPodLevelResources(containerName, resources{cpuRequest: "10"}, resources{cpuRequest: "8", memoryRequest: "50Mi", ephemeralStorageRequest: "1Gi"}),
+			resourceName:             v1.ResourceMemory,
+			expectedValue:            52428800,
+			podLevelResourcesEnabled: true,
+		},
+		{
+			cName:                    "pod level cpu req only, container cpu, mem and ephemeral-storage req: ephemeral-storage",
+			pod:                      getPodWithPodLevelResources(containerName, resources{cpuRequest: "10"}, resources{cpuRequest: "8", memoryRequest: "50Mi", ephemeralStorageRequest: "1Gi"}),
+			resourceName:             v1.ResourceEphemeralStorage,
+			expectedValue:            1073741824,
+			podLevelResourcesEnabled: true,
+		},
+		{
 			cName:                    "cpu pod without pod level resources but pod level resources feature enabled",
 			pod:                      getPod(containerName, resources{cpuRequest: "9"}),
 			resourceName:             v1.ResourceCPU,
@@ -170,13 +193,83 @@ func TestGetResourceRequest(t *testing.T) {
 			expectedValue:            94371840,
 			podLevelResourcesEnabled: true,
 		},
+		{
+			cName: "dra mapping and overhead ignored when feature gate disabled",
+			pod: func() *v1.Pod {
+				p := getPod(containerName, resources{memoryRequest: "100Mi"})
+				p.Status.ExtraNodeAllocatableResources = []v1.ExtraNodeAllocatableResource{
+					{
+						ContainerName: "",
+						Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("200Mi")},
+						Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("200Mi")},
+					},
+					{
+						ContainerName: containerName,
+						Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("200Mi")},
+					},
+				}
+				return p
+			}(),
+			resourceName:                       v1.ResourceMemory,
+			expectedValue:                      100 * 1024 * 1024,
+			draNodeAllocatableResourcesEnabled: false,
+		},
+		{
+			cName: "dra mapping and overhead included when feature gate enabled",
+			pod: func() *v1.Pod {
+				p := getPod(containerName, resources{memoryRequest: "100Mi"})
+				p.Status.ExtraNodeAllocatableResources = []v1.ExtraNodeAllocatableResource{
+					{
+						ContainerName: "",
+						Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("275Mi")},
+						Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("275Mi")},
+					},
+					{
+						ContainerName: containerName,
+						Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("25Mi")},
+						Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("275Mi")},
+					},
+				}
+				return p
+			}(),
+			resourceName:                       v1.ResourceMemory,
+			expectedValue:                      375 * 1024 * 1024, // 100Mi spec + 275Mi pod entry
+			draNodeAllocatableResourcesEnabled: true,
+		},
+		{
+			cName: "pod level resources take precedence over container and dra requests",
+			pod: func() *v1.Pod {
+				p := getPodWithPodLevelResources(containerName, resources{memoryRequest: "500Mi"}, resources{memoryRequest: "100Mi"})
+				p.Status.ExtraNodeAllocatableResources = []v1.ExtraNodeAllocatableResource{
+					{
+						ContainerName: "",
+						Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("200Mi")},
+						Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("200Mi")},
+					},
+					{
+						ContainerName: containerName,
+						Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("200Mi")},
+					},
+				}
+				return p
+			}(),
+			resourceName:                       v1.ResourceMemory,
+			expectedValue:                      500 * 1024 * 1024,
+			podLevelResourcesEnabled:           true,
+			draNodeAllocatableResourcesEnabled: true,
+		},
 	}
-	as := assert.New(t)
 	for idx, tc := range cases {
-		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, tc.podLevelResourcesEnabled)
+		t.Run(tc.cName, func(t *testing.T) {
+			if !tc.podLevelResourcesEnabled {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.37"))
+			}
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, tc.podLevelResourcesEnabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRANodeAllocatableResources, tc.draNodeAllocatableResourcesEnabled)
 
-		actual := GetResourceRequest(tc.pod, tc.resourceName)
-		as.Equal(tc.expectedValue, actual, "expected test case [%d] %v: to return %q; got %q instead", idx, tc.cName, tc.expectedValue, actual)
+			actual := GetResourceRequest(tc.pod, tc.resourceName)
+			assert.Equal(t, tc.expectedValue, actual, "expected test case [%d] %v: to return %q; got %q instead", idx, tc.cName, tc.expectedValue, actual)
+		})
 	}
 }
 
@@ -336,6 +429,7 @@ func TestExtractResourceValue(t *testing.T) {
 
 type resources struct {
 	cpuRequest, cpuLimit, memoryRequest, memoryLimit, cpuOverhead, memoryOverhead string
+	ephemeralStorageRequest                                                       string
 }
 
 func defineResources(resources resources) v1.ResourceRequirements {
@@ -355,6 +449,9 @@ func defineResources(resources resources) v1.ResourceRequirements {
 	}
 	if resources.memoryRequest != "" {
 		r.Requests[v1.ResourceMemory] = resource.MustParse(resources.memoryRequest)
+	}
+	if resources.ephemeralStorageRequest != "" {
+		r.Requests[v1.ResourceEphemeralStorage] = resource.MustParse(resources.ephemeralStorageRequest)
 	}
 
 	return r

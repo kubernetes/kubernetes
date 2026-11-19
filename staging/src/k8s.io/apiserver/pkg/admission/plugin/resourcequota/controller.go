@@ -259,7 +259,8 @@ func (e *quotaEvaluator) checkQuotas(quotas []corev1.ResourceQuota, admissionAtt
 			}
 		}
 
-		if !atLeastOneChangeForThisWaiter {
+		// keep determined results: a conflict retry re-runs this loop with only the conflicted subset
+		if !atLeastOneChangeForThisWaiter && IsDefaultDeny(admissionAttribute.result) {
 			admissionAttribute.result = nil
 		}
 
@@ -611,7 +612,8 @@ func CheckRequest(quotas []corev1.ResourceQuota, a admission.Attributes, evaluat
 		requestedUsage := quota.Mask(deltaUsage, hardResources)
 		newUsage := quota.Add(resourceQuota.Status.Used, requestedUsage)
 
-		if a.GetSubresource() != "status" {
+		// Enforce hard limits on pods/status as extraNodeAllocatableResources can grant resources beyond pod spec.
+		if a.GetSubresource() != "status" || a.GetResource().GroupResource() == corev1.Resource("pods") {
 			maskedNewUsage := quota.Mask(newUsage, quota.ResourceNames(requestedUsage))
 
 			if allowed, exceeded := quota.LessThanOrEqual(maskedNewUsage, resourceQuota.Status.Hard); !allowed {

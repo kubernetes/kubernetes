@@ -72,7 +72,8 @@ type staticWebhookSource[T runtime.Object] struct {
 	buildAccessors accessorBuilder[T]
 
 	current      atomic.Pointer[webhookData[T]]
-	lastReadHash atomic.Pointer[string] // hash of last file content read (for short-circuiting)
+	lastReadHash atomic.Pointer[string] // hash of last file content read, valid or not (for short-circuiting)
+	currentHash  atomic.Pointer[string] // hash of the content current was loaded from
 	hasSynced    atomic.Bool
 }
 
@@ -131,6 +132,7 @@ func (s *staticWebhookSource[T]) LoadInitial() error {
 	}
 
 	s.current.Store(&webhookData[T]{configurations: configs, accessors: accessors})
+	s.currentHash.Store(&hash)
 	s.lastReadHash.Store(&hash)
 	s.hasSynced.Store(true)
 
@@ -158,17 +160,34 @@ func (s *staticWebhookSource[T]) RunReloadLoop(ctx context.Context) {
 
 func (s *staticWebhookSource[T]) checkAndReload() {
 	configs, hash, err := s.loadFunc(s.manifestsDir)
+	if err != nil && len(hash) == 0 {
+		// The content could not be read, so it is unknown whether it changed.
+		// Forget the last read hash so the next successful read is recorded,
+		// even if the content matches what is already loaded. An empty directory
+		// also has an empty hash, but no error, and is tracked like other content.
+		s.lastReadHash.Store(nil)
+	} else {
+		// Short-circuit if file content hasn't changed since last read. Invalid
+		// content is tracked too, so it is reported once rather than on every check.
+		if last := s.lastReadHash.Load(); last != nil && hash == *last {
+			return
+		}
+		s.lastReadHash.Store(&hash)
+	}
+
 	if err != nil {
 		klog.ErrorS(err, "reloading admission manifest config", "plugin", string(s.webhookType), "dir", s.manifestsDir)
 		metrics.RecordAutomaticReloadFailure(s.webhookType, s.apiServerID)
 		return
 	}
 
-	// Short-circuit if file content hasn't changed since last read.
-	if last := s.lastReadHash.Load(); last != nil && hash == *last {
+	// The content is back to what is already in use, e.g. after a bad edit was
+	// reverted. Record the recovery without rebuilding.
+	if current := s.currentHash.Load(); current != nil && hash == *current {
+		klog.InfoS("admission manifest config matches the current config", "plugin", string(s.webhookType), "dir", s.manifestsDir)
+		metrics.RecordAutomaticReloadSuccess(s.webhookType, s.apiServerID, hash)
 		return
 	}
-	s.lastReadHash.Store(&hash)
 
 	// Build and validate accessors (configs may be empty if files deleted)
 	accessors := s.buildAccessors(configs)
@@ -179,6 +198,7 @@ func (s *staticWebhookSource[T]) checkAndReload() {
 	}
 
 	s.current.Store(&webhookData[T]{configurations: configs, accessors: accessors})
+	s.currentHash.Store(&hash)
 	klog.InfoS("reloaded admission manifest config", "plugin", string(s.webhookType), "dir", s.manifestsDir)
 	metrics.RecordAutomaticReloadSuccess(s.webhookType, s.apiServerID, hash)
 }

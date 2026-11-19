@@ -29,10 +29,12 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/api/deployment"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	appsvalidation "k8s.io/kubernetes/pkg/apis/apps/validation"
+	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/features"
 )
 
@@ -73,18 +75,27 @@ func (deploymentStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.S
 
 // PrepareForCreate clears fields that are not allowed to be set by end users on creation.
 func (deploymentStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
-	deployment := obj.(*apps.Deployment)
-	deployment.Status = apps.DeploymentStatus{}
-	deployment.Generation = 1
+	newDeployment := obj.(*apps.Deployment)
+	newDeployment.Status = apps.DeploymentStatus{}
+	newDeployment.Generation = 1
 
-	pod.DropDisabledTemplateFields(&deployment.Spec.Template, nil)
+	deployment.DropDisabledFields(&newDeployment.Spec, nil)
+	pod.DropDisabledTemplateFields(&newDeployment.Spec.Template, nil)
 }
 
 // Validate validates a new deployment.
 func (deploymentStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	deployment := obj.(*apps.Deployment)
-	opts := pod.GetValidationOptionsFromPodTemplate(&deployment.Spec.Template, nil)
+	opts := corevalidation.GetValidationOptionsFromPodTemplate(&deployment.Spec.Template, nil)
 	return appsvalidation.ValidateDeployment(deployment, opts)
+}
+
+// DeclarativeValidationConfig declares the options referenced by this type's tags,
+// mapped to whether each is enabled.
+func (deploymentStrategy) DeclarativeValidationConfig(ctx context.Context, obj, oldObj runtime.Object) rest.DeclarativeValidationConfig {
+	return rest.DeclarativeValidationConfig{Options: map[string]bool{
+		string(features.WorkloadWithDeployment): utilfeature.DefaultFeatureGate.Enabled(features.WorkloadWithDeployment),
+	}}
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
@@ -113,7 +124,9 @@ func (deploymentStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime
 	oldDeployment := old.(*apps.Deployment)
 	newDeployment.Status = oldDeployment.Status
 
+	deployment.DropDisabledFields(&newDeployment.Spec, &oldDeployment.Spec)
 	pod.DropDisabledTemplateFields(&newDeployment.Spec.Template, &oldDeployment.Spec.Template)
+	pod.SyncPodNetworkOnTemplateUpdate(&newDeployment.Spec.Template, &oldDeployment.Spec.Template)
 
 	// Spec updates bump the generation so that we can distinguish between
 	// scaling events and template changes, annotation updates bump the generation
@@ -129,7 +142,7 @@ func (deploymentStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.O
 	newDeployment := obj.(*apps.Deployment)
 	oldDeployment := old.(*apps.Deployment)
 
-	opts := pod.GetValidationOptionsFromPodTemplate(&newDeployment.Spec.Template, &oldDeployment.Spec.Template)
+	opts := corevalidation.GetValidationOptionsFromPodTemplate(&newDeployment.Spec.Template, &oldDeployment.Spec.Template)
 	allErrs := appsvalidation.ValidateDeploymentUpdate(newDeployment, oldDeployment, opts)
 
 	return allErrs

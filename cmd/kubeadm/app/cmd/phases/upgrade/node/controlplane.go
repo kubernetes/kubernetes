@@ -70,8 +70,8 @@ func runControlPlane() func(c workflow.RunData) error {
 		// Upgrade the control plane and etcd if installed on this node
 		fmt.Printf("[upgrade/control-plane] Upgrading your Static Pod-hosted control plane instance to version %q...\n", cfg.KubernetesVersion)
 		if dryRun {
-			fmt.Printf("[dryrun] Would upgrade your static Pod-hosted control plane to version %q", cfg.KubernetesVersion)
-			return upgrade.DryRunStaticPodUpgrade(patchesDir, cfg)
+			fmt.Printf("[dryrun] Would upgrade your static Pod-hosted control plane to version %q\n", cfg.KubernetesVersion)
+			return upgrade.DryRunStaticPodUpgrade(patchesDir, cfg, etcdUpgrade)
 		}
 
 		waiter := apiclient.NewKubeWaiter(data.Client(), data.Cfg().Timeouts.UpgradeManifests.Duration, os.Stdout)

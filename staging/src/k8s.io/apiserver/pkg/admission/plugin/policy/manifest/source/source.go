@@ -62,7 +62,8 @@ type StaticPolicySource[P, B runtime.Object, E generic.Evaluator] struct {
 	manifestType         metrics.ManifestType
 
 	current      atomic.Pointer[[]generic.PolicyHook[P, B, E]]
-	lastReadHash atomic.Pointer[string] // hash of last file content read (for short-circuiting)
+	lastReadHash atomic.Pointer[string] // hash of last file content read, valid or not (for short-circuiting)
+	currentHash  atomic.Pointer[string] // hash of the content current was loaded from
 	hasSynced    atomic.Bool
 }
 
@@ -99,6 +100,7 @@ func (s *StaticPolicySource[P, B, E]) LoadInitial() error {
 		return err
 	}
 	s.current.Store(&hooks)
+	s.currentHash.Store(&hash)
 	s.lastReadHash.Store(&hash)
 	s.hasSynced.Store(true)
 
@@ -153,17 +155,34 @@ func (s *StaticPolicySource[P, B, E]) compile(policies []P, bindings []B) ([]gen
 
 func (s *StaticPolicySource[P, B, E]) checkAndReload() {
 	policies, bindings, hash, err := s.loadFunc(s.manifestsDir)
+	if err != nil && len(hash) == 0 {
+		// The content could not be read, so it is unknown whether it changed.
+		// Forget the last read hash so the next successful read is recorded,
+		// even if the content matches what is already loaded. An empty directory
+		// also has an empty hash, but no error, and is tracked like other content.
+		s.lastReadHash.Store(nil)
+	} else {
+		// Short-circuit if file content hasn't changed since last read. Invalid
+		// content is tracked too, so it is reported once rather than on every check.
+		if last := s.lastReadHash.Load(); last != nil && hash == *last {
+			return
+		}
+		s.lastReadHash.Store(&hash)
+	}
+
 	if err != nil {
 		klog.ErrorS(err, "reloading manifest config", "plugin", string(s.manifestType), "dir", s.manifestsDir)
 		metrics.RecordAutomaticReloadFailure(s.manifestType, s.apiServerID)
 		return
 	}
 
-	// Short-circuit if file content hasn't changed since last read.
-	if last := s.lastReadHash.Load(); last != nil && hash == *last {
+	// The content is back to what is already in use, e.g. after a bad edit was
+	// reverted. Record the recovery without rebuilding.
+	if current := s.currentHash.Load(); current != nil && hash == *current {
+		klog.InfoS("manifest config matches the current config", "plugin", string(s.manifestType), "dir", s.manifestsDir)
+		metrics.RecordAutomaticReloadSuccess(s.manifestType, s.apiServerID, hash)
 		return
 	}
-	s.lastReadHash.Store(&hash)
 
 	hooks, err := s.compile(policies, bindings)
 	if err != nil {
@@ -172,6 +191,7 @@ func (s *StaticPolicySource[P, B, E]) checkAndReload() {
 		return
 	}
 	s.current.Store(&hooks)
+	s.currentHash.Store(&hash)
 
 	klog.InfoS("reloaded manifest config", "plugin", string(s.manifestType), "dir", s.manifestsDir)
 	metrics.RecordAutomaticReloadSuccess(s.manifestType, s.apiServerID, hash)

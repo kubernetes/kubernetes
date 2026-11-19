@@ -211,23 +211,28 @@ func newBaseGoCollector() baseGoCollector {
 		goroutinesDesc: NewDesc(
 			"go_goroutines",
 			"Number of goroutines that currently exist.",
-			nil, nil),
+			nil, nil,
+		),
 		threadsDesc: NewDesc(
 			"go_threads",
 			"Number of OS threads created.",
-			nil, nil),
+			nil, nil,
+		),
 		gcDesc: NewDesc(
 			"go_gc_duration_seconds",
 			"A summary of the wall-time pause (stop-the-world) duration in garbage collection cycles.",
-			nil, nil),
+			nil, nil,
+		),
 		gcLastTimeDesc: NewDesc(
 			"go_memstats_last_gc_time_seconds",
 			"Number of seconds since 1970 of last garbage collection.",
-			nil, nil),
+			nil, nil,
+		),
 		goInfoDesc: NewDesc(
 			"go_info",
 			"Information about the Go environment.",
-			nil, Labels{"version": runtime.Version()}),
+			nil, Labels{"version": runtime.Version()},
+		),
 	}
 }
 

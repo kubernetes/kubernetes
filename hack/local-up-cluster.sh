@@ -112,12 +112,14 @@ PRESERVE_ETCD="${PRESERVE_ETCD:-false}"
 ENABLE_TRACING=${ENABLE_TRACING:-false}
 
 # Enable ML-DSA post-quantum cryptography for all cluster certificates.
-# When true, generates ML-DSA CAs and certs, enables the CertificateSigningRequestMLDSA
-# feature gate, and configures the kubelet to use ML-DSA keys for certificate rotation.
+# When true, generates ML-DSA CAs, certs and signing keys, enables the CertificateSigningRequestMLDSA,
+# PodCertificateMLDSA, and ServiceAccountTokenMLDSA feature gates, and configures
+# the kubelet to use ML-DSA keys for certificate rotation.
+# ML-DSA API server health checks require curl using OpenSSL 3.5.0 or newer.
 ENABLE_MLDSA=${ENABLE_MLDSA:-false}
 MLDSA_ALGORITHM=${MLDSA_ALGORITHM:-"ML-DSA-65"}
 if [[ "${ENABLE_MLDSA}" == "true" ]]; then
-  FEATURE_GATES="${FEATURE_GATES},CertificateSigningRequestMLDSA=true,PodCertificateMLDSA=true"
+  FEATURE_GATES="${FEATURE_GATES},CertificateSigningRequestMLDSA=true,PodCertificateMLDSA=true,ServiceAccountTokenMLDSA=true"
   case "${MLDSA_ALGORITHM}" in
     ML-DSA-44) KUBE_CERT_KEY_ALGO="mldsa44" ;;
     ML-DSA-65) KUBE_CERT_KEY_ALGO="mldsa65" ;;
@@ -213,7 +215,7 @@ function usage {
             echo "           CPUMANAGER_POLICY_OPTIONS=full-pcpus-only=\"true\" \\"
             echo "           CPUMANAGER_RECONCILE_PERIOD=\"5s\" \\"
             echo "           KUBELET_FLAGS=\"--kube-reserved=cpu=1,memory=4Gi --system-reserved=cpu=1,memory=1Gi --reserved-memory 0:memory=3Gi;1:memory=2148Mi --resolv-conf=/run/systemd/resolve/resolv.conf\" \\"
-            echo "           hack/local-up-cluster.sh ( run with Topology, CPU, Memory Management policies alongside InPlacePodVerticalScaling, extra flags for etcd and coredns)"
+            echo "           hack/local-up-cluster.sh ( run with Topology, CPU, Memory Management policies alongside InPlacePodVerticalScalingExclusiveCPUs, extra flags for etcd and coredns)"
             echo ""
             echo "-d         dry-run: prepare for running commands, then show their command lines instead of running them"
 }
@@ -283,6 +285,10 @@ function run {
         echo "RUN ${what}: ${*}"
     fi
 }
+
+if [[ "${ENABLE_MLDSA}" == "true" && "${START_MODE}" != "kubeletonly" && -z "${DRY_RUN}" ]]; then
+  kube::util::test_curl_mldsa_support || exit 1
+fi
 
 if [ -z "${GO_OUT}" ]; then
     binaries_to_build="cmd/kubectl cmd/kube-apiserver cmd/kube-controller-manager cmd/cloud-controller-manager cmd/kube-scheduler"
@@ -581,7 +587,11 @@ function set_service_accounts {
     # Generate ServiceAccount key if needed
     if [[ ! -f "${SERVICE_ACCOUNT_KEY}" ]]; then
       mkdir -p "$(dirname "${SERVICE_ACCOUNT_KEY}")"
-      openssl genrsa -out "${SERVICE_ACCOUNT_KEY}" 2048 2>/dev/null
+       if [[ "${ENABLE_MLDSA}" == "true" ]]; then
+            openssl genpkey -algorithm "${MLDSA_ALGORITHM}" -provparam ml-dsa.output_formats=seed-only -out "${SERVICE_ACCOUNT_KEY}" 2>/dev/null
+       else
+            openssl genrsa -out "${SERVICE_ACCOUNT_KEY}" 2048 2>/dev/null
+       fi
     fi
 }
 

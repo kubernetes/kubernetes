@@ -27,7 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enetwork "k8s.io/kubernetes/test/e2e/framework/network"
@@ -417,12 +416,12 @@ var _ = SIGDescribe("Downward API", framework.WithSerial(), framework.WithDisrup
 
 })
 
-var _ = SIGDescribe("Downward API", feature.PodLevelResources, framework.WithFeatureGate(features.PodLevelResources), func() {
+var _ = SIGDescribe("Downward API", func() {
 	f := framework.NewDefaultFramework("downward-api")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.Context("Downward API tests for pod level resources", func() {
-		ginkgo.It("should provide default limits.cpu/memory from pod level resources", func(ctx context.Context) {
+		f.It("should provide default limits.cpu/memory from pod level resources", f.WithNodeConformance(), func(ctx context.Context) {
 			podName := "downward-api-" + string(uuid.NewUUID())
 			env := []v1.EnvVar{
 				{
@@ -481,7 +480,7 @@ var _ = SIGDescribe("Downward API", feature.PodLevelResources, framework.WithFea
 			testDownwardAPIUsingPod(ctx, f, pod, env, expectations)
 		})
 
-		ginkgo.It("should provide default limits.cpu/memory from pod level resources or node allocatable", func(ctx context.Context) {
+		f.It("should provide default limits.cpu/memory from pod level resources or node allocatable", f.WithNodeConformance(), func(ctx context.Context) {
 			podName := "downward-api-" + string(uuid.NewUUID())
 			cName := "dapi-container"
 			env := []v1.EnvVar{
@@ -549,16 +548,16 @@ var _ = SIGDescribe("Downward API", feature.PodLevelResources, framework.WithFea
 
 			// Wait for client pod to complete.
 			err := e2epod.WaitForPodSuccessInNamespaceTimeout(ctx, f.ClientSet, createdPod.Name, f.Namespace.Name, f.Timeouts.PodStart)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "wait for Pod %q in namespace %q to succeed", createdPod.Name, f.Namespace.Name)
 
 			// Grab its logs.  Get host first.
 			podStatus, err := podClient.Get(ctx, createdPod.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "get Pod %q in namespace %q", createdPod.Name, f.Namespace.Name)
 
 			// Get the node allocatable resources
 			nodeName := podStatus.Spec.NodeName
 			node, err := f.ClientSet.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "get Node %q", nodeName)
 			// Prepare expectations based on node allocatable resources
 			expectations := []string{
 				// Although the CPU limit for Pod Level Resources is set to 1250m (which would be 1.25),
@@ -570,13 +569,13 @@ var _ = SIGDescribe("Downward API", feature.PodLevelResources, framework.WithFea
 			}
 
 			logs, err := e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, podStatus.Name, cName)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "get logs of container %q in Pod %q in namespace %q", cName, podStatus.Name, f.Namespace.Name)
 
 			ginkgo.By(fmt.Sprintf("Checking logs from node %s pod %s container %s", nodeName, podStatus.Name, cName))
 			for _, expected := range expectations {
 				m := gomega.MatchRegexp(expected)
 				matches, err := m.Match(logs)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "match container logs against the expected output")
 				gomega.Expect(matches).To(gomega.BeTrueBecause("expected %q in container output: %s", expected, logs))
 			}
 		})

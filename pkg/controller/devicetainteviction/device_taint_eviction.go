@@ -421,7 +421,7 @@ func (tc *Controller) maybeDeletePod(ctx context.Context, podRef tainteviction.N
 		}
 	}()
 
-	err := tc.addConditionAndDeletePod(ctx, podRef)
+	deleted, err := tc.addConditionAndDeletePod(ctx, podRef)
 	if apierrors.IsNotFound(err) {
 		// Not a problem, the work is done.
 		// But we didn't do it, so don't
@@ -430,6 +430,11 @@ func (tc *Controller) maybeDeletePod(ctx context.Context, podRef tainteviction.N
 	}
 	if err != nil {
 		return 0, err
+	}
+	if !deleted {
+		// Someone else is already deleting the pod.
+		// We didn't do it, so don't bump the metric.
+		return 0, nil
 	}
 
 	podDeletionLatency := time.Since(eviction.when.Time)
@@ -456,22 +461,23 @@ func (tc *Controller) maybeDeletePod(ctx context.Context, podRef tainteviction.N
 	return 0, nil
 }
 
-func (tc *Controller) addConditionAndDeletePod(ctx context.Context, podRef tainteviction.NamespacedObject) (err error) {
+// addConditionAndDeletePod returns false without an error if the pod is already being deleted.
+func (tc *Controller) addConditionAndDeletePod(ctx context.Context, podRef tainteviction.NamespacedObject) (deleted bool, err error) {
 	pod, err := tc.client.CoreV1().Pods(podRef.Namespace).Get(ctx, podRef.Name, metav1.GetOptions{})
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	if pod.UID != podRef.UID {
 		// This special error suppresses event logging in our caller and prevents further retries.
 		// We can stop because the pod we were meant to evict is already gone and happens to
 		// be replaced by some other pod which reuses the same name.
-		return apierrors.NewNotFound(v1.SchemeGroupVersion.WithResource("pods").GroupResource(), pod.Name)
+		return false, apierrors.NewNotFound(v1.SchemeGroupVersion.WithResource("pods").GroupResource(), pod.Name)
 	}
 
 	if pod.DeletionTimestamp != nil {
-		// Already deleted, no need to evict.
-		return nil
+		// Already being deleted, no need to evict.
+		return false, nil
 	}
 
 	// Emit the event only if we are actually doing something.
@@ -486,18 +492,21 @@ func (tc *Controller) addConditionAndDeletePod(ctx context.Context, podRef taint
 	})
 	if updated {
 		if _, _, _, err := utilpod.PatchPodStatus(ctx, tc.client, pod.Namespace, pod.Name, pod.UID, pod.Status, *newStatus); err != nil {
-			return err
+			return false, err
 		}
 	}
 	// Unlikely, but it could happen that the pod we got above got replaced with
 	// another pod using the same name in the meantime. Include a precondition
 	// to prevent that race. This delete attempt then fails and the next one detects
 	// the new pod and stops retrying.
-	return tc.client.CoreV1().Pods(podRef.Namespace).Delete(ctx, podRef.Name, metav1.DeleteOptions{
+	if err := tc.client.CoreV1().Pods(podRef.Namespace).Delete(ctx, podRef.Name, metav1.DeleteOptions{
 		Preconditions: &metav1.Preconditions{
 			UID: &podRef.UID,
 		},
-	})
+	}); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 func (tc *Controller) maybeUpdateRuleStatus(ctx context.Context, ruleRef tainteviction.NamespacedObject) (time.Duration, error) {
@@ -1235,7 +1244,8 @@ func (tc *Controller) claimEvictionTime(claim *resourceapi.ResourceClaim) *evict
 			haveToleration := false
 			tolerationSeconds := int64(math.MaxInt64)
 			for _, toleration := range allocatedDevice.Tolerations {
-				if toleration.Effect == resourceapi.DeviceTaintEffectNoExecute &&
+				// An empty effect matches all taint effects, including NoExecute.
+				if (toleration.Effect == "" || toleration.Effect == resourceapi.DeviceTaintEffectNoExecute) &&
 					resourceclaim.ToleratesTaint(toleration, *taint.deviceTaint()) {
 					if toleration.TolerationSeconds == nil {
 						// Tolerate forever -> ignore taint.
@@ -1257,12 +1267,12 @@ func (tc *Controller) claimEvictionTime(claim *resourceapi.ResourceClaim) *evict
 			taints.Insert(taint)
 			if when == nil {
 				when = newEvictionTime
-				tc.logger.V(5).Info("Claim is affected by device taint", "claim", klog.KObj(claim), "device", allocatedDevice, "taint", taint, "evictionTime", when)
+				tc.logger.V(5).Info("Claim is affected by device taint", "claim", klog.KObj(claim), "device", allocatedDevice, "taint", taint, "evictionTime", klog.SafePtr(when))
 				continue
 			}
 			if newEvictionTime != nil && newEvictionTime.Before(when) {
 				when = newEvictionTime
-				tc.logger.V(5).Info("Claim is affected by device taint", "claim", klog.KObj(claim), "device", allocatedDevice, "taint", taint, "evictionTime", when)
+				tc.logger.V(5).Info("Claim is affected by device taint", "claim", klog.KObj(claim), "device", allocatedDevice, "taint", taint, "evictionTime", klog.SafePtr(when))
 			}
 		}
 	}
@@ -1534,7 +1544,7 @@ func (tc *Controller) handlePods(claim *resourceapi.ResourceClaim) {
 			podGroupKey := claim.Namespace + "/" + consumer.Name
 			pods, err := tc.podInformer.Informer().GetIndexer().ByIndex(podGroupIndex, podGroupKey)
 			if err != nil {
-				utilruntime.HandleErrorWithLogger(tc.logger, err, "retrieve Pods for PodGroup %s from cache", podGroupKey)
+				utilruntime.HandleErrorWithLogger(tc.logger, err, "retrieve Pods for PodGroup from cache", "podGroup", klog.KRef(claim.Namespace, consumer.Name))
 				continue
 			}
 			for _, obj := range pods {

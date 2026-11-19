@@ -35,6 +35,7 @@ var PluginsV1 = &config.Plugins{
 			{Name: names.TaintToleration, Weight: 3},
 			{Name: names.NodeAffinity, Weight: 2},
 			{Name: names.NodePorts},
+			{Name: names.DeferredPodScheduling},
 			{Name: names.NodeResourcesFit, Weight: 1},
 			{Name: names.VolumeRestrictions},
 			{Name: names.NodeVolumeLimits},
@@ -48,6 +49,11 @@ var PluginsV1 = &config.Plugins{
 			{Name: names.ImageLocality, Weight: 1},
 			{Name: names.DefaultBinder},
 			{Name: names.NodeDeclaredFeatures},
+		},
+	},
+	Reserve: config.PluginSet{
+		Disabled: []config.Plugin{
+			{Name: names.DefaultPreemption},
 		},
 	},
 }
@@ -69,10 +75,9 @@ var ExpandedPluginsV1 = &config.Plugins{
 	PreFilter: config.PluginSet{
 		Enabled: []config.Plugin{
 			{Name: names.NodeName},
-			{Name: names.NodeUnschedulable},
-			{Name: names.TaintToleration},
 			{Name: names.NodeAffinity},
 			{Name: names.NodePorts},
+			{Name: names.DeferredPodScheduling},
 			{Name: names.NodeResourcesFit},
 			{Name: names.VolumeRestrictions},
 			{Name: names.NodeVolumeLimits},
@@ -91,6 +96,7 @@ var ExpandedPluginsV1 = &config.Plugins{
 			{Name: names.TaintToleration},
 			{Name: names.NodeAffinity},
 			{Name: names.NodePorts},
+			{Name: names.DeferredPodScheduling},
 			{Name: names.NodeResourcesFit},
 			{Name: names.VolumeRestrictions},
 			{Name: names.NodeVolumeLimits},
@@ -165,6 +171,7 @@ var ExpandedPluginsV1 = &config.Plugins{
 	},
 	Bind: config.PluginSet{
 		Enabled: []config.Plugin{
+			{Name: names.DeferredPodScheduling},
 			{Name: names.DefaultBinder},
 		},
 	},

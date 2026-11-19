@@ -427,6 +427,25 @@ function kube::util::test_openssl_installed {
     OPENSSL_BIN=$(command -v openssl)
 }
 
+# OpenSSL 3.5.0 introduced native ML-DSA support:
+# https://openssl-library.org/news/openssl-3.5-notes/
+function kube::util::test_curl_mldsa_support {
+  local version
+  if ! version=$(curl --version 2>&1); then
+    kube::log::error "Failed to run curl --version: ${version}. ENABLE_MLDSA=true requires curl using OpenSSL 3.5.0 or newer; install a compatible curl build."
+    return 1
+  fi
+  version="${version%%$'\n'*}"
+  # Inactive TLS backends in MultiSSL builds are parenthesized.
+  if [[ "${version}" =~ (^|[[:space:]])OpenSSL/([0-9]+)\.([0-9]+)\.[0-9]+ ]]; then
+    if (( BASH_REMATCH[2] > 3 || (BASH_REMATCH[2] == 3 && BASH_REMATCH[3] >= 5) )); then
+      return 0
+    fi
+  fi
+  kube::log::error "ENABLE_MLDSA=true requires curl using OpenSSL 3.5.0 or newer; detected: ${version}. Upgrade or install curl built with a compatible OpenSSL backend."
+  return 1
+}
+
 # Query the API server for client certificate authentication capabilities
 function kube::util::test_client_certificate_authentication_enabled {
   local output
@@ -436,7 +455,7 @@ function kube::util::test_client_certificate_authentication_enabled {
     | "${OPENSSL_BIN}" s_client -connect "127.0.0.1:${SECURE_API_PORT}" 2> /dev/null \
     | grep -A3 'Acceptable client certificate CA names')
 
-  if [[ "${output}" != *"/CN=127.0.0.1"* ]] && [[ "${output}" != *"CN = 127.0.0.1"* ]]; then
+  if [[ "${output}" != *"CN=127.0.0.1"* ]] && [[ "${output}" != *"CN = 127.0.0.1"* ]]; then
     echo "API server not configured for client certificate authentication"
     echo "Output of from acceptable client certificate check: ${output}"
     exit 1

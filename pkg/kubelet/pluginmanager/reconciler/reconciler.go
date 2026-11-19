@@ -133,14 +133,21 @@ func (rc *reconciler) reconcile(ctx context.Context) {
 		if unregisterPlugin {
 			logger.V(5).Info("Starting operationExecutor.UnregisterPlugin", "plugin", registeredPlugin)
 			err := rc.operationExecutor.UnregisterPlugin(ctx, registeredPlugin, rc.actualStateOfWorld)
-			if err != nil &&
-				!goroutinemap.IsAlreadyExists(err) &&
-				!exponentialbackoff.IsExponentialBackoff(err) {
-				// Ignore goroutinemap.IsAlreadyExists and exponentialbackoff.IsExponentialBackoff errors, they are expected.
-				// Log all other errors.
-				logger.Error(err, "OperationExecutor.UnregisterPlugin failed", "plugin", registeredPlugin)
-			}
-			if err == nil {
+			if err != nil {
+				if goroutinemap.IsAlreadyExists(err) {
+					// IsAlreadyExists is expected when the previous reconciler iteration
+					// already dispatched this operation and it has not yet completed;
+					// this is normal and not an error, so log at V(4) only.
+					logger.V(4).Info("OperationExecutor.UnregisterPlugin skipped: operation already in progress", "plugin", registeredPlugin)
+				} else if exponentialbackoff.IsExponentialBackoff(err) {
+					// IsExponentialBackoff is expected after a failed attempt while
+					// exponential backoff is still active; this is normal operation,
+					// but worth logging at V(4) so operators can diagnose prolonged delays.
+					logger.V(4).Info("OperationExecutor.UnregisterPlugin skipped: exponential backoff in effect", "plugin", registeredPlugin, "err", err)
+				} else {
+					logger.Error(err, "OperationExecutor.UnregisterPlugin failed", "plugin", registeredPlugin)
+				}
+			} else {
 				logger.V(1).Info("OperationExecutor.UnregisterPlugin started", "plugin", registeredPlugin)
 			}
 		}
@@ -151,13 +158,21 @@ func (rc *reconciler) reconcile(ctx context.Context) {
 		if !rc.actualStateOfWorld.PluginExistsWithCorrectUUID(pluginToRegister) {
 			logger.V(5).Info("Starting operationExecutor.RegisterPlugin", "plugin", pluginToRegister)
 			err := rc.operationExecutor.RegisterPlugin(ctx, pluginToRegister.SocketPath, pluginToRegister.UUID, rc.getHandlers(), rc.actualStateOfWorld)
-			if err != nil &&
-				!goroutinemap.IsAlreadyExists(err) &&
-				!exponentialbackoff.IsExponentialBackoff(err) {
-				// Ignore goroutinemap.IsAlreadyExists and exponentialbackoff.IsExponentialBackoff errors, they are expected.
-				logger.Error(err, "OperationExecutor.RegisterPlugin failed", "plugin", pluginToRegister)
-			}
-			if err == nil {
+			if err != nil {
+				if goroutinemap.IsAlreadyExists(err) {
+					// IsAlreadyExists is expected when the previous reconciler iteration
+					// already dispatched this operation and it has not yet completed;
+					// this is normal and not an error, so log at V(4) only.
+					logger.V(4).Info("OperationExecutor.RegisterPlugin skipped: operation already in progress", "plugin", pluginToRegister)
+				} else if exponentialbackoff.IsExponentialBackoff(err) {
+					// IsExponentialBackoff is expected after a failed attempt while
+					// exponential backoff is still active; this is normal operation,
+					// but worth logging at V(4) so operators can diagnose prolonged delays.
+					logger.V(4).Info("OperationExecutor.RegisterPlugin skipped: exponential backoff in effect", "plugin", pluginToRegister, "err", err)
+				} else {
+					logger.Error(err, "OperationExecutor.RegisterPlugin failed", "plugin", pluginToRegister)
+				}
+			} else {
 				logger.V(1).Info("OperationExecutor.RegisterPlugin started", "plugin", pluginToRegister)
 			}
 		}

@@ -27,15 +27,8 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env
 
-# Ensure that we find the binaries we build before anything else.
-export GOBIN="${KUBE_OUTPUT_BIN}"
-PATH="${GOBIN}:${PATH}"
-
-# Install whydeadcode
-go install github.com/aarzilli/whydeadcode@latest
-
 # Prefer full path for running zeitgeist
-WHYDEADCODE_BIN="$(which whydeadcode)"
+WHYDEADCODE_BIN="$(go -C hack/tools tool -n whydeadcode)"
 
 pushd "${KUBE_ROOT}"
 

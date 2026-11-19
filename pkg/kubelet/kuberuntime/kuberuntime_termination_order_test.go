@@ -17,13 +17,20 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"context"
 	"sync"
 	"testing"
 	"testing/synctest"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/klog/v2"
+	"k8s.io/ktesting"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 )
 
 func TestTerminationOrderingSidecarStopAfterMain(t *testing.T) {
@@ -64,7 +71,7 @@ func testTerminationOrderingSidecarStopAfterMain(t *testing.T) {
 
 	go func() {
 		close(syncChannel) // notifies other goroutine that this goroutine scheduled.
-		sidecarWaitDelay = int64(to.waitForTurn("init", 30))
+		sidecarWaitDelay = int64(to.waitForTurn(context.Background(), "init", 30))
 		to.containerTerminated("init")
 		wg.Done()
 	}()
@@ -72,7 +79,7 @@ func testTerminationOrderingSidecarStopAfterMain(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		<-syncChannel // make sure the other goroutine is scheduled.
-		mainWaitDelay = int64(to.waitForTurn("main", 0))
+		mainWaitDelay = int64(to.waitForTurn(context.Background(), "main", 0))
 		time.Sleep(1 * time.Second)
 		to.containerTerminated("main")
 		wg.Done()
@@ -133,7 +140,7 @@ func testTerminationOrderingSidecarsInReverseOrder(t *testing.T) {
 	var delays sync.Map
 
 	waitAndExit := func(name string) {
-		delay := int64(to.waitForTurn(name, 30))
+		delay := int64(to.waitForTurn(context.Background(), name, 30))
 		delays.Store(name, delay)
 		time.Sleep(1250 * time.Millisecond)
 		to.containerTerminated(name)
@@ -239,7 +246,7 @@ func testTerminationOrderingObeysGrace(t *testing.T) {
 
 	waitAndExit := func(name string) {
 		// just a two second grace period which is not long enough for all of the waits to finish
-		delay := int64(to.waitForTurn(name, 2))
+		delay := int64(to.waitForTurn(context.Background(), name, 2))
 		delays.Store(name, delay)
 		time.Sleep(1 * time.Second)
 		to.containerTerminated(name)
@@ -290,6 +297,159 @@ func testTerminationOrderingObeysGrace(t *testing.T) {
 		if got := getDelay(tc.containerName); got != tc.expectedDelay {
 			t.Errorf("expected delay for container %s = %d, got %d", tc.containerName, tc.expectedDelay, got)
 		}
+	}
+}
+
+func TestTerminationOrderingPod(t *testing.T) {
+	restartPolicy := v1.ContainerRestartPolicyAlways
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{UID: "12345678", Name: "bar", Namespace: "new"},
+		Spec: v1.PodSpec{
+			InitContainers: []v1.Container{{Name: "sidecar", Image: "busybox", RestartPolicy: &restartPolicy}},
+			Containers:     []v1.Container{{Name: "main", Image: "busybox"}},
+		},
+	}
+	removed := v1.Container{Name: "removed", Image: "busybox"}
+	running := []string{"sidecar", "main", "removed"}
+
+	for name, tc := range map[string]struct {
+		disabled bool
+		// record sets up the actuated state.
+		record  func(t *testing.T, m *kubeGenericRuntimeManager)
+		running []string
+		// wantRemoved is whether the removed container is added to the pod.
+		wantRemoved bool
+	}{
+		"running removed container": {
+			record: func(t *testing.T, m *kubeGenericRuntimeManager) {
+				require.NoError(t, m.actuatedState.SetContainer(klog.Background(), pod.UID, podutil.Containers, removed))
+			},
+			running:     running,
+			wantRemoved: true,
+		},
+		"removed container not running": {
+			record: func(t *testing.T, m *kubeGenericRuntimeManager) {
+				require.NoError(t, m.actuatedState.SetContainer(klog.Background(), pod.UID, podutil.Containers, removed))
+			},
+			running: []string{"sidecar", "main"},
+		},
+		"no record": {
+			running: running,
+		},
+		"resources-only record": {
+			// e.g. written by an older kubelet.
+			record: func(t *testing.T, m *kubeGenericRuntimeManager) {
+				require.NoError(t, m.actuatedState.SetContainerResources(klog.Background(), pod.UID, "removed", podutil.Containers, v1.ResourceRequirements{}))
+			},
+			running: running,
+		},
+		"gate disabled": {
+			disabled: true,
+			record: func(t *testing.T, m *kubeGenericRuntimeManager) {
+				require.NoError(t, m.actuatedState.SetContainer(klog.Background(), pod.UID, podutil.Containers, removed))
+			},
+			running:     running,
+			wantRemoved: true,
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			setDynamicContainersGate(t, !tc.disabled)
+			_, _, m, err := createTestRuntimeManager(ktesting.Init(t))
+			require.NoError(t, err)
+			if tc.record != nil {
+				tc.record(t, m)
+			}
+
+			got := m.terminationOrderingPod(pod, tc.running)
+			if tc.wantRemoved {
+				// The removed container is added as a main container, so sidecars wait for it.
+				assert.Equal(t, []v1.Container{pod.Spec.Containers[0], removed}, got.Spec.Containers)
+				assert.Equal(t, pod.Spec.InitContainers, got.Spec.InitContainers)
+				assert.Len(t, pod.Spec.Containers, 1, "the given pod is unchanged")
+			} else {
+				assert.Same(t, pod, got)
+			}
+		})
+	}
+	assert.Nil(t, (&kubeGenericRuntimeManager{}).terminationOrderingPod(nil, running))
+}
+
+func TestTerminationOrderingCancellation(t *testing.T) {
+	for _, tc := range []struct {
+		name         string
+		container    string
+		mainStopped  bool
+		cancelBefore bool
+		gracePeriod  int64
+	}{
+		{name: "waiting for main", container: "sidecar-1", gracePeriod: 100},
+		{name: "waiting for another sidecar", container: "sidecar-1", mainStopped: true, gracePeriod: 100},
+		{name: "already canceled", container: "sidecar-1", cancelBefore: true, gracePeriod: 100},
+		{name: "canceled without grace", container: "sidecar-1", cancelBefore: true},
+		{name: "canceled without predecessors", container: "main", cancelBefore: true, gracePeriod: 100},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				pod := newSidecarTerminationTestPod()
+				ordering := newTerminationOrdering(pod, getContainerNames(pod))
+				if tc.mainStopped {
+					ordering.containerTerminated("main")
+				}
+				ctx, cancel := context.WithCancel(context.Background())
+				defer cancel()
+				if tc.cancelBefore {
+					cancel()
+				}
+				done := make(chan struct{})
+				start := time.Now()
+				go func() {
+					ordering.waitForTurn(ctx, tc.container, tc.gracePeriod)
+					close(done)
+				}()
+				synctest.Wait()
+				cancel()
+				synctest.Wait()
+				select {
+				case <-done:
+				default:
+					t.Fatal("termination ordering did not return after cancellation")
+				}
+				require.Zero(t, time.Since(start), "cancellation must not wait for the original grace period")
+				for name, notification := range ordering.terminated {
+					select {
+					case <-notification:
+						t.Fatalf("cancellation marked container %q as terminated", name)
+					default:
+					}
+				}
+			})
+		})
+	}
+}
+
+func TestTerminationOrderingContextDeadline(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		pod := newSidecarTerminationTestPod()
+		ordering := newTerminationOrdering(pod, getContainerNames(pod))
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+		waitTime := ordering.waitForTurn(ctx, "sidecar-1", 100)
+		require.ErrorIs(t, ctx.Err(), context.DeadlineExceeded)
+		require.InDelta(t, 1, waitTime, 0.001)
+	})
+}
+
+func newSidecarTerminationTestPod() *v1.Pod {
+	restartPolicy := v1.ContainerRestartPolicyAlways
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{UID: "sidecar-pod", Name: "sidecar-pod", Namespace: "test"},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{{Name: "main"}},
+			InitContainers: []v1.Container{
+				{Name: "sidecar-1", RestartPolicy: &restartPolicy},
+				{Name: "sidecar-2", RestartPolicy: &restartPolicy},
+			},
+		},
 	}
 }
 

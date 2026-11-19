@@ -7,7 +7,6 @@ reviewers:
   - wojtek-t
   - deads2k
   - derekwaynecarr
-  - mikedanese
   - liggitt
   - sttts
   - dchen1107
@@ -22,7 +21,6 @@ reviewers:
   - cheftako
   - andrewsykim
 emeritus_approvers:
-  - mikedanese
   - dims
   - andrewsykim
 labels:

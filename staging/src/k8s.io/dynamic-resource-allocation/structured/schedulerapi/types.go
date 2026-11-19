@@ -93,6 +93,25 @@ type AllocatedState struct {
 	// AggregatedCapacity records the consumed capacity per device ID when
 	// the DRAConsumableCapacity feature is enabled.
 	AggregatedCapacity ConsumedCapacityCollection
+	// ConsumedCounters contains saved counter snapshots from non-admin allocations,
+	// grouped by device and including allocations still in flight.
+	// Entries exist only for devices with at least one saved snapshot, including
+	// known zero usage. Each allocation result's snapshot is preserved separately.
+	// Snapshot contents remain immutable while the allocator uses this state.
+	// Fixed consumption is reconstructed from ResourceSlices instead.
+	// This field may be nil when DRASharedConsumableCapacity is disabled.
+	ConsumedCounters CounterConsumptionByDevice
+}
+
+// CounterConsumptionByDevice contains allocation-status snapshots per device.
+type CounterConsumptionByDevice map[DeviceID][]CounterConsumptionForAllocation
+
+// CounterConsumptionForAllocation contains one allocation result's counter snapshot.
+type CounterConsumptionForAllocation []resourceapi.CounterSetConsumption
+
+// Add appends an allocation's snapshot, including known zeros.
+func (c CounterConsumptionByDevice) Add(id DeviceID, consumption []resourceapi.CounterSetConsumption) {
+	c[id] = append(c[id], consumption)
 }
 
 // ConsumedCapacity represents the consumed capacity of a specific resource.
@@ -115,7 +134,7 @@ func NewConsumedCapacity() ConsumedCapacity {
 func (s ConsumedCapacity) Clone() ConsumedCapacity {
 	clone := make(ConsumedCapacity)
 	for name, quantity := range s {
-		q := quantity.DeepCopy()
+		q := *quantity
 		clone[name] = &q
 	}
 	return clone
@@ -125,7 +144,7 @@ func (s ConsumedCapacity) Clone() ConsumedCapacity {
 // and creates a new entry if no capacity created yet.
 func (s ConsumedCapacity) Add(addedCapacity ConsumedCapacity) {
 	for name, quantity := range addedCapacity {
-		val := quantity.DeepCopy()
+		val := *quantity
 		if _, found := s[name]; found {
 			s[name].Add(val)
 		} else {
@@ -227,11 +246,11 @@ func NewDeviceConsumedCapacity(deviceID DeviceID, consumedCapacity map[resourcea
 	for name, val := range consumedCapacity {
 		identifier, ok := strings.CutPrefix(string(name), driverPrefix)
 		if ok {
-			key := draapi.FullyQualifiedName{Domain: deviceID.Driver.String(), Identifier: identifier}
+			key := draapi.FullyQualifiedName{Domain: deviceID.Driver, Identifier: draapi.MakeUniqueString(identifier)}
 			normalized[key] = new(val)
 			continue
 		}
-		key := draapi.MakeFullyQualifiedName(name, deviceID.Driver.String())
+		key := draapi.MakeFullyQualifiedName(name, deviceID.Driver, draapi.MakeUniqueString)
 		if _, alreadySet := normalized[key]; alreadySet {
 			continue
 		}

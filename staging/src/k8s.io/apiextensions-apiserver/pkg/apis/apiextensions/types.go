@@ -37,6 +37,7 @@ type CustomResourceDefinitionSpec struct {
 	// Version is the version this resource belongs in
 	// Should be always first item in Versions field if provided.
 	// Optional, but at least one of Version or Versions must be set.
+	//
 	// Deprecated: Please use `Versions`.
 	Version string
 	// Names are the names used to describe this custom resource

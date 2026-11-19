@@ -18,6 +18,8 @@ package cm
 
 import (
 	"bufio"
+	"context"
+	"errors"
 	"fmt"
 	"math"
 	"os"
@@ -31,13 +33,86 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	resourcehelper "k8s.io/component-helpers/resource"
 	"k8s.io/klog/v2"
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm/util"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
+
+// CheckSwapControllerAvailability reports whether the swap cgroup controller is available on the host.
+func CheckSwapControllerAvailability(ctx context.Context, isCgroup2 bool) bool {
+	return checkSwapControllerAvailability(ctx, isCgroup2, util.CgroupRoot, "/proc/self/cgroup")
+}
+
+func checkSwapControllerAvailability(ctx context.Context, isCgroup2 bool, cgroupRoot, procCgroupPath string) bool {
+	// See https://github.com/containerd/containerd/pull/7838/
+	logger := klog.FromContext(ctx)
+	p := filepath.Join(cgroupRoot, "memory", "memory.memsw.limit_in_bytes")
+	if isCgroup2 {
+		// memory.swap.max does not exist in the cgroup root, so check /sys/fs/cgroup/<SELF>/memory.swap.max.
+		cgroupsMap, err := libcontainercgroups.ParseCgroupFile(procCgroupPath)
+		if err != nil {
+			logger.V(5).Info("Failed to detect the availability of the swap controller, assuming not available", "err", fmt.Errorf("failed to parse %s: %w", procCgroupPath, err))
+			return false
+		}
+		p = filepath.Join(cgroupRoot, cgroupsMap[""], Cgroup2MaxSwapFilename)
+	}
+	if _, err := os.Stat(p); err != nil {
+		if !errors.Is(err, os.ErrNotExist) {
+			logger.V(5).Info("Failed to detect the availability of the swap controller, assuming not available", "err", err)
+		}
+		return false
+	}
+	return true
+}
+
+// CalcSwapForBurstablePods calculates the proportional swap limit per KEP-2400:
+// (memoryRequest / nodeTotalMemory) * totalPodsSwapAvailable.
+func CalcSwapForBurstablePods(memoryRequest, nodeTotalMemory, totalPodsSwapAvailable int64) (int64, error) {
+	if nodeTotalMemory <= 0 {
+		return 0, fmt.Errorf("total node memory is 0")
+	}
+	if memoryRequest > nodeTotalMemory {
+		return 0, fmt.Errorf("memory request %d is larger than total node memory %d", memoryRequest, nodeTotalMemory)
+	}
+
+	memoryProportion := float64(memoryRequest) / float64(nodeTotalMemory)
+	swapAllocation := memoryProportion * float64(totalPodsSwapAvailable)
+	return int64(swapAllocation), nil
+}
+
+// ApplyPodLevelSwapConfig sets memory.swap.max on the pod cgroup when PodLevelResources
+// is enabled and pod-level resources are set on cgroup v2 with the swap controller available.
+// This is only invoked from EnsureExists when creating a new pod cgroup; existing pod cgroups
+// do not have memory.swap.max recomputed.
+// Container-only pods leave pod cgroup memory.swap.max untouched ("max") per KEP-2400.
+// Skipping when the swap controller is absent avoids libcontainer Unified write failures on swapless kernels.
+func ApplyPodLevelSwapConfig(logger klog.Logger, pod *v1.Pod, rc *ResourceConfig, memorySwapBehavior kubetypes.SwapBehavior, nodeTotalMemory, totalPodsSwapAvailable int64, isCgroup2, swapControllerAvailable bool) {
+	if rc == nil || pod == nil || !isCgroup2 || !swapControllerAvailable ||
+		!utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodLevelResources) ||
+		!resourcehelper.IsPodLevelResourcesSet(pod) {
+		return
+	}
+
+	swapValue := "0"
+	if memorySwapBehavior == kubetypes.LimitedSwap {
+		if eligible, podMemoryRequest := IsPodEligibleForSwap(pod); eligible {
+			swapLimit, err := CalcSwapForBurstablePods(podMemoryRequest, nodeTotalMemory, totalPodsSwapAvailable)
+			if err != nil {
+				logger.Error(err, "Cannot calculate pod swap allocation amount; disallowing swap", "pod", klog.KObj(pod))
+			} else {
+				swapValue = strconv.FormatInt(swapLimit, 10)
+			}
+		}
+	}
+
+	if rc.Unified == nil {
+		rc.Unified = map[string]string{}
+	}
+	rc.Unified[Cgroup2MaxSwapFilename] = swapValue
+}
 
 // ApplyPodLevelMemoryHigh sets memory.high on the pod cgroup using the KEP-2570 formula.
 // Applies when PodLevelResources is enabled and the pod has memory limits declared
@@ -47,20 +122,11 @@ func ApplyPodLevelMemoryHigh(pod *v1.Pod, rc *ResourceConfig, throttlingFactor f
 	if !podLevelResourcesEnabled || !resourcehelper.IsPodLevelResourcesSet(pod) {
 		return
 	}
-	reqs := resourcehelper.PodRequests(pod, resourcehelper.PodResourcesOptions{})
-	limits := resourcehelper.PodLimits(pod, resourcehelper.PodResourcesOptions{})
-	memoryLimitsDeclared := true
-	for c := range podutil.ContainerIter(&pod.Spec, podutil.InitContainers|podutil.Containers) {
-		if c.Resources.Limits.Memory().IsZero() {
-			memoryLimitsDeclared = false
-		}
+	opts := resourcehelper.PodResourcesOptions{
+		UseExtraNodeAllocatableResources: utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DRANodeAllocatableResources),
 	}
-	if !pod.Spec.Resources.Limits.Memory().IsZero() {
-		memoryLimitsDeclared = true
-	}
-	if !memoryLimitsDeclared {
-		return
-	}
+	reqs := resourcehelper.PodRequests(pod, opts)
+	limits := resourcehelper.PodLimits(pod, opts)
 	memoryRequest := int64(0)
 	memoryLimit := int64(0)
 	if req, found := reqs[v1.ResourceMemory]; found {
@@ -183,38 +249,19 @@ func ResourceConfigForPod(allocatedPod *v1.Pod, enforceCPULimits bool, cpuPeriod
 	// sum requests and limits.
 	reqs := resourcehelper.PodRequests(allocatedPod, resourcehelper.PodResourcesOptions{
 		// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
-		SkipPodLevelResources:                    !podLevelResourcesEnabled,
-		UseStatusResources:                       false,
-		UseDRANodeAllocatableResourceClaimStatus: draNodeAllocatableEnabled,
+		SkipPodLevelResources:            !podLevelResourcesEnabled,
+		UseStatusResources:               false,
+		UseExtraNodeAllocatableResources: draNodeAllocatableEnabled,
 	})
-	// track if limits were applied for each resource.
-	memoryLimitsDeclared := true
-	cpuLimitsDeclared := true
-
+	// PodLimits() omits a cpu or memory limit that is not declared by every container (or
+	// at the pod level), so presence in the map below doubles as the "limits declared"
+	// signal.
 	limits := resourcehelper.PodLimits(allocatedPod, resourcehelper.PodResourcesOptions{
 		// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
-		SkipPodLevelResources:                    !podLevelResourcesEnabled,
-		UseDRANodeAllocatableResourceClaimStatus: draNodeAllocatableEnabled,
+		SkipPodLevelResources:            !podLevelResourcesEnabled,
+		UseExtraNodeAllocatableResources: draNodeAllocatableEnabled,
 	})
 
-	for c := range podutil.ContainerIter(&allocatedPod.Spec, podutil.InitContainers|podutil.Containers) {
-		if c.Resources.Limits.Cpu().IsZero() {
-			cpuLimitsDeclared = false
-		}
-		if c.Resources.Limits.Memory().IsZero() {
-			memoryLimitsDeclared = false
-		}
-	}
-
-	if podLevelResourcesEnabled && resourcehelper.IsPodLevelResourcesSet(allocatedPod) {
-		if !allocatedPod.Spec.Resources.Limits.Cpu().IsZero() {
-			cpuLimitsDeclared = true
-		}
-
-		if !allocatedPod.Spec.Resources.Limits.Memory().IsZero() {
-			memoryLimitsDeclared = true
-		}
-	}
 	// map hugepage pagesize (bytes) to limits (bytes)
 	hugePageLimits := HugePageLimits(reqs)
 
@@ -252,11 +299,11 @@ func ResourceConfigForPod(allocatedPod *v1.Pod, enforceCPULimits bool, cpuPeriod
 		result.Memory = &memoryLimits
 	} else if qosClass == v1.PodQOSBurstable {
 		result.CPUShares = &cpuShares
-		if cpuLimitsDeclared {
+		if cpuLimits != 0 {
 			result.CPUQuota = &cpuQuota
 			result.CPUPeriod = &cpuPeriod
 		}
-		if memoryLimitsDeclared {
+		if memoryLimits != 0 {
 			result.Memory = &memoryLimits
 		}
 	} else {

@@ -136,6 +136,17 @@ const (
 	// Has no guarantees for trust at all. Some distributions may honor these
 	// as client certs, but that behavior is not standard kubernetes behavior.
 	LegacyUnknownSignerName = "kubernetes.io/legacy-unknown"
+
+	// AddPodFQDNKey is a "unverifiedUserAnnotations" key that tells the ServiceServingSigner
+	// to add pod's FQDN to the resulting certificate's DNS SANs
+	AddPodFQDNKey = "kubernetes.io/add-pod-fqdn"
+
+	// ServiceNamesKey is a "unverifiedUserAnnotations" key that tells the ServiceServingSigner
+	// to add services' DNS names to the resulting certificate's DNS SANs
+	ServiceNamesKey = "kubernetes.io/service-names"
+
+	// ServiceServingSignerName is the signer name for the ServiceServingSigner
+	ServiceServingSignerName = "kubernetes.io/service-serving"
 )
 
 // ExtraValue masks the value so protobuf can generate

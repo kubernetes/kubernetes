@@ -317,8 +317,23 @@ func TestStore_MetricsTrackedForResourceVersions(t *testing.T) {
 		expectedMetric int64
 	}{
 		{
-			name:           "empty store has zero metric",
+			name:           "empty store does not publish metric",
 			actions:        []func(f cache.Store){},
+			expectedMetric: -1,
+		},
+		{
+			name: "zero resource version sets metric to zero",
+			actions: []func(f cache.Store){
+				func(f cache.Store) { _ = f.Replace([]interface{}{mkFifoObj("foo", "0")}, "0") },
+			},
+			expectedMetric: 0,
+		},
+		{
+			name: "empty resource version after sync resets metric to zero",
+			actions: []func(f cache.Store){
+				func(f cache.Store) { _ = f.Add(mkFifoObj("foo", "10")) },
+				func(f cache.Store) { _ = f.Replace([]interface{}{mkFifoObj("foo", "")}, "") },
+			},
 			expectedMetric: 0,
 		},
 		{
@@ -532,10 +547,13 @@ informer_processing_latency_seconds_count{group="%s",name="%s",resource="%s",ver
 
 func verifyStoreResourceVersion(t *testing.T, metricsProvider *testInformerMetricsProvider, informerName string, gvr schema.GroupVersionResource, expected int64) {
 	t.Helper()
-	want := fmt.Sprintf(`# HELP informer_store_resource_version [ALPHA] The 15 least significant digits of the resource version of the store.
+	var want string
+	if expected >= 0 {
+		want = fmt.Sprintf(`# HELP informer_store_resource_version [ALPHA] The 15 least significant digits of the resource version of the store.
 # TYPE informer_store_resource_version gauge
 informer_store_resource_version{group="%s",name="%s",resource="%s",version="%s"} %d
 `, gvr.Group, informerName, gvr.Resource, gvr.Version, expected)
+	}
 	if err := testutil.GatherAndCompare(metricsProvider.registry, strings.NewReader(want), "informer_store_resource_version"); err != nil {
 		t.Fatal(err)
 	}

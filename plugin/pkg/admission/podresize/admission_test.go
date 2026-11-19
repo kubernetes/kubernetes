@@ -86,6 +86,16 @@ func TestResizeAdmission(t *testing.T) {
 		},
 	}
 
+	// A pod whose requests exceed the node allocatable, e.g. because it shrank.
+	overAllocatablePod := testPod.DeepCopy()
+	overAllocatablePod.Spec.Containers[0].Resources.Requests[core.ResourceCPU] = resource.MustParse("10")
+	limitsOnlyResize := func() *core.Pod {
+		p := overAllocatablePod.DeepCopy()
+		p.Generation = 2
+		p.Spec.Containers[0].Resources.Limits = core.ResourceList{core.ResourceMemory: resource.MustParse("2Gi")}
+		return p
+	}
+
 	testCases := []struct {
 		name        string
 		subresource string
@@ -245,6 +255,127 @@ func TestResizeAdmission(t *testing.T) {
 			expectErr:   true,
 			errContains: "node \"missing-node\" not found",
 		},
+		{
+			name:        "Dynamic: successful container add on Linux node",
+			subresource: "dynamic",
+			oldPod:      testPod,
+			newPod: func() *core.Pod {
+				p := testPod.DeepCopy()
+				p.Generation = 2
+				p.Spec.Containers = append(p.Spec.Containers, *p.Spec.Containers[0].DeepCopy())
+				p.Spec.Containers[1].Name = "added"
+				return p
+			},
+			expectErr: false,
+		},
+		{
+			name:        "Dynamic: reject container add exceeding allocatable",
+			subresource: "dynamic",
+			oldPod:      testPod,
+			newPod: func() *core.Pod {
+				p := testPod.DeepCopy()
+				p.Generation = 2
+				p.Spec.Containers = append(p.Spec.Containers, *p.Spec.Containers[0].DeepCopy())
+				p.Spec.Containers[1].Name = "added"
+				p.Spec.Containers[1].Resources.Requests[core.ResourceCPU] = resource.MustParse("10")
+				return p
+			},
+			expectErr:   true,
+			errContains: "node didn't have enough allocatable resources: cpu",
+		},
+		{
+			name:        "Dynamic: reject resize exceeding allocatable",
+			subresource: "dynamic",
+			oldPod:      testPod,
+			newPod: func() *core.Pod {
+				p := testPod.DeepCopy()
+				p.Generation = 2
+				p.Spec.Containers[0].Resources.Requests[core.ResourceMemory] = resource.MustParse("10Gi")
+				return p
+			},
+			expectErr:   true,
+			errContains: "node didn't have enough allocatable resources: memory",
+		},
+		{
+			name:        "Dynamic: reject container swap on non-Linux node",
+			subresource: "dynamic",
+			oldPod: func() *core.Pod {
+				p := testPod.DeepCopy()
+				p.Spec.NodeName = "windows-node"
+				return p
+			}(),
+			newPod: func() *core.Pod {
+				p := testPod.DeepCopy()
+				p.Spec.NodeName = "windows-node"
+				p.Generation = 2
+				p.Spec.Containers[0].Name = "replacement"
+				return p
+			},
+			expectErr:   true,
+			errContains: "pod resize is only supported on linux nodes",
+		},
+		{
+			name:        "Dynamic: reject adding a container without resources on non-Linux node",
+			subresource: "dynamic",
+			oldPod: func() *core.Pod {
+				p := testPod.DeepCopy()
+				p.Spec.NodeName = "windows-node"
+				return p
+			}(),
+			newPod: func() *core.Pod {
+				p := testPod.DeepCopy()
+				p.Spec.NodeName = "windows-node"
+				p.Generation = 2
+				p.Spec.Containers = append(p.Spec.Containers, core.Container{Name: "added", Image: "image"})
+				return p
+			},
+			expectErr:   true,
+			errContains: "pod resize is only supported on linux nodes",
+		},
+		{
+			name:        "Dynamic: reject image update on non-Linux node",
+			subresource: "dynamic",
+			oldPod: func() *core.Pod {
+				p := testPod.DeepCopy()
+				p.Spec.NodeName = "windows-node"
+				return p
+			}(),
+			newPod: func() *core.Pod {
+				p := testPod.DeepCopy()
+				p.Spec.NodeName = "windows-node"
+				p.Generation = 2
+				p.Spec.Containers[0].Image = "new-image"
+				return p
+			},
+			expectErr:   true,
+			errContains: "pod resize is only supported on linux nodes",
+		},
+		{
+			name:        "Dynamic: skip allocatable check for adding a container without resources",
+			subresource: "dynamic",
+			oldPod:      overAllocatablePod,
+			newPod: func() *core.Pod {
+				p := overAllocatablePod.DeepCopy()
+				p.Generation = 2
+				p.Spec.Containers = append(p.Spec.Containers, core.Container{Name: "added", Image: "image"})
+				return p
+			},
+			expectErr: false,
+		},
+		{
+			name:        "Skip allocatable check for limits-only resize",
+			subresource: "resize",
+			oldPod:      overAllocatablePod,
+			newPod:      limitsOnlyResize,
+			expectErr:   false,
+		},
+		{
+			name:        "Dynamic: skip allocatable check for limits-only resize",
+			subresource: "dynamic",
+			oldPod:      overAllocatablePod,
+			newPod:      limitsOnlyResize,
+			expectErr:   false,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -255,7 +386,6 @@ func TestResizeAdmission(t *testing.T) {
 			plugin, err := NewPlugin()
 			require.NoError(t, err)
 			plugin.SetExternalKubeInformerFactory(informerFactory)
-			plugin.inPlacePodVerticalScalingEnabled = true
 
 			stopCh := make(chan struct{})
 			defer close(stopCh)
@@ -390,6 +520,40 @@ func TestValidateRequestsWithinAllocatable(t *testing.T) {
 			},
 			expectedErr: true,
 			// CPU: 150m + 100m = 250m. Mem: 150Mi + 100Mi = 250Mi (262144000 bytes)
+			expectedMsg: "cpu, requested: 250, allocatable: 200",
+		},
+		{
+			name: "cpu and mem alone are within allocatable, but extra node allocatable resources cause failure",
+			pod: &corev1.Pod{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name: "c1",
+							Resources: corev1.ResourceRequirements{
+								Requests: corev1.ResourceList{
+									corev1.ResourceCPU:    resource.MustParse("150m"),
+									corev1.ResourceMemory: resource.MustParse("150Mi"),
+								},
+							},
+						},
+					},
+				},
+				Status: corev1.PodStatus{
+					ExtraNodeAllocatableResources: []corev1.ExtraNodeAllocatableResource{
+						{
+							ContainerName: "",
+							Requests:      corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("100m")},
+							Limits:        corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("100m")},
+						},
+					},
+				},
+			},
+			allocatable: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("200m"),
+				corev1.ResourceMemory: resource.MustParse("200Mi"),
+			},
+			expectedErr: true,
+			// CPU: 150m + 100m = 250m.
 			expectedMsg: "cpu, requested: 250, allocatable: 200",
 		},
 		{

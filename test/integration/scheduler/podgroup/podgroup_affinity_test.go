@@ -29,8 +29,8 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
+	schedulerutils "k8s.io/kubernetes/test/integration/scheduler"
 	stepsframework "k8s.io/kubernetes/test/integration/scheduler/podgroup/stepsframework"
-	testutils "k8s.io/kubernetes/test/integration/util"
 )
 
 const hostnameKey = "kubernetes.io/hostname"
@@ -154,11 +154,11 @@ func TestPodGroupSchedulingWithPodAntiAffinity(t *testing.T) {
 					features.CompositePodGroup:               cpgEnabled,
 				})
 
-				testCtx := testutils.InitTestSchedulerWithNS(t, "podgroup-anti-affinity",
+				testCtx := schedulerutils.InitTestSchedulerWithNS(t, "podgroup-anti-affinity",
 					// disable backoff
 					scheduler.WithPodMaxBackoffSeconds(0),
 					scheduler.WithPodInitialBackoffSeconds(0))
-				ns := testCtx.NS.Name
+				ns := testCtx.Namespace()
 
 				commonSteps := []stepsframework.Step{
 					{

@@ -1,0 +1,17 @@
+rules:
+  # e2e.test is built on macOS and Windows to test Linux clusters. Kubelet
+  # packages stub Linux behavior on other platforms (pkg/kubelet/cm sets
+  # QuotaPeriod to 0), so only platform-neutral leaf packages may be imported.
+  - selectorRegexp: ^k8s[.]io/kubernetes/pkg/kubelet(/|$)
+    allowedPrefixes:
+      - k8s.io/kubernetes/pkg/kubelet/apis/config
+      - k8s.io/kubernetes/pkg/kubelet/events
+      - k8s.io/kubernetes/pkg/kubelet/images
+      - k8s.io/kubernetes/pkg/kubelet/metrics
+      - k8s.io/kubernetes/pkg/kubelet/qos
+      - k8s.io/kubernetes/pkg/kubelet/runtimeclass/testing
+      - k8s.io/kubernetes/pkg/kubelet/sysctl
+      - k8s.io/kubernetes/pkg/kubelet/types
+  - selectorRegexp: ^k8s[.]io/kubernetes/pkg/kubelet(/|$)
+    forbiddenPrefixes:
+      - ""

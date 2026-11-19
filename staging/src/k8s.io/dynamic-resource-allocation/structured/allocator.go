@@ -19,6 +19,7 @@ package structured
 import (
 	"context"
 	"fmt"
+	"iter"
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
@@ -26,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	draapi "k8s.io/dynamic-resource-allocation/api"
 	"k8s.io/dynamic-resource-allocation/cel"
 	"k8s.io/dynamic-resource-allocation/structured/internal"
 	"k8s.io/dynamic-resource-allocation/structured/internal/experimental"
@@ -82,6 +84,45 @@ func NewDeviceConsumedCapacity(deviceID DeviceID, consumedCapacity map[resourcea
 	return schedulerapi.NewDeviceConsumedCapacity(deviceID, consumedCapacity)
 }
 
+// ForEachAllocatedDevice invokes the provided callback for each
+// device in the allocation result which was allocated
+// exclusively for the claim.
+//
+// Devices allocated with admin access can be shared with other
+// claims and are skipped without invoking the callback.
+//
+// ForEachAllocatedDevice does nothing if the allocation is nil.
+func ForEachAllocatedDevice(allocation *resourceapi.AllocationResult,
+	dedicatedDeviceCallback func(deviceID DeviceID),
+	enabledConsumableCapacity bool,
+	sharedDeviceCallback func(SharedDeviceID),
+	consumedCapacityCallback func(DeviceConsumedCapacity)) {
+	internal.ForEachAllocatedDevice(allocation, dedicatedDeviceCallback, enabledConsumableCapacity, sharedDeviceCallback, consumedCapacityCallback)
+}
+
+// AddToAllocatedState adds the devices and consumed capacity from the
+// allocation results of allocated claims to the state, using
+// [ForEachAllocatedDevice]. The state must not be nil. Nil device sets and the
+// capacity map get created. Nil allocation results are skipped. If consumable capacity
+// is disabled in the features, all devices are treated as dedicated.
+//
+// With shared consumable capacity enabled, recorded counter snapshots are
+// appended per allocation. The counter map is created only when consumption was
+// recorded. Admin access does not reserve resources and is skipped.
+func AddToAllocatedState(state *AllocatedState, allocations iter.Seq[*resourceapi.AllocationResult], features Features) {
+	internal.AddToAllocatedState(state, allocations, features)
+}
+
+// ResolveCounterConsumption is a helper for callers outside the allocator to
+// resolve counter amounts using the allocator's rounding and policy checks.
+// The allocator itself uses the internal implementation directly.
+// The boolean is false when the resolved amount violates the policy;
+// an error indicates that resolution failed.
+// A nil requested value selects the policy default or the counter's full value.
+func ResolveCounterConsumption(requestedValue *resource.Quantity, counter resourceapi.Counter, features Features) (resource.Quantity, bool, error) {
+	return experimental.ResolveCounterConsumption(requestedValue, counter, features.FractionalCapacityRange)
+}
+
 // Allocator calculates how to allocate a set of unallocated claims which use
 // structured parameters.
 //
@@ -127,7 +168,7 @@ func NewAllocator(ctx context.Context,
 	features Features,
 	allocatedState AllocatedState,
 	classLister DeviceClassLister,
-	slices []*resourceapi.ResourceSlice,
+	slices []*draapi.ResourceSlice,
 	celCache *cel.Cache,
 ) (Allocator, error) {
 	// The actual implementation may vary depending on which features are enabled.
@@ -192,7 +233,7 @@ var availableAllocators = []struct {
 		features Features,
 		allocatedState AllocatedState,
 		classLister DeviceClassLister,
-		slices []*resourceapi.ResourceSlice,
+		slices []*draapi.ResourceSlice,
 		celCache *cel.Cache,
 	) (Allocator, error)
 	nodeMatches func(node *v1.Node,
@@ -209,10 +250,10 @@ var availableAllocators = []struct {
 			features Features,
 			allocatedState AllocatedState,
 			classLister DeviceClassLister,
-			slices []*resourceapi.ResourceSlice,
+			slices []*draapi.ResourceSlice,
 			celCache *cel.Cache,
 		) (Allocator, error) {
-			return stable.NewAllocator(ctx, features, allocatedState.AllocatedDevices, classLister, slices, celCache)
+			return stable.NewAllocator(ctx, features, allocatedState, classLister, slices, celCache)
 		},
 		nodeMatches: stable.NodeMatches,
 	},
@@ -223,7 +264,7 @@ var availableAllocators = []struct {
 			features Features,
 			allocatedState AllocatedState,
 			classLister DeviceClassLister,
-			slices []*resourceapi.ResourceSlice,
+			slices []*draapi.ResourceSlice,
 			celCache *cel.Cache,
 		) (Allocator, error) {
 			return incubating.NewAllocator(ctx, features, allocatedState, classLister, slices, celCache)
@@ -237,7 +278,7 @@ var availableAllocators = []struct {
 			features Features,
 			allocateState AllocatedState,
 			classLister DeviceClassLister,
-			slices []*resourceapi.ResourceSlice,
+			slices []*draapi.ResourceSlice,
 			celCache *cel.Cache,
 		) (Allocator, error) {
 			return experimental.NewAllocator(ctx, features, allocateState, classLister, slices, celCache)

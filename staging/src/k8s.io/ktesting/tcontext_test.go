@@ -19,6 +19,7 @@ package ktesting_test
 import (
 	"context"
 	"fmt"
+	"runtime"
 	"sync"
 	"testing"
 	"testing/synctest"
@@ -184,6 +185,10 @@ func TestCancelCtx(t *testing.T) {
 }
 
 func TestParallel(t *testing.T) {
+	if runtime.GOMAXPROCS(0) < 3 {
+		t.Skip("needs GOMAXPROCS >= 3")
+	}
+
 	var wg sync.WaitGroup
 	wg.Add(3)
 
@@ -237,4 +242,26 @@ func TestWithContext(t *testing.T) {
 	tCtx.Expect(context.Cause(tCtx)).To(gomega.MatchError(gomega.ContainSubstring("done")))
 	tCtx.Expect(newCtx.Err()).To(gomega.MatchError(context.DeadlineExceeded))
 	tCtx.Expect(newCtx.Value("foo")).To(gomega.Equal("bar"))
+}
+
+func TestWithDeadline(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		tCtx := ktesting.Init(t)
+		tCtx = tCtx.WithDeadline(time.Now().Add(time.Second), "deadline test")
+		time.Sleep(2 * time.Second)
+		synctest.Wait()
+		tCtx.Expect(context.Cause(tCtx)).To(gomega.MatchError(context.DeadlineExceeded), "cause")
+		tCtx.Expect(tCtx.Err()).To(gomega.MatchError(context.DeadlineExceeded), "err")
+	})
+}
+
+func TestWithTimeout(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		tCtx := ktesting.Init(t)
+		tCtx = tCtx.WithTimeout(time.Second, "timeout test")
+		time.Sleep(2 * time.Second)
+		synctest.Wait()
+		tCtx.Expect(context.Cause(tCtx)).To(gomega.MatchError(context.DeadlineExceeded), "cause")
+		tCtx.Expect(tCtx.Err()).To(gomega.MatchError(context.DeadlineExceeded), "err")
+	})
 }

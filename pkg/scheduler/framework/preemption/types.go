@@ -20,155 +20,20 @@ import (
 	"fmt"
 	"sync/atomic"
 
-	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/klog/v2"
+	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	fwk "k8s.io/kube-scheduler/framework"
-	"k8s.io/kubernetes/pkg/scheduler/framework"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
-
-// getHighestAllAncestor returns the key of the highest ancestor in the hierarchy that has disruption mode All.
-// It returns (key, true) if found, or (empty, false) if not found.
-// TODO: log/return an error if there is a gap in the hierarchy.
-func getHighestAllAncestor(pod *v1.Pod, pgLister fwk.PodGroupLister, cpgLister fwk.CompositePodGroupLister) (fwk.EntityKey, bool) {
-	if pod.Spec.SchedulingGroup == nil || pgLister == nil {
-		return fwk.EntityKey{}, false
-	}
-	startKey := fwk.PodGroupKey(pod.Namespace, *pod.Spec.SchedulingGroup.PodGroupName)
-	var highestAllKey fwk.EntityKey
-	var hasAll bool
-
-	for gpg := range traverseHierarchyUp(pod.Namespace, startKey, pgLister, cpgLister) {
-		if gpg.HasDisruptionModeAll() {
-			highestAllKey = gpg.GetKey()
-			hasAll = true
-		}
-	}
-
-	return highestAllKey, hasAll
-}
-
-// createDomainVictims converts deduplicated Victim entries into DomainVictim objects
-// by enriching them with node blast-radius metadata from the snapshot, allowing the preemption
-// evaluator to assess the cluster-wide impact of evicting each candidate.
-func createDomainVictims(snapshot fwk.SharedLister, victims []Victim) ([]*DomainVictim, error) {
-	var allPossibleVictims []*DomainVictim
-	for _, vi := range victims {
-		v, err := newDomainVictim(snapshot, vi.Pods(), vi.Priority(), vi.Type())
-		if err != nil {
-			return nil, err
-		}
-		allPossibleVictims = append(allPossibleVictims, v)
-	}
-	return allPossibleVictims, nil
-}
-
-// getWorkloadPreemptionVictims discovers all candidate victims across the cluster snapshot for workload preemption.
-// Pods that are part of a pod group or composite pod group with disruption mode All are grouped
-// together into a single victim. Otherwise, they are treated as individual victims.
-// In both cases, the priority of the victim is determined by the pod group or composite pod group priority.
-func getWorkloadPreemptionVictims(logger klog.Logger, snapshot fwk.SharedLister, podGroupSnapshot fwk.PodGroupLister, compositePodGroupSnapshot fwk.CompositePodGroupLister) ([]Victim, error) {
-	nodes, err := snapshot.NodeInfos().List()
-	if err != nil {
-		return nil, err
-	}
-
-	return getCrossNodesVictims(logger, snapshot, podGroupSnapshot, compositePodGroupSnapshot, nodes), nil
-}
-
-// getCrossNodesVictims aggregates pods across the provided nodes into cluster-wide preemption candidates.
-// When a pod belongs to a group hierarchy where any ancestor has disruption mode All, it groups all scheduled pods of that hierarchy
-// across the cluster into a single victim so that preemption evaluates the total cluster-wide cost
-// and blast radius of evicting the entire group.
-func getCrossNodesVictims(logger klog.Logger, snapshot fwk.SharedLister, podGroupSnapshot fwk.PodGroupLister, compositePodGroupSnapshot fwk.CompositePodGroupLister, nodes []fwk.NodeInfo) []Victim {
-	existing := sets.New[fwk.EntityKey]()
-	var victims []Victim
-	for _, node := range nodes {
-		for _, podInfo := range node.GetPods() {
-			p := podInfo.GetPod()
-
-			highestAllKey, hasAll := getHighestAllAncestor(p, podGroupSnapshot, compositePodGroupSnapshot)
-			if !hasAll {
-				itemKey := fwk.PodKey(p.Namespace, p.Name)
-				if !existing.Has(itemKey) {
-					existing.Insert(itemKey)
-					victims = append(victims, NewPodVictim(podInfo, podGroupSnapshot, compositePodGroupSnapshot))
-				}
-				continue
-			}
-
-			if !existing.Has(highestAllKey) {
-				existing.Insert(highestAllKey)
-				victims = append(victims, searchCrossNodesVictimPods(logger, highestAllKey, podInfo, snapshot, podGroupSnapshot, compositePodGroupSnapshot))
-			}
-		}
-	}
-
-	return victims
-}
-
-// searchCrossNodesVictimPods searches and collects all scheduled pods belonging to the leaf pod groups
-// of the hierarchy starting from pgKey, and aggregates them into a single Victim.
-// If no scheduled pods are found in the leaf pod groups, it falls back to creating a PodVictim for the given podInfo.
-func searchCrossNodesVictimPods(
-	logger klog.Logger,
-	pgKey fwk.EntityKey,
-	podInfo fwk.PodInfo,
-	snapshot fwk.SharedLister,
-	podGroupSnapshot fwk.PodGroupLister,
-	compositePodGroupSnapshot fwk.CompositePodGroupLister,
-) Victim {
-	var allPods []*v1.Pod
-	if compositePodGroupSnapshot == nil {
-		pgState, err := snapshot.PodGroupStates().Get(podInfo.GetPod().GetNamespace(), pgKey.Name)
-		if err != nil {
-			// Assuming this is guaranteed to succeed if feature is on and pods exist.
-			// If it fails, we keep the local pods only.
-			return NewPodVictim(podInfo, podGroupSnapshot, compositePodGroupSnapshot)
-		}
-		allPods = append(allPods, pgState.ScheduledPods()...)
-	} else {
-		for pgState, err := range helper.GetPodGroupStates(snapshot, pgKey) {
-			if err != nil {
-				logger.Error(err, "Failed to get pod group state during preemption victim collection", "rootKey", pgKey)
-				continue
-			}
-			if pgState != nil {
-				allPods = append(allPods, pgState.ScheduledPods()...)
-			}
-		}
-	}
-
-	if len(allPods) == 0 {
-		// This should never happen since podInfo is sourced from a node in the snapshot and
-		// should be present in ScheduledPods() of its leaf PodGroup. If leaf traversal or
-		// PodGroupState snapshot lookups fail, treat the pod as an individual victim.
-		return NewPodVictim(podInfo, podGroupSnapshot, compositePodGroupSnapshot)
-	}
-
-	podInfos := make([]fwk.PodInfo, len(allPods))
-	for i, p := range allPods {
-		// pods from ScheduledPods() already passed Filter/Reserve, and cannot error here.
-		podInfos[i], _ = framework.NewPodInfo(p)
-	}
-
-	priority := getPodPriority(podInfo.GetPod(), podGroupSnapshot, compositePodGroupSnapshot)
-	// It can only return an error for empty podInfos, which is guaranteed not to be empty here.
-	victim, _ := NewVictim(podInfos, priority, pgKey.Type)
-	return victim
-}
 
 // Victim represents an atomic entity that can be preempted (a victim).
 // It abstracts individual Pods and PodGroup, ensuring that
 // atomic entities are treated as a single unit during eviction.
 type Victim interface {
-	// Priority returns the priority of the preemption unit.
-	// For a single Pod, this is the Pod's priority.
-	// For a PodGroup, this is the priority of the PodGroup.
+	// Priority returns the priority of the preemption unit, which is the priority of its Pods.
+	// For a PodGroup or CompositePodGroup this is also the group's priority: the scheduling cycle
+	// guarantees that every Pod in a hierarchy shares the priority of the hierarchy's root.
 	Priority() int32
 
 	// Pods returns the list of all Pods that belong to this preemption unit.
@@ -200,9 +65,9 @@ func (v *victim) Pods() []fwk.PodInfo {
 	return v.pods
 }
 
-// Priority returns the priority of the preemption unit.
-// For a single Pod, this is the Pod's priority.
-// For a PodGroup, this is the priority of the PodGroup.
+// Priority returns the priority of the preemption unit, which is the priority of its Pods.
+// For a PodGroup or CompositePodGroup this is also the group's priority: the scheduling cycle
+// guarantees that every Pod in a hierarchy shares the priority of the hierarchy's root.
 func (v *victim) Priority() int32 {
 	return v.priority
 }
@@ -218,23 +83,11 @@ func (v *victim) Type() fwk.EntityKeyType {
 }
 
 // NewPodVictim creates a new Victim representing a single Pod.
-// It calculates the priority of the pod, taking into account its scheduling group if applicable.
 // It ignores the error from NewVictim internally as it is guaranteed to succeed for a single valid pod.
-// TODO: what we do below is not ideal:
-//   - From the victim's importance POV, individual Pods should always have the PodKeyType.
-//   - On the other hand, we need to store the information that the Pod victim belongs to the "single"
-//     disruption mode PodGroup due to WAP-related metrics bookkeeping.
-//   - Ideally, we should store another bit of information denoting the type of top-level group the victim
-//     Pod belongs to.
-//
-// We should fix this on the occasion of adding support for CompositePodGroup WAP-related metrics.
-func NewPodVictim(podInfo fwk.PodInfo, pgLister fwk.PodGroupLister, cpgLister fwk.CompositePodGroupLister) Victim {
-	priority := getPodPriority(podInfo.GetPod(), pgLister, cpgLister)
-	keyType := fwk.PodKeyType
-	if podInfo.GetPod().Spec.SchedulingGroup != nil && pgLister != nil {
-		keyType = fwk.PodGroupKeyType
-	}
-	vi, _ := NewVictim([]fwk.PodInfo{podInfo}, priority, keyType)
+// The victim is always of PodKeyType, even if the pod belongs to a PodGroup or CompositePodGroup with
+// disruption mode Single: it is evicted alone, so it ranks and is reported in metrics as an individual pod.
+func NewPodVictim(podInfo fwk.PodInfo) Victim {
+	vi, _ := NewVictim([]fwk.PodInfo{podInfo}, corev1helpers.PodPriority(podInfo.GetPod()), fwk.PodKeyType)
 	return vi
 }
 
@@ -316,12 +169,24 @@ type candidate struct {
 	victims *extenderv1.Victims
 	// name returns the target domain(for pod group)/node name where the preemptor gets nominated to run.
 	name string
-	// numPodGroupDisruptions returns the number of preemption units that affect pod groups.
-	// A single preemption unit can be all pods in a pod group (for DisruptionMode=all) or a single pod (for DisruptionMode=single).
-	numPodGroupDisruptions int
+	// disruptions is the number of preemption units per victim type. Used only for metrics.
+	disruptions map[fwk.EntityKeyType]int
+	// nodes returns a list of nodes where the preemptor pods get nominated to run.
+	// For a single pod preemption it's equal Name but for pod group preemption
+	// it contains a set of nodes for all preemptor pods.
+	nodes []string
 }
 
 var _ fwk.PreemptionCandidate = &candidate{}
+
+func newCandidate(victims *extenderv1.Victims, name string, disruptions map[fwk.EntityKeyType]int, nodes ...string) *candidate {
+	return &candidate{
+		victims:     victims,
+		name:        name,
+		disruptions: disruptions,
+		nodes:       nodes,
+	}
+}
 
 // Victims returns s.victims.
 func (s *candidate) Victims() *extenderv1.Victims {
@@ -333,9 +198,16 @@ func (s *candidate) Name() string {
 	return s.name
 }
 
-// NumPodGroupDisruptions returns s.numPodGroupDisruptions.
-func (s *candidate) NumPodGroupDisruptions() int {
-	return s.numPodGroupDisruptions
+// NumDisruptionsByVictimType returns s.disruptions.
+func (s *candidate) NumDisruptionsByVictimType() map[fwk.EntityKeyType]int {
+	return s.disruptions
+}
+
+// Nodes returns a list of nodes where the preemptor pods get nominated to run.
+// For a single pod preemption it's equal Name but for pod group preemption
+// it contains a set of nodes for all preemptor pods.
+func (s *candidate) Nodes() []string {
+	return s.nodes
 }
 
 type candidateList struct {

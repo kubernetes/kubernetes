@@ -454,6 +454,74 @@ func (_c *MockControllerServer_ControllerGetCapabilities_Call) RunAndReturn(run 
 	return _c
 }
 
+// ControllerGetNodeInfo provides a mock function for the type MockControllerServer
+func (_mock *MockControllerServer) ControllerGetNodeInfo(context1 context.Context, controllerGetNodeInfoRequest *csi.ControllerGetNodeInfoRequest) (*csi.ControllerGetNodeInfoResponse, error) {
+	ret := _mock.Called(context1, controllerGetNodeInfoRequest)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ControllerGetNodeInfo")
+	}
+
+	var r0 *csi.ControllerGetNodeInfoResponse
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *csi.ControllerGetNodeInfoRequest) (*csi.ControllerGetNodeInfoResponse, error)); ok {
+		return returnFunc(context1, controllerGetNodeInfoRequest)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *csi.ControllerGetNodeInfoRequest) *csi.ControllerGetNodeInfoResponse); ok {
+		r0 = returnFunc(context1, controllerGetNodeInfoRequest)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*csi.ControllerGetNodeInfoResponse)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *csi.ControllerGetNodeInfoRequest) error); ok {
+		r1 = returnFunc(context1, controllerGetNodeInfoRequest)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockControllerServer_ControllerGetNodeInfo_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ControllerGetNodeInfo'
+type MockControllerServer_ControllerGetNodeInfo_Call struct {
+	*mock.Call
+}
+
+// ControllerGetNodeInfo is a helper method to define mock.On call
+//   - context1 context.Context
+//   - controllerGetNodeInfoRequest *csi.ControllerGetNodeInfoRequest
+func (_e *MockControllerServer_Expecter) ControllerGetNodeInfo(context1 any, controllerGetNodeInfoRequest any) *MockControllerServer_ControllerGetNodeInfo_Call {
+	return &MockControllerServer_ControllerGetNodeInfo_Call{Call: _e.mock.On("ControllerGetNodeInfo", context1, controllerGetNodeInfoRequest)}
+}
+
+func (_c *MockControllerServer_ControllerGetNodeInfo_Call) Run(run func(context1 context.Context, controllerGetNodeInfoRequest *csi.ControllerGetNodeInfoRequest)) *MockControllerServer_ControllerGetNodeInfo_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *csi.ControllerGetNodeInfoRequest
+		if args[1] != nil {
+			arg1 = args[1].(*csi.ControllerGetNodeInfoRequest)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockControllerServer_ControllerGetNodeInfo_Call) Return(controllerGetNodeInfoResponse *csi.ControllerGetNodeInfoResponse, err error) *MockControllerServer_ControllerGetNodeInfo_Call {
+	_c.Call.Return(controllerGetNodeInfoResponse, err)
+	return _c
+}
+
+func (_c *MockControllerServer_ControllerGetNodeInfo_Call) RunAndReturn(run func(context1 context.Context, controllerGetNodeInfoRequest *csi.ControllerGetNodeInfoRequest) (*csi.ControllerGetNodeInfoResponse, error)) *MockControllerServer_ControllerGetNodeInfo_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ControllerGetVolume provides a mock function for the type MockControllerServer
 func (_mock *MockControllerServer) ControllerGetVolume(context1 context.Context, controllerGetVolumeRequest *csi.ControllerGetVolumeRequest) (*csi.ControllerGetVolumeResponse, error) {
 	ret := _mock.Called(context1, controllerGetVolumeRequest)

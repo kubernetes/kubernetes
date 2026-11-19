@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -41,6 +42,7 @@ import (
 	"k8s.io/apiserver/pkg/storage/cacher/metrics"
 	"k8s.io/apiserver/pkg/storage/cacher/progress"
 	"k8s.io/apiserver/pkg/storage/cacher/store"
+	cachertesting "k8s.io/apiserver/pkg/storage/cacher/testing"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/cache"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -105,7 +107,7 @@ func (w *testWatchCache) getCacheIntervalForEvents(resourceVersion uint64, opts 
 	w.RLock()
 	defer w.RUnlock()
 
-	return w.getAllEventsSinceLocked(resourceVersion, "", opts)
+	return w.getAllEventsSinceLocked(resourceVersion, "", opts, nil)
 }
 
 // newTestWatchCache just adds a fake clock.
@@ -132,7 +134,12 @@ func newTestWatchCache(capacity int, eventFreshDuration time.Duration, indexers 
 		defer wc.RUnlock()
 		return wc.resourceVersion, nil
 	}
-	wc.watchCache = newWatchCache(keyFunc, mockHandler, getAttrsFunc, versioner, indexers, testingclock.NewFakeClock(time.Now()), eventFreshDuration, schema.GroupResource{Resource: "pods"}, pr, getCurrentRV)
+	var err error
+	wc.watchCache, err = newWatchCache(keyFunc, mockHandler, getAttrsFunc, versioner, indexers, testingclock.NewFakeClock(time.Now()), eventFreshDuration, 0, schema.GroupResource{Resource: "pods"}, pr, getCurrentRV)
+	if err != nil {
+		panic(err)
+	}
+	go wc.freshness.Run(wc.stopCh)
 	// To preserve behavior of tests that assume a given capacity,
 	// resize it to th expected size.
 	wc.history.capacity = capacity
@@ -441,9 +448,8 @@ func TestMarker(t *testing.T) {
 	}
 }
 
-func TestWaitUntilFreshAndGetList(t *testing.T) {
-	ctx := context.Background()
-	store := newTestWatchCache(3, DefaultEventFreshDuration, &cache.Indexers{
+func testIndexers() *cache.Indexers {
+	return &cache.Indexers{
 		"l:label": func(obj interface{}) ([]string, error) {
 			pod, ok := obj.(*v1.Pod)
 			if !ok {
@@ -461,100 +467,203 @@ func TestWaitUntilFreshAndGetList(t *testing.T) {
 			}
 			return []string{pod.Spec.NodeName}, nil
 		},
-	})
-	defer store.Stop()
+	}
+}
+
+func TestWaitUntilFreshAndGetList(t *testing.T) {
+	ctx := t.Context()
+	s := newTestWatchCache(3, DefaultEventFreshDuration, testIndexers())
+	t.Cleanup(s.Stop)
+	s.config.getCurrentRV = func(context.Context) (uint64, error) {
+		return 5, nil
+	}
+
+	pod1 := makeTestPodDetails("pod1", 2, "node1", map[string]string{"label": "value1"})
+	pod2 := makeTestPodDetails("pod2", 3, "node1", map[string]string{"label": "value1"})
+	pod3 := makeTestPodDetails("pod3", 5, "node2", map[string]string{"label": "value2"})
+
+	continueNegativeRV, err := storage.EncodeContinue("/prefix/ns/pod1\x00", "/prefix/", -1)
+	require.NoError(t, err)
+	continueExactRV, err := storage.EncodeContinue("/prefix/ns/pod1\x00", "/prefix/", 5)
+	require.NoError(t, err)
+
+	var wg sync.WaitGroup
+	t.Cleanup(wg.Wait)
 	// In background, update the store.
-	go func() {
-		store.Add(makeTestPodDetails("pod1", 2, "node1", map[string]string{"label": "value1"}))
-		store.Add(makeTestPodDetails("pod2", 3, "node1", map[string]string{"label": "value1"}))
-		store.Add(makeTestPodDetails("pod3", 5, "node2", map[string]string{"label": "value2"}))
-	}()
+	wg.Go(func() {
+		s.Add(pod1)
+		s.Add(pod2)
+		s.Add(pod3)
+	})
 
-	// list by empty MatchValues.
-	resp, indexUsed, err := store.WaitUntilFreshAndGetList(ctx, "/prefix/", storage.ListOptions{ResourceVersion: "5", Recursive: true, Predicate: storage.Everything})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if resp.ResourceVersion != 5 {
-		t.Errorf("unexpected resourceVersion: %v, expected: 5", resp.ResourceVersion)
-	}
-	if len(itemsFromListResp(t, resp)) != 3 {
-		t.Errorf("unexpected list returned: %#v", resp)
-	}
-	if indexUsed != "" {
-		t.Errorf("Used index %q but expected none to be used", indexUsed)
+	tests := []struct {
+		name        string
+		rv          string
+		rvMatch     metav1.ResourceVersionMatch
+		prefix      string
+		recursive   bool
+		pred        storage.SelectionPredicate
+		expectedOut []*v1.Pod
+		expectRV    uint64
+		expectIndex string
+	}{
+		{
+			name:        "list by empty MatchValues",
+			prefix:      "/prefix/",
+			recursive:   true,
+			rv:          "5",
+			pred:        storage.Everything,
+			expectedOut: []*v1.Pod{pod1, pod2, pod3},
+			expectRV:    5,
+		},
+		{
+			name:      "list by label index",
+			prefix:    "/prefix/",
+			recursive: true,
+			rv:        "5",
+			pred: storage.SelectionPredicate{
+				Label: labels.SelectorFromSet(map[string]string{
+					"label": "value1",
+				}),
+				Field: fields.SelectorFromSet(map[string]string{
+					"spec.nodeName": "node2",
+				}),
+				IndexLabels: []string{"label"},
+			},
+			expectedOut: []*v1.Pod{pod1, pod2},
+			expectRV:    5,
+			expectIndex: "l:label",
+		},
+		{
+			name:      "list with spec.nodeName index",
+			prefix:    "/prefix/",
+			recursive: true,
+			rv:        "5",
+			pred: storage.SelectionPredicate{
+				Label: labels.SelectorFromSet(map[string]string{
+					"not-exist-label": "whatever",
+				}),
+				Field: fields.SelectorFromSet(map[string]string{
+					"spec.nodeName": "node2",
+				}),
+				IndexFields: []string{"spec.nodeName"},
+			},
+			expectedOut: []*v1.Pod{pod3},
+			expectRV:    5,
+			expectIndex: "f:spec.nodeName",
+		},
+		{
+			name:      "list with index not exists",
+			prefix:    "/prefix/",
+			recursive: true,
+			rv:        "5",
+			pred: storage.SelectionPredicate{
+				Label: labels.SelectorFromSet(map[string]string{
+					"not-exist-label": "whatever",
+				}),
+				Field:       fields.Everything(),
+				IndexLabels: []string{"label"},
+			},
+			expectedOut: []*v1.Pod{pod1, pod2, pod3},
+			expectRV:    5,
+		},
+		{
+			name:      "list with spec.nodeName index and negative-RV continue",
+			prefix:    "/prefix/",
+			recursive: true,
+			pred: storage.SelectionPredicate{
+				Label:       labels.Everything(),
+				Field:       fields.SelectorFromSet(map[string]string{"spec.nodeName": "node1"}),
+				IndexFields: []string{"spec.nodeName"},
+				Continue:    continueNegativeRV,
+			},
+			expectedOut: []*v1.Pod{pod2},
+			expectRV:    5,
+			expectIndex: "f:spec.nodeName",
+		},
+		{
+			name:      "list with spec.nodeName index and positive-RV continue",
+			prefix:    "/prefix/",
+			recursive: true,
+			pred: storage.SelectionPredicate{
+				Label:       labels.Everything(),
+				Field:       fields.SelectorFromSet(map[string]string{"spec.nodeName": "node1"}),
+				IndexFields: []string{"spec.nodeName"},
+				Continue:    continueExactRV,
+			},
+			expectedOut: []*v1.Pod{pod2, pod3},
+			expectRV:    5,
+			expectIndex: "",
+		},
+		{
+			name:        "non-recursive consistent get by key",
+			prefix:      "/prefix/ns/pod2",
+			pred:        storage.Everything,
+			expectedOut: []*v1.Pod{pod2},
+			expectRV:    5,
+		},
+		{
+			name:        "non-recursive missing key",
+			prefix:      "/prefix/ns/missing",
+			rv:          "5",
+			pred:        storage.Everything,
+			expectedOut: []*v1.Pod{},
+			expectRV:    5,
+		},
+		{
+			name:   "non-recursive ignores continue and index",
+			prefix: "/prefix/ns/pod1",
+			rv:     "5",
+			pred: storage.SelectionPredicate{
+				Label:       labels.Everything(),
+				Field:       fields.SelectorFromSet(map[string]string{"spec.nodeName": "node1"}),
+				IndexFields: []string{"spec.nodeName"},
+				Continue:    continueExactRV,
+			},
+			expectedOut: []*v1.Pod{pod1},
+			expectRV:    5,
+			expectIndex: "",
+		},
+		{
+			name:   "non-recursive with limit uses NotOlderThan instead of legacy exact",
+			prefix: "/prefix/ns/pod3",
+			rv:     "4",
+			pred: storage.SelectionPredicate{
+				Label: labels.Everything(),
+				Field: fields.Everything(),
+				Limit: 1,
+			},
+			expectedOut: []*v1.Pod{pod3},
+			expectRV:    5,
+		},
 	}
 
-	// list by label index.
-	resp, indexUsed, err = store.WaitUntilFreshAndGetList(ctx, "/prefix/", storage.ListOptions{ResourceVersion: "5", Recursive: true, Predicate: storage.SelectionPredicate{
-		Label: labels.SelectorFromSet(map[string]string{
-			"label": "value1",
-		}),
-		Field: fields.SelectorFromSet(map[string]string{
-			"spec.nodeName": "node2",
-		}),
-		IndexLabels: []string{"label"},
-	}})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if resp.ResourceVersion != 5 {
-		t.Errorf("unexpected resourceVersion: %v, expected: 5", resp.ResourceVersion)
-	}
-	if len(itemsFromListResp(t, resp)) != 2 {
-		t.Errorf("unexpected list returned: %#v", resp)
-	}
-	if indexUsed != "l:label" {
-		t.Errorf("Used index %q but expected %q", indexUsed, "l:label")
-	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	// list with spec.nodeName index.
-	resp, indexUsed, err = store.WaitUntilFreshAndGetList(ctx, "/prefix/", storage.ListOptions{ResourceVersion: "5", Recursive: true, Predicate: storage.SelectionPredicate{
-		Label: labels.SelectorFromSet(map[string]string{
-			"not-exist-label": "whatever",
-		}),
-		Field: fields.SelectorFromSet(map[string]string{
-			"spec.nodeName": "node2",
-		}),
-		IndexFields: []string{"spec.nodeName"},
-	}})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if resp.ResourceVersion != 5 {
-		t.Errorf("unexpected resourceVersion: %v, expected: 5", resp.ResourceVersion)
-	}
-	if len(itemsFromListResp(t, resp)) != 1 {
-		t.Errorf("unexpected list returned: %#v", resp)
-	}
-	if indexUsed != "f:spec.nodeName" {
-		t.Errorf("Used index %q but expected %q", indexUsed, "f:spec.nodeName")
-	}
+			opts := storage.ListOptions{
+				ResourceVersion:      tt.rv,
+				ResourceVersionMatch: tt.rvMatch,
+				Predicate:            tt.pred,
+				Recursive:            tt.recursive,
+			}
+			resp, indexUsed, err := s.WaitUntilFreshAndGetList(ctx, tt.prefix, opts)
+			require.NoError(t, err)
+			require.Equal(t, tt.expectRV, resp.ResourceVersion)
+			require.Equal(t, tt.expectIndex, indexUsed)
 
-	// list with index not exists.
-	resp, indexUsed, err = store.WaitUntilFreshAndGetList(ctx, "/prefix/", storage.ListOptions{ResourceVersion: "5", Recursive: true, Predicate: storage.SelectionPredicate{
-		Label: labels.SelectorFromSet(map[string]string{
-			"not-exist-label": "whatever",
-		}),
-		Field:       fields.Everything(),
-		IndexLabels: []string{"label"},
-	}})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if resp.ResourceVersion != 5 {
-		t.Errorf("unexpected resourceVersion: %v, expected: 5", resp.ResourceVersion)
-	}
-	if len(itemsFromListResp(t, resp)) != 3 {
-		t.Errorf("unexpected list returned: %#v", resp)
-	}
-	if indexUsed != "" {
-		t.Errorf("Used index %q but expected none to be used", indexUsed)
+			var expectedElements []*store.Element
+			for _, pod := range tt.expectedOut {
+				expectedElements = append(expectedElements, makeTestStoreElement(pod))
+			}
+			require.Equal(t, expectedElements, itemsFromListResp(t, resp))
+		})
 	}
 }
 
 func TestWaitUntilFreshAndListFromCache(t *testing.T) {
-	forceRequestWatchProgressSupport(t)
+	cachertesting.ForceRequestWatchProgressSupport(t)
 	ctx := context.Background()
 	store := newTestWatchCache(3, DefaultEventFreshDuration, &cache.Indexers{})
 	defer store.Stop()
@@ -582,28 +691,35 @@ func TestWaitUntilFreshAndListFromCache(t *testing.T) {
 
 func TestWaitUntilFreshAndGet(t *testing.T) {
 	ctx := context.Background()
-	store := newTestWatchCache(3, DefaultEventFreshDuration, &cache.Indexers{})
-	defer store.Stop()
+	for _, rv := range []string{"", "5"} {
+		t.Run(fmt.Sprintf("resourceVersion=%q", rv), func(t *testing.T) {
+			store := newTestWatchCache(3, DefaultEventFreshDuration, &cache.Indexers{})
+			defer store.Stop()
+			store.config.getCurrentRV = func(context.Context) (uint64, error) {
+				return 5, nil
+			}
 
-	// In background, update the store.
-	go func() {
-		store.Add(makeTestPod("foo", 2))
-		store.Add(makeTestPod("bar", 5))
-	}()
+			// In background, update the store.
+			go func() {
+				store.Add(makeTestPod("foo", 2))
+				store.Add(makeTestPod("bar", 5))
+			}()
 
-	obj, exists, resourceVersion, err := store.WaitUntilFreshAndGet(ctx, 5, "/prefix/ns/bar")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if resourceVersion != 5 {
-		t.Errorf("unexpected resourceVersion: %v, expected: 5", resourceVersion)
-	}
-	if !exists {
-		t.Fatalf("no results returned: %#v", obj)
-	}
-	expected := makeTestStoreElement(makeTestPod("bar", 5))
-	if !apiequality.Semantic.DeepEqual(expected, obj) {
-		t.Errorf("expected %v, got %v", expected, obj)
+			obj, exists, resourceVersion, err := store.WaitUntilFreshAndGet(ctx, rv, "/prefix/ns/bar")
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if resourceVersion != 5 {
+				t.Errorf("unexpected resourceVersion: %v, expected: 5", resourceVersion)
+			}
+			if !exists {
+				t.Fatalf("no results returned: %#v", obj)
+			}
+			expected := makeTestStoreElement(makeTestPod("bar", 5))
+			if !apiequality.Semantic.DeepEqual(expected, obj) {
+				t.Errorf("expected %v, got %v", expected, obj)
+			}
+		})
 	}
 }
 
@@ -612,6 +728,8 @@ func TestWaitUntilFreshAndListTimeout(t *testing.T) {
 	store := newTestWatchCache(3, DefaultEventFreshDuration, &cache.Indexers{})
 	defer store.Stop()
 	fc := store.config.clock.(*testingclock.FakeClock)
+	done := make(chan struct{})
+	defer close(done)
 
 	// In background, step clock after the below call starts the timer.
 	go func() {
@@ -625,8 +743,12 @@ func TestWaitUntilFreshAndListTimeout(t *testing.T) {
 		// Add an object to make sure the test would
 		// eventually fail instead of just waiting
 		// forever.
-		time.Sleep(30 * time.Second)
-		store.Add(makeTestPod("bar", 4))
+		select {
+		case <-done:
+			return
+		case <-time.After(30 * time.Second):
+			store.Add(makeTestPod("bar", 4))
+		}
 	}()
 
 	_, _, err := store.WaitUntilFreshAndGetList(ctx, "", storage.ListOptions{ResourceVersion: "4", Predicate: storage.Everything})
@@ -1207,6 +1329,268 @@ func TestCapacityUpperBound(t *testing.T) {
 	}
 }
 
+func TestNewWatchCacheHistoryMaxEvents(t *testing.T) {
+	testCases := []struct {
+		name               string
+		eventFreshDuration time.Duration
+		maxEvents          int
+		expectedUpperBound int
+		expectErr          bool
+	}{
+		{
+			name:               "zero keeps the default upper bound",
+			eventFreshDuration: DefaultEventFreshDuration,
+			maxEvents:          0,
+			expectedUpperBound: defaultUpperBoundCapacity,
+		},
+		{
+			name:               "zero keeps the upper bound derived from eventFreshDuration",
+			eventFreshDuration: 4 * DefaultEventFreshDuration,
+			maxEvents:          0,
+			expectedUpperBound: 4 * defaultUpperBoundCapacity,
+		},
+		{
+			name:               "override raises the upper bound",
+			eventFreshDuration: DefaultEventFreshDuration,
+			maxEvents:          1_000_000,
+			expectedUpperBound: 1_000_000,
+		},
+		{
+			name:               "override replaces the upper bound derived from eventFreshDuration",
+			eventFreshDuration: 4 * DefaultEventFreshDuration,
+			maxEvents:          200_000,
+			expectedUpperBound: 200_000,
+		},
+		{
+			name:               "override equal to the lower bound",
+			eventFreshDuration: DefaultEventFreshDuration,
+			maxEvents:          defaultLowerBoundCapacity,
+			expectedUpperBound: defaultLowerBoundCapacity,
+		},
+		{
+			name:               "override below the lower bound",
+			eventFreshDuration: DefaultEventFreshDuration,
+			maxEvents:          defaultLowerBoundCapacity - 1,
+			expectErr:          true,
+		},
+		{
+			name:               "negative override",
+			eventFreshDuration: DefaultEventFreshDuration,
+			maxEvents:          -1,
+			expectErr:          true,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			config := &ImmutableWatchCacheConfig{groupResource: schema.GroupResource{Resource: "pods"}}
+			h, err := newWatchCacheHistory(config, test.eventFreshDuration, test.maxEvents)
+			if test.expectErr {
+				if err == nil {
+					t.Fatalf("expected an error for maxEvents %d, got nil", test.maxEvents)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if h.upperBoundCapacity != test.expectedUpperBound {
+				t.Errorf("expected upperBoundCapacity %d, got %d", test.expectedUpperBound, h.upperBoundCapacity)
+			}
+			if h.capacity != defaultLowerBoundCapacity || len(h.cache) != defaultLowerBoundCapacity {
+				t.Errorf("expected initial capacity %d, got capacity %d with cache length %d", defaultLowerBoundCapacity, h.capacity, len(h.cache))
+			}
+		})
+	}
+}
+
+func TestOldestServableLocked(t *testing.T) {
+	testCases := []struct {
+		name     string
+		capacity int
+		// listResourceVersion, when not zero, is the resourceVersion of a
+		// ResetLocked call before the events.
+		listResourceVersion uint64
+		eventRVs            []uint64
+		// resetAfterEvents calls ResetLocked with resetResourceVersion after the events.
+		resetAfterEvents     bool
+		resetResourceVersion uint64
+		expected             uint64
+		expectedOK           bool
+	}{
+		{
+			name:                "list done, no events",
+			capacity:            3,
+			listResourceVersion: 10,
+			expected:            11,
+			expectedOK:          true,
+		},
+		{
+			name:                "list done, no event removed since",
+			capacity:            3,
+			listResourceVersion: 10,
+			eventRVs:            []uint64{15, 16},
+			expected:            11,
+			expectedOK:          true,
+		},
+		{
+			name:                "list done, events removed since",
+			capacity:            3,
+			listResourceVersion: 10,
+			eventRVs:            []uint64{15, 16, 17, 18, 19},
+			expected:            17,
+			expectedOK:          true,
+		},
+		{
+			name:                "list done, start index past the capacity",
+			capacity:            3,
+			listResourceVersion: 10,
+			eventRVs:            []uint64{15, 16, 17, 18, 19, 20, 21},
+			expected:            19,
+			expectedOK:          true,
+		},
+		{
+			name:                 "events removed, then reset and list done",
+			capacity:             3,
+			eventRVs:             []uint64{15, 16, 17, 18, 19},
+			resetAfterEvents:     true,
+			resetResourceVersion: 30,
+			expected:             31,
+			expectedOK:           true,
+		},
+		{
+			name:       "no list, events in the buffer",
+			capacity:   3,
+			eventRVs:   []uint64{15, 16},
+			expected:   15,
+			expectedOK: true,
+		},
+		{
+			name:       "no list, one event in the buffer",
+			capacity:   3,
+			eventRVs:   []uint64{15},
+			expected:   15,
+			expectedOK: true,
+		},
+		{
+			name:       "no list, no events",
+			capacity:   3,
+			expectedOK: false,
+		},
+		{
+			name:             "no list, events removed, then reset",
+			capacity:         3,
+			eventRVs:         []uint64{15, 16, 17, 18, 19},
+			resetAfterEvents: true,
+			expectedOK:       false,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			store := newTestWatchCache(test.capacity, DefaultEventFreshDuration, &cache.Indexers{})
+			defer store.Stop()
+			// Pin the capacity so that a full buffer drops its oldest event.
+			store.history.lowerBoundCapacity = test.capacity
+			store.history.upperBoundCapacity = test.capacity
+			if test.listResourceVersion > 0 {
+				store.history.ResetLocked(test.listResourceVersion)
+			}
+			for _, rv := range test.eventRVs {
+				store.history.updateCache(&watchCacheEvent{ResourceVersion: rv, RecordTime: store.config.clock.Now()})
+			}
+			if test.resetAfterEvents {
+				store.history.ResetLocked(test.resetResourceVersion)
+			}
+
+			got, ok := store.history.oldestServableLocked()
+			if got != test.expected || ok != test.expectedOK {
+				t.Errorf("expected (%d, %v), got (%d, %v)", test.expected, test.expectedOK, got, ok)
+			}
+			// GetIntervalLocked must use the result: 5 is older than every expected value.
+			expectedErr := "watch cache isn't correctly initialized"
+			if test.expectedOK {
+				expectedErr = fmt.Sprintf("too old resource version: 5 (%d)", test.expected-1)
+			}
+			_, err := store.history.GetIntervalLocked(5, store.RLocker())
+			if err == nil || err.Error() != expectedErr {
+				t.Errorf("expected GetIntervalLocked to return the error %q, got: %v", expectedErr, err)
+			}
+			if checkErr := store.history.checkResourceVersionLocked(5); checkErr == nil || checkErr.Error() != expectedErr {
+				t.Errorf("expected checkResourceVersionLocked to return the error %q, got: %v", expectedErr, checkErr)
+			}
+			if test.expectedOK {
+				require.NoError(t, store.history.checkResourceVersionLocked(test.expected-1))
+			}
+		})
+	}
+}
+
+func TestEventsAfterLocked(t *testing.T) {
+	testCases := []struct {
+		name        string
+		eventRVs    []uint64
+		afterRV     uint64
+		stopAfter   int
+		expectedRVs []uint64
+	}{
+		{
+			name:    "empty buffer",
+			afterRV: 0,
+		},
+		{
+			name:        "all buffered events after resourceVersion",
+			eventRVs:    []uint64{15, 16},
+			afterRV:     10,
+			expectedRVs: []uint64{15, 16},
+		},
+		{
+			name:        "wrapped cyclic buffer filters older and equal resourceVersions",
+			eventRVs:    []uint64{15, 16, 17, 18, 19},
+			afterRV:     17,
+			expectedRVs: []uint64{18, 19},
+		},
+		{
+			name:     "no buffered events strictly newer than resourceVersion",
+			eventRVs: []uint64{15, 16, 17, 18, 19},
+			afterRV:  19,
+		},
+		{
+			name:        "early break stops iteration",
+			eventRVs:    []uint64{15, 16, 17, 18, 19},
+			afterRV:     10,
+			stopAfter:   2,
+			expectedRVs: []uint64{17, 18},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			testEventsAfterLocked(t, 3, tc.eventRVs, tc.afterRV, tc.stopAfter, tc.expectedRVs)
+		})
+	}
+}
+
+func testEventsAfterLocked(t *testing.T, capacity int, eventRVs []uint64, afterRV uint64, stopAfter int, expectedRVs []uint64) {
+	store := newTestWatchCache(capacity, DefaultEventFreshDuration, &cache.Indexers{})
+	defer store.Stop()
+	store.history.lowerBoundCapacity = capacity
+	store.history.upperBoundCapacity = capacity
+	for _, rv := range eventRVs {
+		store.history.updateCache(&watchCacheEvent{ResourceVersion: rv, RecordTime: store.config.clock.Now()})
+	}
+
+	var gotRVs []uint64
+	for event := range store.history.eventsAfterLocked(afterRV) {
+		gotRVs = append(gotRVs, event.ResourceVersion)
+		if stopAfter > 0 && len(gotRVs) == stopAfter {
+			break
+		}
+	}
+	require.Equal(t, expectedRVs, gotRVs)
+}
+
 func BenchmarkWatchCache_updateCache(b *testing.B) {
 	store := newTestWatchCache(defaultUpperBoundCapacity, DefaultEventFreshDuration, &cache.Indexers{})
 	defer store.Stop()
@@ -1251,7 +1635,7 @@ func TestHistogramCacheReadWait(t *testing.T) {
 				getCompleted := make(chan struct{})
 				go func() {
 					defer close(getCompleted)
-					if _, _, _, err := store.WaitUntilFreshAndGet(ctx, 5, "prefix/ns/bar"); err != nil {
+					if _, _, _, err := store.WaitUntilFreshAndGet(ctx, "5", "prefix/ns/bar"); err != nil {
 						t.Errorf("unexpected error: %v", err)
 					}
 				}()
@@ -1291,7 +1675,7 @@ func TestHistogramCacheReadWait(t *testing.T) {
 			desc:            "resourceVersion is 0",
 			resourceVersion: 0,
 			run: func(t *testing.T) {
-				if _, _, _, err := store.WaitUntilFreshAndGet(ctx, 0, "prefix/ns/bar"); err != nil {
+				if _, _, _, err := store.WaitUntilFreshAndGet(ctx, "0", "prefix/ns/bar"); err != nil {
 					t.Errorf("unexpected error: %v", err)
 				}
 			},
@@ -1406,9 +1790,9 @@ func testWatchCacheSnapshotConcurrency(t *testing.T, s *testWatchCache, resource
 	wg.Wait()
 }
 
-func itemsFromListResp(t *testing.T, resp listResp) []interface{} {
+func itemsFromListResp(t *testing.T, resp listResp) []*store.Element {
 	t.Helper()
-	var items []interface{}
+	var items []*store.Element
 	for elem, err := range resp.All() {
 		if err != nil {
 			t.Fatal(err)
@@ -1418,10 +1802,9 @@ func itemsFromListResp(t *testing.T, resp listResp) []interface{} {
 	return items
 }
 
-func getMaxItemRV(t *testing.T, versioner storage.Versioner, items []interface{}) uint64 {
+func getMaxItemRV(t *testing.T, versioner storage.Versioner, items []*store.Element) uint64 {
 	var maxRV uint64
-	for _, item := range items {
-		elem := item.(*store.Element)
+	for _, elem := range items {
 		itemRV, err := versioner.ObjectResourceVersion(elem.Object)
 		require.NoError(t, err)
 		maxRV = max(maxRV, itemRV)

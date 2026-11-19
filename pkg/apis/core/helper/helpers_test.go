@@ -90,7 +90,7 @@ func TestIsNodeAllocatableResource(t *testing.T) {
 	}{
 		{"cpu", true},
 		{"memory", true},
-		{"ephemeral-storage", false},
+		{"ephemeral-storage", true},
 		{"hugepages-2Mi", true},
 		{"disk", false},
 		{"blah", false},

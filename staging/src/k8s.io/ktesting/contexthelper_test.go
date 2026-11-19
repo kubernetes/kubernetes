@@ -125,8 +125,8 @@ func TestCause(t *testing.T) {
 			parentCtx:   contextBackground,
 			timeout:     time.Millisecond,
 			sleep:       5 * time.Millisecond,
-			expectErr:   context.Canceled,
-			expectCause: canceledError(timeoutCause),
+			expectErr:   context.DeadlineExceeded,
+			expectCause: deadlineExceededError(timeoutCause),
 		},
 		"parent-canceled": {
 			parentCtx: func(t *testing.T) context.Context {
@@ -206,7 +206,15 @@ func TestCause(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			synctest.Test(t, func(t *testing.T) {
 				tCtx := Init(t)
-				tCtx = tCtx.WithContext(tt.parentCtx(t)).WithTimeout(tt.timeout, timeoutCause.Error())
+				tCtx = tCtx.WithContext(tt.parentCtx(t))
+				if tt.timeout > 0 {
+					// A timeout of 0 makes a "deadline exceeded" error race
+					// with a "context canceled" error.
+					tCtx = tCtx.WithTimeout(tt.timeout, timeoutCause.Error())
+				} else {
+					// Tests without a timeout still rely on cancellation being set up.
+					tCtx = tCtx.WithCancel()
+				}
 				if tt.cancelCause != nil {
 					tCtx.CancelBecause(*tt.cancelCause)
 				}

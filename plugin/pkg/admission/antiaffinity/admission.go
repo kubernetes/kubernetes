@@ -54,8 +54,9 @@ func NewInterPodAntiAffinity() *Plugin {
 // Validate will deny any pod that defines AntiAffinity topology key other than v1.LabelHostname i.e. "kubernetes.io/hostname"
 // in  requiredDuringSchedulingRequiredDuringExecution and requiredDuringSchedulingIgnoredDuringExecution.
 func (p *Plugin) Validate(ctx context.Context, attributes admission.Attributes, o admission.ObjectInterfaces) (err error) {
-	// Ignore all calls to subresources or resources other than pods.
-	if len(attributes.GetSubresource()) != 0 || attributes.GetResource().GroupResource() != api.Resource("pods") {
+	// Ignore calls to resources other than pods, and to subresources that can't modify affinity.
+	subresource := attributes.GetSubresource()
+	if (len(subresource) != 0 && subresource != "dynamic") || attributes.GetResource().GroupResource() != api.Resource("pods") {
 		return nil
 	}
 	pod, ok := attributes.GetObject().(*api.Pod)

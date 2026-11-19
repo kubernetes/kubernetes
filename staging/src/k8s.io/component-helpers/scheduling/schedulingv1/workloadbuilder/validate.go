@@ -21,7 +21,8 @@ import (
 	"fmt"
 	"slices"
 
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1 "k8s.io/api/scheduling/v1"
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
@@ -81,15 +82,17 @@ func (b *Builder) Validate(ctx context.Context, input ValidationInput) field.Err
 		op = operation.Operation{Type: operation.Update}
 	}
 
-	return b.validateItem(ctx, op, b.root, input.OldRoot)
+	allErrs := b.validateItem(ctx, op, b.root, input.OldRoot, itemValidationOpts{})
+	allErrs = append(allErrs, b.validatePriorityClassName(b.root)...)
+	return allErrs
 }
 
 // validateWorkloadItemTree does a full traversal of the tree.
 func validateWorkloadItemTree(root *WorkloadItem) error {
 	seen := make(map[string]struct{})
 
-	var validate func(item *WorkloadItem) error
-	validate = func(item *WorkloadItem) error {
+	var validate func(item *WorkloadItem, depth int) error
+	validate = func(item *WorkloadItem, depth int) error {
 		if item == nil {
 			return fmt.Errorf("workload item cannot be nil")
 		}
@@ -101,19 +104,35 @@ func validateWorkloadItemTree(root *WorkloadItem) error {
 		}
 		seen[item.Name] = struct{}{}
 
+		if depth > schedulingv1beta1.WorkloadMaxTreeDepth {
+			return fmt.Errorf("workload item %q at depth %d exceeds maximum allowed tree depth of %d", item.Name, depth, schedulingv1beta1.WorkloadMaxTreeDepth)
+		}
+
 		if err := validateItemInputUnion(item); err != nil {
 			return err
 		}
 
+		var leafChildren, compositeChildren int
 		for _, child := range item.Children {
-			if err := validate(child); err != nil {
+			if err := validate(child, depth+1); err != nil {
 				return err
 			}
+			if isComposite(child) {
+				compositeChildren++
+			} else {
+				leafChildren++
+			}
+		}
+		if leafChildren > schedulingv1beta1.WorkloadMaxPodGroupTemplates {
+			return fmt.Errorf("workload item %q has %d leaf children, exceeding maximum allowed of %d", item.Name, leafChildren, schedulingv1beta1.WorkloadMaxPodGroupTemplates)
+		}
+		if compositeChildren > schedulingv1beta1.WorkloadMaxPodGroupTemplates {
+			return fmt.Errorf("workload item %q has %d composite children, exceeding maximum allowed of %d", item.Name, compositeChildren, schedulingv1beta1.WorkloadMaxPodGroupTemplates)
 		}
 		return nil
 	}
 
-	return validate(root)
+	return validate(root, 1)
 }
 
 // validateItemInputUnion enforces the WorkloadInput leaf/composite union. A composite
@@ -151,11 +170,16 @@ func validateItemInputUnion(item *WorkloadItem) error {
 	return nil
 }
 
+type itemValidationOpts struct {
+	requireGangSchedulingPolicy bool
+	requireAllDisruptionMode    bool
+}
+
 // validateItem runs declarative and controller-policy validation on a single
 // WorkloadItem and recurses into its children. Each node reports its
 // building-block errors relative to its own Path, and controllers map the errors
 // onto their own API fields.
-func (b *Builder) validateItem(ctx context.Context, op operation.Operation, item, oldItem *WorkloadItem) field.ErrorList {
+func (b *Builder) validateItem(ctx context.Context, op operation.Operation, item, oldItem *WorkloadItem, opts itemValidationOpts) field.ErrorList {
 	var allErrs field.ErrorList
 
 	if !b.opts.DisableDeclarativeValidation {
@@ -166,6 +190,8 @@ func (b *Builder) validateItem(ctx context.Context, op operation.Operation, item
 	allErrs = append(allErrs, b.validateAllowedSchedulingPolicies(item, resolvedConfig)...)
 	allErrs = append(allErrs, b.validateAllowedDisruptionModes(item, resolvedConfig)...)
 	allErrs = append(allErrs, b.validateDisruptionModeCompatibleWithSchedulingPolicy(item, resolvedConfig)...)
+	allErrs = append(allErrs, b.validateParentChildSchedulingPolicy(item, resolvedConfig, opts.requireGangSchedulingPolicy)...)
+	allErrs = append(allErrs, b.validateParentChildDisruptionMode(item, resolvedConfig, opts.requireAllDisruptionMode)...)
 
 	// oldItem is the previous counterpart of item (or nil for a create or a node
 	// that is new in this update). Children are correlated with their previous
@@ -179,10 +205,38 @@ func (b *Builder) validateItem(ctx context.Context, op operation.Operation, item
 		}
 	}
 
+	if hasGangPolicy(resolvedConfig) {
+		opts.requireGangSchedulingPolicy = true
+	}
+	if hasAllDisruptionMode(resolvedConfig) {
+		opts.requireAllDisruptionMode = true
+	}
 	for _, child := range item.Children {
-		allErrs = append(allErrs, b.validateItem(ctx, op, child, oldChildrenByName[child.Name])...)
+		allErrs = append(allErrs, b.validateItem(ctx, op, child, oldChildrenByName[child.Name], opts)...)
 	}
 	return allErrs
+}
+
+// validatePriorityClassName ensures all items in the tree resolve to the same
+// PriorityClassName, reporting a single error at the root path if any diverge.
+// Keep in sync with validateWorkloadPriority in
+// k8s.io/kubernetes/pkg/apis/scheduling/validation.
+func (b *Builder) validatePriorityClassName(root *WorkloadItem) field.ErrorList {
+	rootPriority := resolveSchedulingConfig(root).PriorityClassName
+
+	var hasMismatch func(item *WorkloadItem) bool
+	hasMismatch = func(item *WorkloadItem) bool {
+		if resolveSchedulingConfig(item).PriorityClassName != rootPriority {
+			return true
+		}
+		return slices.ContainsFunc(item.Children, hasMismatch)
+	}
+
+	if slices.ContainsFunc(root.Children, hasMismatch) {
+		return field.ErrorList{field.Invalid(
+			root.Path, field.OmitValueType{}, "all priorityClassName values must be identical, detected multiple values")}
+	}
+	return nil
 }
 
 // appendPathElements returns rootPath with the given elements appended as
@@ -213,27 +267,27 @@ func (b *Builder) validatePodGroupItemDeclarative(ctx context.Context, op operat
 
 	if item.Input.Policy.PodGroupData != nil {
 		path := appendPathElements(item.Path, item.Input.Policy.PathElements)
-		var oldData *schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy
+		var oldData *schedulingv1.WorkloadPodGroupSchedulingPolicy
 		if oldItem != nil && oldItem.Input.Policy.PodGroupData != nil {
 			oldData = oldItem.Input.Policy.PodGroupData
 		}
-		allErrs = append(allErrs, schedulingv1alpha3.Validate_WorkloadPodGroupSchedulingPolicy(ctx, op, path, item.Input.Policy.PodGroupData, oldData)...)
+		allErrs = append(allErrs, schedulingv1.Validate_WorkloadPodGroupSchedulingPolicy(ctx, op, path, item.Input.Policy.PodGroupData, oldData)...)
 	}
 	if item.Input.Constraints.PodGroupData != nil {
 		path := appendPathElements(item.Path, item.Input.Constraints.PathElements)
-		var oldData *schedulingv1alpha3.WorkloadPodGroupSchedulingConstraints
+		var oldData *schedulingv1.WorkloadPodGroupSchedulingConstraints
 		if oldItem != nil && oldItem.Input.Constraints.PodGroupData != nil {
 			oldData = oldItem.Input.Constraints.PodGroupData
 		}
-		allErrs = append(allErrs, schedulingv1alpha3.Validate_WorkloadPodGroupSchedulingConstraints(ctx, op, path, item.Input.Constraints.PodGroupData, oldData)...)
+		allErrs = append(allErrs, schedulingv1.Validate_WorkloadPodGroupSchedulingConstraints(ctx, op, path, item.Input.Constraints.PodGroupData, oldData)...)
 	}
 	if item.Input.DisruptionMode.PodGroupData != nil {
 		path := appendPathElements(item.Path, item.Input.DisruptionMode.PathElements)
-		var oldData *schedulingv1alpha3.WorkloadPodGroupDisruptionMode
+		var oldData *schedulingv1.WorkloadPodGroupDisruptionMode
 		if oldItem != nil && oldItem.Input.DisruptionMode.PodGroupData != nil {
 			oldData = oldItem.Input.DisruptionMode.PodGroupData
 		}
-		allErrs = append(allErrs, schedulingv1alpha3.Validate_WorkloadPodGroupDisruptionMode(ctx, op, path, item.Input.DisruptionMode.PodGroupData, oldData)...)
+		allErrs = append(allErrs, schedulingv1.Validate_WorkloadPodGroupDisruptionMode(ctx, op, path, item.Input.DisruptionMode.PodGroupData, oldData)...)
 	}
 
 	allErrs = append(allErrs, b.validateResourceClaims(ctx, op, item, oldItem)...)
@@ -248,27 +302,27 @@ func (b *Builder) validateCompositePodGroupItemDeclarative(ctx context.Context, 
 
 	if item.Input.Policy.CompositePodGroupData != nil {
 		path := appendPathElements(item.Path, item.Input.Policy.PathElements)
-		var oldData *schedulingv1alpha3.WorkloadCompositePodGroupSchedulingPolicy
+		var oldData *schedulingv1.WorkloadCompositePodGroupSchedulingPolicy
 		if oldItem != nil && oldItem.Input.Policy.CompositePodGroupData != nil {
 			oldData = oldItem.Input.Policy.CompositePodGroupData
 		}
-		allErrs = append(allErrs, schedulingv1alpha3.Validate_WorkloadCompositePodGroupSchedulingPolicy(ctx, op, path, item.Input.Policy.CompositePodGroupData, oldData)...)
+		allErrs = append(allErrs, schedulingv1.Validate_WorkloadCompositePodGroupSchedulingPolicy(ctx, op, path, item.Input.Policy.CompositePodGroupData, oldData)...)
 	}
 	if item.Input.Constraints.CompositePodGroupData != nil {
 		path := appendPathElements(item.Path, item.Input.Constraints.PathElements)
-		var oldData *schedulingv1alpha3.WorkloadCompositePodGroupSchedulingConstraints
+		var oldData *schedulingv1.WorkloadCompositePodGroupSchedulingConstraints
 		if oldItem != nil && oldItem.Input.Constraints.CompositePodGroupData != nil {
 			oldData = oldItem.Input.Constraints.CompositePodGroupData
 		}
-		allErrs = append(allErrs, schedulingv1alpha3.Validate_WorkloadCompositePodGroupSchedulingConstraints(ctx, op, path, item.Input.Constraints.CompositePodGroupData, oldData)...)
+		allErrs = append(allErrs, schedulingv1.Validate_WorkloadCompositePodGroupSchedulingConstraints(ctx, op, path, item.Input.Constraints.CompositePodGroupData, oldData)...)
 	}
 	if item.Input.DisruptionMode.CompositePodGroupData != nil {
 		path := appendPathElements(item.Path, item.Input.DisruptionMode.PathElements)
-		var oldData *schedulingv1alpha3.WorkloadCompositePodGroupDisruptionMode
+		var oldData *schedulingv1.WorkloadCompositePodGroupDisruptionMode
 		if oldItem != nil && oldItem.Input.DisruptionMode.CompositePodGroupData != nil {
 			oldData = oldItem.Input.DisruptionMode.CompositePodGroupData
 		}
-		allErrs = append(allErrs, schedulingv1alpha3.Validate_WorkloadCompositePodGroupDisruptionMode(ctx, op, path, item.Input.DisruptionMode.CompositePodGroupData, oldData)...)
+		allErrs = append(allErrs, schedulingv1.Validate_WorkloadCompositePodGroupDisruptionMode(ctx, op, path, item.Input.DisruptionMode.CompositePodGroupData, oldData)...)
 	}
 
 	return allErrs
@@ -280,7 +334,7 @@ func (b *Builder) validateCompositePodGroupItemDeclarative(ctx context.Context, 
 // checks; a new claim with no old match validates as an addition.
 func (b *Builder) validateResourceClaims(ctx context.Context, op operation.Operation, item, oldItem *WorkloadItem) field.ErrorList {
 	newClaims := item.Input.ResourceClaims.PodGroupData
-	var oldClaims []schedulingv1alpha3.WorkloadPodGroupResourceClaim
+	var oldClaims []schedulingv1.WorkloadPodGroupResourceClaim
 	if oldItem != nil {
 		oldClaims = oldItem.Input.ResourceClaims.PodGroupData
 	}
@@ -290,7 +344,7 @@ func (b *Builder) validateResourceClaims(ctx context.Context, op operation.Opera
 
 	path := appendPathElements(item.Path, item.Input.ResourceClaims.PathElements)
 
-	oldByName := make(map[string]*schedulingv1alpha3.WorkloadPodGroupResourceClaim, len(oldClaims))
+	oldByName := make(map[string]*schedulingv1.WorkloadPodGroupResourceClaim, len(oldClaims))
 	for i := range oldClaims {
 		oldByName[oldClaims[i].Name] = &oldClaims[i]
 	}
@@ -299,27 +353,23 @@ func (b *Builder) validateResourceClaims(ctx context.Context, op operation.Opera
 	for idx := range newClaims {
 		data := &newClaims[idx]
 		oldData := oldByName[data.Name]
-		allErrs = append(allErrs, schedulingv1alpha3.Validate_WorkloadPodGroupResourceClaim(ctx, op, path.Index(idx), data, oldData)...)
+		allErrs = append(allErrs, schedulingv1.Validate_WorkloadPodGroupResourceClaim(ctx, op, path.Index(idx), data, oldData)...)
 	}
 	return allErrs
 }
 
 // validateAllowedSchedulingPolicies rejects a resolved scheduling policy that is
 // outside the controller's allow-list, reporting at the policy block's path.
+// An unset policy compiles to Basic, so it is checked against BasicPolicy.
 func (b *Builder) validateAllowedSchedulingPolicies(item *WorkloadItem, resolvedConfig *SchedulingConfig) field.ErrorList {
-	if resolvedConfig == nil || resolvedConfig.Policy == nil {
-		return nil
-	}
-
 	path := appendPathElements(item.Path, item.Input.Policy.PathElements)
 
 	var allErrs field.ErrorList
-	policy := resolvedConfig.Policy
-	if policy.Basic != nil && !slices.Contains(b.opts.AllowedPolicies, BasicPolicy) {
+	if hasBasicPolicy(resolvedConfig) && !slices.Contains(b.opts.AllowedPolicies, BasicPolicy) {
 		allErrs = append(allErrs, field.Forbidden(
 			path, "basic scheduling policy is not supported by this controller"))
 	}
-	if policy.Gang != nil && !slices.Contains(b.opts.AllowedPolicies, GangPolicy) {
+	if hasGangPolicy(resolvedConfig) && !slices.Contains(b.opts.AllowedPolicies, GangPolicy) {
 		allErrs = append(allErrs, field.Forbidden(
 			path, "gang scheduling policy is not supported by this controller"))
 	}
@@ -328,20 +378,16 @@ func (b *Builder) validateAllowedSchedulingPolicies(item *WorkloadItem, resolved
 
 // validateAllowedDisruptionModes rejects a resolved disruption mode that is
 // outside the controller's allow-list, reporting at the disruptionMode block's path.
+// An unset mode defaults to Single, so it is checked against SingleMode.
 func (b *Builder) validateAllowedDisruptionModes(item *WorkloadItem, resolvedConfig *SchedulingConfig) field.ErrorList {
-	if resolvedConfig == nil || resolvedConfig.DisruptionMode == nil {
-		return nil
-	}
-
 	path := appendPathElements(item.Path, item.Input.DisruptionMode.PathElements)
 
 	var allErrs field.ErrorList
-	dm := resolvedConfig.DisruptionMode
-	if dm.Single != nil && !slices.Contains(b.opts.AllowedDisruptionModes, SingleMode) {
+	if hasSingleDisruptionMode(resolvedConfig) && !slices.Contains(b.opts.AllowedDisruptionModes, SingleMode) {
 		allErrs = append(allErrs, field.Forbidden(
 			path, "the disruptionMode `single` is not supported by this controller"))
 	}
-	if dm.All != nil && !slices.Contains(b.opts.AllowedDisruptionModes, AllMode) {
+	if hasAllDisruptionMode(resolvedConfig) && !slices.Contains(b.opts.AllowedDisruptionModes, AllMode) {
 		allErrs = append(allErrs, field.Forbidden(
 			path, "the disruptionMode `all` is not supported by this controller"))
 	}
@@ -349,16 +395,71 @@ func (b *Builder) validateAllowedDisruptionModes(item *WorkloadItem, resolvedCon
 }
 
 // validateDisruptionModeCompatibleWithSchedulingPolicy enforces the cross-field
-// rule declarative validation cannot express: a Basic group is scheduled
-// independently, so all-or-nothing disruption is meaningless for it.
+// rule declarative validation cannot express: a Basic group (including an unset
+// policy, which compiles to Basic) is scheduled independently, so
+// all-or-nothing disruption is meaningless for it.
 func (b *Builder) validateDisruptionModeCompatibleWithSchedulingPolicy(item *WorkloadItem, resolvedConfig *SchedulingConfig) field.ErrorList {
-	if resolvedConfig == nil ||
-		resolvedConfig.Policy == nil || resolvedConfig.Policy.Basic == nil ||
-		resolvedConfig.DisruptionMode == nil || resolvedConfig.DisruptionMode.All == nil {
+	if !hasBasicPolicy(resolvedConfig) || !hasAllDisruptionMode(resolvedConfig) {
 		return nil
 	}
 
 	path := appendPathElements(item.Path, item.Input.DisruptionMode.PathElements)
 	return field.ErrorList{field.Invalid(
 		path, "", "the disruptionMode `all` is not supported with the Basic scheduling policy")}
+}
+
+// validateParentChildSchedulingPolicy rejects a child group that resolves to a
+// non-gang scheduling policy (including an unset policy, which compiles to
+// Basic) when an ancestor composite group uses Gang scheduling.
+func (b *Builder) validateParentChildSchedulingPolicy(item *WorkloadItem, resolvedConfig *SchedulingConfig, requireGang bool) field.ErrorList {
+	if !requireGang || hasGangPolicy(resolvedConfig) {
+		return nil
+	}
+
+	path := appendPathElements(item.Path, item.Input.Policy.PathElements)
+	return field.ErrorList{field.Invalid(
+		path, field.OmitValueType{}, "must have `gang` scheduling policy when parent group has `gang` scheduling policy")}
+}
+
+// hasGangPolicy reports whether the config resolves to the Gang scheduling
+// policy.
+func hasGangPolicy(cfg *SchedulingConfig) bool {
+	return cfg != nil && cfg.Policy != nil && cfg.Policy.Gang != nil
+}
+
+// hasBasicPolicy reports whether the config resolves to the Basic scheduling
+// policy, either explicitly or by defaulting when no policy is set.
+func hasBasicPolicy(cfg *SchedulingConfig) bool {
+	if cfg == nil || cfg.Policy == nil || *cfg.Policy == (SchedulingPolicy{}) {
+		return true
+	}
+	return cfg.Policy.Basic != nil
+}
+
+// validateParentChildDisruptionMode rejects a child group that resolves to a
+// non-All disruption mode (including an unset mode, which defaults to Single)
+// when an ancestor composite group uses the All disruption mode.
+func (b *Builder) validateParentChildDisruptionMode(item *WorkloadItem, resolvedConfig *SchedulingConfig, requireAll bool) field.ErrorList {
+	if !requireAll || hasAllDisruptionMode(resolvedConfig) {
+		return nil
+	}
+
+	path := appendPathElements(item.Path, item.Input.DisruptionMode.PathElements)
+	return field.ErrorList{field.Invalid(
+		path, field.OmitValueType{}, "must have `all` disruption mode when parent group has `all` disruption mode")}
+}
+
+// hasAllDisruptionMode reports whether the config resolves to the All
+// disruption mode.
+func hasAllDisruptionMode(cfg *SchedulingConfig) bool {
+	return cfg != nil && cfg.DisruptionMode != nil && cfg.DisruptionMode.All != nil
+}
+
+// hasSingleDisruptionMode reports whether the config resolves to the Single
+// disruption mode, either explicitly or by defaulting when no mode is set.
+func hasSingleDisruptionMode(cfg *SchedulingConfig) bool {
+	if cfg == nil || cfg.DisruptionMode == nil || *cfg.DisruptionMode == (DisruptionMode{}) {
+		return true
+	}
+	return cfg.DisruptionMode.Single != nil
 }

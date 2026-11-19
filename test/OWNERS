@@ -9,7 +9,6 @@ reviewers:
   - johnSchnake
   - liggitt
   - SataQiu
-  - smarterclayton
   - thockin
   - wojtek-t
 approvers:
@@ -25,7 +24,6 @@ approvers:
   - enj
   - janetkuo
   - liggitt
-  - mikedanese
   - MrHohn
   - msau42
   - oomichi
@@ -33,7 +31,6 @@ approvers:
   - pwittrock # for test/e2e/kubectl.go
   - saad-ali
   - SataQiu
-  - smarterclayton
   - soltysh
   - sttts
   - thockin

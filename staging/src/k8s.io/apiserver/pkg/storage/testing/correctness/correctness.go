@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -30,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/apis/example"
 	"k8s.io/apiserver/pkg/storage"
@@ -66,7 +68,7 @@ func correctnessTestSteps() []testStep {
 	pod3RV8 := "8"
 	pod3RV9 := "9"
 	pod3RV10 := "10"
-	pod5RV15 := "15"
+	pod5RV18 := "18"
 	errCustom := fmt.Errorf("user rejected update")
 
 	pod3v1 := pod3.DeepCopy()
@@ -687,7 +689,18 @@ func correctnessTestSteps() []testStep {
 			},
 		},
 		{
-			Name: "27. Delete pod3 with stale CachedExistingObject where ValidateDeletion fails on stale RV retries and returns success RV=13",
+			Name: "27. Compact at ResourceVersion=11",
+			Request: Request{
+				Op:      OpCompact,
+				Compact: CompactRequest{ResourceVersion: "11"},
+			},
+			CorrectResponse: Response{},
+			InvalidResponses: []Response{
+				{Err: storage.NewTooLargeResourceVersionError(11, 12, 0)},
+			},
+		},
+		{
+			Name: "28. Delete pod3 with stale CachedExistingObject where ValidateDeletion fails on stale RV retries and returns success RV=14",
 			Request: Request{
 				Op:  OpDelete,
 				Key: pod3Key,
@@ -703,20 +716,43 @@ func correctnessTestSteps() []testStep {
 				},
 			},
 			CorrectResponse: Response{
-				Object: withRV(pod3v7, "13"),
+				Object: withRV(pod3v7, "14"),
 			},
 			ExpectedEvent: &watch.Event{
 				Type:   watch.Deleted,
-				Object: withRV(pod3v7, "13"),
+				Object: withRV(pod3v7, "14"),
 			},
 			InvalidResponses: []Response{
 				{Object: withRV(pod3v7, "12")},
-				{Object: withRV(pod3v7, "14")},
+				{Object: withRV(pod3v7, "13")},
+				{Object: withRV(pod3v7, "15")},
 				{Object: nil, Err: nil},
 			},
 		},
 		{
-			Name: "28. Create pod4 returns success RV=14",
+			Name: "29. Compact between writes at ResourceVersion=13",
+			Request: Request{
+				Op:      OpCompact,
+				Compact: CompactRequest{ResourceVersion: "13"},
+			},
+			CorrectResponse: Response{},
+			InvalidResponses: []Response{
+				{Err: storage.NewTooLargeResourceVersionError(13, 14, 0)},
+			},
+		},
+		{
+			Name: "30. Compact past last write at ResourceVersion=15",
+			Request: Request{
+				Op:      OpCompact,
+				Compact: CompactRequest{ResourceVersion: "15"},
+			},
+			CorrectResponse: Response{},
+			InvalidResponses: []Response{
+				{Err: storage.NewTooLargeResourceVersionError(15, 15, 0)},
+			},
+		},
+		{
+			Name: "31. Create pod4 after compact past last write returns success RV=17",
 			Request: Request{
 				Op:  OpCreate,
 				Key: pod4Key,
@@ -725,20 +761,20 @@ func correctnessTestSteps() []testStep {
 				},
 			},
 			CorrectResponse: Response{
-				Object: withRV(pod4, "14"),
+				Object: withRV(pod4, "17"),
 			},
 			ExpectedEvent: &watch.Event{
 				Type:   watch.Added,
-				Object: withRV(pod4, "14"),
+				Object: withRV(pod4, "17"),
 			},
 			InvalidResponses: []Response{
-				{Object: withRV(pod4, "13")},
-				{Object: withRV(pod4, "15")},
+				{Object: withRV(pod4, "16")},
+				{Object: withRV(pod4, "18")},
 				{Object: nil, Err: nil},
 			},
 		},
 		{
-			Name: "29. Create pod5 in ns10 returns success RV=15",
+			Name: "32. Create pod5 in ns10 returns success RV=18",
 			Request: Request{
 				Op:  OpCreate,
 				Key: pod5Key,
@@ -747,29 +783,29 @@ func correctnessTestSteps() []testStep {
 				},
 			},
 			CorrectResponse: Response{
-				Object: withRV(pod5, "15"),
+				Object: withRV(pod5, "18"),
 			},
 			ExpectedEvent: &watch.Event{
 				Type:   watch.Added,
-				Object: withRV(pod5, "15"),
+				Object: withRV(pod5, "18"),
 			},
 			InvalidResponses: []Response{
-				{Object: withRV(pod5, "14")},
-				{Object: withRV(pod5, "16")},
+				{Object: withRV(pod5, "17")},
+				{Object: withRV(pod5, "19")},
 				{Object: nil, Err: nil},
 			},
 		},
 		{
-			Name: "30. Update existing pod4 with ignoreNotFound=true validating ResponseMeta has pod4 RV, not store RV, returns success RV=16",
+			Name: "33. Update existing pod4 with ignoreNotFound=true validating ResponseMeta has pod4 RV, not store RV, returns success RV=19",
 			Request: Request{
 				Op:  OpUpdate,
 				Key: pod4Key,
 				Update: UpdateRequest{
 					IgnoreNotFound: true,
 					UpdateFunc: func(input runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
-						// Creating pod5 moved the store to RV 15.
-						if res.ResourceVersion != 14 {
-							return nil, nil, fmt.Errorf("expected ResourceVersion 14, got %d", res.ResourceVersion)
+						// Creating pod5 moved the store to RV 18.
+						if res.ResourceVersion != 17 {
+							return nil, nil, fmt.Errorf("expected ResourceVersion 17, got %d", res.ResourceVersion)
 						}
 						pod := input.(*example.Pod).DeepCopy()
 						pod.Labels = map[string]string{"version": "v1"}
@@ -778,25 +814,25 @@ func correctnessTestSteps() []testStep {
 				},
 			},
 			CorrectResponse: Response{
-				Object: withLabel(pod4, "16", "version", "v1"),
+				Object: withLabel(pod4, "19", "version", "v1"),
 			},
 			ExpectedEvent: &watch.Event{
 				Type:   watch.Modified,
-				Object: withLabel(pod4, "16", "version", "v1"),
+				Object: withLabel(pod4, "19", "version", "v1"),
 			},
 			InvalidResponses: []Response{
-				{Object: withLabel(pod4, "15", "version", "v1")},
-				{Object: withLabel(pod4, "17", "version", "v1")},
+				{Object: withLabel(pod4, "18", "version", "v1")},
+				{Object: withLabel(pod4, "20", "version", "v1")},
 				{Object: nil, Err: nil},
 			},
 		},
 		{
-			Name: "31. Update pod4 with CachedExistingObject and failing UpdateFunc returns user error",
+			Name: "34. Update pod4 with CachedExistingObject and failing UpdateFunc returns user error",
 			Request: Request{
 				Op:  OpUpdate,
 				Key: pod4Key,
 				Update: UpdateRequest{
-					CachedExistingObject: withRV(pod4, "14"),
+					CachedExistingObject: withRV(pod4, "17"),
 					UpdateFunc: func(input runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
 						return nil, nil, errCustom
 					},
@@ -807,21 +843,21 @@ func correctnessTestSteps() []testStep {
 				Err:    errCustom,
 			},
 			InvalidResponses: []Response{
-				{Object: withLabel(pod4, "16", "version", "v1")},
-				{Object: withLabel(pod4, "17", "version", "v1")},
+				{Object: withLabel(pod4, "19", "version", "v1")},
+				{Object: withLabel(pod4, "20", "version", "v1")},
 				{Object: nil, Err: nil},
 			},
 		},
 		{
-			Name: "32. Update pod4 with stale CachedExistingObject where UpdateFunc fails on stale RV retries and returns success RV=17",
+			Name: "35. Update pod4 with stale CachedExistingObject where UpdateFunc fails on stale RV retries and returns success RV=20",
 			Request: Request{
 				Op:  OpUpdate,
 				Key: pod4Key,
 				Update: UpdateRequest{
-					CachedExistingObject: withRV(pod4, "14"),
+					CachedExistingObject: withRV(pod4, "17"),
 					UpdateFunc: func(input runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
-						if res.ResourceVersion != 16 {
-							return nil, nil, fmt.Errorf("expected ResourceVersion 16, got %d", res.ResourceVersion)
+						if res.ResourceVersion != 19 {
+							return nil, nil, fmt.Errorf("expected ResourceVersion 19, got %d", res.ResourceVersion)
 						}
 						pod := input.(*example.Pod).DeepCopy()
 						pod.Labels = map[string]string{"version": "v2"}
@@ -830,64 +866,64 @@ func correctnessTestSteps() []testStep {
 				},
 			},
 			CorrectResponse: Response{
-				Object: withLabel(pod4, "17", "version", "v2"),
+				Object: withLabel(pod4, "20", "version", "v2"),
 			},
 			ExpectedEvent: &watch.Event{
 				Type:   watch.Modified,
-				Object: withLabel(pod4, "17", "version", "v2"),
+				Object: withLabel(pod4, "20", "version", "v2"),
 			},
 			InvalidResponses: []Response{
-				{Object: withLabel(pod4, "16", "version", "v2")},
-				{Object: withLabel(pod4, "18", "version", "v2")},
+				{Object: withLabel(pod4, "19", "version", "v2")},
+				{Object: withLabel(pod4, "21", "version", "v2")},
 				{Object: nil, Err: nil},
 			},
 		},
 		{
-			Name: "33. Delete pod5 with CachedExistingObject and matching ResourceVersion precondition returns success RV=18",
+			Name: "36. Delete pod5 with CachedExistingObject and matching ResourceVersion precondition returns success RV=21",
 			Request: Request{
 				Op:  OpDelete,
 				Key: pod5Key,
 				Delete: DeleteRequest{
-					Preconditions:        &storage.Preconditions{ResourceVersion: &pod5RV15},
-					CachedExistingObject: withRV(pod5, "15"),
+					Preconditions:        &storage.Preconditions{ResourceVersion: &pod5RV18},
+					CachedExistingObject: withRV(pod5, "18"),
 				},
 			},
 			CorrectResponse: Response{
-				Object: withRV(pod5, "18"),
+				Object: withRV(pod5, "21"),
 			},
 			ExpectedEvent: &watch.Event{
 				Type:   watch.Deleted,
-				Object: withRV(pod5, "18"),
+				Object: withRV(pod5, "21"),
 			},
 			InvalidResponses: []Response{
 				{Object: &example.Pod{}, Err: storage.NewKeyNotFoundError(pod5Key, 0)},
-				{Object: withRV(pod5, "15")},
-				{Object: withRV(pod5, "17")},
-				{Object: withRV(pod5, "19")},
+				{Object: withRV(pod5, "18")},
+				{Object: withRV(pod5, "20")},
+				{Object: withRV(pod5, "22")},
 				{Object: nil, Err: nil},
 			},
 		},
 		{
-			Name: "34. Delete deleted pod5 with stale CachedExistingObject returns NotFound",
+			Name: "37. Delete deleted pod5 with stale CachedExistingObject returns NotFound",
 			Request: Request{
 				Op:  OpDelete,
 				Key: pod5Key,
 				Delete: DeleteRequest{
-					CachedExistingObject: withRV(pod5, "15"),
+					CachedExistingObject: withRV(pod5, "18"),
 				},
 			},
 			CorrectResponse: Response{
 				Object: nil,
-				Err:    storage.NewKeyNotFoundError(pod5Key, 18),
+				Err:    storage.NewKeyNotFoundError(pod5Key, 21),
 			},
 			InvalidResponses: []Response{
-				{Object: withRV(pod5, "18")},
-				{Object: withRV(pod5, "19")},
+				{Object: withRV(pod5, "21")},
+				{Object: withRV(pod5, "22")},
 				{Object: nil, Err: nil},
 			},
 		},
 		{
-			Name: "35. Create pod1 with ResourceVersion set returns ErrResourceVersionSetOnCreate",
+			Name: "38. Create pod1 with ResourceVersion set returns ErrResourceVersionSetOnCreate",
 			Request: Request{
 				Op:     OpCreate,
 				Key:    pod1Key,
@@ -895,12 +931,12 @@ func correctnessTestSteps() []testStep {
 			},
 			CorrectResponse: Response{Err: storage.ErrResourceVersionSetOnCreate},
 			InvalidResponses: []Response{
-				{Object: withRV(pod1, "19")},
+				{Object: withRV(pod1, "22")},
 				{Object: nil, Err: nil},
 			},
 		},
 		{
-			Name: "36. Create with empty key returns empty key error",
+			Name: "39. Create with empty key returns empty key error",
 			Request: Request{
 				Op:     OpCreate,
 				Key:    "",
@@ -908,12 +944,12 @@ func correctnessTestSteps() []testStep {
 			},
 			CorrectResponse: Response{Err: fmt.Errorf("empty key: %q", "")},
 			InvalidResponses: []Response{
-				{Object: withRV(pod1, "19")},
+				{Object: withRV(pod1, "22")},
 				{Object: nil, Err: nil},
 			},
 		},
 		{
-			Name: "37. Update with key containing . returns invalid key error",
+			Name: "40. Update with key containing . returns invalid key error",
 			Request: Request{
 				Op:  OpUpdate,
 				Key: "/pods/./ns1/pod4",
@@ -923,31 +959,31 @@ func correctnessTestSteps() []testStep {
 			},
 			CorrectResponse: Response{Err: fmt.Errorf("invalid key: %q", "/pods/./ns1/pod4")},
 			InvalidResponses: []Response{
-				{Object: nil, Err: storage.NewKeyNotFoundError("/pods/./ns1/pod4", 18)},
+				{Object: nil, Err: storage.NewKeyNotFoundError("/pods/./ns1/pod4", 21)},
 				{Object: nil, Err: nil},
 			},
 		},
 		{
-			Name: "38. Delete with key / returns empty key error",
+			Name: "41. Delete with key / returns empty key error",
 			Request: Request{
 				Op:  OpDelete,
 				Key: "/",
 			},
 			CorrectResponse: Response{Err: fmt.Errorf("empty key: %q", "/")},
 			InvalidResponses: []Response{
-				{Object: nil, Err: storage.NewKeyNotFoundError("/", 18)},
+				{Object: nil, Err: storage.NewKeyNotFoundError("/", 21)},
 				{Object: nil, Err: nil},
 			},
 		},
 		{
-			Name: "35. Compact at ResourceVersion=13",
+			Name: "42. Compact at ResourceVersion=16",
 			Request: Request{
 				Op:      OpCompact,
-				Compact: CompactRequest{ResourceVersion: "13"},
+				Compact: CompactRequest{ResourceVersion: "16"},
 			},
 			CorrectResponse: Response{},
 			InvalidResponses: []Response{
-				{Err: storage.NewTooLargeResourceVersionError(13, 18, 0)},
+				{Err: storage.NewTooLargeResourceVersionError(16, 21, 0)},
 			},
 		},
 	}
@@ -963,6 +999,9 @@ func readTestCases() []testStep {
 	pod4Key := mustGetKey(pod4)
 	pod5Key := mustGetKey(pod5)
 	_, invalidRVErr := storage.APIObjectVersioner{}.ParseResourceVersion("abc")
+	_, _, malformedContinueErr := storage.DecodeContinue("not-base64!!!", "/pods/")
+	traversalContinue := mustEncodeContinue("/pods/ns1/../ns10/pod5", "/pods/ns1/", 18)
+	_, _, traversalContinueErr := storage.DecodeContinue(traversalContinue, "/pods/ns1/")
 	listRecursive := ListRequest{Options: storage.ListOptions{Recursive: true, Predicate: storage.Everything}}
 	listNonRecursive := ListRequest{Options: storage.ListOptions{Predicate: storage.Everything}}
 
@@ -971,12 +1010,12 @@ func readTestCases() []testStep {
 			Name:    "Get existing pod",
 			Request: Request{Op: OpGet, Key: pod4Key},
 			CorrectResponse: Response{
-				Object: withLabel(pod4, "17", "version", "v2"),
+				Object: withLabel(pod4, "20", "version", "v2"),
 			},
 			InvalidResponses: []Response{
 				{Object: &example.Pod{}, Err: storage.NewKeyNotFoundError(pod4Key, 0)},
-				{Object: withLabel(pod4, "16", "version", "v2")},
-				{Object: withLabel(pod4, "18", "version", "v2")},
+				{Object: withLabel(pod4, "19", "version", "v2")},
+				{Object: withLabel(pod4, "21", "version", "v2")},
 				{Object: nil, Err: nil},
 			},
 		},
@@ -985,7 +1024,7 @@ func readTestCases() []testStep {
 			Request: Request{Op: OpGet, Key: pod1Key},
 			CorrectResponse: Response{
 				Object: nil,
-				Err:    storage.NewKeyNotFoundError(pod1Key, 19),
+				Err:    storage.NewKeyNotFoundError(pod1Key, 22),
 			},
 			InvalidResponses: []Response{
 				{Object: nil, Err: storage.NewKeyNotFoundError(pod1Key, 0)},
@@ -998,7 +1037,7 @@ func readTestCases() []testStep {
 			Name:    "Get existing pod with ignoreNotFound=true",
 			Request: Request{Op: OpGet, Key: pod4Key, Get: GetRequest{Options: storage.GetOptions{IgnoreNotFound: true}}},
 			CorrectResponse: Response{
-				Object: withLabel(pod4, "17", "version", "v2"),
+				Object: withLabel(pod4, "20", "version", "v2"),
 			},
 			InvalidResponses: []Response{
 				{Object: &example.Pod{}},
@@ -1013,8 +1052,8 @@ func readTestCases() []testStep {
 				Object: &example.Pod{},
 			},
 			InvalidResponses: []Response{
-				{Object: withRV(pod5, "15")},
 				{Object: withRV(pod5, "18")},
+				{Object: withRV(pod5, "21")},
 				{Object: nil, Err: storage.NewKeyNotFoundError(pod5Key, 0)},
 				{Object: nil, Err: nil},
 			},
@@ -1048,49 +1087,49 @@ func readTestCases() []testStep {
 			},
 			CorrectResponse: Response{Err: invalidRVErr},
 			InvalidResponses: []Response{
-				{Object: withLabel(pod4, "17", "version", "v2")},
+				{Object: withLabel(pod4, "20", "version", "v2")},
 				{Object: nil, Err: apierrors.NewBadRequest(fmt.Sprintf("invalid resource version: %v", invalidRVErr))},
 				{Object: nil, Err: nil},
 			},
 		},
 		{
-			Name: "Get pod4 with ResourceVersion=16 returns pod4 at RV>=16",
+			Name: "Get pod4 with ResourceVersion=19 returns pod4 at RV>=19",
 			Request: Request{
 				Op:  OpGet,
 				Key: pod4Key,
-				Get: GetRequest{Options: storage.GetOptions{ResourceVersion: "16"}},
+				Get: GetRequest{Options: storage.GetOptions{ResourceVersion: "19"}},
 			},
 			CorrectResponse: Response{
-				Object: withLabel(pod4, "16", "version", "v1"),
+				Object: withLabel(pod4, "19", "version", "v1"),
 			},
 			InvalidResponses: []Response{
-				{Object: withRV(pod4, "14")},
-				{Object: withLabel(pod4, "20", "version", "v2")},
+				{Object: withRV(pod4, "17")},
+				{Object: withLabel(pod4, "23", "version", "v2")},
 				{Object: &example.Pod{}},
 				{Object: nil, Err: storage.NewKeyNotFoundError(pod4Key, 0)},
-				{Object: nil, Err: storage.NewKeyNotFoundError(pod4Key, 19)},
-				{Object: nil, Err: storage.NewTooLargeResourceVersionError(16, 19, 0)},
-				{Object: nil, Err: apierrors.NewResourceExpired("too old resource version: 16 (19)")},
+				{Object: nil, Err: storage.NewKeyNotFoundError(pod4Key, 22)},
+				{Object: nil, Err: storage.NewTooLargeResourceVersionError(19, 22, 0)},
+				{Object: nil, Err: apierrors.NewResourceExpired("too old resource version: 19 (22)")},
 				{Object: nil, Err: nil},
 			},
 		},
 		{
-			Name: "Get pod4 with compacted ResourceVersion=12 returns pod4 at RV>=13",
+			Name: "Get pod4 with compacted ResourceVersion=12 returns pod4 at RV>=16",
 			Request: Request{
 				Op:  OpGet,
 				Key: pod4Key,
 				Get: GetRequest{Options: storage.GetOptions{ResourceVersion: "12"}},
 			},
 			CorrectResponse: Response{
-				Object: withRV(pod4, "14"),
+				Object: withRV(pod4, "17"),
 			},
 			InvalidResponses: []Response{
-				{Object: withLabel(pod4, "20", "version", "v2")},
+				{Object: withLabel(pod4, "23", "version", "v2")},
 				{Object: &example.Pod{}},
 				{Object: nil, Err: storage.NewKeyNotFoundError(pod4Key, 0)},
-				{Object: nil, Err: storage.NewKeyNotFoundError(pod4Key, 19)},
-				{Object: nil, Err: storage.NewTooLargeResourceVersionError(12, 19, 0)},
-				{Object: nil, Err: apierrors.NewResourceExpired("too old resource version: 12 (13)")},
+				{Object: nil, Err: storage.NewKeyNotFoundError(pod4Key, 22)},
+				{Object: nil, Err: storage.NewTooLargeResourceVersionError(12, 22, 0)},
+				{Object: nil, Err: apierrors.NewResourceExpired("too old resource version: 12 (16)")},
 				{Object: nil, Err: nil},
 			},
 		},
@@ -1102,34 +1141,56 @@ func readTestCases() []testStep {
 				Get: GetRequest{Options: storage.GetOptions{ResourceVersion: "0", IgnoreNotFound: true}},
 			},
 			CorrectResponse: Response{
-				Object: withRV(pod4, "14"),
+				Object: withRV(pod4, "17"),
 			},
 			InvalidResponses: []Response{
-				{Object: withLabel(pod4, "20", "version", "v2")},
+				{Object: withLabel(pod4, "23", "version", "v2")},
 				{Object: withRV(pod1, "2")},
 				{Object: nil, Err: storage.NewKeyNotFoundError(pod4Key, 0)},
-				{Object: nil, Err: storage.NewKeyNotFoundError(pod4Key, 19)},
+				{Object: nil, Err: storage.NewKeyNotFoundError(pod4Key, 22)},
 				{Object: nil, Err: nil},
 			},
 		},
 		{
-			Name: "Get deleted pod5 with ResourceVersion=18 returns KeyNotFoundError",
+			Name: "Get deleted pod5 with ResourceVersion=21 returns KeyNotFoundError",
 			Request: Request{
 				Op:  OpGet,
 				Key: pod5Key,
-				Get: GetRequest{Options: storage.GetOptions{ResourceVersion: "18"}},
+				Get: GetRequest{Options: storage.GetOptions{ResourceVersion: "21"}},
 			},
 			CorrectResponse: Response{
 				Object: nil,
-				Err:    storage.NewKeyNotFoundError(pod5Key, 18),
+				Err:    storage.NewKeyNotFoundError(pod5Key, 21),
 			},
 			InvalidResponses: []Response{
-				{Object: withRV(pod5, "15")},
+				{Object: withRV(pod5, "18")},
 				{Object: &example.Pod{}},
 				{Object: nil, Err: storage.NewKeyNotFoundError(pod5Key, 0)},
-				{Object: nil, Err: storage.NewKeyNotFoundError(pod5Key, 15)},
-				{Object: nil, Err: storage.NewKeyNotFoundError(pod5Key, 17)},
+				{Object: nil, Err: storage.NewKeyNotFoundError(pod5Key, 18)},
 				{Object: nil, Err: storage.NewKeyNotFoundError(pod5Key, 20)},
+				{Object: nil, Err: storage.NewKeyNotFoundError(pod5Key, 23)},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List pods with Exact ResourceVersion=22",
+			Request: Request{
+				Op:  OpList,
+				Key: "/pods/",
+				List: ListRequest{Options: storage.ListOptions{
+					ResourceVersion:      "22",
+					ResourceVersionMatch: metav1.ResourceVersionMatchExact,
+					Recursive:            true,
+					Predicate:            storage.Everything,
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodList("22", withLabel(pod4, "20", "version", "v2")),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("21", withLabel(pod4, "20", "version", "v2"))},
+				{Object: nil, Err: apierrors.NewResourceExpired("too old resource version: 22 (22)")},
+				{Object: nil, Err: storage.NewTooLargeResourceVersionError(22, 22, 0)},
 				{Object: nil, Err: nil},
 			},
 		},
@@ -1142,12 +1203,12 @@ func readTestCases() []testStep {
 			},
 			CorrectResponse: Response{
 				Object: nil,
-				Err:    storage.NewTooLargeResourceVersionError(99, 19, 0),
+				Err:    storage.NewTooLargeResourceVersionError(99, 22, 0),
 			},
 			InvalidResponses: []Response{
-				{Object: withLabel(pod4, "17", "version", "v2")},
+				{Object: withLabel(pod4, "20", "version", "v2")},
 				{Object: nil, Err: storage.NewKeyNotFoundError(pod4Key, 0)},
-				{Object: nil, Err: storage.NewKeyNotFoundError(pod4Key, 19)},
+				{Object: nil, Err: storage.NewKeyNotFoundError(pod4Key, 22)},
 				{Object: nil, Err: nil},
 			},
 		},
@@ -1155,12 +1216,12 @@ func readTestCases() []testStep {
 			Name:    "List all pods",
 			Request: Request{Op: OpList, Key: "/pods/", List: listRecursive},
 			CorrectResponse: Response{
-				Object: newTestPodList("19", withLabel(pod4, "17", "version", "v2")),
+				Object: newTestPodList("22", withLabel(pod4, "20", "version", "v2")),
 			},
 			InvalidResponses: []Response{
-				{Object: newTestPodList("18", withLabel(pod4, "17", "version", "v2"))},
-				{Object: newTestPodList("19", withLabel(pod4, "17", "version", "v2"), withRV(pod5, "15"))},
-				{Object: newTestPodList("19")},
+				{Object: newTestPodList("21", withLabel(pod4, "20", "version", "v2"))},
+				{Object: newTestPodList("22", withLabel(pod4, "20", "version", "v2"), withRV(pod5, "18"))},
+				{Object: newTestPodList("22")},
 				{Object: nil, Err: apierrors.NewResourceExpired("too old resource version")},
 				{Object: nil, Err: nil},
 			},
@@ -1169,11 +1230,11 @@ func readTestCases() []testStep {
 			Name:    "List pods in namespace ns1",
 			Request: Request{Op: OpList, Key: "/pods/ns1", List: listRecursive},
 			CorrectResponse: Response{
-				Object: newTestPodList("19", withLabel(pod4, "17", "version", "v2")),
+				Object: newTestPodList("22", withLabel(pod4, "20", "version", "v2")),
 			},
 			InvalidResponses: []Response{
-				{Object: newTestPodList("19", withLabel(pod4, "17", "version", "v2"), withRV(pod5, "15"))},
-				{Object: newTestPodList("18", withLabel(pod4, "17", "version", "v2"))},
+				{Object: newTestPodList("22", withLabel(pod4, "20", "version", "v2"), withRV(pod5, "18"))},
+				{Object: newTestPodList("21", withLabel(pod4, "20", "version", "v2"))},
 				{Object: nil, Err: nil},
 			},
 		},
@@ -1181,11 +1242,11 @@ func readTestCases() []testStep {
 			Name:    "List pods in empty namespace ns10",
 			Request: Request{Op: OpList, Key: "/pods/ns10", List: listRecursive},
 			CorrectResponse: Response{
-				Object: newTestPodList("19"),
+				Object: newTestPodList("22"),
 			},
 			InvalidResponses: []Response{
-				{Object: newTestPodList("18")},
-				{Object: newTestPodList("19", withRV(pod5, "15"))},
+				{Object: newTestPodList("21")},
+				{Object: newTestPodList("22", withRV(pod5, "18"))},
 				{Object: nil, Err: nil},
 			},
 		},
@@ -1193,11 +1254,11 @@ func readTestCases() []testStep {
 			Name:    "List existing pod non-recursively",
 			Request: Request{Op: OpList, Key: pod4Key, List: listNonRecursive},
 			CorrectResponse: Response{
-				Object: newTestPodList("19", withLabel(pod4, "17", "version", "v2")),
+				Object: newTestPodList("22", withLabel(pod4, "20", "version", "v2")),
 			},
 			InvalidResponses: []Response{
-				{Object: newTestPodList("18", withLabel(pod4, "17", "version", "v2"))},
-				{Object: newTestPodList("19")},
+				{Object: newTestPodList("21", withLabel(pod4, "20", "version", "v2"))},
+				{Object: newTestPodList("22")},
 				{Object: nil, Err: nil},
 			},
 		},
@@ -1205,11 +1266,11 @@ func readTestCases() []testStep {
 			Name:    "List non-existing pod non-recursively",
 			Request: Request{Op: OpList, Key: pod3Key, List: listNonRecursive},
 			CorrectResponse: Response{
-				Object: newTestPodList("19"),
+				Object: newTestPodList("22"),
 			},
 			InvalidResponses: []Response{
-				{Object: newTestPodList("19", withLabel(pod3, "12", "version", "v7"))},
-				{Object: newTestPodList("13")},
+				{Object: newTestPodList("22", withLabel(pod3, "12", "version", "v7"))},
+				{Object: newTestPodList("16")},
 				{Object: nil, Err: nil},
 			},
 		},
@@ -1217,37 +1278,569 @@ func readTestCases() []testStep {
 			Name:    "List namespace non-recursively",
 			Request: Request{Op: OpList, Key: "/pods/ns1", List: listNonRecursive},
 			CorrectResponse: Response{
-				Object: newTestPodList("19"),
+				Object: newTestPodList("22"),
 			},
 			InvalidResponses: []Response{
-				{Object: newTestPodList("19", withLabel(pod4, "17", "version", "v2"))},
+				{Object: newTestPodList("22", withLabel(pod4, "20", "version", "v2"))},
 				{Object: nil, Err: nil},
 			},
 		},
 		{
-			Name: "List pods with Exact ResourceVersion=13 when none exist",
+			Name:    "List cluster root non-recursively",
+			Request: Request{Op: OpList, Key: "/pods/", List: listNonRecursive},
+			CorrectResponse: Response{
+				Object: newTestPodList("22"),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("22", withLabel(pod4, "20", "version", "v2"))},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name:    "List existing pod recursively returns empty list",
+			Request: Request{Op: OpList, Key: pod4Key, List: listRecursive},
+			CorrectResponse: Response{
+				Object: newTestPodList("22"),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("22", withLabel(pod4, "20", "version", "v2"))},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List existing pod non-recursively with ResourceVersion=0",
+			Request: Request{
+				Op:  OpList,
+				Key: pod4Key,
+				List: ListRequest{Options: storage.ListOptions{
+					ResourceVersion: "0",
+					Recursive:       false,
+					Predicate:       storage.Everything,
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodList("17", withRV(pod4, "17")),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("0")},
+				{Object: newTestPodList("17")},
+				{Object: newTestPodList("23", withLabel(pod4, "20", "version", "v2"))},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List non-existing pod non-recursively with ResourceVersion=0",
+			Request: Request{
+				Op:  OpList,
+				Key: pod3Key,
+				List: ListRequest{Options: storage.ListOptions{
+					ResourceVersion: "0",
+					Recursive:       false,
+					Predicate:       storage.Everything,
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodList("17"),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("17", withLabel(pod3, "12", "version", "v7"))},
+				{Object: newTestPodList("23")},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List namespace non-recursively with ResourceVersion=0",
+			Request: Request{
+				Op:  OpList,
+				Key: "/pods/ns1",
+				List: ListRequest{Options: storage.ListOptions{
+					ResourceVersion: "0",
+					Recursive:       false,
+					Predicate:       storage.Everything,
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodList("17"),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("17", withRV(pod4, "17"))},
+				{Object: newTestPodList("23")},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List cluster root non-recursively with ResourceVersion=0",
 			Request: Request{
 				Op:  OpList,
 				Key: "/pods/",
 				List: ListRequest{Options: storage.ListOptions{
-					ResourceVersion:      "13",
+					ResourceVersion: "0",
+					Recursive:       false,
+					Predicate:       storage.Everything,
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodList("17"),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("17", withRV(pod4, "17"))},
+				{Object: newTestPodList("23")},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List existing pod non-recursively with Exact ResourceVersion=18",
+			Request: Request{
+				Op:  OpList,
+				Key: pod5Key,
+				List: ListRequest{Options: storage.ListOptions{
+					ResourceVersion:      "18",
+					ResourceVersionMatch: metav1.ResourceVersionMatchExact,
+					Recursive:            false,
+					Predicate:            storage.Everything,
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodList("18", withRV(pod5, "18")),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("18")},
+				{Object: newTestPodList("18", withRV(pod4, "17"), withRV(pod5, "18"))},
+				{Object: newTestPodList("22", withRV(pod5, "18"))},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List non-existing pod non-recursively with Exact ResourceVersion=16",
+			Request: Request{
+				Op:  OpList,
+				Key: pod3Key,
+				List: ListRequest{Options: storage.ListOptions{
+					ResourceVersion:      "16",
+					ResourceVersionMatch: metav1.ResourceVersionMatchExact,
+					Recursive:            false,
+					Predicate:            storage.Everything,
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodList("16"),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("16", withLabel(pod3, "12", "version", "v7"))},
+				{Object: newTestPodList("22")},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List namespace non-recursively with Exact ResourceVersion=18",
+			Request: Request{
+				Op:  OpList,
+				Key: "/pods/ns1",
+				List: ListRequest{Options: storage.ListOptions{
+					ResourceVersion:      "18",
+					ResourceVersionMatch: metav1.ResourceVersionMatchExact,
+					Recursive:            false,
+					Predicate:            storage.Everything,
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodList("18"),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("18", withRV(pod4, "17"))},
+				{Object: newTestPodList("22")},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List cluster root non-recursively with Exact ResourceVersion=18",
+			Request: Request{
+				Op:  OpList,
+				Key: "/pods/",
+				List: ListRequest{Options: storage.ListOptions{
+					ResourceVersion:      "18",
+					ResourceVersionMatch: metav1.ResourceVersionMatchExact,
+					Recursive:            false,
+					Predicate:            storage.Everything,
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodList("18"),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("18", withRV(pod4, "17"), withRV(pod5, "18"))},
+				{Object: newTestPodList("22")},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List pod non-recursively with compacted Exact ResourceVersion=12 returns ResourceExpired",
+			Request: Request{
+				Op:  OpList,
+				Key: pod3Key,
+				List: ListRequest{Options: storage.ListOptions{
+					ResourceVersion:      "12",
+					ResourceVersionMatch: metav1.ResourceVersionMatchExact,
+					Recursive:            false,
+					Predicate:            storage.Everything,
+				}},
+			},
+			CorrectResponse: Response{
+				Object: nil,
+				Err:    apierrors.NewResourceExpired("The resourceVersion for the provided list is too old."),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("12", withLabel(pod3, "12", "version", "v7"))},
+				{Object: newTestPodList("22")},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List existing pod non-recursively with NotOlderThan ResourceVersion=18",
+			Request: Request{
+				Op:  OpList,
+				Key: pod4Key,
+				List: ListRequest{Options: storage.ListOptions{
+					ResourceVersion:      "18",
+					ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan,
+					Recursive:            false,
+					Predicate:            storage.Everything,
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodList("19", withLabel(pod4, "19", "version", "v1")),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("17", withRV(pod4, "17"))},
+				{Object: newTestPodList("19", withLabel(pod4, "19", "version", "v1"), withRV(pod5, "18"))},
+				{Object: newTestPodList("23", withLabel(pod4, "20", "version", "v2"))},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List existing pod non-recursively with NotOlderThan compacted ResourceVersion=12",
+			Request: Request{
+				Op:  OpList,
+				Key: pod4Key,
+				List: ListRequest{Options: storage.ListOptions{
+					ResourceVersion:      "12",
+					ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan,
+					Recursive:            false,
+					Predicate:            storage.Everything,
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodList("21", withLabel(pod4, "20", "version", "v2")),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("12")},
+				{Object: newTestPodList("23", withLabel(pod4, "20", "version", "v2"))},
+				{Object: nil, Err: apierrors.NewResourceExpired("The resourceVersion for the provided list is too old.")},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List namespace non-recursively with NotOlderThan ResourceVersion=18",
+			Request: Request{
+				Op:  OpList,
+				Key: "/pods/ns1",
+				List: ListRequest{Options: storage.ListOptions{
+					ResourceVersion:      "18",
+					ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan,
+					Recursive:            false,
+					Predicate:            storage.Everything,
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodList("19"),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("17")},
+				{Object: newTestPodList("19", withLabel(pod4, "19", "version", "v1"))},
+				{Object: newTestPodList("23")},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List cluster root non-recursively with NotOlderThan ResourceVersion=18",
+			Request: Request{
+				Op:  OpList,
+				Key: "/pods/",
+				List: ListRequest{Options: storage.ListOptions{
+					ResourceVersion:      "18",
+					ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan,
+					Recursive:            false,
+					Predicate:            storage.Everything,
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodList("19"),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("17")},
+				{Object: newTestPodList("19", withLabel(pod4, "19", "version", "v1"), withRV(pod5, "18"))},
+				{Object: newTestPodList("23")},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List pod non-recursively with future ResourceVersion=99 returns TooLargeResourceVersionError",
+			Request: Request{
+				Op:  OpList,
+				Key: pod4Key,
+				List: ListRequest{Options: storage.ListOptions{
+					ResourceVersion:      "99",
+					ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan,
+					Recursive:            false,
+					Predicate:            storage.Everything,
+				}},
+			},
+			CorrectResponse: Response{
+				Object: nil,
+				Err:    storage.NewTooLargeResourceVersionError(99, 22, 0),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("22", withLabel(pod4, "20", "version", "v2"))},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List existing pod non-recursively with matching label selector",
+			Request: Request{
+				Op:  OpList,
+				Key: pod4Key,
+				List: ListRequest{Options: storage.ListOptions{
+					Recursive: false,
+					Predicate: storage.SelectionPredicate{
+						Label:    labels.SelectorFromSet(labels.Set{"version": "v2"}),
+						Field:    fields.Everything(),
+						GetAttrs: storage.DefaultNamespaceScopedAttr,
+					},
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodList("22", withLabel(pod4, "20", "version", "v2")),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("22")},
+				{Object: newTestPodList("21", withLabel(pod4, "20", "version", "v2"))},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List existing pod non-recursively with non-matching label selector",
+			Request: Request{
+				Op:  OpList,
+				Key: pod4Key,
+				List: ListRequest{Options: storage.ListOptions{
+					Recursive: false,
+					Predicate: storage.SelectionPredicate{
+						Label:    labels.SelectorFromSet(labels.Set{"version": "v1"}),
+						Field:    fields.Everything(),
+						GetAttrs: storage.DefaultNamespaceScopedAttr,
+					},
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodList("22"),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("22", withLabel(pod4, "20", "version", "v2"))},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List existing pod non-recursively with matching field selector",
+			Request: Request{
+				Op:  OpList,
+				Key: pod4Key,
+				List: ListRequest{Options: storage.ListOptions{
+					Recursive: false,
+					Predicate: storage.SelectionPredicate{
+						Label:    labels.Everything(),
+						Field:    fields.OneTermEqualSelector("metadata.name", "pod4"),
+						GetAttrs: storage.DefaultNamespaceScopedAttr,
+					},
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodList("22", withLabel(pod4, "20", "version", "v2")),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("22")},
+				{Object: newTestPodList("21", withLabel(pod4, "20", "version", "v2"))},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List existing pod non-recursively with non-matching field selector",
+			Request: Request{
+				Op:  OpList,
+				Key: pod4Key,
+				List: ListRequest{Options: storage.ListOptions{
+					Recursive: false,
+					Predicate: storage.SelectionPredicate{
+						Label:    labels.Everything(),
+						Field:    fields.OneTermEqualSelector("metadata.name", "pod5"),
+						GetAttrs: storage.DefaultNamespaceScopedAttr,
+					},
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodList("22"),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("22", withLabel(pod4, "20", "version", "v2"))},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List existing pod non-recursively with Exact ResourceVersion=19 and matching label selector",
+			Request: Request{
+				Op:  OpList,
+				Key: pod4Key,
+				List: ListRequest{Options: storage.ListOptions{
+					ResourceVersion:      "19",
+					ResourceVersionMatch: metav1.ResourceVersionMatchExact,
+					Recursive:            false,
+					Predicate: storage.SelectionPredicate{
+						Label:    labels.SelectorFromSet(labels.Set{"version": "v1"}),
+						Field:    fields.Everything(),
+						GetAttrs: storage.DefaultNamespaceScopedAttr,
+					},
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodList("19", withLabel(pod4, "19", "version", "v1")),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("19")},
+				{Object: newTestPodList("22")},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List existing pod non-recursively with Exact ResourceVersion=19 and matching field selector",
+			Request: Request{
+				Op:  OpList,
+				Key: pod4Key,
+				List: ListRequest{Options: storage.ListOptions{
+					ResourceVersion:      "19",
+					ResourceVersionMatch: metav1.ResourceVersionMatchExact,
+					Recursive:            false,
+					Predicate: storage.SelectionPredicate{
+						Label:    labels.Everything(),
+						Field:    fields.OneTermEqualSelector("metadata.namespace", "ns1"),
+						GetAttrs: storage.DefaultNamespaceScopedAttr,
+					},
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodList("19", withLabel(pod4, "19", "version", "v1")),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("19")},
+				{Object: newTestPodList("22")},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List existing pod non-recursively with Limit=1",
+			Request: Request{
+				Op:  OpList,
+				Key: pod4Key,
+				List: ListRequest{Options: storage.ListOptions{
+					Recursive: false,
+					Predicate: storage.SelectionPredicate{
+						Label: labels.Everything(),
+						Field: fields.Everything(),
+						Limit: 1,
+					},
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodList("22", withLabel(pod4, "20", "version", "v2")),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodListWithContinue("22", new(int64(0)), withLabel(pod4, "20", "version", "v2"))},
+				{Object: newTestPodList("22")},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List existing pod non-recursively with Exact ResourceVersion=18 and Limit=1",
+			Request: Request{
+				Op:  OpList,
+				Key: pod4Key,
+				List: ListRequest{Options: storage.ListOptions{
+					ResourceVersion:      "18",
+					ResourceVersionMatch: metav1.ResourceVersionMatchExact,
+					Recursive:            false,
+					Predicate: storage.SelectionPredicate{
+						Label: labels.Everything(),
+						Field: fields.Everything(),
+						Limit: 1,
+					},
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodList("18", withRV(pod4, "17")),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodListWithContinue("18", new(int64(1)), withRV(pod4, "17"))},
+				{Object: newTestPodList("18")},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List existing pod non-recursively with legacy ResourceVersion=18 and Limit=1",
+			Request: Request{
+				Op:  OpList,
+				Key: pod4Key,
+				List: ListRequest{Options: storage.ListOptions{
+					ResourceVersion: "18",
+					Recursive:       false,
+					Predicate: storage.SelectionPredicate{
+						Label: labels.Everything(),
+						Field: fields.Everything(),
+						Limit: 1,
+					},
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodList("22", withLabel(pod4, "20", "version", "v2")),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("17", withRV(pod4, "17"))},
+				{Object: newTestPodListWithContinue("18", new(int64(1)), withRV(pod4, "17"))},
+				{Object: newTestPodListWithContinue("22", new(int64(0)), withLabel(pod4, "20", "version", "v2"))},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List pods with Exact ResourceVersion=16 when none exist",
+			Request: Request{
+				Op:  OpList,
+				Key: "/pods/",
+				List: ListRequest{Options: storage.ListOptions{
+					ResourceVersion:      "16",
 					ResourceVersionMatch: metav1.ResourceVersionMatchExact,
 					Recursive:            true,
 					Predicate:            storage.Everything,
 				}},
 			},
 			CorrectResponse: Response{
-				Object: newTestPodList("13"),
+				Object: newTestPodList("16"),
 			},
 			InvalidResponses: []Response{
 				{Object: newTestPodList("12")},
-				{Object: newTestPodList("13", withLabel(pod3, "12", "version", "v7"))},
+				{Object: newTestPodList("16", withLabel(pod3, "12", "version", "v7"))},
 				{Object: nil, Err: apierrors.NewResourceExpired("The resourceVersion for the provided list is too old.")},
 				{Object: nil, Err: nil},
 			},
 		},
 		{
-			Name: "List pods with Exact ResourceVersion=15",
+			Name: "List pods with compacted Exact ResourceVersion=15 returns ResourceExpired",
 			Request: Request{
 				Op:  OpList,
 				Key: "/pods/",
@@ -1259,16 +1852,38 @@ func readTestCases() []testStep {
 				}},
 			},
 			CorrectResponse: Response{
-				Object: newTestPodList("15", withRV(pod4, "14"), withRV(pod5, "15")),
+				Object: nil,
+				Err:    apierrors.NewResourceExpired("The resourceVersion for the provided list is too old."),
 			},
 			InvalidResponses: []Response{
-				{Object: newTestPodList("14", withRV(pod4, "14"))},
-				{Object: newTestPodList("16", withLabel(pod4, "16", "version", "v1"), withRV(pod5, "15"))},
-				{Object: newTestPodList("19", withLabel(pod4, "17", "version", "v2"))},
-				{Object: newTestPodList("15", withRV(pod4, "14"))},
-				{Object: newTestPodList("15", withRV(pod5, "15"), withRV(pod4, "14"))},
-				{Object: newTestPodList("15", withLabel(pod4, "17", "version", "v2"))},
-				{Object: nil, Err: storage.NewTooLargeResourceVersionError(15, 19, 0)},
+				{Object: newTestPodList("15")},
+				{Object: nil, Err: storage.NewTooLargeResourceVersionError(15, 22, 0)},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List pods with Exact ResourceVersion=18",
+			Request: Request{
+				Op:  OpList,
+				Key: "/pods/",
+				List: ListRequest{Options: storage.ListOptions{
+					ResourceVersion:      "18",
+					ResourceVersionMatch: metav1.ResourceVersionMatchExact,
+					Recursive:            true,
+					Predicate:            storage.Everything,
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodList("18", withRV(pod4, "17"), withRV(pod5, "18")),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("17", withRV(pod4, "17"))},
+				{Object: newTestPodList("19", withLabel(pod4, "19", "version", "v1"), withRV(pod5, "18"))},
+				{Object: newTestPodList("22", withLabel(pod4, "20", "version", "v2"))},
+				{Object: newTestPodList("18", withRV(pod4, "17"))},
+				{Object: newTestPodList("18", withRV(pod5, "18"), withRV(pod4, "17"))},
+				{Object: newTestPodList("18", withLabel(pod4, "20", "version", "v2"))},
+				{Object: nil, Err: storage.NewTooLargeResourceVersionError(18, 22, 0)},
 				{Object: nil, Err: apierrors.NewResourceExpired("The resourceVersion for the provided list is too old.")},
 				{Object: nil, Err: nil},
 			},
@@ -1293,15 +1908,37 @@ func readTestCases() []testStep {
 				{Object: newTestPodList("12", withLabel(pod3, "12", "version", "v7"))},
 				{Object: newTestPodList("12", withLabel(pod3, "12", "version", "v7")), Err: apierrors.NewResourceExpired("The resourceVersion for the provided list is too old.")},
 				{Object: nil, Err: storage.NewKeyNotFoundError("/pods/", 0)},
-				{Object: nil, Err: storage.NewTooLargeResourceVersionError(12, 19, 0)},
+				{Object: nil, Err: storage.NewTooLargeResourceVersionError(12, 22, 0)},
 				{Object: nil, Err: nil},
 			},
 		},
 		{
-			Name: "List pods with Exact ResourceVersion=18",
+			Name: "List pods with Exact ResourceVersion=21",
 			Request: Request{
 				Op:  OpList,
 				Key: "/pods/",
+				List: ListRequest{Options: storage.ListOptions{
+					ResourceVersion:      "21",
+					ResourceVersionMatch: metav1.ResourceVersionMatchExact,
+					Recursive:            true,
+					Predicate:            storage.Everything,
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodList("21", withLabel(pod4, "20", "version", "v2")),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("20", withLabel(pod4, "20", "version", "v2"))},
+				{Object: nil, Err: apierrors.NewResourceExpired("too old resource version: 21 (22)")},
+				{Object: nil, Err: storage.NewTooLargeResourceVersionError(21, 22, 0)},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List ns1 with Exact ResourceVersion=18",
+			Request: Request{
+				Op:  OpList,
+				Key: "/pods/ns1",
 				List: ListRequest{Options: storage.ListOptions{
 					ResourceVersion:      "18",
 					ResourceVersionMatch: metav1.ResourceVersionMatchExact,
@@ -1310,57 +1947,35 @@ func readTestCases() []testStep {
 				}},
 			},
 			CorrectResponse: Response{
-				Object: newTestPodList("18", withLabel(pod4, "17", "version", "v2")),
+				Object: newTestPodList("18", withRV(pod4, "17")),
 			},
 			InvalidResponses: []Response{
-				{Object: newTestPodList("17", withLabel(pod4, "17", "version", "v2"))},
-				{Object: nil, Err: apierrors.NewResourceExpired("too old resource version: 18 (19)")},
-				{Object: nil, Err: storage.NewTooLargeResourceVersionError(18, 19, 0)},
+				{Object: newTestPodList("18", withRV(pod4, "17"), withRV(pod5, "18"))},
+				{Object: newTestPodList("17", withRV(pod4, "17"))},
 				{Object: nil, Err: nil},
 			},
 		},
 		{
-			Name: "List ns1 with Exact ResourceVersion=15",
-			Request: Request{
-				Op:  OpList,
-				Key: "/pods/ns1",
-				List: ListRequest{Options: storage.ListOptions{
-					ResourceVersion:      "15",
-					ResourceVersionMatch: metav1.ResourceVersionMatchExact,
-					Recursive:            true,
-					Predicate:            storage.Everything,
-				}},
-			},
-			CorrectResponse: Response{
-				Object: newTestPodList("15", withRV(pod4, "14")),
-			},
-			InvalidResponses: []Response{
-				{Object: newTestPodList("15", withRV(pod4, "14"), withRV(pod5, "15"))},
-				{Object: newTestPodList("14", withRV(pod4, "14"))},
-				{Object: nil, Err: nil},
-			},
-		},
-		{
-			Name: "List pods with NotOlderThan ResourceVersion=15",
+			Name: "List pods with NotOlderThan ResourceVersion=18",
 			Request: Request{
 				Op:  OpList,
 				Key: "/pods/",
 				List: ListRequest{Options: storage.ListOptions{
-					ResourceVersion:      "15",
+					ResourceVersion:      "18",
 					ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan,
 					Recursive:            true,
 					Predicate:            storage.Everything,
 				}},
 			},
 			CorrectResponse: Response{
-				Object: newTestPodList("16", withLabel(pod4, "16", "version", "v1"), withRV(pod5, "15")),
+				Object: newTestPodList("19", withLabel(pod4, "19", "version", "v1"), withRV(pod5, "18")),
 			},
 			InvalidResponses: []Response{
-				{Object: newTestPodList("14", withRV(pod4, "14"))},
-				{Object: newTestPodList("20", withLabel(pod4, "17", "version", "v2"))},
-				{Object: newTestPodList("16", withRV(pod4, "14"), withRV(pod5, "15"))},
-				{Object: nil, Err: storage.NewTooLargeResourceVersionError(15, 19, 0)},
-				{Object: nil, Err: apierrors.NewResourceExpired("too old resource version: 15 (19)")},
+				{Object: newTestPodList("17", withRV(pod4, "17"))},
+				{Object: newTestPodList("23", withLabel(pod4, "20", "version", "v2"))},
+				{Object: newTestPodList("19", withRV(pod4, "17"), withRV(pod5, "18"))},
+				{Object: nil, Err: storage.NewTooLargeResourceVersionError(18, 22, 0)},
+				{Object: nil, Err: apierrors.NewResourceExpired("too old resource version: 18 (22)")},
 				{Object: nil, Err: nil},
 			},
 		},
@@ -1377,12 +1992,12 @@ func readTestCases() []testStep {
 				}},
 			},
 			CorrectResponse: Response{
-				Object: newTestPodList("18", withLabel(pod4, "17", "version", "v2")),
+				Object: newTestPodList("21", withLabel(pod4, "20", "version", "v2")),
 			},
 			InvalidResponses: []Response{
 				{Object: newTestPodList("12", withLabel(pod3, "12", "version", "v7"))},
-				{Object: newTestPodList("20", withLabel(pod4, "17", "version", "v2"))},
-				{Object: nil, Err: storage.NewTooLargeResourceVersionError(12, 19, 0)},
+				{Object: newTestPodList("23", withLabel(pod4, "20", "version", "v2"))},
+				{Object: nil, Err: storage.NewTooLargeResourceVersionError(12, 22, 0)},
 				{Object: nil, Err: apierrors.NewResourceExpired("The resourceVersion for the provided list is too old.")},
 				{Object: nil, Err: nil},
 			},
@@ -1399,13 +2014,13 @@ func readTestCases() []testStep {
 				}},
 			},
 			CorrectResponse: Response{
-				Object: newTestPodList("14", withRV(pod4, "14")),
+				Object: newTestPodList("17", withRV(pod4, "17")),
 			},
 			InvalidResponses: []Response{
 				{Object: newTestPodList("0")},
-				{Object: newTestPodList("20", withLabel(pod4, "17", "version", "v2"))},
-				{Object: newTestPodList("15", withRV(pod4, "14"))},
-				{Object: nil, Err: apierrors.NewResourceExpired("too old resource version: 0 (19)")},
+				{Object: newTestPodList("23", withLabel(pod4, "20", "version", "v2"))},
+				{Object: newTestPodList("18", withRV(pod4, "17"))},
+				{Object: nil, Err: apierrors.NewResourceExpired("too old resource version: 0 (22)")},
 				{Object: nil, Err: nil},
 			},
 		},
@@ -1423,11 +2038,11 @@ func readTestCases() []testStep {
 			},
 			CorrectResponse: Response{
 				Object: nil,
-				Err:    storage.NewTooLargeResourceVersionError(99, 19, 0),
+				Err:    storage.NewTooLargeResourceVersionError(99, 22, 0),
 			},
 			InvalidResponses: []Response{
-				{Object: newTestPodList("19", withLabel(pod4, "17", "version", "v2"))},
-				{Object: newTestPodList("99", withLabel(pod4, "17", "version", "v2"))},
+				{Object: newTestPodList("22", withLabel(pod4, "20", "version", "v2"))},
+				{Object: newTestPodList("99", withLabel(pod4, "20", "version", "v2"))},
 				{Object: nil, Err: storage.NewKeyNotFoundError("/pods/", 0)},
 				{Object: nil, Err: nil},
 			},
@@ -1437,7 +2052,7 @@ func readTestCases() []testStep {
 			Request:         Request{Op: OpList, Key: "/pods/..", List: listRecursive},
 			CorrectResponse: Response{Err: fmt.Errorf("invalid key: %q", "/pods/..")},
 			InvalidResponses: []Response{
-				{Object: newTestPodList("19", withLabel(pod4, "17", "version", "v2"))},
+				{Object: newTestPodList("22", withLabel(pod4, "20", "version", "v2"))},
 				{Object: nil, Err: nil},
 			},
 		},
@@ -1454,7 +2069,7 @@ func readTestCases() []testStep {
 			},
 			CorrectResponse: Response{Err: apierrors.NewBadRequest(fmt.Sprintf("invalid resource version: %v", invalidRVErr))},
 			InvalidResponses: []Response{
-				{Object: newTestPodList("19", withLabel(pod4, "17", "version", "v2"))},
+				{Object: newTestPodList("22", withLabel(pod4, "20", "version", "v2"))},
 				{Object: nil, Err: nil},
 			},
 		},
@@ -1464,7 +2079,7 @@ func readTestCases() []testStep {
 				Op:  OpList,
 				Key: "/pods/",
 				List: ListRequest{Options: storage.ListOptions{
-					ResourceVersion:      "15",
+					ResourceVersion:      "18",
 					ResourceVersionMatch: "Newest",
 					Recursive:            true,
 					Predicate:            storage.Everything,
@@ -1472,7 +2087,7 @@ func readTestCases() []testStep {
 			},
 			CorrectResponse: Response{Err: fmt.Errorf("unknown ResourceVersionMatch value: %v", "Newest")},
 			InvalidResponses: []Response{
-				{Object: newTestPodList("19", withLabel(pod4, "17", "version", "v2"))},
+				{Object: newTestPodList("22", withLabel(pod4, "20", "version", "v2"))},
 				{Object: nil, Err: nil},
 			},
 		},
@@ -1491,11 +2106,11 @@ func readTestCases() []testStep {
 				}},
 			},
 			CorrectResponse: Response{
-				Object: newTestPodList("19", withLabel(pod4, "17", "version", "v2")),
+				Object: newTestPodList("22", withLabel(pod4, "20", "version", "v2")),
 			},
 			InvalidResponses: []Response{
-				{Object: newTestPodList("19")},
-				{Object: newTestPodList("18", withLabel(pod4, "17", "version", "v2"))},
+				{Object: newTestPodList("22")},
+				{Object: newTestPodList("21", withLabel(pod4, "20", "version", "v2"))},
 				{Object: nil, Err: nil},
 			},
 		},
@@ -1514,11 +2129,11 @@ func readTestCases() []testStep {
 				}},
 			},
 			CorrectResponse: Response{
-				Object: newTestPodList("19"),
+				Object: newTestPodList("22"),
 			},
 			InvalidResponses: []Response{
-				{Object: newTestPodList("19", withLabel(pod4, "17", "version", "v2"))},
-				{Object: newTestPodList("19", withLabel(pod4, "16", "version", "v1"))},
+				{Object: newTestPodList("22", withLabel(pod4, "20", "version", "v2"))},
+				{Object: newTestPodList("22", withLabel(pod4, "19", "version", "v1"))},
 				{Object: nil, Err: nil},
 			},
 		},
@@ -1537,11 +2152,11 @@ func readTestCases() []testStep {
 				}},
 			},
 			CorrectResponse: Response{
-				Object: newTestPodList("19", withLabel(pod4, "17", "version", "v2")),
+				Object: newTestPodList("22", withLabel(pod4, "20", "version", "v2")),
 			},
 			InvalidResponses: []Response{
-				{Object: newTestPodList("19")},
-				{Object: newTestPodList("18", withLabel(pod4, "17", "version", "v2"))},
+				{Object: newTestPodList("22")},
+				{Object: newTestPodList("21", withLabel(pod4, "20", "version", "v2"))},
 				{Object: nil, Err: nil},
 			},
 		},
@@ -1560,21 +2175,21 @@ func readTestCases() []testStep {
 				}},
 			},
 			CorrectResponse: Response{
-				Object: newTestPodList("19"),
+				Object: newTestPodList("22"),
 			},
 			InvalidResponses: []Response{
-				{Object: newTestPodList("19", withLabel(pod4, "17", "version", "v2"))},
-				{Object: newTestPodList("19", withRV(pod5, "15"))},
+				{Object: newTestPodList("22", withLabel(pod4, "20", "version", "v2"))},
+				{Object: newTestPodList("22", withRV(pod5, "18"))},
 				{Object: nil, Err: nil},
 			},
 		},
 		{
-			Name: "List pods with Exact ResourceVersion=16 and label selector",
+			Name: "List pods with Exact ResourceVersion=19 and label selector",
 			Request: Request{
 				Op:  OpList,
 				Key: "/pods/",
 				List: ListRequest{Options: storage.ListOptions{
-					ResourceVersion:      "16",
+					ResourceVersion:      "19",
 					ResourceVersionMatch: metav1.ResourceVersionMatchExact,
 					Recursive:            true,
 					Predicate: storage.SelectionPredicate{
@@ -1585,22 +2200,22 @@ func readTestCases() []testStep {
 				}},
 			},
 			CorrectResponse: Response{
-				Object: newTestPodList("16", withLabel(pod4, "16", "version", "v1")),
+				Object: newTestPodList("19", withLabel(pod4, "19", "version", "v1")),
 			},
 			InvalidResponses: []Response{
-				{Object: newTestPodList("16", withLabel(pod4, "16", "version", "v1"), withRV(pod5, "15"))},
-				{Object: newTestPodList("16")},
+				{Object: newTestPodList("19", withLabel(pod4, "19", "version", "v1"), withRV(pod5, "18"))},
 				{Object: newTestPodList("19")},
+				{Object: newTestPodList("22")},
 				{Object: nil, Err: nil},
 			},
 		},
 		{
-			Name: "List pods with Exact ResourceVersion=16 and field selector",
+			Name: "List pods with Exact ResourceVersion=19 and field selector",
 			Request: Request{
 				Op:  OpList,
 				Key: "/pods/",
 				List: ListRequest{Options: storage.ListOptions{
-					ResourceVersion:      "16",
+					ResourceVersion:      "19",
 					ResourceVersionMatch: metav1.ResourceVersionMatchExact,
 					Recursive:            true,
 					Predicate: storage.SelectionPredicate{
@@ -1611,12 +2226,640 @@ func readTestCases() []testStep {
 				}},
 			},
 			CorrectResponse: Response{
-				Object: newTestPodList("16", withRV(pod5, "15")),
+				Object: newTestPodList("19", withRV(pod5, "18")),
 			},
 			InvalidResponses: []Response{
-				{Object: newTestPodList("16", withLabel(pod4, "16", "version", "v1"), withRV(pod5, "15"))},
-				{Object: newTestPodList("16")},
+				{Object: newTestPodList("19", withLabel(pod4, "19", "version", "v1"), withRV(pod5, "18"))},
 				{Object: newTestPodList("19")},
+				{Object: newTestPodList("22")},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List pods with Limit=1 when one pod exists",
+			Request: Request{
+				Op:  OpList,
+				Key: "/pods/",
+				List: ListRequest{Options: storage.ListOptions{
+					ResourceVersion: "",
+					Recursive:       true,
+					Predicate: storage.SelectionPredicate{
+						Label: labels.Everything(),
+						Field: fields.Everything(),
+						Limit: 1,
+					},
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodList("22", withLabel(pod4, "20", "version", "v2")),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodListWithContinue("22", new(int64(0)), withLabel(pod4, "20", "version", "v2"))},
+				{Object: newTestPodList("22")},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List pods with Exact ResourceVersion=18 and Limit=1",
+			Request: Request{
+				Op:  OpList,
+				Key: "/pods/",
+				List: ListRequest{Options: storage.ListOptions{
+					ResourceVersion:      "18",
+					ResourceVersionMatch: metav1.ResourceVersionMatchExact,
+					Recursive:            true,
+					Predicate: storage.SelectionPredicate{
+						Label: labels.Everything(),
+						Field: fields.Everything(),
+						Limit: 1,
+					},
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodListWithContinue("18", new(int64(1)), withRV(pod4, "17")),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("18", withRV(pod4, "17"))},
+				{Object: newTestPodListWithContinue("18", new(int64(2)), withRV(pod4, "17"))},
+				{Object: newTestPodListWithContinue("18", nil, withRV(pod4, "17"))},
+				{Object: newTestPodListWithContinue("18", new(int64(1)), withRV(pod4, "17"), withRV(pod5, "18"))},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List pods with legacy ResourceVersion=18 and Limit=1",
+			Request: Request{
+				Op:  OpList,
+				Key: "/pods/",
+				List: ListRequest{Options: storage.ListOptions{
+					ResourceVersion: "18",
+					Recursive:       true,
+					Predicate: storage.SelectionPredicate{
+						Label: labels.Everything(),
+						Field: fields.Everything(),
+						Limit: 1,
+					},
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodListWithContinue("18", new(int64(1)), withRV(pod4, "17")),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("18", withRV(pod4, "17"))},
+				{Object: newTestPodListWithContinue("18", new(int64(2)), withRV(pod4, "17"))},
+				{Object: newTestPodListWithContinue("18", nil, withRV(pod4, "17"))},
+				{Object: newTestPodListWithContinue("18", new(int64(1)), withRV(pod4, "17"), withRV(pod5, "18"))},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List pods with Exact ResourceVersion=19, Limit=1, and field selector matching second pod",
+			Request: Request{
+				Op:  OpList,
+				Key: "/pods/",
+				List: ListRequest{Options: storage.ListOptions{
+					ResourceVersion:      "19",
+					ResourceVersionMatch: metav1.ResourceVersionMatchExact,
+					Recursive:            true,
+					Predicate: storage.SelectionPredicate{
+						Label:    labels.Everything(),
+						Field:    fields.OneTermEqualSelector("metadata.namespace", "ns10"),
+						GetAttrs: storage.DefaultNamespaceScopedAttr,
+						Limit:    1,
+					},
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodList("19", withRV(pod5, "18")),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("19")},
+				{Object: newTestPodListWithContinue("19", new(int64(1)), withRV(pod5, "18"))},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List pods without trailing slash with Exact ResourceVersion=18 and Limit=1",
+			Request: Request{
+				Op:  OpList,
+				Key: "/pods",
+				List: ListRequest{Options: storage.ListOptions{
+					ResourceVersion:      "18",
+					ResourceVersionMatch: metav1.ResourceVersionMatchExact,
+					Recursive:            true,
+					Predicate: storage.SelectionPredicate{
+						Label: labels.Everything(),
+						Field: fields.Everything(),
+						Limit: 1,
+					},
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodListWithContinue("18", new(int64(1)), withRV(pod4, "17")),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("18", withRV(pod4, "17"))},
+				{Object: newTestPodListWithContinue("18", nil, withRV(pod4, "17"))},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List pods with NotOlderThan ResourceVersion=18, Limit=1, and field selector matching first pod",
+			Request: Request{
+				Op:  OpList,
+				Key: "/pods/",
+				List: ListRequest{Options: storage.ListOptions{
+					ResourceVersion:      "18",
+					ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan,
+					Recursive:            true,
+					Predicate: storage.SelectionPredicate{
+						Label:    labels.Everything(),
+						Field:    fields.OneTermEqualSelector("metadata.namespace", "ns1"),
+						GetAttrs: storage.DefaultNamespaceScopedAttr,
+						Limit:    1,
+					},
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodList("19", withLabel(pod4, "19", "version", "v1")),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("19")},
+				{Object: newTestPodListWithContinue("19", new(int64(1)), withLabel(pod4, "19", "version", "v1"))},
+				{Object: newTestPodList("19", withLabel(pod4, "19", "version", "v1"), withRV(pod5, "18"))},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List pods with Exact ResourceVersion=19, Limit=1, and field selector matching both pods",
+			Request: Request{
+				Op:  OpList,
+				Key: "/pods/",
+				List: ListRequest{Options: storage.ListOptions{
+					ResourceVersion:      "19",
+					ResourceVersionMatch: metav1.ResourceVersionMatchExact,
+					Recursive:            true,
+					Predicate: storage.SelectionPredicate{
+						Label:    labels.Everything(),
+						Field:    fields.OneTermNotEqualSelector("metadata.namespace", "ns2"),
+						GetAttrs: storage.DefaultNamespaceScopedAttr,
+						Limit:    1,
+					},
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodListWithContinue("19", nil, withLabel(pod4, "19", "version", "v1")),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("19", withLabel(pod4, "19", "version", "v1"))},
+				{Object: newTestPodListWithContinue("19", new(int64(1)), withLabel(pod4, "19", "version", "v1"))},
+				{Object: newTestPodListWithContinue("19", nil, withLabel(pod4, "19", "version", "v1"), withRV(pod5, "18"))},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List pods with Continue from start at Exact ResourceVersion=18 and Limit=1",
+			Request: Request{
+				Op:  OpList,
+				Key: "/pods/",
+				List: ListRequest{Options: storage.ListOptions{
+					Recursive: true,
+					Predicate: storage.SelectionPredicate{
+						Label:    labels.Everything(),
+						Field:    fields.Everything(),
+						Limit:    1,
+						Continue: mustEncodeContinue("/pods/a", "/pods/", 18),
+					},
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodListWithContinue("18", new(int64(1)), withRV(pod4, "17")),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("18", withRV(pod4, "17"))},
+				{Object: newTestPodListWithContinue("18", new(int64(2)), withRV(pod4, "17"))},
+				{Object: newTestPodListWithContinue("18", nil, withRV(pod4, "17"))},
+				{Object: newTestPodListWithContinue("18", new(int64(1)), withRV(pod4, "17"), withRV(pod5, "18"))},
+				{Object: newTestPodList("22", withLabel(pod4, "20", "version", "v2"))},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List pods with Continue after pod4 at Exact ResourceVersion=18 without Limit",
+			Request: Request{
+				Op:  OpList,
+				Key: "/pods/",
+				List: ListRequest{Options: storage.ListOptions{
+					Recursive: true,
+					Predicate: storage.SelectionPredicate{
+						Label:    labels.Everything(),
+						Field:    fields.Everything(),
+						Continue: mustEncodeContinue(pod4Key+"\x00", "/pods/", 18),
+					},
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodList("18", withRV(pod5, "18")),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("18", withRV(pod4, "17"), withRV(pod5, "18"))},
+				{Object: newTestPodList("18")},
+				{Object: newTestPodList("22")},
+				{Object: newTestPodListWithContinue("18", new(int64(0)), withRV(pod5, "18"))},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List pods with Continue after pod4 at Exact ResourceVersion=18 and Limit=1",
+			Request: Request{
+				Op:  OpList,
+				Key: "/pods/",
+				List: ListRequest{Options: storage.ListOptions{
+					Recursive: true,
+					Predicate: storage.SelectionPredicate{
+						Label:    labels.Everything(),
+						Field:    fields.Everything(),
+						Limit:    1,
+						Continue: mustEncodeContinue(pod4Key+"\x00", "/pods/", 18),
+					},
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodList("18", withRV(pod5, "18")),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodListWithContinue("18", new(int64(0)), withRV(pod5, "18"))},
+				{Object: newTestPodList("18", withRV(pod4, "17"), withRV(pod5, "18"))},
+				{Object: newTestPodList("18")},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List pods with Continue inclusive at pod5 at Exact ResourceVersion=18",
+			Request: Request{
+				Op:  OpList,
+				Key: "/pods/",
+				List: ListRequest{Options: storage.ListOptions{
+					Recursive: true,
+					Predicate: storage.SelectionPredicate{
+						Label:    labels.Everything(),
+						Field:    fields.Everything(),
+						Continue: mustEncodeContinue(pod5Key, "/pods/", 18),
+					},
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodList("18", withRV(pod5, "18")),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("18")},
+				{Object: newTestPodList("18", withRV(pod4, "17"), withRV(pod5, "18"))},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List pods with Continue after pod5 at Exact ResourceVersion=18 returns empty list",
+			Request: Request{
+				Op:  OpList,
+				Key: "/pods/",
+				List: ListRequest{Options: storage.ListOptions{
+					Recursive: true,
+					Predicate: storage.SelectionPredicate{
+						Label:    labels.Everything(),
+						Field:    fields.Everything(),
+						Continue: mustEncodeContinue(pod5Key+"\x00", "/pods/", 18),
+					},
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodList("18"),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("18", withRV(pod5, "18"))},
+				{Object: newTestPodList("22")},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List pods without trailing slash with Continue after pod4 at Exact ResourceVersion=18",
+			Request: Request{
+				Op:  OpList,
+				Key: "/pods",
+				List: ListRequest{Options: storage.ListOptions{
+					Recursive: true,
+					Predicate: storage.SelectionPredicate{
+						Label:    labels.Everything(),
+						Field:    fields.Everything(),
+						Continue: mustEncodeContinue(pod4Key+"\x00", "/pods/", 18),
+					},
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodList("18", withRV(pod5, "18")),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("18", withRV(pod4, "17"), withRV(pod5, "18"))},
+				{Object: newTestPodList("18")},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List pods in namespace ns1 with Continue from start at Exact ResourceVersion=18",
+			Request: Request{
+				Op:  OpList,
+				Key: "/pods/ns1",
+				List: ListRequest{Options: storage.ListOptions{
+					Recursive: true,
+					Predicate: storage.SelectionPredicate{
+						Label:    labels.Everything(),
+						Field:    fields.Everything(),
+						Continue: mustEncodeContinue("/pods/ns1/a", "/pods/ns1/", 18),
+					},
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodList("18", withRV(pod4, "17")),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("18", withRV(pod4, "17"), withRV(pod5, "18"))},
+				{Object: newTestPodList("18")},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List pods in namespace ns1 with Continue after pod4 at Exact ResourceVersion=18 returns empty list",
+			Request: Request{
+				Op:  OpList,
+				Key: "/pods/ns1",
+				List: ListRequest{Options: storage.ListOptions{
+					Recursive: true,
+					Predicate: storage.SelectionPredicate{
+						Label:    labels.Everything(),
+						Field:    fields.Everything(),
+						Continue: mustEncodeContinue(pod4Key+"\x00", "/pods/ns1/", 18),
+					},
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodList("18"),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("18", withRV(pod5, "18"))},
+				{Object: newTestPodList("18", withRV(pod4, "17"))},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List pods with Continue at Exact ResourceVersion=18 and ResourceVersion=0",
+			Request: Request{
+				Op:  OpList,
+				Key: "/pods/",
+				List: ListRequest{Options: storage.ListOptions{
+					ResourceVersion: "0",
+					Recursive:       true,
+					Predicate: storage.SelectionPredicate{
+						Label:    labels.Everything(),
+						Field:    fields.Everything(),
+						Continue: mustEncodeContinue(pod4Key+"\x00", "/pods/", 18),
+					},
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodList("18", withRV(pod5, "18")),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("22")},
+				{Object: newTestPodList("22", withLabel(pod4, "20", "version", "v2"))},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List pods with Continue from start at Exact ResourceVersion=19, Limit=1, and field selector matching both pods",
+			Request: Request{
+				Op:  OpList,
+				Key: "/pods/",
+				List: ListRequest{Options: storage.ListOptions{
+					Recursive: true,
+					Predicate: storage.SelectionPredicate{
+						Label:    labels.Everything(),
+						Field:    fields.OneTermNotEqualSelector("metadata.namespace", "ns2"),
+						GetAttrs: storage.DefaultNamespaceScopedAttr,
+						Limit:    1,
+						Continue: mustEncodeContinue("/pods/a", "/pods/", 19),
+					},
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodListWithContinue("19", nil, withLabel(pod4, "19", "version", "v1")),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("19", withLabel(pod4, "19", "version", "v1"))},
+				{Object: newTestPodListWithContinue("19", new(int64(1)), withLabel(pod4, "19", "version", "v1"))},
+				{Object: newTestPodListWithContinue("19", nil, withLabel(pod4, "19", "version", "v1"), withRV(pod5, "18"))},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List pods with Continue at compacted ResourceVersion=15 returns ResourceExpired with inconsistent continue token",
+			Request: Request{
+				Op:  OpList,
+				Key: "/pods/",
+				List: ListRequest{Options: storage.ListOptions{
+					Recursive: true,
+					Predicate: storage.SelectionPredicate{
+						Label:    labels.Everything(),
+						Field:    fields.Everything(),
+						Continue: mustEncodeContinue(pod4Key+"\x00", "/pods/", 15),
+					},
+				}},
+			},
+			CorrectResponse: Response{
+				Err: compactedContinueError(pod4Key+"\x00", "/pods/"),
+			},
+			InvalidResponses: []Response{
+				{Err: apierrors.NewResourceExpired("The resourceVersion for the provided list is too old.")},
+				{Err: compactedContinueError(pod4Key, "/pods/")},
+				{Object: newTestPodList("22")},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List pods with inconsistent Continue (rv=-1) from start returns latest consistent list",
+			Request: Request{
+				Op:  OpList,
+				Key: "/pods/",
+				List: ListRequest{Options: storage.ListOptions{
+					Recursive: true,
+					Predicate: storage.SelectionPredicate{
+						Label:    labels.Everything(),
+						Field:    fields.Everything(),
+						Continue: mustEncodeContinue("/pods/a", "/pods/", -1),
+					},
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodList("22", withLabel(pod4, "20", "version", "v2")),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("22")},
+				{Object: newTestPodList("20", withLabel(pod4, "20", "version", "v2"))},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List pods with inconsistent Continue (rv=-1) after pod4 returns empty consistent list",
+			Request: Request{
+				Op:  OpList,
+				Key: "/pods/",
+				List: ListRequest{Options: storage.ListOptions{
+					Recursive: true,
+					Predicate: storage.SelectionPredicate{
+						Label:    labels.Everything(),
+						Field:    fields.Everything(),
+						Continue: mustEncodeContinue(pod4Key+"\x00", "/pods/", -1),
+					},
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodList("22"),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("22", withLabel(pod4, "20", "version", "v2"))},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List pods with Continue at future ResourceVersion=99 returns TooLargeResourceVersionError",
+			Request: Request{
+				Op:  OpList,
+				Key: "/pods/",
+				List: ListRequest{Options: storage.ListOptions{
+					Recursive: true,
+					Predicate: storage.SelectionPredicate{
+						Label:    labels.Everything(),
+						Field:    fields.Everything(),
+						Continue: mustEncodeContinue(pod4Key+"\x00", "/pods/", 99),
+					},
+				}},
+			},
+			CorrectResponse: Response{
+				Err: storage.NewTooLargeResourceVersionError(99, 22, 0),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("22")},
+				{Err: apierrors.NewResourceExpired("The resourceVersion for the provided list is too old.")},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List single pod non-recursively ignores Continue token",
+			Request: Request{
+				Op:  OpList,
+				Key: pod4Key,
+				List: ListRequest{Options: storage.ListOptions{
+					Recursive: false,
+					Predicate: storage.SelectionPredicate{
+						Label:    labels.Everything(),
+						Field:    fields.Everything(),
+						Continue: "not-base64!!!",
+					},
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodList("22", withLabel(pod4, "20", "version", "v2")),
+			},
+			InvalidResponses: []Response{
+				{Err: apierrors.NewBadRequest(fmt.Sprintf("invalid continue token: %v", malformedContinueErr))},
+				{Object: newTestPodList("22")},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List pods with malformed Continue token returns BadRequest",
+			Request: Request{
+				Op:  OpList,
+				Key: "/pods/",
+				List: ListRequest{Options: storage.ListOptions{
+					Recursive: true,
+					Predicate: storage.SelectionPredicate{
+						Label:    labels.Everything(),
+						Field:    fields.Everything(),
+						Continue: "not-base64!!!",
+					},
+				}},
+			},
+			CorrectResponse: Response{
+				Err: apierrors.NewBadRequest(fmt.Sprintf("invalid continue token: %v", malformedContinueErr)),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("22", withLabel(pod4, "20", "version", "v2"))},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List pods with Continue token having rv=0 returns BadRequest",
+			Request: Request{
+				Op:  OpList,
+				Key: "/pods/",
+				List: ListRequest{Options: storage.ListOptions{
+					Recursive: true,
+					Predicate: storage.SelectionPredicate{
+						Label:    labels.Everything(),
+						Field:    fields.Everything(),
+						Continue: mustEncodeContinue("/pods/a", "/pods/", 0),
+					},
+				}},
+			},
+			CorrectResponse: Response{
+				Err: apierrors.NewBadRequest(fmt.Sprintf("invalid continue token: %v", storage.ErrInvalidStartRV)),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("22", withLabel(pod4, "20", "version", "v2"))},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List pods with Continue token escaping prefix returns BadRequest",
+			Request: Request{
+				Op:  OpList,
+				Key: "/pods/ns1/",
+				List: ListRequest{Options: storage.ListOptions{
+					Recursive: true,
+					Predicate: storage.SelectionPredicate{
+						Label:    labels.Everything(),
+						Field:    fields.Everything(),
+						Continue: traversalContinue,
+					},
+				}},
+			},
+			CorrectResponse: Response{
+				Err: apierrors.NewBadRequest(fmt.Sprintf("invalid continue token: %v", traversalContinueErr)),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("18", withRV(pod5, "18"))},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List pods with Continue and non-zero ResourceVersion returns BadRequest",
+			Request: Request{
+				Op:  OpList,
+				Key: "/pods/",
+				List: ListRequest{Options: storage.ListOptions{
+					ResourceVersion: "18",
+					Recursive:       true,
+					Predicate: storage.SelectionPredicate{
+						Label:    labels.Everything(),
+						Field:    fields.Everything(),
+						Continue: mustEncodeContinue(pod4Key+"\x00", "/pods/", 18),
+					},
+				}},
+			},
+			CorrectResponse: Response{
+				Err: apierrors.NewBadRequest("specifying resource version is not allowed when using continue"),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("18", withRV(pod5, "18"))},
 				{Object: nil, Err: nil},
 			},
 		},
@@ -1626,6 +2869,7 @@ func readTestCases() []testStep {
 type watchTestCase struct {
 	Name        string
 	Request     WatchRequest
+	ExpectMaxRV uint64
 	ExpectError error
 }
 
@@ -1641,111 +2885,236 @@ func watchTestCases() []watchTestCase {
 		opts.Predicate.AllowWatchBookmarks = true
 		return opts
 	}
+	watchNonRecursive := func(rv string, match metav1.ResourceVersionMatch) storage.ListOptions {
+		opts := watch(rv, match)
+		opts.Recursive = false
+		return opts
+	}
+	watchNonRecursiveWithBookmarks := func(rv string, match metav1.ResourceVersionMatch) storage.ListOptions {
+		opts := watchWithBookmarks(rv, match)
+		opts.Recursive = false
+		return opts
+	}
 	watchList := func(rv string) storage.ListOptions {
 		pred := storage.Everything
 		pred.AllowWatchBookmarks = true
 		return storage.ListOptions{ResourceVersion: rv, ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan, Predicate: pred, Recursive: true, SendInitialEvents: new(true)}
 	}
+	watchListNonRecursive := func(rv string) storage.ListOptions {
+		opts := watchList(rv)
+		opts.Recursive = false
+		return opts
+	}
 	return []watchTestCase{
 		{
-			Name:    "Watch everything",
-			Request: WatchRequest{Key: "/pods/", Options: watch("", "")},
+			Name:        "Watch everything",
+			Request:     WatchRequest{Key: "/pods/", Options: watch("", "")},
+			ExpectMaxRV: 21,
 		},
 		{
-			Name:    "Watch everything with AllowWatchBookmarks",
-			Request: WatchRequest{Key: "/pods/", Options: watchWithBookmarks("", "")},
+			Name:        "Watch everything with AllowWatchBookmarks",
+			Request:     WatchRequest{Key: "/pods/", Options: watchWithBookmarks("", "")},
+			ExpectMaxRV: 21,
 		},
 		{
-			Name:    "Watch everything with NotOlderThan",
-			Request: WatchRequest{Key: "/pods/", Options: watch("", metav1.ResourceVersionMatchNotOlderThan)},
+			Name:        "Watch everything with NotOlderThan",
+			Request:     WatchRequest{Key: "/pods/", Options: watch("", metav1.ResourceVersionMatchNotOlderThan)},
+			ExpectMaxRV: 21,
 		},
 		{
-			Name:    "Watch everything with ResourceVersion=0",
-			Request: WatchRequest{Key: "/pods/", Options: watch("0", "")},
+			Name:        "Watch everything with ResourceVersion=0",
+			Request:     WatchRequest{Key: "/pods/", Options: watch("0", "")},
+			ExpectMaxRV: 21,
 		},
 		{
-			Name:    "Watch everything with ResourceVersion=0 and AllowWatchBookmarks",
-			Request: WatchRequest{Key: "/pods/", Options: watchWithBookmarks("0", "")},
+			Name:        "Watch everything with ResourceVersion=0 and AllowWatchBookmarks",
+			Request:     WatchRequest{Key: "/pods/", Options: watchWithBookmarks("0", "")},
+			ExpectMaxRV: 21,
 		},
 		{
-			Name:    "Watch everything with ResourceVersion=0 and NotOlderThan",
-			Request: WatchRequest{Key: "/pods/", Options: watch("0", metav1.ResourceVersionMatchNotOlderThan)},
+			Name:        "Watch everything with ResourceVersion=0 and NotOlderThan",
+			Request:     WatchRequest{Key: "/pods/", Options: watch("0", metav1.ResourceVersionMatchNotOlderThan)},
+			ExpectMaxRV: 21,
 		},
 		{
-			Name:    "Watch everything with ResourceVersion=1",
-			Request: WatchRequest{Key: "/pods/", Options: watch("1", "")},
+			Name:        "Watch everything with ResourceVersion=1",
+			Request:     WatchRequest{Key: "/pods/", Options: watch("1", "")},
+			ExpectMaxRV: 21,
 		},
 		{
-			Name:    "Watch everything with ResourceVersion=1 and AllowWatchBookmarks",
-			Request: WatchRequest{Key: "/pods/", Options: watchWithBookmarks("1", "")},
+			Name:        "Watch everything with ResourceVersion=1 and AllowWatchBookmarks",
+			Request:     WatchRequest{Key: "/pods/", Options: watchWithBookmarks("1", "")},
+			ExpectMaxRV: 21,
 		},
 		{
-			Name:    "Watch everything with ResourceVersion=1 and Exact",
-			Request: WatchRequest{Key: "/pods/", Options: watch("1", metav1.ResourceVersionMatchExact)},
+			Name:        "Watch everything with ResourceVersion=1 and Exact",
+			Request:     WatchRequest{Key: "/pods/", Options: watch("1", metav1.ResourceVersionMatchExact)},
+			ExpectMaxRV: 21,
 		},
 		{
-			Name:    "Watch everything with ResourceVersion=1 and NotOlderThan",
-			Request: WatchRequest{Key: "/pods/", Options: watch("1", metav1.ResourceVersionMatchNotOlderThan)},
+			Name:        "Watch everything with ResourceVersion=1 and NotOlderThan",
+			Request:     WatchRequest{Key: "/pods/", Options: watch("1", metav1.ResourceVersionMatchNotOlderThan)},
+			ExpectMaxRV: 21,
 		},
 		{
-			Name:    "Watch everything with ResourceVersion=8",
-			Request: WatchRequest{Key: "/pods/", Options: watch("8", "")},
+			Name:        "Watch everything with ResourceVersion=8",
+			Request:     WatchRequest{Key: "/pods/", Options: watch("8", "")},
+			ExpectMaxRV: 21,
 		},
 		{
-			Name:    "Watch everything with ResourceVersion=8 and AllowWatchBookmarks",
-			Request: WatchRequest{Key: "/pods/", Options: watchWithBookmarks("8", "")},
+			Name:        "Watch everything with ResourceVersion=8 and AllowWatchBookmarks",
+			Request:     WatchRequest{Key: "/pods/", Options: watchWithBookmarks("8", "")},
+			ExpectMaxRV: 21,
 		},
 		{
-			Name:    "Watch everything with ResourceVersion=8 and Exact",
-			Request: WatchRequest{Key: "/pods/", Options: watch("8", metav1.ResourceVersionMatchExact)},
+			Name:        "Watch everything with ResourceVersion=8 and Exact",
+			Request:     WatchRequest{Key: "/pods/", Options: watch("8", metav1.ResourceVersionMatchExact)},
+			ExpectMaxRV: 21,
 		},
 		{
-			Name:    "Watch everything with ResourceVersion=8 and NotOlderThan",
-			Request: WatchRequest{Key: "/pods/", Options: watch("8", metav1.ResourceVersionMatchNotOlderThan)},
+			Name:        "Watch everything with ResourceVersion=8 and NotOlderThan",
+			Request:     WatchRequest{Key: "/pods/", Options: watch("8", metav1.ResourceVersionMatchNotOlderThan)},
+			ExpectMaxRV: 21,
 		},
 		{
-			Name:    "Watch on namespace ns1 with ResourceVersion=1",
-			Request: WatchRequest{Key: "/pods/ns1/", Options: watch("1", "")},
+			Name:        "Watch on namespace ns1 with ResourceVersion=1",
+			Request:     WatchRequest{Key: "/pods/ns1/", Options: watch("1", "")},
+			ExpectMaxRV: 20,
 		},
 		{
-			Name:    "Watch on namespace ns1 with ResourceVersion=1 and Exact",
-			Request: WatchRequest{Key: "/pods/ns1/", Options: watch("1", metav1.ResourceVersionMatchExact)},
+			Name:        "Watch on namespace ns1 with ResourceVersion=1 and Exact",
+			Request:     WatchRequest{Key: "/pods/ns1/", Options: watch("1", metav1.ResourceVersionMatchExact)},
+			ExpectMaxRV: 20,
 		},
 		{
-			Name:    "Watch on namespace ns1 with ResourceVersion=1 and NotOlderThan",
-			Request: WatchRequest{Key: "/pods/ns1/", Options: watch("1", metav1.ResourceVersionMatchNotOlderThan)},
+			Name:        "Watch on namespace ns1 with ResourceVersion=1 and NotOlderThan",
+			Request:     WatchRequest{Key: "/pods/ns1/", Options: watch("1", metav1.ResourceVersionMatchNotOlderThan)},
+			ExpectMaxRV: 20,
 		},
 		{
-			Name:    "Watch on namespace ns10 with ResourceVersion=1",
-			Request: WatchRequest{Key: "/pods/ns10/", Options: watch("1", "")},
+			Name:        "Watch on namespace ns10 with ResourceVersion=1",
+			Request:     WatchRequest{Key: "/pods/ns10/", Options: watch("1", "")},
+			ExpectMaxRV: 21,
 		},
 		{
-			Name:    "Watch on namespace ns10 with ResourceVersion=1 and Exact",
-			Request: WatchRequest{Key: "/pods/ns10/", Options: watch("1", metav1.ResourceVersionMatchExact)},
+			Name:        "Watch on namespace ns10 with ResourceVersion=1 and Exact",
+			Request:     WatchRequest{Key: "/pods/ns10/", Options: watch("1", metav1.ResourceVersionMatchExact)},
+			ExpectMaxRV: 21,
 		},
 		{
-			Name:    "Watch on namespace ns10 with ResourceVersion=1 and NotOlderThan",
-			Request: WatchRequest{Key: "/pods/ns10/", Options: watch("1", metav1.ResourceVersionMatchNotOlderThan)},
+			Name:        "Watch on namespace ns10 with ResourceVersion=1 and NotOlderThan",
+			Request:     WatchRequest{Key: "/pods/ns10/", Options: watch("1", metav1.ResourceVersionMatchNotOlderThan)},
+			ExpectMaxRV: 21,
 		},
 		{
-			Name:    "Watch list everything",
-			Request: WatchRequest{Key: "/pods/", Options: watchList("")},
+			Name:        "Watch list everything",
+			Request:     WatchRequest{Key: "/pods/", Options: watchList("")},
+			ExpectMaxRV: 21,
 		},
 		{
-			Name:    "Watch list everything with ResourceVersion=0",
-			Request: WatchRequest{Key: "/pods/", Options: watchList("0")},
+			Name:        "Watch list everything with ResourceVersion=0",
+			Request:     WatchRequest{Key: "/pods/", Options: watchList("0")},
+			ExpectMaxRV: 21,
 		},
 		{
-			Name:    "Watch list everything with ResourceVersion=1",
-			Request: WatchRequest{Key: "/pods/", Options: watchList("1")},
+			Name:        "Watch list everything with ResourceVersion=1",
+			Request:     WatchRequest{Key: "/pods/", Options: watchList("1")},
+			ExpectMaxRV: 21,
 		},
 		{
-			Name:    "Watch list on namespace ns1 with ResourceVersion=1",
-			Request: WatchRequest{Key: "/pods/ns1/", Options: watchList("1")},
+			Name:        "Watch list on namespace ns1 with ResourceVersion=1",
+			Request:     WatchRequest{Key: "/pods/ns1/", Options: watchList("1")},
+			ExpectMaxRV: 20,
 		},
 		{
-			Name:    "Watch list on namespace ns10 with ResourceVersion=1",
-			Request: WatchRequest{Key: "/pods/ns10/", Options: watchList("1")},
+			Name:        "Watch list on namespace ns10 with ResourceVersion=1",
+			Request:     WatchRequest{Key: "/pods/ns10/", Options: watchList("1")},
+			ExpectMaxRV: 21,
+		},
+		{
+			Name:        "Watch single pod pod1 non-recursively",
+			Request:     WatchRequest{Key: "/pods/ns1/pod1", Options: watchNonRecursive("", "")},
+			ExpectMaxRV: 4,
+		},
+		{
+			Name:        "Watch single pod pod1 non-recursively with AllowWatchBookmarks",
+			Request:     WatchRequest{Key: "/pods/ns1/pod1", Options: watchNonRecursiveWithBookmarks("", "")},
+			ExpectMaxRV: 4,
+		},
+		{
+			Name:        "Watch single pod pod1 non-recursively with NotOlderThan",
+			Request:     WatchRequest{Key: "/pods/ns1/pod1", Options: watchNonRecursive("", metav1.ResourceVersionMatchNotOlderThan)},
+			ExpectMaxRV: 4,
+		},
+		{
+			Name:        "Watch single pod pod1 non-recursively with ResourceVersion=0",
+			Request:     WatchRequest{Key: "/pods/ns1/pod1", Options: watchNonRecursive("0", "")},
+			ExpectMaxRV: 4,
+		},
+		{
+			Name:        "Watch single pod pod1 non-recursively with ResourceVersion=0 and AllowWatchBookmarks",
+			Request:     WatchRequest{Key: "/pods/ns1/pod1", Options: watchNonRecursiveWithBookmarks("0", "")},
+			ExpectMaxRV: 4,
+		},
+		{
+			Name:        "Watch single pod pod1 non-recursively with ResourceVersion=0 and NotOlderThan",
+			Request:     WatchRequest{Key: "/pods/ns1/pod1", Options: watchNonRecursive("0", metav1.ResourceVersionMatchNotOlderThan)},
+			ExpectMaxRV: 4,
+		},
+		{
+			Name:        "Watch single pod pod4 non-recursively with ResourceVersion=1",
+			Request:     WatchRequest{Key: "/pods/ns1/pod4", Options: watchNonRecursive("1", "")},
+			ExpectMaxRV: 20,
+		},
+		{
+			Name:        "Watch single pod pod4 non-recursively with ResourceVersion=1 and AllowWatchBookmarks",
+			Request:     WatchRequest{Key: "/pods/ns1/pod4", Options: watchNonRecursiveWithBookmarks("1", "")},
+			ExpectMaxRV: 20,
+		},
+		{
+			Name:        "Watch single pod pod4 non-recursively with ResourceVersion=1 and Exact",
+			Request:     WatchRequest{Key: "/pods/ns1/pod4", Options: watchNonRecursive("1", metav1.ResourceVersionMatchExact)},
+			ExpectMaxRV: 20,
+		},
+		{
+			Name:        "Watch single pod pod4 non-recursively with ResourceVersion=1 and NotOlderThan",
+			Request:     WatchRequest{Key: "/pods/ns1/pod4", Options: watchNonRecursive("1", metav1.ResourceVersionMatchNotOlderThan)},
+			ExpectMaxRV: 20,
+		},
+		{
+			Name:        "Watch single pod pod4 non-recursively with ResourceVersion=8",
+			Request:     WatchRequest{Key: "/pods/ns1/pod4", Options: watchNonRecursive("8", "")},
+			ExpectMaxRV: 20,
+		},
+		{
+			Name:        "Watch single pod pod4 non-recursively with ResourceVersion=8 and AllowWatchBookmarks",
+			Request:     WatchRequest{Key: "/pods/ns1/pod4", Options: watchNonRecursiveWithBookmarks("8", "")},
+			ExpectMaxRV: 20,
+		},
+		{
+			Name:        "Watch single pod pod4 non-recursively with ResourceVersion=8 and Exact",
+			Request:     WatchRequest{Key: "/pods/ns1/pod4", Options: watchNonRecursive("8", metav1.ResourceVersionMatchExact)},
+			ExpectMaxRV: 20,
+		},
+		{
+			Name:        "Watch single pod pod4 non-recursively with ResourceVersion=8 and NotOlderThan",
+			Request:     WatchRequest{Key: "/pods/ns1/pod4", Options: watchNonRecursive("8", metav1.ResourceVersionMatchNotOlderThan)},
+			ExpectMaxRV: 20,
+		},
+		{
+			Name:        "Watch list single pod pod1 non-recursively",
+			Request:     WatchRequest{Key: "/pods/ns1/pod1", Options: watchListNonRecursive("")},
+			ExpectMaxRV: 4,
+		},
+		{
+			Name:        "Watch list single pod pod1 non-recursively with ResourceVersion=0",
+			Request:     WatchRequest{Key: "/pods/ns1/pod1", Options: watchListNonRecursive("0")},
+			ExpectMaxRV: 4,
+		},
+		{
+			Name:        "Watch list single pod pod4 non-recursively with ResourceVersion=1",
+			Request:     WatchRequest{Key: "/pods/ns1/pod4", Options: watchListNonRecursive("1")},
+			ExpectMaxRV: 20,
 		},
 		{
 			Name:        "Watch with empty key returns empty key error",
@@ -1847,65 +3216,84 @@ func RunTestCorrectness(ctx context.Context, t *testing.T, store storage.Interfa
 	require.NoError(t, err)
 
 	for _, tc := range readTestCases() {
-		var out runtime.Object
-		var err error
-		switch tc.Request.Op {
-		case OpGet:
-			out = &example.Pod{}
-			err = store.Get(ctx, tc.Request.Key, tc.Request.Get.Options, out)
-		case OpList:
-			out = &example.PodList{}
-			err = store.GetList(ctx, tc.Request.Key, tc.Request.List.Options, out)
-		default:
-			t.Fatalf("unknown read operation: %v", tc.Request.Op)
-		}
-		var respObj runtime.Object
-		if err == nil {
-			respObj = out
-		}
-		resp := Response{Object: respObj, Err: err}
-		ok, next, change := model.Step(tc.Request, resp)
-		require.True(t, ok, "step %s failed to match model state transition: req=%+v resp=%+v", tc.Name, tc.Request, resp)
-		require.Equal(t, model, next, "step %s", tc.Name)
-		require.Nil(t, change, "step %s", tc.Name)
-		require.NoError(t, replay.Validate(tc.Request, resp), "step %s", tc.Name)
+		t.Run(tc.Name, func(t *testing.T) {
+			t.Parallel()
+			var out runtime.Object
+			var err error
+			switch tc.Request.Op {
+			case OpGet:
+				out = &example.Pod{}
+				err = store.Get(ctx, tc.Request.Key, tc.Request.Get.Options, out)
+			case OpList:
+				out = &example.PodList{}
+				err = store.GetList(ctx, tc.Request.Key, tc.Request.List.Options, out)
+			default:
+				t.Fatalf("unknown read operation: %v", tc.Request.Op)
+			}
+			var respObj runtime.Object
+			if err == nil {
+				respObj = out
+			}
+			resp := Response{Object: respObj, Err: err}
+			ok, next, change := model.Step(tc.Request, resp)
+			require.True(t, ok, "step %s failed to match model state transition: req=%+v resp=%+v", tc.Name, tc.Request, resp)
+			require.Equal(t, model, next, "step %s", tc.Name)
+			require.Nil(t, change, "step %s", tc.Name)
+			require.NoError(t, replay.Validate(tc.Request, resp), "step %s", tc.Name)
+		})
 	}
 
 	validator := NewWatchValidator(versioner, replay, keyFunc)
 	for i, w := range watchCases {
-		var resp WatchResponse
-		if watchErrs[i] != nil {
-			resp = WatchResponse{Err: watchErrs[i]}
-		} else {
-			targetRV, err := replay.LastWatchRV(w.Request)
-			require.NoError(t, err, "step %s", w.Name)
-			resp = WatchResponse{Events: collectEventsTillRV(t, watches[i], versioner, targetRV)}
-		}
-		require.NoError(t, validator.ValidateWatch(w.Request, resp), "step %s", w.Name)
+		t.Run(w.Name, func(t *testing.T) {
+			t.Parallel()
+			var resp WatchResponse
+			if watchErrs[i] != nil {
+				resp = WatchResponse{Err: watchErrs[i]}
+			} else {
+				resp = WatchResponse{Events: collectEventsTillRV(t, watches[i], versioner, w.ExpectMaxRV)}
+			}
+			require.NoError(t, validator.ValidateWatch(w.Request, resp), "step %s", w.Name)
+		})
 	}
 }
 
 func collectEventsTillRV(t *testing.T, watcher watch.Interface, versioner storage.Versioner, targetRV uint64) []watch.Event {
 	events := []watch.Event{}
-	for e := range watcher.ResultChan() {
-		if cacheable, ok := e.Object.(runtime.CacheableObject); ok {
-			e.Object = cacheable.GetObject()
+	var maxRV uint64
+	for {
+		timeout := wait.ForeverTestTimeout
+		if maxRV >= targetRV {
+			timeout = 100 * time.Millisecond
 		}
-		events = append(events, e)
-		if e.Type == watch.Error {
-			_, open := <-watcher.ResultChan()
-			require.False(t, open, "watch channel should be closed after watch.Error")
-			break
-		}
-		accessor, err := meta.Accessor(e.Object)
-		require.NoError(t, err)
-		rv, err := versioner.ParseResourceVersion(accessor.GetResourceVersion())
-		require.NoError(t, err)
-		if rv >= targetRV {
-			break
+		select {
+		case e, open := <-watcher.ResultChan():
+			if !open {
+				return events
+			}
+			if cacheable, ok := e.Object.(runtime.CacheableObject); ok {
+				e.Object = cacheable.GetObject()
+			}
+			events = append(events, e)
+			if e.Type == watch.Error {
+				_, open := <-watcher.ResultChan()
+				require.False(t, open, "watch channel should be closed after watch.Error")
+				return events
+			}
+			accessor, err := meta.Accessor(e.Object)
+			require.NoError(t, err)
+			rv, err := versioner.ParseResourceVersion(accessor.GetResourceVersion())
+			require.NoError(t, err)
+			if rv > maxRV {
+				maxRV = rv
+			}
+		case <-time.After(timeout):
+			if maxRV < targetRV {
+				t.Fatalf("timed out waiting for watch event with RV >= %d (maxRV=%d)", targetRV, maxRV)
+			}
+			return events
 		}
 	}
-	return events
 }
 
 func newTestPod(name, namespace string, uid types.UID, rv string) *example.Pod {
@@ -1944,6 +3332,26 @@ func newTestPodList(rv string, pods ...*example.Pod) *example.PodList {
 		list.Items = append(list.Items, *pod)
 	}
 	return list
+}
+
+func newTestPodListWithContinue(rv string, remaining *int64, pods ...*example.Pod) *example.PodList {
+	list := newTestPodList(rv, pods...)
+	parsedRV, err := (storage.APIObjectVersioner{}).ParseResourceVersion(rv)
+	if err != nil {
+		panic(err)
+	}
+	lastPod := pods[len(pods)-1]
+	list.Continue = mustEncodeContinue(mustGetKey(lastPod)+"\x00", "/pods/", int64(parsedRV))
+	list.RemainingItemCount = remaining
+	return list
+}
+
+func mustEncodeContinue(key, keyPrefix string, rv int64) string {
+	token, err := storage.EncodeContinue(key, keyPrefix, rv)
+	if err != nil {
+		panic(err)
+	}
+	return token
 }
 
 func mustGetKey(obj runtime.Object) string {

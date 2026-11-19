@@ -30,7 +30,7 @@ import (
 
 func Test_MarkVolumeAsMountAttempted(t *testing.T) {
 	volumePluginMgr, _ := volumetesting.GetTestKubeletVolumePluginMgr(t)
-	asw := NewActualStateOfWorld("mynode", volumePluginMgr)
+	asw := NewActualStateOfWorld("mynode", volumePluginMgr, nil)
 
 	podName := util.GetUniquePodName(&v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: "pod1uid"}})
 	volumeName := v1.UniqueVolumeName("fake-plugin/vol1")
@@ -49,7 +49,7 @@ func Test_MarkVolumeAsMountAttempted(t *testing.T) {
 func Test_MarkVolumeAsMountAttempted_ClearedOnDeletePodFromVolume(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
 	volumePluginMgr, plugin := volumetesting.GetTestKubeletVolumePluginMgr(t)
-	asw := NewActualStateOfWorld("mynode", volumePluginMgr)
+	asw := NewActualStateOfWorld("mynode", volumePluginMgr, nil)
 
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -125,7 +125,7 @@ func Test_GetVolumesToReportHealth(t *testing.T) {
 			volumePluginMgr, _ := volumetesting.GetTestKubeletVolumePluginMgr(t)
 			seLinuxTranslator := util.NewFakeSELinuxLabelTranslator()
 			dsw := NewDesiredStateOfWorld(volumePluginMgr, seLinuxTranslator)
-			asw := NewActualStateOfWorld("mynode", volumePluginMgr)
+			asw := NewActualStateOfWorld("mynode", volumePluginMgr, nil)
 
 			pod, volumeSpec := newCSITestPodAndSpec("pod1", "pod1uid", "vol1", "csi-driver", "handle-1")
 			podName := util.GetUniquePodName(pod)

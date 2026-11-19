@@ -55,6 +55,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/watch"
+	clientfeatures "k8s.io/client-go/features"
+	clientfeaturestesting "k8s.io/client-go/features/testing"
 	"k8s.io/client-go/kubernetes/scheme"
 	restclientwatch "k8s.io/client-go/rest/watch"
 	"k8s.io/client-go/tools/metrics"
@@ -72,6 +74,20 @@ func TestNewRequestSetsAccept(t *testing.T) {
 	}
 	r = NewRequestWithClient(&url.URL{Path: "/path/"}, "", ClientContentConfig{ContentType: "application/other"}, nil).Verb("get")
 	if r.headers.Get("Accept") != "application/other, */*" {
+		t.Errorf("unexpected headers: %#v", r.headers)
+	}
+
+	// A CBOR ContentType set directly still needs the ClientsAllowCBOR feature gate.
+	clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.ClientsAllowCBOR, false)
+	r = NewRequestWithClient(&url.URL{Path: "/path/"}, "", ClientContentConfig{ContentType: "application/cbor"}, nil).Verb("get")
+	if r.headers.Get("Accept") != "application/json, */*" {
+		t.Errorf("unexpected headers: %#v", r.headers)
+	}
+
+	// DropManagedFields set directly still needs the ManagedFieldsOptOutClient feature gate.
+	clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.ManagedFieldsOptOutClient, false)
+	r = NewRequestWithClient(&url.URL{Path: "/path/"}, "", ClientContentConfig{DropManagedFields: true}, nil).Verb("get")
+	if r.headers.Get("Accept") != "application/json, */*" {
 		t.Errorf("unexpected headers: %#v", r.headers)
 	}
 }
@@ -2071,6 +2087,37 @@ func TestBody(t *testing.T) {
 		if body != tt.expected {
 			t.Errorf("%d: req.Body = %q; want %q", i, body, tt.expected)
 		}
+	}
+}
+
+func TestNewWatchEventDecoder(t *testing.T) {
+	tests := []struct {
+		name              string
+		featureEnabled    bool
+		sendInitialEvents string
+		wantConcurrent    bool
+	}{
+		{name: "feature enabled with initial events", featureEnabled: true, sendInitialEvents: "true", wantConcurrent: true},
+		{name: "feature disabled with initial events", sendInitialEvents: "true", wantConcurrent: false},
+		{name: "feature enabled without initial events", featureEnabled: true, wantConcurrent: false},
+		{name: "feature enabled with initial events disabled", featureEnabled: true, sendInitialEvents: "false", wantConcurrent: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.WatchListClientConcurrentDecoding, tt.featureEnabled)
+			r := &Request{params: url.Values{
+				"sendInitialEvents": {tt.sendInitialEvents},
+			}}
+			stream := streaming.NewDecoder(io.NopCloser(strings.NewReader("")), scheme.Codecs.UniversalDecoder())
+			decoder := r.newWatchEventDecoder(stream, scheme.Codecs.UniversalDecoder())
+			t.Cleanup(decoder.Close)
+
+			if tt.wantConcurrent {
+				require.IsType(t, &restclientwatch.ConcurrentWatchEventDecoder{}, decoder)
+			} else {
+				require.IsType(t, &restclientwatch.Decoder{}, decoder)
+			}
+		})
 	}
 }
 

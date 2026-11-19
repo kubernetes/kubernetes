@@ -30,6 +30,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/sharding"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache/synctrack"
@@ -253,6 +255,12 @@ type SharedInformer interface {
 	// Please see the comment on TransformFunc for more details.
 	SetTransform(handler TransformFunc) error
 
+	// SetShardSelector configures a shard selector on the informer's underlying
+	// ListerWatcher via NewShardedListWatch.
+	//
+	// Must be set before starting the informer.
+	SetShardSelector(selector sharding.Selector) error
+
 	// IsStopped reports whether the informer has already been stopped.
 	// Adding event handlers to already stopped informers is not possible.
 	// An informer already stopped will never be started again.
@@ -458,6 +466,7 @@ func NewSharedIndexInformerWithOptions(lw ListerWatcher, exampleObject runtime.O
 		identifier:                      options.Identifier,
 		informerMetricsProvider:         options.InformerMetricsProvider,
 		keyFunc:                         DeletionHandlingMetaNamespaceKeyFunc,
+		shardSelector:                   options.ShardSelector,
 	}
 }
 
@@ -481,6 +490,9 @@ type SharedIndexInformerOptions struct {
 	// InformerMetricsProvider is the metrics provider for the FIFO queue.
 	// If not set, metrics will be no-ops.
 	InformerMetricsProvider InformerMetricsProvider
+
+	// ShardSelector optionally restricts the informer to a shard subset via NewShardedListWatch.
+	ShardSelector sharding.Selector
 }
 
 // InformerSynced is a function that can be used to determine if an informer has synced.  This is useful for determining if caches have synced.
@@ -694,6 +706,37 @@ func (c SyncResult) AsError() error {
 	return fmt.Errorf("failed to sync all caches: %s: %w", strings.Join(unsynced, ", "), c.Err)
 }
 
+// GVRSyncResult is like [SyncResult] for factories which key their informers
+// by [schema.GroupVersionResource], i.e. the dynamic and metadata informer factories.
+type GVRSyncResult struct {
+	// Err is nil if all informer caches were synced, otherwise it is
+	// the reason why waiting for cache syncing stopped (= context.Cause(ctx)).
+	Err error
+
+	// Synced maps each registered informer in a factory to
+	// true if it has synced, false otherwise.
+	Synced map[schema.GroupVersionResource]bool
+}
+
+// AsError turns a GVRSyncResult into an error if not all caches were synced,
+// otherwise it returns nil. The error wraps context.Cause(ctx) and
+// includes information about the informers which were not synced.
+func (c GVRSyncResult) AsError() error {
+	if c.Err == nil {
+		return nil
+	}
+
+	unsynced := make([]string, 0, len(c.Synced))
+	for gvr, synced := range c.Synced {
+		if !synced {
+			unsynced = append(unsynced, gvr.String())
+		}
+	}
+	slices.Sort(unsynced)
+
+	return fmt.Errorf("failed to sync all caches: %s: %w", strings.Join(unsynced, ", "), c.Err)
+}
+
 // `*sharedIndexInformer` implements SharedIndexInformer and has three
 // main components.  One is an indexed local cache, `indexer Indexer`.
 // The second main component is a Controller that pulls
@@ -747,7 +790,8 @@ type sharedIndexInformer struct {
 	// Called whenever the ListAndWatch drops the connection with an error.
 	watchErrorHandler WatchErrorHandlerWithContext
 
-	transform TransformFunc
+	transform     TransformFunc
+	shardSelector sharding.Selector
 
 	// identifier is used to identify this informer for metrics and logging purposes.
 	identifier InformerNameAndResource
@@ -834,6 +878,18 @@ func (s *sharedIndexInformer) SetTransform(handler TransformFunc) error {
 	return nil
 }
 
+func (s *sharedIndexInformer) SetShardSelector(selector sharding.Selector) error {
+	s.startedLock.Lock()
+	defer s.startedLock.Unlock()
+
+	if s.started {
+		return fmt.Errorf("informer has already started")
+	}
+
+	s.shardSelector = selector
+	return nil
+}
+
 func (s *sharedIndexInformer) Run(stopCh <-chan struct{}) {
 	s.RunWithContext(wait.ContextForChannel(stopCh))
 }
@@ -855,7 +911,7 @@ func (s *sharedIndexInformer) RunWithContext(ctx context.Context) {
 
 		cfg := &Config{
 			Queue:             fifo,
-			ListerWatcher:     s.listerWatcher,
+			ListerWatcher:     NewShardedListWatch(s.listerWatcher, s.shardSelector),
 			ObjectType:        s.objectType,
 			ObjectDescription: s.objectDescription,
 			FullResyncPeriod:  s.resyncCheckPeriod,
@@ -972,6 +1028,7 @@ func (s *sharedIndexInformer) GetController() Controller {
 }
 
 func (s *sharedIndexInformer) AddEventHandler(handler ResourceEventHandler) (ResourceEventHandlerRegistration, error) {
+	//nolint:logcheck // Cannot provide Logger here.
 	return s.AddEventHandlerWithOptions(handler, HandlerOptions{})
 }
 
@@ -993,6 +1050,7 @@ func determineResyncPeriod(logger klog.Logger, desired, check time.Duration) tim
 const minimumResyncPeriod = 1 * time.Second
 
 func (s *sharedIndexInformer) AddEventHandlerWithResyncPeriod(handler ResourceEventHandler, resyncPeriod time.Duration) (ResourceEventHandlerRegistration, error) {
+	//nolint:logcheck // Cannot provide Logger here.
 	return s.AddEventHandlerWithOptions(handler, HandlerOptions{ResyncPeriod: &resyncPeriod})
 }
 

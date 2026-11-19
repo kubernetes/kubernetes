@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"path"
+	"slices"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -28,6 +29,8 @@ import (
 	"k8s.io/apiserver/pkg/admission/plugin/manifest"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/config/apis/webhookadmission"
 	v1 "k8s.io/apiserver/pkg/admission/plugin/webhook/config/apis/webhookadmission/v1"
+	"k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 )
 
 var (
@@ -69,5 +72,30 @@ func LoadConfig(configFile io.Reader) (*webhookadmission.WebhookAdmission, error
 		return nil, err
 	}
 
+	if err := validateStaticOrder(config.StaticOrder, config.StaticManifestsDir); err != nil {
+		return nil, err
+	}
+
 	return config, nil
+}
+
+// validateStaticOrder checks that staticOrder is gated, recognized, and only set
+// alongside staticManifestsDir. An empty value is equivalent to StaticFirst and is
+// always allowed.
+func validateStaticOrder(staticOrder webhookadmission.StaticOrder, staticManifestsDir string) error {
+	if len(staticOrder) == 0 {
+		return nil
+	}
+	fldPath := field.NewPath("staticOrder")
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ManifestBasedAdmissionControlConfig) {
+		return field.Forbidden(fldPath, "staticOrder requires the ManifestBasedAdmissionControlConfig feature gate to be enabled")
+	}
+	supported := []webhookadmission.StaticOrder{webhookadmission.ByName, webhookadmission.StaticFirst, webhookadmission.StaticLast}
+	if !slices.Contains(supported, staticOrder) {
+		return field.NotSupported(fldPath, staticOrder, supported)
+	}
+	if len(staticManifestsDir) == 0 {
+		return field.Invalid(fldPath, staticOrder, "may only be set when staticManifestsDir is set")
+	}
+	return nil
 }

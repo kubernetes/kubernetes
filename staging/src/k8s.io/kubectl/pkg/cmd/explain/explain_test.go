@@ -20,6 +20,7 @@ import (
 	"errors"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -210,17 +211,16 @@ func TestExplainOpenAPIV3(t *testing.T) {
 		fakeDiscoveryClient := discovery.NewDiscoveryClientForConfigOrDie(&rest.Config{Host: "https://not.a.real.site:65543/"})
 		return fakeDiscoveryClient.OpenAPIV3(), nil
 	}
-	// Returns a client that causes fallback to v2 implementation
+	// Returns a client whose OpenAPI V3 requests fail
 	cases := []explainTestCase{
 		{
-			// No --output, but OpenAPIV3 enabled should fall back to v2 if
-			// v2 is not available. Shows this by making openapiv3 client
-			// point to a bad URL. So the fact the proper data renders is
-			// indication v2 was used instead.
-			Name:              "Fallback",
-			Args:              []string{"pods"},
-			ExpectPattern:     []string{`\s*KIND:[\t ]*Pod\s*`},
-			OpenAPIV3SchemaFn: fallbackV3SchemaFn,
+			// No --output and OpenAPI V3 unreachable: the error is
+			// reported instead of falling back to the deprecated v2
+			// implementation.
+			Name:               "NoFallbackToOpenAPIV2",
+			Args:               []string{"pods"},
+			ExpectErrorPattern: `not\.a\.real\.site`,
+			OpenAPIV3SchemaFn:  fallbackV3SchemaFn,
 		},
 		{
 			Name:          "NonDefaultAPIVersion",
@@ -229,8 +229,9 @@ func TestExplainOpenAPIV3(t *testing.T) {
 			ExpectPattern: []string{`\s*VERSION:[\t ]*(v2|autoscaling/v2)\s*`},
 		},
 		{
-			// Show that explicitly specifying --output plaintext-openapiv2 causes
-			// old implementation to be used even though OpenAPIV3 is enabled
+			// Show that explicitly specifying the deprecated --output
+			// plaintext-openapiv2 still uses the old implementation, without
+			// touching OpenAPI V3
 			Name:              "OutputPlaintextV2",
 			Args:              []string{"pods"},
 			Flags:             map[string]string{"output": "plaintext-openapiv2"},
@@ -334,6 +335,56 @@ func runExplainTestCases(t *testing.T, cases []explainTestCase) {
 // OpenAPI V2 specifications retrieval -- should never be called.
 func panicOpenAPISchemaFn() (openapi.Resources, error) {
 	panic("should never be called")
+}
+
+// An OpenAPI V3 failure is reported; it does not fall back to retrieving
+// the V2 specifications.
+func TestExplainOpenAPIV3FailureDoesNotFallbackToOpenAPIV2(t *testing.T) {
+	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
+	tf.OpenAPIV3ClientFunc = func() (openapiclient.Client, error) {
+		fakeDiscoveryClient := discovery.NewDiscoveryClientForConfigOrDie(&rest.Config{Host: "https://not.a.real.site:65543/"})
+		return fakeDiscoveryClient.OpenAPIV3(), nil
+	}
+	// OpenAPI V2 specifications retrieval will panic if called.
+	tf.OpenAPISchemaFunc = panicOpenAPISchemaFn
+
+	var fatal string
+	cmdutil.BehaviorOnFatal(func(str string, code int) { fatal = str })
+	defer cmdutil.DefaultBehaviorOnFatal()
+
+	ioStreams, _, _, errOut := genericiooptions.NewTestIOStreams()
+	cmd := explain.NewCmdExplain("kubectl", tf, ioStreams)
+	cmd.Run(cmd, []string{"pods"})
+
+	if !strings.Contains(fatal, "not.a.real.site") {
+		t.Fatalf("expected the OpenAPI V3 error to be reported, got %q", fatal)
+	}
+	if errOut.Len() != 0 {
+		t.Fatalf("unexpected stderr output: %s", errOut.String())
+	}
+}
+
+// The deprecated plaintext-openapiv2 output warns on stderr.
+func TestExplainOpenAPIV2OutputWarns(t *testing.T) {
+	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
+	tf.OpenAPISchemaFunc = FakeOpenAPISchema.OpenAPISchemaFn
+	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
+
+	ioStreams, _, out, errOut := genericiooptions.NewTestIOStreams()
+	cmd := explain.NewCmdExplain("kubectl", tf, ioStreams)
+	if err := cmd.Flags().Set("output", "plaintext-openapiv2"); err != nil {
+		t.Fatal(err)
+	}
+	cmd.Run(cmd, []string{"pods"})
+
+	if !strings.Contains(errOut.String(), "--output=plaintext-openapiv2 is deprecated") {
+		t.Fatalf("expected deprecation warning on stderr, got %q", errOut.String())
+	}
+	if matched, _ := regexp.MatchString(`\s*KIND:[\t ]*Pod\s*`, out.String()); !matched {
+		t.Fatalf("expected Pod to be explained, got:\n%s", out.String())
+	}
 }
 
 // OpenAPI V3 specifications retrieval does *not* retrieve V2 specifications.

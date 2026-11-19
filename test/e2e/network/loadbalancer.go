@@ -639,7 +639,7 @@ var _ = common.SIGDescribe("LoadBalancers", feature.LoadBalancer, func() {
 		e2eservice.WaitForServiceUpdatedWithFinalizer(ctx, cs, svc.Namespace, svc.Name, true)
 	})
 
-	f.It("should be able to create LoadBalancer Service without NodePort and change it", f.WithSlow(), func(ctx context.Context) {
+	testLoadBalancerServiceWithoutNodePort := func(ctx context.Context, externalTrafficPolicy v1.ServiceExternalTrafficPolicy) {
 		// FIXME: need a better platform-independent timeout
 		loadBalancerLagTimeout := e2eservice.LoadBalancerLagTimeoutAWS
 		loadBalancerCreateTimeout := e2eservice.GetServiceLoadBalancerCreationTimeout(ctx, cs)
@@ -648,7 +648,7 @@ var _ = common.SIGDescribe("LoadBalancers", feature.LoadBalancer, func() {
 		// very slow, so we lumped all the tests into one LB lifecycle.
 
 		serviceName := "reallocate-nodeport-test"
-		ns1 := f.Namespace.Name // LB1 in ns1 on TCP
+		ns1 := f.Namespace.Name
 		framework.Logf("namespace for TCP test: %s", ns1)
 
 		ginkgo.By("creating a TCP service " + serviceName + " with type=ClusterIP in namespace " + ns1)
@@ -663,16 +663,15 @@ var _ = common.SIGDescribe("LoadBalancers", feature.LoadBalancer, func() {
 		_, err = tcpJig.Run(ctx, nil)
 		framework.ExpectNoError(err)
 
-		// Change the services to LoadBalancer.
-		ginkgo.By("changing the TCP service to type=LoadBalancer")
+		ginkgo.By("changing the TCP service to type=LoadBalancer without NodePort allocation")
 		_, err = tcpJig.UpdateService(ctx, func(s *v1.Service) {
 			s.Spec.Type = v1.ServiceTypeLoadBalancer
 			s.Spec.AllocateLoadBalancerNodePorts = ptr.To(false)
+			s.Spec.ExternalTrafficPolicy = externalTrafficPolicy
 		})
 		framework.ExpectNoError(err)
 
 		ginkgo.By("waiting for the TCP service to have a load balancer")
-		// Wait for the load balancer to be created asynchronously
 		tcpService, err = tcpJig.WaitForLoadBalancer(ctx, loadBalancerCreateTimeout)
 		framework.ExpectNoError(err)
 		if int(tcpService.Spec.Ports[0].NodePort) != 0 {
@@ -684,13 +683,12 @@ var _ = common.SIGDescribe("LoadBalancers", feature.LoadBalancer, func() {
 		ginkgo.By("hitting the TCP service's LoadBalancer")
 		e2eservice.TestReachableHTTP(ctx, tcpIngressIP, svcPort, loadBalancerLagTimeout)
 
-		// Change the services' node ports.
-
 		ginkgo.By("adding a TCP service's NodePort")
 		tcpService, err = tcpJig.UpdateService(ctx, func(s *v1.Service) {
 			s.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 		})
 		framework.ExpectNoError(err)
+
 		tcpNodePort := int(tcpService.Spec.Ports[0].NodePort)
 		if tcpNodePort == 0 {
 			framework.Failf("TCP Spec.Ports[0].NodePort (%d) not allocated", tcpNodePort)
@@ -702,6 +700,14 @@ var _ = common.SIGDescribe("LoadBalancers", feature.LoadBalancer, func() {
 
 		ginkgo.By("hitting the TCP service's LoadBalancer")
 		e2eservice.TestReachableHTTP(ctx, tcpIngressIP, svcPort, loadBalancerLagTimeout)
+	}
+
+	f.It("should be able to create LoadBalancer Service without NodePort with Cluster external traffic policy", f.WithSlow(), func(ctx context.Context) {
+		testLoadBalancerServiceWithoutNodePort(ctx, v1.ServiceExternalTrafficPolicyCluster)
+	})
+
+	f.It("should be able to create LoadBalancer Service without NodePort with Local external traffic policy", f.WithSlow(), func(ctx context.Context) {
+		testLoadBalancerServiceWithoutNodePort(ctx, v1.ServiceExternalTrafficPolicyLocal)
 	})
 
 	ginkgo.It("should be able to preserve UDP traffic when server pod cycles for a LoadBalancer service on different nodes", func(ctx context.Context) {

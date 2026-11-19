@@ -30,6 +30,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/textlogger"
 )
@@ -201,14 +202,35 @@ func (m *mockChecker) Done() <-chan struct{} {
 }
 
 func TestSyncResult(t *testing.T) {
+	type syncResult interface {
+		AsError() error
+	}
+	deployments := schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"}
+	pods := schema.GroupVersionResource{Version: "v1", Resource: "pods"}
+	cause := errors.New("my custom cancellation reason")
+
 	for name, tc := range map[string]struct {
-		result        SyncResult
+		result        syncResult
 		expectAsError string
 	}{
-		"empty": {},
+		"empty":     {result: SyncResult{}},
+		"gvr-empty": {result: GVRSyncResult{}},
+		"all-synced": {
+			result: SyncResult{
+				Synced: map[reflect.Type]bool{
+					reflect.TypeFor[int]():    true,
+					reflect.TypeFor[string](): true,
+				},
+			},
+		},
+		"gvr-all-synced": {
+			result: GVRSyncResult{
+				Synced: map[schema.GroupVersionResource]bool{deployments: true, pods: true},
+			},
+		},
 		"one": {
 			result: SyncResult{
-				Err: errors.New("my custom cancellation reason"),
+				Err: cause,
 				Synced: map[reflect.Type]bool{
 					reflect.TypeFor[int]():    true,
 					reflect.TypeFor[string](): false,
@@ -216,15 +238,35 @@ func TestSyncResult(t *testing.T) {
 			},
 			expectAsError: "failed to sync all caches: string: my custom cancellation reason",
 		},
+		"gvr-one": {
+			result: GVRSyncResult{
+				Err: cause,
+				Synced: map[schema.GroupVersionResource]bool{
+					deployments: true,
+					pods:        false,
+				},
+			},
+			expectAsError: "failed to sync all caches: " + pods.String() + ": my custom cancellation reason",
+		},
 		"many": {
 			result: SyncResult{
-				Err: errors.New("my custom cancellation reason"),
+				Err: cause,
 				Synced: map[reflect.Type]bool{
 					reflect.TypeFor[int]():    false,
 					reflect.TypeFor[string](): false,
 				},
 			},
 			expectAsError: "failed to sync all caches: int, string: my custom cancellation reason",
+		},
+		"gvr-many": {
+			result: GVRSyncResult{
+				Err: cause,
+				Synced: map[schema.GroupVersionResource]bool{
+					deployments: false,
+					pods:        false,
+				},
+			},
+			expectAsError: "failed to sync all caches: " + pods.String() + ", " + deployments.String() + ": my custom cancellation reason",
 		},
 	} {
 
@@ -238,8 +280,8 @@ func TestSyncResult(t *testing.T) {
 			case tc.expectAsError != "" && actual != nil && actual.Error() != tc.expectAsError:
 				t.Fatalf("expected %q, got %q", tc.expectAsError, actual.Error())
 			}
-			if tc.result.Err != nil && !errors.Is(actual, tc.result.Err) {
-				t.Errorf("actual error %+v should wrap %v but doesn't", actual, tc.result.Err)
+			if tc.expectAsError != "" && !errors.Is(actual, cause) {
+				t.Errorf("actual error %+v should wrap %v but doesn't", actual, cause)
 			}
 		})
 	}

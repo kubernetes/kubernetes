@@ -48,6 +48,7 @@ type Sample = model.Sample
 type Time = model.Time
 type Metric = model.Metric
 type LabelValue = model.LabelValue
+type LabelValues = model.LabelValues
 type LabelName = model.LabelName
 type SampleHistogram = model.SampleHistogram
 type FloatString = model.FloatString
@@ -241,8 +242,7 @@ func (vec HistogramVec) Quantile(q float64) float64 {
 		}
 	}
 	if hasNative {
-		sort.Slice(native, func(i, j int) bool { return native[i].upperBound < native[j].upperBound })
-		return nonCumulativeBucketQuantile(q, native)
+		return nonCumulativeBucketQuantile(q, mergeBuckets(native))
 	}
 
 	var buckets []bucket
@@ -455,6 +455,27 @@ func (hist *Histogram) nativeBuckets() []bucket {
 
 	sort.Slice(buckets, func(i, j int) bool { return buckets[i].upperBound < buckets[j].upperBound })
 	return buckets
+}
+
+// mergeBuckets sorts buckets by ascending upper bound and sums the counts of
+// buckets sharing the same (lowerBound, upperBound) range. This is necessary
+// when combining native histogram buckets from multiple Histograms (e.g. in
+// HistogramVec.Quantile): without merging, two histograms observing values in
+// the same bucket would be treated as separate buckets covering the same
+// range, which skews nonCumulativeBucketQuantile's within-bucket
+// interpolation.
+func mergeBuckets(buckets []bucket) []bucket {
+	sort.Slice(buckets, func(i, j int) bool { return buckets[i].upperBound < buckets[j].upperBound })
+
+	var merged []bucket
+	for _, b := range buckets {
+		if n := len(merged); n > 0 && merged[n-1].lowerBound == b.lowerBound && merged[n-1].upperBound == b.upperBound {
+			merged[n-1].count += b.count
+			continue
+		}
+		merged = append(merged, b)
+	}
+	return merged
 }
 
 // decodeNativeHistogramSpans decodes the sparse bucket representation used by

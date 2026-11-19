@@ -42,6 +42,8 @@ type CSINodeDriverApplyConfiguration struct {
 	// When a driver is initialized on a node, it provides the same topology keys
 	// along with values. Kubelet will expose these topology keys as labels
 	// on its own node object.
+	// For a driver in spec.driverRegistrations, external-attacher adds these
+	// labels instead.
 	// When Kubernetes does topology aware provisioning, it can use this list to
 	// determine which labels it should retrieve from the node object and pass
 	// back to the driver.

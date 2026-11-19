@@ -18,6 +18,7 @@ package reconciliation
 
 import (
 	"context"
+
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,7 +30,9 @@ import (
 // It is a best effort attempt as the user may not be able to get or create namespaces.
 // This allows us to handle flows where the user can only mutate roles and role bindings.
 func tryEnsureNamespace(client corev1client.NamespaceInterface, namespace string) error {
-	_, getErr := client.Get(context.TODO(), namespace, metav1.GetOptions{})
+	// Allow a cached get to make the serial lookup cheaper.
+	// If we get a NotFound, trying to create the namespace and getting a conflict error is tolerated.
+	_, getErr := client.Get(context.TODO(), namespace, metav1.GetOptions{ResourceVersion: "0"})
 	if getErr == nil {
 		return nil
 	}

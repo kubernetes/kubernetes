@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -27,8 +28,10 @@ import (
 	"github.com/spf13/pflag"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiserverapis "k8s.io/apiserver/pkg/apis/apiserver"
+	genericfeatures "k8s.io/apiserver/pkg/features"
 	apiserver "k8s.io/apiserver/pkg/server"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	appconfig "k8s.io/cloud-provider/app/config"
 	cpconfig "k8s.io/cloud-provider/config"
 	nodeconfig "k8s.io/cloud-provider/controllers/node/config"
@@ -36,8 +39,10 @@ import (
 	serviceconfig "k8s.io/cloud-provider/controllers/service/config"
 	cliflag "k8s.io/component-base/cli/flag"
 	componentbaseconfig "k8s.io/component-base/config"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	cmconfig "k8s.io/controller-manager/config"
 	cmoptions "k8s.io/controller-manager/options"
+	cmfeatures "k8s.io/controller-manager/pkg/features"
 	migration "k8s.io/controller-manager/pkg/leadermigration/options"
 	netutils "k8s.io/utils/net"
 
@@ -200,6 +205,7 @@ func TestAddFlags(t *testing.T) {
 		"--leader-elect-renew-deadline=15s",
 		"--leader-elect-resource-lock=leases",
 		"--leader-elect-retry-period=5s",
+		"--leader-elect-recovery-deadline=90s",
 		"--master=192.168.4.20",
 		"--min-resync-period=100m",
 		"--node-status-update-frequency=10m",
@@ -240,7 +246,8 @@ func TestAddFlags(t *testing.T) {
 					ResourceName:      "cloud-controller-manager",
 					ResourceNamespace: "kube-system",
 				},
-				Controllers: []string{"foo", "bar"},
+				LeaderElectionRecoveryDeadline: metav1.Duration{Duration: 90 * time.Second},
+				Controllers:                    []string{"foo", "bar"},
 			},
 			Debugging: &cmoptions.DebuggingOptions{
 				DebuggingConfiguration: &componentbaseconfig.DebuggingConfiguration{
@@ -344,6 +351,8 @@ func TestAddFlags(t *testing.T) {
 }
 
 func TestCreateConfig(t *testing.T) {
+	// --leader-elect-recovery-deadline is rejected unless the gate is enabled.
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, cmfeatures.LeaderElectionRecovery, true)
 	fs := pflag.NewFlagSet("addflagstest", pflag.ContinueOnError)
 
 	s, err := NewCloudControllerManagerOptions()
@@ -385,6 +394,7 @@ func TestCreateConfig(t *testing.T) {
 		"--leader-elect-renew-deadline=15s",
 		"--leader-elect-resource-lock=leases",
 		"--leader-elect-retry-period=5s",
+		"--leader-elect-recovery-deadline=90s",
 		"--master=192.168.4.20",
 		"--min-resync-period=100m",
 		"--node-status-update-frequency=10m",
@@ -424,7 +434,8 @@ func TestCreateConfig(t *testing.T) {
 					ResourceName:      "cloud-controller-manager",
 					ResourceNamespace: "kube-system",
 				},
-				Controllers: []string{"foo", "bar"},
+				LeaderElectionRecoveryDeadline: metav1.Duration{Duration: 90 * time.Second},
+				Controllers:                    []string{"foo", "bar"},
 				Debugging: componentbaseconfig.DebuggingConfiguration{
 					EnableProfiling:           false,
 					EnableContentionProfiling: true,
@@ -487,6 +498,8 @@ func TestCreateConfig(t *testing.T) {
 }
 
 func TestCreateConfigWithoutWebHooks(t *testing.T) {
+	// --leader-elect-recovery-deadline is rejected unless the gate is enabled.
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, cmfeatures.LeaderElectionRecovery, true)
 	fs := pflag.NewFlagSet("addflagstest", pflag.ContinueOnError)
 
 	s, err := NewCloudControllerManagerOptions()
@@ -532,6 +545,7 @@ func TestCreateConfigWithoutWebHooks(t *testing.T) {
 		"--leader-elect-renew-deadline=15s",
 		"--leader-elect-resource-lock=leases",
 		"--leader-elect-retry-period=5s",
+		"--leader-elect-recovery-deadline=90s",
 		"--master=192.168.4.20",
 		"--min-resync-period=100m",
 		"--node-status-update-frequency=10m",
@@ -573,7 +587,8 @@ func TestCreateConfigWithoutWebHooks(t *testing.T) {
 					ResourceName:      "cloud-controller-manager",
 					ResourceNamespace: "kube-system",
 				},
-				Controllers: []string{"foo", "bar"},
+				LeaderElectionRecoveryDeadline: metav1.Duration{Duration: 90 * time.Second},
+				Controllers:                    []string{"foo", "bar"},
 				Debugging: componentbaseconfig.DebuggingConfiguration{
 					EnableProfiling:           false,
 					EnableContentionProfiling: true,
@@ -663,5 +678,39 @@ func TestCloudControllerManagerAliases(t *testing.T) {
 	}
 	if !reflect.DeepEqual(cfg.Controllers, expectedControllers) {
 		t.Errorf("controller aliases not resolved correctly, expected %+v, got %+v", expectedControllers, cfg.Controllers)
+	}
+}
+
+func TestValidateLeaderElectionRecoveryDeadline(t *testing.T) {
+	for _, tc := range []struct {
+		name                  string
+		recovery, coordinated bool
+		wantErr               string
+	}{
+		{name: "gate off", wantErr: "leader-elect-recovery-deadline requires the LeaderElectionRecovery feature gate"},
+		{name: "gate on", recovery: true},
+		{name: "gate on with coordinated leader election", recovery: true, coordinated: true, wantErr: "leader-elect-recovery-deadline is not yet supported with the CoordinatedLeaderElection feature gate"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, cmfeatures.LeaderElectionRecovery, tc.recovery)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.CoordinatedLeaderElection, tc.coordinated)
+			o, err := NewCloudControllerManagerOptions()
+			if err != nil {
+				t.Fatal(err)
+			}
+			o.Generic.LeaderElectionRecoveryDeadline = metav1.Duration{Duration: 30 * time.Second}
+			// Other options are left at their defaults, so Validate may report
+			// unrelated errors; only the recovery deadline ones matter here.
+			got := ""
+			if err := o.Validate(nil, nil, nil, nil, nil); err != nil {
+				got = err.Error()
+			}
+			if tc.wantErr == "" && strings.Contains(got, "leader-elect-recovery-deadline") {
+				t.Errorf("unexpected recovery deadline error: %s", got)
+			}
+			if tc.wantErr != "" && !strings.Contains(got, tc.wantErr) {
+				t.Errorf("expected an error containing %q, got %q", tc.wantErr, got)
+			}
+		})
 	}
 }

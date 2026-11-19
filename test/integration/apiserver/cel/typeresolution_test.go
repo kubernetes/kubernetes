@@ -23,8 +23,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/cel-go/cel"
-	"github.com/google/cel-go/interpreter"
+	"cel.dev/cel-go/cel"
+	"cel.dev/cel-go/interpreter"
 
 	"k8s.io/apiserver/pkg/cel/environment"
 
@@ -34,9 +34,9 @@ import (
 	networkingv1 "k8s.io/api/networking/v1"
 	nodev1 "k8s.io/api/node/v1"
 	storagev1 "k8s.io/api/storage/v1"
-	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	extclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
-	apiextensionsscheme "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/scheme"
+	apiextensionsv1 "k8s.io/apiextensions-api/pkg/apis/apiextensions/v1"
+	extclientset "k8s.io/apiextensions-api/pkg/client/clientset/clientset"
+	apiextensionsscheme "k8s.io/apiextensions-api/pkg/client/clientset/clientset/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"

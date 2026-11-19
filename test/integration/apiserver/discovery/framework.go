@@ -22,10 +22,9 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
-	"testing"
 	"time"
 
-	apiextensions "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	apiextensions "k8s.io/apiextensions-api/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -38,9 +37,10 @@ import (
 	aggregator "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset"
 
 	apidiscoveryv2 "k8s.io/api/apidiscovery/v2"
-	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apiextensionsv1 "k8s.io/apiextensions-api/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
+	testutils "k8s.io/kubernetes/test/utils"
 )
 
 const acceptV1JSON = "application/json"
@@ -607,7 +607,7 @@ func WaitForGroupsAbsent(ctx context.Context, client testClient, groups ...strin
 
 }
 
-func WaitForRootPaths(t *testing.T, ctx context.Context, client testClient, requirePaths, forbidPaths sets.Set[string]) error {
+func WaitForRootPaths(t testutils.TB, ctx context.Context, client testClient, requirePaths, forbidPaths sets.Set[string]) error {
 	return wait.PollUntilContextTimeout(ctx, 250*time.Millisecond, maxTimeout, true, func(ctx context.Context) (done bool, err error) {
 		statusContent, err := client.Discovery().RESTClient().Get().AbsPath("/").SetHeader("Accept", "application/json").DoRaw(ctx)
 		if err != nil {

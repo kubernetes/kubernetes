@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io"
 	"reflect"
+	"strconv"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -222,6 +223,17 @@ func modifyConfig(curr reflect.Value, steps *navigationSteps, propertyValue stri
 			return err
 		}
 		actualCurrValue.SetBool(boolValue)
+		return nil
+
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		if steps.moreStepsRemaining() {
+			return fmt.Errorf("can't have more steps after an integer. %v", steps)
+		}
+		intValue, err := strconv.ParseInt(propertyValue, 10, actualCurrValue.Type().Bits())
+		if err != nil {
+			return fmt.Errorf("error parsing integer value %q: %w", propertyValue, err)
+		}
+		actualCurrValue.SetInt(intValue)
 		return nil
 
 	case reflect.Struct:

@@ -58,10 +58,7 @@ var (
 		kubectl explain deployments --api-version=apps/v1
 
 		# Get the documentation of a specific field of a resource
-		kubectl explain pods.spec.containers
-
-		# Get the documentation of resources in different format
-		kubectl explain deployment --output=plaintext-openapiv2`))
+		kubectl explain pods.spec.containers`))
 )
 
 const (
@@ -93,7 +90,7 @@ func NewExplainFlags(streams genericiooptions.IOStreams) *ExplainFlags {
 func (flags *ExplainFlags) AddFlags(cmd *cobra.Command) {
 	cmd.Flags().BoolVarP(&flags.Recursive, "recursive", "R", flags.Recursive, "Print the fields of fields. Use --max-depth to cap the recursion depth.")
 	cmd.Flags().StringVar(&flags.APIVersion, "api-version", flags.APIVersion, "Get different explanations for particular API version (API group/version)")
-	cmd.Flags().StringVarP(&flags.OutputFormat, "output", "o", plaintextTemplateName, "Format in which to render the schema (plaintext, plaintext-openapiv2)")
+	cmd.Flags().StringVarP(&flags.OutputFormat, "output", "o", plaintextTemplateName, "Format in which to render the schema (plaintext, or the deprecated plaintext-openapiv2)")
 	cmd.Flags().IntVar(&flags.MaxDepth, "max-depth", flags.MaxDepth, "Maximum recursion depth when printing nested fields with --recursive. 0 means no limit. Requires --recursive when greater than 0.")
 }
 
@@ -210,18 +207,13 @@ func (o *ExplainOptions) Run() error {
 		}
 	}
 
-	// Fallback to openapiv2 implementation using special template name
+	// The deprecated plaintext-openapiv2 output renders from the deprecated
+	// /openapi/v2 endpoint. It is used only when asked for: every supported
+	// server serves /openapi/v3, so there is no fallback to it.
 	switch o.OutputFormat {
 	case plaintextOpenAPIV2TemplateName:
+		fmt.Fprintln(o.ErrOut, "warning: --output=plaintext-openapiv2 is deprecated and will be removed in a future release. Use --output=plaintext.") //nolint:errcheck
 		return o.renderOpenAPIV2(fullySpecifiedGVR, fieldsPath)
-	case plaintextTemplateName:
-		// Check whether the server reponds to OpenAPIV3.
-		if _, err := o.OpenAPIV3Client.Paths(); err != nil {
-			// Use v2 renderer if server does not support v3
-			return o.renderOpenAPIV2(fullySpecifiedGVR, fieldsPath)
-		}
-
-		fallthrough
 	default:
 		if len(o.APIVersion) > 0 {
 			apiVersion, err := schema.ParseGroupVersion(o.APIVersion)

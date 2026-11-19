@@ -21,6 +21,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"k8s.io/apiserver/pkg/admission/plugin/manifest"
 )
 
 func TestLoadValidatingManifests(t *testing.T) {
@@ -405,6 +407,9 @@ webhooks:
 				if tt.errContains != "" && !strings.Contains(err.Error(), tt.errContains) {
 					t.Errorf("LoadValidatingManifests() error = %v, want error containing %q", err, tt.errContains)
 				}
+				if _, wantHash, _ := manifest.LoadFiles(dir); len(wantHash) == 0 || result.Hash != wantHash {
+					t.Errorf("LoadValidatingManifests() hash = %q, want the content hash %q", result.Hash, wantHash)
+				}
 				return
 			}
 
@@ -570,9 +575,12 @@ func TestLoadManifestsFromDirectory_EmptyPath(t *testing.T) {
 }
 
 func TestLoadManifestsFromDirectory_NonExistentDirectory(t *testing.T) {
-	_, err := LoadValidatingManifests("/nonexistent/directory/path")
+	result, err := LoadValidatingManifests("/nonexistent/directory/path")
 	if err == nil {
-		t.Error("LoadValidatingManifests() expected error for non-existent directory, got nil")
+		t.Fatal("LoadValidatingManifests() expected error for non-existent directory, got nil")
+	}
+	if result.Hash != "" {
+		t.Errorf("LoadValidatingManifests() hash = %q, want empty for content that could not be read", result.Hash)
 	}
 }
 

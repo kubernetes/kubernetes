@@ -52,7 +52,7 @@ func WithWatchTerminationDuringShutdown(handler http.Handler, termination apireq
 
 		// attach ServerShutdownSignal to the watch request so that the
 		// watch handler loop can return as soon as the server signals
-		// that it is shutting down.
+		// that active watch requests should start draining.
 		ctx = apirequest.WithServerShutdownSignal(req.Context(), termination)
 		req = req.WithContext(ctx)
 

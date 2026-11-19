@@ -18,6 +18,7 @@ package ktesting
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 )
@@ -34,6 +35,18 @@ func (c canceledError) Error() string { return string(c) }
 
 func (c canceledError) Is(target error) bool {
 	return target == context.Canceled
+}
+
+// deadlineExceededError is used as the cause when a context created via
+// [withTimeout] expires. Its [deadlineExceededError.Is] method makes
+// errors.Is(err, context.DeadlineExceeded) report true, matching the
+// behavior of [context.WithTimeout] and [context.WithDeadline].
+type deadlineExceededError string
+
+func (d deadlineExceededError) Error() string { return string(d) }
+
+func (d deadlineExceededError) Is(target error) bool {
+	return target == context.DeadlineExceeded
 }
 
 // testContext returns the context associated with tb, as implemented by
@@ -88,7 +101,9 @@ func runWhenDone(tb TB, cb func()) {
 // withTimeout corresponds to [context.WithTimeout]. In contrast to
 // [context.WithTimeout], it automatically cancels during test cleanup, provides
 // the given cause when the deadline is reached, and its cancel function
-// requires a cause.
+// requires a cause. Both the cause and the error reported by the context's
+// Err method satisfy errors.Is(err, context.DeadlineExceeded) when the
+// timeout expires, just like [context.WithTimeout] itself.
 func withTimeout(ctx context.Context, tb TB, timeout time.Duration, timeoutCause string) (context.Context, func(cause error)) {
 	tb.Helper()
 
@@ -125,7 +140,7 @@ func withTimeout(ctx context.Context, tb TB, timeout time.Duration, timeoutCause
 			// Would be nice to log this with the source code location
 			// of our caller, but testing.Logf does not support that.
 			tb.Log(fmt.Sprintf("\nINFO: canceling context: %s\n", timeoutCause))
-			cancel(canceledError(timeoutCause))
+			cancel(deadlineExceededError(timeoutCause))
 		}
 	}()
 
@@ -148,4 +163,18 @@ type deadlineContext struct {
 
 func (d deadlineContext) Deadline() (time.Time, bool) {
 	return d.deadline, true
+}
+
+// Err reports context.DeadlineExceeded instead of context.Canceled when the
+// context was canceled because its deadline was reached, matching the
+// behavior of [context.WithTimeout] and [context.WithDeadline].
+func (d deadlineContext) Err() error {
+	err := d.Context.Err()
+	if err == nil {
+		return nil
+	}
+	if errors.Is(context.Cause(d.Context), context.DeadlineExceeded) {
+		return context.DeadlineExceeded
+	}
+	return err
 }

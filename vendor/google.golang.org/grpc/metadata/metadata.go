@@ -360,6 +360,66 @@ func FromOutgoingContext(ctx context.Context) (MD, bool) {
 	return out, ok
 }
 
+// ValueFromOutgoingContext returns the metadata value corresponding to the
+// metadata key from the outgoing metadata if it exists. Keys are matched in a
+// case-insensitive manner.
+//
+// Unlike FromOutgoingContext, this does not copy the entire outgoing metadata.
+func ValueFromOutgoingContext(ctx context.Context, key string) []string {
+	raw, ok := ctx.Value(mdOutgoingKey{}).(rawMD)
+	if !ok {
+		return nil
+	}
+
+	key = strings.ToLower(key)
+	// Unlike ValueFromIncomingContext, this can't return as soon as raw.md is
+	// checked: raw.added still needs to be walked and accumulated regardless.
+	// The else below prevents that from overwriting an exact match with an
+	// unrelated case-insensitive one.
+	var matchedMD []string
+	if v, ok := raw.md[key]; ok {
+		matchedMD = v
+	} else {
+		for k, v := range raw.md {
+			// Case insensitive comparison: MD is a map, and there's no
+			// guarantee that the MD attached to the context is created using
+			// our helper functions.
+			if strings.EqualFold(k, key) {
+				matchedMD = v
+				break
+			}
+		}
+	}
+
+	// Defer allocating vals until raw.added actually has a match, so a match
+	// found only in raw.md doesn't pay for both a copyOf and a growing
+	// append.
+	var vals []string
+	for _, added := range raw.added {
+		if len(added)%2 == 1 {
+			panic(fmt.Sprintf("metadata: ValueFromOutgoingContext got an odd number of input pairs for metadata: %d", len(added)))
+		}
+
+		// Case insensitive, like FromOutgoingContext: added isn't guaranteed
+		// lowercase, though AppendToOutgoingContext already lowercases it in
+		// practice, so try the cheap exact match first.
+		for i := 0; i < len(added); i += 2 {
+			if added[i] == key || strings.EqualFold(added[i], key) {
+				if vals == nil {
+					vals = make([]string, 0, len(matchedMD)+1)
+					vals = append(vals, matchedMD...)
+				}
+				vals = append(vals, added[i+1])
+			}
+		}
+	}
+
+	if vals == nil && matchedMD != nil {
+		return copyOf(matchedMD)
+	}
+	return vals
+}
+
 type rawMD struct {
 	md    MD
 	added [][]string

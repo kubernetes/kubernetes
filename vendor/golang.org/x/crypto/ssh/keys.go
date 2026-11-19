@@ -51,6 +51,12 @@ const (
 	KeyAlgoED25519     = "ssh-ed25519"
 	KeyAlgoSKED25519   = "sk-ssh-ed25519@openssh.com"
 
+	// KeyAlgoMLDSA44, KeyAlgoMLDSA65 and KeyAlgoMLDSA87 are the ML-DSA
+	// algorithms of [SSH-MLDSA].
+	KeyAlgoMLDSA44 = "ssh-mldsa-44"
+	KeyAlgoMLDSA65 = "ssh-mldsa-65"
+	KeyAlgoMLDSA87 = "ssh-mldsa-87"
+
 	// KeyAlgoRSASHA256 and KeyAlgoRSASHA512 are only public key algorithms, not
 	// public key formats, so they can't appear as a PublicKey.Type. The
 	// corresponding PublicKey.Type is KeyAlgoRSA. See RFC 8332, Section 2.
@@ -83,7 +89,10 @@ func parsePubKey(in []byte, algo string) (pubKey PublicKey, rest []byte, err err
 		return parseED25519(in)
 	case KeyAlgoSKED25519:
 		return parseSKEd25519(in)
-	case CertAlgoRSAv01, InsecureCertAlgoDSAv01, CertAlgoECDSA256v01, CertAlgoECDSA384v01, CertAlgoECDSA521v01, CertAlgoSKECDSA256v01, CertAlgoED25519v01, CertAlgoSKED25519v01:
+	case KeyAlgoMLDSA44, KeyAlgoMLDSA65, KeyAlgoMLDSA87:
+		return parseMLDSA(in, algo)
+	case CertAlgoRSAv01, InsecureCertAlgoDSAv01, CertAlgoECDSA256v01, CertAlgoECDSA384v01, CertAlgoECDSA521v01, CertAlgoSKECDSA256v01, CertAlgoED25519v01, CertAlgoSKED25519v01,
+		CertAlgoMLDSA44v01Go, CertAlgoMLDSA65v01Go, CertAlgoMLDSA87v01Go:
 		cert, err := parseCert(in, certKeyAlgoNames[algo])
 		if err != nil {
 			return nil, nil, err
@@ -98,11 +107,30 @@ func parsePubKey(in []byte, algo string) (pubKey PublicKey, rest []byte, err err
 	return nil, nil, fmt.Errorf("ssh: unknown key algorithm: %v", algo)
 }
 
+// trimSpace removes leading and trailing ASCII space and tab.
+func trimSpace(in []byte) []byte {
+	return bytes.Trim(in, " \t")
+}
+
+// asciiFields splits in around each run of ASCII space and tab.
+func asciiFields(in []byte) [][]byte {
+	return bytes.FieldsFunc(in, func(r rune) bool {
+		return r == ' ' || r == '\t'
+	})
+}
+
+// dropCR removes a single trailing carriage return, so that an entry written
+// with CRLF line endings is read like one written with LF endings. A carriage
+// return anywhere else belongs to the field that holds it.
+func dropCR(in []byte) []byte {
+	return bytes.TrimSuffix(in, []byte("\r"))
+}
+
 // parseAuthorizedKey parses a public key in OpenSSH authorized_keys format
 // (see sshd(8) manual page) once the options and key type fields have been
 // removed.
 func parseAuthorizedKey(in []byte) (out PublicKey, comment string, err error) {
-	in = bytes.TrimSpace(in)
+	in = trimSpace(in)
 
 	i := bytes.IndexAny(in, " \t")
 	if i == -1 {
@@ -120,7 +148,7 @@ func parseAuthorizedKey(in []byte) (out PublicKey, comment string, err error) {
 	if err != nil {
 		return nil, "", err
 	}
-	comment = string(bytes.TrimSpace(in[i:]))
+	comment = string(trimSpace(in[i:]))
 	return out, comment, nil
 }
 
@@ -149,12 +177,9 @@ func ParseKnownHosts(in []byte) (marker string, hosts []string, pubKey PublicKey
 			rest = nil
 		}
 
-		end = bytes.IndexByte(in, '\r')
-		if end != -1 {
-			in = in[:end]
-		}
+		in = dropCR(in)
 
-		in = bytes.TrimSpace(in)
+		in = trimSpace(in)
 		if len(in) == 0 || in[0] == '#' {
 			in = rest
 			continue
@@ -168,8 +193,10 @@ func ParseKnownHosts(in []byte) (marker string, hosts []string, pubKey PublicKey
 
 		// Strip out the beginning of the known_host key.
 		// This is either an optional marker or a (set of) hostname(s).
-		keyFields := bytes.Fields(in)
-		if len(keyFields) < 3 || len(keyFields) > 5 {
+		// The comment is not delimited, so there is no upper bound on the
+		// number of fields.
+		keyFields := asciiFields(in)
+		if len(keyFields) < 3 {
 			return "", nil, nil, "", nil, errors.New("ssh: invalid entry in known_hosts data")
 		}
 
@@ -215,12 +242,9 @@ func ParseAuthorizedKey(in []byte) (out PublicKey, comment string, options []str
 			rest = nil
 		}
 
-		end = bytes.IndexByte(in, '\r')
-		if end != -1 {
-			in = in[:end]
-		}
+		in = dropCR(in)
 
-		in = bytes.TrimSpace(in)
+		in = trimSpace(in)
 		if len(in) == 0 || in[0] == '#' {
 			in = rest
 			continue
@@ -334,7 +358,8 @@ func MarshalAuthorizedKey(key PublicKey) []byte {
 }
 
 // MarshalPrivateKey returns a PEM block with the private key serialized in the
-// OpenSSH format.
+// OpenSSH format. ML-DSA keys are not supported, since no OpenSSH format is
+// defined for them: use [x509.MarshalPKCS8PrivateKey] instead.
 func MarshalPrivateKey(key crypto.PrivateKey, comment string) (*pem.Block, error) {
 	return marshalOpenSSHPrivateKey(key, comment, unencryptedOpenSSHMarshaler)
 }
@@ -1173,9 +1198,9 @@ func (k *skEd25519PublicKey) CryptoPublicKey() crypto.PublicKey {
 }
 
 // NewSignerFromKey takes an *rsa.PrivateKey, *dsa.PrivateKey,
-// *ecdsa.PrivateKey or any other crypto.Signer and returns a
-// corresponding Signer instance. ECDSA keys must use P-256, P-384 or
-// P-521. DSA keys must use parameter size L1024N160.
+// *ecdsa.PrivateKey, *mldsa.PrivateKey, or any other crypto.Signer and returns
+// a corresponding Signer instance. ECDSA keys must use P-256, P-384 or P-521.
+// DSA keys must use parameter size L1024N160.
 func NewSignerFromKey(key interface{}) (Signer, error) {
 	switch key := key.(type) {
 	case crypto.Signer:
@@ -1285,8 +1310,8 @@ func (s *wrappedSigner) SignWithAlgorithm(rand io.Reader, data []byte, algorithm
 }
 
 // NewPublicKey takes an *rsa.PublicKey, *dsa.PublicKey, *ecdsa.PublicKey,
-// or ed25519.PublicKey returns a corresponding PublicKey instance.
-// ECDSA keys must use P-256, P-384 or P-521.
+// ed25519.PublicKey, or an *mldsa.PublicKey, and returns a corresponding
+// PublicKey instance. ECDSA keys must use P-256, P-384 or P-521.
 func NewPublicKey(key interface{}) (PublicKey, error) {
 	switch key := key.(type) {
 	case *rsa.PublicKey:
@@ -1304,7 +1329,13 @@ func NewPublicKey(key interface{}) (PublicKey, error) {
 		}
 		return ed25519PublicKey(key), nil
 	default:
-		return nil, fmt.Errorf("ssh: unsupported key type %T", key)
+		pub, err := newMLDSAPublicKey(key)
+		if errors.Is(err, errNotMLDSAKey) {
+			return nil, fmt.Errorf("ssh: unsupported key type %T", key)
+		} else if err != nil {
+			return nil, err
+		}
+		return pub, nil
 	}
 }
 

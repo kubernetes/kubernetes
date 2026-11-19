@@ -78,9 +78,6 @@ type BasicDeviceApplyConfiguration struct {
 	// has to be limited to exactly the node that was chosen when allocating the claim.
 	// If set to true, the scheduler will set the ResourceClaim.Status.Allocation.NodeSelector
 	// to match the node where the allocation was made.
-	//
-	// This is a beta field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
-	// feature gates.
 	BindsToNode *bool `json:"bindsToNode,omitempty"`
 	// bindingConditions defines the conditions for proceeding with binding.
 	// All of these conditions must be set in the per-device status
@@ -90,9 +87,6 @@ type BasicDeviceApplyConfiguration struct {
 	// The maximum number of binding conditions is 4.
 	//
 	// The conditions must be a valid condition type string.
-	//
-	// This is a beta field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
-	// feature gates.
 	BindingConditions []string `json:"bindingConditions,omitempty"`
 	// bindingFailureConditions defines the conditions for binding failure.
 	// They may be set in the per-device status conditions.
@@ -101,9 +95,6 @@ type BasicDeviceApplyConfiguration struct {
 	// The maximum number of binding failure conditions is 4.
 	//
 	// The conditions must be a valid condition type string.
-	//
-	// This is a beta field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
-	// feature gates.
 	BindingFailureConditions []string `json:"bindingFailureConditions,omitempty"`
 	// allowMultipleAllocations marks whether the device is allowed to be allocated to multiple DeviceRequests.
 	//
@@ -119,6 +110,8 @@ type BasicDeviceApplyConfiguration struct {
 	// can also be requested through claims and allocated by the DRA driver.
 	// For example, a CPU DRA driver might allocate exclusive CPUs or auxiliary node memory
 	// dependencies of an accelerator device.
+	// When the device is allocated for a pod's claim, the scheduler records these resources
+	// in the pod's `status.extraNodeAllocatableResources`, as described for mapping and overhead.
 	// The keys of this map are the node-allocatable resource names (e.g., "cpu", "memory").
 	// Extended resource names are not permitted as keys.
 	NodeAllocatableResources map[corev1.ResourceName]NodeAllocatableResourceApplyConfiguration `json:"nodeAllocatableResources,omitempty"`

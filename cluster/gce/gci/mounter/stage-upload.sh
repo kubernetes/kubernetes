@@ -60,7 +60,7 @@ cp "${ACI_IMAGE}" "${ACI_DIR}/${MOUNTER_ACI_IMAGE}"
 
 # Upload the contents to gcs
 echo "Uploading gci mounter ACI in ${ACI_DIR} to ${MOUNTER_GCS_DIR}"
-gsutil cp "${ACI_DIR}/${MOUNTER_ACI_IMAGE}" "${MOUNTER_GCS_DIR}"
+gcloud storage cp "${ACI_DIR}/${MOUNTER_ACI_IMAGE}" "${MOUNTER_GCS_DIR}"
 
 echo "Upload completed"
 echo "Updated gci-mounter ACI version and SH512 in cluster/gce/gci/configure.sh"

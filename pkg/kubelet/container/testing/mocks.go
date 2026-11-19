@@ -232,6 +232,75 @@ func (_c *MockRuntime_DeleteContainer_Call) RunAndReturn(run func(ctx context.Co
 	return _c
 }
 
+// EnsureSecurityProfiles provides a mock function for the type MockRuntime
+func (_mock *MockRuntime) EnsureSecurityProfiles(ctx context.Context, pod *v10.Pod, podStatus *container.PodStatus, pullSecrets []v10.Secret) error {
+	ret := _mock.Called(ctx, pod, podStatus, pullSecrets)
+
+	if len(ret) == 0 {
+		panic("no return value specified for EnsureSecurityProfiles")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *v10.Pod, *container.PodStatus, []v10.Secret) error); ok {
+		r0 = returnFunc(ctx, pod, podStatus, pullSecrets)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockRuntime_EnsureSecurityProfiles_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'EnsureSecurityProfiles'
+type MockRuntime_EnsureSecurityProfiles_Call struct {
+	*mock.Call
+}
+
+// EnsureSecurityProfiles is a helper method to define mock.On call
+//   - ctx context.Context
+//   - pod *v10.Pod
+//   - podStatus *container.PodStatus
+//   - pullSecrets []v10.Secret
+func (_e *MockRuntime_Expecter) EnsureSecurityProfiles(ctx any, pod any, podStatus any, pullSecrets any) *MockRuntime_EnsureSecurityProfiles_Call {
+	return &MockRuntime_EnsureSecurityProfiles_Call{Call: _e.mock.On("EnsureSecurityProfiles", ctx, pod, podStatus, pullSecrets)}
+}
+
+func (_c *MockRuntime_EnsureSecurityProfiles_Call) Run(run func(ctx context.Context, pod *v10.Pod, podStatus *container.PodStatus, pullSecrets []v10.Secret)) *MockRuntime_EnsureSecurityProfiles_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *v10.Pod
+		if args[1] != nil {
+			arg1 = args[1].(*v10.Pod)
+		}
+		var arg2 *container.PodStatus
+		if args[2] != nil {
+			arg2 = args[2].(*container.PodStatus)
+		}
+		var arg3 []v10.Secret
+		if args[3] != nil {
+			arg3 = args[3].([]v10.Secret)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRuntime_EnsureSecurityProfiles_Call) Return(err error) *MockRuntime_EnsureSecurityProfiles_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockRuntime_EnsureSecurityProfiles_Call) RunAndReturn(run func(ctx context.Context, pod *v10.Pod, podStatus *container.PodStatus, pullSecrets []v10.Secret) error) *MockRuntime_EnsureSecurityProfiles_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GarbageCollect provides a mock function for the type MockRuntime
 func (_mock *MockRuntime) GarbageCollect(ctx context.Context, gcPolicy container.GCPolicy, allSourcesReady bool, evictNonDeletedPods bool) error {
 	ret := _mock.Called(ctx, gcPolicy, allSourcesReady, evictNonDeletedPods)
@@ -1390,6 +1459,68 @@ func (_c *MockRuntime_ListPodSandboxMetrics_Call) RunAndReturn(run func(ctx cont
 	return _c
 }
 
+// ListSecurityProfiles provides a mock function for the type MockRuntime
+func (_mock *MockRuntime) ListSecurityProfiles(ctx context.Context) ([]*v1.SecurityProfileInfo, error) {
+	ret := _mock.Called(ctx)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListSecurityProfiles")
+	}
+
+	var r0 []*v1.SecurityProfileInfo
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context) ([]*v1.SecurityProfileInfo, error)); ok {
+		return returnFunc(ctx)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context) []*v1.SecurityProfileInfo); ok {
+		r0 = returnFunc(ctx)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]*v1.SecurityProfileInfo)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = returnFunc(ctx)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockRuntime_ListSecurityProfiles_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListSecurityProfiles'
+type MockRuntime_ListSecurityProfiles_Call struct {
+	*mock.Call
+}
+
+// ListSecurityProfiles is a helper method to define mock.On call
+//   - ctx context.Context
+func (_e *MockRuntime_Expecter) ListSecurityProfiles(ctx any) *MockRuntime_ListSecurityProfiles_Call {
+	return &MockRuntime_ListSecurityProfiles_Call{Call: _e.mock.On("ListSecurityProfiles", ctx)}
+}
+
+func (_c *MockRuntime_ListSecurityProfiles_Call) Run(run func(ctx context.Context)) *MockRuntime_ListSecurityProfiles_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRuntime_ListSecurityProfiles_Call) Return(securityProfileInfos []*v1.SecurityProfileInfo, err error) *MockRuntime_ListSecurityProfiles_Call {
+	_c.Call.Return(securityProfileInfos, err)
+	return _c
+}
+
+func (_c *MockRuntime_ListSecurityProfiles_Call) RunAndReturn(run func(ctx context.Context) ([]*v1.SecurityProfileInfo, error)) *MockRuntime_ListSecurityProfiles_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // PullImage provides a mock function for the type MockRuntime
 func (_mock *MockRuntime) PullImage(ctx context.Context, image container.ImageSpec, credentials []credentialprovider.TrackedAuthConfig, podSandboxConfig *v1.PodSandboxConfig) (string, *credentialprovider.TrackedAuthConfig, error) {
 	ret := _mock.Called(ctx, image, credentials, podSandboxConfig)
@@ -1476,6 +1607,90 @@ func (_c *MockRuntime_PullImage_Call) RunAndReturn(run func(ctx context.Context,
 	return _c
 }
 
+// PullSecurityProfile provides a mock function for the type MockRuntime
+func (_mock *MockRuntime) PullSecurityProfile(ctx context.Context, image container.ImageSpec, credentials []credentialprovider.TrackedAuthConfig, podSandboxConfig *v1.PodSandboxConfig, kind v1.SecurityProfileKind) (bool, error) {
+	ret := _mock.Called(ctx, image, credentials, podSandboxConfig, kind)
+
+	if len(ret) == 0 {
+		panic("no return value specified for PullSecurityProfile")
+	}
+
+	var r0 bool
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, container.ImageSpec, []credentialprovider.TrackedAuthConfig, *v1.PodSandboxConfig, v1.SecurityProfileKind) (bool, error)); ok {
+		return returnFunc(ctx, image, credentials, podSandboxConfig, kind)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, container.ImageSpec, []credentialprovider.TrackedAuthConfig, *v1.PodSandboxConfig, v1.SecurityProfileKind) bool); ok {
+		r0 = returnFunc(ctx, image, credentials, podSandboxConfig, kind)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, container.ImageSpec, []credentialprovider.TrackedAuthConfig, *v1.PodSandboxConfig, v1.SecurityProfileKind) error); ok {
+		r1 = returnFunc(ctx, image, credentials, podSandboxConfig, kind)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockRuntime_PullSecurityProfile_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PullSecurityProfile'
+type MockRuntime_PullSecurityProfile_Call struct {
+	*mock.Call
+}
+
+// PullSecurityProfile is a helper method to define mock.On call
+//   - ctx context.Context
+//   - image container.ImageSpec
+//   - credentials []credentialprovider.TrackedAuthConfig
+//   - podSandboxConfig *v1.PodSandboxConfig
+//   - kind v1.SecurityProfileKind
+func (_e *MockRuntime_Expecter) PullSecurityProfile(ctx any, image any, credentials any, podSandboxConfig any, kind any) *MockRuntime_PullSecurityProfile_Call {
+	return &MockRuntime_PullSecurityProfile_Call{Call: _e.mock.On("PullSecurityProfile", ctx, image, credentials, podSandboxConfig, kind)}
+}
+
+func (_c *MockRuntime_PullSecurityProfile_Call) Run(run func(ctx context.Context, image container.ImageSpec, credentials []credentialprovider.TrackedAuthConfig, podSandboxConfig *v1.PodSandboxConfig, kind v1.SecurityProfileKind)) *MockRuntime_PullSecurityProfile_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 container.ImageSpec
+		if args[1] != nil {
+			arg1 = args[1].(container.ImageSpec)
+		}
+		var arg2 []credentialprovider.TrackedAuthConfig
+		if args[2] != nil {
+			arg2 = args[2].([]credentialprovider.TrackedAuthConfig)
+		}
+		var arg3 *v1.PodSandboxConfig
+		if args[3] != nil {
+			arg3 = args[3].(*v1.PodSandboxConfig)
+		}
+		var arg4 v1.SecurityProfileKind
+		if args[4] != nil {
+			arg4 = args[4].(v1.SecurityProfileKind)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+			arg4,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRuntime_PullSecurityProfile_Call) Return(b bool, err error) *MockRuntime_PullSecurityProfile_Call {
+	_c.Call.Return(b, err)
+	return _c
+}
+
+func (_c *MockRuntime_PullSecurityProfile_Call) RunAndReturn(run func(ctx context.Context, image container.ImageSpec, credentials []credentialprovider.TrackedAuthConfig, podSandboxConfig *v1.PodSandboxConfig, kind v1.SecurityProfileKind) (bool, error)) *MockRuntime_PullSecurityProfile_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // RemoveImage provides a mock function for the type MockRuntime
 func (_mock *MockRuntime) RemoveImage(ctx context.Context, image container.ImageSpec) error {
 	ret := _mock.Called(ctx, image)
@@ -1529,6 +1744,63 @@ func (_c *MockRuntime_RemoveImage_Call) Return(err error) *MockRuntime_RemoveIma
 }
 
 func (_c *MockRuntime_RemoveImage_Call) RunAndReturn(run func(ctx context.Context, image container.ImageSpec) error) *MockRuntime_RemoveImage_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// RemoveSecurityProfile provides a mock function for the type MockRuntime
+func (_mock *MockRuntime) RemoveSecurityProfile(ctx context.Context, digest string) error {
+	ret := _mock.Called(ctx, digest)
+
+	if len(ret) == 0 {
+		panic("no return value specified for RemoveSecurityProfile")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) error); ok {
+		r0 = returnFunc(ctx, digest)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockRuntime_RemoveSecurityProfile_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RemoveSecurityProfile'
+type MockRuntime_RemoveSecurityProfile_Call struct {
+	*mock.Call
+}
+
+// RemoveSecurityProfile is a helper method to define mock.On call
+//   - ctx context.Context
+//   - digest string
+func (_e *MockRuntime_Expecter) RemoveSecurityProfile(ctx any, digest any) *MockRuntime_RemoveSecurityProfile_Call {
+	return &MockRuntime_RemoveSecurityProfile_Call{Call: _e.mock.On("RemoveSecurityProfile", ctx, digest)}
+}
+
+func (_c *MockRuntime_RemoveSecurityProfile_Call) Run(run func(ctx context.Context, digest string)) *MockRuntime_RemoveSecurityProfile_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRuntime_RemoveSecurityProfile_Call) Return(err error) *MockRuntime_RemoveSecurityProfile_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockRuntime_RemoveSecurityProfile_Call) RunAndReturn(run func(ctx context.Context, digest string) error) *MockRuntime_RemoveSecurityProfile_Call {
 	_c.Call.Return(run)
 	return _c
 }

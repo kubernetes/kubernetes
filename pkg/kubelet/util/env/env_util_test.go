@@ -58,12 +58,13 @@ func TestParseEnv(t *testing.T) {
 	tempDir := t.TempDir()
 
 	type testCase struct {
-		name        string
-		envContent  string
-		key         string
-		wantValue   string
-		wantErr     bool
-		errContains string
+		name         string
+		envContent   string
+		key          string
+		wantValue    string
+		wantNotFound bool
+		wantErr      bool
+		errContains  string
 	}
 	tests := []testCase{
 		{
@@ -98,12 +99,78 @@ KEY3='val3'
 			errContains: `whitespace before '=' is not allowed`,
 		},
 		{
+			name: "value after whitespace following '=' triggers error",
+			envContent: `KEY1= 'val1'
+KEY2='val2'
+`,
+			key:         "KEY1",
+			wantErr:     true,
+			errContains: `unexpected content after whitespace following '='`,
+		},
+		{
+			name: "value after whitespace following '=' on another key triggers error",
+			envContent: `KEY1= 'val1'
+KEY2='val2'
+`,
+			key:         "KEY2",
+			wantErr:     true,
+			errContains: `at line 1: unexpected content after whitespace following '='`,
+		},
+		{
+			name: "unquoted value after whitespace following '=' triggers error",
+			envContent: `KEY1= val1
+KEY2='val2'
+`,
+			key:         "KEY1",
+			wantErr:     true,
+			errContains: `unexpected content after whitespace following '='`,
+		},
+		{
+			name:       "only whitespace after '=' assigns empty value",
+			envContent: "KEY1=   \nKEY2='val2'\n",
+			key:        "KEY1",
+			wantValue:  ``,
+		},
+		{
+			name: "whitespace and comment after '=' assigns empty value",
+			envContent: `KEY1= # comment
+KEY2='val2'
+`,
+			key:       "KEY1",
+			wantValue: ``,
+		},
+		{
+			name: "whitespace after '=' on another key is skipped",
+			envContent: `KEY1= # comment
+KEY2='val2'
+`,
+			key:       "KEY2",
+			wantValue: `val2`,
+		},
+		{
+			name:       "tab and comment after '=' assigns empty value",
+			envContent: "KEY1=\t# comment\nKEY2='val2'\n",
+			key:        "KEY1",
+			wantValue:  ``,
+		},
+		{
+			// '#' starts a comment only after whitespace; bash reads KEY1=#x as the value #x.
+			name: "'#' directly after '=' triggers error",
+			envContent: `KEY1=#x
+KEY2='val2'
+`,
+			key:         "KEY1",
+			wantErr:     true,
+			errContains: `value must be enclosed in single quotes`,
+		},
+		{
 			name: "key not found returns empty",
 			envContent: `KEY1='foo'
 KEY2='bar'
 `,
-			key:       "KEY3",
-			wantValue: ``,
+			key:          "KEY3",
+			wantValue:    ``,
+			wantNotFound: true,
 		},
 		{
 			name: "value with embedded #",
@@ -176,6 +243,53 @@ KEY2='bar' # comment
 `,
 			key:       "KEY2",
 			wantValue: `bar`,
+		},
+		{
+			name:       "tab before comment after closing quote",
+			envContent: "KEY1='foo'\t# comment\n",
+			key:        "KEY1",
+			wantValue:  "foo",
+		},
+		{
+			name:       "comment after empty quoted value",
+			envContent: "KEY1='' # comment\n",
+			key:        "KEY1",
+			wantValue:  "",
+		},
+		{
+			name:       "comment after multi-line quoted value",
+			envContent: "KEY1='foo\nbar' # comment\n",
+			key:        "KEY1",
+			wantValue:  "foo\nbar",
+		},
+		{
+			// Without whitespace, bash treats '#suffix' as part of the value.
+			name:        "hash directly after closing quote triggers error",
+			envContent:  "KEY1='foo'#suffix\n",
+			key:         "KEY1",
+			wantErr:     true,
+			errContains: "at line 1: unexpected content after closing quote",
+		},
+		{
+			name:        "hash directly after empty quoted value triggers error",
+			envContent:  "KEY1=''#\n",
+			key:         "KEY1",
+			wantErr:     true,
+			errContains: "at line 1: unexpected content after closing quote",
+		},
+		{
+			name:        "hash directly after multi-line closing quote triggers error",
+			envContent:  "KEY1='foo\nbar'#suffix\n",
+			key:         "KEY1",
+			wantErr:     true,
+			errContains: "at line 2: unexpected content after closing quote",
+		},
+		{
+			name:        "hash directly after closing quote on another key triggers error",
+			envContent:  "KEY1='foo'#suffix\nKEY2='bar'\n",
+			key:         "KEY2",
+			wantErr:     true,
+			errContains: "at line 1: unexpected content after closing quote",
 		},
 		{
 			name: "missing key triggers error with line number",
@@ -577,7 +691,7 @@ huHhWsWslkcntkKp0V1Jc8oGv86Dp5mPhpfpMOK+vCe2TrS/saes9fNVxjorSpLl4xTU/V
 			if err := tmpFile.Close(); err != nil {
 				t.Fatalf("failed to close temp file: %v", err)
 			}
-			gotValue, err := ParseEnv(tmpFile.Name(), tt.key)
+			gotValue, gotFound, err := ParseEnv(tmpFile.Name(), tt.key)
 			if tt.wantErr {
 				if err == nil {
 					t.Errorf("expected error, got none")
@@ -594,6 +708,9 @@ huHhWsWslkcntkKp0V1Jc8oGv86Dp5mPhpfpMOK+vCe2TrS/saes9fNVxjorSpLl4xTU/V
 			}
 			if gotValue != tt.wantValue {
 				t.Errorf("got %q, want %q", gotValue, tt.wantValue)
+			}
+			if wantFound := !tt.wantNotFound; gotFound != wantFound {
+				t.Errorf("got found %v, want %v", gotFound, wantFound)
 			}
 
 			// Verify shell behavior matches our parser

@@ -356,7 +356,8 @@ func updateCommittedIndex(ap *toApply, rh *raftReadyHandler) {
 
 func (r *raftNode) processMessages(ms []*raftpb.Message) []*raftpb.Message {
 	sentAppResp := false
-	var messages []*raftpb.Message
+	keep := make([]bool, len(ms))
+	count := 0
 	for i := len(ms) - 1; i >= 0; i-- {
 		m := ms[i]
 		if r.isIDRemoved(m.GetTo()) {
@@ -396,7 +397,17 @@ func (r *raftNode) processMessages(ms []*raftpb.Message) []*raftpb.Message {
 				heartbeatSendFailures.Inc()
 			}
 		}
-		messages = append(messages, m)
+		keep[i] = true
+		count++
+	}
+	if count == 0 {
+		return nil
+	}
+	messages := make([]*raftpb.Message, 0, count)
+	for i, ok := range keep {
+		if ok {
+			messages = append(messages, ms[i])
+		}
 	}
 	return messages
 }

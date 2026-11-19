@@ -22,6 +22,8 @@ import (
 	"testing"
 
 	"github.com/onsi/gomega/format"
+
+	_ "k8s.io/ktesting/format" // Register YAML formatting.
 )
 
 func TestGomegaFormatObject(t *testing.T) {

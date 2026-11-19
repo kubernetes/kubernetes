@@ -50,6 +50,14 @@ const (
 	//
 	// Make kube-controller-manager release leader election lock on exit.
 	ControllerManagerReleaseLeaderElectionLockOnExit featuregate.Feature = "ControllerManagerReleaseLeaderElectionLockOnExit"
+
+	// owner: @maspinwall
+	// kep: http://kep.k8s.io/6361
+	//
+	// Run the controller manager's leader elector in recovery mode and route
+	// controller client writes through its write gate, so that a replica that
+	// cannot renew its lease stops writing before another candidate takes over.
+	LeaderElectionRecovery featuregate.Feature = "LeaderElectionRecovery"
 )
 
 func SetupCurrentKubernetesSpecificFeatureGates(featuregates featuregate.MutableVersionedFeatureGate) error {
@@ -61,6 +69,7 @@ func SetupCurrentKubernetesSpecificFeatureGates(featuregates featuregate.Mutable
 var versionedCloudPublicFeatureGates = map[featuregate.Feature]featuregate.VersionedSpecs{
 	CloudControllerManagerWatchBasedRoutesReconciliation: {
 		{Version: version.MustParse("1.35"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.38"), Default: false, PreRelease: featuregate.Beta},
 	},
 	CloudControllerManagerWebhook: {
 		{Version: version.MustParse("1.27"), Default: false, PreRelease: featuregate.Alpha},
@@ -70,5 +79,8 @@ var versionedCloudPublicFeatureGates = map[featuregate.Feature]featuregate.Versi
 	},
 	ControllerManagerReleaseLeaderElectionLockOnExit: {
 		{Version: version.MustParse("1.36"), Default: false, PreRelease: featuregate.Alpha},
+	},
+	LeaderElectionRecovery: {
+		{Version: version.MustParse("1.38"), Default: false, PreRelease: featuregate.Alpha},
 	},
 }

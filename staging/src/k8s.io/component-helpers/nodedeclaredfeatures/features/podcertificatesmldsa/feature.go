@@ -51,15 +51,6 @@ func (f *podCertificatesMLDSAFeature) InferForScheduling(podInfo *types.PodInfo)
 }
 
 func (f *podCertificatesMLDSAFeature) InferForUpdate(oldPodInfo, newPodInfo *types.PodInfo) bool {
-	oldHasMLDSAKeyType := podSpecHasProjectedPodCertificateWithMLDSAKeyType(oldPodInfo.Spec)
-	newHasMLDSAKeyType := podSpecHasProjectedPodCertificateWithMLDSAKeyType(newPodInfo.Spec)
-
-	// if the old pod spec does not have any podCertificate projected volumes but
-	// the new one does, the update has introduced a dependency on the PodCertificateMLDSA feature gate.
-	if !oldHasMLDSAKeyType && newHasMLDSAKeyType {
-		return true
-	}
-
 	return false
 }
 

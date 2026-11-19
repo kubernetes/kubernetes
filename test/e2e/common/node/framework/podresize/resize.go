@@ -296,7 +296,10 @@ func addResourceList(des, src v1.ResourceList) {
 func VerifyPodContainersCgroupValues(ctx context.Context, f *framework.Framework, pod *v1.Pod, tcInfo []ResizableContainerInfo) error {
 	ginkgo.GinkgoHelper()
 
-	onCgroupv2 := cgroups.IsPodOnCgroupv2Node(f, pod.Name, pod.Spec.Containers[0].Name)
+	onCgroupv2, err := cgroups.IsPodOnCgroupv2Node(f, pod, pod.Spec.Containers[0].Name)
+	if err != nil {
+		return err
+	}
 
 	var errs []error
 	for _, ci := range tcInfo {
@@ -412,11 +415,11 @@ func WaitForPodResizeActuation(ctx context.Context, f *framework.Framework, podC
 				}
 			}
 			return nil, nil
-		})),
+		})), "wait for Pod %q in namespace %q to finish resizing", pod.Name, pod.Namespace,
 	)
 
 	resizedPod, err := framework.GetObject(podClient.Get, pod.Name, metav1.GetOptions{})(ctx)
-	framework.ExpectNoError(err, "failed to get resized pod")
+	framework.ExpectNoError(err, "get resized pod")
 	return resizedPod
 }
 
@@ -473,13 +476,13 @@ func CheckPodResized(ctx context.Context, f *framework.Framework, resizedPod *v1
 
 func MakeResizePatch(originalContainers, desiredContainers []ResizableContainerInfo, originPodResources, desiredPodResources *v1.ResourceRequirements) []byte {
 	original, err := json.Marshal(MakePodWithResizableContainers("", "", "", originalContainers, originPodResources))
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "encode original Pod resize specification as JSON")
 
 	desired, err := json.Marshal(MakePodWithResizableContainers("", "", "", desiredContainers, desiredPodResources))
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "encode desired Pod resize specification as JSON")
 
 	patch, err := strategicpatch.CreateTwoWayMergePatch(original, desired, v1.Pod{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "create Pod resize patch")
 
 	return patch
 }

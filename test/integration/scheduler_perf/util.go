@@ -18,7 +18,9 @@ package benchmark
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"maps"
@@ -32,7 +34,6 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	schedulingapiv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	schedulingapiv1beta1 "k8s.io/api/scheduling/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -42,14 +43,17 @@ import (
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/ktesting"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/metadata"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/component-base/featuregate"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
+	pvutil "k8s.io/component-helpers/storage/volume"
 	"k8s.io/klog/v2"
 	kubeschedulerconfigv1 "k8s.io/kube-scheduler/config/v1"
 	apiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
+	"k8s.io/kubernetes/pkg/controller/namespace"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
@@ -58,6 +62,7 @@ import (
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 	"k8s.io/kubernetes/test/integration/framework"
 	"k8s.io/kubernetes/test/integration/util"
+	testutils "k8s.io/kubernetes/test/utils"
 )
 
 const (
@@ -94,9 +99,6 @@ func mustSetupCluster(tCtx ktesting.TContext, config *config.KubeSchedulerConfig
 	var runtimeConfig []string
 	if enabledFeatures[features.GenericWorkload] {
 		runtimeConfig = append(runtimeConfig, fmt.Sprintf("%s=true", schedulingapiv1beta1.SchemeGroupVersion))
-	}
-	if enabledFeatures[features.CompositePodGroup] {
-		runtimeConfig = append(runtimeConfig, fmt.Sprintf("%s=true", schedulingapiv1alpha3.SchemeGroupVersion))
 	}
 	customFlags := []string{
 		// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
@@ -145,9 +147,9 @@ func mustSetupCluster(tCtx ktesting.TContext, config *config.KubeSchedulerConfig
 	// scheduler either).
 	controllerClient := clientset.NewForConfigOrDie(cfg)
 	controllerInformerFactory := informers.NewSharedInformerFactory(controllerClient, 0)
-	util.StartFakePVController(tCtx, controllerClient, controllerInformerFactory)
+	startFakePVController(tCtx, controllerClient, controllerInformerFactory)
 	runGC := util.CreateGCController(tCtx, tCtx, *cfg, controllerInformerFactory)
-	runNS := util.CreateNamespaceController(tCtx, tCtx, *cfg, controllerInformerFactory)
+	runNS := createNamespaceController(tCtx, tCtx, *cfg, controllerInformerFactory)
 	// Testing of DRA with inline resource claims depends on this
 	// controller for creating and removing ResourceClaims.
 	runResourceClaimController := util.CreateResourceClaimController(tCtx, tCtx, controllerClient, controllerInformerFactory)
@@ -161,6 +163,76 @@ func mustSetupCluster(tCtx ktesting.TContext, config *config.KubeSchedulerConfig
 	go runResourceClaimController()
 
 	return scheduler, informerFactory, done, tCtx
+}
+
+// startFakePVController is a simplified pv controller logic that sets PVC VolumeName and annotation for each PV binding.
+// TODO(mborsz): Use a real PV controller here.
+func startFakePVController(tCtx ktesting.TContext, clientSet clientset.Interface, informerFactory informers.SharedInformerFactory) {
+	pvInformer := informerFactory.Core().V1().PersistentVolumes()
+
+	syncPV := func(obj *v1.PersistentVolume) {
+		if obj.Spec.ClaimRef != nil {
+			claimRef := obj.Spec.ClaimRef
+			pvc, err := clientSet.CoreV1().PersistentVolumeClaims(claimRef.Namespace).Get(tCtx, claimRef.Name, metav1.GetOptions{})
+			if err != nil {
+				// Note that the error can be anything, because components like
+				// apiserver are also shutting down at the same time, but this
+				// check is conservative and only ignores the "context canceled"
+				// error while shutting down.
+				if tCtx.Err() == nil || !errors.Is(err, context.Canceled) {
+					klog.Errorf("error while getting %v/%v: %v", claimRef.Namespace, claimRef.Name, err)
+				}
+				return
+			}
+
+			if pvc.Spec.VolumeName == "" {
+				pvc.Spec.VolumeName = obj.Name
+				metav1.SetMetaDataAnnotation(&pvc.ObjectMeta, pvutil.AnnBindCompleted, "yes")
+				_, err := clientSet.CoreV1().PersistentVolumeClaims(claimRef.Namespace).Update(tCtx, pvc, metav1.UpdateOptions{})
+				if err != nil {
+					if tCtx.Err() == nil || !errors.Is(err, context.Canceled) {
+						// Shutting down, no need to record this.
+						klog.Errorf("error while updating %v/%v: %v", claimRef.Namespace, claimRef.Name, err)
+					}
+					return
+				}
+			}
+		}
+	}
+
+	_, err := pvInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc: func(obj interface{}) {
+			syncPV(obj.(*v1.PersistentVolume))
+		},
+		UpdateFunc: func(_, obj interface{}) {
+			syncPV(obj.(*v1.PersistentVolume))
+		},
+	})
+	tCtx.ExpectNoError(err, "add PV event handler")
+}
+
+// createNamespaceController creates a namespace controller and returns a run
+// function for it. The informer factory needs to be started before invoking
+// that function.
+func createNamespaceController(ctx context.Context, tb testutils.TB, restConfig restclient.Config, informerSet informers.SharedInformerFactory) func() {
+	restclient.AddUserAgent(&restConfig, "namespace-controller")
+	clientSet := clientset.NewForConfigOrDie(&restConfig)
+	metadataClient, err := metadata.NewForConfig(&restConfig)
+	if err != nil {
+		tb.Fatalf("Failed to create metadataClient: %v", err)
+	}
+	discoverResourcesFn := clientSet.Discovery().ServerPreferredNamespacedResources
+	controller := namespace.NewNamespaceController(
+		ctx,
+		clientSet,
+		metadataClient,
+		discoverResourcesFn,
+		informerSet.Core().V1().Namespaces(),
+		10*time.Hour,
+		v1.FinalizerKubernetes)
+	return func() {
+		go controller.Run(ctx, 5)
+	}
 }
 
 func isAttempted(pod *v1.Pod) bool {

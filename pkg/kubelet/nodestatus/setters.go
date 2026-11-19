@@ -284,7 +284,7 @@ func MachineInfo(nodeName string,
 				node.Status.Capacity[v1.ResourceName(removedResource)] = *resource.NewQuantity(int64(0), resource.DecimalSI)
 			}
 
-			if utilfeature.DefaultFeatureGate.Enabled(features.NodeSwap) && info.SwapCapacity != 0 {
+			if info.SwapCapacity != 0 {
 				node.Status.NodeInfo.Swap = &v1.NodeSwapStatus{
 					Capacity: ptr.To(int64(info.SwapCapacity)),
 				}
@@ -435,9 +435,6 @@ func GoRuntime() Setter {
 // NodeFeatures returns a Setter that sets NodeFeatures on the node.
 func NodeFeatures(featuresGetter func() *kubecontainer.RuntimeFeatures) Setter {
 	return func(ctx context.Context, node *v1.Node) error {
-		if !utilfeature.DefaultFeatureGate.Enabled(features.SupplementalGroupsPolicy) {
-			return nil
-		}
 		features := featuresGetter()
 		if features == nil {
 			return nil
@@ -452,9 +449,6 @@ func NodeFeatures(featuresGetter func() *kubecontainer.RuntimeFeatures) Setter {
 // RuntimeHandlers returns a Setter that sets RuntimeHandlers on the node.
 func RuntimeHandlers(fn func() []kubecontainer.RuntimeHandler) Setter {
 	return func(ctx context.Context, node *v1.Node) error {
-		if !utilfeature.DefaultFeatureGate.Enabled(features.RecursiveReadOnlyMounts) && !utilfeature.DefaultFeatureGate.Enabled(features.UserNamespacesSupport) {
-			return nil
-		}
 		handlers := fn()
 		node.Status.RuntimeHandlers = make([]v1.NodeRuntimeHandler, len(handlers))
 		for i, h := range handlers {

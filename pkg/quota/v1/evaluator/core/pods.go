@@ -23,6 +23,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -35,6 +36,7 @@ import (
 	"k8s.io/utils/clock"
 
 	resourcehelper "k8s.io/component-helpers/resource"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
@@ -132,23 +134,21 @@ func (p *podEvaluator) Constraints(required []corev1.ResourceName, item runtime.
 		return err
 	}
 
-	// As mentioned in the subsequent comment, the older versions required explicit
-	// resource requests for CPU & memory for each container if resource quotas were
-	// enabled for these resources. This was a design flaw as resource validation is
-	// coupled with quota enforcement. With pod-level resources
-	// feature, container-level resources are not mandatory. Hence the check for
-	// missing container requests, for CPU/memory resources that have quotas set,
-	// is skipped when pod-level resources feature is enabled and resources are set
-	// at pod level.
-	if feature.DefaultFeatureGate.Enabled(features.PodLevelResources) && resourcehelper.IsPodLevelResourcesSet(pod) {
-		return nil
-	}
-
 	// BACKWARD COMPATIBILITY REQUIREMENT: if we quota cpu or memory, then each container
 	// must make an explicit request for the resource.  this was a mistake.  it coupled
 	// validation with resource counting, but we did this before QoS was even defined.
 	// let's not make that mistake again with other resources now that QoS is defined.
 	requiredSet := quota.ToSet(required).Intersection(validationSet)
+	// When PodLevelResources is enabled, CPU/memory requests or limits specified at the
+	// pod level satisfy the corresponding quota constraint for the whole pod; any
+	// remaining required resources must still be specified on every container.
+	if feature.DefaultFeatureGate.Enabled(features.PodLevelResources) && pod.Spec.Resources != nil {
+		podUsage := podComputeUsageHelper(pod.Spec.Resources.Requests, pod.Spec.Resources.Limits)
+		requiredSet = requiredSet.Difference(quota.ToSet(quota.ResourceNames(podUsage)))
+	}
+	if requiredSet.Len() == 0 {
+		return nil
+	}
 	missingSetResourceToContainerNames := make(map[string]sets.String)
 	for i := range pod.Spec.Containers {
 		enforcePodContainerConstraints(&pod.Spec.Containers[i], requiredSet, missingSetResourceToContainerNames)
@@ -194,9 +194,50 @@ func (p *podEvaluator) Handles(a admission.Attributes) bool {
 		return op == admission.Create
 	case "resize":
 		return op == admission.Update
+	case "status":
+		if op == admission.Update {
+			pod, err1 := toExternalPodOrError(a.GetObject())
+			oldPod, err2 := toExternalPodOrError(a.GetOldObject())
+			if err1 != nil || err2 != nil {
+				return false
+			}
+			return len(pod.Status.ExtraNodeAllocatableResources) > 0 &&
+				!apiequality.Semantic.DeepEqual(oldPod.Status.ExtraNodeAllocatableResources, pod.Status.ExtraNodeAllocatableResources)
+		}
+		return false
+	case "dynamic":
+		if op != admission.Update {
+			return false
+		}
+		pod, err1 := toExternalPodOrError(a.GetObject())
+		oldPod, err2 := toExternalPodOrError(a.GetOldObject())
+		if err1 != nil || err2 != nil {
+			return true
+		}
+		// Updates that don't change usage or scope aren't charged, as on the main resource, so a
+		// pod that predates a quota's constraints can still get e.g. an image update.
+		return IsTerminating(oldPod) != IsTerminating(pod) || resourcesChanged(oldPod, pod) || containersAdded(oldPod, pod)
 	default:
 		return false
 	}
+}
+
+// resourcesChanged returns true if the pod's total requests or limits changed.
+func resourcesChanged(oldPod, pod *corev1.Pod) bool {
+	opts := podResourcesOptions()
+	return !quota.Equals(resourcehelper.PodRequests(oldPod, opts), resourcehelper.PodRequests(pod, opts)) ||
+		!quota.Equals(resourcehelper.PodLimits(oldPod, opts), resourcehelper.PodLimits(pod, opts))
+}
+
+// containersAdded returns true if pod has a container that oldPod doesn't. Added containers must
+// meet the quota's per-container constraints even if the totals don't change.
+func containersAdded(oldPod, pod *corev1.Pod) bool {
+	for pair := range podutil.ContainerPairs(pod, oldPod, podutil.Containers) {
+		if pair.Old == nil {
+			return true
+		}
+	}
+	return false
 }
 
 // Matches returns true if the evaluator matches the specified quota with the provided input item
@@ -398,16 +439,23 @@ func PodUsageFunc(obj runtime.Object, clock clock.Clock) (corev1.ResourceList, e
 		return result, nil
 	}
 
-	opts := resourcehelper.PodResourcesOptions{
-		UseStatusResources: feature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling),
-		// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
-		SkipPodLevelResources: !feature.DefaultFeatureGate.Enabled(features.PodLevelResources),
-	}
+	opts := podResourcesOptions()
 	requests := resourcehelper.PodRequests(pod, opts)
 	limits := resourcehelper.PodLimits(pod, opts)
 
 	result = quota.Add(result, podComputeUsageHelper(requests, limits))
 	return result, nil
+}
+
+func podResourcesOptions() resourcehelper.PodResourcesOptions {
+	return resourcehelper.PodResourcesOptions{
+		UseStatusResources: true,
+		// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
+		SkipPodLevelResources:                          !feature.DefaultFeatureGate.Enabled(features.PodLevelResources),
+		InPlacePodLevelResourcesVerticalScalingEnabled: feature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling),
+		// Not gated, so pods that carry the field stay charged when the feature is disabled.
+		UseExtraNodeAllocatableResources: true,
+	}
 }
 
 func isBestEffort(pod *corev1.Pod) bool {

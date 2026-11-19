@@ -21,7 +21,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/cel-go/cel"
+	"cel.dev/cel-go/cel"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -3539,15 +3539,6 @@ func TestValidateValidatingAdmissionPolicyBinding(t *testing.T) {
 			},
 		},
 		expectedError: `metadata.name: Invalid value: "!!!!":`,
-	}, {
-		name: "PolicyName is required",
-		config: &admissionregistration.ValidatingAdmissionPolicyBinding{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "config",
-			},
-			Spec: admissionregistration.ValidatingAdmissionPolicyBindingSpec{},
-		},
-		expectedError: `spec.policyName: Required value`,
 	}, {
 		name: "matchResources validation: matchPolicy",
 		config: &admissionregistration.ValidatingAdmissionPolicyBinding{

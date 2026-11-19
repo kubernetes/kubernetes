@@ -35,7 +35,7 @@ type ProjectedVolumeSourceApplyConfiguration struct {
 	DefaultMode *int32 `json:"defaultMode,omitempty"`
 	// defaultUser is Optional: The owner UID of the created files by default.
 	// The defaultUser field is only used as a fallback when the item-level user field is unset.
-	// (Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
+	// (Beta) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
 	DefaultUser *int64 `json:"defaultUser,omitempty"`
 }
 

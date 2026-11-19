@@ -22,9 +22,9 @@ import (
 	"os"
 	"os/exec"
 	"path"
-	"testing"
 
 	"k8s.io/klog/v2"
+	"k8s.io/ktesting"
 
 	"k8s.io/kubernetes/test/e2e/framework"
 )
@@ -113,7 +113,7 @@ func (e *E2EServices) Stop() {
 
 // RunE2EServices actually start the e2e services. This function is used to
 // start e2e services in current process. This is only used in run-services-mode.
-func RunE2EServices(t *testing.T) {
+func RunE2EServices(t ktesting.TB) {
 	e := newE2EServices()
 	if err := e.run(t); err != nil {
 		klog.Fatalf("Failed to run e2e services: %v", err)
