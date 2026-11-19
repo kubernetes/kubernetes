@@ -38,27 +38,6 @@ import (
 	"k8s.io/utils/ptr"
 )
 
-// getResourceList returns a ResourceList with the
-// specified cpu and memory resource values
-func getResourceList(cpu, memory string) v1.ResourceList {
-	res := v1.ResourceList{}
-	if cpu != "" {
-		res[v1.ResourceCPU] = resource.MustParse(cpu)
-	}
-	if memory != "" {
-		res[v1.ResourceMemory] = resource.MustParse(memory)
-	}
-	return res
-}
-
-// getResourceRequirements returns a ResourceRequirements object
-func getResourceRequirements(requests, limits v1.ResourceList) v1.ResourceRequirements {
-	res := v1.ResourceRequirements{}
-	res.Requests = requests
-	res.Limits = limits
-	return res
-}
-
 func TestResourceConfigForPod(t *testing.T) {
 	const Mi = int64(1024 * 1024)
 	const Gi = int64(1024 * 1024 * 1024)

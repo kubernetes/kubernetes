@@ -43,10 +43,25 @@ type stateCheckpoint struct {
 	checkpointManager checkpointmanager.CheckpointManager
 	checkpointName    string
 	lastChecksum      checksum.Checksum
+	// omitV1PodLevelResources leaves the pod-level resources out of the legacy V1 representation.
+	// TODO: Remove in v1.39 when the V1 checkpoint format is no longer supported.
+	omitV1PodLevelResources bool
 }
 
 // NewStateCheckpoint creates new State for keeping track of pod resource information with checkpoint backend
 func NewStateCheckpoint(logger klog.Logger, stateDir, checkpointName string, maskFn func(*v1.Pod)) (State, error) {
+	return newStateCheckpoint(logger, stateDir, checkpointName, maskFn, false)
+}
+
+// NewActuatedStateCheckpoint is NewStateCheckpoint for the actuated state, whose pod-level
+// resources are the effective resources of the pod cgroup. A kubelet that only reads the legacy V1
+// representation would take them for explicit pod-level resources, so they are left out of it.
+// TODO: Remove in v1.39 when the V1 checkpoint format is no longer supported.
+func NewActuatedStateCheckpoint(logger klog.Logger, stateDir, checkpointName string, maskFn func(*v1.Pod)) (State, error) {
+	return newStateCheckpoint(logger, stateDir, checkpointName, maskFn, true)
+}
+
+func newStateCheckpoint(logger klog.Logger, stateDir, checkpointName string, maskFn func(*v1.Pod), omitV1PodLevelResources bool) (State, error) {
 	checkpointManager, err := checkpointmanager.NewCheckpointManager(stateDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize checkpoint manager for pod resource information tracking: %w", err)
@@ -60,10 +75,11 @@ func NewStateCheckpoint(logger klog.Logger, stateDir, checkpointName string, mas
 	}
 
 	stateCheckpoint := &stateCheckpoint{
-		cache:             newStateMemory(logger, pods, maskFn),
-		checkpointManager: checkpointManager,
-		checkpointName:    checkpointName,
-		lastChecksum:      checksum,
+		cache:                   newStateMemory(logger, pods, maskFn),
+		checkpointManager:       checkpointManager,
+		checkpointName:          checkpointName,
+		lastChecksum:            checksum,
+		omitV1PodLevelResources: omitV1PodLevelResources,
 	}
 
 	if migrated {
@@ -113,7 +129,7 @@ func (sc *stateCheckpoint) storeState(logger klog.Logger) error {
 	// The cache is not locked while the pods are encoded, since it never modifies a stored pod.
 	podList := sc.cache.toPodList()
 
-	checkpoint, err := NewCheckpointV2(podList)
+	checkpoint, err := NewCheckpointV2(podList, sc.omitV1PodLevelResources)
 	if err != nil {
 		return fmt.Errorf("failed to create checkpoint: %w", err)
 	}

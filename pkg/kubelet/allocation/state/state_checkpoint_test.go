@@ -34,6 +34,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
@@ -538,4 +539,34 @@ func Test_stateCheckpoint_containersSurviveRestart(t *testing.T) {
 	assert.Equal(t, main, got)
 	_, ok = restored.GetContainer(podUID, "removed", podutil.Containers)
 	assert.False(t, ok)
+}
+
+// The actuated state keeps pod-level resources in its V2 pod list but leaves them out of the
+// legacy V1 entries, which the allocated state still writes them to.
+func Test_stateCheckpoint_v1PodLevelResources(t *testing.T) {
+	podResources := requirements("500m", "512Mi")
+	for name, tc := range map[string]struct {
+		newState func(klog.Logger, string, string, func(*v1.Pod)) (State, error)
+		wantV1   *v1.ResourceRequirements
+	}{
+		"allocated": {newState: NewStateCheckpoint, wantV1: &podResources},
+		"actuated":  {newState: NewActuatedStateCheckpoint},
+	} {
+		t.Run(name, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
+			testDir := getTestDir(t)
+			sc, err := tc.newState(logger, testDir, testCheckpoint, nil)
+			require.NoError(t, err)
+			require.NoError(t, sc.SetPodLevelResources(logger, "pod-1", &podResources))
+
+			restored, err := tc.newState(logger, testDir, testCheckpoint, nil)
+			require.NoError(t, err)
+			got, _ := restored.GetPodLevelResources("pod-1")
+			requireNoDiff(t, &podResources, got, "pod-level resources restored from the V2 pod list")
+
+			file, err := os.ReadFile(filepath.Join(testDir, testCheckpoint))
+			require.NoError(t, err)
+			requireNoDiff(t, tc.wantV1, readLegacyFile(t, file)["pod-1"].PodLevelResources, "pod-level resources in the V1 entries")
+		})
+	}
 }

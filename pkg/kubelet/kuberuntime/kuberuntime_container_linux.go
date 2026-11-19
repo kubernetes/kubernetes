@@ -519,6 +519,13 @@ func (m *kubeGenericRuntimeManager) applyPodLevelMemoryHigh(pod *v1.Pod, rc *cm.
 	if m.memoryThrottlingFactor != nil {
 		cm.ApplyPodLevelMemoryHigh(pod, rc, *m.memoryThrottlingFactor)
 	}
+	// An unlimited pod memory limit doesn't throttle either.
+	if rc.Memory != nil && *rc.Memory < 0 {
+		if rc.Unified == nil {
+			rc.Unified = map[string]string{}
+		}
+		rc.Unified[cm.Cgroup2MemoryHigh] = "max"
+	}
 }
 
 // initSwapControllerAvailabilityCheck returns a function that checks swap controller availability
