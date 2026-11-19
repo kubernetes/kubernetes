@@ -108,10 +108,17 @@ var _ fwk.PodGroupPostFilterPlugin = &DefaultPreemption{}
 var _ framework.RankNodesPlugin = &DefaultPreemption{}
 var _ fwk.ReservePlugin = &DefaultPreemption{}
 var _ fwk.RelevancePlugin = &DefaultPreemption{}
+var _ fwk.SignPlugin = &DefaultPreemption{}
 
 // Name returns name of the plugin. It is used in logs, etc.
 func (pl *DefaultPreemption) Name() string {
 	return Name
+}
+
+// SignPod implements fwk.SignPlugin for RankNodes. Node ranks depend on
+// PodGroupPreemptionState rather than individual preemptor pod attributes.
+func (pl *DefaultPreemption) SignPod(_ context.Context, _ *v1.Pod) ([]fwk.SignFragment, *fwk.Status) {
+	return nil, nil
 }
 
 // IsRelevantForPodResize returns true to indicate that DefaultPreemption is relevant for pod resizes,

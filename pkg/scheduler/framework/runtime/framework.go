@@ -542,10 +542,6 @@ func NewFramework(ctx context.Context, r Registry, profile *config.KubeScheduler
 		}
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.OpportunisticBatching) {
-		f.computeBatchablePlugins()
-	}
-
 	// Put default preemption as the only RankNodesPlugin and check that all PostFilter
 	// plugins are also enabled at PodGroupPostFilter, as PodGroups only run the latter.
 	if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
@@ -576,6 +572,10 @@ func NewFramework(ctx context.Context, r Registry, profile *config.KubeScheduler
 				logger.Error(nil, msg, "plugin", pl.Name(), "profile", f.profileName)
 			}
 		}
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.OpportunisticBatching) {
+		f.computeBatchablePlugins()
 	}
 
 	if options.captureProfile != nil {
@@ -967,7 +967,7 @@ func (f *frameworkImpl) QueueSortFunc() fwk.LessFunc {
 	return f.queueSortPlugins[0].Less
 }
 
-// If any of our preFilter, filter, preScore or score plugins haven't
+// If any of our preFilter, filter, preScore, score or rankNodes plugins haven't
 // implemented a signature, then disable the cache.
 func (f *frameworkImpl) computeBatchablePlugins() {
 	f.enableSignatures = true
@@ -991,6 +991,9 @@ func (f *frameworkImpl) computeBatchablePlugins() {
 		candidatePlugins = append(candidatePlugins, pl)
 	}
 	for _, pl := range f.scorePlugins {
+		candidatePlugins = append(candidatePlugins, pl)
+	}
+	for _, pl := range f.rankNodesPlugins {
 		candidatePlugins = append(candidatePlugins, pl)
 	}
 
