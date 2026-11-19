@@ -29,6 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/ktesting"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/winstats"
 )
 
@@ -231,5 +232,55 @@ func TestCalculateWindowsResources(t *testing.T) {
 	for _, test := range tests {
 		windowsContainerResources := fakeRuntimeSvc.calculateWindowsResources(tCtx, &test.cpuLim, &test.memLim)
 		assert.Equal(t, test.expected, windowsContainerResources)
+	}
+}
+
+func TestToKubeContainerResources(t *testing.T) {
+	tests := []struct {
+		name      string
+		resources *runtimeapi.ContainerResources
+		expected  *kubecontainer.ContainerResources
+	}{
+		{
+			name:      "no windows resources reported",
+			resources: &runtimeapi.ContainerResources{},
+			expected:  nil,
+		},
+		{
+			// CpuMaximum is a hundredth of a percent of the whole machine, so it cannot be
+			// inverted back to the cpu limit the container was given. Reporting nothing lets
+			// the caller fall back to the allocated limit, which is accurate.
+			name: "cpu maximum alone reports no resources",
+			resources: &runtimeapi.ContainerResources{
+				Windows: &runtimeapi.WindowsContainerResources{CpuMaximum: 312},
+			},
+			expected: nil,
+		},
+		{
+			name: "memory limit is reported, cpu maximum is not",
+			resources: &runtimeapi.ContainerResources{
+				Windows: &runtimeapi.WindowsContainerResources{
+					CpuMaximum:         312,
+					MemoryLimitInBytes: 134217728,
+				},
+			},
+			expected: &kubecontainer.ContainerResources{
+				MemoryLimit: resource.NewQuantity(134217728, resource.BinarySI),
+			},
+		},
+		{
+			name: "memory limit alone is reported",
+			resources: &runtimeapi.ContainerResources{
+				Windows: &runtimeapi.WindowsContainerResources{MemoryLimitInBytes: 134217728},
+			},
+			expected: &kubecontainer.ContainerResources{
+				MemoryLimit: resource.NewQuantity(134217728, resource.BinarySI),
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			assert.Equal(t, test.expected, toKubeContainerResources(test.resources))
+		})
 	}
 }
