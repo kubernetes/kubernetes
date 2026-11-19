@@ -160,9 +160,7 @@ func (m *manager) CompleteAdmit(ctx context.Context, pod *v1.Pod, operation life
 		return
 	}
 	m.state.CommitPendingResize(pending)
-	// TODO(#140629): notify the policy that the resize was committed, so that
-	// it can update the metrics derived from the assignments. No policy
-	// changes the scratch state yet, so there is nothing to update now.
+	m.policy.ResizeCommitted(logger, m.state, pending)
 }
 
 // checkCPUsFree fails if a CPU the pending resize takes from the default CPU

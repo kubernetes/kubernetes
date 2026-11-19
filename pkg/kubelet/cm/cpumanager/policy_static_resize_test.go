@@ -72,6 +72,8 @@ type staticPolicyResizeTest struct {
 	expErr                      error
 	expCPUAlloc                 bool
 	expCSet                     cpuset.CPUSet
+	// expBaseline is the expected baseline, if it differs from expCSet.
+	expBaseline cpuset.CPUSet
 }
 
 // this is not a real Clone() - hence Pseudo- - because we don't clone some
@@ -101,6 +103,7 @@ func (spt staticPolicyResizeTest) PseudoClone() staticPolicyResizeTest {
 		expErr:                      spt.expErr,
 		expCPUAlloc:                 spt.expCPUAlloc,
 		expCSet:                     spt.expCSet.Clone(),
+		expBaseline:                 spt.expBaseline.Clone(),
 	}
 }
 
@@ -822,7 +825,9 @@ func TestStaticPolicyAddWithInPlacePodVerticalScalingExclusiveCPUs(t *testing.T)
 			pod:             makePod("fakePod", "fakeContainer3", "4000m", "4000m"),
 			expErr:          nil,
 			expCPUAlloc:     true,
-			expCSet:         cpuset.New(1, 5),
+			// A container added again with more CPUs than assigned is resized at once.
+			expCSet:     cpuset.New(1, 2, 5, 6),
+			expBaseline: cpuset.New(1, 5),
 		},
 		{
 			description: "podResize GuPodSingleCore, SingleSocketHT, ExpectAllocOneCPU",
@@ -1016,9 +1021,13 @@ func runStaticPolicyTestCaseWithInPlacePodVerticalScalingExclusiveCPUs(t *testin
 				testCase.description, container.Name, st.baselines)
 		}
 
-		if !original.Baseline.Equals(testCase.expCSet) {
+		expBaseline := testCase.expCSet
+		if !testCase.expBaseline.IsEmpty() {
+			expBaseline = testCase.expBaseline
+		}
+		if !original.Baseline.Equals(expBaseline) {
 			t.Errorf("StaticPolicy Allocate() error (%v). expected cpuset %s but got %s",
-				testCase.description, testCase.expCSet, original.Baseline)
+				testCase.description, expBaseline, original.Baseline)
 		}
 
 		if !original.Baseline.Intersection(st.defaultCPUSet).IsEmpty() {

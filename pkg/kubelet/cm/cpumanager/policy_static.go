@@ -47,6 +47,10 @@ const (
 	PolicyStatic policyName = "static"
 	// ErrorSMTAlignment represents the type of an SMTAlignmentError
 	ErrorSMTAlignment = "SMTAlignmentError"
+	// ErrorResizeFeasibility represents the type of a resizeFeasibilityError
+	ErrorResizeFeasibility = "ResizeFeasibilityError"
+	// ErrorResizeCPUAllocation represents the type of a resizeCPUAllocationError
+	ErrorResizeCPUAllocation = "ResizeCPUAllocationError"
 )
 
 // SMTAlignmentError represents an error due to SMT alignment
@@ -104,9 +108,11 @@ type resizeFeasibilityError struct {
 	CausedBy      string
 }
 
-// Type returns v1.PodReasonInfeasible, so the resize is not retried.
+// Type returns human-readable type of this error. Used in the admission control to populate Admission Failure reason.
+// It is also the reason_detail of pod_infeasible_resizes_total, which does not count a reason equal to
+// v1.PodReasonInfeasible, since the resize admit handler counts these rejections itself.
 func (e resizeFeasibilityError) Type() string {
-	return v1.PodReasonInfeasible
+	return ErrorResizeFeasibility
 }
 
 func (e resizeFeasibilityError) RejectionType() lifecycle.RejectionType {
@@ -126,9 +132,10 @@ type resizeCPUAllocationError struct {
 	TopologyError string
 }
 
-// Type returns v1.PodReasonInfeasible, so the resize is not retried.
+// Type returns human-readable type of this error. Used in the admission control to populate Admission Failure reason.
+// It is also the reason_detail of pod_infeasible_resizes_total, see resizeFeasibilityError.Type.
 func (e resizeCPUAllocationError) Type() string {
-	return v1.PodReasonInfeasible
+	return ErrorResizeCPUAllocation
 }
 
 func (e resizeCPUAllocationError) RejectionType() lifecycle.RejectionType {
@@ -970,7 +977,7 @@ func (p *staticPolicy) Allocate(logger klog.Logger, s state.State, pod *v1.Pod, 
 	case lifecycle.AddOperation:
 		return p.allocateForAdd(logger, s, pod, container)
 	case lifecycle.UpdateOperation:
-		return p.allocateForResize(logger, s, pod, container)
+		return p.allocateForResize(logger, s, pod, container, operation)
 	default:
 		logger.V(2).Info("CPU Manager container-level resource allocation skipped, operation not supported by the static CPU manager policy")
 		return nil
@@ -1022,7 +1029,7 @@ func (p *staticPolicy) allocateForAdd(logger klog.Logger, s state.State, pod *v1
 			// Without InPlacePodVerticalScalingExclusiveCPUs the assignment is
 			// kept, as any other assignment present in the state.
 			logger.Info("Static policy: container already present in state with a different number of CPUs, resizing", "cpuset", cset, "requestedSize", numCPUs)
-			if err := p.allocateForResize(logger, s, pod, container); err != nil {
+			if err := p.allocateForResize(logger, s, pod, container, lifecycle.AddOperation); err != nil {
 				return err
 			}
 			// The resize may have changed the CPU set of the container.
@@ -1059,7 +1066,15 @@ func (p *staticPolicy) allocateForAdd(logger klog.Logger, s state.State, pod *v1
 	return nil
 }
 
-func (p *staticPolicy) allocateForResize(logger klog.Logger, s state.State, pod *v1.Pod, container *v1.Container) (rerr error) {
+// allocateForResize changes the exclusive CPUs of a container to its allocated
+// resources. The operation tells who calls it:
+//   - lifecycle.UpdateOperation: the admission of a resize, on its scratch state.
+//     The metrics derived from the result are published once the resize is
+//     committed, see ResizeCommitted;
+//   - lifecycle.AddOperation: allocateForAdd, for a pod admitted again with a
+//     resize that was not applied, on the state. allocateForAdd counts the
+//     attempt, so only the metrics derived from the result are published here.
+func (p *staticPolicy) allocateForResize(logger klog.Logger, s state.State, pod *v1.Pod, container *v1.Container, operation lifecycle.Operation) (rerr error) {
 	logger = klog.LoggerWithValues(logger, "podUID", pod.UID, "containerName", container.Name)
 
 	resizeFeasibility := p.checkResizeFeasibility(logger, s, pod, container)
@@ -1080,22 +1095,18 @@ func (p *staticPolicy) allocateForResize(logger klog.Logger, s state.State, pod 
 	}
 
 	// container belongs in an exclusively allocated pool
-	metrics.CPUManagerPinningRequestsTotal.Inc()
-	defer func() {
-		if rerr != nil {
-			metrics.CPUManagerPinningErrorsTotal.Inc()
-			metrics.ResourceManagerAllocationErrorsTotal.WithLabelValues(metrics.ResourceManagerCPU, metrics.ResourceManagerNode).Inc()
-			if p.options.FullPhysicalCPUsOnly {
-				metrics.ContainerAlignedComputeResourcesFailure.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedPhysicalCPU).Inc()
+	if operation == lifecycle.UpdateOperation {
+		metrics.CPUManagerPinningRequestsTotal.Inc()
+		defer func() {
+			if rerr != nil {
+				metrics.CPUManagerPinningErrorsTotal.Inc()
+				metrics.ResourceManagerAllocationErrorsTotal.WithLabelValues(metrics.ResourceManagerCPU, metrics.ResourceManagerNode).Inc()
+				if p.options.FullPhysicalCPUsOnly {
+					metrics.ContainerAlignedComputeResourcesFailure.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedPhysicalCPU).Inc()
+				}
 			}
-			return
-		}
-		// TODO: move in updateMetricsOnAllocate
-		if p.options.FullPhysicalCPUsOnly {
-			// increment only if we know we allocate aligned resources
-			metrics.ContainerAlignedComputeResources.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedPhysicalCPU).Inc()
-		}
-	}()
+		}()
+	}
 
 	// Get a list of reusable CPUs (e.g. CPUs reused from initContainers). It may include CPUs
 	// the container has already, which the SMT alignment check counts separately.
@@ -1134,15 +1145,38 @@ func (p *staticPolicy) allocateForResize(logger klog.Logger, s state.State, pod 
 		cpusToRelease := resizeFeasibility.cpusInUseByPodContainer.Difference(newallocatedcpuset.CPUs).Difference(getAssignedCPUsOfSiblings(s, string(pod.UID), container.Name))
 		s.SetDefaultCPUSet(s.GetDefaultCPUSet().Union(cpusToRelease))
 	}
-	p.updateMetricsOnAllocate(logger, s, newallocatedcpuset)
-	metrics.ResourceManagerAllocationsTotal.WithLabelValues(metrics.ResourceManagerCPU, metrics.ResourceManagerNode).Inc()
-	metrics.ResourceManagerContainerAssignments.WithLabelValues(metrics.ResourceManagerCPU, metrics.ResourceManagerExclusiveNode).Inc()
+	// A resize changes the assignment of a container, but does not add one, so
+	// the count of container assignments does not change.
+	if operation == lifecycle.AddOperation {
+		p.updateMetricsOnAllocate(logger, s, newallocatedcpuset)
+		metrics.ResourceManagerAllocationsTotal.WithLabelValues(metrics.ResourceManagerCPU, metrics.ResourceManagerNode).Inc()
+	}
 
 	logger.V(4).Info("Allocated exclusive CPUs for resize", "cpuset", newallocatedcpuset.CPUs.String())
-	// TODO Follow IPRR expected model, admission decides whether kubelet can accept the resize,
-	// and nothing is committed until every admit handler has passed and the allocation is persisted; actuation then happens in syncPod.
-	// https://github.com/kubernetes/kubernetes/pull/140629#discussion_r4273387867
+	// For a resize, s is the scratch state of the admission. The CPU manager
+	// commits it to the state once every admit handler admitted the pod and
+	// the pod allocation is persisted, see CompleteAdmit.
 	return nil
+}
+
+// ResizeCommitted publishes the metrics of a resize allocated by
+// allocateForResize, once the CPU manager committed it to the state.
+func (p *staticPolicy) ResizeCommitted(logger klog.Logger, s state.State, pending state.PendingResize) {
+	for containerName, cset := range pending.ContainerCPUSets {
+		if cset.IsEmpty() {
+			continue
+		}
+		logger.V(4).Info("Static policy: resize committed", "podUID", pending.PodUID, "containerName", containerName, "cpuset", cset)
+		metrics.ResourceManagerAllocationsTotal.WithLabelValues(metrics.ResourceManagerCPU, metrics.ResourceManagerNode).Inc()
+		if p.options.FullPhysicalCPUsOnly {
+			// allocateForResize enforces the SMT alignment.
+			metrics.ContainerAlignedComputeResources.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedPhysicalCPU).Inc()
+		}
+		if p.topology.CheckAlignment(cset).UncoreCache {
+			metrics.ContainerAlignedComputeResources.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedUncoreCache).Inc()
+		}
+	}
+	p.updateMetricsFromState(logger, s)
 }
 
 // getAssignedCPUsOfSiblings returns assigned cpus of given container's siblings(all containers other than the given container) in the given pod `podUID`.
@@ -1625,13 +1659,18 @@ func (p *staticPolicy) getPodTopologyHintsForAdd(logger klog.Logger, s state.Sta
 				if allocated.Size() != requestedByContainer {
 					if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingExclusiveCPUs) {
 						// Handled as a resize, see allocateForAdd.
-						// TODO(#140629): return hints that cannot be satisfied if the
-						// resize is not feasible. allocateForAdd returns before it
-						// looks at the state for a container with no exclusive CPU
-						// request, so Allocate does not reject such a pod, as it
-						// does for an update.
 						logger_.Info("CPUs already allocated to container with different number than request, generating hints for a resize", "requestedByContainer", requestedByContainer, "allocatedSize", allocated.Size())
-						return p.getPodTopologyHintsForResize(logger, s, pod)
+						if hints := p.getPodTopologyHintsForResize(logger, s, pod); hints != nil {
+							return hints
+						}
+						// The resize of the readmitted pod gets no pod-level
+						// preference, because it is not feasible or not supported.
+						// Unlike an update, Allocate does not reject the pod then:
+						// allocateForAdd returns before it looks at the state for a
+						// container with no exclusive CPU request. Fall through to
+						// the hints that cannot be satisfied, as without the feature
+						// gate, so that the pod is not admitted without alignment.
+						logger_.V(2).Info("Resize of the readmitted pod has no pod-level preference, generating hints that cannot be satisfied")
 					}
 					logger_.Info("CPUs already allocated to container with different number than request", "requestedByContainer", requestedByContainer, "allocatedSize", allocated.Size())
 					// An empty list of hints will be treated as a preference that cannot be satisfied.
