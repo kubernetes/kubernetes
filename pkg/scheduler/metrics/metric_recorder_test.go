@@ -363,6 +363,11 @@ func TestQueuedEntitiesRecorder(t *testing.T) {
 func TestNewMetricsAsyncRecorder(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		Register()
+		// PluginExecutionDuration keeps its observations for the lifetime of the
+		// process, so a second run (-count=N, or an earlier test in this binary)
+		// already starts with counts. Same treatment as #142680 gave the
+		// profile metrics in this package.
+		PluginExecutionDuration.Reset()
 
 		bufferSize := 10
 		interval := 1 * time.Second
