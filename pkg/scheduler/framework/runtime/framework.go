@@ -1968,6 +1968,11 @@ func (f *frameworkImpl) FlushBatch() {
 	f.batch.flush()
 }
 
+// InvalidateNodeRanks implements framework.NodeRankInvalidator.
+func (f *frameworkImpl) InvalidateNodeRanks() {
+	f.batch.InvalidateNodeRanks()
+}
+
 // RunPreBindPlugins runs the set of configured prebind plugins. It returns a
 // failure (bool) if any of the plugins returns an error. It also returns an
 // error containing the rejection message or the error occurred in the plugin.

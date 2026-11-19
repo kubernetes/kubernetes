@@ -378,6 +378,18 @@ type NominatedNodeNameGetter interface {
 	TracksNominationInMemory(pod *v1.Pod) bool
 }
 
+// NodeRankInvalidator is implemented by the handle that the framework passes to plugins.
+// It lets a plugin report that the order returned by a RankNodesPlugin no longer holds,
+// typically from Reserve or Unreserve, where the state that the ranks are derived from changes.
+// The framework then stops reusing the results it cached for that order.
+type NodeRankInvalidator interface {
+	// InvalidateNodeRanks reports that node ranks may have changed. A plugin doesn't need to
+	// report a change that Reserve makes to the rank of the node it reserves, and of no other
+	// node: opportunistic batching evaluates the node of the last scheduled pod again anyway.
+	// It is safe for concurrent use.
+	InvalidateNodeRanks()
+}
+
 // Framework manages the set of plugins in use by the scheduling framework.
 // Configured plugins are called at specified points in a scheduling context.
 type Framework interface {
@@ -385,6 +397,7 @@ type Framework interface {
 	NominatedNodeNameGetter
 	NominationExtensionsRunner
 	VictimExtensionsRunner
+	NodeRankInvalidator
 
 	// PreEnqueuePlugins returns the registered preEnqueue plugins.
 	PreEnqueuePlugins() []fwk.PreEnqueuePlugin
