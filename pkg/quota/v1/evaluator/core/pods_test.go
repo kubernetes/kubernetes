@@ -135,7 +135,63 @@ func TestPodConstraintsFunc(t *testing.T) {
 			required: []corev1.ResourceName{corev1.ResourceMemory, corev1.ResourceCPU},
 			err:      `must specify cpu for: bar,foo; memory for: bar,foo`,
 		},
-		"pod-level resource set, container-level required resources missing": {
+		"pod-level covers all required resources, container-level missing": {
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					Resources: &api.ResourceRequirements{
+						Requests: api.ResourceList{
+							api.ResourceCPU:    resource.MustParse("1m"),
+							api.ResourceMemory: resource.MustParse("1Mi"),
+						},
+						Limits: api.ResourceList{
+							api.ResourceCPU:    resource.MustParse("2m"),
+							api.ResourceMemory: resource.MustParse("2Mi"),
+						},
+					},
+					Containers: []api.Container{{
+						Name:      "foo",
+						Resources: api.ResourceRequirements{},
+					}, {
+						Name:      "bar",
+						Resources: api.ResourceRequirements{},
+					}},
+					InitContainers: []api.Container{{
+						Name:      "init",
+						Resources: api.ResourceRequirements{},
+					}},
+				},
+			},
+			required: []corev1.ResourceName{
+				corev1.ResourceCPU,
+				corev1.ResourceMemory,
+				corev1.ResourceRequestsCPU,
+				corev1.ResourceRequestsMemory,
+				corev1.ResourceLimitsCPU,
+				corev1.ResourceLimitsMemory,
+			},
+			podLevelResourcesEnabled: true,
+			err:                      ``,
+		},
+		"pod-level resource set with feature gate disabled still requires container resources": {
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					Resources: &api.ResourceRequirements{
+						Requests: api.ResourceList{
+							api.ResourceCPU:    resource.MustParse("1m"),
+							api.ResourceMemory: resource.MustParse("1Mi"),
+						},
+					},
+					Containers: []api.Container{{
+						Name:      "foo",
+						Resources: api.ResourceRequirements{},
+					}},
+				},
+			},
+			required:                 []corev1.ResourceName{corev1.ResourceCPU, corev1.ResourceMemory},
+			podLevelResourcesEnabled: false,
+			err:                      `must specify cpu for: foo; memory for: foo`,
+		},
+		"pod-level covers cpu only, container-level memory missing": {
 			pod: &api.Pod{
 				Spec: api.PodSpec{
 					Resources: &api.ResourceRequirements{
@@ -152,20 +208,172 @@ func TestPodConstraintsFunc(t *testing.T) {
 			},
 			required:                 []corev1.ResourceName{corev1.ResourceMemory, corev1.ResourceCPU},
 			podLevelResourcesEnabled: true,
+			err:                      `must specify memory for: bar,foo`,
+		},
+		"pod-level covers cpu and containers cover memory": {
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					Resources: &api.ResourceRequirements{
+						Requests: api.ResourceList{api.ResourceCPU: resource.MustParse("10m")},
+					},
+					InitContainers: []api.Container{{
+						Name: "init",
+						Resources: api.ResourceRequirements{
+							Requests: api.ResourceList{api.ResourceMemory: resource.MustParse("1Mi")},
+						},
+					}},
+					Containers: []api.Container{{
+						Name: "foo",
+						Resources: api.ResourceRequirements{
+							Requests: api.ResourceList{api.ResourceMemory: resource.MustParse("1Mi")},
+						},
+					}, {
+						Name: "bar",
+						Resources: api.ResourceRequirements{
+							Requests: api.ResourceList{api.ResourceMemory: resource.MustParse("2Mi")},
+						},
+					}},
+				},
+			},
+			required:                 []corev1.ResourceName{corev1.ResourceRequestsCPU, corev1.ResourceRequestsMemory},
+			podLevelResourcesEnabled: true,
 			err:                      ``,
+		},
+		"pod-level covers cpu, init container missing required memory": {
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					Resources: &api.ResourceRequirements{
+						Requests: api.ResourceList{api.ResourceCPU: resource.MustParse("10m")},
+					},
+					InitContainers: []api.Container{{
+						Name:      "init",
+						Resources: api.ResourceRequirements{},
+					}},
+					Containers: []api.Container{{
+						Name: "foo",
+						Resources: api.ResourceRequirements{
+							Requests: api.ResourceList{api.ResourceMemory: resource.MustParse("1Mi")},
+						},
+					}},
+				},
+			},
+			required:                 []corev1.ResourceName{corev1.ResourceRequestsCPU, corev1.ResourceRequestsMemory},
+			podLevelResourcesEnabled: true,
+			err:                      `must specify requests.memory for: init`,
+		},
+		"pod-level covers requests only, one container missing required limit": {
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					Resources: &api.ResourceRequirements{
+						Requests: api.ResourceList{
+							api.ResourceCPU:    resource.MustParse("10m"),
+							api.ResourceMemory: resource.MustParse("10Mi"),
+						},
+					},
+					Containers: []api.Container{{
+						Name: "foo",
+						Resources: api.ResourceRequirements{
+							Limits: api.ResourceList{api.ResourceMemory: resource.MustParse("5Mi")},
+						},
+					}, {
+						Name:      "bar",
+						Resources: api.ResourceRequirements{},
+					}},
+				},
+			},
+			required:                 []corev1.ResourceName{corev1.ResourceRequestsCPU, corev1.ResourceRequestsMemory, corev1.ResourceLimitsMemory},
+			podLevelResourcesEnabled: true,
+			err:                      `must specify limits.memory for: bar`,
+		},
+		"pod-level explicit zero quantities satisfy constraints matching container behavior": {
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					Resources: &api.ResourceRequirements{
+						Requests: api.ResourceList{
+							api.ResourceCPU:    resource.MustParse("0"),
+							api.ResourceMemory: resource.MustParse("0"),
+						},
+						Limits: api.ResourceList{
+							api.ResourceCPU:    resource.MustParse("0"),
+							api.ResourceMemory: resource.MustParse("0"),
+						},
+					},
+					Containers: []api.Container{{
+						Name:      "foo",
+						Resources: api.ResourceRequirements{},
+					}},
+				},
+			},
+			required: []corev1.ResourceName{
+				corev1.ResourceCPU,
+				corev1.ResourceMemory,
+				corev1.ResourceRequestsCPU,
+				corev1.ResourceRequestsMemory,
+				corev1.ResourceLimitsCPU,
+				corev1.ResourceLimitsMemory,
+			},
+			podLevelResourcesEnabled: true,
+			err:                      ``,
+		},
+		"container explicit zero quantities satisfy constraints": {
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{{
+						Name: "foo",
+						Resources: api.ResourceRequirements{
+							Requests: api.ResourceList{
+								api.ResourceCPU:    resource.MustParse("0"),
+								api.ResourceMemory: resource.MustParse("0"),
+							},
+							Limits: api.ResourceList{
+								api.ResourceCPU:    resource.MustParse("0"),
+								api.ResourceMemory: resource.MustParse("0"),
+							},
+						},
+					}},
+				},
+			},
+			required: []corev1.ResourceName{
+				corev1.ResourceCPU,
+				corev1.ResourceMemory,
+				corev1.ResourceRequestsCPU,
+				corev1.ResourceRequestsMemory,
+				corev1.ResourceLimitsCPU,
+				corev1.ResourceLimitsMemory,
+			},
+			err: ``,
+		},
+		"pod-level non-cpu/memory resource does not satisfy cpu or memory constraints": {
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					Resources: &api.ResourceRequirements{
+						Requests: api.ResourceList{api.ResourceName(api.ResourceHugePagesPrefix + "2Mi"): resource.MustParse("2Mi")},
+						Limits:   api.ResourceList{api.ResourceName(api.ResourceHugePagesPrefix + "2Mi"): resource.MustParse("2Mi")},
+					},
+					Containers: []api.Container{{
+						Name:      "foo",
+						Resources: api.ResourceRequirements{},
+					}},
+				},
+			},
+			required:                 []corev1.ResourceName{corev1.ResourceCPU, corev1.ResourceMemory},
+			podLevelResourcesEnabled: true,
+			err:                      `must specify cpu for: foo; memory for: foo`,
 		},
 	}
 	evaluator := NewPodEvaluator(nil, clock.RealClock{})
 	for testName, test := range testCases {
-		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, test.podLevelResourcesEnabled)
+		t.Run(testName, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, test.podLevelResourcesEnabled)
 
-		err := evaluator.Constraints(test.required, test.pod)
-		switch {
-		case err != nil && len(test.err) == 0,
-			err == nil && len(test.err) != 0,
-			err != nil && test.err != err.Error():
-			t.Errorf("%s want: %v,got: %v", testName, test.err, err)
-		}
+			err := evaluator.Constraints(test.required, test.pod)
+			switch {
+			case err != nil && len(test.err) == 0,
+				err == nil && len(test.err) != 0,
+				err != nil && test.err != err.Error():
+				t.Errorf("%s want: %v,got: %v", testName, test.err, err)
+			}
+		})
 	}
 }
 

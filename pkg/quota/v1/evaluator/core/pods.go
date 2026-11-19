@@ -134,23 +134,21 @@ func (p *podEvaluator) Constraints(required []corev1.ResourceName, item runtime.
 		return err
 	}
 
-	// As mentioned in the subsequent comment, the older versions required explicit
-	// resource requests for CPU & memory for each container if resource quotas were
-	// enabled for these resources. This was a design flaw as resource validation is
-	// coupled with quota enforcement. With pod-level resources
-	// feature, container-level resources are not mandatory. Hence the check for
-	// missing container requests, for CPU/memory resources that have quotas set,
-	// is skipped when pod-level resources feature is enabled and resources are set
-	// at pod level.
-	if feature.DefaultFeatureGate.Enabled(features.PodLevelResources) && resourcehelper.IsPodLevelResourcesSet(pod) {
-		return nil
-	}
-
 	// BACKWARD COMPATIBILITY REQUIREMENT: if we quota cpu or memory, then each container
 	// must make an explicit request for the resource.  this was a mistake.  it coupled
 	// validation with resource counting, but we did this before QoS was even defined.
 	// let's not make that mistake again with other resources now that QoS is defined.
 	requiredSet := quota.ToSet(required).Intersection(validationSet)
+	// When PodLevelResources is enabled, CPU/memory requests or limits specified at the
+	// pod level satisfy the corresponding quota constraint for the whole pod; any
+	// remaining required resources must still be specified on every container.
+	if feature.DefaultFeatureGate.Enabled(features.PodLevelResources) && pod.Spec.Resources != nil {
+		podUsage := podComputeUsageHelper(pod.Spec.Resources.Requests, pod.Spec.Resources.Limits)
+		requiredSet = requiredSet.Difference(quota.ToSet(quota.ResourceNames(podUsage)))
+	}
+	if requiredSet.Len() == 0 {
+		return nil
+	}
 	missingSetResourceToContainerNames := make(map[string]sets.String)
 	for i := range pod.Spec.Containers {
 		enforcePodContainerConstraints(&pod.Spec.Containers[i], requiredSet, missingSetResourceToContainerNames)
