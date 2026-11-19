@@ -916,6 +916,12 @@ const (
 	// Enables PodLevelResourcesFixDefaulting.
 	PodLevelResourcesFixDefaulting featuregate.Feature = "PodLevelResourcesFixDefaulting"
 
+	// owner: @ndixita
+	// kep: https://kep.k8s.io/2837
+	//
+	// Validates that individual init container resource limits do not exceed pod-level resource limits.
+	PodLevelResourcesFixInitContainerLimits featuregate.Feature = "PodLevelResourcesFixInitContainerLimits"
+
 	// owner: @KevinTMtz
 	// key: https://kep.k8s.io/2837
 	//
@@ -1936,6 +1942,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.Beta},
 	},
 
+	PodLevelResourcesFixInitContainerLimits: {
+		{Version: version.MustParse("1.38"), Default: true, PreRelease: featuregate.Beta},
+	},
+
 	PodLevelResourcesFixKubeletQOSClass: {
 		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.Beta},
 	},
@@ -2709,6 +2719,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	PodLevelResources: {},
 
 	PodLevelResourcesFixDefaulting: {PodLevelResources},
+
+	PodLevelResourcesFixInitContainerLimits: {PodLevelResources},
 
 	PodLevelResourcesFixKubeletQOSClass: {PodLevelResources},
 
