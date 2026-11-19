@@ -18,12 +18,16 @@ package dynamiccertificates
 
 import (
 	"bytes"
+	"crypto"
+	"crypto/x509"
 )
 
 // certKeyContent holds the content for the cert and key
 type certKeyContent struct {
-	cert []byte
-	key  []byte
+	cert    []byte
+	key     []byte
+	certObj *x509.Certificate
+	keyObj  crypto.PrivateKey
 }
 
 func (c *certKeyContent) Equal(rhs *certKeyContent) bool {
@@ -31,6 +35,7 @@ func (c *certKeyContent) Equal(rhs *certKeyContent) bool {
 		return c == rhs
 	}
 
+	// assume certObj and keyObj are always deserialized form of cert and key
 	return bytes.Equal(c.key, rhs.key) && bytes.Equal(c.cert, rhs.cert)
 }
 

@@ -56,6 +56,7 @@ import (
 	migration "k8s.io/controller-manager/pkg/leadermigration/options"
 	kubecontrollerconfig "k8s.io/kubernetes/cmd/kube-controller-manager/app/config"
 	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
+	podcertssignerconfig "k8s.io/kubernetes/pkg/controller/certificates/podcertssigner/config"
 	csrsigningconfig "k8s.io/kubernetes/pkg/controller/certificates/signer/config"
 	cronjobconfig "k8s.io/kubernetes/pkg/controller/cronjob/config"
 	daemonconfig "k8s.io/kubernetes/pkg/controller/daemon/config"
@@ -178,6 +179,10 @@ var args = []string{
 	"--route-reconciliation-period=30s",
 	"--secondary-node-eviction-rate=0.05",
 	"--service-account-private-key-file=/service-account-private-key",
+	"--service-serving-signer-cert=/var/certs/service-serving.crt",
+	"--service-serving-signer-key=/var/certs/service-serving.key",
+	"--service-serving-trust-bundle=/var/certs/trust-bundle.pem",
+	"--cluster-domain=example.local",
 	"--terminated-pod-gc-threshold=12000",
 	"--unhealthy-zone-threshold=0.6",
 	"--use-service-account-credentials=true",
@@ -434,6 +439,14 @@ func TestAddFlags(t *testing.T) {
 			&serviceaccountconfig.SAControllerConfiguration{
 				ServiceAccountKeyFile:  "/service-account-private-key",
 				ConcurrentSATokenSyncs: 10,
+			},
+		},
+		ServiceServingSigner: &ServiceServingSignerOptions{
+			ServiceServingSignerConfiguration: &podcertssignerconfig.ServiceServingSignerConfiguration{
+				CACertPath:    "/var/certs/service-serving.crt",
+				CAKeyPath:     "/var/certs/service-serving.key",
+				CABundlePath:  "/var/certs/trust-bundle.pem",
+				ClusterDomain: "example.local",
 			},
 		},
 		LegacySATokenCleaner: &LegacySATokenCleanerOptions{
@@ -769,6 +782,12 @@ func TestApplyTo(t *testing.T) {
 			SAController: serviceaccountconfig.SAControllerConfiguration{
 				ServiceAccountKeyFile:  "/service-account-private-key",
 				ConcurrentSATokenSyncs: 10,
+			},
+			ServiceServingSigner: podcertssignerconfig.ServiceServingSignerConfiguration{
+				CACertPath:    "/var/certs/service-serving.crt",
+				CAKeyPath:     "/var/certs/service-serving.key",
+				CABundlePath:  "/var/certs/trust-bundle.pem",
+				ClusterDomain: "example.local",
 			},
 			LegacySATokenCleaner: serviceaccountconfig.LegacySATokenCleanerConfiguration{
 				CleanUpPeriod: metav1.Duration{Duration: 365 * 24 * time.Hour},
