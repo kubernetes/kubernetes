@@ -25,17 +25,16 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/wait"
-	clientfeatures "k8s.io/client-go/features"
 	"k8s.io/klog/v2"
 )
 
-// retryAfterJitterFactor adds up to 10% of the retry wait at random before
-// the next attempt. The server sends the same Retry-After to every client it
-// rejects in a given second, so exact waits bring them all back together
-// (https://github.com/kubernetes/kubernetes/issues/105521). The jitter is
-// meant to spread those retries; the added latency grows with the fraction,
-// and 10% keeps the worst case at a tenth of the server's wait.
+// Up to retryAfterJitterFactor of the retry wait is added at random, so
+// clients rejected with the same Retry-After do not retry as a thundering herd.
 const retryAfterJitterFactor = 0.1
+
+func jitterRetryAfter(delay time.Duration) time.Duration {
+	return wait.Jitter(delay, retryAfterJitterFactor)
+}
 
 // IsRetryableErrorFunc allows the client to provide its own function
 // that determines whether the specified err from the server is retryable.
@@ -230,11 +229,11 @@ func (r *withRetry) Before(ctx context.Context, request *Request) error {
 		if backoffDelay := request.backoff.CalculateBackoffWithContext(ctx, url); backoffDelay > delay {
 			delay = backoffDelay
 		}
-		// Jitter the delay that wins, not only Retry-After: a cohort held at
-		// the same backoff ceiling is in lockstep too, so the sleep may exceed
-		// that ceiling by the jitter fraction.
-		if clientfeatures.FeatureGates().Enabled(clientfeatures.ClientRetryAfterJitter) {
-			delay = wait.Jitter(delay, retryAfterJitterFactor)
+		// The jitter applies to the backoff delay too when it is larger, since
+		// clients at the same backoff maximum retry together as well. The sleep
+		// can exceed that maximum by up to retryAfterJitterFactor.
+		if request.retryAfterJitterFn != nil {
+			delay = request.retryAfterJitterFn(delay)
 		}
 		request.backoff.SleepWithContext(ctx, delay)
 	}

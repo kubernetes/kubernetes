@@ -405,57 +405,71 @@ func TestWrapPreviousError(t *testing.T) {
 func TestBeforeJittersRetryAfter(t *testing.T) {
 	const retryAfter = 4 * time.Second
 	tests := []struct {
-		name     string
-		enabled  bool
-		backoff  time.Duration
-		minSleep time.Duration
-		maxSleep time.Duration
+		name    string
+		backoff time.Duration
+		delay   time.Duration
 	}{
 		{
-			name:     "gate off keeps the exact Retry-After",
-			minSleep: retryAfter,
-			maxSleep: retryAfter,
+			name:  "Retry-After wins",
+			delay: retryAfter,
 		},
 		{
-			name:     "gate on adds up to the jitter fraction",
-			enabled:  true,
-			minSleep: retryAfter,
-			maxSleep: retryAfter + time.Duration(retryAfterJitterFactor*float64(retryAfter)),
+			name:    "backoff wins",
+			backoff: 10 * time.Second,
+			delay:   10 * time.Second,
+		},
+	}
+	featureModes := []struct {
+		name          string
+		jitterEnabled bool
+		setup         func(*testing.T)
+	}{
+		{
+			// ClientRetryAfterJitter is beta and enabled by default.
+			// When the feature gate is removed, this case remains unchanged.
+			name:          "feature enabled",
+			jitterEnabled: true,
 		},
 		{
-			name:     "gate off keeps the exact larger backoff delay",
-			backoff:  10 * time.Second,
-			minSleep: 10 * time.Second,
-			maxSleep: 10 * time.Second,
-		},
-		{
-			name:     "gate on jitters the larger backoff delay",
-			enabled:  true,
-			backoff:  10 * time.Second,
-			minSleep: 10 * time.Second,
-			maxSleep: 10*time.Second + time.Duration(retryAfterJitterFactor*float64(10*time.Second)),
+			// When the feature gate is removed, delete this entire entry.
+			name: "feature disabled",
+			setup: func(t *testing.T) {
+				clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.ClientRetryAfterJitter, false)
+			},
 		},
 	}
 	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.ClientRetryAfterJitter, test.enabled)
-			backoff := &testBackoffManager{delay: test.backoff}
-			req := &Request{c: &RESTClient{}, backoff: backoff}
-			r := &withRetry{maxRetries: 1, retryAfter: &RetryAfter{Wait: retryAfter, Attempt: 1}}
-			jittered := false
-			for i := range 1000 {
+		for _, mode := range featureModes {
+			t.Run(test.name+"/"+mode.name, func(t *testing.T) {
+				if mode.setup != nil {
+					mode.setup(t)
+				}
+				req := NewRequestWithClient(&url.URL{}, "", ClientContentConfig{}, nil)
+				if got := req.retryAfterJitterFn != nil; got != mode.jitterEnabled {
+					t.Fatalf("retryAfterJitterFn set: %v, want %v", got, mode.jitterEnabled)
+				}
+				want := test.delay
+				if mode.jitterEnabled {
+					maxJitter := time.Duration(retryAfterJitterFactor * float64(test.delay))
+					if got := req.retryAfterJitterFn(test.delay); got < test.delay || got > test.delay+maxJitter {
+						t.Errorf("retryAfterJitterFn(%v) = %v, want within [%v, %v]", test.delay, got, test.delay, test.delay+maxJitter)
+					}
+					// Replace wait.Jitter with its maximum so the sleep is exact.
+					req.retryAfterJitterFn = func(d time.Duration) time.Duration {
+						return d + time.Duration(retryAfterJitterFactor*float64(d))
+					}
+					want += time.Duration(retryAfterJitterFactor * float64(test.delay))
+				}
+				backoff := &testBackoffManager{delay: test.backoff}
+				req.backoff = backoff
+				r := &withRetry{maxRetries: 1, retryAfter: &RetryAfter{Wait: retryAfter, Attempt: 1}}
 				if err := r.Before(context.Background(), req); err != nil {
 					t.Fatalf("Before returned an unexpected error: %v", err)
 				}
-				got := backoff.sleeps[i]
-				if got < test.minSleep || got > test.maxSleep {
-					t.Fatalf("sleep %v outside [%v, %v]", got, test.minSleep, test.maxSleep)
+				if len(backoff.sleeps) != 1 || backoff.sleeps[0] != want {
+					t.Errorf("sleeps %v, want [%v]", backoff.sleeps, want)
 				}
-				jittered = jittered || got > test.minSleep
-			}
-			if test.minSleep != test.maxSleep && !jittered {
-				t.Errorf("no sleep exceeded the minimum of %v in 1000 attempts", test.minSleep)
-			}
-		})
+			})
+		}
 	}
 }

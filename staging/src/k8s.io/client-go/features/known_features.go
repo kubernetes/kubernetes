@@ -42,8 +42,8 @@ const (
 	// beta: v1.38
 	//
 	// If enabled, the wait before retrying a request that was rejected with a
-	// Retry-After header is jittered by up to 10%, so clients rejected together
-	// do not retry together.
+	// Retry-After header (the larger of Retry-After and the client's backoff) is
+	// jittered by up to 10%, so clients rejected together do not retry together.
 	ClientRetryAfterJitter Feature = "ClientRetryAfterJitter"
 
 	// owner: @yt2985

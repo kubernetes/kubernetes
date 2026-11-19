@@ -225,6 +225,9 @@ func readExpBackoffConfig() BackoffManagerWithContext {
 	if errBase != nil || errDuration != nil {
 		return &NoBackoff{}
 	}
+	// NOTE: do not switch to flowcontrol.NewBackOffWithJitter. The retry path
+	// already jitters the larger of this delay and Retry-After (see
+	// retryAfterJitterFn), so the delay would be jittered twice.
 	return &URLBackoff{
 		Backoff: flowcontrol.NewBackOff(
 			time.Duration(backoffBaseInt)*time.Second,
