@@ -22,7 +22,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/core/helper"
 	"k8s.io/kubernetes/pkg/features"
 )
 
@@ -45,8 +44,7 @@ func GetPodQOS(pod *core.Pod) core.PodQOSClass {
 // NOTE: This is tested in pkg/apis/core/v1/helper/qos/qos_test.go
 func ComputePodQOS(pod *core.Pod) core.PodQOSClass {
 	// When pod-level resources are specified, we use them to determine QoS class.
-	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) &&
-		(pod.Spec.Resources != nil && (!utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourcesFixKubeletQOSClass) || helper.IsPodLevelResourcesSet(pod))) {
+	if usePodLevelResourcesForQOS(pod) {
 		return requirementsQOS(pod.Spec.Resources)
 	}
 
@@ -123,4 +121,35 @@ func resourceQOS(resources *core.ResourceRequirements, res core.ResourceName) co
 		// req == lim != 0
 		return core.PodQOSGuaranteed
 	}
+}
+
+// usePodLevelResourcesForQOS reports whether the pod-level resources decide the
+// pod's QoS class. The QoS class depends on cpu and memory only, so pod-level
+// resources that set neither, for example only limits.swap, leave it to the
+// containers.
+func usePodLevelResourcesForQOS(pod *core.Pod) bool {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) || pod.Spec.Resources == nil {
+		return false
+	}
+	if hasQoSComputeResources(pod.Spec.Resources) {
+		return true
+	}
+	// Without PodLevelResourcesFixKubeletQOSClass, empty pod-level resources
+	// also decide the QoS class.
+	return !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourcesFixKubeletQOSClass) &&
+		len(pod.Spec.Resources.Requests)+len(pod.Spec.Resources.Limits) == 0
+}
+
+// hasQoSComputeResources reports whether resources sets a request or a limit
+// for a resource that the QoS class depends on.
+func hasQoSComputeResources(resources *core.ResourceRequirements) bool {
+	for res := range supportedQoSComputeResources {
+		if _, ok := resources.Requests[res]; ok {
+			return true
+		}
+		if _, ok := resources.Limits[res]; ok {
+			return true
+		}
+	}
+	return false
 }

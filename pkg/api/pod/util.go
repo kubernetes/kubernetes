@@ -1665,7 +1665,7 @@ func DefaultPodLevelResources(pod *api.Pod) {
 	if pod.Spec.Resources == nil {
 		return
 	}
-	if len(pod.Spec.Resources.Requests) == 0 && len(pod.Spec.Resources.Limits) == 0 {
+	if !helper.IsPodLevelResourcesSet(pod) {
 		return
 	}
 
