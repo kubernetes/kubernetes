@@ -88,7 +88,7 @@ var _ = SIGDescribe("Node Container Manager", framework.WithSerial(), func() {
 				framework.ExpectNoError(runHugepagesUpgradeTest(ctx, f, mmPolicy, expectedRejectionReason, expectedRejectionMsg))
 			},
 			ginkgo.Entry("with memory manager Static policy",
-				"Static", "UnexpectedAdmissionError", "Allocate failed due to [memorymanager]"),
+				"Static", "OutOfmemory", "[memorymanager] failed to get the default NUMA affinity"),
 			ginkgo.Entry("with memory manager None policy",
 				"None", "OutOfhugepages-2Mi", "Node didn't have enough resource: hugepages-2Mi"),
 		)
