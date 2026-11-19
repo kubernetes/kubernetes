@@ -681,17 +681,29 @@ func TestCompleteAdmitWithoutTransaction(t *testing.T) {
 	}
 }
 
-// TestResizeWithStaticPolicyChangesNothing checks that this transaction alone
-// does not change the behavior: the static policy handles only the add
-// operation and skips an update, so admitting a resize leaves the state exactly
-// as before. The exclusive CPU resize of KEP-5554 will have to adapt this test.
-func TestResizeWithStaticPolicyChangesNothing(t *testing.T) {
+// TestResizeWithStaticPolicy checks the resize transaction with the static
+// policy. With InPlacePodVerticalScalingExclusiveCPUs disabled, the policy skips
+// an update, so admitting a resize leaves the state exactly as before. With the
+// feature gate enabled, the resize is applied only if the admission succeeds.
+func TestResizeWithStaticPolicy(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.WindowsCPUAndMemoryAffinity, true)
 	}
 
-	for _, result := range []lifecycle.AdmitResult{lifecycle.AdmitSuccess, lifecycle.AdmitFailure} {
-		t.Run(string(result), func(t *testing.T) {
+	tests := []struct {
+		name                string
+		exclusiveCPUsResize bool
+		result              lifecycle.AdmitResult
+		expectResized       bool
+	}{
+		{name: "feature gate disabled, success", result: lifecycle.AdmitSuccess},
+		{name: "feature gate disabled, failure", result: lifecycle.AdmitFailure},
+		{name: "feature gate enabled, success", exclusiveCPUsResize: true, result: lifecycle.AdmitSuccess, expectResized: true},
+		{name: "feature gate enabled, failure", exclusiveCPUsResize: true, result: lifecycle.AdmitFailure},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.InPlacePodVerticalScalingExclusiveCPUs, tc.exclusiveCPUsResize)
 			logger, ctx := ktesting.NewTestContext(t)
 			policy, err := NewStaticPolicy(logger, topoSingleSocketHT, 1, cpuset.New(), topologymanager.NewFakeManager(logger), nil)
 			require.NoError(t, err)
@@ -713,10 +725,64 @@ func TestResizeWithStaticPolicyChangesNothing(t *testing.T) {
 			resized := makePod("pod", "c1", "4", "4")
 			m.GetTopologyHints(logger, resized, &resized.Spec.Containers[0], lifecycle.UpdateOperation)
 			require.NoError(t, m.Allocate(ctx, resized, &resized.Spec.Containers[0], lifecycle.UpdateOperation))
-			m.CompleteAdmit(ctx, resized, lifecycle.UpdateOperation, result)
+			require.Equal(t, before.GetCPUAssignments(), m.State().GetCPUAssignments(), "the resize must not change the state before it is committed")
+			m.CompleteAdmit(ctx, resized, lifecycle.UpdateOperation, tc.result)
 
-			require.Equal(t, before.GetCPUAssignments(), m.State().GetCPUAssignments(), "assignments")
-			require.True(t, before.GetDefaultCPUSet().Equals(m.State().GetDefaultCPUSet()), "expected default %s, got %s", before.GetDefaultCPUSet(), m.State().GetDefaultCPUSet())
+			if !tc.expectResized {
+				require.Equal(t, before.GetCPUAssignments(), m.State().GetCPUAssignments(), "assignments")
+				require.True(t, before.GetDefaultCPUSet().Equals(m.State().GetDefaultCPUSet()), "expected default %s, got %s", before.GetDefaultCPUSet(), m.State().GetDefaultCPUSet())
+				return
+			}
+			resizedC1, _ := m.State().GetCPUSet("pod", "c1")
+			require.Equal(t, 4, resizedC1.Size(), "c1 must get the resized number of CPUs, got %s", resizedC1)
+			require.True(t, c1.IsSubsetOf(resizedC1), "c1 must keep %s, got %s", c1, resizedC1)
+			expectDefault := before.GetDefaultCPUSet().Difference(resizedC1)
+			require.True(t, expectDefault.Equals(m.State().GetDefaultCPUSet()), "expected default %s, got %s", expectDefault, m.State().GetDefaultCPUSet())
 		})
 	}
+}
+
+// TestResizeWithStaticPolicyPartialFailure checks that the resize of a pod
+// changes nothing when the static policy allocates the resize of one container,
+// but fails to allocate the resize of the next one: the first resize stays on
+// the scratch state, which the failed admission drops.
+func TestResizeWithStaticPolicyPartialFailure(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.WindowsCPUAndMemoryAffinity, true)
+	}
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.InPlacePodVerticalScalingExclusiveCPUs, true)
+	logger, ctx := ktesting.NewTestContext(t)
+	// 8 CPUs, CPU 0 is reserved.
+	policy, err := NewStaticPolicy(logger, topoSingleSocketHT, 1, cpuset.New(), topologymanager.NewFakeManager(logger), nil)
+	require.NoError(t, err)
+	pod := makeMultiContainerPod(nil, []struct{ request, limit string }{{"2", "2"}, {"2", "2"}})
+	m := &manager{
+		policy:          policy,
+		state:           state.NewMemoryState(logger),
+		lastUpdateState: state.NewMemoryState(logger),
+		containerMap:    containermap.NewContainerMap(),
+		sourcesReady:    &sourcesReadyStub{},
+		activePods:      func() []*v1.Pod { return []*v1.Pod{pod} },
+	}
+	require.NoError(t, policy.Start(logger, m.state))
+	for i := range pod.Spec.Containers {
+		require.NoError(t, m.Allocate(ctx, pod, &pod.Spec.Containers[i], lifecycle.AddOperation))
+	}
+	before := cloneState(logger, m.State())
+	free := before.GetDefaultCPUSet().Difference(cpuset.New(0))
+	require.Equal(t, 3, free.Size(), "3 CPUs must stay free, got %s", free)
+
+	// Each container asks for 2 more CPUs: the first one gets 2 of the 3 free
+	// CPUs, so there is not enough left for the second one.
+	resized := makeMultiContainerPod(nil, []struct{ request, limit string }{{"4", "4"}, {"4", "4"}})
+	for i := range resized.Spec.Containers {
+		m.GetTopologyHints(logger, resized, &resized.Spec.Containers[i], lifecycle.UpdateOperation)
+	}
+	require.NoError(t, m.Allocate(ctx, resized, &resized.Spec.Containers[0], lifecycle.UpdateOperation))
+	require.Error(t, m.Allocate(ctx, resized, &resized.Spec.Containers[1], lifecycle.UpdateOperation))
+	require.Equal(t, before.GetCPUAssignments(), m.State().GetCPUAssignments(), "the resize must not change the state before it is committed")
+	m.CompleteAdmit(ctx, resized, lifecycle.UpdateOperation, lifecycle.AdmitFailure)
+
+	require.Equal(t, before.GetCPUAssignments(), m.State().GetCPUAssignments(), "assignments")
+	require.True(t, before.GetDefaultCPUSet().Equals(m.State().GetDefaultCPUSet()), "expected default %s, got %s", before.GetDefaultCPUSet(), m.State().GetDefaultCPUSet())
 }
