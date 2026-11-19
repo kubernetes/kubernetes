@@ -87,6 +87,17 @@ func (b *OpportunisticBatch) IsDisabled() bool {
 	return b == nil || b.disabled
 }
 
+// flush drops the cached results without counting a flush in the metrics. It is meant for
+// callers that switch to scheduling pods against another view of the cluster: nothing is
+// wrong with the results, they just don't describe that view.
+func (b *OpportunisticBatch) flush() {
+	if b == nil {
+		return
+	}
+	b.state = nil
+	b.lastCycle = schedulingCycle{}
+}
+
 // GetNodeHint provides a hint for the pod based on the filtering and scoring results of previous cycles. Caching works
 // only for consecutive pods with the same signature (pods of one PodGroup scheduling cycle also qualify). The node
 // chosen for the previous pod is re-checked first: if it is still feasible it is rescored and competes with the cached

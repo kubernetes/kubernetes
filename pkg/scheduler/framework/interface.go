@@ -439,6 +439,10 @@ type Framework interface {
 	// SetBatchingDisabled disables or re-enables opportunistic batching on the framework.
 	SetBatchingDisabled(disabled bool)
 
+	// FlushBatch drops any cached batching state without counting a cache flush metric,
+	// for when the caller switches to scheduling pods against another view of the cluster.
+	FlushBatch()
+
 	// RunRawScorePlugins runs only the Score() phase of each active scoring plugin for a single node,
 	// without NormalizeScore or weighting and returns pre-NormalizeScore values.
 	RunRawScorePlugins(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) ([]fwk.PluginScore, *fwk.Status)
