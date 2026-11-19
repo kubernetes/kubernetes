@@ -653,6 +653,10 @@ func (p fakeContainerStatsProvider) PodCPUAndMemoryStats(context.Context, *v1.Po
 	return nil, fmt.Errorf("no podStats set")
 }
 
+func (p fakeContainerStatsProvider) PodSwapStats(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus) (*statsapi.PodStats, error) {
+	return p.PodCPUAndMemoryStats(ctx, pod, podStatus)
+}
+
 func (p fakeContainerStatsProvider) ListPodCPUAndMemoryStats(context.Context) ([]statsapi.PodStats, error) {
 	return nil, fmt.Errorf("not implemented")
 }
