@@ -30,9 +30,11 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/util/wait"
 	apiserverfeat "k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/server"
 	flagzv1alpha1 "k8s.io/apiserver/pkg/server/flagz/api/v1alpha1"
@@ -847,6 +849,19 @@ users:
 		t.Fatal(err)
 	}
 	req.Header.Add("Authorization", fmt.Sprintf("Token %s", token))
+	// The informers start after the secure server does, so /healthz can be ok
+	// before the metric exists. Wait for it before the read below.
+	if err := wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, wait.ForeverTestTimeout, true, func(context.Context) (bool, error) {
+		r, err := client.Do(req)
+		if err != nil {
+			return false, err
+		}
+		defer r.Body.Close()
+		body, err := io.ReadAll(r.Body)
+		return strings.Contains(string(body), "informer_queued_items{"), err
+	}); err != nil {
+		t.Fatalf("informer_queued_items did not show up in /metrics: %v", err)
+	}
 	r, err := client.Do(req)
 	if err != nil {
 		t.Fatalf("failed to GET /metrics: %v", err)
