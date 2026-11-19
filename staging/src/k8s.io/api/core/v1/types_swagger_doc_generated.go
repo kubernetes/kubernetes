@@ -2028,7 +2028,7 @@ var map_PodStatus = map[string]string{
 	"allocatedResources":            "AllocatedResources is the total requests allocated for this pod by the node, including pod.spec.overhead. If pod-level requests are not set, this will be the total requests aggregated across containers in the pod, plus pod.spec.overhead if specified.",
 	"resources":                     "Resources represents the compute resource requests and limits that have been applied at the pod level if pod-level requests or limits are set in PodSpec.Resources, plus pod.spec.overhead if specified (for limits, only added to non-zero limits; kubelets prior to v1.38 may omit overhead from memory and hugepages requests when set in PodSpec.Resources).",
 	"extraNodeAllocatableResources": "extraNodeAllocatableResources lists node allocatable resources that the pod and its containers use in addition to their spec, for example for the devices allocated to the pod's DRA claims. The scheduler sets them before it binds the pod. Allowed are the resources that v1.Node reports in `status.allocatable` that are not extended resources (see https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#extended-resources), such as \"cpu\", \"memory\", \"ephemeral-storage\", and \"hugepages-<size>\".\n\nThe list has one pod entry, with an empty containerName, and at most one entry for each init or regular container. The pod's total footprint is its spec plus the pod entry, so the pod entry must cover what the container entries add to the peak of the spec, across the init, sidecar, and regular containers. For resources that the pod level resources (`spec.resources`) set, that value is the footprint and must already include the extra resources.",
-	"volumeStatuses":                "VolumeStatuses contains the status of individual volumes used by this pod. This is an alpha field and requires enabling the CSIVolumeHealth feature gate.",
+	"volumeStatuses":                "VolumeStatuses contains the status of individual volumes used by this pod. This is an alpha field and requires enabling the CSIVolumeHealth or DynamicNodeLocalEphemeralVolumes feature gate.",
 }
 
 func (PodStatus) SwaggerDoc() map[string]string {
@@ -2067,8 +2067,9 @@ func (PodTemplateSpec) SwaggerDoc() map[string]string {
 
 var map_PodVolumeStatus = map[string]string{
 	"":             "PodVolumeStatus represents the status of an individual volume used by a pod.",
-	"name":         "name matches an entry in pod.spec.volumes.",
+	"name":         "name matches an entry in pod.spec.volumes, or the name of a dynamically removed volume that is still unmounting on the node.",
 	"healthStatus": "healthStatus contains health reported by the CSI node plugin for this volume on the pod's node. Populated by the kubelet. This is an alpha field and requires enabling the CSIVolumeHealth feature gate.",
+	"hostPhase":    "hostPhase represents the host-level preparation phase of the volume: Pending, HostMounted, Unmounting. Currently populated only for node-local ephemeral volume types supported for dynamic updates (configMap, secret, projected, emptyDir, and image). This is an alpha field and requires enabling the DynamicNodeLocalEphemeralVolumes feature gate.",
 }
 
 func (PodVolumeStatus) SwaggerDoc() map[string]string {
