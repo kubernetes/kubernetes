@@ -332,6 +332,108 @@ func TestAdmission(t *testing.T) {
 	}
 }
 
+// newPlacementTestPlugin returns a plugin with a single registered feature,
+// "TestFeature", that is required to schedule every pod. The feature is
+// generally available from maxVersion on; the plugin runs at version 1.35.0.
+func newPlacementTestPlugin(t *testing.T, client *fake.Clientset, maxVersion string) *Plugin {
+	t.Helper()
+	feature := ndftesting.NewMockFeature(t)
+	feature.SetName("TestFeature")
+	feature.SetInferForScheduling(func(*ndf.PodInfo) bool { return true })
+	feature.SetMaxVersion(version.MustParseSemantic(maxVersion))
+
+	target, err := NewPlugin()
+	require.NoError(t, err)
+	target.nodeDeclaredFeatureFramework = ndf.New([]ndf.Feature{feature})
+	target.version = version.MustParseSemantic("1.35.0")
+
+	informerFactory := informers.NewSharedInformerFactory(client, 0)
+	target.SetExternalKubeInformerFactory(informerFactory)
+	target.InspectFeatureGates(utilfeature.DefaultFeatureGate)
+	require.NoError(t, target.ValidateInitialization())
+	informerFactory.Start(t.Context().Done())
+	informerFactory.WaitForCacheSync(t.Context().Done())
+	return target
+}
+
+func placementTestNodes() []runtime.Object {
+	return []runtime.Object{
+		&v1.Node{
+			ObjectMeta: metav1.ObjectMeta{Name: "node-with-feature"},
+			Status:     v1.NodeStatus{DeclaredFeatures: []string{"TestFeature"}},
+		},
+		&v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node-without-feature"}},
+	}
+}
+
+func TestPodCreateAdmission(t *testing.T) {
+	const featureNotAvailable = `pod requires features TestFeature which are not available on node "node-without-feature"`
+
+	testCases := []struct {
+		name        string
+		nodeName    string
+		annotations map[string]string
+		// maxVersion is the last version in which nodes have to declare the feature.
+		maxVersion  string
+		errContains string
+	}{
+		{
+			name:       "pod without nodeName is left to the scheduler",
+			maxVersion: "1.35.0",
+		},
+		{
+			name:       "node declares the feature",
+			nodeName:   "node-with-feature",
+			maxVersion: "1.35.0",
+		},
+		{
+			name:        "node does not declare the feature",
+			nodeName:    "node-without-feature",
+			maxVersion:  "1.35.0",
+			errContains: featureNotAvailable,
+		},
+		{
+			name:        "node does not exist",
+			nodeName:    "unknown-node",
+			maxVersion:  "1.35.0",
+			errContains: `node "unknown-node" not found`,
+		},
+		{
+			name:        "mirror pod is not checked",
+			nodeName:    "node-without-feature",
+			annotations: map[string]string{core.MirrorPodAnnotationKey: "hash"},
+			maxVersion:  "1.35.0",
+		},
+		{
+			name:       "feature is generally available",
+			nodeName:   "node-without-feature",
+			maxVersion: "1.34.0",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			target := newPlacementTestPlugin(t, fake.NewClientset(placementTestNodes()...), tc.maxVersion)
+
+			pod := &core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-pod", Namespace: "test-ns", Annotations: tc.annotations},
+				Spec: core.PodSpec{
+					NodeName:   tc.nodeName,
+					Containers: []core.Container{{Name: "container", Image: "image"}},
+				},
+			}
+			attrs := admission.NewAttributesRecord(pod, nil, core.Kind("Pod").WithVersion("v1"), pod.Namespace, pod.Name, core.Resource("pods").WithVersion("v1"), "", admission.Create, &metav1.CreateOptions{}, false, nil)
+			err := target.Validate(t.Context(), attrs, nil)
+
+			if tc.errContains == "" {
+				require.NoError(t, err)
+				return
+			}
+			require.ErrorContains(t, err, tc.errContains)
+		})
+	}
+}
+
 func TestNodeAllocatableResourceSliceAdmission(t *testing.T) {
 	nodeNameWithFeature := "node-with-feature"
 	nodeNameWithFeature2 := "node-with-feature-2"

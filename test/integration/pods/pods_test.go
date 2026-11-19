@@ -1684,6 +1684,94 @@ func TestNodeDeclaredFeatureAdmission(t *testing.T) {
 	}
 }
 
+// TestNodeDeclaredFeatureAdmissionPodCreate covers the pods that reach a node
+// without the scheduler: a pod created with spec.nodeName set is rejected when
+// the node does not declare the features the pod requires.
+func TestNodeDeclaredFeatureAdmissionPodCreate(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NetworkIsolatedPods, true)
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
+	defer server.TearDownFn()
+	client := clientset.NewForConfigOrDie(server.ClientConfig)
+	ns := framework.CreateNamespaceOrDie(client, "pod-create-feature-admission", t)
+	defer framework.DeleteNamespaceOrDie(client, ns, t)
+	ctx := context.Background()
+
+	const (
+		nodeWithFeature    = "node-with-feature"
+		nodeWithoutFeature = "node-without-feature"
+		notAvailable       = `pod requires features NetworkIsolatedPods which are not available on node "node-without-feature"`
+	)
+	for name, declaredFeatures := range map[string][]string{
+		nodeWithFeature:    {"NetworkIsolatedPods"},
+		nodeWithoutFeature: {"SomeOtherFeature"},
+	} {
+		node := &v1.Node{
+			ObjectMeta: metav1.ObjectMeta{Name: name},
+			Status: v1.NodeStatus{
+				NodeInfo:         v1.NodeSystemInfo{KubeletVersion: "1.38.0"},
+				DeclaredFeatures: declaredFeatures,
+			},
+		}
+		if _, err := client.CoreV1().Nodes().Create(ctx, node, metav1.CreateOptions{}); err != nil {
+			t.Fatalf("Failed to create node %s: %v", name, err)
+		}
+		defer func() {
+			if err := client.CoreV1().Nodes().Delete(ctx, name, metav1.DeleteOptions{}); err != nil {
+				t.Errorf("Failed to delete node %s: %v", name, err)
+			}
+		}()
+	}
+
+	testCases := []struct {
+		name        string
+		podNetwork  *v1.PodNetwork
+		nodeName    string
+		expectError string
+	}{
+		{
+			name:        "pod that requires a feature the node does not declare",
+			podNetwork:  new(v1.PodNetworkIsolated),
+			nodeName:    nodeWithoutFeature,
+			expectError: notAvailable,
+		},
+		{
+			name:       "pod that requires a feature the node declares",
+			podNetwork: new(v1.PodNetworkIsolated),
+			nodeName:   nodeWithFeature,
+		},
+		{
+			name:     "pod that does not require a feature",
+			nodeName: nodeWithoutFeature,
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{GenerateName: "test-pod-"},
+				Spec: v1.PodSpec{
+					NodeName:   tc.nodeName,
+					PodNetwork: tc.podNetwork,
+					Containers: []v1.Container{{Name: "test-container", Image: "fakeimage"}},
+				},
+			}
+			// Retry until the admission plugin has the node in its informer cache.
+			var err error
+			pollErr := wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 10*time.Second, true, func(ctx context.Context) (bool, error) {
+				_, err = client.CoreV1().Pods(ns.Name).Create(ctx, pod, metav1.CreateOptions{})
+				return err == nil || !strings.Contains(err.Error(), "not found"), nil
+			})
+			switch {
+			case pollErr != nil:
+				t.Errorf("Unexpected error: %v (last error during create: %v)", pollErr, err)
+			case tc.expectError == "" && err != nil:
+				t.Errorf("Unexpected error: %v", err)
+			case tc.expectError != "" && (err == nil || !apierrors.IsForbidden(err) || !strings.Contains(err.Error(), tc.expectError)):
+				t.Errorf("Expected a Forbidden error containing %q, got: %v", tc.expectError, err)
+			}
+		})
+	}
+}
+
 func TestPodResizeValidation(t *testing.T) {
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	defer server.TearDownFn()

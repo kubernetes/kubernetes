@@ -26,7 +26,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
-	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -63,10 +62,10 @@ func networkIsolatedPod(name string) *v1.Pod {
 	}
 }
 
-// expectPodRejectedByAdmission creates an isolated pod and expects the kubelet
-// to reject it with PodFeatureUnsupported instead of attaching it to the pod
+// expectPodRejectedByAdmission creates an isolated pod and expects it to be
+// rejected with PodFeatureUnsupported instead of being attached to the pod
 // network. Pods in node e2e bypass the scheduler (spec.nodeName is set), so
-// this exercises the kubelet admission path directly.
+// the pod is rejected by the kube-apiserver or by the kubelet.
 func expectPodRejectedByAdmission(ctx context.Context, f *framework.Framework, podClient *e2epod.PodClient, name string) {
 	ginkgo.GinkgoHelper()
 
@@ -75,17 +74,11 @@ func expectPodRejectedByAdmission(ctx context.Context, f *framework.Framework, p
 		return getLocalNode(ctx, f).Status.DeclaredFeatures
 	}).WithTimeout(2*time.Minute).WithPolling(2*time.Second).ShouldNot(gomega.ContainElement(networkIsolatedPodsFeature), "node status must stop declaring the feature")
 
-	ginkgo.By("Creating a network isolated pod")
-	pod := podClient.Create(ctx, networkIsolatedPod(name))
-
-	ginkgo.By("Waiting for the pod to fail admission")
-	err := e2epod.WaitForPodFailedReason(ctx, f.ClientSet, pod, lifecycle.PodFeatureUnsupported, framework.PodStartShortTimeout)
-	framework.ExpectNoError(err, "expected the pod to be rejected with reason %s", lifecycle.PodFeatureUnsupported)
-
-	pod, err = podClient.Get(ctx, pod.Name, metav1.GetOptions{})
-	framework.ExpectNoError(err)
-	gomega.Expect(pod.Status.Message).To(gomega.ContainSubstring(networkIsolatedPodsFeature))
-	gomega.Expect(pod.Status.PodIP).To(gomega.BeEmpty(), "a rejected pod must not get a pod IP")
+	ginkgo.By("Creating a network isolated pod and waiting for it to be rejected")
+	pod := expectPodRejectedForMissingFeature(ctx, f, podClient, networkIsolatedPod(name), networkIsolatedPodsFeature)
+	if pod != nil {
+		gomega.Expect(pod.Status.PodIP).To(gomega.BeEmpty(), "a rejected pod must not get a pod IP")
+	}
 }
 
 // These tests need a container runtime that reports the pod_network_isolated

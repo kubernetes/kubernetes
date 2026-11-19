@@ -33,7 +33,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/component-helpers/nodedeclaredfeatures/features/cgroupoptions"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
@@ -252,9 +251,7 @@ echo "$i"`, expectedLimit, createCgroup)
 		ginkgo.DescribeTable("should reject a pod that requests a cgroup mount mode", func(ctx context.Context, mountMode v1.CgroupMountMode) {
 			pod := cgroupOptionsPod("cgroup-unsupported",
 				cgroupOptionsContainer("test", new(mountMode)))
-			pod = podClient.Create(ctx, pod)
-
-			framework.ExpectNoError(e2epod.WaitForPodFailedReason(ctx, f.ClientSet, pod, lifecycle.PodFeatureUnsupported, framework.PodStartShortTimeout))
+			expectPodRejectedForMissingFeature(ctx, f, podClient, pod, cgroupoptions.CgroupOptionsFeatureName)
 		},
 			ginkgo.Entry("ReadOnly", v1.CgroupMountModeReadOnly),
 			ginkgo.Entry("ReadWrite", v1.CgroupMountModeReadWrite),

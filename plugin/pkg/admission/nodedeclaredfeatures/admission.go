@@ -54,7 +54,7 @@ func Register(plugins *admission.Plugins) {
 	})
 }
 
-// Plugin is an admission controller that validates pod updates against node capabilities.
+// Plugin is an admission controller that validates pod updates, and pods created with spec.nodeName set, against the features declared by nodes.
 type Plugin struct {
 	*admission.Handler
 	nodeLister                             corev1listers.NodeLister
@@ -127,6 +127,12 @@ func (p *Plugin) Validate(ctx context.Context, a admission.Attributes, o admissi
 }
 
 func (p *Plugin) validatePod(a admission.Attributes) error {
+	if a.GetOperation() == admission.Create {
+		if a.GetSubresource() == "" {
+			return p.validatePodCreate(a)
+		}
+		return nil
+	}
 	if a.GetOperation() != admission.Update {
 		return nil
 	}
@@ -160,6 +166,61 @@ func (p *Plugin) validatePod(a admission.Attributes) error {
 	}
 
 	return p.validatePodUpdate(pod, oldPod, a)
+}
+
+// validatePodCreate rejects a pod that is created already assigned to a node
+// (spec.nodeName is set) when the node does not declare the features that the
+// pod requires. Such a pod does not go through the scheduler, and a kubelet
+// that predates a feature does not know that it has to reject the pod.
+func (p *Plugin) validatePodCreate(a admission.Attributes) error {
+	pod, ok := a.GetObject().(*core.Pod)
+	if !ok {
+		return errors.NewBadRequest(fmt.Sprintf("expected a pod but got a %T", a.GetObject()))
+	}
+	if len(pod.Spec.NodeName) == 0 {
+		return nil
+	}
+	// A mirror pod is the API representation of a static pod. The kubelet
+	// decides about static pods without the kube-apiserver and never runs a
+	// mirror pod, so rejecting one only hides the static pod from the API.
+	if _, isMirrorPod := pod.Annotations[core.MirrorPodAnnotationKey]; isMirrorPod {
+		return nil
+	}
+	podV1 := &corev1.Pod{}
+	if err := v1.Convert_core_Pod_To_v1_Pod(pod, podV1, nil); err != nil {
+		return errors.NewBadRequest(fmt.Sprintf("failed to convert pod: %v", err))
+	}
+	return p.validatePodPlacement(&ndf.PodInfo{Spec: &podV1.Spec, Status: &podV1.Status}, pod.Spec.NodeName, a)
+}
+
+// validatePodPlacement checks that the node declares the features that the pod
+// requires to be scheduled, as the scheduler does for the pods it binds.
+func (p *Plugin) validatePodPlacement(podInfo *ndf.PodInfo, nodeName string, a admission.Attributes) error {
+	reqs, err := p.nodeDeclaredFeatureFramework.InferForPodScheduling(podInfo, p.version)
+	if err != nil {
+		return admission.NewForbidden(a, fmt.Errorf("failed to infer pod feature requirements: %w", err))
+	}
+	if reqs.IsEmpty() {
+		return nil
+	}
+	if !p.WaitForReady() {
+		return admission.NewForbidden(a, fmt.Errorf("not yet ready to handle request"))
+	}
+	node, err := p.nodeLister.Get(nodeName)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			return admission.NewForbidden(a, fmt.Errorf("node %q not found", nodeName))
+		}
+		return admission.NewForbidden(a, fmt.Errorf("failed to get node %q: %w", nodeName, err))
+	}
+	result, err := p.nodeDeclaredFeatureFramework.MatchNode(reqs, node)
+	if err != nil {
+		return admission.NewForbidden(a, fmt.Errorf("failed to match pod requirements against node %q: %w", node.Name, err))
+	}
+	if !result.IsMatch {
+		return admission.NewForbidden(a, fmt.Errorf("pod requires features %s which are not available on node %q", strings.Join(result.UnsatisfiedRequirements, ", "), node.Name))
+	}
+	return nil
 }
 
 func (p *Plugin) validatePodUpdate(pod, oldPod *core.Pod, a admission.Attributes) error {
