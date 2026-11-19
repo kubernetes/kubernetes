@@ -158,6 +158,8 @@ func NewPodsToActivate() *PodsToActivate {
 type SortedScoredNodes interface {
 	Pop() fwk.NodePluginScores
 	Len() int
+	// Ranked reports whether the nodes are ordered by node rank first.
+	Ranked() bool
 	// UnorderedList returns all nodes in heap-internal order (not sorted by score).
 	UnorderedList() []fwk.NodePluginScores
 }

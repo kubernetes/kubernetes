@@ -176,7 +176,8 @@ func newBatchTestFramework(ctx context.Context, scorePl *configurableScorePlugin
 }
 
 type testSortedScoredNodes struct {
-	Nodes []string
+	Nodes    []string
+	IsRanked bool
 }
 
 var _ framework.SortedScoredNodes = &testSortedScoredNodes{}
@@ -189,6 +190,10 @@ func (t *testSortedScoredNodes) Pop() fwk.NodePluginScores {
 
 func (t *testSortedScoredNodes) Len() int {
 	return len(t.Nodes)
+}
+
+func (t *testSortedScoredNodes) Ranked() bool {
+	return t.IsRanked
 }
 
 func (t *testSortedScoredNodes) UnorderedList() []fwk.NodePluginScores {
