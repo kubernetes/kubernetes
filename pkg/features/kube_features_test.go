@@ -97,3 +97,17 @@ func TestAllDependenciesRegistered(t *testing.T) {
 		}
 	}
 }
+
+func TestMutableProbesRequireDynamicContainers(t *testing.T) {
+	gate := utilfeature.DefaultFeatureGate.DeepCopy()
+	if err := gate.SetFromMap(map[string]bool{
+		string(ContainerScopedProbes):  true,
+		string(DynamicContainers):      true,
+		string(MutableContainerProbes): true,
+	}); err != nil {
+		t.Fatalf("enabling mutable probes with its dependencies: %v", err)
+	}
+	if err := gate.SetFromMap(map[string]bool{string(DynamicContainers): false}); err == nil {
+		t.Fatal("MutableContainerProbes must reject a configuration without DynamicContainers")
+	}
+}

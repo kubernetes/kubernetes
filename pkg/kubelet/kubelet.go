@@ -838,12 +838,16 @@ func NewMainKubelet(ctx context.Context,
 	}
 	klet.actuatedState = actuatedState
 
+	klet.runner = kubecontainer.NewCommandRunner(kubeDeps.RemoteRuntimeService)
+	klet.probeManager = newProbeManager(ctx, klet, kubeDeps)
+
 	runtime, postImageGCHooks, err := kuberuntime.NewKubeGenericRuntimeManager(
 		ctx,
 		kubecontainer.FilterEventRecorder(kubeDeps.Recorder),
 		klet.livenessManager,
 		klet.readinessManager,
 		klet.startupManager,
+		klet.probeManager,
 		rootDirectory,
 		podLogsDirectory,
 		machineInfo,
@@ -888,7 +892,6 @@ func NewMainKubelet(ctx context.Context,
 	}
 	klet.containerRuntime = runtime
 	klet.streamingRuntime = runtime
-	klet.runner = kubecontainer.NewCommandRunner(kubeDeps.RemoteRuntimeService)
 	resizeAdmitHandler := allocation.NewPodResizesAdmitHandler(klet.containerManager, klet.containerManager, runtime, klet.allocationManager)
 
 	runtimeCache, err := kubecontainer.NewRuntimeCache(klet.containerRuntime, runtimeCacheRefreshPeriod)
@@ -1038,18 +1041,6 @@ func NewMainKubelet(ctx context.Context,
 				kubeDeps.TLSConfig.ClientCAs = clientCAs
 			}
 		}
-	}
-
-	if kubeDeps.ProbeManager != nil {
-		klet.probeManager = kubeDeps.ProbeManager
-	} else {
-		klet.probeManager = prober.NewManager(
-			klet.statusManager,
-			klet.livenessManager,
-			klet.readinessManager,
-			klet.startupManager,
-			klet.runner,
-			kubeDeps.Recorder)
 	}
 
 	var clusterTrustBundleManager clustertrustbundle.Manager = &clustertrustbundle.NoopManager{}
@@ -1283,6 +1274,31 @@ func NewMainKubelet(ctx context.Context,
 
 type serviceLister interface {
 	List(labels.Selector) ([]*v1.Service, error)
+}
+
+// newProbeManager selects the probe manager based on the ContainerScopedProbes gate.
+func newProbeManager(ctx context.Context, klet *Kubelet, kubeDeps *Dependencies) prober.Manager {
+	if kubeDeps.ProbeManager != nil {
+		return kubeDeps.ProbeManager
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.ContainerScopedProbes) {
+		return prober.NewContainerBoundManager(
+			ctx,
+			klet.livenessManager,
+			klet.readinessManager,
+			klet.startupManager,
+			klet.runner,
+			kubeDeps.Recorder)
+	}
+
+	return prober.NewManager(
+		klet.statusManager,
+		klet.livenessManager,
+		klet.readinessManager,
+		klet.startupManager,
+		klet.runner,
+		kubeDeps.Recorder)
 }
 
 // Kubelet is the main kubelet implementation.
@@ -2215,6 +2231,32 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 		kl.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeNormal, events.ResizeCompleted, "%s", msg)
 	}
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.ContainerScopedProbes) {
+		if kubecontainer.IsHostNetworkPod(pod) && len(podStatus.IPs) == 0 {
+			if hostIPs, err := kl.getHostIPsAnyWay(ctx); err == nil {
+				for _, ip := range hostIPs {
+					podStatus.IPs = append(podStatus.IPs, ip.String())
+				}
+			}
+		}
+
+		probePod := pod
+		if kubetypes.IsStaticPod(pod) {
+			// Static pods carry no API status. Keep the static pod's identity for
+			// probe results and events, but recover state from its matching mirror.
+			podCopy := *pod
+			probePod = &podCopy
+			probePod.Status = v1.PodStatus{}
+			if mirrorPod != nil && kubepod.IsMirrorPodOf(mirrorPod, pod) {
+				probePod.Status = mirrorPod.Status
+			}
+			// Without matching status, adoption leaves startup unknown and readiness
+			// false until live probes establish the state of each container.
+		}
+		// Seed adopted containers before status generation to preserve Started and Ready.
+		kl.probeManager.SyncPod(ctx, probePod, podStatus)
+	}
+
 	// Generate final API pod status with pod and status manager status
 	apiPodStatus := kl.generateAPIPodStatus(ctx, pod, podStatus, SyncPod)
 	// The pod IP may be changed in generateAPIPodStatus if the pod is using host network. (See #24576)
@@ -2379,8 +2421,10 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 		}
 	}
 
-	// Ensure the pod is being probed
-	kl.probeManager.SyncPod(ctx, pod)
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ContainerScopedProbes) {
+		// Legacy status generation must run before creating startup workers.
+		kl.probeManager.SyncPod(ctx, pod, podStatus)
+	}
 
 	restartingAllContainers := false
 	if utilfeature.DefaultFeatureGate.Enabled(features.RestartAllContainersOnContainerExits) {
@@ -2961,10 +3005,16 @@ func (kl *Kubelet) syncLoopIteration(ctx context.Context, configCh <-chan kubety
 		logger.V(4).Info("SyncLoop (SYNC) pods", "total", len(podsToSync), "pods", klog.KObjSlice(podsToSync))
 		handler.HandlePodSyncs(ctx, podsToSync)
 	case update := <-kl.livenessManager.Updates():
+		if !kl.livenessManager.IsCurrent(update) {
+			break
+		}
 		if update.Result == proberesults.Failure {
 			handleProbeSync(ctx, kl, update, handler, "liveness", "unhealthy")
 		}
 	case update := <-kl.readinessManager.Updates():
+		if !kl.readinessManager.IsCurrent(update) {
+			break
+		}
 		ready := update.Result == proberesults.Success
 		kl.statusManager.SetContainerReadiness(logger, update.PodUID, update.ContainerID, ready)
 
@@ -2974,6 +3024,9 @@ func (kl *Kubelet) syncLoopIteration(ctx context.Context, configCh <-chan kubety
 		}
 		handleProbeSync(ctx, kl, update, handler, "readiness", status)
 	case update := <-kl.startupManager.Updates():
+		if !kl.startupManager.IsCurrent(update) {
+			break
+		}
 		started := update.Result == proberesults.Success
 		kl.statusManager.SetContainerStartup(logger, update.PodUID, update.ContainerID, started)
 
