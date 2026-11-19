@@ -912,9 +912,9 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 			return fmt.Errorf("topology manager policy options %v require feature gates %q enabled",
 				s.TopologyManagerPolicyOptions, features.TopologyManagerPolicyOptions)
 		}
-		if !kubeletutil.IsCgroup2UnifiedMode() && s.MemorySwap.SwapBehavior == string(kubelettypes.LimitedSwap) {
-			// LimitedSwap is not supported for cgroupv1 so we are failing early.
-			return fmt.Errorf("LimitedSwap is only supported with cgroupv2")
+		if !kubeletutil.IsCgroup2UnifiedMode() && cm.IsSwapBehaviorEnabled(s.MemorySwap.SwapBehavior) {
+			// Swap is not supported for cgroupv1 so we are failing early.
+			return fmt.Errorf("%s is only supported with cgroupv2", s.MemorySwap.SwapBehavior)
 		}
 		if !s.FailSwapOn && s.MemorySwap.SwapBehavior == "" {
 			// This is just a log because we are using a default of NoSwap.

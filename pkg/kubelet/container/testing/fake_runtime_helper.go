@@ -43,6 +43,10 @@ type FakeRuntimeHelper struct {
 	Err                               error
 	PodStats                          map[kubetypes.UID]*statsapi.PodStats
 	EffectiveEphemeralVolumeLimitFunc func(pod *v1.Pod, volumeName string) (*resource.Quantity, error)
+	// PodSwapStatsByUID is returned by PodSwapStats.
+	PodSwapStatsByUID map[kubetypes.UID]*statsapi.PodStats
+	// PodSwapStatsCalls counts PodSwapStats calls.
+	PodSwapStatsCalls int
 }
 
 func (f *FakeRuntimeHelper) GenerateRunContainerOptions(_ context.Context, pod *v1.Pod, container *v1.Container, podIP string, podIPs []string, imageVolumes kubecontainer.ImageVolumes) (*kubecontainer.RunContainerOptions, func(), error) {
@@ -133,6 +137,14 @@ func (f *FakeRuntimeHelper) PodCPUAndMemoryStats(_ context.Context, pod *v1.Pod,
 		return stats, nil
 	}
 	return nil, fmt.Errorf("stats for pod %q not found", pod.UID)
+}
+
+func (f *FakeRuntimeHelper) PodSwapStats(_ context.Context, pod *v1.Pod, _ *kubecontainer.PodStatus) (*statsapi.PodStats, error) {
+	f.PodSwapStatsCalls++
+	if stats, ok := f.PodSwapStatsByUID[pod.UID]; ok {
+		return stats, nil
+	}
+	return nil, fmt.Errorf("swap stats for pod %q not found", pod.UID)
 }
 
 func (f *FakeRuntimeHelper) OnPodSandboxReady(_ context.Context, _ *v1.Pod) error {

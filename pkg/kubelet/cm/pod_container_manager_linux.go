@@ -64,7 +64,7 @@ type podContainerManagerImpl struct {
 	memoryReservationPolicy kubeletconfig.MemoryReservationPolicy
 	// memoryThrottlingFactor is used to compute pod-level memory.high
 	memoryThrottlingFactor *float64
-	// memorySwapBehavior controls pod-level swap behavior (NoSwap or LimitedSwap)
+	// memorySwapBehavior controls pod-level swap behavior (NoSwap, LimitedSwap or WorkloadControlledSwap)
 	memorySwapBehavior kubetypes.SwapBehavior
 	// memoryCapacity and swapCapacity are node capacities in bytes used for proportional swap calculation
 	memoryCapacity int64
@@ -107,6 +107,9 @@ func (m *podContainerManagerImpl) EnsureExists(logger klog.Logger, pod *v1.Pod) 
 			Name:               podContainerName,
 			ResourceParameters: ResourceConfigForPod(pod, enforceCPULimits, m.cpuCFSQuotaPeriod, enforceMemoryQoS, m.memoryReservationPolicy),
 		}
+		if !m.isNodeSwapEnabled() {
+			containerConfig.ResourceParameters.Unified = UnifiedWithoutSwap(containerConfig.ResourceParameters.Unified)
+		}
 		if m.podPidsLimit > 0 {
 			containerConfig.ResourceParameters.PidsLimit = &m.podPidsLimit
 		}
@@ -122,6 +125,16 @@ func (m *podContainerManagerImpl) EnsureExists(logger klog.Logger, pod *v1.Pod) 
 
 	}
 	return nil
+}
+
+func (m *podContainerManagerImpl) isNodeSwapEnabled() bool {
+	if !IsSwapBehaviorEnabled(string(m.memorySwapBehavior)) {
+		return false
+	}
+	if !isCgroup2UnifiedMode() {
+		return false
+	}
+	return m.getSwapControllerAvailable != nil && m.getSwapControllerAvailable()
 }
 
 // applyPodLevelMemoryHigh sets memory.high on the pod cgroup.
@@ -170,6 +183,14 @@ func podRequestsWritableCgroups(pod *v1.Pod) bool {
 // pod cgroup never has memory.swap.max recomputed (for example, if kubelet restarts with a
 // different swapBehavior).
 func (m *podContainerManagerImpl) applyPodLevelSwapConfig(logger klog.Logger, pod *v1.Pod, rc *ResourceConfig) {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.WorkloadControlledSwap) && m.isNodeSwapEnabled() {
+		// KEP-5359: a pod-level limits.swap, already set by ResourceConfigForPod,
+		// wins over the LimitedSwap value. On a WorkloadControlledSwap node it is
+		// the only limit on the pod cgroup.
+		if HasExplicitSwapLimit(pod, nil) || m.memorySwapBehavior == kubetypes.WorkloadControlledSwap {
+			return
+		}
+	}
 	swapControllerAvailable := m.getSwapControllerAvailable != nil && m.getSwapControllerAvailable()
 	ApplyPodLevelSwapConfig(logger, pod, rc, m.memorySwapBehavior, m.memoryCapacity, m.swapCapacity, isCgroup2UnifiedMode(), swapControllerAvailable)
 }

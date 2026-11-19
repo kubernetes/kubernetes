@@ -611,3 +611,115 @@ func TestEnsureExistsWithPodLevelSwap(t *testing.T) {
 		})
 	}
 }
+
+// TestEnsureExistsPodLevelSwapLimit covers how an explicit pod-level
+// limits.swap (KEP-5359) and the LimitedSwap value share the pod cgroup's
+// memory.swap.max.
+func TestEnsureExistsPodLevelSwapLimit(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeatures.PodLevelResources, true)
+
+	origIsCgroup2 := isCgroup2UnifiedMode
+	t.Cleanup(func() { isCgroup2UnifiedMode = origIsCgroup2 })
+	isCgroup2UnifiedMode = func() bool { return true }
+
+	const (
+		gi             = 1024 * 1024 * 1024
+		nodeMem  int64 = 40 * gi
+		nodeSwap int64 = 5 * gi
+	)
+	qosContainersInfo := QOSContainersInfo{
+		Guaranteed: RootCgroupName,
+		Burstable:  NewCgroupName(RootCgroupName, strings.ToLower(string(v1.PodQOSBurstable))),
+		BestEffort: NewCgroupName(RootCgroupName, strings.ToLower(string(v1.PodQOSBestEffort))),
+	}
+	newPod := func(uid string, swapLimit string) *v1.Pod {
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{UID: types.UID(uid)},
+			Spec: v1.PodSpec{
+				Resources: &v1.ResourceRequirements{
+					Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("2Gi")},
+					Limits:   v1.ResourceList{v1.ResourceMemory: resource.MustParse("4Gi")},
+				},
+				Containers: []v1.Container{{Name: "c1"}},
+			},
+		}
+		if swapLimit != "" {
+			pod.Spec.Resources.Limits[v1.ResourceSwap] = resource.MustParse(swapLimit)
+		}
+		return pod
+	}
+	explicit := strconv.FormatInt(512*1024*1024, 10)
+	// 2Gi of 40Gi node memory, of 5Gi node swap.
+	proportional := strconv.FormatInt(gi/4, 10)
+
+	for _, tc := range []struct {
+		name                 string
+		gate                 bool
+		swapBehavior         kubetypes.SwapBehavior
+		noSwapController     bool
+		podSwapLimit         string
+		expectedSwapMax      string
+		expectedSwapMaxUnset bool
+	}{
+		{
+			name: "LimitedSwap node: pod-level limits.swap wins",
+			gate: true, swapBehavior: kubetypes.LimitedSwap, podSwapLimit: "512Mi",
+			expectedSwapMax: explicit,
+		},
+		{
+			name: "LimitedSwap node: no limits.swap keeps the LimitedSwap value",
+			gate: true, swapBehavior: kubetypes.LimitedSwap,
+			expectedSwapMax: proportional,
+		},
+		{
+			name: "LimitedSwap node, gate off: limits.swap is ignored",
+			gate: false, swapBehavior: kubetypes.LimitedSwap, podSwapLimit: "512Mi",
+			expectedSwapMax: proportional,
+		},
+		{
+			name: "WorkloadControlledSwap node: pod-level limits.swap is applied",
+			gate: true, swapBehavior: kubetypes.WorkloadControlledSwap, podSwapLimit: "512Mi",
+			expectedSwapMax: explicit,
+		},
+		{
+			name: "WorkloadControlledSwap node: no limits.swap leaves the pod cgroup unlimited",
+			gate: true, swapBehavior: kubetypes.WorkloadControlledSwap,
+			expectedSwapMaxUnset: true,
+		},
+		{
+			name: "NoSwap node: limits.swap is not applied",
+			gate: true, swapBehavior: kubetypes.NoSwap, podSwapLimit: "512Mi",
+			expectedSwapMax: "0",
+		},
+		{
+			name: "no swap controller: memory.swap.max is not written",
+			gate: true, swapBehavior: kubetypes.LimitedSwap, noSwapController: true, podSwapLimit: "512Mi",
+			expectedSwapMaxUnset: true,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeatures.WorkloadControlledSwap, tc.gate)
+			fakeCM := &fakeCgroupManager{}
+			pcm := &podContainerManagerImpl{
+				qosContainersInfo:          qosContainersInfo,
+				cgroupManager:              fakeCM,
+				enforceCPULimits:           true,
+				cpuCFSQuotaPeriod:          QuotaPeriod,
+				podContainerManager:        NewStubContainerManager(),
+				memorySwapBehavior:         tc.swapBehavior,
+				memoryCapacity:             nodeMem,
+				swapCapacity:               nodeSwap,
+				getSwapControllerAvailable: func() bool { return !tc.noSwapController },
+			}
+			require.NoError(t, pcm.EnsureExists(logger, newPod("pod-level-swap", tc.podSwapLimit)))
+			require.Len(t, fakeCM.created, 1)
+			gotUnified := fakeCM.created[0].ResourceParameters.Unified
+			if tc.expectedSwapMaxUnset {
+				require.NotContains(t, gotUnified, Cgroup2MaxSwapFilename)
+			} else {
+				require.Equal(t, tc.expectedSwapMax, gotUnified[Cgroup2MaxSwapFilename])
+			}
+		})
+	}
+}

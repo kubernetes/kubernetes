@@ -368,8 +368,17 @@ func ValidateRuntimeClassName(name string, fldPath *field.Path) field.ErrorList 
 
 // validateOverhead can be used to check whether the given Overhead is valid.
 func validateOverhead(overhead core.ResourceList, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
+	var allErrs field.ErrorList
+	if opts.AllowWorkloadControlledSwap {
+		for resName := range overhead {
+			if resourcehelper.IsLimitOnlyResource(v1.ResourceName(resName)) {
+				allErrs = append(allErrs, field.Forbidden(fldPath.Key(string(resName)), fmt.Sprintf("%s may not be specified in overhead", resName)))
+			}
+		}
+	}
 	// reuse the ResourceRequirements validation logic
-	return ValidateContainerResourceRequirements(&core.ResourceRequirements{Limits: overhead}, nil, fldPath, opts)
+	allErrs = append(allErrs, ValidateContainerResourceRequirements(&core.ResourceRequirements{Limits: overhead}, nil, fldPath, opts)...)
+	return allErrs
 }
 
 // Validates that given value is not negative.
@@ -5041,19 +5050,22 @@ func validatePodResourceConsistency(spec *core.PodSpec, fldPath *field.Path, opt
 		}
 	}
 
-	if !opts.AllowInitContainerLimitsExceedingPodLimits {
-		for i, ctr := range spec.InitContainers {
-			for resourceName, ctrLimit := range ctr.Resources.Limits {
-				// Skip if the pod-level limit of the resource is not set.
-				podSpecLimits, exists := spec.Resources.Limits[resourceName]
-				if !exists {
-					continue
-				}
+	for i, ctr := range spec.InitContainers {
+		for resourceName, ctrLimit := range ctr.Resources.Limits {
+			// Limit-only resources (swap) are always checked: they are newer than
+			// the objects AllowInitContainerLimitsExceedingPodLimits keeps valid.
+			if opts.AllowInitContainerLimitsExceedingPodLimits && !resourcehelper.IsLimitOnlyResource(v1.ResourceName(resourceName)) {
+				continue
+			}
+			// Skip if the pod-level limit of the resource is not set.
+			podSpecLimits, exists := spec.Resources.Limits[resourceName]
+			if !exists {
+				continue
+			}
 
-				if ctrLimit.Cmp(podSpecLimits) > 0 {
-					fldPath := fldPath.Child("initContainers").Index(i).Child("resources", "limits").Key(resourceName.String())
-					allErrs = append(allErrs, field.Invalid(fldPath, ctrLimit.String(), fmt.Sprintf("must be less than or equal to pod limits of %s", podSpecLimits.String())))
-				}
+			if ctrLimit.Cmp(podSpecLimits) > 0 {
+				fldPath := fldPath.Child("initContainers").Index(i).Child("resources", "limits").Key(resourceName.String())
+				allErrs = append(allErrs, field.Invalid(fldPath, ctrLimit.String(), fmt.Sprintf("must be less than or equal to pod limits of %s", podSpecLimits.String())))
 			}
 		}
 	}
@@ -5128,7 +5140,15 @@ func validateWindows(spec *core.PodSpec, fldPath *field.Path) field.ErrorList {
 	if spec.ShareProcessNamespace != nil {
 		allErrs = append(allErrs, field.Forbidden(fldPath.Child("shareProcessNamespace"), "cannot be set for a windows pod"))
 	}
+	if spec.Resources != nil {
+		if _, ok := spec.Resources.Limits[core.ResourceSwap]; ok {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("resources", "limits").Key(string(core.ResourceSwap)), "cannot be set for a windows pod"))
+		}
+	}
 	podshelper.VisitContainersWithPath(spec, fldPath, func(c *core.Container, cFldPath *field.Path) bool {
+		if _, ok := c.Resources.Limits[core.ResourceSwap]; ok {
+			allErrs = append(allErrs, field.Forbidden(cFldPath.Child("resources", "limits").Key(string(core.ResourceSwap)), "cannot be set for a windows pod"))
+		}
 		// validate container security context
 		sc := c.SecurityContext
 		// OS based podSecurityContext validation
@@ -7080,6 +7100,17 @@ func validatePodLevelResourcesResize(newPod, oldPod *core.Pod, specPath *field.P
 	return allErrs, mungedPodSpec
 }
 
+// resizableResourceSet returns the resources whose values may change on a
+// resize. swap (KEP-5359) joins cpu and memory when the gate is on. This reads
+// the gate directly rather than the ratcheted AllowWorkloadControlledSwap, so
+// an existing swap limit stays valid but cannot change once the gate is off.
+func resizableResourceSet() sets.Set[core.ResourceName] {
+	if utilfeature.DefaultFeatureGate.Enabled(features.WorkloadControlledSwap) {
+		return supportedResizeResources.Clone().Insert(core.ResourceSwap)
+	}
+	return supportedResizeResources
+}
+
 func dropResizableResourceUpdates(resourceList, oldResourceList core.ResourceList) core.ResourceList {
 	var mungedResourceList core.ResourceList
 	if resourceList == nil {
@@ -7090,7 +7121,7 @@ func dropResizableResourceUpdates(resourceList, oldResourceList core.ResourceLis
 	} else {
 		mungedResourceList = resourceList.DeepCopy()
 	}
-	for r := range supportedResizeResources {
+	for r := range resizableResourceSet() {
 		delete(mungedResourceList, r)
 		if quantity, found := oldResourceList[r]; found {
 			mungedResourceList[r] = quantity
@@ -7199,6 +7230,21 @@ func validatePodLevelResourcesCoverDRA(pod *v1.Pod, validationOpts PodValidation
 		}
 		if ok, msg := validateContainerLimitsCoverDRA(pod, containers); !ok {
 			return false, msg
+		}
+
+		for _, ctr := range pod.Spec.InitContainers {
+			for resourceName, ctrLimit := range ctr.Resources.Limits {
+				if !resourcehelper.IsLimitOnlyResource(v1.ResourceName(resourceName)) {
+					continue
+				}
+				podLevelResLimit, exists := pod.Spec.Resources.Limits[resourceName]
+				if !exists {
+					continue
+				}
+				if ctrLimit.Cmp(podLevelResLimit) > 0 {
+					return false, fmt.Sprintf("pod level limit for %s is insufficient to cover the limit for initContainer %s", resourceName, ctr.Name)
+				}
+			}
 		}
 	}
 
@@ -8179,6 +8225,16 @@ func validateResourceName(value core.ResourceName, fldPath *field.Path) field.Er
 // Validate container resource name
 // Refer to docs/design/resources.md for more details.
 func ValidateContainerResourceName(value core.ResourceName, fldPath *field.Path) field.ErrorList {
+	return validateContainerResourceName(value, fldPath, PodValidationOptions{})
+}
+
+// validateContainerResourceName validates a resource name in a container's
+// resources. Callers outside of a pod spec (LimitRange, HPA) use
+// ValidateContainerResourceName, which does not accept swap.
+func validateContainerResourceName(value core.ResourceName, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
+	if value == core.ResourceSwap && opts.AllowWorkloadControlledSwap {
+		return nil
+	}
 	allErrs := validateResourceName(value, fldPath)
 
 	if len(strings.Split(string(value), "/")) == 1 {
@@ -8196,7 +8252,10 @@ func ValidateContainerResourceName(value core.ResourceName, fldPath *field.Path)
 // validatePodResourceName verifies that:
 // 1. The resource name is a valid compute resource name for pod-level specification.
 // 2. The resource is supported by the PodLevelResources feature.
-func validatePodResourceName(resourceName core.ResourceName, fldPath *field.Path) field.ErrorList {
+func validatePodResourceName(resourceName core.ResourceName, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
+	if resourceName == core.ResourceSwap && opts.AllowWorkloadControlledSwap {
+		return nil
+	}
 	allErrs := validateResourceName(resourceName, fldPath)
 	if len(allErrs) != 0 {
 		return allErrs
@@ -8244,6 +8303,9 @@ func validateLimitRangeTypeName(value core.LimitType, fldPath *field.Path) field
 // Validate limit range resource name
 // limit types (other than Pod/Container) could contain storage not just cpu or memory
 func validateLimitRangeResourceName(limitType core.LimitType, value core.ResourceName, fldPath *field.Path) field.ErrorList {
+	if resourcehelper.IsLimitOnlyResource(v1.ResourceName(value)) {
+		return field.ErrorList{field.Forbidden(fldPath, fmt.Sprintf("%s may only be specified in pod and container limits, not in a LimitRange", value))}
+	}
 	switch limitType {
 	case core.LimitTypePod, core.LimitTypeContainer:
 		return ValidateContainerResourceName(value, fldPath)
@@ -8569,11 +8631,11 @@ func validatePodResourceRequirements(requirements *core.ResourceRequirements, po
 }
 
 func ValidateContainerResourceRequirements(requirements *core.ResourceRequirements, podClaimNames sets.Set[string], fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
-	return validateResourceRequirements(requirements, ValidateContainerResourceName, podClaimNames, fldPath, opts)
+	return validateResourceRequirements(requirements, validateContainerResourceName, podClaimNames, fldPath, opts)
 }
 
 // Validates resource requirement spec.
-func validateResourceRequirements(requirements *core.ResourceRequirements, resourceNameFn func(core.ResourceName, *field.Path) field.ErrorList, podClaimNames sets.Set[string], fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
+func validateResourceRequirements(requirements *core.ResourceRequirements, resourceNameFn func(core.ResourceName, *field.Path, PodValidationOptions) field.ErrorList, podClaimNames sets.Set[string], fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 	limPath := fldPath.Child("limits")
 	reqPath := fldPath.Child("requests")
@@ -8586,7 +8648,7 @@ func validateResourceRequirements(requirements *core.ResourceRequirements, resou
 
 		fldPath := limPath.Key(string(resourceName))
 		// Validate resource name.
-		allErrs = append(allErrs, resourceNameFn(resourceName, fldPath)...)
+		allErrs = append(allErrs, resourceNameFn(resourceName, fldPath, opts)...)
 
 		// Validate resource quantity.
 		allErrs = append(allErrs, ValidateResourceQuantityValue(resourceName, quantity, fldPath)...)
@@ -8605,10 +8667,18 @@ func validateResourceRequirements(requirements *core.ResourceRequirements, resou
 	for resourceName, quantity := range requirements.Requests {
 		fldPath := reqPath.Key(string(resourceName))
 		// Validate resource name.
-		allErrs = append(allErrs, resourceNameFn(resourceName, fldPath)...)
+		nameErrs := resourceNameFn(resourceName, fldPath, opts)
+		allErrs = append(allErrs, nameErrs...)
 
 		// Validate resource quantity.
 		allErrs = append(allErrs, ValidateResourceQuantityValue(resourceName, quantity, fldPath)...)
+
+		if resourcehelper.IsLimitOnlyResource(v1.ResourceName(resourceName)) {
+			if len(nameErrs) == 0 {
+				allErrs = append(allErrs, field.Forbidden(fldPath, fmt.Sprintf("%s may only be specified in limits, not requests", resourceName)))
+			}
+			continue
+		}
 
 		// Check that request <= limit.
 		limitQuantity, exists := requirements.Limits[resourceName]

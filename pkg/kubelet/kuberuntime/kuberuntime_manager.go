@@ -53,6 +53,7 @@ import (
 	crierror "k8s.io/cri-api/pkg/errors"
 	remote "k8s.io/cri-client/pkg"
 	"k8s.io/klog/v2"
+	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/credentialprovider"
@@ -653,8 +654,8 @@ type podActions struct {
 	VolumesToUpsize []v1.Volume
 	// VolumesToDownsize keeps a list of volumes needing size decrease.
 	VolumesToDownsize []v1.Volume
-	// PodCgroupResourcesToUpdate is the set of resources (cpu, memory) whose pod-level
-	// cgroup configuration needs to be updated.
+	// PodCgroupResourcesToUpdate is the set of resources (cpu, memory, and swap for a
+	// pod-level swap limit) whose pod-level cgroup configuration needs to be updated.
 	PodCgroupResourcesToUpdate sets.Set[v1.ResourceName]
 	// ContainersToReset is a list of containers to be killed (if running) and removed from
 	// runtime for RestartAllContainers. The container that triggered RestartAllContainers
@@ -669,6 +670,11 @@ type resourceRequirements struct {
 	memoryRequest int64
 	cpuLimit      int64
 	cpuRequest    int64
+	// swapLimit is the effective memory.swap.max of a container (KEP-5359), not
+	// the raw limits.swap entry: it already folds in pod-level inheritance and
+	// the LimitedSwap recalculation, so comparing two of these tells whether the
+	// cgroup value must change.
+	swapLimit int64
 }
 
 func (p podActions) String() string {
@@ -744,6 +750,79 @@ func setResourceQuantity(dst, src v1.ResourceList, name v1.ResourceName) v1.Reso
 	return dst
 }
 
+// workloadSwapLimitsEnabled reports whether workload-specified limits.swap, and
+// in-place resize of swap, are honored on this node: the WorkloadControlledSwap
+// gate is on and the node can configure swap. With the gate off a LimitedSwap
+// node still gets its node-derived swap limits, and this returns false.
+func (m *kubeGenericRuntimeManager) workloadSwapLimitsEnabled() bool {
+	return utilfeature.DefaultFeatureGate.Enabled(features.WorkloadControlledSwap) && m.nodeSwapEnabled()
+}
+
+// podSwapLimitEqual compares pod-level limits.swap. Presence matters because
+// an unset pod-level swap limit means unlimited.
+func podSwapLimitEqual(a, b *v1.ResourceRequirements) bool {
+	var aSwap, bSwap resource.Quantity
+	var aHas, bHas bool
+	if a != nil {
+		aSwap, aHas = a.Limits[v1.ResourceSwap]
+	}
+	if b != nil {
+		bSwap, bHas = b.Limits[v1.ResourceSwap]
+	}
+	return aHas == bHas && aSwap.Equal(bSwap)
+}
+
+// actuatedPodLevelResources returns the pod-level resources to record as actuated for pod: the
+// effective cpu and memory that size the pod cgroup, plus the pod-level swap limit (KEP-5359),
+// which is only ever set explicitly.
+func actuatedPodLevelResources(pod *v1.Pod) *v1.ResourceRequirements {
+	return withPodSwapLimit(cm.EffectivePodResources(pod), pod.Spec.Resources)
+}
+
+// withPodSwapLimit returns resources with the pod-level swap limit of src, if it has one.
+func withPodSwapLimit(resources, src *v1.ResourceRequirements) *v1.ResourceRequirements {
+	if src == nil {
+		return resources
+	}
+	swapLimit, ok := src.Limits[v1.ResourceSwap]
+	if !ok {
+		return resources
+	}
+	if resources == nil {
+		resources = &v1.ResourceRequirements{}
+	}
+	if resources.Limits == nil {
+		resources.Limits = v1.ResourceList{}
+	}
+	resources.Limits[v1.ResourceSwap] = swapLimit
+	return resources
+}
+
+// actuatedSwapLimit returns the swap limit container currently runs with. It is derived from the
+// actuated container resources and the actuated pod-level swap limit in the same way that
+// effectiveSwapLimit derives the desired one from the pod spec.
+func (m *kubeGenericRuntimeManager) actuatedSwapLimit(pod *v1.Pod, container *v1.Container, actuatedContainerResources *v1.ResourceRequirements) int64 {
+	podCtx := pod
+	if actuatedPodResources, _ := m.actuatedState.GetPodLevelResources(pod.UID); !podSwapLimitEqual(pod.Spec.Resources, actuatedPodResources) {
+		// Shallow copies: only the pod-level swap limit differs from the pod spec.
+		podCopy := *pod
+		var podResources v1.ResourceRequirements
+		if pod.Spec.Resources != nil {
+			podResources = *pod.Spec.Resources
+		}
+		var actuatedLimits v1.ResourceList
+		if actuatedPodResources != nil {
+			actuatedLimits = actuatedPodResources.Limits
+		}
+		podResources.Limits = setResourceQuantity(podResources.Limits.DeepCopy(), actuatedLimits, v1.ResourceSwap)
+		podCopy.Spec.Resources = &podResources
+		podCtx = &podCopy
+	}
+	containerCtx := *container
+	containerCtx.Resources = *actuatedContainerResources
+	return m.effectiveSwapLimit(podCtx, &containerCtx)
+}
+
 // computePodResizeAction determines the actions required (if any) to resize the given container.
 // Returns whether to keep (true) or restart (false) the container.
 // TODO(vibansal): Make this function to be agnostic to whether it is dealing with a restartable init container or not (i.e. remove the argument `isRestartableInitContainer`).
@@ -781,6 +860,10 @@ func (m *kubeGenericRuntimeManager) computePodResizeAction(ctx context.Context, 
 	desiredResources := containerResourcesFromRequirements(pod.Spec.Resources, &container.Resources)
 	// The actuated container limits already include any limits applied from pod-level limits.
 	currentResources := containerResourcesFromRequirements(nil, &actuatedContainerResources)
+	if utilfeature.DefaultFeatureGate.Enabled(features.WorkloadControlledSwap) {
+		desiredResources.swapLimit = m.effectiveSwapLimit(pod, &container)
+		currentResources.swapLimit = m.actuatedSwapLimit(pod, &container, &actuatedContainerResources)
+	}
 
 	if currentResources == desiredResources {
 		// No resize required.
@@ -797,6 +880,8 @@ func (m *kubeGenericRuntimeManager) computePodResizeAction(ctx context.Context, 
 			}
 		}
 		// If a resource policy isn't set, the implicit default is NotRequired.
+		// Note: `swap` is not accepted in resizePolicy today, so swap changes are
+		// always NotRequired (KEP-5359 open question D6).
 		return true, false
 	}
 	markContainerForUpdate := func(rName v1.ResourceName, desiredValue, currentValue int64) {
@@ -821,6 +906,12 @@ func (m *kubeGenericRuntimeManager) computePodResizeAction(ctx context.Context, 
 	resizeMemReq, restartMemReq := determineContainerResize(v1.ResourceMemory, desiredResources.memoryRequest, currentResources.memoryRequest)
 	resizeCPULim, restartCPULim := determineContainerResize(v1.ResourceCPU, desiredResources.cpuLimit, currentResources.cpuLimit)
 	resizeCPUReq, restartCPUReq := determineContainerResize(v1.ResourceCPU, desiredResources.cpuRequest, currentResources.cpuRequest)
+	// A swap delta can come from a user change to limits.swap, from a pod-level
+	// limit change, or from LimitedSwap recalculating after a memory request
+	// change. All three are actuated the same way (own ordered pass, see
+	// doPodResizeAction); admission decides which are allowed (see
+	// allocation/handlers.go).
+	resizeSwapLim, _ := determineContainerResize(v1.ResourceSwap, desiredResources.swapLimit, currentResources.swapLimit)
 	if restartCPULim || restartCPUReq || restartMemLim || restartMemReq {
 		// resize policy requires this container to restart
 		changes.ContainersToKill[kubeContainerStatus.ID] = containerToKillInfo{
@@ -846,6 +937,9 @@ func (m *kubeGenericRuntimeManager) computePodResizeAction(ctx context.Context, 
 			markContainerForUpdate(v1.ResourceCPU, desiredResources.cpuLimit, currentResources.cpuLimit)
 		} else if resizeCPUReq {
 			markContainerForUpdate(v1.ResourceCPU, desiredResources.cpuRequest, currentResources.cpuRequest)
+		}
+		if resizeSwapLim {
+			markContainerForUpdate(v1.ResourceSwap, desiredResources.swapLimit, currentResources.swapLimit)
 		}
 	}
 	return true
@@ -878,9 +972,9 @@ func (m *kubeGenericRuntimeManager) InitializeActuatedPod(logger klog.Logger, al
 		}
 	}
 	if hasPod && stored.Spec.Resources != nil {
-		actuatedPod.Spec.Resources = cm.ResizableResources(stored.Spec.Resources)
+		actuatedPod.Spec.Resources = withPodSwapLimit(cm.ResizableResources(stored.Spec.Resources), stored.Spec.Resources)
 	} else {
-		actuatedPod.Spec.Resources = cm.EffectivePodResources(&actuatedPod)
+		actuatedPod.Spec.Resources = actuatedPodLevelResources(&actuatedPod)
 	}
 	if err := m.actuatedState.SetPod(logger, &actuatedPod); err != nil {
 		logger.Error(err, "Failed to initialize actuated pod resource info checkpoint", "pod", klog.KObj(&actuatedPod))
@@ -1044,9 +1138,45 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 		return resizeResult
 	}
 
+	// KEP-5359: swap is actuated in its own pass. Read the pod cgroup's current
+	// memory.swap.max so pod-level increases/decreases can be ordered against
+	// the container writes. swapLimitsEnabled is false when the node cannot swap, in
+	// which case effectiveSwapLimit already yields no container deltas.
+	swapLimitsEnabled := m.workloadSwapLimitsEnabled()
+	var currentPodSwapLimit, desiredPodSwapLimit int64
+	var currentPodSwapSet, desiredPodSwapSet bool
+	if swapLimitsEnabled {
+		currentPodSwapConfig, err := pcm.GetPodCgroupConfig(pod, v1.ResourceSwap)
+		if err != nil {
+			logger.Error(err, "Unable to get pod cgroup swap config", "pod", klog.KObj(pod))
+			resizeResult.Fail(kubecontainer.ErrResizePodInPlace, fmt.Sprintf("unable to get pod cgroup swap config for pod %q", format.Pod(pod)))
+			return resizeResult
+		}
+		currentPodSwapLimit, currentPodSwapSet = cm.SwapLimitFromConfig(currentPodSwapConfig)
+		desiredPodSwapLimit, desiredPodSwapSet = cm.SwapLimitFromConfig(podResources)
+	} else {
+		podResources.Unified = cm.UnifiedWithoutSwap(podResources.Unified)
+	}
+	// "unset" is +inf, so adding a pod-level limit is a decrease. API validation
+	// rejects removing a pod-level limit, so there is no unset-after-set case.
+	podSwapResize := swapLimitsEnabled && podContainerChanges.PodCgroupResourcesToUpdate.Has(v1.ResourceSwap)
+	podSwapIncreasing := podSwapResize && currentPodSwapSet && desiredPodSwapSet && desiredPodSwapLimit > currentPodSwapLimit
+	podSwapDecreasing := podSwapResize && desiredPodSwapSet && (!currentPodSwapSet || desiredPodSwapLimit < currentPodSwapLimit)
+
 	currentPodResources := podResources
 	currentPodResources = mergeResourceConfig(currentPodResources, currentPodMemoryConfig)
 	currentPodResources = mergeResourceConfig(currentPodResources, currentPodCPUConfig)
+	if swapLimitsEnabled {
+		// podResources carries the *desired* memory.swap.max in Unified; the
+		// "current" view must reflect the cgroup. UnifiedWithoutSwap copies the
+		// map so podResources.Unified is not mutated through the shared reference.
+		currentPodResources.Unified = cm.UnifiedWithoutSwap(currentPodResources.Unified)
+		if currentPodSwapSet {
+			cm.SetSwapLimit(currentPodResources, &currentPodSwapLimit)
+		} else {
+			cm.SetSwapLimit(currentPodResources, nil)
+		}
+	}
 
 	// Before proceeding with the resize, perform a best-effort check to catch potential resize
 	// errors in order to avoid a partial-resize state.
@@ -1072,7 +1202,12 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 			actuatedPodResources.Requests = setResourceQuantity(actuatedPodResources.Requests, effectivePodResources.Requests, resourceName)
 		}
 		if limits {
-			actuatedPodResources.Limits = setResourceQuantity(actuatedPodResources.Limits, effectivePodResources.Limits, resourceName)
+			effectiveLimits := effectivePodResources.Limits
+			if resourceName == v1.ResourceSwap && pod.Spec.Resources != nil {
+				// The pod-level swap limit is only ever explicit.
+				effectiveLimits = pod.Spec.Resources.Limits
+			}
+			actuatedPodResources.Limits = setResourceQuantity(actuatedPodResources.Limits, effectiveLimits, resourceName)
 		}
 		if err := m.actuatedState.SetPodLevelResources(logger, pod.UID, actuatedPodResources); err != nil {
 			logger.Error(err, "SetPodLevelResources failed", "pod", klog.KObj(pod), "resourceName", resourceName)
@@ -1093,13 +1228,19 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 				resizedResources.CPUShares = podResources.CPUShares
 			}
 		case v1.ResourceMemory:
+			// memory.high/min/low travel with the memory pass; memory.swap.max has
+			// its own ordered pass (2a/2c below) and must not be written here.
+			memoryUnified := cm.UnifiedWithoutSwap(podResources.Unified)
 			if setLimitValue {
 				resizedResources.Memory = podResources.Memory
-			} else if len(podResources.Unified) == 0 {
+			} else if len(memoryUnified) == 0 {
 				// Memory requests are only written to cgroups by MemoryQoS.
 				return nil
 			}
-			resizedResources.Unified = podResources.Unified
+			resizedResources.Unified = memoryUnified
+		case v1.ResourceSwap:
+			// Only memory.swap.max. Called only when a pod-level limit is desired.
+			cm.SetSwapLimit(resizedResources, &desiredPodSwapLimit)
 		}
 
 		// Notify the runtime first. If this fails, the runtime has rejected the resize.
@@ -1207,7 +1348,41 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 		}
 	}
 
-	// 2. Memory cgroups
+	// 2. Memory family: swap and memory are independent cgroup v2 limits, but
+	// reclaim triggered by a tighter memory.max (or memory.high under MemoryQoS)
+	// needs swap headroom to make progress. Every intermediate state is kept at
+	// least as permissive as both endpoints:
+	//   2a. swap increases   (pod cgroup up, then containers)
+	//   2b. memory           (existing: pod up -> containers -> pod down)
+	//   2c. swap decreases   (containers, then pod cgroup down)
+	// If a step fails, SyncPod retries from the top; a partially applied state
+	// (more swap than the final value) is safe.
+	var swapIncreases, swapDecreases []containerToUpdateInfo
+	for _, cUpdate := range podContainerChanges.ContainersToUpdate[v1.ResourceSwap] {
+		if cUpdate.desiredContainerResources.swapLimit > cUpdate.currentContainerResources.swapLimit {
+			swapIncreases = append(swapIncreases, cUpdate)
+		} else {
+			swapDecreases = append(swapDecreases, cUpdate)
+		}
+	}
+	// 2a. Swap increases
+	if swapLimitsEnabled && (podSwapIncreasing || len(swapIncreases) > 0) {
+		if podSwapIncreasing {
+			if err := setPodCgroupConfig(logger, v1.ResourceSwap, true); err != nil {
+				resizeResult.Fail(kubecontainer.ErrResizePodInPlace, err.Error())
+				return resizeResult
+			}
+		}
+		if len(swapIncreases) > 0 {
+			if err := m.updatePodContainerResources(ctx, pod, v1.ResourceSwap, swapIncreases); err != nil {
+				logger.Error(err, "updatePodContainerResources failed", "pod", format.Pod(pod), "resource", v1.ResourceSwap)
+				resizeResult.Fail(kubecontainer.ErrResizePodInPlace, err.Error())
+				return resizeResult
+			}
+		}
+	}
+
+	// 2b. Memory cgroups
 	if len(podContainerChanges.ContainersToUpdate[v1.ResourceMemory]) > 0 || podContainerChanges.PodCgroupResourcesToUpdate.Has(v1.ResourceMemory) {
 		if podResources.Memory == nil {
 			// Default pod memory limit to the current memory limit if unset to prevent it from updating.
@@ -1217,6 +1392,29 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 			actuatedPodResources.Requests.Memory().Value(), effectivePodResources.Requests.Memory().Value()); errResize != nil {
 			resizeResult.Fail(kubecontainer.ErrResizePodInPlace, errResize.Error())
 			return resizeResult
+		}
+	}
+
+	// 2c. Swap decreases
+	if swapLimitsEnabled && (podSwapDecreasing || len(swapDecreases) > 0) {
+		if len(swapDecreases) > 0 {
+			if err := m.updatePodContainerResources(ctx, pod, v1.ResourceSwap, swapDecreases); err != nil {
+				logger.Error(err, "updatePodContainerResources failed", "pod", format.Pod(pod), "resource", v1.ResourceSwap)
+				resizeResult.Fail(kubecontainer.ErrResizePodInPlace, err.Error())
+				return resizeResult
+			}
+		}
+		if podSwapDecreasing {
+			if err := setPodCgroupConfig(logger, v1.ResourceSwap, true); err != nil {
+				resizeResult.Fail(kubecontainer.ErrResizePodInPlace, err.Error())
+				return resizeResult
+			}
+		}
+	}
+	if podSwapResize {
+		// Record the limit, including when it needed no cgroup write.
+		if err := updateActuatedPodLevelResources(v1.ResourceSwap, false, true); err != nil {
+			logger.Error(err, "Failed to update pod-level actuated resources", "resource", v1.ResourceSwap, "pod", klog.KObj(pod))
 		}
 	}
 
@@ -1261,7 +1459,11 @@ func (m *kubeGenericRuntimeManager) validatePodResizeAction(
 	currentPodResources, desiredPodResources *cm.ResourceConfig,
 	podContainerChanges podActions,
 ) error {
-	if len(podContainerChanges.ContainersToUpdate[v1.ResourceMemory]) > 0 || podContainerChanges.PodCgroupResourcesToUpdate.Has(v1.ResourceMemory) {
+	memoryChanging := len(podContainerChanges.ContainersToUpdate[v1.ResourceMemory]) > 0 || podContainerChanges.PodCgroupResourcesToUpdate.Has(v1.ResourceMemory)
+	// Swap limits only change where the kubelet honors workload swap limits.
+	swapChanging := m.workloadSwapLimitsEnabled() &&
+		(len(podContainerChanges.ContainersToUpdate[v1.ResourceSwap]) > 0 || podContainerChanges.PodCgroupResourcesToUpdate.Has(v1.ResourceSwap))
+	if memoryChanging || swapChanging {
 		return m.validateMemoryResizeAction(ctx, pod, podStatus, currentPodResources, desiredPodResources, podContainerChanges)
 	}
 
@@ -1278,6 +1480,13 @@ func extraNodeAllocatableMemoryLimit(pod *v1.Pod, container *v1.Container) int64
 	return limits.Memory().Value()
 }
 
+// validateMemoryResizeAction defers a resize while any memory-family limit
+// would be set at or below current usage. Memory: the kernel would reclaim and
+// possibly OOM-kill. Swap (KEP-5359): the kernel accepts memory.swap.max below
+// memory.swap.current without reclaim, but the workload would then be one
+// memory.max touch away from OOM with no swap-out possible, and status would
+// report a limit the cgroup is already over. The swap check applies equally
+// to user-declared and LimitedSwap-recalculated limits.
 func (m *kubeGenericRuntimeManager) validateMemoryResizeAction(
 	ctx context.Context,
 	pod *v1.Pod,
@@ -1300,8 +1509,28 @@ func (m *kubeGenericRuntimeManager) validateMemoryResizeAction(
 		}
 	}
 
-	if !podLimitDecreasing && len(decreasingContainerLimits) == 0 {
-		// No memory limits are decreasing: nothing else to check here.
+	// Determine which swap limits are decreasing. "unset" (max) counts as +inf,
+	// so adding a pod-level swap limit is a decrease.
+	swapLimitsEnabled := m.workloadSwapLimitsEnabled()
+	podSwapDecreasing := false
+	var desiredPodSwap int64
+	if swapLimitsEnabled && podContainerChanges.PodCgroupResourcesToUpdate.Has(v1.ResourceSwap) {
+		currentSwap, currentSet := cm.SwapLimitFromConfig(currentPodResources)
+		desiredSwap, desiredSet := cm.SwapLimitFromConfig(desiredPodResources)
+		if desiredSet && (!currentSet || desiredSwap < currentSwap) {
+			podSwapDecreasing = true
+			desiredPodSwap = desiredSwap
+		}
+	}
+	decreasingContainerSwap := map[string]int64{} // Map of container name to desired swap limit.
+	for _, cUpdate := range podContainerChanges.ContainersToUpdate[v1.ResourceSwap] {
+		if cUpdate.currentContainerResources == nil || cUpdate.desiredContainerResources.swapLimit < cUpdate.currentContainerResources.swapLimit {
+			decreasingContainerSwap[cUpdate.container.Name] = cUpdate.desiredContainerResources.swapLimit
+		}
+	}
+
+	if !podLimitDecreasing && len(decreasingContainerLimits) == 0 && !podSwapDecreasing && len(decreasingContainerSwap) == 0 {
+		// No memory or swap limits are decreasing: nothing else to check here.
 		return nil
 	}
 
@@ -1309,6 +1538,13 @@ func (m *kubeGenericRuntimeManager) validateMemoryResizeAction(
 	podUsageStats, err := m.runtimeHelper.PodCPUAndMemoryStats(ctx, pod, podStatus)
 	if err != nil {
 		return fmt.Errorf("unable to read memory usage for pod %q", format.Pod(pod))
+	}
+	if missingSwapUsage(podUsageStats, podSwapDecreasing, decreasingContainerSwap) {
+		// Some runtimes leave swap out of CRI stats. Only pay for the extra
+		// stats read when a swap limit is actually being lowered.
+		if swapStats, err := m.runtimeHelper.PodSwapStats(ctx, pod, podStatus); err == nil {
+			mergeSwapUsage(podUsageStats, swapStats)
+		}
 	}
 
 	var errs []error
@@ -1320,6 +1556,15 @@ func (m *kubeGenericRuntimeManager) validateMemoryResizeAction(
 				*desiredPodResources.Memory, *podUsageStats.Memory.UsageBytes))
 		}
 	}
+	// Swap usage 0 under a limit of 0 is fine (no swap in use), hence ">" not ">=".
+	if podSwapDecreasing {
+		if podUsageStats.Swap == nil || podUsageStats.Swap.SwapUsageBytes == nil {
+			errs = append(errs, fmt.Errorf("missing pod swap usage"))
+		} else if *podUsageStats.Swap.SwapUsageBytes > uint64(desiredPodSwap) {
+			errs = append(errs, fmt.Errorf("attempting to set pod swap limit (%d) below current swap usage (%d)",
+				desiredPodSwap, *podUsageStats.Swap.SwapUsageBytes))
+		}
+	}
 	for _, cStats := range podUsageStats.Containers {
 		if desiredLimit, ok := decreasingContainerLimits[cStats.Name]; ok {
 			if cStats.Memory == nil || cStats.Memory.UsageBytes == nil {
@@ -1329,14 +1574,69 @@ func (m *kubeGenericRuntimeManager) validateMemoryResizeAction(
 					cStats.Name, desiredLimit, *cStats.Memory.UsageBytes))
 			}
 		}
+		if desiredSwap, ok := decreasingContainerSwap[cStats.Name]; ok {
+			if cStats.Swap == nil || cStats.Swap.SwapUsageBytes == nil {
+				errs = append(errs, fmt.Errorf("missing container %q swap usage", cStats.Name))
+			} else if *cStats.Swap.SwapUsageBytes > uint64(desiredSwap) {
+				errs = append(errs, fmt.Errorf("attempting to set container %q swap limit (%d) below current swap usage (%d)",
+					cStats.Name, desiredSwap, *cStats.Swap.SwapUsageBytes))
+			}
+		}
 	}
 
 	if len(errs) > 0 {
 		agg := utilerrors.NewAggregate(errs)
+		if podSwapDecreasing || len(decreasingContainerSwap) > 0 {
+			return fmt.Errorf("cannot decrease memory or swap limits: %w", agg)
+		}
 		return fmt.Errorf("cannot decrease memory limits: %w", agg)
 	}
 
 	return nil
+}
+
+// missingSwapUsage reports whether a swap limit is being lowered for the pod or
+// a container whose swap usage is absent from stats.
+func missingSwapUsage(stats *statsapi.PodStats, podSwapDecreasing bool, decreasingContainerSwap map[string]int64) bool {
+	if podSwapDecreasing && (stats.Swap == nil || stats.Swap.SwapUsageBytes == nil) {
+		return true
+	}
+	if len(decreasingContainerSwap) == 0 {
+		return false
+	}
+	found := map[string]bool{}
+	for _, cs := range stats.Containers {
+		if cs.Swap != nil && cs.Swap.SwapUsageBytes != nil {
+			found[cs.Name] = true
+		}
+	}
+	for name := range decreasingContainerSwap {
+		if !found[name] {
+			return true
+		}
+	}
+	return false
+}
+
+// mergeSwapUsage fills swap usage missing from stats with the values in swapStats.
+func mergeSwapUsage(stats, swapStats *statsapi.PodStats) {
+	if swapStats == nil {
+		return
+	}
+	if stats.Swap == nil || stats.Swap.SwapUsageBytes == nil {
+		stats.Swap = swapStats.Swap
+	}
+	for _, fb := range swapStats.Containers {
+		for i := range stats.Containers {
+			if stats.Containers[i].Name != fb.Name {
+				continue
+			}
+			if stats.Containers[i].Swap == nil || stats.Containers[i].Swap.SwapUsageBytes == nil {
+				stats.Containers[i].Swap = fb.Swap
+			}
+			break
+		}
+	}
 }
 
 func (m *kubeGenericRuntimeManager) updatePodContainerResources(ctx context.Context, pod *v1.Pod, resourceName v1.ResourceName, containersToUpdate []containerToUpdateInfo) error {
@@ -1345,8 +1645,9 @@ func (m *kubeGenericRuntimeManager) updatePodContainerResources(ctx context.Cont
 
 	for _, cInfo := range containersToUpdate {
 		container := cInfo.container.DeepCopy()
-		// If updating memory limit, use most recently configured CPU request and limit values.
-		// If updating CPU request and limit, use most recently configured memory request and limit values.
+		// Each UpdateContainerResources call carries the full LinuxContainerResources,
+		// so the synthetic container holds the most recently configured value for
+		// every resource except the one being updated.
 		switch resourceName {
 		case v1.ResourceMemory:
 			container.Resources.Limits = v1.ResourceList{
@@ -1366,8 +1667,49 @@ func (m *kubeGenericRuntimeManager) updatePodContainerResources(ctx context.Cont
 				v1.ResourceCPU:    *resource.NewMilliQuantity(cInfo.desiredContainerResources.cpuRequest, resource.DecimalSI),
 				v1.ResourceMemory: *resource.NewQuantity(cInfo.currentContainerResources.memoryRequest, resource.BinarySI),
 			}
+		case v1.ResourceSwap:
+			container.Resources.Limits = v1.ResourceList{
+				v1.ResourceCPU:    *resource.NewMilliQuantity(cInfo.currentContainerResources.cpuLimit, resource.DecimalSI),
+				v1.ResourceMemory: *resource.NewQuantity(cInfo.currentContainerResources.memoryLimit, resource.BinarySI),
+			}
+			container.Resources.Requests = v1.ResourceList{
+				v1.ResourceCPU:    *resource.NewMilliQuantity(cInfo.currentContainerResources.cpuRequest, resource.DecimalSI),
+				v1.ResourceMemory: *resource.NewQuantity(cInfo.currentContainerResources.memoryRequest, resource.BinarySI),
+			}
 		}
-		if err := m.updateContainerResources(ctx, pod, container, cInfo.kubeContainerID, cInfo.containerType); err != nil {
+		actuated := container
+		if utilfeature.DefaultFeatureGate.Enabled(features.WorkloadControlledSwap) {
+			// KEP-5359: pin the swap limit explicitly. generateLinuxContainerResources
+			// re-derives memory.swap.max from the container it is handed; without
+			// this a cpu/memory update would reset swap to the mode default (0 under
+			// WorkloadControlledSwap) or recompute LimitedSwap from the synthetic
+			// memory request. The explicit value takes precedence in
+			// effectiveSwapLimit, so the number written is exactly the one chosen in
+			// computePodResizeAction.
+			swapLimit := cInfo.currentContainerResources.swapLimit
+			if resourceName == v1.ResourceSwap {
+				swapLimit = cInfo.desiredContainerResources.swapLimit
+			}
+			container.Resources.Limits[v1.ResourceSwap] = *resource.NewQuantity(swapLimit, resource.BinarySI)
+			// The pin is only for the CRI request. The actuated checkpoint records
+			// limits.swap only for a container that declares it, and only once the
+			// swap pass has applied it. A container that inherits its swap limit
+			// (pod-level, LimitedSwap, or the node default) must not get one, or it
+			// would stop following later pod-level or LimitedSwap changes.
+			actuated = container.DeepCopy()
+			delete(actuated.Resources.Limits, v1.ResourceSwap)
+			if resourceName == v1.ResourceSwap {
+				if _, declared := cInfo.container.Resources.Limits[v1.ResourceSwap]; declared {
+					actuated.Resources.Limits[v1.ResourceSwap] = container.Resources.Limits[v1.ResourceSwap]
+				}
+			} else if previous, found := m.actuatedState.GetContainerResources(pod.UID, container.Name); found {
+				// cpu and memory passes leave the recorded swap limit as it was.
+				if q, recorded := previous.Limits[v1.ResourceSwap]; recorded {
+					actuated.Resources.Limits[v1.ResourceSwap] = q
+				}
+			}
+		}
+		if err := m.updateContainerResourcesAndRecord(ctx, pod, container, actuated, cInfo.kubeContainerID, cInfo.containerType); err != nil {
 			// Log error and abort as container updates need to succeed in the order determined by computePodResizeAction.
 			// The recovery path is for SyncPod to keep retrying at later times until it succeeds.
 			logger.Error(err, "updateContainerResources failed", "container", container.Name, "cID", cInfo.kubeContainerID,
@@ -1385,6 +1727,9 @@ func (m *kubeGenericRuntimeManager) updatePodContainerResources(ctx context.Cont
 		case v1.ResourceCPU:
 			cInfo.currentContainerResources.cpuLimit = cInfo.desiredContainerResources.cpuLimit
 			cInfo.currentContainerResources.cpuRequest = cInfo.desiredContainerResources.cpuRequest
+		case v1.ResourceSwap:
+			cInfo.currentContainerResources.swapLimit = cInfo.desiredContainerResources.swapLimit
+			m.warnSwapLimitAbovePodLimit(ctx, pod, cInfo.container)
 		}
 	}
 	return nil
@@ -1813,7 +2158,15 @@ func (m *kubeGenericRuntimeManager) computePodLevelResourcesResizeAction(ctx con
 		return nil
 	}
 
-	return podCgroupResourcesToUpdate(cm.EffectivePodResources(pod), actuatedPodLevelResources)
+	toUpdate := podCgroupResourcesToUpdate(cm.EffectivePodResources(pod), actuatedPodLevelResources)
+	// KEP-5359: the pod-level swap limit is a pod cgroup limit of its own.
+	if m.workloadSwapLimitsEnabled() && !podSwapLimitEqual(pod.Spec.Resources, actuatedPodLevelResources) {
+		if toUpdate == nil {
+			toUpdate = sets.New[v1.ResourceName]()
+		}
+		toUpdate.Insert(v1.ResourceSwap)
+	}
+	return toUpdate
 }
 
 // podCgroupResourcesToUpdate returns the resources (cpu, memory) whose desired pod cgroup requests
@@ -2638,7 +2991,7 @@ func (m *kubeGenericRuntimeManager) ListPodSandboxMetrics(ctx context.Context) (
 }
 
 func (m *kubeGenericRuntimeManager) UpdateActuatedPodLevelResources(logger klog.Logger, actuatedPod *v1.Pod) error {
-	return m.actuatedState.SetPodLevelResources(logger, actuatedPod.UID, cm.EffectivePodResources(actuatedPod))
+	return m.actuatedState.SetPodLevelResources(logger, actuatedPod.UID, actuatedPodLevelResources(actuatedPod))
 }
 
 // isPodResizeInProgress checks whether the actuated resizable resources differ from
@@ -2713,6 +3066,16 @@ func (m *kubeGenericRuntimeManager) isContainerResourceResizeInProgress(allocate
 				allocatedResources.Limits = kubeutil.GetLimits(&kubeutil.ResourceOpts{PodResources: allocatedPod.Spec.Resources, ContainerResources: &allocatedContainer.Resources})
 			}
 
+			if utilfeature.DefaultFeatureGate.Enabled(features.WorkloadControlledSwap) {
+				// Compare effective swap, not raw map entries: a container without
+				// limits.swap derives its value from the pod-level limit or LimitedSwap.
+				allocatedSwap := m.effectiveSwapLimit(allocatedPod, allocatedContainer)
+				actuatedSwap := m.actuatedSwapLimit(allocatedPod, allocatedContainer, &actuatedResources)
+				if allocatedSwap != actuatedSwap {
+					return false
+				}
+			}
+
 			return allocatedResources.Requests[v1.ResourceCPU].Equal(actuatedResources.Requests[v1.ResourceCPU]) &&
 				allocatedResources.Limits[v1.ResourceCPU].Equal(actuatedResources.Limits[v1.ResourceCPU]) &&
 				allocatedResources.Requests[v1.ResourceMemory].Equal(actuatedResources.Requests[v1.ResourceMemory]) &&
@@ -2758,7 +3121,12 @@ func (m *kubeGenericRuntimeManager) isPodLevelResourcesResizeInProgress(allocate
 		return false
 	}
 
-	return podCgroupResourcesToUpdate(cm.EffectivePodResources(allocatedPod), actuatedPodResources).Len() > 0
+	if podCgroupResourcesToUpdate(cm.EffectivePodResources(allocatedPod), actuatedPodResources).Len() > 0 {
+		return true
+	}
+	// Pod-level swap is only actuated when the node manages swap; comparing it
+	// otherwise would leave the resize in progress forever.
+	return m.workloadSwapLimitsEnabled() && !podSwapLimitEqual(actuatedPodResources, allocatedPod.Spec.Resources)
 }
 
 func isResizableContainer(container *v1.Container, containerType podutil.ContainerType) bool {

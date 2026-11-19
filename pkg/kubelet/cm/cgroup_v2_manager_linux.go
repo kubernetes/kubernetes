@@ -90,7 +90,12 @@ func (c *cgroupV2impl) MemoryUsage(name CgroupName) (int64, error) {
 // Get the resource config values applied to the cgroup for specified resource type
 func (c *cgroupV2impl) GetCgroupConfig(name CgroupName, resource v1.ResourceName) (*ResourceConfig, error) {
 	cgroupPaths := c.buildCgroupPaths(name)
-	cgroupResourcePath, found := cgroupPaths[string(resource)]
+	// Swap lives in the memory controller.
+	pathKey := string(resource)
+	if resource == v1.ResourceSwap {
+		pathKey = string(v1.ResourceMemory)
+	}
+	cgroupResourcePath, found := cgroupPaths[pathKey]
 	if !found {
 		return nil, fmt.Errorf("failed to build %v cgroup fs path for cgroup %v", resource, name)
 	}
@@ -99,8 +104,21 @@ func (c *cgroupV2impl) GetCgroupConfig(name CgroupName, resource v1.ResourceName
 		return c.getCgroupCPUConfig(cgroupResourcePath)
 	case v1.ResourceMemory:
 		return c.getCgroupMemoryConfig(cgroupResourcePath)
+	case v1.ResourceSwap:
+		return c.getCgroupSwapConfig(cgroupResourcePath)
 	}
 	return nil, fmt.Errorf("unsupported resource %v for cgroup %v", resource, name)
+}
+
+// getCgroupSwapConfig reads memory.swap.max into ResourceConfig.Unified. The
+// raw string is kept ("max" or bytes) so SwapLimitFromConfig can distinguish
+// unlimited from a numeric limit.
+func (c *cgroupV2impl) getCgroupSwapConfig(cgroupPath string) (*ResourceConfig, error) {
+	val, err := fscommon.GetCgroupParamString(cgroupPath, Cgroup2MaxSwapFilename)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read %s for cgroup %v: %w", Cgroup2MaxSwapFilename, cgroupPath, err)
+	}
+	return &ResourceConfig{Unified: map[string]string{Cgroup2SwapMaxFile: strings.TrimSpace(val)}}, nil
 }
 
 func (c *cgroupV2impl) getCgroupCPUConfig(cgroupPath string) (*ResourceConfig, error) {
