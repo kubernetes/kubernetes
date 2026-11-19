@@ -143,3 +143,29 @@ func TestWatch(t *testing.T) {
 		},
 	)
 }
+
+func TestEtcdStringDataCompatibility(t *testing.T) {
+	storage, server := newStorage(t)
+	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
+	ctx := genericregistrytest.NewNamespaceScopeContext(storage.Store, metav1.NamespaceDefault)
+
+	stored := validNewSecret("foo")
+	stored.StringData = map[string]string{"extra": "val"}
+	key, _ := storage.KeyFunc(ctx, stored.Name)
+	if err := storage.Storage.Create(ctx, key, stored, nil, 0, false); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	obj, err := storage.Get(ctx, stored.Name, &metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	served := obj.(*api.Secret)
+	if served.StringData != nil {
+		t.Errorf("expected stringData cleared by storage-decode defaulting, got %#v", served.StringData)
+	}
+	if string(served.Data["extra"]) != "val" {
+		t.Errorf("expected stringData folded into data by storage-decode defaulting, got %#v", served.Data)
+	}
+}

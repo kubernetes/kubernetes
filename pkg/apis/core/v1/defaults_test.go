@@ -2622,12 +2622,32 @@ func TestSetDefaultProjectedVolumeSource(t *testing.T) {
 }
 
 func TestSetDefaultSecret(t *testing.T) {
-	s := &v1.Secret{}
+	s := &v1.Secret{
+		Data: map[string][]byte{
+			"keep":      []byte("original"),
+			"overwrite": []byte("old"),
+		},
+		StringData: map[string]string{
+			"overwrite": "new",
+			"added":     "val",
+		},
+	}
 	obj2 := roundTrip(t, runtime.Object(s))
 	s2 := obj2.(*v1.Secret)
 
 	if s2.Type != v1.SecretTypeOpaque {
 		t.Errorf("Expected secret type %v, got %v", v1.SecretTypeOpaque, s2.Type)
+	}
+	if s2.StringData != nil {
+		t.Errorf("Expected stringData to be cleared, got %v", s2.StringData)
+	}
+	expectedData := map[string][]byte{
+		"keep":      []byte("original"),
+		"overwrite": []byte("new"),
+		"added":     []byte("val"),
+	}
+	if !reflect.DeepEqual(s2.Data, expectedData) {
+		t.Errorf("Expected secret data %v, got %v", expectedData, s2.Data)
 	}
 }
 
@@ -3526,6 +3546,35 @@ func TestSetDefaultPodTerminationGracePeriodSeconds(t *testing.T) {
 			pod2 := obj2.(*v1.Pod)
 			if !reflect.DeepEqual(pod2.Spec.TerminationGracePeriodSeconds, tc.expected) {
 				t.Errorf("expected %v, got %v", *tc.expected, *pod2.Spec.TerminationGracePeriodSeconds)
+			}
+		})
+	}
+}
+
+func TestSetDefaultNodeSpecPodCIDRs(t *testing.T) {
+	tests := []struct {
+		name        string
+		podCIDR     string
+		podCIDRs    []string
+		expectCIDR  string
+		expectCIDRs []string
+	}{
+		{name: "only podCIDR, podCIDRs synthesized", podCIDR: "10.0.1.0/24", expectCIDR: "10.0.1.0/24", expectCIDRs: []string{"10.0.1.0/24"}},
+		{name: "mismatched, podCIDR authoritative", podCIDR: "10.0.0.0/24", podCIDRs: []string{"10.0.1.0/24", "ace:cab:deca::/8"}, expectCIDR: "10.0.0.0/24", expectCIDRs: []string{"10.0.0.0/24"}},
+		{name: "only podCIDRs, podCIDR filled", podCIDRs: []string{"10.0.1.0/24", "ace:cab:deca::/8"}, expectCIDR: "10.0.1.0/24", expectCIDRs: []string{"10.0.1.0/24", "ace:cab:deca::/8"}},
+		{name: "consistent dual-stack preserved", podCIDR: "10.0.1.0/24", podCIDRs: []string{"10.0.1.0/24", "ace:cab:deca::/8"}, expectCIDR: "10.0.1.0/24", expectCIDRs: []string{"10.0.1.0/24", "ace:cab:deca::/8"}},
+		{name: "neither set", expectCIDR: "", expectCIDRs: nil},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			node := &v1.Node{Spec: v1.NodeSpec{PodCIDR: tc.podCIDR, PodCIDRs: tc.podCIDRs}}
+			obj2 := roundTrip(t, runtime.Object(node))
+			node2 := obj2.(*v1.Node)
+			if node2.Spec.PodCIDR != tc.expectCIDR {
+				t.Errorf("expected podCIDR %q, got %q", tc.expectCIDR, node2.Spec.PodCIDR)
+			}
+			if !reflect.DeepEqual(node2.Spec.PodCIDRs, tc.expectCIDRs) {
+				t.Errorf("expected podCIDRs %#v, got %#v", tc.expectCIDRs, node2.Spec.PodCIDRs)
 			}
 		})
 	}
