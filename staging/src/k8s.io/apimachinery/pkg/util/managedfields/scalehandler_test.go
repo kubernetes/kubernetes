@@ -779,6 +779,52 @@ func TestTransformingManagedFieldsToParentMultiVersion(t *testing.T) {
 	}
 }
 
+func TestScaleRoundTripPreservesUpdateOwnership(t *testing.T) {
+	timestamp := metav1.NewTime(time.Unix(100, 0))
+	want := []metav1.ManagedFieldsEntry{{
+		Manager:    "kubectl-create",
+		Operation:  metav1.ManagedFieldsOperationUpdate,
+		APIVersion: "apps/v1",
+		Time:       &timestamp,
+		FieldsType: "FieldsV1",
+		FieldsV1:   metav1.NewFieldsV1(`{"f:spec":{"f:replicas":{},"f:selector":{}}}`),
+	}}
+
+	replicasOnly := want[0]
+	replicasOnly.Time = nil
+	replicasOnly.FieldsV1 = metav1.NewFieldsV1(`{"f:spec":{"f:replicas":{}}}`)
+	selectorOnly := want[0]
+	selectorOnly.FieldsV1 = metav1.NewFieldsV1(`{"f:spec":{"f:selector":{}}}`)
+
+	for _, tc := range []struct {
+		name            string
+		input, expected []metav1.ManagedFieldsEntry
+	}{
+		{"intact", want, want},
+		{"split by an older scale update", []metav1.ManagedFieldsEntry{replicasOnly, selectorOnly}, want},
+		{"split in reverse order", []metav1.ManagedFieldsEntry{selectorOnly, replicasOnly}, want},
+		{"replicas unowned", []metav1.ManagedFieldsEntry{selectorOnly}, []metav1.ManagedFieldsEntry{selectorOnly}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			entries := tc.input
+			for i := 1; i <= 2; i++ {
+				handler := NewScaleHandler(entries, schema.GroupVersion{Group: "apps", Version: "v1"}, defaultMappings())
+				scale, err := handler.ToSubresource()
+				if err != nil {
+					t.Fatal(err)
+				}
+				entries, err = handler.ToParent(scale)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if !reflect.DeepEqual(entries, tc.expected) {
+					t.Fatalf("round trip %d: got %v, want %v", i, entries, tc.expected)
+				}
+			}
+		})
+	}
+}
+
 func defaultMappings() ResourcePathMappings {
 	return ResourcePathMappings{
 		"apps/v1": fieldpath.MakePathOrDie("spec", "replicas"),
