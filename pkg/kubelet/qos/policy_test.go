@@ -1275,6 +1275,43 @@ func TestGetContainerOOMScoreAdjust(t *testing.T) {
 			},
 			enableDRANodeAllocatableResources: true,
 		},
+		"burstable-pod-level-request-with-non-restartable-init-container": {
+			// The pod requests 1Gi and neither container requests anything, so the whole 1Gi is
+			// unallocated. i1 finishes before c1 starts, so the two never compete for it and each
+			// one is credited with all of it.
+			pod: makeTestPodForDRA(podParams{
+				c1Mem:       "0",
+				initMem:     "0",
+				podLevelMem: "1Gi",
+			}),
+			memoryCapacity: 4000000000,
+			lowHighOOMScoreAdj: map[string]lowHighOOMScoreAdjTest{
+				// OOMScoreAdj = 1000 - (1000 * (0 + 1Gi) / 4GB) = 732
+				"i1": {lowOOMScoreAdj: 732, highOOMScoreAdj: 732},
+				"c1": {lowOOMScoreAdj: 732, highOOMScoreAdj: 732},
+			},
+			podLevelResourcesFeatureEnabled: true,
+		},
+		"burstable-pod-level-request-with-non-restartable-init-container-and-later-sidecar": {
+			// As above, but s1 is restartable and declared after i1, so s1 runs alongside c1 and
+			// the two of them split the unallocated 1Gi. i1 has already finished by then, and no
+			// restartable init container is declared before it, so i1 still gets all of it.
+			pod: makeTestPodForDRA(podParams{
+				c1Mem:       "0",
+				initMem:     "0",
+				sidecarMem:  "0",
+				podLevelMem: "1Gi",
+			}),
+			memoryCapacity: 4000000000,
+			lowHighOOMScoreAdj: map[string]lowHighOOMScoreAdjTest{
+				// OOMScoreAdj = 1000 - (1000 * (0 + 1Gi) / 4GB) = 732
+				"i1": {lowOOMScoreAdj: 732, highOOMScoreAdj: 732},
+				// OOMScoreAdj = 1000 - (1000 * (0 + 1Gi/2) / 4GB) = 866
+				"s1": {lowOOMScoreAdj: 866, highOOMScoreAdj: 866},
+				"c1": {lowOOMScoreAdj: 866, highOOMScoreAdj: 866},
+			},
+			podLevelResourcesFeatureEnabled: true,
+		},
 	}
 	for name, test := range oomTests {
 		t.Run(name, func(t *testing.T) {
@@ -1290,5 +1327,66 @@ func TestGetContainerOOMScoreAdjust(t *testing.T) {
 			}
 		})
 
+	}
+}
+
+func TestNumCompetingContainers(t *testing.T) {
+	restartable := func(name string) v1.Container {
+		return v1.Container{Name: name, RestartPolicy: &restartPolicyAlways}
+	}
+	plain := func(name string) v1.Container {
+		return v1.Container{Name: name}
+	}
+	makePod := func(regular []v1.Container, initContainers []v1.Container) *v1.Pod {
+		return &v1.Pod{Spec: v1.PodSpec{Containers: regular, InitContainers: initContainers}}
+	}
+
+	tests := map[string]struct {
+		pod      *v1.Pod
+		expected map[string]int
+	}{
+		"single container": {
+			pod:      makePod([]v1.Container{plain("c1")}, nil),
+			expected: map[string]int{"c1": 1},
+		},
+		"two containers": {
+			pod:      makePod([]v1.Container{plain("c1"), plain("c2")}, nil),
+			expected: map[string]int{"c1": 2, "c2": 2},
+		},
+		"non-restartable init container runs alone": {
+			pod:      makePod([]v1.Container{plain("c1")}, []v1.Container{plain("i1")}),
+			expected: map[string]int{"c1": 1, "i1": 1},
+		},
+		"several non-restartable init containers each run alone": {
+			pod:      makePod([]v1.Container{plain("c1")}, []v1.Container{plain("i1"), plain("i2"), plain("i3")}),
+			expected: map[string]int{"c1": 1, "i1": 1, "i2": 1, "i3": 1},
+		},
+		"sidecar runs with the regular containers": {
+			pod:      makePod([]v1.Container{plain("c1")}, []v1.Container{restartable("s1")}),
+			expected: map[string]int{"c1": 2, "s1": 2},
+		},
+		"sidecar declared after the init container does not run with it": {
+			pod:      makePod([]v1.Container{plain("c1")}, []v1.Container{plain("i1"), restartable("s1")}),
+			expected: map[string]int{"c1": 2, "s1": 2, "i1": 1},
+		},
+		"sidecar declared before the init container runs with it": {
+			pod:      makePod([]v1.Container{plain("c1")}, []v1.Container{restartable("s1"), plain("i1")}),
+			expected: map[string]int{"c1": 2, "s1": 2, "i1": 2},
+		},
+		"only the sidecars declared before the init container run with it": {
+			pod:      makePod([]v1.Container{plain("c1")}, []v1.Container{restartable("s1"), plain("i1"), restartable("s2")}),
+			expected: map[string]int{"c1": 3, "s1": 3, "s2": 3, "i1": 2},
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			for containerName, expected := range test.expected {
+				got := numCompetingContainers(test.pod, &v1.Container{Name: containerName})
+				if got != expected {
+					t.Errorf("numCompetingContainers for %s = %d, want %d", containerName, got, expected)
+				}
+			}
+		})
 	}
 }
