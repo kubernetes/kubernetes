@@ -1968,3 +1968,84 @@ func TestConditionalWaitCheckConditionHandlesMalformedConditions(t *testing.T) {
 		})
 	}
 }
+
+
+// TestWaitForMultipleConditionsPrintsOnce ensures that when multiple conditions are evaluated,
+// o.Printer.PrintObj is called exactly once when all conditions are satisfied,
+// and is NOT called when any condition fails (preventing premature success output).
+func TestWaitForMultipleConditionsPrintsOnce(t *testing.T) {
+	scheme := runtime.NewScheme()
+	listMapping := map[schema.GroupVersionResource]string{
+		{Group: "group", Version: "version", Resource: "theresource"}: "TheKindList",
+	}
+
+	info := &resource.Info{
+		Mapping: &meta.RESTMapping{
+			Resource: schema.GroupVersionResource{Group: "group", Version: "version", Resource: "theresource"},
+		},
+		Name:      "name-foo",
+		Namespace: "ns-foo",
+	}
+
+	t.Run("both conditions met - printed exactly once", func(t *testing.T) {
+		fakeClient := dynamicfakeclient.NewSimpleDynamicClientWithCustomListKinds(scheme, listMapping)
+		fakeClient.PrependReactor("list", "theresource", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
+			obj := newUnstructured("group/version", "TheKind", "ns-foo", "name-foo")
+			obj = addCondition(obj, "Ready", "True")
+			obj = addCondition(obj, "Available", "True")
+			return true, newUnstructuredList(obj), nil
+		})
+
+		conditionFuncs, err := conditionFuncsFor([]string{"condition=Ready", "condition=Available"}, io.Discard)
+		require.NoError(t, err)
+
+		printCalls := 0
+		testPrinter := printers.ResourcePrinterFunc(func(obj runtime.Object, w io.Writer) error {
+			printCalls++
+			return nil
+		})
+
+		o := &WaitOptions{
+			ResourceFinder: genericclioptions.NewSimpleFakeResourceFinder(info),
+			DynamicClient:  fakeClient,
+			Timeout:        10 * time.Second,
+			Printer:        testPrinter,
+			ConditionFn:    conditionFuncs,
+			IOStreams:      genericiooptions.NewTestIOStreamsDiscard(),
+		}
+		err = o.RunWaitContext(t.Context())
+		require.NoError(t, err)
+		require.Equal(t, 1, printCalls, "expected printer to be called exactly once for the resource when all conditions are met")
+	})
+
+	t.Run("first condition met but second condition fails - never printed", func(t *testing.T) {
+		fakeClient := dynamicfakeclient.NewSimpleDynamicClientWithCustomListKinds(scheme, listMapping)
+		fakeClient.PrependReactor("list", "theresource", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
+			obj := newUnstructured("group/version", "TheKind", "ns-foo", "name-foo")
+			obj = addCondition(obj, "Ready", "True")
+			obj = addCondition(obj, "Available", "False")
+			return true, newUnstructuredList(obj), nil
+		})
+
+		conditionFuncs, err := conditionFuncsFor([]string{"condition=Ready", "condition=Available"}, io.Discard)
+		require.NoError(t, err)
+
+		printCalls := 0
+		testPrinter := printers.ResourcePrinterFunc(func(obj runtime.Object, w io.Writer) error {
+			printCalls++
+			return nil
+		})
+
+		o := &WaitOptions{
+			ResourceFinder: genericclioptions.NewSimpleFakeResourceFinder(info),
+			DynamicClient:  fakeClient,
+			Timeout:        1 * time.Second,
+			Printer:        testPrinter,
+			ConditionFn:    conditionFuncs,
+			IOStreams:      genericiooptions.NewTestIOStreamsDiscard(),
+		}
+		err = o.RunWaitContext(t.Context())
+		require.Error(t, err)
+		require.Equal(t, 0, printCalls, "expected printer to NEVER be called if any condition fails")
+	})
+}

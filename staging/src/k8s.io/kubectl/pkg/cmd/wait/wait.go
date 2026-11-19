@@ -376,16 +376,22 @@ func (o *WaitOptions) RunWaitContext(ctx context.Context) error {
 		}
 
 		visitCount++
+		finalObject := info.Object
 		for _, condFn := range o.ConditionFn {
-			finalObject, success, err := condFn(ctx, info, o)
+			obj, success, err := condFn(ctx, info, o)
 			if success {
-				o.Printer.PrintObj(finalObject, o.Out) //nolint:errcheck
+				if obj != nil {
+					finalObject = obj
+				}
 				continue
 			}
 			if err == nil {
-				return fmt.Errorf("%v unsatisfied for unknown reason", finalObject)
+				return fmt.Errorf("%v unsatisfied for unknown reason", obj)
 			}
 			return err
+		}
+		if finalObject != nil {
+			o.Printer.PrintObj(finalObject, o.Out) //nolint:errcheck
 		}
 		return nil
 	}
