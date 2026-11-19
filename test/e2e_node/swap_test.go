@@ -55,6 +55,9 @@ const (
 	cgroupV2MaxSwapLimit           = "max"
 	cgroupV2swapCurrentUsageFile   = "memory.swap.current"
 	cgroupV2MemoryCurrentUsageFile = "memory.current"
+
+	// stressMemoryThrottlingFactor is the kubelet memoryThrottlingFactor used by the swap stress tests.
+	stressMemoryThrottlingFactor = 0.7
 )
 
 var (
@@ -189,7 +192,18 @@ var _ = SIGDescribe("Swap", "[LinuxOnly]", ginkgo.Ordered, feature.Swap, framewo
 			})
 
 			ginkgo.Context("LimitedSwap", func() {
-				tempSetCurrentKubeletConfig(f, enableLimitedSwap)
+				tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *config.KubeletConfiguration) {
+					enableLimitedSwap(ctx, initialConfig)
+
+					// Set memory.high so that a stress pod starts swapping at
+					// request + factor*(limit or node allocatable - request)
+					// rather than when the node itself runs out of memory.
+					if initialConfig.FeatureGates == nil {
+						initialConfig.FeatureGates = make(map[string]bool)
+					}
+					initialConfig.FeatureGates[string(features.MemoryQoS)] = true
+					initialConfig.MemoryThrottlingFactor = new(stressMemoryThrottlingFactor)
+				})
 
 				getRequestBySwapLimit := func(swapPercentage int64) *resource.Quantity {
 					gomega.ExpectWithOffset(1, swapPercentage).To(gomega.And(
@@ -757,6 +771,295 @@ var _ = SIGDescribe("Swap", "[LinuxOnly]", ginkgo.Ordered, feature.Swap, framewo
 				})
 			})
 		})
+
+		f.Context("WorkloadControlledSwap", framework.WithFeatureGate(features.WorkloadControlledSwap), func() {
+			enableWorkloadControlledSwap := func(ctx context.Context, initialConfig *config.KubeletConfiguration) {
+				if initialConfig.FeatureGates == nil {
+					initialConfig.FeatureGates = make(map[string]bool)
+				}
+				initialConfig.FeatureGates[string(features.WorkloadControlledSwap)] = true
+				initialConfig.FeatureGates[string(features.PodLevelResources)] = true
+				initialConfig.FeatureGates[string(features.InPlacePodLevelResourcesVerticalScaling)] = true
+				initialConfig.MemorySwap.SwapBehavior = string(types.WorkloadControlledSwap)
+			}
+
+			enableLimitedSwapWithGate := func(ctx context.Context, initialConfig *config.KubeletConfiguration) {
+				if initialConfig.FeatureGates == nil {
+					initialConfig.FeatureGates = make(map[string]bool)
+				}
+				initialConfig.FeatureGates[string(features.WorkloadControlledSwap)] = true
+				initialConfig.MemorySwap.SwapBehavior = string(types.LimitedSwap)
+			}
+
+			enableNoSwapWithGate := func(ctx context.Context, initialConfig *config.KubeletConfiguration) {
+				if initialConfig.FeatureGates == nil {
+					initialConfig.FeatureGates = make(map[string]bool)
+				}
+				initialConfig.FeatureGates[string(features.WorkloadControlledSwap)] = true
+				initialConfig.MemorySwap.SwapBehavior = string(types.NoSwap)
+			}
+
+			f.Context("when swapBehavior is WorkloadControlledSwap", func() {
+				tempSetCurrentKubeletConfig(f, enableWorkloadControlledSwap)
+
+				ginkgo.DescribeTable("defaults to zero swap when limits.swap is omitted", func(qosClass v1.PodQOSClass, memoryRequestEqualLimit bool) {
+					pod := getSwapTestPod(f, qosClass, memoryRequestEqualLimit)
+					pod = runPodAndWaitUntilScheduled(f, pod)
+					if !isPodCgroupV2(f, pod) {
+						e2eskipper.Skipf("swap tests require cgroup v2")
+					}
+					expectNoSwap(f, pod)
+				},
+					ginkgo.Entry("QOS BestEffort", v1.PodQOSBestEffort, false),
+					ginkgo.Entry("QOS Burstable", v1.PodQOSBurstable, false),
+					ginkgo.Entry("QOS Guaranteed", v1.PodQOSGuaranteed, false),
+				)
+
+				ginkgo.It("configures container cgroup memory.swap.max and reports status when limits.swap is set", func() {
+					pod := getSwapTestPod(f, v1.PodQOSBurstable, false)
+					swapQty := resource.MustParse("64Mi")
+					pod.Spec.Containers[0].Resources.Limits = v1.ResourceList{
+						v1.ResourceMemory: resource.MustParse("256Mi"),
+						v1.ResourceSwap:   swapQty,
+					}
+					pod = runPodAndWaitUntilScheduled(f, pod)
+					if !isPodCgroupV2(f, pod) {
+						e2eskipper.Skipf("swap tests require cgroup v2")
+					}
+					expectLimitedSwap(f, pod, swapQty.Value())
+
+					gomega.Eventually(func() (int64, error) {
+						updated := getUpdatedPod(f, pod)
+						if len(updated.Status.ContainerStatuses) == 0 || updated.Status.ContainerStatuses[0].Resources == nil {
+							return 0, fmt.Errorf("container status resources not yet populated")
+						}
+						q, ok := updated.Status.ContainerStatuses[0].Resources.Limits[v1.ResourceSwap]
+						if !ok {
+							return 0, fmt.Errorf("limits.swap not yet reported in container status")
+						}
+						return q.Value(), nil
+					}, 30*time.Second, 1*time.Second).Should(gomega.Equal(swapQty.Value()))
+				})
+
+				ginkgo.It("preserves Guaranteed QoS class when limits.swap is set on a Guaranteed pod", func() {
+					pod := getSwapTestPod(f, v1.PodQOSGuaranteed, false)
+					swapQty := resource.MustParse("100Mi")
+					pod.Spec.Containers[0].Resources.Limits[v1.ResourceSwap] = swapQty
+					pod = runPodAndWaitUntilScheduled(f, pod)
+					if !isPodCgroupV2(f, pod) {
+						e2eskipper.Skipf("swap tests require cgroup v2")
+					}
+					gomega.Expect(pod.Status.QOSClass).To(gomega.Equal(v1.PodQOSGuaranteed))
+					expectLimitedSwap(f, pod, swapQty.Value())
+				})
+
+				ginkgo.It("enforces pod-level limits.swap inheritance and container-level overrides", framework.WithFeatureGate(features.PodLevelResources), func() {
+					pod := getSleepingPod(f.Namespace.Name)
+					pod.Spec.Resources = &v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("512Mi"),
+							v1.ResourceSwap:   resource.MustParse("200Mi"),
+						},
+					}
+					pod.Spec.Containers = []v1.Container{
+						{
+							Name:    "c-explicit",
+							Image:   busyboxImage,
+							Command: []string{"sleep", "600"},
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("64Mi")},
+								Limits:   v1.ResourceList{v1.ResourceMemory: resource.MustParse("128Mi"), v1.ResourceSwap: resource.MustParse("64Mi")},
+							},
+						},
+						{
+							Name:    "c-zero",
+							Image:   busyboxImage,
+							Command: []string{"sleep", "600"},
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("64Mi")},
+								Limits:   v1.ResourceList{v1.ResourceMemory: resource.MustParse("128Mi"), v1.ResourceSwap: resource.MustParse("0")},
+							},
+						},
+						{
+							Name:    "c-inherit",
+							Image:   busyboxImage,
+							Command: []string{"sleep", "600"},
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("64Mi")},
+								Limits:   v1.ResourceList{v1.ResourceMemory: resource.MustParse("128Mi")},
+							},
+						},
+					}
+					pod = runPodAndWaitUntilScheduled(f, pod)
+					if !isPodCgroupV2(f, pod) {
+						e2eskipper.Skipf("swap tests require cgroup v2")
+					}
+
+					expectContainerLimitedSwap(f, pod, "c-explicit", 64*1024*1024)
+					zeroLimit, err := readContainerCgroupFile(f, pod, "c-zero", cgroupV2SwapLimitFile)
+					framework.ExpectNoError(err)
+					gomega.Expect(zeroLimit).To(gomega.Equal("0"))
+					expectContainerLimitedSwap(f, pod, "c-inherit", 200*1024*1024)
+				})
+
+				ginkgo.It("resizes container and pod-level limits.swap in place without restarting containers", framework.WithFeatureGate(features.PodLevelResources), framework.WithFeatureGate(features.InPlacePodLevelResourcesVerticalScaling), func() {
+					const mi = 1024 * 1024
+					const inheritingContainer = "c-inherit"
+					pod := getSwapTestPod(f, v1.PodQOSBurstable, false)
+					pod.Spec.Resources = &v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("512Mi"),
+							v1.ResourceSwap:   resource.MustParse("128Mi"),
+						},
+					}
+					pod.Spec.Containers[0].Resources.Limits = v1.ResourceList{
+						v1.ResourceMemory: resource.MustParse("256Mi"),
+						v1.ResourceSwap:   resource.MustParse("64Mi"),
+					}
+					// A container without its own limits.swap follows the pod-level limit.
+					pod.Spec.Containers = append(pod.Spec.Containers, v1.Container{
+						Name:    inheritingContainer,
+						Image:   busyboxImage,
+						Command: []string{"sleep", "600"},
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("64Mi")},
+							Limits:   v1.ResourceList{v1.ResourceMemory: resource.MustParse("128Mi")},
+						},
+					})
+					explicitContainer := pod.Spec.Containers[0].Name
+					pod = runPodAndWaitUntilScheduled(f, pod)
+					if !isPodCgroupV2(f, pod) {
+						e2eskipper.Skipf("swap tests require cgroup v2")
+					}
+
+					cgroupSwapLimit := func(containerName string) func() (int64, error) {
+						return func() (int64, error) {
+							valStr, err := readContainerCgroupFile(f, pod, containerName, cgroupV2SwapLimitFile)
+							if err != nil {
+								return 0, err
+							}
+							return strconv.ParseInt(valStr, 10, 64)
+						}
+					}
+					podStatusSwapLimit := func() (int64, error) {
+						updated := getUpdatedPod(f, pod)
+						if updated.Status.Resources == nil {
+							return 0, fmt.Errorf("pod status has no resources")
+						}
+						limit, ok := updated.Status.Resources.Limits[v1.ResourceSwap]
+						if !ok {
+							return 0, fmt.Errorf("pod status has no limits.swap")
+						}
+						return limit.Value(), nil
+					}
+					containerStatusSwapLimit := func() (int64, error) {
+						updated := getUpdatedPod(f, pod)
+						for _, cs := range updated.Status.ContainerStatuses {
+							if cs.Name != explicitContainer {
+								continue
+							}
+							if cs.Resources == nil {
+								return 0, fmt.Errorf("container %q status has no resources", cs.Name)
+							}
+							limit, ok := cs.Resources.Limits[v1.ResourceSwap]
+							if !ok {
+								return 0, fmt.Errorf("container %q status has no limits.swap", cs.Name)
+							}
+							return limit.Value(), nil
+						}
+						return 0, fmt.Errorf("no status for container %q", explicitContainer)
+					}
+					// expectSwap waits for the cgroups and the pod status to show the given limits.
+					expectSwap := func(podSwap, containerSwap int64) {
+						const cgroupAlignment = 4 * 1024
+						gomega.Eventually(cgroupSwapLimit(explicitContainer), 30*time.Second, 1*time.Second).Should(gomega.BeNumerically("~", containerSwap, cgroupAlignment))
+						gomega.Eventually(cgroupSwapLimit(inheritingContainer), 30*time.Second, 1*time.Second).Should(gomega.BeNumerically("~", podSwap, cgroupAlignment))
+						gomega.Eventually(podStatusSwapLimit, 60*time.Second, 1*time.Second).Should(gomega.BeNumerically("~", podSwap, cgroupAlignment))
+						gomega.Eventually(containerStatusSwapLimit, 60*time.Second, 1*time.Second).Should(gomega.BeNumerically("~", containerSwap, cgroupAlignment))
+					}
+					expectSwap(128*mi, 64*mi)
+
+					// Increase pod-level and container-level swap limits in place.
+					podClient := e2epod.NewPodClient(f)
+					gomega.Eventually(func() error {
+						updated := getUpdatedPod(f, pod)
+						updated.Spec.Resources.Limits[v1.ResourceSwap] = resource.MustParse("256Mi")
+						updated.Spec.Containers[0].Resources.Limits[v1.ResourceSwap] = resource.MustParse("128Mi")
+						_, err := podClient.UpdateResize(context.Background(), pod.Name, updated, metav1.UpdateOptions{})
+						return err
+					}, 30*time.Second, 1*time.Second).Should(gomega.Succeed())
+					expectSwap(256*mi, 128*mi)
+
+					// Decrease container-level and pod-level swap limits in place.
+					gomega.Eventually(func() error {
+						updated := getUpdatedPod(f, pod)
+						updated.Spec.Containers[0].Resources.Limits[v1.ResourceSwap] = resource.MustParse("32Mi")
+						updated.Spec.Resources.Limits[v1.ResourceSwap] = resource.MustParse("64Mi")
+						_, err := podClient.UpdateResize(context.Background(), pod.Name, updated, metav1.UpdateOptions{})
+						return err
+					}, 30*time.Second, 1*time.Second).Should(gomega.Succeed())
+					expectSwap(64*mi, 32*mi)
+
+					finalPod := getUpdatedPod(f, pod)
+					for _, cs := range finalPod.Status.ContainerStatuses {
+						gomega.Expect(cs.RestartCount).To(gomega.Equal(int32(0)), "container %q restarted", cs.Name)
+					}
+				})
+			})
+
+			f.Context("when swapBehavior is LimitedSwap", func() {
+				tempSetCurrentKubeletConfig(f, enableLimitedSwapWithGate)
+
+				ginkgo.It("allows a Burstable container to opt out of swap via limits.swap: 0", func() {
+					pod := getSwapTestPod(f, v1.PodQOSBurstable, false)
+					pod.Spec.Containers[0].Resources.Limits = v1.ResourceList{
+						v1.ResourceMemory: resource.MustParse("256Mi"),
+						v1.ResourceSwap:   resource.MustParse("0"),
+					}
+					pod = runPodAndWaitUntilScheduled(f, pod)
+					if !isPodCgroupV2(f, pod) {
+						e2eskipper.Skipf("swap tests require cgroup v2")
+					}
+					expectNoSwap(f, pod)
+				})
+			})
+
+			f.Context("when swapBehavior is NoSwap", func() {
+				tempSetCurrentKubeletConfig(f, enableNoSwapWithGate)
+
+				ginkgo.It("starts pod with memory.swap.max == 0, omits status limits.swap, and emits SwapLimitNotEnforced warning", func() {
+					pod := getSwapTestPod(f, v1.PodQOSBurstable, false)
+					pod.Spec.Containers[0].Resources.Limits = v1.ResourceList{
+						v1.ResourceMemory: resource.MustParse("256Mi"),
+						v1.ResourceSwap:   resource.MustParse("64Mi"),
+					}
+					pod = runPodAndWaitUntilScheduled(f, pod)
+					if !isPodCgroupV2(f, pod) {
+						e2eskipper.Skipf("swap tests require cgroup v2")
+					}
+					expectNoSwap(f, pod)
+
+					updated := getUpdatedPod(f, pod)
+					if len(updated.Status.ContainerStatuses) > 0 && updated.Status.ContainerStatuses[0].Resources != nil {
+						_, hasSwap := updated.Status.ContainerStatuses[0].Resources.Limits[v1.ResourceSwap]
+						gomega.Expect(hasSwap).To(gomega.BeFalseBecause("NoSwap node must not report un-enforced limits.swap in status"))
+					}
+
+					gomega.Eventually(func() bool {
+						eventList, err := f.ClientSet.CoreV1().Events(f.Namespace.Name).List(context.Background(), metav1.ListOptions{})
+						if err != nil {
+							return false
+						}
+						for _, ev := range eventList.Items {
+							if ev.InvolvedObject.UID == pod.UID && ev.Reason == "SwapLimitNotEnforced" {
+								return true
+							}
+						}
+						return false
+					}, 30*time.Second, 1*time.Second).Should(gomega.BeTrueBecause("expected SwapLimitNotEnforced warning event"))
+				})
+			})
+		})
 	})
 })
 
@@ -803,6 +1106,8 @@ func getSleepingPod(namespace string) *v1.Pod {
 		},
 		Spec: v1.PodSpec{
 			RestartPolicy: v1.RestartPolicyAlways,
+			// sleep ignores SIGTERM, so the default grace period adds 30s to every pod deletion.
+			TerminationGracePeriodSeconds: new(int64(1)),
 			Containers: []v1.Container{
 				{
 					Name:    "busybox-container",
