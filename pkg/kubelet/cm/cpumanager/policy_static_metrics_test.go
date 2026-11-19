@@ -23,6 +23,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	v1 "k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/legacyregistry"
@@ -123,6 +124,19 @@ func assertCPUMetrics(t *testing.T, expected cpuMetricsSnapshot) {
 	require.InDelta(t, expected.exclusiveCPUs, got.exclusiveCPUs, delta, "exclusive CPU allocation count")
 	require.InDelta(t, expected.sharedPoolMilli, got.sharedPoolMilli, delta, "shared pool size millicores")
 	require.InDeltaMapValues(t, expected.perNUMA, got.perNUMA, delta, "allocation per NUMA node")
+}
+
+func assertCPUsAlignmentMetrics(t *testing.T, scope string, expectedAligned, expectedFailed float64) {
+	t.Helper()
+
+	aligned, err := testutil.GetCounterMetricValue(metrics.ContainerAlignedComputeResources.WithLabelValues(scope, metrics.AlignedPhysicalCPU))
+	require.NoError(t, err)
+
+	failed, err := testutil.GetCounterMetricValue(metrics.ContainerAlignedComputeResourcesFailure.WithLabelValues(scope, metrics.AlignedPhysicalCPU))
+	require.NoError(t, err)
+
+	require.InDelta(t, expectedAligned, aligned, 0.001, "physical_cpu aligned count")
+	require.InDelta(t, expectedFailed, failed, 0.001, "physical_cpu failure count")
 }
 
 func newMetricsTestPolicy(t *testing.T, topo *topology.CPUTopology, numReservedCPUs int, reservedCPUs cpuset.CPUSet, hint *topologymanager.TopologyHint) *staticPolicy {
@@ -962,4 +976,129 @@ func TestStaticPolicyMetricsRestartConsistencyPodLevelRestoredAfterRestartAndRel
 
 	require.NoError(t, p.RemoveContainer(logger, st, "plrm-pod", "shared-container"))
 	assertCPUMetrics(t, cpuMetricsSnapshot{exclusiveCPUs: 0, sharedPoolMilli: 11000, perNUMA: map[string]float64{"0": 0, "1": 0}})
+}
+
+func TestStaticPolicyMetricsCPUsAlignment(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.PodLevelResources, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.PodLevelResourceManagers, true)
+
+	testCases := []struct {
+		name            string
+		assignedCPUs    cpuset.CPUSet
+		expectedAligned float64
+		expectedFailed  float64
+		scope           string
+		pod             *v1.Pod
+		readmission     bool
+	}{
+		{
+			name:            "pod scope, full physical core (2 CPUs) is counted as aligned",
+			assignedCPUs:    cpuset.New(),
+			expectedAligned: 1,
+			expectedFailed:  0,
+			scope:           metrics.AlignScopePod,
+			pod:             makePodWithPodLevelResources("plrm-pod1", "2", "2", "ctn1", "1", "1"),
+		},
+		{
+			name:            "container scope, full physical cores (6 CPUs) are counted as aligned",
+			assignedCPUs:    cpuset.New(),
+			expectedAligned: 1,
+			expectedFailed:  0,
+			scope:           metrics.AlignScopeContainer,
+			pod:             makePod("pod1", "ctn1", "6", "6"),
+		},
+		{
+			name:            "pod scope, partial physical cores (3 CPUs) fails",
+			assignedCPUs:    cpuset.New(),
+			expectedAligned: 0,
+			expectedFailed:  1,
+			scope:           metrics.AlignScopePod,
+			pod:             makePodWithPodLevelResources("plrm-pod1", "3", "3", "ctn1", "1", "1"),
+		},
+		{
+			name:            "container scope, partial physical core (1 CPU) fails",
+			assignedCPUs:    cpuset.New(),
+			expectedAligned: 0,
+			expectedFailed:  1,
+			scope:           metrics.AlignScopeContainer,
+			pod:             makePod("pod1", "ctn1", "1", "1"),
+		},
+		{
+			name:            "pod scope, request larger than the free physical cores fails",
+			assignedCPUs:    cpuset.New(2, 3, 4, 5, 8, 9, 10, 11),
+			expectedAligned: 0,
+			expectedFailed:  1,
+			scope:           metrics.AlignScopePod,
+			pod:             makePodWithPodLevelResources("plrm-pod1", "4", "4", "ctn1", "1", "1"),
+		},
+		{
+			name:            "container scope, full physical core (2 CPUs) is counted as aligned, re-admission enabled",
+			assignedCPUs:    cpuset.New(),
+			expectedAligned: 1,
+			expectedFailed:  0,
+			scope:           metrics.AlignScopeContainer,
+			pod:             makePod("pod1", "ctn1", "2", "2"),
+			readmission:     true,
+		},
+		{
+			name:            "pod scope, full physical cores (4 CPUs) are counted as aligned, re-admission enabled",
+			assignedCPUs:    cpuset.New(),
+			expectedAligned: 1,
+			expectedFailed:  0,
+			scope:           metrics.AlignScopePod,
+			pod:             makePodWithPodLevelResources("plrm-pod1", "4", "4", "ctn1", "1", "1"),
+			readmission:     true,
+		},
+		{
+			name:            "pod scope, partial physical core (1 CPUs) fails, re-admission enabled",
+			assignedCPUs:    cpuset.New(),
+			expectedAligned: 0,
+			expectedFailed:  1,
+			scope:           metrics.AlignScopePod,
+			pod:             makePodWithPodLevelResources("plrm-pod1", "1", "1", "ctn1", "250m", "250m"),
+			readmission:     true,
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
+			hint := &topologymanager.TopologyHint{NUMANodeAffinity: newNUMAAffinity(0), Preferred: true}
+
+			p := newMetricsTestPolicy(t, topoDualSocketHT, 1, cpuset.New(0), hint)
+			p.options = StaticPolicyOptions{FullPhysicalCPUsOnly: true}
+
+			st := &mockState{assignments: state.ContainerCPUAssignments{"pod2": {"ctn2": tc.assignedCPUs}}, defaultCPUSet: topoDualSocketHT.CPUDetails.CPUs().Difference(tc.assignedCPUs)}
+			require.NoError(t, p.Start(logger, st))
+
+			allocateAndAssert := func() {
+				var unusedScope string
+				var err error
+
+				metrics.ContainerAlignedComputeResources.Reset()
+				metrics.ContainerAlignedComputeResourcesFailure.Reset()
+
+				switch tc.scope {
+				case "container":
+					err = p.Allocate(logger, st, tc.pod, &tc.pod.Spec.Containers[0], lifecycle.AddOperation)
+					unusedScope = metrics.AlignScopePod
+				case "pod":
+					err = p.AllocatePod(logger, st, tc.pod, lifecycle.AddOperation)
+					unusedScope = metrics.AlignScopeContainer
+				}
+
+				if tc.expectedFailed == 0 {
+					require.NoError(t, err)
+				}
+				assertCPUsAlignmentMetrics(t, unusedScope, 0, 0)
+				assertCPUsAlignmentMetrics(t, tc.scope, tc.expectedAligned, tc.expectedFailed)
+			}
+
+			allocateAndAssert()
+
+			if tc.readmission {
+				// Emulate a kubelet restart: counters are lost, allocation is restored from state.
+				allocateAndAssert()
+			}
+		})
+	}
 }
