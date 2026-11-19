@@ -155,8 +155,12 @@ func PodRequests(pod *v1.Pod, opts PodResourcesOptions) v1.ResourceList {
 
 	if !opts.SkipPodLevelResources && IsPodLevelRequestsSet(pod) {
 		effectiveReqs := pod.Spec.Resources.Requests
-		if opts.InPlacePodLevelResourcesVerticalScalingEnabled && opts.UseStatusResources && pod.Status.Resources != nil {
-			effectiveReqs = effectivePodLevelResources(pod, pod.Spec.Resources.Requests, pod.Status.Resources.Requests, pod.Status.AllocatedResources)
+		if opts.InPlacePodLevelResourcesVerticalScalingEnabled && opts.UseStatusResources && (pod.Status.Resources != nil || pod.Status.AllocatedResources != nil) {
+			var statusRequests v1.ResourceList
+			if pod.Status.Resources != nil {
+				statusRequests = pod.Status.Resources.Requests
+			}
+			effectiveReqs = effectivePodLevelResources(pod, pod.Spec.Resources.Requests, statusRequests, pod.Status.AllocatedResources)
 		}
 
 		applyPodLevelResources(reqs, effectiveReqs)
@@ -178,11 +182,21 @@ func applyPodLevelResources(result, effectiveResources v1.ResourceList) {
 	}
 }
 
+// effectivePodLevelResources returns max(spec, statuses...) with pod.Spec.Overhead excluded.
+// Status lists from kubelet include pod.Spec.Overhead, so overhead is subtracted before comparing
+// with spec (safe because pod.Spec.Overhead is immutable; revisit if it ever becomes mutable).
 func effectivePodLevelResources(pod *v1.Pod, spec v1.ResourceList, statuses ...v1.ResourceList) v1.ResourceList {
 	if IsPodResizeInfeasible(pod) {
 		spec = nil
 	}
-	return max(spec, statuses...)
+	if pod.Spec.Overhead == nil {
+		return max(spec, statuses...)
+	}
+	result := max(spec)
+	for _, status := range statuses {
+		maxResourceList(result, subtractResourceList(status, pod.Spec.Overhead))
+	}
+	return result
 }
 
 func containerSpecRequests(container *v1.Container, _ *v1.ContainerStatus, _ bool) v1.ResourceList {
@@ -314,8 +328,9 @@ func aggregateContainerResourcesByFn(pod *v1.Pod, opts PodResourcesOptions, getR
 }
 
 // AggregateContainerRequests computes the total resource requests of all the containers
-// in a pod. This computation folows the formula defined in the KEP for sidecar
-// containers. See https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/753-sidecar-containers#resources-calculation-for-scheduling-and-pod-admission
+// in a pod. pod.Spec.Overhead is never included in the result. This computation follows the
+// formula defined in the KEP for sidecar containers. See
+// https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/753-sidecar-containers#resources-calculation-for-scheduling-and-pod-admission
 // for more details.
 func AggregateContainerRequests(pod *v1.Pod, opts PodResourcesOptions) v1.ResourceList {
 	// attempt to reuse the maps if passed, or allocate otherwise
@@ -342,6 +357,12 @@ func AggregateContainerRequests(pod *v1.Pod, opts PodResourcesOptions) v1.Resour
 			// DRA values are not added to allocatedReqs and actuatedReqs because
 			// 1. Kubelet adds DRA allocations when setting pod.Status.AllocatedResources.
 			// 2. Kubelet adds DRA allocations when configuring pod-level cgroups. Since pod.Status.Resources.Requests is read from cgroup settings, it already contains DRA values.
+			// Pod overhead is subtracted (safe because pod.Spec.Overhead is immutable) because
+			// AggregateContainerRequests never includes pod.Spec.Overhead.
+			if pod.Spec.Overhead != nil {
+				allocatedReqs = subtractResourceList(allocatedReqs, pod.Spec.Overhead)
+				actuatedReqs = subtractResourceList(actuatedReqs, pod.Spec.Overhead)
+			}
 		} else {
 			// DRA allocations are added to allocatedReqs here because Kubelet does not include DRA in pod.Status.ContainerStatuses[].AllocatedResources. Adding them prevents under-reporting.
 			// This is a temporary fallback until InPlacePodLevelResourcesVerticalScaling is Beta/GA on all nodes and pod-level status fields which natively include DRA are always available.
@@ -499,8 +520,9 @@ func omitPartiallySetEphemeralStorageLimit(pod *v1.Pod, limits v1.ResourceList, 
 }
 
 // AggregateContainerLimits computes the aggregated resource limits of all the containers
-// in a pod. This computation follows the formula defined in the KEP for sidecar
-// containers. See https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/753-sidecar-containers#resources-calculation-for-scheduling-and-pod-admission
+// in a pod. pod.Spec.Overhead is never included in the result. This computation follows the
+// formula defined in the KEP for sidecar containers. See
+// https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/753-sidecar-containers#resources-calculation-for-scheduling-and-pod-admission
 // for more details.
 //
 // If any container does not set a cpu or memory limit, or sets it to zero, that limit is
@@ -530,6 +552,11 @@ func AggregateContainerLimits(pod *v1.Pod, opts PodResourcesOptions) v1.Resource
 		if opts.InPlacePodLevelResourcesVerticalScalingEnabled && pod.Status.Resources != nil && pod.Status.Resources.Limits != nil {
 			actuatedLimits = pod.Status.Resources.Limits
 			// Kubelet includes DRA values when populating pod limits. Since pod.Status.Resources.Limits is updated based on cgroup settings, it already contains DRA values, so we should not add them again here.
+			// Pod overhead is subtracted (safe because pod.Spec.Overhead is immutable) because
+			// AggregateContainerLimits never includes pod.Spec.Overhead.
+			if pod.Spec.Overhead != nil {
+				actuatedLimits = subtractResourceList(actuatedLimits, pod.Spec.Overhead)
+			}
 		} else {
 			// Kubelet considers DRA values while updating container limits. We should not be adding it here again.
 			actuatedLimits = aggregateContainerResourcesByFn(pod, opts, containerActuatedLimits)
@@ -557,6 +584,26 @@ func addResourceList(list, newList v1.ResourceList) {
 			list[name] = value
 		}
 	}
+}
+
+// subtractResourceList subtracts matching keys in newList from a copy of list, clamping
+// negative results to zero and ignoring keys absent from list (unlike subtractNonNegative).
+// If either list or newList is empty, it returns list as-is.
+func subtractResourceList(list, newList v1.ResourceList) v1.ResourceList {
+	if len(list) == 0 || len(newList) == 0 {
+		return list
+	}
+	result := list.DeepCopy()
+	for name, quantity := range newList {
+		if value, ok := result[name]; ok {
+			value.Sub(quantity)
+			if value.Sign() < 0 {
+				value.Set(0)
+			}
+			result[name] = value
+		}
+	}
+	return result
 }
 
 // maxResourceList sets list to the greater of list/newList for every resource in newList

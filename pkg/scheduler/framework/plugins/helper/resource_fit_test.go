@@ -114,15 +114,21 @@ func TestPodInfoWithAllocatedResources(t *testing.T) {
 
 		mem100Mi := resource.MustParse("100Mi")
 		mem150Mi := resource.MustParse("150Mi")
+		mem200Mi := resource.MustParse("200Mi")
+		mem250Mi := resource.MustParse("250Mi")
 		mem300Mi := resource.MustParse("300Mi")
 		mem50Mi := resource.MustParse("50Mi")
 
 		for _, tc := range []struct {
-			name string
-			pod  *v1.Pod
+			name    string
+			pod     *v1.Pod
+			wantCPU int64
+			wantMem int64
 		}{
 			{
-				name: "container-level requests",
+				name:    "container-level requests",
+				wantCPU: 150,
+				wantMem: mem150Mi.Value(),
 				pod: &v1.Pod{
 					Spec: v1.PodSpec{
 						NodeName: "node1",
@@ -169,7 +175,57 @@ func TestPodInfoWithAllocatedResources(t *testing.T) {
 				},
 			},
 			{
-				name: "pod-level requests",
+				name:    "container-level requests with larger actual status requests",
+				wantCPU: 250,
+				wantMem: mem250Mi.Value(),
+				pod: &v1.Pod{
+					Spec: v1.PodSpec{
+						NodeName: "node1",
+						Overhead: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("50m"),
+							v1.ResourceMemory: mem50Mi,
+						},
+						Containers: []v1.Container{{
+							Name: "app",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("300m"),
+									v1.ResourceMemory: mem300Mi,
+								},
+							},
+						}},
+					},
+					Status: v1.PodStatus{
+						AllocatedResources: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("150m"),
+							v1.ResourceMemory: mem150Mi,
+						},
+						Resources: &v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("250m"),
+								v1.ResourceMemory: mem250Mi,
+							},
+						},
+						ContainerStatuses: []v1.ContainerStatus{{
+							Name: "app",
+							AllocatedResources: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("100m"),
+								v1.ResourceMemory: mem100Mi,
+							},
+							Resources: &v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("200m"),
+									v1.ResourceMemory: mem200Mi,
+								},
+							},
+						}},
+					},
+				},
+			},
+			{
+				name:    "pod-level requests",
+				wantCPU: 150,
+				wantMem: mem150Mi.Value(),
 				pod: &v1.Pod{
 					Spec: v1.PodSpec{
 						NodeName: "node1",
@@ -199,6 +255,75 @@ func TestPodInfoWithAllocatedResources(t *testing.T) {
 					},
 				},
 			},
+			{
+				// Status.Resources.Requests (250m = 200m actual + 50m overhead) exceeds
+				// Status.AllocatedResources (150m = 100m allocated + 50m overhead) during a
+				// downsize; overhead must only be subtracted once from Status.Resources.Requests.
+				name:    "pod-level requests with larger actual status requests",
+				wantCPU: 250,
+				wantMem: mem250Mi.Value(),
+				pod: &v1.Pod{
+					Spec: v1.PodSpec{
+						NodeName: "node1",
+						Overhead: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("50m"),
+							v1.ResourceMemory: mem50Mi,
+						},
+						Resources: &v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("500m"),
+								v1.ResourceMemory: mem300Mi,
+							},
+						},
+						Containers: []v1.Container{{Name: "app"}},
+					},
+					Status: v1.PodStatus{
+						AllocatedResources: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("150m"),
+							v1.ResourceMemory: mem150Mi,
+						},
+						Resources: &v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("250m"),
+								v1.ResourceMemory: mem250Mi,
+							},
+						},
+					},
+				},
+			},
+			{
+				name:    "pod-level requests with larger allocated than actual status requests",
+				wantCPU: 250,
+				wantMem: mem250Mi.Value(),
+				pod: &v1.Pod{
+					Spec: v1.PodSpec{
+						NodeName: "node1",
+						Overhead: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("50m"),
+							v1.ResourceMemory: mem50Mi,
+						},
+						Resources: &v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("500m"),
+								v1.ResourceMemory: mem300Mi,
+							},
+						},
+						Containers: []v1.Container{{Name: "app"}},
+					},
+					Status: v1.PodStatus{
+						AllocatedResources: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("250m"),
+							v1.ResourceMemory: mem250Mi,
+						},
+						Resources: &v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("150m"),
+								v1.ResourceMemory: mem150Mi,
+							},
+						},
+					},
+				},
+			},
 		} {
 			t.Run(tc.name, func(t *testing.T) {
 				podInfo, err := framework.NewPodInfo(tc.pod)
@@ -206,11 +331,11 @@ func TestPodInfoWithAllocatedResources(t *testing.T) {
 					t.Fatal(err)
 				}
 				gotRes := podInfoWithAllocatedResources(podInfo).CalculateResource().Resource
-				if gotRes.GetMilliCPU() != 150 {
-					t.Errorf("MilliCPU = %d, want 150 (100m allocated + 50m overhead)", gotRes.GetMilliCPU())
+				if gotRes.GetMilliCPU() != tc.wantCPU {
+					t.Errorf("MilliCPU = %d, want %d", gotRes.GetMilliCPU(), tc.wantCPU)
 				}
-				if gotRes.GetMemory() != mem150Mi.Value() {
-					t.Errorf("Memory = %d, want %d (100Mi allocated + 50Mi overhead)", gotRes.GetMemory(), mem150Mi.Value())
+				if gotRes.GetMemory() != tc.wantMem {
+					t.Errorf("Memory = %d, want %d", gotRes.GetMemory(), tc.wantMem)
 				}
 			})
 		}
