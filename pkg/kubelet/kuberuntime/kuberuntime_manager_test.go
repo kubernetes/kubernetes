@@ -2166,7 +2166,7 @@ func TestComputePodActionsForRestartAllContainers(t *testing.T) {
 			status := test.podStatusFunc()
 
 			// Initialize the actuated resources.
-			m.InitializeActuatedPod(tCtx.Logger(), pod)
+			m.InitializeActuatedPod(tCtx.Logger(), pod, nil)
 
 			actions := m.computePodActions(tCtx, pod, status, test.restartAllContainers)
 
@@ -2595,7 +2595,7 @@ func TestComputePodActionsWithInitContainers(t *testing.T) {
 			pod, status := makeBasePodAndStatusWithInitContainers()
 
 			// Sync the actuated state with the base values before any resize
-			m.InitializeActuatedPod(tCtx.Logger(), pod)
+			m.InitializeActuatedPod(tCtx.Logger(), pod, nil)
 
 			if test.actions.ContainersToUpdate != nil {
 				for res := range test.actions.ContainersToUpdate {
@@ -4410,7 +4410,7 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 				c := &pod.Spec.Containers[1]
 				c.Resources = v1.ResourceRequirements{}
 				c.ResizePolicy = []v1.ContainerResizePolicy{cpuPolicyRestartRequired, memPolicyRestartRequired}
-				m.InitializeActuatedPod(logger, pod)
+				m.InitializeActuatedPod(logger, pod, nil)
 			},
 			podLevelResizeEnabled: true,
 			getExpectedPodActionsFn: func(pod *v1.Pod, podStatus *kubecontainer.PodStatus) *podActions {
@@ -4429,7 +4429,7 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 				}
 				c := &pod.Spec.Containers[1]
 				c.Resources = v1.ResourceRequirements{}
-				m.InitializeActuatedPod(logger, pod)
+				m.InitializeActuatedPod(logger, pod, nil)
 			},
 			getExpectedPodActionsFn: func(pod *v1.Pod, podStatus *kubecontainer.PodStatus) *podActions {
 				return &podActions{
@@ -4586,7 +4586,7 @@ func TestComputePodResizeActionForOOMKilledContainer(t *testing.T) {
 		{ResourceName: v1.ResourceMemory, RestartPolicy: v1.NotRequired},
 	}
 	// record the pre-resize resource limits as what was last actuated.
-	m.InitializeActuatedPod(logger, pod)
+	m.InitializeActuatedPod(logger, pod, nil)
 
 	// Pod Resized
 	resize := pod.Spec.Containers[0].Resources.DeepCopy()
@@ -4650,7 +4650,7 @@ func TestComputePodResizeActionForOOMKilledInitContainer(t *testing.T) {
 	pod.Status.ContainerStatuses = nil
 
 	// record pre-resize resource limits as what was last actuated.
-	m.InitializeActuatedPod(logger, pod)
+	m.InitializeActuatedPod(logger, pod, nil)
 
 	// Pod Resized
 	resize := pod.Spec.InitContainers[0].Resources.DeepCopy()
@@ -4722,7 +4722,7 @@ func TestComputePodResizeActionForOOMKilledSidecarContainer(t *testing.T) {
 	})
 
 	// record pre-resize resource limits as what was last actuated.
-	m.InitializeActuatedPod(logger, pod)
+	m.InitializeActuatedPod(logger, pod, nil)
 
 	// Pod Resized
 	resize := pod.Spec.InitContainers[0].Resources.DeepCopy()
@@ -6030,7 +6030,7 @@ func TestComputePodActions_VolumeResizeWithRestartContainerPolicy(t *testing.T) 
 	}
 	status.ContainerStatuses[0].Hash = kubecontainer.HashContainer(&pod.Spec.Containers[0])
 	require.NoError(t, m.actuatedState.SetPodVolume(logger, pod.UID, pod.Spec.Volumes[0]))
-	m.InitializeActuatedPod(logger, pod)
+	m.InitializeActuatedPod(logger, pod, nil)
 
 	// Resize only the memory-backed emptyDir volume sizeLimit.
 	pod.Spec.Volumes[0].EmptyDir.SizeLimit = &vol200M
@@ -7964,7 +7964,7 @@ func TestInitializeActuatedPod_PreservesActuatedVolumes(t *testing.T) {
 	require.NoError(t, m.actuatedState.SetPodVolume(tCtx.Logger(), pod.UID, cmVol))
 	require.NoError(t, m.actuatedState.SetPodVolume(tCtx.Logger(), pod.UID, memVol))
 
-	m.InitializeActuatedPod(tCtx.Logger(), pod)
+	m.InitializeActuatedPod(tCtx.Logger(), pod, nil)
 
 	actuatedPod, ok := m.actuatedState.GetPod(pod.UID)
 	require.True(t, ok)
@@ -8202,7 +8202,7 @@ func TestInitializeActuatedPodLevelResources(t *testing.T) {
 				require.NoError(t, tc.setup(m))
 			}
 
-			m.InitializeActuatedPod(logger, pod)
+			m.InitializeActuatedPod(logger, pod, nil)
 			got, ok := m.actuatedState.GetPodLevelResources(pod.UID)
 			require.True(t, ok)
 			assert.True(t, apiequality.Semantic.DeepEqual(tc.expected, got), "want %v, got %v", tc.expected, got)
@@ -8228,7 +8228,7 @@ func TestInitializeActuatedPodLevelResources(t *testing.T) {
 		require.NoError(t, m.actuatedState.SetPodLevelResources(logger, pod.UID, &v1.ResourceRequirements{Limits: v1.ResourceList{v1.ResourceMemory: actuatedLimit}}))
 		require.NoError(t, m.actuatedState.SetEmptyDirVolumeLimit(logger, pod.UID, vol.Name, &v1.EmptyDirVolumeSource{Medium: v1.StorageMediumMemory, SizeLimit: &actuatedLimit}))
 
-		m.InitializeActuatedPod(logger, podWithVolume)
+		m.InitializeActuatedPod(logger, podWithVolume, nil)
 		got, ok := m.actuatedState.GetEmptyDirVolumeLimit(pod.UID, vol.Name)
 		require.True(t, ok)
 		assert.True(t, actuatedLimit.Equal(*got), "want %v, got %v", actuatedLimit, got)
@@ -8316,7 +8316,7 @@ func TestDoPodResizeAction_PodCgroupReconciliation(t *testing.T) {
 			pod.Spec.Containers[0].Resources = tc.actuated
 			_, fakeContainers := makeAndSetFakePod(tCtx, m, fakeRuntime, pod)
 			kps.ContainerStatuses[0].ID = kubecontainer.ContainerID{Type: "testRuntime", ID: fakeContainers[0].Id}
-			m.InitializeActuatedPod(logger, pod)
+			m.InitializeActuatedPod(logger, pod, nil)
 			syncResize := func(resources v1.ResourceRequirements) error {
 				pod.Spec.Containers[0].Resources = resources
 				kps.ContainerStatuses[0].Hash = kubecontainer.HashContainer(&pod.Spec.Containers[0])
@@ -8333,7 +8333,7 @@ func TestDoPodResizeAction_PodCgroupReconciliation(t *testing.T) {
 
 			if tc.restart {
 				loadState()
-				m.InitializeActuatedPod(logger, pod)
+				m.InitializeActuatedPod(logger, pod, nil)
 			}
 			final := tc.resized
 			if tc.revert {
@@ -8475,7 +8475,7 @@ func TestDoPodResizeAction_PodCgroupLimits(t *testing.T) {
 			_, fakeContainers := makeAndSetFakePod(tCtx, m, fakeRuntime, pod)
 			beforePod := pod.DeepCopy()
 			beforePod.Spec.Containers = beforePod.Spec.Containers[:len(tc.before.containers)]
-			m.InitializeActuatedPod(logger, beforePod)
+			m.InitializeActuatedPod(logger, beforePod, nil)
 
 			pod.Spec.Resources = tc.after.pod
 			resized := -1

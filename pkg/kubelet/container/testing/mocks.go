@@ -1102,8 +1102,8 @@ func (_c *MockRuntime_ImageStats_Call) RunAndReturn(run func(ctx context.Context
 }
 
 // InitializeActuatedPod provides a mock function for the type MockRuntime
-func (_mock *MockRuntime) InitializeActuatedPod(logger klog.Logger, allocatedPod *v10.Pod) {
-	_mock.Called(logger, allocatedPod)
+func (_mock *MockRuntime) InitializeActuatedPod(logger klog.Logger, allocatedPod *v10.Pod, podStatus *container.PodStatus) {
+	_mock.Called(logger, allocatedPod, podStatus)
 	return
 }
 
@@ -1115,11 +1115,12 @@ type MockRuntime_InitializeActuatedPod_Call struct {
 // InitializeActuatedPod is a helper method to define mock.On call
 //   - logger klog.Logger
 //   - allocatedPod *v10.Pod
-func (_e *MockRuntime_Expecter) InitializeActuatedPod(logger any, allocatedPod any) *MockRuntime_InitializeActuatedPod_Call {
-	return &MockRuntime_InitializeActuatedPod_Call{Call: _e.mock.On("InitializeActuatedPod", logger, allocatedPod)}
+//   - podStatus *container.PodStatus
+func (_e *MockRuntime_Expecter) InitializeActuatedPod(logger any, allocatedPod any, podStatus any) *MockRuntime_InitializeActuatedPod_Call {
+	return &MockRuntime_InitializeActuatedPod_Call{Call: _e.mock.On("InitializeActuatedPod", logger, allocatedPod, podStatus)}
 }
 
-func (_c *MockRuntime_InitializeActuatedPod_Call) Run(run func(logger klog.Logger, allocatedPod *v10.Pod)) *MockRuntime_InitializeActuatedPod_Call {
+func (_c *MockRuntime_InitializeActuatedPod_Call) Run(run func(logger klog.Logger, allocatedPod *v10.Pod, podStatus *container.PodStatus)) *MockRuntime_InitializeActuatedPod_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 klog.Logger
 		if args[0] != nil {
@@ -1129,9 +1130,14 @@ func (_c *MockRuntime_InitializeActuatedPod_Call) Run(run func(logger klog.Logge
 		if args[1] != nil {
 			arg1 = args[1].(*v10.Pod)
 		}
+		var arg2 *container.PodStatus
+		if args[2] != nil {
+			arg2 = args[2].(*container.PodStatus)
+		}
 		run(
 			arg0,
 			arg1,
+			arg2,
 		)
 	})
 	return _c
@@ -1142,7 +1148,7 @@ func (_c *MockRuntime_InitializeActuatedPod_Call) Return() *MockRuntime_Initiali
 	return _c
 }
 
-func (_c *MockRuntime_InitializeActuatedPod_Call) RunAndReturn(run func(logger klog.Logger, allocatedPod *v10.Pod)) *MockRuntime_InitializeActuatedPod_Call {
+func (_c *MockRuntime_InitializeActuatedPod_Call) RunAndReturn(run func(logger klog.Logger, allocatedPod *v10.Pod, podStatus *container.PodStatus)) *MockRuntime_InitializeActuatedPod_Call {
 	_c.Run(run)
 	return _c
 }

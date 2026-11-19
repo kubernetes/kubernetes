@@ -274,6 +274,12 @@ func (m *kubeGenericRuntimeManager) startContainer(ctx context.Context, podSandb
 		defer cleanupAction()
 	}
 	if err != nil {
+		if (utilfeature.DefaultFeatureGate.Enabled(features.DynamicNodeLocalEphemeralVolumes) || utilfeature.DefaultFeatureGate.Enabled(features.DynamicContainers)) &&
+			hasSubPathVolumeMount(container.VolumeMounts) && m.runtimeHelper != nil {
+			if cleanErr := m.runtimeHelper.CleanContainerSubPaths(pod.UID, container.Name); cleanErr != nil {
+				logger.Error(cleanErr, "Failed to clean container subPath mounts after container config generation error", "pod", klog.KObj(pod), "containerName", container.Name)
+			}
+		}
 		s, _ := grpcstatus.FromError(err)
 		m.recordContainerEvent(ctx, pod, container, "", v1.EventTypeWarning, events.FailedToCreateContainer, "Error: %v", s.Message())
 		return s.Message(), ErrCreateContainerConfig

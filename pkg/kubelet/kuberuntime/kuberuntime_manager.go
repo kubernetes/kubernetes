@@ -947,7 +947,7 @@ func (m *kubeGenericRuntimeManager) computePodResizeAction(ctx context.Context, 
 
 // TODO: Move InitializeActuatedPod, UpdateActuatedPodLevelResources, and IsPodResizeInProgress
 // out of the runtime now that actuatedState is owned by the Kubelet.
-func (m *kubeGenericRuntimeManager) InitializeActuatedPod(logger klog.Logger, allocatedPod *v1.Pod) {
+func (m *kubeGenericRuntimeManager) InitializeActuatedPod(logger klog.Logger, allocatedPod *v1.Pod, podStatus *kubecontainer.PodStatus) {
 	stored, hasPod := m.actuatedState.GetPod(allocatedPod.UID)
 	// TODO: In v1.39, when the V1 checkpoint format is no longer supported, we will still need to
 	// check stored.Name == "" (and preserve stored.Spec.Resources and stored.Spec.Volumes below)
@@ -979,6 +979,7 @@ func (m *kubeGenericRuntimeManager) InitializeActuatedPod(logger klog.Logger, al
 	if err := m.actuatedState.SetPod(logger, &actuatedPod); err != nil {
 		logger.Error(err, "Failed to initialize actuated pod resource info checkpoint", "pod", klog.KObj(&actuatedPod))
 	}
+	m.backfillActuatedFromV1(logger, allocatedPod, &actuatedPod, podStatus)
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingMemoryBackedVolumes) && hasPod {
 		for _, vol := range stored.Spec.Volumes {
 			if !allocation.VolHasMemoryBackedEmptyDir(&vol) {
@@ -1003,46 +1004,67 @@ func (m *kubeGenericRuntimeManager) InitializeActuatedPod(logger klog.Logger, al
 	}
 }
 
-// KeepOnlyResourceValues strips everything from pod.Spec except the resizable resources (and
-// container volume mounts when DynamicNodeLocalEphemeralVolumes is enabled), because those are
-// all SetPod initializes in the actuated state (mounted volumes are recorded via SetPodVolume
-// and preserved by SetPod).
+// backfillActuatedFromV1 populates actuated container specs and mounted OCI Image volumes for
+// containers that had already been created when no complete V2 actuated checkpoint exists yet
+// (e.g. upgrading from a V1 checkpoint or initializing a BestEffort pod that had no V1 entry).
+// It runs after SetPod rather than inside state.UpdatePodFromV1 because SetPod applies
+// KeepOnlyResourceValues and requires runtime podStatus.
+// TODO: Remove in v1.39 when the V1 checkpoint format is no longer supported.
+func (m *kubeGenericRuntimeManager) backfillActuatedFromV1(logger klog.Logger, allocatedPod, actuatedPod *v1.Pod, podStatus *kubecontainer.PodStatus) {
+	dynamicVolumesEnabled := utilfeature.DefaultFeatureGate.Enabled(features.DynamicNodeLocalEphemeralVolumes)
+	if podStatus == nil || (!dynamicVolumesEnabled && !utilfeature.DefaultFeatureGate.Enabled(features.DynamicContainers)) {
+		return
+	}
+	hasRegularCreated := HasAnyRegularContainerCreated(allocatedPod, podStatus)
+	for specCtr, cType := range podutil.ContainerIter(&allocatedPod.Spec, podutil.AllContainers) {
+		cs := podStatus.FindContainerStatusByName(specCtr.Name)
+		if cs == nil && (cType != podutil.InitContainers || !hasRegularCreated) {
+			continue
+		}
+		backfilled := *specCtr.DeepCopy()
+		if actCtr := findContainerInPodSpec(&actuatedPod.Spec, specCtr.Name, cType); actCtr != nil {
+			backfilled.Resources = actCtr.Resources
+		} else {
+			backfilled.Resources = actuatedContainerResources(allocatedPod, specCtr)
+		}
+		if err := m.actuatedState.SetContainer(logger, allocatedPod.UID, cType, backfilled); err != nil {
+			logger.Error(err, "Failed to backfill actuated container spec from V1 checkpoint", "pod", klog.KObj(actuatedPod), "containerName", specCtr.Name)
+		}
+		if dynamicVolumesEnabled {
+			for _, vm := range backfilled.VolumeMounts {
+				volIdx := slices.IndexFunc(allocatedPod.Spec.Volumes, func(v v1.Volume) bool { return v.Name == vm.Name })
+				if volIdx < 0 || allocatedPod.Spec.Volumes[volIdx].Image == nil {
+					continue
+				}
+				if err := m.actuatedState.SetPodVolume(logger, allocatedPod.UID, allocatedPod.Spec.Volumes[volIdx]); err != nil {
+					logger.Error(err, "Failed to backfill actuated image volume from V1 checkpoint", "pod", klog.KObj(actuatedPod), "volumeName", vm.Name)
+				}
+			}
+		}
+	}
+}
+
+// KeepOnlyResourceValues strips everything from pod.Spec except the resizable resources, because
+// those are all SetPod initializes in the actuated state (mounted volumes are recorded via
+// SetPodVolume and preserved by SetPod, and container VolumeMounts are recorded when each
+// container starts).
 func KeepOnlyResourceValues(pod *v1.Pod) {
 	pod.Generation = 0
 	spec := v1.PodSpec{
 		Resources: pod.Spec.Resources,
 	}
-	keepVolumeMounts := utilfeature.DefaultFeatureGate.Enabled(features.DynamicNodeLocalEphemeralVolumes)
 	for container, containerType := range podutil.ContainerIter(&pod.Spec, podutil.InitContainers|podutil.Containers) {
-		resizable := allocation.IsResizableContainer(container, containerType)
-		hasVolumeMounts := keepVolumeMounts && len(container.VolumeMounts) > 0
-		if !resizable && !hasVolumeMounts {
+		if !allocation.IsResizableContainer(container, containerType) {
 			continue
 		}
-		actuated := v1.Container{Name: container.Name}
-		if resizable {
-			actuated.Resources = container.Resources
-		}
-		if hasVolumeMounts {
-			actuated.VolumeMounts = container.VolumeMounts
+		actuated := v1.Container{
+			Name:      container.Name,
+			Resources: container.Resources,
 		}
 		if containerType == podutil.InitContainers {
 			spec.InitContainers = append(spec.InitContainers, actuated)
 		} else {
 			spec.Containers = append(spec.Containers, actuated)
-		}
-	}
-	if keepVolumeMounts {
-		for _, ec := range pod.Spec.EphemeralContainers {
-			if len(ec.VolumeMounts) == 0 {
-				continue
-			}
-			spec.EphemeralContainers = append(spec.EphemeralContainers, v1.EphemeralContainer{
-				EphemeralContainerCommon: v1.EphemeralContainerCommon{
-					Name:         ec.Name,
-					VolumeMounts: ec.VolumeMounts,
-				},
-			})
 		}
 	}
 	pod.Spec = spec
@@ -1735,6 +1757,63 @@ func (m *kubeGenericRuntimeManager) updatePodContainerResources(ctx context.Cont
 	return nil
 }
 
+func findContainerInPodSpec(spec *v1.PodSpec, name string, containerType podutil.ContainerType) *v1.Container {
+	for c := range podutil.ContainerIter(spec, containerType) {
+		if c.Name == name {
+			return c
+		}
+	}
+	return nil
+}
+
+func hasSubPathVolumeMount(mounts []v1.VolumeMount) bool {
+	return slices.ContainsFunc(mounts, func(vm v1.VolumeMount) bool {
+		return vm.SubPath != "" || vm.SubPathExpr != ""
+	})
+}
+
+// reconcileNonRunningActuatedContainers clears actuated container VolumeMounts and VolumeDevices
+// for removed containers once they are no longer running, so dynamically removed volumes can
+// unmount from the host and removed containers' terminated statuses drop stale VolumeMounts.
+func (m *kubeGenericRuntimeManager) reconcileNonRunningActuatedContainers(logger klog.Logger, pod *v1.Pod, podStatus *kubecontainer.PodStatus, actuatedPod *v1.Pod) *v1.Pod {
+	if actuatedPod == nil || podStatus == nil {
+		return actuatedPod
+	}
+	updated := false
+	for actCtr, cType := range podutil.ContainerIter(&actuatedPod.Spec, podutil.AllContainers) {
+		if len(actCtr.VolumeMounts) == 0 && len(actCtr.VolumeDevices) == 0 {
+			continue
+		}
+		if podStatus.HasRunningOrUnknownContainer(actCtr.Name) {
+			continue
+		}
+		specCtr := findContainerInPodSpec(&pod.Spec, actCtr.Name, cType)
+		if specCtr != nil {
+			continue
+		}
+		if hasSubPathVolumeMount(actCtr.VolumeMounts) && m.runtimeHelper != nil {
+			if err := m.runtimeHelper.CleanContainerSubPaths(pod.UID, actCtr.Name); err != nil {
+				logger.Error(err, "Failed to clean container subPath mounts for stopped container", "pod", klog.KObj(pod), "containerName", actCtr.Name)
+				continue
+			}
+		}
+		cleared := *actCtr
+		cleared.VolumeMounts = nil
+		cleared.VolumeDevices = nil
+		if err := m.actuatedState.SetContainer(logger, pod.UID, cType, cleared); err != nil {
+			logger.Error(err, "Failed to clear actuated volume mounts for stopped container", "pod", klog.KObj(pod), "containerName", actCtr.Name)
+		} else {
+			updated = true
+		}
+	}
+	if updated {
+		if refreshed, ok := m.actuatedState.GetPodReadOnly(pod.UID); ok {
+			return refreshed
+		}
+	}
+	return actuatedPod
+}
+
 // computePodActions checks whether the pod spec has changed and returns the changes if true.
 func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, restartAllContainers bool) podActions {
 	logger := klog.FromContext(ctx)
@@ -1764,6 +1843,12 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 		// Containers removed from the pod spec are killed, but never restarted.
 		m.killRemovedContainers(logger, pod, podStatus, &changes)
 		return changes
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicNodeLocalEphemeralVolumes) || utilfeature.DefaultFeatureGate.Enabled(features.DynamicContainers) {
+		if p, ok := m.actuatedState.GetPodReadOnly(pod.UID); ok && p != nil && p.Name != "" {
+			m.reconcileNonRunningActuatedContainers(logger, pod, podStatus, p)
+		}
 	}
 
 	// If we need to (re-)create the pod sandbox, everything will need to be
@@ -2007,6 +2092,12 @@ func (m *kubeGenericRuntimeManager) dropRemovedActuatedContainers(logger klog.Lo
 	var forget []string
 	for pair := range podutil.ContainerPairs(pod, actuated, podutil.Containers) {
 		if pair.New == nil && podStatus.FindContainerStatusByName(pair.Old.Name) == nil {
+			if hasSubPathVolumeMount(pair.Old.VolumeMounts) && m.runtimeHelper != nil {
+				if err := m.runtimeHelper.CleanContainerSubPaths(pod.UID, pair.Old.Name); err != nil {
+					logger.Error(err, "Failed to clean container subPath mounts for dropped container", "pod", klog.KObj(pod), "containerName", pair.Old.Name)
+					continue
+				}
+			}
 			forget = append(forget, pair.Old.Name)
 		}
 	}
@@ -2051,8 +2142,20 @@ func (m *kubeGenericRuntimeManager) pruneRemovedContainers(ctx context.Context, 
 		}
 	}
 	if names := sets.List(gone.Difference(remaining)); len(names) > 0 {
-		if err := m.actuatedState.RemoveContainers(logger, pod.UID, podutil.Containers, names...); err != nil {
-			logger.Error(err, "Failed to drop actuated records of pruned containers", "pod", klog.KObj(pod), "containers", names)
+		var cleaned []string
+		for _, name := range names {
+			if m.runtimeHelper != nil {
+				if err := m.runtimeHelper.CleanContainerSubPaths(pod.UID, name); err != nil {
+					logger.Error(err, "Failed to clean container subPath mounts for pruned container", "pod", klog.KObj(pod), "containerName", name)
+					continue
+				}
+			}
+			cleaned = append(cleaned, name)
+		}
+		if len(cleaned) > 0 {
+			if err := m.actuatedState.RemoveContainers(logger, pod.UID, podutil.Containers, cleaned...); err != nil {
+				logger.Error(err, "Failed to drop actuated records of pruned containers", "pod", klog.KObj(pod), "containers", cleaned)
+			}
 		}
 	}
 	return results

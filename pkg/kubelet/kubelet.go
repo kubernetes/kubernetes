@@ -2402,7 +2402,7 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 		return false, nil, err
 	}
 	// Volumes are finished mounting. Make sure actuated state (container resources and volume limits) is initialized.
-	kl.containerRuntime.InitializeActuatedPod(logger, pod)
+	kl.containerRuntime.InitializeActuatedPod(logger, pod, podStatus)
 
 	// Fetch the pull secrets for the pod
 	pullSecrets, missingPullSecretNames := kl.getPullSecretsForPod(logger, pod)
