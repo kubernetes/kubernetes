@@ -43,9 +43,10 @@ func GetResourceRequestQuantity(pod *v1.Pod, resourceName v1.ResourceName) resou
 	}
 
 	opts := resourcehelper.PodResourcesOptions{
-		SkipPodLevelResources:            !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
-		ExcludeOverhead:                  true,
-		UseExtraNodeAllocatableResources: utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources),
+		SkipPodLevelResources:                    !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
+		PodLevelResourcesEphemeralStorageEnabled: utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourcesEphemeralStorage),
+		ExcludeOverhead:                          true,
+		UseExtraNodeAllocatableResources:         utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources),
 	}
 	if rQuantity, ok := resourcehelper.PodRequests(pod, opts)[resourceName]; ok {
 		requestQuantity.Add(rQuantity)

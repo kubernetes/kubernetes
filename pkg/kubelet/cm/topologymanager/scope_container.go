@@ -62,7 +62,7 @@ func (s *containerScope) Admit(ctx context.Context, pod *v1.Pod, operation lifec
 				metrics.ContainerAlignedComputeResourcesFailure.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedNUMANode).Inc()
 			}
 			metrics.TopologyManagerAdmissionErrorsTotal.Inc()
-			if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) && resourcehelper.IsPodLevelResourcesSet(pod) {
+			if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) && resourcehelper.IsPodLevelComputeResourcesSet(pod) {
 				return admission.GetPodAdmitResult(NewPodLevelTopologyAffinityError("pod with pod-level resources failed admission with a container-level topology manager"))
 			}
 			return admission.GetPodAdmitResult(&TopologyAffinityError{})

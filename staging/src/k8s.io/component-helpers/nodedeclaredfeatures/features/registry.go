@@ -25,6 +25,7 @@ import (
 	"k8s.io/component-helpers/nodedeclaredfeatures/features/inplacepodresize"
 	"k8s.io/component-helpers/nodedeclaredfeatures/features/networkisolatedpods"
 	"k8s.io/component-helpers/nodedeclaredfeatures/features/podcertificatesmldsa"
+	"k8s.io/component-helpers/nodedeclaredfeatures/features/podlevelresources"
 	"k8s.io/component-helpers/nodedeclaredfeatures/features/restartallcontainers"
 	"k8s.io/component-helpers/nodedeclaredfeatures/features/securityprofileoci"
 	"k8s.io/component-helpers/nodedeclaredfeatures/features/usernamespaceshostnetwork"
@@ -46,6 +47,7 @@ var AllFeatures = []types.Feature{
 	volumebindmountoptions.Feature,
 	draoptionalnodeoperations.Feature,
 	podcertificatesmldsa.Feature,
+	podlevelresources.EphemeralStorageFeature,
 	securityprofileoci.Feature,
 	dynamiccontainers.Feature,
 	cgroupoptions.Feature,

@@ -907,7 +907,7 @@ func (p *staticPolicy) allocateForAdd(logger klog.Logger, s state.State, pod *v1
 		return nil
 	}
 
-	if (!utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) || !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources)) && resourcehelper.IsPodLevelResourcesSet(pod) {
+	if (!utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) || !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources)) && resourcehelper.IsPodLevelComputeResourcesSet(pod) {
 		logger.V(2).Info("CPU Manager allocation skipped, pod is using pod-level resources but the PodLevelResourceManagers feature gate is not enabled", "pod", klog.KObj(pod), "podUID", pod.UID)
 		return nil
 	}
@@ -1070,7 +1070,7 @@ func (p *staticPolicy) guaranteedCPUs(logger klog.Logger, pod *v1.Pod, container
 	// For pod-level resource management, a container is only considered for exclusive
 	// CPUs if its request equals its limit for both the CPU and Memory. This
 	// aligns with the Guaranteed QoS requirement for container-level resources.
-	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) && resourcehelper.IsPodLevelResourcesSet(pod) && !cmqos.IsContainerEquivalentQOSGuaranteed(container) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) && resourcehelper.IsPodLevelComputeResourcesSet(pod) && !cmqos.IsContainerEquivalentQOSGuaranteed(container) {
 		logger.V(5).Info("Exclusive CPU allocation skipped, container is not eligible, request and limit are not equal", "pod", klog.KObj(pod), "containerName", container.Name)
 		return 0
 	}
@@ -1090,7 +1090,7 @@ func (p *staticPolicy) podGuaranteedCPUs(logger klog.Logger, pod *v1.Pod) int {
 	// If pod-level resources are set, use them directly.
 	// This check is important because this function is called from GetPodTopologyHints,
 	// which runs before the main feature gate check in AllocatePod.
-	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) && resourcehelper.IsPodLevelResourcesSet(pod) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) && resourcehelper.IsPodLevelComputeResourcesSet(pod) {
 		qos := v1qos.GetPodQOS(pod)
 		if qos != v1.PodQOSGuaranteed {
 			return 0
@@ -1181,7 +1181,7 @@ func (p *staticPolicy) getTopologyHintsForAdd(logger klog.Logger, s state.State,
 
 	// If the pod has pod-level resources but the feature gate is disabled,
 	// log it and return nil hints to admit the pod without alignment.
-	if (!utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) || !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources)) && resourcehelper.IsPodLevelResourcesSet(pod) {
+	if (!utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) || !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources)) && resourcehelper.IsPodLevelComputeResourcesSet(pod) {
 		logger.V(3).Info("CPU Manager hint generation skipped, pod is using pod-level resources but the PodLevelResourceManagers feature gate is not enabled")
 		return nil
 	}
@@ -1252,7 +1252,7 @@ func (p *staticPolicy) getPodTopologyHintsForAdd(logger klog.Logger, s state.Sta
 
 	// If the pod has pod-level resources but the feature gate is disabled,
 	// log it and return nil hints to admit the pod without alignment.
-	if (!utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) || !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources)) && resourcehelper.IsPodLevelResourcesSet(pod) {
+	if (!utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) || !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources)) && resourcehelper.IsPodLevelComputeResourcesSet(pod) {
 		logger.V(3).Info("CPU Manager pod hint generation skipped, pod is using pod-level resources but the PodLevelResourceManagers feature gate is not enabled", "podUID", pod.UID)
 		return nil
 	}
@@ -1273,7 +1273,7 @@ func (p *staticPolicy) getPodTopologyHintsForAdd(logger klog.Logger, s state.Sta
 	// Fall through to the normal hint generation, which accounts for the CPUs
 	// that will be released back to the default pool.
 	staleCPUs := cpuset.New()
-	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) && resourcehelper.IsPodLevelResourcesSet(pod) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) && resourcehelper.IsPodLevelComputeResourcesSet(pod) {
 		if allocated, exists := s.GetPodCPUSet(string(pod.UID)); exists && !allocated.IsEmpty() {
 			if podAllocationStaleness(s, pod, allocated) == notStale {
 				if allocated.Size() != requested {

@@ -2284,10 +2284,11 @@ func TestNodeFitsNativeResources(t *testing.T) {
 
 func TestValidatePodLevelResourcesCoverDRA(t *testing.T) {
 	tests := []struct {
-		name                          string
-		pod                           *v1.Pod
-		extraNodeAllocatableResources []v1.ExtraNodeAllocatableResource
-		disableFixInitContainerLimits bool
+		name                                    string
+		pod                                     *v1.Pod
+		extraNodeAllocatableResources           []v1.ExtraNodeAllocatableResource
+		disableFixInitContainerLimits           bool
+		enablePodLevelResourcesEphemeralStorage bool
 
 		wantStatusCode   fwk.Code
 		wantErrorMessage string
@@ -2714,6 +2715,115 @@ func TestValidatePodLevelResourcesCoverDRA(t *testing.T) {
 			},
 			wantStatusCode: fwk.Success,
 		},
+		{
+			name:                                    "PodLevel ephemeral-storage request insufficient with DRA when gate enabled",
+			enablePodLevelResourcesEphemeralStorage: true,
+			pod: st.MakePod().Name("test-pod").
+				Resources(v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceEphemeralStorage: resource.MustParse("3Gi"),
+					},
+				}).
+				Containers([]v1.Container{{
+					Name: "c1",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceEphemeralStorage: resource.MustParse("2Gi"),
+						},
+						Claims: []v1.ResourceClaim{{Name: "dra-claim"}},
+					},
+				}}).
+				Obj(),
+			extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+				{
+					ContainerName: "",
+					Requests:      v1.ResourceList{v1.ResourceEphemeralStorage: resource.MustParse("2Gi")},
+					Limits:        v1.ResourceList{v1.ResourceEphemeralStorage: resource.MustParse("2Gi")},
+				},
+				{
+					ContainerName: "c1",
+					Limits:        v1.ResourceList{v1.ResourceEphemeralStorage: resource.MustParse("2Gi")},
+				},
+			},
+			wantStatusCode:   fwk.UnschedulableAndUnresolvable,
+			wantErrorMessage: "pod level request for ephemeral-storage is insufficient to cover the aggregated container and node-allocatable DRA requests",
+		},
+		{
+			name:                                    "PodLevel ephemeral-storage request ignored when gate disabled",
+			enablePodLevelResourcesEphemeralStorage: false,
+			pod: st.MakePod().Name("test-pod").
+				Resources(v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceEphemeralStorage: resource.MustParse("3Gi"),
+					},
+				}).
+				Containers([]v1.Container{{
+					Name: "c1",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceEphemeralStorage: resource.MustParse("2Gi"),
+						},
+						Claims: []v1.ResourceClaim{{Name: "dra-claim"}},
+					},
+				}}).
+				Obj(),
+			extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+				{
+					ContainerName: "",
+					Requests:      v1.ResourceList{v1.ResourceEphemeralStorage: resource.MustParse("2Gi")},
+					Limits:        v1.ResourceList{v1.ResourceEphemeralStorage: resource.MustParse("2Gi")},
+				},
+				{
+					ContainerName: "c1",
+					Limits:        v1.ResourceList{v1.ResourceEphemeralStorage: resource.MustParse("2Gi")},
+				},
+			},
+			wantStatusCode: fwk.Success,
+		},
+		{
+			name:                                    "PodLevel ephemeral-storage limit insufficient for init container DRA overhead when gate enabled",
+			enablePodLevelResourcesEphemeralStorage: true,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceEphemeralStorage: resource.MustParse("5Gi"),
+						},
+					},
+					InitContainers: []v1.Container{{
+						Name: "init-1",
+						Resources: v1.ResourceRequirements{
+							Limits: v1.ResourceList{
+								v1.ResourceEphemeralStorage: resource.MustParse("4Gi"),
+							},
+							Claims: []v1.ResourceClaim{{Name: "dra-claim"}},
+						},
+					}},
+					Containers: []v1.Container{{
+						Name: "c1",
+						Resources: v1.ResourceRequirements{
+							Limits: v1.ResourceList{
+								v1.ResourceEphemeralStorage: resource.MustParse("2Gi"),
+							},
+						},
+					}},
+				},
+			},
+			extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+				{
+					ContainerName: "",
+					Requests:      v1.ResourceList{v1.ResourceEphemeralStorage: resource.MustParse("2Gi")},
+					Limits:        v1.ResourceList{v1.ResourceEphemeralStorage: resource.MustParse("2Gi")},
+				},
+				{
+					ContainerName: "init-1",
+					Requests:      v1.ResourceList{v1.ResourceEphemeralStorage: resource.MustParse("2Gi")},
+					Limits:        v1.ResourceList{v1.ResourceEphemeralStorage: resource.MustParse("2Gi")},
+				},
+			},
+			wantStatusCode:   fwk.UnschedulableAndUnresolvable,
+			wantErrorMessage: "pod level limit for ephemeral-storage is insufficient to cover the limit and DRA overhead for container init-1",
+		},
 	}
 
 	for _, tt := range tests {
@@ -2722,6 +2832,7 @@ func TestValidatePodLevelResourcesCoverDRA(t *testing.T) {
 				fts: feature.Features{
 					EnablePodLevelResources:                       true,
 					EnablePodLevelResourcesFixInitContainerLimits: !tt.disableFixInitContainerLimits,
+					EnablePodLevelResourcesEphemeralStorage:       tt.enablePodLevelResourcesEphemeralStorage,
 				},
 			}
 			tt.pod.Status.ExtraNodeAllocatableResources = tt.extraNodeAllocatableResources

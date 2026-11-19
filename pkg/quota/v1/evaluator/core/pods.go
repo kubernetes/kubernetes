@@ -452,6 +452,7 @@ func podResourcesOptions() resourcehelper.PodResourcesOptions {
 		UseStatusResources: true,
 		// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
 		SkipPodLevelResources:                          !feature.DefaultFeatureGate.Enabled(features.PodLevelResources),
+		PodLevelResourcesEphemeralStorageEnabled:       feature.DefaultFeatureGate.Enabled(features.PodLevelResourcesEphemeralStorage),
 		InPlacePodLevelResourcesVerticalScalingEnabled: feature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling),
 		// Not gated, so pods that carry the field stay charged when the feature is disabled.
 		UseExtraNodeAllocatableResources: true,

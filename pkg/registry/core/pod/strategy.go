@@ -99,7 +99,7 @@ func (podStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	mutatePodAffinity(pod)
 	mutateTopologySpreadConstraints(pod)
 	applyAppArmorVersionSkew(ctx, pod)
-	podutil.DefaultPodLevelResources(pod)
+	podutil.DefaultPodLevelResourcesForCreate(pod)
 
 	pod.Status.QOSClass = qos.GetPodQOS(pod)
 }
@@ -463,7 +463,7 @@ func (podResizeStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 		}
 
 		if newPod.Spec.Resources != nil {
-			podutil.DefaultPodLevelResources(newPod)
+			podutil.DefaultPodLevelResourcesForResize(newPod, oldPod)
 		}
 	}
 
@@ -513,7 +513,7 @@ func (podDynamicStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime
 			newPod.Spec.Resources = oldPod.Spec.Resources.DeepCopy()
 		}
 		if newPod.Spec.Resources != nil {
-			podutil.DefaultPodLevelResources(newPod)
+			podutil.DefaultPodLevelResourcesForResize(newPod, oldPod)
 		}
 	}
 

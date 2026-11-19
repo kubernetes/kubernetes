@@ -578,7 +578,8 @@ func PodValidateLimitFunc(limitRange *corev1.LimitRange, pod, oldPod *api.Pod) e
 		// enforce pod limits
 		if limitType == corev1.LimitTypePod {
 			opts := podResourcesOptions{
-				PodLevelResourcesEnabled: feature.DefaultFeatureGate.Enabled(features.PodLevelResources),
+				PodLevelResourcesEnabled:                 feature.DefaultFeatureGate.Enabled(features.PodLevelResources),
+				PodLevelResourcesEphemeralStorageEnabled: feature.DefaultFeatureGate.Enabled(features.PodLevelResourcesEphemeralStorage),
 			}
 			var oldPodRequests, oldPodLimits api.ResourceList
 			if oldPod != nil {
@@ -693,6 +694,9 @@ type podResourcesOptions struct {
 	// PodLevelResourcesEnabled indicates that the PodLevelResources feature gate is
 	// enabled.
 	PodLevelResourcesEnabled bool
+	// PodLevelResourcesEphemeralStorageEnabled indicates that the
+	// PodLevelResourcesEphemeralStorage feature gate is enabled.
+	PodLevelResourcesEphemeralStorageEnabled bool
 }
 
 // podRequests is a simplified version of pkg/api/v1/resource/PodRequests that operates against the core version of
@@ -743,6 +747,9 @@ func podRequests(pod *api.Pod, opts podResourcesOptions) api.ResourceList {
 	if opts.PodLevelResourcesEnabled && pod.Spec.Resources != nil {
 		for resourceName, quantity := range pod.Spec.Resources.Requests {
 			if isSupportedPodLevelResource(resourceName) {
+				if resourceName == api.ResourceEphemeralStorage && !opts.PodLevelResourcesEphemeralStorageEnabled {
+					continue
+				}
 				// override with pod-level resource requests
 				reqs[resourceName] = quantity
 			}
@@ -797,6 +804,9 @@ func podLimits(pod *api.Pod, opts podResourcesOptions) api.ResourceList {
 	if opts.PodLevelResourcesEnabled && pod.Spec.Resources != nil {
 		for resourceName, quantity := range pod.Spec.Resources.Limits {
 			if isSupportedPodLevelResource(resourceName) {
+				if resourceName == api.ResourceEphemeralStorage && !opts.PodLevelResourcesEphemeralStorageEnabled {
+					continue
+				}
 				// override with pod-level resource limits
 				limits[resourceName] = quantity
 			}

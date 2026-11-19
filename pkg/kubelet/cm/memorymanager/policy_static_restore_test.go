@@ -174,7 +174,7 @@ func TestMemoryManagerRestoreState(t *testing.T) {
 			}
 
 			// Allocate resources
-			if tc.podLevelResourceManagersEnabled && resourcehelper.IsPodLevelResourcesSet(pod) {
+			if tc.podLevelResourceManagersEnabled && resourcehelper.IsPodLevelComputeResourcesSet(pod) {
 				err = mgr.AllocatePod(logger, pod, lifecycle.AddOperation)
 				if err != nil {
 					t.Fatalf("could not allocate pod: %v", err)
@@ -261,7 +261,7 @@ func TestMemoryManagerRestoreState(t *testing.T) {
 				}
 			}
 
-			if tc.podLevelResourceManagersEnabled && resourcehelper.IsPodLevelResourcesSet(pod) {
+			if tc.podLevelResourceManagersEnabled && resourcehelper.IsPodLevelComputeResourcesSet(pod) {
 				if err := mgr2.AllocatePod(logger, pod, lifecycle.AddOperation); err != nil {
 					t.Fatalf("could not allocate restored pod: %v", err)
 				}

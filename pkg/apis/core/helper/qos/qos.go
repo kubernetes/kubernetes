@@ -44,9 +44,10 @@ func GetPodQOS(pod *core.Pod) core.PodQOSClass {
 // A pod is Burstable if cpu & memory limits and requests do not match across all containers.
 // NOTE: This is tested in pkg/apis/core/v1/helper/qos/qos_test.go
 func ComputePodQOS(pod *core.Pod) core.PodQOSClass {
-	// When pod-level resources are specified, we use them to determine QoS class.
+	// When pod-level compute resources are specified, we use them to determine QoS class.
 	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) &&
-		(pod.Spec.Resources != nil && (!utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourcesFixKubeletQOSClass) || helper.IsPodLevelResourcesSet(pod))) {
+		(pod.Spec.Resources != nil && (!utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourcesFixKubeletQOSClass) ||
+			helper.IsPodLevelComputeResourcesSet(pod))) {
 		return requirementsQOS(pod.Spec.Resources)
 	}
 

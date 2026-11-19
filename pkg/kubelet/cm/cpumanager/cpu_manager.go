@@ -609,7 +609,7 @@ func (m *manager) GetResourceIsolationLevel(pod *v1.Pod, container *v1.Container
 		return cmqos.ResourceIsolationHost
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodLevelResourceManagers) && resourcehelper.IsPodLevelResourcesSet(pod) && !resourcesQualifyForExclusiveCPUs(container) {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodLevelResourceManagers) && resourcehelper.IsPodLevelComputeResourcesSet(pod) && !resourcesQualifyForExclusiveCPUs(container) {
 		return cmqos.ResourceIsolationPod
 	}
 

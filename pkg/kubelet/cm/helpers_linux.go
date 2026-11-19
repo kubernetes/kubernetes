@@ -92,7 +92,7 @@ func CalcSwapForBurstablePods(memoryRequest, nodeTotalMemory, totalPodsSwapAvail
 func ApplyPodLevelSwapConfig(logger klog.Logger, pod *v1.Pod, rc *ResourceConfig, memorySwapBehavior kubetypes.SwapBehavior, nodeTotalMemory, totalPodsSwapAvailable int64, isCgroup2, swapControllerAvailable bool) {
 	if rc == nil || pod == nil || !isCgroup2 || !swapControllerAvailable ||
 		!utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodLevelResources) ||
-		!resourcehelper.IsPodLevelResourcesSet(pod) {
+		!resourcehelper.IsPodLevelComputeResourcesSet(pod) {
 		return
 	}
 
@@ -119,7 +119,7 @@ func ApplyPodLevelSwapConfig(logger klog.Logger, pod *v1.Pod, rc *ResourceConfig
 // (either pod-level or all containers). Skips Guaranteed-like pods where request == limit.
 func ApplyPodLevelMemoryHigh(pod *v1.Pod, rc *ResourceConfig, throttlingFactor float64) {
 	podLevelResourcesEnabled := utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodLevelResources)
-	if !podLevelResourcesEnabled || !resourcehelper.IsPodLevelResourcesSet(pod) {
+	if !podLevelResourcesEnabled || !resourcehelper.IsPodLevelComputeResourcesSet(pod) {
 		return
 	}
 	opts := resourcehelper.PodResourcesOptions{

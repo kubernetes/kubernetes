@@ -1369,6 +1369,7 @@ func (pi *PodInfo) CalculateResource() fwk.PodResource {
 		return *pi.cachedResource
 	}
 	podLevelResourcesEnabled := utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources)
+	podLevelResourcesEphemeralStorageEnabled := utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourcesEphemeralStorage)
 	inPlacePodLevelResourcesVerticalScalingEnabled := utilfeature.DefaultMutableFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling)
 	// An unbound pod's status entries are stale, so only bound and assumed pods count them.
 	// TODO(pravk03): Count the extra node allocatable resources of nominated pods too. A nominated pod
@@ -1380,17 +1381,21 @@ func (pi *PodInfo) CalculateResource() fwk.PodResource {
 		UseStatusResources: true,
 		InPlacePodLevelResourcesVerticalScalingEnabled: inPlacePodLevelResourcesVerticalScalingEnabled,
 		// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
-		SkipPodLevelResources:            !podLevelResourcesEnabled,
-		UseExtraNodeAllocatableResources: nodeAllocatableResourcesDRAEnabled,
+		SkipPodLevelResources:                    !podLevelResourcesEnabled,
+		PodLevelResourcesEphemeralStorageEnabled: podLevelResourcesEphemeralStorageEnabled,
+		UseExtraNodeAllocatableResources:         nodeAllocatableResourcesDRAEnabled,
 	})
-	non0Requests := resourcehelper.PodRequests(pi.Pod, resourcehelper.PodResourcesOptions{
-		UseStatusResources: true,
-		InPlacePodLevelResourcesVerticalScalingEnabled: inPlacePodLevelResourcesVerticalScalingEnabled,
-		// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
-		SkipPodLevelResources:            !podLevelResourcesEnabled,
-		NonMissingContainerRequests:      getNonMissingContainerRequests(),
-		UseExtraNodeAllocatableResources: nodeAllocatableResourcesDRAEnabled,
-	})
+	non0Requests := requests
+	if !podLevelResourcesEnabled || !hasPodLevelCPUAndMemoryRequests(pi.Pod) {
+		non0Requests = resourcehelper.PodRequests(pi.Pod, resourcehelper.PodResourcesOptions{
+			UseStatusResources: true,
+			InPlacePodLevelResourcesVerticalScalingEnabled: inPlacePodLevelResourcesVerticalScalingEnabled,
+			// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
+			SkipPodLevelResources:            !podLevelResourcesEnabled,
+			NonMissingContainerRequests:      defaultNonMissingContainerRequests,
+			UseExtraNodeAllocatableResources: nodeAllocatableResourcesDRAEnabled,
+		})
+	}
 	non0CPU := non0Requests[v1.ResourceCPU]
 	non0Mem := non0Requests[v1.ResourceMemory]
 
@@ -1711,17 +1716,31 @@ func NewNodeInfo(pods ...*v1.Pod) *NodeInfo {
 	return ni
 }
 
-// getNonMissingContainerRequests returns the default non-zero CPU and memory
+// defaultNonMissingContainerRequests holds the default non-zero CPU and memory
 // requests that the scheduler substitutes for missing container-level requests
 // when computing Non0CPU and Non0Mem. Pod-level requests, where set, take
 // precedence over the container aggregate, so these defaults only matter for
-// resources without a pod-level request.
-// The defaults are not set on the Pod object; they are used only for scoring.
-func getNonMissingContainerRequests() v1.ResourceList {
-	return v1.ResourceList{
-		v1.ResourceCPU:    *resource.NewMilliQuantity(schedutil.DefaultMilliCPURequest, resource.DecimalSI),
-		v1.ResourceMemory: *resource.NewQuantity(schedutil.DefaultMemoryRequest, resource.DecimalSI),
+// resources without a pod-level request. Treated as read-only; not set on the
+// Pod object and used only for scoring.
+var defaultNonMissingContainerRequests = v1.ResourceList{
+	v1.ResourceCPU:    *resource.NewMilliQuantity(schedutil.DefaultMilliCPURequest, resource.DecimalSI),
+	v1.ResourceMemory: *resource.NewQuantity(schedutil.DefaultMemoryRequest, resource.DecimalSI),
+}
+
+// hasPodLevelCPUAndMemoryRequests reports whether pod sets both CPU and memory
+// pod-level requests (without an infeasible resize discarding spec), in which
+// case Non0CPU and Non0Mem match the pod's effective CPU and memory requests.
+func hasPodLevelCPUAndMemoryRequests(pod *v1.Pod) bool {
+	if pod.Spec.Resources == nil {
+		return false
 	}
+	if _, ok := pod.Spec.Resources.Requests[v1.ResourceCPU]; !ok {
+		return false
+	}
+	if _, ok := pod.Spec.Resources.Requests[v1.ResourceMemory]; !ok {
+		return false
+	}
+	return !resourcehelper.IsPodResizeInfeasible(pod)
 }
 
 // GetPodKey returns the string key of a pod.

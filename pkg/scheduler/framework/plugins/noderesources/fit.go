@@ -94,6 +94,7 @@ type Fit struct {
 	ignoredResources                                   sets.Set[string]
 	ignoredResourceGroups                              sets.Set[string]
 	enablePodLevelResources                            bool
+	enablePodLevelResourcesEphemeralStorage            bool
 	enableDRAExtendedResource                          bool
 	enableInPlacePodLevelResourcesVerticalScaling      bool
 	enableInPlacePodVerticalScalingSchedulerPreemption bool
@@ -180,11 +181,12 @@ func (f *Fit) Name() string {
 // Filtering and scoring based on the container resources and overheads.
 func (pl *Fit) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.SignFragment, *fwk.Status) {
 	opts := ResourceRequestsOptions{
-		EnablePodLevelResources:   pl.enablePodLevelResources,
-		EnableDRAExtendedResource: pl.enableDRAExtendedResource,
+		EnablePodLevelResources:                 pl.enablePodLevelResources,
+		EnablePodLevelResourcesEphemeralStorage: pl.enablePodLevelResourcesEphemeralStorage,
+		EnableDRAExtendedResource:               pl.enableDRAExtendedResource,
 	}
+	podRequest := computePodResourceRequest(pod, opts)
 	if pl.enableDRAExtendedResource {
-		podRequest := computePodResourceRequest(pod, opts)
 		for rName, rQuant := range podRequest.ScalarResources {
 			// Skip in case request quantity is zero
 			if rQuant == 0 {
@@ -197,7 +199,7 @@ func (pl *Fit) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.SignFragment, *f
 	}
 
 	return []fwk.SignFragment{
-		{Key: fwk.ResourcesSignerName, Value: computePodResourceRequest(pod, opts)},
+		{Key: fwk.ResourcesSignerName, Value: podRequest},
 	}, nil
 }
 
@@ -211,6 +213,7 @@ func getScorer(strategy *config.ScoringStrategy, fts feature.Features) (*resourc
 	}
 	scorer := scorerFactory(strategy)
 	scorer.enablePodLevelResources = fts.EnablePodLevelResources
+	scorer.enablePodLevelResourcesEphemeralStorage = fts.EnablePodLevelResourcesEphemeralStorage
 	scorer.enableInPlacePodLevelResourcesVerticalScaling = fts.EnableInPlacePodLevelResourcesVerticalScaling
 	return scorer, nil
 }
@@ -243,11 +246,12 @@ func NewFit(_ context.Context, plArgs runtime.Object, h fwk.Handle, fts feature.
 	}
 
 	pl := &Fit{
-		ignoredResources:          sets.New(args.IgnoredResources...),
-		ignoredResourceGroups:     sets.New(args.IgnoredResourceGroups...),
-		handle:                    h,
-		enablePodLevelResources:   fts.EnablePodLevelResources,
-		enableDRAExtendedResource: fts.EnableDRAExtendedResource,
+		ignoredResources:                        sets.New(args.IgnoredResources...),
+		ignoredResourceGroups:                   sets.New(args.IgnoredResourceGroups...),
+		handle:                                  h,
+		enablePodLevelResources:                 fts.EnablePodLevelResources,
+		enablePodLevelResourcesEphemeralStorage: fts.EnablePodLevelResourcesEphemeralStorage,
+		enableDRAExtendedResource:               fts.EnableDRAExtendedResource,
 
 		enableInPlacePodLevelResourcesVerticalScaling: fts.EnableInPlacePodLevelResourcesVerticalScaling,
 
@@ -292,7 +296,8 @@ func computePodResourceRequest(pod *v1.Pod, opts ResourceRequestsOptions) *preFi
 // PreFilter invoked at the prefilter extension point.
 func (f *Fit) PreFilter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) (*fwk.PreFilterResult, *fwk.Status) {
 	result := computePodResourceRequest(pod, ResourceRequestsOptions{
-		EnablePodLevelResources: f.enablePodLevelResources,
+		EnablePodLevelResources:                 f.enablePodLevelResources,
+		EnablePodLevelResourcesEphemeralStorage: f.enablePodLevelResourcesEphemeralStorage,
 		// pod.Spec.NodeName != "" is needed here to exclude any stale status from a previously failed PreBind when the pod is not bound yet and the status is not cleared yet in the assumed pod.
 		EnableDRANodeAllocatableResources: f.enableDRANodeAllocatableResources && pod.Spec.NodeName != "",
 	})
@@ -412,8 +417,11 @@ func (f *Fit) haveEnoughRelevantResourcesDecreased(targetPod *v1.Pod, originalPo
 	// the other pod was scheduled, so modification or deletion may free up some resources.
 	originalMaxResourceReq, modifiedMaxResourceReq := &framework.Resource{}, &framework.Resource{}
 	opts := resource.PodResourcesOptions{
+		Reuse:              make(v1.ResourceList, 4),
 		UseStatusResources: true,
 		InPlacePodLevelResourcesVerticalScalingEnabled: f.enableInPlacePodLevelResourcesVerticalScaling,
+		SkipPodLevelResources:                          !f.enablePodLevelResources,
+		PodLevelResourcesEphemeralStorageEnabled:       f.enablePodLevelResourcesEphemeralStorage,
 		UseExtraNodeAllocatableResources:               f.enableDRANodeAllocatableResources,
 	}
 	originalMaxResourceReq.SetMaxResource(resource.PodRequests(originalPod, opts))
@@ -469,8 +477,9 @@ func (f *Fit) isSchedulableAfterNodeChange(logger klog.Logger, pod *v1.Pod, oldO
 	}
 
 	opts := ResourceRequestsOptions{
-		EnablePodLevelResources:   f.enablePodLevelResources,
-		EnableDRAExtendedResource: f.enableDRAExtendedResource,
+		EnablePodLevelResources:                 f.enablePodLevelResources,
+		EnablePodLevelResourcesEphemeralStorage: f.enablePodLevelResourcesEphemeralStorage,
+		EnableDRAExtendedResource:               f.enableDRAExtendedResource,
 		// An unbound pod's status entries are stale, so we should not be considering them when
 		// checking whether the node fits the pod.
 		EnableDRANodeAllocatableResources: f.enableDRANodeAllocatableResources && pod.Spec.NodeName != "",
@@ -671,8 +680,9 @@ func (f *Fit) recomputePodResourceRequestForNode(cycleState fwk.CycleState, pod 
 	podCopy := *pod
 	podCopy.Status.ExtraNodeAllocatableResources = extraResources
 	return computePodResourceRequest(&podCopy, ResourceRequestsOptions{
-		EnablePodLevelResources:           f.enablePodLevelResources,
-		EnableDRANodeAllocatableResources: true,
+		EnablePodLevelResources:                 f.enablePodLevelResources,
+		EnablePodLevelResourcesEphemeralStorage: f.enablePodLevelResourcesEphemeralStorage,
+		EnableDRANodeAllocatableResources:       true,
 	})
 }
 

@@ -830,3 +830,77 @@ func Test_podResourceCollector_CollectWithStability(t *testing.T) {
 		})
 	}
 }
+
+func TestPodResourceCollectorPodLevelEphemeralStorage(t *testing.T) {
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "test", Name: "foo"},
+		Spec: v1.PodSpec{
+			Resources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceEphemeralStorage: resource.MustParse("5G"),
+				},
+				Limits: v1.ResourceList{
+					v1.ResourceEphemeralStorage: resource.MustParse("10G"),
+				},
+			},
+			Containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceEphemeralStorage: resource.MustParse("1G"),
+						},
+						Limits: v1.ResourceList{
+							v1.ResourceEphemeralStorage: resource.MustParse("2G"),
+						},
+					},
+				},
+			},
+		},
+	}
+
+	tests := []struct {
+		name        string
+		gateEnabled bool
+		expected    string
+	}{
+		{
+			name:        "gate disabled reports container-level ephemeral-storage",
+			gateEnabled: false,
+			expected: `
+				# HELP kube_pod_resource_limit [STABLE] Resources limit for workloads on the cluster, broken down by pod. This shows the resource usage the scheduler and kubelet expect per pod for resources along with the unit for the resource if any.
+				# TYPE kube_pod_resource_limit gauge
+				kube_pod_resource_limit{namespace="test",node="",pod="foo",priority="",resource="ephemeral-storage",scheduler="",unit="bytes"} 2e+09
+				# HELP kube_pod_resource_request [STABLE] Resources requested by workloads on the cluster, broken down by pod. This shows the resource usage the scheduler and kubelet expect per pod for resources along with the unit for the resource if any.
+				# TYPE kube_pod_resource_request gauge
+				kube_pod_resource_request{namespace="test",node="",pod="foo",priority="",resource="ephemeral-storage",scheduler="",unit="bytes"} 1e+09
+				`,
+		},
+		{
+			name:        "gate enabled reports pod-level ephemeral-storage",
+			gateEnabled: true,
+			expected: `
+				# HELP kube_pod_resource_limit [STABLE] Resources limit for workloads on the cluster, broken down by pod. This shows the resource usage the scheduler and kubelet expect per pod for resources along with the unit for the resource if any.
+				# TYPE kube_pod_resource_limit gauge
+				kube_pod_resource_limit{namespace="test",node="",pod="foo",priority="",resource="ephemeral-storage",scheduler="",unit="bytes"} 1e+10
+				# HELP kube_pod_resource_request [STABLE] Resources requested by workloads on the cluster, broken down by pod. This shows the resource usage the scheduler and kubelet expect per pod for resources along with the unit for the resource if any.
+				# TYPE kube_pod_resource_request gauge
+				kube_pod_resource_request{namespace="test",node="",pod="foo",priority="",resource="ephemeral-storage",scheduler="",unit="bytes"} 5e+09
+				`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, true)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, true)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourcesEphemeralStorage, tt.gateEnabled)
+
+			c := NewPodResourcesMetricsCollector(&fakePodLister{pods: []*v1.Pod{pod}})
+			registry := metrics.NewKubeRegistry()
+			registry.CustomMustRegister(c)
+			if err := testutil.GatherAndCompare(registry, strings.NewReader(tt.expected)); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}

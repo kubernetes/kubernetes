@@ -524,7 +524,7 @@ func (m *manager) GetResourceIsolationLevel(pod *v1.Pod, container *v1.Container
 		return cmqos.ResourceIsolationHost
 	}
 
-	if feature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) && resourcehelper.IsPodLevelResourcesSet(pod) && !cmqos.IsContainerEquivalentQOSGuaranteed(container) {
+	if feature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) && resourcehelper.IsPodLevelComputeResourcesSet(pod) && !cmqos.IsContainerEquivalentQOSGuaranteed(container) {
 		return cmqos.ResourceIsolationPod
 	}
 
