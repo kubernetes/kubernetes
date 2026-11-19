@@ -420,6 +420,12 @@ func TestDeclarativeValidateStatusUpdate(t *testing.T) {
 					field.NotSupported(conditionPath.Index(0).Child("status"), api.VolumeHealthStatusType("Invalid"), []api.VolumeHealthStatusType(nil)),
 				},
 			},
+			"hostPhase enum": {
+				volumeHealth: []api.PodVolumeStatus{{Name: "vol", HostPhase: "Invalid"}},
+				expectedErrs: field.ErrorList{
+					field.NotSupported(field.NewPath("status", "volumeStatuses").Index(0).Child("hostPhase"), api.PodVolumeHostPhase("Invalid"), []api.PodVolumeHostPhase(nil)),
+				},
+			},
 			"reason required": {
 				volumeHealth: []api.PodVolumeStatus{{Name: "vol", HealthStatus: &api.VolumeHealthStatus{HealthConditions: []api.VolumeHealthCondition{{Status: api.VolumeHealthDegraded}}}}},
 				expectedErrs: field.ErrorList{

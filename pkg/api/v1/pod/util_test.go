@@ -30,6 +30,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	internalpod "k8s.io/kubernetes/pkg/api/pod"
+	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
 )
 
@@ -1669,4 +1671,51 @@ func TestVolumePairs(t *testing.T) {
 		})
 		assert.Zero(t, allocs)
 	})
+}
+
+func TestIsSupportedDynamicVolumeSource(t *testing.T) {
+	tests := []struct {
+		name     string
+		source   *v1.VolumeSource
+		expected bool
+	}{
+		{name: "nil", source: nil, expected: false},
+		{name: "empty", source: &v1.VolumeSource{}, expected: false},
+		{name: "configMap", source: &v1.VolumeSource{ConfigMap: &v1.ConfigMapVolumeSource{}}, expected: true},
+		{name: "secret", source: &v1.VolumeSource{Secret: &v1.SecretVolumeSource{}}, expected: true},
+		{name: "projected", source: &v1.VolumeSource{Projected: &v1.ProjectedVolumeSource{}}, expected: true},
+		{name: "emptyDir", source: &v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}, expected: true},
+		{name: "image", source: &v1.VolumeSource{Image: &v1.ImageVolumeSource{}}, expected: true},
+		{name: "hostPath", source: &v1.VolumeSource{HostPath: &v1.HostPathVolumeSource{}}, expected: false},
+		{name: "pvc", source: &v1.VolumeSource{PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{}}, expected: false},
+		{name: "downwardAPI", source: &v1.VolumeSource{DownwardAPI: &v1.DownwardAPIVolumeSource{}}, expected: false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.expected, IsSupportedDynamicVolumeSource(tc.source))
+		})
+	}
+}
+
+func TestIsSupportedDynamicVolumeSourceParity(t *testing.T) {
+	v1Type := reflect.TypeFor[v1.VolumeSource]()
+	coreType := reflect.TypeFor[core.VolumeSource]()
+	assert.Equal(t, v1Type.NumField(), coreType.NumField(), "v1.VolumeSource and core.VolumeSource field counts must match")
+
+	for i := 0; i < v1Type.NumField(); i++ {
+		v1Field := v1Type.Field(i)
+		coreField, ok := coreType.FieldByName(v1Field.Name)
+		if !assert.True(t, ok, "core.VolumeSource missing field %s", v1Field.Name) {
+			continue
+		}
+		var v1Src v1.VolumeSource
+		var coreSrc core.VolumeSource
+		reflect.ValueOf(&v1Src).Elem().Field(i).Set(reflect.New(v1Field.Type.Elem()))
+		reflect.ValueOf(&coreSrc).Elem().FieldByIndex(coreField.Index).Set(reflect.New(coreField.Type.Elem()))
+		assert.Equal(t,
+			internalpod.IsSupportedDynamicVolumeSource(&coreSrc),
+			IsSupportedDynamicVolumeSource(&v1Src),
+			"parity mismatch for VolumeSource field %s", v1Field.Name,
+		)
+	}
 }

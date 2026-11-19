@@ -2704,7 +2704,7 @@ var resizeStatusSet = sets.New(core.PersistentVolumeClaimControllerResizeInProgr
 	core.PersistentVolumeClaimNodeResizeInProgress,
 	core.PersistentVolumeClaimNodeResizeInfeasible)
 
-func validatePodVolumeStatuses(volumeStatuses []core.PodVolumeStatus, spec *core.PodSpec, fldPath *field.Path) field.ErrorList {
+func validatePodVolumeStatuses(volumeStatuses, oldVolumeStatuses []core.PodVolumeStatus, spec *core.PodSpec, opts PodValidationOptions, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	volumeNames := sets.New[string]()
 	if spec != nil {
@@ -2712,10 +2712,23 @@ func validatePodVolumeStatuses(volumeStatuses []core.PodVolumeStatus, spec *core
 			volumeNames.Insert(v.Name)
 		}
 	}
+	hostPhaseAllowed := opts.DynamicNodeLocalEphemeralVolumesEnabled || slices.ContainsFunc(oldVolumeStatuses, func(vs core.PodVolumeStatus) bool {
+		return vs.HostPhase != ""
+	})
+	oldStatusNames := sets.New[string]()
+	for _, oldVS := range oldVolumeStatuses {
+		oldStatusNames.Insert(oldVS.Name)
+	}
 	for i, vh := range volumeStatuses {
 		idxPath := fldPath.Index(i)
 		if len(vh.Name) > 0 && !volumeNames.Has(vh.Name) {
-			allErrs = append(allErrs, field.NotFound(idxPath.Child("name"), vh.Name))
+			// Dynamically removed volumes remain in VolumeStatuses with a non-empty HostPhase
+			// (and nil HealthStatus) until the kubelet completes host teardown.
+			if !hostPhaseAllowed || vh.HealthStatus != nil || vh.HostPhase == "" {
+				allErrs = append(allErrs, field.NotFound(idxPath.Child("name"), vh.Name))
+			} else if !oldStatusNames.Has(vh.Name) {
+				allErrs = append(allErrs, ValidateDNS1123Label(vh.Name, idxPath.Child("name"))...)
+			}
 		}
 		allErrs = append(allErrs, validateVolumeHealthStatus(vh.HealthStatus, idxPath.Child("healthStatus"))...)
 	}
@@ -6382,7 +6395,7 @@ func ValidatePodStatusUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions
 	allErrs = append(allErrs, validatePodExtendedResourceClaimStatus(newPod.Status.ExtendedResourceClaimStatus, &newPod.Spec, fldPath.Child("extendedResourceClaimStatus"))...)
 	allErrs = append(allErrs, validateExtraNodeAllocatableResources(newPod.Status, &newPod.Spec, fldPath.Child("extraNodeAllocatableResources"))...)
 
-	allErrs = append(allErrs, validatePodVolumeStatuses(newPod.Status.VolumeStatuses, &newPod.Spec, fldPath.Child("volumeStatuses"))...)
+	allErrs = append(allErrs, validatePodVolumeStatuses(newPod.Status.VolumeStatuses, oldPod.Status.VolumeStatuses, &newPod.Spec, opts, fldPath.Child("volumeStatuses"))...)
 
 	if newIPErrs := validatePodIPs(newPod, oldPod); len(newIPErrs) > 0 {
 		allErrs = append(allErrs, newIPErrs...)
@@ -6848,19 +6861,34 @@ func ValidatePodDynamicUpdate(newPod, oldPod *core.Pod, opts PodValidationOption
 	alignedOldPod := *oldPod
 	alignedOldPod.Spec = alignOldContainers(newPod, oldPod)
 
+	var volumesChanged bool
+	if opts.DynamicNodeLocalEphemeralVolumesEnabled {
+		var volErrs field.ErrorList
+		volErrs, volumesChanged = validateDynamicVolumeChanges(newPod, oldPod, specPath)
+		allErrs = append(allErrs, volErrs...)
+		if len(volErrs) > 0 {
+			return allErrs
+		}
+		if volumesChanged {
+			alignedOldPod.Spec = alignOldVolumes(newPod, oldPod, alignedOldPod.Spec)
+		}
+	}
+
 	resizeErrs, mungedPodSpec, resized := validateResizableSpecChanges(newPod, &alignedOldPod, specPath, opts)
 	allErrs = append(allErrs, resizeErrs...)
 	if len(allErrs) > 0 {
 		return allErrs
 	}
 
-	if containersChanged || resized {
+	if containersChanged || volumesChanged || resized {
 		if _, ok := oldPod.Annotations[core.MirrorPodAnnotationKey]; ok {
-			return field.ErrorList{field.Forbidden(field.NewPath(""), "static pods cannot be resized or have containers added or removed")}
+			return field.ErrorList{field.Forbidden(field.NewPath(""), "static pods cannot be resized or have containers added or removed or volumes modified")}
 		}
 		if oldPod.Spec.OS != nil && oldPod.Spec.OS.Name == core.Windows {
-			return field.ErrorList{field.Forbidden(field.NewPath(""), "windows pods cannot be resized or have containers added or removed")}
+			return field.ErrorList{field.Forbidden(field.NewPath(""), "windows pods cannot be resized or have containers added or removed or volumes modified")}
 		}
+	}
+	if containersChanged || resized {
 		if qos.GetPodQOS(oldPod) != qos.ComputePodQOS(newPod) {
 			allErrs = append(allErrs, field.Invalid(specPath, newPod.Status.QOSClass, "Pod QOS Class may not change as a result of resizing or adding or removing containers"))
 		}
@@ -6914,17 +6942,19 @@ func validateDynamicContainerChanges(newPod, oldPod *core.Pod, specPath *field.P
 		}
 	}
 	if len(added) == 0 && len(removed) == 0 {
+		if !opts.DynamicContainersEnabled && !slices.EqualFunc(newPod.Spec.Containers, oldPod.Spec.Containers, func(a, b core.Container) bool { return a.Name == b.Name }) {
+			return append(allErrs, field.Forbidden(ctrsPath, "containers may not be added, removed, or reordered when DynamicContainers feature gate is disabled")), false
+		}
 		return nil, false
 	}
+	if !opts.DynamicContainersEnabled {
+		return append(allErrs, field.Forbidden(ctrsPath, "containers may not be added, removed, or reordered when DynamicContainers feature gate is disabled")), false
+	}
 
-	if oldPod.DeletionTimestamp != nil {
-		return append(allErrs, field.Forbidden(ctrsPath, "containers may not be added or removed once the pod is terminating")), true
-	}
-	if oldPod.Status.Phase != core.PodRunning {
-		allErrs = append(allErrs, field.Forbidden(ctrsPath, fmt.Sprintf("containers may only be added or removed while the pod is %s, but it is %q", core.PodRunning, oldPod.Status.Phase)))
-	}
-	if !isPodInitialized(oldPod) {
-		allErrs = append(allErrs, field.Forbidden(ctrsPath, "containers may only be added or removed after all init containers have completed"))
+	lifecycleErrs, terminating := validateDynamicPodLifecycle(oldPod, ctrsPath, "containers")
+	allErrs = append(allErrs, lifecycleErrs...)
+	if terminating {
+		return allErrs, true
 	}
 
 	hasResources := func(c *core.Container) bool {
@@ -7012,6 +7042,115 @@ func alignOldContainers(newPod, oldPod *core.Pod) core.PodSpec {
 		}
 	}
 	return alignedOldPodSpec
+}
+
+func validateDynamicPodLifecycle(oldPod *core.Pod, fldPath *field.Path, subject string) (errs field.ErrorList, terminating bool) {
+	if oldPod.DeletionTimestamp != nil {
+		return field.ErrorList{field.Forbidden(fldPath, fmt.Sprintf("%s may not be added or removed once the pod is terminating", subject))}, true
+	}
+	if oldPod.Status.Phase != core.PodRunning {
+		errs = append(errs, field.Forbidden(fldPath, fmt.Sprintf("%s may only be added or removed while the pod is %s, but it is %q", subject, core.PodRunning, oldPod.Status.Phase)))
+	}
+	if !isPodInitialized(oldPod) {
+		errs = append(errs, field.Forbidden(fldPath, fmt.Sprintf("%s may only be added or removed after all init containers have completed", subject)))
+	}
+	return errs, false
+}
+
+// validateDynamicVolumeChanges validates dynamic node-local ephemeral volume
+// additions, removals, and reorderings on pods/dynamic, and returns whether any occurred.
+// In-place mutations to kept volumes and existing containers' volumeMounts/volumeDevices
+// are left to validateResizableSpecChanges and validatePodSpecUpdate.
+func validateDynamicVolumeChanges(newPod, oldPod *core.Pod, specPath *field.Path) (field.ErrorList, bool) {
+	var allErrs field.ErrorList
+	volsPath := specPath.Child("volumes")
+
+	var added []int
+	var removed []*core.Volume
+	i := 0
+	for pair := range podutil.VolumePairs(newPod, oldPod) {
+		switch {
+		case pair.Old == nil:
+			added = append(added, i)
+			i++
+		case pair.New == nil:
+			removed = append(removed, pair.Old)
+		default:
+			i++
+		}
+	}
+
+	volumesReordered := !slices.EqualFunc(newPod.Spec.Volumes, oldPod.Spec.Volumes, func(a, b core.Volume) bool {
+		return a.Name == b.Name
+	})
+	if len(added) == 0 && len(removed) == 0 && !volumesReordered {
+		return nil, false
+	}
+
+	lifecycleErrs, terminating := validateDynamicPodLifecycle(oldPod, volsPath, "volumes")
+	allErrs = append(allErrs, lifecycleErrs...)
+	if terminating {
+		return allErrs, true
+	}
+
+	hasVolumeStatus := func(name string) bool {
+		if slices.ContainsFunc(oldPod.Status.VolumeStatuses, func(vs core.PodVolumeStatus) bool { return vs.Name == name }) {
+			return true
+		}
+		// Terminated containers have already torn down their mount namespaces; host-level
+		// teardown is tracked via oldPod.Status.VolumeStatuses.
+		hasMountStatus := func(cs core.ContainerStatus) bool {
+			return cs.State.Terminated == nil &&
+				slices.ContainsFunc(cs.VolumeMounts, func(vm core.VolumeMountStatus) bool { return vm.Name == name })
+		}
+		return slices.ContainsFunc(oldPod.Status.InitContainerStatuses, hasMountStatus) ||
+			slices.ContainsFunc(oldPod.Status.ContainerStatuses, hasMountStatus) ||
+			slices.ContainsFunc(oldPod.Status.EphemeralContainerStatuses, hasMountStatus)
+	}
+
+	for _, idx := range added {
+		newVol := &newPod.Spec.Volumes[idx]
+		volPath := volsPath.Index(idx)
+		if !podutil.IsSupportedDynamicVolumeSource(&newVol.VolumeSource) {
+			allErrs = append(allErrs, field.Forbidden(volPath, "only configMap, secret, projected, emptyDir, and image volumes may be dynamically added"))
+		}
+		if hasVolumeStatus(newVol.Name) {
+			allErrs = append(allErrs, field.Forbidden(volPath.Child("name"), fmt.Sprintf("volume %q cannot be re-added while previous volume with the same name is still pending, mounted, or unmounting in pod status", newVol.Name)))
+		}
+	}
+
+	// Note: validatePodMetadataAndSpec -> ValidatePodSpec -> ValidateVolumeMounts already verifies
+	// that all volumeMounts across containers, initContainers, and ephemeralContainers reference a
+	// volume present in newPod.Spec.Volumes, preventing a volume from being removed while mounted
+	// by any remaining container in newPod.Spec.
+	for _, oldVol := range removed {
+		if !podutil.IsSupportedDynamicVolumeSource(&oldVol.VolumeSource) {
+			allErrs = append(allErrs, field.Forbidden(volsPath, fmt.Sprintf("volume %q of unsupported type may not be dynamically removed", oldVol.Name)))
+			continue
+		}
+		if podutil.IsVolumeMountedInPodSpec(&oldPod.Spec, oldVol.Name) && !hasVolumeStatus(oldVol.Name) {
+			allErrs = append(allErrs, field.Forbidden(volsPath, fmt.Sprintf("volume %q may not be removed until its status is reported", oldVol.Name)))
+		}
+	}
+
+	return allErrs, true
+}
+
+// alignOldVolumes aligns alignedSpec.Volumes with newPod: kept volumes are ordered to
+// match newPod and retain their old spec (preserving any emptyDir.sizeLimit diff for
+// validateResizableSpecChanges), removed volumes are dropped, and added volumes are
+// copied from newPod.
+func alignOldVolumes(newPod, oldPod *core.Pod, alignedSpec core.PodSpec) core.PodSpec {
+	alignedSpec.Volumes = make([]core.Volume, 0, len(newPod.Spec.Volumes))
+	for pair := range podutil.VolumePairs(newPod, oldPod) {
+		switch {
+		case pair.Old == nil:
+			alignedSpec.Volumes = append(alignedSpec.Volumes, *pair.New)
+		case pair.New != nil:
+			alignedSpec.Volumes = append(alignedSpec.Volumes, *pair.Old)
+		}
+	}
+	return alignedSpec
 }
 
 func validateDynamicContainerResources(resources *core.ResourceRequirements, fldPath *field.Path) field.ErrorList {

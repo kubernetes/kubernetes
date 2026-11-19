@@ -4936,9 +4936,28 @@ type EvictionResponder struct {
 	Priority *int32
 }
 
+// PodVolumeHostPhase represents the host preparation phase of a volume mounted to a pod.
+type PodVolumeHostPhase string
+
+const (
+	// PodVolumeHostPending indicates that the volume has been added to pod.Spec.Volumes,
+	// and is waiting node allocation or host preparation/mounting by VolumeManager.
+	PodVolumeHostPending PodVolumeHostPhase = "Pending"
+
+	// PodVolumeHostMounted indicates that VolumeManager has successfully prepared and
+	// mounted the volume on the node host (marked ready in ActualStateOfWorld).
+	PodVolumeHostMounted PodVolumeHostPhase = "HostMounted"
+
+	// PodVolumeHostUnmounting indicates that volume removal has been admitted and allocated
+	// by Kubelet, and Kubelet is waiting for any removed containers referencing the volume to
+	// terminate and tearing down the host mount.
+	PodVolumeHostUnmounting PodVolumeHostPhase = "Unmounting"
+)
+
 // PodVolumeStatus represents the status of an individual volume used by a pod.
 type PodVolumeStatus struct {
-	// name matches an entry in pod.spec.volumes.
+	// name matches an entry in pod.spec.volumes, or the name of a dynamically removed
+	// volume that is still unmounting on the node.
 	// +required
 	Name string
 	// healthStatus contains health reported by the CSI node plugin for this volume
@@ -4947,6 +4966,14 @@ type PodVolumeStatus struct {
 	// +featureGate=CSIVolumeHealth
 	// +optional
 	HealthStatus *VolumeHealthStatus
+	// hostPhase represents the host-level preparation phase of the volume:
+	// Pending, HostMounted, Unmounting. Currently populated only for node-local
+	// ephemeral volume types supported for dynamic updates (configMap, secret,
+	// projected, emptyDir, and image).
+	// This is an alpha field and requires enabling the DynamicNodeLocalEphemeralVolumes feature gate.
+	// +featureGate=DynamicNodeLocalEphemeralVolumes
+	// +optional
+	HostPhase PodVolumeHostPhase
 }
 
 // PodStatus represents information about the status of a pod. Status may trail the actual
@@ -5092,8 +5119,8 @@ type PodStatus struct {
 	ExtraNodeAllocatableResources []ExtraNodeAllocatableResource
 
 	// VolumeStatuses contains the status of individual volumes used by this pod.
-	// This is an alpha field and requires enabling the CSIVolumeHealth feature gate.
-	// +featureGate=CSIVolumeHealth
+	// This is an alpha field and requires enabling the CSIVolumeHealth or DynamicNodeLocalEphemeralVolumes feature gate.
+	// +featureGate=CSIVolumeHealth,DynamicNodeLocalEphemeralVolumes
 	// +optional
 	// +patchMergeKey=name
 	// +patchStrategy=merge

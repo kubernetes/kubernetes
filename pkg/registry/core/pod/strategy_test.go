@@ -5646,6 +5646,7 @@ func TestWarningsOnUpdate(t *testing.T) {
 }
 
 func TestPodDynamicStrategy(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicContainers, true)
 	ctx := genericapirequest.NewDefaultContext()
 	mkPod := func(ctrs ...string) *api.Pod {
 		var containers []api.Container
@@ -5714,6 +5715,7 @@ func TestPodDynamicStrategy(t *testing.T) {
 }
 
 func TestPodDynamicStrategyPodLevelResourcesDefaulting(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicContainers, true)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, true)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourcesFixDefaulting, true)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodLevelResourcesVerticalScaling, true)
@@ -5894,4 +5896,333 @@ func TestWorkloadControlledSwapFeatureGateLifecycle(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("expected container swap resize with WorkloadControlledSwap re-enabled to succeed, got: %v", err)
 	}
+}
+
+func TestPodVolumeStatusesOwnership(t *testing.T) {
+	ctx := genericapirequest.NewContext()
+
+	t.Run("PrepareForCreate leaves VolumeStatuses empty for kubelet to populate", func(t *testing.T) {
+		mkPodWithVols := func() *api.Pod {
+			p := newPod("pod-vols", []api.Container{newContainer("c1", nil, nil)})
+			p.Spec.Volumes = []api.Volume{
+				{Name: "z-secret", VolumeSource: api.VolumeSource{Secret: &api.SecretVolumeSource{SecretName: "s1"}}},
+				{Name: "a-empty", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}},
+				{Name: "m-hostpath", VolumeSource: api.VolumeSource{HostPath: &api.HostPathVolumeSource{Path: "/tmp"}}},
+			}
+			p.Spec.Containers[0].VolumeMounts = []api.VolumeMount{
+				{Name: "z-secret", MountPath: "/mnt/sec"},
+				{Name: "a-empty", MountPath: "/mnt/emp"},
+			}
+			return p
+		}
+
+		for _, enabled := range []bool{false, true} {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicNodeLocalEphemeralVolumes, enabled)
+			pod := mkPodWithVols()
+			Strategy.PrepareForCreate(ctx, pod)
+			if pod.Status.VolumeStatuses != nil {
+				t.Fatalf("expected nil VolumeStatuses on create (enabled=%v), got %v", enabled, pod.Status.VolumeStatuses)
+			}
+		}
+	})
+
+	t.Run("DynamicStrategy leaves VolumeStatuses to kubelet and blocks premature removal or name reuse", func(t *testing.T) {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicContainers, true)
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicNodeLocalEphemeralVolumes, true)
+
+		ctr := podtest.MakeContainer("c1")
+		ctr.VolumeMounts = []api.VolumeMount{{Name: "vol-init", MountPath: "/mnt/init"}}
+		oldPod := podtest.MakePod("pod-dyn",
+			podtest.SetResourceVersion("1"),
+			podtest.SetGeneration(1),
+			podtest.SetContainers(ctr),
+			podtest.SetNodeName("node-1"),
+			podtest.SetVolumes(api.Volume{
+				Name:         "vol-init",
+				VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}},
+			}),
+			podtest.SetStatus(api.PodStatus{
+				Phase:              api.PodRunning,
+				QOSClass:           api.PodQOSBestEffort,
+				ObservedGeneration: 1,
+				Conditions:         []api.PodCondition{{Type: api.PodInitialized, Status: api.ConditionTrue}},
+				VolumeStatuses: []api.PodVolumeStatus{
+					{Name: "vol-init", HostPhase: api.PodVolumeHostMounted},
+				},
+			}),
+		)
+		oldSnapshot := oldPod.DeepCopy()
+
+		// Step 1: Add vol-cm (cm-a) and dynamic container c-dyn mounting it via /dynamic -> VolumeStatuses is left unchanged for kubelet to report.
+		afterAdd := oldPod.DeepCopy()
+		afterAdd.Spec.Volumes = append(afterAdd.Spec.Volumes, api.Volume{
+			Name:         "vol-cm",
+			VolumeSource: api.VolumeSource{ConfigMap: &api.ConfigMapVolumeSource{LocalObjectReference: api.LocalObjectReference{Name: "cm-a"}}},
+		})
+		dynCtr := podtest.MakeContainer("c-dyn")
+		dynCtr.VolumeMounts = []api.VolumeMount{{Name: "vol-cm", MountPath: "/mnt/cm"}}
+		afterAdd.Spec.Containers = append(afterAdd.Spec.Containers, dynCtr)
+		DynamicStrategy.PrepareForUpdate(ctx, afterAdd, oldPod)
+		if diff := cmp.Diff(oldSnapshot, oldPod); diff != "" {
+			t.Fatalf("PrepareForUpdate mutated oldPod (-want, +got):\n%s", diff)
+		}
+		if errs := DynamicStrategy.ValidateUpdate(ctx, afterAdd, oldPod); len(errs) != 0 {
+			t.Fatalf("unexpected errors adding vol-cm and c-dyn: %v", errs)
+		}
+		if diff := cmp.Diff(oldPod.Status.VolumeStatuses, afterAdd.Status.VolumeStatuses); diff != "" {
+			t.Fatalf("expected DynamicStrategy not to synthesize VolumeStatuses (-want, +got):\n%s", diff)
+		}
+
+		// Step 2: Removing c-dyn and vol-cm before kubelet reports status is rejected.
+		prematureRemove := afterAdd.DeepCopy()
+		prematureRemove.Spec.Volumes = prematureRemove.Spec.Volumes[:1]
+		prematureRemove.Spec.Containers = prematureRemove.Spec.Containers[:1]
+		DynamicStrategy.PrepareForUpdate(ctx, prematureRemove, afterAdd)
+		if errs := DynamicStrategy.ValidateUpdate(ctx, prematureRemove, afterAdd); len(errs) == 0 {
+			t.Fatal("expected premature removal before kubelet reports status to be rejected")
+		}
+
+		// Step 3: Kubelet reports c-dyn and vol-cm in status -> joint removal succeeds, and status stays until kubelet clears it.
+		kubeletObserved := afterAdd.DeepCopy()
+		kubeletObserved.Status.ObservedGeneration = afterAdd.Generation
+		kubeletObserved.Status.ContainerStatuses = []api.ContainerStatus{{Name: "c-dyn"}}
+		kubeletObserved.Status.VolumeStatuses = []api.PodVolumeStatus{
+			{Name: "vol-cm", HostPhase: api.PodVolumeHostPending},
+			{Name: "vol-init", HostPhase: api.PodVolumeHostMounted},
+		}
+		StatusStrategy.PrepareForUpdate(ctx, kubeletObserved, afterAdd)
+		if errs := StatusStrategy.ValidateUpdate(ctx, kubeletObserved, afterAdd); len(errs) != 0 {
+			t.Fatalf("unexpected status validation errors: %v", errs)
+		}
+
+		afterRemove := kubeletObserved.DeepCopy()
+		afterRemove.Spec.Volumes = afterRemove.Spec.Volumes[:1]
+		afterRemove.Spec.Containers = afterRemove.Spec.Containers[:1]
+		DynamicStrategy.PrepareForUpdate(ctx, afterRemove, kubeletObserved)
+		if errs := DynamicStrategy.ValidateUpdate(ctx, afterRemove, kubeletObserved); len(errs) != 0 {
+			t.Fatalf("unexpected errors removing c-dyn and vol-cm after kubelet reported status: %v", errs)
+		}
+
+		// Step 4: Re-adding vol-cm with different parameters (cm-b) is rejected while kubelet status still reports vol-cm.
+		for _, activePhase := range []api.PodVolumeHostPhase{api.PodVolumeHostPending, api.PodVolumeHostMounted, api.PodVolumeHostUnmounting} {
+			removedActive := afterRemove.DeepCopy()
+			removedActive.Status.ContainerStatuses = nil
+			removedActive.Status.VolumeStatuses = []api.PodVolumeStatus{
+				{Name: "vol-cm", HostPhase: activePhase},
+				{Name: "vol-init", HostPhase: api.PodVolumeHostMounted},
+			}
+			reAddActive := removedActive.DeepCopy()
+			reAddActive.Spec.Volumes = append(reAddActive.Spec.Volumes, api.Volume{
+				Name:         "vol-cm",
+				VolumeSource: api.VolumeSource{ConfigMap: &api.ConfigMapVolumeSource{LocalObjectReference: api.LocalObjectReference{Name: "cm-b"}}},
+			})
+			reAddCtr := podtest.MakeContainer("c-dyn-2")
+			reAddCtr.VolumeMounts = []api.VolumeMount{{Name: "vol-cm", MountPath: "/mnt/cm"}}
+			reAddActive.Spec.Containers = append(reAddActive.Spec.Containers, reAddCtr)
+			DynamicStrategy.PrepareForUpdate(ctx, reAddActive, removedActive)
+			errs := DynamicStrategy.ValidateUpdate(ctx, reAddActive, removedActive)
+			if len(errs) == 0 || !strings.Contains(errs.ToAggregate().Error(), "cannot be re-added while previous volume with the same name is still pending, mounted, or unmounting") {
+				t.Fatalf("expected re-add rejection when removed volume is %s in VolumeStatuses, got: %v", activePhase, errs)
+			}
+		}
+
+		// Step 5: Once kubelet clears vol-cm from VolumeStatuses, re-adding vol-cm succeeds.
+		currentStatus := afterRemove.DeepCopy()
+		currentStatus.Status.ObservedGeneration = afterRemove.Generation
+		currentStatus.Status.ContainerStatuses = nil
+		currentStatus.Status.VolumeStatuses = []api.PodVolumeStatus{
+			{Name: "vol-init", HostPhase: api.PodVolumeHostMounted},
+		}
+		StatusStrategy.PrepareForUpdate(ctx, currentStatus, afterRemove)
+		if errs := StatusStrategy.ValidateUpdate(ctx, currentStatus, afterRemove); len(errs) != 0 {
+			t.Fatalf("unexpected status validation errors clearing vol-cm: %v", errs)
+		}
+
+		reAddAfterClear := currentStatus.DeepCopy()
+		reAddAfterClear.Spec.Volumes = append(reAddAfterClear.Spec.Volumes, api.Volume{
+			Name:         "vol-cm",
+			VolumeSource: api.VolumeSource{ConfigMap: &api.ConfigMapVolumeSource{LocalObjectReference: api.LocalObjectReference{Name: "cm-b"}}},
+		})
+		reAddCtr := podtest.MakeContainer("c-dyn-2")
+		reAddCtr.VolumeMounts = []api.VolumeMount{{Name: "vol-cm", MountPath: "/mnt/cm"}}
+		reAddAfterClear.Spec.Containers = append(reAddAfterClear.Spec.Containers, reAddCtr)
+		DynamicStrategy.PrepareForUpdate(ctx, reAddAfterClear, currentStatus)
+		if errs := DynamicStrategy.ValidateUpdate(ctx, reAddAfterClear, currentStatus); len(errs) != 0 {
+			t.Fatalf("expected re-add to succeed once kubelet cleared status, got: %v", errs)
+		}
+	})
+
+	t.Run("DynamicStrategy rejects container add/remove when DynamicContainers is disabled and DynamicNodeLocalEphemeralVolumes is enabled", func(t *testing.T) {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicNodeLocalEphemeralVolumes, true)
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicContainers, false)
+
+		oldPod := podtest.MakePod("pod",
+			podtest.SetResourceVersion("1"),
+			podtest.SetNodeName("node-1"),
+			podtest.SetContainers(podtest.MakeContainer("c1")),
+			podtest.SetVolumes(podtest.MakeEmptyVolume("vol-init")),
+			podtest.SetStatus(api.PodStatus{
+				Phase:      api.PodRunning,
+				Conditions: []api.PodCondition{{Type: api.PodInitialized, Status: api.ConditionTrue}},
+			}),
+		)
+		withAddedCtr := oldPod.DeepCopy()
+		withAddedCtr.Spec.Containers = append(withAddedCtr.Spec.Containers, podtest.MakeContainer("c2"))
+		DynamicStrategy.PrepareForUpdate(ctx, withAddedCtr, oldPod)
+		if errs := DynamicStrategy.ValidateUpdate(ctx, withAddedCtr, oldPod); len(errs) == 0 {
+			t.Fatal("expected container addition to be rejected when DynamicContainers is disabled")
+		}
+	})
+
+	t.Run("StatusStrategy PrepareForUpdate and ValidateUpdate across CSIVolumeHealth and DynamicNodeLocalEphemeralVolumes", func(t *testing.T) {
+		health := &api.VolumeHealthStatus{
+			HealthConditions: []api.VolumeHealthCondition{{Status: api.VolumeHealthHealthy, Reason: "VolumeHealthy"}},
+		}
+		cases := []struct {
+			name        string
+			csiGate     bool
+			dynGate     bool
+			wantEntries []api.PodVolumeStatus
+		}{
+			{
+				name:        "both disabled drops all VolumeStatuses and passes validation",
+				csiGate:     false,
+				dynGate:     false,
+				wantEntries: nil,
+			},
+			{
+				name:    "CSIVolumeHealth=true, DynamicNodeLocalEphemeralVolumes=false drops removed HostPhase entry and keeps spec HealthStatus",
+				csiGate: true,
+				dynGate: false,
+				wantEntries: []api.PodVolumeStatus{
+					{Name: "vol-init", HealthStatus: health.DeepCopy()},
+				},
+			},
+			{
+				name:    "CSIVolumeHealth=false, DynamicNodeLocalEphemeralVolumes=true drops HealthStatus and keeps HostPhase including removed volume",
+				csiGate: false,
+				dynGate: true,
+				wantEntries: []api.PodVolumeStatus{
+					{Name: "vol-init", HostPhase: api.PodVolumeHostMounted},
+					{Name: "vol-removed", HostPhase: api.PodVolumeHostUnmounting},
+				},
+			},
+			{
+				name:    "both enabled keeps spec HealthStatus+HostPhase and removed HostPhase",
+				csiGate: true,
+				dynGate: true,
+				wantEntries: []api.PodVolumeStatus{
+					{Name: "vol-init", HealthStatus: health.DeepCopy(), HostPhase: api.PodVolumeHostMounted},
+					{Name: "vol-removed", HostPhase: api.PodVolumeHostUnmounting},
+				},
+			},
+		}
+
+		for _, tc := range cases {
+			t.Run(tc.name, func(t *testing.T) {
+				featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+					features.CSIVolumeHealth:                  tc.csiGate,
+					features.DynamicNodeLocalEphemeralVolumes: tc.dynGate,
+				})
+				oldPod := podtest.MakePod("pod",
+					podtest.SetResourceVersion("1"),
+					podtest.SetGeneration(1),
+					podtest.SetNodeName("node-1"),
+					podtest.SetContainers(podtest.MakeContainer("c1")),
+					podtest.SetVolumes(podtest.MakeEmptyVolume("vol-init")),
+					podtest.SetStatus(api.PodStatus{
+						Phase:      api.PodRunning,
+						QOSClass:   api.PodQOSBestEffort,
+						Conditions: []api.PodCondition{{Type: api.PodInitialized, Status: api.ConditionTrue}},
+					}),
+				)
+				newPod := oldPod.DeepCopy()
+				newPod.Status.ObservedGeneration = 1
+				newPod.Status.VolumeStatuses = []api.PodVolumeStatus{
+					{Name: "vol-init", HealthStatus: health.DeepCopy(), HostPhase: api.PodVolumeHostMounted},
+					{Name: "vol-removed", HostPhase: api.PodVolumeHostUnmounting},
+				}
+
+				StatusStrategy.PrepareForUpdate(ctx, newPod, oldPod)
+				if diff := cmp.Diff(tc.wantEntries, newPod.Status.VolumeStatuses); diff != "" {
+					t.Fatalf("unexpected VolumeStatuses after StatusStrategy.PrepareForUpdate (-want, +got):\n%s", diff)
+				}
+				if errs := StatusStrategy.ValidateUpdate(ctx, newPod, oldPod); len(errs) != 0 {
+					t.Fatalf("unexpected StatusStrategy.ValidateUpdate errors: %v", errs.ToAggregate())
+				}
+			})
+		}
+
+		// With CSIVolumeHealth=true and DynamicNodeLocalEphemeralVolumes=false, name-only entries
+		// must not be dropped by PrepareForUpdate: valid name-only entries are preserved and invalid
+		// name-only entries reach validation rather than being silently stripped.
+		featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+			features.CSIVolumeHealth:                  true,
+			features.DynamicNodeLocalEphemeralVolumes: false,
+		})
+		basePod := podtest.MakePod("pod",
+			podtest.SetResourceVersion("1"),
+			podtest.SetGeneration(1),
+			podtest.SetNodeName("node-1"),
+			podtest.SetContainers(podtest.MakeContainer("c1")),
+			podtest.SetVolumes(podtest.MakeEmptyVolume("vol-init")),
+			podtest.SetStatus(api.PodStatus{
+				Phase:      api.PodRunning,
+				QOSClass:   api.PodQOSBestEffort,
+				Conditions: []api.PodCondition{{Type: api.PodInitialized, Status: api.ConditionTrue}},
+			}),
+		)
+		validNameOnly := basePod.DeepCopy()
+		validNameOnly.Status.ObservedGeneration = 1
+		validNameOnly.Status.VolumeStatuses = []api.PodVolumeStatus{{Name: "vol-init"}}
+		StatusStrategy.PrepareForUpdate(ctx, validNameOnly, basePod)
+		if diff := cmp.Diff([]api.PodVolumeStatus{{Name: "vol-init"}}, validNameOnly.Status.VolumeStatuses); diff != "" {
+			t.Fatalf("expected valid name-only entry to be preserved (-want, +got):\n%s", diff)
+		}
+		if errs := StatusStrategy.ValidateUpdate(ctx, validNameOnly, basePod); len(errs) != 0 {
+			t.Fatalf("expected valid name-only entry to pass validation, got: %v", errs.ToAggregate())
+		}
+
+		// Handwritten validatePodVolumeStatuses (called by StatusStrategy.ValidateUpdate) only checks
+		// len(vh.Name) > 0 && !volumeNames.Has(vh.Name). Empty Name (+k8s:required) and duplicate
+		// Name (+k8s:listType=map, +k8s:listMapKey=name) are enforced by Declarative Validation in
+		// rest.BeforeUpdate rather than StatusStrategy.ValidateUpdate, so PrepareForUpdate must
+		// preserve all three inputs intact.
+		for _, badCase := range []struct {
+			name                    string
+			statuses                []api.PodVolumeStatus
+			expectValidateUpdateErr bool
+		}{
+			{
+				name:                    "empty name",
+				statuses:                []api.PodVolumeStatus{{Name: ""}},
+				expectValidateUpdateErr: false,
+			},
+			{
+				name:                    "nonexistent volume",
+				statuses:                []api.PodVolumeStatus{{Name: "does-not-exist"}},
+				expectValidateUpdateErr: true,
+			},
+			{
+				name:                    "duplicate volume",
+				statuses:                []api.PodVolumeStatus{{Name: "vol-init"}, {Name: "vol-init"}},
+				expectValidateUpdateErr: false,
+			},
+		} {
+			badPod := basePod.DeepCopy()
+			badPod.Status.ObservedGeneration = 1
+			badPod.Status.VolumeStatuses = append([]api.PodVolumeStatus(nil), badCase.statuses...)
+			StatusStrategy.PrepareForUpdate(ctx, badPod, basePod)
+			if diff := cmp.Diff(badCase.statuses, badPod.Status.VolumeStatuses); diff != "" {
+				t.Fatalf("expected PrepareForUpdate to preserve %s for validation (-want, +got):\n%s", badCase.name, diff)
+			}
+			errs := StatusStrategy.ValidateUpdate(ctx, badPod, basePod)
+			if badCase.expectValidateUpdateErr && len(errs) == 0 {
+				t.Fatalf("expected %s to fail StatusStrategy.ValidateUpdate when CSIVolumeHealth=true, got no errors", badCase.name)
+			}
+			if !badCase.expectValidateUpdateErr && len(errs) != 0 {
+				t.Fatalf("expected %s to pass handwritten StatusStrategy.ValidateUpdate (enforced by Declarative Validation), got: %v", badCase.name, errs.ToAggregate())
+			}
+		}
+	})
 }
