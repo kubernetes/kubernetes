@@ -23,42 +23,64 @@ type ClientMetrics struct {
 	clientStreamRecvHistogram *prometheus.HistogramVec
 	// clientStreamSendHistogram can be nil
 	clientStreamSendHistogram *prometheus.HistogramVec
+
+	// contextLabelNames stores the names of context labels
+	contextLabelNames []string
 }
 
 // NewClientMetrics returns a new ClientMetrics object.
 // NOTE: Remember to register ClientMetrics object using prometheus registry
 // e.g. prometheus.MustRegister(myClientMetrics).
 func NewClientMetrics(opts ...ClientMetricsOption) *ClientMetrics {
-	var config clientMetricsConfig
+	config := &clientMetricsConfig{
+		clientHandledHistogramFn:    func() *prometheus.HistogramVec { return nil },
+		clientStreamRecvHistogramFn: func() *prometheus.HistogramVec { return nil },
+		clientStreamSendHistogramFn: func() *prometheus.HistogramVec { return nil },
+	}
 	config.apply(opts)
+
+	// Build label names by combining default labels with context labels
+	defaultLabels := []string{"grpc_type", "grpc_service", "grpc_method"}
+	defaultLabelsWithCode := []string{"grpc_type", "grpc_service", "grpc_method", "grpc_code"}
+
+	startedLabels := append(defaultLabels, config.contextLabels...)
+	handledLabels := append(defaultLabelsWithCode, config.contextLabels...)
+	streamLabels := append(defaultLabels, config.contextLabels...)
+
 	return &ClientMetrics{
 		clientStartedCounter: prometheus.NewCounterVec(
 			config.counterOpts.apply(prometheus.CounterOpts{
 				Name: "grpc_client_started_total",
 				Help: "Total number of RPCs started on the client.",
-			}), []string{"grpc_type", "grpc_service", "grpc_method"}),
+			}), startedLabels,
+		),
 
 		clientHandledCounter: prometheus.NewCounterVec(
 			config.counterOpts.apply(prometheus.CounterOpts{
 				Name: "grpc_client_handled_total",
 				Help: "Total number of RPCs completed by the client, regardless of success or failure.",
-			}), []string{"grpc_type", "grpc_service", "grpc_method", "grpc_code"}),
+			}), handledLabels,
+		),
 
 		clientStreamMsgReceived: prometheus.NewCounterVec(
 			config.counterOpts.apply(prometheus.CounterOpts{
 				Name: "grpc_client_msg_received_total",
 				Help: "Total number of RPC stream messages received by the client.",
-			}), []string{"grpc_type", "grpc_service", "grpc_method"}),
+			}), streamLabels,
+		),
 
 		clientStreamMsgSent: prometheus.NewCounterVec(
 			config.counterOpts.apply(prometheus.CounterOpts{
 				Name: "grpc_client_msg_sent_total",
 				Help: "Total number of gRPC stream messages sent by the client.",
-			}), []string{"grpc_type", "grpc_service", "grpc_method"}),
+			}), streamLabels,
+		),
 
-		clientHandledHistogram:    config.clientHandledHistogram,
-		clientStreamRecvHistogram: config.clientStreamRecvHistogram,
-		clientStreamSendHistogram: config.clientStreamSendHistogram,
+		clientHandledHistogram:    config.clientHandledHistogramFn(),
+		clientStreamRecvHistogram: config.clientStreamRecvHistogramFn(),
+		clientStreamSendHistogram: config.clientStreamSendHistogramFn(),
+
+		contextLabelNames: config.contextLabels,
 	}
 }
 
