@@ -62,17 +62,10 @@ type PodResourcesOptions struct {
 	UseExtraNodeAllocatableResources bool
 }
 
-var supportedPodLevelResources = sets.New(v1.ResourceCPU, v1.ResourceMemory)
-
-// limitOnlyResources are resources that only support cgroup limits (e.g. swap).
-// Requests must not be set and must not be defaulted from limits for these resources.
-// Keeping limitOnlyResources disjoint from supportedPodLevelResources and
-// standardContainerResources ensures that QoS, PodRequests/PodLimits aggregation,
-// defaultPodRequests, LimitRange, and ResourceQuota invariants remain untouched for all callers.
-var limitOnlyResources = sets.New(v1.ResourceSwap)
+var supportedPodLevelResources = sets.New(v1.ResourceCPU, v1.ResourceMemory, v1.ResourceHugePagesPrefix)
 
 func SupportedPodLevelResources() sets.Set[v1.ResourceName] {
-	return supportedPodLevelResources.Clone().Insert(v1.ResourceHugePagesPrefix)
+	return supportedPodLevelResources.Clone()
 }
 
 // IsSupportedPodLevelResources checks if a given resource is supported by pod-level
@@ -80,12 +73,6 @@ func SupportedPodLevelResources() sets.Set[v1.ResourceName] {
 // the resource is supported.
 func IsSupportedPodLevelResource(name v1.ResourceName) bool {
 	return supportedPodLevelResources.Has(name) || strings.HasPrefix(string(name), v1.ResourceHugePagesPrefix)
-}
-
-// IsLimitOnlyResource returns true for resources that only support limits
-// (e.g. swap). Requests must not be set or defaulted for these resources.
-func IsLimitOnlyResource(name v1.ResourceName) bool {
-	return limitOnlyResources.Has(name)
 }
 
 // IsPodLevelResourcesSet check if PodLevelResources pod-level resources are set.
@@ -153,6 +140,19 @@ func IsPodLevelLimitsSet(pod *v1.Pod) bool {
 	}
 
 	return false
+}
+
+// limitOnlyResources are resources that only support cgroup limits (e.g. swap, pids).
+// Requests must not be set and must not be defaulted from limits for these resources.
+// Keeping limitOnlyResources disjoint from supportedPodLevelResources and
+// standardContainerResources ensures that QoS, PodRequests/PodLimits aggregation,
+// defaultPodRequests, LimitRange, and ResourceQuota invariants remain untouched for all callers.
+var limitOnlyResources = sets.New(v1.ResourceSwap, v1.ResourcePID)
+
+// IsLimitOnlyResource returns true for resources that only support limits
+// (e.g. swap, pids). Requests must not be set or defaulted for these resources.
+func IsLimitOnlyResource(name v1.ResourceName) bool {
+	return limitOnlyResources.Has(name)
 }
 
 // PodRequests computes the total pod requests per the PodResourcesOptions supplied.
