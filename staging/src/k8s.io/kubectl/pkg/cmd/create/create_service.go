@@ -283,7 +283,7 @@ func NewCmdCreateServiceNodePort(f cmdutil.Factory, ioStreams genericiooptions.I
 	o := NewServiceOptions(ioStreams, corev1.ServiceTypeNodePort)
 
 	cmd := &cobra.Command{
-		Use:                   "nodeport NAME [--tcp=port:targetPort] [--dry-run=server|client|none]",
+		Use:                   "nodeport NAME --tcp=port:targetPort [--dry-run=server|client|none]",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Create a NodePort service"),
 		Long:                  serviceNodePortLong,
@@ -320,7 +320,7 @@ func NewCmdCreateServiceLoadBalancer(f cmdutil.Factory, ioStreams genericiooptio
 	o := NewServiceOptions(ioStreams, corev1.ServiceTypeLoadBalancer)
 
 	cmd := &cobra.Command{
-		Use:                   "loadbalancer NAME [--tcp=port:targetPort] [--dry-run=server|client|none]",
+		Use:                   "loadbalancer NAME --tcp=port:targetPort [--dry-run=server|client|none]",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Create a LoadBalancer service"),
 		Long:                  serviceLoadBalancerLong,
