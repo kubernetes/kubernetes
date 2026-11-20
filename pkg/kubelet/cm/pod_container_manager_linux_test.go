@@ -19,8 +19,10 @@ limitations under the License.
 package cm
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -28,6 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -118,6 +121,7 @@ func TestIsCgroupPod(t *testing.T) {
 	}
 	for _, cgroupDriver := range []string{"cgroupfs", "systemd"} {
 		pcm := &podContainerManagerImpl{
+			unconfiguredPods:  newPodCgroupTracker(),
 			cgroupManager:     NewCgroupManager(logger, nil, cgroupDriver),
 			enforceCPULimits:  true,
 			qosContainersInfo: qosContainersInfo,
@@ -289,6 +293,7 @@ func TestGetPodContainerName(t *testing.T) {
 
 	for _, tt := range tests {
 		pcm := &podContainerManagerImpl{
+			unconfiguredPods:  newPodCgroupTracker(),
 			cgroupManager:     tt.fields.cgroupManager,
 			qosContainersInfo: qosContainersInfo,
 		}
@@ -388,6 +393,7 @@ func TestEnsureExistsWritableCgroupLimits(t *testing.T) {
 			}
 			fake := &fakeCgroupManager{}
 			m := &podContainerManagerImpl{
+				unconfiguredPods:    newPodCgroupTracker(),
 				cgroupManager:       fake,
 				podContainerManager: NewStubContainerManager(),
 			}
@@ -586,6 +592,7 @@ func TestEnsureExistsWithPodLevelSwap(t *testing.T) {
 				swapAvailableFn = func() bool { return tt.swapControllerAvailable }
 			}
 			pcm := &podContainerManagerImpl{
+				unconfiguredPods:           newPodCgroupTracker(),
 				qosContainersInfo:          qosContainersInfo,
 				cgroupManager:              fakeCM,
 				enforceCPULimits:           true,
@@ -702,6 +709,7 @@ func TestEnsureExistsPodLevelSwapLimit(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeatures.WorkloadControlledSwap, tc.gate)
 			fakeCM := &fakeCgroupManager{}
 			pcm := &podContainerManagerImpl{
+				unconfiguredPods:           newPodCgroupTracker(),
 				qosContainersInfo:          qosContainersInfo,
 				cgroupManager:              fakeCM,
 				enforceCPULimits:           true,
@@ -722,4 +730,219 @@ func TestEnsureExistsPodLevelSwapLimit(t *testing.T) {
 			}
 		})
 	}
+}
+
+type testPodCgroupManager struct {
+	*fakeCgroupManager
+	mu               sync.Mutex
+	exists           map[string]bool
+	createCalls      int
+	updateCalls      int
+	createErr        error
+	updateErr        error
+	createPartialDir bool
+}
+
+func newTestPodCgroupManager() *testPodCgroupManager {
+	return &testPodCgroupManager{
+		fakeCgroupManager: &fakeCgroupManager{},
+		exists:            make(map[string]bool),
+	}
+}
+
+func (m *testPodCgroupManager) Exists(name CgroupName) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.exists[m.Name(name)]
+}
+
+func (m *testPodCgroupManager) Create(_ klog.Logger, config *CgroupConfig) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.createCalls++
+	key := m.Name(config.Name)
+	if m.createErr != nil {
+		if m.createPartialDir {
+			m.exists[key] = true
+		}
+		return m.createErr
+	}
+	m.exists[key] = true
+	return nil
+}
+
+func (m *testPodCgroupManager) Update(_ klog.Logger, _ *CgroupConfig) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.updateCalls++
+	return m.updateErr
+}
+
+func (m *testPodCgroupManager) Destroy(_ klog.Logger, config *CgroupConfig) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	delete(m.exists, m.Name(config.Name))
+	return nil
+}
+
+func TestEnsureExists(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	qosContainersInfo := QOSContainersInfo{
+		Guaranteed: RootCgroupName,
+		Burstable:  NewCgroupName(RootCgroupName, strings.ToLower(string(v1.PodQOSBurstable))),
+		BestEffort: NewCgroupName(RootCgroupName, strings.ToLower(string(v1.PodQOSBestEffort))),
+	}
+
+	newPod := func(uid types.UID) *v1.Pod {
+		return &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{UID: uid},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{{Name: "container"}},
+			},
+		}
+	}
+
+	newPCM := func(fakeCM *testPodCgroupManager, tracker *podCgroupTracker) *podContainerManagerImpl {
+		return &podContainerManagerImpl{
+			unconfiguredPods:    tracker,
+			cgroupManager:       fakeCM,
+			podContainerManager: NewStubContainerManager(),
+			qosContainersInfo:   qosContainersInfo,
+			enforceCPULimits:    true,
+		}
+	}
+
+	t.Run("creates cgroup once and skips subsequent calls", func(t *testing.T) {
+		fakeCM := newTestPodCgroupManager()
+		pcm := newPCM(fakeCM, newPodCgroupTracker())
+		pod := newPod("uid-create-once")
+
+		require.NoError(t, pcm.EnsureExists(logger, pod))
+		require.Equal(t, 1, fakeCM.createCalls)
+		require.Equal(t, 0, fakeCM.updateCalls)
+
+		require.NoError(t, pcm.EnsureExists(logger, pod))
+		require.Equal(t, 1, fakeCM.createCalls)
+		require.Equal(t, 0, fakeCM.updateCalls)
+	})
+
+	t.Run("reconciles partial Create failure via Update on retry", func(t *testing.T) {
+		fakeCM := newTestPodCgroupManager()
+		fakeCM.createErr = fmt.Errorf("simulated Set failure")
+		fakeCM.createPartialDir = true
+		pcm := newPCM(fakeCM, newPodCgroupTracker())
+		pod := newPod("uid-partial-fail")
+
+		// Create leaves the cgroup on disk but fails to apply its parameters.
+		require.Error(t, pcm.EnsureExists(logger, pod))
+		require.Equal(t, 1, fakeCM.createCalls)
+		require.True(t, pcm.Exists(pod))
+		require.True(t, pcm.unconfiguredPods.has(pod.UID))
+
+		// The retry reapplies the parameters via Update.
+		fakeCM.createErr = nil
+		require.NoError(t, pcm.EnsureExists(logger, pod))
+		require.Equal(t, 1, fakeCM.createCalls)
+		require.Equal(t, 1, fakeCM.updateCalls)
+		require.False(t, pcm.unconfiguredPods.has(pod.UID))
+
+		// Once configured, further calls are no-ops.
+		require.NoError(t, pcm.EnsureExists(logger, pod))
+		require.Equal(t, 1, fakeCM.updateCalls)
+	})
+
+	t.Run("reconciliation state is shared across pod container manager instances", func(t *testing.T) {
+		// The kubelet creates a new pod container manager on every pod sync,
+		// so the retry must see the failure recorded by the earlier instance.
+		fakeCM := newTestPodCgroupManager()
+		fakeCM.createErr = fmt.Errorf("simulated Set failure")
+		fakeCM.createPartialDir = true
+		tracker := newPodCgroupTracker()
+		pod := newPod("uid-shared")
+
+		require.Error(t, newPCM(fakeCM, tracker).EnsureExists(logger, pod))
+
+		fakeCM.createErr = nil
+		require.NoError(t, newPCM(fakeCM, tracker).EnsureExists(logger, pod))
+		require.Equal(t, 1, fakeCM.updateCalls)
+	})
+
+	t.Run("does not update an existing configured pod cgroup", func(t *testing.T) {
+		// Covers later syncs, in-place resizes and kubelet restarts: only the
+		// resize path may change the parameters of a configured pod cgroup.
+		fakeCM := newTestPodCgroupManager()
+		pod := newPod("uid-existing")
+		pod.Spec.Containers[0].Resources.Requests = v1.ResourceList{v1.ResourceMemory: resource.MustParse("50Mi")}
+		pod.Spec.Containers[0].Resources.Limits = v1.ResourceList{v1.ResourceMemory: resource.MustParse("200Mi")}
+		require.NoError(t, newPCM(fakeCM, newPodCgroupTracker()).EnsureExists(logger, pod))
+
+		// Shrink the memory limit while keeping the pod Burstable, so that the
+		// pod cgroup path is unchanged.
+		resized := pod.DeepCopy()
+		resized.Spec.Containers[0].Resources.Limits[v1.ResourceMemory] = resource.MustParse("100Mi")
+		for range 3 {
+			require.NoError(t, newPCM(fakeCM, newPodCgroupTracker()).EnsureExists(logger, resized))
+		}
+		require.Equal(t, 1, fakeCM.createCalls)
+		require.Equal(t, 0, fakeCM.updateCalls)
+	})
+
+	t.Run("recreates pod cgroup removed out-of-band", func(t *testing.T) {
+		fakeCM := newTestPodCgroupManager()
+		pcm := newPCM(fakeCM, newPodCgroupTracker())
+		pod := newPod("uid-removed")
+
+		require.NoError(t, pcm.EnsureExists(logger, pod))
+		podCgroup, _ := pcm.GetPodContainerName(pod)
+		fakeCM.mu.Lock()
+		delete(fakeCM.exists, fakeCM.Name(podCgroup))
+		fakeCM.mu.Unlock()
+
+		require.NoError(t, pcm.EnsureExists(logger, pod))
+		require.Equal(t, 2, fakeCM.createCalls)
+		require.True(t, pcm.Exists(pod))
+	})
+
+	t.Run("Destroy clears reconciliation state", func(t *testing.T) {
+		fakeCM := newTestPodCgroupManager()
+		fakeCM.createErr = fmt.Errorf("simulated Set failure")
+		fakeCM.createPartialDir = true
+		pcm := newPCM(fakeCM, newPodCgroupTracker())
+		pod := newPod("uid-destroy")
+
+		require.Error(t, pcm.EnsureExists(logger, pod))
+		require.True(t, pcm.unconfiguredPods.has(pod.UID))
+
+		podCgroup, _ := pcm.GetPodContainerName(pod)
+		require.NoError(t, pcm.Destroy(logger, podCgroup))
+		require.False(t, pcm.unconfiguredPods.has(pod.UID))
+	})
+
+	t.Run("concurrent EnsureExists and Destroy are race-free", func(t *testing.T) {
+		fakeCM := newTestPodCgroupManager()
+		fakeCM.createErr = fmt.Errorf("simulated Set failure")
+		fakeCM.createPartialDir = true
+		tracker := newPodCgroupTracker()
+
+		var wg sync.WaitGroup
+		for i := range 16 {
+			wg.Go(func() {
+				pcm := newPCM(fakeCM, tracker)
+				pod := newPod(types.UID(fmt.Sprintf("uid-concurrent-%d", i)))
+				// Partial Create failure, then reconciliation via Update.
+				// require must not be used outside the test goroutine.
+				if err := pcm.EnsureExists(logger, pod); err == nil {
+					t.Errorf("expected partial Create failure for pod %s", pod.UID)
+				}
+				if err := pcm.EnsureExists(logger, pod); err != nil {
+					t.Errorf("reconciling pod %s: %v", pod.UID, err)
+				}
+				podCgroup, _ := pcm.GetPodContainerName(pod)
+				if err := pcm.Destroy(logger, podCgroup); err != nil {
+					t.Errorf("destroying pod %s: %v", pod.UID, err)
+				}
+			})
+		}
+		wg.Wait()
+	})
 }

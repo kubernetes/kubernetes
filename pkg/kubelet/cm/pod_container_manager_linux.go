@@ -22,11 +22,13 @@ import (
 	"os"
 	"path"
 	"strings"
+	"sync"
 
 	libcontainercgroups "github.com/opencontainers/cgroups"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
@@ -71,6 +73,39 @@ type podContainerManagerImpl struct {
 	swapCapacity   int64
 	// getSwapControllerAvailable reports whether the swap cgroup controller is available on the host
 	getSwapControllerAvailable func() bool
+	// unconfiguredPods tracks pod cgroups that were created but whose resource
+	// parameters failed to apply. It is owned by the ContainerManager and shared
+	// by every podContainerManagerImpl it hands out, because the kubelet creates
+	// a new pod container manager on each pod sync.
+	unconfiguredPods *podCgroupTracker
+}
+
+// podCgroupTracker is a concurrency-safe set of pod UIDs.
+type podCgroupTracker struct {
+	mu   sync.Mutex
+	uids sets.Set[types.UID]
+}
+
+func newPodCgroupTracker() *podCgroupTracker {
+	return &podCgroupTracker{uids: sets.New[types.UID]()}
+}
+
+func (t *podCgroupTracker) insert(uid types.UID) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.uids.Insert(uid)
+}
+
+func (t *podCgroupTracker) has(uid types.UID) bool {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.uids.Has(uid)
+}
+
+func (t *podCgroupTracker) delete(uid types.UID) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.uids.Delete(uid)
 }
 
 var isCgroup2UnifiedMode = libcontainercgroups.IsCgroup2UnifiedMode
@@ -85,45 +120,60 @@ func (m *podContainerManagerImpl) Exists(pod *v1.Pod) bool {
 }
 
 // EnsureExists takes a pod as argument and makes sure that
-// pod cgroup exists if qos cgroup hierarchy flag is enabled.
-// If the pod level container doesn't already exist it is created.
+// pod cgroup exists and is configured if qos cgroup hierarchy flag is enabled.
+// If the pod level container doesn't already exist it is created. If an earlier
+// Create left the cgroup on disk without its resource parameters applied, they
+// are reapplied via Update. An existing, configured pod cgroup is left untouched,
+// so that in-place resize remains the only path that changes its parameters.
 func (m *podContainerManagerImpl) EnsureExists(logger klog.Logger, pod *v1.Pod) error {
-	// check if container already exist
-	alreadyExists := m.Exists(pod)
-	if !alreadyExists {
-		enforceCPULimits := m.enforceCPULimits
-		if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DisableCPUQuotaWithExclusiveCPUs) && m.podContainerManager.PodHasExclusiveCPUs(logger, pod) {
-			logger.V(2).Info("Disabled CFS quota", "pod", klog.KObj(pod))
-			enforceCPULimits = false
-		}
-		enforceMemoryQoS := false
-		if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.MemoryQoS) &&
-			isCgroup2UnifiedMode() {
-			enforceMemoryQoS = true
-		}
-		// Create the pod container
-		podContainerName, _ := m.GetPodContainerName(pod)
-		containerConfig := &CgroupConfig{
-			Name:               podContainerName,
-			ResourceParameters: ResourceConfigForPod(pod, enforceCPULimits, m.cpuCFSQuotaPeriod, enforceMemoryQoS, m.memoryReservationPolicy),
-		}
-		if !m.isNodeSwapEnabled() {
-			containerConfig.ResourceParameters.Unified = UnifiedWithoutSwap(containerConfig.ResourceParameters.Unified)
-		}
-		if m.podPidsLimit > 0 {
-			containerConfig.ResourceParameters.PidsLimit = &m.podPidsLimit
-		}
-		if enforceMemoryQoS {
-			m.applyPodLevelMemoryHigh(pod, containerConfig.ResourceParameters)
-			logger.V(4).Info("MemoryQoS config for pod", "pod", klog.KObj(pod), "unified", containerConfig.ResourceParameters.Unified)
-		}
-		applyWritableCgroupLimits(pod, containerConfig.ResourceParameters)
-		m.applyPodLevelSwapConfig(logger, pod, containerConfig.ResourceParameters)
-		if err := m.cgroupManager.Create(logger, containerConfig); err != nil {
-			return fmt.Errorf("failed to create container for %v : %v", podContainerName, err)
-		}
-
+	exists := m.Exists(pod)
+	if exists && !m.unconfiguredPods.has(pod.UID) {
+		return nil
 	}
+
+	enforceCPULimits := m.enforceCPULimits
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DisableCPUQuotaWithExclusiveCPUs) && m.podContainerManager.PodHasExclusiveCPUs(logger, pod) {
+		logger.V(2).Info("Disabled CFS quota", "pod", klog.KObj(pod))
+		enforceCPULimits = false
+	}
+	enforceMemoryQoS := utilfeature.DefaultFeatureGate.Enabled(kubefeatures.MemoryQoS) &&
+		isCgroup2UnifiedMode()
+
+	podContainerName, _ := m.GetPodContainerName(pod)
+	containerConfig := &CgroupConfig{
+		Name:               podContainerName,
+		ResourceParameters: ResourceConfigForPod(pod, enforceCPULimits, m.cpuCFSQuotaPeriod, enforceMemoryQoS, m.memoryReservationPolicy),
+	}
+	if !m.isNodeSwapEnabled() {
+		containerConfig.ResourceParameters.Unified = UnifiedWithoutSwap(containerConfig.ResourceParameters.Unified)
+	}
+	if m.podPidsLimit > 0 {
+		containerConfig.ResourceParameters.PidsLimit = &m.podPidsLimit
+	}
+	if enforceMemoryQoS {
+		m.applyPodLevelMemoryHigh(pod, containerConfig.ResourceParameters)
+		logger.V(4).Info("MemoryQoS config for pod", "pod", klog.KObj(pod), "unified", containerConfig.ResourceParameters.Unified)
+	}
+	applyWritableCgroupLimits(pod, containerConfig.ResourceParameters)
+	m.applyPodLevelSwapConfig(logger, pod, containerConfig.ResourceParameters)
+
+	if exists {
+		if err := m.cgroupManager.Update(logger, containerConfig); err != nil {
+			return fmt.Errorf("failed to update container for %v : %w", podContainerName, err)
+		}
+		m.unconfiguredPods.delete(pod.UID)
+		return nil
+	}
+
+	if err := m.cgroupManager.Create(logger, containerConfig); err != nil {
+		if m.Exists(pod) {
+			// The cgroup was created but its parameters were not applied;
+			// retry them via Update on the next sync.
+			m.unconfiguredPods.insert(pod.UID)
+		}
+		return fmt.Errorf("failed to create container for %v : %w", podContainerName, err)
+	}
+	m.unconfiguredPods.delete(pod.UID)
 	return nil
 }
 
@@ -307,6 +357,9 @@ func (m *podContainerManagerImpl) Destroy(logger klog.Logger, podCgroup CgroupNa
 	if err := m.cgroupManager.Destroy(logger, containerConfig); err != nil {
 		logger.Info("Failed to delete cgroup paths", "cgroupName", podCgroup, "err", err)
 		return fmt.Errorf("failed to delete cgroup paths for %v : %v", podCgroup, err)
+	}
+	if isPod, podUID := m.IsPodCgroup(m.cgroupManager.Name(podCgroup)); isPod {
+		m.unconfiguredPods.delete(podUID)
 	}
 	return nil
 }

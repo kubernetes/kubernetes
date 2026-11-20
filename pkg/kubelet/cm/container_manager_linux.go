@@ -148,6 +148,10 @@ type containerManagerImpl struct {
 	kubeClient clientset.Interface
 	// resourceUpdates is a channel that provides resource updates.
 	resourceUpdates chan resourceupdates.Update
+
+	// unconfiguredPodCgroups is shared by all pod container managers so that
+	// partially configured pod cgroups are reconciled across pod syncs.
+	unconfiguredPodCgroups *podCgroupTracker
 }
 
 type features struct {
@@ -313,6 +317,8 @@ func NewContainerManager(ctx context.Context, mountUtil mount.Interface, cadviso
 		cgroupRoot:                 cgroupRoot,
 		recorder:                   recorder,
 		qosContainerManager:        qosContainerManager,
+
+		unconfiguredPodCgroups: newPodCgroupTracker(),
 	}
 
 	cm.topologyManager, err = topologymanager.NewManager(
@@ -430,6 +436,7 @@ func (cm *containerManagerImpl) NewPodContainerManager() PodContainerManager {
 			memoryCapacity:             cm.internalCapacity.Memory().Value(),
 			swapCapacity:               cm.internalCapacity.Name(internalSwapResourceName, resource.BinarySI).Value(),
 			getSwapControllerAvailable: cm.getSwapControllerAvailable,
+			unconfiguredPods:           cm.unconfiguredPodCgroups,
 		}
 	}
 	return &podContainerManagerNoop{
