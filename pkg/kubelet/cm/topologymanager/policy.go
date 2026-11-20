@@ -537,24 +537,71 @@ func (m HintMerger) Merge(logger klog.Logger) TopologyHint {
 		utilfeature.DefaultFeatureGate.Enabled(kubefeatures.TopologyManagerPolicyAlphaOptions)
 	var displacedHint *TopologyHint
 
+	// Equivalent prefixes have the same possible continuations. Keep the first
+	// one in traversal order so equal final hints retain the same Score.
+	//
+	// That only holds while compare() orders merged hints by their affinity
+	// alone. With an allocation strategy it also reads Score, and two masks
+	// which are equally fit but differently scored are ordered by it. That
+	// order is not transitive, since a hint with no score falls back to the
+	// structural comparison, so which hint wins can depend on how often and
+	// when a merged hint is compared. Prefixes are then not deduplicated and
+	// every continuation is evaluated, as before.
+	dedupe := m.AllocationStrategy == NUMAAllocationStrategyNone
+	type mergeState struct {
+		affinity      string
+		preferred     bool
+		firstAffinity string
+	}
+	seen := make([]map[mergeState]bool, len(m.Hints)+1)
+	for i := range seen {
+		seen[i] = make(map[mergeState]bool)
+	}
+	permutation := make([]TopologyHint, len(m.Hints))
 	var bestHint *TopologyHint
-	iterateAllProviderTopologyHints(m.Hints, func(permutation []TopologyHint) {
-		// Get the NUMANodeAffinity from each hint in the permutation and see if any
-		// of them encode unpreferred allocations.
-		//
-		// The permutation is built from m.Hints, so permutation[i] is drawn from
-		// m.Hints[i] and the aggregation can weight each hint by the resource it
-		// came from without the two ever being able to fall out of step.
-		mergedHint := m.mergePermutation(logger, defaultAffinity, permutation)
-
-		// Compare the current bestHint with the candidate mergedHint and
-		// update bestHint if appropriate.
-		bestHint = m.compare(m.CompareNUMAAffinityMasks, bestHint, &mergedHint)
-
-		if trackDisplacedHint {
-			displacedHint = m.compare(m.CompareNUMAAffinityMasksWithoutStrategy, displacedHint, &mergedHint)
+	var iterate func(int, bitmask.BitMask, bitmask.BitMask, bool)
+	iterate = func(dim int, affinity, firstAffinity bitmask.BitMask, preferred bool) {
+		// Intersections can only shrink, so an empty prefix cannot yield a candidate.
+		if affinity.IsEmpty() {
+			return
 		}
-	})
+		state := mergeState{affinity: affinity.String(), preferred: preferred}
+		if preferred && firstAffinity != nil {
+			// Preserve the original affinity for equality checks, before it was
+			// intersected with the machine's default mask. Nil means no constraint.
+			state.firstAffinity = firstAffinity.String()
+		}
+		if dedupe {
+			if seen[dim][state] {
+				return
+			}
+			seen[dim][state] = true
+		}
+
+		if dim == len(m.Hints) {
+			mergedHint := m.mergePermutation(logger, defaultAffinity, permutation)
+			bestHint = m.compare(m.CompareNUMAAffinityMasks, bestHint, &mergedHint)
+			if trackDisplacedHint {
+				displacedHint = m.compare(m.CompareNUMAAffinityMasksWithoutStrategy, displacedHint, &mergedHint)
+			}
+			return
+		}
+		for _, hint := range m.Hints[dim].hints {
+			nextAffinity, nextFirstAffinity := affinity, firstAffinity
+			nextPreferred := preferred && hint.Preferred
+			if hint.NUMANodeAffinity != nil {
+				nextAffinity = bitmask.And(affinity, hint.NUMANodeAffinity)
+				if firstAffinity == nil {
+					nextFirstAffinity = hint.NUMANodeAffinity
+				} else if !firstAffinity.IsEqual(hint.NUMANodeAffinity) {
+					nextPreferred = false
+				}
+			}
+			permutation[dim] = hint
+			iterate(dim+1, nextAffinity, nextFirstAffinity, nextPreferred)
+		}
+	}
+	iterate(0, defaultAffinity, nil, true)
 
 	if bestHint == nil {
 		bestHint = &TopologyHint{NUMANodeAffinity: defaultAffinity, Preferred: false}
