@@ -23,11 +23,13 @@ import (
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/events"
 	"k8s.io/klog/v2/ktesting"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 )
 
@@ -346,6 +348,147 @@ func TestFrameworkForPod(t *testing.T) {
 			}
 			if fwk == nil {
 				t.Errorf("expected non-nil framework for scheduler name %q", tt.schedulerName)
+			}
+		})
+	}
+}
+
+func TestFrameworkForPodGroup(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	cfgs := []config.KubeSchedulerProfile{
+		{
+			SchedulerName: v1.DefaultSchedulerName,
+			Plugins: &config.Plugins{
+				QueueSort: config.PluginSet{
+					Enabled: []config.Plugin{{Name: "QueueSort"}},
+				},
+				Bind: config.PluginSet{
+					Enabled: []config.Plugin{{Name: "Bind1"}},
+				},
+			},
+		},
+		{
+			SchedulerName: "custom-scheduler",
+			Plugins: &config.Plugins{
+				QueueSort: config.PluginSet{
+					Enabled: []config.Plugin{{Name: "QueueSort"}},
+				},
+				Bind: config.PluginSet{
+					Enabled: []config.Plugin{{Name: "Bind2"}},
+				},
+			},
+		},
+	}
+
+	m, err := NewMap(ctx, cfgs, fakeRegistry, nilRecorderFactory)
+	if err != nil {
+		t.Fatalf("NewMap() error = %v", err)
+	}
+
+	successTests := []struct {
+		name            string
+		podGroupInfo    fwk.PodGroupInfo
+		wantProfileName string
+	}{
+		{
+			name: "explicit scheduler name matching profile",
+			podGroupInfo: &framework.PodGroupInfo{
+				GenericPodGroup: fwk.NewGenericPodGroup(&schedulingv1beta1.PodGroup{}),
+				UnscheduledPods: []*v1.Pod{
+					{Spec: v1.PodSpec{SchedulerName: "custom-scheduler"}},
+				},
+			},
+			wantProfileName: "custom-scheduler",
+		},
+		{
+			name: "empty scheduler name defaults to default-scheduler",
+			podGroupInfo: &framework.PodGroupInfo{
+				GenericPodGroup: fwk.NewGenericPodGroup(&schedulingv1beta1.PodGroup{}),
+				UnscheduledPods: []*v1.Pod{
+					{Spec: v1.PodSpec{SchedulerName: ""}},
+				},
+			},
+			wantProfileName: v1.DefaultSchedulerName,
+		},
+		{
+			name: "composite pod group resolves profile from child leaf pod group",
+			podGroupInfo: framework.NewPodGroupInfo(
+				fwk.NewGenericCompositePodGroup(&schedulingv1beta1.CompositePodGroup{}),
+				&framework.PodGroupInfo{
+					GenericPodGroup: fwk.NewGenericPodGroup(&schedulingv1beta1.PodGroup{}),
+					UnscheduledPods: []*v1.Pod{
+						{Spec: v1.PodSpec{SchedulerName: "custom-scheduler"}},
+					},
+				},
+			),
+			wantProfileName: "custom-scheduler",
+		},
+		{
+			name: "composite pod group skips empty first leaf child and resolves from sibling",
+			podGroupInfo: framework.NewPodGroupInfo(
+				fwk.NewGenericCompositePodGroup(&schedulingv1beta1.CompositePodGroup{}),
+				&framework.PodGroupInfo{
+					GenericPodGroup: fwk.NewGenericPodGroup(&schedulingv1beta1.PodGroup{}),
+				},
+				&framework.PodGroupInfo{
+					GenericPodGroup: fwk.NewGenericPodGroup(&schedulingv1beta1.PodGroup{}),
+					UnscheduledPods: []*v1.Pod{
+						{Spec: v1.PodSpec{SchedulerName: "custom-scheduler"}},
+					},
+				},
+			),
+			wantProfileName: "custom-scheduler",
+		},
+	}
+
+	for _, tt := range successTests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := m.FrameworkForPodGroup(tt.podGroupInfo)
+			if err != nil {
+				t.Fatalf("FrameworkForPodGroup() unexpected error = %v", err)
+			}
+			if got == nil {
+				t.Fatal("FrameworkForPodGroup() returned nil framework")
+			}
+			if got.ProfileName() != tt.wantProfileName {
+				t.Errorf("FrameworkForPodGroup().ProfileName() = %q, want %q", got.ProfileName(), tt.wantProfileName)
+			}
+		})
+	}
+
+	errorTests := []struct {
+		name         string
+		podGroupInfo fwk.PodGroupInfo
+	}{
+		{
+			name:         "nil pod group returns error",
+			podGroupInfo: nil,
+		},
+		{
+			name: "empty pod group returns error",
+			podGroupInfo: &framework.PodGroupInfo{
+				GenericPodGroup: fwk.NewGenericPodGroup(&schedulingv1beta1.PodGroup{}),
+			},
+		},
+		{
+			name: "unknown scheduler name returns error",
+			podGroupInfo: &framework.PodGroupInfo{
+				GenericPodGroup: fwk.NewGenericPodGroup(&schedulingv1beta1.PodGroup{}),
+				UnscheduledPods: []*v1.Pod{
+					{Spec: v1.PodSpec{SchedulerName: "non-existent"}},
+				},
+			},
+		},
+	}
+
+	for _, tt := range errorTests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := m.FrameworkForPodGroup(tt.podGroupInfo)
+			if err == nil {
+				t.Fatalf("FrameworkForPodGroup() = %v, want error", got)
+			}
+			if got != nil {
+				t.Errorf("FrameworkForPodGroup() returned non-nil framework %v on error", got)
 			}
 		})
 	}

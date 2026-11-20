@@ -25,7 +25,9 @@ import (
 	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/cache"
 	draapi "k8s.io/dynamic-resource-allocation/api"
+	"k8s.io/dynamic-resource-allocation/deviceclass/extendedresourcecache"
 	resourceslicetracker "k8s.io/dynamic-resource-allocation/resourceslice/tracker"
 	"k8s.io/klog/v2"
 	configv1 "k8s.io/kube-scheduler/config/v1"
@@ -68,7 +70,11 @@ type FrameworkComponents struct {
 	// DRA components required for registering event handlers.
 	resourceClaimCache   *assumecache.AssumeCache
 	resourceSliceTracker *resourceslicetracker.Tracker
-	draManager           fwk.SharedDRAManager
+	draManager           *dynamicresources.DefaultDRAManager
+
+	// registeredHandlers holds the informer event handler registrations created
+	// by FrameworkComponents so callers can wait for their initial sync.
+	registeredHandlers []cache.ResourceEventHandlerRegistration
 
 	// podGroupHierarchyTracker tracks the known pods of each PodGroup and the ready child
 	// groups of each CompositePodGroup.
@@ -86,17 +92,50 @@ var defaultComponentsOptions = schedulerOptions{
 }
 
 // NewFrameworkComponents initializes the shared dependencies required across
-// scheduler framework profiles.
+// scheduler framework profiles for standalone consumers.
+//
+// Note that scheduler.New does not call NewFrameworkComponents; it calls the
+// unexported newFrameworkComponents directly and wires event handlers itself
+// via addAllEventHandlers.
 //
 // Callers must invoke NewFrameworkComponents before starting the shared
 // informer factory so that any required informers are registered prior to Start().
+//
+// NewFrameworkComponents calls metrics.Register(), which registers all
+// scheduler metrics in the global legacyregistry. Callers must not invoke
+// metrics.InitMetrics() because reassigning the package-level metric variables
+// causes a data race.
 func NewFrameworkComponents(ctx context.Context, client clientset.Interface, informerFactory informers.SharedInformerFactory, opts ...Option) (*FrameworkComponents, error) {
 	options := defaultComponentsOptions
 	for _, opt := range opts {
 		opt(&options)
 	}
 
-	return newFrameworkComponents(ctx, client, informerFactory, options)
+	metrics.Register()
+
+	comps, err := newFrameworkComponents(ctx, client, informerFactory, options)
+	if err != nil {
+		return nil, err
+	}
+
+	// Standalone callers do not invoke scheduler.New / addAllEventHandlers, so
+	// register extendedResourceCache on the DeviceClasses informer here.
+	// scheduler.New instead chains its queue event handler onto
+	// extendedResourceCache before registering it on the informer.
+	if feature.DefaultFeatureGate.Enabled(features.DRAExtendedResource) {
+		logger := klog.FromContext(ctx)
+		erCache := comps.draManager.DeviceClassResolver().(*extendedresourcecache.ExtendedResourceCache)
+		reg, err := informerFactory.Resource().V1().DeviceClasses().Informer().AddEventHandlerWithOptions(
+			erCache,
+			cache.HandlerOptions{Logger: &logger},
+		)
+		if err != nil {
+			return nil, fmt.Errorf("couldn't add event handler for DeviceClass extendedResourceCache: %w", err)
+		}
+		comps.registeredHandlers = append(comps.registeredHandlers, reg)
+	}
+
+	return comps, nil
 }
 
 func newFrameworkComponents(ctx context.Context,
@@ -145,6 +184,11 @@ func newFrameworkComponents(ctx context.Context,
 	}
 	draManager := dynamicresources.NewDRAManager(ctx, resourceClaimCache, resourceSliceTracker, informerFactory)
 
+	registeredHandlers := []cache.ResourceEventHandlerRegistration{
+		resourceSliceTracker,
+		draManager.ClaimHandlerRegistration(),
+	}
+
 	var apiDispatcher *apidispatcher.APIDispatcher
 	if feature.DefaultFeatureGate.Enabled(features.SchedulerAsyncAPICalls) {
 		apiDispatcher = apidispatcher.New(client, int(options.parallelism), apicalls.Relevances)
@@ -166,6 +210,7 @@ func newFrameworkComponents(ctx context.Context,
 		resourceClaimCache:       resourceClaimCache,
 		resourceSliceTracker:     resourceSliceTracker,
 		draManager:               draManager,
+		registeredHandlers:       registeredHandlers,
 		podGroupHierarchyTracker: podGroupHierarchyTracker,
 		client:                   client,
 		informerFactory:          informerFactory,
@@ -176,6 +221,13 @@ func newFrameworkComponents(ctx context.Context,
 // GetCache returns the shared scheduler cache instance.
 func (c *FrameworkComponents) GetCache() internalcache.Cache {
 	return c.cache
+}
+
+// WaitForHandlersSync waits for all informer event handlers registered by
+// FrameworkComponents (such as DRA caches and trackers) to finish processing
+// their initial informer lists.
+func (c *FrameworkComponents) WaitForHandlersSync(ctx context.Context) error {
+	return waitForHandlersSync(ctx, c.registeredHandlers)
 }
 
 // NewFrameworkMap builds the map of scheduling framework profiles from the
@@ -209,7 +261,7 @@ func NewFrameworkMap(
 		frameworkruntime.WithClientSet(c.client),
 		frameworkruntime.WithKubeConfig(c.options.kubeConfig),
 		frameworkruntime.WithInformerFactory(c.informerFactory),
-		frameworkruntime.WithSharedDRAManager(c.draManager),
+		frameworkruntime.WithSharedDRAManager(c.draManager.WithIsolatedInFlightAllocations()),
 		frameworkruntime.WithSharedPodGroupHierarchyTracker(c.podGroupHierarchyTracker),
 		frameworkruntime.WithSnapshotSharedLister(snapshot),
 		frameworkruntime.WithMutableSnapshotLister(snapshot),

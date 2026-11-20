@@ -21,12 +21,16 @@ import (
 	"maps"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/onsi/gomega"
+
 	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/cache"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/dynamic-resource-allocation/structured"
@@ -681,5 +685,79 @@ func testGatherAllocatedStateParity(tCtx ktesting.TContext) {
 				})
 			}
 		})
+	}
+}
+
+func TestWithIsolatedInFlightAllocations(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	informer := &testInformer{}
+	claimsCache := assumecache.NewAssumeCache(tCtx.Logger(), informer, "ResourceClaim", "", nil)
+	informerFactory := informers.NewSharedInformerFactory(fake.NewClientset(), 0)
+
+	base := NewDRAManager(tCtx, claimsCache, nil, informerFactory)
+	if base.ClaimHandlerRegistration() == nil {
+		t.Fatal("expected non-nil ClaimHandlerRegistration")
+	}
+
+	derivedA := base.WithIsolatedInFlightAllocations()
+	derivedB := base.WithIsolatedInFlightAllocations()
+
+	// Seed an unallocated claim into the shared assume cache and verify both
+	// derived managers observe it.
+	unallocated := st.FromResourceClaim(pendingClaim).UID(string(claimUID)).Obj()
+	unallocated.ResourceVersion = "1"
+	informer.add(unallocated)
+
+	for name, mgr := range map[string]*DefaultDRAManager{"derivedA": derivedA, "derivedB": derivedB} {
+		got, err := mgr.ResourceClaims().Get(unallocated.Namespace, unallocated.Name)
+		if err != nil {
+			t.Fatalf("%s: Get() error = %v", name, err)
+		}
+		if diff := cmp.Diff(unallocated, got); diff != "" {
+			t.Fatalf("%s: Get() mismatch (-want +got):\n%s", name, diff)
+		}
+	}
+
+	// Signal a pending allocation only in derivedA.
+	pending := st.FromResourceClaim(allocatedClaim).UID(string(claimUID)).Obj()
+	if err := derivedA.ResourceClaims().SignalClaimPendingAllocation(claimUID, pending); err != nil {
+		t.Fatalf("derivedA SignalClaimPendingAllocation() error = %v", err)
+	}
+
+	gotPending := derivedA.ResourceClaims().GetPendingAllocation(claimUID)
+	if diff := cmp.Diff(pending.Status.Allocation, gotPending); diff != "" {
+		t.Errorf("derivedA GetPendingAllocation() mismatch (-want +got):\n%s", diff)
+	}
+	if got := derivedB.ResourceClaims().GetPendingAllocation(claimUID); got != nil {
+		t.Errorf("derivedB GetPendingAllocation() = %v, want nil (isolated from derivedA)", got)
+	}
+	if got := base.ResourceClaims().GetPendingAllocation(claimUID); got != nil {
+		t.Errorf("base GetPendingAllocation() = %v, want nil (isolated from derivedA)", got)
+	}
+
+	// Subsequent informer updates to the shared assume cache must be reflected
+	// in all derived managers through the shared allocatedDevices tracker.
+	persisted := st.FromResourceClaim(allocatedClaim).UID(string(claimUID)).Obj()
+	persisted.ResourceVersion = "2"
+	informer.add(persisted)
+
+	devicesA, err := derivedA.ResourceClaims().ListAllAllocatedDevices()
+	if err != nil {
+		t.Fatalf("derivedA ListAllAllocatedDevices() error = %v", err)
+	}
+	devicesB, err := derivedB.ResourceClaims().ListAllAllocatedDevices()
+	if err != nil {
+		t.Fatalf("derivedB ListAllAllocatedDevices() error = %v", err)
+	}
+	if diff := cmp.Diff(devicesA, devicesB); diff != "" {
+		t.Errorf("allocated devices mismatch between derivedA and derivedB (-A +B):\n%s", diff)
+	}
+	if devicesB.Len() == 0 {
+		t.Errorf("expected derivedB to see allocated devices from shared claimsCache update, got empty set")
+	}
+
+	// DeviceClassResolver must return the same shared ExtendedResourceCache instance.
+	if derivedA.DeviceClassResolver() != base.DeviceClassResolver() || derivedB.DeviceClassResolver() != base.DeviceClassResolver() {
+		t.Errorf("expected derived managers to share DeviceClassResolver with base")
 	}
 }

@@ -33,6 +33,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	resourcelisters "k8s.io/client-go/listers/resource/v1"
+	"k8s.io/client-go/tools/cache"
 	draapi "k8s.io/dynamic-resource-allocation/api"
 	"k8s.io/dynamic-resource-allocation/deviceclass/extendedresourcecache"
 	resourceslicetracker "k8s.io/dynamic-resource-allocation/resourceslice/tracker"
@@ -54,6 +55,7 @@ type DefaultDRAManager struct {
 	resourceSliceLister   *resourceSliceLister
 	deviceClassLister     *deviceClassLister
 	extendedResourceCache *extendedresourcecache.ExtendedResourceCache
+	claimHandlerReg       cache.ResourceEventHandlerRegistration
 }
 
 func NewDRAManager(ctx context.Context, claimsCache *assumecache.AssumeCache, resourceSliceTracker *resourceslicetracker.Tracker, informerFactory informers.SharedInformerFactory) *DefaultDRAManager {
@@ -75,9 +77,38 @@ func NewDRAManager(ctx context.Context, claimsCache *assumecache.AssumeCache, re
 
 	// Reacting to events is more efficient than iterating over the list
 	// repeatedly in PreFilter.
-	manager.resourceClaimTracker.cache.AddEventHandler(manager.resourceClaimTracker.allocatedDevices.handlers())
+	manager.claimHandlerReg = manager.resourceClaimTracker.cache.AddEventHandler(manager.resourceClaimTracker.allocatedDevices.handlers())
 
 	return manager
+}
+
+// ClaimHandlerRegistration returns the event handler registration used to
+// populate the ResourceClaim assume cache and allocatedDevices tracker.
+func (s *DefaultDRAManager) ClaimHandlerRegistration() cache.ResourceEventHandlerRegistration {
+	return s.claimHandlerReg
+}
+
+// WithIsolatedInFlightAllocations returns a shallow clone of DefaultDRAManager
+// with an independent in-flight allocations map while sharing the underlying
+// informer-backed caches (claimsCache, allocatedDevices, resourceSliceLister,
+// deviceClassLister, and extendedResourceCache). It does not register any
+// additional event handlers, making it safe to call repeatedly for isolated
+// snapshots.
+//
+// Only tentative Reserve/Unreserve state (inFlightAllocations) is isolated.
+// AssumeClaimAfterAPICall and AssumedClaimRestore (called during PreBind)
+// mutate the shared claimsCache and propagate to allocatedDevices across all
+// clones; callers simulating PreBind with isolated claim mutations must supply
+// a custom SharedDRAManager.
+func (s *DefaultDRAManager) WithIsolatedInFlightAllocations() *DefaultDRAManager {
+	clone := *s
+	clone.resourceClaimTracker = &claimTracker{
+		cache:               s.resourceClaimTracker.cache,
+		inFlightAllocations: make(map[types.UID]inFlightAllocation),
+		allocatedDevices:    s.resourceClaimTracker.allocatedDevices,
+		logger:              s.resourceClaimTracker.logger,
+	}
+	return &clone
 }
 
 func (s *DefaultDRAManager) ResourceClaims() fwk.ResourceClaimTracker {
