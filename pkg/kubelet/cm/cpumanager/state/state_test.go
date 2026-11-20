@@ -110,3 +110,69 @@ func TestCloneWithInPlacePodVerticalScalingExclusiveCPUs(t *testing.T) {
 		t.Fail()
 	}
 }
+
+// Test contains artificial data that cannot be produced in real scenarios for easier verification of PendingResizeDelta function.
+func TestPendingResizeDelta(t *testing.T) {
+	// c1 has {1,2}, c2 has {4,6} and the pod-level assignment {1,2,3,4} holds
+	// both, except CPU 6.
+	assignments := ContainerCPUAssignments{
+		"pod": {
+			"c1": cpuset.New(1, 2),
+			"c2": cpuset.New(4, 6),
+		},
+	}
+	podAssignments := PodCPUAssignments{
+		"pod": {CPUSet: cpuset.New(1, 2, 3, 4)},
+	}
+	pod := cpuset.New(1, 2, 3, 4, 5)
+
+	tests := []struct {
+		name           string
+		pending        PendingResize
+		expectTaken    cpuset.CPUSet
+		expectReleased cpuset.CPUSet
+	}{
+		{
+			name: "containers and pod-level assignment",
+			pending: PendingResize{
+				PodUID:           "pod",
+				ContainerCPUSets: map[string]cpuset.CPUSet{"c1": cpuset.New(1, 2, 3), "c2": cpuset.New(4)},
+				PodCPUSet:        &pod,
+			},
+			expectTaken:    cpuset.New(5),
+			expectReleased: cpuset.New(6),
+		},
+		{
+			name:           "a CPU moving between containers of the pod",
+			pending:        PendingResize{PodUID: "pod", ContainerCPUSets: map[string]cpuset.CPUSet{"c1": cpuset.New(1, 2, 6), "c2": cpuset.New(4)}},
+			expectTaken:    cpuset.New(),
+			expectReleased: cpuset.New(),
+		},
+		{
+			name:           "a CPU coming from the pod-level assignment",
+			pending:        PendingResize{PodUID: "pod", ContainerCPUSets: map[string]cpuset.CPUSet{"c1": cpuset.New(1, 2, 3)}},
+			expectTaken:    cpuset.New(),
+			expectReleased: cpuset.New(),
+		},
+		{
+			name:           "the pod-level assignment only",
+			pending:        PendingResize{PodUID: "pod", PodCPUSet: &pod},
+			expectTaken:    cpuset.New(5),
+			expectReleased: cpuset.New(),
+		},
+		{
+			name:           "a pod without assignments",
+			pending:        PendingResize{PodUID: "new", ContainerCPUSets: map[string]cpuset.CPUSet{"c": cpuset.New(7)}},
+			expectTaken:    cpuset.New(7),
+			expectReleased: cpuset.New(),
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			taken, released := PendingResizeDelta(assignments, podAssignments, tc.pending)
+			if !taken.Equals(tc.expectTaken) || !released.Equals(tc.expectReleased) {
+				t.Errorf("Expected taken %s and released %s, got %s and %s", tc.expectTaken, tc.expectReleased, taken, released)
+			}
+		})
+	}
+}

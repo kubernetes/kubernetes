@@ -1521,3 +1521,35 @@ func TestDeletePod(t *testing.T) {
 		})
 	}
 }
+
+// TestCommitPendingResize checks that the commit is stored in the checkpoint,
+// so that a kubelet restart sees the resize applied.
+func TestCommitPendingResize(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingExclusiveCPUs, true)
+	logger, _ := ktesting.NewTestContext(t)
+	tmpDir := t.TempDir()
+
+	state1, err := NewCheckpointState(logger, tmpDir, testingCheckpoint, "static", containermap.ContainerMap{})
+	require.NoError(t, err)
+	state1.SetCPUSet("pod1", "container", cpuset.New(4, 5))
+	state1.SetCPUSet("pod2", "container", cpuset.New(7, 8))
+	state1.SetDefaultCPUSet(cpuset.New(1, 2, 3, 6))
+
+	state1.CommitPendingResize(PendingResize{
+		PodUID:           "pod1",
+		ContainerCPUSets: map[string]cpuset.CPUSet{"container": cpuset.New(4, 5, 6)},
+	})
+
+	state2, err := NewCheckpointState(logger, tmpDir, testingCheckpoint, "static", containermap.ContainerMap{})
+	require.NoError(t, err)
+
+	for _, state := range []State{state1, state2} {
+		for pod, expected := range map[string]string{"pod1": "4-6", "pod2": "7-8"} {
+			actual, _ := state.GetCPUSet(pod, "container")
+			require.Equal(t, expected, actual.String())
+		}
+		require.Equal(t, "1-3", state.GetDefaultCPUSet().String())
+		baseline, _ := state.GetBaselineCPUSet("pod1", "container")
+		require.Equal(t, "4-5", baseline.String(), "the commit must keep the baseline")
+	}
+}

@@ -894,6 +894,8 @@ func (p *staticPolicy) Allocate(logger klog.Logger, s state.State, pod *v1.Pod, 
 	switch operation {
 	case lifecycle.AddOperation:
 		return p.allocateForAdd(logger, s, pod, container)
+	case lifecycle.UpdateOperation:
+		return p.allocateForResize(logger, s, pod, container)
 	default:
 		logger.V(2).Info("CPU Manager container-level resource allocation skipped, operation not supported by the static CPU manager policy")
 		return nil
@@ -936,8 +938,24 @@ func (p *staticPolicy) allocateForAdd(logger klog.Logger, s state.State, pod *v1
 	// restarted with full-pcpus-only=true, checkpointed allocations that don't
 	// satisfy SMT alignment are accepted to avoid disrupting running workloads.
 	if cset, ok := s.GetCPUSet(string(pod.UID), container.Name); ok {
+		if cset.Size() != numCPUs && utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingExclusiveCPUs) {
+			// The pod is admitted again, for example after a kubelet restart,
+			// with allocated resources that differ from its CPU assignment: a
+			// resize was admitted, but its CPU assignment was not changed.
+			// Handle it as a resize, which aligns the assignment if possible;
+			// see resizeTransaction for when it may not be possible.
+			// Without InPlacePodVerticalScalingExclusiveCPUs the assignment is
+			// kept, as any other assignment present in the state.
+			logger.Info("Static policy: container already present in state with a different number of CPUs, resizing", "cpuset", cset, "requestedSize", numCPUs)
+			if err := p.allocateForResize(logger, s, pod, container); err != nil {
+				return err
+			}
+			// The resize may have changed the CPU set of the container.
+			cset, _ = s.GetCPUSet(string(pod.UID), container.Name)
+		} else {
+			logger.Info("Static policy: container already present in state, skipping")
+		}
 		p.updateCPUsToReuse(pod, container, cset)
-		logger.Info("Static policy: container already present in state, skipping")
 		return nil
 	}
 
@@ -963,6 +981,14 @@ func (p *staticPolicy) allocateForAdd(logger klog.Logger, s state.State, pod *v1
 	metrics.ResourceManagerContainerAssignments.WithLabelValues(metrics.ResourceManagerCPU, metrics.ResourceManagerExclusiveNode).Inc()
 
 	logger.V(4).Info("Allocated exclusive CPUs", "cpuset", cpuAllocation.CPUs.String())
+	return nil
+}
+
+// allocateForResize changes the CPU assignment of a container to its allocated
+// resources. The static policy does not support it yet, so it keeps the
+// assignment unchanged.
+func (p *staticPolicy) allocateForResize(logger klog.Logger, _ state.State, _ *v1.Pod, _ *v1.Container) error {
+	logger.V(2).Info("CPU Manager container-level resource allocation skipped, operation not supported by the static CPU manager policy")
 	return nil
 }
 
@@ -1160,6 +1186,8 @@ func (p *staticPolicy) GetTopologyHints(logger klog.Logger, s state.State, pod *
 	switch operation {
 	case lifecycle.AddOperation:
 		return p.getTopologyHintsForAdd(logger, s, pod, container)
+	case lifecycle.UpdateOperation:
+		return p.getTopologyHintsForResize(logger, s, pod, container)
 	default:
 		logger.V(2).Info("CPU Manager container-level hint generation skipped, operation not supported by the static CPU manager policy")
 		return nil
@@ -1191,6 +1219,11 @@ func (p *staticPolicy) getTopologyHintsForAdd(logger klog.Logger, s state.State,
 	// kubelet restart, for example.
 	if allocated, exists := s.GetCPUSet(string(pod.UID), container.Name); exists {
 		if allocated.Size() != requested {
+			if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingExclusiveCPUs) {
+				// Handled as a resize, see allocateForAdd.
+				logger.Info("CPUs already allocated to container with different number than request, generating hints for a resize", "requestedSize", requested, "allocatedSize", allocated.Size())
+				return p.getTopologyHintsForResize(logger, s, pod, container)
+			}
 			logger.Info("CPUs already allocated to container with different number than request", "requestedSize", requested, "allocatedSize", allocated.Size())
 			// An empty list of hints will be treated as a preference that cannot be satisfied.
 			// In definition of hints this is equal to: TopologyHint[NUMANodeAffinity: nil, Preferred: false].
@@ -1225,11 +1258,27 @@ func (p *staticPolicy) getTopologyHintsForAdd(logger klog.Logger, s state.State,
 	}
 }
 
+// getTopologyHintsForResize generates the hints for a resize of a container.
+// The static policy does not support resize yet, so it has no preference.
+func (p *staticPolicy) getTopologyHintsForResize(logger klog.Logger, _ state.State, _ *v1.Pod, _ *v1.Container) map[string][]topologymanager.TopologyHint {
+	logger.V(2).Info("CPU Manager container-level hint generation skipped, operation not supported by the static CPU manager policy")
+	return nil
+}
+
+// getPodTopologyHintsForResize generates the hints for a resize of a pod.
+// The static policy does not support resize yet, so it has no preference.
+func (p *staticPolicy) getPodTopologyHintsForResize(logger klog.Logger, _ state.State, _ *v1.Pod) map[string][]topologymanager.TopologyHint {
+	logger.V(2).Info("CPU Manager pod hint generation skipped, operation not supported by the static CPU manager policy")
+	return nil
+}
+
 func (p *staticPolicy) GetPodTopologyHints(logger klog.Logger, s state.State, pod *v1.Pod, operation lifecycle.Operation) map[string][]topologymanager.TopologyHint {
 	logger = klog.LoggerWithValues(logger, "pod", klog.KObj(pod), "podUID", pod.UID, "operation", operation)
 	switch operation {
 	case lifecycle.AddOperation:
 		return p.getPodTopologyHintsForAdd(logger, s, pod)
+	case lifecycle.UpdateOperation:
+		return p.getPodTopologyHintsForResize(logger, s, pod)
 	default:
 		logger.V(2).Info("CPU Manager pod hint generation skipped, operation not supported by the static CPU manager policy")
 		return nil
@@ -1333,6 +1382,16 @@ func (p *staticPolicy) getPodTopologyHintsForAdd(logger klog.Logger, s state.Sta
 			// kubelet restart, for example.
 			if allocated, exists := s.GetCPUSet(string(pod.UID), container.Name); exists {
 				if allocated.Size() != requestedByContainer {
+					if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingExclusiveCPUs) {
+						// Handled as a resize, see allocateForAdd.
+						// TODO(#140629): return hints that cannot be satisfied if the
+						// resize is not feasible. allocateForAdd returns before it
+						// looks at the state for a container with no exclusive CPU
+						// request, so Allocate does not reject such a pod, as it
+						// does for an update.
+						logger_.Info("CPUs already allocated to container with different number than request, generating hints for a resize", "requestedByContainer", requestedByContainer, "allocatedSize", allocated.Size())
+						return p.getPodTopologyHintsForResize(logger, s, pod)
+					}
 					logger_.Info("CPUs already allocated to container with different number than request", "requestedByContainer", requestedByContainer, "allocatedSize", allocated.Size())
 					// An empty list of hints will be treated as a preference that cannot be satisfied.
 					// In definition of hints this is equal to: TopologyHint[NUMANodeAffinity: nil, Preferred: false].
