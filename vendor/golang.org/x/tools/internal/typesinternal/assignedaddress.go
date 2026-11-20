@@ -20,11 +20,12 @@ import (
 // These examples cause IsAssignedOrAddressTaken on the identifier for x to
 // return true:
 //
-//		x = 1
-//		x++
-//		x[i] = 1	   (assume x is an array)
-//		x.a[i] = 1	 (assume x.a is a non-pointer struct field)
-//	  use(&x)
+//	x = 1
+//	x++
+//	x[i] = 1	 (assume x is an array)
+//	x.a[i] = 1	 (assume x.a is a non-pointer struct field)
+//	use(&x)
+//	use(x[i:j])	 (assume x is an array; the slice aliases x)
 //
 // whereas these cause it to return false:
 //
@@ -53,9 +54,12 @@ func IsAssignedOrAddressTaken(info *types.Info, cur inspector.Cursor) bool {
 	// as it is always true for a variable even when that variable is
 	// used only as an r-value. So we must inspect enclosing syntax.
 outer:
-	// Ascend to outermost aggregate of which
-	// original cur is a part:
-	//    x -> (x) | x.f | x[i] | x[i:j]
+	// Ascend to the outermost expression that denotes the
+	// same variable as the original cur, or part of it:
+	//    x -> (x) | x.f | x[i]
+	// where x.f does not go through a pointer and x[i] indexes an array.
+	// Other forms (array slices x[i:j], method selections, pointer
+	// indirections) are decided immediately within the loop.
 	for cur = range cur.Enclosing() {
 		switch cur.ParentEdgeKind() {
 		case edge.ParenExpr_X:
@@ -90,14 +94,18 @@ outer:
 				}
 			}
 		case edge.IndexExpr_X, edge.SliceExpr_X:
-			// If x[i] or x[i:j] is an lvalue,
-			// then x is an lvalue iff x is an array.
+			// x[i] and x[i:j] refer to x's own memory only if x is an
+			// array; for slices, maps, strings, and pointers to arrays,
+			// they go through a reference and do not involve x itself.
 			t := info.TypeOf(cur.Node().(ast.Expr))
 			if t == nil || t == types.Typ[types.Invalid] {
 				return true // no type information (ill-typed code); be conservative
 			}
 			if !is[*types.Array](t.Underlying()) {
 				return false
+			}
+			if cur.ParentEdgeKind() == edge.SliceExpr_X {
+				return true // x[i:j] on an array implicitly takes &x
 			}
 		default:
 			break outer

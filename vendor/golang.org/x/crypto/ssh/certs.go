@@ -22,11 +22,9 @@ import (
 // field.
 const (
 	CertAlgoRSAv01 = "ssh-rsa-cert-v01@openssh.com"
-	// Deprecated: DSA is only supported at insecure key sizes, and was removed
-	// from major implementations.
+	// Deprecated: DSA is no longer supported.
 	CertAlgoDSAv01 = InsecureCertAlgoDSAv01
-	// Deprecated: DSA is only supported at insecure key sizes, and was removed
-	// from major implementations.
+	// Deprecated: DSA is no longer supported.
 	InsecureCertAlgoDSAv01 = "ssh-dss-cert-v01@openssh.com"
 	CertAlgoECDSA256v01    = "ecdsa-sha2-nistp256-cert-v01@openssh.com"
 	CertAlgoECDSA384v01    = "ecdsa-sha2-nistp384-cert-v01@openssh.com"
@@ -416,7 +414,8 @@ func (c *CertChecker) Authenticate(conn ConnMetadata, pubKey PublicKey) (*Permis
 
 // CheckCert checks CriticalOptions, ValidPrincipals, revocation, timestamp and
 // the signature of the certificate. Critical options that are not listed in
-// SupportedCriticalOptions are rejected.
+// SupportedCriticalOptions are rejected, as are an empty principal and a
+// certificate with an empty ValidPrincipals.
 func (c *CertChecker) CheckCert(principal string, cert *Certificate) error {
 	if c.IsRevoked != nil && c.IsRevoked(cert) {
 		return fmt.Errorf("ssh: certificate serial %d revoked", cert.Serial)
@@ -428,18 +427,11 @@ func (c *CertChecker) CheckCert(principal string, cert *Certificate) error {
 		}
 	}
 
-	if len(cert.ValidPrincipals) > 0 {
-		// By default, certs are valid for all users/hosts.
-		found := false
-		for _, p := range cert.ValidPrincipals {
-			if p == principal {
-				found = true
-				break
-			}
-		}
-		if !found {
-			return fmt.Errorf("ssh: principal %q not in the set of valid principals for given certificate: %q", principal, cert.ValidPrincipals)
-		}
+	if principal == "" {
+		return errors.New("ssh: empty principal")
+	}
+	if !slices.Contains(cert.ValidPrincipals, principal) {
+		return fmt.Errorf("ssh: principal %q not in the set of valid principals for given certificate: %q", principal, cert.ValidPrincipals)
 	}
 
 	clock := c.Clock
@@ -475,8 +467,15 @@ func (c *CertChecker) CheckCert(principal string, cert *Certificate) error {
 // SignatureKey, and Signature fields. If the authority implements the
 // MultiAlgorithmSigner interface the first algorithm in the list is used. This
 // is useful if you want to sign with a specific algorithm. As specified in
-// [SSH-CERTS], Section 2.1.1, authority can't be a [Certificate].
+// [SSH-CERTS], Section 2.1.1, authority can't be a [Certificate]. An empty
+// ValidPrincipals, or an empty entry in it, is rejected.
 func (c *Certificate) SignCert(rand io.Reader, authority Signer) error {
+	if len(c.ValidPrincipals) == 0 {
+		return errors.New("ssh: certificate has no principals")
+	}
+	if slices.Contains(c.ValidPrincipals, "") {
+		return errors.New("ssh: empty principal in certificate")
+	}
 	c.Nonce = make([]byte, 32)
 	if _, err := io.ReadFull(rand, c.Nonce); err != nil {
 		return err
@@ -524,19 +523,18 @@ func (c *Certificate) SignCert(rand io.Reader, authority Signer) error {
 //
 // This map must be kept in sync with the one in agent/client.go.
 var certKeyAlgoNames = map[string]string{
-	CertAlgoRSAv01:         KeyAlgoRSA,
-	CertAlgoRSASHA256v01:   KeyAlgoRSASHA256,
-	CertAlgoRSASHA512v01:   KeyAlgoRSASHA512,
-	InsecureCertAlgoDSAv01: InsecureKeyAlgoDSA,
-	CertAlgoECDSA256v01:    KeyAlgoECDSA256,
-	CertAlgoECDSA384v01:    KeyAlgoECDSA384,
-	CertAlgoECDSA521v01:    KeyAlgoECDSA521,
-	CertAlgoSKECDSA256v01:  KeyAlgoSKECDSA256,
-	CertAlgoED25519v01:     KeyAlgoED25519,
-	CertAlgoSKED25519v01:   KeyAlgoSKED25519,
-	CertAlgoMLDSA44v01Go:   KeyAlgoMLDSA44,
-	CertAlgoMLDSA65v01Go:   KeyAlgoMLDSA65,
-	CertAlgoMLDSA87v01Go:   KeyAlgoMLDSA87,
+	CertAlgoRSAv01:        KeyAlgoRSA,
+	CertAlgoRSASHA256v01:  KeyAlgoRSASHA256,
+	CertAlgoRSASHA512v01:  KeyAlgoRSASHA512,
+	CertAlgoECDSA256v01:   KeyAlgoECDSA256,
+	CertAlgoECDSA384v01:   KeyAlgoECDSA384,
+	CertAlgoECDSA521v01:   KeyAlgoECDSA521,
+	CertAlgoSKECDSA256v01: KeyAlgoSKECDSA256,
+	CertAlgoED25519v01:    KeyAlgoED25519,
+	CertAlgoSKED25519v01:  KeyAlgoSKED25519,
+	CertAlgoMLDSA44v01Go:  KeyAlgoMLDSA44,
+	CertAlgoMLDSA65v01Go:  KeyAlgoMLDSA65,
+	CertAlgoMLDSA87v01Go:  KeyAlgoMLDSA87,
 }
 
 // underlyingAlgo returns the signature algorithm associated with algo (which is

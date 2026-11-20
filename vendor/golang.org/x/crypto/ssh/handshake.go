@@ -13,6 +13,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 )
 
 // debugHandshake, if set, prints messages sent and received.  Key
@@ -115,8 +116,8 @@ type handshakeTransport struct {
 	// dance to handle a custom server's message.
 	bannerCallback BannerCallback
 
-	// Algorithms agreed in the last key exchange.
-	algorithms *NegotiatedAlgorithms
+	// Algorithms agreed in the last completed key exchange.
+	algorithms atomic.Pointer[NegotiatedAlgorithms]
 
 	// Counters exclusively owned by readLoop.
 	readPacketsLeft uint32
@@ -186,7 +187,7 @@ func (t *handshakeTransport) getSessionID() []byte {
 }
 
 func (t *handshakeTransport) getAlgorithms() NegotiatedAlgorithms {
-	return *t.algorithms
+	return *t.algorithms.Load()
 }
 
 // waitSession waits for the session to be established. This should be
@@ -294,8 +295,8 @@ func (t *handshakeTransport) resetWriteThresholds() {
 	t.writePacketsLeft = packetRekeyThreshold
 	if t.config.RekeyThreshold > 0 {
 		t.writeBytesLeft = int64(t.config.RekeyThreshold)
-	} else if t.algorithms != nil {
-		t.writeBytesLeft = t.algorithms.Write.rekeyBytes()
+	} else if algs := t.algorithms.Load(); algs != nil {
+		t.writeBytesLeft = algs.Write.rekeyBytes()
 	} else {
 		t.writeBytesLeft = 1 << 30
 	}
@@ -411,8 +412,8 @@ func (t *handshakeTransport) resetReadThresholds() {
 	t.readPacketsLeft = packetRekeyThreshold
 	if t.config.RekeyThreshold > 0 {
 		t.readBytesLeft = int64(t.config.RekeyThreshold)
-	} else if t.algorithms != nil {
-		t.readBytesLeft = t.algorithms.Read.rekeyBytes()
+	} else if algs := t.algorithms.Load(); algs != nil {
+		t.readBytesLeft = algs.Read.rekeyBytes()
 	} else {
 		t.readBytesLeft = 1 << 30
 	}
@@ -629,6 +630,7 @@ func (t *handshakeTransport) writePacket(p []byte) error {
 	if err := t.pushPacket(p); err != nil {
 		t.writeError = err
 		t.writeCond.Broadcast()
+		return err
 	}
 
 	return nil
@@ -674,8 +676,7 @@ func (t *handshakeTransport) enterKeyExchange(otherInitPacket []byte) error {
 		magics.serverKexInit = otherInitPacket
 	}
 
-	var err error
-	t.algorithms, err = findAgreedAlgorithms(isClient, clientInit, serverInit)
+	algs, err := findAgreedAlgorithms(isClient, clientInit, serverInit)
 	if err != nil {
 		return err
 	}
@@ -705,16 +706,16 @@ func (t *handshakeTransport) enterKeyExchange(otherInitPacket []byte) error {
 		}
 	}
 
-	kex, ok := kexAlgoMap[t.algorithms.KeyExchange]
+	kex, ok := kexAlgoMap[algs.KeyExchange]
 	if !ok {
-		return fmt.Errorf("ssh: unexpected key exchange algorithm %v", t.algorithms.KeyExchange)
+		return fmt.Errorf("ssh: unexpected key exchange algorithm %v", algs.KeyExchange)
 	}
 
 	var result *kexResult
 	if len(t.hostKeys) > 0 {
-		result, err = t.server(kex, &magics)
+		result, err = t.server(kex, algs.HostKey, &magics)
 	} else {
-		result, err = t.client(kex, &magics)
+		result, err = t.client(kex, algs.HostKey, &magics)
 	}
 
 	if err != nil {
@@ -727,7 +728,7 @@ func (t *handshakeTransport) enterKeyExchange(otherInitPacket []byte) error {
 	}
 	result.SessionID = t.sessionID
 
-	if err := t.conn.prepareKeyChange(t.algorithms, result); err != nil {
+	if err := t.conn.prepareKeyChange(algs, result); err != nil {
 		return err
 	}
 	if err = t.conn.writePacket([]byte{msgNewKeys}); err != nil {
@@ -767,6 +768,8 @@ func (t *handshakeTransport) enterKeyExchange(otherInitPacket []byte) error {
 		// after receiving SSH_MSG_NEWKEYS.
 		t.conn.setInitialKEXDone()
 	}
+
+	t.algorithms.Store(algs)
 
 	return nil
 }
@@ -813,17 +816,17 @@ func pickHostKey(hostKeys []Signer, algo string) AlgorithmSigner {
 	return nil
 }
 
-func (t *handshakeTransport) server(kex kexAlgorithm, magics *handshakeMagics) (*kexResult, error) {
-	hostKey := pickHostKey(t.hostKeys, t.algorithms.HostKey)
+func (t *handshakeTransport) server(kex kexAlgorithm, hostKeyAlgo string, magics *handshakeMagics) (*kexResult, error) {
+	hostKey := pickHostKey(t.hostKeys, hostKeyAlgo)
 	if hostKey == nil {
 		return nil, errors.New("ssh: internal error: negotiated unsupported signature type")
 	}
 
-	r, err := kex.Server(t.conn, t.config.Rand, magics, hostKey, t.algorithms.HostKey)
+	r, err := kex.Server(t.conn, t.config.Rand, magics, hostKey, hostKeyAlgo)
 	return r, err
 }
 
-func (t *handshakeTransport) client(kex kexAlgorithm, magics *handshakeMagics) (*kexResult, error) {
+func (t *handshakeTransport) client(kex kexAlgorithm, hostKeyAlgo string, magics *handshakeMagics) (*kexResult, error) {
 	result, err := kex.Client(t.conn, t.config.Rand, magics)
 	if err != nil {
 		return nil, err
@@ -834,7 +837,7 @@ func (t *handshakeTransport) client(kex kexAlgorithm, magics *handshakeMagics) (
 		return nil, err
 	}
 
-	if err := verifyHostKeySignature(hostKey, t.algorithms.HostKey, result); err != nil {
+	if err := verifyHostKeySignature(hostKey, hostKeyAlgo, result); err != nil {
 		return nil, err
 	}
 

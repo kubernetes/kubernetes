@@ -438,7 +438,6 @@ func (s *Session) wait(reqs <-chan *Request) error {
 				return err
 			}
 
-			// Must sanitize strings?
 			wm.signal = sigval.Signal
 			wm.msg = sigval.Error
 			wm.lang = sigval.Lang
@@ -641,10 +640,10 @@ func (w Waitmsg) Lang() string {
 func (w Waitmsg) String() string {
 	str := fmt.Sprintf("Process exited with status %v", w.status)
 	if w.signal != "" {
-		str += fmt.Sprintf(" from signal %v", w.signal)
+		str += fmt.Sprintf(" from signal %q", w.signal)
 	}
 	if w.msg != "" {
-		str += fmt.Sprintf(". Reason was: %v", w.msg)
+		str += fmt.Sprintf(". Reason was: %q", w.msg)
 	}
 	return str
 }

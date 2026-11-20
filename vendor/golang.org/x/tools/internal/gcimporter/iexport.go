@@ -1088,7 +1088,14 @@ func (w *exportWriter) doTyp(t types.Type, pkg *types.Package) {
 
 	case *types.Interface:
 		w.startType(interfaceType)
-		w.pkg(pkg) // qualifies unexported method funcs
+		methodPkg := pkg
+		for i := range t.NumExplicitMethods() {
+			if mp := t.ExplicitMethod(i).Pkg(); mp != nil {
+				methodPkg = mp
+				break
+			}
+		}
+		w.pkg(methodPkg) // qualifies unexported method funcs
 
 		n := t.NumEmbeddeds()
 		w.uint64(uint64(n))

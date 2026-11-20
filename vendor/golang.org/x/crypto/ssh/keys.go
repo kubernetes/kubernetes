@@ -38,11 +38,9 @@ import (
 // arguments.
 const (
 	KeyAlgoRSA = "ssh-rsa"
-	// Deprecated: DSA is only supported at insecure key sizes, and was removed
-	// from major implementations.
+	// Deprecated: DSA is no longer supported.
 	KeyAlgoDSA = InsecureKeyAlgoDSA
-	// Deprecated: DSA is only supported at insecure key sizes, and was removed
-	// from major implementations.
+	// Deprecated: DSA is no longer supported.
 	InsecureKeyAlgoDSA = "ssh-dss"
 	KeyAlgoECDSA256    = "ecdsa-sha2-nistp256"
 	KeyAlgoSKECDSA256  = "sk-ecdsa-sha2-nistp256@openssh.com"
@@ -79,8 +77,6 @@ func parsePubKey(in []byte, algo string) (pubKey PublicKey, rest []byte, err err
 	switch algo {
 	case KeyAlgoRSA:
 		return parseRSA(in)
-	case InsecureKeyAlgoDSA:
-		return parseDSA(in)
 	case KeyAlgoECDSA256, KeyAlgoECDSA384, KeyAlgoECDSA521:
 		return parseECDSA(in, algo)
 	case KeyAlgoSKECDSA256:
@@ -91,7 +87,7 @@ func parsePubKey(in []byte, algo string) (pubKey PublicKey, rest []byte, err err
 		return parseSKEd25519(in)
 	case KeyAlgoMLDSA44, KeyAlgoMLDSA65, KeyAlgoMLDSA87:
 		return parseMLDSA(in, algo)
-	case CertAlgoRSAv01, InsecureCertAlgoDSAv01, CertAlgoECDSA256v01, CertAlgoECDSA384v01, CertAlgoECDSA521v01, CertAlgoSKECDSA256v01, CertAlgoED25519v01, CertAlgoSKED25519v01,
+	case CertAlgoRSAv01, CertAlgoECDSA256v01, CertAlgoECDSA384v01, CertAlgoECDSA521v01, CertAlgoSKECDSA256v01, CertAlgoED25519v01, CertAlgoSKED25519v01,
 		CertAlgoMLDSA44v01Go, CertAlgoMLDSA65v01Go, CertAlgoMLDSA87v01Go:
 		cert, err := parseCert(in, certKeyAlgoNames[algo])
 		if err != nil {
@@ -104,7 +100,7 @@ func parsePubKey(in []byte, algo string) (pubKey PublicKey, rest []byte, err err
 			algo, keyFormat)
 	}
 
-	return nil, nil, fmt.Errorf("ssh: unknown key algorithm: %v", algo)
+	return nil, nil, fmt.Errorf("ssh: unknown key algorithm: %q", algo)
 }
 
 // trimSpace removes leading and trailing ASCII space and tab.
@@ -166,7 +162,8 @@ func parseAuthorizedKey(in []byte) (out PublicKey, comment string, err error) {
 // can be called repeatedly to parse multiple entries.
 //
 // If no entries were found in the input then err will be io.EOF. Otherwise a
-// non-nil err value indicates a parse error.
+// non-nil err value indicates a parse error, and rest contains the input
+// following the invalid entry.
 func ParseKnownHosts(in []byte) (marker string, hosts []string, pubKey PublicKey, comment string, rest []byte, err error) {
 	for len(in) > 0 {
 		end := bytes.IndexByte(in, '\n')
@@ -197,7 +194,7 @@ func ParseKnownHosts(in []byte) (marker string, hosts []string, pubKey PublicKey
 		// number of fields.
 		keyFields := asciiFields(in)
 		if len(keyFields) < 3 {
-			return "", nil, nil, "", nil, errors.New("ssh: invalid entry in known_hosts data")
+			return "", nil, nil, "", rest, errors.New("ssh: invalid entry in known_hosts data")
 		}
 
 		// keyFields[0] is either "@cert-authority", "@revoked" or a comma separated
@@ -217,10 +214,10 @@ func ParseKnownHosts(in []byte) (marker string, hosts []string, pubKey PublicKey
 
 		key := bytes.Join(keyFields[2:], []byte(" "))
 		if pubKey, comment, err = parseAuthorizedKey(key); err != nil {
-			return "", nil, nil, "", nil, err
+			return "", nil, nil, "", rest, err
 		}
 		if pubKey.Type() != wantType {
-			return "", nil, nil, "", nil, fmt.Errorf("ssh: known hosts key type mismatch: human-readable type %q, encoded type %q", wantType, pubKey.Type())
+			return "", nil, nil, "", rest, fmt.Errorf("ssh: known hosts key type mismatch: human-readable type %q, encoded type %q", wantType, pubKey.Type())
 		}
 
 		return marker, strings.Split(hosts, ","), pubKey, comment, rest, nil
@@ -550,7 +547,7 @@ func (r *rsaPublicKey) Marshal() []byte {
 func (r *rsaPublicKey) Verify(data []byte, sig *Signature) error {
 	supportedAlgos := algorithmsForKeyFormat(r.Type())
 	if !slices.Contains(supportedAlgos, sig.Format) {
-		return fmt.Errorf("ssh: signature type %s for key type %s", sig.Format, r.Type())
+		return fmt.Errorf("ssh: signature type %q for key type %q", sig.Format, r.Type())
 	}
 	hash, err := hashFunc(sig.Format)
 	if err != nil {
@@ -608,170 +605,6 @@ func (r *rsaPublicKey) CryptoPublicKey() crypto.PublicKey {
 	return (*rsa.PublicKey)(r)
 }
 
-type dsaPublicKey dsa.PublicKey
-
-func (k *dsaPublicKey) Type() string {
-	return "ssh-dss"
-}
-
-func checkDSAParams(param *dsa.Parameters) error {
-	// SSH specifies FIPS 186-2, which only provided a single size
-	// (1024 bits) DSA key. FIPS 186-3 allows for larger key
-	// sizes, which would confuse SSH.
-	if l := param.P.BitLen(); l != 1024 {
-		return fmt.Errorf("ssh: unsupported DSA key size %d", l)
-	}
-
-	// FIPS 186-2 specifies that Q must be exactly 160 bits. We must enforce
-	// this to prevent DoS attacks where an attacker sends a huge Q which makes
-	// verification slow.
-	if l := param.Q.BitLen(); l != 160 {
-		return fmt.Errorf("ssh: unsupported DSA sub-prime size %d", l)
-	}
-
-	// The generator G is an element of the group, so it must be strictly less
-	// than the modulus P.
-	if param.G.Cmp(param.P) >= 0 {
-		return errors.New("ssh: DSA generator larger than modulus")
-	}
-
-	// G must be positive.
-	if param.G.Sign() <= 0 {
-		return errors.New("ssh: DSA generator must be positive")
-	}
-
-	return nil
-}
-
-// parseDSA parses an DSA key according to RFC 4253, section 6.6.
-func parseDSA(in []byte) (out PublicKey, rest []byte, err error) {
-	var w struct {
-		P, Q, G, Y *big.Int
-		Rest       []byte `ssh:"rest"`
-	}
-	if err := Unmarshal(in, &w); err != nil {
-		return nil, nil, err
-	}
-
-	param := dsa.Parameters{
-		P: w.P,
-		Q: w.Q,
-		G: w.G,
-	}
-	if err := checkDSAParams(&param); err != nil {
-		return nil, nil, err
-	}
-
-	// The public value Y must be a non-zero element of the group, i.e.
-	// strictly between 0 and P. crypto/dsa.Verify does not range-check Y,
-	// so we reject out-of-range values here to prevent a maliciously
-	// oversized Y from slowing verification.
-	if w.Y.Sign() <= 0 || w.Y.Cmp(w.P) >= 0 {
-		return nil, nil, errors.New("ssh: DSA public value Y out of range")
-	}
-
-	key := &dsaPublicKey{
-		Parameters: param,
-		Y:          w.Y,
-	}
-	return key, w.Rest, nil
-}
-
-func (k *dsaPublicKey) Marshal() []byte {
-	// DSA publickey struct layout should match the struct used by
-	// parseDSACert in the x/crypto/ssh/agent package.
-	w := struct {
-		Name       string
-		P, Q, G, Y *big.Int
-	}{
-		k.Type(),
-		k.P,
-		k.Q,
-		k.G,
-		k.Y,
-	}
-
-	return Marshal(&w)
-}
-
-func (k *dsaPublicKey) Verify(data []byte, sig *Signature) error {
-	if sig.Format != k.Type() {
-		return fmt.Errorf("ssh: signature type %s for key type %s", sig.Format, k.Type())
-	}
-	hash, err := hashFunc(sig.Format)
-	if err != nil {
-		return err
-	}
-	h := hash.New()
-	h.Write(data)
-	digest := h.Sum(nil)
-
-	// Per RFC 4253, section 6.6,
-	// The value for 'dss_signature_blob' is encoded as a string containing
-	// r, followed by s (which are 160-bit integers, without lengths or
-	// padding, unsigned, and in network byte order).
-	// For DSS purposes, sig.Blob should be exactly 40 bytes in length.
-	if len(sig.Blob) != 40 {
-		return errors.New("ssh: DSA signature parse error")
-	}
-	r := new(big.Int).SetBytes(sig.Blob[:20])
-	s := new(big.Int).SetBytes(sig.Blob[20:])
-	if dsa.Verify((*dsa.PublicKey)(k), digest, r, s) {
-		return nil
-	}
-	return errors.New("ssh: signature did not verify")
-}
-
-func (k *dsaPublicKey) CryptoPublicKey() crypto.PublicKey {
-	return (*dsa.PublicKey)(k)
-}
-
-type dsaPrivateKey struct {
-	*dsa.PrivateKey
-}
-
-func (k *dsaPrivateKey) PublicKey() PublicKey {
-	return (*dsaPublicKey)(&k.PrivateKey.PublicKey)
-}
-
-func (k *dsaPrivateKey) Sign(rand io.Reader, data []byte) (*Signature, error) {
-	return k.SignWithAlgorithm(rand, data, k.PublicKey().Type())
-}
-
-func (k *dsaPrivateKey) Algorithms() []string {
-	return []string{k.PublicKey().Type()}
-}
-
-func (k *dsaPrivateKey) SignWithAlgorithm(rand io.Reader, data []byte, algorithm string) (*Signature, error) {
-	if algorithm != "" && algorithm != k.PublicKey().Type() {
-		return nil, fmt.Errorf("ssh: unsupported signature algorithm %s", algorithm)
-	}
-
-	hash, err := hashFunc(k.PublicKey().Type())
-	if err != nil {
-		return nil, err
-	}
-	h := hash.New()
-	h.Write(data)
-	digest := h.Sum(nil)
-	r, s, err := dsa.Sign(rand, k.PrivateKey, digest)
-	if err != nil {
-		return nil, err
-	}
-
-	sig := make([]byte, 40)
-	rb := r.Bytes()
-	sb := s.Bytes()
-
-	copy(sig[20-len(rb):20], rb)
-	copy(sig[40-len(sb):], sb)
-
-	return &Signature{
-		Format: k.PublicKey().Type(),
-		Blob:   sig,
-	}, nil
-}
-
 type ecdsaPublicKey ecdsa.PublicKey
 
 func (k *ecdsaPublicKey) Type() string {
@@ -826,7 +659,7 @@ func (k ed25519PublicKey) Marshal() []byte {
 
 func (k ed25519PublicKey) Verify(b []byte, sig *Signature) error {
 	if sig.Format != k.Type() {
-		return fmt.Errorf("ssh: signature type %s for key type %s", sig.Format, k.Type())
+		return fmt.Errorf("ssh: signature type %q for key type %q", sig.Format, k.Type())
 	}
 	if l := len(k); l != ed25519.PublicKeySize {
 		return fmt.Errorf("ssh: invalid size %d for Ed25519 public key", l)
@@ -905,7 +738,7 @@ func (k *ecdsaPublicKey) Marshal() []byte {
 
 func (k *ecdsaPublicKey) Verify(data []byte, sig *Signature) error {
 	if sig.Format != k.Type() {
-		return fmt.Errorf("ssh: signature type %s for key type %s", sig.Format, k.Type())
+		return fmt.Errorf("ssh: signature type %q for key type %q", sig.Format, k.Type())
 	}
 	hash, err := hashFunc(sig.Format)
 	if err != nil {
@@ -1026,7 +859,7 @@ func (k *skECDSAPublicKey) Marshal() []byte {
 
 func (k *skECDSAPublicKey) Verify(data []byte, sig *Signature) error {
 	if sig.Format != k.Type() {
-		return fmt.Errorf("ssh: signature type %s for key type %s", sig.Format, k.Type())
+		return fmt.Errorf("ssh: signature type %q for key type %q", sig.Format, k.Type())
 	}
 	hash, err := hashFunc(sig.Format)
 	if err != nil {
@@ -1137,7 +970,7 @@ func (k *skEd25519PublicKey) Marshal() []byte {
 
 func (k *skEd25519PublicKey) Verify(data []byte, sig *Signature) error {
 	if sig.Format != k.Type() {
-		return fmt.Errorf("ssh: signature type %s for key type %s", sig.Format, k.Type())
+		return fmt.Errorf("ssh: signature type %q for key type %q", sig.Format, k.Type())
 	}
 	if l := len(k.PublicKey); l != ed25519.PublicKeySize {
 		return fmt.Errorf("invalid size %d for Ed25519 public key", l)
@@ -1197,27 +1030,16 @@ func (k *skEd25519PublicKey) CryptoPublicKey() crypto.PublicKey {
 	return k.PublicKey
 }
 
-// NewSignerFromKey takes an *rsa.PrivateKey, *dsa.PrivateKey,
-// *ecdsa.PrivateKey, *mldsa.PrivateKey, or any other crypto.Signer and returns
-// a corresponding Signer instance. ECDSA keys must use P-256, P-384 or P-521.
-// DSA keys must use parameter size L1024N160.
+// NewSignerFromKey takes an *rsa.PrivateKey, *ecdsa.PrivateKey,
+// *mldsa.PrivateKey, or any other crypto.Signer and returns a corresponding
+// Signer instance. ECDSA keys must use P-256, P-384 or P-521.
 func NewSignerFromKey(key interface{}) (Signer, error) {
 	switch key := key.(type) {
 	case crypto.Signer:
 		return NewSignerFromSigner(key)
-	case *dsa.PrivateKey:
-		return newDSAPrivateKey(key)
 	default:
 		return nil, fmt.Errorf("ssh: unsupported key type %T", key)
 	}
-}
-
-func newDSAPrivateKey(key *dsa.PrivateKey) (Signer, error) {
-	if err := checkDSAParams(&key.PublicKey.Parameters); err != nil {
-		return nil, err
-	}
-
-	return &dsaPrivateKey{key}, nil
 }
 
 type wrappedSigner struct {
@@ -1277,10 +1099,8 @@ func (s *wrappedSigner) SignWithAlgorithm(rand io.Reader, data []byte, algorithm
 	}
 
 	// crypto.Signer.Sign is expected to return an ASN.1-encoded signature
-	// for ECDSA and DSA, but that's not the encoding expected by SSH, so
-	// re-encode.
-	switch s.pubKey.(type) {
-	case *ecdsaPublicKey, *dsaPublicKey:
+	// for ECDSA, but that's not the encoding expected by SSH, so re-encode.
+	if _, ok := s.pubKey.(*ecdsaPublicKey); ok {
 		type asn1Signature struct {
 			R, S *big.Int
 		}
@@ -1289,18 +1109,7 @@ func (s *wrappedSigner) SignWithAlgorithm(rand io.Reader, data []byte, algorithm
 		if err != nil {
 			return nil, err
 		}
-
-		switch s.pubKey.(type) {
-		case *ecdsaPublicKey:
-			signature = Marshal(asn1Sig)
-
-		case *dsaPublicKey:
-			signature = make([]byte, 40)
-			r := asn1Sig.R.Bytes()
-			s := asn1Sig.S.Bytes()
-			copy(signature[20-len(r):20], r)
-			copy(signature[40-len(s):40], s)
-		}
+		signature = Marshal(asn1Sig)
 	}
 
 	return &Signature{
@@ -1309,9 +1118,9 @@ func (s *wrappedSigner) SignWithAlgorithm(rand io.Reader, data []byte, algorithm
 	}, nil
 }
 
-// NewPublicKey takes an *rsa.PublicKey, *dsa.PublicKey, *ecdsa.PublicKey,
-// ed25519.PublicKey, or an *mldsa.PublicKey, and returns a corresponding
-// PublicKey instance. ECDSA keys must use P-256, P-384 or P-521.
+// NewPublicKey takes an *rsa.PublicKey, *ecdsa.PublicKey, ed25519.PublicKey,
+// or an *mldsa.PublicKey, and returns a corresponding PublicKey instance. ECDSA
+// keys must use P-256, P-384 or P-521.
 func NewPublicKey(key interface{}) (PublicKey, error) {
 	switch key := key.(type) {
 	case *rsa.PublicKey:
@@ -1321,8 +1130,6 @@ func NewPublicKey(key interface{}) (PublicKey, error) {
 			return nil, errors.New("ssh: only P-256, P-384 and P-521 EC keys are supported")
 		}
 		return (*ecdsaPublicKey)(key), nil
-	case *dsa.PublicKey:
-		return (*dsaPublicKey)(key), nil
 	case ed25519.PublicKey:
 		if l := len(key); l != ed25519.PublicKeySize {
 			return nil, fmt.Errorf("ssh: invalid size %d for Ed25519 public key", l)
@@ -1384,7 +1191,7 @@ func (*PassphraseMissingError) Error() string {
 }
 
 // ParseRawPrivateKey returns a private key from a PEM encoded private key. It supports
-// RSA, DSA, ECDSA, and Ed25519 private keys in PKCS#1, PKCS#8, OpenSSL, and OpenSSH
+// RSA, ECDSA, and Ed25519 private keys in PKCS#1, PKCS#8, OpenSSL, and OpenSSH
 // formats. If the private key is encrypted, it will return a PassphraseMissingError.
 func ParseRawPrivateKey(pemBytes []byte) (interface{}, error) {
 	block, _ := pem.Decode(pemBytes)
@@ -1404,8 +1211,6 @@ func ParseRawPrivateKey(pemBytes []byte) (interface{}, error) {
 		return x509.ParsePKCS8PrivateKey(block.Bytes)
 	case "EC PRIVATE KEY":
 		return x509.ParseECPrivateKey(block.Bytes)
-	case "DSA PRIVATE KEY":
-		return ParseDSAPrivateKey(block.Bytes)
 	case "OPENSSH PRIVATE KEY":
 		return parseOpenSSHPrivateKey(block.Bytes, unencryptedOpenSSHKey)
 	default:
@@ -1445,8 +1250,6 @@ func ParseRawPrivateKeyWithPassphrase(pemBytes, passphrase []byte) (interface{},
 		result, err = x509.ParsePKCS1PrivateKey(buf)
 	case "EC PRIVATE KEY":
 		result, err = x509.ParseECPrivateKey(buf)
-	case "DSA PRIVATE KEY":
-		result, err = ParseDSAPrivateKey(buf)
 	default:
 		err = fmt.Errorf("ssh: unsupported key type %q", block.Type)
 	}
@@ -1461,36 +1264,11 @@ func ParseRawPrivateKeyWithPassphrase(pemBytes, passphrase []byte) (interface{},
 	return result, err
 }
 
-// ParseDSAPrivateKey returns a DSA private key from its ASN.1 DER encoding, as
-// specified by the OpenSSL DSA man page.
+// ParseDSAPrivateKey always returns an error.
+//
+// Deprecated: DSA is no longer supported.
 func ParseDSAPrivateKey(der []byte) (*dsa.PrivateKey, error) {
-	var k struct {
-		Version int
-		P       *big.Int
-		Q       *big.Int
-		G       *big.Int
-		Pub     *big.Int
-		Priv    *big.Int
-	}
-	rest, err := asn1.Unmarshal(der, &k)
-	if err != nil {
-		return nil, errors.New("ssh: failed to parse DSA key: " + err.Error())
-	}
-	if len(rest) > 0 {
-		return nil, errors.New("ssh: garbage after DSA key")
-	}
-
-	return &dsa.PrivateKey{
-		PublicKey: dsa.PublicKey{
-			Parameters: dsa.Parameters{
-				P: k.P,
-				Q: k.Q,
-				G: k.G,
-			},
-			Y: k.Pub,
-		},
-		X: k.Priv,
-	}, nil
+	return nil, errors.New("ssh: DSA keys are not supported")
 }
 
 func unencryptedOpenSSHKey(cipherName, kdfName, kdfOpts string, privKeyBlock []byte) ([]byte, error) {
