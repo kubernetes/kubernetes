@@ -690,10 +690,13 @@ const (
 )
 
 // WaitForHandlersSync waits for EventHandlers to sync.
-// It returns true if it was successful, false if the controller should shut down
 func (sched *Scheduler) WaitForHandlersSync(ctx context.Context) error {
+	return waitForHandlersSync(ctx, sched.registeredHandlers)
+}
+
+func waitForHandlersSync(ctx context.Context, handlers []cache.ResourceEventHandlerRegistration) error {
 	return wait.PollUntilContextCancel(ctx, syncedPollPeriod, true, func(ctx context.Context) (done bool, err error) {
-		for _, handler := range sched.registeredHandlers {
+		for _, handler := range handlers {
 			if !handler.HasSynced() {
 				return false, nil
 			}

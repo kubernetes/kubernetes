@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/events"
+	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
@@ -97,6 +98,20 @@ func (m Map) FrameworkForPod(pod *v1.Pod) (framework.Framework, error) {
 		return nil, fmt.Errorf("profile not found for scheduler name %q", name)
 	}
 	return f, nil
+}
+
+// FrameworkForPodGroup returns the framework registered for the pod group's
+// scheduler name, determined from its first unscheduled pod. An empty
+// scheduler name falls back to the default scheduler, matching FrameworkForPod.
+func (m Map) FrameworkForPodGroup(podGroupInfo fwk.PodGroupInfo) (framework.Framework, error) {
+	if podGroupInfo == nil {
+		return nil, errors.New("pod group is nil")
+	}
+	pods := podGroupInfo.GetAllUnscheduledPods()
+	if len(pods) == 0 {
+		return nil, errors.New("no unscheduled pods in pod group")
+	}
+	return m.FrameworkForPod(pods[0])
 }
 
 // NewRecorderFactory returns a RecorderFactory for the broadcaster.
