@@ -34,10 +34,12 @@ import (
 )
 
 const (
-	// Kubelet GC's on a frequency of once every 5 minutes
-	// Add a little leeway to give it time.
-	checkGCUntil time.Duration = 6 * time.Minute
-	checkGCFreq  time.Duration = 30 * time.Second
+	// imageGCPeriodForTest overrides the kubelet's ImageGCPeriod for this suite only,
+	// so these specs don't have to wait on the 5-minute production default.
+	imageGCPeriodForTest time.Duration = 10 * time.Second
+	// Ceiling only: an image must sit unused for ImageMaximumGCAge (1m), then wait for one GC pass (up to imageGCPeriodForTest).
+	checkGCUntil time.Duration = 2 * time.Minute
+	checkGCFreq  time.Duration = 2 * time.Second
 )
 
 var _ = SIGDescribe("ImageGarbageCollect", framework.WithSerial(), framework.WithNodeConformance(), func() {
@@ -54,6 +56,7 @@ var _ = SIGDescribe("ImageGarbageCollect", framework.WithSerial(), framework.Wit
 	})
 	ginkgo.Context("when ImageMaximumGCAge is set", func() {
 		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
+			initialConfig.ImageGCPeriod = metav1.Duration{Duration: imageGCPeriodForTest}
 			initialConfig.ImageMaximumGCAge = metav1.Duration{Duration: time.Duration(time.Minute * 1)}
 			initialConfig.ImageMinimumGCAge = metav1.Duration{Duration: time.Duration(time.Second * 1)}
 		})
@@ -69,8 +72,7 @@ var _ = SIGDescribe("ImageGarbageCollect", framework.WithSerial(), framework.Wit
 
 			e2epod.NewPodClient(f).DeleteSync(ctx, pod.ObjectMeta.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
 
-			// Even though the image gc max timing is less, we are bound by the kubelet's
-			// ImageGCPeriod, which is hardcoded to 5 minutes.
+			// Bound by ImageMaximumGCAge (1m) plus one GC pass (imageGCPeriodForTest).
 			gomega.Eventually(ctx, func() int {
 				gcdImageList, err := is.ListImages(context.Background(), &runtimeapi.ImageFilter{})
 				framework.ExpectNoError(err)
@@ -99,8 +101,7 @@ var _ = SIGDescribe("ImageGarbageCollect", framework.WithSerial(), framework.Wit
 				return len(gcdImageList)
 			}, 50*time.Second, 10*time.Second).Should(gomega.Equal(len(allImages)))
 
-			// Even though the image gc max timing is less, we are bound by the kubelet's
-			// ImageGCPeriod, which is hardcoded to 5 minutes.
+			// Bound by ImageMaximumGCAge (1m) plus one GC pass (imageGCPeriodForTest).
 			gomega.Eventually(ctx, func() int {
 				gcdImageList, err := is.ListImages(context.Background(), &runtimeapi.ImageFilter{})
 				framework.ExpectNoError(err)

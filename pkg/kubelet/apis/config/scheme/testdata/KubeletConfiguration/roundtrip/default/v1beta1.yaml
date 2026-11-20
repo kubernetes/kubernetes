@@ -16,6 +16,7 @@ cgroupDriver: cgroupfs
 cgroupsPerQOS: true
 clientCertificateKeyAlgorithm: ECDSA-P256
 configMapAndSecretChangeDetectionStrategy: Watch
+containerGCPeriod: 1m0s
 containerLogMaxFiles: 5
 containerLogMaxSize: 10Mi
 containerLogMaxWorkers: 1
@@ -49,6 +50,7 @@ healthzPort: 10248
 httpCheckFrequency: 20s
 imageGCHighThresholdPercent: 85
 imageGCLowThresholdPercent: 80
+imageGCPeriod: 5m0s
 imageMaximumGCAge: 0s
 imageMinimumGCAge: 2m0s
 imagePullCredentialsVerificationPolicy: NeverVerifyPreloadedImages
