@@ -23,6 +23,9 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/admissionregistration/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/admission/coverage"
 	"sigs.k8s.io/randfill"
 )
 
@@ -107,6 +110,74 @@ func TestValidatingWebhookAccessor(t *testing.T) {
 			}
 			if !reflect.DeepEqual(orig, copy) {
 				t.Errorf("expected validatingWebhook to round trip through WebhookAccessor, diff:\n%s", cmp.Diff(orig, copy))
+			}
+		})
+	}
+}
+
+func TestGetCoverageGaps(t *testing.T) {
+	podsGR := schema.GroupResource{Resource: "pods"}
+	reqs := []coverage.Requirement{{
+		Resource: podsGR,
+		Target:   coverage.Shape{Operation: admission.Update, Subresource: "dynamic"},
+		Sources:  []coverage.Shape{{Operation: admission.Create}},
+	}}
+	otherReqs := []coverage.Requirement{{
+		Resource: podsGR,
+		Target:   coverage.Shape{Operation: admission.Update, Subresource: "resize"},
+		Sources:  []coverage.Shape{{Operation: admission.Create}},
+	}}
+	podCreateRules := []v1.RuleWithOperations{{
+		Operations: []v1.OperationType{v1.Create},
+		Rule:       v1.Rule{APIGroups: []string{""}, APIVersions: []string{"v1"}, Resources: []string{"pods"}},
+	}}
+	// Covers reqs but not otherReqs, so recomputing for otherReqs would
+	// return non-nil gaps.
+	coversReqsRules := []v1.RuleWithOperations{{
+		Operations: []v1.OperationType{v1.Create},
+		Rule:       v1.Rule{APIGroups: []string{""}, APIVersions: []string{"v1"}, Resources: []string{"pods"}},
+	}, {
+		Operations: []v1.OperationType{v1.Update},
+		Rule:       v1.Rule{APIGroups: []string{""}, APIVersions: []string{"v1"}, Resources: []string{"pods/dynamic"}},
+	}}
+
+	for _, tc := range []struct {
+		name       string
+		accessor   WebhookAccessor
+		wantNonNil bool
+	}{{
+		name:       "mutating",
+		accessor:   NewMutatingWebhookAccessor("cfg/hook.example.com/0", "cfg", &v1.MutatingWebhook{Name: "hook.example.com", Rules: podCreateRules}),
+		wantNonNil: true,
+	}, {
+		name:       "validating",
+		accessor:   NewValidatingWebhookAccessor("cfg/hook.example.com/0", "cfg", &v1.ValidatingWebhook{Name: "hook.example.com", Rules: podCreateRules}),
+		wantNonNil: true,
+	}, {
+		name:       "nil gaps are cached",
+		accessor:   NewMutatingWebhookAccessor("cfg/hook.example.com/0", "cfg", &v1.MutatingWebhook{Name: "hook.example.com", Rules: coversReqsRules}),
+		wantNonNil: false,
+	}} {
+		t.Run(tc.name, func(t *testing.T) {
+			// Empty requirements must not consume the Once.
+			if c := tc.accessor.GetCoverageGaps(nil); c != nil {
+				t.Fatalf("GetCoverageGaps(nil) = %v, want nil", c)
+			}
+			first := tc.accessor.GetCoverageGaps(reqs)
+			if tc.wantNonNil && first == nil {
+				t.Fatal("GetCoverageGaps() = nil, want non-nil gaps")
+			}
+			if !tc.wantNonNil && first != nil {
+				t.Fatalf("GetCoverageGaps() = %v, want nil", first)
+			}
+			for i := range 3 {
+				if c := tc.accessor.GetCoverageGaps(reqs); c != first {
+					t.Errorf("call %d: GetCoverageGaps() = %v, want %v", i, c, first)
+				}
+			}
+			// The first non-empty requirements slice wins.
+			if c := tc.accessor.GetCoverageGaps(otherReqs); c != first {
+				t.Errorf("GetCoverageGaps(otherReqs) = %v, want %v", c, first)
 			}
 		})
 	}

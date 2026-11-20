@@ -24,6 +24,7 @@ import (
 	v1 "k8s.io/api/admissionregistration/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/admission/coverage"
 	"k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/apiserver/pkg/admission/plugin/cel"
 	"k8s.io/apiserver/pkg/admission/plugin/manifest/metrics"
@@ -77,6 +78,7 @@ var _ admission.Interface = &Plugin{}
 var _ admission.ValidationInterface = &Plugin{}
 var _ initializer.WantsExcludedAdmissionResources = &Plugin{}
 var _ initializer.WantsManifestLoaders = &Plugin{}
+var _ initializer.WantsAdmissionCoverage = &Plugin{}
 
 // SetManifestLoaders provides the manifest load functions for scheme-based defaulting and validation.
 func (a *Plugin) SetManifestLoaders(loaders *initializer.ManifestLoaders) {
@@ -98,6 +100,9 @@ func (a *Plugin) SetManifestLoaders(loaders *initializer.ManifestLoaders) {
 			},
 			func(b *v1.ValidatingAdmissionPolicyBinding) string { return b.Spec.PolicyName },
 			metrics.VAPManifestType,
+			source.WithCoverageGapsFunc(func(p *v1.ValidatingAdmissionPolicy, b *v1.ValidatingAdmissionPolicyBinding) *coverage.Gaps {
+				return coverage.ForPolicyBinding(a.GetAdmissionCoverage(), p.Spec.MatchConstraints, b.Spec.MatchResources)
+			}),
 		)
 		if err := staticSource.LoadInitial(); err != nil {
 			return nil, err
@@ -114,26 +119,28 @@ func NewPlugin(configFile io.Reader) (*Plugin, error) {
 
 	handler := admission.NewHandler(admission.Connect, admission.Create, admission.Delete, admission.Update)
 
-	p := &Plugin{
-		Plugin: generic.NewPlugin(
-			handler,
-			func(f informers.SharedInformerFactory, client kubernetes.Interface, dynamicClient dynamic.Interface, restMapper meta.RESTMapper) generic.Source[PolicyHook] {
-				return generic.NewPolicySource(
-					f.Admissionregistration().V1().ValidatingAdmissionPolicies().Informer(),
-					f.Admissionregistration().V1().ValidatingAdmissionPolicyBindings().Informer(),
-					NewValidatingAdmissionPolicyAccessor,
-					NewValidatingAdmissionPolicyBindingAccessor,
-					compilePolicy,
-					f,
-					dynamicClient,
-					restMapper,
-				)
-			},
-			func(a authorizer.UnconditionalAuthorizer, m *matching.Matcher, client kubernetes.Interface) generic.Dispatcher[PolicyHook] {
-				return NewDispatcher(a, generic.NewPolicyMatcher(m))
-			},
-		),
-	}
+	// The factories run in ValidateInitialization, after every initializer, so
+	// they read the injected coverage requirements from p.
+	p := &Plugin{}
+	p.Plugin = generic.NewPlugin(
+		handler,
+		func(f informers.SharedInformerFactory, client kubernetes.Interface, dynamicClient dynamic.Interface, restMapper meta.RESTMapper) generic.Source[PolicyHook] {
+			return generic.NewPolicySource(
+				f.Admissionregistration().V1().ValidatingAdmissionPolicies().Informer(),
+				f.Admissionregistration().V1().ValidatingAdmissionPolicyBindings().Informer(),
+				NewValidatingAdmissionPolicyAccessor,
+				NewValidatingAdmissionPolicyBindingAccessor,
+				compilePolicy,
+				f,
+				dynamicClient,
+				restMapper,
+				generic.WithCoverageRequirements(p.GetAdmissionCoverage()),
+			)
+		},
+		func(a authorizer.UnconditionalAuthorizer, m *matching.Matcher, client kubernetes.Interface) generic.Dispatcher[PolicyHook] {
+			return NewDispatcher(a, generic.NewPolicyMatcher(m))
+		},
+	)
 	p.SetEnabled(true)
 	p.SetStaticManifestsDir(cfg.StaticManifestsDir)
 	return p, nil

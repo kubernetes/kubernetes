@@ -22,6 +22,7 @@ import (
 	v1 "k8s.io/api/admissionregistration/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apiserver/pkg/admission/coverage"
 	"k8s.io/apiserver/pkg/admission/plugin/cel"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/matchconditions"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/predicates/namespace"
@@ -49,6 +50,11 @@ type WebhookAccessor interface {
 
 	// GetCompiledMatcher gets the compiled matcher object
 	GetCompiledMatcher(compiler cel.ConditionCompiler) matchconditions.Matcher
+
+	// GetCoverageGaps returns this webhook's admission coverage gaps, built on first
+	// call with coverage.ForWebhook. Returns nil if reqs is empty or the webhook can never be
+	// in violation. The first non-empty reqs wins; accessors are rebuilt on configuration change.
+	GetCoverageGaps(reqs []coverage.Requirement) *coverage.Gaps
 
 	// GetName gets the webhook Name field. Note that the name is scoped to the webhook
 	// configuration and does not provide a globally unique identity, if a unique identity is
@@ -109,6 +115,9 @@ type mutatingWebhookAccessor struct {
 
 	compileMatcher  sync.Once
 	compiledMatcher matchconditions.Matcher
+
+	initCoverageGaps sync.Once
+	coverageGaps     *coverage.Gaps
 }
 
 func (m *mutatingWebhookAccessor) GetUID() string {
@@ -149,6 +158,17 @@ func (m *mutatingWebhookAccessor) GetCompiledMatcher(compiler cel.ConditionCompi
 		), m.FailurePolicy, "webhook", "admit", m.Name)
 	})
 	return m.compiledMatcher
+}
+
+func (m *mutatingWebhookAccessor) GetCoverageGaps(reqs []coverage.Requirement) *coverage.Gaps {
+	// Checked outside the Once so that empty requirements don't cache nil gaps.
+	if len(reqs) == 0 {
+		return nil
+	}
+	m.initCoverageGaps.Do(func() {
+		m.coverageGaps = coverage.ForWebhook(reqs, m.Rules)
+	})
+	return m.coverageGaps
 }
 
 func (m *mutatingWebhookAccessor) GetParsedNamespaceSelector() (labels.Selector, error) {
@@ -241,6 +261,9 @@ type validatingWebhookAccessor struct {
 
 	compileMatcher  sync.Once
 	compiledMatcher matchconditions.Matcher
+
+	initCoverageGaps sync.Once
+	coverageGaps     *coverage.Gaps
 }
 
 func (v *validatingWebhookAccessor) GetUID() string {
@@ -277,6 +300,17 @@ func (v *validatingWebhookAccessor) GetCompiledMatcher(compiler cel.ConditionCom
 		), v.FailurePolicy, "webhook", "validating", v.Name)
 	})
 	return v.compiledMatcher
+}
+
+func (v *validatingWebhookAccessor) GetCoverageGaps(reqs []coverage.Requirement) *coverage.Gaps {
+	// Checked outside the Once so that empty requirements don't cache nil gaps.
+	if len(reqs) == 0 {
+		return nil
+	}
+	v.initCoverageGaps.Do(func() {
+		v.coverageGaps = coverage.ForWebhook(reqs, v.Rules)
+	})
+	return v.coverageGaps
 }
 
 func (v *validatingWebhookAccessor) GetParsedNamespaceSelector() (labels.Selector, error) {

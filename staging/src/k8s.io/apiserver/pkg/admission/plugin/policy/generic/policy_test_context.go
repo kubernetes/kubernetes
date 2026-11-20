@@ -43,6 +43,7 @@ import (
 	"k8s.io/component-base/featuregate"
 
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/admission/coverage"
 	"k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/util/compatibility"
@@ -76,6 +77,21 @@ type PolicyTestContext[P runtime.Object, B runtime.Object, E Evaluator] struct {
 	unstructuredTracker     clienttesting.ObjectTracker
 }
 
+// PolicyTestContextOption configures optional behavior of NewPolicyTestContext.
+type PolicyTestContextOption func(*policyTestContextOptions)
+
+type policyTestContextOptions struct {
+	coverageRequirements []coverage.Requirement
+}
+
+// WithAdmissionCoverage injects reqs into the plugin, as an initializer would,
+// and makes the policy source build coverage gaps.
+func WithAdmissionCoverage(reqs []coverage.Requirement) PolicyTestContextOption {
+	return func(o *policyTestContextOptions) {
+		o.coverageRequirements = reqs
+	}
+}
+
 func NewPolicyTestContext[P, B runtime.Object, E Evaluator](
 	logger Logger,
 	newPolicyAccessor func(P) PolicyAccessor,
@@ -84,7 +100,13 @@ func NewPolicyTestContext[P, B runtime.Object, E Evaluator](
 	dispatcher dispatcherFactory[PolicyHook[P, B, E]],
 	initialObjects []runtime.Object,
 	paramMappings []meta.RESTMapping,
+	opts ...PolicyTestContextOption,
 ) (*PolicyTestContext[P, B, E], func(), error) {
+	var options policyTestContextOptions
+	for _, opt := range opts {
+		opt(&options)
+	}
+
 	var Pexample P
 	var Bexample B
 
@@ -199,10 +221,12 @@ func NewPolicyTestContext[P, B runtime.Object, E Evaluator](
 				sif,
 				i2,
 				r,
+				WithCoverageRequirements(options.coverageRequirements),
 			)
 			return source
 		}, dispatcher)
 	plugin.SetEnabled(true)
+	plugin.SetAdmissionCoverage(options.coverageRequirements)
 
 	featureGate := featuregate.NewFeatureGate()
 	effectiveVersion := compatibility.DefaultBuildEffectiveVersion()
