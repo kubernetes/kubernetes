@@ -19,7 +19,6 @@ package disruption
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"slices"
 	"sync"
 	"time"
@@ -32,10 +31,12 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/discovery"
 	appsv1informers "k8s.io/client-go/informers/apps/v1"
@@ -80,6 +81,18 @@ const (
 
 type updater func(context.Context, *policy.PodDisruptionBudget) error
 
+// podProjectionKey retains only the pod fields needed for PDB lookup and
+// reporting MultiplePodDisruptionBudgets events, not the full pod object.
+type podProjectionKey struct {
+	Namespace string
+	Name      string    // Used in logs and the warning event's object reference.
+	UID       types.UID // Identifies the pod instance in the warning event.
+	Labels    labels.Set
+	// OldLabels is set when labels change. An empty non-nil set represents
+	// previously absent labels so the old PDB membership is still resolved.
+	OldLabels labels.Set
+}
+
 type DisruptionController struct {
 	kubeClient clientset.Interface
 	mapper     apimeta.RESTMapper
@@ -108,6 +121,11 @@ type DisruptionController struct {
 	// PodDisruptionBudget keys that need to be synced.
 	queue        workqueue.TypedRateLimitingInterface[string]
 	recheckQueue workqueue.TypedDelayingInterface[string]
+
+	// podQueue resolves pod events to matching PDBs. Keeping this lookup out
+	// of the informer callback avoids blocking event delivery when many PDBs
+	// exist in the pod's namespace.
+	podQueue workqueue.TypedInterface[*podProjectionKey]
 
 	// pod keys that need to be synced due to a stale DisruptionTarget condition.
 	stalePodDisruptionQueue   workqueue.TypedRateLimitingInterface[string]
@@ -197,6 +215,10 @@ func NewDisruptionControllerInternal(ctx context.Context,
 			Clock:  clock,
 			Name:   "disruption_recheck",
 		}),
+		podQueue: workqueue.NewTypedWithConfig(workqueue.TypedQueueConfig[*podProjectionKey]{
+			Clock: clock,
+			Name:  "disruption_pod",
+		}),
 		stalePodDisruptionQueue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
 			workqueue.TypedRateLimitingQueueConfig[string]{
@@ -217,13 +239,13 @@ func NewDisruptionControllerInternal(ctx context.Context,
 
 	_, _ = podInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
-			dc.addPod(logger, obj)
+			dc.onPodUpdate(logger, nil, obj)
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
-			dc.updatePod(logger, oldObj, newObj)
+			dc.onPodUpdate(logger, oldObj, newObj)
 		},
 		DeleteFunc: func(obj interface{}) {
-			dc.deletePod(logger, obj)
+			dc.onPodUpdate(logger, obj, nil)
 		},
 	}, cache.HandlerOptions{Logger: &logger})
 	dc.podLister = podInformer.Lister()
@@ -466,6 +488,7 @@ func (dc *DisruptionController) Run(ctx context.Context, workers int) {
 	defer func() {
 		logger.Info("Shutting down disruption controller")
 		dc.queue.ShutDown()
+		dc.podQueue.ShutDown()
 		dc.recheckQueue.ShutDown()
 		dc.stalePodDisruptionQueue.ShutDown()
 		wg.Wait()
@@ -478,6 +501,9 @@ func (dc *DisruptionController) Run(ctx context.Context, workers int) {
 	for range workers {
 		wg.Go(func() {
 			wait.UntilWithContext(ctx, dc.worker, time.Second)
+		})
+		wg.Go(func() {
+			wait.UntilWithContext(ctx, dc.podQueueWorker, time.Second)
 		})
 	}
 	wg.Go(func() {
@@ -519,93 +545,151 @@ func (dc *DisruptionController) removeDB(logger klog.Logger, obj interface{}) {
 	dc.enqueuePdb(logger, pdb)
 }
 
-func (dc *DisruptionController) addPod(logger klog.Logger, obj interface{}) {
-	pod := obj.(*v1.Pod)
-	logger.V(4).Info("AddPod called on pod", "pod", klog.KObj(pod))
-	pdbs := dc.getPdbsForPod(logger, pod)
-	dc.warnMultiplePodDisruptionBudgets(logger, pod, pdbs)
-	if len(pdbs) == 0 {
-		logger.V(4).Info("No matching PDBs for pod", "pod", klog.KObj(pod))
-	}
-	for _, pdb := range pdbs {
-		logger.V(4).Info("addPod -> PDB", "pod", klog.KObj(pod), "podDisruptionBudget", klog.KObj(pdb))
-		dc.enqueuePdb(logger, pdb)
-	}
-	if has, cleanAfter := dc.nonTerminatingPodHasStaleDisruptionCondition(pod); has {
-		dc.enqueueStalePodDisruptionCleanup(logger, pod, cleanAfter)
-	}
-}
-
-func (dc *DisruptionController) updatePod(logger klog.Logger, old, cur interface{}) {
-	curPod := cur.(*v1.Pod)
-	oldPod := old.(*v1.Pod)
-	syncPdbs := map[string]*policy.PodDisruptionBudget{}
-
-	logger.V(4).Info("UpdatePod called on pod", "pod", klog.KObj(curPod))
-
-	if !reflect.DeepEqual(oldPod.Labels, curPod.Labels) {
-		for _, pdb := range dc.getPdbsForPod(logger, oldPod) {
-			key, err := controller.KeyFunc(pdb)
-			if err != nil {
-				logger.Error(err, "Couldn't get key for PodDisruptionBudget", "podDisruptionBudget", klog.KObj(pdb))
-				continue
-			}
-			syncPdbs[key] = pdb
-		}
-	}
-	curPdbs := dc.getPdbsForPod(logger, curPod)
-	// Warn only for curPod. Old labels are no longer on the live pod.
-	dc.warnMultiplePodDisruptionBudgets(logger, curPod, curPdbs)
-	for _, pdb := range curPdbs {
-		key, err := controller.KeyFunc(pdb)
-		if err != nil {
-			logger.Error(err, "Couldn't get key for PodDisruptionBudget", "podDisruptionBudget", klog.KObj(pdb))
-			continue
-		}
-		syncPdbs[key] = pdb
-	}
-	if len(syncPdbs) == 0 {
-		logger.V(4).Info("No matching PDBs for pod", "pod", klog.KObj(curPod))
-	}
-	for _, pdb := range syncPdbs {
-		logger.V(4).Info("updatePod -> PDB", "pod", klog.KObj(curPod), "podDisruptionBudget", klog.KObj(pdb))
-		dc.enqueuePdb(logger, pdb)
-	}
-	if has, cleanAfter := dc.nonTerminatingPodHasStaleDisruptionCondition(curPod); has {
-		dc.enqueueStalePodDisruptionCleanup(logger, curPod, cleanAfter)
-	}
-}
-
-func (dc *DisruptionController) deletePod(logger klog.Logger, obj interface{}) {
-	pod, ok := obj.(*v1.Pod)
-	// When a delete is dropped, the relist will notice a pod in the store not
-	// in the list, leading to the insertion of a tombstone object which contains
-	// the deleted key/value. Note that this value might be stale. If the pod
-	// changed labels the new ReplicaSet will not be woken up till the periodic
-	// resync.
-	if !ok {
-		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
-		if !ok {
-			logger.Error(nil, "Couldn't get object from tombstone", "obj", obj)
-			return
-		}
-		pod, ok = tombstone.Obj.(*v1.Pod)
-		if !ok {
-			logger.Error(nil, "Tombstone contained object that is not a pod", "obj", obj)
-			return
-		}
-	}
-	logger.V(4).Info("DeletePod called on pod", "pod", klog.KObj(pod))
-	pdbs := dc.getPdbsForPod(logger, pod)
-	dc.warnMultiplePodDisruptionBudgets(logger, pod, pdbs)
-	if len(pdbs) == 0 {
-		logger.V(4).Info("No matching PDBs for pod", "pod", klog.KObj(pod))
+// onPodUpdate enqueues a projection key for Add/Update/Delete events. The
+// pod -> PDB lookup is deferred to podQueueWorker so the informer callback stays cheap.
+func (dc *DisruptionController) onPodUpdate(logger klog.Logger, oldObj, newObj interface{}) {
+	oldPod := getPodFromObject(oldObj)
+	newPod := getPodFromObject(newObj)
+	if oldPod == nil && newPod == nil {
+		utilruntime.HandleError(fmt.Errorf("unexpected pod event with both old/new values as nil, ignoring"))
 		return
 	}
-	for _, pdb := range pdbs {
-		logger.V(4).Info("DeletePod -> PDB", "pod", klog.KObj(pod), "podDisruptionBudget", klog.KObj(pdb))
-		dc.enqueuePdb(logger, pdb)
+
+	// Stale DisruptionTarget cleanup depends on the full pod status and does
+	// not touch the PDB index, so keep it in the callback.
+	if newPod != nil {
+		if has, cleanAfter := dc.nonTerminatingPodHasStaleDisruptionCondition(newPod); has {
+			dc.enqueueStalePodDisruptionCleanup(logger, newPod, cleanAfter)
+		}
 	}
+
+	key := getPodUpdateProjectionKey(oldPod, newPod)
+	if key == nil {
+		return
+	}
+	logger.V(5).Info("Enqueued pod for PDB lookup", "pod", klog.KRef(key.Namespace, key.Name), "labelsChanged", key.OldLabels != nil)
+	dc.podQueue.Add(key)
+}
+
+// getPodUpdateProjectionKey converts a pod Add/Update/Delete event into the
+// minimal set of fields needed to find matching PDBs.
+func getPodUpdateProjectionKey(oldPod, newPod *v1.Pod) *podProjectionKey {
+	pod := newPod
+	if pod == nil {
+		pod = oldPod
+	}
+	if pod == nil {
+		return nil
+	}
+
+	if oldPod == nil {
+		return newPodProjectionKey(newPod)
+	}
+	if newPod == nil {
+		return newPodProjectionKey(oldPod)
+	}
+
+	// Readiness and owner reference changes also affect PDB accounting.
+	// Preserve reconciliation for updates and informer resyncs, not just label changes.
+	key := newPodProjectionKey(newPod)
+	labelsChanged := !apiequality.Semantic.DeepEqual(oldPod.Labels, newPod.Labels)
+	if !labelsChanged {
+		return key
+	}
+	key.OldLabels = oldPod.Labels
+	if key.OldLabels == nil {
+		key.OldLabels = labels.Set{}
+	}
+	return key
+}
+
+// newPodProjectionKey builds the projection key for one pod.
+func newPodProjectionKey(pod *v1.Pod) *podProjectionKey {
+	return &podProjectionKey{
+		Namespace: pod.Namespace,
+		Name:      pod.Name,
+		UID:       pod.UID,
+		Labels:    pod.Labels,
+	}
+}
+
+// getPodFromObject returns the pod carried by an informer event, or nil if the
+// object is not a pod or a pod tombstone. Nil is valid for the absent side of
+// an Add or Delete event; invalid non-nil objects are reported here.
+func getPodFromObject(obj interface{}) *v1.Pod {
+	if obj == nil {
+		return nil
+	}
+	if pod, ok := obj.(*v1.Pod); ok {
+		return pod
+	}
+	// If we reached here it means the pod was deleted but its final state is unrecorded.
+	tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
+	if !ok {
+		utilruntime.HandleError(fmt.Errorf("couldn't get object from tombstone %#v", obj))
+		return nil
+	}
+	pod, ok := tombstone.Obj.(*v1.Pod)
+	if !ok {
+		utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a Pod: %#v", obj))
+		return nil
+	}
+	return pod
+}
+
+func (dc *DisruptionController) podQueueWorker(ctx context.Context) {
+	for dc.processNextPodWorkItem(ctx) {
+	}
+}
+
+func (dc *DisruptionController) processNextPodWorkItem(ctx context.Context) bool {
+	key, quit := dc.podQueue.Get()
+	if quit {
+		return false
+	}
+	defer dc.podQueue.Done(key)
+
+	dc.syncPod(ctx, key)
+	return true
+}
+
+// syncPod resolves a queued pod projection key to the PDBs it may affect.
+func (dc *DisruptionController) syncPod(ctx context.Context, key *podProjectionKey) {
+	logger := klog.FromContext(ctx)
+	startTime := dc.clock.Now()
+	defer func() {
+		logger.V(4).Info("Finished syncing pod for PDB lookup", "pod", klog.KRef(key.Namespace, key.Name), "duration", dc.clock.Since(startTime))
+	}()
+
+	for pdb := range dc.getPDBsToUpdate(logger, key) {
+		dc.queue.Add(pdb)
+	}
+}
+
+func (dc *DisruptionController) getPDBsToUpdate(logger klog.Logger, key *podProjectionKey) sets.Set[string] {
+	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{
+		Namespace: key.Namespace,
+		Name:      key.Name,
+		UID:       key.UID,
+		Labels:    key.Labels,
+	}}
+	currentPDBs := dc.getPdbsForPod(logger, pod)
+	pdbs := sets.New[string]()
+	for _, pdb := range currentPDBs {
+		pdbs.Insert(pdb.Namespace + "/" + pdb.Name)
+	}
+
+	// Reconcile both memberships, including PDBs shared by the old and new labels.
+	if key.OldLabels != nil {
+		oldPod := *pod
+		oldPod.Labels = key.OldLabels
+		for _, pdb := range dc.getPdbsForPod(logger, &oldPod) {
+			pdbs.Insert(pdb.Namespace + "/" + pdb.Name)
+		}
+	}
+	// Old labels are no longer on the live pod, so only warn for current matches.
+	dc.warnMultiplePodDisruptionBudgets(logger, pod, currentPDBs)
+	return pdbs
 }
 
 func (dc *DisruptionController) enqueuePdb(logger klog.Logger, pdb *policy.PodDisruptionBudget) {

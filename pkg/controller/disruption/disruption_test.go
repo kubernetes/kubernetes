@@ -180,6 +180,7 @@ func newFakeDisruptionControllerWithTime(ctx context.Context, now time.Time) (*d
 		fakeClock,
 		stalePodDisruptionTimeout,
 	)
+	context.AfterFunc(ctx, dc.podQueue.ShutDown)
 	dc.getUpdater = func() updater { return ps.Set }
 	dc.podListerSynced = alwaysReady
 	dc.pdbListerSynced = alwaysReady
@@ -1026,6 +1027,92 @@ func TestPDBNotExist(t *testing.T) {
 	}
 }
 
+func TestPodEventsDeferPDBLookup(t *testing.T) {
+	pod, _ := newPod(t, "pod")
+	updated := pod.DeepCopy()
+	updated.ResourceVersion = "19"
+
+	for _, tc := range []struct {
+		name     string
+		old, cur interface{}
+	}{
+		{name: "add", cur: pod},
+		{name: "update without label change", old: pod, cur: updated},
+		{name: "delete", old: pod},
+		{name: "tombstone", old: cache.DeletedFinalStateUnknown{Obj: pod}},
+		{name: "resync", old: pod, cur: pod.DeepCopy()},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			logger, ctx := ktesting.NewTestContext(t)
+			dc, _ := newFakeDisruptionController(ctx)
+			t.Cleanup(dc.podQueue.ShutDown)
+			pdb, key := newMinAvailablePodDisruptionBudget(t, intstr.FromInt32(1))
+			add(t, dc.pdbStore, pdb)
+			// The callback must not perform PDB lookup.
+			lister := dc.pdbLister
+			dc.pdbLister = nil
+			dc.onPodUpdate(logger, tc.old, tc.cur)
+			if dc.podQueue.Len() != 1 || dc.queue.Len() != 0 {
+				t.Fatal("pod callback must enqueue only the pod projection")
+			}
+			// The worker must resolve deleted pods without consulting the pod cache.
+			dc.pdbLister = lister
+			if !dc.processNextPodWorkItem(ctx) || dc.podQueue.Len() != 0 {
+				t.Fatal("expected pod worker to consume the event")
+			}
+			if diff := cmp.Diff([]string{key}, getQueuedPDBKeys(t, dc)); diff != "" {
+				t.Fatalf("queued PDBs mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestPodQueueResolvesLabelTransitions(t *testing.T) {
+	for _, tc := range []struct {
+		name              string
+		oldLabels, labels map[string]string
+		oldSelector       *metav1.LabelSelector
+		want              []string
+	}{
+		{
+			name: "previously nil labels", labels: map[string]string{"foo": "new"},
+			oldSelector: &metav1.LabelSelector{MatchExpressions: []metav1.LabelSelectorRequirement{{Key: "foo", Operator: metav1.LabelSelectorOpDoesNotExist}}},
+			want:        []string{"default/new", "default/old"},
+		},
+		{
+			name: "common membership still reconciled", oldLabels: map[string]string{"foo": "old"}, labels: map[string]string{"foo": "old", "extra": "value"},
+			oldSelector: newSel(map[string]string{"foo": "old"}), want: []string{"default/old"},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			logger, ctx := ktesting.NewTestContext(t)
+			dc, _ := newFakeDisruptionController(ctx)
+			t.Cleanup(dc.podQueue.ShutDown)
+			for name, selector := range map[string]*metav1.LabelSelector{
+				"old": tc.oldSelector, "new": newSel(map[string]string{"foo": "new"}),
+			} {
+				add(t, dc.pdbStore, &policy.PodDisruptionBudget{
+					ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: name},
+					Spec:       policy.PodDisruptionBudgetSpec{Selector: selector},
+				})
+			}
+			oldPod, _ := newPod(t, "pod")
+			oldPod.Labels = tc.oldLabels
+			newPod := oldPod.DeepCopy()
+			newPod.Labels = tc.labels
+			newPod.ResourceVersion = "19"
+			dc.onPodUpdate(logger, oldPod, newPod)
+			// Resolution must work without the pod in the informer cache.
+			if dc.podQueue.Len() != 1 || !dc.processNextPodWorkItem(ctx) {
+				t.Fatal("expected pod worker to process the event")
+			}
+			if diff := cmp.Diff(tc.want, getQueuedPDBKeys(t, dc), cmpopts.SortSlices(func(a, b string) bool { return a < b })); diff != "" {
+				t.Fatalf("queued PDBs mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
 func TestUpdateDisruptedPods(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 	dc, ps := newFakeDisruptionController(ctx)
@@ -1540,7 +1627,24 @@ func TestStalePodDisruption(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			tCtx := ktesting.Init(t)
 			dc, _ := newFakeDisruptionControllerWithTime(tCtx, now)
-			go dc.Run(tCtx, 1)
+			ctx, cancel := context.WithCancel(tCtx)
+			done := make(chan struct{})
+			go func() {
+				dc.Run(ctx, 2)
+				close(done)
+			}()
+			t.Cleanup(func() {
+				cancel()
+				defer dc.podQueue.ShutDown()
+				select {
+				case <-done:
+					if !dc.podQueue.ShuttingDown() {
+						t.Error("pod queue was not shut down")
+					}
+				case <-time.After(5 * time.Second):
+					t.Error("controller blocked while shutting down")
+				}
+			})
 			if _, err := dc.coreClient.CoreV1().Pods(tc.pod.Namespace).Create(tCtx, tc.pod, metav1.CreateOptions{}); err != nil {
 				t.Fatalf("Failed to create pod: %v", err)
 			}
@@ -1642,7 +1746,10 @@ func TestUpdatePodEnqueuesPreviouslyMatchingPDB(t *testing.T) {
 	curPod := oldPod.DeepCopy()
 	curPod.Labels = map[string]string{"app": "new"}
 
-	dc.updatePod(logger, oldPod, curPod)
+	dc.onPodUpdate(logger, oldPod, curPod)
+	if dc.podQueue.Len() != 1 || !dc.processNextPodWorkItem(ctx) {
+		t.Fatal("expected pod worker to process the update")
+	}
 
 	got := getQueuedPDBKeys(t, dc)
 	want := []string{oldKey, newKey}
@@ -1669,7 +1776,10 @@ func TestAddPodEnqueuesAllMatchingPDBs(t *testing.T) {
 	add(t, dc.pdbStore, pdbB)
 
 	pod, _ := newPod(t, "pod") // labels foo=bar; both PDBs use that selector
-	dc.addPod(logger, pod)
+	dc.onPodUpdate(logger, nil, pod)
+	if dc.podQueue.Len() != 1 || !dc.processNextPodWorkItem(ctx) {
+		t.Fatal("expected pod worker to process the add")
+	}
 
 	got := getQueuedPDBKeys(t, dc)
 	want := []string{keyA, keyB}
@@ -1677,7 +1787,7 @@ func TestAddPodEnqueuesAllMatchingPDBs(t *testing.T) {
 		t.Fatalf("enqueued PDB keys mismatch (-want,+got):\n%s", diff)
 	}
 
-	// FakeRecorder is synchronous; the event is already on the channel after addPod.
+	// FakeRecorder is synchronous; the event is already on the channel after processing the pod.
 	wantEvent := fmt.Sprintf(
 		`%s %s Pod %q/%q matches multiple PodDisruptionBudgets %q. Overlapping PDBs are unsupported for eviction.`,
 		v1.EventTypeWarning, "MultiplePodDisruptionBudgets", pod.Namespace, pod.Name, []string{"pdb-a", "pdb-b"},
@@ -1719,7 +1829,10 @@ func TestUpdatePodDoesNotWarnForOldPodMultiplePDBs(t *testing.T) {
 	curPod := oldPod.DeepCopy()
 	curPod.Labels = map[string]string{"app": "new"}
 
-	dc.updatePod(logger, oldPod, curPod)
+	dc.onPodUpdate(logger, oldPod, curPod)
+	if dc.podQueue.Len() != 1 || !dc.processNextPodWorkItem(ctx) {
+		t.Fatal("expected pod worker to process the update")
+	}
 
 	events := dc.recorder.(*record.FakeRecorder).Events
 	if len(events) != 0 {
