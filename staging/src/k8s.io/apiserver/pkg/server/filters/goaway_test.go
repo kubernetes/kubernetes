@@ -325,15 +325,10 @@ func TestClientReceivedGOAWAY(t *testing.T) {
 			tr := &http.Transport{
 				TLSHandshakeTimeout: 10 * time.Second,
 				TLSClientConfig:     tlsConfig,
-				// Disable connection pooling to avoid additional connections
-				// that cause the test to flake
-				MaxIdleConnsPerHost: -1,
+				ForceAttemptHTTP2:   true,
 				DialTLSContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
 					return dialFn(network, addr, tlsConfig)
 				},
-			}
-			if err := http2.ConfigureTransport(tr); err != nil {
-				t.Fatalf("failed to configure http transport, err: %v", err)
 			}
 
 			client := &http.Client{
