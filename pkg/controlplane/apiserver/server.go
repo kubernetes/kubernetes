@@ -95,6 +95,9 @@ func (c completedConfig) New(name string, delegationTarget genericapiserver.Dele
 	if err != nil {
 		return nil, err
 	}
+	if c.ServiceAccountIssuerCleanup != nil {
+		generic.RegisterDestroyFunc(c.ServiceAccountIssuerCleanup)
+	}
 
 	if c.EnableLogsSupport {
 		routes.Logs{}.Install(generic.Handler.GoRestfulContainer)
