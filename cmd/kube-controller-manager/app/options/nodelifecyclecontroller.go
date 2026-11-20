@@ -49,6 +49,9 @@ func (o *NodeLifecycleControllerOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.Float32Var(&o.UnhealthyZoneThreshold, "unhealthy-zone-threshold", 0.55, "Fraction of Nodes in a zone which needs to be not Ready (minimum 3) for zone to be treated as unhealthy. ")
 	fs.DurationVar(&o.NodeMonitorPeriod.Duration, "node-monitor-period", o.NodeMonitorPeriod.Duration,
 		"The period for syncing NodeStatus in NodeLifecycleController.")
+	fs.Int32Var(&o.ConcurrentNodeLifecycleSyncs, "concurrent-node-lifecycle-syncs", o.ConcurrentNodeLifecycleSyncs,
+		fmt.Sprintf("The number of nodes whose NoSchedule taints and labels %s reconciles concurrently. "+
+			"Larger number = faster taint updates when many nodes join at once, but more load on the API server.", names.NodeLifecycleController))
 }
 
 // ApplyTo fills up NodeLifecycleController config with options.
@@ -64,6 +67,7 @@ func (o *NodeLifecycleControllerOptions) ApplyTo(cfg *nodelifecycleconfig.NodeLi
 	cfg.LargeClusterSizeThreshold = o.LargeClusterSizeThreshold
 	cfg.UnhealthyZoneThreshold = o.UnhealthyZoneThreshold
 	cfg.NodeMonitorPeriod = o.NodeMonitorPeriod
+	cfg.ConcurrentNodeLifecycleSyncs = o.ConcurrentNodeLifecycleSyncs
 
 	return nil
 }
@@ -75,5 +79,8 @@ func (o *NodeLifecycleControllerOptions) Validate() []error {
 	}
 
 	errs := []error{}
+	if o.ConcurrentNodeLifecycleSyncs < 1 {
+		errs = append(errs, fmt.Errorf("concurrent-node-lifecycle-syncs must be at least 1, but got %d", o.ConcurrentNodeLifecycleSyncs))
+	}
 	return errs
 }

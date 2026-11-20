@@ -51,4 +51,7 @@ func RecommendedDefaultNodeLifecycleControllerConfiguration(obj *kubectrlmgrconf
 	if obj.NodeMonitorPeriod == zero {
 		obj.NodeMonitorPeriod = metav1.Duration{Duration: 5 * time.Second}
 	}
+	if obj.ConcurrentNodeLifecycleSyncs == 0 {
+		obj.ConcurrentNodeLifecycleSyncs = 8
+	}
 }
