@@ -76,7 +76,7 @@ func GetContainerOOMScoreAdjust(pod *v1.Pod, container *v1.Container, memoryCapa
 	// https://github.com/kubernetes/enhancements/blob/master/keps/sig-node/2837-pod-level-resource-spec/README.md#oom-score-adjustment
 	// for more details.
 	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) && pod.Spec.Resources != nil {
-		remainingReqPerContainer = remainingPodMemReqPerContainer(pod)
+		remainingReqPerContainer = remainingPodMemReqPerContainer(pod, container)
 	}
 	oomScoreAdjust = 1000 - (1000 * (containerMemReq + remainingReqPerContainer) / memoryCapacity)
 
