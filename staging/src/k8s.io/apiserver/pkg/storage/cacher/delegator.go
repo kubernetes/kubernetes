@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"strings"
 	"sync"
 	"time"
 
@@ -28,8 +29,10 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/audit"
+	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/cacher/consistency"
@@ -102,11 +105,19 @@ func (c *CacheDelegator) Delete(ctx context.Context, key string, out runtime.Obj
 		// IsTooLargeResourceVersion occurs when the requested RV is higher than cache's current RV
 		// and cache hasn't caught up within the timeout period.
 		if storage.IsTooLargeResourceVersion(err) {
+			success := "true"
+			var fallback string
 			if utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCacheSkipTimeoutFallback) {
+				fallback = "skipped"
 				err = errors.NewTooManyRequests(err.Error(), resourceVersionTooHighRetrySeconds)
 			} else {
+				fallback = "true"
 				err = c.deleteUsingStore(ctx, key, out, preconditions, validateDeletion, opts)
 			}
+			if err != nil && !storage.IsNotFound(err) {
+				success = "false"
+			}
+			c.recordConsistentRead(ctx, success, fallback)
 		}
 	}
 	return err
@@ -193,7 +204,7 @@ func (c *CacheDelegator) Get(ctx context.Context, key string, opts storage.GetOp
 				success = "false"
 			}
 		}
-		metrics.ConsistentReadTotal.WithLabelValues(c.cacher.groupResource.Group, c.cacher.groupResource.Resource, success, fallback).Add(1)
+		c.recordConsistentRead(ctx, success, fallback)
 	}
 	return err
 }
@@ -242,14 +253,26 @@ func (c *CacheDelegator) GetList(ctx context.Context, key string, opts storage.L
 			if err != nil {
 				success = "false"
 			}
-			metrics.ConsistentReadTotal.WithLabelValues(c.cacher.groupResource.Group, c.cacher.groupResource.Resource, success, fallback).Add(1)
+			c.recordConsistentRead(ctx, success, fallback)
 		}
 		return err
 	}
 	if result.ConsistentRead {
-		metrics.ConsistentReadTotal.WithLabelValues(c.cacher.groupResource.Group, c.cacher.groupResource.Resource, success, fallback).Add(1)
+		c.recordConsistentRead(ctx, success, fallback)
 	}
 	return nil
+}
+
+func (c *CacheDelegator) recordConsistentRead(ctx context.Context, success, fallback string) {
+	recordConsistentRead(ctx, c.cacher.groupResource, success, fallback)
+}
+
+func recordConsistentRead(ctx context.Context, groupResource schema.GroupResource, success, fallback string) {
+	var verb string
+	if requestInfo, ok := request.RequestInfoFrom(ctx); ok && requestInfo != nil {
+		verb = strings.ToUpper(requestInfo.Verb)
+	}
+	metrics.ConsistentReadTotal.WithLabelValues(groupResource.Group, groupResource.Resource, verb, success, fallback).Add(1)
 }
 
 func shouldDelegateListOnNotReadyCache(opts storage.ListOptions) bool {
@@ -269,11 +292,19 @@ func (c *CacheDelegator) GuaranteedUpdate(ctx context.Context, key string, desti
 		// IsTooLargeResourceVersion occurs when the requested RV is higher than cache's current RV
 		// and cache hasn't caught up within the timeout period.
 		if storage.IsTooLargeResourceVersion(err) {
+			success := "true"
+			var fallback string
 			if utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCacheSkipTimeoutFallback) {
+				fallback = "skipped"
 				err = errors.NewTooManyRequests(err.Error(), resourceVersionTooHighRetrySeconds)
 			} else {
+				fallback = "true"
 				err = c.updateUsingStore(ctx, key, destination, ignoreNotFound, preconditions, tryUpdate)
 			}
+			if err != nil && !storage.IsNotFound(err) {
+				success = "false"
+			}
+			c.recordConsistentRead(ctx, success, fallback)
 		}
 	}
 	return err
