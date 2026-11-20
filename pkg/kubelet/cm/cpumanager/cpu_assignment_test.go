@@ -984,6 +984,63 @@ func TestTakeByTopologyNUMAPacked(t *testing.T) {
 			"",
 			mustParseCPUSet(t, "4-7,12-15,1,9"),
 		},
+		{
+			"take cpus from partial UncoreCache skipping partially allocated core - SMT-4",
+			topoUncoreSingleSocketSMT4,
+			StaticPolicyOptions{PreferAlignByUncoreCacheOption: true},
+			mustParseCPUSet(t, "0-8,10-31"), // one thread of core 1 allocated
+			6,
+			"",
+			cpuset.New(0, 8, 16, 24, 2, 10), // full core 0, half of core 2
+		},
+		{
+			"take cpus from next UncoreCache when full cores of the first cannot satisfy request - SMT-4",
+			topoUncoreSingleSocketSMT4,
+			StaticPolicyOptions{PreferAlignByUncoreCacheOption: true},
+			// uncore 0: core 3 free, one thread each of cores 0-2 free
+			mustParseCPUSet(t, "0-3,11,19,27,4-7,12-15,20-23,28-31"),
+			6,
+			"",
+			cpuset.New(4, 12, 20, 28, 5, 13), // full core 4, half of core 5
+		},
+		{
+			"take full UncoreCache and partial UncoreCache - SMT-4",
+			topoUncoreSingleSocketSMT4,
+			StaticPolicyOptions{PreferAlignByUncoreCacheOption: true},
+			mustParseCPUSet(t, "0-31"),
+			22,
+			"",
+			mustParseCPUSet(t, "0-3,8-11,16-19,24-27,4,12,20,28,5,13"), // uncore 0, full core 4, half of core 5
+		},
+		{
+			"take E-core and P-core from partial UncoreCache without splitting a core - hybrid",
+			topoSingleSocketSingleNumaPerSocketPCoreHTMonolithicUncore, // E-cores 0-7, P-cores 8-15
+			StaticPolicyOptions{PreferAlignByUncoreCacheOption: true},
+			mustParseCPUSet(t, "7-23"), // E-core 7 and all P-cores free
+			3,
+			"",
+			cpuset.New(7, 8, 16),
+		},
+		{
+			"take cpus from partial UncoreCache skipping partially allocated P-core - hybrid",
+			topoSingleSocketSingleNumaPerSocketPCoreHTECoreST, // P-cores 0-28 step 4, E-cores 32-43
+			StaticPolicyOptions{PreferAlignByUncoreCacheOption: true},
+			mustParseCPUSet(t, "1-27"), // one thread of P-core 0 allocated
+			3,
+			"",
+			cpuset.New(2, 3, 16), // full P-core 4 and E-core 32
+		},
+		{
+			"take cpus from partial UncoreCache in core ID order even if it splits a core - hybrid",
+			topoSingleSocketSingleNumaPerSocketPCoreHTMonolithicUncore, // E-cores 0-7, P-cores 8-15
+			StaticPolicyOptions{PreferAlignByUncoreCacheOption: true},
+			mustParseCPUSet(t, "7-23"), // E-core 7 and all P-cores free
+			2,
+			"",
+			// P-core 8 alone (8,16) would avoid the split; ordering cores by width
+			// changes which core types get consumed first and is left for a follow-up
+			cpuset.New(7, 8),
+		},
 	}...)
 
 	for _, tc := range testCases {

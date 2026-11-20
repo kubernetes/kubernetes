@@ -1547,6 +1547,67 @@ func TestCPUsInUncoreCaches(t *testing.T) {
 		})
 	}
 }
+
+func TestFreeCoresInUncoreCache(t *testing.T) {
+	// hybrid topology: SMT-2 P-cores mixed with single-thread E-cores, so
+	// NumCPUs/NumCores does not describe any individual core
+	allCPUs := CPUDetails{
+		0:  {CoreID: 0, UncoreCacheID: 0},
+		8:  {CoreID: 0, UncoreCacheID: 0},
+		1:  {CoreID: 1, UncoreCacheID: 0},
+		9:  {CoreID: 1, UncoreCacheID: 0},
+		2:  {CoreID: 2, UncoreCacheID: 0},
+		3:  {CoreID: 3, UncoreCacheID: 0},
+		4:  {CoreID: 4, UncoreCacheID: 1},
+		12: {CoreID: 4, UncoreCacheID: 1},
+		5:  {CoreID: 5, UncoreCacheID: 1},
+	}
+	tests := []struct {
+		name      string
+		available cpuset.CPUSet
+		ids       []int
+		want      cpuset.CPUSet
+	}{
+		{
+			name:      "all cores free",
+			available: allCPUs.CPUs(),
+			ids:       []int{0},
+			want:      cpuset.New(0, 1, 2, 3),
+		},
+		{
+			name:      "partially free P-core is skipped",
+			available: allCPUs.CPUs().Difference(cpuset.New(8)),
+			ids:       []int{0},
+			want:      cpuset.New(1, 2, 3),
+		},
+		{
+			name:      "busy E-core is skipped",
+			available: allCPUs.CPUs().Difference(cpuset.New(2)),
+			ids:       []int{0},
+			want:      cpuset.New(0, 1, 3),
+		},
+		{
+			name:      "multiple uncore caches",
+			available: allCPUs.CPUs().Difference(cpuset.New(12)),
+			ids:       []int{0, 1},
+			want:      cpuset.New(0, 1, 2, 3, 5),
+		},
+		{
+			name:      "uncore cache does not exist",
+			available: allCPUs.CPUs(),
+			ids:       []int{2},
+			want:      cpuset.New(),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := allCPUs.KeepOnly(tt.available).FreeCoresInUncoreCache(allCPUs, tt.ids...)
+			if !got.Equals(tt.want) {
+				t.Errorf("FreeCoresInUncoreCache() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
 func TestUncoreInNUMANodes(t *testing.T) {
 	tests := []struct {
 		name    string
