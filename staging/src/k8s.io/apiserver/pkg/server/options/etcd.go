@@ -71,7 +71,8 @@ type EtcdOptions struct {
 	// WatchCacheSizes represents override to a given resource
 	WatchCacheSizes []string
 
-	// SkipHealthEndpoints, when true, causes the Apply methods to not set up health endpoints.
+	// SkipHealthEndpoints, when true, causes the Apply methods to not set up health endpoints
+	// or the storage size metrics monitor.
 	// This allows multiple invocations of the Apply methods without duplication of said endpoints.
 	SkipHealthEndpoints bool
 }
@@ -262,11 +263,15 @@ func (s *EtcdOptions) ApplyWithStorageFactoryTo(factory serverstorage.StorageFac
 		return err
 	}
 
-	monitorCache, err := newMonitorCache(factory, c.DrainedNotify())
-	if err != nil {
-		return err
+	// The storage monitor getter is process-wide, so skip it along with the health endpoints.
+	// Otherwise a second Apply replaces the getter that includes --etcd-servers-overrides.
+	if !s.SkipHealthEndpoints {
+		monitorCache, err := newMonitorCache(factory, c.DrainedNotify())
+		if err != nil {
+			return err
+		}
+		metrics.SetStorageMonitorGetter(monitorCache.get)
 	}
-	metrics.SetStorageMonitorGetter(monitorCache.get)
 
 	c.RESTOptionsGetter = s.CreateRESTOptionsGetter(factory, c.ResourceTransformers, c.StorageCompressionRules)
 	return nil

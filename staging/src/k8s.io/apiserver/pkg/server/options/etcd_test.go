@@ -39,6 +39,7 @@ import (
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/options/compressionconfig"
 	compressionconfigmetrics "k8s.io/apiserver/pkg/server/options/compressionconfig/metrics"
+	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/apiserver/pkg/storage/etcd3/metrics"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	storagevalue "k8s.io/apiserver/pkg/storage/value"
@@ -730,6 +731,44 @@ func TestApplyKeepsStorageCompressionRules(t *testing.T) {
 	}
 }
 
+// TestStorageMonitorGetterKeepsOverrides checks that a second Apply with SkipHealthEndpoints,
+// as kube-apiserver runs for its apiextensions and aggregator configs, keeps the storage size
+// metric reporting the --etcd-servers-overrides backends.
+func TestStorageMonitorGetterKeepsOverrides(t *testing.T) {
+	metrics.Register()
+	sizes := map[string]int64{"https://core:2379": 100, "https://events:2379": 200}
+	original := createMonitor
+	createMonitor = func(cfg storagebackend.Config) (metrics.Monitor, error) {
+		return &fakeMonitor{size: sizes[cfg.Transport.ServerList[0]]}, nil
+	}
+	t.Cleanup(func() {
+		createMonitor = original
+		metrics.SetStorageMonitorGetter(func() ([]metrics.Monitor, error) { return nil, nil })
+	})
+
+	storageConfig := storagebackend.Config{Transport: storagebackend.TransportConfig{ServerList: []string{"https://core:2379"}}}
+	factory := serverstorage.NewDefaultStorageFactory(storageConfig, "", nil, nil, nil, nil)
+	factory.SetEtcdLocation(schema.GroupResource{Resource: "events"}, []string{"https://events:2379"})
+	main := &EtcdOptions{StorageConfig: storageConfig}
+	if err := main.ApplyWithStorageFactoryTo(factory, server.NewConfig(codecs)); err != nil {
+		t.Fatal(err)
+	}
+	extensions := &EtcdOptions{StorageConfig: storageConfig, SkipHealthEndpoints: true}
+	if err := extensions.ApplyTo(server.NewConfig(codecs)); err != nil {
+		t.Fatal(err)
+	}
+
+	want := `
+# HELP apiserver_storage_size_bytes [STABLE] Size of the storage database file physically allocated in bytes.
+# TYPE apiserver_storage_size_bytes gauge
+apiserver_storage_size_bytes{storage_cluster_id="etcd-0"} 100
+apiserver_storage_size_bytes{storage_cluster_id="etcd-1"} 200
+`
+	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(want), "apiserver_storage_size_bytes"); err != nil {
+		t.Error(err)
+	}
+}
+
 func TestMonitorCache(t *testing.T) {
 	setCreateMonitor := func(t *testing.T, fn func(storagebackend.Config) (metrics.Monitor, error)) {
 		t.Helper()
@@ -896,10 +935,11 @@ func TestMonitorCache(t *testing.T) {
 
 type fakeMonitor struct {
 	closeCalls atomic.Int32
+	size       int64
 }
 
 func (f *fakeMonitor) Monitor(ctx context.Context) (metrics.StorageMetrics, error) {
-	return metrics.StorageMetrics{}, nil
+	return metrics.StorageMetrics{Size: f.size}, nil
 }
 
 func (f *fakeMonitor) Close() error {
