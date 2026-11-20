@@ -8545,3 +8545,129 @@ func TestDoPodResizeAction_PodCgroupLimits(t *testing.T) {
 		})
 	}
 }
+
+func TestComputePodActions_DynamicVolumeContainerStartReadiness(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicNodeLocalEphemeralVolumes, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicContainers, true)
+
+	tCtx := ktesting.Init(t)
+	fakeRuntime, fakeImage, m, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+	fakeImage.SetFakeImages([]string{"busybox:latest"})
+
+	cmVol := v1.Volume{
+		Name:         "dyn-cm",
+		VolumeSource: v1.VolumeSource{ConfigMap: &v1.ConfigMapVolumeSource{LocalObjectReference: v1.LocalObjectReference{Name: "my-cm"}}},
+	}
+	pvcVol := v1.Volume{
+		Name:         "static-pvc",
+		VolumeSource: v1.VolumeSource{PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{ClaimName: "my-pvc"}},
+	}
+	imgVol := v1.Volume{
+		Name:         "dyn-img",
+		VolumeSource: v1.VolumeSource{Image: &v1.ImageVolumeSource{Reference: "busybox:latest", PullPolicy: v1.PullIfNotPresent}},
+	}
+	unusedImgVol := v1.Volume{
+		Name:         "unused-img",
+		VolumeSource: v1.VolumeSource{Image: &v1.ImageVolumeSource{Reference: "localhost/nonexistent:v1", PullPolicy: v1.PullAlways}},
+	}
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{UID: "dyn-start-uid", Name: "dyn-start", Namespace: "default"},
+		Spec: v1.PodSpec{
+			RestartPolicy: v1.RestartPolicyOnFailure,
+			Volumes:       []v1.Volume{pvcVol, cmVol, imgVol, unusedImgVol},
+			Containers: []v1.Container{
+				{
+					Name:         "c1-done",
+					Image:        "busybox",
+					VolumeMounts: []v1.VolumeMount{{Name: "static-pvc", MountPath: "/pvc"}},
+				},
+				{
+					Name:         "c2-dyn",
+					Image:        "busybox",
+					VolumeMounts: []v1.VolumeMount{{Name: "dyn-cm", MountPath: "/cm"}},
+				},
+				{
+					Name:         "c3-img",
+					Image:        "busybox",
+					VolumeMounts: []v1.VolumeMount{{Name: "dyn-img", MountPath: "/img"}},
+				},
+			},
+			EphemeralContainers: []v1.EphemeralContainer{
+				{
+					EphemeralContainerCommon: v1.EphemeralContainerCommon{
+						Name:         "eph-cm",
+						Image:        "busybox",
+						VolumeMounts: []v1.VolumeMount{{Name: "dyn-cm", MountPath: "/cm"}},
+					},
+				},
+				{
+					EphemeralContainerCommon: v1.EphemeralContainerCommon{
+						Name:         "eph-unallocated",
+						Image:        "busybox",
+						VolumeMounts: []v1.VolumeMount{{Name: "unallocated-vol", MountPath: "/unalloc"}},
+					},
+				},
+			},
+		},
+	}
+	m.InitializeActuatedPod(tCtx.Logger(), pod, nil)
+
+	// 1. Sandbox creation path: c1-done (PVC) and c3-img (Image) are ready to start immediately,
+	// while c2-dyn (unmounted ConfigMap) is deferred.
+	sandboxCreateActions := m.computePodActions(tCtx, pod, &kubecontainer.PodStatus{ID: pod.UID, Name: pod.Name, Namespace: pod.Namespace}, false)
+	assert.True(t, sandboxCreateActions.CreateSandbox)
+	assert.Equal(t, []int{0, 2}, sandboxCreateActions.ContainersToStart, "only containers with ready volumes should start during sandbox creation")
+
+	// 2. Running sandbox where c1-done has already succeeded (ExitCode: 0 -> keepCount == 0):
+	// c2-dyn and both ephemeral containers are deferred because dyn-cm is not mounted yet and
+	// unallocated-vol is not in pod.Spec.Volumes; hasDeferredContainerStart must keep KillPod false!
+	fakeSandboxID, err := fakeRuntime.RunPodSandbox(tCtx, &runtimeapi.PodSandboxConfig{
+		Metadata: &runtimeapi.PodSandboxMetadata{Name: pod.Name, Namespace: pod.Namespace, Uid: string(pod.UID)},
+	}, "")
+	require.NoError(t, err)
+	sandboxStatus, err := fakeRuntime.PodSandboxStatus(tCtx, fakeSandboxID, false)
+	require.NoError(t, err)
+	statusWithExitedC1 := &kubecontainer.PodStatus{
+		ID:              pod.UID,
+		Name:            pod.Name,
+		Namespace:       pod.Namespace,
+		SandboxStatuses: []*runtimeapi.PodSandboxStatus{sandboxStatus.GetStatus()},
+		ContainerStatuses: []*kubecontainer.Status{
+			{
+				ID:       kubecontainer.ContainerID{Type: "fake", ID: "c1-id"},
+				Name:     "c1-done",
+				State:    kubecontainer.ContainerStateExited,
+				ExitCode: 0,
+			},
+			{
+				ID:       kubecontainer.ContainerID{Type: "fake", ID: "c3-id"},
+				Name:     "c3-img",
+				State:    kubecontainer.ContainerStateExited,
+				ExitCode: 0,
+			},
+		},
+	}
+	deferredActions := m.computePodActions(tCtx, pod, statusWithExitedC1, false)
+	assert.False(t, deferredActions.KillPod, "pod sandbox must not be killed while a container start is deferred on an unready dynamic volume")
+	assert.Empty(t, deferredActions.ContainersToStart)
+	assert.Empty(t, deferredActions.EphemeralContainersToStart)
+
+	// 3. Once VolumeManager records dyn-cm in actuatedState, c2-dyn and eph-cm are queued to start,
+	// while eph-unallocated continues waiting until its volume is allocated.
+	require.NoError(t, m.actuatedState.SetPodVolume(tCtx.Logger(), pod.UID, cmVol))
+	readyActions := m.computePodActions(tCtx, pod, statusWithExitedC1, false)
+	assert.False(t, readyActions.KillPod)
+	assert.Equal(t, []int{1}, readyActions.ContainersToStart)
+	assert.Equal(t, []int{0}, readyActions.EphemeralContainersToStart)
+
+	// 4. getImageVolumes skips unreferenced unused-img and records dyn-img in actuatedState once pulled.
+	pulls, err := m.getImageVolumes(tCtx, pod, &runtimeapi.PodSandboxConfig{}, nil)
+	require.NoError(t, err)
+	assert.Contains(t, pulls, "dyn-img")
+	assert.NotContains(t, pulls, "unused-img", "unreferenced OCI Image volume must be skipped")
+	actVols, ok := m.actuatedState.GetPodVolumes(pod.UID)
+	require.True(t, ok)
+	assert.Equal(t, []v1.Volume{cmVol, imgVol}, actVols, "pulled OCI Image volume must be recorded in actuatedState")
+}
