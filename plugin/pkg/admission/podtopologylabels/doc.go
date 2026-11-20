@@ -22,4 +22,4 @@ limitations under the License.
 // also trigger the plugin to copy the labels as described.
 // If the binding target is NOT a Node object, no action is taken.
 // If the referenced Node object does not exist, no action is taken.
-package podtopologylabels // import "k8s.io/kubernetes/plugin/pkg/admission/podtopologylabels"
+package podtopologylabels

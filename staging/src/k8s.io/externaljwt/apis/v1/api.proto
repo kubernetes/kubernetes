@@ -35,11 +35,9 @@ service ExternalJWTSigner {
   
     // FetchKeys returns the set of public keys that are trusted to sign
     // Kubernetes service account tokens. Kube-apiserver will call this RPC:
-    //
-    // * Every time it tries to validate a JWT from the service account issuer with an unknown key ID, and
-    //
-    // * Periodically, so it can serve reasonably-up-to-date keys from the OIDC
-    //   JWKs endpoint.
+    //   - Every time it tries to validate a JWT from the service account issuer with an unknown key ID, and
+    //   - Periodically, so it can serve reasonably-up-to-date keys from the OIDC
+    //     JWKs endpoint.
     rpc FetchKeys(FetchKeysRequest) returns (FetchKeysResponse) {}
     
     // Metadata is meant to be called once on startup.
