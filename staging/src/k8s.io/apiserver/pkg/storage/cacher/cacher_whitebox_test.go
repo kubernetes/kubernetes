@@ -17,6 +17,7 @@ limitations under the License.
 package cacher
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"errors"
@@ -67,10 +68,30 @@ import (
 	k8smetrics "k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
+	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
 	testingclock "k8s.io/utils/clock/testing"
 	"k8s.io/utils/ptr"
 )
+
+func TestSetCachingObjectsLogsPreviousObjectTypeOnDeleteError(t *testing.T) {
+	state := klog.CaptureState()
+	t.Cleanup(state.Restore)
+	var output bytes.Buffer
+	klog.SetOutput(&output)
+	klog.LogToStderr(false)
+
+	event := &watchCacheEvent{
+		Type:       watch.Deleted,
+		Object:     &example.Pod{},
+		PrevObject: &runtime.Unknown{ContentType: "previous-object-content-marker"},
+	}
+	setCachingObjects(event, storage.APIObjectVersioner{})
+	klog.Flush()
+
+	require.Contains(t, output.String(), "*runtime.Unknown")
+	require.NotContains(t, output.String(), "previous-object-content-marker")
+}
 
 func newTestCacherWithoutSyncing(s storage.Interface, c clock.WithTicker) (*Cacher, storage.Versioner, error) {
 	return newTestCacherWithoutSyncingAndIndexers(s, c, nil)
