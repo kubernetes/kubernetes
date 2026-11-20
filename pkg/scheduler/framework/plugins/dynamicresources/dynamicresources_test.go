@@ -1302,6 +1302,10 @@ type want struct {
 	// after PreBind, as if the actual Bind had failed.
 	unreserveAfterBindFailure *result
 
+	// unreserveAfterBindFailureWithPreemption, if set, overrides
+	// unreserveAfterBindFailure in TestPluginWithPreemption.
+	unreserveAfterBindFailureWithPreemption *result
+
 	// unreserveBeforePreBind, if set, triggers a call to Unreserve
 	// before PreBind, as if the some other PreBind plugin had failed.
 	unreserveBeforePreBind *result
@@ -1585,7 +1589,13 @@ func testResourceSliceUpdatePreservesSharedCounterAllocation(tCtx ktesting.TCont
 }
 
 func TestPlugin(t *testing.T) {
-	testPlugin(ktesting.Init(t))
+	testPlugin(ktesting.Init(t), false /* preemption */)
+}
+
+// TestPluginWithPreemption re-runs TestPlugin cases with DRAPreemption enabled,
+// verifying identical behavior apart from expected DRAPreemption differences.
+func TestPluginWithPreemption(t *testing.T) {
+	testPlugin(ktesting.Init(t), true /* preemption */)
 }
 
 func TestPreFilterReusesPendingAllocationWithNilNodeSelector(t *testing.T) {
@@ -1907,7 +1917,7 @@ func TestUnreserveExtendedResourceClaimAfterAllocationInPreBind(t *testing.T) {
 	assert.True(tCtx, allocatedDevices.Has(schedulerapi.MakeDeviceID(device.Driver, device.Pool, device.Device)), "allocated devices: %v", allocatedDevices.UnsortedList())
 }
 
-func testPlugin(tCtx ktesting.TContext) {
+func testPlugin(tCtx ktesting.TContext, preemption bool) {
 	testcases := map[string]testPluginCase{
 		"empty-with-extended-resources-disabled": {
 			emulatedVersion:  "1.36",
@@ -2462,7 +2472,7 @@ func testPlugin(tCtx ktesting.TContext) {
 			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAAdminAccess: false},
 			// When the DRAAdminAccess feature gate is disabled,
 			// even though the pending claim requests admin access,
-			// the scheduler returns an unschedulable status.
+			// the scheduler returns an error.
 			pod:     podWithClaimName,
 			claims:  []*resourceapi.ResourceClaim{adminAccess(pendingClaim), otherAllocatedClaim},
 			classes: []*resourceapi.DeviceClass{deviceClass},
@@ -2470,7 +2480,7 @@ func testPlugin(tCtx ktesting.TContext) {
 			want: want{
 				filter: perNodeResult{
 					workerNode.Name: {
-						status: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, `claim default/my-pod-my-resource, request req-1: admin access is requested, but the feature is disabled`),
+						status: fwk.NewStatus(fwk.Error, `claim default/my-pod-my-resource, request req-1: admin access is requested, but the feature is disabled`),
 					},
 				},
 			},
@@ -2565,7 +2575,7 @@ func testPlugin(tCtx ktesting.TContext) {
 			want: want{
 				filter: perNodeResult{
 					workerNode.Name: {
-						status: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, `claim default/my-pod-my-resource: selector #0 on device some-driver/worker/instance-1: CEL runtime error: no such key: `+string(attrName)+`. consider using CEL optional chaining (.? followed by orValue()) or guarding the check with has() for optional fields`),
+						status: fwk.NewStatus(fwk.Error, `claim default/my-pod-my-resource: selector #0 on device some-driver/worker/instance-1: CEL runtime error: no such key: `+string(attrName)+`. consider using CEL optional chaining (.? followed by orValue()) or guarding the check with has() for optional fields`),
 					},
 				},
 				prescore: result{
@@ -2702,7 +2712,7 @@ func testPlugin(tCtx ktesting.TContext) {
 				},
 				prebind: result{
 					inFlightClaims: []metav1.Object{addAllocationTimestamp(allocatedClaim)},
-					status:         fwk.NewStatus(fwk.Unschedulable, `claim bind error`),
+					status:         fwk.NewStatus(fwk.Error, `claim bind error`),
 				},
 				unreserveAfterBindFailure: &result{},
 			},
@@ -2712,6 +2722,83 @@ func testPlugin(tCtx ktesting.TContext) {
 					Resource: "resourceclaims",
 					Reaction: func(action cgotesting.Action) (handled bool, ret apiruntime.Object, err error) {
 						return true, nil, apierrors.NewBadRequest("claim bind error")
+					},
+				},
+			},
+		},
+		"bind-failure-after-allocation": {
+			// PreBind stores the allocation made in this cycle, then binding
+			// fails. Unreserve only removes the pod from ReservedFor, even under
+			// DRAPreemption, because Bind may have bound the pod despite failing.
+			pod:     podWithClaimName,
+			claims:  []*resourceapi.ResourceClaim{pendingClaim},
+			classes: []*resourceapi.DeviceClass{deviceClass},
+			objs:    []apiruntime.Object{workerNodeSlice},
+			want: want{
+				reserve: result{
+					inFlightClaims: []metav1.Object{allocatedClaim},
+				},
+				prebind: result{
+					assumedClaim: addAllocationTimestamp(reserve(allocatedClaim, podWithClaimName)),
+					changes: change{
+						claim: func(claim *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
+							if claim.Name == claimName {
+								claim = claim.DeepCopy()
+								claim.Finalizers = allocatedClaim.Finalizers
+								claim.Status = inUseClaim.Status
+								claim = addAllocationTimestamp(claim)
+							}
+							return claim
+						},
+					},
+				},
+				unreserveAfterBindFailure: &result{
+					assumedClaim: addAllocationTimestamp(reserve(allocatedClaim, podWithClaimName)),
+					changes: change{
+						claim: func(in *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
+							out := in.DeepCopy()
+							out.Status.ReservedFor = []resourceapi.ResourceClaimConsumerReference{}
+							return out
+						},
+					},
+				},
+			},
+		},
+		"bind-failure-after-allocation-in-podgroup": {
+			// PreBind succeeds for a PodGroup member, then binding fails.
+			// Unreserve only removes the pod from ReservedFor.
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAWorkloadResourceClaims: false, features.GenericWorkload: true},
+			pod:              groupedPodWithClaimName,
+			podGroups:        []*schedulingapi.PodGroup{podGroupWithClaimName},
+			claims:           []*resourceapi.ResourceClaim{pendingPodGroupClaim},
+			classes:          []*resourceapi.DeviceClass{deviceClass},
+			objs:             []apiruntime.Object{workerNodeSlice},
+			want: want{
+				reserve: result{
+					inFlightClaims: []metav1.Object{allocatedPodGroupClaim},
+				},
+				prebind: result{
+					assumedClaim: addAllocationTimestamp(reserve(allocatedPodGroupClaim, groupedPodWithClaimName)),
+					changes: change{
+						claim: func(claim *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
+							if claim.Name == claimName {
+								claim = claim.DeepCopy()
+								claim.Finalizers = allocatedClaim.Finalizers
+								claim.Status = inUseClaim.Status
+								claim = addAllocationTimestamp(claim)
+							}
+							return claim
+						},
+					},
+				},
+				unreserveAfterBindFailure: &result{
+					assumedClaim: addAllocationTimestamp(reserve(allocatedPodGroupClaim, groupedPodWithClaimName)),
+					changes: change{
+						claim: func(in *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
+							out := in.DeepCopy()
+							out.Status.ReservedFor = []resourceapi.ResourceClaimConsumerReference{}
+							return out
+						},
 					},
 				},
 			},
@@ -2865,7 +2952,7 @@ func testPlugin(tCtx ktesting.TContext) {
 			claims: []*resourceapi.ResourceClaim{updateDeviceClassName(claim, "does-not-exist")},
 			want: want{
 				prefilter: result{
-					status: fwk.NewStatus(fwk.Unschedulable, `request req-1: device class does-not-exist does not exist`),
+					status: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, `request req-1: device class does-not-exist does not exist`),
 				},
 				postfilter: result{
 					status: fwk.NewStatus(fwk.Unschedulable),
@@ -2892,7 +2979,7 @@ func testPlugin(tCtx ktesting.TContext) {
 			claims: []*resourceapi.ResourceClaim{updateDeviceClassName(claimWithPrioritzedList, "does-not-exist")},
 			want: want{
 				prefilter: result{
-					status: fwk.NewStatus(fwk.Unschedulable, `request req-1/subreq-1: device class does-not-exist does not exist`),
+					status: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, `request req-1/subreq-1: device class does-not-exist does not exist`),
 				},
 				postfilter: result{
 					status: fwk.NewStatus(fwk.Unschedulable),
@@ -3120,7 +3207,7 @@ func testPlugin(tCtx ktesting.TContext) {
 					inFlightClaims: []metav1.Object{addAllocationTimestamp(extendedResourceClaimNoName)},
 					assumedClaim:   addAllocationTimestamp(reserve(extendedResourceClaim, podWithExtendedResourceName)),
 					added:          []metav1.Object{addAllocationTimestamp(reserve(extendedResourceClaim, podWithExtendedResourceName))},
-					status:         fwk.NewStatus(fwk.Unschedulable, `patch error`),
+					status:         fwk.NewStatus(fwk.Error, `patch error`),
 				},
 				postbind: result{
 					assumedClaim: reserve(extendedResourceClaim, podWithExtendedResourceName),
@@ -3259,7 +3346,7 @@ func testPlugin(tCtx ktesting.TContext) {
 				},
 				prebind: result{
 					inFlightClaims: []metav1.Object{extendedResourceClaimNoName},
-					status:         fwk.NewStatus(fwk.Unschedulable, `claim creation errors`),
+					status:         fwk.NewStatus(fwk.Error, `claim creation errors`),
 				},
 				unreserveAfterBindFailure: &result{
 					removed: []metav1.Object{reserve(extendedResourceClaim, podWithExtendedResourceName)},
@@ -3511,10 +3598,11 @@ func testPlugin(tCtx ktesting.TContext) {
 			},
 		},
 		"unreserve-after-allocation-in-prebind-other-claim-fails": {
-			// PreBind stores the allocation of the first claim, then fails
-			// for the second one. Unreserve cannot remove the reservation,
-			// so the allocation of the first claim must stay in the assume
-			// cache.
+			// PreBind stores the first claim's allocation, then fails on the
+			// second. Without DRAPreemption, Unreserve's ReservedFor patch
+			// fails (failPatch) and the first claim's allocation stays in the
+			// assume cache; with DRAPreemption, Unreserve deallocates it via
+			// UpdateStatus instead.
 			pod:       podWithTwoClaimNames,
 			claims:    []*resourceapi.ResourceClaim{pendingClaim, pendingClaim2},
 			classes:   []*resourceapi.DeviceClass{deviceClass},
@@ -3561,6 +3649,86 @@ func testPlugin(tCtx ktesting.TContext) {
 				},
 				unreserveAfterBindFailure: &result{
 					assumedClaim: addAllocationTimestamp(reserve(allocatedClaim, podWithTwoClaimNames)),
+				},
+				unreserveAfterBindFailureWithPreemption: &result{
+					assumedClaim: st.FromResourceClaim(allocatedClaim).Allocation(nil).Obj(),
+					changes: change{
+						claim: func(claim *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
+							if claim.Name == claimName {
+								claim = claim.DeepCopy()
+								claim.Status = resourceapi.ResourceClaimStatus{}
+							}
+							return claim
+						},
+					},
+				},
+			},
+		},
+		"unreserve-after-allocation-in-prebind-deallocation-conflict": {
+			// Like unreserve-after-allocation-in-prebind-other-claim-fails,
+			// but deallocating the first claim conflicts, so Unreserve falls
+			// back to removing the pod from ReservedFor.
+			pod:     podWithTwoClaimNames,
+			claims:  []*resourceapi.ResourceClaim{pendingClaim, pendingClaim2},
+			classes: []*resourceapi.DeviceClass{deviceClass},
+			objs:    []apiruntime.Object{largeWorkerNodeSlice},
+			reactors: []cgotesting.Reactor{
+				&cgotesting.SimpleReactor{
+					Verb:     "update",
+					Resource: "resourceclaims",
+					Reaction: func(action cgotesting.Action) (handled bool, ret apiruntime.Object, err error) {
+						claim, ok := action.(cgotesting.UpdateAction).GetObject().(*resourceapi.ResourceClaim)
+						if !ok || action.GetSubresource() != "status" {
+							return false, nil, nil
+						}
+						switch {
+						case claim.Name == claimName2:
+							return true, nil, apierrors.NewBadRequest("claim status update error")
+						case claim.Status.Allocation == nil:
+							return true, nil, apierrors.NewConflict(resourceapi.Resource("resourceclaims"), claim.Name, errors.New("claim changed"))
+						}
+						return false, nil, nil
+					},
+				},
+			},
+			want: want{
+				reserve: result{
+					inFlightClaims: []metav1.Object{
+						allocatedClaim,
+						st.FromResourceClaim(pendingClaim2).Allocation(allocationResult).Obj(),
+					},
+				},
+				prebind: result{
+					inFlightClaims: []metav1.Object{
+						addAllocationTimestamp(allocatedClaim),
+						addAllocationTimestamp(st.FromResourceClaim(pendingClaim2).Allocation(allocationResult).Obj()),
+					},
+					assumedClaim: addAllocationTimestamp(reserve(allocatedClaim, podWithTwoClaimNames)),
+					changes: change{
+						claim: func(in *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
+							if in.Name == claimName2 {
+								// Only the finalizer got added before the status update failed.
+								out := in.DeepCopy()
+								out.Finalizers = append(out.Finalizers, resourceapi.Finalizer)
+								return out
+							}
+							return addAllocationTimestamp(reserve(allocatedClaim, podWithTwoClaimNames))
+						},
+					},
+					status: fwk.AsStatus(errors.New("claim status update error")),
+				},
+				unreserveAfterBindFailure: &result{
+					assumedClaim: addAllocationTimestamp(reserve(allocatedClaim, podWithTwoClaimNames)),
+					changes: change{
+						claim: func(in *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
+							if in.Name != claimName {
+								return in
+							}
+							out := in.DeepCopy()
+							out.Status.ReservedFor = []resourceapi.ResourceClaimConsumerReference{}
+							return out
+						},
+					},
 				},
 			},
 		},
@@ -4263,7 +4431,7 @@ func testPlugin(tCtx ktesting.TContext) {
 				},
 				prebind: result{
 					inFlightClaims: []metav1.Object{allocatedClaim},
-					status:         fwk.NewStatus(fwk.Unschedulable, `clear extraNodeAllocatableResources of pod default/my-pod: patch error`),
+					status:         fwk.NewStatus(fwk.Error, `clear extraNodeAllocatableResources of pod default/my-pod: patch error`),
 				},
 			},
 		},
@@ -4651,7 +4819,7 @@ func testPlugin(tCtx ktesting.TContext) {
 			}(),
 			want: want{
 				filter: perNodeResult{
-					workerNodeWithCapacity.Name: {status: fwk.NewStatus(fwk.Unschedulable, `Insufficient cpu`)},
+					workerNodeWithCapacity.Name: {status: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, `Insufficient cpu`)},
 				},
 				postfilter: result{
 					status: fwk.NewStatus(fwk.Unschedulable),
@@ -4706,7 +4874,7 @@ func testPlugin(tCtx ktesting.TContext) {
 			want: want{
 				filter: perNodeResult{
 					workerNodeWithCapacity.Name: {
-						status: fwk.NewStatus(fwk.Unschedulable, `Insufficient cpu`),
+						status: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, `Insufficient cpu`),
 						extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{{
 							ContainerName: "",
 							Requests:      v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("10")},
@@ -4732,7 +4900,7 @@ func testPlugin(tCtx ktesting.TContext) {
 			objs:    []apiruntime.Object{workerNodeSliceWithNodeAllocatableResource(), podWithClaimReferenceInContainer},
 			want: want{
 				filter: perNodeResult{
-					workerNodeWithCapacity.Name: {status: fwk.NewStatus(fwk.Unschedulable, `cannot allocate all claims`)},
+					workerNodeWithCapacity.Name: {status: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, `cannot allocate all claims`)},
 				},
 				postfilter: result{
 					status: fwk.NewStatus(fwk.Unschedulable),
@@ -5168,10 +5336,17 @@ func testPlugin(tCtx ktesting.TContext) {
 			if nodes == nil {
 				nodes = []*v1.Node{workerNode}
 			}
+			if preemption && tc.emulatedVersion != "" {
+				// DRAPreemption was introduced in 1.38 and cannot be enabled at older emulated versions.
+				tCtx.Skipf("DRAPreemption needs version 1.38, the test case emulates %s", tc.emulatedVersion)
+			}
 			if tc.emulatedVersion != "" {
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(tCtx, utilfeature.DefaultFeatureGate, version.MustParse(tc.emulatedVersion))
 			}
 			featuregatetesting.SetFeatureGatesDuringTest(tCtx, utilfeature.DefaultFeatureGate, tc.featureOverrides)
+			if preemption {
+				featuregatetesting.SetFeatureGateDuringTest(tCtx, utilfeature.DefaultFeatureGate, features.DRAPreemption, true)
+			}
 			feats := feature.NewSchedulerFeaturesFromGates(utilfeature.DefaultFeatureGate)
 			testCtx := setup(tCtx, tc.args, nodes, tc.claims, tc.classes, tc.podGroups, tc.objs, feats, tc.failPatch, tc.reactors)
 			for _, pod := range tc.existingPods {
@@ -5337,11 +5512,15 @@ func testPlugin(tCtx ktesting.TContext) {
 					tCtx.Run("prebind", func(tCtx ktesting.TContext) {
 						testCtx.verify(tCtx, tc.want.prebind, initialObjects, tc.pod, nil, preBindStatus)
 					})
-					if tc.want.unreserveAfterBindFailure != nil {
+					wantUnreserve := tc.want.unreserveAfterBindFailure
+					if preemption && tc.want.unreserveAfterBindFailureWithPreemption != nil {
+						wantUnreserve = tc.want.unreserveAfterBindFailureWithPreemption
+					}
+					if wantUnreserve != nil {
 						initialObjects = testCtx.listAll(tCtx)
 						testCtx.p.Unreserve(tCtx, testCtx.state, tc.pod, selectedNodeName)
 						tCtx.Run("unreserverAfterBindFailure", func(tCtx ktesting.TContext) {
-							testCtx.verify(tCtx, *tc.want.unreserveAfterBindFailure, initialObjects, tc.pod, nil, status)
+							testCtx.verify(tCtx, *wantUnreserve, initialObjects, tc.pod, nil, status)
 						})
 					} else if status.IsSuccess() {
 						initialObjects = testCtx.listAll(tCtx)
@@ -5367,9 +5546,15 @@ func testPlugin(tCtx ktesting.TContext) {
 					})
 				} else {
 					result, status := testCtx.p.PostFilter(tCtx, testCtx.state, tc.pod, nil /* filteredNodeStatusMap not used by plugin */)
+					wantPostFilter := tc.want.postfilter
+					if preemption && wantPostFilter.status != nil && wantPostFilter.status.Code() == fwk.Unschedulable && len(wantPostFilter.status.Reasons()) > 0 {
+						// Under DRAPreemption, PostFilter returns UnschedulableAndUnresolvable
+						// after deallocating or deleting a claim to skip preemption for the cycle.
+						wantPostFilter.status = fwk.NewStatus(fwk.UnschedulableAndUnresolvable, wantPostFilter.status.Reasons()...)
+					}
 					tCtx.Run("postfilter", func(tCtx ktesting.TContext) {
 						assert.Equal(tCtx, tc.want.postFilterResult, result)
-						testCtx.verify(tCtx, tc.want.postfilter, initialObjects, tc.pod, nil, status)
+						testCtx.verify(tCtx, wantPostFilter, initialObjects, tc.pod, nil, status)
 					})
 				}
 			}
@@ -5414,8 +5599,9 @@ func (tc *testContext) verify(tCtx ktesting.TContext, expected result, initialOb
 	if expected.status == nil {
 		assert.Nil(tCtx, status, status.AsError())
 	} else if actualErr := status.AsError(); actualErr != nil {
-		// Compare only the error strings.
+		// Compare only the error strings and the code.
 		assert.ErrorContains(tCtx, actualErr, expected.status.AsError().Error())
+		assert.Equal(tCtx, expected.status.Code().String(), status.Code().String(), "status code")
 	} else {
 		assert.Equal(tCtx, expected.status, status)
 	}
@@ -5667,32 +5853,41 @@ func update(objects []metav1.Object, updates change) []metav1.Object {
 	return updated
 }
 
-func setup(tCtx ktesting.TContext, args *config.DynamicResourcesArgs, nodes []*v1.Node, claims []*resourceapi.ResourceClaim, classes []*resourceapi.DeviceClass, podGroups []*schedulingapi.PodGroup, objs []apiruntime.Object, features feature.Features, failPatch bool, apiReactors []cgotesting.Reactor) (result *testContext) {
+// draTestEnv holds the client, informer factory, and DefaultDRAManager shared
+// across test setups that build their own Framework (such as DefaultPreemption
+// tests) without constructing a throwaway Framework and plugin instance.
+type draTestEnv struct {
+	client          *fake.Clientset
+	informerFactory informers.SharedInformerFactory
+	draManager      *DefaultDRAManager
+	doneCheckers    []cache.DoneChecker
+}
+
+func setupDRAManager(tCtx ktesting.TContext, claims []*resourceapi.ResourceClaim, classes []*resourceapi.DeviceClass, podGroups []*schedulingapi.PodGroup, objs []apiruntime.Object, features feature.Features, failPatch bool, apiReactors []cgotesting.Reactor) *draTestEnv {
 	tCtx.Helper()
 
-	tc := &testContext{}
-	tc.client = fake.NewSimpleClientset(objs...)
-	reactor := createReactor(tc.client.Tracker(), failPatch)
-	tc.client.PrependReactor("*", "*", reactor)
+	env := &draTestEnv{}
+	env.client = fake.NewSimpleClientset(objs...)
+	reactor := createReactor(env.client.Tracker(), failPatch)
+	env.client.PrependReactor("*", "*", reactor)
 	// Prepends reactors to the client.
-	tc.client.ReactionChain = append(apiReactors, tc.client.ReactionChain...)
+	env.client.ReactionChain = append(apiReactors, env.client.ReactionChain...)
 
-	tc.informerFactory = informers.NewSharedInformerFactory(tc.client, 0)
-	sliceInformer := draapi.NewInformerForResourceSlice(tc.informerFactory)
+	env.informerFactory = informers.NewSharedInformerFactory(env.client, 0)
+	sliceInformer := draapi.NewInformerForResourceSlice(env.informerFactory)
 
-	var doneCheckers []cache.DoneChecker
 	resourceSliceTrackerOpts := resourceslicetracker.Options{
 		EnableDeviceTaintRules: true,
 		SliceLister:            draapi.NewResourceSliceLister(sliceInformer.GetIndexer()),
 		SliceInformer:          sliceInformer,
-		TaintInformer:          tc.informerFactory.Resource().V1().DeviceTaintRules(),
-		KubeClient:             tc.client,
+		TaintInformer:          env.informerFactory.Resource().V1().DeviceTaintRules(),
+		KubeClient:             env.client,
 	}
 	resourceSliceTracker, err := resourceslicetracker.StartTracker(tCtx, resourceSliceTrackerOpts)
 	require.NoError(tCtx, err, "couldn't start resource slice tracker")
-	doneCheckers = append(doneCheckers, resourceSliceTracker.HasSyncedChecker())
+	env.doneCheckers = append(env.doneCheckers, resourceSliceTracker.HasSyncedChecker())
 
-	claimsCache := assumecache.NewAssumeCache(tCtx.Logger(), tc.informerFactory.Resource().V1().ResourceClaims().Informer(), "resource claim", "", nil)
+	claimsCache := assumecache.NewAssumeCache(tCtx.Logger(), env.informerFactory.Resource().V1().ResourceClaims().Informer(), "resource claim", "", nil)
 	// NewAssumeCache calls the informer's AddEventHandler method to register
 	// a handler in order to stay in sync with the informer's store, but
 	// NewAssumeCache does not return the ResourceEventHandlerRegistration.
@@ -5703,19 +5898,60 @@ func setup(tCtx ktesting.TContext, args *config.DynamicResourcesArgs, nodes []*v
 	// This is not the registered handler that is used by the DRA
 	// manager, but it is close enough because the assume cache
 	// uses a single boolean for "is synced" for all handlers.
-	doneCheckers = append(doneCheckers, claimsCache.AddEventHandler(cache.ResourceEventHandlerFuncs{}).HasSyncedChecker())
+	env.doneCheckers = append(env.doneCheckers, claimsCache.AddEventHandler(cache.ResourceEventHandlerFuncs{}).HasSyncedChecker())
 
-	tc.draManager = NewDRAManager(tCtx, claimsCache, resourceSliceTracker, tc.informerFactory)
+	env.draManager = NewDRAManager(tCtx, claimsCache, resourceSliceTracker, env.informerFactory)
 	if features.EnableDRAExtendedResource {
 		logger := tCtx.Logger()
 		handlerOptions := cache.HandlerOptions{Logger: &logger}
-		cache := tc.draManager.DeviceClassResolver().(*extendedresourcecache.ExtendedResourceCache)
-		deviceClassHandlerRegistration, err := tc.informerFactory.Resource().V1().DeviceClasses().Informer().AddEventHandlerWithOptions(cache, handlerOptions)
+		extCache := env.draManager.DeviceClassResolver().(*extendedresourcecache.ExtendedResourceCache)
+		deviceClassHandlerRegistration, err := env.informerFactory.Resource().V1().DeviceClasses().Informer().AddEventHandlerWithOptions(extCache, handlerOptions)
 		require.NoError(tCtx, err, "failed to add device class informer event handler")
-		doneCheckers = append(doneCheckers, deviceClassHandlerRegistration.HasSyncedChecker())
+		env.doneCheckers = append(env.doneCheckers, deviceClassHandlerRegistration.HasSyncedChecker())
 	}
 
-	tc.podGroupManager = internalcache.New(tCtx, nil, true, false)
+	// The tests use the API to create the objects because then reactors
+	// get triggered.
+	for _, claim := range claims {
+		_, err := env.client.ResourceV1().ResourceClaims(claim.Namespace).Create(tCtx, claim, metav1.CreateOptions{})
+		tCtx.ExpectNoError(err, "create resource claim")
+	}
+	for _, class := range classes {
+		_, err := env.client.ResourceV1().DeviceClasses().Create(tCtx, class, metav1.CreateOptions{})
+		tCtx.ExpectNoError(err, "create resource class")
+	}
+	for _, podGroup := range podGroups {
+		_, err := env.client.SchedulingV1beta1().PodGroups(podGroup.Namespace).Create(tCtx, podGroup, metav1.CreateOptions{})
+		tCtx.ExpectNoError(err, "create pod group")
+	}
+
+	return env
+}
+
+func (e *draTestEnv) startAndSync(tCtx ktesting.TContext) {
+	tCtx.Helper()
+	e.informerFactory.StartWithContext(tCtx)
+	tCtx.Cleanup(e.informerFactory.Shutdown)
+
+	e.informerFactory.WaitForCacheSyncWithContext(tCtx)
+	// The above does not tell us if the registered handlers (e.g. from NewAssumeCache)
+	// are synced, we need to wait until the event handlers confirm that they are synced.
+	// This ensures that the assume cache is in sync with the informer's
+	// store which has been informed by at least one full LIST of the underlying storage.
+	cache.WaitFor(tCtx, "event handlers", e.doneCheckers...)
+}
+
+func setup(tCtx ktesting.TContext, args *config.DynamicResourcesArgs, nodes []*v1.Node, claims []*resourceapi.ResourceClaim, classes []*resourceapi.DeviceClass, podGroups []*schedulingapi.PodGroup, objs []apiruntime.Object, features feature.Features, failPatch bool, apiReactors []cgotesting.Reactor) (result *testContext) {
+	tCtx.Helper()
+
+	env := setupDRAManager(tCtx, claims, classes, podGroups, objs, features, failPatch, apiReactors)
+	tc := &testContext{
+		client:          env.client,
+		informerFactory: env.informerFactory,
+		draManager:      env.draManager,
+	}
+
+	tc.podGroupManager = internalcache.New(tCtx, nil, true /* genericWorkloadEnabled */, false /* compositePodGroupEnabled */)
 	for _, obj := range objs {
 		if pod, ok := obj.(*v1.Pod); ok {
 			tc.podGroupManager.AddPodGroupMember(pod)
@@ -5747,30 +5983,7 @@ func setup(tCtx ktesting.TContext, args *config.DynamicResourcesArgs, nodes []*v
 	tCtx.ExpectNoError(err, "create plugin")
 	tc.p = pl.(*DynamicResources)
 
-	// The tests use the API to create the objects because then reactors
-	// get triggered.
-	for _, claim := range claims {
-		_, err := tc.client.ResourceV1().ResourceClaims(claim.Namespace).Create(tCtx, claim, metav1.CreateOptions{})
-		tCtx.ExpectNoError(err, "create resource claim")
-	}
-	for _, class := range classes {
-		_, err := tc.client.ResourceV1().DeviceClasses().Create(tCtx, class, metav1.CreateOptions{})
-		tCtx.ExpectNoError(err, "create resource class")
-	}
-	for _, podGroup := range podGroups {
-		_, err := tc.client.SchedulingV1beta1().PodGroups(podGroup.Namespace).Create(tCtx, podGroup, metav1.CreateOptions{})
-		tCtx.ExpectNoError(err, "create pod group")
-	}
-
-	tc.informerFactory.StartWithContext(tCtx)
-	tCtx.Cleanup(tc.informerFactory.Shutdown)
-
-	tc.informerFactory.WaitForCacheSyncWithContext(tCtx)
-	// The above does not tell us if the registered handlers (e.g. from NewAssumeCache)
-	// are synced, we need to wait until the event handlers confirm that they are synced.
-	// This ensures that the assume cache is in sync with the informer's
-	// store which has been informed by at least one full LIST of the underlying storage.
-	cache.WaitFor(tCtx, "event handlers", doneCheckers...)
+	env.startAndSync(tCtx)
 
 	for _, node := range nodes {
 		nodeInfo := framework.NewNodeInfo()

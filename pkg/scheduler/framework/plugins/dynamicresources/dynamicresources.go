@@ -107,6 +107,21 @@ type stateData struct {
 	// and PreBind must patch the field: with the entries of this attempt, or by clearing it.
 	staleExtraNodeAllocatableResources bool
 
+	// preemption holds the cycle-wide DRA preemption state (KEP-5690),
+	// including the PreFilter snapshot and cached Filter results. Nil unless
+	// DRAPreemption is enabled and the pod has claims.
+	preemption *preemptionData
+
+	// preBindSucceeded records that PreBind succeeded when DRAPreemption is
+	// enabled. When true, Unreserve leaves claims allocated because a failed
+	// Bind call may still have bound the pod on the API server.
+	preBindSucceeded bool
+
+	// claimBeingAllocated records that PreFilter rejected the pod because
+	// another pod is allocating one of its claims when DRAPreemption is
+	// enabled. PostFilter uses it to skip DefaultPreemption.
+	claimBeingAllocated bool
+
 	// mutex must be locked while accessing any of the fields below.
 	mutex sync.Mutex
 
@@ -138,6 +153,9 @@ type stateData struct {
 	nodeAllocatableSlices map[string][]*draapi.ResourceSlice
 }
 
+// Clone returns d without copying, so all CycleState clones share one
+// stateData. Mutable per-clone state lives in a separate CycleState entry,
+// preemptionSimulationState in preemption.go.
 func (d *stateData) Clone() fwk.StateData {
 	return d
 }
@@ -198,6 +216,9 @@ type DynamicResources struct {
 	celCache       *cel.Cache
 	draManager     fwk.SharedDRAManager
 	podIndexer     cache.Indexer
+	// preemptionTracker is nil when DRAPreemption is disabled or draManager is
+	// not a DefaultDRAManager.
+	preemptionTracker *preemptionTracker
 }
 
 const (
@@ -251,6 +272,12 @@ func New(ctx context.Context, plArgs runtime.Object, fh fwk.Handle, fts feature.
 			}
 		}
 		pl.podIndexer = podInformer.GetIndexer()
+	}
+	if fts.EnableDRAPreemption {
+		// Shared across all scheduler profiles via DefaultDRAManager.
+		if manager, ok := pl.draManager.(*DefaultDRAManager); ok {
+			pl.preemptionTracker = manager.preemptionTracker
+		}
 	}
 
 	return pl, nil
@@ -319,6 +346,11 @@ func (pl *DynamicResources) EventsToRegister(_ context.Context) ([]fwk.ClusterEv
 			QueueingHintFn: pl.isSchedulableAfterNodeDeclaredFeaturesChange,
 		})
 	}
+	if pl.fts.EnableDRAPreemption {
+		// Wake nominated preemptors on victim deletion and pods waiting on
+		// forgotten assumed pods; see isSchedulableAfterAssignedPodDeleted.
+		events = append(events, fwk.ClusterEventWithHint{Event: fwk.ClusterEvent{Resource: fwk.AssignedPod, ActionType: fwk.Delete}, QueueingHintFn: pl.isSchedulableAfterAssignedPodDeleted})
+	}
 
 	return events, nil
 }
@@ -350,7 +382,7 @@ func (pl *DynamicResources) isSchedulableAfterNodeDeclaredFeaturesChange(logger 
 // attempt.
 func (pl *DynamicResources) PreEnqueue(ctx context.Context, pod *v1.Pod) (status *fwk.Status) {
 	if err := pl.foreachPodResourceClaim(pod, nil); err != nil {
-		return statusUnschedulable(klog.FromContext(ctx), err.Error())
+		return statusUnschedulableAndUnresolvable(klog.FromContext(ctx), err.Error())
 	}
 	return nil
 }
@@ -652,7 +684,7 @@ func (pl *DynamicResources) PreFilter(ctx context.Context, state fwk.CycleState,
 
 	userClaims, err := pl.podResourceClaims(pod)
 	if err != nil {
-		return nil, statusUnschedulable(logger, err.Error())
+		return nil, statusUnschedulableAndUnresolvable(logger, err.Error())
 	}
 	logger.V(5).Info("pod resource claims", "pod", klog.KObj(pod), "resourceclaims", klog.KObjSlice(userClaims))
 	extendedResourceClaim, status := pl.preFilterExtendedResources(pod, logger, s)
@@ -661,7 +693,7 @@ func (pl *DynamicResources) PreFilter(ctx context.Context, state fwk.CycleState,
 	}
 	claimBindings, err := pl.podResourceClaimBindings(pod)
 	if err != nil {
-		return nil, statusUnschedulable(logger, err.Error())
+		return nil, statusUnschedulableAndUnresolvable(logger, err.Error())
 	}
 	claims := newClaimStore(userClaims, extendedResourceClaim, claimBindings)
 
@@ -688,7 +720,7 @@ func (pl *DynamicResources) PreFilter(ctx context.Context, state fwk.CycleState,
 			!resourceclaim.CanBeReserved(claim) &&
 			!resourceclaim.IsReservedForPod(pod, claim, pl.fts.EnableDRAWorkloadResourceClaims) {
 			// Resource is in use. The pod has to wait.
-			return nil, statusUnschedulable(logger, "resourceclaim in use", "pod", klog.KObj(pod), "resourceclaim", klog.KObj(claim))
+			return nil, statusUnschedulableAndUnresolvable(logger, "resourceclaim in use", "pod", klog.KObj(pod), "resourceclaim", klog.KObj(claim))
 		}
 
 		if claim.Status.Allocation != nil {
@@ -737,7 +769,10 @@ func (pl *DynamicResources) PreFilter(ctx context.Context, state fwk.CycleState,
 			// to finish, see inFlightAllocations
 			// documentation for details.
 			if pl.draManager.ResourceClaims().GetPendingAllocation(claim.UID) != nil {
-				return nil, statusUnschedulable(logger, fmt.Sprintf("resource claim %s is in the process of being allocated", klog.KObj(claim)))
+				if pl.fts.EnableDRAPreemption {
+					s.claimBeingAllocated = true
+				}
+				return nil, statusUnschedulableAndUnresolvable(logger, fmt.Sprintf("resource claim %s is in the process of being allocated", klog.KObj(claim)))
 			}
 
 			// Continue without validating the special claim for extended resource backed by DRA.
@@ -765,7 +800,7 @@ func (pl *DynamicResources) PreFilter(ctx context.Context, state fwk.CycleState,
 					}
 				case len(request.FirstAvailable) > 0:
 					if !pl.fts.EnableDRAPrioritizedList {
-						return nil, statusUnschedulable(logger, fmt.Sprintf("resource claim %s, request %s: has subrequests, but the DRAPrioritizedList feature is disabled", klog.KObj(claim), request.Name))
+						return nil, statusUnschedulableAndUnresolvable(logger, fmt.Sprintf("resource claim %s, request %s: has subrequests, but the DRAPrioritizedList feature is disabled", klog.KObj(claim), request.Name))
 					}
 					for _, subRequest := range request.FirstAvailable {
 						qualRequestName := strings.Join([]string{request.Name, subRequest.Name}, "/")
@@ -774,7 +809,7 @@ func (pl *DynamicResources) PreFilter(ctx context.Context, state fwk.CycleState,
 						}
 					}
 				default:
-					return nil, statusUnschedulable(logger, fmt.Sprintf("resource claim %s, request %s: unknown request type", klog.KObj(claim), request.Name))
+					return nil, statusUnschedulableAndUnresolvable(logger, fmt.Sprintf("resource claim %s, request %s: unknown request type", klog.KObj(claim), request.Name))
 				}
 			}
 		}
@@ -807,6 +842,7 @@ func (pl *DynamicResources) PreFilter(ctx context.Context, state fwk.CycleState,
 		}
 	}
 
+	var allocatedState *structured.AllocatedState
 	if numClaimsToAllocate > 0 {
 		if loggerV := logger.V(5); loggerV.Enabled() {
 			claimsToAllocate := make([]*resourceapi.ResourceClaim, 0, claims.len())
@@ -831,7 +867,6 @@ func (pl *DynamicResources) PreFilter(ctx context.Context, state fwk.CycleState,
 		//
 		// This might have to be retried in the unlikely case that some concurrent modification made
 		// the result invalid.
-		var allocatedState *structured.AllocatedState
 		err = wait.PollUntilContextTimeout(ctx, time.Microsecond, 5*time.Second, true /* immediate */, func(context.Context) (bool, error) {
 			if pl.fts.EnableDRAConsumableCapacity {
 				allocatedState, err = pl.draManager.ResourceClaims().GatherAllocatedState()
@@ -882,6 +917,10 @@ func (pl *DynamicResources) PreFilter(ctx context.Context, state fwk.CycleState,
 		s.allocator = allocator
 	}
 	s.claims = claims
+	if pl.fts.EnableDRAPreemption {
+		s.preemption = pl.newPreemptionData(pod, &s.claims, allocatedState, resourceSlices)
+		state.Write(preemptionSimulationStateKey, &preemptionSimulationState{})
+	}
 	return nil, nil
 }
 
@@ -913,14 +952,9 @@ func (pl *DynamicResources) validateDeviceClass(logger klog.Logger, deviceClassN
 		if apierrors.IsNotFound(err) {
 			// Here we mark the pod as "unschedulable", so it'll sleep in
 			// the unscheduleable queue until a DeviceClass event occurs.
-			return statusUnschedulable(logger, fmt.Sprintf("request %s: device class %s does not exist", requestName, deviceClassName))
+			return statusUnschedulableAndUnresolvable(logger, fmt.Sprintf("request %s: device class %s does not exist", requestName, deviceClassName))
 		}
 	}
-	return nil
-}
-
-// PreFilterExtensions returns prefilter extensions, pod add and remove.
-func (pl *DynamicResources) PreFilterExtensions() fwk.PreFilterExtensions {
 	return nil
 }
 
@@ -1020,7 +1054,14 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 		return nil
 	}
 
+	var sim *preemptionSimulationState
+	var holds *nodeHolds
+	if state.preemption != nil {
+		sim = getPreemptionSimulationState(cs)
+		holds = pl.holdsOnNode(sim, node.Name)
+	}
 	var unavailableClaims []int
+	numDeallocating := 0
 	for index, claim := range state.claims.all() {
 		logger.V(10).Info("filtering based on resource claims of the pod", "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaim", klog.KObj(claim))
 
@@ -1028,6 +1069,18 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 		if nodeSelector := state.informationsForClaim[index].availableOnNodes; nodeSelector != nil && !nodeSelector.Match(node) {
 			logger.V(5).Info("allocation's node selector does not match", "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaim", klog.KObj(claim))
 			unavailableClaims = append(unavailableClaims, index)
+			continue
+		}
+
+		// Reject a tracked victim claim awaiting deallocation so it isn't
+		// reserved again; PostFilter deallocates it if unused. Because alpha
+		// only tracks pod-owned claims (see AssumeVictim), this mainly catches
+		// a PreBind-preempted victim requeued after Unreserve failed to
+		// deallocate its claim.
+		if claim.Status.Allocation != nil && pl.isVictimClaimSettling(claim) {
+			logger.V(5).Info("claim of preempted pods is being deallocated", "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaim", klog.KObj(claim))
+			unavailableClaims = append(unavailableClaims, index)
+			numDeallocating++
 			continue
 		}
 
@@ -1074,6 +1127,7 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 	var allocations []resourceapi.AllocationResult
 	var extraNodeAllocatableResources []v1.ExtraNodeAllocatableResource
 	allocationsMap := make(map[types.UID]*resourceapi.AllocationResult)
+	var simulated *simulatedResult
 	if state.allocator != nil {
 		allocCtx := ctx
 		if loggerV := logger.V(5); loggerV.Enabled() {
@@ -1111,7 +1165,7 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 			if pendingAlloc := state.informationsForClaim[index].allocation; pendingAlloc != nil {
 				if allocationResultRequiresDRAOptionalNodeOperations(pendingAlloc) && !slices.Contains(node.Status.DeclaredFeatures, draoptionalnodeoperations.DRAOptionalNodeOperationsFeatureGate) {
 					logger.V(5).Info("allocation's device requires DRAOptionalNodeOperations feature, but node lacks it", "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaim", klog.KObj(claim))
-					return statusUnschedulable(logger, fmt.Sprintf("resource claim %s allocation requires DRAOptionalNodeOperations feature on the node", klog.KObj(claim)), "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaim", klog.KObj(claim))
+					return statusUnschedulableAndUnresolvable(logger, fmt.Sprintf("resource claim %s allocation requires DRAOptionalNodeOperations feature on the node", klog.KObj(claim)), "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaim", klog.KObj(claim))
 				}
 				pendingResult = append(pendingResult, *pendingAlloc)
 				pendingPositions = append(pendingPositions, position)
@@ -1121,7 +1175,9 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 			claimsToAllocate = append(claimsToAllocate, claim)
 			freshPositions = append(freshPositions, position)
 		}
-		allocationResult, err := state.allocator.Allocate(allocCtx, node, claimsToAllocate)
+		// Allocate against cs's simulated victim releases and device holds,
+		// reusing pass 1's cached result when holds is nil so Reserve keeps it.
+		allocationResult, allocatedState, err := pl.allocate(allocCtx, state, sim, holds, node, claimsToAllocate)
 		switch {
 		case errors.Is(err, context.DeadlineExceeded):
 			// Timeouts are potentially transient. Return Error
@@ -1134,9 +1190,17 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 		case errors.Is(err, structured.ErrFailedAllocationOnNode):
 			// Not a fatal error, allocation on other nodes may proceed.
 			// The error is only surfaced if allocation fails on all nodes.
-			return statusUnschedulable(logger, err.Error(), "pod", klog.KObj(pod), "node", klog.KObj(node))
+			//
+			// Allocate returns this error whenever allocation fails and any
+			// pool on the node (even from an unrelated driver) is invalid or
+			// incomplete, so preempting a victim in a healthy pool may still
+			// let the pod fit.
+			if len(unavailableClaims) == 0 && pl.preemptionMightHelp(state, pod, nodeInfo, allocatedState) {
+				return statusPreemptionMightHelp(logger, err.Error(), "pod", klog.KObj(pod), "node", klog.KObj(node))
+			}
+			return statusUnschedulableAndUnresolvable(logger, err.Error(), "pod", klog.KObj(pod), "node", klog.KObj(node))
 		case ctx.Err() != nil:
-			return statusUnschedulable(logger, fmt.Sprintf("asked by caller to stop allocating devices: %v", context.Cause(ctx)), "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaims", klog.KObjSlice(claimsToAllocate))
+			return statusUnschedulableAndUnresolvable(logger, fmt.Sprintf("asked by caller to stop allocating devices: %v", context.Cause(ctx)), "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaims", klog.KObjSlice(claimsToAllocate))
 		case err != nil:
 			// This should only fail if there is something wrong with the claim or class.
 			// Return an error to abort scheduling of it.
@@ -1152,7 +1216,17 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 		}
 		// Check for exact length just to be sure. In practice this is all-or-nothing.
 		if len(allocationResult) != len(claimsToAllocate) {
-			return statusUnschedulable(logger, "cannot allocate all claims", "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaims", klog.KObjSlice(claimsToAllocate))
+			if len(unavailableClaims) == 0 && pl.preemptionMightHelp(state, pod, nodeInfo, allocatedState) {
+				return statusPreemptionMightHelp(logger, "cannot allocate all claims", "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaims", klog.KObjSlice(claimsToAllocate))
+			}
+			return statusUnschedulableAndUnresolvable(logger, "cannot allocate all claims", "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaims", klog.KObjSlice(claimsToAllocate))
+		}
+
+		if sim != nil {
+			simulated = &simulatedResult{
+				allocationResults: allocationResult,
+				heldClaims:        newHeldClaims(claimsToAllocate, allocationResult, extendedResourceClaim, nodeExtendedResourceClaim),
+			}
 		}
 
 		// Reserve and Score consume these results by claim position, so they
@@ -1177,6 +1251,11 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 		}
 	}
 
+	// Only record results when Filter succeeds on this node.
+	if simulated != nil && len(unavailableClaims) == 0 {
+		state.preemption.simulatedResults.store(sim, node.Name, simulated)
+	}
+
 	// Store information in state while holding the mutex.
 	if state.allocator != nil || len(unavailableClaims) > 0 {
 		state.mutex.Lock()
@@ -1195,7 +1274,10 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 			state.unavailableClaims.Insert(index)
 		}
 
-		return statusUnschedulable(logger, "resourceclaim not available on the node", "pod", klog.KObj(pod))
+		if numDeallocating == len(unavailableClaims) {
+			return statusUnschedulableAndUnresolvable(logger, "resourceclaim of preempted pods is being deallocated", "pod", klog.KObj(pod))
+		}
+		return statusUnschedulableAndUnresolvable(logger, "resourceclaim not available on the node", "pod", klog.KObj(pod))
 	}
 
 	if state.allocator != nil {
@@ -1232,6 +1314,14 @@ func (pl *DynamicResources) PostFilter(ctx context.Context, cs fwk.CycleState, p
 	if err != nil {
 		return nil, statusError(logger, err)
 	}
+	if state.claimBeingAllocated {
+		// Return UnschedulableAndUnresolvable to skip DefaultPreemption.
+		// Preemption cannot help while another pod is allocating the claim,
+		// and DefaultPreemption would clear any existing nomination, dropping
+		// its hold and PodEligibleToPreempt gating. The claim update or the
+		// other pod's deletion will requeue this pod.
+		return nil, fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "ResourceClaim is being allocated for another pod")
+	}
 	// If a Pod doesn't have any resource claims attached to it, there is no need for further processing.
 	// Thus we provide a fast path for this case to avoid unnecessary computations.
 	if state.claims.empty() {
@@ -1239,7 +1329,17 @@ func (pl *DynamicResources) PostFilter(ctx context.Context, cs fwk.CycleState, p
 		return nil, fwk.NewStatus(fwk.Unschedulable)
 	}
 
-	_, status := pl.deallocateOrDeletePodClaims(ctx, pod, state)
+	foundClaim, status := pl.deallocateOrDeletePodClaims(ctx, pod, state)
+	if !foundClaim {
+		foundClaim, status = pl.deallocateVictimClaims(ctx, pod, state)
+	}
+	if foundClaim && status.Code() == fwk.Unschedulable && state.preemption != nil {
+		// Return UnschedulableAndUnresolvable to short-circuit later PostFilter
+		// plugins (DefaultPreemption) for this cycle. CycleState still reflects
+		// the claim's stale allocation, and once the claim update triggers a new
+		// cycle the pod may fit elsewhere without preemption.
+		return nil, fwk.NewStatus(fwk.UnschedulableAndUnresolvable, status.Reasons()...)
+	}
 	return nil, status
 }
 
@@ -1258,14 +1358,9 @@ func (pl *DynamicResources) deallocateOrDeletePodClaims(ctx context.Context, pod
 			continue
 		}
 
-		if len(claim.Status.ReservedFor) == 0 ||
-			(len(claim.Status.ReservedFor) == 1 && claim.Status.ReservedFor[0].UID == pod.UID) {
-			claim := claim.DeepCopy()
-			claim.Status.ReservedFor = nil
-			claim.Status.Allocation = nil
-			claim.Status.Devices = nil
+		if !reservedForOthers(claim, pod.UID) {
 			logger.V(5).Info("Deallocation of ResourceClaim", "pod", klog.KObj(pod), "resourceclaim", klog.KObj(claim))
-			if _, err := pl.clientset.ResourceV1().ResourceClaims(claim.Namespace).UpdateStatus(ctx, claim, metav1.UpdateOptions{}); err != nil {
+			if _, err := pl.deallocateClaim(ctx, claim); err != nil {
 				return true, statusError(logger, err)
 			}
 			return true, fwk.NewStatus(fwk.Unschedulable, "deallocation of ResourceClaim completed")
@@ -1283,6 +1378,16 @@ func (pl *DynamicResources) deallocateOrDeletePodClaims(ctx context.Context, pod
 	}
 
 	return false, fwk.NewStatus(fwk.Unschedulable)
+}
+
+// deallocateClaim clears the allocation and the reservations of claim. The
+// update fails if claim is outdated.
+func (pl *DynamicResources) deallocateClaim(ctx context.Context, claim *resourceapi.ResourceClaim) (*resourceapi.ResourceClaim, error) {
+	claim = claim.DeepCopy()
+	claim.Status.ReservedFor = nil
+	claim.Status.Allocation = nil
+	claim.Status.Devices = nil
+	return pl.clientset.ResourceV1().ResourceClaims(claim.Namespace).UpdateStatus(ctx, claim, metav1.UpdateOptions{})
 }
 
 // PodGroupPostFilter checks whether there are allocated claims that could get
@@ -1329,6 +1434,9 @@ func (pl *DynamicResources) PodGroupPostFilter(
 				continue
 			}
 			foundClaim, status := pl.deallocateOrDeletePodClaims(ctx, pod, podState)
+			if !foundClaim {
+				foundClaim, status = pl.deallocateVictimClaims(ctx, pod, podState)
+			}
 			if status.IsError() {
 				return nil, status
 			}
@@ -1446,7 +1554,7 @@ func (pl *DynamicResources) deallocatePodGroupClaims(ctx context.Context, state 
 					logger.Error(err, "postfilter unreserving claim", "resourceclaim", klog.KObj(claim))
 					continue
 				} else {
-					return statusUnschedulable(logger, "ResourceClaim unreserved for PodGroup")
+					return statusUnschedulableAndUnresolvable(logger, "ResourceClaim unreserved for PodGroup")
 				}
 			}
 		}
@@ -1627,6 +1735,14 @@ func (pl *DynamicResources) Reserve(ctx context.Context, cs fwk.CycleState, pod 
 				claim.Finalizers = append(claim.Finalizers, resourceapi.Finalizer)
 			}
 			claim.Status.Allocation = allocation
+			if pl.preemptionTracker != nil {
+				// Clear any stale victim-claim entry before signaling the new
+				// pending allocation, for example from a victim canceled before
+				// PreBind persisted its allocation. Otherwise, reallocating the
+				// same devices would match that entry and block preemption on
+				// the node until the pod terminates.
+				pl.preemptionTracker.forgetVictimClaim(claim.UID, nil)
+			}
 			err := pl.draManager.ResourceClaims().SignalClaimPendingAllocation(claim.UID, claim)
 			if err != nil {
 				return statusError(logger, fmt.Errorf("internal error, couldn't signal allocation for claim %s: %w", claim.Name, err))
@@ -1646,7 +1762,9 @@ func (pl *DynamicResources) Reserve(ctx context.Context, cs fwk.CycleState, pod 
 	return nil
 }
 
-// Unreserve clears the ReservedFor field for all claims.
+// Unreserve clears the ReservedFor field for all claims, or, when DRAPreemption
+// is enabled and PreBind didn't succeed, deallocates claims that this cycle
+// allocated and reserved solely for pod (see deallocateUnreservedClaim).
 // It's idempotent, and does nothing if no state found for the given pod.
 func (pl *DynamicResources) Unreserve(ctx context.Context, cs fwk.CycleState, pod *v1.Pod, nodeName string) {
 	state, err := getStateData(cs)
@@ -1664,7 +1782,7 @@ func (pl *DynamicResources) Unreserve(ctx context.Context, cs fwk.CycleState, po
 	logger := klog.FromContext(ctx)
 
 	// we process user claims here first, extendedResourceClaim if any is handled below.
-	for _, claim := range state.claims.allUserClaims() {
+	for index, claim := range state.claims.allUserClaims() {
 		// If allocation was in-flight, then it might not be anymore if no pods
 		// still need the pending allocation. The allocation is not removed
 		// until the last Pod sharing it is Bound or Unreserved.
@@ -1677,6 +1795,10 @@ func (pl *DynamicResources) Unreserve(ctx context.Context, cs fwk.CycleState, po
 		// this or another Pod sharing the claim and make its devices look free.
 		if deleted := pl.draManager.ResourceClaims().MaybeRemoveClaimPendingAllocation(claim.UID, false); deleted {
 			logger.V(5).Info("Released resource in allocation result", "claim", klog.KObj(claim), "uid", claim.UID, "resourceVersion", claim.ResourceVersion, "allocation", klog.Format(claim.Status.Allocation))
+			// If this is a victim claim, preemptionTracker keeps it because
+			// PreBind may have stored the allocation although its request
+			// failed. If not, victimClaimSettling prunes the entry of the
+			// unallocated claim.
 
 			// If we are currently asynchronously Binding Pods in a PodGroup,
 			// then the pendingAllocations set does not need to be updated. New
@@ -1695,6 +1817,16 @@ func (pl *DynamicResources) Unreserve(ctx context.Context, cs fwk.CycleState, po
 		// PodGroup is not schedulable (in PostFilter) and not used yet.
 		if claim.Status.Allocation != nil &&
 			resourceclaim.IsReservedForPod(pod, claim, false /* acceptPodGroupReservation */) {
+			// informationsForClaim has an allocation only if this cycle
+			// allocated the claim. Once PreBind succeeds, a failed Bind call
+			// may still have bound the pod on the API server and kubelet may
+			// use the devices, so leave them allocated. A victim canceled after
+			// DynamicResources.PreBind, for example in a later PreBind plugin,
+			// keeps its claim tracked and deallocates it in PostFilter.
+			if pl.fts.EnableDRAPreemption && !state.preBindSucceeded && state.informationsForClaim[index].allocation != nil &&
+				pl.deallocateUnreservedClaim(ctx, pod, claim) {
+				continue
+			}
 			// Remove pod from ReservedFor. A strategic-merge-patch is used
 			// because that allows removing an individual entry without having
 			// the latest ResourceClaim.
@@ -1716,6 +1848,40 @@ func (pl *DynamicResources) Unreserve(ctx context.Context, cs fwk.CycleState, po
 	// failed. The next scheduling attempt replaces or clears them.
 }
 
+// deallocateUnreservedClaim deallocates a claim allocated in pod's current
+// cycle if pod is still its sole consumer; on conflict or shared use it returns
+// false so Unreserve falls back to removing pod from ReservedFor.
+//
+// Removing pod from ReservedFor alone would leave devices allocated because
+// the ResourceClaim controller only deallocates when it removes the last
+// consumer itself, and a victim canceled in PreBind may not reach PostFilter
+// (deallocateVictimClaims) promptly or at all. For non-preemption failures,
+// pod's next attempt simply allocates again.
+func (pl *DynamicResources) deallocateUnreservedClaim(ctx context.Context, pod *v1.Pod, claim *resourceapi.ResourceClaim) bool {
+	if pl.inPodGroup(pod) {
+		// Other pods of the PodGroup may share the allocation.
+		return false
+	}
+	latest, err := pl.draManager.ResourceClaims().Get(claim.Namespace, claim.Name)
+	if err != nil || latest.UID != claim.UID || latest.Status.Allocation == nil ||
+		len(latest.Status.ReservedFor) != 1 || latest.Status.ReservedFor[0].UID != pod.UID {
+		return false
+	}
+	logger := klog.FromContext(ctx)
+	updated, err := pl.deallocateClaim(ctx, latest)
+	if err != nil {
+		logger.V(5).Info("Deallocation of ResourceClaim in Unreserve failed", "pod", klog.KObj(pod), "resourceclaim", klog.KObj(claim), "err", err)
+		return false
+	}
+	logger.V(5).Info("Deallocated ResourceClaim in Unreserve", "pod", klog.KObj(pod), "resourceclaim", klog.KObj(claim))
+	// Assume the deallocated claim immediately so the next scheduling cycle and
+	// PodEligibleToPreempt observe the freed devices before the informer catches up.
+	if err := pl.draManager.ResourceClaims().AssumeClaimAfterAPICall(updated); err != nil {
+		logger.V(5).Info("Claim not stored in assume cache", "err", err, "resourceclaim", klog.KObj(updated))
+	}
+	return true
+}
+
 // PreBind gets called in a separate goroutine after it has been determined
 // that the pod should get bound to this node. Because Reserve did not actually
 // reserve claims, we need to do it now. For claims with the builtin controller,
@@ -1728,6 +1894,11 @@ func (pl *DynamicResources) PreBind(ctx context.Context, cs fwk.CycleState, pod 
 	state, err := getStateData(cs)
 	if err != nil {
 		return statusError(klog.FromContext(ctx), err)
+	}
+	if pl.fts.EnableDRAPreemption {
+		defer func() {
+			state.preBindSucceeded = retStatus.IsSuccess()
+		}()
 	}
 	if state.claims.empty() && !state.staleExtraNodeAllocatableResources {
 		return nil
@@ -2245,9 +2416,9 @@ func hasBindingConditions(state *stateData) bool {
 	return false
 }
 
-// statusUnschedulable ensures that there is a log message associated with the
+// statusUnschedulableAndUnresolvable ensures that there is a log message associated with the
 // line where the status originated.
-func statusUnschedulable(logger klog.Logger, reason string, kv ...interface{}) *fwk.Status {
+func statusUnschedulableAndUnresolvable(logger klog.Logger, reason string, kv ...interface{}) *fwk.Status {
 	if loggerV := logger.V(5); loggerV.Enabled() {
 		helper, loggerV := loggerV.WithCallStackHelper()
 		helper()
@@ -2256,6 +2427,19 @@ func statusUnschedulable(logger klog.Logger, reason string, kv ...interface{}) *
 		loggerV.Info("pod unschedulable", kv...)
 	}
 	return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, reason)
+}
+
+// statusPreemptionMightHelp is like statusUnschedulableAndUnresolvable, but
+// returns Unschedulable so that DefaultPreemption evaluates the node.
+func statusPreemptionMightHelp(logger klog.Logger, reason string, kv ...interface{}) *fwk.Status {
+	if loggerV := logger.V(5); loggerV.Enabled() {
+		helper, loggerV := loggerV.WithCallStackHelper()
+		helper()
+		kv = append(kv, "reason", reason)
+		// nolint: logcheck // warns because it cannot check key/values
+		loggerV.Info("pod unschedulable, preemption might help", kv...)
+	}
+	return fwk.NewStatus(fwk.Unschedulable, reason)
 }
 
 // statusError ensures that there is a log message associated with the
