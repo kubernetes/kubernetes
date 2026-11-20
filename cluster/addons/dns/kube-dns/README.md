@@ -1,9 +1,9 @@
 # kube-dns
 
 `kube-dns` schedules DNS Pods and Service on the cluster, other pods in cluster
-can use the DNS Service’s IP to resolve DNS names.
+can use the DNS Serviceâs IP to resolve DNS names.
 
-* [Administrators guide](https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/)
+* [Administrators guide](http://kubernetes.io/docs/admin/dns/)
 * [Code repository](http://www.github.com/kubernetes/dns)
 
 ## Manually scale kube-dns Deployment
