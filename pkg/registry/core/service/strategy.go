@@ -31,10 +31,12 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	pkgstorage "k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	serviceapi "k8s.io/kubernetes/pkg/api/service"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
+	"k8s.io/kubernetes/pkg/features"
 
 	"sigs.k8s.io/structured-merge-diff/v7/fieldpath"
 )
@@ -211,7 +213,29 @@ func SelectableFields(service *api.Service) fields.Set {
 //	if !utilfeature.DefaultFeatureGate.Enabled(features.MyFeature) && !myFeatureInUse(oldSvc) {
 //	    newSvc.Status.MyFeature = nil
 //	}
-func dropServiceStatusDisabledFields(newSvc *api.Service, oldSvc *api.Service) {}
+func dropServiceStatusDisabledFields(newSvc *api.Service, oldSvc *api.Service) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.LoadBalancerIPModeRouter) && !loadbalancerIPModeRouterInUse(oldSvc) {
+		for i := range newSvc.Status.LoadBalancer.Ingress {
+			if newSvc.Status.LoadBalancer.Ingress[i].IPMode != nil &&
+				*newSvc.Status.LoadBalancer.Ingress[i].IPMode == api.LoadBalancerIPModeRouter {
+				mode := api.LoadBalancerIPModeVIP
+				newSvc.Status.LoadBalancer.Ingress[i].IPMode = &mode
+			}
+		}
+	}
+}
+
+func loadbalancerIPModeRouterInUse(svc *api.Service) bool {
+	if svc == nil {
+		return false
+	}
+	for _, ing := range svc.Status.LoadBalancer.Ingress {
+		if ing.IPMode != nil && *ing.IPMode == api.LoadBalancerIPModeRouter {
+			return true
+		}
+	}
+	return false
+}
 
 func sameStringSlice(a []string, b []string) bool {
 	if len(a) != len(b) {

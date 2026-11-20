@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	apiservice "k8s.io/kubernetes/pkg/api/v1/service"
@@ -45,8 +46,10 @@ type ServicePort interface {
 	StickyMaxAgeSeconds() int
 	// ExternalIPs returns service ExternalIPs
 	ExternalIPs() []net.IP
-	// LoadBalancerVIPs returns service LoadBalancerIPs which are VIP mode
+	// LoadBalancerVIPs returns service LoadBalancerIPs which are VIP or Router mode
 	LoadBalancerVIPs() []net.IP
+	// LoadBalancerIPModeRouter returns true if the given IP is a Router-mode LB IP
+	LoadBalancerIPModeRouter(ip net.IP) bool
 	// Protocol returns service protocol.
 	Protocol() v1.Protocol
 	// LoadBalancerSourceRanges returns service LoadBalancerSourceRanges if present empty array if not
@@ -80,6 +83,7 @@ type BaseServicePortInfo struct {
 	protocol                 v1.Protocol
 	nodePort                 int
 	loadBalancerVIPs         []net.IP
+	loadBalancerRouterIPs    sets.Set[string]
 	sessionAffinityType      v1.ServiceAffinity
 	stickyMaxAgeSeconds      int
 	externalIPs              []net.IP
@@ -148,6 +152,11 @@ func (bsvcPortInfo *BaseServicePortInfo) ExternalIPs() []net.IP {
 // LoadBalancerVIPs is part of ServicePort interface.
 func (bsvcPortInfo *BaseServicePortInfo) LoadBalancerVIPs() []net.IP {
 	return bsvcPortInfo.loadBalancerVIPs
+}
+
+// LoadBalancerIPModeRouter is part of ServicePort interface.
+func (bsvcPortInfo *BaseServicePortInfo) LoadBalancerIPModeRouter(ip net.IP) bool {
+	return bsvcPortInfo.loadBalancerRouterIPs.Has(ip.String())
 }
 
 // ExternalPolicyLocal is part of ServicePort interface.
@@ -222,15 +231,21 @@ func newBaseServiceInfo(service *v1.Service, ipFamily v1.IPFamily, port *v1.Serv
 	// Filter Load Balancer Ingress IPs to correct IP family. While proxying load
 	// balancers might choose to proxy connections from an LB IP of one family to a
 	// service IP of another family, that's irrelevant to kube-proxy, which only
-	// creates rules for VIP-style load balancers.
+	// creates rules for VIP and Router mode load balancers.
 	for _, ing := range service.Status.LoadBalancer.Ingress {
-		if ing.IP == "" || !proxyutil.IsVIPMode(ing) {
+		if ing.IP == "" || !proxyutil.IsVIPMode(ing) && !proxyutil.IsRouterMode(ing) {
 			continue
 		}
 
 		ip := netutils.ParseIPSloppy(ing.IP) // (already verified as an IP-address)
 		if ingFamily := proxyutil.GetIPFamilyFromIP(ip); ingFamily == ipFamily {
 			info.loadBalancerVIPs = append(info.loadBalancerVIPs, ip)
+			if proxyutil.IsRouterMode(ing) {
+				if info.loadBalancerRouterIPs == nil {
+					info.loadBalancerRouterIPs = sets.New[string]()
+				}
+				info.loadBalancerRouterIPs.Insert(ip.String())
+			}
 		}
 	}
 
