@@ -43,6 +43,7 @@ import (
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/utils/ptr"
@@ -274,11 +275,42 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerResources(ctx context.
 // configureContainerSwapResources configures the swap resources for a specified (linux) container.
 // Swap is only configured if a swap cgroup controller is available.
 func (m *kubeGenericRuntimeManager) configureContainerSwapResources(ctx context.Context, lcr *runtimeapi.LinuxContainerResources, pod *v1.Pod, container *v1.Container) {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.WorkloadControlledSwap) {
+		// KEP-5359: the swap limit is a single number derived by effectiveSwapLimit,
+		// shared with the in-place resize path so creation and resize agree.
+		if !m.nodeSwapEnabled() {
+			// Warn only on container creation (when container points to the pod spec entry).
+			// The in-place resize path passes a synthetic container copy (see updatePodContainerResources).
+			explicit := false
+			if spec := kubecontainer.GetContainerSpec(pod, container.Name); spec != nil && spec == container {
+				explicit = cm.HasExplicitSwapLimit(pod, spec)
+			}
+			if explicit && m.recorder != nil {
+				m.recordContainerEvent(ctx, pod, container, "", v1.EventTypeWarning, events.SwapLimitNotEnforced,
+					"Container %s has a swap limit (resources.limits.swap on the container or the pod) but this node cannot enforce it (swapBehavior=%q, cgroup v2: %t, swap controller: %t)",
+					container.Name, m.memorySwapBehavior, isCgroup2UnifiedMode(), m.getSwapControllerAvailable())
+			}
+			if m.getSwapControllerAvailable() {
+				swapConfigurationHelper := newSwapConfigurationHelper(*m.machineInfo, m.getSwapControllerAvailable)
+				swapConfigurationHelper.ConfigureNoSwap(ctx, lcr)
+			}
+			return
+		}
+		if spec := kubecontainer.GetContainerSpec(pod, container.Name); spec != nil && spec == container {
+			// Container creation only, as above.
+			m.warnSwapLimitAbovePodLimit(ctx, pod, container)
+		}
+		swapConfigurationHelper := newSwapConfigurationHelper(*m.machineInfo, m.getSwapControllerAvailable)
+		swapConfigurationHelper.configureSwap(ctx, lcr, formatSwapLimit(m.effectiveSwapLimit(pod, container)))
+		return
+	}
+
 	if !m.getSwapControllerAvailable() {
 		return
 	}
 
 	swapConfigurationHelper := newSwapConfigurationHelper(*m.machineInfo, m.getSwapControllerAvailable)
+
 	// NOTE(ehashman): Behavior is defined in the opencontainers runtime spec:
 	// https://github.com/opencontainers/runtime-spec/blob/1c3f411f041711bbeecf35ff7e93461ea6789220/config-linux.md#memory
 	switch m.GetContainerSwapBehavior(pod, container) {
@@ -291,9 +323,124 @@ func (m *kubeGenericRuntimeManager) configureContainerSwapResources(ctx context.
 	}
 }
 
+// nodeSwapEnabled reports whether this kubelet can configure swap at all.
+func (m *kubeGenericRuntimeManager) nodeSwapEnabled() bool {
+	if !cm.IsSwapBehaviorEnabled(m.memorySwapBehavior) {
+		return false
+	}
+	if !m.getSwapControllerAvailable() {
+		return false
+	}
+	return isCgroup2UnifiedMode()
+}
+
+// limitedSwapPodLimit returns the swap limit that LimitedSwap puts on the pod
+// cgroup of a pod with pod-level resources (see cm.ApplyPodLevelSwapConfig),
+// and whether one applies. A pod-level limits.swap replaces it.
+func (m *kubeGenericRuntimeManager) limitedSwapPodLimit(pod *v1.Pod) (int64, bool) {
+	if !m.workloadSwapLimitsEnabled() || types.SwapBehavior(m.memorySwapBehavior) != types.LimitedSwap {
+		return 0, false
+	}
+	if !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodLevelResources) || !resourcehelper.IsPodLevelResourcesSet(pod) || cm.HasExplicitSwapLimit(pod, nil) {
+		return 0, false
+	}
+	eligible, podMemoryRequest := cm.IsPodEligibleForSwap(pod)
+	if !eligible {
+		return 0, true
+	}
+	limit, err := cm.CalcSwapForBurstablePods(podMemoryRequest, int64(m.machineInfo.MemoryCapacity), int64(m.machineInfo.SwapCapacity))
+	if err != nil {
+		return 0, true
+	}
+	return limit, true
+}
+
+// warnSwapLimitAbovePodLimit emits SwapLimitNotEnforced when container declares
+// a limits.swap above the swap limit LimitedSwap put on its pod cgroup. The
+// pod cgroup caps the container, so the declared limit is not fully available
+// until the pod sets its own limits.swap.
+func (m *kubeGenericRuntimeManager) warnSwapLimitAbovePodLimit(ctx context.Context, pod *v1.Pod, container *v1.Container) {
+	declared, ok := container.Resources.Limits[v1.ResourceSwap]
+	if !ok || m.recorder == nil {
+		return
+	}
+	podLimit, capped := m.limitedSwapPodLimit(pod)
+	if !capped || declared.Value() <= podLimit {
+		return
+	}
+	m.recordContainerEvent(ctx, pod, container, "", v1.EventTypeWarning, events.SwapLimitNotEnforced,
+		"Container %s resources.limits.swap (%s) exceeds the pod swap limit (%s) that LimitedSwap calculates for a pod with pod-level resources; set resources.limits.swap on the pod to raise it",
+		container.Name, declared.String(), resource.NewQuantity(podLimit, resource.BinarySI).String())
+}
+
+// swapLimitMax is the effectiveSwapLimit of a container whose memory.swap.max
+// is "max": LimitedSwap leaves a container without a memory request unbounded
+// when pod-level resources are set, and the pod cgroup caps its swap.
+const swapLimitMax = int64(math.MaxInt64)
+
+func formatSwapLimit(limit int64) string {
+	if limit == swapLimitMax {
+		return cm.Cgroup2MaxSwapLimit
+	}
+	return strconv.FormatInt(limit, 10)
+}
+
+// effectiveSwapLimit returns the memory.swap.max value (bytes) the kubelet
+// intends for container. It is evaluated against whatever resources are on the
+// given pod/container, so the resize path can call it with actuated copies as
+// well as the desired spec. It returns 0 when the node cannot enforce swap
+// (see nodeSwapEnabled).
+//
+// Precedence (KEP-5359 "workload swap wins"):
+//  1. container resources.limits.swap
+//  2. pod resources.limits.swap (PodLevelResources)
+//  3. node mode default: the LimitedSwap value (proportional to the memory
+//     request, or swapLimitMax), otherwise 0
+func (m *kubeGenericRuntimeManager) effectiveSwapLimit(pod *v1.Pod, container *v1.Container) int64 {
+	if !m.nodeSwapEnabled() {
+		return 0
+	}
+	if q, ok := container.Resources.Limits[v1.ResourceSwap]; ok {
+		return q.Value()
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodLevelResources) {
+		if limit, ok := cm.PodSwapLimit(pod); ok {
+			return limit
+		}
+	}
+	// Same derivation as ConfigureLimitedSwap, which serves this case when the
+	// WorkloadControlledSwap gate is off.
+	if types.SwapBehavior(m.memorySwapBehavior) != types.LimitedSwap || !cm.IsContainerEligibleForSwap(pod, container) {
+		return 0
+	}
+	memoryRequest := container.Resources.Requests.Memory()
+	if memoryRequest.IsZero() {
+		return swapLimitMax
+	}
+	limit, err := cm.CalcSwapForBurstablePods(memoryRequest.Value(), int64(m.machineInfo.MemoryCapacity), int64(m.machineInfo.SwapCapacity))
+	if err != nil {
+		return 0
+	}
+	return limit
+}
+
 // GetContainerSwapBehavior checks what swap behavior should be configured for a container,
 // considering the requirements for enabling swap.
 func (m *kubeGenericRuntimeManager) GetContainerSwapBehavior(pod *v1.Pod, container *v1.Container) types.SwapBehavior {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.WorkloadControlledSwap) {
+		if !m.nodeSwapEnabled() {
+			return types.NoSwap
+		}
+		// A nil container asks about the node.
+		if container == nil {
+			return types.SwapBehavior(m.memorySwapBehavior)
+		}
+		if cm.HasExplicitSwapLimit(pod, container) {
+			return types.WorkloadControlledSwap
+		}
+		// Without a swap limit from the workload the node mode decides: the
+		// LimitedSwap rules below, and no swap on a WorkloadControlledSwap node.
+	}
 	if types.SwapBehavior(m.memorySwapBehavior) == types.LimitedSwap &&
 		m.getSwapControllerAvailable != nil &&
 		m.getSwapControllerAvailable() &&

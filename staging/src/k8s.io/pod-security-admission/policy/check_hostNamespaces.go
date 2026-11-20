@@ -17,6 +17,7 @@ limitations under the License.
 package policy
 
 import (
+	"fmt"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -25,13 +26,16 @@ import (
 )
 
 /*
-Sharing the host network, PID, and IPC namespaces must be disallowed.
+Sharing the host network, PID, IPC, and cgroup namespaces must be disallowed.
 
 **Restricted Fields:**
 
 spec.hostNetwork
 spec.hostPID
 spec.hostIPC
+spec.containers[*].hostCgroupNamespace
+spec.initContainers[*].hostCgroupNamespace
+spec.ephemeralContainers[*].hostCgroupNamespace
 
 **Allowed Values:** undefined, false
 */
@@ -68,6 +72,22 @@ func hostNamespaces_1_0(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec)
 
 	if podSpec.HostIPC {
 		hostNamespaces = append(hostNamespaces, "hostIPC=true")
+	}
+
+	// Checked in all versions, as the field did not exist before v1.38
+	// and older versions of the policy must not allow it either.
+	var hostCgroupNamespaceContainers []string
+	visitContainers(podSpec, func(container *corev1.Container) {
+		if container.HostCgroupNamespace != nil && *container.HostCgroupNamespace {
+			hostCgroupNamespaceContainers = append(hostCgroupNamespaceContainers, container.Name)
+		}
+	})
+	if len(hostCgroupNamespaceContainers) > 0 {
+		hostNamespaces = append(hostNamespaces, fmt.Sprintf(
+			"%s %s must not set hostCgroupNamespace=true",
+			pluralize("container", "containers", len(hostCgroupNamespaceContainers)),
+			joinQuote(hostCgroupNamespaceContainers),
+		))
 	}
 
 	if len(hostNamespaces) > 0 {

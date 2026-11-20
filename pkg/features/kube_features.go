@@ -151,6 +151,12 @@ const (
 	// Adds support for using ML-DSA signed certificate signing request data in the CertificateSigningRequest spec.request field.
 	CertificateSigningRequestMLDSA featuregate.Feature = "CertificateSigningRequestMLDSA"
 
+	// owner: @AkihiroSuda
+	// kep: https://kep.k8s.io/5714
+	//
+	// Enables specifying whether containers use the host cgroup namespace.
+	CgroupNamespacesSupport featuregate.Feature = "CgroupNamespacesSupport"
+
 	// owner: @Divya063 @chrishenzie
 	// kep: https://kep.k8s.io/5474
 	//
@@ -1293,6 +1299,12 @@ const (
 	// Enables support for graceful shutdown windows node.
 	WindowsGracefulNodeShutdown featuregate.Feature = "WindowsGracefulNodeShutdown"
 
+	// owner: @ajaysundark
+	// kep: https://kep.k8s.io/5359
+	//
+	// Enables explicit container-level and pod-level swap limit configuration via resources.limits.swap.
+	WorkloadControlledSwap featuregate.Feature = "WorkloadControlledSwap"
+
 	// owner: @PannagaRao
 	// kep: https://kep.k8s.io/6276
 	// alpha: v1.38
@@ -1390,6 +1402,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	CertificateSigningRequestMLDSA: {
 		{Version: version.MustParse("1.38"), Default: false, PreRelease: featuregate.Beta},
 		{Version: version.MustParse("1.38"), Default: true, PreRelease: featuregate.Beta, MinCompatibilityVersion: version.MustParse("1.38")},
+	},
+
+	CgroupNamespacesSupport: {
+		{Version: version.MustParse("1.38"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
 	CgroupOptions: {
@@ -2236,6 +2252,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.Beta},
 	},
 
+	WorkloadControlledSwap: {
+		{Version: version.MustParse("1.38"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	WorkloadWithDeployment: {
 		{Version: version.MustParse("1.38"), Default: false, PreRelease: featuregate.Alpha},
 	},
@@ -2520,6 +2540,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	CSIVolumeHealth: {},
 
 	CertificateSigningRequestMLDSA: {},
+
+	CgroupNamespacesSupport: {},
 
 	CgroupOptions: {},
 
@@ -2859,6 +2881,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	WindowsCPUAndMemoryAffinity: {},
 
 	WindowsGracefulNodeShutdown: {GracefulNodeShutdown},
+
+	WorkloadControlledSwap: {},
 
 	WorkloadWithDeployment: {GenericWorkload},
 

@@ -681,6 +681,9 @@ func (kl *Kubelet) EffectiveEphemeralVolumeLimit(pod *v1.Pod, volumeName string)
 // the container runtime to set parameters for launching a container.
 func (kl *Kubelet) GenerateRunContainerOptions(ctx context.Context, pod *v1.Pod, container *v1.Container, podIP string, podIPs []string, imageVolumes kubecontainer.ImageVolumes) (*kubecontainer.RunContainerOptions, func(), error) {
 	logger := klog.FromContext(ctx)
+	if err := kl.checkCgroupNamespaceSupport(pod, container); err != nil {
+		return nil, nil, err
+	}
 	supportsRRO := kl.runtimeClassSupportsRecursiveReadOnlyMounts(logger, pod)
 
 	opts, err := kl.containerManager.GetResources(ctx, pod, container)
@@ -2250,7 +2253,13 @@ func (kl *Kubelet) unallocatedContainerStatuses(allocatedPod *v1.Pod) []v1.Conta
 	return statuses
 }
 
-func getEffectiveAllocatedResources(allocatedPod *v1.Pod) *v1.ResourceRequirements {
+func (kl *Kubelet) isSwapLimitEnforced(pod *v1.Pod) bool {
+	return utilfeature.DefaultFeatureGate.Enabled(features.WorkloadControlledSwap) &&
+		kl.containerRuntime != nil &&
+		kl.containerRuntime.GetContainerSwapBehavior(pod, nil) != kubetypes.NoSwap
+}
+
+func (kl *Kubelet) getEffectiveAllocatedResources(allocatedPod *v1.Pod) *v1.ResourceRequirements {
 	allocatedResources := allocatedPod.Spec.Resources.DeepCopy()
 	if allocatedResources == nil {
 		allocatedResources = &v1.ResourceRequirements{}
@@ -2261,6 +2270,14 @@ func getEffectiveAllocatedResources(allocatedPod *v1.Pod) *v1.ResourceRequiremen
 	}
 	allocatedResources.Requests = resourcehelper.PodRequests(allocatedPod, opts)
 	allocatedResources.Limits = resourcehelper.PodLimits(allocatedPod, opts)
+	if kl.isSwapLimitEnforced(allocatedPod) && allocatedPod.Spec.Resources != nil {
+		if swapLimit, ok := allocatedPod.Spec.Resources.Limits[v1.ResourceSwap]; ok {
+			if allocatedResources.Limits == nil {
+				allocatedResources.Limits = make(v1.ResourceList)
+			}
+			allocatedResources.Limits[v1.ResourceSwap] = swapLimit
+		}
+	}
 	return allocatedResources
 }
 
@@ -2275,7 +2292,7 @@ func getEffectiveAllocatedResources(allocatedPod *v1.Pod) *v1.ResourceRequiremen
 // convertToAPIContainerStatuses does for non-running containers.
 func (kl *Kubelet) convertToAPIPodLevelResourcesStatus(logger klog.Logger, allocatedPod *v1.Pod, oldPodStatus v1.PodStatus, phase v1.PodPhase) *v1.ResourceRequirements {
 	if resizable, _, _ := allocation.IsInPlacePodLevelResourcesVerticalScalingAllowed(allocatedPod); !resizable || phase != v1.PodRunning {
-		return getEffectiveAllocatedResources(allocatedPod)
+		return kl.getEffectiveAllocatedResources(allocatedPod)
 	}
 
 	// TODO(ndixita): Revisit the decision to output cgroup values in Pod Status.
@@ -2289,13 +2306,13 @@ func (kl *Kubelet) convertToAPIPodLevelResourcesStatus(logger klog.Logger, alloc
 			// Teardown removed the pod cgroup while the pod was still
 			// running: report the effective allocated resources instead of
 			// cgroup readback values.
-			return getEffectiveAllocatedResources(allocatedPod)
+			return kl.getEffectiveAllocatedResources(allocatedPod)
 		}
 	}
 	cpuConfig, err := pcm.GetPodCgroupConfig(allocatedPod, v1.ResourceCPU)
 	if err != nil {
 		if logPodCgroupReadError(logger, err, "failed to read cpu cgroup config for the pod", allocatedPod) {
-			return getEffectiveAllocatedResources(allocatedPod)
+			return kl.getEffectiveAllocatedResources(allocatedPod)
 		}
 	}
 
@@ -2311,7 +2328,7 @@ func (kl *Kubelet) convertToAPIPodLevelResourcesStatus(logger klog.Logger, alloc
 		}
 	}
 
-	resources := getEffectiveAllocatedResources(allocatedPod)
+	resources := kl.getEffectiveAllocatedResources(allocatedPod)
 
 	if oldPodStatus.Resources == nil {
 		oldPodStatus.Resources = &v1.ResourceRequirements{}
@@ -2357,6 +2374,23 @@ func (kl *Kubelet) convertToAPIPodLevelResourcesStatus(logger klog.Logger, alloc
 		resources.Limits[v1.ResourceMemory] = memoryLimit.DeepCopy()
 	} else {
 		preserveOldResourcesValue(v1.ResourceMemory, oldPodStatus.Resources.Limits, resources.Limits)
+	}
+
+	// KEP-5359: pod-level swap limit, read back from the pod cgroup's
+	// memory.swap.max. "max" means no limit has been actuated yet (for example
+	// a deferred resize that adds one), so status omits it rather than report
+	// the allocated value.
+	if _, declared := resources.Limits[v1.ResourceSwap]; declared {
+		if !kl.isSwapLimitEnforced(allocatedPod) {
+			delete(resources.Limits, v1.ResourceSwap)
+		} else if swapConfig, err := pcm.GetPodCgroupConfig(allocatedPod, v1.ResourceSwap); err != nil {
+			logger.V(4).Info("failed to read swap cgroup config for the pod", "podName", allocatedPod.Name, "err", err)
+			preserveOldResourcesValue(v1.ResourceSwap, oldPodStatus.Resources.Limits, resources.Limits)
+		} else if swapLimit, ok := cm.SwapLimitFromConfig(swapConfig); ok {
+			resources.Limits[v1.ResourceSwap] = *apiresource.NewQuantity(swapLimit, apiresource.BinarySI)
+		} else {
+			delete(resources.Limits, v1.ResourceSwap)
+		}
 	}
 
 	return resources
@@ -2574,7 +2608,11 @@ func (kl *Kubelet) convertToAPIContainerStatuses(ctx context.Context, pod *v1.Po
 
 		if cStatus.State != kubecontainer.ContainerStateRunning {
 			// If the container isn't running, just use the allocated resources.
-			return allocatedContainer.Resources.DeepCopy()
+			resources := allocatedContainer.Resources.DeepCopy()
+			if !kl.isSwapLimitEnforced(pod) {
+				delete(resources.Limits, v1.ResourceSwap)
+			}
+			return resources
 		}
 		if oldStatus.Resources == nil {
 			oldStatus.Resources = &v1.ResourceRequirements{}
@@ -2622,6 +2660,23 @@ func (kl *Kubelet) convertToAPIContainerStatuses(ctx context.Context, pod *v1.Po
 				resources.Limits[v1.ResourceMemory] = cStatus.Resources.MemoryLimit.DeepCopy()
 			} else {
 				preserveOldResourcesValue(v1.ResourceMemory, oldStatus.Resources.Limits, resources.Limits)
+			}
+			// KEP-5359: report the actuated swap limit only for containers that
+			// declared one and when swap is enforced on the node. Kubelet-derived
+			// values (pod-level inheritance, LimitedSwap) stay out of status until
+			// the API shape is settled.
+			if _, declared := resources.Limits[v1.ResourceSwap]; declared {
+				// Swap has no dedicated CRI status field, so runtimes are not
+				// required to echo memory.swap.max back. Report the value the
+				// kubelet last applied successfully, and nothing until then.
+				delete(resources.Limits, v1.ResourceSwap)
+				if kl.isSwapLimitEnforced(pod) {
+					if actuated, found := kl.actuatedState.GetContainerResources(pod.UID, cName); found {
+						if q, ok := actuated.Limits[v1.ResourceSwap]; ok {
+							resources.Limits[v1.ResourceSwap] = q
+						}
+					}
+				}
 			}
 		}
 
@@ -3088,6 +3143,38 @@ func runtimeHandlerSupportsRecursiveReadOnlyMounts(logger klog.Logger, runtimeHa
 		}
 	}
 	logger.Error(nil, "Unknown runtime handler", "runtimeHandlerName", runtimeHandlerName)
+	return false
+}
+
+// checkCgroupNamespaceSupport returns an error if the container specifies hostCgroupNamespace
+// but the kubelet or the runtime handler cannot honor it, so that the field is not silently ignored.
+func (kl *Kubelet) checkCgroupNamespaceSupport(pod *v1.Pod, container *v1.Container) error {
+	if container.HostCgroupNamespace == nil {
+		return nil
+	}
+	if !utilfeature.DefaultFeatureGate.Enabled(features.CgroupNamespacesSupport) {
+		return fmt.Errorf("container %q specifies hostCgroupNamespace, but the %s feature gate is disabled on the kubelet", container.Name, features.CgroupNamespacesSupport)
+	}
+	var runtimeHandlerName string
+	if kl.runtimeClassManager != nil {
+		var err error
+		runtimeHandlerName, err = kl.runtimeClassManager.LookupRuntimeHandler(pod.Spec.RuntimeClassName)
+		if err != nil {
+			return fmt.Errorf("failed to look up the runtime handler: %w", err)
+		}
+	}
+	if !runtimeHandlerSupportsCgroupNamespaces(runtimeHandlerName, kl.runtimeState.runtimeHandlers()) {
+		return fmt.Errorf("container %q specifies hostCgroupNamespace, but the runtime handler %q does not support cgroup namespaces", container.Name, runtimeHandlerName)
+	}
+	return nil
+}
+
+func runtimeHandlerSupportsCgroupNamespaces(runtimeHandlerName string, runtimeHandlers []kubecontainer.RuntimeHandler) bool {
+	for _, h := range runtimeHandlers {
+		if h.Name == runtimeHandlerName {
+			return h.SupportsCgroupNamespaces
+		}
+	}
 	return false
 }
 

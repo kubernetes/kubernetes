@@ -120,6 +120,7 @@ status:
   phase: phaseValue
   runtimeHandlers:
   - features:
+      cgroupNamespaces: true
       recursiveReadOnlyMounts: true
       userNamespaces: true
     name: nameValue

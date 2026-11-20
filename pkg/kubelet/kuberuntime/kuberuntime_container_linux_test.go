@@ -37,6 +37,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -1333,10 +1334,11 @@ func TestGenerateLinuxContainerConfigNamespaces(t *testing.T) {
 	}
 
 	for _, tc := range []struct {
-		name   string
-		pod    *v1.Pod
-		target *kubecontainer.ContainerID
-		want   *runtimeapi.NamespaceOption
+		name             string
+		pod              *v1.Pod
+		target           *kubecontainer.ContainerID
+		want             *runtimeapi.NamespaceOption
+		cgroupnsDisabled bool
 	}{
 		{
 			"Default namespaces",
@@ -1351,6 +1353,7 @@ func TestGenerateLinuxContainerConfigNamespaces(t *testing.T) {
 			&runtimeapi.NamespaceOption{
 				Pid: runtimeapi.NamespaceMode_CONTAINER,
 			},
+			false,
 		},
 		{
 			"PID Namespace POD",
@@ -1366,6 +1369,7 @@ func TestGenerateLinuxContainerConfigNamespaces(t *testing.T) {
 			&runtimeapi.NamespaceOption{
 				Pid: runtimeapi.NamespaceMode_POD,
 			},
+			false,
 		},
 		{
 			"PID Namespace TARGET",
@@ -1381,9 +1385,58 @@ func TestGenerateLinuxContainerConfigNamespaces(t *testing.T) {
 				Pid:      runtimeapi.NamespaceMode_TARGET,
 				TargetId: "really-long-id-string",
 			},
+			false,
+		},
+		{
+			"Cgroup Namespace NODE",
+			&v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: "test", HostCgroupNamespace: new(true)},
+					},
+				},
+			},
+			nil,
+			&runtimeapi.NamespaceOption{
+				Pid:             runtimeapi.NamespaceMode_CONTAINER,
+				CgroupnsOptions: &runtimeapi.CgroupNamespace{Mode: runtimeapi.NamespaceMode_NODE},
+			},
+			false,
+		},
+		{
+			"Cgroup Namespace CONTAINER",
+			&v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: "test", HostCgroupNamespace: new(false)},
+					},
+				},
+			},
+			nil,
+			&runtimeapi.NamespaceOption{
+				Pid:             runtimeapi.NamespaceMode_CONTAINER,
+				CgroupnsOptions: &runtimeapi.CgroupNamespace{Mode: runtimeapi.NamespaceMode_CONTAINER},
+			},
+			false,
+		},
+		{
+			"Cgroup Namespace with the feature gate disabled",
+			&v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: "test", HostCgroupNamespace: new(true)},
+					},
+				},
+			},
+			nil,
+			&runtimeapi.NamespaceOption{
+				Pid: runtimeapi.NamespaceMode_CONTAINER,
+			},
+			true,
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CgroupNamespacesSupport, !tc.cgroupnsDisabled)
 			got, err := m.generateLinuxContainerConfig(tCtx, &tc.pod.Spec.Containers[0], tc.pod, nil, "", tc.target, false)
 			assert.NoError(t, err)
 			if !proto.Equal(tc.want, got.SecurityContext.NamespaceOptions) {
@@ -3728,4 +3781,125 @@ func TestContainerMemoryHighSkippedWithPodLevelResources(t *testing.T) {
 		_, ok := lcr.Unified[cm.Cgroup2MemoryHigh]
 		assert.False(t, ok, "memory.high should NOT be set when container memory req==limit, even if pod is Burstable")
 	})
+}
+func TestConfigureContainerSwapResourcesWorkloadControlled(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WorkloadControlledSwap, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, true)
+
+	_, _, m, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+	m.machineInfo.MemoryCapacity = 42949672960 // 40Gi
+	m.machineInfo.SwapCapacity = 5368709120    // 5Gi
+
+	t.Run("WorkloadControlledSwap mode enforces explicit container and pod swap limits", func(t *testing.T) {
+		setCgroupVersionDuringTest(cgroupV2)
+		m.getSwapControllerAvailable = func() bool { return true }
+		m.memorySwapBehavior = string(types.WorkloadControlledSwap)
+		fakeRecorder := record.NewFakeRecorder(10)
+		m.recorder = fakeRecorder
+
+		pod := &v1.Pod{
+			Spec: v1.PodSpec{
+				Resources: &v1.ResourceRequirements{
+					Limits: v1.ResourceList{v1.ResourceSwap: resource.MustParse("512Mi")},
+				},
+				Containers: []v1.Container{
+					{
+						Name: "c-explicit",
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("1Gi")},
+							Limits:   v1.ResourceList{v1.ResourceMemory: resource.MustParse("1Gi"), v1.ResourceSwap: resource.MustParse("256Mi")},
+						},
+					},
+					{
+						Name: "c-inherits-pod",
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("1Gi")},
+						},
+					},
+				},
+			},
+		}
+
+		res0 := m.generateLinuxContainerResources(tCtx, pod, &pod.Spec.Containers[0], false)
+		res1 := m.generateLinuxContainerResources(tCtx, pod, &pod.Spec.Containers[1], false)
+		assert.Equal(t, strconv.FormatInt(256*1024*1024, 10), res0.Unified[cm.Cgroup2MaxSwapFilename])
+		assert.Equal(t, strconv.FormatInt(512*1024*1024, 10), res1.Unified[cm.Cgroup2MaxSwapFilename])
+		assert.Empty(t, fakeRecorder.Events)
+	})
+
+	t.Run("NoSwap node emits SwapLimitNotEnforced on creation and suppresses on resize", func(t *testing.T) {
+		setCgroupVersionDuringTest(cgroupV2)
+		m.getSwapControllerAvailable = func() bool { return true }
+		m.memorySwapBehavior = string(types.NoSwap)
+		fakeRecorder := record.NewFakeRecorder(10)
+		m.recorder = kubecontainer.FilterEventRecorder(fakeRecorder)
+
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-pod",
+				Namespace: "default",
+				UID:       "12345",
+			},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name: "c-swap",
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("512Mi")},
+							Limits:   v1.ResourceList{v1.ResourceSwap: resource.MustParse("256Mi")},
+						},
+					},
+				},
+			},
+		}
+
+		// Container creation passes &pod.Spec.Containers[0] -> emits SwapLimitNotEnforced once.
+		resCreate := m.generateLinuxContainerResources(tCtx, pod, &pod.Spec.Containers[0], false)
+		assert.Equal(t, "0", resCreate.Unified[cm.Cgroup2MaxSwapFilename])
+		require.Len(t, fakeRecorder.Events, 1)
+		event := <-fakeRecorder.Events
+		assert.Contains(t, event, "SwapLimitNotEnforced")
+
+		// In-place resize passes a synthetic container copy -> must not emit duplicate SwapLimitNotEnforced.
+		syntheticContainer := pod.Spec.Containers[0]
+		resResize := m.generateLinuxContainerResources(tCtx, pod, &syntheticContainer, false)
+		assert.Equal(t, "0", resResize.Unified[cm.Cgroup2MaxSwapFilename])
+		assert.Empty(t, fakeRecorder.Events)
+	})
+}
+
+func TestValidateCgroupNamespaceMountMode(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		mode        *runtimeapi.NamespaceMode
+		mountMode   runtimeapi.CgroupMountMode
+		privileged  bool
+		expectedErr bool
+	}{
+		{name: "default", mountMode: runtimeapi.CgroupMountMode_CGROUP_MOUNT_MODE_READ_WRITE},
+		{name: "CONTAINER, READ_WRITE", mode: ptr.To(runtimeapi.NamespaceMode_CONTAINER), mountMode: runtimeapi.CgroupMountMode_CGROUP_MOUNT_MODE_READ_WRITE},
+		{name: "NODE, unspecified", mode: ptr.To(runtimeapi.NamespaceMode_NODE)},
+		{name: "NODE, READ_ONLY", mode: ptr.To(runtimeapi.NamespaceMode_NODE), mountMode: runtimeapi.CgroupMountMode_CGROUP_MOUNT_MODE_READ_ONLY},
+		{name: "NODE, READ_WRITE, privileged", mode: ptr.To(runtimeapi.NamespaceMode_NODE), mountMode: runtimeapi.CgroupMountMode_CGROUP_MOUNT_MODE_READ_WRITE, privileged: true},
+		{name: "NODE, READ_WRITE, non-privileged", mode: ptr.To(runtimeapi.NamespaceMode_NODE), mountMode: runtimeapi.CgroupMountMode_CGROUP_MOUNT_MODE_READ_WRITE, expectedErr: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			sc := &runtimeapi.LinuxContainerSecurityContext{
+				NamespaceOptions: &runtimeapi.NamespaceOption{},
+				CgroupMountMode:  tc.mountMode,
+				Privileged:       tc.privileged,
+			}
+			if tc.mode != nil {
+				sc.NamespaceOptions.CgroupnsOptions = &runtimeapi.CgroupNamespace{Mode: *tc.mode}
+			}
+			err := validateCgroupNamespaceMountMode("test", sc)
+			if tc.expectedErr {
+				assert.EqualError(t, err, `container "test" must be privileged to use a read-write cgroup mount with the host cgroup namespace`)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
 }

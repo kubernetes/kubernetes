@@ -1142,6 +1142,7 @@ func NewMainKubelet(ctx context.Context,
 	if utilfeature.DefaultFeatureGate.Enabled(features.NodeDeclaredFeatures) || utilfeature.DefaultFeatureGate.Enabled(features.SecurityProfileOCI) {
 		if status, err := klet.containerRuntime.Status(ctx); err == nil && status != nil {
 			klet.runtimeState.setRuntimeFeatures(status.Features)
+			klet.runtimeState.setRuntimeHandlers(status.Handlers)
 		} else if err != nil {
 			logger.V(4).Info("Unable to prefetch container runtime features", "err", err)
 		}
@@ -1732,6 +1733,11 @@ func (kl *Kubelet) ListPodCPUAndMemoryStats(ctx context.Context) ([]statsapi.Pod
 // PodCPUAndMemoryStats is delegated to StatsProvider
 func (kl *Kubelet) PodCPUAndMemoryStats(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus) (*statsapi.PodStats, error) {
 	return kl.StatsProvider.PodCPUAndMemoryStats(ctx, pod, podStatus)
+}
+
+// PodSwapStats is delegated to StatsProvider
+func (kl *Kubelet) PodSwapStats(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus) (*statsapi.PodStats, error) {
+	return kl.StatsProvider.PodSwapStats(ctx, pod, podStatus)
 }
 
 // ListPodStatsAndUpdateCPUNanoCoreUsage is delegated to StatsProvider, which implements stats.Provider interface

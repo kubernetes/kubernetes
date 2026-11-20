@@ -65,6 +65,14 @@ func (m *kubeGenericRuntimeManager) determineEffectiveSecurityContext(ctx contex
 		return nil, err
 	}
 	synthesized.NamespaceOptions = namespaceOptions
+	if utilfeature.DefaultFeatureGate.Enabled(features.CgroupNamespacesSupport) && container.HostCgroupNamespace != nil {
+		// Leaving CgroupnsOptions nil lets the runtime apply its default mode.
+		mode := runtimeapi.NamespaceMode_CONTAINER
+		if *container.HostCgroupNamespace {
+			mode = runtimeapi.NamespaceMode_NODE
+		}
+		synthesized.NamespaceOptions.CgroupnsOptions = &runtimeapi.CgroupNamespace{Mode: mode}
+	}
 	podSc := pod.Spec.SecurityContext
 	if podSc != nil {
 		if podSc.FSGroup != nil {
@@ -107,6 +115,10 @@ func (m *kubeGenericRuntimeManager) determineEffectiveSecurityContext(ctx contex
 		default:
 			return nil, fmt.Errorf("unsupported cgroup mount mode: %s", string(*effectiveSc.CgroupOptions.MountMode))
 		}
+	}
+
+	if err := validateCgroupNamespaceMountMode(container.Name, synthesized); err != nil {
+		return nil, err
 	}
 
 	return synthesized, nil
@@ -184,4 +196,15 @@ func convertToRuntimeCapabilities(opts *v1.Capabilities) *runtimeapi.Capability 
 	}
 
 	return capabilities
+}
+
+// validateCgroupNamespaceMountMode rejects a writable cgroup filesystem in the host cgroup namespace
+// for a non-privileged container, as it would expose the node's entire cgroup hierarchy as writable.
+func validateCgroupNamespaceMountMode(containerName string, sc *runtimeapi.LinuxContainerSecurityContext) error {
+	if sc.GetNamespaceOptions().GetCgroupnsOptions().GetMode() == runtimeapi.NamespaceMode_NODE &&
+		sc.GetCgroupMountMode() == runtimeapi.CgroupMountMode_CGROUP_MOUNT_MODE_READ_WRITE &&
+		!sc.GetPrivileged() {
+		return fmt.Errorf("container %q must be privileged to use a read-write cgroup mount with the host cgroup namespace", containerName)
+	}
+	return nil
 }

@@ -1,79 +1,64 @@
-# SIG cli maintainers Guide
-
-## Sustaining engineering tasks
-
-The following tasks need to be performed consistently as a part of maintaining the health
-of SIG cli.  We will be developing an oncall rotation for working on these tasks, where
-the oncall is responsible to doing each task daily.
-
-### Issue triage
-
-Routinely monitor the newly filed issues and triage them to make sure we identify regressions.
-
-[Kubectl repo](https://github.com/kubernetes/kubectl/issues)
-
-[Kubernetes repo](https://github.com/kubernetes/kubernetes/issues?utf8=%E2%9C%93&q=is%3Aissue%20is%3Aopen%20label%3Asig%2Fcli)
-
-Look for:
-
-- Requests for help
-  - Don't spend a lot of time on these, but answer and close them if it is easy  
-- Regressions and bugs
-  - Find the root cause
-  - Triage the severity
-  - Issues only occurring in old versions but not in new versions are less severe
-- Simple issues for new contributors
-  - Label these with "for-new-contributors"
-  - Give them a priority
-  - Make sure they are
-    - Small
-    - Well scoped
-    - In areas of code with minimal technical debt
-    - In areas of code with strong ownership already
-- Feature requests
-  - Do one of
-    - Close them with an explanation along the lines of "Don't have capacity right now, try reopening in 6 months"
-    - Label them with a "priority"
-
-### Test triage
-
-Monitor [test grid](https://testgrid.k8s.io/sig-cli-master)
-and make sure the tests are passing.
-
-If any tests are failing, debug them and send a fix.  Ask for help if you get stuck.
-
-### PR review
-
-Make sure PRs aren't getting stuck without attention.  If reviewers routinely don't respond
-to PRs within a few days, we should take those reviewers out of the list.
-
-Look through the PR list with [SIG cli](https://github.com/kubernetes/kubernetes/pulls?utf8=%E2%9C%93&q=is%3Apr%20is%3Aopen%20label%3Asig%2Fcli)
-
-## New contributor assistance
-
-- Look through issues labeled "for-new-contributors" that are assigned, and make sure they are active.
-  If they haven't had activity in a couple days, ping the assignee and ask if help is needed.
-- Identify issues for new contributors to pick up
-- Figure out a progression for new contributors to become reviewers
-
-## Per-release tasks
-
-### At the start of the dev cycle
-
-- Write planned features for each release
-  - Use the [template](../roadmap/template.md)
-
-### During code-freeze
-
-- Daily look at issues labeled with [sig/cli in the milestone](https://github.com/kubernetes/kubernetes/issues?utf8=%E2%9C%93&q=is%3Aissue%20is%3Aopen%20label%3Asig%2Fcli%20milestone%3Av1.9%20) and make sure they are owned and make progress
-  - **Note:** You will need to update the milestone in the link to the current milestone
-
-## Every 3-6 months tasks
-
-### (3 months) Report about SIG cli at the community meeting
-
-TODO: fill this in
-
-### (6 months) Setup a SIG cli face-to-face
-
-TODO: fill this in
+IyBTSUcgY2xpIG1haW50YWluZXJzIEd1aWRlCgojIyBTdXN0YWluaW5nIGVu
+Z2luZWVyaW5nIHRhc2tzCgpUaGUgZm9sbG93aW5nIHRhc2tzIG5lZWQgdG8g
+YmUgcGVyZm9ybWVkIGNvbnNpc3RlbnRseSBhcyBhIHBhcnQgb2YgbWFpbnRh
+aW5pbmcgdGhlIGhlYWx0aApvZiBTSUcgY2xpLiAgV2Ugd2lsbCBiZSBkZXZl
+bG9waW5nIGFuIG9uY2FsbCByb3RhdGlvbiBmb3Igd29ya2luZyBvbiB0aGVz
+ZSB0YXNrcywgd2hlcmUKdGhlIG9uY2FsbCBpcyByZXNwb25zaWJsZSB0byBk
+b2luZyBlYWNoIHRhc2sgZGFpbHkuCgojIyMgSXNzdWUgdHJpYWdlCgpSb3V0
+aW5lbHkgbW9uaXRvciB0aGUgbmV3bHkgZmlsZWQgaXNzdWVzIGFuZCB0cmlh
+Z2UgdGhlbSB0byBtYWtlIHN1cmUgd2UgaWRlbnRpZnkgcmVncmVzc2lvbnMu
+CgpbS3ViZWN0bCByZXBvXShodHRwczovL2dpdGh1Yi5jb20va3ViZXJuZXRl
+cy9rdWJlY3RsL2lzc3VlcykKCltLdWJlcm5ldGVzIHJlcG9dKGh0dHBzOi8v
+Z2l0aHViLmNvbS9rdWJlcm5ldGVzL2t1YmVybmV0ZXMvaXNzdWVzP3V0Zjg9
+JUUyJTlDJTkzJnE9aXMlM0Fpc3N1ZSUyMGlzJTNBb3BlbiUyMGxhYmVsJTNB
+c2lnJTJGY2xpKQoKTG9vayBmb3I6CgotIFJlcXVlc3RzIGZvciBoZWxwCiAg
+LSBEb24ndCBzcGVuZCBhIGxvdCBvZiB0aW1lIG9uIHRoZXNlLCBidXQgYW5z
+d2VyIGFuZCBjbG9zZSB0aGVtIGlmIGl0IGlzIGVhc3kgIAotIFJlZ3Jlc3Np
+b25zIGFuZCBidWdzCiAgLSBGaW5kIHRoZSByb290IGNhdXNlCiAgLSBUcmlh
+Z2UgdGhlIHNldmVyaXR5CiAgLSBJc3N1ZXMgb25seSBvY2N1cnJpbmcgaW4g
+b2xkIHZlcnNpb25zIGJ1dCBub3QgaW4gbmV3IHZlcnNpb25zIGFyZSBsZXNz
+IHNldmVyZQotIFNpbXBsZSBpc3N1ZXMgZm9yIG5ldyBjb250cmlidXRvcnMK
+ICAtIExhYmVsIHRoZXNlIHdpdGggImZvci1uZXctY29udHJpYnV0b3JzIgog
+IC0gR2l2ZSB0aGVtIGEgcHJpb3JpdHkKICAtIE1ha2Ugc3VyZSB0aGV5IGFy
+ZQogICAgLSBTbWFsbAogICAgLSBXZWxsIHNjb3BlZAogICAgLSBJbiBhcmVh
+cyBvZiBjb2RlIHdpdGggbWluaW1hbCB0ZWNobmljYWwgZGVidAogICAgLSBJ
+biBhcmVhcyBvZiBjb2RlIHdpdGggc3Ryb25nIG93bmVyc2hpcCBhbHJlYWR5
+Ci0gRmVhdHVyZSByZXF1ZXN0cwogIC0gRG8gb25lIG9mCiAgICAtIENsb3Nl
+IHRoZW0gd2l0aCBhbiBleHBsYW5hdGlvbiBhbG9uZyB0aGUgbGluZXMgb2Yg
+IkRvbid0IGhhdmUgY2FwYWNpdHkgcmlnaHQgbm93LCB0cnkgcmVvcGVuaW5n
+IGluIDYgbW9udGhzIgogICAgLSBMYWJlbCB0aGVtIHdpdGggYSAicHJpb3Jp
+dHkiCgojIyMgVGVzdCB0cmlhZ2UKCk1vbml0b3IgW3Rlc3QgZ3JpZF0oaHR0
+cHM6Ly90ZXN0Z3JpZC5rOHMuaW8vc2lnLWNsaS1tYXN0ZXIpCmFuZCBtYWtl
+IHN1cmUgdGhlIHRlc3RzIGFyZSBwYXNzaW5nLgoKSWYgYW55IHRlc3RzIGFy
+ZSBmYWlsaW5nLCBkZWJ1ZyB0aGVtIGFuZCBzZW5kIGEgZml4LiAgQXNrIGZv
+ciBoZWxwIGlmIHlvdSBnZXQgc3R1Y2suCgojIyMgUFIgcmV2aWV3CgpNYWtl
+IHN1cmUgUFJzIGFyZW4ndCBnZXR0aW5nIHN0dWNrIHdpdGhvdXQgYXR0ZW50
+aW9uLiAgSWYgcmV2aWV3ZXJzIHJvdXRpbmVseSBkb24ndCByZXNwb25kCnRv
+IFBScyB3aXRoaW4gYSBmZXcgZGF5cywgd2Ugc2hvdWxkIHRha2UgdGhvc2Ug
+cmV2aWV3ZXJzIG91dCBvZiB0aGUgbGlzdC4KCkxvb2sgdGhyb3VnaCB0aGUg
+UFIgbGlzdCB3aXRoIFtTSUcgY2xpXShodHRwczovL2dpdGh1Yi5jb20va3Vi
+ZXJuZXRlcy9rdWJlcm5ldGVzL3B1bGxzP3V0Zjg9JUUyJTlDJTkzJnE9aXMl
+M0FwciUyMGlzJTNBb3BlbiUyMGxhYmVsJTNBc2lnJTJGY2xpKQoKIyMgTmV3
+IGNvbnRyaWJ1dG9yIGFzc2lzdGFuY2UKCi0gTG9vayB0aHJvdWdoIGlzc3Vl
+cyBsYWJlbGVkICJmb3ItbmV3LWNvbnRyaWJ1dG9ycyIgdGhhdCBhcmUgYXNz
+aWduZWQsIGFuZCBtYWtlIHN1cmUgdGhleSBhcmUgYWN0aXZlLgogIElmIHRo
+ZXkgaGF2ZW4ndCBoYWQgYWN0aXZpdHkgaW4gYSBjb3VwbGUgZGF5cywgcGlu
+ZyB0aGUgYXNzaWduZWUgYW5kIGFzayBpZiBoZWxwIGlzIG5lZWRlZC4KLSBJ
+ZGVudGlmeSBpc3N1ZXMgZm9yIG5ldyBjb250cmlidXRvcnMgdG8gcGljayB1
+cAotIEZpZ3VyZSBvdXQgYSBwcm9ncmVzc2lvbiBmb3IgbmV3IGNvbnRyaWJ1
+dG9ycyB0byBiZWNvbWUgcmV2aWV3ZXJzCgojIyBQZXItcmVsZWFzZSB0YXNr
+cwoKIyMjIEF0IHRoZSBzdGFydCBvZiB0aGUgZGV2IGN5Y2xlCgotIFdyaXRl
+IHBsYW5uZWQgZmVhdHVyZXMgZm9yIGVhY2ggcmVsZWFzZQogIC0gVXNlIHRo
+ZSBbdGVtcGxhdGVdKC4uL3JvYWRtYXAvdGVtcGxhdGUubWQpCgojIyMgRHVy
+aW5nIGNvZGUtZnJlZXplCgotIERhaWx5IGxvb2sgYXQgaXNzdWVzIGxhYmVs
+ZWQgd2l0aCBbc2lnL2NsaSBpbiB0aGUgbWlsZXN0b25lXShodHRwczovL2dp
+dGh1Yi5jb20va3ViZXJuZXRlcy9rdWJlcm5ldGVzL2lzc3Vlcz91dGY4PSVF
+MiU5QyU5MyZxPWlzJTNBaXNzdWUlMjBpcyUzQW9wZW4lMjBsYWJlbCUzQXNp
+ZyUyRmNsaSUyMG1pbGVzdG9uZSUzQXYxLjklMjApIGFuZCBtYWtlIHN1cmUg
+dGhleSBhcmUgb3duZWQgYW5kIG1ha2UgcHJvZ3Jlc3MKICAtICoqTm90ZToq
+KiBZb3Ugd2lsbCBuZWVkIHRvIHVwZGF0ZSB0aGUgbWlsZXN0b25lIGluIHRo
+ZSBsaW5rIHRvIHRoZSBjdXJyZW50IG1pbGVzdG9uZQoKIyMgRXZlcnkgMy02
+IG1vbnRocyB0YXNrcwoKIyMjICgzIG1vbnRocykgUmVwb3J0IGFib3V0IFNJ
+RyBjbGkgYXQgdGhlIGNvbW11bml0eSBtZWV0aW5nCgpUT0RPOiBmaWxsIHRo
+aXMgaW4KCiMjIyAoNiBtb250aHMpIFNldHVwIGEgU0lHIGNsaSBmYWNlLXRv
+LWZhY2UKClRPRE86IGZpbGwgdGhpcyBpbgo=

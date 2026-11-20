@@ -212,6 +212,9 @@ func (p *cadvisorStatsProvider) PodCPUAndMemoryStats(ctx context.Context, pod *v
 			cpu, memory := cadvisorInfoToCPUandMemoryStats(&info)
 			podStats.CPU = cpu
 			podStats.Memory = memory
+			if utilfeature.DefaultFeatureGate.Enabled(features.WorkloadControlledSwap) {
+				podStats.Swap = cadvisorInfoToSwapStats(&info)
+			}
 		} else {
 			containerName := kubetypes.GetContainerName(info.Spec.Labels)
 			if containerName != kubetypes.PodInfraContainerName && containerName != "" {
@@ -221,6 +224,11 @@ func (p *cadvisorStatsProvider) PodCPUAndMemoryStats(ctx context.Context, pod *v
 	}
 
 	return podStats, nil
+}
+
+// PodSwapStats returns swap usage for the pod and its containers.
+func (p *cadvisorStatsProvider) PodSwapStats(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus) (*statsapi.PodStats, error) {
+	return p.PodCPUAndMemoryStats(ctx, pod, podStatus)
 }
 
 // ListPodCPUAndMemoryStats returns the cpu and memory stats of all the pod-managed containers.

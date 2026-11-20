@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"hash/fnv"
+	"maps"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -248,14 +249,17 @@ func toKubeRuntimeStatus(status *runtimeapi.RuntimeStatus, handlers []*runtimeap
 	for i, h := range handlers {
 		supportsRRO := false
 		supportsUserns := false
+		supportsCgroupns := false
 		if h.Features != nil {
 			supportsRRO = h.Features.RecursiveReadOnlyMounts
 			supportsUserns = h.Features.UserNamespaces
+			supportsCgroupns = h.Features.CgroupNamespaces
 		}
 		retHandlers[i] = kubecontainer.RuntimeHandler{
 			Name:                            h.Name,
 			SupportsRecursiveReadOnlyMounts: supportsRRO,
 			SupportsUserNamespaces:          supportsUserns,
+			SupportsCgroupNamespaces:        supportsCgroupns,
 		}
 	}
 	var retFeatures *kubecontainer.RuntimeFeatures
@@ -455,12 +459,12 @@ func mergeResourceConfig(source, update *cm.ResourceConfig) *cm.ResourceConfig {
 	}
 
 	if update.Unified != nil {
-		if merged.Unified == nil {
-			merged.Unified = make(map[string]string)
-		}
-		for k, v := range update.Unified {
-			merged.Unified[k] = v
-		}
+		// Copy rather than write through: merged shares source's map, and the
+		// resize path keeps source around as the rollback target.
+		unified := make(map[string]string, len(merged.Unified)+len(update.Unified))
+		maps.Copy(unified, merged.Unified)
+		maps.Copy(unified, update.Unified)
+		merged.Unified = unified
 	}
 
 	return &merged

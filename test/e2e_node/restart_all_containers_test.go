@@ -239,6 +239,11 @@ var _ = SIGDescribe("RestartAllContainersWithKubeletRestarts",
 				return fmt.Errorf("pod cleanup not finished")
 			}, 2*time.Minute, 1*time.Second).Should(gomega.Succeed())
 
+			// The condition turns False just before the kubelet starts the init container
+			// again. Stopping the kubelet during that StartContainer call fails the pod.
+			ginkgo.By("waiting for init container to run again")
+			framework.ExpectNoError(e2epod.WaitForContainerRunning(ctx, f.ClientSet, f.Namespace.Name, podName, "init", time.Minute))
+
 			ginkgo.By("restarting kubelet")
 			restartKubelet := mustStopKubelet(ctx, f)
 			restartKubelet(ctx)

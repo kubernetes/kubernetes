@@ -9023,6 +9023,19 @@ func TestValidateEphemeralContainers(t *testing.T) {
 		}},
 		field.ErrorList{{Type: field.ErrorTypeForbidden, Field: "ephemeralContainers[0].ports"}},
 	}, {
+		"Container uses disallowed field: HostCgroupNamespace",
+		line(),
+		[]core.EphemeralContainer{{
+			EphemeralContainerCommon: core.EphemeralContainerCommon{
+				Name:                     "debug",
+				Image:                    "image",
+				ImagePullPolicy:          "IfNotPresent",
+				TerminationMessagePolicy: "File",
+				HostCgroupNamespace:      new(true),
+			},
+		}},
+		field.ErrorList{{Type: field.ErrorTypeForbidden, Field: "ephemeralContainers[0].hostCgroupNamespace"}},
+	}, {
 		"Container uses disallowed field: ReadinessProbe",
 		line(),
 		[]core.EphemeralContainer{{
@@ -22577,7 +22590,7 @@ func TestValidatePodResourceNames(t *testing.T) {
 		{"kubernetes.io/will/not/work/", true},
 	}
 	for _, item := range table {
-		errs := validatePodResourceName(item.input, field.NewPath("field"))
+		errs := validatePodResourceName(item.input, field.NewPath("field"), PodValidationOptions{})
 		if len(errs) != 0 && !item.expectedFailure {
 			t.Errorf("expected no failure for input %q, got: %v", item.input, errs)
 		}
@@ -22585,6 +22598,23 @@ func TestValidatePodResourceNames(t *testing.T) {
 		if len(errs) == 0 && item.expectedFailure {
 			t.Errorf("expected failure for input %q", item.input)
 		}
+	}
+}
+
+func TestValidateResourceNameSwap(t *testing.T) {
+	fldPath := field.NewPath("field")
+	for _, allowed := range []bool{true, false} {
+		opts := PodValidationOptions{AllowWorkloadControlledSwap: allowed}
+		if errs := validateContainerResourceName(core.ResourceSwap, fldPath, opts); (len(errs) == 0) != allowed {
+			t.Errorf("validateContainerResourceName with AllowWorkloadControlledSwap=%v: got %v", allowed, errs)
+		}
+		if errs := validatePodResourceName(core.ResourceSwap, fldPath, opts); (len(errs) == 0) != allowed {
+			t.Errorf("validatePodResourceName with AllowWorkloadControlledSwap=%v: got %v", allowed, errs)
+		}
+	}
+	// Callers outside of a pod spec (LimitRange, HPA) must keep rejecting swap.
+	if errs := ValidateContainerResourceName(core.ResourceSwap, fldPath); len(errs) == 0 {
+		t.Errorf("expected ValidateContainerResourceName to reject swap")
 	}
 }
 
@@ -24712,6 +24742,7 @@ func TestValidateOSFields(t *testing.T) {
 	// - Add documentation to the os field in the api
 	// - Add validation logic validateLinux, validateWindows functions to make sure the field is only set for eligible OSes
 	osSpecificFields := sets.NewString(
+		"Containers[*].HostCgroupNamespace",
 		"Containers[*].SecurityContext.AppArmorProfile",
 		"Containers[*].SecurityContext.AllowPrivilegeEscalation",
 		"Containers[*].SecurityContext.CgroupOptions",
@@ -24724,6 +24755,7 @@ func TestValidateOSFields(t *testing.T) {
 		"Containers[*].SecurityContext.SELinuxOptions",
 		"Containers[*].SecurityContext.SeccompProfile",
 		"Containers[*].SecurityContext.WindowsOptions",
+		"InitContainers[*].HostCgroupNamespace",
 		"InitContainers[*].SecurityContext.AppArmorProfile",
 		"InitContainers[*].SecurityContext.AllowPrivilegeEscalation",
 		"InitContainers[*].SecurityContext.CgroupOptions",
@@ -24736,6 +24768,7 @@ func TestValidateOSFields(t *testing.T) {
 		"InitContainers[*].SecurityContext.SELinuxOptions",
 		"InitContainers[*].SecurityContext.SeccompProfile",
 		"InitContainers[*].SecurityContext.WindowsOptions",
+		"EphemeralContainers[*].EphemeralContainerCommon.HostCgroupNamespace",
 		"EphemeralContainers[*].EphemeralContainerCommon.SecurityContext.AppArmorProfile",
 		"EphemeralContainers[*].EphemeralContainerCommon.SecurityContext.AllowPrivilegeEscalation",
 		"EphemeralContainers[*].EphemeralContainerCommon.SecurityContext.CgroupOptions",
@@ -28243,6 +28276,43 @@ func TestValidateHostUsers(t *testing.T) {
 		opts: PodValidationOptions{
 			AllowUserNamespacesWithVolumeDevices: true,
 		},
+	}, {
+		name:    "hostUsers=false & hostCgroupNamespace=false",
+		success: true,
+		spec: &core.PodSpec{
+			HostUsers:  &falseVar,
+			Containers: []core.Container{{Name: "test-container", HostCgroupNamespace: &falseVar}},
+		},
+	}, {
+		name:    "hostUsers=true & hostCgroupNamespace=true",
+		success: true,
+		spec: &core.PodSpec{
+			HostUsers:  &trueVar,
+			Containers: []core.Container{{Name: "test-container", HostCgroupNamespace: &trueVar}},
+		},
+	}, {
+		name:    "hostUsers=false & container hostCgroupNamespace=true",
+		success: false,
+		spec: &core.PodSpec{
+			HostUsers:  &falseVar,
+			Containers: []core.Container{{Name: "test-container", HostCgroupNamespace: &trueVar}},
+		},
+	}, {
+		name:    "hostUsers=false & initContainer hostCgroupNamespace=true",
+		success: false,
+		spec: &core.PodSpec{
+			HostUsers:      &falseVar,
+			InitContainers: []core.Container{{Name: "test-container", HostCgroupNamespace: &trueVar}},
+		},
+	}, {
+		name:    "hostUsers=false & ephemeralContainer hostCgroupNamespace=true",
+		success: false,
+		spec: &core.PodSpec{
+			HostUsers: &falseVar,
+			EphemeralContainers: []core.EphemeralContainer{{
+				EphemeralContainerCommon: core.EphemeralContainerCommon{Name: "test-container", HostCgroupNamespace: &trueVar},
+			}},
+		},
 	},
 	}
 
@@ -28256,6 +28326,32 @@ func TestValidateHostUsers(t *testing.T) {
 			}
 			if tc.success && len(allErrs) != 0 {
 				t.Errorf("Unexpected error(s): %v", allErrs)
+			}
+		})
+	}
+}
+
+func TestValidateHostCgroupNamespaceOS(t *testing.T) {
+	fldPath := field.NewPath("spec")
+	for _, hostCgroupNamespace := range []bool{true, false} {
+		spec := &core.PodSpec{
+			InitContainers: []core.Container{{Name: "init", HostCgroupNamespace: new(hostCgroupNamespace)}},
+			Containers:     []core.Container{{Name: "ctr", HostCgroupNamespace: new(hostCgroupNamespace)}},
+			EphemeralContainers: []core.EphemeralContainer{{
+				EphemeralContainerCommon: core.EphemeralContainerCommon{Name: "eph", HostCgroupNamespace: new(hostCgroupNamespace)},
+			}},
+		}
+		t.Run(fmt.Sprintf("hostCgroupNamespace=%v", hostCgroupNamespace), func(t *testing.T) {
+			if errs := validateLinux(spec, fldPath); len(errs) != 0 {
+				t.Errorf("unexpected errors for a linux pod: %v", errs)
+			}
+			expected := field.ErrorList{
+				field.Forbidden(fldPath.Child("initContainers").Index(0).Child("hostCgroupNamespace"), "cannot be set for a windows pod"),
+				field.Forbidden(fldPath.Child("containers").Index(0).Child("hostCgroupNamespace"), "cannot be set for a windows pod"),
+				field.Forbidden(fldPath.Child("ephemeralContainers").Index(0).Child("hostCgroupNamespace"), "cannot be set for a windows pod"),
+			}
+			if errs := validateWindows(spec, fldPath); !reflect.DeepEqual(errs, expected) {
+				t.Errorf("unexpected errors for a windows pod: %v", cmp.Diff(expected, errs))
 			}
 		})
 	}
@@ -30128,6 +30224,7 @@ func TestValidatePodResize(t *testing.T) {
 		disableInitCtrResize              bool
 		enableMemoryBackedVolumesResize   bool
 		enableDRANodeAllocatableResources bool
+		disableWorkloadControlledSwap     bool
 		err                               string
 	}{
 		{
@@ -31652,6 +31749,170 @@ func TestValidatePodResize(t *testing.T) {
 				return p
 			}(),
 		},
+		// KEP-5359: swap is resizable when WorkloadControlledSwap is enabled.
+		{
+			test: "swap limit increase",
+			old: mkPod(
+				core.ResourceList{core.ResourceMemory: resource.MustParse("100Mi")},
+				core.ResourceList{core.ResourceMemory: resource.MustParse("200Mi"), core.ResourceSwap: resource.MustParse("100Mi")},
+			),
+			new: mkPod(
+				core.ResourceList{core.ResourceMemory: resource.MustParse("100Mi")},
+				core.ResourceList{core.ResourceMemory: resource.MustParse("200Mi"), core.ResourceSwap: resource.MustParse("300Mi")},
+			),
+			err: "",
+		},
+		{
+			test: "swap limit decrease to zero",
+			old: mkPod(
+				core.ResourceList{core.ResourceMemory: resource.MustParse("100Mi")},
+				core.ResourceList{core.ResourceMemory: resource.MustParse("200Mi"), core.ResourceSwap: resource.MustParse("100Mi")},
+			),
+			new: mkPod(
+				core.ResourceList{core.ResourceMemory: resource.MustParse("100Mi")},
+				core.ResourceList{core.ResourceMemory: resource.MustParse("200Mi"), core.ResourceSwap: resource.MustParse("0")},
+			),
+			err: "",
+		},
+		{
+			test: "swap limit added on resize",
+			old: mkPod(
+				core.ResourceList{core.ResourceMemory: resource.MustParse("100Mi")},
+				core.ResourceList{core.ResourceMemory: resource.MustParse("200Mi")},
+			),
+			new: mkPod(
+				core.ResourceList{core.ResourceMemory: resource.MustParse("100Mi")},
+				core.ResourceList{core.ResourceMemory: resource.MustParse("200Mi"), core.ResourceSwap: resource.MustParse("100Mi")},
+			),
+			err: "",
+		},
+		{
+			test: "swap limit removed on resize",
+			old: mkPod(
+				core.ResourceList{core.ResourceMemory: resource.MustParse("100Mi")},
+				core.ResourceList{core.ResourceMemory: resource.MustParse("200Mi"), core.ResourceSwap: resource.MustParse("100Mi")},
+			),
+			new: mkPod(
+				core.ResourceList{core.ResourceMemory: resource.MustParse("100Mi")},
+				core.ResourceList{core.ResourceMemory: resource.MustParse("200Mi")},
+			),
+			err: "resource limits cannot be removed",
+		},
+		{
+			test: "swap limit change rejected when WorkloadControlledSwap is disabled",
+			old: mkPod(
+				core.ResourceList{core.ResourceMemory: resource.MustParse("100Mi")},
+				core.ResourceList{core.ResourceMemory: resource.MustParse("200Mi"), core.ResourceSwap: resource.MustParse("100Mi")},
+			),
+			new: mkPod(
+				core.ResourceList{core.ResourceMemory: resource.MustParse("100Mi")},
+				core.ResourceList{core.ResourceMemory: resource.MustParse("200Mi"), core.ResourceSwap: resource.MustParse("300Mi")},
+			),
+			disableWorkloadControlledSwap: true,
+			err:                           "must be a standard resource for containers",
+		},
+		{
+			test: "pod-level swap limit resize",
+			old: mkPod(
+				core.ResourceList{core.ResourceMemory: resource.MustParse("100Mi")},
+				core.ResourceList{core.ResourceMemory: resource.MustParse("200Mi")},
+				podtest.SetPodResources(&core.ResourceRequirements{Limits: core.ResourceList{core.ResourceMemory: resource.MustParse("400Mi"), core.ResourceSwap: resource.MustParse("100Mi")}}),
+			),
+			new: mkPod(
+				core.ResourceList{core.ResourceMemory: resource.MustParse("100Mi")},
+				core.ResourceList{core.ResourceMemory: resource.MustParse("200Mi")},
+				podtest.SetPodResources(&core.ResourceRequirements{Limits: core.ResourceList{core.ResourceMemory: resource.MustParse("400Mi"), core.ResourceSwap: resource.MustParse("200Mi")}}),
+			),
+			err: "",
+		},
+		{
+			test: "container swap limit may not exceed pod swap limit after resize",
+			old: mkPod(
+				core.ResourceList{core.ResourceMemory: resource.MustParse("100Mi")},
+				core.ResourceList{core.ResourceMemory: resource.MustParse("200Mi"), core.ResourceSwap: resource.MustParse("100Mi")},
+				podtest.SetPodResources(&core.ResourceRequirements{Limits: core.ResourceList{core.ResourceMemory: resource.MustParse("400Mi"), core.ResourceSwap: resource.MustParse("200Mi")}}),
+			),
+			new: mkPod(
+				core.ResourceList{core.ResourceMemory: resource.MustParse("100Mi")},
+				core.ResourceList{core.ResourceMemory: resource.MustParse("200Mi"), core.ResourceSwap: resource.MustParse("300Mi")},
+				podtest.SetPodResources(&core.ResourceRequirements{Limits: core.ResourceList{core.ResourceMemory: resource.MustParse("400Mi"), core.ResourceSwap: resource.MustParse("200Mi")}}),
+			),
+			err: "must be less than or equal to pod limits",
+		},
+		{
+			test: "sidecar initContainer swap limit resize",
+			old: mkPod(
+				core.ResourceList{core.ResourceMemory: resource.MustParse("100Mi")},
+				core.ResourceList{core.ResourceMemory: resource.MustParse("200Mi")},
+				func(pod *core.Pod) {
+					pod.Spec.InitContainers = []core.Container{
+						podtest.MakeContainer("sidecar",
+							podtest.SetContainerRestartPolicy(core.ContainerRestartPolicyAlways),
+							podtest.SetContainerResources(core.ResourceRequirements{
+								Requests: core.ResourceList{core.ResourceMemory: resource.MustParse("100Mi")},
+								Limits:   core.ResourceList{core.ResourceMemory: resource.MustParse("200Mi"), core.ResourceSwap: resource.MustParse("64Mi")},
+							}),
+						),
+					}
+				},
+			),
+			new: mkPod(
+				core.ResourceList{core.ResourceMemory: resource.MustParse("100Mi")},
+				core.ResourceList{core.ResourceMemory: resource.MustParse("200Mi")},
+				func(pod *core.Pod) {
+					pod.Spec.InitContainers = []core.Container{
+						podtest.MakeContainer("sidecar",
+							podtest.SetContainerRestartPolicy(core.ContainerRestartPolicyAlways),
+							podtest.SetContainerResources(core.ResourceRequirements{
+								Requests: core.ResourceList{core.ResourceMemory: resource.MustParse("100Mi")},
+								Limits:   core.ResourceList{core.ResourceMemory: resource.MustParse("200Mi"), core.ResourceSwap: resource.MustParse("128Mi")},
+							}),
+						),
+					}
+				},
+			),
+			err: "",
+		},
+		{
+			test: "pod-level swap limit added on resize",
+			old: mkPod(
+				core.ResourceList{core.ResourceMemory: resource.MustParse("100Mi")},
+				core.ResourceList{core.ResourceMemory: resource.MustParse("200Mi")},
+				podtest.SetPodResources(&core.ResourceRequirements{Limits: core.ResourceList{core.ResourceMemory: resource.MustParse("400Mi")}}),
+			),
+			new: mkPod(
+				core.ResourceList{core.ResourceMemory: resource.MustParse("100Mi")},
+				core.ResourceList{core.ResourceMemory: resource.MustParse("200Mi")},
+				podtest.SetPodResources(&core.ResourceRequirements{Limits: core.ResourceList{core.ResourceMemory: resource.MustParse("400Mi"), core.ResourceSwap: resource.MustParse("200Mi")}}),
+			),
+			err: "",
+		},
+		{
+			test: "pod-level swap limit cannot be removed on resize",
+			old: mkPod(
+				core.ResourceList{core.ResourceMemory: resource.MustParse("100Mi")},
+				core.ResourceList{core.ResourceMemory: resource.MustParse("200Mi")},
+				podtest.SetPodResources(&core.ResourceRequirements{Limits: core.ResourceList{core.ResourceMemory: resource.MustParse("400Mi"), core.ResourceSwap: resource.MustParse("200Mi")}}),
+			),
+			new: mkPod(
+				core.ResourceList{core.ResourceMemory: resource.MustParse("100Mi")},
+				core.ResourceList{core.ResourceMemory: resource.MustParse("200Mi")},
+				podtest.SetPodResources(&core.ResourceRequirements{Limits: core.ResourceList{core.ResourceMemory: resource.MustParse("400Mi")}}),
+			),
+			err: "resource limits cannot be removed",
+		},
+		{
+			test: "swap request added on resize rejected",
+			old: mkPod(
+				core.ResourceList{core.ResourceMemory: resource.MustParse("100Mi")},
+				core.ResourceList{core.ResourceMemory: resource.MustParse("200Mi")},
+			),
+			new: mkPod(
+				core.ResourceList{core.ResourceMemory: resource.MustParse("100Mi"), core.ResourceSwap: resource.MustParse("100Mi")},
+				core.ResourceList{core.ResourceMemory: resource.MustParse("200Mi")},
+			),
+			err: "swap may only be specified in limits, not requests",
+		},
 		// TODO(#141166): An unchanged stored value must pass on update. Expect no error.
 		{
 			test: "cpu resize next to an unchanged fractional extended resource",
@@ -31679,6 +31940,10 @@ func TestValidatePodResize(t *testing.T) {
 			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, true)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRANodeAllocatableResources, test.enableDRANodeAllocatableResources)
+			if !test.disableInitCtrResize {
+				// WorkloadControlledSwap does not exist in the emulated 1.36 gate set.
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WorkloadControlledSwap, !test.disableWorkloadControlledSwap)
+			}
 
 			test.new.ObjectMeta.ResourceVersion = "1"
 			test.old.ObjectMeta.ResourceVersion = "1"
@@ -31710,6 +31975,7 @@ func TestValidatePodResize(t *testing.T) {
 				PodLevelResourcesEnabled:                            true,
 				InPlacePodVerticalScalingMemoryBackedVolumesEnabled: test.enableMemoryBackedVolumesResize,
 				AllowInitContainerLimitsExceedingPodLimits:          hasInitContainerLimitsExceedingPodLimits(&test.old.Spec),
+				AllowWorkloadControlledSwap:                         !test.disableWorkloadControlledSwap,
 			})
 
 			if test.err == "" {
@@ -34415,5 +34681,315 @@ func TestValidatePodDynamicUpdateDRACoverage(t *testing.T) {
 	errs := ValidatePodDynamicUpdate(exceeds, oldPod, opts)
 	if want := "insufficient to cover the aggregated container and node-allocatable DRA requests"; !strings.Contains(errs.ToAggregate().Error(), want) {
 		t.Errorf("expected error containing %q, got: %v", want, errs)
+	}
+}
+
+func TestValidateSwapResourceRequirements(t *testing.T) {
+	gracePeriod := int64(30)
+	basePodSpec := func() core.PodSpec {
+		return core.PodSpec{
+			TerminationGracePeriodSeconds: &gracePeriod,
+			RestartPolicy:                 core.RestartPolicyAlways,
+			DNSPolicy:                     core.DNSClusterFirst,
+			Containers: []core.Container{
+				{
+					Name:                     "c1",
+					Image:                    "pause",
+					ImagePullPolicy:          core.PullIfNotPresent,
+					TerminationMessagePolicy: core.TerminationMessageReadFile,
+				},
+			},
+		}
+	}
+
+	testCases := []struct {
+		name        string
+		mutate      func(spec *core.PodSpec)
+		opts        PodValidationOptions
+		wantErr     bool
+		errContains string
+	}{
+		{
+			name: "container swap limit allowed when AllowWorkloadControlledSwap is true",
+			mutate: func(spec *core.PodSpec) {
+				spec.Containers[0].Resources.Limits = core.ResourceList{
+					core.ResourceSwap: resource.MustParse("1Gi"),
+				}
+			},
+			opts:    PodValidationOptions{AllowWorkloadControlledSwap: true},
+			wantErr: false,
+		},
+		{
+			name: "container swap limit rejected when AllowWorkloadControlledSwap is false",
+			mutate: func(spec *core.PodSpec) {
+				spec.Containers[0].Resources.Limits = core.ResourceList{
+					core.ResourceSwap: resource.MustParse("1Gi"),
+				}
+			},
+			opts:        PodValidationOptions{AllowWorkloadControlledSwap: false},
+			wantErr:     true,
+			errContains: "must be a standard resource",
+		},
+		{
+			name: "container swap request forbidden when AllowWorkloadControlledSwap is true",
+			mutate: func(spec *core.PodSpec) {
+				spec.Containers[0].Resources.Requests = core.ResourceList{
+					core.ResourceSwap: resource.MustParse("1Gi"),
+				}
+			},
+			opts:        PodValidationOptions{AllowWorkloadControlledSwap: true},
+			wantErr:     true,
+			errContains: "swap may only be specified in limits, not requests",
+		},
+		{
+			name: "pod-level swap limit allowed when AllowWorkloadControlledSwap and PodLevelResourcesEnabled are true",
+			mutate: func(spec *core.PodSpec) {
+				spec.Resources = &core.ResourceRequirements{
+					Limits: core.ResourceList{
+						core.ResourceSwap: resource.MustParse("2Gi"),
+					},
+				}
+				spec.Containers[0].Resources.Limits = core.ResourceList{
+					core.ResourceSwap: resource.MustParse("1Gi"),
+				}
+			},
+			opts:    PodValidationOptions{AllowWorkloadControlledSwap: true, PodLevelResourcesEnabled: true},
+			wantErr: false,
+		},
+		{
+			name: "pod-level swap request forbidden when AllowWorkloadControlledSwap and PodLevelResourcesEnabled are true",
+			mutate: func(spec *core.PodSpec) {
+				spec.Resources = &core.ResourceRequirements{
+					Requests: core.ResourceList{
+						core.ResourceSwap: resource.MustParse("2Gi"),
+					},
+				}
+			},
+			opts:        PodValidationOptions{AllowWorkloadControlledSwap: true, PodLevelResourcesEnabled: true},
+			wantErr:     true,
+			errContains: "swap may only be specified in limits, not requests",
+		},
+		{
+			name: "container swap limit exceeding pod swap limit rejected",
+			mutate: func(spec *core.PodSpec) {
+				spec.Resources = &core.ResourceRequirements{
+					Limits: core.ResourceList{
+						core.ResourceSwap: resource.MustParse("1Gi"),
+					},
+				}
+				spec.Containers[0].Resources.Limits = core.ResourceList{
+					core.ResourceSwap: resource.MustParse("2Gi"),
+				}
+			},
+			opts:        PodValidationOptions{AllowWorkloadControlledSwap: true, PodLevelResourcesEnabled: true},
+			wantErr:     true,
+			errContains: "must be less than or equal to pod limits",
+		},
+		{
+			name: "initContainer swap limit exceeding pod swap limit rejected",
+			mutate: func(spec *core.PodSpec) {
+				spec.Resources = &core.ResourceRequirements{
+					Limits: core.ResourceList{
+						core.ResourceSwap: resource.MustParse("1Gi"),
+					},
+				}
+				spec.InitContainers = []core.Container{
+					{
+						Name:                     "init-1",
+						Image:                    "pause",
+						ImagePullPolicy:          core.PullIfNotPresent,
+						TerminationMessagePolicy: core.TerminationMessageReadFile,
+						Resources: core.ResourceRequirements{
+							Limits: core.ResourceList{
+								core.ResourceSwap: resource.MustParse("2Gi"),
+							},
+						},
+					},
+				}
+			},
+			opts:        PodValidationOptions{AllowWorkloadControlledSwap: true, PodLevelResourcesEnabled: true},
+			wantErr:     true,
+			errContains: "spec.initContainers[0].resources.limits[swap]: Invalid value: \"2Gi\": must be less than or equal to pod limits",
+		},
+		{
+			// Swap is checked even where older init container limits may exceed the pod-level ones.
+			name: "initContainer swap limit exceeding pod swap limit rejected when other init container limits may exceed pod limits",
+			mutate: func(spec *core.PodSpec) {
+				spec.Resources = &core.ResourceRequirements{
+					Limits: core.ResourceList{
+						core.ResourceSwap: resource.MustParse("1Gi"),
+					},
+				}
+				spec.InitContainers = []core.Container{
+					{
+						Name:                     "init-1",
+						Image:                    "pause",
+						ImagePullPolicy:          core.PullIfNotPresent,
+						TerminationMessagePolicy: core.TerminationMessageReadFile,
+						Resources: core.ResourceRequirements{
+							Limits: core.ResourceList{
+								core.ResourceSwap: resource.MustParse("2Gi"),
+							},
+						},
+					},
+				}
+			},
+			opts:        PodValidationOptions{AllowWorkloadControlledSwap: true, PodLevelResourcesEnabled: true, AllowInitContainerLimitsExceedingPodLimits: true},
+			wantErr:     true,
+			errContains: "spec.initContainers[0].resources.limits[swap]: Invalid value: \"2Gi\": must be less than or equal to pod limits",
+		},
+		{
+			name: "windows pod with container swap limit rejected",
+			mutate: func(spec *core.PodSpec) {
+				spec.OS = &core.PodOS{Name: core.Windows}
+				spec.Containers[0].Resources.Limits = core.ResourceList{
+					core.ResourceSwap: resource.MustParse("1Gi"),
+				}
+			},
+			opts:        PodValidationOptions{AllowWorkloadControlledSwap: true},
+			wantErr:     true,
+			errContains: "cannot be set for a windows pod",
+		},
+		{
+			name: "windows pod with pod-level swap limit rejected",
+			mutate: func(spec *core.PodSpec) {
+				spec.OS = &core.PodOS{Name: core.Windows}
+				spec.Resources = &core.ResourceRequirements{
+					Limits: core.ResourceList{
+						core.ResourceSwap: resource.MustParse("1Gi"),
+					},
+				}
+			},
+			opts:        PodValidationOptions{AllowWorkloadControlledSwap: true, PodLevelResourcesEnabled: true},
+			wantErr:     true,
+			errContains: "cannot be set for a windows pod",
+		},
+		{
+			name: "pod overhead swap forbidden when AllowWorkloadControlledSwap is true",
+			mutate: func(spec *core.PodSpec) {
+				spec.Overhead = core.ResourceList{
+					core.ResourceSwap: resource.MustParse("256Mi"),
+				}
+			},
+			opts:        PodValidationOptions{AllowWorkloadControlledSwap: true},
+			wantErr:     true,
+			errContains: "swap may not be specified in overhead",
+		},
+		{
+			name: "pod overhead swap rejected when AllowWorkloadControlledSwap is false",
+			mutate: func(spec *core.PodSpec) {
+				spec.Overhead = core.ResourceList{
+					core.ResourceSwap: resource.MustParse("256Mi"),
+				}
+			},
+			opts:        PodValidationOptions{AllowWorkloadControlledSwap: false},
+			wantErr:     true,
+			errContains: "must be a standard resource",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			spec := basePodSpec()
+			tc.mutate(&spec)
+			errs := ValidatePodSpec(&spec, nil, field.NewPath("spec"), tc.opts)
+			if tc.wantErr {
+				if len(errs) == 0 {
+					t.Fatalf("expected error containing %q, got none", tc.errContains)
+				}
+				found := false
+				for _, err := range errs {
+					if strings.Contains(err.Error(), tc.errContains) {
+						found = true
+						break
+					}
+				}
+				if !found {
+					t.Errorf("expected error containing %q, got %v", tc.errContains, errs)
+				}
+			} else if len(errs) != 0 {
+				t.Errorf("expected no errors, got %v", errs)
+			}
+		})
+	}
+
+	t.Run("swap rejected in LimitRange and ResourceQuota", func(t *testing.T) {
+		limitItems := []core.LimitRangeItem{
+			{Type: core.LimitTypeContainer, Max: core.ResourceList{core.ResourceSwap: resource.MustParse("1Gi")}},
+			{Type: core.LimitTypeContainer, Min: core.ResourceList{core.ResourceSwap: resource.MustParse("64Mi")}},
+			{Type: core.LimitTypeContainer, Default: core.ResourceList{core.ResourceSwap: resource.MustParse("512Mi")}},
+			{Type: core.LimitTypeContainer, DefaultRequest: core.ResourceList{core.ResourceSwap: resource.MustParse("256Mi")}},
+			{Type: core.LimitTypeContainer, MaxLimitRequestRatio: core.ResourceList{core.ResourceSwap: resource.MustParse("2")}},
+			{Type: core.LimitTypePod, Max: core.ResourceList{core.ResourceSwap: resource.MustParse("2Gi")}},
+			{Type: core.LimitTypePersistentVolumeClaim, Max: core.ResourceList{core.ResourceSwap: resource.MustParse("1Gi")}},
+		}
+		for i, item := range limitItems {
+			lr := &core.LimitRange{
+				ObjectMeta: metav1.ObjectMeta{Name: "lr", Namespace: "default"},
+				Spec: core.LimitRangeSpec{
+					Limits: []core.LimitRangeItem{item},
+				},
+			}
+			errs := ValidateLimitRange(lr)
+			if len(errs) == 0 {
+				t.Errorf("case %d: expected ValidateLimitRange to reject swap, got no errors", i)
+				continue
+			}
+			wantDetail := "swap may only be specified in pod and container limits, not in a LimitRange"
+			if errs[0].Type != field.ErrorTypeForbidden || errs[0].Detail != wantDetail {
+				t.Errorf("case %d: expected Forbidden error %q, got %v", i, wantDetail, errs)
+			}
+		}
+
+		rq := &core.ResourceQuota{
+			ObjectMeta: metav1.ObjectMeta{Name: "rq", Namespace: "default"},
+			Spec: core.ResourceQuotaSpec{
+				Hard: core.ResourceList{
+					core.ResourceSwap: resource.MustParse("10Gi"),
+				},
+			},
+		}
+		if errs := ValidateResourceQuota(rq); len(errs) == 0 {
+			t.Errorf("expected ValidateResourceQuota to reject swap, got no errors")
+		}
+	})
+}
+
+func TestValidateHostCgroupNamespaceCgroupMountMode(t *testing.T) {
+	path := field.NewPath("spec", "containers").Index(0)
+	mountModePath := path.Child("securityContext", "cgroupOptions", "mountMode")
+	readWrite, readOnly := core.CgroupMountModeReadWrite, core.CgroupMountModeReadOnly
+	for _, tc := range []struct {
+		name                string
+		hostCgroupNamespace *bool
+		privileged          *bool
+		mountMode           *core.CgroupMountMode
+		expectErr           bool
+	}{
+		{name: "hostCgroupNamespace unset, ReadWrite", mountMode: &readWrite},
+		{name: "hostCgroupNamespace false, ReadWrite", hostCgroupNamespace: new(false), mountMode: &readWrite},
+		{name: "hostCgroupNamespace true, no cgroupOptions", hostCgroupNamespace: new(true)},
+		{name: "hostCgroupNamespace true, ReadOnly", hostCgroupNamespace: new(true), mountMode: &readOnly},
+		{name: "hostCgroupNamespace true, ReadWrite, privileged", hostCgroupNamespace: new(true), privileged: new(true), mountMode: &readWrite},
+		{name: "hostCgroupNamespace true, ReadWrite, privileged false", hostCgroupNamespace: new(true), privileged: new(false), mountMode: &readWrite, expectErr: true},
+		{name: "hostCgroupNamespace true, ReadWrite, privileged unset", hostCgroupNamespace: new(true), mountMode: &readWrite, expectErr: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctr := &core.Container{Name: "ctr", HostCgroupNamespace: tc.hostCgroupNamespace}
+			if tc.privileged != nil || tc.mountMode != nil {
+				ctr.SecurityContext = &core.SecurityContext{Privileged: tc.privileged}
+				if tc.mountMode != nil {
+					ctr.SecurityContext.CgroupOptions = &core.CgroupOptions{MountMode: tc.mountMode}
+				}
+			}
+			var expected field.ErrorList
+			if tc.expectErr {
+				expected = field.ErrorList{field.Invalid(mountModePath, readWrite, "cannot be set to ReadWrite when `hostCgroupNamespace` is true, unless `privileged` is true")}
+			}
+			errs := validateHostCgroupNamespaceCgroupMountMode(ctr, path)
+			if diff := cmp.Diff(expected, errs, cmpopts.EquateEmpty()); diff != "" {
+				t.Errorf("unexpected errors (-want, +got):\n%s", diff)
+			}
+		})
 	}
 }
