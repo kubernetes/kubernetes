@@ -2713,10 +2713,11 @@
   file: test/e2e/common/node/pod_resize.go
 - testname: Pod Level Resources Spec and QoS
   codename: '[sig-node] Pod Level Resources should support pod-level resource limits
-    and requests specification [Conformance]'
-  description: Ensure pods created with pod-level resources (requests and limits)
+    and requests specification [LinuxOnly] [Conformance]'
+  description: 'Ensure pods created with pod-level resources (requests and limits)
     are successfully created with correct pod-level resources defaulted and assigned
-    appropriate QoS class.
+    appropriate QoS class. [LinuxOnly]: This test is marked as LinuxOnly since the
+    Windows kubelet rejects pods that set pod-level resources.'
   release: v1.38
   file: test/e2e/common/node/pod_level_resources.go
 - testname: PodTemplate, delete a collection

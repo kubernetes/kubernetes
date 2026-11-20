@@ -420,7 +420,7 @@ var _ = SIGDescribe("Downward API", func() {
 	f := framework.NewDefaultFramework("downward-api")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
-	ginkgo.Context("Downward API tests for pod level resources", func() {
+	ginkgo.Context("Downward API tests for pod level resources [LinuxOnly]", func() {
 		f.It("should provide default limits.cpu/memory from pod level resources", f.WithNodeConformance(), func(ctx context.Context) {
 			podName := "downward-api-" + string(uuid.NewUUID())
 			env := []v1.EnvVar{

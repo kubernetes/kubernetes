@@ -49,8 +49,9 @@ var _ = SIGDescribe("Pod Level Resources", func() {
 		Release : v1.38
 		Testname: Pod Level Resources Spec and QoS
 		Description: Ensure pods created with pod-level resources (requests and limits) are successfully created with correct pod-level resources defaulted and assigned appropriate QoS class.
+		[LinuxOnly]: This test is marked as LinuxOnly since the Windows kubelet rejects pods that set pod-level resources.
 	*/
-	framework.ConformanceIt("should support pod-level resource limits and requests specification", func(ctx context.Context) {
+	framework.ConformanceIt("should support pod-level resource limits and requests specification [LinuxOnly]", func(ctx context.Context) {
 		podMetadata := makeObjectMetadata("testpod", f.Namespace.Name)
 		testPod := makePod(&podMetadata, &cgroups.ContainerResources{CPUReq: "100m", CPULim: "100m", MemReq: "100Mi", MemLim: "100Mi"}, []containerInfo{{Name: "c1"}, {Name: "c2"}}, false)
 
