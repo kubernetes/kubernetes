@@ -93,6 +93,7 @@ func NewCmdCreateCronJob(f cmdutil.Factory, ioStreams genericiooptions.IOStreams
 		Example:               cronjobExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
+			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.Run())
 		},
 	}
@@ -162,6 +163,16 @@ func (o *CreateCronJobOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, a
 	}
 
 	return nil
+}
+
+// Validate makes sure provided values are valid CronJob options
+func (o *CreateCronJobOptions) Validate() error {
+	switch corev1.RestartPolicy(o.Restart) {
+	case corev1.RestartPolicyOnFailure, corev1.RestartPolicyNever:
+		return nil
+	default:
+		return fmt.Errorf("invalid restart policy: %s, supported values: %s, %s", o.Restart, corev1.RestartPolicyOnFailure, corev1.RestartPolicyNever)
+	}
 }
 
 // Run performs the execution of 'create cronjob' sub command
