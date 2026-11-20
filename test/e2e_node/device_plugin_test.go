@@ -1001,6 +1001,9 @@ func testDevicePluginNodeReboot(f *framework.Framework, pluginSockDir string) {
 
 				err := rs.RemovePodSandbox(ctx, sandbox.Id)
 				framework.ExpectNoError(err)
+			}
+			// Wait after the loop: a pod name can have more than one sandbox.
+			for _, sandbox := range sandboxes {
 				waitForAllContainerRemoval(ctx, sandbox.Metadata.Name, sandbox.Metadata.Namespace)
 			}
 
