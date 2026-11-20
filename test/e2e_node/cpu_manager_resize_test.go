@@ -19,6 +19,7 @@ package e2enode
 import (
 	"context"
 	"fmt"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -30,12 +31,14 @@ import (
 	"github.com/onsi/gomega/types"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apimachinerytypes "k8s.io/apimachinery/pkg/types"
 	helpers "k8s.io/component-helpers/resource"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
+	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
 	"k8s.io/kubernetes/test/e2e/common/node/framework/cgroups"
 	"k8s.io/kubernetes/test/e2e/common/node/framework/podresize"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -1884,7 +1887,488 @@ var _ = SIGDescribe("CPU Manager with InPlacePodVerticalScalingExclusiveCPUs ena
 		}
 	})
 
+	// The resize of exclusive CPUs is admitted as a transaction: the CPU manager allocates the CPUs of the
+	// resize on a scratch state, and commits them only once the resize is admitted and its allocation is
+	// persisted. A rejected resize, or a kubelet restart, must leave the CPU manager state consistent with
+	// the allocated resources of the pod.
+	ginkgo.When("admitting a resize of exclusive CPUs as a transaction", ginkgo.Label("resize admission transaction", "exclusive-cpus"), func() {
+		ginkgo.BeforeEach(func(ctx context.Context) {
+			reservedCPUs = cpuset.New(0)
+		})
+
+		configureKubelet := func(ctx context.Context, minCPUs int) {
+			ginkgo.GinkgoHelper()
+			skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), minCPUs)
+
+			updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
+				policyName:         string(cpumanager.PolicyStatic),
+				reservedSystemCPUs: reservedCPUs, // Not really needed for the tests but helps to make a more precise check
+				enableInPlacePodVerticalScalingExclusiveCPUs: true,
+				topologyManagerPolicy:                        "none",
+			}))
+		}
+
+		// createTestPod creates the shared pool pod, then the test pod, and checks the CPUs of the test pod.
+		createTestPod := func(ctx context.Context, baseline []podresize.ResizableContainerInfo, baselineCPUInfo []containerCPUInfo) resizeAttempt {
+			ginkgo.GinkgoHelper()
+			ginkgo.By("creating a best-effort pod running on the shared CPU pool")
+			sharedPoolPod := createPodSync(ctx, makeCPUManagerBEPod("shared-pool-pod", []ctnAttribute{
+				{
+					ctnName:    sharedPoolContainerName,
+					ctnCommand: "sleep 1d",
+				},
+			}))
+
+			ginkgo.By("creating the test pod")
+			testPod := podresize.MakePodWithResizableContainers(f.Namespace.Name, "testpod", strconv.Itoa(time.Now().Nanosecond()), baseline, nil)
+			testPod = e2epod.MustMixinRestrictedPodSecurity(testPod)
+			testPod = createPodSync(ctx, testPod)
+			podresize.VerifyPodResources(testPod, baseline, nil)
+
+			checkEnv := resizeCheckEnv{
+				f:             f,
+				testPod:       testPod,
+				sharedPoolPod: sharedPoolPod,
+				reservedCPUs:  reservedCPUs,
+			}
+			ginkgo.By("verifying the cpusets of the test pod")
+			checkAllocatedCPUsForResize(ctx, checkEnv, nil, baselineCPUInfo)
+
+			return resizeAttempt{
+				pod:           testPod,
+				sharedPoolPod: sharedPoolPod,
+				baseline:      baseline,
+			}
+		}
+
+		patchResize := func(ctx context.Context, pod *v1.Pod, from, to []podresize.ResizableContainerInfo) *v1.Pod {
+			ginkgo.GinkgoHelper()
+			patchedPod, err := e2epod.PodClientNS(f, pod.Namespace).Patch(ctx, pod.Name, apimachinerytypes.StrategicMergePatchType,
+				podresize.MakeResizePatch(from, to, nil, nil), metav1.PatchOptions{}, "resize")
+			framework.ExpectNoError(err, "failed to patch pod %s for resize", pod.Name)
+			return patchedPod
+		}
+
+		// rejectResizeAfterCPUAllocation resizes the CPUs and the memory of a pod with a single container. The
+		// CPU manager can allocate the CPUs, but the node doesn't have enough memory left, so the predicate
+		// admit handler, which runs after the CPU manager, defers the resize.
+		rejectResizeAfterCPUAllocation := func(ctx context.Context) resizeAttempt {
+			ginkgo.GinkgoHelper()
+			configureKubelet(ctx, 3)
+
+			allocatableMemory := getLocalNode(ctx, f).Status.Allocatable[v1.ResourceMemory]
+			allocatableMemoryMi := allocatableMemory.Value() / (1024 * 1024)
+			fillerMemoryMi := allocatableMemoryMi / 2
+			// The resized pod fits the node allocatable memory, which the API server checks, but not the
+			// memory left by the filler pod.
+			desiredMemoryMi := allocatableMemoryMi - fillerMemoryMi + 100
+
+			ginkgo.By(fmt.Sprintf("creating a burstable pod requesting %dMi of the %dMi allocatable memory", fillerMemoryMi, allocatableMemoryMi))
+			fillerPod := makeCPUManagerBEPod("memory-filler-pod", []ctnAttribute{
+				{
+					ctnName:    "memory-filler-container",
+					ctnCommand: "sleep 1d",
+				},
+			})
+			fillerPod.Spec.Containers[0].Resources.Requests = v1.ResourceList{
+				v1.ResourceMemory: resource.MustParse(fmt.Sprintf("%dMi", fillerMemoryMi)),
+			}
+			createPodSync(ctx, fillerPod)
+
+			attempt := createTestPod(ctx,
+				[]podresize.ResizableContainerInfo{
+					{
+						Name:      "gu-container-1",
+						Resources: &cgroups.ContainerResources{CPUReq: "2000m", CPULim: "2000m", MemReq: "200Mi", MemLim: "200Mi"},
+					},
+				},
+				[]containerCPUInfo{
+					{
+						Name:     "gu-container-1",
+						cpuCount: 2,
+					},
+				})
+			attempt.desired = []podresize.ResizableContainerInfo{
+				{
+					Name: "gu-container-1",
+					Resources: &cgroups.ContainerResources{CPUReq: "3000m", CPULim: "3000m",
+						MemReq: fmt.Sprintf("%dMi", desiredMemoryMi), MemLim: fmt.Sprintf("%dMi", desiredMemoryMi)},
+				},
+			}
+			attempt.before = takeExclusiveCPUsSnapshot(ctx, f, attempt.pod, attempt.sharedPoolPod)
+
+			ginkgo.By("resizing the CPUs of the test pod, and its memory beyond the memory left on the node")
+			patchedPod := patchResize(ctx, attempt.pod, attempt.baseline, attempt.desired)
+
+			ginkgo.By("waiting for the resize to be deferred")
+			WaitForPodResizeDeferred(ctx, f, patchedPod)
+			deferredPod, err := e2epod.PodClientNS(f, patchedPod.Namespace).Get(ctx, patchedPod.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err, "failed to get the pod with the deferred resize")
+			gomega.Expect(deferredPod).To(HaveStatusConditionsMatchingRegex("Deferred.*Node didn't have enough resource: memory"))
+
+			return attempt
+		}
+
+		// rejectResizeOfSecondContainer resizes both containers of a pod. The CPU manager can allocate the CPUs
+		// for the first container, but not enough CPUs are left for the second one, so the resize is infeasible.
+		rejectResizeOfSecondContainer := func(ctx context.Context) resizeAttempt {
+			ginkgo.GinkgoHelper()
+			// The API server rejects a resize that exceeds the node allocatable CPUs, so the node must fit the
+			// resized pod, which needs 5 CPUs. A blocker pod takes the CPUs the resize doesn't need.
+			configureKubelet(ctx, 5)
+
+			attempt := createTestPod(ctx,
+				[]podresize.ResizableContainerInfo{
+					{
+						Name:      "gu-container-1",
+						Resources: &cgroups.ContainerResources{CPUReq: "1000m", CPULim: "1000m", MemReq: "200Mi", MemLim: "200Mi"},
+					},
+					{
+						Name:      "gu-container-2",
+						Resources: &cgroups.ContainerResources{CPUReq: "1000m", CPULim: "1000m", MemReq: "200Mi", MemLim: "200Mi"},
+					},
+				},
+				[]containerCPUInfo{
+					{
+						Name:     "gu-container-1",
+						cpuCount: 1,
+					},
+					{
+						Name:     "gu-container-2",
+						cpuCount: 1,
+					},
+				})
+			attempt.desired = []podresize.ResizableContainerInfo{
+				{
+					Name:      "gu-container-1",
+					Resources: &cgroups.ContainerResources{CPUReq: "2000m", CPULim: "2000m", MemReq: "200Mi", MemLim: "200Mi"},
+				},
+				{
+					Name:      "gu-container-2",
+					Resources: &cgroups.ContainerResources{CPUReq: "3000m", CPULim: "3000m", MemReq: "200Mi", MemLim: "200Mi"},
+				},
+			}
+
+			// Leave 2 free CPUs: enough for the first container, which needs 1 more CPU, but not for the
+			// second one, which needs 2 more CPUs.
+			freeCPUs := takeExclusiveCPUsSnapshot(ctx, f, attempt.pod, attempt.sharedPoolPod).freeCPUs(reservedCPUs)
+			blockerCPUs := freeCPUs.Size() - 2
+			if blockerCPUs < 0 {
+				e2eskipper.Skipf("Skipping test: %d free CPUs %s, the test needs at least 2", freeCPUs.Size(), freeCPUs)
+			}
+			if blockerCPUs > 0 {
+				ginkgo.By(fmt.Sprintf("creating a guaranteed pod taking %d of the free CPUs %s", blockerCPUs, freeCPUs))
+				createPodSync(ctx, makeCPUManagerPod("blocker-pod", []ctnAttribute{
+					{
+						ctnName:    "blocker-container",
+						cpuRequest: strconv.Itoa(blockerCPUs),
+						cpuLimit:   strconv.Itoa(blockerCPUs),
+					},
+				}))
+			}
+			attempt.before = takeExclusiveCPUsSnapshot(ctx, f, attempt.pod, attempt.sharedPoolPod)
+			gomega.Expect(attempt.before.freeCPUs(reservedCPUs).Size()).To(gomega.Equal(2), "the blocker pod must leave 2 free CPUs")
+
+			ginkgo.By("resizing both containers of the test pod")
+			patchedPod := patchResize(ctx, attempt.pod, attempt.baseline, attempt.desired)
+
+			ginkgo.By("waiting for the resize to be infeasible")
+			WaitForPodResizeInfeasible(ctx, f, patchedPod)
+			infeasiblePod, err := e2epod.PodClientNS(f, patchedPod.Namespace).Get(ctx, patchedPod.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err, "failed to get the pod with the infeasible resize")
+			gomega.Expect(infeasiblePod).To(HaveStatusConditionsMatchingRegex("Infeasible.*Unable to resize container exclusively allocated pool.*containerName = gu-container-2"))
+
+			return attempt
+		}
+
+		// expectFreeCPUsAllocatable checks that a new pod gets all the CPUs free for exclusive allocation.
+		expectFreeCPUsAllocatable := func(ctx context.Context, freeCPUs cpuset.CPUSet) {
+			ginkgo.GinkgoHelper()
+			ginkgo.By(fmt.Sprintf("creating a guaranteed pod requesting all the free CPUs %s", freeCPUs))
+			pod := createPodSync(ctx, makeCPUManagerPod("free-cpus-pod", []ctnAttribute{
+				{
+					ctnName:    "free-cpus-container",
+					cpuRequest: strconv.Itoa(freeCPUs.Size()),
+					cpuLimit:   strconv.Itoa(freeCPUs.Size()),
+				},
+			}))
+			gomega.Expect(pod).To(HaveContainerCPUsEqualTo("free-cpus-container", freeCPUs))
+		}
+
+		// restartKubeletWithPod restarts the kubelet, and checks that the pod is admitted again without
+		// restarting its containers.
+		restartKubeletWithPod := func(ctx context.Context, pod *v1.Pod) {
+			ginkgo.GinkgoHelper()
+			ginkgo.By("restarting the kubelet")
+			startKubelet := mustStopKubelet(ctx, f)
+			startKubelet(ctx)
+
+			ginkgo.By("verifying the pod is not rejected during re-admission and keeps running after kubelet restart")
+			gomega.Consistently(ctx, func(ctx context.Context) (v1.PodPhase, error) {
+				p, err := e2epod.NewPodClient(f).Get(ctx, pod.Name, metav1.GetOptions{})
+				if err != nil {
+					return "", err
+				}
+				return p.Status.Phase, nil
+			}).WithTimeout(30*time.Second).WithPolling(f.Timeouts.Poll).Should(gomega.Equal(v1.PodRunning), "pod should stay running after kubelet restart, not be rejected during re-admission")
+
+			restartedPod, err := e2epod.NewPodClient(f).Get(ctx, pod.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err, "failed to get pod after kubelet restart")
+			for _, status := range restartedPod.Status.ContainerStatuses {
+				gomega.Expect(status.RestartCount).To(gomega.BeZero(), "container %s must not restart", status.Name)
+			}
+		}
+
+		ginkgo.It("should keep the CPUs as before a resize rejected after the CPU manager allocated CPUs for it", func(ctx context.Context) {
+			attempt := rejectResizeAfterCPUAllocation(ctx)
+
+			ginkgo.By("verifying the container keeps its CPUs, and the CPUs of the resize stay in the shared pool")
+			expectExclusiveCPUsSnapshot(ctx, f, attempt.pod, attempt.sharedPoolPod, attempt.before)
+		})
+
+		ginkgo.It("should keep the CPUs of the first container as before a resize rejected for the second container", func(ctx context.Context) {
+			attempt := rejectResizeOfSecondContainer(ctx)
+
+			ginkgo.By("verifying the containers keep their CPUs, not the ones allocated for the first container during admission")
+			expectExclusiveCPUsSnapshot(ctx, f, attempt.pod, attempt.sharedPoolPod, attempt.before)
+		})
+
+		ginkgo.It("should let a new pod get all the CPUs that were free before a rejected resize", func(ctx context.Context) {
+			attempt := rejectResizeAfterCPUAllocation(ctx)
+			expectExclusiveCPUsSnapshot(ctx, f, attempt.pod, attempt.sharedPoolPod, attempt.before)
+
+			expectFreeCPUsAllocatable(ctx, attempt.before.freeCPUs(reservedCPUs))
+
+			ginkgo.By("verifying the container of the test pod keeps its CPUs")
+			for name, cpus := range attempt.before.containerCPUs {
+				expectedCPUs, err := cpuset.Parse(cpus)
+				framework.ExpectNoError(err, "failed to parse the CPUs %q of container %s", cpus, name)
+				gomega.Expect(attempt.pod).To(HaveContainerCPUsEqualTo(name, expectedCPUs))
+			}
+		})
+
+		ginkgo.It("should leave nothing of a rejected resize in the CPU manager state when the resize is reverted", func(ctx context.Context) {
+			attempt := rejectResizeOfSecondContainer(ctx)
+
+			ginkgo.By("reverting the resize")
+			revertedPod := patchResize(ctx, attempt.pod, attempt.desired, attempt.baseline)
+
+			ginkgo.By("waiting for the pending resize to be cleared")
+			waitForPodResizeConditionsCleared(ctx, f, revertedPod)
+			podresize.VerifyPodResources(revertedPod, attempt.baseline, nil)
+
+			ginkgo.By("verifying the CPU manager state is the same as before the rejected resize")
+			expectExclusiveCPUsSnapshot(ctx, f, attempt.pod, attempt.sharedPoolPod, attempt.before)
+		})
+
+		ginkgo.It("should admit the pod again with its original CPUs after a kubelet restart following a rejected resize", func(ctx context.Context) {
+			attempt := rejectResizeOfSecondContainer(ctx)
+
+			restartKubeletWithPod(ctx, attempt.pod)
+
+			ginkgo.By("verifying the resize is still infeasible")
+			WaitForPodResizeInfeasible(ctx, f, attempt.pod)
+
+			ginkgo.By("verifying the containers keep their CPUs after kubelet restart")
+			expectExclusiveCPUsSnapshot(ctx, f, attempt.pod, attempt.sharedPoolPod, attempt.before)
+
+			expectFreeCPUsAllocatable(ctx, attempt.before.freeCPUs(reservedCPUs))
+		})
+
+		ginkgo.It("should keep the resized CPUs after a kubelet restart following an admitted resize", func(ctx context.Context) {
+			configureKubelet(ctx, 3)
+
+			attempt := createTestPod(ctx,
+				[]podresize.ResizableContainerInfo{
+					{
+						Name:      "gu-container-1",
+						Resources: &cgroups.ContainerResources{CPUReq: "2000m", CPULim: "2000m", MemReq: "200Mi", MemLim: "200Mi"},
+					},
+				},
+				[]containerCPUInfo{
+					{
+						Name:     "gu-container-1",
+						cpuCount: 2,
+					},
+				})
+			attempt.desired = []podresize.ResizableContainerInfo{
+				{
+					Name:      "gu-container-1",
+					Resources: &cgroups.ContainerResources{CPUReq: "3000m", CPULim: "3000m", MemReq: "200Mi", MemLim: "200Mi"},
+				},
+			}
+			attempt.before = takeExclusiveCPUsSnapshot(ctx, f, attempt.pod, attempt.sharedPoolPod)
+
+			ginkgo.By("resizing the CPUs of the test pod")
+			patchedPod := patchResize(ctx, attempt.pod, attempt.baseline, attempt.desired)
+			expected := podresize.UpdateExpectedContainerRestarts(ctx, patchedPod, attempt.desired)
+
+			ginkgo.By("waiting for the resize to be complete and the pod to become ready")
+			resizedPod := podresize.WaitForPodResizeActuation(ctx, f, e2epod.PodClientNS(f, attempt.pod.Namespace), attempt.pod, nil)
+			podresize.VerifyPodResources(resizedPod, expected, nil)
+
+			ginkgo.By("verifying the cpusets of the resized pod")
+			checkAllocatedCPUsForResize(ctx, resizeCheckEnv{
+				f:             f,
+				testPod:       attempt.pod,
+				sharedPoolPod: attempt.sharedPoolPod,
+				reservedCPUs:  reservedCPUs,
+			}, attempt.before.recordedStates(), []containerCPUInfo{
+				{
+					Name:     "gu-container-1",
+					cpuCount: 3,
+				},
+			})
+			resized := takeExclusiveCPUsSnapshot(ctx, f, attempt.pod, attempt.sharedPoolPod)
+
+			restartKubeletWithPod(ctx, attempt.pod)
+
+			ginkgo.By("verifying the container keeps its resized CPUs after kubelet restart")
+			expectExclusiveCPUsSnapshot(ctx, f, attempt.pod, attempt.sharedPoolPod, resized)
+		})
+	})
 })
+
+// resizeAttempt is a test pod, and a resize of it.
+type resizeAttempt struct {
+	pod *v1.Pod
+	// sharedPoolPod is a best-effort pod, its container runs on the shared CPU pool.
+	sharedPoolPod *v1.Pod
+	baseline      []podresize.ResizableContainerInfo
+	desired       []podresize.ResizableContainerInfo
+	// before is the CPU assignment before the resize.
+	before exclusiveCPUsSnapshot
+}
+
+// exclusiveCPUsSnapshot is the CPU assignment of a test pod, compared before and after a resize attempt.
+type exclusiveCPUsSnapshot struct {
+	// containerCPUs are the CPU sets of the app containers of the pod, read from their cgroups.
+	containerCPUs map[string]string
+	// sharedPoolCPUs is the CPU set of the shared pool, read from the cgroup of a container running on it.
+	sharedPoolCPUs string
+	// checkpoint is the CPU manager state, read from its checkpoint.
+	checkpoint state.CPUManagerCheckpointData
+}
+
+// freeCPUs returns the CPUs free for exclusive allocation.
+func (s exclusiveCPUsSnapshot) freeCPUs(reservedCPUs cpuset.CPUSet) cpuset.CPUSet {
+	ginkgo.GinkgoHelper()
+	defaultCPUs, err := cpuset.Parse(s.checkpoint.DefaultCPUSet)
+	framework.ExpectNoError(err, "failed to parse the default CPU set %q", s.checkpoint.DefaultCPUSet)
+	return defaultCPUs.Difference(reservedCPUs)
+}
+
+// recordedStates returns the CPU sets of the containers, as checkAllocatedCPUsForResize records them.
+func (s exclusiveCPUsSnapshot) recordedStates() map[string]recordedState {
+	ginkgo.GinkgoHelper()
+	states := make(map[string]recordedState, len(s.containerCPUs))
+	for name, cpus := range s.containerCPUs {
+		assignedCPUs, err := cpuset.Parse(cpus)
+		framework.ExpectNoError(err, "failed to parse the CPUs %q of container %s", cpus, name)
+		states[name] = recordedState{
+			assignedCPUs: assignedCPUs,
+			baselineCPUs: assignedCPUs,
+		}
+	}
+	return states
+}
+
+func getCPUManagerCheckpointData() (state.CPUManagerCheckpointData, error) {
+	data, err := os.ReadFile(cpuManagerStateFile)
+	if err != nil {
+		return state.CPUManagerCheckpointData{}, fmt.Errorf("failed to read the CPU manager state file %s: %w", cpuManagerStateFile, err)
+	}
+	checkpoint := &state.CPUManagerCheckpoint{}
+	if err := checkpoint.UnmarshalCheckpoint(data); err != nil {
+		return state.CPUManagerCheckpointData{}, err
+	}
+	return checkpoint.CheckpointData, nil
+}
+
+func readExclusiveCPUsSnapshot(pod, sharedPoolPod *v1.Pod) (exclusiveCPUsSnapshot, error) {
+	checkpoint, err := getCPUManagerCheckpointData()
+	if err != nil {
+		return exclusiveCPUsSnapshot{}, err
+	}
+	sharedPoolCPUs, err := getContainerAllowedCPUs(sharedPoolPod, sharedPoolContainerName, false)
+	if err != nil {
+		return exclusiveCPUsSnapshot{}, err
+	}
+	snapshot := exclusiveCPUsSnapshot{
+		containerCPUs:  make(map[string]string, len(pod.Spec.Containers)),
+		sharedPoolCPUs: sharedPoolCPUs.String(),
+		checkpoint:     checkpoint,
+	}
+	for _, ctn := range pod.Spec.Containers {
+		cpus, err := getContainerAllowedCPUs(pod, ctn.Name, false)
+		if err != nil {
+			return exclusiveCPUsSnapshot{}, err
+		}
+		snapshot.containerCPUs[ctn.Name] = cpus.String()
+	}
+	return snapshot, nil
+}
+
+// takeExclusiveCPUsSnapshot waits for the cgroups of the app containers of the pod, all of them with exclusive
+// CPUs, and of the shared pool to match the CPU manager state, and returns the CPU assignment.
+func takeExclusiveCPUsSnapshot(ctx context.Context, f *framework.Framework, pod, sharedPoolPod *v1.Pod) exclusiveCPUsSnapshot {
+	ginkgo.GinkgoHelper()
+	// CPUManagerReconcilePeriod is set to 1 second during tests,
+	// to reduce flakiness this check includes a 5 second timeout.
+	const cpusetReconcilePeriodTimeout = 5 * time.Second
+	var snapshot exclusiveCPUsSnapshot
+	gomega.Eventually(ctx, func(g gomega.Gomega) {
+		var err error
+		snapshot, err = readExclusiveCPUsSnapshot(pod, sharedPoolPod)
+		g.Expect(err).ToNot(gomega.HaveOccurred())
+		g.Expect(snapshot.sharedPoolCPUs).To(gomega.Equal(snapshot.checkpoint.DefaultCPUSet), "the shared pool must match the CPU manager state")
+		for name, cpus := range snapshot.containerCPUs {
+			g.Expect(cpus).To(gomega.Equal(snapshot.checkpoint.Entries[string(pod.UID)][name]), "the CPUs of container %s must match the CPU manager state", name)
+		}
+	}).WithTimeout(cpusetReconcilePeriodTimeout).WithPolling(f.Timeouts.Poll).Should(gomega.Succeed())
+	framework.Logf("pod %s/%s containers CPUs %v, shared pool %s", pod.Namespace, pod.Name, snapshot.containerCPUs, snapshot.sharedPoolCPUs)
+	return snapshot
+}
+
+// expectExclusiveCPUsSnapshot checks that the CPU assignment of the pod, the shared pool and the CPU manager
+// state match the snapshot, and keep matching it.
+func expectExclusiveCPUsSnapshot(ctx context.Context, f *framework.Framework, pod, sharedPoolPod *v1.Pod, expected exclusiveCPUsSnapshot) {
+	ginkgo.GinkgoHelper()
+	// CPUManagerReconcilePeriod is set to 1 second during tests,
+	// to reduce flakiness this check includes a 5 second timeout.
+	const cpusetReconcilePeriodTimeout = 5 * time.Second
+	matchSnapshot := func(g gomega.Gomega) {
+		snapshot, err := readExclusiveCPUsSnapshot(pod, sharedPoolPod)
+		g.Expect(err).ToNot(gomega.HaveOccurred())
+		g.Expect(snapshot.containerCPUs).To(gomega.Equal(expected.containerCPUs), "the containers must keep their CPUs")
+		g.Expect(snapshot.sharedPoolCPUs).To(gomega.Equal(expected.sharedPoolCPUs), "the shared pool must keep its CPUs")
+		g.Expect(snapshot.checkpoint).To(gomega.Equal(expected.checkpoint), "the CPU manager state must not change")
+	}
+	gomega.Eventually(ctx, matchSnapshot).WithTimeout(cpusetReconcilePeriodTimeout).WithPolling(f.Timeouts.Poll).Should(gomega.Succeed())
+	gomega.Consistently(ctx, matchSnapshot).WithTimeout(10 * time.Second).WithPolling(f.Timeouts.Poll).Should(gomega.Succeed())
+}
+
+func WaitForPodResizeDeferred(ctx context.Context, f *framework.Framework, testPod *v1.Pod) {
+	framework.ExpectNoError(e2epod.WaitForPodCondition(ctx, f.ClientSet, testPod.Namespace, testPod.Name, "display pod resize status as deferred", f.Timeouts.PodStart, func(pod *v1.Pod) (bool, error) {
+		return helpers.IsPodResizeDeferred(pod), nil
+	}))
+}
+
+// waitForPodResizeConditionsCleared waits for the kubelet to observe the last change of the pod, and to clear
+// its resize conditions.
+func waitForPodResizeConditionsCleared(ctx context.Context, f *framework.Framework, testPod *v1.Pod) {
+	framework.ExpectNoError(e2epod.WaitForPodCondition(ctx, f.ClientSet, testPod.Namespace, testPod.Name, "clear the pod resize conditions", f.Timeouts.PodStart, func(pod *v1.Pod) (bool, error) {
+		if pod.Status.ObservedGeneration < pod.Generation {
+			return false, nil
+		}
+		for _, condition := range pod.Status.Conditions {
+			if condition.Type == v1.PodResizePending || condition.Type == v1.PodResizeInProgress {
+				return false, nil
+			}
+		}
+		return true, nil
+	}))
+}
 
 func WaitForPodResizeInfeasible(ctx context.Context, f *framework.Framework, testPod *v1.Pod) {
 	framework.ExpectNoError(e2epod.WaitForPodCondition(ctx, f.ClientSet, testPod.Namespace, testPod.Name, "display pod resize status as infeasible", f.Timeouts.PodStart, func(pod *v1.Pod) (bool, error) {
