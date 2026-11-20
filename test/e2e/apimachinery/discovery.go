@@ -24,12 +24,10 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
 	clientdiscovery "k8s.io/client-go/discovery"
 	"k8s.io/ktesting/format"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/utils/crd"
 	admissionapi "k8s.io/pod-security-admission/api"
 
@@ -37,7 +35,6 @@ import (
 	"github.com/onsi/gomega"
 )
 
-var storageVersionServerVersion = utilversion.MustParseSemantic("v1.13.99")
 var _ = SIGDescribe("Discovery", func() {
 	f := framework.NewDefaultFramework("discovery")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
@@ -46,8 +43,6 @@ var _ = SIGDescribe("Discovery", func() {
 
 	ginkgo.BeforeEach(func() {
 		namespaceName = f.Namespace.Name
-
-		e2eskipper.SkipUnlessServerVersionGTE(storageVersionServerVersion, f.ClientSet.Discovery())
 
 		ginkgo.By("Setting up server cert")
 		setupServerCert(namespaceName, serviceName)

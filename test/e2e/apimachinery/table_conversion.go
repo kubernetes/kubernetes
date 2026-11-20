@@ -33,22 +33,14 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	admissionapi "k8s.io/pod-security-admission/api"
 
-	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 )
-
-var serverPrintVersion = utilversion.MustParseSemantic("v1.10.0")
 
 var _ = SIGDescribe("Servers with support for Table transformation", func() {
 	f := framework.NewDefaultFramework("tables")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
-
-	ginkgo.BeforeEach(func() {
-		e2eskipper.SkipUnlessServerVersionGTE(serverPrintVersion, f.ClientSet.Discovery())
-	})
 
 	ginkgo.It("should return pod details", func(ctx context.Context) {
 		ns := f.Namespace.Name
