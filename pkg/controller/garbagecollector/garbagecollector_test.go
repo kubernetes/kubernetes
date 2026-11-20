@@ -62,6 +62,7 @@ import (
 	"k8s.io/client-go/metadata/metadatainformer"
 	restclient "k8s.io/client-go/rest"
 	clientgotesting "k8s.io/client-go/testing"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	metricsutil "k8s.io/component-base/metrics/testutil"
@@ -574,6 +575,11 @@ func TestDependentsRace(t *testing.T) {
 
 	gc := setupGC(t, &restclient.Config{})
 	defer close(gc.stop)
+
+	// mark the graph synced, which is required to process orphans
+	gc.dependencyGraphBuilder.monitors = monitors{
+		{Version: "v1", Resource: "pods"}: &monitor{controller: fakeMonitorController{synced: true}},
+	}
 
 	const updates = 100
 	owner := &node{dependents: make(map[*node]struct{})}
@@ -1156,6 +1162,151 @@ func TestGarbageCollectorSync(t *testing.T) {
 	}
 }
 
+// TestAttemptToOrphanWaitsForGraphSync ensures that the orphan finalizer on a resource is not removed
+// until all resource monitors have synced
+func TestAttemptToOrphanWaitsForGraphSync(t *testing.T) {
+	owner := &v1.ReplicationController{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "ReplicationController",
+			APIVersion: "v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              "owner1",
+			Namespace:         "ns1",
+			UID:               "123",
+			DeletionTimestamp: ptr.To(metav1.Now()),
+			Finalizers:        []string{metav1.FinalizerOrphanDependents},
+		},
+	}
+	pod := getPod("dependent", []metav1.OwnerReference{
+		{
+			Kind:       "ReplicationController",
+			Name:       "owner1",
+			UID:        "123",
+			APIVersion: "v1",
+		},
+	})
+	ownerPath := "/api/v1/namespaces/ns1/replicationcontrollers/owner1"
+	podPath := "/api/v1/namespaces/ns1/pods/dependent"
+
+	testHandler := &fakeActionHandler{
+		response: map[string]FakeResponse{
+			"GET" + "/api/v1/replicationcontrollers": {
+				200,
+				serilizeOrDie(t, &v1.ReplicationControllerList{Items: []v1.ReplicationController{*owner}}),
+			},
+			// LIST will return 404 to simulate initial list not syncing
+			"GET" + "/api/v1/pods": {
+				404,
+				[]byte("{}"),
+			},
+			"GET" + ownerPath: {
+				200,
+				serilizeOrDie(t, owner),
+			},
+			"PATCH" + podPath: {
+				200,
+				serilizeOrDie(t, pod),
+			},
+		},
+	}
+
+	testHandler2 := &fakeActionHandler{
+		response: map[string]FakeResponse{
+			"GET" + "/api/v1/pods": {
+				200,
+				serilizeOrDie(t, &v1.PodList{Items: []v1.Pod{*pod}}),
+			},
+		},
+	}
+	var podSyncOK atomic.Bool
+	var alternativeTestHandler = func(response http.ResponseWriter, request *http.Request) {
+		if request.URL.Path == "/api/v1/pods" && podSyncOK.Load() {
+			testHandler2.ServeHTTP(response, request)
+			return
+		}
+		testHandler.ServeHTTP(response, request)
+	}
+	srv, clientConfig := testServerAndClientConfig(alternativeTestHandler)
+	defer srv.Close()
+	clientConfig.ContentConfig.NegotiatedSerializer = nil
+	kubeClient, err := kubernetes.NewForConfig(clientConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client := &wrappedKubeClientWithUnsupportedWatchListSemantics{kubeClient}
+
+	rm := &testRESTMapper{testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme)}
+	metadataClient, err := metadata.NewForConfig(clientConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	sharedInformers := informers.NewSharedInformerFactory(client, 0)
+
+	var wg sync.WaitGroup
+
+	tCtx := ktesting.Init(t)
+	tCtx.Cleanup(wg.Wait)
+	logger := tCtx.Logger()
+
+	alwaysStarted := make(chan struct{})
+	close(alwaysStarted)
+
+	gc, err := NewGarbageCollector(tCtx, client, metadataClient, rm, map[schema.GroupResource]struct{}{}, sharedInformers, alwaysStarted)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := gc.resyncMonitors(logger, map[schema.GroupVersionResource]struct{}{
+		{Version: "v1", Resource: "pods"}:                   {},
+		{Version: "v1", Resource: "replicationcontrollers"}: {},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	firstAction := func(method, path string) int {
+		testHandler.lock.Lock()
+		defer testHandler.lock.Unlock()
+		for i, a := range testHandler.actions {
+			if a.method == method && a.path == path {
+				return i
+			}
+		}
+		return -1
+	}
+	ownerRequeued := func() bool {
+		n, ok := gc.dependencyGraphBuilder.uidToNode.Read(owner.UID)
+		return ok && gc.attemptToOrphan.NumRequeues(n) > 0
+	}
+
+	wg.Go(func() {
+		gc.Run(tCtx, 1, 200*time.Millisecond)
+	})
+
+	// Wait until the worker has processed the owner, meaning either server received a patch or the item was requeued (the item should be requeued)
+	if err := wait.PollUntilContextTimeout(tCtx, 50*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
+		return firstAction("PATCH", ownerPath) >= 0 || ownerRequeued(), nil
+	}); err != nil {
+		t.Fatalf("orphan worker did not process the owner: %v", err)
+	}
+	if firstAction("PATCH", ownerPath) >= 0 {
+		t.Fatal("orphan finalizer was removed while the pods monitor was not synced")
+	}
+
+	// At this point, the store can sync and owner should be patched
+	podSyncOK.Store(true)
+
+	if err := wait.PollUntilContextTimeout(tCtx, 50*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
+		return firstAction("PATCH", ownerPath) >= 0, nil
+	}); err != nil {
+		t.Fatalf("orphan finalizer was not removed after the pods monitor synced: %v", err)
+	}
+	podPatch, ownerPatch := firstAction("PATCH", podPath), firstAction("PATCH", ownerPath)
+	if podPatch < 0 || podPatch > ownerPatch {
+		t.Errorf("expected the dependent to be patched before the owner, got dependent patch at %d, owner patch at %d", podPatch, ownerPatch)
+	}
+}
+
 func assertMonitors(t *testing.T, gc *GarbageCollector, resources ...string) {
 	t.Helper()
 	expected := sets.NewString(resources...)
@@ -1239,6 +1390,11 @@ func TestConflictingData(t *testing.T) {
 	badSecretReferenceWithDeploymentUID := makeID("v1", "Secret", "ns1", "secretname", string(deployment1apps.UID))
 	badChildPod := makeID("v1", "Pod", "ns1", "badpod", "badpoduid")
 	goodChildPod := makeID("v1", "Pod", "ns1", "goodpod", "goodpoduid")
+
+	// rc1 blocks owner deletion so that foreground deletion will wait
+	rc1 := makeID("v1", "ReplicationController", "ns1", "rc1", "rcuid1")
+	rc1Blocking := rc1
+	rc1Blocking.BlockOwnerDeletion = ptr.To(true)
 
 	var testScenarios = []struct {
 		name           string
@@ -2572,6 +2728,70 @@ func TestConflictingData(t *testing.T) {
 				}),
 			},
 		},
+		{
+			name: "orphan finalizer kept until monitors sync",
+			steps: []step{
+				// setup
+				createObjectInClient("", "v1", "replicationcontrollers", "ns1", withDeletion(makeMetadataObj(rc1), metav1.FinalizerOrphanDependents)),
+				createObjectInClient("", "v1", "pods", "ns1", makeMetadataObj(pod1ns1, rc1)),
+				// observe the owning replication controller has orphan finalizer, before the pods monitor has synced
+				setMonitorsSynced(false),
+				processEvent(withDeletion(makeAddEvent(rc1), metav1.FinalizerOrphanDependents)),
+				assertState(state{
+					graphNodes:             []*node{makeNode(rc1)},
+					pendingAttemptToOrphan: []*node{makeNode(rc1)}, // owner queued for orphaning
+				}),
+				// process the queued orphan of owner
+				processAttemptToOrphan(1),
+				assertState(state{
+					graphNodes:             []*node{makeNode(rc1)},
+					pendingAttemptToOrphan: []*node{makeNode(rc1)}, // graph was not synced and owner was requeued
+				}),
+				// sync the monitors to allow orphan deletion
+				setMonitorsSynced(true),
+				processEvent(makeAddEvent(pod1ns1, rc1)),
+				processAttemptToOrphan(1),
+				assertState(state{
+					clientActions: []string{
+						"patch /v1, Resource=pods ns=ns1 name=podname1",              // dependent pods have their ownerRefs removed
+						"get /v1, Resource=replicationcontrollers ns=ns1 name=rc1",   // GET happened on owner
+						"patch /v1, Resource=replicationcontrollers ns=ns1 name=rc1", // rc has no orphan finalizer
+					},
+					graphNodes: []*node{makeNode(rc1), makeNode(pod1ns1, withOwners(rc1))},
+				}),
+			},
+		},
+		{
+			name: "foreground deletion finalizer kept until monitors sync",
+			steps: []step{
+				// setup
+				createObjectInClient("", "v1", "replicationcontrollers", "ns1", withDeletion(makeMetadataObj(rc1), metav1.FinalizerDeleteDependents)),
+				createObjectInClient("", "v1", "pods", "ns1", makeMetadataObj(pod1ns1, rc1Blocking)),
+				// observe the owning replication controller has orphan finalizer, before the pods monitor has synced
+				setMonitorsSynced(false),
+				processEvent(withDeletion(makeAddEvent(rc1), metav1.FinalizerDeleteDependents)),
+				assertState(state{
+					graphNodes:             []*node{makeNode(rc1)},
+					pendingAttemptToDelete: []*node{makeNode(rc1)}, // owner queued for foreground delete
+				}),
+				// process the queued delete of owner
+				processAttemptToDelete(1),
+				assertState(state{
+					clientActions:          []string{"get /v1, Resource=replicationcontrollers ns=ns1 name=rc1"}, // get latest owner
+					graphNodes:             []*node{makeNode(rc1)},
+					pendingAttemptToDelete: []*node{makeNode(rc1)}, // graph was not synced and owner was requeued
+				}),
+				// sync the monitors to allow foreground deletion
+				setMonitorsSynced(true),
+				processEvent(makeAddEvent(pod1ns1, rc1Blocking)),
+				processAttemptToDelete(1),
+				assertState(state{
+					clientActions:          []string{"get /v1, Resource=replicationcontrollers ns=ns1 name=rc1"}, // GET happened on owner
+					graphNodes:             []*node{makeNode(rc1), makeNode(pod1ns1, withOwners(rc1Blocking))},
+					pendingAttemptToDelete: []*node{makeNode(pod1ns1, withOwners(rc1Blocking))}, // blocking dependent queued for attempted delete, owner keeps its finalizer
+				}),
+			},
+		},
 	}
 
 	alwaysStarted := make(chan struct{})
@@ -2743,6 +2963,22 @@ func withRV[T any](obj T, rv string) T {
 	return obj
 }
 
+// withDeletion marks the obj as being deleted with the given finalizers
+func withDeletion[T any](obj T, finalizers ...string) T {
+	now := metav1.Now()
+	switch t := any(obj).(type) {
+	case *metav1.PartialObjectMetadata:
+		t.DeletionTimestamp = &now
+		t.Finalizers = finalizers
+	case *metaonly.MetadataOnlyObject:
+		t.DeletionTimestamp = &now
+		t.Finalizers = finalizers
+	case *event:
+		withDeletion(t.obj, finalizers...)
+	}
+	return obj
+}
+
 func makeMetadataObj(identity objectReference, owners ...objectReference) *metav1.PartialObjectMetadata {
 	obj := &metav1.PartialObjectMetadata{
 		TypeMeta:   metav1.TypeMeta{APIVersion: identity.APIVersion, Kind: identity.Kind},
@@ -2823,6 +3059,56 @@ func processAttemptToDelete(count int) step {
 					}
 					ctx.gc.processAttemptToDeleteWorker(context.TODO())
 				}
+			}
+		},
+	}
+}
+
+// processAttemptToOrphan runs the orphan worker on `count` items from the attemptToOrphan queue
+func processAttemptToOrphan(count int) step {
+	return step{
+		name: "processAttemptToOrphan",
+		check: func(ctx stepContext) {
+			ctx.t.Helper()
+			if count <= 0 {
+				// process all
+				for ctx.gc.dependencyGraphBuilder.attemptToOrphan.Len() != 0 {
+					ctx.gc.processAttemptToOrphanWorker(ctx.logger)
+				}
+			} else {
+				for i := 0; i < count; i++ {
+					if ctx.gc.dependencyGraphBuilder.attemptToOrphan.Len() == 0 {
+						ctx.t.Errorf("expected at least %d pending changes, got %d", count, i+1)
+						return
+					}
+					ctx.gc.processAttemptToOrphanWorker(ctx.logger)
+				}
+			}
+		},
+	}
+}
+
+// fakeMonitorController reports a fixed sync state for a resource monitor
+type fakeMonitorController struct {
+	cache.Controller
+	synced bool
+}
+
+func (c fakeMonitorController) HasSynced() bool {
+	return c.synced
+}
+
+// setMonitorsSynced replaces the graph builder monitors with a single pods monitor in the given sync state
+func setMonitorsSynced(synced bool) step {
+	return step{
+		name: "setMonitorsSynced",
+		check: func(ctx stepContext) {
+			ctx.t.Helper()
+			gb := ctx.gc.dependencyGraphBuilder
+			gb.monitorLock.Lock()
+			defer gb.monitorLock.Unlock()
+			gb.monitors = monitors{
+				{Version: "v1", Resource: "pods"}: &monitor{controller: fakeMonitorController{synced: synced}},
 			}
 		},
 	}
