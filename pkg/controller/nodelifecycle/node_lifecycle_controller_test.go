@@ -28,11 +28,13 @@ import (
 	coordv1 "k8s.io/api/coordination/v1"
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	appsinformers "k8s.io/client-go/informers/apps/v1"
@@ -3780,6 +3782,99 @@ func TestReconcileNodeLabels(t *testing.T) {
 				t.Errorf("%s: label %q: expected value %q, got value %q", test.Name, key, expectedValue, actualValue)
 			}
 		}
+	}
+}
+
+// TestProcessNodeUpdateRequeuesOnFailure verifies that a node whose taint
+// patch fails is requeued and retried.
+func TestProcessNodeUpdateRequeuesOnFailure(t *testing.T) {
+	node := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              "node0",
+			CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+		},
+		Spec: v1.NodeSpec{
+			Taints: []v1.Taint{
+				{Key: v1.TaintNodeNotReady, Effect: v1.TaintEffectNoSchedule},
+			},
+		},
+		Status: v1.NodeStatus{
+			Conditions: []v1.NodeCondition{
+				{
+					Type:               v1.NodeReady,
+					Status:             v1.ConditionTrue,
+					LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+					LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+				},
+			},
+		},
+	}
+	kubeClient := fake.NewSimpleClientset(node)
+	// The first patch fails with a non-conflict error; the second succeeds.
+	failedPatches := 0
+	kubeClient.PrependReactor("patch", "nodes", func(action testcore.Action) (bool, runtime.Object, error) {
+		if failedPatches == 0 {
+			failedPatches++
+			return true, nil, apierrors.NewTooManyRequests("too many requests", 1)
+		}
+		return false, nil, nil
+	})
+
+	tCtx := ktesting.Init(t)
+	nodeController, err := newNodeLifecycleControllerFromClient(
+		tCtx,
+		kubeClient,
+		testRateLimiterQPS,
+		testRateLimiterQPS,
+		testLargeClusterThreshold,
+		testUnhealthyThreshold,
+		testNodeMonitorGracePeriod,
+		testNodeStartupGracePeriod,
+		testNodeMonitorPeriod,
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if err := nodeController.nodeInformer.Informer().GetStore().Add(node); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	nodeController.nodeUpdateQueue.Add(node.Name)
+	item, shutdown := nodeController.nodeUpdateQueue.Get()
+	if shutdown {
+		t.Fatal("queue shut down unexpectedly")
+	}
+	nodeController.processNodeUpdate(tCtx, item)
+	if failedPatches != 1 {
+		t.Fatalf("expected the first patch to fail, got %d failed patches", failedPatches)
+	}
+	if got := nodeController.nodeUpdateQueue.NumRequeues(node.Name); got != 1 {
+		t.Fatalf("expected 1 requeue of %s after the failed patch, got %d", node.Name, got)
+	}
+	// The retry is added after the rate limiter delay.
+	if err := wait.PollUntilContextTimeout(tCtx, 10*time.Millisecond, wait.ForeverTestTimeout, true, func(context.Context) (bool, error) {
+		return nodeController.nodeUpdateQueue.Len() == 1, nil
+	}); err != nil {
+		t.Fatalf("node %s was not requeued after the failed patch: %v", node.Name, err)
+	}
+
+	item, shutdown = nodeController.nodeUpdateQueue.Get()
+	if shutdown {
+		t.Fatal("queue shut down unexpectedly")
+	}
+	nodeController.processNodeUpdate(tCtx, item)
+	if got := nodeController.nodeUpdateQueue.NumRequeues(node.Name); got != 0 {
+		t.Fatalf("expected the requeue count of %s to be reset after the retry, got %d", node.Name, got)
+	}
+	if got := nodeController.nodeUpdateQueue.Len(); got != 0 {
+		t.Fatalf("expected an empty queue after the retry, got %d items", got)
+	}
+	updatedNode, err := kubeClient.CoreV1().Nodes().Get(tCtx, node.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if taintutils.TaintExists(updatedNode.Spec.Taints, &v1.Taint{Key: v1.TaintNodeNotReady, Effect: v1.TaintEffectNoSchedule}) {
+		t.Errorf("expected the retry to remove the not-ready taint, got taints %v", updatedNode.Spec.Taints)
 	}
 }
 
