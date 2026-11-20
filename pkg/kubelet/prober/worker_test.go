@@ -1323,21 +1323,22 @@ func TestNewWorkerActiveProbesGauge(t *testing.T) {
 			go w.run(tCtx)
 
 			labels := test.expectedLabels
-			if test.expectUntouched {
-				// Nothing to increment for a non-HTTP probe; use any label
-				// combination to confirm the gauge is never touched.
-				labels = map[string]string{"protocol": string(v1.HTTPProtocolHTTP1)}
-			} else {
-				gaugeIsOne := func(ctx context.Context) (bool, error) {
+			gaugeReaches := func(want float64) error {
+				condition := func(context.Context) (bool, error) {
 					v, err := testutil.GetGaugeMetricValue(ActiveProbes.With(labels))
 					if err != nil {
 						return false, err
 					}
-					return v == 1, nil
+					return v == want, nil
 				}
-				if err := wait.PollUntilContextTimeout(tCtx, 10*time.Millisecond, wait.ForeverTestTimeout, true, gaugeIsOne); err != nil {
-					t.Fatalf("expected ActiveProbes%v to reach 1 after the worker started running: %v", labels, err)
-				}
+				return wait.PollUntilContextTimeout(tCtx, 10*time.Millisecond, wait.ForeverTestTimeout, true, condition)
+			}
+			if test.expectUntouched {
+				// Nothing to increment for a non-HTTP probe; use any label
+				// combination to confirm the gauge is never touched.
+				labels = map[string]string{"protocol": string(v1.HTTPProtocolHTTP1)}
+			} else if err := gaugeReaches(1); err != nil {
+				t.Fatalf("expected ActiveProbes%v to reach 1 after the worker started running: %v", labels, err)
 			}
 
 			w.stop()
@@ -1345,12 +1346,10 @@ func TestNewWorkerActiveProbesGauge(t *testing.T) {
 				t.Fatalf("error waiting for worker exit: %v", err)
 			}
 
-			got, err := testutil.GetGaugeMetricValue(ActiveProbes.With(labels))
-			if err != nil {
-				t.Fatalf("failed to get gauge value: %v", err)
-			}
-			if got != 0 {
-				t.Errorf("expected ActiveProbes%v to be 0 after worker exit, got %v", labels, got)
+			// The worker deregisters itself before decrementing ActiveProbes, so
+			// waitForWorkerExit can return while the decrement is still pending.
+			if err := gaugeReaches(0); err != nil {
+				t.Errorf("expected ActiveProbes%v to reach 0 after worker exit: %v", labels, err)
 			}
 		})
 	}
