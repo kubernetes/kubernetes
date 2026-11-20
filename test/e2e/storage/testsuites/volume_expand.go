@@ -400,14 +400,20 @@ func (v *volumeExpandTestSuite) DefineTests(driver storageframework.TestDriver, 
 			l.pod = nil
 
 			ginkgo.By("Creating a new pod with same volume on the same node")
+			// The reason we pin the pod to the same node is because we do not want the pod to move to a
+			// different node when it is deleted. Keeping the pod on the same node reproduces the scenario
+			// that the volume might already be mounted when resize is attempted.
+			// We should consider adding a unit test that exercises this better.
+			// We start from the driver's ClientNodeSelection (rather than a bare {Name: nodeName}) so that
+			// any selectors/affinity required to schedule the pod are preserved, e.g. the OS node selector
+			// on Windows. We then add affinity to keep the pod on the original node.
+			pod2NodeSelection := l.config.ClientNodeSelection
+			e2epod.SetAffinity(&pod2NodeSelection, nodeName)
 			podConfig = e2epod.Config{
-				NS:           f.Namespace.Name,
-				PVCs:         []*v1.PersistentVolumeClaim{l.resource.Pvc},
-				SeLinuxLabel: e2epod.GetLinuxLabel(),
-				// The reason we use this node selection is because we do not want pod to move to different node when pod is deleted.
-				// Keeping pod on same node reproduces the scenario that volume might already be mounted when resize is attempted.
-				// We should consider adding a unit test that exercises this better.
-				NodeSelection: e2epod.NodeSelection{Name: nodeName},
+				NS:            f.Namespace.Name,
+				PVCs:          []*v1.PersistentVolumeClaim{l.resource.Pvc},
+				SeLinuxLabel:  e2epod.GetLinuxLabel(),
+				NodeSelection: pod2NodeSelection,
 				ImageID:       e2epod.GetDefaultTestImageID(),
 			}
 			l.pod2, err = e2epod.CreateSecPodWithNodeSelection(ctx, f.ClientSet, &podConfig, f.Timeouts.PodStart)
