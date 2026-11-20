@@ -22,12 +22,14 @@ import (
 	v1 "k8s.io/api/admissionregistration/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/admission/plugin/cel"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/matchconditions"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/predicates/namespace"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/predicates/object"
 	"k8s.io/apiserver/pkg/cel/environment"
 	webhookutil "k8s.io/apiserver/pkg/util/webhook"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 )
 
@@ -40,6 +42,9 @@ type WebhookAccessor interface {
 
 	// GetUID gets a string that uniquely identifies the webhook.
 	GetUID() string
+
+	// GetConfigurationUID gets the UID of the webhook configuration that owns this webhook.
+	GetConfigurationUID() types.UID
 
 	// GetConfigurationName gets the name of the webhook configuration that owns this webhook.
 	GetConfigurationName() string
@@ -83,17 +88,20 @@ type WebhookAccessor interface {
 
 	// GetType returns the type of the accessor (validate or admit)
 	GetType() string
+
+	GetKubeClient() kubernetes.Interface
 }
 
 // NewMutatingWebhookAccessor creates an accessor for a MutatingWebhook.
-func NewMutatingWebhookAccessor(uid, configurationName string, h *v1.MutatingWebhook) WebhookAccessor {
-	return &mutatingWebhookAccessor{uid: uid, configurationName: configurationName, MutatingWebhook: h}
+func NewMutatingWebhookAccessor(uid, configurationName string, configurationUID types.UID, h *v1.MutatingWebhook, kubeClient kubernetes.Interface) WebhookAccessor {
+	return &mutatingWebhookAccessor{uid: uid, configurationName: configurationName, configurationUID: configurationUID, MutatingWebhook: h, kubeClient: kubeClient}
 }
 
 type mutatingWebhookAccessor struct {
 	*v1.MutatingWebhook
 	uid               string
 	configurationName string
+	configurationUID  types.UID
 
 	initObjectSelector sync.Once
 	objectSelector     labels.Selector
@@ -109,6 +117,8 @@ type mutatingWebhookAccessor struct {
 
 	compileMatcher  sync.Once
 	compiledMatcher matchconditions.Matcher
+
+	kubeClient kubernetes.Interface
 }
 
 func (m *mutatingWebhookAccessor) GetUID() string {
@@ -117,6 +127,10 @@ func (m *mutatingWebhookAccessor) GetUID() string {
 
 func (m *mutatingWebhookAccessor) GetConfigurationName() string {
 	return m.configurationName
+}
+
+func (m *mutatingWebhookAccessor) GetConfigurationUID() types.UID {
+	return m.configurationUID
 }
 
 func (m *mutatingWebhookAccessor) GetRESTClient(clientManager *webhookutil.ClientManager) (*rest.RESTClient, error) {
@@ -217,15 +231,20 @@ func (m *mutatingWebhookAccessor) GetValidatingWebhook() (*v1.ValidatingWebhook,
 	return nil, false
 }
 
+func (m *mutatingWebhookAccessor) GetKubeClient() kubernetes.Interface {
+	return m.kubeClient
+}
+
 // NewValidatingWebhookAccessor creates an accessor for a ValidatingWebhook.
-func NewValidatingWebhookAccessor(uid, configurationName string, h *v1.ValidatingWebhook) WebhookAccessor {
-	return &validatingWebhookAccessor{uid: uid, configurationName: configurationName, ValidatingWebhook: h}
+func NewValidatingWebhookAccessor(uid, configurationName string, configurationUID types.UID, h *v1.ValidatingWebhook, kubeClient kubernetes.Interface) WebhookAccessor {
+	return &validatingWebhookAccessor{uid: uid, configurationName: configurationName, configurationUID: configurationUID, ValidatingWebhook: h, kubeClient: kubeClient}
 }
 
 type validatingWebhookAccessor struct {
 	*v1.ValidatingWebhook
 	uid               string
 	configurationName string
+	configurationUID  types.UID
 
 	initObjectSelector sync.Once
 	objectSelector     labels.Selector
@@ -241,6 +260,8 @@ type validatingWebhookAccessor struct {
 
 	compileMatcher  sync.Once
 	compiledMatcher matchconditions.Matcher
+
+	kubeClient kubernetes.Interface
 }
 
 func (v *validatingWebhookAccessor) GetUID() string {
@@ -249,6 +270,10 @@ func (v *validatingWebhookAccessor) GetUID() string {
 
 func (v *validatingWebhookAccessor) GetConfigurationName() string {
 	return v.configurationName
+}
+
+func (v *validatingWebhookAccessor) GetConfigurationUID() types.UID {
+	return v.configurationUID
 }
 
 func (v *validatingWebhookAccessor) GetRESTClient(clientManager *webhookutil.ClientManager) (*rest.RESTClient, error) {
@@ -347,6 +372,10 @@ func (v *validatingWebhookAccessor) GetMutatingWebhook() (*v1.MutatingWebhook, b
 
 func (v *validatingWebhookAccessor) GetValidatingWebhook() (*v1.ValidatingWebhook, bool) {
 	return v.ValidatingWebhook, true
+}
+
+func (v *validatingWebhookAccessor) GetKubeClient() kubernetes.Interface {
+	return v.kubeClient
 }
 
 // hookClientConfigForWebhook construct a webhookutil.ClientConfig using a WebhookAccessor to access
