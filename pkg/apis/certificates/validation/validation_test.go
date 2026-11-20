@@ -25,12 +25,14 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/asn1"
 	"encoding/pem"
 	"fmt"
 	"math/big"
 	mathrand "math/rand"
 	"reflect"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -2446,6 +2448,19 @@ func TestValidatePodCertificateRequestStatusUpdate(t *testing.T) {
 	certWithBadDNSName4 := mustSignCertForPublicKey(t, 24*time.Hour, pub1, caCertDER, caPrivKey, true, "example.", "")
 	certWithBadEmailAddress := mustSignCertForPublicKey(t, 24*time.Hour, pub1, caCertDER, caPrivKey, false, "", "email@@address")
 
+	// ParseCertificate may drop empty SAN names; then the validation cannot see them.
+	var wantEmptyDNSNameErrors field.ErrorList
+	block, _ := pem.Decode([]byte(certWithBadDNSName1))
+	badDNSNameCert, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		t.Fatalf("Error while parsing certificate: %v", err)
+	}
+	if slices.Contains(badDNSNameCert.DNSNames, "") {
+		wantEmptyDNSNameErrors = field.ErrorList{
+			field.Invalid(field.NewPath("status", "certificateChain"), "", "leaf certificate should not contain empty DNSName"),
+		}
+	}
+
 	certFromIntermediate := mustSignCertForPublicKey(t, 24*time.Hour, pub1, intermediateCACertDER, intermediateCAPrivKey, false, "", "")
 
 	testCases := []struct {
@@ -4172,9 +4187,7 @@ func TestValidatePodCertificateRequestStatusUpdate(t *testing.T) {
 					NotAfter:         ptr.To(metav1.NewTime(mustParseTime(t, "1970-01-02T00:00:00Z"))),
 				},
 			},
-			wantErrors: field.ErrorList{
-				field.Invalid(field.NewPath("status", "certificateChain"), "", "leaf certificate should not contain empty DNSName"),
-			},
+			wantErrors: wantEmptyDNSNameErrors,
 		},
 		{
 			description: "leaf cert can not contain DNSName contains '..'",
@@ -4538,7 +4551,15 @@ func mustSignCertForPublicKey(t *testing.T, validity time.Duration, subjectPubli
 		NotAfter:    mustParseTime(t, "1970-01-01T00:00:00Z").Add(validity),
 	}
 	if usebadDNSName {
-		certTemplate.DNSNames = append(certTemplate.DNSNames, badDNSName)
+		if badDNSName == "" {
+			// CreateCertificate may reject an empty DNSName; write the SAN extension by hand.
+			certTemplate.ExtraExtensions = append(certTemplate.ExtraExtensions, pkix.Extension{
+				Id:    asn1.ObjectIdentifier{2, 5, 29, 17},
+				Value: []byte{0x30, 0x02, 0x82, 0x00}, // SEQUENCE { [2] dNSName "" }
+			})
+		} else {
+			certTemplate.DNSNames = append(certTemplate.DNSNames, badDNSName)
+		}
 	}
 	if badEmailAddress != "" {
 		certTemplate.EmailAddresses = append(certTemplate.EmailAddresses, badEmailAddress)
