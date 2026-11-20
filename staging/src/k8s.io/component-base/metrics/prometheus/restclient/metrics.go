@@ -103,6 +103,15 @@ var (
 		[]string{"code", "verb", "host"},
 	)
 
+	requestRejected = k8smetrics.NewCounterVec(
+		&k8smetrics.CounterOpts{
+			Name:           "rest_client_requests_rejected_total",
+			StabilityLevel: k8smetrics.ALPHA,
+			Help:           "Number of HTTP request attempts the server rejected because it is overloaded, partitioned by method and host. Requires an apiserver that sets the X-Kubernetes-Overload-Rejected response header.",
+		},
+		[]string{"method", "host"},
+	)
+
 	execPluginCertTTLAdapter = &expiryToTTLAdapter{}
 
 	execPluginCertTTL = k8smetrics.NewGaugeFunc(
@@ -237,6 +246,7 @@ func init() {
 		RateLimiterLatency:           &latencyAdapter{m: rateLimiterLatency},
 		RequestResult:                &resultAdapter{requestResult},
 		RequestRetry:                 &retryAdapter{requestRetry},
+		RequestRejected:              &rejectedAdapter{requestRejected},
 		ExecPluginCalls:              &callsAdapter{m: execPluginCalls},
 		ExecPluginPolicyCalls:        &policyAdapter{m: execPluginPolicyCalls},
 		TransportCacheEntries:        &transportCacheAdapter{m: transportCacheEntries},
@@ -252,6 +262,7 @@ func init() {
 			legacyregistry.MustRegister(rateLimiterLatency)
 			legacyregistry.MustRegister(requestResult)
 			legacyregistry.MustRegister(requestRetry)
+			legacyregistry.MustRegister(requestRejected)
 			legacyregistry.RawMustRegister(execPluginCertTTL)
 			legacyregistry.MustRegister(execPluginCertRotation)
 			legacyregistry.MustRegister(execPluginCalls)
@@ -343,6 +354,15 @@ type retryAdapter struct {
 func (r *retryAdapter) IncrementRetry(ctx context.Context, code, method, host string) {
 	metrics.EnsureRegistered()
 	r.m.WithContext(ctx).WithLabelValues(code, method, host).Inc()
+}
+
+type rejectedAdapter struct {
+	m *k8smetrics.CounterVec
+}
+
+func (r *rejectedAdapter) IncrementRejected(ctx context.Context, method, host string) {
+	metrics.EnsureRegistered()
+	r.m.WithContext(ctx).WithLabelValues(method, host).Inc()
 }
 
 type transportCacheAdapter struct {

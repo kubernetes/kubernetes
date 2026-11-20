@@ -374,9 +374,22 @@ func setResponseHeaders(classification *PriorityAndFairnessClassification, w htt
 	w.Header().Set(flowcontrol.ResponseHeaderMatchedFlowSchemaUID, string(classification.FlowSchemaUID))
 }
 
+// overloadRejectedHeader is set on 429 responses sent because the apiserver
+// shed load (API Priority and Fairness or the max-in-flight limit). Other 429s,
+// such as an Eviction blocked by a PodDisruptionBudget or the apiserver shutting
+// down, do not carry it. Clients use it to tell "I am overloading the apiserver"
+// apart from a 429 that says nothing about load.
+//
+// The client-go REST client reads this header (staging/src/k8s.io/client-go/rest);
+// keep the two values in sync.
+const overloadRejectedHeader = "X-Kubernetes-Overload-Rejected"
+
+// tooManyRequests rejects the request because the apiserver is overloaded.
+// Only load shedding should call it, as it marks the response with overloadRejectedHeader.
 func tooManyRequests(req *http.Request, w http.ResponseWriter, retryAfter string) {
 	// Return a 429 status indicating "Too Many Requests"
 	w.Header().Set("Retry-After", retryAfter)
+	w.Header().Set(overloadRejectedHeader, "true")
 	http.Error(w, "Too many requests, please try again later.", http.StatusTooManyRequests)
 }
 

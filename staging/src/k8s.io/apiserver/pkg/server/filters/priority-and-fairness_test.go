@@ -226,7 +226,7 @@ func TestApfRejectRequest(t *testing.T) {
 	defer cancel()
 	StartPriorityAndFairnessWatermarkMaintenance(ctx.Done())
 
-	if err := expectHTTPGet(fmt.Sprintf("%s/api/v1/namespaces/default", server.URL), http.StatusTooManyRequests); err != nil {
+	if err := expectOverloadRejectedGet(fmt.Sprintf("%s/api/v1/namespaces/default", server.URL)); err != nil {
 		t.Error(err)
 	}
 
