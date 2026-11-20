@@ -84,6 +84,53 @@ func TestTranslationUsingEnvVar(t *testing.T) {
 			expectedStr: expectedStrEnUSLocale,
 		},
 		{
+			name:        "Locale without a codeset",
+			setenv:      map[string]string{"LANG": "en_US"},
+			expectedStr: expectedStrEnUSLocale,
+		},
+		{
+			name:        "Locale with a modifier and no codeset",
+			setenv:      map[string]string{"LANG": "en_US@modifier"},
+			expectedStr: expectedStrEnUSLocale,
+		},
+		{
+			name:        "Locale with a codeset and modifier",
+			setenv:      map[string]string{"LANG": "en_US.UTF-8@modifier"},
+			expectedStr: expectedStrEnUSLocale,
+		},
+		{
+			name: "LC_ALL without a codeset overrides LC_MESSAGES and LANG",
+			setenv: map[string]string{
+				"LC_ALL":      "en_US",
+				"LC_MESSAGES": "be_BY.UTF-8",
+				"LANG":        "be_BY.UTF-8",
+			},
+			expectedStr: expectedStrEnUSLocale,
+		},
+		{
+			name: "LC_MESSAGES without a codeset overrides LANG",
+			setenv: map[string]string{
+				"LC_MESSAGES": "en_US",
+				"LANG":        "be_BY.UTF-8",
+			},
+			expectedStr: expectedStrEnUSLocale,
+		},
+		{
+			name:        "C locale overrides LANG",
+			setenv:      map[string]string{"LC_ALL": "C", "LANG": knownTestLocale},
+			expectedStr: expectedStrFallback,
+		},
+		{
+			name:        "POSIX locale overrides LANG",
+			setenv:      map[string]string{"LC_ALL": "POSIX", "LANG": knownTestLocale},
+			expectedStr: expectedStrFallback,
+		},
+		{
+			name:        "C locale with a codeset overrides LANG",
+			setenv:      map[string]string{"LC_ALL": "C.UTF-8", "LANG": knownTestLocale},
+			expectedStr: expectedStrFallback,
+		},
+		{
 			name: "LC_MESSAGES overrides LANG",
 			setenv: map[string]string{
 				"LANG":        "be_BY.UTF-8", // Unknown locale
@@ -125,6 +172,21 @@ func TestTranslationUsingEnvVar(t *testing.T) {
 		{
 			name:        "Invalid env var",
 			setenv:      map[string]string{"LC_MESSAGES": "fake.locale.UTF-8"},
+			expectedStr: expectedStrFallback,
+		},
+		{
+			name:        "Known locale with an invalid codeset",
+			setenv:      map[string]string{"LANG": "en_US.UTF-8.invalid"},
+			expectedStr: expectedStrFallback,
+		},
+		{
+			name:        "Locale without a language",
+			setenv:      map[string]string{"LANG": ".UTF-8"},
+			expectedStr: expectedStrFallback,
+		},
+		{
+			name:        "Unknown locale without a codeset",
+			setenv:      map[string]string{"LANG": "be_BY"},
 			expectedStr: expectedStrFallback,
 		},
 		{
