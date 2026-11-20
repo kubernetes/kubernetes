@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/internal/listoptions"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/apply"
 )
@@ -169,6 +170,7 @@ func (c *Client[T]) Get(ctx context.Context, name string, options metav1.GetOpti
 
 // List takes label and field selectors, and returns the list of resources that match those selectors.
 func (l *alsoLister[T, L]) List(ctx context.Context, opts metav1.ListOptions) (L, error) {
+	listoptions.PreserveFullList(ctx, &opts)
 	list := l.newList()
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {

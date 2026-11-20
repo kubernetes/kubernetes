@@ -691,9 +691,9 @@ func (r *Reflector) list(ctx context.Context) error {
 		}()
 		// Attempt to gather list in chunks, if supported by listerWatcher, if not, the first
 		// list request will return the full response.
-		pager := pager.New(pager.SimplePageFunc(func(opts metav1.ListOptions) (runtime.Object, error) {
+		pager := pager.New(func(ctx context.Context, opts metav1.ListOptions) (runtime.Object, error) {
 			return r.listerWatcher.ListWithContext(ctx, opts)
-		}))
+		})
 		switch {
 		case r.WatchListPageSize != 0:
 			pager.PageSize = r.WatchListPageSize
@@ -717,7 +717,7 @@ func (r *Reflector) list(ctx context.Context) error {
 			pager.PageSize = 0
 		}
 
-		list, paginatedResult, err = pager.ListWithAlloc(context.Background(), options)
+		list, paginatedResult, err = pager.ListWithAlloc(ctx, options)
 		if isExpiredError(err) || isTooLargeResourceVersionError(err) {
 			r.setIsLastSyncResourceVersionUnavailable(true)
 			// Retry immediately if the resource version used to list is unavailable.
@@ -726,7 +726,7 @@ func (r *Reflector) list(ctx context.Context) error {
 			// resource version it is listing at is expired or the cache may not yet be synced to the provided
 			// resource version. So we need to fallback to resourceVersion="" in all to recover and ensure
 			// the reflector makes forward progress.
-			list, paginatedResult, err = pager.ListWithAlloc(context.Background(), metav1.ListOptions{ResourceVersion: r.relistResourceVersion()})
+			list, paginatedResult, err = pager.ListWithAlloc(ctx, metav1.ListOptions{ResourceVersion: r.relistResourceVersion()})
 		}
 		if err == nil {
 			if unsupportedList, unsupportedListGVK := isUnsupportedTableListObject(list); unsupportedList {

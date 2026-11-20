@@ -18,6 +18,7 @@ package pager
 
 import (
 	"context"
+	stderrors "errors"
 	"fmt"
 	"reflect"
 	"testing"
@@ -240,6 +241,83 @@ func TestListPager_List(t *testing.T) {
 				t.Errorf("ListPager.List() = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestListPager_FullListIfExpired(t *testing.T) {
+	page := func(count int, continueToken string) runtime.Object {
+		result := list(count, "30")
+		result.Continue = continueToken
+		return result
+	}
+	tests := []struct {
+		name    string
+		result  runtime.Object
+		err     error
+		wantErr bool
+	}{
+		{name: "complete list", result: page(4, "")},
+		{name: "complete list of page size", result: page(2, "")},
+		{name: "complete empty list", result: page(0, "")},
+		{name: "partial list", result: page(2, "next"), wantErr: true},
+		{name: "partial short list", result: page(1, "next"), wantErr: true},
+		{name: "partial empty list", result: page(0, "next"), wantErr: true},
+		{name: "expired fallback", err: errors.NewResourceExpired("fallback expired"), wantErr: true},
+		{name: "invalid list", result: &metav1.PartialObjectMetadata{}, wantErr: true},
+	}
+	for _, method := range []string{"List", "ListWithAlloc"} {
+		for _, tt := range tests {
+			t.Run(method+"/"+tt.name, func(t *testing.T) {
+				options := metav1.ListOptions{
+					ResourceVersion:      "10",
+					ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan,
+					LabelSelector:        "app=example",
+					FieldSelector:        "metadata.namespace=default",
+				}
+				calls := 0
+				p := New(func(ctx context.Context, opts metav1.ListOptions) (runtime.Object, error) {
+					calls++
+					switch calls {
+					case 1:
+						firstPage := list(2, "20")
+						firstPage.Continue = "next"
+						return firstPage, nil
+					case 2:
+						return nil, errors.NewResourceExpired("continuation expired")
+					case 3:
+						if !reflect.DeepEqual(opts, options) {
+							t.Fatalf("fallback options = %#v, want %#v", opts, options)
+						}
+						return tt.result, tt.err
+					default:
+						t.Fatalf("unexpected list call %d", calls)
+						return nil, nil
+					}
+				})
+				p.PageSize = 2
+				listFn := p.List
+				if method == "ListWithAlloc" {
+					listFn = p.ListWithAlloc
+				}
+				got, paginated, err := listFn(context.Background(), options)
+				if calls != 3 || !paginated {
+					t.Fatalf("calls = %d, paginated = %t; want 3, true", calls, paginated)
+				}
+				if (err != nil) != tt.wantErr {
+					t.Fatalf("error = %v, wantErr %t", err, tt.wantErr)
+				}
+				if tt.err != nil && !stderrors.Is(err, tt.err) {
+					t.Errorf("error = %v, want original fallback error %v", err, tt.err)
+				}
+				want := tt.result
+				if tt.wantErr {
+					want = nil
+				}
+				if !reflect.DeepEqual(got, want) {
+					t.Errorf("result = %#v, want %#v", got, want)
+				}
+			})
+		}
 	}
 }
 
