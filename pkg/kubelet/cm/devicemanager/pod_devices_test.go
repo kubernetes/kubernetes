@@ -61,6 +61,105 @@ func TestGetContainerDevices(t *testing.T) {
 	}
 }
 
+func TestPodDevicesReservationLifecycle(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	const (
+		podUID                = "pod"
+		containerName         = "container"
+		committedContainer    = "committed-container"
+		resourceName          = "example.com/resource"
+		committedResourceName = "example.com/committed-resource"
+		deviceID              = "dev0"
+		committedDeviceID     = "dev1"
+	)
+
+	podDevices := newPodDevices()
+	require.True(t, podDevices.reserve(podUID, containerName, resourceName))
+	require.False(t, podDevices.reserve(podUID, containerName, resourceName), "a second allocation must not replace an in-flight reservation")
+	require.True(t, podDevices.addDevicesToReservation(podUID, containerName, resourceName, sets.New[string](deviceID)))
+
+	assert.False(t, podDevices.hasPod(podUID), "reservations must not be exposed as committed pod allocations")
+	assert.Empty(t, podDevices.pods())
+	assert.Nil(t, podDevices.containerDevices(podUID, containerName, resourceName))
+	assert.Nil(t, podDevices.getContainerDevices(podUID, containerName))
+	assert.Nil(t, podDevices.deviceRunContainerOptions(logger, podUID, containerName))
+	assert.Empty(t, podDevices.toCheckpointData(logger))
+	assert.Equal(t, sets.New[string](deviceID), podDevices.devices()[resourceName], "reservations must still make devices unavailable")
+
+	// Garbage collection must remove the pod's committed allocations without
+	// removing an in-flight reservation owned by that same pod.
+	podDevices.insert(podUID, committedContainer, committedResourceName, constructDevices([]string{committedDeviceID}), newContainerAllocateResponse())
+	assert.True(t, podDevices.hasPod(podUID))
+	podsWithReservations := podDevices.delete([]string{podUID})
+	assert.Equal(t, []string{podUID}, podsWithReservations)
+	assert.False(t, podDevices.hasPod(podUID))
+	assert.Nil(t, podDevices.containerDevices(podUID, committedContainer, committedResourceName))
+	assert.Equal(t, sets.New[string](deviceID), podDevices.devices()[resourceName])
+
+	response := newContainerAllocateResponse()
+	require.True(t, podDevices.commitReservation(podUID, containerName, resourceName, constructDevices([]string{deviceID}), response))
+	assert.True(t, podDevices.hasPod(podUID))
+	assert.Equal(t, sets.New[string](deviceID), podDevices.containerDevices(podUID, containerName, resourceName))
+	assert.False(t, podDevices.rollbackReservation(podUID, containerName, resourceName), "a committed allocation must not be rolled back as a reservation")
+	assert.Empty(t, podDevices.delete([]string{podUID}), "committed-only deletion must not report reservations")
+}
+
+func TestPodDevicesRollbackReservation(t *testing.T) {
+	const (
+		podUID        = "pod"
+		containerName = "container"
+		resourceName  = "example.com/resource"
+	)
+
+	podDevices := newPodDevices()
+	require.True(t, podDevices.reserve(podUID, containerName, resourceName))
+	require.True(t, podDevices.addDevicesToReservation(podUID, containerName, resourceName, sets.New[string]("dev0")))
+	require.True(t, podDevices.rollbackReservation(podUID, containerName, resourceName))
+	assert.Empty(t, podDevices.devs)
+	assert.Empty(t, podDevices.devices())
+}
+
+func TestPodDevices(t *testing.T) {
+	const (
+		podUID           = "pod"
+		reservedPodUID   = "reserved-pod"
+		container1       = "container1"
+		container2       = "container2"
+		resource1        = "example.com/resource1"
+		resource2        = "example.com/resource2"
+		committedDevice1 = "dev1"
+		committedDevice2 = "dev2"
+		committedDevice3 = "dev3"
+		reservedDevice   = "reserved-dev"
+	)
+
+	podDevices := newPodDevices()
+	podDevices.insert(podUID, container1, resource1,
+		constructDevices([]string{committedDevice1}),
+		newContainerAllocateResponse())
+	podDevices.insert(podUID, container2, resource1,
+		constructDevices([]string{committedDevice2}),
+		newContainerAllocateResponse())
+	podDevices.insert(podUID, container1, resource2,
+		constructDevices([]string{committedDevice3}),
+		newContainerAllocateResponse())
+
+	require.True(t, podDevices.reserve(
+		reservedPodUID, container1, resource1))
+	require.True(t, podDevices.addDevicesToReservation(
+		reservedPodUID, container1, resource1,
+		sets.New[string](reservedDevice)))
+
+	assert.Equal(t, sets.New[string](committedDevice1, committedDevice2),
+		podDevices.podDevices(podUID, resource1))
+	assert.Equal(t, sets.New[string](committedDevice3),
+		podDevices.podDevices(podUID, resource2))
+	assert.Empty(t, podDevices.podDevices(podUID, "example.com/unknown"))
+	assert.Empty(t, podDevices.podDevices("unknown-pod", resource1))
+	assert.Empty(t, podDevices.podDevices(reservedPodUID, resource1),
+		"in-flight reservations must not be exposed as pod devices")
+}
+
 func TestResourceDeviceInstanceFilter(t *testing.T) {
 	var expected string
 	var cond map[string]sets.Set[string]
@@ -256,43 +355,76 @@ func TestDeviceRunContainerOptions(t *testing.T) {
 
 func TestGetPodAndContainerForDevice(t *testing.T) {
 	podDevices := newPodDevices()
-	resourceName1 := "domain1.com/resource1"
-	podID := "pod1"
-	contID := "con1"
-	devices := checkpoint.DevicesPerNUMA{0: []string{"dev1"}, 1: []string{"dev1"}}
-
-	podDevices.insert(podID, contID, resourceName1,
-		devices,
-		newContainerAllocateResponse(
-			withDevices(map[string]string{"/dev/r1dev1": "/dev/r1dev1", "/dev/r1dev2": "/dev/r1dev2"}),
-			withMounts(map[string]string{"/home/r1lib1": "/usr/r1lib1"}),
-		),
+	const (
+		resource1     = "domain1.com/resource1"
+		resource2     = "domain2.com/resource2"
+		pod1          = "pod1"
+		pod2          = "pod2"
+		reservedPod   = "reserved-pod"
+		container1    = "container1"
+		container2    = "container2"
+		deviceID      = "dev1"
+		reservedDevID = "reserved-dev"
 	)
 
-	// dev2 is a new device
-	podUID, _ := podDevices.getPodAndContainerForDevice(resourceName1, "dev2")
-	assert.Equal(t, "", podUID)
+	podDevices.insert(pod1, container1, resource1,
+		constructDevices([]string{deviceID}),
+		newContainerAllocateResponse())
+	// Device IDs are unique only within a resource, so the same ID may be
+	// committed to a different pod and container under another resource.
+	podDevices.insert(pod2, container2, resource2,
+		constructDevices([]string{deviceID}),
+		newContainerAllocateResponse())
+	require.True(t, podDevices.reserve(
+		reservedPod, container1, resource1))
+	require.True(t, podDevices.addDevicesToReservation(
+		reservedPod, container1, resource1,
+		sets.New[string](reservedDevID)))
 
-	// dev1 is a exist device
-	podUID, _ = podDevices.getPodAndContainerForDevice(resourceName1, "dev1")
-	assert.Equal(t, "pod1", podUID)
+	testCases := []struct {
+		name              string
+		resource          string
+		device            string
+		expectedPod       string
+		expectedContainer string
+	}{
+		{
+			name:              "committed device",
+			resource:          resource1,
+			device:            deviceID,
+			expectedPod:       pod1,
+			expectedContainer: container1,
+		},
+		{
+			name:              "same device ID under another resource",
+			resource:          resource2,
+			device:            deviceID,
+			expectedPod:       pod2,
+			expectedContainer: container2,
+		},
+		{
+			name:     "reserved device",
+			resource: resource1,
+			device:   reservedDevID,
+		},
+		{
+			name:     "unknown device",
+			resource: resource1,
+			device:   "unknown-device",
+		},
+		{
+			name:     "unknown resource",
+			resource: "domain3.com/unknown",
+			device:   deviceID,
+		},
+	}
 
-	// a device with the same ID allocated to another pod under a different
-	// resource name must not match: device IDs are only unique per resource.
-	resourceName2 := "domain2.com/resource2"
-	podDevices.insert("pod2", contID, resourceName2,
-		devices,
-		newContainerAllocateResponse(
-			withDevices(map[string]string{"/dev/r2dev1": "/dev/r2dev1"}),
-		),
-	)
-
-	podUID, _ = podDevices.getPodAndContainerForDevice(resourceName2, "dev1")
-	assert.Equal(t, "pod2", podUID)
-
-	podUID, _ = podDevices.getPodAndContainerForDevice(resourceName1, "dev1")
-	assert.Equal(t, "pod1", podUID)
-
-	podUID, _ = podDevices.getPodAndContainerForDevice("domain3.com/unknown", "dev1")
-	assert.Empty(t, podUID)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			podUID, containerName := podDevices.getPodAndContainerForDevice(
+				tc.resource, tc.device)
+			assert.Equal(t, tc.expectedPod, podUID)
+			assert.Equal(t, tc.expectedContainer, containerName)
+		})
+	}
 }

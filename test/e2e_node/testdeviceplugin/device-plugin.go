@@ -51,6 +51,7 @@ type DevicePlugin struct {
 	callsSync sync.Mutex
 
 	errorInjector func(string) error
+	allocateFunc  func(context.Context, *kubeletdevicepluginv1beta1.AllocateRequest) error
 
 	kubeletdevicepluginv1beta1.UnsafeDevicePluginServer
 }
@@ -130,6 +131,12 @@ func (dp *DevicePlugin) Allocate(ctx context.Context, request *kubeletdeviceplug
 	dp.calls = append(dp.calls, "Allocate")
 	dp.callsSync.Unlock()
 
+	if dp.allocateFunc != nil {
+		if err := dp.allocateFunc(ctx, request); err != nil {
+			return nil, err
+		}
+	}
+
 	for _, r := range request.ContainerRequests {
 		response := &kubeletdevicepluginv1beta1.ContainerAllocateResponse{}
 		for _, id := range r.DevicesIds {
@@ -153,6 +160,10 @@ func (dp *DevicePlugin) PreStartContainer(ctx context.Context, request *kubeletd
 
 func (dp *DevicePlugin) GetPreferredAllocation(ctx context.Context, request *kubeletdevicepluginv1beta1.PreferredAllocationRequest) (*kubeletdevicepluginv1beta1.PreferredAllocationResponse, error) {
 	return nil, nil
+}
+
+func (dp *DevicePlugin) SetAllocateFunc(allocateFunc func(context.Context, *kubeletdevicepluginv1beta1.AllocateRequest) error) {
+	dp.allocateFunc = allocateFunc
 }
 
 func (dp *DevicePlugin) RegisterDevicePlugin(ctx context.Context, uniqueName, resourceName string, devices []*kubeletdevicepluginv1beta1.Device) error {
