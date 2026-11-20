@@ -18,6 +18,7 @@ package prober
 
 import (
 	"fmt"
+	"slices"
 	"testing"
 	"time"
 
@@ -856,6 +857,149 @@ func TestDoProbe_TerminatedContainerWithRestartPolicyNever(t *testing.T) {
 
 	// Verify result is set to Failure for terminated container
 	expectResult(t, w, results.Failure, "regular container with pod restart policy Never")
+}
+
+func TestDoProbe_NewContainerOnKubeletRestart(t *testing.T) {
+	logger, ctx := ktesting.NewTestContext(t)
+
+	const (
+		oldContainerID = "test://old_container_id"
+		newContainerID = "test://new_container_id"
+	)
+
+	tests := []struct {
+		name string
+		// featureEnabled toggles ChangeContainerStatusOnKubeletRestart feature gate.
+		// When enabled, the result is always seeded with the probe's initial value.
+		featureEnabled bool
+		// apiContainerID is the container ID in the pod status the kubelet last
+		// observed from the API server, which may be outdated.
+		apiContainerID string
+		isSidecar      bool
+		probeType      probeType
+		// expectedUpdates is the sequence of results the worker is expected to publish.
+		expectedUpdates []results.Result
+	}{
+		{
+			name:           "feature disabled, readiness, the same container survived the kubelet restart",
+			featureEnabled: false,
+			apiContainerID: newContainerID,
+			probeType:      readiness,
+		},
+		{
+			name:            "feature disabled, readiness, a new container was created while the API server was unreachable",
+			featureEnabled:  false,
+			apiContainerID:  oldContainerID,
+			probeType:       readiness,
+			expectedUpdates: []results.Result{results.Failure},
+		},
+		{
+			name:           "feature disabled, readiness, the kubelet never observed a container ID",
+			featureEnabled: false,
+			apiContainerID: "",
+			probeType:      readiness,
+		},
+		{
+			name:           "feature disabled, readiness, the same sidecar survived the kubelet restart",
+			featureEnabled: false,
+			apiContainerID: newContainerID,
+			isSidecar:      true,
+			probeType:      readiness,
+		},
+		{
+			name:            "feature disabled, readiness, a new sidecar was created while the API server was unreachable",
+			featureEnabled:  false,
+			apiContainerID:  oldContainerID,
+			isSidecar:       true,
+			probeType:       readiness,
+			expectedUpdates: []results.Result{results.Failure},
+		},
+		{
+			name:            "feature disabled, startup, a new container was created while the API server was unreachable",
+			featureEnabled:  false,
+			apiContainerID:  oldContainerID,
+			probeType:       startup,
+			expectedUpdates: []results.Result{results.Unknown},
+		},
+		{
+			// Regression test for https://github.com/kubernetes/kubernetes/issues/136910:
+			// a sidecar that survived the restart keeps its startup result.
+			name:            "feature disabled, startup, the same sidecar survived the kubelet restart",
+			featureEnabled:  false,
+			apiContainerID:  newContainerID,
+			isSidecar:       true,
+			probeType:       startup,
+			expectedUpdates: []results.Result{results.Success},
+		},
+		{
+			name:            "feature disabled, startup, a new sidecar was created while the API server was unreachable",
+			featureEnabled:  false,
+			apiContainerID:  oldContainerID,
+			isSidecar:       true,
+			probeType:       startup,
+			expectedUpdates: []results.Result{results.Unknown},
+		},
+		{
+			name:            "feature is enabled, readiness, the same container survived the kubelet restart",
+			featureEnabled:  true,
+			apiContainerID:  newContainerID,
+			probeType:       readiness,
+			expectedUpdates: []results.Result{results.Failure},
+		},
+		{
+			name:            "feature is enabled, readiness, a new container was created while the API server was unreachable",
+			featureEnabled:  true,
+			apiContainerID:  oldContainerID,
+			probeType:       readiness,
+			expectedUpdates: []results.Result{results.Failure},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ChangeContainerStatusOnKubeletRestart, tc.featureEnabled)
+
+			m := newTestManager()
+
+			// The runtime reports a container that started before the kubelet restart
+			// grace period, so its start time alone makes it look like a container
+			// that survived the restart.
+			podStatus := getTestRunningStatus()
+			podStatus.ContainerStatuses[0].ContainerID = newContainerID
+			podStatus.ContainerStatuses[0].State.Running.StartedAt = metav1.Time{Time: kubeletRestartGracePeriod(m.start).Add(-time.Minute)}
+
+			// The pod status the kubelet last observed from the API server.
+			apiContainerStatus := v1.ContainerStatus{Name: testContainerName, ContainerID: tc.apiContainerID}
+
+			var w *worker
+			if tc.isSidecar {
+				w = newTestWorkerWithRestartableInitContainer(m, tc.probeType)
+				w.spec = &v1.Probe{InitialDelaySeconds: 1000}
+				podStatus.InitContainerStatuses = []v1.ContainerStatus{podStatus.ContainerStatuses[0]}
+				podStatus.ContainerStatuses = nil
+				w.pod.Status.InitContainerStatuses = []v1.ContainerStatus{apiContainerStatus}
+			} else {
+				w = newTestWorker(m, tc.probeType, v1.Probe{InitialDelaySeconds: 1000})
+				w.pod.Status.ContainerStatuses = []v1.ContainerStatus{apiContainerStatus}
+			}
+			m.statusManager.SetPodStatus(logger, w.pod, podStatus)
+
+			w.doProbe(ctx)
+
+			var updates []results.Result
+			for drained := false; !drained; {
+				select {
+				case update := <-resultsManager(m, tc.probeType).Updates():
+					updates = append(updates, update.Result)
+				default:
+					drained = true
+				}
+			}
+			if !slices.Equal(updates, tc.expectedUpdates) {
+				t.Errorf("Expected updates %v, but got: %v", tc.expectedUpdates, updates)
+			}
+		})
+	}
 }
 
 func TestLivenessProbeDisabledByStarted(t *testing.T) {

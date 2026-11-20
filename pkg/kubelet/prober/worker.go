@@ -255,28 +255,41 @@ func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 		w.containerID = kubecontainer.ParseContainerID(logger, c.ContainerID)
 
 		if !utilfeature.DefaultFeatureGate.Enabled(features.ChangeContainerStatusOnKubeletRestart) {
+			// The container start time alone cannot tell a container that survived the
+			// kubelet restart apart from a new container the runtime created while the
+			// kubelet could not reach the API server, so compare the container ID the
+			// kubelet last observed from the API server with the one the runtime reports.
+			// See https://github.com/kubernetes/kubernetes/issues/141473
+			apiContainerStatuses := w.pod.Status.ContainerStatuses
+			if w.isInitContainer() {
+				apiContainerStatuses = w.pod.Status.InitContainerStatuses
+			}
+			canInherit := canInheritProbeState(apiContainerStatuses, w.container.Name, c.ContainerID)
+
 			// On kubelet restart, we don't want to immediately set the probe result to Failure,
 			// as this could cause a container that was Ready to become NotReady.
 			isRestart := false
-			if c.State.Running != nil {
+			if canInherit && c.State.Running != nil {
 				containerStartTime := c.State.Running.StartedAt.Time
 				if !containerStartTime.IsZero() && containerStartTime.Before(kubeletRestartGracePeriod(w.probeManager.start)) {
 					isRestart = true
 				}
 			}
 
-			// For restartable init containers (sidecars) with a startup probe, seed the
-			// startup result with Success if the container had already started before the
-			// kubelet restarted. This ensures startupManager.Get() returns a valid result,
-			// allowing computeInitContainerActions to detect pod initialization.
-			// See https://github.com/kubernetes/kubernetes/issues/136910
-			if isRestartableInitContainer && w.probeType == startup {
-				if c.Started != nil && *c.Started {
+			// Started can be true before the container passed its own startup probe, so trust
+			// it only when isRestart says the same container survived. A wrong Success cannot
+			// be undone by a later overwrite, because every stored result is published and
+			// consumers act on the first one they see.
+			if isRestart {
+				// For restartable init containers (sidecars) with a startup probe, seed the
+				// startup result with Success if the container had already started before the
+				// kubelet restarted. This ensures startupManager.Get() returns a valid result,
+				// allowing computeInitContainerActions to detect pod initialization.
+				// See https://github.com/kubernetes/kubernetes/issues/136910
+				if isRestartableInitContainer && w.probeType == startup && c.Started != nil && *c.Started {
 					w.resultsManager.Set(w.containerID, results.Success, w.pod)
 				}
-			}
-
-			if !isRestart {
+			} else {
 				w.resultsManager.Set(w.containerID, w.initialValue, w.pod)
 			}
 		} else {
