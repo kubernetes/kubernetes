@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: Node
+metadata:
+  name: scheduler-perf-no-dra-{{.Index}}
+  labels:
+    # Labels normally set by the kubelet. Added here to make node objects more realistic
+    # in test cases which use label selectors.
+    beta.kubernetes.io/arch: amd64
+    beta.kubernetes.io/os: linux
+    kubernetes.io/arch: amd64
+    kubernetes.io/hostname: scheduler-perf-no-dra-{{.Index}}
+    kubernetes.io/os: linux
+    # Labels set by kubeadm. Added for the same reason.
+    node-role.kubernetes.io/control-plane: ""
+    node.kubernetes.io/exclude-from-external-load-balancers: "" 
+spec: {}
+status:
+  capacity:
+    pods: "110"
+    cpu: "4"
+    memory: 32Gi
+  conditions:
+    - status: "True"
+      type: Ready
+  phase: Running
