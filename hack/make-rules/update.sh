@@ -45,11 +45,13 @@ BASH_TARGETS=(
 	update-golangci-lint-config
 )
 
+FAILED_TARGETS=()
 for t in "${BASH_TARGETS[@]}"; do
 	echo -e "${color_yellow:?}Running ${t}${color_norm:?}"
 	if ${SILENT} ; then
 		if ! bash "${KUBE_ROOT}/hack/${t}.sh" 1> /dev/null; then
 			echo -e "${color_red:?}Running ${t} FAILED${color_norm}"
+			FAILED_TARGETS+=("${t}")
 			if ! ${ALL}; then
 				exit 1
 			fi
@@ -57,11 +59,18 @@ for t in "${BASH_TARGETS[@]}"; do
 	else
 		if ! bash "${KUBE_ROOT}/hack/${t}.sh"; then
 			echo -e "${color_red}Running ${t} FAILED${color_norm}"
+			FAILED_TARGETS+=("${t}")
 			if ! ${ALL}; then
 				exit 1
 			fi
 		fi
 	fi
 done
+
+# With FORCE_ALL the loop keeps going after a failure, so report it here.
+if [[ ${#FAILED_TARGETS[@]} -gt 0 ]]; then
+	echo -e "${color_red}Update scripts failed: ${FAILED_TARGETS[*]}${color_norm}"
+	exit 1
+fi
 
 echo -e "${color_green:?}Update scripts completed successfully${color_norm}"
