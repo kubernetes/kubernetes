@@ -458,21 +458,23 @@ type NodeTopologyHandler interface {
 // NodeTopologyConfig tracks node topology labels.
 type NodeTopologyConfig struct {
 	listerSynced   cache.InformerSynced
-	eventHandlers  []NodeTopologyHandler
+	eventHandler   NodeTopologyHandler
 	topologyLabels map[string]string
 	logger         klog.Logger
 }
 
-// NewNodeTopologyConfig creates a new NodeTopologyConfig.
-func NewNodeTopologyConfig(ctx context.Context, nodeInformer v1informers.NodeInformer, resyncPeriod time.Duration) *NodeTopologyConfig {
-	return newNodeTopologyConfig(ctx, nodeInformer, resyncPeriod, nil)
+// NewNodeTopologyConfig creates a new NodeTopologyConfig. The handler is provided during construction
+// so a running informer cannot replay its cached Node before the handler is registered.
+func NewNodeTopologyConfig(ctx context.Context, nodeInformer v1informers.NodeInformer, resyncPeriod time.Duration, handler NodeTopologyHandler) *NodeTopologyConfig {
+	return newNodeTopologyConfig(ctx, nodeInformer, resyncPeriod, handler, nil)
 }
 
 // newNodeTopologyConfig implements NewNodeTopologyConfig by additionally consuming a callback function which is invoked when
 // event handler completes processing and is only used for testing.
-func newNodeTopologyConfig(ctx context.Context, nodeInformer v1informers.NodeInformer, resyncPeriod time.Duration, callback func()) *NodeTopologyConfig {
+func newNodeTopologyConfig(ctx context.Context, nodeInformer v1informers.NodeInformer, resyncPeriod time.Duration, handler NodeTopologyHandler, callback func()) *NodeTopologyConfig {
 	result := &NodeTopologyConfig{
 		logger:         klog.FromContext(ctx),
+		eventHandler:   handler,
 		topologyLabels: make(map[string]string),
 	}
 
@@ -499,11 +501,6 @@ func newNodeTopologyConfig(ctx context.Context, nodeInformer v1informers.NodeInf
 	return result
 }
 
-// RegisterEventHandler registers a handler which is called on Node object change.
-func (n *NodeTopologyConfig) RegisterEventHandler(handler NodeTopologyHandler) {
-	n.eventHandlers = append(n.eventHandlers, handler)
-}
-
 // handleNodeEvent is a helper function to handle Add, Update and Delete
 // events on Node objects and call downstream event handlers.
 func (n *NodeTopologyConfig) handleNodeEvent(obj interface{}) {
@@ -524,8 +521,6 @@ func (n *NodeTopologyConfig) handleNodeEvent(obj interface{}) {
 	}
 
 	n.topologyLabels = topologyLabels
-	for i := range n.eventHandlers {
-		n.logger.V(4).Info("Calling handler.OnTopologyChange")
-		n.eventHandlers[i].OnTopologyChange(n.topologyLabels)
-	}
+	n.logger.V(4).Info("Calling handler.OnTopologyChange")
+	n.eventHandler.OnTopologyChange(n.topologyLabels)
 }
