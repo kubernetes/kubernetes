@@ -2359,15 +2359,24 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 			}
 		}
 		if !podKilled || !runOnce {
-			if !pcm.Exists(pod) {
+			podCgroupExisted := pcm.Exists(pod)
+			if !podCgroupExisted {
 				if err := kl.containerManager.UpdateQOSCgroups(logger); err != nil {
 					logger.V(2).Info("Failed to update QoS cgroups while syncing pod", "pod", klog.KObj(pod), "err", err)
 				}
-				if err := pcm.EnsureExists(logger, pod); err != nil {
-					kl.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeWarning, events.FailedToCreatePodContainer, "unable to ensure pod container exists: %v", err)
-					return false, nil, fmt.Errorf("failed to ensure that the pod: %v cgroups exist and are correctly applied: %v", pod.UID, err)
-				}
+			}
+			// EnsureExists is called on every sync so that a pod cgroup left
+			// partially configured (e.g. a failed Set or a kubelet restart between
+			// Apply and Set) is reconciled. It is a no-op once the pod is configured.
+			if err := pcm.EnsureExists(logger, pod); err != nil {
+				kl.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeWarning, events.FailedToCreatePodContainer, "unable to ensure pod container exists: %v", err)
+				return false, nil, fmt.Errorf("failed to ensure that the pod: %v cgroups exist and are correctly applied: %w", pod.UID, err)
+			}
 
+			// Only seed the actuated pod-level resources when the pod cgroup was
+			// created by this sync. Recording them on every sync would mark a pending
+			// in-place pod-level resize as already actuated, so it would never be applied.
+			if !podCgroupExisted {
 				if err = kl.containerRuntime.UpdateActuatedPodLevelResources(logger, pod); err != nil {
 					return false, nil, fmt.Errorf("failed to update the state of pod-level resources for the pod %v : %w", pod.UID, err)
 				}
