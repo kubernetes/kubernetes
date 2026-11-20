@@ -215,9 +215,12 @@ func serveSCTPPort(port, value string) {
 		}
 		go func(conn *sctp.SCTPConn) {
 			defer conn.Close()
+			if _, err := conn.Read(make([]byte, 1024)); err != nil {
+				log.Println("Failed to read request", err)
+				return
+			}
 			log.Println("Sending response")
-			_, err = conn.Write([]byte(value))
-			if err != nil {
+			if _, err := conn.Write([]byte(value)); err != nil {
 				log.Println("Failed to send response", err)
 				return
 			}
