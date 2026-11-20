@@ -125,10 +125,7 @@ func (kl *Kubelet) tryRegisterWithAPIServer(node *v1.Node) bool {
 	// Edge case: the node was previously registered; reconcile
 	// the value of the controller-managed attach-detach
 	// annotation.
-	requiresUpdate := kl.reconcileCMADAnnotationWithExistingNode(node, existingNode)
-	requiresUpdate = kl.updateDefaultLabels(node, existingNode) || requiresUpdate
-	requiresUpdate = kl.reconcileExtendedResource(node, existingNode) || requiresUpdate
-	requiresUpdate = kl.reconcileHugePageResource(node, existingNode) || requiresUpdate
+	requiresUpdate := kl.reconcileInitialNodeWithExistingNode(node, existingNode)
 	if requiresUpdate {
 		if _, _, err := nodeutil.PatchNodeStatus(kl.kubeClient.CoreV1(), types.NodeName(kl.nodeName), originalNode, existingNode); err != nil {
 			klog.ErrorS(err, "Unable to reconcile node with API server,error updating node", "node", klog.KObj(node))
@@ -137,6 +134,16 @@ func (kl *Kubelet) tryRegisterWithAPIServer(node *v1.Node) bool {
 	}
 
 	return true
+}
+
+// reconcileInitialNodeWithExistingNode reconciles the initial node with the existing node,
+// returning a boolean indicating whether the existing node must be updated.
+func (kl *Kubelet) reconcileInitialNodeWithExistingNode(initialNode, existingNode *v1.Node) bool {
+	requiresUpdate := kl.reconcileCMADAnnotationWithExistingNode(initialNode, existingNode)
+	requiresUpdate = kl.updateDefaultLabels(initialNode, existingNode) || requiresUpdate
+	requiresUpdate = kl.reconcileExtendedResource(initialNode, existingNode) || requiresUpdate
+	requiresUpdate = kl.reconcileHugePageResource(initialNode, existingNode) || requiresUpdate
+	return requiresUpdate
 }
 
 // reconcileHugePageResource will update huge page capacity for each page size and remove huge page sizes no longer supported
@@ -190,7 +197,7 @@ func (kl *Kubelet) reconcileHugePageResource(initialNode, existingNode *v1.Node)
 func (kl *Kubelet) reconcileExtendedResource(initialNode, node *v1.Node) bool {
 	requiresUpdate := updateDefaultResources(initialNode, node)
 	// Check with the device manager to see if node has been recreated, in which case extended resources should be zeroed until they are available
-	if kl.containerManager.ShouldResetExtendedResourceCapacity() {
+	if kl.containerManager != nil && kl.containerManager.ShouldResetExtendedResourceCapacity() {
 		for k := range node.Status.Capacity {
 			if v1helper.IsExtendedResourceName(k) {
 				klog.InfoS("Zero out resource capacity in existing node", "resourceName", k, "node", klog.KObj(node))
