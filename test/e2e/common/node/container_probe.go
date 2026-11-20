@@ -186,6 +186,7 @@ var _ = SIGDescribe("Probing container", func() {
 		livenessProbe := &v1.Probe{
 			ProbeHandler:        tcpSocketHandler(8080),
 			InitialDelaySeconds: 15,
+			TimeoutSeconds:      5, // default 1s can be pretty aggressive in CI environments with low resources
 			FailureThreshold:    1,
 		}
 		pod := livenessPodSpec(f.Namespace.Name, nil, livenessProbe)
