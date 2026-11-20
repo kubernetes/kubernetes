@@ -22,25 +22,52 @@ import (
 	"context"
 	"net/url"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
+// registerFnEntry pairs a RegisterFn installed via RegisterOpts with its own
+// sync.Once, so each callback runs exactly once even when it is registered
+// after EnsureRegistered has already run. Running one more than once would
+// re-register with legacyregistry, which panics on duplicates.
+type registerFnEntry struct {
+	once sync.Once
+	fn   func()
+}
+
 var (
-	registerMetrics      sync.Once
-	ensureRegisteredOnce sync.Once
-	// ensureRegisteredFn, if set via RegisterOpts.RegisterFn, is invoked
-	// exactly once before any rest client is constructed. Adapter packages
-	// (e.g. k8s.io/component-base/metrics/prometheus/restclient) install
-	// this callback in their init() so that the actual registration with
-	// legacyregistry — and the metric Create() that reads
-	// feature-gate-derived options like NativeHistograms — happens at
-	// runtime rather than at init() time. See EnsureRegistered for the
-	// caller-side contract.
-	ensureRegisteredFn func()
+	// registerLock guards the write path of Register and the registration
+	// state below. The exported metric hooks are read from the request path
+	// without synchronization, so Register must be called before any rest
+	// client is constructed; see the Register documentation.
+	registerLock sync.Mutex
+
+	// registerFns holds every callback installed via RegisterOpts.RegisterFn.
+	// Adapter packages (e.g. k8s.io/component-base/metrics/prometheus/restclient)
+	// install these in their init() so that the actual registration with
+	// legacyregistry — and the metric Create() that reads feature-gate-derived
+	// options like NativeHistograms — happens at runtime rather than at init()
+	// time. See EnsureRegistered for the caller-side contract.
+	//
+	// It is only ever replaced, never appended to in place, so EnsureRegistered
+	// can range over a snapshot of it without holding registerLock.
+	registerFns []*registerFnEntry
+
+	// ensureRegisteredStarted records whether EnsureRegistered has run at least
+	// once. Once it has, a callback registered afterwards is invoked
+	// immediately rather than waiting for a call that may never come. It is
+	// atomic because the lock-free fast path in EnsureRegistered has to record
+	// it without taking registerLock.
+	ensureRegisteredStarted atomic.Bool
+
+	// registerFnsPending is the lock-free fast path for EnsureRegistered, which
+	// adapters call on every observation. Its zero value, false, means there is
+	// nothing left to invoke.
+	registerFnsPending atomic.Bool
 )
 
-// EnsureRegistered invokes the callback installed via RegisterOpts.RegisterFn (if
-// any) exactly once. Callers should treat it as idempotent; subsequent calls are
+// EnsureRegistered invokes the callbacks installed via RegisterOpts.RegisterFn,
+// each exactly once. Callers should treat it as idempotent; subsequent calls are
 // effectively free.
 //
 // New public constructors or entry points for packages in client-go that create
@@ -51,10 +78,39 @@ var (
 // "first-observation" to "first client construction", meaning the metric
 // series is visible to Promteheus scrapes from process startup rather than
 // appearing only after the first request.
+//
+// A RegisterFn must not itself call Register or EnsureRegistered.
 func EnsureRegistered() {
-	if ensureRegisteredFn != nil {
-		ensureRegisteredOnce.Do(ensureRegisteredFn)
+	// Record that registration time has passed even when there is nothing to
+	// invoke, so that a provider registering later knows no further
+	// EnsureRegistered call is guaranteed. Tested before storing to keep the
+	// steady-state path read-only rather than writing the same cache line from
+	// every request on every core.
+	if !ensureRegisteredStarted.Load() {
+		ensureRegisteredStarted.Store(true)
 	}
+
+	if !registerFnsPending.Load() {
+		return
+	}
+
+	registerLock.Lock()
+	entries := registerFns
+	registerLock.Unlock()
+
+	// Callbacks run outside registerLock: they call back into metric
+	// registries and must not be serialized behind the registration state.
+	for _, entry := range entries {
+		entry.once.Do(entry.fn)
+	}
+
+	registerLock.Lock()
+	// Anything registered while the callbacks above were running is not
+	// covered by this pass, so leave the fast path armed for it.
+	if len(registerFns) == len(entries) {
+		registerFnsPending.Store(false)
+	}
+	registerLock.Unlock()
 }
 
 // DurationMetric is a measurement of some amount of time.
@@ -198,65 +254,106 @@ type RegisterOpts struct {
 	// before the first rest client is constructed. Adapters use this to defer
 	// registrations that depend on runtime state (eg., feature gates read my metric
 	// Create() without changing the import side contract of the adapter package.)
+	//
+	// Callbacks from multiple Register calls are all retained and each is
+	// invoked exactly once. A callback registered after EnsureRegistered has
+	// already run is invoked by Register itself, since no further
+	// EnsureRegistered call is guaranteed. It must not call Register or
+	// EnsureRegistered.
 	RegisterFn func()
 }
 
-// Register registers metrics for the rest client to use. This can
-// only be called once.
+// Register adds the metrics in opts to those the rest client and its transports
+// update. It may be called by more than one provider: every registered metric
+// receives every observation. Nil fields in opts are ignored.
+//
+// Earlier releases applied only the first call to Register and silently
+// ignored every later caller.
+//
+// Register should be called before any REST client, HTTP transport, or
+// credential provider is constructed, typically from an init function: the
+// metrics it installs are read from the request path without synchronization,
+// and values already captured by existing clients are not updated
+// retroactively. Registering the same metric more than once records each
+// observation once per registration.
 func Register(opts RegisterOpts) {
-	registerMetrics.Do(func() {
-		if opts.ClientCertExpiry != nil {
-			ClientCertExpiry = opts.ClientCertExpiry
-		}
-		if opts.ClientCertRotationAge != nil {
-			ClientCertRotationAge = opts.ClientCertRotationAge
-		}
-		if opts.RequestLatency != nil {
-			RequestLatency = opts.RequestLatency
-		}
-		if opts.ResolverLatency != nil {
-			ResolverLatency = opts.ResolverLatency
-		}
-		if opts.RequestSize != nil {
-			RequestSize = opts.RequestSize
-		}
-		if opts.ResponseSize != nil {
-			ResponseSize = opts.ResponseSize
-		}
-		if opts.RateLimiterLatency != nil {
-			RateLimiterLatency = opts.RateLimiterLatency
-		}
-		if opts.RequestResult != nil {
-			RequestResult = opts.RequestResult
-		}
-		if opts.ExecPluginCalls != nil {
-			ExecPluginCalls = opts.ExecPluginCalls
-		}
-		if opts.ExecPluginPolicyCalls != nil {
-			ExecPluginPolicyCalls = opts.ExecPluginPolicyCalls
-		}
-		if opts.RequestRetry != nil {
-			RequestRetry = opts.RequestRetry
-		}
-		if opts.TransportCacheEntries != nil {
-			TransportCacheEntries = opts.TransportCacheEntries
-		}
-		if opts.TransportCreateCalls != nil {
-			TransportCreateCalls = opts.TransportCreateCalls
-		}
-		if opts.TransportCAReloads != nil {
-			TransportCAReloads = opts.TransportCAReloads
-		}
-		if opts.TransportCertRotationGCCalls != nil {
-			TransportCertRotationGCCalls = opts.TransportCertRotationGCCalls
-		}
-		if opts.TransportCacheGCCalls != nil {
-			TransportCacheGCCalls = opts.TransportCacheGCCalls
-		}
-		if opts.RegisterFn != nil {
-			ensureRegisteredFn = opts.RegisterFn
-		}
-	})
+	registerLock.Lock()
+
+	// Each hook is written only when there is something to add. The combine
+	// helpers already ignore a nil addition, but the assignment itself would
+	// still be a write, and these are read from the request path without
+	// synchronization.
+	if opts.ClientCertExpiry != nil {
+		ClientCertExpiry = combineExpiry(ClientCertExpiry, opts.ClientCertExpiry)
+	}
+	if opts.ClientCertRotationAge != nil {
+		ClientCertRotationAge = combineDuration(ClientCertRotationAge, opts.ClientCertRotationAge)
+	}
+	if opts.RequestLatency != nil {
+		RequestLatency = combineLatency(RequestLatency, opts.RequestLatency)
+	}
+	if opts.ResolverLatency != nil {
+		ResolverLatency = combineResolverLatency(ResolverLatency, opts.ResolverLatency)
+	}
+	if opts.RequestSize != nil {
+		RequestSize = combineSize(RequestSize, opts.RequestSize)
+	}
+	if opts.ResponseSize != nil {
+		ResponseSize = combineSize(ResponseSize, opts.ResponseSize)
+	}
+	if opts.RateLimiterLatency != nil {
+		RateLimiterLatency = combineLatency(RateLimiterLatency, opts.RateLimiterLatency)
+	}
+	if opts.RequestResult != nil {
+		RequestResult = combineResult(RequestResult, opts.RequestResult)
+	}
+	if opts.ExecPluginCalls != nil {
+		ExecPluginCalls = combineCalls(ExecPluginCalls, opts.ExecPluginCalls)
+	}
+	if opts.ExecPluginPolicyCalls != nil {
+		ExecPluginPolicyCalls = combinePolicy(ExecPluginPolicyCalls, opts.ExecPluginPolicyCalls)
+	}
+	if opts.RequestRetry != nil {
+		RequestRetry = combineRetry(RequestRetry, opts.RequestRetry)
+	}
+	if opts.TransportCacheEntries != nil {
+		TransportCacheEntries = combineTransportCache(TransportCacheEntries, opts.TransportCacheEntries)
+	}
+	if opts.TransportCreateCalls != nil {
+		TransportCreateCalls = combineTransportCreateCalls(TransportCreateCalls, opts.TransportCreateCalls)
+	}
+	if opts.TransportCAReloads != nil {
+		TransportCAReloads = combineTransportCAReloads(TransportCAReloads, opts.TransportCAReloads)
+	}
+	if opts.TransportCertRotationGCCalls != nil {
+		TransportCertRotationGCCalls = combineTransportCertRotationGCCalls(TransportCertRotationGCCalls, opts.TransportCertRotationGCCalls)
+	}
+	if opts.TransportCacheGCCalls != nil {
+		TransportCacheGCCalls = combineTransportCacheGCCalls(TransportCacheGCCalls, opts.TransportCacheGCCalls)
+	}
+
+	fireNow := false
+	if opts.RegisterFn != nil {
+		// Copy rather than append in place: EnsureRegistered ranges over the
+		// current slice without holding registerLock.
+		next := make([]*registerFnEntry, len(registerFns)+1)
+		copy(next, registerFns)
+		next[len(registerFns)] = &registerFnEntry{fn: opts.RegisterFn}
+		registerFns = next
+		registerFnsPending.Store(true)
+
+		// RegisterFn is deliberately not invoked here. Adapters install it so
+		// that registration happens at first client construction, once
+		// feature gates are set; firing it now would defeat that. Fire it
+		// only if that moment has already passed, because no further
+		// EnsureRegistered call is guaranteed.
+		fireNow = ensureRegisteredStarted.Load()
+	}
+	registerLock.Unlock()
+
+	if fireNow {
+		EnsureRegistered()
+	}
 }
 
 type noopDuration struct{}
