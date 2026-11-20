@@ -5424,7 +5424,7 @@ func (f *fakePodProvider) SyncPodNow(ctx context.Context, pod *v1.Pod) {
 func makeAllocationManager(t *testing.T, runtime *containertest.FakeRuntime, allocatedPods []*v1.Pod, nodeConfig *cm.NodeConfig) Manager {
 	t.Helper()
 	logger, _ := ktesting.NewTestContext(t)
-	statusManager := status.NewManager(&fake.Clientset{}, kubepod.NewBasicPodManager(), &statustest.FakePodDeletionSafetyProvider{}, kubeletutil.NewPodStartupLatencyTracker())
+	statusManager := status.NewManager(&fake.Clientset{}, &record.FakeRecorder{}, kubepod.NewBasicPodManager(), &statustest.FakePodDeletionSafetyProvider{}, kubeletutil.NewPodStartupLatencyTracker())
 	var containerManager *cm.FakeContainerManager
 	if nodeConfig == nil {
 		containerManager = cm.NewFakeContainerManager(logger)
@@ -6293,7 +6293,7 @@ func TestRetryPendingAllocationsSyncsSchedulerEvaluationCompletedRemoval(t *test
 	am := allocationManager.(*manager)
 	// Strip sub-second LastProbeTime drift so unchanged Deferred conditions compare equal in retryPendingAllocations.
 	am.statusManager = fixedProbeTimeStatusManager{
-		Manager: status.NewManager(&fake.Clientset{}, podManager, &statustest.FakePodDeletionSafetyProvider{}, kubeletutil.NewPodStartupLatencyTracker()),
+		Manager: status.NewManager(&fake.Clientset{}, &record.FakeRecorder{}, podManager, &statustest.FakePodDeletionSafetyProvider{}, kubeletutil.NewPodStartupLatencyTracker()),
 	}
 	require.NoError(t, allocationManager.SetAllocatedPod(logger, pod))
 
@@ -6345,7 +6345,7 @@ func TestRetryPendingAllocationsSyncsSchedulerEvaluationCompletedRemoval(t *test
 	am.podProvider.(*fakePodProvider).pods = []*v1.Pod{resizedPodWithSEC}
 	// Run once to stabilize the OutOfcpu message after switching back from blockedPodWithSEC, then reset clearSchedEvalCond via a fresh status manager with Deferred already set.
 	am.statusManager = fixedProbeTimeStatusManager{
-		Manager: status.NewManager(&fake.Clientset{}, podManager, &statustest.FakePodDeletionSafetyProvider{}, kubeletutil.NewPodStartupLatencyTracker()),
+		Manager: status.NewManager(&fake.Clientset{}, &record.FakeRecorder{}, podManager, &statustest.FakePodDeletionSafetyProvider{}, kubeletutil.NewPodStartupLatencyTracker()),
 	}
 	am.statusManager.SetPodResizePendingCondition(resizedPod.UID, v1.PodReasonDeferred, "Node didn't have enough resource: cpu, requested: 5000, used: 0, capacity: 4000", resizedPod.Generation)
 	syncCount = 0
@@ -6366,7 +6366,7 @@ func makeAllocationManagerWithNodeGetter(
 ) Manager {
 	t.Helper()
 	logger, _ := ktesting.NewTestContext(t)
-	statusManager := status.NewManager(&fake.Clientset{}, kubepod.NewBasicPodManager(), &statustest.FakePodDeletionSafetyProvider{}, kubeletutil.NewPodStartupLatencyTracker())
+	statusManager := status.NewManager(&fake.Clientset{}, &record.FakeRecorder{}, kubepod.NewBasicPodManager(), &statustest.FakePodDeletionSafetyProvider{}, kubeletutil.NewPodStartupLatencyTracker())
 	containerManager := cm.NewFakeContainerManager(logger)
 	allocationManager := NewInMemoryManager(
 		logger,
