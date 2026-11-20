@@ -1314,6 +1314,9 @@ func (c *Cacher) dispatchEvents() {
 func setCachingObjects(event *watchCacheEvent, versioner storage.Versioner) {
 	switch event.Type {
 	case watch.Added, watch.Modified:
+		if _, ok := event.Object.(*cachingObject); ok {
+			return
+		}
 		if object, err := newCachingObject(event.Object); err == nil {
 			event.Object = object
 		} else {
@@ -1327,6 +1330,12 @@ func setCachingObjects(event *watchCacheEvent, versioner storage.Versioner) {
 		// This is rare enough that it doesn't justify making deep-copy of the
 		// object (done by newCachingObject) every time.
 	case watch.Deleted:
+		if event.PrevObject == nil {
+			return
+		}
+		if _, ok := event.PrevObject.(*cachingObject); ok {
+			return
+		}
 		// Don't wrap Object for delete events - these are not to deliver any
 		// events. Only wrap PrevObject.
 		if object, err := newCachingObject(event.PrevObject); err == nil {
@@ -1404,19 +1413,10 @@ func (c *Cacher) dispatchEvent(event *watchCacheEvent) {
 }
 
 func (c *Cacher) prepareEventForDispatch(event *watchCacheEvent) *watchCacheEvent {
-	// Set up caching of object serializations only for dispatching this event.
-	//
-	// Storing serializations in memory would result in increased memory usage,
-	// but it would help for caching encodings for watches started from old
-	// versions. However, we still don't have a convincing data that the gain
-	// from it justifies increased memory usage, so for now we drop the cached
-	// serializations after dispatching this event.
-	//
-	// Given that CachingObject is just wrapping the object and not perfoming
-	// deep-copying (until some field is explicitly being modified), we create
-	// it unconditionally to ensure safety and reduce deep-copying.
-	//
-	// Make a shallow copy to allow overwriting Object and PrevObject.
+	// Events from watchCache already wrap Object (or PrevObject on delete) in
+	// cachingObject so live dispatch, interval catchup, and stalled-watcher
+	// resync passes share cached serializations. Copy watchCacheEvent so
+	// per-pass timeline marks do not mutate the shared history entry.
 	wcEvent := *event
 	setCachingObjects(&wcEvent, c.versioner)
 	wcEvent.timeline.MarkAt(metrics.PointWatcherEnqueued, c.clock.Now())
