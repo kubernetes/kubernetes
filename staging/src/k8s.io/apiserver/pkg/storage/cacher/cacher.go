@@ -108,6 +108,10 @@ type Config struct {
 	// watch cache event history capacity derived from EventsHistoryWindow.
 	WatchCacheMaxEvents int
 
+	// ConsistencyCheckPeriod is the period between checks that the watch cache
+	// is consistent with etcd. Zero means the default.
+	ConsistencyCheckPeriod time.Duration
+
 	// The Cache will be caching objects of a given Type and assumes that they
 	// are all stored under ResourcePrefix directory in the underlying database.
 	ResourcePrefix string
@@ -385,6 +389,7 @@ type Cacher struct {
 	watcherMetrics                *metrics.WatcherMetricsObservers
 	resyncMetrics                 metrics.ResyncMetrics
 	disableConsistentGetFromCache bool
+	consistencyCheckPeriod        time.Duration
 }
 
 // NewCacherFromConfig creates a new Cacher responsible for servicing WATCH and LIST requests from
@@ -468,6 +473,7 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 		watcherMetrics:                metrics.NewWatcherMetricsObservers(config.GroupResource),
 		resyncMetrics:                 metrics.NewResyncMetrics(config.GroupResource),
 		disableConsistentGetFromCache: config.DisableConsistentGetFromCache,
+		consistencyCheckPeriod:        config.ConsistencyCheckPeriod,
 	}
 
 	// Ensure that timer is stopped.
@@ -490,6 +496,9 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 	}
 	if config.WatchCacheMaxEvents != 0 && config.WatchCacheMaxEvents < MinWatchCacheMaxEvents {
 		return nil, fmt.Errorf("config.WatchCacheMaxEvents (%d) must be 0 or at least %d", config.WatchCacheMaxEvents, MinWatchCacheMaxEvents)
+	}
+	if config.ConsistencyCheckPeriod < 0 {
+		return nil, fmt.Errorf("config.ConsistencyCheckPeriod (%v) must not be negative", config.ConsistencyCheckPeriod)
 	}
 
 	progressRequester := progress.NewConditionalProgressRequester(config.Storage.RequestWatchProgress, config.Clock, contextMetadata)

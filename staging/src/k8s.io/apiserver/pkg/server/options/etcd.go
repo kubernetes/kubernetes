@@ -44,6 +44,7 @@ import (
 	encryptionconfigmetrics "k8s.io/apiserver/pkg/server/options/encryptionconfig/metrics"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	cacherstorage "k8s.io/apiserver/pkg/storage/cacher"
+	"k8s.io/apiserver/pkg/storage/cacher/consistency"
 	"k8s.io/apiserver/pkg/storage/etcd3/metrics"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	storagefactory "k8s.io/apiserver/pkg/storage/storagebackend/factory"
@@ -89,7 +90,33 @@ func NewEtcdOptions(backendConfig *storagebackend.Config) *EtcdOptions {
 		EnableWatchCache:        true,
 	}
 	options.StorageConfig.CountMetricPollPeriod = time.Minute
+	options.StorageConfig.WatchCacheConsistencyCheckPeriod = consistency.DefaultCheckPeriod
 	return options
+}
+
+// positiveDurationValue is a pflag.Value that only accepts durations greater than zero.
+type positiveDurationValue struct {
+	value *time.Duration
+}
+
+func (v *positiveDurationValue) String() string {
+	return v.value.String()
+}
+
+func (v *positiveDurationValue) Set(s string) error {
+	d, err := time.ParseDuration(s)
+	if err != nil {
+		return err
+	}
+	if d <= 0 {
+		return fmt.Errorf("must be greater than zero")
+	}
+	*v.value = d
+	return nil
+}
+
+func (v *positiveDurationValue) Type() string {
+	return "duration"
 }
 
 var storageMediaTypes = sets.New(
@@ -178,6 +205,11 @@ func (s *EtcdOptions) AddFlags(fs *pflag.FlagSet) {
 		"Maximum number of events the watch cache keeps in its history per resource. "+
 		"The history still starts small and grows on demand up to this limit. "+
 		"If zero, the limit is derived from the events history window.")
+
+	fs.Var(&positiveDurationValue{value: &s.StorageConfig.WatchCacheConsistencyCheckPeriod}, "watch-cache-consistency-check-period", ""+
+		"The period between checks that the watch cache is consistent with etcd. "+
+		"A longer period reduces the background load, but delays detection of an inconsistent cache "+
+		"and recovery of serving from it. Must be greater than zero.")
 
 	fs.StringVar(&s.StorageConfig.Type, "storage-backend", s.StorageConfig.Type,
 		"The storage backend for persistence. Options: 'etcd3' (default).")
