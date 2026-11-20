@@ -30,6 +30,7 @@ import (
 	"github.com/onsi/gomega/types"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apimachinerytypes "k8s.io/apimachinery/pkg/types"
 	helpers "k8s.io/component-helpers/resource"
@@ -1884,7 +1885,178 @@ var _ = SIGDescribe("CPU Manager with InPlacePodVerticalScalingExclusiveCPUs ena
 		}
 	})
 
+	// The resize of exclusive CPUs is admitted as a transaction: the CPU manager allocates the CPUs of the
+	// resize on a scratch state, and commits them only once the resize is admitted and its allocation is
+	// persisted. A rejected resize must leave the CPUs of the pod and the shared pool as they were before it.
+	ginkgo.When("admitting a resize of exclusive CPUs as a transaction", ginkgo.Label("resize admission transaction", "exclusive-cpus"), func() {
+		ginkgo.DescribeTable("", func(ctx context.Context, resizedCPUCount int, expectedDeferred bool) {
+			// The CPU manager reserves the kube-reserved CPU rounded up to whole CPUs, and which CPUs it
+			// reserves is not checked here.
+			reservedCPUs = cpuset.New()
+			const kubeReservedCPU = "500m"
+			cfg := configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
+				policyName: string(cpumanager.PolicyStatic),
+				enableInPlacePodVerticalScalingExclusiveCPUs: true,
+				topologyManagerPolicy:                        "none",
+			})
+			cfg.ReservedSystemCPUs = ""
+			cfg.KubeReserved["cpu"] = kubeReservedCPU
+			updateKubeletConfigIfNeeded(ctx, f, cfg)
+
+			reservedCPU := resource.MustParse(kubeReservedCPU)
+			if systemReserved, ok := cfg.SystemReserved["cpu"]; ok {
+				reservedCPU.Add(resource.MustParse(systemReserved))
+			}
+			reservedMilliCPUs := reservedCPU.MilliValue()
+			var capacityMilliCPUs, allocatableMilliCPUs int64
+			ginkgo.By("waiting for the node allocatable CPU to account for the reserved CPU")
+			gomega.Eventually(ctx, func(g gomega.Gomega) {
+				node := getLocalNode(ctx, f)
+				capacity := node.Status.Capacity[v1.ResourceCPU]
+				allocatable := node.Status.Allocatable[v1.ResourceCPU]
+				capacityMilliCPUs, allocatableMilliCPUs = capacity.MilliValue(), allocatable.MilliValue()
+				g.Expect(allocatableMilliCPUs).To(gomega.Equal(capacityMilliCPUs - reservedMilliCPUs))
+			}).WithTimeout(time.Minute).WithPolling(f.Timeouts.Poll).Should(gomega.Succeed())
+
+			// The filler pod leaves 3750m of the node allocatable CPU, e.g. with 5 CPUs it takes 750m of
+			// 4500m, and the CPU manager can allocate 4 CPUs exclusively. The test pod gets 2 CPUs. A resize
+			// to 4 CPUs fits the node allocatable CPU, which the API server checks, and the CPUs the CPU
+			// manager can allocate, but not the node allocatable CPU left, so it is deferred. A resize to
+			// 3 CPUs fits the node allocatable CPU left too, so it is admitted.
+			const baselineCPUCount = 2
+			const allocatableMilliCPUsLeft = 3750
+			exclusiveCPUs := int((capacityMilliCPUs - (reservedMilliCPUs+999)/1000*1000) / 1000)
+			if exclusiveCPUs < resizedCPUCount {
+				e2eskipper.Skipf("Skipping test: %d CPUs for exclusive allocation, the test needs at least %d", exclusiveCPUs, resizedCPUCount)
+			}
+			fillerMilliCPUs := allocatableMilliCPUs - allocatableMilliCPUsLeft
+			if fillerMilliCPUs < 0 {
+				e2eskipper.Skipf("Skipping test: %dm of node allocatable CPU, the test needs at least %dm", allocatableMilliCPUs, allocatableMilliCPUsLeft)
+			}
+			baselineCPUs := strconv.Itoa(baselineCPUCount * 1000)
+			desiredCPUs := strconv.Itoa(resizedCPUCount * 1000)
+
+			ginkgo.By(fmt.Sprintf("creating a burstable pod requesting %dm of the %dm allocatable CPU", fillerMilliCPUs, allocatableMilliCPUs))
+			fillerPod := makeCPUManagerBEPod("cpu-filler-pod", []ctnAttribute{
+				{
+					ctnName:    "cpu-filler-container",
+					ctnCommand: "sleep 1d",
+				},
+			})
+			fillerPod.Spec.Containers[0].Resources.Requests = v1.ResourceList{
+				v1.ResourceCPU: *resource.NewMilliQuantity(fillerMilliCPUs, resource.DecimalSI),
+			}
+			createPodSync(ctx, fillerPod)
+
+			ginkgo.By("creating a best-effort pod running on the shared CPU pool")
+			sharedPoolPod := createPodSync(ctx, makeCPUManagerBEPod("shared-pool-pod", []ctnAttribute{
+				{
+					ctnName:    sharedPoolContainerName,
+					ctnCommand: "sleep 1d",
+				},
+			}))
+
+			baselineContainers := []podresize.ResizableContainerInfo{
+				{
+					Name:      "gu-container-1",
+					Resources: &cgroups.ContainerResources{CPUReq: baselineCPUs + "m", CPULim: baselineCPUs + "m", MemReq: "200Mi", MemLim: "200Mi"},
+				},
+			}
+			desiredContainers := []podresize.ResizableContainerInfo{
+				{
+					Name:      "gu-container-1",
+					Resources: &cgroups.ContainerResources{CPUReq: desiredCPUs + "m", CPULim: desiredCPUs + "m", MemReq: "200Mi", MemLim: "200Mi"},
+				},
+			}
+			expectedCPUInfo := []containerCPUInfo{
+				{
+					Name:     "gu-container-1",
+					cpuCount: baselineCPUCount,
+				},
+			}
+
+			ginkgo.By("creating the test pod")
+			testPod := podresize.MakePodWithResizableContainers(f.Namespace.Name, "testpod", strconv.Itoa(time.Now().Nanosecond()), baselineContainers, nil)
+			testPod = e2epod.MustMixinRestrictedPodSecurity(testPod)
+			testPod = createPodSync(ctx, testPod)
+			podresize.VerifyPodResources(testPod, baselineContainers, nil)
+
+			checkEnv := resizeCheckEnv{
+				f:             f,
+				testPod:       testPod,
+				sharedPoolPod: sharedPoolPod,
+				reservedCPUs:  reservedCPUs,
+			}
+			ginkgo.By("verifying the cpusets of the test pod")
+			stateBeforeResize := checkAllocatedCPUsForResize(ctx, checkEnv, nil, expectedCPUInfo)
+			sharedCPUsBeforeResize, err := getContainerAllowedCPUs(sharedPoolPod, sharedPoolContainerName, false)
+			framework.ExpectNoError(err, "failed to get the CPUs of the shared pool")
+
+			expectSharedCPUs := func(expectedCPUs cpuset.CPUSet) {
+				ginkgo.GinkgoHelper()
+				// CPUManagerReconcilePeriod is set to 1 second during tests,
+				// to reduce flakiness this check includes a 5 second timeout.
+				const cpusetReconcilePeriodTimeout = 5 * time.Second
+				matchSharedCPUs := func(g gomega.Gomega) {
+					sharedCPUs, err := getContainerAllowedCPUs(sharedPoolPod, sharedPoolContainerName, false)
+					g.Expect(err).To(gomega.Succeed(), "failed to get the CPUs of the shared pool")
+					g.Expect(sharedCPUs.String()).To(gomega.Equal(expectedCPUs.String()), "unexpected CPUs of the shared pool")
+				}
+				gomega.Eventually(ctx, matchSharedCPUs).WithTimeout(cpusetReconcilePeriodTimeout).WithPolling(f.Timeouts.Poll).Should(gomega.Succeed())
+				gomega.Consistently(ctx, matchSharedCPUs).WithTimeout(10 * time.Second).WithPolling(f.Timeouts.Poll).Should(gomega.Succeed())
+			}
+
+			ginkgo.By(fmt.Sprintf("resizing the CPUs of the test pod from %sm to %sm", baselineCPUs, desiredCPUs))
+			podClient := e2epod.PodClientNS(f, testPod.Namespace)
+			patchedPod, err := podClient.Patch(ctx, testPod.Name, apimachinerytypes.StrategicMergePatchType,
+				podresize.MakeResizePatch(baselineContainers, desiredContainers, nil, nil), metav1.PatchOptions{}, "resize")
+			framework.ExpectNoError(err, "failed to patch pod for resize")
+
+			if !expectedDeferred {
+				expected := podresize.UpdateExpectedContainerRestarts(ctx, patchedPod, desiredContainers)
+				ginkgo.By("waiting for the resize to be complete and the pod to become ready")
+				resizedPod := podresize.WaitForPodResizeActuation(ctx, f, podClient, testPod, nil)
+				podresize.VerifyPodResources(resizedPod, expected, nil)
+
+				ginkgo.By("verifying the container keeps its CPUs and gets the CPUs of the resize")
+				stateAfterResize := checkAllocatedCPUsForResize(ctx, checkEnv, stateBeforeResize, []containerCPUInfo{
+					{
+						Name:     "gu-container-1",
+						cpuCount: resizedCPUCount,
+					},
+				})
+				addedCPUs := stateAfterResize["gu-container-1"].assignedCPUs.Difference(stateBeforeResize["gu-container-1"].assignedCPUs)
+
+				ginkgo.By(fmt.Sprintf("verifying the CPUs %s of the resize are taken from the shared pool %s", addedCPUs, sharedCPUsBeforeResize))
+				gomega.Expect(addedCPUs.IsSubsetOf(sharedCPUsBeforeResize)).To(gomega.BeTrueBecause(
+					"the CPUs %s of the resize must be taken from the shared pool %s", addedCPUs, sharedCPUsBeforeResize))
+				expectSharedCPUs(sharedCPUsBeforeResize.Difference(addedCPUs))
+				return
+			}
+
+			ginkgo.By("waiting for the resize to be deferred")
+			WaitForPodResizeDeferred(ctx, f, patchedPod)
+			deferredPod, err := podClient.Get(ctx, patchedPod.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err, "failed to get the pod with the deferred resize")
+			gomega.Expect(deferredPod).To(HaveStatusConditionsMatchingRegex("Deferred.*Node didn't have enough resource: cpu"))
+
+			ginkgo.By("verifying the container keeps its CPUs")
+			checkAllocatedCPUsForResize(ctx, checkEnv, stateBeforeResize, expectedCPUInfo)
+
+			ginkgo.By(fmt.Sprintf("verifying the shared pool keeps its CPUs %s, including the CPU the resize would have taken", sharedCPUsBeforeResize))
+			expectSharedCPUs(sharedCPUsBeforeResize)
+		},
+			ginkgo.Entry("should keep the CPUs as before a resize deferred for the node allocatable CPU after the CPU manager allocated CPUs for it", 4, true),
+			ginkgo.Entry("should resize the CPUs when the node allocatable CPU left fits the resize", 3, false),
+		)
+	})
 })
+
+func WaitForPodResizeDeferred(ctx context.Context, f *framework.Framework, testPod *v1.Pod) {
+	framework.ExpectNoError(e2epod.WaitForPodCondition(ctx, f.ClientSet, testPod.Namespace, testPod.Name, "display pod resize status as deferred", f.Timeouts.PodStart, func(pod *v1.Pod) (bool, error) {
+		return helpers.IsPodResizeDeferred(pod), nil
+	}))
+}
 
 func WaitForPodResizeInfeasible(ctx context.Context, f *framework.Framework, testPod *v1.Pod) {
 	framework.ExpectNoError(e2epod.WaitForPodCondition(ctx, f.ClientSet, testPod.Namespace, testPod.Name, "display pod resize status as infeasible", f.Timeouts.PodStart, func(pod *v1.Pod) (bool, error) {
