@@ -988,6 +988,7 @@ func testDevicePluginNodeReboot(f *framework.Framework, pluginSockDir string) {
 
 			ginkgo.By("stopping the kubelet")
 			restartKubelet := mustStopKubelet(ctx, f)
+			ginkgo.DeferCleanup(restartKubelet)
 
 			ginkgo.By("stopping all the local containers - using CRI")
 			rs, _, err := getCRIClient(ctx)

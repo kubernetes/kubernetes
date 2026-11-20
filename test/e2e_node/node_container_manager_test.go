@@ -309,6 +309,7 @@ func runTest(ctx context.Context, f *framework.Framework) error {
 	// Update the Kubelet configuration.
 	ginkgo.By("Stopping the kubelet")
 	restartKubelet := mustStopKubelet(ctx, f)
+	ginkgo.DeferCleanup(restartKubelet)
 
 	expectedNAPodCgroup := cm.NewCgroupName(cm.RootCgroupName, nodeAllocatableCgroup)
 
@@ -596,6 +597,7 @@ func run1GiHugepagesTest(ctx context.Context, f *framework.Framework) error {
 
 	ginkgo.By("Stopping the kubelet")
 	restartKubelet := mustStopKubelet(ctx, f)
+	ginkgo.DeferCleanup(restartKubelet)
 
 	expectedNAPodCgroup := cm.NewCgroupName(cm.RootCgroupName, nodeAllocatableCgroup)
 	if err := cgroupManager.Destroy(klog.Background(), &cm.CgroupConfig{
