@@ -427,8 +427,10 @@ func NewNodeLifecycleController(ctx context.Context, opts ControllerOptions) (*C
 			nc.nodeUpdateQueue.Add(node.Name)
 			return nil
 		}),
-		UpdateFunc: controllerutil.CreateUpdateNodeHandler(func(_, newNode *v1.Node) error {
-			nc.nodeUpdateQueue.Add(newNode.Name)
+		UpdateFunc: controllerutil.CreateUpdateNodeHandler(func(oldNode, newNode *v1.Node) error {
+			if nodeUpdateNeedsProcessing(oldNode, newNode) {
+				nc.nodeUpdateQueue.Add(newNode.Name)
+			}
 			return nil
 		}),
 		DeleteFunc: controllerutil.CreateDeleteNodeHandler(logger, func(node *v1.Node) error {
@@ -454,6 +456,40 @@ func NewNodeLifecycleController(ctx context.Context, opts ControllerOptions) (*C
 	}
 
 	return nc, nil
+}
+
+// nodeUpdateNeedsProcessing reports whether a node update changes a field that
+// doNoScheduleTaintingPass or reconcileNodeLabels read, or is an informer resync.
+func nodeUpdateNeedsProcessing(oldNode, newNode *v1.Node) bool {
+	if oldNode.ResourceVersion == newNode.ResourceVersion {
+		return true
+	}
+	if oldNode.Spec.Unschedulable != newNode.Spec.Unschedulable {
+		return true
+	}
+	if !apiequality.Semantic.DeepEqual(oldNode.Spec.Taints, newNode.Spec.Taints) {
+		return true
+	}
+	for conditionType := range nodeConditionToTaintKeyStatusMap {
+		_, oldCondition := controllerutil.GetNodeCondition(&oldNode.Status, conditionType)
+		_, newCondition := controllerutil.GetNodeCondition(&newNode.Status, conditionType)
+		if (oldCondition == nil) != (newCondition == nil) {
+			return true
+		}
+		if oldCondition != nil && oldCondition.Status != newCondition.Status {
+			return true
+		}
+	}
+	for _, r := range labelReconcileInfo {
+		for _, key := range []string{r.primaryKey, r.secondaryKey} {
+			oldValue, oldExists := oldNode.Labels[key]
+			newValue, newExists := newNode.Labels[key]
+			if oldExists != newExists || oldValue != newValue {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // Run starts an asynchronous loop that monitors the status of cluster nodes.
