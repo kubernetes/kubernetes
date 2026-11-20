@@ -249,7 +249,7 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 	getCmd := get.NewCmdGet("kubectl", f, o.IOStreams)
 	getCmd.ValidArgsFunction = utilcomp.ResourceTypeAndNameCompletionFunc(f)
 	debugCmd := debug.NewCmdDebug(f, o.IOStreams)
-	debugCmd.ValidArgsFunction = utilcomp.ResourceTypeAndNameCompletionFunc(f)
+	debugCmd.ValidArgsFunction = utilcomp.DebugResourceNameCompletionFunc(f)
 
 	groups := templates.CommandGroups{
 		{
