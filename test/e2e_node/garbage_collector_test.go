@@ -1,336 +1,265 @@
-/*
-Copyright 2016 The Kubernetes Authors.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
-
-package e2enode
-
-import (
-	"context"
-	"fmt"
-	"strconv"
-	"time"
-
-	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	internalapi "k8s.io/cri-api/pkg/apis"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
-	"k8s.io/kubelet/pkg/types"
-	"k8s.io/kubernetes/test/e2e/framework"
-	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	admissionapi "k8s.io/pod-security-admission/api"
-
-	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
-)
-
-const (
-	//TODO (dashpole): Once dynamic config is possible, test different values for maxPerPodContainer and maxContainers
-	// Currently using default values for maxPerPodContainer and maxTotalContainers
-	maxPerPodContainer = 1
-	maxTotalContainers = -1
-
-	garbageCollectDuration = 3 * time.Minute
-	setupDuration          = 10 * time.Minute
-	runtimePollInterval    = 10 * time.Second
-)
-
-type testPodSpec struct {
-	podName string
-	// containerPrefix must be unique for each pod, and cannot end in a number.
-	// containerPrefix is used to identify which containers belong to which pod in the test.
-	containerPrefix string
-	// the number of times each container should restart
-	restartCount int32
-	// the number of containers in the test pod
-	numContainers int
-	// a function that returns the number of containers currently on the node (including dead containers).
-	getContainerNames func() ([]string, error)
-}
-
-func (pod *testPodSpec) getContainerName(containerNumber int) string {
-	return fmt.Sprintf("%s%d", pod.containerPrefix, containerNumber)
-}
-
-type testRun struct {
-	// Name for logging purposes
-	testName string
-	// Pod specs for the test
-	testPods []*testPodSpec
-}
-
-// GarbageCollect tests that the Kubelet conforms to the Kubelet Garbage Collection Policy, found here:
-// http://kubernetes.io/docs/admin/garbage-collection/
-var _ = SIGDescribe("GarbageCollect", framework.WithSerial(), framework.WithNodeConformance(), func() {
-	f := framework.NewDefaultFramework("garbage-collect-test")
-	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
-	containerNamePrefix := "gc-test-container-"
-	podNamePrefix := "gc-test-pod-"
-
-	// These suffixes are appended to pod and container names.
-	// They differentiate pods from one another, and allow filtering
-	// by names to identify which containers belong to which pods
-	// They must be unique, and must not end in a number
-	firstSuffix := "one-container-no-restarts"
-	secondSuffix := "many-containers-many-restarts-one-pod"
-	thirdSuffix := "many-containers-many-restarts-"
-	tests := []testRun{
-		{
-			testName: "One Non-restarting Container",
-			testPods: []*testPodSpec{
-				{
-					podName:         podNamePrefix + firstSuffix,
-					containerPrefix: containerNamePrefix + firstSuffix,
-					restartCount:    0,
-					numContainers:   1,
-				},
-			},
-		},
-		{
-			testName: "Many Restarting Containers",
-			testPods: []*testPodSpec{
-				{
-					podName:         podNamePrefix + secondSuffix,
-					containerPrefix: containerNamePrefix + secondSuffix,
-					restartCount:    4,
-					numContainers:   4,
-				},
-			},
-		},
-		{
-			testName: "Many Pods with Many Restarting Containers",
-			testPods: []*testPodSpec{
-				{
-					podName:         podNamePrefix + thirdSuffix + "one",
-					containerPrefix: containerNamePrefix + thirdSuffix + "one",
-					restartCount:    3,
-					numContainers:   4,
-				},
-				{
-					podName:         podNamePrefix + thirdSuffix + "two",
-					containerPrefix: containerNamePrefix + thirdSuffix + "two",
-					restartCount:    2,
-					numContainers:   6,
-				},
-				{
-					podName:         podNamePrefix + thirdSuffix + "three",
-					containerPrefix: containerNamePrefix + thirdSuffix + "three",
-					restartCount:    3,
-					numContainers:   5,
-				},
-			},
-		},
-	}
-	for _, test := range tests {
-		containerGCTest(f, test)
-	}
-})
-
-// Tests the following:
-//
-//	pods are created, and all containers restart the specified number of times
-//	while containers are running, the number of copies of a single container does not exceed maxPerPodContainer
-//	while containers are running, the total number of containers does not exceed maxTotalContainers
-//	while containers are running, if not constrained by maxPerPodContainer or maxTotalContainers, keep an extra copy of each container
-//	once pods are killed, all containers are eventually cleaned up
-func containerGCTest(f *framework.Framework, test testRun) {
-	var runtime internalapi.RuntimeService
-	ginkgo.BeforeEach(func(ctx context.Context) {
-		var err error
-		runtime, _, err = getCRIClient(ctx)
-		framework.ExpectNoError(err)
-	})
-	for _, pod := range test.testPods {
-		// Initialize the getContainerNames function to use CRI runtime client.
-		pod.getContainerNames = func() ([]string, error) {
-			relevantContainers := []string{}
-			containers, err := runtime.ListContainers(context.Background(), &runtimeapi.ContainerFilter{
-				LabelSelector: map[string]string{
-					types.KubernetesPodNameLabel:      pod.podName,
-					types.KubernetesPodNamespaceLabel: f.Namespace.Name,
-				},
-			})
-			if err != nil {
-				return relevantContainers, err
-			}
-			for _, container := range containers {
-				relevantContainers = append(relevantContainers, container.Labels[types.KubernetesContainerNameLabel])
-			}
-			return relevantContainers, nil
-		}
-	}
-
-	ginkgo.Context(fmt.Sprintf("Garbage Collection Test: %s", test.testName), func() {
-		ginkgo.BeforeEach(func(ctx context.Context) {
-			realPods := getPods(test.testPods)
-			e2epod.NewPodClient(f).CreateBatch(ctx, realPods)
-			ginkgo.By("Making sure all containers restart the specified number of times")
-			gomega.Eventually(ctx, func(ctx context.Context) error {
-				for _, podSpec := range test.testPods {
-					err := verifyPodRestartCount(ctx, f, podSpec.podName, podSpec.numContainers, podSpec.restartCount)
-					if err != nil {
-						return err
-					}
-				}
-				return nil
-			}, setupDuration, runtimePollInterval).Should(gomega.BeNil())
-		})
-
-		ginkgo.It("Should eventually garbage collect containers when we exceed the number of dead containers per container", func(ctx context.Context) {
-			totalContainers := 0
-			for _, pod := range test.testPods {
-				totalContainers += pod.numContainers*2 + 1
-			}
-			gomega.Eventually(ctx, func() error {
-				total := 0
-				for _, pod := range test.testPods {
-					containerNames, err := pod.getContainerNames()
-					if err != nil {
-						return err
-					}
-					total += len(containerNames)
-					// Check maxPerPodContainer for each container in the pod
-					for i := 0; i < pod.numContainers; i++ {
-						containerCount := 0
-						for _, containerName := range containerNames {
-							if containerName == pod.getContainerName(i) {
-								containerCount++
-							}
-						}
-						if containerCount > maxPerPodContainer+1 {
-							return fmt.Errorf("expected number of copies of container: %s, to be <= maxPerPodContainer: %d; list of containers: %v",
-								pod.getContainerName(i), maxPerPodContainer, containerNames)
-						}
-					}
-				}
-				//Check maxTotalContainers.  Currently, the default is -1, so this will never happen until we can configure maxTotalContainers
-				if maxTotalContainers > 0 && totalContainers <= maxTotalContainers && total > maxTotalContainers {
-					return fmt.Errorf("expected total number of containers: %v, to be <= maxTotalContainers: %v", total, maxTotalContainers)
-				}
-				return nil
-			}, garbageCollectDuration, runtimePollInterval).Should(gomega.BeNil())
-
-			if maxPerPodContainer >= 2 && maxTotalContainers < 0 { // make sure constraints wouldn't make us gc old containers
-				ginkgo.By("Making sure the kubelet consistently keeps around an extra copy of each container.")
-				gomega.Consistently(ctx, func() error {
-					for _, pod := range test.testPods {
-						containerNames, err := pod.getContainerNames()
-						if err != nil {
-							return err
-						}
-						for i := 0; i < pod.numContainers; i++ {
-							containerCount := 0
-							for _, containerName := range containerNames {
-								if containerName == pod.getContainerName(i) {
-									containerCount++
-								}
-							}
-							if pod.restartCount > 0 && containerCount < maxPerPodContainer+1 {
-								return fmt.Errorf("expected pod %v to have extra copies of old containers", pod.podName)
-							}
-						}
-					}
-					return nil
-				}, garbageCollectDuration, runtimePollInterval).Should(gomega.BeNil())
-			}
-		})
-
-		ginkgo.AfterEach(func(ctx context.Context) {
-			for _, pod := range test.testPods {
-				ginkgo.By(fmt.Sprintf("Deleting Pod %v", pod.podName))
-				e2epod.NewPodClient(f).DeleteSync(ctx, pod.podName, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
-			}
-
-			ginkgo.By("Making sure all containers get cleaned up")
-			gomega.Eventually(ctx, func() error {
-				for _, pod := range test.testPods {
-					containerNames, err := pod.getContainerNames()
-					if err != nil {
-						return err
-					}
-					if len(containerNames) > 0 {
-						return fmt.Errorf("%v containers still remain", containerNames)
-					}
-				}
-				return nil
-			}, garbageCollectDuration, runtimePollInterval).Should(gomega.BeNil())
-
-			if ginkgo.CurrentSpecReport().Failed() && framework.TestContext.DumpLogsOnFailure {
-				logNodeEvents(ctx, f)
-				logPodEvents(ctx, f)
-			}
-		})
-	})
-}
-
-func getPods(specs []*testPodSpec) (pods []*v1.Pod) {
-	for _, spec := range specs {
-		ginkgo.By(fmt.Sprintf("Creating %v containers with restartCount: %v", spec.numContainers, spec.restartCount))
-		containers := []v1.Container{}
-		for i := 0; i < spec.numContainers; i++ {
-			containers = append(containers, v1.Container{
-				Image:   busyboxImage,
-				Name:    spec.getContainerName(i),
-				Command: getRestartingContainerCommand("/test-empty-dir-mnt", i, spec.restartCount, ""),
-				VolumeMounts: []v1.VolumeMount{
-					{MountPath: "/test-empty-dir-mnt", Name: "test-empty-dir"},
-				},
-			})
-		}
-		pods = append(pods, &v1.Pod{
-			ObjectMeta: metav1.ObjectMeta{Name: spec.podName},
-			Spec: v1.PodSpec{
-				RestartPolicy: v1.RestartPolicyAlways,
-				Containers:    containers,
-				Volumes: []v1.Volume{
-					{Name: "test-empty-dir", VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}},
-				},
-			},
-		})
-	}
-	return
-}
-
-func getRestartingContainerCommand(path string, containerNum int, restarts int32, loopingCommand string) []string {
-	return []string{
-		"sh",
-		"-c",
-		fmt.Sprintf(`
-			f=%s/countfile%s
-			count=$(echo 'hello' >> $f ; wc -l $f | awk {'print $1'})
-			if [ $count -lt %d ]; then
-				exit 0
-			fi
-			while true; do %s sleep 1; done`,
-			path, strconv.Itoa(containerNum), restarts+1, loopingCommand),
-	}
-}
-
-func verifyPodRestartCount(ctx context.Context, f *framework.Framework, podName string, expectedNumContainers int, expectedRestartCount int32) error {
-	updatedPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, podName, metav1.GetOptions{})
-	if err != nil {
-		return err
-	}
-	if len(updatedPod.Status.ContainerStatuses) != expectedNumContainers {
-		return fmt.Errorf("expected pod %s to have %d containers, actual: %d",
-			updatedPod.Name, expectedNumContainers, len(updatedPod.Status.ContainerStatuses))
-	}
-	for _, containerStatus := range updatedPod.Status.ContainerStatuses {
-		if containerStatus.RestartCount < expectedRestartCount {
-			return fmt.Errorf("pod %s had container with restartcount %d.  Should have been at least %d",
-				updatedPod.Name, containerStatus.RestartCount, expectedRestartCount)
-		}
-	}
-	return nil
-}
+LyoKQ29weXJpZ2h0IDIwMTYgVGhlIEt1YmVybmV0ZXMgQXV0aG9ycy4KCkxp
+Y2Vuc2VkIHVuZGVyIHRoZSBBcGFjaGUgTGljZW5zZSwgVmVyc2lvbiAyLjAg
+KHRoZSAiTGljZW5zZSIpOwp5b3UgbWF5IG5vdCB1c2UgdGhpcyBmaWxlIGV4
+Y2VwdCBpbiBjb21wbGlhbmNlIHdpdGggdGhlIExpY2Vuc2UuCllvdSBtYXkg
+b2J0YWluIGEgY29weSBvZiB0aGUgTGljZW5zZSBhdAoKICAgIGh0dHA6Ly93
+d3cuYXBhY2hlLm9yZy9saWNlbnNlcy9MSUNFTlNFLTIuMAoKVW5sZXNzIHJl
+cXVpcmVkIGJ5IGFwcGxpY2FibGUgbGF3IG9yIGFncmVlZCB0byBpbiB3cml0
+aW5nLCBzb2Z0d2FyZQpkaXN0cmlidXRlZCB1bmRlciB0aGUgTGljZW5zZSBp
+cyBkaXN0cmlidXRlZCBvbiBhbiAiQVMgSVMiIEJBU0lTLApXSVRIT1VUIFdB
+UlJBTlRJRVMgT1IgQ09ORElUSU9OUyBPRiBBTlkgS0lORCwgZWl0aGVyIGV4
+cHJlc3Mgb3IgaW1wbGllZC4KU2VlIHRoZSBMaWNlbnNlIGZvciB0aGUgc3Bl
+Y2lmaWMgbGFuZ3VhZ2UgZ292ZXJuaW5nIHBlcm1pc3Npb25zIGFuZApsaW1p
+dGF0aW9ucyB1bmRlciB0aGUgTGljZW5zZS4KKi8KCnBhY2thZ2UgZTJlbm9k
+ZQoKaW1wb3J0ICgKCSJjb250ZXh0IgoJImZtdCIKCSJzdHJjb252IgoJInRp
+bWUiCgoJdjEgIms4cy5pby9hcGkvY29yZS92MSIKCW1ldGF2MSAiazhzLmlv
+L2FwaW1hY2hpbmVyeS9wa2cvYXBpcy9tZXRhL3YxIgoJaW50ZXJuYWxhcGkg
+Ims4cy5pby9jcmktYXBpL3BrZy9hcGlzIgoJcnVudGltZWFwaSAiazhzLmlv
+L2NyaS1hcGkvcGtnL2FwaXMvcnVudGltZS92MSIKCSJrOHMuaW8va3ViZWxl
+dC9wa2cvdHlwZXMiCgkiazhzLmlvL2t1YmVybmV0ZXMvdGVzdC9lMmUvZnJh
+bWV3b3JrIgoJZTJlcG9kICJrOHMuaW8va3ViZXJuZXRlcy90ZXN0L2UyZS9m
+cmFtZXdvcmsvcG9kIgoJYWRtaXNzaW9uYXBpICJrOHMuaW8vcG9kLXNlY3Vy
+aXR5LWFkbWlzc2lvbi9hcGkiCgoJImdpdGh1Yi5jb20vb25zaS9naW5rZ28v
+djIiCgkiZ2l0aHViLmNvbS9vbnNpL2dvbWVnYSIKKQoKY29uc3QgKAoJLy9U
+T0RPIChkYXNocG9sZSk6IE9uY2UgZHluYW1pYyBjb25maWcgaXMgcG9zc2li
+bGUsIHRlc3QgZGlmZmVyZW50IHZhbHVlcyBmb3IgbWF4UGVyUG9kQ29udGFp
+bmVyIGFuZCBtYXhDb250YWluZXJzCgkvLyBDdXJyZW50bHkgdXNpbmcgZGVm
+YXVsdCB2YWx1ZXMgZm9yIG1heFBlclBvZENvbnRhaW5lciBhbmQgbWF4VG90
+YWxDb250YWluZXJzCgltYXhQZXJQb2RDb250YWluZXIgPSAxCgltYXhUb3Rh
+bENvbnRhaW5lcnMgPSAtMQoKCWdhcmJhZ2VDb2xsZWN0RHVyYXRpb24gPSAz
+ICogdGltZS5NaW51dGUKCXNldHVwRHVyYXRpb24gICAgICAgICAgPSAxMCAq
+IHRpbWUuTWludXRlCglydW50aW1lUG9sbEludGVydmFsICAgID0gMTAgKiB0
+aW1lLlNlY29uZAopCgp0eXBlIHRlc3RQb2RTcGVjIHN0cnVjdCB7Cglwb2RO
+YW1lIHN0cmluZwoJLy8gY29udGFpbmVyUHJlZml4IG11c3QgYmUgdW5pcXVl
+IGZvciBlYWNoIHBvZCwgYW5kIGNhbm5vdCBlbmQgaW4gYSBudW1iZXIuCgkv
+LyBjb250YWluZXJQcmVmaXggaXMgdXNlZCB0byBpZGVudGlmeSB3aGljaCBj
+b250YWluZXJzIGJlbG9uZyB0byB3aGljaCBwb2QgaW4gdGhlIHRlc3QuCglj
+b250YWluZXJQcmVmaXggc3RyaW5nCgkvLyB0aGUgbnVtYmVyIG9mIHRpbWVz
+IGVhY2ggY29udGFpbmVyIHNob3VsZCByZXN0YXJ0CglyZXN0YXJ0Q291bnQg
+aW50MzIKCS8vIHRoZSBudW1iZXIgb2YgY29udGFpbmVycyBpbiB0aGUgdGVz
+dCBwb2QKCW51bUNvbnRhaW5lcnMgaW50CgkvLyBhIGZ1bmN0aW9uIHRoYXQg
+cmV0dXJucyB0aGUgbnVtYmVyIG9mIGNvbnRhaW5lcnMgY3VycmVudGx5IG9u
+IHRoZSBub2RlIChpbmNsdWRpbmcgZGVhZCBjb250YWluZXJzKS4KCWdldENv
+bnRhaW5lck5hbWVzIGZ1bmMoKSAoW11zdHJpbmcsIGVycm9yKQp9CgpmdW5j
+IChwb2QgKnRlc3RQb2RTcGVjKSBnZXRDb250YWluZXJOYW1lKGNvbnRhaW5l
+ck51bWJlciBpbnQpIHN0cmluZyB7CglyZXR1cm4gZm10LlNwcmludGYoIiVz
+JWQiLCBwb2QuY29udGFpbmVyUHJlZml4LCBjb250YWluZXJOdW1iZXIpCn0K
+CnR5cGUgdGVzdFJ1biBzdHJ1Y3QgewoJLy8gTmFtZSBmb3IgbG9nZ2luZyBw
+dXJwb3NlcwoJdGVzdE5hbWUgc3RyaW5nCgkvLyBQb2Qgc3BlY3MgZm9yIHRo
+ZSB0ZXN0Cgl0ZXN0UG9kcyBbXSp0ZXN0UG9kU3BlYwp9CgovLyBHYXJiYWdl
+Q29sbGVjdCB0ZXN0cyB0aGF0IHRoZSBLdWJlbGV0IGNvbmZvcm1zIHRvIHRo
+ZSBLdWJlbGV0IEdhcmJhZ2UgQ29sbGVjdGlvbiBQb2xpY3ksIGZvdW5kIGhl
+cmU6Ci8vIGh0dHA6Ly9rdWJlcm5ldGVzLmlvL2RvY3MvYWRtaW4vZ2FyYmFn
+ZS1jb2xsZWN0aW9uLwp2YXIgXyA9IFNJR0Rlc2NyaWJlKCJHYXJiYWdlQ29s
+bGVjdCIsIGZyYW1ld29yay5XaXRoU2VyaWFsKCksIGZyYW1ld29yay5XaXRo
+Tm9kZUNvbmZvcm1hbmNlKCksIGZ1bmMoKSB7CglmIDo9IGZyYW1ld29yay5O
+ZXdEZWZhdWx0RnJhbWV3b3JrKCJnYXJiYWdlLWNvbGxlY3QtdGVzdCIpCglm
+Lk5hbWVzcGFjZVBvZFNlY3VyaXR5TGV2ZWwgPSBhZG1pc3Npb25hcGkuTGV2
+ZWxQcml2aWxlZ2VkCgljb250YWluZXJOYW1lUHJlZml4IDo9ICJnYy10ZXN0
+LWNvbnRhaW5lci0iCglwb2ROYW1lUHJlZml4IDo9ICJnYy10ZXN0LXBvZC0i
+CgoJLy8gVGhlc2Ugc3VmZml4ZXMgYXJlIGFwcGVuZGVkIHRvIHBvZCBhbmQg
+Y29udGFpbmVyIG5hbWVzLgoJLy8gVGhleSBkaWZmZXJlbnRpYXRlIHBvZHMg
+ZnJvbSBvbmUgYW5vdGhlciwgYW5kIGFsbG93IGZpbHRlcmluZwoJLy8gYnkg
+bmFtZXMgdG8gaWRlbnRpZnkgd2hpY2ggY29udGFpbmVycyBiZWxvbmcgdG8g
+d2hpY2ggcG9kcwoJLy8gVGhleSBtdXN0IGJlIHVuaXF1ZSwgYW5kIG11c3Qg
+bm90IGVuZCBpbiBhIG51bWJlcgoJZmlyc3RTdWZmaXggOj0gIm9uZS1jb250
+YWluZXItbm8tcmVzdGFydHMiCglzZWNvbmRTdWZmaXggOj0gIm1hbnktY29u
+dGFpbmVycy1tYW55LXJlc3RhcnRzLW9uZS1wb2QiCgl0aGlyZFN1ZmZpeCA6
+PSAibWFueS1jb250YWluZXJzLW1hbnktcmVzdGFydHMtIgoJdGVzdHMgOj0g
+W110ZXN0UnVuewoJCXsKCQkJdGVzdE5hbWU6ICJPbmUgTm9uLXJlc3RhcnRp
+bmcgQ29udGFpbmVyIiwKCQkJdGVzdFBvZHM6IFtdKnRlc3RQb2RTcGVjewoJ
+CQkJewoJCQkJCXBvZE5hbWU6ICAgICAgICAgcG9kTmFtZVByZWZpeCArIGZp
+cnN0U3VmZml4LAoJCQkJCWNvbnRhaW5lclByZWZpeDogY29udGFpbmVyTmFt
+ZVByZWZpeCArIGZpcnN0U3VmZml4LAoJCQkJCXJlc3RhcnRDb3VudDogICAg
+MCwKCQkJCQludW1Db250YWluZXJzOiAgIDEsCgkJCQl9LAoJCQl9LAoJCX0s
+CgkJewoJCQl0ZXN0TmFtZTogIk1hbnkgUmVzdGFydGluZyBDb250YWluZXJz
+IiwKCQkJdGVzdFBvZHM6IFtdKnRlc3RQb2RTcGVjewoJCQkJewoJCQkJCXBv
+ZE5hbWU6ICAgICAgICAgcG9kTmFtZVByZWZpeCArIHNlY29uZFN1ZmZpeCwK
+CQkJCQljb250YWluZXJQcmVmaXg6IGNvbnRhaW5lck5hbWVQcmVmaXggKyBz
+ZWNvbmRTdWZmaXgsCgkJCQkJcmVzdGFydENvdW50OiAgICA0LAoJCQkJCW51
+bUNvbnRhaW5lcnM6ICAgNCwKCQkJCX0sCgkJCX0sCgkJfSwKCQl7CgkJCXRl
+c3ROYW1lOiAiTWFueSBQb2RzIHdpdGggTWFueSBSZXN0YXJ0aW5nIENvbnRh
+aW5lcnMiLAoJCQl0ZXN0UG9kczogW10qdGVzdFBvZFNwZWN7CgkJCQl7CgkJ
+CQkJcG9kTmFtZTogICAgICAgICBwb2ROYW1lUHJlZml4ICsgdGhpcmRTdWZm
+aXggKyAib25lIiwKCQkJCQljb250YWluZXJQcmVmaXg6IGNvbnRhaW5lck5h
+bWVQcmVmaXggKyB0aGlyZFN1ZmZpeCArICJvbmUiLAoJCQkJCXJlc3RhcnRD
+b3VudDogICAgMywKCQkJCQludW1Db250YWluZXJzOiAgIDQsCgkJCQl9LAoJ
+CQkJewoJCQkJCXBvZE5hbWU6ICAgICAgICAgcG9kTmFtZVByZWZpeCArIHRo
+aXJkU3VmZml4ICsgInR3byIsCgkJCQkJY29udGFpbmVyUHJlZml4OiBjb250
+YWluZXJOYW1lUHJlZml4ICsgdGhpcmRTdWZmaXggKyAidHdvIiwKCQkJCQly
+ZXN0YXJ0Q291bnQ6ICAgIDIsCgkJCQkJbnVtQ29udGFpbmVyczogICA2LAoJ
+CQkJfSwKCQkJCXsKCQkJCQlwb2ROYW1lOiAgICAgICAgIHBvZE5hbWVQcmVm
+aXggKyB0aGlyZFN1ZmZpeCArICJ0aHJlZSIsCgkJCQkJY29udGFpbmVyUHJl
+Zml4OiBjb250YWluZXJOYW1lUHJlZml4ICsgdGhpcmRTdWZmaXggKyAidGhy
+ZWUiLAoJCQkJCXJlc3RhcnRDb3VudDogICAgMywKCQkJCQludW1Db250YWlu
+ZXJzOiAgIDUsCgkJCQl9LAoJCQl9LAoJCX0sCgl9Cglmb3IgXywgdGVzdCA6
+PSByYW5nZSB0ZXN0cyB7CgkJY29udGFpbmVyR0NUZXN0KGYsIHRlc3QpCgl9
+Cn0pCgovLyBUZXN0cyB0aGUgZm9sbG93aW5nOgovLwovLwlwb2RzIGFyZSBj
+cmVhdGVkLCBhbmQgYWxsIGNvbnRhaW5lcnMgcmVzdGFydCB0aGUgc3BlY2lm
+aWVkIG51bWJlciBvZiB0aW1lcwovLwl3aGlsZSBjb250YWluZXJzIGFyZSBy
+dW5uaW5nLCB0aGUgbnVtYmVyIG9mIGNvcGllcyBvZiBhIHNpbmdsZSBjb250
+YWluZXIgZG9lcyBub3QgZXhjZWVkIG1heFBlclBvZENvbnRhaW5lcgovLwl3
+aGlsZSBjb250YWluZXJzIGFyZSBydW5uaW5nLCB0aGUgdG90YWwgbnVtYmVy
+IG9mIGNvbnRhaW5lcnMgZG9lcyBub3QgZXhjZWVkIG1heFRvdGFsQ29udGFp
+bmVycwovLwl3aGlsZSBjb250YWluZXJzIGFyZSBydW5uaW5nLCBpZiBub3Qg
+Y29uc3RyYWluZWQgYnkgbWF4UGVyUG9kQ29udGFpbmVyIG9yIG1heFRvdGFs
+Q29udGFpbmVycywga2VlcCBhbiBleHRyYSBjb3B5IG9mIGVhY2ggY29udGFp
+bmVyCi8vCW9uY2UgcG9kcyBhcmUga2lsbGVkLCBhbGwgY29udGFpbmVycyBh
+cmUgZXZlbnR1YWxseSBjbGVhbmVkIHVwCmZ1bmMgY29udGFpbmVyR0NUZXN0
+KGYgKmZyYW1ld29yay5GcmFtZXdvcmssIHRlc3QgdGVzdFJ1bikgewoJdmFy
+IHJ1bnRpbWUgaW50ZXJuYWxhcGkuUnVudGltZVNlcnZpY2UKCWdpbmtnby5C
+ZWZvcmVFYWNoKGZ1bmMoY3R4IGNvbnRleHQuQ29udGV4dCkgewoJCXZhciBl
+cnIgZXJyb3IKCQlydW50aW1lLCBfLCBlcnIgPSBnZXRDUklDbGllbnQoY3R4
+KQoJCWZyYW1ld29yay5FeHBlY3ROb0Vycm9yKGVycikKCX0pCglmb3IgXywg
+cG9kIDo9IHJhbmdlIHRlc3QudGVzdFBvZHMgewoJCS8vIEluaXRpYWxpemUg
+dGhlIGdldENvbnRhaW5lck5hbWVzIGZ1bmN0aW9uIHRvIHVzZSBDUkkgcnVu
+dGltZSBjbGllbnQuCgkJcG9kLmdldENvbnRhaW5lck5hbWVzID0gZnVuYygp
+IChbXXN0cmluZywgZXJyb3IpIHsKCQkJcmVsZXZhbnRDb250YWluZXJzIDo9
+IFtdc3RyaW5ne30KCQkJY29udGFpbmVycywgZXJyIDo9IHJ1bnRpbWUuTGlz
+dENvbnRhaW5lcnMoY29udGV4dC5CYWNrZ3JvdW5kKCksICZydW50aW1lYXBp
+LkNvbnRhaW5lckZpbHRlcnsKCQkJCUxhYmVsU2VsZWN0b3I6IG1hcFtzdHJp
+bmddc3RyaW5newoJCQkJCXR5cGVzLkt1YmVybmV0ZXNQb2ROYW1lTGFiZWw6
+ICAgICAgcG9kLnBvZE5hbWUsCgkJCQkJdHlwZXMuS3ViZXJuZXRlc1BvZE5h
+bWVzcGFjZUxhYmVsOiBmLk5hbWVzcGFjZS5OYW1lLAoJCQkJfSwKCQkJfSkK
+CQkJaWYgZXJyICE9IG5pbCB7CgkJCQlyZXR1cm4gcmVsZXZhbnRDb250YWlu
+ZXJzLCBlcnIKCQkJfQoJCQlmb3IgXywgY29udGFpbmVyIDo9IHJhbmdlIGNv
+bnRhaW5lcnMgewoJCQkJcmVsZXZhbnRDb250YWluZXJzID0gYXBwZW5kKHJl
+bGV2YW50Q29udGFpbmVycywgY29udGFpbmVyLkxhYmVsc1t0eXBlcy5LdWJl
+cm5ldGVzQ29udGFpbmVyTmFtZUxhYmVsXSkKCQkJfQoJCQlyZXR1cm4gcmVs
+ZXZhbnRDb250YWluZXJzLCBuaWwKCQl9Cgl9CgoJZ2lua2dvLkNvbnRleHQo
+Zm10LlNwcmludGYoIkdhcmJhZ2UgQ29sbGVjdGlvbiBUZXN0OiAlcyIsIHRl
+c3QudGVzdE5hbWUpLCBmdW5jKCkgewoJCWdpbmtnby5CZWZvcmVFYWNoKGZ1
+bmMoY3R4IGNvbnRleHQuQ29udGV4dCkgewoJCQlyZWFsUG9kcyA6PSBnZXRQ
+b2RzKHRlc3QudGVzdFBvZHMpCgkJCWUyZXBvZC5OZXdQb2RDbGllbnQoZiku
+Q3JlYXRlQmF0Y2goY3R4LCByZWFsUG9kcykKCQkJZ2lua2dvLkJ5KCJNYWtp
+bmcgc3VyZSBhbGwgY29udGFpbmVycyByZXN0YXJ0IHRoZSBzcGVjaWZpZWQg
+bnVtYmVyIG9mIHRpbWVzIikKCQkJZ29tZWdhLkV2ZW50dWFsbHkoY3R4LCBm
+dW5jKGN0eCBjb250ZXh0LkNvbnRleHQpIGVycm9yIHsKCQkJCWZvciBfLCBw
+b2RTcGVjIDo9IHJhbmdlIHRlc3QudGVzdFBvZHMgewoJCQkJCWVyciA6PSB2
+ZXJpZnlQb2RSZXN0YXJ0Q291bnQoY3R4LCBmLCBwb2RTcGVjLnBvZE5hbWUs
+IHBvZFNwZWMubnVtQ29udGFpbmVycywgcG9kU3BlYy5yZXN0YXJ0Q291bnQp
+CgkJCQkJaWYgZXJyICE9IG5pbCB7CgkJCQkJCXJldHVybiBlcnIKCQkJCQl9
+CgkJCQl9CgkJCQlyZXR1cm4gbmlsCgkJCX0sIHNldHVwRHVyYXRpb24sIHJ1
+bnRpbWVQb2xsSW50ZXJ2YWwpLlNob3VsZChnb21lZ2EuQmVOaWwoKSkKCQl9
+KQoKCQlnaW5rZ28uSXQoIlNob3VsZCBldmVudHVhbGx5IGdhcmJhZ2UgY29s
+bGVjdCBjb250YWluZXJzIHdoZW4gd2UgZXhjZWVkIHRoZSBudW1iZXIgb2Yg
+ZGVhZCBjb250YWluZXJzIHBlciBjb250YWluZXIiLCBmdW5jKGN0eCBjb250
+ZXh0LkNvbnRleHQpIHsKCQkJdG90YWxDb250YWluZXJzIDo9IDAKCQkJZm9y
+IF8sIHBvZCA6PSByYW5nZSB0ZXN0LnRlc3RQb2RzIHsKCQkJCXRvdGFsQ29u
+dGFpbmVycyArPSBwb2QubnVtQ29udGFpbmVycyoyICsgMQoJCQl9CgkJCWdv
+bWVnYS5FdmVudHVhbGx5KGN0eCwgZnVuYygpIGVycm9yIHsKCQkJCXRvdGFs
+IDo9IDAKCQkJCWZvciBfLCBwb2QgOj0gcmFuZ2UgdGVzdC50ZXN0UG9kcyB7
+CgkJCQkJY29udGFpbmVyTmFtZXMsIGVyciA6PSBwb2QuZ2V0Q29udGFpbmVy
+TmFtZXMoKQoJCQkJCWlmIGVyciAhPSBuaWwgewoJCQkJCQlyZXR1cm4gZXJy
+CgkJCQkJfQoJCQkJCXRvdGFsICs9IGxlbihjb250YWluZXJOYW1lcykKCQkJ
+CQkvLyBDaGVjayBtYXhQZXJQb2RDb250YWluZXIgZm9yIGVhY2ggY29udGFp
+bmVyIGluIHRoZSBwb2QKCQkJCQlmb3IgaSA6PSAwOyBpIDwgcG9kLm51bUNv
+bnRhaW5lcnM7IGkrKyB7CgkJCQkJCWNvbnRhaW5lckNvdW50IDo9IDAKCQkJ
+CQkJZm9yIF8sIGNvbnRhaW5lck5hbWUgOj0gcmFuZ2UgY29udGFpbmVyTmFt
+ZXMgewoJCQkJCQkJaWYgY29udGFpbmVyTmFtZSA9PSBwb2QuZ2V0Q29udGFp
+bmVyTmFtZShpKSB7CgkJCQkJCQkJY29udGFpbmVyQ291bnQrKwoJCQkJCQkJ
+fQoJCQkJCQl9CgkJCQkJCWlmIGNvbnRhaW5lckNvdW50ID4gbWF4UGVyUG9k
+Q29udGFpbmVyKzEgewoJCQkJCQkJcmV0dXJuIGZtdC5FcnJvcmYoImV4cGVj
+dGVkIG51bWJlciBvZiBjb3BpZXMgb2YgY29udGFpbmVyOiAlcywgdG8gYmUg
+PD0gbWF4UGVyUG9kQ29udGFpbmVyOiAlZDsgbGlzdCBvZiBjb250YWluZXJz
+OiAldiIsCgkJCQkJCQkJcG9kLmdldENvbnRhaW5lck5hbWUoaSksIG1heFBl
+clBvZENvbnRhaW5lciwgY29udGFpbmVyTmFtZXMpCgkJCQkJCX0KCQkJCQl9
+CgkJCQl9CgkJCQkvL0NoZWNrIG1heFRvdGFsQ29udGFpbmVycy4gIEN1cnJl
+bnRseSwgdGhlIGRlZmF1bHQgaXMgLTEsIHNvIHRoaXMgd2lsbCBuZXZlciBo
+YXBwZW4gdW50aWwgd2UgY2FuIGNvbmZpZ3VyZSBtYXhUb3RhbENvbnRhaW5l
+cnMKCQkJCWlmIG1heFRvdGFsQ29udGFpbmVycyA+IDAgJiYgdG90YWxDb250
+YWluZXJzIDw9IG1heFRvdGFsQ29udGFpbmVycyAmJiB0b3RhbCA+IG1heFRv
+dGFsQ29udGFpbmVycyB7CgkJCQkJcmV0dXJuIGZtdC5FcnJvcmYoImV4cGVj
+dGVkIHRvdGFsIG51bWJlciBvZiBjb250YWluZXJzOiAldiwgdG8gYmUgPD0g
+bWF4VG90YWxDb250YWluZXJzOiAldiIsIHRvdGFsLCBtYXhUb3RhbENvbnRh
+aW5lcnMpCgkJCQl9CgkJCQlyZXR1cm4gbmlsCgkJCX0sIGdhcmJhZ2VDb2xs
+ZWN0RHVyYXRpb24sIHJ1bnRpbWVQb2xsSW50ZXJ2YWwpLlNob3VsZChnb21l
+Z2EuQmVOaWwoKSkKCgkJCWlmIG1heFBlclBvZENvbnRhaW5lciA+PSAyICYm
+IG1heFRvdGFsQ29udGFpbmVycyA8IDAgeyAvLyBtYWtlIHN1cmUgY29uc3Ry
+YWludHMgd291bGRuJ3QgbWFrZSB1cyBnYyBvbGQgY29udGFpbmVycwoJCQkJ
+Z2lua2dvLkJ5KCJNYWtpbmcgc3VyZSB0aGUga3ViZWxldCBjb25zaXN0ZW50
+bHkga2VlcHMgYXJvdW5kIGFuIGV4dHJhIGNvcHkgb2YgZWFjaCBjb250YWlu
+ZXIuIikKCQkJCWdvbWVnYS5Db25zaXN0ZW50bHkoY3R4LCBmdW5jKCkgZXJy
+b3IgewoJCQkJCWZvciBfLCBwb2QgOj0gcmFuZ2UgdGVzdC50ZXN0UG9kcyB7
+CgkJCQkJCWNvbnRhaW5lck5hbWVzLCBlcnIgOj0gcG9kLmdldENvbnRhaW5l
+ck5hbWVzKCkKCQkJCQkJaWYgZXJyICE9IG5pbCB7CgkJCQkJCQlyZXR1cm4g
+ZXJyCgkJCQkJCX0KCQkJCQkJZm9yIGkgOj0gMDsgaSA8IHBvZC5udW1Db250
+YWluZXJzOyBpKysgewoJCQkJCQkJY29udGFpbmVyQ291bnQgOj0gMAoJCQkJ
+CQkJZm9yIF8sIGNvbnRhaW5lck5hbWUgOj0gcmFuZ2UgY29udGFpbmVyTmFt
+ZXMgewoJCQkJCQkJCWlmIGNvbnRhaW5lck5hbWUgPT0gcG9kLmdldENvbnRh
+aW5lck5hbWUoaSkgewoJCQkJCQkJCQljb250YWluZXJDb3VudCsrCgkJCQkJ
+CQkJfQoJCQkJCQkJfQoJCQkJCQkJaWYgcG9kLnJlc3RhcnRDb3VudCA+IDAg
+JiYgY29udGFpbmVyQ291bnQgPCBtYXhQZXJQb2RDb250YWluZXIrMSB7CgkJ
+CQkJCQkJcmV0dXJuIGZtdC5FcnJvcmYoImV4cGVjdGVkIHBvZCAldiB0byBo
+YXZlIGV4dHJhIGNvcGllcyBvZiBvbGQgY29udGFpbmVycyIsIHBvZC5wb2RO
+YW1lKQoJCQkJCQkJfQoJCQkJCQl9CgkJCQkJfQoJCQkJCXJldHVybiBuaWwK
+CQkJCX0sIGdhcmJhZ2VDb2xsZWN0RHVyYXRpb24sIHJ1bnRpbWVQb2xsSW50
+ZXJ2YWwpLlNob3VsZChnb21lZ2EuQmVOaWwoKSkKCQkJfQoJCX0pCgoJCWdp
+bmtnby5BZnRlckVhY2goZnVuYyhjdHggY29udGV4dC5Db250ZXh0KSB7CgkJ
+CWZvciBfLCBwb2QgOj0gcmFuZ2UgdGVzdC50ZXN0UG9kcyB7CgkJCQlnaW5r
+Z28uQnkoZm10LlNwcmludGYoIkRlbGV0aW5nIFBvZCAldiIsIHBvZC5wb2RO
+YW1lKSkKCQkJCWUyZXBvZC5OZXdQb2RDbGllbnQoZikuRGVsZXRlU3luYyhj
+dHgsIHBvZC5wb2ROYW1lLCBtZXRhdjEuRGVsZXRlT3B0aW9uc3t9LCBmLlRp
+bWVvdXRzLlBvZERlbGV0ZSkKCQkJfQoKCQkJZ2lua2dvLkJ5KCJNYWtpbmcg
+c3VyZSBhbGwgY29udGFpbmVycyBnZXQgY2xlYW5lZCB1cCIpCgkJCWdvbWVn
+YS5FdmVudHVhbGx5KGN0eCwgZnVuYygpIGVycm9yIHsKCQkJCWZvciBfLCBw
+b2QgOj0gcmFuZ2UgdGVzdC50ZXN0UG9kcyB7CgkJCQkJY29udGFpbmVyTmFt
+ZXMsIGVyciA6PSBwb2QuZ2V0Q29udGFpbmVyTmFtZXMoKQoJCQkJCWlmIGVy
+ciAhPSBuaWwgewoJCQkJCQlyZXR1cm4gZXJyCgkJCQkJfQoJCQkJCWlmIGxl
+bihjb250YWluZXJOYW1lcykgPiAwIHsKCQkJCQkJcmV0dXJuIGZtdC5FcnJv
+cmYoIiV2IGNvbnRhaW5lcnMgc3RpbGwgcmVtYWluIiwgY29udGFpbmVyTmFt
+ZXMpCgkJCQkJfQoJCQkJfQoJCQkJcmV0dXJuIG5pbAoJCQl9LCBnYXJiYWdl
+Q29sbGVjdER1cmF0aW9uLCBydW50aW1lUG9sbEludGVydmFsKS5TaG91bGQo
+Z29tZWdhLkJlTmlsKCkpCgoJCQlpZiBnaW5rZ28uQ3VycmVudFNwZWNSZXBv
+cnQoKS5GYWlsZWQoKSAmJiBmcmFtZXdvcmsuVGVzdENvbnRleHQuRHVtcExv
+Z3NPbkZhaWx1cmUgewoJCQkJbG9nTm9kZUV2ZW50cyhjdHgsIGYpCgkJCQls
+b2dQb2RFdmVudHMoY3R4LCBmKQoJCQl9CgkJfSkKCX0pCn0KCmZ1bmMgZ2V0
+UG9kcyhzcGVjcyBbXSp0ZXN0UG9kU3BlYykgKHBvZHMgW10qdjEuUG9kKSB7
+Cglmb3IgXywgc3BlYyA6PSByYW5nZSBzcGVjcyB7CgkJZ2lua2dvLkJ5KGZt
+dC5TcHJpbnRmKCJDcmVhdGluZyAldiBjb250YWluZXJzIHdpdGggcmVzdGFy
+dENvdW50OiAldiIsIHNwZWMubnVtQ29udGFpbmVycywgc3BlYy5yZXN0YXJ0
+Q291bnQpKQoJCWNvbnRhaW5lcnMgOj0gW112MS5Db250YWluZXJ7fQoJCWZv
+ciBpIDo9IDA7IGkgPCBzcGVjLm51bUNvbnRhaW5lcnM7IGkrKyB7CgkJCWNv
+bnRhaW5lcnMgPSBhcHBlbmQoY29udGFpbmVycywgdjEuQ29udGFpbmVyewoJ
+CQkJSW1hZ2U6ICAgYnVzeWJveEltYWdlLAoJCQkJTmFtZTogICAgc3BlYy5n
+ZXRDb250YWluZXJOYW1lKGkpLAoJCQkJQ29tbWFuZDogZ2V0UmVzdGFydGlu
+Z0NvbnRhaW5lckNvbW1hbmQoIi90ZXN0LWVtcHR5LWRpci1tbnQiLCBpLCBz
+cGVjLnJlc3RhcnRDb3VudCwgIiIpLAoJCQkJVm9sdW1lTW91bnRzOiBbXXYx
+LlZvbHVtZU1vdW50ewoJCQkJCXtNb3VudFBhdGg6ICIvdGVzdC1lbXB0eS1k
+aXItbW50IiwgTmFtZTogInRlc3QtZW1wdHktZGlyIn0sCgkJCQl9LAoJCQl9
+KQoJCX0KCQlwb2RzID0gYXBwZW5kKHBvZHMsICZ2MS5Qb2R7CgkJCU9iamVj
+dE1ldGE6IG1ldGF2MS5PYmplY3RNZXRhe05hbWU6IHNwZWMucG9kTmFtZX0s
+CgkJCVNwZWM6IHYxLlBvZFNwZWN7CgkJCQlSZXN0YXJ0UG9saWN5OiB2MS5S
+ZXN0YXJ0UG9saWN5QWx3YXlzLAoJCQkJQ29udGFpbmVyczogICAgY29udGFp
+bmVycywKCQkJCVZvbHVtZXM6IFtddjEuVm9sdW1lewoJCQkJCXtOYW1lOiAi
+dGVzdC1lbXB0eS1kaXIiLCBWb2x1bWVTb3VyY2U6IHYxLlZvbHVtZVNvdXJj
+ZXtFbXB0eURpcjogJnYxLkVtcHR5RGlyVm9sdW1lU291cmNle319fSwKCQkJ
+CX0sCgkJCX0sCgkJfSkKCX0KCXJldHVybgp9CgpmdW5jIGdldFJlc3RhcnRp
+bmdDb250YWluZXJDb21tYW5kKHBhdGggc3RyaW5nLCBjb250YWluZXJOdW0g
+aW50LCByZXN0YXJ0cyBpbnQzMiwgbG9vcGluZ0NvbW1hbmQgc3RyaW5nKSBb
+XXN0cmluZyB7CglyZXR1cm4gW11zdHJpbmd7CgkJInNoIiwKCQkiLWMiLAoJ
+CWZtdC5TcHJpbnRmKGAKCQkJZj0lcy9jb3VudGZpbGUlcwoJCQljb3VudD0k
+KGVjaG8gJ2hlbGxvJyA+PiAkZiA7IHdjIC1sICRmIHwgYXdrIHsncHJpbnQg
+JDEnfSkKCQkJaWYgWyAkY291bnQgLWx0ICVkIF07IHRoZW4KCQkJCWV4aXQg
+MAoJCQlmaQoJCQl3aGlsZSB0cnVlOyBkbyAlcyBzbGVlcCAxOyBkb25lYCwK
+CQkJcGF0aCwgc3RyY29udi5JdG9hKGNvbnRhaW5lck51bSksIHJlc3RhcnRz
+KzEsIGxvb3BpbmdDb21tYW5kKSwKCX0KfQoKZnVuYyB2ZXJpZnlQb2RSZXN0
+YXJ0Q291bnQoY3R4IGNvbnRleHQuQ29udGV4dCwgZiAqZnJhbWV3b3JrLkZy
+YW1ld29yaywgcG9kTmFtZSBzdHJpbmcsIGV4cGVjdGVkTnVtQ29udGFpbmVy
+cyBpbnQsIGV4cGVjdGVkUmVzdGFydENvdW50IGludDMyKSBlcnJvciB7Cgl1
+cGRhdGVkUG9kLCBlcnIgOj0gZi5DbGllbnRTZXQuQ29yZVYxKCkuUG9kcyhm
+Lk5hbWVzcGFjZS5OYW1lKS5HZXQoY3R4LCBwb2ROYW1lLCBtZXRhdjEuR2V0
+T3B0aW9uc3t9KQoJaWYgZXJyICE9IG5pbCB7CgkJcmV0dXJuIGVycgoJfQoJ
+aWYgbGVuKHVwZGF0ZWRQb2QuU3RhdHVzLkNvbnRhaW5lclN0YXR1c2VzKSAh
+PSBleHBlY3RlZE51bUNvbnRhaW5lcnMgewoJCXJldHVybiBmbXQuRXJyb3Jm
+KCJleHBlY3RlZCBwb2QgJXMgdG8gaGF2ZSAlZCBjb250YWluZXJzLCBhY3R1
+YWw6ICVkIiwKCQkJdXBkYXRlZFBvZC5OYW1lLCBleHBlY3RlZE51bUNvbnRh
+aW5lcnMsIGxlbih1cGRhdGVkUG9kLlN0YXR1cy5Db250YWluZXJTdGF0dXNl
+cykpCgl9Cglmb3IgXywgY29udGFpbmVyU3RhdHVzIDo9IHJhbmdlIHVwZGF0
+ZWRQb2QuU3RhdHVzLkNvbnRhaW5lclN0YXR1c2VzIHsKCQlpZiBjb250YWlu
+ZXJTdGF0dXMuUmVzdGFydENvdW50IDwgZXhwZWN0ZWRSZXN0YXJ0Q291bnQg
+ewoJCQlyZXR1cm4gZm10LkVycm9yZigicG9kICVzIGhhZCBjb250YWluZXIg
+d2l0aCByZXN0YXJ0Y291bnQgJWQuICBTaG91bGQgaGF2ZSBiZWVuIGF0IGxl
+YXN0ICVkIiwKCQkJCXVwZGF0ZWRQb2QuTmFtZSwgY29udGFpbmVyU3RhdHVz
+LlJlc3RhcnRDb3VudCwgZXhwZWN0ZWRSZXN0YXJ0Q291bnQpCgkJfQoJfQoJ
+cmV0dXJuIG5pbAp9Cg==
