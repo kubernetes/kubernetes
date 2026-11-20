@@ -18,11 +18,17 @@ package fc
 
 import (
 	"errors"
+	"io/fs"
 	"os"
+	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
+	testingexec "k8s.io/utils/exec/testing"
+
+	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
 )
 
@@ -141,6 +147,280 @@ func (handler *fakeIOHandler) WriteFile(filename string, data []byte, perm os.Fi
 
 func (handler *fakeIOHandler) ReadFile(filename string) ([]byte, error) {
 	return nil, nil
+}
+
+type fakeDetachIOHandler struct {
+	fakeIOHandler
+	t                *testing.T
+	linkTarget       string
+	expectedEvalPath string
+	evalErr          error
+	mapPath          string
+	writtenFiles     []string
+}
+
+func (handler *fakeDetachIOHandler) EvalSymlinks(path string) (string, error) {
+	handler.t.Helper()
+	if path != handler.expectedEvalPath {
+		handler.t.Errorf("evaluated symlink path = %q, want %q", path, handler.expectedEvalPath)
+	}
+	if handler.evalErr != nil {
+		return "", handler.evalErr
+	}
+	return handler.linkTarget, nil
+}
+
+func (handler *fakeDetachIOHandler) WriteFile(filename string, data []byte, perm os.FileMode) error {
+	handler.t.Helper()
+	if _, err := os.Stat(handler.mapPath); err != nil {
+		handler.t.Errorf("global map path was removed before device cleanup: %v", err)
+	}
+	handler.writtenFiles = append(handler.writtenFiles, filename)
+	return nil
+}
+
+type fakeDetachDeviceUtil struct {
+	util.DeviceUtil
+	multipathDevice string
+	slaveDevices    []string
+}
+
+func (handler *fakeDetachDeviceUtil) FindMultipathDeviceForDevice(disk string) string {
+	return handler.multipathDevice
+}
+
+func (handler *fakeDetachDeviceUtil) FindSlaveDevicesOnMultipath(disk string) []string {
+	return handler.slaveDevices
+}
+
+type fakeDetachManager struct {
+	diskManager
+	readDir func(string) ([]os.DirEntry, error)
+}
+
+func (manager *fakeDetachManager) DetachBlockFCDisk(c fcDiskUnmapper, mapPath, devicePath string) error {
+	return (&fcUtil{}).detachBlockFCDisk(c, mapPath, devicePath, manager.readDir)
+}
+
+func TestTearDownDeviceRecoversFromStaleDevicePath(t *testing.T) {
+	const wwn = "50050768030539b6"
+	const wwid = "3600508b400105e210000900000490000"
+	tests := []struct {
+		name          string
+		volumeInfo    string
+		devicePath    string
+		linkName      string
+		linkTarget    string
+		readDirErr    error
+		evalErr       error
+		multipath     string
+		slaveDevices  []string
+		cleanupErr    bool
+		wantSearchDir string
+		wantWrites    []string
+		wantErr       bool
+	}{
+		{
+			name:          "WWN and LUN identity resolves current device",
+			volumeInfo:    wwn + "-lun-0",
+			linkName:      "pci-0000:41:00.0-fc-0x" + wwn + "-lun-0",
+			linkTarget:    "/dev/sdy",
+			wantSearchDir: byPath,
+			wantWrites:    []string{"/sys/block/sdy/device/delete"},
+		},
+		{
+			name:          "WWID identity resolves current device",
+			volumeInfo:    wwid,
+			linkName:      "scsi-" + wwid,
+			linkTarget:    "/dev/sdz",
+			wantSearchDir: byID,
+			wantWrites:    []string{"/sys/block/sdz/device/delete"},
+		},
+		{
+			name:          "identity resolves multipath device",
+			volumeInfo:    wwid,
+			linkName:      "scsi-" + wwid,
+			linkTarget:    "/dev/sda",
+			multipath:     "/dev/dm-1",
+			slaveDevices:  []string{"/dev/sda", "/dev/sdb"},
+			wantSearchDir: byID,
+			wantWrites: []string{
+				"/sys/block/sda/device/delete",
+				"/sys/block/sdb/device/delete",
+			},
+		},
+		{
+			name:          "stale path and identity no longer resolves",
+			volumeInfo:    wwid,
+			wantSearchDir: byID,
+		},
+		{
+			name:          "identity directory no longer exists",
+			volumeInfo:    wwid,
+			readDirErr:    os.ErrNotExist,
+			wantSearchDir: byID,
+		},
+		{
+			name:          "identity disappears while resolving",
+			volumeInfo:    wwid,
+			linkName:      "scsi-" + wwid,
+			evalErr:       os.ErrNotExist,
+			wantSearchDir: byID,
+		},
+		{
+			name:          "empty path and identity resolves",
+			volumeInfo:    wwn + "-lun-0",
+			devicePath:    "empty",
+			linkName:      "fc-0x" + wwn + "-lun-0",
+			linkTarget:    "/dev/sdc",
+			wantSearchDir: byPath,
+			wantWrites:    []string{"/sys/block/sdc/device/delete"},
+		},
+		{
+			name:          "empty path without identity still returns error",
+			volumeInfo:    wwn + "-lun-0",
+			devicePath:    "empty",
+			wantSearchDir: byPath,
+			wantErr:       true,
+		},
+		{
+			name:          "existing path remains normal",
+			volumeInfo:    wwn + "-lun-0",
+			devicePath:    "existing",
+			linkTarget:    "/dev/sdd",
+			wantSearchDir: byPath,
+			wantWrites:    []string{"/sys/block/sdd/device/delete"},
+		},
+		{
+			name:          "identity lookup access error is returned",
+			volumeInfo:    wwid,
+			readDirErr:    os.ErrPermission,
+			wantSearchDir: byID,
+			wantErr:       true,
+		},
+		{
+			name:          "identity resolution access error is returned",
+			volumeInfo:    wwid,
+			linkName:      "scsi-" + wwid,
+			evalErr:       os.ErrPermission,
+			wantSearchDir: byID,
+			wantErr:       true,
+		},
+		{
+			name:          "multipath cleanup error is returned",
+			volumeInfo:    wwid,
+			linkName:      "scsi-" + wwid,
+			linkTarget:    "/dev/sda",
+			multipath:     "/dev/dm-1",
+			cleanupErr:    true,
+			wantSearchDir: byID,
+			wantErr:       true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			mapPath := filepath.Join(t.TempDir(), test.volumeInfo)
+			if err := os.Mkdir(mapPath, 0750); err != nil {
+				t.Fatalf("failed to create global map path: %v", err)
+			}
+			devicePath := filepath.Join(t.TempDir(), "missing-device")
+			if test.devicePath == "empty" {
+				devicePath = ""
+			} else if test.devicePath == "existing" {
+				if err := os.WriteFile(devicePath, nil, 0600); err != nil {
+					t.Fatalf("failed to create remembered device path: %v", err)
+				}
+			}
+			var readDirs []string
+			readDir := func(dirname string) ([]os.DirEntry, error) {
+				readDirs = append(readDirs, dirname)
+				if test.readDirErr != nil {
+					return nil, test.readDirErr
+				}
+				entries := []os.DirEntry{
+					fs.FileInfoToDirEntry(&fakeFileInfo{name: "scsi-unrelated-volume"}),
+				}
+				if test.linkName != "" {
+					entries = append(entries, fs.FileInfoToDirEntry(&fakeFileInfo{name: test.linkName}))
+				}
+				return entries, nil
+			}
+			expectedEvalPath := ""
+			if test.linkName != "" {
+				expectedEvalPath = filepath.Join(test.wantSearchDir, test.linkName)
+			} else if test.devicePath == "existing" {
+				expectedEvalPath = devicePath
+			}
+			io := &fakeDetachIOHandler{
+				t:                t,
+				linkTarget:       test.linkTarget,
+				expectedEvalPath: expectedEvalPath,
+				evalErr:          test.evalErr,
+				mapPath:          mapPath,
+			}
+			manager := &fakeDetachManager{readDir: readDir}
+			scripts := []volumetest.CommandScript{}
+			if test.multipath != "" {
+				returnCode := 0
+				if test.cleanupErr {
+					returnCode = 1
+				}
+				scripts = append(scripts, volumetest.CommandScript{
+					Cmd: "multipath", Args: []string{"-f", test.multipath}, ReturnCode: returnCode,
+				})
+			}
+			if !test.cleanupErr {
+				for _, write := range test.wantWrites {
+					device := strings.TrimSuffix(strings.TrimPrefix(write, "/sys/block/"), "/device/delete")
+					scripts = append(scripts, volumetest.CommandScript{
+						Cmd: "blockdev", Args: []string{"--flushbufs", "/dev/" + device},
+					})
+				}
+			}
+			fakeExec := &testingexec.FakeExec{ExactOrder: true}
+			if len(scripts) > 0 {
+				volumetest.ScriptCommands(fakeExec, scripts)
+			} else {
+				fakeExec.DisableScripts = true
+			}
+			unmapper := &fcDiskUnmapper{
+				fcDisk: &fcDisk{
+					manager: manager,
+					io:      io,
+				},
+				deviceUtil: &fakeDetachDeviceUtil{
+					multipathDevice: test.multipath,
+					slaveDevices:    test.slaveDevices,
+				},
+				exec: fakeExec,
+			}
+
+			err := unmapper.TearDownDevice(mapPath, devicePath)
+			if (err != nil) != test.wantErr {
+				t.Fatalf("TearDownDevice() error = %v, wantErr %t", err, test.wantErr)
+			}
+			if test.wantSearchDir == "" {
+				if len(readDirs) != 0 {
+					t.Errorf("unexpected identity searches: %v", readDirs)
+				}
+			} else if !reflect.DeepEqual(readDirs, []string{test.wantSearchDir}) {
+				t.Errorf("search directories = %v, want %q", readDirs, test.wantSearchDir)
+			}
+			if fakeExec.CommandCalls != len(scripts) {
+				t.Errorf("executed commands = %d, want %d", fakeExec.CommandCalls, len(scripts))
+			}
+			if !reflect.DeepEqual(io.writtenFiles, test.wantWrites) {
+				t.Errorf("device cleanup writes = %v, want %v", io.writtenFiles, test.wantWrites)
+			}
+			_, statErr := os.Stat(mapPath)
+			if test.wantErr && statErr != nil {
+				t.Errorf("expected global map path to remain after error, stat error: %v", statErr)
+			} else if !test.wantErr && !os.IsNotExist(statErr) {
+				t.Errorf("expected global map path to be removed, stat error: %v", statErr)
+			}
+		})
+	}
 }
 
 func TestSearchDisk(t *testing.T) {
