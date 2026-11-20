@@ -19,11 +19,13 @@ package kuberuntime
 import (
 	"context"
 	"fmt"
+	goruntime "runtime"
 	"sort"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -38,6 +40,8 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/runtimeclass"
+	rctest "k8s.io/kubernetes/pkg/kubelet/runtimeclass/testing"
 	"k8s.io/utils/ptr"
 )
 
@@ -357,7 +361,7 @@ func TestGetImageUser(t *testing.T) {
 		i.Images[test.originalImage.name].Username = test.originalImage.username
 		i.Images[test.originalImage.name].Uid = test.originalImage.uid
 
-		uid, username, err := m.getImageUser(tCtx, test.originalImage.name)
+		uid, username, err := m.getImageUser(tCtx, &runtimeapi.ImageSpec{Image: test.originalImage.name})
 		assert.NoError(t, err, "TestCase[%d]", j)
 
 		if test.expectedImageUserValues.uid == (*int64)(nil) {
@@ -366,6 +370,71 @@ func TestGetImageUser(t *testing.T) {
 			assert.Equal(t, test.expectedImageUserValues.uid, *uid, "TestCase[%d]", j)
 		}
 		assert.Equal(t, test.expectedImageUserValues.username, username, "TestCase[%d]", j)
+	}
+}
+
+type imageStatusRecordingService struct {
+	*runtimetesting.FakeImageService
+	imagesByHandler map[string]*runtimeapi.Image
+	requests        []*runtimeapi.ImageSpec
+}
+
+func (s *imageStatusRecordingService) ImageStatus(_ context.Context, image *runtimeapi.ImageSpec, _ bool) (*runtimeapi.ImageStatusResponse, error) {
+	s.requests = append(s.requests, image)
+	return &runtimeapi.ImageStatusResponse{Image: s.imagesByHandler[image.RuntimeHandler]}, nil
+}
+
+func TestStartContainerImageUser(t *testing.T) {
+	if goruntime.GOOS != "linux" {
+		t.Skip("Image UID is only applied to Linux container configs.")
+	}
+
+	const (
+		imageTag = "test-image:latest"
+		imageRef = "sha256:test-image"
+	)
+	for _, enabled := range []bool{false, true} {
+		t.Run(fmt.Sprintf("gate=%t", enabled), func(t *testing.T) {
+			expectedHandler := ""
+			if enabled {
+				expectedHandler = rctest.SandboxRuntimeHandler
+			}
+			tCtx := ktesting.Init(t)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RuntimeClassInImageCriAPI, enabled)
+			fakeRuntime, fakeImages, m, err := createTestRuntimeManager(tCtx)
+			require.NoError(t, err)
+			m.runtimeClassManager = runtimeclass.NewManager(rctest.NewPopulatedClient())
+			defer rctest.StartManagerSync(tCtx, m.runtimeClassManager)()
+			m.podLogsDirectory = t.TempDir()
+
+			service := &imageStatusRecordingService{
+				FakeImageService: fakeImages,
+				imagesByHandler: map[string]*runtimeapi.Image{
+					"":                           {Id: imageRef, Uid: &runtimeapi.Int64Value{}},
+					rctest.SandboxRuntimeHandler: {Id: imageRef, Uid: &runtimeapi.Int64Value{Value: 1000}},
+				},
+			}
+			m.imageService = service
+			container := makeTestContainer("test-container", imageTag)
+			container.ImagePullPolicy = v1.PullIfNotPresent
+			container.SecurityContext = &v1.SecurityContext{RunAsNonRoot: ptr.To(enabled)}
+			pod := makeTestPod("test-pod", "test-namespace", "test-uid", []v1.Container{container})
+			pod.Spec.RuntimeClassName = ptr.To(rctest.SandboxRuntimeClass)
+			sandboxConfig, err := m.generatePodSandboxConfig(tCtx, pod, 0)
+			require.NoError(t, err)
+
+			_, err = m.startContainer(tCtx, "test-sandbox", sandboxConfig, containerStartSpec(&pod.Spec.Containers[0]), pod, &kubecontainer.PodStatus{}, nil, "", nil, nil)
+			require.NoError(t, err)
+			require.Len(t, fakeRuntime.Containers, 1)
+			for _, created := range fakeRuntime.Containers {
+				assert.Equal(t, &runtimeapi.ImageSpec{Image: imageRef, UserSpecifiedImage: imageTag, RuntimeHandler: expectedHandler}, created.Image)
+				assert.Equal(t, runtimeapi.ContainerState_CONTAINER_RUNNING, created.State)
+			}
+			assert.Equal(t, []*runtimeapi.ImageSpec{
+				{Image: imageTag, Annotations: map[string]string{}, RuntimeHandler: expectedHandler},
+				{Image: imageRef, UserSpecifiedImage: imageTag, RuntimeHandler: expectedHandler},
+			}, service.requests)
+		})
 	}
 }
 
