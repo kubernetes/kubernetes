@@ -856,7 +856,7 @@ users:
 		if err != nil {
 			return false, err
 		}
-		defer r.Body.Close()
+		defer func() { _ = r.Body.Close() }()
 		body, err := io.ReadAll(r.Body)
 		return strings.Contains(string(body), "informer_queued_items{"), err
 	}); err != nil {
