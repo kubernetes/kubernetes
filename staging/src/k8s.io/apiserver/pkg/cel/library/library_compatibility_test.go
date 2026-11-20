@@ -17,12 +17,14 @@ limitations under the License.
 package library
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
 	"cel.dev/cel-go/cel"
 	"cel.dev/cel-go/common/decls"
 	"cel.dev/cel-go/common/types"
+	"cel.dev/cel-go/ext"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 )
@@ -120,3 +122,78 @@ func TestTypeRegistration(t *testing.T) {
 
 // We have our own implementation of these, but they are also cel-go types
 var upstreamTypeNames = sets.New[string]("net.IP", "net.CIDR")
+
+// TestNetworkLibraryOverloadCompatibility verifies that the cel-go network library, which replaces
+// the kubernetes IP and CIDR libraries in the base environment from Kubernetes 1.38, declares every
+// overload of those libraries with the same overload ID and signature, so that stored expressions
+// compiled with the kubernetes libraries still compile.
+//
+// It also tracks the overloads that the cel-go network library adds on top of the kubernetes
+// libraries. The cel-go network library does not gate its functions on NetworkVersion, so a cel-go
+// bump that adds a function makes it available in the base environment without a Kubernetes
+// version gate. New functions must follow
+// https://github.com/kubernetes/enhancements/tree/master/keps/sig-api-machinery/2876-crd-validation-expression-language#function-library-updates
+// before they are listed below.
+func TestNetworkLibraryOverloadCompatibility(t *testing.T) {
+	kubernetesOverloads := overloadSignatures(t, IP(), CIDR(CIDRVersion(1)))
+	celGoOverloads := overloadSignatures(t, ext.Network(ext.NetworkVersion(1)))
+
+	for id, signature := range kubernetesOverloads {
+		celGoSignature, ok := celGoOverloads[id]
+		if !ok {
+			t.Errorf("Expected overload %s %q of the kubernetes IP and CIDR libraries to be declared by the cel-go network library", id, signature)
+			continue
+		}
+		if celGoSignature != signature {
+			t.Errorf("Expected overload %s to have signature %q in the cel-go network library, matching the kubernetes IP and CIDR libraries, but got %q", id, signature, celGoSignature)
+		}
+	}
+
+	// WARN: Overloads added by the cel-go network library on top of the kubernetes IP and CIDR
+	// libraries must be tracked here along with the Kubernetes version that introduced them.
+	expectedAdditions := map[string]string{
+		// Kubernetes <1.38>:
+	}
+	for id, signature := range celGoOverloads {
+		if _, ok := kubernetesOverloads[id]; ok {
+			continue
+		}
+		expected, ok := expectedAdditions[id]
+		switch {
+		case !ok:
+			t.Errorf("Unexpected overload %s %q added by the cel-go network library. It must be introduced in a new Kubernetes version and tracked here.", id, signature)
+		case expected != signature:
+			t.Errorf("Expected overload %s added by the cel-go network library to have signature %q, but got %q", id, expected, signature)
+		}
+	}
+	for id, signature := range expectedAdditions {
+		if _, ok := celGoOverloads[id]; !ok {
+			t.Errorf("Expected overload %s %q to be added by the cel-go network library, but it was not found", id, signature)
+		}
+	}
+}
+
+// overloadSignatures returns the signatures of all function overloads declared by the given
+// environment options, keyed by overload ID.
+func overloadSignatures(t *testing.T, opts ...cel.EnvOption) map[string]string {
+	t.Helper()
+	env, err := cel.NewCustomEnv(opts...)
+	if err != nil {
+		t.Fatal(err)
+	}
+	signatures := map[string]string{}
+	for name, fn := range env.Functions() {
+		for _, o := range fn.OverloadDecls() {
+			var args []string
+			for _, at := range o.ArgTypes() {
+				args = append(args, at.String())
+			}
+			signature := fmt.Sprintf("%s(%s) -> %s", name, strings.Join(args, ", "), o.ResultType())
+			if o.IsMemberFunction() {
+				signature = fmt.Sprintf("%s.%s(%s) -> %s", args[0], name, strings.Join(args[1:], ", "), o.ResultType())
+			}
+			signatures[o.ID()] = signature
+		}
+	}
+	return signatures
+}

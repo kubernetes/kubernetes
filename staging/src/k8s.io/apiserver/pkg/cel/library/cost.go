@@ -25,6 +25,7 @@ import (
 	"cel.dev/cel-go/common/types"
 	"cel.dev/cel-go/common/types/ref"
 	"cel.dev/cel-go/common/types/traits"
+	"cel.dev/cel-go/ext"
 
 	"k8s.io/apiserver/pkg/cel"
 )
@@ -39,11 +40,13 @@ var knownUnhandledFunctions = map[string]bool{
 	"uint":                true,
 	"duration":            true,
 	"bytes":               true,
+	"string":              true,
 	"cel.@mapInsert":      true,
 	"timestamp":           true,
 	"strings.quote":       true,
 	"value":               true,
 	"_==_":                true,
+	"_!=_":                true,
 	"_&&_":                true,
 	"_||_":                true,
 	"_>_":                 true,
@@ -251,6 +254,8 @@ func (l *CostEstimator) CallCost(function, overloadID string, args []ref.Val, re
 			case *cel.Quantity, cel.Quantity,
 				*cel.IP, cel.IP,
 				*cel.CIDR, cel.CIDR,
+				*ext.IP, ext.IP, // cel-go network library, used by the base environment from 1.38.
+				*ext.CIDR, ext.CIDR,
 				*cel.Format, cel.Format, // Formats have a small max size. Format takes pointer receiver.
 				*cel.URL, cel.URL, // TODO: Computing the actual cost is expensive, and changing this would be a breaking change
 				*cel.Semver, cel.Semver,
