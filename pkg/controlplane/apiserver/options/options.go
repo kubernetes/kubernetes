@@ -40,6 +40,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/apis/authentication/validation"
 	_ "k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubeapiserver"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 	"k8s.io/kubernetes/pkg/serviceaccount/externaljwt/plugin"
@@ -269,6 +270,22 @@ func (o *Options) Complete(ctx context.Context, alternateDNS []string, alternate
 	err := o.completeServiceAccountOptions(ctx, &completed)
 	if err != nil {
 		return CompletedOptions{}, err
+	}
+
+	if completed.Etcd != nil && completed.Etcd.EnableWatchCache {
+		sizes := kubeapiserver.DefaultWatchCacheSizes()
+		// Ensure that overrides parse correctly.
+		userSpecified, err := genericoptions.ParseWatchCacheSizes(completed.Etcd.WatchCacheSizes)
+		if err != nil {
+			return CompletedOptions{}, err
+		}
+		for resource, size := range userSpecified {
+			sizes[resource] = size
+		}
+		completed.Etcd.WatchCacheSizes, err = genericoptions.WriteWatchCacheSizes(sizes)
+		if err != nil {
+			return CompletedOptions{}, err
+		}
 	}
 
 	for key, value := range completed.APIEnablement.RuntimeConfig {
