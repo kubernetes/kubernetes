@@ -411,6 +411,29 @@ func TestEmptyRange(t *testing.T) {
 	testJSONPath(tests, true, t)
 }
 
+func TestEmptyArrayInInputs(t *testing.T) {
+	var inputMiddleEmpty = []byte(`{"items":[{"tags":["x","y"]},{"tags":[]},{"tags":["z"]}]}`)
+	var inputFirstEmpty = []byte(`{"items":[{"tags":[]},{"tags":["x","y"]},{"tags":["z"]}]}`)
+	var inputLastEmpty = []byte(`{"items":[{"tags":["x","y"]},{"tags":["z"]},{"tags":[]}]}`)
+	var inputAllEmpty = []byte(`{"items":[{"tags":[]},{"tags":[]}]}`)
+
+	parseJSON := func(data []byte) interface{} {
+		var obj interface{}
+		if err := json.Unmarshal(data, &obj); err != nil {
+			t.Fatal(err)
+		}
+		return obj
+	}
+
+	tests := []jsonpathTest{
+		{"empty array in middle input", `{.items[*].tags[*]}`, parseJSON(inputMiddleEmpty), "x y z", false},
+		{"empty array in first input", `{.items[*].tags[*]}`, parseJSON(inputFirstEmpty), "x y z", false},
+		{"empty array in last input", `{.items[*].tags[*]}`, parseJSON(inputLastEmpty), "x y z", false},
+		{"all arrays empty", `{.items[*].tags[*]}`, parseJSON(inputAllEmpty), "", false},
+	}
+	testJSONPath(tests, false, t)
+}
+
 func TestNestedRanges(t *testing.T) {
 	var input = []byte(`{
 		"items": [
