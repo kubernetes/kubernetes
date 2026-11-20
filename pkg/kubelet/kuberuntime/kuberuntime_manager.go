@@ -1116,8 +1116,14 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 	logger := klog.FromContext(ctx)
 	start := time.Now()
 	success := false
+	containerResized := len(podContainerChanges.ContainersToUpdate) > 0
+	podResized := len(podContainerChanges.PodCgroupResourcesToUpdate) > 0
 	defer func() {
-		metrics.PodResizeDurationMilliseconds.WithLabelValues(strconv.FormatBool(success)).Observe(float64(time.Since(start).Milliseconds()))
+		metrics.PodResizeDurationMilliseconds.WithLabelValues(
+			strconv.FormatBool(success),
+			strconv.FormatBool(containerResized),
+			strconv.FormatBool(podResized),
+		).Observe(float64(time.Since(start).Milliseconds()))
 	}()
 
 	resizeResult := kubecontainer.NewSyncResult(kubecontainer.ResizePodInPlace, format.Pod(pod))

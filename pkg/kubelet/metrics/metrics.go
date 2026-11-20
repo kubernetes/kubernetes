@@ -208,6 +208,7 @@ const (
 
 	// Metric keys for in-place pod resize operations.
 	ContainerRequestedResizesKey        = "container_requested_resizes_total"
+	PodRequestedResizesKey              = "pod_requested_resizes_total"
 	VolumeRequestedResizesKey           = "volume_requested_resizes_total"
 	PodResizeDurationMillisecondsKey    = "pod_resize_duration_milliseconds"
 	PodPendingResizesKey                = "pod_pending_resizes"
@@ -1354,6 +1355,17 @@ var (
 		[]string{"resource", "requirement", "operation"},
 	)
 
+	// PodRequestedResizes tracks the cumulative number of requested resizes at the pod level.
+	PodRequestedResizes = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           PodRequestedResizesKey,
+			Help:           "Number of requested resizes, counted at the pod level. Different resources on the same pod are counted separately. The 'requirement' label refers to 'requests' or 'limits'; the 'operation' label can be one of 'add', 'remove', 'increase' or 'decrease'.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"resource", "requirement", "operation"},
+	)
+
 	// VolumeRequestedResizes tracks the cumulative number of requested resizes at the volume level.
 	VolumeRequestedResizes = metrics.NewCounterVec(
 		&metrics.CounterOpts{
@@ -1370,11 +1382,11 @@ var (
 		&metrics.HistogramOpts{
 			Subsystem:      KubeletSubsystem,
 			Name:           PodResizeDurationMillisecondsKey,
-			Help:           "Duration in milliseconds to actuate a pod resize",
+			Help:           "Duration in milliseconds to actuate a pod resize. Label 'container_resources' reports whether container resources were updated in-place; label 'pod_resources' reports whether effective pod cgroup resources were updated.",
 			Buckets:        podResizeDurationBuckets,
 			StabilityLevel: metrics.ALPHA,
 		},
-		[]string{"success"},
+		[]string{"success", "container_resources", "pod_resources"},
 	)
 
 	// PodPendingResizes tracks the number of pending resizes for pods.
@@ -1393,10 +1405,10 @@ var (
 		&metrics.CounterOpts{
 			Subsystem:      KubeletSubsystem,
 			Name:           PodInfeasibleResizesKey,
-			Help:           "Number of infeasible resizes for pods.",
+			Help:           "Number of infeasible resizes for pods. Labels 'container_resources' and 'pod_resources' report whether the resize changes container-level and pod-level spec resources, respectively.",
 			StabilityLevel: metrics.ALPHA,
 		},
-		[]string{"reason_detail"},
+		[]string{"reason_detail", "container_resources", "pod_resources"},
 	)
 
 	// PodInProgressResizes tracks the number of in-progress resizes for pods.
@@ -1666,6 +1678,7 @@ func Register() {
 		}
 
 		legacyregistry.MustRegister(ContainerRequestedResizes)
+		legacyregistry.MustRegister(PodRequestedResizes)
 		legacyregistry.MustRegister(PodResizeDurationMilliseconds)
 		legacyregistry.MustRegister(PodPendingResizes)
 		legacyregistry.MustRegister(PodInfeasibleResizes)

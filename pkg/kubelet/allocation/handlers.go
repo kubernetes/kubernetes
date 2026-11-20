@@ -20,9 +20,9 @@ import (
 	"cmp"
 	"context"
 	"fmt"
+	"strconv"
 
 	v1 "k8s.io/api/core/v1"
-	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	resourcehelper "k8s.io/component-helpers/resource"
@@ -71,34 +71,36 @@ func (h *podResizesAdmitHandler) Admit(ctx context.Context, attrs *lifecycle.Pod
 	if disallowed, msg := h.disallowContainerChangesForPodLevelExclusiveResources(pod, allocatedPod); disallowed {
 		logger.V(3).Info(msg, "pod", format.Pod(pod))
 		if attrs.Update.Resize {
-			metrics.PodInfeasibleResizes.WithLabelValues("guaranteed_pod_level_resources_exclusive_allocation").Inc()
+			recordInfeasibleResize("guaranteed_pod_level_resources_exclusive_allocation", isContainerResizeRequested(pod, allocatedPod), isPodResizeRequested(pod, allocatedPod))
 		}
 		return lifecycle.PodAdmitResult{Admit: false, Reason: v1.PodReasonInfeasible, Message: msg, RejectionType: lifecycle.RejectionInfeasible}
 	}
 	if !attrs.Update.Resize {
 		return lifecycle.PodAdmitResult{Admit: true}
 	}
+	containerResizeRequested := isContainerResizeRequested(pod, allocatedPod)
+	podResizeRequested := isPodResizeRequested(pod, allocatedPod)
 	if resizable, msg, reason := IsInPlacePodVerticalScalingAllowed(pod); !resizable {
 		// If there is a pending resize but the resize is not allowed, always use the allocated resources.
-		metrics.PodInfeasibleResizes.WithLabelValues(reason).Inc()
+		recordInfeasibleResize(reason, containerResizeRequested, podResizeRequested)
 		return lifecycle.PodAdmitResult{Admit: false, Reason: v1.PodReasonInfeasible, Message: msg, RejectionType: lifecycle.RejectionInfeasible}
 	}
 	if resizeNotAllowed, msg := disallowResizeForSwappableContainers(h.containerRuntime, pod, allocatedPod); resizeNotAllowed {
 		// If this resize involve swap recalculation, set as infeasible, as IPPR with swap is not supported for beta.
-		metrics.PodInfeasibleResizes.WithLabelValues("swap_limitation").Inc()
+		recordInfeasibleResize("swap_limitation", containerResizeRequested, podResizeRequested)
 		return lifecycle.PodAdmitResult{Admit: false, Reason: v1.PodReasonInfeasible, Message: msg, RejectionType: lifecycle.RejectionInfeasible}
 	}
-	if !apiequality.Semantic.DeepEqual(pod.Spec.Resources, allocatedPod.Spec.Resources) {
+	if podResizeRequested {
 		if resizable, msg, reason := IsInPlacePodLevelResourcesVerticalScalingAllowed(pod); !resizable {
 			// If there is a pending pod-level resources resize but the resize is not allowed, always use the allocated resources.
-			metrics.PodInfeasibleResizes.WithLabelValues(reason).Inc()
+			recordInfeasibleResize(reason, containerResizeRequested, podResizeRequested)
 			return lifecycle.PodAdmitResult{Admit: false, Reason: v1.PodReasonInfeasible, Message: msg, RejectionType: lifecycle.RejectionInfeasible}
 		}
 	}
 
 	if disallowed, msg, reason := disallowResizeForMemoryBackedVolumes(pod, allocatedPod, h.containerManager.GetNodeConfig().CgroupVersion); disallowed {
 		logger.V(3).Info(msg, "pod", format.Pod(pod))
-		metrics.PodInfeasibleResizes.WithLabelValues(reason).Inc()
+		recordInfeasibleResize(reason, containerResizeRequested, podResizeRequested)
 		return lifecycle.PodAdmitResult{Admit: false, Reason: v1.PodReasonInfeasible, Message: msg, RejectionType: lifecycle.RejectionInfeasible}
 	}
 
@@ -108,18 +110,18 @@ func (h *podResizesAdmitHandler) Admit(ctx context.Context, attrs *lifecycle.Pod
 			if cpuMode == cm.ResourceAllocationModeExclusive && h.guaranteedPodResourceResizeRequired(pod, allocatedPod, v1.ResourceCPU) {
 				msg := fmt.Sprintf("Resize is infeasible for Guaranteed Pods when CPU allocation mode is %s", cpuMode)
 				logger.V(3).Info(msg, "pod", format.Pod(pod))
-				metrics.PodInfeasibleResizes.WithLabelValues("guaranteed_pod_cpu_manager_static_policy").Inc()
+				recordInfeasibleResize("guaranteed_pod_cpu_manager_static_policy", containerResizeRequested, podResizeRequested)
 				return lifecycle.PodAdmitResult{Admit: false, Reason: v1.PodReasonInfeasible, Message: msg, RejectionType: lifecycle.RejectionInfeasible}
 			}
 		} else if cpuMode := h.resourceManager.AllocationMode(v1.ResourceCPU); cpuMode == cm.ResourceAllocationModeExclusive && exclusiveCPUsResizeRequiredForPodLevelResources(pod, allocatedPod) {
 			msg := fmt.Sprintf("Resize of exclusive CPUs is infeasible for Guaranteed Pods with pod-level resources when CPU allocation mode is %s", cpuMode)
 			logger.V(3).Info(msg, "pod", format.Pod(pod))
-			metrics.PodInfeasibleResizes.WithLabelValues("guaranteed_pod_level_resources_exclusive_cpus").Inc()
+			recordInfeasibleResize("guaranteed_pod_level_resources_exclusive_cpus", containerResizeRequested, podResizeRequested)
 			return lifecycle.PodAdmitResult{Admit: false, Reason: v1.PodReasonInfeasible, Message: msg, RejectionType: lifecycle.RejectionInfeasible}
 		} else if cpuMode == cm.ResourceAllocationModeExclusive && exclusiveCPUsContainerAddedOrRemoved(pod, allocatedPod) {
 			msg := fmt.Sprintf("Adding or removing containers with exclusive CPUs is infeasible for Guaranteed Pods when CPU allocation mode is %s", cpuMode)
 			logger.V(3).Info(msg, "pod", format.Pod(pod))
-			metrics.PodInfeasibleResizes.WithLabelValues("guaranteed_pod_exclusive_cpus_container_change").Inc()
+			recordInfeasibleResize("guaranteed_pod_exclusive_cpus_container_change", containerResizeRequested, podResizeRequested)
 			return lifecycle.PodAdmitResult{Admit: false, Reason: v1.PodReasonInfeasible, Message: msg, RejectionType: lifecycle.RejectionInfeasible}
 		}
 		if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingExclusiveMemory) {
@@ -127,13 +129,21 @@ func (h *podResizesAdmitHandler) Admit(ctx context.Context, attrs *lifecycle.Pod
 			if memMode == cm.ResourceAllocationModeExclusive && h.guaranteedPodResourceResizeRequired(pod, allocatedPod, v1.ResourceMemory) {
 				msg := fmt.Sprintf("Resize is infeasible for Guaranteed Pods when memory allocation mode is %s", memMode)
 				logger.V(3).Info(msg, "pod", format.Pod(pod))
-				metrics.PodInfeasibleResizes.WithLabelValues("guaranteed_pod_memory_manager_static_policy").Inc()
+				recordInfeasibleResize("guaranteed_pod_memory_manager_static_policy", containerResizeRequested, podResizeRequested)
 				return lifecycle.PodAdmitResult{Admit: false, Reason: v1.PodReasonInfeasible, Message: msg, RejectionType: lifecycle.RejectionInfeasible}
 			}
 		}
 	}
 
 	return lifecycle.PodAdmitResult{Admit: true}
+}
+
+func recordInfeasibleResize(reason string, containerResources, podResources bool) {
+	metrics.PodInfeasibleResizes.WithLabelValues(
+		reason,
+		strconv.FormatBool(containerResources),
+		strconv.FormatBool(podResources),
+	).Inc()
 }
 
 func disallowResizeForMemoryBackedVolumes(desiredPod, allocatedPod *v1.Pod, cgroupVersion int) (bool, string, string) {

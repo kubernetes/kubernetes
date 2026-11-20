@@ -627,7 +627,9 @@ func (m *manager) handlePendingAllocation(ctx context.Context, pod *v1.Pod) (lif
 		return lifecycle.PodAdmitResult{Admit: true}, false, nil
 	}
 
-	resizeRequested := isResizeRequested(pod, allocatedPod)
+	containerResizeRequested := isContainerResizeRequested(pod, allocatedPod)
+	podResizeRequested := isPodResizeRequested(pod, allocatedPod)
+	resizeRequested := containerResizeRequested || podResizeRequested || IsMemoryBackedVolumeResizeRequested(pod, allocatedPod)
 	dynamicContainers := utilfeature.DefaultFeatureGate.Enabled(features.DynamicContainers)
 	dynamicVolumes := utilfeature.DefaultFeatureGate.Enabled(features.DynamicNodeLocalEphemeralVolumes)
 	if !resizeRequested && !dynamicContainers && !dynamicVolumes {
@@ -691,7 +693,7 @@ func (m *manager) handlePendingAllocation(ctx context.Context, pod *v1.Pod) (lif
 			reason = v1.PodReasonInfeasible
 			// podResizesAdmitHandler counts its own rejections with a more specific reason.
 			if resizeRequested && result.Reason != v1.PodReasonInfeasible {
-				metrics.PodInfeasibleResizes.WithLabelValues(result.Reason).Inc()
+				recordInfeasibleResize(result.Reason, containerResizeRequested, podResizeRequested)
 			}
 		}
 		if m.statusManager.SetPodResizePendingCondition(pod.UID, reason, result.Message, pod.Generation) {
@@ -714,14 +716,15 @@ func containerHasResources(c *v1.Container) bool {
 	return len(c.Resources.Requests) > 0 || len(c.Resources.Limits) > 0
 }
 
-// isResizeRequested returns whether the desired pod asks for a change to the resources of its
-// containers, to its pod-level resources, or to the size limit of one of its memory-backed emptyDir
-// volumes. With DynamicContainers, adding or removing a main container that has resources is a
-// resize too. Any other field that is gated on allocation can differ too, but that is not a resize.
-func isResizeRequested(desired, allocated *v1.Pod) bool {
-	if !apiequality.Semantic.DeepEqual(desired.Spec.Resources, allocated.Spec.Resources) {
-		return true
-	}
+// isPodResizeRequested returns whether the desired pod asks for a change to its pod-level resources.
+func isPodResizeRequested(desired, allocated *v1.Pod) bool {
+	return !apiequality.Semantic.DeepEqual(desired.Spec.Resources, allocated.Spec.Resources)
+}
+
+// isContainerResizeRequested returns whether the desired pod asks for a change to the resources of
+// its containers. With DynamicContainers, adding or removing a main container that has resources is
+// a container resize too.
+func isContainerResizeRequested(desired, allocated *v1.Pod) bool {
 	// TODO(KEP-5972): Report rejected container additions and removals (e.g. by NodeDeclaredFeatures
 	// when DynamicContainers is disabled) as PodResizePending, and consider classifying them as
 	// resizes only when the effective pod-level resources change. The add/remove constraints (swap,
@@ -737,7 +740,7 @@ func isResizeRequested(desired, allocated *v1.Pod) bool {
 			return true
 		}
 	}
-	return IsMemoryBackedVolumeResizeRequested(desired, allocated)
+	return false
 }
 
 // canAdmitPod determines if a pod can be admitted, and gives a reason if it
