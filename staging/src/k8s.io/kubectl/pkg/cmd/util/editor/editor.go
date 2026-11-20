@@ -78,11 +78,11 @@ func defaultEnvEditor(envs []string) ([]string, bool) {
 	if len(editor) == 0 {
 		editor = platformize(defaultEditor, windowsEditor)
 	}
-	if !strings.Contains(editor, " ") {
+	if !strings.ContainsAny(editor, " \t") {
 		return []string{editor}, false
 	}
 	if !strings.ContainsAny(editor, "\"'\\") {
-		return strings.Split(editor, " "), false
+		return strings.Fields(editor), false
 	}
 	// rather than parse the shell arguments ourselves, punt to the shell
 	shell := defaultEnvShell()
