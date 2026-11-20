@@ -17,10 +17,7 @@ limitations under the License.
 package app
 
 import (
-	"context"
 	"encoding/json"
-	"errors"
-	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -28,7 +25,6 @@ import (
 	"reflect"
 	"strings"
 	"testing"
-	"time"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -47,35 +43,6 @@ import (
 	proxymetrics "k8s.io/kubernetes/pkg/proxy/metrics"
 	netutils "k8s.io/utils/net"
 )
-
-type fakeProxyServerLongRun struct{}
-
-// Run runs the specified ProxyServer.
-func (s *fakeProxyServerLongRun) Run(ctx context.Context) error {
-	for {
-		time.Sleep(2 * time.Second)
-	}
-}
-
-// CleanupAndExit runs in the specified ProxyServer.
-func (s *fakeProxyServerLongRun) CleanupAndExit() error {
-	return nil
-}
-
-type fakeProxyServerError struct{}
-
-// Run runs the specified ProxyServer.
-func (s *fakeProxyServerError) Run(ctx context.Context) error {
-	for {
-		time.Sleep(2 * time.Second)
-		return fmt.Errorf("mocking error from ProxyServer.Run()")
-	}
-}
-
-// CleanupAndExit runs in the specified ProxyServer.
-func (s *fakeProxyServerError) CleanupAndExit() error {
-	return errors.New("mocking error from ProxyServer.CleanupAndExit()")
-}
 
 // fakeMux matches the statusz mux interface used by statusz.Install:
 // it needs Handle(path, handler) and ListedPaths().
