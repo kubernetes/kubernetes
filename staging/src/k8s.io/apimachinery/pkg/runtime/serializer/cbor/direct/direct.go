@@ -41,3 +41,9 @@ func Unmarshal(src []byte, dst any) error {
 func Diagnose(src []byte) (string, error) {
 	return modes.Diagnostic.Diagnose(src)
 }
+
+// TranscodeJSONObject transcodes a raw JSON object string directly into CBOR bytes
+// without intermediate map[string]interface{} allocations.
+func TranscodeJSONObject(rawStr string) ([]byte, bool) {
+	return modes.TranscodeJSONObject(rawStr)
+}
