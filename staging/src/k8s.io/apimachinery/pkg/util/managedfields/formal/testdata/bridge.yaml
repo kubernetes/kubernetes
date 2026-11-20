@@ -1,0 +1,436 @@
+# Copyright 2026 The Kubernetes Authors.
+# SPDX-License-Identifier: Apache-2.0
+#
+# These expectations are authored independently of Lean and Go. Owners use SMD
+# path spelling; container-presence ownership is outside the shared projection.
+version: 1
+cases:
+- name: shared-scalar-release-conflict-force-and-idempotence
+  steps:
+  - manager: A
+    apply: {x: one, "y": two}
+    expect:
+      object: {x: one, "y": two}
+      owners: {A: [.x, .y]}
+  - manager: B
+    apply: {x: one}
+    expect:
+      object: {x: one, "y": two}
+      owners: {A: [.x, .y], B: [.x]}
+  - manager: A
+    apply: {"y": two}
+    expect:
+      object: {x: one, "y": two}
+      owners: {A: [.y], B: [.x]}
+  - manager: C
+    apply: {x: changed}
+    expect:
+      error: conflict
+      object: {x: one, "y": two}
+      owners: {A: [.y], B: [.x]}
+  - manager: C
+    force: true
+    apply: {x: changed}
+    expect:
+      object: {x: changed, "y": two}
+      owners: {A: [.y], C: [.x]}
+  - manager: A
+    apply: {}
+    expect:
+      object: {x: changed}
+      owners: {C: [.x]}
+  - manager: C
+    force: true
+    apply: {x: changed}
+    expect:
+      object: {x: changed}
+      owners: {C: [.x]}
+  - manager: C
+    apply: {}
+    expect: {object: {}, owners: {}}
+- name: independent-granular-object-branches
+  steps:
+  - manager: A
+    apply: {settings: {left: one}}
+    expect:
+      object: {settings: {left: one}}
+      owners: {A: [.settings.left]}
+  - manager: B
+    apply: {settings: {right: two}}
+    expect:
+      object: {settings: {left: one, right: two}}
+      owners: {A: [.settings.left], B: [.settings.right]}
+  - manager: A
+    apply: {}
+    expect:
+      object: {settings: {right: two}}
+      owners: {B: [.settings.right]}
+  - manager: B
+    apply: {}
+    expect: {object: {}, owners: {}}
+- name: atomic-map-is-one-value
+  steps:
+  - manager: A
+    apply: {atomic: {left: one, right: two}}
+    expect:
+      object: {atomic: {left: one, right: two}}
+      owners: {A: [.atomic]}
+  - manager: B
+    apply: {atomic: {left: one}}
+    expect:
+      error: conflict
+      object: {atomic: {left: one, right: two}}
+      owners: {A: [.atomic]}
+  - manager: B
+    force: true
+    apply: {atomic: {left: one}}
+    expect:
+      object: {atomic: {left: one}}
+      owners: {B: [.atomic]}
+  - manager: B
+    apply: {}
+    expect: {object: {}, owners: {}}
+- name: key-only-item-last-membership
+  steps:
+  - manager: A
+    apply: {items: [{name: db, host: h}]}
+    expect:
+      object: {items: [{name: db, host: h}]}
+      owners: {A: ['.items[name="db"]', '.items[name="db"].host']}
+  - manager: B
+    apply: {items: [{name: db, note: injected}]}
+    expect:
+      object: {items: [{name: db, host: h, note: injected}]}
+      owners:
+        A: ['.items[name="db"]', '.items[name="db"].host']
+        B: ['.items[name="db"]', '.items[name="db"].note']
+  - manager: A
+    apply: {}
+    expect:
+      object: {items: [{name: db, note: injected}]}
+      owners: {B: ['.items[name="db"]', '.items[name="db"].note']}
+  - manager: B
+    apply: {}
+    expect: {object: {}, owners: {}}
+- name: proposal-last-full-deletes-partial-contribution
+  required: {items: [host, port]}
+  steps:
+  - manager: A
+    apply: {items: [{name: db, host: h, port: p}]}
+    expect:
+      object: {items: [{name: db, host: h, port: p}]}
+      owners: {A: ['.items[name="db"]', '.items[name="db"].host', '.items[name="db"].port']}
+  - manager: B
+    apply: {items: [{name: db, note: injected}]}
+    expect:
+      object: {items: [{name: db, host: h, port: p, note: injected}]}
+      owners:
+        A: ['.items[name="db"]', '.items[name="db"].host', '.items[name="db"].port']
+        B: ['.items[name="db"]', '.items[name="db"].note']
+  - manager: A
+    apply: {}
+    expect: {object: {}, owners: {}}
+    goExpect:
+      object: {items: [{name: db, note: injected}]}
+      owners: {B: ['.items[name="db"]', '.items[name="db"].note']}
+    differenceKind: proposal
+    difference: Current SSA retains the partial applier's item; the proposed last-full-manager rule deletes it.
+- name: proposal-rejects-required-ownership-fragmentation
+  required: {items: [host, port]}
+  steps:
+  - manager: A
+    apply: {items: [{name: db, host: h, port: p}]}
+    expect:
+      object: {items: [{name: db, host: h, port: p}]}
+      owners: {A: ['.items[name="db"]', '.items[name="db"].host', '.items[name="db"].port']}
+  - manager: B
+    apply: {items: [{name: db, port: p}]}
+    expect:
+      object: {items: [{name: db, host: h, port: p}]}
+      owners:
+        A: ['.items[name="db"]', '.items[name="db"].host', '.items[name="db"].port']
+        B: ['.items[name="db"]', '.items[name="db"].port']
+  - manager: A
+    apply: {items: [{name: db, host: h}]}
+    expect:
+      error: orphanedItem
+      object: {items: [{name: db, host: h, port: p}]}
+      owners:
+        A: ['.items[name="db"]', '.items[name="db"].host', '.items[name="db"].port']
+        B: ['.items[name="db"]', '.items[name="db"].port']
+    goExpect:
+      object: {items: [{name: db, host: h, port: p}]}
+      owners:
+        A: ['.items[name="db"]', '.items[name="db"].host']
+        B: ['.items[name="db"]', '.items[name="db"].port']
+    differenceKind: proposal
+    difference: Current SSA allows fragmentation; the proposed invariant rejects it atomically.
+- name: nested-full-and-partial-roles-switch-levels
+  required: {items: [host], 'items[].children': [url]}
+  steps:
+  - manager: A
+    apply: {items: [{name: db, host: h}]}
+    expect:
+      object: {items: [{name: db, host: h}]}
+      owners: {A: ['.items[name="db"]', '.items[name="db"].host']}
+  - manager: B
+    apply: {items: [{name: db, children: [{name: api, url: u}]}]}
+    expect:
+      object: {items: [{name: db, host: h, children: [{name: api, url: u}]}]}
+      owners:
+        A: ['.items[name="db"]', '.items[name="db"].host']
+        B: ['.items[name="db"]', '.items[name="db"].children[name="api"]', '.items[name="db"].children[name="api"].url']
+  - manager: A
+    apply: {items: [{name: db, host: h, children: [{name: api, note: injected}]}]}
+    expect:
+      object: {items: [{name: db, host: h, children: [{name: api, url: u, note: injected}]}]}
+      owners:
+        A: ['.items[name="db"]', '.items[name="db"].host', '.items[name="db"].children[name="api"]', '.items[name="db"].children[name="api"].note']
+        B: ['.items[name="db"]', '.items[name="db"].children[name="api"]', '.items[name="db"].children[name="api"].url']
+  - manager: A
+    apply: {items: [{name: db, host: h}]}
+    expect:
+      object: {items: [{name: db, host: h, children: [{name: api, url: u}]}]}
+      owners:
+        A: ['.items[name="db"]', '.items[name="db"].host']
+        B: ['.items[name="db"]', '.items[name="db"].children[name="api"]', '.items[name="db"].children[name="api"].url']
+- name: force-transfer-does-not-invent-container-ownership
+  steps:
+  - manager: A
+    apply: {settings: {left: one}}
+    expect:
+      object: {settings: {left: one}}
+      owners: {A: [.settings.left]}
+  - manager: B
+    force: true
+    apply: {settings: {left: two}}
+    expect:
+      object: {settings: {left: two}}
+      owners: {B: [.settings.left]}
+  - manager: B
+    apply: {}
+    expect: {object: {}, owners: {}}
+- name: empty-list-repetition-changes-presence
+  semantics: current
+  steps:
+  - manager: A
+    apply: {items: [{name: db, host: old}]}
+    expect:
+      object: {items: [{name: db, host: old}]}
+      owners: {A: ['.items[name="db"]', '.items[name="db"].host']}
+  - manager: A
+    apply: {items: []}
+    expect: {object: {}, owners: {}}
+  - manager: A
+    apply: {items: []}
+    expect: {object: {items: []}, owners: {}}
+  - manager: A
+    apply: {items: []}
+    expect: {object: {items: []}, owners: {}}
+- name: empty-list-default-wrapper-bootstraps-update-owner
+  semantics: current
+  bootstrap: true
+  steps:
+  - manager: A
+    apply: {items: [{name: db, host: old}]}
+    expect:
+      object: {items: [{name: db, host: old}]}
+      owners: {A: ['.items[name="db"]', '.items[name="db"].host']}
+  - manager: A
+    apply: {items: []}
+    expect: {object: {}, owners: {}}
+  - manager: A
+    apply: {items: []}
+    expect: {object: {items: []}, owners: {}}
+  - manager: A
+    apply: {items: []}
+    expect:
+      object: {items: []}
+      owners: {'before-first-apply@update': [.items]}
+  - manager: A
+    apply: {items: []}
+    expect:
+      object: {items: []}
+      owners: {'before-first-apply@update': [.items]}
+- name: explicit-empty-map-becomes-null-before-repetition
+  semantics: current
+  steps:
+  - manager: A
+    apply: {settings: {left: old}}
+    expect: {object: {settings: {left: old}}, owners: {A: [.settings.left]}}
+  - manager: A
+    apply: {settings: {}}
+    expect: {object: {settings: null}, owners: {A: [.settings]}}
+  - manager: B
+    apply: {settings: {}}
+    expect: {error: conflict, object: {settings: null}, owners: {A: [.settings]}}
+  - manager: A
+    apply: {settings: {}}
+    expect: {object: {settings: {}}, owners: {A: [.settings]}}
+  - manager: B
+    apply: {settings: {}}
+    expect: {object: {settings: {}}, owners: {A: [.settings], B: [.settings]}}
+- name: null-map-member-survives-adding-a-child
+  semantics: current
+  steps:
+  - manager: A
+    apply: {settings: null}
+    expect: {object: {settings: null}, owners: {A: [.settings]}}
+  - manager: B
+    apply: {settings: {left: live}}
+    expect: {object: {settings: {left: live}}, owners: {A: [.settings], B: [.settings.left]}}
+- name: null-map-member-conflicts-with-an-empty-map
+  semantics: current
+  steps:
+  - manager: A
+    apply: {settings: null}
+    expect: {object: {settings: null}, owners: {A: [.settings]}}
+  - manager: B
+    apply: {settings: {}}
+    expect: {error: conflict, object: {settings: null}, owners: {A: [.settings]}}
+- name: null-list-member-survives-adding-an-item
+  semantics: current
+  steps:
+  - manager: A
+    apply: {items: null}
+    expect: {object: {items: null}, owners: {A: [.items]}}
+  - manager: B
+    apply: {items: [{name: db, host: live}]}
+    expect:
+      object: {items: [{name: db, host: live}]}
+      owners: {A: [.items], B: ['.items[name="db"]', '.items[name="db"].host']}
+- name: null-map-operand-retains-foreign-children
+  semantics: current
+  steps:
+  - manager: A
+    apply: {settings: {left: live}}
+    expect: {object: {settings: {left: live}}, owners: {A: [.settings.left]}}
+  - manager: B
+    apply: {settings: null}
+    expect: {object: {settings: {left: live}}, owners: {A: [.settings.left], B: [.settings]}}
+- name: null-list-operand-retains-foreign-items
+  semantics: current
+  steps:
+  - manager: A
+    apply: {items: [{name: db, host: live}]}
+    expect:
+      object: {items: [{name: db, host: live}]}
+      owners: {A: ['.items[name="db"]', '.items[name="db"].host']}
+  - manager: B
+    apply: {items: null}
+    expect:
+      object: {items: [{name: db, host: live}]}
+      owners: {A: ['.items[name="db"]', '.items[name="db"].host'], B: [.items]}
+- name: update-owned-child-does-not-retain-item
+  semantics: current
+  steps:
+  - manager: A
+    apply: {items: [{name: db, host: old}]}
+    expect:
+      object: {items: [{name: db, host: old}]}
+      owners: {A: ['.items[name="db"]', '.items[name="db"].host']}
+  - operation: update
+    manager: B
+    apply: {items: [{name: db, host: new}]}
+    expect:
+      object: {items: [{name: db, host: new}]}
+      owners: {A: ['.items[name="db"]'], B@update: ['.items[name="db"].host']}
+  - manager: A
+    apply: {}
+    expect: {object: {items: null}, owners: {}}
+- name: shared-update-owned-child-does-not-retain-item
+  semantics: current
+  steps:
+  - manager: A
+    apply: {items: [{name: db, host: old}]}
+    expect:
+      object: {items: [{name: db, host: old}]}
+      owners: {A: ['.items[name="db"]', '.items[name="db"].host']}
+  - operation: update
+    manager: B
+    apply: {items: [{name: db, host: new}]}
+    expect:
+      object: {items: [{name: db, host: new}]}
+      owners: {A: ['.items[name="db"]'], B@update: ['.items[name="db"].host']}
+  - manager: A
+    apply: {items: [{name: db, host: new}]}
+    expect:
+      object: {items: [{name: db, host: new}]}
+      owners: {A: ['.items[name="db"]', '.items[name="db"].host'], B@update: ['.items[name="db"].host']}
+  - manager: A
+    apply: {}
+    expect: {object: {items: null}, owners: {}}
+- name: shared-apply-owned-child-retains-item
+  semantics: current
+  steps:
+  - manager: A
+    apply: {items: [{name: db, host: new}]}
+    expect:
+      object: {items: [{name: db, host: new}]}
+      owners: {A: ['.items[name="db"]', '.items[name="db"].host']}
+  - manager: B
+    apply: {items: [{name: db, host: new}]}
+    expect:
+      object: {items: [{name: db, host: new}]}
+      owners: {A: ['.items[name="db"]', '.items[name="db"].host'], B: ['.items[name="db"]', '.items[name="db"].host']}
+  - manager: A
+    apply: {}
+    expect:
+      object: {items: [{name: db, host: new}]}
+      owners: {B: ['.items[name="db"]', '.items[name="db"].host']}
+- name: literal-manager-name-does-not-alias-update-identity
+  semantics: current
+  steps:
+  - operation: update
+    manager: A
+    apply: {x: one}
+    expect: {object: {x: one}, owners: {A@update: [.x]}}
+  - manager: A@update
+    apply: {"y": two}
+    expect:
+      object: {x: one, "y": two}
+      owners: {A@update: [.x], 'apply("A@update")': [.y]}
+  - manager: A@update
+    apply: {}
+    expect: {object: {x: one}, owners: {A@update: [.x]}}
+  - manager: A
+    apply: {x: one}
+    expect: {object: {x: one}, owners: {A: [.x], A@update: [.x]}}
+- name: nonstatus-root-coownership-blocks-another-write
+  semantics: current
+  schema: |
+    types:
+    - name: Document
+      map:
+        fields:
+        - name: apiVersion
+          type: {scalar: string}
+        - name: kind
+          type: {scalar: string}
+        - name: settings
+          type:
+            map:
+              fields:
+              - name: desired
+                type: {scalar: string}
+        - name: status
+          type:
+            map:
+              fields:
+              - name: observed
+                type: {scalar: string}
+  steps:
+  - manager: Main
+    apply: {settings: {desired: one}}
+    expect: {object: {settings: {desired: one}}, owners: {Main: [.settings.desired]}}
+  - manager: Status
+    apply: {settings: {desired: one}, status: {observed: ready}}
+    expect:
+      object: {settings: {desired: one}, status: {observed: ready}}
+      owners: {Main: [.settings.desired], Status: [.settings.desired, .status.observed]}
+  - manager: Main
+    apply: {settings: {desired: two}}
+    expect:
+      error: conflict
+      object: {settings: {desired: one}, status: {observed: ready}}
+      owners: {Main: [.settings.desired], Status: [.settings.desired, .status.observed]}

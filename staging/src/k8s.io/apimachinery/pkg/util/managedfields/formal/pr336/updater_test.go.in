@@ -1,0 +1,127 @@
+/*
+Copyright The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package merge
+
+import (
+	"encoding/json"
+	"os"
+	"reflect"
+	"testing"
+
+	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
+	"sigs.k8s.io/structured-merge-diff/v6/typed"
+)
+
+type ssaFormalIdentityConverter struct{}
+
+func (ssaFormalIdentityConverter) Convert(object *typed.TypedValue, _ fieldpath.APIVersion) (*typed.TypedValue, error) {
+	return object, nil
+}
+func (ssaFormalIdentityConverter) IsMissingVersionError(error) bool { return false }
+
+func TestSSAFormalUpdaterFilteredCache(t *testing.T) {
+	parser, err := typed.NewParser(`types:
+- name: Document
+  map:
+    fields:
+    - name: amount
+      type: {scalar: numeric}
+    - name: extra
+      type: {scalar: string}
+`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	typ := parser.Type("Document")
+	old, err := typ.FromUnstructured(map[string]any{"amount": int64(0)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	newValue, err := typ.FromUnstructured(map[string]any{"amount": int64(1)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	amount := fieldpath.MakePathOrDie("amount")
+	exclude := fieldpath.NewExcludeSetFilter(fieldpath.NewSet(amount))
+	updater := (&UpdaterBuilder{
+		Converter:    ssaFormalIdentityConverter{},
+		IgnoreFilter: map[fieldpath.APIVersion]fieldpath.Filter{"v1": exclude, "v2": exclude},
+	}).BuildUpdater()
+	owners := fieldpath.ManagedFields{
+		"A": fieldpath.NewVersionedSet(fieldpath.NewSet(amount), "v2", true),
+		"B": fieldpath.NewVersionedSet(fieldpath.NewSet(amount), "v1", false),
+	}
+	actual, comparison, err := updater.update(old, newValue, "v2", owners, "A", false)
+	if err != nil {
+		t.Fatalf("uncached version used unfiltered changes: %v", err)
+	}
+	if !comparison.IsSame() || len(actual) != 2 {
+		t.Fatalf("unexpected filtered updater result: %v; owners=%v", comparison, actual)
+	}
+	for name, version := range map[string]fieldpath.APIVersion{"A": "v2", "B": "v1"} {
+		entry := actual[name]
+		if entry == nil || entry.APIVersion() != version || entry.Applied() != (name == "A") || !entry.Set().Has(amount) {
+			t.Fatalf("filtered update changed %s ownership/version/operation: %v", name, entry)
+		}
+	}
+	original, err := old.Compare(newValue)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !original.Modified.Has(amount) {
+		t.Fatal("native comparison did not detect the scalar change")
+	}
+	local := original
+	cache := map[fieldpath.APIVersion]*typed.Comparison{"v1": original}
+	cache["v1"] = original.FilterFields(exclude)
+	if local != cache["v1"] || !local.IsSame() {
+		t.Fatal("comparison filter did not mutate the shared reference")
+	}
+
+	// The applying actor's fields are installed before this private updater runs.
+	extra := fieldpath.MakePathOrDie("extra")
+	withExtra, err := typ.FromUnstructured(map[string]any{"amount": int64(1), "extra": "added"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	forcedOwners := fieldpath.ManagedFields{
+		"A": fieldpath.NewVersionedSet(fieldpath.NewSet(amount, extra), "v1", true),
+		"B": fieldpath.NewVersionedSet(fieldpath.NewSet(amount), "v1", true),
+	}
+	plainUpdater := (&UpdaterBuilder{Converter: ssaFormalIdentityConverter{}}).BuildUpdater()
+	forced, _, err := plainUpdater.update(old, withExtra, "v1", forcedOwners, "A", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(forced) != 1 || forced["B"] != nil {
+		t.Fatalf("forced update created or retained foreign claims: %v", forced)
+	}
+	a := forced["A"]
+	if a == nil || !a.Set().Equals(fieldpath.NewSet(amount, extra)) || a.APIVersion() != "v1" || !a.Applied() {
+		t.Fatalf("forced update changed the installed actor claim set: %v", a)
+	}
+
+	var expected map[string]bool
+	if err := json.Unmarshal([]byte(os.Getenv("SSA_UPDATER_EXPECTED")), &expected); err != nil {
+		t.Fatalf("set SSA_UPDATER_EXPECTED from ssa-model --updater-observations: %v", err)
+	}
+	actualObservation := map[string]bool{"filteredCacheObserved": true, "forcedClaimsStayBounded": true}
+	if !reflect.DeepEqual(expected, actualObservation) {
+		t.Fatalf("imported updater/native observations differ: model=%v native=%v", expected, actualObservation)
+	}
+	t.Log("filteredCacheObserved=true forcedClaimsStayBounded=true")
+}

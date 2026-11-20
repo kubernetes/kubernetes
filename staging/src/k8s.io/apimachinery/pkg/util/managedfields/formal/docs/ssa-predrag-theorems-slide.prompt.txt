@@ -1,0 +1,105 @@
+Generated with the built-in image_gen tool.
+Grounded in the executable SSA model in this directory; SMD PR #336 head 6fab440 and base 560aaa5.
+Style: visualize-slide, matching the companion ownership slide.
+
+GENERATION PROMPT
+
+Use case: infographic-diagram. Generate exactly ONE self-contained ENGLISH technical presentation slide as ONE raster image, wide 16:9. No multi-slide collage, no slide/page number.
+Match an established Kubernetes SSA slide series: pure white background, Excalidraw whiteboard style, slightly irregular thin dark outlines, handwritten-looking headings, restrained pale blue / violet / green / amber / rose panels, clean legible monospaced code/YAML. Dense but carefully structured, with precise alignment and readable typography. No decorative icons, logos, watermarks or arbitrary connectors. Manager A is blue, B purple; green means proved/success, red failure/counterexample, amber an assumption, classifier fact or limitation. Every arrow must mean data flow, proof dependency, time or a labeled comparison.
+Use ordinary YAML for examples, never invented ownership-set notation. When list-map examples appear, make required field names bold and key field names bold AND underlined, as actual typography, not Markdown stars or literal HTML. No boxes may overlap, clip text, or hide omitted YAML parent fields. Statements about the model and about actual Go must remain distinct. Do not assert universal Go correctness.
+
+TITLE: "PR #336: theorems, counterexamples, and Go evidence"
+SUBTITLE: "Pinned PR head 6fab440 • general classifier laws are different from safety of the whole PR"
+
+LAYOUT: three main columns (roughly 31% / 42% / 27%) plus one full-width bottom boundary strip. Use green for a proved compatibility law, amber for direct classifier consequences, red for demonstrated failures. Provide plain-English explanations next to exact theorem identifiers; no invented mathematical set notation.
+
+LEFT COLUMN first panel heading "General compatibility theorem"
+Green exact source identifier:
+"no_required_transition_equivalence"
+Text: "If every item has no required core beyond its key, predrag Apply and current Apply are equal for ALL finite model states and requests."
+YAML example:
+items:
+- name: db      # A, B
+  note: live    # B
+Here name is bold AND underlined; note is optional, normal-weight.
+Small meaningful temporal flow: "A applies {}" → "B keeps the item" → "B applies {}" → "Item gone".
+Caption: "Key-only means no ADDITIONAL required fields."
+
+Second left panel heading "Classifier laws — by definition"
+Use three compact amber cards with exact identifiers and English consequences:
+1. "explicit_map_shortcuts_required_children"
+"An explicit map-member claim can make prCovers true while strict required-child coverage is false."
+2. "granular_list_without_member_is_partial"
+"No direct granular-list presence claim makes the PR's required-list classifier false."
+3. "updater_keeps_membership"
+"Update ownership is exempt from partial-applier key filtering."
+Small note: "Eligibility/classifier statements; not a universal Go correctness proof."
+
+CENTER COLUMN heading "Kernel-checked execution witnesses"
+Top red-bordered witness panel title "Fragmentation, then partial deletion"
+Show a stored candidate after A has released port:
+items:
+- name: db     # A, B
+  host: old    # A
+  port: "p"    # B
+Make name bold+underlined, host and port bold.
+Text: "Both values remain. Neither manager is full."
+A labeled arrow "PR accepts; then B applies {}" points to a red result:
+"The item disappears, including A's host."
+Exact compact theorem references:
+"pr_accepts_fragment_without_full_owner"
+"pr_partial_can_delete_foreign_required_branch"
+
+Second red witness panel title "Required-map shortcut"
+Context: "A owns required conn.endpoint; B applies conn: {}."
+Result text: "PR counts B as covered. A leaves; endpoint disappears."
+Exact source name:
+"pr_map_shortcut_retains_invalid_item"
+Small note: "SMD result; external validation may reject it."
+
+Third red witness panel title "Required granular list"
+YAML request by A:
+items:
+- name: db
+  children:
+  - name: child
+Here BOTH name field names are list-map keys, bold AND underlined. children is required, bold.
+Text: "A supplies the list and its element. The PR still calls A partial."
+Then: "After B shares only optional data, B's omission can delete A's subtree."
+Exact source name:
+"pr_required_list_owner_is_misclassified"
+Note: "These are specific finite witnesses, not universal liveness theorems."
+
+RIGHT COLUMN upper panel heading "Stronger full policy: separate model"
+Small code badge ".full".
+Exact witness name:
+"full_contract_rejects_same_fragment"
+Plain text: "The fragmenting request is rejected atomically; A's old claim is retained."
+Second statement:
+"accepted_objects_have_full_owner"
+Label it explicitly "Guard consequence", then:
+"Every accepted required-bearing object has an individual full manager."
+Third statement:
+"scoped_history_preserves_invariants"
+"Finite mixed scoped Apply/Update histories preserve item and object invariants."
+A strong amber line: "These are NOT guarantees of the raw PR."
+
+RIGHT COLUMN lower blue panel heading "Actual pinned Go comparison"
+Show two aligned comparison pairs with lines labeled "compare exact observations":
+"Lean predrag" with "Go head 6fab440"
+"Lean current" with "Go base 560aaa5".
+Caption:
+"7 cases / 23 transitions at EACH revision"
+"Objects, ownership and errors match."
+"Both real merge test suites run."
+Important emphasized line:
+"The comparisons pass because they reproduce the counterexamples."
+
+BOTTOM FULL-WIDTH STRIP:
+"The full-manager guard is absent from PR #336. Required granular-list presence still needs an ownership encoding."
+Second line:
+"Kernel-checked model statements + bounded Go agreement; NO universal Go refinement proof."
+Include a very small module key:
+"Semantics.lean = variant and classifier laws · Counterexamples.lean = execution witnesses · testdata/pr336.yaml = independent Go oracles"
+
+DO NOT claim the PR enforces the stronger invariant. Do not present the repaired-model theorem as a theorem of predrag mode. Do not hide that absence of an empty granular-list ownership marker is an open representation problem. Keep all YAML properly rooted with items: and correct indentation.

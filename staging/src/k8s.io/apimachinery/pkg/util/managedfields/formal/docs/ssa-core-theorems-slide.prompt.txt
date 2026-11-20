@@ -1,0 +1,115 @@
+Generated with the built-in image_gen tool.
+Grounded in the executable SSA model in this directory; SMD PR #336 head 6fab440 and base 560aaa5.
+Style: visualize-slide, matching the companion ownership slide.
+
+GENERATION PROMPT
+
+Use case: infographic-diagram. Generate exactly ONE self-contained ENGLISH technical presentation slide as ONE raster image, wide 16:9. No multi-slide collage, no slide/page number.
+Match an established Kubernetes SSA slide series: pure white background, Excalidraw whiteboard style, slightly irregular thin dark outlines, handwritten-looking headings, restrained pale blue / violet / green / amber / rose panels, clean legible monospaced code/YAML. Dense but carefully structured, with precise alignment and readable typography. No decorative icons, logos, watermarks or arbitrary connectors. Manager A is blue, B purple; green means proved/success, red failure/counterexample, amber an assumption, classifier fact or limitation. Every arrow must mean data flow, proof dependency, time or a labeled comparison.
+Use ordinary YAML for examples, never invented ownership-set notation. When list-map examples appear, make required field names bold and key field names bold AND underlined, as actual typography, not Markdown stars or literal HTML. No boxes may overlap, clip text, or hide omitted YAML parent fields. Statements about the model and about actual Go must remain distinct. Do not assert universal Go correctness.
+
+TITLE: "SSA core laws: what Lean actually proves"
+SUBTITLE: "Baseline ownership obligations, with explicit premises — before assessing PR #336"
+PROMINENT SCOPE LINE: "General theorems about the normalized SSA.apply item-core model; not a refinement proof of current Go."
+
+LAYOUT: four substantial panels in a clean 2×2 arrangement, plus a slim bottom scope strip. Let the idempotence panel have enough room for a real dependency diagram. All examples here use optional scalar fields x and y: normal-weight YAML field names, no key or required-field decoration.
+
+TOP LEFT PANEL heading "Conflicts, force, and co-ownership"
+Show one state box:
+"Existing state"
+x: one   # A owns x
+A semantic next-request arrow to a request box:
+"B applies, force = false"
+x: two
+A red outcome "Conflict".
+Under it, two distinct alternative rules (do not depict them as one combined execution):
+"With force: changing x removes A's value claim; B claims the new value."
+"With the SAME value: B can co-claim x; A's claim survives, even with force."
+Small exact theorem-name captions:
+"foreign_change_conflicts"
+"force_transfers_changed_claim"
+"equal_writes_do_not_conflict"
+Caption: "Conflict rejection assumes a valid initial state and normalized Apply. Phase claims refer to updatedClaims."
+
+TOP RIGHT PANEL heading "Omission + exact actor ownership"
+Two aligned independent examples:
+SHARED example:
+"Before: x: one, owners A and B"
+then arrow labeled "A applies {}"
+to green box "x remains; B still owns it".
+Below in small type: "Requires no overwrite and no ancestor lifetime deletion."
+EXCLUSIVE example:
+"Before: x: one, only A owns it"
+then arrow labeled "A applies {}"
+to box "x disappears".
+Caption: "Before defaulting."
+Under these, a blue rule strip:
+"After a successful Apply, the actor owns exactly its requested footprint."
+Small exact theorem names:
+"shared_omission_preserves_value"
+"exclusive_omission_removes_value"
+"accepted_actor_claims_exact"
+
+BOTTOM LEFT PANEL heading "Idempotence is a transition proof"
+Start with two source-fact boxes:
+"accepted_preserves_intent" / "Requested cells are already present"
+and
+"accepted_actor_claims_exact" / "No old actor claims linger".
+Converging true proof-dependency arrows lead to:
+"Repeating causes no value changes, releases, or deletion roots"
+then an arrow to
+"accepted_reapply_candidate_fixed"
+then an arrow to a green box
+"accepted_apply_idempotent".
+Inside the final box show the exact Lean expressions with labels:
+"First success: apply schema before r = .ok once"
+"Same request: apply schema once r = .ok once"
+Caption: "Immediate repetition succeeds with the EXACT same model state, including force."
+Important: no intervening requests; do not suggest idempotence is merely an acceptance guard.
+
+BOTTOM RIGHT PANEL heading "Progress, not only preservation"
+Show "Fresh manager B" above this request:
+x: one
+y: two
+Next to it show the prior state:
+x: one   # A
+y: two   # A
+A labeled arrow "B acquires the unchanged snapshot" leads to a green result:
+"Success • same data • every old claim retained"
+"Both managers can now own x and y."
+The theorem name must be exact:
+"Progress.unchanged_snapshot_acquisition"
+A compact amber premise box:
+"Valid initial state; fresh manager; normalized unchanged snapshot, including model cell order."
+One short green line: "No force is needed."
+Below, a separate small badge and explanation:
+"Guard-based safety"
+"accepted_valid / finite_history_preserves_validity"
+"Chosen model invariants hold after success and at every committed finite prefix; rejections keep the old state."
+Clearly do not imply this guard-based safety proves availability under arbitrary admission.
+
+BOTTOM FULL-WIDTH SCOPE STRIP:
+"Structure: proper_ancestor_is_container + scalar_has_no_descendants rule out scalar/descendant contradictions."
+Then the essential limit:
+"These proofs concern the proposed item-core transition. Current/PR wire pruning, scoped Apply/Update histories and admission composition have separate definitions and claims."
+And very short final line:
+"No universal Go refinement, conversion, defaulting or storage-concurrency theorem is claimed."
+
+ACCURACY:
+- Do not state that all listed model laws have already been proved as universal properties of Go or of the current wire-pruning mode.
+- Shared omission must retain its no-ancestor-deletion premise.
+- Force transfer of a changed foreign scalar is an ownership-update phase law.
+- The acquisition theorem requires a fresh manager, normalized data and exact snapshot cell-list equality; do not silently generalize it to arbitrary edits or to arbitrary admission policies.
+- A repeated accepted request has a general exact-state fixed-point proof, not just a concrete test.
+- Theorem names are actual source identifiers, not decorative captions; copy them accurately.
+
+
+LOCALIZED CORRECTION PROMPT
+
+Precise localized edit of this English technical slide. Keep its 16:9 layout, whiteboard style, colors, panels, examples, ALL theorem identifiers and unrelated text exactly unchanged.
+Make ONLY these two corrections:
+1. In the bottom-left idempotence panel, replace the final small caption line that currently starts "Important: no intervening requests; do not suggest..." with this reader-facing sentence:
+"No intervening requests. This follows from a transition fixed point."
+Keep the preceding line "Immediate repetition succeeds with the EXACT same model state, including force." unchanged. Remove the leaked instruction wording completely.
+2. In the bottom-right progress panel, the Fresh manager B request is an INPUT to snapshot acquisition. Add one thin, semantically clear arrow from the top of the "Fresh manager B" YAML request box to the small action box "B acquires the unchanged snapshot". Route this connector through the narrow white space above the state boxes, under the panel heading; do not cross or cover the Prior state box or any text. The Prior state already flows toward the green result; preserve that arrow. Both prior state and B's request must visibly participate in the acquisition, with no false arrow from B's request into the prior-state box.
+Do not alter values, ownership labels, premises, scope caveats, theorem names or any other wording.

@@ -1,0 +1,803 @@
+# SSA ownership reference model
+
+This executable Lean project separates three contracts: current single-version
+SSA (`current`), the required-field change in
+[structured-merge-diff PR #336](https://github.com/kubernetes-sigs/structured-merge-diff/pull/336)
+(`predrag`), and the stronger full-manager policy developed in that discussion
+(`full`). It changes no Kubernetes request path or dependency.
+
+The [proof explorer](docs/proofs.html) contains the accepted Lean propositions,
+source, axiom dependencies and proof dependency graph. The
+[property catalogue](PROPERTIES.md) maps the contracts to KEP-555 and existing
+SSA tests. Human review of the definitions remains necessary.
+
+![Full-manager scopes, PR counterexamples, and admission boundary](docs/ssa-ownership-full-manager-slide.png)
+
+Additional slides: [verification plumbing](docs/ssa-lean-plumbing-slide.png), [SSA core theorems](docs/ssa-core-theorems-slide.png), and [PR #336 results](docs/ssa-predrag-theorems-slide.png).
+
+## Full-manager definition and scope
+
+For each associative-list item, a full manager owns membership plus its entire
+required core. Keys are carried by membership. A required map recursively adds
+its required children to that **same manager's** core. Optional descendants do
+not become part of the parent's core. Every nested item is checked independently.
+
+Ordinary object scopes are instantiated separately, including optional maps and
+the root. A required-bearing object must have one manager covering its required
+core; ownership of an optional child can belong to a different manager. An
+ordinary map with no required fields needs no additional completeness guard.
+A key-only list item still requires a membership owner: it disappears only when
+the last membership claimant leaves.
+
+The proposed `writeScoped` operation computes item lifetimes, then optional
+required-bearing object lifetimes, and validates the entire request atomically.
+An actor omitting a whole scope may delete it only if that actor was full and no
+full successor remains. Omitting only part of its required core is rejected if
+no full manager remains. Ancestor deletion dominates descendants. The root is
+never an omission-deletion root. Update is an explicit object replacement and
+has separate ownership rules.
+
+For example, if A is full in `foo.bar` and partial in `foo.abc`, while B has the
+opposite roles, A may omit all of optional `foo.bar` while retaining its partial
+contribution to `foo.abc`. It may not keep only half of `bar`'s required core
+without a full successor. These sibling-role transitions have kernel-checked
+execution proofs in `SSA/Counterexamples.lean`.
+
+```yaml
+# List keyed by name; host and port are required.
+# A creates this item.
+items:
+- name: database
+  host: db.example.com
+  port: "5432"
+---
+# B shares only port; A remains full.
+items:
+- name: database
+  port: "5432"
+---
+# A releases port: the full policy rejects this whole request.
+items:
+- name: database
+  host: db.example.com
+```
+
+Both required values would remain, but neither manager would own the whole
+core. Rejection preserves A's previous port claim. A general progress theorem
+also proves that a fresh manager can acquire a normalized snapshot of unchanged
+data without force, preserving the data and all existing claims. This theorem
+allows sparse real ownership; it does not fabricate container claims.
+
+Required granular lists remain a substantive design problem: current SMD
+field-set extraction creates no direct claim for a known non-null granular list, even
+when explicitly applied empty. The FieldsV1 trie grammar can represent such
+membership; generating and preserving it through SSA operations is the missing
+design. The stronger core uses an explicit collection-presence assertion for
+this case. Its synthetic required-list examples do not establish compatibility
+with the current implementation. The actual-wire modes preserve the missing
+marker and demonstrate the PR's resulting misclassification.
+
+Explicit null creates a direct field member. The raw PR classifier checks that
+path independently of the model's value/presence tag, matching the real FieldSet
+representation. Pinned list/map null controls caught and closed an earlier
+model mismatch. API validity of null is checked separately; mapping nullable
+required containers into the stronger policy needs additional shape metadata.
+
+That direct claim can also survive when another manager adds children to a
+previously null granular container. It is not permanently tied to null's value
+tag. The comparison corpus includes populated-map/list and empty-map controls,
+and a separate generated nullable-container family. Raw typed merge preserves
+nonempty granular structure when null is supplied; empty/null pairs are leaves.
+
+## Baseline counterexample
+
+Unconditional immediate idempotence is false for current SSA: after A owns a
+nonempty associative list, the first Apply of `endpoints: []` removes the field;
+the second identical request creates `[]`. OpenAPI `required` or CEL
+`has(self.endpoints)` rejects the first transition and every identical retry,
+although empty-list creation is valid. The counterexample is kernel-checked,
+connected to the imported pruning source with normalized primitives, and
+reproduced through actual CRD HTTP requests and etcd. The default pipeline also
+bootstraps an Update owner on a later retry. See the
+[requests, cause, exact proof boundaries and checks](docs/baseline-empty-list.md).
+
+A second baseline bug affects empty granular maps even with a presence claim:
+Apply of `settings: {}` produces `settings: null`. An optional non-nullable map
+then cannot be emptied; with nullable maps, another manager's identical empty
+intent conflicts until the original actor repairs the value by repeating its
+request. Real HTTP tests also cover CEL, atomic-map and defaulting controls.
+The [bug register](docs/ssa-bugs.md) separates baseline bugs from the three
+PR #336 classifier/deletion failures and links each to its proof and reproducer.
+
+A reachable Apply/Update history additionally refutes unrestricted handoff
+safety: B's Update owns a child without item membership, then A's omission
+removes that item and child. A nullable list schema accepts the resulting null;
+an optional non-nullable schema rejects every identical retry. The concrete
+and source-bound proofs are in `SSA/HandoffCounterexamples.lean`, with actual
+HTTP checks for both policies and a link to existing
+[Kubernetes #134902](https://github.com/kubernetes/kubernetes/issues/134902).
+One additional unchanged reassertion by A makes the child genuinely A/B-owned
+before omission; the item and shared scalar still disappear. This refutes
+unrestricted BASE-03 as well. B acquiring membership through Apply instead is
+a surviving control. Both nullable policies check the co-owned history through
+HTTP, with exact pre-omission FieldsV1 and persisted GET observations.
+
+A subresource counterexample concerns valid CRDs with an additional root such
+as `settings`: `/status` can claim unchanged `settings.desired`, despite the
+REST strategy restoring every non-status value. The original main manager's
+next change then conflicts. `ResetCounterexamples` refutes this broader reset
+contract; the HTTP test checks exact leaf claims and unchanged storage after
+rejection. Conventional spec/status reset controls pass. The complete imported
+Apply body explains installation through the configured filter, whose roots
+omit settings; primitive and REST-envelope refinement remain explicit.
+
+A numeric counterexample refutes unrestricted scalar-intent, non-forced
+foreign-value safety and forced transfer. A owns exact int64 `9223372036854775807`; B asserts
+binary64 `2^63`, without force. Alone, the assertion is discarded as a false
+no-op while B acquires its claim. Adding unrelated `note: changed` makes the
+different numeric value persist while both managers retain the claim. Real
+HTTP/GET confirms both results; an exact int64 change correctly conflicts.
+With force, the rounded numeric change still retains A's claim. An exact
+integer forced change correctly transfers the claim to B in Lean, Go and HTTP.
+The source primitive instance implements that transfer and empty-owner cleanup;
+the counterexample does not follow from a missing force rule in the model.
+`NumericCounterexamples` proves these concrete imported-Apply executions and
+the contract refutations under explicit scalar primitives. It also proves
+nontransitive numeric equality and the impossibility of a faithful ordinary
+equality quotient. See [SSA-05](docs/ssa-bugs.md#ssa-05-rounded-numeric-comparison-loses-intent-or-misses-a-conflict).
+
+A second numeric failure is in FieldsV1 key decoding: exact integer selector
+`id: 9007199254740993` becomes its neighbor `9007199254740992`. A valid CRD
+then rejects B adding that distinct neighbor item with a conflict against A.
+`NumericCodecCounterexamples` refutes exact numeric path round-tripping for a
+canonical starting trie under the concrete numeric-read specification. Complete
+Go byte/key round trips reproduce the witness in vendored and both pinned SMD
+revisions, and HTTP verifies the false conflict and atomic rollback. The
+structural FieldsV1 theorem remains true after label decoding. See
+[SSA-06](docs/ssa-bugs.md#ssa-06-fieldsv1-rounding-aliases-distinct-integer-list-keys).
+
+`GranularKeyCounterexamples` additionally executes the complete imported Apply
+body for that history, under explicit integer-key/string-payload primitives.
+It refutes independent new-item progress (BASE-09b). Forcing the false conflict
+adds B's item but drops A's claims on its unchanged original payload; a second
+formal refutation records this ownership-frame failure. The nil-last-set prune
+callback is realized by imported source, and small keys succeed. Native current
+and both pinned SMD versions compare the same observations; real HTTP/GET
+checks rejection atomicity, the forced ownership loss and exact retained data.
+The wire input explicitly establishes A's old payload claim before decoding;
+the preservation proposition receives that fact as a premise. Native observers
+inspect exact data and fieldsets for the inconsistent counterexample, while the
+ordinary reference-model adapter continues to check normalized claim targets.
+
+`NumericOmissionCounterexamples` records another consequence of SSA-06:
+A's exclusively owned payload survives omission because B's different upper
+item selector is decoded as the lower key. Both item keys remain asserted;
+no ancestor deletion, default or mutation explains the retained value.
+The raw ownership and matching data targets are explicit before-decoding
+premises. All four imported pruning functions realize the candidate under
+normalized primitives and every lawful map schedule. Native vendored/pinned
+Go and actual HTTP check the reachable history plus all three controls:
+small shared keys, small unshared keys and large unshared keys. This refutes
+unrestricted BASE-02; general typed/set and request-stage refinement remain open.
+
+## What is checked
+
+- General core laws: scalar conflicts, equal-value co-ownership, force transfer,
+  exclusive/shared omission, exact actor claims, intent preservation, immediate
+  accepted-Apply idempotence, finite-history validity, and co-ownership monotonicity.
+- General structural laws: every proper ancestor is a real container; a scalar
+  cannot have descendants; composite key names have a canonical strict order.
+- General locality: full classification depends only on claims below that item,
+  with recursive required-map coverage at arbitrary finite depth.
+- General key-only lifetime laws: direct deletion is exactly last-membership
+  release; an accepted last release removes the whole subtree, while a retained
+  foreign membership preserves the item if no proper ancestor item is deleted.
+  These cover arbitrary finite manager counts and both force values in the
+  proposed item-core transition. Enclosing object lifetimes remain separate.
+- General progress: unchanged snapshot acquisition by a fresh manager succeeds.
+- Update: complete data replacement, touched-field ownership, preservation of
+  untouched claims, distinct Apply/Update manager identities, and invariant preservation for arbitrary finite mixed scoped histories.
+- Boundary composition: mutation before final validation, relational old/new
+  validators, final item/object checks, atomic rollback, and the inability of value-only validation to
+  distinguish different ownership of the same data. Arbitrary validators may
+  block a handoff; no unconditional availability claim is made.
+- Exact finite counterexamples for PR #336: ownership fragmentation followed by
+  partial deletion, required-map member shortcut, and required granular lists.
+- Baseline counterexample: empty-list Apply changes data on repetition; a
+  presence validator makes every finite number of identical retries fail.
+- Default Apply wrapper: Update-from-empty initialization preserves data,
+  leaves existing manager maps alone and creates non-Apply claims. A concrete
+  proof and real wrapper comparison track reinitialization after ownership loss.
+- General PR compatibility: with no additional required metadata, `predrag` and
+  `current` transitions are equal for every finite state and normalized request.
+
+`SSA/Apply.lean` and its `Contracts` proofs describe the proposed item-core
+transition. `ObjectScope` adds the per-object policy; the core's exact idempotence
+proof is not advertised as a theorem about arbitrary admission or the whole
+scoped operation. `Pruning` and `Semantics` represent the current/PR field-set
+algorithm separately, including named-field expansion, three-pass pruning,
+implicit key leaves, empty/null promotion and the final ownership update.
+
+`WireContracts` proves laws for that separate current/PR transition: pruning
+retains foreign claims until the final comparison, the candidate is independent
+of force, final foreign claims have an exact survival condition, successful
+non-forced requests do not modify foreign-owned final targets, and forcing an
+already successful request preserves its result. Fresh unchanged snapshot
+acquisition is also proved directly for both raw modes; it requires only
+structural validity, not the proposed full-manager invariant.
+
+The accepted-result laws additionally prove that a changed foreign final target
+conflicts without force; force admits a structurally valid candidate; changed
+foreign claims disappear; and unchanged final targets retain co-ownership.
+These statements concern the raw model, not just the proposed stronger core.
+The Go primitive and updater refinement obligations remain open in the catalogue.
+
+## Binding proofs to source
+
+`cmd/ssa-source` uses Go's parser to import complete bodies and checked signatures
+from the selected updater and element-set sources into `SSA/GoSource.lean`,
+`SSA/UpdaterSource.lean`, `SSA/ElementSource.lean` and `SSA/SetSource.lean`:
+
+| Source function | Kernel-checked contract |
+| --- | --- |
+| `addBackDanglingItems` | `SourceContracts.imported_dangling_matches_spec` |
+| `addBackOwnedItemsForVersion` | `SourceContracts.imported_owned_version_matches_spec` |
+| `addBackOwnedItems` | `OwnedSource.imported_owned_items_matches_spec` |
+| `prune` | `PruneSource.imported_prune_matches_spec` |
+| `Apply` | `ApplySource.imported_apply_matches_spec` |
+| internal `update` | `UpdaterContracts.imported_update_never_adds_claims`, `UpdaterBridge.source_apply_excludes_reset_fields` |
+| `PathElementSet.Difference`, `Union`, `Intersection` (`fieldpath/element.go`) | `ElementAlgebra.imported_matches`, `imported_membership`, `imported_preserves_order`, `imported_preserves_uniqueness` |
+| `Set.Difference`, `SetNodeMap.Difference` (`fieldpath/set.go`) | `SetContracts.imported_node_matches`, `imported_set_matches`, `imported_difference_never_adds_paths` |
+| `Set.RecursiveDifference`, `SetNodeMap.RecursiveDifference`, `excludeFilter.Filter` | `SetFilterContracts.imported_flat_node_matches`, `imported_flat_set_matches`, `imported_flat_filter_matches`, `locally_ordered_filter_excludes_root` (flat root exclusions only) |
+| `PathElementSet.Has`, `PathElement.Less`, selected Go `slices.BinarySearchFunc` | `SearchContracts.imported_search_matches`, `SearchMembership.imported_search_membership`, `HasBridge.imported_has_membership`, `FilterHasBridge.source_filter_excludes_root` |
+| `toFieldSetWalker.doMap`, `doList` (`typed/tofieldset.go`) | `AtomicFieldContracts.imported_atomic_fields`, `imported_atomic_claims_scope`, `imported_atomic_never_adds_descendant` (atomic entry only) |
+| `mergingWalker.doMap`, `doList`, `doLeaf`, `ruleKeepRHS` closure (`typed/merge.go`) | `AtomicMergeContracts.imported_keep_right`, `imported_leaf`, `imported_atomic_merge` (atomic entry only) |
+| `removingWalker.doScalar`, `doMap`, `doList` (`typed/remove.go`) | `AtomicRemoveContracts.imported_scalar`, `imported_atomic_container`, `imported_atomic_remove_fresh`, `imported_atomic_extract_whole` (scalar/atomic entry only) |
+| `resolveSchema`, `deduceAtom`, `handleAtom` (`typed/helpers.go`) | `SchemaDispatchContracts.imported_deduce`, `SchemaDispatchHandler.imported_handle`, `SchemaDispatchResolver.imported_full_dispatch`, `SchemaDispatchFactoryBridge.imported_factory_dispatch` |
+| `Schema.resolveNoOverrides`, `Resolve`, `Map.CopyInto` (`schema/elements.go`) | `SchemaLookupContracts.imported_plain`, `SchemaResolveContracts.imported_resolve`, `SchemaResolveCache.imported_history`, `SchemaLookupBridge.imported_schema_and_dispatch` |
+
+The interpreter handles lexical variable identity, tuple assignment, error
+zero values, short-circuit nil checks, map presence, local version maps and
+finite map traversal. It quantifies over every lawful version-map iteration
+permutation. Statement fuel bounds syntax depth; the loop proofs cover arbitrary
+finite manager/version counts. Unsupported syntax, map aliases, writes to
+iterated maps, unbound globals and changed import bindings are rejected. The
+internal ownership updater may delete its currently visited entry; the importer
+checks that restriction, and its interpreter uses independent lawful schedules
+for the lexical ranges.
+Successful conversion has a non-nil result in the primitive contract; a failed
+conversion retains its optional returned object rather than assuming it is nil.
+
+The complete Apply contract covers reconciliation, merge and extraction errors,
+legacy/current filter selection, snapshotting the old actor set before installing
+the filtered set, prune/update ordering and nil-object returns on a data no-op.
+Both configured filter maps, missing version entries and nil maps are distinct.
+A missing legacy exclusion set is an execution failure, matching its nil-set
+dereference; it is not invented as an ordinary returned API error. Successful
+callbacks have non-nil objects and allocated logical managed maps. Their
+primitive behavior and unmodeled aliasing side effects remain review obligations.
+
+`ResetFields` proves prefix exclusion, filter idempotence and recursive trie
+membership refinement at arbitrary finite depth. The source-level theorem
+`ApplySource.imported_apply_excludes_reset_fields` composes this filter with an
+explicit final-updater contract. `UpdaterBridge.source_apply_excludes_reset_fields`
+now realizes that callback with complete imported `update` execution and derives
+its non-growth property. It requires the field-set primitive's exact left-subset
+law for Difference. `SetBridge` now derives that law from the complete recursive
+Set/SetNodeMap Difference imports with an explicit finite path representation.
+The actual ownership codec/memory representation, other set/filter operations
+and complete subresource pipeline still need refinement.
+
+`UpdaterSubset` models comparison objects by heap addresses: filtering a
+comparison mutates the object shared by a local variable and the version cache.
+Expression evaluation keeps its environment immutable while updating that heap.
+`UpdaterContracts` proves a general invariant for finite safe programs, including
+assignment, deletion, branches, returns, `continue` and arbitrary finite ranges.
+The actual complete updater satisfies the source-shape premise. Consequently,
+every returned manager path already belonged to that manager at this phase's
+entry, under the Difference premise. Typed comparison, conversion and filter
+outcomes may otherwise be arbitrary. This private phase runs after ownership
+decoding and actor-field installation; it is not a no-growth law for an entire
+Apply request or for wire decoding.
+
+`UpdaterBridge` decodes successful imported execution into the existing Apply
+callback interface. Primitive, conflict, configuration and interpreter failures
+remain explicit failures. This supplies source-backed non-growth without assuming
+the desired final Apply result. Universal interpreter progress and runtime
+refinement of all primitives remain separate obligations.
+
+Two full-source observations agree with native private `update` in vendored SMD
+and both pinned revisions: filtering an uncached version is visible through
+shared comparison references, and force does not grant B the actor's new field.
+Go's overlay adds the internal-package witness without editing the dependency.
+The ownership-growth mutation is rejected both by the unchanged Lean source
+certificate and by the native force witness.
+
+`PruningRefinement.single_version_pruning_refinement` connects all four imported
+functions to the normalized three-pass model for arbitrary states and field
+sets, with all managers in one API version. Its callee-realization witnesses
+discharge the restoration callbacks using the other imported source functions.
+The model's phase factoring has a separate exact equality with its original
+formula. Each imported function has a semantic Go-source mutation that must
+invalidate the unchanged theorem at the expected module.
+
+The Go parser/importer and subset semantics need human review. Conversion,
+typed field-set extraction, named-field expansion, set primitives and removal
+remain explicit primitive contracts. Their Go implementations and the remaining
+updater/request pipeline are further proof obligations. The multi-version
+source orchestration contract does not establish semantic correctness of API
+conversions. No generated AST digest substitutes for those proofs.
+
+`ElementAlgebra` proves the three element-set operations from their complete
+Go bodies with one shared loop induction. The typed interpreter checks fresh
+output allocation, short-circuit bounds, safe slice/index access, append and
+increments. All operations have a linear fuel bound for arbitrary finite inputs
+and comparators. Union preserves Go's choice of the right representative on an
+equal-key branch; this control-flow theorem needs no equality assumption.
+
+Exact difference/union/intersection membership and sorted, duplicate-free outputs
+then follow under the stated sorted-input and strict-total-order premises.
+`ElementOrder.nat_strict_order` constructs those laws for the rank comparator
+used by the executable comparison. The existing `ElementDifference` theorem
+names remain specializations, including the stronger difference-only order
+preservation law that needs neither comparator laws nor a sorted right input.
+These are general proofs rather than fixture enumeration.
+
+An independent comparison executes all three real Go methods and the imported
+interpreter on all 4,096 subset pairs of six independently ranked elements per
+operation: 12,288 operation/pair cases in total. The elements span field, key,
+value and index selectors. Boolean membership oracles independently constrain
+the results; input size and membership are checked after every Go call. Each
+method has a semantic source mutation that its shared proof must reject.
+This bounded evidence supports the interpreter/representation boundary, not a
+universal proof of Go's PathElement comparator. The comparator, `Has`/binary
+search, recursive Set/SetNodeMap membership laws and complete filter composition
+remain explicit obligations. These component theorems do not prove the full
+field-path operations used by pruning.
+
+`RecursiveSets` separates direct members from child sets, matching the Go
+representation at every finite depth. `SetSource` imports both complete
+`Difference` bodies; the receiver type distinguishes their identical method
+names. `SetContracts.imported_node_matches` proves the complete child loop equals
+finite recursion, including the left representative on comparator-equal keys.
+`imported_set_matches` composes this with the source-verified direct-member
+algorithm. `imported_difference_never_adds_paths` proves exact left-path origin
+without sorting, comparator laws or even assumptions about `Empty()` results.
+The two mutually recursive definitions terminate by the finite input sizes.
+
+`SetBridge` supplies the updater's Difference primitive with this recursive
+implementation and proves its finite flat-path encoding. The actor frame then
+follows without a supplied `DifferenceShrinks` premise. The connection from
+actual decoded FieldsV1/Go heap objects to that representation remains a
+boundary; this phase proof does not repair the numeric codec counterexamples.
+The interpreter treats address/dereference observationally for immutable inputs
+and fresh output, as enforced by the importer. Arbitrary nil/cyclic pointers,
+other set-operation membership laws and complete runtime refinement stay open.
+
+A native fieldpath-package overlay compares 4,102 exact recursive Difference
+results against the imported interpreter: all 4,096 pairs from six nested paths,
+plus numeric-comparator collisions, an empty structural node and depth-64 cases.
+Exact serialized tokens assign test labels; Go `Has`/`Equals` never decides the
+left-path-origin oracle. Both pinned PR revisions run the same comparison. A
+source mutation that uses the right matched-child label must be rejected by the
+unchanged Lean source certificate and independently fail the native origin law.
+
+`SetSource` also imports both complete `RecursiveDifference` methods and
+`excludeFilter.Filter`. `SetFilterContracts` proves their execution on the
+conventional flat root-exclusion sets, such as `spec`, `status` and `metadata`.
+The child's main while loop is skipped because the exclusion set has no child
+nodes. A finite suffix-range proof shows that a recognized root's entire child
+scope is omitted, without inspecting or comparing descendant keys. These are
+ownership-path filters; restoring object data is a separate REST strategy phase.
+
+`ElementLocalOrder` restricts the direct-member algebra premises to the labels
+actually visited. `locally_ordered_filter_excludes_root` therefore requires a
+lawful domain only for direct root members and exclusion roots, not for nested
+numeric item keys. `Has` recognition is now derived by the source-backed search bridge under
+word bounds and local comparison/equality laws. Sorted/direct-label representation
+and actual field-name comparison remain explicit boundaries. No arbitrary nested
+exclusion-tree or complete reset/Apply pipeline theorem is claimed. The original
+normalized prefix-filter theorems remain separately available.
+
+The native overlay additionally checks 518 root-filter pairs against imported
+source, including all root-mask combinations, independent-prefix preservation,
+numeric collisions inside retained/dropped subtrees, empty structure and depth
+64. Both pinned revisions run it too. An eleventh source mutation replaces
+`RecursiveDifference` with ordinary `Difference`; unchanged source theorems and
+the independent native prefix-exclusion oracle must both reject it.
+
+`HasSource` now imports the complete `PathElementSet.Has` and
+`PathElement.Less` wrappers; `SearchSource` imports the selected Go toolchain's
+complete `slices.BinarySearchFunc` (at the same-label target instantiation used
+by Has). `SearchContracts.imported_search_matches` proves its execution against
+an independent terminating interval algorithm for every pure comparator and
+representable finite input. The word-width model preserves the unsigned-sum
+midpoint; `SearchIndex` proves its arithmetic, safe indices, safe increment and
+strict interval progress even when the intermediate signed sum overflows.
+
+`SearchMembership` proves exact membership under sorted inputs, local ordering
+and faithful comparator-zero equality. `HasBridge` supplies that library source
+execution to the actual Has wrapper and separately binds Less to the negative
+comparison result. `FilterHasBridge.source_filter_excludes_root` composes these
+with the complete flat-root filter and derives the previous Has-recognition
+premise. Nested numeric selectors still need no order laws on this path. Actual
+field-name/string comparison, sorted/root/heap/ownership representation and the
+remaining typed/Apply/API/storage pipeline are explicit boundaries. This does
+not claim a globally faithful mixed-numeric lookup law.
+
+The native overlay compares 776 lookup/Has queries over 32/64-bit model word
+widths, 128 Less results, and 16 typed Go midpoint controls near both signed
+integer limits. Independent rank/membership oracles constrain the lawful cases;
+four mixed-numeric controls per width check exact source fidelity where the
+comparator law fails. The 518 root-filter comparisons now use the source-backed
+Has specification in place of an exact-membership oracle. Both pinned revisions
+run the same overlays. A twelfth source mutation flips the actual library's final
+comparator-zero test: unchanged source proofs and an independent native
+membership oracle must both reject it. The original Go BSD notice is retained
+in the generated translation and standalone HTML; no runtime dependency changes.
+
+The typed field-set walker now has complete source imports for `doMap` and
+`doList`. `AtomicFieldContracts.imported_atomic_fields` covers their atomic
+branch at arbitrary finite scope depth and prior field sets, for opaque input
+values and coercion handles. It adds the whole nonempty scope path, never visits
+the child walker, returns nil validation errors and runs the captured deferred
+Free. Every other field membership stays unchanged. Existing descendant claims
+are preserved; the theorem does not silently assume them absent. The empty root
+path is ignored, matching Go's separate top-level ownership exception.
+
+The interpreter models defer registration and LIFO cleanup explicitly. Unsupported
+non-atomic visitor calls fail, rather than inventing successful traversal.
+Insertion is a membership projection; actual Set.Insert, coercion and allocator
+heap realization remain explicit boundaries. The source merge and removal
+components below do not close schema dispatch or complete SSA composition.
+Exact insertion realization also needs a restricted selector domain: the known
+mixed-numeric identity counterexamples rule out its unrestricted global form.
+This is a source-bound BASE-09 component, not closure of the whole atomic law.
+
+The internal-package Go overlay checks 320 map/list cases: null/empty/singleton,
+width/depth 64, four scope shapes including the empty root, and prior sibling,
+descendant and whole-scope claims. Exact selectors, input/path immutability and
+deferred Free counts are independently checked. Both pinned revisions run the
+same cases and the full typed suite. Two additional source mutations reverse
+the map/list atomic guards independently; unchanged source certificates and
+native scope-claim oracles reject both.
+
+The atomic merge path additionally imports complete map/list dispatch,
+`doLeaf` and the `ruleKeepRHS` function-literal initializer from `typed/merge.go`.
+The importer checks that `mergeRule` is the actual named function type; a
+same-named wrapper function could otherwise conceal additional effects.
+`AtomicMergeContracts.imported_keep_right` proves whole right-operand selection
+when present, falling back to the whole left operand and then the prior output.
+Optional Go interfaces/pointers are distinct from a present JSON null.
+
+`imported_leaf` derives the real rule callback and suppresses subsequent rule
+calls when a leaf was already selected. `imported_atomic_merge` composes both
+complete dispatch bodies with these source callees for arbitrary opaque input
+values, finite resource sizes and caller state. It executes the explicit
+coercion contracts and empty-container checks before leaf selection. Each call
+has a fresh frame: caller locals and pending frees survive a nested call;
+captured local resources are freed right before left at the outer return.
+Non-atomic child traversal remains an explicit unsupported branch.
+
+The native overlay checks 2,352 combinations of whole operands, missing versus
+explicit null, prior output/leaf state, four scopes, mixed numeric magnitudes,
+width/depth 64, input/path immutability and actual cleanup order. Object values
+cross the comparison protocol as exact Go JSON text, so the oracle uses neither
+rounded numeric equality nor a lossy selector comparison. Both pinned versions
+run the same cases. Three further mutations clear the right output or bypass
+the map/list leaf guard; unchanged proofs and independent native oracles reject
+them. The removal/extraction source component below extends these checks.
+
+These are typed merge-phase claims. Actual Unstructured/coercion/allocator heap
+realization, top-level typed/schema dispatch, general removal/comparison and complete
+SSA composition remain separate. In particular, SSA's later comparison can
+still discard a whole numeric assertion as the already recorded false no-op.
+
+`AtomicRemoveSource` additionally retains all three complete scalar/map/list
+bodies from `typed/remove.go`. A structural AST includes declarations, type
+syntax, loops and callback bodies without erasing the non-atomic tail. This mode
+uses `RawGoSyntax`; numeric tokens remain exact, source positions retain only
+presence, and comments/parser symbol links are omitted. Its specialized
+interpreter explicitly fails on operations outside the interpreted fragment.
+The theorem proves atomic execution returns before those operations. This does
+not assign successful behavior to the retained non-atomic code. The existing
+lexically resolved import profiles retain their rejection rules.
+
+`imported_scalar` copies the whole Unstructured result. For arbitrary pure
+shape/resource/Unstructured callbacks, opaque input, finite resource lengths,
+old output, caller locals and pending frees, `imported_atomic_container` proves
+that matching map/list extraction copies the whole result, removal retains the
+old output, and mismatching shapes return without conversion or cleanup. Empty
+containers follow the same law. A list captures Free even for a nil resource;
+a map defers it only for a non-nil resource. Caller frame/input are preserved.
+`imported_atomic_remove_fresh` therefore states the necessary fresh-output
+premise explicitly; `imported_atomic_extract_whole` requires a matching shape.
+The complete source caller now derives this initialization, as described below;
+the source lookup/cache value proof is separate below, with named lookup/copy/sync and heap primitives still open.
+
+The independent Go overlay compares 1,152 helper invocations (384 each scalar,
+map and list), both extract/remove modes, prior output, nil interfaces versus
+typed nil containers, empty/wide/deep/mixed-numeric values, four selection sets,
+exact JSON text and input/selection immutability. The protocol supplies dynamic
+shape/resource descriptors separately because JSON null does not encode Go's
+typed-nil container distinction. This is an explicit representation boundary,
+not a verified JSON codec. Both pinned revisions run the same overlay. Clearing
+the scalar output or inverting either atomic extraction guard must fail both
+the unchanged Lean theorems and the independent native output oracle.
+
+`RemoveFactoryContracts.imported_factory` now imports the fourth complete body,
+`removeItemsWithSchema`. It derives Go struct zero initialization, including
+absent output, and the exact input/schema/selection/allocator/extract fields
+before the resolver callback. The return wraps the resulting raw output.
+Normal ValidationErrors are arbitrary opaque payloads which the source caller
+ignores; interpreter failures remain separate. No successful-resolver premise
+is introduced. Allocation and wrapping use explicit abstract primitives. The bridge represents
+a present Go Value interface whose raw payload may be null. Nil interface
+arguments, pointer/alias identity and allocator heap realization remain outside
+this bridge.
+
+`RemoveFactoryBridge` supplies the already proved scalar or atomic handler to
+that callback. Its caller theorems derive fresh-output removal and whole
+extraction from source initialization, with no extra fresh-output assumption.
+The source selection below discharges that handler premise. Actual
+Schema.Resolve has a separate source value/cache proof below; typed method entry remains separate.
+`imported_factory_ignores_reported_errors` also derives null wrapping when a
+resolver reports any normal error without changing the fresh walker.
+
+An additional 1,152 native caller cases use real schema resolution, both modes,
+all prior value shapes, four selection sets, missing named types and invalid
+atoms. The control checks the actual resolver error channel before invoking
+the real caller. Exact wrapped JSON output and input/selection immutability are
+compared to the source interpreter. Inverting the constructor's extract flag,
+skipping resolution or discarding its raw result must fail both the unchanged
+factory theorem and the independent native caller oracle. Both pinned
+revisions run these cases too.
+
+The complete `typed/helpers.go` bodies now derive selection itself.
+`SchemaDispatchContracts.imported_deduce` preserves exact map/scalar/list type
+pointers, returns the original atom when the matched category is unavailable,
+and does not change handler state. This includes nil Go interfaces and arbitrary
+pure kind predicates; no mutually exclusive predicate premise is needed.
+A selected Go switch case ends even when its inner if does not return.
+`SchemaDispatchHandler.imported_handle` derives map-before-scalar-before-list
+priority, exact callback arguments, normal validation errors and post-state.
+
+`SchemaDispatchResolver.imported_full_dispatch` composes actual deduction and
+selection source with the complete resolver orchestration. Lookup failure and
+invalid atoms retain their distinct error arguments. Stateful expression
+semantics preserve callback effects inside return statements. Normal validation
+errors remain separate from interpreter failures. Source function frames keep
+callee locals separate. `SchemaDispatchFactoryBridge.imported_factory_dispatch`
+connects that chain to the source constructor, selected source removal handlers
+and wrapped output. Its `imported_atomic_map` corollary derives whole-value
+atomic map behavior from a successful atomic-map lookup, without assuming a
+handler-selection callback. Scalar/list singleton-atom laws also cover
+arbitrary predicate combinations.
+
+`SchemaLookupBridge` now realizes the Schema.Resolve callback separately from
+its complete source bodies. Value kind queries, schema/type representation,
+error formatting, coercion,
+Unstructured, allocation/wrapping and heap correspondence remain separate
+implementation obligations. Non-atomic traversal raises an explicit unsupported
+error in this bridge; no successful result is invented.
+
+The new independent Go overlay checks 1,296 deductions, 96 handler calls and
+7,776 complete resolver calls. It spans all eight pointer-presence masks,
+actual pointer identity, missing Go Value versus present null, real numeric and
+typed-nil/wide/deep values, all 64 synthetic predicate combinations, named and
+inline references, missing lookups, callback errors and prior handler state.
+Independent bit-mask/priority oracles supply expected pointer/callback outcomes.
+Actual Schema.Resolve results are an explicit lookup boundary, with independent
+found/handler expectations. The existing 1,152 complete-caller cases now compare
+both the older selected-handler adapter and the new full source-selection chain.
+Both pinned revisions run the same overlays. Returning the whole scalar atom,
+reordering map/scalar priority or skipping deduction must fail unchanged source
+certificates and independent native oracles.
+
+The structural importer retains original string tokens plus Go-decoded constant
+annotations; selected constants are printable ASCII. It rejects shadowed frame
+variables, unresolved frame names and global variable/constant reads. Range
+variables account for Go parser synthetic declaration nodes. Import bindings,
+complete signatures and the original AST are retained and checked. These checks
+do not replace human review of Go binding/representation correspondence or
+verify the Go type checker/compiler/runtime.
+
+`SchemaLookupContracts.imported_plain` derives named-versus-inline lookup and
+missing-type behavior from the complete `resolveNoOverrides` AST. The complete
+`Schema.Resolve` AST additionally retains and executes the override-cache path.
+`SchemaResolveContracts.imported_resolve` covers nil and allocated caches,
+arbitrary cached values, hits/misses, map-before-list override priority,
+scalar/empty-atom failure, exact opaque non-relationship contents, cache writes,
+normal failure exits and deferred unlock. An unsuccessful lookup allocates the
+cache but never stores a failed result. The interpreter captures deferred
+receiver/arguments and runs them at return; it rejects writes to a local copy
+after its pointer escapes instead of silently forgetting aliases.
+
+`SchemaResolveCache.imported_history` proves arbitrary finite histories from a
+valid unlocked cache: results equal the cache-free specification, cache soundness
+is preserved and the mutex is released after every call. The reference key must
+denote a stable immutable TypeRef, and the named lookup environment must remain
+unchanged. The empty cache is proved valid. The full source execution theorem
+also covers arbitrary invalid initial caches; it correctly returns such a hit
+without revalidation. The correctness/history theorem deliberately requires
+cache validity. `SchemaLookupBridge.imported_schema_and_dispatch` composes the
+schema method with actual typed resolver/deduction/handler source.
+
+The value view separates each container's relationship from otherwise arbitrary
+opaque immutable contents. Map.CopyInto is source-derived below. FindNamedType,
+Go key/heap representation, allocation identity and synchronization primitives
+remain explicit implementation boundaries. The serial mutex model does not
+verify the Go scheduler or race freedom. An independent native overlay compares
+5,120 plain/full lookups, including all eight atom masks, nil/named/missing/empty/
+Unicode names, four relationships, nil/allocated/hit/unrelated caches, repeated
+calls and warm/cold map field indexes. It checks exported contents independently,
+fresh changed-container pointers, unchanged other pointers, exact cached pointers,
+input immutability and the actual unlocked mutex. A separate 64-goroutine test
+runs with the race detector. Both pinned revisions run the lookup matrix and
+concurrency control. Five mutations cover missing-name failure, the map override,
+cache-hit polarity, deferred unlock and mutation through an escaped local copy;
+each must fail the unchanged certificate and independent Go oracle.
+
+`MapCopyContracts.imported_copy` now derives the complete Map.CopyInto body,
+including nil destination, all four exported fields, atomic cache Load/Store,
+Once reset and the complete synchronous callback. Exported contents are arbitrary
+opaque values; cache pointers and serial Once tokens are explicit. The destination
+is disjoint from the immutable source. `imported_resolver_copy` supplies the exact
+opaque value-copy contract used in the resolver. `imported_fresh` and
+`imported_fresh_valid_index` also preserve field-index coherence for a fresh
+cache/Once destination and an initially coherent source.
+
+The fresh-destination condition cannot be removed for index coherence:
+`initialized_destination_can_break_index` formalizes the stale-cache case.
+Actual Go reproduces it with normally initialized maps: source.Fields is `new`,
+destination.Fields and its initialized index are `old`. CopyInto changes Fields
+to `new` but retains the old index when the source index is still nil. FindField
+then finds `old` and misses `new`. Resolve creates a fresh Map, so this component
+defect has no established SSA reachability. It is not counted as a seventh SSA
+bug. Another 252 native/current and pinned comparisons cover nil destinations,
+nil/empty/populated caches, independent Once states, copied exports, shared
+pointer identity and source immutability. Removing Fields assignment or Once
+reset must fail the unchanged proof and independent native oracle.
+
+CI now checks thirty-three complete ASTs from nine distinct source files and
+thirty-three semantic mutations, twenty-five also native. Source value/coercion/
+allocator heap realization, remaining schema primitives, full typed entry,
+complete removal/comparison and full SSA composition remain open; these are
+component proofs for BASE-09.
+
+The mixed numeric comparator actually fails the global equality/order premise:
+two distinct int64 values can each compare equal to one float64. A concrete
+numeric-key Difference retains an element that the excluded set's `Has` finds.
+`--numeric-counterexamples` executes the imported source witnesses; the Go
+comparison checks their observations against real equality, element sets and
+managedfields. General IEEE conversion and typed primitives are not thereby
+verified; the witness model represents finite nonnegative integral floats only.
+
+`RawSourceCounterexamples` instantiates this complete pruning chain for both
+empty-list transitions, with all callees realized under every lawful map
+schedule. The actual typed/set implementations are still separate from those
+normalized primitive instances.
+
+`FieldsV1` independently proves the recursive trie/object-grammar round trip at
+arbitrary finite depth, including leaf `{}` membership and the `"."` marker
+used when membership and descendants coexist. Its canonicality premise excludes
+empty child sets and duplicate edge keys. JSON bytes and path-element string
+parsing remain separate obligations; this does not verify Go's JSON library.
+The unrestricted numeric-key codec obligation is now refuted: the concrete
+reader changes a canonical selector's magnitude. The comparison inspects exact
+decoded key values and bytes, rather than trusting the same mixed-number
+`Has`/`Equals` relation that masks this loss.
+`FieldPathSet` additionally proves exact trie-to-path-set membership at arbitrary
+depth and the correspondence of normalized difference/intersection with trie
+selection. Empty structural nodes in selection still require wire normalization.
+
+## Implementation evidence
+
+The Go adapter independently walks a supplied SMD structural schema. It supports
+named/recursive types, granular and atomic maps/lists, unknown map entries,
+composite scalar list-map keys, scalar sets, JSON scalars including null, and
+sparse empty-map ownership. Structural context does not invent claims. Values,
+container presence ownership, item ownership and errors are compared after each
+request; only the API envelope, redundant key leaves, and associative-list order
+are projected out.
+
+The independent [baseline corpus](testdata/bridge.yaml), deterministic scalar
+and structural Apply/Update sequences run against the actual managedfields
+wrappers with real FieldsV1 round trips. New mismatches fail with a replayable
+request prefix. There is no tolerated `model-gap` category. Intended differences
+between the stronger policy and existing Go require exact independent outcomes
+for both engines.
+
+Corpus, path and schema-default decoding preserve int64 tokens before falling
+back to float64, matching the API's numeric domain. Regression checks retain
+integers above `2^53`, including MaxInt64, in both requests and independent
+expectations. Previously the adapter rounded untyped numbers to float64 before
+either engine could observe them; that comparison defect is fixed rather than
+used to exclude the numeric counterexample.
+
+The adapter keeps operation distinct from the literal manager name. Plain names
+retain readable labels such as `A` and `A@update`; names containing reserved
+characters are quoted with their operation. Thus an Apply manager literally
+named `A@update` is `apply("A@update")`, separate from an Update by `A`.
+Independent cases check acquisition, omission and co-ownership across these
+identities. The comparison still fixes one API version and excludes subresources.
+
+Explicit `bootstrap: true` cases additionally run the actual
+`NewSkipNonAppliedManager` wrapper and the separate `Bootstrap` model.
+This comparison accepts single-version Apply-only histories and also runs
+generated structural requests. Probabilistic non-Apply tracking is outside
+that comparison domain; unsupported combinations fail explicitly.
+
+[PR cases](testdata/pr336.yaml) also run against **both pinned upstream revisions**:
+head `6fab440a518a1b329e5cabd5a3c924d6c267828b` and base
+`560aaa513ea735bf59e6011feecd5388e2dfeae9`. The runner uses the actual v7 updater,
+original required metadata at the head, unchanged metadata-free schema at the
+base, operation flags and field-set serialization. It neither patches upstream
+logic nor modifies Kubernetes' module graph. Both revisions' merge tests run.
+
+## Proof boundary
+
+The quantifiers cover arbitrary finite normalized states, paths, manager sets,
+required cores and request histories in the stated contract. The instance-expanded
+schema is built for the keys/scopes used by a trace; an arbitrary future key
+universe is not pre-enumerated in a theorem about a particular schema.
+
+The Go comparisons are bounded evidence, **not a proof that every Go execution
+refines Lean**. API-version conversion, changing schema topology, defaulting,
+list-key defaults, deduced/unstructured union types, duplicate-list semantics,
+subresource/reset filters and storage retries are not fully modeled. Duplicate
+keys and set entries are rejected by this adapter. Numeric values follow the
+Go JSON decoding domain; no arbitrary-precision JSON number theorem is claimed.
+
+Admission/CEL behavior is represented by functions with explicit predicates,
+not by verified interpreters or a formalization of every Kubernetes admission
+plugin. The proposed guard rejects already-fragmented initial states; rollout,
+repair and migration need a separate policy. These boundaries are distinct from
+the two former representation defects, which are now fixed and checked.
+
+## Verification
+
+No Mathlib or external Lake packages are used. Install the pinned Lean release
+from `lean-toolchain`, then run:
+
+```sh
+bash ci/verify.sh
+lake exe ssa-model --list
+lake exe ssa-model --trace raw-pr-fragmentation-and-partial-deletion
+```
+
+`ci/verify.sh` can install Lean with a checked-in SHA-256. Go and Python 3 are
+required; Go may download the toolchain required by the pinned v7 upstream
+source. Set `SSA_LAKE` for an existing Lean installation. Full logs are retained.
+
+Verification cleans/rebuilds, audits every declaration and project module,
+rechecks proof terms with `leanchecker --fresh Main`, rejects five negative
+audit probes, checks/regenerates fixture JSON, runs Go tests and both upstream
+comparisons, and rejects a stale HTML explorer. No check is skipped. Prow setup
+in [ci](ci/README.md) requires a separate test-infra activation.
+
+In a Kubernetes checkout, `bash ci/verify-apiserver.sh` additionally runs the
+actual HTTP/etcd empty-container counterexamples, Required/CEL rejection,
+ownership bootstrap, Update-owned list-item omission and status reset ownership.
+It also checks all five numeric variants, with exact native numeric types,
+retained claims and persisted GET observations.
+The numeric-key test additionally checks a false conflict between distinct
+large integer list keys and successful independent small-key management.
+Four additional numeric-omission variants verify exact raw exclusive ownership,
+phantom sharing, omitted payload presence, claims and persisted GET equality.
+The seven HTTP test functions cover twenty-five variants.
+The proposed Kubernetes Prow job runs both entrypoints. The API check belongs
+to Kubernetes integration testing and is unavailable in published apimachinery.
+
+Regenerate the fixtures and explorer after model changes:
+
+```sh
+lake build
+lake exe ssa-model --fixtures > fixtures/scenarios.json
+lake env lean SSA/Audit.lean
+python3 docs/generate.py
+```
+
+The HTML is standalone and requires no network or server. Statements, source
+snapshots and direct dependency edges come from Lean's accepted environment;
+explanations and specification choices remain reviewable human content.

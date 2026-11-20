@@ -1,0 +1,1920 @@
+{
+  "SSA.accepted_valid": {
+    "title": "Accepted states satisfy the model invariant",
+    "scope": "guard",
+    "meaning": "Successful Apply implies the model's shape, required-value, and full-manager predicates.",
+    "limits": "This is the proposed item-core policy. Structural well-formedness is strengthened and has separate ancestor/no-scalar-descendant theorems."
+  },
+  "SSA.accepted_complete": {
+    "title": "Successful Apply leaves complete item ownership",
+    "scope": "guard",
+    "meaning": "Every accepted result passes the per-item full-manager check.",
+    "limits": "Completeness is an acceptance condition; this alone establishes no progress."
+  },
+  "SSA.every_surviving_item_has_full": {
+    "title": "Each surviving item has an individual full manager",
+    "scope": "guard",
+    "meaning": "For any item descriptor in the schema whose membership survives, there is one manager covering membership and the whole required core.",
+    "limits": "The witness is local to each associative-list item. It need not be the same manager at another level."
+  },
+  "SSA.rejected_is_atomic": {
+    "title": "Rejected requests retain the old state",
+    "scope": "guard",
+    "meaning": "The model's commit wrapper returns the original object and claims for any error.",
+    "limits": "This is a fact about the wrapper, not a proof of etcd transactionality."
+  },
+  "SSA.committed_valid": {
+    "title": "One committed transition preserves validity",
+    "scope": "guard",
+    "meaning": "From a valid state, either a successful valid result is committed or a rejected request retains the valid original.",
+    "limits": "Validity is the stated item-core predicate, before external admission or the additional object-scope policy."
+  },
+  "SSA.key_only_full": {
+    "title": "Key-only items: every membership claimant is full",
+    "scope": "definition",
+    "meaning": "When there are no required fields beyond the key, full ownership reduces exactly to membership ownership.",
+    "limits": "The key is carried by the item path. Last-claim deletion is also exercised by execution fixtures."
+  },
+  "SSA.required_branches_same_manager": {
+    "title": "One manager must cover all required branches",
+    "scope": "definition",
+    "meaning": "Covering a conjunction requires both branches to be covered by the same manager argument.",
+    "limits": "A coalition where A covers one branch and B another is insufficient."
+  },
+  "SSA.partial_cannot_directly_delete": {
+    "title": "Partial managers cannot authorize direct item deletion",
+    "scope": "definition",
+    "meaning": "The lifetime-deletion predicate is false when the departing actor was not full.",
+    "limits": "An item can still disappear when an ancestor is deleted."
+  },
+  "SSA.surviving_full_blocks_direct_deletion": {
+    "title": "Another full manager blocks direct deletion",
+    "scope": "definition",
+    "meaning": "A full owner remaining in the provisional state prevents the direct deletion rule from firing.",
+    "limits": "The provisional state is after ownership transfers. Ancestor deletion is a separate operation."
+  },
+  "SSA.subtree_frame": {
+    "title": "Values outside deleted subtrees are unchanged",
+    "meaning": "A cell outside every deletion root belongs to the result of dropSubtrees exactly when it belonged to the input.",
+    "limits": "This theorem concerns the subtree-deletion phase, not the whole Apply transition."
+  },
+  "SSA.claims_frame": {
+    "title": "Claims outside deleted subtrees are unchanged",
+    "meaning": "Subtree deletion preserves exactly the claims whose targets lie outside every removed subtree.",
+    "limits": "Ownership replacement, force, and pruning have separate obligations."
+  },
+  "SSA.candidate_preserves_unrelated_value": {
+    "title": "Unwritten, unreleased values survive",
+    "meaning": "An old scalar survives the candidate when the request neither overwrites nor releases it and no deletion root contains it.",
+    "limits": "The theorem has explicit no-overwrite, no-release, and lifetime-boundary premises."
+  },
+  "SSA.ancestor_deletion_dominates": {
+    "title": "Ancestor deletion removes descendants",
+    "meaning": "A cell below a selected deletion root is absent after subtree deletion.",
+    "limits": "A child's own full manager does not shield it from a deleted ancestor."
+  },
+  "SSA.owns_monotone": {
+    "title": "Adding claims preserves existing ownership",
+    "meaning": "A manager's existing claim survives any extension of the claim set.",
+    "limits": "This says nothing about transitions that remove or transfer claims."
+  },
+  "SSA.map_presence_monotone": {
+    "title": "Adding claims preserves map presence coverage",
+    "meaning": "Existing descendant-based map presence coverage remains true when claims are added."
+  },
+  "SSA.covers_monotone": {
+    "title": "Adding claims preserves required-core coverage",
+    "meaning": "Coverage is monotone for every recursively defined required core.",
+    "limits": "The proof inducts over the required core; schema changes are not included."
+  },
+  "SSA.full_monotone": {
+    "title": "Co-ownership cannot make a full owner partial",
+    "meaning": "Adding claims preserves both membership ownership and required-core coverage."
+  },
+  "SSA.Contracts.accepted_preserves_intent": {
+    "title": "Successful Apply preserves every asserted cell",
+    "meaning": "Every value, item, or presence marker written by a successful request is in the accepted result.",
+    "limits": "Inputs are normalized assertions. This is conditional on the first request succeeding.",
+    "sketch": "Normalization requires enclosing item membership. Written cells therefore lie outside deletion roots. The actor also keeps each written footprint, so release pruning cannot remove those cells."
+  },
+  "SSA.Contracts.accepted_actor_claims_exact": {
+    "title": "The actor's resulting footprint is exactly its intent",
+    "meaning": "A footprint is owned by the actor after success if and only if the request contains it.",
+    "limits": "This is the model's normalized footprint, including presence assertions not all represented by current SMD.",
+    "sketch": "Old actor claims are replaced. Every new desired claim is tied to a written cell, whose enclosing membership keeps it outside deleted subtrees."
+  },
+  "SSA.Contracts.foreign_change_conflicts": {
+    "title": "Changing a foreign-owned scalar conflicts",
+    "meaning": "A valid initial state and normalized request that changes a foreign-owned scalar are rejected with conflict when force is false.",
+    "limits": "This models Apply; Update and admission are outside the operation."
+  },
+  "SSA.Contracts.equal_writes_do_not_conflict": {
+    "title": "Unchanged assertions cannot create a conflict",
+    "meaning": "If all writes leave values unchanged, the conflict predicate is false regardless of their owners.",
+    "limits": "Other acceptance guards may still reject the request."
+  },
+  "SSA.Contracts.force_transfers_changed_claim": {
+    "title": "Force removes changed foreign value claims",
+    "meaning": "The ownership-update phase removes each foreign scalar claim overwritten with a changed value under force.",
+    "limits": "This is a phase theorem. Force does not bypass required-value or full-manager guards."
+  },
+  "SSA.Contracts.unchanged_foreign_claim_preserved": {
+    "title": "Equal-value assertions preserve co-ownership",
+    "meaning": "A foreign claim survives ownership updating when writes at its path do not change the value, including under force.",
+    "limits": "Later ancestor deletion can still remove the claim."
+  },
+  "SSA.Contracts.unwritten_foreign_claim_preserved": {
+    "title": "Unwritten foreign claims survive ownership updating",
+    "meaning": "A request preserves another actor's claim when it does not write at that path.",
+    "limits": "The conclusion concerns updatedClaims, before lifetime deletion."
+  },
+  "SSA.Contracts.shared_omission_preserves_value": {
+    "title": "Shared unclaiming preserves the old scalar",
+    "meaning": "An old scalar survives if a foreign owner remains, it is not overwritten, and no deletion root contains it.",
+    "limits": "The no-ancestor-deletion premise matters: the proposed lifetime rule can remove a whole item and its partial contributions."
+  },
+  "SSA.Contracts.exclusive_omission_removes_value": {
+    "title": "Exclusive unclaiming removes the scalar",
+    "meaning": "Omitting a scalar previously owned only by the actor removes that scalar from the candidate.",
+    "limits": "This is before defaulting. A later defaulter could supply a new API value."
+  },
+  "SSA.Contracts.accepted_nonforce_preserves_foreign_assertion": {
+    "title": "Successful non-forced assertions retain foreign values",
+    "meaning": "If a successful request without force writes a foreign-owned scalar, that write did not change its value.",
+    "limits": "It does not prevent lifetime deletion from removing foreign fields elsewhere."
+  },
+  "SSA.Contracts.handoff_preserves_full_successor": {
+    "title": "An already-full successor stays full during release",
+    "meaning": "Another actor's successful non-forced request preserves a full successor when none of the successor's claims is below a deletion root.",
+    "limits": "This proves release safety. Progress.unchanged_snapshot_acquisition separately proves fresh-manager acquisition under unchanged-snapshot preconditions."
+  },
+  "SSA.Contracts.finite_history_preserves_validity": {
+    "title": "Every finite committed history preserves validity",
+    "meaning": "Starting from a valid state, any finite request sequence ends in a valid committed state, including rejected requests.",
+    "limits": "Every prefix is also a finite history. This is safety, not availability or fairness.",
+    "sketch": "Induct over the request list. The one-step commit theorem preserves validity, so the induction hypothesis applies to the remaining requests."
+  },
+  "SSA.Contracts.accepted_reapply_writes_unchanged": {
+    "title": "The first accepted result already contains every write",
+    "meaning": "After one success, every write in the same request is unchanged relative to that result.",
+    "sketch": "Intent preservation supplies each written cell. Unique cell paths in accepted results rule out a second cell with different content."
+  },
+  "SSA.Contracts.accepted_reapply_has_no_conflicts": {
+    "title": "Immediate repetition has no ownership conflict",
+    "meaning": "After one successful Apply, repeating that request cannot trigger the conflict predicate.",
+    "limits": "The stronger final idempotence theorem also proves that all remaining guards accept."
+  },
+  "SSA.Contracts.accepted_reapply_candidate_fixed": {
+    "title": "The transition phases reach an exact fixed point",
+    "meaning": "Running the same request's merge, deletion, and pruning phases again produces exactly the accepted state, including internal list order.",
+    "sketch": "Exact actor claims imply no releases and no deletion roots. The first success establishes stable cell/claim list forms, so replacing the same writes and claims changes neither list."
+  },
+  "SSA.Contracts.accepted_apply_idempotent": {
+    "title": "Proposed core: repeating successful Apply returns the same state",
+    "meaning": "For every schema, state, and request: if the first Apply succeeds, the immediate repetition succeeds and returns exactly that result, even with force.",
+    "limits": "This proves the proposed item-core Apply, with no intervening operation. Scoped histories, Update and admission composition have separate theorems; arbitrary admission is not part of this idempotence result. The unrestricted current-SSA law is refuted by Counterexamples.raw_apply_is_not_unconditionally_idempotent and an actual CRD HTTP regression.",
+    "sketch": "First prove that repeated writes are unchanged and cannot conflict. Exact actor claims eliminate releases and lifetime deletion. Stable list forms give the same candidate. That unchanged state is already valid, so every acceptance guard succeeds."
+  },
+  "SSA.Contracts.repeated_apply_observationally_equal": {
+    "title": "Repeated Apply preserves values and ownership observations",
+    "meaning": "Two immediately repeated successful requests yield identical cell and claim membership observations.",
+    "limits": "This follows from the stronger exact-state idempotence result."
+  },
+  "SSA.Examples.all_fixtures_pass": {
+    "title": "Fourteen scenarios satisfy their assertions",
+    "meaning": "The kernel checks the recorded expectations across fourteen finite scenarios and 49 transitions.",
+    "limits": "These are concrete execution witnesses, not a general theorem covering every possible sequence."
+  },
+  "SSA.Examples.fragment_values_are_valid": {
+    "title": "The fragmented counterexample still has valid required values",
+    "meaning": "In this specific counterexample, all required values remain present despite fragmented ownership."
+  },
+  "SSA.Examples.fragment_has_no_full_manager": {
+    "title": "The same counterexample has no full manager",
+    "meaning": "Although the required values exist, neither actor individually covers the whole required core."
+  },
+  "SSA.Examples.unchecked_partial_omission_deletes_foreign_host": {
+    "title": "The reduced unsafe rule deletes a foreign host",
+    "meaning": "In the concrete fragmented state, the reduced PR-style deletion rule removes another actor's host field.",
+    "limits": "The unsafe rule is a countermodel, not a mechanically translated Go revision."
+  },
+  "SSA.Examples.corrected_apply_rejects_fragment": {
+    "title": "The proposed Apply rejects this fragmentation",
+    "meaning": "The specific request that fragments the required core returns orphanedItem."
+  },
+  "SSA.Examples.repeating_same_apply_is_idempotent": {
+    "title": "A concrete repeated Apply is unchanged",
+    "meaning": "The initial example request is idempotent in its concrete accepted state.",
+    "limits": "The Contracts module also contains a separate general idempotence theorem."
+  },
+  "SSA.Contracts.nodup_of_eraseDups_length": {
+    "scope": "helper",
+    "title": "Nodup of erasedups length"
+  },
+  "SSA.Contracts.cells_unique_by_path": {
+    "scope": "helper",
+    "title": "Cells unique by path"
+  },
+  "SSA.Contracts.valid_unique_paths": {
+    "scope": "helper",
+    "title": "Valid unique paths"
+  },
+  "SSA.Contracts.scalar_has_no_descendants": {
+    "title": "Scalars cannot have descendants",
+    "meaning": "A well-shaped state cannot store both a scalar at a path and another cell below it.",
+    "limits": "General structural result at arbitrary path depth; the root is an implicit object."
+  },
+  "SSA.Progress.unchanged_snapshot_acquisition": {
+    "title": "A fresh manager can acquire unchanged data",
+    "meaning": "A fresh manager applying a normalized snapshot of the existing data succeeds without changing the data or losing any old claim.",
+    "limits": "The requested sparse footprint is unchanged data, the initial state is valid, and the actor is fresh. External validators may still forbid acquisition. The normalized cell-list order must match the state; no arbitrary admission policy is included."
+  },
+  "SSA.Locality.full_manager_is_item_local": {
+    "title": "Full ownership is local to one item",
+    "meaning": "Agreement of all claims below an item gives the same full classification for that item.",
+    "limits": "The required core stays inside the item; arbitrary request commutativity is not asserted."
+  },
+  "SSA.accepted_objects_have_full_owner": {
+    "title": "Required-bearing objects retain a whole owner",
+    "meaning": "Successful scoped writes leave each existing required-bearing ordinary object with an individual full manager.",
+    "limits": "An acceptance-guard consequence; the separate sibling execution demonstrates successful progress and rejection.",
+    "scope": "guard"
+  },
+  "SSA.no_required_transition_equivalence": {
+    "title": "No required metadata means unchanged behavior",
+    "meaning": "For arbitrary finite states and requests, the PR and current wire transitions are equal if every item has an empty additional required core.",
+    "limits": "This concerns the modeled single-version wire modes; the bounded upstream comparisons check their implementation correspondence."
+  },
+  "SSA.explicit_map_shortcuts_required_children": {
+    "title": "The PR map-member shortcut bypasses required children",
+    "meaning": "Whenever an explicit map member exists but required-child coverage is missing, the PR classifier returns true while the strict classifier returns false.",
+    "limits": "This general classifier counterexample is also instantiated and run against the actual pinned upstream code.",
+    "scope": "definition"
+  },
+  "SSA.Boundary.accepted_satisfies_validator": {
+    "title": "Final states satisfy the selected validator",
+    "meaning": "Any accepted boundary result satisfies its old/new-state predicate after the mutator runs.",
+    "limits": "The validator is a function parameter. This is not a proof of the CEL or webhook interpreter.",
+    "scope": "guard"
+  },
+  "SSA.Boundary.validator_can_block_any_handoff": {
+    "title": "Arbitrary admission can forbid every handoff",
+    "meaning": "A validator returning false rejects any proposed handoff.",
+    "limits": "Full-owner invariants cannot alone guarantee liveness under arbitrary admission constraints."
+  },
+  "SSA.Counterexamples.pr_accepts_fragment_without_full_owner": {
+    "scope": "execution",
+    "limits": "A kernel-checked finite witness. General locality, classifier and compatibility theorems are separate statements."
+  },
+  "SSA.Counterexamples.pr_partial_can_delete_foreign_required_branch": {
+    "scope": "execution",
+    "limits": "A kernel-checked finite witness. General locality, classifier and compatibility theorems are separate statements."
+  },
+  "SSA.Counterexamples.pr_map_shortcut_retains_invalid_item": {
+    "scope": "execution",
+    "limits": "A kernel-checked finite witness. General locality, classifier and compatibility theorems are separate statements."
+  },
+  "SSA.Counterexamples.pr_required_list_owner_is_misclassified": {
+    "scope": "execution",
+    "limits": "A kernel-checked finite witness. General locality, classifier and compatibility theorems are separate statements."
+  },
+  "SSA.Counterexamples.sibling_objects_have_independent_roles": {
+    "scope": "execution",
+    "limits": "A kernel-checked finite witness. General locality, classifier and compatibility theorems are separate statements."
+  },
+  "SSA.Counterexamples.sibling_fragmentation_rejects_entire_request": {
+    "scope": "execution",
+    "limits": "A kernel-checked finite witness. General locality, classifier and compatibility theorems are separate statements."
+  },
+  "SSA.Counterexamples.sibling_lifetime_deletion_preserves_other_full_owner": {
+    "scope": "execution",
+    "limits": "A kernel-checked finite witness. General locality, classifier and compatibility theorems are separate statements."
+  },
+  "SSA.check_objects_valid": {
+    "scope": "helper"
+  },
+  "SSA.checked_proposal": {
+    "scope": "helper"
+  },
+  "SSA.scoped_history_preserves_invariants": {
+    "title": "Mixed scoped histories preserve both invariants",
+    "meaning": "Every committed finite history of scoped Apply and Update retains valid item ownership and valid ordinary-object ownership.",
+    "limits": "A safety induction over the guarded operation; it includes rejections, but not storage concurrency or eventual success."
+  },
+  "SSA.Boundary.accepted_scoped_boundary": {
+    "title": "Post-admission state passes all three checks",
+    "meaning": "After mutation and validation, successful boundary results satisfy the item invariant, object-scope invariant, and the old/new validator.",
+    "limits": "This composes explicit function stages and a final guard. It does not verify interpreter implementations or Kubernetes stage wiring.",
+    "scope": "guard"
+  },
+  "SSA.accepted_scoped_valid": {
+    "scope": "guard"
+  },
+  "SSA.accepted_full_update_valid": {
+    "scope": "guard"
+  },
+  "SSA.Boundary.accepted_final_valid": {
+    "scope": "guard"
+  },
+  "SSA.Boundary.validation_rejection_is_atomic": {
+    "scope": "guard"
+  },
+  "SSA.granular_list_without_member_is_partial": {
+    "scope": "definition"
+  },
+  "SSA.current_key_only_last_claimant": {
+    "scope": "definition"
+  },
+  "SSA.no_required_retains_same_key": {
+    "scope": "definition"
+  },
+  "SSA.updater_keeps_membership": {
+    "scope": "definition",
+    "limits": "This is membership eligibility in the modeled PR classifier; the actual pruning passes and pinned Go comparisons are separate evidence."
+  },
+  "SSA.WireContracts.candidate_foreign_claim_exact": {
+    "title": "Exact final foreign-claim survival in raw SSA",
+    "meaning": "A foreign claim survives exactly when it existed before, its path exists after pruning, and the final comparison reports no modification at that path.",
+    "limits": "Current/PR normalized wire transition. This characterizes ownership updating; it does not prove the Go typed tree operations."
+  },
+  "SSA.WireContracts.accepted_nonforce_foreign_unchanged": {
+    "title": "Successful raw Apply does not modify a foreign final target",
+    "meaning": "For each original foreign owner and matching cell in the final pruned object, acceptance without force implies that comparison reports no modification.",
+    "limits": "This concerns surviving final targets. It does not assert that every foreign-owned target survives deletion or prove conversion/admission behavior."
+  },
+  "SSA.WireContracts.unchanged_snapshot_acquisition": {
+    "title": "Fresh snapshot acquisition in current and PR SSA",
+    "meaning": "A fresh actor can apply a normalized unchanged snapshot to any structurally valid state; the request succeeds, data stays unchanged, and all old claims remain alongside the new footprint.",
+    "limits": "No full-manager invariant is assumed. Snapshot equality includes the normalized cell-list order. It is not arbitrary edit progress or admission-constrained liveness."
+  },
+  "SSA.FieldsV1.root_roundtrip": {
+    "title": "Canonical FieldsV1 trie/object-grammar round trip",
+    "meaning": "At arbitrary finite depth, encoding and decoding preserve the canonical root trie, including leaf membership and membership shared with descendants.",
+    "limits": "The grammar begins after JSON and path-element parsing. Unique keys and nonempty child sets are premises; Go JSON bytes and parser correctness are not proved."
+  },
+  "SSA.SourceContracts.imported_dangling_matches_spec": {
+    "title": "Imported Go pruning source satisfies its outcome contract",
+    "meaning": "Executing the complete imported addBackDanglingItems AST returns the specified result for every object/error domain and every supplied primitive implementation, including all failure and missing-version branches.",
+    "limits": "One source function. The Go parser/importer and Go-subset semantics need review; conversion and typed operations are explicit pure-function parameters, not proved Go implementations. A semantic source mutation must invalidate this theorem."
+  },
+  "SSA.SourceContracts.source_dangling_refines_model": {
+    "title": "Imported source specializes to normalized final pruning",
+    "meaning": "With the normalized single-version primitives, the imported Go function computes exactly the model's dangling-field removal expression for arbitrary states and field sets.",
+    "limits": "The specialization does not prove that the Go implementations of those primitives refine the normalized definitions."
+  },
+  "SSA.SourceContracts.imported_owned_version_matches_spec": {
+    "title": "Imported per-version restoration covers all source exits",
+    "meaning": "The complete Go helper matches its contract, including both conversions, field-set errors, restoration and missing-version returns carrying the actual optional conversion result.",
+    "limits": "Successful conversion is non-nil in the primitive interface. Conversion and typed/set implementations remain explicit proof obligations."
+  },
+  "SSA.OwnedSource.imported_owned_items_matches_spec": {
+    "title": "Imported ownership restoration for any finite manager map",
+    "meaning": "The entire Go helper computes version grouping, restores the last-applied version first, then traverses every remaining version under any lawful permutation, propagating the exact success/error result.",
+    "limits": "Manager/version counts are arbitrary finite sizes. The per-version callee is an explicit contract; source semantics and primitive implementations still require their separate justification."
+  },
+  "SSA.PruneSource.imported_prune_matches_spec": {
+    "title": "Complete imported three-phase pruning orchestration",
+    "meaning": "The actual Go AST short-circuits nil/empty last sets, performs initial conversion and removal, invokes ownership and dangling restoration in order, propagates all errors, and performs the final actor-version conversion.",
+    "limits": "Requires the actor entry installed by Apply. Callees and typed/conversion primitives are explicit contracts; this theorem alone does not discharge them."
+  },
+  "SSA.PruningRefinement.single_version_pruning_refinement": {
+    "title": "All four source functions compose in the single-version model",
+    "meaning": "For arbitrary states, field sets and finite manager counts, the imported pruning function equals the normalized three-pass model, with callee-realization witnesses proved from all three other imported functions.",
+    "limits": "All managers share the last-applied API version, and the actor entry exists. Typed/set primitives are normalized definitions; their actual Go implementations are not proved by this composition result."
+  },
+  "SSA.PruningRefinement.linked_restore_preserves_objects": {
+    "title": "Model restoration never falls into nullable-input recovery",
+    "meaning": "Every finite restoration schedule under the identity-conversion primitives succeeds with two present object values.",
+    "limits": "This is a non-vacuity and call-domain result for the normalized primitive instance, not a claim about arbitrary external Go converters."
+  },
+  "SSA.FieldPathSet.paths_membership": {
+    "title": "Trie normalization preserves every membership claim",
+    "meaning": "For arbitrary finite tries and paths, flat path membership is equivalent to recursive trie membership, preserving the distinction between direct membership and descendants.",
+    "limits": "This proves the normalization relation, not Go JSON-byte parsing or sorting implementation correctness."
+  },
+  "SSA.pruning_pipeline_formula": {
+    "scope": "definition"
+  },
+  "SSA.GoSubset.exec_assign": {
+    "scope": "definition"
+  },
+  "SSA.GoSubset.exec_branch": {
+    "scope": "definition"
+  },
+  "SSA.GoSubset.exec_range": {
+    "scope": "definition"
+  },
+  "SSA.GoSubset.exec_declare_error": {
+    "scope": "definition"
+  },
+  "SSA.Counterexamples.raw_apply_is_not_unconditionally_idempotent": {
+    "title": "Current SSA: immediate data idempotence is false",
+    "meaning": "A owns a nonempty associative list. Applying an empty list first removes the field; the identical request then creates the empty list. These accepted transitions refute the universal immediate-idempotence proposition.",
+    "limits": "A concrete counterexample, also reproduced on both pinned SMD revisions and through CRD HTTP. This does not refute every conditional idempotence law.",
+    "sketch": "Instantiate the universal law with the populated state and empty-list request. The first transition succeeds. Kernel evaluation of its repetition yields different cells, contradicting equality."
+  },
+  "SSA.Counterexamples.required_list_retries_never_empty_the_list": {
+    "scope": "general",
+    "title": "Presence validation blocks every finite number of identical retries",
+    "meaning": "The empty-list request is valid as data, but its first pruned proposal lacks the required field. Validation rejects it atomically. Induction proves that every finite retry count leaves the original populated state unchanged.",
+    "limits": "The chosen policy checks list presence with no mutation or defaulting. Real OpenAPI required and CEL has(self.endpoints) are additionally exercised through HTTP; their interpreters are not generally formalized."
+  },
+  "SSA.RawSourceCounterexamples.imported_pruning_loses_explicit_empty_list": {
+    "title": "Imported Go pruning reproduces the empty-list loss",
+    "meaning": "The source-bound four-function pruning chain returns the state without the explicitly applied empty list, with all callees realized under every lawful map-iteration schedule.",
+    "limits": "Concrete normalized object/field-set primitives. Their actual Go implementations remain a separate proof obligation; Go comparisons and the HTTP regression supply implementation evidence."
+  },
+  "SSA.bootstrap_preserves_data": {
+    "scope": "definition"
+  },
+  "SSA.bootstrap_keeps_nonempty_manager_map": {
+    "scope": "definition"
+  },
+  "SSA.bootstrap_from_empty_claims": {
+    "scope": "definition"
+  },
+  "SSA.bootstrap_creates_update_claims": {
+    "scope": "definition"
+  },
+  "SSA.Counterexamples.raw_apply_is_not_presence_idempotent": {
+    "title": "Even application-data presence changes on immediate repetition",
+    "meaning": "The current-SSA counterexample refutes the universal law that every field has the same container presence after the first and second identical accepted Apply.",
+    "limits": "This is independent of metadata, timestamps and internal list ordering. The concrete trace is also checked through the CRD HTTP API."
+  },
+  "SSA.Counterexamples.default_wrapper_bootstraps_empty_list_owner": {
+    "title": "The default wrapper creates an Update owner on the third Apply",
+    "meaning": "With no remaining claims, Update-from-empty initialization gives before-first-apply a presence claim on the existing empty list. The identical Apply retains that foreign Update claim.",
+    "limits": "A concrete proof in the separate bootstrap model, matched by NewSkipNonAppliedManager and HTTP/etcd execution. This is not a general source-refinement theorem for the default manager stack."
+  },
+  "SSA.Counterexamples.default_wrapper_fourth_apply_is_fixed": {
+    "title": "The fourth Apply preserves the bootstrapped data and claims",
+    "meaning": "The nonempty Update-manager map suppresses reinitialization; the repeated request returns the same modeled data and claims.",
+    "limits": "Concrete ownership/data fixed point. ResourceVersion stability is observed separately in the real HTTP test."
+  },
+  "SSA.ContainerCounterexamples.empty_map_first_apply_creates_null": {
+    "title": "SSA-02: explicit empty-map intent becomes null while its claim survives",
+    "meaning": "A releases the last granular-map child by applying an empty map. The accepted raw result is null, with A still holding the requested map-presence claim.",
+    "limits": "Concrete normalized trace, reproduced by managedfields, both pinned SMD revisions and CRD HTTP. Map presence is already claimed, so a missing collection marker does not explain this case."
+  },
+  "SSA.ContainerCounterexamples.nonnullable_map_retries_never_empty": {
+    "scope": "general",
+    "title": "Optional non-nullable maps fail after every finite retry count",
+    "meaning": "The validator permits an absent settings field or an object. The first Apply instead produces null and is rejected atomically. Induction proves that every finite number of identical requests preserves the populated map.",
+    "limits": "No required-field premise. The object-or-absent policy is explicit; the actual optional non-nullable CRD schema independently reproduces the failure through HTTP."
+  },
+  "SSA.ContainerCounterexamples.empty_map_can_conflict_with_identical_previous_intent": {
+    "title": "An identical empty-map intent conflicts until the first actor repairs null",
+    "meaning": "After A applies an empty map and stores null, B conflicts when applying the same empty-map intent. A repeats its request, creating the actual empty object; B can then co-own it without force.",
+    "limits": "The stored value before B’s failure is null, not the intended empty object. This is a downstream effect of lost intent, rather than a counterexample to conflict-free acquisition of equal stored values."
+  },
+  "SSA.ContainerCounterexamples.imported_pruning_creates_null": {
+    "title": "The imported four-function pruning chain creates the null map",
+    "meaning": "The source-bound pruning composition produces the null result, with all callees realized and every lawful version-map schedule.",
+    "limits": "Concrete object/field-set instance with normalized typed/set primitives. Actual Go and HTTP results independently confirm the trace; a universal primitive refinement is still separate."
+  },
+  "SSA.ContainerCounterexamples.empty_object_default_repairs_this_proposal": {
+    "title": "A specific empty-object default repairs the unexpected null",
+    "meaning": "The explicit post-pruning mutation replaces null with the empty map before type validation. The resulting state equals A’s repaired second raw result.",
+    "limits": "Concrete mutator and trace. The real HTTP test checks the matching CRD default; this theorem does not formalize arbitrary defaulting programs."
+  },
+  "SSA.ContainerCounterexamples.empty_map_null_for_every_scalar_payload": {
+    "scope": "general",
+    "title": "The empty-map failure is independent of the removed scalar payload",
+    "meaning": "For every encoded scalar value at settings.left, replacing the populated granular map with the same empty-map intent yields the identical null result and retained map claim.",
+    "limits": "One map/child shape in the raw transition, arbitrary scalar text. The concrete witness uses the same JSON string encoding as the Go adapter. This is not a universal Go primitive refinement."
+  },
+  "SSA.owns_member_of_owns": {
+    "scope": "definition"
+  },
+  "SSA.direct_value_member_covers_containers": {
+    "scope": "definition",
+    "title": "The raw PR counts a direct null member for maps and lists",
+    "meaning": "An explicit null claim has a value tag in the normalized model but only a direct path member on the wire. The PR classifier counts that member for required maps and lists.",
+    "limits": "This concerns ownership classification. Null validity depends on the API schema; the stronger nullable-container policy has a separate schema-mapping obligation."
+  },
+  "SSA.Counterexamples.pr_explicit_null_list_has_direct_membership": {
+    "title": "Explicit null retains membership that an empty granular list lacks",
+    "meaning": "A supplies a required children field as null. Its direct member causes the actual PR to retain A’s item when partial B leaves. The same trace matches both pinned revisions.",
+    "limits": "A contrasting ownership control that corrected a model mismatch. API admission may reject null; no nullable-schema validity theorem is asserted here."
+  },
+  "SSA.WireContracts.accepted_candidate": {
+    "scope": "helper"
+  },
+  "SSA.WireContracts.accepted_cells": {
+    "scope": "helper"
+  },
+  "SSA.WireContracts.wire_merge_existing_cell": {
+    "scope": "helper"
+  },
+  "SSA.WireContracts.foreign_change_conflicts": {
+    "title": "Changing a foreign final target conflicts without force",
+    "meaning": "For either raw mode, a structurally valid initial state and a normalized non-forced request, any modified final cell with an original foreign owner forces the conflict result.",
+    "limits": "The comparison is against the final pruned data. A removed target is a separate case. Typed comparison and Go updater refinement remain open."
+  },
+  "SSA.WireContracts.forced_accepts_valid_candidate": {
+    "title": "Force admits a structurally valid raw candidate",
+    "meaning": "A normalized forced request from a valid initial shape succeeds if its final candidate has valid shape, regardless of ownership conflicts.",
+    "limits": "Current/PR model theorem, before API defaulting or admission. Force does not bypass schema, CEL or webhook validation."
+  },
+  "SSA.WireContracts.accepted_foreign_claim_exact": {
+    "title": "Exact foreign ownership after raw Apply",
+    "meaning": "An original foreign claim survives precisely when its final path remains and no final cell at that path is modified by the typed comparison.",
+    "limits": "Arbitrary finite normalized raw states in either mode. This characterizes final ownership, not just a provisional ownership phase; Go primitives and the updater still require refinement."
+  },
+  "SSA.WireContracts.force_transfers_changed_claim": {
+    "title": "A changed final target loses its old foreign claims",
+    "meaning": "After successful raw Apply, an old foreign claim cannot remain on a final target whose typed value changed.",
+    "limits": "Current/PR transition. Without force such a request conflicts; the acceptance premise allows this transfer law to apply after a successful forced change."
+  },
+  "SSA.WireContracts.unchanged_foreign_claim_preserved": {
+    "title": "Equal final values preserve foreign co-ownership",
+    "meaning": "An original foreign claim survives a successful raw Apply when its target path remains and the typed comparison reports no modification there, including with force enabled.",
+    "limits": "Final values are compared to stored values. Equal request payloads alone do not satisfy this premise if pruning changes their result."
+  },
+  "SSA.WireContracts.removed_foreign_claim_dropped": {
+    "title": "A removed target loses its foreign claim",
+    "meaning": "A successful raw Apply cannot leave an original foreign claim whose target path has disappeared.",
+    "limits": "This is ownership cleanup, not permission to delete foreign data. The cause and legality of the removal require separate properties."
+  },
+  "SSA.ContainerCounterexamples.null_member_survives_a_new_map_child": {
+    "scope": "general",
+    "title": "A claim acquired from null survives a new map child",
+    "meaning": "For every encoded scalar payload, B can add a map child while the direct member A acquired from null remains at the map path.",
+    "limits": "One fixed map/child shape and manager pair. Actual Go controls cover both maps and lists; the empty-map alternative conflicts. This corrects a model discrepancy rather than identifying another SSA bug."
+  },
+  "SSA.HandoffCounterexamples.update_acquires_child_without_item": {
+    "title": "Update acquires a child without acquiring its item",
+    "meaning": "Starting from A’s Apply, B’s Update takes ownership of the changed host leaf. A retains item membership, which B never acquires.",
+    "limits": "Concrete reachable history; actual Go and HTTP ownership assertions reproduce both operation flags and the distinct claims."
+  },
+  "SSA.HandoffCounterexamples.unrestricted_foreign_omission_safety_is_false": {
+    "title": "Foreign scalar ownership alone cannot guarantee handoff safety",
+    "meaning": "A’s non-forced omission removes an Update-owned scalar belonging to B when A releases the containing item. The request writes no value at B’s path. This refutes unrestricted BASE-07.",
+    "limits": "The statement intentionally has no item-lifetime premise. Conditional shared-omission and full-successor theorems retain theirs. Nullable HTTP accepts the deletion; non-nullable HTTP rejects its null result."
+  },
+  "SSA.HandoffCounterexamples.nonnullable_list_omission_retries_fail": {
+    "scope": "general",
+    "title": "Non-nullable list omission fails after every retry count",
+    "meaning": "Induction proves that every finite repetition preserves the pre-omission state under the explicit list-or-absent validator, because pruning proposes null.",
+    "limits": "One Apply/Update history, arbitrary finite retry count. Real HTTP checks optional non-nullable and nullable list schemas, including unchanged data, ownership and resourceVersion on rejection."
+  },
+  "SSA.HandoffCounterexamples.imported_pruning_removes_update_child": {
+    "title": "Imported pruning removes the Update-owned child",
+    "meaning": "The complete four-function pruning chain produces the item-removal proposal under every lawful manager-version schedule, with every callee realized.",
+    "limits": "Concrete same-version object/field-set witness using normalized typed/set primitives. Final foreign-claim cleanup and HTTP validation are separate checked stages."
+  },
+  "SSA.ApplySource.imported_apply_matches_spec": {
+    "title": "Complete imported Apply control flow",
+    "scope": "general",
+    "meaning": "The complete Go Apply body agrees with an independently factored specification for every explicit primitive outcome.",
+    "limits": "Merge, extraction, reconciliation, pruning and final update remain callbacks. Successful callback objects are non-nil, logical managed maps allocated, and alias side effects absent; this is not an end-to-end Go refinement theorem."
+  },
+  "SSA.ApplySource.imported_apply_success_iff": {
+    "title": "Characterize every returned Apply result",
+    "scope": "helper",
+    "meaning": "A returned source-interpreter result is exactly a result of the independent Apply specification, including nil on a data no-op.",
+    "limits": "Derived from the complete control-flow theorem and inherits its primitive contracts."
+  },
+  "SSA.ApplySource.imported_apply_excludes_reset_fields": {
+    "title": "Configured reset roots stay outside actor ownership",
+    "scope": "general",
+    "meaning": "With the stated prefix filter, every descendant of every reset root is absent from the final actor field set.",
+    "limits": "Conditional on UpdateDoesNotGrowActor for the final updater callback and correct Go realization of the configured filter. Neither remaining implementation obligation is assumed closed."
+  },
+  "SSA.ResetFields.filter_membership": {
+    "title": "Prefix-filter membership",
+    "scope": "general",
+    "meaning": "A path survives precisely when it belonged to the input and no reset root prefixes it.",
+    "limits": "Normalized finite field sets; JSON bytes and actual Go recursive exclusion still require refinement."
+  },
+  "SSA.ResetFields.filter_excludes_descendants": {
+    "title": "Reset exclusion reaches all depths",
+    "scope": "general",
+    "meaning": "No direct reset root or descendant can survive prefix filtering.",
+    "limits": "Arbitrary finite roots and paths; prefix filtering is distinct from ordinary field-set Difference."
+  },
+  "SSA.ResetFields.filter_is_idempotent": {
+    "title": "Reset filtering is idempotent",
+    "scope": "general",
+    "meaning": "Filtering the same field set twice with the same reset roots produces the same list.",
+    "limits": "This is a filter law, not SSA Apply idempotence."
+  },
+  "SSA.ResetFields.filter_preserves_other_top_field": {
+    "title": "Unrelated root membership is retained",
+    "scope": "general",
+    "meaning": "Filtering one named top-level root leaves membership under any different top-level root unchanged, at every finite depth.",
+    "limits": "This explains why spec/metadata exclusion cannot remove a valid settings root."
+  },
+  "SSA.ResetFields.flat_filter_refines_trie": {
+    "title": "Flat reset filter matches trie selection",
+    "scope": "general",
+    "meaning": "Filtered normalized path membership equals recursively selected trie membership.",
+    "limits": "Membership refinement only; empty structural nodes and wire serialization are separate."
+  },
+  "SSA.ResetFields.installed_actor_excludes_reset": {
+    "title": "Installing filtered claims excludes reset fields",
+    "scope": "general",
+    "meaning": "Replacing the actor entry with the filtered extracted set cannot install a reset root or descendant.",
+    "limits": "Concerns installation; the later updater stage requires the separate non-growth premise."
+  },
+  "SSA.ResetFields.update_preserves_reset_exclusion": {
+    "title": "Non-growing update preserves reset exclusion",
+    "scope": "general",
+    "meaning": "An update stage that never grows the actor field set preserves installed prefix exclusion.",
+    "limits": "ActorDoesNotGrow is the remaining local callback contract, not a premise about the entire Apply result."
+  },
+  "SSA.ResetCounterexamples.restoration_preserves_nonstatus_data": {
+    "title": "Status restoration retains every other data cell",
+    "scope": "general",
+    "meaning": "For arbitrary before/proposal states, restoring non-status fields preserves every non-status cell exactly.",
+    "limits": "A normalized REST restoration model. Claims intentionally remain from the proposal; the full Go REST strategy is not imported."
+  },
+  "SSA.ResetCounterexamples.broad_status_reset_contract_is_false": {
+    "title": "Refute ownership exclusion for every REST-reset field",
+    "scope": "execution",
+    "meaning": "A reachable fresh status actor acquires an unchanged settings claim, despite the status strategy restoring every non-status data field.",
+    "limits": "The actual CRD HTTP test independently reproduces the claim and subsequent conflict. This refutes BASE-12b, not conventional spec/status exclusion."
+  },
+  "SSA.ResetCounterexamples.status_acquires_a_reset_field": {
+    "title": "Status can claim a restored settings field",
+    "scope": "execution",
+    "meaning": "The concrete co-ownership request leaves settings unchanged but installs the status actor claim.",
+    "limits": "The API test uses the same literal manager name on main and status; the inner model uses distinct logical identities."
+  },
+  "SSA.ResetCounterexamples.status_claim_blocks_regular_apply": {
+    "title": "The restored-field claim causes a later conflict",
+    "scope": "execution",
+    "meaning": "The original main actor cannot change settings without force once the status actor co-owns it; rejection preserves the state.",
+    "limits": "HTTP GET additionally checks unchanged stored ownership and resourceVersion."
+  },
+  "SSA.ResetCounterexamples.imported_apply_installs_nonstatus_claim": {
+    "title": "Complete imported Apply installs the unwanted claim",
+    "scope": "execution",
+    "meaning": "A concrete normalized primitive instance of the imported Apply body installs settings ownership because the configured roots omit settings.",
+    "limits": "Merge and final update are explicit normalized primitive instances. The real HTTP test is independent evidence, not their general refinement proof."
+  },
+  "SSA.ResetCounterexamples.imported_prune_callback_is_realized": {
+    "title": "Realize fresh status actor pruning in source",
+    "scope": "execution",
+    "meaning": "The imported prune body returns directly when the fresh status actor has no last-applied set.",
+    "limits": "Closes this concrete pruning callback only, not the merge or final updater callbacks."
+  },
+  "SSA.ElementDifference.difference_membership": {
+    "title": "Two-pointer difference has exact set membership",
+    "scope": "general",
+    "meaning": "For every finite pair of sorted input lists, an element survives exactly when it occurs on the left and not on the right.",
+    "limits": "Requires the explicit strict-total-order laws. The functional algorithm is connected to the imported Go method by imported_difference_matches."
+  },
+  "SSA.ElementDifference.difference_sublist": {
+    "title": "Difference preserves left-input order and uniqueness",
+    "scope": "general",
+    "meaning": "For any comparator and finite inputs, the output is a sublist of the left input.",
+    "limits": "This is an algorithm theorem; sortedness and uniqueness are inherited when present, rather than assumed for every possible input."
+  },
+  "SSA.ElementDifference.imported_difference_matches": {
+    "title": "Complete imported Go element-set difference",
+    "scope": "general",
+    "meaning": "The complete PathElementSet.Difference AST executes successfully and equals the independently factored two-pointer algorithm for every finite input pair, using a linear fuel bound.",
+    "limits": "The typed interpreter models non-nil input sets, fresh output slices, pure element comparisons and bounded index access. Parser/subset semantics need human review; comparison semantics and the Go compiler/runtime are outside this theorem. The original statement now specializes the shared ElementAlgebra source induction."
+  },
+  "SSA.ElementDifference.imported_difference_membership": {
+    "title": "Go source computes exact membership difference",
+    "scope": "general",
+    "meaning": "On finite sorted inputs under strict-total-order comparator laws, every returned element belongs precisely to the left input and not to the right input.",
+    "limits": "The actual PathElement.Less/Compare implementation remains a refinement obligation. This is the element component, not the full recursive Set or reset filter."
+  },
+  "SSA.ElementDifference.imported_difference_preserves_order": {
+    "title": "Go element-set result remains sorted",
+    "scope": "general",
+    "meaning": "Whenever the left input is sorted, the imported Difference method returns a sorted list; the shared proof preserves the original absence of comparator-law and sorted-right premises.",
+    "limits": "Exact difference membership still needs both inputs sorted and the comparator laws. Full recursive set composition remains open."
+  },
+  "SSA.ElementAlgebra.compute_membership": {
+    "title": "All three set-membership laws",
+    "scope": "general",
+    "meaning": "For arbitrary finite sorted inputs, the common two-pointer algorithm computes difference, union or intersection membership exactly.",
+    "limits": "Requires the explicit strict-total-order comparator laws. The algorithm is separately equated to each complete imported Go body."
+  },
+  "SSA.ElementAlgebra.compute_left_sublist": {
+    "title": "Difference and intersection retain left-input order",
+    "scope": "general",
+    "meaning": "For every comparator and input pair, each non-union operation returns a sublist of the left input.",
+    "limits": "No sortedness or comparator laws are needed. Union can add right-input elements and has a separate ordering proof."
+  },
+  "SSA.ElementAlgebra.union_pairwise": {
+    "title": "Union preserves sorted representation",
+    "scope": "general",
+    "meaning": "Strictly sorted inputs under a lawful comparator yield a strictly sorted union.",
+    "limits": "This is the common algorithm theorem; imported_matches supplies the source connection."
+  },
+  "SSA.ElementAlgebra.imported_matches": {
+    "title": "Three complete imported Go methods share one source proof",
+    "scope": "general",
+    "meaning": "For every finite input pair and comparator, complete imported Difference, Union and Intersection execute successfully and equal the common algorithm, with a linear fuel bound.",
+    "limits": "Includes the actual right representative emitted by Union on equal comparisons, all suffix branches and safe indexing. The typed interpreter models non-nil sets, fresh output slices and pure comparisons; parser/semantics require human review."
+  },
+  "SSA.ElementAlgebra.imported_membership": {
+    "title": "Exact set membership in every imported result",
+    "scope": "general",
+    "meaning": "Every returned Difference, Union or Intersection result obeys its standard left/right membership law at arbitrary finite sizes.",
+    "limits": "Requires sorted inputs and explicit comparator-order laws. Actual PathElement.Less/Compare and recursive Set/SetNodeMap refinement remain open."
+  },
+  "SSA.ElementAlgebra.imported_preserves_order": {
+    "title": "Imported results preserve strict ordering",
+    "scope": "general",
+    "meaning": "Each complete imported method returns a strictly sorted result from strictly sorted inputs under the comparator laws.",
+    "limits": "The legacy difference-only specialization retains the stronger frame with no comparator-law or sorted-right premise."
+  },
+  "SSA.ElementAlgebra.imported_preserves_uniqueness": {
+    "title": "Imported results retain unique element keys",
+    "scope": "general",
+    "meaning": "The three imported operations cannot produce duplicate element keys from sorted canonical inputs under the comparator laws.",
+    "limits": "Derived through strict ordering and irreflexivity; this is a representation guarantee, not an extra independent SSA correctness claim."
+  },
+  "SSA.ElementOrder.head_absent": {
+    "title": "Head absent",
+    "scope": "helper",
+    "meaning": "A strict sorted head cannot reoccur in its tail.",
+    "limits": "Generic comparator helper, not an independent SSA guarantee."
+  },
+  "SSA.ElementOrder.before_all": {
+    "title": "Before all",
+    "scope": "helper",
+    "meaning": "An element preceding a sorted head precedes every member of that list.",
+    "limits": "Generic comparator helper, not an independent SSA guarantee."
+  },
+  "SSA.ElementOrder.before_absent": {
+    "title": "Before absent",
+    "scope": "helper",
+    "meaning": "An element preceding a sorted head is absent from that list.",
+    "limits": "Generic comparator helper, not an independent SSA guarantee."
+  },
+  "SSA.ElementOrder.sorted_unique": {
+    "title": "Sorted unique",
+    "scope": "helper",
+    "meaning": "Irreflexive strict ordering implies unique list members.",
+    "limits": "Generic comparator helper, not an independent SSA guarantee."
+  },
+  "SSA.ElementOrder.nat_strict_order": {
+    "title": "Construct the comparison harness ordering laws",
+    "scope": "helper",
+    "meaning": "Natural rank comparison constructively satisfies every StrictOrder premise used by the executable comparison.",
+    "limits": "This witnesses consistency and applicability for the rank domain; it does not prove the actual Go PathElement comparator implementation."
+  },
+  "SSA.NumericCounterexamples.witnesses_are_represented": {
+    "title": "Numeric witnesses are representable",
+    "scope": "execution",
+    "meaning": "Both int64 values and the binary64 2^63 witness lie in the declared represented domain.",
+    "limits": "Finite nonnegative integral witness model; native Go primitives and CRD HTTP/GET independently check these values. General IEEE and typed/updater refinement are not claimed."
+  },
+  "SSA.NumericCounterexamples.equality_is_not_transitive": {
+    "title": "Mixed numeric equality is nontransitive",
+    "scope": "execution",
+    "meaning": "MaxInt64 and MaxInt64-1 are distinct integers, but each compares equal to binary64 2^63 after mixed conversion.",
+    "limits": "Finite nonnegative integral witness model; native Go primitives and CRD HTTP/GET independently check these values. General IEEE and typed/updater refinement are not claimed."
+  },
+  "SSA.NumericCounterexamples.incomparability_is_not_transitive": {
+    "title": "Comparator incomparability is nontransitive",
+    "scope": "execution",
+    "meaning": "Each integer is incomparable with the float, while the two integers have a strict order.",
+    "limits": "Finite nonnegative integral witness model; native Go primitives and CRD HTTP/GET independently check these values. General IEEE and typed/updater refinement are not claimed."
+  },
+  "SSA.NumericCounterexamples.rounded_equality_changes_magnitude": {
+    "title": "Rounded equality misses a real numeric change",
+    "scope": "execution",
+    "meaning": "The mixed comparison reports equality between numbers with different exact magnitudes.",
+    "limits": "Finite nonnegative integral witness model; native Go primitives and CRD HTTP/GET independently check these values. General IEEE and typed/updater refinement are not claimed."
+  },
+  "SSA.NumericCounterexamples.no_faithful_equality_projection": {
+    "title": "No faithful equality quotient exists",
+    "scope": "general",
+    "meaning": "No encoding into ordinary identity can faithfully realize this numeric equality, even restricted to the represented domain.",
+    "limits": "The impossibility follows from three concrete represented witnesses; it does not assert that every individual numeric comparison is wrong."
+  },
+  "SSA.NumericCounterexamples.difference_retains_an_excluded_member": {
+    "title": "Numeric-key Difference violates the membership law",
+    "scope": "execution",
+    "meaning": "Individually sorted numeric-key inputs return MaxInt64 although the excluded set considers it present.",
+    "limits": "Executes the complete imported element-set body. Real Go Difference and Has independently reproduce the witness; conditional lawful-comparator algebra theorems remain valid."
+  },
+  "SSA.NumericCounterexamples.original_is_source_reachable": {
+    "title": "The A-owned starting state is reachable",
+    "scope": "execution",
+    "meaning": "A creates the exact integer and its claim from an empty object through the imported Apply body.",
+    "limits": "Finite nonnegative integral witness model; native Go primitives and CRD HTTP/GET independently check these values. General IEEE and typed/updater refinement are not claimed."
+  },
+  "SSA.NumericCounterexamples.scalar_only_is_false_noop": {
+    "title": "Scalar-only intent is lost as a false no-op",
+    "scope": "execution",
+    "meaning": "B asserts a different representable number; imported Apply returns nil while installing co-ownership. The wrapper retains the old integer.",
+    "limits": "Finite nonnegative integral witness model; native Go primitives and CRD HTTP/GET independently check these values. General IEEE and typed/updater refinement are not claimed."
+  },
+  "SSA.NumericCounterexamples.independent_note_changes_foreign_number": {
+    "title": "An unrelated note exposes the missed conflict",
+    "scope": "execution",
+    "meaning": "With the same number plus a note, B changes A’s numeric magnitude without force, while A keeps its claim.",
+    "limits": "Finite nonnegative integral witness model; native Go primitives and CRD HTTP/GET independently check these values. General IEEE and typed/updater refinement are not claimed."
+  },
+  "SSA.NumericCounterexamples.integer_change_conflicts": {
+    "title": "Exact integer comparison supplies a conflict control",
+    "scope": "execution",
+    "meaning": "A different int64 value reaches the conflict return. HTTP checks complete storage rollback.",
+    "limits": "Finite nonnegative integral witness model; native Go primitives and CRD HTTP/GET independently check these values. General IEEE and typed/updater refinement are not claimed."
+  },
+  "SSA.NumericCounterexamples.prune_callback_is_realized": {
+    "title": "Fresh-manager pruning is the imported nil branch",
+    "scope": "execution",
+    "meaning": "The concrete Apply witness’s pruning callback is realized by the imported prune body when B has no last set.",
+    "limits": "This closes that callback for the named history; general typed/update primitive refinement remains separate."
+  },
+  "SSA.NumericCounterexamples.exact_scalar_intent_is_false": {
+    "title": "BASE-01: unrestricted scalar intent is false",
+    "scope": "execution",
+    "meaning": "A represented numeric assertion succeeds but its exact magnitude is absent from the committed object.",
+    "limits": "Finite nonnegative integral witness model; native Go primitives and CRD HTTP/GET independently check these values. General IEEE and typed/updater refinement are not claimed."
+  },
+  "SSA.NumericCounterexamples.nonforce_foreign_value_safety_is_false": {
+    "title": "BASE-04: unrestricted numeric conflict safety is false",
+    "scope": "execution",
+    "meaning": "A non-forced request changes an A-owned numeric magnitude while retaining A’s claim.",
+    "limits": "Finite nonnegative integral witness model; native Go primitives and CRD HTTP/GET independently check these values. General IEEE and typed/updater refinement are not claimed."
+  },
+  "SSA.NumericCodecCounterexamples.original_trie_is_canonical": {
+    "title": "The numeric-key witness starts canonical",
+    "scope": "execution",
+    "meaning": "The exact integer-keyed starting trie has unique edges and nonempty canonical children.",
+    "limits": "Discharges the structural round-trip theorem’s input premise; the failure occurs in label decoding."
+  },
+  "SSA.NumericCodecCounterexamples.original_encodes_exact_key": {
+    "title": "The initial wire label retains the exact key",
+    "scope": "execution",
+    "meaning": "Structural encoding contains the exact integer selector; the model does not pre-round the input.",
+    "limits": "The concrete numeric-read callback is specified, not a verified full JSON parser. Exact native key/byte round trips check the witness in vendored and both pinned SMD revisions; CRD HTTP checks the resulting false conflict."
+  },
+  "SSA.NumericCodecCounterexamples.exact_integer_keys_are_distinct": {
+    "title": "The two integer selectors are distinct",
+    "scope": "execution",
+    "meaning": "2^53+1 and 2^53 identify different exact integer-keyed items.",
+    "limits": "The concrete numeric-read callback is specified, not a verified full JSON parser. Exact native key/byte round trips check the witness in vendored and both pinned SMD revisions; CRD HTTP checks the resulting false conflict."
+  },
+  "SSA.NumericCodecCounterexamples.reader_collapses_distinct_integer_keys": {
+    "title": "Numeric parsing aliases distinct integer selectors",
+    "scope": "execution",
+    "meaning": "The concrete numeric reader maps both distinct integer keys to the same rounded selector.",
+    "limits": "The concrete numeric-read callback is specified, not a verified full JSON parser. Exact native key/byte round trips check the witness in vendored and both pinned SMD revisions; CRD HTTP checks the resulting false conflict."
+  },
+  "SSA.NumericCodecCounterexamples.numeric_key_roundtrip_moves_membership": {
+    "title": "Round-tripping moves the ownership path",
+    "scope": "execution",
+    "meaning": "After numeric decoding, the canonical original path loses membership and the neighbor gains it.",
+    "limits": "The concrete numeric-read callback is specified, not a verified full JSON parser. Exact native key/byte round trips check the witness in vendored and both pinned SMD revisions; CRD HTTP checks the resulting false conflict."
+  },
+  "SSA.NumericCodecCounterexamples.exact_numeric_path_roundtrip_is_false": {
+    "title": "BASE-10: unrestricted numeric path round-tripping is false",
+    "scope": "execution",
+    "meaning": "A canonical represented integer-keyed field set does not preserve exact path membership through its numeric codec.",
+    "limits": "The concrete numeric-read callback is specified, not a verified full JSON parser. Exact native key/byte round trips check the witness in vendored and both pinned SMD revisions; CRD HTTP checks the resulting false conflict. The existing structural FieldsV1 theorem remains valid after label decoding."
+  },
+  "SSA.NumericCodecCounterexamples.small_key_roundtrip_control": {
+    "title": "Small independent integer keys remain distinct",
+    "scope": "execution",
+    "meaning": "The key 42 round-trips and stays distinct from 41, matching the successful API control.",
+    "limits": "The concrete numeric-read callback is specified, not a verified full JSON parser. Exact native key/byte round trips check the witness in vendored and both pinned SMD revisions; CRD HTTP checks the resulting false conflict."
+  },
+  "SSA.NumericCounterexamples.forced_change_retains_foreign_claim": {
+    "title": "Force retains A’s claim on a rounded numeric change",
+    "scope": "execution",
+    "meaning": "B forces a different exact magnitude, but the rounded comparison leaves both amount claims.",
+    "limits": "Complete imported Apply under explicit scalar primitives that implement forced transfer and empty-entry cleanup. Native managedfields and actual CRD HTTP/GET check both the rounded failure and the exact-integer success control; general typed/updater refinement remains separate."
+  },
+  "SSA.NumericCounterexamples.forced_integer_control_transfers": {
+    "title": "An exact forced integer change transfers the claim",
+    "scope": "execution",
+    "meaning": "The same modeled updater transfers a detected int-to-int change to B and removes A’s empty entry.",
+    "limits": "Complete imported Apply under explicit scalar primitives that implement forced transfer and empty-entry cleanup. Native managedfields and actual CRD HTTP/GET check both the rounded failure and the exact-integer success control; general typed/updater refinement remains separate."
+  },
+  "SSA.NumericCounterexamples.forced_transfer_is_false": {
+    "title": "BASE-06: unrestricted numeric force transfer is false",
+    "scope": "execution",
+    "meaning": "A represented forced numeric change succeeds while retaining the old foreign amount claim.",
+    "limits": "Complete imported Apply under explicit scalar primitives that implement forced transfer and empty-entry cleanup. Native managedfields and actual CRD HTTP/GET check both the rounded failure and the exact-integer success control; general typed/updater refinement remains separate."
+  },
+  "SSA.KeyOnly.has_full_iff_membership": {
+    "title": "Key-only fullness needs a membership claimant",
+    "scope": "definition",
+    "meaning": "With an empty required core, a full-manager witness exists exactly when an item-membership claim exists.",
+    "limits": "Classification fact for arbitrary finite claim sets, including malformed states; not alone a transition-survival theorem."
+  },
+  "SSA.KeyOnly.foreign_membership_survives_merge": {
+    "title": "Foreign membership survives scalar force transfer",
+    "scope": "helper",
+    "meaning": "The proposed merge/claim phase preserves every foreign item-membership claim, for either force value.",
+    "limits": "Membership is a separate claim kind in this stronger item-core model. This does not assert the same representation for raw SMD."
+  },
+  "SSA.KeyOnly.merged_membership_iff_foreign": {
+    "title": "Omission leaves exactly the foreign memberships",
+    "scope": "helper",
+    "meaning": "If the actor omits item membership, the merged result contains membership exactly when an old foreign claimant remains.",
+    "limits": "General finite claim-phase result. Final subtree pruning and accepted-result survival have separate theorems."
+  },
+  "SSA.KeyOnly.direct_deletion_iff_last_membership": {
+    "title": "Direct key-only deletion means last-membership release",
+    "scope": "definition",
+    "meaning": "For an existing key-only item owned by the departing actor, direct deletion is authorized exactly when every old membership claim belonged to that actor.",
+    "limits": "The actor omits membership. Arbitrary finite managers and both force values; this characterizes the direct lifetime predicate, not deletion by an ancestor."
+  },
+  "SSA.KeyOnly.last_membership_prunes_subtree": {
+    "title": "Last membership release prunes the entire subtree",
+    "scope": "general",
+    "meaning": "The proposed candidate contains no cell at or below a key-only item after its last membership claimant leaves.",
+    "limits": "The key-only item is instantiated in the schema, exists before the request and belongs to the departing actor. Does not assume acceptance; descendants can have other optional owners."
+  },
+  "SSA.KeyOnly.accepted_last_membership_prunes_subtree": {
+    "title": "An accepted last release removes every descendant",
+    "scope": "general",
+    "meaning": "The complete accepted item-core result contains no cell beneath a key-only item after the last membership release.",
+    "limits": "General operational law, including both force values and arbitrary finite state/schema sizes. Separate scoped object/admission operations require their own composition boundary."
+  },
+  "SSA.KeyOnly.accepted_foreign_membership_preserves_item": {
+    "title": "A retained membership preserves its key-only item",
+    "scope": "general",
+    "meaning": "Every accepted core transition keeps a key-only item if a foreign member remains and no proper ancestor item lifetime is deleted.",
+    "limits": "Does not assume survival or exclude direct deletion in its premise: that exclusion is derived from membership. Accepted initial validity supplies schema uniqueness; final validity links the retained claim to actual item data. Ordinary object scopes remain separate."
+  },
+  "SSA.Contracts.accepted_candidate": {
+    "title": "Accepted result identifies the candidate",
+    "scope": "helper",
+    "meaning": "Connects phase-level candidate results to the exact state returned on success.",
+    "limits": "Internal composition/representation lemma, not an additional independent SSA correctness guarantee."
+  },
+  "SSA.Contracts.accepted_initial_valid": {
+    "title": "Successful requests start from a valid state",
+    "scope": "helper",
+    "meaning": "Exposes the acceptance-guard fact needed to compose schema and state invariants.",
+    "limits": "Internal composition/representation lemma, not an additional independent SSA correctness guarantee."
+  },
+  "SSA.Contracts.members_equal_of_nodup_map": {
+    "title": "Unique mapped keys identify one member",
+    "scope": "helper",
+    "meaning": "A list with distinct mapped keys cannot contain different members at the same key.",
+    "limits": "Internal composition/representation lemma, not an additional independent SSA correctness guarantee."
+  },
+  "SSA.Contracts.schema_unique_paths": {
+    "title": "A well-formed schema has unique item paths",
+    "scope": "helper",
+    "meaning": "The executable schema uniqueness check yields pairwise distinct instantiated item paths.",
+    "limits": "Internal composition/representation lemma, not an additional independent SSA correctness guarantee."
+  },
+  "SSA.GranularKeyCounterexamples.initial_raw_owner_is_reachable": {
+    "title": "A’s exact raw ownership is source-reachable",
+    "scope": "execution",
+    "meaning": "A creates the original integer-keyed item and payload from empty through imported Apply.",
+    "limits": "Concrete integer-key/string-payload schema, explicit numeric-read and typed/update primitive instances, with complete imported Apply execution. Native current/pinned Go and real CRD HTTP/GET independently check the history; universal typed/codec refinement remains separate."
+  },
+  "SSA.GranularKeyCounterexamples.original_does_not_own_neighbor": {
+    "title": "The distinct neighbor is absent from A’s original footprint",
+    "scope": "execution",
+    "meaning": "Before ownership decoding, the raw exact integer selectors identify different item paths.",
+    "limits": "Concrete integer-key/string-payload schema, explicit numeric-read and typed/update primitive instances, with complete imported Apply execution. Native current/pinned Go and real CRD HTTP/GET independently check the history; universal typed/codec refinement remains separate."
+  },
+  "SSA.GranularKeyCounterexamples.independent_key_conflicts_after_codec": {
+    "title": "Imported Apply rejects the independent neighbor",
+    "scope": "execution",
+    "meaning": "B’s fresh non-forced addition reaches the conflict return after the old ownership selector is decoded.",
+    "limits": "Concrete integer-key/string-payload schema, explicit numeric-read and typed/update primitive instances, with complete imported Apply execution. Native current/pinned Go and real CRD HTTP/GET independently check the history; universal typed/codec refinement remains separate."
+  },
+  "SSA.GranularKeyCounterexamples.small_independent_key_is_accepted": {
+    "title": "Small independent keys supply a successful control",
+    "scope": "execution",
+    "meaning": "Imported Apply accepts key 41 beside A’s key 42 and preserves both ownership contributions.",
+    "limits": "Concrete integer-key/string-payload schema, explicit numeric-read and typed/update primitive instances, with complete imported Apply execution. Native current/pinned Go and real CRD HTTP/GET independently check the history; universal typed/codec refinement remains separate."
+  },
+  "SSA.GranularKeyCounterexamples.fresh_prune_callback_is_realized": {
+    "title": "Fresh B pruning is realized by imported source",
+    "scope": "execution",
+    "meaning": "The concrete pruning callback is exactly the nil-last-set branch of the complete imported prune body.",
+    "limits": "Concrete integer-key/string-payload schema, explicit numeric-read and typed/update primitive instances, with complete imported Apply execution. Native current/pinned Go and real CRD HTTP/GET independently check the history; universal typed/codec refinement remains separate."
+  },
+  "SSA.GranularKeyCounterexamples.unconditional_independent_item_progress_is_false": {
+    "title": "BASE-09b: independent granular-item progress is false",
+    "scope": "execution",
+    "meaning": "A represented distinct neighbor item cannot be added without a false conflict in this valid fixed schema.",
+    "limits": "Concrete integer-key/string-payload schema, explicit numeric-read and typed/update primitive instances, with complete imported Apply execution. Native current/pinned Go and real CRD HTTP/GET independently check the history; universal typed/codec refinement remains separate."
+  },
+  "SSA.GranularKeyCounterexamples.forced_addition_drops_unchanged_foreign_owner": {
+    "title": "Force drops ownership of A’s unchanged original payload",
+    "scope": "execution",
+    "meaning": "The forced retry keeps both items and A’s old payload but removes A’s old field claims.",
+    "limits": "Concrete integer-key/string-payload schema, explicit numeric-read and typed/update primitive instances, with complete imported Apply execution. Native current/pinned Go and real CRD HTTP/GET independently check the history; universal typed/codec refinement remains separate."
+  },
+  "SSA.GranularKeyCounterexamples.unchanged_foreign_payload_ownership_is_false": {
+    "title": "Unchanged foreign payload ownership is not preserved",
+    "scope": "execution",
+    "meaning": "A’s explicitly established pre-decoding wire claim disappears after the forced request while its original payload stays exactly old.",
+    "limits": "Concrete integer-key/string-payload schema, explicit numeric-read and typed/update primitive instances, with complete imported Apply execution. Native current/pinned Go and real CRD HTTP/GET independently check the history; universal typed/codec refinement remains separate."
+  },
+  "SSA.NumericOmissionCounterexamples.imported_pruning_matches": {
+    "title": "Four imported pruning functions realize the omission candidate",
+    "scope": "general",
+    "meaning": "Every lower key, sharing choice and lawful manager-map schedule realizes the linked normalized pruning expression.",
+    "limits": "Complete imported pruning and realized callees under normalized typed/set and identity-conversion primitives. The mixed comparator and complete Apply/request history are independently exercised by Go/HTTP, not universally refined here."
+  },
+  "SSA.NumericOmissionCounterexamples.lower_payload_is_raw_exclusive": {
+    "title": "The lower payload is exclusively A-owned before decoding",
+    "meaning": "B's raw upper selector does not claim the lower payload. Exclusivity is a wire-input premise, not a claim about already corrupted ownership.",
+    "limits": "Concrete adjacent integer-key history; actual HTTP checks the exact before-decoding FieldsV1 selector and payload claims."
+  },
+  "SSA.NumericOmissionCounterexamples.prior_wire_targets_exist": {
+    "title": "Every raw ownership target exists in the initial data",
+    "meaning": "The counterexample starts with matching exact item, key-leaf and payload targets.",
+    "limits": "Finite exact-label fieldset check for the named structural schema; general JSON/parser correctness remains separate."
+  },
+  "SSA.NumericOmissionCounterexamples.omission_keeps_both_items_and_does_not_assert_lower_payload": {
+    "title": "The request omits one scalar while retaining both items",
+    "meaning": "Both item keys stay asserted, but the lower payload is absent from the new footprint.",
+    "limits": "Concrete request footprint; no ancestor deletion, default or mutation is involved."
+  },
+  "SSA.NumericOmissionCounterexamples.foreign_upper_selector_becomes_lower_claim": {
+    "title": "The upper item's ownership becomes phantom lower sharing",
+    "meaning": "The exact upper selector excludes the lower payload, while the rounded decoded selector includes it.",
+    "limits": "Explicit concrete numeric-read specification; native numeric fieldset decoding and actual HTTP independently reproduce it."
+  },
+  "SSA.NumericOmissionCounterexamples.omitted_exclusive_payload_survives": {
+    "title": "The omitted exclusive payload survives unchanged",
+    "meaning": "Pruning restores the lower payload through the foreign decoded claim, retaining the original complete data.",
+    "limits": "Concrete linked normalized-pruning witness; full Go/API history supplies independent implementation evidence."
+  },
+  "SSA.NumericOmissionCounterexamples.unconditional_exclusive_omission_is_false": {
+    "title": "BASE-02: unrestricted exclusive omission is false",
+    "meaning": "A valid exact-wire exclusive claim and an omitted scalar do not imply scalar deletion after numeric ownership decoding.",
+    "limits": "No defaults or admission mutation. Both keys survive. The real implementation and HTTP agree; this is a counterexample, not a universal typed/codec refinement theorem."
+  },
+  "SSA.NumericOmissionCounterexamples.omission_controls_remove_lower_payload": {
+    "title": "All three independent omission controls delete the scalar",
+    "meaning": "Small shared, small unshared and large unshared keys remove the omitted lower payload.",
+    "limits": "Named controls checked by Lean, native vendored/pinned SMD and HTTP."
+  },
+  "SSA.GranularKeyCounterexamples.initial_payload_is_raw_owned": {
+    "title": "A owns the unchanged payload before wire decoding",
+    "scope": "execution",
+    "meaning": "The exact original payload path belongs to A in the initial serialized ownership meaning.",
+    "limits": "This premise is passed explicitly to the ownership-preservation proposition. Initial source reachability and the raw CRD FieldsV1 payload claim independently establish it; the decoder is part of the modeled request, not a silently corrupted initial state."
+  },
+  "SSA.UpdaterContracts.claims_bounded_refl": {
+    "title": "Claims bounded refl",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterContracts.claims_bounded_trans": {
+    "title": "Claims bounded trans",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterContracts.deleting_claims_is_bounded": {
+    "title": "Deleting claims is bounded",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterContracts.replacing_with_old_claims_is_bounded": {
+    "title": "Replacing with old claims is bounded",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterContracts.imported_update_has_only_subtractive_claim_writes": {
+    "title": "The imported update body satisfies the subtractive-write certificate",
+    "scope": "helper",
+    "meaning": "Kernel-checks the complete imported source against the safe-program syntactic premise. Semantic soundness is proved separately and composed in imported_update_never_adds_claims.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterContracts.heap_write_reads_back": {
+    "title": "Heap write reads back",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterContracts.equal_references_observe_same_filter": {
+    "title": "Equal references observe same filter",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterContracts.filter_method_mutates_shared_reference": {
+    "title": "Filter method mutates shared reference",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterContracts.filtered_reference_exposes_modified_fields": {
+    "title": "Filtered reference exposes modified fields",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterContracts.expression_preserves_environment": {
+    "title": "Expression preserves environment",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterContracts.arguments_preserve_environment": {
+    "title": "Arguments preserve environment",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterContracts.read_write_same": {
+    "title": "Read write same",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterContracts.read_write_other": {
+    "title": "Read write other",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterContracts.invariant_of_same_environment": {
+    "title": "Invariant of same environment",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterContracts.eval_variable": {
+    "title": "Eval variable",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterContracts.eval_call": {
+    "title": "Eval call",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterContracts.eval_index": {
+    "title": "Eval index",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterContracts.eval_all_empty": {
+    "title": "Eval all empty",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterContracts.eval_all_cons": {
+    "title": "Eval all cons",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterContracts.eval_current_fields": {
+    "title": "Eval current fields",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterContracts.difference_call_has_single_field_result": {
+    "title": "Difference call has single field result",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterContracts.eval_difference_of_current_fields": {
+    "title": "Eval difference of current fields",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterContracts.new_versioned_set_keeps_first_fields": {
+    "title": "New versioned set keeps first fields",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterContracts.eval_subtractive_write_cannot_add": {
+    "title": "Eval subtractive write cannot add",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterContracts.manager_lookup_is_member": {
+    "title": "Manager lookup is member",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterContracts.subtractive_shape": {
+    "title": "Subtractive shape",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterContracts.invariant_write_unprotected": {
+    "title": "Invariant write unprotected",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterContracts.invariant_bind_names": {
+    "title": "Invariant bind names",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterContracts.successful_subtractive_write_has_current_entry": {
+    "title": "Successful subtractive write has current entry",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterContracts.run_eval_has_raw_result": {
+    "title": "Run eval has raw result",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterContracts.invariant_tracked_not_nil": {
+    "title": "Invariant tracked not nil",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterContracts.invariant_tracked_not_package": {
+    "title": "Invariant tracked not package",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterContracts.invariant_store_subtraction": {
+    "title": "Invariant store subtraction",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterContracts.invariant_store_bounded_map": {
+    "title": "Invariant store bounded map",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterContracts.invariant_store_deletion": {
+    "title": "Invariant store deletion",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterContracts.run_eval_variable": {
+    "title": "Run eval variable",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterContracts.managed_map_assignment_shape": {
+    "title": "Managed map assignment shape",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterContracts.run_all_has_raw_result": {
+    "title": "Run all has raw result",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterContracts.evaluated_first_variable_is_head": {
+    "title": "Evaluated first variable is head",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterContracts.safe_return_is_bounded": {
+    "title": "Safe return is bounded",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterContracts.range_preserves_invariant": {
+    "title": "Range preserves invariant",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterContracts.map_assignment_preserves_invariant": {
+    "title": "Map assignment preserves invariant",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterContracts.map_deletion_preserves_invariant": {
+    "title": "Map deletion preserves invariant",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterContracts.safe_program_preserves_claim_bound": {
+    "title": "Safe program preserves claim bound",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterContracts.initial_ownership_is_bounded": {
+    "title": "Initial ownership is bounded",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterContracts.imported_update_never_adds_claims": {
+    "title": "Imported ownership update never adds a manager claim path",
+    "scope": "general",
+    "meaning": "Every returned exact path already belonged to the same manager at entry to the complete private update phase, for arbitrary finite managers, versions, errors, force and lawful schedules.",
+    "limits": "Requires Difference to select exact paths from its left operand and the explicit typed/set/conversion/filter primitives. Entry is after ownership decoding and actor-field installation. This does not establish whole-request or wire non-growth, interpreter progress for every Go input, or universal runtime/primitive refinement."
+  },
+  "SSA.UpdaterContracts.imported_update_preserves_prefix_exclusion": {
+    "title": "Imported update preserves an excluded ownership prefix",
+    "scope": "general",
+    "meaning": "A manager excluded from a prefix before the private update cannot acquire a path under that prefix through this complete source execution.",
+    "limits": "Corollary of source claim non-growth under exact Difference left-subset preservation. Configuration and the preceding actual filter/request pipeline remain separate obligations."
+  },
+  "SSA.UpdaterBridge.decoded_success_is_source_success": {
+    "title": "Decoded success is source success",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterBridge.source_update_does_not_grow_actor": {
+    "title": "Source update does not grow actor",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterBridge.source_apply_excludes_reset_fields": {
+    "title": "Imported Apply and update compose to preserve configured reset exclusion",
+    "scope": "general",
+    "meaning": "Complete Apply installs the selected prefix filter and invokes a source-backed update callback whose non-growth is derived from imported update execution.",
+    "limits": "The callback frame is derived rather than assumed. Exact Difference left-subset preservation, configured model prefix filtering, primitive purity/types, and successful interpreter execution remain explicit. Actual recursive set/filter implementation and complete API/subresource/runtime refinement are not proved."
+  },
+  "SSA.UpdaterExamples.imported_update_observes_in_place_filter": {
+    "title": "Uncached-version filtering is visible through shared comparison references",
+    "scope": "execution",
+    "meaning": "A full source execution observes the same filtered comparison through local and version-cache references and preserves B’s v1 Update flag/claim.",
+    "limits": "Named scalar/identity-version primitive fixture. Exact native private-update observations agree in vendored SMD and both pinned revisions. General source non-growth has its separate quantified proof; this is execution evidence."
+  },
+  "SSA.UpdaterExamples.imported_forced_update_does_not_give_B_new_fields": {
+    "title": "Force does not give B the actor’s newly added field",
+    "scope": "execution",
+    "meaning": "With the actor’s new footprint already installed, forced source execution removes B’s conflict claim and leaves B without the new extra field.",
+    "limits": "Named scalar/identity-version primitive fixture. Exact native private-update observations agree in vendored SMD and both pinned revisions. General source non-growth has its separate quantified proof; this is execution evidence."
+  },
+  "SSA.RecursiveSets.node_paths_cons": {
+    "scope": "helper",
+    "meaning": "Internal finite-tree or source-composition lemma used by recursive Difference non-growth.",
+    "limits": "A representation or source-composition lemma, not an independent whole-request SSA guarantee. Finite non-nil acyclic sets, the explicit pure interpreter semantics, and the Go/runtime representation boundary apply."
+  },
+  "SSA.RecursiveSets.nodes_compute_never_adds_paths": {
+    "scope": "helper",
+    "meaning": "Internal finite-tree or source-composition lemma used by recursive Difference non-growth.",
+    "limits": "A representation or source-composition lemma, not an independent whole-request SSA guarantee. Finite non-nil acyclic sets, the explicit pure interpreter semantics, and the Go/runtime representation boundary apply."
+  },
+  "SSA.RecursiveSets.nodes_difference_eq_compute": {
+    "scope": "helper",
+    "meaning": "Internal finite-tree or source-composition lemma used by recursive Difference non-growth.",
+    "limits": "A representation or source-composition lemma, not an independent whole-request SSA guarantee. Finite non-nil acyclic sets, the explicit pure interpreter semantics, and the Go/runtime representation boundary apply."
+  },
+  "SSA.RecursiveSets.difference_never_adds_paths": {
+    "title": "Recursive Difference never invents an exact path",
+    "scope": "general",
+    "meaning": "For every finite direct-members/children tree pair, every label comparator and every Empty callback, every recursive Difference result path occurs in the left tree. Direct membership and child membership remain independent.",
+    "limits": "No sorting, strict-order or faithful numeric-equality premise. This is a finite structural algorithm law; SetContracts separately connects both imported Go bodies. Cyclic/nil pointer structures and arbitrary Go runtime refinement are outside this statement."
+  },
+  "SSA.SetContracts.imported_node_matches": {
+    "title": "Complete imported child-node Difference matches finite recursion",
+    "scope": "general",
+    "meaning": "The full SetNodeMap.Difference AST equals the independent two-pointer algorithm at every finite input size, including matched-child recursion, Empty branches, safe indices, lexical diff local and remaining-left suffix.",
+    "limits": "Arbitrary comparator, Empty and recursive-child callbacks; local statement fuel is derived from input lengths. The child callback is subsequently supplied by the verified finite structural recursion."
+  },
+  "SSA.SetContracts.imported_members_match": {
+    "scope": "helper",
+    "meaning": "Internal finite-tree or source-composition lemma used by recursive Difference non-growth.",
+    "limits": "A representation or source-composition lemma, not an independent whole-request SSA guarantee. Finite non-nil acyclic sets, the explicit pure interpreter semantics, and the Go/runtime representation boundary apply."
+  },
+  "SSA.SetContracts.imported_set_matches": {
+    "title": "Complete imported Set.Difference matches recursive trees",
+    "scope": "general",
+    "meaning": "The complete Set.Difference AST constructs its direct members with source-verified element subtraction and its child nodes with the verified finite structural implementation.",
+    "limits": "recursive_node_call_is_source connects the child callback; imported_members_match connects the direct-member callback. Observational pointer semantics cover immutable inputs/fresh output, not all Go pointer programs."
+  },
+  "SSA.SetContracts.recursive_node_call_is_source": {
+    "scope": "helper",
+    "meaning": "Internal finite-tree or source-composition lemma used by recursive Difference non-growth.",
+    "limits": "A representation or source-composition lemma, not an independent whole-request SSA guarantee. Finite non-nil acyclic sets, the explicit pure interpreter semantics, and the Go/runtime representation boundary apply."
+  },
+  "SSA.SetContracts.imported_difference_never_adds_paths": {
+    "title": "Imported recursive Difference preserves exact left-path origin",
+    "scope": "general",
+    "meaning": "Every exact path in the complete imported Set.Difference result was already present in its left finite tree, for arbitrary comparators and Empty callbacks.",
+    "limits": "The two complete method imports and element import are digest-checked. No comparator faithfulness is assumed. The 4,102 native pairs support the runtime/representation boundary but do not universally prove it."
+  },
+  "SSA.SetBridge.paths_one_path": {
+    "scope": "helper",
+    "meaning": "Internal finite-tree or source-composition lemma used by recursive Difference non-growth.",
+    "limits": "A representation or source-composition lemma, not an independent whole-request SSA guarantee. Finite non-nil acyclic sets, the explicit pure interpreter semantics, and the Go/runtime representation boundary apply."
+  },
+  "SSA.SetBridge.combine_membership": {
+    "scope": "helper",
+    "meaning": "Internal finite-tree or source-composition lemma used by recursive Difference non-growth.",
+    "limits": "A representation or source-composition lemma, not an independent whole-request SSA guarantee. Finite non-nil acyclic sets, the explicit pure interpreter semantics, and the Go/runtime representation boundary apply."
+  },
+  "SSA.SetBridge.encode_membership": {
+    "scope": "helper",
+    "meaning": "Internal finite-tree or source-composition lemma used by recursive Difference non-growth.",
+    "limits": "A representation or source-composition lemma, not an independent whole-request SSA guarantee. Finite non-nil acyclic sets, the explicit pure interpreter semantics, and the Go/runtime representation boundary apply."
+  },
+  "SSA.SetBridge.field_difference_shrinks": {
+    "scope": "helper",
+    "meaning": "Internal finite-tree or source-composition lemma used by recursive Difference non-growth.",
+    "limits": "A representation or source-composition lemma, not an independent whole-request SSA guarantee. Finite non-nil acyclic sets, the explicit pure interpreter semantics, and the Go/runtime representation boundary apply."
+  },
+  "SSA.SetBridge.recursive_difference_discharges_updater_premise": {
+    "scope": "helper",
+    "meaning": "Internal finite-tree or source-composition lemma used by recursive Difference non-growth.",
+    "limits": "A representation or source-composition lemma, not an independent whole-request SSA guarantee. Finite non-nil acyclic sets, the explicit pure interpreter semantics, and the Go/runtime representation boundary apply."
+  },
+  "SSA.SetBridge.source_updater_with_recursive_difference_does_not_grow_actor": {
+    "title": "Source updater frame with derived recursive Difference bound",
+    "scope": "general",
+    "meaning": "The source-backed ownership updater satisfies the actor no-growth frame with the explicit recursive-tree Difference adapter; DifferenceShrinks is proved from recursive source algorithms instead of being a supplied premise.",
+    "limits": "The adapter has a proved finite path encoding. Relating it to actual ownership decoding/Go memory remains explicit; it does not repair FieldsV1 numeric aliasing or prove whole-request no-growth. Comparison, conversion, filter and remaining primitives are still parameters."
+  },
+  "SSA.ElementLocalOrder.map_restrict": {
+    "scope": "helper",
+    "meaning": "Internal source, finite-tree or restricted-domain order lemma.",
+    "limits": "A finite-list/tree or interpreter-composition helper, not another independent SSA guarantee. The explicit primitive and runtime/representation boundary applies."
+  },
+  "SSA.ElementLocalOrder.mem_restrict": {
+    "scope": "helper",
+    "meaning": "Internal source, finite-tree or restricted-domain order lemma.",
+    "limits": "A finite-list/tree or interpreter-composition helper, not another independent SSA guarantee. The explicit primitive and runtime/representation boundary applies."
+  },
+  "SSA.ElementLocalOrder.compute_map": {
+    "scope": "general",
+    "title": "Projection commutes with all three element algorithms",
+    "meaning": "At every finite input size and for every comparator, projecting labels before or after Difference, Union or Intersection gives the same result. No global order law or injective projection is required.",
+    "limits": "This is an algorithmic component law; the separately proved source correspondence connects the algorithms to imported Go methods."
+  },
+  "SSA.ElementLocalOrder.restricted_order": {
+    "scope": "helper",
+    "meaning": "Internal source, finite-tree or restricted-domain order lemma.",
+    "limits": "A finite-list/tree or interpreter-composition helper, not another independent SSA guarantee. The explicit primitive and runtime/representation boundary applies."
+  },
+  "SSA.ElementLocalOrder.restrict_preserves_order": {
+    "scope": "helper",
+    "meaning": "Internal source, finite-tree or restricted-domain order lemma.",
+    "limits": "A finite-list/tree or interpreter-composition helper, not another independent SSA guarantee. The explicit primitive and runtime/representation boundary applies."
+  },
+  "SSA.ElementLocalOrder.compute_local_membership": {
+    "scope": "general",
+    "title": "Element membership needs order only in the active label domain",
+    "meaning": "The three algorithms have their usual exact membership laws when their sorted input labels lie in a domain with a strict total order. Comparator behavior outside that domain is irrelevant.",
+    "limits": "The input-domain, input-sorting and local-order premises remain explicit. No global mixed-numeric order law is assumed."
+  },
+  "SSA.ElementLocalOrder.imported_local_membership": {
+    "scope": "general",
+    "title": "Imported element methods inherit local-domain membership laws",
+    "meaning": "The complete source Difference, Union and Intersection results satisfy exact membership on the lawful active domain, even if unrelated labels violate global comparator laws.",
+    "limits": "Finite source execution is already proved; label domain, local order and sorted input realization in actual Go still need their own connection."
+  },
+  "SSA.SetFilterContracts.imported_range_matches_scan": {
+    "scope": "helper",
+    "meaning": "Internal source, finite-tree or restricted-domain order lemma.",
+    "limits": "A finite-list/tree or interpreter-composition helper, not another independent SSA guarantee. The explicit primitive and runtime/representation boundary applies."
+  },
+  "SSA.SetFilterContracts.scan_output": {
+    "scope": "helper",
+    "meaning": "Internal source, finite-tree or restricted-domain order lemma.",
+    "limits": "A finite-list/tree or interpreter-composition helper, not another independent SSA guarantee. The explicit primitive and runtime/representation boundary applies."
+  },
+  "SSA.SetFilterContracts.imported_flat_node_matches": {
+    "scope": "general",
+    "title": "Root exclusion executes the complete child-node source",
+    "meaning": "For a right set with only direct root members, the complete RecursiveDifference child AST returns exactly the left children not matched by Has. The nested while body is bypassed; the suffix range is proved for arbitrary finite width.",
+    "limits": "This theorem is specifically for flat reset roots. Has remains an explicit primitive; arbitrary deeper exclusion trees and universal Go runtime refinement are not covered."
+  },
+  "SSA.SetFilterContracts.flat_node_callback_is_source": {
+    "scope": "helper",
+    "meaning": "Internal source, finite-tree or restricted-domain order lemma.",
+    "limits": "A finite-list/tree or interpreter-composition helper, not another independent SSA guarantee. The explicit primitive and runtime/representation boundary applies."
+  },
+  "SSA.SetFilterContracts.imported_flat_set_matches": {
+    "scope": "general",
+    "title": "Root-level RecursiveDifference composes its source callbacks",
+    "meaning": "The complete Set.RecursiveDifference AST combines source-verified direct-member subtraction and the source-derived child filter for an exclusion tree without descendants.",
+    "limits": "flat_node_callback_is_source validates the child callback on this input shape. This does not assert correctness for arbitrary nested exclusions or derive the actual Has implementation."
+  },
+  "SSA.SetFilterContracts.imported_flat_filter_matches": {
+    "scope": "general",
+    "title": "Actual excludeFilter.Filter calls the root subtree-exclusion algorithm",
+    "meaning": "The complete imported Filter body returns the source-derived root exclusion result, using the fixed flat-root recursive callbacks.",
+    "limits": "Conventional top-level reset roots only. Direct membership subtraction and Has need the explicit label/representation premises; this is not the complete Apply/subresource pipeline."
+  },
+  "SSA.SetFilterContracts.flat_set_excludes_root": {
+    "scope": "helper",
+    "meaning": "Internal source, finite-tree or restricted-domain order lemma.",
+    "limits": "A finite-list/tree or interpreter-composition helper, not another independent SSA guarantee. The explicit primitive and runtime/representation boundary applies."
+  },
+  "SSA.SetFilterContracts.imported_filter_excludes_root": {
+    "scope": "general",
+    "title": "Imported root filter excludes every descendant claim path",
+    "meaning": "Every root::suffix path is absent from the complete filter result when direct subtraction removes that root and Has recognizes it in the exclusion set. Suffix depth is unbounded and its labels are never compared.",
+    "limits": "Direct-root subtraction and Has recognition are explicit primitive premises; these are narrowed by the local-domain theorem. Ownership codec/heap and complete request refinement remain open."
+  },
+  "SSA.SetFilterContracts.locally_ordered_filter_excludes_root": {
+    "scope": "general",
+    "title": "Only direct field-name order is needed for source reset exclusion",
+    "meaning": "Sorted direct labels and reset roots in a locally lawful domain suffice for the actual imported filter to exclude a root and all descendants. Descendant labels may lie outside that domain and may have mixed-numeric comparator collisions.",
+    "limits": "Has must recognize the reset root. Actual Go Has/binary search, field-name comparison, root-set representation and whole Apply/API pipeline still need refinement. The source control-flow theorem itself is general at finite width and unbounded child depth."
+  },
+  "SSA.SearchIndex.unsigned_midpoint_eq_half": {
+    "scope": "general",
+    "title": "Go unsigned midpoint equals the mathematical average on valid bounds",
+    "meaning": "At every positive word width, two representable nonnegative Go array bounds have the expected midpoint after signed-sum overflow, unsigned conversion and right shift.",
+    "limits": "The interpreter represents the uint residue explicitly. This proves the arithmetic bridge under the stated bounds, not the Go compiler or arbitrary overflowing integer programs."
+  },
+  "SSA.SearchIndex.unsigned_midpoint_inside": {
+    "scope": "helper",
+    "meaning": "Finite interval, machine-word, source-callback or local-membership composition lemma.",
+    "limits": "A proof helper rather than another independent SSA guarantee. Pure comparison, supported inputs and the documented runtime/representation boundary apply."
+  },
+  "SSA.SearchIndex.unsigned_midpoint_progress": {
+    "scope": "helper",
+    "meaning": "Finite interval, machine-word, source-callback or local-membership composition lemma.",
+    "limits": "A proof helper rather than another independent SSA guarantee. Pure comparison, supported inputs and the documented runtime/representation boundary apply."
+  },
+  "SSA.SearchAlgorithm.result_bounds": {
+    "scope": "helper",
+    "meaning": "Finite interval, machine-word, source-callback or local-membership composition lemma.",
+    "limits": "A proof helper rather than another independent SSA guarantee. Pure comparison, supported inputs and the documented runtime/representation boundary apply."
+  },
+  "SSA.SearchAlgorithm.boundary": {
+    "scope": "helper",
+    "meaning": "Finite interval, machine-word, source-callback or local-membership composition lemma.",
+    "limits": "A proof helper rather than another independent SSA guarantee. Pure comparison, supported inputs and the documented runtime/representation boundary apply."
+  },
+  "SSA.SearchContracts.imported_search_matches": {
+    "scope": "general",
+    "title": "Complete selected Go binary search matches a terminating interval algorithm",
+    "meaning": "For every pure comparator and finite array below the Go int bound, the complete imported BinarySearchFunc executes without fuel/index failure and returns the independent lower-bound index and comparator-zero flag.",
+    "limits": "Same label/target type instantiation used by Has, positive word width and representable array size. No comparator-order premise is needed for execution; exact membership needs separate local-domain laws."
+  },
+  "SSA.SearchMembership.before_is_prefix": {
+    "scope": "helper",
+    "meaning": "Finite interval, machine-word, source-callback or local-membership composition lemma.",
+    "limits": "A proof helper rather than another independent SSA guarantee. Pure comparison, supported inputs and the documented runtime/representation boundary apply."
+  },
+  "SSA.SearchMembership.found_iff_member": {
+    "scope": "helper",
+    "meaning": "Finite interval, machine-word, source-callback or local-membership composition lemma.",
+    "limits": "A proof helper rather than another independent SSA guarantee. Pure comparison, supported inputs and the documented runtime/representation boundary apply."
+  },
+  "SSA.SearchMembership.imported_search_membership": {
+    "scope": "general",
+    "title": "Imported standard-library search has exact local-domain membership",
+    "meaning": "The source result is true exactly for a member of the sorted array, assuming a lawful order and faithful comparator-zero equality on the actual labels and query.",
+    "limits": "The unrestricted mixed-numeric domain does not satisfy these premises. Comparator implementation, label/array representation and universal Go runtime refinement remain separate."
+  },
+  "SSA.HasBridge.source_search_matches": {
+    "scope": "helper",
+    "meaning": "Finite interval, machine-word, source-callback or local-membership composition lemma.",
+    "limits": "A proof helper rather than another independent SSA guarantee. Pure comparison, supported inputs and the documented runtime/representation boundary apply."
+  },
+  "SSA.HasBridge.imported_has_matches": {
+    "scope": "general",
+    "title": "Actual Has wrapper delegates to complete source-backed library execution",
+    "meaning": "The complete imported PathElementSet.Has body calls the source-backed selected-library search with its exact closed PathElement.Compare callback and returns the independent result.",
+    "limits": "Comparison remains a pure explicit primitive; word width/array bounds are stated. Unsupported callback captures/effects or input shapes are rejected rather than invented successes."
+  },
+  "SSA.HasBridge.imported_less_matches": {
+    "scope": "helper",
+    "meaning": "Finite interval, machine-word, source-callback or local-membership composition lemma.",
+    "limits": "A proof helper rather than another independent SSA guarantee. Pure comparison, supported inputs and the documented runtime/representation boundary apply."
+  },
+  "SSA.HasBridge.has_iff_member": {
+    "scope": "helper",
+    "meaning": "Finite interval, machine-word, source-callback or local-membership composition lemma.",
+    "limits": "A proof helper rather than another independent SSA guarantee. Pure comparison, supported inputs and the documented runtime/representation boundary apply."
+  },
+  "SSA.HasBridge.imported_has_membership": {
+    "scope": "general",
+    "title": "Complete imported Has has exact membership on its lawful domain",
+    "meaning": "The actual Has wrapper and imported standard-library execution yield true exactly for membership under sortedness, local order, faithful comparator-zero equality and Go word bounds.",
+    "limits": "This derives membership from source instead of assuming Has. It does not discharge the false global mixed-numeric comparator laws or prove the ownership codec."
+  },
+  "SSA.FilterHasBridge.set_has_is_source": {
+    "scope": "helper",
+    "meaning": "Finite interval, machine-word, source-callback or local-membership composition lemma.",
+    "limits": "A proof helper rather than another independent SSA guarantee. Pure comparison, supported inputs and the documented runtime/representation boundary apply."
+  },
+  "SSA.FilterHasBridge.set_less_is_source": {
+    "scope": "helper",
+    "meaning": "Finite interval, machine-word, source-callback or local-membership composition lemma.",
+    "limits": "A proof helper rather than another independent SSA guarantee. Pure comparison, supported inputs and the documented runtime/representation boundary apply."
+  },
+  "SSA.FilterHasBridge.source_filter_excludes_root": {
+    "scope": "general",
+    "title": "Source root-filter exclusion without an assumed Has-recognition premise",
+    "meaning": "Complete Filter/RecursiveDifference source now uses Has/Less with their complete source correspondences. Reset-root recognition is derived from the actual Has/library membership theorem, so every root::suffix ownership path is excluded at arbitrary suffix depth.",
+    "limits": "Requires local comparison/equality laws, sorted direct/root labels, positive word width, representable roots and the flat-root input shape. Actual field-name/string comparison, root/heap/ownership representation, typed operations and complete Apply/API/storage composition remain open."
+  },
+  "SSA.HandoffCounterexamples.reassertion_shares_update_owned_child": {
+    "scope": "execution",
+    "title": "A and the Update manager genuinely share the scalar before omission",
+    "meaning": "After B Updates host, A reasserts that unchanged value. Both own host; A alone owns the item membership.",
+    "limits": "A reachable concrete history. Native managedfields, both pinned SMD revisions and HTTP independently check the ownership precondition."
+  },
+  "SSA.HandoffCounterexamples.omission_removes_shared_update_child": {
+    "scope": "execution",
+    "title": "Item omission removes the genuinely shared scalar",
+    "meaning": "A omits the item without force. The current raw transition returns a null list, no item or host, and no claims.",
+    "limits": "Enclosing-item deletion is essential. A separate Apply-owned membership control survives in native and pinned comparisons."
+  },
+  "SSA.HandoffCounterexamples.unrestricted_shared_omission_safety_is_false": {
+    "scope": "execution",
+    "title": "Unrestricted shared omission is false in existing SSA (BASE-03)",
+    "meaning": "A concrete reachable history refutes a universal claim that an omitted co-owned scalar survives whenever another manager has not released its intent.",
+    "limits": "The positive proposed-core theorem retains an explicit no-ancestor-deletion premise. Nullable HTTP accepts and persists this deletion; non-nullable HTTP rejects it atomically. This is another consequence of SSA-03."
+  },
+  "SSA.HandoffCounterexamples.imported_pruning_removes_shared_child": {
+    "scope": "execution",
+    "title": "Complete imported pruning realizes the shared-child deletion",
+    "meaning": "All four imported pruning functions have realized callees for the shared-child trace, under every lawful manager-map iteration schedule.",
+    "limits": "Normalized typed/set primitives and one API version. This source witness does not prove universal primitive or codec refinement."
+  },
+  "SSA.AtomicFieldContracts.imported_atomic_fields": {
+    "scope": "general",
+    "title": "Complete typed atomic visitors add only the whole scope claim",
+    "meaning": "For either complete doMap/doList AST, atomic entry adds the nonempty current path, preserves prior memberships, returns nil validation errors and frees the resource captured by defer. Input contents, path depth and prior claim-set size are arbitrary finite parameters.",
+    "limits": "Insert is a membership projection and coercion supplies opaque resource handles. Actual Set.Insert/coercion/allocator heap realization, schema dispatch, atomic merge/removal/comparison and complete SSA composition remain open. Non-atomic child calls fail explicitly. The empty root path is not tracked."
+  },
+  "SSA.AtomicFieldContracts.imported_atomic_claims_scope": {
+    "scope": "helper",
+    "title": "Nonempty atomic scope acquires its whole membership",
+    "meaning": "Successful imported atomic extraction includes the current scope path, including null or empty contents.",
+    "limits": "A corollary of the complete visitor certificate, not a separate whole-request ownership guarantee. Empty root insertion is explicitly excluded."
+  },
+  "SSA.AtomicFieldContracts.imported_atomic_never_adds_descendant": {
+    "scope": "general",
+    "title": "Atomic extraction preserves every other field membership",
+    "meaning": "Every path different from the current atomic scope is present afterward exactly when it was already present. Thus no fresh descendant or sibling claim appears.",
+    "limits": "Prior descendant claims can exist and remain; this theorem does not establish their initial absence or post-reconciliation canonicality. The underlying insertion/coercion/allocator/runtime boundary is explicit."
+  },
+  "SSA.AtomicFieldContracts.insert_membership": {
+    "scope": "helper",
+    "meaning": "Membership characterization of the explicit whole-path insertion projection, including the empty-root exception.",
+    "limits": "This does not verify actual Go Set.Insert."
+  },
+  "SSA.AtomicMergeMachine.operand_roundtrip": {
+    "scope": "helper",
+    "meaning": "The explicit optional operand representation preserves missing interfaces separately from present opaque values.",
+    "limits": "A representation helper, not a JSON or Go heap theorem."
+  },
+  "SSA.AtomicMergeContracts.imported_keep_right": {
+    "scope": "general",
+    "title": "The complete imported merge-rule closure copies one whole operand",
+    "meaning": "The actual ruleKeepRHS initializer selects the complete right operand when present, otherwise the complete left, otherwise leaves the prior output. Caller locals, pending frees and the leaf flag are preserved. Present JSON null can still have a non-nil output pointer.",
+    "limits": "Opaque operand values and explicit Unstructured/pointer observations. Actual value-interface and heap realization remain separate. The importer checks the named function type so the conversion cannot silently denote an effectful wrapper."
+  },
+  "SSA.AtomicMergeContracts.imported_leaf": {
+    "scope": "general",
+    "title": "Complete leaf source derives its rule callback and protects an existing leaf",
+    "meaning": "A fresh leaf invokes the verified source closure once and marks the whole scope selected. A previously selected leaf does not invoke it or change output. Nested calls use fresh frames and retain their caller's pending cleanup.",
+    "limits": "The rule is fixed to imported ruleKeepRHS. This is the typed merge phase, not validation, comparison, or the entire SSA pipeline."
+  },
+  "SSA.AtomicMergeContracts.imported_atomic_merge": {
+    "scope": "general",
+    "title": "Complete atomic map/list dispatch uses whole operands and source callees",
+    "meaning": "For arbitrary opaque values, pure resource-coercion results, finite resource lengths and caller state, both complete dispatch ASTs execute their coercion/empty checks, call actual leaf/rule source, return nil errors and free captured resources right before left. Caller locals and pending frees remain intact.",
+    "limits": "Requires atomic entry. Non-atomic child traversal fails explicitly. Actual coercion/Unstructured/allocator heap realization, schema/top-level typed dispatch, removal/comparison and full SSA composition remain open. Both missing operands retain prior output here; the complete merge wrapper separately rejects both missing inputs."
+  },
+  "SSA.AtomicMergeContracts.imported_atomic_right_is_whole": {
+    "scope": "helper",
+    "title": "A present right operand replaces the whole fresh atomic unit",
+    "meaning": "Successful imported atomic dispatch with an unselected leaf copies exactly the whole present right value, marks the leaf and restores the caller's frame.",
+    "limits": "A corollary of the complete dispatch certificate. A present JSON null is included; subsequent SSA comparison can still exhibit the documented numeric false no-op."
+  },
+  "SSA.AtomicMergeContracts.imported_atomic_absent_right_keeps_left": {
+    "scope": "helper",
+    "title": "A missing right operand retains the whole left value",
+    "meaning": "The fresh atomic node falls back to the complete left operand when the right Go interface is absent.",
+    "limits": "Missing interface differs from a present JSON null. This is a typed merge-phase corollary."
+  },
+  "SSA.AtomicRemoveContracts.imported_scalar": {
+    "title": "Scalar removal helper copies the complete raw value",
+    "scope": "general",
+    "meaning": "The complete imported scalar helper copies its Unstructured result and returns nil validation errors, preserving caller input/frame/pending frees.",
+    "limits": "Path selection and deletion occur in the caller. Unstructured and allocator/value heap realization remain explicit primitive boundaries."
+  },
+  "SSA.AtomicRemoveContracts.imported_atomic_container": {
+    "title": "Atomic extraction/removal returns before child traversal",
+    "scope": "general",
+    "meaning": "For arbitrary finite sizes and pure shape/resource callbacks, matching atomic extraction copies the whole value; remove preserves old output. Mismatching shapes return unchanged. Captured cleanup and caller frame are preserved.",
+    "limits": "Structural ASTs retain the non-atomic loops/callbacks, whose execution explicitly fails. This theorem proves they are not reached at atomic entry. The source caller now discharges fresh initialization. Dynamic shape, Unstructured, resource/heap and actual schema dispatch remain boundaries; native comparisons are finite evidence."
+  },
+  "SSA.AtomicRemoveContracts.imported_atomic_remove_fresh": {
+    "title": "Atomic removal yields no output from a fresh walker",
+    "scope": "helper",
+    "meaning": "If output is initially absent and extract is false, source atomic dispatch returns absent output.",
+    "limits": "The fresh-output premise is necessary for the private helper. The complete source factory now discharges it for selected handlers; actual schema selection and heap/wrapping realization remain separate."
+  },
+  "SSA.AtomicRemoveContracts.imported_atomic_extract_whole": {
+    "title": "Matching atomic extraction copies a whole operand",
+    "scope": "helper",
+    "meaning": "At atomic entry with matching shape and extraction enabled, the result is exactly the raw Unstructured input and the caller frame/input are preserved.",
+    "limits": "This specializes the general source theorem. Dynamic shape, raw value representation, allocator heap and complete request dispatch remain separate."
+  },
+  "SSA.RemoveFactoryContracts.imported_factory": {
+    "title": "The complete source caller initializes a fresh walker",
+    "scope": "general",
+    "meaning": "For arbitrary opaque values/schema/selection/reference types and resolver outcomes, the complete caller sets exact constructor fields and zero output, invokes the resolver and wraps its raw output. Every normal resolver error payload is discarded.",
+    "limits": "Allocation and wrapping are abstract primitive operations. The callback models resolver post-state and a distinct normal error payload; interpreter failure is separate. Actual Schema.Resolve lookup/cache, primitives/heap and full typed/request dispatch remain open. Source helper selection is derived separately."
+  },
+  "SSA.RemoveFactoryBridge.imported_atomic_factory": {
+    "title": "Source initialization discharges the atomic fresh-output premise",
+    "scope": "general",
+    "meaning": "Composing the complete caller with the selected source atomic map/list handler yields a wrapped whole matching value for extraction and wrapped null for removal. Fresh output follows from the constructor AST.",
+    "limits": "The full source helper chain now derives selection from resolved type pointers. Schema.Resolve lookup/cache remains a primitive. Pure shape/Unstructured/resource contracts, allocator/wrapping and heap realization remain explicit; this is not a full Schema.Resolve or Apply theorem. Inputs represent a present Go Value interface; raw null is allowed. Nil interfaces, pointer/alias identity and allocator heap realization remain outside this bridge."
+  },
+  "SSA.RemoveFactoryBridge.imported_scalar_factory": {
+    "title": "The source caller and scalar handler compose",
+    "scope": "general",
+    "meaning": "When the selected handler is scalar, the complete caller wraps its entire Unstructured result in either mode.",
+    "limits": "The caller selects list/map items before scalar dispatch. Source helper selection is derived separately; Schema.Resolve lookup/cache, primitive representations and complete request refinement remain open."
+  },
+  "SSA.RemoveFactoryBridge.imported_factory_ignores_reported_errors": {
+    "title": "Normal schema errors do not escape the private caller",
+    "scope": "helper",
+    "meaning": "Any normal resolver error payload, with the fresh walker unchanged, still produces the wrapped null output because the complete caller discards the error return.",
+    "limits": "This is a private unvalidated helper fact, not an API-server acceptance claim. Native missing-type and invalid-atom controls observe actual errors and output; Schema.Resolve lookup/cache remains open; the helper resolver source is derived separately."
+  },
+  "SSA.SchemaDispatchMachine.optional_roundtrip": {
+    "title": "Optional Value-interface representation round trip",
+    "scope": "helper",
+    "meaning": "Missing Go Value and a present value remain distinct through the invocation boundary.",
+    "limits": "This is the explicit representation helper, not a Go heap/JSON codec theorem."
+  },
+  "SSA.SchemaDispatchContracts.imported_deduce": {
+    "title": "Source deduction preserves exact selected type pointers",
+    "scope": "general",
+    "meaning": "The full source function selects only an allowed matching scalar/list/map pointer or returns the original atom, with handler state unchanged. A matched switch case stops even if its inner if does not return.",
+    "limits": "Pure kind queries may be arbitrary, including contradictory flags. No exclusive-kind assumption is required. Actual value-query/heap realization remains separate."
+  },
+  "SSA.SchemaDispatchContracts.deduced_map_only": {
+    "title": "A map-only atom is unchanged by deduction",
+    "scope": "helper",
+    "meaning": "A singleton map type pointer is preserved for every optional input and every predicate combination.",
+    "limits": "This specializes the source deduction specification; lookup and actual value realization are separate."
+  },
+  "SSA.SchemaDispatchContracts.deduced_scalar_only": {
+    "title": "A scalar-only atom is unchanged by deduction",
+    "scope": "helper",
+    "meaning": "A singleton scalar type pointer is preserved for every optional input and every predicate combination.",
+    "limits": "This is a specification specialization, not a complete schema or API theorem."
+  },
+  "SSA.SchemaDispatchContracts.deduced_list_only": {
+    "title": "A list-only atom is unchanged by deduction",
+    "scope": "helper",
+    "meaning": "A singleton list type pointer is preserved for every optional input and every predicate combination.",
+    "limits": "This is a specification specialization; lookup and representation correspondence remain separate."
+  },
+  "SSA.SchemaDispatchHandler.imported_handle": {
+    "title": "Source handler priority and error/state propagation",
+    "scope": "general",
+    "meaning": "The complete handler body chooses map, then scalar, then list, preserving the exact type pointer and callback post-state/error payload. Missing atoms use the source error arguments.",
+    "limits": "Handlers and the formatter remain explicit callbacks here. Source removal handlers are supplied by the factory bridge; actual formatting/heap realization remain open."
+  },
+  "SSA.SchemaDispatchResolver.imported_resolve": {
+    "title": "The complete resolver preserves callee order and state",
+    "scope": "general",
+    "meaning": "Lookup failure returns the source error; success passes the exact resolved atom through deduction and then handler selection, propagating normal errors and post-state.",
+    "limits": "Deduction and handler callbacks are explicit at this theorem; the following composition realizes them from source. Schema.Resolve lookup/cache and formatting remain primitives."
+  },
+  "SSA.SchemaDispatchResolver.imported_full_dispatch": {
+    "title": "Source-derived deduction and handler selection compose",
+    "scope": "general",
+    "meaning": "Both helper callback contracts are realized by their complete imported bodies, deriving the full resolver outcome from lookup, type predicates, formatter and leaf handlers.",
+    "limits": "Actual Schema.Resolve cache/lookup, type representation, value queries and leaf/runtime/heap realization remain separate."
+  },
+  "SSA.SchemaDispatchFactoryBridge.imported_factory_dispatch": {
+    "title": "Complete source selection reaches the removal caller",
+    "scope": "general",
+    "meaning": "The complete constructor, resolver, deduction and priority selection compose with source scalar/atomic removal handlers and wrapping. The manual kind-selection callback is removed.",
+    "limits": "Lookup/cache and value/coercion/Unstructured/formatter/allocation/wrapping/heap contracts remain explicit. Non-atomic traversal is unsupported; this is not complete typed/SSA entry refinement."
+  },
+  "SSA.SchemaDispatchFactoryBridge.imported_atomic_map": {
+    "title": "Atomic-map lookup derives the whole caller result",
+    "scope": "general",
+    "meaning": "A successful map-only atomic lookup drives the complete source chain to whole matching extraction or wrapped null on removal, with fresh output derived from the constructor.",
+    "limits": "The lookup result is an explicit precondition until Schema.Resolve and schema/type representation are source-realized. Value/coercion/Unstructured and allocator/wrapping/heap contracts remain separate."
+  },
+  "SSA.SchemaLookupContracts.imported_plain": {
+    "title": "Source named and inline lookup",
+    "scope": "general",
+    "meaning": "The complete no-override method selects FindNamedType for a non-nil name, returns an empty unsuccessful result on a missing name, and otherwise returns the exact inlined atom.",
+    "limits": "FindNamedType remains a pure primitive; this does not verify its sync.Once/atomic-pointer cache."
+  },
+  "SSA.SchemaLookupContracts.imported_fast_path": {
+    "title": "No override bypasses the mutable cache",
+    "scope": "general",
+    "meaning": "The full Resolve AST returns through its first branch before evaluating locks, cache access or copy operations.",
+    "limits": "This theorem retains an explicit no-override callback; the composed theorem supplies its imported body."
+  },
+  "SSA.SchemaLookupContracts.imported_no_override_lookup": {
+    "title": "Both no-override source bodies compose",
+    "scope": "general",
+    "meaning": "The full Resolve AST and source helper realize named/inline lookup without a mutable override-cache premise.",
+    "limits": "Named-type search and Go representation remain explicit boundaries."
+  },
+  "SSA.SchemaResolveContracts.imported_resolve": {
+    "title": "Complete source override-cache execution",
+    "scope": "general",
+    "meaning": "For arbitrary atoms, relationship values and cache entries, source execution matches the specification of allocation, lookup, copy priority, cache writes, failure exits and captured deferred unlock.",
+    "limits": "Requires an initially unlocked serial mutex. Containers have a value view with arbitrary opaque immutable contents. FindNamedType, physical pointers, key equality and Go synchronization/runtime are not verified here. Invalid cached hits are returned as the source does; validity is not silently assumed. Map.CopyInto has a separate source value/index proof."
+  },
+  "SSA.SchemaResolveCache.empty_valid": {
+    "title": "The empty schema cache is sound",
+    "scope": "general",
+    "meaning": "Every stored result agrees with cache-free immutable schema resolution, vacuously for the initial empty cache.",
+    "limits": "The named lookup and reference environment are fixed within this definition."
+  },
+  "SSA.SchemaResolveCache.computed_valid": {
+    "title": "A schema lookup preserves cache soundness",
+    "scope": "general",
+    "meaning": "A valid cache remains valid after a hit, successful miss, failed miss or no-override lookup.",
+    "limits": "Reference identity must name the same immutable reference; the named lookup cannot change during the history."
+  },
+  "SSA.SchemaResolveCache.imported_correct": {
+    "title": "Valid source cache realizes cache-free lookup",
+    "scope": "general",
+    "meaning": "The full imported method returns exactly the no-cache specification from a valid unlocked state.",
+    "limits": "Validity and a stable reference environment are explicit premises. This does not assert correctness for a cache whose key-referred contents are mutated."
+  },
+  "SSA.SchemaResolveCache.imported_history": {
+    "title": "Arbitrary finite source lookup histories",
+    "scope": "general",
+    "meaning": "Any finite repeated or mixed-key sequence from a valid unlocked cache matches the immutable cache-free specification and preserves cache soundness and mutex release.",
+    "limits": "The environment and key-referred TypeRef values remain immutable. This is a serial primitive model, not a proof of Go scheduler behavior or race freedom. Native current/pinned and race-enabled concurrency checks are separate evidence."
+  },
+  "SSA.SchemaLookupBridge.imported_schema_and_dispatch": {
+    "title": "Source schema lookup feeds source typed dispatch",
+    "scope": "general",
+    "meaning": "The full schema method supplies the actual lookup result to the complete typed resolver, deduction and handler-selection ASTs, preserving the resulting schema cache state.",
+    "limits": "Requires cache validity and stable references. Named lookup, value predicates, formatter, handlers, key/pointer/heap representations and synchronization primitives remain explicit. This is not whole SSA correctness."
+  },
+  "SSA.MapCopyContracts.imported_copy": {
+    "title": "Complete source map copy and private cache transfer",
+    "scope": "general",
+    "meaning": "The complete Map.CopyInto AST derives nil-destination behavior, exported-field copies, cache Load/Store, Once reset and the full synchronous callback for arbitrary contents and cache/token states.",
+    "limits": "The source is immutable and non-nil; destination is disjoint. Once and atomic-pointer operations use explicit serial semantics. Physical pointers, heap correspondence and the Go runtime remain separate."
+  },
+  "SSA.MapCopyContracts.imported_fresh": {
+    "title": "A fresh destination receives the available index",
+    "scope": "general",
+    "meaning": "Copying into a destination with nil cache and unused Once token copies every exported field and the available source cache, with the token set exactly when a cache is available.",
+    "limits": "Fresh cache/token premises are explicit. Source-index coherence is a separate premise in the following theorem."
+  },
+  "SSA.MapCopyContracts.imported_value_view": {
+    "title": "Source copy preserves every opaque exported field",
+    "scope": "general",
+    "meaning": "Every non-nil destination receives exactly the source fields, element type, unions and element relationship in the container value view.",
+    "limits": "This value-view theorem does not assert index correctness for reused destinations, nor physical allocation identity."
+  },
+  "SSA.MapCopyContracts.imported_resolver_copy": {
+    "title": "Source CopyInto realizes the resolver primitive",
+    "scope": "general",
+    "meaning": "The complete imported method supplies the exact opaque immutable-contents copy used by the source Schema.Resolve interpreter.",
+    "limits": "The local resolver copy has not escaped. Destination/source heap disjointness and Go representation remain explicit; fresh-index correctness is supplied separately."
+  },
+  "SSA.MapCopyContracts.imported_fresh_valid_index": {
+    "title": "Fresh copies preserve field-index coherence",
+    "scope": "general",
+    "meaning": "Any coherent source index yields a coherent destination after the complete source method when the target cache/token are fresh.",
+    "limits": "The index function is arbitrary and source coherence is an explicit premise. This does not prove Map.FindField itself or the Go synchronization runtime."
+  },
+  "SSA.MapCopyContracts.imported_uninitialized_retains_old_cache": {
+    "title": "An unindexed source retains the old destination cache",
+    "scope": "general",
+    "meaning": "The complete source method copies new exported fields but leaves destination cache/token unchanged when the source cache is nil.",
+    "limits": "This is actual source behavior, not a claim that the public overwrite contract is correct for initialized reused destinations."
+  },
+  "SSA.MapCopyContracts.initialized_destination_can_break_index": {
+    "title": "Reused destination can have a stale field index",
+    "scope": "execution",
+    "meaning": "A finite source-executed witness has new fields and the previous initialized index. Native current/pinned Go reproduces it with normally initialized old/new field maps.",
+    "limits": "This component defect is not counted as an additional SSA bug: Resolve supplies a fresh destination and no SSA reachability is established. The witness uses an explicit index projection; Map.FindField source and runtime/heap refinement remain separate."
+  }
+}
