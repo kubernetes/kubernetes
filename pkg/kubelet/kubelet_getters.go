@@ -21,10 +21,12 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"path"
 	"path/filepath"
 
 	cadvisorapi "github.com/google/cadvisor/lib/model"
 	"k8s.io/klog/v2"
+	kubeletapitypes "k8s.io/kubelet/pkg/types"
 	"k8s.io/mount-utils"
 	utilpath "k8s.io/utils/path"
 	utilstrings "k8s.io/utils/strings"
@@ -449,7 +451,55 @@ func (kl *Kubelet) getPodVolumeSubpathListFromDisk(logger klog.Logger, podUID ty
 
 // GetRequestedContainersInfo returns container info.
 func (kl *Kubelet) GetRequestedContainersInfo(containerName string, options cadvisorapi.RequestOptions) (map[string]*cadvisorapi.ContainerInfo, error) {
-	return kl.cadvisor.GetRequestedContainersInfo(containerName, options)
+	containers, err := kl.cadvisor.GetRequestedContainersInfo(containerName, options)
+	if err != nil {
+		return nil, err
+	}
+	// Do not report containers of pods that are no longer assigned to this
+	// kubelet. If a pod is deleted or rescheduled while its cgroup cannot be
+	// removed (e.g. it still contains an unkillable task), cAdvisor would
+	// otherwise keep exporting metrics attributed to the pod, which can be
+	// aggregated with the metrics of a replacement pod reusing the same name
+	// (StatefulSets). The Summary API and /metrics/resource endpoint already
+	// gate on pod lifecycle state for the same reason.
+	pcm := kl.containerManager.NewPodContainerManager()
+	filterStalePodContainers(containers, func(uid types.UID) bool {
+		_, known := kl.podManager.GetPodByUID(uid)
+		return known
+	}, pcm.IsPodCgroup)
+	return containers, nil
+}
+
+// filterStalePodContainers removes containers that belong to a pod unknown to
+// podExists. Containers that do not belong to any pod are kept.
+func filterStalePodContainers(containers map[string]*cadvisorapi.ContainerInfo, podExists func(types.UID) bool, isPodCgroup func(string) (bool, types.UID)) {
+	for name, info := range containers {
+		if podUID, ok := podUIDForContainer(name, info, isPodCgroup); ok && !podExists(podUID) {
+			klog.V(4).InfoS("Suppressing cAdvisor container info for pod unknown to this kubelet", "cgroupPath", name, "podUID", podUID)
+			delete(containers, name)
+		}
+	}
+}
+
+// podUIDForContainer returns the UID of the pod a container belongs to,
+// preferring the io.kubernetes.pod.uid label set on container cgroups and
+// falling back to parsing the pod cgroup from the cgroup path. The second
+// return value is false for containers that do not belong to any pod.
+func podUIDForContainer(cgroupfs string, info *cadvisorapi.ContainerInfo, isPodCgroup func(string) (bool, types.UID)) (types.UID, bool) {
+	if info != nil {
+		if uid := kubeletapitypes.GetPodUID(info.Spec.Labels); uid != "" {
+			return types.UID(uid), true
+		}
+	}
+	if isPod, uid := isPodCgroup(cgroupfs); isPod {
+		return uid, true
+	}
+	if parent := path.Dir(cgroupfs); parent != "/" && parent != "." {
+		if isPod, uid := isPodCgroup(parent); isPod {
+			return uid, true
+		}
+	}
+	return "", false
 }
 
 // GetVersionInfo returns information about the version of cAdvisor in use.
