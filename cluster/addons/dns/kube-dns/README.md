@@ -1,62 +1,41 @@
-# kube-dns
-
-`kube-dns` schedules DNS Pods and Service on the cluster, other pods in cluster
-can use the DNS Serviceâs IP to resolve DNS names.
-
-* [Administrators guide](http://kubernetes.io/docs/admin/dns/)
-* [Code repository](http://www.github.com/kubernetes/dns)
-
-## Manually scale kube-dns Deployment
-
-kube-dns creates only one DNS Pod by default. If
-[dns-horizontal-autoscaler](../../dns-horizontal-autoscaler/)
-is not enabled, you may need to manually scale kube-dns Deployment.
-
-Please use below `kubectl scale` command to scale:
-```
-kubectl --namespace=kube-system scale deployment kube-dns --replicas=<NUM_YOU_WANT>
-```
-
-Do not use `kubectl edit` to modify kube-dns Deployment object if it is
-controlled by [Addon Manager](../../addon-manager/). Otherwise the modifications
-will be clobbered, in addition the replicas count for kube-dns Deployment will
-be reset to 1. See [Cluster add-ons README](../../README.md) and
-[#36411](https://github.com/kubernetes/kubernetes/issues/36411) for reference.
-
-## kube-dns addon templates
-
-This directory contains the base UNDERSCORE templates that can be used to
-generate the kube-dns.yaml.in needed in Salt format.
-
-Due to a varied preference in templating language choices, the transform
-Makefile in this directory should be enhanced to generate all required formats
-from the base underscore templates.
-
-**N.B.**: When you add a parameter you should also update the various scripts
-that supply values for your new parameter.  Here is one way you might find those
-scripts:
-
-```
-cd kubernetes && git grep 'kube-dns.yaml'
-```
-
-### Base Template files
-
-These are the authoritative base templates.
-Run 'make' to generate the Salt and Sed yaml templates from these.
-
-```
-kube-dns.yaml.base
-```
-
-### Generated Salt files
-
-```
-kube-dns.yaml.in
-```
-
-### Generated Sed files
-
-```
-kube-dns.yaml.sed
-```
+IyBrdWJlLWRucwoKYGt1YmUtZG5zYCBzY2hlZHVsZXMgRE5TIFBvZHMgYW5k
+IFNlcnZpY2Ugb24gdGhlIGNsdXN0ZXIsIG90aGVyIHBvZHMgaW4gY2x1c3Rl
+cgpjYW4gdXNlIHRoZSBETlMgU2VydmljZeKAmXMgSVAgdG8gcmVzb2x2ZSBE
+TlMgbmFtZXMuCgoqIFtBZG1pbmlzdHJhdG9ycyBndWlkZV0oaHR0cDovL2t1
+YmVybmV0ZXMuaW8vZG9jcy9hZG1pbi9kbnMvKQoqIFtDb2RlIHJlcG9zaXRv
+cnldKGh0dHA6Ly93d3cuZ2l0aHViLmNvbS9rdWJlcm5ldGVzL2RucykKCiMj
+IE1hbnVhbGx5IHNjYWxlIGt1YmUtZG5zIERlcGxveW1lbnQKCmt1YmUtZG5z
+IGNyZWF0ZXMgb25seSBvbmUgRE5TIFBvZCBieSBkZWZhdWx0LiBJZgpbZG5z
+LWhvcml6b250YWwtYXV0b3NjYWxlcl0oLi4vLi4vZG5zLWhvcml6b250YWwt
+YXV0b3NjYWxlci8pCmlzIG5vdCBlbmFibGVkLCB5b3UgbWF5IG5lZWQgdG8g
+bWFudWFsbHkgc2NhbGUga3ViZS1kbnMgRGVwbG95bWVudC4KClBsZWFzZSB1
+c2UgYmVsb3cgYGt1YmVjdGwgc2NhbGVgIGNvbW1hbmQgdG8gc2NhbGU6CmBg
+YAprdWJlY3RsIC0tbmFtZXNwYWNlPWt1YmUtc3lzdGVtIHNjYWxlIGRlcGxv
+eW1lbnQga3ViZS1kbnMgLS1yZXBsaWNhcz08TlVNX1lPVV9XQU5UPgpgYGAK
+CkRvIG5vdCB1c2UgYGt1YmVjdGwgZWRpdGAgdG8gbW9kaWZ5IGt1YmUtZG5z
+IERlcGxveW1lbnQgb2JqZWN0IGlmIGl0IGlzCmNvbnRyb2xsZWQgYnkgW0Fk
+ZG9uIE1hbmFnZXJdKC4uLy4uL2FkZG9uLW1hbmFnZXIvKS4gT3RoZXJ3aXNl
+IHRoZSBtb2RpZmljYXRpb25zCndpbGwgYmUgY2xvYmJlcmVkLCBpbiBhZGRp
+dGlvbiB0aGUgcmVwbGljYXMgY291bnQgZm9yIGt1YmUtZG5zIERlcGxveW1l
+bnQgd2lsbApiZSByZXNldCB0byAxLiBTZWUgW0NsdXN0ZXIgYWRkLW9ucyBS
+RUFETUVdKC4uLy4uL1JFQURNRS5tZCkgYW5kClsjMzY0MTFdKGh0dHBzOi8v
+Z2l0aHViLmNvbS9rdWJlcm5ldGVzL2t1YmVybmV0ZXMvaXNzdWVzLzM2NDEx
+KSBmb3IgcmVmZXJlbmNlLgoKIyMga3ViZS1kbnMgYWRkb24gdGVtcGxhdGVz
+CgpUaGlzIGRpcmVjdG9yeSBjb250YWlucyB0aGUgYmFzZSBVTkRFUlNDT1JF
+IHRlbXBsYXRlcyB0aGF0IGNhbiBiZSB1c2VkIHRvCmdlbmVyYXRlIHRoZSBr
+dWJlLWRucy55YW1sLmluIG5lZWRlZCBpbiBTYWx0IGZvcm1hdC4KCkR1ZSB0
+byBhIHZhcmllZCBwcmVmZXJlbmNlIGluIHRlbXBsYXRpbmcgbGFuZ3VhZ2Ug
+Y2hvaWNlcywgdGhlIHRyYW5zZm9ybQpNYWtlZmlsZSBpbiB0aGlzIGRpcmVj
+dG9yeSBzaG91bGQgYmUgZW5oYW5jZWQgdG8gZ2VuZXJhdGUgYWxsIHJlcXVp
+cmVkIGZvcm1hdHMKZnJvbSB0aGUgYmFzZSB1bmRlcnNjb3JlIHRlbXBsYXRl
+cy4KCioqTi5CLioqOiBXaGVuIHlvdSBhZGQgYSBwYXJhbWV0ZXIgeW91IHNo
+b3VsZCBhbHNvIHVwZGF0ZSB0aGUgdmFyaW91cyBzY3JpcHRzCnRoYXQgc3Vw
+cGx5IHZhbHVlcyBmb3IgeW91ciBuZXcgcGFyYW1ldGVyLiAgSGVyZSBpcyBv
+bmUgd2F5IHlvdSBtaWdodCBmaW5kIHRob3NlCnNjcmlwdHM6CgpgYGAKY2Qg
+a3ViZXJuZXRlcyAmJiBnaXQgZ3JlcCAna3ViZS1kbnMueWFtbCcKYGBgCgoj
+IyMgQmFzZSBUZW1wbGF0ZSBmaWxlcwoKVGhlc2UgYXJlIHRoZSBhdXRob3Jp
+dGF0aXZlIGJhc2UgdGVtcGxhdGVzLgpSdW4gJ21ha2UnIHRvIGdlbmVyYXRl
+IHRoZSBTYWx0IGFuZCBTZWQgeWFtbCB0ZW1wbGF0ZXMgZnJvbSB0aGVzZS4K
+CmBgYAprdWJlLWRucy55YW1sLmJhc2UKYGBgCgojIyMgR2VuZXJhdGVkIFNh
+bHQgZmlsZXMKCmBgYAprdWJlLWRucy55YW1sLmluCmBgYAoKIyMjIEdlbmVy
+YXRlZCBTZWQgZmlsZXMKCmBgYAprdWJlLWRucy55YW1sLnNlZApgYGA=
