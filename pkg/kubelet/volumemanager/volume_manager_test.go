@@ -1062,3 +1062,52 @@ func TestVolumeManager_ResizeEphemeralVolume(t *testing.T) {
 		})
 	}
 }
+
+func TestPollVolumes(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+
+	t.Run("returns soon after the condition is met", func(t *testing.T) {
+		calls := 0
+		start := time.Now()
+		err := pollVolumes(ctx, func(context.Context) (bool, error) {
+			calls++
+			return calls == 3, nil
+		})
+		elapsed := time.Since(start)
+		require.NoError(t, err)
+		assert.Equal(t, 3, calls)
+		// Polling at podAttachAndMountRetryInterval alone would take 2*300ms.
+		assert.Less(t, elapsed, podAttachAndMountRetryInterval, "condition met on the third check")
+	})
+
+	t.Run("keeps polling after the fast period", func(t *testing.T) {
+		start := time.Now()
+		ready := podAttachAndMountFastPeriod + 100*time.Millisecond
+		err := pollVolumes(ctx, func(context.Context) (bool, error) {
+			return time.Since(start) >= ready, nil
+		})
+		elapsed := time.Since(start)
+		require.NoError(t, err)
+		assert.GreaterOrEqual(t, elapsed, ready)
+		assert.Less(t, elapsed, ready+2*podAttachAndMountRetryInterval)
+	})
+
+	t.Run("returns the condition's error", func(t *testing.T) {
+		condErr := fmt.Errorf("volume setup failed")
+		err := pollVolumes(ctx, func(context.Context) (bool, error) {
+			return false, condErr
+		})
+		assert.ErrorIs(t, err, condErr)
+	})
+
+	t.Run("stops when the context is cancelled", func(t *testing.T) {
+		for _, after := range []time.Duration{50 * time.Millisecond, podAttachAndMountFastPeriod + 50*time.Millisecond} {
+			cancelCtx, cancel := context.WithTimeout(ctx, after)
+			err := pollVolumes(cancelCtx, func(context.Context) (bool, error) {
+				return false, nil
+			})
+			cancel()
+			assert.True(t, wait.Interrupted(err), "cancelled after %v: got %v", after, err)
+		}
+	})
+}
