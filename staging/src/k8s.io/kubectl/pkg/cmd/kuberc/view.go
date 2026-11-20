@@ -119,8 +119,8 @@ func (o *ViewOptions) Run() error {
 		if o.Explicit {
 			return fmt.Errorf("kuberc file not found at %s", o.KubeRCFile)
 		}
-		fmt.Fprintf(o.Out, "kuberc file not found at %s\n", o.KubeRCFile)                                        //nolint:errcheck
-		fmt.Fprintf(o.Out, "Would you like to generate a default kuberc file with recommended options? (y/N): ") //nolint:errcheck
+		fmt.Fprintf(o.ErrOut, "kuberc file not found at %s\n", o.KubeRCFile)                                        //nolint:errcheck
+		fmt.Fprintf(o.ErrOut, "Would you like to generate a default kuberc file with recommended options? (y/N): ") //nolint:errcheck
 		var input string
 		_, err := fmt.Fscanln(o.In, &input)
 		if err != nil {
@@ -134,7 +134,7 @@ func (o *ViewOptions) Run() error {
 		}
 
 		pref = kuberc.CreateDefaultPreference()
-		if err := kuberc.SavePreference(pref, o.KubeRCFile, o.Out); err != nil {
+		if err := kuberc.SavePreference(pref, o.KubeRCFile, o.ErrOut); err != nil {
 			return err
 		}
 	}

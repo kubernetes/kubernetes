@@ -17,6 +17,7 @@ limitations under the License.
 package kuberc
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -24,6 +25,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -90,7 +92,7 @@ aliases:
 		tmpDir := t.TempDir()
 		kubercPath := filepath.Join(tmpDir, "kuberc")
 
-		streams, in, out, _ := genericiooptions.NewTestIOStreams()
+		streams, in, out, errOut := genericiooptions.NewTestIOStreams()
 		in.WriteString("n\n")
 		o := &ViewOptions{
 			KubeRCFile: kubercPath,
@@ -104,46 +106,55 @@ aliases:
 		if _, err := os.Stat(kubercPath); !os.IsNotExist(err) {
 			t.Errorf("expected no kuberc file to be created, stat returned: %v", err)
 		}
-		if got := out.String(); !strings.Contains(got, "kuberc file not found") {
-			t.Errorf("expected the missing-file notice in output, got: %q", got)
+		if out.Len() != 0 {
+			t.Errorf("expected empty stdout, got: %q", out.String())
+		}
+		if got := errOut.String(); !strings.Contains(got, "kuberc file not found") {
+			t.Errorf("expected the missing-file notice on stderr, got: %q", got)
 		}
 	})
 
 	t.Run("accepting to generate a default kuberc", func(t *testing.T) {
-		tmpDir := t.TempDir()
-		kubercPath := filepath.Join(tmpDir, "kuberc")
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				kubercPath := filepath.Join(t.TempDir(), "kuberc")
+				streams, in, out, errOut := genericiooptions.NewTestIOStreams()
+				in.WriteString("y\n")
+				o := &ViewOptions{
+					KubeRCFile: kubercPath,
+					PrintFlags: genericclioptions.NewPrintFlags("").WithDefaultOutput(tt.outputFormat),
+					IOStreams:  streams,
+				}
 
-		streams, in, out, _ := genericiooptions.NewTestIOStreams()
-		in.WriteString("y\n")
-		o := &ViewOptions{
-			KubeRCFile: kubercPath,
-			PrintFlags: genericclioptions.NewPrintFlags("").WithDefaultOutput("yaml"),
-			IOStreams:  streams,
-		}
+				if err := o.Run(); err != nil {
+					t.Fatalf("Run() unexpected error = %v", err)
+				}
+				saved, err := os.ReadFile(kubercPath)
+				if err != nil {
+					t.Fatalf("read generated kuberc file: %v", err)
+				}
+				var savedPref v1.Preference
+				if err := yaml.UnmarshalStrict(saved, &savedPref); err != nil {
+					t.Fatalf("decode generated kuberc file: %v", err)
+				}
 
-		if err := o.Run(); err != nil {
-			t.Fatalf("Run() unexpected error = %v", err)
-		}
-		if _, err := os.Stat(kubercPath); err != nil {
-			t.Fatalf("expected kuberc file to be created, stat returned: %v", err)
-		}
-		expectedOutput := fmt.Sprintf(`kuberc file not found at %s
-Would you like to generate a default kuberc file with recommended options? (y/N): Updated %s
-aliases: []
-apiVersion: kubectl.config.k8s.io/v1
-defaults:
-- command: apply
-  options:
-  - default: "true"
-    name: server-side
-- command: delete
-  options:
-  - default: "true"
-    name: interactive
-kind: Preference
-`, kubercPath, kubercPath)
-		if diff := cmp.Diff(expectedOutput, out.String()); diff != "" {
-			t.Errorf("output mismatch (-expected +got):\n%s", diff)
+				if tt.outputFormat == "json" && !json.Valid(out.Bytes()) {
+					t.Fatalf("stdout is not valid JSON: %q", out.String())
+				}
+				var displayedPref v1.Preference
+				if err := yaml.UnmarshalStrict(out.Bytes(), &displayedPref); err != nil {
+					t.Fatalf("decode %s from stdout: %v\nstdout: %q", tt.outputFormat, err, out.String())
+				}
+				if diff := cmp.Diff(savedPref, displayedPref, cmpopts.EquateEmpty()); diff != "" {
+					t.Errorf("preference mismatch (-saved +displayed):\n%s", diff)
+				}
+
+				wantMessages := fmt.Sprintf("kuberc file not found at %s\n"+
+					"Would you like to generate a default kuberc file with recommended options? (y/N): Updated %s\n", kubercPath, kubercPath)
+				if diff := cmp.Diff(wantMessages, errOut.String()); diff != "" {
+					t.Errorf("stderr mismatch (-want +got):\n%s", diff)
+				}
+			})
 		}
 	})
 
