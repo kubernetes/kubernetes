@@ -1677,6 +1677,26 @@ func TestIsPodLevelResourcesSet(t *testing.T) {
 			},
 			expected: true,
 		},
+		{
+			// pids is limit-only and not a supported pod-level resource: on its
+			// own it must not flip a pod onto pod-level resource code paths
+			// (QOS, quota, cgroup cpu/memory computations).
+			name: "only limit-only resource (pids) limits set",
+			podResources: &v1.ResourceRequirements{
+				Limits: v1.ResourceList{v1.ResourcePID: resource.MustParse("2048")},
+			},
+			expected: false,
+		},
+		{
+			name: "limit-only resource (pids) alongside supported resource limits set",
+			podResources: &v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					v1.ResourcePID: resource.MustParse("2048"),
+					v1.ResourceCPU: resource.MustParse("1m"),
+				},
+			},
+			expected: true,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -1688,6 +1708,64 @@ func TestIsPodLevelResourcesSet(t *testing.T) {
 		})
 	}
 
+}
+
+func TestPodResourcesWithPIDLimit(t *testing.T) {
+	// pids is limit-only and non-accountable: it must never surface in the
+	// PodRequests/PodLimits aggregation helpers, whether it is the only
+	// pod-level entry or set alongside cpu/memory.
+	containerResources := v1.ResourceRequirements{
+		Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("100m")},
+		Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("100m")},
+	}
+
+	testCases := []struct {
+		name            string
+		podResources    *v1.ResourceRequirements
+		expectedCPULims string
+	}{
+		{
+			name: "pids-only pod-level limits",
+			podResources: &v1.ResourceRequirements{
+				Limits: v1.ResourceList{v1.ResourcePID: resource.MustParse("2048")},
+			},
+			expectedCPULims: "100m", // aggregated from containers; pod-level branch not taken
+		},
+		{
+			name: "pids alongside pod-level cpu limits",
+			podResources: &v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					v1.ResourceCPU: resource.MustParse("200m"),
+					v1.ResourcePID: resource.MustParse("2048"),
+				},
+			},
+			expectedCPULims: "200m", // pod-level limit wins; pids still excluded
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			pod := &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources:  tc.podResources,
+					Containers: []v1.Container{{Name: "c1", Resources: containerResources}},
+				},
+			}
+
+			requests := PodRequests(pod, PodResourcesOptions{})
+			if _, ok := requests[v1.ResourcePID]; ok {
+				t.Errorf("PodRequests must never contain pids, got: %v", requests)
+			}
+
+			limits := PodLimits(pod, PodResourcesOptions{})
+			if _, ok := limits[v1.ResourcePID]; ok {
+				t.Errorf("PodLimits must not contain the limit-only pids resource, got: %v", limits)
+			}
+			if cpu := limits[v1.ResourceCPU]; cpu.String() != tc.expectedCPULims {
+				t.Errorf("expected cpu limit %s, got %s", tc.expectedCPULims, cpu.String())
+			}
+		})
+	}
 }
 
 func TestIsPodLevelLimitsSet(t *testing.T) {
@@ -3253,11 +3331,41 @@ func TestIsSupportedPodLevelResource(t *testing.T) {
 			resource: v1.ResourceHugePagesPrefix + "1Gi",
 			expected: true,
 		},
+		{
+			// pids is limit-only and deliberately not a supported pod-level
+			// resource, so it never feeds pod-level accounting.
+			name:     v1.ResourcePID.String(),
+			resource: v1.ResourcePID,
+			expected: false,
+		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			if got := IsSupportedPodLevelResource(tc.resource); got != tc.expected {
 				t.Errorf("Supported pod level resource %s: got=%t, want=%t", tc.resource.String(), got, tc.expected)
+			}
+		})
+	}
+}
+
+func TestIsLimitOnlyResource(t *testing.T) {
+	testCases := []struct {
+		resource v1.ResourceName
+		expected bool
+	}{
+		{resource: v1.ResourcePID, expected: true},
+		{resource: v1.ResourceCPU, expected: false},
+		{resource: v1.ResourceMemory, expected: false},
+		{resource: v1.ResourceEphemeralStorage, expected: false},
+		{resource: v1.ResourceHugePagesPrefix + "2Mi", expected: false},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.resource.String(), func(t *testing.T) {
+			if got := IsLimitOnlyResource(tc.resource); got != tc.expected {
+				t.Errorf("IsLimitOnlyResource(%s): got=%t, want=%t", tc.resource, got, tc.expected)
+			}
+			if tc.expected && IsSupportedPodLevelResource(tc.resource) {
+				t.Errorf("limit-only resource %s must not be a supported pod-level resource", tc.resource)
 			}
 		})
 	}

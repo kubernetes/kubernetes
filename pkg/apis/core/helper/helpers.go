@@ -328,6 +328,7 @@ var integerResources = sets.New(
 	core.ResourcePersistentVolumeClaims,
 	core.ResourceServicesNodePorts,
 	core.ResourceServicesLoadBalancers,
+	core.ResourcePID,
 )
 
 // IsIntegerResourceName returns true if the resource is measured in integer values

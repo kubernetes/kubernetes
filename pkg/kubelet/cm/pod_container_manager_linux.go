@@ -28,11 +28,13 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	kubeevents "k8s.io/kubernetes/pkg/kubelet/events"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
@@ -71,6 +73,8 @@ type podContainerManagerImpl struct {
 	swapCapacity   int64
 	// getSwapControllerAvailable reports whether the swap cgroup controller is available on the host
 	getSwapControllerAvailable func() bool
+	// recorder is used to emit Kubernetes events
+	recorder record.EventRecorder
 }
 
 var isCgroup2UnifiedMode = libcontainercgroups.IsCgroup2UnifiedMode
@@ -110,8 +114,21 @@ func (m *podContainerManagerImpl) EnsureExists(logger klog.Logger, pod *v1.Pod) 
 		if !m.isNodeSwapEnabled() {
 			containerConfig.ResourceParameters.Unified = UnifiedWithoutSwap(containerConfig.ResourceParameters.Unified)
 		}
-		if m.podPidsLimit > 0 {
-			containerConfig.ResourceParameters.PidsLimit = &m.podPidsLimit
+		effectivePidLimit := m.podPidsLimit
+		pidLimitCapped := false
+		var requestedPidLimit int64
+		if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PerPodPIDLimit) {
+			if podPid := getPodPIDLimit(pod); podPid > 0 {
+				if podPid < effectivePidLimit || effectivePidLimit <= 0 {
+					effectivePidLimit = podPid
+				} else if podPid > effectivePidLimit {
+					pidLimitCapped = true
+					requestedPidLimit = podPid
+				}
+			}
+		}
+		if effectivePidLimit > 0 {
+			containerConfig.ResourceParameters.PidsLimit = &effectivePidLimit
 		}
 		if enforceMemoryQoS {
 			m.applyPodLevelMemoryHigh(pod, containerConfig.ResourceParameters)
@@ -122,7 +139,14 @@ func (m *podContainerManagerImpl) EnsureExists(logger klog.Logger, pod *v1.Pod) 
 		if err := m.cgroupManager.Create(logger, containerConfig); err != nil {
 			return fmt.Errorf("failed to create container for %v : %v", podContainerName, err)
 		}
-
+		// Report capping only once the limit has actually been applied, so a
+		// failing cgroup creation does not emit misleading (and repeated) events.
+		if pidLimitCapped {
+			logger.V(4).Info("Pod PID limit capped by node podPidsLimit", "pod", klog.KObj(pod), "requested", requestedPidLimit, "effective", effectivePidLimit)
+			m.recorder.Eventf(pod, v1.EventTypeWarning, kubeevents.PIDLimitCapped,
+				"Requested PID limit %d exceeds node podPidsLimit; capped to %d",
+				requestedPidLimit, effectivePidLimit)
+		}
 	}
 	return nil
 }
@@ -450,4 +474,14 @@ func (m *podContainerManagerNoop) GetPodCgroupConfig(_ *v1.Pod, _ v1.ResourceNam
 
 func (m *podContainerManagerNoop) SetPodCgroupConfig(_ klog.Logger, _ *v1.Pod, _ *ResourceConfig) error {
 	return nil
+}
+
+// getPodPIDLimit extracts the pod-level PID limit from spec.resources.limits.pids.
+// It returns 0 if the pod does not specify a PID limit.
+func getPodPIDLimit(pod *v1.Pod) int64 {
+	if pod.Spec.Resources == nil {
+		return 0
+	}
+	pid := pod.Spec.Resources.Limits[v1.ResourcePID]
+	return pid.Value()
 }

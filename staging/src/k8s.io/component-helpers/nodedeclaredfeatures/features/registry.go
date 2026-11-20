@@ -25,6 +25,7 @@ import (
 	"k8s.io/component-helpers/nodedeclaredfeatures/features/extendwebsocketstokubelet"
 	"k8s.io/component-helpers/nodedeclaredfeatures/features/inplacepodresize"
 	"k8s.io/component-helpers/nodedeclaredfeatures/features/networkisolatedpods"
+	"k8s.io/component-helpers/nodedeclaredfeatures/features/perpodpidlimit"
 	"k8s.io/component-helpers/nodedeclaredfeatures/features/podcertificatesmldsa"
 	"k8s.io/component-helpers/nodedeclaredfeatures/features/restartallcontainers"
 	"k8s.io/component-helpers/nodedeclaredfeatures/features/securityprofileoci"
@@ -42,6 +43,7 @@ var AllFeatures = []types.Feature{
 	extendwebsocketstokubelet.Feature,
 	inplacepodresize.NonSidecarInitContainerResizeFeature,
 	inplacepodresize.MemoryBackedVolumesResizeFeature,
+	perpodpidlimit.Feature,
 	usernamespaceshostnetwork.Feature,
 	dranodeallocatableresources.Feature,
 	volumebindmountoptions.Feature,

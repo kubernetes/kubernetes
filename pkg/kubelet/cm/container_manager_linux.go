@@ -430,6 +430,7 @@ func (cm *containerManagerImpl) NewPodContainerManager() PodContainerManager {
 			memoryCapacity:             cm.internalCapacity.Memory().Value(),
 			swapCapacity:               cm.internalCapacity.Name(internalSwapResourceName, resource.BinarySI).Value(),
 			getSwapControllerAvailable: cm.getSwapControllerAvailable,
+			recorder:                   cm.recorder,
 		}
 	}
 	return &podContainerManagerNoop{

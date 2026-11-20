@@ -40,6 +40,7 @@ const (
 	ResizeStarted                   = "ResizeStarted"
 	ResizeError                     = "ResizeError"
 	FailedNodeDeclaredFeaturesCheck = "FailedNodeDeclaredFeaturesCheck"
+	PIDLimitCapped                  = "PIDLimitCapped"
 	// SwapLimitNotEnforced is emitted when a pod declares resources.limits.swap
 	// but the node cannot honor it (NoSwap, cgroup v1, or no swap controller), or
 	// when the LimitedSwap limit of the pod cgroup caps a container's limit.

@@ -62,6 +62,7 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/pod"
 	apiservice "k8s.io/kubernetes/pkg/api/service"
 	podutilv1 "k8s.io/kubernetes/pkg/api/v1/pod"
+	v1resource "k8s.io/kubernetes/pkg/api/v1/resource"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 	"k8s.io/kubernetes/pkg/apis/core/helper/qos"
@@ -6680,7 +6681,7 @@ func ValidatePodResize(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 		allErrs = append(allErrs, field.Invalid(specPath, newPod.Status.QOSClass, "Pod QOS Class may not change as a result of resizing"))
 	}
 
-	if isPodLevelResourcesSet(oldPod) || isPodLevelResourcesSet(newPod) {
+	if hasPodLevelResizeResources(oldPod) || hasPodLevelResizeResources(newPod) {
 		// pods with pod-level resources cannot be resized without
 		// InPlacePodLevelResourcesVerticalScaling feature gate being enabled.
 		if !opts.InPlacePodLevelResourcesVerticalScalingEnabled {
@@ -6742,9 +6743,16 @@ func ValidatePodResize(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 	return allErrs
 }
 
-func isPodLevelResourcesSet(pod *core.Pod) bool {
-	return pod.Spec.Resources != nil &&
-		(len(pod.Spec.Resources.Requests)+len(pod.Spec.Resources.Limits) > 0)
+func hasPodLevelResizeResources(pod *core.Pod) bool {
+	if pod.Spec.Resources == nil {
+		return false
+	}
+	if helper.IsPodLevelResourcesSet(pod) {
+		return true
+	}
+	// Swap is resizable without pod-level compute resources, unlike PID limits.
+	_, hasSwapLimit := pod.Spec.Resources.Limits[core.ResourceSwap]
+	return hasSwapLimit
 }
 
 func isInitContainerResizable(ctr *core.Container) bool {
@@ -6758,7 +6766,7 @@ func validateResizableSpecChanges(newPod, oldPod *core.Pod, specPath *field.Path
 	var allErrs field.ErrorList
 
 	var mungedPodSpec core.PodSpec
-	if opts.InPlacePodLevelResourcesVerticalScalingEnabled && (isPodLevelResourcesSet(oldPod) || isPodLevelResourcesSet(newPod)) {
+	if opts.InPlacePodLevelResourcesVerticalScalingEnabled && (hasPodLevelResizeResources(oldPod) || hasPodLevelResizeResources(newPod)) {
 		var errs field.ErrorList
 		errs, mungedPodSpec = validatePodLevelResourcesResize(newPod, oldPod, specPath, opts)
 		allErrs = append(allErrs, errs...)
@@ -6878,7 +6886,7 @@ func ValidatePodDynamicUpdate(newPod, oldPod *core.Pod, opts PodValidationOption
 // validateResizeAllowed validates that the pod may be resized.
 func validateResizeAllowed(newPod, oldPod *core.Pod, specPath *field.Path, opts PodValidationOptions) field.ErrorList {
 	var allErrs field.ErrorList
-	if !opts.InPlacePodLevelResourcesVerticalScalingEnabled && (isPodLevelResourcesSet(oldPod) || isPodLevelResourcesSet(newPod)) {
+	if !opts.InPlacePodLevelResourcesVerticalScalingEnabled && (hasPodLevelResizeResources(oldPod) || hasPodLevelResizeResources(newPod)) {
 		allErrs = append(allErrs, field.Forbidden(field.NewPath(""), "resize of pods with pod-level resources is forbidden when InPlacePodLevelResourcesVerticalScalingEnabled feature gate is disabled"))
 	}
 	return allErrs
@@ -8654,7 +8662,30 @@ func validateBasicResource(quantity resource.Quantity, fldPath *field.Path) fiel
 }
 
 func validatePodResourceRequirements(requirements *core.ResourceRequirements, podClaimNames sets.Set[string], fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
-	return validateResourceRequirements(requirements, validatePodResourceName, podClaimNames, fldPath, opts)
+	allErrs := validateResourceRequirements(requirements, func(resourceName core.ResourceName, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
+		// pids is not a supported pod-level resource for accounting purposes,
+		// but is accepted here as a pod-level limit; it is validated below.
+		if resourceName == core.ResourcePID {
+			return nil
+		}
+		return validatePodResourceName(resourceName, fldPath, opts)
+	}, podClaimNames, fldPath, opts)
+
+	// PID-specific validation: these checks only apply at the pod level so
+	// that containers never see misleading "pids limit must be between …"
+	// errors when pids is already rejected as a non-standard container resource.
+	limPath := fldPath.Child("limits")
+	for resourceName, quantity := range requirements.Limits {
+		if resourceName == core.ResourcePID {
+			fldPath := limPath.Key(string(resourceName))
+			if !opts.AllowPodPIDLimit {
+				allErrs = append(allErrs, field.Forbidden(fldPath, "requires the PerPodPIDLimit feature gate"))
+				continue
+			}
+			allErrs = append(allErrs, validatePIDResourceValue(resourceName, quantity, fldPath)...)
+		}
+	}
+	return allErrs
 }
 
 func ValidateContainerResourceRequirements(requirements *core.ResourceRequirements, podClaimNames sets.Set[string], fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
@@ -8808,6 +8839,18 @@ func validateResourceQuantityHugePageValue(name core.ResourceName, quantity reso
 		return fmt.Errorf("%s is not positive integer multiple of %s", quantity.String(), name)
 	}
 
+	return nil
+}
+
+// validatePIDResourceValue validates that pids resource values are within the allowed range.
+func validatePIDResourceValue(name core.ResourceName, quantity resource.Quantity, fldPath *field.Path) field.ErrorList {
+	if name != core.ResourcePID {
+		return nil
+	}
+	val := quantity.Value()
+	if val < v1resource.MinPodPIDLimit || val > v1resource.MaxPodPIDLimit {
+		return field.ErrorList{field.Invalid(fldPath, quantity.String(), fmt.Sprintf("pids limit must be between %d and %d", v1resource.MinPodPIDLimit, v1resource.MaxPodPIDLimit))}
+	}
 	return nil
 }
 
