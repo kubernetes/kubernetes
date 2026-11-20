@@ -42,6 +42,8 @@ type TopologyCache struct {
 	cpuRatiosByZone         map[string]float64
 	endpointsByService      map[string]map[discovery.AddressType]EndpointZoneInfo
 	hintsPopulatedByService sets.Set[string]
+	unallocatedServices     map[string]map[discovery.AddressType]int
+	reconcilingServices     map[string]int
 }
 
 // EndpointZoneInfo tracks the distribution of endpoints across zones for a
@@ -63,39 +65,74 @@ func NewTopologyCache() *TopologyCache {
 		cpuRatiosByZone:         map[string]float64{},
 		endpointsByService:      map[string]map[discovery.AddressType]EndpointZoneInfo{},
 		hintsPopulatedByService: sets.Set[string]{},
+		unallocatedServices:     map[string]map[discovery.AddressType]int{},
+		reconcilingServices:     map[string]int{},
 	}
 }
 
 // GetOverloadedServices returns a list of Service keys that refer to Services
-// that have crossed the overload threshold for any zone.
+// that have crossed the overload threshold or can retry a failed allocation.
 func (t *TopologyCache) GetOverloadedServices() []string {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
-	svcKeys := []string{}
+	svcKeys := sets.New[string]()
+	// An in-flight reconciliation may still be using the previous Node topology.
+	for svcKey := range t.reconcilingServices {
+		svcKeys.Insert(svcKey)
+	}
 	for svcKey, eziByAddrType := range t.endpointsByService {
 		for _, ezi := range eziByAddrType {
 			if serviceOverloaded(ezi, t.cpuRatiosByZone) {
-				svcKeys = append(svcKeys, svcKey)
+				svcKeys.Insert(svcKey)
+				break
+			}
+		}
+	}
+	for svcKey, endpointsByAddrType := range t.unallocatedServices {
+		for _, totalEndpoints := range endpointsByAddrType {
+			if _, event := t.getAllocationsLocked(totalEndpoints); event == nil {
+				svcKeys.Insert(svcKey)
 				break
 			}
 		}
 	}
 
-	return svcKeys
+	return svcKeys.UnsortedList()
 }
 
 // AddHints adds or updates topology hints on EndpointSlices and returns updated
 // lists of EndpointSlices to create and update.
 func (t *TopologyCache) AddHints(logger klog.Logger, si *SliceInfo) ([]*discovery.EndpointSlice, []*discovery.EndpointSlice, []*EventBuilder) {
 	totalEndpoints := si.getTotalReadyEndpoints()
-	allocations, allocationsEvent := t.getAllocations(totalEndpoints)
+	t.lock.Lock()
+	t.reconcilingServices[si.ServiceKey]++
+	allocations, allocationsEvent := t.getAllocationsLocked(totalEndpoints)
+	t.lock.Unlock()
+	hintsAllocated := false
+	defer func() {
+		t.lock.Lock()
+		defer t.lock.Unlock()
+		if !hintsAllocated {
+			t.removeHintsLocked(si.ServiceKey, si.AddressType)
+			// Fewer than two ready endpoints cannot support hints under any Node topology.
+			if totalEndpoints >= 2 {
+				if t.unallocatedServices[si.ServiceKey] == nil {
+					t.unallocatedServices[si.ServiceKey] = map[discovery.AddressType]int{}
+				}
+				t.unallocatedServices[si.ServiceKey][si.AddressType] = totalEndpoints
+			}
+		}
+		t.reconcilingServices[si.ServiceKey]--
+		if t.reconcilingServices[si.ServiceKey] == 0 {
+			delete(t.reconcilingServices, si.ServiceKey)
+		}
+	}()
 	events := []*EventBuilder{}
 	if allocationsEvent != nil {
 		logger.Info(allocationsEvent.Message+", removing hints", "key", si.ServiceKey, "addressType", si.AddressType)
 		allocationsEvent.Message = FormatWithAddressType(allocationsEvent.Message, si.AddressType)
 		events = append(events, allocationsEvent)
-		t.RemoveHints(si.ServiceKey, si.AddressType)
 		slicesToCreate, slicesToUpdate := RemoveHintsFromSlices(si)
 		return slicesToCreate, slicesToUpdate, events
 	}
@@ -121,7 +158,6 @@ func (t *TopologyCache) AddHints(logger klog.Logger, si *SliceInfo) ([]*discover
 					Reason:    "TopologyAwareHintsDisabled",
 					Message:   FormatWithAddressType(NoZoneSpecified, si.AddressType),
 				})
-				t.RemoveHints(si.ServiceKey, si.AddressType)
 				slicesToCreate, slicesToUpdate := RemoveHintsFromSlices(si)
 				return slicesToCreate, slicesToUpdate, events
 			}
@@ -148,7 +184,6 @@ func (t *TopologyCache) AddHints(logger klog.Logger, si *SliceInfo) ([]*discover
 			Reason:    "TopologyAwareHintsDisabled",
 			Message:   FormatWithAddressType(NoAllocatedHintsForZones, si.AddressType),
 		})
-		t.RemoveHints(si.ServiceKey, si.AddressType)
 		slicesToCreate, slicesToUpdate := RemoveHintsFromSlices(si)
 		return slicesToCreate, slicesToUpdate, events
 	}
@@ -157,6 +192,7 @@ func (t *TopologyCache) AddHints(logger klog.Logger, si *SliceInfo) ([]*discover
 	defer t.lock.Unlock()
 	hintsEnabled := t.hasPopulatedHintsLocked(si.ServiceKey)
 	t.setHintsLocked(si.ServiceKey, si.AddressType, allocatedHintsByZone)
+	hintsAllocated = true
 
 	// if hints were not enabled before, we publish an event to indicate we enabled them.
 	if !hintsEnabled {
@@ -180,6 +216,7 @@ func (t *TopologyCache) SetHints(serviceKey string, addrType discovery.AddressTy
 }
 
 func (t *TopologyCache) setHintsLocked(serviceKey string, addrType discovery.AddressType, allocatedHintsByZone EndpointZoneInfo) {
+	t.removeUnallocatedServiceLocked(serviceKey, addrType)
 	_, ok := t.endpointsByService[serviceKey]
 	if !ok {
 		t.endpointsByService[serviceKey] = map[discovery.AddressType]EndpointZoneInfo{}
@@ -189,20 +226,31 @@ func (t *TopologyCache) setHintsLocked(serviceKey string, addrType discovery.Add
 	t.hintsPopulatedByService.Insert(serviceKey)
 }
 
-// RemoveHints removes topology hints for the provided serviceKey and addrType
-// from this cache.
+// RemoveHints forgets topology hints and pending allocations for the provided
+// serviceKey and addrType.
 func (t *TopologyCache) RemoveHints(serviceKey string, addrType discovery.AddressType) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
+	t.removeHintsLocked(serviceKey, addrType)
+}
 
+func (t *TopologyCache) removeHintsLocked(serviceKey string, addrType discovery.AddressType) {
+	t.removeUnallocatedServiceLocked(serviceKey, addrType)
 	_, ok := t.endpointsByService[serviceKey]
 	if ok {
 		delete(t.endpointsByService[serviceKey], addrType)
 	}
 	if len(t.endpointsByService[serviceKey]) == 0 {
 		delete(t.endpointsByService, serviceKey)
+		t.hintsPopulatedByService.Delete(serviceKey)
 	}
-	t.hintsPopulatedByService.Delete(serviceKey)
+}
+
+func (t *TopologyCache) removeUnallocatedServiceLocked(serviceKey string, addrType discovery.AddressType) {
+	delete(t.unallocatedServices[serviceKey], addrType)
+	if len(t.unallocatedServices[serviceKey]) == 0 {
+		delete(t.unallocatedServices, serviceKey)
+	}
 }
 
 // SetNodes updates the Node distribution for the TopologyCache.
@@ -278,13 +326,10 @@ func (t *TopologyCache) hasPopulatedHintsLocked(serviceKey string) bool {
 	return t.hintsPopulatedByService.Has(serviceKey)
 }
 
-// getAllocations returns a set of minimum and maximum allocations per zone. If
+// getAllocationsLocked returns a set of minimum and maximum allocations per zone. If
 // it is not possible to provide allocations that are below the overload
 // threshold, a nil value will be returned.
-func (t *TopologyCache) getAllocations(numEndpoints int) (map[string]allocation, *EventBuilder) {
-	t.lock.Lock()
-	defer t.lock.Unlock()
-
+func (t *TopologyCache) getAllocationsLocked(numEndpoints int) (map[string]allocation, *EventBuilder) {
 	// it is similar to checking !t.sufficientNodeInfo
 	if t.cpuRatiosByZone == nil {
 		return nil, &EventBuilder{

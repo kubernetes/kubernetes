@@ -90,6 +90,15 @@ func (r *Reconciler) Reconcile(logger klog.Logger, service *corev1.Service, pods
 
 	// addresses that this service supports [o(1) find]
 	serviceSupportedAddressesTypes := getAddressTypesForService(service)
+	if r.topologyCache != nil {
+		// A failed EndpointSlice write may leave an allocation without an existing slice.
+		serviceKey := fmt.Sprintf("%s/%s", service.Namespace, service.Name)
+		for _, addressType := range []discovery.AddressType{discovery.AddressTypeIPv4, discovery.AddressTypeIPv6} {
+			if !serviceSupportedAddressesTypes.Has(addressType) {
+				r.topologyCache.RemoveHints(serviceKey, addressType)
+			}
+		}
+	}
 
 	// loop through slices identifying their address type.
 	// slices that no longer match address type supported by services
@@ -641,6 +650,11 @@ func (r *Reconciler) reconcileByPortMapping(
 
 func (r *Reconciler) DeleteService(namespace, name string) {
 	r.metricsCache.DeleteService(types.NamespacedName{Namespace: namespace, Name: name})
+	if r.topologyCache != nil {
+		serviceKey := fmt.Sprintf("%s/%s", namespace, name)
+		r.topologyCache.RemoveHints(serviceKey, discovery.AddressTypeIPv4)
+		r.topologyCache.RemoveHints(serviceKey, discovery.AddressTypeIPv6)
+	}
 }
 
 func (r *Reconciler) GetControllerName() string {

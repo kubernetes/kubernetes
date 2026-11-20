@@ -402,12 +402,14 @@ func (c *Controller) syncService(logger klog.Logger, key string) error {
 	if service.Spec.Type == v1.ServiceTypeExternalName {
 		// services with Type ExternalName receive no endpoints from this controller;
 		// Ref: https://issues.k8s.io/105986
+		c.reconciler.DeleteService(namespace, name)
 		return nil
 	}
 
 	if service.Spec.Selector == nil {
 		// services without a selector receive no endpoint slices from this controller;
 		// these services will receive endpoint slices that are created out-of-band via the REST API.
+		c.reconciler.DeleteService(namespace, name)
 		return nil
 	}
 
@@ -625,9 +627,10 @@ func (c *Controller) updateNode(old, cur interface{}) {
 	curNode := cur.(*v1.Node)
 
 	// LabelTopologyZone may be added by cloud provider asynchronously after the Node is created.
-	// The topology cache should be updated in this case.
+	// Allocatable CPU changes also affect the capacity ratios used for topology hints.
 	if isNodeReady(oldNode) != isNodeReady(curNode) ||
-		oldNode.Labels[v1.LabelTopologyZone] != curNode.Labels[v1.LabelTopologyZone] {
+		oldNode.Labels[v1.LabelTopologyZone] != curNode.Labels[v1.LabelTopologyZone] ||
+		oldNode.Status.Allocatable.Cpu().Cmp(*curNode.Status.Allocatable.Cpu()) != 0 {
 		c.topologyQueue.Add(topologyQueueItemKey)
 	}
 }
@@ -650,7 +653,7 @@ func (c *Controller) checkNodeTopologyDistribution(logger klog.Logger) {
 	c.topologyCache.SetNodes(logger, nodes)
 	serviceKeys := c.topologyCache.GetOverloadedServices()
 	for _, serviceKey := range serviceKeys {
-		logger.V(2).Info("Queuing Service after Node change due to overloading", "key", serviceKey)
+		logger.V(2).Info("Queuing Service after Node topology change", "key", serviceKey)
 		c.serviceQueue.Add(serviceKey)
 	}
 }
