@@ -1111,7 +1111,7 @@ func (p *staticPolicy) allocateForResize(logger klog.Logger, s state.State, pod 
 	// Get a list of reusable CPUs (e.g. CPUs reused from initContainers). It may include CPUs
 	// the container has already, which the SMT alignment check counts separately.
 	reusableCPUs := getReusableCPUsForResizeByPodContainer(s, pod, container)
-	if err := p.enforceSMTAlignment(s, resizeFeasibility.requestedCPUsByPodContainer, resizeFeasibility.cpusInUseByPodContainer.Size(), reusableCPUs.Difference(resizeFeasibility.cpusInUseByPodContainer), lifecycle.UpdateOperation); err != nil {
+	if err := p.enforceSMTAlignment(s, resizeFeasibility.requestedCPUsByPodContainer, resizeFeasibility.cpusInUseByPodContainer.Size(), reusableCPUs.Difference(resizeFeasibility.cpusInUseByPodContainer), operation); err != nil {
 		return err
 	}
 	logger.V(4).Info("Static policy: container already present in state, attempting InPlacePodVerticalScaling")
@@ -1153,6 +1153,7 @@ func (p *staticPolicy) allocateForResize(logger klog.Logger, s state.State, pod 
 	}
 
 	logger.V(4).Info("Allocated exclusive CPUs for resize", "cpuset", newallocatedcpuset.CPUs.String())
+	// For an add, s is the live state, and the assignment is committed immediately.
 	// For a resize, s is the scratch state of the admission. The CPU manager
 	// commits it to the state once every admit handler admitted the pod and
 	// the pod allocation is persisted, see CompleteAdmit.
@@ -1162,6 +1163,10 @@ func (p *staticPolicy) allocateForResize(logger klog.Logger, s state.State, pod 
 // ResizeCommitted publishes the metrics of a resize allocated by
 // allocateForResize, once the CPU manager committed it to the state.
 func (p *staticPolicy) ResizeCommitted(logger klog.Logger, s state.State, pending state.PendingResize) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingExclusiveCPUs) {
+		return
+	}
+
 	for containerName, cset := range pending.ContainerCPUSets {
 		if cset.IsEmpty() {
 			continue
