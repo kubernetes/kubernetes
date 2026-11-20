@@ -294,7 +294,8 @@ func writeProjectFiles(fProjects *os.File, fProjid *os.File, writeProjid bool, l
 	if err == nil {
 		// Ensure that both files are written before we try to rename either.
 		if writeProjid {
-			tmpProjid, err := writeProjectFile(fProjid, list.projid)
+			var tmpProjid string
+			tmpProjid, err = writeProjectFile(fProjid, list.projid)
 			if err == nil {
 				err = os.Rename(tmpProjid, fProjid.Name())
 				if err != nil {
