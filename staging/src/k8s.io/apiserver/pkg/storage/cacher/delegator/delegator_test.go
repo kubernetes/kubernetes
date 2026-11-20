@@ -40,7 +40,6 @@ import (
 	cachertesting "k8s.io/apiserver/pkg/storage/cacher/testing"
 	"k8s.io/apiserver/pkg/storage/cacher/testing/setup"
 	"k8s.io/apiserver/pkg/storage/etcd3"
-	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
 	storagetesting "k8s.io/apiserver/pkg/storage/testing"
 	"k8s.io/apiserver/pkg/storage/testing/correctness"
 	"k8s.io/apiserver/pkg/storage/value"
@@ -90,14 +89,14 @@ func TestDeleteOnce(t *testing.T) {
 	t.Parallel()
 	ctx, cacher, terminate := setup.Setup(t)
 	t.Cleanup(terminate)
-	storagetesting.RunTestDeleteOnce(ctx, t, cacher, etcd3testing.PathPrefix(), cachertesting.Examplev1ProtoCodec)
+	storagetesting.RunTestDeleteOnce(ctx, t, cacher, cachertesting.Examplev1ProtoCodec)
 }
 
 func TestUpdateOnce(t *testing.T) {
 	t.Parallel()
 	ctx, cacher, terminate := setup.Setup(t)
 	t.Cleanup(terminate)
-	storagetesting.RunTestUpdateOnce(ctx, t, cacher, etcd3testing.PathPrefix(), cachertesting.Examplev1ProtoCodec)
+	storagetesting.RunTestUpdateOnce(ctx, t, cacher, cachertesting.Examplev1ProtoCodec)
 }
 
 type testTransformer struct {
@@ -581,7 +580,7 @@ func TestCorrectness(t *testing.T) {
 					ctx, cacher, server, terminate := setup.SetupWithEtcdServer(t)
 					t.Cleanup(terminate)
 					keyFunc := func(obj runtime.Object) (string, error) { return storage.NamespaceKeyFunc("/pods/", obj) }
-					correctness.RunTestCorrectness(ctx, t, cacher, etcd3testing.PathPrefix(), keyFunc, setup.CompactStore(cacher, server.V3Client.Client))
+					correctness.RunTestCorrectness(ctx, t, cacher, keyFunc, setup.CompactStore(cacher, server.V3Client.Client))
 				})
 			}
 		})

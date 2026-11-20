@@ -863,7 +863,7 @@ func TestValidateWatch(t *testing.T) {
 		},
 	}
 	versioner := storage.APIObjectVersioner{}
-	initialState := NewEmptyModel("", func() runtime.Object { return &example.Pod{} }, func() runtime.Object { return &example.PodList{} }, versioner)
+	initialState := NewEmptyModel(func() runtime.Object { return &example.Pod{} }, func() runtime.Object { return &example.PodList{} }, versioner)
 	replay, err := NewReplay(initialState, operations)
 	require.NoError(t, err)
 	validator := NewWatchValidator(versioner, replay, getKey)

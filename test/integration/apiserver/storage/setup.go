@@ -96,7 +96,7 @@ func newEtcdStorageForResource(t testutils.TB, etcdConfig *storagebackend.Config
 	return resourceConfig
 }
 
-func setupStore(tCtx ktesting.TContext, transformer value.Transformer) (storage.Interface, string) {
+func setupStore(tCtx ktesting.TContext, transformer value.Transformer) storage.Interface {
 	featuregatetesting.SetFeatureGateDuringTest(tCtx, utilfeature.DefaultFeatureGate, features.WatchList, true)
 	etcdURL, stop, err := framework.RunCustomEtcd(tCtx.Logger(), "storage_correctness_etcd", nil)
 	if err != nil {
@@ -123,7 +123,7 @@ func setupStore(tCtx ktesting.TContext, transformer value.Transformer) (storage.
 	}
 	tCtx.Cleanup(destroyFunc)
 
-	return store, "/" + etcdConfig.Prefix
+	return store
 }
 
 func setupCacher(tCtx ktesting.TContext, s storage.Interface) storage.Interface {

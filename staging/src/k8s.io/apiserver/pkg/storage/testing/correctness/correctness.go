@@ -127,6 +127,7 @@ func correctnessTestSteps() []testStep {
 			InvalidResponses: []Response{
 				{Object: withRV(pod1, "2")},
 				{Object: withRV(pod1, "3")},
+				{Object: nil, Err: storage.NewKeyExistsError("/registry"+pod1Key, 0)},
 				{Object: &example.Pod{}, Err: storage.NewKeyNotFoundError(pod1Key, 0)},
 				{Object: nil, Err: nil},
 			},
@@ -167,6 +168,7 @@ func correctnessTestSteps() []testStep {
 			},
 			InvalidResponses: []Response{
 				{Object: withRV(pod2, "4")},
+				{Object: nil, Err: (&storage.Preconditions{UID: &wrongUID}).Check("/registry"+pod2Key, withRV(pod2, "3"))},
 				{Object: nil, Err: nil},
 				{Object: nil, Err: storage.NewKeyNotFoundError(pod2Key, 0)},
 			},
@@ -184,6 +186,7 @@ func correctnessTestSteps() []testStep {
 			},
 			InvalidResponses: []Response{
 				{Object: withRV(pod2, "4")},
+				{Object: nil, Err: (&storage.Preconditions{ResourceVersion: &wrongRV}).Check("/registry"+pod2Key, withRV(pod2, "3"))},
 				{Object: nil, Err: nil},
 				{Object: nil, Err: storage.NewKeyNotFoundError(pod2Key, 0)},
 			},
@@ -223,6 +226,7 @@ func correctnessTestSteps() []testStep {
 			InvalidResponses: []Response{
 				{Object: withRV(pod1, "4")},
 				{Object: withRV(pod1, "5")},
+				{Object: nil, Err: storage.NewKeyNotFoundError("/registry"+pod1Key, 4)},
 				{Object: nil, Err: nil},
 			},
 		},
@@ -269,6 +273,7 @@ func correctnessTestSteps() []testStep {
 			InvalidResponses: []Response{
 				{Object: withRV(pod3v1, "5")},
 				{Object: withRV(pod3v1, "6")},
+				{Object: nil, Err: storage.NewKeyNotFoundError("/registry"+pod3Key, 5)},
 				{Object: nil, Err: nil},
 			},
 		},
@@ -291,6 +296,7 @@ func correctnessTestSteps() []testStep {
 			},
 			InvalidResponses: []Response{
 				{Object: withRV(pod3v1, "6")},
+				{Object: nil, Err: (&storage.Preconditions{UID: &pod3UID}).Check("/registry"+pod3Key, &example.Pod{})},
 				{Object: nil, Err: nil},
 				{Object: nil, Err: storage.NewKeyNotFoundError(pod3Key, 5)},
 			},
@@ -418,6 +424,7 @@ func correctnessTestSteps() []testStep {
 			InvalidResponses: []Response{
 				{Object: withRV(pod3v2, "7")},
 				{Object: withRV(pod3v2, "8")},
+				{Object: nil, Err: (&storage.Preconditions{UID: &wrongUID}).Check("/registry"+pod3Key, withRV(pod3v2, "7"))},
 				{Object: nil, Err: nil},
 				{Object: nil, Err: storage.NewKeyNotFoundError(pod3Key, 7)},
 			},
@@ -443,6 +450,7 @@ func correctnessTestSteps() []testStep {
 			InvalidResponses: []Response{
 				{Object: withRV(pod3v2, "7")},
 				{Object: withRV(pod3v2, "8")},
+				{Object: nil, Err: (&storage.Preconditions{ResourceVersion: &wrongRV}).Check("/registry"+pod3Key, withRV(pod3v2, "7"))},
 				{Object: nil, Err: nil},
 				{Object: nil, Err: storage.NewKeyNotFoundError(pod3Key, 7)},
 			},
@@ -1028,6 +1036,7 @@ func readTestCases() []testStep {
 			},
 			InvalidResponses: []Response{
 				{Object: nil, Err: storage.NewKeyNotFoundError(pod1Key, 0)},
+				{Object: nil, Err: storage.NewKeyNotFoundError("/registry"+pod1Key, 22)},
 				{Object: withRV(pod1, "2")},
 				{Object: withRV(pod1, "4")},
 				{Object: nil, Err: nil},
@@ -1168,6 +1177,7 @@ func readTestCases() []testStep {
 				{Object: nil, Err: storage.NewKeyNotFoundError(pod5Key, 0)},
 				{Object: nil, Err: storage.NewKeyNotFoundError(pod5Key, 18)},
 				{Object: nil, Err: storage.NewKeyNotFoundError(pod5Key, 20)},
+				{Object: nil, Err: storage.NewKeyNotFoundError("/registry"+pod5Key, 21)},
 				{Object: nil, Err: storage.NewKeyNotFoundError(pod5Key, 23)},
 				{Object: nil, Err: nil},
 			},
@@ -3151,9 +3161,9 @@ func watchTestCases() []watchTestCase {
 
 // RunTestCorrectness executes the operations from the sequential storage model against real storage
 // and validates that every transition matches the StorageModel specification.
-func RunTestCorrectness(ctx context.Context, t *testing.T, store storage.Interface, storagePrefix string, keyFunc func(obj runtime.Object) (string, error), compact func(ctx context.Context, t *testing.T, resourceVersion string)) {
+func RunTestCorrectness(ctx context.Context, t *testing.T, store storage.Interface, keyFunc func(obj runtime.Object) (string, error), compact func(ctx context.Context, t *testing.T, resourceVersion string)) {
 	versioner := store.Versioner()
-	initialState := NewEmptyModel(storagePrefix, func() runtime.Object { return &example.Pod{} }, func() runtime.Object { return &example.PodList{} }, versioner)
+	initialState := NewEmptyModel(func() runtime.Object { return &example.Pod{} }, func() runtime.Object { return &example.PodList{} }, versioner)
 	model := initialState.Clone()
 
 	watchCases := watchTestCases()
