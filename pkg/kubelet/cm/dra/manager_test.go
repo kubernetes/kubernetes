@@ -34,7 +34,9 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
@@ -59,6 +61,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/dra/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/resourceupdates"
 	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/kubernetes/test/utils/ktesting/initoption"
 )
 
 const (
@@ -2291,6 +2294,31 @@ func TestHandleWatchResourcesStream(t *testing.T) {
 		}
 		assert.True(t, finalErr == nil || errors.Is(finalErr, io.EOF), "Expected nil or io.EOF, got %v", finalErr)
 	})
+}
+
+func TestHandleWatchResourcesStreamUnimplemented(t *testing.T) {
+	tCtx := ktesting.Init(t, initoption.BufferLogs(true))
+	manager, err := NewManager(tCtx.Logger(), nil, t.TempDir())
+	require.NoError(t, err)
+
+	responses := make(chan struct {
+		Resp *drahealthv1alpha1.NodeWatchResourcesResponse
+		Err  error
+	}, 1)
+	responses <- struct {
+		Resp *drahealthv1alpha1.NodeWatchResourcesResponse
+		Err  error
+	}{Err: status.Error(codes.Unimplemented, "device health reporting is not supported by this driver")}
+
+	stream := &mockWatchResourcesClient{
+		RecvChan: responses,
+		Ctx:      tCtx,
+	}
+	err = manager.HandleWatchResourcesStream(tCtx, stream, driverName)
+	require.Equal(t, codes.Unimplemented, status.Code(err))
+
+	logOutput := tCtx.Logger().GetSink().(ktesting.Underlier).GetBuffer().String()
+	assert.NotContains(t, logOutput, "Error receiving from WatchResources stream", "Unimplemented health reporting should not be logged as an error")
 }
 
 // TestUpdateAllocatedResourcesStatus verifies that the manager can correctly
