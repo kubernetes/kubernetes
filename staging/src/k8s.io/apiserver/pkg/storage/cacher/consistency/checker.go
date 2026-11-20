@@ -35,11 +35,16 @@ import (
 	"k8s.io/klog/v2"
 )
 
+const (
+	// DefaultCheckPeriod is the default period of checking consistency between etcd and cache.
+	DefaultCheckPeriod = 5 * time.Minute
+)
+
 var (
 	// CheckPeriod is the period of checking consistency between etcd and cache.
 	// 5 minutes were proposed to match the default compaction period. It's magnitute higher than
 	// List latency SLO (30 seconds) and timeout (1 minute).
-	CheckPeriod = 5 * time.Minute
+	CheckPeriod = DefaultCheckPeriod
 	// PanicOnCacheInconsistency enables the consistency checking mechanism for cache.
 	// Based on KUBE_WATCHCACHE_CONSISTENCY_CHECKER environment variable.
 	PanicOnCacheInconsistency = false
@@ -58,6 +63,7 @@ func NewChecker(resourcePrefix string, groupResource schema.GroupResource, newLi
 		newListFunc:    newListFunc,
 		cacher:         cacher,
 		etcd:           etcd,
+		CheckPeriod:    CheckPeriod,
 	}
 }
 
@@ -68,6 +74,9 @@ type Checker struct {
 
 	cacher cacher
 	etcd   getLister
+
+	// CheckPeriod overrides the package default when positive.
+	CheckPeriod time.Duration
 }
 
 type cacher interface {
@@ -82,14 +91,23 @@ type getLister interface {
 
 func (c Checker) Run(stopCh <-chan struct{}) {
 	klog.V(3).InfoS("Cache consistency check start", "group", c.groupResource.Group, "resource", c.groupResource.Resource)
+	period := c.period()
 	jitter := 0.5 // Period between [interval, interval * (1.0 + jitter)]
 	sliding := true
 	// wait.JitterUntilWithContext starts work immediately, so wait first.
 	select {
-	case <-time.After(wait.Jitter(CheckPeriod, jitter)):
+	case <-time.After(wait.Jitter(period, jitter)):
 	case <-stopCh:
 	}
-	wait.JitterUntilWithContext(wait.ContextForChannel(stopCh), c.check, CheckPeriod, jitter, sliding)
+	wait.JitterUntilWithContext(wait.ContextForChannel(stopCh), c.check, period, jitter, sliding)
+}
+
+// period returns the configured check period, falling back to the default.
+func (c Checker) period() time.Duration {
+	if c.CheckPeriod > 0 {
+		return c.CheckPeriod
+	}
+	return CheckPeriod
 }
 
 func (c *Checker) check(ctx context.Context) {

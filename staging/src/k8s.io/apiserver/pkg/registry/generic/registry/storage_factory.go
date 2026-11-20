@@ -63,6 +63,7 @@ func StorageWithCacher() generic.StorageDecorator {
 			GroupResource:                 storageConfig.GroupResource,
 			EventsHistoryWindow:           storageConfig.EventsHistoryWindow,
 			WatchCacheMaxEvents:           storageConfig.WatchCacheMaxEvents,
+			ConsistencyCheckPeriod:        storageConfig.WatchCacheConsistencyCheckPeriod,
 			ResourcePrefix:                resourcePrefix,
 			KeyFunc:                       cacheKeyFunc,
 			NewFunc:                       newFunc,

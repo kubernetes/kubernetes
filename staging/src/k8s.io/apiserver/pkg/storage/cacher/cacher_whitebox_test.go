@@ -170,6 +170,42 @@ func TestNewCacherFromConfigRejectsInvalidWatchCacheMaxEvents(t *testing.T) {
 	}
 }
 
+func TestNewCacherFromConfigRejectsNegativeConsistencyCheckPeriod(t *testing.T) {
+	config := Config{
+		Versioner:              storage.APIObjectVersioner{},
+		GroupResource:          schema.GroupResource{Resource: "pods"},
+		EventsHistoryWindow:    DefaultEventFreshDuration,
+		ConsistencyCheckPeriod: -time.Minute,
+		ResourcePrefix:         "/pods/",
+		NewFunc:                func() runtime.Object { return &example.Pod{} },
+		NewListFunc:            func() runtime.Object { return &example.PodList{} },
+		Codec:                  cachertesting.Codecs.LegacyCodec(examplev1.SchemeGroupVersion),
+	}
+
+	_, err := NewCacherFromConfig(config)
+	if err == nil {
+		t.Fatal("expected an error for a negative ConsistencyCheckPeriod, got nil")
+	}
+	if !strings.Contains(err.Error(), "ConsistencyCheckPeriod") {
+		t.Errorf("expected error about ConsistencyCheckPeriod, got: %v", err)
+	}
+}
+
+func TestNewCacheDelegatorUsesConsistencyCheckPeriod(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DetectCacheInconsistency, true)
+
+	cacher := &Cacher{consistencyCheckPeriod: 15 * time.Minute}
+	delegator := NewCacheDelegator(cacher, nil)
+	defer delegator.Stop()
+
+	if delegator.checker == nil {
+		t.Fatal("expected a consistency checker")
+	}
+	if got := delegator.checker.CheckPeriod; got != 15*time.Minute {
+		t.Errorf("check period = %v, want %v", got, 15*time.Minute)
+	}
+}
+
 func TestShouldDelegateList(t *testing.T) {
 	type opts struct {
 		Recursive            bool

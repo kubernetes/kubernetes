@@ -28,6 +28,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/spf13/pflag"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -39,6 +41,7 @@ import (
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/options/compressionconfig"
 	compressionconfigmetrics "k8s.io/apiserver/pkg/server/options/compressionconfig/metrics"
+	"k8s.io/apiserver/pkg/storage/cacher/consistency"
 	"k8s.io/apiserver/pkg/storage/etcd3/metrics"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	storagevalue "k8s.io/apiserver/pkg/storage/value"
@@ -252,6 +255,27 @@ func TestEtcdOptionsValidate(t *testing.T) {
 				t.Errorf("got err: %s, expected err nil", errs)
 			}
 		})
+	}
+}
+
+func TestWatchCacheConsistencyCheckPeriodFlag(t *testing.T) {
+	opts := NewEtcdOptions(&storagebackend.Config{
+		Transport: storagebackend.TransportConfig{ServerList: []string{"http://127.0.0.1"}},
+	})
+	fs := pflag.NewFlagSet("test", pflag.ContinueOnError)
+	opts.AddFlags(fs)
+
+	if got := opts.StorageConfig.WatchCacheConsistencyCheckPeriod; got != consistency.DefaultCheckPeriod {
+		t.Errorf("default period = %v, want %v", got, consistency.DefaultCheckPeriod)
+	}
+	if err := fs.Parse([]string{"--watch-cache-consistency-check-period=15m"}); err != nil {
+		t.Fatalf("unexpected error parsing 15m: %v", err)
+	}
+	if got := opts.StorageConfig.WatchCacheConsistencyCheckPeriod; got != 15*time.Minute {
+		t.Errorf("period = %v, want %v", got, 15*time.Minute)
+	}
+	if err := fs.Parse([]string{"--watch-cache-consistency-check-period=0"}); err == nil {
+		t.Error("expected an error for a zero period")
 	}
 }
 

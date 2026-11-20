@@ -48,6 +48,7 @@ func NewCacheDelegator(cacher *Cacher, storage storage.Interface) *CacheDelegato
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.DetectCacheInconsistency) || consistency.PanicOnCacheInconsistency {
 		d.checker = consistency.NewChecker(cacher.resourcePrefix, cacher.groupResource, cacher.newListFunc, cacher, storage)
+		d.checker.CheckPeriod = cacher.consistencyCheckPeriod
 		d.wg.Add(1)
 		go func() {
 			defer d.wg.Done()
