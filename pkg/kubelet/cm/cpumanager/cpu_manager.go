@@ -436,6 +436,19 @@ func (m *manager) removeStaleState(rootLogger klog.Logger) {
 		}
 	}
 
+	// A crash after deleting the last container can leave only the pod-level
+	// allocation in the checkpoint. Container-based cleanup cannot find it.
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodLevelResourceManagers) {
+		for podUID := range m.state.GetPodCPUAssignments() {
+			if _, active := activeContainers[podUID]; active {
+				continue
+			}
+			if err := m.policy.RemoveContainer(rootLogger, m.state, podUID, ""); err != nil {
+				rootLogger.Error(err, "Failed to remove stale pod CPU allocation", "podUID", podUID)
+			}
+		}
+	}
+
 	m.containerMap.Visit(func(podUID, containerName, containerID string) {
 		logger := klog.LoggerWithValues(rootLogger, "podUID", podUID, "containerName", containerName)
 		if _, ok := activeContainers[podUID][containerName]; ok {

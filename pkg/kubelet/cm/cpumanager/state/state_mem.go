@@ -206,6 +206,21 @@ func (s *stateMemory) DeletePod(podUID string) {
 	s.logger.V(2).Info("Deleted pod", "podUID", podUID)
 }
 
+// ReleasePod atomically removes the container assignments, the baselines and
+// the pod-level entry of the pod, and adds releasedCPUSet to the default CPU
+// set. The pod may have no entry in a given map: an allocation rollback can
+// release a pod whose pod-level entry was never written.
+func (s *stateMemory) ReleasePod(podUID string, releasedCPUSet cpuset.CPUSet) {
+	s.Lock()
+	defer s.Unlock()
+
+	delete(s.assignments, podUID)
+	delete(s.baselines, podUID)
+	delete(s.podAssignments, podUID)
+	s.defaultCPUSet = s.defaultCPUSet.Union(releasedCPUSet)
+	s.logger.V(2).Info("Released pod CPU allocations", "podUID", podUID, "releasedCPUSet", releasedCPUSet, "defaultCPUSet", s.defaultCPUSet)
+}
+
 func (s *stateMemory) ClearState() {
 	s.Lock()
 	defer s.Unlock()

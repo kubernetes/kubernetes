@@ -753,10 +753,10 @@ func TestStaticPolicyMetricsPodLevelRestoreStalePodCPUSetDropped(t *testing.T) {
 		defaultCPUSet:  allCPUs,
 	}
 	require.NoError(t, p.Start(logger, st))
-	// The interrupted release left the bubble both in the pod-level entry
-	// and in the default CPU set, so the seeded gauges report it as
-	// exclusively allocated while the shared pool is already full.
-	assertCPUMetrics(t, cpuMetricsSnapshot{exclusiveCPUs: 4, sharedPoolMilli: 11000, perNUMA: map[string]float64{"0": 4, "1": 0}})
+	// The legacy interrupted release left the bubble both in the pod-level
+	// entry and in the default CPU set. The startup cleanup reclaims the entry,
+	// so the seeded gauges report the full shared pool and no exclusive CPUs.
+	assertCPUMetrics(t, cpuMetricsSnapshot{exclusiveCPUs: 0, sharedPoolMilli: 11000, perNUMA: map[string]float64{"0": 0, "1": 0}})
 
 	pod := makePodWithContainersAndPodLevelResources("plrm-pod", "4", "4", nil, []containerSpec{
 		{name: "gu-container", request: "2", limit: "2"},

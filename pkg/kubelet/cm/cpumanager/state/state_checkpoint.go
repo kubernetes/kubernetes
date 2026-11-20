@@ -430,6 +430,19 @@ func (sc *stateCheckpoint) DeletePod(podUID string) {
 	}
 }
 
+// ReleasePod releases every resource the pod holds and saves the result in a
+// single checkpoint write, so a crash can never observe a partially released
+// pod.
+func (sc *stateCheckpoint) ReleasePod(podUID string, releasedCPUSet cpuset.CPUSet) {
+	sc.mux.Lock()
+	defer sc.mux.Unlock()
+	sc.cache.ReleasePod(podUID, releasedCPUSet)
+	err := sc.storeState()
+	if err != nil {
+		sc.logger.Error(err, "Failed to store state to checkpoint", "podUID", podUID)
+	}
+}
+
 // ClearState clears the state and saves it in a checkpoint
 func (sc *stateCheckpoint) ClearState() {
 	sc.mux.Lock()
