@@ -32,7 +32,7 @@ func initPaths(cg *cgroups.Cgroup) (map[string]string, error) {
 	}
 
 	paths := make(map[string]string)
-	for _, sys := range subsystems {
+	for _, sys := range subsystems() {
 		name := sys.Name()
 		path, err := subsysPath(root, inner, name)
 		if err != nil {

@@ -1634,7 +1634,7 @@ func TestUncoreCaches(t *testing.T) {
 	}
 }
 
-func Test_getUncoreCacheID(t *testing.T) {
+func Test_uncoreCacheLayersUncoreID(t *testing.T) {
 	tests := []struct {
 		name string
 		args cadvisorapi.Core
@@ -1669,9 +1669,252 @@ func Test_getUncoreCacheID(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := getUncoreCacheID(tt.args); got != tt.want {
-				t.Errorf("getUncoreCacheID() = %v, want %v", got, tt.want)
+			if got, _ := uncoreCacheLayers(cadvisorapi.Node{}, tt.args); got != tt.want {
+				t.Errorf("uncoreCacheLayers() uncore id = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+func cache(id, level int) cadvisorapi.Cache {
+	return cadvisorapi.Cache{Id: id, Level: level, Type: "Unified", Size: 1 << 20}
+}
+
+// Test_DiscoverUncoreCacheLayers checks how Discover turns the caches from cadvisor
+// (Node.Caches and Core.UncoreCaches) into the uncore cache and nested layers.
+func Test_DiscoverUncoreCacheLayers(t *testing.T) {
+	tests := map[string]struct {
+		machineInfo cadvisorapi.MachineInfo
+		want        map[int]CPUInfo
+		wantUncore  int
+	}{
+		"l2-pairs-below-a-partial-l3-in-sysfs-order": {
+			// one node, non-SMT cores, L2 shared by 2 cores, L3 by 4 cores.
+			machineInfo: cadvisorapi.MachineInfo{
+				NumCores: 8, NumSockets: 1,
+				Topology: []cadvisorapi.Node{{Id: 0, Cores: []cadvisorapi.Core{
+					{SocketID: 0, Id: 0, Threads: []int{0}, UncoreCaches: []cadvisorapi.Cache{cache(100, 2), cache(200, 3)}},
+					{SocketID: 0, Id: 1, Threads: []int{1}, UncoreCaches: []cadvisorapi.Cache{cache(100, 2), cache(200, 3)}},
+					{SocketID: 0, Id: 2, Threads: []int{2}, UncoreCaches: []cadvisorapi.Cache{cache(109, 2), cache(200, 3)}},
+					{SocketID: 0, Id: 3, Threads: []int{3}, UncoreCaches: []cadvisorapi.Cache{cache(109, 2), cache(200, 3)}},
+					{SocketID: 0, Id: 4, Threads: []int{4}, UncoreCaches: []cadvisorapi.Cache{cache(103, 2), cache(201, 3)}},
+					{SocketID: 0, Id: 5, Threads: []int{5}, UncoreCaches: []cadvisorapi.Cache{cache(103, 2), cache(201, 3)}},
+					{SocketID: 0, Id: 6, Threads: []int{6}, UncoreCaches: []cadvisorapi.Cache{cache(106, 2), cache(201, 3)}},
+					{SocketID: 0, Id: 7, Threads: []int{7}, UncoreCaches: []cadvisorapi.Cache{cache(106, 2), cache(201, 3)}},
+				}}},
+			},
+			want: map[int]CPUInfo{
+				0: {CoreID: 0, UncoreCacheID: 200, NestedUncoreCacheIDs: []int{100}},
+				1: {CoreID: 1, UncoreCacheID: 200, NestedUncoreCacheIDs: []int{100}},
+				2: {CoreID: 2, UncoreCacheID: 200, NestedUncoreCacheIDs: []int{109}},
+				3: {CoreID: 3, UncoreCacheID: 200, NestedUncoreCacheIDs: []int{109}},
+				4: {CoreID: 4, UncoreCacheID: 201, NestedUncoreCacheIDs: []int{103}},
+				5: {CoreID: 5, UncoreCacheID: 201, NestedUncoreCacheIDs: []int{103}},
+				6: {CoreID: 6, UncoreCacheID: 201, NestedUncoreCacheIDs: []int{106}},
+				7: {CoreID: 7, UncoreCacheID: 201, NestedUncoreCacheIDs: []int{106}},
+			},
+			wantUncore: 2,
+		},
+		"order-of-the-uncore-caches-entries-does-not-matter": {
+			machineInfo: cadvisorapi.MachineInfo{
+				NumCores: 2, NumSockets: 1,
+				Topology: []cadvisorapi.Node{{Id: 0, Cores: []cadvisorapi.Core{
+					{SocketID: 0, Id: 0, Threads: []int{0}, UncoreCaches: []cadvisorapi.Cache{cache(200, 3), cache(100, 2)}},
+					{SocketID: 0, Id: 1, Threads: []int{1}, UncoreCaches: []cadvisorapi.Cache{cache(200, 3), cache(100, 2)}},
+				}}},
+			},
+			want: map[int]CPUInfo{
+				0: {CoreID: 0, UncoreCacheID: 200, NestedUncoreCacheIDs: []int{100}},
+				1: {CoreID: 1, UncoreCacheID: 200, NestedUncoreCacheIDs: []int{100}},
+			},
+			wantUncore: 1,
+		},
+		"node-level-l3-with-a-shared-l2-in-uncore-caches": {
+			// Xeon 6 with E-cores: the L3 spans each node, so it is in Node.Caches and the
+			// cores' UncoreCaches hold only the 4-core L2
+			machineInfo: cadvisorapi.MachineInfo{
+				NumCores: 8, NumSockets: 2,
+				Topology: []cadvisorapi.Node{
+					{Id: 0, Caches: []cadvisorapi.Cache{cache(5, 3)}, Cores: []cadvisorapi.Core{
+						{SocketID: 0, Id: 0, Threads: []int{0}, UncoreCaches: []cadvisorapi.Cache{cache(0, 2)}},
+						{SocketID: 0, Id: 1, Threads: []int{1}, UncoreCaches: []cadvisorapi.Cache{cache(0, 2)}},
+						{SocketID: 0, Id: 2, Threads: []int{2}, UncoreCaches: []cadvisorapi.Cache{cache(2, 2)}},
+						{SocketID: 0, Id: 3, Threads: []int{3}, UncoreCaches: []cadvisorapi.Cache{cache(2, 2)}},
+					}},
+					{Id: 1, Caches: []cadvisorapi.Cache{cache(6, 3)}, Cores: []cadvisorapi.Core{
+						{SocketID: 1, Id: 0, Threads: []int{4}, UncoreCaches: []cadvisorapi.Cache{cache(1, 2)}},
+						{SocketID: 1, Id: 1, Threads: []int{5}, UncoreCaches: []cadvisorapi.Cache{cache(1, 2)}},
+						{SocketID: 1, Id: 2, Threads: []int{6}, UncoreCaches: []cadvisorapi.Cache{cache(3, 2)}},
+						{SocketID: 1, Id: 3, Threads: []int{7}, UncoreCaches: []cadvisorapi.Cache{cache(3, 2)}},
+					}},
+				},
+			},
+			want: map[int]CPUInfo{
+				0: {CoreID: 0, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 5, NestedUncoreCacheIDs: []int{0}},
+				1: {CoreID: 1, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 5, NestedUncoreCacheIDs: []int{0}},
+				2: {CoreID: 2, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 5, NestedUncoreCacheIDs: []int{2}},
+				3: {CoreID: 3, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 5, NestedUncoreCacheIDs: []int{2}},
+				4: {CoreID: 4, SocketID: 1, NUMANodeID: 1, UncoreCacheID: 6, NestedUncoreCacheIDs: []int{1}},
+				5: {CoreID: 5, SocketID: 1, NUMANodeID: 1, UncoreCacheID: 6, NestedUncoreCacheIDs: []int{1}},
+				6: {CoreID: 6, SocketID: 1, NUMANodeID: 1, UncoreCacheID: 6, NestedUncoreCacheIDs: []int{3}},
+				7: {CoreID: 7, SocketID: 1, NUMANodeID: 1, UncoreCacheID: 6, NestedUncoreCacheIDs: []int{3}},
+			},
+			wantUncore: 2,
+		},
+		"node-level-l3-only": {
+			// Xeon Scalable without sub-NUMA clustering: only a node level L3.
+			machineInfo: cadvisorapi.MachineInfo{
+				NumCores: 4, NumSockets: 2,
+				Topology: []cadvisorapi.Node{
+					{Id: 0, Caches: []cadvisorapi.Cache{cache(10, 3)}, Cores: []cadvisorapi.Core{
+						{SocketID: 0, Id: 0, Threads: []int{0}},
+						{SocketID: 0, Id: 1, Threads: []int{1}},
+					}},
+					{Id: 1, Caches: []cadvisorapi.Cache{cache(11, 3)}, Cores: []cadvisorapi.Core{
+						{SocketID: 1, Id: 0, Threads: []int{2}},
+						{SocketID: 1, Id: 1, Threads: []int{3}},
+					}},
+				},
+			},
+			want: map[int]CPUInfo{
+				0: {CoreID: 0, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 10},
+				1: {CoreID: 1, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 10},
+				2: {CoreID: 2, SocketID: 1, NUMANodeID: 1, UncoreCacheID: 11},
+				3: {CoreID: 3, SocketID: 1, NUMANodeID: 1, UncoreCacheID: 11},
+			},
+			wantUncore: 2,
+		},
+		"hybrid-cores-only-cores-sharing-an-l2-get-a-nested-layer": {
+			// Core i7-12700K (SMT cores with a private L2, cores without SMT sharing an L2),
+			// reduced to 2 + 4 cores, with the L3 in UncoreCaches of every core
+			machineInfo: cadvisorapi.MachineInfo{
+				NumCores: 8, NumSockets: 1,
+				Topology: []cadvisorapi.Node{{Id: 0, Cores: []cadvisorapi.Core{
+					{SocketID: 0, Id: 0, Threads: []int{0, 1}, Caches: []cadvisorapi.Cache{cache(0, 2)}, UncoreCaches: []cadvisorapi.Cache{cache(0, 3)}},
+					{SocketID: 0, Id: 4, Threads: []int{2, 3}, Caches: []cadvisorapi.Cache{cache(1, 2)}, UncoreCaches: []cadvisorapi.Cache{cache(0, 3)}},
+					{SocketID: 0, Id: 36, Threads: []int{4}, UncoreCaches: []cadvisorapi.Cache{cache(9, 2), cache(0, 3)}},
+					{SocketID: 0, Id: 37, Threads: []int{5}, UncoreCaches: []cadvisorapi.Cache{cache(9, 2), cache(0, 3)}},
+					{SocketID: 0, Id: 38, Threads: []int{6}, UncoreCaches: []cadvisorapi.Cache{cache(9, 2), cache(0, 3)}},
+					{SocketID: 0, Id: 39, Threads: []int{7}, UncoreCaches: []cadvisorapi.Cache{cache(9, 2), cache(0, 3)}},
+				}}},
+			},
+			want: map[int]CPUInfo{
+				0: {CoreID: 0, UncoreCacheID: 0},
+				1: {CoreID: 0, UncoreCacheID: 0},
+				2: {CoreID: 2, UncoreCacheID: 0},
+				3: {CoreID: 2, UncoreCacheID: 0},
+				4: {CoreID: 4, UncoreCacheID: 0, NestedUncoreCacheIDs: []int{9}},
+				5: {CoreID: 5, UncoreCacheID: 0, NestedUncoreCacheIDs: []int{9}},
+				6: {CoreID: 6, UncoreCacheID: 0, NestedUncoreCacheIDs: []int{9}},
+				7: {CoreID: 7, UncoreCacheID: 0, NestedUncoreCacheIDs: []int{9}},
+			},
+			wantUncore: 1,
+		},
+		"hybrid-cores-with-a-node-level-l3": {
+			// the same with the L3 as a node level cache (cadvisor reports either form on
+			// hybrid CPUs)
+			machineInfo: cadvisorapi.MachineInfo{
+				NumCores: 8, NumSockets: 1,
+				Topology: []cadvisorapi.Node{{Id: 0, Caches: []cadvisorapi.Cache{cache(0, 3)}, Cores: []cadvisorapi.Core{
+					{SocketID: 0, Id: 0, Threads: []int{0, 1}, Caches: []cadvisorapi.Cache{cache(0, 2)}},
+					{SocketID: 0, Id: 4, Threads: []int{2, 3}, Caches: []cadvisorapi.Cache{cache(1, 2)}},
+					{SocketID: 0, Id: 36, Threads: []int{4}, UncoreCaches: []cadvisorapi.Cache{cache(9, 2)}},
+					{SocketID: 0, Id: 37, Threads: []int{5}, UncoreCaches: []cadvisorapi.Cache{cache(9, 2)}},
+					{SocketID: 0, Id: 38, Threads: []int{6}, UncoreCaches: []cadvisorapi.Cache{cache(9, 2)}},
+					{SocketID: 0, Id: 39, Threads: []int{7}, UncoreCaches: []cadvisorapi.Cache{cache(9, 2)}},
+				}}},
+			},
+			want: map[int]CPUInfo{
+				0: {CoreID: 0, UncoreCacheID: 0},
+				1: {CoreID: 0, UncoreCacheID: 0},
+				2: {CoreID: 2, UncoreCacheID: 0},
+				3: {CoreID: 2, UncoreCacheID: 0},
+				4: {CoreID: 4, UncoreCacheID: 0, NestedUncoreCacheIDs: []int{9}},
+				5: {CoreID: 5, UncoreCacheID: 0, NestedUncoreCacheIDs: []int{9}},
+				6: {CoreID: 6, UncoreCacheID: 0, NestedUncoreCacheIDs: []int{9}},
+				7: {CoreID: 7, UncoreCacheID: 0, NestedUncoreCacheIDs: []int{9}},
+			},
+			wantUncore: 1,
+		},
+		"many-levels-of-uncore-caches": {
+			// an imaginary part: a node wide level 5 cache, uncore caches of levels 2 to 4
+			// below it
+			machineInfo: cadvisorapi.MachineInfo{
+				NumCores: 2, NumSockets: 1,
+				Topology: []cadvisorapi.Node{{Id: 0, Caches: []cadvisorapi.Cache{cache(50, 5)}, Cores: []cadvisorapi.Core{
+					{SocketID: 0, Id: 0, Threads: []int{0}, UncoreCaches: []cadvisorapi.Cache{cache(100, 2), cache(300, 3), cache(400, 4)}},
+					{SocketID: 0, Id: 1, Threads: []int{1}, UncoreCaches: []cadvisorapi.Cache{cache(101, 2), cache(300, 3), cache(400, 4)}},
+				}}},
+			},
+			want: map[int]CPUInfo{
+				0: {CoreID: 0, UncoreCacheID: 50, NestedUncoreCacheIDs: []int{400, 300, 100}},
+				1: {CoreID: 1, UncoreCacheID: 50, NestedUncoreCacheIDs: []int{400, 300, 101}},
+			},
+			wantUncore: 1,
+		},
+		"l3-only-on-smt-cores-has-no-nested-layer": {
+			// an L2 private to an SMT core is not in UncoreCaches
+			machineInfo: cadvisorapi.MachineInfo{
+				NumCores: 4, NumSockets: 1,
+				Topology: []cadvisorapi.Node{{Id: 0, Cores: []cadvisorapi.Core{
+					{SocketID: 0, Id: 0, Threads: []int{0, 2}, UncoreCaches: []cadvisorapi.Cache{cache(7, 3)}},
+					{SocketID: 0, Id: 1, Threads: []int{1, 3}, UncoreCaches: []cadvisorapi.Cache{cache(7, 3)}},
+				}}},
+			},
+			want: map[int]CPUInfo{
+				0: {CoreID: 0, UncoreCacheID: 7},
+				1: {CoreID: 1, UncoreCacheID: 7},
+				2: {CoreID: 0, UncoreCacheID: 7},
+				3: {CoreID: 1, UncoreCacheID: 7},
+			},
+			wantUncore: 1,
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
+			got, err := Discover(logger, &tt.machineInfo)
+			if err != nil {
+				t.Fatalf("Discover() error = %v", err)
+			}
+			if diff := cmp.Diff(map[int]CPUInfo(got.CPUDetails), tt.want); diff != "" {
+				t.Errorf("CPUDetails mismatch (-got +want):\n%s", diff)
+			}
+			if got.NumUncoreCache != tt.wantUncore {
+				t.Errorf("NumUncoreCache = %d, want %d", got.NumUncoreCache, tt.wantUncore)
+			}
+		})
+	}
+}
+
+func TestCPUDetailsNestedUncoreCacheGroups(t *testing.T) {
+	d := CPUDetails{
+		0: {CoreID: 0, UncoreCacheID: 0, NestedUncoreCacheIDs: []int{100, 7}},
+		1: {CoreID: 1, UncoreCacheID: 0, NestedUncoreCacheIDs: []int{100, 8}},
+		2: {CoreID: 2, UncoreCacheID: 0, NestedUncoreCacheIDs: []int{109, 9}},
+		3: {CoreID: 3, UncoreCacheID: 0}, // no nested uncore cache
+	}
+	if got := d.NestedUncoreCacheLayers(); got != 2 {
+		t.Errorf("NestedUncoreCacheLayers() = %d, want 2", got)
+	}
+	if got := (CPUDetails{0: {CoreID: 0}}).NestedUncoreCacheLayers(); got != 0 {
+		t.Errorf("NestedUncoreCacheLayers() without nested uncore caches = %d, want 0", got)
+	}
+	want := []map[int][]int{
+		{100: {0, 1}, 109: {2}},
+		{7: {0}, 8: {1}, 9: {2}},
+		{},
+	}
+	for layer, wantGroups := range want {
+		got := d.NestedUncoreCacheGroups(layer)
+		if len(got) != len(wantGroups) {
+			t.Errorf("NestedUncoreCacheGroups(%d) has %d groups, want %d", layer, len(got), len(wantGroups))
+		}
+		for id, cpus := range wantGroups {
+			if !got[id].Equals(cpuset.New(cpus...)) {
+				t.Errorf("NestedUncoreCacheGroups(%d)[%d] = %v, want %v", layer, id, got[id], cpus)
+			}
+		}
 	}
 }

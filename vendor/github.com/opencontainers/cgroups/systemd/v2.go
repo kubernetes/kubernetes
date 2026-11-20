@@ -1,11 +1,9 @@
 package systemd
 
 import (
-	"bufio"
-	"errors"
 	"fmt"
+	"maps"
 	"math"
-	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -17,11 +15,19 @@ import (
 
 	"github.com/opencontainers/cgroups"
 	"github.com/opencontainers/cgroups/fs2"
+	"github.com/opencontainers/cgroups/internal/delegate"
 )
 
+// Minimum systemd versions supporting some unit properties. Unless noted
+// otherwise, these are from "Added in version" notes in
+// https://github.com/systemd/systemd/blob/v262/man/systemd.resource-control.xml
 const (
-	cpuIdleSupportedVersion   = 252
-	oomPolicySupportedVersion = 253
+	cpuQuotaPeriodSupportedVersion = 242 // CPUQuotaPeriodSec=
+	allowedCPUsSupportedVersion    = 244 // AllowedCPUs=, AllowedMemoryNodes=
+	cpuIdleSupportedVersion        = 252 // CPUWeight=idle (see NEWS for v252)
+	oomPolicySupportedVersion      = 253 // OOMPolicy= for scopes (see systemd.scope.xml)
+	zswapMaxSupportedVersion       = 253 // MemoryZSwapMax=
+	zswapWritebackSupportedVersion = 256 // MemoryZSwapWriteback=
 )
 
 type UnifiedManager struct {
@@ -69,6 +75,8 @@ func shouldSetCPUIdle(cm *dbusConnManager, v string) bool {
 // For the list of keys, see https://www.kernel.org/doc/Documentation/cgroup-v2.txt
 //
 // For the list of systemd unit properties, see systemd.resource-control(5).
+//
+// The value of res["cpu.max"] may be modified (see addCPUQuota).
 func unifiedResToSystemdProps(cm *dbusConnManager, res map[string]string) (props []systemdDbus.Property, _ error) {
 	var err error
 
@@ -114,7 +122,17 @@ func unifiedResToSystemdProps(cm *dbusConnManager, res map[string]string) (props
 					return nil, fmt.Errorf("unified resource %q quota value conversion error: %w", k, err)
 				}
 			}
+			origQuota := quota
 			addCPUQuota(cm, &props, &quota, period)
+			if quota != origQuota {
+				// Update the value along with the round-up in order
+				// to write the same value to cgroupfs.
+				sv[0] = "max"
+				if quota > 0 {
+					sv[0] = strconv.FormatInt(quota, 10)
+				}
+				res[k] = strings.Join(sv, " ")
+			}
 
 		case "cpu.weight":
 			if shouldSetCPUIdle(cm, strings.TrimSpace(res["cpu.idle"])) {
@@ -139,9 +157,8 @@ func unifiedResToSystemdProps(cm *dbusConnManager, res map[string]string) (props
 				"cpuset.cpus": "AllowedCPUs",
 				"cpuset.mems": "AllowedMemoryNodes",
 			}
-			// systemd only supports these properties since v244
 			sdVer := systemdVersion(cm)
-			if sdVer >= 244 {
+			if sdVer >= allowedCPUsSupportedVersion {
 				props = append(props,
 					newProp(m[k], bits))
 			} else {
@@ -167,6 +184,29 @@ func unifiedResToSystemdProps(cm *dbusConnManager, res map[string]string) (props
 			}
 			props = append(props,
 				newProp(m[k], num))
+
+		case "memory.zswap.max":
+			num, err := strconv.ParseUint(v, 10, 64)
+			if err != nil {
+				return nil, fmt.Errorf("invalid %s=%q, expected a number", k, v)
+			}
+			if sdVer := systemdVersion(cm); sdVer < zswapMaxSupportedVersion {
+				logrus.Debugf("systemd v%d does not support MemoryZSwapMax", sdVer)
+				continue
+			}
+			props = append(props,
+				newProp("MemoryZSwapMax", num))
+
+		case "memory.zswap.writeback":
+			if v != "0" && v != "1" {
+				return nil, fmt.Errorf("invalid %s=%q, expected 0 or 1", k, v)
+			}
+			if sdVer := systemdVersion(cm); sdVer < zswapWritebackSupportedVersion {
+				logrus.Debugf("systemd v%d does not support MemoryZSwapWriteback", sdVer)
+				continue
+			}
+			props = append(props,
+				newProp("MemoryZSwapWriteback", v == "1"))
 
 		case "pids.max":
 			num := uint64(math.MaxUint64)
@@ -231,7 +271,9 @@ func genV2ResourcesProperties(dirPath string, r *cgroups.Resources, cm *dbusConn
 	if err != nil {
 		return nil, err
 	}
-	if swap != 0 {
+	if swap != 0 || r.MemorySwap > 0 {
+		// swap == 0 && r.MemorySwap > 0: memory and memorySwap
+		// set to the same value -- disable swap.
 		properties = append(properties,
 			newProp("MemorySwapMax", uint64(swap)))
 	}
@@ -366,51 +408,12 @@ func (m *UnifiedManager) Apply(pid int) error {
 	}
 
 	if c.OwnerUID != nil {
-		// The directory itself must be chowned.
-		err := os.Chown(m.path, *c.OwnerUID, -1)
-		if err != nil {
+		if err := delegate.Chown(m.path, *c.OwnerUID); err != nil {
 			return err
-		}
-
-		filesToChown, err := cgroupFilesToChown()
-		if err != nil {
-			return err
-		}
-
-		for _, v := range filesToChown {
-			err := os.Chown(m.path+"/"+v, *c.OwnerUID, -1)
-			// Some files might not be present.
-			if err != nil && !errors.Is(err, os.ErrNotExist) {
-				return err
-			}
 		}
 	}
 
 	return nil
-}
-
-// The kernel exposes a list of files that should be chowned to the delegate
-// uid in /sys/kernel/cgroup/delegate.  If the file is not present
-// (Linux < 4.15), use the initial values mentioned in cgroups(7).
-func cgroupFilesToChown() ([]string, error) {
-	const cgroupDelegateFile = "/sys/kernel/cgroup/delegate"
-
-	f, err := os.Open(cgroupDelegateFile)
-	if err != nil {
-		return []string{"cgroup.procs", "cgroup.subtree_control", "cgroup.threads"}, nil
-	}
-	defer f.Close()
-
-	filesToChown := []string{}
-	scanner := bufio.NewScanner(f)
-	for scanner.Scan() {
-		filesToChown = append(filesToChown, scanner.Text())
-	}
-	if err := scanner.Err(); err != nil {
-		return nil, fmt.Errorf("error reading %s: %w", cgroupDelegateFile, err)
-	}
-
-	return filesToChown, nil
 }
 
 // AddPid adds a process with a given pid to an existing cgroup.
@@ -525,8 +528,9 @@ func (m *UnifiedManager) Set(r *cgroups.Resources) error {
 	if r == nil {
 		return nil
 	}
-	// Use a copy since CpuQuota in r may be modified.
+	// Use a copy since CpuQuota and Unified["cpu.max"] in r may be modified.
 	rCopy := *r
+	rCopy.Unified = maps.Clone(r.Unified)
 	r = &rCopy
 	properties, err := genV2ResourcesProperties(m.fsMgr.Path(""), r, m.dbus)
 	if err != nil {

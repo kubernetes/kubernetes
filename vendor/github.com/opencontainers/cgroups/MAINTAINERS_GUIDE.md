@@ -64,11 +64,37 @@ made through a pull request.
 
 All decisions are pull requests, and the relevant maintainers make
 decisions by accepting or refusing the pull request. Review and acceptance
-by anyone is denoted by adding a comment in the pull request: `LGTM`.
+by anyone is denoted by approving the pull request (an `LGTM`).
 However, only currently listed `MAINTAINERS` are counted towards the required
-two LGTMs. In addition, if a maintainer has created a pull request, they cannot
-count toward the two LGTM rule (to ensure equal amounts of review for every pull
-request, no matter who wrote it).
+LGTMs, and the pull request author's own LGTM is never counted.
+
+A pull request can be merged once it has:
+
+* two LGTMs from maintainers; or
+* one LGTM from a maintainer, if it is a routine change; or
+* one LGTM from another maintainer, if the author is a maintainer, the pull
+  request is not a governance change, and it has been open for review (that
+  is, not a draft) for at least 7 days, or 14 days if it is a large change
+  (more than 100 lines added and removed). This gives other maintainers a
+  chance to review and object.
+
+A pull request is a governance change if it changes the rules of the project,
+or how they are enforced. That is, it changes `MAINTAINERS`, `CODEOWNERS`,
+a top-level `*.md` file other than `README.md` (such as this document), or the
+`review-policy` workflow. A governance change always requires two LGTMs.
+
+A pull request is a routine change if it is not a governance change, and it is
+either:
+
+* opened by Dependabot; or
+* only changes documentation (`*.md` files) and/or CI configuration (files
+  under `.github/`).
+
+In all cases, a maintainer requesting changes blocks the merge until the
+request is resolved (the reviewer approves, or the review is dismissed).
+
+These rules are enforced by the
+[`review-policy`](.github/workflows/review-policy.yml) check.
 
 Overall the maintainer system works because of mutual respect.
 The maintainers trust one another to act in the best interests of the project.
