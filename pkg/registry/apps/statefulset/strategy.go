@@ -144,7 +144,7 @@ func (statefulSetStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Obj
 	newStatefulSet := obj.(*apps.StatefulSet)
 	warnings := pod.GetWarningsForPodTemplate(ctx, field.NewPath("spec", "template"), &newStatefulSet.Spec.Template, nil)
 	for i, pvc := range newStatefulSet.Spec.VolumeClaimTemplates {
-		warnings = append(warnings, pvcutil.GetWarningsForPersistentVolumeClaimSpec(field.NewPath("spec", "volumeClaimTemplates").Index(i), pvc.Spec)...)
+		warnings = append(warnings, pvcutil.GetWarningsForPersistentVolumeClaimSpec(field.NewPath("spec", "volumeClaimTemplates").Index(i).Child("spec"), pvc.Spec)...)
 	}
 
 	if newStatefulSet.Spec.RevisionHistoryLimit != nil && *newStatefulSet.Spec.RevisionHistoryLimit < 0 {
@@ -185,7 +185,7 @@ func (statefulSetStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtim
 		warnings = pod.GetWarningsForPodTemplate(ctx, field.NewPath("spec", "template"), &newStatefulSet.Spec.Template, &oldStatefulSet.Spec.Template)
 	}
 	for i, pvc := range newStatefulSet.Spec.VolumeClaimTemplates {
-		warnings = append(warnings, pvcutil.GetWarningsForPersistentVolumeClaimSpec(field.NewPath("spec", "volumeClaimTemplates").Index(i).Child("Spec"), pvc.Spec)...)
+		warnings = append(warnings, pvcutil.GetWarningsForPersistentVolumeClaimSpec(field.NewPath("spec", "volumeClaimTemplates").Index(i).Child("spec"), pvc.Spec)...)
 	}
 	if newStatefulSet.Spec.RevisionHistoryLimit != nil && *newStatefulSet.Spec.RevisionHistoryLimit < 0 {
 		warnings = append(warnings, "spec.revisionHistoryLimit: a negative value retains all historical revisions; a value >= 0 is recommended")
