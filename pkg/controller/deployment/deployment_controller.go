@@ -667,7 +667,19 @@ func (dc *DeploymentController) syncDeployment(ctx context.Context, key string) 
 
 	scalingEvent, err := dc.isScalingEvent(ctx, d, rsList)
 	if err != nil {
-		return err
+		newRS := util.FindNewReplicaSet(d, rsList)
+		// Availability under an old minReadySeconds value cannot establish
+		// completion while updating that value is failing.
+		if newRS == nil || newRS.Spec.MinReadySeconds != d.Spec.MinReadySeconds {
+			return err
+		}
+		// ReplicaSet counts may still reflect a previous spec until it is observed.
+		for _, rs := range rsList {
+			if rs.Status.ObservedGeneration < rs.Generation {
+				return err
+			}
+		}
+		return dc.syncRolloutStatusAfter(ctx, err, rsList, newRS, d)
 	}
 	if scalingEvent {
 		return dc.sync(ctx, d, rsList)
