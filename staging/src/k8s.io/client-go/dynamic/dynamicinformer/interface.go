@@ -38,6 +38,8 @@ type DynamicSharedInformerFactory interface {
 	StartWithContext(ctx context.Context)
 
 	// ForResource gives generic access to a shared informer of the matching type.
+	// If the informer cached for gvr has stopped, ForResource replaces it with a
+	// new one, which the next call to Start or StartWithContext runs.
 	ForResource(gvr schema.GroupVersionResource) informers.GenericInformer
 
 	// WaitForCacheSync blocks until all started informers' caches were synced
