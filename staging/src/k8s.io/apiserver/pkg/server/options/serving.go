@@ -152,6 +152,10 @@ func (s *SecureServingOptions) Validate() []error {
 		errors = append(errors, fmt.Errorf("cert/key file and in-memory certificate cannot both be set"))
 	}
 
+	if (len(s.ServerCert.CertKey.CertFile) == 0) != (len(s.ServerCert.CertKey.KeyFile) == 0) {
+		errors = append(errors, fmt.Errorf("--tls-cert-file and --tls-private-key-file must be specified together"))
+	}
+
 	return errors
 }
 
