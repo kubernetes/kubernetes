@@ -40,6 +40,7 @@ import (
 	"golang.org/x/time/rate"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
+	"google.golang.org/protobuf/proto"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
@@ -284,6 +285,29 @@ func (t *etcd3ProberMonitor) Monitor(ctx context.Context) (metrics.StorageMetric
 	}, nil
 }
 
+// etcdCodec keeps etcd messages out of gRPC's shared buffer pool, where one
+// large response slows down every later message above 1 MiB:
+// https://github.com/grpc/grpc-go/issues/9626
+type etcdCodec struct{}
+
+func (etcdCodec) Marshal(v any) ([]byte, error) {
+	m, ok := v.(proto.Message)
+	if !ok {
+		return nil, fmt.Errorf("failed to marshal, message is %T, want proto.Message", v)
+	}
+	return proto.Marshal(m)
+}
+
+func (etcdCodec) Unmarshal(data []byte, v any) error {
+	m, ok := v.(proto.Message)
+	if !ok {
+		return fmt.Errorf("failed to unmarshal, message is %T, want proto.Message", v)
+	}
+	return proto.Unmarshal(data, m)
+}
+
+func (etcdCodec) String() string { return "proto" }
+
 var newETCD3Client = func(c storagebackend.TransportConfig) (*kubernetes.Client, error) {
 	tlsInfo := transport.TLSInfo{
 		CertFile:      c.CertFile,
@@ -315,6 +339,7 @@ var newETCD3Client = func(c storagebackend.TransportConfig) (*kubernetes.Client,
 		// which seems to be what we want as the metrics will be collected on each attempt (retry)
 		grpc.WithChainUnaryInterceptor(grpcpromClientMetrics.UnaryClientInterceptor()),
 		grpc.WithChainStreamInterceptor(grpcpromClientMetrics.StreamClientInterceptor()),
+		grpc.WithCodec(etcdCodec{}),
 	}
 	tracingOpts := []otelgrpc.Option{
 		otelgrpc.WithMessageEvents(otelgrpc.ReceivedEvents, otelgrpc.SentEvents),
