@@ -25,19 +25,21 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
 
 	"k8s.io/apimachinery/pkg/util/wait"
 
-	units "github.com/docker/go-units"
 	libcontainercgroups "github.com/opencontainers/cgroups"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 
 	"k8s.io/component-helpers/resource"
+	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
 const (
@@ -62,6 +64,8 @@ type qosContainerManagerImpl struct {
 	cgroupRoot              CgroupName
 	qosReserved             map[v1.ResourceName]int64
 	memoryReservationPolicy kubeletconfig.MemoryReservationPolicy
+	enforcePodsAllocatable  bool
+	reservedHugePages       sets.Set[v1.ResourceName]
 }
 
 func NewQOSContainerManager(subsystems *CgroupSubsystems, cgroupRoot CgroupName, nodeConfig NodeConfig, cgroupManager CgroupManager) (QOSContainerManager, error) {
@@ -71,12 +75,23 @@ func NewQOSContainerManager(subsystems *CgroupSubsystems, cgroupRoot CgroupName,
 		}, nil
 	}
 
+	reservedHugePages := sets.New[v1.ResourceName]()
+	for _, rl := range []v1.ResourceList{nodeConfig.SystemReserved, nodeConfig.KubeReserved} {
+		for name := range rl {
+			if v1helper.IsHugePageResourceName(name) {
+				reservedHugePages.Insert(name)
+			}
+		}
+	}
+
 	return &qosContainerManagerImpl{
 		subsystems:              subsystems,
 		cgroupManager:           cgroupManager,
 		cgroupRoot:              cgroupRoot,
 		qosReserved:             nodeConfig.QOSReserved,
 		memoryReservationPolicy: nodeConfig.MemoryReservationPolicy,
+		enforcePodsAllocatable:  nodeConfig.EnforceNodeAllocatable.Has(kubetypes.NodeAllocatableEnforcementKey),
+		reservedHugePages:       reservedHugePages,
 	}, nil
 }
 
@@ -190,7 +205,7 @@ func (m *qosContainerManagerImpl) Start(ctx context.Context, getNodeAllocatable 
 func (m *qosContainerManagerImpl) setHugePagesUnbounded(cgroupConfig *CgroupConfig) error {
 	hugePageLimit := map[int64]int64{}
 	for _, pageSize := range libcontainercgroups.HugePageSizes() {
-		pageSizeBytes, err := units.RAMInBytes(pageSize)
+		pageSizeBytes, err := hugePageSizeBytes(pageSize)
 		if err != nil {
 			return err
 		}
@@ -200,11 +215,66 @@ func (m *qosContainerManagerImpl) setHugePagesUnbounded(cgroupConfig *CgroupConf
 	return nil
 }
 
+// hugePageSizeBytes parses a size as libcontainercgroups.HugePageSizes prints
+// it: <n>KB, <n>MB or <n>GB, in powers of 1024. It accepts nothing else.
+func hugePageSizeBytes(pageSize string) (int64, error) {
+	cut := max(len(pageSize)-2, 0)
+	var shift int
+	switch pageSize[cut:] {
+	case "KB":
+		shift = 10
+	case "MB":
+		shift = 20
+	case "GB":
+		shift = 30
+	default:
+		return 0, fmt.Errorf("hugepage size %q: want <n>KB, <n>MB or <n>GB", pageSize)
+	}
+	// 63-shift bits keep the size within int64.
+	n, err := strconv.ParseUint(pageSize[:cut], 10, 63-shift)
+	if err != nil {
+		return 0, fmt.Errorf("hugepage size %q: %w", pageSize, err)
+	}
+	return int64(n << shift), nil
+}
+
 func (m *qosContainerManagerImpl) setHugePagesConfig(configs map[v1.PodQOSClass]*CgroupConfig) error {
-	for _, v := range configs {
-		if err := m.setHugePagesUnbounded(v); err != nil {
+	for qos, cfg := range configs {
+		if qos == v1.PodQOSGuaranteed {
+			if err := m.setHugePagesForGuaranteed(cfg); err != nil {
+				return err
+			}
+		} else {
+			if err := m.setHugePagesUnbounded(cfg); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// setHugePagesForGuaranteed applies node-allocatable hugepage limits to the
+// Guaranteed QoS class cgroup, but only for page sizes that appear in
+// SystemReserved/KubeReserved and only when pods enforcement is active.
+// Unreserved page sizes stay unbounded, preserving backward compatibility.
+func (m *qosContainerManagerImpl) setHugePagesForGuaranteed(cgroupConfig *CgroupConfig) error {
+	if err := m.setHugePagesUnbounded(cgroupConfig); err != nil {
+		return err
+	}
+
+	if !m.enforcePodsAllocatable || m.reservedHugePages.Len() == 0 {
+		return nil
+	}
+
+	for name, q := range m.getNodeAllocatable() {
+		if !m.reservedHugePages.Has(name) {
+			continue
+		}
+		pageSize, err := v1helper.HugePageSizeFromResourceName(name)
+		if err != nil {
 			return err
 		}
+		cgroupConfig.ResourceParameters.HugePageLimit[pageSize.Value()] = q.Value()
 	}
 	return nil
 }
@@ -224,8 +294,8 @@ func (m *qosContainerManagerImpl) setCPUCgroupConfig(configs map[v1.PodQOSClass]
 		req := resource.PodRequests(pod, resource.PodResourcesOptions{
 			Reuse: reuseReqs,
 			// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
-			SkipPodLevelResources:                    !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodLevelResources),
-			UseDRANodeAllocatableResourceClaimStatus: draNodeAllocatableEnabled,
+			SkipPodLevelResources:            !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodLevelResources),
+			UseExtraNodeAllocatableResources: draNodeAllocatableEnabled,
 		})
 		if request, found := req[v1.ResourceCPU]; found {
 			burstablePodCPURequest += request.MilliValue()
@@ -262,8 +332,8 @@ func (m *qosContainerManagerImpl) getQoSMemoryRequests() map[v1.PodQOSClass]int6
 		}
 		draNodeAllocatableEnabled := utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DRANodeAllocatableResources)
 		req := resource.PodRequests(pod, resource.PodResourcesOptions{
-			Reuse:                                    reuseReqs,
-			UseDRANodeAllocatableResourceClaimStatus: draNodeAllocatableEnabled,
+			Reuse:                            reuseReqs,
+			UseExtraNodeAllocatableResources: draNodeAllocatableEnabled,
 		})
 		if request, found := req[v1.ResourceMemory]; found {
 			podMemoryRequest += request.Value()
@@ -392,7 +462,7 @@ func (m *qosContainerManagerImpl) UpdateCgroups(logger klog.Logger) error {
 		return err
 	}
 
-	// update the qos level cgroup settings for huge pages (ensure they remain unbounded)
+	// update the qos level cgroup settings for huge pages
 	if err := m.setHugePagesConfig(qosConfigs); err != nil {
 		return err
 	}

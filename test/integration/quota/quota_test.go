@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -34,16 +35,19 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/quota/v1/generic"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	watchtools "k8s.io/client-go/tools/watch"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/ktesting"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/controller"
 	replicationcontroller "k8s.io/kubernetes/pkg/controller/replication"
 	resourcequotacontroller "k8s.io/kubernetes/pkg/controller/resourcequota"
+	"k8s.io/kubernetes/pkg/features"
 	quotainstall "k8s.io/kubernetes/pkg/quota/v1/install"
 	"k8s.io/kubernetes/test/integration/framework"
-	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 const (
@@ -601,4 +605,187 @@ func newService(name string, svcType v1.ServiceType, allocateNodePort bool) *v1.
 			}},
 		},
 	}
+}
+
+func TestQuotaPodLevelResourceConstraints(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, true)
+	tCtx := ktesting.Init(t)
+
+	_, kubeConfig, tearDownFn := framework.StartTestServer(tCtx, t, framework.TestServerSetup{
+		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
+			opts.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount"}
+		},
+	})
+	defer tearDownFn()
+
+	cs := clientset.NewForConfigOrDie(kubeConfig)
+	ns := framework.CreateNamespaceOrDie(cs, "quota-plr-constraints", t)
+	defer framework.DeleteNamespaceOrDie(cs, ns, t)
+
+	informers := informers.NewSharedInformerFactory(cs, controller.NoResyncPeriodFunc())
+	discoveryFunc := cs.Discovery().ServerPreferredNamespacedResources
+	listerFuncForResource := generic.ListerFuncForResourceFunc(informers.ForResource)
+	qc, err := quotainstall.NewQuotaConfigurationForControllers(listerFuncForResource, informers)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	informersStarted := make(chan struct{})
+	resourceQuotaController, err := resourcequotacontroller.NewController(tCtx, &resourcequotacontroller.ControllerOptions{
+		QuotaClient:               cs.CoreV1(),
+		ResourceQuotaInformer:     informers.Core().V1().ResourceQuotas(),
+		ResyncPeriod:              controller.NoResyncPeriodFunc,
+		InformerFactory:           informers,
+		ReplenishmentResyncPeriod: controller.NoResyncPeriodFunc,
+		DiscoveryFunc:             discoveryFunc,
+		IgnoredResourcesFunc:      qc.IgnoredResources,
+		InformersStarted:          informersStarted,
+		Registry:                  generic.NewRegistry(qc.Evaluators()),
+	})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	go resourceQuotaController.Run(tCtx, 2)
+	go resourceQuotaController.Sync(tCtx, discoveryFunc, 30*time.Second)
+	informers.Start(tCtx.Done())
+	close(informersStarted)
+
+	rq := &v1.ResourceQuota{
+		ObjectMeta: metav1.ObjectMeta{Name: "compute-quota", Namespace: ns.Name},
+		Spec: v1.ResourceQuotaSpec{
+			Hard: v1.ResourceList{
+				v1.ResourceRequestsCPU:    resource.MustParse("4"),
+				v1.ResourceLimitsCPU:      resource.MustParse("8"),
+				v1.ResourceRequestsMemory: resource.MustParse("4Gi"),
+				v1.ResourceLimitsMemory:   resource.MustParse("8Gi"),
+			},
+		},
+	}
+	waitForQuota(t, rq, cs)
+
+	makePod := func(name string, podRes *v1.ResourceRequirements, containers ...v1.Container) *v1.Pod {
+		return &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: ns.Name},
+			Spec: v1.PodSpec{
+				Resources:  podRes,
+				Containers: containers,
+			},
+		}
+	}
+
+	// Pod-level CPU only does not exempt missing memory requests and limits on containers.
+	_, err = cs.CoreV1().Pods(ns.Name).Create(tCtx, makePod("missing-memory",
+		&v1.ResourceRequirements{
+			Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("500m")},
+			Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
+		},
+		v1.Container{Name: "c1", Image: "pause"},
+		v1.Container{Name: "c2", Image: "pause"},
+	), metav1.CreateOptions{})
+	if !apierrors.IsForbidden(err) || !strings.Contains(err.Error(), "must specify limits.memory for: c1,c2; requests.memory for: c1,c2") {
+		t.Fatalf("expected forbidden error for missing memory, got: %v", err)
+	}
+
+	// Partial container memory limit without a pod-level memory limit leaves c2 unbounded and is rejected.
+	_, err = cs.CoreV1().Pods(ns.Name).Create(tCtx, makePod("missing-c2-mem-limit",
+		&v1.ResourceRequirements{
+			Requests: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("500m"),
+				v1.ResourceMemory: resource.MustParse("512Mi"),
+			},
+			Limits: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
+		},
+		v1.Container{
+			Name:  "c1",
+			Image: "pause",
+			Resources: v1.ResourceRequirements{
+				Limits: v1.ResourceList{v1.ResourceMemory: resource.MustParse("256Mi")},
+			},
+		},
+		v1.Container{Name: "c2", Image: "pause"},
+	), metav1.CreateOptions{})
+	if !apierrors.IsForbidden(err) || !strings.Contains(err.Error(), "must specify limits.memory for: c2") {
+		t.Fatalf("expected forbidden error for missing c2 limits.memory, got: %v", err)
+	}
+
+	// Pod-level covers all quota resources while containers specify none.
+	_, err = cs.CoreV1().Pods(ns.Name).Create(tCtx, makePod("all-pod-level",
+		&v1.ResourceRequirements{
+			Requests: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("500m"),
+				v1.ResourceMemory: resource.MustParse("512Mi"),
+			},
+			Limits: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("1"),
+				v1.ResourceMemory: resource.MustParse("1Gi"),
+			},
+		},
+		v1.Container{Name: "c1", Image: "pause"},
+		v1.Container{Name: "c2", Image: "pause"},
+	), metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("expected pod with all quota resources at pod level to be admitted, got: %v", err)
+	}
+	waitForUsedResourceQuota(t, cs, ns.Name, rq.Name, v1.ResourceList{
+		v1.ResourceRequestsCPU:    resource.MustParse("500m"),
+		v1.ResourceLimitsCPU:      resource.MustParse("1"),
+		v1.ResourceRequestsMemory: resource.MustParse("512Mi"),
+		v1.ResourceLimitsMemory:   resource.MustParse("1Gi"),
+	})
+
+	// Pod-level covers CPU while all containers specify memory requests and limits.
+	_, err = cs.CoreV1().Pods(ns.Name).Create(tCtx, makePod("split-pod-and-container",
+		&v1.ResourceRequirements{
+			Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("500m")},
+			Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
+		},
+		v1.Container{
+			Name:  "c1",
+			Image: "pause",
+			Resources: v1.ResourceRequirements{
+				Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("256Mi")},
+				Limits:   v1.ResourceList{v1.ResourceMemory: resource.MustParse("512Mi")},
+			},
+		},
+		v1.Container{
+			Name:  "c2",
+			Image: "pause",
+			Resources: v1.ResourceRequirements{
+				Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("256Mi")},
+				Limits:   v1.ResourceList{v1.ResourceMemory: resource.MustParse("512Mi")},
+			},
+		},
+	), metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("expected pod with pod-level CPU and container-level memory to be admitted, got: %v", err)
+	}
+	waitForUsedResourceQuota(t, cs, ns.Name, rq.Name, v1.ResourceList{
+		v1.ResourceRequestsCPU:    resource.MustParse("1"),
+		v1.ResourceLimitsCPU:      resource.MustParse("2"),
+		v1.ResourceRequestsMemory: resource.MustParse("1Gi"),
+		v1.ResourceLimitsMemory:   resource.MustParse("2Gi"),
+	})
+
+	// Explicit zero quantities at pod level satisfy constraints without adding usage.
+	_, err = cs.CoreV1().Pods(ns.Name).Create(tCtx, makePod("explicit-zero-memory",
+		&v1.ResourceRequirements{
+			Requests: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("500m"),
+				v1.ResourceMemory: resource.MustParse("0"),
+			},
+			Limits: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("1"),
+				v1.ResourceMemory: resource.MustParse("0"),
+			},
+		},
+		v1.Container{Name: "c1", Image: "pause"},
+	), metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("expected pod with explicit zero pod-level memory to be admitted, got: %v", err)
+	}
+	waitForUsedResourceQuota(t, cs, ns.Name, rq.Name, v1.ResourceList{
+		v1.ResourceRequestsCPU:    resource.MustParse("1500m"),
+		v1.ResourceLimitsCPU:      resource.MustParse("3"),
+		v1.ResourceRequestsMemory: resource.MustParse("1Gi"),
+		v1.ResourceLimitsMemory:   resource.MustParse("2Gi"),
+	})
 }

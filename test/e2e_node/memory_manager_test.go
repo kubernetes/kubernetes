@@ -694,11 +694,11 @@ var _ = SIGDescribe("Memory Manager", "[LinuxOnly]", framework.WithDisruptive(),
 						return false
 					}
 
-					if tmpPod.Status.Reason != "UnexpectedAdmissionError" {
+					if tmpPod.Status.Reason != "OutOfmemory" {
 						return false
 					}
 
-					if !strings.Contains(tmpPod.Status.Message, "Allocate failed due to [memorymanager]") {
+					if !strings.Contains(tmpPod.Status.Message, "[memorymanager] failed to get the default NUMA affinity") {
 						return false
 					}
 
@@ -807,13 +807,6 @@ func configureMemoryManagerInKubelet(oldCfg *kubeletconfig.KubeletConfiguration,
 		newCfg.FeatureGates = make(map[string]bool)
 	}
 
-	newCfg.FeatureGates["PodLevelResources"] = kubeletArguments.enablePodLevelResources
-	// InPlacePodLevelResourcesVerticalScaling, PodLevelResourcesFixDefaulting and PodLevelResourcesFixKubeletQOSClass are only supported when PodLevelResources is enabled
-	if !kubeletArguments.enablePodLevelResources {
-		newCfg.FeatureGates["InPlacePodLevelResourcesVerticalScaling"] = kubeletArguments.enablePodLevelResources
-		newCfg.FeatureGates["PodLevelResourcesFixDefaulting"] = kubeletArguments.enablePodLevelResources
-		newCfg.FeatureGates["PodLevelResourcesFixKubeletQOSClass"] = kubeletArguments.enablePodLevelResources
-	}
 	newCfg.FeatureGates["PodLevelResourceManagers"] = kubeletArguments.enablePodLevelResourceManagers
 
 	newCfg.MemoryManagerPolicy = kubeletArguments.policyName

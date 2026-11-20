@@ -24,7 +24,7 @@ import (
 	"time"
 	"unsafe"
 
-	"k8s.io/apiserver/pkg/server"
+	"k8s.io/apiserver/pkg/server/signals"
 	"k8s.io/klog/v2"
 
 	"golang.org/x/sys/windows"
@@ -171,7 +171,7 @@ Loop:
 				// If we do not do this, our main threads won't be notified of the upcoming shutdown.
 				// Since Windows services do not use any console, we cannot simply generate a CTRL_BREAK_EVENT
 				// but need a dedicated notification mechanism.
-				graceful := server.RequestShutdown()
+				graceful := signals.RequestShutdown()
 
 				// Free up the control handler and let us terminate as gracefully as possible.
 				// If that takes too long, the service controller will kill the remaining threads.

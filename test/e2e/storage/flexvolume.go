@@ -18,14 +18,16 @@ package storage
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net"
 	"path"
-
+	"strings"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -40,14 +42,11 @@ import (
 )
 
 const (
-	driverDir              = "test/e2e/testing-manifests/flexvolume/"
-	defaultVolumePluginDir = "/usr/libexec/kubernetes/kubelet-plugins/volume/exec"
-	// TODO: change this and config-test.sh when default flex volume install path is changed for GCI
-	// On gci, root is read-only and controller-manager containerized. Assume
-	// controller-manager has started with --flex-volume-plugin-dir equal to this
-	// (see cluster/gce/config-test.sh)
-	gciVolumePluginDir = "/home/kubernetes/flexvolume"
-	detachTimeout      = 10 * time.Second
+	driverDir = "test/e2e/testing-manifests/flexvolume/"
+	// kube-controller-manager's default for --flex-volume-plugin-dir.
+	defaultVolumePluginDir  = "/usr/libexec/kubernetes/kubelet-plugins/volume/exec"
+	flexVolumePluginDirFlag = "--flex-volume-plugin-dir="
+	detachTimeout           = 10 * time.Second
 )
 
 // testFlexVolume tests that a client pod using a given flexvolume driver
@@ -68,73 +67,101 @@ func testFlexVolume(ctx context.Context, driver string, config e2evolume.TestCon
 	e2evolume.TestVolumeClient(ctx, f, config, nil, "" /* fsType */, tests)
 }
 
-// installFlex installs the driver found at filePath on the node, and restarts
-// kubelet if 'restart' is true. If node is nil, installs on the master, and restarts
-// controller-manager if 'restart' is true.
-func installFlex(ctx context.Context, c clientset.Interface, node *v1.Node, vendor, driver, filePath string) {
-	flexDir := getFlexDir(c, node, vendor, driver)
+// installFlex installs the driver found at filePath on the node via hostExec.
+// If node is nil, installs on the master via SSH.
+func installFlex(ctx context.Context, c clientset.Interface, hostExec utils.HostExec, node *v1.Node, vendor, driver, filePath string) {
+	flexDir := getFlexDir(ctx, c, node, vendor, driver)
 	flexFile := path.Join(flexDir, driver)
 
-	host := ""
-	var err error
-	if node != nil {
-		host, err = e2enode.GetSSHExternalIP(node)
-		if err != nil {
-			host, err = e2enode.GetSSHInternalIP(node)
-		}
-	} else {
-		instanceWithPort := framework.APIAddress()
-		hostName := getHostFromHostPort(instanceWithPort)
-		host = net.JoinHostPort(hostName, e2essh.SSHPort)
-	}
-
-	framework.ExpectNoError(err)
-
-	cmd := fmt.Sprintf("sudo mkdir -p %s", flexDir)
-	sshAndLog(ctx, cmd, host, true /*failOnError*/)
+	runFlexCmd(ctx, hostExec, node, fmt.Sprintf("mkdir -p %s", flexDir), true /*failOnError*/)
 
 	data, err := e2etestfiles.Read(filePath)
 	if err != nil {
 		framework.Fail(err.Error())
 	}
-	cmd = fmt.Sprintf("sudo tee <<'EOF' %s\n%s\nEOF", flexFile, string(data))
-	sshAndLog(ctx, cmd, host, true /*failOnError*/)
+	runFlexCmd(ctx, hostExec, node, fmt.Sprintf("tee <<'EOF' %s\n%s\nEOF", flexFile, string(data)), true /*failOnError*/)
 
-	cmd = fmt.Sprintf("sudo chmod +x %s", flexFile)
-	sshAndLog(ctx, cmd, host, true /*failOnError*/)
+	runFlexCmd(ctx, hostExec, node, fmt.Sprintf("chmod +x %s", flexFile), true /*failOnError*/)
 }
 
-func uninstallFlex(ctx context.Context, c clientset.Interface, node *v1.Node, vendor, driver string) {
-	flexDir := getFlexDir(c, node, vendor, driver)
+func uninstallFlex(ctx context.Context, c clientset.Interface, hostExec utils.HostExec, node *v1.Node, vendor, driver string) {
+	flexDir := getFlexDir(ctx, c, node, vendor, driver)
+	runFlexCmd(ctx, hostExec, node, fmt.Sprintf("rm -r %s", flexDir), false /*failOnError*/)
+}
 
-	host := ""
+// runFlexCmd runs cmd as root on node via hostExec, or on the master via SSH if node is nil.
+func runFlexCmd(ctx context.Context, hostExec utils.HostExec, node *v1.Node, cmd string, failOnError bool) {
+	if node == nil {
+		host := net.JoinHostPort(getHostFromHostPort(framework.APIAddress()), e2essh.SSHPort)
+		sshAndLog(ctx, "sudo "+cmd, host, failOnError)
+		return
+	}
+	result, err := hostExec.Execute(ctx, cmd, node)
+	utils.LogResult(result)
+	framework.ExpectNoError(err)
+	if result.Code != 0 && failOnError {
+		framework.Failf("%s returned non-zero, stderr: %s", cmd, result.Stderr)
+	}
+}
+
+// getFlexDir returns the flexvolume install dir used by the node's kubelet, or by
+// kube-controller-manager if node is nil. Skips the test if it cannot be determined.
+func getFlexDir(ctx context.Context, c clientset.Interface, node *v1.Node, vendor, driver string) string {
+	var volumePluginDir string
 	var err error
 	if node != nil {
-		host, err = e2enode.GetSSHExternalIP(node)
-		if err != nil {
-			host, err = e2enode.GetSSHInternalIP(node)
-		}
+		volumePluginDir, err = kubeletVolumePluginDir(ctx, c, node.Name)
 	} else {
-		instanceWithPort := framework.APIAddress()
-		hostName := getHostFromHostPort(instanceWithPort)
-		host = net.JoinHostPort(hostName, e2essh.SSHPort)
+		volumePluginDir, err = controllerManagerVolumePluginDir(ctx, c)
 	}
-
-	if host == "" {
-		framework.Failf("Error getting node ip : %v", err)
+	if err != nil {
+		e2eskipper.Skipf("Unable to determine flexvolume plugin dir: %v", err)
 	}
-
-	cmd := fmt.Sprintf("sudo rm -r %s", flexDir)
-	sshAndLog(ctx, cmd, host, false /*failOnError*/)
+	return path.Join(volumePluginDir, fmt.Sprintf("/%s~%s/", vendor, driver))
 }
 
-func getFlexDir(c clientset.Interface, node *v1.Node, vendor, driver string) string {
-	volumePluginDir := defaultVolumePluginDir
-	if framework.ProviderIs("gce") {
-		volumePluginDir = gciVolumePluginDir
+func kubeletVolumePluginDir(ctx context.Context, c clientset.Interface, nodeName string) (string, error) {
+	raw, err := c.CoreV1().RESTClient().Get().Resource("nodes").Name(nodeName).SubResource("proxy").Suffix("configz").DoRaw(ctx)
+	if err != nil {
+		return "", fmt.Errorf("reading kubelet configz from node %s: %w", nodeName, err)
 	}
-	flexDir := path.Join(volumePluginDir, fmt.Sprintf("/%s~%s/", vendor, driver))
-	return flexDir
+	var configz struct {
+		KubeletConfig struct {
+			VolumePluginDir string `json:"volumePluginDir"`
+		} `json:"kubeletconfig"`
+	}
+	if err := json.Unmarshal(raw, &configz); err != nil {
+		return "", fmt.Errorf("decoding kubelet configz from node %s: %w", nodeName, err)
+	}
+	if configz.KubeletConfig.VolumePluginDir == "" {
+		return "", fmt.Errorf("kubelet configz from node %s has no volumePluginDir", nodeName)
+	}
+	return configz.KubeletConfig.VolumePluginDir, nil
+}
+
+// controllerManagerVolumePluginDir reads --flex-volume-plugin-dir from the kube-controller-manager pod spec.
+func controllerManagerVolumePluginDir(ctx context.Context, c clientset.Interface) (string, error) {
+	pods, err := c.CoreV1().Pods(metav1.NamespaceSystem).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return "", fmt.Errorf("listing %s pods: %w", metav1.NamespaceSystem, err)
+	}
+	for _, pod := range pods.Items {
+		if !strings.HasPrefix(pod.Name, "kube-controller-manager") {
+			continue
+		}
+		for _, container := range pod.Spec.Containers {
+			// Flags may be embedded in a single shell command string, so scan each field by token.
+			for _, arg := range append(container.Command, container.Args...) {
+				for token := range strings.FieldsSeq(arg) {
+					if dir, ok := strings.CutPrefix(token, flexVolumePluginDirFlag); ok {
+						return strings.Trim(dir, `"'`), nil
+					}
+				}
+			}
+		}
+		return defaultVolumePluginDir, nil
+	}
+	return "", fmt.Errorf("no kube-controller-manager pod found in %s", metav1.NamespaceSystem)
 }
 
 func sshAndLog(ctx context.Context, cmd, host string, failOnError bool) {
@@ -157,9 +184,10 @@ func getHostFromHostPort(hostPort string) string {
 	return host
 }
 
-var _ = utils.SIGDescribe("Flexvolumes", framework.WithProvider("gce", "local"), func() {
+var _ = utils.SIGDescribe("Flexvolumes", func() {
 	f := framework.NewDefaultFramework("flexvolume")
-	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
+	// hostexec pods are privileged.
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	// note that namespace deletion is handled by delete-namespace flag
 
@@ -168,11 +196,14 @@ var _ = utils.SIGDescribe("Flexvolumes", framework.WithProvider("gce", "local"),
 	var node *v1.Node
 	var config e2evolume.TestConfig
 	var suffix string
+	var hostExec utils.HostExec
 
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		e2eskipper.SkipUnlessMasterOSDistroIs("debian", "ubuntu", "gci", "custom")
 		e2eskipper.SkipUnlessNodeOSDistroIs("debian", "ubuntu", "gci", "custom")
-		e2eskipper.SkipUnlessSSHKeyPresent()
+
+		hostExec = utils.NewHostExec(f)
+		ginkgo.DeferCleanup(hostExec.Cleanup)
 
 		cs = f.ClientSet
 		ns = f.Namespace
@@ -192,22 +223,25 @@ var _ = utils.SIGDescribe("Flexvolumes", framework.WithProvider("gce", "local"),
 		driverInstallAs := driver + "-" + suffix
 
 		ginkgo.By(fmt.Sprintf("installing flexvolume %s on node %s as %s", path.Join(driverDir, driver), node.Name, driverInstallAs))
-		installFlex(ctx, cs, node, "k8s", driverInstallAs, path.Join(driverDir, driver))
+		installFlex(ctx, cs, hostExec, node, "k8s", driverInstallAs, path.Join(driverDir, driver))
 
 		testFlexVolume(ctx, driverInstallAs, config, f)
 
 		ginkgo.By(fmt.Sprintf("uninstalling flexvolume %s from node %s", driverInstallAs, node.Name))
-		uninstallFlex(ctx, cs, node, "k8s", driverInstallAs)
+		uninstallFlex(ctx, cs, hostExec, node, "k8s", driverInstallAs)
 	})
 
 	f.It("should be mountable when attachable", feature.Flexvolumes, func(ctx context.Context) {
+		// installing on the control plane still requires SSH.
+		e2eskipper.SkipUnlessSSHKeyPresent()
+
 		driver := "dummy-attachable"
 		driverInstallAs := driver + "-" + suffix
 
 		ginkgo.By(fmt.Sprintf("installing flexvolume %s on node %s as %s", path.Join(driverDir, driver), node.Name, driverInstallAs))
-		installFlex(ctx, cs, node, "k8s", driverInstallAs, path.Join(driverDir, driver))
+		installFlex(ctx, cs, hostExec, node, "k8s", driverInstallAs, path.Join(driverDir, driver))
 		ginkgo.By(fmt.Sprintf("installing flexvolume %s on master as %s", path.Join(driverDir, driver), driverInstallAs))
-		installFlex(ctx, cs, nil, "k8s", driverInstallAs, path.Join(driverDir, driver))
+		installFlex(ctx, cs, hostExec, nil, "k8s", driverInstallAs, path.Join(driverDir, driver))
 
 		testFlexVolume(ctx, driverInstallAs, config, f)
 
@@ -215,8 +249,8 @@ var _ = utils.SIGDescribe("Flexvolumes", framework.WithProvider("gce", "local"),
 		time.Sleep(detachTimeout)
 
 		ginkgo.By(fmt.Sprintf("uninstalling flexvolume %s from node %s", driverInstallAs, node.Name))
-		uninstallFlex(ctx, cs, node, "k8s", driverInstallAs)
+		uninstallFlex(ctx, cs, hostExec, node, "k8s", driverInstallAs)
 		ginkgo.By(fmt.Sprintf("uninstalling flexvolume %s from master", driverInstallAs))
-		uninstallFlex(ctx, cs, nil, "k8s", driverInstallAs)
+		uninstallFlex(ctx, cs, hostExec, nil, "k8s", driverInstallAs)
 	})
 })

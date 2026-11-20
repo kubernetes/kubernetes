@@ -34,11 +34,11 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	resourceinformers "k8s.io/client-go/informers/resource/v1"
+	"k8s.io/client-go/ktesting"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/controller/devicetainteviction"
 	"k8s.io/kubernetes/pkg/features"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
-	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 	"k8s.io/utils/ptr"
 )
 
@@ -59,10 +59,7 @@ func testEvictCluster(tCtx ktesting.TContext, useRule useRuleMode) {
 	// Not parallel because it creates a controller.
 
 	var wg sync.WaitGroup
-	defer func() {
-		tCtx.Cancel("time to shut down")
-		wg.Wait()
-	}()
+	tCtx.Cleanup(wg.Wait)
 
 	numPods := 1000
 	devicesPerSlice := 50

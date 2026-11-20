@@ -39,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/ktesting"
 	cgoresource "k8s.io/client-go/kubernetes/typed/resource/v1"
 	draclient "k8s.io/dynamic-resource-allocation/client"
 	"k8s.io/dynamic-resource-allocation/resourceslice"
@@ -46,7 +47,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/dra/test-driver/app"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 	admissionapi "k8s.io/pod-security-admission/api"
 	"k8s.io/utils/ptr"
 )
@@ -808,7 +808,7 @@ func PartitionableResources(withPartitionType bool) driverResourcesGenFunc {
 		counterSlice := resourceslice.Slice{
 			SharedCounters: []resourceapi.CounterSet{{
 				Name:     "gpu-0",
-				Counters: map[string]resourceapi.Counter{"memory": {Value: resource.MustParse("8")}},
+				Counters: map[string]resourceapi.Counter{"memory": {Value: *resource.NewQuantity(8, resource.BinarySI)}},
 			}},
 		}
 		deviceSlice := resourceslice.Slice{Devices: devices}
@@ -838,7 +838,7 @@ func partitionDevice(name, profile, memory string) resourceapi.Device {
 		Attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{resourceapi.QualifiedName(PartitionProfileAttribute): {StringValue: &profile}},
 		ConsumesCounters: []resourceapi.DeviceCounterConsumption{{
 			CounterSet: "gpu-0",
-			Counters:   map[string]resourceapi.Counter{"memory": {Value: resource.MustParse(memory)}},
+			Counters:   map[string]resourceapi.CounterRequirement{"memory": {Value: new(resource.MustParse(memory))}},
 		}},
 	}
 }

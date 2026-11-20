@@ -439,8 +439,15 @@ function codegen::validation() {
         kube::log::status "DBG: found ${#tag_dirs[@]} +k8s:validation-gen tagged dirs"
     fi
 
+    # The extensions example uses "+k8s:" like everything else, so the
+    # search above finds it -- but this run knows nothing about its formats.
+    local extensions_example="staging/src/k8s.io/code-generator/cmd/validation-gen/examples/extensions"
+
     local tag_pkgs=()
     for dir in "${tag_dirs[@]}"; do
+        if [[ "${dir}" == "${extensions_example}"/* ]]; then
+            continue
+        fi
         tag_pkgs+=("./$dir")
     done
 
@@ -489,6 +496,17 @@ function codegen::validation() {
         --go-header-file "${BOILERPLATE_FILENAME}" \
         --output-file "${output_file}" \
         "./${custom_prefix_example}/output_tests/..." \
+        "$@"
+
+    # The extensions example, excluded above. This is the stock
+    # generator: --validation-extensions-file is the whole difference.
+    kube::log::status "Generating validation code for the extensions example"
+    validation-gen \
+        -v "${KUBE_VERBOSE}" \
+        --go-header-file "${BOILERPLATE_FILENAME}" \
+        --output-file "${output_file}" \
+        --validation-extensions-file "./${extensions_example}/extensions.yaml" \
+        "./${extensions_example}/output_tests/..." \
         "$@"
 
     if [[ "${DBG_CODEGEN}" == 1 ]]; then

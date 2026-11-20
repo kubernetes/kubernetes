@@ -46,12 +46,17 @@ import (
 	cpoptions "k8s.io/cloud-provider/options"
 
 	eventv1 "k8s.io/api/events/v1"
+	"k8s.io/apiserver/pkg/util/compatibility"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientgofeaturegate "k8s.io/client-go/features"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	cmconfig "k8s.io/controller-manager/config"
 	cmoptions "k8s.io/controller-manager/options"
+	cmfeatures "k8s.io/controller-manager/pkg/features"
 	migration "k8s.io/controller-manager/pkg/leadermigration/options"
 	kubecontrollerconfig "k8s.io/kubernetes/cmd/kube-controller-manager/app/config"
 	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
+	podcertssignerconfig "k8s.io/kubernetes/pkg/controller/certificates/podcertssigner/config"
 	csrsigningconfig "k8s.io/kubernetes/pkg/controller/certificates/signer/config"
 	cronjobconfig "k8s.io/kubernetes/pkg/controller/cronjob/config"
 	daemonconfig "k8s.io/kubernetes/pkg/controller/daemon/config"
@@ -61,7 +66,9 @@ import (
 	endpointconfig "k8s.io/kubernetes/pkg/controller/endpoint/config"
 	endpointsliceconfig "k8s.io/kubernetes/pkg/controller/endpointslice/config"
 	endpointslicemirroringconfig "k8s.io/kubernetes/pkg/controller/endpointslicemirroring/config"
+	evictionrequestconfig "k8s.io/kubernetes/pkg/controller/evictionrequest/config"
 	garbagecollectorconfig "k8s.io/kubernetes/pkg/controller/garbagecollector/config"
+	imperativeevictionresponderconfig "k8s.io/kubernetes/pkg/controller/imperativeevictionresponder/config"
 	jobconfig "k8s.io/kubernetes/pkg/controller/job/config"
 	namespaceconfig "k8s.io/kubernetes/pkg/controller/namespace/config"
 	nodeipamconfig "k8s.io/kubernetes/pkg/controller/nodeipam/config"
@@ -79,6 +86,7 @@ import (
 	attachdetachconfig "k8s.io/kubernetes/pkg/controller/volume/attachdetach/config"
 	ephemeralvolumeconfig "k8s.io/kubernetes/pkg/controller/volume/ephemeral/config"
 	persistentvolumeconfig "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/config"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
 	netutils "k8s.io/utils/net"
 )
 
@@ -109,9 +117,11 @@ var args = []string{
 	"--concurrent-statefulset-syncs=15",
 	"--concurrent-endpoint-syncs=10",
 	"--concurrent-ephemeralvolume-syncs=10",
+	"--concurrent-eviction-request-syncs=10",
 	"--concurrent-service-endpoint-syncs=10",
 	"--concurrent-gc-syncs=30",
 	"--concurrent-namespace-syncs=20",
+	"--concurrent-imperative-eviction-responder-syncs=17",
 	"--concurrent-job-syncs=10",
 	"--concurrent-cron-job-syncs=10",
 	"--concurrent-replicaset-syncs=10",
@@ -144,6 +154,7 @@ var args = []string{
 	"--leader-elect-renew-deadline=15s",
 	"--leader-elect-resource-lock=leases",
 	"--leader-elect-retry-period=5s",
+	"--leader-elect-recovery-deadline=90s",
 	"--legacy-service-account-token-clean-up-period=8760h",
 	"--master=192.168.4.20",
 	"--max-endpoints-per-slice=200",
@@ -168,6 +179,10 @@ var args = []string{
 	"--route-reconciliation-period=30s",
 	"--secondary-node-eviction-rate=0.05",
 	"--service-account-private-key-file=/service-account-private-key",
+	"--service-serving-signer-cert=/var/certs/service-serving.crt",
+	"--service-serving-signer-key=/var/certs/service-serving.key",
+	"--service-serving-trust-bundle=/var/certs/trust-bundle.pem",
+	"--cluster-domain=example.local",
 	"--terminated-pod-gc-threshold=12000",
 	"--unhealthy-zone-threshold=0.6",
 	"--use-service-account-credentials=true",
@@ -206,7 +221,8 @@ func TestAddFlags(t *testing.T) {
 					ResourceName:      "kube-controller-manager",
 					ResourceNamespace: "kube-system",
 				},
-				Controllers: []string{"foo", "bar"},
+				LeaderElectionRecoveryDeadline: metav1.Duration{Duration: 90 * time.Second},
+				Controllers:                    []string{"foo", "bar"},
 			},
 			Debugging: &cmoptions.DebuggingOptions{
 				DebuggingConfiguration: &componentbaseconfig.DebuggingConfiguration{
@@ -317,6 +333,11 @@ func TestAddFlags(t *testing.T) {
 				ConcurrentEphemeralVolumeSyncs: 10,
 			},
 		},
+		EvictionRequestController: &EvictionRequestControllerOptions{
+			&evictionrequestconfig.EvictionRequestControllerConfiguration{
+				ConcurrentEvictionRequestSyncs: 10,
+			},
+		},
 		GarbageCollectorController: &GarbageCollectorControllerOptions{
 			&garbagecollectorconfig.GarbageCollectorControllerConfiguration{
 				ConcurrentGCSyncs: 30,
@@ -335,6 +356,11 @@ func TestAddFlags(t *testing.T) {
 				HorizontalPodAutoscalerCPUInitializationPeriod:      metav1.Duration{Duration: 90 * time.Second},
 				HorizontalPodAutoscalerInitialReadinessDelay:        metav1.Duration{Duration: 50 * time.Second},
 				HorizontalPodAutoscalerTolerance:                    0.1,
+			},
+		},
+		ImperativeEvictionResponderController: &ImperativeEvictionResponderControllerOptions{
+			&imperativeevictionresponderconfig.ImperativeEvictionResponderControllerConfiguration{
+				ConcurrentImperativeEvictionResponderSyncs: 17,
 			},
 		},
 		JobController: &JobControllerOptions{
@@ -413,6 +439,14 @@ func TestAddFlags(t *testing.T) {
 			&serviceaccountconfig.SAControllerConfiguration{
 				ServiceAccountKeyFile:  "/service-account-private-key",
 				ConcurrentSATokenSyncs: 10,
+			},
+		},
+		ServiceServingSigner: &ServiceServingSignerOptions{
+			ServiceServingSignerConfiguration: &podcertssignerconfig.ServiceServingSignerConfiguration{
+				CACertPath:    "/var/certs/service-serving.crt",
+				CAKeyPath:     "/var/certs/service-serving.key",
+				CABundlePath:  "/var/certs/trust-bundle.pem",
+				ClusterDomain: "example.local",
 			},
 		},
 		LegacySATokenCleaner: &LegacySATokenCleanerOptions{
@@ -539,6 +573,13 @@ func TestValidateFlags(t *testing.T) {
 			},
 			wantErr: true,
 		},
+		{
+			name: "concurrent eviction request syncs set to 0",
+			flags: []string{
+				"--concurrent-eviction-request-syncs=0",
+			},
+			wantErr: true,
+		},
 	}
 
 	for _, tc := range testcases {
@@ -585,7 +626,8 @@ func TestApplyTo(t *testing.T) {
 					ResourceName:      "kube-controller-manager",
 					ResourceNamespace: "kube-system",
 				},
-				Controllers: []string{"foo", "bar"},
+				LeaderElectionRecoveryDeadline: metav1.Duration{Duration: 90 * time.Second},
+				Controllers:                    []string{"foo", "bar"},
 				Debugging: componentbaseconfig.DebuggingConfiguration{
 					EnableProfiling:           false,
 					EnableContentionProfiling: true,
@@ -663,6 +705,9 @@ func TestApplyTo(t *testing.T) {
 			EphemeralVolumeController: ephemeralvolumeconfig.EphemeralVolumeControllerConfiguration{
 				ConcurrentEphemeralVolumeSyncs: 10,
 			},
+			EvictionRequestController: evictionrequestconfig.EvictionRequestControllerConfiguration{
+				ConcurrentEvictionRequestSyncs: 10,
+			},
 			GarbageCollectorController: garbagecollectorconfig.GarbageCollectorControllerConfiguration{
 				ConcurrentGCSyncs: 30,
 				GCIgnoredResources: []garbagecollectorconfig.GroupResource{
@@ -678,6 +723,9 @@ func TestApplyTo(t *testing.T) {
 				HorizontalPodAutoscalerCPUInitializationPeriod:      metav1.Duration{Duration: 90 * time.Second},
 				HorizontalPodAutoscalerInitialReadinessDelay:        metav1.Duration{Duration: 50 * time.Second},
 				HorizontalPodAutoscalerTolerance:                    0.1,
+			},
+			ImperativeEvictionResponderController: imperativeevictionresponderconfig.ImperativeEvictionResponderControllerConfiguration{
+				ConcurrentImperativeEvictionResponderSyncs: 17,
 			},
 			JobController: jobconfig.JobControllerConfiguration{
 				ConcurrentJobSyncs: 10,
@@ -734,6 +782,12 @@ func TestApplyTo(t *testing.T) {
 			SAController: serviceaccountconfig.SAControllerConfiguration{
 				ServiceAccountKeyFile:  "/service-account-private-key",
 				ConcurrentSATokenSyncs: 10,
+			},
+			ServiceServingSigner: podcertssignerconfig.ServiceServingSignerConfiguration{
+				CACertPath:    "/var/certs/service-serving.crt",
+				CAKeyPath:     "/var/certs/service-serving.key",
+				CABundlePath:  "/var/certs/trust-bundle.pem",
+				ClusterDomain: "example.local",
 			},
 			LegacySATokenCleaner: serviceaccountconfig.LegacySATokenCleanerConfiguration{
 				CleanUpPeriod: metav1.Duration{Duration: 365 * 24 * time.Hour},
@@ -1256,6 +1310,26 @@ func TestValidateControllersOptions(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:                   "EvictionRequestControllerOptions ConcurrentEvictionRequestSyncs equal 0",
+			expectErrors:           true,
+			expectedErrorSubString: "concurrent-eviction-request-syncs must not be less than 1",
+			options: &EvictionRequestControllerOptions{
+				&evictionrequestconfig.EvictionRequestControllerConfiguration{
+					ConcurrentEvictionRequestSyncs: 0,
+				},
+			},
+		},
+		{
+			name:                   "EvictionRequestControllerOptions ConcurrentEvictionRequestSyncs equal 0",
+			expectErrors:           true,
+			expectedErrorSubString: "concurrent-eviction-request-syncs must not be more than 50",
+			options: &EvictionRequestControllerOptions{
+				&evictionrequestconfig.EvictionRequestControllerConfiguration{
+					ConcurrentEvictionRequestSyncs: 51,
+				},
+			},
+		},
 		/* empty errs */
 		{
 			name:         "CronJobControllerOptions",
@@ -1303,6 +1377,15 @@ func TestValidateControllersOptions(t *testing.T) {
 			},
 		},
 		{
+			name:         "EvictionRequestControllerOptions",
+			expectErrors: false,
+			options: &EvictionRequestControllerOptions{
+				&evictionrequestconfig.EvictionRequestControllerConfiguration{
+					ConcurrentEvictionRequestSyncs: 10,
+				},
+			},
+		},
+		{
 			name:         "ResourceClaimControllerOptions",
 			expectErrors: false,
 			options: &ResourceClaimControllerOptions{
@@ -1338,6 +1421,35 @@ func TestValidateControllersOptions(t *testing.T) {
 						{Group: eventv1.GroupName, Resource: "events"},
 					},
 					EnableGarbageCollector: false,
+				},
+			},
+		},
+		{
+			name:         "ImperativeEvictionResponderControllerConfiguration",
+			expectErrors: false,
+			options: &ImperativeEvictionResponderControllerOptions{
+				&imperativeevictionresponderconfig.ImperativeEvictionResponderControllerConfiguration{
+					ConcurrentImperativeEvictionResponderSyncs: 17,
+				},
+			},
+		},
+		{
+			name:                   "ImperativeEvictionResponderControllerConfiguration lower than minConcurrentImperativeEvictionResponderSyncs (1)",
+			expectErrors:           true,
+			expectedErrorSubString: "concurrent-imperative-eviction-responder-syncs must not be less than 1",
+			options: &ImperativeEvictionResponderControllerOptions{
+				&imperativeevictionresponderconfig.ImperativeEvictionResponderControllerConfiguration{
+					ConcurrentImperativeEvictionResponderSyncs: 0,
+				},
+			},
+		},
+		{
+			name:                   "ImperativeEvictionResponderControllerConfiguration greater than maxConcurrentImperativeEvictionResponderSyncs (50)",
+			expectErrors:           true,
+			expectedErrorSubString: "concurrent-imperative-eviction-responder-syncs must not be more than 50",
+			options: &ImperativeEvictionResponderControllerOptions{
+				&imperativeevictionresponderconfig.ImperativeEvictionResponderControllerConfiguration{
+					ConcurrentImperativeEvictionResponderSyncs: 51,
 				},
 			},
 		},
@@ -1439,6 +1551,30 @@ func TestValidateControllersOptions(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:         "EvictionRequestControllerOptions valid",
+			expectErrors: false,
+			options: &EvictionRequestControllerOptions{
+				&evictionrequestconfig.EvictionRequestControllerConfiguration{
+					ConcurrentEvictionRequestSyncs: 5,
+				},
+			},
+		},
+		{
+			name:                   "EvictionRequestControllerOptions zero syncs",
+			expectErrors:           true,
+			expectedErrorSubString: "concurrent-eviction-request-syncs must not be less than 1",
+			options: &EvictionRequestControllerOptions{
+				&evictionrequestconfig.EvictionRequestControllerConfiguration{
+					ConcurrentEvictionRequestSyncs: 0,
+				},
+			},
+		},
+		{
+			name:         "EvictionRequestControllerOptions nil",
+			expectErrors: false,
+			options:      (*EvictionRequestControllerOptions)(nil),
+		},
 	}
 
 	for _, tc := range testCases {
@@ -1520,6 +1656,8 @@ func TestControllerManagerAliases(t *testing.T) {
 }
 
 func TestWatchListClientFlagUsage(t *testing.T) {
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.37"))
+
 	fs := pflag.NewFlagSet("addflagstest", pflag.ContinueOnError)
 	s, _ := NewKubeControllerManagerOptions()
 	for _, f := range s.Flags([]string{""}, []string{""}, nil).FlagSets {
@@ -1531,11 +1669,19 @@ func TestWatchListClientFlagUsage(t *testing.T) {
 }
 
 func TestWatchListClientFlagChange(t *testing.T) {
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.37"))
+
 	fs := pflag.NewFlagSet("addflagstest", pflag.ContinueOnError)
 	s, err := NewKubeControllerManagerOptions()
 	if err != nil {
 		t.Fatal(fmt.Errorf("NewKubeControllerManagerOptions failed with %w", err))
 	}
+
+	featureGate := utilfeature.DefaultFeatureGate.DeepCopy()
+	effectiveVersion := compatibility.DefaultBuildEffectiveVersion()
+	effectiveVersion.SetEmulationVersion(featureGate.EmulationVersion())
+	s.ComponentGlobalsRegistry = basecompatibility.NewComponentGlobalsRegistry()
+	utilruntime.Must(s.ComponentGlobalsRegistry.Register(basecompatibility.DefaultKubeComponent, effectiveVersion, featureGate))
 
 	for _, f := range s.Flags([]string{""}, []string{""}, nil).FlagSets {
 		fs.AddFlagSet(f)
@@ -1544,20 +1690,22 @@ func TestWatchListClientFlagChange(t *testing.T) {
 	assertWatchListClientFeatureDefaultValue(t)
 	assertWatchListCommandLineDefaultValue(t, fs)
 
-	args := []string{fmt.Sprintf("--feature-gates=%v=true", clientgofeaturegate.WatchListClient)}
+	args := []string{
+		"--emulated-version=1.37",
+		fmt.Sprintf("--feature-gates=%v=false", clientgofeaturegate.WatchListClient),
+	}
 	if err := fs.Parse(args); err != nil {
 		t.Fatal(fmt.Errorf("FlatSet.Parse failed with %w", err))
 	}
 
-	// this is needed to Apply parsed flags to GlobalRegistry, so the DefaultFeatureGate values can be set from the flag
 	err = s.ComponentGlobalsRegistry.Set()
 	if err != nil {
 		t.Fatal(fmt.Errorf("ComponentGlobalsRegistry.Set failed with %w", err))
 	}
 
-	watchListClientValue := clientgofeaturegate.FeatureGates().Enabled(clientgofeaturegate.WatchListClient)
-	if !watchListClientValue {
-		t.Fatalf("expected %q feature gate to be enabled after setting the command line flag", clientgofeaturegate.WatchListClient)
+	watchListClientValue := featureGate.Enabled(featuregate.Feature(clientgofeaturegate.WatchListClient))
+	if watchListClientValue {
+		t.Fatalf("expected %q feature gate to be disabled after setting the command line flag", clientgofeaturegate.WatchListClient)
 	}
 }
 
@@ -1647,4 +1795,36 @@ func (r sortedGCIgnoredResources) Less(i, j int) bool {
 
 func (r sortedGCIgnoredResources) Swap(i, j int) {
 	r[i], r[j] = r[j], r[i]
+}
+
+func TestValidateLeaderElectionRecoveryDeadline(t *testing.T) {
+	for _, tc := range []struct {
+		name                  string
+		recovery, coordinated bool
+		wantErr               string
+	}{
+		{name: "gate off", wantErr: "leader-elect-recovery-deadline requires the LeaderElectionRecovery feature gate"},
+		{name: "gate on", recovery: true},
+		{name: "gate on with coordinated leader election", recovery: true, coordinated: true, wantErr: "leader-elect-recovery-deadline is not yet supported with the CoordinatedLeaderElection feature gate"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, cmfeatures.LeaderElectionRecovery, tc.recovery)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeatures.CoordinatedLeaderElection, tc.coordinated)
+			s, err := NewKubeControllerManagerOptions()
+			if err != nil {
+				t.Fatal(err)
+			}
+			s.Generic.LeaderElectionRecoveryDeadline = metav1.Duration{Duration: 30 * time.Second}
+			got := ""
+			if err := s.Validate([]string{""}, []string{""}, nil); err != nil {
+				got = err.Error()
+			}
+			if tc.wantErr == "" && strings.Contains(got, "leader-elect-recovery-deadline") {
+				t.Errorf("unexpected recovery deadline error: %s", got)
+			}
+			if tc.wantErr != "" && !strings.Contains(got, tc.wantErr) {
+				t.Errorf("expected an error containing %q, got %q", tc.wantErr, got)
+			}
+		})
+	}
 }

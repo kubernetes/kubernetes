@@ -427,149 +427,96 @@ func TestDropDisabledVolumeAttributesClass(t *testing.T) {
 func TestDropDisabledFieldsFromStatus(t *testing.T) {
 	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
 	tests := []struct {
-		name                                string
-		enableRecoverVolumeExpansionFailure bool
-		enableVolumeAttributesClass         bool
-		enableCSIVolumeHealth               bool
-		pvc                                 *core.PersistentVolumeClaim
-		oldPVC                              *core.PersistentVolumeClaim
-		expected                            *core.PersistentVolumeClaim
+		name                        string
+		enableVolumeAttributesClass bool
+		enableCSIVolumeHealth       bool
+		pvc                         *core.PersistentVolumeClaim
+		oldPVC                      *core.PersistentVolumeClaim
+		expected                    *core.PersistentVolumeClaim
 	}{
 		{
-			name:                                "for:newPVC=hasAllocatedResource,oldPVC=doesnot,featuregate=false; should drop field",
-			enableRecoverVolumeExpansionFailure: false,
-			enableVolumeAttributesClass:         false,
-			pvc:                                 withAllocatedResource("5G"),
-			oldPVC:                              getPVC(),
-			expected:                            getPVC(),
+			name:                        "for:newPVC=hasAllocatedResource,oldPVC=doesnot; should keep field",
+			enableVolumeAttributesClass: false,
+			pvc:                         withAllocatedResource("5G"),
+			oldPVC:                      getPVC(),
+			expected:                    withAllocatedResource("5G"),
 		},
 		{
-			name:                                "for:newPVC=hasAllocatedResource,oldPVC=doesnot,featuregate=RecoverVolumeExpansionFailure=true; should keep field",
-			enableRecoverVolumeExpansionFailure: true,
-			enableVolumeAttributesClass:         false,
-			pvc:                                 withAllocatedResource("5G"),
-			oldPVC:                              getPVC(),
-			expected:                            withAllocatedResource("5G"),
+			name:                        "for:newPVC=hasAllocatedResource,oldPVC=hasAllocatedResource; should keep field",
+			enableVolumeAttributesClass: false,
+			pvc:                         withAllocatedResource("5G"),
+			oldPVC:                      withAllocatedResource("5G"),
+			expected:                    withAllocatedResource("5G"),
 		},
 		{
-			name:                                "for:newPVC=hasAllocatedResource,oldPVC=hasAllocatedResource,featuregate=RecoverVolumeExpansionFailure=true; should keep field",
-			enableRecoverVolumeExpansionFailure: true,
-			enableVolumeAttributesClass:         false,
-			pvc:                                 withAllocatedResource("5G"),
-			oldPVC:                              withAllocatedResource("5G"),
-			expected:                            withAllocatedResource("5G"),
+			name:                        "for:newPVC=hasResizeStatus,oldPVC=doesnot; should keep field",
+			enableVolumeAttributesClass: false,
+			pvc:                         withResizeStatus(core.PersistentVolumeClaimNodeResizeInfeasible),
+			oldPVC:                      getPVC(),
+			expected:                    withResizeStatus(core.PersistentVolumeClaimNodeResizeInfeasible),
 		},
 		{
-			name:                                "for:newPVC=hasAllocatedResource,oldPVC=hasAllocatedResource,featuregate=false; should keep field",
-			enableRecoverVolumeExpansionFailure: false,
-			enableVolumeAttributesClass:         false,
-			pvc:                                 withAllocatedResource("10G"),
-			oldPVC:                              withAllocatedResource("5G"),
-			expected:                            withAllocatedResource("10G"),
+			name:                        "for:newPVC=hasResizeStatus,oldPVC=hasResizeStatus; should keep field",
+			enableVolumeAttributesClass: false,
+			pvc:                         withResizeStatus(core.PersistentVolumeClaimNodeResizeInfeasible),
+			oldPVC:                      withResizeStatus(core.PersistentVolumeClaimNodeResizeInfeasible),
+			expected:                    withResizeStatus(core.PersistentVolumeClaimNodeResizeInfeasible),
 		},
 		{
-			name:                                "for:newPVC=hasAllocatedResource,oldPVC=nil,featuregate=false; should drop field",
-			enableRecoverVolumeExpansionFailure: false,
-			enableVolumeAttributesClass:         false,
-			pvc:                                 withAllocatedResource("5G"),
-			oldPVC:                              nil,
-			expected:                            getPVC(),
+			name:                        "for:newPVC=hasVolumeAttributeClass,oldPVC=nil, featuregate=false should drop field",
+			enableVolumeAttributesClass: false,
+			pvc:                         withVolumeAttributesClassName("foo"),
+			oldPVC:                      nil,
+			expected:                    getPVC(),
 		},
 		{
-			name:                                "for:newPVC=hasResizeStatus,oldPVC=nil, featuregate=false should drop field",
-			enableRecoverVolumeExpansionFailure: false,
-			enableVolumeAttributesClass:         false,
-			pvc:                                 withResizeStatus(core.PersistentVolumeClaimNodeResizeInfeasible),
-			oldPVC:                              nil,
-			expected:                            getPVC(),
+			name:                        "for:newPVC=hasVolumeAttributeClass,oldPVC=doesnot,featuregate=VolumeAttributesClass=true; should keep field",
+			enableVolumeAttributesClass: true,
+			pvc:                         withVolumeAttributesClassName("foo"),
+			oldPVC:                      getPVC(),
+			expected:                    withVolumeAttributesClassName("foo"),
 		},
 		{
-			name:                                "for:newPVC=hasResizeStatus,oldPVC=doesnot,featuregate=RecoverVolumeExpansionFailure=true; should keep field",
-			enableRecoverVolumeExpansionFailure: true,
-			enableVolumeAttributesClass:         false,
-			pvc:                                 withResizeStatus(core.PersistentVolumeClaimNodeResizeInfeasible),
-			oldPVC:                              getPVC(),
-			expected:                            withResizeStatus(core.PersistentVolumeClaimNodeResizeInfeasible),
+			name:                        "for:newPVC=hasVolumeAttributeClass,oldPVC=hasVolumeAttributeClass,featuregate=VolumeAttributesClass=true; should keep field",
+			enableVolumeAttributesClass: true,
+			pvc:                         withVolumeAttributesClassName("foo"),
+			oldPVC:                      withVolumeAttributesClassName("foo"),
+			expected:                    withVolumeAttributesClassName("foo"),
 		},
 		{
-			name:                                "for:newPVC=hasResizeStatus,oldPVC=hasResizeStatus,featuregate=RecoverVolumeExpansionFailure=true; should keep field",
-			enableRecoverVolumeExpansionFailure: true,
-			enableVolumeAttributesClass:         false,
-			pvc:                                 withResizeStatus(core.PersistentVolumeClaimNodeResizeInfeasible),
-			oldPVC:                              withResizeStatus(core.PersistentVolumeClaimNodeResizeInfeasible),
-			expected:                            withResizeStatus(core.PersistentVolumeClaimNodeResizeInfeasible),
+			name:                        "for:newPVC=hasVolumeAttributeClass,oldPVC=hasVolumeAttributeClass,featuregate=false; should keep field",
+			enableVolumeAttributesClass: false,
+			pvc:                         withVolumeAttributesClassName("foo"),
+			oldPVC:                      withVolumeAttributesClassName("foo"),
+			expected:                    withVolumeAttributesClassName("foo"),
 		},
 		{
-			name:                                "for:newPVC=hasResizeStatus,oldPVC=hasResizeStatus,featuregate=false; should keep field",
-			enableRecoverVolumeExpansionFailure: false,
-			enableVolumeAttributesClass:         false,
-			pvc:                                 withResizeStatus(core.PersistentVolumeClaimNodeResizeInfeasible),
-			oldPVC:                              withResizeStatus(core.PersistentVolumeClaimNodeResizeInfeasible),
-			expected:                            withResizeStatus(core.PersistentVolumeClaimNodeResizeInfeasible),
+			name:                        "for:newPVC=hasVolumeAttributesModifyStatus,oldPVC=nil, featuregate=false should drop field",
+			enableVolumeAttributesClass: false,
+			pvc:                         withVolumeAttributesModifyStatus("bar", core.PersistentVolumeClaimModifyVolumePending),
+			oldPVC:                      nil,
+			expected:                    getPVC(),
 		},
 		{
-			name:                                "for:newPVC=hasVolumeAttributeClass,oldPVC=nil, featuregate=false should drop field",
-			enableRecoverVolumeExpansionFailure: false,
-			enableVolumeAttributesClass:         false,
-			pvc:                                 withVolumeAttributesClassName("foo"),
-			oldPVC:                              nil,
-			expected:                            getPVC(),
+			name:                        "for:newPVC=hasVolumeAttributesModifyStatus,oldPVC=doesnot,featuregate=VolumeAttributesClass=true; should keep field",
+			enableVolumeAttributesClass: true,
+			pvc:                         withVolumeAttributesModifyStatus("bar", core.PersistentVolumeClaimModifyVolumePending),
+			oldPVC:                      getPVC(),
+			expected:                    withVolumeAttributesModifyStatus("bar", core.PersistentVolumeClaimModifyVolumePending),
 		},
 		{
-			name:                                "for:newPVC=hasVolumeAttributeClass,oldPVC=doesnot,featuregate=VolumeAttributesClass=true; should keep field",
-			enableRecoverVolumeExpansionFailure: false,
-			enableVolumeAttributesClass:         true,
-			pvc:                                 withVolumeAttributesClassName("foo"),
-			oldPVC:                              getPVC(),
-			expected:                            withVolumeAttributesClassName("foo"),
+			name:                        "for:newPVC=hasVolumeAttributesModifyStatus,oldPVC=hasVolumeAttributesModifyStatus,featuregate=VolumeAttributesClass=true; should keep field",
+			enableVolumeAttributesClass: true,
+			pvc:                         withVolumeAttributesModifyStatus("bar", core.PersistentVolumeClaimModifyVolumePending),
+			oldPVC:                      withVolumeAttributesModifyStatus("bar", core.PersistentVolumeClaimModifyVolumePending),
+			expected:                    withVolumeAttributesModifyStatus("bar", core.PersistentVolumeClaimModifyVolumePending),
 		},
 		{
-			name:                                "for:newPVC=hasVolumeAttributeClass,oldPVC=hasVolumeAttributeClass,featuregate=VolumeAttributesClass=true; should keep field",
-			enableRecoverVolumeExpansionFailure: false,
-			enableVolumeAttributesClass:         true,
-			pvc:                                 withVolumeAttributesClassName("foo"),
-			oldPVC:                              withVolumeAttributesClassName("foo"),
-			expected:                            withVolumeAttributesClassName("foo"),
-		},
-		{
-			name:                                "for:newPVC=hasVolumeAttributeClass,oldPVC=hasVolumeAttributeClass,featuregate=false; should keep field",
-			enableRecoverVolumeExpansionFailure: false,
-			enableVolumeAttributesClass:         false,
-			pvc:                                 withVolumeAttributesClassName("foo"),
-			oldPVC:                              withVolumeAttributesClassName("foo"),
-			expected:                            withVolumeAttributesClassName("foo"),
-		},
-		{
-			name:                                "for:newPVC=hasVolumeAttributesModifyStatus,oldPVC=nil, featuregate=false should drop field",
-			enableRecoverVolumeExpansionFailure: false,
-			enableVolumeAttributesClass:         false,
-			pvc:                                 withVolumeAttributesModifyStatus("bar", core.PersistentVolumeClaimModifyVolumePending),
-			oldPVC:                              nil,
-			expected:                            getPVC(),
-		},
-		{
-			name:                                "for:newPVC=hasVolumeAttributesModifyStatus,oldPVC=doesnot,featuregate=VolumeAttributesClass=true; should keep field",
-			enableRecoverVolumeExpansionFailure: false,
-			enableVolumeAttributesClass:         true,
-			pvc:                                 withVolumeAttributesModifyStatus("bar", core.PersistentVolumeClaimModifyVolumePending),
-			oldPVC:                              getPVC(),
-			expected:                            withVolumeAttributesModifyStatus("bar", core.PersistentVolumeClaimModifyVolumePending),
-		},
-		{
-			name:                                "for:newPVC=hasVolumeAttributesModifyStatus,oldPVC=hasVolumeAttributesModifyStatus,featuregate=VolumeAttributesClass=true; should keep field",
-			enableRecoverVolumeExpansionFailure: false,
-			enableVolumeAttributesClass:         true,
-			pvc:                                 withVolumeAttributesModifyStatus("bar", core.PersistentVolumeClaimModifyVolumePending),
-			oldPVC:                              withVolumeAttributesModifyStatus("bar", core.PersistentVolumeClaimModifyVolumePending),
-			expected:                            withVolumeAttributesModifyStatus("bar", core.PersistentVolumeClaimModifyVolumePending),
-		},
-		{
-			name:                                "for:newPVC=hasVolumeAttributesModifyStatus,oldPVC=hasVolumeAttributesModifyStatus,featuregate=false; should keep field",
-			enableRecoverVolumeExpansionFailure: false,
-			enableVolumeAttributesClass:         false,
-			pvc:                                 withVolumeAttributesModifyStatus("bar", core.PersistentVolumeClaimModifyVolumePending),
-			oldPVC:                              withVolumeAttributesModifyStatus("bar", core.PersistentVolumeClaimModifyVolumePending),
-			expected:                            withVolumeAttributesModifyStatus("bar", core.PersistentVolumeClaimModifyVolumePending),
+			name:                        "for:newPVC=hasVolumeAttributesModifyStatus,oldPVC=hasVolumeAttributesModifyStatus,featuregate=false; should keep field",
+			enableVolumeAttributesClass: false,
+			pvc:                         withVolumeAttributesModifyStatus("bar", core.PersistentVolumeClaimModifyVolumePending),
+			oldPVC:                      withVolumeAttributesModifyStatus("bar", core.PersistentVolumeClaimModifyVolumePending),
+			expected:                    withVolumeAttributesModifyStatus("bar", core.PersistentVolumeClaimModifyVolumePending),
 		},
 		{
 			name:                  "for:newPVC=hasHealthStatus,oldPVC=nil,featuregate=CSIVolumeHealth=false; should drop field",
@@ -611,9 +558,8 @@ func TestDropDisabledFieldsFromStatus(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.RecoverVolumeExpansionFailure: test.enableRecoverVolumeExpansionFailure,
-				features.VolumeAttributesClass:         test.enableVolumeAttributesClass,
-				features.CSIVolumeHealth:               test.enableCSIVolumeHealth,
+				features.VolumeAttributesClass: test.enableVolumeAttributesClass,
+				features.CSIVolumeHealth:       test.enableCSIVolumeHealth,
 			})
 
 			DropDisabledFieldsFromStatus(test.pvc, test.oldPVC)
@@ -741,6 +687,65 @@ func TestWarnings(t *testing.T) {
 				},
 			},
 			expected: nil,
+		},
+		{
+			name: "large integer no warning",
+			template: &core.PersistentVolumeClaim{
+				Spec: core.PersistentVolumeClaimSpec{
+					Resources: core.VolumeResourceRequirements{
+						Requests: core.ResourceList{
+							core.ResourceStorage: resource.MustParse("9223372036854775808"),
+						},
+						Limits: core.ResourceList{
+							core.ResourceStorage: resource.MustParse("9223372036854775808"),
+						},
+					},
+				},
+			},
+			expected: nil,
+		},
+		{
+			name: "large fractional warning",
+			template: &core.PersistentVolumeClaim{
+				Spec: core.PersistentVolumeClaimSpec{
+					Resources: core.VolumeResourceRequirements{
+						Requests: core.ResourceList{
+							core.ResourceStorage: resource.MustParse("9223372036854775808.001"),
+						},
+					},
+				},
+			},
+			expected: []string{
+				`spec.resources.requests[storage]: fractional byte value "9223372036854775808001m" is invalid, must be an integer`,
+			},
+		},
+		{
+			name: "whole byte value whose milli projection overflows int64",
+			template: &core.PersistentVolumeClaim{
+				Spec: core.PersistentVolumeClaimSpec{
+					Resources: core.VolumeResourceRequirements{
+						Requests: core.ResourceList{
+							core.ResourceStorage: resource.MustParse("9223372036854776"),
+						},
+					},
+				},
+			},
+			expected: nil,
+		},
+		{
+			name: "fractional byte value within a milli of the next whole byte",
+			template: &core.PersistentVolumeClaim{
+				Spec: core.PersistentVolumeClaimSpec{
+					Resources: core.VolumeResourceRequirements{
+						Requests: core.ResourceList{
+							core.ResourceStorage: resource.MustParse("1.9999"),
+						},
+					},
+				},
+			},
+			expected: []string{
+				`spec.resources.requests[storage]: fractional byte value "1999900u" is invalid, must be an integer`,
+			},
 		},
 		{
 			name: "storageclass annotations warning",

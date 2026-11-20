@@ -17,6 +17,7 @@ limitations under the License.
 package unstructured
 
 import (
+	"fmt"
 	"io/ioutil"
 	"math"
 	"reflect"
@@ -382,6 +383,216 @@ func TestNestedNullCoercingStringMap(t *testing.T) {
 				}
 			} else if gotErr != nil {
 				t.Errorf("wanted nil error, got %v", gotErr)
+			}
+		})
+	}
+}
+
+func TestDecodeList(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		data    string
+		list    *UnstructuredList
+		want    *UnstructuredList
+		wantErr string
+	}{
+		{
+			name: "typed list",
+			data: `{"kind":"PodList","apiVersion":"v1","metadata":{"resourceVersion":"5"},"items":[{"metadata":{"name":"a","generation":2}},{"kind":"Pod","metadata":{"name":"b"}},null]}`,
+			want: &UnstructuredList{
+				Object: map[string]interface{}{"kind": "PodList", "apiVersion": "v1", "metadata": map[string]interface{}{"resourceVersion": "5"}},
+				Items: []Unstructured{
+					{Object: map[string]interface{}{"kind": "Pod", "apiVersion": "v1", "metadata": map[string]interface{}{"name": "a", "generation": int64(2)}}},
+					// Kind and apiVersion are only set on items that have neither.
+					{Object: map[string]interface{}{"kind": "Pod", "metadata": map[string]interface{}{"name": "b"}}},
+					{Object: map[string]interface{}{"kind": "Pod", "apiVersion": "v1"}},
+				},
+			},
+		},
+		{
+			// A nested items key stays in its item.
+			name: "list of mixed kinds",
+			data: `{"kind":"List","apiVersion":"v1","items":[{"kind":"Pod","apiVersion":"v1","spec":{"volumes":[{"configMap":{"items":[{"key":"k"}]}}]}},{"kind":"Service","apiVersion":"v1","spec":{"ports":[{"port":1.5}]}}]}`,
+			want: &UnstructuredList{
+				Object: map[string]interface{}{"kind": "List", "apiVersion": "v1"},
+				Items: []Unstructured{
+					{Object: map[string]interface{}{"kind": "Pod", "apiVersion": "v1", "spec": map[string]interface{}{"volumes": []interface{}{map[string]interface{}{"configMap": map[string]interface{}{"items": []interface{}{map[string]interface{}{"key": "k"}}}}}}}},
+					{Object: map[string]interface{}{"kind": "Service", "apiVersion": "v1", "spec": map[string]interface{}{"ports": []interface{}{map[string]interface{}{"port": 1.5}}}}},
+				},
+			},
+		},
+		{
+			// Members named like the decoding struct's fields stay in the list.
+			name: "members named Object and Items",
+			data: `{"kind":"PodList","apiVersion":"v1","Object":{"a":1},"Items":[1],"items":[{"b":2}]}`,
+			want: &UnstructuredList{
+				Object: map[string]interface{}{"kind": "PodList", "apiVersion": "v1", "Object": map[string]interface{}{"a": int64(1)}, "Items": []interface{}{int64(1)}},
+				Items:  []Unstructured{{Object: map[string]interface{}{"kind": "Pod", "apiVersion": "v1", "b": int64(2)}}},
+			},
+		},
+		{
+			// Keys that data does not set are kept and items are replaced.
+			name: "decode into a populated list",
+			data: `{"kind":"PodList","apiVersion":"v1","items":[{"metadata":{"name":"a"}}]}`,
+			list: &UnstructuredList{
+				Object: map[string]interface{}{"kind": "OldList", "stale": "x", "items": []interface{}{map[string]interface{}{"kind": "Stale"}}},
+				Items:  []Unstructured{{Object: map[string]interface{}{"kind": "Stale"}}},
+			},
+			want: &UnstructuredList{
+				Object: map[string]interface{}{"kind": "PodList", "apiVersion": "v1", "stale": "x"},
+				Items:  []Unstructured{{Object: map[string]interface{}{"kind": "Pod", "apiVersion": "v1", "metadata": map[string]interface{}{"name": "a"}}}},
+			},
+		},
+		{
+			name: "empty items",
+			data: `{"kind":"PodList","items":[]}`,
+			want: &UnstructuredList{Object: map[string]interface{}{"kind": "PodList"}, Items: []Unstructured{}},
+		},
+		{
+			name: "null items",
+			data: `{"kind":"PodList","items":null}`,
+			want: &UnstructuredList{Object: map[string]interface{}{"kind": "PodList"}, Items: []Unstructured{}},
+		},
+		{
+			name: "no items",
+			data: `{"kind":"PodList"}`,
+			want: &UnstructuredList{Object: map[string]interface{}{"kind": "PodList"}, Items: []Unstructured{}},
+		},
+		{
+			// An item with an apiVersion or a kind is left as it is.
+			name: "item with an apiVersion and no kind",
+			data: `{"kind":"PodList","apiVersion":"v1","items":[{"apiVersion":"v2"}]}`,
+			want: &UnstructuredList{
+				Object: map[string]interface{}{"kind": "PodList", "apiVersion": "v1"},
+				Items:  []Unstructured{{Object: map[string]interface{}{"apiVersion": "v2"}}},
+			},
+		},
+		{
+			// The kind and apiVersion inferred for a null item are empty.
+			name: "null item in a list without a kind or apiVersion",
+			data: `{"kind":"List","items":[null]}`,
+			want: &UnstructuredList{
+				Object: map[string]interface{}{"kind": "List"},
+				Items:  []Unstructured{{Object: map[string]interface{}{"kind": "", "apiVersion": ""}}},
+			},
+		},
+		{
+			name: "numbers",
+			data: `{"kind":"FooList","apiVersion":"g/v1","items":[{"i":1,"f":1.5,"big":9223372036854775808}]}`,
+			want: &UnstructuredList{
+				Object: map[string]interface{}{"kind": "FooList", "apiVersion": "g/v1"},
+				Items:  []Unstructured{{Object: map[string]interface{}{"kind": "Foo", "apiVersion": "g/v1", "i": int64(1), "f": 1.5, "big": 9223372036854775808.0}}},
+			},
+		},
+		{
+			name:    "item that is not an object",
+			data:    `{"kind":"PodList","items":[{"a":1},2]}`,
+			wantErr: "cannot unmarshal number",
+		},
+		{
+			name:    "items repeated, the first not an array",
+			data:    `{"kind":"PodList","items":5,"items":[{"a":1}]}`,
+			wantErr: "cannot unmarshal number",
+		},
+		{
+			name:    "number out of range",
+			data:    `{"kind":"PodList","items":[{"a":1e400}]}`,
+			wantErr: "1e400",
+		},
+		{
+			name:    "not an object",
+			data:    `[{"kind":"PodList"}]`,
+			wantErr: "cannot unmarshal array",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			list := tc.list
+			if list == nil {
+				list = &UnstructuredList{}
+			}
+			err := list.UnmarshalJSON([]byte(tc.data))
+			if tc.wantErr != "" {
+				if err == nil || !strings.Contains(err.Error(), tc.wantErr) {
+					t.Fatalf("got error %v, want one containing %q", err, tc.wantErr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(list, tc.want) {
+				t.Errorf("got  %#v\nwant %#v", list, tc.want)
+			}
+		})
+	}
+}
+
+// TestDecodeListAllocations checks that a list decode allocates about as much
+// as decoding its items one by one with Unstructured.UnmarshalJSON, so each
+// item is decoded once.
+func TestDecodeListAllocations(t *testing.T) {
+	const n = 50
+	const item = `{"kind":"Pod","apiVersion":"v1","metadata":{"name":"a","labels":{"app":"a"}},"spec":{"containers":[{"name":"c","image":"i"}]}}`
+	itemData := []byte(item)
+	list := []byte(`{"kind":"PodList","apiVersion":"v1","items":[` + strings.TrimSuffix(strings.Repeat(item+",", n), ",") + `]}`)
+
+	itemAllocs := testing.AllocsPerRun(20, func() {
+		if err := (&Unstructured{}).UnmarshalJSON(itemData); err != nil {
+			t.Fatal(err)
+		}
+	})
+	listAllocs := testing.AllocsPerRun(20, func() {
+		if err := (&UnstructuredList{}).UnmarshalJSON(list); err != nil {
+			t.Fatal(err)
+		}
+	})
+	if limit := 1.25 * n * itemAllocs; listAllocs > limit {
+		t.Errorf("decoding a list of %d items took %v allocations, more than %v, 1.25 times what it takes to decode each item on its own", n, listAllocs, limit)
+	}
+}
+
+func benchmarkListJSON(n int) []byte {
+	const item = `{"metadata":{"name":"web-%[1]d","namespace":"default","uid":"4c1f2a9e-0d3b-4c1a-9f2e-%012[1]d","resourceVersion":"%[1]d","labels":{"app":"web","tier":"frontend"},` +
+		`"ownerReferences":[{"apiVersion":"apps/v1","kind":"ReplicaSet","name":"web","uid":"a1b2c3d4","controller":true}],` +
+		`"managedFields":[{"manager":"kube-controller-manager","operation":"Update","apiVersion":"v1","fieldsType":"FieldsV1","fieldsV1":{"f:metadata":{"f:labels":{".":{},"f:app":{}}},"f:spec":{"f:containers":{"k:{\"name\":\"web\"}":{".":{},"f:image":{}}}}}}]},` +
+		`"spec":{"containers":[{"name":"web","image":"registry.k8s.io/nginx-slim:0.27","ports":[{"containerPort":8080,"protocol":"TCP"}],"resources":{"requests":{"cpu":"100m","memory":"128Mi"}}}],` +
+		`"volumes":[{"name":"kube-api-access","projected":{"defaultMode":420,"sources":[{"serviceAccountToken":{"expirationSeconds":3607,"path":"token"}},{"configMap":{"name":"kube-root-ca.crt","items":[{"key":"ca.crt","path":"ca.crt"}]}}]}}],` +
+		`"nodeName":"node-%[1]d","restartPolicy":"Always","terminationGracePeriodSeconds":30},` +
+		`"status":{"phase":"Running","podIP":"10.244.0.1","conditions":[{"type":"Ready","status":"True","lastTransitionTime":"2026-09-29T12:00:05Z"}]}}`
+	items := make([]string, n)
+	for i := range items {
+		items[i] = fmt.Sprintf(item, i)
+	}
+	return []byte(`{"kind":"PodList","apiVersion":"v1","metadata":{"resourceVersion":"123"},"items":[` + strings.Join(items, ",") + `]}`)
+}
+
+// benchmarkLargeStringsJSON returns a ConfigMapList of n items that each carry
+// a string of about 100KB.
+func benchmarkLargeStringsJSON(n int) []byte {
+	blob := strings.Repeat("QUJDREVGR0hJSktMTU5PUFFSU1RVVldYWVo=", 3000)
+	items := make([]string, n)
+	for i := range items {
+		items[i] = fmt.Sprintf(`{"metadata":{"name":"cm-%d","namespace":"default"},"data":{"blob":%q}}`, i, blob)
+	}
+	return []byte(`{"kind":"ConfigMapList","apiVersion":"v1","metadata":{"resourceVersion":"123"},"items":[` + strings.Join(items, ",") + `]}`)
+}
+
+func BenchmarkDecodeList(b *testing.B) {
+	for _, tc := range []struct {
+		name string
+		data []byte
+	}{
+		{"pods-10", benchmarkListJSON(10)},
+		{"pods-1000", benchmarkListJSON(1000)},
+		{"large-strings-10", benchmarkLargeStringsJSON(10)},
+	} {
+		b.Run(tc.name, func(b *testing.B) {
+			b.ReportAllocs()
+			b.SetBytes(int64(len(tc.data)))
+			for b.Loop() {
+				if err := (&UnstructuredList{}).UnmarshalJSON(tc.data); err != nil {
+					b.Fatal(err)
+				}
 			}
 		})
 	}

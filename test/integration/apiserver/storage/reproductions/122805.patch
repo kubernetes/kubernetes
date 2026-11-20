@@ -1,0 +1,15 @@
+diff --git a/staging/src/k8s.io/apiserver/pkg/storage/cacher/cacher.go b/staging/src/k8s.io/apiserver/pkg/storage/cacher/cacher.go
+index 92628f8e2df..8f0c3cf8022 100644
+--- a/staging/src/k8s.io/apiserver/pkg/storage/cacher/cacher.go
++++ b/staging/src/k8s.io/apiserver/pkg/storage/cacher/cacher.go
+@@ -884,7 +884,9 @@ func (c *Cacher) initWatcherIntervalLocked(watcher *cacheWatcher) (*watchCacheIn
+ 		return nil, err
+ 	}
+ 
+-	if isListWatchRequest(opts) {
++	// BUG REVERT (#122805): when ResourceVersion is unset on a WatchList request,
++	// do not schedule an initial-events-end bookmark.
++	if len(opts.ResourceVersion) > 0 && isListWatchRequest(opts) {
+ 		bookmark, err := c.getInitialEventsEndBookmark(cacheInterval.resourceVersion)
+ 		if err != nil {
+ 			return nil, err

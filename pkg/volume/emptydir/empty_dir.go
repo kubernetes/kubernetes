@@ -34,7 +34,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	resourcehelper "k8s.io/component-helpers/resource"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
@@ -153,6 +153,23 @@ func calculateEmptyDirMemorySize(nodeAllocatableMemory *resource.Quantity, spec 
 	return sizeLimit
 }
 
+// EffectiveEphemeralVolumeLimit calculates the effective memory size limit for a memory-backed
+// emptyDir volume as the minimum of node allocatable memory, pod memory limit, and the volume's
+// sizeLimit.
+func (plugin *emptyDirPlugin) EffectiveEphemeralVolumeLimit(spec *volume.Spec, pod *v1.Pod) (*resource.Quantity, error) {
+	if spec.Volume == nil || spec.Volume.EmptyDir == nil {
+		return nil, fmt.Errorf("spec does not reference an emptyDir volume type")
+	}
+	if spec.Volume.EmptyDir.Medium != v1.StorageMediumMemory {
+		return nil, fmt.Errorf("only memory-backed emptyDir volumes support direct resize")
+	}
+	nodeAllocatable, err := plugin.host.GetNodeAllocatable()
+	if err != nil {
+		return nil, err
+	}
+	return calculateEmptyDirMemorySize(nodeAllocatable.Memory(), spec, pod), nil
+}
+
 func (plugin *emptyDirPlugin) newMounterInternal(spec *volume.Spec, pod *v1.Pod, mounter mount.Interface, mountDetector mountDetector) (volume.Mounter, error) {
 	medium := v1.StorageMediumDefault
 	sizeLimit := &resource.Quantity{}
@@ -160,11 +177,11 @@ func (plugin *emptyDirPlugin) newMounterInternal(spec *volume.Spec, pod *v1.Pod,
 	if spec.Volume.EmptyDir != nil { // Support a non-specified source as EmptyDir.
 		medium = spec.Volume.EmptyDir.Medium
 		if medium == v1.StorageMediumMemory {
-			nodeAllocatable, err := plugin.host.GetNodeAllocatable()
+			var err error
+			sizeLimit, err = plugin.EffectiveEphemeralVolumeLimit(spec, pod)
 			if err != nil {
 				return nil, err
 			}
-			sizeLimit = calculateEmptyDirMemorySize(nodeAllocatable.Memory(), spec, pod)
 		}
 		if utilfeature.DefaultFeatureGate.Enabled(features.EmptyDirVolumeMode) {
 			mode = spec.Volume.EmptyDir.Mode
@@ -421,12 +438,12 @@ func getPageSizeMountOption(medium v1.StorageMedium, pod *v1.Pod) (string, error
 	}
 
 	podLevelAndContainerLevelRequests := []v1.ResourceList{}
-	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) && resourcehelper.IsPodLevelResourcesSet(pod) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) && pod.Spec.Resources != nil {
 		podLevelAndContainerLevelRequests = append(podLevelAndContainerLevelRequests, pod.Spec.Resources.Requests)
 	}
 
 	// In some rare cases init containers can also consume Huge pages
-	for _, container := range append(pod.Spec.Containers, pod.Spec.InitContainers...) {
+	for container := range podutil.ContainerIter(&pod.Spec, podutil.InitContainers|podutil.Containers) {
 		podLevelAndContainerLevelRequests = append(podLevelAndContainerLevelRequests, container.Resources.Requests)
 	}
 

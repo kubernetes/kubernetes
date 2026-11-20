@@ -304,8 +304,16 @@ func (p *sysadminProfile) Apply(pod *corev1.Pod, containerName string, target ru
 
 	switch style {
 	case node:
-		useHostNamespaces(pod)
-		mountRootPartition(pod, containerName)
+		n := target.(*corev1.Node)
+		if n.Labels[corev1.LabelOSStable] == string(corev1.Windows) {
+			clearSecurityContext(pod, containerName)
+			setWindowsHostProcess(pod)
+			setWindowsRunAsUserName(pod, containerName)
+			pod.Spec.HostNetwork = true
+		} else {
+			useHostNamespaces(pod)
+			mountRootPartition(pod, containerName)
+		}
 
 	case podCopy:
 		// to mimic general, default and baseline
@@ -473,6 +481,39 @@ func setSeccompProfile(p *corev1.Pod, containerName string) {
 			c.SecurityContext = &corev1.SecurityContext{}
 		}
 		c.SecurityContext.SeccompProfile = &corev1.SeccompProfile{Type: "RuntimeDefault"}
+		return false
+	})
+}
+
+// setWindowsHostProcess configures the pod for Windows Host Process Container (HPC) execution.
+// HostProcess is set at the pod level because all containers in an HPC pod must agree.
+func setWindowsHostProcess(p *corev1.Pod) {
+	p.Spec.OS = &corev1.PodOS{Name: corev1.Windows}
+	if p.Spec.SecurityContext == nil {
+		p.Spec.SecurityContext = &corev1.PodSecurityContext{}
+	}
+	if p.Spec.SecurityContext.WindowsOptions == nil {
+		p.Spec.SecurityContext.WindowsOptions = &corev1.WindowsSecurityContextOptions{}
+	}
+	p.Spec.SecurityContext.WindowsOptions.HostProcess = new(true)
+	p.Spec.SecurityContext.WindowsOptions.RunAsUserName = new("NT AUTHORITY\\SYSTEM")
+}
+
+// setWindowsRunAsUserName sets the RunAsUserName at the container level.
+// This is set at container level rather than pod level so that it can be
+// overridden via the --custom flag.
+func setWindowsRunAsUserName(p *corev1.Pod, containerName string) {
+	podutils.VisitContainers(&p.Spec, podutils.AllContainers, func(c *corev1.Container, _ podutils.ContainerType) bool {
+		if c.Name != containerName {
+			return true
+		}
+		if c.SecurityContext == nil {
+			c.SecurityContext = &corev1.SecurityContext{}
+		}
+		if c.SecurityContext.WindowsOptions == nil {
+			c.SecurityContext.WindowsOptions = &corev1.WindowsSecurityContextOptions{}
+		}
+		c.SecurityContext.WindowsOptions.RunAsUserName = new("NT AUTHORITY\\SYSTEM")
 		return false
 	})
 }

@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/klog/v2"
+	"k8s.io/kube-openapi/pkg/common"
 	"k8s.io/kube-openapi/pkg/util"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 )
@@ -58,10 +59,19 @@ func ToValidOperationID(s string, capitalizeFirstLetter bool) string {
 	return buffer.String()
 }
 
-// GetOperationIDAndTags returns a customize operation ID and a list of tags for kubernetes API server's OpenAPI spec to prevent duplicate IDs.
+// GetOperationIDAndTagsFromRoute returns a customized operation ID and a list of tags for kubernetes API server's OpenAPI spec to prevent duplicate IDs.
+func GetOperationIDAndTagsFromRoute(r common.Route) (string, []string, error) {
+	return operationIDAndTags(r.OperationName(), r.Path())
+}
+
+// GetOperationIDAndTags is GetOperationIDAndTagsFromRoute for a go-restful route.
+//
+// Deprecated: use GetOperationIDAndTagsFromRoute.
 func GetOperationIDAndTags(r *restful.Route) (string, []string, error) {
-	op := r.Operation
-	path := r.Path
+	return operationIDAndTags(r.Operation, r.Path)
+}
+
+func operationIDAndTags(op, path string) (string, []string, error) {
 	var tags []string
 	prefix, exists := verbs.GetPrefix(op)
 	if !exists {

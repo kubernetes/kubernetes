@@ -29,9 +29,11 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
 const (
@@ -62,7 +64,16 @@ type podContainerManagerImpl struct {
 	memoryReservationPolicy kubeletconfig.MemoryReservationPolicy
 	// memoryThrottlingFactor is used to compute pod-level memory.high
 	memoryThrottlingFactor *float64
+	// memorySwapBehavior controls pod-level swap behavior (NoSwap, LimitedSwap or WorkloadControlledSwap)
+	memorySwapBehavior kubetypes.SwapBehavior
+	// memoryCapacity and swapCapacity are node capacities in bytes used for proportional swap calculation
+	memoryCapacity int64
+	swapCapacity   int64
+	// getSwapControllerAvailable reports whether the swap cgroup controller is available on the host
+	getSwapControllerAvailable func() bool
 }
+
+var isCgroup2UnifiedMode = libcontainercgroups.IsCgroup2UnifiedMode
 
 // Make sure that podContainerManagerImpl implements the PodContainerManager interface
 var _ PodContainerManager = &podContainerManagerImpl{}
@@ -87,7 +98,7 @@ func (m *podContainerManagerImpl) EnsureExists(logger klog.Logger, pod *v1.Pod) 
 		}
 		enforceMemoryQoS := false
 		if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.MemoryQoS) &&
-			libcontainercgroups.IsCgroup2UnifiedMode() {
+			isCgroup2UnifiedMode() {
 			enforceMemoryQoS = true
 		}
 		// Create the pod container
@@ -96,6 +107,9 @@ func (m *podContainerManagerImpl) EnsureExists(logger klog.Logger, pod *v1.Pod) 
 			Name:               podContainerName,
 			ResourceParameters: ResourceConfigForPod(pod, enforceCPULimits, m.cpuCFSQuotaPeriod, enforceMemoryQoS, m.memoryReservationPolicy),
 		}
+		if !m.isNodeSwapEnabled() {
+			containerConfig.ResourceParameters.Unified = UnifiedWithoutSwap(containerConfig.ResourceParameters.Unified)
+		}
 		if m.podPidsLimit > 0 {
 			containerConfig.ResourceParameters.PidsLimit = &m.podPidsLimit
 		}
@@ -103,12 +117,24 @@ func (m *podContainerManagerImpl) EnsureExists(logger klog.Logger, pod *v1.Pod) 
 			m.applyPodLevelMemoryHigh(pod, containerConfig.ResourceParameters)
 			logger.V(4).Info("MemoryQoS config for pod", "pod", klog.KObj(pod), "unified", containerConfig.ResourceParameters.Unified)
 		}
+		applyWritableCgroupLimits(pod, containerConfig.ResourceParameters)
+		m.applyPodLevelSwapConfig(logger, pod, containerConfig.ResourceParameters)
 		if err := m.cgroupManager.Create(logger, containerConfig); err != nil {
 			return fmt.Errorf("failed to create container for %v : %v", podContainerName, err)
 		}
 
 	}
 	return nil
+}
+
+func (m *podContainerManagerImpl) isNodeSwapEnabled() bool {
+	if !IsSwapBehaviorEnabled(string(m.memorySwapBehavior)) {
+		return false
+	}
+	if !isCgroup2UnifiedMode() {
+		return false
+	}
+	return m.getSwapControllerAvailable != nil && m.getSwapControllerAvailable()
 }
 
 // applyPodLevelMemoryHigh sets memory.high on the pod cgroup.
@@ -118,6 +144,55 @@ func (m *podContainerManagerImpl) applyPodLevelMemoryHigh(pod *v1.Pod, rc *Resou
 	if m.memoryThrottlingFactor != nil {
 		ApplyPodLevelMemoryHigh(pod, rc, *m.memoryThrottlingFactor)
 	}
+}
+
+const (
+	defaultWritableCgroupMaxDescendants = "250"
+	defaultWritableCgroupMaxDepth       = "50"
+)
+
+func applyWritableCgroupLimits(pod *v1.Pod, rc *ResourceConfig) {
+	if !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CgroupOptions) || !podRequestsWritableCgroups(pod) {
+		return
+	}
+	if rc.Unified == nil {
+		rc.Unified = map[string]string{}
+	}
+	rc.Unified[Cgroup2MaxDescendants] = defaultWritableCgroupMaxDescendants
+	rc.Unified[Cgroup2MaxDepth] = defaultWritableCgroupMaxDepth
+}
+
+func containerRequestsWritableCgroups(sc *v1.SecurityContext) bool {
+	if sc == nil || sc.CgroupOptions == nil || sc.CgroupOptions.MountMode == nil {
+		return false
+	}
+	return *sc.CgroupOptions.MountMode == v1.CgroupMountModeReadWrite
+}
+
+func podRequestsWritableCgroups(pod *v1.Pod) bool {
+	for c := range podutil.ContainerIter(&pod.Spec, podutil.AllContainers) {
+		if containerRequestsWritableCgroups(c.SecurityContext) {
+			return true
+		}
+	}
+	return false
+}
+
+// applyPodLevelSwapConfig sets memory.swap.max on the pod cgroup when the cgroup is created.
+// Since EnsureExists only invokes this when the pod cgroup does not already exist, an existing
+// pod cgroup never has memory.swap.max recomputed (for example, if kubelet restarts with a
+// different swapBehavior).
+func (m *podContainerManagerImpl) applyPodLevelSwapConfig(logger klog.Logger, pod *v1.Pod, rc *ResourceConfig) {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.WorkloadControlledSwap) && m.isNodeSwapEnabled() {
+		// KEP-5359: a pod-level limits.swap, already set by ResourceConfigForPod,
+		// wins over the LimitedSwap value. On a WorkloadControlledSwap node it is
+		// the only limit on the pod cgroup.
+		if HasExplicitSwapLimit(pod, nil) || m.memorySwapBehavior == kubetypes.WorkloadControlledSwap {
+			return
+		}
+	}
+	swapControllerAvailable := m.getSwapControllerAvailable != nil && m.getSwapControllerAvailable()
+	ApplyPodLevelSwapConfig(logger, pod, rc, m.memorySwapBehavior, m.memoryCapacity, m.swapCapacity, isCgroup2UnifiedMode(), swapControllerAvailable)
 }
 
 // GetPodContainerName returns the CgroupName identifier, and its literal cgroupfs form on the host.

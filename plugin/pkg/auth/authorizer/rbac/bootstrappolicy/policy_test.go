@@ -199,6 +199,33 @@ func TestBootstrapClusterRolesWithFeatureGatesEnabled(t *testing.T) {
 	testObjects(t, featureGateList, "cluster-roles-featuregates.yaml")
 }
 
+// Modifying the containers of a running pod must be explicitly granted, so the
+// default user-facing roles must not allow writing to pods/dynamic.
+func TestDefaultRolesDoNotGrantPodsDynamic(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		"AllAlpha": true,
+		"AllBeta":  true,
+	})
+
+	userFacingRoles := sets.New("admin", "edit", "view", "system:aggregate-to-admin", "system:aggregate-to-edit", "system:aggregate-to-view")
+	found := sets.New[string]()
+	for _, role := range bootstrappolicy.ClusterRoles() {
+		if !userFacingRoles.Has(role.Name) {
+			continue
+		}
+		found.Insert(role.Name)
+		for _, verb := range []string{"create", "update", "patch"} {
+			rule := rbacv1helpers.NewRule(verb).Groups("").Resources("pods/dynamic").RuleOrDie()
+			if covers, _ := validation.Covers(role.Rules, []rbacv1.PolicyRule{rule}); covers {
+				t.Errorf("role %q must not grant %q on pods/dynamic", role.Name, verb)
+			}
+		}
+	}
+	if missing := userFacingRoles.Difference(found); missing.Len() > 0 {
+		t.Errorf("roles not found in bootstrap policy: %v", sets.List(missing))
+	}
+}
+
 func TestBootstrapClusterRoleBindings(t *testing.T) {
 	list := &api.List{}
 	names := sets.NewString()
@@ -229,6 +256,28 @@ func TestBootstrapControllerRoles(t *testing.T) {
 		list.Items = append(list.Items, roles[name])
 	}
 	testObjects(t, list, "controller-roles.yaml")
+}
+
+func TestBootstrapControllerRolesWithFeatureGatesEnabled(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		"AllAlpha": true,
+		"AllBeta":  true,
+	})
+
+	roles := bootstrappolicy.ControllerRoles()
+	featureGateList := &api.List{}
+	featureGateNames := sets.NewString()
+	featureGateRoles := map[string]runtime.Object{}
+	for i := range roles {
+		role := roles[i]
+		featureGateNames.Insert(role.Name)
+		featureGateRoles[role.Name] = &role
+	}
+	for _, featureGateName := range featureGateNames.List() {
+		featureGateList.Items = append(featureGateList.Items, featureGateRoles[featureGateName])
+	}
+
+	testObjects(t, featureGateList, "controller-roles-featuregates.yaml")
 }
 
 func TestBootstrapControllerRoleBindings(t *testing.T) {

@@ -48,7 +48,6 @@ spec:
         - --cloud-provider={{.CloudProvider}}
         - --gcs-path={{.GCSPath}}
         - --gcloud-auth-file-path=/etc/service-account/service-account.json
-        - --enable-hollow-node-logs={{.EnableHollowNodeLogs}}
         - --dump-systemd-journal={{.DumpSystemdJournal}}
         - --extra-log-files={{.ExtraLogFiles}}
         - --extra-systemd-services={{.ExtraSystemdServices}}

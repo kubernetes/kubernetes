@@ -118,6 +118,11 @@ func DetermineEffectiveSecurityContext(pod *v1.Pod, container *v1.Container) *v1
 		*effectiveSc.ProcMount = *containerSc.ProcMount
 	}
 
+	if containerSc.CgroupOptions != nil {
+		effectiveSc.CgroupOptions = new(v1.CgroupOptions)
+		*effectiveSc.CgroupOptions = *containerSc.CgroupOptions
+	}
+
 	return effectiveSc
 }
 

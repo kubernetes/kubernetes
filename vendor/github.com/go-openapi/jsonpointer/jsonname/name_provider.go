@@ -39,15 +39,20 @@ func NewNameProvider() *NameProvider {
 }
 
 func buildnameIndex(tpe reflect.Type, idx, reverseIdx map[string]string) {
-	for i := range tpe.NumField() {
-		targetDes := tpe.Field(i)
+	for targetDes := range tpe.Fields() {
 
 		if targetDes.PkgPath != "" { // unexported
 			continue
 		}
 
 		if targetDes.Anonymous { // walk embedded structures tree down first
-			buildnameIndex(targetDes.Type, idx, reverseIdx)
+			// An embedded field is not necessarily a struct: it may be a pointer to a struct, or a named
+			// non-struct type (e.g. an embedded named slice or map). Only struct shapes carry promoted
+			// fields worth indexing; anything else contributes no json name and must not be walked.
+			if embedded := structTypeOf(targetDes.Type); embedded != nil {
+				buildnameIndex(embedded, idx, reverseIdx)
+			}
+
 			continue
 		}
 
@@ -73,6 +78,12 @@ func buildnameIndex(tpe reflect.Type, idx, reverseIdx map[string]string) {
 }
 
 func newNameIndex(tpe reflect.Type) nameIndex {
+	tpe = structTypeOf(tpe)
+	if tpe == nil {
+		// only struct shapes carry json names: anything else indexes to nothing.
+		return nameIndex{jsonNames: map[string]string{}, goNames: map[string]string{}}
+	}
+
 	idx := make(map[string]string, tpe.NumField())
 	reverseIdx := make(map[string]string, tpe.NumField())
 
@@ -80,11 +91,44 @@ func newNameIndex(tpe reflect.Type) nameIndex {
 	return nameIndex{jsonNames: idx, goNames: reverseIdx}
 }
 
+// structTypeOf reduces tpe to the struct type it designates, dereferencing a pointer type.
+//
+// It returns nil when tpe is nil or does not designate a struct, so that callers may treat
+// "nothing to index here" uniformly instead of panicking in [reflect.Type.NumField].
+func structTypeOf(tpe reflect.Type) reflect.Type {
+	if tpe == nil {
+		return nil
+	}
+
+	if tpe.Kind() == reflect.Pointer {
+		tpe = tpe.Elem()
+	}
+
+	if tpe.Kind() != reflect.Struct {
+		return nil
+	}
+
+	return tpe
+}
+
+// typeOfSubject returns the type of a document subject, dereferencing pointers.
+//
+// It returns nil for an untyped nil subject, which resolves to an empty name index rather than
+// panicking in [reflect.Value.Type].
+func typeOfSubject(subject any) reflect.Type {
+	rValue := reflect.Indirect(reflect.ValueOf(subject))
+	if !rValue.IsValid() {
+		return nil
+	}
+
+	return rValue.Type()
+}
+
 // GetJSONNames gets all the json property names for a type.
 func (n *NameProvider) GetJSONNames(subject any) []string {
 	n.lock.Lock()
 	defer n.lock.Unlock()
-	tpe := reflect.Indirect(reflect.ValueOf(subject)).Type()
+	tpe := typeOfSubject(subject)
 	names, ok := n.index[tpe]
 	if !ok {
 		names = n.makeNameIndex(tpe)
@@ -99,7 +143,7 @@ func (n *NameProvider) GetJSONNames(subject any) []string {
 
 // GetJSONName gets the json name for a go property name.
 func (n *NameProvider) GetJSONName(subject any, name string) (string, bool) {
-	tpe := reflect.Indirect(reflect.ValueOf(subject)).Type()
+	tpe := typeOfSubject(subject)
 	return n.GetJSONNameForType(tpe, name)
 }
 
@@ -117,7 +161,7 @@ func (n *NameProvider) GetJSONNameForType(tpe reflect.Type, name string) (string
 
 // GetGoName gets the go name for a json property name.
 func (n *NameProvider) GetGoName(subject any, name string) (string, bool) {
-	tpe := reflect.Indirect(reflect.ValueOf(subject)).Type()
+	tpe := typeOfSubject(subject)
 	return n.GetGoNameForType(tpe, name)
 }
 

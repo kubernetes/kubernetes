@@ -125,7 +125,7 @@
     templatePath: templates/podgroup.yaml
     templateParams:
       podsPerGroup: $podsPerGroup
-      priority: 9999999
+      priority: 10000
   - opcode: createPods
     collectMetrics: true
     countParam: $highPriorityGroups
@@ -136,7 +136,7 @@
       podsPerGroup: $podsPerGroup
       cpuRequest: $highPriorityCpuRequest
       hostPortBase: 9000
-      priority: 9999999
+      priority: 10000
 
   workloads:
   - name: 2Nodes_1PreemptorGang_2Pods_Evicting_2LowPriorityGangs
@@ -303,3 +303,273 @@
     featureGates:
       TopologyAwareWorkloadScheduling: true
       CompositePodGroup: true
+
+# GangPreemptionTopologySpreading benchmarks the performance of gang preemption
+# when the gang pods also have topology spreading constraints.
+#
+# The scenario flow is:
+# 1. Create a set of nodes distributed across multiple zones (topology.kubernetes.io/zone).
+# 2. Fill the cluster with low-priority pods.
+# 3. Submit high-priority PodGroups (gangs) where the individual pods have topology spreading constraints.
+# 4. This forces the scheduler to preempt low-priority pods while ensuring the gang pods
+#    are spread across zones.
+- name: GangPreemptionTopologySpreading
+  featureGates:
+    GenericWorkload: true
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+    nodeTemplatePath: ../templates/node-default.yaml
+    labelNodePrepareStrategy:
+      labelKey: "topology.kubernetes.io/zone"
+      labelValues: ["zone-1", "zone-2", "zone-3"]
+  - opcode: createNamespaces
+    prefix: gang-preempt
+    count: 2
+  - opcode: createPods
+    countParam: $initPods
+    podTemplatePath: templates/pod-low-priority.yaml
+    namespace: gang-preempt-1
+    templateParams:
+      nodesCount: $initNodes
+      podsCount: $initPods
+  - opcode: createPodGroups
+    countParam: $preemptorPodGroups
+    namespace: gang-preempt-0
+    templatePath: templates/podgroup.yaml
+    templateParams:
+      podsPerGroup: $podsPerGroup
+      priority: 10000
+  - opcode: createPods
+    collectMetrics: true
+    countParam: $preemptorPodGroups
+    countMultiplierParam: $podsPerGroup
+    namespace: gang-preempt-0
+    podTemplatePath: templates/gang-pod-with-topology-spreading.yaml
+    templateParams:
+      podsPerGroup: $podsPerGroup
+      cpuRequest: $gangCpuRequest
+      priority: 10000
+  workloads:
+  - name: 3Nodes_1PreemptorGang_3Pods_Evicting_12InitPods
+    labels: [short, integration-test]
+    params:
+      initNodes: 3
+      initPods: 12
+      preemptorPodGroups: 1
+      podsPerGroup: 3
+      gangCpuRequest: 3900m
+  - name: 100Nodes_6PreemptorGangs_16Pods_Evicting_1000InitPods
+    labels: [performance]
+    params:
+      initNodes: 100
+      initPods: 1000
+      preemptorPodGroups: 6
+      podsPerGroup: 16
+      gangCpuRequest: 3970m
+
+# GangPreemptionHeroWorkload exercises preemption for the large hero workload:
+# 1. All workloads are configured for 1 pod/node (70% of 4000m node capacity = 2800m CPU + hostPortBase).
+# 2. Initial cluster occupancy is 60% (leaving 40% of nodes free):
+#    - Training (Medium Priority 10000, 30% of cluster): 3 PodGroups of 10% cluster size each.
+#    - Large Batch (Low Priority 100, ~20% of cluster): large PodGroups.
+#    - Small Batch (Low Priority 100, ~10% of cluster): small PodGroups.
+# 3. A single Hero High-Priority PodGroup (Priority 1000000, 50% of cluster) is submitted,
+#    preempting ~10% of the cluster from low-priority batch workloads while reprieving
+#    all medium-priority training workloads (30%) and the remaining low-priority batch workloads (20%).
+- name: GangPreemptionHeroWorkload
+  featureGates:
+    GenericWorkload: true
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+  - opcode: createNamespaces
+    prefix: gang-preempt
+    count: 4
+  # Training (Medium Priority 10000 by default): 30% of cluster
+  - opcode: createPodGroups
+    countParam: $trainingGroups
+    namespace: gang-preempt-1
+    templatePath: templates/podgroup.yaml
+    templateParams:
+      podsPerGroup: $trainingPodsPerGroup
+      priority: $trainingPriority|10000
+      disruptionMode: $disruptionMode
+  - opcode: createPods
+    countParam: $trainingGroups
+    countMultiplierParam: $trainingPodsPerGroup
+    namespace: gang-preempt-1
+    podTemplatePath: templates/gang-pod.yaml
+    templateParams:
+      podsPerGroup: $trainingPodsPerGroup
+      cpuRequest: 2800m
+      hostPortBase: 8000
+      priority: $trainingPriority|10000
+  # Large Batch (Low Priority 100): ~20% of cluster
+  - opcode: createPodGroups
+    countParam: $largeBatchGroups
+    namespace: gang-preempt-2
+    templatePath: templates/podgroup.yaml
+    templateParams:
+      podsPerGroup: $largeBatchPodsPerGroup
+      priority: 100
+      disruptionMode: $disruptionMode
+  - opcode: createPods
+    countParam: $largeBatchGroups
+    countMultiplierParam: $largeBatchPodsPerGroup
+    namespace: gang-preempt-2
+    podTemplatePath: templates/gang-pod.yaml
+    templateParams:
+      podsPerGroup: $largeBatchPodsPerGroup
+      cpuRequest: 2800m
+      hostPortBase: 8000
+      priority: 100
+  # Small Batch (Low Priority 100): ~10% of cluster
+  - opcode: createPodGroups
+    countParam: $smallBatchGroups
+    namespace: gang-preempt-3
+    templatePath: templates/podgroup.yaml
+    templateParams:
+      podsPerGroup: $smallBatchPodsPerGroup
+      priority: 100
+      disruptionMode: $disruptionMode
+  - opcode: createPods
+    countParam: $smallBatchGroups
+    countMultiplierParam: $smallBatchPodsPerGroup
+    namespace: gang-preempt-3
+    podTemplatePath: templates/gang-pod.yaml
+    templateParams:
+      podsPerGroup: $smallBatchPodsPerGroup
+      cpuRequest: 2800m
+      hostPortBase: 8000
+      priority: 100
+  # Hero Workload (High Priority 1000000): 50% of cluster
+  - opcode: createPodGroups
+    countParam: $heroGroups
+    namespace: gang-preempt-0
+    templatePath: templates/podgroup.yaml
+    templateParams:
+      podsPerGroup: $heroPodsPerGroup
+      priority: 1000000
+      disruptionMode: $disruptionMode
+  - opcode: startCollectingMetrics
+    name: gang-preempt-0
+    namespaces: [gang-preempt-0]
+  - opcode: createPods
+    skipWaitToCompletion: true
+    countParam: $heroGroups
+    countMultiplierParam: $heroPodsPerGroup
+    namespace: gang-preempt-0
+    podTemplatePath: templates/gang-pod.yaml
+    templateParams:
+      podsPerGroup: $heroPodsPerGroup
+      cpuRequest: 2800m
+      hostPortBase: 9000
+      priority: 1000000
+  - opcode: barrier
+    namespaces: [gang-preempt-0]
+    stageRequirement: $stageRequirement|Scheduled
+  - opcode: stopCollectingMetrics
+  workloads:
+  - name: 10Nodes_Hero5Pods_60PctOccupied
+    labels: [short, integration-test]
+    params:
+      initNodes: 10
+      trainingGroups: 3
+      trainingPodsPerGroup: 1
+      largeBatchGroups: 1
+      largeBatchPodsPerGroup: 2
+      smallBatchGroups: 1
+      smallBatchPodsPerGroup: 1
+      heroGroups: 1
+      heroPodsPerGroup: 5
+      disruptionMode: All
+  - name: 100Nodes_Hero50Pods_60PctOccupied
+    labels: [performance]
+    params:
+      initNodes: 100
+      trainingGroups: 3
+      trainingPodsPerGroup: 10
+      largeBatchGroups: 1
+      largeBatchPodsPerGroup: 20
+      smallBatchGroups: 2
+      smallBatchPodsPerGroup: 5
+      heroGroups: 1
+      heroPodsPerGroup: 50
+      disruptionMode: All
+  - name: 1000Nodes_Hero500Pods_60PctOccupied
+    labels: [performance]
+    params:
+      initNodes: 1000
+      trainingGroups: 3
+      trainingPodsPerGroup: 100
+      largeBatchGroups: 1
+      largeBatchPodsPerGroup: 200
+      smallBatchGroups: 2
+      smallBatchPodsPerGroup: 50
+      heroGroups: 1
+      heroPodsPerGroup: 500
+      disruptionMode: All
+  - name: 4900Nodes_Hero2450Pods_60PctOccupied
+    labels: [performance]
+    params:
+      initNodes: 4900
+      trainingGroups: 3
+      trainingPodsPerGroup: 490
+      largeBatchGroups: 3
+      largeBatchPodsPerGroup: 250
+      smallBatchGroups: 14
+      smallBatchPodsPerGroup: 50
+      heroGroups: 1
+      heroPodsPerGroup: 2450
+      disruptionMode: All
+  - name: 4900Nodes_Hero2450Pods_60PctOccupied_SingleDisruptionMode
+    labels: [performance]
+    params:
+      initNodes: 4900
+      trainingGroups: 3
+      trainingPodsPerGroup: 490
+      largeBatchGroups: 3
+      largeBatchPodsPerGroup: 250
+      smallBatchGroups: 14
+      smallBatchPodsPerGroup: 50
+      heroGroups: 1
+      heroPodsPerGroup: 2450
+      disruptionMode: Single
+  # Sparse victims scenario: 2400 nodes are free, 2450 nodes run higher-priority pods (priority 2000000),
+  # and 50 nodes run low-priority victims (priority 100). Isolates the CPU cost of victim-aware ranking
+  # and disabling OpportunisticBatching when eviction count (50 pods) is minimal.
+  - name: 4900Nodes_Hero2450Pods_SparseVictims
+    labels: [performance]
+    params:
+      initNodes: 4900
+      trainingGroups: 5
+      trainingPodsPerGroup: 490
+      trainingPriority: 2000000
+      largeBatchGroups: 1
+      largeBatchPodsPerGroup: 25
+      smallBatchGroups: 1
+      smallBatchPodsPerGroup: 25
+      heroGroups: 1
+      heroPodsPerGroup: 2450
+      disruptionMode: All
+  # Unschedulable preemption scenario: 2900 nodes run higher-priority pods (priority 2000000) that cannot
+  # be preempted, leaving only 2000 feasible nodes (550 free + 1450 low-priority batch nodes) for 2450 Hero pods.
+  # The Hero PodGroup schedules 2000 out of 2450 pods in PodGroupPostFilter before failing and evicting zero victims.
+  - name: 4900Nodes_Hero2450Pods_Unschedulable
+    labels: [performance]
+    params:
+      initNodes: 4900
+      trainingGroups: 5
+      trainingPodsPerGroup: 580
+      trainingPriority: 2000000
+      largeBatchGroups: 3
+      largeBatchPodsPerGroup: 250
+      smallBatchGroups: 14
+      smallBatchPodsPerGroup: 50
+      heroGroups: 1
+      heroPodsPerGroup: 2450
+      disruptionMode: All
+      stageRequirement: Attempted
+
+

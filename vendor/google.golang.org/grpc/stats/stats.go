@@ -190,6 +190,9 @@ type OutHeader struct {
 	Compression string
 	// Header contains the header metadata sent.
 	Header metadata.MD
+	// Authority is the :authority pseudo-header sent for the RPC.
+	// It is valid only if Client is true.
+	Authority string
 
 	// The following fields are valid only if Client is true.
 	// FullMethod is the full RPC method string, i.e., /package.service/method.

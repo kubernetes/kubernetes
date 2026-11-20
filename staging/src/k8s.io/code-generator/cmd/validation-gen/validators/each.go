@@ -52,10 +52,12 @@ func init() {
 type eachValTagValidator struct {
 	byPath    map[string]*listMetadata
 	validator TagValidationExtractor
+	prefix    string
 }
 
 func (evtv *eachValTagValidator) Init(cfg Config) {
 	evtv.validator = cfg.TagValidator
+	evtv.prefix = cfg.TagPrefix
 }
 
 func (eachValTagValidator) TagName() string {
@@ -109,14 +111,15 @@ func (evtv eachValTagValidator) GetValidations(context Context, tag codetags.Tag
 		return Validations{}, err
 	}
 
-	if len(validations.Variables) > 0 {
-		return Validations{}, fmt.Errorf("variable generation is not supported")
-	}
-
 	result := Validations{
 		OpaqueValType: validations.OpaqueType, // Map element opacity to collection value opacity
 	}
 	result.Comments = append(result.Comments, validations.Comments...)
+	// A variable is a package-level declaration and does not depend on the
+	// element being iterated, so it is hoisted out rather than rejected.
+	for _, v := range validations.Variables {
+		result.AddVariable(v)
+	}
 
 	if len(validations.Functions) > 0 {
 		// We defer this because we want listType and listMapKey to compute list keys first.
@@ -150,6 +153,9 @@ func (evtv eachValTagValidator) GetValidations(context Context, tag codetags.Tag
 // this is a typedef to a list, this is the alias type, not the underlying
 // type.
 func (evtv eachValTagValidator) getValidations(fldPath *field.Path, t *types.Type, validations Validations) (Validations, error) {
+	if err := checkNoNonError(evtv.prefix+eachValTagName, validations); err != nil {
+		return Validations{}, err
+	}
 	switch util.NativeType(t).Kind {
 	case types.Slice, types.Array:
 		return evtv.getListValidations(fldPath, t, validations)
@@ -223,12 +229,14 @@ func (evtv eachValTagValidator) getListValidations(fldPath *field.Path, t *types
 	wrapped := WrapFunctions(validations, func(vfn FunctionGen, _ DeferredScope) FunctionGen {
 		comm := vfn.Comments
 		vfn.Comments = nil
-		return Function(eachValTagName, vfn.Flags, validateFunc, matchArg, equivArg, WrapperFunction{Function: vfn, ObjType: nt.Elem, PathFragment: "[*]"}).WithComments(comm...)
+		return Function(eachValTagName, DefaultFlags, validateFunc, matchArg, equivArg, WrapperFunction{Function: vfn, ObjType: nt.Elem, PathFragment: "[*]"}).WithComments(comm...)
 	})
-	// Only Functions/Deferred carry forward; element opacity becomes value opacity.
+	// Element opacity becomes value opacity. Variables carry forward because a
+	// deferred tag can ask for one after GetValidations has hoisted.
 	return Validations{
 		Functions:     wrapped.Functions,
 		Deferred:      wrapped.Deferred,
+		Variables:     wrapped.Variables,
 		OpaqueValType: validations.OpaqueType,
 	}, nil
 }
@@ -250,11 +258,12 @@ func (evtv eachValTagValidator) getMapValidations(t *types.Type, validations Val
 	wrapped := WrapFunctions(validations, func(vfn FunctionGen, _ DeferredScope) FunctionGen {
 		comm := vfn.Comments
 		vfn.Comments = nil
-		return Function(eachValTagName, vfn.Flags, validateFunc, equivArg, WrapperFunction{Function: vfn, ObjType: nt.Elem, PathFragment: "[*]"}).WithComments(comm...)
+		return Function(eachValTagName, DefaultFlags, validateFunc, equivArg, WrapperFunction{Function: vfn, ObjType: nt.Elem, PathFragment: "[*]"}).WithComments(comm...)
 	})
 	return Validations{
 		Functions:     wrapped.Functions,
 		Deferred:      wrapped.Deferred,
+		Variables:     wrapped.Variables,
 		OpaqueValType: validations.OpaqueType,
 	}, nil
 }
@@ -277,10 +286,12 @@ func (evtv eachValTagValidator) Docs() TagDoc {
 
 type eachKeyTagValidator struct {
 	validator TagValidationExtractor
+	prefix    string
 }
 
 func (ektv *eachKeyTagValidator) Init(cfg Config) {
 	ektv.validator = cfg.TagValidator
+	ektv.prefix = cfg.TagPrefix
 }
 
 func (eachKeyTagValidator) TagName() string {
@@ -318,14 +329,14 @@ func (ektv eachKeyTagValidator) GetValidations(context Context, tag codetags.Tag
 		return Validations{}, err
 	}
 
-	if len(validations.Variables) > 0 {
-		return Validations{}, fmt.Errorf("variable generation is not supported")
-	}
-
 	result := Validations{
 		OpaqueKeyType: validations.OpaqueType,
 	}
 	result.Comments = append(result.Comments, validations.Comments...)
+	// Hoisted out of the iteration; see eachValTagValidator.
+	for _, v := range validations.Variables {
+		result.AddVariable(v)
+	}
 
 	if len(validations.Functions) > 0 {
 		innerVals, err := ektv.getValidations(t, Validations{Functions: validations.Functions})
@@ -357,17 +368,39 @@ func (ektv eachKeyTagValidator) GetValidations(context Context, tag codetags.Tag
 }
 
 func (ektv eachKeyTagValidator) getValidations(t *types.Type, validations Validations) (Validations, error) {
+	if err := checkNoNonError(ektv.prefix+eachKeyTagName, validations); err != nil {
+		return Validations{}, err
+	}
 	nt := util.NativeType(t)
 	wrapped := WrapFunctions(validations, func(vfn FunctionGen, _ DeferredScope) FunctionGen {
 		comm := vfn.Comments
 		vfn.Comments = nil
-		return Function(eachKeyTagName, vfn.Flags, validateEachMapKey, WrapperFunction{Function: vfn, ObjType: nt.Key}).WithComments(comm...)
+		return Function(eachKeyTagName, DefaultFlags, validateEachMapKey, WrapperFunction{Function: vfn, ObjType: nt.Key}).WithComments(comm...)
 	})
 	return Validations{
 		Functions:     wrapped.Functions,
 		Deferred:      wrapped.Deferred,
+		Variables:     wrapped.Variables,
 		OpaqueKeyType: validations.OpaqueType,
 	}, nil
+}
+
+// checkNoNonError rejects validations that report no error of their own and
+// exist only to stop the validations after them, via ShortCircuit. Each
+// iteration tag runs as its own pass over the collection, so the later passes
+// run anyway and the internal stop signal surfaces as a spurious error.
+// Contrast the item tag, which emits a cohort per item, giving short-circuiting
+// somewhere to act.
+//
+// TODO: lift this by emitting all of a field's iteration tags as one pass,
+// whose per-element closure scopes short-circuiting to the element that failed.
+func checkNoNonError(iterTag string, validations Validations) error {
+	for _, fn := range validations.Functions {
+		if fn.Flags.IsSet(NonError) {
+			return fmt.Errorf("+%s does not support optional/non-error validations", iterTag)
+		}
+	}
+	return nil
 }
 
 // ForEachKey returns a validation that applies a function to each key of

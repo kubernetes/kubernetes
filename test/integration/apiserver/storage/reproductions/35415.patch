@@ -1,0 +1,42 @@
+diff --git a/staging/src/k8s.io/apiserver/pkg/storage/etcd3/store.go b/staging/src/k8s.io/apiserver/pkg/storage/etcd3/store.go
+index 05ae1e5ef8e..77353a17bab 100644
+--- a/staging/src/k8s.io/apiserver/pkg/storage/etcd3/store.go
++++ b/staging/src/k8s.io/apiserver/pkg/storage/etcd3/store.go
+@@ -500,7 +500,7 @@ func (s *store) updateOnce(ctx context.Context, preparedKey string, destination
+ 		// If we skipped the original Get in this loop, we must refresh from
+ 		// etcd in order to be sure the data in the store is equivalent to
+ 		// our desired serialization before short-circuiting a write.
+-		if !origState.FromStorage {
++		if false && !origState.FromStorage {
+ 			origState, err = s.getCurrentState(ctx, "updateGet", preparedKey, v, ignoreNotFound, false)
+ 			if err != nil {
+ 				return origState, false, err
+diff --git a/staging/src/k8s.io/apiserver/pkg/storage/txn.go b/staging/src/k8s.io/apiserver/pkg/storage/txn.go
+index d082ebe9eb7..fe2dc361a4f 100644
+--- a/staging/src/k8s.io/apiserver/pkg/storage/txn.go
++++ b/staging/src/k8s.io/apiserver/pkg/storage/txn.go
+@@ -114,20 +114,14 @@ func ConditionalDelete(ctx context.Context, d TxnDelegator, key string, out runt
+ func GuaranteedUpdate(ctx context.Context, d TxnDelegator, key string, destination runtime.Object, ignoreNotFound bool, preconditions *Preconditions, tryUpdate UpdateFunc, origState *ObjState) (err error) {
+ 	for {
+ 		if err := preconditions.Check(key, origState.Obj); err != nil {
+-			origState, err = refreshOnError(ctx, origState, err, ignoreNotFound, d.GetCurrentState)
+-			if err != nil {
+-				return err
+-			}
+-			continue
++			// BUG REVERT (#35415): treat the cached suggestion as authoritative without
++			// refetching live state from etcd when preconditions or no-op checks run.
++			return err
+ 		}
+ 
+ 		ret, ttl, err := updateState(origState, tryUpdate)
+ 		if err != nil {
+-			origState, err = refreshOnError(ctx, origState, err, ignoreNotFound, d.GetCurrentState)
+-			if err != nil {
+-				return err
+-			}
+-			continue
++			return err
+ 		}
+ 
+ 		var success bool

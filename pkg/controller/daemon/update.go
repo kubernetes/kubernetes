@@ -38,6 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/daemon/util"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
+	"k8s.io/utils/ptr"
 )
 
 // rollingUpdate identifies the set of old pods to delete, or additional pods to create on nodes,
@@ -568,7 +569,7 @@ func (dsc *DaemonSetsController) snapshot(ctx context.Context, ds *apps.DaemonSe
 		}
 		// If the collision count used to compute hash was in fact stale, there's no need to bump collision count; retry again
 		if !reflect.DeepEqual(currDS.Status.CollisionCount, ds.Status.CollisionCount) {
-			return nil, fmt.Errorf("found a stale collision count (%d, expected %d) of DaemonSet %q while processing; will retry until it is updated", ds.Status.CollisionCount, currDS.Status.CollisionCount, ds.Name)
+			return nil, fmt.Errorf("found a stale collision count (%d, expected %d) of DaemonSet %q while processing; will retry until it is updated", ptr.Deref(ds.Status.CollisionCount, 0), ptr.Deref(currDS.Status.CollisionCount, 0), ds.Name)
 		}
 		if currDS.Status.CollisionCount == nil {
 			currDS.Status.CollisionCount = new(int32)

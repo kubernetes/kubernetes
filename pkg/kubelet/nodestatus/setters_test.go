@@ -38,16 +38,16 @@ import (
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/component-base/featuregate"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/version"
 	"k8s.io/klog/v2"
+	"k8s.io/ktesting"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubecontainertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/util/sliceutils"
-	"k8s.io/kubernetes/test/utils/ktesting"
 	netutils "k8s.io/utils/net"
 	"k8s.io/utils/ptr"
 )
@@ -452,7 +452,6 @@ func TestMachineInfo(t *testing.T) {
 		expectNode                           *v1.Node
 		expectEvents                         []testEvent
 		disableLocalStorageCapacityIsolation bool
-		featureGateDependencies              []featuregate.Feature
 	}{
 		{
 			desc:    "machine identifiers, basic capacity and allocatable",
@@ -897,23 +896,10 @@ func TestMachineInfo(t *testing.T) {
 					},
 				},
 			},
-			featureGateDependencies: []featuregate.Feature{features.NodeSwap},
 		},
 	}
 
 	for _, tc := range cases {
-		featureGatesMissing := false
-		for _, featureGateDependency := range tc.featureGateDependencies {
-			if !utilfeature.DefaultFeatureGate.Enabled(featureGateDependency) {
-				featureGatesMissing = true
-				break
-			}
-		}
-
-		if featureGatesMissing {
-			continue
-		}
-
 		t.Run(tc.desc, func(t *testing.T) {
 			ctx := ktesting.Init(t)
 			machineInfoFunc := func() (*cadvisorapi.MachineInfo, error) {
@@ -1157,7 +1143,7 @@ func TestImages(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.desc, func(t *testing.T) {
 			ctx := ktesting.Init(t)
-			imageListFunc := func() ([]kubecontainer.Image, error) {
+			imageListFunc := func(_ context.Context) ([]kubecontainer.Image, error) {
 				// today, imageListFunc is expected to return a sorted list,
 				// but we may choose to sort in the setter at some future point
 				// (e.g. if the image cache stopped sorting for us)
@@ -1956,5 +1942,48 @@ func makeDiskPressureCondition(pressure bool, transition, heartbeat time.Time) *
 		Message:            "kubelet has no disk pressure",
 		LastTransitionTime: metav1.NewTime(transition),
 		LastHeartbeatTime:  metav1.NewTime(heartbeat),
+	}
+}
+
+func TestRuntimeHandlersCgroupNamespaces(t *testing.T) {
+	handlers := []kubecontainer.RuntimeHandler{
+		{Name: "supported", SupportsRecursiveReadOnlyMounts: true, SupportsUserNamespaces: true, SupportsCgroupNamespaces: true},
+		{Name: "unsupported"},
+	}
+	for _, enabled := range []bool{true, false} {
+		t.Run(fmt.Sprintf("CgroupNamespacesSupport=%v", enabled), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CgroupNamespacesSupport, enabled)
+			tCtx := ktesting.Init(t)
+			node := &v1.Node{}
+			require.NoError(t, RuntimeHandlers(func() []kubecontainer.RuntimeHandler { return handlers })(tCtx, node))
+
+			cgroupNamespaces := func(b bool) *bool {
+				if !enabled {
+					return nil
+				}
+				return new(b)
+			}
+			expected := []v1.NodeRuntimeHandler{
+				{
+					Name: "supported",
+					Features: &v1.NodeRuntimeHandlerFeatures{
+						RecursiveReadOnlyMounts: new(true),
+						UserNamespaces:          new(true),
+						CgroupNamespaces:        cgroupNamespaces(true),
+					},
+				},
+				{
+					Name: "unsupported",
+					Features: &v1.NodeRuntimeHandlerFeatures{
+						RecursiveReadOnlyMounts: new(false),
+						UserNamespaces:          new(false),
+						CgroupNamespaces:        cgroupNamespaces(false),
+					},
+				},
+			}
+			if diff := cmp.Diff(expected, node.Status.RuntimeHandlers); diff != "" {
+				t.Errorf("unexpected runtime handlers (-want, +got):\n%s", diff)
+			}
+		})
 	}
 }

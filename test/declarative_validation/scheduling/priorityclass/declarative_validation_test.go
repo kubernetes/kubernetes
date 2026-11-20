@@ -24,9 +24,12 @@ import (
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/apis/core"
-	scheduling "k8s.io/kubernetes/pkg/apis/scheduling"
+	"k8s.io/kubernetes/pkg/apis/scheduling"
 	registry "k8s.io/kubernetes/pkg/registry/scheduling/priorityclass"
 	"k8s.io/kubernetes/test/declarative_validation/meta"
+
+	// Ensure all API groups are registered with the scheme.
+	_ "k8s.io/kubernetes/pkg/apis/scheduling/install"
 )
 
 func TestDeclarativeValidate(t *testing.T) {
@@ -37,11 +40,9 @@ func TestDeclarativeValidate(t *testing.T) {
 	}
 }
 
-func TestDeclarativeValidateUpdate(t *testing.T) {
-	for _, apiVersion := range apiVersions {
-		t.Run(apiVersion, func(t *testing.T) {
-			testDeclarativeValidateUpdate(t, apiVersion)
-		})
+func setValue(v int32) func(obj *scheduling.PriorityClass) {
+	return func(obj *scheduling.PriorityClass) {
+		obj.Value = v
 	}
 }
 
@@ -55,8 +56,29 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		Verb:              "create",
 	})
 
-	obj := mkPriorityClass()
+	testCases := map[string]struct {
+		input        scheduling.PriorityClass
+		expectedErrs field.ErrorList
+	}{
+		"valid": {
+			input: mkValidPriorityClass(),
+		},
+	}
+	for k, tc := range testCases {
+		t.Run(k, func(t *testing.T) {
+			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, registry.Strategy, tc.expectedErrs)
+		})
+	}
+	obj := mkValidPriorityClass()
 	meta.RunObjectMetaTestCases(t, ctx, &obj, registry.Strategy, meta.WithStringentFinalizerValidation())
+}
+
+func TestDeclarativeValidateUpdate(t *testing.T) {
+	for _, apiVersion := range apiVersions {
+		t.Run(apiVersion, func(t *testing.T) {
+			testDeclarativeValidateUpdate(t, apiVersion)
+		})
+	}
 }
 
 func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
@@ -65,58 +87,83 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 		APIGroup:          "scheduling.k8s.io",
 		APIVersion:        apiVersion,
 		Resource:          "priorityclasses",
-		Name:              "valid-obj",
+		Name:              "valid-priority-class",
 		IsResourceRequest: true,
 		Verb:              "update",
 	})
-
 	testCases := map[string]struct {
-		old, update  scheduling.PriorityClass
+		oldObj       scheduling.PriorityClass
+		updateObj    scheduling.PriorityClass
 		expectedErrs field.ErrorList
 	}{
+		"valid update": {
+			oldObj:    mkValidPriorityClass(),
+			updateObj: mkValidPriorityClass(),
+		},
 		"preemptionPolicy: unchanged = valid": {
-			old:    mkPriorityClass(tweakPreemptionPolicy(core.PreemptLowerPriority)),
-			update: mkPriorityClass(tweakPreemptionPolicy(core.PreemptLowerPriority)),
+			oldObj:    mkValidPriorityClass(tweakPreemptionPolicy(core.PreemptLowerPriority)),
+			updateObj: mkValidPriorityClass(tweakPreemptionPolicy(core.PreemptLowerPriority)),
 		},
 		"preemptionPolicy: nil to set = invalid": {
-			old:    mkPriorityClass(),
-			update: mkPriorityClass(tweakPreemptionPolicy(core.PreemptLowerPriority)),
+			oldObj:    mkValidPriorityClass(),
+			updateObj: mkValidPriorityClass(tweakPreemptionPolicy(core.PreemptLowerPriority)),
 			expectedErrs: field.ErrorList{
 				field.Invalid(field.NewPath("preemptionPolicy"), nil, "field is immutable").WithOrigin("immutable").MarkAlpha(),
 			},
 		},
 		"preemptionPolicy: set to different = invalid": {
-			old:    mkPriorityClass(tweakPreemptionPolicy(core.PreemptLowerPriority)),
-			update: mkPriorityClass(tweakPreemptionPolicy(core.PreemptNever)),
+			oldObj:    mkValidPriorityClass(tweakPreemptionPolicy(core.PreemptLowerPriority)),
+			updateObj: mkValidPriorityClass(tweakPreemptionPolicy(core.PreemptNever)),
 			expectedErrs: field.ErrorList{
 				field.Invalid(field.NewPath("preemptionPolicy"), nil, "field is immutable").WithOrigin("immutable").MarkAlpha(),
 			},
 		},
 		"preemptionPolicy: set to nil = invalid": {
-			old:    mkPriorityClass(tweakPreemptionPolicy(core.PreemptLowerPriority)),
-			update: mkPriorityClass(),
+			oldObj:    mkValidPriorityClass(tweakPreemptionPolicy(core.PreemptLowerPriority)),
+			updateObj: mkValidPriorityClass(),
 			expectedErrs: field.ErrorList{
 				field.Invalid(field.NewPath("preemptionPolicy"), nil, "field is immutable").WithOrigin("immutable").MarkAlpha(),
+			},
+		},
+		"value changed": {
+			oldObj:    mkValidPriorityClass(),
+			updateObj: mkValidPriorityClass(setValue(20)),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("value"), nil, "field is immutable").WithOrigin("immutable").MarkAlpha(),
+			},
+		},
+		"value set to unset": {
+			oldObj:    mkValidPriorityClass(),
+			updateObj: mkValidPriorityClass(setValue(0)),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("value"), nil, "field is immutable").WithOrigin("immutable").MarkAlpha(),
+			},
+		},
+		"value unset to set": {
+			oldObj:    mkValidPriorityClass(setValue(0)),
+			updateObj: mkValidPriorityClass(),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("value"), nil, "field is immutable").WithOrigin("immutable").MarkAlpha(),
 			},
 		},
 	}
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {
-			tc.old.ResourceVersion = "1"
-			tc.update.ResourceVersion = "1"
-			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.update, &tc.old, registry.Strategy, tc.expectedErrs)
+			tc.oldObj.ResourceVersion = "1"
+			tc.updateObj.ResourceVersion = "2"
+			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.updateObj, &tc.oldObj, registry.Strategy, tc.expectedErrs)
 		})
 	}
-
-	updateObj := mkPriorityClass()
+	updateObj := mkValidPriorityClass()
 	meta.RunObjectMetaUpdateTestCases(t, ctx, &updateObj, registry.Strategy, meta.WithStringentFinalizerValidation())
 }
 
-func mkPriorityClass(tweaks ...func(pc *scheduling.PriorityClass)) scheduling.PriorityClass {
+func mkValidPriorityClass(tweaks ...func(*scheduling.PriorityClass)) scheduling.PriorityClass {
 	pc := scheduling.PriorityClass{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "valid-obj",
+			Name: "valid-priority-class",
 		},
+		Value: 10,
 	}
 	for _, tweak := range tweaks {
 		tweak(&pc)

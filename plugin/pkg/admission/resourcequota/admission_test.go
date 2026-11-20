@@ -28,17 +28,21 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apiserver/pkg/admission"
 	genericadmissioninitializer "k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/apiserver/pkg/admission/plugin/resourcequota"
 	resourcequotaapi "k8s.io/apiserver/pkg/admission/plugin/resourcequota/apis/resourcequota"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	testcore "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	controlplaneadmission "k8s.io/kubernetes/pkg/controlplane/apiserver/admission"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/quota/v1/install"
 )
 
@@ -670,6 +674,135 @@ func TestAdmitExceedQuotaLimit(t *testing.T) {
 	err = handler.Validate(context.TODO(), admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, corev1.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil), nil)
 	if err == nil {
 		t.Errorf("Expected an error exceeding quota")
+	}
+}
+
+func TestAdmitExceedQuotaLimitWithLargeExponent(t *testing.T) {
+	resourceQuota := &corev1.ResourceQuota{
+		ObjectMeta: metav1.ObjectMeta{Name: "quota", Namespace: "test", ResourceVersion: "124"},
+		Status: corev1.ResourceQuotaStatus{
+			Hard: corev1.ResourceList{
+				corev1.ResourceMemory: resource.MustParse("10Gi"),
+			},
+			Used: corev1.ResourceList{
+				corev1.ResourceMemory: resource.MustParse("0"),
+			},
+		},
+	}
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+
+	kubeClient := fake.NewSimpleClientset(resourceQuota)
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, 0)
+
+	handler, err := createHandler(kubeClient, informerFactory, stopCh)
+	if err != nil {
+		t.Errorf("Error occurred while creating admission plugin: %v", err)
+	}
+
+	if err := informerFactory.Core().V1().ResourceQuotas().Informer().GetIndexer().Add(resourceQuota); err != nil {
+		t.Fatal(err)
+	}
+	newPod := validPod("not-allowed-pod", 2, getResourceRequirements(getResourceList("", "1Gi"), getResourceList("", "")))
+	newPod.Spec.Containers[1].Resources = getResourceRequirements(getResourceList("", "1e2147483646"), getResourceList("", ""))
+	err = handler.Validate(context.TODO(), admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, corev1.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil), nil)
+	if want := "exceeded quota: quota, requested: memory=1000000000000000000000000000010e2147483616"; err == nil || !strings.Contains(err.Error(), want) {
+		t.Errorf("Validate() error = %v, want an error containing %q", err, want)
+	}
+}
+
+// TestAdmitDynamicContainers verifies that containers added or removed through the pods/dynamic
+// subresource are charged against quota like a resize.
+func TestAdmitDynamicContainers(t *testing.T) {
+	oldPod := validPod("pod", 1, getResourceRequirements(getResourceList("1", "1Gi"), getResourceList("1", "1Gi")))
+	oldPod.ResourceVersion = "1"
+	oldPod.Spec.Containers[0].Name = "c0"
+	withAdded := func(resources api.ResourceRequirements) *api.Pod {
+		pod := oldPod.DeepCopy()
+		pod.Spec.Containers = append(pod.Spec.Containers, api.Container{Name: "added", Image: "foo", Resources: resources})
+		return pod
+	}
+	withRemoved := oldPod.DeepCopy()
+	withRemoved.Spec.Containers = []api.Container{{Name: "replacement", Image: "foo", Resources: getResourceRequirements(getResourceList("500m", "1Gi"), getResourceList("500m", "1Gi"))}}
+
+	testCases := []struct {
+		name          string
+		pod           *api.Pod
+		expectErr     string
+		expectUsedCPU string // empty if no quota update is expected
+	}{{
+		name:          "added container within quota",
+		pod:           withAdded(getResourceRequirements(getResourceList("1", "1Gi"), getResourceList("1", "1Gi"))),
+		expectUsedCPU: "2",
+	}, {
+		name:      "added container exceeding quota",
+		pod:       withAdded(getResourceRequirements(getResourceList("2500m", "1Gi"), getResourceList("2500m", "1Gi"))),
+		expectErr: "exceeded quota",
+	}, {
+		name:      "added container missing required resources",
+		pod:       withAdded(api.ResourceRequirements{}),
+		expectErr: "must specify",
+	}, {
+		name: "replaced container with lower usage",
+		pod:  withRemoved,
+	}}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			resourceQuota := &corev1.ResourceQuota{
+				ObjectMeta: metav1.ObjectMeta{Name: "quota", Namespace: "test", ResourceVersion: "124"},
+				Status: corev1.ResourceQuotaStatus{
+					Hard: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("3"),
+						corev1.ResourceMemory: resource.MustParse("100Gi"),
+					},
+					Used: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("1"),
+						corev1.ResourceMemory: resource.MustParse("1Gi"),
+					},
+				},
+			}
+			stopCh := make(chan struct{})
+			defer close(stopCh)
+			kubeClient := fake.NewSimpleClientset(resourceQuota)
+			informerFactory := informers.NewSharedInformerFactory(kubeClient, 0)
+			handler, err := createHandler(kubeClient, informerFactory, stopCh)
+			if err != nil {
+				t.Fatalf("Error occurred while creating admission plugin: %v", err)
+			}
+			if err := informerFactory.Core().V1().ResourceQuotas().Informer().GetIndexer().Add(resourceQuota); err != nil {
+				t.Fatal(err)
+			}
+
+			err = handler.Validate(t.Context(), admission.NewAttributesRecord(tc.pod, oldPod, api.Kind("Pod").WithVersion("version"), tc.pod.Namespace, tc.pod.Name, corev1.Resource("pods").WithVersion("version"), "dynamic", admission.Update, &metav1.UpdateOptions{}, false, nil), nil)
+			if tc.expectErr != "" {
+				if err == nil || !strings.Contains(err.Error(), tc.expectErr) {
+					t.Fatalf("expected error containing %q, got %v", tc.expectErr, err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+
+			var updated *corev1.ResourceQuota
+			for _, action := range removeListWatch(kubeClient.Actions()) {
+				if update, ok := action.(testcore.UpdateAction); ok {
+					updated = update.GetObject().(*corev1.ResourceQuota)
+				}
+			}
+			if tc.expectUsedCPU == "" {
+				if updated != nil {
+					t.Errorf("unexpected quota update: %v", updated.Status.Used)
+				}
+				return
+			}
+			if updated == nil {
+				t.Fatal("expected a quota update")
+			}
+			if used := updated.Status.Used[corev1.ResourceCPU]; used.String() != tc.expectUsedCPU {
+				t.Errorf("expected used cpu %s, got %s", tc.expectUsedCPU, used.String())
+			}
+		})
 	}
 }
 
@@ -2734,5 +2867,258 @@ func TestAdmitAllowDecreaseUsageWithoutCoveringQuota(t *testing.T) {
 
 	if err != nil {
 		t.Errorf("Expected no error for decreasing a limited resource without quota, got %v", err)
+	}
+}
+
+func TestAdmitPodStatusExtraNodeAllocatableResources(t *testing.T) {
+	testCases := []struct {
+		name                     string
+		podLevelResourcesEnabled bool
+		oldPod                   *api.Pod
+		newPod                   *api.Pod
+		expectError              string
+		expectQuotaUpdate        bool
+		expectedUsed             corev1.ResourceList
+	}{
+		{
+			name: "admits status update with extraNodeAllocatableResources within quota and charges delta",
+			oldPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "dra-pod", Namespace: "test", ResourceVersion: "1"},
+				Spec: api.PodSpec{
+					Containers: []api.Container{{
+						Name:      "c1",
+						Resources: getResourceRequirements(getResourceList("100m", "1Gi"), getResourceList("", "")),
+					}},
+				},
+			},
+			newPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "dra-pod", Namespace: "test", ResourceVersion: "1"},
+				Spec: api.PodSpec{
+					Containers: []api.Container{{
+						Name:      "c1",
+						Resources: getResourceRequirements(getResourceList("100m", "1Gi"), getResourceList("", "")),
+					}},
+				},
+				Status: api.PodStatus{
+					ExtraNodeAllocatableResources: []api.ExtraNodeAllocatableResource{
+						{
+							ContainerName: "",
+							Requests:      api.ResourceList{api.ResourceCPU: resource.MustParse("1"), api.ResourceMemory: resource.MustParse("10Gi")},
+							Limits:        api.ResourceList{api.ResourceCPU: resource.MustParse("1"), api.ResourceMemory: resource.MustParse("10Gi")},
+						},
+						{
+							ContainerName: "c1",
+							Limits:        api.ResourceList{api.ResourceCPU: resource.MustParse("1"), api.ResourceMemory: resource.MustParse("10Gi")},
+						},
+					},
+				},
+			},
+			expectQuotaUpdate: true,
+			expectedUsed: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("2"),
+				corev1.ResourceMemory: resource.MustParse("60Gi"),
+				corev1.ResourcePods:   resource.MustParse("3"),
+			},
+		},
+		{
+			name: "rejects status update when extraNodeAllocatableResources delta exceeds hard quota",
+			oldPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "dra-pod", Namespace: "test", ResourceVersion: "1"},
+				Spec: api.PodSpec{
+					Containers: []api.Container{{
+						Name:      "c1",
+						Resources: getResourceRequirements(getResourceList("100m", "1Gi"), getResourceList("", "")),
+					}},
+				},
+			},
+			newPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "dra-pod", Namespace: "test", ResourceVersion: "1"},
+				Spec: api.PodSpec{
+					Containers: []api.Container{{
+						Name:      "c1",
+						Resources: getResourceRequirements(getResourceList("100m", "1Gi"), getResourceList("", "")),
+					}},
+				},
+				Status: api.PodStatus{
+					ExtraNodeAllocatableResources: []api.ExtraNodeAllocatableResource{
+						{
+							ContainerName: "",
+							Requests:      api.ResourceList{api.ResourceCPU: resource.MustParse("3")},
+							Limits:        api.ResourceList{api.ResourceCPU: resource.MustParse("3")},
+						},
+						{
+							ContainerName: "c1",
+							Limits:        api.ResourceList{api.ResourceCPU: resource.MustParse("3")},
+						},
+					},
+				},
+			},
+			expectError: "exceeded quota",
+		},
+		{
+			name:                     "pod-level resources covering DRA resource produces zero delta on status update",
+			podLevelResourcesEnabled: true,
+			oldPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "dra-plr-pod", Namespace: "test", ResourceVersion: "1"},
+				Spec: api.PodSpec{
+					Resources: &api.ResourceRequirements{
+						Requests: getResourceList("2", "10Gi"),
+					},
+					Containers: []api.Container{{Name: "c1"}},
+				},
+			},
+			newPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "dra-plr-pod", Namespace: "test", ResourceVersion: "1"},
+				Spec: api.PodSpec{
+					Resources: &api.ResourceRequirements{
+						Requests: getResourceList("2", "10Gi"),
+					},
+					Containers: []api.Container{{Name: "c1"}},
+				},
+				Status: api.PodStatus{
+					ExtraNodeAllocatableResources: []api.ExtraNodeAllocatableResource{
+						{
+							ContainerName: "",
+							Requests:      api.ResourceList{api.ResourceCPU: resource.MustParse("1"), api.ResourceMemory: resource.MustParse("5Gi")},
+							Limits:        api.ResourceList{api.ResourceCPU: resource.MustParse("1"), api.ResourceMemory: resource.MustParse("5Gi")},
+						},
+						{
+							ContainerName: "c1",
+							Limits:        api.ResourceList{api.ResourceCPU: resource.MustParse("1"), api.ResourceMemory: resource.MustParse("5Gi")},
+						},
+					},
+				},
+			},
+			expectQuotaUpdate: false,
+		},
+		{
+			name: "ignores status update when extraNodeAllocatableResources is unchanged",
+			oldPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "dra-pod", Namespace: "test", ResourceVersion: "1"},
+				Spec: api.PodSpec{
+					Containers: []api.Container{{
+						Name:      "c1",
+						Resources: getResourceRequirements(getResourceList("100m", "1Gi"), getResourceList("", "")),
+					}},
+				},
+				Status: api.PodStatus{
+					Phase: api.PodPending,
+				},
+			},
+			newPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "dra-pod", Namespace: "test", ResourceVersion: "1"},
+				Spec: api.PodSpec{
+					Containers: []api.Container{{
+						Name:      "c1",
+						Resources: getResourceRequirements(getResourceList("100m", "1Gi"), getResourceList("", "")),
+					}},
+				},
+				Status: api.PodStatus{
+					Phase: api.PodRunning,
+				},
+			},
+			expectQuotaUpdate: false,
+		},
+		{
+			// The pod does not specify the cpu and memory requests that the quota requires.
+			name: "admits status update clearing extraNodeAllocatableResources without evaluating quota",
+			oldPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "dra-pod", Namespace: "test", ResourceVersion: "1"},
+				Spec: api.PodSpec{
+					Containers: []api.Container{{Name: "c1"}},
+				},
+				Status: api.PodStatus{
+					ExtraNodeAllocatableResources: []api.ExtraNodeAllocatableResource{
+						{
+							ContainerName: "",
+							Requests:      api.ResourceList{api.ResourceCPU: resource.MustParse("1")},
+							Limits:        api.ResourceList{api.ResourceCPU: resource.MustParse("1")},
+						},
+						{
+							ContainerName: "c1",
+							Limits:        api.ResourceList{api.ResourceCPU: resource.MustParse("1")},
+						},
+					},
+				},
+			},
+			newPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "dra-pod", Namespace: "test", ResourceVersion: "1"},
+				Spec: api.PodSpec{
+					Containers: []api.Container{{Name: "c1"}},
+				},
+				Status: api.PodStatus{
+					ExtraNodeAllocatableResources: []api.ExtraNodeAllocatableResource{},
+				},
+			},
+			expectQuotaUpdate: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if !tc.podLevelResourcesEnabled {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.37"))
+			}
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRANodeAllocatableResources, true)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, tc.podLevelResourcesEnabled)
+
+			resourceQuota := &corev1.ResourceQuota{
+				ObjectMeta: metav1.ObjectMeta{Name: "quota", Namespace: "test", ResourceVersion: "124"},
+				Status: corev1.ResourceQuotaStatus{
+					Hard: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("3"),
+						corev1.ResourceMemory: resource.MustParse("100Gi"),
+						corev1.ResourcePods:   resource.MustParse("5"),
+					},
+					Used: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("1"),
+						corev1.ResourceMemory: resource.MustParse("50Gi"),
+						corev1.ResourcePods:   resource.MustParse("3"),
+					},
+				},
+			}
+			stopCh := make(chan struct{})
+			defer close(stopCh)
+
+			kubeClient := fake.NewSimpleClientset(resourceQuota)
+			informerFactory := informers.NewSharedInformerFactory(kubeClient, 0)
+
+			handler, err := createHandler(kubeClient, informerFactory, stopCh)
+			if err != nil {
+				t.Fatalf("Error occurred while creating admission plugin: %v", err)
+			}
+
+			if err := informerFactory.Core().V1().ResourceQuotas().Informer().GetIndexer().Add(resourceQuota); err != nil {
+				t.Fatal(err)
+			}
+			err = handler.Validate(context.TODO(), admission.NewAttributesRecord(tc.newPod, tc.oldPod, api.Kind("Pod").WithVersion("version"), tc.newPod.Namespace, tc.newPod.Name, corev1.Resource("pods").WithVersion("version"), "status", admission.Update, &metav1.UpdateOptions{}, false, nil), nil)
+			if tc.expectError != "" {
+				if err == nil || !strings.Contains(err.Error(), tc.expectError) {
+					t.Fatalf("Expected error containing %q, got: %v", tc.expectError, err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+
+			decimatedActions := removeListWatch(kubeClient.Actions())
+			if !tc.expectQuotaUpdate {
+				if len(decimatedActions) != 0 {
+					t.Fatalf("Expected no quota update actions, got: %v", decimatedActions)
+				}
+				return
+			}
+			if len(decimatedActions) == 0 {
+				t.Fatalf("Expected quota status update action, got none")
+			}
+			usage := decimatedActions[len(decimatedActions)-1].(testcore.UpdateAction).GetObject().(*corev1.ResourceQuota)
+			for k, v := range tc.expectedUsed {
+				actual := usage.Status.Used[k]
+				if actual.String() != v.String() {
+					t.Errorf("Usage Used: Key: %v, Expected: %v, Actual: %v", k, v.String(), actual.String())
+				}
+			}
+		})
 	}
 }

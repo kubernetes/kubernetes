@@ -21,6 +21,7 @@ import (
 	serviceconfigv1alpha1 "k8s.io/cloud-provider/controllers/service/config/v1alpha1"
 	cmconfigv1alpha1 "k8s.io/controller-manager/config/v1alpha1"
 	kubectrlmgrconfigv1alpha1 "k8s.io/kube-controller-manager/config/v1alpha1"
+	podcertssignerconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/certificates/podcertssigner/config/v1alpha1"
 	csrsigningconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/certificates/signer/config/v1alpha1"
 	cronjobconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/cronjob/config/v1alpha1"
 	daemonconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/daemon/config/v1alpha1"
@@ -30,7 +31,9 @@ import (
 	endpointconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/endpoint/config/v1alpha1"
 	endpointsliceconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/endpointslice/config/v1alpha1"
 	endpointslicemirroringconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/endpointslicemirroring/config/v1alpha1"
+	evictionrequestconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/evictionrequest/config/v1alpha1"
 	garbagecollectorconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/garbagecollector/config/v1alpha1"
+	imperativeevictionresponderv1alpha1 "k8s.io/kubernetes/pkg/controller/imperativeevictionresponder/config/v1alpha1"
 	jobconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/job/config/v1alpha1"
 	namespaceconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/namespace/config/v1alpha1"
 	nodeipamconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/nodeipam/config/v1alpha1"
@@ -90,8 +93,12 @@ func SetDefaults_KubeControllerManagerConfiguration(obj *kubectrlmgrconfigv1alph
 	endpointslicemirroringconfigv1alpha1.RecommendedDefaultEndpointSliceMirroringControllerConfiguration(&obj.EndpointSliceMirroringController)
 	// Use the default RecommendedDefaultEphemeralVolumeControllerConfiguration options
 	ephemeralvolumeconfigv1alpha1.RecommendedDefaultEphemeralVolumeControllerConfiguration(&obj.EphemeralVolumeController)
+	// Use the default RecommendedDefaultEvictionRequestControllerConfiguration options
+	evictionrequestconfigv1alpha1.RecommendedDefaultEvictionRequestControllerConfiguration(&obj.EvictionRequestController)
 	// Use the default RecommendedDefaultGarbageCollectorControllerConfiguration options
 	garbagecollectorconfigv1alpha1.RecommendedDefaultGarbageCollectorControllerConfiguration(&obj.GarbageCollectorController)
+	// Use the default RecommendedDefaultImperativeEvictionResponderControllerConfiguration options
+	imperativeevictionresponderv1alpha1.RecommendedDefaultImperativeEvictionResponderControllerConfiguration(&obj.ImperativeEvictionResponderController)
 	// Use the default RecommendedDefaultJobControllerConfiguration options
 	jobconfigv1alpha1.RecommendedDefaultJobControllerConfiguration(&obj.JobController)
 	// Use the default RecommendedDefaultCronJobControllerConfiguration options
@@ -112,6 +119,8 @@ func SetDefaults_KubeControllerManagerConfiguration(obj *kubectrlmgrconfigv1alph
 	replicationconfigv1alpha1.RecommendedDefaultReplicationControllerConfiguration(&obj.ReplicationController)
 	// Use the default RecommendedDefaultResourceQuotaControllerConfiguration options
 	resourcequotaconfigv1alpha1.RecommendedDefaultResourceQuotaControllerConfiguration(&obj.ResourceQuotaController)
+	// Use the default RecommendedDefaultServiceServingSignerConfiguration options
+	podcertssignerconfigv1alpha1.RecommendedDefaultPodCertsSignerConfiguration(&obj.ServiceServingSigner)
 	// Use the default RecommendedDefaultServiceControllerConfiguration options
 	serviceconfigv1alpha1.RecommendedDefaultServiceControllerConfiguration(&obj.ServiceController)
 	// Use the default RecommendedDefaultLegacySATokenCleanerConfiguration options

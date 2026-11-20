@@ -24,10 +24,10 @@ import (
 	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/ktesting"
 	"k8s.io/dynamic-resource-allocation/resourceslice"
 	drautils "k8s.io/kubernetes/test/e2e/dra/utils"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 )
 
 // partitionableDeviceResources tests the DRAPartitionableDevices feature across upgrade/downgrade.
@@ -62,9 +62,9 @@ var partitionableDeviceList = []resourceapi.Device{
 		ConsumesCounters: []resourceapi.DeviceCounterConsumption{
 			{
 				CounterSet: "memory-pool",
-				Counters: map[string]resourceapi.Counter{
+				Counters: map[string]resourceapi.CounterRequirement{
 					"memory": {
-						Value: resource.MustParse("2Gi"),
+						Value: new(resource.MustParse("2Gi")),
 					},
 				},
 			},
@@ -78,9 +78,9 @@ var partitionableDeviceList = []resourceapi.Device{
 		ConsumesCounters: []resourceapi.DeviceCounterConsumption{
 			{
 				CounterSet: "memory-pool",
-				Counters: map[string]resourceapi.Counter{
+				Counters: map[string]resourceapi.CounterRequirement{
 					"memory": {
-						Value: resource.MustParse("2Gi"),
+						Value: new(resource.MustParse("2Gi")),
 					},
 				},
 			},
@@ -94,9 +94,9 @@ var partitionableDeviceList = []resourceapi.Device{
 		ConsumesCounters: []resourceapi.DeviceCounterConsumption{
 			{
 				CounterSet: "memory-pool",
-				Counters: map[string]resourceapi.Counter{
+				Counters: map[string]resourceapi.CounterRequirement{
 					"memory": {
-						Value: resource.MustParse("2Gi"),
+						Value: new(resource.MustParse("2Gi")),
 					},
 				},
 			},
@@ -110,9 +110,9 @@ var partitionableDeviceList = []resourceapi.Device{
 		ConsumesCounters: []resourceapi.DeviceCounterConsumption{
 			{
 				CounterSet: "memory-pool",
-				Counters: map[string]resourceapi.Counter{
+				Counters: map[string]resourceapi.CounterRequirement{
 					"memory": {
-						Value: resource.MustParse("2Gi"),
+						Value: new(resource.MustParse("2Gi")),
 					},
 				},
 			},
@@ -126,9 +126,9 @@ var partitionableDeviceList = []resourceapi.Device{
 		ConsumesCounters: []resourceapi.DeviceCounterConsumption{
 			{
 				CounterSet: "memory-pool",
-				Counters: map[string]resourceapi.Counter{
+				Counters: map[string]resourceapi.CounterRequirement{
 					"memory": {
-						Value: resource.MustParse("4Gi"),
+						Value: new(resource.MustParse("4Gi")),
 					},
 				},
 			},
@@ -142,9 +142,9 @@ var partitionableDeviceList = []resourceapi.Device{
 		ConsumesCounters: []resourceapi.DeviceCounterConsumption{
 			{
 				CounterSet: "memory-pool",
-				Counters: map[string]resourceapi.Counter{
+				Counters: map[string]resourceapi.CounterRequirement{
 					"memory": {
-						Value: resource.MustParse("4Gi"),
+						Value: new(resource.MustParse("4Gi")),
 					},
 				},
 			},

@@ -22,6 +22,7 @@ import (
 	"unicode/utf8"
 
 	"k8s.io/apimachinery/pkg/api/operation"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/api/validate/constraints"
 	"k8s.io/apimachinery/pkg/api/validate/content"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -133,6 +134,30 @@ func Maximum[T constraints.Integer](_ context.Context, _ operation.Operation, fl
 	}
 	if *value > max {
 		return field.ErrorList{field.Invalid(fldPath, *value, content.MaxError(max)).WithOrigin("maximum")}
+	}
+	return nil
+}
+
+// MinimumQuantity verifies that the specified quantity is greater than or
+// equal to min.
+func MinimumQuantity(_ context.Context, _ operation.Operation, fldPath *field.Path, value, _ *resource.Quantity, min resource.Quantity) field.ErrorList {
+	if value == nil {
+		return nil
+	}
+	if value.Cmp(min) < 0 {
+		return field.ErrorList{field.Invalid(fldPath, value.String(), content.MinError(min.String())).WithOrigin("minimum")}
+	}
+	return nil
+}
+
+// MaximumQuantity verifies that the specified quantity is less than or equal
+// to max.
+func MaximumQuantity(_ context.Context, _ operation.Operation, fldPath *field.Path, value, _ *resource.Quantity, max resource.Quantity) field.ErrorList {
+	if value == nil {
+		return nil
+	}
+	if value.Cmp(max) > 0 {
+		return field.ErrorList{field.Invalid(fldPath, value.String(), content.MaxError(max.String())).WithOrigin("maximum")}
 	}
 	return nil
 }

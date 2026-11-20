@@ -109,7 +109,7 @@ type containerLogManager struct {
 }
 
 // NewContainerLogManager creates a new container log manager.
-func NewContainerLogManager(runtimeService internalapi.RuntimeService, osInterface kubecontainer.OSInterface, maxSize string, maxFiles int, maxWorkers int, monitorInterval metav1.Duration) (ContainerLogManager, error) {
+func NewContainerLogManager(logger klog.Logger, runtimeService internalapi.RuntimeService, osInterface kubecontainer.OSInterface, maxSize string, maxFiles int, maxWorkers int, monitorInterval metav1.Duration) (ContainerLogManager, error) {
 	if maxFiles <= 1 {
 		return nil, fmt.Errorf("invalid MaxFiles %d, must be > 1", maxFiles)
 	}
@@ -134,7 +134,10 @@ func NewContainerLogManager(runtimeService internalapi.RuntimeService, osInterfa
 		maxWorkers: maxWorkers,
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
-			workqueue.TypedRateLimitingQueueConfig[string]{Name: "kubelet_log_rotate_manager"},
+			workqueue.TypedRateLimitingQueueConfig[string]{
+				Logger: &logger,
+				Name:   "kubelet_log_rotate_manager",
+			},
 		),
 		monitoringPeriod: monitorInterval,
 	}, nil
@@ -397,8 +400,14 @@ func (c *containerLogManager) compressLog(log string) error {
 		return fmt.Errorf("failed to compress %q to %q: %w", log, tmpLog, err)
 	}
 	// The archive needs to be closed before renaming, otherwise an error will occur on Windows.
-	w.Close()
-	f.Close()
+	// Closing flushes the rest of the compressed data, so a failure here means the
+	// archive is incomplete and the original log must be kept.
+	if err := w.Close(); err != nil {
+		return fmt.Errorf("failed to compress %q to %q: %w", log, tmpLog, err)
+	}
+	if err := f.Close(); err != nil {
+		return fmt.Errorf("failed to close %q: %w", tmpLog, err)
+	}
 	compressedLog := log + compressSuffix
 	if err := c.osInterface.Rename(tmpLog, compressedLog); err != nil {
 		return fmt.Errorf("failed to rename %q to %q: %w", tmpLog, compressedLog, err)

@@ -24,15 +24,16 @@ import (
 	cadvisorapi "github.com/google/cadvisor/lib/model"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/ktesting"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
-	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/cpuset"
 )
 
@@ -216,6 +217,9 @@ func TestPodGuaranteedCPUs(t *testing.T) {
 	}
 	for _, tc := range tcases {
 		t.Run(tc.name, func(t *testing.T) {
+			if !tc.podLevelResourcesEnabled {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.37"))
+			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, tc.podLevelResourcesEnabled)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourceManagers, tc.podLevelResourceManagersEnabled)
 
@@ -233,51 +237,57 @@ func TestGetTopologyHints(t *testing.T) {
 	machineInfo := returnMachineInfo()
 
 	for _, tc := range returnTestCases() {
-		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, tc.podLevelResourcesEnabled)
-		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourceManagers, tc.podLevelResourceManagersEnabled)
-
-		topology, _ := topology.Discover(logger, &machineInfo)
-
-		var activePods []*v1.Pod
-		for p := range tc.assignments {
-			pod := v1.Pod{}
-			pod.UID = types.UID(p)
-			for c := range tc.assignments[p] {
-				container := v1.Container{}
-				container.Name = c
-				pod.Spec.Containers = append(pod.Spec.Containers, container)
+		t.Run(tc.name, func(t *testing.T) {
+			if !tc.podLevelResourcesEnabled {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.37"))
 			}
-			activePods = append(activePods, &pod)
-		}
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, tc.podLevelResourcesEnabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourceManagers, tc.podLevelResourceManagersEnabled)
 
-		m := manager{
-			policy: &staticPolicy{
-				topology:  topology,
-				numaNodes: topology.CPUDetails.NUMANodes().List(),
-			},
-			state: &mockState{
-				assignments:   tc.assignments,
-				defaultCPUSet: tc.defaultCPUSet,
-			},
-			topology:          topology,
-			activePods:        func() []*v1.Pod { return activePods },
-			podStatusProvider: mockPodStatusProvider{},
-			sourcesReady:      &sourcesReadyStub{},
-		}
+			topology, _ := topology.Discover(logger, &machineInfo)
 
-		hints := m.GetTopologyHints(logger, &tc.pod, &tc.container, lifecycle.AddOperation)[string(v1.ResourceCPU)]
-		if len(tc.expectedHints) == 0 && len(hints) == 0 {
-			continue
-		}
-		sort.SliceStable(hints, func(i, j int) bool {
-			return hints[i].LessThan(hints[j])
+			var activePods []*v1.Pod
+			for p := range tc.assignments {
+				pod := v1.Pod{}
+				pod.UID = types.UID(p)
+				for c := range tc.assignments[p] {
+					container := v1.Container{}
+					container.Name = c
+					pod.Spec.Containers = append(pod.Spec.Containers, container)
+				}
+				activePods = append(activePods, &pod)
+			}
+
+			m := manager{
+				policy: &staticPolicy{
+					topology:  topology,
+					numaNodes: topology.CPUDetails.NUMANodes().List(),
+					affinity:  scoringTopologyStore(logger),
+				},
+				state: &mockState{
+					assignments:   tc.assignments,
+					defaultCPUSet: tc.defaultCPUSet,
+				},
+				topology:          topology,
+				activePods:        func() []*v1.Pod { return activePods },
+				podStatusProvider: mockPodStatusProvider{},
+				sourcesReady:      &sourcesReadyStub{},
+			}
+
+			hints := m.GetTopologyHints(logger, &tc.pod, &tc.container, lifecycle.AddOperation)[string(v1.ResourceCPU)]
+			if len(tc.expectedHints) == 0 && len(hints) == 0 {
+				return
+			}
+			sort.SliceStable(hints, func(i, j int) bool {
+				return hints[i].LessThan(hints[j])
+			})
+			sort.SliceStable(tc.expectedHints, func(i, j int) bool {
+				return tc.expectedHints[i].LessThan(tc.expectedHints[j])
+			})
+			if !reflect.DeepEqual(tc.expectedHints, hints) {
+				t.Errorf("Test case %q: Expected in result to be %v , got %v", tc.name, tc.expectedHints, hints)
+			}
 		})
-		sort.SliceStable(tc.expectedHints, func(i, j int) bool {
-			return tc.expectedHints[i].LessThan(tc.expectedHints[j])
-		})
-		if !reflect.DeepEqual(tc.expectedHints, hints) {
-			t.Errorf("Test case %q: Expected in result to be %v , got %v", tc.name, tc.expectedHints, hints)
-		}
 	}
 }
 
@@ -286,51 +296,57 @@ func TestGetPodTopologyHints(t *testing.T) {
 	machineInfo := returnMachineInfo()
 
 	for _, tc := range returnTestCases() {
-		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, tc.podLevelResourcesEnabled)
-		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourceManagers, tc.podLevelResourceManagersEnabled)
-
-		topology, _ := topology.Discover(logger, &machineInfo)
-
-		var activePods []*v1.Pod
-		for p := range tc.assignments {
-			pod := v1.Pod{}
-			pod.UID = types.UID(p)
-			for c := range tc.assignments[p] {
-				container := v1.Container{}
-				container.Name = c
-				pod.Spec.Containers = append(pod.Spec.Containers, container)
+		t.Run(tc.name, func(t *testing.T) {
+			if !tc.podLevelResourcesEnabled {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.37"))
 			}
-			activePods = append(activePods, &pod)
-		}
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, tc.podLevelResourcesEnabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourceManagers, tc.podLevelResourceManagersEnabled)
 
-		m := manager{
-			policy: &staticPolicy{
-				topology:  topology,
-				numaNodes: topology.CPUDetails.NUMANodes().List(),
-			},
-			state: &mockState{
-				assignments:   tc.assignments,
-				defaultCPUSet: tc.defaultCPUSet,
-			},
-			topology:          topology,
-			activePods:        func() []*v1.Pod { return activePods },
-			podStatusProvider: mockPodStatusProvider{},
-			sourcesReady:      &sourcesReadyStub{},
-		}
+			topology, _ := topology.Discover(logger, &machineInfo)
 
-		podHints := m.GetPodTopologyHints(logger, &tc.pod, lifecycle.AddOperation)[string(v1.ResourceCPU)]
-		if len(tc.expectedHints) == 0 && len(podHints) == 0 {
-			continue
-		}
-		sort.SliceStable(podHints, func(i, j int) bool {
-			return podHints[i].LessThan(podHints[j])
+			var activePods []*v1.Pod
+			for p := range tc.assignments {
+				pod := v1.Pod{}
+				pod.UID = types.UID(p)
+				for c := range tc.assignments[p] {
+					container := v1.Container{}
+					container.Name = c
+					pod.Spec.Containers = append(pod.Spec.Containers, container)
+				}
+				activePods = append(activePods, &pod)
+			}
+
+			m := manager{
+				policy: &staticPolicy{
+					topology:  topology,
+					numaNodes: topology.CPUDetails.NUMANodes().List(),
+					affinity:  scoringTopologyStore(logger),
+				},
+				state: &mockState{
+					assignments:   tc.assignments,
+					defaultCPUSet: tc.defaultCPUSet,
+				},
+				topology:          topology,
+				activePods:        func() []*v1.Pod { return activePods },
+				podStatusProvider: mockPodStatusProvider{},
+				sourcesReady:      &sourcesReadyStub{},
+			}
+
+			podHints := m.GetPodTopologyHints(logger, &tc.pod, lifecycle.AddOperation)[string(v1.ResourceCPU)]
+			if len(tc.expectedHints) == 0 && len(podHints) == 0 {
+				return
+			}
+			sort.SliceStable(podHints, func(i, j int) bool {
+				return podHints[i].LessThan(podHints[j])
+			})
+			sort.SliceStable(tc.expectedHints, func(i, j int) bool {
+				return tc.expectedHints[i].LessThan(tc.expectedHints[j])
+			})
+			if !reflect.DeepEqual(tc.expectedHints, podHints) {
+				t.Errorf("Test case %q: Expected in result to be %v , got %v", tc.name, tc.expectedHints, podHints)
+			}
 		})
-		sort.SliceStable(tc.expectedHints, func(i, j int) bool {
-			return tc.expectedHints[i].LessThan(tc.expectedHints[j])
-		})
-		if !reflect.DeepEqual(tc.expectedHints, podHints) {
-			t.Errorf("Test case %q: Expected in result to be %v , got %v", tc.name, tc.expectedHints, podHints)
-		}
 	}
 }
 
@@ -374,34 +390,42 @@ func TestGetPodTopologyHintsWithPolicyOptions(t *testing.T) {
 				{
 					NUMANodeAffinity: m0001,
 					Preferred:        true,
+					Score:            90,
 				},
 				{
 					NUMANodeAffinity: m0011,
 					Preferred:        false,
+					Score:            92,
 				},
 				{
 					NUMANodeAffinity: m0101,
 					Preferred:        false,
+					Score:            95,
 				},
 				{
 					NUMANodeAffinity: m1001,
 					Preferred:        false,
+					Score:            95,
 				},
 				{
 					NUMANodeAffinity: m0111,
 					Preferred:        false,
+					Score:            95,
 				},
 				{
 					NUMANodeAffinity: m1011,
 					Preferred:        false,
+					Score:            95,
 				},
 				{
 					NUMANodeAffinity: m1101,
 					Preferred:        false,
+					Score:            96,
 				},
 				{
 					NUMANodeAffinity: m1111,
 					Preferred:        false,
+					Score:            96,
 				},
 			},
 		},
@@ -417,34 +441,42 @@ func TestGetPodTopologyHintsWithPolicyOptions(t *testing.T) {
 				{
 					NUMANodeAffinity: m0001,
 					Preferred:        true,
+					Score:            90,
 				},
 				{
 					NUMANodeAffinity: m0011,
 					Preferred:        true,
+					Score:            92,
 				},
 				{
 					NUMANodeAffinity: m0101,
 					Preferred:        false,
+					Score:            95,
 				},
 				{
 					NUMANodeAffinity: m1001,
 					Preferred:        false,
+					Score:            95,
 				},
 				{
 					NUMANodeAffinity: m0111,
 					Preferred:        false,
+					Score:            95,
 				},
 				{
 					NUMANodeAffinity: m1011,
 					Preferred:        false,
+					Score:            95,
 				},
 				{
 					NUMANodeAffinity: m1101,
 					Preferred:        false,
+					Score:            96,
 				},
 				{
 					NUMANodeAffinity: m1111,
 					Preferred:        false,
+					Score:            96,
 				},
 			},
 		},
@@ -460,10 +492,12 @@ func TestGetPodTopologyHintsWithPolicyOptions(t *testing.T) {
 				{
 					NUMANodeAffinity: m0111,
 					Preferred:        true,
+					Score:            21,
 				},
 				{
 					NUMANodeAffinity: m1111,
 					Preferred:        true,
+					Score:            41,
 				},
 			},
 		},
@@ -491,6 +525,7 @@ func TestGetPodTopologyHintsWithPolicyOptions(t *testing.T) {
 					topology:  testCase.topology,
 					options:   policyOpt,
 					numaNodes: testCase.topology.CPUDetails.NUMANodes().List(),
+					affinity:  scoringTopologyStore(tCtx.Logger()),
 				},
 				state: &mockState{
 					assignments:   testCase.assignments,
@@ -549,10 +584,12 @@ func TestTopologyHintsPodLevelResources(t *testing.T) {
 				{
 					NUMANodeAffinity: firstSocketMask,
 					Preferred:        true,
+					Score:            50,
 				},
 				{
 					NUMANodeAffinity: crossSocketMask,
 					Preferred:        false,
+					Score:            66,
 				},
 			},
 			expectedContainerLevelHints: nil,
@@ -566,20 +603,24 @@ func TestTopologyHintsPodLevelResources(t *testing.T) {
 				{
 					NUMANodeAffinity: firstSocketMask,
 					Preferred:        true,
+					Score:            50,
 				},
 				{
 					NUMANodeAffinity: crossSocketMask,
 					Preferred:        false,
+					Score:            66,
 				},
 			},
 			expectedContainerLevelHints: []topologymanager.TopologyHint{
 				{
 					NUMANodeAffinity: firstSocketMask,
 					Preferred:        true,
+					Score:            50,
 				},
 				{
 					NUMANodeAffinity: crossSocketMask,
 					Preferred:        false,
+					Score:            66,
 				},
 			},
 		},
@@ -616,6 +657,7 @@ func TestTopologyHintsPodLevelResources(t *testing.T) {
 				policy: &staticPolicy{
 					topology:  topology,
 					numaNodes: topology.CPUDetails.NUMANodes().List(),
+					affinity:  scoringTopologyStore(logger),
 				},
 				state: &mockState{
 					assignments:   tc.assignments,
@@ -684,14 +726,17 @@ func returnTestCases() []testCase {
 				{
 					NUMANodeAffinity: firstSocketMask,
 					Preferred:        true,
+					Score:            33,
 				},
 				{
 					NUMANodeAffinity: secondSocketMask,
 					Preferred:        true,
+					Score:            1,
 				},
 				{
 					NUMANodeAffinity: crossSocketMask,
 					Preferred:        false,
+					Score:            16,
 				},
 			},
 		},
@@ -704,10 +749,12 @@ func returnTestCases() []testCase {
 				{
 					NUMANodeAffinity: secondSocketMask,
 					Preferred:        true,
+					Score:            1,
 				},
 				{
 					NUMANodeAffinity: crossSocketMask,
 					Preferred:        false,
+					Score:            16,
 				},
 			},
 		},
@@ -720,6 +767,7 @@ func returnTestCases() []testCase {
 				{
 					NUMANodeAffinity: crossSocketMask,
 					Preferred:        true,
+					Score:            16,
 				},
 			},
 		},
@@ -739,6 +787,7 @@ func returnTestCases() []testCase {
 				{
 					NUMANodeAffinity: crossSocketMask,
 					Preferred:        false,
+					Score:            83,
 				},
 			},
 		},
@@ -758,15 +807,19 @@ func returnTestCases() []testCase {
 					testContainer1.Name: cpuset.New(0, 6),
 				},
 			},
+			// Nothing is in the default set, so the node is fully assigned and
+			// every mask scores 100 regardless of what this container holds.
 			defaultCPUSet: cpuset.New(),
 			expectedHints: []topologymanager.TopologyHint{
 				{
 					NUMANodeAffinity: firstSocketMask,
 					Preferred:        true,
+					Score:            100,
 				},
 				{
 					NUMANodeAffinity: crossSocketMask,
 					Preferred:        false,
+					Score:            100,
 				},
 			},
 		},
@@ -784,10 +837,12 @@ func returnTestCases() []testCase {
 				{
 					NUMANodeAffinity: secondSocketMask,
 					Preferred:        true,
+					Score:            100,
 				},
 				{
 					NUMANodeAffinity: crossSocketMask,
 					Preferred:        false,
+					Score:            100,
 				},
 			},
 		},
@@ -805,6 +860,7 @@ func returnTestCases() []testCase {
 				{
 					NUMANodeAffinity: crossSocketMask,
 					Preferred:        true,
+					Score:            100,
 				},
 			},
 		},
@@ -850,10 +906,12 @@ func returnTestCases() []testCase {
 				{
 					NUMANodeAffinity: firstSocketMask,
 					Preferred:        true,
+					Score:            50,
 				},
 				{
 					NUMANodeAffinity: crossSocketMask,
 					Preferred:        false,
+					Score:            66,
 				},
 			},
 			podLevelResourcesEnabled:        true,

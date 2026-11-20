@@ -97,10 +97,12 @@ func fakeScaleClient(t *testing.T) (ScalesGetter, []schema.GroupResource) {
 		},
 	}
 
+	//nolint:logcheck // scale.New below requires a PreferredResourceMapper, which is the older, non-contextual interface, so building it from discovery has no context to thread through here.
 	restMapperRes, err := restmapper.GetAPIGroupResources(fakeDiscoveryClient)
 	if err != nil {
 		t.Fatalf("unexpected error while constructing resource list from fake discovery client: %v", err)
 	}
+	//nolint:logcheck // scale.New below requires a PreferredResourceMapper, which is the older, non-contextual interface, so building it from discovery has no context to thread through here.
 	restMapper := restmapper.NewDiscoveryRESTMapper(restMapperRes)
 
 	autoscalingScale := &autoscalingv1.Scale{

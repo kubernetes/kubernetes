@@ -32,7 +32,10 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1" //Added new
 	v1 "k8s.io/api/core/v1"
+	schedulingv1 "k8s.io/api/scheduling/v1"
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	unstructuredv1 "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
@@ -51,6 +54,7 @@ import (
 	"k8s.io/client-go/util/retry"
 	appsinternal "k8s.io/kubernetes/pkg/apis/apps"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
+	"k8s.io/kubernetes/pkg/features"
 	apimachineryutils "k8s.io/kubernetes/test/e2e/common/apimachinery"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
@@ -165,7 +169,7 @@ var _ = SIGDescribe("Deployment", func() {
 	f.It("should not disrupt a cloud load-balancer's connectivity during rollout", f.WithProvider("aws", "azure", "gce"), func(ctx context.Context) {
 		e2eskipper.SkipIfIPv6("aws")
 		nodes, err := e2enode.GetReadySchedulableNodes(ctx, c)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "list ready schedulable nodes")
 		e2eskipper.SkipUnlessAtLeast(len(nodes.Items), 3, "load-balancer test requires at least 3 schedulable nodes")
 		testRollingUpdateDeploymentWithLocalTrafficLoadBalancer(ctx, f)
 	})
@@ -205,7 +209,7 @@ var _ = SIGDescribe("Deployment", func() {
 			},
 		}
 		deploymentsList, err := f.ClientSet.AppsV1().Deployments("").List(ctx, metav1.ListOptions{LabelSelector: testDeploymentLabelsFlat})
-		framework.ExpectNoError(err, "failed to list Deployments")
+		framework.ExpectNoError(err, "list Deployments")
 
 		ginkgo.By("creating a Deployment")
 		testDeployment := e2edeployment.NewDeployment(
@@ -215,7 +219,7 @@ var _ = SIGDescribe("Deployment", func() {
 		testDeployment.Spec.Template.Spec.TerminationGracePeriodSeconds = &one
 
 		createdDeployment, err := f.ClientSet.AppsV1().Deployments(testNamespaceName).Create(ctx, testDeployment, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "failed to create Deployment %v in namespace %v", testDeploymentName, testNamespaceName)
+		framework.ExpectNoError(err, "create Deployment %v in namespace %v", testDeploymentName, testNamespaceName)
 		gomega.Expect(createdDeployment).To(apimachineryutils.HaveValidResourceVersion())
 
 		ginkgo.By("waiting for Deployment to be created")
@@ -234,7 +238,7 @@ var _ = SIGDescribe("Deployment", func() {
 			}
 			return false, nil
 		})
-		framework.ExpectNoError(err, "failed to see %v event", watch.Added)
+		framework.ExpectNoError(err, "see %v event", watch.Added)
 
 		ginkgo.By("waiting for all Replicas to be Ready")
 		ctxUntil, cancel = context.WithTimeout(ctx, f.Timeouts.PodStart)
@@ -252,7 +256,7 @@ var _ = SIGDescribe("Deployment", func() {
 			}
 			return false, nil
 		})
-		framework.ExpectNoError(err, "failed to see replicas of %v in namespace %v scale to requested amount of %v", testDeployment.Name, testNamespaceName, testDeploymentDefaultReplicas)
+		framework.ExpectNoError(err, "see replicas of %v in namespace %v scale to requested amount of %v", testDeployment.Name, testNamespaceName, testDeploymentDefaultReplicas)
 
 		ginkgo.By("patching the Deployment")
 		deploymentPatch, err := json.Marshal(map[string]interface{}{
@@ -272,9 +276,9 @@ var _ = SIGDescribe("Deployment", func() {
 				},
 			},
 		})
-		framework.ExpectNoError(err, "failed to Marshal Deployment JSON patch")
+		framework.ExpectNoError(err, "Marshal Deployment JSON patch")
 		patchedDeployment, err := f.ClientSet.AppsV1().Deployments(testNamespaceName).Patch(ctx, testDeploymentName, types.StrategicMergePatchType, []byte(deploymentPatch), metav1.PatchOptions{})
-		framework.ExpectNoError(err, "failed to patch Deployment")
+		framework.ExpectNoError(err, "patch Deployment")
 		gomega.Expect(resourceversion.CompareResourceVersion(createdDeployment.ResourceVersion, patchedDeployment.ResourceVersion)).To(gomega.BeNumerically("==", -1), "updated object should have a larger resource version")
 		ctxUntil, cancel = context.WithTimeout(ctx, 30*time.Second)
 		defer cancel()
@@ -294,7 +298,7 @@ var _ = SIGDescribe("Deployment", func() {
 			}
 			return false, nil
 		})
-		framework.ExpectNoError(err, "failed to see %v event", watch.Modified)
+		framework.ExpectNoError(err, "see %v event", watch.Modified)
 
 		ginkgo.By("waiting for Replicas to scale")
 		ctxUntil, cancel = context.WithTimeout(ctx, f.Timeouts.PodStart)
@@ -316,11 +320,11 @@ var _ = SIGDescribe("Deployment", func() {
 			}
 			return false, nil
 		})
-		framework.ExpectNoError(err, "failed to see replicas of %v in namespace %v scale to requested amount of %v", testDeployment.Name, testNamespaceName, testDeploymentMinimumReplicas)
+		framework.ExpectNoError(err, "see replicas of %v in namespace %v scale to requested amount of %v", testDeployment.Name, testNamespaceName, testDeploymentMinimumReplicas)
 
 		ginkgo.By("listing Deployments")
 		deploymentsList, err = f.ClientSet.AppsV1().Deployments("").List(ctx, metav1.ListOptions{LabelSelector: testDeploymentLabelsFlat})
-		framework.ExpectNoError(err, "failed to list Deployments")
+		framework.ExpectNoError(err, "list Deployments")
 		foundDeployment := false
 		for _, deploymentItem := range deploymentsList.Items {
 			if deploymentItem.ObjectMeta.Name == testDeploymentName &&
@@ -342,13 +346,13 @@ var _ = SIGDescribe("Deployment", func() {
 		testDeploymentDefaultReplicasPointer := &testDeploymentDefaultReplicas
 		testDeploymentUpdate.Spec.Replicas = testDeploymentDefaultReplicasPointer
 		testDeploymentUpdateUnstructuredMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&testDeploymentUpdate)
-		framework.ExpectNoError(err, "failed to convert to unstructured")
+		framework.ExpectNoError(err, "convert to unstructured")
 		testDeploymentUpdateUnstructured := unstructuredv1.Unstructured{
 			Object: testDeploymentUpdateUnstructuredMap,
 		}
 		// currently this hasn't been able to hit the endpoint replaceAppsV1NamespacedDeploymentStatus
 		_, err = dc.Resource(deploymentResource).Namespace(testNamespaceName).Update(ctx, &testDeploymentUpdateUnstructured, metav1.UpdateOptions{}) //, "status")
-		framework.ExpectNoError(err, "failed to update the DeploymentStatus")
+		framework.ExpectNoError(err, "update the DeploymentStatus")
 		ctxUntil, cancel = context.WithTimeout(ctx, 30*time.Second)
 		defer cancel()
 		_, err = watchtools.Until(ctxUntil, deploymentsList.ResourceVersion, w, func(event watch.Event) (bool, error) {
@@ -368,16 +372,16 @@ var _ = SIGDescribe("Deployment", func() {
 			}
 			return false, nil
 		})
-		framework.ExpectNoError(err, "failed to see %v event", watch.Modified)
+		framework.ExpectNoError(err, "see %v event", watch.Modified)
 
 		ginkgo.By("fetching the DeploymentStatus")
 		deploymentGetUnstructured, err := dc.Resource(deploymentResource).Namespace(testNamespaceName).Get(ctx, testDeploymentName, metav1.GetOptions{}, "status")
-		framework.ExpectNoError(err, "failed to fetch the Deployment")
+		framework.ExpectNoError(err, "fetch the Deployment")
 		deploymentGet := appsv1.Deployment{}
 		err = runtime.DefaultUnstructuredConverter.FromUnstructured(deploymentGetUnstructured.Object, &deploymentGet)
-		framework.ExpectNoError(err, "failed to convert the unstructured response to a Deployment")
-		gomega.Expect(deploymentGet.Spec.Template.Spec.Containers[0].Image).To(gomega.Equal(testDeploymentUpdateImage), "failed to update image")
-		gomega.Expect(deploymentGet.ObjectMeta.Labels).To(gomega.HaveKeyWithValue("test-deployment", "updated"), "failed to update labels")
+		framework.ExpectNoError(err, "convert the unstructured response to a Deployment")
+		gomega.Expect(deploymentGet.Spec.Template.Spec.Containers[0].Image).To(gomega.Equal(testDeploymentUpdateImage), "update image")
+		gomega.Expect(deploymentGet.ObjectMeta.Labels).To(gomega.HaveKeyWithValue("test-deployment", "updated"), "update labels")
 
 		ctxUntil, cancel = context.WithTimeout(ctx, f.Timeouts.PodStart)
 		defer cancel()
@@ -395,7 +399,7 @@ var _ = SIGDescribe("Deployment", func() {
 			}
 			return false, nil
 		})
-		framework.ExpectNoError(err, "failed to see replicas of %v in namespace %v scale to requested amount of %v", testDeployment.Name, testNamespaceName, testDeploymentDefaultReplicas)
+		framework.ExpectNoError(err, "see replicas of %v in namespace %v scale to requested amount of %v", testDeployment.Name, testNamespaceName, testDeploymentDefaultReplicas)
 
 		ginkgo.By("patching the DeploymentStatus")
 		deploymentStatusPatch, err := json.Marshal(map[string]interface{}{
@@ -404,10 +408,10 @@ var _ = SIGDescribe("Deployment", func() {
 				"availableReplicas": testDeploymentAvailableReplicas,
 			},
 		})
-		framework.ExpectNoError(err, "failed to Marshal Deployment JSON patch")
+		framework.ExpectNoError(err, "Marshal Deployment JSON patch")
 
 		_, err = dc.Resource(deploymentResource).Namespace(testNamespaceName).Patch(ctx, testDeploymentName, types.StrategicMergePatchType, []byte(deploymentStatusPatch), metav1.PatchOptions{}, "status")
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "patch Deployment status %q in namespace %q", testDeploymentName, testNamespaceName)
 
 		ctxUntil, cancel = context.WithTimeout(ctx, 30*time.Second)
 		defer cancel()
@@ -426,16 +430,16 @@ var _ = SIGDescribe("Deployment", func() {
 			}
 			return false, nil
 		})
-		framework.ExpectNoError(err, "failed to see %v event", watch.Modified)
+		framework.ExpectNoError(err, "see %v event", watch.Modified)
 
 		ginkgo.By("fetching the DeploymentStatus")
 		deploymentGetUnstructured, err = dc.Resource(deploymentResource).Namespace(testNamespaceName).Get(ctx, testDeploymentName, metav1.GetOptions{}, "status")
-		framework.ExpectNoError(err, "failed to fetch the DeploymentStatus")
+		framework.ExpectNoError(err, "fetch the DeploymentStatus")
 		deploymentGet = appsv1.Deployment{}
 		err = runtime.DefaultUnstructuredConverter.FromUnstructured(deploymentGetUnstructured.Object, &deploymentGet)
-		framework.ExpectNoError(err, "failed to convert the unstructured response to a Deployment")
-		gomega.Expect(deploymentGet.Spec.Template.Spec.Containers[0].Image).To(gomega.Equal(testDeploymentUpdateImage), "failed to update image")
-		gomega.Expect(deploymentGet.ObjectMeta.Labels).To(gomega.HaveKeyWithValue("test-deployment", "updated"), "failed to update labels")
+		framework.ExpectNoError(err, "convert the unstructured response to a Deployment")
+		gomega.Expect(deploymentGet.Spec.Template.Spec.Containers[0].Image).To(gomega.Equal(testDeploymentUpdateImage), "update image")
+		gomega.Expect(deploymentGet.ObjectMeta.Labels).To(gomega.HaveKeyWithValue("test-deployment", "updated"), "update labels")
 
 		ctxUntil, cancel = context.WithTimeout(ctx, f.Timeouts.PodStart)
 		defer cancel()
@@ -454,11 +458,11 @@ var _ = SIGDescribe("Deployment", func() {
 			}
 			return false, nil
 		})
-		framework.ExpectNoError(err, "failed to see replicas of %v in namespace %v scale to requested amount of %v", testDeployment.Name, testNamespaceName, testDeploymentDefaultReplicas)
+		framework.ExpectNoError(err, "see replicas of %v in namespace %v scale to requested amount of %v", testDeployment.Name, testNamespaceName, testDeploymentDefaultReplicas)
 
 		ginkgo.By("deleting the Deployment")
 		err = f.ClientSet.AppsV1().Deployments(testNamespaceName).DeleteCollection(ctx, metav1.DeleteOptions{GracePeriodSeconds: &one}, metav1.ListOptions{LabelSelector: testDeploymentLabelsFlat})
-		framework.ExpectNoError(err, "failed to delete Deployment via collection")
+		framework.ExpectNoError(err, "delete Deployment via collection")
 
 		ctxUntil, cancel = context.WithTimeout(ctx, 1*time.Minute)
 		defer cancel()
@@ -478,7 +482,7 @@ var _ = SIGDescribe("Deployment", func() {
 			}
 			return false, nil
 		})
-		framework.ExpectNoError(err, "failed to see %v event", watch.Deleted)
+		framework.ExpectNoError(err, "see %v event", watch.Deleted)
 	})
 
 	/*
@@ -500,7 +504,7 @@ var _ = SIGDescribe("Deployment", func() {
 			},
 		}
 		dList, err := c.AppsV1().Deployments("").List(ctx, metav1.ListOptions{LabelSelector: labelSelector})
-		framework.ExpectNoError(err, "failed to list Deployments")
+		framework.ExpectNoError(err, "list Deployments")
 
 		ginkgo.By("creating a Deployment")
 
@@ -509,17 +513,17 @@ var _ = SIGDescribe("Deployment", func() {
 		framework.Logf("Creating simple deployment %s", dName)
 		d := e2edeployment.NewDeployment(dName, replicas, podLabels, AgnhostImageName, AgnhostImage, appsv1.RollingUpdateDeploymentStrategyType)
 		deploy, err := c.AppsV1().Deployments(ns).Create(ctx, d, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "create Deployment %q in namespace %q", d.Name, ns)
 
 		// Wait for it to be updated to revision 1
 		err = e2edeployment.WaitForDeploymentRevisionAndImage(c, ns, dName, "1", AgnhostImage)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "verify Deployment %q in namespace %q has revision %q and image %q", dName, ns, "1", AgnhostImage)
 
 		err = e2edeployment.WaitForDeploymentComplete(c, deploy)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "wait for Deployment %q in namespace %q to complete", deploy.Name, deploy.Namespace)
 
 		testDeployment, err := dClient.Get(ctx, dName, metav1.GetOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "get Deployment %q in namespace %q", dName, ns)
 
 		ginkgo.By("Getting /status")
 		dResource := schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"}
@@ -581,7 +585,7 @@ var _ = SIGDescribe("Deployment", func() {
 			framework.Logf("Observed %v event: %+v", object, event.Type)
 			return false, nil
 		})
-		framework.ExpectNoError(err, "failed to locate Deployment %v in namespace %v", testDeployment.ObjectMeta.Name, ns)
+		framework.ExpectNoError(err, "locate Deployment %v in namespace %v", testDeployment.ObjectMeta.Name, ns)
 		framework.Logf("Deployment %s has an updated status", dName)
 
 		ginkgo.By("patching the Statefulset Status")
@@ -618,10 +622,388 @@ var _ = SIGDescribe("Deployment", func() {
 			framework.Logf("Observed %v event: %+v", object, event.Type)
 			return false, nil
 		})
-		framework.ExpectNoError(err, "failed to locate deployment %v in namespace %v", testDeployment.ObjectMeta.Name, ns)
+		framework.ExpectNoError(err, "locate deployment %v in namespace %v", testDeployment.ObjectMeta.Name, ns)
 		framework.Logf("Deployment %s has a patched status", dName)
 	})
+
+	f.It("should compile a Workload and a single PodGroup for a gang Deployment and wire its pods to the PodGroup", f.WithFeatureGate(features.GenericWorkload), f.WithFeatureGate(features.WorkloadWithDeployment), func(ctx context.Context) {
+		testGangDeploymentWorkload(ctx, f)
+	})
+	f.It("should bind all gang Deployment replicas atomically or none when the gang cannot be satisfied", f.WithFeatureGate(features.GenericWorkload), f.WithFeatureGate(features.WorkloadWithDeployment), func(ctx context.Context) {
+		testGangDeploymentAtomicBind(ctx, f)
+	})
+	f.It("should reject invalid gang Deployment specs at admission", f.WithFeatureGate(features.GenericWorkload), f.WithFeatureGate(features.WorkloadWithDeployment), func(ctx context.Context) {
+		testGangDeploymentAdmission(ctx, f)
+	})
+	f.It("should propagate an elastic gang minCount change to the Workload and PodGroup", f.WithFeatureGate(features.GenericWorkload), f.WithFeatureGate(features.WorkloadWithDeployment), func(ctx context.Context) {
+		testGangDeploymentElasticMinCount(ctx, f)
+	})
+	f.It("should delete the PodGroup on scale-to-zero and recreate it on scale-up while retaining the Workload", f.WithFeatureGate(features.GenericWorkload), f.WithFeatureGate(features.WorkloadWithDeployment), func(ctx context.Context) {
+		testGangDeploymentScaleToZero(ctx, f)
+	})
+	f.It("should not disturb running gang pods when scaling up", f.WithFeatureGate(features.GenericWorkload), f.WithFeatureGate(features.WorkloadWithDeployment), func(ctx context.Context) {
+		testGangDeploymentScaleUpNonDisruptive(ctx, f)
+	})
 })
+
+func newGangDeployment(name string, replicas int32, podLabels map[string]string, minCount *int32) *appsv1.Deployment {
+	d := e2edeployment.NewDeployment(name, replicas, podLabels, AgnhostImageName, AgnhostImage, appsv1.RecreateDeploymentStrategyType)
+	d.Spec.Scheduling = &appsv1.DeploymentSchedulingConfiguration{
+		SchedulingPolicy: &schedulingv1.WorkloadPodGroupSchedulingPolicy{
+			Gang: &schedulingv1.WorkloadPodGroupGangSchedulingPolicy{MinCount: minCount},
+		},
+	}
+	return d
+}
+
+func waitForDeploymentWorkload(ctx context.Context, c clientset.Interface, ns, deploymentName string) *schedulingv1beta1.Workload {
+	var workload *schedulingv1beta1.Workload
+	gomega.Eventually(ctx, func(ctx context.Context) (*schedulingv1beta1.Workload, error) {
+		list, err := c.SchedulingV1beta1().Workloads(ns).List(ctx, metav1.ListOptions{})
+		if err != nil {
+			return nil, err
+		}
+		for i := range list.Items {
+			if ref := list.Items[i].Spec.ControllerRef; ref != nil && ref.Kind == "Deployment" && ref.Name == deploymentName {
+				workload = &list.Items[i]
+				return workload, nil
+			}
+		}
+		return nil, nil
+	}).WithTimeout(framework.PodStartTimeout).WithPolling(time.Second).ShouldNot(gomega.BeNil(), "expected a Workload owned by Deployment %s", deploymentName)
+	return workload
+}
+
+func waitForDeploymentReplicaSetName(ctx context.Context, c clientset.Interface, ns string, podLabels map[string]string) string {
+	var rsName string
+	selector := labels.SelectorFromSet(podLabels).String()
+	gomega.Eventually(ctx, func(ctx context.Context) (string, error) {
+		rsList, err := c.AppsV1().ReplicaSets(ns).List(ctx, metav1.ListOptions{LabelSelector: selector})
+		if err != nil {
+			return "", err
+		}
+		for i := range rsList.Items {
+			if rsList.Items[i].DeletionTimestamp == nil {
+				rsName = rsList.Items[i].Name
+				return rsName, nil
+			}
+		}
+		return "", nil
+	}).WithTimeout(framework.PodStartTimeout).WithPolling(time.Second).ShouldNot(gomega.BeEmpty(), "expected a ReplicaSet for pods %v", podLabels)
+	return rsName
+}
+
+func waitForReplicaSetPodGroup(ctx context.Context, c clientset.Interface, ns, rsName string) *schedulingv1beta1.PodGroup {
+	rs, err := c.AppsV1().ReplicaSets(ns).Get(ctx, rsName, metav1.GetOptions{})
+	framework.ExpectNoError(err, "get ReplicaSet %q", rsName)
+
+	var podGroup *schedulingv1beta1.PodGroup
+	gomega.Eventually(ctx, func(ctx context.Context) (*schedulingv1beta1.PodGroup, error) {
+		list, err := c.SchedulingV1beta1().PodGroups(ns).List(ctx, metav1.ListOptions{})
+		if err != nil {
+			return nil, err
+		}
+		// The controller names the PodGroup from a hash, so match on the ReplicaSet controller ownerRef.
+		for i := range list.Items {
+			pg := &list.Items[i]
+			if pg.DeletionTimestamp != nil {
+				continue
+			}
+			if owner := metav1.GetControllerOf(pg); owner != nil && owner.Kind == "ReplicaSet" && owner.UID == rs.UID {
+				podGroup = pg
+				return podGroup, nil
+			}
+		}
+		return nil, nil
+	}).WithTimeout(framework.PodStartTimeout).WithPolling(time.Second).ShouldNot(gomega.BeNil(), "expected a PodGroup controller-owned by ReplicaSet %s", rsName)
+	return podGroup
+}
+
+func expectGangMinCount(ctx context.Context, c clientset.Interface, ns, workloadName, podGroupName string, want int32) {
+	gomega.Eventually(ctx, func(ctx context.Context) (int32, error) {
+		wl, err := c.SchedulingV1beta1().Workloads(ns).Get(ctx, workloadName, metav1.GetOptions{})
+		if err != nil {
+			return 0, err
+		}
+		if len(wl.Spec.PodGroupTemplates) == 0 || wl.Spec.PodGroupTemplates[0].SchedulingPolicy.Gang == nil {
+			return -1, nil
+		}
+		return wl.Spec.PodGroupTemplates[0].SchedulingPolicy.Gang.MinCount, nil
+	}).WithTimeout(framework.PodStartTimeout).WithPolling(time.Second).Should(gomega.Equal(want), "workload %s gang minCount", workloadName)
+
+	gomega.Eventually(ctx, func(ctx context.Context) (int32, error) {
+		pg, err := c.SchedulingV1beta1().PodGroups(ns).Get(ctx, podGroupName, metav1.GetOptions{})
+		if err != nil {
+			return 0, err
+		}
+		if pg.Spec.SchedulingPolicy.Gang == nil {
+			return -1, nil
+		}
+		return pg.Spec.SchedulingPolicy.Gang.MinCount, nil
+	}).WithTimeout(framework.PodStartTimeout).WithPolling(time.Second).Should(gomega.Equal(want), "podGroup %s gang minCount", podGroupName)
+}
+
+func scaleGangDeployment(ctx context.Context, c clientset.Interface, ns, name string, replicas int32) {
+	scale := &autoscalingv1.Scale{
+		ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: name},
+		Spec:       autoscalingv1.ScaleSpec{Replicas: replicas},
+	}
+	_, err := c.AppsV1().Deployments(ns).UpdateScale(ctx, name, scale, metav1.UpdateOptions{})
+	framework.ExpectNoError(err, "scale Deployment %q to %d", name, replicas)
+}
+
+func testGangDeploymentWorkload(ctx context.Context, f *framework.Framework) {
+	c := f.ClientSet
+	ns := f.Namespace.Name
+	podLabels := map[string]string{"name": "gang-deployment"}
+	replicas := int32(3)
+
+	d := newGangDeployment("gang-deployment", replicas, podLabels, new(replicas))
+	deploy, err := c.AppsV1().Deployments(ns).Create(ctx, d, metav1.CreateOptions{})
+	framework.ExpectNoError(err, "create gang Deployment %q", d.Name)
+
+	ginkgo.By("waiting for the Workload compiled from the Deployment")
+	workload := waitForDeploymentWorkload(ctx, c, ns, deploy.Name)
+	gomega.Expect(workload.Spec.PodGroupTemplates).To(gomega.HaveLen(1), "expected a single PodGroupTemplate")
+	gomega.Expect(workload.Spec.PodGroupTemplates[0].SchedulingPolicy.Gang).NotTo(gomega.BeNil(), "expected gang scheduling policy")
+	gomega.Expect(workload.Spec.PodGroupTemplates[0].SchedulingPolicy.Gang.MinCount).To(gomega.Equal(replicas), "workload gang minCount")
+
+	workloadOwner := metav1.GetControllerOf(workload)
+	gomega.Expect(workloadOwner).NotTo(gomega.BeNil(), "workload should have a controller owner")
+	gomega.Expect(workloadOwner.Kind).To(gomega.Equal("Deployment"), "workload controller owner kind")
+	gomega.Expect(workloadOwner.UID).To(gomega.Equal(deploy.UID), "workload should be owned by Deployment %s", deploy.Name)
+
+	ginkgo.By("waiting for the PodGroup created for the ReplicaSet")
+	rsName := waitForDeploymentReplicaSetName(ctx, c, ns, podLabels)
+	podGroup := waitForReplicaSetPodGroup(ctx, c, ns, rsName)
+	gomega.Expect(podGroup.Spec.WorkloadRef).NotTo(gomega.BeNil(), "podGroup workloadRef")
+	gomega.Expect(podGroup.Spec.WorkloadRef.WorkloadName).To(gomega.Equal(workload.Name), "podGroup workloadRef name")
+	gomega.Expect(podGroup.Spec.SchedulingPolicy.Gang).NotTo(gomega.BeNil(), "podGroup gang policy")
+	gomega.Expect(podGroup.Spec.SchedulingPolicy.Gang.MinCount).To(gomega.Equal(replicas), "podGroup gang minCount")
+
+	rs, err := c.AppsV1().ReplicaSets(ns).Get(ctx, rsName, metav1.GetOptions{})
+	framework.ExpectNoError(err, "get ReplicaSet %q", rsName)
+	pgController := metav1.GetControllerOf(podGroup)
+	gomega.Expect(pgController).NotTo(gomega.BeNil(), "podGroup should have a controller owner")
+	gomega.Expect(pgController.Kind).To(gomega.Equal("ReplicaSet"), "podGroup controller owner kind")
+	gomega.Expect(pgController.UID).To(gomega.Equal(rs.UID), "podGroup should be controller-owned by ReplicaSet %s", rsName)
+
+	ginkgo.By("waiting for the Deployment to complete")
+	framework.ExpectNoError(e2edeployment.WaitForDeploymentComplete(c, deploy), "wait for gang Deployment %q to complete", deploy.Name)
+
+	ginkgo.By("verifying pods are wired to the PodGroup")
+	pods, err := e2edeployment.GetPodsForDeployment(ctx, c, deploy)
+	framework.ExpectNoError(err, "list pods for Deployment %q", deploy.Name)
+	gomega.Expect(pods.Items).To(gomega.HaveLen(int(replicas)))
+	for _, pod := range pods.Items {
+		gomega.Expect(pod.Spec.SchedulingGroup).NotTo(gomega.BeNil(), "pod %s missing schedulingGroup", pod.Name)
+		gomega.Expect(pod.Spec.SchedulingGroup.PodGroupName).To(gomega.HaveValue(gomega.Equal(podGroup.Name)), "pod %s podGroupName", pod.Name)
+	}
+}
+
+func testGangDeploymentAtomicBind(ctx context.Context, f *framework.Framework) {
+	c := f.ClientSet
+	ns := f.Namespace.Name
+	replicas := int32(3)
+
+	ginkgo.By("a gang Deployment that fits binds all replicas")
+	fitLabels := map[string]string{"name": "gang-fit"}
+	fit := newGangDeployment("gang-fit", replicas, fitLabels, new(replicas))
+	fitDeploy, err := c.AppsV1().Deployments(ns).Create(ctx, fit, metav1.CreateOptions{})
+	framework.ExpectNoError(err, "create gang Deployment %q", fit.Name)
+	framework.ExpectNoError(e2edeployment.WaitForDeploymentComplete(c, fitDeploy), "all gang replicas should bind")
+
+	fitRS := waitForDeploymentReplicaSetName(ctx, c, ns, fitLabels)
+	fitPG := waitForReplicaSetPodGroup(ctx, c, ns, fitRS)
+	gomega.Eventually(ctx, func(ctx context.Context) (string, error) {
+		pg, err := c.SchedulingV1beta1().PodGroups(ns).Get(ctx, fitPG.Name, metav1.GetOptions{})
+		if err != nil {
+			return "", err
+		}
+		for _, cond := range pg.Status.Conditions {
+			if cond.Type == schedulingv1beta1.PodGroupInitiallyScheduled {
+				return cond.Reason, nil
+			}
+		}
+		return "", nil
+	}).WithTimeout(framework.PodStartTimeout).WithPolling(time.Second).Should(gomega.Equal(schedulingv1beta1.PodGroupReasonScheduled), "PodGroup should report Scheduled")
+
+	ginkgo.By("a gang Deployment that cannot fit binds none of its replicas")
+	nofitLabels := map[string]string{"name": "gang-nofit"}
+	// Each pod requests more CPU than any node has, so the gang can never be satisfied.
+	nofit := newGangDeployment("gang-nofit", replicas, nofitLabels, new(replicas))
+	nofit.Spec.Template.Spec.Containers[0].Resources = v1.ResourceRequirements{
+		Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1000")},
+	}
+	nofitDeploy, err := c.AppsV1().Deployments(ns).Create(ctx, nofit, metav1.CreateOptions{})
+	framework.ExpectNoError(err, "create gang Deployment %q", nofit.Name)
+	nofitRS := waitForDeploymentReplicaSetName(ctx, c, ns, nofitLabels)
+	waitForReplicaSetPodGroup(ctx, c, ns, nofitRS)
+	gomega.Consistently(ctx, func(ctx context.Context) (int, error) {
+		pods, err := e2edeployment.GetPodsForDeployment(ctx, c, nofitDeploy)
+		if err != nil {
+			return 0, err
+		}
+		running := 0
+		for _, pod := range pods.Items {
+			if pod.Status.Phase == v1.PodRunning {
+				running++
+			}
+		}
+		return running, nil
+	}).WithTimeout(30*time.Second).WithPolling(3*time.Second).Should(gomega.Equal(0), "no gang pod should bind when the gang cannot be satisfied")
+}
+
+func testGangDeploymentAdmission(ctx context.Context, f *framework.Framework) {
+	c := f.ClientSet
+	ns := f.Namespace.Name
+	podLabels := map[string]string{"name": "gang-invalid"}
+
+	ginkgo.By("rejecting a gang Deployment with RollingUpdate strategy")
+	rolling := newGangDeployment("gang-rollingupdate", 3, podLabels, new(int32(3)))
+	rolling.Spec.Strategy = appsv1.DeploymentStrategy{Type: appsv1.RollingUpdateDeploymentStrategyType}
+	_, err := c.AppsV1().Deployments(ns).Create(ctx, rolling, metav1.CreateOptions{})
+	gomega.Expect(err).To(gomega.HaveOccurred(), "RollingUpdate gang Deployment must be rejected")
+	gomega.Expect(err.Error()).To(gomega.ContainSubstring("gang-scheduled Deployment requires strategy type Recreate"))
+
+	ginkgo.By("rejecting a gang Deployment whose minCount exceeds replicas")
+	exceed := newGangDeployment("gang-mincount", 2, podLabels, new(int32(3)))
+	_, err = c.AppsV1().Deployments(ns).Create(ctx, exceed, metav1.CreateOptions{})
+	gomega.Expect(err).To(gomega.HaveOccurred(), "gang Deployment with minCount > replicas must be rejected")
+	gomega.Expect(err.Error()).To(gomega.ContainSubstring("must not be greater than replicas"))
+}
+
+func testGangDeploymentElasticMinCount(ctx context.Context, f *framework.Framework) {
+	c := f.ClientSet
+	ns := f.Namespace.Name
+	podLabels := map[string]string{"name": "gang-elastic"}
+	initial := int32(2)
+	updated := int32(3)
+
+	d := newGangDeployment("gang-elastic", 4, podLabels, new(initial))
+	deploy, err := c.AppsV1().Deployments(ns).Create(ctx, d, metav1.CreateOptions{})
+	framework.ExpectNoError(err, "create gang Deployment %q", d.Name)
+
+	workload := waitForDeploymentWorkload(ctx, c, ns, deploy.Name)
+	rsName := waitForDeploymentReplicaSetName(ctx, c, ns, podLabels)
+	podGroup := waitForReplicaSetPodGroup(ctx, c, ns, rsName)
+	expectGangMinCount(ctx, c, ns, workload.Name, podGroup.Name, initial)
+
+	ginkgo.By("updating the gang minCount")
+	err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		cur, err := c.AppsV1().Deployments(ns).Get(ctx, deploy.Name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		cur.Spec.Scheduling.SchedulingPolicy.Gang.MinCount = new(updated)
+		_, err = c.AppsV1().Deployments(ns).Update(ctx, cur, metav1.UpdateOptions{})
+		return err
+	})
+	framework.ExpectNoError(err, "update gang minCount")
+
+	expectGangMinCount(ctx, c, ns, workload.Name, podGroup.Name, updated)
+}
+
+func testGangDeploymentScaleToZero(ctx context.Context, f *framework.Framework) {
+	c := f.ClientSet
+	ns := f.Namespace.Name
+	podLabels := map[string]string{"name": "gang-scale-zero"}
+	replicas := int32(2)
+
+	d := newGangDeployment("gang-scale-zero", replicas, podLabels, nil)
+	deploy, err := c.AppsV1().Deployments(ns).Create(ctx, d, metav1.CreateOptions{})
+	framework.ExpectNoError(err, "create gang Deployment %q", d.Name)
+
+	workload := waitForDeploymentWorkload(ctx, c, ns, deploy.Name)
+	rsName := waitForDeploymentReplicaSetName(ctx, c, ns, podLabels)
+	podGroup := waitForReplicaSetPodGroup(ctx, c, ns, rsName)
+	// minCount is derived from replicas when unset
+	expectGangMinCount(ctx, c, ns, workload.Name, podGroup.Name, replicas)
+
+	ginkgo.By("scaling the Deployment to zero deletes the PodGroup but retains the Workload")
+	scaleGangDeployment(ctx, c, ns, deploy.Name, 0)
+	gomega.Eventually(ctx, func(ctx context.Context) (bool, error) {
+		_, err := c.SchedulingV1beta1().PodGroups(ns).Get(ctx, podGroup.Name, metav1.GetOptions{})
+		if apierrors.IsNotFound(err) {
+			return true, nil
+		}
+		return false, err
+	}).WithTimeout(framework.PodStartTimeout).WithPolling(time.Second).Should(gomega.BeTrueBecause("PodGroup should be deleted on scale-to-zero"))
+
+	// Workload is retained, but its minCount is reset to the default of 1
+	gomega.Eventually(ctx, func(ctx context.Context) (int32, error) {
+		wl, err := c.SchedulingV1beta1().Workloads(ns).Get(ctx, workload.Name, metav1.GetOptions{})
+		if err != nil {
+			return 0, err
+		}
+		if len(wl.Spec.PodGroupTemplates) == 0 || wl.Spec.PodGroupTemplates[0].SchedulingPolicy.Gang == nil {
+			return -1, nil
+		}
+		return wl.Spec.PodGroupTemplates[0].SchedulingPolicy.Gang.MinCount, nil
+	}).WithTimeout(framework.PodStartTimeout).WithPolling(time.Second).Should(gomega.Equal(int32(1)), "retained workload minCount should default to 1")
+
+	ginkgo.By("scaling the Deployment back up recreates the PodGroup")
+	scaleGangDeployment(ctx, c, ns, deploy.Name, replicas)
+	newRSName := waitForDeploymentReplicaSetName(ctx, c, ns, podLabels)
+	newPodGroup := waitForReplicaSetPodGroup(ctx, c, ns, newRSName)
+	expectGangMinCount(ctx, c, ns, workload.Name, newPodGroup.Name, replicas)
+}
+
+func testGangDeploymentScaleUpNonDisruptive(ctx context.Context, f *framework.Framework) {
+	c := f.ClientSet
+	ns := f.Namespace.Name
+	podLabels := map[string]string{"name": "gang-scale-up"}
+	initial := int32(2)
+	scaled := int32(4)
+
+	d := newGangDeployment("gang-scale-up", initial, podLabels, new(initial))
+	deploy, err := c.AppsV1().Deployments(ns).Create(ctx, d, metav1.CreateOptions{})
+	framework.ExpectNoError(err, "create gang Deployment %q", d.Name)
+	framework.ExpectNoError(e2edeployment.WaitForDeploymentComplete(c, deploy), "initial gang replicas should bind")
+
+	original, err := e2edeployment.GetPodsForDeployment(ctx, c, deploy)
+	framework.ExpectNoError(err, "list initial pods")
+	gomega.Expect(original.Items).NotTo(gomega.BeEmpty(), "expected initial gang pods")
+	originalUIDs := map[string]types.UID{}
+	for _, pod := range original.Items {
+		originalUIDs[pod.Name] = pod.UID
+	}
+	gomega.Expect(original.Items[0].Spec.SchedulingGroup).NotTo(gomega.BeNil(), "original pod missing schedulingGroup")
+	originalPodGroup := original.Items[0].Spec.SchedulingGroup.PodGroupName
+	gomega.Expect(originalPodGroup).NotTo(gomega.BeNil(), "original pod missing podGroupName")
+
+	ginkgo.By("scaling the Deployment up")
+	scaleGangDeployment(ctx, c, ns, deploy.Name, scaled)
+	deploy, err = c.AppsV1().Deployments(ns).Get(ctx, deploy.Name, metav1.GetOptions{})
+	framework.ExpectNoError(err)
+	framework.ExpectNoError(e2edeployment.WaitForDeploymentComplete(c, deploy), "scaled gang replicas should bind")
+
+	ginkgo.By("verifying all replicas share the original PodGroup")
+	scaledPods, err := e2edeployment.GetPodsForDeployment(ctx, c, deploy)
+	framework.ExpectNoError(err, "list pods after scale-up")
+	gomega.Expect(scaledPods.Items).To(gomega.HaveLen(int(scaled)), "expected %d pods after scale-up", scaled)
+	for _, pod := range scaledPods.Items {
+		gomega.Expect(pod.Spec.SchedulingGroup).NotTo(gomega.BeNil(), "pod %s missing schedulingGroup", pod.Name)
+		gomega.Expect(pod.Spec.SchedulingGroup.PodGroupName).To(gomega.HaveValue(gomega.Equal(*originalPodGroup)), "pod %s should share the original PodGroup", pod.Name)
+	}
+
+	ginkgo.By("verifying the original pods were not disturbed")
+	gomega.Consistently(ctx, func(ctx context.Context) error {
+		for name, uid := range originalUIDs {
+			pod, err := c.CoreV1().Pods(ns).Get(ctx, name, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			if pod.UID != uid {
+				return fmt.Errorf("pod %s was recreated", name)
+			}
+			if pod.Status.Phase != v1.PodRunning {
+				return fmt.Errorf("pod %s no longer running: %s", name, pod.Status.Phase)
+			}
+		}
+		return nil
+	}).WithTimeout(30*time.Second).WithPolling(5*time.Second).Should(gomega.Succeed(), "original gang pods should keep running undisturbed")
+}
 
 func failureTrap(ctx context.Context, c clientset.Interface, ns string) {
 	deployments, err := c.AppsV1().Deployments(ns).List(ctx, metav1.ListOptions{LabelSelector: labels.Everything().String()})
@@ -675,21 +1057,21 @@ func failureTrap(ctx context.Context, c clientset.Interface, ns string) {
 
 func stopDeployment(ctx context.Context, c clientset.Interface, ns, deploymentName string) {
 	deployment, err := c.AppsV1().Deployments(ns).Get(ctx, deploymentName, metav1.GetOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "get Deployment %q in namespace %q", deploymentName, ns)
 
 	framework.Logf("Deleting deployment %s", deploymentName)
 	err = e2eresource.DeleteResourceAndWaitForGC(ctx, c, appsinternal.Kind("Deployment"), ns, deployment.Name)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "delete Deployment %q in namespace %q and wait for garbage collection", deployment.Name, ns)
 
 	framework.Logf("Ensuring deployment %s was deleted", deploymentName)
 	_, err = c.AppsV1().Deployments(ns).Get(ctx, deployment.Name, metav1.GetOptions{})
 	gomega.Expect(err).To(gomega.MatchError(apierrors.IsNotFound, fmt.Sprintf("Expected deployment %s to be deleted", deploymentName)))
 	framework.Logf("Ensuring deployment %s's RSes were deleted", deploymentName)
 	selector, err := metav1.LabelSelectorAsSelector(deployment.Spec.Selector)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "convert the Deployment label selector")
 	options := metav1.ListOptions{LabelSelector: selector.String()}
 	rss, err := c.AppsV1().ReplicaSets(ns).List(ctx, options)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "list ReplicaSets in namespace %q", ns)
 	gomega.Expect(rss.Items).Should(gomega.BeEmpty())
 	framework.Logf("Ensuring deployment %s's Pods were deleted", deploymentName)
 	var pods *v1.PodList
@@ -719,19 +1101,19 @@ func testDeleteDeployment(ctx context.Context, f *framework.Framework) {
 	d := e2edeployment.NewDeployment(deploymentName, replicas, podLabels, AgnhostImageName, AgnhostImage, appsv1.RollingUpdateDeploymentStrategyType)
 	d.Annotations = map[string]string{"test": "should-copy-to-replica-set", v1.LastAppliedConfigAnnotation: "should-not-copy-to-replica-set"}
 	deploy, err := c.AppsV1().Deployments(ns).Create(ctx, d, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "create Deployment %q in namespace %q", d.Name, ns)
 
 	// Wait for it to be updated to revision 1
 	err = e2edeployment.WaitForDeploymentRevisionAndImage(c, ns, deploymentName, "1", AgnhostImage)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "verify Deployment %q in namespace %q has revision %q and image %q", deploymentName, ns, "1", AgnhostImage)
 
 	err = e2edeployment.WaitForDeploymentComplete(c, deploy)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "wait for Deployment %q in namespace %q to complete", deploy.Name, deploy.Namespace)
 
 	deployment, err := c.AppsV1().Deployments(ns).Get(ctx, deploymentName, metav1.GetOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "get Deployment %q in namespace %q", deploymentName, ns)
 	newRS, err := testutil.GetNewReplicaSet(deployment, c)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "find new ReplicaSet for Deployment %q", deployment.Name)
 	gomega.Expect(newRS).NotTo(gomega.Equal(nilRs))
 	stopDeployment(ctx, c, ns, deploymentName)
 }
@@ -756,7 +1138,7 @@ func testRollingUpdateDeployment(ctx context.Context, f *framework.Framework) {
 	rs.Annotations = annotations
 	framework.Logf("Creating replica set %q (going to be adopted)", rs.Name)
 	_, err := c.AppsV1().ReplicaSets(ns).Create(ctx, rs, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "create ReplicaSet %q in namespace %q", rs.Name, ns)
 	// Verify that the required pods have come up.
 	err = e2epod.VerifyPodsRunning(ctx,
 		c,
@@ -772,23 +1154,24 @@ func testRollingUpdateDeployment(ctx context.Context, f *framework.Framework) {
 	framework.Logf("Creating deployment %q", deploymentName)
 	d := e2edeployment.NewDeployment(deploymentName, replicas, deploymentPodLabels, AgnhostImageName, AgnhostImage, appsv1.RollingUpdateDeploymentStrategyType)
 	deploy, err := c.AppsV1().Deployments(ns).Create(ctx, d, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "create Deployment %q in namespace %q", d.Name, ns)
 
 	// Wait for it to be updated to revision 3546343826724305833.
+	const nextRevision = "3546343826724305833"
 	framework.Logf("Ensuring deployment %q gets the next revision from the one the adopted replica set %q has", deploy.Name, rs.Name)
-	err = e2edeployment.WaitForDeploymentRevisionAndImage(c, ns, deploymentName, "3546343826724305833", AgnhostImage)
-	framework.ExpectNoError(err)
+	err = e2edeployment.WaitForDeploymentRevisionAndImage(c, ns, deploymentName, nextRevision, AgnhostImage)
+	framework.ExpectNoError(err, "verify Deployment %q in namespace %q has revision %q and image %q", deploymentName, ns, nextRevision, AgnhostImage)
 
 	framework.Logf("Ensuring status for deployment %q is the expected", deploy.Name)
 	err = e2edeployment.WaitForDeploymentComplete(c, deploy)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "wait for Deployment %q in namespace %q to complete", deploy.Name, deploy.Namespace)
 
 	// There should be 1 old RS (webserver-controller, which is adopted)
 	framework.Logf("Ensuring deployment %q has one old replica set (the one it adopted)", deploy.Name)
 	deployment, err := c.AppsV1().Deployments(ns).Get(ctx, deploymentName, metav1.GetOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "get Deployment %q in namespace %q", deploymentName, ns)
 	_, allOldRSs, err := testutil.GetOldReplicaSets(deployment, c)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "find old ReplicaSets for Deployment %q", deployment.Name)
 	gomega.Expect(allOldRSs).To(gomega.HaveLen(1))
 }
 
@@ -801,16 +1184,16 @@ func testRecreateDeployment(ctx context.Context, f *framework.Framework) {
 	framework.Logf("Creating deployment %q", deploymentName)
 	d := e2edeployment.NewDeployment(deploymentName, int32(1), map[string]string{"name": "sample-pod-3"}, AgnhostImageName, PrevAgnhostImage, appsv1.RecreateDeploymentStrategyType)
 	deployment, err := c.AppsV1().Deployments(ns).Create(ctx, d, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "create Deployment %q in namespace %q", d.Name, ns)
 
 	// Wait for it to be updated to revision 1
 	framework.Logf("Waiting deployment %q to be updated to revision 1", deploymentName)
 	err = e2edeployment.WaitForDeploymentRevisionAndImage(c, ns, deploymentName, "1", PrevAgnhostImage)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "verify Deployment %q in namespace %q has revision %q and image %q", deploymentName, ns, "1", PrevAgnhostImage)
 
 	framework.Logf("Waiting deployment %q to complete", deploymentName)
 	err = e2edeployment.WaitForDeploymentComplete(c, deployment)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "wait for Deployment %q in namespace %q to complete", deployment.Name, deployment.Namespace)
 
 	// Update deployment to delete agnhost pods and bring up webserver pods.
 	framework.Logf("Triggering a new rollout for deployment %q", deploymentName)
@@ -818,11 +1201,11 @@ func testRecreateDeployment(ctx context.Context, f *framework.Framework) {
 		update.Spec.Template.Spec.Containers[0].Name = AgnhostImageName
 		update.Spec.Template.Spec.Containers[0].Image = AgnhostImage
 	})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "update Deployment %q in namespace %q", deploymentName, ns)
 
 	framework.Logf("Watching deployment %q to verify that new pods will not run with olds pods", deploymentName)
 	err = watchRecreateDeployment(ctx, c, deployment)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "observe Deployment %q recreation", deployment.Name)
 }
 
 // testDeploymentCleanUpPolicy tests that deployment supports cleanup policy
@@ -840,7 +1223,7 @@ func testDeploymentCleanUpPolicy(ctx context.Context, f *framework.Framework) {
 	replicas := int32(1)
 	revisionHistoryLimit := ptr.To[int32](0)
 	_, err := c.AppsV1().ReplicaSets(ns).Create(ctx, newRS(rsName, replicas, rsPodLabels, AgnhostImageName, AgnhostImage, nil), metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "create ReplicaSet in namespace %q", ns)
 
 	// Verify that the required pods have come up.
 	err = e2epod.VerifyPodsRunning(ctx,
@@ -865,7 +1248,7 @@ func testDeploymentCleanUpPolicy(ctx context.Context, f *framework.Framework) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	w, err := c.CoreV1().Pods(ns).Watch(ctx, options)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "watch Pods in namespace %q", ns)
 	go func() {
 		defer ginkgo.GinkgoRecover()
 		// There should be only one pod being created, which is the pod with the agnhost image.
@@ -896,11 +1279,11 @@ func testDeploymentCleanUpPolicy(ctx context.Context, f *framework.Framework) {
 	d := e2edeployment.NewDeployment(deploymentName, replicas, deploymentPodLabels, AgnhostImageName, AgnhostImage, appsv1.RollingUpdateDeploymentStrategyType)
 	d.Spec.RevisionHistoryLimit = revisionHistoryLimit
 	_, err = c.AppsV1().Deployments(ns).Create(ctx, d, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "create Deployment %q in namespace %q", d.Name, ns)
 
 	ginkgo.By(fmt.Sprintf("Waiting for deployment %s history to be cleaned up", deploymentName))
 	err = waitForDeploymentOldRSsNum(ctx, c, ns, deploymentName, int(*revisionHistoryLimit))
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "wait for Deployment %q in namespace %q to retain %d old ReplicaSets", deploymentName, ns, int(*revisionHistoryLimit))
 }
 
 // testRolloverDeployment tests that deployment supports rollover.
@@ -918,7 +1301,7 @@ func testRolloverDeployment(ctx context.Context, f *framework.Framework) {
 	rsName := "test-rollover-controller"
 	rsReplicas := int32(1)
 	_, err := c.AppsV1().ReplicaSets(ns).Create(ctx, newRS(rsName, rsReplicas, rsPodLabels, AgnhostImageName, AgnhostImage, nil), metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "create ReplicaSet in namespace %q", ns)
 	// Verify that the required pods have come up.
 	err = e2epod.VerifyPodsRunning(ctx,
 		c,
@@ -932,7 +1315,7 @@ func testRolloverDeployment(ctx context.Context, f *framework.Framework) {
 	// Wait for replica set to become ready before adopting it.
 	framework.Logf("Waiting for pods owned by replica set %q to become ready", rsName)
 	err = e2ereplicaset.WaitForReadyReplicaSet(ctx, c, ns, rsName)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "wait for ReplicaSet %q in namespace %q to become ready", rsName, ns)
 
 	// Create a deployment to delete webserver pods and instead bring up redis-slave pods.
 	// We use a nonexistent image here, so that we make sure it won't finish
@@ -948,26 +1331,26 @@ func testRolloverDeployment(ctx context.Context, f *framework.Framework) {
 	}
 	newDeployment.Spec.MinReadySeconds = int32(10)
 	_, err = c.AppsV1().Deployments(ns).Create(ctx, newDeployment, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "create Deployment %q in namespace %q", newDeployment.Name, ns)
 
 	// Verify that the pods were scaled up and down as expected.
 	deployment, err := c.AppsV1().Deployments(ns).Get(ctx, deploymentName, metav1.GetOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "get Deployment %q in namespace %q", deploymentName, ns)
 	framework.Logf("Make sure deployment %q performs scaling operations", deploymentName)
 	// Make sure the deployment starts to scale up and down replica sets by checking if its updated replicas >= 1
 	err = waitForDeploymentUpdatedReplicasGTE(c, ns, deploymentName, deploymentReplicas, deployment.Generation)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "wait for Deployment %q in namespace %q to have at least %d updated replicas", deploymentName, ns, deploymentReplicas)
 	// Check if it's updated to revision 1 correctly
 	framework.Logf("Check revision of new replica set for deployment %q", deploymentName)
 	err = checkDeploymentRevisionAndImage(c, ns, deploymentName, "1", deploymentImage)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "verify Deployment %q in namespace %q has revision %q and image %q", deploymentName, ns, "1", deploymentImage)
 
 	framework.Logf("Ensure that both replica sets have 1 created replica")
 	oldRS, err := c.AppsV1().ReplicaSets(ns).Get(ctx, rsName, metav1.GetOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "get ReplicaSet %q in namespace %q", rsName, ns)
 	ensureReplicas(oldRS, int32(1))
 	newRS, err := testutil.GetNewReplicaSet(deployment, c)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "find new ReplicaSet for Deployment %q", deployment.Name)
 	ensureReplicas(newRS, int32(1))
 
 	// The deployment is stuck, update it to rollover the above 2 ReplicaSets and bring up agnhost pods.
@@ -977,29 +1360,29 @@ func testRolloverDeployment(ctx context.Context, f *framework.Framework) {
 		update.Spec.Template.Spec.Containers[0].Name = updatedDeploymentImageName
 		update.Spec.Template.Spec.Containers[0].Image = updatedDeploymentImage
 	})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "update Deployment %q in namespace %q", newDeployment.Name, ns)
 
 	// Use observedGeneration to determine if the controller noticed the pod template update.
 	framework.Logf("Wait deployment %q to be observed by the deployment controller", deploymentName)
 	err = waitForObservedDeployment(c, ns, deploymentName, deployment.Generation)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "wait for Deployment %q in namespace %q to observe generation %d", deploymentName, ns, deployment.Generation)
 
 	// Wait for it to be updated to revision 2
 	framework.Logf("Wait for revision update of deployment %q to 2", deploymentName)
 	err = e2edeployment.WaitForDeploymentRevisionAndImage(c, ns, deploymentName, "2", updatedDeploymentImage)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "verify Deployment %q in namespace %q has revision %q and image %q", deploymentName, ns, "2", updatedDeploymentImage)
 
 	framework.Logf("Make sure deployment %q is complete", deploymentName)
 	err = waitForDeploymentCompleteAndCheckRolling(c, deployment)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "wait for Deployment %q in namespace %q to complete while respecting rolling update limits", deployment.Name, deployment.Namespace)
 
 	framework.Logf("Ensure that both old replica sets have no replicas")
 	oldRS, err = c.AppsV1().ReplicaSets(ns).Get(ctx, rsName, metav1.GetOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "get ReplicaSet %q in namespace %q", rsName, ns)
 	ensureReplicas(oldRS, int32(0))
 	// Not really the new replica set anymore but we GET by name so that's fine.
 	newRS, err = c.AppsV1().ReplicaSets(ns).Get(ctx, newRS.Name, metav1.GetOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "get ReplicaSet in namespace %q", ns)
 	ensureReplicas(newRS, int32(0))
 }
 
@@ -1039,7 +1422,7 @@ func testIterativeDeployments(ctx context.Context, f *framework.Framework) {
 	d.Spec.Template.Spec.TerminationGracePeriodSeconds = &zero
 	framework.Logf("Creating deployment %q", deploymentName)
 	deployment, err := c.AppsV1().Deployments(ns).Create(ctx, d, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "create Deployment %q in namespace %q", d.Name, ns)
 
 	iterations := 20
 	for i := range iterations {
@@ -1056,7 +1439,7 @@ func testIterativeDeployments(ctx context.Context, f *framework.Framework) {
 				update.Spec.Template.Spec.Containers[0].Env = append(update.Spec.Template.Spec.Containers[0].Env, newEnv)
 				randomScale(update, i)
 			})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "update Deployment %q in namespace %q", deploymentName, ns)
 
 		case n < 0.4:
 			// rollback to the previous version
@@ -1067,7 +1450,7 @@ func testIterativeDeployments(ctx context.Context, f *framework.Framework) {
 				}
 				update.Annotations[appsv1.DeprecatedRollbackTo] = "0"
 			})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "update Deployment %q in namespace %q", deploymentName, ns)
 
 		case n < 0.6:
 			// just scaling
@@ -1075,7 +1458,7 @@ func testIterativeDeployments(ctx context.Context, f *framework.Framework) {
 			deployment, err = e2edeployment.UpdateDeploymentWithRetries(c, ns, deployment.Name, func(update *appsv1.Deployment) {
 				randomScale(update, i)
 			})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "update Deployment %q in namespace %q", deploymentName, ns)
 
 		case n < 0.8:
 			// toggling the deployment
@@ -1085,24 +1468,24 @@ func testIterativeDeployments(ctx context.Context, f *framework.Framework) {
 					update.Spec.Paused = false
 					randomScale(update, i)
 				})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "update Deployment %q in namespace %q", deploymentName, ns)
 			} else {
 				framework.Logf("%02d: pausing deployment %q", i, deployment.Name)
 				deployment, err = e2edeployment.UpdateDeploymentWithRetries(c, ns, deployment.Name, func(update *appsv1.Deployment) {
 					update.Spec.Paused = true
 					randomScale(update, i)
 				})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "update Deployment %q in namespace %q", deploymentName, ns)
 			}
 
 		default:
 			// arbitrarily delete deployment pods
 			framework.Logf("%02d: arbitrarily deleting one or more deployment pods for deployment %q", i, deployment.Name)
 			selector, err := metav1.LabelSelectorAsSelector(deployment.Spec.Selector)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "convert the Deployment label selector")
 			opts := metav1.ListOptions{LabelSelector: selector.String()}
 			podList, err := c.CoreV1().Pods(ns).List(ctx, opts)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "list Pods in namespace %q", ns)
 			if len(podList.Items) == 0 {
 				framework.Logf("%02d: no deployment pods to delete", i)
 				continue
@@ -1115,7 +1498,7 @@ func testIterativeDeployments(ctx context.Context, f *framework.Framework) {
 				framework.Logf("%02d: deleting deployment pod %q", i, name)
 				err := c.CoreV1().Pods(ns).Delete(ctx, name, metav1.DeleteOptions{})
 				if err != nil && !apierrors.IsNotFound(err) {
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "delete Pod %q in namespace %q", name, ns)
 				}
 			}
 		}
@@ -1123,26 +1506,26 @@ func testIterativeDeployments(ctx context.Context, f *framework.Framework) {
 
 	// unpause the deployment if we end up pausing it
 	deployment, err = c.AppsV1().Deployments(ns).Get(ctx, deployment.Name, metav1.GetOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "get Deployment %q in namespace %q", deploymentName, ns)
 	if deployment.Spec.Paused {
 		framework.Logf("Resuming deployment %q", deployment.Name)
 		deployment, err = e2edeployment.UpdateDeploymentWithRetries(c, ns, deployment.Name, func(update *appsv1.Deployment) {
 			update.Spec.Paused = false
 		})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "update Deployment %q in namespace %q", deploymentName, ns)
 	}
 
 	framework.Logf("Waiting for deployment %q to be observed by the controller", deploymentName)
 	err = waitForObservedDeployment(c, ns, deploymentName, deployment.Generation)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "wait for Deployment %q in namespace %q to observe generation %d", deploymentName, ns, deployment.Generation)
 
 	framework.Logf("Waiting for deployment %q status", deploymentName)
 	err = e2edeployment.WaitForDeploymentComplete(c, deployment)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "wait for Deployment %q in namespace %q to complete", deployment.Name, deployment.Namespace)
 
 	framework.Logf("Checking deployment %q for a complete condition", deploymentName)
 	err = waitForDeploymentWithCondition(c, ns, deploymentName, deploymentutil.NewRSAvailableReason, appsv1.DeploymentProgressing)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "wait for Deployment %q in namespace %q to report condition %s with reason %q", deploymentName, ns, appsv1.DeploymentProgressing, deploymentutil.NewRSAvailableReason)
 }
 
 func testDeploymentsControllerRef(ctx context.Context, f *framework.Framework) {
@@ -1155,9 +1538,9 @@ func testDeploymentsControllerRef(ctx context.Context, f *framework.Framework) {
 	replicas := int32(1)
 	d := e2edeployment.NewDeployment(deploymentName, replicas, podLabels, AgnhostImageName, AgnhostImage, appsv1.RollingUpdateDeploymentStrategyType)
 	deploy, err := c.AppsV1().Deployments(ns).Create(ctx, d, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "create Deployment %q in namespace %q", d.Name, ns)
 	err = e2edeployment.WaitForDeploymentComplete(c, deploy)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "wait for Deployment %q in namespace %q to complete", deploy.Name, deploy.Namespace)
 
 	framework.Logf("Verifying Deployment %q has only one ReplicaSet", deploymentName)
 	rsList := listDeploymentReplicaSets(ctx, c, ns, podLabels)
@@ -1168,11 +1551,11 @@ func testDeploymentsControllerRef(ctx context.Context, f *framework.Framework) {
 
 	framework.Logf("Checking the ReplicaSet has the right controllerRef")
 	err = checkDeploymentReplicaSetsControllerRef(ctx, c, ns, deploy.UID, podLabels)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "verify ReplicaSets in namespace %q reference Deployment UID %q", ns, deploy.UID)
 
 	framework.Logf("Deleting Deployment %q and orphaning its ReplicaSet", deploymentName)
 	err = orphanDeploymentReplicaSets(ctx, c, deploy)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "orphan ReplicaSets of Deployment %q", deploy.Name)
 
 	ginkgo.By("Wait for the ReplicaSet to be orphaned")
 	err = wait.PollUntilContextTimeout(ctx, dRetryPeriod, dRetryTimeout, false, waitDeploymentReplicaSetsOrphaned(c, ns, podLabels))
@@ -1182,13 +1565,13 @@ func testDeploymentsControllerRef(ctx context.Context, f *framework.Framework) {
 	framework.Logf("Creating Deployment %q to adopt the ReplicaSet", deploymentName)
 	d = e2edeployment.NewDeployment(deploymentName, replicas, podLabels, AgnhostImageName, AgnhostImage, appsv1.RollingUpdateDeploymentStrategyType)
 	deploy, err = c.AppsV1().Deployments(ns).Create(ctx, d, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "create Deployment %q in namespace %q", d.Name, ns)
 	err = e2edeployment.WaitForDeploymentComplete(c, deploy)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "wait for Deployment %q in namespace %q to complete", deploy.Name, deploy.Namespace)
 
 	framework.Logf("Waiting for the ReplicaSet to have the right controllerRef")
 	err = checkDeploymentReplicaSetsControllerRef(ctx, c, ns, deploy.UID, podLabels)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "verify ReplicaSets in namespace %q reference Deployment UID %q", ns, deploy.UID)
 
 	framework.Logf("Verifying no extra ReplicaSet is created (Deployment %q still has only one ReplicaSet after adoption)", deploymentName)
 	rsList = listDeploymentReplicaSets(ctx, c, ns, podLabels)
@@ -1217,11 +1600,11 @@ func testProportionalScalingDeployment(ctx context.Context, f *framework.Framewo
 
 	framework.Logf("Creating deployment %q", deploymentName)
 	deployment, err := c.AppsV1().Deployments(ns).Create(ctx, d, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "create Deployment %q in namespace %q", d.Name, ns)
 
 	framework.Logf("Waiting for observed generation %d", deployment.Generation)
 	err = waitForObservedDeployment(c, ns, deploymentName, deployment.Generation)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "wait for Deployment %q in namespace %q to observe generation %d", deploymentName, ns, deployment.Generation)
 
 	// Verify that the required pods have come up.
 	framework.Logf("Waiting for all required pods to come up")
@@ -1230,10 +1613,10 @@ func testProportionalScalingDeployment(ctx context.Context, f *framework.Framewo
 
 	framework.Logf("Waiting for deployment %q to complete", deployment.Name)
 	err = e2edeployment.WaitForDeploymentComplete(c, deployment)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "wait for Deployment %q in namespace %q to complete", deployment.Name, deployment.Namespace)
 
 	firstRS, err := testutil.GetNewReplicaSet(deployment, c)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "find new ReplicaSet for Deployment %q", deployment.Name)
 
 	// Update the deployment with a non-existent image so that the new replica set
 	// will be blocked to simulate a partial rollout.
@@ -1241,40 +1624,40 @@ func testProportionalScalingDeployment(ctx context.Context, f *framework.Framewo
 	deployment, err = e2edeployment.UpdateDeploymentWithRetries(c, ns, d.Name, func(update *appsv1.Deployment) {
 		update.Spec.Template.Spec.Containers[0].Image = "webserver:404"
 	})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "update Deployment %q in namespace %q", d.Name, ns)
 
 	framework.Logf("Waiting for observed generation %d", deployment.Generation)
 	err = waitForObservedDeployment(c, ns, deploymentName, deployment.Generation)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "wait for Deployment %q in namespace %q to observe generation %d", deploymentName, ns, deployment.Generation)
 
 	// Checking state of first rollout's replicaset.
 	maxUnavailable, err := intstr.GetScaledValueFromIntOrPercent(deployment.Spec.Strategy.RollingUpdate.MaxUnavailable, int(*(deployment.Spec.Replicas)), false)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "resolve the Deployment rolling update replica limit")
 
 	// First rollout's replicaset should have Deployment's (replicas - maxUnavailable) = 10 - 2 = 8 available replicas.
 	minAvailableReplicas := replicas - int32(maxUnavailable)
 	framework.Logf("Waiting for the first rollout's replicaset to have .status.availableReplicas = %d", minAvailableReplicas)
 	err = e2ereplicaset.WaitForReplicaSetTargetAvailableReplicas(ctx, c, firstRS, minAvailableReplicas)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "wait for ReplicaSet %q to have %d available replicas", firstRS.Name, minAvailableReplicas)
 
 	// First rollout's replicaset should have .spec.replicas = 8 too.
 	framework.Logf("Waiting for the first rollout's replicaset to have .spec.replicas = %d", minAvailableReplicas)
 	err = waitForReplicaSetTargetSpecReplicas(ctx, c, firstRS, minAvailableReplicas)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "wait for ReplicaSet %q to have %d desired replicas", firstRS.Name, minAvailableReplicas)
 
 	// The desired replicas wait makes sure that the RS controller has created expected number of pods.
 	framework.Logf("Waiting for the first rollout's replicaset of deployment %q to have desired number of replicas", deploymentName)
 	firstRS, err = c.AppsV1().ReplicaSets(ns).Get(ctx, firstRS.Name, metav1.GetOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "get ReplicaSet in namespace %q", ns)
 	err = waitForReplicaSetDesiredReplicas(ctx, c.AppsV1(), firstRS)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "wait for ReplicaSet %q to reach its desired replica count", firstRS.Name)
 
 	// Checking state of second rollout's replicaset.
 	secondRS, err := testutil.GetNewReplicaSet(deployment, c)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "find new ReplicaSet for Deployment %q", deployment.Name)
 
 	maxSurge, err := intstr.GetScaledValueFromIntOrPercent(deployment.Spec.Strategy.RollingUpdate.MaxSurge, int(*(deployment.Spec.Replicas)), false)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "resolve the Deployment rolling update replica limit")
 
 	// Second rollout's replicaset should have 0 available replicas.
 	framework.Logf("Verifying that the second rollout's replicaset has .status.availableReplicas = 0")
@@ -1284,20 +1667,20 @@ func testProportionalScalingDeployment(ctx context.Context, f *framework.Framewo
 	newReplicas := replicas + int32(maxSurge) - minAvailableReplicas
 	framework.Logf("Waiting for the second rollout's replicaset to have .spec.replicas = %d", newReplicas)
 	err = waitForReplicaSetTargetSpecReplicas(ctx, c, secondRS, newReplicas)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "wait for ReplicaSet %q to have %d desired replicas", secondRS.Name, newReplicas)
 
 	// The desired replicas wait makes sure that the RS controller has created expected number of pods.
 	framework.Logf("Waiting for the second rollout's replicaset of deployment %q to have desired number of replicas", deploymentName)
 	secondRS, err = c.AppsV1().ReplicaSets(ns).Get(ctx, secondRS.Name, metav1.GetOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "get ReplicaSet in namespace %q", ns)
 	err = waitForReplicaSetDesiredReplicas(ctx, c.AppsV1(), secondRS)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "wait for ReplicaSet %q to reach its desired replica count", secondRS.Name)
 
 	// Check the deployment's minimum availability.
 	framework.Logf("Verifying that deployment %q has minimum required number of available replicas", deploymentName)
 	if deployment.Status.AvailableReplicas < minAvailableReplicas {
 		err = fmt.Errorf("observed %d available replicas, less than min required %d", deployment.Status.AvailableReplicas, minAvailableReplicas)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "Deployment %q in namespace %q did not maintain minimum availability", deployment.Name, ns)
 	}
 
 	// Scale the deployment to 30 replicas.
@@ -1306,25 +1689,25 @@ func testProportionalScalingDeployment(ctx context.Context, f *framework.Framewo
 	_, err = e2edeployment.UpdateDeploymentWithRetries(c, ns, deployment.Name, func(update *appsv1.Deployment) {
 		update.Spec.Replicas = &newReplicas
 	})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "update Deployment %q in namespace %q", deploymentName, ns)
 
 	framework.Logf("Waiting for the replicasets of deployment %q to have desired number of replicas", deploymentName)
 	firstRS, err = c.AppsV1().ReplicaSets(ns).Get(ctx, firstRS.Name, metav1.GetOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "get ReplicaSet in namespace %q", ns)
 	secondRS, err = c.AppsV1().ReplicaSets(ns).Get(ctx, secondRS.Name, metav1.GetOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "get ReplicaSet in namespace %q", ns)
 
 	// First rollout's replicaset should have .spec.replicas = 8 + (30-10)*(8/13) = 8 + 12 = 20 replicas.
 	// Note that 12 comes from rounding (30-10)*(8/13) to nearest integer.
 	framework.Logf("Verifying that first rollout's replicaset has .spec.replicas = 20")
 	err = waitForReplicaSetTargetSpecReplicas(ctx, c, firstRS, 20)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "wait for ReplicaSet %q to have %d desired replicas", firstRS.Name, 20)
 
 	// Second rollout's replicaset should have .spec.replicas = 5 + (30-10)*(5/13) = 5 + 8 = 13 replicas.
 	// Note that 8 comes from rounding (30-10)*(5/13) to nearest integer.
 	framework.Logf("Verifying that second rollout's replicaset has .spec.replicas = 13")
 	err = waitForReplicaSetTargetSpecReplicas(ctx, c, secondRS, 13)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "wait for ReplicaSet %q to have %d desired replicas", secondRS.Name, 13)
 }
 
 func checkDeploymentReplicaSetsControllerRef(ctx context.Context, c clientset.Interface, ns string, uid types.UID, label map[string]string) error {
@@ -1355,7 +1738,7 @@ func listDeploymentReplicaSets(ctx context.Context, c clientset.Interface, ns st
 	selector := labels.Set(label).AsSelector()
 	options := metav1.ListOptions{LabelSelector: selector.String()}
 	rsList, err := c.AppsV1().ReplicaSets(ns).List(ctx, options)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "list ReplicaSets in namespace %q", ns)
 	gomega.Expect(rsList.Items).ToNot(gomega.BeEmpty())
 	return rsList
 }
@@ -1399,9 +1782,9 @@ func testRollingUpdateDeploymentWithLocalTrafficLoadBalancer(ctx context.Context
 		MaxUnavailable: ptr.To(intstr.FromInt32(0)),
 	}
 	deployment, err := c.AppsV1().Deployments(ns).Create(ctx, d, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "create Deployment %q in namespace %q", d.Name, ns)
 	err = e2edeployment.WaitForDeploymentComplete(c, deployment)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "wait for Deployment %q in namespace %q to complete", deployment.Name, deployment.Namespace)
 
 	framework.Logf("Creating a service %s with type=LoadBalancer and externalTrafficPolicy=Local in namespace %s", name, ns)
 	jig := e2eservice.NewTestJig(c, ns, name)
@@ -1409,20 +1792,17 @@ func testRollingUpdateDeploymentWithLocalTrafficLoadBalancer(ctx context.Context
 	service, err := jig.CreateLoadBalancerService(ctx, e2eservice.GetServiceLoadBalancerCreationTimeout(ctx, c), func(svc *v1.Service) {
 		svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyLocal
 	})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "create LoadBalancer Service %q in namespace %q with local traffic policy", name, ns)
 
 	lbNameOrAddress := e2eservice.GetIngressPoint(&service.Status.LoadBalancer.Ingress[0])
 	svcPort := int(service.Spec.Ports[0].Port)
 
 	framework.Logf("Hitting the replica set's pods through the service's load balancer")
-	timeout := e2eservice.LoadBalancerLagTimeoutDefault
-	if framework.ProviderIs("aws") {
-		timeout = e2eservice.LoadBalancerLagTimeoutAWS
-	}
+	timeout := e2eservice.GetServiceLoadBalancerPropagationTimeout(ctx, c)
 	e2eservice.TestReachableHTTP(ctx, lbNameOrAddress, svcPort, timeout)
 
 	expectedNodes, err := jig.GetEndpointNodeNames(ctx)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "get endpoint nodes for Service %q in namespace %q", name, ns)
 
 	framework.Logf("Starting a goroutine to watch the service's endpoints in the background")
 	done := make(chan struct{})
@@ -1455,15 +1835,15 @@ func testRollingUpdateDeploymentWithLocalTrafficLoadBalancer(ctx context.Context
 			update.Spec.Template.Labels["iteration"] = fmt.Sprintf("%d", i)
 			setAffinities(update, true)
 		})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "update Deployment %q in namespace %q", d.Name, ns)
 
 		framework.Logf("Waiting for observed generation %d", deployment.Generation)
 		err = waitForObservedDeployment(c, ns, name, deployment.Generation)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "wait for Deployment %q in namespace %q to observe generation %d", name, ns, deployment.Generation)
 
 		framework.Logf("Make sure deployment %q is complete", name)
 		err = waitForDeploymentCompleteAndCheckRolling(c, deployment)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "wait for Deployment %q in namespace %q to complete while respecting rolling update limits", deployment.Name, deployment.Namespace)
 	}
 
 	select {
@@ -1667,17 +2047,17 @@ func testDeploymentSubresources(ctx context.Context, f *framework.Framework) {
 	framework.Logf("Creating simple deployment %s", deploymentName)
 	d := e2edeployment.NewDeployment("test-new-deployment", int32(1), map[string]string{"name": AgnhostImageName}, AgnhostImageName, AgnhostImage, appsv1.RollingUpdateDeploymentStrategyType)
 	deploy, err := c.AppsV1().Deployments(ns).Create(ctx, d, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "create Deployment %q in namespace %q", d.Name, ns)
 
 	// Wait for it to be updated to revision 1
 	err = e2edeployment.WaitForDeploymentRevisionAndImage(c, ns, deploymentName, "1", AgnhostImage)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "verify Deployment %q in namespace %q has revision %q and image %q", deploymentName, ns, "1", AgnhostImage)
 
 	err = e2edeployment.WaitForDeploymentComplete(c, deploy)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "wait for Deployment %q in namespace %q to complete", deploy.Name, deploy.Namespace)
 
 	_, err = c.AppsV1().Deployments(ns).Get(ctx, deploymentName, metav1.GetOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "get Deployment %q in namespace %q", deploymentName, ns)
 
 	ginkgo.By("getting scale subresource")
 	scale, err := c.AppsV1().Deployments(ns).GetScale(ctx, deploymentName, metav1.GetOptions{})

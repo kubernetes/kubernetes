@@ -22,8 +22,8 @@ import (
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/ktesting"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
-	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestNewAllowlist(t *testing.T) {
@@ -120,6 +120,9 @@ func TestAllowlist(t *testing.T) {
 		status := w.Admit(tCtx, attrs)
 		if status.Admit {
 			t.Errorf("expected to be rejected: %+v", test)
+		}
+		if status.RejectionType != lifecycle.RejectionInfeasible {
+			t.Errorf("expected rejection type %v, got %v", lifecycle.RejectionInfeasible, status.RejectionType)
 		}
 	}
 

@@ -34,7 +34,6 @@ import (
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/client-go/tools/portforward"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
-	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
 )
 
@@ -1011,7 +1010,7 @@ func TestCreateDialer(t *testing.T) {
 	}
 	config := cmdtesting.DefaultClientConfig()
 	opts := PortForwardOptions{Config: config}
-	// First, ensure that no environment variable creates the fallback dialer.
+	// WebSockets with SPDY fallback is always used.
 	dialer, err := createDialer("GET", url, opts)
 	if err != nil {
 		t.Fatalf("unable to create dialer: %v", err)
@@ -1019,22 +1018,5 @@ func TestCreateDialer(t *testing.T) {
 	if _, isFallback := dialer.(*portforward.StreamingFallbackDialer); !isFallback {
 		t.Errorf("expected fallback dialer, got %#v", dialer)
 	}
-	// Next, check turning on feature flag explicitly also creates fallback dialer.
-	t.Setenv(string(cmdutil.PortForwardWebsockets), "true")
-	dialer, err = createDialer("GET", url, opts)
-	if err != nil {
-		t.Fatalf("unable to create dialer: %v", err)
-	}
-	if _, isFallback := dialer.(*portforward.StreamingFallbackDialer); !isFallback {
-		t.Errorf("expected fallback dialer, got %#v", dialer)
-	}
-	// Finally, check explicit disabling does NOT create the fallback dialer.
-	t.Setenv(string(cmdutil.PortForwardWebsockets), "false")
-	dialer, err = createDialer("GET", url, opts)
-	if err != nil {
-		t.Fatalf("unable to create dialer: %v", err)
-	}
-	if _, isFallback := dialer.(*portforward.StreamingFallbackDialer); isFallback {
-		t.Errorf("expected fallback dialer, got %#v", dialer)
-	}
+
 }

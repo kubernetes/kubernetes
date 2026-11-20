@@ -110,4 +110,4 @@ commonLabels:
   create: false
   group: networking.k8s.io
   kind: NetworkPolicy
-` + metadataLabelsFieldSpecs
+` + metadataLabelsFieldSpecs + volumeClaimTemplatesMetadataLabels

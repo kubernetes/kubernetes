@@ -88,6 +88,10 @@ type unlockedActiveQueueReader interface {
 	// Returns false if the entity doesn't exist in the queue.
 	// This method should be called in activeQueue.underLock() or activeQueue.underRLock().
 	get(entityLookup framework.QueuedEntityInfo) (framework.QueuedEntityInfo, bool)
+	// getInFlightPod returns the pod object that the pod with the given UID
+	// was popped with, or nil if that pod is not in flight.
+	// This method should be called in activeQueue.underLock() or activeQueue.underRLock().
+	getInFlightPod(uid types.UID) *v1.Pod
 }
 
 // unlockedActiveQueue defines activeQ methods that are not protected by the lock itself.
@@ -144,6 +148,16 @@ func (uaq *unlockedActiveQueue) addEventsIfPodInFlight(oldPod, newPod *v1.Pod, e
 // This method should be called in activeQueue.underLock() or activeQueue.underRLock().
 func (uaq *unlockedActiveQueue) get(entityLookup framework.QueuedEntityInfo) (framework.QueuedEntityInfo, bool) {
 	return uaq.queue.Get(entityLookup)
+}
+
+// getInFlightPod returns the pod object that the pod with the given UID was
+// popped with, or nil if that pod is not in flight.
+// This method should be called in activeQueue.underLock() or activeQueue.underRLock().
+func (uaq *unlockedActiveQueue) getInFlightPod(uid types.UID) *v1.Pod {
+	if inFlightPod, ok := uaq.inFlightPods[uid]; ok {
+		return inFlightPod.Value.(*v1.Pod)
+	}
+	return nil
 }
 
 // backoffQPopper defines method that is used to pop from the backoffQ when the activeQ is empty.
@@ -289,7 +303,7 @@ func (aq *activeQueue) unlockedMoveEntityToInFlight(logger klog.Logger, entity f
 				_ = specificEntity.RemovePod(pInfo.Pod)
 				logger.Error(nil, "Discarding the popped pod group member. It's tracked in multiple places in the scheduler", "pod", klog.KObj(pInfo), "podGroup", klog.KObj(specificEntity))
 			}
-			if len(specificEntity.QueuedPodInfos) == 0 {
+			if !specificEntity.HasQueuedPodInfos() {
 				return fmt.Errorf("all pods from the pod group are tracked in multiple places in the scheduler: %s", klog.KObj(specificEntity))
 			}
 		default:
@@ -300,6 +314,9 @@ func (aq *activeQueue) unlockedMoveEntityToInFlight(logger klog.Logger, entity f
 
 	// Update metrics for unschedulable plugins.
 	for pInfo := range entity.ForEachPodInfo() {
+		if pInfo.IsResize() {
+			continue
+		}
 		for plugin := range pInfo.UnschedulablePlugins.Union(pInfo.PendingPlugins) {
 			metrics.UnschedulableReason(plugin, pInfo.Pod.Spec.SchedulerName).Dec()
 		}
@@ -388,6 +405,8 @@ func (aq *activeQueue) list() []*v1.Pod {
 
 // len returns length of the queue.
 func (aq *activeQueue) len() int {
+	aq.lock.RLock()
+	defer aq.lock.RUnlock()
 	return aq.queue.Len()
 }
 

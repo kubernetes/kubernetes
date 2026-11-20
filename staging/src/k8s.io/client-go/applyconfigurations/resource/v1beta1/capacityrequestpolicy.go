@@ -25,14 +25,22 @@ import (
 // CapacityRequestPolicyApplyConfiguration represents a declarative configuration of the CapacityRequestPolicy type for use
 // with apply.
 //
-// CapacityRequestPolicy defines how requests consume device capacity.
+// CapacityRequestPolicy defines how requests consume device capacity and
+// how devices consume counters.
+//
+// It is used by DeviceCapacity.RequestPolicy and Counter.ConsumptionPolicy.
+// For counter consumption, capacity means the available counter value,
+// and a request means the device's required counter amount.
+// Both use the same default selection, rounding and range arithmetic,
+// including the DRAFractionalCapacityRange feature gate and the rules
+// described by CapacityRequestPolicyRange.
 //
 // Must not set more than one ValidRequestValues.
 type CapacityRequestPolicyApplyConfiguration struct {
-	// Default specifies how much of this capacity is consumed by a request
+	// default specifies how much of this capacity is consumed by a request
 	// that does not contain an entry for it in DeviceRequest's Capacity.
 	Default *resource.Quantity `json:"default,omitempty"`
-	// ValidValues defines a set of acceptable quantity values in consuming requests.
+	// validValues defines a set of acceptable quantity values in consuming requests.
 	//
 	// Must not contain more than 10 entries.
 	// Must be sorted in ascending order.
@@ -47,7 +55,7 @@ type CapacityRequestPolicyApplyConfiguration struct {
 	// If the requested amount exceeds all valid values, the request violates the policy,
 	// and this device cannot be allocated.
 	ValidValues []resource.Quantity `json:"validValues,omitempty"`
-	// ValidRange defines an acceptable quantity value range in consuming requests.
+	// validRange defines an acceptable quantity value range in consuming requests.
 	//
 	// If this field is set,
 	// Default must be defined and it must fall within the defined ValidRange.

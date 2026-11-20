@@ -165,6 +165,32 @@ func TestSyncDriverUpdater(t *testing.T) {
 		}
 	})
 
+	t.Run("driver with node info from the controller, should stop updater", func(t *testing.T) {
+		updatePeriod := int64(60)
+		driver := createTestDriver(testDriverName, &updatePeriod)
+		f := setupTest(t, driver)
+		defer f.cleanup()
+
+		csiDrivers.Set(testDriverName, Driver{
+			endpoint:                "test-endpoint",
+			highestSupportedVersion: &utilversion.Version{},
+			nodeInfoFromController:  true,
+		})
+		defer unregisterTestDriver(testDriverName)
+
+		updaterStopCh := make(chan struct{})
+		f.updater.driverUpdaters.Store(testDriverName, updaterStopCh)
+
+		verifyUpdaterState(t, f.updater, testDriverName, true)
+
+		f.updater.syncDriverUpdater(testDriverName)
+		verifyUpdaterState(t, f.updater, testDriverName, false)
+
+		if !isChannelClosed(updaterStopCh) {
+			t.Errorf("Stop channel was not closed")
+		}
+	})
+
 	t.Run("replace existing updater", func(t *testing.T) {
 		updatePeriod := int64(60)
 		driver := createTestDriver(testDriverName, &updatePeriod)

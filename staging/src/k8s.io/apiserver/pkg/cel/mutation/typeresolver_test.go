@@ -21,9 +21,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/cel-go/cel"
-	"github.com/google/cel-go/common/types"
-	"github.com/google/cel-go/common/types/ref"
+	"cel.dev/cel-go/cel"
+	"cel.dev/cel-go/common/types"
+	"cel.dev/cel-go/common/types/ref"
 
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apiserver/pkg/cel/common"
@@ -359,5 +359,5 @@ func mustCreateEnv(t testing.TB, envOptions ...cel.EnvOption) *cel.Env {
 // and set up the optional library with default configuration.
 // it fatally fails the test if the env fails to set up.
 func mustCreateEnvWithOptional(t testing.TB, envOptions ...cel.EnvOption) *cel.Env {
-	return mustCreateEnv(t, append(envOptions, cel.OptionalTypes())...)
+	return mustCreateEnv(t, append(envOptions, cel.OptionalTypes(cel.OptionalTypesVersion(2)))...)
 }

@@ -113,9 +113,13 @@ func FmtPriorityLevelConfigurationSpec(plSpec *flowcontrol.PriorityLevelConfigur
 func BufferPriorityLevelConfigurationSpec(buf *bytes.Buffer, plSpec *flowcontrol.PriorityLevelConfigurationSpec) {
 	buf.WriteString(fmt.Sprintf("flowcontrolv1.PriorityLevelConfigurationSpec{Type: %#v", plSpec.Type))
 	if plSpec.Limited != nil {
-		buf.WriteString(fmt.Sprintf(", Limited: &flowcontrol.LimitedPriorityLevelConfiguration{NominalConcurrencyShares:%d, LimitResponse:flowcontrol.LimitResponse{Type:%#v", plSpec.Limited.NominalConcurrencyShares, plSpec.Limited.LimitResponse.Type))
+		buf.WriteString(", Limited: &flowcontrol.LimitedPriorityLevelConfiguration{")
+		if plSpec.Limited.NominalConcurrencyShares != nil {
+			fmt.Fprintf(buf, "NominalConcurrencyShares:%d, ", *plSpec.Limited.NominalConcurrencyShares)
+		}
+		fmt.Fprintf(buf, "LimitResponse:flowcontrol.LimitResponse{Type:%#v", plSpec.Limited.LimitResponse.Type)
 		if plSpec.Limited.LimitResponse.Queuing != nil {
-			buf.WriteString(fmt.Sprintf(", Queuing:&%#+v", *plSpec.Limited.LimitResponse.Queuing))
+			fmt.Fprintf(buf, ", Queuing:&%#+v", *plSpec.Limited.LimitResponse.Queuing)
 		}
 		buf.WriteString(" } }")
 	}

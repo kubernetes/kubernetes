@@ -28,11 +28,13 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epodoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
@@ -111,9 +113,9 @@ var _ = SIGDescribe("Security Context", func() {
 			}
 
 			logs1, err := getLogs(createdPod1)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "get logs of Pod %q for the security context test", createdPod1.Name)
 			logs2, err := getLogs(createdPod2)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "get logs of Pod %q for the security context test", createdPod2.Name)
 
 			// 65536 is the size used for a user namespace.  Verify that the value is present
 			// in the /proc/self/uid_map file.
@@ -154,7 +156,7 @@ var _ = SIGDescribe("Security Context", func() {
 				}
 
 				logs, err := getLogs(createdPod)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "get logs of Pod %q for the security context test", createdPod.Name)
 
 				// The hostUID is the second field in the /proc/self/uid_map file.
 				hostMap := strings.Fields(logs)
@@ -403,7 +405,7 @@ var _ = SIGDescribe("Security Context", func() {
 
 			createdPod = e2epod.NewPodClient(f).Create(ctx, createdPod)
 			ev, err := e2epod.NewPodClient(f).WaitForErrorEventOrSuccess(ctx, createdPod)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "observe an error event or successful completion for Pod %q", createdPod.Name)
 			gomega.Expect(ev).NotTo(gomega.BeNil())
 			gomega.Expect(ev.Reason).To(gomega.Equal(events.FailedToCreateContainer))
 
@@ -506,7 +508,7 @@ var _ = SIGDescribe("Security Context", func() {
 			podClient.Create(ctx, pod)
 
 			podClient.WaitForSuccess(ctx, name, framework.PodStartTimeout)
-			framework.ExpectNoError(podClient.MatchContainerOutput(ctx, name, name, "1000"))
+			framework.ExpectNoError(podClient.MatchContainerOutput(ctx, name, name, "1000"), "verify container %q in Pod %q outputs %q", name, name, "1000")
 		})
 		ginkgo.It("should not run with an explicit root user ID [LinuxOnly]", func(ctx context.Context) {
 			// creates a pod with RunAsUser, which is not supported on Windows.
@@ -516,17 +518,23 @@ var _ = SIGDescribe("Security Context", func() {
 			pod = podClient.Create(ctx, pod)
 
 			ev, err := podClient.WaitForErrorEventOrSuccess(ctx, pod)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "observe an error event or successful completion for Pod %q", pod.Name)
 			gomega.Expect(ev).NotTo(gomega.BeNil())
 			gomega.Expect(ev.Reason).To(gomega.Equal(events.FailedToCreateContainer))
 		})
 		ginkgo.It("should run with an image specified user ID", func(ctx context.Context) {
 			name := "implicit-nonroot-uid"
 			pod := makeNonRootPod(name, nonRootImage, nil)
+			expectedUser := "1234"
+			if framework.NodeOSDistroIs("windows") {
+				// The Windows nonroot image runs as ContainerUser.
+				pod.Spec.Containers[0].Command = []string{"cmd", "/S", "/C", "echo %username%"}
+				expectedUser = "ContainerUser"
+			}
 			podClient.Create(ctx, pod)
 
 			podClient.WaitForSuccess(ctx, name, framework.PodStartTimeout)
-			framework.ExpectNoError(podClient.MatchContainerOutput(ctx, name, name, "1234"))
+			framework.ExpectNoError(podClient.MatchContainerOutput(ctx, name, name, expectedUser), "verify container %q in Pod %q outputs %q", name, name, expectedUser)
 		})
 		ginkgo.It("should not run without a specified user ID", func(ctx context.Context) {
 			name := "implicit-root-uid"
@@ -534,7 +542,7 @@ var _ = SIGDescribe("Security Context", func() {
 			pod = podClient.Create(ctx, pod)
 
 			ev, err := podClient.WaitForErrorEventOrSuccess(ctx, pod)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "observe an error event or successful completion for Pod %q", pod.Name)
 			gomega.Expect(ev).NotTo(gomega.BeNil())
 			gomega.Expect(ev.Reason).To(gomega.Equal(events.FailedToCreateContainer))
 		})
@@ -665,6 +673,70 @@ var _ = SIGDescribe("Security Context", func() {
 		})
 	})
 
+	ginkgo.Context("When creating a container with HostCgroupNamespace", framework.WithFeatureGate(features.CgroupNamespacesSupport), func() {
+		var nodeName string
+		ginkgo.BeforeEach(func(ctx context.Context) {
+			e2eskipper.SkipIfNodeOSDistroIs("windows")
+			nodes, err := e2enode.GetReadySchedulableNodes(ctx, f.ClientSet)
+			framework.ExpectNoError(err)
+			for _, node := range nodes.Items {
+				for _, h := range node.Status.RuntimeHandlers {
+					// Pods without runtimeClassName use the default handler ("").
+					if h.Name == "" && h.Features != nil && ptr.Deref(h.Features.CgroupNamespaces, false) {
+						nodeName = node.Name
+						return
+					}
+				}
+			}
+			e2eskipper.Skipf("no node has a runtime that supports cgroup namespaces")
+		})
+
+		// readSelfCgroup returns the cgroup path in /proc/self/cgroup, as seen from the container.
+		readSelfCgroup := func(ctx context.Context, privileged, hostCgroupNamespace bool) string {
+			podName := "cgroupns-" + string(uuid.NewUUID())
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: podName,
+				},
+				Spec: v1.PodSpec{
+					RestartPolicy: v1.RestartPolicyNever,
+					Containers: []v1.Container{
+						{
+							Name:                podName,
+							Image:               imageutils.GetE2EImage(imageutils.BusyBox),
+							Command:             []string{"cat", "/proc/self/cgroup"},
+							HostCgroupNamespace: &hostCgroupNamespace,
+							SecurityContext: &v1.SecurityContext{
+								Privileged: &privileged,
+							},
+						},
+					},
+				},
+			}
+			e2epod.SetNodeSelection(&pod.Spec, e2epod.NodeSelection{Name: nodeName})
+			podClient.Create(ctx, pod)
+			podClient.WaitForSuccess(ctx, podName, framework.PodStartTimeout)
+			logs, err := e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, podName, podName)
+			framework.ExpectNoError(err, "GetPodLogs for pod %q", podName)
+			framework.Logf("Got logs for pod %q: %q", podName, logs)
+			cgroupPath, ok := strings.CutPrefix(strings.TrimSpace(logs), "0::")
+			if !ok || strings.Contains(cgroupPath, "\n") {
+				e2eskipper.Skipf("cgroup v2 is required, got /proc/self/cgroup: %q", logs)
+			}
+			return cgroupPath
+		}
+
+		for _, privileged := range []bool{false, true} {
+			f.It(fmt.Sprintf("should unshare the cgroup namespace if set to false (privileged=%v) [LinuxOnly]", privileged), func(ctx context.Context) {
+				gomega.Expect(readSelfCgroup(ctx, privileged, false)).To(gomega.Equal("/"))
+			})
+
+			f.It(fmt.Sprintf("should use the host cgroup namespace if set to true (privileged=%v) [LinuxOnly]", privileged), func(ctx context.Context) {
+				gomega.Expect(readSelfCgroup(ctx, privileged, true)).NotTo(gomega.Equal("/"))
+			})
+		}
+	})
+
 	ginkgo.Context("when creating containers with AllowPrivilegeEscalation", func() {
 		makeAllowPrivilegeEscalationPod := func(podName string, allowPrivilegeEscalation *bool, uid int64) *v1.Pod {
 			return &v1.Pod{
@@ -745,7 +817,7 @@ var _ = SIGDescribe("Security Context", func() {
 		})
 	})
 
-	f.Context("SupplementalGroupsPolicy [LinuxOnly]", feature.SupplementalGroupsPolicy, func() {
+	f.Context("SupplementalGroupsPolicy [LinuxOnly]", func() {
 		timeout := 1 * time.Minute
 
 		agnhostImage := imageutils.GetE2EImage(imageutils.Agnhost)
@@ -790,7 +862,7 @@ var _ = SIGDescribe("Security Context", func() {
 		}
 		nodeSupportsSupplementalGroupsPolicy := func(ctx context.Context, f *framework.Framework, nodeName string) bool {
 			node, err := f.ClientSet.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "get Node %q", nodeName)
 			gomega.Expect(node).NotTo(gomega.BeNil())
 			if node.Status.Features != nil {
 				supportsSupplementalGroupsPolicy := node.Status.Features.SupplementalGroupsPolicy
@@ -836,9 +908,9 @@ var _ = SIGDescribe("Security Context", func() {
 			}
 
 			if featureSupportedOnNode {
-				framework.ExpectNoError(waitForContainerUser(ctx, f, podName, containerName, expectedContainerUser))
+				framework.ExpectNoError(waitForContainerUser(ctx, f, podName, containerName, expectedContainerUser), "wait for container %q in Pod %q to report expected user %v", containerName, podName, expectedContainerUser)
 			}
-			framework.ExpectNoError(waitForPodLogs(ctx, f, podName, containerName, expectedOutput+"\n"))
+			framework.ExpectNoError(waitForPodLogs(ctx, f, podName, containerName, expectedOutput+"\n"), "wait for container %q in Pod %q to log %q", containerName, podName, expectedOutput+"\n")
 
 			stdout := e2epod.ExecCommandInContainer(f, podName, containerName, "id", "-G")
 			gomega.Expect(stdout).To(gomega.Equal(expectedOutput))
@@ -854,9 +926,9 @@ var _ = SIGDescribe("Security Context", func() {
 			}
 
 			if featureSupportedOnNode {
-				framework.ExpectNoError(waitForContainerUser(ctx, f, podName, containerName, expectedContainerUser))
+				framework.ExpectNoError(waitForContainerUser(ctx, f, podName, containerName, expectedContainerUser), "wait for container %q in Pod %q to report expected user %v", containerName, podName, expectedContainerUser)
 			}
-			framework.ExpectNoError(waitForPodLogs(ctx, f, podName, containerName, expectedOutput+"\n"))
+			framework.ExpectNoError(waitForPodLogs(ctx, f, podName, containerName, expectedOutput+"\n"), "wait for container %q in Pod %q to log %q", containerName, podName, expectedOutput+"\n")
 
 			stdout := e2epod.ExecCommandInContainer(f, podName, containerName, "id", "-G")
 			gomega.Expect(stdout).To(gomega.Equal(expectedOutput))
@@ -900,10 +972,10 @@ var _ = SIGDescribe("Security Context", func() {
 				ginkgo.BeforeEach(func(ctx context.Context) {
 					ginkgo.By("creating a pod", func() {
 						pod = e2epod.NewPodClient(f).Create(ctx, mkPod(ptr.To(v1.SupplementalGroupsPolicyStrict)))
-						framework.ExpectNoError(e2epod.WaitForPodScheduled(ctx, f.ClientSet, pod.Namespace, pod.Name))
+						framework.ExpectNoError(e2epod.WaitForPodScheduled(ctx, f.ClientSet, pod.Namespace, pod.Name), "wait for Pod %q in namespace %q to be scheduled", pod.Name, pod.Namespace)
 						var err error
 						pod, err = e2epod.NewPodClient(f).Get(ctx, pod.Name, metav1.GetOptions{})
-						framework.ExpectNoError(err)
+						framework.ExpectNoError(err, "get Pod in namespace %q", f.Namespace.Name)
 					})
 					if !nodeSupportsSupplementalGroupsPolicy(ctx, f, pod.Spec.NodeName) {
 						e2eskipper.Skipf("scheduled node does not support SupplementalGroupsPolicy")

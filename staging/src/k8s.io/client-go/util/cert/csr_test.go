@@ -19,28 +19,26 @@ package cert
 import (
 	"crypto/x509"
 	"crypto/x509/pkix"
+	_ "embed"
 	"encoding/pem"
 	"net"
-	"os"
 	"testing"
 
 	"k8s.io/client-go/util/keyutil"
 	netutils "k8s.io/utils/net"
 )
 
+//go:embed testdata/dontUseThisKey.pem
+var dontUseThisKeyPEM []byte
+
 func TestMakeCSR(t *testing.T) {
-	keyFile := "testdata/dontUseThisKey.pem"
 	subject := &pkix.Name{
 		CommonName: "kube-worker",
 	}
 	dnsSANs := []string{"localhost"}
 	ipSANs := []net.IP{netutils.ParseIPSloppy("127.0.0.1")}
 
-	keyData, err := os.ReadFile(keyFile)
-	if err != nil {
-		t.Fatal(err)
-	}
-	key, err := keyutil.ParsePrivateKeyPEM(keyData)
+	key, err := keyutil.ParsePrivateKeyPEM(dontUseThisKeyPEM)
 	if err != nil {
 		t.Fatal(err)
 	}

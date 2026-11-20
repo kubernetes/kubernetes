@@ -67,8 +67,6 @@ type Allocator struct {
 	// metrics is a metrics recorder that can be disabled
 	metrics     metricsRecorderInterface
 	metricLabel string
-
-	rand *rand.Rand
 }
 
 var _ Interface = &Allocator{}
@@ -133,7 +131,6 @@ func NewIPAllocator(
 		ipAddressSynced: ipAddressInformer.Informer().HasSynced,
 		metrics:         &emptyMetricsRecorder{}, // disabled by default
 		metricLabel:     cidr.String(),
-		rand:            rand.New(rand.NewSource(time.Now().UnixNano())),
 	}
 	a.ready.Store(true)
 	return a, nil
@@ -254,7 +251,7 @@ func (a *Allocator) allocateNextService(svc *api.Service, dryRun bool) (net.IP, 
 	var offset uint64
 	switch {
 	case rangeSize >= math.MaxInt64:
-		offset = a.rand.Uint64()
+		offset = rand.Uint64()
 		// a.offsetAddress + offset should not overflow a 64 bit CIDR.
 		if math.MaxUint64-offset < uint64(a.rangeOffset) {
 			offset -= uint64(a.rangeOffset)
@@ -262,7 +259,7 @@ func (a *Allocator) allocateNextService(svc *api.Service, dryRun bool) (net.IP, 
 	case rangeSize == 0:
 		return net.IP{}, ErrFull
 	default:
-		offset = uint64(a.rand.Int63n(int64(rangeSize)))
+		offset = uint64(rand.Int63n(int64(rangeSize)))
 	}
 	iterator := ipIterator(a.offsetAddress, a.lastAddress, offset)
 	ip, err := a.allocateFromRange(iterator, svc)
@@ -272,7 +269,7 @@ func (a *Allocator) allocateNextService(svc *api.Service, dryRun bool) (net.IP, 
 	}
 	// if the upper range is full, try to allocate from the lower range
 	if errors.Is(err, ErrFull) && a.rangeOffset != 0 {
-		offset = uint64(a.rand.Intn(a.rangeOffset))
+		offset = uint64(rand.Intn(a.rangeOffset))
 		iterator = ipIterator(a.firstAddress, a.offsetAddress.Prev(), offset)
 		ip, err = a.allocateFromRange(iterator, svc)
 		if err == nil {

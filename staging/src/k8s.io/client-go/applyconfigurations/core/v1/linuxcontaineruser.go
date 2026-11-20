@@ -23,11 +23,11 @@ package v1
 //
 // LinuxContainerUser represents user identity information in Linux containers
 type LinuxContainerUserApplyConfiguration struct {
-	// UID is the primary uid initially attached to the first process in the container
+	// uid is the primary uid initially attached to the first process in the container
 	UID *int64 `json:"uid,omitempty"`
-	// GID is the primary gid initially attached to the first process in the container
+	// gid is the primary gid initially attached to the first process in the container
 	GID *int64 `json:"gid,omitempty"`
-	// SupplementalGroups are the supplemental groups initially attached to the first process in the container
+	// supplementalGroups are the supplemental groups initially attached to the first process in the container
 	SupplementalGroups []int64 `json:"supplementalGroups,omitempty"`
 }
 

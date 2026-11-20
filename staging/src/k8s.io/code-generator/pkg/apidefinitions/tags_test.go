@@ -46,3 +46,29 @@ func TestGroupNameForPackage(t *testing.T) {
 		})
 	}
 }
+
+func TestOpenAPIModelPackageForPackage(t *testing.T) {
+	cases := []struct {
+		name     string
+		comments []string
+		want     string
+		wantOK   bool
+	}{
+		{name: "model package tag", comments: []string{"+k8s:openapi-model-package=io.k8s.api.core.v1"}, want: "io.k8s.api.core.v1", wantOK: true},
+		{name: "no tag"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, ok, err := OpenAPIModelPackageForPackage(tc.comments)
+			if err != nil {
+				t.Fatalf("err = %v", err)
+			}
+			if ok != tc.wantOK {
+				t.Errorf("ok = %v, want %v", ok, tc.wantOK)
+			}
+			if got != tc.want {
+				t.Errorf("got %q, want %q", got, tc.want)
+			}
+		})
+	}
+}

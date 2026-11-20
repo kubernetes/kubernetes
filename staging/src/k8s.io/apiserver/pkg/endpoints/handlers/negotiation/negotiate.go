@@ -171,6 +171,10 @@ type MediaTypeOptions struct {
 	// profile controls the discovery profile (e.g., "local" for local (non peer-aggregated) discovery)
 	Profile string
 
+	// drop lists the field paths the client asked to omit from the response.
+	// "metadata.managedFields" is the only supported value.
+	Drop []string
+
 	// unrecognized is a list of all unrecognized keys
 	Unrecognized []string
 
@@ -233,6 +237,21 @@ func acceptMediaTypeOptions(params map[string]string, accepts *runtime.Serialize
 		// controls the discovery profile (eg local vs peer-aggregated)
 		case "profile":
 			options.Profile = v
+
+		// controls the fields omitted from the returned object, treated as
+		// unrecognized while the ManagedFieldsOptOut feature gate is disabled
+		case "drop":
+			if !utilfeature.DefaultFeatureGate.Enabled(features.ManagedFieldsOptOut) {
+				options.Unrecognized = append(options.Unrecognized, k)
+				continue
+			}
+			if len(v) == 0 {
+				continue
+			}
+			if v != "metadata.managedFields" {
+				return MediaTypeOptions{}, false
+			}
+			options.Drop = []string{v}
 
 		default:
 			options.Unrecognized = append(options.Unrecognized, k)

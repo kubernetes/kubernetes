@@ -29,6 +29,7 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+	"github.com/onsi/gomega/gstruct"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -38,6 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	kubeletevents "k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/images"
+	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -267,21 +269,107 @@ var _ = SIGDescribe(feature.CriProxy, framework.WithSerial(), func() {
 		})
 
 		ginkgo.It("should use streaming RPCs for listing pods and containers", func(ctx context.Context) {
-			// Track which streaming APIs were called
-			apiCalled := make(map[string]bool)
+			var streamContainersCalled, streamPodSandboxesCalled atomic.Bool
+			var listContainersCalled, listPodSandboxCalled atomic.Bool
 			err := addCRIProxyInjector(e2eCriProxy, func(apiName string) error {
-				apiCalled[apiName] = true
+				switch apiName {
+				case criproxy.StreamContainers:
+					streamContainersCalled.Store(true)
+				case criproxy.StreamPodSandboxes:
+					streamPodSandboxesCalled.Store(true)
+				case criproxy.ListContainers:
+					listContainersCalled.Store(true)
+				case criproxy.ListPodSandbox:
+					listPodSandboxCalled.Store(true)
+				}
 				return nil
 			})
 			framework.ExpectNoError(err)
 
 			// Wait for kubelet to make list calls (which should use streaming when enabled)
-			gomega.Eventually(func(g gomega.Gomega) {
-				g.Expect(apiCalled[criproxy.StreamContainers]).To(gomega.BeTrueBecause("StreamContainers should be called"))
-				g.Expect(apiCalled[criproxy.StreamPodSandboxes]).To(gomega.BeTrueBecause("StreamPodSandboxes should be called"))
-				g.Expect(apiCalled[criproxy.ListContainers]).To(gomega.BeFalseBecause("ListContainers should not be called"))
-				g.Expect(apiCalled[criproxy.ListPodSandbox]).To(gomega.BeFalseBecause("ListPodSandbox should not be called"))
+			gomega.Eventually(ctx, func(g gomega.Gomega) {
+				g.Expect(streamContainersCalled.Load()).To(gomega.BeTrueBecause("StreamContainers should be called"))
+				g.Expect(streamPodSandboxesCalled.Load()).To(gomega.BeTrueBecause("StreamPodSandboxes should be called"))
+				g.Expect(listContainersCalled.Load()).To(gomega.BeFalseBecause("ListContainers should not be called"))
+				g.Expect(listPodSandboxCalled.Load()).To(gomega.BeFalseBecause("ListPodSandbox should not be called"))
+
+				scraped, err := getKubeletMetrics(ctx)
+				g.Expect(err).To(gomega.Succeed())
+				const metricName = kubeletmetrics.KubeletSubsystem + "_" + kubeletmetrics.CRIListStreamingTotalKey
+				for _, operation := range []string{"list_containers", "list_podsandbox"} {
+					var calls float64
+					for _, sample := range scraped[metricName] {
+						if string(sample.Metric["operation_type"]) == operation && sample.Metric["result"] == "success" {
+							calls += float64(sample.Value)
+						}
+					}
+					g.Expect(calls).To(gomega.BeNumerically(">", 0), "expected a streaming attempt for %s", operation)
+				}
 			}).WithPolling(1 * time.Second).WithTimeout(1 * time.Minute).Should(gomega.Succeed())
+		})
+
+		ginkgo.It("should report streaming fallback for both CRI services", func(ctx context.Context) {
+			ginkgo.DeferCleanup(func(ctx context.Context) {
+				framework.ExpectNoError(resetCRIProxyInjector(e2eCriProxy))
+				restartKubelet(ctx, true)
+				waitForKubeletToStart(ctx, f)
+			})
+
+			var streamingUnsupported atomic.Bool
+			var runtimeStreaming, imageStreaming atomic.Bool
+			framework.ExpectNoError(addCRIProxyInjector(e2eCriProxy, func(apiName string) error {
+				switch apiName {
+				case criproxy.StreamContainers, criproxy.StreamPodSandboxes, criproxy.StreamContainerStats,
+					criproxy.StreamPodSandboxStats, criproxy.StreamPodSandboxMetrics:
+					runtimeStreaming.Store(true)
+				case criproxy.StreamImages:
+					imageStreaming.Store(true)
+				default:
+					return nil
+				}
+				if streamingUnsupported.Load() {
+					return status.Error(codes.Unimplemented, "list streaming not supported")
+				}
+				return nil
+			}))
+
+			// A fresh CRI client clears fallback cached by earlier tests.
+			restartKubelet(ctx, true)
+			waitForKubeletToStart(ctx, f)
+
+			gomega.Eventually(ctx, func(g gomega.Gomega) {
+				g.Expect(runtimeStreaming.Load()).To(gomega.BeTrueBecause("Expected a runtime list streaming RPC before injecting Unimplemented"))
+				g.Expect(imageStreaming.Load()).To(gomega.BeTrueBecause("Expected an image list streaming RPC before injecting Unimplemented"))
+			}).WithPolling(time.Second).WithTimeout(2 * time.Minute).Should(gomega.Succeed())
+
+			const metricName = kubeletmetrics.KubeletSubsystem + "_" + kubeletmetrics.CRIListStreamingTotalKey
+			scraped, err := getKubeletMetrics(ctx)
+			framework.ExpectNoError(err)
+			for _, sample := range scraped[metricName] {
+				if sample.Metric["result"] == "fallback" {
+					gomega.Expect(sample.Value).To(gomega.BeNumerically("==", 0), "streaming must work before injecting Unimplemented")
+				}
+			}
+			streamingUnsupported.Store(true)
+
+			gomega.Eventually(ctx, func(g gomega.Gomega) {
+				scraped, err := getKubeletMetrics(ctx)
+				g.Expect(err).To(gomega.Succeed())
+				var runtimeFallbacks, imageFallbacks float64
+				// Any runtime list operation can disable streaming for the runtime service.
+				for _, sample := range scraped[metricName] {
+					if sample.Metric["result"] != "fallback" {
+						continue
+					}
+					if sample.Metric["operation_type"] == "list_images" {
+						imageFallbacks += float64(sample.Value)
+					} else {
+						runtimeFallbacks += float64(sample.Value)
+					}
+				}
+				g.Expect(runtimeFallbacks).To(gomega.BeNumerically(">", 0))
+				g.Expect(imageFallbacks).To(gomega.BeNumerically(">", 0))
+			}).WithPolling(time.Second).WithTimeout(2 * time.Minute).Should(gomega.Succeed())
 		})
 
 		ginkgo.It("should handle mid-stream errors", func(ctx context.Context) {
@@ -296,7 +384,17 @@ var _ = SIGDescribe(feature.CriProxy, framework.WithSerial(), func() {
 			var midStreamErrors atomic.Int32
 			var listFallbackCalls atomic.Int32
 
-			err := addCRIProxyInjector(e2eCriProxy, func(apiName string) error {
+			const metricName = kubeletmetrics.KubeletSubsystem + "_" + kubeletmetrics.CRIListStreamingTotalKey
+			scraped, err := getKubeletMetrics(ctx)
+			framework.ExpectNoError(err)
+			var initialErrors float64
+			for _, sample := range scraped[metricName] {
+				if sample.Metric["operation_type"] == "list_containers" && sample.Metric["result"] == "error" {
+					initialErrors = float64(sample.Value)
+				}
+			}
+
+			err = addCRIProxyInjector(e2eCriProxy, func(apiName string) error {
 				switch apiName {
 				case criproxy.StreamContainers:
 					// Reset per-call counter at the start of each streaming call
@@ -318,6 +416,16 @@ var _ = SIGDescribe(feature.CriProxy, framework.WithSerial(), func() {
 				return midStreamErrors.Load() > 0
 			}).WithPolling(1 * time.Second).WithTimeout(1 * time.Minute).Should(
 				gomega.BeTrueBecause("Expected mid-stream error to be triggered during StreamContainers"))
+
+			gomega.Eventually(ctx, func(g gomega.Gomega) {
+				scraped, err := getKubeletMetrics(ctx)
+				g.Expect(err).To(gomega.Succeed())
+				g.Expect(scraped).To(gstruct.MatchKeys(gstruct.IgnoreExtras, gstruct.Keys{
+					metricName: gstruct.MatchElements(sampleLabelID, gstruct.IgnoreExtras, gstruct.Elements{
+						metricName + `{operation_type="list_containers", result="error"}`: timelessSampleAtLeast(initialErrors + 1),
+					}),
+				}))
+			}).WithPolling(time.Second).WithTimeout(time.Minute).Should(gomega.Succeed())
 
 			// Verify no fallback to unary RPC (Internal errors should NOT trigger fallback)
 			gomega.Expect(listFallbackCalls.Load()).To(gomega.Equal(int32(0)),

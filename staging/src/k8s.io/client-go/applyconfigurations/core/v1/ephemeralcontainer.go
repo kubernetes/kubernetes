@@ -39,7 +39,7 @@ type EphemeralContainerApplyConfiguration struct {
 	// following inlined struct so than an EphemeralContainer may easily be converted
 	// to a Container.
 	EphemeralContainerCommonApplyConfiguration `json:""`
-	// If set, the name of the container from PodSpec that this ephemeral container targets.
+	// targetContainerName if set, the name of the container from PodSpec that this ephemeral container targets.
 	// The ephemeral container will be run in the namespaces (IPC, PID, etc) of this container.
 	// If not set then the ephemeral container uses the namespaces configured in the Pod spec.
 	//
@@ -266,6 +266,14 @@ func (b *EphemeralContainerApplyConfiguration) WithImagePullPolicy(value corev1.
 // If called multiple times, the SecurityContext field is set to the value of the last call.
 func (b *EphemeralContainerApplyConfiguration) WithSecurityContext(value *SecurityContextApplyConfiguration) *EphemeralContainerApplyConfiguration {
 	b.EphemeralContainerCommonApplyConfiguration.SecurityContext = value
+	return b
+}
+
+// WithHostCgroupNamespace sets the HostCgroupNamespace field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the HostCgroupNamespace field is set to the value of the last call.
+func (b *EphemeralContainerApplyConfiguration) WithHostCgroupNamespace(value bool) *EphemeralContainerApplyConfiguration {
+	b.EphemeralContainerCommonApplyConfiguration.HostCgroupNamespace = &value
 	return b
 }
 

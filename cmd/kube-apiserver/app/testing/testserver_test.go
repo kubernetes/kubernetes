@@ -22,7 +22,7 @@ import (
 	"testing"
 
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
-	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/ktesting"
 )
 
 // TestStartTestServerTearDownCauseOnTestCompletion verifies that when a test

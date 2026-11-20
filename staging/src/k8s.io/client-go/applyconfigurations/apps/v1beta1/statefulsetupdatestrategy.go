@@ -29,9 +29,9 @@ import (
 // controller will use to perform updates. It includes any additional parameters
 // necessary to perform the update for the indicated strategy.
 type StatefulSetUpdateStrategyApplyConfiguration struct {
-	// Type indicates the type of the StatefulSetUpdateStrategy.
+	// type indicates the type of the StatefulSetUpdateStrategy.
 	Type *appsv1beta1.StatefulSetUpdateStrategyType `json:"type,omitempty"`
-	// RollingUpdate is used to communicate parameters when Type is RollingUpdateStatefulSetStrategyType.
+	// rollingUpdate is used to communicate parameters when Type is RollingUpdateStatefulSetStrategyType.
 	RollingUpdate *RollingUpdateStatefulSetStrategyApplyConfiguration `json:"rollingUpdate,omitempty"`
 }
 

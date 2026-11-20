@@ -17,16 +17,15 @@ limitations under the License.
 package preemption
 
 import (
+	"cmp"
+
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
-	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/util/sets"
-	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
+	policylisters "k8s.io/client-go/listers/policy/v1"
 	fwk "k8s.io/kube-scheduler/framework"
-	"k8s.io/kube-scheduler/util"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
 // PodTerminatingByPreemption returns true if the pod is in the termination state caused by scheduler preemption.
@@ -41,6 +40,17 @@ func PodTerminatingByPreemption(p *v1.Pod) bool {
 		}
 	}
 	return false
+}
+
+// NominatedNodeName returns the node that pod is nominated to. When fh
+// implements framework.NominatedNodeNameGetter (which returns the in-memory
+// nomination from PodNominator when DRAPreemption is enabled), it delegates to
+// fh. Otherwise, it returns pod.Status.NominatedNodeName.
+func NominatedNodeName(fh fwk.Handle, pod *v1.Pod) string {
+	if nominator, ok := fh.(framework.NominatedNodeNameGetter); ok {
+		return nominator.NominatedNodeName(pod)
+	}
+	return pod.Status.NominatedNodeName
 }
 
 // MoreImportantVictim decides which of two preemption units is considered more critical.
@@ -65,19 +75,8 @@ func PodTerminatingByPreemption(p *v1.Pod) bool {
 //     If group types and sizes are equal, the group that started earlier (has the oldest pod)
 //     is more important.
 func MoreImportantVictim(vi1, vi2 Victim) bool {
-	if vi1.Priority() != vi2.Priority() {
-		return vi1.Priority() > vi2.Priority()
-	}
-
-	rank1 := victimRank(vi1)
-	rank2 := victimRank(vi2)
-
-	if rank1 != rank2 {
-		return rank1 > rank2
-	}
-
-	if len(vi1.Pods()) != len(vi2.Pods()) {
-		return len(vi1.Pods()) > len(vi2.Pods())
+	if c := compareVictimStructuralImportance(vi1, vi2); c != 0 {
+		return c > 0
 	}
 
 	t1, t2 := vi1.EarliestStartTime(), vi2.EarliestStartTime()
@@ -106,100 +105,17 @@ func victimRank(vi Victim) int {
 	}
 }
 
-// TraverseHierarchyUp traverses the hierarchy of PodGroups/CompositePodGroups upward from startKey.
-// At each node (either a PodGroup or a CompositePodGroup), visitFn is called.
-// If visitFn returns (stop = true), the traversal stops immediately.
-// If the next parent is missing, or cannot be listed, the traversal also stops.
-// This method assumes that both GenericWorkload as well as CompositePodGroup feature gates are enabled.
-// TODO: log/return an error if there is a gap in the hierarchy.
-func TraverseHierarchyUp(
-	namespace string,
-	startKey fwk.EntityKey,
-	pgLister fwk.PodGroupLister,
-	cpgLister fwk.CompositePodGroupLister,
-	visitFn func(key fwk.EntityKey, pg *schedulingv1beta1.PodGroup, cpg *schedulingv1alpha3.CompositePodGroup) (stop bool),
-) {
-	if pgLister == nil || cpgLister == nil {
-		return
+// compareVictimStructuralImportance compares two victims on structural importance:
+// Priority, Workload Type Rank (CompositePodGroup > PodGroup > Pod), and Group Size.
+// Returns > 0 if vi1 is more important, < 0 if vi2 is more important, and 0 if equal.
+func compareVictimStructuralImportance(vi1, vi2 Victim) int {
+	if c := cmp.Compare(vi1.Priority(), vi2.Priority()); c != 0 {
+		return c
 	}
-	currentKey := startKey
-	visited := sets.New[fwk.EntityKey]()
-	for range schedulingv1beta1.WorkloadMaxTreeDepth {
-		if visited.Has(currentKey) {
-			break
-		}
-		visited.Insert(currentKey)
-
-		switch currentKey.Type {
-		case fwk.PodGroupKeyType:
-			pg, err := pgLister.Get(namespace, currentKey.Name)
-			if err != nil || pg == nil {
-				return
-			}
-			if visitFn(currentKey, pg, nil) {
-				return
-			}
-			if pg.Spec.ParentCompositePodGroupName == nil {
-				return
-			}
-			currentKey = fwk.CompositePodGroupKey(namespace, *pg.Spec.ParentCompositePodGroupName)
-
-		case fwk.CompositePodGroupKeyType:
-			cpg, err := cpgLister.Get(namespace, currentKey.Name)
-			if err != nil || cpg == nil {
-				return
-			}
-			if visitFn(currentKey, nil, cpg) {
-				return
-			}
-			if cpg.Spec.ParentCompositePodGroupName == nil {
-				return
-			}
-			currentKey = fwk.CompositePodGroupKey(namespace, *cpg.Spec.ParentCompositePodGroupName)
-		}
+	if c := cmp.Compare(victimRank(vi1), victimRank(vi2)); c != 0 {
+		return c
 	}
-}
-
-// GetPodPriority returns the effective preemption priority of a pod. If the pod belongs to
-// a pod group or composite pod group hierarchy, it returns the priority of the root group of the hierarchy.
-// If podGroupLister is nil or the pod does not belong to a pod group, it returns the pod's own priority.
-// If compositePodGroupLister is nil or a parent composite pod group in the hierarchy is not found,
-// it falls back to the priority of the last successfully resolved group (or the pod's own priority).
-// TODO: log/return an error if there is a gap in the hierarchy.
-func GetPodPriority(p *v1.Pod, podGroupLister fwk.PodGroupLister, compositePodGroupLister fwk.CompositePodGroupLister) int32 {
-	if p.Spec.SchedulingGroup == nil || podGroupLister == nil {
-		return corev1helpers.PodPriority(p)
-	}
-	if compositePodGroupLister == nil {
-		pg, err := podGroupLister.Get(p.Namespace, *p.Spec.SchedulingGroup.PodGroupName)
-		if err != nil || pg == nil {
-			return corev1helpers.PodPriority(p)
-		}
-		return util.PodGroupPriority(pg)
-	}
-
-	startKey := fwk.PodGroupKey(p.Namespace, *p.Spec.SchedulingGroup.PodGroupName)
-	var lastPG *schedulingv1beta1.PodGroup
-	var lastCPG *schedulingv1alpha3.CompositePodGroup
-
-	TraverseHierarchyUp(p.Namespace, startKey, podGroupLister, compositePodGroupLister, func(key fwk.EntityKey, pg *schedulingv1beta1.PodGroup, cpg *schedulingv1alpha3.CompositePodGroup) bool {
-		if pg != nil {
-			lastPG = pg
-			lastCPG = nil
-		} else if cpg != nil {
-			lastCPG = cpg
-			lastPG = nil
-		}
-		return false
-	})
-
-	if lastCPG != nil {
-		return util.CompositePodGroupPriority(lastCPG)
-	}
-	if lastPG != nil {
-		return util.PodGroupPriority(lastPG)
-	}
-	return corev1helpers.PodPriority(p)
+	return cmp.Compare(len(vi1.Pods()), len(vi2.Pods()))
 }
 
 // FilterVictimsWithPDBViolation groups "victims" into "violatingVictims"
@@ -208,10 +124,6 @@ func GetPodPriority(p *v1.Pod, podGroupLister fwk.PodGroupLister, compositePodGr
 func FilterVictimsWithPDBViolation[T Victim](victims []T, pdbs []*policy.PodDisruptionBudget) (violatingVictims []ViolatingVictim[T], nonViolatingVictims []T) {
 	pdbsAllowed := make([]int32, len(pdbs))
 	podIsViolating := func(pod *v1.Pod) bool {
-		if len(pod.Labels) == 0 {
-			return false
-		}
-
 		for i, pdb := range pdbs {
 			if pdb.Namespace != pod.Namespace {
 				continue
@@ -221,8 +133,7 @@ func FilterVictimsWithPDBViolation[T Victim](victims []T, pdbs []*policy.PodDisr
 				// This object has an invalid selector, it does not match the pod
 				continue
 			}
-			// A PDB with a nil or empty selector matches nothing.
-			if selector.Empty() || !selector.Matches(labels.Set(pod.Labels)) {
+			if !selector.Matches(labels.Set(pod.Labels)) {
 				continue
 			}
 
@@ -270,4 +181,9 @@ func FilterVictimsWithPDBViolation[T Victim](victims []T, pdbs []*policy.PodDisr
 	}
 
 	return violatingVictims, nonViolatingVictims
+}
+
+// getPodDisruptionBudgets returns all pod disruption budgets from the provided lister.
+func getPodDisruptionBudgets(pdbLister policylisters.PodDisruptionBudgetLister) ([]*policy.PodDisruptionBudget, error) {
+	return pdbLister.List(labels.Everything())
 }

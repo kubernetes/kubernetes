@@ -24,9 +24,9 @@ package v1beta2
 // ResourceClaimStatus tracks whether the resource has been allocated and what
 // the result of that was.
 type ResourceClaimStatusApplyConfiguration struct {
-	// Allocation is set once the claim has been allocated successfully.
+	// allocation is set once the claim has been allocated successfully.
 	Allocation *AllocationResultApplyConfiguration `json:"allocation,omitempty"`
-	// ReservedFor indicates which entities are currently allowed to use
+	// reservedFor indicates which entities are currently allowed to use
 	// the claim. A Pod which references a ResourceClaim which is not
 	// reserved for that Pod will not be started. A claim that is in
 	// use or might be in use because it has been reserved must not get
@@ -46,7 +46,7 @@ type ResourceClaimStatusApplyConfiguration struct {
 	// There can be at most 256 such reservations. This may get increased in
 	// the future, but not reduced.
 	ReservedFor []ResourceClaimConsumerReferenceApplyConfiguration `json:"reservedFor,omitempty"`
-	// Devices contains the status of each device allocated for this
+	// devices contains the status of each device allocated for this
 	// claim, as reported by the driver. This can include driver-specific
 	// information. Entries are owned by their respective drivers.
 	Devices []AllocatedDeviceStatusApplyConfiguration `json:"devices,omitempty"`

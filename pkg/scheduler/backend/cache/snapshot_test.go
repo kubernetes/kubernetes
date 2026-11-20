@@ -508,6 +508,99 @@ func TestNewSnapshot(t *testing.T) {
 	}
 }
 
+// TestNewSnapshotNodeOrder checks the order of NewSnapshot's node lists.
+func TestNewSnapshotNodeOrder(t *testing.T) {
+	selector := &metav1.LabelSelector{MatchLabels: map[string]string{"app": "a"}}
+	noAffinityPod := func(name, nodeName string) *v1.Pod {
+		return st.MakePod().Name(name).Namespace("ns").Node(nodeName).Obj()
+	}
+	affinityPod := func(name, nodeName string) *v1.Pod {
+		return st.MakePod().Name(name).Namespace("ns").Node(nodeName).PodAffinity("zone", selector, st.PodAffinityWithRequiredReq).Obj()
+	}
+	antiAffinityPod := func(name, nodeName string) *v1.Pod {
+		return st.MakePod().Name(name).Namespace("ns").Node(nodeName).PodAntiAffinity("zone", selector, st.PodAntiAffinityWithRequiredReq).Obj()
+	}
+	hostScopedAntiAffinityPod := func(name, nodeName string) *v1.Pod {
+		return st.MakePod().Name(name).Namespace("ns").Node(nodeName).PodAntiAffinity(v1.LabelHostname, selector, st.PodAntiAffinityWithRequiredReq).Obj()
+	}
+	pods := []*v1.Pod{
+		antiAffinityPod("p1", "missing-b"),
+		noAffinityPod("p2", ""),
+		antiAffinityPod("p3", "node-a"),
+		noAffinityPod("p4", "missing-a"),
+		affinityPod("p5", "node-c"),
+		antiAffinityPod("p6", "node-d"),
+		noAffinityPod("p7", "missing-b"),
+		hostScopedAntiAffinityPod("p8", "node-e"),
+		hostScopedAntiAffinityPod("p9", "missing-a"),
+	}
+	var nodes []*v1.Node
+	for _, name := range []string{"node-c", "node-a", "node-e", "node-a", "node-d"} {
+		nodes = append(nodes, st.MakeNode().Name(name).Obj())
+	}
+
+	for _, fastPathEnabled := range []bool{true, false} {
+		t.Run(fmt.Sprintf("fastPath=%v", fastPathEnabled), func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.InterPodAffinityHostnameFastPath: fastPathEnabled,
+			})
+			names := func(list []fwk.NodeInfo, err error) []string {
+				t.Helper()
+				if err != nil {
+					t.Fatal(err)
+				}
+				var got []string
+				for _, nodeInfo := range list {
+					if nodeInfo.Node() != nil {
+						got = append(got, nodeInfo.Node().Name)
+					} else {
+						got = append(got, "nodeless:"+nodeInfo.GetPods()[0].GetPod().Spec.NodeName)
+					}
+				}
+				return got
+			}
+			// p8 and p9 only have host-scoped anti-affinity, so node-e and missing-a are
+			// on the anti-affinity list but not on the non-host-scoped one.
+			wantNonHostScopedAntiAffinity := []string{"node-a", "node-d", "nodeless:missing-b"}
+			if !fastPathEnabled {
+				// The non-host-scoped list is empty when the feature gate is disabled.
+				wantNonHostScopedAntiAffinity = nil
+			}
+
+			lister := NewSnapshot(pods, nodes).NodeInfos()
+			for _, list := range []struct {
+				name      string
+				got, want []string
+			}{
+				{
+					name: "List",
+					got:  names(lister.List()),
+					want: []string{"node-c", "node-a", "node-e", "node-d", "nodeless:missing-b", "nodeless:", "nodeless:missing-a"},
+				},
+				{
+					name: "HavePodsWithAffinityList",
+					got:  names(lister.HavePodsWithAffinityList()),
+					want: []string{"node-c", "node-a", "node-e", "node-d", "nodeless:missing-b", "nodeless:missing-a"},
+				},
+				{
+					name: "HavePodsWithRequiredAntiAffinityList",
+					got:  names(lister.HavePodsWithRequiredAntiAffinityList()),
+					want: []string{"node-a", "node-e", "node-d", "nodeless:missing-b", "nodeless:missing-a"},
+				},
+				{
+					name: "HavePodsWithRequiredNonHostScopedAntiAffinityList",
+					got:  names(lister.HavePodsWithRequiredNonHostScopedAntiAffinityList()),
+					want: wantNonHostScopedAntiAffinity,
+				},
+			} {
+				if diff := cmp.Diff(list.want, list.got); diff != "" {
+					t.Errorf("%s: unexpected node order (-want +got):\n%s", list.name, diff)
+				}
+			}
+		})
+	}
+}
+
 func TestSnapshot_AssumeForget(t *testing.T) {
 	node1 := st.MakeNode().Name("node-1").Obj()
 	node2 := st.MakeNode().Name("node-2").Obj()
@@ -1802,7 +1895,7 @@ func TestSnapshot_AddRemovePod(t *testing.T) {
 					features.GenericWorkload:                  true,
 					features.InterPodAffinityHostnameFastPath: fastPathEnabled,
 				})
-				s := NewTestSnapshotWithPodGroups(tt.initialPods, tt.initialNodes, tt.initialPodGroups)
+				s := NewTestSnapshotWithPodGroups(tt.initialPods, tt.initialNodes, tt.initialPodGroups, nil)
 
 				// Store original state for deep verification
 				origNodeInfoMap, origNodeInfoList, origAffinityList, origAntiAffinityList, origUsedPVCRefCounts, origPGStates, origNonHostScopedAntiAffinityList := simplifySnapshot(s)
@@ -1957,133 +2050,6 @@ func TestSnapshot_AddRemovePod(t *testing.T) {
 	}
 }
 
-func TestSnapshot_BuildHierarchySnapshotFromPod(t *testing.T) {
-	snapshot := NewEmptySnapshot()
-	pod := st.MakePod().Name("p1").Namespace("ns1").UID("p1").PodGroupName("pg1").Obj()
-
-	manager, err := snapshot.BuildHierarchySnapshotFromPod(pod)
-	if err != nil {
-		t.Errorf("BuildHierarchySnapshotFromPod() expected no error, got %v", err)
-	}
-	if manager != snapshot {
-		t.Errorf("BuildHierarchySnapshotFromPod() expected to return snapshot itself")
-	}
-}
-
-func TestSnapshot_GetRootKeyForGroup(t *testing.T) {
-	setupSnapshotForRootKeyTest := func(genericWorkloadEnabled, compositePodGroupEnabled bool) *Snapshot {
-		s := NewEmptySnapshot()
-		s.genericWorkloadEnabled = genericWorkloadEnabled
-		s.compositePodGroupEnabled = compositePodGroupEnabled
-
-		pg1 := st.MakePodGroup().Name("pg1").Namespace("ns1").ParentCompositePodGroup("cpg1").Obj()
-		cpg1 := st.MakeCompositePodGroup().Name("cpg1").Namespace("ns1").ParentCompositePodGroup("cpg2").Obj()
-		cpg2 := st.MakeCompositePodGroup().Name("cpg2").Namespace("ns1").Obj()
-
-		s.podGroupStates[fwk.PodGroupKey("ns1", "pg1")] = &podGroupStateSnapshot{podGroupStateData: podGroupStateData{podGroup: pg1}}
-		s.compositePodGroupStates[fwk.CompositePodGroupKey("ns1", "cpg1")] = &compositePodGroupStateSnapshot{compositePodGroupStateData: compositePodGroupStateData{compositePodGroup: cpg1}}
-		s.compositePodGroupStates[fwk.CompositePodGroupKey("ns1", "cpg2")] = &compositePodGroupStateSnapshot{compositePodGroupStateData: compositePodGroupStateData{compositePodGroup: cpg2}}
-
-		s.podGroupStates[fwk.PodGroupKey("ns1", "pg_cycle")] = &podGroupStateSnapshot{podGroupStateData: podGroupStateData{podGroup: st.MakePodGroup().Name("pg_cycle").Namespace("ns1").ParentCompositePodGroup("cpg_cycle_1").Obj()}}
-		s.compositePodGroupStates[fwk.CompositePodGroupKey("ns1", "cpg_cycle_1")] = &compositePodGroupStateSnapshot{compositePodGroupStateData: compositePodGroupStateData{compositePodGroup: st.MakeCompositePodGroup().Name("cpg_cycle_1").Namespace("ns1").ParentCompositePodGroup("cpg_cycle_2").Obj()}}
-		s.compositePodGroupStates[fwk.CompositePodGroupKey("ns1", "cpg_cycle_2")] = &compositePodGroupStateSnapshot{compositePodGroupStateData: compositePodGroupStateData{compositePodGroup: st.MakeCompositePodGroup().Name("cpg_cycle_2").Namespace("ns1").ParentCompositePodGroup("cpg_cycle_1").Obj()}}
-
-		s.podGroupStates[fwk.PodGroupKey("ns1", "pg_missing_parent")] = &podGroupStateSnapshot{podGroupStateData: podGroupStateData{podGroup: st.MakePodGroup().Name("pg_missing_parent").Namespace("ns1").ParentCompositePodGroup("non-existent").Obj()}}
-
-		return s
-	}
-
-	tests := []struct {
-		name                     string
-		genericWorkloadEnabled   bool
-		compositePodGroupEnabled bool
-		key                      fwk.EntityKey
-		want                     fwk.EntityKey
-		wantOk                   bool
-		wantErr                  bool
-	}{
-		{
-			name:                     "from pg to root (GW=true, CPG=true)",
-			genericWorkloadEnabled:   true,
-			compositePodGroupEnabled: true,
-			key:                      fwk.PodGroupKey("ns1", "pg1"),
-			want:                     fwk.CompositePodGroupKey("ns1", "cpg2"),
-			wantOk:                   true,
-		},
-		{
-			name:                     "from cpg to root (GW=true, CPG=true)",
-			genericWorkloadEnabled:   true,
-			compositePodGroupEnabled: true,
-			key:                      fwk.CompositePodGroupKey("ns1", "cpg1"),
-			want:                     fwk.CompositePodGroupKey("ns1", "cpg2"),
-			wantOk:                   true,
-		},
-		{
-			name:                     "from root (GW=true, CPG=true)",
-			genericWorkloadEnabled:   true,
-			compositePodGroupEnabled: true,
-			key:                      fwk.CompositePodGroupKey("ns1", "cpg2"),
-			want:                     fwk.CompositePodGroupKey("ns1", "cpg2"),
-			wantOk:                   true,
-		},
-		{
-			name:                     "from pg (with parent set), compositePodGroup disabled",
-			genericWorkloadEnabled:   true,
-			compositePodGroupEnabled: false,
-			key:                      fwk.PodGroupKey("ns1", "pg1"),
-			want:                     fwk.PodGroupKey("ns1", "pg1"),
-			wantOk:                   true,
-		},
-		{
-			name:                     "from cpg, compositePodGroup disabled",
-			genericWorkloadEnabled:   true,
-			compositePodGroupEnabled: false,
-			key:                      fwk.CompositePodGroupKey("ns1", "cpg1"),
-			want:                     fwk.CompositePodGroupKey("ns1", "cpg2"), // It processes CPG keys normally
-			wantOk:                   true,
-		},
-		{
-			name:                     "missing intermediate",
-			genericWorkloadEnabled:   true,
-			compositePodGroupEnabled: true,
-			key:                      fwk.PodGroupKey("ns1", "pg_missing_parent"),
-			wantOk:                   false,
-			wantErr:                  false,
-		},
-		{
-			name:                     "cycle detected",
-			genericWorkloadEnabled:   true,
-			compositePodGroupEnabled: true,
-			key:                      fwk.PodGroupKey("ns1", "pg_cycle"),
-			wantErr:                  true,
-		},
-		{
-			name:                     "pod key type is not supported",
-			genericWorkloadEnabled:   true,
-			compositePodGroupEnabled: true,
-			key:                      fwk.PodKey("ns1", "pod1"),
-			wantErr:                  true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			s := setupSnapshotForRootKeyTest(tt.genericWorkloadEnabled, tt.compositePodGroupEnabled)
-			got, gotOk, err := s.GetRootKeyForGroup(tt.key)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("GetRootKeyForGroup() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if gotOk != tt.wantOk {
-				t.Errorf("GetRootKeyForGroup() gotOk = %v, want %v", gotOk, tt.wantOk)
-			}
-			if got != tt.want {
-				t.Errorf("GetRootKeyForGroup() got = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
 func TestSnapshot_HavePodsWithRequiredNonHostScopedAntiAffinityList(t *testing.T) {
 	podWithNonHostScopedAntiAffinity := st.MakePod().Name("pod-1").UID("pod-1").Namespace("ns").
 		PodAntiAffinityExists("label", "zone", st.PodAntiAffinityWithRequiredReq).Node("node-1").Obj()
@@ -2148,5 +2114,759 @@ func TestSnapshot_HavePodsWithRequiredNonHostScopedAntiAffinityList(t *testing.T
 				}
 			})
 		}
+	}
+}
+
+func TestSnapshot_AddGenericPodGroups(t *testing.T) {
+	pg1 := st.MakePodGroup().Name("pg1").Namespace("ns1").ParentCompositePodGroup("cpgMid").Obj()
+	pg2 := st.MakePodGroup().Name("pg2").Namespace("ns1").ParentCompositePodGroup("cpgRoot").Obj()
+	pgStandalone := st.MakePodGroup().Name("pgStandalone").Namespace("ns1").Obj()
+	cpgMid := st.MakeCompositePodGroup().Name("cpgMid").Namespace("ns1").ParentCompositePodGroup("cpgRoot").Obj()
+	cpgRoot := st.MakeCompositePodGroup().Name("cpgRoot").Namespace("ns1").Obj()
+
+	pg1Key := fwk.PodGroupKey("ns1", "pg1")
+	pg2Key := fwk.PodGroupKey("ns1", "pg2")
+	pgStandaloneKey := fwk.PodGroupKey("ns1", "pgStandalone")
+	cpgMidKey := fwk.CompositePodGroupKey("ns1", "cpgMid")
+	cpgRootKey := fwk.CompositePodGroupKey("ns1", "cpgRoot")
+
+	podInPG1 := st.MakePod().Name("p1").Namespace("ns1").UID("p1").PodGroupName("pg1").Obj()
+
+	tests := []struct {
+		name                     string
+		compositePodGroupEnabled bool
+		initialPods              []*v1.Pod
+		initialPGs               []*schedulingv1beta1.PodGroup
+		initialCPGs              []*schedulingv1beta1.CompositePodGroup
+		gpgsToAdd                []*fwk.GenericPodGroup
+		wantErr                  bool
+		wantPGs                  map[fwk.EntityKey]*schedulingv1beta1.PodGroup
+		wantCPGs                 map[fwk.EntityKey]*schedulingv1beta1.CompositePodGroup
+		wantChildren             map[fwk.EntityKey]sets.Set[fwk.EntityKey]
+		wantPGPodCounts          map[fwk.EntityKey]int
+	}{
+		{
+			name:                     "add podGroup with parent (parent ahead of child)",
+			compositePodGroupEnabled: true,
+			gpgsToAdd: []*fwk.GenericPodGroup{
+				fwk.NewGenericCompositePodGroup(cpgRoot),
+				fwk.NewGenericPodGroup(pg2),
+			},
+			wantPGs: map[fwk.EntityKey]*schedulingv1beta1.PodGroup{
+				pg2Key: pg2,
+			},
+			wantCPGs: map[fwk.EntityKey]*schedulingv1beta1.CompositePodGroup{
+				cpgRootKey: cpgRoot,
+			},
+			wantChildren: map[fwk.EntityKey]sets.Set[fwk.EntityKey]{
+				cpgRootKey: sets.New(pg2Key),
+			},
+		},
+		{
+			name:                     "add podGroups when parent is added after the child",
+			compositePodGroupEnabled: true,
+			gpgsToAdd: []*fwk.GenericPodGroup{
+				fwk.NewGenericPodGroup(pg1),
+				fwk.NewGenericCompositePodGroup(cpgMid),
+				fwk.NewGenericCompositePodGroup(cpgRoot),
+			},
+			wantPGs: map[fwk.EntityKey]*schedulingv1beta1.PodGroup{
+				pg1Key: pg1,
+			},
+			wantCPGs: map[fwk.EntityKey]*schedulingv1beta1.CompositePodGroup{
+				cpgMidKey:  cpgMid,
+				cpgRootKey: cpgRoot,
+			},
+			wantChildren: map[fwk.EntityKey]sets.Set[fwk.EntityKey]{
+				cpgRootKey: sets.New(cpgMidKey),
+				cpgMidKey:  sets.New(pg1Key),
+			},
+		},
+		{
+			name:                     "add podGroup when state already exists from member pods",
+			compositePodGroupEnabled: true,
+			initialPods:              []*v1.Pod{podInPG1},
+			gpgsToAdd: []*fwk.GenericPodGroup{
+				fwk.NewGenericPodGroup(pg1),
+				fwk.NewGenericCompositePodGroup(cpgMid),
+			},
+			wantPGs: map[fwk.EntityKey]*schedulingv1beta1.PodGroup{
+				pg1Key: pg1,
+			},
+			wantCPGs: map[fwk.EntityKey]*schedulingv1beta1.CompositePodGroup{
+				cpgMidKey: cpgMid,
+			},
+			wantChildren: map[fwk.EntityKey]sets.Set[fwk.EntityKey]{
+				cpgMidKey:  sets.New(pg1Key),
+				cpgRootKey: sets.New(cpgMidKey),
+			},
+			wantPGPodCounts: map[fwk.EntityKey]int{
+				pg1Key: 1,
+			},
+		},
+		{
+			name:                     "adding existing podGroup fails",
+			compositePodGroupEnabled: true,
+			initialPGs:               []*schedulingv1beta1.PodGroup{pgStandalone},
+			gpgsToAdd: []*fwk.GenericPodGroup{
+				fwk.NewGenericPodGroup(pgStandalone), // already exists
+			},
+			wantErr: true,
+			wantPGs: map[fwk.EntityKey]*schedulingv1beta1.PodGroup{
+				pgStandaloneKey: pgStandalone,
+			},
+			wantCPGs:     map[fwk.EntityKey]*schedulingv1beta1.CompositePodGroup{},
+			wantChildren: map[fwk.EntityKey]sets.Set[fwk.EntityKey]{},
+		},
+		{
+			name:                     "adding existing compositePodGroup fails",
+			compositePodGroupEnabled: true,
+			initialCPGs:              []*schedulingv1beta1.CompositePodGroup{cpgRoot},
+			gpgsToAdd: []*fwk.GenericPodGroup{
+				fwk.NewGenericCompositePodGroup(cpgRoot), // already exists
+			},
+			wantErr: true,
+			wantPGs: map[fwk.EntityKey]*schedulingv1beta1.PodGroup{},
+			wantCPGs: map[fwk.EntityKey]*schedulingv1beta1.CompositePodGroup{
+				cpgRootKey: cpgRoot,
+			},
+			wantChildren: map[fwk.EntityKey]sets.Set[fwk.EntityKey]{},
+		},
+		{
+			name:                     "add podGroups when compositePodGroupEnabled is false skips parent-child linking",
+			compositePodGroupEnabled: false,
+			gpgsToAdd: []*fwk.GenericPodGroup{
+				fwk.NewGenericPodGroup(pg1),
+				fwk.NewGenericCompositePodGroup(cpgMid),
+				fwk.NewGenericCompositePodGroup(cpgRoot),
+			},
+			wantPGs: map[fwk.EntityKey]*schedulingv1beta1.PodGroup{
+				pg1Key: pg1,
+			},
+			wantCPGs: map[fwk.EntityKey]*schedulingv1beta1.CompositePodGroup{
+				cpgMidKey:  cpgMid,
+				cpgRootKey: cpgRoot,
+			},
+			wantChildren: map[fwk.EntityKey]sets.Set[fwk.EntityKey]{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.GenericWorkload:                 true,
+				features.TopologyAwareWorkloadScheduling: tt.compositePodGroupEnabled,
+				features.CompositePodGroup:               tt.compositePodGroupEnabled,
+			})
+
+			s := NewTestSnapshotWithPodGroups(tt.initialPods, nil, tt.initialPGs, tt.initialCPGs)
+			s.compositePodGroupEnabled = tt.compositePodGroupEnabled
+
+			for _, gpg := range tt.gpgsToAdd {
+				err := s.AddGenericPodGroup(gpg)
+				if (err != nil) != tt.wantErr {
+					t.Fatalf("AddGenericPodGroups() error = %v, wantErr %v", err, tt.wantErr)
+				}
+			}
+
+			gotPGs := make(map[fwk.EntityKey]*schedulingv1beta1.PodGroup)
+			for k, pgs := range s.podGroupStates {
+				if pgs.podGroup != nil {
+					gotPGs[k] = pgs.podGroup
+				}
+				if pgs.AllPodsCount() != tt.wantPGPodCounts[k] {
+					t.Errorf("PodGroup %s AllPodsCount() = %d, want %d", k, pgs.AllPodsCount(), tt.wantPGPodCounts[k])
+				}
+			}
+
+			gotCPGs := make(map[fwk.EntityKey]*schedulingv1beta1.CompositePodGroup)
+			gotChildren := make(map[fwk.EntityKey]sets.Set[fwk.EntityKey])
+			for k, cpgs := range s.compositePodGroupStates {
+				if cpgs.compositePodGroup != nil {
+					gotCPGs[k] = cpgs.compositePodGroup
+				}
+				if len(cpgs.children) > 0 {
+					gotChildren[k] = cpgs.children
+				}
+			}
+
+			if diff := cmp.Diff(tt.wantPGs, gotPGs); diff != "" {
+				t.Errorf("Unexpected podGroups (-want, +got):\n%s", diff)
+			}
+			if diff := cmp.Diff(tt.wantCPGs, gotCPGs); diff != "" {
+				t.Errorf("Unexpected compositePodGroups (-want, +got):\n%s", diff)
+			}
+			if diff := cmp.Diff(tt.wantChildren, gotChildren); diff != "" {
+				t.Errorf("Unexpected children (-want, +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestSnapshot_RemoveGenericPodGroup(t *testing.T) {
+	pgLeaf := st.MakePodGroup().Name("pgLeaf").Namespace("ns1").ParentCompositePodGroup("cpgMid").Obj()
+	pgDirect := st.MakePodGroup().Name("pgDirect").Namespace("ns1").ParentCompositePodGroup("cpgRoot").Obj()
+	cpgMid := st.MakeCompositePodGroup().Name("cpgMid").Namespace("ns1").ParentCompositePodGroup("cpgRoot").Obj()
+	cpgRoot := st.MakeCompositePodGroup().Name("cpgRoot").Namespace("ns1").Obj()
+
+	pgLeafKey := fwk.PodGroupKey("ns1", "pgLeaf")
+	pgDirectKey := fwk.PodGroupKey("ns1", "pgDirect")
+	cpgMidKey := fwk.CompositePodGroupKey("ns1", "cpgMid")
+	cpgRootKey := fwk.CompositePodGroupKey("ns1", "cpgRoot")
+
+	podInPGLeaf := st.MakePod().Name("pLeaf").Namespace("ns1").UID("pLeaf").PodGroupName("pgLeaf").Obj()
+
+	tests := []struct {
+		name                     string
+		compositePodGroupEnabled bool
+		initialPods              []*v1.Pod
+		initialGPGs              []*fwk.GenericPodGroup
+		gpgToRemove              *fwk.GenericPodGroup
+		wantErr                  bool
+		wantPGs                  map[fwk.EntityKey]*schedulingv1beta1.PodGroup
+		wantCPGs                 map[fwk.EntityKey]*schedulingv1beta1.CompositePodGroup
+		wantChildren             map[fwk.EntityKey]sets.Set[fwk.EntityKey]
+		wantPGStatesExist        sets.Set[fwk.EntityKey]
+		wantCPGStatesExist       sets.Set[fwk.EntityKey]
+	}{
+		{
+			name:                     "remove non-existing podGroup returns error",
+			compositePodGroupEnabled: true,
+			initialGPGs: []*fwk.GenericPodGroup{
+				fwk.NewGenericPodGroup(pgDirect),
+				fwk.NewGenericCompositePodGroup(cpgRoot),
+			},
+			gpgToRemove: fwk.NewGenericPodGroup(pgLeaf),
+			wantErr:     true,
+			wantPGs: map[fwk.EntityKey]*schedulingv1beta1.PodGroup{
+				pgDirectKey: pgDirect,
+			},
+			wantCPGs: map[fwk.EntityKey]*schedulingv1beta1.CompositePodGroup{
+				cpgRootKey: cpgRoot,
+			},
+			wantChildren: map[fwk.EntityKey]sets.Set[fwk.EntityKey]{
+				cpgRootKey: sets.New(pgDirectKey),
+			},
+		},
+		{
+			name:                     "remove non-existing compositePodGroup returns error",
+			compositePodGroupEnabled: true,
+			initialGPGs: []*fwk.GenericPodGroup{
+				fwk.NewGenericPodGroup(pgDirect),
+				fwk.NewGenericCompositePodGroup(cpgRoot),
+			},
+			gpgToRemove: fwk.NewGenericCompositePodGroup(cpgMid),
+			wantErr:     true,
+			wantPGs: map[fwk.EntityKey]*schedulingv1beta1.PodGroup{
+				pgDirectKey: pgDirect,
+			},
+			wantCPGs: map[fwk.EntityKey]*schedulingv1beta1.CompositePodGroup{
+				cpgRootKey: cpgRoot,
+			},
+			wantChildren: map[fwk.EntityKey]sets.Set[fwk.EntityKey]{
+				cpgRootKey: sets.New(pgDirectKey),
+			},
+		},
+		{
+			name:                     "remove podGroup with parent removes it from parent's children list",
+			compositePodGroupEnabled: true,
+			initialGPGs: []*fwk.GenericPodGroup{
+				fwk.NewGenericPodGroup(pgLeaf),
+				fwk.NewGenericPodGroup(pgDirect),
+				fwk.NewGenericCompositePodGroup(cpgMid),
+				fwk.NewGenericCompositePodGroup(cpgRoot),
+			},
+			gpgToRemove: fwk.NewGenericPodGroup(pgDirect),
+			wantErr:     false,
+			wantPGs: map[fwk.EntityKey]*schedulingv1beta1.PodGroup{
+				pgLeafKey: pgLeaf,
+			},
+			wantCPGs: map[fwk.EntityKey]*schedulingv1beta1.CompositePodGroup{
+				cpgMidKey:  cpgMid,
+				cpgRootKey: cpgRoot,
+			},
+			wantChildren: map[fwk.EntityKey]sets.Set[fwk.EntityKey]{
+				cpgRootKey: sets.New(cpgMidKey),
+				cpgMidKey:  sets.New(pgLeafKey),
+			},
+			wantPGStatesExist:  sets.New(pgLeafKey),
+			wantCPGStatesExist: sets.New(cpgMidKey, cpgRootKey),
+		},
+		{
+			name:                     "remove middle compositePodGroup removes it from parent's children list without losing its own children",
+			compositePodGroupEnabled: true,
+			initialGPGs: []*fwk.GenericPodGroup{
+				fwk.NewGenericPodGroup(pgLeaf),
+				fwk.NewGenericCompositePodGroup(cpgMid),
+				fwk.NewGenericCompositePodGroup(cpgRoot),
+			},
+			gpgToRemove: fwk.NewGenericCompositePodGroup(cpgMid),
+			wantErr:     false,
+			wantPGs: map[fwk.EntityKey]*schedulingv1beta1.PodGroup{
+				pgLeafKey: pgLeaf,
+			},
+			wantCPGs: map[fwk.EntityKey]*schedulingv1beta1.CompositePodGroup{
+				cpgRootKey: cpgRoot,
+			},
+			wantChildren: map[fwk.EntityKey]sets.Set[fwk.EntityKey]{
+				cpgMidKey: sets.New(pgLeafKey),
+			},
+			wantPGStatesExist:  sets.New(pgLeafKey),
+			wantCPGStatesExist: sets.New(cpgMidKey, cpgRootKey),
+		},
+		{
+			name:                     "remove podGroup with member pods retains podGroupStateSnapshot without API object",
+			compositePodGroupEnabled: true,
+			initialPods:              []*v1.Pod{podInPGLeaf},
+			initialGPGs: []*fwk.GenericPodGroup{
+				fwk.NewGenericPodGroup(pgLeaf),
+				fwk.NewGenericCompositePodGroup(cpgMid),
+			},
+			gpgToRemove: fwk.NewGenericPodGroup(pgLeaf),
+			wantErr:     false,
+			wantPGs:     map[fwk.EntityKey]*schedulingv1beta1.PodGroup{},
+			wantCPGs: map[fwk.EntityKey]*schedulingv1beta1.CompositePodGroup{
+				cpgMidKey: cpgMid,
+			},
+			wantChildren: map[fwk.EntityKey]sets.Set[fwk.EntityKey]{
+				cpgRootKey: sets.New(cpgMidKey),
+			},
+			wantPGStatesExist:  sets.New(pgLeafKey),
+			wantCPGStatesExist: sets.New(cpgMidKey, cpgRootKey),
+		},
+		{
+			name:                     "remove podGroup when compositePodGroupEnabled is false",
+			compositePodGroupEnabled: false,
+			initialGPGs: []*fwk.GenericPodGroup{
+				fwk.NewGenericPodGroup(pgDirect),
+				fwk.NewGenericCompositePodGroup(cpgRoot),
+			},
+			gpgToRemove: fwk.NewGenericPodGroup(pgDirect),
+			wantErr:     false,
+			wantPGs:     map[fwk.EntityKey]*schedulingv1beta1.PodGroup{},
+			wantCPGs: map[fwk.EntityKey]*schedulingv1beta1.CompositePodGroup{
+				cpgRootKey: cpgRoot,
+			},
+			wantChildren:       map[fwk.EntityKey]sets.Set[fwk.EntityKey]{},
+			wantPGStatesExist:  sets.New[fwk.EntityKey](),
+			wantCPGStatesExist: sets.New(cpgRootKey),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.GenericWorkload:                 true,
+				features.TopologyAwareWorkloadScheduling: tt.compositePodGroupEnabled,
+				features.CompositePodGroup:               tt.compositePodGroupEnabled,
+			})
+
+			s := NewEmptySnapshot()
+			s.genericWorkloadEnabled = true
+			s.compositePodGroupEnabled = tt.compositePodGroupEnabled
+			if len(tt.initialPods) > 0 {
+				s.podGroupStates = createPodGroupStates(tt.initialPods)
+			}
+			for _, gpg := range tt.initialGPGs {
+				if err := s.AddGenericPodGroup(gpg); err != nil {
+					t.Fatalf("Setup AddGenericPodGroups() failed: %v", err)
+				}
+			}
+
+			err := s.RemoveGenericPodGroup(tt.gpgToRemove)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("RemoveGenericPodGroup() error = %v, wantErr %v", err, tt.wantErr)
+			}
+
+			gotPGs := make(map[fwk.EntityKey]*schedulingv1beta1.PodGroup)
+			gotPGStatesExist := sets.New[fwk.EntityKey]()
+			for k, pgs := range s.podGroupStates {
+				gotPGStatesExist.Insert(k)
+				if pgs.podGroup != nil {
+					gotPGs[k] = pgs.podGroup
+				}
+			}
+
+			gotCPGs := make(map[fwk.EntityKey]*schedulingv1beta1.CompositePodGroup)
+			gotChildren := make(map[fwk.EntityKey]sets.Set[fwk.EntityKey])
+			gotCPGStatesExist := sets.New[fwk.EntityKey]()
+			for k, cpgs := range s.compositePodGroupStates {
+				gotCPGStatesExist.Insert(k)
+				if cpgs.compositePodGroup != nil {
+					gotCPGs[k] = cpgs.compositePodGroup
+				}
+				if len(cpgs.children) > 0 {
+					gotChildren[k] = cpgs.children
+				}
+			}
+
+			if diff := cmp.Diff(tt.wantPGs, gotPGs); diff != "" {
+				t.Errorf("Unexpected podGroups (-want, +got):\n%s", diff)
+			}
+			if diff := cmp.Diff(tt.wantCPGs, gotCPGs); diff != "" {
+				t.Errorf("Unexpected compositePodGroups (-want, +got):\n%s", diff)
+			}
+			if diff := cmp.Diff(tt.wantChildren, gotChildren); diff != "" {
+				t.Errorf("Unexpected children (-want, +got):\n%s", diff)
+			}
+			if tt.wantPGStatesExist != nil {
+				if diff := cmp.Diff(tt.wantPGStatesExist, gotPGStatesExist); diff != "" {
+					t.Errorf("Unexpected podGroupStates keys (-want, +got):\n%s", diff)
+				}
+			}
+			if tt.wantCPGStatesExist != nil {
+				if diff := cmp.Diff(tt.wantCPGStatesExist, gotCPGStatesExist); diff != "" {
+					t.Errorf("Unexpected compositePodGroupStates keys (-want, +got):\n%s", diff)
+				}
+			}
+		})
+	}
+}
+
+func TestSnapshot_PodGroupMembers(t *testing.T) {
+	makePod := func(name, podGroup string) *v1.Pod {
+		return st.MakePod().Namespace("ns").Name(name).UID(name).PodGroupName(podGroup).Obj()
+	}
+	makeAssignedPod := func(name, podGroup string) *v1.Pod {
+		return st.MakePod().Namespace("ns").Name(name).UID(name).PodGroupName(podGroup).Node("node1").Obj()
+	}
+	// withLabel adds a label to the pod, e.g. to update the pod without binding it.
+	withLabel := func(pod *v1.Pod) *v1.Pod {
+		pod.Labels = map[string]string{"foo": "bar"}
+		return pod
+	}
+	makePG := func(name string) *schedulingv1beta1.PodGroup {
+		return st.MakePodGroup().Namespace("ns").Name(name).Obj()
+	}
+	// makePGState returns a pod group state with the given PodGroup object (nil for none) and pods.
+	makePGState := func(pg *schedulingv1beta1.PodGroup, pods ...*v1.Pod) *podGroupStateSnapshot {
+		pgs := &podGroupStateSnapshot{podGroupStateData: newPodGroupStateData()}
+		pgs.podGroup = pg
+		for _, pod := range pods {
+			pgs.addPod(pod)
+		}
+		return pgs
+	}
+
+	tests := []struct {
+		name                   string
+		disableGenericWorkload bool
+		initialPods            []*v1.Pod
+		initialPodGroups       []*schedulingv1beta1.PodGroup
+		action                 func(s *Snapshot) error
+		wantErr                bool
+		// wantPodGroupStates maps pod group names to their expected states.
+		wantPodGroupStates map[string]*podGroupStateSnapshot
+	}{
+		{
+			name:             "add unscheduled pod to existing pod group state",
+			initialPodGroups: []*schedulingv1beta1.PodGroup{makePG("pg1")},
+			action: func(s *Snapshot) error {
+				return s.AddPodGroupMember(makePod("p1", "pg1"))
+			},
+			wantPodGroupStates: map[string]*podGroupStateSnapshot{
+				"pg1": makePGState(makePG("pg1"), makePod("p1", "pg1")),
+			},
+		},
+		{
+			name:        "add assigned pod to pod group state without PodGroup object",
+			initialPods: []*v1.Pod{makePod("p1", "pg1")},
+			action: func(s *Snapshot) error {
+				return s.AddPodGroupMember(makeAssignedPod("p2", "pg1"))
+			},
+			wantPodGroupStates: map[string]*podGroupStateSnapshot{
+				"pg1": makePGState(nil, makePod("p1", "pg1"), makeAssignedPod("p2", "pg1")),
+			},
+		},
+		{
+			name: "add pod creates missing pod group state",
+			action: func(s *Snapshot) error {
+				return s.AddPodGroupMember(makePod("p1", "pg1"))
+			},
+			wantPodGroupStates: map[string]*podGroupStateSnapshot{
+				"pg1": makePGState(nil, makePod("p1", "pg1")),
+			},
+		},
+		{
+			name:             "add pod already in its pod group state returns error",
+			initialPods:      []*v1.Pod{makePod("p1", "pg1")},
+			initialPodGroups: []*schedulingv1beta1.PodGroup{makePG("pg1")},
+			action: func(s *Snapshot) error {
+				return s.AddPodGroupMember(makeAssignedPod("p1", "pg1"))
+			},
+			wantErr: true,
+			wantPodGroupStates: map[string]*podGroupStateSnapshot{
+				"pg1": makePGState(makePG("pg1"), makePod("p1", "pg1")),
+			},
+		},
+		{
+			name:             "add pod with empty UID returns error",
+			initialPodGroups: []*schedulingv1beta1.PodGroup{makePG("pg1")},
+			action: func(s *Snapshot) error {
+				return s.AddPodGroupMember(st.MakePod().Namespace("ns").Name("p1").PodGroupName("pg1").Obj())
+			},
+			wantErr: true,
+			wantPodGroupStates: map[string]*podGroupStateSnapshot{
+				"pg1": makePGState(makePG("pg1")),
+			},
+		},
+		{
+			name:             "add pod without pod group returns error",
+			initialPodGroups: []*schedulingv1beta1.PodGroup{makePG("pg1")},
+			action: func(s *Snapshot) error {
+				return s.AddPodGroupMember(st.MakePod().Namespace("ns").Name("p1").UID("p1").Obj())
+			},
+			wantErr: true,
+			wantPodGroupStates: map[string]*podGroupStateSnapshot{
+				"pg1": makePGState(makePG("pg1")),
+			},
+		},
+		{
+			name:                   "add pod with GenericWorkload disabled returns error",
+			disableGenericWorkload: true,
+			initialPodGroups:       []*schedulingv1beta1.PodGroup{makePG("pg1")},
+			action: func(s *Snapshot) error {
+				return s.AddPodGroupMember(makePod("p1", "pg1"))
+			},
+			wantErr: true,
+			wantPodGroupStates: map[string]*podGroupStateSnapshot{
+				"pg1": makePGState(makePG("pg1")),
+			},
+		},
+		{
+			name:             "update binds unscheduled pod",
+			initialPods:      []*v1.Pod{makePod("p1", "pg1"), makePod("p2", "pg1")},
+			initialPodGroups: []*schedulingv1beta1.PodGroup{makePG("pg1")},
+			action: func(s *Snapshot) error {
+				return s.UpdatePodGroupMember(makePod("p1", "pg1"), makeAssignedPod("p1", "pg1"))
+			},
+			wantPodGroupStates: map[string]*podGroupStateSnapshot{
+				"pg1": makePGState(makePG("pg1"), makeAssignedPod("p1", "pg1"), makePod("p2", "pg1")),
+			},
+		},
+		{
+			name:             "update unscheduled pod without binding",
+			initialPods:      []*v1.Pod{makePod("p1", "pg1")},
+			initialPodGroups: []*schedulingv1beta1.PodGroup{makePG("pg1")},
+			action: func(s *Snapshot) error {
+				return s.UpdatePodGroupMember(makePod("p1", "pg1"), withLabel(makePod("p1", "pg1")))
+			},
+			wantPodGroupStates: map[string]*podGroupStateSnapshot{
+				"pg1": makePGState(makePG("pg1"), withLabel(makePod("p1", "pg1"))),
+			},
+		},
+		{
+			name:             "update assigned pod",
+			initialPods:      []*v1.Pod{makeAssignedPod("p1", "pg1")},
+			initialPodGroups: []*schedulingv1beta1.PodGroup{makePG("pg1")},
+			action: func(s *Snapshot) error {
+				return s.UpdatePodGroupMember(makeAssignedPod("p1", "pg1"), withLabel(makeAssignedPod("p1", "pg1")))
+			},
+			wantPodGroupStates: map[string]*podGroupStateSnapshot{
+				"pg1": makePGState(makePG("pg1"), withLabel(makeAssignedPod("p1", "pg1"))),
+			},
+		},
+		{
+			name:             "update with old pod of a different pod returns error",
+			initialPods:      []*v1.Pod{makePod("p1", "pg1"), makePod("p2", "pg1")},
+			initialPodGroups: []*schedulingv1beta1.PodGroup{makePG("pg1")},
+			action: func(s *Snapshot) error {
+				return s.UpdatePodGroupMember(makePod("p2", "pg1"), makeAssignedPod("p1", "pg1"))
+			},
+			wantErr: true,
+			wantPodGroupStates: map[string]*podGroupStateSnapshot{
+				"pg1": makePGState(makePG("pg1"), makePod("p1", "pg1"), makePod("p2", "pg1")),
+			},
+		},
+		{
+			name:             "update with old pod of another pod group returns error",
+			initialPods:      []*v1.Pod{makePod("p1", "pg2")},
+			initialPodGroups: []*schedulingv1beta1.PodGroup{makePG("pg1"), makePG("pg2")},
+			action: func(s *Snapshot) error {
+				return s.UpdatePodGroupMember(makePod("p1", "pg1"), makeAssignedPod("p1", "pg2"))
+			},
+			wantErr: true,
+			wantPodGroupStates: map[string]*podGroupStateSnapshot{
+				"pg1": makePGState(makePG("pg1")),
+				"pg2": makePGState(makePG("pg2"), makePod("p1", "pg2")),
+			},
+		},
+		{
+			name:             "update with old pod node not matching stored pod returns error",
+			initialPods:      []*v1.Pod{makePod("p1", "pg1")},
+			initialPodGroups: []*schedulingv1beta1.PodGroup{makePG("pg1")},
+			action: func(s *Snapshot) error {
+				return s.UpdatePodGroupMember(makeAssignedPod("p1", "pg1"), withLabel(makeAssignedPod("p1", "pg1")))
+			},
+			wantErr: true,
+			wantPodGroupStates: map[string]*podGroupStateSnapshot{
+				"pg1": makePGState(makePG("pg1"), makePod("p1", "pg1")),
+			},
+		},
+		{
+			name:             "update unbinding assigned pod returns error",
+			initialPods:      []*v1.Pod{makeAssignedPod("p1", "pg1")},
+			initialPodGroups: []*schedulingv1beta1.PodGroup{makePG("pg1")},
+			action: func(s *Snapshot) error {
+				return s.UpdatePodGroupMember(makeAssignedPod("p1", "pg1"), makePod("p1", "pg1"))
+			},
+			wantErr: true,
+			wantPodGroupStates: map[string]*podGroupStateSnapshot{
+				"pg1": makePGState(makePG("pg1"), makeAssignedPod("p1", "pg1")),
+			},
+		},
+		{
+			name:             "update moving assigned pod to another node returns error",
+			initialPods:      []*v1.Pod{makeAssignedPod("p1", "pg1")},
+			initialPodGroups: []*schedulingv1beta1.PodGroup{makePG("pg1")},
+			action: func(s *Snapshot) error {
+				movedPod := st.MakePod().Namespace("ns").Name("p1").UID("p1").PodGroupName("pg1").Node("node2").Obj()
+				return s.UpdatePodGroupMember(makeAssignedPod("p1", "pg1"), movedPod)
+			},
+			wantErr: true,
+			wantPodGroupStates: map[string]*podGroupStateSnapshot{
+				"pg1": makePGState(makePG("pg1"), makeAssignedPod("p1", "pg1")),
+			},
+		},
+		{
+			name:             "update pod missing from its pod group state returns error",
+			initialPods:      []*v1.Pod{makePod("p1", "pg1")},
+			initialPodGroups: []*schedulingv1beta1.PodGroup{makePG("pg1")},
+			action: func(s *Snapshot) error {
+				return s.UpdatePodGroupMember(makePod("p2", "pg1"), makeAssignedPod("p2", "pg1"))
+			},
+			wantErr: true,
+			wantPodGroupStates: map[string]*podGroupStateSnapshot{
+				"pg1": makePGState(makePG("pg1"), makePod("p1", "pg1")),
+			},
+		},
+		{
+			name:             "update moving pod to another pod group returns error",
+			initialPods:      []*v1.Pod{makePod("p1", "pg1")},
+			initialPodGroups: []*schedulingv1beta1.PodGroup{makePG("pg1"), makePG("pg2")},
+			action: func(s *Snapshot) error {
+				return s.UpdatePodGroupMember(makePod("p1", "pg1"), makePod("p1", "pg2"))
+			},
+			wantErr: true,
+			wantPodGroupStates: map[string]*podGroupStateSnapshot{
+				"pg1": makePGState(makePG("pg1"), makePod("p1", "pg1")),
+				"pg2": makePGState(makePG("pg2")),
+			},
+		},
+		{
+			name:                   "update pod with GenericWorkload disabled returns error",
+			disableGenericWorkload: true,
+			initialPods:            []*v1.Pod{makePod("p1", "pg1")},
+			initialPodGroups:       []*schedulingv1beta1.PodGroup{makePG("pg1")},
+			action: func(s *Snapshot) error {
+				return s.UpdatePodGroupMember(makePod("p1", "pg1"), makeAssignedPod("p1", "pg1"))
+			},
+			wantErr: true,
+			wantPodGroupStates: map[string]*podGroupStateSnapshot{
+				"pg1": makePGState(makePG("pg1"), makePod("p1", "pg1")),
+			},
+		},
+		{
+			name:             "remove pod keeps pod group state with remaining pods",
+			initialPods:      []*v1.Pod{makePod("p1", "pg1"), makePod("p2", "pg1")},
+			initialPodGroups: []*schedulingv1beta1.PodGroup{makePG("pg1")},
+			action: func(s *Snapshot) error {
+				return s.RemovePodGroupMember(makePod("p1", "pg1"))
+			},
+			wantPodGroupStates: map[string]*podGroupStateSnapshot{
+				"pg1": makePGState(makePG("pg1"), makePod("p2", "pg1")),
+			},
+		},
+		{
+			name:             "remove assigned pod",
+			initialPods:      []*v1.Pod{makeAssignedPod("p1", "pg1"), makePod("p2", "pg1")},
+			initialPodGroups: []*schedulingv1beta1.PodGroup{makePG("pg1")},
+			action: func(s *Snapshot) error {
+				return s.RemovePodGroupMember(makeAssignedPod("p1", "pg1"))
+			},
+			wantPodGroupStates: map[string]*podGroupStateSnapshot{
+				"pg1": makePGState(makePG("pg1"), makePod("p2", "pg1")),
+			},
+		},
+		{
+			name:             "remove last pod keeps pod group state with PodGroup object",
+			initialPods:      []*v1.Pod{makePod("p1", "pg1")},
+			initialPodGroups: []*schedulingv1beta1.PodGroup{makePG("pg1")},
+			action: func(s *Snapshot) error {
+				return s.RemovePodGroupMember(makePod("p1", "pg1"))
+			},
+			wantPodGroupStates: map[string]*podGroupStateSnapshot{
+				"pg1": makePGState(makePG("pg1")),
+			},
+		},
+		{
+			name:        "remove last pod deletes pod group state without PodGroup object",
+			initialPods: []*v1.Pod{makePod("p1", "pg1"), makePod("p2", "pg2")},
+			action: func(s *Snapshot) error {
+				return s.RemovePodGroupMember(makePod("p1", "pg1"))
+			},
+			wantPodGroupStates: map[string]*podGroupStateSnapshot{
+				"pg2": makePGState(nil, makePod("p2", "pg2")),
+			},
+		},
+		{
+			name:             "remove pod missing from its pod group state returns error",
+			initialPods:      []*v1.Pod{makePod("p1", "pg1")},
+			initialPodGroups: []*schedulingv1beta1.PodGroup{makePG("pg1")},
+			action: func(s *Snapshot) error {
+				return s.RemovePodGroupMember(makePod("p2", "pg1"))
+			},
+			wantErr: true,
+			wantPodGroupStates: map[string]*podGroupStateSnapshot{
+				"pg1": makePGState(makePG("pg1"), makePod("p1", "pg1")),
+			},
+		},
+		{
+			name:             "remove pod of unknown pod group returns error",
+			initialPods:      []*v1.Pod{makePod("p1", "pg1")},
+			initialPodGroups: []*schedulingv1beta1.PodGroup{makePG("pg1")},
+			action: func(s *Snapshot) error {
+				return s.RemovePodGroupMember(makePod("p2", "pg2"))
+			},
+			wantErr: true,
+			wantPodGroupStates: map[string]*podGroupStateSnapshot{
+				"pg1": makePGState(makePG("pg1"), makePod("p1", "pg1")),
+			},
+		},
+		{
+			name:                   "remove pod with GenericWorkload disabled returns error",
+			disableGenericWorkload: true,
+			initialPods:            []*v1.Pod{makePod("p1", "pg1")},
+			initialPodGroups:       []*schedulingv1beta1.PodGroup{makePG("pg1")},
+			action: func(s *Snapshot) error {
+				return s.RemovePodGroupMember(makePod("p1", "pg1"))
+			},
+			wantErr: true,
+			wantPodGroupStates: map[string]*podGroupStateSnapshot{
+				"pg1": makePGState(makePG("pg1"), makePod("p1", "pg1")),
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, true)
+			s := NewTestSnapshotWithPodGroups(tt.initialPods, nil, tt.initialPodGroups, nil)
+			// Disable GenericWorkload only after the initial pod group states are created from the pods.
+			s.genericWorkloadEnabled = !tt.disableGenericWorkload
+
+			err := tt.action(s)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("Unexpected error: %v, wantErr: %v", err, tt.wantErr)
+			}
+
+			want := make(map[fwk.EntityKey]*podGroupStateSnapshot, len(tt.wantPodGroupStates))
+			for name, pgs := range tt.wantPodGroupStates {
+				want[fwk.PodGroupKey("ns", name)] = pgs
+			}
+			if diff := cmp.Diff(want, s.podGroupStates, podGroupStateCmpOpts...); diff != "" {
+				t.Errorf("Unexpected pod group states (-want, +got):\n%s", diff)
+			}
+		})
 	}
 }

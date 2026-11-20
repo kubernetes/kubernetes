@@ -29,10 +29,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	core "k8s.io/client-go/testing"
+	"k8s.io/ktesting"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
-	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestListVolumesForPod(t *testing.T) {
@@ -81,7 +81,6 @@ func TestListVolumesForPod(t *testing.T) {
 	})
 
 	tCtx := ktesting.Init(t)
-	defer tCtx.Cancel("test has completed")
 	go kubelet.volumeManager.Run(tCtx, kubelet.sourcesReady)
 
 	kubelet.podManager.SetPods([]*v1.Pod{pod})
@@ -200,7 +199,6 @@ func TestPodVolumesExist(t *testing.T) {
 	}
 
 	tCtx := ktesting.Init(t)
-	defer tCtx.Cancel("test has completed")
 
 	go kubelet.volumeManager.Run(tCtx, kubelet.sourcesReady)
 
@@ -261,7 +259,6 @@ func TestPodVolumeDeadlineAttachAndMount(t *testing.T) {
 	}
 
 	tCtx := ktesting.Init(t)
-	defer tCtx.Cancel("test has completed")
 	go kubelet.volumeManager.Run(tCtx, kubelet.sourcesReady)
 
 	kubelet.podManager.SetPods(pods)
@@ -323,7 +320,6 @@ func TestPodVolumeDeadlineUnmount(t *testing.T) {
 	}
 
 	tCtx := ktesting.Init(t)
-	defer tCtx.Cancel("test has completed")
 	go kubelet.volumeManager.Run(tCtx, kubelet.sourcesReady)
 
 	kubelet.podManager.SetPods(pods)
@@ -377,7 +373,6 @@ func TestVolumeAttachAndMountControllerDisabled(t *testing.T) {
 	})
 
 	tCtx := ktesting.Init(t)
-	defer tCtx.Cancel("test has completed")
 	go kubelet.volumeManager.Run(tCtx, kubelet.sourcesReady)
 
 	kubelet.podManager.SetPods([]*v1.Pod{pod})
@@ -437,7 +432,6 @@ func TestVolumeUnmountAndDetachControllerDisabled(t *testing.T) {
 	})
 
 	tCtx := ktesting.Init(t)
-	defer tCtx.Cancel("test has completed")
 	go kubelet.volumeManager.Run(tCtx, kubelet.sourcesReady)
 
 	// Add pod
@@ -540,7 +534,6 @@ func TestVolumeAttachAndMountControllerEnabled(t *testing.T) {
 	})
 
 	tCtx := ktesting.Init(t)
-	defer tCtx.Cancel("test has completed")
 	go kubelet.volumeManager.Run(tCtx, kubelet.sourcesReady)
 
 	kubelet.podManager.SetPods([]*v1.Pod{pod})
@@ -625,7 +618,6 @@ func TestVolumeUnmountAndDetachControllerEnabled(t *testing.T) {
 	})
 
 	tCtx := ktesting.Init(t)
-	defer tCtx.Cancel("test has completed")
 	go kubelet.volumeManager.Run(tCtx, kubelet.sourcesReady)
 
 	// Add pod

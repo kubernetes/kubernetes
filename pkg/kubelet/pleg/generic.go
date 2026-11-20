@@ -80,6 +80,12 @@ type GenericPLEG struct {
 	relistRequests chan relistRequest
 	// globalRelistTimer controls the periodic global relist.
 	globalRelistTimer clock.Timer
+	// suspendMu guards suspendedPods.
+	suspendMu sync.Mutex
+	// suspendedPods tracks pods whose relist observations are suspended while they are being
+	// synced. The presence of a key means the pod is suspended; the value records whether a
+	// relist was deferred (pending) during the suspension.
+	suspendedPods map[types.UID]bool
 }
 
 // Empty placeholder value for podsToReinspect (shared pointer reduces allocations).
@@ -144,6 +150,7 @@ func NewGenericPLEG(runtime kubecontainer.Runtime, eventChannel chan *PodLifecyc
 		cache:          cache,
 		clock:          clock,
 		relistRequests: make(chan relistRequest, 200),
+		suspendedPods:  make(map[types.UID]bool),
 	}
 }
 
@@ -342,12 +349,21 @@ func (g *GenericPLEG) reconcilePodRecord(ctx context.Context, pid types.UID) {
 		events = append(events, containerEvents...)
 	}
 
-	_, reinspect := g.podsToReinspect.LoadAndDelete(pid)
+	_, reinspect := g.podsToReinspect.Load(pid)
 
 	if len(events) == 0 && !reinspect {
 		// Nothing else needed for this pod.
 		return
 	}
+
+	// If the pod is being synced, defer observing it until the sync finishes. The pod record
+	// is intentionally not updated (and the reinspect flag is kept), so the deferred changes
+	// are detected again by the next relist of this pod.
+	if g.deferIfSuspended(pid) {
+		logger.V(4).Info("GenericPLEG: Pod relist is suspended, deferring reconciliation", "podUID", pid)
+		return
+	}
+	g.podsToReinspect.Delete(pid)
 
 	// updateCache() will inspect the pod and update the cache. If an
 	// error occurs during the inspection, we want PLEG to retry again
@@ -411,9 +427,15 @@ func (g *GenericPLEG) reconcilePodRecord(ctx context.Context, pid types.UID) {
 }
 
 func (g *GenericPLEG) relistPod(ctx context.Context, podUID types.UID) {
+	logger := klog.FromContext(ctx)
+	// Skip the runtime call entirely while the pod is being synced.
+	if g.deferIfSuspended(podUID) {
+		logger.V(4).Info("GenericPLEG: Pod relist is suspended, deferring on-demand relist", "podUID", podUID)
+		return
+	}
+
 	g.relistLock.Lock()
 	defer g.relistLock.Unlock()
-	logger := klog.FromContext(ctx)
 
 	logger.V(5).Info("GenericPLEG: Relisting Pod", "podUID", podUID)
 
@@ -483,12 +505,12 @@ func computeEvents(logger klog.Logger, oldPod, newPod *kubecontainer.Pod, cid *k
 
 // getPodIP preserves an older cached status' pod IP if the new status has no pod IPs
 // and its sandboxes have exited
-func (g *GenericPLEG) getPodIPs(pid types.UID, status *kubecontainer.PodStatus) []string {
+func (g *GenericPLEG) getPodIPs(ctx context.Context, pid types.UID, status *kubecontainer.PodStatus) []string {
 	if len(status.IPs) != 0 {
 		return status.IPs
 	}
 
-	oldStatus, err := g.cache.Get(pid)
+	oldStatus, err := g.cache.Get(ctx, pid)
 	if err != nil || len(oldStatus.IPs) == 0 {
 		return nil
 	}
@@ -537,7 +559,7 @@ func (g *GenericPLEG) updateCache(ctx context.Context, pod *kubecontainer.Pod, p
 		// When a pod is torn down, kubelet may race with PLEG and retrieve
 		// a pod status after network teardown, but the kubernetes API expects
 		// the completed pod's IP to be available after the pod is dead.
-		status.IPs = g.getPodIPs(pid, status)
+		status.IPs = g.getPodIPs(ctx, pid, status)
 	}
 
 	g.cache.Set(pod.ID, status, err, timestamp)
@@ -546,6 +568,39 @@ func (g *GenericPLEG) updateCache(ctx context.Context, pod *kubecontainer.Pod, p
 
 func (g *GenericPLEG) RequestReinspect(podUID types.UID) {
 	g.podsToReinspect.Store(podUID, empty)
+}
+
+// SuspendRelist holds back relist observations for the pod until ResumeRelist is called.
+func (g *GenericPLEG) SuspendRelist(podUID types.UID) {
+	g.suspendMu.Lock()
+	defer g.suspendMu.Unlock()
+	if _, ok := g.suspendedPods[podUID]; !ok {
+		// Set the value to false to denote the suspended pod does not have any pending events yet.
+		g.suspendedPods[podUID] = false
+	}
+}
+
+// ResumeRelist ends the suspension for the pod and reports whether a relist was deferred
+// while it was suspended. Requesting the follow-up relist is left to the caller, so that it
+// can do so after recording its sync time.
+func (g *GenericPLEG) ResumeRelist(podUID types.UID) bool {
+	g.suspendMu.Lock()
+	defer g.suspendMu.Unlock()
+	relistDeferred := g.suspendedPods[podUID]
+	delete(g.suspendedPods, podUID)
+	return relistDeferred
+}
+
+// deferIfSuspended returns true if the pod's relist is suspended, recording that a relist
+// was deferred so it can be replayed on resume.
+func (g *GenericPLEG) deferIfSuspended(podUID types.UID) bool {
+	g.suspendMu.Lock()
+	defer g.suspendMu.Unlock()
+	if _, ok := g.suspendedPods[podUID]; !ok {
+		return false
+	}
+	g.suspendedPods[podUID] = true
+	return true
 }
 
 func (g *GenericPLEG) RequestRelist(logger klog.Logger, podUID types.UID) {

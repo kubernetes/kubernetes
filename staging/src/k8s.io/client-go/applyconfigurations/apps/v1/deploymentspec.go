@@ -28,34 +28,48 @@ import (
 //
 // DeploymentSpec is the specification of the desired behavior of the Deployment.
 type DeploymentSpecApplyConfiguration struct {
-	// Number of desired pods. This is a pointer to distinguish between explicit
-	// zero and not specified. Defaults to 1.
+	// replicas is the desired number of pods. This is a pointer to distinguish
+	// between explicit zero and not specified. Defaults to 1.
 	Replicas *int32 `json:"replicas,omitempty"`
-	// Label selector for pods. Existing ReplicaSets whose pods are
+	// selector is a label selector for pods. Existing ReplicaSets whose pods are
 	// selected by this will be the ones affected by this deployment.
 	// It must match the pod template's labels.
 	Selector *metav1.LabelSelectorApplyConfiguration `json:"selector,omitempty"`
-	// Template describes the pods that will be created.
+	// template describes the pods that will be created.
 	// The only allowed template.spec.restartPolicy value is "Always".
 	Template *corev1.PodTemplateSpecApplyConfiguration `json:"template,omitempty"`
-	// The deployment strategy to use to replace existing pods with new ones.
+	// strategy to use to replace existing Deployment pods with new ones.
 	Strategy *DeploymentStrategyApplyConfiguration `json:"strategy,omitempty"`
-	// Minimum number of seconds for which a newly created pod should be ready
-	// without any of its container crashing, for it to be considered available.
-	// Defaults to 0 (pod will be considered available as soon as it is ready)
+	// minReadySeconds is the minimum number of seconds for which a newly created pod should
+	// be ready without any of its container crashing, for it to be considered available.
+	// Defaults to 0 (pod will be considered available as soon as it is ready).
 	MinReadySeconds *int32 `json:"minReadySeconds,omitempty"`
-	// The number of old ReplicaSets to retain to allow rollback.
+	// revisionHistoryLimit is the maximum number of old ReplicaSets to retain to allow rollback.
 	// This is a pointer to distinguish between explicit zero and not specified.
 	// Defaults to 10.
 	RevisionHistoryLimit *int32 `json:"revisionHistoryLimit,omitempty"`
-	// Indicates that the deployment is paused.
+	// paused indicates that the deployment is paused.
 	Paused *bool `json:"paused,omitempty"`
-	// The maximum time in seconds for a deployment to make progress before it
-	// is considered to be failed. The deployment controller will continue to
-	// process failed deployments and a condition with a ProgressDeadlineExceeded
-	// reason will be surfaced in the deployment status. Note that progress will
-	// not be estimated during the time a deployment is paused. Defaults to 600s.
+	// progressDeadlineSeconds is the maximum time in seconds for a deployment to
+	// make progress before it is considered to be failed. The deployment controller
+	// will continue to process failed deployments and a condition with a
+	// ProgressDeadlineExceeded reason will be surfaced in the deployment status.
+	// Note that progress will not be estimated during the time a deployment is paused.
+	// Defaults to 600s.
 	ProgressDeadlineSeconds *int32 `json:"progressDeadlineSeconds,omitempty"`
+	// scheduling defines the Workload-aware Scheduling configuration for this Deployment.
+	// When set, it specifies the scheduling policy (basic or gang), topology
+	// constraints, disruption mode, and shared resource claims.
+	// When spec.scheduling is omitted, no Workload or PodGroup is created and the
+	// Deployment uses standard pod-by-pod scheduling.
+	// This field is gated by the WorkloadWithDeployment feature gate.
+	// Once set, this field is immutable except for schedulingPolicy.gang.minCount.
+	//
+	// - The scheduling field can only be set when the Deployment is created.
+	// - A gang schedulingPolicy requires strategy.type Recreate.
+	// - When schedulingPolicy.gang.minCount is set, replicas must be 0 or at least minCount.
+	// - template.spec.schedulingGroup must be unset.
+	Scheduling *DeploymentSchedulingConfigurationApplyConfiguration `json:"scheduling,omitempty"`
 }
 
 // DeploymentSpecApplyConfiguration constructs a declarative configuration of the DeploymentSpec type for use with
@@ -125,5 +139,13 @@ func (b *DeploymentSpecApplyConfiguration) WithPaused(value bool) *DeploymentSpe
 // If called multiple times, the ProgressDeadlineSeconds field is set to the value of the last call.
 func (b *DeploymentSpecApplyConfiguration) WithProgressDeadlineSeconds(value int32) *DeploymentSpecApplyConfiguration {
 	b.ProgressDeadlineSeconds = &value
+	return b
+}
+
+// WithScheduling sets the Scheduling field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Scheduling field is set to the value of the last call.
+func (b *DeploymentSpecApplyConfiguration) WithScheduling(value *DeploymentSchedulingConfigurationApplyConfiguration) *DeploymentSpecApplyConfiguration {
+	b.Scheduling = value
 	return b
 }

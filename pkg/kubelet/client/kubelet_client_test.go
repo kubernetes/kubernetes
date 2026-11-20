@@ -33,7 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apiserver/pkg/server/egressselector"
-	"k8s.io/kubernetes/test/utils/client-go/ktesting"
+	"k8s.io/client-go/ktesting"
 )
 
 func kubeletTestCertHelper(valid bool) KubeletTLSConfig {

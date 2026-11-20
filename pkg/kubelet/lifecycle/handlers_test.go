@@ -42,10 +42,10 @@ import (
 	"k8s.io/component-base/metrics/testutil"
 	ndf "k8s.io/component-helpers/nodedeclaredfeatures"
 	ndftesting "k8s.io/component-helpers/nodedeclaredfeatures/testing"
+	"k8s.io/ktesting"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
-	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 type fakeContainerCommandRunner struct {
@@ -126,6 +126,16 @@ func (f *fakeHTTP) Do(req *http.Request) (*http.Response, error) {
 	return f.resp, f.err
 }
 
+type contextBlockingHTTP struct {
+	started chan context.Context
+}
+
+func (f *contextBlockingHTTP) Do(req *http.Request) (*http.Response, error) {
+	f.started <- req.Context()
+	<-req.Context().Done()
+	return nil, req.Context().Err()
+}
+
 func TestRunHandlerHttp(t *testing.T) {
 	_, tCtx := ktesting.NewTestContext(t)
 	fakeHTTPGetter := fakeHTTP{}
@@ -160,6 +170,44 @@ func TestRunHandlerHttp(t *testing.T) {
 	if fakeHTTPGetter.url != "http://foo:8080/bar" {
 		t.Errorf("unexpected url: %s", fakeHTTPGetter.url)
 	}
+}
+
+func TestRunHandlerHTTPCancellation(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	ctx, cancel := context.WithCancel(tCtx)
+	defer cancel()
+	httpDoer := &contextBlockingHTTP{started: make(chan context.Context, 1)}
+	handlerRunner := NewHandlerRunner(httpDoer, &fakeContainerCommandRunner{}, nil, nil)
+	containerID := kubecontainer.ContainerID{Type: "test", ID: "container"}
+	container := v1.Container{
+		Name: "container",
+		Lifecycle: &v1.Lifecycle{PreStop: &v1.LifecycleHandler{HTTPGet: &v1.HTTPGetAction{
+			Host: "127.0.0.1",
+			Port: intstr.FromInt32(8080),
+		}}},
+	}
+	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod", Namespace: "test"}}
+
+	done := make(chan error, 1)
+	go func() {
+		_, err := handlerRunner.Run(ctx, containerID, pod, &container, container.Lifecycle.PreStop)
+		done <- err
+	}()
+
+	var requestCtx context.Context
+	select {
+	case requestCtx = <-httpDoer.started:
+	case <-time.After(5 * time.Second):
+		t.Fatal("HTTP lifecycle hook did not start")
+	}
+	cancel()
+	select {
+	case err := <-done:
+		require.ErrorIs(t, err, context.Canceled)
+	case <-time.After(5 * time.Second):
+		t.Fatal("HTTP lifecycle hook did not return after its context was cancelled")
+	}
+	require.ErrorIs(t, requestCtx.Err(), context.Canceled)
 }
 
 func TestRunHandlerHttpWithHeaders(t *testing.T) {
@@ -849,7 +897,7 @@ func TestRunSleepHandler(t *testing.T) {
 
 func TestDeclaredFeaturesAdmitHandler(t *testing.T) {
 	tCtx := ktesting.Init(t)
-	pod := &v1.Pod{
+	basePod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-pod",
 		},
@@ -865,8 +913,39 @@ func TestDeclaredFeaturesAdmitHandler(t *testing.T) {
 		}
 		return m
 	}
+	createPodContainerFeature := func(t *testing.T, name string, maxVersionStr string) *ndftesting.MockFeature {
+		m := ndftesting.NewMockFeature(t)
+		m.SetName(name)
+		m.SetInferForScheduling(func(podInfo *ndf.PodInfo) bool {
+			return podInfo.Spec != nil && len(podInfo.Spec.Containers) > 0
+		})
+		if maxVersionStr != "" {
+			m.SetMaxVersion(version.MustParseSemantic(maxVersionStr))
+		} else {
+			m.SetMaxVersion(nil)
+		}
+		return m
+	}
+	createUpdateOnlyFeature := func(t *testing.T, name string, inferForUpdate bool) *ndftesting.MockFeature {
+		m := ndftesting.NewMockFeature(t)
+		m.SetName(name)
+		m.SetInferForScheduling(func(podInfo *ndf.PodInfo) bool { return false })
+		m.SetInferForUpdate(func(oldPodInfo, newPodInfo *ndf.PodInfo) bool { return inferForUpdate })
+		m.SetMaxVersion(nil)
+		return m
+	}
+	podWithContainer := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-pod",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{{Name: "c1"}},
+		},
+	}
+
 	testCases := []struct {
 		name                 string
+		attrs                *PodAdmitAttributes
 		nodeDeclaredFeatures []string
 		version              *version.Version
 		registeredFeatures   []ndf.Feature
@@ -875,7 +954,18 @@ func TestDeclaredFeaturesAdmitHandler(t *testing.T) {
 		expectedMessage      string
 	}{
 		{
-			name:                 "Admit: no requirements",
+			name:                 "AddOperation: Admit when no requirements",
+			attrs:                &PodAdmitAttributes{Pod: basePod, Operation: AddOperation},
+			nodeDeclaredFeatures: []string{"FeatureA"},
+			version:              version.MustParseSemantic("1.30.0"),
+			registeredFeatures: []ndf.Feature{
+				createMockFeature(t, "FeatureA", false, ""),
+			},
+			expectedAdmit: true,
+		},
+		{
+			name:                 "AddOperation: Admit when requirements met",
+			attrs:                &PodAdmitAttributes{Pod: basePod, Operation: AddOperation},
 			nodeDeclaredFeatures: []string{"FeatureA"},
 			version:              version.MustParseSemantic("1.30.0"),
 			registeredFeatures: []ndf.Feature{
@@ -884,16 +974,8 @@ func TestDeclaredFeaturesAdmitHandler(t *testing.T) {
 			expectedAdmit: true,
 		},
 		{
-			name:                 "Admit: requirements met",
-			nodeDeclaredFeatures: []string{"FeatureA"},
-			version:              version.MustParseSemantic("1.30.0"),
-			registeredFeatures: []ndf.Feature{
-				createMockFeature(t, "FeatureA", true, ""),
-			},
-			expectedAdmit: true,
-		},
-		{
-			name:                 "Reject: requirements not met",
+			name:                 "AddOperation: Reject when requirements not met",
+			attrs:                &PodAdmitAttributes{Pod: basePod, Operation: AddOperation},
 			nodeDeclaredFeatures: []string{},
 			version:              version.MustParseSemantic("1.30.0"),
 			registeredFeatures: []ndf.Feature{
@@ -904,13 +986,74 @@ func TestDeclaredFeaturesAdmitHandler(t *testing.T) {
 			expectedMessage: "Pod requires node features that are not available: FeatureA",
 		},
 		{
-			name:                 "Admit without feature declared - feature generally available",
+			name:                 "AddOperation: Admit without feature declared when feature generally available",
+			attrs:                &PodAdmitAttributes{Pod: basePod, Operation: AddOperation},
 			nodeDeclaredFeatures: []string{},
 			version:              version.MustParseSemantic("1.35.0"),
 			registeredFeatures: []ndf.Feature{
 				createMockFeature(t, "FeatureA", true, "1.34.0"),
 			},
 			expectedAdmit: true,
+		},
+		{
+			name: "UpdateOperation: Admit when feature was already required by AllocatedPod even if node lacks feature",
+			attrs: &PodAdmitAttributes{
+				Pod:       podWithContainer,
+				Operation: UpdateOperation,
+				Update:    &PodUpdate{AllocatedPod: podWithContainer},
+			},
+			nodeDeclaredFeatures: []string{},
+			version:              version.MustParseSemantic("1.30.0"),
+			registeredFeatures: []ndf.Feature{
+				createPodContainerFeature(t, "FeatureA", ""),
+			},
+			expectedAdmit: true,
+		},
+		{
+			name: "UpdateOperation: Reject when update newly requires scheduling feature not on node",
+			attrs: &PodAdmitAttributes{
+				Pod:       podWithContainer,
+				Operation: UpdateOperation,
+				Update:    &PodUpdate{AllocatedPod: basePod},
+			},
+			nodeDeclaredFeatures: []string{},
+			version:              version.MustParseSemantic("1.30.0"),
+			registeredFeatures: []ndf.Feature{
+				createPodContainerFeature(t, "FeatureA", ""),
+			},
+			expectedAdmit:   false,
+			expectedReason:  PodFeatureUnsupported,
+			expectedMessage: "Pod requires node features that are not available: FeatureA",
+		},
+		{
+			name: "UpdateOperation: Admit when update newly requires scheduling feature that is declared on node",
+			attrs: &PodAdmitAttributes{
+				Pod:       podWithContainer,
+				Operation: UpdateOperation,
+				Update:    &PodUpdate{AllocatedPod: basePod},
+			},
+			nodeDeclaredFeatures: []string{"FeatureA"},
+			version:              version.MustParseSemantic("1.30.0"),
+			registeredFeatures: []ndf.Feature{
+				createPodContainerFeature(t, "FeatureA", ""),
+			},
+			expectedAdmit: true,
+		},
+		{
+			name: "UpdateOperation: Reject when update-specific InferForUpdate requirement not met on node",
+			attrs: &PodAdmitAttributes{
+				Pod:       basePod,
+				Operation: UpdateOperation,
+				Update:    &PodUpdate{AllocatedPod: basePod},
+			},
+			nodeDeclaredFeatures: []string{},
+			version:              version.MustParseSemantic("1.30.0"),
+			registeredFeatures: []ndf.Feature{
+				createUpdateOnlyFeature(t, "FeatureUpdateOnly", true),
+			},
+			expectedAdmit:   false,
+			expectedReason:  PodFeatureUnsupported,
+			expectedMessage: "Pod requires node features that are not available: FeatureUpdateOnly",
 		},
 	}
 
@@ -919,14 +1062,47 @@ func TestDeclaredFeaturesAdmitHandler(t *testing.T) {
 			framework := ndf.New(tc.registeredFeatures)
 			fs := framework.MustMapSorted(tc.nodeDeclaredFeatures)
 			handler := NewDeclaredFeaturesAdmitHandler(framework, fs, tc.version)
-			attrs := &PodAdmitAttributes{Pod: pod}
 
-			result := handler.Admit(tCtx, attrs)
+			result := handler.Admit(tCtx, tc.attrs)
 
 			require.Equal(t, tc.expectedAdmit, result.Admit)
 			if !result.Admit {
 				require.Equal(t, tc.expectedReason, result.Reason)
 				require.Contains(t, result.Message, tc.expectedMessage, "Expected message '%s' to contain '%s'", result.Message, tc.expectedMessage)
+				require.Equal(t, RejectionInfeasible, result.RejectionType)
+			}
+		})
+	}
+}
+
+func TestSecurityProfileOCIAdmitHandler(t *testing.T) {
+	ociPod := &v1.Pod{Spec: v1.PodSpec{
+		Containers: []v1.Container{{Name: "c", SecurityContext: &v1.SecurityContext{SeccompProfile: &v1.SeccompProfile{
+			Type: v1.SeccompProfileTypeOCI,
+			OCI:  &v1.SecurityProfileOCI{Ref: "registry.example.com/profile@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"},
+		}}}},
+	}}
+	plainPod := &v1.Pod{Spec: v1.PodSpec{Containers: []v1.Container{{Name: "c"}}}}
+
+	for _, tc := range []struct {
+		name     string
+		pod      *v1.Pod
+		features *kubecontainer.RuntimeFeatures
+		admit    bool
+	}{
+		{name: "pod without OCI profile", pod: plainPod, admit: true},
+		{name: "runtime supports OCI profiles", pod: ociPod, features: &kubecontainer.RuntimeFeatures{SeccompProfileOCI: true}, admit: true},
+		{name: "runtime without support", pod: ociPod, features: &kubecontainer.RuntimeFeatures{}},
+		{name: "runtime features unknown", pod: ociPod},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			handler := NewSecurityProfileOCIAdmitHandler(func() *kubecontainer.RuntimeFeatures { return tc.features })
+			result := handler.Admit(context.Background(), &PodAdmitAttributes{Pod: tc.pod})
+			if result.Admit != tc.admit {
+				t.Fatalf("Admit() = %v, want %v", result.Admit, tc.admit)
+			}
+			if !tc.admit && result.Reason != SecurityProfileOCIUnsupportedReason {
+				t.Errorf("unexpected reason %q", result.Reason)
 			}
 		})
 	}

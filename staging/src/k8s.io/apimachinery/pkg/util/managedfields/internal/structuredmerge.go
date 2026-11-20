@@ -18,13 +18,13 @@ package internal
 
 import (
 	"fmt"
-
 	"sigs.k8s.io/structured-merge-diff/v7/fieldpath"
 	"sigs.k8s.io/structured-merge-diff/v7/merge"
 	"sigs.k8s.io/structured-merge-diff/v7/typed"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -100,6 +100,15 @@ func (f *structuredMergeManager) Update(liveObj, newObj runtime.Object, managed 
 	newObjTyped, err := f.typeConverter.ObjectToTyped(newObjVersioned, typed.AllowDuplicates)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to convert new object (%v) to smd typed: %v", objectGVKNN(newObjVersioned), err)
+	}
+	// Temporarily clear managedFields on liveObjVersioned so ObjectToTyped and
+	// updater.Update do not walk it (newObj's managedFields are already cleared,
+	// and stripMetaManager ignores metadata.managedFields).
+	if liveMeta, ok := liveObjVersioned.(metav1.ObjectMetaAccessor); ok {
+		objectMeta := liveMeta.GetObjectMeta()
+		managedFields := objectMeta.GetManagedFields()
+		objectMeta.SetManagedFields(nil)
+		defer objectMeta.SetManagedFields(managedFields)
 	}
 	liveObjTyped, err := f.typeConverter.ObjectToTyped(liveObjVersioned, typed.AllowDuplicates)
 	if err != nil {

@@ -29,9 +29,12 @@ import (
 	"testing"
 
 	restful "github.com/emicklei/go-restful/v3"
+	jose "github.com/go-jose/go-jose/v4"
 	"github.com/google/go-cmp/cmp"
-	jose "gopkg.in/go-jose/go-jose.v2"
 
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/routes"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 )
@@ -97,6 +100,10 @@ func TestServeConfiguration(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	mldsaKeysGetter, err := serviceaccount.StaticPublicKeysGetter([]interface{}{getPublicKey(mldsa44PublicKey)})
+	if err != nil {
+		t.Fatal(err)
+	}
 	keysGetter := &proxyKeyGetter{PublicKeysGetter: ecKeysGetter}
 	s, jwksURI := setupServer(t, exampleIssuer, keysGetter)
 	defer s.Close()
@@ -115,6 +122,13 @@ func TestServeConfiguration(t *testing.T) {
 		SubjectTypes:  []string{"public"},
 		SigningAlgs:   []string{"RS256"},
 	}
+	wantMLDSA := Configuration{
+		Issuer:        exampleIssuer,
+		JWKSURI:       jwksURI,
+		ResponseTypes: []string{"id_token"},
+		SubjectTypes:  []string{"public"},
+		SigningAlgs:   []string{"ML-DSA-44"},
+	}
 	reqURL := s.URL + "/.well-known/openid-configuration"
 
 	expectConfiguration(t, reqURL, wantEC)
@@ -128,6 +142,16 @@ func TestServeConfiguration(t *testing.T) {
 		listener.Enqueue()
 	}
 	expectConfiguration(t, reqURL, wantRSA)
+
+	keysGetter.PublicKeysGetter = mldsaKeysGetter
+
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceAccountTokenMLDSA, true)
+
+	// notify the metadata the keys changed, expected a modified response
+	for _, listener := range keysGetter.listeners {
+		listener.Enqueue()
+	}
+	expectConfiguration(t, reqURL, wantMLDSA)
 }
 
 func expectConfiguration(t *testing.T, reqURL string, want Configuration) {
@@ -168,7 +192,7 @@ func TestServeKeys(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var serveKeysTests = []struct {
+	serveKeysTests := []struct {
 		Name               string
 		Keys               []interface{}
 		WantKeys           []jose.JSONWebKey
@@ -349,6 +373,7 @@ func TestServeKeys(t *testing.T) {
 		})
 	}
 }
+
 func expectKeys(t *testing.T, reqURL string, wantKeys []jose.JSONWebKey) {
 	resp, err := http.Get(reqURL)
 	if err != nil {

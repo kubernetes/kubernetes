@@ -22,13 +22,15 @@ import (
 	"math"
 
 	v1 "k8s.io/api/core/v1"
-	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	draapi "k8s.io/dynamic-resource-allocation/api"
 	"k8s.io/dynamic-resource-allocation/structured"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 )
 
@@ -56,7 +58,7 @@ type draPreScoreState struct {
 	// allocatedState holds the DRA allocated state for DRA extended resources scoring.
 	allocatedState *structured.AllocatedState
 	// resourceSlices holds the list of resource slices for DRA extended resource scoring.
-	resourceSlices []*resourceapi.ResourceSlice
+	resourceSlices []*draapi.ResourceSlice
 }
 
 // balancedAllocationPreScoreState computed at PreScore and used at Score.
@@ -77,10 +79,12 @@ func (s *balancedAllocationPreScoreState) Clone() fwk.StateData {
 // PreScore calculates incoming pod's resource requests and writes them to the cycle state used.
 func (ba *BalancedAllocation) PreScore(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) *fwk.Status {
 	podRequests := ba.calculatePodResourceRequestList(pod, ba.resources)
-	if ba.isBestEffortPod(podRequests) {
+	if ba.isBestEffortPod(podRequests) && !ba.hasExtraNodeAllocatableResources(cycleState, nodes...) {
 		// Skip BalancedAllocation scoring for best-effort pods to
 		// prevent a large number of pods from being scheduled to the same node.
 		// See https://github.com/kubernetes/kubernetes/issues/129138 for details.
+		// A pod whose CPU or memory comes only from DRA devices requests nothing in
+		// its spec but does consume node resources, so it keeps being scored.
 		return fwk.NewStatus(fwk.Skip)
 	}
 	state := &balancedAllocationPreScoreState{
@@ -131,7 +135,7 @@ func (pl *BalancedAllocation) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.S
 				continue
 			}
 
-			if shouldDelegateResourceToDRA(rName, nil, pl.draManager, opts) {
+			if helper.ShouldDelegateResourceToDRA(rName, nil, pl.draManager, opts) {
 				return nil, fwk.NewStatus(fwk.Unschedulable, "signature disabled when dra extended resources are used in the cluster")
 			}
 		}
@@ -147,7 +151,7 @@ func (ba *BalancedAllocation) Score(ctx context.Context, state fwk.CycleState, p
 	s, err := getBalancedAllocationPreScoreState(state)
 	if err != nil {
 		s = &balancedAllocationPreScoreState{podRequests: ba.calculatePodResourceRequestList(pod, ba.resources)}
-		if ba.isBestEffortPod(s.podRequests) {
+		if ba.isBestEffortPod(s.podRequests) && !ba.hasExtraNodeAllocatableResources(state, nodeInfo) {
 			return 0, nil
 		}
 		if ba.enableDRAExtendedResource {
@@ -166,7 +170,26 @@ func (ba *BalancedAllocation) Score(ctx context.Context, state fwk.CycleState, p
 	// Detail: score = (1 - std) * MaxNodeScore, where std is calculated by the root square of Σ((fraction(i)-mean)^2)/len(resources)
 	// The algorithm is partly inspired by:
 	// "Wei Huang et al. An Energy Efficient Virtual Machine Placement Algorithm with Balanced Resource Utilization"
-	return ba.score(ctx, pod, nodeInfo, s.podRequests, s.draPreScoreState)
+	podRequests := ba.calculatePodRequestWithExtraNodeAllocatable(state, pod, nodeInfo.Node().Name, s.podRequests)
+	return ba.score(ctx, pod, nodeInfo, podRequests, s.draPreScoreState)
+}
+
+// hasExtraNodeAllocatableResources returns true when some plugin recorded extra node
+// allocatable resources for the pod on any of the given nodes.
+func (ba *BalancedAllocation) hasExtraNodeAllocatableResources(cycleState fwk.CycleState, nodes ...fwk.NodeInfo) bool {
+	if !ba.enableDRANodeAllocatableResources {
+		return false
+	}
+	state := framework.GetExtraNodeAllocatableResourcesState(cycleState)
+	if state == nil {
+		return false
+	}
+	for _, nodeInfo := range nodes {
+		if node := nodeInfo.Node(); node != nil && state.Has(node.Name) {
+			return true
+		}
+	}
+	return false
 }
 
 // ScoreExtensions of the Score plugin.
@@ -188,15 +211,15 @@ func NewBalancedAllocation(_ context.Context, baArgs runtime.Object, h fwk.Handl
 	return &BalancedAllocation{
 		handle: h,
 		resourceAllocationScorer: resourceAllocationScorer{
-			Name:                            BalancedAllocationName,
-			enableInPlacePodVerticalScaling: fts.EnableInPlacePodVerticalScaling,
-			enablePodLevelResources:         fts.EnablePodLevelResources,
-			enableDRAExtendedResource:       fts.EnableDRAExtendedResource,
-			scorer:                          balancedResourceScorer,
-			useRequested:                    true,
-			resources:                       args.Resources,
+			Name:                      BalancedAllocationName,
+			enablePodLevelResources:   fts.EnablePodLevelResources,
+			enableDRAExtendedResource: fts.EnableDRAExtendedResource,
+			scorer:                    balancedResourceScorer,
+			useRequested:              true,
+			resources:                 args.Resources,
 			enableInPlacePodLevelResourcesVerticalScaling: fts.EnableInPlacePodLevelResourcesVerticalScaling,
-			draManager: h.SharedDRAManager(),
+			enableDRANodeAllocatableResources:             fts.EnableDRANodeAllocatableResources,
+			draManager:                                    h.SharedDRAManager(),
 		},
 	}, nil
 }

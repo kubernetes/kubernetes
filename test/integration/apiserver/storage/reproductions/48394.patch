@@ -1,0 +1,29 @@
+diff --git a/staging/src/k8s.io/apiserver/pkg/storage/etcd3/store.go b/staging/src/k8s.io/apiserver/pkg/storage/etcd3/store.go
+index 05ae1e5ef8e..2bac6d3b9ff 100644
+--- a/staging/src/k8s.io/apiserver/pkg/storage/etcd3/store.go
++++ b/staging/src/k8s.io/apiserver/pkg/storage/etcd3/store.go
+@@ -497,22 +497,8 @@ func (s *store) updateOnce(ctx context.Context, preparedKey string, destination
+ 	span.AddEvent("Encode succeeded", attribute.Int("len", len(data)))
+ 
+ 	if !origState.Stale && bytes.Equal(data, origState.Data) {
+-		// If we skipped the original Get in this loop, we must refresh from
+-		// etcd in order to be sure the data in the store is equivalent to
+-		// our desired serialization before short-circuiting a write.
+-		if !origState.FromStorage {
+-			origState, err = s.getCurrentState(ctx, "updateGet", preparedKey, v, ignoreNotFound, false)
+-			if err != nil {
+-				return origState, false, err
+-			}
+-			if !bytes.Equal(data, origState.Data) {
+-				// original data changed, restart loop
+-				if !getOnFailure {
+-					return origState, false, storage.NewResourceVersionConflictsError(preparedKey, origState.Rev)
+-				}
+-				return origState, false, nil
+-			}
+-		}
++		// BUG REVERT (#48394): short-circuit no-op updates against a stale cached
++		// suggestion without refreshing from etcd to verify live stored data.
+ 		// recheck that the data from etcd is not stale before short-circuiting a write
+ 		if !origState.Stale {
+ 			err = s.decoder.Decode(origState.Data, destination, origState.Rev)

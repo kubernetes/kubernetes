@@ -17,6 +17,7 @@ limitations under the License.
 package util
 
 import (
+	"math"
 	"os"
 	"reflect"
 	"runtime"
@@ -143,6 +144,64 @@ func TestCalculateTimeoutForVolume(t *testing.T) {
 	timeout = CalculateTimeoutForVolume(50, 30, pv)
 	if timeout != 4500 {
 		t.Errorf("Expected 4500 for timeout but got %v", timeout)
+	}
+
+	// Largest size whose timeout fits the activeDeadlineSeconds ceiling.
+	pv.Spec.Capacity[v1.ResourceStorage] = resource.MustParse("71582788Gi")
+	timeout = CalculateTimeoutForVolume(50, 30, pv)
+	if timeout != 2147483640 {
+		t.Errorf("Expected 2147483640 for timeout but got %v", timeout)
+	}
+
+	// The size fits int64 but the product does not fit int32.
+	pv.Spec.Capacity[v1.ResourceStorage] = resource.MustParse("71582789Gi")
+	timeout = CalculateTimeoutForVolume(50, 30, pv)
+	if timeout != math.MaxInt32 {
+		t.Errorf("Expected %v for timeout but got %v", int64(math.MaxInt32), timeout)
+	}
+
+	pv.Spec.Capacity[v1.ResourceStorage] = resource.MustParse("100E")
+	timeout = CalculateTimeoutForVolume(50, 30, pv)
+	if timeout != math.MaxInt32 {
+		t.Errorf("Expected %v for timeout but got %v", int64(math.MaxInt32), timeout)
+	}
+
+	// Past int64: Value() saturates, and the timeout is still capped.
+	pv.Spec.Capacity[v1.ResourceStorage] = resource.MustParse("18446744073709551616")
+	timeout = CalculateTimeoutForVolume(50, 30, pv)
+	if timeout != math.MaxInt32 {
+		t.Errorf("Expected %v for timeout but got %v", int64(math.MaxInt32), timeout)
+	}
+
+	// A large increment must not wrap the product. The increment is an int32
+	// flag with no validation bound, and at this size the Gi count is
+	// 8589934591, so anything above 1073741824 overflows the multiplication.
+	pv.Spec.Capacity[v1.ResourceStorage] = resource.MustParse("100E")
+	timeout = CalculateTimeoutForVolume(50, math.MaxInt32, pv)
+	if timeout != math.MaxInt32 {
+		t.Errorf("Expected %v for timeout but got %v", int64(math.MaxInt32), timeout)
+	}
+
+	// The product fits int64 but not int32.
+	pv.Spec.Capacity[v1.ResourceStorage] = resource.MustParse("2Gi")
+	timeout = CalculateTimeoutForVolume(50, math.MaxInt32, pv)
+	if timeout != math.MaxInt32 {
+		t.Errorf("Expected %v for timeout but got %v", int64(math.MaxInt32), timeout)
+	}
+
+	// A negative increment must not wrap the product either: at 100E it wraps
+	// to 2147483648, which the cap would hand back as a 68-year deadline.
+	pv.Spec.Capacity[v1.ResourceStorage] = resource.MustParse("100E")
+	timeout = CalculateTimeoutForVolume(50, math.MinInt32, pv)
+	if timeout != 50 {
+		t.Errorf("Expected 50 for timeout but got %v", timeout)
+	}
+
+	// Below the wrap a negative increment already fell back to the minimum.
+	pv.Spec.Capacity[v1.ResourceStorage] = resource.MustParse("2Gi")
+	timeout = CalculateTimeoutForVolume(50, math.MinInt32, pv)
+	if timeout != 50 {
+		t.Errorf("Expected 50 for timeout but got %v", timeout)
 	}
 }
 

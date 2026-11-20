@@ -23,4 +23,7 @@ const (
 	// Duplicated from PodResources API
 	DefaultQPS         = 100
 	DefaultBurstTokens = 10
+	// DefaultMaxConcurrentStreams is the maximum number of concurrent streams
+	// (WatchPods calls) per client connection.
+	DefaultMaxConcurrentStreams = 100
 )

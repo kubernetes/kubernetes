@@ -115,7 +115,7 @@ func NewPriorityClassInformerWithOptions(client kubernetes.Interface, options in
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
 func NewTypedPriorityClassInformerWithOptions(client kubernetes.Interface, options internalinterfaces.InformerOptions) PriorityClassIndexInformer {
-	gvr := schema.GroupVersionResource{Group: "scheduling.k8s.io", Version: "v1", Resource: "priorityclasss"}
+	gvr := schema.GroupVersionResource{Group: "scheduling.k8s.io", Version: "v1", Resource: "priorityclasses"}
 	identifier := options.InformerName.WithResource(gvr)
 	tweakListOptions := options.TweakListOptions
 	return cache.NewTypedSharedIndexInformer[*apischedulingv1.PriorityClass](cache.NewSharedIndexInformerWithOptions(

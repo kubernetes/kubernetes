@@ -14,7 +14,21 @@ func IsImageMatched(s, t string) bool {
 	// Tag values are limited to [a-zA-Z0-9_.{}-].
 	// Some tools like Bazel rules_k8s allow tag patterns with {} characters.
 	// More info: https://github.com/bazelbuild/rules_k8s/pull/423
-	pattern, _ := regexp.Compile("^" + t + "(:[a-zA-Z0-9_.{}-]*)?(@sha256:[a-zA-Z0-9_.{}-]*)?$")
+	//
+	// The digest algorithm is matched following the OCI grammar
+	// (algorithm-component separated by one of [+._-], e.g. sha256, sha512,
+	// multihash+base58) rather than hard-coded to sha256, so that references
+	// using any OCI-valid digest algorithm match consistently with Split,
+	// which accepts any algorithm.
+	// See https://github.com/opencontainers/image-spec/blob/main/descriptor.md#digests
+	// The name t comes from kustomization images[].name and is interpolated
+	// into the pattern directly, so it can be an invalid regexp (for example
+	// "["). When it fails to compile, treat it as matching nothing rather than
+	// dereferencing a nil *Regexp, which would panic during the build.
+	pattern, err := regexp.Compile("^" + t + "(:[a-zA-Z0-9_.{}-]*)?(@[a-zA-Z0-9]+([.+_-][a-zA-Z0-9]+)*:[a-zA-Z0-9_.{}-]*)?$")
+	if err != nil {
+		return false
+	}
 	return pattern.MatchString(s)
 }
 

@@ -90,10 +90,10 @@ func TestBootstrapPriorityLevelConfigurationWithBorrowing(t *testing.T) {
 			continue
 		}
 		if test.nominalSharesExpected != *bootstrapPL.Spec.Limited.NominalConcurrencyShares {
-			t.Errorf("bootstrap PriorityLevelConfiguration %q: expected NominalConcurrencyShares: %d, but got: %d", test.name, test.nominalSharesExpected, bootstrapPL.Spec.Limited.NominalConcurrencyShares)
+			t.Errorf("bootstrap PriorityLevelConfiguration %q: expected NominalConcurrencyShares: %d, but got: %d", test.name, test.nominalSharesExpected, *bootstrapPL.Spec.Limited.NominalConcurrencyShares)
 		}
 		if test.lendablePercentexpected != *bootstrapPL.Spec.Limited.LendablePercent {
-			t.Errorf("bootstrap PriorityLevelConfiguration %q: expected NominalConcurrencyShares: %d, but got: %d", test.name, test.lendablePercentexpected, bootstrapPL.Spec.Limited.LendablePercent)
+			t.Errorf("bootstrap PriorityLevelConfiguration %q: expected NominalConcurrencyShares: %d, but got: %d", test.name, test.lendablePercentexpected, *bootstrapPL.Spec.Limited.LendablePercent)
 		}
 		if bootstrapPL.Spec.Limited.BorrowingLimitPercent != nil {
 			t.Errorf("bootstrap PriorityLevelConfiguration %q: expected BorrowingLimitPercent to be nil, but got: %d", test.name, *bootstrapPL.Spec.Limited.BorrowingLimitPercent)

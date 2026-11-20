@@ -76,6 +76,10 @@ func (m *Quantity) Size() (n int) {
 	_ = l
 
 	// BEGIN CUSTOM SIZE
+	// Deliberately uses String(), not CacheString(): Size() only measures the
+	// value, it must not mutate the Quantity being encoded. This means
+	// MarshalToSizedBuffer() recomputes the canonical string again, but that's
+	// the cost of not surprising callers with a mutating "read" path.
 	l = len(m.String())
 	// END CUSTOM SIZE
 
@@ -89,6 +93,9 @@ func sovGenerated(x uint64) (n int) {
 
 // Unmarshal is a customized version of the generated Protobuf unmarshaler for a struct
 // with a single string field.
+//
+// This function is unsafe to call concurrently with method calls from other
+// goroutines (even to read-only methods).
 func (m *Quantity) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0

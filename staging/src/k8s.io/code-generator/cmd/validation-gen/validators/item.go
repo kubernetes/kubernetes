@@ -131,8 +131,11 @@ func (itv *itemTagValidator) GetValidations(context Context, tag codetags.Tag) (
 			}
 			deferredResult := Validations{}
 			for _, vfn := range validations.Functions {
-				f := Function(itemTagName, vfn.Flags, validateFunc, matchArg, equivArg, WrapperFunction{Function: vfn, ObjType: elemT})
+				f := Function(itemTagName, vfn.Flags, validateFunc, matchArg, equivArg, WrapperFunction{Function: vfn, ObjType: elemT, PathFragment: "[*]"})
 				f.Cohort = itemKey
+				if vfn.Cohort != "" {
+					f.Cohort = itemKey + "." + vfn.Cohort
+				}
 				vfn = f
 				deferredResult.AddFunction(vfn)
 			}
@@ -175,8 +178,11 @@ func (itv *itemTagValidator) GetValidations(context Context, tag codetags.Tag) (
 					// mistakenly attempt to pass individual list elements to it.
 					return fn
 				}
-				f := Function(itemTagName, fn.Flags, validateFunc, matchArg, equivArg, WrapperFunction{Function: fn, ObjType: elemT})
+				f := Function(itemTagName, fn.Flags, validateFunc, matchArg, equivArg, WrapperFunction{Function: fn, ObjType: elemT, PathFragment: "[*]"})
 				f.Cohort = itemKey
+				if fn.Cohort != "" {
+					f.Cohort = itemKey + "." + fn.Cohort
+				}
 				return f
 			}, d.Scope), nil
 		}))

@@ -27,6 +27,7 @@ import (
 	"path/filepath"
 	"regexp"
 	goruntime "runtime"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -107,16 +108,28 @@ func (m *kubeGenericRuntimeManager) recordContainerEvent(ctx context.Context, po
 // containers, plus some additional fields. In both cases startSpec.container will be set.
 type startSpec struct {
 	container          *v1.Container
+	containerType      podutil.ContainerType
 	ephemeralContainer *v1.EphemeralContainer
 }
 
 func containerStartSpec(c *v1.Container) *startSpec {
-	return &startSpec{container: c}
+	return &startSpec{
+		container:     c,
+		containerType: podutil.Containers,
+	}
+}
+
+func initContainerStartSpec(c *v1.Container) *startSpec {
+	return &startSpec{
+		container:     c,
+		containerType: podutil.InitContainers,
+	}
 }
 
 func ephemeralContainerStartSpec(ec *v1.EphemeralContainer) *startSpec {
 	return &startSpec{
 		container:          (*v1.Container)(&ec.EphemeralContainerCommon),
+		containerType:      podutil.EphemeralContainers,
 		ephemeralContainer: ec,
 	}
 }
@@ -193,7 +206,7 @@ func (m *kubeGenericRuntimeManager) getPodRuntimeHandler(pod *v1.Pod) (podRuntim
 
 // startContainer starts a container and returns a message indicates why it is failed on error.
 // It starts the container through the following steps:
-// * pull the image
+// * pull the security profile and the image
 // * create the container
 // * start the container
 // * run the post start lifecycle hooks (if applicable)
@@ -201,7 +214,7 @@ func (m *kubeGenericRuntimeManager) startContainer(ctx context.Context, podSandb
 	logger := klog.FromContext(ctx)
 	container := spec.container
 
-	// Step 1: pull the image.
+	// Step 1: pull the security profile and the image.
 	podRuntimeHandler, err := m.getPodRuntimeHandler(pod)
 	if err != nil {
 		return "", err
@@ -210,6 +223,11 @@ func (m *kubeGenericRuntimeManager) startContainer(ctx context.Context, podSandb
 	ref, err := kubecontainer.GenerateContainerRef(pod, container)
 	if err != nil {
 		logger.Error(err, "Couldn't make a ref to pod", "pod", klog.KObj(pod), "containerName", container.Name)
+	}
+
+	if msg, err := m.ensureContainerSecurityProfile(ctx, ref, pod, container, pullSecrets, podSandboxConfig, podRuntimeHandler); err != nil {
+		m.recordContainerEvent(ctx, pod, container, "", v1.EventTypeWarning, events.FailedToCreateContainer, "Error: %v", msg)
+		return msg, err
 	}
 
 	imageRef, msg, err := m.imagePuller.EnsureImageExists(ctx, ref, pod, container.Image, pullSecrets, podSandboxConfig, podRuntimeHandler, container.ImagePullPolicy)
@@ -261,8 +279,8 @@ func (m *kubeGenericRuntimeManager) startContainer(ctx context.Context, podSandb
 		return s.Message(), ErrCreateContainerConfig
 	}
 
-	// When creating a container, mark the resources as actuated.
-	if err := m.setActuatedContainerResources(logger, pod, container); err != nil {
+	// When creating a container, record its whole spec as actuated.
+	if err := m.setActuatedContainer(logger, pod, container, spec.containerType); err != nil {
 		m.recordContainerEvent(ctx, pod, container, "", v1.EventTypeWarning, events.FailedToCreateContainer, "Error: %v", err)
 		return err.Error(), ErrCreateContainerConfig
 	}
@@ -296,6 +314,9 @@ func (m *kubeGenericRuntimeManager) startContainer(ctx context.Context, podSandb
 		return s.Message(), kubecontainer.ErrRunContainer
 	}
 	m.recordContainerEvent(ctx, pod, container, containerID, v1.EventTypeNormal, events.StartedContainer, "Container started")
+
+	// Initial delays include time spent in PostStart.
+	startedAt := time.Now()
 
 	// Symlink container logs to the legacy container log location for cluster logging
 	// support.
@@ -335,6 +356,9 @@ func (m *kubeGenericRuntimeManager) startContainer(ctx context.Context, podSandb
 			return msg, ErrPostStartHook
 		}
 	}
+
+	// Probes may depend on initialization performed by PostStart.
+	m.probeLifecycle.StartProbes(ctx, pod, container, kubecontainer.ContainerID{Type: m.runtimeName, ID: containerID}, podIPs, startedAt)
 
 	return "", nil
 }
@@ -407,7 +431,14 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(ctx context.Context,
 	return config, cleanupAction, nil
 }
 
-func (m *kubeGenericRuntimeManager) updateContainerResources(ctx context.Context, pod *v1.Pod, container *v1.Container, containerID kubecontainer.ContainerID) error {
+func (m *kubeGenericRuntimeManager) updateContainerResources(ctx context.Context, pod *v1.Pod, container *v1.Container, containerID kubecontainer.ContainerID, containerType podutil.ContainerType) error {
+	return m.updateContainerResourcesAndRecord(ctx, pod, container, container, containerID, containerType)
+}
+
+// updateContainerResourcesAndRecord sends the resources derived from container
+// to the runtime and records actuated in the actuated checkpoint. They differ
+// only when the CRI request carries values that are not part of the spec.
+func (m *kubeGenericRuntimeManager) updateContainerResourcesAndRecord(ctx context.Context, pod *v1.Pod, container, actuated *v1.Container, containerID kubecontainer.ContainerID, containerType podutil.ContainerType) error {
 	logger := klog.FromContext(ctx)
 	containerResources := m.generateContainerResources(ctx, pod, container)
 	if containerResources == nil {
@@ -415,18 +446,41 @@ func (m *kubeGenericRuntimeManager) updateContainerResources(ctx context.Context
 	}
 	err := m.runtimeService.UpdateContainerResources(ctx, containerID.ID, containerResources)
 	if err == nil {
-		err = m.setActuatedContainerResources(logger, pod, container)
+		err = m.setActuatedContainerResources(logger, pod, actuated, containerType)
 	}
 	return err
 }
 
-func (m *kubeGenericRuntimeManager) setActuatedContainerResources(logger klog.Logger, pod *v1.Pod, container *v1.Container) error {
+func (m *kubeGenericRuntimeManager) setActuatedContainerResources(logger klog.Logger, pod *v1.Pod, container *v1.Container, containerType podutil.ContainerType) error {
+	return m.actuatedState.SetContainerResources(logger, pod.UID, container.Name, containerType, actuatedContainerResources(pod, container))
+}
+
+// setActuatedContainer records the whole spec of a container that is being started, so that it can
+// still be looked up after the container is removed from the pod spec.
+func (m *kubeGenericRuntimeManager) setActuatedContainer(logger klog.Logger, pod *v1.Pod, container *v1.Container, containerType podutil.ContainerType) error {
+	actuated := container.DeepCopy()
+	actuated.Resources = actuatedContainerResources(pod, container)
+	return m.actuatedState.SetContainer(logger, pod.UID, containerType, *actuated)
+}
+
+func actuatedContainerResources(pod *v1.Pod, container *v1.Container) v1.ResourceRequirements {
 	containerResources := container.Resources
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) {
 		containerResources = *containerResources.DeepCopy()
 		containerResources.Limits = kubeutil.GetLimits(&kubeutil.ResourceOpts{PodResources: pod.Spec.Resources, ContainerResources: &container.Resources})
 	}
-	return m.actuatedState.SetContainerResources(logger, pod.UID, container.Name, containerResources)
+	return containerResources
+}
+
+// getActuatedContainer returns the spec a container of the given type was last started with, if
+// recorded. It is used for containers removed from the pod spec.
+func (m *kubeGenericRuntimeManager) getActuatedContainer(podUID kubetypes.UID, containerName string, containerType podutil.ContainerType) (*v1.Container, bool) {
+	c, ok := m.actuatedState.GetContainer(podUID, containerName, containerType)
+	// A record written by an older kubelet holds only resources, and has no image.
+	if !ok || c.Image == "" {
+		return nil, false
+	}
+	return c, true
 }
 
 func (m *kubeGenericRuntimeManager) updatePodSandboxResources(ctx context.Context, sandboxID string, pod *v1.Pod, podResources *cm.ResourceConfig) error {
@@ -689,25 +743,22 @@ func (m *kubeGenericRuntimeManager) getPodContainerStatuses(ctx context.Context,
 func (m *kubeGenericRuntimeManager) toKubeContainerStatus(ctx context.Context, podUID kubetypes.UID, status *runtimeapi.ContainerStatus, runtimeName string) *kubecontainer.Status {
 	annotatedInfo := getContainerInfoFromAnnotations(ctx, status.Annotations)
 	labeledInfo := getContainerInfoFromLabels(ctx, status.Labels)
-	var cStatusResources *kubecontainer.ContainerResources
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-		// If runtime reports cpu & memory resources info, add it to container status
-		cStatusResources = toKubeContainerResources(status.Resources)
+	// If runtime reports cpu & memory resources info, add it to container status
+	cStatusResources := toKubeContainerResources(status.Resources)
 
-		// Fill missing resource values from the actuated resources.
-		if cStatusResources == nil || cStatusResources.MemoryRequest == nil {
-			if actuatedResources, ok := m.actuatedState.GetContainerResources(podUID, labeledInfo.ContainerName); ok {
-				if cStatusResources == nil {
-					cStatusResources = &kubecontainer.ContainerResources{
-						CPURequest:    actuatedResources.Requests.Cpu(),
-						CPULimit:      actuatedResources.Limits.Cpu(),
-						MemoryRequest: actuatedResources.Requests.Memory(),
-						MemoryLimit:   actuatedResources.Limits.Memory(),
-					}
-				} else if cStatusResources.MemoryRequest == nil {
-					if memReq := actuatedResources.Requests[v1.ResourceMemory]; !memReq.IsZero() {
-						cStatusResources.MemoryRequest = &memReq
-					}
+	// Fill missing resource values from the actuated resources.
+	if cStatusResources == nil || cStatusResources.MemoryRequest == nil {
+		if actuatedResources, ok := m.actuatedState.GetContainerResources(podUID, labeledInfo.ContainerName); ok {
+			if cStatusResources == nil {
+				cStatusResources = &kubecontainer.ContainerResources{
+					CPURequest:    actuatedResources.Requests.Cpu(),
+					CPULimit:      actuatedResources.Limits.Cpu(),
+					MemoryRequest: actuatedResources.Requests.Memory(),
+					MemoryLimit:   actuatedResources.Limits.Memory(),
+				}
+			} else if cStatusResources.MemoryRequest == nil {
+				if memReq := actuatedResources.Requests[v1.ResourceMemory]; !memReq.IsZero() {
+					cStatusResources.MemoryRequest = &memReq
 				}
 			}
 		}
@@ -719,10 +770,7 @@ func (m *kubeGenericRuntimeManager) toKubeContainerStatus(ctx context.Context, p
 		imageID = status.ImageId
 	}
 
-	var cStatusUser *kubecontainer.ContainerUser
-	if utilfeature.DefaultFeatureGate.Enabled(features.SupplementalGroupsPolicy) {
-		cStatusUser = toKubeContainerUser(status.User)
-	}
+	cStatusUser := toKubeContainerUser(status.User)
 
 	var cStatusStopSignal *v1.Signal
 	if utilfeature.DefaultFeatureGate.Enabled(features.ContainerStopSignals) {
@@ -754,9 +802,10 @@ func (m *kubeGenericRuntimeManager) toKubeContainerStatus(ctx context.Context, p
 	}
 
 	if status.State != runtimeapi.ContainerState_CONTAINER_CREATED {
-		// If container is not in the created state, we have tried and
-		// started the container. Set the StartedAt time.
 		cStatus.StartedAt = time.Unix(0, status.StartedAt)
+		if cStatus.StartedAt.Equal(time.Unix(0, 0)) {
+			cStatus.StartedAt = time.Time{}
+		}
 	}
 	if status.State == runtimeapi.ContainerState_CONTAINER_EXITED {
 		cStatus.Reason = status.Reason
@@ -801,6 +850,11 @@ func (m *kubeGenericRuntimeManager) executePreStopHook(ctx context.Context, pod 
 	select {
 	case <-time.After(time.Duration(gracePeriod) * time.Second):
 		logger.V(2).Info("PreStop hook not completed in grace period", "pod", klog.KObj(pod), "podUID", pod.UID,
+			"containerName", containerSpec.Name, "containerID", containerID.String(), "gracePeriod", gracePeriod)
+	case <-ctx.Done():
+		// A shorter deletion grace period supersedes this hook invocation. The
+		// queued pod worker update will retry termination with the new deadline.
+		logger.V(2).Info("PreStop hook interrupted", "pod", klog.KObj(pod), "podUID", pod.UID,
 			"containerName", containerSpec.Name, "containerID", containerID.String(), "gracePeriod", gracePeriod)
 	case <-done:
 		logger.V(3).Info("PreStop hook completed", "pod", klog.KObj(pod), "podUID", pod.UID,
@@ -863,19 +917,32 @@ func (m *kubeGenericRuntimeManager) restoreSpecsFromContainerLabels(ctx context.
 // * Stop the container.
 func (m *kubeGenericRuntimeManager) killContainer(ctx context.Context, pod *v1.Pod, containerID kubecontainer.ContainerID, containerName string, message string, reason containerKillReason, gracePeriodOverride *int64, ordering *terminationOrdering) error {
 	logger := klog.FromContext(ctx)
+
+	// Stop liveness and startup probes immediately to avoid redundant probing during shutdown.
+	// Readiness probes continue running so draining containers can be marked NotReady.
+	m.probeLifecycle.StopProbes(containerID, kubecontainer.LivenessProbe|kubecontainer.StartupProbe)
+
 	var containerSpec *v1.Container
 	if pod != nil {
-		if containerSpec = kubecontainer.GetContainerSpec(pod, containerName); containerSpec == nil {
-			return fmt.Errorf("failed to get containerSpec %q (id=%q) in pod %q when killing container for reason %q",
-				containerName, containerID.String(), format.Pod(pod), message)
+		containerSpec = kubecontainer.GetContainerSpec(pod, containerName)
+		if containerSpec == nil {
+			// The container may have been removed from the pod spec, which only regular containers
+			// can be; use the spec it was started with, if recorded.
+			containerSpec, _ = m.getActuatedContainer(pod.UID, containerName, podutil.Containers)
 		}
-	} else {
-		// Restore necessary information if one of the specs is nil.
+	}
+	if containerSpec == nil {
+		// The pod may be unknown, or the container spec wasn't recorded; fall back to the specs
+		// recorded in the container labels.
 		restoredPod, restoredContainer, err := m.restoreSpecsFromContainerLabels(ctx, containerID)
 		if err != nil {
 			return err
 		}
-		pod, containerSpec = restoredPod, restoredContainer
+		// Prefer the live pod when available since it carries the current grace period and deletion state.
+		if pod == nil {
+			pod = restoredPod
+		}
+		containerSpec = restoredContainer
 	}
 
 	// From this point, pod and container must be non-nil.
@@ -901,7 +968,10 @@ func (m *kubeGenericRuntimeManager) killContainer(ctx context.Context, pod *v1.P
 	// time remaining
 	if ordering != nil && gracePeriod > 0 {
 		// grace period is only in seconds, so the time we've waited gets truncated downward
-		gracePeriod -= int64(ordering.waitForTurn(containerName, gracePeriod))
+		gracePeriod -= int64(ordering.waitForTurn(ctx, containerName, gracePeriod))
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 	}
 
 	// always give containers a minimal shutdown window to avoid unnecessary SIGKILLs
@@ -921,6 +991,10 @@ func (m *kubeGenericRuntimeManager) killContainer(ctx context.Context, pod *v1.P
 	logger.V(3).Info("Container exited normally", "pod", klog.KObj(pod), "podUID", pod.UID,
 		"containerName", containerName, "containerID", containerID.String())
 
+	// Container has stopped: stop the remaining readiness probe and drop all
+	// cached probe results.
+	m.probeLifecycle.StopProbes(containerID, kubecontainer.AllProbes)
+
 	if ordering != nil {
 		ordering.containerTerminated(containerName)
 	}
@@ -928,43 +1002,81 @@ func (m *kubeGenericRuntimeManager) killContainer(ctx context.Context, pod *v1.P
 	return nil
 }
 
-// killContainersWithSyncResult kills all pod's containers with sync results.
-func (m *kubeGenericRuntimeManager) killContainersWithSyncResult(ctx context.Context, pod *v1.Pod, runningPod kubecontainer.Pod, gracePeriodOverride *int64) (syncResults []*kubecontainer.SyncResult) {
-	logger := klog.FromContext(ctx)
-	containerResults := make(chan *kubecontainer.SyncResult, len(runningPod.Containers))
-	wg := sync.WaitGroup{}
-
-	wg.Add(len(runningPod.Containers))
-	var termOrdering *terminationOrdering
-	if types.HasRestartableInitContainer(pod) {
-		var runningContainerNames []string
-		for _, container := range runningPod.Containers {
-			runningContainerNames = append(runningContainerNames, container.Name)
-		}
-		termOrdering = newTerminationOrdering(pod, runningContainerNames)
-	}
+// killRunningPodContainers kills all running pod's containers.
+func (m *kubeGenericRuntimeManager) killRunningPodContainers(ctx context.Context, pod *v1.Pod, runningPod kubecontainer.Pod, gracePeriodOverride *int64) []*kubecontainer.SyncResult {
+	containersToKill := make(map[kubecontainer.ContainerID]containerToKillInfo, len(runningPod.Containers))
 	for _, container := range runningPod.Containers {
-		go func(container *kubecontainer.Container) {
-			defer utilruntime.HandleCrashWithContext(ctx)
-			defer wg.Done()
+		containersToKill[container.ID] = containerToKillInfo{
+			name:   container.Name,
+			reason: reasonUnknown,
+		}
+	}
+	var runningContainerNames []string
+	for _, container := range runningPod.Containers {
+		runningContainerNames = append(runningContainerNames, container.Name)
+	}
+	var termOrdering *terminationOrdering
+	if orderingPod := m.terminationOrderingPod(pod, runningContainerNames); types.HasRestartableInitContainer(orderingPod) {
+		termOrdering = newTerminationOrdering(orderingPod, runningContainerNames)
+	}
+	return m.killContainers(ctx, pod, containersToKill, gracePeriodOverride, termOrdering)
+}
 
-			killContainerResult := kubecontainer.NewSyncResult(kubecontainer.KillContainer, container.Name)
-			if err := m.killContainer(ctx, pod, container.ID, container.Name, "", reasonUnknown, gracePeriodOverride, termOrdering); err != nil {
+// killContainers kills the given containers concurrently and blocks until all of
+// them have been stopped. It returns one sync result per container, in no
+// particular order. If ordering is non-nil, it is used to enforce termination
+// ordering.
+func (m *kubeGenericRuntimeManager) killContainers(ctx context.Context, pod *v1.Pod, containersToKill map[kubecontainer.ContainerID]containerToKillInfo, gracePeriodOverride *int64, ordering *terminationOrdering) []*kubecontainer.SyncResult {
+	logger := klog.FromContext(ctx)
+	containerResults := make(chan *kubecontainer.SyncResult, len(containersToKill))
+	var wg sync.WaitGroup
+
+	for containerID, containerInfo := range containersToKill {
+		wg.Go(func() {
+			defer utilruntime.HandleCrashWithContext(ctx)
+
+			killContainerResult := kubecontainer.NewSyncResult(kubecontainer.KillContainer, containerInfo.name)
+			if err := m.killContainer(ctx, pod, containerID, containerInfo.name, containerInfo.message, containerInfo.reason, gracePeriodOverride, ordering); err != nil {
 				killContainerResult.Fail(kubecontainer.ErrKillContainer, err.Error())
-				// Use runningPod for logging as the pod passed in could be *nil*.
-				logger.Error(err, "Kill container failed", "pod", klog.KRef(runningPod.Namespace, runningPod.Name), "podUID", runningPod.ID,
-					"containerName", container.Name, "containerID", container.ID)
+				logger.Error(err, "Kill container failed", "pod", klog.KObj(pod), "podUID", pod.UID,
+					"containerName", containerInfo.name, "containerID", containerID)
 			}
 			containerResults <- killContainerResult
-		}(container)
+		})
 	}
 	wg.Wait()
 	close(containerResults)
 
+	syncResults := make([]*kubecontainer.SyncResult, 0, len(containersToKill))
 	for containerResult := range containerResults {
 		syncResults = append(syncResults, containerResult)
 	}
-	return
+	return syncResults
+}
+
+// terminationOrderingPod returns the pod to order the termination of its containers by. That's pod
+// plus the running containers that were removed from its spec, as they were started, so that
+// sidecars wait for them as they do for main containers.
+func (m *kubeGenericRuntimeManager) terminationOrderingPod(pod *v1.Pod, runningContainerNames []string) *v1.Pod {
+	if pod == nil {
+		return pod
+	}
+	var removed []v1.Container
+	for _, name := range runningContainerNames {
+		if kubecontainer.GetContainerSpec(pod, name) != nil {
+			continue
+		}
+		// Only regular containers can be removed from the pod spec.
+		if container, ok := m.getActuatedContainer(pod.UID, name, podutil.Containers); ok {
+			removed = append(removed, *container)
+		}
+	}
+	if len(removed) == 0 {
+		return pod
+	}
+	orderingPod := *pod
+	orderingPod.Spec.Containers = append(slices.Clone(pod.Spec.Containers), removed...)
+	return &orderingPod
 }
 
 // pruneInitContainersBeforeStart ensures that before we begin creating init
@@ -1034,9 +1146,19 @@ func (m *kubeGenericRuntimeManager) purgeInitContainers(ctx context.Context, pod
 // HasAnyRegularContainerCreated returns true if any regular container has been
 // created, which indicates all init containers have been initialized.
 func HasAnyRegularContainerCreated(pod *v1.Pod, podStatus *kubecontainer.PodStatus) bool {
-	for _, container := range pod.Spec.Containers {
-		status := podStatus.FindContainerStatusByName(container.Name)
-		if status == nil {
+	seen := sets.New[string]()
+	for _, status := range podStatus.ContainerStatuses {
+		// Only the most recent status of each container counts, as with FindContainerStatusByName.
+		if seen.Has(status.Name) {
+			continue
+		}
+		seen.Insert(status.Name)
+		// Only regular containers can be removed from the spec, and API validation doesn't let an
+		// added container reuse the name of a removed one while the pod reports its status, which
+		// it does while the removed container has runtime containers. So a container that isn't an
+		// init or ephemeral container is a regular one, even one that was removed from the spec.
+		if slices.ContainsFunc(pod.Spec.InitContainers, func(c v1.Container) bool { return c.Name == status.Name }) ||
+			slices.ContainsFunc(pod.Spec.EphemeralContainers, func(c v1.EphemeralContainer) bool { return c.Name == status.Name }) {
 			continue
 		}
 		switch status.State {
@@ -1294,11 +1416,6 @@ func (m *kubeGenericRuntimeManager) computeInitContainerActions(ctx context.Cont
 			changes.InitContainersToStart[l-1-i], changes.InitContainersToStart[i]
 	}
 
-	if !changes.UpdatePodLevelResources && !changes.UpdatePodResources {
-		// If any starting containers have resized, we need to resize the pod resources.
-		changes.UpdatePodResources = m.startingResizedContainer(logger, pod, pod.Spec.InitContainers, changes.InitContainersToStart)
-	}
-
 	return podHasInitialized
 }
 
@@ -1313,6 +1430,15 @@ func (m *kubeGenericRuntimeManager) GetContainerLogs(ctx context.Context, pod *v
 	status := resp.GetStatus()
 	if status == nil {
 		return remote.ErrContainerStatusNil
+	}
+	// Since v1.32, stdout may be nil if the stream is not requested.
+	if stdout != nil {
+		// Do a zero-byte write to stdout before handing off to the container runtime.
+		// This ensures at least one Write call is made to the writer when copying starts,
+		// even if we then block waiting for log output from the container.
+		if _, err := stdout.Write([]byte{}); err != nil {
+			return err
+		}
 	}
 	return m.ReadLogs(ctx, status.GetLogPath(), containerID.ID, logOptions, stdout, stderr)
 }

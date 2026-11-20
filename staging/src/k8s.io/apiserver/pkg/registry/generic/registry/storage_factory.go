@@ -37,14 +37,18 @@ func StorageWithCacher() generic.StorageDecorator {
 	return func(
 		storageConfig *storagebackend.ConfigForResource,
 		resourcePrefix string,
-		cacheKeyFunc func(obj runtime.Object) (string, error),
+		cacheKeyFunc generic.CacheKeyFunc,
+		reverseKeyFunc storage.ReverseKeyFunc,
 		newFunc func() runtime.Object,
 		newListFunc func() runtime.Object,
 		getAttrsFunc storage.AttrFunc,
 		triggerFuncs storage.IndexerFuncs,
 		indexers *cache.Indexers) (storage.Interface, factory.DestroyFunc, error) {
 
-		s, d, err := generic.NewRawStorage(storageConfig, newFunc, newListFunc, resourcePrefix)
+		if cacheKeyFunc == nil {
+			return nil, nil, fmt.Errorf("cache key func must be provided when storage caching is enabled")
+		}
+		s, d, err := generic.NewRawStorage(storageConfig, newFunc, newListFunc, reverseKeyFunc, resourcePrefix)
 		if err != nil {
 			return s, d, err
 		}
@@ -54,18 +58,20 @@ func StorageWithCacher() generic.StorageDecorator {
 		}
 
 		cacherConfig := cacherstorage.Config{
-			Storage:             s,
-			Versioner:           storage.APIObjectVersioner{},
-			GroupResource:       storageConfig.GroupResource,
-			EventsHistoryWindow: storageConfig.EventsHistoryWindow,
-			ResourcePrefix:      resourcePrefix,
-			KeyFunc:             cacheKeyFunc,
-			NewFunc:             newFunc,
-			NewListFunc:         newListFunc,
-			GetAttrsFunc:        getAttrsFunc,
-			IndexerFuncs:        triggerFuncs,
-			Indexers:            indexers,
-			Codec:               storageConfig.Codec,
+			Storage:                       s,
+			Versioner:                     storage.APIObjectVersioner{},
+			GroupResource:                 storageConfig.GroupResource,
+			EventsHistoryWindow:           storageConfig.EventsHistoryWindow,
+			WatchCacheMaxEvents:           storageConfig.WatchCacheMaxEvents,
+			ResourcePrefix:                resourcePrefix,
+			KeyFunc:                       cacheKeyFunc,
+			NewFunc:                       newFunc,
+			NewListFunc:                   newListFunc,
+			GetAttrsFunc:                  getAttrsFunc,
+			IndexerFuncs:                  triggerFuncs,
+			Indexers:                      indexers,
+			Codec:                         storageConfig.Codec,
+			DisableConsistentGetFromCache: storageConfig.Transformer != nil,
 		}
 		cacher, err := cacherstorage.NewCacherFromConfig(cacherConfig)
 		if err != nil {

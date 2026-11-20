@@ -23,9 +23,9 @@ package v1
 //
 // Sysctl defines a kernel parameter to be set
 type SysctlApplyConfiguration struct {
-	// Name of a property to set
+	// name of a property to set
 	Name *string `json:"name,omitempty"`
-	// Value of a property to set
+	// value of a property to set
 	Value *string `json:"value,omitempty"`
 }
 

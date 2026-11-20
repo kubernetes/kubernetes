@@ -234,9 +234,52 @@ func TestLoadFiles(t *testing.T) {
 	})
 
 	t.Run("nonexistent dir returns error", func(t *testing.T) {
-		_, _, err := LoadFiles("/nonexistent/path")
+		_, hash, err := LoadFiles("/nonexistent/path")
 		if err == nil {
-			t.Error("expected error for nonexistent dir")
+			t.Fatal("expected error for nonexistent dir")
+		}
+		if hash != "" {
+			t.Errorf("expected empty hash for content that could not be read, got %q", hash)
+		}
+	})
+
+	t.Run("invalid YAML returns the hash of all files with the error", func(t *testing.T) {
+		dir := t.TempDir()
+		write := func(name, content string) {
+			t.Helper()
+			if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0644); err != nil {
+				t.Fatal(err)
+			}
+		}
+		contentErrHash := func() string {
+			t.Helper()
+			docs, hash, err := LoadFiles(dir)
+			if err == nil {
+				t.Fatal("expected error for invalid YAML")
+			}
+			if !strings.Contains(err.Error(), `failed to split YAML documents in file "`+filepath.Join(dir, "a.yaml")+`"`) {
+				t.Errorf("unexpected error message: %v", err)
+			}
+			if docs != nil {
+				t.Errorf("expected no docs on error, got %d", len(docs))
+			}
+			if len(hash) == 0 {
+				t.Fatal("expected non-empty hash with the error")
+			}
+			return hash
+		}
+
+		write("a.yaml", "kind: A\n--- invalid\nkind: B\n")
+		write("b.yaml", "kind: C")
+		first := contentErrHash()
+		if again := contentErrHash(); again != first {
+			t.Errorf("hash changed for unchanged content: %q != %q", again, first)
+		}
+
+		// The hash covers files after the one that failed to split.
+		write("b.yaml", "kind: D")
+		if changed := contentErrHash(); changed == first {
+			t.Errorf("hash did not change after a later file changed: %q", changed)
 		}
 	})
 

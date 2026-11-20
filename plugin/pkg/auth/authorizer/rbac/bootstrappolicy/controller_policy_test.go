@@ -108,25 +108,47 @@ func TestPodGroupProtectionControllerRBAC(t *testing.T) {
 	roleName := saRolePrefix + "podgroup-protection-controller"
 
 	tests := []struct {
-		name              string
-		enableFeatureGate bool
-		expectRole        bool
+		name                    string
+		enableGenericWorkload   bool
+		enableCompositePodGroup bool
+		expectRole              bool
+		wantRules               []rbacv1.PolicyRule
 	}{
 		{
-			name:              "role and binding absent when GenericWorkload is disabled",
-			enableFeatureGate: false,
-			expectRole:        false,
+			name:                  "role and binding absent when GenericWorkload is disabled",
+			enableGenericWorkload: false,
+			expectRole:            false,
 		},
 		{
-			name:              "role and binding present when GenericWorkload is enabled",
-			enableFeatureGate: true,
-			expectRole:        true,
+			name:                    "role and binding present when GenericWorkload is enabled and CompositePodGroup is disabled",
+			enableGenericWorkload:   true,
+			enableCompositePodGroup: false,
+			expectRole:              true,
+			wantRules: []rbacv1.PolicyRule{
+				{Verbs: []string{"get", "list", "update", "watch"}, APIGroups: []string{"scheduling.k8s.io"}, Resources: []string{"podgroups"}},
+				{Verbs: []string{"get", "list", "watch"}, APIGroups: []string{""}, Resources: []string{"pods"}},
+			},
+		},
+		{
+			name:                    "role and binding present with compositepodgroups when GenericWorkload and CompositePodGroup are enabled",
+			enableGenericWorkload:   true,
+			enableCompositePodGroup: true,
+			expectRole:              true,
+			wantRules: []rbacv1.PolicyRule{
+				{Verbs: []string{"get", "list", "update", "watch"}, APIGroups: []string{"scheduling.k8s.io"}, Resources: []string{"podgroups"}},
+				{Verbs: []string{"get", "list", "watch"}, APIGroups: []string{""}, Resources: []string{"pods"}},
+				{Verbs: []string{"get", "list", "update", "watch"}, APIGroups: []string{"scheduling.k8s.io"}, Resources: []string{"compositepodgroups"}},
+			},
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, test.enableFeatureGate)
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.GenericWorkload:                 test.enableGenericWorkload,
+				features.TopologyAwareWorkloadScheduling: test.enableCompositePodGroup,
+				features.CompositePodGroup:               test.enableCompositePodGroup,
+			})
 
 			var foundRole *rbacv1.ClusterRole
 			for i, role := range ControllerRoles() {
@@ -147,12 +169,8 @@ func TestPodGroupProtectionControllerRBAC(t *testing.T) {
 				t.Fatalf("role %q not found when GenericWorkload is enabled", roleName)
 			}
 
-			wantRules := []rbacv1.PolicyRule{
-				{Verbs: []string{"get", "list", "update", "watch"}, APIGroups: []string{"scheduling.k8s.io"}, Resources: []string{"podgroups"}},
-				{Verbs: []string{"get", "list", "watch"}, APIGroups: []string{""}, Resources: []string{"pods"}},
-			}
-			if !reflect.DeepEqual(foundRole.Rules, wantRules) {
-				t.Errorf("unexpected rules:\ngot:  %+v\nwant: %+v", foundRole.Rules, wantRules)
+			if !reflect.DeepEqual(foundRole.Rules, test.wantRules) {
+				t.Errorf("unexpected rules:\ngot:  %+v\nwant: %+v", foundRole.Rules, test.wantRules)
 			}
 
 			var foundBinding *rbacv1.ClusterRoleBinding
@@ -191,20 +209,22 @@ func TestControllerRoleVerbsConsistency(t *testing.T) {
 }
 
 func TestJobControllerSchedulingRules(t *testing.T) {
+	roleName := saRolePrefix + "job-controller"
 	cases := []struct {
-		name                string
-		workloadWithJob     bool
-		wantSchedulingRules bool
+		name               string
+		workloadWithJob    bool
+		wantWorkloadsVerbs []string
+		wantPodGroupsVerbs []string
 	}{
 		{
-			name:                "feature gate disabled",
-			workloadWithJob:     false,
-			wantSchedulingRules: false,
+			name:            "feature gate disabled",
+			workloadWithJob: false,
 		},
 		{
-			name:                "feature gate enabled",
-			workloadWithJob:     true,
-			wantSchedulingRules: true,
+			name:               "feature gate enabled",
+			workloadWithJob:    true,
+			wantWorkloadsVerbs: []string{"create", "get", "list", "patch", "update", "watch"},
+			wantPodGroupsVerbs: []string{"create", "delete", "get", "list", "patch", "update", "watch"},
 		},
 	}
 
@@ -214,26 +234,64 @@ func TestJobControllerSchedulingRules(t *testing.T) {
 				features.GenericWorkload: tc.workloadWithJob,
 				features.WorkloadWithJob: tc.workloadWithJob,
 			})
-			got := hasSchedulingRules(ControllerRoles())
-			if got != tc.wantSchedulingRules {
-				t.Errorf("hasSchedulingRules() = %v, want %v", got, tc.wantSchedulingRules)
+			roles := ControllerRoles()
+			if got := resourceRuleVerbs(roles, roleName, "workloads"); !slices.Equal(got, tc.wantWorkloadsVerbs) {
+				t.Errorf("job-controller workloads verbs = %v, want %v", got, tc.wantWorkloadsVerbs)
+			}
+			if got := resourceRuleVerbs(roles, roleName, "podgroups"); !slices.Equal(got, tc.wantPodGroupsVerbs) {
+				t.Errorf("job-controller podgroups verbs = %v, want %v", got, tc.wantPodGroupsVerbs)
 			}
 		})
 	}
 }
 
-func hasSchedulingRules(roles []rbacv1.ClusterRole) bool {
+func TestDeploymentReplicaSetControllerSchedulingRules(t *testing.T) {
+	cases := []struct {
+		name                   string
+		workloadWithDeployment bool
+		wantSchedulingRules    bool
+	}{
+		{name: "feature gate disabled", workloadWithDeployment: false, wantSchedulingRules: false},
+		{name: "feature gate enabled", workloadWithDeployment: true, wantSchedulingRules: true},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.GenericWorkload:        tc.workloadWithDeployment,
+				features.WorkloadWithDeployment: tc.workloadWithDeployment,
+			})
+			roles := ControllerRoles()
+			if got := hasResourceRule(roles, saRolePrefix+"deployment-controller", "workloads"); got != tc.wantSchedulingRules {
+				t.Errorf("deployment-controller workloads rule = %v, want %v", got, tc.wantSchedulingRules)
+			}
+			if got := hasResourceRule(roles, saRolePrefix+"replicaset-controller", "workloads"); got != tc.wantSchedulingRules {
+				t.Errorf("replicaset-controller workloads rule = %v, want %v", got, tc.wantSchedulingRules)
+			}
+			if got := hasResourceRule(roles, saRolePrefix+"replicaset-controller", "podgroups"); got != tc.wantSchedulingRules {
+				t.Errorf("replicaset-controller podgroups rule = %v, want %v", got, tc.wantSchedulingRules)
+			}
+			if hasResourceRule(roles, saRolePrefix+"deployment-controller", "podgroups") {
+				t.Errorf("deployment-controller should not have a podgroups rule")
+			}
+		})
+	}
+}
+
+func hasResourceRule(roles []rbacv1.ClusterRole, roleName, resource string) bool {
+	return len(resourceRuleVerbs(roles, roleName, resource)) > 0
+}
+
+func resourceRuleVerbs(roles []rbacv1.ClusterRole, roleName, resource string) []string {
 	for _, role := range roles {
-		if role.Name != saRolePrefix+"job-controller" {
+		if role.Name != roleName {
 			continue
 		}
 		for _, rule := range role.Rules {
-			if slices.Contains(rule.APIGroups, "scheduling.k8s.io") &&
-				slices.Contains(rule.Resources, "workloads") &&
-				slices.Contains(rule.Resources, "podgroups") {
-				return true
+			if slices.Contains(rule.APIGroups, "scheduling.k8s.io") && slices.Contains(rule.Resources, resource) {
+				return rule.Verbs
 			}
 		}
 	}
-	return false
+	return nil
 }

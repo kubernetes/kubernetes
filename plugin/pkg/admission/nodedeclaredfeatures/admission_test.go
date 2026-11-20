@@ -35,6 +35,7 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	ndf "k8s.io/component-helpers/nodedeclaredfeatures"
 	"k8s.io/component-helpers/nodedeclaredfeatures/features/dranodeallocatableresources"
+	"k8s.io/component-helpers/nodedeclaredfeatures/features/dynamiccontainers"
 	ndftesting "k8s.io/component-helpers/nodedeclaredfeatures/testing"
 	"k8s.io/kubernetes/pkg/apis/core"
 	apisresource "k8s.io/kubernetes/pkg/apis/resource"
@@ -57,7 +58,15 @@ func TestAdmission(t *testing.T) {
 		},
 	}
 
-	client := fake.NewClientset(nodeWithFeature, nodeWithoutFeature)
+	nodeWithDynamicContainers := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-node-dynamic-containers"},
+		Status: v1.NodeStatus{
+			DeclaredFeatures: []string{dynamiccontainers.DynamicContainersFeatureGate},
+			NodeInfo:         v1.NodeSystemInfo{KubeletVersion: "1.38.0"},
+		},
+	}
+
+	client := fake.NewClientset(nodeWithFeature, nodeWithoutFeature, nodeWithDynamicContainers)
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
 
 	oldPod := &core.Pod{
@@ -84,6 +93,16 @@ func TestAdmission(t *testing.T) {
 	podWithNoNode.Spec.NodeName = ""
 	podWithInvalidNode := oldPod.DeepCopy()
 	podWithInvalidNode.Spec.NodeName = "invalid-node"
+	withAddedContainer := func(nodeName string) (*core.Pod, *core.Pod) {
+		oldP := oldPod.DeepCopy()
+		oldP.Spec.NodeName = nodeName
+		newP := oldP.DeepCopy()
+		newP.Generation = oldP.Generation + 1
+		newP.Spec.Containers = append(newP.Spec.Containers, core.Container{Name: "added", Image: "image"})
+		return newP, oldP
+	}
+	addedOnNodeWithoutFeature, oldOnNodeWithoutFeature := withAddedContainer("test-node-no-feature")
+	addedOnNodeWithFeature, oldOnNodeWithFeature := withAddedContainer("test-node-dynamic-containers")
 
 	createMockFeature := func(t *testing.T, name string, inferForUpdate bool, maxVersionStr string) *ndftesting.MockFeature {
 		m := ndftesting.NewMockFeature(t)
@@ -235,6 +254,42 @@ func TestAdmission(t *testing.T) {
 			subresource: "resize",
 			expectErr:   false,
 		},
+		{
+			name:               "dynamic container add rejected on node without DynamicContainers",
+			pod:                addedOnNodeWithoutFeature,
+			oldPod:             oldOnNodeWithoutFeature,
+			featureGateEnabled: true,
+			componentVersion:   "1.38.0",
+			registeredFeatures: []ndf.Feature{dynamiccontainers.Feature},
+			subresource:        "dynamic",
+			expectErr:          true,
+			errContains:        "pod update requires features DynamicContainers which are not available on node \"test-node-no-feature\"",
+		},
+		{
+			name:               "dynamic container add allowed on node with DynamicContainers",
+			pod:                addedOnNodeWithFeature,
+			oldPod:             oldOnNodeWithFeature,
+			featureGateEnabled: true,
+			componentVersion:   "1.38.0",
+			registeredFeatures: []ndf.Feature{dynamiccontainers.Feature},
+			subresource:        "dynamic",
+			expectErr:          false,
+		},
+		{
+			name: "dynamic update without container changes allowed on node without DynamicContainers",
+			pod: func() *core.Pod {
+				p := oldOnNodeWithoutFeature.DeepCopy()
+				p.Generation++
+				p.Spec.Containers[0].Image = "new-image"
+				return p
+			}(),
+			oldPod:             oldOnNodeWithoutFeature,
+			featureGateEnabled: true,
+			componentVersion:   "1.38.0",
+			registeredFeatures: []ndf.Feature{dynamiccontainers.Feature},
+			subresource:        "dynamic",
+			expectErr:          false,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -289,7 +344,7 @@ func TestNodeAllocatableResourceSliceAdmission(t *testing.T) {
 		},
 		Status: v1.NodeStatus{
 			DeclaredFeatures: []string{dranodeallocatableresources.DRANodeAllocatableResourcesFeature},
-			NodeInfo:         v1.NodeSystemInfo{KubeletVersion: "1.37.0"},
+			NodeInfo:         v1.NodeSystemInfo{KubeletVersion: "1.38.0"},
 		},
 	}
 	nodeWithFeature2 := &v1.Node{
@@ -299,7 +354,7 @@ func TestNodeAllocatableResourceSliceAdmission(t *testing.T) {
 		},
 		Status: v1.NodeStatus{
 			DeclaredFeatures: []string{dranodeallocatableresources.DRANodeAllocatableResourcesFeature},
-			NodeInfo:         v1.NodeSystemInfo{KubeletVersion: "1.37.0"},
+			NodeInfo:         v1.NodeSystemInfo{KubeletVersion: "1.38.0"},
 		},
 	}
 	nodeWithoutFeature := &v1.Node{
@@ -438,7 +493,7 @@ func TestNodeAllocatableResourceSliceAdmission(t *testing.T) {
 			},
 			nodes:       []runtime.Object{nodeWithoutFeature},
 			expectErr:   true,
-			errContains: "does not support DRANodeAllocatableResources feature",
+			errContains: "does not support DRAExtraNodeAllocatableResources feature",
 			operation:   admission.Create,
 		},
 		{
@@ -525,7 +580,7 @@ func TestNodeAllocatableResourceSliceAdmission(t *testing.T) {
 			},
 			nodes:       []runtime.Object{nodeWithFeature, nodeWithoutFeature},
 			expectErr:   true,
-			errContains: "does not support DRANodeAllocatableResources feature",
+			errContains: "does not support DRAExtraNodeAllocatableResources feature",
 			operation:   admission.Create,
 		},
 		{
@@ -547,7 +602,7 @@ func TestNodeAllocatableResourceSliceAdmission(t *testing.T) {
 			},
 			nodes:       []runtime.Object{nodeWithFeature, nodeWithoutFeature},
 			expectErr:   true,
-			errContains: "does not support DRANodeAllocatableResources feature",
+			errContains: "does not support DRAExtraNodeAllocatableResources feature",
 			operation:   admission.Create,
 		},
 		{
@@ -613,7 +668,7 @@ func TestNodeAllocatableResourceSliceAdmission(t *testing.T) {
 			},
 			nodes:       []runtime.Object{nodeWithoutFeature},
 			expectErr:   true,
-			errContains: "does not support DRANodeAllocatableResources feature",
+			errContains: "does not support DRAExtraNodeAllocatableResources feature",
 			operation:   admission.Create,
 		},
 		{
@@ -657,7 +712,7 @@ func TestNodeAllocatableResourceSliceAdmission(t *testing.T) {
 				},
 			},
 			nodes: []runtime.Object{nodeWithFeature, nodeWithoutFeature}, expectErr: true,
-			errContains: "does not support DRANodeAllocatableResources feature",
+			errContains: "does not support DRAExtraNodeAllocatableResources feature",
 			operation:   admission.Create,
 		},
 		{
@@ -680,7 +735,7 @@ func TestNodeAllocatableResourceSliceAdmission(t *testing.T) {
 			},
 			nodes:       []runtime.Object{nodeWithFeature, nodeWithoutFeature},
 			expectErr:   true,
-			errContains: "does not support DRANodeAllocatableResources feature",
+			errContains: "does not support DRAExtraNodeAllocatableResources feature",
 			operation:   admission.Create,
 		},
 		{

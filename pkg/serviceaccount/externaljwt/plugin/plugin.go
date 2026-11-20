@@ -25,12 +25,14 @@ import (
 	"net"
 	"time"
 
+	jose "github.com/go-jose/go-jose/v4"
+	"github.com/go-jose/go-jose/v4/jwt"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-	jose "gopkg.in/go-jose/go-jose.v2"
-	"gopkg.in/go-jose/go-jose.v2/jwt"
 
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	externaljwtv1 "k8s.io/externaljwt/apis/v1"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 	externaljwtmetrics "k8s.io/kubernetes/pkg/serviceaccount/externaljwt/metrics"
 )
@@ -178,9 +180,15 @@ func (p *Plugin) validateJWTHeader(ctx context.Context, response *externaljwtv1.
 	// - pkg/serviceaccount/externaljwt/plugin/plugin.go validateJWTHeader
 	// - pkg/serviceaccount/jwt.go signerFromRSAPrivateKey
 	// - pkg/serviceaccount/jwt.go signerFromECDSAPrivateKey
+	// - pkg/serviceaccount/jwt.go signerFromMLDSAPrivateKey
+	// - pkg/serviceaccount/jwt.go AcceptableServiceAccountSignatureAlgorithms
 	// - test/images/agnhost/openidmetadata/openidmetadata.go validate SupportedSigningAlgs
 	case "RS256", "ES256", "ES384", "ES512":
 		// OK
+	case "ML-DSA-44", "ML-DSA-65", "ML-DSA-87":
+		if !utilfeature.DefaultFeatureGate.Enabled(features.ServiceAccountTokenMLDSA) {
+			return fmt.Errorf("bad signing algorithm %q", header.Algorithm)
+		}
 	default:
 		return fmt.Errorf("bad signing algorithm %q", header.Algorithm)
 	}

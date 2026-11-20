@@ -1,0 +1,39 @@
+diff --git a/staging/src/k8s.io/apiserver/pkg/storage/cacher/cache_watcher.go b/staging/src/k8s.io/apiserver/pkg/storage/cacher/cache_watcher.go
+index 7e6030d263a..338b9d78e8d 100644
+--- a/staging/src/k8s.io/apiserver/pkg/storage/cacher/cache_watcher.go
++++ b/staging/src/k8s.io/apiserver/pkg/storage/cacher/cache_watcher.go
+@@ -505,7 +505,7 @@ func (c *cacheWatcher) process(ctx context.Context) {
+ 	defer close(c.result)
+ 	defer c.Stop()
+ 	initialized := false
+-	var resourceVersion uint64
++	resourceVersion := c.requiredResourceVersion
+ 
+ 	for {
+ 		select {
+@@ -525,7 +525,9 @@ func (c *cacheWatcher) process(ctx context.Context) {
+ 				if err := c.processInitialEvents(item.interval); err != nil {
+ 					return
+ 				}
+-				resourceVersion = item.interval.resourceVersion
++				// BUG REVERT (#49745 class): pre-fix the watch RV floor was not raised to the
++				// snapshot RV, so a cacheInterval built from a fresher version could deliver
++				// events at or below the snapshot resourceVersion.
+ 				// At this point we already start processing incoming watch events.
+ 				// However, the init event can still be processed because their serialization
+ 				// and sending to the client happens asynchrnously.
+diff --git a/staging/src/k8s.io/apiserver/pkg/storage/cacher/cacher.go b/staging/src/k8s.io/apiserver/pkg/storage/cacher/cacher.go
+index 92628f8e2df..fcb9c99ced1 100644
+--- a/staging/src/k8s.io/apiserver/pkg/storage/cacher/cacher.go
++++ b/staging/src/k8s.io/apiserver/pkg/storage/cacher/cacher.go
+@@ -867,7 +867,9 @@ func (c *Cacher) watch(ctx context.Context, key string, requestedWatchRV uint64,
+ }
+ 
+ func (c *Cacher) registerWatcherLocked(watcher *cacheWatcher, cacheInterval *watchCacheInterval) {
+-	watcher.dispatchedResourceVersion = cacheInterval.resourceVersion
++	// BUG REVERT (#49745 class): do not raise dispatchedResourceVersion to the
++	// snapshot/interval RV.
++	watcher.dispatchedResourceVersion = watcher.requiredResourceVersion
+ 	c.watchers.addWatcher(watcher)
+ 	// Add it to the queue only when the client support watch bookmarks.
+ 	if watcher.allowWatchBookmarks {

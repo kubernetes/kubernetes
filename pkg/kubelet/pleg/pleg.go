@@ -71,4 +71,13 @@ type PodLifecycleEventGenerator interface {
 	RequestReinspect(podUID types.UID)
 	// RequestRelist queues up the pod for an on-demand relist.
 	RequestRelist(logger klog.Logger, podUID types.UID)
+	// SuspendRelist holds back relist observations for the pod while it is being synced.
+	// Any relist (on-demand or global) that would observe a change for the pod is deferred
+	// until ResumeRelist is called.
+	SuspendRelist(podUID types.UID)
+	// ResumeRelist ends the suspension started by SuspendRelist and reports whether any relist
+	// was deferred during the suspension. It does not request a relist itself: the caller
+	// should request one (after recording its own sync time) if a relist was deferred and it
+	// is not already going to request one.
+	ResumeRelist(podUID types.UID) (relistDeferred bool)
 }

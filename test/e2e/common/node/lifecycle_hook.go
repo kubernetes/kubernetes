@@ -28,7 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -85,7 +84,7 @@ var _ = SIGDescribe("Container Lifecycle Hook", func() {
 
 		ginkgo.BeforeEach(func(ctx context.Context) {
 			node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "select a ready schedulable node")
 			targetNode = node.Name
 			nodeSelection := e2epod.NodeSelection{}
 			e2epod.SetAffinity(&nodeSelection, targetNode)
@@ -305,7 +304,7 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Restartable Init Container
 
 		ginkgo.BeforeEach(func(ctx context.Context) {
 			node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "select a ready schedulable node")
 			targetNode = node.Name
 			nodeSelection := e2epod.NodeSelection{}
 			e2epod.SetAffinity(&nodeSelection, targetNode)
@@ -719,7 +718,7 @@ var _ = SIGDescribe("Lifecycle Sleep Hook", framework.WithNodeConformance(), fun
 			// transition through Terminated. The actual correctness check below uses
 			// the container's intrinsic StartedAt/FinishedAt timestamps and is unaffected
 			// by how long we waited here.
-			framework.ExpectNoError(e2epod.WaitForContainerTerminated(ctx, f.ClientSet, f.Namespace.Name, p.Name, name, f.Timeouts.PodDelete))
+			framework.ExpectNoError(e2epod.WaitForContainerTerminated(ctx, f.ClientSet, f.Namespace.Name, p.Name, name, f.Timeouts.PodDelete), "wait for container %q in Pod %q in namespace %q to terminate", name, p.Name, f.Namespace.Name)
 
 			p, err := podClient.Get(ctx, p.Name, metav1.GetOptions{})
 			if err != nil {
@@ -770,7 +769,7 @@ var _ = SIGDescribe("Lifecycle sleep action zero value", framework.WithNodeConfo
 	})
 })
 
-var _ = SIGDescribe(feature.ContainerStopSignals, framework.WithFeatureGate(features.ContainerStopSignals), func() {
+var _ = SIGDescribe("Container Stop Signals", framework.WithFeatureGate(features.ContainerStopSignals), func() {
 	f := framework.NewDefaultFramework("container-stop-signals")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 	var podClient *e2epod.PodClient

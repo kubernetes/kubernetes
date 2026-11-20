@@ -23,8 +23,8 @@ import (
 	"testing"
 	"time"
 
-	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	crdclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1"
+	apiextensionsv1 "k8s.io/apiextensions-api/pkg/apis/apiextensions/v1"
+	crdclient "k8s.io/apiextensions-api/pkg/client/clientset/clientset/typed/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/controller/finalizer"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -70,7 +70,6 @@ func TestOverlappingBuiltInResources(t *testing.T) {
 // TestOverlappingCustomResourceAPIService ensures creating and deleting a custom resource overlapping with APIServices does not destroy APIService data
 func TestOverlappingCustomResourceAPIService(t *testing.T) {
 	apiServer := StartRealAPIServerOrDie(t)
-	defer apiServer.Cleanup()
 
 	apiServiceClient, err := apiregistrationclient.NewForConfig(apiServer.Config)
 	if err != nil {
@@ -232,7 +231,6 @@ func TestOverlappingCustomResourceAPIService(t *testing.T) {
 // TestOverlappingCustomResourceCustomResourceDefinition ensures creating and deleting a custom resource overlapping with CustomResourceDefinition does not destroy CustomResourceDefinition data
 func TestOverlappingCustomResourceCustomResourceDefinition(t *testing.T) {
 	apiServer := StartRealAPIServerOrDie(t)
-	defer apiServer.Cleanup()
 
 	crdClient, err := crdclient.NewForConfig(apiServer.Config)
 	if err != nil {

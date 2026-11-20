@@ -26,7 +26,6 @@ import (
 	admissionregv1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
 	admissionregv1beta1 "k8s.io/api/admissionregistration/v1beta1"
 	apidiscoveryv2 "k8s.io/api/apidiscovery/v2"
-	apidiscoveryv2beta1 "k8s.io/api/apidiscovery/v2beta1"
 	apiserverinternalv1alpha1 "k8s.io/api/apiserverinternal/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
@@ -34,6 +33,7 @@ import (
 	authenticationv1 "k8s.io/api/authentication/v1"
 	authenticationv1beta1 "k8s.io/api/authentication/v1beta1"
 	authorizationv1 "k8s.io/api/authorization/v1"
+	authorizationv1alpha1 "k8s.io/api/authorization/v1alpha1"
 	authorizationv1beta1 "k8s.io/api/authorization/v1beta1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
@@ -94,13 +94,13 @@ var groups = []runtime.SchemeBuilder{
 	admissionregv1beta1.SchemeBuilder,
 	admissionregv1.SchemeBuilder,
 	apiserverinternalv1alpha1.SchemeBuilder,
-	apidiscoveryv2beta1.SchemeBuilder,
 	apidiscoveryv2.SchemeBuilder,
 	appsv1beta1.SchemeBuilder,
 	appsv1beta2.SchemeBuilder,
 	appsv1.SchemeBuilder,
 	authenticationv1beta1.SchemeBuilder,
 	authenticationv1.SchemeBuilder,
+	authorizationv1alpha1.SchemeBuilder,
 	authorizationv1beta1.SchemeBuilder,
 	authorizationv1.SchemeBuilder,
 	autoscalingv1.SchemeBuilder,

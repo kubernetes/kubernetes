@@ -745,8 +745,8 @@ func parseProcMounts(content []byte) ([]MountPoint, error) {
 		}
 
 		mp := MountPoint{
-			Device: fields[0],
-			Path:   fields[1],
+			Device: unescapeMountPath(fields[0]),
+			Path:   unescapeMountPath(fields[1]),
 			Type:   fields[2],
 			Opts:   strings.Split(fields[3], ","),
 		}

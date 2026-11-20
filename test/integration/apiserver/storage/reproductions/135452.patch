@@ -1,0 +1,35 @@
+diff --git a/staging/src/k8s.io/apiserver/pkg/storage/cacher/cacher.go b/staging/src/k8s.io/apiserver/pkg/storage/cacher/cacher.go
+index 92628f8e2df..8ac4b0bb2df 100644
+--- a/staging/src/k8s.io/apiserver/pkg/storage/cacher/cacher.go
++++ b/staging/src/k8s.io/apiserver/pkg/storage/cacher/cacher.go
+@@ -813,13 +813,8 @@ func (c *Cacher) watch(ctx context.Context, key string, requestedWatchRV uint64,
+ 	span.AddEvent("watchCache locked acquired")
+ 	defer c.watchCache.RUnlock()
+ 
+-	if opts.SendInitialEvents != nil && *opts.SendInitialEvents {
+-		err := c.watchCache.waitUntilFreshLocked(ctx, requiredResourceVersion)
+-		if err != nil {
+-			return nil, err
+-		}
+-		span.AddEvent("watchCache fresh enough")
+-	}
++	// BUG REVERT (#135452): do not wait for watchCache freshness or fail with
++	// TooLargeResourceVersionError when WatchList requests a newer/unrecognized RV.
+ 
+ 	// requiredResourceVersion = 0 means that we don't require any specific starting point
+ 	// and we would like to start watching from ~now.
+diff --git a/staging/src/k8s.io/apiserver/pkg/storage/etcd3/watcher.go b/staging/src/k8s.io/apiserver/pkg/storage/etcd3/watcher.go
+index abdbb258124..f68982cb5b9 100644
+--- a/staging/src/k8s.io/apiserver/pkg/storage/etcd3/watcher.go
++++ b/staging/src/k8s.io/apiserver/pkg/storage/etcd3/watcher.go
+@@ -466,7 +466,9 @@ func logWatchChannelErr(err error) {
+ // it means we don't have any specific
+ // preferences for delivering bookmark events.
+ func (wc *watchChan) startWatching(watchClosedCh chan struct{}, initialEventsEndBookmarkRequired, forceInitialEvents bool) {
+-	if wc.initialRev > 0 && forceInitialEvents {
++	// BUG REVERT (#135452): do not check whether initialRev exceeds currentStorageRV,
++	// allowing watches on a future RV to hang instead of emitting an Error event.
++	if false && wc.initialRev > 0 && forceInitialEvents {
+ 		currentStorageRV, err := wc.watcher.getCurrentStorageRV(wc.ctx)
+ 		if err != nil {
+ 			wc.sendError(err)

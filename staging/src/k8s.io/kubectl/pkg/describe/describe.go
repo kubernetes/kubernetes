@@ -50,6 +50,7 @@ import (
 	policyv1 "k8s.io/api/policy/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	resourcev1 "k8s.io/api/resource/v1"
+	resourcev1alpha3 "k8s.io/api/resource/v1alpha3"
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -84,6 +85,7 @@ import (
 	"k8s.io/kubectl/pkg/util/rbac"
 	kubectlresourcehelper "k8s.io/kubectl/pkg/util/resource"
 	storageutil "k8s.io/kubectl/pkg/util/storage"
+	"k8s.io/utils/ptr"
 )
 
 // Each level has 2 spaces for PrefixWriter
@@ -193,45 +195,46 @@ func describerMap(clientConfig *rest.Config) (map[schema.GroupKind]ResourceDescr
 	}
 
 	m := map[schema.GroupKind]ResourceDescriber{
-		{Group: corev1.GroupName, Kind: "Pod"}:                               &PodDescriber{c},
-		{Group: corev1.GroupName, Kind: "ReplicationController"}:             &ReplicationControllerDescriber{c},
-		{Group: corev1.GroupName, Kind: "Secret"}:                            &SecretDescriber{c},
-		{Group: corev1.GroupName, Kind: "Service"}:                           &ServiceDescriber{c},
-		{Group: corev1.GroupName, Kind: "ServiceAccount"}:                    &ServiceAccountDescriber{c},
-		{Group: corev1.GroupName, Kind: "Node"}:                              &NodeDescriber{c},
-		{Group: corev1.GroupName, Kind: "LimitRange"}:                        &LimitRangeDescriber{c},
-		{Group: corev1.GroupName, Kind: "ResourceQuota"}:                     &ResourceQuotaDescriber{c},
-		{Group: corev1.GroupName, Kind: "PersistentVolume"}:                  &PersistentVolumeDescriber{c},
-		{Group: corev1.GroupName, Kind: "PersistentVolumeClaim"}:             &PersistentVolumeClaimDescriber{c},
-		{Group: corev1.GroupName, Kind: "Namespace"}:                         &NamespaceDescriber{c},
-		{Group: corev1.GroupName, Kind: "Endpoints"}:                         &EndpointsDescriber{c},
-		{Group: corev1.GroupName, Kind: "ConfigMap"}:                         &ConfigMapDescriber{c},
-		{Group: corev1.GroupName, Kind: "PriorityClass"}:                     &PriorityClassDescriber{c},
-		{Group: discoveryv1.GroupName, Kind: "EndpointSlice"}:                &EndpointSliceDescriber{c},
-		{Group: autoscalingv2.GroupName, Kind: "HorizontalPodAutoscaler"}:    &HorizontalPodAutoscalerDescriber{c},
-		{Group: networkingv1.GroupName, Kind: "Ingress"}:                     &IngressDescriber{c},
-		{Group: networkingv1.GroupName, Kind: "IngressClass"}:                &IngressClassDescriber{c},
-		{Group: networkingv1beta1.GroupName, Kind: "ServiceCIDR"}:            &ServiceCIDRDescriber{c},
-		{Group: networkingv1beta1.GroupName, Kind: "IPAddress"}:              &IPAddressDescriber{c},
-		{Group: networkingv1.GroupName, Kind: "ServiceCIDR"}:                 &ServiceCIDRDescriber{c},
-		{Group: networkingv1.GroupName, Kind: "IPAddress"}:                   &IPAddressDescriber{c},
-		{Group: batchv1.GroupName, Kind: "Job"}:                              &JobDescriber{c},
-		{Group: batchv1.GroupName, Kind: "CronJob"}:                          &CronJobDescriber{c},
-		{Group: appsv1.GroupName, Kind: "StatefulSet"}:                       &StatefulSetDescriber{c},
-		{Group: appsv1.GroupName, Kind: "Deployment"}:                        &DeploymentDescriber{c},
-		{Group: appsv1.GroupName, Kind: "DaemonSet"}:                         &DaemonSetDescriber{c},
-		{Group: appsv1.GroupName, Kind: "ReplicaSet"}:                        &ReplicaSetDescriber{c},
-		{Group: certificatesv1.GroupName, Kind: "CertificateSigningRequest"}: &CertificateSigningRequestDescriber{c},
-		{Group: storagev1.GroupName, Kind: "StorageClass"}:                   &StorageClassDescriber{c},
-		{Group: storagev1.GroupName, Kind: "CSINode"}:                        &CSINodeDescriber{c},
-		{Group: storagev1.GroupName, Kind: "VolumeAttributesClass"}:          &VolumeAttributesClassDescriber{c},
-		{Group: policyv1.GroupName, Kind: "PodDisruptionBudget"}:             &PodDisruptionBudgetDescriber{c},
-		{Group: rbacv1.GroupName, Kind: "Role"}:                              &RoleDescriber{c},
-		{Group: rbacv1.GroupName, Kind: "ClusterRole"}:                       &ClusterRoleDescriber{c},
-		{Group: rbacv1.GroupName, Kind: "RoleBinding"}:                       &RoleBindingDescriber{c},
-		{Group: rbacv1.GroupName, Kind: "ClusterRoleBinding"}:                &ClusterRoleBindingDescriber{c},
-		{Group: networkingv1.GroupName, Kind: "NetworkPolicy"}:               &NetworkPolicyDescriber{c},
-		{Group: schedulingv1.GroupName, Kind: "PriorityClass"}:               &PriorityClassDescriber{c},
+		{Group: corev1.GroupName, Kind: "Pod"}:                                 &PodDescriber{c},
+		{Group: corev1.GroupName, Kind: "ReplicationController"}:               &ReplicationControllerDescriber{c},
+		{Group: corev1.GroupName, Kind: "Secret"}:                              &SecretDescriber{c},
+		{Group: corev1.GroupName, Kind: "Service"}:                             &ServiceDescriber{c},
+		{Group: corev1.GroupName, Kind: "ServiceAccount"}:                      &ServiceAccountDescriber{c},
+		{Group: corev1.GroupName, Kind: "Node"}:                                &NodeDescriber{c},
+		{Group: corev1.GroupName, Kind: "LimitRange"}:                          &LimitRangeDescriber{c},
+		{Group: corev1.GroupName, Kind: "ResourceQuota"}:                       &ResourceQuotaDescriber{c},
+		{Group: corev1.GroupName, Kind: "PersistentVolume"}:                    &PersistentVolumeDescriber{c},
+		{Group: corev1.GroupName, Kind: "PersistentVolumeClaim"}:               &PersistentVolumeClaimDescriber{c},
+		{Group: corev1.GroupName, Kind: "Namespace"}:                           &NamespaceDescriber{c},
+		{Group: corev1.GroupName, Kind: "Endpoints"}:                           &EndpointsDescriber{c},
+		{Group: corev1.GroupName, Kind: "ConfigMap"}:                           &ConfigMapDescriber{c},
+		{Group: corev1.GroupName, Kind: "PriorityClass"}:                       &PriorityClassDescriber{c},
+		{Group: discoveryv1.GroupName, Kind: "EndpointSlice"}:                  &EndpointSliceDescriber{c},
+		{Group: autoscalingv2.GroupName, Kind: "HorizontalPodAutoscaler"}:      &HorizontalPodAutoscalerDescriber{c},
+		{Group: networkingv1.GroupName, Kind: "Ingress"}:                       &IngressDescriber{c},
+		{Group: networkingv1.GroupName, Kind: "IngressClass"}:                  &IngressClassDescriber{c},
+		{Group: networkingv1beta1.GroupName, Kind: "ServiceCIDR"}:              &ServiceCIDRDescriber{c},
+		{Group: networkingv1beta1.GroupName, Kind: "IPAddress"}:                &IPAddressDescriber{c},
+		{Group: networkingv1.GroupName, Kind: "ServiceCIDR"}:                   &ServiceCIDRDescriber{c},
+		{Group: networkingv1.GroupName, Kind: "IPAddress"}:                     &IPAddressDescriber{c},
+		{Group: batchv1.GroupName, Kind: "Job"}:                                &JobDescriber{c},
+		{Group: batchv1.GroupName, Kind: "CronJob"}:                            &CronJobDescriber{c},
+		{Group: appsv1.GroupName, Kind: "StatefulSet"}:                         &StatefulSetDescriber{c},
+		{Group: appsv1.GroupName, Kind: "Deployment"}:                          &DeploymentDescriber{c},
+		{Group: appsv1.GroupName, Kind: "DaemonSet"}:                           &DaemonSetDescriber{c},
+		{Group: appsv1.GroupName, Kind: "ReplicaSet"}:                          &ReplicaSetDescriber{c},
+		{Group: certificatesv1.GroupName, Kind: "CertificateSigningRequest"}:   &CertificateSigningRequestDescriber{c},
+		{Group: storagev1.GroupName, Kind: "StorageClass"}:                     &StorageClassDescriber{c},
+		{Group: storagev1.GroupName, Kind: "CSINode"}:                          &CSINodeDescriber{c},
+		{Group: storagev1.GroupName, Kind: "VolumeAttributesClass"}:            &VolumeAttributesClassDescriber{c},
+		{Group: policyv1.GroupName, Kind: "PodDisruptionBudget"}:               &PodDisruptionBudgetDescriber{c},
+		{Group: rbacv1.GroupName, Kind: "Role"}:                                &RoleDescriber{c},
+		{Group: rbacv1.GroupName, Kind: "ClusterRole"}:                         &ClusterRoleDescriber{c},
+		{Group: rbacv1.GroupName, Kind: "RoleBinding"}:                         &RoleBindingDescriber{c},
+		{Group: rbacv1.GroupName, Kind: "ClusterRoleBinding"}:                  &ClusterRoleBindingDescriber{c},
+		{Group: networkingv1.GroupName, Kind: "NetworkPolicy"}:                 &NetworkPolicyDescriber{c},
+		{Group: schedulingv1.GroupName, Kind: "PriorityClass"}:                 &PriorityClassDescriber{c},
+		{Group: resourcev1alpha3.GroupName, Kind: "ResourcePoolStatusRequest"}: &ResourcePoolStatusRequestDescriber{c},
 	}
 
 	return m, nil
@@ -2010,6 +2013,9 @@ func describeContainerEnvVars(container corev1.Container, resolverFn EnvVarResol
 		case e.ValueFrom.ConfigMapKeyRef != nil:
 			optional := e.ValueFrom.ConfigMapKeyRef.Optional != nil && *e.ValueFrom.ConfigMapKeyRef.Optional
 			w.Write(LEVEL_3, "%s:\t<set to the key '%s' of config map '%s'>\tOptional: %t\n", e.Name, e.ValueFrom.ConfigMapKeyRef.Key, e.ValueFrom.ConfigMapKeyRef.Name, optional)
+		case e.ValueFrom.FileKeyRef != nil:
+			optional := e.ValueFrom.FileKeyRef.Optional != nil && *e.ValueFrom.FileKeyRef.Optional
+			w.Write(LEVEL_3, "%s:\t<set to the key '%s' of file '%s' in volume '%s'>\tOptional: %t\n", e.Name, e.ValueFrom.FileKeyRef.Key, e.ValueFrom.FileKeyRef.Path, e.ValueFrom.FileKeyRef.VolumeName, optional)
 		}
 	}
 }
@@ -4054,6 +4060,15 @@ func describeHorizontalPodAutoscalerV1(hpa *autoscalingv1.HorizontalPodAutoscale
 	})
 }
 
+// percentOf returns value as a truncated percentage of total, or 0 when total
+// is 0 (for example, a node that has not reported allocatable resources yet).
+func percentOf(value, total int64) int64 {
+	if total == 0 {
+		return 0
+	}
+	return int64(float64(value) / float64(total) * 100)
+}
+
 func describeNodeResource(nodeNonTerminatedPodsList *corev1.PodList, node *corev1.Node, w PrefixWriter) {
 	w.Write(LEVEL_0, "Non-terminated Pods:\t(%d in total)\n", len(nodeNonTerminatedPodsList.Items))
 	w.Write(LEVEL_1, "Namespace\tName\t\tCPU Requests\tCPU Limits\tMemory Requests\tMemory Limits\tAge\n")
@@ -4064,16 +4079,16 @@ func describeNodeResource(nodeNonTerminatedPodsList *corev1.PodList, node *corev
 	}
 
 	for _, pod := range nodeNonTerminatedPodsList.Items {
-		req := resourcehelper.PodRequests(&pod, resourcehelper.PodResourcesOptions{SkipPodLevelResources: false, UseStatusResources: true})
-		limit := resourcehelper.PodLimits(&pod, resourcehelper.PodResourcesOptions{SkipPodLevelResources: false, UseStatusResources: true})
+		req := resourcehelper.PodRequests(&pod, resourcehelper.PodResourcesOptions{SkipPodLevelResources: false, UseStatusResources: true, UseExtraNodeAllocatableResources: true})
+		limit := resourcehelper.PodLimits(&pod, resourcehelper.PodResourcesOptions{SkipPodLevelResources: false, UseStatusResources: true, UseExtraNodeAllocatableResources: true})
 		cpuReq, cpuLimit, memoryReq, memoryLimit := req[corev1.ResourceCPU], limit[corev1.ResourceCPU], req[corev1.ResourceMemory], limit[corev1.ResourceMemory]
-		fractionCpuReq := float64(cpuReq.MilliValue()) / float64(allocatable.Cpu().MilliValue()) * 100
-		fractionCpuLimit := float64(cpuLimit.MilliValue()) / float64(allocatable.Cpu().MilliValue()) * 100
-		fractionMemoryReq := float64(memoryReq.Value()) / float64(allocatable.Memory().Value()) * 100
-		fractionMemoryLimit := float64(memoryLimit.Value()) / float64(allocatable.Memory().Value()) * 100
+		fractionCpuReq := percentOf(cpuReq.MilliValue(), allocatable.Cpu().MilliValue())
+		fractionCpuLimit := percentOf(cpuLimit.MilliValue(), allocatable.Cpu().MilliValue())
+		fractionMemoryReq := percentOf(memoryReq.Value(), allocatable.Memory().Value())
+		fractionMemoryLimit := percentOf(memoryLimit.Value(), allocatable.Memory().Value())
 		w.Write(LEVEL_1, "%s\t%s\t\t%s (%d%%)\t%s (%d%%)\t%s (%d%%)\t%s (%d%%)\t%s\n", pod.Namespace, pod.Name,
-			cpuReq.String(), int64(fractionCpuReq), cpuLimit.String(), int64(fractionCpuLimit),
-			memoryReq.String(), int64(fractionMemoryReq), memoryLimit.String(), int64(fractionMemoryLimit), translateTimestampSince(pod.CreationTimestamp))
+			cpuReq.String(), fractionCpuReq, cpuLimit.String(), fractionCpuLimit,
+			memoryReq.String(), fractionMemoryReq, memoryLimit.String(), fractionMemoryLimit, translateTimestampSince(pod.CreationTimestamp))
 	}
 
 	w.Write(LEVEL_0, "Allocated resources:\n  (Total limits may be over 100 percent, i.e., overcommitted.)\n")
@@ -4082,30 +4097,12 @@ func describeNodeResource(nodeNonTerminatedPodsList *corev1.PodList, node *corev
 	reqs, limits := getPodsTotalRequestsAndLimits(nodeNonTerminatedPodsList)
 	cpuReqs, cpuLimits, memoryReqs, memoryLimits, ephemeralstorageReqs, ephemeralstorageLimits :=
 		reqs[corev1.ResourceCPU], limits[corev1.ResourceCPU], reqs[corev1.ResourceMemory], limits[corev1.ResourceMemory], reqs[corev1.ResourceEphemeralStorage], limits[corev1.ResourceEphemeralStorage]
-	fractionCpuReqs := float64(0)
-	fractionCpuLimits := float64(0)
-	if allocatable.Cpu().MilliValue() != 0 {
-		fractionCpuReqs = float64(cpuReqs.MilliValue()) / float64(allocatable.Cpu().MilliValue()) * 100
-		fractionCpuLimits = float64(cpuLimits.MilliValue()) / float64(allocatable.Cpu().MilliValue()) * 100
-	}
-	fractionMemoryReqs := float64(0)
-	fractionMemoryLimits := float64(0)
-	if allocatable.Memory().Value() != 0 {
-		fractionMemoryReqs = float64(memoryReqs.Value()) / float64(allocatable.Memory().Value()) * 100
-		fractionMemoryLimits = float64(memoryLimits.Value()) / float64(allocatable.Memory().Value()) * 100
-	}
-	fractionEphemeralStorageReqs := float64(0)
-	fractionEphemeralStorageLimits := float64(0)
-	if allocatable.StorageEphemeral().Value() != 0 {
-		fractionEphemeralStorageReqs = float64(ephemeralstorageReqs.Value()) / float64(allocatable.StorageEphemeral().Value()) * 100
-		fractionEphemeralStorageLimits = float64(ephemeralstorageLimits.Value()) / float64(allocatable.StorageEphemeral().Value()) * 100
-	}
 	w.Write(LEVEL_1, "%s\t%s (%d%%)\t%s (%d%%)\n",
-		corev1.ResourceCPU, cpuReqs.String(), int64(fractionCpuReqs), cpuLimits.String(), int64(fractionCpuLimits))
+		corev1.ResourceCPU, cpuReqs.String(), percentOf(cpuReqs.MilliValue(), allocatable.Cpu().MilliValue()), cpuLimits.String(), percentOf(cpuLimits.MilliValue(), allocatable.Cpu().MilliValue()))
 	w.Write(LEVEL_1, "%s\t%s (%d%%)\t%s (%d%%)\n",
-		corev1.ResourceMemory, memoryReqs.String(), int64(fractionMemoryReqs), memoryLimits.String(), int64(fractionMemoryLimits))
+		corev1.ResourceMemory, memoryReqs.String(), percentOf(memoryReqs.Value(), allocatable.Memory().Value()), memoryLimits.String(), percentOf(memoryLimits.Value(), allocatable.Memory().Value()))
 	w.Write(LEVEL_1, "%s\t%s (%d%%)\t%s (%d%%)\n",
-		corev1.ResourceEphemeralStorage, ephemeralstorageReqs.String(), int64(fractionEphemeralStorageReqs), ephemeralstorageLimits.String(), int64(fractionEphemeralStorageLimits))
+		corev1.ResourceEphemeralStorage, ephemeralstorageReqs.String(), percentOf(ephemeralstorageReqs.Value(), allocatable.StorageEphemeral().Value()), ephemeralstorageLimits.String(), percentOf(ephemeralstorageLimits.Value(), allocatable.StorageEphemeral().Value()))
 
 	extResources := make([]string, 0, len(allocatable))
 	hugePageResources := make([]string, 0, len(allocatable))
@@ -4122,14 +4119,8 @@ func describeNodeResource(nodeNonTerminatedPodsList *corev1.PodList, node *corev
 
 	for _, resource := range hugePageResources {
 		hugePageSizeRequests, hugePageSizeLimits, hugePageSizeAllocable := reqs[corev1.ResourceName(resource)], limits[corev1.ResourceName(resource)], allocatable[corev1.ResourceName(resource)]
-		fractionHugePageSizeRequests := float64(0)
-		fractionHugePageSizeLimits := float64(0)
-		if hugePageSizeAllocable.Value() != 0 {
-			fractionHugePageSizeRequests = float64(hugePageSizeRequests.Value()) / float64(hugePageSizeAllocable.Value()) * 100
-			fractionHugePageSizeLimits = float64(hugePageSizeLimits.Value()) / float64(hugePageSizeAllocable.Value()) * 100
-		}
 		w.Write(LEVEL_1, "%s\t%s (%d%%)\t%s (%d%%)\n",
-			resource, hugePageSizeRequests.String(), int64(fractionHugePageSizeRequests), hugePageSizeLimits.String(), int64(fractionHugePageSizeLimits))
+			resource, hugePageSizeRequests.String(), percentOf(hugePageSizeRequests.Value(), hugePageSizeAllocable.Value()), hugePageSizeLimits.String(), percentOf(hugePageSizeLimits.Value(), hugePageSizeAllocable.Value()))
 	}
 
 	for _, ext := range extResources {
@@ -4141,8 +4132,10 @@ func describeNodeResource(nodeNonTerminatedPodsList *corev1.PodList, node *corev
 func getPodsTotalRequestsAndLimits(podList *corev1.PodList) (reqs map[corev1.ResourceName]resource.Quantity, limits map[corev1.ResourceName]resource.Quantity) {
 	reqs, limits = map[corev1.ResourceName]resource.Quantity{}, map[corev1.ResourceName]resource.Quantity{}
 	for _, pod := range podList.Items {
-		podReqs := resourcehelper.PodRequests(&pod, resourcehelper.PodResourcesOptions{SkipPodLevelResources: false})
-		podLimits := resourcehelper.PodLimits(&pod, resourcehelper.PodResourcesOptions{SkipPodLevelResources: false})
+		// Use the same accounting as the per-pod rows above so that the totals
+		// agree with them while a pod is being resized in place.
+		podReqs := resourcehelper.PodRequests(&pod, resourcehelper.PodResourcesOptions{SkipPodLevelResources: false, UseStatusResources: true, UseExtraNodeAllocatableResources: true})
+		podLimits := resourcehelper.PodLimits(&pod, resourcehelper.PodResourcesOptions{SkipPodLevelResources: false, UseStatusResources: true, UseExtraNodeAllocatableResources: true})
 		for podReqName, podReqValue := range podReqs {
 			if value, ok := reqs[podReqName]; !ok {
 				reqs[podReqName] = podReqValue.DeepCopy()
@@ -4788,6 +4781,178 @@ func describePriorityClass(pc *schedulingv1.PriorityClass, events *corev1.EventL
 	})
 }
 
+// ResourcePoolStatusRequestDescriber shows the per-pool status of a request.
+type ResourcePoolStatusRequestDescriber struct {
+	clientset.Interface
+}
+
+func (d *ResourcePoolStatusRequestDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
+	request, err := d.ResourceV1alpha3().ResourcePoolStatusRequests().Get(context.TODO(), name, metav1.GetOptions{})
+	if err != nil {
+		return "", err
+	}
+
+	var events *corev1.EventList
+	if describerSettings.ShowEvents {
+		events, _ = searchEvents(d.CoreV1(), request, describerSettings.ChunkSize)
+	}
+
+	return describeResourcePoolStatusRequest(request, events)
+}
+
+func describeResourcePoolStatusRequest(request *resourcev1alpha3.ResourcePoolStatusRequest, events *corev1.EventList) (string, error) {
+	return tabbedString(func(out io.Writer) error {
+		w := NewPrefixWriter(out)
+		w.Write(LEVEL_0, "Name:\t%s\n", request.Name)
+		printLabelsMultiline(w, "Labels", request.Labels)
+		printAnnotationsMultiline(w, "Annotations", request.Annotations)
+		w.Write(LEVEL_0, "CreationTimestamp:\t%s\n", request.CreationTimestamp.Time.Format(time.RFC1123Z))
+
+		spec := request.Spec
+		w.Write(LEVEL_0, "Spec:\n")
+		w.Write(LEVEL_1, "Driver:\t%s\n", spec.Driver)
+		w.Write(LEVEL_1, "Pool Name:\t%s\n", stringOrNone(ptr.Deref(spec.PoolName, "")))
+		if spec.Limit != nil {
+			w.Write(LEVEL_1, "Limit:\t%d\n", *spec.Limit)
+		}
+		if spec.DefaultPartitionTypeAttribute != nil {
+			w.Write(LEVEL_1, "Default Partition Type Attribute:\t%s\n", *spec.DefaultPartitionTypeAttribute)
+		}
+
+		status := request.Status
+		if status == nil {
+			w.Write(LEVEL_0, "Status:\tPending\n")
+		} else {
+			describeResourcePoolStatusRequestStatus(w, status)
+		}
+
+		if events != nil {
+			DescribeEvents(events, w)
+		}
+		return nil
+	})
+}
+
+func describeResourcePoolStatusRequestStatus(w PrefixWriter, status *resourcev1alpha3.ResourcePoolStatusRequestStatus) {
+	waiting := meta.IsStatusConditionTrue(status.Conditions, resourcev1alpha3.ResourcePoolStatusRequestConditionWaitingForPools)
+	state := "Complete"
+	switch {
+	case waiting:
+		state = resourcev1alpha3.ResourcePoolStatusRequestConditionWaitingForPools
+	case meta.IsStatusConditionTrue(status.Conditions, resourcev1alpha3.ResourcePoolStatusRequestConditionFailed):
+		state = "Failed"
+	}
+	w.Write(LEVEL_0, "Status:\t%s\n", state)
+
+	// poolCount is only meaningful in the final status.
+	if !waiting {
+		// pools is truncated at spec.limit; poolCount is not.
+		poolCount := int(ptr.Deref(status.PoolCount, int32(len(status.Pools))))
+		if poolCount > len(status.Pools) {
+			w.Write(LEVEL_1, "Pool Count:\t%d (showing %d, truncated by limit)\n", poolCount, len(status.Pools))
+		} else {
+			w.Write(LEVEL_1, "Pool Count:\t%d\n", poolCount)
+		}
+	}
+
+	if len(status.Conditions) > 0 {
+		w.Write(LEVEL_0, "Conditions:\n")
+		w.Write(LEVEL_1, "Type\tStatus\tLastTransitionTime\tReason\tMessage\n")
+		w.Write(LEVEL_1, "----\t------\t------------------\t------\t-------\n")
+		for _, c := range status.Conditions {
+			w.Write(LEVEL_1, "%v\t%v\t%s\t%v\t%v\n",
+				c.Type,
+				c.Status,
+				c.LastTransitionTime.Time.Format(time.RFC1123Z),
+				c.Reason,
+				c.Message)
+		}
+	}
+
+	if len(status.Pools) == 0 {
+		return
+	}
+
+	// Unset counts print as "-".
+	count := func(v *int32) string {
+		if v == nil {
+			return "-"
+		}
+		return strconv.Itoa(int(*v))
+	}
+	w.Write(LEVEL_0, "Pools:\n")
+	w.Write(LEVEL_1, "Pool\tNode\tGeneration\tSlices\tTotal\tAllocated\tAvailable\tUnavailable\n")
+	w.Write(LEVEL_1, "----\t----\t----------\t------\t-----\t---------\t---------\t-----------\n")
+	var withErrors, withPartitions, withShareable []resourcev1alpha3.PoolStatus
+	for _, p := range status.Pools {
+		w.Write(LEVEL_1, "%s\t%s\t%d\t%s\t%s\t%s\t%s\t%s\n",
+			p.PoolName,
+			stringOrNone(ptr.Deref(p.NodeName, "")),
+			p.Generation,
+			count(p.ResourceSliceCount),
+			count(p.TotalDevices),
+			count(p.AllocatedDevices),
+			count(p.AvailableDevices),
+			count(p.UnavailableDevices))
+		if p.ValidationError != nil {
+			withErrors = append(withErrors, p)
+		}
+		if len(p.PartitionSummary) > 0 {
+			withPartitions = append(withPartitions, p)
+		}
+		if p.ShareableSummary != nil {
+			withShareable = append(withShareable, p)
+		}
+	}
+
+	if len(withErrors) > 0 {
+		w.Write(LEVEL_0, "Validation Errors:\n")
+		w.Write(LEVEL_1, "Pool\tError\n")
+		w.Write(LEVEL_1, "----\t-----\n")
+		for _, p := range withErrors {
+			w.Write(LEVEL_1, "%s\t%s\n", p.PoolName, *p.ValidationError)
+		}
+	}
+
+	if len(withPartitions) > 0 {
+		w.Write(LEVEL_0, "Partition Summary:\n")
+		w.Write(LEVEL_1, "Pool\tAttribute\tType\tTotal\tAllocatable\n")
+		w.Write(LEVEL_1, "----\t---------\t----\t-----\t-----------\n")
+		for _, p := range withPartitions {
+			for _, ps := range p.PartitionSummary {
+				w.Write(LEVEL_1, "%s\t%s\t%s\t%s\t%s\n", p.PoolName, ps.Attribute, ps.Type, count(ps.Total), count(ps.Allocatable))
+			}
+		}
+	}
+
+	if len(withShareable) > 0 {
+		w.Write(LEVEL_0, "Shareable Summary:\n")
+		w.Write(LEVEL_1, "Pool\tFully Available\tIn Use\tCapacity\tTotal\tConsumed\tAvailable\n")
+		w.Write(LEVEL_1, "----\t---------------\t------\t--------\t-----\t--------\t---------\n")
+		quantity := func(q *resource.Quantity) string {
+			if q == nil {
+				return "-"
+			}
+			return q.String()
+		}
+		for _, p := range withShareable {
+			sh := p.ShareableSummary
+			fully, inUse := count(sh.FullyAvailableDevices), count(sh.PartiallyAvailableDevices)
+			if len(sh.Capacity) == 0 {
+				w.Write(LEVEL_1, "%s\t%s\t%s\t<none>\t\t\t\n", p.PoolName, fully, inUse)
+				continue
+			}
+			for i, c := range sh.Capacity {
+				// Device counts on the first row only.
+				if i > 0 {
+					fully, inUse = "", ""
+				}
+				w.Write(LEVEL_1, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n", p.PoolName, fully, inUse, c.Name, quantity(c.Total), quantity(c.Consumed), quantity(c.Available))
+			}
+		}
+	}
+}
+
 func stringOrNone(s string) string {
 	return stringOrDefaultValue(s, "<none>")
 }
@@ -5259,15 +5424,11 @@ func formatEndpointSlices(endpointSlices []discoveryv1.EndpointSlice, ports sets
 	}
 	var list []string
 	max := 3
-	more := false
 	count := 0
 	for i := range endpointSlices {
 		if len(endpointSlices[i].Ports) == 0 {
 			// It's possible to have headless services with no ports.
 			for j := range endpointSlices[i].Endpoints {
-				if len(list) == max {
-					more = true
-				}
 				isReady := endpointSlices[i].Endpoints[j].Conditions.Ready == nil || *endpointSlices[i].Endpoints[j].Conditions.Ready
 				if !isReady {
 					// ready indicates that this endpoint is prepared to receive traffic,
@@ -5277,7 +5438,7 @@ func formatEndpointSlices(endpointSlices []discoveryv1.EndpointSlice, ports sets
 					// More info: vendor/k8s.io/api/discovery/v1/types.go
 					continue
 				}
-				if !more {
+				if len(list) < max {
 					list = append(list, endpointSlices[i].Endpoints[j].Addresses[0])
 				}
 				count++
@@ -5288,9 +5449,6 @@ func formatEndpointSlices(endpointSlices []discoveryv1.EndpointSlice, ports sets
 				port := endpointSlices[i].Ports[j]
 				if ports == nil || ports.Has(*port.Name) {
 					for k := range endpointSlices[i].Endpoints {
-						if len(list) == max {
-							more = true
-						}
 						addr := endpointSlices[i].Endpoints[k].Addresses[0]
 						isReady := endpointSlices[i].Endpoints[k].Conditions.Ready == nil || *endpointSlices[i].Endpoints[k].Conditions.Ready
 						if !isReady {
@@ -5301,7 +5459,7 @@ func formatEndpointSlices(endpointSlices []discoveryv1.EndpointSlice, ports sets
 							// More info: vendor/k8s.io/api/discovery/v1/types.go
 							continue
 						}
-						if !more {
+						if len(list) < max {
 							hostPort := net.JoinHostPort(addr, strconv.Itoa(int(*port.Port)))
 							list = append(list, hostPort)
 						}
@@ -5312,7 +5470,10 @@ func formatEndpointSlices(endpointSlices []discoveryv1.EndpointSlice, ports sets
 		}
 	}
 	ret := strings.Join(list, ",")
-	if more {
+	// Only ready endpoints are listed and counted, so the "more" suffix must be
+	// derived from the ready count rather than from having visited an endpoint
+	// past the display limit, which may have been skipped as not ready.
+	if count > max {
 		return fmt.Sprintf("%s + %d more...", ret, count-max)
 	}
 	return ret

@@ -55,11 +55,13 @@ func TestEnforceRequirements(t *testing.T) {
 		expectedErrNonRoot string
 	}{
 		{
+			// The root check runs first. A root user passes it and then fails to fetch the
+			// cluster config, which is needed for the CoreDNS migration check.
 			name: "Fail pre-flight check",
 			flags: applyPlanFlags{
 				kubeConfigPath: fullPath,
 			},
-			expectedErr:        "preflight checks failed",
+			expectedErr:        "[upgrade/init config] FATAL",
 			expectedErrNonRoot: "preflight checks failed",
 		},
 		{

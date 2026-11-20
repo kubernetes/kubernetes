@@ -109,7 +109,7 @@ func RunObjectMetaTestCases[T runtime.Object](t *testing.T, ctx context.Context,
 				meta.SetGeneration(-1)
 			},
 			ExpectedErrs: field.ErrorList{
-				field.Invalid(fldPath.Child("generation"), "", "").WithOrigin("minimum").MarkAlpha(),
+				field.Invalid(fldPath.Child("generation"), "", "").WithOrigin("minimum").MarkBeta(),
 			},
 		},
 		{
@@ -127,7 +127,7 @@ func RunObjectMetaTestCases[T runtime.Object](t *testing.T, ctx context.Context,
 				})
 			},
 			ExpectedErrs: field.ErrorList{
-				field.Required(fldPath.Child("ownerReferences").Index(0).Child("apiVersion"), "must not be empty").MarkAlpha(),
+				field.Required(fldPath.Child("ownerReferences").Index(0).Child("apiVersion"), "must not be empty").MarkBeta(),
 			},
 		},
 		{
@@ -169,7 +169,7 @@ func RunObjectMetaTestCases[T runtime.Object](t *testing.T, ctx context.Context,
 				})
 			},
 			ExpectedErrs: field.ErrorList{
-				field.Required(fldPath.Child("ownerReferences").Index(0).Child("kind"), "must not be empty").MarkAlpha(),
+				field.Required(fldPath.Child("ownerReferences").Index(0).Child("kind"), "must not be empty").MarkBeta(),
 			},
 		},
 		{
@@ -180,7 +180,7 @@ func RunObjectMetaTestCases[T runtime.Object](t *testing.T, ctx context.Context,
 				})
 			},
 			ExpectedErrs: field.ErrorList{
-				field.Required(fldPath.Child("ownerReferences").Index(0).Child("name"), "must not be empty").MarkAlpha(),
+				field.Required(fldPath.Child("ownerReferences").Index(0).Child("name"), "must not be empty").MarkBeta(),
 			},
 		},
 		{
@@ -191,7 +191,7 @@ func RunObjectMetaTestCases[T runtime.Object](t *testing.T, ctx context.Context,
 				})
 			},
 			ExpectedErrs: field.ErrorList{
-				field.Required(fldPath.Child("ownerReferences").Index(0).Child("uid"), "must not be empty").MarkAlpha(),
+				field.Required(fldPath.Child("ownerReferences").Index(0).Child("uid"), "must not be empty").MarkBeta(),
 			},
 		},
 		{
@@ -258,7 +258,7 @@ func RunObjectMetaTestCases[T runtime.Object](t *testing.T, ctx context.Context,
 				})
 			},
 			ExpectedErrs: field.ErrorList{
-				field.NotSupported(fldPath.Child("managedFields").Index(0).Child("operation"), metav1.ManagedFieldsOperationType("Invalid"), []metav1.ManagedFieldsOperationType{metav1.ManagedFieldsOperationApply, metav1.ManagedFieldsOperationUpdate}).MarkAlpha(),
+				field.NotSupported(fldPath.Child("managedFields").Index(0).Child("operation"), metav1.ManagedFieldsOperationType("Invalid"), []metav1.ManagedFieldsOperationType{metav1.ManagedFieldsOperationApply, metav1.ManagedFieldsOperationUpdate}).MarkBeta(),
 			},
 		},
 		{
@@ -269,7 +269,7 @@ func RunObjectMetaTestCases[T runtime.Object](t *testing.T, ctx context.Context,
 				})
 			},
 			ExpectedErrs: field.ErrorList{
-				field.Required(fldPath.Child("managedFields").Index(0).Child("operation"), "").MarkAlpha(),
+				field.Required(fldPath.Child("managedFields").Index(0).Child("operation"), "").MarkBeta(),
 			},
 		},
 		{
@@ -491,7 +491,7 @@ func RunObjectMetaUpdateTestCases[T runtime.Object](t *testing.T, ctx context.Co
 				new.SetGeneration(4)
 			},
 			ExpectedErrs: field.ErrorList{
-				field.Invalid(fldPath.Child("generation"), "", "must not be decremented").MarkFromImperative(),
+				field.Invalid(fldPath.Child("generation"), "", "must not be decremented").WithOrigin("monotonic").MarkAlpha(),
 			},
 		},
 		{
@@ -509,7 +509,7 @@ func RunObjectMetaUpdateTestCases[T runtime.Object](t *testing.T, ctx context.Co
 				new.SetGeneration(0)
 			},
 			ExpectedErrs: field.ErrorList{
-				field.Invalid(fldPath.Child("generation"), "", "must not be decremented").MarkFromImperative(),
+				field.Invalid(fldPath.Child("generation"), "", "field cannot be cleared once set").WithOrigin("update").MarkAlpha(),
 			},
 		},
 		{
@@ -519,8 +519,8 @@ func RunObjectMetaUpdateTestCases[T runtime.Object](t *testing.T, ctx context.Co
 				new.SetGeneration(-1)
 			},
 			ExpectedErrs: field.ErrorList{
-				field.Invalid(fldPath.Child("generation"), "", "").WithOrigin("minimum").MarkAlpha(),
-				field.Invalid(fldPath.Child("generation"), "", "must not be decremented").MarkFromImperative(),
+				field.Invalid(fldPath.Child("generation"), "", "").WithOrigin("minimum").MarkBeta(),
+				field.Invalid(fldPath.Child("generation"), "", "must not be decremented").WithOrigin("monotonic").MarkAlpha(),
 			},
 		},
 		{
@@ -539,7 +539,7 @@ func RunObjectMetaUpdateTestCases[T runtime.Object](t *testing.T, ctx context.Co
 				new.SetUID("uid-2")
 			},
 			ExpectedErrs: field.ErrorList{
-				field.Invalid(fldPath.Child("uid"), "", "field is immutable").WithOrigin("immutable").MarkAlpha(),
+				field.Invalid(fldPath.Child("uid"), "", "field is immutable").WithOrigin("immutable").MarkBeta(),
 			},
 		},
 		{
@@ -549,7 +549,7 @@ func RunObjectMetaUpdateTestCases[T runtime.Object](t *testing.T, ctx context.Co
 				new.SetCreationTimestamp(t2)
 			},
 			ExpectedErrs: field.ErrorList{
-				field.Invalid(fldPath.Child("creationTimestamp"), "", "field is immutable").WithOrigin("immutable").MarkAlpha(),
+				field.Invalid(fldPath.Child("creationTimestamp"), "", "field is immutable").WithOrigin("immutable").MarkBeta(),
 			},
 		},
 		{
@@ -559,7 +559,7 @@ func RunObjectMetaUpdateTestCases[T runtime.Object](t *testing.T, ctx context.Co
 				new.SetDeletionTimestamp(&t2)
 			},
 			ExpectedErrs: field.ErrorList{
-				field.Invalid(fldPath.Child("deletionTimestamp"), "", "field is immutable").WithOrigin("immutable").MarkAlpha(),
+				field.Invalid(fldPath.Child("deletionTimestamp"), "", "field is immutable").WithOrigin("immutable").MarkBeta(),
 			},
 		},
 		{
@@ -571,7 +571,7 @@ func RunObjectMetaUpdateTestCases[T runtime.Object](t *testing.T, ctx context.Co
 				new.SetDeletionGracePeriodSeconds(&g2)
 			},
 			ExpectedErrs: field.ErrorList{
-				field.Invalid(fldPath.Child("deletionGracePeriodSeconds"), "", "field is immutable").WithOrigin("immutable").MarkAlpha(),
+				field.Invalid(fldPath.Child("deletionGracePeriodSeconds"), "", "field is immutable").WithOrigin("immutable").MarkBeta(),
 			},
 		},
 		{
@@ -658,25 +658,60 @@ func RunObjectMetaUpdateTestCases[T runtime.Object](t *testing.T, ctx context.Co
 				field.Invalid(fldPath.Child("labels"), "", "").WithOrigin("format=k8s-label-value").MarkFromImperative(),
 			},
 		},
-	}
-
-	if strategy.NamespaceScoped() {
-		testCases = append(testCases, struct {
-			Name         string
-			Modify       func(old, new metav1.Object)
-			ExpectedErrs field.ErrorList
-		}{
-			Name: "update: namespace: immutable",
+		{
+			Name: "update: namespace: changed to different value",
 			Modify: func(old, new metav1.Object) {
 				old.SetResourceVersion("1")
 				new.SetResourceVersion("2")
 				old.SetNamespace("ns-one")
 				new.SetNamespace("ns-two")
 			},
-			ExpectedErrs: field.ErrorList{
-				field.Invalid(fldPath.Child("namespace"), "", "field is immutable").MarkFromImperative(),
+			ExpectedErrs: func() field.ErrorList {
+				errs := field.ErrorList{
+					field.Invalid(fldPath.Child("namespace"), "", "").WithOrigin("immutable").MarkAlpha(),
+				}
+				if !strategy.NamespaceScoped() {
+					errs = append(errs, field.Forbidden(fldPath.Child("namespace"), "not allowed on this type").MarkFromImperative())
+				}
+				return errs
+			}(),
+		},
+		{
+			Name: "update: namespace: empty to non-empty",
+			Modify: func(old, new metav1.Object) {
+				old.SetResourceVersion("1")
+				new.SetResourceVersion("2")
+				old.SetNamespace("")
+				new.SetNamespace("ns-set")
 			},
-		})
+			ExpectedErrs: func() field.ErrorList {
+				errs := field.ErrorList{
+					field.Invalid(fldPath.Child("namespace"), "", "").WithOrigin("immutable").MarkAlpha(),
+				}
+				if !strategy.NamespaceScoped() {
+					errs = append(errs, field.Forbidden(fldPath.Child("namespace"), "not allowed on this type").MarkFromImperative())
+				}
+				return errs
+			}(),
+		},
+		{
+			Name: "update: namespace: non-empty to empty",
+			Modify: func(old, new metav1.Object) {
+				old.SetResourceVersion("1")
+				new.SetResourceVersion("2")
+				old.SetNamespace("ns-set")
+				new.SetNamespace("")
+			},
+			ExpectedErrs: func() field.ErrorList {
+				errs := field.ErrorList{
+					field.Invalid(fldPath.Child("namespace"), "", "").WithOrigin("immutable").MarkAlpha(),
+				}
+				if strategy.NamespaceScoped() {
+					errs = append(errs, field.Required(fldPath.Child("namespace"), "").MarkFromImperative())
+				}
+				return errs
+			}(),
+		},
 	}
 
 	for _, tc := range testCases {

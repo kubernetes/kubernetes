@@ -17,7 +17,6 @@ limitations under the License.
 package util
 
 import (
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 )
 
@@ -33,7 +32,7 @@ func PodGroupPriority(pg *schedulingv1beta1.PodGroup) int32 {
 }
 
 // CompositePodGroupPriority returns priority of a given composite pod group.
-func CompositePodGroupPriority(cpg *schedulingv1alpha3.CompositePodGroup) int32 {
+func CompositePodGroupPriority(cpg *schedulingv1beta1.CompositePodGroup) int32 {
 	if cpg.Spec.Priority != nil {
 		return *cpg.Spec.Priority
 	}

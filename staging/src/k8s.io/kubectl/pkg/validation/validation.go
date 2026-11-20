@@ -34,6 +34,9 @@ type schemaValidation struct {
 
 // NewSchemaValidation creates a new Schema that can be used
 // to validate objects.
+//
+// Deprecated: validates against the deprecated OpenAPI v2 schema. kubectl
+// relies on server-side field validation instead.
 func NewSchemaValidation(resourcesGetter openapi.OpenAPIResourcesGetter) Schema {
 	return &schemaValidation{
 		resourcesGetter: resourcesGetter,

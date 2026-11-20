@@ -87,7 +87,7 @@ func Test_Run_Positive_DoNothing(t *testing.T) {
 		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, false, dsw, asw, ad, nsu, nodeLister, fakeRecorder)
 
 	// Act
-	go reconciler.Run(ctx)
+	runReconciler(ctx, t, reconciler)
 
 	// Assert
 	waitForNewAttacherCallCount(t, 0 /* expectedCallCount */, fakePlugin)
@@ -141,7 +141,7 @@ func Test_Run_Positive_OneDesiredVolumeAttach(t *testing.T) {
 	}
 
 	// Act
-	go reconciler.Run(ctx)
+	runReconciler(ctx, t, reconciler)
 
 	// Assert
 	waitForNewAttacherCallCount(t, 1 /* expectedCallCount */, fakePlugin)
@@ -152,8 +152,8 @@ func Test_Run_Positive_OneDesiredVolumeAttach(t *testing.T) {
 // Populates desiredStateOfWorld cache with one node/volume/pod tuple.
 // Calls Run()
 // Verifies there is one attach call and no detach calls.
-// Marks the node/volume as unmounted.
-// Deletes the node/volume/pod tuple from desiredStateOfWorld cache.
+// Deletes the node/volume/pod tuple from desiredStateOfWorld cache. The volume is not mounted by the
+// node, as no node status reported it in use.
 // Verifies there is one detach call and no (new) attach calls.
 func Test_Run_Positive_OneDesiredVolumeAttachThenDetachWithUnmountedVolume(t *testing.T) {
 	logger, ctx := ktesting.NewTestContext(t)
@@ -196,7 +196,7 @@ func Test_Run_Positive_OneDesiredVolumeAttachThenDetachWithUnmountedVolume(t *te
 	}
 
 	// Act
-	go reconciler.Run(ctx)
+	runReconciler(ctx, t, reconciler)
 
 	// Assert
 	waitForNewAttacherCallCount(t, 1 /* expectedCallCount */, fakePlugin)
@@ -215,8 +215,6 @@ func Test_Run_Positive_OneDesiredVolumeAttachThenDetachWithUnmountedVolume(t *te
 			generatedVolumeName,
 			nodeName)
 	}
-	asw.SetVolumesMountedByNode(logger, []v1.UniqueVolumeName{generatedVolumeName}, nodeName)
-	asw.SetVolumesMountedByNode(logger, nil, nodeName)
 
 	// Assert
 	waitForNewDetacherCallCount(t, 1 /* expectedCallCount */, fakePlugin)
@@ -229,7 +227,7 @@ func Test_Run_Positive_OneDesiredVolumeAttachThenDetachWithUnmountedVolume(t *te
 // Populates desiredStateOfWorld cache with one node/volume/pod tuple.
 // Calls Run()
 // Verifies there is one attach call and no detach calls.
-// Deletes the node/volume/pod tuple from desiredStateOfWorld cache without first marking the node/volume as unmounted.
+// Marks the node/volume as mounted, then deletes the node/volume/pod tuple from desiredStateOfWorld cache.
 // Verifies there is one detach call and no (new) attach calls.
 func Test_Run_Positive_OneDesiredVolumeAttachThenDetachWithMountedVolume(t *testing.T) {
 	logger, ctx := ktesting.NewTestContext(t)
@@ -288,7 +286,7 @@ func Test_Run_Positive_OneDesiredVolumeAttachThenDetachWithMountedVolume(t *test
 	}
 
 	// Act
-	go reconciler.Run(ctx)
+	runReconciler(ctx, t, reconciler)
 
 	// Assert
 	waitForNewAttacherCallCount(t, 1 /* expectedCallCount */, fakePlugin)
@@ -296,6 +294,9 @@ func Test_Run_Positive_OneDesiredVolumeAttachThenDetachWithMountedVolume(t *test
 	waitForAttachCallCount(t, 1 /* expectedAttachCallCount */, fakePlugin)
 	verifyNewDetacherCallCount(t, true /* expectZeroNewDetacherCallCount */, fakePlugin)
 	waitForDetachCallCount(t, 0 /* expectedDetachCallCount */, fakePlugin)
+
+	// Mark the volume as mounted by the node so a normal detach is blocked.
+	asw.SetVolumesMountedByNode(logger, []v1.UniqueVolumeName{generatedVolumeName}, nodeName)
 
 	// Act
 	dsw.DeletePod(types.UniquePodName(podName), generatedVolumeName, nodeName)
@@ -325,8 +326,8 @@ func Test_Run_Positive_OneDesiredVolumeAttachThenDetachWithMountedVolume(t *test
 // Has node update fail
 // Calls Run()
 // Verifies there is one attach call and no detach calls.
-// Marks the node/volume as unmounted.
-// Deletes the node/volume/pod tuple from desiredStateOfWorld cache.
+// Deletes the node/volume/pod tuple from desiredStateOfWorld cache. The volume is not mounted by the
+// node, as no node status reported it in use.
 // Verifies there are NO detach call and no (new) attach calls.
 func Test_Run_Negative_OneDesiredVolumeAttachThenDetachWithUnmountedVolumeUpdateStatusFail(t *testing.T) {
 	logger, ctx := ktesting.NewTestContext(t)
@@ -369,7 +370,7 @@ func Test_Run_Negative_OneDesiredVolumeAttachThenDetachWithUnmountedVolumeUpdate
 	}
 
 	// Act
-	go reconciler.Run(ctx)
+	runReconciler(ctx, t, reconciler)
 
 	// Assert
 	waitForNewAttacherCallCount(t, 1 /* expectedCallCount */, fakePlugin)
@@ -388,8 +389,9 @@ func Test_Run_Negative_OneDesiredVolumeAttachThenDetachWithUnmountedVolumeUpdate
 			generatedVolumeName,
 			nodeName)
 	}
-	asw.SetVolumesMountedByNode(logger, []v1.UniqueVolumeName{generatedVolumeName}, nodeName)
-	asw.SetVolumesMountedByNode(logger, nil, nodeName)
+	// Give the reconciler loops to act on the deletion, all of which must decline the detach
+	// because the node status update fails.
+	time.Sleep(reconcilerLoopPeriod * 5)
 
 	// Assert
 	verifyNewDetacherCallCount(t, true /* expectZeroNewDetacherCallCount */, fakePlugin)
@@ -450,7 +452,7 @@ func Test_Run_OneVolumeAttachAndDetachMultipleNodesWithReadWriteMany(t *testing.
 	}
 
 	// Act
-	go reconciler.Run(ctx)
+	runReconciler(ctx, t, reconciler)
 
 	// Assert
 	waitForNewAttacherCallCount(t, 2 /* expectedCallCount */, fakePlugin)
@@ -546,7 +548,7 @@ func Test_Run_OneVolumeAttachAndDetachMultipleNodesWithReadWriteOnce(t *testing.
 	}
 
 	// Act
-	go reconciler.Run(ctx)
+	runReconciler(ctx, t, reconciler)
 
 	// Assert
 	waitForNewAttacherCallCount(t, 1 /* expectedCallCount */, fakePlugin)
@@ -630,7 +632,7 @@ func Test_Run_OneVolumeAttachAndDetachUncertainNodesWithReadWriteOnce(t *testing
 	dsw.AddNode(nodeName2)
 
 	// Act
-	go reconciler.Run(ctx)
+	runReconciler(ctx, t, reconciler)
 
 	// Add the pod in which the volume is attached to the uncertain node
 	generatedVolumeName, podAddErr := dsw.AddPod(types.UniquePodName(podName1), controllervolumetesting.NewPod(podName1, podName1), volumeSpec, nodeName1)
@@ -643,10 +645,6 @@ func Test_Run_OneVolumeAttachAndDetachUncertainNodesWithReadWriteOnce(t *testing
 	waitForVolumeAddedToNode(t, generatedVolumeName, nodeName1, asw)
 	verifyVolumeAttachedToNode(t, generatedVolumeName, nodeName1, cache.AttachStateAttached, asw)
 	verifyVolumeReportedAsAttachedToNode(t, logger, generatedVolumeName, nodeName1, true, asw, volumeAttachedCheckTimeout)
-
-	// When volume is added to the node, it is set to mounted by default. Then the status will be updated by checking node status VolumeInUse.
-	// Without this, the delete operation will be delayed due to mounted status
-	asw.SetVolumesMountedByNode(logger, nil, nodeName1)
 
 	dsw.DeletePod(types.UniquePodName(podName1), generatedVolumeName, nodeName1)
 
@@ -710,9 +708,6 @@ func Test_Run_UpdateNodeStatusFailBeforeOneVolumeDetachNodeWithReadWriteOnce(t *
 	// Mock NodeStatusUpdate fail
 	rc.(*reconciler).nodeStatusUpdater = statusupdater.NewFakeNodeStatusUpdater(true /* returnError */)
 	reconciliationLoopFunc(ctx)
-	// The first detach will be triggered after at least 50ms (maxWaitForUnmountDuration in test).
-	time.Sleep(100 * time.Millisecond)
-	reconciliationLoopFunc(ctx)
 	// Right before detach operation is performed, the volume will be first removed from being reported
 	// as attached on node status (RemoveVolumeFromReportAsAttached). After UpdateNodeStatus operation which is expected to fail,
 	// controller then added the volume back as attached.
@@ -758,7 +753,7 @@ func Test_Run_OneVolumeDetachFailNodeWithReadWriteOnce(t *testing.T) {
 	dsw.AddNode(nodeName2)
 
 	// Act
-	go reconciler.Run(ctx)
+	runReconciler(ctx, t, reconciler)
 
 	// Add the pod in which the volume is attached to the FailDetachNode
 	generatedVolumeName, podAddErr := dsw.AddPod(types.UniquePodName(podName1), controllervolumetesting.NewPod(podName1, podName1), volumeSpec, nodeName1)
@@ -839,7 +834,7 @@ func Test_Run_OneVolumeAttachAndDetachTimeoutNodesWithReadWriteOnce(t *testing.T
 	dsw.AddNode(nodeName2)
 
 	// Act
-	go reconciler.Run(ctx)
+	runReconciler(ctx, t, reconciler)
 
 	// Add the pod in which the volume is attached to the timeout node
 	generatedVolumeName, podAddErr := dsw.AddPod(types.UniquePodName(podName1), controllervolumetesting.NewPod(podName1, podName1), volumeSpec, nodeName1)
@@ -851,10 +846,6 @@ func Test_Run_OneVolumeAttachAndDetachTimeoutNodesWithReadWriteOnce(t *testing.T
 	waitForVolumeAddedToNode(t, generatedVolumeName, nodeName1, asw)
 	verifyVolumeAttachedToNode(t, generatedVolumeName, nodeName1, cache.AttachStateUncertain, asw)
 	verifyVolumeReportedAsAttachedToNode(t, logger, generatedVolumeName, nodeName1, false, asw, volumeAttachedCheckTimeout)
-
-	// When volume is added to the node, it is set to mounted by default. Then the status will be updated by checking node status VolumeInUse.
-	// Without this, the delete operation will be delayed due to mounted status
-	asw.SetVolumesMountedByNode(logger, nil, nodeName1)
 
 	dsw.DeletePod(types.UniquePodName(podName1), generatedVolumeName, nodeName1)
 
@@ -943,7 +934,7 @@ func Test_Run_OneVolumeDetachOnOutOfServiceTaintedNode(t *testing.T) {
 	}
 
 	// Act
-	go reconciler.Run(ctx)
+	runReconciler(ctx, t, reconciler)
 
 	// Assert
 	waitForNewAttacherCallCount(t, 1 /* expectedCallCount */, fakePlugin)
@@ -951,6 +942,9 @@ func Test_Run_OneVolumeDetachOnOutOfServiceTaintedNode(t *testing.T) {
 	waitForAttachCallCount(t, 1 /* expectedAttachCallCount */, fakePlugin)
 	verifyNewDetacherCallCount(t, true /* expectZeroNewDetacherCallCount */, fakePlugin)
 	waitForDetachCallCount(t, 0 /* expectedDetachCallCount */, fakePlugin)
+
+	// Mark the volume as mounted by the node so that only the out-of-service taint can override the mounted check.
+	asw.SetVolumesMountedByNode(logger, []v1.UniqueVolumeName{generatedVolumeName}, nodeName1)
 
 	// Delete the pod and the volume will be detached only after the maxLongWaitForUnmountDuration expires as volume is
 	//not unmounted. Here maxLongWaitForUnmountDuration is used to mimic that node is out of service.
@@ -1027,7 +1021,7 @@ func Test_Run_OneVolumeDetachOnNoOutOfServiceTaintedNode(t *testing.T) {
 	}
 
 	// Act
-	go reconciler.Run(ctx)
+	runReconciler(ctx, t, reconciler)
 
 	// Assert
 	waitForNewAttacherCallCount(t, 1 /* expectedCallCount */, fakePlugin)
@@ -1036,11 +1030,17 @@ func Test_Run_OneVolumeDetachOnNoOutOfServiceTaintedNode(t *testing.T) {
 	verifyNewDetacherCallCount(t, true /* expectZeroNewDetacherCallCount */, fakePlugin)
 	waitForDetachCallCount(t, 0 /* expectedDetachCallCount */, fakePlugin)
 
+	// Mark the volume as mounted by the node so a normal detach is blocked.
+	asw.SetVolumesMountedByNode(logger, []v1.UniqueVolumeName{generatedVolumeName}, nodeName1)
+
 	// Delete the pod and the volume will be detached only after the maxLongWaitForUnmountDuration expires as volume is
 	// not unmounted. Here maxLongWaitForUnmountDuration is used to mimic that node is out of service.
 	// But in this case the node does not have the node.kubernetes.io/out-of-service taint and hence it will wait for
 	// maxLongWaitForUnmountDuration and will not be detached immediately.
 	dsw.DeletePod(types.UniquePodName(podName1), generatedVolumeName, nodeName1)
+	// Give the reconciler many loops to act on the deletion. Its drain timer is
+	// maxLongWaitForUnmountDuration, which stays far from expiring.
+	time.Sleep(reconcilerLoopPeriod * 5)
 	// Assert -- Detach will be triggered only after maxLongWaitForUnmountDuration expires
 	waitForNewDetacherCallCount(t, 0 /* expectedCallCount */, fakePlugin)
 	verifyNewAttacherCallCount(t, false /* expectZeroNewAttacherCallCount */, fakePlugin)
@@ -1113,7 +1113,7 @@ func Test_Run_OneVolumeDetachOnUnhealthyNode(t *testing.T) {
 	}
 
 	// Act
-	go reconciler.Run(ctx)
+	runReconciler(ctx, t, reconciler)
 
 	// Assert
 	waitForNewAttacherCallCount(t, 1 /* expectedCallCount */, fakePlugin)
@@ -1122,9 +1122,12 @@ func Test_Run_OneVolumeDetachOnUnhealthyNode(t *testing.T) {
 	verifyNewDetacherCallCount(t, true /* expectZeroNewDetacherCallCount */, fakePlugin)
 	waitForDetachCallCount(t, 0 /* expectedDetachCallCount */, fakePlugin)
 
+	// Mark the volume as mounted by the node so a normal detach is blocked.
+	asw.SetVolumesMountedByNode(logger, []v1.UniqueVolumeName{generatedVolumeName}, nodeName1)
+
 	// Act
-	// Delete the pod and the volume will be detached even after the maxWaitForUnmountDuration expires as volume is
-	// not unmounted and the node is healthy.
+	// Delete the pod. The volume is still mounted and the node is healthy, so it is not detached even after
+	// the maxWaitForUnmountDuration expires.
 	dsw.DeletePod(types.UniquePodName(podName1), generatedVolumeName, nodeName1)
 	time.Sleep(maxWaitForUnmountDuration * 5)
 	// Assert
@@ -1233,7 +1236,7 @@ func Test_Run_OneVolumeDetachOnUnhealthyNodeWithForceDetachOnUnmountDisabled(t *
 	}
 
 	// Act
-	go reconciler.Run(ctx)
+	runReconciler(ctx, t, reconciler)
 
 	// Assert
 	waitForNewAttacherCallCount(t, 1 /* expectedCallCount */, fakePlugin)
@@ -1242,9 +1245,12 @@ func Test_Run_OneVolumeDetachOnUnhealthyNodeWithForceDetachOnUnmountDisabled(t *
 	verifyNewDetacherCallCount(t, true /* expectZeroNewDetacherCallCount */, fakePlugin)
 	waitForDetachCallCount(t, 0 /* expectedDetachCallCount */, fakePlugin)
 
+	// Mark the volume as mounted by the node so a normal detach is blocked.
+	asw.SetVolumesMountedByNode(logger, []v1.UniqueVolumeName{generatedVolumeName}, nodeName1)
+
 	// Act
-	// Delete the pod and the volume will be detached even after the maxWaitForUnmountDuration expires as volume is
-	// not unmounted and the node is healthy.
+	// Delete the pod. The volume is still mounted and the node is healthy, so it is not detached even after
+	// the maxWaitForUnmountDuration expires.
 	dsw.DeletePod(types.UniquePodName(podName1), generatedVolumeName, nodeName1)
 	time.Sleep(maxWaitForUnmountDuration * 5)
 	// Assert
@@ -1868,14 +1874,40 @@ func waitForCondition(interval time.Duration, fn wait.ConditionFunc) error {
 }
 
 // verifies the force detach metric with reason
+// runReconciler runs the reconciler until the test ends and waits for it to
+// return. The force detach metric is global, so a reconciler still running
+// after its test returns could change it under the next test.
+func runReconciler(ctx context.Context, t *testing.T, rc Reconciler) {
+	t.Helper()
+
+	ctx, cancel := context.WithCancel(ctx)
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		rc.Run(ctx)
+	}()
+	t.Cleanup(func() {
+		cancel()
+		<-done
+	})
+}
+
 func testForceDetachMetric(t *testing.T, inputForceDetachMetricCounter int, reason string) {
 	t.Helper()
 
-	actualForceDetachMericCounter, err := metricstestutil.GetCounterMetricValue(metrics.ForceDetachMetricCounter.WithLabelValues(reason))
+	// The reconciler records the metric after DetachVolume returns, but the
+	// detach itself runs in its own goroutine, so the fake detacher can be
+	// called before the counter is incremented.
+	var actualForceDetachMericCounter float64
+	err := waitForCondition(5*time.Millisecond, func() (bool, error) {
+		var err error
+		actualForceDetachMericCounter, err = metricstestutil.GetCounterMetricValue(metrics.ForceDetachMetricCounter.WithLabelValues(reason))
+		if err != nil {
+			return false, err
+		}
+		return actualForceDetachMericCounter == float64(inputForceDetachMetricCounter), nil
+	})
 	if err != nil {
-		t.Errorf("Error getting actualForceDetachMericCounter")
-	}
-	if actualForceDetachMericCounter != float64(inputForceDetachMetricCounter) {
-		t.Errorf("Expected desiredForceDetachMericCounter to be %d, got %v", inputForceDetachMetricCounter, actualForceDetachMericCounter)
+		t.Errorf("Expected desiredForceDetachMericCounter to be %d, got %v: %v", inputForceDetachMetricCounter, actualForceDetachMericCounter, err)
 	}
 }

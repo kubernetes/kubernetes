@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -41,15 +42,19 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	cloudprovider "k8s.io/cloud-provider"
 	cloudproviderapi "k8s.io/cloud-provider/api"
+	"k8s.io/cloud-provider/events"
 	cloudnodeutil "k8s.io/cloud-provider/node/helpers"
 	controllersmetrics "k8s.io/component-base/metrics/prometheus/controllers"
 	nodeutil "k8s.io/component-helpers/node/util"
+	"k8s.io/controller-manager/pkg/features"
 	"k8s.io/klog/v2"
 )
 
 func init() {
 	registerMetrics()
 }
+
+var k8sNamespaceRegex = regexp.MustCompile(`(^|\.)(kubernetes|k8s)\.io/`)
 
 // labelReconcileInfo lists Node labels to reconcile, and how to reconcile them.
 // primaryKey and secondaryKey are keys of labels to reconcile.
@@ -290,6 +295,12 @@ func (cnc *CloudNodeController) UpdateNodeStatus(ctx context.Context) error {
 		}
 
 		cnc.updateNodeAddress(ctx, node, instanceMetadata)
+
+		if utilfeature.DefaultFeatureGate.Enabled(features.CloudNodeAdditionalLabelsReconciliation) {
+			if err := cnc.reconcileAdditionalLabels(node, instanceMetadata); err != nil {
+				klog.Errorf("Error reconciling additional labels for node %q: %v", node.Name, err)
+			}
+		}
 	}
 
 	workqueue.ParallelizeUntil(ctx, int(cnc.statusUpdateWorkerCount), len(nodes), updateNodeFunc)
@@ -353,6 +364,61 @@ func (cnc *CloudNodeController) reconcileNodeLabels(nodeName string) error {
 
 	if !cloudnodeutil.AddOrUpdateLabelsOnNode(cnc.kubeClient, labelsToUpdate, node) {
 		return fmt.Errorf("failed update labels for node %+v", node)
+	}
+
+	return nil
+}
+
+// reconcileAdditionalLabels adds or updates labels returned by the cloud provider.
+func (cnc *CloudNodeController) reconcileAdditionalLabels(
+	node *v1.Node,
+	instanceMetadata *cloudprovider.InstanceMetadata,
+) error {
+	if instanceMetadata == nil || len(instanceMetadata.AdditionalLabels) == 0 {
+		return nil
+	}
+
+	// Keep provider-owned labels read-only: concurrent reconciliations may
+	// receive the same map from a provider.
+	labelsToUpdate := map[string]string{}
+	for key, value := range instanceMetadata.AdditionalLabels {
+		// Cloud providers should not use label namespaces reserved by Kubernetes.
+		if k8sNamespaceRegex.MatchString(key) {
+			klog.V(4).InfoS(
+				"Discarding node label because it uses a Kubernetes-reserved namespace",
+				"node", klog.KObj(node),
+				"label", key,
+			)
+			continue
+		}
+
+		currentValue, exists := node.Labels[key]
+		if !exists || currentValue != value {
+			labelsToUpdate[key] = value
+			klog.V(6).InfoS(
+				"Reconciling additional node label",
+				"node", klog.KObj(node),
+				"label", key,
+				"previouslyPresent", exists,
+				"oldValue", currentValue,
+				"newValue", value,
+			)
+		}
+	}
+
+	if len(labelsToUpdate) == 0 {
+		return nil
+	}
+
+	if !cloudnodeutil.AddOrUpdateLabelsOnNode(
+		cnc.kubeClient,
+		labelsToUpdate,
+		node,
+	) {
+		return fmt.Errorf(
+			"failed to update additional labels for node %q",
+			node.Name,
+		)
 	}
 
 	return nil
@@ -481,7 +547,7 @@ func (cnc *CloudNodeController) syncNode(ctx context.Context, nodeName string) e
 		return err
 	}
 
-	cnc.recorder.Event(copyNode, v1.EventTypeNormal, "Synced", "Node synced successfully")
+	cnc.recorder.Event(copyNode, v1.EventTypeNormal, events.NodeSynced, "Node synced successfully")
 	initialNodeSyncDelay.Observe(time.Since(curNode.ObjectMeta.CreationTimestamp.Time).Seconds())
 	return nil
 }
@@ -553,7 +619,6 @@ func (cnc *CloudNodeController) getNodeModifiersFromCloudProvider(
 				n.Labels = map[string]string{}
 			}
 
-			k8sNamespaceRegex := regexp.MustCompile(`(^|\.)(kubernetes|k8s)\.io/`)
 			for k, v := range instanceMeta.AdditionalLabels {
 				// Cloud provider should not be using kubernetes namespaces in labels
 				if isK8sNamespace := k8sNamespaceRegex.MatchString(k); isK8sNamespace {

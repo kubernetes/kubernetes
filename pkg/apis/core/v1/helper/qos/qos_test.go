@@ -26,6 +26,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	resourcehelper "k8s.io/component-helpers/resource"
@@ -373,13 +374,158 @@ func TestComputePodQOS(t *testing.T) {
 			podLevelResourcesEnabled: true,
 			podLevelResourcesFixKubeletQOSClassEnabled: true,
 		},
+		{
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "best-effort-with-swap-limits"},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "best-effort-with-swap",
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceSwap: resource.MustParse("1Gi"),
+								},
+							},
+						},
+					},
+					Resources: &v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceSwap: resource.MustParse("2Gi"),
+						},
+					},
+				},
+			},
+			expected:                 v1.PodQOSBestEffort,
+			podLevelResourcesEnabled: true,
+			podLevelResourcesFixKubeletQOSClassEnabled: true,
+		},
+		{
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "guaranteed-with-swap-limits-only"},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "guaranteed-with-swap",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("100m"),
+									v1.ResourceMemory: resource.MustParse("100Mi"),
+								},
+								Limits: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("100m"),
+									v1.ResourceMemory: resource.MustParse("100Mi"),
+									v1.ResourceSwap:   resource.MustParse("1Gi"),
+								},
+							},
+						},
+					},
+					Resources: &v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceSwap: resource.MustParse("1Gi"),
+						},
+					},
+				},
+			},
+			expected:                 v1.PodQOSGuaranteed,
+			podLevelResourcesEnabled: true,
+			podLevelResourcesFixKubeletQOSClassEnabled: true,
+		},
+		{
+			// cpu and memory at pod level decide the QoS class; limits.swap next
+			// to them does not change it.
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "guaranteed-pod-level-resources-with-swap-limit"},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: "best-effort"},
+					},
+					Resources: &v1.ResourceRequirements{
+						Requests: getResourceList("100m", "100Mi"),
+						Limits: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("100m"),
+							v1.ResourceMemory: resource.MustParse("100Mi"),
+							v1.ResourceSwap:   resource.MustParse("1Gi"),
+						},
+					},
+				},
+			},
+			expected:                 v1.PodQOSGuaranteed,
+			podLevelResourcesEnabled: true,
+			podLevelResourcesFixKubeletQOSClassEnabled: true,
+		},
+		{
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "guaranteed-with-swap-limits-only-fix-disabled"},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "guaranteed-with-swap",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("100m"),
+									v1.ResourceMemory: resource.MustParse("100Mi"),
+								},
+								Limits: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("100m"),
+									v1.ResourceMemory: resource.MustParse("100Mi"),
+									v1.ResourceSwap:   resource.MustParse("1Gi"),
+								},
+							},
+						},
+					},
+					Resources: &v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceSwap: resource.MustParse("1Gi"),
+						},
+					},
+				},
+			},
+			expected:                 v1.PodQOSGuaranteed,
+			podLevelResourcesEnabled: true,
+			podLevelResourcesFixKubeletQOSClassEnabled: false,
+		},
+		{
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "burstable-with-swap-limits-only-fix-disabled"},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "burstable-with-swap",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU: resource.MustParse("100m"),
+								},
+								Limits: v1.ResourceList{
+									v1.ResourceSwap: resource.MustParse("1Gi"),
+								},
+							},
+						},
+					},
+					Resources: &v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceSwap: resource.MustParse("1Gi"),
+						},
+					},
+				},
+			},
+			expected:                 v1.PodQOSBurstable,
+			podLevelResourcesEnabled: true,
+			podLevelResourcesFixKubeletQOSClassEnabled: false,
+		},
 	}
 	tests = append(tests, explicitPLRTests...)
 
 	for _, testCase := range tests {
 		t.Run(testCase.pod.Name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, testCase.podLevelResourcesEnabled)
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourcesFixKubeletQOSClass, testCase.podLevelResourcesFixKubeletQOSClassEnabled)
+			if !testCase.podLevelResourcesEnabled {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.37"))
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, false)
+			} else {
+				if !testCase.podLevelResourcesFixKubeletQOSClassEnabled {
+					featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.37"))
+				}
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourcesFixKubeletQOSClass, testCase.podLevelResourcesFixKubeletQOSClassEnabled)
+			}
 			if actual := ComputePodQOS(testCase.pod); testCase.expected != actual {
 				t.Errorf("ComputePodQOS error: expected: %s, actual: %s;\npod = %s", testCase.expected, actual, prettyPrintPod(testCase.pod))
 			}

@@ -41,10 +41,15 @@ func init() {
 			},
 			"metadata.generation": {
 				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
+				{ErrorType: "FieldValueInvalid", Origin: "monotonic"},
+				{ErrorType: "FieldValueInvalid", Origin: "update"},
 			},
 			"metadata.managedFields[*].operation": {
 				{ErrorType: "FieldValueNotSupported"},
 				{ErrorType: "FieldValueRequired"},
+			},
+			"metadata.namespace": {
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
 			},
 			"metadata.ownerReferences[*].apiVersion": {
 				{ErrorType: "FieldValueRequired"},
@@ -60,6 +65,18 @@ func init() {
 			},
 			"metadata.uid": {
 				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
+			},
+			"spec.deviceSelector.all": {
+				{ErrorType: "FieldValueInvalid", Origin: "neq"},
+			},
+			"spec.deviceSelector.device": {
+				{ErrorType: "FieldValueForbidden", Origin: "dependentForbidden"},
+			},
+			"spec.deviceSelector.driver": {
+				{ErrorType: "FieldValueForbidden", Origin: "dependentForbidden"},
+			},
+			"spec.deviceSelector.pool": {
+				{ErrorType: "FieldValueForbidden", Origin: "dependentForbidden"},
 			},
 			"spec.taint.effect": {
 				{ErrorType: "FieldValueNotSupported"},

@@ -1,0 +1,37 @@
+diff --git a/staging/src/k8s.io/apiserver/pkg/storage/cacher/cacher.go b/staging/src/k8s.io/apiserver/pkg/storage/cacher/cacher.go
+index 92628f8e2df..d0966617696 100644
+--- a/staging/src/k8s.io/apiserver/pkg/storage/cacher/cacher.go
++++ b/staging/src/k8s.io/apiserver/pkg/storage/cacher/cacher.go
+@@ -950,7 +950,13 @@ func (c *Cacher) Get(ctx context.Context, key string, opts storage.GetOptions, o
+ 		return err
+ 	}
+ 
+-	obj, exists, err := c.get(ctx, key, opts.ResourceVersion, opts.IgnoreNotFound)
++	rv := opts.ResourceVersion
++	if rv == "" {
++		// BUG INJECTION: serve consistent Get(RV="") from the current watch cache
++		// state without fetching the latest RV from etcd.
++		rv = "0"
++	}
++	obj, exists, err := c.get(ctx, key, rv, opts.IgnoreNotFound)
+ 	if err != nil && !storage.IsNotFound(err) {
+ 		return err
+ 	}
+diff --git a/staging/src/k8s.io/apiserver/pkg/storage/cacher/delegator.go b/staging/src/k8s.io/apiserver/pkg/storage/cacher/delegator.go
+index 7df76a7f736..4e25a21a392 100644
+--- a/staging/src/k8s.io/apiserver/pkg/storage/cacher/delegator.go
++++ b/staging/src/k8s.io/apiserver/pkg/storage/cacher/delegator.go
+@@ -160,11 +160,8 @@ func (c *CacheDelegator) Watch(ctx context.Context, key string, opts storage.Lis
+ 
+ func (c *CacheDelegator) Get(ctx context.Context, key string, opts storage.GetOptions, objPtr runtime.Object) error {
+ 	consistentRead := opts.ResourceVersion == ""
+-	if consistentRead {
+-		if !c.consistentGetFromCacheEnabled() {
+-			return c.storage.Get(ctx, key, opts, objPtr)
+-		}
+-	}
++	// BUG INJECTION: the ConsistentGetFromCache=false bypass that routes consistent
++	// Gets to etcd has been removed, so they are always served from the watch cache.
+ 	if !c.cacher.Ready() {
+ 		// If Cache is not initialized, delegator Get requests to storage
+ 		// as described in https://kep.k8s.io/4568

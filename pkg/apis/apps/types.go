@@ -17,6 +17,7 @@ limitations under the License.
 package apps
 
 import (
+	schedulingv1 "k8s.io/api/scheduling/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -93,7 +94,7 @@ const (
 	// RecreateStatefulSetStrategyType indicates that all existing pods will be
 	// deleted and fully terminated before any new-revision pods are created.
 	// This ensures that old and new revision Pods never run at the same time.
-	// This is an alpha type and requires enabling StatefulSetRecreateStrategy feature gate.
+	// This is a beta type and requires enabling StatefulSetRecreateStrategy feature gate.
 	// Switching to the Recreate strategy is allowed when the feature gate is enabled,
 	// and switching away from it to a different update strategy is also allowed.
 	//
@@ -109,11 +110,13 @@ type RollingUpdateStatefulSetStrategy struct {
 	// This is helpful in being able to do a canary based deployment. The default value is 0.
 	Partition int32
 	// The maximum number of pods that can be unavailable during the update.
-	// Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%).
-	// Absolute number is calculated from percentage by rounding up. This can not be 0.
-	// Defaults to 1. This field is beta-level and is enabled by default. The field applies to all pods in the range 0 to
-	// Replicas-1. That means if there is any unavailable pod in the range 0 to Replicas-1, it
-	// will be counted towards MaxUnavailable.
+	// Value can be an absolute number (ex: 5) or a percentage of pods in the update range (ex: 10%).
+	// Absolute number is calculated from percentage by rounding down. This can not be 0.
+	// Defaults to 1. This field is beta-level and is enabled by default.
+	// The field applies only to pods in the update range (ordinals greater than or equal to
+	// Partition, up to Replicas-1). Unavailable pods below Partition are not counted towards
+	// MaxUnavailable. When MaxUnavailable is a percentage, it is calculated from the number of
+	// pods in that update range (Replicas - Partition), not from all replicas.
 	// This setting might not be effective for the OrderedReady podManagementPolicy. That policy ensures pods are created and become ready one at a time.
 	//
 	// +featureGate=MaxUnavailableStatefulSet
@@ -305,7 +308,7 @@ type StatefulSetConditionType string
 
 const (
 	// StatefulSetProgressing means the StatefulSet is progressing through an update.
-	// This condition is an alpha type and requires enabling StatefulSetRecreateStrategy feature gate.
+	// This condition is a beta type and requires enabling StatefulSetRecreateStrategy feature gate.
 	StatefulSetProgressing StatefulSetConditionType = "Progressing"
 )
 
@@ -435,6 +438,57 @@ type DeploymentSpec struct {
 	// the max value of int32 (i.e. 2147483647) by default, which means "no deadline".
 	// +optional
 	ProgressDeadlineSeconds *int32
+
+	// Scheduling defines the Workload-aware Scheduling configuration for this Deployment.
+	// When set, it specifies the scheduling policy (basic or gang), topology
+	// constraints, disruption mode, and shared resource claims.
+	// When spec.scheduling is omitted, no Workload or PodGroup is created and the
+	// Deployment uses standard pod-by-pod scheduling.
+	// This field is gated by the WorkloadWithDeployment feature gate.
+	// Once set, this field is immutable except for schedulingPolicy.gang.minCount.
+	//
+	// +featureGate=WorkloadWithDeployment
+	// +optional
+	Scheduling *DeploymentSchedulingConfiguration
+}
+
+// DeploymentSchedulingConfiguration composes the reusable scheduling building blocks
+// from scheduling.k8s.io for use on a Deployment.
+type DeploymentSchedulingConfiguration struct {
+	// SchedulingPolicy defines the scheduling policy for this Deployment. If
+	// spec.scheduling.schedulingPolicy is omitted, the Basic policy is used.
+	// Otherwise, exactly one of Basic or Gang must be set. For Gang, minCount may
+	// be omitted to derive it from replicas.
+	//
+	// +optional
+	SchedulingPolicy *schedulingv1.WorkloadPodGroupSchedulingPolicy
+
+	// SchedulingConstraints defines optional scheduling constraints (e.g. topology)
+	// for the Deployment's pods.
+	//
+	// +optional
+	SchedulingConstraints *schedulingv1.WorkloadPodGroupSchedulingConstraints
+
+	// DisruptionMode defines the mode in which the Deployment's pods can be disrupted.
+	// One of Single or All.
+	// If omitted, standard per-pod disruption behavior is used.
+	//
+	// +optional
+	DisruptionMode *schedulingv1.WorkloadPodGroupDisruptionMode
+
+	// ResourceClaims defines which ResourceClaims may be shared among Pods in
+	// the Deployment. Pods consume the devices allocated to a PodGroup's claim by
+	// defining a claim in its own Spec.ResourceClaims that matches the
+	// PodGroup's claim exactly. The claim must have the same name and refer to
+	// the same ResourceClaim or ResourceClaimTemplate.
+	// At most 4 claims may be set, matching the limit on the resulting PodGroup.
+	//
+	// +optional
+	// +patchMergeKey=name
+	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=name
+	ResourceClaims []schedulingv1.WorkloadPodGroupResourceClaim
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -818,7 +872,8 @@ const (
 	// DaemonSetTemplateGenerationKey is the key of the labels that is added
 	// to daemon set pods to distinguish between old and new pod templates
 	// during DaemonSet template update.
-	// DEPRECATED: DefaultDaemonSetUniqueLabelKey is used instead.
+	//
+	// Deprecated: DefaultDaemonSetUniqueLabelKey is used instead.
 	DaemonSetTemplateGenerationKey string = "pod-template-generation"
 )
 

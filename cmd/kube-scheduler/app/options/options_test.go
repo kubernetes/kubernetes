@@ -23,6 +23,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -32,6 +33,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
+	clientfeatures "k8s.io/client-go/features"
+	clientfeaturestesting "k8s.io/client-go/features/testing"
+	clientset "k8s.io/client-go/kubernetes"
+	restclient "k8s.io/client-go/rest"
 	basecompatibility "k8s.io/component-base/compatibility"
 	componentbaseconfig "k8s.io/component-base/config"
 	"k8s.io/component-base/logs"
@@ -597,6 +602,7 @@ profiles:
 								},
 								Disabled: []kubeschedulerconfig.Plugin{
 									{Name: names.VolumeBinding},
+									{Name: names.DefaultPreemption},
 								},
 							},
 							PreBind: kubeschedulerconfig.PluginSet{
@@ -725,6 +731,7 @@ profiles:
 								},
 								Disabled: []kubeschedulerconfig.Plugin{
 									{Name: names.VolumeBinding},
+									{Name: names.DefaultPreemption},
 								},
 							},
 						},
@@ -734,6 +741,7 @@ profiles:
 						SchedulerName: "bar-profile",
 						Plugins: &kubeschedulerconfig.Plugins{
 							MultiPoint: defaults.PluginsV1.MultiPoint,
+							Reserve:    defaults.PluginsV1.Reserve,
 							PreBind: kubeschedulerconfig.PluginSet{
 								Disabled: []kubeschedulerconfig.Plugin{
 									{Name: names.VolumeBinding},
@@ -1002,6 +1010,42 @@ profiles:
 			}
 			if username != tc.expectedUsername {
 				t.Errorf("expected server call with user %q, got %q", tc.expectedUsername, username)
+			}
+		})
+	}
+}
+
+func TestCreateClients(t *testing.T) {
+	var accept string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		accept = req.Header.Get("Accept")
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"kind":"PodList","apiVersion":"v1","items":[]}`))
+	}))
+	defer server.Close()
+
+	for _, enabled := range []bool{false, true} {
+		t.Run(fmt.Sprintf("ManagedFieldsOptOutClient=%t", enabled), func(t *testing.T) {
+			clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.ManagedFieldsOptOutClient, enabled)
+			client, informerClient, _, err := createClients(&restclient.Config{Host: server.URL})
+			if err != nil {
+				t.Fatalf("unexpected error creating clients: %v", err)
+			}
+			// Without the gate, the informers keep sharing client, including its rate limiter.
+			if !enabled && informerClient != client {
+				t.Error("expected the informers to share the scheduler's client")
+			}
+			list := func(c clientset.Interface) string {
+				if _, err := c.CoreV1().Pods("").List(context.Background(), metav1.ListOptions{}); err != nil {
+					t.Fatalf("unexpected error listing pods: %v", err)
+				}
+				return accept
+			}
+			if got := list(client); strings.Contains(got, "drop=") {
+				t.Errorf("client Accept = %q, want no drop parameter", got)
+			}
+			if got := list(informerClient); strings.Contains(got, "drop=metadata.managedFields") != enabled {
+				t.Errorf("informer client Accept = %q, want drop parameter: %t", got, enabled)
 			}
 		})
 	}

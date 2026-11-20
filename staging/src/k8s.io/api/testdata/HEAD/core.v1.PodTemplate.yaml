@@ -234,6 +234,7 @@ template:
         secretRef:
           name: nameValue
           optional: true
+      hostCgroupNamespace: true
       image: imageValue
       imagePullPolicy: imagePullPolicyValue
       lifecycle:
@@ -361,6 +362,8 @@ template:
           - addValue
           drop:
           - dropValue
+        cgroupOptions:
+          mountMode: mountModeValue
         privileged: true
         procMount: procMountValue
         readOnlyRootFilesystem: true
@@ -374,6 +377,11 @@ template:
           user: userValue
         seccompProfile:
           localhostProfile: localhostProfileValue
+          oci:
+            baseProfile:
+              localhostProfile: localhostProfileValue
+              type: typeValue
+            ref: refValue
           type: typeValue
         windowsOptions:
           gmsaCredentialSpec: gmsaCredentialSpecValue
@@ -472,6 +480,7 @@ template:
         secretRef:
           name: nameValue
           optional: true
+      hostCgroupNamespace: true
       image: imageValue
       imagePullPolicy: imagePullPolicyValue
       lifecycle:
@@ -599,6 +608,8 @@ template:
           - addValue
           drop:
           - dropValue
+        cgroupOptions:
+          mountMode: mountModeValue
         privileged: true
         procMount: procMountValue
         readOnlyRootFilesystem: true
@@ -612,6 +623,11 @@ template:
           user: userValue
         seccompProfile:
           localhostProfile: localhostProfileValue
+          oci:
+            baseProfile:
+              localhostProfile: localhostProfileValue
+              type: typeValue
+            ref: refValue
           type: typeValue
         windowsOptions:
           gmsaCredentialSpec: gmsaCredentialSpecValue
@@ -716,6 +732,7 @@ template:
         secretRef:
           name: nameValue
           optional: true
+      hostCgroupNamespace: true
       image: imageValue
       imagePullPolicy: imagePullPolicyValue
       lifecycle:
@@ -843,6 +860,8 @@ template:
           - addValue
           drop:
           - dropValue
+        cgroupOptions:
+          mountMode: mountModeValue
         privileged: true
         procMount: procMountValue
         readOnlyRootFilesystem: true
@@ -856,6 +875,11 @@ template:
           user: userValue
         seccompProfile:
           localhostProfile: localhostProfileValue
+          oci:
+            baseProfile:
+              localhostProfile: localhostProfileValue
+              type: typeValue
+            ref: refValue
           type: typeValue
         windowsOptions:
           gmsaCredentialSpec: gmsaCredentialSpecValue
@@ -914,6 +938,7 @@ template:
       name: nameValue
     overhead:
       overheadKey: "0"
+    podNetwork: podNetworkValue
     preemptionPolicy: preemptionPolicyValue
     priority: 25
     priorityClassName: priorityClassNameValue
@@ -955,6 +980,11 @@ template:
         user: userValue
       seccompProfile:
         localhostProfile: localhostProfileValue
+        oci:
+          baseProfile:
+            localhostProfile: localhostProfileValue
+            type: typeValue
+          ref: refValue
         type: typeValue
       supplementalGroups:
       - 4

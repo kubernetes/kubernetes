@@ -29,12 +29,12 @@ import (
 // events. For the PostStart and PreStop lifecycle handlers, management of the container blocks
 // until the action is complete, unless the container process fails, in which case the handler is aborted.
 type LifecycleApplyConfiguration struct {
-	// PostStart is called immediately after a container is created. If the handler fails,
+	// postStart is called immediately after a container is created. If the handler fails,
 	// the container is terminated and restarted according to its restart policy.
 	// Other management of the container blocks until the hook completes.
 	// More info: https://kubernetes.io/docs/concepts/containers/container-lifecycle-hooks/#container-hooks
 	PostStart *LifecycleHandlerApplyConfiguration `json:"postStart,omitempty"`
-	// PreStop is called immediately before a container is terminated due to an
+	// preStop is called immediately before a container is terminated due to an
 	// API request or management event such as liveness/startup probe failure,
 	// preemption, resource contention, etc. The handler is not called if the
 	// container crashes or exits. The Pod's termination grace period countdown begins before the
@@ -44,7 +44,7 @@ type LifecycleApplyConfiguration struct {
 	// or until the termination grace period is reached.
 	// More info: https://kubernetes.io/docs/concepts/containers/container-lifecycle-hooks/#container-hooks
 	PreStop *LifecycleHandlerApplyConfiguration `json:"preStop,omitempty"`
-	// StopSignal defines which signal will be sent to a container when it is being stopped.
+	// stopSignal defines which signal will be sent to a container when it is being stopped.
 	// If not specified, the default is defined by the container runtime in use.
 	// StopSignal can only be set for Pods with a non-empty .spec.os.name
 	StopSignal *corev1.Signal `json:"stopSignal,omitempty"`

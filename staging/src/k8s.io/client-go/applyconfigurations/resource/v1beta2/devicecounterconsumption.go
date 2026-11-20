@@ -24,14 +24,14 @@ package v1beta2
 // DeviceCounterConsumption defines a set of counters that
 // a device will consume from a CounterSet.
 type DeviceCounterConsumptionApplyConfiguration struct {
-	// CounterSet is the name of the set from which the
+	// counterSet is the name of the set from which the
 	// counters defined will be consumed.
 	CounterSet *string `json:"counterSet,omitempty"`
-	// Counters defines the counters that will be consumed by the device.
+	// counters defines the counters that will be consumed by the device.
 	//
 	// The maximum number of counters is 32.
-	Counters map[string]CounterApplyConfiguration `json:"counters,omitempty"`
-	// CompatibilityGroups is a list of opaque group names for
+	Counters map[string]CounterRequirementApplyConfiguration `json:"counters,omitempty"`
+	// compatibilityGroups is a list of opaque group names for
 	// this counter set consumption.
 	//
 	// Devices that consume counters from the same counter set may only be
@@ -71,9 +71,9 @@ func (b *DeviceCounterConsumptionApplyConfiguration) WithCounterSet(value string
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, the entries provided by each call will be put on the Counters field,
 // overwriting an existing map entries in Counters field with the same key.
-func (b *DeviceCounterConsumptionApplyConfiguration) WithCounters(entries map[string]CounterApplyConfiguration) *DeviceCounterConsumptionApplyConfiguration {
+func (b *DeviceCounterConsumptionApplyConfiguration) WithCounters(entries map[string]CounterRequirementApplyConfiguration) *DeviceCounterConsumptionApplyConfiguration {
 	if b.Counters == nil && len(entries) > 0 {
-		b.Counters = make(map[string]CounterApplyConfiguration, len(entries))
+		b.Counters = make(map[string]CounterRequirementApplyConfiguration, len(entries))
 	}
 	for k, v := range entries {
 		b.Counters[k] = v

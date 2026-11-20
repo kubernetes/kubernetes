@@ -20,15 +20,26 @@ import (
 	"fmt"
 	"strings"
 
-	jose "gopkg.in/go-jose/go-jose.v2"
+	jose "github.com/go-jose/go-jose/v4"
 )
 
 // ComputeDetachedSignature takes content and token details and computes a detached
 // JWS signature.  This is described in Appendix F of RFC 7515.  Basically, this
 // is a regular JWS with the content part of the signature elided.
 func ComputeDetachedSignature(content, tokenID, tokenSecret string) (string, error) {
+	key := []byte(tokenSecret)
+
+	// if the token secret is not at least 32 bytes in length,
+	// pad it with zeros until it is 32 bytes. This satisfies
+	// the go-jose requirement that keys for HS256 signatures need
+	// to be at least this long.
+	if len([]byte(tokenSecret)) < 32 {
+		key = make([]byte, 32)
+		copy(key, []byte(tokenSecret))
+	}
+
 	jwk := &jose.JSONWebKey{
-		Key:   []byte(tokenSecret),
+		Key:   key,
 		KeyID: tokenID,
 	}
 

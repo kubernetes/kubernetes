@@ -42,22 +42,22 @@ type StorageClass struct {
 
 	// provisioner indicates the type of the provisioner.
 	// +required
-	// +k8s:beta(since: "1.37")=+k8s:required
-	// +k8s:beta(since: "1.37")=+k8s:immutable
+	// +k8s:required
+	// +k8s:immutable
 	Provisioner string `json:"provisioner" protobuf:"bytes,2,opt,name=provisioner"`
 
 	// parameters holds the parameters for the provisioner that should
 	// create volumes of this storage class.
 	// +optional
-	// +k8s:beta(since: "1.37")=+k8s:immutable
-	// +k8s:beta(since: "1.37")=+k8s:optional
+	// +k8s:immutable
+	// +k8s:optional
 	Parameters map[string]string `json:"parameters,omitempty" protobuf:"bytes,3,rep,name=parameters"`
 
 	// reclaimPolicy controls the reclaimPolicy for dynamically provisioned PersistentVolumes of this storage class.
 	// Defaults to Delete.
 	// +optional
-	// +k8s:beta(since: "1.37")=+k8s:immutable
-	// +k8s:beta(since: "1.37")=+k8s:optional
+	// +k8s:immutable
+	// +k8s:optional
 	ReclaimPolicy *v1.PersistentVolumeReclaimPolicy `json:"reclaimPolicy,omitempty" protobuf:"bytes,4,opt,name=reclaimPolicy,casttype=k8s.io/api/core/v1.PersistentVolumeReclaimPolicy"`
 
 	// mountOptions controls the mountOptions for dynamically provisioned PersistentVolumes of this storage class.
@@ -75,8 +75,8 @@ type StorageClass struct {
 	// provisioned and bound.  When unset, VolumeBindingImmediate is used.
 	// This field is only honored by servers that enable the VolumeScheduling feature.
 	// +optional
-	// +k8s:beta(since: "1.37")=+k8s:immutable
-	// +k8s:beta(since: "1.37")=+k8s:optional
+	// +k8s:immutable
+	// +k8s:optional
 	VolumeBindingMode *VolumeBindingMode `json:"volumeBindingMode,omitempty" protobuf:"bytes,7,opt,name=volumeBindingMode"`
 
 	// allowedTopologies restrict the node topologies where volumes can be dynamically provisioned.
@@ -106,6 +106,7 @@ type StorageClassList struct {
 
 // VolumeBindingMode indicates how PersistentVolumeClaims should be bound.
 // +enum
+// +k8s:validation-gen-nolint
 type VolumeBindingMode string
 
 const (
@@ -363,8 +364,8 @@ type CSIDriverSpec struct {
 	//
 	// +optional
 	// +listType=set
-	// +k8s:alpha(since: "1.37")=+k8s:optional
-	// +k8s:alpha(since: "1.37")=+k8s:immutable
+	// +k8s:beta(since: "1.38")=+k8s:optional
+	// +k8s:beta(since: "1.38")=+k8s:immutable
 	VolumeLifecycleModes []VolumeLifecycleMode `json:"volumeLifecycleModes,omitempty" protobuf:"bytes,3,opt,name=volumeLifecycleModes"`
 
 	// storageCapacity indicates that the CSI volume driver wants pod scheduling to consider the storage
@@ -595,6 +596,8 @@ const (
 // they use the node-driver-registrar sidecar container, the kubelet will
 // automatically populate the CSINode object for the CSI driver as part of
 // kubelet plugin registration.
+// For a driver in spec.driverRegistrations, the kubelet only adds the
+// registration, and external-attacher populates its spec.drivers entry.
 // CSINode has the same name as a node. If the object is missing, it means either
 // there are no CSI Drivers available on the node, or the Kubelet version is low
 // enough that it doesn't create this object.
@@ -620,12 +623,32 @@ type CSINode struct {
 type CSINodeSpec struct {
 	// drivers is a list of information of all CSI Drivers existing on a node.
 	// If all drivers in the list are uninstalled, this can become empty.
+	// A driver in driverRegistrations may be missing from this list until
+	// external-attacher adds it.
 	// +patchMergeKey=name
 	// +patchStrategy=merge
 	// +listType=map
 	// +listMapKey=name
 	// +optional
 	Drivers []CSINodeDriver `json:"drivers" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,1,rep,name=drivers"`
+
+	// driverRegistrations lists CSI drivers on this node whose topology and volume
+	// attachment limit are reported by the CSI controller instead of the node.
+	// kubelet adds an entry with the node ID returned by the driver's NodeGetInfo call,
+	// and external-attacher then adds the driver to drivers using ControllerGetNodeInfo.
+	// An entry's nodeID must match the nodeID of the drivers entry with the same name,
+	// if one exists.
+	// This is an alpha field and requires enabling the CSIControllerGetNodeInfo feature gate.
+	// +optional
+	// +k8s:optional
+	// +listType=map
+	// +listMapKey=name
+	// +k8s:listType=map
+	// +k8s:listMapKey=name
+	// +patchMergeKey=name
+	// +patchStrategy=merge
+	// +featureGate=CSIControllerGetNodeInfo
+	DriverRegistrations []CSINodeDriverRegistration `json:"driverRegistrations,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,2,rep,name=driverRegistrations"`
 }
 
 // CSINodeDriver holds information about the specification of one CSI driver installed on a node
@@ -653,6 +676,8 @@ type CSINodeDriver struct {
 	// When a driver is initialized on a node, it provides the same topology keys
 	// along with values. Kubelet will expose these topology keys as labels
 	// on its own node object.
+	// For a driver in spec.driverRegistrations, external-attacher adds these
+	// labels instead.
 	// When Kubernetes does topology aware provisioning, it can use this list to
 	// determine which labels it should retrieve from the node object and pass
 	// back to the driver.
@@ -678,31 +703,71 @@ type VolumeNodeResources struct {
 	Count *int32 `json:"count,omitempty" protobuf:"varint,1,opt,name=count"`
 }
 
+// CSINodeDriverRegistration holds the node ID of a CSI driver whose topology and
+// volume attachment limit are reported by the CSI controller.
+type CSINodeDriverRegistration struct {
+	// name is the name of the CSI driver. This MUST be the same name returned by
+	// the CSI GetPluginInfo() call for that driver. This field is required.
+	// +required
+	// +k8s:required
+	// +k8s:format=k8s-long-name-caseless
+	// +k8s:maxLength=63
+	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
+
+	// nodeID is the ID of the node from the driver's point of view, as returned
+	// by the driver's NodeGetInfo call. This field is required.
+	// +required
+	// +k8s:required
+	// +k8s:maxBytes=256
+	NodeID string `json:"nodeID" protobuf:"bytes,2,opt,name=nodeID"`
+}
+
 // StorageHealthStatusType describes the health status category of a storage backend.
 // +enum
+// +k8s:alpha(since: "1.38")=+k8s:enum
 type StorageHealthStatusType string
 
 const (
+	// StorageHealthUnknown indicates that the driver reported an unknown health status, or a status
+	// Kubernetes does not recognize. The storage subsystem should not be considered healthy.
+	StorageHealthUnknown StorageHealthStatusType = "StorageHealthUnknown"
 	// StorageUnreachable indicates the storage backend is unreachable.
 	StorageUnreachable StorageHealthStatusType = "StorageUnreachable"
 	// StorageDegraded indicates the storage backend is functioning with reduced capability.
 	StorageDegraded StorageHealthStatusType = "StorageDegraded"
+	// StorageHealthy indicates that the storage backend is healthy as seen from this node.
+	StorageHealthy StorageHealthStatusType = "StorageHealthy"
 )
 
-// StorageHealthCondition represents an adverse health condition reported
+// StorageHealthCondition represents a health condition reported
 // by a CSI driver for its storage backend on a node.
 type StorageHealthCondition struct {
 	// status is the health status category.
-	// One of "StorageUnreachable", "StorageDegraded".
+	// Possible values are:
+	// - "StorageHealthUnknown": the driver reported an unknown health status, or a status Kubernetes does not recognize; the backend must not be considered healthy.
+	// - "StorageUnreachable": the storage backend is unreachable.
+	// - "StorageDegraded": the storage backend is functioning with reduced capability.
+	// - "StorageHealthy": the storage backend is healthy as seen from this node.
+	//
+	// Additional values may be introduced as the CSI specification evolves.
+	// Writers that do not recognize a status may classify it as StorageHealthUnknown.
+	// Readers that do not recognize a status must use it only for health reporting
+	// and observability.
 	// +required
+	// +k8s:alpha(since: "1.38")=+k8s:required
 	Status StorageHealthStatusType `json:"status" protobuf:"bytes,1,opt,name=status,casttype=StorageHealthStatusType"`
 	// reason is a brief CamelCase machine-parseable reason.
-	// Maximum permitted length of a reason is 256 characters.
+	// Maximum permitted length of a reason is 256 bytes.
 	// +required
+	// +k8s:alpha(since: "1.38")=+k8s:required
+	// +k8s:alpha(since: "1.38")=+k8s:maxBytes=256
+	// +k8s:alpha(since: "1.38")=+k8s:format=k8s-condition-reason
 	Reason string `json:"reason" protobuf:"bytes,2,opt,name=reason"`
 	// message is a human-readable description.
+	// Maximum permitted length of a message is 1024 bytes.
 	// +optional
-	// Maximum permitted length of a message is 1024 characters.
+	// +k8s:alpha(since: "1.38")=+k8s:optional
+	// +k8s:alpha(since: "1.38")=+k8s:maxBytes=1024
 	Message string `json:"message,omitempty" protobuf:"bytes,3,opt,name=message"`
 	// accessMode is the access mode affected. Nil means all access modes are affected.
 	// +optional
@@ -711,6 +776,7 @@ type StorageHealthCondition struct {
 	// +optional
 	VolumeMode *v1.PersistentVolumeMode `json:"volumeMode,omitempty" protobuf:"bytes,5,opt,name=volumeMode,casttype=k8s.io/api/core/v1.PersistentVolumeMode"`
 	// lastTransitionTime is when this condition first appeared at its current state.
+	// lastTransitionTime remains unchanged when only the message changes.
 	// +optional
 	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty" protobuf:"bytes,6,opt,name=lastTransitionTime"`
 }
@@ -719,18 +785,26 @@ type StorageHealthCondition struct {
 type StorageHealth struct {
 	// name is the CSI driver name, matching CSINodeDriver.name.
 	// +required
+	// +k8s:alpha(since: "1.38")=+k8s:required
 	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
-	// healthConditions are the adverse storage backend conditions reported by the CSI driver.
+	// healthConditions are the storage backend conditions reported by the CSI driver.
 	// At most 16 conditions may be reported.
+	// An empty list means the CSI driver either does not support storage health
+	// or has not reported it yet. If the driver supports storage health and its
+	// storage backend is healthy, the kubelet reports a StorageHealthy condition.
 	// +optional
 	// +listType=atomic
+	// +k8s:alpha(since: "1.38")=+k8s:optional
+	// +k8s:alpha(since: "1.38")=+k8s:maxItems=16
 	HealthConditions []StorageHealthCondition `json:"healthConditions,omitempty" protobuf:"bytes,2,rep,name=healthConditions"`
 }
 
 // CSINodeStatus contains health and status information for storage on a node.
 type CSINodeStatus struct {
 	// storageHealth contains backend health reports for CSI drivers registered on the node.
+	// This is an alpha field and requires enabling the CSIVolumeHealth feature gate.
 	// +optional
+	// +k8s:optional
 	// +listType=map
 	// +listMapKey=name
 	// +patchMergeKey=name
@@ -814,6 +888,8 @@ type CSIStorageCapacity struct {
 	// creator.
 	// This field is immutable.
 	// +required
+	// +k8s:alpha(since: "1.38")=+k8s:required
+	// +k8s:alpha(since: "1.38")=+k8s:immutable
 	StorageClassName string `json:"storageClassName" protobuf:"bytes,3,name=storageClassName"`
 
 	// capacity is the value reported by the CSI driver in its GetCapacityResponse

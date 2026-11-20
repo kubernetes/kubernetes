@@ -54,21 +54,22 @@ func getOpenFileCount() (float64, error) {
 	// benefits, however, include fewer system calls and not failing when at the
 	// open file soft limit.
 
-	if dir, err := os.Open("/dev/fd"); err != nil {
+	dir, err := os.Open("/dev/fd")
+	if err != nil {
 		return 0.0, err
-	} else {
-		defer dir.Close()
-
-		// Avoid ReadDir(), as it calls stat(2) on each descriptor.  Not only is
-		// that info not used, but KQUEUE descriptors fail stat(2), which causes
-		// the whole method to fail.
-		if names, err := dir.Readdirnames(0); err != nil {
-			return 0.0, err
-		} else {
-			// Subtract 1 to ignore the open /dev/fd descriptor above.
-			return float64(len(names) - 1), nil
-		}
 	}
+	defer dir.Close()
+
+	// Avoid ReadDir(), as it calls stat(2) on each descriptor.  Not only is
+	// that info not used, but KQUEUE descriptors fail stat(2), which causes
+	// the whole method to fail.
+	names, err := dir.Readdirnames(0)
+	if err != nil {
+		return 0.0, err
+	}
+
+	// Subtract 1 to ignore the open /dev/fd descriptor above.
+	return float64(len(names) - 1), nil
 }
 
 func (c *processCollector) processCollect(ch chan<- Metric) {

@@ -17,10 +17,9 @@ limitations under the License.
 package podgroupprotection
 
 import (
-	"context"
-	"reflect"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -29,58 +28,97 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	schedulingapi "k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/utils/dump"
 )
 
 func TestAdmit(t *testing.T) {
-	pg := &schedulingapi.PodGroup{
-		TypeMeta: metav1.TypeMeta{Kind: "PodGroup"},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "my-podgroup",
-			Namespace: "default",
-		},
-	}
+	pg := &schedulingapi.PodGroup{}
+	pg.Name = "my-podgroup"
+	pg.Namespace = "default"
 
 	pgWithFinalizer := pg.DeepCopy()
 	pgWithFinalizer.Finalizers = []string{schedulingapi.PodGroupProtectionFinalizer}
 
+	cpg := &schedulingapi.CompositePodGroup{}
+	cpg.Name = "my-compositepodgroup"
+	cpg.Namespace = "default"
+
+	cpgWithFinalizer := cpg.DeepCopy()
+	cpgWithFinalizer.Finalizers = []string{schedulingapi.CompositePodGroupProtectionFinalizer}
+
 	tests := []struct {
-		name           string
-		enabled        bool
-		resource       schema.GroupVersionResource
-		object         runtime.Object
-		expectedObject runtime.Object
-		namespace      string
+		name                   string
+		genericWorkloadEnabled bool
+		compositeGroupEnabled  bool
+		resource               schema.GroupVersionResource
+		object                 runtime.Object
+		expectedObject         runtime.Object
+		namespace              string
 	}{
 		{
-			name:           "podgroup create with plugin enabled, add finalizer",
-			enabled:        true,
-			resource:       schedulingapi.SchemeGroupVersion.WithResource("podgroups"),
-			object:         pg,
-			expectedObject: pgWithFinalizer,
-			namespace:      pg.Namespace,
+			name:                   "podgroup create with plugin enabled, add finalizer",
+			genericWorkloadEnabled: true,
+			resource:               schedulingapi.SchemeGroupVersion.WithResource("podgroups"),
+			object:                 pg,
+			expectedObject:         pgWithFinalizer,
+			namespace:              pg.Namespace,
 		},
 		{
-			name:           "podgroup finalizer already exists, no new finalizer",
-			enabled:        true,
-			resource:       schedulingapi.SchemeGroupVersion.WithResource("podgroups"),
-			object:         pgWithFinalizer,
-			expectedObject: pgWithFinalizer,
-			namespace:      pgWithFinalizer.Namespace,
+			name:                   "podgroup finalizer already exists, no new finalizer",
+			genericWorkloadEnabled: true,
+			resource:               schedulingapi.SchemeGroupVersion.WithResource("podgroups"),
+			object:                 pgWithFinalizer,
+			expectedObject:         pgWithFinalizer,
+			namespace:              pgWithFinalizer.Namespace,
 		},
 		{
 			name:           "podgroup create with plugin disabled, no finalizer added",
-			enabled:        false,
 			resource:       schedulingapi.SchemeGroupVersion.WithResource("podgroups"),
 			object:         pg,
 			expectedObject: pg,
 			namespace:      pg.Namespace,
 		},
+		{
+			name:                   "compositepodgroup create with plugin enabled, add finalizer",
+			genericWorkloadEnabled: true,
+			compositeGroupEnabled:  true,
+			resource:               schedulingapi.SchemeGroupVersion.WithResource("compositepodgroups"),
+			object:                 cpg,
+			expectedObject:         cpgWithFinalizer,
+			namespace:              cpg.Namespace,
+		},
+		{
+			name:                   "compositepodgroup finalizer already exists, no new finalizer",
+			genericWorkloadEnabled: true,
+			compositeGroupEnabled:  true,
+			resource:               schedulingapi.SchemeGroupVersion.WithResource("compositepodgroups"),
+			object:                 cpgWithFinalizer,
+			expectedObject:         cpgWithFinalizer,
+			namespace:              cpgWithFinalizer.Namespace,
+		},
+		{
+			name:                   "compositepodgroup create with CompositePodGroup feature disabled, no finalizer added",
+			genericWorkloadEnabled: true,
+			resource:               schedulingapi.SchemeGroupVersion.WithResource("compositepodgroups"),
+			object:                 cpg,
+			expectedObject:         cpg,
+			namespace:              cpg.Namespace,
+		},
+		{
+			name:           "compositepodgroup create with GenericWorkload feature disabled, no finalizer added",
+			resource:       schedulingapi.SchemeGroupVersion.WithResource("compositepodgroups"),
+			object:         cpg,
+			expectedObject: cpg,
+			namespace:      cpg.Namespace,
+		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, test.enabled)
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.GenericWorkload:                 test.genericWorkloadEnabled,
+				features.TopologyAwareWorkloadScheduling: test.compositeGroupEnabled,
+				features.CompositePodGroup:               test.compositeGroupEnabled,
+			})
 
 			ctrl := newPlugin()
 			ctrl.InspectFeatureGates(utilfeature.DefaultFeatureGate)
@@ -100,12 +138,29 @@ func TestAdmit(t *testing.T) {
 				nil,
 			)
 
-			if err := ctrl.Admit(context.TODO(), attrs, nil); err != nil {
+			if err := ctrl.Admit(t.Context(), attrs, nil); err != nil {
 				t.Errorf("got unexpected error: %v", err)
 			}
-			if !reflect.DeepEqual(test.expectedObject, obj) {
-				t.Errorf("Expected object:\n%s\ngot:\n%s", dump.Pretty(test.expectedObject), dump.Pretty(obj))
+			if diff := cmp.Diff(test.expectedObject, obj); diff != "" {
+				t.Errorf("unexpected object diff (-want +got):\n%s", diff)
 			}
 		})
 	}
+}
+
+func TestValidateInitialization(t *testing.T) {
+	t.Run("uninspected feature gates", func(t *testing.T) {
+		ctrl := newPlugin()
+		if err := ctrl.ValidateInitialization(); err == nil {
+			t.Errorf("expected error for uninspected feature gates")
+		}
+	})
+
+	t.Run("inspected feature gates", func(t *testing.T) {
+		ctrl := newPlugin()
+		ctrl.InspectFeatureGates(utilfeature.DefaultFeatureGate)
+		if err := ctrl.ValidateInitialization(); err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+	})
 }

@@ -23,7 +23,7 @@ package v1beta1
 //
 // ResourcePool describes the pool that ResourceSlices belong to.
 type ResourcePoolApplyConfiguration struct {
-	// Name is used to identify the pool. For node-local devices, this
+	// name is used to identify the pool. For node-local devices, this
 	// is often the node name, but this is not required.
 	// A field selector can be used to list only ResourceSlice objects
 	// belonging to a certain pool.
@@ -31,7 +31,7 @@ type ResourcePoolApplyConfiguration struct {
 	// It must not be longer than 253 characters and must consist of one or more DNS sub-domains
 	// separated by slashes. This field is immutable.
 	Name *string `json:"name,omitempty"`
-	// Generation tracks the change in a pool over time. Whenever a driver
+	// generation tracks the change in a pool over time. Whenever a driver
 	// changes something about one or more of the resources in a pool, it
 	// must change the generation in all ResourceSlices which are part of
 	// that pool. Consumers of ResourceSlices should only consider
@@ -44,7 +44,7 @@ type ResourcePoolApplyConfiguration struct {
 	// detect pools which are comprised of multiple ResourceSlices and are
 	// in an incomplete state.
 	Generation *int64 `json:"generation,omitempty"`
-	// ResourceSliceCount is the total number of ResourceSlices in the pool at this
+	// resourceSliceCount is the total number of ResourceSlices in the pool at this
 	// generation number. Must be greater than zero.
 	//
 	// Consumers can use this to check whether they have seen all ResourceSlices

@@ -50,6 +50,8 @@ func (s *DeprecatedInsecureServingInfo) Serve(handler http.Handler, shutdownTime
 		ReadHeaderTimeout: 32 * time.Second, // just shy of requestTimeoutUpperBound
 	}
 
+	setMaxHeaderValueCount(insecureServer)
+
 	if len(s.Name) > 0 {
 		klog.Infof("Serving %s insecurely on %s", s.Name, s.Listener.Addr())
 	} else {

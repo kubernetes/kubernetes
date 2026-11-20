@@ -28,7 +28,7 @@ import (
 //
 // TopologySpreadConstraint specifies how to spread matching pods among the given topology.
 type TopologySpreadConstraintApplyConfiguration struct {
-	// MaxSkew describes the degree to which pods may be unevenly distributed.
+	// maxSkew describes the degree to which pods may be unevenly distributed.
 	// When `whenUnsatisfiable=DoNotSchedule`, it is the maximum permitted difference
 	// between the number of matching pods in the target topology and the global minimum.
 	// The global minimum is the minimum number of matching pods in an eligible domain
@@ -46,7 +46,7 @@ type TopologySpreadConstraintApplyConfiguration struct {
 	// to topologies that satisfy it.
 	// It's a required field. Default value is 1 and 0 is not allowed.
 	MaxSkew *int32 `json:"maxSkew,omitempty"`
-	// TopologyKey is the key of node labels. Nodes that have a label with this key
+	// topologyKey is the key of node labels. Nodes that have a label with this key
 	// and identical values are considered to be in the same topology.
 	// We consider each <key, value> as a "bucket", and try to put balanced number
 	// of pods into each bucket.
@@ -57,7 +57,7 @@ type TopologySpreadConstraintApplyConfiguration struct {
 	// And, if TopologyKey is "topology.kubernetes.io/zone", each zone is a domain of that topology.
 	// It's a required field.
 	TopologyKey *string `json:"topologyKey,omitempty"`
-	// WhenUnsatisfiable indicates how to deal with a pod if it doesn't satisfy
+	// whenUnsatisfiable indicates how to deal with a pod if it doesn't satisfy
 	// the spread constraint.
 	// - DoNotSchedule (default) tells the scheduler not to schedule it.
 	// - ScheduleAnyway tells the scheduler to schedule the pod in any location,
@@ -76,11 +76,11 @@ type TopologySpreadConstraintApplyConfiguration struct {
 	// won't make it *more* imbalanced.
 	// It's a required field.
 	WhenUnsatisfiable *corev1.UnsatisfiableConstraintAction `json:"whenUnsatisfiable,omitempty"`
-	// LabelSelector is used to find matching pods.
+	// labelSelector is used to find matching pods.
 	// Pods that match this label selector are counted to determine the number of pods
 	// in their corresponding topology domain.
 	LabelSelector *metav1.LabelSelectorApplyConfiguration `json:"labelSelector,omitempty"`
-	// MinDomains indicates a minimum number of eligible domains.
+	// minDomains indicates a minimum number of eligible domains.
 	// When the number of eligible domains with matching topology keys is less than minDomains,
 	// Pod Topology Spread treats "global minimum" as 0, and then the calculation of Skew is performed.
 	// And when the number of eligible domains with matching topology keys equals or greater than minDomains,
@@ -100,14 +100,14 @@ type TopologySpreadConstraintApplyConfiguration struct {
 	// because computed skew will be 3(3 - 0) if new Pod is scheduled to any of the three zones,
 	// it will violate MaxSkew.
 	MinDomains *int32 `json:"minDomains,omitempty"`
-	// NodeAffinityPolicy indicates how we will treat Pod's nodeAffinity/nodeSelector
+	// nodeAffinityPolicy indicates how we will treat Pod's nodeAffinity/nodeSelector
 	// when calculating pod topology spread skew. Options are:
 	// - Honor: only nodes matching nodeAffinity/nodeSelector are included in the calculations.
 	// - Ignore: nodeAffinity/nodeSelector are ignored. All nodes are included in the calculations.
 	//
 	// If this value is nil, the behavior is equivalent to the Honor policy.
 	NodeAffinityPolicy *corev1.NodeInclusionPolicy `json:"nodeAffinityPolicy,omitempty"`
-	// NodeTaintsPolicy indicates how we will treat node taints when calculating
+	// nodeTaintsPolicy indicates how we will treat node taints when calculating
 	// pod topology spread skew. Options are:
 	// - Honor: nodes without taints, along with tainted nodes for which the incoming pod
 	// has a toleration, are included.
@@ -115,7 +115,7 @@ type TopologySpreadConstraintApplyConfiguration struct {
 	//
 	// If this value is nil, the behavior is equivalent to the Ignore policy.
 	NodeTaintsPolicy *corev1.NodeInclusionPolicy `json:"nodeTaintsPolicy,omitempty"`
-	// MatchLabelKeys is a set of pod label keys to select the pods over which
+	// matchLabelKeys is a set of pod label keys to select the pods over which
 	// spreading will be calculated. The keys are used to lookup values from the
 	// incoming pod labels, those key-value labels are ANDed with labelSelector
 	// to select the group of existing pods over which spreading will be calculated

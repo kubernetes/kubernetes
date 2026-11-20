@@ -19,16 +19,17 @@ package kubelet
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/ktesting"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestPodResourceLimitsDefaulting(t *testing.T) {
@@ -97,14 +98,18 @@ func TestPodResourceLimitsDefaulting(t *testing.T) {
 			podLevelResourcesEnabled: true,
 		},
 	}
-	as := assert.New(t)
 	for idx, tc := range cases {
-		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeatures.PodLevelResources, tc.podLevelResourcesEnabled)
-		actual, _, err := tk.kubelet.defaultPodLimitsForDownwardAPI(tCtx, tc.pod, nil)
-		as.NoError(err, "failed to default pod limits: %v", err)
-		if !apiequality.Semantic.DeepEqual(tc.expected, actual) {
-			as.Fail("test case [%d] failed.  Expected: %+v, Got: %+v", idx, tc.expected, actual)
-		}
+		t.Run("", func(t *testing.T) {
+			if !tc.podLevelResourcesEnabled {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.37"))
+			}
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeatures.PodLevelResources, tc.podLevelResourcesEnabled)
+			actual, _, err := tk.kubelet.defaultPodLimitsForDownwardAPI(tCtx, tc.pod, nil)
+			require.NoError(t, err, "failed to default pod limits")
+			if !apiequality.Semantic.DeepEqual(tc.expected, actual) {
+				t.Errorf("test case [%d] failed.  Expected: %+v, Got: %+v", idx, tc.expected, actual)
+			}
+		})
 	}
 }
 

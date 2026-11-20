@@ -1,0 +1,15 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+approvers:
+  # SIG Testing leads, keep in sync with SIG
+  - aojea
+  - bentheelder
+  - jbpratt
+  - michelle192837
+  - pohly
+  # additional approvers
+  - nojnhuh
+reviewers:
+  - pohly
+labels:
+  - sig/testing

@@ -1,0 +1,79 @@
+diff --git a/staging/src/k8s.io/apiserver/pkg/storage/cacher/watch_cache.go b/staging/src/k8s.io/apiserver/pkg/storage/cacher/watch_cache.go
+index 1192901c78d..92a8160c803 100644
+--- a/staging/src/k8s.io/apiserver/pkg/storage/cacher/watch_cache.go
++++ b/staging/src/k8s.io/apiserver/pkg/storage/cacher/watch_cache.go
+@@ -345,7 +345,7 @@ func (c *watchCache) waitUntilFreshAndListNonRecursive(ctx context.Context, key
+ // with their ResourceVersion and the name of the index, if any, that was used.
+ func (w *watchCache) WaitUntilFreshAndGetKeys(ctx context.Context, resourceVersion uint64) ([]string, error) {
+ 	span := tracing.SpanFromContext(ctx)
+-	snap, _, err := w.waitAndGetLatestSnapshot(ctx, false, resourceVersion, nil)
++	snap, _, err := w.waitAndGetLatestSnapshot(ctx, false, resourceVersion, nil, true)
+ 	if err != nil {
+ 		return nil, err
+ 	}
+@@ -430,7 +430,7 @@ func (w *watchCache) waitAndReadSnapshot(ctx context.Context, semantic readConsi
+ 	case consistencyConsistent:
+ 		return w.waitAndGetConsistentSnapshot(ctx, recursive, matchValues)
+ 	case consistencyNotOlderThan:
+-		return w.waitAndGetLatestSnapshot(ctx, recursive, resourceVersion, matchValues)
++		return w.waitAndGetLatestSnapshot(ctx, recursive, resourceVersion, matchValues, true)
+ 	default:
+ 		return nil, "", fmt.Errorf("unknown RV semantic: %s", semantic)
+ 	}
+@@ -464,10 +464,10 @@ func (w *watchCache) waitAndGetConsistentSnapshot(ctx context.Context, recursive
+ 		return nil, "", err
+ 	}
+ 	span.AddEvent("getCurrentRV success")
+-	return w.waitAndGetLatestSnapshot(ctx, recursive, resourceVersion, matchValues)
++	return w.waitAndGetLatestSnapshot(ctx, recursive, resourceVersion, matchValues, true)
+ }
+ 
+-func (w *watchCache) waitAndGetLatestSnapshot(ctx context.Context, recursive bool, minResourceVersion uint64, matchValues []storage.MatchValue) (snap store.Snapshot, index string, err error) {
++func (w *watchCache) waitAndGetLatestSnapshot(ctx context.Context, recursive bool, minResourceVersion uint64, matchValues []storage.MatchValue, requestProgress bool) (snap store.Snapshot, index string, err error) {
+ 	if minResourceVersion == 0 {
+ 		snap, index := w.getLatestSnapshot(ctx, recursive, matchValues)
+ 		return snap, index, nil
+@@ -477,7 +477,7 @@ func (w *watchCache) waitAndGetLatestSnapshot(ctx context.Context, recursive boo
+ 	w.RLock()
+ 	span.AddEvent("watchCache locked acquired")
+ 	defer w.RUnlock()
+-	err = w.waitUntilFreshLocked(ctx, minResourceVersion)
++	err = w.freshness.waitUntilFresh(ctx, minResourceVersion, w.RLocker(), requestProgress)
+ 	if err != nil {
+ 		return nil, "", err
+ 	}
+@@ -539,7 +539,9 @@ func (w *watchCache) WaitUntilFreshAndGet(ctx context.Context, resourceVersion s
+ 	if err != nil {
+ 		return nil, false, 0, err
+ 	}
+-	snap, _, err := w.waitAndGetLatestSnapshot(ctx, false, minResourceVersion, nil)
++	// BUG REVERT (#123674): do not request watch progress when waiting for
++	// freshness in WaitUntilFreshAndGet.
++	snap, _, err := w.waitAndGetLatestSnapshot(ctx, false, minResourceVersion, nil, false)
+ 	if err != nil {
+ 		return nil, false, 0, err
+ 	}
+diff --git a/staging/src/k8s.io/apiserver/pkg/storage/cacher/watch_cache_freshness.go b/staging/src/k8s.io/apiserver/pkg/storage/cacher/watch_cache_freshness.go
+index d7cc073cdfc..bec8d489c98 100644
+--- a/staging/src/k8s.io/apiserver/pkg/storage/cacher/watch_cache_freshness.go
++++ b/staging/src/k8s.io/apiserver/pkg/storage/cacher/watch_cache_freshness.go
+@@ -81,11 +81,17 @@ func (w *freshnessWaiter) broadcast(resourceVersion uint64) {
+ }
+ 
+ func (w *freshnessWaiter) waitUntilFreshLockedWithLocker(ctx context.Context, resourceVersion uint64, locker sync.Locker) error {
++	return w.waitUntilFresh(ctx, resourceVersion, locker, true)
++}
++
++func (w *freshnessWaiter) waitUntilFresh(ctx context.Context, resourceVersion uint64, locker sync.Locker, requestProgress bool) error {
+ 	if resourceVersion == 0 || resourceVersion <= w.latestRV {
+ 		return nil
+ 	}
+-	w.progressRequester.Add()
+-	defer w.progressRequester.Remove()
++	if requestProgress {
++		w.progressRequester.Add()
++		defer w.progressRequester.Remove()
++	}
+ 	startTime := w.clock.Now()
+ 	defer func() {
+ 		if resourceVersion > 0 {

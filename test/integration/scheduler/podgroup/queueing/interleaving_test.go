@@ -21,13 +21,12 @@ import (
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
-	schedulingapi "k8s.io/api/scheduling/v1beta1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
+	schedulerutils "k8s.io/kubernetes/test/integration/scheduler"
 	stepsframework "k8s.io/kubernetes/test/integration/scheduler/podgroup/stepsframework"
 	testutils "k8s.io/kubernetes/test/integration/util"
 )
@@ -90,10 +89,8 @@ func TestPodGroupInterleaving(t *testing.T) {
 				},
 				{
 					Name: "Verify gang PodGroup condition is set to Unschedulable",
-					WaitForPodGroupCondition: &stepsframework.PodGroupConditionCheck{
-						PodGroupName:    "pg-low",
-						ConditionStatus: metav1.ConditionFalse,
-						Reason:          schedulingapi.PodGroupReasonUnschedulable,
+					WaitForGroupsUnschedulable: &stepsframework.Groups{
+						PodGroups: []string{"pg-low"},
 					},
 				},
 			},
@@ -213,10 +210,8 @@ func TestPodGroupInterleaving(t *testing.T) {
 				},
 				{
 					Name: "Verify gang PodGroup condition is set to Unschedulable",
-					WaitForPodGroupCondition: &stepsframework.PodGroupConditionCheck{
-						PodGroupName:    "pg",
-						ConditionStatus: metav1.ConditionFalse,
-						Reason:          schedulingapi.PodGroupReasonUnschedulable,
+					WaitForGroupsUnschedulable: &stepsframework.Groups{
+						PodGroups: []string{"pg"},
 					},
 				},
 			},
@@ -813,16 +808,16 @@ func TestPodGroupInterleaving(t *testing.T) {
 						features.CompositePodGroup:               cpgEnabled,
 					})
 
-					testCtx := testutils.InitTestSchedulerWithOptions(
+					testCtx := schedulerutils.InitTestSchedulerWithOptions(
 						t,
 						testutils.InitTestAPIServer(t, "pg-interleaving", nil),
 						0,
 						scheduler.WithPodInitialBackoffSeconds(0),
 						scheduler.WithPodMaxBackoffSeconds(0),
 					)
-					testutils.SyncSchedulerInformerFactory(testCtx)
+					schedulerutils.SyncSchedulerInformerFactory(testCtx)
 
-					ns := testCtx.NS.Name
+					ns := testCtx.Namespace()
 
 					if err := stepsframework.RunSteps(testCtx, t, ns, tt.steps); err != nil {
 						t.Fatal(err)

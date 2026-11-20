@@ -19,6 +19,7 @@ package grpc
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -42,6 +43,57 @@ func TestNew(t *testing.T) {
 		s := New()
 		assert.Implements(t, (*Prober)(nil), s)
 	})
+}
+
+type cancelableHealthServer struct {
+	grpchealth.UnimplementedHealthServer
+	started chan struct{}
+}
+
+func (s *cancelableHealthServer) Check(ctx context.Context, _ *grpchealth.HealthCheckRequest) (*grpchealth.HealthCheckResponse, error) {
+	close(s.started)
+	<-ctx.Done()
+	return nil, ctx.Err()
+}
+
+func TestProbeCancellation(t *testing.T) {
+	lis, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	server := grpc.NewServer()
+	serveErr := make(chan error, 1)
+	t.Cleanup(func() {
+		server.Stop()
+		if err := <-serveErr; err != nil && !errors.Is(err, grpc.ErrServerStopped) {
+			t.Errorf("gRPC server failed: %v", err)
+		}
+	})
+	health := &cancelableHealthServer{started: make(chan struct{})}
+	grpchealth.RegisterHealthServer(server, health)
+	go func() {
+		serveErr <- server.Serve(lis)
+	}()
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	result := make(chan probe.Result, 1)
+	go func() {
+		r, _, _ := New().Probe(ctx, "127.0.0.1", "", lis.Addr().(*net.TCPAddr).Port, time.Minute, ProbeOptions{})
+		result <- r
+	}()
+	select {
+	case <-health.started:
+	case <-time.After(5 * time.Second):
+		t.Fatal("health check did not reach the server")
+	}
+	cancel()
+	select {
+	case r := <-result:
+		assert.Equal(t, probe.Failure, r)
+	case <-time.After(5 * time.Second):
+		t.Fatal("probe did not stop after context cancellation")
+	}
 }
 
 type successServerMock struct {
@@ -122,12 +174,20 @@ func (e errorNotServeServerMock) Watch(_ *grpchealth.HealthCheckRequest, stream 
 }
 
 func TestGrpcProber_Probe(t *testing.T) {
-	t.Run("Should: failed but return nil error because cant find host", func(t *testing.T) {
+	t.Run("Should: fail fast when the connection is refused", func(t *testing.T) {
 		s := New()
-		p, o, err := s.Probe("", "", 32, time.Second, ProbeOptions{})
+		lis, err := net.Listen("tcp", "127.0.0.1:0")
+		if err != nil {
+			t.Fatalf("failed to listen: %v", err)
+		}
+		port := lis.Addr().(*net.TCPAddr).Port
+		_ = lis.Close()
+		start := time.Now()
+		p, o, err := s.Probe(t.Context(), "127.0.0.1", "", port, 10*time.Second, ProbeOptions{})
 		assert.Equal(t, probe.Failure, p)
 		assert.NoError(t, err)
-		assert.Equal(t, "timeout: failed to connect service \":32\" within 1s: context deadline exceeded", o)
+		assert.Contains(t, o, fmt.Sprintf("error: failed to connect service at \"127.0.0.1:%d\"", port))
+		assert.Less(t, time.Since(start), 5*time.Second)
 	})
 	t.Run("Should: return nil error because connection closed", func(t *testing.T) {
 		s := New()
@@ -142,7 +202,7 @@ func TestGrpcProber_Probe(t *testing.T) {
 
 		// take some time to wait server boot
 		time.Sleep(2 * time.Second)
-		p, _, err := s.Probe("127.0.0.1", "", port, time.Second, ProbeOptions{})
+		p, _, err := s.Probe(t.Context(), "127.0.0.1", "", port, time.Second, ProbeOptions{})
 		assert.Equal(t, probe.Failure, p)
 		assert.NoError(t, err)
 	})
@@ -158,7 +218,7 @@ func TestGrpcProber_Probe(t *testing.T) {
 		}()
 		// take some time to wait server boot
 		time.Sleep(2 * time.Second)
-		p, o, err := s.Probe("0.0.0.0", "", port, time.Second, ProbeOptions{})
+		p, o, err := s.Probe(t.Context(), "0.0.0.0", "", port, time.Second, ProbeOptions{})
 		assert.Equal(t, probe.Failure, p)
 		assert.NoError(t, err)
 		assert.Equal(t, "service unhealthy (responded with \"NOT_SERVING\")", o)
@@ -176,7 +236,7 @@ func TestGrpcProber_Probe(t *testing.T) {
 		}()
 		// take some time to wait server boot
 		time.Sleep(2 * time.Second)
-		p, o, err := s.Probe("0.0.0.0", "", port, time.Second*2, ProbeOptions{})
+		p, o, err := s.Probe(t.Context(), "0.0.0.0", "", port, time.Second*2, ProbeOptions{})
 		assert.Equal(t, probe.Failure, p)
 		assert.NoError(t, err)
 		assert.Equal(t, "timeout: health rpc did not complete within 2s", o)
@@ -195,7 +255,7 @@ func TestGrpcProber_Probe(t *testing.T) {
 		}()
 		// take some time to wait server boot
 		time.Sleep(2 * time.Second)
-		p, _, err := s.Probe("0.0.0.0", "", port, time.Second*2, ProbeOptions{})
+		p, _, err := s.Probe(t.Context(), "0.0.0.0", "", port, time.Second*2, ProbeOptions{})
 		assert.Equal(t, probe.Success, p)
 		assert.NoError(t, err)
 	})
@@ -212,7 +272,7 @@ func TestGrpcProber_Probe(t *testing.T) {
 		}()
 		// take some time to wait server boot
 		time.Sleep(2 * time.Second)
-		p, _, err := s.Probe("0.0.0.0", "", port, time.Second*2, ProbeOptions{})
+		p, _, err := s.Probe(t.Context(), "0.0.0.0", "", port, time.Second*2, ProbeOptions{})
 		assert.Equal(t, probe.Success, p)
 		assert.NoError(t, err)
 	})
@@ -282,7 +342,7 @@ func TestGrpcProber_Probe_TLS(t *testing.T) {
 			time.Sleep(2 * time.Second)
 
 			s := New()
-			p, _, err := s.Probe("127.0.0.1", "", port, time.Second*2, ProbeOptions{UseTLS: tc.useTLS})
+			p, _, err := s.Probe(t.Context(), "127.0.0.1", "", port, time.Second*2, ProbeOptions{UseTLS: tc.useTLS})
 			assert.Equal(t, tc.expectedResult, p)
 			assert.NoError(t, err)
 		})

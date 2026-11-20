@@ -1275,6 +1275,46 @@ func TestValidateClaim(t *testing.T) {
 				return claim
 			}(),
 		},
+		"capacity-requests-bad-key": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices", "requests").Index(0).Child("exactly", "capacity", "requests"), "1bad", "a valid C identifier must start with alphabetic character or '_', followed by a string of alphanumeric characters or '_' (e.g. 'my_name',  or 'MY_NAME',  or 'MyName', regex used for validation is '[A-Za-z_][A-Za-z0-9_]*')"),
+			},
+			claim: func() *resource.ResourceClaim {
+				claim := testClaim(goodName, goodNS, validClaimSpec)
+				claim.Spec.Devices.Requests[0].Exactly.Capacity = &resource.CapacityRequirements{
+					Requests: map[resource.QualifiedName]apiresource.Quantity{
+						"1bad": apiresource.MustParse("1"),
+					},
+				}
+				return claim
+			}(),
+		},
+		"capacity-requests-bad-key-in-subrequest": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices", "requests").Index(0).Child("firstAvailable").Index(0).Child("capacity", "requests"), "1bad", "a valid C identifier must start with alphabetic character or '_', followed by a string of alphanumeric characters or '_' (e.g. 'my_name',  or 'MY_NAME',  or 'MyName', regex used for validation is '[A-Za-z_][A-Za-z0-9_]*')"),
+			},
+			claim: func() *resource.ResourceClaim {
+				claim := testClaim(goodName, goodNS, validClaimSpecWithFirstAvailable)
+				claim.Spec.Devices.Requests[0].FirstAvailable[0].Capacity = &resource.CapacityRequirements{
+					Requests: map[resource.QualifiedName]apiresource.Quantity{
+						"1bad": apiresource.MustParse("1"),
+					},
+				}
+				return claim
+			}(),
+		},
+		"capacity-requests-valid": {
+			wantFailures: nil,
+			claim: func() *resource.ResourceClaim {
+				claim := testClaim(goodName, goodNS, validClaimSpec)
+				claim.Spec.Devices.Requests[0].Exactly.Capacity = &resource.CapacityRequirements{
+					Requests: map[resource.QualifiedName]apiresource.Quantity{
+						"dra.example.com/cores": apiresource.MustParse("4"),
+					},
+				}
+				return claim
+			}(),
+		},
 	}
 
 	for name, scenario := range scenarios {
@@ -1371,6 +1411,7 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 		deviceStatusFeatureGate       bool
 		prioritizedListFeatureGate    bool
 		consumableCapacityFeatureGate bool
+		sharedConsumableCapacityGate  bool
 		oldClaim                      *resource.ResourceClaim
 		update                        func(claim *resource.ResourceClaim) *resource.ResourceClaim
 		wantFailures                  field.ErrorList
@@ -2601,6 +2642,33 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 			},
 			consumableCapacityFeatureGate: true,
 		},
+		"invalid-add-consumed-capacity-bad-key": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("status", "allocation", "devices", "results").Index(0).Child("consumedCapacity"), "1bad", "a valid C identifier must start with alphabetic character or '_', followed by a string of alphanumeric characters or '_' (e.g. 'my_name',  or 'MY_NAME',  or 'MyName', regex used for validation is '[A-Za-z_][A-Za-z0-9_]*')"),
+			},
+			oldClaim: testClaim(goodName, goodNS, validClaimSpec),
+			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
+				claim.Status.Allocation = &resource.AllocationResult{
+					Devices: resource.DeviceAllocationResult{
+						Results: []resource.DeviceRequestAllocationResult{
+							{
+								Request:     goodName,
+								Driver:      goodName,
+								Pool:        goodName,
+								Device:      goodName,
+								ShareID:     ptr.To(goodShareID),
+								AdminAccess: ptr.To(false),
+								ConsumedCapacity: map[resource.QualifiedName]apiresource.Quantity{
+									"1bad": apiresource.MustParse("1"),
+								},
+							},
+						},
+					},
+				}
+				return claim
+			},
+			consumableCapacityFeatureGate: true,
+		},
 		"valid-add-enable-both-device-status-and-consumable-capacity-features": {
 			oldClaim: testClaim(goodName, goodNS, validClaimSpec),
 			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
@@ -2630,6 +2698,22 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 			},
 			consumableCapacityFeatureGate: true,
 			deviceStatusFeatureGate:       true,
+		},
+		"valid-counter-snapshots-above-int64": {
+			adminAccess:                   true,
+			deviceStatusFeatureGate:       true,
+			prioritizedListFeatureGate:    true,
+			consumableCapacityFeatureGate: true,
+			oldClaim:                      testClaim(goodName, goodNS, validClaimSpec),
+			sharedConsumableCapacityGate:  true,
+			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
+				consumption := []resource.CounterSetConsumption{{CounterSet: "set", Counters: map[string]apiresource.Quantity{"counter": apiresource.MustParse("10000000000000000000")}}}
+				claim.Status.Allocation = &resource.AllocationResult{Devices: resource.DeviceAllocationResult{Results: []resource.DeviceRequestAllocationResult{{
+					Request: goodName, Driver: goodName, Pool: goodName, Device: goodName,
+					ConsumedCounters: consumption,
+				}}}}
+				return claim
+			},
 		},
 		"invalid-add-allocated-status-no-share-id": {
 			wantFailures: field.ErrorList{
@@ -2780,15 +2864,19 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
-			if !scenario.adminAccess {
+			if !scenario.adminAccess && !scenario.sharedConsumableCapacityGate {
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
 			}
-			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+			overrides := featuregatetesting.FeatureOverrides{
 				features.DRAAdminAccess:               scenario.adminAccess,
 				features.DRAResourceClaimDeviceStatus: scenario.deviceStatusFeatureGate,
 				features.DRAPrioritizedList:           scenario.prioritizedListFeatureGate,
 				features.DRAConsumableCapacity:        scenario.consumableCapacityFeatureGate,
-			})
+			}
+			if scenario.sharedConsumableCapacityGate {
+				overrides[features.DRASharedConsumableCapacity] = true
+			}
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, overrides)
 
 			scenario.oldClaim.ResourceVersion = "1"
 			errs := ValidateResourceClaimStatusUpdate(scenario.update(scenario.oldClaim.DeepCopy()), scenario.oldClaim)

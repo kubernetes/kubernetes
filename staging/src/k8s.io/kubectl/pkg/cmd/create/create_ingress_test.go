@@ -49,6 +49,14 @@ func TestCreateIngressValidation(t *testing.T) {
 			defaultbackend: "xpto:4444",
 			expected:       "",
 		},
+		"default backend without service name": {
+			defaultbackend: ":4444",
+			expected:       "default-backend should be in format servicename:serviceport",
+		},
+		"default backend without port value": {
+			defaultbackend: "xpto:",
+			expected:       "default-backend should be in format servicename:serviceport",
+		},
 		"invalid annotation": {
 			defaultbackend: "xpto:4444",
 			annotations: []string{
@@ -61,9 +69,23 @@ func TestCreateIngressValidation(t *testing.T) {
 			defaultbackend: "xpto:4444",
 			annotations: []string{
 				"key1=value1",
-				"key2=",
+				"key2=value2",
 			},
 			expected: "",
+		},
+		"empty annotation key": {
+			defaultbackend: "xpto:4444",
+			annotations: []string{
+				"=value",
+			},
+			expected: "annotation =value is invalid and should be in format key=[value]",
+		},
+		"empty annotation value": {
+			defaultbackend: "xpto:4444",
+			annotations: []string{
+				"key=",
+			},
+			expected: "annotation key= is invalid and should be in format key=[value]",
 		},
 		"multiple conformant rules": {
 			rules: []string{
@@ -129,6 +151,36 @@ func TestCreateIngressValidation(t *testing.T) {
 				"/path/subpath*=svc:redis,tls=blo",
 			},
 			expected: "",
+		},
+		"invalid trailing data after tls secret": {
+			rules: []string{
+				"foo.com/=svc:http,tls=secret123,garbage",
+			},
+			expected: "rule foo.com/=svc:http,tls=secret123,garbage is invalid and should be in format host/path=svcname:svcport[,tls[=secret]]",
+		},
+		"invalid trailing data after tls": {
+			rules: []string{
+				"foo.com/=svc:http,tls,garbage",
+			},
+			expected: "rule foo.com/=svc:http,tls,garbage is invalid and should be in format host/path=svcname:svcport[,tls[=secret]]",
+		},
+		"invalid rule with an equals sign in the path": {
+			rules: []string{
+				"foo.com/a=b=svc:http",
+			},
+			expected: "rule foo.com/a=b=svc:http is invalid and should be in format host/path=svcname:svcport[,tls[=secret]]",
+		},
+		"invalid rule with a comma in the path": {
+			rules: []string{
+				"foo.com/a,b=svc:http",
+			},
+			expected: "rule foo.com/a,b=svc:http is invalid and should be in format host/path=svcname:svcport[,tls[=secret]]",
+		},
+		"invalid rule with a newline in the path": {
+			rules: []string{
+				"foo.com/a\nb=svc:http",
+			},
+			expected: "rule foo.com/a\nb=svc:http is invalid and should be in format host/path=svcname:svcport[,tls[=secret]]",
 		},
 	}
 

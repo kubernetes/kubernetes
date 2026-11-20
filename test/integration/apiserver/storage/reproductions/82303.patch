@@ -1,0 +1,19 @@
+diff --git a/staging/src/k8s.io/apiserver/pkg/storage/txn.go b/staging/src/k8s.io/apiserver/pkg/storage/txn.go
+index d082ebe9eb7..45064df4e7e 100644
+--- a/staging/src/k8s.io/apiserver/pkg/storage/txn.go
++++ b/staging/src/k8s.io/apiserver/pkg/storage/txn.go
+@@ -114,11 +114,9 @@ func ConditionalDelete(ctx context.Context, d TxnDelegator, key string, out runt
+ func GuaranteedUpdate(ctx context.Context, d TxnDelegator, key string, destination runtime.Object, ignoreNotFound bool, preconditions *Preconditions, tryUpdate UpdateFunc, origState *ObjState) (err error) {
+ 	for {
+ 		if err := preconditions.Check(key, origState.Obj); err != nil {
+-			origState, err = refreshOnError(ctx, origState, err, ignoreNotFound, d.GetCurrentState)
+-			if err != nil {
+-				return err
+-			}
+-			continue
++			// BUG REVERT (#82303): return precondition check failure on a stale
++			// cached suggestion without refetching live data from etcd.
++			return err
+ 		}
+ 
+ 		ret, ttl, err := updateState(origState, tryUpdate)

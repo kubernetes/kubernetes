@@ -17,13 +17,17 @@ limitations under the License.
 package drain
 
 import (
+	"bytes"
+	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"os"
 	"reflect"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -32,12 +36,17 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
+	"k8s.io/cli-runtime/pkg/printers"
+	"k8s.io/cli-runtime/pkg/resource"
+	kubernetesfake "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/rest/fake"
+	clienttesting "k8s.io/client-go/testing"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/drain"
@@ -950,4 +959,144 @@ func (m *MyReq) isFor(method string, path string) bool {
 		req.URL.Path == strings.Join([]string{"/api/v1", path}, "") ||
 		req.URL.Path == strings.Join([]string{"/apis/apps/v1", path}, "") ||
 		req.URL.Path == strings.Join([]string{"/apis/batch/v1", path}, ""))
+}
+
+type recordedCondition struct {
+	node  string
+	event drain.NodeConditionEvent
+}
+
+type recordingConditionReporter struct {
+	lock   sync.Mutex
+	events []recordedCondition
+	err    error
+}
+
+func (r *recordingConditionReporter) Report(_ context.Context, nodeName string, event drain.NodeConditionEvent) error {
+	r.lock.Lock()
+	r.events = append(r.events, recordedCondition{node: nodeName, event: event})
+	r.lock.Unlock()
+	return r.err
+}
+
+func (r *recordingConditionReporter) recordedEvents() []recordedCondition {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+	return append([]recordedCondition(nil), r.events...)
+}
+
+func TestRunDrainReportsConditionsPerNode(t *testing.T) {
+	reporter := &recordingConditionReporter{}
+	o := newConditionTestOptions(t, reporter, "node-1", "node-2")
+
+	if err := o.RunDrain(context.Background()); err != nil {
+		t.Fatalf("RunDrain() error = %v", err)
+	}
+	want := []recordedCondition{
+		{node: "node-1", event: drain.NodeConditionDrainStarted},
+		{node: "node-1", event: drain.NodeConditionDrainCompleted},
+		{node: "node-2", event: drain.NodeConditionDrainStarted},
+		{node: "node-2", event: drain.NodeConditionDrainCompleted},
+	}
+	assertRecordedConditions(t, reporter.recordedEvents(), want)
+}
+
+func TestRunDrainReportingFailureIsWarningOnly(t *testing.T) {
+	reporter := &recordingConditionReporter{err: errors.New("status denied")}
+	o := newConditionTestOptions(t, reporter, "node")
+	var errOut bytes.Buffer
+	o.ErrOut = &errOut
+	o.drainer.ErrOut = &errOut
+	o.WarningPrinter = printers.NewWarningPrinter(&errOut, printers.WarningPrinterOptions{})
+
+	if err := o.RunDrain(context.Background()); err != nil {
+		t.Fatalf("RunDrain() error = %v", err)
+	}
+	if got := errOut.String(); !bytes.Contains([]byte(got), []byte(`Warning: failed to update drain conditions on node "node": status denied`)) {
+		t.Fatalf("warning output = %q", got)
+	}
+}
+
+func TestRunDrainReportingFailureDoesNotReplaceDrainError(t *testing.T) {
+	reporter := &recordingConditionReporter{err: errors.New("status denied")}
+	o := newConditionTestOptions(t, reporter, "node")
+	o.drainer.Client.(*kubernetesfake.Clientset).PrependReactor("list", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
+		return true, nil, errors.New("pods unavailable")
+	})
+
+	err := o.RunDrain(context.Background())
+	if err == nil || !strings.Contains(err.Error(), "pods unavailable") {
+		t.Fatalf("RunDrain() error = %v, want original pod-list error", err)
+	}
+	if strings.Contains(err.Error(), "status denied") {
+		t.Fatalf("RunDrain() error = %v, must not include reporting error", err)
+	}
+	want := []recordedCondition{
+		{node: "node", event: drain.NodeConditionDrainStarted},
+		{node: "node", event: drain.NodeConditionDrainFailed},
+	}
+	assertRecordedConditions(t, reporter.recordedEvents(), want)
+}
+
+func TestRunUncordonReportsConditionForNoOp(t *testing.T) {
+	reporter := &recordingConditionReporter{}
+	o := newConditionTestOptions(t, reporter, "node")
+	node := o.nodeInfos[0].Object.(*corev1.Node)
+	node.Spec.Unschedulable = false
+
+	if err := o.RunCordonOrUncordon(context.Background(), false); err != nil {
+		t.Fatalf("RunCordonOrUncordon() error = %v", err)
+	}
+	want := []recordedCondition{{node: "node", event: drain.NodeConditionUncordoned}}
+	assertRecordedConditions(t, reporter.recordedEvents(), want)
+}
+
+func newConditionTestOptions(t *testing.T, reporter drain.ConditionReporter, nodeNames ...string) *DrainCmdOptions {
+	t.Helper()
+	objects := make([]runtime.Object, 0, len(nodeNames))
+	infos := make([]*resource.Info, 0, len(nodeNames))
+	mapping := &meta.RESTMapping{
+		Resource:         corev1.SchemeGroupVersion.WithResource("nodes"),
+		GroupVersionKind: corev1.SchemeGroupVersion.WithKind("Node"),
+		Scope:            meta.RESTScopeRoot,
+	}
+	for _, name := range nodeNames {
+		node := &corev1.Node{
+			ObjectMeta: metav1.ObjectMeta{Name: name},
+			Spec:       corev1.NodeSpec{Unschedulable: true},
+		}
+		objects = append(objects, node)
+		infos = append(infos, &resource.Info{
+			Name:    name,
+			Object:  node,
+			Mapping: mapping,
+		})
+	}
+	client := kubernetesfake.NewClientset(objects...)
+	streams, _, out, errOut := genericiooptions.NewTestIOStreams()
+	o := &DrainCmdOptions{
+		IOStreams: streams,
+		drainer: &drain.Helper{
+			Client:            client,
+			Ctx:               context.Background(),
+			Out:               out,
+			ErrOut:            errOut,
+			DisableEviction:   true,
+			ConditionReporter: reporter,
+			DryRunStrategy:    cmdutil.DryRunNone,
+		},
+		nodeInfos: infos,
+		ToPrinter: func(operation string) (printers.ResourcePrinterFunc, error) {
+			return func(runtime.Object, io.Writer) error { return nil }, nil
+		},
+		WarningPrinter: printers.NewWarningPrinter(errOut, printers.WarningPrinterOptions{}),
+	}
+	return o
+}
+
+func assertRecordedConditions(t *testing.T, got, want []recordedCondition) {
+	t.Helper()
+	if fmt.Sprint(got) != fmt.Sprint(want) {
+		t.Fatalf("events = %#v, want %#v", got, want)
+	}
 }

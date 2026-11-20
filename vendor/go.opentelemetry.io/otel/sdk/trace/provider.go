@@ -1,7 +1,7 @@
 // Copyright The OpenTelemetry Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package trace // import "go.opentelemetry.io/otel/sdk/trace"
+package trace
 
 import (
 	"context"
@@ -13,6 +13,7 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/internal/global"
 	"go.opentelemetry.io/otel/sdk/instrumentation"
+	"go.opentelemetry.io/otel/sdk/internal/attrnorm"
 	"go.opentelemetry.io/otel/sdk/resource"
 	"go.opentelemetry.io/otel/sdk/trace/internal/observ"
 	"go.opentelemetry.io/otel/trace"
@@ -42,22 +43,27 @@ type tracerProviderConfig struct {
 
 	// resource contains attributes representing an entity that produces telemetry.
 	resource *resource.Resource
+
+	// panicRecordingDisabled disables recording exception events from panics.
+	panicRecordingDisabled bool
 }
 
 // MarshalLog is the marshaling function used by the logging system to represent this Provider.
 func (cfg tracerProviderConfig) MarshalLog() any {
 	return struct {
-		SpanProcessors  []SpanProcessor
-		SamplerType     string
-		IDGeneratorType string
-		SpanLimits      SpanLimits
-		Resource        *resource.Resource
+		SpanProcessors         []SpanProcessor
+		SamplerType            string
+		IDGeneratorType        string
+		SpanLimits             SpanLimits
+		Resource               *resource.Resource
+		PanicRecordingDisabled bool
 	}{
-		SpanProcessors:  cfg.processors,
-		SamplerType:     fmt.Sprintf("%T", cfg.sampler),
-		IDGeneratorType: fmt.Sprintf("%T", cfg.idGenerator),
-		SpanLimits:      cfg.spanLimits,
-		Resource:        cfg.resource,
+		SpanProcessors:         cfg.processors,
+		SamplerType:            fmt.Sprintf("%T", cfg.sampler),
+		IDGeneratorType:        fmt.Sprintf("%T", cfg.idGenerator),
+		SpanLimits:             cfg.spanLimits,
+		Resource:               cfg.resource,
+		PanicRecordingDisabled: cfg.panicRecordingDisabled,
 	}
 }
 
@@ -74,10 +80,11 @@ type TracerProvider struct {
 
 	// These fields are not protected by the lock mu. They are assumed to be
 	// immutable after creation of the TracerProvider.
-	sampler     Sampler
-	idGenerator IDGenerator
-	spanLimits  SpanLimits
-	resource    *resource.Resource
+	sampler                Sampler
+	idGenerator            IDGenerator
+	spanLimits             SpanLimits
+	resource               *resource.Resource
+	panicRecordingDisabled bool
 }
 
 var _ trace.TracerProvider = &TracerProvider{}
@@ -112,11 +119,12 @@ func NewTracerProvider(opts ...TracerProviderOption) *TracerProvider {
 	o = ensureValidTracerProviderConfig(o)
 
 	tp := &TracerProvider{
-		namedTracer: make(map[instrumentation.Scope]*tracer),
-		sampler:     o.sampler,
-		idGenerator: o.idGenerator,
-		spanLimits:  o.spanLimits,
-		resource:    o.resource,
+		namedTracer:            make(map[instrumentation.Scope]*tracer),
+		sampler:                o.sampler,
+		idGenerator:            o.idGenerator,
+		spanLimits:             o.spanLimits,
+		resource:               o.resource,
+		panicRecordingDisabled: o.panicRecordingDisabled,
 	}
 	global.Info("TracerProvider created", "config", o)
 
@@ -142,6 +150,10 @@ func (p *TracerProvider) Tracer(name string, opts ...trace.TracerOption) trace.T
 		return noop.NewTracerProvider().Tracer(name, opts...)
 	}
 	c := trace.NewTracerConfig(opts...)
+	attrs, _, _ := attrnorm.SetDedupLimitDepth(
+		c.InstrumentationAttributes(),
+		p.spanLimits.AttributeValueDepthLimit,
+	)
 	if name == "" {
 		name = defaultTracerName
 	}
@@ -149,7 +161,7 @@ func (p *TracerProvider) Tracer(name string, opts ...trace.TracerOption) trace.T
 		Name:       name,
 		Version:    c.InstrumentationVersion(),
 		SchemaURL:  c.SchemaURL(),
-		Attributes: c.InstrumentationAttributes(),
+		Attributes: attrs,
 	}
 
 	t, ok := func() (trace.Tracer, bool) {
@@ -246,13 +258,14 @@ func (p *TracerProvider) UnregisterSpanProcessor(sp SpanProcessor) {
 			idx = i
 		}
 	}
-	if stopOnce != nil {
-		stopOnce.state.Do(func() {
-			if err := sp.Shutdown(context.Background()); err != nil {
-				otel.Handle(err)
-			}
-		})
+	if stopOnce == nil {
+		return
 	}
+	stopOnce.state.Do(func() {
+		if err := sp.Shutdown(context.Background()); err != nil {
+			otel.Handle(err)
+		}
+	})
 	if len(spss) > 1 {
 		copy(spss[idx:], spss[idx+1:])
 	}
@@ -357,6 +370,16 @@ func WithSpanProcessor(sp SpanProcessor) TracerProviderOption {
 	})
 }
 
+// WithoutPanicRecording configures the TracerProvider to not record exception
+// events when a Span is ended while panicking. The panic continues to
+// propagate, and the span is ended without adding the event.
+func WithoutPanicRecording() TracerProviderOption {
+	return traceProviderOptionFunc(func(cfg tracerProviderConfig) tracerProviderConfig {
+		cfg.panicRecordingDisabled = true
+		return cfg
+	})
+}
+
 // WithResource returns a TracerProviderOption that will configure the
 // Resource r as a TracerProvider's Resource. The configured Resource is
 // referenced by all the Tracers the TracerProvider creates. It represents the
@@ -410,6 +433,29 @@ func WithSampler(s Sampler) TracerProviderOption {
 	})
 }
 
+// WithAttributeValueDepthLimit sets the maximum allowed depth for attribute
+// values. Depth starts at one for the top-level value and increments when
+// descending into an array element or map value. An array or map beyond this
+// depth is replaced by an empty value.
+//
+// This limit applies to span, event, link, and instrumentation scope
+// attributes processed by this TracerProvider. It does not apply to Resource
+// attributes.
+//
+// Setting this to zero means the default limit of 64 is used. Setting this to
+// a negative value means no limit is applied.
+//
+// There is no environment variable for this limit.
+func WithAttributeValueDepthLimit(limit int) TracerProviderOption {
+	if limit == 0 {
+		limit = DefaultAttributeValueDepthLimit
+	}
+	return traceProviderOptionFunc(func(cfg tracerProviderConfig) tracerProviderConfig {
+		cfg.spanLimits.AttributeValueDepthLimit = limit
+		return cfg
+	})
+}
+
 // WithSpanLimits returns a TracerProviderOption that configures a
 // TracerProvider to use the SpanLimits sl. These SpanLimits bound any Span
 // created by a Tracer from the TracerProvider.
@@ -428,6 +474,9 @@ func WithSampler(s Sampler) TracerProviderOption {
 func WithSpanLimits(sl SpanLimits) TracerProviderOption {
 	if sl.AttributeValueLengthLimit <= 0 {
 		sl.AttributeValueLengthLimit = DefaultAttributeValueLengthLimit
+	}
+	if sl.AttributeValueDepthLimit <= 0 {
+		sl.AttributeValueDepthLimit = DefaultAttributeValueDepthLimit
 	}
 	if sl.AttributeCountLimit <= 0 {
 		sl.AttributeCountLimit = DefaultAttributeCountLimit
@@ -454,13 +503,14 @@ func WithSpanLimits(sl SpanLimits) TracerProviderOption {
 // TracerProvider to use these limits. These limits bound any Span created by
 // a Tracer from the TracerProvider.
 //
-// The limits will be used as-is. Zero or negative values will not be changed
-// to the default value like WithSpanLimits does. Setting a limit to zero will
-// effectively disable the related resource it limits and setting to a
-// negative value will mean that resource is unlimited. Consequentially, this
-// means that the zero-value SpanLimits will disable all span resources.
-// Because of this, limits should be constructed using NewSpanLimits and
-// updated accordingly.
+// The limits will be used as-is, except that an AttributeValueDepthLimit of
+// zero means the default limit is used. Other zero or negative values will not
+// be changed to the default value like WithSpanLimits does. Setting a limit to
+// zero will effectively disable the related resource it limits and setting to
+// a negative value will mean that resource is unlimited. Consequentially, the
+// zero-value SpanLimits will disable all span resources except the attribute
+// value depth limit. Because of this, limits should be constructed using
+// NewSpanLimits and updated accordingly.
 //
 // If this or WithSpanLimits are not provided, the TracerProvider will use the
 // limits defined by environment variables, or the defaults if unset. Refer to
@@ -505,6 +555,9 @@ func ensureValidTracerProviderConfig(cfg tracerProviderConfig) tracerProviderCon
 	}
 	if cfg.resource == nil {
 		cfg.resource = resource.Default()
+	}
+	if cfg.spanLimits.AttributeValueDepthLimit == 0 {
+		cfg.spanLimits.AttributeValueDepthLimit = DefaultAttributeValueDepthLimit
 	}
 	return cfg
 }

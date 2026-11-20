@@ -52,14 +52,13 @@ import (
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
+	consistencyutil "k8s.io/client-go/util/consistency"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/client-go/util/workqueue"
 	nodetopology "k8s.io/component-helpers/node/topology"
 	kubeletapis "k8s.io/kubelet/pkg/apis"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/nodelifecycle/scheduler"
-	"k8s.io/kubernetes/pkg/controller/tainteviction"
-	consistencyutil "k8s.io/kubernetes/pkg/controller/util/consistency"
 	controllerutil "k8s.io/kubernetes/pkg/controller/util/node"
 	"k8s.io/kubernetes/pkg/features"
 	taintutils "k8s.io/kubernetes/pkg/util/taints"
@@ -137,11 +136,6 @@ const (
 	podUpdateWorkerSize = 4
 	// nodeUpdateWorkerSize defines the size of workers for node update or/and pod update.
 	nodeUpdateWorkerSize = 8
-
-	// taintEvictionController is defined here in order to prevent imports of
-	// k8s.io/kubernetes/cmd/kube-controller-manager/names which would result in validation errors.
-	// This constant will be removed upon graduation of the SeparateTaintEvictionController feature.
-	taintEvictionController = "taint-eviction-controller"
 )
 
 // labelReconcileInfo lists Node labels to reconcile, and how to reconcile them.
@@ -215,6 +209,12 @@ func (n *nodeHealthMap) set(name string, data *nodeHealthData) {
 	n.nodeHealths[name] = data
 }
 
+func (n *nodeHealthMap) delete(name string) {
+	n.lock.Lock()
+	defer n.lock.Unlock()
+	delete(n.nodeHealths, name)
+}
+
 type podUpdateItem struct {
 	namespace string
 	name      string
@@ -222,8 +222,6 @@ type podUpdateItem struct {
 
 // Controller is the controller that manages node's life cycle.
 type Controller struct {
-	taintManager *tainteviction.Controller
-
 	podLister         corelisters.PodLister
 	podInformerSynced cache.InformerSynced
 	kubeClient        clientset.Interface
@@ -310,49 +308,71 @@ type Controller struct {
 	podUpdateQueue  workqueue.TypedRateLimitingInterface[podUpdateItem]
 }
 
+// ControllerOptions holds options for creating a node lifecycle controller.
+type ControllerOptions struct {
+	LeaseInformer               coordinformers.LeaseInformer
+	PodInformer                 coreinformers.PodInformer
+	NodeInformer                coreinformers.NodeInformer
+	DaemonSetInformer           appsv1informers.DaemonSetInformer
+	KubeClient                  clientset.Interface
+	NodeMonitorPeriod           time.Duration
+	NodeStartupGracePeriod      time.Duration
+	NodeMonitorGracePeriod      time.Duration
+	EvictionLimiterQPS          float32
+	SecondaryEvictionLimiterQPS float32
+	LargeClusterThreshold       int32
+	UnhealthyZoneThreshold      float32
+}
+
+func (o *ControllerOptions) validate() error {
+	var errs []error
+	if o.LeaseInformer == nil {
+		errs = append(errs, errors.New("LeaseInformer cannot be nil"))
+	}
+	if o.PodInformer == nil {
+		errs = append(errs, errors.New("PodInformer cannot be nil"))
+	}
+	if o.NodeInformer == nil {
+		errs = append(errs, errors.New("NodeInformer cannot be nil"))
+	}
+	if o.DaemonSetInformer == nil {
+		errs = append(errs, errors.New("DaemonSetInformer cannot be nil"))
+	}
+	return errors.Join(errs...)
+}
+
 // NewNodeLifecycleController returns a new taint controller.
-func NewNodeLifecycleController(
-	ctx context.Context,
-	leaseInformer coordinformers.LeaseInformer,
-	podInformer coreinformers.PodInformer,
-	nodeInformer coreinformers.NodeInformer,
-	daemonSetInformer appsv1informers.DaemonSetInformer,
-	kubeClient clientset.Interface,
-	nodeMonitorPeriod time.Duration,
-	nodeStartupGracePeriod time.Duration,
-	nodeMonitorGracePeriod time.Duration,
-	evictionLimiterQPS float32,
-	secondaryEvictionLimiterQPS float32,
-	largeClusterThreshold int32,
-	unhealthyZoneThreshold float32,
-) (*Controller, error) {
+func NewNodeLifecycleController(ctx context.Context, opts ControllerOptions) (*Controller, error) {
 	logger := klog.FromContext(ctx)
-	if kubeClient == nil {
+	if opts.KubeClient == nil {
 		logger.Error(nil, "kubeClient is nil when starting nodelifecycle Controller")
 		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
+	}
+	if err := opts.validate(); err != nil {
+		return nil, err
 	}
 
 	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "node-controller"})
 
 	nc := &Controller{
-		kubeClient:                  kubeClient,
+		kubeClient:                  opts.KubeClient,
 		now:                         metav1.Now,
 		knownNodeSet:                make(map[string]*v1.Node),
 		nodeHealthMap:               newNodeHealthMap(),
 		broadcaster:                 eventBroadcaster,
 		recorder:                    recorder,
-		nodeMonitorPeriod:           nodeMonitorPeriod,
-		nodeStartupGracePeriod:      nodeStartupGracePeriod,
-		nodeMonitorGracePeriod:      nodeMonitorGracePeriod,
+		nodeMonitorPeriod:           opts.NodeMonitorPeriod,
+		nodeStartupGracePeriod:      opts.NodeStartupGracePeriod,
+		nodeMonitorGracePeriod:      opts.NodeMonitorGracePeriod,
 		nodeUpdateWorkerSize:        nodeUpdateWorkerSize,
 		zoneNoExecuteTainter:        make(map[string]*scheduler.RateLimitedTimedQueue),
 		nodesToRetry:                sync.Map{},
 		zoneStates:                  make(map[string]ZoneState),
-		evictionLimiterQPS:          evictionLimiterQPS,
-		secondaryEvictionLimiterQPS: secondaryEvictionLimiterQPS,
-		largeClusterThreshold:       largeClusterThreshold,
-		unhealthyZoneThreshold:      unhealthyZoneThreshold,
+		evictionLimiterQPS:          opts.EvictionLimiterQPS,
+		secondaryEvictionLimiterQPS: opts.SecondaryEvictionLimiterQPS,
+		largeClusterThreshold:       opts.LargeClusterThreshold,
+		unhealthyZoneThreshold:      opts.UnhealthyZoneThreshold,
 		nodeUpdateQueue:             workqueue.NewTypedWithConfig(workqueue.TypedQueueConfig[string]{Name: "node_lifecycle_controller"}),
 		podUpdateQueue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[podUpdateItem](),
@@ -367,7 +387,7 @@ func NewNodeLifecycleController(
 	nc.enterFullDisruptionFunc = nc.HealthyQPSFunc
 	nc.computeZoneStateFunc = nc.ComputeZoneState
 
-	_, _ = podInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
+	_, _ = opts.PodInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			pod := obj.(*v1.Pod)
 			nc.podUpdated(nil, pod)
@@ -378,9 +398,11 @@ func NewNodeLifecycleController(
 			nc.podUpdated(prevPod, newPod)
 		},
 	}, cache.HandlerOptions{Logger: &logger})
-	nc.podInformerSynced = podInformer.Informer().HasSynced
-	controller.AddPodNodeNameIndexer(podInformer.Informer())
-	podIndexer := podInformer.Informer().GetIndexer()
+	nc.podInformerSynced = opts.PodInformer.Informer().HasSynced
+	if err := controller.AddPodNodeNameIndexer(opts.PodInformer.Informer()); err != nil {
+		return nil, fmt.Errorf("failed to add pod nodeName indexer: %w", err)
+	}
+	podIndexer := opts.PodInformer.Informer().GetIndexer()
 	nc.getPodsAssignedToNode = func(nodeName string) ([]*v1.Pod, error) {
 		objs, err := podIndexer.ByIndex(controller.PodNodeNameKeyIndex, nodeName)
 		if err != nil {
@@ -396,20 +418,11 @@ func NewNodeLifecycleController(
 		}
 		return pods, nil
 	}
-	nc.podLister = podInformer.Lister()
-	nc.nodeLister = nodeInformer.Lister()
-
-	if !utilfeature.DefaultFeatureGate.Enabled(features.SeparateTaintEvictionController) {
-		logger.Info("Running TaintEvictionController as part of NodeLifecyleController")
-		tm, err := tainteviction.New(ctx, kubeClient, podInformer, nodeInformer, taintEvictionController)
-		if err != nil {
-			return nil, err
-		}
-		nc.taintManager = tm
-	}
+	nc.podLister = opts.PodInformer.Lister()
+	nc.nodeLister = opts.NodeInformer.Lister()
 
 	logger.Info("Controller will reconcile labels")
-	_, _ = nodeInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
+	_, _ = opts.NodeInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: controllerutil.CreateAddNodeHandler(func(node *v1.Node) error {
 			nc.nodeUpdateQueue.Add(node.Name)
 			return nil
@@ -424,17 +437,17 @@ func NewNodeLifecycleController(
 		}),
 	}, cache.HandlerOptions{Logger: &logger})
 
-	nc.leaseLister = leaseInformer.Lister()
-	nc.leaseInformerSynced = leaseInformer.Informer().HasSynced
+	nc.leaseLister = opts.LeaseInformer.Lister()
+	nc.leaseInformerSynced = opts.LeaseInformer.Informer().HasSynced
 
-	nc.nodeInformerSynced = nodeInformer.Informer().HasSynced
+	nc.nodeInformerSynced = opts.NodeInformer.Informer().HasSynced
 
-	nc.daemonSetStore = daemonSetInformer.Lister()
-	nc.daemonSetInformerSynced = daemonSetInformer.Informer().HasSynced
+	nc.daemonSetStore = opts.DaemonSetInformer.Lister()
+	nc.daemonSetInformerSynced = opts.DaemonSetInformer.Informer().HasSynced
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.NodeControllerLeaseCircuitBreaker) {
 		nc.consistencyStore = consistencyutil.NewConsistencyStore(map[schema.GroupResource]consistencyutil.LastSyncRVGetter{
-			leaseResource: leaseInformer.Informer().GetStore(),
+			leaseResource: opts.LeaseInformer.Informer().GetStore(),
 		})
 	} else {
 		nc.consistencyStore = consistencyutil.NewNoopConsistencyStore()
@@ -470,13 +483,6 @@ func (nc *Controller) Run(ctx context.Context) {
 
 	if !cache.WaitForNamedCacheSyncWithContext(ctx, nc.leaseInformerSynced, nc.nodeInformerSynced, nc.podInformerSynced, nc.daemonSetInformerSynced) {
 		return
-	}
-
-	if !utilfeature.DefaultFeatureGate.Enabled(features.SeparateTaintEvictionController) {
-		logger.Info("Starting", "controller", taintEvictionController)
-		wg.Go(func() {
-			nc.taintManager.Run(ctx)
-		})
 	}
 
 	// Start workers to reconcile labels and/or update NoSchedule taint for nodes.
@@ -705,6 +711,7 @@ func (nc *Controller) monitorNodeHealth(ctx context.Context) error {
 		logger.V(1).Info("Controller observed a Node deletion", "node", klog.KRef("", deleted[i].Name))
 		controllerutil.RecordNodeEvent(ctx, nc.recorder, deleted[i].Name, string(deleted[i].UID), v1.EventTypeNormal, "RemovingNode", fmt.Sprintf("Removing Node %v from Controller", deleted[i].Name))
 		delete(nc.knownNodeSet, deleted[i].Name)
+		nc.nodeHealthMap.delete(deleted[i].Name)
 	}
 
 	var zoneToNodeConditionsLock sync.Mutex
@@ -753,7 +760,7 @@ func (nc *Controller) monitorNodeHealth(ctx context.Context) error {
 		if currentReadyCondition != nil {
 			pods, err := nc.getPodsAssignedToNode(node.Name)
 			if err != nil {
-				utilruntime.HandleErrorWithContext(ctx, err, "Unable to list pods of node", node.Name)
+				utilruntime.HandleErrorWithContext(ctx, err, "Unable to list pods", "node", klog.KObj(node))
 				if currentReadyCondition.Status != v1.ConditionTrue && observedReadyCondition.Status == v1.ConditionTrue {
 					// If error happened during node status transition (Ready -> NotReady)
 					// we need to mark node for retry to force MarkPodsNotReady execution

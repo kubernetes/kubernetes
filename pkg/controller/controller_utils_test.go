@@ -48,12 +48,12 @@ import (
 	"k8s.io/client-go/tools/record"
 	utiltesting "k8s.io/client-go/util/testing"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/ktesting"
 	"k8s.io/kubernetes/pkg/apis/core"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/controller/testutil"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/securitycontext"
-	"k8s.io/kubernetes/test/utils/ktesting"
 	testingclock "k8s.io/utils/clock/testing"
 	"k8s.io/utils/ptr"
 
@@ -69,7 +69,7 @@ func NewFakeControllerExpectationsLookup(ttl time.Duration) (*ControllerExpectat
 	ttlPolicy := &cache.TTLPolicy{TTL: ttl, Clock: fakeClock}
 	ttlStore := cache.NewFakeExpirationStore(
 		ExpKeyFunc, nil, ttlPolicy, fakeClock)
-	return &ControllerExpectations{ttlStore}, fakeClock
+	return &ControllerExpectations{Store: ttlStore, clock: fakeClock}, fakeClock
 }
 
 func newReplicationController(replicas int) *v1.ReplicationController {
@@ -254,6 +254,33 @@ func TestControllerExpectations(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestControllerExpectationsExpiryUsesInjectedClock verifies unfulfilled
+// expectations expire strictly after ExpectationsTimeout on the injected clock,
+// and that expectations built without a clock fall back to the real one.
+func TestControllerExpectationsExpiryUsesInjectedClock(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	fakeClock := testingclock.NewFakeClock(time.Now())
+	e := NewControllerExpectationsWithClock(fakeClock)
+	rc := newReplicationController(1)
+	rcKey, err := KeyFunc(rc)
+	require.NoError(t, err)
+	require.NoError(t, e.SetExpectations(logger, rcKey, 1, 0))
+
+	assert.False(t, e.SatisfiedExpectations(logger, rcKey), "unfulfilled expectations must block the sync")
+	fakeClock.Step(ExpectationsTimeout)
+	assert.False(t, e.SatisfiedExpectations(logger, rcKey), "expectations must not expire at exactly ExpectationsTimeout")
+	fakeClock.Step(time.Nanosecond)
+	assert.True(t, e.SatisfiedExpectations(logger, rcKey), "expectations must expire once ExpectationsTimeout has passed")
+
+	orig := ExpectationsClock
+	t.Cleanup(func() { ExpectationsClock = orig })
+	ExpectationsClock = fakeClock
+	fromGlobal := NewControllerExpectations()
+	require.NoError(t, fromGlobal.SetExpectations(logger, rcKey, 1, 0))
+	fakeClock.Step(ExpectationsTimeout + time.Nanosecond)
+	assert.True(t, fromGlobal.SatisfiedExpectations(logger, rcKey), "NewControllerExpectations must use ExpectationsClock")
 }
 
 func TestUIDExpectations(t *testing.T) {

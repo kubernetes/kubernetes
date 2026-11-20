@@ -211,6 +211,21 @@ func (g *group) isLastSpecWithPair(specID uint, pair runOncePair) bool {
 	return lastSpecID == specID
 }
 
+func (g *group) willRunAnotherAttempt(isFinalAttempt bool) bool {
+	if isFinalAttempt {
+		return false
+	}
+
+	if g.suite.currentSpecReport.MaxMustPassRepeatedly > 0 {
+		return g.suite.currentSpecReport.State.Is(types.SpecStatePassed)
+	}
+	if g.suite.currentSpecReport.MaxFlakeAttempts > 0 {
+		return g.suite.currentSpecReport.State.Is(types.SpecStateFailureStates)
+	}
+
+	return false
+}
+
 func (g *group) attemptSpec(isFinalAttempt bool, spec Spec) bool {
 	failedInARunOnceBefore := false
 	pairs := g.runOncePairs[spec.SubjectID()]
@@ -280,10 +295,11 @@ func (g *group) attemptSpec(isFinalAttempt bool, spec Spec) bool {
 			}
 			// it's our last chance to run if we're the last spec for our oncePair
 			isLastSpecWithPair := g.isLastSpecWithPair(spec.SubjectID(), pair)
+			willRunAnotherAttempt := g.willRunAnotherAttempt(isFinalAttempt)
 
 			switch g.suite.currentSpecReport.State {
 			case types.SpecStatePassed: //this attempt is passing...
-				return isLastSpecWithPair //...we should run-once if we'this is our last chance
+				return isLastSpecWithPair && !willRunAnotherAttempt //...we should run-once if this is our last chance
 			case types.SpecStateSkipped: //the spec was skipped by the user...
 				if isLastSpecWithPair {
 					return true //...we're the last spec, so we should run the AfterNode
@@ -292,7 +308,7 @@ func (g *group) attemptSpec(isFinalAttempt bool, spec Spec) bool {
 					return true //...or, a run-once node at our nesting level was skipped which means this is our last chance to run
 				}
 			case types.SpecStateFailed, types.SpecStatePanicked, types.SpecStateTimedout: // the spec has failed...
-				if isFinalAttempt {
+				if !willRunAnotherAttempt {
 					if g.continueOnFailure {
 						return isLastSpecWithPair || failedInARunOnceBefore //...we're configured to continue on failures - so we should only run if we're the last spec for this pair or if we failed in a runOnceBefore (which means we _are_ the last spec to run)
 					} else {

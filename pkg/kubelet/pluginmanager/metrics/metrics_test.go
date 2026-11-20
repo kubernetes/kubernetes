@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"testing"
 
+	"k8s.io/ktesting"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
-	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestMetricCollection(t *testing.T) {

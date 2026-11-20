@@ -22,6 +22,8 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -40,6 +42,11 @@ func TestConfigToExecCluster(t *testing.T) {
 	const proxyURL = "https://some-proxy-url.com/tuna/fish"
 	proxy := func(r *http.Request) (*url.URL, error) {
 		return url.Parse(proxyURL)
+	}
+
+	caFile := filepath.Join(t.TempDir(), "ca.pem")
+	if err := os.WriteFile(caFile, []byte("a CA bundle lives here"), 0644); err != nil {
+		t.Fatal(err)
 	}
 
 	tests := []struct {
@@ -63,7 +70,8 @@ func TestConfigToExecCluster(t *testing.T) {
 					Insecure:   true,
 					CAData:     []byte("some-ca-data"),
 				},
-				Proxy: proxy,
+				Proxy:                 proxy,
+				MinConnectionPoolSize: 4,
 			},
 			wantOut: clientauthenticationapi.Cluster{
 				Server:                   "some-host",
@@ -71,6 +79,7 @@ func TestConfigToExecCluster(t *testing.T) {
 				InsecureSkipTLSVerify:    true,
 				CertificateAuthorityData: []byte("some-ca-data"),
 				ProxyURL:                 proxyURL,
+				MinConnectionPoolSize:    4,
 				Config: &runtime.Unknown{
 					Raw: []byte("stuff"),
 				},
@@ -89,7 +98,7 @@ func TestConfigToExecCluster(t *testing.T) {
 				TLSClientConfig: TLSClientConfig{
 					ServerName: "some-server-name",
 					Insecure:   true,
-					CAFile:     "testdata/ca.pem",
+					CAFile:     caFile,
 				},
 				Proxy: proxy,
 			},
@@ -129,7 +138,7 @@ func TestConfigToExecCluster(t *testing.T) {
 				TLSClientConfig: TLSClientConfig{
 					ServerName: "some-server-name",
 					Insecure:   true,
-					CAFile:     "testdata/ca.pem",
+					CAFile:     caFile,
 				},
 			},
 			wantOut: clientauthenticationapi.Cluster{
@@ -294,6 +303,8 @@ func TestConfigToExecClusterRoundtrip(t *testing.T) {
 		expected.WarningHandlerWithContext = nil
 		expected.Timeout = 0
 		expected.Dial = nil
+		// MinConnectionPoolSize is an int32 in the exec cluster info.
+		expected.MinConnectionPoolSize = int(int32(expected.MinConnectionPoolSize))
 
 		// Manually set URLs so we don't get an error when parsing these during the roundtrip.
 		if expected.Host != "" {

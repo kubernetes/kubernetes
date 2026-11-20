@@ -66,6 +66,12 @@ func MatchMayChangeInTheFuture(matcher GomegaMatcher, value any) bool {
 
 // AsyncAssertions are returned by Eventually and Consistently and enable matchers to be polled repeatedly to ensure
 // they are eventually satisfied
+//
+// The optional optionalDescription argument allows you to annotate the assertion with additional information.
+// It is passed as the second argument and can be a format string followed by arguments, or a func() string.
+// The description is included in failure messages to provide context.
+//
+// For details on annotating assertions, see: https://onsi.github.io/gomega/#annotating-assertions
 type AsyncAssertion interface {
 	Should(matcher GomegaMatcher, optionalDescription ...any) bool
 	ShouldNot(matcher GomegaMatcher, optionalDescription ...any) bool
@@ -86,6 +92,12 @@ type AsyncAssertion interface {
 }
 
 // Assertions are returned by Ω and Expect and enable assertions against Gomega matchers
+//
+// The optional optionalDescription argument allows you to annotate the assertion with additional information.
+// It is passed as the second argument and can be a format string followed by arguments, or a func() string.
+// The description is included in failure messages to provide context.
+//
+// For details on annotating assertions, see: https://onsi.github.io/gomega/#annotating-assertions
 type Assertion interface {
 	Should(matcher GomegaMatcher, optionalDescription ...any) bool
 	ShouldNot(matcher GomegaMatcher, optionalDescription ...any) bool

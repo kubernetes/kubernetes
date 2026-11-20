@@ -25,7 +25,9 @@ import (
 )
 
 type event struct {
-	key              string
+	// Use a distinct type to prevent accidentally treating backend-prefixed
+	// etcd keys as the resource-relative keys accepted by storage.ReverseKeyFunc.
+	key              storageKey
 	value            []byte
 	prevValue        []byte
 	rev              int64
@@ -51,7 +53,7 @@ type event struct {
 // parseKV converts a KeyValue retrieved from an initial sync() listing to a synthetic isCreated event.
 func parseKV(kv *mvccpb.KeyValue) *event {
 	return &event{
-		key:            string(kv.Key),
+		key:            storageKey(kv.Key),
 		value:          kv.Value,
 		prevValue:      nil,
 		rev:            kv.ModRevision,
@@ -61,21 +63,21 @@ func parseKV(kv *mvccpb.KeyValue) *event {
 	}
 }
 
-func parseEvent(e *clientv3.Event) (*event, error) {
-	if !e.IsCreate() && e.PrevKv == nil {
+func parseEvent(e *clientv3.Event, expectPrevKV bool) (*event, error) {
+	if expectPrevKV && !e.IsCreate() && e.PrevKv == nil {
 		// If the previous value is nil, error. One example of how this is possible is if the previous value has been compacted already.
 		return nil, fmt.Errorf("etcd event received with PrevKv=nil (key=%q, modRevision=%d, type=%s)", string(e.Kv.Key), e.Kv.ModRevision, e.Type.String())
 
 	}
 	ret := &event{
-		key:        string(e.Kv.Key),
+		key:        storageKey(e.Kv.Key),
 		value:      e.Kv.Value,
 		rev:        e.Kv.ModRevision,
 		isDeleted:  e.Type == clientv3.EventTypeDelete,
 		isCreated:  e.IsCreate(),
 		recordTime: time.Now(),
 	}
-	if e.PrevKv != nil {
+	if expectPrevKV && e.PrevKv != nil {
 		ret.prevValue = e.PrevKv.Value
 	}
 	return ret, nil

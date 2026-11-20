@@ -121,6 +121,8 @@ func (m *managerImpl) Admit(_ context.Context, attrs *lifecycle.PodAdmitAttribut
 			Admit:   false,
 			Reason:  NodeShutdownNotAdmittedReason,
 			Message: nodeShutdownNotAdmittedMessage,
+			// The shutdown may be cancelled.
+			RejectionType: lifecycle.RejectionBlocked,
 		}
 	}
 	return lifecycle.PodAdmitResult{Admit: true}

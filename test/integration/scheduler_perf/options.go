@@ -20,9 +20,9 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/ktesting"
 	"k8s.io/kubernetes/pkg/scheduler"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
-	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 )
 
 type SchedulerPerfOption func(options *schedulerPerfOptions)
@@ -70,6 +70,16 @@ func WithNodeUpdateFn(fn NodeUpdateFn) SchedulerPerfOption {
 func WithPreRunFn(preRunFn PreRunFn) SchedulerPerfOption {
 	return func(s *schedulerPerfOptions) {
 		s.preRunFn = preRunFn
+	}
+}
+
+// WithOutOfTreePluginRegistry sets the out-of-tree plugin registry used when starting the
+// scheduler. RunBenchmarkPerfScheduling takes the registry as a positional argument; this
+// option lets the integration-test path (RunIntegrationPerfScheduling) register the same
+// custom plugins.
+func WithOutOfTreePluginRegistry(registry frameworkruntime.Registry) SchedulerPerfOption {
+	return func(s *schedulerPerfOptions) {
+		s.outOfTreePluginRegistry = registry
 	}
 }
 

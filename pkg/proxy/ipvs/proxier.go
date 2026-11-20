@@ -50,9 +50,9 @@ import (
 	"k8s.io/kubernetes/pkg/proxy/metrics"
 	"k8s.io/kubernetes/pkg/proxy/runner"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
-	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	utilkernel "k8s.io/kubernetes/pkg/util/kernel"
 	netutils "k8s.io/utils/net"
+	utiliptables "sigs.k8s.io/iptables-wrappers/pkg/iptables"
 )
 
 const (
@@ -110,7 +110,7 @@ const (
 func NewDualStackProxier(
 	ctx context.Context,
 	config *kubeproxyconfig.KubeProxyConfiguration,
-	ipts map[v1.IPFamily]utiliptables.Interface,
+	ipts map[utiliptables.Protocol]utiliptables.Interface,
 	ipvs utilipvs.Interface,
 	ipset utilipset.Interface,
 	sysctl utilsysctl.Interface,
@@ -122,14 +122,14 @@ func NewDualStackProxier(
 	initOnly bool,
 ) (proxy.Provider, error) {
 	// Create an ipv4 instance of the single-stack proxier
-	ipv4Proxier, err := NewProxier(ctx, config, v1.IPv4Protocol, ipts[v1.IPv4Protocol], ipvs, ipset, sysctl,
+	ipv4Proxier, err := NewProxier(ctx, config, v1.IPv4Protocol, ipts[utiliptables.ProtocolIPv4], ipvs, ipset, sysctl,
 		localDetectors[v1.IPv4Protocol], nodeName, nodeIPs[v1.IPv4Protocol], recorder,
 		healthzServer, initOnly)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create ipv4 proxier: %v", err)
 	}
 
-	ipv6Proxier, err := NewProxier(ctx, config, v1.IPv6Protocol, ipts[v1.IPv6Protocol], ipvs, ipset, sysctl,
+	ipv6Proxier, err := NewProxier(ctx, config, v1.IPv6Protocol, ipts[utiliptables.ProtocolIPv6], ipvs, ipset, sysctl,
 		localDetectors[v1.IPv6Protocol], nodeName, nodeIPs[v1.IPv6Protocol], recorder,
 		healthzServer, initOnly)
 	if err != nil {
@@ -1185,7 +1185,7 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 		"Restoring iptables", "natChains", proxier.natChains,
 		"natRules", proxier.natRules, "filterChains", proxier.filterChains,
 		"filterRules", proxier.filterRules)
-	err = proxier.iptables.RestoreAll(proxier.iptablesData.Bytes(), utiliptables.NoFlushTables, utiliptables.RestoreCounters)
+	err = proxier.iptables.Restore(context.TODO(), proxier.iptablesData.Bytes())
 	if err != nil {
 		if pErr, ok := err.(utiliptables.ParseError); ok {
 			lines := utiliptables.ExtractLines(proxier.iptablesData.Bytes(), pErr.Line(), 3)
@@ -1511,7 +1511,7 @@ func (proxier *Proxier) acceptIPVSTraffic() {
 // createAndLinkKubeChain create all kube chains that ipvs proxier need and write basic link.
 func (proxier *Proxier) createAndLinkKubeChain() {
 	for _, ch := range iptablesChains {
-		if _, err := proxier.iptables.EnsureChain(ch.table, ch.chain); err != nil {
+		if _, err := proxier.iptables.EnsureChain(context.TODO(), ch.table, ch.chain); err != nil {
 			proxier.logger.Error(err, "Failed to ensure chain exists", "table", ch.table, "chain", ch.chain)
 			return
 		}
@@ -1524,7 +1524,7 @@ func (proxier *Proxier) createAndLinkKubeChain() {
 
 	for _, jc := range iptablesJumpChain {
 		args := []string{"-m", "comment", "--comment", jc.comment, "-j", string(jc.to)}
-		if _, err := proxier.iptables.EnsureRule(utiliptables.Prepend, jc.table, jc.from, args...); err != nil {
+		if _, err := proxier.iptables.EnsureRule(context.TODO(), utiliptables.Prepend, jc.table, jc.from, args...); err != nil {
 			proxier.logger.Error(err, "Failed to ensure chain jumps", "table", jc.table, "srcChain", jc.from, "dstChain", jc.to)
 		}
 	}

@@ -42,6 +42,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	testcore "k8s.io/client-go/testing"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/ktesting"
 	kubeletapis "k8s.io/kubelet/pkg/apis"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/nodelifecycle/scheduler"
@@ -50,7 +51,6 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/util/node"
 	taintutils "k8s.io/kubernetes/pkg/util/taints"
-	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
 )
 
@@ -153,21 +153,20 @@ func newNodeLifecycleControllerFromClient(
 	daemonSetInformer := factory.Apps().V1().DaemonSets()
 	podInformer := factory.Core().V1().Pods()
 
-	nc, err := NewNodeLifecycleController(
-		ctx,
-		leaseInformer,
-		podInformer,
-		nodeInformer,
-		daemonSetInformer,
-		kubeClient,
-		nodeMonitorPeriod,
-		nodeStartupGracePeriod,
-		nodeMonitorGracePeriod,
-		evictionLimiterQPS,
-		secondaryEvictionLimiterQPS,
-		largeClusterThreshold,
-		unhealthyZoneThreshold,
-	)
+	nc, err := NewNodeLifecycleController(ctx, ControllerOptions{
+		LeaseInformer:               leaseInformer,
+		PodInformer:                 podInformer,
+		NodeInformer:                nodeInformer,
+		DaemonSetInformer:           daemonSetInformer,
+		KubeClient:                  kubeClient,
+		NodeMonitorPeriod:           nodeMonitorPeriod,
+		NodeStartupGracePeriod:      nodeStartupGracePeriod,
+		NodeMonitorGracePeriod:      nodeMonitorGracePeriod,
+		EvictionLimiterQPS:          evictionLimiterQPS,
+		SecondaryEvictionLimiterQPS: secondaryEvictionLimiterQPS,
+		LargeClusterThreshold:       largeClusterThreshold,
+		UnhealthyZoneThreshold:      unhealthyZoneThreshold,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -2295,6 +2294,67 @@ func TestMonitorNodeHealthMarkPodsNotReadyWithWorkerSize(t *testing.T) {
 	}
 }
 
+func TestMonitorNodeHealthRemovesDeletedNodeHealth(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	fakeNow := metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC)
+	fakeNodeHandler := &testutil.FakeNodeHandler{
+		Existing: []*v1.Node{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					CreationTimestamp: fakeNow,
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node1",
+					CreationTimestamp: fakeNow,
+				},
+			},
+		},
+		Clientset: fake.NewSimpleClientset(&v1.PodList{}),
+	}
+	nodeController, _ := newNodeLifecycleControllerFromClient(
+		tCtx,
+		fakeNodeHandler,
+		testRateLimiterQPS,
+		testRateLimiterQPS,
+		testLargeClusterThreshold,
+		testUnhealthyThreshold,
+		testNodeMonitorGracePeriod,
+		testNodeStartupGracePeriod,
+		testNodeMonitorPeriod)
+	nodeController.now = func() metav1.Time { return fakeNow }
+	nodeController.recorder = testutil.NewFakeRecorder()
+	nodeController.getPodsAssignedToNode = fakeGetPodsAssignedToNode(fakeNodeHandler.Clientset)
+
+	if err := nodeController.syncNodeStore(fakeNodeHandler); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if err := nodeController.monitorNodeHealth(tCtx); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	for _, name := range []string{"node0", "node1"} {
+		if nodeController.nodeHealthMap.getDeepCopy(name) == nil {
+			t.Fatalf("expected node health of %s to be recorded", name)
+		}
+	}
+
+	fakeNodeHandler.Existing = fakeNodeHandler.Existing[:1]
+	if err := nodeController.syncNodeStore(fakeNodeHandler); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if err := nodeController.monitorNodeHealth(tCtx); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if nodeController.nodeHealthMap.getDeepCopy("node0") == nil {
+		t.Errorf("expected node health of node0 to be kept")
+	}
+	if nodeController.nodeHealthMap.getDeepCopy("node1") != nil {
+		t.Errorf("expected node health of deleted node1 to be removed")
+	}
+}
+
 func TestMonitorNodeHealthMarkPodsNotReadyRetry(t *testing.T) {
 	type nodeIteration struct {
 		timeToPass time.Duration
@@ -4091,6 +4151,91 @@ func TestProcessPodMarkPodNotReady(t *testing.T) {
 			}
 			if podStatusUpdated != item.expectedPodStatusUpdate {
 				t.Errorf("expect pod status updated to be %v, but got %v", item.expectedPodStatusUpdate, podStatusUpdated)
+			}
+		})
+	}
+}
+
+func TestNewNodeLifecycleControllerValidation(t *testing.T) {
+	validOpts := func(kubeClient clientset.Interface) (ControllerOptions, informers.SharedInformerFactory) {
+		factory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
+		return ControllerOptions{
+			LeaseInformer:               factory.Coordination().V1().Leases(),
+			PodInformer:                 factory.Core().V1().Pods(),
+			NodeInformer:                factory.Core().V1().Nodes(),
+			DaemonSetInformer:           factory.Apps().V1().DaemonSets(),
+			KubeClient:                  kubeClient,
+			NodeMonitorPeriod:           testNodeMonitorPeriod,
+			NodeStartupGracePeriod:      testNodeStartupGracePeriod,
+			NodeMonitorGracePeriod:      testNodeMonitorGracePeriod,
+			EvictionLimiterQPS:          testRateLimiterQPS,
+			SecondaryEvictionLimiterQPS: testRateLimiterQPS,
+			LargeClusterThreshold:       testLargeClusterThreshold,
+			UnhealthyZoneThreshold:      testUnhealthyThreshold,
+		}, factory
+	}
+
+	cases := []struct {
+		name    string
+		mutate  func(t *testing.T, ctx context.Context, opts *ControllerOptions, factory informers.SharedInformerFactory)
+		wantErr bool
+	}{
+		{
+			name:    "valid options",
+			mutate:  func(_ *testing.T, _ context.Context, _ *ControllerOptions, _ informers.SharedInformerFactory) {},
+			wantErr: false,
+		},
+		{
+			name: "nil LeaseInformer",
+			mutate: func(_ *testing.T, _ context.Context, opts *ControllerOptions, _ informers.SharedInformerFactory) {
+				opts.LeaseInformer = nil
+			},
+			wantErr: true,
+		},
+		{
+			name: "nil PodInformer",
+			mutate: func(_ *testing.T, _ context.Context, opts *ControllerOptions, _ informers.SharedInformerFactory) {
+				opts.PodInformer = nil
+			},
+			wantErr: true,
+		},
+		{
+			name: "nil NodeInformer",
+			mutate: func(_ *testing.T, _ context.Context, opts *ControllerOptions, _ informers.SharedInformerFactory) {
+				opts.NodeInformer = nil
+			},
+			wantErr: true,
+		},
+		{
+			name: "nil DaemonSetInformer",
+			mutate: func(_ *testing.T, _ context.Context, opts *ControllerOptions, _ informers.SharedInformerFactory) {
+				opts.DaemonSetInformer = nil
+			},
+			wantErr: true,
+		},
+		{
+			name: "stopped pod informer without nodeName indexer",
+			mutate: func(_ *testing.T, _ context.Context, opts *ControllerOptions, factory informers.SharedInformerFactory) {
+				_ = opts.PodInformer.Informer()
+				stopCh := make(chan struct{})
+				factory.Start(stopCh)
+				close(stopCh)
+				factory.Shutdown()
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			kubeClient := fake.NewSimpleClientset()
+			opts, factory := validOpts(kubeClient)
+			tc.mutate(t, tCtx, &opts, factory)
+
+			_, err := NewNodeLifecycleController(tCtx, opts)
+			if (err != nil) != tc.wantErr {
+				t.Fatalf("NewNodeLifecycleController() error = %v, wantErr %v", err, tc.wantErr)
 			}
 		})
 	}

@@ -112,7 +112,8 @@
                   "type": "typeValue",
                   "status": "statusValue"
                 }
-              ]
+              ],
+              "name": "nameValue"
             }
           ]
         },
@@ -920,13 +921,24 @@
                   "procMount": "procMountValue",
                   "seccompProfile": {
                     "type": "typeValue",
-                    "localhostProfile": "localhostProfileValue"
+                    "localhostProfile": "localhostProfileValue",
+                    "oci": {
+                      "ref": "refValue",
+                      "baseProfile": {
+                        "type": "typeValue",
+                        "localhostProfile": "localhostProfileValue"
+                      }
+                    }
                   },
                   "appArmorProfile": {
                     "type": "typeValue",
                     "localhostProfile": "localhostProfileValue"
+                  },
+                  "cgroupOptions": {
+                    "mountMode": "mountModeValue"
                   }
                 },
+                "hostCgroupNamespace": true,
                 "stdin": true,
                 "stdinOnce": true,
                 "tty": true
@@ -1245,13 +1257,24 @@
                   "procMount": "procMountValue",
                   "seccompProfile": {
                     "type": "typeValue",
-                    "localhostProfile": "localhostProfileValue"
+                    "localhostProfile": "localhostProfileValue",
+                    "oci": {
+                      "ref": "refValue",
+                      "baseProfile": {
+                        "type": "typeValue",
+                        "localhostProfile": "localhostProfileValue"
+                      }
+                    }
                   },
                   "appArmorProfile": {
                     "type": "typeValue",
                     "localhostProfile": "localhostProfileValue"
+                  },
+                  "cgroupOptions": {
+                    "mountMode": "mountModeValue"
                   }
                 },
+                "hostCgroupNamespace": true,
                 "stdin": true,
                 "stdinOnce": true,
                 "tty": true
@@ -1570,13 +1593,24 @@
                   "procMount": "procMountValue",
                   "seccompProfile": {
                     "type": "typeValue",
-                    "localhostProfile": "localhostProfileValue"
+                    "localhostProfile": "localhostProfileValue",
+                    "oci": {
+                      "ref": "refValue",
+                      "baseProfile": {
+                        "type": "typeValue",
+                        "localhostProfile": "localhostProfileValue"
+                      }
+                    }
                   },
                   "appArmorProfile": {
                     "type": "typeValue",
                     "localhostProfile": "localhostProfileValue"
+                  },
+                  "cgroupOptions": {
+                    "mountMode": "mountModeValue"
                   }
                 },
+                "hostCgroupNamespace": true,
                 "stdin": true,
                 "stdinOnce": true,
                 "tty": true,
@@ -1628,7 +1662,14 @@
               "fsGroupChangePolicy": "fsGroupChangePolicyValue",
               "seccompProfile": {
                 "type": "typeValue",
-                "localhostProfile": "localhostProfileValue"
+                "localhostProfile": "localhostProfileValue",
+                "oci": {
+                  "ref": "refValue",
+                  "baseProfile": {
+                    "type": "typeValue",
+                    "localhostProfile": "localhostProfileValue"
+                  }
+                }
               },
               "appArmorProfile": {
                 "type": "typeValue",
@@ -1986,7 +2027,8 @@
                 "name": "nameValue",
                 "priority": 2
               }
-            ]
+            ],
+            "podNetwork": "podNetworkValue"
           }
         },
         "ttlSecondsAfterFinished": 8,

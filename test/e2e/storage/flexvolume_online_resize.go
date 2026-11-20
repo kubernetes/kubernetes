@@ -111,11 +111,13 @@ var _ = utils.SIGDescribe(feature.Flexvolumes, "Mounted flexvolume volume expand
 		e2eskipper.SkipUnlessSSHKeyPresent()
 
 		driver := "dummy-attachable"
+		hostExec := utils.NewHostExec(f)
+		ginkgo.DeferCleanup(hostExec.Cleanup)
 
 		ginkgo.By(fmt.Sprintf("installing flexvolume %s on node %s as %s", path.Join(driverDir, driver), node.Name, driver))
-		installFlex(ctx, c, node, "k8s", driver, path.Join(driverDir, driver))
+		installFlex(ctx, c, hostExec, node, "k8s", driver, path.Join(driverDir, driver))
 		ginkgo.By(fmt.Sprintf("installing flexvolume %s on (master) node %s as %s", path.Join(driverDir, driver), node.Name, driver))
-		installFlex(ctx, c, nil, "k8s", driver, path.Join(driverDir, driver))
+		installFlex(ctx, c, hostExec, nil, "k8s", driver, path.Join(driverDir, driver))
 
 		pv := e2epv.MakePersistentVolume(e2epv.PersistentVolumeConfig{
 			PVSource: v1.PersistentVolumeSource{

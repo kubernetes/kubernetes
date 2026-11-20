@@ -19,7 +19,6 @@ package noderesources
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
@@ -30,12 +29,12 @@ import (
 	"k8s.io/dynamic-resource-allocation/cel"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/dynamicresources"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 	"k8s.io/utils/ptr"
@@ -48,6 +47,7 @@ var _ fwk.PreScorePlugin = &Fit{}
 var _ fwk.ScorePlugin = &Fit{}
 var _ fwk.SignPlugin = &Fit{}
 var _ fwk.PlacementScorePlugin = &Fit{}
+var _ fwk.RelevancePlugin = &Fit{}
 
 const (
 	// Name is the name of the plugin used in the plugin registry and configurations.
@@ -93,14 +93,20 @@ var nodeResourceStrategyTypeMap = map[config.ScoringStrategyType]scorer{
 type Fit struct {
 	ignoredResources                                   sets.Set[string]
 	ignoredResourceGroups                              sets.Set[string]
-	enableInPlacePodVerticalScaling                    bool
 	enablePodLevelResources                            bool
 	enableDRAExtendedResource                          bool
 	enableInPlacePodLevelResourcesVerticalScaling      bool
 	enableInPlacePodVerticalScalingSchedulerPreemption bool
+	enableDRANodeAllocatableResources                  bool
 	handle                                             fwk.Handle
 	*resourceAllocationScorer
 	placementScorer *resourceAllocationScorer
+}
+
+// IsRelevantForPodResize returns true to indicate that NodeResourcesFit is relevant for pod resizes,
+// as it evaluates whether the node has sufficient resources for the resized pod.
+func (f *Fit) IsRelevantForPodResize() bool {
+	return true
 }
 
 // ScoreExtensions of the Score plugin.
@@ -184,7 +190,7 @@ func (pl *Fit) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.SignFragment, *f
 			if rQuant == 0 {
 				continue
 			}
-			if shouldDelegateResourceToDRA(rName, nil, pl.draManager, opts) {
+			if helper.ShouldDelegateResourceToDRA(rName, nil, pl.draManager, opts) {
 				return nil, fwk.NewStatus(fwk.Unschedulable, "signature disabled when dra extended resources are used in the cluster")
 			}
 		}
@@ -195,7 +201,7 @@ func (pl *Fit) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.SignFragment, *f
 	}, nil
 }
 
-func getScorer(strategy *config.ScoringStrategy) (*resourceAllocationScorer, error) {
+func getScorer(strategy *config.ScoringStrategy, fts feature.Features) (*resourceAllocationScorer, error) {
 	if strategy == nil {
 		return nil, fmt.Errorf("scoring strategy not specified")
 	}
@@ -203,7 +209,10 @@ func getScorer(strategy *config.ScoringStrategy) (*resourceAllocationScorer, err
 	if !exists {
 		return nil, fmt.Errorf("scoring strategy %s is not supported", strategy.Type)
 	}
-	return scorerFactory(strategy), nil
+	scorer := scorerFactory(strategy)
+	scorer.enablePodLevelResources = fts.EnablePodLevelResources
+	scorer.enableInPlacePodLevelResourcesVerticalScaling = fts.EnableInPlacePodLevelResourcesVerticalScaling
+	return scorer, nil
 }
 
 // NewFit initializes a new plugin and returns it.
@@ -216,10 +225,11 @@ func NewFit(_ context.Context, plArgs runtime.Object, h fwk.Handle, fts feature.
 		return nil, err
 	}
 
-	scorer, err := getScorer(args.ScoringStrategy)
+	scorer, err := getScorer(args.ScoringStrategy, fts)
 	if err != nil {
 		return nil, err
 	}
+	scorer.enableDRANodeAllocatableResources = fts.EnableDRANodeAllocatableResources
 	if fts.EnableDRAExtendedResource {
 		scorer.enableDRAExtendedResource = true
 		scorer.draManager = h.SharedDRAManager()
@@ -233,16 +243,17 @@ func NewFit(_ context.Context, plArgs runtime.Object, h fwk.Handle, fts feature.
 	}
 
 	pl := &Fit{
-		ignoredResources:                sets.New(args.IgnoredResources...),
-		ignoredResourceGroups:           sets.New(args.IgnoredResourceGroups...),
-		enableInPlacePodVerticalScaling: fts.EnableInPlacePodVerticalScaling,
-		handle:                          h,
-		enablePodLevelResources:         fts.EnablePodLevelResources,
-		enableDRAExtendedResource:       fts.EnableDRAExtendedResource,
+		ignoredResources:          sets.New(args.IgnoredResources...),
+		ignoredResourceGroups:     sets.New(args.IgnoredResourceGroups...),
+		handle:                    h,
+		enablePodLevelResources:   fts.EnablePodLevelResources,
+		enableDRAExtendedResource: fts.EnableDRAExtendedResource,
 
 		enableInPlacePodLevelResourcesVerticalScaling: fts.EnableInPlacePodLevelResourcesVerticalScaling,
 
 		enableInPlacePodVerticalScalingSchedulerPreemption: fts.EnableInPlacePodVerticalScalingSchedulerPreemption,
+
+		enableDRANodeAllocatableResources: fts.EnableDRANodeAllocatableResources,
 
 		resourceAllocationScorer: scorer,
 	}
@@ -251,90 +262,40 @@ func NewFit(_ context.Context, plArgs runtime.Object, h fwk.Handle, fts feature.
 		placementScorer, err := getScorer(&config.ScoringStrategy{
 			Type:      config.MostAllocated,
 			Resources: args.ScoringStrategy.Resources,
-		})
+		}, fts)
 		if err != nil {
 			return nil, err
 		}
+		placementScorer.enableDRANodeAllocatableResources = fts.EnableDRANodeAllocatableResources
 		pl.placementScorer = placementScorer
 	}
 
 	return pl, nil
 }
 
+// InsufficientResource, ResourceRequestsOptions and Fits live in plugins/helper
+// so the kubelet can use them without this plugin's DRA imports.
+type InsufficientResource = helper.InsufficientResource
+
 // ResourceRequestsOptions contains feature gate flags for resource request computation.
-type ResourceRequestsOptions struct {
-	EnablePodLevelResources                            bool
-	EnableDRAExtendedResource                          bool
-	EnableDRANodeAllocatableResources                  bool
-	EnableInPlacePodVerticalScalingSchedulerPreemption bool
+type ResourceRequestsOptions = helper.ResourceRequestsOptions
+
+// Fits checks if node have enough resources to host the pod.
+func Fits(pod *v1.Pod, nodeInfo fwk.NodeInfo, draManager fwk.SharedDRAManager, opts ResourceRequestsOptions) []InsufficientResource {
+	return helper.Fits(pod, nodeInfo, draManager, opts)
 }
 
-// shouldDelegateResourceToDRA checks if the given resource should be delegated to the DRA plugin.
-// It returns true if:
-//  1. The resource is not a scalar resource in the node's allocatable (not provided by device plugin)
-//  2. A device class mapping exists for the resource in the cache (when draManager is available)
-func shouldDelegateResourceToDRA(rName v1.ResourceName, nodeInfo fwk.NodeInfo, draManager fwk.SharedDRAManager, opts ResourceRequestsOptions) bool {
-	if !opts.EnableDRAExtendedResource {
-		return false
-	}
-
-	if nodeInfo != nil {
-		if allocatable := nodeInfo.GetAllocatable().GetScalarResources()[rName]; allocatable > 0 {
-			return false
-		}
-	}
-
-	if draManager == nil {
-		return false
-	}
-
-	// If draManager is available, check the cache for a mapping
-	cache := draManager.DeviceClassResolver()
-	return cache.GetDeviceClass(rName) != nil
-}
-
-// computePodResourceRequest returns a framework.Resource that covers the largest
-// width in each resource dimension. Because init-containers run sequentially, we collect
-// the max in each dimension iteratively. In contrast, we sum the resource vectors for
-// regular containers since they run simultaneously.
-//
-// # The resources defined for Overhead should be added to the calculated Resource request sum
-//
-// Example:
-//
-// Pod:
-//
-//	InitContainers
-//	  IC1:
-//	    CPU: 2
-//	    Memory: 1G
-//	  IC2:
-//	    CPU: 2
-//	    Memory: 3G
-//	Containers
-//	  C1:
-//	    CPU: 2
-//	    Memory: 1G
-//	  C2:
-//	    CPU: 1
-//	    Memory: 1G
-//
-// Result: CPU: 3, Memory: 3G
 func computePodResourceRequest(pod *v1.Pod, opts ResourceRequestsOptions) *preFilterState {
-	// pod hasn't scheduled yet so we don't need to worry about InPlacePodVerticalScalingEnabled
-	reqs := resource.PodRequests(pod, resource.PodResourcesOptions{
-		// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
-		SkipPodLevelResources:                    !opts.EnablePodLevelResources,
-		UseDRANodeAllocatableResourceClaimStatus: opts.EnableDRANodeAllocatableResources,
-	})
-	result := &preFilterState{}
-	result.SetMaxResource(reqs)
-	return result
+	return &preFilterState{Resource: helper.ComputePodResourceRequest(pod, opts)}
 }
 
 // PreFilter invoked at the prefilter extension point.
 func (f *Fit) PreFilter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) (*fwk.PreFilterResult, *fwk.Status) {
-	result := computePodResourceRequest(pod, ResourceRequestsOptions{EnablePodLevelResources: f.enablePodLevelResources})
+	result := computePodResourceRequest(pod, ResourceRequestsOptions{
+		EnablePodLevelResources: f.enablePodLevelResources,
+		// pod.Spec.NodeName != "" is needed here to exclude any stale status from a previously failed PreBind when the pod is not bound yet and the status is not cleared yet in the assumed pod.
+		EnableDRANodeAllocatableResources: f.enableDRANodeAllocatableResources && pod.Spec.NodeName != "",
+	})
 
 	cycleState.Write(preFilterStateKey, result)
 	return nil, nil
@@ -365,23 +326,13 @@ func (f *Fit) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWithHint, e
 	events := []fwk.ClusterEventWithHint{
 		{Event: fwk.ClusterEvent{Resource: fwk.AssignedPod, ActionType: fwk.Delete}, QueueingHintFn: f.isSchedulableAfterAssignedPodDelete},
 		{Event: fwk.ClusterEvent{Resource: fwk.Node, ActionType: fwk.Add | fwk.UpdateNodeAllocatable}, QueueingHintFn: f.isSchedulableAfterNodeChange},
+		{Event: fwk.ClusterEvent{Resource: fwk.AssignedPod, ActionType: fwk.UpdatePodScaleDown}, QueueingHintFn: f.isSchedulableAfterAssignedPodScaleDown},
+		{Event: fwk.ClusterEvent{Resource: fwk.TargetPod, ActionType: fwk.UpdatePodScaleDown}, QueueingHintFn: f.isSchedulableAfterTargetPodScaleDown},
 	}
 	if f.enableDRAExtendedResource {
 		events = append(events,
 			// A pod might be waiting for an exteneded resurce from a class to get created or modified.
 			fwk.ClusterEventWithHint{Event: fwk.ClusterEvent{Resource: fwk.DeviceClass, ActionType: fwk.Add | fwk.Update}, QueueingHintFn: f.isSchedulableAfterDeviceClassEvent})
-	}
-	if f.enableInPlacePodVerticalScaling {
-		// If InPlacePodVerticalScaling (KEP 1287) is enabled, then UpdatePodScaleDown event should be registered
-		// for this plugin since a Pod update may free up resources that make other Pods schedulable.
-		events = append(events,
-			fwk.ClusterEventWithHint{Event: fwk.ClusterEvent{Resource: fwk.AssignedPod, ActionType: fwk.UpdatePodScaleDown}, QueueingHintFn: f.isSchedulableAfterAssignedPodScaleDown},
-			fwk.ClusterEventWithHint{Event: fwk.ClusterEvent{Resource: fwk.TargetPod, ActionType: fwk.UpdatePodScaleDown}, QueueingHintFn: f.isSchedulableAfterTargetPodScaleDown})
-	}
-	if f.enableInPlacePodVerticalScalingSchedulerPreemption {
-		events = append(events,
-			fwk.ClusterEventWithHint{Event: fwk.ClusterEvent{Resource: fwk.AssignedPod, ActionType: fwk.UpdatePodScaleUp}, QueueingHintFn: f.isSchedulableAfterAssignedPodScaleUp},
-			fwk.ClusterEventWithHint{Event: fwk.ClusterEvent{Resource: fwk.TargetPod, ActionType: fwk.UpdatePodScaleUp}, QueueingHintFn: f.isSchedulableAfterTargetPodScaleUp})
 	}
 	return events, nil
 }
@@ -399,9 +350,13 @@ func (f *Fit) isSchedulableAfterAssignedPodDelete(logger klog.Logger, pod *v1.Po
 		return fwk.QueueSkip, nil
 	}
 
-	if f.enableInPlacePodVerticalScalingSchedulerPreemption && resource.IsPodResizeDeferred(pod) {
-		if deletedPod.Spec.NodeName != pod.Spec.NodeName {
-			logger.V(5).Info("another scheduled pod was deleted, but it's on a different node than the deferred resize pod", "pod", klog.KObj(pod), "deletedPod", klog.KObj(deletedPod))
+	if f.enableInPlacePodVerticalScalingSchedulerPreemption && len(pod.Spec.NodeName) > 0 && resource.IsPodResizeDeferred(pod) {
+		deletedNodeName := deletedPod.Spec.NodeName
+		if deletedNodeName == "" {
+			deletedNodeName = deletedPod.Status.NominatedNodeName
+		}
+		if deletedNodeName != pod.Spec.NodeName {
+			logger.V(5).Info("another scheduled or nominated pod was deleted, but it's on a different node than the deferred resize pod", "pod", klog.KObj(pod), "deletedPod", klog.KObj(deletedPod))
 			return fwk.QueueSkip, nil
 		}
 	}
@@ -414,38 +369,6 @@ func (f *Fit) isSchedulableAfterAssignedPodDelete(logger klog.Logger, pod *v1.Po
 // isSchedulableAfterTargetPodScaleDown is invoked when the target pod is scaled down, making itself schedulable.
 func (f *Fit) isSchedulableAfterTargetPodScaleDown(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
 	logger.V(5).Info("the target pod got scaled down and it may be schedulable now", "pod", klog.KObj(pod))
-	return fwk.Queue, nil
-}
-
-// isSchedulableAfterTargetPodScaleUp is invoked when the target pod is scaled up.
-// Requeuing is necessary because a pod parked in UnschedulableAndUnresolvable (fitting naturally)
-// may exceed available headroom upon scaling up further, requiring preemption to clear space.
-func (f *Fit) isSchedulableAfterTargetPodScaleUp(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
-	if !resource.IsPodResizeDeferred(pod) {
-		logger.V(5).Info("the target pod got scaled up, but it is not a deferred resize pod", "pod", klog.KObj(pod))
-		return fwk.QueueSkip, nil
-	}
-	logger.V(5).Info("the target pod got scaled up, re-evaluating", "pod", klog.KObj(pod))
-	return fwk.Queue, nil
-}
-
-// isSchedulableAfterAssignedPodScaleUp checks if another assigned pod scaled up on the same node.
-// Requeuing is necessary because a competing scale-up can consume the free headroom a parked pod
-// was waiting for, forcing the deferred pod back into active evaluation to initiate preemption.
-func (f *Fit) isSchedulableAfterAssignedPodScaleUp(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
-	_, modifiedPod, err := schedutil.As[*v1.Pod](oldObj, newObj)
-	if err != nil {
-		return fwk.Queue, err
-	}
-	if !resource.IsPodResizeDeferred(pod) {
-		logger.V(5).Info("another assigned pod got scaled up, but target pod is not a deferred resize pod", "pod", klog.KObj(pod), "modifiedPod", klog.KObj(modifiedPod))
-		return fwk.QueueSkip, nil
-	}
-	if modifiedPod.Spec.NodeName != pod.Spec.NodeName {
-		logger.V(5).Info("another assigned pod got scaled up, but on a different node than the deferred resize pod", "pod", klog.KObj(pod), "modifiedPod", klog.KObj(modifiedPod))
-		return fwk.QueueSkip, nil
-	}
-	logger.V(5).Info("another assigned pod got scaled up on the same node as the deferred resize pod, re-evaluating", "pod", klog.KObj(pod), "modifiedPod", klog.KObj(modifiedPod))
 	return fwk.Queue, nil
 }
 
@@ -479,7 +402,7 @@ func (f *Fit) haveEnoughRelevantResourcesDecreased(targetPod *v1.Pod, originalPo
 		return false
 	}
 
-	if f.enableInPlacePodVerticalScalingSchedulerPreemption && resource.IsPodResizeDeferred(targetPod) {
+	if f.enableInPlacePodVerticalScalingSchedulerPreemption && len(targetPod.Spec.NodeName) > 0 && resource.IsPodResizeDeferred(targetPod) {
 		// A pod with deferred resize is already bound to a specific node, so changes to other nodes do not affect its schedulability.
 		if modifiedPod.Spec.NodeName != targetPod.Spec.NodeName {
 			return false
@@ -488,7 +411,11 @@ func (f *Fit) haveEnoughRelevantResourcesDecreased(targetPod *v1.Pod, originalPo
 
 	// the other pod was scheduled, so modification or deletion may free up some resources.
 	originalMaxResourceReq, modifiedMaxResourceReq := &framework.Resource{}, &framework.Resource{}
-	opts := resource.PodResourcesOptions{UseStatusResources: f.enableInPlacePodVerticalScaling, InPlacePodLevelResourcesVerticalScalingEnabled: f.enableInPlacePodLevelResourcesVerticalScaling}
+	opts := resource.PodResourcesOptions{
+		UseStatusResources: true,
+		InPlacePodLevelResourcesVerticalScalingEnabled: f.enableInPlacePodLevelResourcesVerticalScaling,
+		UseExtraNodeAllocatableResources:               f.enableDRANodeAllocatableResources,
+	}
 	originalMaxResourceReq.SetMaxResource(resource.PodRequests(originalPod, opts))
 	modifiedMaxResourceReq.SetMaxResource(resource.PodRequests(modifiedPod, opts))
 
@@ -528,7 +455,7 @@ func (f *Fit) isSchedulableAfterNodeChange(logger klog.Logger, pod *v1.Pod, oldO
 	if err != nil {
 		return fwk.Queue, err
 	}
-	if f.enableInPlacePodVerticalScalingSchedulerPreemption && resource.IsPodResizeDeferred(pod) {
+	if f.enableInPlacePodVerticalScalingSchedulerPreemption && len(pod.Spec.NodeName) > 0 && resource.IsPodResizeDeferred(pod) {
 		// A pod with deferred resize is already bound to a specific node, so changes to other nodes do not affect its schedulability.
 		if modifiedNode.Name != pod.Spec.NodeName {
 			logger.V(5).Info("node was updated, but it is a different node than the deferred resize pod's node", "pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
@@ -544,10 +471,27 @@ func (f *Fit) isSchedulableAfterNodeChange(logger klog.Logger, pod *v1.Pod, oldO
 	opts := ResourceRequestsOptions{
 		EnablePodLevelResources:   f.enablePodLevelResources,
 		EnableDRAExtendedResource: f.enableDRAExtendedResource,
+		// An unbound pod's status entries are stale, so we should not be considering them when
+		// checking whether the node fits the pod.
+		EnableDRANodeAllocatableResources: f.enableDRANodeAllocatableResources && pod.Spec.NodeName != "",
 	}
 
-	// Leaving in the queue, since the pod won't fit into the modified node anyway.
-	if !isFit(pod, modifiedNode, draManager, opts) {
+	// The node's allocatable is insufficient for the pod regardless of what else runs on it.
+	if !fitsEmptyNode(pod, modifiedNode, draManager, opts) {
+		// Check if the pod's nominated node just transitioned from "fitting" to "not fitting"
+		// for native resources (CPU, memory, ephemeral-storage).
+		//
+		// Note: ScalarResources are excluded because device-plugin restarts can transiently drop capacity to 0,
+		// which would cause spurious double-preemptions on the nominated node.
+		// Note: This optimization covers pod-by-pod preemption only. PodGroups waiting
+		// for victims do not benefit because PodGroupEvaluator lacks an "UnschedulableAndUnresolvable" escape path.
+		if pod.Spec.SchedulingGroup == nil &&
+			pod.Status.NominatedNodeName == modifiedNode.Name &&
+			!fitsNativeResourcesOnEmptyNode(pod, modifiedNode, opts) &&
+			fitsEmptyNode(pod, originalNode, draManager, opts) {
+			logger.V(5).Info("nominated node can no longer accommodate the pod, re-queuing so it can preempt elsewhere", "pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
+			return fwk.Queue, nil
+		}
 		logger.V(5).Info("node was created or updated, but it doesn't have enough resource(s) to accommodate this pod", "pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
 		return fwk.QueueSkip, nil
 	}
@@ -632,16 +576,16 @@ func haveAnyRequestedResourcesIncreased(pod *v1.Pod, originalNode, modifiedNode 
 			return true
 		}
 
-		if shouldDelegateResourceToDRA(rName, modifiedNodeInfo, draManager, opts) {
+		if helper.ShouldDelegateResourceToDRA(rName, modifiedNodeInfo, draManager, opts) {
 			return true
 		}
 	}
 	return false
 }
 
-// isFit checks if the pod fits the node. If the node is nil, it returns false.
-// It constructs a fake NodeInfo object for the node and checks if the pod fits the node.
-func isFit(pod *v1.Pod, node *v1.Node, draManager fwk.SharedDRAManager, opts ResourceRequestsOptions) bool {
+// fitsEmptyNode checks whether the pod's resource requests fit within the node's allocatable,
+// ignoring any pods already running on the node.
+func fitsEmptyNode(pod *v1.Pod, node *v1.Node, draManager fwk.SharedDRAManager, opts ResourceRequestsOptions) bool {
 	if node == nil {
 		return false
 	}
@@ -649,6 +593,22 @@ func isFit(pod *v1.Pod, node *v1.Node, draManager fwk.SharedDRAManager, opts Res
 	nodeInfo.SetNode(node)
 
 	return len(Fits(pod, nodeInfo, draManager, opts)) == 0
+}
+
+// fitsNativeResourcesOnEmptyNode checks whether the pod's native resource requests (CPU, memory,
+// ephemeral-storage) fit within the node's allocatable, ignoring any pods already running on the
+// node and ignoring ScalarResources.
+func fitsNativeResourcesOnEmptyNode(pod *v1.Pod, node *v1.Node, opts ResourceRequestsOptions) bool {
+	if node == nil {
+		return false
+	}
+	podRequest := computePodResourceRequest(pod, opts)
+	nodeInfo := framework.NewNodeInfo()
+	nodeInfo.SetNode(node)
+	allocatable := nodeInfo.Allocatable
+	return podRequest.MilliCPU <= allocatable.GetMilliCPU() &&
+		podRequest.Memory <= allocatable.GetMemory() &&
+		podRequest.EphemeralStorage <= allocatable.GetEphemeralStorage()
 }
 
 // Filter invoked at the filter extension point.
@@ -659,6 +619,7 @@ func (f *Fit) Filter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod
 	if err != nil {
 		return fwk.AsStatus(err)
 	}
+	s = f.recomputePodResourceRequestForNode(cycleState, pod, nodeInfo, s)
 
 	var draManager fwk.SharedDRAManager
 	if f.enableDRAExtendedResource {
@@ -671,7 +632,7 @@ func (f *Fit) Filter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod
 		EnableInPlacePodVerticalScalingSchedulerPreemption: f.enableInPlacePodVerticalScalingSchedulerPreemption,
 	}
 
-	insufficientResources := fitsRequest(s, nodeInfo, f.ignoredResources, f.ignoredResourceGroups, draManager, opts, pod)
+	insufficientResources := helper.FitsRequest(&s.Resource, nodeInfo, f.ignoredResources, f.ignoredResourceGroups, draManager, opts, pod)
 
 	if len(insufficientResources) != 0 {
 		// We will keep all failure reasons.
@@ -691,159 +652,28 @@ func (f *Fit) Filter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod
 	return nil
 }
 
-// InsufficientResource describes what kind of resource limit is hit and caused the pod to not fit the node.
-type InsufficientResource struct {
-	ResourceName v1.ResourceName
-	// We explicitly have a parameter for reason to avoid formatting a message on the fly
-	// for common resources, which is expensive for cluster autoscaler simulations.
-	Reason    string
-	Requested int64
-	Used      int64
-	Capacity  int64
-	// Unresolvable indicates whether this node could be schedulable for the pod by the preemption,
-	// which is determined by comparing the node's size and the pod's request.
-	Unresolvable bool
-}
-
-// Fits checks if node have enough resources to host the pod.
-func Fits(pod *v1.Pod, nodeInfo fwk.NodeInfo, draManager fwk.SharedDRAManager, opts ResourceRequestsOptions) []InsufficientResource {
-	return fitsRequest(computePodResourceRequest(pod, opts), nodeInfo, nil, nil, draManager, opts, pod)
-}
-
-func fitsRequest(podRequest *preFilterState, nodeInfo fwk.NodeInfo, ignoredExtendedResources, ignoredResourceGroups sets.Set[string], draManager fwk.SharedDRAManager, opts ResourceRequestsOptions, pod *v1.Pod) []InsufficientResource {
-	insufficientResources := make([]InsufficientResource, 0, 4)
-
-	allowedPodNumber := nodeInfo.GetAllocatable().GetAllowedPodNumber()
-	if len(nodeInfo.GetPods())+1 > allowedPodNumber {
-		insufficientResources = append(insufficientResources, InsufficientResource{
-			ResourceName: v1.ResourcePods,
-			Reason:       "Too many pods",
-			Requested:    1,
-			Used:         int64(len(nodeInfo.GetPods())),
-			Capacity:     int64(allowedPodNumber),
-		})
+// recomputePodResourceRequestForNode recomputes the pod request including the node
+// allocatable resources that other plugins recorded for nodeInfo during Filter.
+// This recomputation is necessary because the other plugins' resource footprint
+// is not known during PreFilter.
+func (f *Fit) recomputePodResourceRequestForNode(cycleState fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo, s *preFilterState) *preFilterState {
+	if !f.enableDRANodeAllocatableResources {
+		return s
 	}
-
-	if podRequest.MilliCPU == 0 &&
-		podRequest.Memory == 0 &&
-		podRequest.EphemeralStorage == 0 &&
-		len(podRequest.ScalarResources) == 0 {
-		return insufficientResources
+	state := framework.GetExtraNodeAllocatableResourcesState(cycleState)
+	if state == nil {
+		return s
 	}
-
-	deltaMilliCPU, deltaMemory, deltaEphemeralStorage, deltaScalarResources := adjustDeltasToAccomodateCacheDiscrepancy(opts, podRequest, nodeInfo, pod)
-
-	if podRequest.MilliCPU > 0 && deltaMilliCPU > (nodeInfo.GetAllocatable().GetMilliCPU()-nodeInfo.GetRequested().GetMilliCPU()) {
-		insufficientResources = append(insufficientResources, InsufficientResource{
-			ResourceName: v1.ResourceCPU,
-			Reason:       "Insufficient cpu",
-			Requested:    podRequest.MilliCPU,
-			Used:         nodeInfo.GetRequested().GetMilliCPU(),
-			Capacity:     nodeInfo.GetAllocatable().GetMilliCPU(),
-			Unresolvable: podRequest.MilliCPU > nodeInfo.GetAllocatable().GetMilliCPU(),
-		})
+	extraResources := state.Get(nodeInfo.Node().Name)
+	if len(extraResources) == 0 {
+		return s
 	}
-	if podRequest.Memory > 0 && deltaMemory > (nodeInfo.GetAllocatable().GetMemory()-nodeInfo.GetRequested().GetMemory()) {
-		insufficientResources = append(insufficientResources, InsufficientResource{
-			ResourceName: v1.ResourceMemory,
-			Reason:       "Insufficient memory",
-			Requested:    podRequest.Memory,
-			Used:         nodeInfo.GetRequested().GetMemory(),
-			Capacity:     nodeInfo.GetAllocatable().GetMemory(),
-			Unresolvable: podRequest.Memory > nodeInfo.GetAllocatable().GetMemory(),
-		})
-	}
-	if podRequest.EphemeralStorage > 0 &&
-		deltaEphemeralStorage > (nodeInfo.GetAllocatable().GetEphemeralStorage()-nodeInfo.GetRequested().GetEphemeralStorage()) {
-		insufficientResources = append(insufficientResources, InsufficientResource{
-			ResourceName: v1.ResourceEphemeralStorage,
-			Reason:       "Insufficient ephemeral-storage",
-			Requested:    podRequest.EphemeralStorage,
-			Used:         nodeInfo.GetRequested().GetEphemeralStorage(),
-			Capacity:     nodeInfo.GetAllocatable().GetEphemeralStorage(),
-			Unresolvable: podRequest.GetEphemeralStorage() > nodeInfo.GetAllocatable().GetEphemeralStorage(),
-		})
-	}
-
-	for rName, rQuant := range deltaScalarResources {
-		// Skip in case request quantity is zero
-		if rQuant == 0 {
-			continue
-		}
-
-		if v1helper.IsExtendedResourceName(rName) {
-			// If this resource is one of the extended resources that should be ignored, we will skip checking it.
-			// rName is guaranteed to have a slash due to API validation.
-			var rNamePrefix string
-			if ignoredResourceGroups.Len() > 0 {
-				rNamePrefix = strings.Split(string(rName), "/")[0]
-			}
-			if ignoredExtendedResources.Has(string(rName)) || ignoredResourceGroups.Has(rNamePrefix) {
-				continue
-			}
-		}
-
-		if shouldDelegateResourceToDRA(rName, nodeInfo, draManager, opts) {
-			continue
-		}
-		if podRequest.ScalarResources[rName] > 0 && rQuant > (nodeInfo.GetAllocatable().GetScalarResources()[rName]-nodeInfo.GetRequested().GetScalarResources()[rName]) {
-			insufficientResources = append(insufficientResources, InsufficientResource{
-				ResourceName: rName,
-				Reason:       fmt.Sprintf("Insufficient %v", rName),
-				Requested:    podRequest.ScalarResources[rName],
-				Used:         nodeInfo.GetRequested().GetScalarResources()[rName],
-				Capacity:     nodeInfo.GetAllocatable().GetScalarResources()[rName],
-				Unresolvable: rQuant > nodeInfo.GetAllocatable().GetScalarResources()[rName],
-			})
-		}
-	}
-
-	return insufficientResources
-}
-
-// adjustDeltasToAccomodateCacheDiscrepancy calculates the resource requests to evaluate
-// for a pod. For an assigned pod, its desired resources are already accounted for in the
-// node cache (max(desired, allocated, actual)), so ideally we only check if the node is
-// overallocated. This function exists to amortize asynchronous discrepancies between the
-// pod info in the scheduling queue and the node snapshot cache.
-func adjustDeltasToAccomodateCacheDiscrepancy(opts ResourceRequestsOptions, podRequest *preFilterState, nodeInfo fwk.NodeInfo, pod *v1.Pod) (int64, int64, int64, map[v1.ResourceName]int64) {
-	deltaMilliCPU := podRequest.MilliCPU
-	deltaMemory := podRequest.Memory
-	deltaEphemeralStorage := podRequest.EphemeralStorage
-	deltaScalarResources := podRequest.ScalarResources
-
-	if !opts.EnableInPlacePodVerticalScalingSchedulerPreemption || pod == nil || len(pod.Spec.NodeName) == 0 || pod.Spec.NodeName != nodeInfo.Node().Name {
-		return deltaMilliCPU, deltaMemory, deltaEphemeralStorage, deltaScalarResources
-	}
-
-	var cachedPodInfo fwk.PodInfo
-	for _, pInfo := range nodeInfo.GetPods() {
-		if pInfo.GetPod().UID == pod.UID {
-			cachedPodInfo = pInfo
-			break
-		}
-	}
-	if cachedPodInfo == nil {
-		return deltaMilliCPU, deltaMemory, deltaEphemeralStorage, deltaScalarResources
-	}
-
-	cachedRes := cachedPodInfo.CalculateResource().Resource
-	// We take max(0, ...) to prevent negative deltas when podRequest < cachedRes (e.g., during scale-down
-	// or asynchronous cache lag). Allowing a negative delta would improperly reduce the node's requested
-	// usage before the Kubelet has actually freed the resources. If a stale larger cachedRes causes
-	// preemption to fail, eventual cache convergence will emit a scale-down event to wake up the pod.
-	deltaMilliCPU = max(0, podRequest.MilliCPU-cachedRes.GetMilliCPU())
-	deltaMemory = max(0, podRequest.Memory-cachedRes.GetMemory())
-	deltaEphemeralStorage = max(0, podRequest.EphemeralStorage-cachedRes.GetEphemeralStorage())
-
-	adjustedScalars := make(map[v1.ResourceName]int64)
-	cachedScalars := cachedRes.GetScalarResources()
-	for rName, rQuant := range podRequest.ScalarResources {
-		adjustedScalars[rName] = max(0, rQuant-cachedScalars[rName])
-	}
-	deltaScalarResources = adjustedScalars
-
-	return deltaMilliCPU, deltaMemory, deltaEphemeralStorage, deltaScalarResources
+	podCopy := *pod
+	podCopy.Status.ExtraNodeAllocatableResources = extraResources
+	return computePodResourceRequest(&podCopy, ResourceRequestsOptions{
+		EnablePodLevelResources:           f.enablePodLevelResources,
+		EnableDRANodeAllocatableResources: true,
+	})
 }
 
 // Score invoked at the Score extension point.
@@ -864,7 +694,8 @@ func (f *Fit) Score(ctx context.Context, state fwk.CycleState, pod *v1.Pod, node
 		}
 	}
 
-	return f.score(ctx, pod, nodeInfo, s.podRequests, s.draPreScoreState)
+	podRequests := f.calculatePodRequestWithExtraNodeAllocatable(state, pod, nodeInfo.Node().Name, s.podRequests)
+	return f.score(ctx, pod, nodeInfo, podRequests, s.draPreScoreState)
 }
 
 // PlacementScoreExtensions is not used by this plugin.

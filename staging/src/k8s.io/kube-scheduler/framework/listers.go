@@ -19,12 +19,12 @@ package framework
 import (
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
-	schedulingapi "k8s.io/api/scheduling/v1beta1"
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/dynamic-resource-allocation/structured"
+	draapi "k8s.io/dynamic-resource-allocation/api"
+	"k8s.io/dynamic-resource-allocation/structured/schedulerapi"
 	"k8s.io/klog/v2"
 )
 
@@ -68,7 +68,7 @@ type SharedLister interface {
 // PodGroupLister provides read access to cached pod group objects.
 type PodGroupLister interface {
 	// Get returns the PodGroup with the given namespace and name.
-	Get(namespace, name string) (*schedulingapi.PodGroup, error)
+	Get(namespace, name string) (*schedulingv1beta1.PodGroup, error)
 }
 
 // MutableSnapshotSharedLister interface represents a lister that allows mutating snapshot and restoring it afterwards.
@@ -102,7 +102,7 @@ type PodGroupStateLister interface {
 // CompositePodGroupLister provides read access to cached composite pod group objects.
 type CompositePodGroupLister interface {
 	// Get returns the CompositePodGroup with the given namespace and name.
-	Get(namespace, name string) (*schedulingv1alpha3.CompositePodGroup, error)
+	Get(namespace, name string) (*schedulingv1beta1.CompositePodGroup, error)
 }
 
 // CompositePodGroupStateLister provides read access to composite pod group states.
@@ -126,7 +126,7 @@ type ResourceSliceLister interface {
 	// k8s.io/dynamic-resource-allocation/resourceslice/tracker provides an implementation
 	// of the necessary logic. That tracker can be instantiated as a replacement for
 	// a normal ResourceSlice informer and provides a ListPatchedResourceSlices method.
-	ListWithDeviceTaintRules() ([]*resourceapi.ResourceSlice, error)
+	ListWithDeviceTaintRules() ([]*draapi.ResourceSlice, error)
 }
 
 // DeviceClassLister can be used to obtain DeviceClasses.
@@ -152,10 +152,10 @@ type ResourceClaimTracker interface {
 	Get(namespace, claimName string) (*resourceapi.ResourceClaim, error)
 	// ListAllAllocatedDevices lists all allocated Devices from allocated ResourceClaims. The result is guaranteed to immediately include
 	// any changes made via AssumeClaimAfterAPICall(), and SignalClaimPendingAllocation().
-	ListAllAllocatedDevices() (sets.Set[structured.DeviceID], error)
+	ListAllAllocatedDevices() (sets.Set[schedulerapi.DeviceID], error)
 	// GatherAllocatedState gathers information about allocated devices from allocated ResourceClaims. The result is guaranteed to immediately include
 	// any changes made via AssumeClaimAfterAPICall(), and SignalClaimPendingAllocation().
-	GatherAllocatedState() (*structured.AllocatedState, error)
+	GatherAllocatedState() (*schedulerapi.AllocatedState, error)
 
 	// SignalClaimPendingAllocation signals to the tracker that the given ResourceClaim will be allocated via an API call in the
 	// binding phase, therefore the given ResourceClaim must be non-nil and have a non-nil Status.Allocation.
@@ -220,10 +220,9 @@ type PodGroupManager interface {
 	CompositePodGroupStates() CompositePodGroupStateLister
 	// CompositePodGroups returns the CompositePodGroupLister.
 	CompositePodGroups() CompositePodGroupLister
-	// BuildHierarchySnapshotFromPod builds a hierarchy snapshot from the given pod.
-	BuildHierarchySnapshotFromPod(pod *v1.Pod) (PodGroupManager, error)
-	// GetRootKeyForGroup returns the root key of the given EntityKey.
-	GetRootKeyForGroup(key EntityKey) (EntityKey, bool, error)
+	// FindRootGroup returns the root *GenericPodGroup for the given EntityKey,
+	// or nil if the root group was not found.
+	FindRootGroup(key EntityKey) (*GenericPodGroup, error)
 }
 
 // PodGroupState provides an interface to view the state of a single pod group.
@@ -251,4 +250,24 @@ type PodGroupState interface {
 type CompositePodGroupState interface {
 	// GetChildren returns the keys of child groups.
 	GetChildren() []EntityKey
+}
+
+// RootGroupReadiness holds the resolved root GenericPodGroup and its readiness state.
+type RootGroupReadiness struct {
+	// RootGroup provides unified access to the underlying root PodGroup or CompositePodGroup object.
+	RootGroup *GenericPodGroup
+	// IsReady is true if the number of ready child groups/pods directly under this root group meets the group
+	// scheduling policy's minimum threshold.
+	IsReady bool
+}
+
+// PodGroupHierarchyTracker provides read access to readiness quorum counts aggregated across
+// PodGroup and CompositePodGroup hierarchies.
+type PodGroupHierarchyTracker interface {
+	// FindRootGroupReadiness traverses parent links from key to locate the root GenericPodGroup in the hierarchy.
+	// If the root group is found, it is returned along with information if the number of its children meets its scheduling policy's
+	// minimum threshold. If the root group cannot be resolved (or does not exist), nil is returned without an error.
+	FindRootGroupReadiness(key EntityKey) (*RootGroupReadiness, error)
+	// AreSameHierarchy checks whether two entities belong to the same hierarchy owned by the same root group.
+	AreSameHierarchy(key1, key2 EntityKey) (bool, error)
 }

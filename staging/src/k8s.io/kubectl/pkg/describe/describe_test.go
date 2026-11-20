@@ -42,6 +42,7 @@ import (
 	policyv1 "k8s.io/api/policy/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	resourcev1 "k8s.io/api/resource/v1"
+	resourcev1alpha3 "k8s.io/api/resource/v1alpha3"
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -734,6 +735,146 @@ func TestDescribePriorityClass(t *testing.T) {
 			for _, expected := range testCase.expect {
 				if !strings.Contains(out, expected) {
 					t.Errorf("expected to find %q in output: %q", expected, out)
+				}
+			}
+		})
+	}
+}
+
+func TestDescribeResourcePoolStatusRequest(t *testing.T) {
+	created := metav1.NewTime(time.Date(2026, 10, 1, 10, 0, 0, 0, time.UTC))
+	completed := metav1.NewTime(created.Add(2 * time.Second))
+	completeCondition := metav1.Condition{
+		Type:               resourcev1alpha3.ResourcePoolStatusRequestConditionComplete,
+		Status:             metav1.ConditionTrue,
+		Reason:             "CalculationComplete",
+		Message:            "Calculated status for 4 pools (1 incomplete)",
+		LastTransitionTime: completed,
+	}
+	request := func(status *resourcev1alpha3.ResourcePoolStatusRequestStatus) *resourcev1alpha3.ResourcePoolStatusRequest {
+		return &resourcev1alpha3.ResourcePoolStatusRequest{
+			ObjectMeta: metav1.ObjectMeta{Name: "gpus", CreationTimestamp: created, Labels: map[string]string{"team": "ml"}},
+			Spec: resourcev1alpha3.ResourcePoolStatusRequestSpec{
+				Driver:                        "gpu.example.com",
+				Limit:                         ptr.To[int32](4),
+				DefaultPartitionTypeAttribute: new("gpu.example.com/profile"),
+			},
+			Status: status,
+		}
+	}
+	quantity := func(s string) *resource.Quantity { q := resource.MustParse(s); return &q }
+
+	testCases := map[string]struct {
+		request   *resourcev1alpha3.ResourcePoolStatusRequest
+		expect    []string
+		notExpect []string
+	}{
+		"pending": {
+			request: request(nil),
+			expect: []string{
+				"Name:", "gpus",
+				"team=ml",
+				"Driver:", "gpu.example.com",
+				"Pool Name:", "<none>",
+				"Limit:", "4",
+				"Default Partition Type Attribute:", "gpu.example.com/profile",
+				"Status:", "Pending",
+			},
+			notExpect: []string{"Conditions:", "Pools:"},
+		},
+		"waiting for pools": {
+			request: request(&resourcev1alpha3.ResourcePoolStatusRequestStatus{
+				PoolCount: new(int32(0)),
+				Conditions: []metav1.Condition{{
+					Type:               resourcev1alpha3.ResourcePoolStatusRequestConditionWaitingForPools,
+					Status:             metav1.ConditionTrue,
+					Reason:             "PoolsIncomplete",
+					LastTransitionTime: created,
+				}},
+			}),
+			expect:    []string{"Status:", "WaitingForPools", "Conditions:", "PoolsIncomplete"},
+			notExpect: []string{"Pool Count:", "Pools:"},
+		},
+		"failed": {
+			request: request(&resourcev1alpha3.ResourcePoolStatusRequestStatus{
+				PoolCount: ptr.To[int32](0),
+				Conditions: []metav1.Condition{{
+					Type:               resourcev1alpha3.ResourcePoolStatusRequestConditionFailed,
+					Status:             metav1.ConditionTrue,
+					Reason:             "CalculationFailed",
+					Message:            "Failed to list ResourceSlices: boom",
+					LastTransitionTime: completed,
+				}},
+			}),
+			expect:    []string{"Status:", "Failed", "CalculationFailed", "Failed to list ResourceSlices: boom"},
+			notExpect: []string{"Partition Summary:", "Shareable Summary:"},
+		},
+		"complete with every pool shape": {
+			request: request(&resourcev1alpha3.ResourcePoolStatusRequestStatus{
+				PoolCount: ptr.To[int32](6),
+				Pools: []resourcev1alpha3.PoolStatus{
+					{
+						Driver: "gpu.example.com", PoolName: "node-1", Generation: 5, NodeName: new("node-1"),
+						ResourceSliceCount: ptr.To[int32](1), TotalDevices: ptr.To[int32](4), AllocatedDevices: ptr.To[int32](2),
+						AvailableDevices: ptr.To[int32](1), UnavailableDevices: ptr.To[int32](1),
+					},
+					{
+						Driver: "gpu.example.com", PoolName: "node-2", Generation: 5,
+						ValidationError: new("PoolIncomplete: pool gpu.example.com/node-2 is incomplete: observed 1/2 slices at generation 5"),
+					},
+					{
+						Driver: "gpu.example.com", PoolName: "node-3", Generation: 7, NodeName: new("node-3"),
+						ResourceSliceCount: ptr.To[int32](2), TotalDevices: ptr.To[int32](3), AllocatedDevices: ptr.To[int32](1),
+						AvailableDevices: ptr.To[int32](2), UnavailableDevices: ptr.To[int32](0),
+						PartitionSummary: []resourcev1alpha3.PartitionTypeStatus{
+							{Attribute: "gpu.example.com/profile", Type: "Full", Total: ptr.To[int32](1), Allocatable: ptr.To[int32](0)},
+							{Attribute: "gpu.example.com/profile", Type: "Half", Total: ptr.To[int32](2), Allocatable: ptr.To[int32](1)},
+						},
+					},
+					{
+						Driver: "gpu.example.com", PoolName: "node-4", Generation: 3, NodeName: new("node-4"),
+						ResourceSliceCount: ptr.To[int32](1), TotalDevices: ptr.To[int32](3), AllocatedDevices: ptr.To[int32](2),
+						AvailableDevices: ptr.To[int32](1), UnavailableDevices: ptr.To[int32](0),
+						ShareableSummary: &resourcev1alpha3.ShareableSummaryStatus{
+							FullyAvailableDevices:     ptr.To[int32](1),
+							PartiallyAvailableDevices: ptr.To[int32](2),
+							Capacity: []resourcev1alpha3.ShareableCapacityStatus{
+								{Name: "cores", Total: quantity("24"), Consumed: quantity("6"), Available: quantity("18")},
+								{Name: "memory", Total: quantity("240Gi"), Consumed: quantity("90Gi"), Available: quantity("150Gi")},
+							},
+						},
+					},
+				},
+				Conditions: []metav1.Condition{completeCondition},
+			}),
+			expect: []string{
+				"Status:", "Complete",
+				"Pool Count:", "6 (showing 4, truncated by limit)",
+				"CalculationComplete", "Calculated status for 4 pools (1 incomplete)",
+				"Pool", "Node", "Generation", "Slices", "Total", "Allocated", "Available", "Unavailable",
+				"node-2", "PoolIncomplete: pool gpu.example.com/node-2 is incomplete: observed 1/2 slices at generation 5",
+				"Partition Summary:", "gpu.example.com/profile", "Full", "Half",
+				"Shareable Summary:", "Fully Available", "In Use", "cores", "memory", "240Gi", "90Gi", "150Gi",
+			},
+		},
+	}
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			fake := fake.NewClientset(tc.request)
+			c := &describeClient{T: t, Interface: fake}
+			d := ResourcePoolStatusRequestDescriber{c}
+			out, err := d.Describe("", tc.request.Name, DescriberSettings{ShowEvents: true})
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			for _, expected := range tc.expect {
+				if !strings.Contains(out, expected) {
+					t.Errorf("expected to find %q in output:\n%s", expected, out)
+				}
+			}
+			for _, unexpected := range tc.notExpect {
+				if strings.Contains(out, unexpected) {
+					t.Errorf("did not expect %q in output:\n%s", unexpected, out)
 				}
 			}
 		})
@@ -1580,6 +1721,81 @@ func TestDescribeContainerPorts(t *testing.T) {
 	}
 }
 
+func TestFormatEndpointSlices(t *testing.T) {
+	endpoint := func(addr string, ready bool) discoveryv1.Endpoint {
+		return discoveryv1.Endpoint{
+			Addresses:  []string{addr},
+			Conditions: discoveryv1.EndpointConditions{Ready: new(ready)},
+		}
+	}
+	ports := []discoveryv1.EndpointPort{{Name: new("http"), Port: new(int32(80))}}
+
+	testCases := []struct {
+		name           string
+		endpointSlices []discoveryv1.EndpointSlice
+		expected       string
+	}{
+		{
+			name:     "no endpoint slices",
+			expected: "<none>",
+		},
+		{
+			name: "three ready endpoints",
+			endpointSlices: []discoveryv1.EndpointSlice{{
+				Ports:     ports,
+				Endpoints: []discoveryv1.Endpoint{endpoint("10.0.0.1", true), endpoint("10.0.0.2", true), endpoint("10.0.0.3", true)},
+			}},
+			expected: "10.0.0.1:80,10.0.0.2:80,10.0.0.3:80",
+		},
+		{
+			name: "three ready endpoints followed by a not ready endpoint",
+			endpointSlices: []discoveryv1.EndpointSlice{{
+				Ports:     ports,
+				Endpoints: []discoveryv1.Endpoint{endpoint("10.0.0.1", true), endpoint("10.0.0.2", true), endpoint("10.0.0.3", true), endpoint("10.0.0.4", false)},
+			}},
+			expected: "10.0.0.1:80,10.0.0.2:80,10.0.0.3:80",
+		},
+		{
+			name: "four ready endpoints",
+			endpointSlices: []discoveryv1.EndpointSlice{{
+				Ports:     ports,
+				Endpoints: []discoveryv1.Endpoint{endpoint("10.0.0.1", true), endpoint("10.0.0.2", true), endpoint("10.0.0.3", true), endpoint("10.0.0.4", true)},
+			}},
+			expected: "10.0.0.1:80,10.0.0.2:80,10.0.0.3:80 + 1 more...",
+		},
+		{
+			name: "not ready endpoints are skipped when counting more",
+			endpointSlices: []discoveryv1.EndpointSlice{{
+				Ports:     ports,
+				Endpoints: []discoveryv1.Endpoint{endpoint("10.0.0.1", false), endpoint("10.0.0.2", true), endpoint("10.0.0.3", true), endpoint("10.0.0.4", true), endpoint("10.0.0.5", false), endpoint("10.0.0.6", true)},
+			}},
+			expected: "10.0.0.2:80,10.0.0.3:80,10.0.0.4:80 + 1 more...",
+		},
+		{
+			name: "headless service with three ready endpoints followed by not ready endpoints",
+			endpointSlices: []discoveryv1.EndpointSlice{{
+				Endpoints: []discoveryv1.Endpoint{endpoint("10.0.0.1", true), endpoint("10.0.0.2", true), endpoint("10.0.0.3", true), endpoint("10.0.0.4", false), endpoint("10.0.0.5", false)},
+			}},
+			expected: "10.0.0.1,10.0.0.2,10.0.0.3",
+		},
+		{
+			name: "headless service with more ready endpoints than shown",
+			endpointSlices: []discoveryv1.EndpointSlice{{
+				Endpoints: []discoveryv1.Endpoint{endpoint("10.0.0.1", true), endpoint("10.0.0.2", true), endpoint("10.0.0.3", true), endpoint("10.0.0.4", false), endpoint("10.0.0.5", true)},
+			}},
+			expected: "10.0.0.1,10.0.0.2,10.0.0.3 + 1 more...",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := formatEndpointSlices(tc.endpointSlices, nil); got != tc.expected {
+				t.Errorf("expected %q, got %q", tc.expected, got)
+			}
+		})
+	}
+}
+
 func TestDescribeContainers(t *testing.T) {
 	trueVal := true
 	testCases := []struct {
@@ -1677,6 +1893,25 @@ func TestDescribeContainers(t *testing.T) {
 				RestartCount: 7,
 			},
 			expectedElements: []string{"test", "State", "Waiting", "Ready", "True", "Restart Count", "7", "Image", "image", "envname", "xyz", "a123\tConfigMap\tOptional: false"},
+		},
+		// Env from a file key (fileKeyRef).
+		{
+			container: corev1.Container{Name: "test", Image: "image", Env: []corev1.EnvVar{{Name: "envname", ValueFrom: &corev1.EnvVarSource{FileKeyRef: &corev1.FileKeySelector{VolumeName: "config", Path: "app.env", Key: "TOKEN"}}}}},
+			status: corev1.ContainerStatus{
+				Name:         "test",
+				Ready:        true,
+				RestartCount: 7,
+			},
+			expectedElements: []string{"test", "State", "Waiting", "Ready", "True", "Restart Count", "7", "Image", "image", "envname:\t<set to the key 'TOKEN' of file 'app.env' in volume 'config'>\tOptional: false"},
+		},
+		{
+			container: corev1.Container{Name: "test", Image: "image", Env: []corev1.EnvVar{{Name: "envname", ValueFrom: &corev1.EnvVarSource{FileKeyRef: &corev1.FileKeySelector{VolumeName: "config", Path: "app.env", Key: "TOKEN", Optional: &trueVal}}}}},
+			status: corev1.ContainerStatus{
+				Name:         "test",
+				Ready:        true,
+				RestartCount: 7,
+			},
+			expectedElements: []string{"test", "State", "Waiting", "Ready", "True", "Restart Count", "7", "Image", "image", "envname:\t<set to the key 'TOKEN' of file 'app.env' in volume 'config'>\tOptional: true"},
 		},
 		{
 			container: corev1.Container{Name: "test", Image: "image", Env: []corev1.EnvVar{{Name: "envname", Value: "xyz"}}, EnvFrom: []corev1.EnvFromSource{{Prefix: "p_", ConfigMapRef: &corev1.ConfigMapEnvSource{LocalObjectReference: corev1.LocalObjectReference{Name: "a123"}}}}},
@@ -6384,6 +6619,26 @@ func TestDescribeNode(t *testing.T) {
 				Phase: corev1.PodRunning,
 			},
 		},
+		&corev1.Pod{
+			Name:      "pod-with-limits",
+			Namespace: "foo",
+			Kind:      "Pod",
+			Spec: corev1.PodSpec{
+				Containers: []corev1.Container{
+					{
+						Name:  "cpu-mem-limits",
+						Image: "image:latest",
+						Resources: corev1.ResourceRequirements{
+							Requests: getResourceList("1", "1Gi"),
+							Limits:   getResourceList("2", "2Gi"),
+						},
+					},
+				},
+			},
+			Status: corev1.PodStatus{
+				Phase: corev1.PodRunning,
+			},
+		},
 		&corev1.EventList{
 			Items: []corev1.Event{
 				{
@@ -6433,8 +6688,8 @@ func TestDescribeNode(t *testing.T) {
   (Total limits may be over 100 percent, i.e., overcommitted.)
   Resource           Requests     Limits
   --------           --------     ------
-  cpu                1 (25%)      2 (50%)
-  memory             1Gi (8%)     2Gi (16%)
+  cpu                2 (50%)      2 (50%)
+  memory             2Gi (16%)    2Gi (16%)
   ephemeral-storage  0 (0%)       0 (0%)
   hugepages-1Gi      0 (0%)       0 (0%)
   hugepages-2Mi      512Mi (25%)  512Mi (25%)`,
@@ -6585,8 +6840,8 @@ func TestDescribeNodeWithSidecar(t *testing.T) {
   (Total limits may be over 100 percent, i.e., overcommitted.)
   Resource           Requests     Limits
   --------           --------     ------
-  cpu                2 (50%)      2 (50%)
-  memory             2Gi (16%)    2Gi (16%)
+  cpu                2 (50%)      0 (0%)
+  memory             2Gi (16%)    0 (0%)
   ephemeral-storage  0 (0%)       0 (0%)
   hugepages-1Gi      0 (0%)       0 (0%)
   hugepages-2Mi      512Mi (25%)  512Mi (25%)`,
@@ -6688,6 +6943,120 @@ func TestDescribeNodeWithPodLevelResources(t *testing.T) {
 		if !strings.Contains(out, expected) {
 			t.Errorf("expected to find %q in output: %q", expected, out)
 		}
+	}
+}
+
+func TestDescribeNodeResource(t *testing.T) {
+	newPod := func(requests, limits corev1.ResourceList, status *corev1.ResourceRequirements) corev1.Pod {
+		pod := corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: "pod-1", Namespace: "foo"},
+			Spec: corev1.PodSpec{
+				Containers: []corev1.Container{{
+					Name:      "container-1",
+					Resources: corev1.ResourceRequirements{Requests: requests, Limits: limits},
+				}},
+			},
+		}
+		if status != nil {
+			pod.Status = corev1.PodStatus{
+				Phase:             corev1.PodRunning,
+				ContainerStatuses: []corev1.ContainerStatus{{Name: "container-1", Resources: status}},
+			}
+		}
+		return pod
+	}
+
+	tests := []struct {
+		name     string
+		node     *corev1.Node
+		pods     []corev1.Pod
+		expected []string
+	}{
+		{
+			name: "node with allocatable resources",
+			node: &corev1.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: "bar"},
+				Status:     corev1.NodeStatus{Allocatable: getResourceList("1", "1Gi")},
+			},
+			pods: []corev1.Pod{newPod(getResourceList("250m", "256Mi"), getResourceList("500m", "512Mi"), nil)},
+			expected: []string{
+				"foo\tpod-1\t\t250m (25%)\t500m (50%)\t256Mi (25%)\t512Mi (50%)\t",
+				"cpu\t250m (25%)\t500m (50%)\n",
+				"memory\t256Mi (25%)\t512Mi (50%)\n",
+			},
+		},
+		{
+			// A node that has not reported capacity or allocatable yet, for
+			// example one registered by hand or whose kubelet has not posted
+			// its status. Percentages must be 0 instead of a division by zero.
+			name: "node without allocatable resources",
+			node: &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "bar"}},
+			pods: []corev1.Pod{newPod(getResourceList("100m", "100Mi"), getResourceList("200m", "200Mi"), nil)},
+			expected: []string{
+				"foo\tpod-1\t\t100m (0%)\t200m (0%)\t100Mi (0%)\t200Mi (0%)\t",
+				"cpu\t100m (0%)\t200m (0%)\n",
+				"memory\t100Mi (0%)\t200Mi (0%)\n",
+			},
+		},
+		{
+			// A pod in the middle of an in-place resize: the spec still asks
+			// for 100m but the container status already reports 500m. The
+			// per-pod row and the "Allocated resources" totals must agree.
+			name: "pod being resized in place",
+			node: &corev1.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: "bar"},
+				Status:     corev1.NodeStatus{Allocatable: getResourceList("1", "1Gi")},
+			},
+			pods: []corev1.Pod{newPod(getResourceList("100m", ""), getResourceList("100m", ""), &corev1.ResourceRequirements{
+				Requests: getResourceList("500m", ""),
+				Limits:   getResourceList("500m", ""),
+			})},
+			expected: []string{
+				"foo\tpod-1\t\t500m (50%)\t500m (50%)\t0 (0%)\t0 (0%)\t",
+				"cpu\t500m (50%)\t500m (50%)\n",
+			},
+		},
+		{
+			name: "pod with extraNodeAllocatableResources",
+			node: &corev1.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: "bar"},
+				Status:     corev1.NodeStatus{Allocatable: getResourceList("1", "1Gi")},
+			},
+			pods: func() []corev1.Pod {
+				p := newPod(getResourceList("100m", "128Mi"), getResourceList("200m", "256Mi"), nil)
+				p.Status.ExtraNodeAllocatableResources = []corev1.ExtraNodeAllocatableResource{
+					{
+						ContainerName: "",
+						Requests:      corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("400m"), corev1.ResourceMemory: resource.MustParse("384Mi")},
+						Limits:        corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("400m"), corev1.ResourceMemory: resource.MustParse("384Mi")},
+					},
+					{
+						ContainerName: "container-1",
+						Requests:      corev1.ResourceList{corev1.ResourceMemory: resource.MustParse("256Mi")},
+						Limits:        corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("400m"), corev1.ResourceMemory: resource.MustParse("384Mi")},
+					},
+				}
+				return []corev1.Pod{p}
+			}(),
+			expected: []string{
+				"foo\tpod-1\t\t500m (50%)\t600m (60%)\t512Mi (50%)\t640Mi (62%)\t",
+				"cpu\t500m (50%)\t600m (60%)\n",
+				"memory\t512Mi (50%)\t640Mi (62%)\n",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			buf := &bytes.Buffer{}
+			describeNodeResource(&corev1.PodList{Items: tt.pods}, tt.node, NewPrefixWriter(buf))
+			out := buf.String()
+			for _, expected := range tt.expected {
+				if !strings.Contains(out, expected) {
+					t.Errorf("expected to find %q in output:\n%s", expected, out)
+				}
+			}
+		})
 	}
 }
 

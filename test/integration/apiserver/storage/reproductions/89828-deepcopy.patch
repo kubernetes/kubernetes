@@ -1,0 +1,96 @@
+diff --git a/staging/src/k8s.io/apiserver/pkg/storage/cacher/delegator.go b/staging/src/k8s.io/apiserver/pkg/storage/cacher/delegator.go
+index 7df76a7f736..27fb86f46a8 100644
+--- a/staging/src/k8s.io/apiserver/pkg/storage/cacher/delegator.go
++++ b/staging/src/k8s.io/apiserver/pkg/storage/cacher/delegator.go
+@@ -115,7 +115,7 @@ func (c *CacheDelegator) Delete(ctx context.Context, key string, out runtime.Obj
+ func (c *CacheDelegator) deleteUsingStore(ctx context.Context, key string, out runtime.Object, preconditions *storage.Preconditions, validateDeletion storage.ValidateObjectFunc, opts storage.DeleteOptions) error {
+ 	// Ignore the caller's suggestion and try to pass down the current version of the object
+ 	// read from cache.
+-	return c.storage.Delete(ctx, key, out, preconditions, validateDeletion, c.cachedSuggestion(ctx, key, preconditions), opts)
++	return c.storage.Delete(ctx, key, out, preconditions, validateDeletion, c.cachedSuggestion(ctx, key, preconditions, true), opts)
+ }
+ 
+ func (c *CacheDelegator) deleteUsingCache(ctx context.Context, key string, out runtime.Object, preconditions *storage.Preconditions, validateDeletion storage.ValidateObjectFunc) error {
+@@ -128,9 +128,10 @@ func (c *CacheDelegator) deleteUsingCache(ctx context.Context, key string, out r
+ 	}
+ 
+ 	d := &txnDelegator{
+-		cacher:  c.cacher,
+-		storage: c.storage,
+-		key:     preparedKey,
++		cacher:       c.cacher,
++		storage:      c.storage,
++		key:          preparedKey,
++		skipDeepCopy: true,
+ 	}
+ 	origState, err := d.getInitialState(ctx, false)
+ 	if err != nil {
+@@ -282,7 +283,7 @@ func (c *CacheDelegator) GuaranteedUpdate(ctx context.Context, key string, desti
+ func (c *CacheDelegator) updateUsingStore(ctx context.Context, key string, destination runtime.Object, ignoreNotFound bool, preconditions *storage.Preconditions, tryUpdate storage.UpdateFunc) error {
+ 	// Ignore the caller's suggestion and try to pass down the current version of the object
+ 	// read from cache.
+-	return c.storage.GuaranteedUpdate(ctx, key, destination, ignoreNotFound, preconditions, tryUpdate, c.cachedSuggestion(ctx, key, preconditions))
++	return c.storage.GuaranteedUpdate(ctx, key, destination, ignoreNotFound, preconditions, tryUpdate, c.cachedSuggestion(ctx, key, preconditions, false))
+ }
+ 
+ func (c *CacheDelegator) updateUsingCache(ctx context.Context, key string, destination runtime.Object, ignoreNotFound bool, preconditions *storage.Preconditions, tryUpdate storage.UpdateFunc) error {
+@@ -316,10 +317,15 @@ func (c *CacheDelegator) updateUsingCache(ctx context.Context, key string, desti
+ 	return storage.GuaranteedUpdate(ctx, d, preparedKey, destination, ignoreNotFound, preconditions, tryUpdate, origState)
+ }
+ 
+-func (c *CacheDelegator) cachedSuggestion(ctx context.Context, key string, preconditions *storage.Preconditions) runtime.Object {
++func (c *CacheDelegator) cachedSuggestion(ctx context.Context, key string, preconditions *storage.Preconditions, skipDeepCopy bool) runtime.Object {
+ 	if obj, exists, err := c.cacher.get(ctx, key, "0", true); err != nil {
+ 		klog.Errorf("GetByKey returned error: %v", err)
+ 	} else if exists && preconditions.Check(key, obj) == nil {
++		if skipDeepCopy {
++			// BUG REVERT (#89828): no DeepCopy, so PrepareObjectForStorage mutates
++			// the live object still held by the watch cache.
++			return obj
++		}
+ 		// DeepCopy the object since we modify resource version when serializing the
+ 		// current object.
+ 		return obj.DeepCopyObject()
+diff --git a/staging/src/k8s.io/apiserver/pkg/storage/cacher/txn_delegator.go b/staging/src/k8s.io/apiserver/pkg/storage/cacher/txn_delegator.go
+index c33c421b85c..2e44d50cc83 100644
+--- a/staging/src/k8s.io/apiserver/pkg/storage/cacher/txn_delegator.go
++++ b/staging/src/k8s.io/apiserver/pkg/storage/cacher/txn_delegator.go
+@@ -26,9 +26,10 @@ import (
+ )
+ 
+ type txnDelegator struct {
+-	cacher  *Cacher
+-	storage txnStorage
+-	key     string
++	cacher       *Cacher
++	storage      txnStorage
++	key          string
++	skipDeepCopy bool
+ }
+ 
+ // txnStorage provides subset of storage.Interface with just Txn operations needed for delegator.
+@@ -48,8 +49,11 @@ func (d *txnDelegator) getInitialState(ctx context.Context, ignoreNotFound bool)
+ 	if !exists {
+ 		return d.GetCurrentState(ctx, ignoreNotFound)
+ 	}
+-	// DeepCopy before GetStateFromObject clears and restores ResourceVersion for encoding.
+-	return storage.GetStateFromObject(d.cacher.versioner, d.cacher.codec, obj.DeepCopyObject(), false)
++	if !d.skipDeepCopy {
++		// DeepCopy before GetStateFromObject clears and restores ResourceVersion for encoding.
++		obj = obj.DeepCopyObject()
++	}
++	return storage.GetStateFromObject(d.cacher.versioner, d.cacher.codec, obj, false)
+ }
+ 
+ // DeleteOnce implements storage.TxnDelegator.
+@@ -111,7 +115,9 @@ func (d *txnDelegator) getStateNotOlderThan(ctx context.Context, resourceVersion
+ 		return nil, err
+ 	}
+ 	if exists {
+-		obj = obj.DeepCopyObject()
++		if !d.skipDeepCopy {
++			obj = obj.DeepCopyObject()
++		}
+ 	} else {
+ 		obj = d.cacher.newFunc()
+ 		if err := runtime.SetZeroValue(obj); err != nil {

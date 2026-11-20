@@ -21,6 +21,7 @@ import (
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/elliptic"
+	"crypto/mldsa"
 	cryptorand "crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
@@ -93,8 +94,8 @@ func LoadOrGenerateKeyFile(keyPath string) (data []byte, wasGenerated bool, err 
 	return generatedData, true, nil
 }
 
-// MarshalPrivateKeyToPEM converts a known private key type of RSA or ECDSA to
-// a PEM encoded block or returns an error.
+// MarshalPrivateKeyToPEM converts a known private key type of RSA, ECDSA or
+// ML-DSA to a PEM encoded block or returns an error.
 func MarshalPrivateKeyToPEM(privateKey crypto.PrivateKey) ([]byte, error) {
 	switch t := privateKey.(type) {
 	case *ecdsa.PrivateKey:
@@ -111,6 +112,16 @@ func MarshalPrivateKeyToPEM(privateKey crypto.PrivateKey) ([]byte, error) {
 		block := &pem.Block{
 			Type:  RSAPrivateKeyBlockType,
 			Bytes: x509.MarshalPKCS1PrivateKey(t),
+		}
+		return pem.EncodeToMemory(block), nil
+	case *mldsa.PrivateKey:
+		derBytes, err := x509.MarshalPKCS8PrivateKey(t)
+		if err != nil {
+			return nil, err
+		}
+		block := &pem.Block{
+			Type:  PrivateKeyBlockType,
+			Bytes: derBytes,
 		}
 		return pem.EncodeToMemory(block), nil
 	default:
@@ -177,7 +188,7 @@ func ParsePrivateKeyPEM(keyData []byte) (interface{}, error) {
 				return key, nil
 			}
 		case PrivateKeyBlockType:
-			// RSA or ECDSA Private Key in unencrypted PKCS#8 format
+			// RSA, ECDSA or ML-DSA Private Key in unencrypted PKCS#8 format
 			if key, err := x509.ParsePKCS8PrivateKey(privateKeyPemBlock.Bytes); err == nil {
 				return key, nil
 			}
@@ -188,10 +199,10 @@ func ParsePrivateKeyPEM(keyData []byte) (interface{}, error) {
 	}
 
 	// we read all the PEM blocks and didn't recognize one
-	return nil, fmt.Errorf("data does not contain a valid RSA or ECDSA private key")
+	return nil, fmt.Errorf("data does not contain a valid RSA, ECDSA or ML-DSA private key")
 }
 
-// ParsePublicKeysPEM is a helper function for reading an array of rsa.PublicKey or ecdsa.PublicKey from a PEM-encoded byte array.
+// ParsePublicKeysPEM is a helper function for reading an array of rsa.PublicKey, ecdsa.PublicKey or mldsa.PublicKey from a PEM-encoded byte array.
 // Reads public keys from both public and private key files.
 func ParsePublicKeysPEM(keyData []byte) ([]interface{}, error) {
 	var block *pem.Block
@@ -220,13 +231,21 @@ func ParsePublicKeysPEM(keyData []byte) ([]interface{}, error) {
 			keys = append(keys, publicKey)
 			continue
 		}
+		if privateKey, err := parseMLDSAPrivateKey(block.Bytes); err == nil {
+			keys = append(keys, privateKey.PublicKey())
+			continue
+		}
+		if publicKey, err := parseMLDSAPublicKey(block.Bytes); err == nil {
+			keys = append(keys, publicKey)
+			continue
+		}
 
 		// tolerate non-key PEM blocks for backwards compatibility
 		// originally, only the first PEM block was parsed and expected to be a key block
 	}
 
 	if len(keys) == 0 {
-		return nil, fmt.Errorf("data does not contain any valid RSA or ECDSA public keys")
+		return nil, fmt.Errorf("data does not contain any valid RSA, ECDSA or ML-DSA public keys")
 	}
 	return keys, nil
 }
@@ -316,6 +335,50 @@ func parseECPrivateKey(data []byte) (*ecdsa.PrivateKey, error) {
 	var ok bool
 	if privKey, ok = parsedKey.(*ecdsa.PrivateKey); !ok {
 		return nil, fmt.Errorf("data doesn't contain valid ECDSA Private Key")
+	}
+
+	return privKey, nil
+}
+
+// parseMLDSAPublicKey parses a single ML-DSA public key from the provided data
+func parseMLDSAPublicKey(data []byte) (*mldsa.PublicKey, error) {
+	var err error
+
+	// Parse the key
+	var parsedKey interface{}
+	if parsedKey, err = x509.ParsePKIXPublicKey(data); err != nil {
+		if cert, err := x509.ParseCertificate(data); err == nil {
+			parsedKey = cert.PublicKey
+		} else {
+			return nil, err
+		}
+	}
+
+	// Test if parsed key is an ML-DSA Public Key
+	var pubKey *mldsa.PublicKey
+	var ok bool
+	if pubKey, ok = parsedKey.(*mldsa.PublicKey); !ok {
+		return nil, fmt.Errorf("data doesn't contain valid ML-DSA Public Key")
+	}
+
+	return pubKey, nil
+}
+
+// parseMLDSAPrivateKey parses a single ML-DSA private key from the provided data
+func parseMLDSAPrivateKey(data []byte) (*mldsa.PrivateKey, error) {
+	var err error
+
+	// Parse the key
+	var parsedKey interface{}
+	if parsedKey, err = x509.ParsePKCS8PrivateKey(data); err != nil {
+		return nil, err
+	}
+
+	// Test if parsed key is an ML-DSA Private Key
+	var privKey *mldsa.PrivateKey
+	var ok bool
+	if privKey, ok = parsedKey.(*mldsa.PrivateKey); !ok {
+		return nil, fmt.Errorf("data doesn't contain valid ML-DSA Private Key")
 	}
 
 	return privKey, nil

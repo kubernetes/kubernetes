@@ -1,4 +1,4 @@
-# socket [![Test Status](https://github.com/mdlayher/socket/workflows/Test/badge.svg)](https://github.com/mdlayher/socket/actions) [![Go Reference](https://pkg.go.dev/badge/github.com/mdlayher/socket.svg)](https://pkg.go.dev/github.com/mdlayher/socket) [![Go Report Card](https://goreportcard.com/badge/github.com/mdlayher/socket)](https://goreportcard.com/report/github.com/mdlayher/socket)
+# socket [![Test Status](https://github.com/mdlayher/socket/workflows/Test/badge.svg)](https://github.com/mdlayher/socket/actions) [![Go Reference](https://pkg.go.dev/badge/github.com/mdlayher/socket.svg)](https://pkg.go.dev/github.com/mdlayher/socket)
 
 Package `socket` provides a low-level network connection type which integrates
 with Go's runtime network poller to provide asynchronous I/O and deadline

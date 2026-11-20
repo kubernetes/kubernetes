@@ -29,9 +29,9 @@ import (
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	resourceapiac "k8s.io/client-go/applyconfigurations/resource/v1"
 	resourceapiacv1beta2 "k8s.io/client-go/applyconfigurations/resource/v1beta2"
+	"k8s.io/client-go/ktesting"
 	draapiv1beta2 "k8s.io/dynamic-resource-allocation/api/v1beta2"
 	drautils "k8s.io/kubernetes/test/e2e/dra/utils"
-	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 )
 
 // resourceClaimDeviceStatus corresponds to testResourceClaimDeviceStatus in test/integration/dra.

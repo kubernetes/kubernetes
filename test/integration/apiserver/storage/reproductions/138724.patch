@@ -1,0 +1,31 @@
+diff --git a/staging/src/k8s.io/apiserver/pkg/storage/cacher/txn_delegator.go b/staging/src/k8s.io/apiserver/pkg/storage/cacher/txn_delegator.go
+index c33c421b85c..b6a3ed1b914 100644
+--- a/staging/src/k8s.io/apiserver/pkg/storage/cacher/txn_delegator.go
++++ b/staging/src/k8s.io/apiserver/pkg/storage/cacher/txn_delegator.go
+@@ -108,6 +108,11 @@ func (d *txnDelegator) GetCurrentState(ctx context.Context, ignoreNotFound bool)
+ func (d *txnDelegator) getStateNotOlderThan(ctx context.Context, resourceVersion string, ignoreNotFound bool) (*storage.ObjState, error) {
+ 	obj, exists, err := d.cacher.get(ctx, d.key, resourceVersion, ignoreNotFound)
+ 	if err != nil {
++		if storage.IsNotFound(err) {
++			// BUG REVERT (#138724): return ResourceVersion=0 on KeyNotFoundError
++			// during Delete/GuaranteedUpdate instead of tracking the cache revision.
++			return nil, storage.NewKeyNotFoundError(d.key, 0)
++		}
+ 		return nil, err
+ 	}
+ 	if exists {
+diff --git a/staging/src/k8s.io/apiserver/pkg/storage/etcd3/store.go b/staging/src/k8s.io/apiserver/pkg/storage/etcd3/store.go
+index 05ae1e5ef8e..2d0f6ce2033 100644
+--- a/staging/src/k8s.io/apiserver/pkg/storage/etcd3/store.go
++++ b/staging/src/k8s.io/apiserver/pkg/storage/etcd3/store.go
+@@ -1164,7 +1164,9 @@ func (s *store) stateFromEtcdResponse(ctx context.Context, kv *mvccpb.KeyValue,
+ 
+ 	if kv == nil {
+ 		if !ignoreNotFound {
+-			return nil, storage.NewKeyNotFoundError(key, rev)
++			// BUG REVERT (#138724): return ResourceVersion=0 on KeyNotFoundError
++			// during Delete/GuaranteedUpdate instead of tracking the etcd revision.
++			return nil, storage.NewKeyNotFoundError(key, 0)
+ 		}
+ 		if err := runtime.SetZeroValue(state.Obj); err != nil {
+ 			return nil, err

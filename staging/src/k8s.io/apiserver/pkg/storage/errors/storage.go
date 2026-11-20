@@ -47,6 +47,9 @@ func InterpretGetError(err error, qualifiedResource schema.GroupResource, name s
 		return errors.NewNotFound(qualifiedResource, name)
 	case storage.IsUnreachable(err):
 		return errors.NewServerTimeout(qualifiedResource, "get", 2) // TODO: make configurable or handled at a higher level
+	case storage.IsInvalidError(err):
+		invalidError, _ := err.(storage.InvalidError)
+		return errors.NewInvalid(schema.GroupKind{Group: qualifiedResource.Group, Kind: qualifiedResource.Resource}, name, invalidError.Errs)
 	case storage.IsInternalError(err):
 		return errors.NewInternalError(err)
 	case storage.IsCorruptObject(err):

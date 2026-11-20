@@ -18,10 +18,13 @@ package openapi3
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
+	"sync"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/openapi"
@@ -54,11 +57,14 @@ type Root interface {
 	GVSpecAsMap(gv schema.GroupVersion) (map[string]interface{}, error)
 }
 
-// root implements the Root interface, and encapsulates the
+// root implements the Root and Resources interfaces, and encapsulates the
 // fields to retrieve, store the parsed OpenAPI V3 root document.
 type root struct {
 	// OpenAPI client to retrieve the OpenAPI V3 documents.
 	client openapi.Client
+
+	mu    sync.Mutex
+	cache map[schema.GroupVersion]*gvCacheEntry
 }
 
 // Validate root implements the Root interface.
@@ -66,6 +72,7 @@ var _ Root = &root{}
 
 // NewRoot returns a structure implementing the Root interface,
 // created with the passed rest client.
+// Prefer NewRootAndResources when GVK-indexed Resources lookups are also needed.
 func NewRoot(client openapi.Client) Root {
 	return &root{client: client}
 }
@@ -127,7 +134,27 @@ func (r *root) retrieveGVBytes(gv schema.GroupVersion) ([]byte, error) {
 	if !found {
 		return nil, &GroupVersionNotFoundError{gv: gv}
 	}
-	return gvOpenAPI.Schema(runtime.ContentTypeJSON)
+	return fetchGVBytes(gv, gvOpenAPI)
+}
+
+// fetchGVBytes downloads the OpenAPI V3 document for gv. A GroupVersion listed
+// in the root document can stop being served before its document is fetched
+// (for example, a CRD deleted or re-created, or an APIService removed, before
+// the server's root listing refreshes), so a 404 or an empty body is reported
+// as *GroupVersionNotFoundError, the same as a GroupVersion missing from the
+// root document.
+func fetchGVBytes(gv schema.GroupVersion, gvOpenAPI openapi.GroupVersion) ([]byte, error) {
+	b, err := gvOpenAPI.Schema(runtime.ContentTypeJSON)
+	if apierrors.IsNotFound(err) {
+		return nil, &GroupVersionNotFoundError{gv: gv, err: err}
+	}
+	if err != nil {
+		return nil, err
+	}
+	if len(b) == 0 {
+		return nil, &GroupVersionNotFoundError{gv: gv, err: errors.New("empty OpenAPI V3 document")}
+	}
+	return b, nil
 }
 
 // gvToAPIPath maps the passed GroupVersion to a relative api
@@ -172,11 +199,20 @@ func pathToGroupVersion(path string) (schema.GroupVersion, error) {
 }
 
 // Encapsulates GroupVersion not found as one of the paths
-// at OpenAPI V3 endpoint.
+// at OpenAPI V3 endpoint, or listed there but not served.
 type GroupVersionNotFoundError struct {
 	gv schema.GroupVersion
+	// err is the underlying cause when the GroupVersion was listed in the
+	// root document but its document was not served; nil otherwise.
+	err error
 }
 
 func (r *GroupVersionNotFoundError) Error() string {
 	return fmt.Sprintf("GroupVersion (%v) not found as OpenAPI V3 path", r.gv)
+}
+
+// Unwrap returns the underlying cause (for example, the server's 404), so
+// callers can still inspect it with errors.Is and errors.As.
+func (r *GroupVersionNotFoundError) Unwrap() error {
+	return r.err
 }

@@ -1,0 +1,19 @@
+diff --git a/staging/src/k8s.io/apiserver/pkg/storage/txn.go b/staging/src/k8s.io/apiserver/pkg/storage/txn.go
+index d082ebe9eb7..36c2db21b6d 100644
+--- a/staging/src/k8s.io/apiserver/pkg/storage/txn.go
++++ b/staging/src/k8s.io/apiserver/pkg/storage/txn.go
+@@ -93,11 +93,9 @@ func ConditionalDelete(ctx context.Context, d TxnDelegator, key string, out runt
+ 			}
+ 		}
+ 		if err := validateDeletion(ctx, origState.Obj); err != nil {
+-			origState, err = refreshOnError(ctx, origState, err, false, d.GetCurrentState)
+-			if err != nil {
+-				return err
+-			}
+-			continue
++			// BUG REVERT (#77619): do not refetch live data when validateDeletion
++			// fails on a stale cached suggestion.
++			return err
+ 		}
+ 
+ 		var success bool

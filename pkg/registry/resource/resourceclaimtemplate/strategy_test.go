@@ -17,6 +17,7 @@ limitations under the License.
 package resourceclaimtemplate
 
 import (
+	"bytes"
 	"context"
 	"testing"
 
@@ -25,6 +26,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apiresource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/version"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -248,7 +250,7 @@ var objWithDerivedAttributesInPrioritizedList = &resource.ResourceClaimTemplate{
 }
 
 var testCapacity = map[resource.QualifiedName]apiresource.Quantity{
-	resource.QualifiedName("test-capacity"): apiresource.MustParse("1"),
+	resource.QualifiedName("test_capacity"): apiresource.MustParse("1"),
 }
 
 var objWithCapacityRequests = func() *resource.ResourceClaimTemplate {
@@ -256,6 +258,17 @@ var objWithCapacityRequests = func() *resource.ResourceClaimTemplate {
 	addSpecDeviceRequestWithCapacityRequests(obj, testCapacity, false)
 	return obj
 }()
+
+// objWithStoredInvalidCapacityName has a capacity request name which was
+// accepted before capacity request names were validated.
+func objWithStoredInvalidCapacityName(prioritizedList bool, finalizers ...string) *resource.ResourceClaimTemplate {
+	obj := obj.DeepCopy()
+	obj.Finalizers = finalizers
+	addSpecDeviceRequestWithCapacityRequests(obj, map[resource.QualifiedName]apiresource.Quantity{
+		"test-capacity": apiresource.MustParse("1"),
+	}, prioritizedList)
+	return obj
+}
 
 func addSpecDeviceRequestWithCapacityRequests(resourceClaimTemplate *resource.ResourceClaimTemplate,
 	capacity map[resource.QualifiedName]apiresource.Quantity, prioritizedListFeature bool) {
@@ -410,6 +423,7 @@ func TestClaimTemplateStrategyCreate(t *testing.T) {
 		"drop-fields-device-taints": {
 			obj:              objWithDeviceTaints,
 			featureOverrides: featuregatetesting.FeatureOverrides{features.DRADeviceTaints: false},
+			emulatedVersion:  "1.37",
 			expectObj:        obj,
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 0 {
@@ -433,7 +447,8 @@ func TestClaimTemplateStrategyCreate(t *testing.T) {
 				features.DRADeviceTaints:    false,
 				features.DRAPrioritizedList: true,
 			},
-			expectObj: objWithPrioritizedList,
+			emulatedVersion: "1.37",
+			expectObj:       objWithPrioritizedList,
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 0 {
 					t.Errorf("expected no action to be taken")
@@ -828,7 +843,8 @@ func TestStrategyUpdate(t *testing.T) {
 				features.DRADeviceTaints:    false,
 				features.DRAPrioritizedList: true,
 			},
-			expectObj: obj,
+			emulatedVersion: "1.37",
+			expectObj:       obj,
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 0 {
 					t.Errorf("expected no action to be taken")
@@ -870,7 +886,8 @@ func TestStrategyUpdate(t *testing.T) {
 				features.DRADeviceTaints:    false,
 				features.DRAPrioritizedList: true,
 			},
-			expectObj: objWithDeviceTaints,
+			emulatedVersion: "1.37",
+			expectObj:       objWithDeviceTaints,
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 0 {
 					t.Errorf("expected no action to be taken")
@@ -884,7 +901,8 @@ func TestStrategyUpdate(t *testing.T) {
 				features.DRADeviceTaints:    false,
 				features.DRAPrioritizedList: true,
 			},
-			expectObj: objWithPrioritizedList,
+			emulatedVersion: "1.37",
+			expectObj:       objWithPrioritizedList,
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 0 {
 					t.Errorf("expected no action to be taken")
@@ -926,7 +944,8 @@ func TestStrategyUpdate(t *testing.T) {
 				features.DRADeviceTaints:    false,
 				features.DRAPrioritizedList: true,
 			},
-			expectObj: objWithDeviceTaintsInPrioritizedList,
+			emulatedVersion: "1.37",
+			expectObj:       objWithDeviceTaintsInPrioritizedList,
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 0 {
 					t.Errorf("expected no action to be taken")
@@ -966,6 +985,32 @@ func TestStrategyUpdate(t *testing.T) {
 				features.DRAConsumableCapacity: false,
 			},
 			expectValidationErrors: []string{fieldImmutableError}, // Spec is immutable.
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+		},
+		"remove-finalizer-with-stored-invalid-capacity-name": {
+			oldObj: objWithStoredInvalidCapacityName(false, "example.com/finalizer"),
+			newObj: objWithStoredInvalidCapacityName(false),
+			featureOverrides: featuregatetesting.FeatureOverrides{
+				features.DRAConsumableCapacity: true,
+			},
+			expectObj: objWithStoredInvalidCapacityName(false),
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+		},
+		"remove-finalizer-with-stored-invalid-capacity-name-in-subrequest": {
+			oldObj: objWithStoredInvalidCapacityName(true, "example.com/finalizer"),
+			newObj: objWithStoredInvalidCapacityName(true),
+			featureOverrides: featuregatetesting.FeatureOverrides{
+				features.DRAConsumableCapacity: true,
+			},
+			expectObj: objWithStoredInvalidCapacityName(true),
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 0 {
 					t.Errorf("expected no action to be taken")
@@ -1148,5 +1193,33 @@ func TestStrategyUpdateWithDerivedAttributes(t *testing.T) {
 			expectObj.ResourceVersion = "4"
 			assert.Equal(t, expectObj, newObj)
 		})
+	}
+}
+
+func TestPrepareForUpdateOpaqueParameters(t *testing.T) {
+	old := obj.DeepCopy()
+	old.ResourceVersion = "1"
+	old.Spec.Spec.Devices.Config = []resource.DeviceClaimConfiguration{{
+		Requests: []string{"req-0"},
+		DeviceConfiguration: resource.DeviceConfiguration{Opaque: &resource.OpaqueDeviceConfiguration{
+			Driver:     "driver.example.com",
+			Parameters: runtime.RawExtension{Raw: []byte(`{"z": 1, "a": "b"}`)},
+		}},
+	}}
+	updated := old.DeepCopy()
+	updated.Labels = map[string]string{"test": "updated"}
+	updated.Spec.Spec.Devices.Config[0].Opaque.Parameters.Raw = []byte(`{"a":"b","z":1}`)
+	strategy := NewStrategy(nil)
+	strategy.PrepareForUpdate(context.Background(), updated, old)
+	if !bytes.Equal(updated.Spec.Spec.Devices.Config[0].Opaque.Parameters.Raw, old.Spec.Spec.Devices.Config[0].Opaque.Parameters.Raw) {
+		t.Error("PrepareForUpdate did not preserve the original opaque parameters")
+	}
+	if errs := strategy.ValidateUpdate(context.Background(), updated, old); len(errs) != 0 {
+		t.Fatalf("metadata-only update rejected: %v", errs)
+	}
+	updated.Spec.Spec.Devices.Requests[0].Exactly.DeviceClassName = "changed"
+	strategy.PrepareForUpdate(context.Background(), updated, old)
+	if errs := strategy.ValidateUpdate(context.Background(), updated, old); len(errs) == 0 {
+		t.Fatal("expected immutable spec validation to reject changed device class")
 	}
 }

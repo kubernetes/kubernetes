@@ -26,6 +26,9 @@ import (
 // +genclient:onlyVerbs=create
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.26
+// +k8s:prerelease-lifecycle-gen:deprecated=1.29
+// +k8s:prerelease-lifecycle-gen:removed=1.32
+// +k8s:prerelease-lifecycle-gen:replacement=authentication.k8s.io,v1,SelfSubjectReview
 
 // SelfSubjectReview contains the user information that the kube-apiserver has about the user making this request.
 // When using impersonation, users will receive the user info of the user being impersonated.  If impersonation or

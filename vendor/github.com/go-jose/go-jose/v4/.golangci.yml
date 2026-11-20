@@ -1,0 +1,53 @@
+# https://github.com/golangci/golangci-lint
+
+run:
+  skip-files:
+    - doc_test.go
+  modules-download-mode: readonly
+
+linters:
+  enable-all: true
+  disable:
+    - gochecknoglobals
+    - goconst
+    - lll
+    - maligned
+    - nakedret
+    - scopelint
+    - unparam
+    - funlen # added in 1.18 (requires go-jose changes before it can be enabled)
+
+linters-settings:
+  gocyclo:
+    min-complexity: 35
+
+issues:
+  exclude-rules:
+    - text: "don't use ALL_CAPS in Go names"
+      linters:
+        - golint
+    - text: "hardcoded credentials"
+      linters:
+        - gosec
+    - text: "weak cryptographic primitive"
+      linters:
+        - gosec
+    - path: json/
+      linters:
+        - dupl
+        - errcheck
+        - gocritic
+        - gocyclo
+        - golint
+        - govet
+        - ineffassign
+        - staticcheck
+        - structcheck
+        - stylecheck
+        - unused
+    - path: _test\.go
+      linters:
+        - scopelint
+    - path: jwk.go
+      linters:
+        - gocyclo

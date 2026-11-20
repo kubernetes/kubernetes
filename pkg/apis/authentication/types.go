@@ -162,7 +162,7 @@ type TokenRequestSpec struct {
 	// ExpirationSeconds is the requested duration of validity of the request. The
 	// token issuer may return a token with a different validity duration so a
 	// client needs to check the 'expiration' field in a response.
-	ExpirationSeconds int64
+	ExpirationSeconds *int64
 
 	// BoundObjectRef is a reference to an object that the token will be bound to.
 	// The token will only be valid for as long as the bound object exists.

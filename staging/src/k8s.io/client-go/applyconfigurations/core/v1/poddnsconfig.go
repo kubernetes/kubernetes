@@ -24,15 +24,15 @@ package v1
 // PodDNSConfig defines the DNS parameters of a pod in addition to
 // those generated from DNSPolicy.
 type PodDNSConfigApplyConfiguration struct {
-	// A list of DNS name server IP addresses.
+	// nameservers is a list of DNS name server IP addresses.
 	// This will be appended to the base nameservers generated from DNSPolicy.
 	// Duplicated nameservers will be removed.
 	Nameservers []string `json:"nameservers,omitempty"`
-	// A list of DNS search domains for host-name lookup.
+	// searches is a list of DNS search domains for host-name lookup.
 	// This will be appended to the base search paths generated from DNSPolicy.
 	// Duplicated search paths will be removed.
 	Searches []string `json:"searches,omitempty"`
-	// A list of DNS resolver options.
+	// options is a list of DNS resolver options.
 	// This will be merged with the base options generated from DNSPolicy.
 	// Duplicated entries will be removed. Resolution options given in Options
 	// will override those that appear in the base DNSPolicy.

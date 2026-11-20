@@ -21,9 +21,9 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/google/cel-go/common/types"
-	"github.com/google/cel-go/common/types/ref"
-	"github.com/google/cel-go/common/types/traits"
+	"cel.dev/cel-go/common/types"
+	"cel.dev/cel-go/common/types/ref"
+	"cel.dev/cel-go/common/types/traits"
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/require"
 
@@ -162,6 +162,39 @@ func TestRuntimeSchemeConvert(t *testing.T) {
 	}
 	if !reflect.DeepEqual(obj, clone) {
 		t.Errorf("unexpected mutation of self-converted Unstructured: obj=%#v, clone=%#v", obj, clone)
+	}
+}
+
+func TestObjectAccessors(t *testing.T) {
+	scheme := initiateScheme(t)
+	attrs := func(obj, oldObj runtime.Object) Attributes {
+		return NewAttributesRecord(obj, oldObj, schema.GroupVersionKind{}, "", "", schema.GroupVersionResource{}, "", "", nil, false, nil)
+	}
+	o := NewObjectInterfacesFromScheme(scheme)
+	origAttrs := attrs(
+		&example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "newpod"}},
+		&example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "oldpod"}},
+	)
+	v1GVK := examplev1.SchemeGroupVersion.WithKind("Pod")
+	versionedAttrs, err := NewVersionedAttributes(origAttrs, v1GVK, o)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	wantObject := &examplev1.Pod{
+		TypeMeta:   metav1.TypeMeta{Kind: "Pod", APIVersion: "example.apiserver.k8s.io/v1"},
+		ObjectMeta: metav1.ObjectMeta{Name: "newpod"},
+	}
+	wantOldObject := &examplev1.Pod{
+		TypeMeta:   metav1.TypeMeta{Kind: "Pod", APIVersion: "example.apiserver.k8s.io/v1"},
+		ObjectMeta: metav1.ObjectMeta{Name: "oldpod"},
+	}
+
+	if diff := cmp.Diff(wantObject, versionedAttrs.GetObject()); diff != "" {
+		t.Errorf("Unexpected GetObject() diff (-want, +got): %s", diff)
+	}
+	if diff := cmp.Diff(wantOldObject, versionedAttrs.GetOldObject()); diff != "" {
+		t.Errorf("Unexpected GetOldObject() diff (-want, +got): %s", diff)
 	}
 }
 

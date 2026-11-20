@@ -43,6 +43,25 @@ func TestStructValidation(t *testing.T) {
 		},
 	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
 		field.Duplicate(field.NewPath("objectMeta", "ownerReferences").Index(1), metav1.OwnerReference{UID: "1", Name: "ref2"}),
+		field.Invalid(field.NewPath("objectMeta", "ownerReferences").Index(0).Child("name"), "ref1", "").WithOrigin("validateFalse"),
+		field.Invalid(field.NewPath("objectMeta", "ownerReferences").Index(1).Child("name"), "ref2", "").WithOrigin("validateFalse"),
+	})
+
+	// Invalid case: duplicate UIDs, with an empty name in the first element.
+	// OwnerReference.Name is itself required, which is not validated here at
+	// all (ObjectMeta is opaque) and must not suppress this struct's own
+	// validations - not for that element, its siblings, or the listMapKey check.
+	st.Value(&Struct{
+		ObjectMeta: metav1.ObjectMeta{
+			OwnerReferences: []metav1.OwnerReference{
+				{UID: "1", Name: ""},
+				{UID: "1", Name: "ref2"},
+			},
+		},
+	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
+		field.Duplicate(field.NewPath("objectMeta", "ownerReferences").Index(1), metav1.OwnerReference{UID: "1", Name: "ref2"}),
+		field.Invalid(field.NewPath("objectMeta", "ownerReferences").Index(0).Child("name"), "", "").WithOrigin("validateFalse"),
+		field.Invalid(field.NewPath("objectMeta", "ownerReferences").Index(1).Child("name"), "ref2", "").WithOrigin("validateFalse"),
 	})
 
 	// Invalid case: duplicate finalizers
@@ -61,5 +80,16 @@ func TestStructValidation(t *testing.T) {
 		},
 	}).ExpectValidateFalseByPath(map[string][]string{
 		"objectMeta.labels": {"labels key error"},
+	})
+
+	// Invalid case: ownerReference name triggers fixed failure
+	st.Value(&Struct{
+		ObjectMeta: metav1.ObjectMeta{
+			OwnerReferences: []metav1.OwnerReference{
+				{UID: "1", Name: "ref1"},
+			},
+		},
+	}).ExpectValidateFalseByPath(map[string][]string{
+		"objectMeta.ownerReferences[0].name": {"ownerReference name error"},
 	})
 }

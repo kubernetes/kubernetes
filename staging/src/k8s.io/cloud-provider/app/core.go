@@ -33,6 +33,7 @@ import (
 	servicecontroller "k8s.io/cloud-provider/controllers/service"
 	controllermanagerapp "k8s.io/controller-manager/app"
 	"k8s.io/controller-manager/controller"
+	cmfeatures "k8s.io/controller-manager/pkg/features"
 	"k8s.io/klog/v2"
 	netutils "k8s.io/utils/net"
 
@@ -44,7 +45,7 @@ func startCloudNodeController(ctx context.Context, initContext ControllerInitCon
 	nodeController, err := cloudnodecontroller.NewCloudNodeController(
 		completedConfig.SharedInformers.Core().V1().Nodes(),
 		// cloud node controller uses existing cluster role from node-controller
-		completedConfig.ClientBuilder.ClientOrDie(initContext.ClientName),
+		clientBuilderFor(controlexContext, completedConfig).ClientOrDie(initContext.ClientName),
 		cloud,
 		completedConfig.ComponentConfig.NodeStatusUpdateFrequency.Duration,
 		completedConfig.ComponentConfig.NodeController.ConcurrentNodeSyncs,
@@ -65,7 +66,7 @@ func startCloudNodeLifecycleController(ctx context.Context, initContext Controll
 	cloudNodeLifecycleController, err := cloudnodelifecyclecontroller.NewCloudNodeLifecycleController(
 		completedConfig.SharedInformers.Core().V1().Nodes(),
 		// cloud node lifecycle controller uses existing cluster role from node-controller
-		completedConfig.ClientBuilder.ClientOrDie(initContext.ClientName),
+		clientBuilderFor(controlexContext, completedConfig).ClientOrDie(initContext.ClientName),
 		cloud,
 		completedConfig.ComponentConfig.NodeLifecycleController.NodeMonitorPeriod.Duration,
 		int(completedConfig.ComponentConfig.NodeLifecycleController.ConcurrentNodeLifecycleSyncs),
@@ -84,7 +85,7 @@ func startServiceController(ctx context.Context, initContext ControllerInitConte
 	// Start the service controller
 	serviceController, err := servicecontroller.New(
 		cloud,
-		completedConfig.ClientBuilder.ClientOrDie(initContext.ClientName),
+		clientBuilderFor(controlexContext, completedConfig).ClientOrDie(initContext.ClientName),
 		completedConfig.SharedInformers.Core().V1().Services(),
 		completedConfig.SharedInformers.Core().V1().Nodes(),
 		completedConfig.ComponentConfig.KubeCloudShared.ClusterName,
@@ -132,7 +133,7 @@ func startRouteController(ctx context.Context, initContext ControllerInitContext
 
 	routeController, err := routecontroller.New(
 		routes,
-		completedConfig.ClientBuilder.ClientOrDie(initContext.ClientName),
+		clientBuilderFor(controlexContext, completedConfig).ClientOrDie(initContext.ClientName),
 		completedConfig.SharedInformers.Core().V1().Nodes(),
 		completedConfig.ComponentConfig.KubeCloudShared.ClusterName,
 		clusterCIDRs,
@@ -162,4 +163,15 @@ func processCIDRs(cidrsList string) ([]*net.IPNet, bool, error) {
 	dualstack, _ := netutils.IsDualStackCIDRs(cidrs)
 
 	return cidrs, dualstack, nil
+}
+
+// clientBuilderFor returns the builder a cloud controller creates its clients
+// with. With LeaderElectionRecovery enabled that is the controller context's
+// builder, which carries the leader election's write gate. Otherwise it is the
+// configured builder, as before the gate existed.
+func clientBuilderFor(controllerContext controllermanagerapp.ControllerContext, completedConfig *config.CompletedConfig) cloudprovider.ControllerClientBuilder {
+	if utilfeature.DefaultFeatureGate.Enabled(cmfeatures.LeaderElectionRecovery) {
+		return controllerContext.ClientBuilder
+	}
+	return completedConfig.ClientBuilder
 }

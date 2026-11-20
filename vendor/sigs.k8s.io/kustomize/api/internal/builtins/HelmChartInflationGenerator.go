@@ -92,6 +92,18 @@ func (p *HelmChartInflationGeneratorPlugin) validateArgs() (err error) {
 		return fmt.Errorf("chart name cannot be empty")
 	}
 
+	// ReleaseName and Name are passed to helm as bare positional arguments
+	// (see AsHelmArgs and pullCommand). A value starting with '-' would be
+	// parsed by helm as a flag instead of a release/chart name, allowing
+	// injection of arbitrary helm flags (e.g. --post-renderer) and
+	// resulting in command execution.
+	if strings.HasPrefix(p.ReleaseName, "-") {
+		return fmt.Errorf("releaseName must not start with '-', got %q", p.ReleaseName)
+	}
+	if strings.HasPrefix(p.Name, "-") {
+		return fmt.Errorf("chart name must not start with '-', got %q", p.Name)
+	}
+
 	// ChartHome might be consulted by the plugin (to read
 	// values files below it), so it must be located under
 	// the loader root (unless root restrictions are
@@ -136,10 +148,8 @@ func (p *HelmChartInflationGeneratorPlugin) errIfIllegalValuesMerge() error {
 		p.ValuesMerge = valuesMergeOptionOverride
 		return nil
 	}
-	for _, opt := range legalMergeOptions {
-		if p.ValuesMerge == opt {
-			return nil
-		}
+	if slices.Contains(legalMergeOptions, p.ValuesMerge) {
+		return nil
 	}
 	return fmt.Errorf("valuesMerge must be one of %v", legalMergeOptions)
 }

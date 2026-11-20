@@ -69,7 +69,6 @@ func init() {
 					}
 
 					gatherer, err := e2edebug.NewResourceUsageGatherer(ctx, f.ClientSet, e2edebug.ResourceGathererOptions{
-						InKubemark:                  framework.ProviderIs("kubemark"),
 						Nodes:                       nodeMode,
 						ResourceDataGatheringPeriod: 60 * time.Second,
 						ProbeDuration:               15 * time.Second,

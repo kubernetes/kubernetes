@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	admissionapi "k8s.io/pod-security-admission/api"
 
+	"k8s.io/client-go/ktesting"
 	"k8s.io/dynamic-resource-allocation/resourceslice"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	"k8s.io/kubernetes/pkg/features"
@@ -42,7 +43,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 )
 
 type draContainerInfo struct {
@@ -202,6 +202,19 @@ var (
 		},
 	}
 
+	ephemeralStorageDevices = []resourceapi.Device{
+		{
+			Name: "device-01",
+			NodeAllocatableResources: map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+				v1.ResourceEphemeralStorage: {
+					Mapping: &resourceapi.NodeAllocatableMapping{
+						DeviceMultiplier: new(resource.MustParse("50Mi")),
+					},
+				},
+			},
+		},
+	}
+
 	res100mCPU1GiCg      = &cgroups.ContainerResources{CPUReq: "100m", CPULim: "200m", MemReq: "1Gi", MemLim: "2Gi"}
 	res1CPU1GiCg         = &cgroups.ContainerResources{CPUReq: "1", CPULim: "2", MemReq: "1Gi", MemLim: "2Gi"}
 	res2CPU2GiCg         = &cgroups.ContainerResources{CPUReq: "2", CPULim: "4", MemReq: "2Gi", MemLim: "4Gi"}
@@ -224,6 +237,11 @@ var (
 			Name: "hugepages-claim",
 		},
 	}
+	claimEphemeralStorage = &resourceapi.ResourceClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "ephemeral-storage-claim",
+		},
+	}
 )
 
 func doNodeAllocatableCgroupsTests(f *framework.Framework) {
@@ -239,6 +257,7 @@ func doNodeAllocatableCgroupsTests(f *framework.Framework) {
 		requiresHugepages                 bool
 		expectedPodHugepagesLimit         string
 		expectedContainerHugepagesLimits  []string // per container
+		expectedPodAllocatedResources     v1.ResourceList
 	}{
 		{
 			name:                 "direct mappings",
@@ -283,15 +302,15 @@ func doNodeAllocatableCgroupsTests(f *framework.Framework) {
 				MemLim: "4396Mi",
 			},
 			expectedContainersCgroup: []cgroups.ContainerResources{
-				// CPU request: 1000m (from spec)
+				// CPU request: 1000m (from spec) + 100m (CPU Claim - PerContainer)
 				// CPU limit: 2000m (from spec) + 100m (CPU Claim - PerContainer) + 100m (CPU Claim - PerPod)
 				// Memory limit: 2048Mi (from spec) + 100Mi (Memory Claim - PerContainer) + 100Mi (Memory Claim - PerPod)
 				// Note: PerPod overhead is counted fully in both the containers, but counted only once at the pod level limiting the overall limit.
-				{CPUReq: "1000m", CPULim: "2200m", MemLim: "2248Mi"},
-				// CPU request: 1000m (from spec)
+				{CPUReq: "1100m", CPULim: "2200m", MemLim: "2248Mi"},
+				// CPU request: 1000m (from spec) + 100m (CPU Claim - PerContainer)
 				// CPU limit: 2000m (from spec) + 100m (CPU Claim - PerContainer) + 100m (CPU Claim - PerPod)
 				// Memory limit: 2048Mi (from spec) + 100Mi (Memory Claim - PerContainer) + 100Mi (Memory Claim - PerPod)
-				{CPUReq: "1000m", CPULim: "2200m", MemLim: "2248Mi"},
+				{CPUReq: "1100m", CPULim: "2200m", MemLim: "2248Mi"},
 			},
 			expectedContainersScoreMemRequest: []int64{1174, 1174}, // 1024 (c1) + 100 (PerContainer) + 100/2 (PerPod) = 1174Mi
 		},
@@ -311,14 +330,14 @@ func doNodeAllocatableCgroupsTests(f *framework.Framework) {
 				MemLim: "5396Mi",
 			},
 			expectedContainersCgroup: []cgroups.ContainerResources{
-				// CPU request: 1000m (from spec)
+				// CPU request: 1000m (from spec) + 100m (CPU Claim - PerContainer)
 				// CPU limit: 2000m (from spec) + 1000m (Direct CPU) + 100m (CPU Claim - PerContainer) + 100m (CPU Claim - PerPod)
 				// Memory limit: 2048Mi (from spec) + 1000Mi (Direct Mem) + 100Mi (Memory Claim - PerContainer) + 100Mi (Memory Claim - PerPod)
-				{CPUReq: "1000m", CPULim: "3200m", MemLim: "3248Mi"},
-				// CPU request: 1000m (from spec)
+				{CPUReq: "1100m", CPULim: "3200m", MemLim: "3248Mi"},
+				// CPU request: 1000m (from spec) + 100m (CPU Claim - PerContainer)
 				// CPU limit: 2000m (from spec) + 1000m (Direct CPU) + 100m (CPU Claim - PerContainer) + 100m (CPU Claim - PerPod)
 				// Memory limit: 2048Mi (from spec) + 1000Mi (Direct Mem) + 100Mi (Memory Claim - PerContainer) + 100Mi (Memory Claim - PerPod)
-				{CPUReq: "1000m", CPULim: "3200m", MemLim: "3248Mi"},
+				{CPUReq: "1100m", CPULim: "3200m", MemLim: "3248Mi"},
 			},
 			expectedContainersScoreMemRequest: []int64{1674, 1674}, // 1024 (c1) + 1000/2 (Direct Mem) + 100 (PerContainer) + 100/2 (PerPod) = 1674Mi
 		},
@@ -338,14 +357,14 @@ func doNodeAllocatableCgroupsTests(f *framework.Framework) {
 				MemLim: "5396Mi",
 			},
 			expectedContainersCgroup: []cgroups.ContainerResources{
-				// CPU request: 1000m (from spec)
+				// CPU request: 1000m (from spec) + 100m (CPU Claim - PerContainer)
 				// CPU limit: 2000m (from spec) + 1000m (Direct CPU) + 100m (CPU Claim - PerContainer) + 100m (CPU Claim - PerPod)
 				// Memory limit: 2048Mi (from spec) + 1000Mi (Direct Mem) + 100Mi (Memory Claim - PerContainer) + 100Mi (Memory Claim - PerPod)
-				{CPUReq: "1000m", CPULim: "3200m", MemLim: "3248Mi"},
-				// CPU request: 1000m (from spec)
+				{CPUReq: "1100m", CPULim: "3200m", MemLim: "3248Mi"},
+				// CPU request: 1000m (from spec) + 100m (CPU Claim - PerContainer)
 				// CPU limit: 2000m (from spec) + 1000m (Direct CPU) + 100m (CPU Claim - PerContainer) + 100m (CPU Claim - PerPod)
 				// Memory limit: 2048Mi (from spec) + 1000Mi (Direct Mem) + 100Mi (Memory Claim - PerContainer) + 100Mi (Memory Claim -PerPod)
-				{CPUReq: "1000m", CPULim: "3200m", MemLim: "3248Mi"},
+				{CPUReq: "1100m", CPULim: "3200m", MemLim: "3248Mi"},
 			},
 			expectedContainersScoreMemRequest: []int64{1674, 1674}, // 1024 (c1) + 1000/2 (Direct Mem) + 100 (PerContainer) + 100/2 (PerPod) = 1674Mi
 		},
@@ -422,14 +441,14 @@ func doNodeAllocatableCgroupsTests(f *framework.Framework) {
 				MemLim: "4096Mi",
 			},
 			expectedContainersCgroup: []cgroups.ContainerResources{
-				// CPU request: 1000m (from spec)
+				// CPU request: 1000m (from spec) + 100m (CPU Claim - PerContainer)
 				// CPU limit: 2000m (from spec) + 100m (CPU Claim - PerContainer) + 100m (CPU Claim - PerPod)
 				// Memory limit: 2048Mi (from spec) + 100Mi (Memory Claim - PerContainer) + 100Mi (Memory Claim - PerPod)
-				{CPUReq: "1000m", CPULim: "2200m", MemLim: "2248Mi"},
-				// CPU request: 1000m (from spec)
+				{CPUReq: "1100m", CPULim: "2200m", MemLim: "2248Mi"},
+				// CPU request: 1000m (from spec) + 100m (CPU Claim - PerContainer)
 				// CPU limit: 2000m (from spec) + 100m (CPU Claim - PerContainer) + 100m (CPU Claim - PerPod)
 				// Memory limit: 2048Mi (from spec) + 100Mi (Memory Claim - PerContainer) + 100Mi (Memory Claim - PerPod)
-				{CPUReq: "1000m", CPULim: "2200m", MemLim: "2248Mi"},
+				{CPUReq: "1100m", CPULim: "2200m", MemLim: "2248Mi"},
 			},
 			expectedContainersScoreMemRequest: []int64{1250, 1250}, // c_effective (1174) + remaining ((2500-2348)/2) = 1174 + 76 = 1250Mi
 		},
@@ -583,6 +602,26 @@ func doNodeAllocatableCgroupsTests(f *framework.Framework) {
 			},
 			expectedContainersScoreMemRequest: []int64{2024, 3024}, // c1: 1024 + 1000Mi = 2024Mi, c2: 1024 + 2000Mi = 3024Mi
 		},
+		{
+			name:                 "ephemeral-storage direct mapping",
+			resourceSliceDevices: ephemeralStorageDevices,
+			containers: []draContainerInfo{
+				{Name: "c1", Resources: &cgroups.ContainerResources{EphStorLim: "10Mi"}, Claims: []*resourceapi.ResourceClaim{claimEphemeralStorage}},
+			},
+			expectedPodCgroup: cgroups.ContainerResources{
+				CPUReq: "",
+				CPULim: "",
+				MemLim: "",
+			},
+			expectedContainersCgroup: []cgroups.ContainerResources{
+				{CPUReq: "", CPULim: "", MemLim: ""},
+			},
+			expectedContainersScoreMemRequest: []int64{0},
+			expectedPodAllocatedResources: v1.ResourceList{
+				// c1 request (10Mi, defaulted from the limit) + direct mapping (50Mi)
+				v1.ResourceEphemeralStorage: resource.MustParse("60Mi"),
+			},
+		},
 	}
 
 	for _, tc := range tests {
@@ -591,13 +630,12 @@ func doNodeAllocatableCgroupsTests(f *framework.Framework) {
 			nodes := drautils.NewNodesNow(tCtx, 1, 4)
 			if tc.requiresHugepages {
 				node, err := f.ClientSet.CoreV1().Nodes().Get(ctx, nodes.NodeNames[0], metav1.GetOptions{})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "get Node %q", nodes.NodeNames[0])
 				if limit, exists := node.Status.Allocatable[v1.ResourceName("hugepages-2Mi")]; !exists || limit.IsZero() {
 					ginkgo.Skip("Skipping hugepages test because Node does not support hugepages-2Mi")
 				}
 			}
 			driver := drautils.NewDriverInstance(tCtx)
-			b := drautils.NewBuilderNow(tCtx, driver)
 
 			// Run driver with these custom devices
 			driverResources := map[string]resourceslice.DriverResources{
@@ -612,6 +650,8 @@ func doNodeAllocatableCgroupsTests(f *framework.Framework) {
 				},
 			}
 			driver.Run(tCtx, framework.TestContext.KubeletRootDir, nodes, driverResources)
+			// Initialize the builder after driver.Run() so LIFO cleanup deletes pods/claims before the driver.
+			b := drautils.NewBuilderNow(tCtx, driver)
 
 			// Create claims and classes
 			createdClaims := createClaims(tCtx, b, tc.containers, tc.unreferencedClaims)
@@ -629,10 +669,11 @@ func doNodeAllocatableCgroupsTests(f *framework.Framework) {
 			// Verify Pod-level cgroups on the node
 			ginkgo.By("verifying pod cgroup limits on the node")
 			err := cgroups.VerifyPodCgroups(ctx, f, pod, &tc.expectedPodCgroup)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "verify pod cgroup values for Pod %q", pod.Name)
 
 			ginkgo.By("verifying containers cgroup limits on the node")
-			onCgroupV2 := cgroups.IsPodOnCgroupv2Node(f, pod.Name, pod.Spec.Containers[0].Name)
+			onCgroupV2, err := cgroups.IsPodOnCgroupv2Node(f, pod, pod.Spec.Containers[0].Name)
+			framework.ExpectNoError(err)
 			for i, container := range pod.Spec.Containers {
 				expectedContainer := &v1.Container{
 					Name:      container.Name,
@@ -642,25 +683,25 @@ func doNodeAllocatableCgroupsTests(f *framework.Framework) {
 					expectedContainer.Resources.Requests = container.Resources.Requests
 				}
 				err = cgroups.VerifyContainerCgroupValues(ctx, f, pod, expectedContainer, onCgroupV2)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "verify container cgroup values for Pod %q", pod.Name)
 			}
 
 			if tc.requiresHugepages {
 				ginkgo.By("verifying pod hugepages limits on the node")
 				err = cgroups.VerifyPodHugepagesLimit(ctx, f, pod, "2MB", tc.expectedPodHugepagesLimit, onCgroupV2)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "verify pod hugepage limits for Pod %q", pod.Name)
 
 				ginkgo.By("verifying containers hugepages limits on the node")
 				for i, container := range pod.Spec.Containers {
 					err = cgroups.VerifyContainerHugepagesLimit(ctx, f, pod, container.Name, "2MB", tc.expectedContainerHugepagesLimits[i], onCgroupV2)
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "verify container hugepage limits for Pod %q", pod.Name)
 				}
 			}
 
 			ginkgo.By("verifying containers oom_score_adj matches QoS rules with overhead")
 			// Retrieve node capacity to check exact adjustment
 			node, err := f.ClientSet.CoreV1().Nodes().Get(ctx, pod.Spec.NodeName, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "get Node %q", pod.Spec.NodeName)
 			nodeMemBytes := node.Status.Capacity.Memory().Value()
 
 			qosClass := v1qos.GetPodQOS(pod)
@@ -675,12 +716,17 @@ func doNodeAllocatableCgroupsTests(f *framework.Framework) {
 					expectedScore = computeExpectedOomScoreAdj(tc.expectedContainersScoreMemRequest[i], nodeMemBytes)
 				}
 				err = cgroups.VerifyOomScoreAdjValue(f, pod, container.Name, fmt.Sprintf("%d", expectedScore))
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "verify container OOM score adjustment for Pod %q", pod.Name)
+			}
+
+			if tc.expectedPodAllocatedResources != nil {
+				ginkgo.By("verifying pod status allocated resources")
+				framework.ExpectNoError(verifyPodStatusResourcesWithDRA(pod, tc.expectedPodAllocatedResources, nil), "verify DRA resource allocations in Pod %q", pod.Name)
 			}
 
 			ginkgo.By("deleting pods")
 			delErr := e2epod.DeletePodWithWait(ctx, f.ClientSet, pod)
-			framework.ExpectNoError(delErr, "failed to delete pod %s", delErr)
+			framework.ExpectNoError(delErr, "delete pod %s", delErr)
 		})
 	}
 }
@@ -697,7 +743,7 @@ func doNodeAllocatableResizeTests(f *framework.Framework) {
 		expectedPodCgroupAfterResize                    cgroups.ContainerResources
 		expectedContainersCgroupAfterResize             []cgroups.ContainerResources // per container
 		expectedPodAllocatedResourcesAfterResize        v1.ResourceList
-		expectedContainersAllocatedResourcesAfterResize []v1.ResourceList
+		expectedContainersAllocatedResourcesAfterResize []v1.ResourceList // ordered by container name to match pod.Status.ContainerStatuses
 	}{
 		{
 			name:                 "direct mappings with resize",
@@ -742,7 +788,7 @@ func doNodeAllocatableResizeTests(f *framework.Framework) {
 			// Memory limit: 3000Mi (from resized spec) + 100Mi (DRA PerPod memory) + 100Mi (DRA PerContainer memory)
 			expectedPodCgroupAfterResize: cgroups.ContainerResources{CPUReq: "1700m", CPULim: "2700m", MemLim: "3200Mi"},
 			expectedContainersCgroupAfterResize: []cgroups.ContainerResources{
-				{CPUReq: "1500m", CPULim: "2700m", MemLim: "3200Mi"},
+				{CPUReq: "1600m", CPULim: "2700m", MemLim: "3200Mi"},
 			},
 			expectedPodAllocatedResourcesAfterResize: v1.ResourceList{
 				v1.ResourceCPU:    resource.MustParse("1700m"),
@@ -843,7 +889,6 @@ func doNodeAllocatableResizeTests(f *framework.Framework) {
 			tCtx := f.TContext(ctx)
 			nodes := drautils.NewNodesNow(tCtx, 1, 4)
 			driver := drautils.NewDriverInstance(tCtx)
-			b := drautils.NewBuilderNow(tCtx, driver)
 
 			driverResources := map[string]resourceslice.DriverResources{
 				nodes.NodeNames[0]: {
@@ -857,6 +902,8 @@ func doNodeAllocatableResizeTests(f *framework.Framework) {
 				},
 			}
 			driver.Run(tCtx, framework.TestContext.KubeletRootDir, nodes, driverResources)
+			// Initialize the builder after driver.Run() so LIFO cleanup deletes pods/claims before the driver.
+			b := drautils.NewBuilderNow(tCtx, driver)
 
 			createdClaims := createClaims(tCtx, b, tc.containers, tc.unreferencedClaims)
 
@@ -885,17 +932,20 @@ func doNodeAllocatableResizeTests(f *framework.Framework) {
 
 			ginkgo.By("patching the pod for resize")
 			patchedPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Patch(ctx, pod.Name, types.StrategicMergePatchType, patch, metav1.PatchOptions{}, "resize")
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "patch Pod %q in namespace %q", pod.Name, f.Namespace.Name)
 
 			ginkgo.By("waiting for resize actuation to complete")
-			resizedPod := podresize.WaitForPodResizeActuation(ctx, f, podClient, pod, desiredContainers)
+			// Pass nil for expectedContainers to skip standard spec-based cgroup/status
+			// checks, as DRA claims inflate cgroup limits and are verified explicitly below.
+			resizedPod := podresize.WaitForPodResizeActuation(ctx, f, podClient, pod, nil)
 
 			ginkgo.By("verifying updated pod cgroup limits after resize")
 			err = cgroups.VerifyPodCgroups(ctx, f, resizedPod, &tc.expectedPodCgroupAfterResize)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "verify pod cgroup values for Pod %q", resizedPod.Name)
 
 			ginkgo.By("verifying updated container cgroup limits after resize")
-			onCgroupV2 := cgroups.IsPodOnCgroupv2Node(f, resizedPod.Name, resizedPod.Spec.Containers[0].Name)
+			onCgroupV2, err := cgroups.IsPodOnCgroupv2Node(f, resizedPod, resizedPod.Spec.Containers[0].Name)
+			framework.ExpectNoError(err)
 			for i, container := range resizedPod.Spec.Containers {
 				expectedContainer := &v1.Container{
 					Name:      container.Name,
@@ -905,18 +955,19 @@ func doNodeAllocatableResizeTests(f *framework.Framework) {
 					expectedContainer.Resources.Requests = container.Resources.Requests
 				}
 				err = cgroups.VerifyContainerCgroupValues(ctx, f, resizedPod, expectedContainer, onCgroupV2)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "verify container cgroup values for Pod %q", resizedPod.Name)
 			}
 
 			ginkgo.By("verifying pod status updates match spec after resize")
-			framework.ExpectNoError(verifyDRAPodLevelStatusResources(resizedPod, tc.expectedPodAllocatedResourcesAfterResize))
+			framework.ExpectNoError(verifyPodStatusResourcesWithDRA(resizedPod, tc.expectedPodAllocatedResourcesAfterResize, tc.expectedContainersAllocatedResourcesAfterResize), "verify DRA resource allocations in Pod %q", resizedPod.Name)
+			framework.ExpectNoError(podresize.VerifyPodRestarts(ctx, f, resizedPod, desiredContainers), "verify container restarts after resize for Pod %q", resizedPod.Name)
 
 			ginkgo.By("verifying pod spec resources after patch")
 			podresize.VerifyPodResources(patchedPod, desiredContainers, desiredPodResources)
 
 			ginkgo.By("deleting pods")
 			delErr := e2epod.DeletePodWithWait(ctx, f.ClientSet, resizedPod)
-			framework.ExpectNoError(delErr, "failed to delete pod %s", delErr)
+			framework.ExpectNoError(delErr, "delete pod %s", delErr)
 		})
 	}
 }
@@ -1014,12 +1065,18 @@ func createClaims(tCtx ktesting.TContext, b *drautils.Builder, containers []draC
 	return createdClaims
 }
 
-func verifyDRAPodLevelStatusResources(gotPod *v1.Pod, wantAllocatedResources v1.ResourceList) error {
+func verifyPodStatusResourcesWithDRA(gotPod *v1.Pod, wantPodAllocatedResources v1.ResourceList, wantContainersAllocatedResources []v1.ResourceList) error {
 	ginkgo.GinkgoHelper()
 	var errs []error
-	if wantAllocatedResources != nil {
-		if err := framework.Gomega().Expect(gotPod.Status.AllocatedResources).To(gomega.BeComparableTo(wantAllocatedResources)); err != nil {
+	if wantPodAllocatedResources != nil {
+		if err := framework.Gomega().Expect(gotPod.Status.AllocatedResources).To(gomega.BeComparableTo(wantPodAllocatedResources)); err != nil {
 			errs = append(errs, fmt.Errorf("pod[%s] status allocatedResources mismatch: %w", gotPod.Name, err))
+		}
+	}
+	for i, wantAllocatedReqs := range wantContainersAllocatedResources {
+		gotCtrStatus := gotPod.Status.ContainerStatuses[i]
+		if err := framework.Gomega().Expect(gotCtrStatus.AllocatedResources).To(gomega.BeComparableTo(wantAllocatedReqs)); err != nil {
+			errs = append(errs, fmt.Errorf("container[%s] status allocatedResources mismatch: %w", gotCtrStatus.Name, err))
 		}
 	}
 	return errors.NewAggregate(errs)

@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"testing"
 
-	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/ktesting"
 )
 
 func TestCanUseIPVSProxier(t *testing.T) {

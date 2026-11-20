@@ -1,3 +1,5 @@
+//go:build !godbus_no_tcp
+
 package dbus
 
 import (

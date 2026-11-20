@@ -20,8 +20,10 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"k8s.io/apimachinery/pkg/api/operation"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/api/validate/constraints"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
@@ -423,6 +425,51 @@ func doTestMinimum[T constraints.Integer](t *testing.T, cases []minimumTestCase[
 	}
 }
 
+func TestMinimumDuration(t *testing.T) {
+	doTestMinimum(t, []minimumTestCase[time.Duration]{{
+		min:   time.Second,
+		value: time.Second,
+	}, {
+		min:   time.Second,
+		value: time.Second - time.Nanosecond,
+		wantErrs: field.ErrorList{
+			field.Invalid(field.NewPath("fldpath"), nil, "must be greater than or equal to 1s").WithOrigin("minimum"),
+		},
+	}})
+}
+
+func TestMinimumQuantity(t *testing.T) {
+	cases := []struct {
+		min      string
+		value    string
+		wantErrs field.ErrorList
+	}{{
+		min:   "1Gi",
+		value: "1024Mi",
+	}, {
+		min:   "1Gi",
+		value: "1073741823",
+		wantErrs: field.ErrorList{
+			field.Invalid(field.NewPath("fldpath"), "1073741823", "must be greater than or equal to 1Gi").WithOrigin("minimum"),
+		},
+	}, {
+		// Value() saturates to the bound here.
+		min:   "-9223372036854775808",
+		value: "-9223372036854775809",
+		wantErrs: field.ErrorList{
+			field.Invalid(field.NewPath("fldpath"), "-9223372036854775809", "must be greater than or equal to -9223372036854775808").WithOrigin("minimum"),
+		},
+	}}
+	matcher := field.ErrorMatcher{}.ByType().ByField().ByValue().ByDetailExact().ByOrigin()
+	for _, tc := range cases {
+		t.Run(fmt.Sprintf("%s >= %s", tc.value, tc.min), func(t *testing.T) {
+			v := resource.MustParse(tc.value)
+			gotErrs := MinimumQuantity(context.Background(), operation.Operation{}, field.NewPath("fldpath"), &v, nil, resource.MustParse(tc.min))
+			matcher.Test(t, tc.wantErrs, gotErrs)
+		})
+	}
+}
+
 func TestMaximum(t *testing.T) {
 	testMaximumPositive[int](t)
 	testMaximumNegative[int](t)
@@ -496,6 +543,51 @@ func doTestMaximum[T constraints.Integer](t *testing.T, cases []maximumTestCase[
 		t.Run(name, func(t *testing.T) {
 			v := tc.value
 			gotErrs := Maximum(context.Background(), operation.Operation{}, field.NewPath("fldpath"), &v, nil, tc.max)
+			matcher.Test(t, tc.wantErrs, gotErrs)
+		})
+	}
+}
+
+func TestMaximumDuration(t *testing.T) {
+	doTestMaximum(t, []maximumTestCase[time.Duration]{{
+		max:   time.Second,
+		value: time.Second,
+	}, {
+		max:   time.Second,
+		value: time.Second + time.Nanosecond,
+		wantErrs: field.ErrorList{
+			field.Invalid(field.NewPath("fldpath"), nil, "must be less than or equal to 1s").WithOrigin("maximum"),
+		},
+	}})
+}
+
+func TestMaximumQuantity(t *testing.T) {
+	cases := []struct {
+		max      string
+		value    string
+		wantErrs field.ErrorList
+	}{{
+		max:   "1Gi",
+		value: "1024Mi",
+	}, {
+		max:   "1Gi",
+		value: "1073741825",
+		wantErrs: field.ErrorList{
+			field.Invalid(field.NewPath("fldpath"), "1073741825", "must be less than or equal to 1Gi").WithOrigin("maximum"),
+		},
+	}, {
+		// Value() saturates to the bound here.
+		max:   "9223372036854775807",
+		value: "9223372036854775808",
+		wantErrs: field.ErrorList{
+			field.Invalid(field.NewPath("fldpath"), "9223372036854775808", "must be less than or equal to 9223372036854775807").WithOrigin("maximum"),
+		},
+	}}
+	matcher := field.ErrorMatcher{}.ByType().ByField().ByValue().ByDetailExact().ByOrigin()
+	for _, tc := range cases {
+		t.Run(fmt.Sprintf("%s <= %s", tc.value, tc.max), func(t *testing.T) {
+			v := resource.MustParse(tc.value)
+			gotErrs := MaximumQuantity(context.Background(), operation.Operation{}, field.NewPath("fldpath"), &v, nil, resource.MustParse(tc.max))
 			matcher.Test(t, tc.wantErrs, gotErrs)
 		})
 	}

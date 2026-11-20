@@ -21,6 +21,7 @@ limitations under the License.
 package loader
 
 import (
+	"context"
 	"fmt"
 
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
@@ -28,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	stagingloader "k8s.io/apiserver/pkg/admission/plugin/webhook/manifest/loader"
+	"k8s.io/apiserver/pkg/registry/rest"
 	admissionregistration "k8s.io/kubernetes/pkg/apis/admissionregistration"
 	admissionregistrationinstall "k8s.io/kubernetes/pkg/apis/admissionregistration/install"
 	"k8s.io/kubernetes/pkg/apis/admissionregistration/validation"
@@ -51,12 +53,14 @@ func init() {
 // and parses them as ValidatingWebhookConfiguration resources.
 // Files containing MutatingWebhookConfiguration cause an error.
 // Files are processed in alphabetical order for deterministic behavior.
+// The returned result is never nil. On error it only carries the Hash of the
+// content that failed to load, which is empty if the content could not be read.
 func LoadValidatingManifests(dir string) (*ValidatingLoadResult, error) {
 	configs, hash, err := stagingloader.LoadManifests(dir, codecs.UniversalDeserializer(), func(obj runtime.Object) ([]*admissionregistrationv1.ValidatingWebhookConfiguration, error) {
 		return acceptObject(obj, extractValidating, defaultAndValidateVWC)
 	})
 	if err != nil {
-		return nil, err
+		return &ValidatingLoadResult{Hash: hash}, err
 	}
 	return &ValidatingLoadResult{Configurations: configs, Hash: hash}, nil
 }
@@ -65,12 +69,14 @@ func LoadValidatingManifests(dir string) (*ValidatingLoadResult, error) {
 // and parses them as MutatingWebhookConfiguration resources.
 // Files containing ValidatingWebhookConfiguration cause an error.
 // Files are processed in alphabetical order for deterministic behavior.
+// The returned result is never nil. On error it only carries the Hash of the
+// content that failed to load, which is empty if the content could not be read.
 func LoadMutatingManifests(dir string) (*MutatingLoadResult, error) {
 	configs, hash, err := stagingloader.LoadManifests(dir, codecs.UniversalDeserializer(), func(obj runtime.Object) ([]*admissionregistrationv1.MutatingWebhookConfiguration, error) {
 		return acceptObject(obj, extractMutating, defaultAndValidateMWC)
 	})
 	if err != nil {
-		return nil, err
+		return &MutatingLoadResult{Hash: hash}, err
 	}
 	return &MutatingLoadResult{Configurations: configs, Hash: hash}, nil
 }
@@ -134,7 +140,9 @@ func defaultAndValidateVWC(config *admissionregistrationv1.ValidatingWebhookConf
 	if err := scheme.Convert(config, internalObj, nil); err != nil {
 		return fmt.Errorf("ValidatingWebhookConfiguration %q: conversion error: %w", config.Name, err)
 	}
-	if errs := validation.ValidateValidatingWebhookConfiguration(internalObj); len(errs) > 0 {
+	errs := validation.ValidateValidatingWebhookConfiguration(internalObj)
+	errs = rest.ValidateDeclarativelyForManifest(context.Background(), scheme, admissionregistrationv1.SchemeGroupVersion, internalObj, errs, rest.DeclarativeValidationConfig{})
+	if len(errs) > 0 {
 		return fmt.Errorf("ValidatingWebhookConfiguration %q: %w", config.Name, errs.ToAggregate())
 	}
 	resultConfig := &admissionregistrationv1.ValidatingWebhookConfiguration{}
@@ -154,7 +162,9 @@ func defaultAndValidateMWC(config *admissionregistrationv1.MutatingWebhookConfig
 	if err := scheme.Convert(config, internalObj, nil); err != nil {
 		return fmt.Errorf("MutatingWebhookConfiguration %q: conversion error: %w", config.Name, err)
 	}
-	if errs := validation.ValidateMutatingWebhookConfiguration(internalObj); len(errs) > 0 {
+	errs := validation.ValidateMutatingWebhookConfiguration(internalObj)
+	errs = rest.ValidateDeclarativelyForManifest(context.Background(), scheme, admissionregistrationv1.SchemeGroupVersion, internalObj, errs, rest.DeclarativeValidationConfig{})
+	if len(errs) > 0 {
 		return fmt.Errorf("MutatingWebhookConfiguration %q: %w", config.Name, errs.ToAggregate())
 	}
 	resultConfig := &admissionregistrationv1.MutatingWebhookConfiguration{}

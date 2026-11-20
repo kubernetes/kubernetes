@@ -21,17 +21,20 @@ import (
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/elliptic"
+	"crypto/mldsa"
 	"crypto/rsa"
 	"encoding/json"
 	"fmt"
 	"net/url"
 	"sync/atomic"
 
-	jose "gopkg.in/go-jose/go-jose.v2"
+	jose "github.com/go-jose/go-jose/v4"
 
 	"k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 const (
@@ -66,15 +69,18 @@ type openidConfig struct {
 func (p *openidConfigProvider) GetConfigJSON() ([]byte, int) {
 	return p.config.Load().configJSON, p.pubKeyGetter.GetCacheAgeMaxSeconds()
 }
+
 func (p *openidConfigProvider) GetKeysetJSON() ([]byte, int) {
 	return p.config.Load().keysetJSON, p.pubKeyGetter.GetCacheAgeMaxSeconds()
 }
+
 func (p *openidConfigProvider) Enqueue() {
 	err := p.Update()
 	if err != nil {
 		klog.ErrorS(err, "failed to update openid config metadata")
 	}
 }
+
 func (p *openidConfigProvider) Update() error {
 	pubKeys := []PublicKey{}
 
@@ -325,6 +331,21 @@ func algorithmFromPublicKey(publicKey crypto.PublicKey) (jose.SignatureAlgorithm
 			return jose.ES512, nil
 		default:
 			return "", fmt.Errorf("unknown private key curve, must be 256, 384, or 521")
+		}
+	case *mldsa.PublicKey:
+		if !utilfeature.DefaultFeatureGate.Enabled(features.ServiceAccountTokenMLDSA) {
+			return "", fmt.Errorf("*mldsa.PrivateKey support is not enabled, must be *rsa.PrivateKey, *ecdsa.PrivateKey, or jose.OpaqueSigner")
+		}
+
+		switch pk.Parameters() {
+		case mldsa.MLDSA44():
+			return jose.MLDSA44, nil
+		case mldsa.MLDSA65():
+			return jose.MLDSA65, nil
+		case mldsa.MLDSA87():
+			return jose.MLDSA87, nil
+		default:
+			return "", fmt.Errorf("unknown ml-dsa key parameters, must be ML-DSA-44, ML-DSA-65, or ML-DSA-87")
 		}
 	case jose.OpaqueSigner:
 		return jose.SignatureAlgorithm(pk.Public().Algorithm), nil

@@ -73,6 +73,7 @@ authentication.k8s.io/v1alpha1 \
 authentication.k8s.io/v1beta1 \
 authorization.k8s.io/v1 \
 authorization.k8s.io/v1beta1 \
+authorization.k8s.io/v1alpha1 \
 autoscaling/v1 \
 autoscaling/v2 \
 batch/v1 \
@@ -124,7 +125,6 @@ internal.apiserver.k8s.io/v1alpha1 \
 KUBE_NONSERVER_GROUP_VERSIONS="
  abac.authorization.kubernetes.io/v0 \
  abac.authorization.kubernetes.io/v1beta1 \
- apidiscovery.k8s.io/v2beta1 \
  apidiscovery.k8s.io/v2 \
  componentconfig/v1alpha1 \
  imagepolicy.k8s.io/v1alpha1\

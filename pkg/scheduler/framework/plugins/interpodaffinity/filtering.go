@@ -23,7 +23,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/component-helpers/resource"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -275,11 +274,14 @@ func (m topologyToMatchedTermCount) clone() topologyToMatchedTermCount {
 }
 
 func (m topologyToMatchedTermCount) update(node *v1.Node, tk string, value int64) {
+	if node == nil {
+		return
+	}
 	if tv, ok := node.Labels[tk]; ok {
 		pair := topologyPair{key: tk, value: tv}
 		m[pair] += value
 		// value could be negative, hence we delete the entry if it is down to zero.
-		if m[pair] == 0 {
+		if m[pair] <= 0 {
 			delete(m, pair)
 		}
 	}
@@ -318,6 +320,9 @@ type topologyPairCount struct {
 }
 
 func (m *topologyToMatchedTermCountList) recordMatch(node *v1.Node, tk string, value int64) {
+	if node == nil {
+		return
+	}
 	if tv, ok := node.Labels[tk]; ok {
 		pair := topologyPair{key: tk, value: tv}
 		*m = append(*m, topologyPairCount{
@@ -350,26 +355,31 @@ func (m *topologyToMatchedTermCountList) appendWithAntiAffinityTerms(terms []fwk
 }
 
 // podMatchesAllAffinityTerms returns true if the given terms list is not empty and given pod matches all the given terms.
-// Useful for checking affinity. For anti-affinity, use podMatchesAnyAffinityTerms.
+// It assumes the terms have already had NamespaceSelector unrolled into Namespaces.
+// For anti-affinity, use podMatchesAnyAffinityTermsWithNSLabels.
 func podMatchesAllAffinityTerms(terms []fwk.AffinityTerm, pod *v1.Pod) bool {
+	return podMatchesAllAffinityTermsWithNSLabels(terms, pod, nil)
+}
+
+// podMatchesAllAffinityTermsWithNSLabels reports whether the pod matches all
+// terms, using nsLabels when the terms have not been unrolled into Namespaces.
+func podMatchesAllAffinityTermsWithNSLabels(terms []fwk.AffinityTerm, pod *v1.Pod, nsLabels labels.Set) bool {
 	if len(terms) == 0 {
 		return false
 	}
 	for _, t := range terms {
-		// The incoming pod NamespaceSelector was merged into the Namespaces set, and so
-		// we are not explicitly passing in namespace labels.
-		if !t.Matches(pod, nil) {
+		if !t.Matches(pod, nsLabels) {
 			return false
 		}
 	}
 	return true
 }
 
-// podMatchesAnyAffinityTerms returns true if the given pod matches any of the given terms.
-// Useful for checking anti-affinity.
-func podMatchesAnyAffinityTerms(terms []fwk.AffinityTerm, pod *v1.Pod) bool {
+// podMatchesAnyAffinityTermsWithNSLabels reports whether the pod matches any
+// term, using nsLabels when the terms have not been unrolled into Namespaces.
+func podMatchesAnyAffinityTermsWithNSLabels(terms []fwk.AffinityTerm, pod *v1.Pod, nsLabels labels.Set) bool {
 	for _, t := range terms {
-		if t.Matches(pod, nil) {
+		if t.Matches(pod, nsLabels) {
 			return true
 		}
 	}
@@ -503,9 +513,6 @@ func (pl *InterPodAffinity) getIncomingAffinityAntiAffinityCounts(ctx context.Co
 // Finally, if no global tracking maps were populated, no host-scoped evaluation is needed, and the incoming pod
 // has no terms of its own, PreFilter returns `fwk.Skip` to completely bypass this plugin during the Filter phase.
 func (pl *InterPodAffinity) PreFilter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, allNodes []fwk.NodeInfo) (*fwk.PreFilterResult, *fwk.Status) {
-	if pl.enableInPlacePodVerticalScalingSchedulerPreemption && resource.IsPodResizeDeferred(pod) {
-		return nil, fwk.NewStatus(fwk.Skip)
-	}
 	s := &preFilterState{
 		enableInterPodAffinityHostnameFastPath: pl.enableInterPodAffinityHostnameFastPath,
 	}
@@ -820,9 +827,6 @@ func satisfiesSelfAffinityCheck(state *preFilterState, nodeInfo fwk.NodeInfo) bo
 //     - Dynamically iterates over the local node's pods that have host-scoped anti-affinity to see if
 //     they reject the incoming pod.
 func (pl *InterPodAffinity) Filter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
-	if pl.enableInPlacePodVerticalScalingSchedulerPreemption && resource.IsPodResizeDeferred(pod) {
-		return nil
-	}
 
 	state, err := getPreFilterState(cycleState)
 	if err != nil {

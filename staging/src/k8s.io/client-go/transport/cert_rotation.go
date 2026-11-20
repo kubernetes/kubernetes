@@ -57,7 +57,10 @@ func certRotatingDialer(logger klog.Logger, reload reloadFunc, dial utilnet.Dial
 		connDialer: connrotation.NewDialer(connrotation.DialFunc(dial)),
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
-			workqueue.TypedRateLimitingQueueConfig[string]{Name: "DynamicClientCertificate"},
+			workqueue.TypedRateLimitingQueueConfig[string]{
+				Logger: &logger,
+				Name:   "DynamicClientCertificate",
+			},
 		),
 	}
 

@@ -20,18 +20,20 @@ package internal
 // See https://github.com/kubernetes/kubernetes/issues/133161.
 
 import (
+	"iter"
+
 	resourceapi "k8s.io/api/resource/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/dynamic-resource-allocation/structured/schedulerapi"
+	"k8s.io/utils/ptr"
 )
 
 // Type aliases pointing to the schedulerapi package where the actual
 // definitions are maintained. This ensures that any changes to these types
 // require autoscaler approval.
 type DeviceID = schedulerapi.DeviceID
-type SharedDeviceID = schedulerapi.SharedDeviceID
 type AllocatedState = schedulerapi.AllocatedState
 type ConsumedCapacity = schedulerapi.ConsumedCapacity
 type ConsumedCapacityCollection = schedulerapi.ConsumedCapacityCollection
@@ -42,20 +44,12 @@ func MakeDeviceID(driver, pool, device string) DeviceID {
 	return schedulerapi.MakeDeviceID(driver, pool, device)
 }
 
-func MakeSharedDeviceID(deviceID DeviceID, shareID *types.UID) SharedDeviceID {
-	return schedulerapi.MakeSharedDeviceID(deviceID, shareID)
-}
-
 func NewConsumedCapacity() ConsumedCapacity {
 	return schedulerapi.NewConsumedCapacity()
 }
 
 func NewConsumedCapacityCollection() ConsumedCapacityCollection {
 	return schedulerapi.NewConsumedCapacityCollection()
-}
-
-func NewDeviceConsumedCapacity(deviceID DeviceID, consumedCapacity map[resourceapi.QualifiedName]resource.Quantity) DeviceConsumedCapacity {
-	return schedulerapi.NewDeviceConsumedCapacity(deviceID, consumedCapacity)
 }
 
 // IsDeviceAllocated checks if a device is allocated, considering both fully allocated devices
@@ -67,11 +61,8 @@ func IsDeviceAllocated(deviceID DeviceID, allocatedState *AllocatedState) bool {
 	}
 
 	// Check if device is partially consumed via shared allocations (consumable capacity case).
-	// We need to check if any shared device ID corresponds to our device.
-	for sharedDeviceID := range allocatedState.AllocatedSharedDeviceIDs {
-		if sharedDeviceID.GetDeviceID() == deviceID {
-			return true
-		}
+	if allocatedState.AllocatedSharedDeviceIDs.Has(deviceID) {
+		return true
 	}
 
 	// For scheduler-generated state, consumed capacity is recorded together with
@@ -89,4 +80,91 @@ func IsDeviceAllocated(deviceID DeviceID, allocatedState *AllocatedState) bool {
 func GenerateShareID() *types.UID {
 	newUID := uuid.NewUUID()
 	return &newUID
+}
+
+// ForEachAllocatedDevice implements structured.ForEachAllocatedDevice.
+func ForEachAllocatedDevice(allocation *resourceapi.AllocationResult,
+	dedicatedDeviceCallback func(deviceID DeviceID),
+	enabledConsumableCapacity bool,
+	sharedDeviceCallback func(schedulerapi.SharedDeviceID),
+	consumedCapacityCallback func(DeviceConsumedCapacity)) {
+	if allocation == nil {
+		return
+	}
+	for _, result := range allocation.Devices.Results {
+		// Kubernetes 1.31 did not set this, 1.32 always does.
+		// Supporting 1.31 is not worth the additional code that
+		// would have to be written (= looking up in request) because
+		// it is extremely unlikely that there really is a result
+		// that still exists in a cluster from 1.31 where this matters.
+		if ptr.Deref(result.AdminAccess, false) {
+			// Is not considered as allocated.
+			continue
+		}
+		deviceID := MakeDeviceID(result.Driver, result.Pool, result.Device)
+
+		// None of the users of this helper need to abort iterating,
+		// therefore it's not supported as it only would add overhead.
+
+		// Execute sharedDeviceCallback and consumedCapacityCallback correspondingly
+		// if DRAConsumableCapacity feature is enabled
+		if enabledConsumableCapacity {
+			shared := result.ShareID != nil
+			if shared {
+				sharedDeviceID := schedulerapi.MakeSharedDeviceID(deviceID, result.ShareID)
+				sharedDeviceCallback(sharedDeviceID)
+				if result.ConsumedCapacity != nil {
+					deviceConsumedCapacity := schedulerapi.NewDeviceConsumedCapacity(deviceID, result.ConsumedCapacity)
+					consumedCapacityCallback(deviceConsumedCapacity)
+				}
+				continue
+			}
+		}
+
+		// Otherwise, execute dedicatedDeviceCallback
+		dedicatedDeviceCallback(deviceID)
+	}
+}
+
+// AddToAllocatedState implements structured.AddToAllocatedState.
+func AddToAllocatedState(state *AllocatedState, allocations iter.Seq[*resourceapi.AllocationResult], features Features) {
+	if state.AllocatedDevices == nil {
+		state.AllocatedDevices = sets.New[DeviceID]()
+	}
+	if state.AllocatedSharedDeviceIDs == nil {
+		state.AllocatedSharedDeviceIDs = sets.New[DeviceID]()
+	}
+	if state.AggregatedCapacity == nil {
+		state.AggregatedCapacity = NewConsumedCapacityCollection()
+	}
+	for allocation := range allocations {
+		ForEachAllocatedDevice(allocation,
+			func(deviceID DeviceID) {
+				state.AllocatedDevices.Insert(deviceID)
+			},
+			features.ConsumableCapacity,
+			func(sharedDeviceID schedulerapi.SharedDeviceID) {
+				state.AllocatedSharedDeviceIDs.Insert(sharedDeviceID.GetDeviceID())
+			},
+			func(capacity DeviceConsumedCapacity) {
+				state.AggregatedCapacity.Insert(capacity)
+			},
+		)
+		if !features.SharedConsumableCapacity || allocation == nil {
+			continue
+		}
+		for _, result := range allocation.Devices.Results {
+			if ptr.Deref(result.AdminAccess, false) {
+				continue
+			}
+			id := MakeDeviceID(result.Driver, result.Pool, result.Device)
+			if len(result.ConsumedCounters) == 0 {
+				continue
+			}
+			if state.ConsumedCounters == nil {
+				state.ConsumedCounters = make(schedulerapi.CounterConsumptionByDevice)
+			}
+			state.ConsumedCounters.Add(id, result.ConsumedCounters)
+		}
+	}
 }

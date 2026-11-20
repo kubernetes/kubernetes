@@ -118,13 +118,16 @@ func (podStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object
 	}
 
 	podutil.DropDisabledPodFields(newPod, oldPod)
+	// The field is immutable on Pods; this only lets clients that do not know
+	// it send full updates of pods that set it.
+	podutil.SyncPodNetworkOnUpdate(&newPod.Spec, &oldPod.Spec)
 	updatePodGeneration(newPod, oldPod)
 }
 
 // Validate validates a new pod.
 func (podStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	pod := obj.(*api.Pod)
-	opts := podutil.GetValidationOptionsFromPodSpecAndMeta(&pod.Spec, nil, &pod.ObjectMeta, nil)
+	opts := corevalidation.GetValidationOptionsFromPodSpecAndMeta(&pod.Spec, nil, &pod.ObjectMeta, nil)
 	opts.ResourceIsPod = true
 	return corevalidation.ValidatePodCreate(pod, opts)
 }
@@ -154,7 +157,7 @@ func (podStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) 
 	// Allow downward api usage of hugepages on pod update if feature is enabled or if the old pod already had used them.
 	pod := obj.(*api.Pod)
 	oldPod := old.(*api.Pod)
-	opts := podutil.GetValidationOptionsFromPodSpecAndMeta(&pod.Spec, &oldPod.Spec, &pod.ObjectMeta, &oldPod.ObjectMeta)
+	opts := corevalidation.GetValidationOptionsFromPodSpecAndMeta(&pod.Spec, &oldPod.Spec, &pod.ObjectMeta, &oldPod.ObjectMeta)
 	opts.ResourceIsPod = true
 	return corevalidation.ValidatePodUpdate(obj.(*api.Pod), old.(*api.Pod), opts)
 }
@@ -249,8 +252,8 @@ func (podStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 	if newPod.Status.ExtendedResourceClaimStatus == nil && oldPod.Status.ExtendedResourceClaimStatus != nil {
 		newPod.Status.ExtendedResourceClaimStatus = oldPod.Status.ExtendedResourceClaimStatus
 	}
-	if newPod.Status.NodeAllocatableResourceClaimStatuses == nil && oldPod.Status.NodeAllocatableResourceClaimStatuses != nil {
-		newPod.Status.NodeAllocatableResourceClaimStatuses = oldPod.Status.NodeAllocatableResourceClaimStatuses
+	if newPod.Status.ExtraNodeAllocatableResources == nil && oldPod.Status.ExtraNodeAllocatableResources != nil {
+		newPod.Status.ExtraNodeAllocatableResources = oldPod.Status.ExtraNodeAllocatableResources
 	}
 
 	preserveOldObservedGeneration(newPod, oldPod)
@@ -288,7 +291,7 @@ func preserveOldObservedGeneration(newPod, oldPod *api.Pod) {
 func (podStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	pod := obj.(*api.Pod)
 	oldPod := old.(*api.Pod)
-	opts := podutil.GetValidationOptionsFromPodSpecAndMeta(&pod.Spec, &oldPod.Spec, &pod.ObjectMeta, &oldPod.ObjectMeta)
+	opts := corevalidation.GetValidationOptionsFromPodSpecAndMeta(&pod.Spec, &oldPod.Spec, &pod.ObjectMeta, &oldPod.ObjectMeta)
 	opts.ResourceIsPod = true
 
 	return corevalidation.ValidatePodStatusUpdate(obj.(*api.Pod), old.(*api.Pod), opts)
@@ -345,7 +348,7 @@ func (podEphemeralContainersStrategy) PrepareForUpdate(ctx context.Context, obj,
 func (podEphemeralContainersStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	newPod := obj.(*api.Pod)
 	oldPod := old.(*api.Pod)
-	opts := podutil.GetValidationOptionsFromPodSpecAndMeta(&newPod.Spec, &oldPod.Spec, &newPod.ObjectMeta, &oldPod.ObjectMeta)
+	opts := corevalidation.GetValidationOptionsFromPodSpecAndMeta(&newPod.Spec, &oldPod.Spec, &newPod.ObjectMeta, &oldPod.ObjectMeta)
 	opts.ResourceIsPod = true
 	return corevalidation.ValidatePodEphemeralContainersUpdate(newPod, oldPod, opts)
 }
@@ -471,7 +474,7 @@ func (podResizeStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 func (podResizeStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	newPod := obj.(*api.Pod)
 	oldPod := old.(*api.Pod)
-	opts := podutil.GetValidationOptionsFromPodSpecAndMeta(&newPod.Spec, &oldPod.Spec, &newPod.ObjectMeta, &oldPod.ObjectMeta)
+	opts := corevalidation.GetValidationOptionsFromPodSpecAndMeta(&newPod.Spec, &oldPod.Spec, &newPod.ObjectMeta, &oldPod.ObjectMeta)
 	opts.ResourceIsPod = true
 	return corevalidation.ValidatePodResize(newPod, oldPod, opts)
 }
@@ -487,6 +490,49 @@ func (p podResizeStrategy) GetResetFieldsFilter() map[fieldpath.APIVersion]field
 	return map[fieldpath.APIVersion]fieldpath.Filter{
 		"v1": p.resetFieldsFilter,
 	}
+}
+
+// podDynamicStrategy is the strategy for the pods/dynamic subresource, which
+// allows an expanded set of mutations.
+type podDynamicStrategy struct {
+	podStrategy
+}
+
+// DynamicStrategy wraps and exports the used podStrategy for the storage package.
+var DynamicStrategy = podDynamicStrategy{Strategy}
+
+func (podDynamicStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
+	newPod := obj.(*api.Pod)
+	oldPod := old.(*api.Pod)
+	newPod.Status = oldPod.Status
+
+	// Pod-level resources are defaulted the same way as for a resize.
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourcesFixDefaulting) {
+		if newPod.Spec.Resources == nil && oldPod.Spec.Resources != nil {
+			// preserve existing PLR for requests from potentially PLR-unaware clients that completely dropped the field
+			newPod.Spec.Resources = oldPod.Spec.Resources.DeepCopy()
+		}
+		if newPod.Spec.Resources != nil {
+			podutil.DefaultPodLevelResources(newPod)
+		}
+	}
+
+	podutil.DropDisabledPodFields(newPod, oldPod)
+	podutil.SyncPodNetworkOnUpdate(&newPod.Spec, &oldPod.Spec)
+	updatePodGeneration(newPod, oldPod)
+}
+
+func (podDynamicStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
+	newPod := obj.(*api.Pod)
+	oldPod := old.(*api.Pod)
+	opts := corevalidation.GetValidationOptionsFromPodSpecAndMeta(&newPod.Spec, &oldPod.Spec, &newPod.ObjectMeta, &oldPod.ObjectMeta)
+	opts.ResourceIsPod = true
+	return corevalidation.ValidatePodDynamicUpdate(newPod, oldPod, opts)
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (podDynamicStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
 }
 
 // GetAttrs returns labels and fields of a given object for filtering purposes.
@@ -643,7 +689,7 @@ func LogLocation(
 	// Try to figure out a container
 	// If a container was provided, it must be valid
 	container := opts.Container
-	container, err = validateContainer(container, pod)
+	container, err = validateContainer(container, pod, true)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -792,7 +838,7 @@ func streamLocation(
 
 	// Try to figure out a container
 	// If a container was provided, it must be valid
-	container, err = validateContainer(container, pod)
+	container, err = validateContainer(container, pod, false)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -854,8 +900,9 @@ func PortForwardLocation(
 	return loc, nodeInfo, nil
 }
 
-// validateContainer validate container is valid for pod, return valid container
-func validateContainer(container string, pod *api.Pod) (string, error) {
+// validateContainer validate container is valid for pod, return valid container. If allowRemoved
+// is set, a regular container removed through pods/dynamic that still has a status is also valid.
+func validateContainer(container string, pod *api.Pod, allowRemoved bool) (string, error) {
 	if len(container) == 0 {
 		switch len(pod.Spec.Containers) {
 		case 1:
@@ -871,8 +918,11 @@ func validateContainer(container string, pod *api.Pod) (string, error) {
 			errStr := fmt.Sprintf("a container name must be specified for pod %s, choose one of: %s", pod.Name, containerNames)
 			return "", errors.NewBadRequest(errStr)
 		}
-	} else {
-		if !podHasContainerWithName(pod, container) {
+	} else if !podHasContainerWithName(pod, container) {
+		// A container removed through pods/dynamic keeps its status until the kubelet has cleaned
+		// it up, and can be inspected until then.
+		_, hasStatus := podutil.GetContainerStatus(pod.Status.ContainerStatuses, container)
+		if !allowRemoved || !utilfeature.DefaultFeatureGate.Enabled(features.DynamicContainers) || !hasStatus {
 			return "", errors.NewBadRequest(fmt.Sprintf("container %s is not valid for pod %s", container, pod.Name))
 		}
 	}
@@ -909,7 +959,7 @@ func applyMatchLabelKeysAndMismatchLabelKeys(term *api.PodAffinityTerm, label ma
 }
 
 func mutatePodAffinity(pod *api.Pod) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.MatchLabelKeysInPodAffinity) || pod.Spec.Affinity == nil {
+	if pod.Spec.Affinity == nil {
 		return
 	}
 	if affinity := pod.Spec.Affinity.PodAffinity; affinity != nil {

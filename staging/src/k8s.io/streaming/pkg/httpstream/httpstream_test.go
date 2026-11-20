@@ -134,7 +134,7 @@ func TestHandshake(t *testing.T) {
 				t.Fatalf("%s: unexpected error: %v", name, err)
 			}
 			if w.statusCode != nil {
-				t.Fatalf("%s: unexpected non-nil w.statusCode: %d", name, w.statusCode)
+				t.Fatalf("%s: unexpected non-nil w.statusCode: %d", name, *w.statusCode)
 			}
 
 			if len(test.expectedProtocol) == 0 {

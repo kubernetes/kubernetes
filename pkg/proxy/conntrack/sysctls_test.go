@@ -22,7 +22,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -30,37 +29,65 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/ktesting"
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
-	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
 )
 
 func TestGetConntrackMax(t *testing.T) {
-	ncores := runtime.NumCPU()
 	const maxLimit = 1048576
 	testCases := []struct {
+		numCPU     int
 		min        int32
 		maxPerCore int32
 		expected   int
 		err        string
 	}{
 		{
+			numCPU:   8,
 			expected: 0,
 		},
 		{
+			numCPU:     8,
 			maxPerCore: 67890, // use this if Max is 0
 			min:        1,     // avoid 0 default
-			expected:   min(67890*ncores, maxLimit),
+			expected:   min(67890*8, maxLimit),
 		},
 		{
+			numCPU:     8,
 			maxPerCore: 1, // ensure that Min is considered
 			min:        123456,
 			expected:   123456,
 		},
 		{
+			numCPU:     8,
 			maxPerCore: 0, // leave system setting
 			min:        123456,
 			expected:   0,
+		},
+		{
+			numCPU:     128,
+			maxPerCore: 32768,
+			min:        8 * maxLimit,
+			expected:   8 * maxLimit,
+		},
+		{
+			numCPU:     8,
+			maxPerCore: 32768,
+			min:        8 * maxLimit,
+			expected:   8 * maxLimit,
+		},
+		{
+			numCPU:     128,
+			maxPerCore: 32768,
+			min:        131072,
+			expected:   maxLimit,
+		},
+		{
+			numCPU:     8,
+			maxPerCore: 32768,
+			min:        524288,
+			expected:   524288,
 		},
 	}
 
@@ -70,7 +97,7 @@ func TestGetConntrackMax(t *testing.T) {
 			MaxPerCore: ptr.To(tc.maxPerCore),
 		}
 		_, ctx := ktesting.NewTestContext(t)
-		x, e := getConntrackMax(ctx, &cfg, ncores)
+		x, e := getConntrackMax(ctx, &cfg, tc.numCPU)
 		if e != nil {
 			if tc.err == "" {
 				t.Errorf("[%d] unexpected error: %v", i, e)
@@ -84,13 +111,18 @@ func TestGetConntrackMax(t *testing.T) {
 }
 
 type fakeConntracker struct {
+	max      int
+	hashsize int
+	err      error
+
 	called []string
-	err    error
 }
 
-// SetMax value is calculated based on the number of CPUs by getConntrackMax()
+func (fc *fakeConntracker) GetMax(ctx context.Context) (int, error) {
+	return fc.max, fc.err
+}
 func (fc *fakeConntracker) SetMax(ctx context.Context, max int) error {
-	fc.called = append(fc.called, "SetMax")
+	fc.called = append(fc.called, fmt.Sprintf("SetMax(%d)", max))
 	return fc.err
 }
 func (fc *fakeConntracker) SetTCPEstablishedTimeout(ctx context.Context, seconds int) error {
@@ -113,14 +145,26 @@ func (fc *fakeConntracker) SetUDPStreamTimeout(ctx context.Context, seconds int)
 	fc.called = append(fc.called, fmt.Sprintf("SetUDPStreamTimeout(%d)", seconds))
 	return fc.err
 }
+func (fc *fakeConntracker) GetHashsize(ctx context.Context) (int, error) {
+	return fc.hashsize, fc.err
+}
+func (fc *fakeConntracker) SetHashsize(ctx context.Context, value int) error {
+	fc.called = append(fc.called, fmt.Sprintf("SetHashsize(%d)", value))
+	return fc.err
+}
+func (fc *fakeConntracker) DetectNumCPU() int {
+	return 8
+}
 
 func TestSetupConntrack(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 	tests := []struct {
 		name         string
 		config       kubeproxyconfig.KubeProxyConntrackConfiguration
-		expect       []string
+		max          int
+		hashsize     int
 		conntrackErr error
+		expect       []string
 		wantErr      bool
 	}{
 		{
@@ -129,11 +173,38 @@ func TestSetupConntrack(t *testing.T) {
 			expect: nil,
 		},
 		{
-			name: "SetMax is called if conntrack.maxPerCore is specified",
+			name: "SetMax is called if conntrack.maxPerCore is specified and sysctl is unset",
 			config: kubeproxyconfig.KubeProxyConntrackConfiguration{
 				MaxPerCore: ptr.To(int32(12)),
 			},
-			expect: []string{"SetMax"},
+			expect: []string{"SetMax(96)", "SetHashsize(24)"},
+		},
+		{
+			name: "SetMax is not called if sysctl value is already correct",
+			config: kubeproxyconfig.KubeProxyConntrackConfiguration{
+				MaxPerCore: ptr.To(int32(12)),
+			},
+			max:      96,
+			hashsize: 24,
+			expect:   nil,
+		},
+		{
+			name: "SetMax is not called if sysctl value is higher than wanted",
+			config: kubeproxyconfig.KubeProxyConntrackConfiguration{
+				MaxPerCore: ptr.To(int32(12)),
+			},
+			max:      192,
+			hashsize: 48,
+			expect:   nil,
+		},
+		{
+			name: "SetMax is called if sysctl value is too low",
+			config: kubeproxyconfig.KubeProxyConntrackConfiguration{
+				MaxPerCore: ptr.To(int32(12)),
+			},
+			max:      48,
+			hashsize: 12,
+			expect:   []string{"SetMax(96)", "SetHashsize(24)"},
 		},
 		{
 			name: "SetMax is not called if conntrack.maxPerCore is 0",
@@ -141,6 +212,24 @@ func TestSetupConntrack(t *testing.T) {
 				MaxPerCore: ptr.To(int32(0)),
 			},
 			expect: nil,
+		},
+		{
+			name: "SetHashsize is called if max is correct but hashsize isn't",
+			config: kubeproxyconfig.KubeProxyConntrackConfiguration{
+				MaxPerCore: ptr.To(int32(12)),
+			},
+			max:      96,
+			hashsize: 0,
+			expect:   []string{"SetHashsize(24)"},
+		},
+		{
+			name: "SetHashsize is not called if max is wrong but hashsize is correct",
+			config: kubeproxyconfig.KubeProxyConntrackConfiguration{
+				MaxPerCore: ptr.To(int32(12)),
+			},
+			max:      48,
+			hashsize: 24,
+			expect:   []string{"SetMax(96)"},
 		},
 		{
 			name: "SetTCPEstablishedTimeout is called if conntrack.tcpEstablishedTimeout is specified",
@@ -225,7 +314,7 @@ func TestSetupConntrack(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			fc := &fakeConntracker{err: test.conntrackErr}
+			fc := &fakeConntracker{max: test.max, hashsize: test.hashsize, err: test.conntrackErr}
 			err := setSysctls(ctx, fc, &test.config)
 			if test.wantErr && err == nil {
 				t.Errorf("Test %q: Expected error, got nil", test.name)

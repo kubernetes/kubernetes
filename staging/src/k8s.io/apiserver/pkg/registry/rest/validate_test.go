@@ -848,3 +848,24 @@ func TestValidateDeclarativelyWithMigrationChecks(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateDeclarativelyForManifest(t *testing.T) {
+	gv := schema.GroupVersion{Version: "v1"}
+	scheme := runtime.NewScheme()
+	scheme.AddKnownTypes(gv, &v1.Pod{})
+	declarativeErr := field.Invalid(field.NewPath("spec"), nil, "declarative")
+	scheme.AddValidationFunc(&v1.Pod{}, func(ctx context.Context, op operation.Operation, object, oldObject any) field.ErrorList {
+		if !op.Options["TestOption"] {
+			return nil
+		}
+		return field.ErrorList{declarativeErr}
+	})
+	handwrittenErr := field.Required(field.NewPath("metadata", "name"), "")
+	config := DeclarativeValidationConfig{Options: map[string]bool{"TestOption": true}}
+
+	got := ValidateDeclarativelyForManifest(context.Background(), scheme, gv, &v1.Pod{}, field.ErrorList{handwrittenErr}, config)
+	want := field.ErrorList{handwrittenErr, declarativeErr}
+	if !equalErrorLists(got, want) {
+		t.Errorf("got %v, want %v", got, want)
+	}
+}

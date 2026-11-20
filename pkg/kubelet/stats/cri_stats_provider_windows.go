@@ -153,7 +153,6 @@ func (p *criStatsProvider) makeWinContainerStats(
 		result.Memory.WorkingSetBytes = ptr.To[uint64](0)
 		result.Memory.AvailableBytes = ptr.To[uint64](0)
 		result.Memory.PageFaults = ptr.To[uint64](0)
-		result.Memory.UsageBytes = ptr.To[uint64](0)
 	}
 	if stats.WritableLayer != nil {
 		result.Rootfs.Time = metav1.NewTime(time.Unix(0, stats.WritableLayer.Timestamp))
@@ -323,6 +322,7 @@ func (p *criStatsProvider) makeWinContainerCPUAndMemoryStats(
 	if stats.Memory != nil {
 		result.Memory = &statsapi.MemoryStats{
 			Time:            metav1.NewTime(time.Unix(0, stats.Memory.Timestamp)),
+			UsageBytes:      valueOfUInt64Value(stats.Memory.CommitMemoryBytes),
 			WorkingSetBytes: ptr.To(stats.Memory.WorkingSetBytes.GetValue()),
 			AvailableBytes:  ptr.To(stats.Memory.AvailableBytes.GetValue()),
 			PageFaults:      ptr.To(stats.Memory.PageFaults.GetValue()),

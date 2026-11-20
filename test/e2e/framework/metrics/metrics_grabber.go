@@ -23,6 +23,7 @@ import (
 	"net"
 	"regexp"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -37,6 +38,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epodoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -70,7 +72,6 @@ type Collection struct {
 // Grabber provides functions which grab metrics from components
 type Grabber struct {
 	client                             clientset.Interface
-	externalClient                     clientset.Interface
 	config                             *rest.Config
 	grabFromAPIServer                  bool
 	grabFromControllerManager          bool
@@ -94,10 +95,8 @@ type Grabber struct {
 // Collecting metrics data is an optional debug feature. Not all clusters will
 // support it. If disabled for a component, the corresponding Grab function
 // will immediately return an error derived from MetricsGrabbingDisabledError.
-func NewMetricsGrabber(ctx context.Context, c clientset.Interface, ec clientset.Interface, config *rest.Config, kubelets bool, scheduler bool, controllers bool, apiServer bool, clusterAutoscaler bool, snapshotController bool) (*Grabber, error) {
-	kubeScheduler := ""
-	kubeControllerManager := ""
-	snapshotControllerManager := ""
+func NewMetricsGrabber(ctx context.Context, c clientset.Interface, config *rest.Config, kubelets bool, scheduler bool, controllers bool, apiServer bool, clusterAutoscaler bool, snapshotController bool) (*Grabber, error) {
+	var kubeSchedulers, kubeControllerManagers, snapshotControllers []v1.Pod
 
 	regKubeScheduler := regexp.MustCompile("kube-scheduler-.*")
 	regKubeControllerManager := regexp.MustCompile("kube-controller-manager-.*")
@@ -116,25 +115,21 @@ func NewMetricsGrabber(ctx context.Context, c clientset.Interface, ec clientset.
 	}
 	for _, pod := range podList.Items {
 		if regKubeScheduler.MatchString(pod.Name) {
-			kubeScheduler = pod.Name
+			kubeSchedulers = append(kubeSchedulers, pod)
 		}
 		if regKubeControllerManager.MatchString(pod.Name) {
-			kubeControllerManager = pod.Name
+			kubeControllerManagers = append(kubeControllerManagers, pod)
 		}
 		if regSnapshotController.MatchString(pod.Name) {
-			snapshotControllerManager = pod.Name
-		}
-		if kubeScheduler != "" && kubeControllerManager != "" && snapshotControllerManager != "" {
-			break
+			snapshotControllers = append(snapshotControllers, pod)
 		}
 	}
-	if clusterAutoscaler && ec == nil {
-		klog.Warningf("Did not receive an external client interface. Grabbing metrics from ClusterAutoscaler is disabled.")
-	}
+	kubeScheduler := leaderPod(ctx, c, scheduler, "kube-scheduler", kubeSchedulers)
+	kubeControllerManager := leaderPod(ctx, c, controllers, "kube-controller-manager", kubeControllerManagers)
+	snapshotControllerManager := leaderPod(ctx, c, snapshotController, "snapshot-controller-leader", snapshotControllers)
 
 	return &Grabber{
 		client:                     c,
-		externalClient:             ec,
 		config:                     config,
 		grabFromAPIServer:          apiServer,
 		grabFromControllerManager:  checkPodDebugHandlers(ctx, c, controllers, "kube-controller-manager", kubeControllerManager),
@@ -168,6 +163,36 @@ func checkPodDebugHandlers(ctx context.Context, c clientset.Interface, requested
 
 	// Metrics gathering enabled.
 	return true
+}
+
+// leaderPod returns the name of the pod to grab metrics from, or "" if there are none. With
+// several instances of a component, only the leader does the work, so the metrics of the others
+// are mostly empty. If requested and the leader can be determined, the pod holding the leader
+// election Lease kube-system/<leaseName> is returned, the first pod otherwise.
+func leaderPod(ctx context.Context, c clientset.Interface, requested bool, leaseName string, pods []v1.Pod) string {
+	if len(pods) == 0 {
+		return ""
+	}
+	if !requested || len(pods) == 1 {
+		return pods[0].Name
+	}
+	lease, err := c.CoordinationV1().Leases(metav1.NamespaceSystem).Get(ctx, leaseName, metav1.GetOptions{})
+	if err != nil {
+		klog.Infof("Can't get Lease %s/%s, using pod %s: %v", metav1.NamespaceSystem, leaseName, pods[0].Name, err)
+		return pods[0].Name
+	}
+	// The holder identity is the hostname of the leader, followed by "_<uuid>" for kube-scheduler
+	// and kube-controller-manager. The hostname is normally the node name for static pods with
+	// host networking, and the pod name otherwise.
+	holder := ptr.Deref(lease.Spec.HolderIdentity, "")
+	hostname, _, _ := strings.Cut(holder, "_")
+	for _, pod := range pods {
+		if hostname != "" && (strings.EqualFold(pod.Spec.NodeName, hostname) || pod.Name == hostname) {
+			return pod.Name
+		}
+	}
+	klog.Warningf("Can't find a %s pod for Lease holder %q, using pod %s", leaseName, holder, pods[0].Name)
+	return pods[0].Name
 }
 
 // HasControlPlanePods returns true if metrics grabber was able to find control-plane pods
@@ -309,19 +334,10 @@ func (g *Grabber) GrabFromScheduler(ctx context.Context) (SchedulerMetrics, erro
 
 // GrabFromClusterAutoscaler returns metrics from cluster autoscaler
 func (g *Grabber) GrabFromClusterAutoscaler(ctx context.Context) (ClusterAutoscalerMetrics, error) {
-	if !g.HasControlPlanePods() && g.externalClient == nil {
+	if !g.HasControlPlanePods() {
 		return ClusterAutoscalerMetrics{}, fmt.Errorf("ClusterAutoscaler: %w", MetricsGrabbingDisabledError)
 	}
-	var client clientset.Interface
-	var namespace string
-	if g.externalClient != nil {
-		client = g.externalClient
-		namespace = "kubemark"
-	} else {
-		client = g.client
-		namespace = metav1.NamespaceSystem
-	}
-	output, err := g.getMetricsFromPod(ctx, client, "cluster-autoscaler", namespace, 8085)
+	output, err := g.getMetricsFromPod(ctx, g.client, "cluster-autoscaler", metav1.NamespaceSystem, 8085)
 	if err != nil {
 		return ClusterAutoscalerMetrics{}, err
 	}

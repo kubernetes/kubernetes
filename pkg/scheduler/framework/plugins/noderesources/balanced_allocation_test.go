@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/ktesting"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
@@ -35,7 +36,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	tf "k8s.io/kubernetes/pkg/scheduler/testing/framework"
-	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestNodeResourcesBalancedAllocation(t *testing.T) {
@@ -324,10 +324,9 @@ func testNodeResourcesBalancedAllocation(tCtx ktesting.TContext) {
 			featuregatetesting.SetFeatureGateDuringTest(tCtx, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, test.draObjects != nil)
 			snapshot := cache.NewSnapshot(test.existingPods, test.nodes)
 			fh, _ := runtime.NewFramework(tCtx, nil, nil, runtime.WithSnapshotSharedLister(snapshot))
-			defer func() {
-				tCtx.Cancel("test has completed")
+			tCtx.Cleanup(func() {
 				runtime.WaitForShutdown(fh)
-			}()
+			})
 			p, _ := NewBalancedAllocation(tCtx, &test.args, fh, feature.Features{
 				EnableDRAExtendedResource: test.draObjects != nil,
 			})
@@ -358,6 +357,120 @@ func testNodeResourcesBalancedAllocation(tCtx ktesting.TContext) {
 				if diff := cmp.Diff(test.expectedScores[i].Score, hostResult); diff != "" {
 					tCtx.Errorf("unexpected score for host %v (-want,+got):\n%s", test.nodes[i].Name, diff)
 				}
+			}
+		})
+	}
+}
+
+// The node has 4 CPU and 4000 bytes of memory.
+func TestBalancedAllocationWithExtraNodeAllocatableResources(t *testing.T) {
+	testCtx := ktesting.Init(t)
+	nodeName := "node-1"
+	requests := map[v1.ResourceName]string{v1.ResourceCPU: "1", v1.ResourceMemory: "1000"}
+	pod := st.MakePod().UID("new").Name("new").Namespace("test-ns").Req(requests).Obj()
+
+	tests := []struct {
+		name                              string
+		pod                               *v1.Pod
+		enableDRANodeAllocatableResources bool
+		extraResources                    map[string][]v1.ExtraNodeAllocatableResource
+		wantPreScoreStatus                *fwk.Status
+		wantScore                         int64
+	}{
+		{
+			// CPU: (1 + 1)/4, memory: 1000/4000. Score: 68 (100 -> 87)
+			name:                              "entries are added to the pod requests",
+			pod:                               pod,
+			enableDRANodeAllocatableResources: true,
+			extraResources: map[string][]v1.ExtraNodeAllocatableResource{
+				nodeName: makeExtraNodeAllocatableResources("1"),
+			},
+			wantScore: 68,
+		},
+		{
+			// CPU: 1/4, memory: 1000/4000. Score: 75 (100 -> 100)
+			name:                              "feature disabled",
+			pod:                               pod,
+			enableDRANodeAllocatableResources: false,
+			extraResources: map[string][]v1.ExtraNodeAllocatableResource{
+				nodeName: makeExtraNodeAllocatableResources("1"),
+			},
+			wantScore: 75,
+		},
+		{
+			// CPU: 1/4, memory: 1000/4000. Score: 75 (100 -> 100)
+			name:                              "pod-level resources take precedence over entries",
+			pod:                               st.MakePod().UID("new").Name("new").Namespace("test-ns").Container("image").PodLevelResourceRequests(requests).Obj(),
+			enableDRANodeAllocatableResources: true,
+			extraResources: map[string][]v1.ExtraNodeAllocatableResource{
+				nodeName: makeExtraNodeAllocatableResources("1"),
+			},
+			wantScore: 75,
+		},
+		{
+			name:                              "pod without requests or extra node allocatable is skipped",
+			pod:                               st.MakePod().UID("new").Name("new").Namespace("test-ns").Container("image").Obj(),
+			enableDRANodeAllocatableResources: true,
+			extraResources: map[string][]v1.ExtraNodeAllocatableResource{
+				"other-node": makeExtraNodeAllocatableResources("2"),
+			},
+			wantPreScoreStatus: fwk.NewStatus(fwk.Skip),
+		},
+		{
+			// Claims alone leave the pod BestEffort, but it does consume node resources.
+			// CPU: 2/4, memory: 0/4000. Score: 62 (100 -> 75)
+			name:                              "pod whose cpu comes only from claims is scored",
+			pod:                               st.MakePod().UID("new").Name("new").Namespace("test-ns").Container("image").Obj(),
+			enableDRANodeAllocatableResources: true,
+			extraResources: map[string][]v1.ExtraNodeAllocatableResource{
+				nodeName: makeExtraNodeAllocatableResources("2"),
+			},
+			wantScore: 62,
+		},
+		{
+			name:                              "pod without requests is skipped when the feature is disabled",
+			pod:                               st.MakePod().UID("new").Name("new").Namespace("test-ns").Container("image").Obj(),
+			enableDRANodeAllocatableResources: false,
+			extraResources: map[string][]v1.ExtraNodeAllocatableResource{
+				nodeName: makeExtraNodeAllocatableResources("2"),
+			},
+			wantPreScoreStatus: fwk.NewStatus(fwk.Skip),
+		},
+	}
+
+	for _, test := range tests {
+		testCtx.SyncTest(test.name, func(tCtx ktesting.TContext) {
+			node := st.MakeNode().Name(nodeName).Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4", v1.ResourceMemory: "4000"}).Obj()
+			nodeInfo := framework.NewNodeInfo()
+			nodeInfo.SetNode(node)
+
+			fh, _ := runtime.NewFramework(tCtx, nil, nil)
+			tCtx.Cleanup(func() {
+				runtime.WaitForShutdown(fh)
+			})
+			p, err := NewBalancedAllocation(tCtx, &config.NodeResourcesBalancedAllocationArgs{
+				Resources: []config.ResourceSpec{{Name: string(v1.ResourceCPU), Weight: 1}, {Name: string(v1.ResourceMemory), Weight: 1}},
+			}, fh, feature.Features{
+				EnablePodLevelResources:           true,
+				EnableDRANodeAllocatableResources: test.enableDRANodeAllocatableResources,
+			})
+			tCtx.ExpectNoError(err, "create balanced allocation plugin")
+
+			cycleState := newNodeAllocatableCycleState(test.extraResources)
+			gotStatus := p.(fwk.PreScorePlugin).PreScore(tCtx, cycleState, test.pod, []fwk.NodeInfo{nodeInfo})
+			if diff := cmp.Diff(test.wantPreScoreStatus, gotStatus); diff != "" {
+				tCtx.Fatalf("status does not match (-want,+got):\n%s", diff)
+			}
+			if gotStatus.IsSkip() {
+				return
+			}
+
+			gotScore, status := p.(fwk.ScorePlugin).Score(tCtx, cycleState, test.pod, nodeInfo)
+			if !status.IsSuccess() {
+				tCtx.Fatalf("score failed with status: %v", status)
+			}
+			if diff := cmp.Diff(test.wantScore, gotScore); diff != "" {
+				tCtx.Errorf("score does not match (-want,+got):\n%s", diff)
 			}
 		})
 	}
@@ -445,12 +558,10 @@ func testBalancedAllocationSignPod(tCtx ktesting.TContext) {
 			} else {
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(tCtx, utilfeature.DefaultFeatureGate, version.MustParse("1.36"))
 			}
-
 			fh, _ := runtime.NewFramework(tCtx, nil, nil, runOpts...)
-			defer func() {
-				tCtx.Cancel("test has completed")
+			tCtx.Cleanup(func() {
 				runtime.WaitForShutdown(fh)
-			}()
+			})
 
 			p, err := NewBalancedAllocation(tCtx, &config.NodeResourcesBalancedAllocationArgs{}, fh, feature.Features{
 				EnableDRAExtendedResource: !test.disableDRAExtendedResource,

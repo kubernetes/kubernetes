@@ -96,11 +96,8 @@ func (r *Matcher) operation() bool {
 }
 
 func splitResource(resSub string) (res, sub string) {
-	parts := strings.SplitN(resSub, "/", 2)
-	if len(parts) == 2 {
-		return parts[0], parts[1]
-	}
-	return parts[0], ""
+	res, sub, _ = strings.Cut(resSub, "/")
+	return res, sub
 }
 
 func (r *Matcher) resource() bool {

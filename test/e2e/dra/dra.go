@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -37,17 +38,21 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	resourceapi "k8s.io/api/resource/v1"
 	resourcealphaapi "k8s.io/api/resource/v1alpha3"
-	resourcev1beta1 "k8s.io/api/resource/v1beta1"
 	resourcev1beta2 "k8s.io/api/resource/v1beta2"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	apitypes "k8s.io/apimachinery/pkg/types"
+	utilversion "k8s.io/apimachinery/pkg/util/version"
 	applyv1 "k8s.io/client-go/applyconfigurations/core/v1"
+	"k8s.io/client-go/ktesting"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/component-helpers/nodedeclaredfeatures/features/draoptionalnodeoperations"
 	metadata "k8s.io/dynamic-resource-allocation/api/metadata"
 	metadatav1alpha1 "k8s.io/dynamic-resource-allocation/api/metadata/v1alpha1"
 	metadatav1beta1 "k8s.io/dynamic-resource-allocation/api/metadata/v1beta1"
@@ -67,7 +72,6 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	dratest "k8s.io/kubernetes/test/integration/dra"
-	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 	admissionapi "k8s.io/pod-security-admission/api"
 	"k8s.io/utils/ptr"
 )
@@ -300,9 +304,47 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 					},
 					StrategicMergePatchSpec: `{"metadata": {"labels": {"test.dra.example.com": "test"}}}`,
 
-					// UpdateStatus is missing here. Needs to be added before graduation.
+					// The controller writes the write-once status; see the next test.
 				},
 			)
+		})
+
+		f.It("resource.k8s.io/v1alpha3 ResourcePoolStatusRequest status is written once by the controller", f.WithFeatureGate(features.DRAResourcePoolStatus), func(ctx context.Context) {
+			requests := f.ClientSet.ResourceV1alpha3().ResourcePoolStatusRequests()
+			request := &resourcealphaapi.ResourcePoolStatusRequest{
+				ObjectMeta: metav1.ObjectMeta{GenerateName: f.UniqueName + "-"},
+				// No slices exist for this driver.
+				Spec: resourcealphaapi.ResourcePoolStatusRequestSpec{Driver: f.UniqueName + ".example.com"},
+			}
+			request, err := requests.Create(ctx, request, metav1.CreateOptions{})
+			framework.ExpectNoError(err, "create ResourcePoolStatusRequest")
+			ginkgo.DeferCleanup(framework.IgnoreNotFound(requests.Delete), request.Name, metav1.DeleteOptions{})
+
+			ginkgo.By("waiting for kube-controller-manager to write the status")
+			gomega.Eventually(ctx, framework.GetObject(requests.Get, request.Name, metav1.GetOptions{})).
+				WithTimeout(time.Minute).
+				Should(gomega.HaveField("Status", gomega.HaveValue(gomega.HaveField("Conditions", gomega.ContainElement(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+					"Type":   gomega.Equal(resourcealphaapi.ResourcePoolStatusRequestConditionComplete),
+					"Status": gomega.Equal(metav1.ConditionTrue),
+				}))))))
+
+			ginkgo.By("reading the status subresource")
+			written, err := f.DynamicClient.Resource(resourcealphaapi.SchemeGroupVersion.WithResource("resourcepoolstatusrequests")).Get(ctx, request.Name, metav1.GetOptions{}, "status")
+			framework.ExpectNoError(err, "get status subresource")
+			poolCount, found, err := unstructured.NestedInt64(written.Object, "status", "poolCount")
+			framework.ExpectNoError(err, "read status.poolCount")
+			gomega.Expect(found).To(gomega.BeTrueBecause("status.poolCount should be set"))
+			gomega.Expect(poolCount).To(gomega.BeZero(), "no pools exist for driver %s", request.Spec.Driver)
+
+			ginkgo.By("rejecting a rewrite of the written status")
+			request, err = requests.Get(ctx, request.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err, "get ResourcePoolStatusRequest")
+			request.Status.PoolCount = ptr.To[int32](1)
+			_, err = requests.UpdateStatus(ctx, request, metav1.UpdateOptions{})
+			gomega.Expect(apierrors.IsInvalid(err)).To(gomega.BeTrueBecause("UpdateStatus of a written status should be rejected as invalid, got: %v", err))
+
+			_, err = requests.Patch(ctx, request.Name, apitypes.MergePatchType, []byte(`{"status": {"poolCount": 1}}`), metav1.PatchOptions{}, "status")
+			gomega.Expect(apierrors.IsInvalid(err)).To(gomega.BeTrueBecause("patching a written status should be rejected as invalid, got: %v", err))
 		})
 	})
 
@@ -2300,87 +2342,6 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 		})
 	}
 
-	v1beta1Tests := func() {
-		nodes := drautils.NewNodes(f, 1, 1)
-		maxAllocations := 1
-		driver := drautils.NewDriver(f, nodes, drautils.DriverResources(maxAllocations))
-		b := drautils.NewBuilder(f, driver)
-		// We have to set the parameters *before* creating the class.
-		b.ClassParameters = `{"x":"y"}`
-		expectedEnv := []string{"admin_x", "y"}
-		_, expected := b.ParametersEnv()
-		expectedEnv = append(expectedEnv, expected...)
-
-		ginkgo.It("supports simple ResourceClaim", func(ctx context.Context) {
-			tCtx := f.TContext(ctx)
-			pod, template := b.PodInlineWithV1beta1()
-			b.Create(tCtx, pod, template)
-			b.TestPod(tCtx, pod, expectedEnv...)
-		})
-
-		f.It("supports requests with alternatives", f.WithFeatureGate(features.DRAPrioritizedList), func(ctx context.Context) {
-			tCtx := f.TContext(ctx)
-			claimName := "external-multiclaim"
-			parameters, _ := b.ParametersEnv()
-			claim := &resourcev1beta1.ResourceClaim{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: claimName,
-				},
-				Spec: resourcev1beta1.ResourceClaimSpec{
-					Devices: resourcev1beta1.DeviceClaim{
-						Requests: []resourcev1beta1.DeviceRequest{{
-							Name: "request-1",
-							FirstAvailable: []resourcev1beta1.DeviceSubRequest{
-								{
-									Name:            "sub-request-1",
-									DeviceClassName: b.ClassName(),
-									AllocationMode:  resourcev1beta1.DeviceAllocationModeExactCount,
-									Count:           2,
-								},
-								{
-									Name:            "sub-request-2",
-									DeviceClassName: b.ClassName(),
-									AllocationMode:  resourcev1beta1.DeviceAllocationModeExactCount,
-									Count:           1,
-								},
-							},
-						}},
-						Config: []resourcev1beta1.DeviceClaimConfiguration{{
-							DeviceConfiguration: resourcev1beta1.DeviceConfiguration{
-								Opaque: &resourcev1beta1.OpaqueDeviceConfiguration{
-									Driver: driver.Name,
-									Parameters: runtime.RawExtension{
-										Raw: []byte(parameters),
-									},
-								},
-							},
-						}},
-					},
-				},
-			}
-			pod := b.PodExternal("")
-			podClaimName := "resource-claim"
-			pod.Spec.ResourceClaims = []v1.PodResourceClaim{
-				{
-					Name:              podClaimName,
-					ResourceClaimName: &claimName,
-				},
-			}
-			b.Create(tCtx, claim, pod)
-			b.TestPod(tCtx, pod, expectedEnv...)
-
-			var allocatedResourceClaim *resourcev1beta1.ResourceClaim
-			gomega.Eventually(ctx, func(ctx context.Context) (*resourcev1beta1.ResourceClaim, error) {
-				var err error
-				allocatedResourceClaim, err = f.ClientSet.ResourceV1beta1().ResourceClaims(f.Namespace.Name).Get(ctx, claim.Name, metav1.GetOptions{})
-				return allocatedResourceClaim, err
-			}).WithTimeout(f.Timeouts.PodDelete).ShouldNot(gomega.HaveField("Status.Allocation", (*resourcev1beta1.AllocationResult)(nil)))
-			results := allocatedResourceClaim.Status.Allocation.Devices.Results
-			gomega.Expect(results).To(gomega.HaveLen(1))
-			gomega.Expect(results[0].Request).To(gomega.Equal("request-1/sub-request-2"))
-		})
-	}
-
 	v1beta2Tests := func() {
 		nodes := drautils.NewNodes(f, 1, 1)
 		maxAllocations := 1
@@ -2481,9 +2442,9 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 					ConsumesCounters: []resourceapi.DeviceCounterConsumption{
 						{
 							CounterSet: "counter-1",
-							Counters: map[string]resourceapi.Counter{
+							Counters: map[string]resourceapi.CounterRequirement{
 								"memory": {
-									Value: resource.MustParse("4Gi"),
+									Value: new(resource.MustParse("4Gi")),
 								},
 							},
 						},
@@ -2494,9 +2455,9 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 					ConsumesCounters: []resourceapi.DeviceCounterConsumption{
 						{
 							CounterSet: "counter-1",
-							Counters: map[string]resourceapi.Counter{
+							Counters: map[string]resourceapi.CounterRequirement{
 								"memory": {
-									Value: resource.MustParse("4Gi"),
+									Value: new(resource.MustParse("4Gi")),
 								},
 							},
 						},
@@ -2621,6 +2582,421 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 		})
 	}
 
+	// constraintsTests covers the DeviceConstraint semantics of a ResourceClaim:
+	// a pod must get scheduled or stay pending depending on whether the devices
+	// which its requests can draw from satisfy matchAttribute/distinctAttribute.
+	// The constraints are evaluated by the scheduler, therefore there is no
+	// variant which involves the kubelet.
+	constraintsTests := func() {
+		// The attributes are declared with an explicit domain (like in
+		// prioritizedListTests) so that a constraint can name them without
+		// having to know the generated driver name.
+		const attributeDomain = "dra.example.com"
+
+		// deviceNameAttribute mirrors the name of the device it is set on.
+		// The CEL environment for device selectors has no device.name
+		// variable, so this attribute is how a request pins itself to one
+		// specific device.
+		deviceNameAttribute := resourceapi.QualifiedName(attributeDomain + "/deviceName")
+
+		// attrValuesAttribute is what the constraints compare. A scalar value is
+		// treated as a single-element set, therefore:
+		//
+		//	device-a {0,1} and device-b {1,2} intersect in {1}
+		//	device-a {0,1} and device-c {3,4} are disjoint
+		//	device-s {1}   and device-a {0,1} intersect in {1}
+		//	device-a {0,1}, device-b {1,2} and device-d {0,2} intersect
+		//	pairwise, but have no element in common
+		attrValuesAttribute := resourceapi.QualifiedName(attributeDomain + "/attrValues")
+		attrValuesConstraintAttribute := resourceapi.FullyQualifiedName(attrValuesAttribute)
+
+		devicesPerNode := map[string]map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{}
+		for name, attrValues := range map[string]resourceapi.DeviceAttribute{
+			"device-a": {IntValues: []int64{0, 1}},
+			"device-b": {IntValues: []int64{1, 2}},
+			"device-c": {IntValues: []int64{3, 4}},
+			"device-d": {IntValues: []int64{0, 2}},
+			"device-s": {IntValue: new(int64(1))},
+		} {
+			devicesPerNode[name] = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+				deviceNameAttribute: {StringValue: new(name)},
+				attrValuesAttribute: attrValues,
+			}
+		}
+		nodes := drautils.NewNodes(f, 1, 1)
+		driver := drautils.NewDriver(f, nodes, drautils.DriverResources(-1, devicesPerNode))
+		b := drautils.NewBuilder(f, driver)
+		driver.WithKubelet = false
+
+		// claimWith builds a claim with one request per device name. Each
+		// request is pinned to that device, so only the constraint decides
+		// whether the claim can be allocated.
+		claimWith := func(constraint resourceapi.DeviceConstraint, deviceNames ...string) *resourceapi.ResourceClaim {
+			claim := b.ExternalClaim()
+			requests := make([]resourceapi.DeviceRequest, 0, len(deviceNames))
+			requestNames := make([]string, 0, len(deviceNames))
+			for i, deviceName := range deviceNames {
+				requestName := fmt.Sprintf("req-%d", i+1)
+				requestNames = append(requestNames, requestName)
+				requests = append(requests, resourceapi.DeviceRequest{
+					Name: requestName,
+					Exactly: &resourceapi.ExactDeviceRequest{
+						DeviceClassName: b.ClassName(),
+						AllocationMode:  resourceapi.DeviceAllocationModeExactCount,
+						Count:           1,
+						Selectors: []resourceapi.DeviceSelector{{
+							CEL: &resourceapi.CELDeviceSelector{
+								Expression: fmt.Sprintf(`device.attributes[%q].deviceName == %q`, attributeDomain, deviceName),
+							},
+						}},
+					},
+				})
+			}
+			constraint.Requests = requestNames
+			claim.Spec.Devices.Requests = requests
+			claim.Spec.Devices.Constraints = []resourceapi.DeviceConstraint{constraint}
+			return claim
+		}
+
+		expectAllocatedDevices := func(ctx context.Context, claim *resourceapi.ResourceClaim, expectedDevices ...string) {
+			var allocatedClaim *resourceapi.ResourceClaim
+			gomega.Eventually(ctx, func(ctx context.Context) (*resourceapi.ResourceClaim, error) {
+				var err error
+				allocatedClaim, err = f.ClientSet.ResourceV1().ResourceClaims(f.Namespace.Name).Get(ctx, claim.Name, metav1.GetOptions{})
+				return allocatedClaim, err
+			}).WithTimeout(f.Timeouts.PodDelete).ShouldNot(gomega.HaveField("Status.Allocation", (*resourceapi.AllocationResult)(nil)))
+			devices := make([]string, 0, len(allocatedClaim.Status.Allocation.Devices.Results))
+			for _, result := range allocatedClaim.Status.Allocation.Devices.Results {
+				devices = append(devices, result.Device)
+			}
+			gomega.Expect(devices).To(gomega.ConsistOf(expectedDevices))
+		}
+
+		expectUnschedulable := func(ctx context.Context, claim *resourceapi.ResourceClaim, pod *v1.Pod) {
+			framework.ExpectNoError(e2epod.WaitForPodNameUnschedulableInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace), "pod must not get scheduled")
+			unallocatedClaim, err := f.ClientSet.ResourceV1().ResourceClaims(f.Namespace.Name).Get(ctx, claim.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err, "get claim")
+			gomega.Expect(unallocatedClaim.Status.Allocation).To(gomega.BeNil(), "claim must not be allocated")
+		}
+
+		ginkgo.It("supports matchAttribute for lists with common elements", func(ctx context.Context) {
+			tCtx := f.TContext(ctx)
+			claim := claimWith(resourceapi.DeviceConstraint{MatchAttribute: &attrValuesConstraintAttribute}, "device-a", "device-b")
+			pod := b.PodExternal(claim.Name)
+			b.Create(tCtx, claim, pod)
+			b.TestPod(tCtx, pod)
+			expectAllocatedDevices(ctx, claim, "device-a", "device-b")
+		})
+
+		ginkgo.It("keeps pod pending for matchAttribute with disjoint lists", func(ctx context.Context) {
+			tCtx := f.TContext(ctx)
+			claim := claimWith(resourceapi.DeviceConstraint{MatchAttribute: &attrValuesConstraintAttribute}, "device-a", "device-c")
+			pod := b.PodExternal(claim.Name)
+			b.Create(tCtx, claim, pod)
+			expectUnschedulable(ctx, claim, pod)
+		})
+
+		// matchAttribute narrows one intersection across all devices
+		// instead of comparing them pairwise, so devices which only
+		// overlap pairwise must not be allocated together.
+		ginkgo.It("keeps pod pending for matchAttribute with pairwise overlapping lists", func(ctx context.Context) {
+			tCtx := f.TContext(ctx)
+			claim := claimWith(resourceapi.DeviceConstraint{MatchAttribute: &attrValuesConstraintAttribute}, "device-a", "device-b", "device-d")
+			pod := b.PodExternal(claim.Name)
+			b.Create(tCtx, claim, pod)
+			expectUnschedulable(ctx, claim, pod)
+		})
+
+		ginkgo.It("supports matchAttribute for a scalar and a list with common elements", func(ctx context.Context) {
+			tCtx := f.TContext(ctx)
+			claim := claimWith(resourceapi.DeviceConstraint{MatchAttribute: &attrValuesConstraintAttribute}, "device-s", "device-a")
+			pod := b.PodExternal(claim.Name)
+			b.Create(tCtx, claim, pod)
+			b.TestPod(tCtx, pod)
+			expectAllocatedDevices(ctx, claim, "device-s", "device-a")
+		})
+
+		// Declare the DRAConsumableCapacity requirement so these tests get
+		// skipped on clusters where distinctAttribute is disabled.
+		f.It("supports distinctAttribute for disjoint lists", f.WithFeatureGate(features.DRAConsumableCapacity), func(ctx context.Context) {
+			tCtx := f.TContext(ctx)
+			claim := claimWith(resourceapi.DeviceConstraint{DistinctAttribute: &attrValuesConstraintAttribute}, "device-a", "device-c")
+			pod := b.PodExternal(claim.Name)
+			b.Create(tCtx, claim, pod)
+			b.TestPod(tCtx, pod)
+			expectAllocatedDevices(ctx, claim, "device-a", "device-c")
+		})
+
+		f.It("keeps pod pending for distinctAttribute with lists sharing an element", f.WithFeatureGate(features.DRAConsumableCapacity), func(ctx context.Context) {
+			tCtx := f.TContext(ctx)
+			claim := claimWith(resourceapi.DeviceConstraint{DistinctAttribute: &attrValuesConstraintAttribute}, "device-a", "device-b")
+			pod := b.PodExternal(claim.Name)
+			b.Create(tCtx, claim, pod)
+			expectUnschedulable(ctx, claim, pod)
+		})
+	}
+
+	sharedConsumableCapacityTests := func() {
+		nodes := drautils.NewNodes(f, 1, 1)
+		capacityName := resourceapi.QualifiedName("dra.example.com/bandwidth")
+		driver := drautils.NewDriver(
+			f,
+			nodes,
+			drautils.ToDriverResources(
+				[]resourceapi.CounterSet{
+					{
+						Name: "shared-bandwidth",
+						Counters: map[string]resourceapi.Counter{
+							"bandwidth": {
+								Value: resource.MustParse("2"),
+								ConsumptionPolicy: func() *resourceapi.CapacityRequestPolicy {
+									defaultVal := resource.MustParse("1")
+									minVal := resource.MustParse("1")
+									maxVal := resource.MustParse("2")
+									stepVal := resource.MustParse("1")
+									return &resourceapi.CapacityRequestPolicy{
+										Default: &defaultVal,
+										ValidRange: &resourceapi.CapacityRequestPolicyRange{
+											Min:  &minVal,
+											Max:  &maxVal,
+											Step: &stepVal,
+										},
+									}
+								}(),
+							},
+						},
+					},
+				},
+				func() []resourceapi.Device {
+					dynamicRole := "dynamic"
+					staticRole := "static"
+					return []resourceapi.Device{
+						{
+							Name: "vf-0",
+							Attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+								"role": {StringValue: &dynamicRole},
+							},
+							ConsumesCounters: []resourceapi.DeviceCounterConsumption{{
+								CounterSet: "shared-bandwidth",
+								Counters: map[string]resourceapi.CounterRequirement{
+									"bandwidth": {
+										ValueFrom: &resourceapi.CounterValueFrom{
+											CapacityName: capacityName,
+										},
+									},
+								},
+							}},
+						},
+						{
+							Name: "vf-1",
+							Attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+								"role": {StringValue: &dynamicRole},
+							},
+							ConsumesCounters: []resourceapi.DeviceCounterConsumption{{
+								CounterSet: "shared-bandwidth",
+								Counters: map[string]resourceapi.CounterRequirement{
+									"bandwidth": {
+										ValueFrom: &resourceapi.CounterValueFrom{
+											CapacityName: capacityName,
+										},
+									},
+								},
+							}},
+						},
+						{
+							Name: "vf-2",
+							Attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+								"role": {StringValue: &dynamicRole},
+							},
+							ConsumesCounters: []resourceapi.DeviceCounterConsumption{{
+								CounterSet: "shared-bandwidth",
+								Counters: map[string]resourceapi.CounterRequirement{
+									"bandwidth": {
+										ValueFrom: &resourceapi.CounterValueFrom{
+											CapacityName: capacityName,
+										},
+									},
+								},
+							}},
+						},
+						{
+							Name: "vf-static",
+							Attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+								"role": {StringValue: &staticRole},
+							},
+							ConsumesCounters: []resourceapi.DeviceCounterConsumption{{
+								CounterSet: "shared-bandwidth",
+								Counters: map[string]resourceapi.CounterRequirement{
+									"bandwidth": {
+										Value: new(resource.MustParse("1")),
+									},
+								},
+							}},
+						},
+					}
+				}()...,
+			),
+		)
+		b := drautils.NewBuilder(f, driver)
+
+		f.It("must account for shared consumable capacity across related devices", func(ctx context.Context) {
+			tCtx := f.TContext(ctx)
+
+			claim := b.ExternalClaim()
+			claim.Spec.Devices.Requests[0].Exactly.Capacity = &resourceapi.CapacityRequirements{
+				Requests: map[resourceapi.QualifiedName]resource.Quantity{
+					capacityName: resource.MustParse("1"),
+				},
+			}
+			pod := b.PodExternal(claim.Name)
+			b.Create(tCtx, claim, pod)
+			b.TestPod(tCtx, pod)
+
+			claim2 := b.ExternalClaim()
+			claim2.Spec.Devices.Requests[0].Exactly.Capacity = &resourceapi.CapacityRequirements{
+				Requests: map[resourceapi.QualifiedName]resource.Quantity{
+					capacityName: resource.MustParse("1"),
+				},
+			}
+			pod2 := b.PodExternal(claim2.Name)
+			b.Create(tCtx, claim2, pod2)
+			b.TestPod(tCtx, pod2)
+
+			claim3 := b.ExternalClaim()
+			claim3.Spec.Devices.Requests[0].Exactly.Capacity = &resourceapi.CapacityRequirements{
+				Requests: map[resourceapi.QualifiedName]resource.Quantity{
+					capacityName: resource.MustParse("1"),
+				},
+			}
+			pod3 := b.PodExternal(claim3.Name)
+			b.Create(tCtx, claim3, pod3)
+
+			framework.ExpectNoError(e2epod.WaitForPodNameUnschedulableInNamespace(ctx, f.ClientSet, pod3.Name, pod3.Namespace))
+			gomega.Consistently(ctx, framework.GetObject(f.ClientSet.CoreV1().Pods(pod3.Namespace).Get, pod3.Name, metav1.GetOptions{})).
+				WithTimeout(20 * time.Second).WithPolling(200 * time.Millisecond).Should(gomega.HaveField("Spec.NodeName", gomega.BeEmpty()))
+
+			b.DeletePodAndWaitForNotFound(tCtx, pod)
+			b.TestPod(tCtx, pod3)
+		})
+
+		f.It("must account for mixed static and request-driven shared counter consumption", func(ctx context.Context) {
+			tCtx := f.TContext(ctx)
+			staticSelector := resourceapi.DeviceSelector{
+				CEL: &resourceapi.CELDeviceSelector{
+					Expression: fmt.Sprintf(`device.attributes["%s"].role == "static"`, driver.Name),
+				},
+			}
+			dynamicSelector := resourceapi.DeviceSelector{
+				CEL: &resourceapi.CELDeviceSelector{
+					Expression: fmt.Sprintf(`device.attributes["%s"].role == "dynamic"`, driver.Name),
+				},
+			}
+
+			staticClaim := b.ExternalClaim()
+			staticClaim.Spec.Devices.Requests[0].Exactly.Selectors = []resourceapi.DeviceSelector{staticSelector}
+			staticPod := b.PodExternal(staticClaim.Name)
+			b.Create(tCtx, staticClaim, staticPod)
+			b.TestPod(tCtx, staticPod)
+
+			dynamicClaim1 := b.ExternalClaim()
+			dynamicClaim1.Spec.Devices.Requests[0].Exactly.Selectors = []resourceapi.DeviceSelector{dynamicSelector}
+			dynamicClaim1.Spec.Devices.Requests[0].Exactly.Capacity = &resourceapi.CapacityRequirements{
+				Requests: map[resourceapi.QualifiedName]resource.Quantity{
+					capacityName: resource.MustParse("1"),
+				},
+			}
+			dynamicPod1 := b.PodExternal(dynamicClaim1.Name)
+			b.Create(tCtx, dynamicClaim1, dynamicPod1)
+			b.TestPod(tCtx, dynamicPod1)
+
+			dynamicClaim2 := b.ExternalClaim()
+			dynamicClaim2.Spec.Devices.Requests[0].Exactly.Selectors = []resourceapi.DeviceSelector{dynamicSelector}
+			dynamicClaim2.Spec.Devices.Requests[0].Exactly.Capacity = &resourceapi.CapacityRequirements{
+				Requests: map[resourceapi.QualifiedName]resource.Quantity{
+					capacityName: resource.MustParse("1"),
+				},
+			}
+			dynamicPod2 := b.PodExternal(dynamicClaim2.Name)
+			b.Create(tCtx, dynamicClaim2, dynamicPod2)
+
+			framework.ExpectNoError(e2epod.WaitForPodNameUnschedulableInNamespace(ctx, f.ClientSet, dynamicPod2.Name, dynamicPod2.Namespace))
+			gomega.Consistently(ctx, framework.GetObject(f.ClientSet.CoreV1().Pods(dynamicPod2.Namespace).Get, dynamicPod2.Name, metav1.GetOptions{})).
+				WithTimeout(20 * time.Second).WithPolling(200 * time.Millisecond).Should(gomega.HaveField("Spec.NodeName", gomega.BeEmpty()))
+
+			b.DeletePodAndWaitForNotFound(tCtx, staticPod)
+			b.TestPod(tCtx, dynamicPod2)
+		})
+	}
+
+	sharedStaticCounterTests := func() {
+		nodes := drautils.NewNodes(f, 1, 1)
+		consumption := []resourceapi.DeviceCounterConsumption{{
+			CounterSet: "shared-memory",
+			Counters:   map[string]resourceapi.CounterRequirement{"memory": {Value: new(resource.MustParse("6Gi"))}},
+		}}
+		driver := drautils.NewDriver(f, nodes, drautils.ToDriverResources(
+			[]resourceapi.CounterSet{{Name: "shared-memory", Counters: map[string]resourceapi.Counter{"memory": {
+				Value: resource.MustParse("10Gi"),
+				ConsumptionPolicy: &resourceapi.CapacityRequestPolicy{
+					Default: new(resource.MustParse("6Gi")), ValidValues: []resource.Quantity{resource.MustParse("6Gi")},
+				},
+			}}}},
+			resourceapi.Device{Name: "shared-device", AllowMultipleAllocations: new(true), ConsumesCounters: consumption},
+			resourceapi.Device{Name: "other-device", ConsumesCounters: consumption},
+		))
+		b := drautils.NewBuilder(f, driver)
+
+		f.It("must retain static counter consumption until the last share is released", func(ctx context.Context) {
+			tCtx := f.TContext(ctx)
+			var claims []*resourceapi.ResourceClaim
+			var pods []*v1.Pod
+			for range 2 {
+				claim := b.ExternalClaim()
+				claim.Spec.Devices.Requests[0].Exactly.Selectors = []resourceapi.DeviceSelector{{CEL: &resourceapi.CELDeviceSelector{Expression: "device.allowMultipleAllocations"}}}
+				pod := b.PodExternal(claim.Name)
+				b.Create(tCtx, claim, pod)
+				b.TestPod(tCtx, pod)
+				allocated, err := f.ClientSet.ResourceV1().ResourceClaims(pod.Namespace).Get(ctx, claim.Name, metav1.GetOptions{})
+				framework.ExpectNoError(err, "get shared claim")
+				gomega.Expect(allocated.Status.Allocation).NotTo(gomega.BeNil())
+				gomega.Expect(allocated.Status.Allocation.Devices.Results).To(gomega.HaveLen(1))
+				result := allocated.Status.Allocation.Devices.Results[0]
+				gomega.Expect(result.Device).To(gomega.Equal("shared-device"))
+				gomega.Expect(result.ShareID).NotTo(gomega.BeNil())
+				gomega.Expect(result.ConsumedCounters).To(gomega.BeEmpty())
+				claims = append(claims, allocated)
+				pods = append(pods, pod)
+			}
+			gomega.Expect(claims[0].Status.Allocation.Devices.Results[0].Pool).To(gomega.Equal(claims[1].Status.Allocation.Devices.Results[0].Pool))
+			gomega.Expect(claims[0].Status.Allocation.Devices.Results[0].ShareID).NotTo(gomega.Equal(claims[1].Status.Allocation.Devices.Results[0].ShareID))
+
+			otherClaim := b.ExternalClaim()
+			otherClaim.Spec.Devices.Requests[0].Exactly.Selectors = []resourceapi.DeviceSelector{{CEL: &resourceapi.CELDeviceSelector{Expression: "!device.allowMultipleAllocations"}}}
+			otherPod := b.PodExternal(otherClaim.Name)
+			b.Create(tCtx, otherClaim, otherPod)
+			framework.ExpectNoError(e2epod.WaitForPodNameUnschedulableInNamespace(ctx, f.ClientSet, otherPod.Name, otherPod.Namespace))
+
+			ginkgo.By("releasing the first share while the second still reserves the device")
+			b.DeletePodAndWaitForNotFound(tCtx, pods[0])
+			gomega.Eventually(ctx, framework.GetObject(f.ClientSet.ResourceV1().ResourceClaims(pods[0].Namespace).Get, claims[0].Name, metav1.GetOptions{})).
+				WithTimeout(f.Timeouts.PodDelete).Should(gomega.HaveField("Status.Allocation", gomega.BeNil()))
+			gomega.Consistently(ctx, framework.GetObject(f.ClientSet.CoreV1().Pods(otherPod.Namespace).Get, otherPod.Name, metav1.GetOptions{})).
+				WithTimeout(20*time.Second).WithPolling(200*time.Millisecond).Should(gomega.HaveField("Spec.NodeName", gomega.BeEmpty()), "6Gi must remain reserved while a share survives")
+			survivor, err := f.ClientSet.ResourceV1().ResourceClaims(pods[1].Namespace).Get(ctx, claims[1].Name, metav1.GetOptions{})
+			framework.ExpectNoError(err, "get surviving shared claim")
+			gomega.Expect(survivor.Status.Allocation).To(gomega.Equal(claims[1].Status.Allocation), "releasing another claim must not change the surviving allocation")
+
+			ginkgo.By("releasing the last share so the other device can use the counters")
+			b.DeletePodAndWaitForNotFound(tCtx, pods[1])
+			gomega.Eventually(ctx, framework.GetObject(f.ClientSet.ResourceV1().ResourceClaims(pods[1].Namespace).Get, claims[1].Name, metav1.GetOptions{})).
+				WithTimeout(f.Timeouts.PodDelete).Should(gomega.HaveField("Status.Allocation", gomega.BeNil()))
+			b.TestPod(tCtx, otherPod)
+			allocated, err := f.ClientSet.ResourceV1().ResourceClaims(otherPod.Namespace).Get(ctx, otherClaim.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err, "get allocation after the last share was released")
+			gomega.Expect(allocated.Status.Allocation.Devices.Results[0].Device).To(gomega.Equal("other-device"))
+		})
+	}
+
 	podGroupResourceClaimTests := func() {
 		nodes := drautils.NewNodes(f, 1, 1)
 		driver := drautils.NewDriver(f, nodes, drautils.DriverResources(1))
@@ -2685,6 +3061,9 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 				for _, event := range evList.Items {
 					gomega.Expect(event.Reason).NotTo(gomega.Equal(events.FailedPrepareDynamicResources), "unexpected FailedPrepareDynamicResources event")
 				}
+
+				// With no node-local driver running, pod deletion hangs unless NodeUnprepareResources is skipped.
+				b.DeletePodAndWaitForNotFound(tCtx, pod)
 			})
 
 			ginkgo.It("fails node preparation when SkipNodeOperations is not set", func(ctx context.Context) {
@@ -2846,6 +3225,45 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 		})
 	}
 
+	// Verifies scheduling behavior across kubelet version-skew jobs, where kubelets before 1.38
+	// do not declare DRAOptionalNodeOperations by default.
+	optionalNodeOperationsSkewTests := func() {
+		ginkgo.It("only schedules pods which skip node operations onto nodes which declare support", func(ctx context.Context) {
+			tCtx := f.TContext(ctx)
+			nodes := drautils.NewNodesNow(tCtx, 1, 1)
+			driver := drautils.NewDriverInstance(tCtx)
+			driver.WithKubelet = false
+			b := drautils.NewBuilderNow(tCtx, driver)
+			driver.Run(tCtx, framework.TestContext.KubeletRootDir, nodes, drautils.DriverResourcesWithSkipNodeOperationsNow(nodes, 1, resourceapi.SkipNodeOperationAll))
+
+			claim := b.ExternalClaim()
+			pod := b.PodExternal(claim.Name)
+			b.Create(tCtx, claim, pod)
+
+			node, err := f.ClientSet.CoreV1().Nodes().Get(ctx, nodes.NodeNames[0], metav1.GetOptions{})
+			framework.ExpectNoError(err, "get node")
+			kubeletVersion, err := utilversion.ParseSemantic(node.Status.NodeInfo.KubeletVersion)
+			framework.ExpectNoError(err, "parse kubelet version %q of node %s", node.Status.NodeInfo.KubeletVersion, node.Name)
+			declared := slices.Contains(node.Status.DeclaredFeatures, draoptionalnodeoperations.DRAOptionalNodeOperationsFeatureGate)
+			// Kubelets >= 1.38 enable and declare DRAOptionalNodeOperations by default.
+			// Comparing against "1.38" (major.minor, not semver "1.38.0") ensures 1.38
+			// pre-release kubelets (e.g. v1.38.0-beta.0) also match.
+			if kubeletVersion.AtLeast(utilversion.MustParse("1.38")) {
+				gomega.Expect(declared).To(gomega.BeTrueBecause("kubelet %s should declare DRAOptionalNodeOperations", node.Status.NodeInfo.KubeletVersion))
+			}
+			if declared {
+				framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod), "start pod")
+				return
+			}
+
+			// Node does not declare DRAOptionalNodeOperations, so the scheduler must keep the pod pending.
+			framework.ExpectNoError(e2epod.WaitForPodNameUnschedulableInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace), "pod should be unschedulable")
+			gomega.Consistently(ctx, framework.GetObject(f.ClientSet.CoreV1().Pods(pod.Namespace).Get, pod.Name, metav1.GetOptions{})).
+				WithTimeout(30*time.Second).
+				Should(gomega.HaveField("Spec.NodeName", gomega.BeEmpty()), "pod must not get scheduled onto a node without DRAOptionalNodeOperations")
+		})
+	}
+
 	// It is okay to use the same context multiple times (like "control plane"),
 	// as long as the test names the still remain unique overall.
 
@@ -2860,14 +3278,25 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 
 	framework.Context("kubelet", feature.DynamicResourceAllocation, f.WithFeatureGate(features.DRAConsumableCapacity), consumableCapacityTests)
 
-	framework.Context("kubelet", feature.DynamicResourceAllocation, "with v1beta1 API", v1beta1Tests)
+	framework.Context("control plane", "device constraints", "with list-typed attributes", f.WithFeatureGate(features.DRAListTypeAttributes), constraintsTests)
+
+	framework.Context("kubelet", feature.DynamicResourceAllocation, f.WithFeatureGate(features.DRAConsumableCapacity), f.WithFeatureGate(features.DRAPartitionableDevices), f.WithFeatureGate(features.DRASharedConsumableCapacity), sharedConsumableCapacityTests)
+	framework.Context("kubelet", feature.DynamicResourceAllocation, f.WithFeatureGate(features.DRAConsumableCapacity), f.WithFeatureGate(features.DRAPartitionableDevices), f.WithFeatureGate(features.DRASharedConsumableCapacity), sharedStaticCounterTests)
+
 	framework.Context("kubelet", feature.DynamicResourceAllocation, "with v1beta2 API", v1beta2Tests)
 
 	framework.Context("kubelet", feature.DynamicResourceAllocation, f.WithFeatureGate(features.DRAPartitionableDevices), partitionableDevicesTests)
 
 	framework.Context("kubelet", feature.DynamicResourceAllocation, f.WithFeatureGate(features.GenericWorkload), f.WithFeatureGate(features.DRAWorkloadResourceClaims), f.WithKubeletMinVersion("1.36"), podGroupResourceClaimTests)
 
-	framework.Context("kubelet", feature.DynamicResourceAllocation, f.WithFeatureGate(features.DRAOptionalNodeOperations), optionalNodeOperationsTests)
+	// These tests expect pods using SkipNodeOperations to get scheduled onto a supporting node.
+	// Kubelet version-skew jobs run older kubelets with default flags, and kubelets before 1.38
+	// do not enable or declare DRAOptionalNodeOperations by default.
+	framework.Context("kubelet", feature.DynamicResourceAllocation, f.WithFeatureGate(features.DRAOptionalNodeOperations), f.WithKubeletMinVersion("1.38"), optionalNodeOperationsTests)
+	// Requires kubelet >= 1.36: kind skew jobs initially register nodes with a current kubelet
+	// before downgrading it, and 1.35 kubelets (where NodeDeclaredFeatures was alpha/off) never
+	// overwrite the stale status.declaredFeatures left behind.
+	framework.Context("kubelet", feature.DynamicResourceAllocation, f.WithFeatureGate(features.DRAOptionalNodeOperations), f.WithKubeletMinVersion("1.36"), "with kubelet version skew", optionalNodeOperationsSkewTests)
 
 	framework.Context("kubelet", feature.DynamicResourceAllocation, f.WithFeatureGate(features.DRADeviceTaints), func() {
 		nodes := drautils.NewNodes(f, 1, 1)
@@ -3133,8 +3562,6 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 
 		ginkgo.By("Creating the pod with extended resource")
 		b.Create(tCtx, class, pod)
-		err := e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod)
-		framework.ExpectNoError(err, "start pod")
 
 		ginkgo.By("Verifying extended resource claim exists")
 		var extendedResourceClaim *resourceapi.ResourceClaim
@@ -3152,7 +3579,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 		}).WithTimeout(time.Minute).Should(gomega.BeTrueBecause("extended resource claim should be created"))
 
 		ginkgo.By("Waiting for the pod to reach terminal state")
-		err = waitFn(ctx, pod)
+		err := waitFn(ctx, pod)
 		framework.ExpectNoError(err, "waiting for pod to reach terminal state")
 
 		ginkgo.By("Verifying extended resource claim is cleaned up")

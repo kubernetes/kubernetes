@@ -23,7 +23,7 @@ package v1beta2
 //
 // CELDeviceSelector contains a CEL expression for selecting a device.
 type CELDeviceSelectorApplyConfiguration struct {
-	// Expression is a CEL expression which evaluates a single device. It
+	// expression is a CEL expression which evaluates a single device. It
 	// must evaluate to true when the device under consideration satisfies
 	// the desired criteria, and false when it does not. Any other result
 	// is an error and causes allocation of devices to abort.

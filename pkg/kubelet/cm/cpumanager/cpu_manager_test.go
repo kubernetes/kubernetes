@@ -40,8 +40,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/test/utils/ktesting"
-	"k8s.io/kubernetes/test/utils/ktesting/initoption"
+	"k8s.io/ktesting"
+	"k8s.io/ktesting/initoption"
 
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
@@ -197,6 +197,10 @@ func (p *mockPolicy) AllocatePod(_ klog.Logger, _ state.State, _ *v1.Pod, _ life
 
 func (p *mockPolicy) GetAllocatableCPUs(_ state.State) cpuset.CPUSet {
 	return cpuset.New()
+}
+
+func (p *mockPolicy) CanAllocateExclusively() bool {
+	return false
 }
 
 type mockRuntimeService struct {
@@ -1870,7 +1874,7 @@ func TestCPUManagerAddResize(t *testing.T) {
 				},
 				{
 					description:      "then resize operation - no error - skip resize",
-					operation:        lifecycle.ResizeOperation,
+					operation:        lifecycle.UpdateOperation,
 					expDefaultCPUSet: cpuset.New(3, 4),
 					expAllocateErr:   nil,
 					expContainerErr:  nil,
@@ -1884,7 +1888,7 @@ func TestCPUManagerAddResize(t *testing.T) {
 			testSteps: []testStep{
 				{
 					description:      "no error - skip allocation",
-					operation:        lifecycle.ResizeOperation,
+					operation:        lifecycle.UpdateOperation,
 					expDefaultCPUSet: cpuset.New(1, 2, 3, 4),
 					expAllocateErr:   nil,
 					expContainerErr:  nil,
@@ -1912,7 +1916,7 @@ func TestCPUManagerAddResize(t *testing.T) {
 			testSteps: []testStep{
 				{
 					description:      "first resize operation - no error - skip resize",
-					operation:        lifecycle.ResizeOperation,
+					operation:        lifecycle.UpdateOperation,
 					expDefaultCPUSet: cpuset.New(1, 2, 3, 4),
 					expAllocateErr:   nil,
 					expContainerErr:  nil,

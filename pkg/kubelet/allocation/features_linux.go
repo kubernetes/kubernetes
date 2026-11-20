@@ -25,9 +25,6 @@ import (
 )
 
 func IsInPlacePodVerticalScalingAllowed(pod *v1.Pod) (allowed bool, msg, reason string) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-		return false, "InPlacePodVerticalScaling is disabled", "feature_gate_off"
-	}
 	return true, "", ""
 }
 

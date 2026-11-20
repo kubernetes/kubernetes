@@ -114,6 +114,13 @@ func (w *compareWalker) compare(prefixFn func() string) (errs ValidationErrors) 
 		return errorf("schema error: no type found matching: %v", *w.typeRef.NamedType)
 	}
 
+	// Skip unchanged subtrees. Avoid checking at the root (len(w.path) == 0)
+	// since the root object typically differs on updates and would traverse
+	// unchanged top-level subtrees twice.
+	if len(w.path) > 0 && w.lhs != nil && w.rhs != nil && value.EqualsUsing(w.allocator, w.lhs, w.rhs) {
+		return nil
+	}
+
 	alhs := deduceAtom(a, w.lhs)
 	arhs := deduceAtom(a, w.rhs)
 

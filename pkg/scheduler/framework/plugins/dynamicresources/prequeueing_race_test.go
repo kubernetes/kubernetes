@@ -28,7 +28,7 @@ import (
 
 func TestPreQueueingHint_PodNotYetIndexed(t *testing.T) {
 	logger := klog.Background()
-	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{podResourceClaimIndexPrefix + "-test": podResourceClaimIndexFunc})
+	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{podResourceClaimIndex: podResourceClaimIndexFunc})
 
 	// Pod with template-based claim, status NOT yet updated
 	pod := &v1.Pod{
@@ -43,7 +43,7 @@ func TestPreQueueingHint_PodNotYetIndexed(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	pl := &DynamicResources{podIndexer: indexer, podResourceClaimIndex: podResourceClaimIndexPrefix + "-test"}
+	pl := &DynamicResources{podIndexer: indexer}
 
 	// Claim allocation event - indexer cannot find pod by this claim name
 	got, err := pl.preQueueingHint(logger, nil, &resourceapi.ResourceClaim{
@@ -56,12 +56,18 @@ func TestPreQueueingHint_PodNotYetIndexed(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// Known limitation: when pod's ResourceClaimStatuses isn't populated yet,
-	// the indexer cannot find the pod. The periodic flush rescues such pods.
+	// When a template pod's ResourceClaimStatuses isn't populated yet, the
+	// generated claim name isn't known, so the indexer cannot map the claim to
+	// the pod and this claim event narrows the pod out. That is expected and
+	// safe: populating ResourceClaimStatuses is itself a pod update that emits a
+	// TargetPod/UpdatePodGeneratedResourceClaim event (see
+	// isSchedulableAfterTargetPodUpdate), which requeues the pod. The rescue does
+	// not depend on the periodic flush.
 	if got.AllPods {
-		t.Logf("AllPods=true (safe fallback)")
-	} else if len(got.Pods) == 0 {
-		t.Logf("empty Pods (known race - pod rescued by flush)")
+		t.Errorf("expected AllPods=false when the pod is not yet indexed, got true")
+	}
+	if len(got.Pods) != 0 {
+		t.Errorf("expected no pods when the pod is not yet indexed, got %v", got.Pods)
 	}
 }
 
@@ -69,7 +75,7 @@ func TestPreQueueingHint_DeleteEventWithPodInIndexer(t *testing.T) {
 	// When an allocated claim is deleted and a pod referencing it exists
 	// in the indexer, AllPods is returned (deletion frees resources).
 	logger := klog.Background()
-	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{podResourceClaimIndexPrefix + "-test": podResourceClaimIndexFunc})
+	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{podResourceClaimIndex: podResourceClaimIndexFunc})
 
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: "my-pod", Namespace: "ns1"},
@@ -83,7 +89,7 @@ func TestPreQueueingHint_DeleteEventWithPodInIndexer(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	pl := &DynamicResources{podIndexer: indexer, podResourceClaimIndex: podResourceClaimIndexPrefix + "-test"}
+	pl := &DynamicResources{podIndexer: indexer}
 
 	// Delete event for an allocated claim
 	got, err := pl.preQueueingHint(logger, &resourceapi.ResourceClaim{

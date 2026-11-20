@@ -34,13 +34,13 @@ import (
 // by clients and scheduled onto hosts.
 type PodApplyConfiguration struct {
 	metav1.TypeMetaApplyConfiguration `json:""`
-	// Standard object's metadata.
+	// metadata is the standard object's metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	// Specification of the desired behavior of the pod.
+	// spec is the specification of the desired behavior of the pod.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	Spec *PodSpecApplyConfiguration `json:"spec,omitempty"`
-	// Most recently observed status of the pod.
+	// status is the most recently observed status of the pod.
 	// This data may not be up to date.
 	// Populated by the system.
 	// Read-only.
@@ -92,6 +92,12 @@ func ExtractPodFrom(pod *corev1.Pod, fieldManager string, subresource string) (*
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 func ExtractPod(pod *corev1.Pod, fieldManager string) (*PodApplyConfiguration, error) {
 	return ExtractPodFrom(pod, fieldManager, "")
+}
+
+// ExtractPodDynamic extracts the applied configuration owned by fieldManager from
+// pod for the dynamic subresource.
+func ExtractPodDynamic(pod *corev1.Pod, fieldManager string) (*PodApplyConfiguration, error) {
+	return ExtractPodFrom(pod, fieldManager, "dynamic")
 }
 
 // ExtractPodEphemeralcontainers extracts the applied configuration owned by fieldManager from

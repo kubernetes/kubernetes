@@ -41,6 +41,8 @@ func init() {
 			},
 			"metadata.generation": {
 				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
+				{ErrorType: "FieldValueInvalid", Origin: "monotonic"},
+				{ErrorType: "FieldValueInvalid", Origin: "update"},
 			},
 			"metadata.managedFields[*].operation": {
 				{ErrorType: "FieldValueNotSupported"},
@@ -48,6 +50,9 @@ func init() {
 			},
 			"metadata.name": {
 				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-long-name"},
+			},
+			"metadata.namespace": {
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
 			},
 			"metadata.ownerReferences[*].apiVersion": {
 				{ErrorType: "FieldValueRequired"},
@@ -74,6 +79,12 @@ func init() {
 			},
 			"spec.extendedResourceName": {
 				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-extended-resource-name"},
+			},
+			"spec.extendedResourceRequest.capacity.requests": {
+				{ErrorType: "FieldValueTooMany", Origin: "maxProperties"},
+			},
+			"spec.extendedResourceRequest.capacity.requests[*]": {
+				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
 			},
 			"spec.selectors": {
 				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},

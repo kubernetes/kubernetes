@@ -1,0 +1,152 @@
+apiVersion: authorization.k8s.io/v1alpha1
+kind: AuthorizationConditionsReview
+metadata:
+  annotations:
+    annotationsKey: annotationsValue
+  creationTimestamp: "2008-01-01T01:01:01Z"
+  deletionGracePeriodSeconds: 10
+  deletionTimestamp: "2009-01-01T01:01:01Z"
+  finalizers:
+  - finalizersValue
+  generateName: generateNameValue
+  generation: 7
+  labels:
+    labelsKey: labelsValue
+  managedFields:
+  - apiVersion: apiVersionValue
+    fieldsType: fieldsTypeValue
+    fieldsV1: {}
+    manager: managerValue
+    operation: operationValue
+    subresource: subresourceValue
+    time: "2004-01-01T01:01:01Z"
+  name: nameValue
+  namespace: namespaceValue
+  ownerReferences:
+  - apiVersion: apiVersionValue
+    blockOwnerDeletion: true
+    controller: true
+    kind: kindValue
+    name: nameValue
+    uid: uidValue
+  resourceVersion: resourceVersionValue
+  selfLink: selfLinkValue
+  uid: uidValue
+request:
+  admissionRequest:
+    dryRun: true
+    kind:
+      group: groupValue
+      kind: kindValue
+      version: versionValue
+    name: nameValue
+    namespace: namespaceValue
+    object:
+      apiVersion: example.com/v1
+      kind: CustomType
+      spec:
+        replicas: 1
+      status:
+        available: 1
+    oldObject:
+      apiVersion: example.com/v1
+      kind: CustomType
+      spec:
+        replicas: 1
+      status:
+        available: 1
+    operation: operationValue
+    options:
+      apiVersion: example.com/v1
+      kind: CustomType
+      spec:
+        replicas: 1
+      status:
+        available: 1
+    requestKind:
+      group: groupValue
+      kind: kindValue
+      version: versionValue
+    requestResource:
+      group: groupValue
+      resource: resourceValue
+      version: versionValue
+    requestSubResource: requestSubResourceValue
+    resource:
+      group: groupValue
+      resource: resourceValue
+      version: versionValue
+    subResource: subResourceValue
+    uid: uidValue
+    userInfo:
+      extra:
+        extraKey:
+        - extraValue
+      groups:
+      - groupsValue
+      uid: uidValue
+      username: usernameValue
+  decision:
+    allow:
+      evaluationError: evaluationErrorValue
+      reason: reasonValue
+    conditionsMap:
+      allowConditions:
+      - condition: conditionValue
+        description: descriptionValue
+        id: idValue
+        type: typeValue
+      denyConditions:
+      - condition: conditionValue
+        description: descriptionValue
+        id: idValue
+        type: typeValue
+      noOpinionConditions:
+      - condition: conditionValue
+        description: descriptionValue
+        id: idValue
+        type: typeValue
+    deny:
+      evaluationError: evaluationErrorValue
+      reason: reasonValue
+    noOpinion:
+      evaluationError: evaluationErrorValue
+      reason: reasonValue
+    type: typeValue
+    union:
+    - authorizerName: authorizerNameValue
+      decision:
+        type: ""
+response:
+  decision:
+    allow:
+      evaluationError: evaluationErrorValue
+      reason: reasonValue
+    conditionsMap:
+      allowConditions:
+      - condition: conditionValue
+        description: descriptionValue
+        id: idValue
+        type: typeValue
+      denyConditions:
+      - condition: conditionValue
+        description: descriptionValue
+        id: idValue
+        type: typeValue
+      noOpinionConditions:
+      - condition: conditionValue
+        description: descriptionValue
+        id: idValue
+        type: typeValue
+    deny:
+      evaluationError: evaluationErrorValue
+      reason: reasonValue
+    noOpinion:
+      evaluationError: evaluationErrorValue
+      reason: reasonValue
+    type: typeValue
+    union:
+    - authorizerName: authorizerNameValue
+      decision:
+        type: ""
+  uid: uidValue

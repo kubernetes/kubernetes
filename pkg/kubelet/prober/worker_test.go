@@ -17,7 +17,10 @@ limitations under the License.
 package prober
 
 import (
+	"context"
 	"fmt"
+	"slices"
+	"sync"
 	"testing"
 	"time"
 
@@ -26,7 +29,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/tools/record"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/component-base/metrics/testutil"
+	"k8s.io/ktesting"
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
@@ -35,7 +42,6 @@ import (
 	statustest "k8s.io/kubernetes/pkg/kubelet/status/testing"
 	kubeletutil "k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/pkg/probe"
-	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func init() {
@@ -489,7 +495,7 @@ func TestSuccessThreshold(t *testing.T) {
 	m.statusManager.SetPodStatus(logger, w.pod, getTestRunningStatus())
 
 	// Start out failure.
-	w.resultsManager.Set(testContainerID, results.Failure, &v1.Pod{})
+	w.resultsManager.Set(t.Context(), testContainerID, results.Failure, &v1.Pod{})
 
 	for i := 0; i < 2; i++ {
 		// Probe defaults to Failure.
@@ -858,6 +864,149 @@ func TestDoProbe_TerminatedContainerWithRestartPolicyNever(t *testing.T) {
 	expectResult(t, w, results.Failure, "regular container with pod restart policy Never")
 }
 
+func TestDoProbe_NewContainerOnKubeletRestart(t *testing.T) {
+	logger, ctx := ktesting.NewTestContext(t)
+
+	const (
+		oldContainerID = "test://old_container_id"
+		newContainerID = "test://new_container_id"
+	)
+
+	tests := []struct {
+		name string
+		// featureEnabled toggles ChangeContainerStatusOnKubeletRestart feature gate.
+		// When enabled, the result is always seeded with the probe's initial value.
+		featureEnabled bool
+		// apiContainerID is the container ID in the pod status the kubelet last
+		// observed from the API server, which may be outdated.
+		apiContainerID string
+		isSidecar      bool
+		probeType      probeType
+		// expectedUpdates is the sequence of results the worker is expected to publish.
+		expectedUpdates []results.Result
+	}{
+		{
+			name:           "feature disabled, readiness, the same container survived the kubelet restart",
+			featureEnabled: false,
+			apiContainerID: newContainerID,
+			probeType:      readiness,
+		},
+		{
+			name:            "feature disabled, readiness, a new container was created while the API server was unreachable",
+			featureEnabled:  false,
+			apiContainerID:  oldContainerID,
+			probeType:       readiness,
+			expectedUpdates: []results.Result{results.Failure},
+		},
+		{
+			name:           "feature disabled, readiness, the kubelet never observed a container ID",
+			featureEnabled: false,
+			apiContainerID: "",
+			probeType:      readiness,
+		},
+		{
+			name:           "feature disabled, readiness, the same sidecar survived the kubelet restart",
+			featureEnabled: false,
+			apiContainerID: newContainerID,
+			isSidecar:      true,
+			probeType:      readiness,
+		},
+		{
+			name:            "feature disabled, readiness, a new sidecar was created while the API server was unreachable",
+			featureEnabled:  false,
+			apiContainerID:  oldContainerID,
+			isSidecar:       true,
+			probeType:       readiness,
+			expectedUpdates: []results.Result{results.Failure},
+		},
+		{
+			name:            "feature disabled, startup, a new container was created while the API server was unreachable",
+			featureEnabled:  false,
+			apiContainerID:  oldContainerID,
+			probeType:       startup,
+			expectedUpdates: []results.Result{results.Unknown},
+		},
+		{
+			// Regression test for https://github.com/kubernetes/kubernetes/issues/136910:
+			// a sidecar that survived the restart keeps its startup result.
+			name:            "feature disabled, startup, the same sidecar survived the kubelet restart",
+			featureEnabled:  false,
+			apiContainerID:  newContainerID,
+			isSidecar:       true,
+			probeType:       startup,
+			expectedUpdates: []results.Result{results.Success},
+		},
+		{
+			name:            "feature disabled, startup, a new sidecar was created while the API server was unreachable",
+			featureEnabled:  false,
+			apiContainerID:  oldContainerID,
+			isSidecar:       true,
+			probeType:       startup,
+			expectedUpdates: []results.Result{results.Unknown},
+		},
+		{
+			name:            "feature is enabled, readiness, the same container survived the kubelet restart",
+			featureEnabled:  true,
+			apiContainerID:  newContainerID,
+			probeType:       readiness,
+			expectedUpdates: []results.Result{results.Failure},
+		},
+		{
+			name:            "feature is enabled, readiness, a new container was created while the API server was unreachable",
+			featureEnabled:  true,
+			apiContainerID:  oldContainerID,
+			probeType:       readiness,
+			expectedUpdates: []results.Result{results.Failure},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ChangeContainerStatusOnKubeletRestart, tc.featureEnabled)
+
+			m := newTestManager()
+
+			// The runtime reports a container that started before the kubelet restart
+			// grace period, so its start time alone makes it look like a container
+			// that survived the restart.
+			podStatus := getTestRunningStatus()
+			podStatus.ContainerStatuses[0].ContainerID = newContainerID
+			podStatus.ContainerStatuses[0].State.Running.StartedAt = metav1.Time{Time: kubeletRestartGracePeriod(m.start).Add(-time.Minute)}
+
+			// The pod status the kubelet last observed from the API server.
+			apiContainerStatus := v1.ContainerStatus{Name: testContainerName, ContainerID: tc.apiContainerID}
+
+			var w *worker
+			if tc.isSidecar {
+				w = newTestWorkerWithRestartableInitContainer(m, tc.probeType)
+				w.spec = &v1.Probe{InitialDelaySeconds: 1000}
+				podStatus.InitContainerStatuses = []v1.ContainerStatus{podStatus.ContainerStatuses[0]}
+				podStatus.ContainerStatuses = nil
+				w.pod.Status.InitContainerStatuses = []v1.ContainerStatus{apiContainerStatus}
+			} else {
+				w = newTestWorker(m, tc.probeType, v1.Probe{InitialDelaySeconds: 1000})
+				w.pod.Status.ContainerStatuses = []v1.ContainerStatus{apiContainerStatus}
+			}
+			m.statusManager.SetPodStatus(logger, w.pod, podStatus)
+
+			w.doProbe(ctx)
+
+			var updates []results.Result
+			for drained := false; !drained; {
+				select {
+				case update := <-resultsManager(m, tc.probeType).Updates():
+					updates = append(updates, update.Result)
+				default:
+					drained = true
+				}
+			}
+			if !slices.Equal(updates, tc.expectedUpdates) {
+				t.Errorf("Expected updates %v, but got: %v", tc.expectedUpdates, updates)
+			}
+		})
+	}
+}
+
 func TestLivenessProbeDisabledByStarted(t *testing.T) {
 	logger, ctx := ktesting.NewTestContext(t)
 	m := newTestManager()
@@ -1108,6 +1257,258 @@ func TestChangeContainerStatusOnKubeletRestart(t *testing.T) {
 			if tc.expectSet && result != tc.expectedResult {
 				t.Errorf("Expected result %v, but got: %v", tc.expectedResult, result)
 			}
+		})
+	}
+}
+
+func TestNewWorkerActiveProbesGauge(t *testing.T) {
+	_ = legacyregistry.Register(ActiveProbes)
+
+	http2 := v1.HTTPProtocolHTTP2
+
+	tests := []struct {
+		name            string
+		probeSpec       v1.Probe
+		gateEnabled     bool
+		expectedLabels  map[string]string
+		expectUntouched bool
+	}{
+		{
+			name:            "non-HTTP probe does not touch the gauge",
+			probeSpec:       v1.Probe{ProbeHandler: v1.ProbeHandler{Exec: &v1.ExecAction{}}, PeriodSeconds: 1, TimeoutSeconds: 1, SuccessThreshold: 1, FailureThreshold: 1},
+			gateEnabled:     true,
+			expectUntouched: true,
+		},
+		{
+			name:        "HTTP probe without protocol defaults to HTTP1",
+			probeSpec:   v1.Probe{ProbeHandler: v1.ProbeHandler{HTTPGet: &v1.HTTPGetAction{}}, PeriodSeconds: 1, TimeoutSeconds: 1, SuccessThreshold: 1, FailureThreshold: 1},
+			gateEnabled: true,
+			expectedLabels: map[string]string{
+				"protocol": string(v1.HTTPProtocolHTTP1),
+			},
+		},
+		{
+			name:        "HTTP2 probe with gate enabled is counted as HTTP2",
+			probeSpec:   v1.Probe{ProbeHandler: v1.ProbeHandler{HTTPGet: &v1.HTTPGetAction{Protocol: &http2}}, PeriodSeconds: 1, TimeoutSeconds: 1, SuccessThreshold: 1, FailureThreshold: 1},
+			gateEnabled: true,
+			expectedLabels: map[string]string{
+				"protocol": string(v1.HTTPProtocolHTTP2),
+			},
+		},
+		{
+			name:        "HTTP2 probe with gate disabled falls back to HTTP1",
+			probeSpec:   v1.Probe{ProbeHandler: v1.ProbeHandler{HTTPGet: &v1.HTTPGetAction{Protocol: &http2}}, PeriodSeconds: 1, TimeoutSeconds: 1, SuccessThreshold: 1, FailureThreshold: 1},
+			gateEnabled: false,
+			expectedLabels: map[string]string{
+				"protocol": string(v1.HTTPProtocolHTTP1),
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ActiveProbes.Reset()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.H2CContainerProbe, test.gateEnabled)
+
+			m := newTestManager()
+			// newTestWorker forces an exec ProbeHandler, so build the pod directly to
+			// keep the HTTP probe spec under test intact.
+			pod := getTestPod()
+			pod.Spec.Containers[0].ReadinessProbe = &test.probeSpec
+			w := newWorker(m, readiness, pod, pod.Spec.Containers[0])
+
+			key := probeKey{testPodUID, testContainerName, readiness}
+			m.workers[key] = w
+			tCtx := ktesting.Init(t)
+			go w.run(tCtx)
+
+			labels := test.expectedLabels
+			if test.expectUntouched {
+				// Nothing to increment for a non-HTTP probe; use any label
+				// combination to confirm the gauge is never touched.
+				labels = map[string]string{"protocol": string(v1.HTTPProtocolHTTP1)}
+			} else {
+				gaugeIsOne := func(ctx context.Context) (bool, error) {
+					v, err := testutil.GetGaugeMetricValue(ActiveProbes.With(labels))
+					if err != nil {
+						return false, err
+					}
+					return v == 1, nil
+				}
+				if err := wait.PollUntilContextTimeout(tCtx, 10*time.Millisecond, wait.ForeverTestTimeout, true, gaugeIsOne); err != nil {
+					t.Fatalf("expected ActiveProbes%v to reach 1 after the worker started running: %v", labels, err)
+				}
+			}
+
+			w.stop()
+			if err := waitForWorkerExit(tCtx.TB(), m, []probeKey{key}); err != nil {
+				t.Fatalf("error waiting for worker exit: %v", err)
+			}
+
+			got, err := testutil.GetGaugeMetricValue(ActiveProbes.With(labels))
+			if err != nil {
+				t.Fatalf("failed to get gauge value: %v", err)
+			}
+			if got != 0 {
+				t.Errorf("expected ActiveProbes%v to be 0 after worker exit, got %v", labels, got)
+			}
+		})
+	}
+}
+
+// TestActiveProbesDecrementsWhenReplaced verifies that a worker decrements
+// ActiveProbes on exit even if it was replaced by a new worker (e.g. the
+// container restarted). Only ProberResults/ProberDuration, which are keyed by
+// pod/container labels the replacement worker reuses, should skip cleanup in that
+// case; ActiveProbes is incremented once per worker instance and must
+// always be balanced by exactly one decrement, regardless of replacement.
+func TestActiveProbesDecrementsWhenReplaced(t *testing.T) {
+	_ = legacyregistry.Register(ActiveProbes)
+	ActiveProbes.Reset()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.H2CContainerProbe, true)
+
+	probeSpec := v1.Probe{
+		ProbeHandler:     v1.ProbeHandler{HTTPGet: &v1.HTTPGetAction{}},
+		PeriodSeconds:    1,
+		TimeoutSeconds:   1,
+		SuccessThreshold: 1,
+		FailureThreshold: 1,
+	}
+	labels := map[string]string{"protocol": string(v1.HTTPProtocolHTTP1)}
+
+	m := newTestManager()
+	pod := getTestPod()
+	pod.Spec.Containers[0].ReadinessProbe = &probeSpec
+	oldWorker := newWorker(m, readiness, pod, pod.Spec.Containers[0])
+	replacementWorker := newWorker(m, readiness, pod, pod.Spec.Containers[0])
+
+	key := probeKey{testPodUID, testContainerName, readiness}
+	tCtx := ktesting.Init(t)
+
+	gaugeReaches := func(want float64) error {
+		condition := func(context.Context) (bool, error) {
+			v, err := testutil.GetGaugeMetricValue(ActiveProbes.With(labels))
+			if err != nil {
+				return false, err
+			}
+			return v == want, nil
+		}
+		return wait.PollUntilContextTimeout(tCtx, 10*time.Millisecond, wait.ForeverTestTimeout, true, condition)
+	}
+
+	m.workers[key] = oldWorker
+	go oldWorker.run(tCtx)
+	if err := gaugeReaches(1); err != nil {
+		t.Fatalf("expected ActiveProbes to reach 1 after the old worker started running: %v", err)
+	}
+
+	// Simulate the replacement: the manager's worker map now points at the new
+	// worker for this probeKey before the old worker's run loop exits.
+	m.workers[key] = replacementWorker
+	go replacementWorker.run(tCtx)
+	if err := gaugeReaches(2); err != nil {
+		t.Fatalf("expected ActiveProbes to reach 2 once the replacement worker started running: %v", err)
+	}
+
+	oldWorker.stop()
+	if err := gaugeReaches(1); err != nil {
+		t.Fatalf("expected ActiveProbes to settle at 1 (replacement worker's own increment) after the replaced worker exited: %v", err)
+	}
+
+	if _, exists := m.getWorker(testPodUID, testContainerName, readiness); !exists {
+		t.Fatalf("expected the replacement worker to remain registered")
+	}
+
+	replacementWorker.stop()
+	if err := gaugeReaches(0); err != nil {
+		t.Fatalf("expected ActiveProbes to reach 0 after the replacement worker also exited: %v", err)
+	}
+}
+
+// hangingRunner blocks in RunInContainer until its context is canceled,
+// standing in for a CRI exec that keeps running inside a container which is
+// being torn down.
+type hangingRunner struct {
+	entered chan struct{}
+	once    sync.Once
+}
+
+func (r *hangingRunner) RunInContainer(ctx context.Context, _ kubecontainer.ContainerID, _ []string, _ time.Duration) ([]byte, error) {
+	r.once.Do(func() { close(r.entered) })
+	<-ctx.Done()
+	return nil, ctx.Err()
+}
+
+// TestStopCancelsInFlightProbe verifies that stop() aborts a probe that is
+// already executing instead of only preventing the next one, and that the
+// aborted probe records no result.
+func TestStopCancelsInFlightProbe(t *testing.T) {
+	ktesting.Init(t).SyncTest("", testStopCancelsInFlightProbe)
+}
+
+func testStopCancelsInFlightProbe(tCtx ktesting.TContext) {
+	t := tCtx.TB()
+	m := newTestManager()
+	// Probe through the real exec prober so the runner sees the worker's
+	// context, the way the CRI client does.
+	runner := &hangingRunner{entered: make(chan struct{})}
+	m.prober = newProber(runner, &record.FakeRecorder{})
+
+	w := newTestWorker(m, liveness, v1.Probe{})
+	key := probeKey{testPodUID, testContainerName, liveness}
+	m.workers[key] = w
+	m.statusManager.SetPodStatus(tCtx.Logger(), w.pod, getTestRunningStatus())
+	go w.run(tCtx)
+
+	select {
+	case <-runner.entered:
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Fatal("Probe never started executing")
+	}
+
+	w.stop()
+
+	if err := waitForWorkerExit(t, m, []probeKey{key}); err != nil {
+		t.Fatalf("Worker did not exit after stop(); the in-flight probe was not canceled: %v", err)
+	}
+
+	// A canceled probe says nothing about container health. Recording it as a
+	// liveness Failure would get the container killed while it is already
+	// being torn down.
+	for {
+		select {
+		case update := <-m.livenessManager.Updates():
+			if update.Result != results.Success {
+				t.Fatalf("Canceled probe recorded %v; expected it to be discarded", update.Result)
+			}
+		default:
+			return
+		}
+	}
+}
+
+func TestWorkerContextCancellation(t *testing.T) {
+	for _, jitter := range []bool{false, true} {
+		t.Run(fmt.Sprintf("jitter=%t", jitter), func(t *testing.T) {
+			ktesting.Init(t).SyncTest("", func(tCtx ktesting.TContext) {
+				m := newTestManager()
+				if !jitter {
+					m.start = time.Now().Add(-time.Hour)
+				}
+				w := newTestWorker(m, readiness, v1.Probe{})
+				w.spec.PeriodSeconds = 3600
+				ctx, cancel := context.WithCancel(tCtx)
+				exited := make(chan struct{})
+				go func() { w.run(ctx); close(exited) }()
+				tCtx.Wait()
+				cancel()
+				tCtx.Wait()
+				select {
+				case <-exited:
+				default:
+					tCtx.Error("worker did not exit when its context was cancelled")
+				}
+			})
 		})
 	}
 }

@@ -45,8 +45,16 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apiserver/pkg/features"
+	"k8s.io/apiserver/pkg/registry/rest"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+)
+
+// resourceStreamer must stay identical to rest.ResourceStreamer so that the type assertion in
+// WriteObjectNegotiated keeps matching the same objects. Both directions are checked.
+var (
+	_ resourceStreamer      = rest.ResourceStreamer(nil)
+	_ rest.ResourceStreamer = resourceStreamer(nil)
 )
 
 const benchmarkSeed = 100

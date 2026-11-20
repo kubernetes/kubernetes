@@ -296,6 +296,32 @@ func TestFilterChanges(t *testing.T) {
 		expected string
 	}{
 		{
+			name: "exclude-applyconfiguration-map-element-type-changes",
+			input: `- ./applyconfigurations/resource/v1.DeviceCounterConsumptionApplyConfiguration.Counters: changed from map[string]CounterApplyConfiguration to map[string]CounterRequirementApplyConfiguration
+- ./applyconfigurations/resource/v1beta2.(*DeviceCounterConsumptionApplyConfiguration).WithCounters: changed from func(map[string]CounterApplyConfiguration) *DeviceCounterConsumptionApplyConfiguration to func(map[string]CounterRequirementApplyConfiguration) *DeviceCounterConsumptionApplyConfiguration
+- ./applyconfigurations/example/v2.WidgetApplyConfiguration.Entries: changed from map[string]EntryApplyConfiguration to map[string]EntryRequirementApplyConfiguration
+- ./applyconfigurations/example/v2.(*WidgetApplyConfiguration).WithEntries: changed from func(map[string]EntryApplyConfiguration) *WidgetApplyConfiguration to func(map[string]EntryRequirementApplyConfiguration) *WidgetApplyConfiguration`,
+			exclude:  true,
+			expected: "",
+		},
+		{
+			name: "retain-unrelated-type-changes",
+			input: `- ./kubernetes/typed/resource/v1.ResourceV1Client.RESTClient: changed from func() rest.Interface to func() *rest.RESTClient
+- ./applyconfigurations/internal.Parser: changed from func() *typed.Parser to func() (*typed.Parser, error)
+- ./applyconfigurations/apps/v1.DeploymentSpecApplyConfiguration.Replicas: changed from *int32 to *int64
+- ./applyconfigurations/autoscaling/v2.(*HorizontalPodAutoscalerSpecApplyConfiguration).WithMaxReplicas: changed from func(int32) *HorizontalPodAutoscalerSpecApplyConfiguration to func(int64) *HorizontalPodAutoscalerSpecApplyConfiguration
+- ./applyconfigurations/example/v2.WidgetApplyConfiguration.Entries: changed from map[string]EntryApplyConfiguration to map[int]EntryRequirementApplyConfiguration
+- ./applyconfigurations/example/v2.WidgetApplyConfiguration.Labels: changed from map[string]string to map[string]int`,
+			exclude: true,
+			expected: `- ./kubernetes/typed/resource/v1.ResourceV1Client.RESTClient: changed from func() rest.Interface to func() *rest.RESTClient
+- ./applyconfigurations/internal.Parser: changed from func() *typed.Parser to func() (*typed.Parser, error)
+- ./applyconfigurations/apps/v1.DeploymentSpecApplyConfiguration.Replicas: changed from *int32 to *int64
+- ./applyconfigurations/autoscaling/v2.(*HorizontalPodAutoscalerSpecApplyConfiguration).WithMaxReplicas: changed from func(int32) *HorizontalPodAutoscalerSpecApplyConfiguration to func(int64) *HorizontalPodAutoscalerSpecApplyConfiguration
+- ./applyconfigurations/example/v2.WidgetApplyConfiguration.Entries: changed from map[string]EntryApplyConfiguration to map[int]EntryRequirementApplyConfiguration
+- ./applyconfigurations/example/v2.WidgetApplyConfiguration.Labels: changed from map[string]string to map[string]int
+`,
+		},
+		{
 			name: "exclude-matching-lines",
 			input: `- ./informers/resource/v1beta2.Interface.DeviceTaintRules: added
 - ./kubernetes/typed/resource/v1beta2.DeviceTaintRulesGetter.DeviceTaintRules: added

@@ -1,0 +1,15 @@
+diff --git a/staging/src/k8s.io/apiserver/pkg/storage/cacher/watch_cache.go b/staging/src/k8s.io/apiserver/pkg/storage/cacher/watch_cache.go
+index 1192901c78d..43d9389981b 100644
+--- a/staging/src/k8s.io/apiserver/pkg/storage/cacher/watch_cache.go
++++ b/staging/src/k8s.io/apiserver/pkg/storage/cacher/watch_cache.go
+@@ -411,7 +411,9 @@ func listRecursiveConsistency(keyPrefix string, versioner storage.Versioner, opt
+ 		} else if opts.Predicate.Limit > 0 && len(opts.ResourceVersion) > 0 && opts.ResourceVersion != "0" {
+ 			// Legacy exact match
+ 			semantic = consistencyExact
+-		} else if opts.ResourceVersion == "" {
++		} else if listRV == 0 {
++			// BUG REVERT (#123676): check listRV == 0 instead of opts.ResourceVersion == "",
++			// treating resourceVersion="0" as a consistent list rather than NotOlderThan 0.
+ 			semantic = consistencyConsistent
+ 		} else {
+ 			semantic = consistencyNotOlderThan

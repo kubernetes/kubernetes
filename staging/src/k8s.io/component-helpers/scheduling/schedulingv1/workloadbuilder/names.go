@@ -50,14 +50,19 @@ func GenerateWorkloadName(ownerName string, ownerUID types.UID) string {
 }
 
 // GeneratePodGroupName returns a deterministic, DNS-compatible name derived
-// from a Workload and its PodGroupTemplate. workloadName and templateName must
-// be non-empty DNS-1123 subdomains. Both names are retained in the prefix where
-// possible; the hash prevents collisions when truncation makes different
-// inputs share a prefix.
-func GeneratePodGroupName(workloadName, templateName string) string {
+// from a Workload, its PodGroupTemplate and the UID of the object that owns the
+// PodGroup. workloadName and templateName must be non-empty DNS-1123 subdomains.
+// Both names are retained in the prefix where possible. The hash prevents
+// collisions when truncation makes different inputs share a prefix. ownerUID is
+// optional and separates sibling owners that select the same template. The hash
+// inputs are delimited so that shifting characters between them cannot collide.
+func GeneratePodGroupName(workloadName, templateName string, ownerUID types.UID) string {
 	hasher := fnv.New32a()
 	_, _ = hasher.Write([]byte(workloadName))
+	_, _ = hasher.Write([]byte{0})
 	_, _ = hasher.Write([]byte(templateName))
+	_, _ = hasher.Write([]byte{0})
+	_, _ = hasher.Write([]byte(ownerUID))
 	hash := rand.SafeEncodeString(fmt.Sprint(hasher.Sum32()))
 
 	maxPrefixLen := validation.DNS1123SubdomainMaxLength - len(hash) - 1

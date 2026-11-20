@@ -524,6 +524,37 @@ func TestTranslatevSphereInTreeInlineVolumeToCSI(t *testing.T) {
 			},
 			expErr: false,
 		},
+		{
+			name: "translate in-tree vsphere volume with storage policy to vSphere CSI PV",
+			inlinevolume: &v1.Volume{
+				Name: "inlinevolume",
+				VolumeSource: v1.VolumeSource{
+					VsphereVolume: &v1.VsphereVirtualDiskVolumeSource{
+						VolumePath:        "[vsanDatastore] volume/inlinevolume.vmdk",
+						FSType:            "ext4",
+						StoragePolicyName: "vSAN Default Storage Policy",
+					},
+				},
+			},
+			csiPV: &v1.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: fmt.Sprintf("%s-%s", VSphereDriverName, "[vsanDatastore] volume/inlinevolume.vmdk"),
+				},
+				Spec: v1.PersistentVolumeSpec{
+					PersistentVolumeSource: v1.PersistentVolumeSource{
+						CSI: &v1.CSIPersistentVolumeSource{
+							Driver:       VSphereDriverName,
+							VolumeHandle: "[vsanDatastore] volume/inlinevolume.vmdk",
+							FSType:       "ext4",
+							VolumeAttributes: map[string]string{
+								paramStoragePolicyName: "vSAN Default Storage Policy",
+							},
+						},
+					},
+					AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
+				},
+			},
+		},
 	}
 
 	for _, tc := range cases {

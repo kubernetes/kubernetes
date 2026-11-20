@@ -17,6 +17,8 @@ limitations under the License.
 package options
 
 import (
+	"fmt"
+
 	"github.com/spf13/pflag"
 	serviceconfig "k8s.io/cloud-provider/controllers/service/config"
 )
@@ -53,5 +55,8 @@ func (o *ServiceControllerOptions) Validate() []error {
 	}
 
 	errs := []error{}
+	if o.ConcurrentServiceSyncs < 1 {
+		errs = append(errs, fmt.Errorf("concurrent-service-syncs must be at least 1, but got %d", o.ConcurrentServiceSyncs))
+	}
 	return errs
 }

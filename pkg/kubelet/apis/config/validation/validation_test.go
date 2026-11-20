@@ -396,11 +396,25 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 	}, {
 		name: "invalid MemorySwap.SwapBehavior",
 		configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
-			conf.FeatureGates = map[string]bool{"NodeSwap": true}
 			conf.MemorySwap.SwapBehavior = "invalid-behavior"
 			return conf
 		},
-		errMsg: "invalid configuration: memorySwap.swapBehavior \"invalid-behavior\" must be one of: \"\", \"LimitedSwap\" or \"NoSwap\"",
+		errMsg: "invalid configuration: memorySwap.swapBehavior \"invalid-behavior\" must be one of: \"\", \"LimitedSwap\", \"NoSwap\" or \"WorkloadControlledSwap\"",
+	}, {
+		name: "MemorySwap.SwapBehavior WorkloadControlledSwap without feature gate enabled",
+		configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+			conf.FeatureGates = map[string]bool{"WorkloadControlledSwap": false}
+			conf.MemorySwap.SwapBehavior = "WorkloadControlledSwap"
+			return conf
+		},
+		errMsg: "invalid configuration: memorySwap.swapBehavior \"WorkloadControlledSwap\" requires feature gate WorkloadControlledSwap",
+	}, {
+		name: "MemorySwap.SwapBehavior WorkloadControlledSwap with feature gate enabled",
+		configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+			conf.FeatureGates = map[string]bool{"WorkloadControlledSwap": true}
+			conf.MemorySwap.SwapBehavior = "WorkloadControlledSwap"
+			return conf
+		},
 	}, {
 		name: "CrashLoopBackOff.MaxContainerRestartPeriod too low",
 		configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
@@ -808,6 +822,10 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 		}, {
 			name: "DefaultPodSysctls configured with feature gate disabled",
 			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				if conf.FeatureGates == nil {
+					conf.FeatureGates = make(map[string]bool)
+				}
+				conf.FeatureGates[string(features.DefaultPodSysctls)] = false
 				conf.DefaultPodSysctls = map[string]string{"net.ipv4.ip_forward": "1"}
 				return conf
 			},
@@ -892,6 +910,95 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 				return conf
 			},
 			errMsg: `invalid configuration: duplicate sysctl "net.ipv4.ip_forward" found in defaultPodSysctls`,
+		}, {
+			name: "valid ClientCertificateKeyAlgorithm ECDSA-P256",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				conf.ClientCertificateKeyAlgorithm = ptr.To(kubeletconfig.CertificateKeyAlgorithmECDSAP256)
+				return conf
+			},
+		}, {
+			name: "valid ClientCertificateKeyAlgorithm ML-DSA-65",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				conf.ClientCertificateKeyAlgorithm = ptr.To(kubeletconfig.CertificateKeyAlgorithmMLDSA65)
+				return conf
+			},
+		}, {
+			name: "valid ClientCertificateKeyAlgorithm nil",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				conf.ClientCertificateKeyAlgorithm = nil
+				return conf
+			},
+		}, {
+			name: "invalid ClientCertificateKeyAlgorithm",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				conf.ClientCertificateKeyAlgorithm = ptr.To(kubeletconfig.CertificateKeyAlgorithmType("INVALID"))
+				return conf
+			},
+			errMsg: `invalid configuration: clientCertificateKeyAlgorithm "INVALID" is not a supported algorithm`,
+		}, {
+			name: "valid ServerCertificateKeyAlgorithm RSA-4096",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				conf.ServerCertificateKeyAlgorithm = ptr.To(kubeletconfig.CertificateKeyAlgorithmRSA4096)
+				return conf
+			},
+		}, {
+			name: "valid ServerCertificateKeyAlgorithm ML-DSA-87",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				conf.ServerCertificateKeyAlgorithm = ptr.To(kubeletconfig.CertificateKeyAlgorithmMLDSA87)
+				conf.TLSMinVersion = "VersionTLS13"
+				return conf
+			},
+		}, {
+			name: "valid ServerCertificateKeyAlgorithm nil",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				conf.ServerCertificateKeyAlgorithm = nil
+				return conf
+			},
+		}, {
+			name: "invalid ServerCertificateKeyAlgorithm",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				conf.ServerCertificateKeyAlgorithm = ptr.To(kubeletconfig.CertificateKeyAlgorithmType("BOGUS"))
+				return conf
+			},
+			errMsg: `invalid configuration: serverCertificateKeyAlgorithm "BOGUS" is not a supported algorithm`,
+		}, {
+			name: "valid ML-DSA ServerCertificateKeyAlgorithm with TLSMinVersion VersionTLS13",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				conf.ServerCertificateKeyAlgorithm = ptr.To(kubeletconfig.CertificateKeyAlgorithmMLDSA65)
+				conf.TLSMinVersion = "VersionTLS13"
+				return conf
+			},
+		}, {
+			name: "invalid ML-DSA ServerCertificateKeyAlgorithm with TLSMinVersion unset",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				conf.ServerCertificateKeyAlgorithm = ptr.To(kubeletconfig.CertificateKeyAlgorithmMLDSA65)
+				conf.TLSMinVersion = ""
+				return conf
+			},
+			errMsg: `invalid configuration: tlsMinVersion "" is incompatible with serverCertificateKeyAlgorithm "ML-DSA-65", ML-DSA requires VersionTLS13`,
+		}, {
+			name: "valid ECDSA ServerCertificateKeyAlgorithm with TLSMinVersion VersionTLS12",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				conf.ServerCertificateKeyAlgorithm = ptr.To(kubeletconfig.CertificateKeyAlgorithmECDSAP256)
+				conf.TLSMinVersion = "VersionTLS12"
+				return conf
+			},
+		}, {
+			name: "invalid ML-DSA-44 ServerCertificateKeyAlgorithm with TLSMinVersion VersionTLS12",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				conf.ServerCertificateKeyAlgorithm = ptr.To(kubeletconfig.CertificateKeyAlgorithmMLDSA44)
+				conf.TLSMinVersion = "VersionTLS12"
+				return conf
+			},
+			errMsg: `invalid configuration: tlsMinVersion "VersionTLS12" is incompatible with serverCertificateKeyAlgorithm "ML-DSA-44", ML-DSA requires VersionTLS13`,
+		}, {
+			name: "invalid ML-DSA-87 ServerCertificateKeyAlgorithm with TLSMinVersion VersionTLS10",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				conf.ServerCertificateKeyAlgorithm = ptr.To(kubeletconfig.CertificateKeyAlgorithmMLDSA87)
+				conf.TLSMinVersion = "VersionTLS10"
+				return conf
+			},
+			errMsg: `invalid configuration: tlsMinVersion "VersionTLS10" is incompatible with serverCertificateKeyAlgorithm "ML-DSA-87", ML-DSA requires VersionTLS13`,
 		},
 	}
 

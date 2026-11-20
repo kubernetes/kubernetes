@@ -19,6 +19,8 @@ limitations under the License.
 package cm
 
 import (
+	"os"
+	"path/filepath"
 	"reflect"
 	"strconv"
 	"testing"
@@ -26,33 +28,16 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/klog/v2/ktesting"
+	"k8s.io/kubernetes/pkg/apis/scheduling"
 	pkgfeatures "k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/utils/ptr"
 )
-
-// getResourceList returns a ResourceList with the
-// specified cpu and memory resource values
-func getResourceList(cpu, memory string) v1.ResourceList {
-	res := v1.ResourceList{}
-	if cpu != "" {
-		res[v1.ResourceCPU] = resource.MustParse(cpu)
-	}
-	if memory != "" {
-		res[v1.ResourceMemory] = resource.MustParse(memory)
-	}
-	return res
-}
-
-// getResourceRequirements returns a ResourceRequirements object
-func getResourceRequirements(requests, limits v1.ResourceList) v1.ResourceRequirements {
-	res := v1.ResourceRequirements{}
-	res.Requests = requests
-	res.Limits = limits
-	return res
-}
 
 func TestResourceConfigForPod(t *testing.T) {
 	const Mi = int64(1024 * 1024)
@@ -496,13 +481,15 @@ func TestResourceConfigForPod(t *testing.T) {
 					},
 				},
 				Status: v1.PodStatus{
-					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+					ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 						{
-							ResourceClaimName: "direct-claim",
-							Containers:        []string{"c1"},
-							Mapping: []v1.NodeAllocatableMappedResources{
-								{Name: v1.ResourceCPU, Quantity: new(resource.MustParse("2"))},
-							},
+							ContainerName: "",
+							Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")},
+							Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")},
+						},
+						{
+							ContainerName: "c1",
+							Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")},
 						},
 					},
 				},
@@ -520,6 +507,7 @@ func TestResourceConfigForPod(t *testing.T) {
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
 						{
+							Name: "c1",
 							Resources: getResourceRequirements(
 								getResourceList("1", "200Mi"), // requests
 								getResourceList("3", "500Mi"), // limits
@@ -528,17 +516,16 @@ func TestResourceConfigForPod(t *testing.T) {
 					},
 				},
 				Status: v1.PodStatus{
-					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+					ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 						{
-							ResourceClaimName: "overhead-claim",
-							Containers:        []string{"c1"},
-							Overhead: []v1.NodeAllocatableOverheadResources{
-								{
-									Name:         v1.ResourceMemory,
-									PerPod:       new(resource.MustParse("300Mi")),
-									PerContainer: new(resource.MustParse("100Mi")),
-								},
-							},
+							ContainerName: "",
+							Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("400Mi")},
+							Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("400Mi")},
+						},
+						{
+							ContainerName: "c1",
+							Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("100Mi")},
+							Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("400Mi")},
 						},
 					},
 				},
@@ -555,6 +542,7 @@ func TestResourceConfigForPod(t *testing.T) {
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
 						{
+							Name: "c1",
 							Resources: getResourceRequirements(
 								getResourceList("1", "200Mi"), // requests
 								getResourceList("3", "500Mi"), // limits
@@ -563,26 +551,16 @@ func TestResourceConfigForPod(t *testing.T) {
 					},
 				},
 				Status: v1.PodStatus{
-					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+					ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 						{
-							ResourceClaimName: "combined-claim",
-							Containers:        []string{"c1"},
-							Mapping: []v1.NodeAllocatableMappedResources{
-								{Name: v1.ResourceCPU, Quantity: new(resource.MustParse("2"))},
-								{Name: v1.ResourceMemory, Quantity: new(resource.MustParse("100Mi"))},
-							},
-							Overhead: []v1.NodeAllocatableOverheadResources{
-								{
-									Name:         v1.ResourceCPU,
-									PerPod:       new(resource.MustParse("1")),
-									PerContainer: new(resource.MustParse("1500m")),
-								},
-								{
-									Name:         v1.ResourceMemory,
-									PerPod:       new(resource.MustParse("300Mi")),
-									PerContainer: new(resource.MustParse("100Mi")),
-								},
-							},
+							ContainerName: "",
+							Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("4500m"), v1.ResourceMemory: resource.MustParse("500Mi")},
+							Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("4500m"), v1.ResourceMemory: resource.MustParse("500Mi")},
+						},
+						{
+							ContainerName: "c1",
+							Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("1500m"), v1.ResourceMemory: resource.MustParse("100Mi")},
+							Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("4500m"), v1.ResourceMemory: resource.MustParse("500Mi")},
 						},
 					},
 				},
@@ -601,6 +579,61 @@ func TestResourceConfigForPod(t *testing.T) {
 			},
 		},
 		{
+			description: "burstable-with-dra-init-only-percontainer-overhead-claim",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					InitContainers: []v1.Container{
+						{
+							Name: "ic1",
+							Resources: getResourceRequirements(
+								getResourceList("500m", "100Mi"), // requests
+								getResourceList("1", "200Mi"),    // limits
+							),
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: getResourceRequirements(
+								getResourceList("1", "200Mi"), // requests
+								getResourceList("2", "400Mi"), // limits
+							),
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+						{
+							ContainerName: "",
+							Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("1500m"), v1.ResourceMemory: resource.MustParse("200Mi")},
+							Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("1500m"), v1.ResourceMemory: resource.MustParse("200Mi")},
+						},
+						{
+							ContainerName: "ic1",
+							Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("2"), v1.ResourceMemory: resource.MustParse("300Mi")},
+							Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("2"), v1.ResourceMemory: resource.MustParse("300Mi")},
+						},
+					},
+				},
+			},
+			draNodeAllocatableResourcesEnabled: true,
+			enforceCPULimits:                   true,
+			quotaPeriod:                        defaultQuotaPeriod,
+			// The pod level entry has what ic1's PerContainer overhead (2 CPUs, 300Mi) adds to the peak of
+			// the spec requests, in its requests and limits:
+			// max(c1 (1), ic1 (0.5) + 2) - max(c1 (1), ic1 (0.5)) = 1.5 CPUs
+			// max(c1 (200), ic1 (100) + 300) - max(c1 (200), ic1 (100)) = 200 Mi
+			// CPUShares: max(c1 request (1), ic1 request (0.5)) + 1.5 = 2.5 CPUs
+			// CPUQuota: max(c1 limit (2), ic1 limit (1)) + 1.5 = 3.5 CPUs
+			// Memory: max(c1 limit (400), ic1 limit (200)) + 200 = 600 Mi
+			expected: &ResourceConfig{
+				CPUShares: new(MilliCPUToShares(2500)),
+				CPUQuota:  new(MilliCPUToQuota(3500, int64(defaultQuotaPeriod))),
+				CPUPeriod: &defaultQuotaPeriod,
+				Memory:    new(600 * Mi),
+			},
+		},
+		{
 			description: "burstable-with-dra-feature-gate-disabled",
 			pod: &v1.Pod{
 				Spec: v1.PodSpec{
@@ -614,13 +647,15 @@ func TestResourceConfigForPod(t *testing.T) {
 					},
 				},
 				Status: v1.PodStatus{
-					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+					ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 						{
-							ResourceClaimName: "direct-claim",
-							Containers:        []string{"c1"},
-							Mapping: []v1.NodeAllocatableMappedResources{
-								{Name: v1.ResourceCPU, Quantity: new(resource.MustParse("2"))},
-							},
+							ContainerName: "",
+							Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")},
+							Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")},
+						},
+						{
+							ContainerName: "c1",
+							Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")},
 						},
 					},
 				},
@@ -645,13 +680,15 @@ func TestResourceConfigForPod(t *testing.T) {
 					},
 				},
 				Status: v1.PodStatus{
-					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+					ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 						{
-							ResourceClaimName: "hugepage-claim",
-							Containers:        []string{"c1"},
-							Mapping: []v1.NodeAllocatableMappedResources{
-								{Name: v1.ResourceName(v1.ResourceHugePagesPrefix + "1Gi"), Quantity: new(resource.MustParse("2Gi"))},
-							},
+							ContainerName: "",
+							Requests:      v1.ResourceList{v1.ResourceName(v1.ResourceHugePagesPrefix + "1Gi"): resource.MustParse("2Gi")},
+							Limits:        v1.ResourceList{v1.ResourceName(v1.ResourceHugePagesPrefix + "1Gi"): resource.MustParse("2Gi")},
+						},
+						{
+							ContainerName: "c1",
+							Limits:        v1.ResourceList{v1.ResourceName(v1.ResourceHugePagesPrefix + "1Gi"): resource.MustParse("2Gi")},
 						},
 					},
 				},
@@ -685,14 +722,15 @@ func TestResourceConfigForPod(t *testing.T) {
 					},
 				},
 				Status: v1.PodStatus{
-					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+					ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 						{
-							ResourceClaimName: "direct-claim",
-							Containers:        []string{"c1"},
-							Mapping: []v1.NodeAllocatableMappedResources{
-								{Name: v1.ResourceCPU, Quantity: new(resource.MustParse("2"))},
-								{Name: v1.ResourceMemory, Quantity: new(resource.MustParse("300Mi"))},
-							},
+							ContainerName: "",
+							Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("2"), v1.ResourceMemory: resource.MustParse("300Mi")},
+							Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("2"), v1.ResourceMemory: resource.MustParse("300Mi")},
+						},
+						{
+							ContainerName: "c1",
+							Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("2"), v1.ResourceMemory: resource.MustParse("300Mi")},
 						},
 					},
 				},
@@ -724,20 +762,15 @@ func TestResourceConfigForPod(t *testing.T) {
 					},
 				},
 				Status: v1.PodStatus{
-					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+					ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 						{
-							ResourceClaimName: "direct-claim-1",
-							Containers:        []string{"c1"},
-							Mapping: []v1.NodeAllocatableMappedResources{
-								{Name: v1.ResourceCPU, Quantity: new(resource.MustParse("100m"))},
-							},
+							ContainerName: "",
+							Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("300m")},
+							Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("300m")},
 						},
 						{
-							ResourceClaimName: "direct-claim-2",
-							Containers:        []string{"c1"},
-							Mapping: []v1.NodeAllocatableMappedResources{
-								{Name: v1.ResourceCPU, Quantity: new(resource.MustParse("200m"))},
-							},
+							ContainerName: "c1",
+							Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("300m")},
 						},
 					},
 				},
@@ -776,17 +809,21 @@ func TestResourceConfigForPod(t *testing.T) {
 					},
 				},
 				Status: v1.PodStatus{
-					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+					ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 						{
-							ResourceClaimName: "overhead-claim",
-							Containers:        []string{"c1", "c2"},
-							Overhead: []v1.NodeAllocatableOverheadResources{
-								{
-									Name:         v1.ResourceMemory,
-									PerPod:       new(resource.MustParse("200Mi")),
-									PerContainer: new(resource.MustParse("100Mi")),
-								},
-							},
+							ContainerName: "",
+							Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("400Mi")},
+							Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("400Mi")},
+						},
+						{
+							ContainerName: "c1",
+							Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("100Mi")},
+							Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("300Mi")},
+						},
+						{
+							ContainerName: "c2",
+							Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("100Mi")},
+							Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("300Mi")},
 						},
 					},
 				},
@@ -824,14 +861,19 @@ func TestResourceConfigForPod(t *testing.T) {
 					},
 				},
 				Status: v1.PodStatus{
-					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+					ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 						{
-							ResourceClaimName: "shared-direct-claim",
-							Containers:        []string{"c1", "c2"},
-							Mapping: []v1.NodeAllocatableMappedResources{
-								{Name: v1.ResourceCPU, Quantity: new(resource.MustParse("2"))},
-								{Name: v1.ResourceMemory, Quantity: new(resource.MustParse("400Mi"))},
-							},
+							ContainerName: "",
+							Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("2"), v1.ResourceMemory: resource.MustParse("400Mi")},
+							Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("2"), v1.ResourceMemory: resource.MustParse("400Mi")},
+						},
+						{
+							ContainerName: "c1",
+							Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("2"), v1.ResourceMemory: resource.MustParse("400Mi")},
+						},
+						{
+							ContainerName: "c2",
+							Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("2"), v1.ResourceMemory: resource.MustParse("400Mi")},
 						},
 					},
 				},
@@ -860,14 +902,15 @@ func TestResourceConfigForPod(t *testing.T) {
 					},
 				},
 				Status: v1.PodStatus{
-					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+					ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 						{
-							ResourceClaimName: "direct-claim",
-							Containers:        []string{"c1"},
-							Mapping: []v1.NodeAllocatableMappedResources{
-								{Name: v1.ResourceCPU, Quantity: new(resource.MustParse("2"))},
-								{Name: v1.ResourceMemory, Quantity: new(resource.MustParse("400Mi"))},
-							},
+							ContainerName: "",
+							Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("2"), v1.ResourceMemory: resource.MustParse("400Mi")},
+							Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("2"), v1.ResourceMemory: resource.MustParse("400Mi")},
+						},
+						{
+							ContainerName: "c1",
+							Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("2"), v1.ResourceMemory: resource.MustParse("400Mi")},
 						},
 					},
 				},
@@ -896,14 +939,15 @@ func TestResourceConfigForPod(t *testing.T) {
 					},
 				},
 				Status: v1.PodStatus{
-					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+					ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 						{
-							ResourceClaimName: "direct-claim",
-							Containers:        []string{"c1"},
-							Mapping: []v1.NodeAllocatableMappedResources{
-								{Name: v1.ResourceCPU, Quantity: new(resource.MustParse("2"))},
-								{Name: v1.ResourceMemory, Quantity: new(resource.MustParse("400Mi"))},
-							},
+							ContainerName: "",
+							Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("2"), v1.ResourceMemory: resource.MustParse("400Mi")},
+							Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("2"), v1.ResourceMemory: resource.MustParse("400Mi")},
+						},
+						{
+							ContainerName: "c1",
+							Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("2"), v1.ResourceMemory: resource.MustParse("400Mi")},
 						},
 					},
 				},
@@ -925,6 +969,9 @@ func TestResourceConfigForPod(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
+			if !testCase.podLevelResourcesEnabled {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.37"))
+			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.PodLevelResources, testCase.podLevelResourcesEnabled)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.DRANodeAllocatableResources, testCase.draNodeAllocatableResourcesEnabled)
 			actual := ResourceConfigForPod(testCase.pod, testCase.enforceCPULimits, testCase.quotaPeriod, false, kubeletconfig.NoneMemoryReservationPolicy)
@@ -1393,6 +1440,50 @@ func TestApplyPodLevelMemoryHigh(t *testing.T) {
 			t.Errorf("expected no Unified map for mixed limits, got %v", rc.Unified)
 		}
 	})
+
+	t.Run("extra node allocatable resources are included in memory.high calculation", func(t *testing.T) {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.DRANodeAllocatableResources, true)
+		pod := &v1.Pod{
+			Spec: v1.PodSpec{
+				Resources: &v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourceMemory: resource.MustParse("512Mi"),
+						v1.ResourceCPU:    resource.MustParse("1"),
+					},
+				},
+				Containers: []v1.Container{
+					{
+						Name:      "c1",
+						Resources: getResourceRequirements(getResourceList("1", "128Mi"), getResourceList("1", "512Mi")),
+					},
+				},
+			},
+			Status: v1.PodStatus{
+				ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+					{
+						ContainerName: "",
+						Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("192Mi")},
+						Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("192Mi")},
+					},
+					{
+						ContainerName: "c1",
+						Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("192Mi")},
+					},
+				},
+			},
+		}
+		rc := &ResourceConfig{}
+		ApplyPodLevelMemoryHigh(pod, rc, 0.9)
+		if rc.Unified == nil {
+			t.Fatal("expected Unified map to be set")
+		}
+		// Total request = 128Mi (container) + 128Mi (mapping) + 64Mi (overhead) = 320Mi
+		// Total limit = 512Mi (pod-level limit covers DRA overhead)
+		want := memoryHighForPod(320*1024*1024, 512*1024*1024, 0.9)
+		if got := rc.Unified[Cgroup2MemoryHigh]; got != want {
+			t.Errorf("Cgroup2MemoryHigh = %q, want %q", got, want)
+		}
+	})
 }
 
 func TestCPUSharesEqualAfterV2RoundTrip(t *testing.T) {
@@ -1445,4 +1536,920 @@ func TestCPUSharesEqualAfterV2RoundTrip(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestIsPodEligibleForSwap(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.PodLevelResources, true)
+
+	gi := int64(1024 * 1024 * 1024)
+	mi := int64(1024 * 1024)
+
+	testCases := []struct {
+		name            string
+		pod             *v1.Pod
+		plrEnabled      *bool
+		expectedElig    bool
+		expectedRequest int64
+	}{
+		{
+			name:         "nil pod is ineligible",
+			pod:          nil,
+			expectedElig: false,
+		},
+		{
+			name:         "BestEffort pod is ineligible",
+			pod:          &v1.Pod{Spec: v1.PodSpec{Containers: []v1.Container{{Name: "c1"}}}},
+			expectedElig: false,
+		},
+		{
+			name: "Guaranteed pod with pod-level resources is ineligible",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: getResourceList("1", "2Gi"),
+						Limits:   getResourceList("1", "2Gi"),
+					},
+					Containers: []v1.Container{{Name: "c1"}},
+				},
+			},
+			expectedElig: false,
+		},
+		{
+			name: "critical Burstable pod is ineligible",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Priority: ptr.To(scheduling.SystemCriticalPriority),
+					Resources: &v1.ResourceRequirements{
+						Requests: getResourceList("", "2Gi"),
+						Limits:   getResourceList("", "4Gi"),
+					},
+					Containers: []v1.Container{{Name: "c1"}},
+				},
+			},
+			expectedElig: false,
+		},
+		{
+			name: "Burstable CPU-only pod with zero memory request is ineligible",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Overhead: v1.ResourceList{v1.ResourceMemory: resource.MustParse("64Mi")},
+					Resources: &v1.ResourceRequirements{
+						Requests: getResourceList("500m", ""),
+						Limits:   getResourceList("1", ""),
+					},
+					Containers: []v1.Container{{Name: "c1"}},
+				},
+			},
+			expectedElig: false,
+		},
+		{
+			name: "Case 1a: pod-level resources only with req < lim is eligible and excludes overhead",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Overhead: v1.ResourceList{v1.ResourceMemory: resource.MustParse("64Mi")},
+					Resources: &v1.ResourceRequirements{
+						Requests: getResourceList("", "2Gi"),
+						Limits:   getResourceList("", "4Gi"),
+					},
+					Containers: []v1.Container{{Name: "c1"}, {Name: "c2"}},
+				},
+			},
+			expectedElig:    true,
+			expectedRequest: 2 * gi,
+		},
+		{
+			name: "Case 1b: pod-level memory request without memory limit is eligible",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: getResourceList("", "2Gi"),
+					},
+					Containers: []v1.Container{{Name: "c1"}},
+				},
+			},
+			expectedElig:    true,
+			expectedRequest: 2 * gi,
+		},
+		{
+			name: "Case 2: mixed pod uses pod-level memory request",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: getResourceList("", "4Gi"),
+						Limits:   getResourceList("", "8Gi"),
+					},
+					Containers: []v1.Container{
+						{Name: "c1", Resources: getResourceRequirements(getResourceList("", "2Gi"), getResourceList("", "3Gi"))},
+						{Name: "c2"},
+					},
+				},
+			},
+			expectedElig:    true,
+			expectedRequest: 4 * gi,
+		},
+		{
+			name: "container-only pod aggregates container memory requests",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: "c1", Resources: getResourceRequirements(getResourceList("", "500Mi"), getResourceList("", ""))},
+						{Name: "c2"},
+					},
+				},
+			},
+			expectedElig:    true,
+			expectedRequest: 500 * mi,
+		},
+		{
+			name: "pod-level CPU with container c1 req == lim and c2 unbounded is eligible via aggregated request",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: getResourceList("500m", ""),
+						Limits:   getResourceList("1", ""),
+					},
+					Containers: []v1.Container{
+						{Name: "c1", Resources: getResourceRequirements(getResourceList("", "2Gi"), getResourceList("", "2Gi"))},
+						{Name: "c2"},
+					},
+				},
+			},
+			expectedElig:    true,
+			expectedRequest: 2 * gi,
+		},
+		{
+			name: "pod-level CPU with single container req == lim is ineligible because aggregated PodMemoryRequest == PodMemoryLimit",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: getResourceList("500m", ""),
+						Limits:   getResourceList("1", ""),
+					},
+					Containers: []v1.Container{
+						{Name: "c1", Resources: getResourceRequirements(getResourceList("", "2Gi"), getResourceList("", "2Gi"))},
+					},
+				},
+			},
+			expectedElig: false,
+		},
+		{
+			name: "Case 6: Burstable pod via CPU where PodMemoryRequest == PodMemoryLimit is ineligible",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: getResourceList("1", "4Gi"),
+						Limits:   getResourceList("2", "4Gi"),
+					},
+					Containers: []v1.Container{
+						{Name: "c1", Resources: getResourceRequirements(getResourceList("", "1Gi"), getResourceList("", "2Gi"))},
+					},
+				},
+			},
+			expectedElig: false,
+		},
+		{
+			name: "PodLevelResources disabled ignores pod.spec.resources",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: getResourceList("", "4Gi"),
+						Limits:   getResourceList("", "8Gi"),
+					},
+					Containers: []v1.Container{
+						{Name: "c1", Resources: getResourceRequirements(getResourceList("", "1Gi"), getResourceList("", "2Gi"))},
+					},
+				},
+			},
+			plrEnabled:      new(false),
+			expectedElig:    true,
+			expectedRequest: 1 * gi,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.plrEnabled != nil {
+				if !*tc.plrEnabled {
+					featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.37"))
+				}
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.PodLevelResources, *tc.plrEnabled)
+			}
+			elig, req := IsPodEligibleForSwap(tc.pod)
+			if elig != tc.expectedElig || req != tc.expectedRequest {
+				t.Fatalf("IsPodEligibleForSwap() = (%t, %d), want (%t, %d)", elig, req, tc.expectedElig, tc.expectedRequest)
+			}
+		})
+	}
+}
+
+func TestApplyPodLevelSwapConfig(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	const (
+		gi                   = 1024 * 1024 * 1024
+		nodeMem        int64 = 40 * gi
+		nodeSwap       int64 = 5 * gi
+		expectedSwap2G int64 = (2 * gi * 5 * gi) / (40 * gi)
+		expectedSwap4G int64 = (4 * gi * 5 * gi) / (40 * gi)
+		expectedSwap6G int64 = (6 * gi * 5 * gi) / (40 * gi)
+	)
+
+	burstablePod2Gi := &v1.Pod{
+		Spec: v1.PodSpec{
+			Resources: &v1.ResourceRequirements{
+				Requests: getResourceList("", "2Gi"),
+				Limits:   getResourceList("", "4Gi"),
+			},
+			Containers: []v1.Container{{Name: "c1"}},
+		},
+	}
+
+	testCases := []struct {
+		name                    string
+		plrEnabled              bool
+		pod                     *v1.Pod
+		initialUnified          map[string]string
+		swapBehavior            kubetypes.SwapBehavior
+		nodeTotalMemory         int64
+		totalPodsSwapAvailable  int64
+		isCgroup2               bool
+		swapControllerAvailable bool
+		expectedUnified         map[string]string
+	}{
+		{
+			name:                    "PodLevelResources disabled leaves Unified untouched",
+			plrEnabled:              false,
+			pod:                     burstablePod2Gi,
+			swapBehavior:            kubetypes.LimitedSwap,
+			nodeTotalMemory:         nodeMem,
+			totalPodsSwapAvailable:  nodeSwap,
+			isCgroup2:               true,
+			swapControllerAvailable: true,
+			expectedUnified:         nil,
+		},
+		{
+			name:                    "nil pod leaves Unified untouched",
+			plrEnabled:              true,
+			pod:                     nil,
+			swapBehavior:            kubetypes.LimitedSwap,
+			nodeTotalMemory:         nodeMem,
+			totalPodsSwapAvailable:  nodeSwap,
+			isCgroup2:               true,
+			swapControllerAvailable: true,
+			expectedUnified:         nil,
+		},
+		{
+			name:       "container-only pod (pod.spec.resources nil) leaves Unified untouched",
+			plrEnabled: true,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: "c1", Resources: getResourceRequirements(getResourceList("", "2Gi"), getResourceList("", "4Gi"))},
+					},
+				},
+			},
+			swapBehavior:            kubetypes.LimitedSwap,
+			nodeTotalMemory:         nodeMem,
+			totalPodsSwapAvailable:  nodeSwap,
+			isCgroup2:               true,
+			swapControllerAvailable: true,
+			expectedUnified:         nil,
+		},
+		{
+			name:       "container-only pod with empty pod.spec.resources leaves Unified untouched",
+			plrEnabled: true,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{},
+					Containers: []v1.Container{
+						{Name: "c1", Resources: getResourceRequirements(getResourceList("", "2Gi"), getResourceList("", "4Gi"))},
+					},
+				},
+			},
+			swapBehavior:            kubetypes.LimitedSwap,
+			nodeTotalMemory:         nodeMem,
+			totalPodsSwapAvailable:  nodeSwap,
+			isCgroup2:               true,
+			swapControllerAvailable: true,
+			expectedUnified:         nil,
+		},
+		{
+			name:       "pod-level CPU only with no memory anywhere sets pod memory.swap.max to 0",
+			plrEnabled: true,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: getResourceList("500m", ""),
+						Limits:   getResourceList("1", ""),
+					},
+					Containers: []v1.Container{{Name: "c1"}},
+				},
+			},
+			swapBehavior:            kubetypes.LimitedSwap,
+			nodeTotalMemory:         nodeMem,
+			totalPodsSwapAvailable:  nodeSwap,
+			isCgroup2:               true,
+			swapControllerAvailable: true,
+			expectedUnified:         map[string]string{Cgroup2MaxSwapFilename: "0"},
+		},
+		{
+			name:       "pod-level CPU with c1 req == lim and c2 unbounded gets PodSwapLimit from aggregated memory request",
+			plrEnabled: true,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: getResourceList("500m", ""),
+						Limits:   getResourceList("1", ""),
+					},
+					Containers: []v1.Container{
+						{Name: "c1", Resources: getResourceRequirements(getResourceList("", "2Gi"), getResourceList("", "2Gi"))},
+						{Name: "c2"},
+					},
+				},
+			},
+			swapBehavior:            kubetypes.LimitedSwap,
+			nodeTotalMemory:         nodeMem,
+			totalPodsSwapAvailable:  nodeSwap,
+			isCgroup2:               true,
+			swapControllerAvailable: true,
+			expectedUnified:         map[string]string{Cgroup2MaxSwapFilename: strconv.FormatInt(expectedSwap2G, 10)},
+		},
+		{
+			name:       "pod-level CPU with single container req == lim sets pod memory.swap.max to 0",
+			plrEnabled: true,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: getResourceList("500m", ""),
+						Limits:   getResourceList("1", ""),
+					},
+					Containers: []v1.Container{
+						{Name: "c1", Resources: getResourceRequirements(getResourceList("", "2Gi"), getResourceList("", "2Gi"))},
+					},
+				},
+			},
+			swapBehavior:            kubetypes.LimitedSwap,
+			nodeTotalMemory:         nodeMem,
+			totalPodsSwapAvailable:  nodeSwap,
+			isCgroup2:               true,
+			swapControllerAvailable: true,
+			expectedUnified:         map[string]string{Cgroup2MaxSwapFilename: "0"},
+		},
+		{
+			name:       "Guaranteed pod with pod-level resources sets pod memory.swap.max to 0",
+			plrEnabled: true,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: getResourceList("1", "2Gi"),
+						Limits:   getResourceList("1", "2Gi"),
+					},
+					Containers: []v1.Container{{Name: "c1"}},
+				},
+			},
+			swapBehavior:            kubetypes.LimitedSwap,
+			nodeTotalMemory:         nodeMem,
+			totalPodsSwapAvailable:  nodeSwap,
+			isCgroup2:               true,
+			swapControllerAvailable: true,
+			expectedUnified:         map[string]string{Cgroup2MaxSwapFilename: "0"},
+		},
+		{
+			name:       "critical Burstable pod with pod-level resources sets pod memory.swap.max to 0",
+			plrEnabled: true,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Priority: ptr.To(scheduling.SystemCriticalPriority),
+					Resources: &v1.ResourceRequirements{
+						Requests: getResourceList("", "2Gi"),
+						Limits:   getResourceList("", "4Gi"),
+					},
+					Containers: []v1.Container{{Name: "c1"}},
+				},
+			},
+			swapBehavior:            kubetypes.LimitedSwap,
+			nodeTotalMemory:         nodeMem,
+			totalPodsSwapAvailable:  nodeSwap,
+			isCgroup2:               true,
+			swapControllerAvailable: true,
+			expectedUnified:         map[string]string{Cgroup2MaxSwapFilename: "0"},
+		},
+		{
+			name:                    "cgroup v1 leaves Unified untouched",
+			plrEnabled:              true,
+			pod:                     burstablePod2Gi,
+			swapBehavior:            kubetypes.LimitedSwap,
+			nodeTotalMemory:         nodeMem,
+			totalPodsSwapAvailable:  nodeSwap,
+			isCgroup2:               false,
+			swapControllerAvailable: true,
+			expectedUnified:         nil,
+		},
+		{
+			name:                    "swap controller unavailable leaves Unified untouched",
+			plrEnabled:              true,
+			pod:                     burstablePod2Gi,
+			swapBehavior:            kubetypes.LimitedSwap,
+			nodeTotalMemory:         nodeMem,
+			totalPodsSwapAvailable:  nodeSwap,
+			isCgroup2:               true,
+			swapControllerAvailable: false,
+			expectedUnified:         nil,
+		},
+		{
+			name:                    "NoSwap sets pod memory.swap.max to 0",
+			plrEnabled:              true,
+			pod:                     burstablePod2Gi,
+			swapBehavior:            kubetypes.NoSwap,
+			nodeTotalMemory:         nodeMem,
+			totalPodsSwapAvailable:  nodeSwap,
+			isCgroup2:               true,
+			swapControllerAvailable: true,
+			expectedUnified:         map[string]string{Cgroup2MaxSwapFilename: "0"},
+		},
+		{
+			name:                    "empty SwapBehavior defaults to NoSwap (0)",
+			plrEnabled:              true,
+			pod:                     burstablePod2Gi,
+			swapBehavior:            "",
+			nodeTotalMemory:         nodeMem,
+			totalPodsSwapAvailable:  nodeSwap,
+			isCgroup2:               true,
+			swapControllerAvailable: true,
+			expectedUnified:         map[string]string{Cgroup2MaxSwapFilename: "0"},
+		},
+		{
+			name:                    "Case 1: pod-only Burstable pod gets proportional PodSwapLimit",
+			plrEnabled:              true,
+			pod:                     burstablePod2Gi,
+			swapBehavior:            kubetypes.LimitedSwap,
+			nodeTotalMemory:         nodeMem,
+			totalPodsSwapAvailable:  nodeSwap,
+			isCgroup2:               true,
+			swapControllerAvailable: true,
+			expectedUnified:         map[string]string{Cgroup2MaxSwapFilename: strconv.FormatInt(expectedSwap2G, 10)},
+		},
+		{
+			name:       "Case 2 & 3: mixed pod gets PodSwapLimit proportional to pod-level request and preserves MemoryQoS keys",
+			plrEnabled: true,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: getResourceList("", "4Gi"),
+						Limits:   getResourceList("", "8Gi"),
+					},
+					Containers: []v1.Container{
+						{Name: "c1", Resources: getResourceRequirements(getResourceList("", "2Gi"), getResourceList("", "3Gi"))},
+						{Name: "c2"},
+					},
+				},
+			},
+			initialUnified:          map[string]string{Cgroup2MemoryLow: "4294967296"},
+			swapBehavior:            kubetypes.LimitedSwap,
+			nodeTotalMemory:         nodeMem,
+			totalPodsSwapAvailable:  nodeSwap,
+			isCgroup2:               true,
+			swapControllerAvailable: true,
+			expectedUnified: map[string]string{
+				Cgroup2MemoryLow:       "4294967296",
+				Cgroup2MaxSwapFilename: strconv.FormatInt(expectedSwap4G, 10),
+			},
+		},
+		{
+			name:       "Case 4: container opt-out keeps pod cgroup swap proportional to full pod request",
+			plrEnabled: true,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: getResourceList("", "6Gi"),
+						Limits:   getResourceList("", "10Gi"),
+					},
+					Containers: []v1.Container{
+						{Name: "c1", Resources: getResourceRequirements(getResourceList("", "2Gi"), getResourceList("", "2Gi"))},
+						{Name: "c2"},
+					},
+				},
+			},
+			swapBehavior:            kubetypes.LimitedSwap,
+			nodeTotalMemory:         nodeMem,
+			totalPodsSwapAvailable:  nodeSwap,
+			isCgroup2:               true,
+			swapControllerAvailable: true,
+			expectedUnified:         map[string]string{Cgroup2MaxSwapFilename: strconv.FormatInt(expectedSwap6G, 10)},
+		},
+		{
+			name:       "Case 6: Burstable pod with PodMemoryRequest == PodMemoryLimit sets pod memory.swap.max to 0",
+			plrEnabled: true,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: getResourceList("1", "4Gi"),
+						Limits:   getResourceList("2", "4Gi"),
+					},
+					Containers: []v1.Container{
+						{Name: "c1", Resources: getResourceRequirements(getResourceList("", "1Gi"), getResourceList("", "2Gi"))},
+					},
+				},
+			},
+			swapBehavior:            kubetypes.LimitedSwap,
+			nodeTotalMemory:         nodeMem,
+			totalPodsSwapAvailable:  nodeSwap,
+			isCgroup2:               true,
+			swapControllerAvailable: true,
+			expectedUnified:         map[string]string{Cgroup2MaxSwapFilename: "0"},
+		},
+		{
+			name:                    "calculation error (zero node memory) falls back to 0",
+			plrEnabled:              true,
+			pod:                     burstablePod2Gi,
+			swapBehavior:            kubetypes.LimitedSwap,
+			nodeTotalMemory:         0,
+			totalPodsSwapAvailable:  nodeSwap,
+			isCgroup2:               true,
+			swapControllerAvailable: true,
+			expectedUnified:         map[string]string{Cgroup2MaxSwapFilename: "0"},
+		},
+		{
+			name:                    "calculation error (pod memory request exceeds node memory) falls back to 0",
+			plrEnabled:              true,
+			pod:                     burstablePod2Gi,
+			swapBehavior:            kubetypes.LimitedSwap,
+			nodeTotalMemory:         1 * gi,
+			totalPodsSwapAvailable:  nodeSwap,
+			isCgroup2:               true,
+			swapControllerAvailable: true,
+			expectedUnified:         map[string]string{Cgroup2MaxSwapFilename: "0"},
+		},
+	}
+
+	t.Run("nil ResourceConfig is a no-op", func(t *testing.T) {
+		ApplyPodLevelSwapConfig(logger, burstablePod2Gi, nil, kubetypes.LimitedSwap, nodeMem, nodeSwap, true, true)
+	})
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if !tc.plrEnabled {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.37"))
+			}
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.PodLevelResources, tc.plrEnabled)
+			rc := &ResourceConfig{Unified: tc.initialUnified}
+			ApplyPodLevelSwapConfig(logger, tc.pod, rc, tc.swapBehavior, tc.nodeTotalMemory, tc.totalPodsSwapAvailable, tc.isCgroup2, tc.swapControllerAvailable)
+			if !reflect.DeepEqual(rc.Unified, tc.expectedUnified) {
+				t.Fatalf("rc.Unified = %v, want %v", rc.Unified, tc.expectedUnified)
+			}
+		})
+	}
+}
+
+func TestIsContainerEligibleForSwap(t *testing.T) {
+	testCases := []struct {
+		name       string
+		plrEnabled bool
+		pod        *v1.Pod
+		container  *v1.Container
+		expected   bool
+	}{
+		{
+			name:       "nil container is ineligible",
+			plrEnabled: true,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: getResourceList("", "1Gi"),
+						Limits:   getResourceList("", "2Gi"),
+					},
+					Containers: []v1.Container{{Name: "c1"}},
+				},
+			},
+			container: nil,
+			expected:  false,
+		},
+		{
+			name:       "Guaranteed pod container is ineligible",
+			plrEnabled: true,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: getResourceList("1", "2Gi"),
+						Limits:   getResourceList("1", "2Gi"),
+					},
+					Containers: []v1.Container{{Name: "c1"}},
+				},
+			},
+			container: &v1.Container{Name: "c1"},
+			expected:  false,
+		},
+		{
+			name:       "resource-less container in eligible PLR pod is eligible",
+			plrEnabled: true,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: getResourceList("", "1Gi"),
+						Limits:   getResourceList("", "2Gi"),
+					},
+					Containers: []v1.Container{{Name: "c1"}},
+				},
+			},
+			container: &v1.Container{Name: "c1"},
+			expected:  true,
+		},
+		{
+			name:       "resource-less container in pod without pod-level memory request is ineligible",
+			plrEnabled: true,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Limits: getResourceList("", "4Gi"),
+					},
+					Containers: []v1.Container{
+						{Name: "c1", Resources: getResourceRequirements(getResourceList("", "1Gi"), getResourceList("", "2Gi"))},
+						{Name: "c2"},
+					},
+				},
+			},
+			container: &v1.Container{Name: "c2"},
+			expected:  false,
+		},
+		{
+			name:       "resource-less container in container-only pod is ineligible",
+			plrEnabled: true,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: "c1", Resources: getResourceRequirements(getResourceList("", "1Gi"), getResourceList("", "2Gi"))},
+						{Name: "c2"},
+					},
+				},
+			},
+			container: &v1.Container{Name: "c2"},
+			expected:  false,
+		},
+		{
+			name:       "container with request == limit in eligible PLR pod is ineligible",
+			plrEnabled: true,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: getResourceList("", "2Gi"),
+						Limits:   getResourceList("", "4Gi"),
+					},
+					Containers: []v1.Container{
+						{Name: "c1", Resources: getResourceRequirements(getResourceList("", "1Gi"), getResourceList("", "1Gi"))},
+					},
+				},
+			},
+			container: &v1.Container{Name: "c1", Resources: getResourceRequirements(getResourceList("", "1Gi"), getResourceList("", "1Gi"))},
+			expected:  false,
+		},
+		{
+			name:       "ephemeral container in eligible PLR pod is ineligible",
+			plrEnabled: true,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: getResourceList("", "2Gi"),
+						Limits:   getResourceList("", "4Gi"),
+					},
+					Containers: []v1.Container{{Name: "c1"}},
+					EphemeralContainers: []v1.EphemeralContainer{
+						{EphemeralContainerCommon: v1.EphemeralContainerCommon{Name: "debug"}},
+					},
+				},
+			},
+			container: &v1.Container{Name: "debug"},
+			expected:  false,
+		},
+		{
+			name:       "synthetic resize container with inherited pod memory limit for resource-less container in pod.Spec remains eligible",
+			plrEnabled: true,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: getResourceList("100m", "1Gi"),
+						Limits:   getResourceList("200m", "2Gi"),
+					},
+					Containers: []v1.Container{
+						{
+							Name:      "c1",
+							Resources: getResourceRequirements(getResourceList("100m", ""), getResourceList("200m", "")),
+						},
+					},
+				},
+			},
+			// Simulates updatePodContainerResources populating Limits[memory] from pod.Spec.Resources.Limits[memory]
+			// while Requests[memory] is 0.
+			container: &v1.Container{
+				Name:      "c1",
+				Resources: getResourceRequirements(getResourceList("150m", "0"), getResourceList("200m", "2Gi")),
+			},
+			expected: true,
+		},
+		{
+			name:       "synthetic resize initContainer with inherited pod memory limit for resource-less sidecar in pod.Spec remains eligible",
+			plrEnabled: true,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: getResourceList("100m", "1Gi"),
+						Limits:   getResourceList("200m", "2Gi"),
+					},
+					InitContainers: []v1.Container{
+						{
+							Name:      "sidecar",
+							Resources: getResourceRequirements(getResourceList("50m", ""), getResourceList("100m", "")),
+						},
+					},
+					Containers: []v1.Container{{Name: "c1"}},
+				},
+			},
+			container: &v1.Container{
+				Name:      "sidecar",
+				Resources: getResourceRequirements(getResourceList("75m", "0"), getResourceList("100m", "2Gi")),
+			},
+			expected: true,
+		},
+		{
+			name:       "Case 6: container with req < lim in Burstable pod where PodMemoryRequest == PodMemoryLimit is ineligible",
+			plrEnabled: true,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: getResourceList("1", "4Gi"),
+						Limits:   getResourceList("2", "4Gi"),
+					},
+					Containers: []v1.Container{
+						{Name: "c1", Resources: getResourceRequirements(getResourceList("", "1Gi"), getResourceList("", "2Gi"))},
+					},
+				},
+			},
+			container: &v1.Container{Name: "c1", Resources: getResourceRequirements(getResourceList("", "1Gi"), getResourceList("", "2Gi"))},
+			expected:  false,
+		},
+		{
+			name:       "resource-less container when PodLevelResources feature gate is disabled is ineligible",
+			plrEnabled: false,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: getResourceList("", "1Gi"),
+						Limits:   getResourceList("", "2Gi"),
+					},
+					Containers: []v1.Container{
+						{Name: "c1", Resources: getResourceRequirements(getResourceList("", "512Mi"), getResourceList("", "1Gi"))},
+						{Name: "c2"},
+					},
+				},
+			},
+			container: &v1.Container{Name: "c2"},
+			expected:  false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if !tc.plrEnabled {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.37"))
+			}
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.PodLevelResources, tc.plrEnabled)
+			if got := IsContainerEligibleForSwap(tc.pod, tc.container); got != tc.expected {
+				t.Fatalf("IsContainerEligibleForSwap() = %t, want %t", got, tc.expected)
+			}
+		})
+	}
+}
+
+func TestCheckSwapControllerAvailability(t *testing.T) {
+	testCases := []struct {
+		name      string
+		isCgroup2 bool
+		setup     func(t *testing.T, cgroupRoot string) string
+		expected  bool
+	}{
+		{
+			name:      "cgroup v1 swap controller file present returns true",
+			isCgroup2: false,
+			setup: func(t *testing.T, cgroupRoot string) string {
+				memDir := filepath.Join(cgroupRoot, "memory")
+				if err := os.MkdirAll(memDir, 0755); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(filepath.Join(memDir, "memory.memsw.limit_in_bytes"), []byte("max\n"), 0644); err != nil {
+					t.Fatal(err)
+				}
+				return ""
+			},
+			expected: true,
+		},
+		{
+			name:      "cgroup v1 swap controller file missing returns false",
+			isCgroup2: false,
+			setup: func(t *testing.T, cgroupRoot string) string {
+				return ""
+			},
+			expected: false,
+		},
+		{
+			name:      "cgroup v2 swap controller file present in self cgroup returns true",
+			isCgroup2: true,
+			setup: func(t *testing.T, cgroupRoot string) string {
+				selfDir := filepath.Join(cgroupRoot, "kubelet.slice")
+				if err := os.MkdirAll(selfDir, 0755); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(filepath.Join(selfDir, Cgroup2MaxSwapFilename), []byte("max\n"), 0644); err != nil {
+					t.Fatal(err)
+				}
+				procFile := filepath.Join(t.TempDir(), "cgroup")
+				if err := os.WriteFile(procFile, []byte("0::/kubelet.slice\n"), 0644); err != nil {
+					t.Fatal(err)
+				}
+				return procFile
+			},
+			expected: true,
+		},
+		{
+			name:      "cgroup v2 swap controller file missing in self cgroup returns false",
+			isCgroup2: true,
+			setup: func(t *testing.T, cgroupRoot string) string {
+				selfDir := filepath.Join(cgroupRoot, "kubelet.slice")
+				if err := os.MkdirAll(selfDir, 0755); err != nil {
+					t.Fatal(err)
+				}
+				procFile := filepath.Join(t.TempDir(), "cgroup")
+				if err := os.WriteFile(procFile, []byte("0::/kubelet.slice\n"), 0644); err != nil {
+					t.Fatal(err)
+				}
+				return procFile
+			},
+			expected: false,
+		},
+		{
+			name:      "cgroup v2 missing proc cgroup file returns false",
+			isCgroup2: true,
+			setup: func(t *testing.T, cgroupRoot string) string {
+				return filepath.Join(t.TempDir(), "nonexistent")
+			},
+			expected: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			cgroupRoot := t.TempDir()
+			procCgroupPath := tc.setup(t, cgroupRoot)
+			if got := checkSwapControllerAvailability(ctx, tc.isCgroup2, cgroupRoot, procCgroupPath); got != tc.expected {
+				t.Fatalf("checkSwapControllerAvailability() = %t, want %t", got, tc.expected)
+			}
+		})
+	}
+}
+
+func TestResourceConfigForPodSwap(t *testing.T) {
+	pod := &v1.Pod{
+		Spec: v1.PodSpec{
+			Resources: &v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					v1.ResourceMemory: resource.MustParse("1Gi"),
+					v1.ResourceSwap:   resource.MustParse("512Mi"),
+				},
+			},
+			Containers: []v1.Container{
+				{Resources: getResourceRequirements(getResourceList("100m", "512Mi"), getResourceList("200m", "1Gi"))},
+			},
+		},
+	}
+
+	t.Run("sets memory.swap.max when PodLevelResources and WorkloadControlledSwap are enabled", func(t *testing.T) {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.PodLevelResources, true)
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.WorkloadControlledSwap, true)
+
+		rc := ResourceConfigForPod(pod, true, QuotaPeriod, false, kubeletconfig.NoneMemoryReservationPolicy)
+		expected := strconv.FormatInt(512*1024*1024, 10)
+		if got := rc.Unified[Cgroup2MaxSwapFilename]; got != expected {
+			t.Fatalf("expected Unified[%q] = %q, got %q", Cgroup2MaxSwapFilename, expected, got)
+		}
+	})
+
+	t.Run("omits memory.swap.max when WorkloadControlledSwap is disabled", func(t *testing.T) {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.PodLevelResources, true)
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.WorkloadControlledSwap, false)
+
+		rc := ResourceConfigForPod(pod, true, QuotaPeriod, false, kubeletconfig.NoneMemoryReservationPolicy)
+		if _, found := rc.Unified[Cgroup2MaxSwapFilename]; found {
+			t.Fatalf("expected Unified[%q] to be omitted when WorkloadControlledSwap is disabled, got %v", Cgroup2MaxSwapFilename, rc.Unified)
+		}
+	})
+
+	t.Run("podContainerManager strips memory.swap.max on NoSwap or missing swap controller", func(t *testing.T) {
+		pcmNoSwap := &podContainerManagerImpl{memorySwapBehavior: "NoSwap", getSwapControllerAvailable: func() bool { return true }}
+		if pcmNoSwap.isNodeSwapEnabled() {
+			t.Fatalf("expected isNodeSwapEnabled() == false when memorySwapBehavior is NoSwap")
+		}
+
+		pcmSwapNoController := &podContainerManagerImpl{memorySwapBehavior: "WorkloadControlledSwap", getSwapControllerAvailable: func() bool { return false }}
+		if pcmSwapNoController.isNodeSwapEnabled() {
+			t.Fatalf("expected isNodeSwapEnabled() == false when swap controller is unavailable")
+		}
+	})
 }

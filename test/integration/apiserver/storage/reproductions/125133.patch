@@ -1,0 +1,25 @@
+diff --git a/staging/src/k8s.io/apiserver/pkg/storage/cacher/cacher.go b/staging/src/k8s.io/apiserver/pkg/storage/cacher/cacher.go
+index 92628f8e2df..330f474797d 100644
+--- a/staging/src/k8s.io/apiserver/pkg/storage/cacher/cacher.go
++++ b/staging/src/k8s.io/apiserver/pkg/storage/cacher/cacher.go
+@@ -1423,18 +1423,8 @@ func (i *indexedWatchers) allMatchingWatchers(namespace, name string, triggerVal
+ // the trigger is not supported, allIndexValues once for the fan-out to every
+ // watcher in indexWatchers.
+ func forEachSelectionKey(namespace, name string, triggerValues []string, triggerSupported bool, scope func(namespacedName), indexValue func(string), allIndexValues func()) {
+-	if len(namespace) > 0 {
+-		if len(name) > 0 {
+-			// namespaced watchers scoped by name
+-			scope(namespacedName{namespace: namespace, name: name})
+-		}
+-		// namespaced watchers not scoped by name
+-		scope(namespacedName{namespace: namespace})
+-	}
+-	if len(name) > 0 {
+-		// cluster-wide watchers scoped by name
+-		scope(namespacedName{name: name})
+-	}
++	// BUG REVERT (#125133-class): watchers scoped by namespace and/or name are
++	// never yielded, so they miss all live and stalled-resync events.
+ 	// cluster-wide watchers unscoped by name
+ 	scope(namespacedName{})
+ 

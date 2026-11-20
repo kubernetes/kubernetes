@@ -17,6 +17,7 @@ limitations under the License.
 package clusterinfo
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -46,9 +47,14 @@ func TestSetupOutputWriterNoOp(t *testing.T) {
 			f := cmdtesting.NewTestFactory()
 			defer f.Cleanup()
 
-			writer := setupOutputWriter(tt.outputWriter, buf, "/some/file/that/should/be/ignored", "")
+			writer, closeWriter := setupOutputWriter(tt.outputWriter, buf, "/some/file/that/should/be/ignored", "")
 			if writer != buf {
 				t.Errorf("expected: %v, saw: %v", buf, writer)
+			}
+			// The default writer is owned by the caller, so releasing must not close it.
+			closeWriter()
+			if _, err := writer.Write([]byte("still open")); err != nil {
+				t.Errorf("expected default writer to stay usable, saw: %v", err)
 			}
 		})
 	}
@@ -68,7 +74,7 @@ func TestSetupOutputWriterFile(t *testing.T) {
 	f := cmdtesting.NewTestFactory()
 	defer f.Cleanup()
 
-	writer := setupOutputWriter(dir, buf, file, extension)
+	writer, closeWriter := setupOutputWriter(dir, buf, file, extension)
 	if writer == buf {
 		t.Errorf("expected: %v, saw: %v", buf, writer)
 	}
@@ -81,6 +87,11 @@ func TestSetupOutputWriterFile(t *testing.T) {
 	}
 	if string(data) != output {
 		t.Errorf("expected: %v, saw: %v", output, data)
+	}
+
+	closeWriter()
+	if _, err := writer.Write([]byte("more")); !errors.Is(err, os.ErrClosed) {
+		t.Errorf("expected the file to be closed, saw: %v", err)
 	}
 }
 
@@ -101,7 +112,8 @@ func TestSetupOutputWriterPermissions(t *testing.T) {
 	f := cmdtesting.NewTestFactory()
 	defer f.Cleanup()
 
-	writer := setupOutputWriter(dir, buf, file, extension)
+	writer, closeWriter := setupOutputWriter(dir, buf, file, extension)
+	defer closeWriter()
 	if writer == buf {
 		t.Errorf("expected: %v, saw: %v", buf, writer)
 	}

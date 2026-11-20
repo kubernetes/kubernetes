@@ -1,0 +1,28 @@
+kind: ResourceSlice
+apiVersion: resource.k8s.io/v1
+metadata:
+  name: resourceslice-{{.Index}}
+spec:
+  pool:
+    name: resourceslice-{{.Index}}
+    generation: 1
+    resourceSliceCount: 1
+  driver: test-driver.cdi.k8s.io
+  nodeName: scheduler-perf-dra-{{.Index}}
+  devices:{{range $socket := 2}}{{range $core := 2}}
+  - name: cpu-{{$socket}}-{{$core}}
+    attributes:
+      type:
+        string: cpu
+      resource.kubernetes.io/pcieRoot:
+        strings:
+        - pci0000:{{$socket}}0
+        - pci0000:{{$socket}}1
+  {{end}}{{end}}{{range $socket := 2}}{{range $root := 2}}{{range $vf := 2}}
+  - name: nic-{{$socket}}-{{$root}}-{{$vf}}
+    attributes:
+      type:
+        string: nic
+      resource.kubernetes.io/pcieRoot:
+        string: pci0000:{{$socket}}{{$root}}
+  {{end}}{{end}}{{end}}

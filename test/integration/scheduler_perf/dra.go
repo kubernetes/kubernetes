@@ -32,15 +32,16 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
+	"k8s.io/client-go/ktesting"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
+	draapi "k8s.io/dynamic-resource-allocation/api"
 	"k8s.io/dynamic-resource-allocation/cel"
 	resourceslicetracker "k8s.io/dynamic-resource-allocation/resourceslice/tracker"
 	"k8s.io/dynamic-resource-allocation/structured"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/dynamicresources"
 	"k8s.io/kubernetes/pkg/scheduler/util/assumecache"
-	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 )
 
 // createResourceClaimsOp defines an op where resource claims are created.
@@ -157,10 +158,12 @@ func (op *allocResourceClaimsOp) run(tCtx ktesting.TContext) {
 	informerFactory := informers.NewSharedInformerFactory(tCtx.Client(), 0)
 	claimInformer := informerFactory.Resource().V1().ResourceClaims().Informer()
 	nodeLister := informerFactory.Core().V1().Nodes().Lister()
+	sliceInformer := draapi.NewInformerForResourceSlice(informerFactory)
 	resourceSliceTrackerOpts := resourceslicetracker.Options{
 		EnableDeviceTaintRules:   utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaintRules),
 		EnableConsumableCapacity: utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity),
-		SliceInformer:            informerFactory.Resource().V1().ResourceSlices(),
+		SliceLister:              draapi.NewResourceSliceLister(sliceInformer.GetIndexer()),
+		SliceInformer:            sliceInformer,
 		KubeClient:               tCtx.Client(),
 	}
 	if resourceSliceTrackerOpts.EnableDeviceTaintRules {
@@ -180,7 +183,7 @@ func (op *allocResourceClaimsOp) run(tCtx ktesting.TContext) {
 		Synced: map[reflect.Type]bool{
 			reflect.TypeFor[*resourceapi.DeviceClass]():   true,
 			reflect.TypeFor[*resourceapi.ResourceClaim](): true,
-			reflect.TypeFor[*resourceapi.ResourceSlice](): true,
+			reflect.TypeFor[*draapi.ResourceSlice]():      true,
 			reflect.TypeFor[*v1.Node]():                   true,
 		},
 	}
@@ -234,7 +237,7 @@ claims:
 		claims, err := draManager.ResourceClaims().List()
 		tCtx.ExpectNoError(err, "list claims")
 		allocatedDevices := sets.New[structured.DeviceID]()
-		allocatedSharedDeviceIDs := sets.New[structured.SharedDeviceID]()
+		allocatedSharedDeviceIDs := sets.New[structured.DeviceID]()
 		aggregatedCapacity := structured.NewConsumedCapacityCollection()
 		for _, claim := range claims {
 			if claim.Status.Allocation == nil {
@@ -242,13 +245,11 @@ claims:
 			}
 			for _, result := range claim.Status.Allocation.Devices.Results {
 				deviceID := structured.MakeDeviceID(result.Driver, result.Pool, result.Device)
-				allocatedDevices.Insert(deviceID)
 				if result.ShareID == nil {
 					allocatedDevices.Insert(deviceID)
 					continue
 				}
-				sharedDeviceID := structured.MakeSharedDeviceID(deviceID, result.ShareID)
-				allocatedSharedDeviceIDs.Insert(sharedDeviceID)
+				allocatedSharedDeviceIDs.Insert(deviceID)
 				claimedCapacity := result.ConsumedCapacity
 				if claimedCapacity != nil {
 					allocatedCapacity := structured.NewDeviceConsumedCapacity(deviceID, claimedCapacity)

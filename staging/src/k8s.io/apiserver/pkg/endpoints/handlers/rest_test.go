@@ -661,10 +661,13 @@ func TestNumberConversion(t *testing.T) {
 	activeDeadlineSeconds := int64(42)
 	currentVersionedObject := &examplev1.Pod{
 		TypeMeta:   metav1.TypeMeta{Kind: "Example", APIVersion: examplev1.SchemeGroupVersion.String()},
-		ObjectMeta: metav1.ObjectMeta{Name: "test-example"},
+		ObjectMeta: metav1.ObjectMeta{Name: "test-example", Labels: map[string]string{"a": "b"}},
 		Spec: examplev1.PodSpec{
 			TerminationGracePeriodSeconds: &terminationGracePeriodSeconds,
 			ActiveDeadlineSeconds:         &activeDeadlineSeconds,
+		},
+		Status: examplev1.PodStatus{
+			Phase: examplev1.PodPhase("Running"),
 		},
 	}
 	versionedObjToUpdate := &examplev1.Pod{}
@@ -679,6 +682,14 @@ func TestNumberConversion(t *testing.T) {
 	if versionedObjToUpdate.Spec.TerminationGracePeriodSeconds == nil || *versionedObjToUpdate.Spec.TerminationGracePeriodSeconds != 42 ||
 		versionedObjToUpdate.Spec.ActiveDeadlineSeconds == nil || *versionedObjToUpdate.Spec.ActiveDeadlineSeconds != 120 {
 		t.Fatal(errors.New("Ports failed to merge because of number conversion issue"))
+	}
+	if versionedObjToUpdate.Status.Phase != examplev1.PodPhase("Running") || versionedObjToUpdate.Labels["a"] != "b" {
+		t.Fatalf("expected unpatched fields to be preserved, got status=%v labels=%v", versionedObjToUpdate.Status.Phase, versionedObjToUpdate.Labels)
+	}
+	versionedObjToUpdate.Labels["a"] = "mutated"
+	*versionedObjToUpdate.Spec.ActiveDeadlineSeconds = 999
+	if currentVersionedObject.Labels["a"] != "b" || *currentVersionedObject.Spec.ActiveDeadlineSeconds != 42 {
+		t.Fatal("patched object aliases original object")
 	}
 }
 

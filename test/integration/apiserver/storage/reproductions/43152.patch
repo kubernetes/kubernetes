@@ -1,0 +1,19 @@
+diff --git a/staging/src/k8s.io/apiserver/pkg/storage/txn.go b/staging/src/k8s.io/apiserver/pkg/storage/txn.go
+index d082ebe9eb7..41a46861b9b 100644
+--- a/staging/src/k8s.io/apiserver/pkg/storage/txn.go
++++ b/staging/src/k8s.io/apiserver/pkg/storage/txn.go
+@@ -123,11 +123,9 @@ func GuaranteedUpdate(ctx context.Context, d TxnDelegator, key string, destinati
+ 
+ 		ret, ttl, err := updateState(origState, tryUpdate)
+ 		if err != nil {
+-			origState, err = refreshOnError(ctx, origState, err, ignoreNotFound, d.GetCurrentState)
+-			if err != nil {
+-				return err
+-			}
+-			continue
++			// BUG REVERT (#43152): return tryUpdate error on a stale cached suggestion
++			// immediately instead of refetching live state from etcd and retrying.
++			return err
+ 		}
+ 
+ 		var success bool

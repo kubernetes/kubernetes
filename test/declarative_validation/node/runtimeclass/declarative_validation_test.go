@@ -71,7 +71,7 @@ func TestRuntimeClass_DeclarativeValidate_Create(t *testing.T) {
 						rc.Handler = ""
 					}),
 					expectedErrs: field.ErrorList{
-						field.Required(field.NewPath("handler"), "must be a valid DNS label").MarkBeta(),
+						field.Required(field.NewPath("handler"), "must be a valid DNS label"),
 					},
 				},
 				"handler with special characters": {
@@ -80,7 +80,7 @@ func TestRuntimeClass_DeclarativeValidate_Create(t *testing.T) {
 					}),
 					expectedErrs: field.ErrorList{
 						field.Invalid(field.NewPath("handler"),
-							"", "").WithOrigin("format=k8s-short-name").MarkBeta(),
+							"", "").WithOrigin("format=k8s-short-name"),
 					},
 				},
 				"handler with uppercase and special characters": {
@@ -89,7 +89,7 @@ func TestRuntimeClass_DeclarativeValidate_Create(t *testing.T) {
 					}),
 					expectedErrs: field.ErrorList{
 						field.Invalid(field.NewPath("handler"),
-							"", "").WithOrigin("format=k8s-short-name").MarkBeta(),
+							"", "").WithOrigin("format=k8s-short-name"),
 					},
 				},
 				"handler exceeds length with invalid characters": {
@@ -98,7 +98,7 @@ func TestRuntimeClass_DeclarativeValidate_Create(t *testing.T) {
 					}),
 					expectedErrs: field.ErrorList{
 						field.Invalid(field.NewPath("handler"),
-							"", "").WithOrigin("format=k8s-short-name").MarkBeta(),
+							"", "").WithOrigin("format=k8s-short-name"),
 					},
 				},
 				"scheduling toleration with valid key": {
@@ -124,7 +124,7 @@ func TestRuntimeClass_DeclarativeValidate_Create(t *testing.T) {
 						}
 					}),
 					expectedErrs: field.ErrorList{
-						field.Invalid(field.NewPath("scheduling", "tolerations").Index(0).Child("key"), nil, "").WithOrigin("format=k8s-label-key").MarkAlpha(),
+						field.Invalid(field.NewPath("scheduling", "tolerations").Index(0).Child("key"), nil, "").WithOrigin("format=k8s-label-key").MarkBeta(),
 					},
 				},
 			}
@@ -178,7 +178,7 @@ func TestRuntimeClass_DeclarativeValidate_Update(t *testing.T) {
 					}),
 					expectedErrs: field.ErrorList{
 						field.Invalid(field.NewPath("handler"), "",
-							"").WithOrigin("immutable").MarkBeta(),
+							"").WithOrigin("immutable"),
 					},
 				},
 			}

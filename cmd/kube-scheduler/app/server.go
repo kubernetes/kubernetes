@@ -36,12 +36,12 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	genericapifilters "k8s.io/apiserver/pkg/endpoints/filters"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/apiserver/pkg/server"
 	genericfilters "k8s.io/apiserver/pkg/server/filters"
 	"k8s.io/apiserver/pkg/server/flagz"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/mux"
 	"k8s.io/apiserver/pkg/server/routes"
+	"k8s.io/apiserver/pkg/server/signals"
 	"k8s.io/apiserver/pkg/server/statusz"
 	"k8s.io/apiserver/pkg/util/compatibility"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -59,6 +59,7 @@ import (
 	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/component-base/metrics/features"
 	"k8s.io/component-base/metrics/legacyregistry"
+	featuremetrics "k8s.io/component-base/metrics/prometheus/feature"
 	"k8s.io/component-base/metrics/prometheus/slis"
 	"k8s.io/component-base/term"
 	utilversion "k8s.io/component-base/version"
@@ -162,7 +163,7 @@ func runCommand(cmd *cobra.Command, opts *options.Options, registryOptions ...Op
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	go func() {
-		stopCh := server.SetupSignalHandler()
+		stopCh := signals.SetupSignalHandler()
 		<-stopCh
 		cancel()
 	}()
@@ -172,7 +173,7 @@ func runCommand(cmd *cobra.Command, opts *options.Options, registryOptions ...Op
 		return err
 	}
 	// add feature enablement metrics
-	fg.(featuregate.MutableFeatureGate).AddMetrics()
+	fg.(featuregate.MutableFeatureGate).AddMetrics(featuremetrics.RecordFeatureInfo)
 	// add component version metrics
 	opts.ComponentGlobalsRegistry.AddMetrics()
 
@@ -247,15 +248,16 @@ func Run(ctx context.Context, cc *schedulerserverconfig.CompletedConfig, sched *
 		}
 
 		// Start lease candidate controller for coordinated leader election
-		leaseCandidate, waitForSync, err := leaderelection.NewCandidate(
-			cc.Client,
-			metav1.NamespaceSystem,
-			cc.LeaderElection.Lock.Identity(),
-			kubeScheduler,
-			binaryVersion.FinalizeVersion(),
-			emulationVersion.FinalizeVersion(),
-			coordinationv1.OldestEmulationVersion,
-		)
+		leaseCandidate, waitForSync, err := leaderelection.NewCandidateWithConfig(leaderelection.CandidateConfig{
+			Clientset:          cc.Client,
+			CandidateNamespace: metav1.NamespaceSystem,
+			CandidateName:      cc.LeaderElection.Lock.Identity(),
+			TargetLease:        kubeScheduler,
+			BinaryVersion:      binaryVersion.FinalizeVersion(),
+			EmulationVersion:   emulationVersion.FinalizeVersion(),
+			Strategy:           coordinationv1.OldestEmulationVersion,
+			Logger:             &logger,
+		})
 		if err != nil {
 			return err
 		}
@@ -286,17 +288,21 @@ func Run(ctx context.Context, cc *schedulerserverconfig.CompletedConfig, sched *
 
 	startInformersAndWaitForSync := func(ctx context.Context) {
 		// Start all informers.
-		cc.InformerFactory.Start(ctx.Done())
+		cc.InformerFactory.StartWithContext(ctx)
 		// DynInformerFactory can be nil in tests.
 		if cc.DynInformerFactory != nil {
-			cc.DynInformerFactory.Start(ctx.Done())
+			cc.DynInformerFactory.StartWithContext(ctx)
 		}
 
 		// Wait for all caches to sync before scheduling.
-		cc.InformerFactory.WaitForCacheSync(ctx.Done())
+		if err := cc.InformerFactory.WaitForCacheSyncWithContext(ctx).AsError(); err != nil {
+			logger.Error(err, "informers are not fully synced")
+		}
 		// DynInformerFactory can be nil in tests.
 		if cc.DynInformerFactory != nil {
-			cc.DynInformerFactory.WaitForCacheSync(ctx.Done())
+			if err := cc.DynInformerFactory.WaitForCacheSyncWithContext(ctx).AsError(); err != nil {
+				logger.Error(err, "dynamic informers are not fully synced")
+			}
 		}
 
 		// Wait for all handlers to sync (all items in the initial list delivered) before scheduling.
@@ -469,6 +475,7 @@ func Setup(ctx context.Context, opts *options.Options, outOfTreeRegistryOptions 
 		scheduler.WithKubeConfig(cc.KubeConfig),
 		scheduler.WithProfiles(cc.ComponentConfig.Profiles...),
 		scheduler.WithPercentageOfNodesToScore(cc.ComponentConfig.PercentageOfNodesToScore),
+		scheduler.WithPercentageOfPlacementsToScore(cc.ComponentConfig.PercentageOfPlacementsToScore),
 		scheduler.WithFrameworkOutOfTreeRegistry(outOfTreeRegistry),
 		scheduler.WithPodMaxBackoffSeconds(cc.ComponentConfig.PodMaxBackoffSeconds),
 		scheduler.WithPodInitialBackoffSeconds(cc.ComponentConfig.PodInitialBackoffSeconds),

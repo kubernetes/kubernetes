@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+
 	"k8s.io/apimachinery/pkg/api/operation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -57,14 +58,13 @@ var (
 	}
 
 	fieldImmutableError             = "field is immutable"
+	notAllowedToUnsetError          = "field cannot be cleared once set"
 	minCountError                   = "must be greater than or equal to 1"
 	subdomainNameError              = "lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters"
-	maximumError                    = "must be less than or equal to"
 	oneOfError                      = "must specify one of: `basic`, `gang`"
 	multipleSchedulingPoliciesError = "must specify exactly one of: `basic`, `gang`"
 	multipleDisruptionModesError    = "must specify exactly one of: `single`, `all`"
 	supportedPoliciesError          = `supported values: "Never", "PreemptLowerPriority"`
-	forbiddenError                  = "Forbidden"
 )
 
 func compositePodGroupWithSchedulingConstraints(keys ...string) *scheduling.CompositePodGroup {
@@ -115,7 +115,7 @@ func TestStrategy(t *testing.T) {
 func ctxWithRequestInfo() context.Context {
 	return genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
 		APIGroup:          "scheduling.k8s.io",
-		APIVersion:        "v1alpha3",
+		APIVersion:        "v1beta1",
 		Resource:          "compositepodgroups",
 		IsResourceRequest: true,
 	})
@@ -125,10 +125,9 @@ func TestStrategyCreate(t *testing.T) {
 	ctx := ctxWithRequestInfo()
 
 	testCases := map[string]struct {
-		obj                            *scheduling.CompositePodGroup
-		expectObj                      *scheduling.CompositePodGroup
-		enablePodGroupPreemptionPolicy bool
-		expectValidationError          string
+		obj                   *scheduling.CompositePodGroup
+		expectObj             *scheduling.CompositePodGroup
+		expectValidationError string
 	}{
 		"simple": {
 			obj:       cpg,
@@ -206,13 +205,17 @@ func TestStrategyCreate(t *testing.T) {
 				return cpg
 			}(),
 		},
-		"too high priority": {
+		"system-node-critical priority": {
 			obj: func() *scheduling.CompositePodGroup {
 				cpg := cpg.DeepCopy()
-				cpg.Spec.Priority = new(int32(scheduling.HighestUserDefinablePriority + 1))
+				cpg.Spec.Priority = new(int32(scheduling.SystemCriticalPriority + 1000))
 				return cpg
 			}(),
-			expectValidationError: maximumError,
+			expectObj: func() *scheduling.CompositePodGroup {
+				cpg := cpg.DeepCopy()
+				cpg.Spec.Priority = new(int32(scheduling.SystemCriticalPriority + 1000))
+				return cpg
+			}(),
 		},
 		"multiple topology constraints": {
 			obj:                   compositePodGroupWithSchedulingConstraints("foo", "bar"),
@@ -230,28 +233,17 @@ func TestStrategyCreate(t *testing.T) {
 			obj:                   cpgWithDisruptionModeBoth(),
 			expectValidationError: multipleDisruptionModesError,
 		},
-		"podgroup preemptionPolicy disabled - drop preemptionPolicy": {
+		"preserve preemptionPolicy (Never)": {
 			obj:       cpgWithPreemptionPolicy(scheduling.PreemptNever),
-			expectObj: cpg,
+			expectObj: cpgWithPreemptionPolicy(scheduling.PreemptNever),
 		},
-		"podgroup preemptionPolicy disabled - drop invalid preemptionPolicy": {
-			obj:       cpgWithPreemptionPolicy(scheduling.PreemptionPolicy("Invalid")),
-			expectObj: cpg,
+		"preserve preemptionPolicy (PreemptLowerPriority)": {
+			obj:       cpgWithPreemptionPolicy(scheduling.PreemptLowerPriority),
+			expectObj: cpgWithPreemptionPolicy(scheduling.PreemptLowerPriority),
 		},
-		"podgroup preemptionPolicy enabled - preserve preemptionPolicy (Never)": {
-			obj:                            cpgWithPreemptionPolicy(scheduling.PreemptNever),
-			expectObj:                      cpgWithPreemptionPolicy(scheduling.PreemptNever),
-			enablePodGroupPreemptionPolicy: true,
-		},
-		"podgroup preemptionPolicy enabled - preserve preemptionPolicy (PreemptLowerPriority)": {
-			obj:                            cpgWithPreemptionPolicy(scheduling.PreemptLowerPriority),
-			expectObj:                      cpgWithPreemptionPolicy(scheduling.PreemptLowerPriority),
-			enablePodGroupPreemptionPolicy: true,
-		},
-		"podgroup preemptionPolicy enabled - invalid preemptionPolicy": {
-			obj:                            cpgWithPreemptionPolicy(scheduling.PreemptionPolicy("Invalid")),
-			enablePodGroupPreemptionPolicy: true,
-			expectValidationError:          supportedPoliciesError,
+		"invalid preemptionPolicy": {
+			obj:                   cpgWithPreemptionPolicy(scheduling.PreemptionPolicy("Invalid")),
+			expectValidationError: supportedPoliciesError,
 		},
 	}
 
@@ -261,7 +253,6 @@ func TestStrategyCreate(t *testing.T) {
 				features.GenericWorkload:                 true,
 				features.CompositePodGroup:               true,
 				features.TopologyAwareWorkloadScheduling: true,
-				features.PodGroupPreemptionPolicy:        tc.enablePodGroupPreemptionPolicy,
 			})
 			newCpg := tc.obj.DeepCopy()
 
@@ -300,10 +291,9 @@ func TestStrategyCreate(t *testing.T) {
 func TestStrategyUpdate(t *testing.T) {
 	ctx := ctxWithRequestInfo()
 	testCases := map[string]struct {
-		oldObj                         *scheduling.CompositePodGroup
-		newObj                         *scheduling.CompositePodGroup
-		enablePodGroupPreemptionPolicy bool
-		expectValidationErrors         []string
+		oldObj                 *scheduling.CompositePodGroup
+		newObj                 *scheduling.CompositePodGroup
+		expectValidationErrors []string
 	}{
 		"no changes": {
 			oldObj: cpg,
@@ -355,14 +345,13 @@ func TestStrategyUpdate(t *testing.T) {
 			}(),
 			expectValidationErrors: []string{fieldImmutableError},
 		},
-		"changing min group count in gang scheduling policy not allowed": {
+		"changing min group count in gang scheduling policy is allowed": {
 			oldObj: cpg,
 			newObj: func() *scheduling.CompositePodGroup {
 				newCpg := cpg.DeepCopy()
 				newCpg.Spec.SchedulingPolicy.Gang.MinGroupCount = 4
 				return newCpg
 			}(),
-			expectValidationErrors: []string{fieldImmutableError},
 		},
 		"changing scheduling policy not allowed": {
 			oldObj: cpg,
@@ -373,7 +362,7 @@ func TestStrategyUpdate(t *testing.T) {
 				}
 				return newCpg
 			}(),
-			expectValidationErrors: []string{fieldImmutableError},
+			expectValidationErrors: []string{fieldImmutableError, notAllowedToUnsetError},
 		},
 		"changing disruption mode not allowed": {
 			oldObj:                 cpg,
@@ -407,16 +396,10 @@ func TestStrategyUpdate(t *testing.T) {
 			}(),
 			expectValidationErrors: []string{fieldImmutableError},
 		},
-		"changing preemptionPolicy not allowed with podgroup preemptionPolicy disabled": {
+		"changing preemptionPolicy not allowed": {
 			oldObj:                 cpgWithPreemptionPolicy(scheduling.PreemptNever),
 			newObj:                 cpgWithPreemptionPolicy(scheduling.PreemptLowerPriority),
-			expectValidationErrors: []string{forbiddenError, fieldImmutableError},
-		},
-		"changing preemptionPolicy not allowed with podgroup preemptionPolicy enabled": {
-			oldObj:                         cpgWithPreemptionPolicy(scheduling.PreemptNever),
-			newObj:                         cpgWithPreemptionPolicy(scheduling.PreemptLowerPriority),
-			enablePodGroupPreemptionPolicy: true,
-			expectValidationErrors:         []string{fieldImmutableError},
+			expectValidationErrors: []string{fieldImmutableError},
 		},
 		"changing scheduling constraints not allowed": {
 			oldObj:                 compositePodGroupWithSchedulingConstraints("foo"),
@@ -441,7 +424,6 @@ func TestStrategyUpdate(t *testing.T) {
 				features.GenericWorkload:                 true,
 				features.CompositePodGroup:               true,
 				features.TopologyAwareWorkloadScheduling: true,
-				features.PodGroupPreemptionPolicy:        tc.enablePodGroupPreemptionPolicy,
 			})
 			oldCpg := tc.oldObj.DeepCopy()
 			newCpg := tc.newObj.DeepCopy()
@@ -475,7 +457,7 @@ func TestStrategyUpdate(t *testing.T) {
 func TestStatusStrategyUpdate(t *testing.T) {
 	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
 		APIGroup:    "scheduling.k8s.io",
-		APIVersion:  "v1alpha3",
+		APIVersion:  "v1beta1",
 		Resource:    "compositepodgroups",
 		Subresource: "status",
 	})

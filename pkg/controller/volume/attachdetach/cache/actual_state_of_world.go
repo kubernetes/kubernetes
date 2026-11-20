@@ -368,12 +368,6 @@ func (asw *actualStateOfWorld) AddVolumeNode(
 			attachedConfirmed:   isAttached,
 			detachRequestedTime: time.Time{},
 		}
-		// Assume mounted, until proven otherwise
-		if asw.inUseVolumes[nodeName] == nil {
-			asw.inUseVolumes[nodeName] = sets.New(volumeName)
-		} else {
-			asw.inUseVolumes[nodeName].Insert(volumeName)
-		}
 	} else {
 		node.attachedConfirmed = isAttached
 		logger.V(5).Info("Volume is already added to attachedVolume list to the node",
@@ -396,7 +390,11 @@ func (asw *actualStateOfWorld) SetVolumesMountedByNode(
 	asw.Lock()
 	defer asw.Unlock()
 
-	asw.inUseVolumes[nodeName] = sets.New(volumeNames...)
+	if volumeNames == nil {
+		delete(asw.inUseVolumes, nodeName)
+	} else {
+		asw.inUseVolumes[nodeName] = sets.New(volumeNames...)
+	}
 	logger.V(5).Info("SetVolumesMountedByNode volume to the node",
 		"node", klog.KRef("", string(nodeName)),
 		"volumeNames", volumeNames)

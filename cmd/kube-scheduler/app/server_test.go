@@ -280,7 +280,6 @@ leaderElection:
 					plugins.PreFilter.Enabled = []config.Plugin{
 						{Name: "NodeResourcesFit"},
 						{Name: "NodePorts"},
-						{Name: "TaintToleration"},
 						{Name: "DynamicResources"},
 					}
 					plugins.PreScore.Enabled = []config.Plugin{
@@ -293,6 +292,9 @@ leaderElection:
 						{Name: "InterPodAffinity", Weight: 1},
 						{Name: "TaintToleration", Weight: 1},
 						{Name: "DynamicResources", Weight: 1},
+					}
+					plugins.Bind.Enabled = []config.Plugin{
+						{Name: "DefaultBinder"},
 					}
 					return plugins
 				}(),

@@ -63,12 +63,17 @@ func NewCriticalPodAdmissionHandler(getPodsFunc eviction.ActivePodsFunc, killPod
 
 // HandleAdmissionFailure gracefully handles admission rejection, and, in some cases,
 // to allow admission of the pod despite its previous failure.
-func (c *CriticalPodAdmissionHandler) HandleAdmissionFailure(ctx context.Context, admitPod *v1.Pod, failureReasons []lifecycle.PredicateFailureReason, operation lifecycle.Operation) ([]lifecycle.PredicateFailureReason, error) {
+func (c *CriticalPodAdmissionHandler) HandleAdmissionFailure(ctx context.Context, admitPod *v1.Pod, failureReasons []lifecycle.PredicateFailureReason, attrs *lifecycle.PodAdmitAttributes) ([]lifecycle.PredicateFailureReason, error) {
 	if !kubetypes.IsCriticalPod(admitPod) {
 		return failureReasons, nil
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption) {
-		if operation == lifecycle.ResizeOperation {
+	if attrs.Operation == lifecycle.UpdateOperation {
+		if !attrs.Update.Resize {
+			// The pod is already running and the update doesn't request more resources, so
+			// preemption can't help it fit.
+			return failureReasons, nil
+		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption) {
 			// For in-place pod resizes, the scheduler owns all preemption decisions.
 			// When a resize cannot be accommodated immediately on the node, Kubelet defers the
 			// resize request and relies on the scheduler to handle preemption asynchronously.

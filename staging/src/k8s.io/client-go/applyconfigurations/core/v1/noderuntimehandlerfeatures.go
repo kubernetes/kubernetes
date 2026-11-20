@@ -23,10 +23,13 @@ package v1
 //
 // NodeRuntimeHandlerFeatures is a set of features implemented by the runtime handler.
 type NodeRuntimeHandlerFeaturesApplyConfiguration struct {
-	// RecursiveReadOnlyMounts is set to true if the runtime handler supports RecursiveReadOnlyMounts.
+	// recursiveReadOnlyMounts is set to true if the runtime handler supports RecursiveReadOnlyMounts.
 	RecursiveReadOnlyMounts *bool `json:"recursiveReadOnlyMounts,omitempty"`
-	// UserNamespaces is set to true if the runtime handler supports UserNamespaces, including for volumes.
+	// userNamespaces is set to true if the runtime handler supports UserNamespaces, including for volumes.
 	UserNamespaces *bool `json:"userNamespaces,omitempty"`
+	// cgroupNamespaces is set to true if the runtime handler supports specifying
+	// whether to use the host cgroup namespace for privileged and non-privileged containers.
+	CgroupNamespaces *bool `json:"cgroupNamespaces,omitempty"`
 }
 
 // NodeRuntimeHandlerFeaturesApplyConfiguration constructs a declarative configuration of the NodeRuntimeHandlerFeatures type for use with
@@ -48,5 +51,13 @@ func (b *NodeRuntimeHandlerFeaturesApplyConfiguration) WithRecursiveReadOnlyMoun
 // If called multiple times, the UserNamespaces field is set to the value of the last call.
 func (b *NodeRuntimeHandlerFeaturesApplyConfiguration) WithUserNamespaces(value bool) *NodeRuntimeHandlerFeaturesApplyConfiguration {
 	b.UserNamespaces = &value
+	return b
+}
+
+// WithCgroupNamespaces sets the CgroupNamespaces field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the CgroupNamespaces field is set to the value of the last call.
+func (b *NodeRuntimeHandlerFeaturesApplyConfiguration) WithCgroupNamespaces(value bool) *NodeRuntimeHandlerFeaturesApplyConfiguration {
+	b.CgroupNamespaces = &value
 	return b
 }

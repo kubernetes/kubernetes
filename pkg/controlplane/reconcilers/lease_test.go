@@ -336,7 +336,7 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 			// masterLeases, err := reconcilers.NewLeases(config, "/masterleases/", ttl)
 			// ref: https://issues.k8s.io/114049
 			baseKey := "/" + uuid.New().String() + "/masterleases/"
-			s, dFunc, err := factory.Create(*sc.ForResource(schema.GroupResource{Resource: "endpoints"}), newFunc, newListFunc, baseKey)
+			s, dFunc, err := factory.Create(*sc.ForResource(schema.GroupResource{Resource: "endpoints"}), newFunc, newListFunc, nil, baseKey)
 			if err != nil {
 				t.Fatalf("Error creating storage: %v", err)
 			}
@@ -426,7 +426,7 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 			// masterLeases, err := reconcilers.NewLeases(config, "/masterleases/", ttl)
 			// ref: https://issues.k8s.io/114049
 			baseKey := "/" + uuid.New().String() + "/masterleases/"
-			s, dFunc, err := factory.Create(*sc.ForResource(schema.GroupResource{Resource: "endpoints"}), newFunc, newListFunc, baseKey)
+			s, dFunc, err := factory.Create(*sc.ForResource(schema.GroupResource{Resource: "endpoints"}), newFunc, newListFunc, nil, baseKey)
 			if err != nil {
 				t.Fatalf("Error creating storage: %v", err)
 			}
@@ -541,7 +541,7 @@ func TestLeaseRemoveEndpoints(t *testing.T) {
 			// masterLeases, err := reconcilers.NewLeases(config, "/masterleases/", ttl)
 			// ref: https://issues.k8s.io/114049
 			baseKey := "/" + uuid.New().String() + "/masterleases/"
-			s, dFunc, err := factory.Create(*sc.ForResource(schema.GroupResource{Resource: "pods"}), newFunc, newListFunc, baseKey)
+			s, dFunc, err := factory.Create(*sc.ForResource(schema.GroupResource{Resource: "pods"}), newFunc, newListFunc, nil, baseKey)
 			if err != nil {
 				t.Fatalf("Error creating storage: %v", err)
 			}
@@ -658,7 +658,7 @@ func TestApiserverShutdown(t *testing.T) {
 			// masterLeases, err := reconcilers.NewLeases(config, "/masterleases/", ttl)
 			// ref: https://issues.k8s.io/114049
 			baseKey := "/" + uuid.New().String() + "/masterleases/"
-			s, dFunc, err := factory.Create(*sc.ForResource(schema.GroupResource{Resource: "endpoints"}), newFunc, newListFunc, baseKey)
+			s, dFunc, err := factory.Create(*sc.ForResource(schema.GroupResource{Resource: "endpoints"}), newFunc, newListFunc, nil, baseKey)
 			if err != nil {
 				t.Fatalf("Error creating storage: %v", err)
 			}

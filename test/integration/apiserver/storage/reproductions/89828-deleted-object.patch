@@ -1,0 +1,32 @@
+diff --git a/staging/src/k8s.io/apiserver/pkg/storage/cacher/txn_delegator.go b/staging/src/k8s.io/apiserver/pkg/storage/cacher/txn_delegator.go
+index c33c421b85c..8fbbc47c57e 100644
+--- a/staging/src/k8s.io/apiserver/pkg/storage/cacher/txn_delegator.go
++++ b/staging/src/k8s.io/apiserver/pkg/storage/cacher/txn_delegator.go
+@@ -63,7 +63,10 @@ func (d *txnDelegator) DeleteOnce(ctx context.Context, origState *storage.ObjSta
+ 	}
+ 	// Ignore failure RV parsing and use empty string to execute consistent read.
+ 	rv, _ := storage.ResourceVersion(err)
+-	state, err := d.getStateNotOlderThan(ctx, rv, false)
++	// BUG INJECTION: ignoreNotFound=true on the conflict refetch, so a key
++	// that vanished between the suggestion and the delete yields an empty
++	// state instead of NotFound, and the retry reports success.
++	state, err := d.getStateNotOlderThan(ctx, rv, true)
+ 	if err != nil {
+ 		return state, false, err
+ 	}
+diff --git a/staging/src/k8s.io/apiserver/pkg/storage/etcd3/store.go b/staging/src/k8s.io/apiserver/pkg/storage/etcd3/store.go
+index 05ae1e5ef8e..b8dd3bf008d 100644
+--- a/staging/src/k8s.io/apiserver/pkg/storage/etcd3/store.go
++++ b/staging/src/k8s.io/apiserver/pkg/storage/etcd3/store.go
+@@ -419,7 +419,10 @@ func (s *store) deleteOnce(ctx context.Context, key string, out runtime.Object,
+ 		if !getOnFailure {
+ 			return nil, false, storage.NewResourceVersionConflictsError(key, txnResp.Revision)
+ 		}
+-		origState, err = s.stateFromEtcdResponse(ctx, txnResp.KV, txnResp.Revision, key, v, false, expectTransformOrDecodeError)
++		// BUG INJECTION: ignoreNotFound=true on the conflict refetch, so a key
++		// that vanished between the suggestion and the delete yields an empty
++		// origState instead of NotFound, and the retry reports success.
++		origState, err = s.stateFromEtcdResponse(ctx, txnResp.KV, txnResp.Revision, key, v, true, expectTransformOrDecodeError)
+ 		return origState, success, err
+ 	}
+ 

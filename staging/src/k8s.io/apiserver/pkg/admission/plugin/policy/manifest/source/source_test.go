@@ -17,12 +17,16 @@ limitations under the License.
 package source
 
 import (
+	"crypto/sha256"
 	"fmt"
+	"strings"
 	"testing"
 
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/admission/plugin/manifest/metrics"
+	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/component-base/metrics/testutil"
 )
 
 type mockEvaluator struct{}
@@ -64,7 +68,7 @@ func getBindingPolicyName(b *admissionregistrationv1.ValidatingAdmissionPolicyBi
 func newTestSource(loadFunc PolicyLoadFunc[*admissionregistrationv1.ValidatingAdmissionPolicy, *admissionregistrationv1.ValidatingAdmissionPolicyBinding]) *StaticPolicySource[*admissionregistrationv1.ValidatingAdmissionPolicy, *admissionregistrationv1.ValidatingAdmissionPolicyBinding, mockEvaluator] {
 	return NewStaticPolicySource[*admissionregistrationv1.ValidatingAdmissionPolicy, *admissionregistrationv1.ValidatingAdmissionPolicyBinding, mockEvaluator](
 		"/tmp/test-manifests",
-		"test-server",
+		testAPIServerID,
 		mockCompiler,
 		loadFunc,
 		getBindingPolicyName,
@@ -135,6 +139,7 @@ func TestStaticPolicySource_HashSkipsReload(t *testing.T) {
 }
 
 func TestStaticPolicySource_FilesDeletionClearsHooks(t *testing.T) {
+	metrics.ResetMetricsForTest()
 	mock := &mockPolicyLoadFunc{
 		policies: []*admissionregistrationv1.ValidatingAdmissionPolicy{validVAP("policy1")},
 		bindings: []*admissionregistrationv1.ValidatingAdmissionPolicyBinding{validVAPB("binding1", "policy1")},
@@ -149,17 +154,21 @@ func TestStaticPolicySource_FilesDeletionClearsHooks(t *testing.T) {
 		t.Fatalf("Hooks() returned %d hooks after initial load, want 1", len(src.Hooks()))
 	}
 
-	// Simulate files being deleted: empty policies/bindings with a new hash.
+	// Simulate files being deleted: an empty directory loads no policies or
+	// bindings and has an empty hash. Later checks must not reload it again.
 	mock.policies = nil
 	mock.bindings = nil
-	mock.hash = "h2"
+	mock.hash = ""
 
-	src.checkAndReload()
+	for range 3 {
+		src.checkAndReload()
+	}
 
 	hooks := src.Hooks()
 	if len(hooks) != 0 {
 		t.Errorf("Hooks() returned %d hooks after deletion reload, want 0", len(hooks))
 	}
+	expectReloadMetrics(t, metrics.VAPManifestType, 2, 0, "")
 }
 
 func TestStaticPolicySource_ReloadKeepsPreviousOnError(t *testing.T) {
@@ -186,4 +195,237 @@ func TestStaticPolicySource_ReloadKeepsPreviousOnError(t *testing.T) {
 	if hooks[0].Policy.Name != "policy1" {
 		t.Errorf("hook policy name = %q, want %q", hooks[0].Policy.Name, "policy1")
 	}
+}
+
+// reloadStep sets what the next loads of the manifest directory return and
+// how many checks see that result, e.g. one per fsnotify event or poll.
+type reloadStep struct {
+	hash     string
+	err      error
+	rejected bool
+	checks   int
+}
+
+func goodContent(hash string, checks int) reloadStep {
+	return reloadStep{hash: hash, checks: checks}
+}
+
+func invalidContent(hash string, checks int) reloadStep {
+	return reloadStep{hash: hash, err: fmt.Errorf("invalid content %s", hash), checks: checks}
+}
+
+func readError(checks int) reloadStep {
+	return reloadStep{err: fmt.Errorf("permission denied"), checks: checks}
+}
+
+// rejectedContent is content that loads but is rejected when compiled.
+func rejectedContent(hash string, checks int) reloadStep {
+	return reloadStep{hash: hash, rejected: true, checks: checks}
+}
+
+func (m *mockPolicyLoadFunc) set(step reloadStep) {
+	m.err = step.err
+	m.hash = step.hash
+	m.policies = nil
+	m.bindings = nil
+	if step.err == nil {
+		name := "policy-" + step.hash
+		if step.rejected {
+			name = "rejected-" + step.hash
+		}
+		m.policies = []*admissionregistrationv1.ValidatingAdmissionPolicy{validVAP(name)}
+		m.bindings = []*admissionregistrationv1.ValidatingAdmissionPolicyBinding{validVAPB("binding-"+step.hash, name)}
+	}
+}
+
+func TestStaticPolicySource_ReloadMetrics(t *testing.T) {
+	tests := []struct {
+		name             string
+		steps            []reloadStep
+		wantSuccess      int
+		wantFailure      int
+		wantConfigHash   string
+		wantSuccessIsNew bool
+		wantBuilds       int
+		wantReplaced     bool
+	}{
+		{
+			name:           "single invalid write seen by a burst of events",
+			steps:          []reloadStep{invalidContent("h2", 5)},
+			wantSuccess:    1,
+			wantFailure:    1,
+			wantConfigHash: "h1",
+		},
+		{
+			name:           "invalid content left in place across polls",
+			steps:          []reloadStep{invalidContent("h2", 1), invalidContent("h2", 60)},
+			wantSuccess:    1,
+			wantFailure:    1,
+			wantConfigHash: "h1",
+		},
+		{
+			name:             "revert to last good content after a failure",
+			steps:            []reloadStep{invalidContent("h2", 3), goodContent("h1", 3)},
+			wantSuccess:      2,
+			wantFailure:      1,
+			wantConfigHash:   "h1",
+			wantSuccessIsNew: true,
+		},
+		{
+			name:             "good change after a failure",
+			steps:            []reloadStep{invalidContent("h2", 3), goodContent("h3", 3)},
+			wantSuccess:      2,
+			wantFailure:      1,
+			wantConfigHash:   "h3",
+			wantSuccessIsNew: true,
+			wantBuilds:       1,
+			wantReplaced:     true,
+		},
+		{
+			name:           "each distinct invalid content counts once",
+			steps:          []reloadStep{invalidContent("h2", 2), invalidContent("h3", 2)},
+			wantSuccess:    1,
+			wantFailure:    2,
+			wantConfigHash: "h1",
+		},
+		{
+			name:             "read errors are retried and recovery to the same content is recorded",
+			steps:            []reloadStep{readError(1), readError(1), goodContent("h1", 2)},
+			wantSuccess:      2,
+			wantFailure:      2,
+			wantConfigHash:   "h1",
+			wantSuccessIsNew: true,
+		},
+		{
+			name:           "invalid content after a read error is counted",
+			steps:          []reloadStep{invalidContent("h2", 1), readError(1), invalidContent("h2", 2)},
+			wantSuccess:    1,
+			wantFailure:    3,
+			wantConfigHash: "h1",
+		},
+		{
+			name:             "revert to last good content after a rejected change",
+			steps:            []reloadStep{rejectedContent("h2", 3), goodContent("h1", 3)},
+			wantSuccess:      2,
+			wantFailure:      1,
+			wantConfigHash:   "h1",
+			wantSuccessIsNew: true,
+			wantBuilds:       1,
+		},
+		{
+			name:           "return to earlier content after a different config was loaded",
+			steps:          []reloadStep{goodContent("h3", 1), goodContent("h1", 1)},
+			wantSuccess:    3,
+			wantConfigHash: "h1",
+			wantBuilds:     2,
+			wantReplaced:   true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			metrics.ResetMetricsForTest()
+			mock := &mockPolicyLoadFunc{}
+			mock.set(goodContent("h1", 0))
+			src := newTestSource(mock.load)
+			if err := src.LoadInitial(); err != nil {
+				t.Fatalf("LoadInitial() returned unexpected error: %v", err)
+			}
+			initial := src.current.Load()
+			compiles := 0
+			src.compiler = func(p *admissionregistrationv1.ValidatingAdmissionPolicy) (mockEvaluator, error) {
+				compiles++
+				if strings.HasPrefix(p.Name, "rejected-") {
+					return mockEvaluator{}, fmt.Errorf("compiling %s", p.Name)
+				}
+				return mockCompiler(p)
+			}
+
+			for _, step := range tt.steps {
+				mock.set(step)
+				for range step.checks {
+					src.checkAndReload()
+				}
+			}
+
+			expectReloadMetrics(t, metrics.VAPManifestType, tt.wantSuccess, tt.wantFailure, tt.wantConfigHash)
+
+			hooks := src.Hooks()
+			if len(hooks) != 1 || hooks[0].Policy.Name != "policy-"+tt.wantConfigHash {
+				t.Errorf("Hooks() = %v, want a single hook for policy-%s", hooks, tt.wantConfigHash)
+			}
+			if compiles != tt.wantBuilds {
+				t.Errorf("compiled policies %d times, want %d", compiles, tt.wantBuilds)
+			}
+			if replaced := src.current.Load() != initial; replaced != tt.wantReplaced {
+				t.Errorf("hooks from the initial load replaced = %v, want %v", replaced, tt.wantReplaced)
+			}
+
+			if tt.wantSuccessIsNew {
+				success, failure := reloadTimestamps(t, metrics.VAPManifestType)
+				if success < failure {
+					t.Errorf("last success timestamp %v is older than last failure timestamp %v", success, failure)
+				}
+			}
+		})
+	}
+}
+
+const testAPIServerID = "test-server"
+
+func expectReloadMetrics(t *testing.T, plugin metrics.ManifestType, success, failure int, configHash string) {
+	t.Helper()
+	idHash := fmt.Sprintf("sha256:%x", sha256.Sum256([]byte(testAPIServerID)))
+	want := `
+# HELP apiserver_manifest_admission_config_controller_automatic_reloads_total [ALPHA] Total number of automatic reloads of admission manifest configuration split by status, plugin, and apiserver identity.
+# TYPE apiserver_manifest_admission_config_controller_automatic_reloads_total counter
+`
+	if failure > 0 {
+		want += fmt.Sprintf("apiserver_manifest_admission_config_controller_automatic_reloads_total{apiserver_id_hash=%q,plugin=%q,status=\"failure\"} %d\n", idHash, plugin, failure)
+	}
+	want += fmt.Sprintf("apiserver_manifest_admission_config_controller_automatic_reloads_total{apiserver_id_hash=%q,plugin=%q,status=\"success\"} %d\n", idHash, plugin, success)
+	want += fmt.Sprintf(`# HELP apiserver_manifest_admission_config_controller_last_config_info [ALPHA] Information about the last applied admission manifest configuration with hash as label, split by plugin and apiserver identity.
+# TYPE apiserver_manifest_admission_config_controller_last_config_info gauge
+apiserver_manifest_admission_config_controller_last_config_info{apiserver_id_hash=%q,hash=%q,plugin=%q} 1
+`, idHash, configHash, plugin)
+
+	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(want),
+		"apiserver_manifest_admission_config_controller_automatic_reloads_total",
+		"apiserver_manifest_admission_config_controller_last_config_info",
+	); err != nil {
+		t.Error(err)
+	}
+}
+
+// reloadTimestamps returns the last success and failure reload timestamps for plugin.
+func reloadTimestamps(t *testing.T, plugin metrics.ManifestType) (success, failure float64) {
+	t.Helper()
+	families, err := legacyregistry.DefaultGatherer.Gather()
+	if err != nil {
+		t.Fatalf("Gather() returned unexpected error: %v", err)
+	}
+	for _, family := range families {
+		if family.GetName() != "apiserver_manifest_admission_config_controller_automatic_reload_last_timestamp_seconds" {
+			continue
+		}
+		for _, m := range family.GetMetric() {
+			labels := map[string]string{}
+			for _, l := range m.GetLabel() {
+				labels[l.GetName()] = l.GetValue()
+			}
+			if labels["plugin"] != string(plugin) {
+				continue
+			}
+			switch labels["status"] {
+			case "success":
+				success = m.GetGauge().GetValue()
+			case "failure":
+				failure = m.GetGauge().GetValue()
+			}
+		}
+	}
+	if success == 0 {
+		t.Fatal("no success reload timestamp recorded")
+	}
+	return success, failure
 }

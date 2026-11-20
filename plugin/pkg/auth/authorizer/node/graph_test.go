@@ -25,6 +25,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
+
 	certsv1 "k8s.io/api/certificates/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -191,6 +192,27 @@ func TestIndex(t *testing.T) {
 
 	a := NewAuthorizer(g, nil, nil)
 
+	addPV := func(pvNumber int) {
+		t.Helper()
+		pvName := fmt.Sprintf("pv%d", pvNumber)
+		pv := &corev1.PersistentVolume{
+			ObjectMeta: metav1.ObjectMeta{Name: pvName, UID: types.UID(fmt.Sprintf("pv%duid1", pvNumber))},
+			Spec: corev1.PersistentVolumeSpec{
+				ClaimRef: &corev1.ObjectReference{
+					Kind:      "PersistentVolumeClaim",
+					Namespace: "pv-pvc-ns",
+					Name:      fmt.Sprintf("pv-pvc-%d", pvNumber),
+				},
+				CSI: &corev1.CSIPersistentVolumeSource{
+					Driver:               "foo",
+					NodeStageSecretRef:   &corev1.SecretReference{Name: "pv-secret", Namespace: "pv-secret-ns"},
+					NodePublishSecretRef: &corev1.SecretReference{Name: "pv-secret", Namespace: "pv-secret-ns"},
+				},
+			},
+		}
+		g.AddPV(pv)
+	}
+
 	addPod := func(podNumber, nodeNumber int) {
 		t.Helper()
 		nodeName := fmt.Sprintf("node%d", nodeNumber)
@@ -205,7 +227,27 @@ func TestIndex(t *testing.T) {
 					{Name: "volume1", VolumeSource: corev1.VolumeSource{ConfigMap: &corev1.ConfigMapVolumeSource{LocalObjectReference: corev1.LocalObjectReference{Name: "cm1"}}}},
 					{Name: "volume2", VolumeSource: corev1.VolumeSource{ConfigMap: &corev1.ConfigMapVolumeSource{LocalObjectReference: corev1.LocalObjectReference{Name: "cm2"}}}},
 					{Name: "volume3", VolumeSource: corev1.VolumeSource{ConfigMap: &corev1.ConfigMapVolumeSource{LocalObjectReference: corev1.LocalObjectReference{Name: "cm3"}}}},
+					{Name: "volume4", VolumeSource: corev1.VolumeSource{ConfigMap: &corev1.ConfigMapVolumeSource{LocalObjectReference: corev1.LocalObjectReference{Name: "cm3"}}}},
+
+					{Name: "secret1.1", VolumeSource: corev1.VolumeSource{Secret: &corev1.SecretVolumeSource{SecretName: "secret1"}}},
+					{Name: "secret1.2", VolumeSource: corev1.VolumeSource{Secret: &corev1.SecretVolumeSource{SecretName: "secret1"}}},
+					{Name: "secret2.1", VolumeSource: corev1.VolumeSource{Secret: &corev1.SecretVolumeSource{SecretName: "secret2"}}},
+					{Name: "secret2.2", VolumeSource: corev1.VolumeSource{Secret: &corev1.SecretVolumeSource{SecretName: "secret2"}}},
+
+					{Name: "pvc1.1", VolumeSource: corev1.VolumeSource{PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: "pvc1"}}},
+					{Name: "pvc1.2", VolumeSource: corev1.VolumeSource{PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: "pvc1"}}},
+					{Name: "pvc2.1", VolumeSource: corev1.VolumeSource{PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: "pvc2"}}},
+					{Name: "pvc2.2", VolumeSource: corev1.VolumeSource{PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: "pvc2"}}},
 				},
+				ResourceClaims: []corev1.PodResourceClaim{
+					{Name: "rc1.1", ResourceClaimName: new("rc1")},
+					{Name: "rc1.2", ResourceClaimName: new("rc1")},
+					{Name: "rc2.1", ResourceClaimName: new("rc2")},
+					{Name: "rc2.2", ResourceClaimName: new("rc2")},
+				},
+			},
+			Status: corev1.PodStatus{
+				ExtendedResourceClaimStatus: &corev1.PodExtendedResourceClaimStatus{ResourceClaimName: "rc2"},
 			},
 		}
 		g.AddPod(pod)
@@ -240,7 +282,7 @@ func TestIndex(t *testing.T) {
 		if !reflect.DeepEqual(expect, actual) {
 			e, _ := json.MarshalIndent(expect, "", "  ")
 			a, _ := json.MarshalIndent(actual, "", "  ")
-			t.Errorf("expected graph:\n%s\ngot:\n%s", string(e), string(a))
+			t.Fatalf("unexpected graph:\n%s", cmp.Diff(e, a))
 		}
 	}
 	expectIndex := func(expect map[string][]string) {
@@ -261,6 +303,23 @@ func TestIndex(t *testing.T) {
 		}
 	}
 
+	addPV(1)
+	addPV(2)
+	addPV(3)
+	expectGraph(map[string][]string{
+		"pv:pv1":                        {"pvc:pv-pvc-ns/pv-pvc-1"},
+		"pv:pv2":                        {"pvc:pv-pvc-ns/pv-pvc-2"},
+		"pv:pv3":                        {"pvc:pv-pvc-ns/pv-pvc-3"},
+		"pvc:pv-pvc-ns/pv-pvc-1":        {},
+		"pvc:pv-pvc-ns/pv-pvc-2":        {},
+		"pvc:pv-pvc-ns/pv-pvc-3":        {},
+		"secret:pv-secret-ns/pv-secret": {"pv:pv1", "pv:pv2", "pv:pv3"},
+	})
+	expectIndex(map[string][]string{})
+	g.DeletePV("pv1")
+	g.DeletePV("pv2")
+	g.DeletePV("pv3")
+
 	for i := 1; i <= g.destinationEdgeThreshold; i++ {
 		addPod(i, i)
 		if i < g.destinationEdgeThreshold {
@@ -279,12 +338,24 @@ func TestIndex(t *testing.T) {
 		"configmap:ns/cm2":      {"pod:ns/pod1", "pod:ns/pod2", "pod:ns/pod3"},
 		"configmap:ns/cm3":      {"pod:ns/pod1", "pod:ns/pod2", "pod:ns/pod3"},
 		"serviceAccount:ns/sa1": {"pod:ns/pod1", "pod:ns/pod2", "pod:ns/pod3"},
+		"pvc:ns/pvc1":           {"pod:ns/pod1", "pod:ns/pod2", "pod:ns/pod3"},
+		"pvc:ns/pvc2":           {"pod:ns/pod1", "pod:ns/pod2", "pod:ns/pod3"},
+		"resourceclaim:ns/rc1":  {"pod:ns/pod1", "pod:ns/pod2", "pod:ns/pod3"},
+		"resourceclaim:ns/rc2":  {"pod:ns/pod1", "pod:ns/pod2", "pod:ns/pod3"},
+		"secret:ns/secret1":     {"pod:ns/pod1", "pod:ns/pod2", "pod:ns/pod3"},
+		"secret:ns/secret2":     {"pod:ns/pod1", "pod:ns/pod2", "pod:ns/pod3"},
 	})
 	expectIndex(map[string][]string{
 		"configmap:ns/cm1":      {"node:node1=1", "node:node2=1", "node:node3=1"},
 		"configmap:ns/cm2":      {"node:node1=1", "node:node2=1", "node:node3=1"},
 		"configmap:ns/cm3":      {"node:node1=1", "node:node2=1", "node:node3=1"},
 		"serviceAccount:ns/sa1": {"node:node1=1", "node:node2=1", "node:node3=1"},
+		"pvc:ns/pvc1":           {"node:node1=1", "node:node2=1", "node:node3=1"},
+		"pvc:ns/pvc2":           {"node:node1=1", "node:node2=1", "node:node3=1"},
+		"resourceclaim:ns/rc1":  {"node:node1=1", "node:node2=1", "node:node3=1"},
+		"resourceclaim:ns/rc2":  {"node:node1=1", "node:node2=1", "node:node3=1"},
+		"secret:ns/secret1":     {"node:node1=1", "node:node2=1", "node:node3=1"},
+		"secret:ns/secret2":     {"node:node1=1", "node:node2=1", "node:node3=1"},
 	})
 
 	// delete one to drop below the threshold
@@ -298,6 +369,12 @@ func TestIndex(t *testing.T) {
 		"configmap:ns/cm2":      {"pod:ns/pod2", "pod:ns/pod3"},
 		"configmap:ns/cm3":      {"pod:ns/pod2", "pod:ns/pod3"},
 		"serviceAccount:ns/sa1": {"pod:ns/pod2", "pod:ns/pod3"},
+		"pvc:ns/pvc1":           {"pod:ns/pod2", "pod:ns/pod3"},
+		"pvc:ns/pvc2":           {"pod:ns/pod2", "pod:ns/pod3"},
+		"resourceclaim:ns/rc1":  {"pod:ns/pod2", "pod:ns/pod3"},
+		"resourceclaim:ns/rc2":  {"pod:ns/pod2", "pod:ns/pod3"},
+		"secret:ns/secret1":     {"pod:ns/pod2", "pod:ns/pod3"},
+		"secret:ns/secret2":     {"pod:ns/pod2", "pod:ns/pod3"},
 	})
 	expectIndex(map[string][]string{})
 
@@ -316,12 +393,24 @@ func TestIndex(t *testing.T) {
 		"configmap:ns/cm2":      {"pod:ns/pod1", "pod:ns/pod2", "pod:ns/pod3", "pod:ns/pod4"},
 		"configmap:ns/cm3":      {"pod:ns/pod1", "pod:ns/pod2", "pod:ns/pod3", "pod:ns/pod4"},
 		"serviceAccount:ns/sa1": {"pod:ns/pod1", "pod:ns/pod2", "pod:ns/pod3", "pod:ns/pod4"},
+		"pvc:ns/pvc1":           {"pod:ns/pod1", "pod:ns/pod2", "pod:ns/pod3", "pod:ns/pod4"},
+		"pvc:ns/pvc2":           {"pod:ns/pod1", "pod:ns/pod2", "pod:ns/pod3", "pod:ns/pod4"},
+		"resourceclaim:ns/rc1":  {"pod:ns/pod1", "pod:ns/pod2", "pod:ns/pod3", "pod:ns/pod4"},
+		"resourceclaim:ns/rc2":  {"pod:ns/pod1", "pod:ns/pod2", "pod:ns/pod3", "pod:ns/pod4"},
+		"secret:ns/secret1":     {"pod:ns/pod1", "pod:ns/pod2", "pod:ns/pod3", "pod:ns/pod4"},
+		"secret:ns/secret2":     {"pod:ns/pod1", "pod:ns/pod2", "pod:ns/pod3", "pod:ns/pod4"},
 	})
 	expectIndex(map[string][]string{
 		"configmap:ns/cm1":      {"node:node1=2", "node:node2=1", "node:node3=1"},
 		"configmap:ns/cm2":      {"node:node1=2", "node:node2=1", "node:node3=1"},
 		"configmap:ns/cm3":      {"node:node1=2", "node:node2=1", "node:node3=1"},
 		"serviceAccount:ns/sa1": {"node:node1=2", "node:node2=1", "node:node3=1"},
+		"pvc:ns/pvc1":           {"node:node1=2", "node:node2=1", "node:node3=1"},
+		"pvc:ns/pvc2":           {"node:node1=2", "node:node2=1", "node:node3=1"},
+		"resourceclaim:ns/rc1":  {"node:node1=2", "node:node2=1", "node:node3=1"},
+		"resourceclaim:ns/rc2":  {"node:node1=2", "node:node2=1", "node:node3=1"},
+		"secret:ns/secret1":     {"node:node1=2", "node:node2=1", "node:node3=1"},
+		"secret:ns/secret2":     {"node:node1=2", "node:node2=1", "node:node3=1"},
 	})
 
 	// delete one to remain above the threshold
@@ -337,12 +426,24 @@ func TestIndex(t *testing.T) {
 		"configmap:ns/cm2":      {"pod:ns/pod2", "pod:ns/pod3", "pod:ns/pod4"},
 		"configmap:ns/cm3":      {"pod:ns/pod2", "pod:ns/pod3", "pod:ns/pod4"},
 		"serviceAccount:ns/sa1": {"pod:ns/pod2", "pod:ns/pod3", "pod:ns/pod4"},
+		"pvc:ns/pvc1":           {"pod:ns/pod2", "pod:ns/pod3", "pod:ns/pod4"},
+		"pvc:ns/pvc2":           {"pod:ns/pod2", "pod:ns/pod3", "pod:ns/pod4"},
+		"resourceclaim:ns/rc1":  {"pod:ns/pod2", "pod:ns/pod3", "pod:ns/pod4"},
+		"resourceclaim:ns/rc2":  {"pod:ns/pod2", "pod:ns/pod3", "pod:ns/pod4"},
+		"secret:ns/secret1":     {"pod:ns/pod2", "pod:ns/pod3", "pod:ns/pod4"},
+		"secret:ns/secret2":     {"pod:ns/pod2", "pod:ns/pod3", "pod:ns/pod4"},
 	})
 	expectIndex(map[string][]string{
 		"configmap:ns/cm1":      {"node:node1=1", "node:node2=1", "node:node3=1"},
 		"configmap:ns/cm2":      {"node:node1=1", "node:node2=1", "node:node3=1"},
 		"configmap:ns/cm3":      {"node:node1=1", "node:node2=1", "node:node3=1"},
 		"serviceAccount:ns/sa1": {"node:node1=1", "node:node2=1", "node:node3=1"},
+		"pvc:ns/pvc1":           {"node:node1=1", "node:node2=1", "node:node3=1"},
+		"pvc:ns/pvc2":           {"node:node1=1", "node:node2=1", "node:node3=1"},
+		"resourceclaim:ns/rc1":  {"node:node1=1", "node:node2=1", "node:node3=1"},
+		"resourceclaim:ns/rc2":  {"node:node1=1", "node:node2=1", "node:node3=1"},
+		"secret:ns/secret1":     {"node:node1=1", "node:node2=1", "node:node3=1"},
+		"secret:ns/secret2":     {"node:node1=1", "node:node2=1", "node:node3=1"},
 	})
 }
 
@@ -432,6 +533,10 @@ func TestIndex2(t *testing.T) {
 		if secretName != "" {
 			pv.Spec.PersistentVolumeSource = corev1.PersistentVolumeSource{
 				CSI: &corev1.CSIPersistentVolumeSource{
+					NodeStageSecretRef: &corev1.SecretReference{
+						Name:      secretName,
+						Namespace: "ns",
+					},
 					NodePublishSecretRef: &corev1.SecretReference{
 						Name:      secretName,
 						Namespace: "ns",
@@ -837,17 +942,18 @@ func TestIndex2(t *testing.T) {
 			desc:          "persistentvolumes adding",
 			startingGraph: NewTestGraph(),
 			graphTransformer: func(g *Graph) {
-				g.AddPV(pv("pv1", "pvc1", ""))
-				g.AddPV(pv("pv2", "pvc2", ""))
-				g.AddPV(pv("pv3", "pvc3", ""))
+				g.AddPV(pv("pv1", "pvc1", "pvsecret"))
+				g.AddPV(pv("pv2", "pvc2", "pvsecret"))
+				g.AddPV(pv("pv3", "pvc3", "pvsecret"))
 			},
 			expectedGraph: map[string][]string{
-				"pv:pv1":      {"pvc:ns/pvc1"},
-				"pv:pv2":      {"pvc:ns/pvc2"},
-				"pv:pv3":      {"pvc:ns/pvc3"},
-				"pvc:ns/pvc1": {},
-				"pvc:ns/pvc2": {},
-				"pvc:ns/pvc3": {},
+				"pv:pv1":             {"pvc:ns/pvc1"},
+				"pv:pv2":             {"pvc:ns/pvc2"},
+				"pv:pv3":             {"pvc:ns/pvc3"},
+				"pvc:ns/pvc1":        {},
+				"pvc:ns/pvc2":        {},
+				"pvc:ns/pvc3":        {},
+				"secret:ns/pvsecret": {"pv:pv1", "pv:pv2", "pv:pv3"},
 			},
 			expectedIndex: map[string][]string{},
 		},

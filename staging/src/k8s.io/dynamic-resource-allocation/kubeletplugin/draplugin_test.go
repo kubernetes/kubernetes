@@ -18,7 +18,12 @@ package kubeletplugin
 
 import (
 	"context"
+	"errors"
+	"net"
+	"path"
+	"strings"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/stretchr/testify/require"
@@ -28,7 +33,9 @@ import (
 
 	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/dynamic-resource-allocation/resourceslice"
 	drahealthv1 "k8s.io/kubelet/pkg/apis/dra-health/v1"
 )
 
@@ -97,6 +104,160 @@ func TestStartWithoutDRAAPI(t *testing.T) {
 		NodeV1beta1(false),
 	)
 	require.ErrorContains(t, err, "no supported DRA gRPC API")
+}
+
+// republishPlugin reacts to an error by publishing again once the test
+// releases it, like a driver that fixes its pools in HandleError.
+type republishPlugin struct {
+	stubPlugin
+	helper    *Helper
+	entered   chan struct{}
+	release   chan struct{}
+	published chan error
+}
+
+func (p *republishPlugin) HandleError(ctx context.Context, err error, msg string) {
+	close(p.entered)
+	<-p.release
+	// Fail instead of deadlocking if the shutdown holds d.mutex.
+	if !p.helper.mutex.TryLock() {
+		p.published <- errors.New("shutdown holds d.mutex while it waits for HandleError")
+		return
+	}
+	p.helper.mutex.Unlock()
+	p.published <- p.helper.PublishResources(ctx, resourceslice.DriverResources{
+		Pools: map[string]resourceslice.Pool{"pool": {Slices: []resourceslice.Slice{{}}}},
+	})
+}
+
+// TestStopWhileHandleErrorPublishes ensures that Stop does not deadlock
+// when HandleError calls PublishResources while the helper stops.
+func TestStopWhileHandleErrorPublishes(t *testing.T) {
+	synctest.Test(t, testStopWhileHandleErrorPublishes)
+}
+
+func testStopWhileHandleErrorPublishes(t *testing.T) {
+	plugin := &republishPlugin{
+		entered:   make(chan struct{}),
+		release:   make(chan struct{}),
+		published: make(chan error, 1),
+	}
+	helper, err := Start(t.Context(), plugin,
+		DriverName("test-driver"),
+		NodeName("node"),
+		NodeUID("node-uid"),
+		KubeClient(fake.NewClientset()),
+		RegistrationService(false),
+		DRAService(false),
+		ReconcilePoolWithName("pool"),
+	)
+	require.NoError(t, err)
+	plugin.helper = helper
+
+	// The worker reports the other pool through HandleError.
+	require.NoError(t, helper.PublishResources(t.Context(), resourceslice.DriverResources{
+		Pools: map[string]resourceslice.Pool{"other-pool": {Slices: []resourceslice.Slice{{}}}},
+	}))
+	synctest.Wait()
+	select {
+	case <-plugin.entered:
+	default:
+		t.Fatal("HandleError was not called")
+	}
+
+	stopped := make(chan struct{})
+	go func() {
+		defer close(stopped)
+		helper.Stop()
+	}()
+	// Let the shutdown run until it waits for the worker in HandleError.
+	synctest.Wait()
+	select {
+	case <-stopped:
+		t.Error("Stop returned before HandleError")
+	default:
+	}
+	close(plugin.release)
+	<-stopped
+	require.NoError(t, <-plugin.published)
+}
+
+func TestRollingUpdatePluginSocketPathLength(t *testing.T) {
+	podUID := types.UID("11111111-2222-3333-4444-555555555555")
+	for _, tc := range []struct {
+		name            string
+		driverName      string
+		driverLen       int
+		fullEndpointLen int
+	}{
+		{name: "36-byte driver", driverName: "abcde.dra-example-driver.sigs.k8s.io", driverLen: 36, fullEndpointLen: 107},
+		{name: "37-byte driver", driverName: "abcdef.dra-example-driver.sigs.k8s.io", driverLen: 37, fullEndpointLen: 108},
+		{name: "63-byte driver", driverName: "a." + strings.Repeat("a", 61), driverLen: 63, fullEndpointLen: 134},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			require.Len(t, tc.driverName, tc.driverLen)
+			require.Empty(t, validation.IsDNS1123Subdomain(tc.driverName))
+
+			fullUIDEndpoint := path.Join(KubeletPluginsDir, tc.driverName, "dra-"+string(podUID)+".sock")
+			require.Len(t, fullUIDEndpoint, tc.fullEndpointLen)
+			pluginEndpoint := capturePluginEndpoint(t, tc.driverName, RollingUpdate(podUID))
+			require.Lessf(t, len(pluginEndpoint), unixPathMax, "DRA plugin endpoint %q must be shorter than %d bytes", pluginEndpoint, unixPathMax)
+			if tc.fullEndpointLen < unixPathMax {
+				require.Equal(t, fullUIDEndpoint, pluginEndpoint)
+			} else {
+				require.NotEqual(t, fullUIDEndpoint, pluginEndpoint)
+			}
+		})
+	}
+}
+
+func TestPluginSocketAutomaticNaming(t *testing.T) {
+	podUID := types.UID("11111111-2222-3333-4444-555555555555")
+	shortDriverName := "driver.example.com"
+	require.Empty(t, validation.IsDNS1123Subdomain(shortDriverName))
+	t.Run("non-rolling", func(t *testing.T) {
+		driverName := "a." + strings.Repeat("a", 61)
+		got := capturePluginEndpoint(t, driverName)
+		require.Equal(t, path.Join(KubeletPluginsDir, driverName, "dra.sock"), got)
+	})
+	t.Run("rolling with short driver", func(t *testing.T) {
+		got := capturePluginEndpoint(t, shortDriverName, RollingUpdate(podUID))
+		require.Equal(t, path.Join(KubeletPluginsDir, shortDriverName, "dra-"+string(podUID)+".sock"), got)
+	})
+	t.Run("explicit with rolling", func(t *testing.T) {
+		got := capturePluginEndpoint(t, shortDriverName, RollingUpdate(podUID), PluginSocket("custom.sock"))
+		require.Equal(t, path.Join(KubeletPluginsDir, shortDriverName, "custom.sock"), got)
+	})
+}
+
+func TestRollingUpdatePluginSocketFile_distinctInputs(t *testing.T) {
+	driverName := "a." + strings.Repeat("a", 61)
+	pluginDir := path.Join(KubeletPluginsDir, driverName)
+	first := rollingUpdatePluginSocketFile(pluginDir, "11111111-2222-3333-4444-555555555555")
+	second := rollingUpdatePluginSocketFile(pluginDir, "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
+
+	require.Equal(t, first, rollingUpdatePluginSocketFile(pluginDir, "11111111-2222-3333-4444-555555555555"))
+	require.NotEqual(t, first, second)
+	require.Less(t, len(path.Join(pluginDir, first)), unixPathMax)
+	require.Less(t, len(path.Join(pluginDir, second)), unixPathMax)
+}
+
+func capturePluginEndpoint(t *testing.T, driverName string, opts ...Option) string {
+	t.Helper()
+	var pluginEndpoint string
+	listenerErr := errors.New("listener disabled")
+	opts = append(opts,
+		DriverName(driverName),
+		KubeClient(fake.NewClientset()),
+		RegistrationService(false),
+		PluginListener(func(_ context.Context, endpoint string) (net.Listener, error) {
+			pluginEndpoint = endpoint
+			return nil, listenerErr
+		}),
+	)
+	_, err := Start(t.Context(), &stubPlugin{}, opts...)
+	require.ErrorIs(t, err, listenerErr)
+	return pluginEndpoint
 }
 
 // fakeHealthStream captures the responses sent by the helper's gRPC bridge.

@@ -1,0 +1,20 @@
+diff --git a/staging/src/k8s.io/apiserver/pkg/storage/txn.go b/staging/src/k8s.io/apiserver/pkg/storage/txn.go
+index d082ebe9eb7..1a7c1a2a5d9 100644
+--- a/staging/src/k8s.io/apiserver/pkg/storage/txn.go
++++ b/staging/src/k8s.io/apiserver/pkg/storage/txn.go
+@@ -85,11 +85,10 @@ func ConditionalDelete(ctx context.Context, d TxnDelegator, key string, out runt
+ 	for {
+ 		if preconditions != nil {
+ 			if err := preconditions.Check(key, origState.Obj); err != nil {
+-				origState, err = refreshOnError(ctx, origState, err, false, d.GetCurrentState)
+-				if err != nil {
+-					return err
+-				}
+-				continue
++				// BUG REVERT (7bab6a9c6ed): the delete-with-suggestion optimization
++				// without its stale-data recheck. A precondition evaluated against a
++				// stale cached object fails the request instead of refetching.
++				return err
+ 			}
+ 		}
+ 		if err := validateDeletion(ctx, origState.Obj); err != nil {

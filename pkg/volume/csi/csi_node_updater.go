@@ -22,8 +22,10 @@ import (
 	"time"
 
 	v1 "k8s.io/api/storage/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // csiNodeUpdater watches for changes to CSIDriver objects and manages the lifecycle
@@ -75,6 +77,9 @@ func (u *csiNodeUpdater) onDriverAdd(obj interface{}) {
 	}
 	klog.V(7).InfoS("onDriverAdd event", "driver", driver.Name)
 	u.syncDriverUpdater(driver.Name)
+	if utilfeature.DefaultFeatureGate.Enabled(features.CSIControllerGetNodeInfo) {
+		go PluginHandler.syncNodeInfoFromController(driver.Name)
+	}
 }
 
 // onDriverUpdate handles updates to CSIDriver objects.
@@ -95,6 +100,11 @@ func (u *csiNodeUpdater) onDriverUpdate(oldObj, newObj interface{}) {
 		klog.V(4).InfoS("NodeAllocatableUpdatePeriodSeconds updated", "driver", newDriver.Name, "oldPeriod", oldPeriod, "newPeriod", newPeriod)
 		u.syncDriverUpdater(newDriver.Name)
 	}
+
+	// A relist reports a CSIDriver object that was recreated while the watch was down as an update.
+	if oldDriver.UID != newDriver.UID && utilfeature.DefaultFeatureGate.Enabled(features.CSIControllerGetNodeInfo) {
+		go PluginHandler.syncNodeInfoFromController(newDriver.Name)
+	}
 }
 
 // onDriverDelete handles deletion of CSIDriver objects.
@@ -110,9 +120,8 @@ func (u *csiNodeUpdater) onDriverDelete(obj interface{}) {
 // syncDriverUpdater re-evaluates whether the periodic updater for a given driver should run.
 // It is invoked from informer events (Add/Update/Delete) and from plugin registration/deregistration.
 func (u *csiNodeUpdater) syncDriverUpdater(driverName string) {
-	// Check if the CSI plugin is installed on this node.
-	if !isDriverInstalled(driverName) {
-		klog.V(4).InfoS("Driver not installed; stopping csiNodeUpdater", "driver", driverName)
+	if !needsNodeInfoUpdate(driverName) {
+		klog.V(4).InfoS("Driver does not need node info updates; stopping csiNodeUpdater", "driver", driverName)
 		u.unregisterDriver(driverName)
 		return
 	}
@@ -184,10 +193,10 @@ func (u *csiNodeUpdater) runPeriodicUpdate(driverName string, period time.Durati
 	}
 }
 
-// isDriverInstalled checks if the CSI driver is installed on the node by checking the global csiDrivers map
-func isDriverInstalled(driverName string) bool {
-	_, ok := csiDrivers.Get(driverName)
-	return ok
+// needsNodeInfoUpdate checks if the CSI driver is installed on the node and kubelet updates its node info.
+func needsNodeInfoUpdate(driverName string) bool {
+	driver, ok := csiDrivers.Get(driverName)
+	return ok && !driver.nodeInfoFromController
 }
 
 // getNodeAllocatableUpdatePeriod returns the NodeAllocatableUpdatePeriodSeconds value from the CSIDriver

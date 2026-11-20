@@ -23,10 +23,15 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2/ktesting"
+	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/allocation/state"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
@@ -439,4 +444,89 @@ func getPodPVCAndPV(volumeMode v1.PersistentVolumeMode, podName, pvName, pvcName
 		},
 	}
 	return pod, pv, pvc
+}
+
+func TestReconstructVolume_ActuatedState(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicNodeLocalEphemeralVolumes, true)
+	logger, _ := ktesting.NewTestContext(t)
+	tmpKubeletDir := t.TempDir()
+	tmpKubeletPodDir := filepath.Join(tmpKubeletDir, "pods")
+	vp := filepath.Join(tmpKubeletPodDir, "pod1uid", "volumes", "fake-plugin", "cm-vol")
+	require.NoError(t, os.MkdirAll(vp, 0755))
+	failedVp := filepath.Join(tmpKubeletPodDir, "pod1uid", "volumes", "unknown-plugin", "failed-vol")
+	require.NoError(t, os.MkdirAll(failedVp, 0755))
+
+	rc, _ := getReconciler(tmpKubeletDir, t, []string{vp}, nil)
+	rcInstance := rc.(*reconciler)
+
+	actuatedState := state.NewStateMemory(logger, nil, nil)
+	rcInstance.actuatedState = actuatedState
+
+	actuatedPod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "pod1uid",
+			Name:      "pod1",
+			Namespace: "ns1",
+		},
+	}
+	actuatedVol := v1.Volume{
+		Name: "cm-vol",
+		VolumeSource: v1.VolumeSource{
+			ConfigMap: &v1.ConfigMapVolumeSource{
+				LocalObjectReference: v1.LocalObjectReference{Name: "my-configmap"},
+			},
+		},
+	}
+	hostPathVol := v1.Volume{
+		Name: "hostpath-vol",
+		VolumeSource: v1.VolumeSource{
+			HostPath: &v1.HostPathVolumeSource{Path: "/tmp"},
+		},
+	}
+	imageVol := v1.Volume{
+		Name: "image-vol",
+		VolumeSource: v1.VolumeSource{
+			Image: &v1.ImageVolumeSource{Reference: "busybox:latest"},
+		},
+	}
+	failedVol := v1.Volume{
+		Name: "failed-vol",
+		VolumeSource: v1.VolumeSource{
+			EmptyDir: &v1.EmptyDirVolumeSource{},
+		},
+	}
+	unreconstructedVol := v1.Volume{
+		Name: "stale-vol",
+		VolumeSource: v1.VolumeSource{
+			EmptyDir: &v1.EmptyDirVolumeSource{},
+		},
+	}
+	require.NoError(t, actuatedState.SetPod(logger, actuatedPod))
+	require.NoError(t, actuatedState.SetPodVolume(logger, actuatedPod.UID, actuatedVol))
+	require.NoError(t, actuatedState.SetPodVolume(logger, actuatedPod.UID, hostPathVol))
+	require.NoError(t, actuatedState.SetPodVolume(logger, actuatedPod.UID, imageVol))
+	require.NoError(t, actuatedState.SetPodVolume(logger, actuatedPod.UID, failedVol))
+	require.NoError(t, actuatedState.SetPodVolume(logger, actuatedPod.UID, unreconstructedVol))
+
+	rvol, err := rcInstance.reconstructVolume(podVolume{
+		podName:        "pod1uid",
+		volumeSpecName: "cm-vol",
+		volumePath:     vp,
+		pluginName:     "fake-plugin",
+		volumeMode:     v1.PersistentVolumeFilesystem,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, rvol)
+	require.Equal(t, "pod1", rvol.pod.Name)
+	require.Equal(t, "ns1", rvol.pod.Namespace)
+	require.NotNil(t, rvol.volumeSpec)
+	require.NotNil(t, rvol.volumeSpec.Volume)
+	require.Equal(t, actuatedVol, *rvol.volumeSpec.Volume)
+
+	rcInstance.reconstructVolumes(logger)
+	vols, ok := actuatedState.GetPodVolumes(actuatedPod.UID)
+	require.True(t, ok)
+	// stale-vol is removed because it is not on disk, whereas cm-vol (reconstructed),
+	// hostpath-vol and image-vol (no per-pod volume dir), and failed-vol (still on disk in volumesFailedReconstruction) are kept.
+	require.Equal(t, []v1.Volume{actuatedVol, hostPathVol, imageVol, failedVol}, vols)
 }

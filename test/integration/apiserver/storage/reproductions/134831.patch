@@ -1,0 +1,22 @@
+diff --git a/staging/src/k8s.io/apiserver/pkg/storage/cacher/watch_cache.go b/staging/src/k8s.io/apiserver/pkg/storage/cacher/watch_cache.go
+index 1192901c78d..18ae42654a8 100644
+--- a/staging/src/k8s.io/apiserver/pkg/storage/cacher/watch_cache.go
++++ b/staging/src/k8s.io/apiserver/pkg/storage/cacher/watch_cache.go
+@@ -633,12 +633,12 @@ func (w *watchCache) suggestedWatchChannelSize(indexExists, triggerUsed bool) in
+ // retrieve events since a certain resourceVersion. This function assumes to
+ // be called under the watchCache lock.
+ func (w *watchCache) getAllEventsSinceLocked(resourceVersion uint64, key string, opts storage.ListOptions, matchValues []storage.MatchValue) (*watchCacheInterval, error) {
+-	if opts.SendInitialEvents != nil && *opts.SendInitialEvents {
+-		interval, _, err := w.getIntervalFromStoreLocked(key, opts, matchValues)
+-		return interval, err
+-	}
++	// BUG REVERT (#134831): do not force reading from store snapshot when
++	// SendInitialEvents=true and resourceVersion > 0, so WatchList with
++	// resourceVersion > 0 serves raw history events (including Modified and
++	// Deleted) before the initial bookmark.
+ 
+-	if resourceVersion == 0 && opts.SendInitialEvents == nil {
++	if resourceVersion == 0 && (opts.SendInitialEvents == nil || *opts.SendInitialEvents) {
+ 		// To keep backward compatibility, we additionally need to return the
+ 		// current state and only then start watching from that point.
+ 		//

@@ -36,11 +36,11 @@ import (
 	"k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/testutil"
+	"k8s.io/ktesting"
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
-	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/clock"
 	testingclock "k8s.io/utils/clock/testing"
 )
@@ -387,7 +387,7 @@ func TestRelistWithCache(t *testing.T) {
 	}
 	for i, c := range cases {
 		testStr := fmt.Sprintf("test[%d]", i)
-		actualStatus, actualErr := pleg.cache.Get(c.pod.ID)
+		actualStatus, actualErr := pleg.cache.Get(tCtx, c.pod.ID)
 		assert.Equal(t, c.status, actualStatus, testStr)
 		assert.Equal(t, c.error, actualErr, testStr)
 	}
@@ -408,7 +408,7 @@ func TestRelistWithCache(t *testing.T) {
 	}
 	for i, c := range cases {
 		testStr := fmt.Sprintf("test[%d]", i)
-		actualStatus, actualErr := pleg.cache.Get(c.pod.ID)
+		actualStatus, actualErr := pleg.cache.Get(tCtx, c.pod.ID)
 		assert.Equal(t, c.status, actualStatus, testStr)
 		assert.Equal(t, c.error, actualErr, testStr)
 	}
@@ -430,7 +430,7 @@ func TestRemoveCacheEntry(t *testing.T) {
 	// removed after relisting.
 	runtimeMock.EXPECT().GetPods(mock.Anything, true).Return([]*kubecontainer.Pod{}, nil).Times(1)
 	pleg.Relist(tCtx)
-	actualStatus, actualErr := pleg.cache.Get(pods[0].ID)
+	actualStatus, actualErr := pleg.cache.Get(tCtx, pods[0].ID)
 	assert.Equal(t, &kubecontainer.PodStatus{ID: pods[0].ID}, actualStatus)
 	assert.NoError(t, actualErr)
 }
@@ -615,11 +615,11 @@ func TestReinspect(t *testing.T) {
 			}
 
 			if tc.expectStatus {
-				actualStatus, actualErr := pleg.cache.Get(podID)
+				actualStatus, actualErr := pleg.cache.Get(tCtx, podID)
 				assert.Equal(t, expectedStatus, actualStatus)
 				assert.Equal(t, tc.updateCacheError, actualErr)
 			} else if tc.podDeleted {
-				actualStatus, _ := pleg.cache.Get(podID)
+				actualStatus, _ := pleg.cache.Get(tCtx, podID)
 				// If deleted, Get returns an empty status with the ID
 				assert.Equal(t, &kubecontainer.PodStatus{ID: podID}, actualStatus)
 			}
@@ -656,7 +656,7 @@ func TestUpdateCacheUsesPodTimestampWhenEventedPLEGIsEnabled(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, expectedStatus, status)
 
-	cachedStatus, cachedErr := cache.Get(podID)
+	cachedStatus, cachedErr := cache.Get(ctx, podID)
 	require.NoError(t, cachedErr)
 	assert.Equal(t, expectedStatus, cachedStatus)
 }
@@ -772,7 +772,7 @@ func TestRelistIPChange(t *testing.T) {
 
 		pleg.Relist(tCtx)
 		actualEvents := getEventsFromChannel(ch)
-		actualStatus, actualErr := pleg.cache.Get(pod.ID)
+		actualStatus, actualErr := pleg.cache.Get(tCtx, pod.ID)
 		assert.Equal(t, status, actualStatus, tc.name)
 		assert.NoError(t, actualErr, tc.name)
 		assert.Exactly(t, []*PodLifecycleEvent{event}, actualEvents)
@@ -793,7 +793,7 @@ func TestRelistIPChange(t *testing.T) {
 
 		pleg.Relist(tCtx)
 		actualEvents = getEventsFromChannel(ch)
-		actualStatus, actualErr = pleg.cache.Get(pod.ID)
+		actualStatus, actualErr = pleg.cache.Get(tCtx, pod.ID)
 		// Must copy status to compare since its pointer gets passed through all
 		// the way to the event
 		statusCopy := *status
@@ -983,9 +983,10 @@ func TestWorkerLoop(t *testing.T) {
 }
 
 func getNewerThanAsync(t *testing.T, cache kubecontainer.ROCache, podID types.UID, minTime time.Time) <-chan *kubecontainer.PodStatus {
+	tCtx := ktesting.Init(t)
 	resCh := make(chan *kubecontainer.PodStatus, 1)
 	go func() {
-		s, err := cache.GetNewerThan(podID, minTime)
+		s, err := cache.GetNewerThan(tCtx, podID, minTime)
 		assert.NoError(t, err)
 		resCh <- s
 	}()
@@ -1013,4 +1014,73 @@ func requireUnblocked[T any](t *testing.T, ch <-chan T) (received T) {
 		t.Fatal("Receive should not have been blocked")
 		return
 	}
+}
+
+func TestSuspendRelist(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PLEGOnDemandRelist, true)
+	tCtx := ktesting.Init(t)
+	testPleg := newTestGenericPLEG()
+	pleg, runtime := testPleg.pleg, testPleg.runtime
+	ch := pleg.Watch()
+
+	setPods := func(state1, state2 kubecontainer.State) {
+		runtime.AllPodList = []*containertest.FakePod{
+			{Pod: &kubecontainer.Pod{ID: "1234", Containers: []*kubecontainer.Container{createTestContainer("c1", state1)}}},
+			{Pod: &kubecontainer.Pod{ID: "4567", Containers: []*kubecontainer.Container{createTestContainer("c2", state2)}}},
+		}
+	}
+	drainRelistRequests := func() int {
+		n := 0
+		for len(pleg.relistRequests) > 0 {
+			<-pleg.relistRequests
+			n++
+		}
+		return n
+	}
+
+	setPods(kubecontainer.ContainerStateRunning, kubecontainer.ContainerStateRunning)
+	pleg.Relist(tCtx)
+	getEventsFromChannel(ch)
+
+	t.Log("A global relist skips the suspended pod but still reports other pods.")
+	pleg.SuspendRelist("1234")
+	setPods(kubecontainer.ContainerStateExited, kubecontainer.ContainerStateExited)
+	pleg.Relist(tCtx)
+	verifyEvents(t, []*PodLifecycleEvent{{ID: "4567", Type: ContainerDied, Data: "c2"}}, getEventsFromChannel(ch))
+
+	t.Log("An on-demand relist of the suspended pod is deferred.")
+	pleg.relistPod(tCtx, "1234")
+	assert.Empty(t, getEventsFromChannel(ch))
+
+	t.Log("Resuming reports the deferred relist, and leaves requesting it to the caller.")
+	assert.True(t, pleg.ResumeRelist("1234"))
+	assert.Equal(t, 0, drainRelistRequests())
+	assert.Empty(t, pleg.suspendedPods)
+	pleg.Relist(tCtx)
+	verifyEvents(t, []*PodLifecycleEvent{{ID: "1234", Type: ContainerDied, Data: "c1"}}, getEventsFromChannel(ch))
+
+	t.Log("A deferred change is not lost, even if the caller does not request a relist.")
+	pleg.SuspendRelist("1234")
+	setPods(kubecontainer.ContainerStateRunning, kubecontainer.ContainerStateExited)
+	pleg.Relist(tCtx)
+	assert.Empty(t, getEventsFromChannel(ch))
+	assert.True(t, pleg.ResumeRelist("1234"))
+	pleg.Relist(tCtx)
+	verifyEvents(t, []*PodLifecycleEvent{{ID: "1234", Type: ContainerStarted, Data: "c1"}}, getEventsFromChannel(ch))
+
+	t.Log("Resuming without any deferred relist reports false.")
+	pleg.SuspendRelist("1234")
+	assert.False(t, pleg.ResumeRelist("1234"))
+
+	t.Log("The reinspect flag is preserved while the pod is suspended.")
+	pleg.SuspendRelist("1234")
+	pleg.RequestReinspect("1234")
+	pleg.Relist(tCtx)
+	_, reinspect := pleg.podsToReinspect.Load(types.UID("1234"))
+	assert.True(t, reinspect)
+	assert.True(t, pleg.ResumeRelist("1234"))
+	pleg.Relist(tCtx)
+	verifyEvents(t, []*PodLifecycleEvent{{ID: "1234", Type: PodSync}}, getEventsFromChannel(ch))
+	_, reinspect = pleg.podsToReinspect.Load(types.UID("1234"))
+	assert.False(t, reinspect)
 }

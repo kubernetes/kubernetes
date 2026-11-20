@@ -192,6 +192,13 @@ func ValidateNetworkPolicy(np *networking.NetworkPolicy, opts NetworkPolicyValid
 }
 
 // ValidationOptionsForNetworking generates NetworkPolicyValidationOptions for Networking
+//
+// AllowInvalidLabelValueInSelector is only derived from spec.podSelector of the
+// old object, but it is applied to every selector in the policy, including the
+// ingress and egress peer selectors. A policy that was persisted before label
+// values in matchExpressions were validated and that has an invalid value only
+// in a peer selector is therefore rejected on update. This is known and left
+// as is, because it has not been reported since the validation was added.
 func ValidationOptionsForNetworking(new, old *networking.NetworkPolicy) NetworkPolicyValidationOptions {
 	opts := NetworkPolicyValidationOptions{
 		AllowInvalidLabelValueInSelector: false,
@@ -574,10 +581,15 @@ func ValidateIngressClassUpdate(newIngressClass, oldIngressClass *networking.Ing
 // validateIngressClassSpec ensures that IngressClassSpec fields are valid.
 func validateIngressClassSpec(spec *networking.IngressClassSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if len(spec.Controller) > maxLenIngressClassController {
-		allErrs = append(allErrs, field.TooLong(fldPath.Child("controller"), "" /*unused*/, maxLenIngressClassController))
+	if len(spec.Controller) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("controller"), "").MarkCoveredByDeclarative())
+	} else {
+		if len(spec.Controller) > maxLenIngressClassController {
+			allErrs = append(allErrs, field.TooLong(fldPath.Child("controller"), "", /*unused*/
+				maxLenIngressClassController).MarkCoveredByDeclarative().WithOrigin("maxBytes"))
+		}
+		allErrs = append(allErrs, validation.IsDomainPrefixedPath(fldPath.Child("controller"), spec.Controller)...)
 	}
-	allErrs = append(allErrs, validation.IsDomainPrefixedPath(fldPath.Child("controller"), spec.Controller)...)
 	allErrs = append(allErrs, validateIngressClassParametersReference(spec.Parameters, fldPath.Child("parameters"))...)
 	return allErrs
 }
@@ -585,7 +597,7 @@ func validateIngressClassSpec(spec *networking.IngressClassSpec, fldPath *field.
 // validateIngressClassSpecUpdate ensures that IngressClassSpec updates are
 // valid.
 func validateIngressClassSpecUpdate(newSpec, oldSpec *networking.IngressClassSpec, fldPath *field.Path) field.ErrorList {
-	return apivalidation.ValidateImmutableField(newSpec.Controller, oldSpec.Controller, fldPath.Child("controller"))
+	return apivalidation.ValidateImmutableField(newSpec.Controller, oldSpec.Controller, fldPath.Child("controller")).MarkCoveredByDeclarative().WithOrigin("immutable")
 }
 
 // validateIngressTypedLocalObjectReference ensures that Parameters fields are valid.

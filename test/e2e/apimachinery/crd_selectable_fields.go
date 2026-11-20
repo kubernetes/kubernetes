@@ -19,11 +19,12 @@ package apimachinery
 import (
 	"context"
 	"fmt"
-	"github.com/onsi/gomega"
 	"sync"
 	"time"
 
-	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	"github.com/onsi/gomega"
+
+	apiextensionsv1 "k8s.io/apiextensions-api/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -315,6 +316,10 @@ type accumulatedEvents struct {
 	added, deleted sets.Set[string]
 }
 
+func (a accumulatedEvents) DeepCopy() *accumulatedEvents {
+	return &accumulatedEvents{added: a.added.Clone(), deleted: a.deleted.Clone()}
+}
+
 func emptyEvents() *accumulatedEvents {
 	return &accumulatedEvents{added: sets.New[string](), deleted: sets.New[string]()}
 }
@@ -377,7 +382,7 @@ func informerAccumulator(informer cache.SharedIndexInformer) func(ctx context.Co
 		}
 		lock.Lock()
 		defer lock.Unlock()
-		return result, nil
+		return result.DeepCopy(), nil
 	}
 }
 

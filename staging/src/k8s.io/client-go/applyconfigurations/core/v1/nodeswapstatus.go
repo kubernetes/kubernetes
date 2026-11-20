@@ -23,7 +23,7 @@ package v1
 //
 // NodeSwapStatus represents swap memory information.
 type NodeSwapStatusApplyConfiguration struct {
-	// Total amount of swap memory in bytes.
+	// capacity is the total amount of swap memory in bytes.
 	Capacity *int64 `json:"capacity,omitempty"`
 }
 

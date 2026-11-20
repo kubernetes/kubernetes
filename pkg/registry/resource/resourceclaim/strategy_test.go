@@ -17,6 +17,7 @@ limitations under the License.
 package resourceclaim
 
 import (
+	"bytes"
 	"context"
 	"testing"
 
@@ -25,6 +26,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apiresource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apiserver/pkg/authentication/user"
@@ -369,6 +371,79 @@ var objWithSkipNodeOperationsStatus = &resource.ResourceClaim{
 	},
 }
 
+var objWithAllocationTimestamp = &resource.ResourceClaim{
+	ObjectMeta: metav1.ObjectMeta{
+		Name:      "valid-claim",
+		Namespace: "kube-system",
+	},
+	Spec: resource.ResourceClaimSpec{
+		Devices: resource.DeviceClaim{
+			Requests: []resource.DeviceRequest{
+				{
+					Name: "req-0",
+					Exactly: &resource.ExactDeviceRequest{
+						DeviceClassName: "class",
+						AllocationMode:  resource.DeviceAllocationModeAll,
+					},
+				},
+			},
+		},
+	},
+	Status: resource.ResourceClaimStatus{
+		Allocation: &resource.AllocationResult{
+			Devices: resource.DeviceAllocationResult{
+				Results: []resource.DeviceRequestAllocationResult{
+					{
+						Request: "req-0",
+						Driver:  "dra.example.com",
+						Pool:    "pool-0",
+						Device:  "device-0",
+					},
+				},
+			},
+			AllocationTimestamp: &metav1.Time{},
+		},
+	},
+}
+
+var objWithSharedConsumableCapacityStatus = &resource.ResourceClaim{
+	ObjectMeta: metav1.ObjectMeta{
+		Name:      "valid-claim",
+		Namespace: "kube-system",
+	},
+	Spec: resource.ResourceClaimSpec{
+		Devices: resource.DeviceClaim{
+			Requests: []resource.DeviceRequest{
+				{
+					Name: "req-0",
+					Exactly: &resource.ExactDeviceRequest{
+						DeviceClassName: "class",
+						AllocationMode:  resource.DeviceAllocationModeAll,
+					},
+				},
+			},
+		},
+	},
+	Status: resource.ResourceClaimStatus{
+		Allocation: &resource.AllocationResult{
+			Devices: resource.DeviceAllocationResult{
+				Results: []resource.DeviceRequestAllocationResult{
+					{
+						Request: "req-0",
+						Driver:  "dra.example.com",
+						Pool:    "pool-0",
+						Device:  "device-0",
+						ConsumedCounters: []resource.CounterSetConsumption{{
+							CounterSet: "pool-0",
+							Counters:   map[string]apiresource.Quantity{"memory": apiresource.MustParse("1")},
+						}},
+					},
+				},
+			},
+		},
+	},
+}
+
 var objWithCapacityRequests = &resource.ResourceClaim{
 	ObjectMeta: metav1.ObjectMeta{
 		Name:      "valid-claim",
@@ -384,7 +459,7 @@ var objWithCapacityRequests = &resource.ResourceClaim{
 						AllocationMode:  resource.DeviceAllocationModeAll,
 						Capacity: &resource.CapacityRequirements{
 							Requests: map[resource.QualifiedName]apiresource.Quantity{
-								resource.QualifiedName("test-capacity"): apiresource.MustParse("1"),
+								resource.QualifiedName("test_capacity"): apiresource.MustParse("1"),
 							},
 						},
 					},
@@ -501,7 +576,7 @@ var (
 )
 
 var testCapacity = map[resource.QualifiedName]apiresource.Quantity{
-	resource.QualifiedName("test-capacity"): apiresource.MustParse("1"),
+	resource.QualifiedName("test_capacity"): apiresource.MustParse("1"),
 }
 
 func TestStrategy(t *testing.T) {
@@ -715,6 +790,25 @@ func TestStrategyCreate(t *testing.T) {
 				modifySpecDeviceRequestWithCapacityRequests(obj, nil, true)
 				return obj
 			}(),
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+		},
+		"drop-fields-shared-consumable-capacity-status": {
+			obj:       objWithSharedConsumableCapacityStatus,
+			expectObj: obj,
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+		},
+		"drop-fields-shared-consumable-capacity-status-enabled-feature": {
+			obj:              objWithSharedConsumableCapacityStatus,
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAConsumableCapacity: true, features.DRASharedConsumableCapacity: true},
+			expectObj:        obj,
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 0 {
 					t.Errorf("expected no action to be taken")
@@ -1226,6 +1320,9 @@ func TestStrategyUpdateWithDerivedAttributes(t *testing.T) {
 }
 
 func TestStatusStrategyUpdate(t *testing.T) {
+	objWithZeroCounterConsumption := objWithSharedConsumableCapacityStatus.DeepCopy()
+	objWithZeroCounterConsumption.Status.Allocation.Devices.Results[0].ConsumedCounters[0].Counters["memory"] = apiresource.MustParse("0")
+
 	ctx := genericapirequest.NewDefaultContext()
 	ctx = genericapirequest.WithUser(ctx, &user.DefaultInfo{
 		Name:   testUser,
@@ -1655,6 +1752,7 @@ func TestStatusStrategyUpdate(t *testing.T) {
 				}
 			},
 			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAResourceClaimDeviceStatus: true, features.DRADeviceBindingConditions: false},
+			emulatedVersion:  "1.37",
 		},
 		"drop-fields-binding-conditions": {
 			oldObj:    obj,
@@ -1666,6 +1764,7 @@ func TestStatusStrategyUpdate(t *testing.T) {
 				}
 			},
 			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAResourceClaimDeviceStatus: true, features.DRADeviceBindingConditions: false},
+			emulatedVersion:  "1.37",
 		},
 		"drop-fields-binding-conditions-disable-feature-gate": {
 			oldObj:    obj,
@@ -1689,6 +1788,7 @@ func TestStatusStrategyUpdate(t *testing.T) {
 				}
 			},
 			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAResourceClaimDeviceStatus: true, features.DRADeviceBindingConditions: false},
+			emulatedVersion:  "1.37",
 		},
 		"keep-fields-optional-node-operations": {
 			oldObj:    obj,
@@ -1722,6 +1822,41 @@ func TestStatusStrategyUpdate(t *testing.T) {
 				}
 			},
 			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAOptionalNodeOperations: false},
+		},
+		"keep-fields-allocation-timestamp": {
+			oldObj:    obj,
+			newObj:    objWithAllocationTimestamp,
+			expectObj: objWithAllocationTimestamp,
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAResourceClaimDeviceStatus: true, features.DRADeviceBindingConditions: true},
+		},
+		"drop-fields-allocation-timestamp": {
+			oldObj:    obj,
+			newObj:    objWithAllocationTimestamp,
+			expectObj: objWithStatus,
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAResourceClaimDeviceStatus: true, features.DRADeviceBindingConditions: false},
+			emulatedVersion:  "1.37",
+		},
+		"keep-exist-fields-allocation-timestamp-disable-feature-gate": {
+			oldObj:    objWithAllocationTimestamp,
+			newObj:    objWithAllocationTimestamp,
+			expectObj: objWithAllocationTimestamp,
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAResourceClaimDeviceStatus: true, features.DRADeviceBindingConditions: false},
+			emulatedVersion:  "1.37",
 		},
 		"keep-fields-consumable-capacity-with-device-status": {
 			oldObj: func() *resource.ResourceClaim {
@@ -1842,6 +1977,50 @@ func TestStatusStrategyUpdate(t *testing.T) {
 				addStatusDevices(obj, testDriver, testPool, testDevice, testShareID)
 				return obj
 			}(),
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+		},
+		"keep-fields-shared-consumable-capacity-with-device-status": {
+			oldObj:           obj,
+			newObj:           objWithSharedConsumableCapacityStatus,
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAResourceClaimDeviceStatus: true, features.DRAConsumableCapacity: true, features.DRASharedConsumableCapacity: true},
+			expectObj:        objWithSharedConsumableCapacityStatus,
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+		},
+		"drop-fields-shared-consumable-capacity-disabled-feature-gate-with-device-status": {
+			oldObj:           obj,
+			newObj:           objWithSharedConsumableCapacityStatus,
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAResourceClaimDeviceStatus: true, features.DRAConsumableCapacity: true},
+			expectObj:        objWithStatus,
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+		},
+		"keep-fields-shared-consumable-capacity-with-device-status-disabled-feature-gate": {
+			oldObj:           objWithSharedConsumableCapacityStatus,
+			newObj:           objWithSharedConsumableCapacityStatus,
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAResourceClaimDeviceStatus: true, features.DRAConsumableCapacity: true},
+			expectObj:        objWithSharedConsumableCapacityStatus,
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+		},
+		"keep-zero-counter-consumption-disabled-feature-gate": {
+			oldObj:           objWithZeroCounterConsumption,
+			newObj:           objWithZeroCounterConsumption,
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAResourceClaimDeviceStatus: true, features.DRAConsumableCapacity: true, features.DRASharedConsumableCapacity: false},
+			expectObj:        objWithZeroCounterConsumption,
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 0 {
 					t.Errorf("expected no action to be taken")
@@ -2059,4 +2238,32 @@ func (f *fakeAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes)
 		return authorizer.DecisionDeny, "denied", nil
 	}
 	return authorizer.DecisionAllow, "default accept", nil
+}
+
+func TestPrepareForUpdateOpaqueParameters(t *testing.T) {
+	old := obj.DeepCopy()
+	old.ResourceVersion = "1"
+	old.Spec.Devices.Config = []resource.DeviceClaimConfiguration{{
+		Requests: []string{"req-0"},
+		DeviceConfiguration: resource.DeviceConfiguration{Opaque: &resource.OpaqueDeviceConfiguration{
+			Driver:     "driver.example.com",
+			Parameters: runtime.RawExtension{Raw: []byte(`{"z": 1, "a": "b"}`)},
+		}},
+	}}
+	updated := old.DeepCopy()
+	updated.Labels = map[string]string{"test": "updated"}
+	updated.Spec.Devices.Config[0].Opaque.Parameters.Raw = []byte(`{"a":"b","z":1}`)
+	strategy := NewStrategy(nil, nil)
+	strategy.PrepareForUpdate(context.Background(), updated, old)
+	if !bytes.Equal(updated.Spec.Devices.Config[0].Opaque.Parameters.Raw, old.Spec.Devices.Config[0].Opaque.Parameters.Raw) {
+		t.Error("PrepareForUpdate did not preserve the original opaque parameters")
+	}
+	if errs := strategy.ValidateUpdate(context.Background(), updated, old); len(errs) != 0 {
+		t.Fatalf("metadata-only update rejected: %v", errs)
+	}
+	updated.Spec.Devices.Requests[0].Exactly.DeviceClassName = "changed"
+	strategy.PrepareForUpdate(context.Background(), updated, old)
+	if errs := strategy.ValidateUpdate(context.Background(), updated, old); len(errs) == 0 {
+		t.Fatal("expected immutable spec validation to reject changed device class")
+	}
 }

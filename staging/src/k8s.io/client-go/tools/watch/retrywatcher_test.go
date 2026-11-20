@@ -18,7 +18,6 @@ package watch
 
 import (
 	"errors"
-	"flag"
 	"fmt"
 	"reflect"
 	"strconv"
@@ -27,24 +26,20 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/onsi/gomega"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/klog/v2"
-	"k8s.io/klog/v2/ktesting"
+	"k8s.io/ktesting"
 	"k8s.io/utils/dump"
 )
 
 func init() {
-	// Enable klog which is used in dependencies
-	klog.InitFlags(nil)
-	flag.Set("logtostderr", "true")
-	flag.Set("v", "9")
+	ktesting.SetDefaultVerbosity(9)
 }
 
 type testObject struct {
@@ -572,11 +567,11 @@ func TestRetryWatcher(t *testing.T) {
 
 	for _, tc := range tt {
 		t.Run(tc.name, func(t *testing.T) {
-			_, ctx := ktesting.NewTestContext(t)
+			tCtx := ktesting.Init(t)
 			t.Parallel()
 
 			atomicCounter, watchFunc := withCounter(tc.watchClient)
-			watcher, err := newRetryWatcher(ctx, tc.initialRV, watchFunc, time.Duration(0))
+			watcher, err := newRetryWatcher(tCtx, tc.initialRV, watchFunc, time.Duration(0))
 			if err != nil {
 				t.Fatalf("failed to create a RetryWatcher: %v", err)
 			}
@@ -610,18 +605,11 @@ func TestRetryWatcher(t *testing.T) {
 				break
 			}
 
-			var counter uint32
 			// We always count with the last watch reestablishing which is imminent but still a race.
 			// We will wait for the last watch to reestablish to avoid it.
-			err = wait.PollImmediate(10*time.Millisecond, 10*time.Second, func() (done bool, err error) {
-				counter = atomic.LoadUint32(atomicCounter)
-				return counter == tc.watchCount, nil
-			})
-			if wait.Interrupted(err) {
-				t.Errorf("expected %d watcher starts, but it has started %d times", tc.watchCount, counter)
-			} else if err != nil {
-				t.Fatal(err)
-			}
+			tCtx.Eventually(func() uint32 {
+				return atomic.LoadUint32(atomicCounter)
+			}).WithTimeout(10*time.Second).WithPolling(10*time.Millisecond).Should(gomega.Equal(tc.watchCount), "watch count")
 
 			if !reflect.DeepEqual(tc.expected, got) {
 				t.Fatalf("expected %s, got %s;\ndiff: %s", dump.Pretty(tc.expected), dump.Pretty(got), cmp.Diff(tc.expected, got))

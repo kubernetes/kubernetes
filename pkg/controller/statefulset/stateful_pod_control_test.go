@@ -37,10 +37,10 @@ import (
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/consistency"
 	"k8s.io/klog/v2/ktesting"
 	_ "k8s.io/kubernetes/pkg/apis/apps/install"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
-	"k8s.io/kubernetes/pkg/controller/util/consistency"
 	"k8s.io/utils/ptr"
 )
 
@@ -900,7 +900,7 @@ func TestStatefulPodControlConsistencyStore(t *testing.T) {
 			action: func(ctx context.Context, control *StatefulPodControl, set *apps.StatefulSet, pod *v1.Pod) error {
 				return control.CreateStatefulPod(ctx, set, pod)
 			},
-			resource: schema.GroupResource{Group: "", Resource: "pods"},
+			resource: podGroupResource,
 			setupMocks: func(fakeClient *fake.Clientset, claimIndexer cache.Indexer, pod *v1.Pod, set *apps.StatefulSet) {
 				fakeClient.AddReactor("get", "persistentvolumeclaims", func(action core.Action) (bool, runtime.Object, error) {
 					return true, nil, apierrors.NewNotFound(action.GetResource().GroupResource(), action.GetResource().Resource)
@@ -924,7 +924,7 @@ func TestStatefulPodControlConsistencyStore(t *testing.T) {
 				pod.Name = "goo-0" // mismatch identity to trigger update
 				return control.UpdateStatefulPod(ctx, set, pod)
 			},
-			resource: schema.GroupResource{Group: "", Resource: "pods"},
+			resource: podGroupResource,
 			setupMocks: func(fakeClient *fake.Clientset, claimIndexer cache.Indexer, pod *v1.Pod, set *apps.StatefulSet) {
 				fakeClient.PrependReactor("update", "pods", func(action core.Action) (bool, runtime.Object, error) {
 					update := action.(core.UpdateAction)
@@ -938,7 +938,7 @@ func TestStatefulPodControlConsistencyStore(t *testing.T) {
 			action: func(ctx context.Context, control *StatefulPodControl, set *apps.StatefulSet, pod *v1.Pod) error {
 				return control.createPersistentVolumeClaims(set, pod)
 			},
-			resource: schema.GroupResource{Group: "", Resource: "persistentvolumeclaims"},
+			resource: persistentVolumeClaimGroupResource,
 			setupMocks: func(fakeClient *fake.Clientset, claimIndexer cache.Indexer, pod *v1.Pod, set *apps.StatefulSet) {
 				fakeClient.AddReactor("get", "persistentvolumeclaims", func(action core.Action) (bool, runtime.Object, error) {
 					return true, nil, apierrors.NewNotFound(action.GetResource().GroupResource(), action.GetResource().Resource)
@@ -956,7 +956,7 @@ func TestStatefulPodControlConsistencyStore(t *testing.T) {
 			action: func(ctx context.Context, control *StatefulPodControl, set *apps.StatefulSet, pod *v1.Pod) error {
 				return control.UpdatePodClaimForRetentionPolicy(ctx, set, pod)
 			},
-			resource: schema.GroupResource{Group: "", Resource: "persistentvolumeclaims"},
+			resource: persistentVolumeClaimGroupResource,
 			setupMocks: func(fakeClient *fake.Clientset, claimIndexer cache.Indexer, pod *v1.Pod, set *apps.StatefulSet) {
 				set.Spec.PersistentVolumeClaimRetentionPolicy = &apps.StatefulSetPersistentVolumeClaimRetentionPolicy{
 					WhenDeleted: apps.DeletePersistentVolumeClaimRetentionPolicyType,
@@ -988,9 +988,11 @@ func TestStatefulPodControlConsistencyStore(t *testing.T) {
 			claimIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 			claimLister := corelisters.NewPersistentVolumeClaimLister(claimIndexer)
 
-			rvGetter := &fakeRVGetter{rv: "1"}
+			podRVGetter := &fakeRVGetter{rv: "1"}
+			claimRVGetter := &fakeRVGetter{rv: "1"}
 			consistencyStore := consistency.NewConsistencyStore(map[schema.GroupResource]consistency.LastSyncRVGetter{
-				tc.resource: rvGetter,
+				podGroupResource:                   podRVGetter,
+				persistentVolumeClaimGroupResource: claimRVGetter,
 			})
 
 			control := NewStatefulPodControl(fakeClient, podLister, claimLister, recorder, consistencyStore)
@@ -1005,7 +1007,15 @@ func TestStatefulPodControlConsistencyStore(t *testing.T) {
 				t.Error("expected consistency store to return an error, got nil")
 			}
 
-			rvGetter.rv = "2"
+			if tc.name == "CreatePod" {
+				// CreateStatefulPod creates both the pod's claims and the pod itself.
+				podRVGetter.rv = "2"
+				claimRVGetter.rv = "2"
+			} else if tc.resource == podGroupResource {
+				podRVGetter.rv = "2"
+			} else if tc.resource == persistentVolumeClaimGroupResource {
+				claimRVGetter.rv = "2"
+			}
 
 			if err := consistencyStore.EnsureReady(types.NamespacedName{Namespace: set.Namespace, Name: set.Name}); err != nil {
 				t.Errorf("expected consistency store to be ready, got an error: %v", err)

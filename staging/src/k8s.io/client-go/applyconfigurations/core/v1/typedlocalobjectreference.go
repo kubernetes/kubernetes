@@ -38,13 +38,13 @@ package v1
 // Instead of using this type, create a locally provided and used type that is well-focused on your reference.
 // For example, ServiceReferences for admission registration: https://github.com/kubernetes/api/blob/release-1.17/admissionregistration/v1/types.go#L533 .
 type TypedLocalObjectReferenceApplyConfiguration struct {
-	// APIGroup is the group for the resource being referenced.
+	// apiGroup is the group for the resource being referenced.
 	// If APIGroup is not specified, the specified Kind must be in the core API group.
 	// For any other third-party types, APIGroup is required.
 	APIGroup *string `json:"apiGroup,omitempty"`
-	// Kind is the type of resource being referenced
+	// kind is the type of resource being referenced
 	Kind *string `json:"kind,omitempty"`
-	// Name is the name of resource being referenced
+	// name is the name of resource being referenced
 	Name *string `json:"name,omitempty"`
 }
 

@@ -245,6 +245,10 @@ var (
 	AsyncReporterCleanupDelegate = func(cleanup func()) func() {
 		return cleanup
 	}
+
+	// XDSFilterWrapperOption returns a ServerOption that sets the internal
+	// stream wrapper used for server-side xDS HTTP filters.
+	XDSFilterWrapperOption any // func(func(grpc.ServerStream) (grpc.ServerStream, error)) grpc.ServerOption
 )
 
 // HealthChecker defines the signature of the client-side LB channel health

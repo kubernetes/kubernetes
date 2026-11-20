@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
 	genericadmissioninitializer "k8s.io/apiserver/pkg/admission/initializer"
@@ -40,6 +41,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	resourcehelper "k8s.io/component-helpers/resource"
 	"k8s.io/kubernetes/pkg/features"
 
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -485,13 +487,16 @@ func TestPodLimitFunc(t *testing.T) {
 	for i := range successCases {
 		test := successCases[i]
 		t.Run(test.pod.Name, func(t *testing.T) {
+			if !test.podLevelResourcesEnabled {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.37"))
+			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, test.podLevelResourcesEnabled)
 			err := PodMutateLimitFunc(&test.limitRange, &test.pod)
 			if err != nil {
 				t.Errorf("Unexpected error for pod: %s, %v", test.pod.Name, err)
 			}
 
-			err = PodValidateLimitFunc(&test.limitRange, &test.pod)
+			err = PodValidateLimitFunc(&test.limitRange, &test.pod, nil)
 			if err != nil {
 				t.Errorf("Unexpected error for pod: %s, %v", test.pod.Name, err)
 			}
@@ -688,6 +693,14 @@ func TestPodLimitFunc(t *testing.T) {
 			podLevelResourcesEnabled: true,
 		},
 		{
+			pod: func() api.Pod {
+				pod := validPod("pod-max-memory-binary-and-large-exponent", 2, getResourceRequirements(getComputeResourceList("", "1Gi"), getComputeResourceList("", "1Gi")))
+				pod.Spec.Containers[1].Resources = getResourceRequirements(getComputeResourceList("", "1e2147483646"), getComputeResourceList("", "1e2147483646"))
+				return pod
+			}(),
+			limitRange: createLimitRange(api.LimitTypePod, api.ResourceList{}, getComputeResourceList("", "10Gi"), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
+		},
+		{
 			pod: validPodWithPodLevelResources("pod-level-limits-exceeding-max", 3, getResourceRequirements(getComputeResourceList("", ""), getComputeResourceList("50m", "60Mi")),
 				getResourceRequirements(getComputeResourceList("", ""), getComputeResourceList("160m", "300Mi")),
 			),
@@ -698,12 +711,15 @@ func TestPodLimitFunc(t *testing.T) {
 	for i := range errorCases {
 		test := errorCases[i]
 		t.Run(test.pod.Name, func(t *testing.T) {
+			if !test.podLevelResourcesEnabled {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.37"))
+			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, test.podLevelResourcesEnabled)
 			err := PodMutateLimitFunc(&test.limitRange, &test.pod)
 			if err != nil {
 				t.Errorf("Unexpected error for pod: %s, %v", test.pod.Name, err)
 			}
-			err = PodValidateLimitFunc(&test.limitRange, &test.pod)
+			err = PodValidateLimitFunc(&test.limitRange, &test.pod, nil)
 			if err == nil {
 				t.Errorf("Expected error for pod: %s", test.pod.Name)
 			}
@@ -821,10 +837,423 @@ func TestLimitRangerAllowPodResize(t *testing.T) {
 	informerFactory.Start(wait.NeverStop)
 
 	testPod := validPod("testPod", 1, api.ResourceRequirements{})
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 	err = handler.Validate(context.TODO(), admission.NewAttributesRecord(&testPod, nil, api.Kind("Pod").WithVersion("version"), limitRange.Namespace, "testPod", api.Resource("pods").WithVersion("version"), "resize", admission.Update, &metav1.UpdateOptions{}, false, nil), nil)
 	if err == nil {
 		t.Errorf("expect error, but got nil")
+	}
+}
+
+// TestLimitRangerValidatePodResize checks that a resize is validated against the
+// LimitRange only for the values it changes. A request or limit the stored pod
+// already holds is valid by definition and must not be rejected by a constraint
+// it no longer satisfies; a value the resize changes is checked as on create.
+func TestLimitRangerValidatePodResize(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, true)
+
+	cpu := func(request, limit string) api.ResourceRequirements {
+		return getResourceRequirements(getComputeResourceList(request, ""), getComputeResourceList(limit, ""))
+	}
+	cpuAndMemory := func(cpuRequest, cpuLimit, memoryRequest, memoryLimit string) api.ResourceRequirements {
+		return getResourceRequirements(getComputeResourceList(cpuRequest, memoryRequest), getComputeResourceList(cpuLimit, memoryLimit))
+	}
+	// pod builds a pod whose containers are named foo-0, foo-1, ... with the given resources, in order.
+	pod := func(resources ...api.ResourceRequirements) api.Pod {
+		p := validPod("pod", 0, api.ResourceRequirements{})
+		for i, r := range resources {
+			p.Spec.Containers = append(p.Spec.Containers, api.Container{Name: "foo-" + strconv.Itoa(i), Image: "foo", Resources: r})
+		}
+		return p
+	}
+	withInitContainer := func(p api.Pod, resources api.ResourceRequirements) api.Pod {
+		p.Spec.InitContainers = []api.Container{{Name: "init", Image: "foo", Resources: resources}}
+		return p
+	}
+	// withSidecar adds a restartable init container.
+	withSidecar := func(p api.Pod, resources api.ResourceRequirements) api.Pod {
+		p.Spec.InitContainers = []api.Container{{Name: "sidecar", Image: "foo", Resources: resources, RestartPolicy: new(api.ContainerRestartPolicyAlways)}}
+		return p
+	}
+	containerMaxCPU := createLimitRange(api.LimitTypeContainer, api.ResourceList{}, getComputeResourceList("1", ""), api.ResourceList{}, api.ResourceList{}, api.ResourceList{})
+	containerMinCPU := createLimitRange(api.LimitTypeContainer, getComputeResourceList("500m", ""), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}, api.ResourceList{})
+	containerCPURatio := createLimitRange(api.LimitTypeContainer, api.ResourceList{}, api.ResourceList{}, api.ResourceList{}, api.ResourceList{}, getComputeResourceList("2", ""))
+	podMaxCPU := createLimitRange(api.LimitTypePod, api.ResourceList{}, getComputeResourceList("2", ""), api.ResourceList{}, api.ResourceList{}, api.ResourceList{})
+	podMaxMemory := createLimitRange(api.LimitTypePod, api.ResourceList{}, getComputeResourceList("", "1Gi"), api.ResourceList{}, api.ResourceList{}, api.ResourceList{})
+	podMinCPU := createLimitRange(api.LimitTypePod, getComputeResourceList("2", ""), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}, api.ResourceList{})
+	podCPURatio := createLimitRange(api.LimitTypePod, api.ResourceList{}, api.ResourceList{}, api.ResourceList{}, api.ResourceList{}, getComputeResourceList("2", ""))
+	containerMaxCPUAndMemory := createLimitRange(api.LimitTypeContainer, api.ResourceList{}, getComputeResourceList("4", "1Gi"), api.ResourceList{}, api.ResourceList{}, api.ResourceList{})
+
+	tests := []struct {
+		name       string
+		limitRange corev1.LimitRange
+		old        *api.Pod // nil means create
+		pod        api.Pod
+		// subresource defaults to "resize" for updates.
+		subresource string
+		wantErr     bool
+	}{
+		{
+			name:       "unchanged container above the max is not checked",
+			limitRange: containerMaxCPU,
+			old:        new(pod(cpu("2", "2"), cpu("500m", "500m"))),
+			pod:        pod(cpu("2", "2"), cpu("800m", "800m")),
+		},
+		{
+			name:       "resized container above the max is rejected",
+			limitRange: containerMaxCPU,
+			old:        new(pod(cpu("500m", "500m"))),
+			pod:        pod(cpu("2", "2")),
+			wantErr:    true,
+		},
+		{
+			name:       "unchanged init container below the min is not checked",
+			limitRange: containerMinCPU,
+			old:        new(withInitContainer(pod(cpu("1", "1")), cpu("100m", "100m"))),
+			pod:        withInitContainer(pod(cpu("2", "2")), cpu("100m", "100m")),
+		},
+		{
+			name:       "unchanged pod memory total above the max is not checked",
+			limitRange: podMaxMemory,
+			old:        new(pod(cpuAndMemory("500m", "500m", "1Gi", "1Gi"), cpuAndMemory("500m", "500m", "1Gi", "1Gi"))),
+			pod:        pod(cpuAndMemory("800m", "800m", "1Gi", "1Gi"), cpuAndMemory("500m", "500m", "1Gi", "1Gi")),
+		},
+		{
+			name:       "changed pod cpu total above the max is rejected",
+			limitRange: podMaxCPU,
+			old:        new(pod(cpu("500m", "500m"), cpu("500m", "500m"))),
+			pod:        pod(cpu("2", "2"), cpu("500m", "500m")),
+			wantErr:    true,
+		},
+		{
+			name:       "unchanged container with a limit-to-request ratio above the max is not checked",
+			limitRange: containerCPURatio,
+			old:        new(pod(cpu("100m", "1"), cpu("500m", "500m"))),
+			pod:        pod(cpu("100m", "1"), cpu("600m", "600m")),
+		},
+		{
+			name:       "resized container with a limit-to-request ratio above the max is rejected",
+			limitRange: containerCPURatio,
+			old:        new(pod(cpu("500m", "500m"))),
+			pod:        pod(cpu("100m", "1")),
+			wantErr:    true,
+		},
+		{
+			name:       "resize that adds a limit the stored container did not have is checked",
+			limitRange: containerMaxCPU,
+			old:        new(pod(cpu("500m", ""))),
+			pod:        pod(cpu("500m", "2")),
+			wantErr:    true,
+		},
+		{
+			name:       "resized restartable init container above the max is rejected",
+			limitRange: containerMaxCPU,
+			old:        new(withSidecar(pod(cpu("500m", "500m")), cpu("500m", "500m"))),
+			pod:        withSidecar(pod(cpu("500m", "500m")), cpu("2", "2")),
+			wantErr:    true,
+		},
+		{
+			name:       "resizing cpu does not re-check the container's unchanged memory",
+			limitRange: containerMaxCPUAndMemory,
+			old:        new(pod(cpuAndMemory("500m", "500m", "2Gi", "2Gi"))),
+			pod:        pod(cpuAndMemory("1", "1", "2Gi", "2Gi")),
+		},
+		{
+			name:       "unchanged pod cpu total below the min is not checked",
+			limitRange: podMinCPU,
+			old:        new(pod(cpuAndMemory("500m", "500m", "1Gi", "1Gi"), cpuAndMemory("500m", "500m", "1Gi", "1Gi"))),
+			pod:        pod(cpuAndMemory("500m", "500m", "2Gi", "2Gi"), cpuAndMemory("500m", "500m", "1Gi", "1Gi")),
+		},
+		{
+			name:       "unchanged pod limit-to-request ratio above the max is not checked",
+			limitRange: podCPURatio,
+			old:        new(pod(cpuAndMemory("100m", "1", "1Gi", "1Gi"))),
+			pod:        pod(cpuAndMemory("100m", "1", "2Gi", "2Gi")),
+		},
+		{
+			name:       "changed pod limit-to-request ratio above the max is rejected",
+			limitRange: podCPURatio,
+			old:        new(pod(cpu("500m", "500m"))),
+			pod:        pod(cpu("100m", "1")),
+			wantErr:    true,
+		},
+		{
+			name:       "offsetting resizes that leave the pod total unchanged are not checked at the pod level",
+			limitRange: podMaxCPU,
+			old:        new(pod(cpu("2", "2"), cpu("1", "1"))),
+			pod:        pod(cpu("1", "1"), cpu("2", "2")),
+		},
+		{
+			name:       "resize that lowers only the request below the min is rejected",
+			limitRange: containerMinCPU,
+			old:        new(pod(cpu("600m", "1"))),
+			pod:        pod(cpu("100m", "1")),
+			wantErr:    true,
+		},
+		{
+			name:       "unchanged second container above the max is not checked",
+			limitRange: containerMaxCPU,
+			old:        new(pod(cpu("500m", "500m"), cpu("2", "2"))),
+			pod:        pod(cpu("800m", "800m"), cpu("2", "2")),
+		},
+		{
+			name:       "unchanged pod-level cpu above the max is not checked when a container is resized",
+			limitRange: podMaxCPU,
+			old:        new(validPodWithPodLevelResources("pod", 1, cpu("500m", "500m"), cpu("3", "3"))),
+			pod:        validPodWithPodLevelResources("pod", 1, cpu("1", "1"), cpu("3", "3")),
+		},
+		{
+			name:       "resized pod-level cpu above the max is rejected",
+			limitRange: podMaxCPU,
+			old:        new(validPodWithPodLevelResources("pod", 1, cpu("500m", "500m"), cpu("1", "1"))),
+			pod:        validPodWithPodLevelResources("pod", 1, cpu("500m", "500m"), cpu("3", "3")),
+			wantErr:    true,
+		},
+		{
+			name:       "create is checked in full",
+			limitRange: containerMaxCPU,
+			pod:        pod(cpu("2", "2")),
+			wantErr:    true,
+		},
+		{
+			name:        "dynamic: added container above the max is rejected",
+			limitRange:  containerMaxCPU,
+			subresource: "dynamic",
+			old:         new(pod(cpu("500m", "500m"))),
+			pod:         pod(cpu("500m", "500m"), cpu("2", "2")),
+			wantErr:     true,
+		},
+		{
+			name:        "dynamic: added container within the max is allowed alongside an unchanged container above it",
+			limitRange:  containerMaxCPU,
+			subresource: "dynamic",
+			old:         new(pod(cpu("2", "2"))),
+			pod:         pod(cpu("2", "2"), cpu("500m", "500m")),
+		},
+		{
+			name:        "dynamic: added container pushing the pod total above the max is rejected",
+			limitRange:  podMaxCPU,
+			subresource: "dynamic",
+			old:         new(pod(cpu("1", "1"))),
+			pod:         pod(cpu("1", "1"), cpu("1500m", "1500m")),
+			wantErr:     true,
+		},
+		{
+			name:        "dynamic: removing a container that drops the pod total below the min is rejected",
+			limitRange:  podMinCPU,
+			subresource: "dynamic",
+			old:         new(pod(cpu("1", "1"), cpu("1", "1"))),
+			pod:         pod(cpu("1", "1")),
+			wantErr:     true,
+		},
+		{
+			name:        "dynamic: resized container above the max is rejected",
+			limitRange:  containerMaxCPU,
+			subresource: "dynamic",
+			old:         new(pod(cpu("500m", "500m"))),
+			pod:         pod(cpu("2", "2")),
+			wantErr:     true,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			handler, informerFactory, err := newHandlerForTest(newMockClientForTest([]corev1.LimitRange{tc.limitRange}))
+			if err != nil {
+				t.Fatalf("unexpected error initializing handler: %v", err)
+			}
+			informerFactory.Start(wait.NeverStop)
+
+			var oldObj runtime.Object
+			subresource, op := "", admission.Create
+			var opts runtime.Object = &metav1.CreateOptions{}
+			if tc.old != nil {
+				oldObj, subresource, op, opts = tc.old, "resize", admission.Update, &metav1.UpdateOptions{}
+				if tc.subresource != "" {
+					subresource = tc.subresource
+				}
+			}
+			attrs := admission.NewAttributesRecord(&tc.pod, oldObj, api.Kind("Pod").WithVersion("version"), tc.pod.Namespace, tc.pod.Name, api.Resource("pods").WithVersion("version"), subresource, op, opts, false, nil)
+			err = handler.Validate(t.Context(), attrs, nil)
+			if (err != nil) != tc.wantErr {
+				t.Errorf("Validate() error = %v, wantErr %v", err, tc.wantErr)
+			}
+		})
+	}
+}
+
+// TestLimitRangerDefaultsDynamicContainers checks that a dynamic update applies the LimitRange
+// defaults to all containers, which are then validated against its constraints.
+func TestLimitRangerDefaultsDynamicContainers(t *testing.T) {
+	limitRange := validLimitRange()
+	handler, informerFactory, err := newHandlerForTest(newMockClientForTest([]corev1.LimitRange{limitRange}))
+	if err != nil {
+		t.Fatalf("unexpected error initializing handler: %v", err)
+	}
+	informerFactory.Start(wait.NeverStop)
+
+	defaulted := getResourceRequirements(getComputeResourceList("50m", "5Mi"), getComputeResourceList("75m", "10Mi"))
+	oldPod := validPod("pod", 1, defaulted)
+	newPod := oldPod.DeepCopy()
+	newPod.Spec.Containers = append(newPod.Spec.Containers, api.Container{Name: "added", Image: "foo"})
+
+	attrs := admission.NewAttributesRecord(newPod, &oldPod, api.Kind("Pod").WithVersion("version"), limitRange.Namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "dynamic", admission.Update, &metav1.UpdateOptions{}, false, nil)
+	if err := admissiontesting.WithReinvocationTesting(t, handler).Admit(t.Context(), attrs, nil); err != nil {
+		t.Fatalf("Admit() error: %v", err)
+	}
+	if !apiequality.Semantic.DeepEqual(defaulted, newPod.Spec.Containers[1].Resources) {
+		t.Errorf("added container resources not defaulted: got %v, want %v", newPod.Spec.Containers[1].Resources, defaulted)
+	}
+	if !apiequality.Semantic.DeepEqual(defaulted, newPod.Spec.Containers[0].Resources) {
+		t.Errorf("existing container resources changed: got %v, want %v", newPod.Spec.Containers[0].Resources, defaulted)
+	}
+	expectNoAnnotation(t, newPod)
+	if err := handler.Validate(t.Context(), attrs, nil); err != nil {
+		t.Errorf("Validate() error: %v", err)
+	}
+
+	// The pod-level max of 200m cpu is exceeded by a third defaulted container.
+	tooMany := newPod.DeepCopy()
+	tooMany.Spec.Containers = append(tooMany.Spec.Containers, api.Container{Name: "added-2", Image: "foo"}, api.Container{Name: "added-3", Image: "foo"})
+	attrs = admission.NewAttributesRecord(tooMany, newPod, api.Kind("Pod").WithVersion("version"), limitRange.Namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "dynamic", admission.Update, &metav1.UpdateOptions{}, false, nil)
+	if err := handler.Admit(t.Context(), attrs, nil); err != nil {
+		t.Fatalf("Admit() error: %v", err)
+	}
+	if err := handler.Validate(t.Context(), attrs, nil); err == nil {
+		t.Error("expected Validate() to reject containers exceeding the pod max")
+	}
+
+	// Containers that predate the LimitRange get its defaults on any dynamic update.
+	undefaultedPod := validPod("pod", 1, api.ResourceRequirements{})
+	for name, update := range map[string]func(*api.Pod){
+		"image update": func(p *api.Pod) { p.Spec.Containers[0].Image = "new-image" },
+		"container add": func(p *api.Pod) {
+			p.Spec.Containers = append(p.Spec.Containers, api.Container{Name: "added", Image: "foo"})
+		},
+	} {
+		newPod := undefaultedPod.DeepCopy()
+		update(newPod)
+		attrs = admission.NewAttributesRecord(newPod, &undefaultedPod, api.Kind("Pod").WithVersion("version"), limitRange.Namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "dynamic", admission.Update, &metav1.UpdateOptions{}, false, nil)
+		if err := admissiontesting.WithReinvocationTesting(t, handler).Admit(t.Context(), attrs, nil); err != nil {
+			t.Fatalf("%s: Admit() error: %v", name, err)
+		}
+		if !apiequality.Semantic.DeepEqual(defaulted, newPod.Spec.Containers[0].Resources) {
+			t.Errorf("%s: existing container resources not defaulted: got %v, want %v", name, newPod.Spec.Containers[0].Resources, defaulted)
+		}
+	}
+}
+
+// auditAnnotationRecorder records the audit annotations added to the attributes it decorates.
+type auditAnnotationRecorder struct {
+	admission.Attributes
+	annotations map[string]string
+}
+
+func (r *auditAnnotationRecorder) AddAnnotation(key, value string) error {
+	r.annotations[key] = value
+	return r.Attributes.AddAnnotation(key, value)
+}
+
+// TestLimitRangerUpdateAnnotation checks that pod updates keep the LimitRanger annotation from
+// creation, even when they apply defaults, which are recorded in an audit annotation instead.
+func TestLimitRangerUpdateAnnotation(t *testing.T) {
+	limitRange := validLimitRange()
+	handler, informerFactory, err := newHandlerForTest(newMockClientForTest([]corev1.LimitRange{limitRange}))
+	if err != nil {
+		t.Fatalf("unexpected error initializing handler: %v", err)
+	}
+	informerFactory.Start(wait.NeverStop)
+
+	defaulted := getResourceRequirements(getComputeResourceList("50m", "5Mi"), getComputeResourceList("75m", "10Mi"))
+	addContainer := func(p *api.Pod) {
+		p.Spec.Containers = append(p.Spec.Containers, api.Container{Name: "added", Image: "foo"})
+	}
+	backfill := func(p *api.Pod) { p.Spec.Containers[0].Resources = api.ResourceRequirements{} }
+	const addedAudit = "LimitRanger plugin set: cpu, memory request for container added; cpu, memory limit for container added"
+	const backfillAudit = "LimitRanger plugin set: cpu, memory request for container foo-0; cpu, memory limit for container foo-0"
+
+	tests := []struct {
+		name          string
+		subresource   string
+		oldAnnotation string
+		update        func(*api.Pod)
+		// wantAnnotation defaults to oldAnnotation.
+		wantAnnotation string
+		wantAudit      string
+	}{{
+		name:          "dynamic: existing annotation is kept",
+		subresource:   "dynamic",
+		oldAnnotation: "LimitRanger plugin set: cpu request for container foo-0",
+		update:        addContainer,
+		wantAudit:     addedAudit,
+	}, {
+		name:        "dynamic: no annotation is added",
+		subresource: "dynamic",
+		update:      addContainer,
+		wantAudit:   addedAudit,
+	}, {
+		name:          "dynamic: no audit annotation without defaults",
+		subresource:   "dynamic",
+		oldAnnotation: "LimitRanger plugin set: cpu request for container foo-0",
+		update:        func(p *api.Pod) { p.Spec.Containers[0].Image = "new-image" },
+	}, {
+		name:          "dynamic: annotation removed from the request is restored",
+		subresource:   "dynamic",
+		oldAnnotation: "LimitRanger plugin set: cpu request for container foo-0",
+		update:        func(p *api.Pod) { p.Annotations = nil },
+	}, {
+		name:          "resize: existing annotation is kept",
+		subresource:   "resize",
+		oldAnnotation: "LimitRanger plugin set: cpu request for container foo-0",
+		update:        backfill,
+		wantAudit:     backfillAudit,
+	}, {
+		name:        "resize: no annotation is added",
+		subresource: "resize",
+		update:      backfill,
+		wantAudit:   backfillAudit,
+	}, {
+		name:          "main resource: annotation changes are kept",
+		oldAnnotation: "LimitRanger plugin set: cpu request for container foo-0",
+		update: func(p *api.Pod) {
+			p.Annotations[limitRangerAnnotation] = "edited"
+		},
+		wantAnnotation: "edited",
+	}}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			oldPod := validPod("pod", 1, defaulted)
+			if tc.oldAnnotation != "" {
+				oldPod.Annotations = map[string]string{limitRangerAnnotation: tc.oldAnnotation}
+			}
+			newPod := oldPod.DeepCopy()
+			tc.update(newPod)
+			attrs := &auditAnnotationRecorder{
+				Attributes:  admission.NewAttributesRecord(newPod, &oldPod, api.Kind("Pod").WithVersion("version"), limitRange.Namespace, newPod.Name, api.Resource("pods").WithVersion("version"), tc.subresource, admission.Update, &metav1.UpdateOptions{}, false, nil),
+				annotations: map[string]string{},
+			}
+			if err := admissiontesting.WithReinvocationTesting(t, handler).Admit(t.Context(), attrs, nil); err != nil {
+				t.Fatalf("Admit() error: %v", err)
+			}
+			wantAudit := map[string]string{}
+			if tc.wantAudit != "" {
+				wantAudit[limitRangerAuditAnnotation] = tc.wantAudit
+			}
+			if !apiequality.Semantic.DeepEqual(wantAudit, attrs.annotations) {
+				t.Errorf("unexpected audit annotations: got %v, want %v", attrs.annotations, wantAudit)
+			}
+			for i, c := range newPod.Spec.Containers {
+				if !apiequality.Semantic.DeepEqual(defaulted, c.Resources) {
+					t.Errorf("container %d resources not defaulted: got %v, want %v", i, c.Resources, defaulted)
+				}
+			}
+			wantAnnotation := tc.wantAnnotation
+			if wantAnnotation == "" {
+				wantAnnotation = tc.oldAnnotation
+			}
+			if wantAnnotation == "" {
+				expectNoAnnotation(t, newPod)
+			} else {
+				verifyAnnotation(t, newPod, wantAnnotation)
+			}
+		})
 	}
 }
 
@@ -933,7 +1362,7 @@ func TestPersistentVolumeClaimLimitFunc(t *testing.T) {
 	}
 	for i := range successCases {
 		test := successCases[i]
-		err := PersistentVolumeClaimValidateLimitFunc(&test.limitRange, &test.pvc)
+		err := PersistentVolumeClaimValidateLimitFunc(&test.limitRange, &test.pvc, nil)
 		if err != nil {
 			t.Errorf("Unexpected error for pvc: %s, %v", test.pvc.Name, err)
 		}
@@ -951,7 +1380,7 @@ func TestPersistentVolumeClaimLimitFunc(t *testing.T) {
 	}
 	for i := range errorCases {
 		test := errorCases[i]
-		err := PersistentVolumeClaimValidateLimitFunc(&test.limitRange, &test.pvc)
+		err := PersistentVolumeClaimValidateLimitFunc(&test.limitRange, &test.pvc, nil)
 		if err == nil {
 			t.Errorf("Expected error for pvc: %s", test.pvc.Name)
 		}
@@ -1059,5 +1488,260 @@ func TestLimitRanger_GetLimitRangesFixed22422(t *testing.T) {
 	}
 	if test1Count != 1 {
 		t.Errorf("Expected 1 limit range call, got %d", test1Count)
+	}
+}
+
+func TestLimitRangerValidatePersistentVolumeClaimUpdate(t *testing.T) {
+	storage := getStorageResourceList
+	pvc := func(name string, requests api.ResourceList) api.PersistentVolumeClaim {
+		return validPersistentVolumeClaim(name, getVolumeResourceRequirements(requests, api.ResourceList{}))
+	}
+	labeled := func(claim api.PersistentVolumeClaim) api.PersistentVolumeClaim {
+		claim.Labels = map[string]string{"touched": "true"}
+		return claim
+	}
+	oneToTen := createLimitRange(api.LimitTypePersistentVolumeClaim, storage("1Gi"), storage("10Gi"), api.ResourceList{}, api.ResourceList{}, api.ResourceList{})
+	atLeastOneTi := createLimitRange(api.LimitTypePersistentVolumeClaim, storage("1Ti"), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}, api.ResourceList{})
+	atLeastOneTi.Name = "min-only"
+	withFoo := createLimitRange(api.LimitTypePersistentVolumeClaim, api.ResourceList{}, api.ResourceList{
+		api.ResourceStorage: resource.MustParse("10Gi"),
+		"example.com/foo":   resource.MustParse("1"),
+	}, api.ResourceList{}, api.ResourceList{}, api.ResourceList{})
+	// Both quantities round to 1073741824001m; compared exactly (#141348) the request is above the max.
+	fractionalMax := createLimitRange(api.LimitTypePersistentVolumeClaim, api.ResourceList{}, storage("1073741824.0001"), api.ResourceList{}, api.ResourceList{}, api.ResourceList{})
+	fractionalMax.Name = "fractional-max"
+
+	tests := []struct {
+		name        string
+		limitRanges []corev1.LimitRange
+		old         *api.PersistentVolumeClaim
+		obj         api.PersistentVolumeClaim
+		wantErr     string
+	}{{
+		name:        "create above max",
+		limitRanges: []corev1.LimitRange{oneToTen},
+		obj:         pvc("a", storage("100Gi")),
+		wantErr:     "maximum storage usage per PersistentVolumeClaim is 10Gi, but request is 100Gi",
+	}, {
+		name:        "create below min",
+		limitRanges: []corev1.LimitRange{oneToTen},
+		obj:         pvc("a", storage("500Mi")),
+		wantErr:     "minimum storage usage per PersistentVolumeClaim is 1Gi, but request is 500Mi",
+	}, {
+		name:        "create within range",
+		limitRanges: []corev1.LimitRange{oneToTen},
+		obj:         pvc("a", storage("5Gi")),
+	}, {
+		name:        "update keeps a stored request within range",
+		limitRanges: []corev1.LimitRange{oneToTen},
+		old:         new(pvc("a", storage("5Gi"))),
+		obj:         pvc("a", storage("5Gi")),
+	}, {
+		name:        "update keeps a stored request above max",
+		limitRanges: []corev1.LimitRange{oneToTen},
+		old:         new(pvc("a", storage("100Gi"))),
+		obj:         labeled(pvc("a", storage("100Gi"))),
+	}, {
+		name:        "create at a fractional request above a fractional max",
+		limitRanges: []corev1.LimitRange{fractionalMax},
+		obj:         pvc("a", storage("1073741824.0009")),
+		wantErr:     "maximum storage usage per PersistentVolumeClaim is 1073741824000100u, but request is 1073741824000900u",
+	}, {
+		name:        "update keeps a stored fractional request above a fractional max",
+		limitRanges: []corev1.LimitRange{fractionalMax},
+		old:         new(pvc("a", storage("1073741824.0009"))),
+		obj:         labeled(pvc("a", storage("1073741824.0009"))),
+	}, {
+		name:        "update moves a stored fractional request to another value above the max",
+		limitRanges: []corev1.LimitRange{fractionalMax},
+		old:         new(pvc("a", storage("1073741824.0009"))),
+		obj:         pvc("a", storage("1073741824.0010")),
+		wantErr:     "maximum storage usage per PersistentVolumeClaim is 1073741824000100u, but request is 1073741824001m",
+	}, {
+		name:        "update keeps a stored request below min",
+		limitRanges: []corev1.LimitRange{oneToTen},
+		old:         new(pvc("a", storage("500Mi"))),
+		obj:         pvc("a", storage("500Mi")),
+	}, {
+		name:        "update spells the same stored request differently",
+		limitRanges: []corev1.LimitRange{oneToTen},
+		old:         new(pvc("a", storage("20Gi"))),
+		obj:         pvc("a", storage("20480Mi")),
+	}, {
+		name:        "update changes the request to another value above max",
+		limitRanges: []corev1.LimitRange{oneToTen},
+		old:         new(pvc("a", storage("100Gi"))),
+		obj:         pvc("a", storage("200Gi")),
+		wantErr:     "maximum storage usage per PersistentVolumeClaim is 10Gi, but request is 200Gi",
+	}, {
+		name:        "update changes the request to a value within range",
+		limitRanges: []corev1.LimitRange{oneToTen},
+		old:         new(pvc("a", storage("100Gi"))),
+		obj:         pvc("a", storage("5Gi")),
+	}, {
+		name:        "update removes the request",
+		limitRanges: []corev1.LimitRange{atLeastOneTi},
+		old:         new(pvc("a", storage("100Gi"))),
+		obj:         pvc("a", api.ResourceList{}),
+		wantErr:     "minimum storage usage per PersistentVolumeClaim is 1Ti.  No request is specified",
+	}, {
+		name:        "update adds a request above max",
+		limitRanges: []corev1.LimitRange{oneToTen},
+		old:         new(pvc("a", api.ResourceList{})),
+		obj:         pvc("a", storage("100Gi")),
+		wantErr:     "maximum storage usage per PersistentVolumeClaim is 10Gi, but request is 100Gi",
+	}, {
+		name:        "update adds another limited resource next to an unchanged one",
+		limitRanges: []corev1.LimitRange{withFoo},
+		old:         new(pvc("a", storage("100Gi"))),
+		obj: pvc("a", api.ResourceList{
+			api.ResourceStorage: resource.MustParse("100Gi"),
+			"example.com/foo":   resource.MustParse("2"),
+		}),
+		wantErr: "maximum example.com/foo usage per PersistentVolumeClaim is 1, but request is 2",
+	}, {
+		name:        "update keeps a stored request outside two limit ranges",
+		limitRanges: []corev1.LimitRange{oneToTen, atLeastOneTi},
+		old:         new(pvc("a", storage("100Gi"))),
+		obj:         pvc("a", storage("100Gi")),
+	}, {
+		name:        "update changes a request under two limit ranges",
+		limitRanges: []corev1.LimitRange{oneToTen, atLeastOneTi},
+		old:         new(pvc("a", storage("100Gi"))),
+		obj:         pvc("a", storage("2Ti")),
+		wantErr:     "maximum storage usage per PersistentVolumeClaim is 10Gi, but request is 2Ti",
+	}}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			handler, informerFactory, err := newHandlerForTest(newMockClientForTest(tc.limitRanges))
+			if err != nil {
+				t.Fatalf("unexpected error initializing handler: %v", err)
+			}
+			informerFactory.Start(wait.NeverStop)
+
+			var oldObj runtime.Object
+			op, opts := admission.Create, runtime.Object(&metav1.CreateOptions{})
+			if tc.old != nil {
+				oldObj, op, opts = tc.old, admission.Update, &metav1.UpdateOptions{}
+			}
+			attrs := admission.NewAttributesRecord(&tc.obj, oldObj, api.Kind("PersistentVolumeClaim").WithVersion("version"), "test", tc.obj.Name, api.Resource("persistentvolumeclaims").WithVersion("version"), "", op, opts, false, nil)
+			err = handler.Validate(t.Context(), attrs, nil)
+			var gotErr, wantErr string
+			if err != nil {
+				gotErr = err.Error()
+			}
+			if tc.wantErr != "" {
+				wantErr = `persistentvolumeclaims "a" is forbidden: ` + tc.wantErr
+			}
+			if gotErr != wantErr {
+				t.Errorf("Validate() error = %q, want %q", gotErr, wantErr)
+			}
+		})
+	}
+}
+
+// TestIsSupportedPodLevelResourceMatchesCanonical guards against this package's
+// notion of a pod-level resource drifting from the canonical one in
+// component-helpers. A drift for hugepages previously caused podRequests and
+// podLimits to ignore the pod-level values.
+func TestIsSupportedPodLevelResourceMatchesCanonical(t *testing.T) {
+	resourceNames := []string{
+		"cpu",
+		"memory",
+		"hugepages-2Mi",
+		"hugepages-1Gi",
+		"ephemeral-storage",
+		"example.com/dongle",
+	}
+
+	for _, name := range resourceNames {
+		t.Run(name, func(t *testing.T) {
+			want := resourcehelper.IsSupportedPodLevelResource(corev1.ResourceName(name))
+			if got := isSupportedPodLevelResource(api.ResourceName(name)); got != want {
+				t.Errorf("isSupportedPodLevelResource(%q) = %v, component-helpers says %v", name, got, want)
+			}
+		})
+	}
+}
+
+// TestPodLimitFuncPodLevelHugepages verifies that a Pod-type LimitRange is enforced
+// against the pod-level hugepages values for min and max.
+// Validation permits the pod-level value to exceed the aggregated container value,
+// so evaluating the container aggregate instead would mis-evaluate pod-scoped constraints.
+func TestPodLimitFuncPodLevelHugepages(t *testing.T) {
+	const hugepages = "hugepages-2Mi"
+
+	newPodLimitRange := func(item corev1.LimitRangeItem) corev1.LimitRange {
+		item.Type = corev1.LimitTypePod
+		return corev1.LimitRange{
+			ObjectMeta: metav1.ObjectMeta{Name: "hugepages-limits", Namespace: "test"},
+			Spec:       corev1.LimitRangeSpec{Limits: []corev1.LimitRangeItem{item}},
+		}
+	}
+
+	hugepagesLimitItem := func(value string) corev1.ResourceList {
+		return corev1.ResourceList{corev1.ResourceName(hugepages): resource.MustParse(value)}
+	}
+
+	hugepagesList := func(value string) api.ResourceList {
+		return api.ResourceList{
+			api.ResourceCPU:             resource.MustParse("100m"),
+			api.ResourceName(hugepages): resource.MustParse(value),
+		}
+	}
+
+	tests := []struct {
+		name        string
+		limitRange  corev1.LimitRange
+		podRequest  string
+		podLimit    string
+		expectError bool
+	}{
+		{
+			name:        "pod-level hugepages above the maximum is rejected",
+			limitRange:  newPodLimitRange(corev1.LimitRangeItem{Max: hugepagesLimitItem("4Gi")}),
+			podRequest:  "8Gi",
+			podLimit:    "8Gi",
+			expectError: true,
+		},
+		{
+			name:        "pod-level hugepages within the maximum is accepted",
+			limitRange:  newPodLimitRange(corev1.LimitRangeItem{Max: hugepagesLimitItem("4Gi")}),
+			podRequest:  "4Gi",
+			podLimit:    "4Gi",
+			expectError: false,
+		},
+		{
+			name:        "pod-level hugepages below the minimum is rejected",
+			limitRange:  newPodLimitRange(corev1.LimitRangeItem{Min: hugepagesLimitItem("4Gi")}),
+			podRequest:  "2Gi",
+			podLimit:    "2Gi",
+			expectError: true,
+		},
+		{
+			name:        "pod-level hugepages meeting the minimum is accepted when container is below minimum",
+			limitRange:  newPodLimitRange(corev1.LimitRangeItem{Min: hugepagesLimitItem("4Gi")}),
+			podRequest:  "4Gi",
+			podLimit:    "4Gi",
+			expectError: false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, true)
+
+			containerResources := getResourceRequirements(hugepagesList("2Gi"), hugepagesList("2Gi"))
+			podResources := getResourceRequirements(hugepagesList(test.podRequest), hugepagesList(test.podLimit))
+			pod := validPodWithPodLevelResources("pod-level-hugepages", 1, containerResources, podResources)
+
+			err := PodValidateLimitFunc(&test.limitRange, &pod, nil)
+			if test.expectError && err == nil {
+				t.Errorf("expected pod with pod-level %s (request=%s, limit=%s) to be rejected, got no error", hugepages, test.podRequest, test.podLimit)
+			}
+			if !test.expectError && err != nil {
+				t.Errorf("expected pod with pod-level %s (request=%s, limit=%s) to be accepted, got: %v", hugepages, test.podRequest, test.podLimit, err)
+			}
+		})
 	}
 }

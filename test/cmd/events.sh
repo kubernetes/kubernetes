@@ -165,7 +165,39 @@ __EOF__
     kube::test::if_has_string "${output_message}" "kind: CronJob"
     kube::test::if_has_string "${output_message}" "name: pi"
 
+    # Post-Condition: an event whose message spans several lines is cut at the
+    # first line break, so that the remaining lines cannot be emitted as extra
+    # rows and break the table. This is what the table printer behind
+    # "kubectl get events" already does.
+    kubectl create -f - << __EOF__
+{
+  "kind": "Event",
+  "apiVersion": "v1",
+  "metadata": {
+    "name": "multiline.test",
+    "namespace": "test-events"
+  },
+  "involvedObject": {
+    "kind": "Pod",
+    "apiVersion": "v1",
+    "name": "multiline",
+    "namespace": "test-events"
+  },
+  "type": "Warning",
+  "reason": "Unhealthy",
+  "message": "Readiness probe failed: first line\nsecond line",
+  "firstTimestamp": "2022-01-01T00:00:00Z",
+  "lastTimestamp": "2022-01-01T00:00:00Z",
+  "count": 1
+}
+__EOF__
+
+    output_message=$(kubectl events -n test-events --for=Pod/multiline "${kube_flags[@]:?}" 2>&1)
+    kube::test::if_has_string "${output_message}" "Readiness probe failed: first line..."
+    kube::test::if_has_not_string "${output_message}" "second line"
+
     #Clean up
+    kubectl delete event multiline.test --namespace=test-events
     kubectl delete cronjob pi --namespace=test-events
     kubectl delete cronjobs.v1.example.com pi --namespace=test-events
     kubectl delete crd cronjobs.example.com

@@ -12,7 +12,7 @@ import (
 // A strategic merge patch directive.
 // See https://github.com/kubernetes/community/blob/master/contributors/devel/sig-api-machinery/strategic-merge-patch.md
 //
-//go:generate stringer -type=smpDirective -linecomment
+//go:generate go tool stringer -type=smpDirective -linecomment
 type smpDirective int
 
 const (

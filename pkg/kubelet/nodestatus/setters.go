@@ -284,7 +284,7 @@ func MachineInfo(nodeName string,
 				node.Status.Capacity[v1.ResourceName(removedResource)] = *resource.NewQuantity(int64(0), resource.DecimalSI)
 			}
 
-			if utilfeature.DefaultFeatureGate.Enabled(features.NodeSwap) && info.SwapCapacity != 0 {
+			if info.SwapCapacity != 0 {
 				node.Status.NodeInfo.Swap = &v1.NodeSwapStatus{
 					Capacity: ptr.To(int64(info.SwapCapacity)),
 				}
@@ -388,12 +388,12 @@ func DaemonEndpoints(daemonEndpoints *v1.NodeDaemonEndpoints) Setter {
 // imageListFunc is expected to return a list of images sorted in descending order by image size.
 // nodeStatusMaxImages is ignored if set to -1.
 func Images(nodeStatusMaxImages int32,
-	imageListFunc func() ([]kubecontainer.Image, error), // typically Kubelet.imageManager.GetImageList
+	imageListFunc func(context.Context) ([]kubecontainer.Image, error), // typically Kubelet.imageManager.GetImageList
 ) Setter {
 	return func(ctx context.Context, node *v1.Node) error {
 		// Update image list of this node
 		var imagesOnNode []v1.ContainerImage
-		containerImages, err := imageListFunc()
+		containerImages, err := imageListFunc(ctx)
 		if err != nil {
 			node.Status.Images = imagesOnNode
 			return fmt.Errorf("error getting image list: %v", err)
@@ -435,9 +435,6 @@ func GoRuntime() Setter {
 // NodeFeatures returns a Setter that sets NodeFeatures on the node.
 func NodeFeatures(featuresGetter func() *kubecontainer.RuntimeFeatures) Setter {
 	return func(ctx context.Context, node *v1.Node) error {
-		if !utilfeature.DefaultFeatureGate.Enabled(features.SupplementalGroupsPolicy) {
-			return nil
-		}
 		features := featuresGetter()
 		if features == nil {
 			return nil
@@ -452,9 +449,6 @@ func NodeFeatures(featuresGetter func() *kubecontainer.RuntimeFeatures) Setter {
 // RuntimeHandlers returns a Setter that sets RuntimeHandlers on the node.
 func RuntimeHandlers(fn func() []kubecontainer.RuntimeHandler) Setter {
 	return func(ctx context.Context, node *v1.Node) error {
-		if !utilfeature.DefaultFeatureGate.Enabled(features.RecursiveReadOnlyMounts) && !utilfeature.DefaultFeatureGate.Enabled(features.UserNamespacesSupport) {
-			return nil
-		}
 		handlers := fn()
 		node.Status.RuntimeHandlers = make([]v1.NodeRuntimeHandler, len(handlers))
 		for i, h := range handlers {
@@ -464,6 +458,9 @@ func RuntimeHandlers(fn func() []kubecontainer.RuntimeHandler) Setter {
 					RecursiveReadOnlyMounts: &h.SupportsRecursiveReadOnlyMounts,
 					UserNamespaces:          &h.SupportsUserNamespaces,
 				},
+			}
+			if utilfeature.DefaultFeatureGate.Enabled(features.CgroupNamespacesSupport) {
+				node.Status.RuntimeHandlers[i].Features.CgroupNamespaces = &h.SupportsCgroupNamespaces
 			}
 		}
 		return nil

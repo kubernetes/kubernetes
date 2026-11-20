@@ -31,6 +31,7 @@ import (
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	v1resource "k8s.io/kubernetes/pkg/api/v1/resource"
 	"k8s.io/kubernetes/pkg/features"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
@@ -1252,7 +1253,7 @@ func evictionMessage(resourceToReclaim v1.ResourceName, pod *v1.Pod, stats stats
 	}
 
 	// Pod level resources will be included in eviction message, along container resources
-	if resourceToReclaim == v1.ResourceMemory && utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) && resourcehelper.IsPodLevelResourcesSet(pod) {
+	if resourceToReclaim == v1.ResourceMemory && utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) && pod.Spec.Resources != nil {
 		if podRequest, ok := pod.Spec.Resources.Requests[resourceToReclaim]; ok && podStats.Memory != nil {
 			podUsage := memoryUsage(podStats.Memory)
 			message += fmt.Sprintf(podMessageFmt, pod.Name, podUsage.String(), podRequest.String(), resourceToReclaim)
@@ -1266,14 +1267,16 @@ func evictionMessage(resourceToReclaim v1.ResourceName, pod *v1.Pod, stats stats
 	// they will always be blamed for resource overuse when an eviction occurs.
 	// That’s why only regular, init and restartable init containers are considered
 	// for the eviction message.
-	containers := pod.Spec.Containers
-	if len(pod.Spec.InitContainers) != 0 {
-		containers = append(containers, pod.Spec.InitContainers...)
-	}
 	for _, containerStats := range podStats.Containers {
-		for _, container := range containers {
+		for container := range podutil.ContainerIter(&pod.Spec, podutil.InitContainers|podutil.Containers) {
 			if container.Name == containerStats.Name {
 				requests := container.Resources.Requests[resourceToReclaim]
+				if utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources) {
+					// A container's effective request includes its extra node allocatable
+					// resources (like DRA allocations), matching how its cgroup limits are sized.
+					extraNodeAllocatableRes := resourcehelper.GetExtraNodeAllocatableResourcesLimits(pod, container.Name)
+					requests.Add(extraNodeAllocatableRes[resourceToReclaim])
+				}
 				var usage *resource.Quantity
 				switch resourceToReclaim {
 				case v1.ResourceEphemeralStorage:

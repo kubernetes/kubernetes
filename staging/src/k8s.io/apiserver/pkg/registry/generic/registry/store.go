@@ -119,19 +119,33 @@ type Store struct {
 	// SingularQualifiedResource is the singular name of the resource.
 	SingularQualifiedResource schema.GroupResource
 
-	// KeyRootFunc returns the root etcd key for this resource; should not
-	// include trailing "/".  This is used for operations that work on the
-	// entire collection (listing and watching).
+	// KeyRootFunc returns the resource-relative key prefix for this resource;
+	// should not include trailing "/". This is used for operations that work
+	// on the entire collection (listing and watching). For example, it returns
+	// "/pods" or "/pods/<namespace>" for pods, and "/persistentvolumes" for
+	// persistent volumes.
 	//
 	// KeyRootFunc and KeyFunc must be supplied together or not at all.
 	KeyRootFunc func(ctx context.Context) string
 
-	// KeyFunc returns the key for a specific object in the collection.
-	// KeyFunc is called for Create/Update/Get/Delete. Note that 'namespace'
-	// can be gotten from ctx.
+	// KeyFunc returns the resource-relative key for a specific object in the
+	// collection. KeyFunc is called for Create/Update/Get/Delete. Note that
+	// 'namespace' can be gotten from ctx. For example, it returns
+	// "/pods/<namespace>/<name>" or "/persistentvolumes/<name>".
 	//
 	// KeyFunc and KeyRootFunc must be supplied together or not at all.
 	KeyFunc func(ctx context.Context, name string) (string, error)
+
+	// ReverseKeyFunc recovers an object's name and namespace from the
+	// resource-relative key produced by KeyFunc. It may be supplied with custom
+	// KeyRootFunc and KeyFunc implementations whose key format differs from the
+	// default "<resource-prefix>/<namespace>/<name>" or
+	// "<resource-prefix>/<name>" format.
+	//
+	// Custom key funcs may omit ReverseKeyFunc. Ordinary watches decode the
+	// previous object to identify deletions. Etcd watches with WatchWithoutPrevKV
+	// require ReverseKeyFunc because deletion events omit the previous object.
+	ReverseKeyFunc storage.ReverseKeyFunc
 
 	// ObjectNameFunc returns the name of an object or an error.
 	ObjectNameFunc func(obj runtime.Object) (string, error)
@@ -162,42 +176,34 @@ type Store struct {
 	// are issued in parallel.
 	DeleteCollectionWorkers int
 
-	// Decorator is an optional exit hook on an object returned from the
-	// underlying storage. The returned object could be an individual object
-	// (e.g. Pod) or a list type (e.g. PodList). Decorator is intended for
-	// integrations that are above storage and should only be used for
-	// specific cases where storage of the value is not appropriate, since
-	// they cannot be watched.
-	Decorator func(runtime.Object)
-
 	// CreateStrategy implements resource-specific behavior during creation.
 	CreateStrategy rest.RESTCreateStrategy
 	// BeginCreate is an optional hook that returns a "transaction-like"
 	// commit/revert function which will be called at the end of the operation,
-	// but before AfterCreate and Decorator, indicating via the argument
+	// but before AfterCreate, indicating via the argument
 	// whether the operation succeeded.  If this returns an error, the function
 	// is not called.  Almost nobody should use this hook.
 	BeginCreate BeginCreateFunc
 	// AfterCreate implements a further operation to run after a resource is
-	// created and before it is decorated, optional.
+	// created, optional.
 	AfterCreate AfterCreateFunc
 
 	// UpdateStrategy implements resource-specific behavior during updates.
 	UpdateStrategy rest.RESTUpdateStrategy
 	// BeginUpdate is an optional hook that returns a "transaction-like"
 	// commit/revert function which will be called at the end of the operation,
-	// but before AfterUpdate and Decorator, indicating via the argument
+	// but before AfterUpdate, indicating via the argument
 	// whether the operation succeeded.  If this returns an error, the function
 	// is not called.  Almost nobody should use this hook.
 	BeginUpdate BeginUpdateFunc
 	// AfterUpdate implements a further operation to run after a resource is
-	// updated and before it is decorated, optional.
+	// updated, optional.
 	AfterUpdate AfterUpdateFunc
 
 	// DeleteStrategy implements resource-specific behavior during deletion.
 	DeleteStrategy rest.RESTDeleteStrategy
 	// AfterDelete implements a further operation to run after a resource is
-	// deleted and before it is decorated, optional.
+	// deleted, optional.
 	AfterDelete AfterDeleteFunc
 	// ReturnDeletedObject determines whether the Store returns the object
 	// that was deleted. Otherwise, return a generic success status response.
@@ -266,6 +272,7 @@ const (
 
 // NamespaceKeyRootFunc is the default function for constructing storage paths
 // to resource directories enforcing namespace rules.
+// prefix must start with "/" and must not end with "/".
 func NamespaceKeyRootFunc(ctx context.Context, prefix string) string {
 	key := prefix
 	ns, ok := genericapirequest.NamespaceFrom(ctx)
@@ -278,6 +285,7 @@ func NamespaceKeyRootFunc(ctx context.Context, prefix string) string {
 // NamespaceKeyFunc is the default function for constructing storage paths to
 // a resource relative to the given prefix enforcing namespace rules. If the
 // context does not contain a namespace, it errors.
+// prefix must start with "/" and must not end with "/".
 func NamespaceKeyFunc(ctx context.Context, prefix string, name string) (string, error) {
 	key := NamespaceKeyRootFunc(ctx, prefix)
 	ns, ok := genericapirequest.NamespaceFrom(ctx)
@@ -296,6 +304,7 @@ func NamespaceKeyFunc(ctx context.Context, prefix string, name string) (string, 
 
 // NoNamespaceKeyFunc is the default function for constructing storage paths
 // to a resource relative to the given prefix without a namespace.
+// prefix must start with "/" and must not end with "/".
 func NoNamespaceKeyFunc(ctx context.Context, prefix string, name string) (string, error) {
 	if len(name) == 0 {
 		return "", apierrors.NewBadRequest("Name parameter required.")
@@ -307,17 +316,57 @@ func NoNamespaceKeyFunc(ctx context.Context, prefix string, name string) (string
 	return key, nil
 }
 
+// NoNamespaceReverseKeyFunc returns a function that recovers a cluster-scoped
+// object's name from a resource-relative key formatted as
+// "<resourcePrefix>/<name>". resourcePrefix must start with "/" and must not
+// end with "/"; name must be non-empty and must not contain "/".
+func NoNamespaceReverseKeyFunc(resourcePrefix string) storage.ReverseKeyFunc {
+	keyPrefix := resourcePrefix + "/"
+	return func(key string) (name string, namespace string, err error) {
+		name, found := strings.CutPrefix(key, keyPrefix)
+		if !found {
+			return "", "", fmt.Errorf("key %q does not have resource prefix %q", key, resourcePrefix)
+		}
+		if name == "" || strings.Contains(name, "/") {
+			return "", "", fmt.Errorf("key %q must contain exactly one non-empty name segment after resource prefix %q", key, resourcePrefix)
+		}
+		return name, "", nil
+	}
+}
+
+// NamespaceReverseKeyFunc returns a function that recovers a namespaced
+// object's namespace and name from a resource-relative key formatted as
+// "<resourcePrefix>/<namespace>/<name>". resourcePrefix must start with "/"
+// and must not end with "/"; namespace and name must be non-empty and must not
+// contain "/".
+func NamespaceReverseKeyFunc(resourcePrefix string) storage.ReverseKeyFunc {
+	keyPrefix := resourcePrefix + "/"
+	return func(key string) (name string, namespace string, err error) {
+		instance, found := strings.CutPrefix(key, keyPrefix)
+		if !found {
+			return "", "", fmt.Errorf("key %q does not have resource prefix %q", key, resourcePrefix)
+		}
+		namespace, name, found = strings.Cut(instance, "/")
+		if !found || namespace == "" || name == "" || strings.Contains(name, "/") {
+			return "", "", fmt.Errorf("key %q must contain exactly two non-empty namespace and name segments after resource prefix %q", key, resourcePrefix)
+		}
+		return name, namespace, nil
+	}
+}
+
 type storeKeyFuncs struct {
-	// storageRootKeyFunc returns the resource-relative storage path prefix for
-	// list and watch requests, for example "/pods" or "/pods/<namespace>".
-	storageRootKeyFunc func(ctx context.Context) string
-	// storageKeyFunc returns the resource-relative storage path for one object,
-	// for example "/pods/<namespace>/<name>" or "/pods/<name>".
-	storageKeyFunc func(ctx context.Context, name string) (string, error)
-	// cacheKeyFunc returns the resource-relative storage path for one object.
-	// It is passed to cache layers that receive objects instead of request
-	// contexts, so it derives the namespace and name from object metadata.
-	cacheKeyFunc func(obj runtime.Object) (string, error)
+	// requestKeyRootFunc returns the resource-relative key prefix for list and
+	// watch requests, for example "/pods" or "/pods/<namespace>".
+	requestKeyRootFunc func(ctx context.Context) string
+	// requestKeyFunc returns the resource-relative key for a single object, for
+	// example "/pods/<namespace>/<name>" or "/persistentvolumes/<name>".
+	requestKeyFunc func(ctx context.Context, name string) (string, error)
+	// objectKeyFunc returns the same resource-relative key as requestKeyFunc,
+	// deriving namespace and name from object metadata for watch-cache callers.
+	objectKeyFunc func(obj runtime.Object) (string, error)
+	// reverseKeyFunc recovers object identity from the same resource-relative
+	// key domain produced by requestKeyFunc.
+	reverseKeyFunc storage.ReverseKeyFunc
 }
 
 func defaultStoreKeyFuncs(prefix string, isNamespaced bool) storeKeyFuncs {
@@ -330,6 +379,7 @@ func defaultStoreKeyFuncs(prefix string, isNamespaced bool) storeKeyFuncs {
 			func(ctx context.Context, name string) (string, error) {
 				return NamespaceKeyFunc(ctx, prefix, name)
 			},
+			NamespaceReverseKeyFunc(prefix),
 		)
 	}
 
@@ -341,18 +391,20 @@ func defaultStoreKeyFuncs(prefix string, isNamespaced bool) storeKeyFuncs {
 		func(ctx context.Context, name string) (string, error) {
 			return NoNamespaceKeyFunc(ctx, prefix, name)
 		},
+		NoNamespaceReverseKeyFunc(prefix),
 	)
 }
 
 func newStoreKeyFuncs(
 	isNamespaced bool,
-	storageRootKeyFunc func(ctx context.Context) string,
-	storageKeyFunc func(ctx context.Context, name string) (string, error),
+	requestKeyRootFunc func(ctx context.Context) string,
+	requestKeyFunc func(ctx context.Context, name string) (string, error),
+	reverseKeyFunc storage.ReverseKeyFunc,
 ) storeKeyFuncs {
 	return storeKeyFuncs{
-		storageRootKeyFunc: storageRootKeyFunc,
-		storageKeyFunc:     storageKeyFunc,
-		cacheKeyFunc: func(obj runtime.Object) (string, error) {
+		requestKeyRootFunc: requestKeyRootFunc,
+		requestKeyFunc:     requestKeyFunc,
+		objectKeyFunc: func(obj runtime.Object) (string, error) {
 			accessor, err := meta.Accessor(obj)
 			if err != nil {
 				return "", err
@@ -362,8 +414,9 @@ func newStoreKeyFuncs(
 			if isNamespaced {
 				ctx = genericapirequest.WithNamespace(ctx, accessor.GetNamespace())
 			}
-			return storageKeyFunc(ctx, accessor.GetName())
+			return requestKeyFunc(ctx, accessor.GetName())
 		},
+		reverseKeyFunc: reverseKeyFunc,
 	}
 }
 
@@ -439,9 +492,6 @@ func (e *Store) List(ctx context.Context, options *metainternalversion.ListOptio
 	if err != nil {
 		return nil, err
 	}
-	if e.Decorator != nil {
-		e.Decorator(out)
-	}
 	return out, nil
 }
 
@@ -457,7 +507,7 @@ func (e *Store) ListPredicate(ctx context.Context, p storage.SelectionPredicate,
 	if utilfeature.DefaultFeatureGate.Enabled(features.ShardedListAndWatch) && options.ShardSelector != "" {
 		sel, err := sharding.Parse(options.ShardSelector)
 		if err != nil {
-			return nil, fmt.Errorf("invalid shard selector: %w", err)
+			return nil, apierrors.NewBadRequest(fmt.Sprintf("invalid shard selector: %v", err))
 		}
 		p.ShardSelector = sel
 	}
@@ -618,9 +668,6 @@ func (e *Store) create(ctx context.Context, obj runtime.Object, createValidation
 
 	if e.AfterCreate != nil {
 		e.AfterCreate(out, options)
-	}
-	if e.Decorator != nil {
-		e.Decorator(out)
 	}
 	return out, nil
 }
@@ -913,9 +960,6 @@ func (e *Store) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 			e.AfterUpdate(out, options)
 		}
 	}
-	if e.Decorator != nil {
-		e.Decorator(out)
-	}
 	return out, creating, nil
 }
 
@@ -950,9 +994,6 @@ func (e *Store) Get(ctx context.Context, name string, options *metav1.GetOptions
 	}
 	if err := e.Storage.Get(ctx, key, storage.GetOptions{ResourceVersion: options.ResourceVersion}, obj); err != nil {
 		return nil, storeerr.InterpretGetError(err, e.qualifiedResourceFromContext(ctx), name)
-	}
-	if e.Decorator != nil {
-		e.Decorator(obj)
 	}
 	return obj, nil
 }
@@ -1486,15 +1527,12 @@ func (e *Store) DeleteCollection(ctx context.Context, deleteValidation rest.Vali
 }
 
 // finalizeDelete runs the Store's AfterDelete hook if runHooks is set and
-// returns the decorated deleted object if appropriate.
+// returns the deleted object if appropriate.
 func (e *Store) finalizeDelete(ctx context.Context, obj runtime.Object, runHooks bool, options *metav1.DeleteOptions) (runtime.Object, error) {
 	if runHooks && e.AfterDelete != nil {
 		e.AfterDelete(obj, options)
 	}
 	if e.ReturnDeletedObject {
-		if e.Decorator != nil {
-			e.Decorator(obj)
-		}
 		return obj, nil
 	}
 	// Return information about the deleted object, which enables clients to
@@ -1537,7 +1575,7 @@ func (e *Store) Watch(ctx context.Context, options *metainternalversion.ListOpti
 		if utilfeature.DefaultFeatureGate.Enabled(features.ShardedListAndWatch) && options.ShardSelector != "" {
 			sel, err := sharding.Parse(options.ShardSelector)
 			if err != nil {
-				return nil, fmt.Errorf("invalid shard selector: %w", err)
+				return nil, apierrors.NewBadRequest(fmt.Sprintf("invalid shard selector: %v", err))
 			}
 			predicate.ShardSelector = sel
 		}
@@ -1573,14 +1611,7 @@ func (e *Store) WatchPredicate(ctx context.Context, p storage.SelectionPredicate
 		// optimization is skipped
 	}
 
-	w, err := e.Storage.Watch(ctx, key, storageOpts)
-	if err != nil {
-		return nil, err
-	}
-	if e.Decorator != nil {
-		return newDecoratedWatcher(ctx, w, e.Decorator), nil
-	}
-	return w, nil
+	return e.Storage.Watch(ctx, key, storageOpts)
 }
 
 // calculateTTL is a helper for retrieving the updated TTL for an object or
@@ -1679,7 +1710,8 @@ func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
 	if !strings.HasPrefix(prefix, "/") {
 		prefix = "/" + prefix
 	}
-	if prefix == "/" {
+	prefix = strings.TrimRight(prefix, "/")
+	if prefix == "" {
 		return fmt.Errorf("store for %s has an invalid prefix %q", e.DefaultQualifiedResource.String(), opts.ResourcePrefix)
 	}
 
@@ -1687,10 +1719,11 @@ func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
 	if e.KeyRootFunc == nil && e.KeyFunc == nil {
 		keyFuncs = defaultStoreKeyFuncs(prefix, isNamespaced)
 	} else {
-		keyFuncs = newStoreKeyFuncs(isNamespaced, e.KeyRootFunc, e.KeyFunc)
+		keyFuncs = newStoreKeyFuncs(isNamespaced, e.KeyRootFunc, e.KeyFunc, e.ReverseKeyFunc)
 	}
-	e.KeyRootFunc = keyFuncs.storageRootKeyFunc
-	e.KeyFunc = keyFuncs.storageKeyFunc
+	e.KeyRootFunc = keyFuncs.requestKeyRootFunc
+	e.KeyFunc = keyFuncs.requestKeyFunc
+	e.ReverseKeyFunc = keyFuncs.reverseKeyFunc
 
 	if e.DeleteCollectionWorkers == 0 {
 		e.DeleteCollectionWorkers = opts.DeleteCollectionWorkers
@@ -1709,12 +1742,23 @@ func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
 	}
 
 	if e.Storage.Storage == nil {
-		e.Storage.Codec = opts.StorageConfig.Codec
+		storageConfig := opts.StorageConfig
+
+		if options.DecodeDecorator != nil {
+			// make a shallow copy of the storageConfig and wrap the codec to decorate on Decode
+			storageConfigCopy := *storageConfig
+			storageConfigCopy.Codec = &decoratedDecoder{Encoder: storageConfig.Codec, decoder: storageConfig.Codec, decorator: options.DecodeDecorator}
+			storageConfig = &storageConfigCopy
+		}
+
+		e.Storage.Codec = storageConfig.Codec
+
 		var err error
 		e.Storage.Storage, e.DestroyFunc, err = opts.Decorator(
-			opts.StorageConfig,
+			storageConfig,
 			prefix,
-			keyFuncs.cacheKeyFunc,
+			keyFuncs.objectKeyFunc,
+			keyFuncs.reverseKeyFunc,
 			e.NewFunc,
 			e.NewListFunc,
 			attrFunc,

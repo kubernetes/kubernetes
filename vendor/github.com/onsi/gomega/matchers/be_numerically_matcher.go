@@ -5,6 +5,7 @@ package matchers
 import (
 	"fmt"
 	"math"
+	"math/big"
 
 	"github.com/onsi/gomega/format"
 )
@@ -60,18 +61,12 @@ func (matcher *BeNumericallyMatcher) Match(actual any) (success bool, err error)
 			secondOperand = toFloat(matcher.CompareTo[1])
 		}
 		success = matcher.matchFloats(toFloat(actual), toFloat(matcher.CompareTo[0]), secondOperand)
-	} else if isInteger(actual) {
-		var secondOperand int64 = 0
+	} else if isInteger(actual) || isUnsignedInteger(actual) {
+		var threshold any = 0
 		if len(matcher.CompareTo) == 2 {
-			secondOperand = toInteger(matcher.CompareTo[1])
+			threshold = matcher.CompareTo[1]
 		}
-		success = matcher.matchIntegers(toInteger(actual), toInteger(matcher.CompareTo[0]), secondOperand)
-	} else if isUnsignedInteger(actual) {
-		var secondOperand uint64 = 0
-		if len(matcher.CompareTo) == 2 {
-			secondOperand = toUnsignedInteger(matcher.CompareTo[1])
-		}
-		success = matcher.matchUnsignedIntegers(toUnsignedInteger(actual), toUnsignedInteger(matcher.CompareTo[0]), secondOperand)
+		success = matcher.matchIntegers(toBigInt(actual), toBigInt(matcher.CompareTo[0]), threshold)
 	} else {
 		return false, fmt.Errorf("Failed to compare:\n%s\n%s:\n%s", format.Object(actual, 1), matcher.Comparator, format.Object(matcher.CompareTo[0], 1))
 	}
@@ -79,40 +74,35 @@ func (matcher *BeNumericallyMatcher) Match(actual any) (success bool, err error)
 	return success, nil
 }
 
-func (matcher *BeNumericallyMatcher) matchIntegers(actual, compareTo, threshold int64) (success bool) {
+// matchIntegers compares signed and unsigned integers by their exact mathematical value, using math/big so
+// that neither mixing signedness nor computing the distance between the two values can overflow
+func (matcher *BeNumericallyMatcher) matchIntegers(actual, compareTo *big.Int, threshold any) (success bool) {
 	switch matcher.Comparator {
 	case "==", "~":
-		diff := actual - compareTo
-		return -threshold <= diff && diff <= threshold
+		distance := new(big.Int).Sub(actual, compareTo)
+		return isWithinThreshold(distance.Abs(distance), threshold)
 	case ">":
-		return (actual > compareTo)
+		return actual.Cmp(compareTo) > 0
 	case ">=":
-		return (actual >= compareTo)
+		return actual.Cmp(compareTo) >= 0
 	case "<":
-		return (actual < compareTo)
+		return actual.Cmp(compareTo) < 0
 	case "<=":
-		return (actual <= compareTo)
+		return actual.Cmp(compareTo) <= 0
 	}
 	return false
 }
 
-func (matcher *BeNumericallyMatcher) matchUnsignedIntegers(actual, compareTo, threshold uint64) (success bool) {
-	switch matcher.Comparator {
-	case "==", "~":
-		if actual < compareTo {
-			actual, compareTo = compareTo, actual
+// isWithinThreshold reports whether the (non-negative) distance is no greater than the threshold, which may be any number
+func isWithinThreshold(distance *big.Int, threshold any) bool {
+	if isFloat(threshold) {
+		t := toFloat(threshold)
+		if math.IsNaN(t) {
+			return false
 		}
-		return actual-compareTo <= threshold
-	case ">":
-		return (actual > compareTo)
-	case ">=":
-		return (actual >= compareTo)
-	case "<":
-		return (actual < compareTo)
-	case "<=":
-		return (actual <= compareTo)
+		return new(big.Float).SetInt(distance).Cmp(big.NewFloat(t)) <= 0
 	}
-	return false
+	return distance.Cmp(toBigInt(threshold)) <= 0
 }
 
 func (matcher *BeNumericallyMatcher) matchFloats(actual, compareTo, threshold float64) (success bool) {
@@ -120,6 +110,10 @@ func (matcher *BeNumericallyMatcher) matchFloats(actual, compareTo, threshold fl
 	case "~":
 		return math.Abs(actual-compareTo) <= threshold
 	case "==":
+		// an explicit threshold is honored, as it is for integers; without one == means exact equality
+		if len(matcher.CompareTo) == 2 {
+			return math.Abs(actual-compareTo) <= threshold
+		}
 		return (actual == compareTo)
 	case ">":
 		return (actual > compareTo)

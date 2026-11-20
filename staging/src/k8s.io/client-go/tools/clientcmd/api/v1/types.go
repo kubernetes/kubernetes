@@ -37,6 +37,7 @@ type Config struct {
 	// +optional
 	APIVersion string `json:"apiVersion,omitempty"`
 	// Preferences holds general information to be use for cli interactions
+	//
 	// Deprecated: this field is deprecated in v1.34. It is not used by any of the Kubernetes components.
 	Preferences Preferences `json:"preferences,omitzero"`
 	// Clusters is a map of referencable names to cluster configs
@@ -93,6 +94,13 @@ type Cluster struct {
 	// compression (server-side) and decompression (client-side): https://github.com/kubernetes/kubernetes/issues/112296.
 	// +optional
 	DisableCompression bool `json:"disable-compression,omitempty"`
+	// MinConnectionPoolSize, if greater than 1, spreads requests to the server across at least this many independent
+	// transports, each with its own connections, preferring the one with fewer requests in flight. More connections may be
+	// opened, for example when a connection reaches the server's limit of concurrent HTTP/2 streams. 0 and 1 keep the
+	// default of a single shared transport. Values below 0 or above 100 are invalid. Ignored if the
+	// ClientsAllowConnectionPool feature gate is disabled.
+	// +optional
+	MinConnectionPoolSize int32 `json:"min-connection-pool-size,omitempty"`
 	// Extensions holds additional information. This is useful for extenders so that reads and writes don't clobber unknown fields
 	// +optional
 	Extensions []NamedExtension `json:"extensions,omitempty"`

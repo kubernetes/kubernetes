@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -35,7 +36,6 @@ import (
 var (
 	deleteReclaimPolicy = api.PersistentVolumeReclaimDelete
 	immediateMode1      = storage.VolumeBindingImmediate
-	immediateMode2      = storage.VolumeBindingImmediate
 	waitingMode         = storage.VolumeBindingWaitForFirstConsumer
 	invalidMode         = storage.VolumeBindingMode("foo")
 	inlineSpec          = api.PersistentVolumeSpec{
@@ -119,11 +119,6 @@ func TestValidateStorageClass(t *testing.T) {
 			Parameters: map[string]string{
 				"": "value",
 			},
-			ReclaimPolicy: &deleteReclaimPolicy,
-		},
-		"provisioner: Required value": {
-			ObjectMeta:    metav1.ObjectMeta{Name: "foo"},
-			Provisioner:   "",
 			ReclaimPolicy: &deleteReclaimPolicy,
 		},
 		"too long parameters": {
@@ -646,62 +641,6 @@ func TestValidateVolumeBindingMode(t *testing.T) {
 		}
 		if !testCase.shouldSucceed && len(errs) == 0 {
 			t.Errorf("Expected failure for test %q, got success", testName)
-		}
-	}
-}
-
-type updateTest struct {
-	oldClass      *storage.StorageClass
-	newClass      *storage.StorageClass
-	shouldSucceed bool
-}
-
-func TestValidateUpdateVolumeBindingMode(t *testing.T) {
-	noBinding := makeClass(nil, nil)
-	immediateBinding1 := makeClass(&immediateMode1, nil)
-	immediateBinding2 := makeClass(&immediateMode2, nil)
-	waitBinding := makeClass(&waitingMode, nil)
-
-	cases := map[string]updateTest{
-		"old and new no mode": {
-			oldClass:      noBinding,
-			newClass:      noBinding,
-			shouldSucceed: true,
-		},
-		"old and new same mode ptr": {
-			oldClass:      immediateBinding1,
-			newClass:      immediateBinding1,
-			shouldSucceed: true,
-		},
-		"old and new same mode value": {
-			oldClass:      immediateBinding1,
-			newClass:      immediateBinding2,
-			shouldSucceed: true,
-		},
-		"old no mode, new mode": {
-			oldClass:      noBinding,
-			newClass:      waitBinding,
-			shouldSucceed: false,
-		},
-		"old mode, new no mode": {
-			oldClass:      waitBinding,
-			newClass:      noBinding,
-			shouldSucceed: false,
-		},
-		"old and new different modes": {
-			oldClass:      waitBinding,
-			newClass:      immediateBinding1,
-			shouldSucceed: false,
-		},
-	}
-
-	for testName, testCase := range cases {
-		errs := ValidateStorageClassUpdate(testCase.newClass, testCase.oldClass)
-		if testCase.shouldSucceed && len(errs) != 0 {
-			t.Errorf("Expected success for %v, got %v", testName, errs)
-		}
-		if !testCase.shouldSucceed && len(errs) == 0 {
-			t.Errorf("Expected failure for %v, got success", testName)
 		}
 	}
 }
@@ -1503,6 +1442,108 @@ func TestCSINodeUpdateValidation(t *testing.T) {
 	}
 }
 
+func makeCSINodeWithRegistrations(drivers []storage.CSINodeDriver, registrations []storage.CSINodeDriverRegistration) *storage.CSINode {
+	return &storage.CSINode{
+		ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+		Spec: storage.CSINodeSpec{
+			Drivers:             drivers,
+			DriverRegistrations: registrations,
+		},
+	}
+}
+
+func TestCSINodeDriverRegistrationsValidation(t *testing.T) {
+	registrationsPath := field.NewPath("spec", "driverRegistrations")
+	driver := storage.CSINodeDriver{Name: "io.kubernetes.storage.csi.driver-1", NodeID: "nodeA"}
+
+	tests := []struct {
+		name          string
+		drivers       []storage.CSINodeDriver
+		registrations []storage.CSINodeDriverRegistration
+		expectedErrs  field.ErrorList
+	}{{
+		name:          "registration without a drivers entry",
+		registrations: []storage.CSINodeDriverRegistration{{Name: driver.Name, NodeID: "nodeA"}},
+	}, {
+		name:          "registration matching the drivers entry",
+		drivers:       []storage.CSINodeDriver{driver},
+		registrations: []storage.CSINodeDriverRegistration{{Name: driver.Name, NodeID: "nodeA"}},
+	}, {
+		name:    "registrations for multiple drivers",
+		drivers: []storage.CSINodeDriver{driver},
+		registrations: []storage.CSINodeDriverRegistration{
+			{Name: driver.Name, NodeID: "nodeA"},
+			{Name: "io.kubernetes.storage.csi.driver-2", NodeID: "nodeB"},
+		},
+	}, {
+		name:          "empty nodeID is left to declarative validation",
+		drivers:       []storage.CSINodeDriver{driver},
+		registrations: []storage.CSINodeDriverRegistration{{Name: driver.Name}},
+	}, {
+		name:          "nodeID differs from the drivers entry",
+		drivers:       []storage.CSINodeDriver{driver},
+		registrations: []storage.CSINodeDriverRegistration{{Name: driver.Name, NodeID: "nodeB"}},
+		expectedErrs:  field.ErrorList{field.Invalid(registrationsPath.Index(0).Child("nodeID"), "nodeB", "")},
+	}}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			errs := ValidateCSINode(makeCSINodeWithRegistrations(tc.drivers, tc.registrations))
+			field.ErrorMatcher{}.ByType().ByField().Test(t, tc.expectedErrs, errs)
+		})
+	}
+}
+
+func TestCSINodeDriverRegistrationsUpdateValidation(t *testing.T) {
+	registrationsPath := field.NewPath("spec", "driverRegistrations")
+	driver := storage.CSINodeDriver{Name: "io.kubernetes.storage.csi.driver-1", NodeID: "nodeA"}
+	registration := storage.CSINodeDriverRegistration{Name: driver.Name, NodeID: "nodeA"}
+
+	tests := []struct {
+		name         string
+		old          *storage.CSINode
+		new          *storage.CSINode
+		expectedErrs field.ErrorList
+	}{{
+		name: "add a registration matching the drivers entry",
+		old:  makeCSINodeWithRegistrations([]storage.CSINodeDriver{driver}, nil),
+		new:  makeCSINodeWithRegistrations([]storage.CSINodeDriver{driver}, []storage.CSINodeDriverRegistration{registration}),
+	}, {
+		name:         "add a registration with a different nodeID than the drivers entry",
+		old:          makeCSINodeWithRegistrations([]storage.CSINodeDriver{driver}, nil),
+		new:          makeCSINodeWithRegistrations([]storage.CSINodeDriver{driver}, []storage.CSINodeDriverRegistration{{Name: driver.Name, NodeID: "nodeB"}}),
+		expectedErrs: field.ErrorList{field.Invalid(registrationsPath.Index(0).Child("nodeID"), "nodeB", "")},
+	}, {
+		name: "change the nodeID of a registration without a drivers entry",
+		old:  makeCSINodeWithRegistrations(nil, []storage.CSINodeDriverRegistration{registration}),
+		new:  makeCSINodeWithRegistrations(nil, []storage.CSINodeDriverRegistration{{Name: driver.Name, NodeID: "nodeB"}}),
+	}, {
+		name: "add the drivers entry for a registration",
+		old:  makeCSINodeWithRegistrations(nil, []storage.CSINodeDriverRegistration{registration}),
+		new:  makeCSINodeWithRegistrations([]storage.CSINodeDriver{driver}, []storage.CSINodeDriverRegistration{registration}),
+	}, {
+		name:         "change the nodeID of a registration that has a drivers entry",
+		old:          makeCSINodeWithRegistrations([]storage.CSINodeDriver{driver}, []storage.CSINodeDriverRegistration{registration}),
+		new:          makeCSINodeWithRegistrations([]storage.CSINodeDriver{driver}, []storage.CSINodeDriverRegistration{{Name: driver.Name, NodeID: "nodeB"}}),
+		expectedErrs: field.ErrorList{field.Invalid(registrationsPath.Index(0).Child("nodeID"), "nodeB", "")},
+	}, {
+		name: "remove a registration and keep the drivers entry",
+		old:  makeCSINodeWithRegistrations([]storage.CSINodeDriver{driver}, []storage.CSINodeDriverRegistration{registration}),
+		new:  makeCSINodeWithRegistrations([]storage.CSINodeDriver{driver}, nil),
+	}, {
+		name: "remove a registration and its drivers entry",
+		old:  makeCSINodeWithRegistrations([]storage.CSINodeDriver{driver}, []storage.CSINodeDriverRegistration{registration}),
+		new:  makeCSINodeWithRegistrations(nil, nil),
+	}}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			errs := ValidateCSINodeUpdate(tc.new, tc.old)
+			field.ErrorMatcher{}.ByType().ByField().Test(t, tc.expectedErrs, errs)
+		})
+	}
+}
+
 func TestCSIDriverValidation(t *testing.T) {
 	// assume this feature is on for this test, detailed enabled/disabled tests in TestMutableCSINodeAllocatableCountEnabledDisabled
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MutableCSINodeAllocatableCount, true)
@@ -2081,6 +2122,51 @@ func TestCSIDriverValidationUpdate(t *testing.T) {
 			if errs := ValidateCSIDriverUpdate(new, &old); len(errs) == 0 {
 				t.Errorf("Expected failure for test: %+v", new)
 			}
+		})
+	}
+}
+
+// TestCSIDriverAttachRequiredFieldPath pins the field path reported for
+// spec.attachRequired. Both call sites used to report "spec.attachedRequired",
+// which is not a field in the API; TestCSIDriverValidation and
+// TestCSIDriverValidationUpdate only assert whether an error was returned, so
+// nothing caught it.
+func TestCSIDriverAttachRequiredFieldPath(t *testing.T) {
+	objectMeta := metav1.ObjectMeta{Name: "test-driver", ResourceVersion: "1"}
+	driver := func(attachRequired *bool) *storage.CSIDriver {
+		return &storage.CSIDriver{
+			ObjectMeta: objectMeta,
+			Spec: storage.CSIDriverSpec{
+				AttachRequired:                attachRequired,
+				PodInfoOnMount:                new(false),
+				StorageCapacity:               new(true),
+				SELinuxMount:                  new(false),
+				PreventPodSchedulingIfMissing: new(false),
+			},
+		}
+	}
+
+	tests := []struct {
+		name string
+		errs field.ErrorList
+	}{{
+		name: "immutable on update",
+		errs: ValidateCSIDriverUpdate(driver(new(true)), driver(new(false))),
+	}, {
+		name: "required on create",
+		errs: ValidateCSIDriver(driver(nil)),
+	}}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var got []string
+			for _, err := range test.errs {
+				got = append(got, err.Field)
+				if err.Field == "spec.attachRequired" {
+					return
+				}
+			}
+			t.Errorf("no error on spec.attachRequired, got errors on %v", got)
 		})
 	}
 }
@@ -2770,6 +2856,18 @@ func TestValidateCSINodeStatusUpdate(t *testing.T) {
 			name: "valid status with StorageUnreachable",
 			new: newNode(storage.StorageHealth{Name: "driver1", HealthConditions: []storage.StorageHealthCondition{
 				{Status: storage.StorageUnreachable, Reason: "BackendDown"},
+			}}),
+		},
+		{
+			name: "valid status with StorageHealthUnknown",
+			new: newNode(storage.StorageHealth{Name: "driver1", HealthConditions: []storage.StorageHealthCondition{
+				{Status: storage.StorageHealthUnknown, Reason: "UnrecognizedStatus"},
+			}}),
+		},
+		{
+			name: "valid status with Healthy",
+			new: newNode(storage.StorageHealth{Name: "driver1", HealthConditions: []storage.StorageHealthCondition{
+				{Status: storage.StorageHealthy, Reason: "BackendHealthy"},
 			}}),
 		},
 		{

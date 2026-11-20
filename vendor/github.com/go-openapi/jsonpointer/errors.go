@@ -3,7 +3,10 @@
 
 package jsonpointer
 
-import "fmt"
+import (
+	"fmt"
+	"reflect"
+)
 
 type pointerError string
 
@@ -45,6 +48,24 @@ func errOutOfBounds(length, idx int) error {
 
 func errInvalidReference(token string) error {
 	return fmt.Errorf("invalid token reference %q: %w", token, ErrPointer)
+}
+
+func errNoField(token string) error {
+	return fmt.Errorf("object has no field %q: %w", token, ErrPointer)
+}
+
+// errUnreachableField reports a field that exists on the type but cannot be reached on this value,
+// because it is promoted through a nil embedded pointer.
+func errUnreachableField(name string, cause error) error {
+	return fmt.Errorf("cannot reach field %q: %w: %w", name, cause, ErrPointer)
+}
+
+// errMapKey reports a reference token that cannot serve as a key of the target map type.
+//
+// JSON object member names are strings, so only maps keyed by a string type (or by an interface
+// type a string satisfies) can be addressed by a JSON pointer.
+func errMapKey(token string, mapType reflect.Type) error {
+	return fmt.Errorf("can't use token %q as a key of map type %v: %w", token, mapType, ErrPointer)
 }
 
 func errDashOnGet() error {

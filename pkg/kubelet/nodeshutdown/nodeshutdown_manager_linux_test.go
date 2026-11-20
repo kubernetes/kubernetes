@@ -40,13 +40,14 @@ import (
 	"k8s.io/klog/v2"
 	klogtesting "k8s.io/klog/v2/ktesting"
 	_ "k8s.io/klog/v2/ktesting/init" // activate ktesting command line flags
+	"k8s.io/ktesting"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	pkgfeatures "k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/nodeshutdown/systemd"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager"
-	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/clock"
 	testingclock "k8s.io/utils/clock/testing"
 )
@@ -323,7 +324,6 @@ func TestManager(t *testing.T) {
 
 	for _, tc := range tests {
 		tCtx.SyncTest(tc.desc, func(tCtx ktesting.TContext) {
-			defer tCtx.Cancel("test completed")
 			t := tCtx.TB()
 			logger := tCtx.Logger()
 
@@ -408,7 +408,9 @@ func TestManager(t *testing.T) {
 				}
 
 				assert.Error(t, manager.ShutdownStatus(), "expected that manager returns error since shutdown is active")
-				assert.False(t, manager.Admit(tCtx, nil).Admit)
+				result := manager.Admit(tCtx, nil)
+				assert.False(t, result.Admit)
+				assert.Equal(t, lifecycle.RejectionBlocked, result.RejectionType)
 				assert.Equal(t, tc.expectedPodToGracePeriodOverride, killedPodsToGracePeriods)
 				assert.Equal(t, tc.expectedDidOverrideInhibitDelay, fakeDbus.didOverrideInhibitDelay, "override system inhibit delay differs")
 				if tc.expectedPodStatuses != nil {
@@ -486,7 +488,6 @@ func TestRestart(t *testing.T) {
 }
 
 func testRestart(tCtx ktesting.TContext) {
-	defer tCtx.Cancel("test completed")
 	logger := tCtx.Logger()
 	t := tCtx.TB()
 	systemDbusTmp := systemDbus
@@ -564,7 +565,6 @@ func TestStartDoesNotReconnectAfterContextCancel(t *testing.T) {
 }
 
 func testStartDoesNotReconnectAfterContextCancel(tCtx ktesting.TContext) {
-	defer tCtx.Cancel("test completed")
 	logger := tCtx.Logger()
 	t := tCtx.TB()
 
@@ -865,7 +865,6 @@ func TestRestartClosesOldConnection(t *testing.T) {
 }
 
 func testRestartClosesOldConnection(tCtx ktesting.TContext) {
-	defer tCtx.Cancel("test completed")
 	logger := tCtx.Logger()
 	t := tCtx.TB()
 

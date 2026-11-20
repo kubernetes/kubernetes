@@ -207,6 +207,11 @@ func (in *DeviceTaintSelector) DeepCopyInto(out *DeviceTaintSelector) {
 		*out = new(string)
 		**out = **in
 	}
+	if in.All != nil {
+		in, out := &in.All, &out.All
+		*out = new(bool)
+		**out = **in
+	}
 	return
 }
 

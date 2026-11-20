@@ -30,27 +30,44 @@ type Operation struct {
 	// those into a single "Update" category.
 	Type Type
 
-	// Options are the validation options in effect for this operation, mapping option
-	// name to whether it is enabled. Option names typically match feature gates, but an
-	// option may be enabled even when its feature gate is off — e.g. when the feature is
-	// already in use by the object being updated. Set by the resource strategy and
-	// read-only during validation.
+	// Options are the validation options in effect for this operation, mapping
+	// option name to whether it is enabled. Option names typically match
+	// feature gates, but an option may be enabled even when its feature gate
+	// is off — e.g. when the feature is already in use by the object being
+	// updated. Set by the resource strategy and read-only during validation.
 	//
-	// Every option a validation tag references must be defined here by the strategy; an
-	// option that is not defined is a programming error (see HasOption).
+	// Every option a validation tag references must be defined in Options or
+	// OptionGetter; any option that is not defined is an error (see HasOption).
 	Options map[string]bool
+
+	// OptionGetter is similar to Options - it indicates the validation options
+	// in effect for this operation.  HasOption will first check Options, and
+	// if the requested option is defined there it will be used (regardless of
+	// the value).  If an option is not defined in Options, OptionGetter will
+	// be checked (as long as it is not nil).
+	OptionGetter OptionGetter
 
 	// Request provides information about the request being validated.
 	Request Request
 }
 
-// HasOption returns whether the named option is enabled and whether it was defined by
-// the strategy. Every option a validation tag references must be defined; callers treat
-// an undefined option as an internal error (see validate.IfOption) rather than silently
-// as disabled.
+// OptionGetter checks whether a named validation option is enabled.
+type OptionGetter interface {
+	Get(option string) (enabled, defined bool)
+}
+
+// HasOption returns whether the named option is enabled and whether it is defined,
+// checking Options first and then OptionGetter. Every option a validation tag references
+// must be defined; callers treat an undefined option as an internal error (see
+// validate.IfOption) rather than silently as disabled.
 func (o Operation) HasOption(option string) (enabled, defined bool) {
-	enabled, defined = o.Options[option]
-	return
+	if enabled, defined = o.Options[option]; defined {
+		return enabled, true
+	}
+	if o.OptionGetter != nil {
+		return o.OptionGetter.Get(option)
+	}
+	return false, false
 }
 
 // Request provides information about the request being validated.

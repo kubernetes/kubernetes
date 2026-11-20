@@ -17,7 +17,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/prometheus/procfs/internal/util"
+	"github.com/prometheus/procfs/internal/parsers"
 )
 
 func sysctlToPath(sysctl string) string {
@@ -25,7 +25,7 @@ func sysctlToPath(sysctl string) string {
 }
 
 func (fs FS) SysctlStrings(sysctl string) ([]string, error) {
-	value, err := util.SysReadFile(fs.proc.Path("sys", sysctlToPath(sysctl)))
+	value, err := parsers.SysReadFile(fs.proc.Path("sys", sysctlToPath(sysctl)))
 	if err != nil {
 		return nil, err
 	}
@@ -41,7 +41,7 @@ func (fs FS) SysctlInts(sysctl string) ([]int, error) {
 
 	values := make([]int, len(fields))
 	for i, f := range fields {
-		vp := util.NewValueParser(f)
+		vp := parsers.NewValueParser(f)
 		values[i] = vp.Int()
 		if err := vp.Err(); err != nil {
 			return nil, fmt.Errorf("%w: field %d in sysctl %s is not a valid int: %w", ErrFileParse, i, sysctl, err)

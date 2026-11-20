@@ -34,9 +34,11 @@ import (
 	"k8s.io/component-base/featuregate"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
+	internalcerts "k8s.io/kubernetes/pkg/apis/certificates"
 	"k8s.io/kubernetes/pkg/controller/certificates/approver"
 	"k8s.io/kubernetes/pkg/controller/certificates/cleaner"
 	ctbpublisher "k8s.io/kubernetes/pkg/controller/certificates/clustertrustbundlepublisher"
+	"k8s.io/kubernetes/pkg/controller/certificates/podcertssigner"
 	"k8s.io/kubernetes/pkg/controller/certificates/rootcacertpublisher"
 	"k8s.io/kubernetes/pkg/controller/certificates/signer"
 	csrsigningconfig "k8s.io/kubernetes/pkg/controller/certificates/signer/config"
@@ -331,7 +333,7 @@ func newKubeAPIServerSignerClusterTrustBundledPublisherController(
 		certificatesv1beta1.SchemeGroupVersion,
 		certificatesv1alpha1.SchemeGroupVersion,
 	} {
-		ctbAvailable, err := clusterTrustBundlesAvailable(apiserverSignerClient, gv)
+		ctbAvailable, err := clusterTrustBundlesAvailable(ctx, apiserverSignerClient, gv)
 		if err != nil {
 			return nil, fmt.Errorf("discovery failed for ClusterTrustBundle: %w", err)
 		}
@@ -353,15 +355,15 @@ func newKubeAPIServerSignerClusterTrustBundledPublisherController(
 	}
 
 	if runner == nil {
-		klog.Info("no known scheme version was found for clustertrustbundles, cannot start kube-apiserver-serving-clustertrustbundle-publisher-controller")
+		klog.FromContext(ctx).Info("no known scheme version was found for clustertrustbundles, cannot start kube-apiserver-serving-clustertrustbundle-publisher-controller")
 		return nil, nil
 	}
 
 	return newControllerLoop(runner.Run, controllerName), nil
 }
 
-func clusterTrustBundlesAvailable(client kubernetes.Interface, schemaVersion schema.GroupVersion) (bool, error) {
-	resList, err := client.Discovery().ServerResourcesForGroupVersion(schemaVersion.String())
+func clusterTrustBundlesAvailable(ctx context.Context, client kubernetes.Interface, schemaVersion schema.GroupVersion) (bool, error) {
+	resList, err := client.Discovery().ServerResourcesForGroupVersionWithContext(ctx, schemaVersion.String())
 	if errors.IsNotFound(err) {
 		return false, nil
 	}
@@ -380,11 +382,7 @@ func clusterTrustBundlesAvailable(client kubernetes.Interface, schemaVersion sch
 
 func getKubeAPIServerCAFileContents(controllerContext ControllerContext) ([]byte, error) {
 	if controllerContext.ComponentConfig.SAController.RootCAFile == "" {
-		config, err := controllerContext.NewClientConfig("root-ca-cert-publisher")
-		if err != nil {
-			return nil, err
-		}
-		return config.CAData, nil
+		return controllerContext.KubeAPIServerCAData, nil
 	}
 
 	rootCA, err := readCA(controllerContext.ComponentConfig.SAController.RootCAFile)
@@ -392,5 +390,76 @@ func getKubeAPIServerCAFileContents(controllerContext ControllerContext) ([]byte
 		return nil, fmt.Errorf("error parsing root-ca-file at %s: %w", controllerContext.ComponentConfig.SAController.RootCAFile, err)
 	}
 	return rootCA, nil
+}
 
+func newKubeServiceServingSignerDescriptor() *ControllerDescriptor {
+	return &ControllerDescriptor{
+		name:                 names.ServiceServingSigner,
+		constructor:          newKubeServiceCASignerControllers,
+		requiredFeatureGates: []featuregate.Feature{features.KubeServingCertificatesSigner},
+	}
+}
+
+func newKubeServiceCASignerControllers(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
+	caCertPath := controllerContext.ComponentConfig.ServiceServingSigner.CACertPath
+	caKeyPath := controllerContext.ComponentConfig.ServiceServingSigner.CAKeyPath
+	caBundlePath := controllerContext.ComponentConfig.ServiceServingSigner.CABundlePath
+
+	// validation should prevent only one being set, just make sure they are all set early
+	if len(caCertPath) == 0 || len(caKeyPath) == 0 || len(caBundlePath) == 0 {
+		klog.FromContext(ctx).Info("Skipping Service Serving Signer controller because it's missing cert/key pair files or the trust bundle file", "controller", "kubernetes.io/service-serving")
+		return nil, nil
+	}
+
+	client, err := controllerContext.NewClient("kube-service-serving-signer")
+	if err != nil {
+		return nil, err
+	}
+
+	signer, err := podcertssigner.NewPodCertificatesSigner(
+		ctx,
+		internalcerts.ServiceServingSignerName,
+		caCertPath,
+		caKeyPath,
+		podcertssigner.NewKubeServiceCATemplateMapper(
+			client.CoreV1(),
+			controllerContext.InformerFactory.Core().V1().Services().Informer(),
+			controllerContext.InformerFactory.Core().V1().Services().Lister(),
+			controllerContext.ComponentConfig.ServiceServingSigner.ClusterDomain,
+		),
+		client,
+		controllerContext.InformerFactory.Core().V1().Pods(),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	serviceCATrustBundle, err := dynamiccertificates.NewDynamicCAContentFromFile("kube-service-serving-ca", caBundlePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create a static CA content provider for the kube-apiserver-serving signer: %w", err)
+	}
+
+	logger := klog.FromContext(ctx)
+	publisher, err := ctbpublisher.NewGAClusterTrustBundlePublisher(
+		logger,
+		internalcerts.ServiceServingSignerName,
+		serviceCATrustBundle,
+		client,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return newControllerLoop(
+		concurrentRun(
+			func(ctx context.Context) {
+				serviceCATrustBundle.Run(ctx, 1)
+			},
+			func(ctx context.Context) {
+				signer.Run(ctx, 5)
+			},
+			publisher.Run,
+		),
+		controllerName,
+	), nil
 }

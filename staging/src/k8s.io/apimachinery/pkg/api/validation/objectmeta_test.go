@@ -667,7 +667,7 @@ func TestValidateObjectMetaDeclaratively(t *testing.T) {
 			obj:               mkMeta(tweakGeneration(-1)),
 			requiresNamespace: true,
 			expectedErrs: field.ErrorList{
-				field.Invalid(fldPath.Child("generation"), int64(-1), "").WithOrigin("minimum").MarkAlpha(),
+				field.Invalid(fldPath.Child("generation"), int64(-1), "").WithOrigin("minimum").MarkBeta(),
 			},
 		},
 		{
@@ -675,7 +675,7 @@ func TestValidateObjectMetaDeclaratively(t *testing.T) {
 			obj:               mkMeta(tweakManagedFields(metav1.ManagedFieldsEntry{FieldsType: "FieldsV1"})),
 			requiresNamespace: true,
 			expectedErrs: field.ErrorList{
-				field.Required(fldPath.Child("managedFields").Index(0).Child("operation"), "").MarkAlpha(),
+				field.Required(fldPath.Child("managedFields").Index(0).Child("operation"), "").MarkBeta(),
 			},
 		},
 		{
@@ -683,7 +683,7 @@ func TestValidateObjectMetaDeclaratively(t *testing.T) {
 			obj:               mkMeta(tweakOwnerRefs(mkOwnerRef(tweakRefAPIVersion("")))),
 			requiresNamespace: true,
 			expectedErrs: field.ErrorList{
-				field.Required(fldPath.Child("ownerReferences").Index(0).Child("apiVersion"), "").MarkAlpha(),
+				field.Required(fldPath.Child("ownerReferences").Index(0).Child("apiVersion"), "").MarkBeta(),
 			},
 		},
 		{
@@ -691,7 +691,7 @@ func TestValidateObjectMetaDeclaratively(t *testing.T) {
 			obj:               mkMeta(tweakOwnerRefs(mkOwnerRef(tweakRefKind("")))),
 			requiresNamespace: true,
 			expectedErrs: field.ErrorList{
-				field.Required(fldPath.Child("ownerReferences").Index(0).Child("kind"), "").MarkAlpha(),
+				field.Required(fldPath.Child("ownerReferences").Index(0).Child("kind"), "").MarkBeta(),
 			},
 		},
 		{
@@ -699,7 +699,7 @@ func TestValidateObjectMetaDeclaratively(t *testing.T) {
 			obj:               mkMeta(tweakOwnerRefs(mkOwnerRef(tweakRefName("")))),
 			requiresNamespace: true,
 			expectedErrs: field.ErrorList{
-				field.Required(fldPath.Child("ownerReferences").Index(0).Child("name"), "").MarkAlpha(),
+				field.Required(fldPath.Child("ownerReferences").Index(0).Child("name"), "").MarkBeta(),
 			},
 		},
 		{
@@ -707,7 +707,7 @@ func TestValidateObjectMetaDeclaratively(t *testing.T) {
 			obj:               mkMeta(tweakOwnerRefs(mkOwnerRef(tweakRefUID("")))),
 			requiresNamespace: true,
 			expectedErrs: field.ErrorList{
-				field.Required(fldPath.Child("ownerReferences").Index(0).Child("uid"), "").MarkAlpha(),
+				field.Required(fldPath.Child("ownerReferences").Index(0).Child("uid"), "").MarkBeta(),
 			},
 		},
 		{
@@ -788,12 +788,21 @@ func TestValidateObjectMetaDeclaratively(t *testing.T) {
 			expectedErrs:      nil,
 		},
 		{
+			name:              "decremented generation on update",
+			obj:               mkMeta(tweakResourceVersion("2"), tweakGeneration(4)),
+			oldObj:            mkMeta(tweakResourceVersion("1"), tweakGeneration(5)),
+			requiresNamespace: true,
+			expectedErrs: field.ErrorList{
+				field.Invalid(fldPath.Child("generation"), int64(4), "must not be decremented").WithOrigin("monotonic").MarkAlpha(),
+			},
+		},
+		{
 			name:              "decremented generation to zero on update",
 			obj:               mkMeta(tweakResourceVersion("2"), tweakGeneration(0)),
 			oldObj:            mkMeta(tweakResourceVersion("1"), tweakGeneration(1)),
 			requiresNamespace: true,
 			expectedErrs: field.ErrorList{
-				field.Invalid(fldPath.Child("generation"), int64(0), "must not be decremented").MarkFromImperative(),
+				field.Invalid(fldPath.Child("generation"), int64(0), "field cannot be cleared once set").WithOrigin("update").MarkAlpha(),
 			},
 		},
 		{
@@ -802,8 +811,8 @@ func TestValidateObjectMetaDeclaratively(t *testing.T) {
 			oldObj:            mkMeta(tweakResourceVersion("1"), tweakGeneration(0)),
 			requiresNamespace: true,
 			expectedErrs: field.ErrorList{
-				field.Invalid(fldPath.Child("generation"), int64(-1), "").WithOrigin("minimum").MarkAlpha(),
-				field.Invalid(fldPath.Child("generation"), int64(-1), "must not be decremented").MarkFromImperative(),
+				field.Invalid(fldPath.Child("generation"), int64(-1), "").WithOrigin("minimum").MarkBeta(),
+				field.Invalid(fldPath.Child("generation"), int64(-1), "must not be decremented").WithOrigin("monotonic").MarkAlpha(),
 			},
 		},
 		{
@@ -812,7 +821,7 @@ func TestValidateObjectMetaDeclaratively(t *testing.T) {
 			oldObj:            mkMeta(tweakNamespace("old-ns"), tweakResourceVersion("1")),
 			requiresNamespace: true,
 			expectedErrs: field.ErrorList{
-				field.Invalid(fldPath.Child("namespace"), "new-ns", "").MarkFromImperative(),
+				field.Invalid(fldPath.Child("namespace"), "new-ns", "").WithOrigin("immutable").MarkAlpha(),
 			},
 		},
 		{
@@ -821,7 +830,7 @@ func TestValidateObjectMetaDeclaratively(t *testing.T) {
 			oldObj:            mkMeta(tweakResourceVersion("1")),
 			requiresNamespace: true,
 			expectedErrs: field.ErrorList{
-				field.Required(fldPath.Child("ownerReferences").Index(0).Child("apiVersion"), "").MarkAlpha(),
+				field.Required(fldPath.Child("ownerReferences").Index(0).Child("apiVersion"), "").MarkBeta(),
 			},
 		},
 		{
@@ -830,7 +839,7 @@ func TestValidateObjectMetaDeclaratively(t *testing.T) {
 			oldObj:            mkMeta(tweakResourceVersion("1")),
 			requiresNamespace: true,
 			expectedErrs: field.ErrorList{
-				field.Required(fldPath.Child("ownerReferences").Index(0).Child("kind"), "").MarkAlpha(),
+				field.Required(fldPath.Child("ownerReferences").Index(0).Child("kind"), "").MarkBeta(),
 			},
 		},
 		{
@@ -839,7 +848,7 @@ func TestValidateObjectMetaDeclaratively(t *testing.T) {
 			oldObj:            mkMeta(tweakResourceVersion("1")),
 			requiresNamespace: true,
 			expectedErrs: field.ErrorList{
-				field.Required(fldPath.Child("ownerReferences").Index(0).Child("name"), "").MarkAlpha(),
+				field.Required(fldPath.Child("ownerReferences").Index(0).Child("name"), "").MarkBeta(),
 			},
 		},
 		{
@@ -848,7 +857,7 @@ func TestValidateObjectMetaDeclaratively(t *testing.T) {
 			oldObj:            mkMeta(tweakResourceVersion("1")),
 			requiresNamespace: true,
 			expectedErrs: field.ErrorList{
-				field.Required(fldPath.Child("ownerReferences").Index(0).Child("uid"), "").MarkAlpha(),
+				field.Required(fldPath.Child("ownerReferences").Index(0).Child("uid"), "").MarkBeta(),
 			},
 		},
 		{
@@ -866,7 +875,7 @@ func TestValidateObjectMetaDeclaratively(t *testing.T) {
 			oldObj:            mkMeta(tweakResourceVersion("1"), tweakUID("uid-old")),
 			requiresNamespace: true,
 			expectedErrs: field.ErrorList{
-				field.Invalid(fldPath.Child("uid"), types.UID("uid-new"), "").WithOrigin("immutable").MarkAlpha(),
+				field.Invalid(fldPath.Child("uid"), types.UID("uid-new"), "").WithOrigin("immutable").MarkBeta(),
 			},
 		},
 		{
@@ -875,7 +884,7 @@ func TestValidateObjectMetaDeclaratively(t *testing.T) {
 			oldObj:            mkMeta(tweakResourceVersion("1"), tweakCreationTimestamp(now)),
 			requiresNamespace: true,
 			expectedErrs: field.ErrorList{
-				field.Invalid(fldPath.Child("creationTimestamp"), later, "").WithOrigin("immutable").MarkAlpha(),
+				field.Invalid(fldPath.Child("creationTimestamp"), later, "").WithOrigin("immutable").MarkBeta(),
 			},
 		},
 		{
@@ -884,7 +893,7 @@ func TestValidateObjectMetaDeclaratively(t *testing.T) {
 			oldObj:            mkMeta(tweakResourceVersion("1"), tweakDeletionTimestamp(&now)),
 			requiresNamespace: true,
 			expectedErrs: field.ErrorList{
-				field.Invalid(fldPath.Child("deletionTimestamp"), &later, "").WithOrigin("immutable").MarkAlpha(),
+				field.Invalid(fldPath.Child("deletionTimestamp"), &later, "").WithOrigin("immutable").MarkBeta(),
 			},
 		},
 		{
@@ -893,7 +902,7 @@ func TestValidateObjectMetaDeclaratively(t *testing.T) {
 			oldObj:            mkMeta(tweakResourceVersion("1"), tweakDeletionGracePeriodSeconds(&gracePeriod30)),
 			requiresNamespace: true,
 			expectedErrs: field.ErrorList{
-				field.Invalid(fldPath.Child("deletionGracePeriodSeconds"), &gracePeriod40, "").WithOrigin("immutable").MarkAlpha(),
+				field.Invalid(fldPath.Child("deletionGracePeriodSeconds"), &gracePeriod40, "").WithOrigin("immutable").MarkBeta(),
 			},
 		},
 	}

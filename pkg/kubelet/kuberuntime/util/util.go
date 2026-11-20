@@ -28,9 +28,7 @@ import (
 
 // PodSandboxChanged checks whether the spec of the pod is changed and returns
 // (changed, new attempt, original sandboxID if exist, reason for change).
-func PodSandboxChanged(pod *v1.Pod, podStatus *kubecontainer.PodStatus) (bool, uint32, string, string) {
-	ctx := context.TODO() // This context will be passed as parameter in the future
-	logger := klog.FromContext(ctx)
+func PodSandboxChanged(logger klog.Logger, pod *v1.Pod, podStatus *kubecontainer.PodStatus) (bool, uint32, string, string) {
 	if len(podStatus.SandboxStatuses) == 0 {
 		logger.V(2).Info("No sandbox for pod can be found. Need to start a new one", "pod", klog.KObj(pod))
 		return true, 0, "", kubetypes.PodSandboxNotReadyMsgNoPodSandbox
@@ -61,7 +59,8 @@ func PodSandboxChanged(pod *v1.Pod, podStatus *kubecontainer.PodStatus) (bool, u
 	}
 
 	// Needs to create a new sandbox when the sandbox does not have an IP address.
-	if !kubecontainer.IsHostNetworkPod(pod) && sandboxStatus.Network != nil && sandboxStatus.Network.Ip == "" {
+	// Host network pods get the node IPs and network isolated pods never have one.
+	if !kubecontainer.IsHostNetworkPod(pod) && !kubecontainer.IsNetworkIsolatedPod(pod) && sandboxStatus.Network != nil && sandboxStatus.Network.Ip == "" {
 		logger.V(2).Info("Sandbox for pod has no IP address. Need to start a new one", "pod", klog.KObj(pod))
 		return true, sandboxStatus.Metadata.Attempt + 1, sandboxStatus.Id, kubetypes.PodSandboxNotReadyMsgNoIPAddress
 	}

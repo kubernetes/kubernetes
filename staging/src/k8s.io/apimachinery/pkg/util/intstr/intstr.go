@@ -56,6 +56,7 @@ const (
 // FromInt creates an IntOrString object with an int32 value. It is
 // your responsibility not to call this method with a value greater
 // than int32.
+//
 // Deprecated: use FromInt32 instead.
 func FromInt(val int) IntOrString {
 	if val > math.MaxInt32 || val < math.MinInt32 {

@@ -21,8 +21,8 @@ import (
 	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/ktesting"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
-	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 )
 
 // compatDevice describes a device to place on a shared counter set, together
@@ -55,7 +55,7 @@ func compatGroupsSlices(nodeName, driverName, counterSet string, devices ...comp
 			Name: dev.name,
 			ConsumesCounters: []resourceapi.DeviceCounterConsumption{{
 				CounterSet:          counterSet,
-				Counters:            map[string]resourceapi.Counter{"mem": {Value: resource.MustParse("4")}},
+				Counters:            map[string]resourceapi.CounterRequirement{"mem": {Value: new(resource.MustParse("4"))}},
 				CompatibilityGroups: dev.groups,
 			}},
 		})

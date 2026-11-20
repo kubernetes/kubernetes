@@ -61,6 +61,7 @@ func TestValidateDeviceCapacity(t *testing.T) {
 	hundredMilli := apiresource.MustParse("100m")
 	twoHundredMilli := apiresource.MustParse("200m")
 	oneUnit := apiresource.MustParse("1")
+	oneUnitDecimalPoint := apiresource.MustParse("1.0")
 
 	one := apiresource.MustParse("1Gi")
 	two := apiresource.MustParse("2Gi")
@@ -73,6 +74,8 @@ func TestValidateDeviceCapacity(t *testing.T) {
 	maxInt64Plus1 := maxInt64Q.DeepCopy()                                       // MaxInt64+1: the first bound that does not fit int64
 	maxInt64Plus1.Add(*apiresource.NewQuantity(1, apiresource.DecimalSI))
 	twoPow64 := apiresource.MustParse("18446744073709551616") // a positive multiple of 2^64, whose Value() reads as 0
+	hundredExa := apiresource.MustParse("100E")
+	thousandExa := apiresource.MustParse("1000E")
 
 	capacityField := field.NewPath("spec", "devices", "capacity")
 	policyField := capacityField.Child("requestPolicy")
@@ -159,6 +162,53 @@ func TestValidateDeviceCapacity(t *testing.T) {
 			wantFailures: field.ErrorList{
 				field.Duplicate(validValuesField.Index(1), "1024"),
 			},
+		},
+		"invalid-options-duplicate-decimal-point": {
+			capacity: testDeviceCapacity(maxCapacity, testCapacityRequestPolicy(&oneUnit, []apiresource.Quantity{oneUnit, oneUnitDecimalPoint}, nil)),
+			wantFailures: field.ErrorList{
+				field.Duplicate(validValuesField.Index(1), "1"),
+			},
+		},
+		"options-duplicate-decimal-point-fractional-gate": {
+			capacity:                    testDeviceCapacity(maxCapacity, testCapacityRequestPolicy(&oneUnit, []apiresource.Quantity{oneUnit, oneUnitDecimalPoint}, nil)),
+			fractionalCapacityRangeGate: true,
+			wantFailures: field.ErrorList{
+				field.Duplicate(validValuesField.Index(1), "1"),
+			},
+		},
+		// TODO(#141166): Distinct values above MaxInt64 are not duplicates. Expect no failures.
+		"options-int64-max-and-plus-one": {
+			capacity: testDeviceCapacity(maxInt64Plus1, testCapacityRequestPolicy(ptr.To(maxInt64Q), []apiresource.Quantity{maxInt64Q, maxInt64Plus1}, nil)),
+			wantFailures: field.ErrorList{
+				field.Duplicate(validValuesField.Index(1), "9223372036854775807"),
+			},
+		},
+		"options-int64-max-and-plus-one-fractional-gate": {
+			capacity:                    testDeviceCapacity(maxInt64Plus1, testCapacityRequestPolicy(ptr.To(maxInt64Q), []apiresource.Quantity{maxInt64Q, maxInt64Plus1}, nil)),
+			fractionalCapacityRangeGate: true,
+		},
+		// TODO(#141166): Distinct values above MaxInt64 are not duplicates. Expect no failures.
+		"options-100E-and-1000E": {
+			capacity: testDeviceCapacity(thousandExa, testCapacityRequestPolicy(ptr.To(hundredExa), []apiresource.Quantity{hundredExa, thousandExa}, nil)),
+			wantFailures: field.ErrorList{
+				field.Duplicate(validValuesField.Index(1), "9223372036854775807"),
+			},
+		},
+		"options-100E-and-1000E-fractional-gate": {
+			capacity:                    testDeviceCapacity(thousandExa, testCapacityRequestPolicy(ptr.To(hundredExa), []apiresource.Quantity{hundredExa, thousandExa}, nil)),
+			fractionalCapacityRangeGate: true,
+		},
+		// An exponent can be up to 2147483647.
+		"large-exponent-valid-value": {
+			capacity: testDeviceCapacity(
+				apiresource.MustParse("1e2147483647"),
+				testCapacityRequestPolicy(
+					ptr.To(apiresource.MustParse("1e2147483646")),
+					[]apiresource.Quantity{apiresource.MustParse("1e2147483646")},
+					nil,
+				),
+			),
+			fractionalCapacityRangeGate: true,
 		},
 		"invalid-options-unsort": {
 			capacity: testDeviceCapacity(maxCapacity, testCapacityRequestPolicy(&one, []apiresource.Quantity{two, one}, nil)),
@@ -270,6 +320,33 @@ func TestValidateDeviceCapacity(t *testing.T) {
 				field.Invalid(validRangeField.Child("step"), "10Gi", "one step 11Gi is larger than capacity value: 10Gi"),
 			},
 		},
+		"binary-min-with-large-step": {
+			capacity: testDeviceCapacity(
+				apiresource.MustParse("2Ki"),
+				testCapacityRequestPolicy(
+					ptr.To(apiresource.MustParse("1Ki")),
+					nil,
+					testValidRange(ptr.To(apiresource.MustParse("1Ki")), nil, ptr.To(apiresource.MustParse("1e2147483646"))),
+				),
+			),
+			wantFailures: field.ErrorList{
+				field.Invalid(validRangeField.Child("step"), "1e2147483646", "one step 1000000000000000000000000000010e2147483616 is larger than capacity value: 2Ki"),
+				field.Invalid(validRangeField.Child("step"), "1e2147483646", boundOverInt64Message),
+			},
+		},
+		"binary-min-with-step-past-int64": {
+			capacity: testDeviceCapacity(
+				apiresource.MustParse("6Ei"),
+				testCapacityRequestPolicy(
+					ptr.To(apiresource.MustParse("4Ei")),
+					nil,
+					testValidRange(ptr.To(apiresource.MustParse("4Ei")), nil, ptr.To(apiresource.MustParse("4Ei"))),
+				),
+			),
+			wantFailures: field.ErrorList{
+				field.Invalid(validRangeField.Child("step"), "4Ei", "one step 8Ei is larger than capacity value: 6Ei"),
+			},
+		},
 		"fractional-range-gate-disabled-valid": {
 			// gate off, fractional values present — no overflow error, no milli-arithmetic alignment
 			capacity: testDeviceCapacity(
@@ -334,12 +411,104 @@ func TestValidateDeviceCapacity(t *testing.T) {
 				field.Invalid(validRangeField.Child("min"), "10u", "value cannot be represented as a milli value"),
 			},
 		},
+		"large-exponent-default-in-range": {
+			capacity: testDeviceCapacity(
+				apiresource.MustParse("1e2147483647"),
+				testCapacityRequestPolicy(
+					ptr.To(apiresource.MustParse("1e2147483646")),
+					nil,
+					testValidRange(ptr.To(apiresource.MustParse("1")), nil, nil),
+				),
+			),
+			fractionalCapacityRangeGate: true,
+		},
+		"zero-default-with-large-exponent": {
+			capacity: testDeviceCapacity(
+				apiresource.MustParse("1"),
+				testCapacityRequestPolicy(
+					ptr.To(apiresource.MustParse("0e2147483647")),
+					nil,
+					testValidRange(ptr.To(apiresource.MustParse("0")), nil, nil),
+				),
+			),
+			fractionalCapacityRangeGate: true,
+		},
 	}
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAFractionalCapacityRange, scenario.fractionalCapacityRangeGate)
 			errs := validateMultiAllocatableDeviceCapacity(scenario.capacity, capacityField)
 			assertFailures(t, scenario.wantFailures, errs)
+		})
+	}
+}
+
+func TestQuantityKeyAsDec(t *testing.T) {
+	scenarios := map[string]struct {
+		quantity string
+		wantKey  string
+	}{
+		"integer":                    {quantity: "1", wantKey: "1"},
+		"integer-with-decimal-point": {quantity: "1.0", wantKey: "1"},
+		"ki":                         {quantity: "1k", wantKey: "1k"},
+		"1000":                       {quantity: "1000", wantKey: "1k"},
+		"1000.0":                     {quantity: "1000.0", wantKey: "1k"},
+		"unabbreviated-ki":           {quantity: "1024", wantKey: "1024"},
+		"abbreviated-ki":             {quantity: "1Ki", wantKey: "1024"},
+		"exponent":                   {quantity: "1e3", wantKey: "1k"},
+		"milli":                      {quantity: "100m", wantKey: "100m"},
+		"large-exponent":             {quantity: "1e100000", wantKey: "10e99999"},
+		"zero-negative-exponent":     {quantity: "0e-2147483647", wantKey: "0"},
+		"zero":                       {quantity: "0", wantKey: "0"},
+		"zero-with-zero-exponent":    {quantity: "0e0", wantKey: "0"},
+		"zero-large-exponent":        {quantity: "0e2147483647", wantKey: "0"},
+		"zero-with-decimal":          {quantity: "0.0", wantKey: "0"},
+	}
+	for name, scenario := range scenarios {
+		t.Run(name, func(t *testing.T) {
+			if got := quantityKeyAsDec(apiresource.MustParse(scenario.quantity)); got != scenario.wantKey {
+				t.Errorf("quantityKeyAsDec(%s) = %q, want %q", scenario.quantity, got, scenario.wantKey)
+			}
+		})
+	}
+}
+
+func TestIsFractionalQuantity(t *testing.T) {
+	scenarios := map[string]struct {
+		quantity       string
+		wantFractional bool
+	}{
+		"integer":          {quantity: "1", wantFractional: false},
+		"whole-milli":      {quantity: "1000m", wantFractional: false},
+		"binary-suffix":    {quantity: "1Ki", wantFractional: false},
+		"exponent":         {quantity: "1e3", wantFractional: false},
+		"large-exponent":   {quantity: "1e100000", wantFractional: false},
+		"decimal-fraction": {quantity: "1.5", wantFractional: true},
+		"fractional-milli": {quantity: "1500m", wantFractional: true},
+		"nano":             {quantity: "1n", wantFractional: true},
+	}
+	for name, scenario := range scenarios {
+		t.Run(name, func(t *testing.T) {
+			q := apiresource.MustParse(scenario.quantity)
+			if got := isFractionalQuantity(q); got != scenario.wantFractional {
+				t.Errorf("isFractionalQuantity(%s) = %v, want %v", scenario.quantity, got, scenario.wantFractional)
+			}
+			q.ToDec()
+			if got := isFractionalQuantity(q); got != scenario.wantFractional {
+				t.Errorf("isFractionalQuantity(%s) with the inf.Dec backend = %v, want %v", scenario.quantity, got, scenario.wantFractional)
+			}
+		})
+	}
+}
+
+func BenchmarkIsFractionalQuantity(b *testing.B) {
+	for _, quantity := range []string{"1", "1.5", "1e100000"} {
+		q := apiresource.MustParse(quantity)
+		b.Run(quantity, func(b *testing.B) {
+			b.ReportAllocs()
+			for b.Loop() {
+				isFractionalQuantity(q)
+			}
 		})
 	}
 }

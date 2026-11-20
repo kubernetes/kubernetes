@@ -36,14 +36,13 @@ import (
 var _ = common.SIGDescribe("Metrics", func() {
 	f := framework.NewDefaultFramework("metrics")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
-	var c, ec clientset.Interface
+	var c clientset.Interface
 	var grabber *e2emetrics.Grabber
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		var err error
 		c = f.ClientSet
-		ec = f.KubemarkExternalClusterClientSet
 		gomega.Eventually(ctx, func() error {
-			grabber, err = e2emetrics.NewMetricsGrabber(ctx, c, ec, f.ClientConfig(), true, true, true, true, true, true)
+			grabber, err = e2emetrics.NewMetricsGrabber(ctx, c, f.ClientConfig(), true, true, true, true, true, true)
 			return err
 		}, 5*time.Minute, 10*time.Second).Should(gomega.BeNil())
 	})

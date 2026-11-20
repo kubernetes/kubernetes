@@ -274,7 +274,7 @@ func isKubeAPIServerClient(req *x509.CertificateRequest, usages []capi.KeyUsage,
 	if signerName != capi.KubeAPIServerClientSignerName {
 		return false, nil
 	}
-	return true, validAPIServerClientUsages(usages)
+	return true, validAPIServerClientUsages(req, usages)
 }
 
 func isLegacyUnknown(req *x509.CertificateRequest, usages []capi.KeyUsage, signerName string) (bool, error) {
@@ -286,7 +286,7 @@ func isLegacyUnknown(req *x509.CertificateRequest, usages []capi.KeyUsage, signe
 	return true, nil
 }
 
-func validAPIServerClientUsages(usages []capi.KeyUsage) error {
+func validAPIServerClientUsages(req *x509.CertificateRequest, usages []capi.KeyUsage) error {
 	hasClientAuth := false
 	for _, u := range usages {
 		switch u {
@@ -301,6 +301,14 @@ func validAPIServerClientUsages(usages []capi.KeyUsage) error {
 	if !hasClientAuth {
 		return fmt.Errorf("missing required usage for client certificate: %s", capi.UsageClientAuth)
 	}
+
+	if req.PublicKeyAlgorithm == x509.MLDSA {
+		err := capihelper.ValidateMLDSAKeyUsages(usagesToSet(usages))
+		if err != nil {
+			return fmt.Errorf("validating usages for ml-dsa key: %w", err)
+		}
+	}
+
 	return nil
 }
 

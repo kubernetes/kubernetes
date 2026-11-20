@@ -62,8 +62,23 @@ func (in Counter) OpenAPIModelName() string {
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
+func (in CounterRequirement) OpenAPIModelName() string {
+	return "io.k8s.api.resource.v1beta1.CounterRequirement"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in CounterSet) OpenAPIModelName() string {
 	return "io.k8s.api.resource.v1beta1.CounterSet"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in CounterSetConsumption) OpenAPIModelName() string {
+	return "io.k8s.api.resource.v1beta1.CounterSetConsumption"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in CounterValueFrom) OpenAPIModelName() string {
+	return "io.k8s.api.resource.v1beta1.CounterValueFrom"
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
@@ -169,6 +184,11 @@ func (in DeviceTaint) OpenAPIModelName() string {
 // OpenAPIModelName returns the OpenAPI model name for this type.
 func (in DeviceToleration) OpenAPIModelName() string {
 	return "io.k8s.api.resource.v1beta1.DeviceToleration"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in ExtendedResourceRequest) OpenAPIModelName() string {
+	return "io.k8s.api.resource.v1beta1.ExtendedResourceRequest"
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.

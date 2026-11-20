@@ -551,6 +551,11 @@ func SetObjectDefaults_Pod(in *corev1.Pod) {
 		SetDefaults_ResourceList(&in.Status.Resources.Limits)
 		SetDefaults_ResourceList(&in.Status.Resources.Requests)
 	}
+	for i := range in.Status.ExtraNodeAllocatableResources {
+		a := &in.Status.ExtraNodeAllocatableResources[i]
+		SetDefaults_ResourceList(&a.Requests)
+		SetDefaults_ResourceList(&a.Limits)
+	}
 }
 
 func SetObjectDefaults_PodList(in *corev1.PodList) {

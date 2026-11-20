@@ -23,12 +23,12 @@ import (
 
 	"github.com/onsi/gomega"
 
+	"k8s.io/client-go/ktesting"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/dynamic-resource-allocation/resourceslice"
 	drautils "k8s.io/kubernetes/test/e2e/dra/utils"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
-	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 	"k8s.io/kubernetes/test/utils/localupcluster"
 )
 
@@ -93,6 +93,14 @@ func testFeatureGateCycle(tCtx ktesting.TContext) {
 			// DRADeviceCompatibilityGroups is alpha and toggleable starting in 1.37;
 			// emulate that version so the test keeps working once the gate locks.
 			emulatedVersion: "1.37",
+		},
+		"optional-node-operations": {
+			test:                optionalNodeOperationsGateCycle,
+			driverResourcesFunc: optionalNodeOperationsClusterResources,
+			toggledGates:        []string{"DRAOptionalNodeOperations"},
+			// DRAOptionalNodeOperations is beta and toggleable in 1.38;
+			// emulate that version so the test keeps working once the gate locks.
+			emulatedVersion: "1.38",
 		},
 	}
 

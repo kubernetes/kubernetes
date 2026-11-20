@@ -56,6 +56,7 @@ import (
 	_ "k8s.io/kubernetes/test/e2e/invariants"
 	"k8s.io/kubernetes/test/e2e/invariants/logcheck"
 	_ "k8s.io/kubernetes/test/e2e/kubectl"
+	_ "k8s.io/kubernetes/test/e2e/lifecycle"
 	_ "k8s.io/kubernetes/test/e2e/network"
 	_ "k8s.io/kubernetes/test/e2e/node"
 	_ "k8s.io/kubernetes/test/e2e/scheduling"
@@ -65,10 +66,10 @@ import (
 	_ "k8s.io/kubernetes/test/e2e/windows"
 
 	// reconfigure framework
+	_ "k8s.io/ktesting/format"
 	_ "k8s.io/kubernetes/test/e2e/framework/debug/init"
 	_ "k8s.io/kubernetes/test/e2e/framework/metrics/init"
 	_ "k8s.io/kubernetes/test/e2e/framework/node/init"
-	_ "k8s.io/kubernetes/test/utils/ktesting/format"
 )
 
 // handleFlags sets up all flags and parses the command line.

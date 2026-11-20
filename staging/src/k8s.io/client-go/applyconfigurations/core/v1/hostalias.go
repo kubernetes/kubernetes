@@ -24,9 +24,9 @@ package v1
 // HostAlias holds the mapping between IP and hostnames that will be injected as an entry in the
 // pod's hosts file.
 type HostAliasApplyConfiguration struct {
-	// IP address of the host file entry.
+	// ip address of the host file entry.
 	IP *string `json:"ip,omitempty"`
-	// Hostnames for the above IP address.
+	// hostnames for the above IP address.
 	Hostnames []string `json:"hostnames,omitempty"`
 }
 

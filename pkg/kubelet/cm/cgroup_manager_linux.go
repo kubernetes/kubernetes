@@ -21,6 +21,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -31,9 +32,11 @@ import (
 	cgroupsystemd "github.com/opencontainers/cgroups/systemd"
 	"k8s.io/klog/v2"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	"k8s.io/mount-utils"
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	cmutil "k8s.io/kubernetes/pkg/kubelet/cm/util"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 )
 
@@ -48,7 +51,26 @@ const (
 	Cgroup2MemoryHigh      string = "memory.high"
 	Cgroup2MaxCpuLimit     string = "max"
 	Cgroup2MaxSwapFilename string = "memory.swap.max"
+	Cgroup2MaxSwapLimit    string = "max"
+	Cgroup2MaxDescendants  string = "cgroup.max.descendants"
+	Cgroup2MaxDepth        string = "cgroup.max.depth"
+
+	procMountInfoPath = "/proc/self/mountinfo"
 )
+
+func cgroupNsdelegateEnabled(mountInfoPath string) (bool, error) {
+	mounts, err := mount.ParseMountInfo(mountInfoPath)
+	if err != nil {
+		return false, err
+	}
+	// Walk backwards since a later mount takes precedence at the same path.
+	for _, m := range slices.Backward(mounts) {
+		if m.MountPoint == cmutil.CgroupRoot {
+			return m.FsType == "cgroup2" && slices.Contains(m.SuperOptions, "nsdelegate"), nil
+		}
+	}
+	return false, fmt.Errorf("no mount at %s in %s", cmutil.CgroupRoot, mountInfoPath)
+}
 
 var RootCgroupName = CgroupName([]string{})
 
@@ -147,6 +169,16 @@ type cgroupCommon struct {
 
 	// useSystemd tells if systemd cgroup manager should be used.
 	useSystemd bool
+
+	// isCgroup2UnifiedModeOverride is used to override the default behavior of isCgroup2UnifiedMode() for testing purposes.
+	isCgroup2UnifiedModeOverride *bool
+}
+
+func (m *cgroupCommon) isCgroup2UnifiedMode() bool {
+	if m.isCgroup2UnifiedModeOverride != nil {
+		return *m.isCgroup2UnifiedModeOverride
+	}
+	return libcontainercgroups.IsCgroup2UnifiedMode()
 }
 
 // Make sure that cgroupV1impl and cgroupV2impl implement the CgroupManager interface
@@ -293,7 +325,7 @@ func (m *cgroupCommon) toResources(logger klog.Logger, resourceConfig *ResourceC
 		resources.Memory = *resourceConfig.Memory
 	}
 	if resourceConfig.CPUShares != nil {
-		if libcontainercgroups.IsCgroup2UnifiedMode() {
+		if m.isCgroup2UnifiedMode() {
 			resources.CpuWeight = getCPUWeight(resourceConfig.CPUShares)
 		} else {
 			resources.CpuShares = *resourceConfig.CPUShares
@@ -317,9 +349,13 @@ func (m *cgroupCommon) toResources(logger klog.Logger, resourceConfig *ResourceC
 	// Ideally unified is used for all the resources when running on cgroup v2.
 	// It doesn't make difference for the memory.max limit, but for e.g. the cpu controller
 	// you can specify the correct setting without relying on the conversions performed by the OCI runtime.
-	if resourceConfig.Unified != nil && libcontainercgroups.IsCgroup2UnifiedMode() {
+	if resourceConfig.Unified != nil && m.isCgroup2UnifiedMode() {
 		resources.Unified = make(map[string]string)
 		for k, v := range resourceConfig.Unified {
+			if k == Cgroup2MaxSwapFilename && !isSwapControllerAvailable() {
+				logger.V(6).Info("Optional cgroup unified file not supported", "file", k)
+				continue
+			}
 			resources.Unified[k] = v
 		}
 	}
@@ -327,8 +363,14 @@ func (m *cgroupCommon) toResources(logger klog.Logger, resourceConfig *ResourceC
 }
 
 func (m *cgroupCommon) maybeSetHugetlb(logger klog.Logger, resourceConfig *ResourceConfig, resources *libcontainercgroups.Resources) {
+	// A nil map means hugepages were not specified, so leave the existing limits alone.
+	// An empty map still zeroes every supported page size.
+	if resourceConfig.HugePageLimit == nil {
+		return
+	}
+
 	// Check if hugetlb is supported.
-	if libcontainercgroups.IsCgroup2UnifiedMode() {
+	if m.isCgroup2UnifiedMode() {
 		if !getSupportedUnifiedControllers().Has("hugetlb") {
 			logger.V(6).Info("Optional subsystem not supported: hugetlb")
 			return
@@ -339,11 +381,18 @@ func (m *cgroupCommon) maybeSetHugetlb(logger klog.Logger, resourceConfig *Resou
 	}
 
 	// For each page size enumerated, set that value.
+	// Only include sizes the kernel actually supports; unsupported sizes
+	// (e.g. 1Gi without pdpe1gb) have no cgroup file and would cause ENOENT.
+	supportedSizes := sets.New[string](libcontainercgroups.HugePageSizes()...)
 	pageSizes := sets.New[string]()
 	for pageSize, limit := range resourceConfig.HugePageLimit {
 		sizeString, err := v1helper.HugePageUnitSizeFromByteSize(pageSize)
 		if err != nil {
 			logger.Info("Invalid pageSize", "err", err)
+			continue
+		}
+		if !supportedSizes.Has(sizeString) {
+			logger.Info("ignoring unsupported hugepage size", "size", sizeString)
 			continue
 		}
 		resources.HugetlbLimit = append(resources.HugetlbLimit, &libcontainercgroups.HugepageLimit{
@@ -478,7 +527,7 @@ func (m *cgroupCommon) ReduceCPULimits(logger klog.Logger, cgroupName CgroupName
 func readCgroupMemoryConfig(cgroupPath string, memLimitFile string) (*ResourceConfig, error) {
 	memLimit, err := fscommon.GetCgroupParamUint(cgroupPath, memLimitFile)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read %s for cgroup %v: %v", memLimitFile, cgroupPath, err)
+		return nil, fmt.Errorf("failed to read %s for cgroup %v: %w", memLimitFile, cgroupPath, err)
 	}
 	mLim := int64(memLimit)
 	//TODO(vinaykul,InPlacePodVerticalScaling): Add memory request support

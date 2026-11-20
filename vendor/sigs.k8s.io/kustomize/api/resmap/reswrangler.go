@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"fmt"
 	"reflect"
+	"slices"
 
 	"sigs.k8s.io/kustomize/api/filters/annotations"
 	"sigs.k8s.io/kustomize/api/resource"
@@ -185,11 +186,8 @@ func (m *resWrangler) GetMatchingResourcesByAnyId(
 			continue
 		}
 
-		for _, id := range append(r.PrevIds(), r.CurId()) {
-			if matches(id) {
-				result = append(result, r)
-				break
-			}
+		if slices.ContainsFunc(append(r.PrevIds(), r.CurId()), matches) {
+			result = append(result, r)
 		}
 	}
 	return result
@@ -588,8 +586,15 @@ func (m *resWrangler) appendReplaceOrMerge(res *resource.Resource) error {
 			if err != nil {
 				return err
 			}
+			oldForData := old
+			if res.GetApiVersion() == "v1" && res.GetKind() == "Secret" {
+				oldForData, err = normalizeSecretStringData(old)
+				if err != nil {
+					return fmt.Errorf("failed to normalize stringData for %s: %w", id, err)
+				}
+			}
 			res.CopyMergeMetaDataFieldsFrom(old)
-			res.MergeDataMapFrom(old)
+			res.MergeDataMapFrom(oldForData)
 			res.MergeBinaryDataMapFrom(old)
 			if orig != nil {
 				res.SetOrigin(orig)
@@ -612,6 +617,38 @@ func (m *resWrangler) appendReplaceOrMerge(res *resource.Resource) error {
 			"found multiple objects %v that could accept merge of %v",
 			matches, id)
 	}
+}
+
+// normalizeSecretStringData returns a copy of res with stringData encoded into
+// data, matching the normalization performed by the Kubernetes API server.
+// Values in stringData take precedence over values with the same key in data.
+func normalizeSecretStringData(res *resource.Resource) (*resource.Resource, error) {
+	normalized := res.DeepCopy()
+	stringData, err := normalized.Pipe(kyaml.Lookup("stringData"))
+	if err != nil {
+		return nil, fmt.Errorf("lookup stringData: %w", err)
+	}
+	if !kyaml.IsMissingOrNull(stringData) {
+		values := map[string]string{}
+		if err := stringData.VisitFields(func(node *kyaml.MapNode) error {
+			key := kyaml.GetValue(node.Key)
+			value := node.Value
+			if value == nil || value.YNode() == nil || value.YNode().Kind != kyaml.ScalarNode {
+				return fmt.Errorf("stringData value for key %q must be a scalar", key)
+			}
+			values[key] = kyaml.GetValue(value)
+			return nil
+		}); err != nil {
+			return nil, fmt.Errorf("read stringData: %w", err)
+		}
+		if err := normalized.LoadMapIntoSecretData(values); err != nil {
+			return nil, fmt.Errorf("encode stringData: %w", err)
+		}
+	}
+	if err := normalized.PipeE(kyaml.Clear("stringData")); err != nil {
+		return nil, fmt.Errorf("clear stringData: %w", err)
+	}
+	return normalized, nil
 }
 
 // AnnotateAll implements ResMap

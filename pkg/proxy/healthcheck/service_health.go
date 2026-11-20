@@ -241,13 +241,16 @@ var _ http.Handler = hcHandler{}
 func (h hcHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	h.hcs.lock.RLock()
 	svc, ok := h.hcs.services[h.name]
-	if !ok || svc == nil {
-		h.hcs.lock.RUnlock()
-		klog.ErrorS(nil, "Received request for closed healthcheck", "service", h.name)
-		return
+	count := 0
+	if ok && svc != nil {
+		count = svc.endpoints
 	}
-	count := svc.endpoints
 	h.hcs.lock.RUnlock()
+
+	if !ok || svc == nil {
+		klog.ErrorS(nil, "Received request for closed healthcheck", "service", h.name)
+	}
+
 	kubeProxyHealthy := h.hcs.healthzServer.Health().Healthy
 
 	resp.Header().Set("Content-Type", "application/json")

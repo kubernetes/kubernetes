@@ -808,7 +808,7 @@ var _ = utils.SIGDescribe("CSI Mock selinux on mount metrics and SELinuxWarningC
 
 				// Some metrics use CSI driver name as a label, which is "csi-mock-" + the namespace name.
 				volumePluginLabel := "volume_plugin=\"kubernetes.io/csi/csi-mock-" + f.Namespace.Name + "\""
-				grabber, err := e2emetrics.NewMetricsGrabber(ctx, f.ClientSet, nil, f.ClientConfig(), true /*kubelet*/, false /*scheduler*/, true /*controllers*/, false /*apiserver*/, false /*autoscaler*/, false /*snapshotController*/)
+				grabber, err := e2emetrics.NewMetricsGrabber(ctx, f.ClientSet, f.ClientConfig(), true /*kubelet*/, false /*scheduler*/, true /*controllers*/, false /*apiserver*/, false /*autoscaler*/, false /*snapshotController*/)
 				framework.ExpectNoError(err, "creating the metrics grabber")
 
 				var nodeStageMountOpts, nodePublishMountOpts []string

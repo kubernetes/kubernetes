@@ -19,13 +19,13 @@ package main
 import (
 	"os"
 
-	genericapiserver "k8s.io/apiserver/pkg/server"
+	"k8s.io/apiserver/pkg/server/signals"
 	"k8s.io/component-base/cli"
 	"k8s.io/sample-apiserver/pkg/cmd/server"
 )
 
 func main() {
-	ctx := genericapiserver.SetupSignalContext()
+	ctx := signals.SetupSignalContext()
 	options := server.NewWardleServerOptions(os.Stdout, os.Stderr)
 	cmd := server.NewCommandStartWardleServer(ctx, options, false)
 	code := cli.Run(cmd)

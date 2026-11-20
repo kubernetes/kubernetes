@@ -25,10 +25,10 @@ package v1alpha3
 // The empty selector matches all devices. Without a selector, no devices
 // are matched.
 type DeviceTaintSelectorApplyConfiguration struct {
-	// If driver is set, only devices from that driver are selected.
+	// driver is the driver name. If driver is set, only devices from that driver are selected.
 	// This fields corresponds to slice.spec.driver.
 	Driver *string `json:"driver,omitempty"`
-	// If pool is set, only devices in that pool are selected.
+	// pool is the pool name. If pool is set, only devices in that pool are selected.
 	//
 	// Also setting the driver name may be useful to avoid
 	// ambiguity when different drivers use the same pool name,
@@ -37,12 +37,21 @@ type DeviceTaintSelectorApplyConfiguration struct {
 	// drivers with node-local devices use the node name as
 	// their pool name.
 	Pool *string `json:"pool,omitempty"`
-	// If device is set, only devices with that name are selected.
+	// device is the name of the device. If device is set, only devices with that name are selected.
 	// This field corresponds to slice.spec.devices[].name.
 	//
 	// Setting also driver and pool may be required to avoid ambiguity,
 	// but is not required.
 	Device *string `json:"device,omitempty"`
+	// all explicitly selects every device from every driver in the
+	// cluster when set to true. It must not be combined with driver, pool,
+	// or device: those must all be unset when all is true.
+	//
+	// Leaving driver, pool, and device all unset also selects every
+	// device, for historical reasons, but doing so without setting all
+	// is deprecated and may be rejected in a future release. Set all
+	// explicitly instead.
+	All *bool `json:"all,omitempty"`
 }
 
 // DeviceTaintSelectorApplyConfiguration constructs a declarative configuration of the DeviceTaintSelector type for use with
@@ -72,5 +81,13 @@ func (b *DeviceTaintSelectorApplyConfiguration) WithPool(value string) *DeviceTa
 // If called multiple times, the Device field is set to the value of the last call.
 func (b *DeviceTaintSelectorApplyConfiguration) WithDevice(value string) *DeviceTaintSelectorApplyConfiguration {
 	b.Device = &value
+	return b
+}
+
+// WithAll sets the All field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the All field is set to the value of the last call.
+func (b *DeviceTaintSelectorApplyConfiguration) WithAll(value bool) *DeviceTaintSelectorApplyConfiguration {
+	b.All = &value
 	return b
 }

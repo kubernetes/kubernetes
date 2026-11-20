@@ -1,0 +1,16 @@
+diff --git a/staging/src/k8s.io/apiserver/pkg/storage/cacher/watch_cache.go b/staging/src/k8s.io/apiserver/pkg/storage/cacher/watch_cache.go
+index 1192901c78d..a19c7878f64 100644
+--- a/staging/src/k8s.io/apiserver/pkg/storage/cacher/watch_cache.go
++++ b/staging/src/k8s.io/apiserver/pkg/storage/cacher/watch_cache.go
+@@ -411,9 +411,9 @@ func listRecursiveConsistency(keyPrefix string, versioner storage.Versioner, opt
+ 		} else if opts.Predicate.Limit > 0 && len(opts.ResourceVersion) > 0 && opts.ResourceVersion != "0" {
+ 			// Legacy exact match
+ 			semantic = consistencyExact
+-		} else if opts.ResourceVersion == "" {
+-			semantic = consistencyConsistent
+ 		} else {
++			// BUG INJECTION (GetList analog of stale-get): serve consistent GetList(RV="")
++			// from the current watch cache state without fetching the latest RV from etcd.
+ 			semantic = consistencyNotOlderThan
+ 		}
+ 	default:

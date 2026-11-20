@@ -453,6 +453,174 @@ func TestInferForPodUpdate(t *testing.T) {
 			expectErr:     true,
 			errContains:   "target version cannot be nil",
 		},
+		{
+			name: "scheduling feature inferred on update when newly required by new pod",
+			registry: []types.Feature{
+				&mockFeature{
+					name: "SchedulingOnlyFeature",
+					inferForScheduling: func(podInfo *types.PodInfo) bool {
+						return len(podInfo.Spec.Containers) > 1
+					},
+					requirements: defaultMockRequirements,
+				},
+			},
+			oldPod: podWith1CPU,
+			newPod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{Name: "c1"}, {Name: "c2"}},
+				},
+			},
+			targetVersion: version.MustParse("1.36.0"),
+			expectedReqs:  []string{"SchedulingOnlyFeature"},
+			expectErr:     false,
+		},
+		{
+			name: "scheduling feature not inferred on update when already required by old pod",
+			registry: []types.Feature{
+				&mockFeature{
+					name: "SchedulingOnlyFeature",
+					inferForScheduling: func(podInfo *types.PodInfo) bool {
+						return len(podInfo.Spec.Containers) > 0
+					},
+					requirements: defaultMockRequirements,
+				},
+			},
+			oldPod: podWith1CPU,
+			newPod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{Name: "c1"}, {Name: "c2"}},
+				},
+			},
+			targetVersion: version.MustParse("1.36.0"),
+			expectedReqs:  nil,
+			expectErr:     false,
+		},
+		{
+			name:     "restartallcontainers inferred on update when container with RestartAllContainers rule is added",
+			registry: DefaultFramework.registry,
+			oldPod:   podWith1CPU,
+			newPod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: "c1"},
+						{
+							Name: "c2",
+							RestartPolicyRules: []v1.ContainerRestartRule{
+								{Action: v1.ContainerRestartRuleActionRestartAllContainers},
+							},
+						},
+					},
+				},
+			},
+			targetVersion: version.MustParse("1.36.0"),
+			expectedReqs:  []string{"DynamicContainers", "RestartAllContainersOnContainerExits"},
+			expectErr:     false,
+		},
+		{
+			name:     "restartallcontainers not inferred on update when old pod already used RestartAllContainers rule",
+			registry: DefaultFramework.registry,
+			oldPod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							RestartPolicyRules: []v1.ContainerRestartRule{
+								{Action: v1.ContainerRestartRuleActionRestartAllContainers},
+							},
+						},
+					},
+				},
+			},
+			newPod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							RestartPolicyRules: []v1.ContainerRestartRule{
+								{Action: v1.ContainerRestartRuleActionRestartAllContainers},
+							},
+						},
+						{Name: "c2"},
+					},
+				},
+			},
+			targetVersion: version.MustParse("1.36.0"),
+			expectedReqs:  []string{"DynamicContainers"},
+			expectErr:     false,
+		},
+		{
+			name:     "volumebindmountoptions inferred on update when container with BindMountOptions is added",
+			registry: DefaultFramework.registry,
+			oldPod:   podWith1CPU,
+			newPod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: "c1"},
+						{
+							Name: "c2",
+							VolumeMounts: []v1.VolumeMount{
+								{Name: "v1", MountPath: "/mnt", BindMountOptions: []string{"ro"}},
+							},
+						},
+					},
+				},
+			},
+			targetVersion: version.MustParse("1.36.0"),
+			expectedReqs:  []string{"DynamicContainers", "VolumeBindMountOptions"},
+			expectErr:     false,
+		},
+		{
+			name:     "securityprofileoci inferred on update when ephemeral container with OCI seccomp profile is added",
+			registry: DefaultFramework.registry,
+			oldPod:   podWith1CPU,
+			newPod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{Name: "c1"}},
+					EphemeralContainers: []v1.EphemeralContainer{
+						{
+							EphemeralContainerCommon: v1.EphemeralContainerCommon{
+								Name: "debug",
+								SecurityContext: &v1.SecurityContext{
+									SeccompProfile: &v1.SeccompProfile{Type: v1.SeccompProfileTypeOCI},
+								},
+							},
+						},
+					},
+				},
+			},
+			targetVersion: version.MustParse("1.36.0"),
+			expectedReqs:  []string{"SecurityProfileOCI"},
+			expectErr:     false,
+		},
+		{
+			name:     "podcertificatesmldsa inferred on update when MLDSA podCertificate volume is added",
+			registry: DefaultFramework.registry,
+			oldPod:   podWith1CPU,
+			newPod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{Name: "c1"}},
+					Volumes: []v1.Volume{
+						{
+							Name: "cert",
+							VolumeSource: v1.VolumeSource{
+								Projected: &v1.ProjectedVolumeSource{
+									Sources: []v1.VolumeProjection{
+										{
+											PodCertificate: &v1.PodCertificateProjection{
+												KeyType: "MLDSA65",
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			targetVersion: version.MustParse("1.36.0"),
+			expectedReqs:  []string{"PodCertificateMLDSA"},
+			expectErr:     false,
+		},
 	}
 
 	for _, tc := range testCases {

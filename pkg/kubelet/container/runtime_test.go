@@ -26,7 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	critesting "k8s.io/cri-api/pkg/apis/testing"
-	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/ktesting"
 )
 
 func TestParseContainerID(t *testing.T) {
@@ -654,7 +654,7 @@ func TestRuntimeStatusString(t *testing.T) {
 	}
 
 	result := status.String()
-	expected := "Runtime Conditions: RuntimeReady=true reason:ready message:runtime is ready, NetworkReady=false reason:not ready message:network is not ready; Handlers: Name=handler1 SupportsRecursiveReadOnlyMounts: true SupportsUserNamespaces: false, Name=handler2 SupportsRecursiveReadOnlyMounts: false SupportsUserNamespaces: true, Features: SupplementalGroupsPolicy: true UserNamespacesHostNetwork: true MountOptions: false"
+	expected := "Runtime Conditions: RuntimeReady=true reason:ready message:runtime is ready, NetworkReady=false reason:not ready message:network is not ready; Handlers: Name=handler1 SupportsRecursiveReadOnlyMounts: true SupportsUserNamespaces: false SupportsCgroupNamespaces: false, Name=handler2 SupportsRecursiveReadOnlyMounts: false SupportsUserNamespaces: true SupportsCgroupNamespaces: false, Features: SupplementalGroupsPolicy: true UserNamespacesHostNetwork: true MountOptions: false SeccompProfileOCI: false CgroupMountMode: false PodNetworkIsolated: false"
 	assert.Equal(t, expected, result, "String()")
 }
 
@@ -670,8 +670,9 @@ func TestRuntimeHandlerString(t *testing.T) {
 				Name:                            "test-handler",
 				SupportsRecursiveReadOnlyMounts: true,
 				SupportsUserNamespaces:          true,
+				SupportsCgroupNamespaces:        true,
 			},
-			expected: "Name=test-handler SupportsRecursiveReadOnlyMounts: true SupportsUserNamespaces: true",
+			expected: "Name=test-handler SupportsRecursiveReadOnlyMounts: true SupportsUserNamespaces: true SupportsCgroupNamespaces: true",
 		},
 		{
 			name: "handler with no features",
@@ -679,8 +680,9 @@ func TestRuntimeHandlerString(t *testing.T) {
 				Name:                            "test-handler",
 				SupportsRecursiveReadOnlyMounts: false,
 				SupportsUserNamespaces:          false,
+				SupportsCgroupNamespaces:        false,
 			},
-			expected: "Name=test-handler SupportsRecursiveReadOnlyMounts: false SupportsUserNamespaces: false",
+			expected: "Name=test-handler SupportsRecursiveReadOnlyMounts: false SupportsUserNamespaces: false SupportsCgroupNamespaces: false",
 		},
 	}
 
@@ -740,7 +742,7 @@ func TestRuntimeFeaturesString(t *testing.T) {
 				SupplementalGroupsPolicy:  true,
 				UserNamespacesHostNetwork: true,
 			},
-			expected: "SupplementalGroupsPolicy: true UserNamespacesHostNetwork: true MountOptions: false",
+			expected: "SupplementalGroupsPolicy: true UserNamespacesHostNetwork: true MountOptions: false SeccompProfileOCI: false CgroupMountMode: false PodNetworkIsolated: false",
 		},
 		{
 			name: "features with both flags false",
@@ -748,7 +750,7 @@ func TestRuntimeFeaturesString(t *testing.T) {
 				SupplementalGroupsPolicy:  false,
 				UserNamespacesHostNetwork: false,
 			},
-			expected: "SupplementalGroupsPolicy: false UserNamespacesHostNetwork: false MountOptions: false",
+			expected: "SupplementalGroupsPolicy: false UserNamespacesHostNetwork: false MountOptions: false SeccompProfileOCI: false CgroupMountMode: false PodNetworkIsolated: false",
 		},
 		{
 			name:     "nil features",

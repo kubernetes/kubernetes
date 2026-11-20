@@ -36,6 +36,7 @@ import (
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/backend/queue"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
+	schedulerutils "k8s.io/kubernetes/test/integration/scheduler"
 	stepsframework "k8s.io/kubernetes/test/integration/scheduler/podgroup/stepsframework"
 	testutils "k8s.io/kubernetes/test/integration/util"
 	"k8s.io/utils/ptr"
@@ -841,7 +842,7 @@ func TestPodGroupQueueing(t *testing.T) {
 					features.CompositePodGroup:               cpgEnabled,
 				})
 
-				var testCtx *testutils.TestContext
+				var testCtx *schedulerutils.TestContext
 				if tt.podInjector != nil || tt.bindingFailing != nil {
 					var piPlugin *podInjectorPlugin
 					var bfPlugin *bindingFailingPlugin
@@ -872,7 +873,7 @@ func TestPodGroupQueueing(t *testing.T) {
 							Plugins:       &plugins,
 						}},
 					})
-					testCtx = testutils.InitTestSchedulerWithNS(t, "podgroup-queueing",
+					testCtx = schedulerutils.InitTestSchedulerWithNS(t, "podgroup-queueing",
 						scheduler.WithFrameworkOutOfTreeRegistry(registry),
 						scheduler.WithProfiles(cfg.Profiles...),
 						scheduler.WithPodMaxBackoffSeconds(0),
@@ -881,11 +882,11 @@ func TestPodGroupQueueing(t *testing.T) {
 						piPlugin.schedulingQueue = testCtx.Scheduler.SchedulingQueue
 					}
 				} else {
-					testCtx = testutils.InitTestSchedulerWithNS(t, "podgroup-queueing",
+					testCtx = schedulerutils.InitTestSchedulerWithNS(t, "podgroup-queueing",
 						scheduler.WithPodMaxBackoffSeconds(0),
 						scheduler.WithPodInitialBackoffSeconds(0))
 				}
-				ns := testCtx.NS.Name
+				ns := testCtx.Namespace()
 
 				steps := append([]stepsframework.Step{
 					{
@@ -988,15 +989,15 @@ func TestPodGroupSequentialQueueing(t *testing.T) {
 					features.CompositePodGroup:               cpgEnabled,
 				})
 
-				testCtx := testutils.InitTestSchedulerWithOptions(
+				testCtx := schedulerutils.InitTestSchedulerWithOptions(
 					t,
 					testutils.InitTestAPIServer(t, "podgroup-queueing", nil),
 					0,
 					scheduler.WithPodInitialBackoffSeconds(0),
 					scheduler.WithPodMaxBackoffSeconds(0),
 				)
-				testutils.SyncSchedulerInformerFactory(testCtx)
-				ns := testCtx.NS.Name
+				schedulerutils.SyncSchedulerInformerFactory(testCtx)
+				ns := testCtx.Namespace()
 
 				steps := append([]stepsframework.Step{
 					{
@@ -1247,7 +1248,7 @@ func TestPodGroupRequeueRemainingOnSchedulingSuccess(t *testing.T) {
 					scheduler.WithPodInitialBackoffSeconds(10),
 					scheduler.WithPodMaxBackoffSeconds(20),
 				)
-				testCtx := testutils.InitTestSchedulerWithOptions(
+				testCtx := schedulerutils.InitTestSchedulerWithOptions(
 					t,
 					testutils.InitTestAPIServer(t, "podgroup-ordering", nil),
 					0,
@@ -1256,8 +1257,8 @@ func TestPodGroupRequeueRemainingOnSchedulingSuccess(t *testing.T) {
 				if piPlugin != nil {
 					piPlugin.schedulingQueue = testCtx.Scheduler.SchedulingQueue
 				}
-				testutils.SyncSchedulerInformerFactory(testCtx)
-				ns := testCtx.NS.Name
+				schedulerutils.SyncSchedulerInformerFactory(testCtx)
+				ns := testCtx.Namespace()
 
 				steps := append([]stepsframework.Step{
 					{

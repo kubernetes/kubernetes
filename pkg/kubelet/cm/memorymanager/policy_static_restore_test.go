@@ -24,15 +24,16 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	resourcehelper "k8s.io/component-helpers/resource"
+	"k8s.io/ktesting"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
-	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 // For the scope of the test, any pod that has pod-level resources and the
@@ -51,6 +52,7 @@ func TestMemoryManagerRestoreState(t *testing.T) {
 		podMemoryRequest                string
 		containers                      []containerSpec
 		expectPodBlocks                 bool
+		allocationAffinity              []int
 		expectedAffinity                []int
 	}{
 		{
@@ -63,6 +65,18 @@ func TestMemoryManagerRestoreState(t *testing.T) {
 			},
 			expectPodBlocks:  true,
 			expectedAffinity: []int{0},
+		},
+		{
+			description:                     "Pod topology hint is restored from a non-zero NUMA node",
+			podLevelResourcesEnabled:        true,
+			podLevelResourceManagersEnabled: true,
+			podMemoryRequest:                "128Mi",
+			containers: []containerSpec{
+				{name: "container1", memRequest: "100Mi", memLimit: "100Mi"},
+			},
+			expectPodBlocks:    true,
+			allocationAffinity: []int{1},
+			expectedAffinity:   []int{1},
 		},
 		{
 			description:                     "Pod topology hint is restored from a multi-container pod allocation",
@@ -114,6 +128,9 @@ func TestMemoryManagerRestoreState(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
+			if !tc.podLevelResourcesEnabled {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.37"))
+			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, tc.podLevelResourcesEnabled)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourceManagers, tc.podLevelResourceManagersEnabled)
 
@@ -137,6 +154,12 @@ func TestMemoryManagerRestoreState(t *testing.T) {
 				},
 			}
 			affinity := topologymanager.NewFakeManager(logger)
+			if tc.allocationAffinity != nil {
+				affinity = topologymanager.NewFakeManagerWithHint(logger, &topologymanager.TopologyHint{
+					NUMANodeAffinity: newNUMAAffinity(tc.allocationAffinity...),
+					Preferred:        true,
+				})
+			}
 
 			// Create new manager
 			sDir := t.TempDir()
@@ -184,7 +207,8 @@ func TestMemoryManagerRestoreState(t *testing.T) {
 			}
 
 			// Re-create manager to simulate restart
-			mgr2, err := NewManager(logger, string(PolicyTypeStatic), &machineInfo, nodeAllocatableReservation, systemReservedMemory, sDir, affinity)
+			restoredAffinity := topologymanager.NewFakeManager(logger)
+			mgr2, err := NewManager(logger, string(PolicyTypeStatic), &machineInfo, nodeAllocatableReservation, systemReservedMemory, sDir, restoredAffinity)
 			if err != nil {
 				t.Fatalf("could not create manager 2: %v", err)
 			}

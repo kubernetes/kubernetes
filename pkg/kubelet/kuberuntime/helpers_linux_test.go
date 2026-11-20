@@ -26,8 +26,8 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"k8s.io/ktesting"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
-	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
 )
 
@@ -126,22 +126,22 @@ func TestGetSeccompProfile(t *testing.T) {
 		{
 			description:   "unknown pod seccomp profile type returns error",
 			podSc:         &v1.PodSecurityContext{SeccompProfile: &v1.SeccompProfile{Type: "Unknown"}},
-			expectedError: `unsupported seccompProfile type "Unknown" (supported: Unconfined, RuntimeDefault, Localhost)`,
+			expectedError: `unsupported seccompProfile type "Unknown" (supported: Unconfined, RuntimeDefault, Localhost, OCI)`,
 		},
 		{
 			description:   "unknown container seccomp profile type returns error",
 			containerSc:   &v1.SecurityContext{SeccompProfile: &v1.SeccompProfile{Type: "Unknown"}},
-			expectedError: `unsupported seccompProfile type "Unknown" (supported: Unconfined, RuntimeDefault, Localhost)`,
+			expectedError: `unsupported seccompProfile type "Unknown" (supported: Unconfined, RuntimeDefault, Localhost, OCI)`,
 		},
 		{
 			description:   "empty pod seccomp profile type returns error",
 			podSc:         &v1.PodSecurityContext{SeccompProfile: &v1.SeccompProfile{}},
-			expectedError: `unsupported seccompProfile type "" (supported: Unconfined, RuntimeDefault, Localhost)`,
+			expectedError: `unsupported seccompProfile type "" (supported: Unconfined, RuntimeDefault, Localhost, OCI)`,
 		},
 		{
 			description:   "empty container seccomp profile type returns error",
 			containerSc:   &v1.SecurityContext{SeccompProfile: &v1.SeccompProfile{}},
-			expectedError: `unsupported seccompProfile type "" (supported: Unconfined, RuntimeDefault, Localhost)`,
+			expectedError: `unsupported seccompProfile type "" (supported: Unconfined, RuntimeDefault, Localhost, OCI)`,
 		},
 	}
 
@@ -247,22 +247,22 @@ func TestGetSeccompProfileDefaultSeccomp(t *testing.T) {
 		{
 			description:   "unknown pod seccomp profile type returns error",
 			podSc:         &v1.PodSecurityContext{SeccompProfile: &v1.SeccompProfile{Type: "Unknown"}},
-			expectedError: `unsupported seccompProfile type "Unknown" (supported: Unconfined, RuntimeDefault, Localhost)`,
+			expectedError: `unsupported seccompProfile type "Unknown" (supported: Unconfined, RuntimeDefault, Localhost, OCI)`,
 		},
 		{
 			description:   "unknown container seccomp profile type returns error",
 			containerSc:   &v1.SecurityContext{SeccompProfile: &v1.SeccompProfile{Type: "Unknown"}},
-			expectedError: `unsupported seccompProfile type "Unknown" (supported: Unconfined, RuntimeDefault, Localhost)`,
+			expectedError: `unsupported seccompProfile type "Unknown" (supported: Unconfined, RuntimeDefault, Localhost, OCI)`,
 		},
 		{
 			description:   "empty pod seccomp profile type returns error",
 			podSc:         &v1.PodSecurityContext{SeccompProfile: &v1.SeccompProfile{}},
-			expectedError: `unsupported seccompProfile type "" (supported: Unconfined, RuntimeDefault, Localhost)`,
+			expectedError: `unsupported seccompProfile type "" (supported: Unconfined, RuntimeDefault, Localhost, OCI)`,
 		},
 		{
 			description:   "empty container seccomp profile type returns error",
 			containerSc:   &v1.SecurityContext{SeccompProfile: &v1.SeccompProfile{}},
-			expectedError: `unsupported seccompProfile type "" (supported: Unconfined, RuntimeDefault, Localhost)`,
+			expectedError: `unsupported seccompProfile type "" (supported: Unconfined, RuntimeDefault, Localhost, OCI)`,
 		},
 	}
 

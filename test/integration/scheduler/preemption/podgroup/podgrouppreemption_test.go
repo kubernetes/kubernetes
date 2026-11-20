@@ -18,7 +18,6 @@ package podgrouppreemption
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -29,7 +28,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
@@ -41,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/ktesting"
 	clientset "k8s.io/client-go/kubernetes"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	configv1 "k8s.io/kube-scheduler/config/v1"
@@ -54,28 +53,29 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
+	schedulerutils "k8s.io/kubernetes/test/integration/scheduler"
 	"k8s.io/kubernetes/test/integration/scheduler/preemption/asyncframework"
 	testutils "k8s.io/kubernetes/test/integration/util"
-	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 )
 
 // TestPodGroupPreemption tests preemption scenarios involving pod groups.
 func TestPodGroupPreemption(t *testing.T) {
 	tests := []struct {
-		name          string
-		nodes         []*v1.Node
-		podGroups     []*schedulingv1beta1.PodGroup
-		initialPods   []*v1.Pod // pods that should be scheduled before preemption starts
-		preemptorPods []*v1.Pod // pods that belong to a group and should trigger preemption
+		name                   string
+		nodes                  []*v1.Node
+		podGroups              []*schedulingv1beta1.PodGroup
+		initialPods            []*v1.Pod // pods that should be scheduled before preemption starts
+		unscheduledPodsWithNNN []*v1.Pod // pods that should remain unscheduled with NNN set before preemption starts
+		preemptorPods          []*v1.Pod // pods that belong to a group and should trigger preemption
 		// the order may be important to ensure deterministic scheduling result, where only some of the preemptor pods will get scheduled.
 		preemptorPodsQueuedInCreationOrder bool
 		pdb                                *policyv1.PodDisruptionBudget
 		expectedScheduled                  []string
 		expectedCandidatesForPreemption    []string
 		expectedUnschedulable              []string
+		expectedNNNRemoved                 []string
 		expectedToHaveNNNInfo              []string
 		expectedPodsPreemptedByWAP         int
-		enablePodGroupPreemptionPolicy     bool
 		customPluginName                   string
 		customPluginFunc                   frameworkruntime.PluginFactory
 		// tempRemovePG, if true, temporarily removes PodGroups for the time of creating preemptor pods
@@ -183,14 +183,102 @@ func TestPodGroupPreemption(t *testing.T) {
 				st.MakePod().Name("high-2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
 				st.MakePod().Name("high-3").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
 			},
-			// With custom scoring, preemptor pods will prefer high-1 node
-			// which will force preemption of low-1 pod.
-			expectedScheduled:               []string{"high-1", "high-2", "high-3", "very-low-1"},
-			expectedCandidatesForPreemption: []string{"low-1"},
+			// Even though custom scoring prefers node1, DefaultPreemption RankNodes
+			// ranks node2 better because very-low-1 has lower priority than low-1.
+			expectedScheduled:               []string{"high-1", "high-2", "high-3", "low-1"},
+			expectedCandidatesForPreemption: []string{"very-low-1"},
 			expectedToHaveNNNInfo:           []string{},
 			expectedPodsPreemptedByWAP:      1,
 			customPluginName:                "mockScorePlugin",
 			customPluginFunc:                newPresetScorePlugin(map[string]int64{"node1": 100, "node2": 0}),
+		},
+		{
+			name: "Preemption node ranking prefers node requiring no preemption over custom score plugin",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+				st.MakeNode().Name("node2").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+				st.MakeNode().Name("node3").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+			},
+			podGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Name("pg1").Namespace("default").Priority(100).MinCount(2).Obj(),
+			},
+			initialPods: []*v1.Pod{
+				st.MakePod().Name("low-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").ZeroTerminationGracePeriod().Priority(10).Node("node1").Obj(),
+				st.MakePod().Name("low-2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").ZeroTerminationGracePeriod().Priority(10).Node("node3").Obj(),
+			},
+			preemptorPods: []*v1.Pod{
+				st.MakePod().Name("high-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
+				st.MakePod().Name("high-2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
+			},
+			// node2 has no victims (Rank 0), so it is chosen for one pod
+			// despite mockScorePlugin preferring node1 and node3. The second pod picks node1 over node3
+			// via mockScorePlugin tie-breaking, sparing low-2 on node3.
+			expectedScheduled:               []string{"high-1", "high-2", "low-2"},
+			expectedCandidatesForPreemption: []string{"low-1"},
+			expectedToHaveNNNInfo:           []string{"high-1", "high-2"},
+			expectedPodsPreemptedByWAP:      1,
+			tempRemovePG:                    true,
+			customPluginName:                "mockScorePlugin",
+			customPluginFunc:                newPresetScorePlugin(map[string]int64{"node1": 100, "node2": 0, "node3": 50}),
+		},
+		{
+			name: "Preemption node ranking prefers node with lower priority victim over custom score plugin",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+				st.MakeNode().Name("node2").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+			},
+			podGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Name("pg1").Namespace("default").Priority(100).MinCount(2).Obj(),
+			},
+			initialPods: []*v1.Pod{
+				st.MakePod().Name("mid-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").ZeroTerminationGracePeriod().Priority(50).Node("node1").Obj(),
+				st.MakePod().Name("low-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").ZeroTerminationGracePeriod().Priority(10).Node("node2").Obj(),
+			},
+			preemptorPods: []*v1.Pod{
+				st.MakePod().Name("high-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
+				st.MakePod().Name("high-2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
+			},
+			expectedScheduled:               []string{"high-1", "high-2", "mid-1"},
+			expectedCandidatesForPreemption: []string{"low-1"},
+			expectedToHaveNNNInfo:           []string{"high-1", "high-2"},
+			expectedPodsPreemptedByWAP:      1,
+			tempRemovePG:                    true,
+			customPluginName:                "mockScorePlugin",
+			customPluginFunc:                newPresetScorePlugin(map[string]int64{"node1": 100, "node2": 0}),
+		},
+		{
+			name: "Preemption node ranking reuses capacity from already-condemned DisruptionModeAll PodGroup victim across nodes",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+				st.MakeNode().Name("node2").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+				st.MakeNode().Name("node3").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+				st.MakeNode().Name("node4").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+			},
+			podGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Name("victim-pg-1").Namespace("default").Priority(10).DisruptionModeAll().MinCount(2).Obj(),
+				st.MakePodGroup().Name("victim-pg-2").Namespace("default").Priority(10).DisruptionModeAll().MinCount(2).Obj(),
+				st.MakePodGroup().Name("preemptor-pg").Namespace("default").Priority(100).MinCount(2).Obj(),
+			},
+			initialPods: []*v1.Pod{
+				st.MakePod().Name("v1-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("victim-pg-1").ZeroTerminationGracePeriod().Priority(10).Node("node1").Obj(),
+				st.MakePod().Name("v1-2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("victim-pg-1").ZeroTerminationGracePeriod().Priority(10).Node("node2").Obj(),
+				st.MakePod().Name("v2-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("victim-pg-2").ZeroTerminationGracePeriod().Priority(10).Node("node3").Obj(),
+				st.MakePod().Name("v2-2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("victim-pg-2").ZeroTerminationGracePeriod().Priority(10).Node("node4").Obj(),
+			},
+			preemptorPods: []*v1.Pod{
+				st.MakePod().Name("high-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("preemptor-pg").ZeroTerminationGracePeriod().Priority(100).Obj(),
+				st.MakePod().Name("high-2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("preemptor-pg").ZeroTerminationGracePeriod().Priority(100).Obj(),
+			},
+			// For high-1, all nodes have equal victim cost (Rank 1), so mockScorePlugin picks node1, condemning victim-pg-1.
+			// For high-2 (identical to high-1), node2 now has 0 surviving victims because victim-pg-1 is already
+			// condemned, so DefaultPreemption ranks node2 (Rank 0) ahead of node3 (Rank 1), sparing victim-pg-2.
+			expectedScheduled:               []string{"high-1", "high-2", "v2-1", "v2-2"},
+			expectedCandidatesForPreemption: []string{"v1-1", "v1-2"},
+			expectedToHaveNNNInfo:           []string{"high-1", "high-2"},
+			expectedPodsPreemptedByWAP:      2,
+			tempRemovePG:                    true,
+			customPluginName:                "mockScorePlugin",
+			customPluginFunc:                newPresetScorePlugin(map[string]int64{"node1": 100, "node2": 0, "node3": 90, "node4": 0}),
 		},
 		{
 			name: "PDB Violation Handling (Reprieve)",
@@ -236,6 +324,10 @@ func TestPodGroupPreemption(t *testing.T) {
 				st.MakePod().Name("low-3").Node("node2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").ZeroTerminationGracePeriod().Priority(10).Obj(),
 				st.MakePod().Name("low-4").Node("node2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").ZeroTerminationGracePeriod().Priority(10).Obj(),
 			},
+			unscheduledPodsWithNNN: []*v1.Pod{
+				st.MakePod().Name("nominated-1").NominatedNodeName("node1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").ZeroTerminationGracePeriod().Priority(10).PreemptionPolicy(v1.PreemptNever).Obj(),
+				st.MakePod().Name("nominated-2").NominatedNodeName("node2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").ZeroTerminationGracePeriod().Priority(10).PreemptionPolicy(v1.PreemptNever).Obj(),
+			},
 			preemptorPods: []*v1.Pod{
 				st.MakePod().Name("high-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
 				st.MakePod().Name("high-2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
@@ -244,6 +336,8 @@ func TestPodGroupPreemption(t *testing.T) {
 			},
 			expectedScheduled:               []string{"high-1", "high-2", "high-3", "high-4"},
 			expectedCandidatesForPreemption: []string{"low-1", "low-2", "low-3", "low-4"},
+			expectedUnschedulable:           []string{"nominated-1", "nominated-2"},
+			expectedNNNRemoved:              []string{"nominated-1", "nominated-2"},
 			expectedToHaveNNNInfo:           []string{"high-1", "high-2", "high-3", "high-4"},
 			expectedPodsPreemptedByWAP:      4,
 		},
@@ -301,28 +395,6 @@ func TestPodGroupPreemption(t *testing.T) {
 			podGroups: []*schedulingv1beta1.PodGroup{
 				st.MakePodGroup().Name("pg1").Namespace("default").Priority(100).MinCount(1).Obj(),
 				st.MakePodGroup().Name("pg2").Namespace("default").DisruptionModeAll().Priority(10).MinCount(3).Obj(),
-			},
-			initialPods: []*v1.Pod{
-				st.MakePod().Name("low-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg2").ZeroTerminationGracePeriod().Priority(10).Obj(),
-				st.MakePod().Name("low-2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg2").ZeroTerminationGracePeriod().Priority(10).Obj(),
-				st.MakePod().Name("low-3").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg2").ZeroTerminationGracePeriod().Priority(10).Obj(),
-			},
-			preemptorPods: []*v1.Pod{
-				st.MakePod().Name("high-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
-			},
-			expectedScheduled:               []string{"high-1"},
-			expectedCandidatesForPreemption: []string{"low-1", "low-2", "low-3"},
-			expectedToHaveNNNInfo:           []string{"high-1"},
-			expectedPodsPreemptedByWAP:      3,
-		},
-		{
-			name: "Preempt the whole basic PodGroup with a PodGroup disruption mode",
-			nodes: []*v1.Node{
-				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "3", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
-			},
-			podGroups: []*schedulingv1beta1.PodGroup{
-				st.MakePodGroup().Name("pg1").Namespace("default").Priority(100).MinCount(1).Obj(),
-				st.MakePodGroup().Name("pg2").Namespace("default").DisruptionModeAll().Priority(10).BasicPolicy().Obj(),
 			},
 			initialPods: []*v1.Pod{
 				st.MakePod().Name("low-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg2").ZeroTerminationGracePeriod().Priority(10).Obj(),
@@ -607,7 +679,7 @@ func TestPodGroupPreemption(t *testing.T) {
 			podGroups: []*schedulingv1beta1.PodGroup{
 				st.MakePodGroup().Name("victim-pg").Namespace("default").Priority(50).DisruptionModeAll().MinCount(2).Obj(),
 				st.MakePodGroup().Name("victim-pg2").Namespace("default").Priority(200).DisruptionModeAll().MinCount(2).Obj(),
-				st.MakePodGroup().Name("preemptor-pg").Namespace("default").Priority(100).BasicPolicy().DisruptionModeAll().Obj(),
+				st.MakePodGroup().Name("preemptor-pg").Namespace("default").Priority(100).BasicPolicy().Obj(),
 			},
 			initialPods: []*v1.Pod{
 				st.MakePod().Name("v1").Node("node1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("victim-pg").ZeroTerminationGracePeriod().Priority(50).Obj(),
@@ -630,7 +702,7 @@ func TestPodGroupPreemption(t *testing.T) {
 		},
 
 		{
-			name: "PodGroup with PreemptNever preemption policy does not perform preemption, with PodGroupPreemptionPolicy enabled",
+			name: "PodGroup with PreemptNever preemption policy does not perform preemption",
 			nodes: []*v1.Node{
 				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "3", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
 			},
@@ -651,10 +723,9 @@ func TestPodGroupPreemption(t *testing.T) {
 			expectedCandidatesForPreemption: []string{},
 			expectedUnschedulable:           []string{"high-1", "high-2", "high-3"},
 			expectedPodsPreemptedByWAP:      0,
-			enablePodGroupPreemptionPolicy:  true,
 		},
 		{
-			name: "PodGroup with PreemptLowerPriority preemption policy performs preemption, with PodGroupPreemptionPolicy enabled",
+			name: "PodGroup with PreemptLowerPriority preemption policy performs preemption",
 			nodes: []*v1.Node{
 				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "3", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
 			},
@@ -674,10 +745,9 @@ func TestPodGroupPreemption(t *testing.T) {
 			expectedScheduled:               []string{"high-1", "high-2", "high-3"},
 			expectedCandidatesForPreemption: []string{"low-1", "low-2", "low-3"},
 			expectedPodsPreemptedByWAP:      3,
-			enablePodGroupPreemptionPolicy:  true,
 		},
 		{
-			name: "PodGroup with default preemption policy performs preemption, with PodGroupPreemptionPolicy enabled",
+			name: "PodGroup with default preemption policy performs preemption",
 			nodes: []*v1.Node{
 				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "3", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
 			},
@@ -697,10 +767,9 @@ func TestPodGroupPreemption(t *testing.T) {
 			expectedScheduled:               []string{"high-1", "high-2", "high-3"},
 			expectedCandidatesForPreemption: []string{"low-1", "low-2", "low-3"},
 			expectedPodsPreemptedByWAP:      3,
-			enablePodGroupPreemptionPolicy:  true,
 		},
 		{
-			name: "PodGroup with PreemptNever preemption policy in all pods does not perform preemption, with PodGroupPreemptionPolicy disabled",
+			name: "PodGroup with nil preemption policy and PreemptNever in all pods does not perform preemption",
 			nodes: []*v1.Node{
 				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "3", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
 			},
@@ -985,10 +1054,14 @@ func TestPodGroupPreemption(t *testing.T) {
 			expectedCandidatesForPreemption: []string{"low-1"},
 			expectedPodsPreemptedByWAP:      1,
 			tempRemovePG:                    true,
-			// both preemptor pods will become schedulable at once, but there will be only place for 1 pod without preemption
-			// the scheduling cycle should prefer binding this pod over preempting to make room for both pods
-			// preemption will be called in the subsequent cycle to make room for the second pod.
-			expectedEventOrder: []string{"Bind:high-1", "PodGroupPostFilter:pg1", "Bind:high-2"},
+			// node1 has room for one more pod. When both preemptors reach the same pod
+			// group cycle, that cycle binds high-1 (member order is fixed) instead of
+			// preempting to fit both, and the next cycle preempts low-1 for high-2.
+			// pg1 may also be popped before both preemptor pods are re-queued. The lone
+			// pod then binds only because it is alone and the other preempts low-1 later,
+			// so either pod may bind first and Bind entries omit pod names. Both paths
+			// emit the same event sequence, so this check cannot tell them apart.
+			expectedEventOrder: []string{"Bind", "PodGroupPostFilter:pg1", "Bind"},
 		},
 		{
 			name: "Binding first before preemption for basic policy",
@@ -1011,10 +1084,14 @@ func TestPodGroupPreemption(t *testing.T) {
 			expectedCandidatesForPreemption: []string{"low-1"},
 			expectedPodsPreemptedByWAP:      1,
 			tempRemovePG:                    true,
-			// both preemptor pods will become schedulable at once, but there will be only place for 1 pod without preemption
-			// the scheduling cycle should prefer binding this pod over preempting to make room for both pods
-			// preemption will be called in the subsequent cycle to make room for the second pod.
-			expectedEventOrder: []string{"Bind:high-1", "PodGroupPostFilter:pg1", "Bind:high-2"},
+			// node1 has room for one more pod. When both preemptors reach the same pod
+			// group cycle, that cycle binds high-1 (member order is fixed) instead of
+			// preempting to fit both, and the next cycle preempts low-1 for high-2.
+			// pg1 may also be popped before both preemptor pods are re-queued. The lone
+			// pod then binds only because it is alone and the other preempts low-1 later,
+			// so either pod may bind first and Bind entries omit pod names. Both paths
+			// emit the same event sequence, so this check cannot tell them apart.
+			expectedEventOrder: []string{"Bind", "PodGroupPostFilter:pg1", "Bind"},
 		},
 		{
 			name: "Topology-Aware Preemption: single topology domain",
@@ -1123,18 +1200,85 @@ func TestPodGroupPreemption(t *testing.T) {
 			expectedPodsPreemptedByWAP:      0,
 			tempRemovePG:                    true,
 		},
+		{
+			name: "Heterogeneous PodGroup Preemption across nodes of different capacities",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+				st.MakeNode().Name("node2").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+			},
+			podGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Name("pg1").Namespace("default").Priority(100).MinCount(2).Obj(),
+			},
+			initialPods: []*v1.Pod{
+				st.MakePod().Name("low-1").Node("node1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").ZeroTerminationGracePeriod().Priority(10).Obj(),
+				st.MakePod().Name("low-2").Node("node1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").ZeroTerminationGracePeriod().Priority(10).Obj(),
+				st.MakePod().Name("low-3").Node("node2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").ZeroTerminationGracePeriod().Priority(10).Obj(),
+			},
+			preemptorPods: []*v1.Pod{
+				st.MakePod().Name("high-1-small").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
+				st.MakePod().Name("high-2-large").Req(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
+			},
+			// high-1-small is evaluated first. Preemption's RankNodes prefers nodes with fewer
+			// potential victims, so node2 (one potential victim) ranks ahead of node1 (two potential
+			// victims) even though mockScorePlugin prefers node1. high-1-small therefore takes node2
+			// and leaves node1 for high-2-large.
+			preemptorPodsQueuedInCreationOrder: true,
+			expectedScheduled:                  []string{"high-2-large", "high-1-small"},
+			expectedCandidatesForPreemption:    []string{"low-1", "low-2", "low-3"},
+			expectedToHaveNNNInfo:              []string{"high-2-large", "high-1-small"},
+			expectedPodsPreemptedByWAP:         3,
+			customPluginName:                   "mockScorePlugin",
+			customPluginFunc:                   newPresetScorePlugin(map[string]int64{"node1": 100, "node2": 0}),
+		},
+		{
+			name: "Preempt only the large pod from a heterogeneous DisruptionModeSingle victim PodGroup and reprieve the small pod",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+			},
+			podGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Name("victim-pg").Namespace("default").Priority(10).MinCount(2).DisruptionModeSingle().Obj(),
+				st.MakePodGroup().Name("preemptor-pg").Namespace("default").Priority(100).MinCount(2).Obj(),
+			},
+			initialPods: []*v1.Pod{
+				st.MakePod().Name("v-large").Node("node1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "3"}).Container("image").PodGroupName("victim-pg").ZeroTerminationGracePeriod().Priority(10).Obj(),
+				st.MakePod().Name("v-small").Node("node1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("victim-pg").ZeroTerminationGracePeriod().Priority(10).Obj(),
+			},
+			preemptorPods: []*v1.Pod{
+				st.MakePod().Name("high-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").PodGroupName("preemptor-pg").ZeroTerminationGracePeriod().Priority(100).Obj(),
+				st.MakePod().Name("high-2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("preemptor-pg").ZeroTerminationGracePeriod().Priority(100).Obj(),
+			},
+			expectedScheduled:               []string{"high-1", "high-2", "v-small"},
+			expectedCandidatesForPreemption: []string{"v-large"},
+			expectedToHaveNNNInfo:           []string{"high-1", "high-2"},
+			expectedPodsPreemptedByWAP:      1,
+		},
+		{
+			name: "Preempt all pods of a heterogeneous DisruptionModeAll victim PodGroup across nodes",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "3", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+				st.MakeNode().Name("node2").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+			},
+			podGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Name("victim-pg").Namespace("default").Priority(10).MinCount(2).DisruptionModeAll().Obj(),
+				st.MakePodGroup().Name("preemptor-pg").Namespace("default").Priority(100).MinCount(1).Obj(),
+			},
+			initialPods: []*v1.Pod{
+				st.MakePod().Name("v-large").Node("node1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "3"}).Container("image").PodGroupName("victim-pg").ZeroTerminationGracePeriod().Priority(10).Obj(),
+				st.MakePod().Name("v-small").Node("node2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("victim-pg").ZeroTerminationGracePeriod().Priority(10).Obj(),
+			},
+			preemptorPods: []*v1.Pod{
+				st.MakePod().Name("high-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").PodGroupName("preemptor-pg").ZeroTerminationGracePeriod().Priority(100).Obj(),
+			},
+			expectedScheduled:               []string{"high-1"},
+			expectedCandidatesForPreemption: []string{"v-large", "v-small"},
+			expectedToHaveNNNInfo:           []string{"high-1"},
+			expectedPodsPreemptedByWAP:      2,
+		},
 	}
 
-	for _, tt := range tests {
-		for _, cpgEnabled := range []bool{true, false} {
-			t.Run(fmt.Sprintf("%s (CPG enabled: %v)", tt.name, cpgEnabled), func(t *testing.T) {
-				featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-					features.PodLevelResources:               true,
-					features.GenericWorkload:                 true,
-					features.PodGroupPreemptionPolicy:        tt.enablePodGroupPreemptionPolicy,
-					features.TopologyAwareWorkloadScheduling: true,
-					features.CompositePodGroup:               cpgEnabled,
-				})
+	run := func(t *testing.T, sharedAPICtx ktesting.TContext) {
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
 				recorder := eventRecorder{}
 				registry := make(frameworkruntime.Registry)
 
@@ -1202,16 +1346,24 @@ func TestPodGroupPreemption(t *testing.T) {
 
 				// Set PodMaxBackoff to 1 second to turn on backoff and allow apiCacher to get information about
 				// pod NNN. Without this we might have a race between starting binding and update of apiCacher.
-				testCtx := testutils.InitTestSchedulerWithNS(t, "podgroup-preemption",
+				testCtx := schedulerutils.InitTestSchedulerWithOptions(t,
+					schedulerutils.WithNewNamespace(t, sharedAPICtx, "podgroup-preemption"),
+					0,
 					scheduler.WithProfiles(cfg.Profiles...),
 					scheduler.WithFrameworkOutOfTreeRegistry(registry),
 					scheduler.WithPodMaxBackoffSeconds(1),
 					scheduler.WithPodInitialBackoffSeconds(0))
-				cs, ns := testCtx.ClientSet, testCtx.NS.Name
+				schedulerutils.SyncSchedulerInformerFactory(testCtx)
+				go testCtx.Scheduler.Run(testCtx.SchedulerCtx)
+				defer testCtx.SchedulerCloseFn()
+				cs, ns := testCtx.Client(), testCtx.Namespace()
+				t.Cleanup(func() {
+					cleanupSharedPodGroupPreemptionResources(t, testCtx, cs, ns, append(tt.initialPods, tt.unscheduledPodsWithNNN...), tt.preemptorPods, tt.podGroups, nil, tt.pdb, tt.nodes)
+				})
 
 				// Create nodes
 				for _, n := range tt.nodes {
-					if _, err := cs.CoreV1().Nodes().Create(testCtx.Ctx, n, metav1.CreateOptions{}); err != nil {
+					if _, err := cs.CoreV1().Nodes().Create(testCtx, n, metav1.CreateOptions{}); err != nil {
 						t.Fatalf("Failed to create node %s: %v", n.Name, err)
 					}
 				}
@@ -1219,7 +1371,7 @@ func TestPodGroupPreemption(t *testing.T) {
 				// Create PDB if specified
 				if tt.pdb != nil {
 					tt.pdb.Namespace = ns
-					if _, err := cs.PolicyV1().PodDisruptionBudgets(ns).Create(testCtx.Ctx, tt.pdb, metav1.CreateOptions{}); err != nil {
+					if _, err := cs.PolicyV1().PodDisruptionBudgets(ns).Create(testCtx, tt.pdb, metav1.CreateOptions{}); err != nil {
 						t.Fatalf("Failed to create PDB: %v", err)
 					}
 				}
@@ -1227,24 +1379,69 @@ func TestPodGroupPreemption(t *testing.T) {
 				// 1. Create PodGroups
 				for _, pg := range tt.podGroups {
 					pg.Namespace = ns
-					if _, err := cs.SchedulingV1beta1().PodGroups(ns).Create(testCtx.Ctx, pg, metav1.CreateOptions{}); err != nil {
+					if _, err := cs.SchedulingV1beta1().PodGroups(ns).Create(testCtx, pg, metav1.CreateOptions{}); err != nil {
 						t.Fatalf("Failed to create PodGroup %s: %v", pg.Name, err)
 					}
 				}
 
 				// 2. Create initial pods
 				for _, p := range tt.initialPods {
-					p.Namespace = ns
-					if _, err := cs.CoreV1().Pods(ns).Create(testCtx.Ctx, p, metav1.CreateOptions{}); err != nil {
+					pod := p.DeepCopy()
+					pod.Namespace = ns
+					if _, err := cs.CoreV1().Pods(ns).Create(testCtx, pod, metav1.CreateOptions{}); err != nil {
 						t.Fatalf("Failed to create pod %s: %v", p.Name, err)
 					}
 				}
 
 				// 3. Wait for initial pods to be scheduled
 				for _, p := range tt.initialPods {
-					if err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false,
-						testutils.PodScheduled(cs, ns, p.Name)); err != nil {
+					if err := wait.PollUntilContextTimeout(testCtx, 100*time.Millisecond, 10*time.Second, false,
+						schedulerutils.PodScheduled(cs, ns, p.Name)); err != nil {
 						t.Errorf("Failed to wait for pod %s to be scheduled: %v", p.Name, err)
+					}
+				}
+
+				logger, _ := ktesting.NewTestContext(t)
+
+				// 3b. Create unscheduled pods with NominatedNodeName and wait for nomination in queue
+				for _, p := range tt.unscheduledPodsWithNNN {
+					pod := p.DeepCopy()
+					pod.Namespace = ns
+					nnn := pod.Status.NominatedNodeName
+					if _, err := cs.CoreV1().Pods(ns).Create(testCtx, pod, metav1.CreateOptions{}); err != nil {
+						t.Fatalf("Failed to create unscheduled pod %s: %v", p.Name, err)
+					}
+					if err := wait.PollUntilContextTimeout(testCtx, 100*time.Millisecond, 10*time.Second, false,
+						schedulerutils.PodUnschedulable(cs, ns, p.Name)); err != nil {
+						t.Fatalf("Failed to wait for pod %s to be unschedulable: %v", p.Name, err)
+					}
+					if nnn != "" {
+						if err := wait.PollUntilContextTimeout(testCtx, 100*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
+							pod, err := cs.CoreV1().Pods(ns).Get(ctx, p.Name, metav1.GetOptions{})
+							if err != nil {
+								return false, err
+							}
+							pod.Status.NominatedNodeName = nnn
+							if _, err := cs.CoreV1().Pods(ns).UpdateStatus(ctx, pod, metav1.UpdateOptions{}); err != nil {
+								if apierrors.IsConflict(err) {
+									return false, nil
+								}
+								return false, err
+							}
+							return true, nil
+						}); err != nil {
+							t.Fatalf("Failed to set NominatedNodeName on pod %s: %v", p.Name, err)
+						}
+						if err := wait.PollUntilContextTimeout(testCtx, 100*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
+							for _, np := range testCtx.Scheduler.SchedulingQueue.NominatedPodsForNode(logger, nnn) {
+								if np.GetPod().Name == p.Name {
+									return true, nil
+								}
+							}
+							return false, nil
+						}); err != nil {
+							t.Fatalf("Failed to wait for pod %s to be nominated on node %s in scheduling queue: %v", p.Name, nnn, err)
+						}
 					}
 				}
 
@@ -1259,20 +1456,21 @@ func TestPodGroupPreemption(t *testing.T) {
 					for i, pg := range tt.podGroups {
 						pgNames[i] = pg.Name
 					}
-					if err := deletePodGroups(testCtx.Ctx, cs, ns, pgNames); err != nil {
+					if err := deletePodGroups(testCtx, cs, ns, pgNames); err != nil {
 						t.Fatalf("Failed to delete PodGroups: %v", err)
 					}
 				}
 
 				for _, p := range tt.preemptorPods {
-					p.Namespace = ns
-					if _, err := cs.CoreV1().Pods(ns).Create(testCtx.Ctx, p, metav1.CreateOptions{}); err != nil {
+					pod := p.DeepCopy()
+					pod.Namespace = ns
+					if _, err := cs.CoreV1().Pods(ns).Create(testCtx, pod, metav1.CreateOptions{}); err != nil {
 						t.Fatalf("Failed to create pod %s: %v", p.Name, err)
 					}
 					if !tt.tempRemovePG && tt.preemptorPodsQueuedInCreationOrder {
-						podScheduledFn := testutils.PodScheduled(cs, ns, p.Name)
-						err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
-							_, ok := testCtx.Scheduler.SchedulingQueue.GetPod(p.Name, p.Namespace, p.Spec.SchedulingGroup)
+						podScheduledFn := schedulerutils.PodScheduled(cs, ns, p.Name)
+						err := wait.PollUntilContextTimeout(testCtx, 100*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
+							_, ok := testCtx.Scheduler.SchedulingQueue.GetPod(ctx, p.Name, ns, p.Spec.SchedulingGroup)
 							if ok {
 								return true, nil
 							}
@@ -1288,7 +1486,7 @@ func TestPodGroupPreemption(t *testing.T) {
 				if tt.tempRemovePG {
 					// Wait for preemptor pods to be unschedulable
 					for _, p := range tt.preemptorPods {
-						if err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false,
+						if err := wait.PollUntilContextTimeout(testCtx, 100*time.Millisecond, 10*time.Second, false,
 							func(ctx context.Context) (bool, error) {
 								return isPodInUnschedulableQueue(testCtx.Scheduler, p.Name, ns), nil
 							}); err != nil {
@@ -1300,7 +1498,7 @@ func TestPodGroupPreemption(t *testing.T) {
 					for _, pg := range tt.podGroups {
 						pgCopy := pg.DeepCopy()
 						pgCopy.ResourceVersion = ""
-						if _, err := cs.SchedulingV1beta1().PodGroups(ns).Create(testCtx.Ctx, pgCopy, metav1.CreateOptions{}); err != nil {
+						if _, err := cs.SchedulingV1beta1().PodGroups(ns).Create(testCtx, pgCopy, metav1.CreateOptions{}); err != nil {
 							t.Fatalf("Failed to recreate PodGroup %s: %v", pg.Name, err)
 						}
 					}
@@ -1309,7 +1507,7 @@ func TestPodGroupPreemption(t *testing.T) {
 				// 5. Wait for preemption to complete if WAP calls are expected
 				if tt.expectedPodsPreemptedByWAP > 0 {
 					wapCalls := 0
-					err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
+					err := wait.PollUntilContextTimeout(testCtx, 100*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
 						wapCalls = 0
 						for _, podName := range tt.expectedCandidatesForPreemption {
 							events, err := cs.CoreV1().Events(ns).List(ctx, metav1.ListOptions{
@@ -1334,16 +1532,16 @@ func TestPodGroupPreemption(t *testing.T) {
 
 				// 6. Verify unschedulable pods
 				for _, podName := range tt.expectedUnschedulable {
-					if err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false,
-						testutils.PodUnschedulable(cs, ns, podName)); err != nil {
+					if err := wait.PollUntilContextTimeout(testCtx, 100*time.Millisecond, 10*time.Second, false,
+						schedulerutils.PodUnschedulable(cs, ns, podName)); err != nil {
 						t.Errorf("Pod %s was expected to be unschedulable but wasn't: %v", podName, err)
 					}
 				}
 
 				// 7. Verify scheduled pods
 				for _, podName := range tt.expectedScheduled {
-					if err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false,
-						testutils.PodScheduled(cs, ns, podName)); err != nil {
+					if err := wait.PollUntilContextTimeout(testCtx, 100*time.Millisecond, 10*time.Second, false,
+						schedulerutils.PodScheduled(cs, ns, podName)); err != nil {
 						t.Errorf("Pod %s was expected to be scheduled but wasn't: %v", podName, err)
 					}
 				}
@@ -1355,7 +1553,7 @@ func TestPodGroupPreemption(t *testing.T) {
 					// Subgroup of pods (might be all) in candidatesForPreemption is expected to be preempted.
 					// Preemption has finished, because all expected pods were scheduled - checked in step 7.
 					// Retry will be performed when there is an error or number of preempted pod do not match expectedPodsPreemptedByWAP.
-					err := wait.PollUntilContextTimeout(testCtx.Ctx, 200*time.Millisecond, 5*time.Second, false,
+					err := wait.PollUntilContextTimeout(testCtx, 200*time.Millisecond, 5*time.Second, false,
 						func(ctx context.Context) (bool, error) {
 							preemptedCount = 0
 							notPreemptedPods = nil
@@ -1392,11 +1590,36 @@ func TestPodGroupPreemption(t *testing.T) {
 					}
 				}
 
-				// 10. Verify event order
+				// 9b. Verify nominated node name is removed from expected pods
+				for _, podName := range tt.expectedNNNRemoved {
+					if err := wait.PollUntilContextTimeout(testCtx, 100*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
+						pod, err := cs.CoreV1().Pods(ns).Get(ctx, podName, metav1.GetOptions{})
+						if err != nil {
+							return false, err
+						}
+						return pod.Status.NominatedNodeName == "", nil
+					}); err != nil {
+						t.Errorf("Pod %s was expected to have NominatedNodeName removed but didn't: %v", podName, err)
+					}
+				}
+
+				// 10. Verify event order.
+				// Entries without ":" match any event of that type (e.g. "Bind" matches "Bind:pod-1");
+				// entries with ":" require an exact Type:Name match.
 				if len(tt.expectedEventOrder) > 0 {
 					actualEvents := recorder.GetEvents()
+					for i, want := range tt.expectedEventOrder {
+						if i >= len(actualEvents) {
+							break
+						}
+						if !strings.Contains(want, ":") {
+							if actual, _, ok := strings.Cut(actualEvents[i], ":"); ok && actual == want {
+								actualEvents[i] = want
+							}
+						}
+					}
 					if diff := cmp.Diff(tt.expectedEventOrder, actualEvents); diff != "" {
-						t.Errorf("Unexpected event order (-want,+got):\n%s", diff)
+						t.Errorf("Unexpected event order (-want,+got):\n%s\nrecorder events: %v", diff, recorder.GetEvents())
 					}
 				}
 
@@ -1407,11 +1630,14 @@ func TestPodGroupPreemption(t *testing.T) {
 					for _, p := range tt.initialPods {
 						allPods = append(allPods, p.Name)
 					}
+					for _, p := range tt.unscheduledPodsWithNNN {
+						allPods = append(allPods, p.Name)
+					}
 					for _, p := range tt.preemptorPods {
 						allPods = append(allPods, p.Name)
 					}
 					for _, podName := range allPods {
-						pod, err := cs.CoreV1().Pods(ns).Get(testCtx.Ctx, podName, metav1.GetOptions{})
+						pod, err := cs.CoreV1().Pods(ns).Get(testCtx, podName, metav1.GetOptions{})
 						if err != nil {
 							if apierrors.IsNotFound(err) {
 								t.Logf("Pod %q: not present in cluster", podName)
@@ -1438,6 +1664,79 @@ func TestPodGroupPreemption(t *testing.T) {
 			})
 		}
 	}
+	for _, cpgEnabled := range []bool{true, false} {
+		t.Run(fmt.Sprintf("CPG enabled: %v", cpgEnabled), func(t *testing.T) {
+			// The API server configuration depends on these feature gates, so start
+			// one server per feature-gate combination and share it across matching subtests.
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.PodLevelResources:               true,
+				features.GenericWorkload:                 true,
+				features.TopologyAwareWorkloadScheduling: true,
+				features.CompositePodGroup:               cpgEnabled,
+			})
+			sharedAPICtx := testutils.InitTestAPIServer(t, "podgroup-preemption", nil)
+
+			run(t, sharedAPICtx)
+		})
+	}
+}
+
+// cleanupSharedPodGroupPreemptionResources removes every resource that can
+// affect scheduling in a later subtest. Namespace deletion alone is
+// asynchronous and cannot provide that isolation when the API server is
+// shared.
+func cleanupSharedPodGroupPreemptionResources(t *testing.T, ctx context.Context, cs clientset.Interface, ns string, initialPods, preemptorPods []*v1.Pod, podGroups []*schedulingv1beta1.PodGroup, compositePodGroups []*schedulingv1beta1.CompositePodGroup, pdb *policyv1.PodDisruptionBudget, nodes []*v1.Node) {
+	t.Helper()
+
+	pods := make([]*v1.Pod, 0, len(initialPods)+len(preemptorPods))
+	for _, podList := range [][]*v1.Pod{initialPods, preemptorPods} {
+		for _, pod := range podList {
+			podCopy := pod.DeepCopy()
+			podCopy.Namespace = ns
+			pods = append(pods, podCopy)
+		}
+	}
+	testutils.CleanupPods(ctx, cs, t, pods)
+
+	pgNames := make([]string, 0, len(podGroups))
+	for _, pg := range podGroups {
+		pgNames = append(pgNames, pg.Name)
+	}
+	if err := deletePodGroups(ctx, cs, ns, pgNames); err != nil {
+		t.Errorf("Failed to delete PodGroups in namespace %s: %v", ns, err)
+	}
+
+	cpgNames := make([]string, 0, len(compositePodGroups))
+	for _, cpg := range compositePodGroups {
+		cpgNames = append(cpgNames, cpg.Name)
+	}
+	if err := deleteCompositePodGroups(ctx, cs, ns, cpgNames); err != nil {
+		t.Errorf("Failed to delete CompositePodGroups in namespace %s: %v", ns, err)
+	}
+
+	if pdb != nil {
+		if err := cs.PolicyV1().PodDisruptionBudgets(ns).Delete(ctx, pdb.Name, metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+			t.Errorf("Failed to delete PDB %s/%s: %v", ns, pdb.Name, err)
+		} else if err := wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 10*time.Second, true, func(ctx context.Context) (bool, error) {
+			_, err := cs.PolicyV1().PodDisruptionBudgets(ns).Get(ctx, pdb.Name, metav1.GetOptions{})
+			return apierrors.IsNotFound(err), nil
+		}); err != nil {
+			t.Errorf("Failed to wait for PDB %s/%s to be deleted: %v", ns, pdb.Name, err)
+		}
+	}
+
+	for _, node := range nodes {
+		if err := cs.CoreV1().Nodes().Delete(ctx, node.Name, metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+			t.Errorf("Failed to delete node %s: %v", node.Name, err)
+			continue
+		}
+		if err := wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
+			_, err := cs.CoreV1().Nodes().Get(ctx, node.Name, metav1.GetOptions{})
+			return apierrors.IsNotFound(err), nil
+		}); err != nil {
+			t.Errorf("Failed to wait for node %s to be deleted: %v", node.Name, err)
+		}
+	}
 }
 
 func TestPodGroupPreemptionStatus(t *testing.T) {
@@ -1448,37 +1747,37 @@ func TestPodGroupPreemptionStatus(t *testing.T) {
 				features.TopologyAwareWorkloadScheduling: cpgEnabled,
 				features.CompositePodGroup:               cpgEnabled,
 			})
-			testCtx := testutils.InitTestSchedulerWithNS(t, "podgroup-preemption-status")
+			testCtx := schedulerutils.InitTestSchedulerWithNS(t, "podgroup-preemption-status")
 
-			cs := testCtx.ClientSet
-			ns := testCtx.NS.Name
+			cs := testCtx.Client()
+			ns := testCtx.Namespace()
 
 			// Create a node.
 			node := st.MakeNode().Name("node-1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj()
-			if _, err := cs.CoreV1().Nodes().Create(testCtx.Ctx, node, metav1.CreateOptions{}); err != nil {
+			if _, err := cs.CoreV1().Nodes().Create(testCtx, node, metav1.CreateOptions{}); err != nil {
 				t.Fatalf("Failed to create node: %v", err)
 			}
 			// Create a low-priority pod low-1 taking whole node
 			lowPod := st.MakePod().Name("low-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").Priority(10).TerminationGracePeriodSeconds(30).Obj()
-			if _, err := cs.CoreV1().Pods(ns).Create(testCtx.Ctx, lowPod, metav1.CreateOptions{}); err != nil {
+			if _, err := cs.CoreV1().Pods(ns).Create(testCtx, lowPod, metav1.CreateOptions{}); err != nil {
 				t.Fatalf("Failed to create low-priority pod: %v", err)
 			}
 			// Wait for low-priority pod to be scheduled
-			if err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false,
-				testutils.PodScheduled(cs, ns, lowPod.Name)); err != nil {
+			if err := wait.PollUntilContextTimeout(testCtx, 100*time.Millisecond, 10*time.Second, false,
+				schedulerutils.PodScheduled(cs, ns, lowPod.Name)); err != nil {
 				t.Fatalf("Failed to wait for low-priority pod to be scheduled: %v", err)
 			}
 			// Create a high-priority pod high-1 belonging to pg1 (priority=100)
 			pg := st.MakePodGroup().Name("pg1").Namespace(ns).MinCount(1).Priority(100).Obj()
-			if _, err := cs.SchedulingV1beta1().PodGroups(ns).Create(testCtx.Ctx, pg, metav1.CreateOptions{}); err != nil {
+			if _, err := cs.SchedulingV1beta1().PodGroups(ns).Create(testCtx, pg, metav1.CreateOptions{}); err != nil {
 				t.Fatalf("Failed to create PodGroup: %v", err)
 			}
 			highPod := st.MakePod().Name("high-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").Priority(100).Obj()
-			if _, err := cs.CoreV1().Pods(ns).Create(testCtx.Ctx, highPod, metav1.CreateOptions{}); err != nil {
+			if _, err := cs.CoreV1().Pods(ns).Create(testCtx, highPod, metav1.CreateOptions{}); err != nil {
 				t.Fatalf("Failed to create high-priority pod: %v", err)
 			}
 			// Poll until the low-priority pod gets DeletionTimestamp set (which indicates preemption is triggered)
-			err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
+			err := wait.PollUntilContextTimeout(testCtx, 100*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
 				pod, err := cs.CoreV1().Pods(ns).Get(ctx, lowPod.Name, metav1.GetOptions{})
 				if err != nil {
 					return false, err
@@ -1490,9 +1789,9 @@ func TestPodGroupPreemptionStatus(t *testing.T) {
 			}
 			// Verify the PodGroup condition.
 			// We want PodGroupInitiallyScheduled status to be False, Reason to be Unschedulable, and Message to contain
-			// both "minCount (1) cannot be satisfied" and "pod group preemption found a placement for podgroup"
+			// both "scheduling policy's minimum threshold (1) cannot be satisfied" and "pod group preemption found a placement for podgroup"
 			var cond *metav1.Condition
-			err = wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 5*time.Second, false, func(ctx context.Context) (bool, error) {
+			err = wait.PollUntilContextTimeout(testCtx, 100*time.Millisecond, 5*time.Second, false, func(ctx context.Context) (bool, error) {
 				currentPG, err := cs.SchedulingV1beta1().PodGroups(ns).Get(ctx, pg.Name, metav1.GetOptions{})
 				if err != nil {
 					return false, err
@@ -1501,7 +1800,7 @@ func TestPodGroupPreemptionStatus(t *testing.T) {
 				if cond != nil &&
 					cond.Status == metav1.ConditionFalse &&
 					cond.Reason == schedulingv1beta1.PodGroupReasonUnschedulable &&
-					strings.Contains(cond.Message, "minCount (1) cannot be satisfied") &&
+					strings.Contains(cond.Message, "scheduling policy's minimum threshold (1) cannot be satisfied") &&
 					strings.Contains(cond.Message, "pod group preemption: found a placement for podgroup, preempting 1 victims") {
 					return true, nil
 				}
@@ -1544,13 +1843,13 @@ func TestPodGroupPreemption_NominatedNodeNameRespected(t *testing.T) {
 				}},
 			})
 
-			testCtx := testutils.InitTestSchedulerWithNS(t, "pg-preemption-nnn",
+			testCtx := schedulerutils.InitTestSchedulerWithNS(t, "pg-preemption-nnn",
 				scheduler.WithProfiles(cfg.Profiles...),
 				scheduler.WithFrameworkOutOfTreeRegistry(registry),
 				scheduler.WithPodMaxBackoffSeconds(1),
 				scheduler.WithPodInitialBackoffSeconds(0),
 			)
-			cs, ns := testCtx.ClientSet, testCtx.NS.Name
+			cs, ns := testCtx.Client(), testCtx.Namespace()
 
 			// 1. Create 3 nodes
 			nodes := []*v1.Node{
@@ -1559,14 +1858,14 @@ func TestPodGroupPreemption_NominatedNodeNameRespected(t *testing.T) {
 				st.MakeNode().Name("node3").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
 			}
 			for _, node := range nodes {
-				if _, err := cs.CoreV1().Nodes().Create(testCtx.Ctx, node, metav1.CreateOptions{}); err != nil {
+				if _, err := cs.CoreV1().Nodes().Create(testCtx, node, metav1.CreateOptions{}); err != nil {
 					t.Fatalf("Failed to create node %s: %v", node.Name, err)
 				}
 			}
 
 			// 2. Create PodGroup with minCount=2
 			pg := st.MakePodGroup().Name("pg1").Namespace(ns).Priority(50).MinCount(2).Obj()
-			if _, err := cs.SchedulingV1beta1().PodGroups(ns).Create(testCtx.Ctx, pg, metav1.CreateOptions{}); err != nil {
+			if _, err := cs.SchedulingV1beta1().PodGroups(ns).Create(testCtx, pg, metav1.CreateOptions{}); err != nil {
 				t.Fatalf("Failed to create pod group pg1: %v", err)
 			}
 
@@ -1577,14 +1876,14 @@ func TestPodGroupPreemption_NominatedNodeNameRespected(t *testing.T) {
 				st.MakePod().Name("pod3").Namespace(ns).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").Priority(10).Node("node3").Obj(),
 			}
 			for _, pod := range initialPods {
-				if _, err := cs.CoreV1().Pods(ns).Create(testCtx.Ctx, pod, metav1.CreateOptions{}); err != nil {
+				if _, err := cs.CoreV1().Pods(ns).Create(testCtx, pod, metav1.CreateOptions{}); err != nil {
 					t.Fatalf("Failed to create pod %s: %v", pod.Name, err)
 				}
 			}
 
 			// Wait for initial pods to be scheduled
 			for _, pod := range initialPods {
-				if err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false, testutils.PodScheduled(cs, ns, pod.Name)); err != nil {
+				if err := wait.PollUntilContextTimeout(testCtx, 100*time.Millisecond, 10*time.Second, false, schedulerutils.PodScheduled(cs, ns, pod.Name)); err != nil {
 					t.Fatalf("Failed to wait for initial pod %s to schedule: %v", pod.Name, err)
 				}
 			}
@@ -1595,7 +1894,7 @@ func TestPodGroupPreemption_NominatedNodeNameRespected(t *testing.T) {
 				st.MakePod().Name("preemptor-2").Namespace(ns).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").Priority(50).Obj(),
 			}
 			for _, pod := range preemptorPods {
-				if _, err := cs.CoreV1().Pods(ns).Create(testCtx.Ctx, pod, metav1.CreateOptions{}); err != nil {
+				if _, err := cs.CoreV1().Pods(ns).Create(testCtx, pod, metav1.CreateOptions{}); err != nil {
 					t.Fatalf("Failed to create preemptor pod %s: %v", pod.Name, err)
 				}
 			}
@@ -1604,7 +1903,7 @@ func TestPodGroupPreemption_NominatedNodeNameRespected(t *testing.T) {
 			initialNNNs := make(map[string]string)
 			for _, pod := range preemptorPods {
 				podName := pod.Name
-				err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
+				err := wait.PollUntilContextTimeout(testCtx, 100*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
 					p, err := cs.CoreV1().Pods(ns).Get(ctx, podName, metav1.GetOptions{})
 					if err != nil {
 						return false, err
@@ -1627,12 +1926,12 @@ func TestPodGroupPreemption_NominatedNodeNameRespected(t *testing.T) {
 			}
 
 			// 6. Remove pod1 from node1
-			if err := cs.CoreV1().Pods(ns).Delete(testCtx.Ctx, "pod1", metav1.DeleteOptions{GracePeriodSeconds: new(int64(0))}); err != nil {
+			if err := cs.CoreV1().Pods(ns).Delete(testCtx, "pod1", metav1.DeleteOptions{GracePeriodSeconds: new(int64(0))}); err != nil {
 				t.Fatalf("Failed to delete pod1: %v", err)
 			}
 
 			// Wait for pod1 to be completely removed from API server
-			err = wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
+			err = wait.PollUntilContextTimeout(testCtx, 100*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
 				_, err := cs.CoreV1().Pods(ns).Get(ctx, "pod1", metav1.GetOptions{})
 				if apierrors.IsNotFound(err) {
 					return true, nil
@@ -1643,68 +1942,29 @@ func TestPodGroupPreemption_NominatedNodeNameRespected(t *testing.T) {
 				t.Fatalf("Timed out waiting for pod1 to be deleted: %v", err)
 			}
 
-			// 7. Verify that nominated node names did not change to node1 despite node1 having free space and higher score from preferNode1ScorePlugin
-			err = wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 3*time.Second, false, func(ctx context.Context) (bool, error) {
-				_, err := cs.CoreV1().Pods(ns).Get(ctx, "pod2", metav1.GetOptions{})
-				if apierrors.IsNotFound(err) {
-					t.Fatalf("pod2 got removed")
-				}
-				_, err = cs.CoreV1().Pods(ns).Get(ctx, "pod3", metav1.GetOptions{})
-				if apierrors.IsNotFound(err) {
-					t.Fatalf("pod3 got removed")
-				}
-
-				for _, pod := range preemptorPods {
-					events, err := cs.CoreV1().Events(ns).List(ctx, metav1.ListOptions{
-						FieldSelector: "involvedObject.name=" + pod.Name,
-					})
-					if err != nil {
-						return false, err
-					}
-					for _, event := range events.Items {
-						t.Logf("Event: %v", event.Message)
-					}
-
-					p, err := cs.CoreV1().Pods(ns).Get(ctx, pod.Name, metav1.GetOptions{})
-					if err != nil {
-						return false, err
-					}
-					if p.Spec.NodeName == "node1" {
-						t.Errorf("Pod %s was incorrectly scheduled to node1", pod.Name)
-						return false, nil
-					}
-					if p.Status.NominatedNodeName != initialNNNs[pod.Name] {
-						t.Errorf("Pod %s NominatedNodeName changed from %s to %s. NodeName = %s", pod.Name, initialNNNs[pod.Name], p.Status.NominatedNodeName, p.Spec.NodeName)
-						return false, nil
-					}
-				}
-				return false, nil
-			})
-			if err != nil && !errors.Is(err, context.DeadlineExceeded) && !wait.Interrupted(err) {
-				t.Fatalf("Unexpected error while checking NNN persistence: %v", err)
-			}
+			// 7. Verify that nominated node names did not change to node1 despite node1 having free space and a higher score from mockScorePlugin.
+			verifyNominationsHeld(testCtx, t, cs, ns, preemptorPods, initialNNNs, "pod2", "pod3")
 		})
 	}
 }
 
 // TestCompositePodGroupPreemption tests preemption scenarios involving composite pod groups.
 func TestCompositePodGroupPreemption(t *testing.T) {
-	tests := []struct {
-		name                           string
-		nodes                          []*v1.Node
-		compositePodGroups             []*schedulingv1alpha3.CompositePodGroup
-		podGroups                      []*schedulingv1beta1.PodGroup
-		initialPods                    []*v1.Pod // pods that should be scheduled before preemption starts
-		preemptorPods                  []*v1.Pod // pods that belong to a CPG hierarchy and should trigger preemption
-		pdb                            *policyv1.PodDisruptionBudget
-		expectedScheduled              []string
-		expectedPreempted              []string
-		expectedUnschedulable          []string
-		expectedToHaveNNNInfo          []string
-		expectedPodsPreemptedByWAP     int
-		enablePodGroupPreemptionPolicy bool
-		customPluginName               string
-		customPluginFunc               frameworkruntime.PluginFactory
+	type testCase struct {
+		name                       string
+		nodes                      []*v1.Node
+		compositePodGroups         []*schedulingv1beta1.CompositePodGroup
+		podGroups                  []*schedulingv1beta1.PodGroup
+		initialPods                []*v1.Pod // pods that should be scheduled before preemption starts
+		preemptorPods              []*v1.Pod // pods that belong to a CPG hierarchy and should trigger preemption
+		pdb                        *policyv1.PodDisruptionBudget
+		expectedScheduled          []string
+		expectedPreempted          []string
+		expectedUnschedulable      []string
+		expectedToHaveNNNInfo      []string
+		expectedPodsPreemptedByWAP int
+		customPluginName           string
+		customPluginFunc           frameworkruntime.PluginFactory
 		// tempRemoveCPG, if true, temporarily removes CompositePodGroups and PodGroups for the time
 		// of creating preemptor pods - but after initial pods have been scheduled.
 		// This ensures that all preemptor pods are created and kept in incompletePodGroupPods.
@@ -1716,7 +1976,8 @@ func TestCompositePodGroupPreemption(t *testing.T) {
 		// but before preemptors are created. This simulates scenarios where a hierarchy is broken
 		// mid-operation to ensure the victim selection logic correctly falls back when parents are missing.
 		removeCPGNameBeforePreemption string
-	}{
+	}
+	tests := []testCase{
 
 		{
 			name: "CPG Partial Preemption",
@@ -1724,11 +1985,11 @@ func TestCompositePodGroupPreemption(t *testing.T) {
 				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
 				st.MakeNode().Name("node2").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
 			},
-			compositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
+			compositePodGroups: []*schedulingv1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Name("cpg1").Namespace("default").Priority(100).BasicPolicy().WorkloadRef("wl1", "t1").Obj(),
 			},
 			podGroups: []*schedulingv1beta1.PodGroup{
-				st.MakePodGroup().Name("pg1").Namespace("default").Priority(100).MinCount(3).ParentCompositePodGroup("cpg1").WorkloadRef("t1", "wl1").Obj(),
+				st.MakePodGroup().Name("pg1").Namespace("default").Priority(100).MinCount(3).ParentCompositePodGroup("cpg1").WorkloadRef("wl1", "t1").Obj(),
 			},
 			initialPods: []*v1.Pod{
 				st.MakePod().Name("low-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").ZeroTerminationGracePeriod().Priority(10).Node("node1").Obj(),
@@ -1739,12 +2000,11 @@ func TestCompositePodGroupPreemption(t *testing.T) {
 				st.MakePod().Name("high-2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
 				st.MakePod().Name("high-3").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
 			},
-			expectedScheduled:              []string{"high-1", "high-2", "high-3", "low-2"},
-			expectedPreempted:              []string{"low-1"},
-			expectedPodsPreemptedByWAP:     1,
-			customPluginName:               "mockScorePlugin",
-			customPluginFunc:               newPresetScorePlugin(map[string]int64{"node1": 100, "node2": 0}),
-			enablePodGroupPreemptionPolicy: true,
+			expectedScheduled:          []string{"high-1", "high-2", "high-3", "low-2"},
+			expectedPreempted:          []string{"low-1"},
+			expectedPodsPreemptedByWAP: 1,
+			customPluginName:           "mockScorePlugin",
+			customPluginFunc:           newPresetScorePlugin(map[string]int64{"node1": 100, "node2": 0}),
 		},
 		{
 			name: "CPG Victim Across Multiple Nodes, CPG DisruptionModeAll",
@@ -1752,12 +2012,12 @@ func TestCompositePodGroupPreemption(t *testing.T) {
 				st.MakeNode().Name("node1").Label("kubernetes.io/hostname", "node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
 				st.MakeNode().Name("node2").Label("kubernetes.io/hostname", "node2").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
 			},
-			compositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
-				st.MakeCompositePodGroup().Name("cpg1").Namespace("default").Priority(10).BasicPolicy().DisruptionModeAll().WorkloadRef("wl1", "t1").Obj(),
+			compositePodGroups: []*schedulingv1beta1.CompositePodGroup{
+				st.MakeCompositePodGroup().Name("cpg1").Namespace("default").Priority(10).MinGroupCount(1).DisruptionModeAll().WorkloadRef("wl1", "t1").Obj(),
 			},
 			podGroups: []*schedulingv1beta1.PodGroup{
-				st.MakePodGroup().Name("pg1").Namespace("default").Priority(10).MinCount(2).ParentCompositePodGroup("cpg1").WorkloadRef("t1", "wl1").Obj(),
-				st.MakePodGroup().Name("pg2").Namespace("default").Priority(10).MinCount(1).ParentCompositePodGroup("cpg1").WorkloadRef("t1", "wl1").Obj(),
+				st.MakePodGroup().Name("pg1").Namespace("default").Priority(10).MinCount(2).ParentCompositePodGroup("cpg1").WorkloadRef("wl1", "t1").Obj(),
+				st.MakePodGroup().Name("pg2").Namespace("default").Priority(10).MinCount(1).ParentCompositePodGroup("cpg1").WorkloadRef("wl1", "t1").Obj(),
 			},
 			initialPods: []*v1.Pod{
 				st.MakePod().Name("low-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").Node("node1").ZeroTerminationGracePeriod().Priority(10).Obj(),
@@ -1767,10 +2027,9 @@ func TestCompositePodGroupPreemption(t *testing.T) {
 			preemptorPods: []*v1.Pod{
 				st.MakePod().Name("high-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").NodeSelector(map[string]string{"kubernetes.io/hostname": "node1"}).ZeroTerminationGracePeriod().Priority(100).Obj(),
 			},
-			expectedScheduled:              []string{"high-1"},
-			expectedPreempted:              []string{"low-1", "low-2", "low-3"},
-			expectedPodsPreemptedByWAP:     3,
-			enablePodGroupPreemptionPolicy: false,
+			expectedScheduled:          []string{"high-1"},
+			expectedPreempted:          []string{"low-1", "low-2", "low-3"},
+			expectedPodsPreemptedByWAP: 3,
 		},
 		{
 			name: "CPG Victim Across Multiple Nodes, CPG DisruptionModeSingle",
@@ -1778,12 +2037,12 @@ func TestCompositePodGroupPreemption(t *testing.T) {
 				st.MakeNode().Name("node1").Label("kubernetes.io/hostname", "node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
 				st.MakeNode().Name("node2").Label("kubernetes.io/hostname", "node2").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
 			},
-			compositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
+			compositePodGroups: []*schedulingv1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Name("cpg1").Namespace("default").Priority(10).BasicPolicy().DisruptionModeSingle().WorkloadRef("wl1", "t1").Obj(),
 			},
 			podGroups: []*schedulingv1beta1.PodGroup{
-				st.MakePodGroup().Name("pg1").Namespace("default").Priority(10).MinCount(2).DisruptionModeSingle().ParentCompositePodGroup("cpg1").WorkloadRef("t1", "wl1").Obj(),
-				st.MakePodGroup().Name("pg2").Namespace("default").Priority(10).MinCount(1).DisruptionModeSingle().ParentCompositePodGroup("cpg1").WorkloadRef("t1", "wl1").Obj(),
+				st.MakePodGroup().Name("pg1").Namespace("default").Priority(10).MinCount(2).DisruptionModeSingle().ParentCompositePodGroup("cpg1").WorkloadRef("wl1", "t1").Obj(),
+				st.MakePodGroup().Name("pg2").Namespace("default").Priority(10).MinCount(1).DisruptionModeSingle().ParentCompositePodGroup("cpg1").WorkloadRef("wl1", "t1").Obj(),
 			},
 			initialPods: []*v1.Pod{
 				st.MakePod().Name("low-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").Node("node1").ZeroTerminationGracePeriod().Priority(10).Obj(),
@@ -1793,21 +2052,20 @@ func TestCompositePodGroupPreemption(t *testing.T) {
 			preemptorPods: []*v1.Pod{
 				st.MakePod().Name("high-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").NodeSelector(map[string]string{"kubernetes.io/hostname": "node1"}).ZeroTerminationGracePeriod().Priority(100).Obj(),
 			},
-			expectedScheduled:              []string{"high-1", "low-2", "low-3"},
-			expectedPreempted:              []string{"low-1"},
-			expectedPodsPreemptedByWAP:     1,
-			enablePodGroupPreemptionPolicy: false,
+			expectedScheduled:          []string{"high-1", "low-2", "low-3"},
+			expectedPreempted:          []string{"low-1"},
+			expectedPodsPreemptedByWAP: 1,
 		},
 		{
 			name: "CPG Preemption aborted if victim yields insufficient resources",
 			nodes: []*v1.Node{
 				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
 			},
-			compositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
+			compositePodGroups: []*schedulingv1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Name("cpg-victim").Namespace("default").Priority(10).BasicPolicy().WorkloadRef("wl1", "t1").Obj(),
 			},
 			podGroups: []*schedulingv1beta1.PodGroup{
-				st.MakePodGroup().Name("pg-victim").Namespace("default").Priority(10).MinCount(1).ParentCompositePodGroup("cpg-victim").WorkloadRef("t1", "wl1").Obj(),
+				st.MakePodGroup().Name("pg-victim").Namespace("default").Priority(10).MinCount(1).ParentCompositePodGroup("cpg-victim").WorkloadRef("wl1", "t1").Obj(),
 			},
 			initialPods: []*v1.Pod{
 				st.MakePod().Name("low-pod").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg-victim").Node("node1").ZeroTerminationGracePeriod().Priority(10).Obj(),
@@ -1815,27 +2073,26 @@ func TestCompositePodGroupPreemption(t *testing.T) {
 			preemptorPods: []*v1.Pod{
 				st.MakePod().Name("high-preemptor").Req(map[v1.ResourceName]string{v1.ResourceCPU: "3"}).Container("image").ZeroTerminationGracePeriod().Priority(100).Obj(),
 			},
-			expectedScheduled:              []string{},
-			expectedPreempted:              []string{},
-			expectedUnschedulable:          []string{"high-preemptor"},
-			expectedPodsPreemptedByWAP:     0,
-			enablePodGroupPreemptionPolicy: false,
+			expectedScheduled:          []string{},
+			expectedPreempted:          []string{},
+			expectedUnschedulable:      []string{"high-preemptor"},
+			expectedPodsPreemptedByWAP: 0,
 		},
 		{
 			name: "CPG Tie-Breaking: PodGroup chosen over CompositePodGroup",
 			nodes: []*v1.Node{
 				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
 			},
-			compositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
-				st.MakeCompositePodGroup().Name("cpg-victim").Namespace("default").Priority(10).BasicPolicy().DisruptionModeAll().WorkloadRef("wl1", "t1").Obj(),
+			compositePodGroups: []*schedulingv1beta1.CompositePodGroup{
+				st.MakeCompositePodGroup().Name("cpg-victim").Namespace("default").Priority(10).MinGroupCount(1).DisruptionModeAll().WorkloadRef("wl1", "t1").Obj(),
 			},
 			podGroups: []*schedulingv1beta1.PodGroup{
 				// Workload 1: A standalone PodGroup (Rank 2)
-				st.MakePodGroup().Name("pg-victim-standalone").Namespace("default").Priority(10).MinCount(1).WorkloadRef("t1", "wl2").Obj(),
+				st.MakePodGroup().Name("pg-victim-standalone").Namespace("default").Priority(10).MinCount(1).WorkloadRef("wl2", "t1").Obj(),
 				// Workload 2: A PodGroup under a CompositePodGroup (Rank 3)
-				st.MakePodGroup().Name("pg-victim-child").Namespace("default").Priority(10).MinCount(1).ParentCompositePodGroup("cpg-victim").WorkloadRef("t1", "wl1").Obj(),
+				st.MakePodGroup().Name("pg-victim-child").Namespace("default").Priority(10).MinCount(1).ParentCompositePodGroup("cpg-victim").WorkloadRef("wl1", "t1").Obj(),
 				// Preemptor Workload
-				st.MakePodGroup().Name("pg-preemptor").Namespace("default").Priority(100).MinCount(1).WorkloadRef("t1", "wl3").Obj(),
+				st.MakePodGroup().Name("pg-preemptor").Namespace("default").Priority(100).MinCount(1).WorkloadRef("wl3", "t1").Obj(),
 			},
 			initialPods: []*v1.Pod{
 				// Standalone PG Pod
@@ -1848,23 +2105,22 @@ func TestCompositePodGroupPreemption(t *testing.T) {
 			},
 			// The scheduler needs 1 CPU. It has two options: low-pg (Rank 2) or low-cpg (Rank 3).
 			// Since Rank 2 < Rank 3, it will choose low-pg (standalone PG) to reprieve the more important CPG structure.
-			expectedScheduled:              []string{"high-preemptor"},
-			expectedPreempted:              []string{"low-pg"},
-			expectedPodsPreemptedByWAP:     1,
-			enablePodGroupPreemptionPolicy: false,
+			expectedScheduled:          []string{"high-preemptor"},
+			expectedPreempted:          []string{"low-pg"},
+			expectedPodsPreemptedByWAP: 1,
 		},
 		{
 			name: "Scheduler targets lower-priority CPG over higher-priority CPG",
 			nodes: []*v1.Node{
 				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "3", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
 			},
-			compositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
+			compositePodGroups: []*schedulingv1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Name("cpg-lower").Namespace("default").Priority(10).BasicPolicy().WorkloadRef("wl1", "t1").Obj(),
 				st.MakeCompositePodGroup().Name("cpg-higher").Namespace("default").Priority(20).BasicPolicy().WorkloadRef("wl2", "t1").Obj(),
 			},
 			podGroups: []*schedulingv1beta1.PodGroup{
-				st.MakePodGroup().Name("pg-lower").Namespace("default").Priority(10).MinCount(1).ParentCompositePodGroup("cpg-lower").WorkloadRef("t1", "wl1").Obj(),
-				st.MakePodGroup().Name("pg-higher").Namespace("default").Priority(20).MinCount(1).ParentCompositePodGroup("cpg-higher").WorkloadRef("t1", "wl2").Obj(),
+				st.MakePodGroup().Name("pg-lower").Namespace("default").Priority(10).MinCount(1).ParentCompositePodGroup("cpg-lower").WorkloadRef("wl1", "t1").Obj(),
+				st.MakePodGroup().Name("pg-higher").Namespace("default").Priority(20).MinCount(1).ParentCompositePodGroup("cpg-higher").WorkloadRef("wl2", "t1").Obj(),
 			},
 			initialPods: []*v1.Pod{
 				st.MakePod().Name("lower-pod").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg-lower").Node("node1").ZeroTerminationGracePeriod().Priority(10).Obj(),
@@ -1873,23 +2129,22 @@ func TestCompositePodGroupPreemption(t *testing.T) {
 			preemptorPods: []*v1.Pod{
 				st.MakePod().Name("high-preemptor").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").ZeroTerminationGracePeriod().Priority(100).Obj(),
 			},
-			expectedScheduled:              []string{"high-preemptor", "higher-pod"},
-			expectedPreempted:              []string{"lower-pod"},
-			expectedPodsPreemptedByWAP:     1,
-			enablePodGroupPreemptionPolicy: false,
+			expectedScheduled:          []string{"high-preemptor", "higher-pod"},
+			expectedPreempted:          []string{"lower-pod"},
+			expectedPodsPreemptedByWAP: 1,
 		},
 		{
 			name: "PDB Violation reprieves the entire CPG victim (DisruptionModeAll)",
 			nodes: []*v1.Node{
 				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "3", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
 			},
-			compositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
-				st.MakeCompositePodGroup().Name("cpg-pdb").Namespace("default").Priority(10).BasicPolicy().DisruptionModeAll().WorkloadRef("wl1", "t1").Obj(),
-				st.MakeCompositePodGroup().Name("cpg-no-pdb").Namespace("default").Priority(10).BasicPolicy().DisruptionModeAll().WorkloadRef("wl2", "t1").Obj(),
+			compositePodGroups: []*schedulingv1beta1.CompositePodGroup{
+				st.MakeCompositePodGroup().Name("cpg-pdb").Namespace("default").Priority(10).MinGroupCount(1).DisruptionModeAll().WorkloadRef("wl1", "t1").Obj(),
+				st.MakeCompositePodGroup().Name("cpg-no-pdb").Namespace("default").Priority(10).MinGroupCount(1).DisruptionModeAll().WorkloadRef("wl2", "t1").Obj(),
 			},
 			podGroups: []*schedulingv1beta1.PodGroup{
-				st.MakePodGroup().Name("pg-pdb").Namespace("default").Priority(10).MinCount(2).ParentCompositePodGroup("cpg-pdb").WorkloadRef("t1", "wl1").Obj(),
-				st.MakePodGroup().Name("pg-no-pdb").Namespace("default").Priority(10).MinCount(1).ParentCompositePodGroup("cpg-no-pdb").WorkloadRef("t1", "wl2").Obj(),
+				st.MakePodGroup().Name("pg-pdb").Namespace("default").Priority(10).MinCount(2).ParentCompositePodGroup("cpg-pdb").WorkloadRef("wl1", "t1").Obj(),
+				st.MakePodGroup().Name("pg-no-pdb").Namespace("default").Priority(10).MinCount(1).ParentCompositePodGroup("cpg-no-pdb").WorkloadRef("wl2", "t1").Obj(),
 			},
 			initialPods: []*v1.Pod{
 				st.MakePod().Name("pod-pdb-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg-pdb").Node("node1").Label("app", "foo").ZeroTerminationGracePeriod().Priority(10).Obj(),
@@ -1906,22 +2161,57 @@ func TestCompositePodGroupPreemption(t *testing.T) {
 			preemptorPods: []*v1.Pod{
 				st.MakePod().Name("high-preemptor").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").ZeroTerminationGracePeriod().Priority(100).Obj(),
 			},
-			expectedScheduled:              []string{"high-preemptor", "pod-pdb-1", "pod-pdb-2"},
-			expectedPreempted:              []string{"pod-no-pdb-1"},
-			expectedPodsPreemptedByWAP:     1,
-			enablePodGroupPreemptionPolicy: false,
+			expectedScheduled:          []string{"high-preemptor", "pod-pdb-1", "pod-pdb-2"},
+			expectedPreempted:          []string{"pod-no-pdb-1"},
+			expectedPodsPreemptedByWAP: 1,
+		},
+		{
+			// Same layout as "PDB Violation reprieves the entire CPG victim", but the
+			// preemptor needs 2 CPU: evicting cpg-no-pdb frees only 1, so the protected
+			// CPG is the only way in. pod-no-pdb-1 is then reprieved: no more is evicted
+			// than needed.
+			name: "PDB is violated as a last resort, and no more than needed is evicted",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "3", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+			},
+			compositePodGroups: []*schedulingv1beta1.CompositePodGroup{
+				st.MakeCompositePodGroup().Name("cpg-pdb").Namespace("default").Priority(10).MinGroupCount(1).DisruptionModeAll().WorkloadRef("wl1", "t1").Obj(),
+				st.MakeCompositePodGroup().Name("cpg-no-pdb").Namespace("default").Priority(10).MinGroupCount(1).DisruptionModeAll().WorkloadRef("wl2", "t1").Obj(),
+			},
+			podGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Name("pg-pdb").Namespace("default").Priority(10).MinCount(2).ParentCompositePodGroup("cpg-pdb").WorkloadRef("wl1", "t1").Obj(),
+				st.MakePodGroup().Name("pg-no-pdb").Namespace("default").Priority(10).MinCount(1).ParentCompositePodGroup("cpg-no-pdb").WorkloadRef("wl2", "t1").Obj(),
+			},
+			initialPods: []*v1.Pod{
+				st.MakePod().Name("pod-pdb-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg-pdb").Node("node1").Label("app", "foo").ZeroTerminationGracePeriod().Priority(10).Obj(),
+				st.MakePod().Name("pod-pdb-2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg-pdb").Node("node1").Label("app", "foo").ZeroTerminationGracePeriod().Priority(10).Obj(),
+				st.MakePod().Name("pod-no-pdb-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg-no-pdb").Node("node1").ZeroTerminationGracePeriod().Priority(10).Obj(),
+			},
+			pdb: &policyv1.PodDisruptionBudget{
+				ObjectMeta: metav1.ObjectMeta{Name: "pdb"},
+				Spec: policyv1.PodDisruptionBudgetSpec{
+					MinAvailable: &intstr.IntOrString{IntVal: 2},
+					Selector:     &metav1.LabelSelector{MatchLabels: map[string]string{"app": "foo"}},
+				},
+			},
+			preemptorPods: []*v1.Pod{
+				st.MakePod().Name("high-preemptor").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").ZeroTerminationGracePeriod().Priority(100).Obj(),
+			},
+			expectedScheduled:          []string{"high-preemptor", "pod-no-pdb-1"},
+			expectedPreempted:          []string{"pod-pdb-1", "pod-pdb-2"},
+			expectedPodsPreemptedByWAP: 2,
 		},
 		{
 			name: "PDB Violation reprieves only the child PG (DisruptionModeSingle)",
 			nodes: []*v1.Node{
 				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "3", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
 			},
-			compositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
+			compositePodGroups: []*schedulingv1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Name("cpg-single").Namespace("default").Priority(10).BasicPolicy().DisruptionModeSingle().WorkloadRef("wl1", "t1").Obj(),
 			},
 			podGroups: []*schedulingv1beta1.PodGroup{
-				st.MakePodGroup().Name("pg-pdb").Namespace("default").Priority(10).MinCount(2).DisruptionModeSingle().ParentCompositePodGroup("cpg-single").WorkloadRef("t1", "wl1").Obj(),
-				st.MakePodGroup().Name("pg-no-pdb").Namespace("default").Priority(10).MinCount(1).DisruptionModeSingle().ParentCompositePodGroup("cpg-single").WorkloadRef("t1", "wl1").Obj(),
+				st.MakePodGroup().Name("pg-pdb").Namespace("default").Priority(10).MinCount(2).DisruptionModeSingle().ParentCompositePodGroup("cpg-single").WorkloadRef("wl1", "t1").Obj(),
+				st.MakePodGroup().Name("pg-no-pdb").Namespace("default").Priority(10).MinCount(1).DisruptionModeSingle().ParentCompositePodGroup("cpg-single").WorkloadRef("wl1", "t1").Obj(),
 			},
 			initialPods: []*v1.Pod{
 				st.MakePod().Name("pod-pdb-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg-pdb").Node("node1").Label("app", "foo").ZeroTerminationGracePeriod().Priority(10).Obj(),
@@ -1938,10 +2228,9 @@ func TestCompositePodGroupPreemption(t *testing.T) {
 			preemptorPods: []*v1.Pod{
 				st.MakePod().Name("high-preemptor").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").ZeroTerminationGracePeriod().Priority(100).Obj(),
 			},
-			expectedScheduled:              []string{"high-preemptor", "pod-pdb-1", "pod-pdb-2"},
-			expectedPreempted:              []string{"pod-no-pdb-1"},
-			expectedPodsPreemptedByWAP:     1,
-			enablePodGroupPreemptionPolicy: false,
+			expectedScheduled:          []string{"high-preemptor", "pod-pdb-1", "pod-pdb-2"},
+			expectedPreempted:          []string{"pod-no-pdb-1"},
+			expectedPodsPreemptedByWAP: 1,
 		},
 		{
 			name: "3-Level Nested CPG resolves DisruptionMode up to the grandparent",
@@ -1949,13 +2238,13 @@ func TestCompositePodGroupPreemption(t *testing.T) {
 				st.MakeNode().Name("node1").Label("kubernetes.io/hostname", "node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
 				st.MakeNode().Name("node2").Label("kubernetes.io/hostname", "node2").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
 			},
-			compositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
-				st.MakeCompositePodGroup().Name("cpg-grandparent").Namespace("default").Priority(10).BasicPolicy().DisruptionModeAll().WorkloadRef("wl1", "t1").Obj(),
-				st.MakeCompositePodGroup().Name("cpg-parent").Namespace("default").Priority(10).BasicPolicy().DisruptionModeSingle().ParentCompositePodGroup("cpg-grandparent").WorkloadRef("wl1", "t1").Obj(),
+			compositePodGroups: []*schedulingv1beta1.CompositePodGroup{
+				st.MakeCompositePodGroup().Name("cpg-grandparent").Namespace("default").Priority(10).MinGroupCount(1).DisruptionModeAll().WorkloadRef("wl1", "t1").Obj(),
+				st.MakeCompositePodGroup().Name("cpg-parent").Namespace("default").Priority(10).MinGroupCount(1).DisruptionModeSingle().ParentCompositePodGroup("cpg-grandparent").WorkloadRef("wl1", "t1").Obj(),
 			},
 			podGroups: []*schedulingv1beta1.PodGroup{
-				st.MakePodGroup().Name("pg1").Namespace("default").Priority(10).MinCount(2).DisruptionModeSingle().ParentCompositePodGroup("cpg-parent").WorkloadRef("t1", "wl1").Obj(),
-				st.MakePodGroup().Name("pg2").Namespace("default").Priority(10).MinCount(1).DisruptionModeSingle().ParentCompositePodGroup("cpg-parent").WorkloadRef("t1", "wl1").Obj(),
+				st.MakePodGroup().Name("pg1").Namespace("default").Priority(10).MinCount(2).DisruptionModeSingle().ParentCompositePodGroup("cpg-parent").WorkloadRef("wl1", "t1").Obj(),
+				st.MakePodGroup().Name("pg2").Namespace("default").Priority(10).MinCount(1).DisruptionModeSingle().ParentCompositePodGroup("cpg-parent").WorkloadRef("wl1", "t1").Obj(),
 			},
 			initialPods: []*v1.Pod{
 				st.MakePod().Name("low-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").Node("node1").ZeroTerminationGracePeriod().Priority(10).Obj(),
@@ -1965,10 +2254,9 @@ func TestCompositePodGroupPreemption(t *testing.T) {
 			preemptorPods: []*v1.Pod{
 				st.MakePod().Name("high-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").NodeSelector(map[string]string{"kubernetes.io/hostname": "node1"}).ZeroTerminationGracePeriod().Priority(100).Obj(),
 			},
-			expectedScheduled:              []string{"high-1"},
-			expectedPreempted:              []string{"low-1", "low-2", "low-3"},
-			expectedPodsPreemptedByWAP:     3,
-			enablePodGroupPreemptionPolicy: false,
+			expectedScheduled:          []string{"high-1"},
+			expectedPreempted:          []string{"low-1", "low-2", "low-3"},
+			expectedPodsPreemptedByWAP: 3,
 		},
 		{
 			name: "Hierarchical DisruptionMode - Grandparent Single, Parent All",
@@ -1976,13 +2264,13 @@ func TestCompositePodGroupPreemption(t *testing.T) {
 				st.MakeNode().Name("node1").Label("kubernetes.io/hostname", "node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
 				st.MakeNode().Name("node2").Label("kubernetes.io/hostname", "node2").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
 			},
-			compositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
+			compositePodGroups: []*schedulingv1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Name("cpg-grandparent").Namespace("default").Priority(10).BasicPolicy().DisruptionModeSingle().WorkloadRef("wl1", "t1").Obj(),
-				st.MakeCompositePodGroup().Name("cpg-parent").Namespace("default").Priority(10).BasicPolicy().DisruptionModeAll().ParentCompositePodGroup("cpg-grandparent").WorkloadRef("wl1", "t1").Obj(),
+				st.MakeCompositePodGroup().Name("cpg-parent").Namespace("default").Priority(10).MinGroupCount(1).DisruptionModeAll().ParentCompositePodGroup("cpg-grandparent").WorkloadRef("wl1", "t1").Obj(),
 			},
 			podGroups: []*schedulingv1beta1.PodGroup{
-				st.MakePodGroup().Name("pg1").Namespace("default").Priority(10).MinCount(2).DisruptionModeSingle().ParentCompositePodGroup("cpg-parent").WorkloadRef("t1", "wl1").Obj(),
-				st.MakePodGroup().Name("pg2").Namespace("default").Priority(10).MinCount(1).DisruptionModeSingle().ParentCompositePodGroup("cpg-grandparent").WorkloadRef("t1", "wl1").Obj(),
+				st.MakePodGroup().Name("pg1").Namespace("default").Priority(10).MinCount(2).DisruptionModeSingle().ParentCompositePodGroup("cpg-parent").WorkloadRef("wl1", "t1").Obj(),
+				st.MakePodGroup().Name("pg2").Namespace("default").Priority(10).MinCount(1).DisruptionModeSingle().ParentCompositePodGroup("cpg-grandparent").WorkloadRef("wl1", "t1").Obj(),
 			},
 			initialPods: []*v1.Pod{
 				st.MakePod().Name("low-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").Node("node1").ZeroTerminationGracePeriod().Priority(10).Obj(),
@@ -1992,21 +2280,20 @@ func TestCompositePodGroupPreemption(t *testing.T) {
 			preemptorPods: []*v1.Pod{
 				st.MakePod().Name("high-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").NodeSelector(map[string]string{"kubernetes.io/hostname": "node1"}).ZeroTerminationGracePeriod().Priority(100).Obj(),
 			},
-			expectedScheduled:              []string{"high-1", "low-3"},
-			expectedPreempted:              []string{"low-1", "low-2"},
-			expectedPodsPreemptedByWAP:     2,
-			enablePodGroupPreemptionPolicy: false,
+			expectedScheduled:          []string{"high-1", "low-3"},
+			expectedPreempted:          []string{"low-1", "low-2"},
+			expectedPodsPreemptedByWAP: 2,
 		},
 		{
-			name: "CPG with default preemption policy performs preemption, with PodGroupPreemptionPolicy enabled",
+			name: "CPG with default preemption policy performs preemption",
 			nodes: []*v1.Node{
 				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "3", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
 			},
-			compositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
+			compositePodGroups: []*schedulingv1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Name("cpg1").Namespace("default").Priority(100).BasicPolicy().WorkloadRef("wl1", "t1").Obj(),
 			},
 			podGroups: []*schedulingv1beta1.PodGroup{
-				st.MakePodGroup().Name("pg1").Namespace("default").Priority(100).MinCount(3).ParentCompositePodGroup("cpg1").WorkloadRef("t1", "wl1").Obj(),
+				st.MakePodGroup().Name("pg1").Namespace("default").Priority(100).MinCount(3).ParentCompositePodGroup("cpg1").WorkloadRef("wl1", "t1").Obj(),
 			},
 			initialPods: []*v1.Pod{
 				st.MakePod().Name("low-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").ZeroTerminationGracePeriod().Priority(10).Obj(),
@@ -2018,22 +2305,21 @@ func TestCompositePodGroupPreemption(t *testing.T) {
 				st.MakePod().Name("high-2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
 				st.MakePod().Name("high-3").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
 			},
-			expectedScheduled:              []string{"high-1", "high-2", "high-3"},
-			expectedPreempted:              []string{"low-1", "low-2", "low-3"},
-			expectedPodsPreemptedByWAP:     3,
-			enablePodGroupPreemptionPolicy: true,
+			expectedScheduled:          []string{"high-1", "high-2", "high-3"},
+			expectedPreempted:          []string{"low-1", "low-2", "low-3"},
+			expectedPodsPreemptedByWAP: 3,
 		},
 		{
 			name: "CPG with PreemptNever Policy",
 			nodes: []*v1.Node{
 				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "3", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
 			},
-			compositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
-				st.MakeCompositePodGroup().Name("cpg1").Namespace("default").Priority(100).BasicPolicy().WorkloadRef("wl1", "t1").PreemptionPolicy(schedulingv1alpha3.PreemptNever).Obj(),
+			compositePodGroups: []*schedulingv1beta1.CompositePodGroup{
+				st.MakeCompositePodGroup().Name("cpg1").Namespace("default").Priority(100).BasicPolicy().WorkloadRef("wl1", "t1").PreemptionPolicy(schedulingv1beta1.PreemptNever).Obj(),
 			},
 			podGroups: []*schedulingv1beta1.PodGroup{
-				st.MakePodGroup().Name("pg1").Namespace("default").Priority(100).MinCount(2).ParentCompositePodGroup("cpg1").WorkloadRef("t1", "wl1").PreemptionPolicy(schedulingv1beta1.PreemptNever).Obj(),
-				st.MakePodGroup().Name("pg2").Namespace("default").Priority(100).MinCount(1).ParentCompositePodGroup("cpg1").WorkloadRef("t1", "wl1").PreemptionPolicy(schedulingv1beta1.PreemptNever).Obj(),
+				st.MakePodGroup().Name("pg1").Namespace("default").Priority(100).MinCount(2).ParentCompositePodGroup("cpg1").WorkloadRef("wl1", "t1").PreemptionPolicy(schedulingv1beta1.PreemptNever).Obj(),
+				st.MakePodGroup().Name("pg2").Namespace("default").Priority(100).MinCount(1).ParentCompositePodGroup("cpg1").WorkloadRef("wl1", "t1").PreemptionPolicy(schedulingv1beta1.PreemptNever).Obj(),
 			},
 			initialPods: []*v1.Pod{
 				st.MakePod().Name("low-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").ZeroTerminationGracePeriod().Priority(10).Obj(),
@@ -2045,23 +2331,22 @@ func TestCompositePodGroupPreemption(t *testing.T) {
 				st.MakePod().Name("high-2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).PreemptionPolicy(v1.PreemptNever).Obj(),
 				st.MakePod().Name("high-3").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg2").ZeroTerminationGracePeriod().Priority(100).PreemptionPolicy(v1.PreemptNever).Obj(),
 			},
-			expectedScheduled:              []string{"low-1", "low-2", "low-3"},
-			expectedPreempted:              []string{},
-			expectedUnschedulable:          []string{"high-1", "high-2", "high-3"},
-			expectedPodsPreemptedByWAP:     0,
-			enablePodGroupPreemptionPolicy: true,
+			expectedScheduled:          []string{"low-1", "low-2", "low-3"},
+			expectedPreempted:          []string{},
+			expectedUnschedulable:      []string{"high-1", "high-2", "high-3"},
+			expectedPodsPreemptedByWAP: 0,
 		},
 		{
 			name: "CPG with PreemptLowerPriority Policy",
 			nodes: []*v1.Node{
 				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "3", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
 			},
-			compositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
-				st.MakeCompositePodGroup().Name("cpg1").Namespace("default").Priority(100).BasicPolicy().WorkloadRef("wl1", "t1").PreemptionPolicy(schedulingv1alpha3.PreemptLowerPriority).Obj(),
+			compositePodGroups: []*schedulingv1beta1.CompositePodGroup{
+				st.MakeCompositePodGroup().Name("cpg1").Namespace("default").Priority(100).BasicPolicy().WorkloadRef("wl1", "t1").PreemptionPolicy(schedulingv1beta1.PreemptLowerPriority).Obj(),
 			},
 			podGroups: []*schedulingv1beta1.PodGroup{
-				st.MakePodGroup().Name("pg1").Namespace("default").Priority(100).MinCount(2).ParentCompositePodGroup("cpg1").WorkloadRef("t1", "wl1").PreemptionPolicy(schedulingv1beta1.PreemptLowerPriority).Obj(),
-				st.MakePodGroup().Name("pg2").Namespace("default").Priority(100).MinCount(1).ParentCompositePodGroup("cpg1").WorkloadRef("t1", "wl1").PreemptionPolicy(schedulingv1beta1.PreemptLowerPriority).Obj(),
+				st.MakePodGroup().Name("pg1").Namespace("default").Priority(100).MinCount(2).ParentCompositePodGroup("cpg1").WorkloadRef("wl1", "t1").PreemptionPolicy(schedulingv1beta1.PreemptLowerPriority).Obj(),
+				st.MakePodGroup().Name("pg2").Namespace("default").Priority(100).MinCount(1).ParentCompositePodGroup("cpg1").WorkloadRef("wl1", "t1").PreemptionPolicy(schedulingv1beta1.PreemptLowerPriority).Obj(),
 			},
 			initialPods: []*v1.Pod{
 				st.MakePod().Name("low-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").ZeroTerminationGracePeriod().Priority(10).Obj(),
@@ -2073,22 +2358,21 @@ func TestCompositePodGroupPreemption(t *testing.T) {
 				st.MakePod().Name("high-2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).PreemptionPolicy(v1.PreemptLowerPriority).Obj(),
 				st.MakePod().Name("high-3").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg2").ZeroTerminationGracePeriod().Priority(100).PreemptionPolicy(v1.PreemptLowerPriority).Obj(),
 			},
-			expectedScheduled:              []string{"high-1", "high-2", "high-3"},
-			expectedPreempted:              []string{"low-1", "low-2", "low-3"},
-			expectedToHaveNNNInfo:          []string{"high-1", "high-2", "high-3"},
-			expectedPodsPreemptedByWAP:     3,
-			enablePodGroupPreemptionPolicy: true,
+			expectedScheduled:          []string{"high-1", "high-2", "high-3"},
+			expectedPreempted:          []string{"low-1", "low-2", "low-3"},
+			expectedToHaveNNNInfo:      []string{"high-1", "high-2", "high-3"},
+			expectedPodsPreemptedByWAP: 3,
 		},
 		{
 			name: "CPG PreemptionPolicy PreemptNever prevents preemption",
 			nodes: []*v1.Node{
 				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "3", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
 			},
-			compositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
-				st.MakeCompositePodGroup().Name("cpg-preempt-never").Namespace("default").Priority(100).BasicPolicy().WorkloadRef("wl1", "t1").PreemptionPolicy(schedulingv1alpha3.PreemptNever).Obj(),
+			compositePodGroups: []*schedulingv1beta1.CompositePodGroup{
+				st.MakeCompositePodGroup().Name("cpg-preempt-never").Namespace("default").Priority(100).BasicPolicy().WorkloadRef("wl1", "t1").PreemptionPolicy(schedulingv1beta1.PreemptNever).Obj(),
 			},
 			podGroups: []*schedulingv1beta1.PodGroup{
-				st.MakePodGroup().Name("pg-preempt-never").Namespace("default").Priority(100).MinCount(2).ParentCompositePodGroup("cpg-preempt-never").WorkloadRef("t1", "wl1").PreemptionPolicy(schedulingv1beta1.PreemptNever).Obj(),
+				st.MakePodGroup().Name("pg-preempt-never").Namespace("default").Priority(100).MinCount(2).ParentCompositePodGroup("cpg-preempt-never").WorkloadRef("wl1", "t1").PreemptionPolicy(schedulingv1beta1.PreemptNever).Obj(),
 			},
 			initialPods: []*v1.Pod{
 				st.MakePod().Name("low-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").ZeroTerminationGracePeriod().Priority(10).Node("node1").Obj(),
@@ -2099,22 +2383,21 @@ func TestCompositePodGroupPreemption(t *testing.T) {
 				st.MakePod().Name("high-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").PodGroupName("pg-preempt-never").ZeroTerminationGracePeriod().Priority(100).PreemptionPolicy(v1.PreemptNever).Obj(),
 				st.MakePod().Name("high-2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg-preempt-never").ZeroTerminationGracePeriod().Priority(100).PreemptionPolicy(v1.PreemptNever).Obj(),
 			},
-			expectedScheduled:              []string{"low-1", "low-2", "low-3"},
-			expectedPreempted:              []string{},
-			expectedUnschedulable:          []string{"high-1", "high-2"},
-			expectedPodsPreemptedByWAP:     0,
-			enablePodGroupPreemptionPolicy: true,
+			expectedScheduled:          []string{"low-1", "low-2", "low-3"},
+			expectedPreempted:          []string{},
+			expectedUnschedulable:      []string{"high-1", "high-2"},
+			expectedPodsPreemptedByWAP: 0,
 		},
 		{
 			name: "CPG PreemptionPolicy PreemptLowerPriority allows preemption",
 			nodes: []*v1.Node{
 				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "3", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
 			},
-			compositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
-				st.MakeCompositePodGroup().Name("cpg-preempt-lower").Namespace("default").Priority(100).BasicPolicy().WorkloadRef("wl1", "t1").PreemptionPolicy(schedulingv1alpha3.PreemptLowerPriority).Obj(),
+			compositePodGroups: []*schedulingv1beta1.CompositePodGroup{
+				st.MakeCompositePodGroup().Name("cpg-preempt-lower").Namespace("default").Priority(100).BasicPolicy().WorkloadRef("wl1", "t1").PreemptionPolicy(schedulingv1beta1.PreemptLowerPriority).Obj(),
 			},
 			podGroups: []*schedulingv1beta1.PodGroup{
-				st.MakePodGroup().Name("pg-preempt-lower").Namespace("default").Priority(100).MinCount(2).ParentCompositePodGroup("cpg-preempt-lower").WorkloadRef("t1", "wl1").PreemptionPolicy(schedulingv1beta1.PreemptLowerPriority).Obj(),
+				st.MakePodGroup().Name("pg-preempt-lower").Namespace("default").Priority(100).MinCount(2).ParentCompositePodGroup("cpg-preempt-lower").WorkloadRef("wl1", "t1").PreemptionPolicy(schedulingv1beta1.PreemptLowerPriority).Obj(),
 			},
 			initialPods: []*v1.Pod{
 				st.MakePod().Name("low-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").ZeroTerminationGracePeriod().Priority(10).Node("node1").Obj(),
@@ -2125,22 +2408,21 @@ func TestCompositePodGroupPreemption(t *testing.T) {
 				st.MakePod().Name("high-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").PodGroupName("pg-preempt-lower").ZeroTerminationGracePeriod().Priority(100).PreemptionPolicy(v1.PreemptLowerPriority).Obj(),
 				st.MakePod().Name("high-2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg-preempt-lower").ZeroTerminationGracePeriod().Priority(100).PreemptionPolicy(v1.PreemptLowerPriority).Obj(),
 			},
-			expectedScheduled:              []string{"high-1", "high-2"},
-			expectedPreempted:              []string{"low-1", "low-2", "low-3"},
-			expectedToHaveNNNInfo:          []string{"high-1", "high-2"},
-			expectedPodsPreemptedByWAP:     3,
-			enablePodGroupPreemptionPolicy: true,
+			expectedScheduled:          []string{"high-1", "high-2"},
+			expectedPreempted:          []string{"low-1", "low-2", "low-3"},
+			expectedToHaveNNNInfo:      []string{"high-1", "high-2"},
+			expectedPodsPreemptedByWAP: 3,
 		},
 		{
-			name: "CPG with PreemptNever preemption policy in all pods does not perform preemption, with PodGroupPreemptionPolicy disabled",
+			name: "CPG with nil preemption policy and PreemptNever in all pods does not perform preemption",
 			nodes: []*v1.Node{
 				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "3", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
 			},
-			compositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
+			compositePodGroups: []*schedulingv1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Name("cpg1").Namespace("default").Priority(100).BasicPolicy().WorkloadRef("wl1", "t1").Obj(),
 			},
 			podGroups: []*schedulingv1beta1.PodGroup{
-				st.MakePodGroup().Name("pg1").Namespace("default").Priority(100).MinCount(3).ParentCompositePodGroup("cpg1").WorkloadRef("t1", "wl1").Obj(),
+				st.MakePodGroup().Name("pg1").Namespace("default").Priority(100).MinCount(3).ParentCompositePodGroup("cpg1").WorkloadRef("wl1", "t1").Obj(),
 			},
 			initialPods: []*v1.Pod{
 				st.MakePod().Name("low-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").ZeroTerminationGracePeriod().Priority(10).Obj(),
@@ -2152,11 +2434,10 @@ func TestCompositePodGroupPreemption(t *testing.T) {
 				st.MakePod().Name("high-2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).PreemptionPolicy(v1.PreemptNever).Obj(),
 				st.MakePod().Name("high-3").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).PreemptionPolicy(v1.PreemptNever).Obj(),
 			},
-			expectedScheduled:              []string{"low-1", "low-2", "low-3"},
-			expectedPreempted:              []string{},
-			expectedUnschedulable:          []string{"high-1", "high-2", "high-3"},
-			expectedPodsPreemptedByWAP:     0,
-			enablePodGroupPreemptionPolicy: false,
+			expectedScheduled:          []string{"low-1", "low-2", "low-3"},
+			expectedPreempted:          []string{},
+			expectedUnschedulable:      []string{"high-1", "high-2", "high-3"},
+			expectedPodsPreemptedByWAP: 0,
 		},
 		{
 			name: "CPG Gang scheduling: preemption with pod anti-affinity constraints",
@@ -2164,11 +2445,11 @@ func TestCompositePodGroupPreemption(t *testing.T) {
 				st.MakeNode().Name("node1").Label("kubernetes.io/hostname", "node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
 				st.MakeNode().Name("node2").Label("kubernetes.io/hostname", "node2").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
 			},
-			compositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
+			compositePodGroups: []*schedulingv1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Name("preemptor-cpg").Namespace("default").Priority(100).BasicPolicy().WorkloadRef("wl1", "t1").Obj(),
 			},
 			podGroups: []*schedulingv1beta1.PodGroup{
-				st.MakePodGroup().Name("preemptor-pg").Namespace("default").Priority(100).MinCount(2).ParentCompositePodGroup("preemptor-cpg").WorkloadRef("t1", "wl1").Obj(),
+				st.MakePodGroup().Name("preemptor-pg").Namespace("default").Priority(100).MinCount(2).ParentCompositePodGroup("preemptor-cpg").WorkloadRef("wl1", "t1").Obj(),
 			},
 			initialPods: []*v1.Pod{
 				st.MakePod().Name("initial-pod").Label("app", "initial").Node("node1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "0.25"}).Container("image").ZeroTerminationGracePeriod().Priority(10).Obj(),
@@ -2179,10 +2460,9 @@ func TestCompositePodGroupPreemption(t *testing.T) {
 				st.MakePod().Name("preemptor-2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1.5"}).Container("image").PodGroupName("preemptor-pg").ZeroTerminationGracePeriod().Priority(100).
 					PodAntiAffinityExists("app", "kubernetes.io/hostname", st.PodAntiAffinityWithRequiredReq).Obj(),
 			},
-			expectedScheduled:              []string{"preemptor-1", "preemptor-2"},
-			expectedPreempted:              []string{"initial-pod"},
-			expectedPodsPreemptedByWAP:     1,
-			enablePodGroupPreemptionPolicy: true,
+			expectedScheduled:          []string{"preemptor-1", "preemptor-2"},
+			expectedPreempted:          []string{"initial-pod"},
+			expectedPodsPreemptedByWAP: 1,
 		},
 		{
 			name: "CPG Gang scheduling: preemption with pod node port",
@@ -2190,11 +2470,11 @@ func TestCompositePodGroupPreemption(t *testing.T) {
 				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
 				st.MakeNode().Name("node2").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
 			},
-			compositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
+			compositePodGroups: []*schedulingv1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Name("preemptor-cpg").Namespace("default").Priority(100).BasicPolicy().WorkloadRef("wl1", "t1").Obj(),
 			},
 			podGroups: []*schedulingv1beta1.PodGroup{
-				st.MakePodGroup().Name("preemptor-pg").Namespace("default").Priority(100).MinCount(2).ParentCompositePodGroup("preemptor-cpg").WorkloadRef("t1", "wl1").Obj(),
+				st.MakePodGroup().Name("preemptor-pg").Namespace("default").Priority(100).MinCount(2).ParentCompositePodGroup("preemptor-cpg").WorkloadRef("wl1", "t1").Obj(),
 			},
 			initialPods: []*v1.Pod{
 				st.MakePod().Name("initial-pod").ContainerPort([]v1.ContainerPort{{ContainerPort: 8080, HostPort: 8080}}).Node("node1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "0.25"}).Container("image").ZeroTerminationGracePeriod().Priority(10).Obj(),
@@ -2203,23 +2483,22 @@ func TestCompositePodGroupPreemption(t *testing.T) {
 				st.MakePod().Name("preemptor-1").ContainerPort([]v1.ContainerPort{{ContainerPort: 8080, HostPort: 8080}}).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1.5"}).Container("image").PodGroupName("preemptor-pg").ZeroTerminationGracePeriod().Priority(100).Obj(),
 				st.MakePod().Name("preemptor-2").ContainerPort([]v1.ContainerPort{{ContainerPort: 8080, HostPort: 8080}}).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1.5"}).Container("image").PodGroupName("preemptor-pg").ZeroTerminationGracePeriod().Priority(100).Obj(),
 			},
-			expectedScheduled:              []string{"preemptor-1", "preemptor-2"},
-			expectedPreempted:              []string{"initial-pod"},
-			expectedPodsPreemptedByWAP:     1,
-			enablePodGroupPreemptionPolicy: true,
+			expectedScheduled:          []string{"preemptor-1", "preemptor-2"},
+			expectedPreempted:          []string{"initial-pod"},
+			expectedPodsPreemptedByWAP: 1,
 		},
 		{
 			name: "Reserve plugins are called during preemption simulation, so second pod fails",
 			nodes: []*v1.Node{
 				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
 			},
-			compositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
+			compositePodGroups: []*schedulingv1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Name("cpg-victim").Namespace("default").Priority(10).BasicPolicy().WorkloadRef("wl1", "t1").Obj(),
 				st.MakeCompositePodGroup().Name("cpg-preemptor").Namespace("default").Priority(100).BasicPolicy().WorkloadRef("wl2", "t2").Obj(),
 			},
 			podGroups: []*schedulingv1beta1.PodGroup{
-				st.MakePodGroup().Name("pg-victim").Namespace("default").Priority(10).MinCount(2).ParentCompositePodGroup("cpg-victim").WorkloadRef("t1", "wl1").Obj(),
-				st.MakePodGroup().Name("pg-preemptor").Namespace("default").Priority(100).MinCount(2).ParentCompositePodGroup("cpg-preemptor").WorkloadRef("t2", "wl2").Obj(),
+				st.MakePodGroup().Name("pg-victim").Namespace("default").Priority(10).MinCount(2).ParentCompositePodGroup("cpg-victim").WorkloadRef("wl1", "t1").Obj(),
+				st.MakePodGroup().Name("pg-preemptor").Namespace("default").Priority(100).MinCount(2).ParentCompositePodGroup("cpg-preemptor").WorkloadRef("wl2", "t2").Obj(),
 			},
 			initialPods: []*v1.Pod{
 				st.MakePod().Name("low-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg-victim").Node("node1").ZeroTerminationGracePeriod().Priority(10).Obj(),
@@ -2243,13 +2522,13 @@ func TestCompositePodGroupPreemption(t *testing.T) {
 				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
 				st.MakeNode().Name("node2").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
 			},
-			compositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
+			compositePodGroups: []*schedulingv1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Name("cpg-victim").Namespace("default").Priority(10).MinGroupCount(1).WorkloadRef("wl1", "t1").Obj(),
 				st.MakeCompositePodGroup().Name("cpg-preemptor").Namespace("default").Priority(100).MinGroupCount(1).WorkloadRef("wl2", "t2").Obj(),
 			},
 			podGroups: []*schedulingv1beta1.PodGroup{
-				st.MakePodGroup().Name("pg-victim").Namespace("default").Priority(10).MinCount(4).ParentCompositePodGroup("cpg-victim").WorkloadRef("t1", "wl1").Obj(),
-				st.MakePodGroup().Name("pg-preemptor").Namespace("default").Priority(100).MinCount(4).ParentCompositePodGroup("cpg-preemptor").WorkloadRef("t2", "wl2").Obj(),
+				st.MakePodGroup().Name("pg-victim").Namespace("default").Priority(10).MinCount(4).ParentCompositePodGroup("cpg-victim").WorkloadRef("wl1", "t1").Obj(),
+				st.MakePodGroup().Name("pg-preemptor").Namespace("default").Priority(100).MinCount(4).ParentCompositePodGroup("cpg-preemptor").WorkloadRef("wl2", "t2").Obj(),
 			},
 			initialPods: []*v1.Pod{
 				st.MakePod().Name("low-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg-victim").Node("node1").ZeroTerminationGracePeriod().Priority(10).Obj(),
@@ -2261,11 +2540,10 @@ func TestCompositePodGroupPreemption(t *testing.T) {
 				st.MakePod().Name("high-3").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg-preemptor").ZeroTerminationGracePeriod().Priority(100).Obj(),
 				st.MakePod().Name("high-4").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg-preemptor").ZeroTerminationGracePeriod().Priority(100).Obj(),
 			},
-			expectedScheduled:              []string{"high-1", "high-2", "high-3", "high-4"},
-			expectedPreempted:              []string{"low-1", "low-2"},
-			expectedPodsPreemptedByWAP:     2,
-			enablePodGroupPreemptionPolicy: false,
-			tempRemoveCPG:                  true,
+			expectedScheduled:          []string{"high-1", "high-2", "high-3", "high-4"},
+			expectedPreempted:          []string{"low-1", "low-2"},
+			expectedPodsPreemptedByWAP: 2,
+			tempRemoveCPG:              true,
 		},
 		{
 			name: "Binding first before preemption for CPG",
@@ -2273,13 +2551,13 @@ func TestCompositePodGroupPreemption(t *testing.T) {
 				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
 				st.MakeNode().Name("node2").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
 			},
-			compositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
+			compositePodGroups: []*schedulingv1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Name("cpg-victim").Namespace("default").Priority(10).BasicPolicy().WorkloadRef("wl1", "t1").Obj(),
 				st.MakeCompositePodGroup().Name("cpg-preemptor").Namespace("default").Priority(100).BasicPolicy().WorkloadRef("wl2", "t2").Obj(),
 			},
 			podGroups: []*schedulingv1beta1.PodGroup{
-				st.MakePodGroup().Name("pg-victim").Namespace("default").Priority(10).MinCount(4).ParentCompositePodGroup("cpg-victim").WorkloadRef("t1", "wl1").Obj(),
-				st.MakePodGroup().Name("pg-preemptor").Namespace("default").Priority(100).MinCount(4).ParentCompositePodGroup("cpg-preemptor").WorkloadRef("t2", "wl2").Obj(),
+				st.MakePodGroup().Name("pg-victim").Namespace("default").Priority(10).MinCount(4).ParentCompositePodGroup("cpg-victim").WorkloadRef("wl1", "t1").Obj(),
+				st.MakePodGroup().Name("pg-preemptor").Namespace("default").Priority(100).MinCount(4).ParentCompositePodGroup("cpg-preemptor").WorkloadRef("wl2", "t2").Obj(),
 			},
 			initialPods: []*v1.Pod{
 				st.MakePod().Name("low-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg-victim").Node("node1").ZeroTerminationGracePeriod().Priority(10).Obj(),
@@ -2291,23 +2569,22 @@ func TestCompositePodGroupPreemption(t *testing.T) {
 				st.MakePod().Name("high-3").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg-preemptor").ZeroTerminationGracePeriod().Priority(100).Obj(),
 				st.MakePod().Name("high-4").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg-preemptor").ZeroTerminationGracePeriod().Priority(100).Obj(),
 			},
-			expectedScheduled:              []string{"high-1", "high-2", "high-3", "high-4"},
-			expectedPreempted:              []string{"low-1", "low-2"},
-			expectedPodsPreemptedByWAP:     2,
-			enablePodGroupPreemptionPolicy: false,
+			expectedScheduled:          []string{"high-1", "high-2", "high-3", "high-4"},
+			expectedPreempted:          []string{"low-1", "low-2"},
+			expectedPodsPreemptedByWAP: 2,
 		},
 		{
 			name: "CPG Missing Parent Reference Fallback",
 			nodes: []*v1.Node{
 				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
 			},
-			compositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
+			compositePodGroups: []*schedulingv1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Name("cpg-victim").Namespace("default").Priority(10).BasicPolicy().WorkloadRef("wl1", "t1").Obj(),
 				st.MakeCompositePodGroup().Name("cpg-preemptor").Namespace("default").Priority(100).BasicPolicy().WorkloadRef("wl2", "t1").Obj(),
 			},
 			podGroups: []*schedulingv1beta1.PodGroup{
-				st.MakePodGroup().Name("pg-victim").Namespace("default").Priority(10).MinCount(2).ParentCompositePodGroup("cpg-victim").WorkloadRef("t1", "wl1").Obj(),
-				st.MakePodGroup().Name("pg-preemptor").Namespace("default").Priority(100).MinCount(2).ParentCompositePodGroup("cpg-preemptor").WorkloadRef("t1", "wl2").Obj(),
+				st.MakePodGroup().Name("pg-victim").Namespace("default").Priority(10).MinCount(2).ParentCompositePodGroup("cpg-victim").WorkloadRef("wl1", "t1").Obj(),
+				st.MakePodGroup().Name("pg-preemptor").Namespace("default").Priority(100).MinCount(2).ParentCompositePodGroup("cpg-preemptor").WorkloadRef("wl2", "t1").Obj(),
 			},
 			initialPods: []*v1.Pod{
 				st.MakePod().Name("low-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg-victim").ZeroTerminationGracePeriod().Priority(10).Node("node1").Obj(),
@@ -2322,16 +2599,205 @@ func TestCompositePodGroupPreemption(t *testing.T) {
 			expectedPodsPreemptedByWAP:    2,
 			removeCPGNameBeforePreemption: "cpg-victim",
 		},
+		{
+			name: "CPG Tie-Breaking: Standalone Pod chosen over CompositePodGroup",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+			},
+			compositePodGroups: []*schedulingv1beta1.CompositePodGroup{
+				st.MakeCompositePodGroup().Name("cpg-victim").Namespace("default").Priority(10).MinGroupCount(1).DisruptionModeAll().WorkloadRef("wl1", "t1").Obj(),
+			},
+			podGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Name("pg-victim").Namespace("default").Priority(10).MinCount(1).ParentCompositePodGroup("cpg-victim").WorkloadRef("wl1", "t1").Obj(),
+				st.MakePodGroup().Name("pg-preemptor").Namespace("default").Priority(100).MinCount(1).WorkloadRef("wl2", "t1").Obj(),
+			},
+			initialPods: []*v1.Pod{
+				// Standalone Pod (Rank 1)
+				st.MakePod().Name("low-standalone").Req(map[v1.ResourceName]string{v1.ResourceCPU: "500m"}).Container("image").ZeroTerminationGracePeriod().Priority(10).Node("node1").Obj(),
+				// CPG Child PG Pod (Rank 3)
+				st.MakePod().Name("low-cpg").Req(map[v1.ResourceName]string{v1.ResourceCPU: "500m"}).Container("image").PodGroupName("pg-victim").ZeroTerminationGracePeriod().Priority(10).Node("node1").Obj(),
+			},
+			preemptorPods: []*v1.Pod{
+				st.MakePod().Name("high-preemptor").Req(map[v1.ResourceName]string{v1.ResourceCPU: "500m"}).Container("image").PodGroupName("pg-preemptor").ZeroTerminationGracePeriod().Priority(100).Obj(),
+			},
+			expectedScheduled:          []string{"high-preemptor", "low-cpg"},
+			expectedPreempted:          []string{"low-standalone"},
+			expectedPodsPreemptedByWAP: 1,
+		},
+		{
+			name: "CPG Tie-Breaking: Standalone Pod and PodGroup chosen over CompositePodGroup",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "3", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+			},
+			compositePodGroups: []*schedulingv1beta1.CompositePodGroup{
+				st.MakeCompositePodGroup().Name("cpg-victim").Namespace("default").Priority(10).MinGroupCount(1).DisruptionModeAll().WorkloadRef("wl1", "t1").Obj(),
+			},
+			podGroups: []*schedulingv1beta1.PodGroup{
+				// Workload 1: A standalone PodGroup (Rank 2)
+				st.MakePodGroup().Name("pg-victim-standalone").Namespace("default").Priority(10).MinCount(1).WorkloadRef("wl2", "t1").Obj(),
+				// Workload 2: A PodGroup under a CompositePodGroup (Rank 3)
+				st.MakePodGroup().Name("pg-victim-child").Namespace("default").Priority(10).MinCount(1).ParentCompositePodGroup("cpg-victim").WorkloadRef("wl1", "t1").Obj(),
+				// Preemptor Workload
+				st.MakePodGroup().Name("pg-preemptor").Namespace("default").Priority(100).MinCount(1).WorkloadRef("wl3", "t1").Obj(),
+			},
+			initialPods: []*v1.Pod{
+				// Standalone Pod (Rank 1)
+				st.MakePod().Name("low-standalone").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").ZeroTerminationGracePeriod().Priority(10).Node("node1").Obj(),
+				// Standalone PG Pod (Rank 2)
+				st.MakePod().Name("low-pg").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg-victim-standalone").ZeroTerminationGracePeriod().Priority(10).Node("node1").Obj(),
+				// CPG Child PG Pod (Rank 3)
+				st.MakePod().Name("low-cpg").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg-victim-child").ZeroTerminationGracePeriod().Priority(10).Node("node1").Obj(),
+			},
+			preemptorPods: []*v1.Pod{
+				st.MakePod().Name("high-preemptor").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").PodGroupName("pg-preemptor").ZeroTerminationGracePeriod().Priority(100).Obj(),
+			},
+			// The scheduler needs 2 CPU. It evaluates three candidates of equal priority (10):
+			// Rank 1 (low-standalone) < Rank 2 (low-pg) < Rank 3 (low-cpg).
+			// It preempts low-standalone (Rank 1) and low-pg (Rank 2), reprieving low-cpg (Rank 3).
+			expectedScheduled:          []string{"high-preemptor", "low-cpg"},
+			expectedPreempted:          []string{"low-standalone", "low-pg"},
+			expectedPodsPreemptedByWAP: 2,
+		},
+		{
+			name: "CPG Tie-Breaking: Smaller CompositePodGroup chosen over Larger CompositePodGroup",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+			},
+			compositePodGroups: []*schedulingv1beta1.CompositePodGroup{
+				st.MakeCompositePodGroup().Name("cpg-small").Namespace("default").Priority(10).MinGroupCount(1).DisruptionModeAll().WorkloadRef("wl1", "t1").Obj(),
+				st.MakeCompositePodGroup().Name("cpg-large").Namespace("default").Priority(10).MinGroupCount(1).DisruptionModeAll().WorkloadRef("wl2", "t1").Obj(),
+			},
+			podGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Name("pg-small").Namespace("default").Priority(10).MinCount(1).ParentCompositePodGroup("cpg-small").WorkloadRef("wl1", "t1").Obj(),
+				st.MakePodGroup().Name("pg-large").Namespace("default").Priority(10).MinCount(3).ParentCompositePodGroup("cpg-large").WorkloadRef("wl2", "t1").Obj(),
+				st.MakePodGroup().Name("pg-preemptor").Namespace("default").Priority(100).MinCount(1).WorkloadRef("wl3", "t1").Obj(),
+			},
+			initialPods: []*v1.Pod{
+				st.MakePod().Name("low-small-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg-small").ZeroTerminationGracePeriod().Priority(10).Node("node1").Obj(),
+				st.MakePod().Name("low-large-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg-large").ZeroTerminationGracePeriod().Priority(10).Node("node1").Obj(),
+				st.MakePod().Name("low-large-2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg-large").ZeroTerminationGracePeriod().Priority(10).Node("node1").Obj(),
+				st.MakePod().Name("low-large-3").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg-large").ZeroTerminationGracePeriod().Priority(10).Node("node1").Obj(),
+			},
+			preemptorPods: []*v1.Pod{
+				st.MakePod().Name("high-preemptor").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg-preemptor").ZeroTerminationGracePeriod().Priority(100).Obj(),
+			},
+			expectedScheduled:          []string{"high-preemptor", "low-large-1", "low-large-2", "low-large-3"},
+			expectedPreempted:          []string{"low-small-1"},
+			expectedPodsPreemptedByWAP: 1,
+		},
+		{
+			name: "Multi-Branch Subtree Isolation with Mixed Disruption Modes",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Label("kubernetes.io/hostname", "node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+				st.MakeNode().Name("node2").Label("kubernetes.io/hostname", "node2").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+			},
+			compositePodGroups: []*schedulingv1beta1.CompositePodGroup{
+				st.MakeCompositePodGroup().Name("cpg-root").Namespace("default").Priority(10).BasicPolicy().DisruptionModeSingle().WorkloadRef("wl1", "t1").Obj(),
+				st.MakeCompositePodGroup().Name("cpg-branch-a").Namespace("default").Priority(10).MinGroupCount(1).DisruptionModeAll().ParentCompositePodGroup("cpg-root").WorkloadRef("wl1", "t1").Obj(),
+				st.MakeCompositePodGroup().Name("cpg-branch-b").Namespace("default").Priority(10).BasicPolicy().DisruptionModeSingle().ParentCompositePodGroup("cpg-root").WorkloadRef("wl1", "t1").Obj(),
+			},
+			podGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Name("pg-a1").Namespace("default").Priority(10).MinCount(1).DisruptionModeSingle().ParentCompositePodGroup("cpg-branch-a").WorkloadRef("wl1", "t1").Obj(),
+				st.MakePodGroup().Name("pg-a2").Namespace("default").Priority(10).MinCount(1).DisruptionModeSingle().ParentCompositePodGroup("cpg-branch-a").WorkloadRef("wl1", "t1").Obj(),
+				st.MakePodGroup().Name("pg-b1").Namespace("default").Priority(10).MinCount(1).DisruptionModeSingle().ParentCompositePodGroup("cpg-branch-b").WorkloadRef("wl1", "t1").Obj(),
+			},
+			initialPods: []*v1.Pod{
+				st.MakePod().Name("low-a1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg-a1").Node("node1").ZeroTerminationGracePeriod().Priority(10).Obj(),
+				st.MakePod().Name("low-a2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg-a2").Node("node2").ZeroTerminationGracePeriod().Priority(10).Obj(),
+				st.MakePod().Name("low-b1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg-b1").Node("node2").ZeroTerminationGracePeriod().Priority(10).Obj(),
+			},
+			preemptorPods: []*v1.Pod{
+				// Pinned to node1: the only way to make room there is evicting low-a1.
+				// cpg-branch-a is DisruptionModeAll, so low-a2 on node2 goes too, while
+				// low-b1 (cpg-branch-b, DisruptionModeSingle) shares node2 and survives.
+				st.MakePod().Name("high-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").NodeSelector(map[string]string{"kubernetes.io/hostname": "node1"}).ZeroTerminationGracePeriod().Priority(100).Obj(),
+			},
+			expectedScheduled:          []string{"high-1", "low-b1"},
+			expectedPreempted:          []string{"low-a1", "low-a2"},
+			expectedPodsPreemptedByWAP: 2,
+		},
+		{
+			name: "Intermediate Parent CPG Deletion Fallback",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+			},
+			compositePodGroups: []*schedulingv1beta1.CompositePodGroup{
+				st.MakeCompositePodGroup().Name("cpg-grandparent").Namespace("default").Priority(100).BasicPolicy().WorkloadRef("wl1", "t1").Obj(),
+				st.MakeCompositePodGroup().Name("cpg-parent").Namespace("default").Priority(100).BasicPolicy().ParentCompositePodGroup("cpg-grandparent").WorkloadRef("wl1", "t1").Obj(),
+			},
+			podGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Name("pg-child").Namespace("default").Priority(20).MinCount(2).ParentCompositePodGroup("cpg-parent").WorkloadRef("wl1", "t1").Obj(),
+			},
+			initialPods: []*v1.Pod{
+				st.MakePod().Name("low-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg-child").ZeroTerminationGracePeriod().Priority(20).Node("node1").Obj(),
+				st.MakePod().Name("low-2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg-child").ZeroTerminationGracePeriod().Priority(20).Node("node1").Obj(),
+			},
+			preemptorPods: []*v1.Pod{
+				st.MakePod().Name("high-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").ZeroTerminationGracePeriod().Priority(50).Obj(),
+			},
+			expectedScheduled:             []string{"high-1"},
+			expectedPreempted:             []string{"low-1", "low-2"},
+			expectedPodsPreemptedByWAP:    2,
+			removeCPGNameBeforePreemption: "cpg-parent",
+		},
+		{
+			name: "Multi-Branch Preemptor with Gang and Basic Subtrees across Multiple Nodes",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Label("kubernetes.io/hostname", "node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+				st.MakeNode().Name("node2").Label("kubernetes.io/hostname", "node2").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+			},
+			compositePodGroups: []*schedulingv1beta1.CompositePodGroup{
+				st.MakeCompositePodGroup().Name("cpg-preemptor").Namespace("default").Priority(100).BasicPolicy().WorkloadRef("wl-preempt", "t1").Obj(),
+				st.MakeCompositePodGroup().Name("cpg-gang-branch").Namespace("default").Priority(100).MinGroupCount(1).ParentCompositePodGroup("cpg-preemptor").WorkloadRef("wl-preempt", "t1").Obj(),
+			},
+			podGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Name("pg-gang").Namespace("default").Priority(100).MinCount(2).ParentCompositePodGroup("cpg-gang-branch").WorkloadRef("wl-preempt", "t1").Obj(),
+				st.MakePodGroup().Name("pg-basic").Namespace("default").Priority(100).BasicPolicy().ParentCompositePodGroup("cpg-preemptor").WorkloadRef("wl-preempt", "t1").Obj(),
+			},
+			initialPods: []*v1.Pod{
+				st.MakePod().Name("low-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1500m"}).Container("image").ZeroTerminationGracePeriod().Priority(10).Node("node1").Obj(),
+				st.MakePod().Name("low-2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1500m"}).Container("image").ZeroTerminationGracePeriod().Priority(10).Node("node2").Obj(),
+			},
+			preemptorPods: []*v1.Pod{
+				st.MakePod().Name("gang-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg-gang").NodeSelector(map[string]string{"kubernetes.io/hostname": "node1"}).ZeroTerminationGracePeriod().Priority(100).Obj(),
+				st.MakePod().Name("gang-2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg-gang").NodeSelector(map[string]string{"kubernetes.io/hostname": "node2"}).ZeroTerminationGracePeriod().Priority(100).Obj(),
+				st.MakePod().Name("basic-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg-basic").NodeSelector(map[string]string{"kubernetes.io/hostname": "node1"}).ZeroTerminationGracePeriod().Priority(100).Obj(),
+			},
+			expectedScheduled:          []string{"gang-1", "gang-2", "basic-1"},
+			expectedPreempted:          []string{"low-1", "low-2"},
+			expectedPodsPreemptedByWAP: 2,
+			tempRemoveCPG:              true,
+		},
+		{
+			name: "CPG Gang Quorum Preemption Infeasibility aborts cleanly without evictions",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+				st.MakeNode().Name("node2").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+			},
+			compositePodGroups: []*schedulingv1beta1.CompositePodGroup{
+				st.MakeCompositePodGroup().Name("cpg-preemptor").Namespace("default").Priority(100).MinGroupCount(1).WorkloadRef("wl-preempt", "t1").Obj(),
+			},
+			podGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Name("pg-gang").Namespace("default").Priority(100).MinCount(3).ParentCompositePodGroup("cpg-preemptor").WorkloadRef("wl-preempt", "t1").Obj(),
+			},
+			initialPods: []*v1.Pod{
+				st.MakePod().Name("low-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").ZeroTerminationGracePeriod().Priority(10).Node("node1").Obj(),
+				st.MakePod().Name("low-2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").ZeroTerminationGracePeriod().Priority(10).Node("node2").Obj(),
+			},
+			preemptorPods: []*v1.Pod{
+				st.MakePod().Name("high-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").PodGroupName("pg-gang").ZeroTerminationGracePeriod().Priority(100).Obj(),
+				st.MakePod().Name("high-2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").PodGroupName("pg-gang").ZeroTerminationGracePeriod().Priority(100).Obj(),
+				st.MakePod().Name("high-3").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").PodGroupName("pg-gang").ZeroTerminationGracePeriod().Priority(100).Obj(),
+			},
+			expectedScheduled:          []string{"low-1", "low-2"},
+			expectedPreempted:          []string{},
+			expectedUnschedulable:      []string{"high-1", "high-2", "high-3"},
+			expectedPodsPreemptedByWAP: 0,
+		},
 	}
 
-	for _, tt := range tests {
+	run := func(t *testing.T, tt testCase, sharedAPICtx ktesting.TContext) {
 		t.Run(tt.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.GenericWorkload:                 true,
-				features.CompositePodGroup:               true,
-				features.TopologyAwareWorkloadScheduling: true,
-				features.PodGroupPreemptionPolicy:        tt.enablePodGroupPreemptionPolicy,
-			})
 			registry := make(frameworkruntime.Registry)
 
 			// Register mock bind plugin that will register NNN information during binding.
@@ -2396,16 +2862,24 @@ func TestCompositePodGroupPreemption(t *testing.T) {
 
 			// Set PodMaxBackoff to 1 second to turn on backoff and allow apiCacher to get information about
 			// pod NNN. Without this we might have a race between starting binding and update of apiCacher.
-			testCtx := testutils.InitTestSchedulerWithNS(t, "cpg-preemption",
+			testCtx := schedulerutils.InitTestSchedulerWithOptions(t,
+				schedulerutils.WithNewNamespace(t, sharedAPICtx, "cpg-preemption"),
+				0,
 				scheduler.WithProfiles(cfg.Profiles...),
 				scheduler.WithFrameworkOutOfTreeRegistry(registry),
 				scheduler.WithPodMaxBackoffSeconds(1),
 				scheduler.WithPodInitialBackoffSeconds(0))
-			cs, ns := testCtx.ClientSet, testCtx.NS.Name
+			schedulerutils.SyncSchedulerInformerFactory(testCtx)
+			go testCtx.Scheduler.Run(testCtx.SchedulerCtx)
+			defer testCtx.SchedulerCloseFn()
+			cs, ns := testCtx.Client(), testCtx.Namespace()
+			t.Cleanup(func() {
+				cleanupSharedPodGroupPreemptionResources(t, testCtx, cs, ns, tt.initialPods, tt.preemptorPods, tt.podGroups, tt.compositePodGroups, tt.pdb, tt.nodes)
+			})
 
 			// Create nodes
 			for _, n := range tt.nodes {
-				if _, err := cs.CoreV1().Nodes().Create(testCtx.Ctx, n, metav1.CreateOptions{}); err != nil {
+				if _, err := cs.CoreV1().Nodes().Create(testCtx, n, metav1.CreateOptions{}); err != nil {
 					t.Fatalf("Failed to create node %s: %v", n.Name, err)
 				}
 			}
@@ -2413,7 +2887,7 @@ func TestCompositePodGroupPreemption(t *testing.T) {
 			// 1. Create CompositePodGroups
 			for _, cpg := range tt.compositePodGroups {
 				cpg.Namespace = ns
-				if _, err := cs.SchedulingV1alpha3().CompositePodGroups(ns).Create(testCtx.Ctx, cpg, metav1.CreateOptions{}); err != nil {
+				if _, err := cs.SchedulingV1beta1().CompositePodGroups(ns).Create(testCtx, cpg, metav1.CreateOptions{}); err != nil {
 					t.Fatalf("Failed to create CompositePodGroup %s: %v", cpg.Name, err)
 				}
 			}
@@ -2421,7 +2895,7 @@ func TestCompositePodGroupPreemption(t *testing.T) {
 			// 2. Create PodGroups
 			for _, pg := range tt.podGroups {
 				pg.Namespace = ns
-				if _, err := cs.SchedulingV1beta1().PodGroups(ns).Create(testCtx.Ctx, pg, metav1.CreateOptions{}); err != nil {
+				if _, err := cs.SchedulingV1beta1().PodGroups(ns).Create(testCtx, pg, metav1.CreateOptions{}); err != nil {
 					t.Fatalf("Failed to create PodGroup %s: %v", pg.Name, err)
 				}
 			}
@@ -2429,21 +2903,22 @@ func TestCompositePodGroupPreemption(t *testing.T) {
 			// 3. Create PodDisruptionBudget if provided
 			if tt.pdb != nil {
 				tt.pdb.Namespace = ns
-				if _, err := cs.PolicyV1().PodDisruptionBudgets(ns).Create(testCtx.Ctx, tt.pdb, metav1.CreateOptions{}); err != nil {
+				if _, err := cs.PolicyV1().PodDisruptionBudgets(ns).Create(testCtx, tt.pdb, metav1.CreateOptions{}); err != nil {
 					t.Fatalf("Failed to create PDB: %v", err)
 				}
 			}
 
 			// 4. Create initial pods
 			for _, p := range tt.initialPods {
-				p.Namespace = ns
-				if _, err := cs.CoreV1().Pods(ns).Create(testCtx.Ctx, p, metav1.CreateOptions{}); err != nil {
+				pod := p.DeepCopy()
+				pod.Namespace = ns
+				if _, err := cs.CoreV1().Pods(ns).Create(testCtx, pod, metav1.CreateOptions{}); err != nil {
 					t.Fatalf("Failed to create pod %s: %v", p.Name, err)
 				}
 			}
 			for _, p := range tt.initialPods {
-				if err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false,
-					testutils.PodScheduled(cs, ns, p.Name)); err != nil {
+				if err := wait.PollUntilContextTimeout(testCtx, 100*time.Millisecond, 10*time.Second, false,
+					schedulerutils.PodScheduled(cs, ns, p.Name)); err != nil {
 					t.Errorf("Failed to wait for pod %s to be scheduled: %v", p.Name, err)
 				}
 			}
@@ -2457,27 +2932,35 @@ func TestCompositePodGroupPreemption(t *testing.T) {
 				for i, cpg := range tt.compositePodGroups {
 					cpgNames[i] = cpg.Name
 				}
-				if err := deleteCompositePodGroups(testCtx.Ctx, cs, ns, cpgNames); err != nil {
+				if err := deleteCompositePodGroups(testCtx, cs, ns, cpgNames); err != nil {
 					t.Fatalf("Failed to delete CompositePodGroups: %v", err)
 				}
 				pgNames := make([]string, len(tt.podGroups))
 				for i, pg := range tt.podGroups {
 					pgNames[i] = pg.Name
 				}
-				if err := deletePodGroups(testCtx.Ctx, cs, ns, pgNames); err != nil {
+				if err := deletePodGroups(testCtx, cs, ns, pgNames); err != nil {
 					t.Fatalf("Failed to delete PodGroups: %v", err)
 				}
 			}
 
 			if tt.removeCPGNameBeforePreemption != "" {
-				if err := cs.SchedulingV1alpha3().CompositePodGroups(ns).Delete(testCtx.Ctx, tt.removeCPGNameBeforePreemption, metav1.DeleteOptions{}); err != nil {
+				if err := deleteCompositePodGroups(testCtx, cs, ns, []string{tt.removeCPGNameBeforePreemption}); err != nil {
 					t.Fatalf("Failed to delete CompositePodGroup %s: %v", tt.removeCPGNameBeforePreemption, err)
+				}
+				if err := wait.PollUntilContextTimeout(testCtx, 100*time.Millisecond, 10*time.Second, true,
+					func(_ context.Context) (bool, error) {
+						_, err := testCtx.Scheduler.Cache.CompositePodGroups().Get(ns, tt.removeCPGNameBeforePreemption)
+						return err != nil, nil
+					}); err != nil {
+					t.Fatalf("CompositePodGroup %s is still in the scheduler cache after deletion: %v", tt.removeCPGNameBeforePreemption, err)
 				}
 			}
 
 			for _, p := range tt.preemptorPods {
-				p.Namespace = ns
-				if _, err := cs.CoreV1().Pods(ns).Create(testCtx.Ctx, p, metav1.CreateOptions{}); err != nil {
+				pod := p.DeepCopy()
+				pod.Namespace = ns
+				if _, err := cs.CoreV1().Pods(ns).Create(testCtx, pod, metav1.CreateOptions{}); err != nil {
 					t.Fatalf("Failed to create pod %s: %v", p.Name, err)
 				}
 			}
@@ -2485,7 +2968,7 @@ func TestCompositePodGroupPreemption(t *testing.T) {
 			if tt.tempRemoveCPG {
 				// Wait for preemptor pods to be unschedulable
 				for _, p := range tt.preemptorPods {
-					if err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false,
+					if err := wait.PollUntilContextTimeout(testCtx, 100*time.Millisecond, 10*time.Second, false,
 						func(ctx context.Context) (bool, error) {
 							return isPodInUnschedulableQueue(testCtx.Scheduler, p.Name, ns), nil
 						}); err != nil {
@@ -2497,14 +2980,14 @@ func TestCompositePodGroupPreemption(t *testing.T) {
 				for _, cpg := range tt.compositePodGroups {
 					cpgCopy := cpg.DeepCopy()
 					cpgCopy.ResourceVersion = ""
-					if _, err := cs.SchedulingV1alpha3().CompositePodGroups(ns).Create(testCtx.Ctx, cpgCopy, metav1.CreateOptions{}); err != nil {
+					if _, err := cs.SchedulingV1beta1().CompositePodGroups(ns).Create(testCtx, cpgCopy, metav1.CreateOptions{}); err != nil {
 						t.Fatalf("Failed to recreate CompositePodGroup %s: %v", cpg.Name, err)
 					}
 				}
 				for _, pg := range tt.podGroups {
 					pgCopy := pg.DeepCopy()
 					pgCopy.ResourceVersion = ""
-					if _, err := cs.SchedulingV1beta1().PodGroups(ns).Create(testCtx.Ctx, pgCopy, metav1.CreateOptions{}); err != nil {
+					if _, err := cs.SchedulingV1beta1().PodGroups(ns).Create(testCtx, pgCopy, metav1.CreateOptions{}); err != nil {
 						t.Fatalf("Failed to recreate PodGroup %s: %v", pg.Name, err)
 					}
 				}
@@ -2513,7 +2996,7 @@ func TestCompositePodGroupPreemption(t *testing.T) {
 			// 6. Wait for preemption to complete if WAP calls are expected
 			if tt.expectedPodsPreemptedByWAP > 0 {
 				wapCalls := 0
-				err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
+				err := wait.PollUntilContextTimeout(testCtx, 100*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
 					wapCalls = 0
 					for _, podName := range tt.expectedPreempted {
 						events, err := cs.CoreV1().Events(ns).List(ctx, metav1.ListOptions{
@@ -2538,23 +3021,23 @@ func TestCompositePodGroupPreemption(t *testing.T) {
 
 			// 7. Verify unschedulable pods
 			for _, podName := range tt.expectedUnschedulable {
-				if err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false,
-					testutils.PodUnschedulable(cs, ns, podName)); err != nil {
+				if err := wait.PollUntilContextTimeout(testCtx, 100*time.Millisecond, 10*time.Second, false,
+					schedulerutils.PodUnschedulable(cs, ns, podName)); err != nil {
 					t.Errorf("Pod %s was expected to be unschedulable but wasn't: %v", podName, err)
 				}
 			}
 
 			// 8. Verify scheduled pods
 			for _, podName := range tt.expectedScheduled {
-				if err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false,
-					testutils.PodScheduled(cs, ns, podName)); err != nil {
+				if err := wait.PollUntilContextTimeout(testCtx, 100*time.Millisecond, 10*time.Second, false,
+					schedulerutils.PodScheduled(cs, ns, podName)); err != nil {
 					t.Errorf("Pod %s was expected to be scheduled but wasn't: %v", podName, err)
 				}
 			}
 
 			// 9. Verify preempted pods
 			for _, podName := range tt.expectedPreempted {
-				if err := wait.PollUntilContextTimeout(testCtx.Ctx, 200*time.Millisecond, 5*time.Second, false,
+				if err := wait.PollUntilContextTimeout(testCtx, 200*time.Millisecond, 5*time.Second, false,
 					func(ctx context.Context) (bool, error) {
 						pod, err := cs.CoreV1().Pods(ns).Get(ctx, podName, metav1.GetOptions{})
 						if err != nil {
@@ -2588,7 +3071,7 @@ func TestCompositePodGroupPreemption(t *testing.T) {
 					allPods = append(allPods, p.Name)
 				}
 				for _, podName := range allPods {
-					pod, err := cs.CoreV1().Pods(ns).Get(testCtx.Ctx, podName, metav1.GetOptions{})
+					pod, err := cs.CoreV1().Pods(ns).Get(testCtx, podName, metav1.GetOptions{})
 					if err != nil {
 						if apierrors.IsNotFound(err) {
 							t.Logf("Pod %q: not present in cluster", podName)
@@ -2614,6 +3097,18 @@ func TestCompositePodGroupPreemption(t *testing.T) {
 			}
 
 		})
+	}
+	// Start API server after configuring feature gates and share it across matching subtests.
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.PodLevelResources:               true,
+		features.GenericWorkload:                 true,
+		features.CompositePodGroup:               true,
+		features.TopologyAwareWorkloadScheduling: true,
+	})
+	sharedAPICtx := testutils.InitTestAPIServer(t, "cpg-preemption", nil)
+
+	for _, tt := range tests {
+		run(t, tt, sharedAPICtx)
 	}
 }
 
@@ -2672,17 +3167,17 @@ func TestPodGroupCycleStatePreserved(t *testing.T) {
 				}},
 			})
 
-			testCtx := testutils.InitTestSchedulerWithNS(t, "state-preserved",
+			testCtx := schedulerutils.InitTestSchedulerWithNS(t, "state-preserved",
 				scheduler.WithProfiles(cfg.Profiles...),
 				scheduler.WithFrameworkOutOfTreeRegistry(registry),
 				scheduler.WithPodMaxBackoffSeconds(1),
 				scheduler.WithPodInitialBackoffSeconds(0),
 			)
-			cs, ns := testCtx.ClientSet, testCtx.NS.Name
+			cs, ns := testCtx.Client(), testCtx.Namespace()
 
 			// 1. Create node with 3 CPU capacity
 			node := st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "3", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj()
-			if _, err := cs.CoreV1().Nodes().Create(testCtx.Ctx, node, metav1.CreateOptions{}); err != nil {
+			if _, err := cs.CoreV1().Nodes().Create(testCtx, node, metav1.CreateOptions{}); err != nil {
 				t.Fatalf("Failed to create node: %v", err)
 			}
 
@@ -2691,14 +3186,14 @@ func TestPodGroupCycleStatePreserved(t *testing.T) {
 			lowPod := st.MakePod().Name("low-pod").Namespace(ns).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").Priority(10).ZeroTerminationGracePeriod().Node("node1").Obj()
 
 			for _, p := range []*v1.Pod{highPod, lowPod} {
-				if _, err := cs.CoreV1().Pods(ns).Create(testCtx.Ctx, p, metav1.CreateOptions{}); err != nil {
+				if _, err := cs.CoreV1().Pods(ns).Create(testCtx, p, metav1.CreateOptions{}); err != nil {
 					t.Fatalf("Failed to create pod %s: %v", p.Name, err)
 				}
 			}
 
 			// Wait for initial pods to be scheduled
 			for _, p := range []*v1.Pod{highPod, lowPod} {
-				if err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false, testutils.PodScheduled(cs, ns, p.Name)); err != nil {
+				if err := wait.PollUntilContextTimeout(testCtx, 100*time.Millisecond, 10*time.Second, false, schedulerutils.PodScheduled(cs, ns, p.Name)); err != nil {
 					t.Fatalf("Failed to wait for initial pod %s to schedule: %v", p.Name, err)
 				}
 			}
@@ -2708,21 +3203,21 @@ func TestPodGroupCycleStatePreserved(t *testing.T) {
 			preemptor2 := st.MakePod().Name("preemptor-2").Namespace(ns).Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").PodGroupName("pg1").Priority(100).ZeroTerminationGracePeriod().Obj()
 
 			for _, p := range []*v1.Pod{preemptor1, preemptor2} {
-				if _, err := cs.CoreV1().Pods(ns).Create(testCtx.Ctx, p, metav1.CreateOptions{}); err != nil {
+				if _, err := cs.CoreV1().Pods(ns).Create(testCtx, p, metav1.CreateOptions{}); err != nil {
 					t.Fatalf("Failed to create preemptor pod %s: %v", p.Name, err)
 				}
 			}
 
 			// 4. Create PodGroup with minCount=2 and priority=100
 			pg := st.MakePodGroup().Name("pg1").Namespace(ns).Priority(100).MinCount(2).Obj()
-			if _, err := cs.SchedulingV1beta1().PodGroups(ns).Create(testCtx.Ctx, pg, metav1.CreateOptions{}); err != nil {
+			if _, err := cs.SchedulingV1beta1().PodGroups(ns).Create(testCtx, pg, metav1.CreateOptions{}); err != nil {
 				t.Fatalf("Failed to create PodGroup pg1: %v", err)
 			}
 
 			var recordedPods sets.Set[string]
 
 			// 5. Verify that stateVerifierPostFilterPlugin was called and state was preserved
-			err = wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
+			err = wait.PollUntilContextTimeout(testCtx, 100*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
 				stateVerifier.lock.Lock()
 				recordedPods = sets.New(stateVerifier.recordedPodNames...)
 				defer stateVerifier.lock.Unlock()
@@ -3617,7 +4112,7 @@ func TestPodGroupAsyncPreemption(t *testing.T) {
 
 			createdPods := []*v1.Pod{}
 			defer func() {
-				testutils.CleanupPods(testCtx.Ctx, cs, t, createdPods)
+				testutils.CleanupPods(testCtx, cs, t, createdPods)
 			}()
 
 			config := asyncframework.AsyncPreemptionStepRunnerConfig{
@@ -3643,8 +4138,8 @@ func TestDisablePodGroupPreemption(t *testing.T) {
 			})
 
 			// Initialize scheduler, and disable preemption.
-			testCtx := testutils.InitTestDisablePreemption(t, "disable-preemption")
-			cs := testCtx.ClientSet
+			testCtx := schedulerutils.InitTestDisablePreemption(t, "disable-preemption")
+			cs := testCtx.Client()
 
 			// Create a node with some resources
 			nodeRes := map[v1.ResourceName]string{
@@ -3652,7 +4147,7 @@ func TestDisablePodGroupPreemption(t *testing.T) {
 				v1.ResourceCPU:    "500m",
 				v1.ResourceMemory: "500",
 			}
-			_, err := testutils.CreateNode(cs, st.MakeNode().Name("node1").Capacity(nodeRes).Obj())
+			_, err := schedulerutils.CreateNode(testCtx, cs, st.MakeNode().Name("node1").Capacity(nodeRes).Obj())
 			if err != nil {
 				t.Fatalf("Error creating nodes: %v", err)
 			}
@@ -3660,28 +4155,28 @@ func TestDisablePodGroupPreemption(t *testing.T) {
 			// Create and run existingPod.
 			existingPod := testutils.InitPausePod(&testutils.PausePodConfig{
 				Name:      "victim-pod",
-				Namespace: testCtx.NS.Name,
+				Namespace: testCtx.Namespace(),
 				Priority:  &asyncframework.LowPriority,
 				Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
 					v1.ResourceCPU:    *resource.NewMilliQuantity(400, resource.DecimalSI),
 					v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI)},
 				},
 			})
-			_, err = testutils.RunPausePod(cs, existingPod)
+			_, err = schedulerutils.RunPausePod(testCtx, cs, existingPod)
 			if err != nil {
 				t.Fatalf("TestDisablePodGroupPreemption (Async preemption enabled: %v): Error running pause pod: %v", asyncPreemptionEnabled, err)
 			}
 
 			// Create pod group.
-			podGroup := st.MakePodGroup().Namespace(testCtx.NS.Name).Name("pg-preemptor").MinCount(1).Priority(asyncframework.HighPriority).Obj()
-			if _, err := cs.SchedulingV1beta1().PodGroups(testCtx.NS.Name).Create(testCtx.Ctx, podGroup, metav1.CreateOptions{}); err != nil {
+			podGroup := st.MakePodGroup().Namespace(testCtx.Namespace()).Name("pg-preemptor").MinCount(1).Priority(asyncframework.HighPriority).Obj()
+			if _, err := cs.SchedulingV1beta1().PodGroups(testCtx.Namespace()).Create(testCtx, podGroup, metav1.CreateOptions{}); err != nil {
 				t.Fatalf("Error creating pod group: %v", err)
 			}
 
 			// Create the preemptor pod.
 			preemptor := testutils.InitPausePod(&testutils.PausePodConfig{
 				Name:         "preemptor-pod",
-				Namespace:    testCtx.NS.Name,
+				Namespace:    testCtx.Namespace(),
 				Priority:     &asyncframework.HighPriority,
 				PodGroupName: "pg-preemptor",
 				Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
@@ -3696,10 +4191,10 @@ func TestDisablePodGroupPreemption(t *testing.T) {
 			// Ensure preemption did not happened.
 			// For preemption to happened, preemptor should be scheduled or unscheduled with nominated node name.
 			// So if the preemptor is unscheduled and does not have nominated node name, it means preemption did not happened.
-			if err := testutils.WaitForPodUnschedulable(testCtx.Ctx, cs, preemptor); err != nil {
+			if err := schedulerutils.WaitForPodUnschedulable(testCtx, cs, preemptor); err != nil {
 				t.Errorf("Preemptor %v should not become scheduled", preemptor.Name)
 			}
-			if err := testutils.WaitForNominatedNodeNameWithTimeout(testCtx.Ctx, cs, preemptor, 5*time.Second); err == nil {
+			if err := schedulerutils.WaitForNominatedNodeNameWithTimeout(testCtx, cs, preemptor, 5*time.Second); err == nil {
 				t.Errorf("Preemptor %v should not be nominated to any node", preemptor.Name)
 			}
 		})
@@ -3804,12 +4299,12 @@ func TestPodGroupPreemptionRespectsWaitingPod(t *testing.T) {
 				}},
 			})
 
-			testCtx := testutils.InitTestSchedulerWithNS(t, "podgroup-waiting-preemption",
+			testCtx := schedulerutils.InitTestSchedulerWithNS(t, "podgroup-waiting-preemption",
 				scheduler.WithProfiles(cfg.Profiles...),
 				scheduler.WithFrameworkOutOfTreeRegistry(registry),
 				scheduler.WithPodMaxBackoffSeconds(0),
 				scheduler.WithPodInitialBackoffSeconds(0))
-			cs, ns := testCtx.ClientSet, testCtx.NS.Name
+			cs, ns := testCtx.Client(), testCtx.Namespace()
 
 			// Create a node with resources for only one set of pods (victims or preemptor).
 			nodeRes := map[v1.ResourceName]string{
@@ -3817,14 +4312,14 @@ func TestPodGroupPreemptionRespectsWaitingPod(t *testing.T) {
 				v1.ResourceMemory: "2Gi",
 			}
 			node := st.MakeNode().Name("big-node").Capacity(nodeRes).Obj()
-			if _, err := cs.CoreV1().Nodes().Create(testCtx.Ctx, node, metav1.CreateOptions{}); err != nil {
+			if _, err := cs.CoreV1().Nodes().Create(testCtx, node, metav1.CreateOptions{}); err != nil {
 				t.Fatalf("Error creating node: %v", err)
 			}
 
 			for _, pg := range tt.podGroups {
 				pg := pg.DeepCopy()
 				pg.Namespace = ns
-				if _, err := cs.SchedulingV1beta1().PodGroups(ns).Create(testCtx.Ctx, pg, metav1.CreateOptions{}); err != nil {
+				if _, err := cs.SchedulingV1beta1().PodGroups(ns).Create(testCtx, pg, metav1.CreateOptions{}); err != nil {
 					t.Fatalf("Failed to create PodGroup %s: %v", pg.Name, err)
 				}
 			}
@@ -3833,7 +4328,7 @@ func TestPodGroupPreemptionRespectsWaitingPod(t *testing.T) {
 			for i, v := range tt.victims {
 				v := v.DeepCopy()
 				v.Namespace = ns
-				createdVictim, err := cs.CoreV1().Pods(ns).Create(testCtx.Ctx, v, metav1.CreateOptions{})
+				createdVictim, err := cs.CoreV1().Pods(ns).Create(testCtx, v, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatalf("Error creating victim %s: %v", v.Name, err)
 				}
@@ -3848,7 +4343,7 @@ func TestPodGroupPreemptionRespectsWaitingPod(t *testing.T) {
 					t.Fatalf("Timed out waiting for %s to reach WaitOnPermit", v.Name)
 				}
 			}
-			if err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 15*time.Second, false, func(ctx context.Context) (bool, error) {
+			if err := wait.PollUntilContextTimeout(testCtx, 100*time.Millisecond, 15*time.Second, false, func(ctx context.Context) (bool, error) {
 				for _, cv := range createdVictims {
 					if wp := testCtx.Scheduler.Profiles[v1.DefaultSchedulerName].GetWaitingPod(cv.UID); wp == nil {
 						return false, nil
@@ -3862,17 +4357,17 @@ func TestPodGroupPreemptionRespectsWaitingPod(t *testing.T) {
 			preemptor := tt.preemptor.DeepCopy()
 			preemptor.Namespace = ns
 			t.Logf("Creating preemptor pod")
-			if _, err := cs.CoreV1().Pods(ns).Create(testCtx.Ctx, preemptor, metav1.CreateOptions{}); err != nil {
+			if _, err := cs.CoreV1().Pods(ns).Create(testCtx, preemptor, metav1.CreateOptions{}); err != nil {
 				t.Fatalf("Error creating preemptor: %v", err)
 			}
 
 			t.Logf("Waiting for preemptor to be scheduled")
-			err = wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 15*time.Second, false, testutils.PodScheduled(cs, ns, preemptor.Name))
+			err = wait.PollUntilContextTimeout(testCtx, 100*time.Millisecond, 15*time.Second, false, schedulerutils.PodScheduled(cs, ns, preemptor.Name))
 			if err != nil {
 				t.Fatalf("Failed waiting for preemptor to schedule: %v", err)
 			}
 
-			p, err := cs.CoreV1().Pods(ns).Get(testCtx.Ctx, preemptor.Name, metav1.GetOptions{})
+			p, err := cs.CoreV1().Pods(ns).Get(testCtx, preemptor.Name, metav1.GetOptions{})
 			if err != nil {
 				t.Fatalf("Error getting preemptor: %v", err)
 			}
@@ -3881,7 +4376,7 @@ func TestPodGroupPreemptionRespectsWaitingPod(t *testing.T) {
 			}
 
 			for _, v := range tt.victims {
-				gotVictim, err := cs.CoreV1().Pods(ns).Get(testCtx.Ctx, v.Name, metav1.GetOptions{})
+				gotVictim, err := cs.CoreV1().Pods(ns).Get(testCtx, v.Name, metav1.GetOptions{})
 				if err != nil {
 					t.Fatalf("Error getting %s at the end: %v", v.Name, err)
 				}
@@ -4212,17 +4707,17 @@ func deletePodGroups(ctx context.Context, cs clientset.Interface, ns string, pgN
 func deleteCompositePodGroups(ctx context.Context, cs clientset.Interface, ns string, cpgNames []string) error {
 	for _, name := range cpgNames {
 		patch := []byte(`{"metadata":{"finalizers":null}}`)
-		if _, err := cs.SchedulingV1alpha3().CompositePodGroups(ns).Patch(ctx, name, types.MergePatchType, patch, metav1.PatchOptions{}); err != nil && !apierrors.IsNotFound(err) {
+		if _, err := cs.SchedulingV1beta1().CompositePodGroups(ns).Patch(ctx, name, types.MergePatchType, patch, metav1.PatchOptions{}); err != nil && !apierrors.IsNotFound(err) {
 			return err
 		}
-		if err := cs.SchedulingV1alpha3().CompositePodGroups(ns).Delete(ctx, name, metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+		if err := cs.SchedulingV1beta1().CompositePodGroups(ns).Delete(ctx, name, metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
 			return err
 		}
 	}
 	// Wait for the composite pod groups to be deleted.
 	for _, name := range cpgNames {
 		err := wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
-			_, err := cs.SchedulingV1alpha3().CompositePodGroups(ns).Get(ctx, name, metav1.GetOptions{})
+			_, err := cs.SchedulingV1beta1().CompositePodGroups(ns).Get(ctx, name, metav1.GetOptions{})
 			return apierrors.IsNotFound(err), nil
 		})
 		if err != nil {
@@ -4230,4 +4725,262 @@ func deleteCompositePodGroups(ctx context.Context, cs clientset.Interface, ns st
 		}
 	}
 	return nil
+}
+
+// verifyNominationsHeld fails on the first observation that contradicts the initial
+// nominations. It never returns true: the property is "nothing moves for the whole
+// window", so only the timeout counts as success.
+func verifyNominationsHeld(ctx context.Context, t *testing.T, cs clientset.Interface, ns string, preemptors []*v1.Pod, initialNNNs map[string]string, victims ...string) {
+	t.Helper()
+	err := wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 3*time.Second, false, func(ctx context.Context) (bool, error) {
+		for _, name := range victims {
+			// Without kubelet, victims stay Terminating. If one disappears, its preemptor
+			// can simply bind to the nominated node and the check stops testing anything.
+			if _, err := cs.CoreV1().Pods(ns).Get(ctx, name, metav1.GetOptions{}); err != nil {
+				return false, fmt.Errorf("failed to get victim %s (it must still exist for this check to mean anything): %w", name, err)
+			}
+		}
+		for _, pod := range preemptors {
+			p, err := cs.CoreV1().Pods(ns).Get(ctx, pod.Name, metav1.GetOptions{})
+			if err != nil {
+				return false, fmt.Errorf("failed to get preemptor %s: %w", pod.Name, err)
+			}
+			if p.Spec.NodeName != "" && p.Spec.NodeName != initialNNNs[pod.Name] {
+				return false, fmt.Errorf("pod %s was bound to %s despite being nominated to %s", pod.Name, p.Spec.NodeName, initialNNNs[pod.Name])
+			}
+			if p.Status.NominatedNodeName != initialNNNs[pod.Name] {
+				return false, fmt.Errorf("pod %s NominatedNodeName changed from %q to %q (NodeName %q)", pod.Name, initialNNNs[pod.Name], p.Status.NominatedNodeName, p.Spec.NodeName)
+			}
+		}
+		return false, nil
+	})
+	if err != nil && !wait.Interrupted(err) {
+		t.Fatalf("NominatedNodeName was not respected: %v", err)
+	}
+}
+
+func TestCompositePodGroupPreemption_NominatedNodeNameRespected(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.GenericWorkload:                 true,
+		features.CompositePodGroup:               true,
+		features.TopologyAwareWorkloadScheduling: true,
+	})
+
+	mockScorePlugin := "mockScorePlugin"
+	registry := make(frameworkruntime.Registry)
+	err := registry.Register(mockScorePlugin, newPresetScorePlugin(map[string]int64{"node1": 100, "node2": 0, "node3": 0}))
+	if err != nil {
+		t.Fatalf("Failed to register custom score plugin: %v", err)
+	}
+
+	cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
+		Profiles: []configv1.KubeSchedulerProfile{{
+			SchedulerName: new(v1.DefaultSchedulerName),
+			Plugins: &configv1.Plugins{
+				Score: configv1.PluginSet{
+					Enabled: []configv1.Plugin{
+						{Name: mockScorePlugin},
+					},
+				},
+			},
+		}},
+	})
+
+	testCtx := schedulerutils.InitTestSchedulerWithNS(t, "cpg-preemption-nnn",
+		scheduler.WithProfiles(cfg.Profiles...),
+		scheduler.WithFrameworkOutOfTreeRegistry(registry),
+		scheduler.WithPodMaxBackoffSeconds(1),
+		scheduler.WithPodInitialBackoffSeconds(0),
+	)
+	cs, ns := testCtx.Client(), testCtx.Namespace()
+
+	// 1. Create 3 nodes
+	nodes := []*v1.Node{
+		st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+		st.MakeNode().Name("node2").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+		st.MakeNode().Name("node3").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+	}
+	for _, node := range nodes {
+		if _, err := cs.CoreV1().Nodes().Create(testCtx, node, metav1.CreateOptions{}); err != nil {
+			t.Fatalf("Failed to create node %s: %v", node.Name, err)
+		}
+	}
+
+	// 2. Create CompositePodGroup and Child PodGroup with minCount=2
+	cpg := st.MakeCompositePodGroup().Name("cpg1").Namespace(ns).Priority(50).BasicPolicy().WorkloadRef("wl1", "t1").Obj()
+	if _, err := cs.SchedulingV1beta1().CompositePodGroups(ns).Create(testCtx, cpg, metav1.CreateOptions{}); err != nil {
+		t.Fatalf("Failed to create composite pod group cpg1: %v", err)
+	}
+
+	pg := st.MakePodGroup().Name("pg1").Namespace(ns).Priority(50).MinCount(2).ParentCompositePodGroup("cpg1").WorkloadRef("wl1", "t1").Obj()
+	if _, err := cs.SchedulingV1beta1().PodGroups(ns).Create(testCtx, pg, metav1.CreateOptions{}); err != nil {
+		t.Fatalf("Failed to create pod group pg1: %v", err)
+	}
+
+	// 3. Create initial pods: pod1 on node1 (high priority), pod2 on node2 & pod3 on node3 (low priority with default grace period)
+	initialPods := []*v1.Pod{
+		st.MakePod().Name("pod1").Namespace(ns).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").Priority(100).ZeroTerminationGracePeriod().Node("node1").Obj(),
+		st.MakePod().Name("pod2").Namespace(ns).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").Priority(10).Node("node2").Obj(),
+		st.MakePod().Name("pod3").Namespace(ns).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").Priority(10).Node("node3").Obj(),
+	}
+	for _, pod := range initialPods {
+		if _, err := cs.CoreV1().Pods(ns).Create(testCtx, pod, metav1.CreateOptions{}); err != nil {
+			t.Fatalf("Failed to create pod %s: %v", pod.Name, err)
+		}
+	}
+
+	// Wait for initial pods to be scheduled
+	for _, pod := range initialPods {
+		if err := wait.PollUntilContextTimeout(testCtx, 100*time.Millisecond, 10*time.Second, false, schedulerutils.PodScheduled(cs, ns, pod.Name)); err != nil {
+			t.Fatalf("Failed to wait for initial pod %s to schedule: %v", pod.Name, err)
+		}
+	}
+
+	// 4. Create preemptor pods belonging to pg1
+	preemptorPods := []*v1.Pod{
+		st.MakePod().Name("preemptor-1").Namespace(ns).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").Priority(50).Obj(),
+		st.MakePod().Name("preemptor-2").Namespace(ns).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").Priority(50).Obj(),
+	}
+	for _, pod := range preemptorPods {
+		if _, err := cs.CoreV1().Pods(ns).Create(testCtx, pod, metav1.CreateOptions{}); err != nil {
+			t.Fatalf("Failed to create preemptor pod %s: %v", pod.Name, err)
+		}
+	}
+
+	// 5. Wait for preemption to occur and verify that NominatedNodeName is set on both preemptor pods
+	initialNNNs := make(map[string]string)
+	for _, pod := range preemptorPods {
+		podName := pod.Name
+		err := wait.PollUntilContextTimeout(testCtx, 100*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
+			p, err := cs.CoreV1().Pods(ns).Get(ctx, podName, metav1.GetOptions{})
+			if err != nil {
+				return false, err
+			}
+			if p.Status.NominatedNodeName != "" {
+				initialNNNs[podName] = p.Status.NominatedNodeName
+				return true, nil
+			}
+			return false, nil
+		})
+		if err != nil {
+			t.Fatalf("Timed out waiting for NominatedNodeName on %s: %v", podName, err)
+		}
+	}
+
+	for podName, nodeName := range initialNNNs {
+		if nodeName == "node1" {
+			t.Errorf("Expected preemptor pod %s NNN to be node2 or node3, got %s", podName, nodeName)
+		}
+	}
+
+	// 6. Remove pod1 from node1
+	if err := cs.CoreV1().Pods(ns).Delete(testCtx, "pod1", metav1.DeleteOptions{GracePeriodSeconds: new(int64(0))}); err != nil {
+		t.Fatalf("Failed to delete pod1: %v", err)
+	}
+
+	// Wait for pod1 to be completely removed from API server
+	err = wait.PollUntilContextTimeout(testCtx, 100*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
+		_, err := cs.CoreV1().Pods(ns).Get(ctx, "pod1", metav1.GetOptions{})
+		if apierrors.IsNotFound(err) {
+			return true, nil
+		}
+		return false, nil
+	})
+	if err != nil {
+		t.Fatalf("Timed out waiting for pod1 to be deleted: %v", err)
+	}
+
+	// 7. Verify that nominated node names did not change to node1 despite node1 having free space and a higher score from mockScorePlugin.
+	verifyNominationsHeld(testCtx, t, cs, ns, preemptorPods, initialNNNs, "pod2", "pod3")
+}
+
+func TestCompositePodGroupPreemptionStatus(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.GenericWorkload:                 true,
+		features.CompositePodGroup:               true,
+		features.TopologyAwareWorkloadScheduling: true,
+	})
+	testCtx := schedulerutils.InitTestSchedulerWithNS(t, "cpg-preemption-status")
+
+	cs := testCtx.Client()
+	ns := testCtx.Namespace()
+
+	// Create a node.
+	node := st.MakeNode().Name("node-1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj()
+	if _, err := cs.CoreV1().Nodes().Create(testCtx, node, metav1.CreateOptions{}); err != nil {
+		t.Fatalf("Failed to create node: %v", err)
+	}
+	// Create a low-priority pod low-1 taking whole node
+	lowPod := st.MakePod().Name("low-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").Priority(10).TerminationGracePeriodSeconds(30).Obj()
+	if _, err := cs.CoreV1().Pods(ns).Create(testCtx, lowPod, metav1.CreateOptions{}); err != nil {
+		t.Fatalf("Failed to create low-priority pod: %v", err)
+	}
+	// Wait for low-priority pod to be scheduled
+	if err := wait.PollUntilContextTimeout(testCtx, 100*time.Millisecond, 10*time.Second, false,
+		schedulerutils.PodScheduled(cs, ns, lowPod.Name)); err != nil {
+		t.Fatalf("Failed to wait for low-priority pod to be scheduled: %v", err)
+	}
+	// Create a CompositePodGroup and child PodGroup (priority=100)
+	cpg := st.MakeCompositePodGroup().Name("cpg1").Namespace(ns).Priority(100).BasicPolicy().WorkloadRef("wl1", "t1").Obj()
+	if _, err := cs.SchedulingV1beta1().CompositePodGroups(ns).Create(testCtx, cpg, metav1.CreateOptions{}); err != nil {
+		t.Fatalf("Failed to create CompositePodGroup: %v", err)
+	}
+	pg := st.MakePodGroup().Name("pg1").Namespace(ns).MinCount(1).Priority(100).ParentCompositePodGroup("cpg1").WorkloadRef("wl1", "t1").Obj()
+	if _, err := cs.SchedulingV1beta1().PodGroups(ns).Create(testCtx, pg, metav1.CreateOptions{}); err != nil {
+		t.Fatalf("Failed to create PodGroup: %v", err)
+	}
+	highPod := st.MakePod().Name("high-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").Priority(100).Obj()
+	if _, err := cs.CoreV1().Pods(ns).Create(testCtx, highPod, metav1.CreateOptions{}); err != nil {
+		t.Fatalf("Failed to create high-priority pod: %v", err)
+	}
+	// Poll until the low-priority pod gets DeletionTimestamp set (which indicates preemption is triggered)
+	err := wait.PollUntilContextTimeout(testCtx, 100*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
+		pod, err := cs.CoreV1().Pods(ns).Get(ctx, lowPod.Name, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		return pod.DeletionTimestamp != nil, nil
+	})
+	if err != nil {
+		t.Fatalf("Failed to wait for low-priority pod to get DeletionTimestamp set: %v", err)
+	}
+	// Verify the child PodGroup condition.
+	// We want PodGroupInitiallyScheduled status to be False, Reason to be Unschedulable, and Message to contain
+	// both "scheduling policy's minimum threshold (1) cannot be satisfied" and "pod group preemption: found a placement for podgroup, preempting 1 victims"
+	var cond *metav1.Condition
+	err = wait.PollUntilContextTimeout(testCtx, 100*time.Millisecond, 5*time.Second, false, func(ctx context.Context) (bool, error) {
+		currentPG, err := cs.SchedulingV1beta1().PodGroups(ns).Get(ctx, pg.Name, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		cond = apimeta.FindStatusCondition(currentPG.Status.Conditions, schedulingv1beta1.PodGroupInitiallyScheduled)
+		if cond != nil &&
+			cond.Status == metav1.ConditionFalse &&
+			cond.Reason == schedulingv1beta1.PodGroupReasonUnschedulable &&
+			strings.Contains(cond.Message, "scheduling policy's minimum threshold (1) cannot be satisfied") &&
+			strings.Contains(cond.Message, "pod group preemption: found a placement for podgroup, preempting 1 victims") {
+			return true, nil
+		}
+		return false, nil
+	})
+	if err != nil {
+		t.Fatalf("Failed to verify PodGroup condition: %v; last observed: %+v", err, cond)
+	}
+	// Verify the root CompositePodGroup condition mirrors the child's: still unschedulable,
+	// with the preemption outcome carried in the message.
+	var cpgCond *metav1.Condition
+	err = wait.PollUntilContextTimeout(testCtx, 100*time.Millisecond, 5*time.Second, false, func(ctx context.Context) (bool, error) {
+		currentCPG, err := cs.SchedulingV1beta1().CompositePodGroups(ns).Get(ctx, cpg.Name, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		cpgCond = apimeta.FindStatusCondition(currentCPG.Status.Conditions, schedulingv1beta1.CompositePodGroupInitiallyScheduled)
+		return cpgCond != nil &&
+			cpgCond.Status == metav1.ConditionFalse &&
+			cpgCond.Reason == schedulingv1beta1.CompositePodGroupReasonUnschedulable &&
+			strings.Contains(cpgCond.Message, "pod group preemption: found a placement for podgroup, preempting 1 victims"), nil
+	})
+	if err != nil {
+		t.Fatalf("Failed to verify CompositePodGroup condition: %v; last observed: %+v", err, cpgCond)
+	}
 }

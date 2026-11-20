@@ -63,6 +63,7 @@ func (s *Strategy) NamespaceScoped() bool {
 
 func (s *Strategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	req := obj.(*certificates.PodCertificateRequest)
+	req.Generation = 1
 	req.Status = certificates.PodCertificateRequestStatus{}
 }
 
@@ -84,6 +85,7 @@ func (s *Strategy) AllowCreateOnUpdate(ctx context.Context) bool {
 func (s *Strategy) PrepareForUpdate(ctx context.Context, new, old runtime.Object) {
 	newReq := new.(*certificates.PodCertificateRequest)
 	oldReq := old.(*certificates.PodCertificateRequest)
+	// spec is immutable, no generation update makes sense
 	newReq.Status = oldReq.Status
 }
 

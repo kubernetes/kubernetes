@@ -6,6 +6,7 @@ package runtimeutil
 import (
 	"fmt"
 	"os"
+	"slices"
 	"sort"
 	"strings"
 
@@ -73,12 +74,7 @@ func (ce *ContainerEnv) AddKeyValue(key, value string) {
 
 // HasExportedKey returns true if the key is a exported key
 func (ce *ContainerEnv) HasExportedKey(key string) bool {
-	for _, k := range ce.VarsToExport {
-		if k == key {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(ce.VarsToExport, key)
 }
 
 // AddKey adds a key into the envs

@@ -45,6 +45,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/batch"
 	batchvalidation "k8s.io/kubernetes/pkg/apis/batch/validation"
 	"k8s.io/kubernetes/pkg/apis/core"
+	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/ptr"
 )
@@ -111,6 +112,7 @@ func (jobStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object
 	job.DropDisabledFields(&newJob.Spec, &oldJob.Spec)
 
 	pod.DropDisabledTemplateFields(&newJob.Spec.Template, &oldJob.Spec.Template)
+	pod.SyncPodNetworkOnTemplateUpdate(&newJob.Spec.Template, &oldJob.Spec.Template)
 
 	// Any changes to the spec increment the generation number.
 	// See metav1.ObjectMeta description for more information on Generation.
@@ -154,7 +156,7 @@ func validationOptionsForJob(newJob, oldJob *batch.Job) batchvalidation.JobValid
 		oldPodTemplate = &oldJob.Spec.Template
 	}
 	opts := batchvalidation.JobValidationOptions{
-		PodValidationOptions:  pod.GetValidationOptionsFromPodTemplate(newPodTemplate, oldPodTemplate),
+		PodValidationOptions:  corevalidation.GetValidationOptionsFromPodTemplate(newPodTemplate, oldPodTemplate),
 		RequirePrefixedLabels: true,
 	}
 	if oldJob != nil {

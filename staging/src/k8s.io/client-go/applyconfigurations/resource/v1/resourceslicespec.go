@@ -28,7 +28,7 @@ import (
 //
 // ResourceSliceSpec contains the information published by the driver in one ResourceSlice.
 type ResourceSliceSpecApplyConfiguration struct {
-	// Driver identifies the DRA driver providing the capacity information.
+	// driver identifies the DRA driver providing the capacity information.
 	// A field selector can be used to list only ResourceSlice
 	// objects with a certain driver name.
 	//
@@ -36,9 +36,9 @@ type ResourceSliceSpecApplyConfiguration struct {
 	// vendor of the driver. It should use only lower case characters.
 	// This field is immutable.
 	Driver *string `json:"driver,omitempty"`
-	// Pool describes the pool that this ResourceSlice belongs to.
+	// pool describes the pool that this ResourceSlice belongs to.
 	Pool *ResourcePoolApplyConfiguration `json:"pool,omitempty"`
-	// NodeName identifies the node which provides the resources in this pool.
+	// nodeName identifies the node which provides the resources in this pool.
 	// A field selector can be used to list only ResourceSlice
 	// objects belonging to a certain node.
 	//
@@ -50,31 +50,31 @@ type ResourceSliceSpecApplyConfiguration struct {
 	// Exactly one of NodeName, NodeSelector, AllNodes, and PerDeviceNodeSelection must be set.
 	// This field is immutable.
 	NodeName *string `json:"nodeName,omitempty"`
-	// NodeSelector defines which nodes have access to the resources in the pool,
+	// nodeSelector defines which nodes have access to the resources in the pool,
 	// when that pool is not limited to a single node.
 	//
 	// Must use exactly one term.
 	//
 	// Exactly one of NodeName, NodeSelector, AllNodes, and PerDeviceNodeSelection must be set.
 	NodeSelector *corev1.NodeSelectorApplyConfiguration `json:"nodeSelector,omitempty"`
-	// AllNodes indicates that all nodes have access to the resources in the pool.
+	// allNodes indicates that all nodes have access to the resources in the pool.
 	//
 	// Exactly one of NodeName, NodeSelector, AllNodes, and PerDeviceNodeSelection must be set.
 	AllNodes *bool `json:"allNodes,omitempty"`
-	// Devices lists some or all of the devices in this pool.
+	// devices lists some or all of the devices in this pool.
 	//
 	// Must not have more than 128 entries. If any device uses taints or consumes counters the limit is 64.
 	//
 	// Only one of Devices and SharedCounters can be set in a ResourceSlice.
 	Devices []DeviceApplyConfiguration `json:"devices,omitempty"`
-	// PerDeviceNodeSelection defines whether the access from nodes to
+	// perDeviceNodeSelection defines whether the access from nodes to
 	// resources in the pool is set on the ResourceSlice level or on each
 	// device. If it is set to true, every device defined the ResourceSlice
 	// must specify this individually.
 	//
 	// Exactly one of NodeName, NodeSelector, AllNodes, and PerDeviceNodeSelection must be set.
 	PerDeviceNodeSelection *bool `json:"perDeviceNodeSelection,omitempty"`
-	// SharedCounters defines a list of counter sets, each of which
+	// sharedCounters defines a list of counter sets, each of which
 	// has a name and a list of counters available.
 	//
 	// The names of the counter sets must be unique in the ResourcePool.
@@ -83,7 +83,7 @@ type ResourceSliceSpecApplyConfiguration struct {
 	//
 	// The maximum number of counter sets is 8.
 	SharedCounters []CounterSetApplyConfiguration `json:"sharedCounters,omitempty"`
-	// PartitionTypeAttribute names a string device attribute (by fully
+	// partitionTypeAttribute names a string device attribute (by fully
 	// qualified name, e.g. "gpu.example.com/profile") whose value labels
 	// each device with its partition type, such as "Full" or "Half" for a
 	// MIG-style GPU.
@@ -91,7 +91,7 @@ type ResourceSliceSpecApplyConfiguration struct {
 	// When set, every partitionable device in the slice must carry the attribute
 	// and devices sharing a value must share the same ConsumesCounters cost.
 	PartitionTypeAttribute *resourcev1.FullyQualifiedName `json:"partitionTypeAttribute,omitempty"`
-	// SkipNodeOperations lists node-local resource operations (gRPC calls)
+	// skipNodeOperations lists node-local resource operations (gRPC calls)
 	// that will be skipped for the devices in this slice when determining whether
 	// operations are necessary on the node. If all allocated devices for a driver in
 	// a claim skip an operation, that gRPC call will be skipped. Valid values are:

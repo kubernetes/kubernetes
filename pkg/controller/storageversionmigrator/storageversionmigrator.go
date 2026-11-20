@@ -71,7 +71,7 @@ type SVMController struct {
 func NewSVMController(
 	ctx context.Context,
 	kubeClient kubernetes.Interface,
-	dynamicClient *dynamic.DynamicClient,
+	dynamicClient dynamic.Interface,
 	svmInformer svminformers.StorageVersionMigrationInformer,
 	controllerName string,
 	mapper meta.ResettableRESTMapper,

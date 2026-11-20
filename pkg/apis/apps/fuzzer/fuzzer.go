@@ -21,6 +21,7 @@ import (
 
 	"sigs.k8s.io/randfill"
 
+	schedulingv1 "k8s.io/api/scheduling/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
@@ -110,6 +111,21 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			pds := int32(c.Rand.Int31())
 			j.RevisionHistoryLimit = &rhl
 			j.ProgressDeadlineSeconds = &pds
+			// spec.scheduling has structural invariants the random filler can't know
+			// about: a policy is a union (one of basic or gang), and a gang
+			// minCount must be a positive integer.
+			if j.Scheduling != nil && j.Scheduling.SchedulingPolicy != nil {
+				if c.Bool() {
+					j.Scheduling.SchedulingPolicy = &schedulingv1.WorkloadPodGroupSchedulingPolicy{
+						Basic: &schedulingv1.WorkloadPodGroupBasicSchedulingPolicy{},
+					}
+				} else {
+					minCount := max(c.Int31(), 1)
+					j.Scheduling.SchedulingPolicy = &schedulingv1.WorkloadPodGroupSchedulingPolicy{
+						Gang: &schedulingv1.WorkloadPodGroupGangSchedulingPolicy{MinCount: &minCount},
+					}
+				}
+			}
 		},
 		func(j *apps.DeploymentStrategy, c randfill.Continue) {
 			c.FillNoCustom(j) // fuzz self without calling this function again

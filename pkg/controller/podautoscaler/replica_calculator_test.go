@@ -32,17 +32,18 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/ktesting"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/controller"
 	metricsclient "k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/test/utils/ktesting"
 	cmapi "k8s.io/metrics/pkg/apis/custom_metrics/v1beta2"
 	emapi "k8s.io/metrics/pkg/apis/external_metrics/v1beta1"
 	metricsapi "k8s.io/metrics/pkg/apis/metrics/v1beta1"
@@ -509,6 +510,35 @@ func TestReplicaCalcResourceScale(t *testing.T) {
 			expectedReplicas:    4,
 			expectedUtilization: 60,
 			expectedRawValue:    numContainersPerPod * 600,
+		},
+		{
+			name: "scale up: replica count overflow saturates to MaxInt32",
+			fixture: calcScenario{
+				currentReplicas: 3,
+				resource: &cpuResource{
+					requests: cpuRequests(3, "1.0"),
+					levels:   makePodMetricLevels(15_000_000_000, 15_000_000_000, 15_000_000_000),
+				},
+			},
+			targetUtilization:   1,
+			expectedReplicas:    math.MaxInt32,
+			expectedUtilization: 1_500_000_000,
+			expectedRawValue:    numContainersPerPod * 15_000_000_000,
+		},
+		{
+			name: "scale up: replica count overflow with unready pod saturates to MaxInt32",
+			fixture: calcScenario{
+				currentReplicas: 3,
+				podReadiness:    []v1.ConditionStatus{v1.ConditionFalse, v1.ConditionTrue, v1.ConditionTrue},
+				resource: &cpuResource{
+					requests: cpuRequests(3, "1.0"),
+					levels:   makePodMetricLevels(15_000_000_000, 15_000_000_000, 15_000_000_000),
+				},
+			},
+			targetUtilization:   1,
+			expectedReplicas:    math.MaxInt32,
+			expectedUtilization: 1_500_000_000,
+			expectedRawValue:    numContainersPerPod * 15_000_000_000,
 		},
 		{
 			name: "scale up: hot-CPU container scales less",
@@ -1062,6 +1092,37 @@ func TestReplicaCalcPodMetric(t *testing.T) {
 			expectedUsage:    20000,
 		},
 		{
+			name: "scale up: replica count overflow saturates to MaxInt32",
+			fixture: calcScenario{
+				currentReplicas: 2,
+				metric:          podMetric(1_500_000_000, 1_500_000_000),
+			},
+			targetUsage:      1,
+			expectedReplicas: math.MaxInt32,
+			expectedUsage:    1_500_000_000,
+		},
+		{
+			name: "scale up: replica count overflow with missing metric saturates to MaxInt32",
+			fixture: calcScenario{
+				currentReplicas: 3,
+				metric:          podMetric(1_500_000_000, 1_500_000_000),
+			},
+			targetUsage:      1,
+			expectedReplicas: math.MaxInt32,
+			expectedUsage:    1_500_000_000,
+		},
+		{
+			name: "scale up: replica count overflow with unready pod saturates to MaxInt32",
+			fixture: calcScenario{
+				currentReplicas: 3,
+				podPhase:        []v1.PodPhase{v1.PodRunning, v1.PodRunning, v1.PodPending},
+				metric:          podMetric(1_500_000_000, 1_500_000_000, 1_500_000_000),
+			},
+			targetUsage:      1,
+			expectedReplicas: math.MaxInt32,
+			expectedUsage:    1_500_000_000,
+		},
+		{
 			name: "scale up: unready hot-CPU pod scales less",
 			fixture: calcScenario{
 				currentReplicas: 3,
@@ -1185,6 +1246,16 @@ func TestReplicaCalcObjectMetric(t *testing.T) {
 			expectedUsage:    math.MaxInt64,
 		},
 		{
+			name: "scale up from zero: replica count overflow saturates to MaxInt32",
+			fixture: calcScenario{
+				currentReplicas: 0,
+				metric:          objectMetric(math.MaxInt32 + 1),
+			},
+			targetUsage:      1,
+			expectedReplicas: math.MaxInt32,
+			expectedUsage:    math.MaxInt32 + 1,
+		},
+		{
 			name: "scale up: ignores unready pods",
 			fixture: calcScenario{
 				currentReplicas: 3,
@@ -1272,6 +1343,16 @@ func TestReplicaCalcObjectPerPodMetric(t *testing.T) {
 			perPodTargetUsage: 5000,
 			expectedReplicas:  4,
 			expectedUsage:     6667,
+		},
+		{
+			name: "scale up: replica count overflow saturates to MaxInt32",
+			fixture: calcScenario{
+				currentReplicas: 3,
+				metric:          perPodMetric(math.MaxInt32 + 1),
+			},
+			perPodTargetUsage: 1,
+			expectedReplicas:  math.MaxInt32,
+			expectedUsage:     715827883, // ceil((MaxInt32 + 1) / 3)
 		},
 		{
 			name: "scale down",
@@ -1566,6 +1647,20 @@ func TestReplicaCalcResourceMissingMetrics(t *testing.T) {
 			expectedReplicas:    3,
 			expectedUtilization: 24,
 			expectedRawValue:    495, // numContainersPerPod * 247, for sufficiently large values of 247.
+		},
+		{
+			name: "some pods missing metrics: replica count overflow saturates to MaxInt32",
+			fixture: calcScenario{
+				currentReplicas: 3,
+				resource: &cpuResource{
+					requests: cpuRequests(3, "1.0"),
+					levels:   makePodMetricLevels(15_000_000_000, 15_000_000_000),
+				},
+			},
+			targetUtilization:   1,
+			expectedReplicas:    math.MaxInt32,
+			expectedUtilization: 1_500_000_000,
+			expectedRawValue:    numContainersPerPod * 15_000_000_000,
 		},
 		{
 			name: "no change: metric equal to target",
@@ -2279,13 +2374,14 @@ func TestCalculateRequests(t *testing.T) {
 	testPod := "test-pod"
 
 	tests := []struct {
-		name                    string
-		pods                    []*v1.Pod
-		container               string
-		resource                v1.ResourceName
-		enablePodLevelResources bool
-		expectedRequests        map[string]int64
-		expectedError           error
+		name                              string
+		pods                              []*v1.Pod
+		container                         string
+		resource                          v1.ResourceName
+		enablePodLevelResources           bool
+		enableDRANodeAllocatableResources bool
+		expectedRequests                  map[string]int64
+		expectedError                     error
 	}{
 		{
 			name:             "void",
@@ -2464,11 +2560,502 @@ func TestCalculateRequests(t *testing.T) {
 			expectedRequests: map[string]int64{testPod: 150},
 			expectedError:    nil,
 		},
+		{
+			name:                    "Pod-level resources exclude overhead when calculating requests",
+			enablePodLevelResources: true,
+			pods: []*v1.Pod{{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      testPod,
+					Namespace: testNamespace,
+				},
+				Spec: v1.PodSpec{
+					Overhead: v1.ResourceList{
+						v1.ResourceCPU: *resource.NewMilliQuantity(200, resource.DecimalSI),
+					},
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(800, resource.DecimalSI)},
+					},
+					Containers: []v1.Container{
+						{Name: "container1"},
+					},
+				},
+			}},
+			container:        "",
+			resource:         v1.ResourceCPU,
+			expectedRequests: map[string]int64{testPod: 800},
+			expectedError:    nil,
+		},
+		{
+			name:                    "Container requests exclude overhead when calculating requests",
+			enablePodLevelResources: true,
+			pods: []*v1.Pod{{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      testPod,
+					Namespace: testNamespace,
+				},
+				Spec: v1.PodSpec{
+					Overhead: v1.ResourceList{
+						v1.ResourceCPU: *resource.NewMilliQuantity(200, resource.DecimalSI),
+					},
+					Containers: []v1.Container{
+						{Name: "container1", Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(100, resource.DecimalSI)}}},
+					},
+				},
+			}},
+			container:        "",
+			resource:         v1.ResourceCPU,
+			expectedRequests: map[string]int64{testPod: 100},
+			expectedError:    nil,
+		},
+		{
+			name:                    "Pod-level request set only for another resource: fail if a container is missing the request",
+			enablePodLevelResources: true,
+			pods: []*v1.Pod{{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      testPod,
+					Namespace: testNamespace,
+				},
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("1Gi")},
+					},
+					Containers: []v1.Container{
+						{Name: "container1"},
+						{Name: "container2", Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(50, resource.DecimalSI)}}},
+					},
+				},
+			}},
+			container:        "",
+			resource:         v1.ResourceCPU,
+			expectedRequests: nil,
+			expectedError:    fmt.Errorf("missing request for %s in container %s of Pod %s", v1.ResourceCPU, "container1", testPod),
+		},
+		{
+			name:                    "Pod-level request set only for another resource: sum container requests, ignoring non-restartable init containers",
+			enablePodLevelResources: true,
+			pods: []*v1.Pod{{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      testPod,
+					Namespace: testNamespace,
+				},
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("1Gi")},
+					},
+					Containers: []v1.Container{
+						{Name: "container1", Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(100, resource.DecimalSI)}}},
+					},
+					InitContainers: []v1.Container{
+						{Name: "init-container1", Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(500, resource.DecimalSI)}}},
+					},
+				},
+			}},
+			container:        "",
+			resource:         v1.ResourceCPU,
+			expectedRequests: map[string]int64{testPod: 100},
+			expectedError:    nil,
+		},
+		{
+			name:                              "DRA node allocatable resources added to container spec requests",
+			enableDRANodeAllocatableResources: true,
+			pods: []*v1.Pod{{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      testPod,
+					Namespace: testNamespace,
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: "container1", Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(100, resource.DecimalSI)}}},
+						{Name: "container2", Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(50, resource.DecimalSI)}}},
+					},
+				},
+				Status: v1.PodStatus{
+					ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+						{
+							ContainerName: "",
+							Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("400m")},
+							Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("400m")},
+						},
+						{
+							ContainerName: "container1",
+							Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("25m")},
+							Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("375m")},
+						},
+						{
+							ContainerName: "container2",
+							Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("25m")},
+							Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("375m")},
+						},
+					},
+				},
+			}},
+			container:        "",
+			resource:         v1.ResourceCPU,
+			expectedRequests: map[string]int64{testPod: 550},
+			expectedError:    nil,
+		},
+		{
+			name:                              "DRA-only pod with no pod.spec CPU request succeeds when DRANodeAllocatableResources enabled",
+			enableDRANodeAllocatableResources: true,
+			pods: []*v1.Pod{{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      testPod,
+					Namespace: testNamespace,
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: "container1"},
+					},
+				},
+				Status: v1.PodStatus{
+					ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+						{
+							ContainerName: "",
+							Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("400m")},
+							Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("400m")},
+						},
+						{
+							ContainerName: "container1",
+							Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("400m")},
+						},
+					},
+				},
+			}},
+			container:        "",
+			resource:         v1.ResourceCPU,
+			expectedRequests: map[string]int64{testPod: 400},
+			expectedError:    nil,
+		},
+		{
+			name:                              "DRA-only pod fails when DRANodeAllocatableResources is disabled",
+			enableDRANodeAllocatableResources: false,
+			pods: []*v1.Pod{{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      testPod,
+					Namespace: testNamespace,
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: "container1"},
+					},
+				},
+				Status: v1.PodStatus{
+					ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+						{
+							ContainerName: "",
+							Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("400m")},
+							Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("400m")},
+						},
+						{
+							ContainerName: "container1",
+							Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("400m")},
+						},
+					},
+				},
+			}},
+			container:        "",
+			resource:         v1.ResourceCPU,
+			expectedRequests: nil,
+			expectedError:    fmt.Errorf("missing request for %s in container %s of Pod %s", v1.ResourceCPU, "container1", testPod),
+		},
+		{
+			name:                              "Multi-container pod fails if one container lacks both spec and DRA request",
+			enableDRANodeAllocatableResources: true,
+			pods: []*v1.Pod{{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      testPod,
+					Namespace: testNamespace,
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: "container1"},
+						{Name: "container2"},
+					},
+				},
+				Status: v1.PodStatus{
+					ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+						{
+							ContainerName: "",
+							Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("400m")},
+							Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("400m")},
+						},
+						{
+							ContainerName: "container1",
+							Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("400m")},
+						},
+					},
+				},
+			}},
+			container:        "",
+			resource:         v1.ResourceCPU,
+			expectedRequests: nil,
+			expectedError:    fmt.Errorf("missing request for %s in container %s of Pod %s", v1.ResourceCPU, "container2", testPod),
+		},
+		{
+			name:                              "Pod-level resources cover DRA without double-counting",
+			enablePodLevelResources:           true,
+			enableDRANodeAllocatableResources: true,
+			pods: []*v1.Pod{{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      testPod,
+					Namespace: testNamespace,
+				},
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(800, resource.DecimalSI)},
+					},
+					Containers: []v1.Container{
+						{Name: "container1", Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(100, resource.DecimalSI)}}},
+					},
+				},
+				Status: v1.PodStatus{
+					ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+						{
+							ContainerName: "",
+							Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("400m")},
+							Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("400m")},
+						},
+						{
+							ContainerName: "container1",
+							Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("400m")},
+						},
+					},
+				},
+			}},
+			container:        "",
+			resource:         v1.ResourceCPU,
+			expectedRequests: map[string]int64{testPod: 800},
+			expectedError:    nil,
+		},
+		{
+			name:                              "Container includes DRA allocation for target container",
+			enableDRANodeAllocatableResources: true,
+			pods: []*v1.Pod{{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      testPod,
+					Namespace: testNamespace,
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: "container1", Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(100, resource.DecimalSI)}}},
+						{Name: "container2", Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(50, resource.DecimalSI)}}},
+					},
+				},
+				Status: v1.PodStatus{
+					ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+						{
+							ContainerName: "",
+							Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("300m")},
+							Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("300m")},
+						},
+						{
+							ContainerName: "container1",
+							Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("300m")},
+						},
+					},
+				},
+			}},
+			container:        "container1",
+			resource:         v1.ResourceCPU,
+			expectedRequests: map[string]int64{testPod: 400},
+			expectedError:    nil,
+		},
+		{
+			name:                              "DRA-only target container with no spec request",
+			enableDRANodeAllocatableResources: true,
+			pods: []*v1.Pod{{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      testPod,
+					Namespace: testNamespace,
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: "container1"},
+					},
+				},
+				Status: v1.PodStatus{
+					ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+						{
+							ContainerName: "",
+							Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("300m")},
+							Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("300m")},
+						},
+						{
+							ContainerName: "container1",
+							Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("300m")},
+						},
+					},
+				},
+			}},
+			container:        "container1",
+			resource:         v1.ResourceCPU,
+			expectedRequests: map[string]int64{testPod: 300},
+			expectedError:    nil,
+		},
+		{
+			name:                              "shared DRA claim counts in full for the target container",
+			enableDRANodeAllocatableResources: true,
+			pods: []*v1.Pod{{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      testPod,
+					Namespace: testNamespace,
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: "container1", Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(100, resource.DecimalSI)}}},
+						{Name: "container2", Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(200, resource.DecimalSI)}}},
+					},
+				},
+				Status: v1.PodStatus{
+					ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+						{
+							ContainerName: "",
+							Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("600m")},
+							Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("600m")},
+						},
+						{
+							ContainerName: "container1",
+							Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("600m")},
+						},
+						{
+							ContainerName: "container2",
+							Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("600m")},
+						},
+					},
+				},
+			}},
+			container:        "container1",
+			resource:         v1.ResourceCPU,
+			expectedRequests: map[string]int64{testPod: 700}, // 100m spec + 600m claim
+			expectedError:    nil,
+		},
+		{
+			name:                              "shared DRA claim counted once for pod",
+			enableDRANodeAllocatableResources: true,
+			pods: []*v1.Pod{{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      testPod,
+					Namespace: testNamespace,
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: "container1", Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(100, resource.DecimalSI)}}},
+						{Name: "container2"},
+					},
+				},
+				Status: v1.PodStatus{
+					ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+						{
+							ContainerName: "",
+							Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("600m")},
+							Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("600m")},
+						},
+						{
+							ContainerName: "container1",
+							Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("600m")},
+						},
+						{
+							ContainerName: "container2",
+							Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("600m")},
+						},
+					},
+				},
+			}},
+			container:        "",
+			resource:         v1.ResourceCPU,
+			expectedRequests: map[string]int64{testPod: 700}, // 100m spec + 600m claim, once
+			expectedError:    nil,
+		},
+		{
+			name:                              "DRA claim used only by plain init container is excluded while sidecar init container claim is included",
+			enableDRANodeAllocatableResources: true,
+			pods: []*v1.Pod{{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      testPod,
+					Namespace: testNamespace,
+				},
+				Spec: v1.PodSpec{
+					InitContainers: []v1.Container{
+						{Name: "init1", Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(500, resource.DecimalSI)}}},
+						{Name: "sidecar1", RestartPolicy: &containerRestartPolicyAlways, Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(200, resource.DecimalSI)}}},
+					},
+					Containers: []v1.Container{
+						{Name: "container1", Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(100, resource.DecimalSI)}}},
+					},
+				},
+				Status: v1.PodStatus{
+					ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+						{
+							ContainerName: "",
+							Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("2300m")},
+							Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("2300m")},
+						},
+						{
+							ContainerName: "init1",
+							Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("2000m")},
+						},
+						{
+							ContainerName: "sidecar1",
+							Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("300m")},
+						},
+					},
+				},
+			}},
+			container:        "",
+			resource:         v1.ResourceCPU,
+			expectedRequests: map[string]int64{testPod: 600}, // 100m container1 + 200m sidecar1 + 300m sidecar-claim (init-only-claim excluded)
+			expectedError:    nil,
+		},
+		{
+			name:                              "per-container overhead of a sidecar claim counts once when a claim used only by a plain init container is excluded",
+			enableDRANodeAllocatableResources: true,
+			pods: []*v1.Pod{{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      testPod,
+					Namespace: testNamespace,
+				},
+				Spec: v1.PodSpec{
+					InitContainers: []v1.Container{
+						{Name: "init1", Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(500, resource.DecimalSI)}}},
+						{Name: "sidecar1", RestartPolicy: &containerRestartPolicyAlways, Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(200, resource.DecimalSI)}}},
+					},
+					Containers: []v1.Container{
+						{Name: "container1", Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(100, resource.DecimalSI)}}},
+					},
+				},
+				Status: v1.PodStatus{
+					ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+						{
+							ContainerName: "",
+							Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("2350m")},
+							Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("2350m")},
+						},
+						{
+							ContainerName: "init1",
+							Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("2000m")},
+						},
+						{
+							ContainerName: "sidecar1",
+							Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("50m")},
+							Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("350m")},
+						},
+					},
+				},
+			}},
+			container:        "",
+			resource:         v1.ResourceCPU,
+			expectedRequests: map[string]int64{testPod: 650}, // 100m container1 + 200m sidecar1 + 50m sidecar1 per-container + 300m sidecar-claim mapping
+			expectedError:    nil,
+		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			if !tc.enablePodLevelResources {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.37"))
+			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, tc.enablePodLevelResources)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRANodeAllocatableResources, tc.enableDRANodeAllocatableResources)
 
 			requests, err := calculateRequests(tc.pods, tc.container, tc.resource)
 			assert.Equal(t, tc.expectedRequests, requests, "requests should be as expected")
@@ -2496,7 +3083,7 @@ func TestCalculatePodRequestsFromContainers_NonExistentContainer(t *testing.T) {
 		},
 	}
 
-	request, err := calculatePodRequestsFromContainers(pod, "non-existent-container", v1.ResourceCPU)
+	request, err := calculatePodRequestsFromContainers(pod, "non-existent-container", v1.ResourceCPU, false)
 
 	require.Error(t, err, "expected error for non-existent container")
 	expectedErr := "container non-existent-container not found in Pod test-pod"
@@ -2535,6 +3122,29 @@ func TestGetPerPodUsage(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			actual := getPerPodUsage(tc.usage, tc.statusReplicas)
 			assert.Equal(t, tc.expected, actual, "unexpected usage value")
+		})
+	}
+}
+
+func TestCeilToInt32(t *testing.T) {
+	testCases := []struct {
+		name     string
+		input    float64
+		expected int32
+	}{
+		{name: "rounds up", input: 1.1, expected: 2},
+		{name: "rounds up for negatives", input: -1.9, expected: -1},
+		{name: "ceiling crosses max int32", input: float64(math.MaxInt32) + 0.5, expected: math.MaxInt32},
+		{name: "positive overflow", input: 5e9, expected: math.MaxInt32},
+		{name: "positive infinity", input: math.Inf(1), expected: math.MaxInt32},
+		{name: "negative overflow", input: -5e9, expected: math.MinInt32},
+		{name: "negative infinity", input: math.Inf(-1), expected: math.MinInt32},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := ceilToInt32(tc.input); got != tc.expected {
+				t.Errorf("ceilToInt32(%v) = %d, want %d", tc.input, got, tc.expected)
+			}
 		})
 	}
 }

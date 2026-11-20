@@ -19,12 +19,22 @@ package v1alpha1
 import (
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/utils/ptr"
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
 	return RegisterDefaults(scheme)
+}
+
+// SetDefaults_CompressionResourceConfiguration sets an omitted minSize to 1Ki.
+// Below that, the space DEFLATE saves isn't worth the CPU it costs on every read
+// and write.
+func SetDefaults_CompressionResourceConfiguration(obj *CompressionResourceConfiguration) {
+	if obj.MinSize == nil {
+		obj.MinSize = resource.NewQuantity(1024, resource.BinarySI)
+	}
 }
 
 func SetDefaults_WebhookConfiguration(obj *WebhookConfiguration) {

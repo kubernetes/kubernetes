@@ -123,6 +123,7 @@ type PodStatusApplyConfiguration struct {
 	// Status of resources resize desired for pod's containers.
 	// It is empty if no resources resize is pending.
 	// Any changes to container resources will automatically set this to "Proposed"
+	//
 	// Deprecated: Resize status is moved to two pod conditions PodResizePending and PodResizeInProgress.
 	// PodResizePending will track states where the spec has been resized, but the Kubelet has not yet allocated the resources.
 	// PodResizeInProgress will track in-progress resizes, and should be present whenever allocated resources != acknowledged resources.
@@ -131,23 +132,32 @@ type PodStatusApplyConfiguration struct {
 	ResourceClaimStatuses []PodResourceClaimStatusApplyConfiguration `json:"resourceClaimStatuses,omitempty"`
 	// Status of extended resource claim backed by DRA.
 	ExtendedResourceClaimStatus *PodExtendedResourceClaimStatusApplyConfiguration `json:"extendedResourceClaimStatus,omitempty"`
-	// AllocatedResources is the total requests allocated for this pod by the node.
+	// AllocatedResources is the total requests allocated for this pod by the node, including pod.spec.overhead.
 	// If pod-level requests are not set, this will be the total requests aggregated
-	// across containers in the pod.
+	// across containers in the pod, plus pod.spec.overhead if specified.
 	AllocatedResources *corev1.ResourceList `json:"allocatedResources,omitempty"`
 	// Resources represents the compute resource requests and limits that have been
 	// applied at the pod level if pod-level requests or limits are set in
-	// PodSpec.Resources
+	// PodSpec.Resources, plus pod.spec.overhead if specified (for limits, only added
+	// to non-zero limits; kubelets prior to v1.38 may omit overhead from memory and
+	// hugepages requests when set in PodSpec.Resources).
 	Resources *ResourceRequirementsApplyConfiguration `json:"resources,omitempty"`
-	// NodeAllocatableResourceClaimStatuses contains the status of node-allocatable resources
-	// that were allocated for this pod through DRA claims. This includes resources currently
-	// reported in v1.Node `status.allocatable` that are not extended resources
-	// (see https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#extended-resources).
-	// Examples include "cpu", "memory", "ephemeral-storage", and hugepages.
-	NodeAllocatableResourceClaimStatuses []NodeAllocatableResourceClaimStatusApplyConfiguration `json:"nodeAllocatableResourceClaimStatuses,omitempty"`
-	// volumeHealth contains node-reported health for each volume the pod is using.
-	// Populated by the kubelet on the pod's node.
-	VolumeHealth []PodVolumeHealthApplyConfiguration `json:"volumeHealth,omitempty"`
+	// extraNodeAllocatableResources lists node allocatable resources that the pod and its containers
+	// use in addition to their spec, for example for the devices allocated to the pod's DRA claims.
+	// The scheduler sets them before it binds the pod. Allowed are the resources that v1.Node reports
+	// in `status.allocatable` that are not extended resources
+	// (see https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#extended-resources),
+	// such as "cpu", "memory", "ephemeral-storage", and "hugepages-<size>".
+	//
+	// The list has one pod entry, with an empty containerName, and at most one entry for each init
+	// or regular container. The pod's total footprint is its spec plus the pod entry, so the pod entry
+	// must cover what the container entries add to the peak of the spec, across the init, sidecar,
+	// and regular containers. For resources that the pod level resources (`spec.resources`) set, that
+	// value is the footprint and must already include the extra resources.
+	ExtraNodeAllocatableResources []ExtraNodeAllocatableResourceApplyConfiguration `json:"extraNodeAllocatableResources,omitempty"`
+	// VolumeStatuses contains the status of individual volumes used by this pod.
+	// This is an alpha field and requires enabling the CSIVolumeHealth feature gate.
+	VolumeStatuses []PodVolumeStatusApplyConfiguration `json:"volumeStatuses,omitempty"`
 }
 
 // PodStatusApplyConfiguration constructs a declarative configuration of the PodStatus type for use with
@@ -351,28 +361,28 @@ func (b *PodStatusApplyConfiguration) WithResources(value *ResourceRequirementsA
 	return b
 }
 
-// WithNodeAllocatableResourceClaimStatuses adds the given value to the NodeAllocatableResourceClaimStatuses field in the declarative configuration
+// WithExtraNodeAllocatableResources adds the given value to the ExtraNodeAllocatableResources field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
-// If called multiple times, values provided by each call will be appended to the NodeAllocatableResourceClaimStatuses field.
-func (b *PodStatusApplyConfiguration) WithNodeAllocatableResourceClaimStatuses(values ...*NodeAllocatableResourceClaimStatusApplyConfiguration) *PodStatusApplyConfiguration {
+// If called multiple times, values provided by each call will be appended to the ExtraNodeAllocatableResources field.
+func (b *PodStatusApplyConfiguration) WithExtraNodeAllocatableResources(values ...*ExtraNodeAllocatableResourceApplyConfiguration) *PodStatusApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
-			panic("nil value passed to WithNodeAllocatableResourceClaimStatuses")
+			panic("nil value passed to WithExtraNodeAllocatableResources")
 		}
-		b.NodeAllocatableResourceClaimStatuses = append(b.NodeAllocatableResourceClaimStatuses, *values[i])
+		b.ExtraNodeAllocatableResources = append(b.ExtraNodeAllocatableResources, *values[i])
 	}
 	return b
 }
 
-// WithVolumeHealth adds the given value to the VolumeHealth field in the declarative configuration
+// WithVolumeStatuses adds the given value to the VolumeStatuses field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
-// If called multiple times, values provided by each call will be appended to the VolumeHealth field.
-func (b *PodStatusApplyConfiguration) WithVolumeHealth(values ...*PodVolumeHealthApplyConfiguration) *PodStatusApplyConfiguration {
+// If called multiple times, values provided by each call will be appended to the VolumeStatuses field.
+func (b *PodStatusApplyConfiguration) WithVolumeStatuses(values ...*PodVolumeStatusApplyConfiguration) *PodStatusApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
-			panic("nil value passed to WithVolumeHealth")
+			panic("nil value passed to WithVolumeStatuses")
 		}
-		b.VolumeHealth = append(b.VolumeHealth, *values[i])
+		b.VolumeStatuses = append(b.VolumeStatuses, *values[i])
 	}
 	return b
 }

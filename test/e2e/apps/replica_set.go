@@ -42,10 +42,13 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/controller/replicaset"
+	"k8s.io/kubernetes/pkg/features"
 	apimachineryutils "k8s.io/kubernetes/test/e2e/common/apimachinery"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2ereplicaset "k8s.io/kubernetes/test/e2e/framework/replicaset"
+	testutil "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
@@ -176,7 +179,108 @@ var _ = SIGDescribe("ReplicaSet", func() {
 	framework.ConformanceIt("should validate Replicaset Status endpoints", func(ctx context.Context) {
 		testRSStatus(ctx, f)
 	})
+
+	f.It("should create a Workload and a new PodGroup for each gang Deployment revision", f.WithFeatureGate(features.GenericWorkload), f.WithFeatureGate(features.WorkloadWithDeployment), func(ctx context.Context) {
+		testGangReplicaSetRollout(ctx, f)
+	})
+
+	f.It("should replace a deleted gang pod without recreating the PodGroup", f.WithFeatureGate(features.GenericWorkload), f.WithFeatureGate(features.WorkloadWithDeployment), func(ctx context.Context) {
+		testGangReplicaSetPodReplacement(ctx, f)
+	})
 })
+
+func testGangReplicaSetRollout(ctx context.Context, f *framework.Framework) {
+	c := f.ClientSet
+	ns := f.Namespace.Name
+	podLabels := map[string]string{"name": "gang-rs-rollout"}
+	replicas := int32(3)
+
+	ginkgo.By("creating a gang Deployment")
+	d := newGangDeployment("gang-rs-rollout", replicas, podLabels, new(replicas))
+	deploy, err := c.AppsV1().Deployments(ns).Create(ctx, d, metav1.CreateOptions{})
+	framework.ExpectNoError(err, "create gang Deployment %q", d.Name)
+
+	ginkgo.By("verifying Workload and PodGroup creation")
+	workload := waitForDeploymentWorkload(ctx, c, ns, deploy.Name)
+	framework.ExpectNoError(e2edeployment.WaitForDeploymentRevisionAndImage(c, ns, deploy.Name, "1", AgnhostImage), "wait for gang Deployment revision 1")
+	rs, err := testutil.GetNewReplicaSet(deploy, c)
+	framework.ExpectNoError(err, "get the initial ReplicaSet")
+	gomega.Expect(rs).NotTo(gomega.BeNil(), "expected a ReplicaSet for revision 1")
+
+	podGroup := waitForReplicaSetPodGroup(ctx, c, ns, rs.Name)
+	gomega.Expect(podGroup.Spec.WorkloadRef).NotTo(gomega.BeNil(), "PodGroup workloadRef should not be nil")
+	gomega.Expect(podGroup.Spec.WorkloadRef.WorkloadName).To(gomega.Equal(workload.Name), "PodGroup should reference the Workload")
+	framework.ExpectNoError(e2edeployment.WaitForDeploymentComplete(c, deploy), "gang replicas should bind")
+
+	ginkgo.By("rolling out a new Deployment revision")
+	deploy, err = e2edeployment.UpdateDeploymentWithRetries(c, ns, deploy.Name, func(update *appsv1.Deployment) {
+		update.Spec.Template.Spec.Containers[0].Image = PrevAgnhostImage
+	})
+	framework.ExpectNoError(err, "update gang Deployment %q", d.Name)
+	framework.ExpectNoError(e2edeployment.WaitForDeploymentRevisionAndImage(c, ns, deploy.Name, "2", PrevAgnhostImage), "wait for gang Deployment revision 2")
+	framework.ExpectNoError(e2edeployment.WaitForDeploymentComplete(c, deploy), "wait for gang Deployment rollout to complete")
+
+	ginkgo.By("verifying the new ReplicaSet uses a new PodGroup and the same Workload")
+	newRS, err := testutil.GetNewReplicaSet(deploy, c)
+	framework.ExpectNoError(err, "get the new ReplicaSet")
+	gomega.Expect(newRS).NotTo(gomega.BeNil(), "expected a ReplicaSet for revision 2")
+	gomega.Expect(newRS.UID).NotTo(gomega.Equal(rs.UID), "rollout should create a new ReplicaSet")
+
+	newPodGroup := waitForReplicaSetPodGroup(ctx, c, ns, newRS.Name)
+	gomega.Expect(newPodGroup.Name).NotTo(gomega.Equal(podGroup.Name), "new revision should have a different PodGroup name")
+	gomega.Expect(newPodGroup.UID).NotTo(gomega.Equal(podGroup.UID), "new revision should have a new PodGroup")
+	gomega.Expect(newPodGroup.Spec.WorkloadRef).NotTo(gomega.BeNil(), "new PodGroup workloadRef should not be nil")
+	gomega.Expect(newPodGroup.Spec.WorkloadRef.WorkloadName).To(gomega.Equal(workload.Name), "new PodGroup should reference the original Workload")
+
+	currentWorkload, err := c.SchedulingV1beta1().Workloads(ns).Get(ctx, workload.Name, metav1.GetOptions{})
+	framework.ExpectNoError(err, "get Workload after rollout")
+	gomega.Expect(currentWorkload.UID).To(gomega.Equal(workload.UID), "rollout should retain the original Workload")
+}
+
+func testGangReplicaSetPodReplacement(ctx context.Context, f *framework.Framework) {
+	c := f.ClientSet
+	ns := f.Namespace.Name
+	podLabels := map[string]string{"name": "gang-rs-replace"}
+	replicas := int32(3)
+
+	d := newGangDeployment("gang-rs-replace", replicas, podLabels, new(replicas))
+	deploy, err := c.AppsV1().Deployments(ns).Create(ctx, d, metav1.CreateOptions{})
+	framework.ExpectNoError(err, "create gang Deployment %q", d.Name)
+	framework.ExpectNoError(e2edeployment.WaitForDeploymentComplete(c, deploy), "gang replicas should bind")
+
+	rsName := waitForDeploymentReplicaSetName(ctx, c, ns, podLabels)
+	podGroup := waitForReplicaSetPodGroup(ctx, c, ns, rsName)
+	originalPGUID := podGroup.UID
+
+	pods, err := e2edeployment.GetPodsForDeployment(ctx, c, deploy)
+	framework.ExpectNoError(err, "list gang pods")
+	gomega.Expect(pods.Items).NotTo(gomega.BeEmpty())
+	victim := pods.Items[0].Name
+
+	ginkgo.By("deleting one gang pod")
+	err = c.CoreV1().Pods(ns).Delete(ctx, victim, metav1.DeleteOptions{})
+	framework.ExpectNoError(err, "delete pod %q", victim)
+
+	ginkgo.By("waiting for the Deployment to replace the pod")
+	framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, c, victim, ns, f.Timeouts.PodDelete), "victim pod %q should be deleted", victim)
+	deploy, err = c.AppsV1().Deployments(ns).Get(ctx, deploy.Name, metav1.GetOptions{})
+	framework.ExpectNoError(err)
+	framework.ExpectNoError(e2edeployment.WaitForDeploymentComplete(c, deploy), "deployment should replace the deleted pod")
+
+	ginkgo.By("verifying the PodGroup was not recreated")
+	pg, err := c.SchedulingV1beta1().PodGroups(ns).Get(ctx, podGroup.Name, metav1.GetOptions{})
+	framework.ExpectNoError(err, "PodGroup should still exist")
+	gomega.Expect(pg.UID).To(gomega.Equal(originalPGUID), "PodGroup should not be recreated when a single pod is replaced")
+
+	ginkgo.By("verifying all pods remain wired to the same PodGroup")
+	pods, err = e2edeployment.GetPodsForDeployment(ctx, c, deploy)
+	framework.ExpectNoError(err, "list gang pods after replacement")
+	gomega.Expect(pods.Items).To(gomega.HaveLen(int(replicas)))
+	for _, pod := range pods.Items {
+		gomega.Expect(pod.Spec.SchedulingGroup).NotTo(gomega.BeNil(), "pod %s missing schedulingGroup", pod.Name)
+		gomega.Expect(pod.Spec.SchedulingGroup.PodGroupName).To(gomega.HaveValue(gomega.Equal(podGroup.Name)), "pod %s podGroupName", pod.Name)
+	}
+}
 
 // A basic test to check the deployment of an image using a ReplicaSet. The
 // image serves its hostname which is checked for each replica.
@@ -192,12 +296,12 @@ func testReplicaSetServeImageOrFail(ctx context.Context, f *framework.Framework,
 	newRS := newRS(name, replicas, rsLabels, name, image, []string{"serve-hostname"})
 	newRS.Spec.Template.Spec.Containers[0].Ports = []v1.ContainerPort{{ContainerPort: 9376}}
 	_, err := f.ClientSet.AppsV1().ReplicaSets(f.Namespace.Name).Create(ctx, newRS, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "create ReplicaSet %q in namespace %q", newRS.Name, f.Namespace.Name)
 
 	// Check that pods for the new RS were created.
 	// TODO: Maybe switch PodsCreated to just check owner references.
 	pods, err := e2epod.PodsCreatedByLabel(ctx, f.ClientSet, f.Namespace.Name, name, replicas, labels.SelectorFromSet(rsLabels))
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "find pods created by %q in namespace %q", name, f.Namespace.Name)
 
 	// Wait for the pods to enter the running state. Waiting loops until the pods
 	// are running so non-running pods cause a timeout for this test.
@@ -216,7 +320,7 @@ func testReplicaSetServeImageOrFail(ctx context.Context, f *framework.Framework,
 				err = fmt.Errorf("pod %q never run: %w", pod.Name, err)
 			}
 		}
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "wait for Pod %q in namespace %q to run", pod.Name, pod.Namespace)
 		framework.Logf("Pod %q is running (conditions: %+v)", pod.Name, pod.Status.Conditions)
 		running++
 	}
@@ -226,7 +330,7 @@ func testReplicaSetServeImageOrFail(ctx context.Context, f *framework.Framework,
 
 	// Verify that something is listening.
 	framework.Logf("Trying to dial the pod")
-	framework.ExpectNoError(e2epod.WaitForPodsResponding(ctx, f.ClientSet, f.Namespace.Name, name, labels.SelectorFromSet(rsLabels), true, 2*time.Minute, pods))
+	framework.ExpectNoError(e2epod.WaitForPodsResponding(ctx, f.ClientSet, f.Namespace.Name, name, labels.SelectorFromSet(rsLabels), true, 2*time.Minute, pods), "wait for pods to respond for %q in namespace %q", name, f.Namespace.Name)
 }
 
 // 1. Create a quota restricting pods in the current namespace to 2.
@@ -241,7 +345,7 @@ func testReplicaSetConditionCheck(ctx context.Context, f *framework.Framework) {
 	ginkgo.By(fmt.Sprintf("Creating quota %q that allows only two pods to run in the current namespace", name))
 	quota := newPodQuota(name, "2")
 	_, err := c.CoreV1().ResourceQuotas(namespace).Create(ctx, quota, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "create ResourceQuota %q in namespace %q", quota.Name, namespace)
 
 	err = wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
 		quota, err = c.CoreV1().ResourceQuotas(namespace).Get(ctx, name, metav1.GetOptions{})
@@ -255,12 +359,12 @@ func testReplicaSetConditionCheck(ctx context.Context, f *framework.Framework) {
 	if wait.Interrupted(err) {
 		err = fmt.Errorf("resource quota %q never synced", name)
 	}
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "wait for ResourceQuota %q in namespace %q to synchronize", name, namespace)
 
 	ginkgo.By(fmt.Sprintf("Creating replica set %q that asks for more than the allowed pod quota", name))
 	rs := newRS(name, 3, map[string]string{"name": name}, AgnhostImageName, AgnhostImage, nil)
 	rs, err = c.AppsV1().ReplicaSets(namespace).Create(ctx, rs, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "create ReplicaSet %q in namespace %q", name, namespace)
 
 	ginkgo.By(fmt.Sprintf("Checking replica set %q has the desired failure condition set", name))
 	generation := rs.Generation
@@ -283,14 +387,14 @@ func testReplicaSetConditionCheck(ctx context.Context, f *framework.Framework) {
 	if wait.Interrupted(err) {
 		err = fmt.Errorf("rs controller never added the failure condition for replica set %q: %#v", name, conditions)
 	}
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "verify the controller failure condition for %q in namespace %q", name, namespace)
 
 	ginkgo.By(fmt.Sprintf("Scaling down replica set %q to satisfy pod quota", name))
 	rs, err = e2ereplicaset.UpdateReplicaSetWithRetries(c, namespace, name, func(update *appsv1.ReplicaSet) {
 		x := int32(2)
 		update.Spec.Replicas = &x
 	})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "update ReplicaSet %q in namespace %q", name, namespace)
 
 	ginkgo.By(fmt.Sprintf("Checking replica set %q has no failure condition set", name))
 	generation = rs.Generation
@@ -312,7 +416,7 @@ func testReplicaSetConditionCheck(ctx context.Context, f *framework.Framework) {
 	if wait.Interrupted(err) {
 		err = fmt.Errorf("rs controller never removed the failure condition for rs %q: %#v", name, conditions)
 	}
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "verify the controller failure condition for %q in namespace %q", name, namespace)
 }
 
 func testRSAdoptMatchingAndReleaseNotMatching(ctx context.Context, f *framework.Framework) {
@@ -339,7 +443,7 @@ func testRSAdoptMatchingAndReleaseNotMatching(ctx context.Context, f *framework.
 	rsSt := newRS(name, replicas, rsLabels, name, AgnhostImage, nil)
 	rsSt.Spec.Selector = &metav1.LabelSelector{MatchLabels: rsLabels}
 	rs, err := f.ClientSet.AppsV1().ReplicaSets(f.Namespace.Name).Create(ctx, rsSt, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "create ReplicaSet %q in namespace %q", rsSt.Name, f.Namespace.Name)
 
 	ginkgo.By("Then the orphan pod is adopted")
 	err = wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
@@ -348,7 +452,7 @@ func testRSAdoptMatchingAndReleaseNotMatching(ctx context.Context, f *framework.
 		if apierrors.IsNotFound(err) {
 			return true, nil
 		}
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "get Pod %q in namespace %q", p.Name, f.Namespace.Name)
 		for _, owner := range p2.OwnerReferences {
 			if *owner.Controller && owner.UID == rs.UID {
 				// pod adopted
@@ -358,16 +462,16 @@ func testRSAdoptMatchingAndReleaseNotMatching(ctx context.Context, f *framework.
 		// pod still not adopted
 		return false, nil
 	})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "get Pod %q in namespace %q", p.Name, f.Namespace.Name)
 
 	ginkgo.By("When the matched label of one of its pods change")
 	pods, err := e2epod.PodsCreatedByLabel(ctx, f.ClientSet, f.Namespace.Name, rs.Name, replicas, labels.SelectorFromSet(rsLabels))
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "find pods created by %q in namespace %q", rs.Name, f.Namespace.Name)
 
 	p = &pods.Items[0]
 	err = wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
 		pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, p.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "get Pod %q in namespace %q", p.Name, f.Namespace.Name)
 
 		pod.Labels = map[string]string{"name": "not-matching-name"}
 		_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Update(ctx, pod, metav1.UpdateOptions{})
@@ -379,12 +483,12 @@ func testRSAdoptMatchingAndReleaseNotMatching(ctx context.Context, f *framework.
 		}
 		return true, nil
 	})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "update labels of Pod %q in namespace %q so it is released by its controller", p.Name, f.Namespace.Name)
 
 	ginkgo.By("Then the pod is released")
 	err = wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
 		p2, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, p.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "get Pod %q in namespace %q", p.Name, f.Namespace.Name)
 		for _, owner := range p2.OwnerReferences {
 			if *owner.Controller && owner.UID == rs.UID {
 				// pod still belonging to the replicaset
@@ -394,7 +498,7 @@ func testRSAdoptMatchingAndReleaseNotMatching(ctx context.Context, f *framework.
 		// pod already released
 		return true, nil
 	})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "get Pod %q in namespace %q", p.Name, f.Namespace.Name)
 }
 
 func testRSScaleSubresources(ctx context.Context, f *framework.Framework) {
@@ -413,7 +517,7 @@ func testRSScaleSubresources(ctx context.Context, f *framework.Framework) {
 	ginkgo.By(fmt.Sprintf("Creating replica set %q that asks for more than the allowed pod quota", rsName))
 	rs := newRS(rsName, replicas, rsPodLabels, AgnhostImageName, AgnhostImage, nil)
 	createdRS, err := c.AppsV1().ReplicaSets(ns).Create(ctx, rs, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "create ReplicaSet %q in namespace %q", rs.Name, ns)
 
 	// Verify that the required pods have come up.
 	err = e2ereplicaset.WaitForReplicaSetTargetAvailableReplicas(ctx, c, createdRS, replicas)
@@ -488,11 +592,11 @@ func testRSLifeCycle(ctx context.Context, f *framework.Framework) {
 		},
 	}
 	rsList, err := f.ClientSet.AppsV1().ReplicaSets("").List(ctx, metav1.ListOptions{LabelSelector: label})
-	framework.ExpectNoError(err, "failed to list rsList")
+	framework.ExpectNoError(err, "list rsList")
 	// Create a ReplicaSet
 	rs := newRS(rsName, replicas, rsPodLabels, AgnhostImageName, AgnhostImage, nil)
 	createdRS, err := c.AppsV1().ReplicaSets(ns).Create(ctx, rs, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "create ReplicaSet %q in namespace %q", rs.Name, ns)
 	gomega.Expect(createdRS).To(apimachineryutils.HaveValidResourceVersion())
 
 	// Verify that the required pods have come up.
@@ -526,9 +630,9 @@ func testRSLifeCycle(ctx context.Context, f *framework.Framework) {
 			},
 		},
 	})
-	framework.ExpectNoError(err, "failed to Marshal ReplicaSet JSON patch")
+	framework.ExpectNoError(err, "Marshal ReplicaSet JSON patch")
 	patchedRS, err := f.ClientSet.AppsV1().ReplicaSets(ns).Patch(ctx, rsName, types.StrategicMergePatchType, []byte(rsPatch), metav1.PatchOptions{})
-	framework.ExpectNoError(err, "failed to patch ReplicaSet")
+	framework.ExpectNoError(err, "patch ReplicaSet")
 	gomega.Expect(resourceversion.CompareResourceVersion(createdRS.ResourceVersion, patchedRS.ResourceVersion)).To(gomega.BeNumerically("==", -1), "patched object should have a larger resource version")
 
 	ctxUntil, cancel := context.WithTimeout(ctx, f.Timeouts.PodStart)
@@ -554,7 +658,7 @@ func testRSLifeCycle(ctx context.Context, f *framework.Framework) {
 		return false, nil
 	})
 
-	framework.ExpectNoError(err, "failed to see replicas of %v in namespace %v scale to requested amount of %v", rs.Name, ns, rsPatchReplicas)
+	framework.ExpectNoError(err, "see replicas of %v in namespace %v scale to requested amount of %v", rs.Name, ns, rsPatchReplicas)
 }
 
 // List and DeleteCollection operations
@@ -579,27 +683,27 @@ func listRSDeleteCollection(ctx context.Context, f *framework.Framework) {
 	ginkgo.By("Create a ReplicaSet")
 	rs := newRS(rsName, replicas, rsPodLabels, AgnhostImageName, AgnhostImage, nil)
 	_, err := rsClient.Create(ctx, rs, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "create ReplicaSet %q in namespace %q", rs.Name, ns)
 
 	ginkgo.By("Verify that the required pods have come up")
 	err = e2epod.VerifyPodsRunning(ctx, c, ns, podName, labels.SelectorFromSet(map[string]string{"name": podName}), false, replicas)
 	framework.ExpectNoError(err, "Failed to create pods: %s", err)
 	r, err := rsClient.Get(ctx, rsName, metav1.GetOptions{})
-	framework.ExpectNoError(err, "failed to get ReplicaSets")
+	framework.ExpectNoError(err, "get ReplicaSets")
 	framework.Logf("Replica Status: %+v", r.Status)
 
 	ginkgo.By("Listing all ReplicaSets")
 	rsList, err := c.AppsV1().ReplicaSets("").List(ctx, metav1.ListOptions{LabelSelector: "e2e=" + e2eValue})
-	framework.ExpectNoError(err, "failed to list ReplicaSets")
+	framework.ExpectNoError(err, "list ReplicaSets")
 	gomega.Expect(rsList.Items).To(gomega.HaveLen(1), "filtered list wasn't found")
 
 	ginkgo.By("DeleteCollection of the ReplicaSets")
 	err = rsClient.DeleteCollection(ctx, metav1.DeleteOptions{GracePeriodSeconds: &one}, metav1.ListOptions{LabelSelector: "e2e=" + e2eValue})
-	framework.ExpectNoError(err, "failed to delete ReplicaSets")
+	framework.ExpectNoError(err, "delete ReplicaSets")
 
 	ginkgo.By("After DeleteCollection verify that ReplicaSets have been deleted")
 	rsList, err = c.AppsV1().ReplicaSets("").List(ctx, metav1.ListOptions{LabelSelector: "e2e=" + e2eValue})
-	framework.ExpectNoError(err, "failed to list ReplicaSets")
+	framework.ExpectNoError(err, "list ReplicaSets")
 	gomega.Expect(rsList.Items).To(gomega.BeEmpty(), "filtered list should have no replicas")
 }
 
@@ -626,12 +730,12 @@ func testRSStatus(ctx context.Context, f *framework.Framework) {
 		},
 	}
 	rsList, err := c.AppsV1().ReplicaSets("").List(ctx, metav1.ListOptions{LabelSelector: labelSelector})
-	framework.ExpectNoError(err, "failed to list Replicasets")
+	framework.ExpectNoError(err, "list Replicasets")
 
 	ginkgo.By("Create a Replicaset")
 	rs := newRS(rsName, replicas, rsPodLabels, AgnhostImageName, AgnhostImage, nil)
 	testReplicaSet, err := c.AppsV1().ReplicaSets(ns).Create(ctx, rs, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "create ReplicaSet %q in namespace %q", rs.Name, ns)
 
 	ginkgo.By("Verify that the required pods have come up.")
 	err = e2epod.VerifyPodsRunning(ctx, c, ns, podName, labels.SelectorFromSet(map[string]string{"name": podName}), false, replicas)
@@ -696,7 +800,7 @@ func testRSStatus(ctx context.Context, f *framework.Framework) {
 		framework.Logf("Observed %v event: %+v", object, event.Type)
 		return false, nil
 	})
-	framework.ExpectNoError(err, "failed to locate replicaset %v in namespace %v", testReplicaSet.ObjectMeta.Name, ns)
+	framework.ExpectNoError(err, "locate replicaset %v in namespace %v", testReplicaSet.ObjectMeta.Name, ns)
 	framework.Logf("Replicaset %s has an updated status", rsName)
 
 	ginkgo.By("patching the Replicaset Status")
@@ -732,6 +836,6 @@ func testRSStatus(ctx context.Context, f *framework.Framework) {
 		framework.Logf("Observed %v event: %+v", object, event.Type)
 		return false, nil
 	})
-	framework.ExpectNoError(err, "failed to locate replicaset %v in namespace %v", testReplicaSet.ObjectMeta.Name, ns)
+	framework.ExpectNoError(err, "locate replicaset %v in namespace %v", testReplicaSet.ObjectMeta.Name, ns)
 	framework.Logf("Replicaset %s has a patched status", rsName)
 }

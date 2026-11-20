@@ -19,7 +19,7 @@ limitations under the License.
 package v1
 
 import (
-	v1alpha3 "k8s.io/client-go/applyconfigurations/scheduling/v1alpha3"
+	schedulingv1 "k8s.io/client-go/applyconfigurations/scheduling/v1"
 )
 
 // JobSchedulingConfigurationApplyConfiguration represents a declarative configuration of the JobSchedulingConfiguration type for use
@@ -33,16 +33,16 @@ type JobSchedulingConfigurationApplyConfiguration struct {
 	// This field is immutable after creation: the policy may not be added or
 	// removed. The policy variant (basic/gang) is frozen by hand-written
 	// validation; only schedulingPolicy.gang.minCount may be changed.
-	SchedulingPolicy *v1alpha3.WorkloadPodGroupSchedulingPolicyApplyConfiguration `json:"schedulingPolicy,omitempty"`
+	SchedulingPolicy *schedulingv1.WorkloadPodGroupSchedulingPolicyApplyConfiguration `json:"schedulingPolicy,omitempty"`
 	// schedulingConstraints defines scheduling constraints (e.g. topology)
 	// for the Job's pods.
 	// This field is immutable after creation.
-	SchedulingConstraints *v1alpha3.WorkloadPodGroupSchedulingConstraintsApplyConfiguration `json:"schedulingConstraints,omitempty"`
+	SchedulingConstraints *schedulingv1.WorkloadPodGroupSchedulingConstraintsApplyConfiguration `json:"schedulingConstraints,omitempty"`
 	// disruptionMode defines the mode in which the Job's pods can be disrupted.
 	// One of Single, All.
 	// This field is immutable after creation: it may not be added or removed,
 	// and the selected mode may not be changed.
-	DisruptionMode *v1alpha3.WorkloadPodGroupDisruptionModeApplyConfiguration `json:"disruptionMode,omitempty"`
+	DisruptionMode *schedulingv1.WorkloadPodGroupDisruptionModeApplyConfiguration `json:"disruptionMode,omitempty"`
 	// resourceClaims defines which ResourceClaims may be shared among Pods in
 	// the Job. Pods consume the devices allocated to a PodGroup's claim by
 	// defining a claim in its own Spec.ResourceClaims that matches the
@@ -51,7 +51,7 @@ type JobSchedulingConfigurationApplyConfiguration struct {
 	// At most 4 claims may be set, matching the limit on the resulting PodGroup.
 	// This list is immutable after creation: entries may neither be added,
 	// removed, nor modified.
-	ResourceClaims []v1alpha3.WorkloadPodGroupResourceClaimApplyConfiguration `json:"resourceClaims,omitempty"`
+	ResourceClaims []schedulingv1.WorkloadPodGroupResourceClaimApplyConfiguration `json:"resourceClaims,omitempty"`
 }
 
 // JobSchedulingConfigurationApplyConfiguration constructs a declarative configuration of the JobSchedulingConfiguration type for use with
@@ -63,7 +63,7 @@ func JobSchedulingConfiguration() *JobSchedulingConfigurationApplyConfiguration 
 // WithSchedulingPolicy sets the SchedulingPolicy field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the SchedulingPolicy field is set to the value of the last call.
-func (b *JobSchedulingConfigurationApplyConfiguration) WithSchedulingPolicy(value *v1alpha3.WorkloadPodGroupSchedulingPolicyApplyConfiguration) *JobSchedulingConfigurationApplyConfiguration {
+func (b *JobSchedulingConfigurationApplyConfiguration) WithSchedulingPolicy(value *schedulingv1.WorkloadPodGroupSchedulingPolicyApplyConfiguration) *JobSchedulingConfigurationApplyConfiguration {
 	b.SchedulingPolicy = value
 	return b
 }
@@ -71,7 +71,7 @@ func (b *JobSchedulingConfigurationApplyConfiguration) WithSchedulingPolicy(valu
 // WithSchedulingConstraints sets the SchedulingConstraints field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the SchedulingConstraints field is set to the value of the last call.
-func (b *JobSchedulingConfigurationApplyConfiguration) WithSchedulingConstraints(value *v1alpha3.WorkloadPodGroupSchedulingConstraintsApplyConfiguration) *JobSchedulingConfigurationApplyConfiguration {
+func (b *JobSchedulingConfigurationApplyConfiguration) WithSchedulingConstraints(value *schedulingv1.WorkloadPodGroupSchedulingConstraintsApplyConfiguration) *JobSchedulingConfigurationApplyConfiguration {
 	b.SchedulingConstraints = value
 	return b
 }
@@ -79,7 +79,7 @@ func (b *JobSchedulingConfigurationApplyConfiguration) WithSchedulingConstraints
 // WithDisruptionMode sets the DisruptionMode field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the DisruptionMode field is set to the value of the last call.
-func (b *JobSchedulingConfigurationApplyConfiguration) WithDisruptionMode(value *v1alpha3.WorkloadPodGroupDisruptionModeApplyConfiguration) *JobSchedulingConfigurationApplyConfiguration {
+func (b *JobSchedulingConfigurationApplyConfiguration) WithDisruptionMode(value *schedulingv1.WorkloadPodGroupDisruptionModeApplyConfiguration) *JobSchedulingConfigurationApplyConfiguration {
 	b.DisruptionMode = value
 	return b
 }
@@ -87,7 +87,7 @@ func (b *JobSchedulingConfigurationApplyConfiguration) WithDisruptionMode(value 
 // WithResourceClaims adds the given value to the ResourceClaims field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the ResourceClaims field.
-func (b *JobSchedulingConfigurationApplyConfiguration) WithResourceClaims(values ...*v1alpha3.WorkloadPodGroupResourceClaimApplyConfiguration) *JobSchedulingConfigurationApplyConfiguration {
+func (b *JobSchedulingConfigurationApplyConfiguration) WithResourceClaims(values ...*schedulingv1.WorkloadPodGroupResourceClaimApplyConfiguration) *JobSchedulingConfigurationApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithResourceClaims")

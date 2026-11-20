@@ -43,6 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
 	"k8s.io/kubernetes/pkg/kubelet/status"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/utils/cpuset"
 )
@@ -162,6 +163,9 @@ type ContainerManager interface {
 	// ContainerHasExclusiveCPUs returns true if the provided container in the pod has exclusive cpu
 	ContainerHasExclusiveCPUs(logger klog.Logger, pod *v1.Pod, container *v1.Container) bool
 
+	// AllocationMode implements the ResourceManager capability discovery contract.
+	AllocationMode(res v1.ResourceName) ResourceAllocationMode
+
 	// Implements the PodResources Provider API
 	podresources.CPUsProvider
 	podresources.DevicesProvider
@@ -195,12 +199,14 @@ type NodeConfig struct {
 	MemoryManagerReservedMemory  []kubeletconfig.MemoryReservation
 	MemoryReservationPolicy      kubeletconfig.MemoryReservationPolicy
 	MemoryThrottlingFactor       *float64
+	MemorySwapBehavior           kubetypes.SwapBehavior
 	PodPidsLimit                 int64
 	EnforceCPULimits             bool
 	CPUCFSQuotaPeriod            time.Duration
 	TopologyManagerPolicy        string
 	TopologyManagerPolicyOptions map[string]string
 	CgroupVersion                int
+	CgroupNsdelegate             bool
 }
 
 type NodeAllocatableConfig struct {

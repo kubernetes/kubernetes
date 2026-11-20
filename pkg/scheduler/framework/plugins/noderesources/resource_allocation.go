@@ -23,6 +23,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	draapi "k8s.io/dynamic-resource-allocation/api"
 	"k8s.io/dynamic-resource-allocation/cel"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/ptr"
@@ -32,6 +33,7 @@ import (
 	"k8s.io/dynamic-resource-allocation/structured"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
 
@@ -51,10 +53,10 @@ type DRACaches struct {
 // resourceAllocationScorer contains information to calculate resource allocation score.
 type resourceAllocationScorer struct {
 	Name                                          string
-	enableInPlacePodVerticalScaling               bool
 	enablePodLevelResources                       bool
 	enableDRAExtendedResource                     bool
 	enableInPlacePodLevelResourcesVerticalScaling bool
+	enableDRANodeAllocatableResources             bool
 	// used to decide whether to use Requested or NonZeroRequested for
 	// cpu and memory.
 	useRequested bool
@@ -187,7 +189,7 @@ func (r *resourceAllocationScorer) calculateNodeAllocatableRequest(
 		}
 		allocatable[i] = nodeAllocatable
 		allocated[i] = nodeAllocated
-		requested[i] = allocated[i] + podRequests[i]
+		requested[i] = framework.SaturatingAdd(allocated[i], podRequests[i])
 	}
 	return requested, allocated, allocatable
 }
@@ -233,13 +235,14 @@ func (r *resourceAllocationScorer) calculateResourceAllocatableRequest(
 
 // calculatePodResourceRequest returns the total non-zero requests. If Overhead is defined for the pod
 // the Overhead is added to the result.
-func (r *resourceAllocationScorer) calculatePodResourceRequest(pod *v1.Pod, resourceName v1.ResourceName) int64 {
+func (r *resourceAllocationScorer) calculatePodResourceRequest(pod *v1.Pod, resourceName v1.ResourceName, useExtraNodeAllocatable bool) int64 {
 
 	opts := resourcehelper.PodResourcesOptions{
-		UseStatusResources: r.enableInPlacePodVerticalScaling,
+		UseStatusResources: true,
 		InPlacePodLevelResourcesVerticalScalingEnabled: r.enableInPlacePodLevelResourcesVerticalScaling,
 		// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
-		SkipPodLevelResources: !r.enablePodLevelResources,
+		SkipPodLevelResources:            !r.enablePodLevelResources,
+		UseExtraNodeAllocatableResources: useExtraNodeAllocatable,
 	}
 
 	if !r.useRequested {
@@ -260,10 +263,37 @@ func (r *resourceAllocationScorer) calculatePodResourceRequest(pod *v1.Pod, reso
 
 func (r *resourceAllocationScorer) calculatePodResourceRequestList(pod *v1.Pod, resources []config.ResourceSpec) []int64 {
 	podRequests := make([]int64, len(resources))
+	// pod.Spec.NodeName != "" is needed here to exclude any stale status from a previously failed PreBind when the pod is not bound yet and the status is not cleared yet in the assumed pod.
+	useExtraNodeAllocatable := r.enableDRANodeAllocatableResources && pod.Spec.NodeName != ""
 	for i := range resources {
-		podRequests[i] = r.calculatePodResourceRequest(pod, v1.ResourceName(resources[i].Name))
+		podRequests[i] = r.calculatePodResourceRequest(pod, v1.ResourceName(resources[i].Name), useExtraNodeAllocatable)
 	}
 	return podRequests
+}
+
+// calculatePodRequestWithExtraNodeAllocatable returns the requests of pod on nodeName.
+// It adds the extra node allocatable resources that other plugins record in cycle state
+// during Filter. PreScore cannot add them, because it computes podRequests once for all
+// nodes and these resources can differ per node.
+func (r *resourceAllocationScorer) calculatePodRequestWithExtraNodeAllocatable(cycleState fwk.CycleState, pod *v1.Pod, nodeName string, podRequests []int64) []int64 {
+	if !r.enableDRANodeAllocatableResources {
+		return podRequests
+	}
+	state := framework.GetExtraNodeAllocatableResourcesState(cycleState)
+	if state == nil {
+		return podRequests
+	}
+	extraResources := state.Get(nodeName)
+	if len(extraResources) == 0 {
+		return podRequests
+	}
+	podCopy := *pod
+	podCopy.Status.ExtraNodeAllocatableResources = extraResources
+	res := make([]int64, len(r.resources))
+	for i := range r.resources {
+		res[i] = r.calculatePodResourceRequest(&podCopy, v1.ResourceName(r.resources[i].Name), r.enableDRANodeAllocatableResources)
+	}
+	return res
 }
 
 func (r *resourceAllocationScorer) isBestEffortPod(podRequests []int64) bool {
@@ -351,7 +381,7 @@ func (r *resourceAllocationScorer) calculateDRAExtendedResourceAllocatableReques
 //	totalCapacity  - total number of devices matching the device class on the node
 //	totalAllocated - number of devices currently allocated from the matching set
 //	error          - any error encountered during processing
-func (r *resourceAllocationScorer) calculateDRAResourceTotals(ctx context.Context, node *v1.Node, deviceClass *resourceapi.DeviceClass, allocatedState *structured.AllocatedState, resourceSlices []*resourceapi.ResourceSlice,
+func (r *resourceAllocationScorer) calculateDRAResourceTotals(ctx context.Context, node *v1.Node, deviceClass *resourceapi.DeviceClass, allocatedState *structured.AllocatedState, resourceSlices []*draapi.ResourceSlice,
 ) (int64, int64, error) {
 	var totalCapacity, totalAllocated int64
 	nodeName := node.Name
@@ -360,11 +390,11 @@ func (r *resourceAllocationScorer) calculateDRAResourceTotals(ctx context.Contex
 		// Early filtering: check if slice applies to this node
 		perDeviceNodeSelection := ptr.Deref(slice.Spec.PerDeviceNodeSelection, false)
 
-		var devices []resourceapi.Device
+		var devices []draapi.Device
 
 		if perDeviceNodeSelection {
 			// Per-device node selection: filter devices individually
-			devices = make([]resourceapi.Device, 0, len(slice.Spec.Devices))
+			devices = make([]draapi.Device, 0, len(slice.Spec.Devices))
 			for _, device := range slice.Spec.Devices {
 				deviceNodeName := ptr.Deref(device.NodeName, "")
 				deviceAllNodes := ptr.Deref(device.AllNodes, false)
@@ -389,7 +419,7 @@ func (r *resourceAllocationScorer) calculateDRAResourceTotals(ctx context.Contex
 		} else {
 			// Slice-level node selection
 			sliceNodeName := ptr.Deref(slice.Spec.NodeName, "")
-			sliceAllNodes := ptr.Deref(slice.Spec.AllNodes, false)
+			sliceAllNodes := slice.Spec.AllNodes
 
 			// Fast path: check AllNodes or exact name match first
 			if !sliceAllNodes && sliceNodeName != nodeName && slice.Spec.NodeSelector != nil {
@@ -415,23 +445,22 @@ func (r *resourceAllocationScorer) calculateDRAResourceTotals(ctx context.Contex
 			pool := slice.Spec.Pool.Name
 			for _, device := range devices {
 				totalCapacity++
-				deviceID := structured.MakeDeviceID(driver, pool, device.Name)
+				// TODO (?): use unique strings in structured.IsDeviceAllocated
+				deviceID := structured.MakeDeviceID(driver.String(), pool.String(), device.Name.String())
 				if structured.IsDeviceAllocated(deviceID, allocatedState) {
 					totalAllocated++
 				}
 			}
 		} else {
 			// Slow path: check device class selectors
-			driver := slice.Spec.Driver
-			pool := slice.Spec.Pool.Name
 			for _, device := range devices {
-				matches, err := r.deviceMatchesClass(ctx, device, deviceClass, driver, pool)
+				matches, err := r.deviceMatchesClass(ctx, slice, device, deviceClass)
 				if err != nil {
 					return 0, 0, err
 				}
 				if matches {
 					totalCapacity++
-					deviceID := structured.MakeDeviceID(driver, pool, device.Name)
+					deviceID := structured.DeviceID{Driver: slice.Spec.Driver, Pool: slice.Spec.Pool.Name, Device: device.Name}
 					if structured.IsDeviceAllocated(deviceID, allocatedState) {
 						totalAllocated++
 					}
@@ -447,7 +476,7 @@ func (r *resourceAllocationScorer) calculateDRAResourceTotals(ctx context.Contex
 // Note: This method assumes the device class has ExtendedResourceName set, as filtering
 // should be done by the caller to ensure we only process DRA resources meant for extended
 // resource scoring.
-func (r *resourceAllocationScorer) deviceMatchesClass(ctx context.Context, device resourceapi.Device, deviceClass *resourceapi.DeviceClass, driver string, poolName string) (bool, error) {
+func (r *resourceAllocationScorer) deviceMatchesClass(ctx context.Context, slice *draapi.ResourceSlice, device draapi.Device, deviceClass *resourceapi.DeviceClass) (bool, error) {
 	// If no selectors are defined, all devices match
 	if len(deviceClass.Spec.Selectors) == 0 {
 		return true, nil
@@ -463,7 +492,8 @@ func (r *resourceAllocationScorer) deviceMatchesClass(ctx context.Context, devic
 			continue
 		}
 
-		key := buildDeviceMatchCacheKey(selector.CEL.Expression, driver, poolName, device.Name)
+		// TODO (?): use UniqueString
+		key := buildDeviceMatchCacheKey(selector.CEL.Expression, slice.Spec.Driver.String(), slice.Spec.Pool.Name.String(), device.Name.String())
 
 		// Check if result is already cached
 		if matches, ok := r.deviceMatchCache.Load(key); ok {
@@ -477,9 +507,10 @@ func (r *resourceAllocationScorer) deviceMatchesClass(ctx context.Context, devic
 		// Create CEL device if we haven't already
 		if !celDeviceCreated {
 			celDevice = cel.Device{
-				Driver:     driver,
-				Attributes: device.Attributes,
-				Capacity:   device.Capacity,
+				Driver:             slice.Spec.Driver.String(),
+				LookupUniqueString: slice.LookupUniqueString,
+				Attributes:         device.Attributes,
+				Capacity:           device.Capacity,
 			}
 			celDeviceCreated = true
 		}
@@ -502,6 +533,7 @@ func (r *resourceAllocationScorer) deviceMatchesClass(ctx context.Context, devic
 	return true, nil
 }
 
+// TODO(#141166): use framework.SaturatingAdd for pod and node placement sums
 func (r *resourceAllocationScorer) scorePlacement(
 	ctx context.Context,
 	podGroupInfo fwk.PodGroupInfo,
@@ -511,7 +543,7 @@ func (r *resourceAllocationScorer) scorePlacement(
 	// Calculate requests for the pod group pods scheduled for this placement
 	for _, assignment := range podGroupAssignments.ProposedAssignments {
 		pod := assignment.GetPod()
-		podRequests := r.calculatePodResourceRequestList(pod, r.resources)
+		podRequests := r.calculatePodRequestWithExtraNodeAllocatable(assignment.GetCycleState(), pod, assignment.GetNodeName(), r.calculatePodResourceRequestList(pod, r.resources))
 		for i := range len(r.resources) {
 			requested[i] += podRequests[i]
 		}

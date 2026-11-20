@@ -17,6 +17,7 @@ limitations under the License.
 package runtimeclass
 
 import (
+	"context"
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -45,14 +46,14 @@ func NewManager(client clientset.Interface) *Manager {
 }
 
 // Start starts syncing the RuntimeClass cache with the apiserver.
-func (m *Manager) Start(stopCh <-chan struct{}) {
-	m.informerFactory.Start(stopCh)
+func (m *Manager) Start(ctx context.Context) {
+	m.informerFactory.StartWithContext(ctx)
 }
 
 // WaitForCacheSync exposes the WaitForCacheSync method on the informer factory for testing
 // purposes.
-func (m *Manager) WaitForCacheSync(stopCh <-chan struct{}) {
-	m.informerFactory.WaitForCacheSync(stopCh)
+func (m *Manager) WaitForCacheSync(ctx context.Context) {
+	m.informerFactory.WaitForCacheSyncWithContext(ctx)
 }
 
 // LookupRuntimeHandler returns the RuntimeHandler string associated with the given RuntimeClass

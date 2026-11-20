@@ -18,16 +18,24 @@ package cm
 
 import (
 	"context"
+	"strconv"
+	"strings"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	resourcehelper "k8s.io/component-helpers/resource"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
+	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
 // for typecheck across platforms
@@ -40,6 +48,216 @@ var _ func(string) ([]int, error) = getCgroupProcs
 var _ func(types.UID) string = GetPodCgroupNameSuffix
 var _ func(string, bool, string) string = NodeAllocatableRoot
 var _ func(klog.Logger, string) (string, error) = GetKubeletContainer
+
+func isBurstableNonCriticalPod(pod *v1.Pod) bool {
+	return pod != nil && !kubetypes.IsCriticalPod(pod) && v1qos.GetPodQOS(pod) == v1.PodQOSBurstable
+}
+
+func isMemoryRangeEligibleForSwap(memRequest, memLimit int64) bool {
+	return memRequest > 0 && memRequest != memLimit
+}
+
+// IsPodEligibleForSwap reports whether the pod is eligible for swap under LimitedSwap
+// and returns its effective memory request. Pod overhead is excluded so swap is sized
+// from the workload memory request.
+func IsPodEligibleForSwap(pod *v1.Pod) (bool, int64) {
+	if !isBurstableNonCriticalPod(pod) {
+		return false, 0
+	}
+	opts := resourcehelper.PodResourcesOptions{
+		ExcludeOverhead:                  true,
+		SkipPodLevelResources:            !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodLevelResources),
+		UseExtraNodeAllocatableResources: utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DRANodeAllocatableResources),
+	}
+	reqs := resourcehelper.PodRequests(pod, opts)
+	limits := resourcehelper.PodLimits(pod, opts)
+
+	podMemoryRequest := reqs.Memory().Value()
+	podMemoryLimit := limits.Memory().Value()
+	if !isMemoryRangeEligibleForSwap(podMemoryRequest, podMemoryLimit) {
+		return false, 0
+	}
+	return true, podMemoryRequest
+}
+
+// IsContainerEligibleForSwap reports whether the container's pod/container resource spec
+// is eligible for swap under LimitedSwap (assuming node-level LimitedSwap is enabled).
+func IsContainerEligibleForSwap(pod *v1.Pod, container *v1.Container) bool {
+	if container == nil || !isBurstableNonCriticalPod(pod) {
+		return false
+	}
+
+	plrActive := utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodLevelResources) &&
+		pod.Spec.Resources != nil && !pod.Spec.Resources.Requests.Memory().IsZero()
+	if plrActive {
+		// Ephemeral debug containers cannot specify resource requests/limits in the API,
+		// and ephemeralContainerStartSpec casts EphemeralContainerCommon to v1.Container
+		// with empty Resources, so guard against treating them as pod-level unbounded swap.
+		for i := range pod.Spec.EphemeralContainers {
+			if pod.Spec.EphemeralContainers[i].Name == container.Name {
+				return false
+			}
+		}
+		if eligible, _ := IsPodEligibleForSwap(pod); !eligible {
+			return false
+		}
+	}
+
+	memReq := container.Resources.Requests.Memory().Value()
+	memLimit := container.Resources.Limits.Memory().Value()
+	if plrActive && memLimit != 0 {
+		// During in-place pod resize, updatePodContainerResources populates omitted
+		// container memory limits from pod.Spec.Resources.Limits[memory] on a synthetic
+		// v1.Container copy. Ignore that inherited limit when the container in pod.Spec
+		// did not declare a container-level memory limit.
+		if origContainer := kubecontainer.GetContainerSpec(pod, container.Name); origContainer != nil && origContainer.Resources.Limits.Memory().IsZero() {
+			memLimit = 0
+		}
+	}
+	if memReq == 0 && memLimit == 0 {
+		return plrActive
+	}
+	return isMemoryRangeEligibleForSwap(memReq, memLimit)
+}
+
+// EffectivePodResources returns the CPU and memory requests and limits that size the pod cgroup:
+// explicit pod-level resources when set, or the container aggregate (including extra
+// node-allocatable resources as in ResourceConfigForPod) otherwise. Pod overhead is excluded
+// because it is immutable and added on top, so it cannot change between resizes.
+func EffectivePodResources(pod *v1.Pod) *v1.ResourceRequirements {
+	opts := resourcehelper.PodResourcesOptions{
+		SkipPodLevelResources:            !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodLevelResources),
+		ExcludeOverhead:                  true,
+		UseExtraNodeAllocatableResources: utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DRANodeAllocatableResources),
+	}
+	return ResizableResources(&v1.ResourceRequirements{
+		Requests: resourcehelper.PodRequests(pod, opts),
+		Limits:   resourcehelper.PodLimits(pod, opts),
+	})
+}
+
+// ResizableResources returns a copy of the non-zero CPU and memory requests and limits in reqs,
+// which are the pod-level resources that size the pod cgroup and can be resized.
+func ResizableResources(reqs *v1.ResourceRequirements) *v1.ResourceRequirements {
+	if reqs == nil {
+		return nil
+	}
+	return &v1.ResourceRequirements{
+		Requests: resizableResources(reqs.Requests),
+		Limits:   resizableResources(reqs.Limits),
+	}
+}
+
+func resizableResources(rl v1.ResourceList) v1.ResourceList {
+	var out v1.ResourceList
+	for _, rName := range []v1.ResourceName{v1.ResourceCPU, v1.ResourceMemory} {
+		if qty, ok := rl[rName]; ok && !qty.IsZero() {
+			if out == nil {
+				out = make(v1.ResourceList)
+			}
+			out[rName] = qty
+		}
+	}
+	return out
+}
+
+const (
+	// Cgroup2SwapMaxFile is the cgroup v2 swap limit interface file. Mirrors
+	// Cgroup2MaxSwapFilename (linux-only) for code shared across platforms.
+	Cgroup2SwapMaxFile = "memory.swap.max"
+	// Cgroup2Unlimited is the value cgroup v2 reports for an unset limit. Mirrors
+	// Cgroup2MaxSwapLimit (linux-only) for code shared across platforms.
+	Cgroup2Unlimited = "max"
+)
+
+// IsSwapBehaviorEnabled reports whether the given KubeletConfiguration
+// memorySwap.swapBehavior enables swap on the node.
+func IsSwapBehaviorEnabled(swapBehavior string) bool {
+	switch kubetypes.SwapBehavior(swapBehavior) {
+	case kubetypes.LimitedSwap, kubetypes.WorkloadControlledSwap:
+		return true
+	default:
+		return false
+	}
+}
+
+// PodSwapLimit returns the explicit pod-level swap limit
+// (pod.spec.resources.limits.swap, in bytes) and whether it is set.
+// KEP-5359: pod-level swap is a plain cgroup ceiling; the kubelet never derives
+// it from container limits.
+func PodSwapLimit(pod *v1.Pod) (int64, bool) {
+	if pod == nil || pod.Spec.Resources == nil {
+		return 0, false
+	}
+	q, ok := pod.Spec.Resources.Limits[v1.ResourceSwap]
+	if !ok {
+		return 0, false
+	}
+	return q.Value(), true
+}
+
+// HasExplicitSwapLimit reports whether the workload, rather than the node mode,
+// sets the container's swap limit.
+func HasExplicitSwapLimit(pod *v1.Pod, container *v1.Container) bool {
+	if container != nil {
+		if _, ok := container.Resources.Limits[v1.ResourceSwap]; ok {
+			return true
+		}
+	}
+	if !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodLevelResources) {
+		return false
+	}
+	_, ok := PodSwapLimit(pod)
+	return ok
+}
+
+// SwapLimitFromConfig extracts memory.swap.max from a ResourceConfig's
+// Unified map. ok is false when the key is absent or set to "max" (unlimited),
+// so callers can treat both as "no limit".
+func SwapLimitFromConfig(rc *ResourceConfig) (limit int64, ok bool) {
+	if rc == nil || rc.Unified == nil {
+		return 0, false
+	}
+	val, found := rc.Unified[Cgroup2SwapMaxFile]
+	if !found || val == Cgroup2Unlimited {
+		return 0, false
+	}
+	parsed, err := strconv.ParseInt(strings.TrimSpace(val), 10, 64)
+	if err != nil {
+		return 0, false
+	}
+	return parsed, true
+}
+
+// SetSwapLimit records memory.swap.max in rc.Unified. A nil limit writes "max"
+// (unlimited), which is how a previously set pod-level swap limit is cleared.
+func SetSwapLimit(rc *ResourceConfig, limit *int64) {
+	if rc.Unified == nil {
+		rc.Unified = map[string]string{}
+	}
+	if limit == nil {
+		rc.Unified[Cgroup2SwapMaxFile] = Cgroup2Unlimited
+		return
+	}
+	rc.Unified[Cgroup2SwapMaxFile] = strconv.FormatInt(*limit, 10)
+}
+
+// UnifiedWithoutSwap returns a copy of unified with memory.swap.max removed.
+// The in-place resize memory pass copies the pod's Unified map wholesale;
+// swap is actuated in its own ordered pass (see doPodResizeAction).
+func UnifiedWithoutSwap(unified map[string]string) map[string]string {
+	if unified == nil {
+		return nil
+	}
+	out := make(map[string]string, len(unified))
+	for k, v := range unified {
+		if k == Cgroup2SwapMaxFile {
+			continue
+		}
+		out[k] = v
+	}
+	return out
+}
 
 // hardEvictionReservation returns a resourcelist that includes reservation of resources based on hard eviction thresholds.
 func hardEvictionReservation(thresholds []evictionapi.Threshold, capacity v1.ResourceList) v1.ResourceList {
