@@ -128,7 +128,7 @@ func TestCPUAccumulatorFreeSockets(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
-			acc := newCPUAccumulator(logger, tc.topo, tc.availableCPUs, 0, CPUSortingStrategyPacked)
+			acc := newCPUAccumulator(logger, tc.topo, tc.availableCPUs, 0, AllocationParams{CPUSortingStrategy: CPUSortingStrategyPacked})
 			result := acc.freeSockets()
 			sort.Ints(result)
 			if !reflect.DeepEqual(result, tc.expect) {
@@ -229,7 +229,7 @@ func TestCPUAccumulatorFreeNUMANodes(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
-			acc := newCPUAccumulator(logger, tc.topo, tc.availableCPUs, 0, CPUSortingStrategyPacked)
+			acc := newCPUAccumulator(logger, tc.topo, tc.availableCPUs, 0, AllocationParams{CPUSortingStrategy: CPUSortingStrategyPacked})
 			result := acc.freeNUMANodes()
 			if !reflect.DeepEqual(result, tc.expect) {
 				t.Errorf("expected %v to equal %v", result, tc.expect)
@@ -279,7 +279,7 @@ func TestCPUAccumulatorFreeSocketsAndNUMANodes(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
-			acc := newCPUAccumulator(logger, tc.topo, tc.availableCPUs, 0, CPUSortingStrategyPacked)
+			acc := newCPUAccumulator(logger, tc.topo, tc.availableCPUs, 0, AllocationParams{CPUSortingStrategy: CPUSortingStrategyPacked})
 			resultNUMANodes := acc.freeNUMANodes()
 			if !reflect.DeepEqual(resultNUMANodes, tc.expectNUMANodes) {
 				t.Errorf("expected NUMA Nodes %v to equal %v", resultNUMANodes, tc.expectNUMANodes)
@@ -364,7 +364,7 @@ func TestCPUAccumulatorFreeCores(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
-			acc := newCPUAccumulator(logger, tc.topo, tc.availableCPUs, 0, CPUSortingStrategyPacked)
+			acc := newCPUAccumulator(logger, tc.topo, tc.availableCPUs, 0, AllocationParams{CPUSortingStrategy: CPUSortingStrategyPacked})
 			result := acc.freeCores()
 			if !reflect.DeepEqual(result, tc.expect) {
 				t.Errorf("expected %v to equal %v", result, tc.expect)
@@ -421,7 +421,7 @@ func TestCPUAccumulatorFreeCPUs(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
-			acc := newCPUAccumulator(logger, tc.topo, tc.availableCPUs, 0, CPUSortingStrategyPacked)
+			acc := newCPUAccumulator(logger, tc.topo, tc.availableCPUs, 0, AllocationParams{CPUSortingStrategy: CPUSortingStrategyPacked})
 			result := acc.freeCPUs()
 			if !reflect.DeepEqual(result, tc.expect) {
 				t.Errorf("expected %v to equal %v", result, tc.expect)
@@ -584,7 +584,7 @@ func TestCPUAccumulatorFreeCPUsSpreadRoundRobin(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
-			acc := newCPUAccumulator(logger, tc.topo, tc.availableCPUs, 0, CPUSortingStrategySpread)
+			acc := newCPUAccumulator(logger, tc.topo, tc.availableCPUs, 0, AllocationParams{CPUSortingStrategy: CPUSortingStrategySpread})
 			result := acc.freeCPUs()
 			if !reflect.DeepEqual(result, tc.expect) {
 				t.Errorf("expected %v to equal %v", result, tc.expect)
@@ -623,7 +623,7 @@ func TestSortAvailableUncoreCaches(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
-			acc := newCPUAccumulator(logger, tc.topo, tc.availableCPUs, 0, CPUSortingStrategyPacked)
+			acc := newCPUAccumulator(logger, tc.topo, tc.availableCPUs, 0, AllocationParams{CPUSortingStrategy: CPUSortingStrategyPacked})
 			result := acc.sortAvailableUncoreCaches()
 			if !reflect.DeepEqual(result, tc.expect) {
 				t.Errorf("expected %v to equal %v", result, tc.expect)
@@ -710,7 +710,7 @@ func TestCPUAccumulatorTake(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
-			acc := newCPUAccumulator(logger, tc.topo, tc.availableCPUs, tc.numCPUs, CPUSortingStrategyPacked)
+			acc := newCPUAccumulator(logger, tc.topo, tc.availableCPUs, tc.numCPUs, AllocationParams{CPUSortingStrategy: CPUSortingStrategyPacked})
 			totalTaken := 0
 			for _, cpus := range tc.takeCPUs {
 				acc.take(cpus)
@@ -973,6 +973,15 @@ func TestTakeByTopologyNUMAPacked(t *testing.T) {
 			mustParseCPUSet(t, "2-3,10-11,4-7,12-15"),
 			6,
 			"",
+			cpuset.New(4, 5, 6, 7, 12, 13),
+		},
+		{
+			"take full cores from best available UncoreCache - SMT enabled",
+			topoUncoreSingleSocketSMT,
+			StaticPolicyOptions{PreferAlignByUncoreCacheOption: true, FullPhysicalCPUsOnly: true},
+			mustParseCPUSet(t, "2-7,10-15"),
+			6,
+			"",
 			cpuset.New(4, 5, 6, 12, 13, 14),
 		},
 		{
@@ -982,7 +991,7 @@ func TestTakeByTopologyNUMAPacked(t *testing.T) {
 			mustParseCPUSet(t, "1-7,9-15"),
 			10,
 			"",
-			mustParseCPUSet(t, "4-7,12-15,1,9"),
+			mustParseCPUSet(t, "4-7,12-15,1,2"),
 		},
 	}...)
 
@@ -993,7 +1002,11 @@ func TestTakeByTopologyNUMAPacked(t *testing.T) {
 				strategy = CPUSortingStrategySpread
 			}
 
-			result, err := takeByTopologyNUMAPacked(logger, tc.topo, tc.availableCPUs, tc.numCPUs, strategy, tc.opts.PreferAlignByUncoreCacheOption)
+			result, err := takeByTopologyNUMAPacked(logger, tc.topo, tc.availableCPUs, tc.numCPUs, AllocationParams{
+				CPUSortingStrategy:       strategy,
+				PreferAlignByUncoreCache: tc.opts.PreferAlignByUncoreCacheOption,
+				FullPCPUsOnly:            tc.opts.FullPhysicalCPUsOnly,
+			})
 			if tc.expErr != "" && err != nil && err.Error() != tc.expErr {
 				t.Errorf("expected error to be [%v] but it was [%v]", tc.expErr, err)
 			}
@@ -1001,6 +1014,30 @@ func TestTakeByTopologyNUMAPacked(t *testing.T) {
 				t.Errorf("expected result [%s] to equal [%s]", result, tc.expResult)
 			}
 		})
+	}
+}
+
+// repro for issue 137315
+func TestTakeByTopologyNUMAPackedUncoreAlignmentOddAmount(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	topo := topoUncoreSingleSocketSMT
+	available := cpuset.New(3, 5, 7, 11, 12, 13, 14, 15)
+
+	// Cache 1 has two full cores and two spare threads, so five CPUs can fit
+	// without crossing a cache boundary (https://github.com/kubernetes/kubernetes/issues/137315).
+	result, err := takeByTopologyNUMAPacked(logger, topo, available, 5, AllocationParams{
+		CPUSortingStrategy:       CPUSortingStrategyPacked,
+		PreferAlignByUncoreCache: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Size() != 5 || !result.IsSubsetOf(available) {
+		t.Fatalf("expected five available CPUs from %s, got %s", available, result)
+	}
+	uncoreIDs := topo.CPUDetails.KeepOnly(result).UncoreCaches()
+	if uncoreIDs.Size() != 1 || uncoreIDs.UnsortedList()[0] != 1 {
+		t.Errorf("expected CPUs within uncore cache 1, got CPUs %s in caches %v", result, uncoreIDs.List())
 	}
 }
 
@@ -1095,7 +1132,11 @@ func TestTakeByTopologyWithSpreadPhysicalCPUsPreferredOption(t *testing.T) {
 		if tc.opts.DistributeCPUsAcrossCores {
 			strategy = CPUSortingStrategySpread
 		}
-		result, err := takeByTopologyNUMAPacked(logger, tc.topo, tc.availableCPUs, tc.numCPUs, strategy, tc.opts.PreferAlignByUncoreCacheOption)
+		result, err := takeByTopologyNUMAPacked(logger, tc.topo, tc.availableCPUs, tc.numCPUs, AllocationParams{
+			CPUSortingStrategy:       strategy,
+			PreferAlignByUncoreCache: tc.opts.PreferAlignByUncoreCacheOption,
+			FullPCPUsOnly:            tc.opts.FullPhysicalCPUsOnly,
+		})
 		if tc.expErr != "" && err.Error() != tc.expErr {
 			t.Errorf("testCase %q failed, expected error to be [%v] but it was [%v]", tc.description, tc.expErr, err)
 		}
@@ -1362,7 +1403,12 @@ func TestTakeByTopologyNUMADistributed(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
-			result, err := takeByTopologyNUMADistributed(logger, tc.topo, tc.availableCPUs, tc.numCPUs, tc.cpuGroupSize, CPUSortingStrategyPacked, tc.opts.AlignBySocket, 0)
+			result, err := takeByTopologyNUMADistributed(logger, tc.topo, tc.availableCPUs, tc.numCPUs, AllocationParams{
+				CPUSortingStrategy: CPUSortingStrategyPacked,
+				FullPCPUsOnly:      tc.opts.FullPhysicalCPUsOnly,
+				CPUGroupSize:       tc.cpuGroupSize,
+				AlignBySocket:      tc.opts.AlignBySocket,
+			})
 			if err != nil {
 				if tc.expErr == "" {
 					t.Errorf("unexpected error [%v]", err)
@@ -1523,7 +1569,12 @@ func TestTakeByTopologyNUMADistributedWithMinNUMAHint(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
-			result, err := takeByTopologyNUMADistributed(logger, tc.topo, tc.availableCPUs, tc.numCPUs, tc.cpuGroupSize, CPUSortingStrategyPacked, tc.alignBySocket, tc.minNUMAsFromHint)
+			result, err := takeByTopologyNUMADistributed(logger, tc.topo, tc.availableCPUs, tc.numCPUs, AllocationParams{
+				CPUSortingStrategy: CPUSortingStrategyPacked,
+				CPUGroupSize:       tc.cpuGroupSize,
+				AlignBySocket:      tc.alignBySocket,
+				MINNUMAsFromHint:   tc.minNUMAsFromHint,
+			})
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
