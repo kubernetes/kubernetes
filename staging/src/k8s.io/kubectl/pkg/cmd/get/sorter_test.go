@@ -19,6 +19,7 @@ package get
 import (
 	"encoding/json"
 	"reflect"
+	"sort"
 	"strings"
 	"testing"
 
@@ -847,5 +848,72 @@ func TestSortersTreatTwoMissingFieldValuesAsEqual(t *testing.T) {
 	}
 	if tableSorter.Less(0, 1) || tableSorter.Less(1, 0) {
 		t.Fatalf("TableSorter must treat two missing field values as equal")
+	}
+}
+
+func TestSortersCompareMixedWholeAndFractionalNumbers(t *testing.T) {
+	widget := func(name string, weight any) runtime.Object {
+		return &unstructured.Unstructured{Object: map[string]any{
+			"apiVersion": "example.com/v1",
+			"kind":       "Widget",
+			"metadata":   map[string]any{"name": name},
+			"spec":       map[string]any{"weight": weight},
+		}}
+	}
+	// JSON decoding yields int64 for whole numbers and float64 for fractional ones.
+	objects := []runtime.Object{
+		widget("two", int64(2)),
+		widget("half", 0.5),
+		widget("one", int64(1)),
+		widget("one-point-five", 1.5),
+	}
+	field := "{.spec.weight}"
+	expected := []string{"half", "one", "one-point-five", "two"}
+
+	names := func(objects []runtime.Object) []string {
+		var names []string
+		for _, object := range objects {
+			names = append(names, object.(*unstructured.Unstructured).GetName())
+		}
+		return names
+	}
+
+	runtimeObjects := append([]runtime.Object(nil), objects...)
+	sort.Stable(NewRuntimeSort(field, runtimeObjects))
+	if got := names(runtimeObjects); !reflect.DeepEqual(got, expected) {
+		t.Errorf("RuntimeSort order: expected %v, got %v", expected, got)
+	}
+
+	table := &metav1.Table{}
+	for _, object := range objects {
+		table.Rows = append(table.Rows, metav1.TableRow{Object: runtime.RawExtension{Object: object}})
+	}
+	tableSorter, err := NewTableSorter(table, field)
+	if err != nil {
+		t.Fatalf("NewTableSorter() unexpected error: %v", err)
+	}
+	sort.Stable(tableSorter)
+	var tableObjects []runtime.Object
+	for _, row := range table.Rows {
+		tableObjects = append(tableObjects, row.Object.Object)
+	}
+	if got := names(tableObjects); !reflect.DeepEqual(got, expected) {
+		t.Errorf("TableSorter order: expected %v, got %v", expected, got)
+	}
+
+	// 2^53+1 has no float64 representation; converting it would make it equal to 2^53.
+	precise := []runtime.Object{
+		widget("int", int64(1<<53+1)),
+		widget("float", float64(1<<53)),
+	}
+	preciseSorter := NewRuntimeSort(field, precise)
+	if preciseSorter.Less(0, 1) || !preciseSorter.Less(1, 0) {
+		t.Errorf("expected float64 %v to sort before int64 %v", float64(1<<53), int64(1<<53+1))
+	}
+
+	// Equal values of different types are equal, in both directions.
+	equal := NewRuntimeSort(field, []runtime.Object{widget("int", int64(1)), widget("float", 1.0)})
+	if equal.Less(0, 1) || equal.Less(1, 0) {
+		t.Errorf("expected int64 1 and float64 1.0 to be equal")
 	}
 }
