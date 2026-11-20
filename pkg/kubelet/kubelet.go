@@ -770,7 +770,6 @@ func NewMainKubelet(ctx context.Context,
 		logger,
 	)
 
-	klet.resourceAnalyzer = serverstats.NewResourceAnalyzer(ctx, klet, kubeCfg.VolumeStatsAggPeriod.Duration, kubeDeps.Recorder)
 	klet.runtimeService = kubeDeps.RemoteRuntimeService
 
 	if kubeDeps.KubeClient != nil {
@@ -836,7 +835,29 @@ func NewMainKubelet(ctx context.Context,
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize actuated state checkpoint: %w", err)
 	}
+	var triggerPodSync func(klog.Logger, types.UID)
+	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicNodeLocalEphemeralVolumes) {
+		klet.volumeSyncCh = make(chan struct{}, 1)
+		triggerPodSync = func(_ klog.Logger, podUID types.UID) {
+			if klet.podWorkers != nil && klet.podWorkers.ShouldPodRuntimeBeRemoved(podUID) {
+				return
+			}
+			klet.enqueueVolumePodSync(podUID)
+		}
+		actuatedState = volumemanager.NewNotifyingActuatedState(actuatedState, triggerPodSync)
+	}
 	klet.actuatedState = actuatedState
+	allocatedPodMgr := &allocatedPodManager{baseManager: klet.podManager, allocationManager: klet.allocationManager}
+	klet.resourceAnalyzer = serverstats.NewResourceAnalyzer(
+		ctx,
+		&allocatedStatsProvider{
+			Provider:   klet,
+			podManager: allocatedPodMgr,
+		},
+		kubeCfg.VolumeStatsAggPeriod.Duration,
+		kubeDeps.Recorder,
+		actuatedState,
+	)
 
 	klet.runner = kubecontainer.NewCommandRunner(kubeDeps.RemoteRuntimeService)
 	klet.probeManager = newProbeManager(ctx, klet, kubeDeps)
@@ -1062,7 +1083,7 @@ func NewMainKubelet(ctx context.Context,
 		podCertificateManager := podcertificate.NewIssuingManager(
 			klog.FromContext(ctx),
 			kubeDeps.KubeClient,
-			klet.podManager,
+			allocatedPodMgr,
 			kubeDeps.Recorder,
 			kubeInformers.Certificates().V1().PodCertificateRequests(),
 			nodeInformer,
@@ -1100,16 +1121,11 @@ func NewMainKubelet(ctx context.Context,
 	}
 
 	// setup volumeManager
-	var vmPodManager volumemanager.PodManager = klet.podManager
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingMemoryBackedVolumes) {
-		// The volume manager should only ever be aware of the 'allocated' pod.
-		vmPodManager = &allocatedPodManager{baseManager: klet.podManager, allocationManager: klet.allocationManager}
-	}
-
+	// The volume manager should only ever be aware of the 'allocated' pod.
 	klet.volumeManager = volumemanager.NewVolumeManager(
 		kubeCfg.EnableControllerAttachDetach,
 		nodeName,
-		vmPodManager,
+		allocatedPodMgr,
 		klet.podWorkers,
 		klet.kubeClient,
 		klet.volumePluginMgr,
@@ -1120,7 +1136,8 @@ func NewMainKubelet(ctx context.Context,
 		volumepathhandler.NewBlockVolumePathHandler(),
 		klet.statusManager,
 		kubeCfg.VolumeStatsAggPeriod.Duration,
-		actuatedState)
+		actuatedState,
+		triggerPodSync)
 
 	boMax, base := newCrashLoopBackOff(kubeCfg)
 
@@ -1654,6 +1671,10 @@ type Kubelet struct {
 	lastNodeUnschedulableLock sync.Mutex
 	// maintains Node.Spec.Unschedulable value from previous run of tryUpdateNodeStatus()
 	lastNodeUnschedulable bool
+
+	volumeSyncMu   sync.Mutex
+	volumeSyncPods sets.Set[types.UID]
+	volumeSyncCh   chan struct{}
 
 	// the list of handlers to call during pod sync loop.
 	lifecycle.PodSyncLoopHandlers
@@ -2385,6 +2406,12 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 		return false, nil, err
 	}
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicNodeLocalEphemeralVolumes) {
+		// Ensure any dynamically added or newly allocated podCertificate projections are queued
+		// before waiting for volumes to mount.
+		kl.podCertificateManager.TrackPod(ctx, pod)
+	}
+
 	// Wait for volumes to attach/mount
 	if err := kl.volumeManager.WaitForAttachAndMount(ctx, pod); err != nil {
 		var volumeAttachLimitErr *volumemanager.VolumeAttachLimitExceededError
@@ -2400,7 +2427,7 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 		return false, nil, err
 	}
 	// Volumes are finished mounting. Make sure actuated state (container resources and volume limits) is initialized.
-	kl.containerRuntime.InitializeActuatedPod(logger, pod)
+	kl.containerRuntime.InitializeActuatedPod(logger, pod, podStatus)
 
 	// Fetch the pull secrets for the pod
 	pullSecrets, missingPullSecretNames := kl.getPullSecretsForPod(logger, pod)
@@ -2748,6 +2775,16 @@ func (kl *Kubelet) SyncTerminatedPod(ctx context.Context, pod *v1.Pod, podStatus
 	}
 	logger.V(3).Info("Pod termination cleaned up volume paths", "pod", klog.KObj(pod), "podUID", pod.UID)
 
+	if kl.actuatedState != nil {
+		if vols, ok := kl.actuatedState.GetPodVolumes(pod.UID); ok {
+			for _, vol := range vols {
+				if err := kl.actuatedState.RemovePodVolume(logger, pod.UID, vol.Name); err != nil {
+					logger.Error(err, "Failed to remove volume from actuated state for terminated pod", "pod", klog.KObj(pod), "podUID", pod.UID, "volumeName", vol.Name)
+				}
+			}
+		}
+	}
+
 	// After volume unmount is complete, let the secret and configmap managers know we're done with this pod
 	if kl.secretManager != nil {
 		kl.secretManager.UnregisterPod(pod)
@@ -3048,6 +3085,10 @@ func (kl *Kubelet) syncLoopIteration(ctx context.Context, configCh <-chan kubety
 			// We do not apply the optimization by updating the status directly, but can do it later
 			handler.HandlePodSyncs(ctx, pods)
 		}
+	case <-kl.volumeSyncCh:
+		if pods := kl.drainVolumePodSyncs(); len(pods) > 0 {
+			handler.HandlePodSyncs(ctx, pods)
+		}
 	case <-housekeepingCh:
 		if !kl.sourcesReady.AllReady() {
 			// If the sources aren't ready or volume manager has not yet synced the states,
@@ -3080,6 +3121,36 @@ func handleProbeSync(ctx context.Context, kl *Kubelet, update proberesults.Updat
 	}
 	logger.V(1).Info("SyncLoop (probe)", "probe", probe, "status", status, "pod", klog.KObj(pod))
 	handler.HandlePodSyncs(ctx, []*v1.Pod{pod})
+}
+
+func (kl *Kubelet) enqueueVolumePodSync(podUID types.UID) {
+	kl.volumeSyncMu.Lock()
+	if kl.volumeSyncPods == nil {
+		kl.volumeSyncPods = sets.New[types.UID]()
+	}
+	kl.volumeSyncPods.Insert(podUID)
+	ch := kl.volumeSyncCh
+	kl.volumeSyncMu.Unlock()
+	if ch != nil {
+		select {
+		case ch <- struct{}{}:
+		default:
+		}
+	}
+}
+
+func (kl *Kubelet) drainVolumePodSyncs() []*v1.Pod {
+	kl.volumeSyncMu.Lock()
+	uids := kl.volumeSyncPods
+	kl.volumeSyncPods = nil
+	kl.volumeSyncMu.Unlock()
+	var pods []*v1.Pod
+	for uid := range uids {
+		if pod, ok := kl.podManager.GetPodByUID(uid); ok {
+			pods = append(pods, pod)
+		}
+	}
+	return pods
 }
 
 // sortPodsForAdmission sorts pods for admission. Pods that were admitted
@@ -3156,7 +3227,8 @@ func (kl *Kubelet) HandlePodAdditions(ctx context.Context, pods []*v1.Pod) {
 			}
 			recordPodLevelResourcesAdmission(pod)
 
-			kl.podCertificateManager.TrackPod(ctx, pod)
+			allocatedPod, _ := kl.allocationManager.GetAllocatedPod(pod)
+			kl.podCertificateManager.TrackPod(ctx, allocatedPod)
 
 			// Backfill the queue of pending allocations, but only after all the pods have
 			// been added. This ensures that no pending allocations get resolved until all the
@@ -3245,6 +3317,19 @@ func (kl *Kubelet) HandlePodUpdates(ctx context.Context, pods []*v1.Pod) {
 			kl.statusManager.ClearPodResizePendingCondition(pod.UID, metrics.DeferredResizeResolutionReverted)
 		}
 
+		if utilfeature.DefaultFeatureGate.Enabled(features.DynamicNodeLocalEphemeralVolumes) {
+			allocatedPod, _ := kl.allocationManager.GetAllocatedPod(pod)
+			if !kl.podWorkers.IsPodTerminationRequested(pod.UID) {
+				if kl.secretManager != nil {
+					kl.secretManager.RegisterPod(allocatedPod)
+				}
+				if kl.configMapManager != nil {
+					kl.configMapManager.RegisterPod(allocatedPod)
+				}
+			}
+			kl.podCertificateManager.TrackPod(ctx, allocatedPod)
+		}
+
 		kl.podWorkers.UpdatePod(ctx, UpdatePodOptions{
 			Pod:        pod,
 			MirrorPod:  mirrorPod,
@@ -3305,16 +3390,15 @@ func recordVolumeResizeOperations(oldPod, newPod *v1.Pod) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingMemoryBackedVolumes) || oldPod == nil || newPod == nil {
 		return
 	}
-	for i, oldVol := range oldPod.Spec.Volumes {
-		if !allocation.VolHasMemoryBackedEmptyDir(&oldVol) {
+	for pair := range podutil.VolumePairs(newPod, oldPod) {
+		if pair.New == nil || pair.Old == nil {
 			continue
 		}
-		newVol := allocation.FindVolume(newPod.Spec.Volumes, oldVol.Name, i)
-		if newVol == nil || !allocation.VolHasMemoryBackedEmptyDir(newVol) {
+		if !allocation.VolHasMemoryBackedEmptyDir(pair.New) || !allocation.VolHasMemoryBackedEmptyDir(pair.Old) {
 			continue
 		}
-		if op := resizeOperationForResources(newVol.EmptyDir.SizeLimit, oldVol.EmptyDir.SizeLimit); op != "" {
-			metrics.VolumeRequestedResizes.WithLabelValues(strings.ToLower(string(newVol.EmptyDir.Medium)), op).Inc()
+		if op := resizeOperationForResources(pair.New.EmptyDir.SizeLimit, pair.Old.EmptyDir.SizeLimit); op != "" {
+			metrics.VolumeRequestedResizes.WithLabelValues(strings.ToLower(string(pair.New.EmptyDir.Medium)), op).Inc()
 		}
 	}
 }
@@ -3888,30 +3972,22 @@ func (kl *Kubelet) OnPodSandboxReady(ctx context.Context, pod *v1.Pod) error {
 	return nil
 }
 
-// allocatedPodManager decorates the base volumemanager.PodManager to intercept pod lookups
+// allocatedPodManager decorates the base kubepod.Manager to intercept pod lookups
 // and return their active allocated state as computed by the allocationManager.
 //
 // This should be used as the pod manager for any components that need to be aware only of the
 // allocated pod.
 type allocatedPodManager struct {
-	baseManager       volumemanager.PodManager
+	baseManager       kubepod.Manager
 	allocationManager allocation.Manager
 }
 
 func (a *allocatedPodManager) getAllocatedPod(pod *v1.Pod) (*v1.Pod, bool) {
-	// TODO: Add a method on the allocation manager for volumeManager to read the allocated pod
-	// without requiring a deep copy or DeepEqual check, especially in preparation for dynamic volumes.
 	if pod == nil {
 		return nil, false
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingMemoryBackedVolumes) && allocation.PodHasMemoryBackedEmptyDir(pod) {
-		if allocatedPod, ok := a.allocationManager.UpdatePodFromAllocation(pod); ok {
-			return allocatedPod, true
-		}
-	}
-	// When the feature gate is disabled, the pod has no memory-backed emptyDir volumes, or there is
-	// no allocation stored for this pod, return the pod as-is.
-	return pod, true
+	allocatedPod, _ := a.allocationManager.GetAllocatedPod(pod)
+	return allocatedPod, true
 }
 
 func (a *allocatedPodManager) GetPodByUID(uid types.UID) (*v1.Pod, bool) {
@@ -3922,9 +3998,17 @@ func (a *allocatedPodManager) GetPodByUID(uid types.UID) (*v1.Pod, bool) {
 	return a.getAllocatedPod(pod)
 }
 
+func (a *allocatedPodManager) GetPodByName(namespace, name string) (*v1.Pod, bool) {
+	pod, found := a.baseManager.GetPodByName(namespace, name)
+	if !found || pod == nil {
+		return pod, found
+	}
+	return a.getAllocatedPod(pod)
+}
+
 func (a *allocatedPodManager) GetPods() []*v1.Pod {
 	pods := a.baseManager.GetPods()
-	var allocatedPods []*v1.Pod
+	allocatedPods := make([]*v1.Pod, 0, len(pods))
 	for _, pod := range pods {
 		if allocatedPod, podFound := a.getAllocatedPod(pod); podFound {
 			allocatedPods = append(allocatedPods, allocatedPod)
@@ -3949,4 +4033,19 @@ func (a *allocatedStatusPodManager) GetPodByUID(uid types.UID) (*v1.Pod, bool) {
 	}
 	pod, _ = a.kl.allocationManager.UpdatePodFromAllocation(pod)
 	return pod, true
+}
+
+// allocatedStatsProvider decorates serverstats.Provider so volume stats classification
+// observes the allocated pod spec rather than unallocated desired updates.
+type allocatedStatsProvider struct {
+	serverstats.Provider
+	podManager *allocatedPodManager
+}
+
+func (p *allocatedStatsProvider) GetPods() []*v1.Pod {
+	return p.podManager.GetPods()
+}
+
+func (p *allocatedStatsProvider) GetPodByName(namespace, name string) (*v1.Pod, bool) {
+	return p.podManager.GetPodByName(namespace, name)
 }

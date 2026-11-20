@@ -455,7 +455,7 @@ const (
 	// owner: @natasha41575
 	// kep: https://kep.k8s.io/6395
 	//
-	// Allow dynamically adding and removing node-local ephemeral volumes and container volumeMounts on running pods.
+	// Allow dynamically adding and removing node-local ephemeral volumes on running pods.
 	DynamicNodeLocalEphemeralVolumes featuregate.Feature = "DynamicNodeLocalEphemeralVolumes"
 
 	// owner: @nispriha

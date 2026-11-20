@@ -328,7 +328,7 @@ func TestComputePodActionsForSwapResize(t *testing.T) {
 
 			pod := tc.allocated()
 			status := runningStatusFor(pod)
-			m.InitializeActuatedPod(logger, pod)
+			m.InitializeActuatedPod(logger, pod, nil)
 			tc.desired(pod)
 
 			actions := m.computePodActions(tCtx, pod, status, false)
@@ -388,7 +388,7 @@ func TestLimitedSwapInheritedMemoryLimitDoesNotResize(t *testing.T) {
 			pod.Spec.Containers = pod.Spec.Containers[:1]
 			pod.Spec.Resources = podLevelMemory(tc.podMemRequest, tc.podMemLimit)
 			status := runningStatusFor(pod)
-			m.InitializeActuatedPod(logger, pod)
+			m.InitializeActuatedPod(logger, pod, nil)
 			// What starting the container records.
 			require.NoError(t, m.setActuatedContainer(logger, pod, &pod.Spec.Containers[0], podutil.Containers))
 
@@ -1019,7 +1019,7 @@ func TestIsPodResizeInProgressSwap(t *testing.T) {
 
 	pod := swapTestPod(withSwapLimit(burstableContainer("c", "1Gi", "2Gi"), "256Mi"))
 	status := runningStatusFor(pod)
-	m.InitializeActuatedPod(logger, pod)
+	m.InitializeActuatedPod(logger, pod, nil)
 	assert.False(t, m.IsPodResizeInProgress(pod, status), "allocated == actuated")
 
 	pod.Spec.Containers[0].Resources.Limits[v1.ResourceSwap] = resource.MustParse("512Mi")
@@ -1321,7 +1321,7 @@ func TestActuatedPodLevelResourcesKeepSwapLimit(t *testing.T) {
 			if tc.setup != nil {
 				require.NoError(t, tc.setup(m, tc.pod))
 			}
-			m.InitializeActuatedPod(logger, tc.pod)
+			m.InitializeActuatedPod(logger, tc.pod, nil)
 
 			actuated, found := m.actuatedState.GetPodLevelResources(tc.pod.UID)
 			require.True(t, found)

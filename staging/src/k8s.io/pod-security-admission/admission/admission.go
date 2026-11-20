@@ -30,6 +30,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -634,6 +635,21 @@ func isSignificantPodUpdate(pod, oldPod *corev1.Pod) bool {
 	if len(pod.Spec.InitContainers) != len(oldPod.Spec.InitContainers) {
 		return true
 	}
+	// Removing or reordering volumes (or resizing emptyDir.sizeLimit) can't introduce a
+	// violation, so only added or changed volumes count.
+	for i := range pod.Spec.Volumes {
+		vol := &pod.Spec.Volumes[i]
+		var oldVol *corev1.Volume
+		for j := range oldPod.Spec.Volumes {
+			if oldPod.Spec.Volumes[j].Name == vol.Name {
+				oldVol = &oldPod.Spec.Volumes[j]
+				break
+			}
+		}
+		if oldVol == nil || isSignificantVolumeUpdate(vol, oldVol) {
+			return true
+		}
+	}
 	// Removing or reordering containers can't introduce a violation, so only added or changed
 	// containers count.
 	for i := range pod.Spec.Containers {
@@ -673,6 +689,22 @@ func isSignificantPodUpdate(pod, oldPod *corev1.Pod) bool {
 		}
 	}
 	return false
+}
+
+func isSignificantVolumeUpdate(vol, oldVol *corev1.Volume) bool {
+	if vol.EmptyDir != nil && oldVol.EmptyDir != nil {
+		// Memory-backed emptyDir sizeLimit updates via pods/resize do not affect PSA policy.
+		volCopy := *vol
+		oldCopy := *oldVol
+		emptyDirCopy := *vol.EmptyDir
+		oldEmptyDirCopy := *oldVol.EmptyDir
+		emptyDirCopy.SizeLimit = nil
+		oldEmptyDirCopy.SizeLimit = nil
+		volCopy.EmptyDir = &emptyDirCopy
+		oldCopy.EmptyDir = &oldEmptyDirCopy
+		return !apiequality.Semantic.DeepEqual(volCopy, oldCopy)
+	}
+	return !apiequality.Semantic.DeepEqual(vol, oldVol)
 }
 
 // isSignificantContainerUpdate determines whether a container update should trigger a policy evaluation.

@@ -34,12 +34,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	versionutil "k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/record"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
+	ndf "k8s.io/component-helpers/nodedeclaredfeatures"
 	"k8s.io/klog/v2"
 	"k8s.io/ktesting"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
@@ -6747,4 +6749,340 @@ func TestDeferredResizeRetriedOnNodeUpscale(t *testing.T) {
 	require.Len(t, conditions, 1, "expected one resize condition after upscale")
 	assert.Equal(t, v1.PodResizeInProgress, conditions[0].Type, "resize should be InProgress after upscale")
 	assert.Equal(t, v1.ConditionTrue, conditions[0].Status)
+}
+
+func TestDynamicVolumeUpdateAllocation(t *testing.T) {
+	if goruntime.GOOS != "linux" {
+		t.Skip("Dynamic node-local ephemeral volumes are only supported on Linux")
+	}
+	metrics.Register()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, true)
+
+	cpu100m := resource.MustParse("100m")
+	cpu200m := resource.MustParse("200m")
+	mem100Mi := resource.MustParse("100Mi")
+	nodeVersion := versionutil.MustParse("1.37.0")
+
+	tests := []struct {
+		name                      string
+		dynamicVolumesGateEnabled bool
+		dynamicContainersEnabled  bool
+		withCPUResize             bool
+		admitResult               lifecycle.PodAdmitResult
+		recoverAfterRetry         bool
+		expectVolumesUpdated      bool
+		expectRequeuedOnReject    bool
+		expectSyncTriggered       bool
+		expectResizeReason        string
+		expectInfeasibleMetric    bool
+		expectEventPrefix         string
+	}{
+		{
+			name:                      "dynamic volume update admitted without setting resize conditions",
+			dynamicVolumesGateEnabled: true,
+			admitResult:               lifecycle.PodAdmitResult{Admit: true},
+			expectVolumesUpdated:      true,
+			expectSyncTriggered:       true,
+		},
+		{
+			name:                      "non-infeasible dynamic volume rejection sets PodResizePending=Deferred, re-queues, and clears condition on retry",
+			dynamicVolumesGateEnabled: true,
+			admitResult: lifecycle.PodAdmitResult{
+				Admit:         false,
+				Reason:        "Evicted",
+				Message:       "The node had condition: [DiskPressure].",
+				RejectionType: lifecycle.RejectionBlocked,
+			},
+			recoverAfterRetry:      true,
+			expectVolumesUpdated:   false,
+			expectRequeuedOnReject: true,
+			expectSyncTriggered:    true,
+			expectResizeReason:     v1.PodReasonDeferred,
+			expectEventPrefix:      "Warning ResizeDeferred",
+		},
+		{
+			name:                      "dynamic volume update denied by NDF admit handler when DynamicNodeLocalEphemeralVolumes is not declared does not re-queue or set resize conditions when DynamicContainers is disabled",
+			dynamicVolumesGateEnabled: false,
+			admitResult:               lifecycle.PodAdmitResult{Admit: true},
+			expectVolumesUpdated:      false,
+			expectRequeuedOnReject:    false,
+			expectSyncTriggered:       false,
+		},
+		{
+			name:                      "dynamic volume update denied by NDF admit handler sets PodResizePending=Infeasible when DynamicContainers is enabled without incrementing resize metric",
+			dynamicVolumesGateEnabled: false,
+			dynamicContainersEnabled:  true,
+			admitResult:               lifecycle.PodAdmitResult{Admit: true},
+			expectVolumesUpdated:      false,
+			expectRequeuedOnReject:    false,
+			expectSyncTriggered:       true,
+			expectResizeReason:        v1.PodReasonInfeasible,
+			expectEventPrefix:         "Warning ResizeInfeasible",
+		},
+		{
+			name:                      "joint resize and dynamic volume update marked infeasible by NDF admit handler when DynamicNodeLocalEphemeralVolumes is not declared",
+			dynamicVolumesGateEnabled: false,
+			withCPUResize:             true,
+			admitResult:               lifecycle.PodAdmitResult{Admit: true},
+			expectVolumesUpdated:      false,
+			expectRequeuedOnReject:    false,
+			expectSyncTriggered:       true,
+			expectResizeReason:        v1.PodReasonInfeasible,
+			expectInfeasibleMetric:    true,
+			expectEventPrefix:         "Warning ResizeInfeasible",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			metrics.PodInfeasibleResizes.Reset()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicNodeLocalEphemeralVolumes, tc.dynamicVolumesGateEnabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicContainers, tc.dynamicContainersEnabled)
+			logger, tCtx := ktesting.NewTestContext(t)
+
+			allocatedPod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID:        "pod-dyn-vol",
+					Name:       "pod-dyn-vol",
+					Namespace:  "default",
+					Generation: 1,
+				},
+				Spec: v1.PodSpec{
+					Volumes: []v1.Volume{{
+						Name:         "vol-1",
+						VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}},
+					}},
+					Containers: []v1.Container{{
+						Name:  "c1",
+						Image: "test-image",
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{v1.ResourceCPU: cpu100m, v1.ResourceMemory: mem100Mi},
+						},
+						VolumeMounts: []v1.VolumeMount{{
+							Name:      "vol-1",
+							MountPath: "/mnt/vol-1",
+						}},
+					}},
+				},
+				Status: v1.PodStatus{
+					Phase: v1.PodRunning,
+				},
+			}
+
+			podStatus := kubecontainer.PodStatus{
+				ID:        allocatedPod.UID,
+				Name:      allocatedPod.Name,
+				Namespace: allocatedPod.Namespace,
+				ContainerStatuses: []*kubecontainer.Status{{
+					Name:  "c1",
+					State: kubecontainer.ContainerStateRunning,
+					Resources: &kubecontainer.ContainerResources{
+						CPURequest:    &cpu100m,
+						MemoryRequest: &mem100Mi,
+					},
+				}},
+			}
+
+			updatedPod := allocatedPod.DeepCopy()
+			updatedPod.Generation = 2
+			updatedPod.Spec.Volumes = append(updatedPod.Spec.Volumes, v1.Volume{
+				Name:         "vol-2",
+				VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}},
+			})
+			if tc.withCPUResize {
+				updatedPod.Spec.Containers[0].Resources.Requests[v1.ResourceCPU] = cpu200m
+			}
+
+			var declared []string
+			if tc.dynamicVolumesGateEnabled {
+				declared = append(declared, string(features.DynamicNodeLocalEphemeralVolumes))
+			}
+			if tc.dynamicContainersEnabled {
+				declared = append(declared, string(features.DynamicContainers))
+			}
+			ndfSet := ndf.DefaultFramework.MustMapSorted(declared)
+
+			currentAdmitResult := tc.admitResult
+			allocationManager := makeAllocationManager(t, &containertest.FakeRuntime{PodStatus: podStatus}, []*v1.Pod{updatedPod}, nil)
+			allocationManager.AddPodAdmitHandlers(lifecycle.PodAdmitHandlers{
+				lifecycle.NewDeclaredFeaturesAdmitHandler(ndf.DefaultFramework, ndfSet, nodeVersion),
+				&testPodAdmitHandler{
+					admitFunc: func(*lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
+						return currentAdmitResult
+					},
+				},
+			})
+			require.NoError(t, allocationManager.SetAllocatedPod(logger, allocatedPod))
+			t.Cleanup(func() {
+				allocationManager.RemovePod(logger, allocatedPod.UID)
+			})
+
+			am := allocationManager.(*manager)
+			fakeRecorder := am.recorder.(*record.FakeRecorder)
+			allocationManager.PushPendingAllocation(logger, updatedPod.UID)
+			require.True(t, allocationManager.HasPendingAllocations())
+
+			allocationManager.RetryPendingAllocations(tCtx, TriggerReasonPodUpdated)
+
+			assert.Equal(t, tc.expectRequeuedOnReject, allocationManager.HasPendingAllocations(), "unexpected pending queue state")
+			if tc.expectEventPrefix != "" {
+				require.Len(t, fakeRecorder.Events, 1)
+				ev := <-fakeRecorder.Events
+				assert.True(t, strings.HasPrefix(ev, tc.expectEventPrefix), "expected event with prefix %q, got %q", tc.expectEventPrefix, ev)
+			} else {
+				assert.Empty(t, fakeRecorder.Events)
+			}
+			switch tc.expectResizeReason {
+			case v1.PodReasonDeferred:
+				assert.True(t, am.statusManager.IsPodResizeDeferred(updatedPod.UID), "expected PodResizePending=Deferred")
+			case v1.PodReasonInfeasible:
+				assert.True(t, am.statusManager.IsPodResizeInfeasible(updatedPod.UID), "expected PodResizePending=Infeasible")
+			default:
+				assert.Empty(t, am.statusManager.GetPodResizeConditions(updatedPod.UID), "resize conditions must not be set")
+			}
+
+			resultingPod, pending := allocationManager.UpdatePodFromAllocation(updatedPod)
+			if tc.expectVolumesUpdated {
+				assert.False(t, pending)
+				assert.Len(t, resultingPod.Spec.Volumes, 2)
+			} else {
+				assert.True(t, pending)
+				assert.Len(t, resultingPod.Spec.Volumes, 1)
+			}
+			assert.Equal(t, tc.expectSyncTriggered, updatedPod.Annotations["pod-sync-triggered"] == "true")
+
+			if tc.recoverAfterRetry {
+				// Repeated non-infeasible rejection keeps the pod queued.
+				allocationManager.RetryPendingAllocations(tCtx, triggerReasonPeriodic)
+				assert.True(t, allocationManager.HasPendingAllocations())
+				assert.Empty(t, fakeRecorder.Events)
+
+				// Once transient node pressure clears, periodic retry allocates the dynamic volume update.
+				delete(updatedPod.Annotations, "pod-sync-triggered")
+				currentAdmitResult = lifecycle.PodAdmitResult{Admit: true}
+				allocationManager.RetryPendingAllocations(tCtx, triggerReasonPeriodic)
+				assert.False(t, allocationManager.HasPendingAllocations())
+				assert.Empty(t, am.statusManager.GetPodResizeConditions(updatedPod.UID))
+				recoveredPod, stillPending := allocationManager.UpdatePodFromAllocation(updatedPod)
+				assert.False(t, stillPending)
+				assert.Len(t, recoveredPod.Spec.Volumes, 2)
+				assert.Equal(t, "true", updatedPod.Annotations["pod-sync-triggered"])
+			}
+
+			expectedMetrics := ""
+			if tc.expectInfeasibleMetric {
+				expectedMetrics = `
+				# HELP kubelet_pod_infeasible_resizes_total [ALPHA] Number of infeasible resizes for pods.
+				# TYPE kubelet_pod_infeasible_resizes_total counter
+				kubelet_pod_infeasible_resizes_total{reason_detail="PodFeatureUnsupported"} 1
+				`
+			}
+			assert.NoError(t, testutil.GatherAndCompare(
+				legacyregistry.DefaultGatherer, strings.NewReader(expectedMetrics), "kubelet_pod_infeasible_resizes_total",
+			))
+		})
+	}
+}
+
+func TestGetAllocatedPod(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	allocationManager := makeAllocationManager(t, &containertest.FakeRuntime{}, nil, nil)
+
+	gotNil, gotNilGen := allocationManager.GetAllocatedPod(nil)
+	assert.Nil(t, gotNil)
+	assert.Zero(t, gotNilGen)
+
+	cpu100m := resource.MustParse("100m")
+	cpu200m := resource.MustParse("200m")
+	grace30 := int64(30)
+	grace60 := int64(60)
+	allocated := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{UID: "pod-get-alloc", Name: "pod", Namespace: "default", Generation: 3},
+		Spec: v1.PodSpec{
+			TerminationGracePeriodSeconds: &grace30,
+			Volumes:                       []v1.Volume{{Name: "vol-1", VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}}},
+			Containers: []v1.Container{{
+				Name:      "c1",
+				Image:     "img:v1",
+				Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: cpu100m}},
+			}},
+		},
+	}
+
+	// Unallocated pod returns desired pod as-is with unknown generation (0).
+	gotUnalloc, gotUnallocGen := allocationManager.GetAllocatedPod(allocated)
+	assert.Same(t, allocated, gotUnalloc)
+	assert.Zero(t, gotUnallocGen)
+
+	require.NoError(t, allocationManager.SetAllocatedPod(logger, allocated))
+	storedBefore, ok := allocationManager.(*manager).allocated.GetPodReadOnly(allocated.UID)
+	require.True(t, ok)
+	storedSnapshot := storedBefore.DeepCopy()
+
+	desired := allocated.DeepCopy()
+	desired.Generation = 4
+	desired.Spec.TerminationGracePeriodSeconds = &grace60
+	desired.Spec.Volumes = append(desired.Spec.Volumes, v1.Volume{Name: "vol-unalloc", VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}})
+	desired.Spec.Containers[0].Image = "img:v2"
+	desired.Spec.Containers[0].Resources.Requests[v1.ResourceCPU] = cpu200m
+
+	got, gotGen := allocationManager.GetAllocatedPod(desired)
+	require.NotNil(t, got)
+	assert.Equal(t, int64(3), gotGen, "allocated generation should come from stored allocation")
+	assert.Equal(t, int64(60), *got.Spec.TerminationGracePeriodSeconds, "passthrough fields should come from desired pod")
+	assert.Equal(t, "img:v2", got.Spec.Containers[0].Image, "container image should pass through when DynamicContainers is disabled")
+	assert.Len(t, got.Spec.Volumes, 1, "gated volumes should come from allocated pod")
+	assert.True(t, cpu100m.Equal(got.Spec.Containers[0].Resources.Requests[v1.ResourceCPU]), "gated resources should come from allocated pod")
+	assert.Equal(t, storedSnapshot, storedBefore, "GetAllocatedPod must not mutate stored read-only pod")
+}
+
+func BenchmarkGetAllocatedPod(b *testing.B) {
+	logger, _ := ktesting.NewTestContext(b)
+	var allocationManager Manager = &manager{allocated: state.NewStateMemory(logger, nil, nil)}
+	cpu100m := resource.MustParse("100m")
+	mem128Mi := resource.MustParse("128Mi")
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{UID: "bench-pod", Name: "bench-pod", Namespace: "default"},
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{
+				{Name: "v1", VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}},
+				{Name: "v2", VolumeSource: v1.VolumeSource{ConfigMap: &v1.ConfigMapVolumeSource{LocalObjectReference: v1.LocalObjectReference{Name: "cm"}}}},
+				{Name: "v3", VolumeSource: v1.VolumeSource{Secret: &v1.SecretVolumeSource{SecretName: "sec"}}},
+			},
+			Containers: []v1.Container{
+				{
+					Name:         "c1",
+					Image:        "registry.k8s.io/pause:3.10",
+					VolumeMounts: []v1.VolumeMount{{Name: "v1", MountPath: "/v1"}, {Name: "v2", MountPath: "/v2"}},
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceCPU: cpu100m, v1.ResourceMemory: mem128Mi},
+						Limits:   v1.ResourceList{v1.ResourceCPU: cpu100m, v1.ResourceMemory: mem128Mi},
+					},
+				},
+				{
+					Name:         "c2",
+					Image:        "registry.k8s.io/pause:3.10",
+					VolumeMounts: []v1.VolumeMount{{Name: "v3", MountPath: "/v3"}},
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceCPU: cpu100m, v1.ResourceMemory: mem128Mi},
+						Limits:   v1.ResourceList{v1.ResourceCPU: cpu100m, v1.ResourceMemory: mem128Mi},
+					},
+				},
+			},
+		},
+	}
+	require.NoError(b, allocationManager.SetAllocatedPod(logger, pod))
+
+	b.Run("GetAllocatedPod", func(b *testing.B) {
+		b.ReportAllocs()
+		for b.Loop() {
+			_, _ = allocationManager.GetAllocatedPod(pod)
+		}
+	})
+	b.Run("UpdatePodFromAllocation", func(b *testing.B) {
+		b.ReportAllocs()
+		for b.Loop() {
+			_, _ = allocationManager.UpdatePodFromAllocation(pod)
+		}
+	})
 }

@@ -146,6 +146,26 @@ func TestPodStatusFindContainerStatusByName(t *testing.T) {
 	}
 }
 
+func TestPodStatusHasRunningOrUnknownContainer(t *testing.T) {
+	podStatus := &PodStatus{
+		ContainerStatuses: []*Status{
+			{Name: "newer-exited-older-unknown", State: ContainerStateExited},
+			{Name: "newer-exited-older-unknown", State: ContainerStateUnknown},
+			{Name: "newer-created-older-running", State: ContainerStateCreated},
+			{Name: "newer-created-older-running", State: ContainerStateRunning},
+			{Name: "only-stopped", State: ContainerStateExited},
+			{Name: "only-stopped", State: ContainerStateCreated},
+		},
+	}
+
+	var nilStatus *PodStatus
+	assert.False(t, nilStatus.HasRunningOrUnknownContainer("newer-exited-older-unknown"))
+	assert.True(t, podStatus.HasRunningOrUnknownContainer("newer-exited-older-unknown"))
+	assert.True(t, podStatus.HasRunningOrUnknownContainer("newer-created-older-running"))
+	assert.False(t, podStatus.HasRunningOrUnknownContainer("only-stopped"))
+	assert.False(t, podStatus.HasRunningOrUnknownContainer("missing"))
+}
+
 func TestPodStatusFindActiveContainerStatusByName(t *testing.T) {
 	podStatus := &PodStatus{
 		ActiveContainerStatuses: []*Status{

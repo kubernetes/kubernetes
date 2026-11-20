@@ -2272,7 +2272,8 @@
             }
           ],
           "lastTransitionTime": "2002-01-01T01:01:01Z"
-        }
+        },
+        "hostPhase": "hostPhaseValue"
       }
     ]
   }

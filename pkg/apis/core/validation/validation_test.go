@@ -34940,8 +34940,9 @@ func TestValidatePodDynamicUpdate(t *testing.T) {
 			}
 
 			errs := ValidatePodDynamicUpdate(newPod, oldPod, PodValidationOptions{
-				ResourceIsPod:            true,
-				PodLevelResourcesEnabled: true,
+				ResourceIsPod:                                  true,
+				PodLevelResourcesEnabled:                       true,
+				DynamicContainersEnabled:                       true,
 				InPlacePodLevelResourcesVerticalScalingEnabled: !tc.disablePodLevelResizeOpt,
 			})
 			if tc.err == "" {
@@ -35049,7 +35050,7 @@ func TestPodUpdateAndResizeForbidContainerAddRemove(t *testing.T) {
 	reordered := oldPod.DeepCopy()
 	reordered.Spec.Containers[0], reordered.Spec.Containers[1] = reordered.Spec.Containers[1], reordered.Spec.Containers[0]
 
-	opts := PodValidationOptions{ResourceIsPod: true}
+	opts := PodValidationOptions{ResourceIsPod: true, DynamicContainersEnabled: true}
 	for name, newPod := range map[string]*core.Pod{"add": added, "remove": removed, "reorder": reordered} {
 		t.Run(name, func(t *testing.T) {
 			if errs := ValidatePodUpdate(newPod, oldPod, opts); len(errs) == 0 {
@@ -35088,7 +35089,7 @@ func TestValidatePodDynamicUpdateDRACoverage(t *testing.T) {
 		}),
 	)
 	oldPod.Spec.ResourceClaims = []core.PodResourceClaim{{Name: "claim", ResourceClaimName: new("claim")}}
-	opts := PodValidationOptions{ResourceIsPod: true, PodLevelResourcesEnabled: true, InPlacePodLevelResourcesVerticalScalingEnabled: true}
+	opts := PodValidationOptions{ResourceIsPod: true, PodLevelResourcesEnabled: true, DynamicContainersEnabled: true, InPlacePodLevelResourcesVerticalScalingEnabled: true}
 
 	fits := oldPod.DeepCopy()
 	fits.Spec.Containers = append(fits.Spec.Containers, ctr("c2", "100m"))
@@ -35409,6 +35410,777 @@ func TestValidateHostCgroupNamespaceCgroupMountMode(t *testing.T) {
 			errs := validateHostCgroupNamespaceCgroupMountMode(ctr, path)
 			if diff := cmp.Diff(expected, errs, cmpopts.EquateEmpty()); diff != "" {
 				t.Errorf("unexpected errors (-want, +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestValidateDynamicNodeLocalEphemeralVolumes(t *testing.T) {
+	defaultMode := new(int32(0644))
+	mkContainer := func(name string, mounts ...core.VolumeMount) core.Container {
+		return core.Container{
+			Name:                     name,
+			Image:                    "busybox",
+			ImagePullPolicy:          core.PullIfNotPresent,
+			TerminationMessagePath:   core.TerminationMessagePathDefault,
+			TerminationMessagePolicy: core.TerminationMessageReadFile,
+			VolumeMounts:             mounts,
+		}
+	}
+	mkRunningPod := func() *core.Pod {
+		return &core.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:            "pod",
+				Namespace:       "default",
+				ResourceVersion: "1",
+			},
+			Spec: core.PodSpec{
+				NodeName:                      "node-1",
+				RestartPolicy:                 core.RestartPolicyAlways,
+				DNSPolicy:                     core.DNSClusterFirst,
+				TerminationGracePeriodSeconds: new(int64(30)),
+				Volumes: []core.Volume{
+					{
+						Name:         "vol-init",
+						VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}},
+					},
+					{
+						Name:         "vol-pvc",
+						VolumeSource: core.VolumeSource{PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{ClaimName: "pvc-1"}},
+					},
+				},
+				InitContainers: []core.Container{
+					mkContainer("ic1", core.VolumeMount{Name: "vol-init", MountPath: "/init"}),
+				},
+				Containers: []core.Container{
+					mkContainer("c1",
+						core.VolumeMount{Name: "vol-init", MountPath: "/mnt/init"},
+						core.VolumeMount{Name: "vol-pvc", MountPath: "/mnt/pvc"},
+					),
+				},
+				EphemeralContainers: []core.EphemeralContainer{
+					{
+						EphemeralContainerCommon: core.EphemeralContainerCommon{
+							Name:                     "ec1",
+							Image:                    "busybox",
+							ImagePullPolicy:          core.PullIfNotPresent,
+							TerminationMessagePath:   core.TerminationMessagePathDefault,
+							TerminationMessagePolicy: core.TerminationMessageReadFile,
+							VolumeMounts: []core.VolumeMount{
+								{Name: "vol-init", MountPath: "/dbg"},
+							},
+						},
+					},
+				},
+			},
+			Status: core.PodStatus{
+				Phase:      core.PodRunning,
+				QOSClass:   core.PodQOSBestEffort,
+				Conditions: []core.PodCondition{{Type: core.PodInitialized, Status: core.ConditionTrue}},
+				VolumeStatuses: []core.PodVolumeStatus{
+					{Name: "vol-init", HostPhase: core.PodVolumeHostMounted},
+				},
+			},
+		}
+	}
+
+	dynOpts := PodValidationOptions{
+		ResourceIsPod:                                       true,
+		DynamicNodeLocalEphemeralVolumesEnabled:             true,
+		InPlacePodVerticalScalingMemoryBackedVolumesEnabled: true,
+	}
+	dynCtrAndVolOpts := PodValidationOptions{
+		ResourceIsPod:                                       true,
+		DynamicContainersEnabled:                            true,
+		DynamicNodeLocalEphemeralVolumesEnabled:             true,
+		InPlacePodVerticalScalingMemoryBackedVolumesEnabled: true,
+	}
+
+	tests := []struct {
+		name    string
+		opts    PodValidationOptions
+		mutate  func(newPod, oldPod *core.Pod)
+		wantErr string
+	}{
+		{
+			name: "allows adding all 5 supported volume types mounted by a newly added dynamic container",
+			opts: dynCtrAndVolOpts,
+			mutate: func(newPod, _ *core.Pod) {
+				newPod.Spec.Volumes = append(slices.Clone(newPod.Spec.Volumes),
+					core.Volume{Name: "v-empty", VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}}},
+					core.Volume{Name: "v-cm", VolumeSource: core.VolumeSource{ConfigMap: &core.ConfigMapVolumeSource{LocalObjectReference: core.LocalObjectReference{Name: "cm1"}, DefaultMode: defaultMode}}},
+					core.Volume{Name: "v-sec", VolumeSource: core.VolumeSource{Secret: &core.SecretVolumeSource{SecretName: "sec1", DefaultMode: defaultMode}}},
+					core.Volume{Name: "v-proj", VolumeSource: core.VolumeSource{Projected: &core.ProjectedVolumeSource{DefaultMode: defaultMode, Sources: []core.VolumeProjection{{ConfigMap: &core.ConfigMapProjection{LocalObjectReference: core.LocalObjectReference{Name: "cm1"}}}}}}},
+					core.Volume{Name: "v-img", VolumeSource: core.VolumeSource{Image: &core.ImageVolumeSource{Reference: "registry.k8s.io/vol:v1", PullPolicy: core.PullIfNotPresent}}},
+				)
+				newPod.Spec.Containers = append(slices.Clone(newPod.Spec.Containers),
+					mkContainer("c-dyn",
+						core.VolumeMount{Name: "v-empty", MountPath: "/mnt/empty"},
+						core.VolumeMount{Name: "v-cm", MountPath: "/mnt/cm"},
+						core.VolumeMount{Name: "v-sec", MountPath: "/mnt/sec"},
+						core.VolumeMount{Name: "v-proj", MountPath: "/mnt/proj"},
+						core.VolumeMount{Name: "v-img", MountPath: "/mnt/img"},
+					),
+				)
+			},
+		},
+		{
+			name: "allows removing unreferenced supported volume",
+			opts: dynOpts,
+			mutate: func(newPod, oldPod *core.Pod) {
+				extra := core.Volume{Name: "v-temp", VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}}}
+				oldPod.Spec.Volumes = append(slices.Clone(oldPod.Spec.Volumes), extra)
+			},
+		},
+		{
+			name: "allows removing dynamic container and its mounted volume in the same transaction once status is reported",
+			opts: dynCtrAndVolOpts,
+			mutate: func(newPod, oldPod *core.Pod) {
+				oldPod.Spec.Volumes = append(slices.Clone(oldPod.Spec.Volumes),
+					core.Volume{Name: "v-dyn", VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}}},
+				)
+				oldPod.Spec.Containers = append(slices.Clone(oldPod.Spec.Containers),
+					mkContainer("c-dyn", core.VolumeMount{Name: "v-dyn", MountPath: "/mnt/dyn"}),
+				)
+				oldPod.Status.ContainerStatuses = append(slices.Clone(oldPod.Status.ContainerStatuses),
+					core.ContainerStatus{Name: "c-dyn"},
+				)
+				oldPod.Status.VolumeStatuses = append(slices.Clone(oldPod.Status.VolumeStatuses),
+					core.PodVolumeStatus{Name: "v-dyn", HostPhase: core.PodVolumeHostMounted},
+				)
+			},
+		},
+		{
+			name: "rejects removing mounted volume while a remaining container still references it",
+			opts: dynCtrAndVolOpts,
+			mutate: func(newPod, oldPod *core.Pod) {
+				dynVol := core.Volume{Name: "v-shared", VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}}}
+				oldPod.Spec.Volumes = append(slices.Clone(oldPod.Spec.Volumes), dynVol)
+				oldPod.Spec.Containers = append(slices.Clone(oldPod.Spec.Containers),
+					mkContainer("c-keep", core.VolumeMount{Name: "v-shared", MountPath: "/mnt/keep"}),
+					mkContainer("c-rm", core.VolumeMount{Name: "v-shared", MountPath: "/mnt/rm"}),
+				)
+				oldPod.Status.ContainerStatuses = append(slices.Clone(oldPod.Status.ContainerStatuses),
+					core.ContainerStatus{Name: "c-keep"},
+					core.ContainerStatus{Name: "c-rm"},
+				)
+				oldPod.Status.VolumeStatuses = append(slices.Clone(oldPod.Status.VolumeStatuses),
+					core.PodVolumeStatus{Name: "v-shared", HostPhase: core.PodVolumeHostMounted},
+				)
+				// Remove c-rm and v-shared while c-keep remains in newPod.Spec.Containers referencing v-shared.
+				newPod.Spec.Containers = append(slices.Clone(newPod.Spec.Containers),
+					mkContainer("c-keep", core.VolumeMount{Name: "v-shared", MountPath: "/mnt/keep"}),
+				)
+			},
+			wantErr: "Not found: \"v-shared\"",
+		},
+		{
+			name: "rejects removing dynamic container and mounted volume before volume status is reported",
+			opts: dynCtrAndVolOpts,
+			mutate: func(newPod, oldPod *core.Pod) {
+				oldPod.Spec.Volumes = append(slices.Clone(oldPod.Spec.Volumes),
+					core.Volume{Name: "v-dyn", VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}}},
+				)
+				oldPod.Spec.Containers = append(slices.Clone(oldPod.Spec.Containers),
+					mkContainer("c-dyn", core.VolumeMount{Name: "v-dyn", MountPath: "/mnt/dyn"}),
+				)
+				oldPod.Status.ContainerStatuses = append(slices.Clone(oldPod.Status.ContainerStatuses),
+					core.ContainerStatus{Name: "c-dyn"},
+				)
+			},
+			wantErr: "volume \"v-dyn\" may not be removed until its status is reported",
+		},
+		{
+			name: "rejects adding volumeMount to an existing container",
+			opts: dynCtrAndVolOpts,
+			mutate: func(newPod, _ *core.Pod) {
+				newPod.Spec.Volumes = append(slices.Clone(newPod.Spec.Volumes),
+					core.Volume{Name: "v-empty", VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}}},
+				)
+				newPod.Spec.Containers[0].VolumeMounts = append(slices.Clone(newPod.Spec.Containers[0].VolumeMounts),
+					core.VolumeMount{Name: "v-empty", MountPath: "/mnt/empty"},
+				)
+			},
+			wantErr: "pod updates may not change fields",
+		},
+		{
+			name: "rejects removing volumeMount from an existing container",
+			opts: dynCtrAndVolOpts,
+			mutate: func(newPod, _ *core.Pod) {
+				newPod.Spec.Containers[0].VolumeMounts = newPod.Spec.Containers[0].VolumeMounts[:1]
+			},
+			wantErr: "pod updates may not change fields",
+		},
+		{
+			name: "rejects mutating existing container volumeMounts",
+			opts: dynCtrAndVolOpts,
+			mutate: func(newPod, _ *core.Pod) {
+				newPod.Spec.Containers[0].VolumeMounts = []core.VolumeMount{
+					{Name: "vol-init", MountPath: "/mnt/init"},
+					{Name: "vol-pvc", MountPath: "/mnt/pvc-changed"},
+				}
+			},
+			wantErr: "pod updates may not change fields",
+		},
+		{
+			name: "allows volume reordering",
+			opts: dynOpts,
+			mutate: func(newPod, _ *core.Pod) {
+				newPod.Spec.Volumes = []core.Volume{
+					newPod.Spec.Volumes[1],
+					newPod.Spec.Volumes[0],
+				}
+			},
+		},
+		{
+			name: "allows volume reordering when interleaved with volume addition",
+			opts: dynOpts,
+			mutate: func(newPod, _ *core.Pod) {
+				newPod.Spec.Volumes = []core.Volume{
+					newPod.Spec.Volumes[1],
+					{Name: "v-new", VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}}},
+					newPod.Spec.Volumes[0],
+				}
+			},
+		},
+		{
+			name: "allows volume reordering while resizing memory-backed emptyDir",
+			opts: dynOpts,
+			mutate: func(newPod, oldPod *core.Pod) {
+				q64 := resource.MustParse("64Mi")
+				q128 := resource.MustParse("128Mi")
+				oldPod.Spec.Volumes[0] = core.Volume{
+					Name:         "vol-init",
+					VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{Medium: core.StorageMediumMemory, SizeLimit: &q64}},
+				}
+				newPod.Spec.Volumes = []core.Volume{
+					newPod.Spec.Volumes[1],
+					{
+						Name:         "vol-init",
+						VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{Medium: core.StorageMediumMemory, SizeLimit: &q128}},
+					},
+				}
+			},
+		},
+		{
+			name: "rejects volume reordering while mutating existing volume",
+			opts: dynOpts,
+			mutate: func(newPod, oldPod *core.Pod) {
+				oldPod.Spec.Volumes = append(slices.Clone(oldPod.Spec.Volumes),
+					core.Volume{Name: "v-cm", VolumeSource: core.VolumeSource{ConfigMap: &core.ConfigMapVolumeSource{LocalObjectReference: core.LocalObjectReference{Name: "cm-a"}, DefaultMode: defaultMode}}},
+				)
+				newPod.Spec.Volumes = []core.Volume{
+					{Name: "v-cm", VolumeSource: core.VolumeSource{ConfigMap: &core.ConfigMapVolumeSource{LocalObjectReference: core.LocalObjectReference{Name: "cm-b"}, DefaultMode: defaultMode}}},
+					newPod.Spec.Volumes[1],
+					newPod.Spec.Volumes[0],
+				}
+			},
+			wantErr: "pod updates may not change fields",
+		},
+		{
+			name: "rejects volume reordering when DynamicNodeLocalEphemeralVolumes is disabled",
+			opts: PodValidationOptions{ResourceIsPod: true, DynamicContainersEnabled: true, DynamicNodeLocalEphemeralVolumesEnabled: false},
+			mutate: func(newPod, _ *core.Pod) {
+				newPod.Spec.Volumes = []core.Volume{
+					newPod.Spec.Volumes[1],
+					newPod.Spec.Volumes[0],
+				}
+			},
+			wantErr: "pod updates may not change fields",
+		},
+		{
+			name: "rejects volume reordering on Pending pod",
+			opts: dynOpts,
+			mutate: func(newPod, oldPod *core.Pod) {
+				oldPod.Status.Phase = core.PodPending
+				newPod.Status.Phase = core.PodPending
+				newPod.Spec.Volumes = []core.Volume{
+					newPod.Spec.Volumes[1],
+					newPod.Spec.Volumes[0],
+				}
+			},
+			wantErr: "volumes may only be added or removed while the pod is Running",
+		},
+		{
+			name: "rejects volume reordering on static pod",
+			opts: dynOpts,
+			mutate: func(newPod, oldPod *core.Pod) {
+				oldPod.Annotations = map[string]string{core.MirrorPodAnnotationKey: "hash"}
+				newPod.Annotations = map[string]string{core.MirrorPodAnnotationKey: "hash"}
+				newPod.Spec.Volumes = []core.Volume{
+					newPod.Spec.Volumes[1],
+					newPod.Spec.Volumes[0],
+				}
+			},
+			wantErr: "static pods cannot be resized or have containers added or removed or volumes modified",
+		},
+		{
+			name: "rejects volume reordering on windows pod",
+			opts: dynOpts,
+			mutate: func(newPod, oldPod *core.Pod) {
+				oldPod.Spec.OS = &core.PodOS{Name: core.Windows}
+				newPod.Spec.OS = &core.PodOS{Name: core.Windows}
+				newPod.Spec.Volumes = []core.Volume{
+					newPod.Spec.Volumes[1],
+					newPod.Spec.Volumes[0],
+				}
+			},
+			wantErr: "windows pods cannot be resized or have containers added or removed or volumes modified",
+		},
+		{
+			name: "rejects container reordering when DynamicContainers is disabled",
+			opts: dynOpts,
+			mutate: func(newPod, oldPod *core.Pod) {
+				c2 := oldPod.Spec.Containers[0]
+				c2.Name = "c2"
+				oldPod.Spec.Containers = append(slices.Clone(oldPod.Spec.Containers), c2)
+				newPod.Spec.Containers = []core.Container{c2, newPod.Spec.Containers[0]}
+			},
+			wantErr: "containers may not be added, removed, or reordered when DynamicContainers feature gate is disabled",
+		},
+		{
+			name: "rejects dynamic volume addition when feature gate is disabled",
+			opts: PodValidationOptions{ResourceIsPod: true, DynamicNodeLocalEphemeralVolumesEnabled: false},
+			mutate: func(newPod, _ *core.Pod) {
+				newPod.Spec.Volumes = append(slices.Clone(newPod.Spec.Volumes),
+					core.Volume{Name: "v-empty", VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}}},
+				)
+			},
+			wantErr: "pod updates may not change fields",
+		},
+		{
+			name: "rejects adding unsupported volume type (PVC)",
+			opts: dynOpts,
+			mutate: func(newPod, _ *core.Pod) {
+				newPod.Spec.Volumes = append(slices.Clone(newPod.Spec.Volumes),
+					core.Volume{Name: "v-pvc2", VolumeSource: core.VolumeSource{PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{ClaimName: "pvc-2"}}},
+				)
+			},
+			wantErr: "only configMap, secret, projected, emptyDir, and image volumes may be dynamically added",
+		},
+		{
+			name: "rejects removing unsupported volume type (PVC)",
+			opts: dynCtrAndVolOpts,
+			mutate: func(newPod, oldPod *core.Pod) {
+				oldPod.Spec.Containers[0].VolumeMounts = []core.VolumeMount{{Name: "vol-init", MountPath: "/mnt/init"}}
+				newPod.Spec.Containers[0].VolumeMounts = []core.VolumeMount{{Name: "vol-init", MountPath: "/mnt/init"}}
+				newPod.Spec.Volumes = []core.Volume{newPod.Spec.Volumes[0]}
+			},
+			wantErr: "of unsupported type may not be dynamically removed",
+		},
+		{
+			name: "rejects in-place mutation of existing volume",
+			opts: dynOpts,
+			mutate: func(newPod, oldPod *core.Pod) {
+				oldPod.Spec.Volumes = append(slices.Clone(oldPod.Spec.Volumes),
+					core.Volume{Name: "v-cm", VolumeSource: core.VolumeSource{ConfigMap: &core.ConfigMapVolumeSource{LocalObjectReference: core.LocalObjectReference{Name: "cm-a"}, DefaultMode: defaultMode}}},
+				)
+				newPod.Spec.Volumes = append(slices.Clone(newPod.Spec.Volumes),
+					core.Volume{Name: "v-cm", VolumeSource: core.VolumeSource{ConfigMap: &core.ConfigMapVolumeSource{LocalObjectReference: core.LocalObjectReference{Name: "cm-b"}, DefaultMode: defaultMode}}},
+				)
+			},
+			wantErr: "pod updates may not change fields",
+		},
+		{
+			name: "rejects mutating initContainer volumeMounts",
+			opts: dynOpts,
+			mutate: func(newPod, _ *core.Pod) {
+				newPod.Spec.InitContainers[0].VolumeMounts = []core.VolumeMount{
+					{Name: "vol-init", MountPath: "/init-changed"},
+				}
+			},
+			wantErr: "pod updates may not change fields",
+		},
+		{
+			name: "rejects mutating ephemeralContainer volumeMounts",
+			opts: dynOpts,
+			mutate: func(newPod, _ *core.Pod) {
+				newPod.Spec.EphemeralContainers[0].VolumeMounts = []core.VolumeMount{
+					{Name: "vol-init", MountPath: "/dbg-changed"},
+				}
+			},
+			wantErr: "pod updates may not change fields",
+		},
+		{
+			name: "rejects re-adding volume while still present in status.volumeStatuses",
+			opts: dynOpts,
+			mutate: func(newPod, oldPod *core.Pod) {
+				oldPod.Status.VolumeStatuses = []core.PodVolumeStatus{
+					{Name: "v-reused", HostPhase: core.PodVolumeHostUnmounting},
+				}
+				newPod.Spec.Volumes = append(slices.Clone(newPod.Spec.Volumes),
+					core.Volume{Name: "v-reused", VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}}},
+				)
+			},
+			wantErr: "cannot be re-added while previous volume with the same name is still pending, mounted, or unmounting in pod status",
+		},
+		{
+			name: "rejects re-adding volume while still present in status.containerStatuses[*].volumeMounts",
+			opts: dynOpts,
+			mutate: func(newPod, oldPod *core.Pod) {
+				oldPod.Status.ContainerStatuses = []core.ContainerStatus{
+					{
+						Name:         "c1",
+						VolumeMounts: []core.VolumeMountStatus{{Name: "v-reused", MountPath: "/mnt/old"}},
+					},
+				}
+				newPod.Spec.Volumes = append(slices.Clone(newPod.Spec.Volumes),
+					core.Volume{Name: "v-reused", VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}}},
+				)
+			},
+			wantErr: "cannot be re-added while previous volume with the same name is still pending, mounted, or unmounting in pod status",
+		},
+		{
+			name: "allows re-adding volume when only present on a Terminated containerStatus",
+			opts: dynOpts,
+			mutate: func(newPod, oldPod *core.Pod) {
+				oldPod.Status.ContainerStatuses = []core.ContainerStatus{
+					{
+						Name:         "c2-exited",
+						State:        core.ContainerState{Terminated: &core.ContainerStateTerminated{ExitCode: 0}},
+						VolumeMounts: []core.VolumeMountStatus{{Name: "v-reused", MountPath: "/mnt/old"}},
+					},
+				}
+				newPod.Spec.Volumes = append(slices.Clone(newPod.Spec.Volumes),
+					core.Volume{Name: "v-reused", VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}}},
+				)
+			},
+		},
+		{
+			name: "rejects dynamic volume update on static pod",
+			opts: dynOpts,
+			mutate: func(newPod, oldPod *core.Pod) {
+				oldPod.Annotations = map[string]string{core.MirrorPodAnnotationKey: "hash"}
+				newPod.Annotations = map[string]string{core.MirrorPodAnnotationKey: "hash"}
+				newPod.Spec.Volumes = append(slices.Clone(newPod.Spec.Volumes),
+					core.Volume{Name: "v-empty", VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}}},
+				)
+			},
+			wantErr: "static pods cannot be resized or have containers added or removed or volumes modified",
+		},
+		{
+			name: "rejects dynamic volume update on windows pod",
+			opts: dynOpts,
+			mutate: func(newPod, oldPod *core.Pod) {
+				oldPod.Spec.OS = &core.PodOS{Name: core.Windows}
+				newPod.Spec.OS = &core.PodOS{Name: core.Windows}
+				newPod.Spec.Volumes = append(slices.Clone(newPod.Spec.Volumes),
+					core.Volume{Name: "v-empty", VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}}},
+				)
+			},
+			wantErr: "windows pods cannot be resized or have containers added or removed or volumes modified",
+		},
+		{
+			name: "rejects dynamic volume update on terminating pod",
+			opts: dynOpts,
+			mutate: func(newPod, oldPod *core.Pod) {
+				now := metav1.Now()
+				oldPod.DeletionTimestamp = &now
+				newPod.DeletionTimestamp = &now
+				newPod.DeletionGracePeriodSeconds = new(int64(30))
+				oldPod.DeletionGracePeriodSeconds = new(int64(30))
+				newPod.Spec.Volumes = append(slices.Clone(newPod.Spec.Volumes),
+					core.Volume{Name: "v-empty", VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}}},
+				)
+			},
+			wantErr: "volumes may not be added or removed once the pod is terminating",
+		},
+		{
+			name: "rejects dynamic volume update on Pending pod",
+			opts: dynOpts,
+			mutate: func(newPod, oldPod *core.Pod) {
+				oldPod.Status.Phase = core.PodPending
+				newPod.Status.Phase = core.PodPending
+				newPod.Spec.Volumes = append(slices.Clone(newPod.Spec.Volumes),
+					core.Volume{Name: "v-empty", VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}}},
+				)
+			},
+			wantErr: "volumes may only be added or removed while the pod is Running",
+		},
+		{
+			name: "rejects dynamic volume update before initContainers complete",
+			opts: dynOpts,
+			mutate: func(newPod, oldPod *core.Pod) {
+				oldPod.Status.Conditions = []core.PodCondition{{Type: core.PodInitialized, Status: core.ConditionFalse}}
+				newPod.Status.Conditions = []core.PodCondition{{Type: core.PodInitialized, Status: core.ConditionFalse}}
+				newPod.Spec.Volumes = append(slices.Clone(newPod.Spec.Volumes),
+					core.Volume{Name: "v-empty", VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}}},
+				)
+			},
+			wantErr: "volumes may only be added or removed after all init containers have completed",
+		},
+		{
+			name: "rejects container addition on /dynamic when DynamicContainers is disabled",
+			opts: dynOpts,
+			mutate: func(newPod, _ *core.Pod) {
+				newPod.Spec.Containers = append(slices.Clone(newPod.Spec.Containers),
+					mkContainer("c2"),
+				)
+			},
+			wantErr: "containers may not be added, removed, or reordered when DynamicContainers feature gate is disabled",
+		},
+		{
+			name: "allows joint dynamic volume addition and memory-backed emptyDir sizeLimit resize",
+			opts: dynOpts,
+			mutate: func(newPod, oldPod *core.Pod) {
+				q64 := resource.MustParse("64Mi")
+				q128 := resource.MustParse("128Mi")
+				oldPod.Spec.Volumes[0] = core.Volume{
+					Name:         "vol-init",
+					VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{Medium: core.StorageMediumMemory, SizeLimit: &q64}},
+				}
+				newPod.Spec.Volumes = append(slices.Clone(oldPod.Spec.Volumes),
+					core.Volume{Name: "v-dyn", VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}}},
+				)
+				newPod.Spec.Volumes[0] = core.Volume{
+					Name:         "vol-init",
+					VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{Medium: core.StorageMediumMemory, SizeLimit: &q128}},
+				}
+			},
+		},
+		{
+			name: "allows standalone memory-backed emptyDir sizeLimit resize on Pending pod",
+			opts: dynOpts,
+			mutate: func(newPod, oldPod *core.Pod) {
+				q64 := resource.MustParse("64Mi")
+				q128 := resource.MustParse("128Mi")
+				oldPod.Status.Phase = core.PodPending
+				newPod.Status.Phase = core.PodPending
+				oldPod.Spec.Volumes[0] = core.Volume{
+					Name:         "vol-init",
+					VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{Medium: core.StorageMediumMemory, SizeLimit: &q64}},
+				}
+				newPod.Spec.Volumes[0] = core.Volume{
+					Name:         "vol-init",
+					VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{Medium: core.StorageMediumMemory, SizeLimit: &q128}},
+				}
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			oldPod := mkRunningPod()
+			newPod := mkRunningPod()
+			tc.mutate(newPod, oldPod)
+			errs := ValidatePodDynamicUpdate(newPod, oldPod, tc.opts)
+			if tc.wantErr == "" {
+				if len(errs) != 0 {
+					t.Fatalf("unexpected errors: %v", errs.ToAggregate())
+				}
+				return
+			}
+			if len(errs) == 0 || !strings.Contains(errs.ToAggregate().Error(), tc.wantErr) {
+				t.Fatalf("expected error containing %q, got: %v", tc.wantErr, errs)
+			}
+		})
+	}
+
+	t.Run("status validation allows post-removal HostPhase lifecycle entries without HealthStatus", func(t *testing.T) {
+		oldPod := mkRunningPod()
+		oldPod.Status.VolumeStatuses = []core.PodVolumeStatus{
+			{Name: "vol-removed", HostPhase: core.PodVolumeHostMounted},
+		}
+		for _, phase := range []core.PodVolumeHostPhase{
+			core.PodVolumeHostPending,
+			core.PodVolumeHostMounted,
+			core.PodVolumeHostUnmounting,
+		} {
+			newPod := oldPod.DeepCopy()
+			newPod.Status.VolumeStatuses = []core.PodVolumeStatus{
+				{Name: "vol-removed", HostPhase: phase},
+			}
+			if errs := ValidatePodStatusUpdate(newPod, oldPod, dynOpts); len(errs) != 0 {
+				t.Errorf("unexpected status validation error for removed volume in phase %q: %v", phase, errs)
+			}
+		}
+
+		// HealthStatus on a removed volume is still rejected.
+		newPodWithHealth := oldPod.DeepCopy()
+		newPodWithHealth.Status.VolumeStatuses = []core.PodVolumeStatus{
+			{
+				Name:      "vol-removed",
+				HostPhase: core.PodVolumeHostUnmounting,
+				HealthStatus: &core.VolumeHealthStatus{
+					HealthConditions: []core.VolumeHealthCondition{{Status: core.VolumeHealthDegraded, Reason: "SlowIO"}},
+				},
+			},
+		}
+		if errs := ValidatePodStatusUpdate(newPodWithHealth, oldPod, dynOpts); len(errs) == 0 {
+			t.Errorf("expected NotFound error when removed volume carries HealthStatus, got none")
+		}
+	})
+}
+
+func TestValidatePodVolumeStatusesFeatureGateInteraction(t *testing.T) {
+	validHealth := &core.VolumeHealthStatus{
+		HealthConditions: []core.VolumeHealthCondition{{Status: core.VolumeHealthHealthy, Reason: "VolumeHealthy"}},
+	}
+	invalidHealth := &core.VolumeHealthStatus{
+		HealthConditions: []core.VolumeHealthCondition{{Status: core.VolumeHealthDegraded, Reason: "bad;reason"}},
+	}
+	mkBasePod := func() *core.Pod {
+		return &core.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:            "pod",
+				Namespace:       "default",
+				ResourceVersion: "1",
+			},
+			Spec: core.PodSpec{
+				Volumes: []core.Volume{
+					{Name: "vol-spec", VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}}},
+				},
+			},
+		}
+	}
+
+	tests := []struct {
+		name              string
+		csiGate           bool
+		dynGate           bool
+		oldVolumeStatuses []core.PodVolumeStatus
+		newVolumeStatuses []core.PodVolumeStatus
+		wantErr           string
+	}{
+		{
+			name:    "both gates off rejects removed volume with HostPhase",
+			csiGate: false,
+			dynGate: false,
+			newVolumeStatuses: []core.PodVolumeStatus{
+				{Name: "vol-removed", HostPhase: core.PodVolumeHostUnmounting},
+			},
+			wantErr: "status.volumeStatuses[0].name",
+		},
+		{
+			name:    "both gates off allows removed volume with HostPhase when oldPod already has HostPhase in use",
+			csiGate: false,
+			dynGate: false,
+			oldVolumeStatuses: []core.PodVolumeStatus{
+				{Name: "vol-removed", HostPhase: core.PodVolumeHostMounted},
+			},
+			newVolumeStatuses: []core.PodVolumeStatus{
+				{Name: "vol-removed", HostPhase: core.PodVolumeHostUnmounting},
+			},
+		},
+		{
+			name:    "CSIVolumeHealth=true, DynamicNodeLocalEphemeralVolumes=false allows HealthStatus on spec volume and rejects removed HostPhase volume",
+			csiGate: true,
+			dynGate: false,
+			newVolumeStatuses: []core.PodVolumeStatus{
+				{Name: "vol-spec", HealthStatus: validHealth},
+				{Name: "vol-removed", HostPhase: core.PodVolumeHostUnmounting},
+			},
+			wantErr: "status.volumeStatuses[1].name",
+		},
+		{
+			name:    "CSIVolumeHealth=true, DynamicNodeLocalEphemeralVolumes=false allows HealthStatus on spec volume",
+			csiGate: true,
+			dynGate: false,
+			newVolumeStatuses: []core.PodVolumeStatus{
+				{Name: "vol-spec", HealthStatus: validHealth},
+			},
+		},
+		{
+			name:    "CSIVolumeHealth=true, DynamicNodeLocalEphemeralVolumes=false with oldPod HostPhase in use allows removed HostPhase volume alongside HealthStatus",
+			csiGate: true,
+			dynGate: false,
+			oldVolumeStatuses: []core.PodVolumeStatus{
+				{Name: "vol-removed", HostPhase: core.PodVolumeHostMounted},
+			},
+			newVolumeStatuses: []core.PodVolumeStatus{
+				{Name: "vol-spec", HealthStatus: validHealth},
+				{Name: "vol-removed", HostPhase: core.PodVolumeHostUnmounting},
+			},
+		},
+		{
+			name:    "CSIVolumeHealth=false, DynamicNodeLocalEphemeralVolumes=true allows removed HostPhase volume",
+			csiGate: false,
+			dynGate: true,
+			newVolumeStatuses: []core.PodVolumeStatus{
+				{Name: "vol-spec", HostPhase: core.PodVolumeHostMounted},
+				{Name: "vol-removed", HostPhase: core.PodVolumeHostUnmounting},
+			},
+		},
+		{
+			name:    "CSIVolumeHealth=false, DynamicNodeLocalEphemeralVolumes=true still validates HealthStatus reason format",
+			csiGate: false,
+			dynGate: true,
+			newVolumeStatuses: []core.PodVolumeStatus{
+				{Name: "vol-spec", HostPhase: core.PodVolumeHostMounted, HealthStatus: invalidHealth},
+			},
+			wantErr: "status.volumeStatuses[0].healthStatus.healthConditions[0].reason",
+		},
+		{
+			name:    "CSIVolumeHealth=false, DynamicNodeLocalEphemeralVolumes=true rejects removed volume carrying HealthStatus",
+			csiGate: false,
+			dynGate: true,
+			newVolumeStatuses: []core.PodVolumeStatus{
+				{Name: "vol-removed", HostPhase: core.PodVolumeHostUnmounting, HealthStatus: validHealth},
+			},
+			wantErr: "status.volumeStatuses[0].name",
+		},
+		{
+			name:    "both gates on allows spec volume with HealthStatus+HostPhase and removed volume with HostPhase only",
+			csiGate: true,
+			dynGate: true,
+			newVolumeStatuses: []core.PodVolumeStatus{
+				{Name: "vol-spec", HealthStatus: validHealth, HostPhase: core.PodVolumeHostMounted},
+				{Name: "vol-removed", HostPhase: core.PodVolumeHostUnmounting},
+			},
+		},
+		{
+			name:    "both gates on rejects removed volume carrying HealthStatus",
+			csiGate: true,
+			dynGate: true,
+			newVolumeStatuses: []core.PodVolumeStatus{
+				{Name: "vol-removed", HealthStatus: validHealth, HostPhase: core.PodVolumeHostUnmounting},
+			},
+			wantErr: "status.volumeStatuses[0].name",
+		},
+		{
+			name:    "DynamicNodeLocalEphemeralVolumes=true rejects removed volume with non-DNS1123 name",
+			csiGate: false,
+			dynGate: true,
+			newVolumeStatuses: []core.PodVolumeStatus{
+				{Name: "../Invalid_Name", HostPhase: core.PodVolumeHostUnmounting},
+			},
+			wantErr: "status.volumeStatuses[0].name",
+		},
+		{
+			name:    "DynamicNodeLocalEphemeralVolumes=true ratchets pre-existing non-DNS1123 name in oldVolumeStatuses",
+			csiGate: false,
+			dynGate: true,
+			oldVolumeStatuses: []core.PodVolumeStatus{
+				{Name: "../Invalid_Name", HostPhase: core.PodVolumeHostUnmounting},
+			},
+			newVolumeStatuses: []core.PodVolumeStatus{
+				{Name: "../Invalid_Name", HostPhase: core.PodVolumeHostUnmounting},
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.CSIVolumeHealth:                  tc.csiGate,
+				features.DynamicNodeLocalEphemeralVolumes: tc.dynGate,
+			})
+			oldPod := mkBasePod()
+			oldPod.Status.VolumeStatuses = tc.oldVolumeStatuses
+			newPod := oldPod.DeepCopy()
+			newPod.Status.VolumeStatuses = tc.newVolumeStatuses
+
+			opts := GetValidationOptionsFromPodSpecAndMeta(&newPod.Spec, &oldPod.Spec, &newPod.ObjectMeta, &oldPod.ObjectMeta)
+			opts.ResourceIsPod = true
+			errs := ValidatePodStatusUpdate(newPod, oldPod, opts)
+			if tc.wantErr == "" {
+				if len(errs) != 0 {
+					t.Fatalf("unexpected errors: %v", errs.ToAggregate())
+				}
+				return
+			}
+			if len(errs) == 0 || !strings.Contains(errs.ToAggregate().Error(), tc.wantErr) {
+				t.Fatalf("expected error containing %q, got: %v", tc.wantErr, errs)
 			}
 		})
 	}

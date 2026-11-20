@@ -90,6 +90,9 @@ type RuntimeHelper interface {
 
 	// EffectiveEphemeralVolumeLimit returns the effective size limit for the specified volume.
 	EffectiveEphemeralVolumeLimit(pod *v1.Pod, volumeName string) (*resource.Quantity, error)
+
+	// CleanContainerSubPaths unmounts and removes any host subPath bind mounts for a container.
+	CleanContainerSubPaths(podUID types.UID, containerName string) error
 }
 
 // ShouldContainerBeRestarted checks whether a container needs to be restarted.

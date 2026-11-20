@@ -1861,6 +1861,21 @@ func Validate_PodTemplateSpec(
 	return errs
 }
 
+var symbolsForPodVolumeHostPhase = sets.New(corev1.PodVolumeHostMounted, corev1.PodVolumeHostPending, corev1.PodVolumeHostUnmounting)
+
+// Validate_PodVolumeHostPhase validates an instance of PodVolumeHostPhase according
+// to declarative validation rules in the API schema.
+func Validate_PodVolumeHostPhase(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *corev1.PodVolumeHostPhase) (errs field.ErrorList) {
+
+	if e := validate.Enum(ctx, op, fldPath, obj, oldObj, symbolsForPodVolumeHostPhase, nil); len(e) != 0 {
+		errs = append(errs, e...)
+	}
+
+	return errs
+}
+
 // Validate_PodVolumeStatus validates an instance of PodVolumeStatus according
 // to declarative validation rules in the API schema.
 func Validate_PodVolumeStatus(
@@ -1924,6 +1939,36 @@ func Validate_PodVolumeStatus(
 				return oldObj.HealthStatus
 			})
 		errs = append(errs, fn(fldPath.Child("healthStatus"), obj.HealthStatus, oldVal, oldObj != nil)...)
+	}
+
+	{ // field corev1.PodVolumeStatus.HostPhase
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *corev1.PodVolumeHostPhase,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_PodVolumeHostPhase(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *corev1.PodVolumeStatus) *corev1.PodVolumeHostPhase {
+				return &oldObj.HostPhase
+			})
+		errs = append(errs, fn(fldPath.Child("hostPhase"), &obj.HostPhase, oldVal, oldObj != nil)...)
 	}
 
 	return errs

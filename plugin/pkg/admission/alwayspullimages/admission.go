@@ -73,17 +73,11 @@ func (a *AlwaysPullImages) Admit(ctx context.Context, attributes admission.Attri
 		c.ImagePullPolicy = api.PullAlways
 		return true
 	})
-	if attributes.GetSubresource() == "dynamic" {
-		// Volumes can't change through the dynamic subresource.
-		return nil
-	}
 
 	// See: https://kep.k8s.io/4639
-	for _, v := range pod.Spec.Volumes {
-		if v.Image != nil {
-			v.Image.PullPolicy = api.PullAlways
-		}
-	}
+	visitNewPulledImageVolumes(attributes, pod, func(img *api.ImageVolumeSource, _ *field.Path) {
+		img.PullPolicy = api.PullAlways
+	})
 
 	return nil
 }
@@ -110,20 +104,13 @@ func (*AlwaysPullImages) Validate(ctx context.Context, attributes admission.Attr
 	})
 
 	// See: https://kep.k8s.io/4639
-	// Volumes can't change through the dynamic subresource.
-	if attributes.GetSubresource() != "dynamic" {
-		for i, v := range pod.Spec.Volumes {
-			if v.Image != nil && v.Image.PullPolicy != api.PullAlways {
-				allErrs = append(allErrs, admission.NewForbidden(attributes,
-					field.NotSupported(
-						field.NewPath("spec").Child("volumes").Index(i).Child("image").Child("pullPolicy"),
-						v.Image.PullPolicy,
-						[]string{string(api.PullAlways)},
-					),
-				))
-			}
+	visitNewPulledImageVolumes(attributes, pod, func(img *api.ImageVolumeSource, p *field.Path) {
+		if img.PullPolicy != api.PullAlways {
+			allErrs = append(allErrs, admission.NewForbidden(attributes,
+				field.NotSupported(p.Child("pullPolicy"), img.PullPolicy, []string{string(api.PullAlways)}),
+			))
 		}
-	}
+	})
 
 	if len(allErrs) > 0 {
 		return utilerrors.NewAggregate(allErrs)
@@ -164,7 +151,33 @@ func visitPulledContainers(attributes admission.Attributes, pod *api.Pod, visito
 	}
 }
 
-// check if it's update and it doesn't add containers or change the images referenced by the pod spec
+// visitNewPulledImageVolumes visits the image volumes whose images must always be pulled, with
+// their paths. On a pods/dynamic update, these are only the image volumes added or whose reference
+// changed, so that existing volumes, whose pull policy is immutable, aren't mutated.
+func visitNewPulledImageVolumes(attributes admission.Attributes, pod *api.Pod, visitor func(*api.ImageVolumeSource, *field.Path)) {
+	var oldPod *api.Pod
+	if attributes.GetSubresource() == "dynamic" {
+		oldPod, _ = attributes.GetOldObject().(*api.Pod)
+	}
+	volsPath := field.NewPath("spec", "volumes")
+	index := 0
+	for pair := range podutil.VolumePairs(pod, oldPod) {
+		if pair.New == nil {
+			continue
+		}
+		path := volsPath.Index(index).Child("image")
+		index++
+		if pair.New.Image == nil {
+			continue
+		}
+		if pair.Old != nil && pair.Old.Image != nil && pair.Old.Image.Reference == pair.New.Image.Reference {
+			continue
+		}
+		visitor(pair.New.Image, path)
+	}
+}
+
+// check if it's update and it doesn't add containers or image volumes or change the images referenced by the pod spec
 func isUpdateWithNoNewImages(attributes admission.Attributes) bool {
 	if attributes.GetOperation() != admission.Update {
 		return false
@@ -182,10 +195,15 @@ func isUpdateWithNoNewImages(attributes admission.Attributes) bool {
 		return false
 	}
 
-	// A container added through the dynamic subresource must always pull, even if it reuses an
-	// image that is already in the pod.
+	// A container or image volume added through the dynamic subresource must always pull, even if
+	// it reuses an image that is already in the pod.
 	for pair := range podutil.ContainerPairs(pod, oldPod, podutil.Containers) {
 		if pair.Old == nil {
+			return false
+		}
+	}
+	for pair := range podutil.VolumePairs(pod, oldPod) {
+		if pair.New != nil && pair.New.Image != nil && (pair.Old == nil || pair.Old.Image == nil || pair.Old.Image.Reference != pair.New.Image.Reference) {
 			return false
 		}
 	}

@@ -201,6 +201,9 @@ func init() {
 				{ErrorType: "FieldValueNotSupported"},
 				{ErrorType: "FieldValueRequired"},
 			},
+			"status.volumeStatuses[*].hostPhase": {
+				{ErrorType: "FieldValueNotSupported"},
+			},
 			"status.volumeStatuses[*].name": {
 				{ErrorType: "FieldValueRequired"},
 			},

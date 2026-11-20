@@ -5873,9 +5873,30 @@ type EvictionResponder struct {
 	Priority *int32 `json:"priority" protobuf:"varint,2,opt,name=priority"`
 }
 
+// PodVolumeHostPhase represents the host preparation phase of a volume mounted to a pod.
+// +enum
+// +k8s:enum
+type PodVolumeHostPhase string
+
+const (
+	// PodVolumeHostPending indicates that the volume has been added to pod.Spec.Volumes,
+	// and is waiting node allocation or host preparation/mounting by VolumeManager.
+	PodVolumeHostPending PodVolumeHostPhase = "Pending"
+
+	// PodVolumeHostMounted indicates that VolumeManager has successfully prepared and
+	// mounted the volume on the node host (marked ready in ActualStateOfWorld).
+	PodVolumeHostMounted PodVolumeHostPhase = "HostMounted"
+
+	// PodVolumeHostUnmounting indicates that volume removal has been admitted and allocated
+	// by Kubelet, and Kubelet is waiting for any removed containers referencing the volume to
+	// terminate and tearing down the host mount.
+	PodVolumeHostUnmounting PodVolumeHostPhase = "Unmounting"
+)
+
 // PodVolumeStatus represents the status of an individual volume used by a pod.
 type PodVolumeStatus struct {
-	// name matches an entry in pod.spec.volumes.
+	// name matches an entry in pod.spec.volumes, or the name of a dynamically removed
+	// volume that is still unmounting on the node.
 	// +required
 	// +k8s:required
 	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
@@ -5886,6 +5907,15 @@ type PodVolumeStatus struct {
 	// +optional
 	// +k8s:optional
 	HealthStatus *VolumeHealthStatus `json:"healthStatus,omitempty" protobuf:"bytes,2,opt,name=healthStatus"`
+	// hostPhase represents the host-level preparation phase of the volume:
+	// Pending, HostMounted, Unmounting. Currently populated only for node-local
+	// ephemeral volume types supported for dynamic updates (configMap, secret,
+	// projected, emptyDir, and image).
+	// This is an alpha field and requires enabling the DynamicNodeLocalEphemeralVolumes feature gate.
+	// +featureGate=DynamicNodeLocalEphemeralVolumes
+	// +optional
+	// +k8s:optional
+	HostPhase PodVolumeHostPhase `json:"hostPhase,omitempty" protobuf:"bytes,3,opt,name=hostPhase,casttype=PodVolumeHostPhase"`
 }
 
 // PodStatus represents information about the status of a pod. Status may trail the actual
@@ -6086,8 +6116,8 @@ type PodStatus struct {
 	// VolumeHealth []PodVolumeHealth `json:"volumeHealth,omitempty" protobuf:"bytes,22,rep,name=volumeHealth"`
 
 	// VolumeStatuses contains the status of individual volumes used by this pod.
-	// This is an alpha field and requires enabling the CSIVolumeHealth feature gate.
-	// +featureGate=CSIVolumeHealth
+	// This is an alpha field and requires enabling the CSIVolumeHealth or DynamicNodeLocalEphemeralVolumes feature gate.
+	// +featureGate=CSIVolumeHealth,DynamicNodeLocalEphemeralVolumes
 	// +optional
 	// +patchMergeKey=name
 	// +patchStrategy=merge

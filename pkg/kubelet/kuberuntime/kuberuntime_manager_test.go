@@ -2166,7 +2166,7 @@ func TestComputePodActionsForRestartAllContainers(t *testing.T) {
 			status := test.podStatusFunc()
 
 			// Initialize the actuated resources.
-			m.InitializeActuatedPod(tCtx.Logger(), pod)
+			m.InitializeActuatedPod(tCtx.Logger(), pod, nil)
 
 			actions := m.computePodActions(tCtx, pod, status, test.restartAllContainers)
 
@@ -2595,7 +2595,7 @@ func TestComputePodActionsWithInitContainers(t *testing.T) {
 			pod, status := makeBasePodAndStatusWithInitContainers()
 
 			// Sync the actuated state with the base values before any resize
-			m.InitializeActuatedPod(tCtx.Logger(), pod)
+			m.InitializeActuatedPod(tCtx.Logger(), pod, nil)
 
 			if test.actions.ContainersToUpdate != nil {
 				for res := range test.actions.ContainersToUpdate {
@@ -4410,7 +4410,7 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 				c := &pod.Spec.Containers[1]
 				c.Resources = v1.ResourceRequirements{}
 				c.ResizePolicy = []v1.ContainerResizePolicy{cpuPolicyRestartRequired, memPolicyRestartRequired}
-				m.InitializeActuatedPod(logger, pod)
+				m.InitializeActuatedPod(logger, pod, nil)
 			},
 			podLevelResizeEnabled: true,
 			getExpectedPodActionsFn: func(pod *v1.Pod, podStatus *kubecontainer.PodStatus) *podActions {
@@ -4429,7 +4429,7 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 				}
 				c := &pod.Spec.Containers[1]
 				c.Resources = v1.ResourceRequirements{}
-				m.InitializeActuatedPod(logger, pod)
+				m.InitializeActuatedPod(logger, pod, nil)
 			},
 			getExpectedPodActionsFn: func(pod *v1.Pod, podStatus *kubecontainer.PodStatus) *podActions {
 				return &podActions{
@@ -4586,7 +4586,7 @@ func TestComputePodResizeActionForOOMKilledContainer(t *testing.T) {
 		{ResourceName: v1.ResourceMemory, RestartPolicy: v1.NotRequired},
 	}
 	// record the pre-resize resource limits as what was last actuated.
-	m.InitializeActuatedPod(logger, pod)
+	m.InitializeActuatedPod(logger, pod, nil)
 
 	// Pod Resized
 	resize := pod.Spec.Containers[0].Resources.DeepCopy()
@@ -4650,7 +4650,7 @@ func TestComputePodResizeActionForOOMKilledInitContainer(t *testing.T) {
 	pod.Status.ContainerStatuses = nil
 
 	// record pre-resize resource limits as what was last actuated.
-	m.InitializeActuatedPod(logger, pod)
+	m.InitializeActuatedPod(logger, pod, nil)
 
 	// Pod Resized
 	resize := pod.Spec.InitContainers[0].Resources.DeepCopy()
@@ -4722,7 +4722,7 @@ func TestComputePodResizeActionForOOMKilledSidecarContainer(t *testing.T) {
 	})
 
 	// record pre-resize resource limits as what was last actuated.
-	m.InitializeActuatedPod(logger, pod)
+	m.InitializeActuatedPod(logger, pod, nil)
 
 	// Pod Resized
 	resize := pod.Spec.InitContainers[0].Resources.DeepCopy()
@@ -6030,7 +6030,7 @@ func TestComputePodActions_VolumeResizeWithRestartContainerPolicy(t *testing.T) 
 	}
 	status.ContainerStatuses[0].Hash = kubecontainer.HashContainer(&pod.Spec.Containers[0])
 	require.NoError(t, m.actuatedState.SetPodVolume(logger, pod.UID, pod.Spec.Volumes[0]))
-	m.InitializeActuatedPod(logger, pod)
+	m.InitializeActuatedPod(logger, pod, nil)
 
 	// Resize only the memory-backed emptyDir volume sizeLimit.
 	pod.Spec.Volumes[0].EmptyDir.SizeLimit = &vol200M
@@ -7964,7 +7964,7 @@ func TestInitializeActuatedPod_PreservesActuatedVolumes(t *testing.T) {
 	require.NoError(t, m.actuatedState.SetPodVolume(tCtx.Logger(), pod.UID, cmVol))
 	require.NoError(t, m.actuatedState.SetPodVolume(tCtx.Logger(), pod.UID, memVol))
 
-	m.InitializeActuatedPod(tCtx.Logger(), pod)
+	m.InitializeActuatedPod(tCtx.Logger(), pod, nil)
 
 	actuatedPod, ok := m.actuatedState.GetPod(pod.UID)
 	require.True(t, ok)
@@ -8202,7 +8202,7 @@ func TestInitializeActuatedPodLevelResources(t *testing.T) {
 				require.NoError(t, tc.setup(m))
 			}
 
-			m.InitializeActuatedPod(logger, pod)
+			m.InitializeActuatedPod(logger, pod, nil)
 			got, ok := m.actuatedState.GetPodLevelResources(pod.UID)
 			require.True(t, ok)
 			assert.True(t, apiequality.Semantic.DeepEqual(tc.expected, got), "want %v, got %v", tc.expected, got)
@@ -8228,7 +8228,7 @@ func TestInitializeActuatedPodLevelResources(t *testing.T) {
 		require.NoError(t, m.actuatedState.SetPodLevelResources(logger, pod.UID, &v1.ResourceRequirements{Limits: v1.ResourceList{v1.ResourceMemory: actuatedLimit}}))
 		require.NoError(t, m.actuatedState.SetEmptyDirVolumeLimit(logger, pod.UID, vol.Name, &v1.EmptyDirVolumeSource{Medium: v1.StorageMediumMemory, SizeLimit: &actuatedLimit}))
 
-		m.InitializeActuatedPod(logger, podWithVolume)
+		m.InitializeActuatedPod(logger, podWithVolume, nil)
 		got, ok := m.actuatedState.GetEmptyDirVolumeLimit(pod.UID, vol.Name)
 		require.True(t, ok)
 		assert.True(t, actuatedLimit.Equal(*got), "want %v, got %v", actuatedLimit, got)
@@ -8316,7 +8316,7 @@ func TestDoPodResizeAction_PodCgroupReconciliation(t *testing.T) {
 			pod.Spec.Containers[0].Resources = tc.actuated
 			_, fakeContainers := makeAndSetFakePod(tCtx, m, fakeRuntime, pod)
 			kps.ContainerStatuses[0].ID = kubecontainer.ContainerID{Type: "testRuntime", ID: fakeContainers[0].Id}
-			m.InitializeActuatedPod(logger, pod)
+			m.InitializeActuatedPod(logger, pod, nil)
 			syncResize := func(resources v1.ResourceRequirements) error {
 				pod.Spec.Containers[0].Resources = resources
 				kps.ContainerStatuses[0].Hash = kubecontainer.HashContainer(&pod.Spec.Containers[0])
@@ -8333,7 +8333,7 @@ func TestDoPodResizeAction_PodCgroupReconciliation(t *testing.T) {
 
 			if tc.restart {
 				loadState()
-				m.InitializeActuatedPod(logger, pod)
+				m.InitializeActuatedPod(logger, pod, nil)
 			}
 			final := tc.resized
 			if tc.revert {
@@ -8475,7 +8475,7 @@ func TestDoPodResizeAction_PodCgroupLimits(t *testing.T) {
 			_, fakeContainers := makeAndSetFakePod(tCtx, m, fakeRuntime, pod)
 			beforePod := pod.DeepCopy()
 			beforePod.Spec.Containers = beforePod.Spec.Containers[:len(tc.before.containers)]
-			m.InitializeActuatedPod(logger, beforePod)
+			m.InitializeActuatedPod(logger, beforePod, nil)
 
 			pod.Spec.Resources = tc.after.pod
 			resized := -1
@@ -8544,4 +8544,130 @@ func TestDoPodResizeAction_PodCgroupLimits(t *testing.T) {
 			assert.Empty(t, m.computePodActions(tCtx, pod, kps, false).PodCgroupResourcesToUpdate)
 		})
 	}
+}
+
+func TestComputePodActions_DynamicVolumeContainerStartReadiness(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicNodeLocalEphemeralVolumes, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicContainers, true)
+
+	tCtx := ktesting.Init(t)
+	fakeRuntime, fakeImage, m, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+	fakeImage.SetFakeImages([]string{"busybox:latest"})
+
+	cmVol := v1.Volume{
+		Name:         "dyn-cm",
+		VolumeSource: v1.VolumeSource{ConfigMap: &v1.ConfigMapVolumeSource{LocalObjectReference: v1.LocalObjectReference{Name: "my-cm"}}},
+	}
+	pvcVol := v1.Volume{
+		Name:         "static-pvc",
+		VolumeSource: v1.VolumeSource{PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{ClaimName: "my-pvc"}},
+	}
+	imgVol := v1.Volume{
+		Name:         "dyn-img",
+		VolumeSource: v1.VolumeSource{Image: &v1.ImageVolumeSource{Reference: "busybox:latest", PullPolicy: v1.PullIfNotPresent}},
+	}
+	unusedImgVol := v1.Volume{
+		Name:         "unused-img",
+		VolumeSource: v1.VolumeSource{Image: &v1.ImageVolumeSource{Reference: "localhost/nonexistent:v1", PullPolicy: v1.PullAlways}},
+	}
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{UID: "dyn-start-uid", Name: "dyn-start", Namespace: "default"},
+		Spec: v1.PodSpec{
+			RestartPolicy: v1.RestartPolicyOnFailure,
+			Volumes:       []v1.Volume{pvcVol, cmVol, imgVol, unusedImgVol},
+			Containers: []v1.Container{
+				{
+					Name:         "c1-done",
+					Image:        "busybox",
+					VolumeMounts: []v1.VolumeMount{{Name: "static-pvc", MountPath: "/pvc"}},
+				},
+				{
+					Name:         "c2-dyn",
+					Image:        "busybox",
+					VolumeMounts: []v1.VolumeMount{{Name: "dyn-cm", MountPath: "/cm"}},
+				},
+				{
+					Name:         "c3-img",
+					Image:        "busybox",
+					VolumeMounts: []v1.VolumeMount{{Name: "dyn-img", MountPath: "/img"}},
+				},
+			},
+			EphemeralContainers: []v1.EphemeralContainer{
+				{
+					EphemeralContainerCommon: v1.EphemeralContainerCommon{
+						Name:         "eph-cm",
+						Image:        "busybox",
+						VolumeMounts: []v1.VolumeMount{{Name: "dyn-cm", MountPath: "/cm"}},
+					},
+				},
+				{
+					EphemeralContainerCommon: v1.EphemeralContainerCommon{
+						Name:         "eph-unallocated",
+						Image:        "busybox",
+						VolumeMounts: []v1.VolumeMount{{Name: "unallocated-vol", MountPath: "/unalloc"}},
+					},
+				},
+			},
+		},
+	}
+	m.InitializeActuatedPod(tCtx.Logger(), pod, nil)
+
+	// 1. Sandbox creation path: c1-done (PVC) and c3-img (Image) are ready to start immediately,
+	// while c2-dyn (unmounted ConfigMap) is deferred.
+	sandboxCreateActions := m.computePodActions(tCtx, pod, &kubecontainer.PodStatus{ID: pod.UID, Name: pod.Name, Namespace: pod.Namespace}, false)
+	assert.True(t, sandboxCreateActions.CreateSandbox)
+	assert.Equal(t, []int{0, 2}, sandboxCreateActions.ContainersToStart, "only containers with ready volumes should start during sandbox creation")
+
+	// 2. Running sandbox where c1-done has already succeeded (ExitCode: 0 -> keepCount == 0):
+	// c2-dyn and both ephemeral containers are deferred because dyn-cm is not mounted yet and
+	// unallocated-vol is not in pod.Spec.Volumes; hasDeferredContainerStart must keep KillPod false!
+	fakeSandboxID, err := fakeRuntime.RunPodSandbox(tCtx, &runtimeapi.PodSandboxConfig{
+		Metadata: &runtimeapi.PodSandboxMetadata{Name: pod.Name, Namespace: pod.Namespace, Uid: string(pod.UID)},
+	}, "")
+	require.NoError(t, err)
+	sandboxStatus, err := fakeRuntime.PodSandboxStatus(tCtx, fakeSandboxID, false)
+	require.NoError(t, err)
+	statusWithExitedC1 := &kubecontainer.PodStatus{
+		ID:              pod.UID,
+		Name:            pod.Name,
+		Namespace:       pod.Namespace,
+		SandboxStatuses: []*runtimeapi.PodSandboxStatus{sandboxStatus.GetStatus()},
+		ContainerStatuses: []*kubecontainer.Status{
+			{
+				ID:       kubecontainer.ContainerID{Type: "fake", ID: "c1-id"},
+				Name:     "c1-done",
+				State:    kubecontainer.ContainerStateExited,
+				ExitCode: 0,
+			},
+			{
+				ID:       kubecontainer.ContainerID{Type: "fake", ID: "c3-id"},
+				Name:     "c3-img",
+				State:    kubecontainer.ContainerStateExited,
+				ExitCode: 0,
+			},
+		},
+	}
+	deferredActions := m.computePodActions(tCtx, pod, statusWithExitedC1, false)
+	assert.False(t, deferredActions.KillPod, "pod sandbox must not be killed while a container start is deferred on an unready dynamic volume")
+	assert.Empty(t, deferredActions.ContainersToStart)
+	assert.Empty(t, deferredActions.EphemeralContainersToStart)
+
+	// 3. Once VolumeManager records dyn-cm in actuatedState, c2-dyn and eph-cm are queued to start,
+	// while eph-unallocated continues waiting until its volume is allocated.
+	require.NoError(t, m.actuatedState.SetPodVolume(tCtx.Logger(), pod.UID, cmVol))
+	readyActions := m.computePodActions(tCtx, pod, statusWithExitedC1, false)
+	assert.False(t, readyActions.KillPod)
+	assert.Equal(t, []int{1}, readyActions.ContainersToStart)
+	assert.Equal(t, []int{0}, readyActions.EphemeralContainersToStart)
+
+	// 4. getImageVolumes skips unreferenced unused-img and records dyn-img in actuatedState once pulled.
+	pulls, err := m.getImageVolumes(tCtx, pod, &runtimeapi.PodSandboxConfig{}, nil)
+	require.NoError(t, err)
+	assert.Contains(t, pulls, "dyn-img")
+	assert.NotContains(t, pulls, "unused-img", "unreferenced OCI Image volume must be skipped")
+	actVols, ok := m.actuatedState.GetPodVolumes(pod.UID)
+	require.True(t, ok)
+	assert.Equal(t, []v1.Volume{cmVol, imgVol}, actVols, "pulled OCI Image volume must be recorded in actuatedState")
 }

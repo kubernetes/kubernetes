@@ -71,6 +71,15 @@ type Subpath struct {
 // Compile time-check for all implementers of subpath interface
 var _ Interface = &subpath{}
 var _ Interface = &FakeSubpath{}
+var _ ContainerSubPathCleaner = &subpath{}
+var _ ContainerSubPathCleaner = &FakeSubpath{}
+
+// ContainerSubPathCleaner is an optional interface implemented by subpath managers
+// that can clean up per-container subpath bind mounts when a dynamic container is removed.
+type ContainerSubPathCleaner interface {
+	// CleanContainerSubPaths removes any subpath bind mounts for containerName under podDir.
+	CleanContainerSubPaths(podDir string, containerName string) error
+}
 
 // FakeSubpath is a subpather implementation for testing
 type FakeSubpath struct{}
@@ -83,6 +92,11 @@ func (fs *FakeSubpath) PrepareSafeSubpath(subPath Subpath) (newHostPath string, 
 
 // CleanSubPaths is a fake implementation of CleanSubPaths. It is a noop
 func (fs *FakeSubpath) CleanSubPaths(podDir string, volumeName string) error {
+	return nil
+}
+
+// CleanContainerSubPaths is a fake implementation of CleanContainerSubPaths. It is a noop
+func (fs *FakeSubpath) CleanContainerSubPaths(podDir string, containerName string) error {
 	return nil
 }
 

@@ -46,7 +46,8 @@ type FakeRuntimeHelper struct {
 	// PodSwapStatsByUID is returned by PodSwapStats.
 	PodSwapStatsByUID map[kubetypes.UID]*statsapi.PodStats
 	// PodSwapStatsCalls counts PodSwapStats calls.
-	PodSwapStatsCalls int
+	PodSwapStatsCalls        int
+	CleanedSubPathContainers []string
 }
 
 func (f *FakeRuntimeHelper) GenerateRunContainerOptions(_ context.Context, pod *v1.Pod, container *v1.Container, podIP string, podIPs []string, imageVolumes kubecontainer.ImageVolumes) (*kubecontainer.RunContainerOptions, func(), error) {
@@ -163,4 +164,9 @@ func (f *FakeRuntimeHelper) EffectiveEphemeralVolumeLimit(pod *v1.Pod, volumeNam
 		return f.EffectiveEphemeralVolumeLimitFunc(pod, volumeName)
 	}
 	return nil, nil
+}
+
+func (f *FakeRuntimeHelper) CleanContainerSubPaths(_ kubetypes.UID, containerName string) error {
+	f.CleanedSubPathContainers = append(f.CleanedSubPathContainers, containerName)
+	return nil
 }

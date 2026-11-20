@@ -29960,7 +29960,7 @@ func schema_k8sio_api_core_v1_PodStatus(ref common.ReferenceCallback) common.Ope
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "VolumeStatuses contains the status of individual volumes used by this pod. This is an alpha field and requires enabling the CSIVolumeHealth feature gate.",
+							Description: "VolumeStatuses contains the status of individual volumes used by this pod. This is an alpha field and requires enabling the CSIVolumeHealth or DynamicNodeLocalEphemeralVolumes feature gate.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -30110,7 +30110,7 @@ func schema_k8sio_api_core_v1_PodVolumeStatus(ref common.ReferenceCallback) comm
 				Properties: map[string]spec.Schema{
 					"name": {
 						SchemaProps: spec.SchemaProps{
-							Description: "name matches an entry in pod.spec.volumes.",
+							Description: "name matches an entry in pod.spec.volumes, or the name of a dynamically removed volume that is still unmounting on the node.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -30120,6 +30120,14 @@ func schema_k8sio_api_core_v1_PodVolumeStatus(ref common.ReferenceCallback) comm
 						SchemaProps: spec.SchemaProps{
 							Description: "healthStatus contains health reported by the CSI node plugin for this volume on the pod's node. Populated by the kubelet. This is an alpha field and requires enabling the CSIVolumeHealth feature gate.",
 							Ref:         ref(corev1.VolumeHealthStatus{}.OpenAPIModelName()),
+						},
+					},
+					"hostPhase": {
+						SchemaProps: spec.SchemaProps{
+							Description: "hostPhase represents the host-level preparation phase of the volume: Pending, HostMounted, Unmounting. Currently populated only for node-local ephemeral volume types supported for dynamic updates (configMap, secret, projected, emptyDir, and image). This is an alpha field and requires enabling the DynamicNodeLocalEphemeralVolumes feature gate.\n\nPossible enum values:\n - `\"HostMounted\"` indicates that VolumeManager has successfully prepared and mounted the volume on the node host (marked ready in ActualStateOfWorld).\n - `\"Pending\"` indicates that the volume has been added to pod.Spec.Volumes, and is waiting node allocation or host preparation/mounting by VolumeManager.\n - `\"Unmounting\"` indicates that volume removal has been admitted and allocated by Kubelet, and Kubelet is waiting for any removed containers referencing the volume to terminate and tearing down the host mount.",
+							Type:        []string{"string"},
+							Format:      "",
+							Enum:        []interface{}{"HostMounted", "Pending", "Unmounting"},
 						},
 					},
 				},

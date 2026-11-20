@@ -156,7 +156,7 @@ type PodStatusApplyConfiguration struct {
 	// value is the footprint and must already include the extra resources.
 	ExtraNodeAllocatableResources []ExtraNodeAllocatableResourceApplyConfiguration `json:"extraNodeAllocatableResources,omitempty"`
 	// VolumeStatuses contains the status of individual volumes used by this pod.
-	// This is an alpha field and requires enabling the CSIVolumeHealth feature gate.
+	// This is an alpha field and requires enabling the CSIVolumeHealth or DynamicNodeLocalEphemeralVolumes feature gate.
 	VolumeStatuses []PodVolumeStatusApplyConfiguration `json:"volumeStatuses,omitempty"`
 }
 

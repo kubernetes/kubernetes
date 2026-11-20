@@ -288,6 +288,21 @@ func TestGraphPopulator_UpdatePodVolumes(t *testing.T) {
 			absentSecrets:          []string{"secret2"},
 			expectedConfigMapEdges: []string{"cm1"},
 		},
+		{
+			name: "reordering volumes does not enqueue pod",
+			initialVolumes: []corev1.Volume{
+				configMapVolume("cm-vol-1", "cm1"),
+				secretVolume("secret-vol-2", "secret2"),
+			},
+			updatedVolumes: []corev1.Volume{
+				secretVolume("secret-vol-2", "secret2"),
+				configMapVolume("cm-vol-1", "cm1"),
+			},
+			incrementGeneration:    true,
+			expectEnqueued:         false,
+			expectedSecretEdges:    []string{"secret2"},
+			expectedConfigMapEdges: []string{"cm1"},
+		},
 	}
 
 	for _, tc := range testCases {

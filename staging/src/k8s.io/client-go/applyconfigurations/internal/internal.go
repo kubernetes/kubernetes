@@ -7571,6 +7571,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: healthStatus
       type:
         namedType: io.k8s.api.core.v1.VolumeHealthStatus
+    - name: hostPhase
+      type:
+        scalar: string
     - name: name
       type:
         scalar: string

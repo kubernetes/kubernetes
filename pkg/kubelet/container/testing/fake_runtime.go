@@ -700,5 +700,5 @@ func (f *FakeRuntime) UpdateActuatedPodLevelResources(logger klog.Logger, alloca
 	return nil
 }
 
-func (f *FakeRuntime) InitializeActuatedPod(_ klog.Logger, _ *v1.Pod) {
+func (f *FakeRuntime) InitializeActuatedPod(_ klog.Logger, _ *v1.Pod, _ *kubecontainer.PodStatus) {
 }

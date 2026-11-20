@@ -22,6 +22,7 @@ package cache
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 
 	v1 "k8s.io/api/core/v1"
@@ -30,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/allocation"
 	"k8s.io/kubernetes/pkg/kubelet/allocation/state"
@@ -159,6 +161,14 @@ type ActualStateOfWorld interface {
 	// the specified pod that either are attached and mounted or are "uncertain",
 	// i.e. a volume plugin may be mounting the volume right now.
 	GetPossiblyMountedVolumesForPod(podName volumetypes.UniquePodName) []MountedVolume
+
+	// GetDynamicVolumeNamesForPod returns the pod-level volume names of supported dynamic
+	// volumes currently present in ASW for the given pod.
+	GetDynamicVolumeNamesForPod(podName volumetypes.UniquePodName) sets.Set[string]
+
+	// SetOnDynamicVolumeRemoved registers a callback invoked after DeleteVolume
+	// removes a pod-scoped supported dynamic volume.
+	SetOnDynamicVolumeRemoved(fn func(types.UID))
 
 	// GetGloballyMountedVolumes generates and returns a list of all attached
 	// volumes that are globally mounted. This list can be used to determine
@@ -291,6 +301,8 @@ type actualStateOfWorld struct {
 
 	// actuatedState stores the checkpointed state of actuated pods and volumes.
 	actuatedState state.State
+	// onDynamicVolumeRemoved is notified after a pod-scoped supported dynamic volume is deleted.
+	onDynamicVolumeRemoved func(types.UID)
 	sync.RWMutex
 }
 
@@ -838,6 +850,15 @@ func shouldRecordVolumeInActuatedState(vol *v1.Volume) bool {
 		allocation.VolHasMemoryBackedEmptyDir(vol)
 }
 
+func shouldRecordVolumeOnMount(vol *v1.Volume) bool {
+	// Image volumes use a no-op volume plugin whose SetUp succeeds before any OCI image pull;
+	// kuberuntime records them in actuatedState only after EnsureImageExists succeeds.
+	if vol == nil || vol.Image != nil {
+		return false
+	}
+	return shouldRecordVolumeInActuatedState(vol)
+}
+
 func (asw *actualStateOfWorld) AddPodToVolume(markVolumeOpts operationexecutor.MarkVolumeOpts) error {
 	podName := markVolumeOpts.PodName
 	podUID := markVolumeOpts.PodUID
@@ -903,7 +924,7 @@ func (asw *actualStateOfWorld) AddPodToVolume(markVolumeOpts operationexecutor.M
 	}
 	asw.Unlock()
 
-	if markVolumeOpts.VolumeMountState == operationexecutor.VolumeMounted && volumeSpec != nil && shouldRecordVolumeInActuatedState(volumeSpec.Volume) {
+	if markVolumeOpts.VolumeMountState == operationexecutor.VolumeMounted && volumeSpec != nil && shouldRecordVolumeOnMount(volumeSpec.Volume) {
 		logger := klog.TODO()
 		volToRecord := *volumeSpec.Volume
 		if markVolumeOpts.Pod != nil && asw.volumePluginMgr != nil && allocation.VolHasMemoryBackedEmptyDir(&volToRecord) {
@@ -1057,25 +1078,82 @@ func (asw *actualStateOfWorld) DeletePodFromVolume(
 	return nil
 }
 
-func (asw *actualStateOfWorld) DeleteVolume(volumeName v1.UniqueVolumeName) error {
+func podUIDFromPodScopedVolume(volumeObj attachedVolume) (types.UID, bool) {
+	if volumeObj.pluginIsAttachable != volumeAttachabilityFalse || volumeObj.spec == nil || volumeObj.pluginName == "" {
+		return "", false
+	}
+	prefix := volumeObj.pluginName + "/"
+	suffix := "-" + volumeObj.spec.Name()
+	volName := string(volumeObj.volumeName)
+	if !strings.HasPrefix(volName, prefix) || !strings.HasSuffix(volName, suffix) || len(volName) <= len(prefix)+len(suffix) {
+		return "", false
+	}
+	return types.UID(volName[len(prefix) : len(volName)-len(suffix)]), true
+}
+
+func (asw *actualStateOfWorld) SetOnDynamicVolumeRemoved(fn func(types.UID)) {
 	asw.Lock()
 	defer asw.Unlock()
+	asw.onDynamicVolumeRemoved = fn
+}
+
+func (asw *actualStateOfWorld) GetDynamicVolumeNamesForPod(podName volumetypes.UniquePodName) sets.Set[string] {
+	asw.RLock()
+	defer asw.RUnlock()
+
+	var names sets.Set[string]
+	attempted := asw.attemptedMounts[podName]
+	for uniqueVolName, volumeObj := range asw.attachedVolumes {
+		if volumeObj.spec == nil || volumeObj.spec.Volume == nil ||
+			!podutil.IsSupportedDynamicVolumeSource(&volumeObj.spec.Volume.VolumeSource) {
+			continue
+		}
+		_, mounted := volumeObj.mountedPods[podName]
+		ownerUID, hasOwner := podUIDFromPodScopedVolume(volumeObj)
+		if !mounted && !attempted.Has(uniqueVolName) && (!hasOwner || volumetypes.UniquePodName(ownerUID) != podName) {
+			continue
+		}
+		if names == nil {
+			names = sets.New[string]()
+		}
+		names.Insert(volumeObj.spec.Name())
+	}
+	return names
+}
+
+func (asw *actualStateOfWorld) DeleteVolume(volumeName v1.UniqueVolumeName) error {
+	asw.Lock()
 
 	volumeObj, volumeExists := asw.attachedVolumes[volumeName]
 	if !volumeExists {
+		asw.Unlock()
 		return nil
 	}
 
 	if len(volumeObj.mountedPods) != 0 {
+		asw.Unlock()
 		return fmt.Errorf(
 			"failed to DeleteVolume %q, it still has %v mountedPods",
 			volumeName,
 			len(volumeObj.mountedPods))
 	}
 
+	podUID, hasPodUID := podUIDFromPodScopedVolume(volumeObj)
+	notify := hasPodUID &&
+		asw.onDynamicVolumeRemoved != nil &&
+		volumeObj.spec != nil &&
+		volumeObj.spec.Volume != nil &&
+		podutil.IsSupportedDynamicVolumeSource(&volumeObj.spec.Volume.VolumeSource)
+	onRemoved := asw.onDynamicVolumeRemoved
+
 	delete(asw.attachedVolumes, volumeName)
 	delete(asw.foundDuringReconstruction, volumeName)
 	asw.clearVolumeMountAttemptedForVolumeLocked(volumeName)
+	asw.Unlock()
+
+	if notify {
+		onRemoved(podUID)
+	}
 	return nil
 }
 

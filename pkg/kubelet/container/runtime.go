@@ -162,7 +162,7 @@ type Runtime interface {
 	UpdateActuatedPodLevelResources(logger klog.Logger, actuatedPod *v1.Pod) error
 	// InitializeActuatedPod initializes actuated container resources and emptyDir volume size limits for the given pod,
 	// if they are not already set.
-	InitializeActuatedPod(logger klog.Logger, allocatedPod *v1.Pod)
+	InitializeActuatedPod(logger klog.Logger, allocatedPod *v1.Pod, podStatus *PodStatus)
 }
 
 var (
@@ -469,6 +469,21 @@ func (podStatus *PodStatus) FindContainerStatusByName(containerName string) *Sta
 		}
 	}
 	return nil
+}
+
+// HasRunningOrUnknownContainer reports whether any container status with the given name
+// is in ContainerStateRunning or ContainerStateUnknown.
+func (podStatus *PodStatus) HasRunningOrUnknownContainer(containerName string) bool {
+	if podStatus == nil {
+		return false
+	}
+	for _, containerStatus := range podStatus.ContainerStatuses {
+		if containerStatus.Name == containerName &&
+			(containerStatus.State == ContainerStateRunning || containerStatus.State == ContainerStateUnknown) {
+			return true
+		}
+	}
+	return false
 }
 
 // FindActiveContainerStatusByName returns active container status in the pod status with the given name.
