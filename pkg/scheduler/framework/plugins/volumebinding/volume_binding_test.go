@@ -957,6 +957,51 @@ func TestVolumeBinding(t *testing.T) {
 			},
 		},
 		{
+			// Regression test for https://github.com/kubernetes/kubernetes/issues/143948.
+			// A CSIStorageCapacity may set only maximumVolumeSize. Filter accepts node-b
+			// because the request fits, but there is no free capacity to score, so
+			// before the fix Score dereferenced the nil capacity and panicked.
+			name: "storage capacity score with only maximum volume size",
+			pod:  makePod("pod-a").withPVCVolume("pvc-dynamic", "").Pod,
+			nodes: []*v1.Node{
+				makeNode("node-a").withLabel(nodeLabelKey, "node-a").Node,
+				makeNode("node-b").withLabel(nodeLabelKey, "node-b").Node,
+				makeNode("node-c").withLabel(nodeLabelKey, "node-c").Node,
+			},
+			pvcs: []*v1.PersistentVolumeClaim{
+				makePVC("pvc-dynamic", waitSCWithStorageCapacity.Name).withRequestStorage(resource.MustParse("10Gi")).PersistentVolumeClaim,
+			},
+			capacities: []*storagev1.CSIStorageCapacity{
+				makeCapacity("node-a", waitSCWithStorageCapacity.Name, makeNode("node-a").withLabel(nodeLabelKey, "node-a").Node, "100Gi", ""),
+				makeCapacity("node-b", waitSCWithStorageCapacity.Name, makeNode("node-b").withLabel(nodeLabelKey, "node-b").Node, "", "100Gi"),
+				makeCapacity("node-c", waitSCWithStorageCapacity.Name, makeNode("node-c").withLabel(nodeLabelKey, "node-c").Node, "50Gi", ""),
+			},
+			fts: feature.Features{
+				EnableStorageCapacityScoring: true,
+			},
+			wantPreFilterStatus: nil,
+			wantStateAfterPreFilter: &stateData{
+				podVolumeClaims: &PodVolumeClaims{
+					boundClaims: []*v1.PersistentVolumeClaim{},
+					unboundClaimsDelayBinding: []*v1.PersistentVolumeClaim{
+						makePVC("pvc-dynamic", waitSCWithStorageCapacity.Name).withRequestStorage(resource.MustParse("10Gi")).PersistentVolumeClaim,
+					},
+					unboundVolumesDelayBinding: map[string][]*v1.PersistentVolume{waitSCWithStorageCapacity.Name: {}},
+				},
+				podVolumesByNode: map[string]*PodVolumes{},
+			},
+			wantFilterStatus: []*fwk.Status{
+				nil,
+				nil,
+				nil,
+			},
+			wantScores: []int64{
+				90,
+				0,
+				80,
+			},
+		},
+		{
 			name: "storage capacity score with static binds",
 			pod:  makePod("pod-a").withPVCVolume("pvc-dynamic", "").withPVCVolume("pvc-static", "").Pod,
 			nodes: []*v1.Node{
