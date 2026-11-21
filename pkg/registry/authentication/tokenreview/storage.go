@@ -34,6 +34,16 @@ import (
 
 var badAuthenticatorAuds = apierrors.NewInternalError(errors.New("error validating audiences"))
 
+// valuelessContext preserves cancellation and deadline propagation without
+// exposing unrelated context values to token authenticators.
+type valuelessContext struct {
+	context.Context
+}
+
+func (valuelessContext) Value(any) any {
+	return nil
+}
+
 type REST struct {
 	tokenAuthenticator authenticator.Request
 	apiAudiences       []string
@@ -90,8 +100,10 @@ func (r *REST) Create(ctx context.Context, obj runtime.Object, createValidation 
 		return tokenReview, nil
 	}
 
+	reqCtx := valuelessContext{Context: ctx}
+
 	// create a header that contains nothing but the token
-	fakeReq := &http.Request{Header: http.Header{}}
+	fakeReq := (&http.Request{Header: http.Header{}}).WithContext(reqCtx)
 	fakeReq.Header.Add("Authorization", "Bearer "+tokenReview.Spec.Token)
 
 	auds := tokenReview.Spec.Audiences
