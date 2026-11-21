@@ -2224,6 +2224,9 @@
           "type": "string"
         }
       },
+      "required": [
+        "type"
+      ],
       "type": "object"
     },
     "io.k8s.api.apps.v1.DaemonSetList": {
@@ -2441,6 +2444,9 @@
           "type": "string"
         }
       },
+      "required": [
+        "type"
+      ],
       "type": "object"
     },
     "io.k8s.api.apps.v1.DeploymentList": {
@@ -2693,6 +2699,9 @@
           "type": "string"
         }
       },
+      "required": [
+        "type"
+      ],
       "type": "object"
     },
     "io.k8s.api.apps.v1.ReplicaSetList": {
@@ -2912,6 +2921,9 @@
           "type": "string"
         }
       },
+      "required": [
+        "type"
+      ],
       "type": "object"
     },
     "io.k8s.api.apps.v1.StatefulSetList": {
