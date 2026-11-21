@@ -21,7 +21,9 @@ import (
 	"fmt"
 	utiltesting "k8s.io/client-go/util/testing"
 	"os"
+	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"k8s.io/client-go/tools/clientcmd"
@@ -94,5 +96,21 @@ func (test deleteContextTest) run(t *testing.T) {
 
 	if !reflect.DeepEqual(test.expectedContexts, contexts) {
 		t.Errorf("expected contexts %v, but found %v in kubeconfig", test.expectedContexts, contexts)
+	}
+}
+
+func TestDeleteContextInvalidArgs(t *testing.T) {
+	for _, args := range [][]string{{}, {"minikube", "otherkube"}} {
+		pathOptions := clientcmd.NewDefaultPathOptions()
+		pathOptions.GlobalFile = filepath.Join(t.TempDir(), "config")
+		pathOptions.EnvVar = ""
+		cmd := NewCmdConfigDeleteContext(bytes.NewBuffer(nil), bytes.NewBuffer(nil), pathOptions)
+		if err := cmd.Flags().Parse(args); err != nil {
+			t.Fatalf("unexpected error parsing args: %v", err)
+		}
+		err := runDeleteContext(bytes.NewBuffer(nil), bytes.NewBuffer(nil), pathOptions, cmd)
+		if err == nil || !strings.Contains(err.Error(), "context to delete is required") {
+			t.Errorf("args %v: expected usage error, got %v", args, err)
+		}
 	}
 }
