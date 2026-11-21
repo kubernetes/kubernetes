@@ -538,7 +538,7 @@
       disruptionMode: Single
   # Sparse victims scenario: 2400 nodes are free, 2450 nodes run higher-priority pods (priority 2000000),
   # and 50 nodes run low-priority victims (priority 100). Isolates the CPU cost of victim-aware ranking
-  # and disabling OpportunisticBatching when eviction count (50 pods) is minimal.
+  # when eviction count (50 pods) is minimal.
   - name: 4900Nodes_Hero2450Pods_SparseVictims
     labels: [performance]
     params:
@@ -572,4 +572,178 @@
       disruptionMode: All
       stageRequirement: Attempted
 
-
+# GangPreemptionHeroWorkloadOpportunisticBatching mirrors the GangPreemptionHeroWorkload workloads
+# with opportunistic batching in action. In every test case above, all pods are unsignable, as the
+# default scheduler configuration spreads them by default, and no two pods would share a signature
+# anyway, as each of them gets a "signature" label of its own.
+# Here, all pods of the Hero PodGroup have the same signature, so that both the regular scheduling
+# pass and the one run for preemption reuse the nodes found for a pod for the pods that follow it.
+- name: GangPreemptionHeroWorkloadOpportunisticBatching
+  featureGates:
+    GenericWorkload: true
+    OpportunisticBatching: true
+  schedulerConfigPath: ../batching/scheduler-config-no-topology.yaml
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+  - opcode: createNamespaces
+    prefix: gang-preempt
+    count: 4
+  # Training (Medium Priority 10000 by default): 30% of cluster
+  - opcode: createPodGroups
+    countParam: $trainingGroups
+    namespace: gang-preempt-1
+    templatePath: templates/podgroup.yaml
+    templateParams:
+      podsPerGroup: $trainingPodsPerGroup
+      priority: $trainingPriority|10000
+      disruptionMode: $disruptionMode
+  - opcode: createPods
+    countParam: $trainingGroups
+    countMultiplierParam: $trainingPodsPerGroup
+    namespace: gang-preempt-1
+    podTemplatePath: templates/gang-pod.yaml
+    templateParams:
+      podsPerGroup: $trainingPodsPerGroup
+      cpuRequest: 2800m
+      hostPortBase: 8000
+      priority: $trainingPriority|10000
+  # Large Batch (Low Priority 100): ~20% of cluster
+  - opcode: createPodGroups
+    countParam: $largeBatchGroups
+    namespace: gang-preempt-2
+    templatePath: templates/podgroup.yaml
+    templateParams:
+      podsPerGroup: $largeBatchPodsPerGroup
+      priority: 100
+      disruptionMode: $disruptionMode
+  - opcode: createPods
+    countParam: $largeBatchGroups
+    countMultiplierParam: $largeBatchPodsPerGroup
+    namespace: gang-preempt-2
+    podTemplatePath: templates/gang-pod.yaml
+    templateParams:
+      podsPerGroup: $largeBatchPodsPerGroup
+      cpuRequest: 2800m
+      hostPortBase: 8000
+      priority: 100
+  # Small Batch (Low Priority 100): ~10% of cluster
+  - opcode: createPodGroups
+    countParam: $smallBatchGroups
+    namespace: gang-preempt-3
+    templatePath: templates/podgroup.yaml
+    templateParams:
+      podsPerGroup: $smallBatchPodsPerGroup
+      priority: 100
+      disruptionMode: $disruptionMode
+  - opcode: createPods
+    countParam: $smallBatchGroups
+    countMultiplierParam: $smallBatchPodsPerGroup
+    namespace: gang-preempt-3
+    podTemplatePath: templates/gang-pod.yaml
+    templateParams:
+      podsPerGroup: $smallBatchPodsPerGroup
+      cpuRequest: 2800m
+      hostPortBase: 8000
+      priority: 100
+  # Hero Workload (High Priority 1000000): 50% of cluster
+  - opcode: createPodGroups
+    countParam: $heroGroups
+    namespace: gang-preempt-0
+    templatePath: templates/podgroup.yaml
+    templateParams:
+      podsPerGroup: $heroPodsPerGroup
+      priority: 1000000
+      disruptionMode: $disruptionMode
+  - opcode: startCollectingMetrics
+    name: gang-preempt-0
+    namespaces: [gang-preempt-0]
+  - opcode: createPods
+    skipWaitToCompletion: true
+    countParam: $heroGroups
+    countMultiplierParam: $heroPodsPerGroup
+    signatureBatchSizeParam: $heroPodsPerGroup
+    namespace: gang-preempt-0
+    podTemplatePath: templates/gang-pod.yaml
+    templateParams:
+      podsPerGroup: $heroPodsPerGroup
+      cpuRequest: 2800m
+      hostPortBase: 9000
+      priority: 1000000
+  - opcode: barrier
+    namespaces: [gang-preempt-0]
+    stageRequirement: $stageRequirement|Scheduled
+  - opcode: stopCollectingMetrics
+  workloads:
+  - name: 10Nodes_Hero5Pods_60PctOccupied
+    labels: [short, integration-test]
+    params:
+      initNodes: 10
+      trainingGroups: 3
+      trainingPodsPerGroup: 1
+      largeBatchGroups: 1
+      largeBatchPodsPerGroup: 2
+      smallBatchGroups: 1
+      smallBatchPodsPerGroup: 1
+      heroGroups: 1
+      heroPodsPerGroup: 5
+      disruptionMode: All
+  # Every victim is a PodGroup that runs on many nodes. Preempting it for one Hero pod changes
+  # the preemption cost of all those nodes, so the nodes have to be evaluated again for the next pod.
+  - name: 4900Nodes_Hero2450Pods_60PctOccupied
+    labels: [performance]
+    params:
+      initNodes: 4900
+      trainingGroups: 3
+      trainingPodsPerGroup: 490
+      largeBatchGroups: 3
+      largeBatchPodsPerGroup: 250
+      smallBatchGroups: 14
+      smallBatchPodsPerGroup: 50
+      heroGroups: 1
+      heroPodsPerGroup: 2450
+      disruptionMode: All
+  # Every victim is a single pod. Preempting it only changes the preemption cost of the node
+  # that the Hero pod goes to, which lets the following pods keep using the nodes found before.
+  - name: 4900Nodes_Hero2450Pods_60PctOccupied_SingleDisruptionMode
+    labels: [performance]
+    params:
+      initNodes: 4900
+      trainingGroups: 3
+      trainingPodsPerGroup: 490
+      largeBatchGroups: 3
+      largeBatchPodsPerGroup: 250
+      smallBatchGroups: 14
+      smallBatchPodsPerGroup: 50
+      heroGroups: 1
+      heroPodsPerGroup: 2450
+      disruptionMode: Single
+  - name: 4900Nodes_Hero2450Pods_SparseVictims
+    labels: [performance]
+    params:
+      initNodes: 4900
+      trainingGroups: 5
+      trainingPodsPerGroup: 490
+      trainingPriority: 2000000
+      largeBatchGroups: 1
+      largeBatchPodsPerGroup: 25
+      smallBatchGroups: 1
+      smallBatchPodsPerGroup: 25
+      heroGroups: 1
+      heroPodsPerGroup: 2450
+      disruptionMode: All
+  - name: 4900Nodes_Hero2450Pods_Unschedulable
+    labels: [performance]
+    params:
+      initNodes: 4900
+      trainingGroups: 5
+      trainingPodsPerGroup: 580
+      trainingPriority: 2000000
+      largeBatchGroups: 3
+      largeBatchPodsPerGroup: 250
+      smallBatchGroups: 14
+      smallBatchPodsPerGroup: 50
+      heroGroups: 1
+      heroPodsPerGroup: 2450
+      disruptionMode: All
+      stageRequirement: Attempted
