@@ -37,6 +37,8 @@ func TestRealFIFO_Metrics(t *testing.T) {
 		actions                     []func(f *cache.RealFIFO)
 		expectedQueuedItems         int
 		expectedLatencyObservations uint64
+		expectedEventsEnqueued      int
+		expectedBatchTerminations   map[cache.BatchTerminationReason]int
 	}{
 		{
 			name:                "empty queue has zero metric",
@@ -48,7 +50,8 @@ func TestRealFIFO_Metrics(t *testing.T) {
 			actions: []func(f *cache.RealFIFO){
 				func(f *cache.RealFIFO) { _ = f.Add(mkFifoObj("foo", "1")) },
 			},
-			expectedQueuedItems: 1,
+			expectedQueuedItems:    1,
+			expectedEventsEnqueued: 1,
 		},
 		{
 			name: "multiple Adds increase metric",
@@ -57,7 +60,8 @@ func TestRealFIFO_Metrics(t *testing.T) {
 				func(f *cache.RealFIFO) { _ = f.Add(mkFifoObj("bar", "2")) },
 				func(f *cache.RealFIFO) { _ = f.Add(mkFifoObj("baz", "3")) },
 			},
-			expectedQueuedItems: 3,
+			expectedQueuedItems:    3,
+			expectedEventsEnqueued: 3,
 		},
 		{
 			name: "Update increases metric",
@@ -65,7 +69,8 @@ func TestRealFIFO_Metrics(t *testing.T) {
 				func(f *cache.RealFIFO) { _ = f.Add(mkFifoObj("foo", "1")) },
 				func(f *cache.RealFIFO) { _ = f.Update(mkFifoObj("foo", "2")) },
 			},
-			expectedQueuedItems: 2,
+			expectedQueuedItems:    2,
+			expectedEventsEnqueued: 2,
 		},
 		{
 			name: "Delete increases metric",
@@ -73,7 +78,8 @@ func TestRealFIFO_Metrics(t *testing.T) {
 				func(f *cache.RealFIFO) { _ = f.Add(mkFifoObj("foo", "1")) },
 				func(f *cache.RealFIFO) { _ = f.Delete(mkFifoObj("foo", "2")) },
 			},
-			expectedQueuedItems: 2,
+			expectedQueuedItems:    2,
+			expectedEventsEnqueued: 2,
 		},
 		{
 			name: "Pop decreases metric and records latency",
@@ -86,6 +92,7 @@ func TestRealFIFO_Metrics(t *testing.T) {
 			},
 			expectedQueuedItems:         1,
 			expectedLatencyObservations: 1,
+			expectedEventsEnqueued:      2,
 		},
 		{
 			name: "PopBatch decreases metric and records latency",
@@ -102,6 +109,8 @@ func TestRealFIFO_Metrics(t *testing.T) {
 			},
 			expectedQueuedItems:         0,
 			expectedLatencyObservations: 1,
+			expectedEventsEnqueued:      3,
+			expectedBatchTerminations:   map[cache.BatchTerminationReason]int{cache.BatchQueueDrained: 1},
 		},
 		{
 			name: "Replace sets metric to new count",
@@ -115,7 +124,8 @@ func TestRealFIFO_Metrics(t *testing.T) {
 				},
 			},
 			// 1 (Add) + 1 (Delete for "old") + 2 (Replace items) = 4
-			expectedQueuedItems: 4,
+			expectedQueuedItems:    4,
+			expectedEventsEnqueued: 4,
 		},
 	}
 
@@ -149,6 +159,9 @@ func TestRealFIFO_Metrics(t *testing.T) {
 
 			// Verify processing latency observations
 			verifyLatencyObservations(t, metricsProvider, "test-fifo", podsGVR, tt.expectedLatencyObservations)
+
+			verifyEventsEnqueued(t, metricsProvider, "test-fifo", podsGVR, tt.expectedEventsEnqueued)
+			verifyBatchTerminations(t, metricsProvider, "test-fifo", podsGVR, tt.expectedBatchTerminations)
 		})
 	}
 }
@@ -461,6 +474,9 @@ type testInformerMetricsProvider struct {
 	gauge                *metrics.GaugeVec
 	histogram            *metrics.HistogramVec
 	storeResourceVersion *metrics.GaugeVec
+	batchSize            *metrics.HistogramVec
+	batchTerminations    *metrics.CounterVec
+	eventsEnqueued       *metrics.CounterVec
 }
 
 func newTestInformerMetricsProvider() *testInformerMetricsProvider {
@@ -496,11 +512,45 @@ func newTestInformerMetricsProvider() *testInformerMetricsProvider {
 	registry.MustRegister(gauge)
 	registry.MustRegister(histogram)
 	registry.MustRegister(storeResourceVersion)
+	batchSize := metrics.NewHistogramVec(
+		&metrics.HistogramOpts{
+			Subsystem:      "informer",
+			Name:           "batch_size",
+			Help:           "Number of deltas popped from the FIFO and processed together as a single batch.",
+			Buckets:        []float64{1, 2, 5, 10, 25, 50, 100, 250, 500, 1000},
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"name", "group", "version", "resource"},
+	)
+	batchTerminations := metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      "informer",
+			Name:           "batch_terminations_total",
+			Help:           "Number of FIFO batches closed, by the reason the batch stopped accumulating deltas.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"name", "group", "version", "resource", "reason"},
+	)
+	eventsEnqueued := metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      "informer",
+			Name:           "events_enqueued_total",
+			Help:           "Number of deltas added to the FIFO.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"name", "group", "version", "resource"},
+	)
+	registry.MustRegister(batchSize)
+	registry.MustRegister(batchTerminations)
+	registry.MustRegister(eventsEnqueued)
 	return &testInformerMetricsProvider{
 		registry:             registry,
 		gauge:                gauge,
 		histogram:            histogram,
 		storeResourceVersion: storeResourceVersion,
+		batchSize:            batchSize,
+		batchTerminations:    batchTerminations,
+		eventsEnqueued:       eventsEnqueued,
 	}
 }
 
@@ -514,6 +564,42 @@ func (p *testInformerMetricsProvider) NewProcessingLatencyMetric(id cache.Inform
 
 func (p *testInformerMetricsProvider) NewStoreResourceVersionMetric(id cache.InformerNameAndResource) cache.GaugeMetric {
 	return p.storeResourceVersion.WithLabelValues(id.Name(), id.GroupVersionResource().Group, id.GroupVersionResource().Version, id.GroupVersionResource().Resource)
+}
+
+func (p *testInformerMetricsProvider) NewBatchSizeMetric(id cache.InformerNameAndResource) cache.HistogramMetric {
+	return p.batchSize.WithLabelValues(id.Name(), id.GroupVersionResource().Group, id.GroupVersionResource().Version, id.GroupVersionResource().Resource)
+}
+
+func (p *testInformerMetricsProvider) NewBatchTerminationMetric(id cache.InformerNameAndResource, reason cache.BatchTerminationReason) cache.CounterMetric {
+	return p.batchTerminations.WithLabelValues(id.Name(), id.GroupVersionResource().Group, id.GroupVersionResource().Version, id.GroupVersionResource().Resource, reason.String())
+}
+
+func (p *testInformerMetricsProvider) NewEventsEnqueuedMetric(id cache.InformerNameAndResource) cache.CounterMetric {
+	return p.eventsEnqueued.WithLabelValues(id.Name(), id.GroupVersionResource().Group, id.GroupVersionResource().Version, id.GroupVersionResource().Resource)
+}
+
+func verifyEventsEnqueued(t *testing.T, metricsProvider *testInformerMetricsProvider, informerName string, gvr schema.GroupVersionResource, expected int) {
+	t.Helper()
+	want := fmt.Sprintf(`# HELP informer_events_enqueued_total [ALPHA] Number of deltas added to the FIFO.
+# TYPE informer_events_enqueued_total counter
+informer_events_enqueued_total{group="%s",name="%s",resource="%s",version="%s"} %d
+`, gvr.Group, informerName, gvr.Resource, gvr.Version, expected)
+	if err := testutil.GatherAndCompare(metricsProvider.registry, strings.NewReader(want), "informer_events_enqueued_total"); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func verifyBatchTerminations(t *testing.T, metricsProvider *testInformerMetricsProvider, informerName string, gvr schema.GroupVersionResource, expected map[cache.BatchTerminationReason]int) {
+	t.Helper()
+	for reason, count := range expected {
+		got, err := testutil.GetCounterMetricValue(metricsProvider.batchTerminations.WithLabelValues(informerName, gvr.Group, gvr.Version, gvr.Resource, reason.String()))
+		if err != nil {
+			t.Fatalf("reading informer_batch_terminations_total{reason=%q}: %v", reason, err)
+		}
+		if int(got) != count {
+			t.Errorf("informer_batch_terminations_total{reason=%q} = %v, want %d", reason, got, count)
+		}
+	}
 }
 
 func verifyQueuedItems(t *testing.T, metricsProvider *testInformerMetricsProvider, informerName string, gvr schema.GroupVersionResource, expected int) {
