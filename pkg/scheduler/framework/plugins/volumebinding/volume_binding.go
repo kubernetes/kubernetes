@@ -71,6 +71,7 @@ func (d *stateData) Clone() fwk.StateData {
 // In the Filter phase, pod binding cache is created for the pod and used in
 // Reserve and PreBind phases.
 type VolumeBinding struct {
+	fh          fwk.Handle
 	Binder      SchedulerVolumeBinder
 	PVCLister   corelisters.PersistentVolumeClaimLister
 	classLister storagelisters.StorageClassLister
@@ -581,6 +582,12 @@ func (pl *VolumeBinding) PreBind(ctx context.Context, cs fwk.CycleState, pod *v1
 	if !ok {
 		return fwk.AsStatus(fmt.Errorf("%w %q", errNoPodVolumeForNode, nodeName))
 	}
+	// Unreserve only reverts assumed cache state, not the API updates below.
+	// Once binding starts, preemption must delete the pod instead of canceling
+	// its binding cycle so that generic ephemeral volumes can be reclaimed.
+	if bindingPod := pl.fh.GetPodInPreBind(pod.UID); bindingPod != nil && !bindingPod.MarkPrebound() {
+		return fwk.AsStatus(context.Cause(ctx))
+	}
 	logger := klog.FromContext(ctx)
 	logger.V(5).Info("Trying to bind volumes for pod", "pod", klog.KObj(pod))
 	err = pl.Binder.BindPodVolumes(ctx, pod, podVolumes)
@@ -646,6 +653,7 @@ func New(ctx context.Context, plArgs runtime.Object, fh fwk.Handle, fts feature.
 		scorer = buildScorerFunction(shape)
 	}
 	return &VolumeBinding{
+		fh:          fh,
 		Binder:      binder,
 		PVCLister:   pvcInformer.Lister(),
 		classLister: storageClassInformer.Lister(),

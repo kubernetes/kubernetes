@@ -1316,6 +1316,56 @@ func TestVolumeBinding(t *testing.T) {
 	}
 }
 
+func TestPreBindPreemption(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		preempted bool
+		allBound  bool
+	}{
+		{name: "before volume binding", preempted: true},
+		{name: "after volume binding starts"},
+		{name: "volumes already bound", allBound: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancelCause(ctx)
+			defer cancel(nil)
+			client := fake.NewClientset()
+			fh, err := runtime.NewFramework(ctx, nil, nil,
+				runtime.WithClientSet(client),
+				runtime.WithInformerFactory(informers.NewSharedInformerFactory(client, 0)),
+				runtime.WithPodsInPreBind(runtime.NewPodsInPreBindMap()))
+			if err != nil {
+				t.Fatal(err)
+			}
+			plugin, err := New(ctx, &config.VolumeBindingArgs{BindTimeoutSeconds: 300}, fh, feature.Features{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			binder := NewFakeVolumeBinder(&FakeVolumeBinderConfig{})
+			pl := plugin.(*VolumeBinding)
+			pl.Binder = binder
+			pod := st.MakePod().Name("victim").UID("victim").Obj()
+			fh.AddPodInPreBind(pod.UID, cancel)
+			bindingPod := fh.GetPodInPreBind(pod.UID)
+			if tc.preempted {
+				bindingPod.CancelPod("preempted")
+			}
+			state := framework.NewCycleState()
+			state.Write(stateKey, &stateData{
+				allBound:         tc.allBound,
+				podVolumesByNode: map[string]*PodVolumes{"node": {}},
+			})
+			status := pl.PreBind(ctx, state, pod, "node")
+			assert.Equal(t, !tc.preempted, status.IsSuccess())
+			assert.Equal(t, !tc.preempted && !tc.allBound, binder.BindCalled)
+			if !tc.preempted {
+				assert.Equal(t, tc.allBound, bindingPod.CancelPod("preempted"), "only pods without volume binding work can be preempted in memory")
+			}
+		})
+	}
+}
+
 func Test_PreBindPreFlight(t *testing.T) {
 	table := []struct {
 		name       string
