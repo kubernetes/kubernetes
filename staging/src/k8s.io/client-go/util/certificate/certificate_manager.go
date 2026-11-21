@@ -434,7 +434,7 @@ func (m *manager) run() {
 	var wg sync.WaitGroup
 	defer wg.Wait()
 
-	templateChanged := make(chan struct{})
+	templateChanged := make(chan struct{}, 1)
 	rotate := func(ctx context.Context) {
 		deadline := m.nextRotationDeadline(logger)
 		if sleepInterval := deadline.Sub(m.now()); sleepInterval > 0 {
@@ -493,7 +493,7 @@ func (m *manager) run() {
 				}
 				select {
 				case templateChanged <- struct{}{}:
-				case <-ctx.Done():
+				default:
 				}
 			}
 		}
