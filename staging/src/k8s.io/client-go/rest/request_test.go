@@ -2105,12 +2105,15 @@ func TestNewWatchEventDecoder(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.WatchListClientConcurrentDecoding, tt.featureEnabled)
-			r := &Request{params: url.Values{
-				"sendInitialEvents": {tt.sendInitialEvents},
-			}}
+			r := NewRequestWithClient(&url.URL{Scheme: "https", Host: "example.com"}, "", defaultContentConfig(), nil).
+				Param("sendInitialEvents", tt.sendInitialEvents)
 			stream := streaming.NewDecoder(io.NopCloser(strings.NewReader("")), scheme.Codecs.UniversalDecoder())
-			decoder := r.newWatchEventDecoder(stream, scheme.Codecs.UniversalDecoder())
+			decoder := r.newWatchEventDecoder(context.Background(), stream, scheme.Codecs.UniversalDecoder(), time.Now())
 			t.Cleanup(decoder.Close)
+			if tt.sendInitialEvents == "true" {
+				require.IsType(t, &watchListLatencyRecordingDecoder{}, decoder)
+				decoder = decoder.(*watchListLatencyRecordingDecoder).Decoder
+			}
 
 			if tt.wantConcurrent {
 				require.IsType(t, &restclientwatch.ConcurrentWatchEventDecoder{}, decoder)

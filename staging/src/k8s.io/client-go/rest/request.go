@@ -762,6 +762,7 @@ func (b *throttledLogger) info(logger klog.Logger, message string, kv ...any) {
 // Watch attempts to begin watching the requested location.
 // Returns a watch.Interface, or an error.
 func (r *Request) Watch(ctx context.Context) (watch.Interface, error) {
+	start := time.Now()
 	if r.body == nil {
 		logBody(klog.FromContext(ctx), 2, "Request Body", r.bodyBytes)
 	}
@@ -800,7 +801,7 @@ func (r *Request) Watch(ctx context.Context) (watch.Interface, error) {
 		resp, err := client.Do(req)
 		retry.After(ctx, r, resp, err)
 		if err == nil && resp.StatusCode == http.StatusOK {
-			return r.newStreamWatcher(ctx, resp)
+			return r.newStreamWatcher(ctx, resp, start)
 		}
 
 		done, transformErr := func() (bool, error) {
@@ -834,7 +835,7 @@ func (r *Request) Watch(ctx context.Context) (watch.Interface, error) {
 	}
 }
 
-func (r *Request) newStreamWatcher(ctx context.Context, resp *http.Response) (watch.Interface, error) {
+func (r *Request) newStreamWatcher(ctx context.Context, resp *http.Response, start time.Time) (watch.Interface, error) {
 	contentType := resp.Header.Get("Content-Type")
 	mediaType, params, err := mime.ParseMediaType(contentType)
 	if err != nil {
@@ -852,18 +853,31 @@ func (r *Request) newStreamWatcher(ctx context.Context, resp *http.Response) (wa
 
 	return watch.NewStreamWatcherWithLogger(
 		klog.FromContext(ctx),
-		r.newWatchEventDecoder(watchEventDecoder, objectDecoder),
+		r.newWatchEventDecoder(ctx, watchEventDecoder, objectDecoder, start),
 		// use 500 to indicate that the cause of the error is unknown - other error codes
 		// are more specific to HTTP interactions, and set a reason
 		errors.NewClientErrorReporter(http.StatusInternalServerError, r.verb, "ClientWatchDecoding"),
 	), nil
 }
 
-func (r *Request) newWatchEventDecoder(streamDecoder streaming.Decoder, objectDecoder runtime.Decoder) watch.Decoder {
-	if clientfeatures.FeatureGates().Enabled(clientfeatures.WatchListClientConcurrentDecoding) && r.params.Get("sendInitialEvents") == "true" {
-		return restclientwatch.NewConcurrentWatchEventDecoder(streamDecoder, objectDecoder)
+func (r *Request) newWatchEventDecoder(ctx context.Context, streamDecoder streaming.Decoder, objectDecoder runtime.Decoder, start time.Time) watch.Decoder {
+	if r.params.Get("sendInitialEvents") != "true" {
+		return restclientwatch.NewDecoder(streamDecoder, objectDecoder)
 	}
-	return restclientwatch.NewDecoder(streamDecoder, objectDecoder)
+
+	var decoder watch.Decoder
+	if clientfeatures.FeatureGates().Enabled(clientfeatures.WatchListClientConcurrentDecoding) {
+		decoder = restclientwatch.NewConcurrentWatchEventDecoder(streamDecoder, objectDecoder)
+	} else {
+		decoder = restclientwatch.NewDecoder(streamDecoder, objectDecoder)
+	}
+	return &watchListLatencyRecordingDecoder{
+		Decoder: decoder,
+		ctx:     ctx,
+		verb:    r.verb,
+		url:     r.finalURLTemplate(),
+		start:   start,
+	}
 }
 
 // updateRequestResultMetric increments the RequestResult metric counter,
