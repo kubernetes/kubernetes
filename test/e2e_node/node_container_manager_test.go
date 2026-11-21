@@ -313,11 +313,12 @@ func runTest(ctx context.Context, f *framework.Framework) error {
 	expectedNAPodCgroup := cm.NewCgroupName(cm.RootCgroupName, nodeAllocatableCgroup)
 
 	// Cleanup from the previous kubelet, to verify the new one creates it correctly
-	if err := cgroupManager.Destroy(klog.Background(), &cm.CgroupConfig{
-		Name: cm.NewCgroupName(expectedNAPodCgroup),
-	}); err != nil {
-		return err
-	}
+	// Destroy waits 30s; systemd can take 90s to kill a leftover container.
+	gomega.Eventually(ctx, func() error {
+		return cgroupManager.Destroy(klog.Background(), &cm.CgroupConfig{
+			Name: cm.NewCgroupName(expectedNAPodCgroup),
+		})
+	}, 2*time.Minute, time.Second).Should(gomega.Succeed())
 	if cgroupManager.Exists(expectedNAPodCgroup) {
 		return fmt.Errorf("Expected Node Allocatable Cgroup %q not to exist", expectedNAPodCgroup)
 	}
@@ -598,11 +599,12 @@ func run1GiHugepagesTest(ctx context.Context, f *framework.Framework) error {
 	restartKubelet := mustStopKubelet(ctx, f)
 
 	expectedNAPodCgroup := cm.NewCgroupName(cm.RootCgroupName, nodeAllocatableCgroup)
-	if err := cgroupManager.Destroy(klog.Background(), &cm.CgroupConfig{
-		Name: cm.NewCgroupName(expectedNAPodCgroup),
-	}); err != nil {
-		return err
-	}
+	// Destroy waits 30s; systemd can take 90s to kill a leftover container.
+	gomega.Eventually(ctx, func() error {
+		return cgroupManager.Destroy(klog.Background(), &cm.CgroupConfig{
+			Name: cm.NewCgroupName(expectedNAPodCgroup),
+		})
+	}, 2*time.Minute, time.Second).Should(gomega.Succeed())
 
 	framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(newCfg))
 	ginkgo.By("Starting the kubelet")
