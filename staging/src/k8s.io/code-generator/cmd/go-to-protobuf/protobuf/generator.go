@@ -309,7 +309,16 @@ func (b bodyGen) doStruct(sw *generator.SnippetWriter) error {
 	var alias *types.Type
 	var fields []protoField
 	options := []string{}
-	allOptions := gengo.ExtractCommentTags("+", b.t.CommentLines)
+	tags, err := gengo.ExtractFunctionStyleCommentTags("+", []string{"protobuf.options.", "protobuf.options.marshal", "protobuf.as", "protobuf.embed"}, b.t.CommentLines)
+	if err != nil {
+		return fmt.Errorf("failed to parse comment tags for %v: %w", b.t, err)
+	}
+	allOptions := map[string][]string{}
+	for _, ts := range tags {
+		for _, t := range ts {
+			allOptions[t.String()] = append(allOptions[t.String()], t.Value)
+		}
+	}
 	for k, v := range allOptions {
 		switch {
 		case strings.HasPrefix(k, "protobuf.options."):

@@ -19,9 +19,11 @@ package util
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 
-	"k8s.io/gengo/v2"
+	genutil "k8s.io/code-generator/pkg/util"
+	"k8s.io/gengo/v2/codetags"
 )
 
 var supportedTags = []string{
@@ -34,6 +36,10 @@ var supportedTags = []string{
 	"genclient:readonly",
 	"genclient:method",
 }
+
+// legacyTags are the unprefixed spellings, which are only read to report that
+// they are no longer valid.
+var legacyTags = []string{"nonNamespaced", "readonly"}
 
 // SupportedVerbs is a list of supported verbs for +onlyVerbs and +skipVerbs.
 var SupportedVerbs = []string{
@@ -194,7 +200,12 @@ func MustParseClientGenTags(lines []string) Tags {
 // tags are provided.
 func ParseClientGenTags(lines []string) (Tags, error) {
 	ret := Tags{}
-	values := gengo.ExtractCommentTags("+", lines)
+	// Filter by name: the strict parser would otherwise fail on unrelated tags
+	// sharing the type's comments, such as +protobuf.options.(...)=false.
+	values, err := genutil.ExtractCommentTagsWithoutArguments("+", append(slices.Clone(supportedTags), legacyTags...), lines)
+	if err != nil {
+		return ret, err
+	}
 	var value []string
 	value, ret.GenerateClient = values["genclient"]
 	// Check the old format and error when used to avoid generating client when //+genclient=false
@@ -244,11 +255,10 @@ func ParseClientGenTags(lines []string) (Tags, error) {
 		}
 		ret.SkipVerbs = skipVerbs
 	}
-	var err error
 	if ret.Extensions, err = parseClientExtensions(values); err != nil {
 		return ret, err
 	}
-	return ret, validateClientGenTags(values)
+	return ret, validateClientGenTags(lines)
 }
 
 func parseClientExtensions(tags map[string][]string) ([]extension, error) {
@@ -332,14 +342,12 @@ func parseClientExtensions(tags map[string][]string) ([]extension, error) {
 	return ret, nil
 }
 
-// validateTags validates that only supported genclient tags were provided.
-func validateClientGenTags(values map[string][]string) error {
-	for _, k := range supportedTags {
-		delete(values, k)
-	}
-	for key := range values {
-		if strings.HasPrefix(key, strings.TrimSuffix(genClientPrefix, ":")) {
-			return errors.New("unknown tag detected: " + key)
+// validateClientGenTags validates that only supported genclient tags were provided.
+// It only looks at tag names, so unrelated tags are never parsed.
+func validateClientGenTags(lines []string) error {
+	for name := range codetags.Extract("+", lines) {
+		if strings.HasPrefix(name, strings.TrimSuffix(genClientPrefix, ":")) && !slices.Contains(supportedTags, name) {
+			return errors.New("unknown tag detected: " + name)
 		}
 	}
 	return nil
