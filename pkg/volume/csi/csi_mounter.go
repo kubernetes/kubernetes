@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -167,7 +168,7 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 
 		fsType = pvSrc.FSType
 
-		volAttribs = pvSrc.VolumeAttributes
+		volAttribs = maps.Clone(pvSrc.VolumeAttributes)
 
 		if pvSrc.NodePublishSecretRef != nil {
 			secretRef = pvSrc.NodePublishSecretRef
@@ -298,6 +299,19 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 		return err
 	}
 
+	if deviceMountPath != "" {
+		data, recovery, err := loadStageRecovery(deviceMountPath)
+		if err != nil && c.plugin.stageRecoveryEnabled(string(c.driverName)) {
+			return volumetypes.NewTransientOperationFailure(err.Error())
+		}
+		if recovery != nil && recovery.Pending {
+			if !matchingStageRecovery(data, recovery, c.spec) {
+				return volumetypes.NewTransientOperationFailure("CSI stage recovery volume identity changed")
+			}
+			return volumetypes.NewStageRecoveryRequiredError(volumetypes.NewTransientOperationFailure("CSI stage recovery is pending"))
+		}
+	}
+
 	csiRPCError := csi.NodePublishVolume(
 		ctx,
 		volumeHandle,
@@ -322,6 +336,8 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 		if volumetypes.IsOperationFinishedError(csiRPCError) && !mounterArgs.ReconstructedVolume && !mounterArgs.IsRemount {
 			if removeMountDirErr := removeMountDir(c.plugin, dir); removeMountDirErr != nil {
 				klog.Error(log("mounter.SetupAt failed to remove mount dir after a NodePublish() error [%s]: %v", dir, removeMountDirErr))
+			} else {
+				return c.requestStageRecovery(ctx, csi, deviceMountPath, dir, csiRPCError)
 			}
 		}
 		return csiRPCError
