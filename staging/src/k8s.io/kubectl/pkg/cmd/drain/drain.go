@@ -428,6 +428,7 @@ func (o *DrainCmdOptions) RunCordonOrUncordon(ctx context.Context, desired bool)
 		cordonOrUncordon = "un" + cordonOrUncordon
 	}
 
+	var errs []error
 	for _, nodeInfo := range o.nodeInfos {
 		printError := func(err error) {
 			fmt.Fprintf(o.ErrOut, "error: unable to %s node %q: %v\n", cordonOrUncordon, nodeInfo.Name, err)
@@ -437,6 +438,7 @@ func (o *DrainCmdOptions) RunCordonOrUncordon(ctx context.Context, desired bool)
 		if gvk.Kind == "Node" {
 			c, err := drain.NewCordonHelperFromRuntimeObject(nodeInfo.Object, scheme.Scheme, gvk)
 			if err != nil {
+				errs = append(errs, fmt.Errorf("unable to %s node %q: %w", cordonOrUncordon, nodeInfo.Name, err))
 				printError(err)
 				continue
 			}
@@ -458,6 +460,7 @@ func (o *DrainCmdOptions) RunCordonOrUncordon(ctx context.Context, desired bool)
 						printError(patchErr)
 					}
 					if err != nil {
+						errs = append(errs, fmt.Errorf("unable to %s node %q: %w", cordonOrUncordon, nodeInfo.Name, err))
 						printError(err)
 						continue
 					}
@@ -482,7 +485,7 @@ func (o *DrainCmdOptions) RunCordonOrUncordon(ctx context.Context, desired bool)
 		}
 	}
 
-	return nil
+	return utilerrors.NewAggregate(errs)
 }
 
 func (o *DrainCmdOptions) reportCondition(ctx context.Context, nodeName string, event drain.NodeConditionEvent) {
