@@ -17,6 +17,7 @@ limitations under the License.
 package certificate
 
 import (
+	"context"
 	"crypto/tls"
 	"fmt"
 	"net"
@@ -37,6 +38,9 @@ import (
 
 // UpdateTransport instruments a restconfig with a transport that dynamically uses
 // certificates provided by the manager for TLS client auth.
+//
+// If no certificate is initially available, connections wait until initial
+// certificate activation completes. Certificate enrollment must use a separate client.
 //
 // The config must not already provide an explicit transport.
 //
@@ -103,6 +107,24 @@ func addCertRotation(logger klog.Logger, stopCh <-chan struct{}, period time.Dur
 	var hasCert atomic.Bool
 	hasCert.Store(lastCert != nil)
 
+	dialContext := d.DialContext
+	var initialCertReady chan struct{}
+	if lastCert == nil {
+		initialCertReady = make(chan struct{})
+		dialContext = func(ctx context.Context, network, address string) (net.Conn, error) {
+			// Do not open a connection with the initial certificate until its
+			// rotation has finished closing existing connections.
+			select {
+			case <-initialCertReady:
+				return d.DialContext(ctx, network, address)
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case <-stopCh:
+				return nil, fmt.Errorf("certificate rotation stopped before initial certificate became available")
+			}
+		}
+	}
+
 	checkLock := &sync.Mutex{}
 	checkNewCertificateAndRotate := func() {
 		// don't run concurrently
@@ -142,7 +164,6 @@ func addCertRotation(logger klog.Logger, stopCh <-chan struct{}, period time.Dur
 			return
 		}
 		lastCert = curr
-		hasCert.Store(lastCert != nil)
 
 		logger.Info("Certificate rotation detected, shutting down client connections to start using new credentials")
 		// The cert has been rotated. Close all existing connections to force the client
@@ -150,6 +171,9 @@ func addCertRotation(logger klog.Logger, stopCh <-chan struct{}, period time.Dur
 		//
 		// See: https://github.com/kubernetes-incubator/bootkube/pull/663#issuecomment-318506493
 		d.CloseAll()
+		if !hasCert.Swap(true) {
+			close(initialCertReady)
+		}
 	}
 
 	// start long-term check
@@ -168,7 +192,7 @@ func addCertRotation(logger klog.Logger, stopCh <-chan struct{}, period time.Dur
 		TLSHandshakeTimeout: 10 * time.Second,
 		TLSClientConfig:     tlsConfig,
 		MaxIdleConnsPerHost: 25,
-		DialContext:         d.DialContext,
+		DialContext:         dialContext,
 	})
 
 	// Zero out all existing TLS options since our new transport enforces them.
