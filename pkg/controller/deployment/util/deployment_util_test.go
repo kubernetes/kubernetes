@@ -1220,6 +1220,28 @@ func TestAnnotationUtils(t *testing.T) {
 	//Tear Down
 }
 
+func TestRevisionOverflowAndNegative(t *testing.T) {
+	rsMax := generateRS(generateDeployment("nginx"))
+	rsMax.Annotations = map[string]string{RevisionAnnotation: fmt.Sprintf("%d", math.MaxInt64)}
+	if _, err := Revision(&rsMax); err == nil {
+		t.Errorf("Revision(math.MaxInt64) should return an error")
+	}
+
+	rsNegative := generateRS(generateDeployment("nginx"))
+	rsNegative.Annotations = map[string]string{RevisionAnnotation: "-1"}
+	if _, err := Revision(&rsNegative); err == nil {
+		t.Errorf("Revision(-1) should return an error")
+	}
+
+	logger, _ := ktesting.NewTestContext(t)
+	rsMax2 := generateRS(generateDeployment("nginx2"))
+	rsMax2.Annotations = map[string]string{RevisionAnnotation: fmt.Sprintf("%d", math.MaxInt64)}
+	rsMax2.Name = "rs-max"
+	if got := MaxRevision(logger, []*apps.ReplicaSet{&rsMax2}); got != 0 {
+		t.Errorf("MaxRevision should ignore math.MaxInt64 revision, got %d", got)
+	}
+}
+
 func TestReplicasAnnotationsNeedUpdate(t *testing.T) {
 
 	desiredReplicas := fmt.Sprintf("%d", int32(10))
