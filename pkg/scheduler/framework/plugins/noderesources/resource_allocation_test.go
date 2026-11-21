@@ -17,11 +17,14 @@ limitations under the License.
 package noderesources
 
 import (
+	"context"
+	"fmt"
 	"math"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/stretchr/testify/assert"
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
@@ -30,6 +33,7 @@ import (
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/version"
+	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
@@ -692,340 +696,6 @@ func newTestDRAManager(tCtx ktesting.TContext, objects ...apiruntime.Object) *dy
 	return draManager
 }
 
-// getCachedDeviceMatch checks the cache for a DeviceMatches result
-// returns (matches, found)
-func (r *resourceAllocationScorer) getCachedDeviceMatch(expression string, driver string, poolName string, deviceName string) (bool, bool) {
-	key := buildDeviceMatchCacheKey(expression, driver, poolName, deviceName)
-
-	if value, ok := r.deviceMatchCache.Load(key); ok {
-		return value.(bool), true
-	}
-
-	return false, false
-}
-
-// setCachedDeviceMatch stores a DeviceMatches result in the cache
-func (r *resourceAllocationScorer) setCachedDeviceMatch(expression string, driver string, poolName string, deviceName string, matches bool) {
-	key := buildDeviceMatchCacheKey(expression, driver, poolName, deviceName)
-	r.deviceMatchCache.Store(key, matches)
-}
-
-func TestDeviceMatchCaching(t *testing.T) {
-	// Create a scorer with caching enabled
-	scorer := &resourceAllocationScorer{
-		DRACaches: DRACaches{
-			celCache: cel.NewCache(10, cel.Features{}),
-		},
-	}
-
-	expression := `device.attributes["example.com"].test_attr == "test-value"`
-	driverName := "example.com/test-driver"
-	poolName := "example-pool"
-	deviceName := "device-1"
-
-	// Test cache operations
-	// Initially, cache should be empty
-	matches, found := scorer.getCachedDeviceMatch(expression, driverName, poolName, deviceName)
-	if found {
-		t.Errorf("Cache should be empty initially, but found an entry")
-	}
-	if matches {
-		t.Errorf("Matches should be false initially, but got true")
-	}
-
-	// Store a result in cache
-	scorer.setCachedDeviceMatch(expression, driverName, poolName, deviceName, true)
-
-	// Retrieve from cache
-	matches, found = scorer.getCachedDeviceMatch(expression, driverName, poolName, deviceName)
-	if !found {
-		t.Errorf("Result should be found in cache, but was not")
-	}
-	if !matches {
-		t.Errorf("Cached result should match what we stored, expected true but got false")
-	}
-
-	// Test caching with error
-	scorer.setCachedDeviceMatch(expression, driverName, poolName, deviceName, false)
-
-	matches, found = scorer.getCachedDeviceMatch(expression, driverName, poolName, deviceName)
-	if !found {
-		t.Errorf("Result should be found in cache")
-	}
-	if matches {
-		t.Errorf("Cached result should match what we stored, expected false but got true")
-	}
-
-	// Test that different devices have different cache keys
-	matches, found = scorer.getCachedDeviceMatch(expression, driverName, poolName, "device-2")
-	if found {
-		t.Errorf("Different device should not hit cache")
-	}
-	if matches {
-		t.Errorf("Matches should be false for uncached entry")
-	}
-
-	// Test that different pools have different cache keys
-	matches, found = scorer.getCachedDeviceMatch(expression, driverName, "other-pool", deviceName)
-	if found {
-		t.Errorf("Different pool should not hit cache")
-	}
-	if matches {
-		t.Errorf("Matches should be false for uncached entry")
-	}
-}
-
-func BenchmarkDeviceMatchCaching(b *testing.B) {
-	expression := `device.attributes["example.com"].test_attr == "test-value"`
-	driverName := "example.com/test-driver"
-	poolName := "example-pool"
-	deviceName := "device-1"
-
-	// Create a scorer with caching enabled
-	scorer := &resourceAllocationScorer{
-		DRACaches: DRACaches{
-			celCache: cel.NewCache(10, cel.Features{}),
-		},
-	}
-
-	b.Run("WithoutCache", func(b *testing.B) {
-		// Disable caching by creating a new scorer each time
-		for i := 0; i < b.N; i++ {
-			freshScorer := &resourceAllocationScorer{
-				DRACaches: DRACaches{
-					celCache: cel.NewCache(10, cel.Features{}),
-				},
-			}
-
-			// This will always be a cache miss
-			_, _ = freshScorer.getCachedDeviceMatch(expression, driverName, poolName, deviceName)
-		}
-	})
-
-	b.Run("WithCache", func(b *testing.B) {
-		// Pre-warm the cache
-		scorer.setCachedDeviceMatch(expression, driverName, poolName, deviceName, true)
-
-		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
-			// This should always be a cache hit
-			_, _ = scorer.getCachedDeviceMatch(expression, driverName, poolName, deviceName)
-		}
-	})
-}
-
-// getCachedNodeMatch checks the cache for a NodeMatches result
-func (r *resourceAllocationScorer) getCachedNodeMatch(nodeName string, nodeNameToMatch string, allNodesMatch bool, nodeSelectorHash string) (bool, bool) {
-	key := buildNodeMatchCacheKey(nodeName, nodeNameToMatch, allNodesMatch, nodeSelectorHash)
-
-	if value, ok := r.nodeMatchCache.Load(key); ok {
-		return value.(bool), true
-	}
-
-	return false, false
-}
-
-// setCachedNodeMatch stores a NodeMatches result in the cache
-func (r *resourceAllocationScorer) setCachedNodeMatch(nodeName string, nodeNameToMatch string, allNodesMatch bool, nodeSelectorHash string, matches bool) {
-	key := buildNodeMatchCacheKey(nodeName, nodeNameToMatch, allNodesMatch, nodeSelectorHash)
-	r.nodeMatchCache.Store(key, matches)
-}
-
-func TestNodeMatchCaching(t *testing.T) {
-	// Create a scorer with caching enabled
-	scorer := &resourceAllocationScorer{
-		DRACaches: DRACaches{
-			celCache: cel.NewCache(10, cel.Features{}),
-		},
-	}
-
-	// Create test node
-	testNode := &v1.Node{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "test-node-1",
-			Labels: map[string]string{
-				"zone":          "us-east-1a",
-				"instance.type": "gpu-xlarge",
-			},
-		},
-	}
-
-	// Test cases for different NodeMatches scenarios
-	testCases := []struct {
-		name            string
-		nodeNameToMatch string
-		allNodesMatch   bool
-		nodeSelector    *v1.NodeSelector
-		expectedMatch   bool
-	}{
-		{
-			name:            "exact node name match",
-			nodeNameToMatch: "test-node-1",
-			allNodesMatch:   false,
-			nodeSelector:    nil,
-			expectedMatch:   true,
-		},
-		{
-			name:            "node name mismatch",
-			nodeNameToMatch: "different-node",
-			allNodesMatch:   false,
-			nodeSelector:    nil,
-			expectedMatch:   false,
-		},
-		{
-			name:            "all nodes match",
-			nodeNameToMatch: "",
-			allNodesMatch:   true,
-			nodeSelector:    nil,
-			expectedMatch:   true,
-		},
-		{
-			name:            "node selector match",
-			nodeNameToMatch: "",
-			allNodesMatch:   false,
-			nodeSelector: &v1.NodeSelector{
-				NodeSelectorTerms: []v1.NodeSelectorTerm{
-					{
-						MatchExpressions: []v1.NodeSelectorRequirement{
-							{
-								Key:      "zone",
-								Operator: v1.NodeSelectorOpIn,
-								Values:   []string{"us-east-1a", "us-east-1b"},
-							},
-						},
-					},
-				},
-			},
-			expectedMatch: true,
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			nodeSelectorStr := tc.nodeSelector.String()
-
-			// First call should be a cache miss
-			_, found1 := scorer.getCachedNodeMatch(testNode.Name, tc.nodeNameToMatch, tc.allNodesMatch, nodeSelectorStr)
-			assert.False(t, found1, "Cache should be empty initially")
-
-			// Simulate setting a cached result
-			scorer.setCachedNodeMatch(testNode.Name, tc.nodeNameToMatch, tc.allNodesMatch, nodeSelectorStr, tc.expectedMatch)
-
-			// Second call should be a cache hit
-			matches2, found2 := scorer.getCachedNodeMatch(testNode.Name, tc.nodeNameToMatch, tc.allNodesMatch, nodeSelectorStr)
-			assert.True(t, found2, "Result should be found in cache")
-			assert.Equal(t, tc.expectedMatch, matches2, "Cached result should match expected value")
-		})
-	}
-}
-
-func TestNodeMatchesCacheHit(t *testing.T) {
-	scorer := &resourceAllocationScorer{
-		DRACaches: DRACaches{
-			celCache: cel.NewCache(1, cel.Features{}),
-		},
-	}
-
-	node := st.MakeNode().Name("cache-node").Label("zone", "us-east-1a").Obj()
-	selector := &v1.NodeSelector{
-		NodeSelectorTerms: []v1.NodeSelectorTerm{
-			{
-				MatchExpressions: []v1.NodeSelectorRequirement{
-					{
-						Key:      "zone",
-						Operator: v1.NodeSelectorOpIn,
-						Values:   []string{"us-east-1a"},
-					},
-				},
-			},
-		},
-	}
-
-	firstMatch, err := scorer.nodeMatches(node, "", false, selector)
-	if err != nil {
-		t.Fatalf("unexpected error while evaluating selector: %v", err)
-	}
-	if !firstMatch {
-		t.Fatalf("expected nodeMatches to return true for the selector")
-	}
-
-	secondMatch, err := scorer.nodeMatches(node, "", false, selector)
-	if err != nil {
-		t.Fatalf("unexpected error while hitting cache: %v", err)
-	}
-	if !secondMatch {
-		t.Fatalf("expected cached nodeMatches to be true")
-	}
-}
-
-func BenchmarkNodeMatchCaching(b *testing.B) {
-	// Create test node
-	testNode := &v1.Node{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "test-node-1",
-			Labels: map[string]string{
-				"zone":          "us-east-1a",
-				"instance.type": "gpu-xlarge",
-			},
-		},
-	}
-
-	// Create a complex NodeSelector to make the test meaningful
-	nodeSelector := &v1.NodeSelector{
-		NodeSelectorTerms: []v1.NodeSelectorTerm{
-			{
-				MatchExpressions: []v1.NodeSelectorRequirement{
-					{
-						Key:      "zone",
-						Operator: v1.NodeSelectorOpIn,
-						Values:   []string{"us-east-1a", "us-east-1b", "us-west-2a"},
-					},
-					{
-						Key:      "instance.type",
-						Operator: v1.NodeSelectorOpExists,
-					},
-				},
-			},
-		},
-	}
-
-	b.Run("WithoutCache", func(b *testing.B) {
-		nodeSelectorStr := nodeSelector.String()
-
-		// Create a new scorer for each iteration to avoid caching
-		for i := 0; i < b.N; i++ {
-			freshScorer := &resourceAllocationScorer{
-				DRACaches: DRACaches{
-					celCache: cel.NewCache(10, cel.Features{}),
-				},
-			}
-
-			// This will always be a cache miss
-			_, _ = freshScorer.getCachedNodeMatch(testNode.Name, "", false, nodeSelectorStr)
-		}
-	})
-
-	b.Run("WithCache", func(b *testing.B) {
-		nodeSelectorStr := nodeSelector.String()
-
-		// Create a scorer and pre-warm the cache
-		scorer := &resourceAllocationScorer{
-			DRACaches: DRACaches{
-				celCache: cel.NewCache(10, cel.Features{}),
-			},
-		}
-
-		// Pre-warm the cache
-		scorer.setCachedNodeMatch(testNode.Name, "", false, nodeSelectorStr, true)
-
-		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
-			// This should always be a cache hit
-			_, _ = scorer.getCachedNodeMatch(testNode.Name, "", false, nodeSelectorStr)
-		}
-	})
-}
-
 func TestCalculateNodeAllocatableRequestSaturatesRequested(t *testing.T) {
 	// Adding the scored pod to a node total already at MaxInt64 must not wrap it
 	// negative, which would read as free capacity.
@@ -1070,4 +740,529 @@ func TestCalculateNodeAllocatableRequestSaturatesRequested(t *testing.T) {
 			t.Errorf("%s: requested = %d, want MaxInt64; a wrap to a negative reads as spare capacity", name, requested[i])
 		}
 	}
+}
+
+// TestDRAMatchCachesAcrossCycles verifies that changing selector inputs does not
+// reuse stale results, while unchanged inputs remain cached across cycles.
+func TestDRAMatchCachesAcrossCycles(t *testing.T) {
+	testDRAMatchCachesAcrossCycles(ktesting.Init(t))
+}
+
+func testDRAMatchCachesAcrossCycles(tCtx ktesting.TContext) {
+	const (
+		nodeName   = "match-cache-node"
+		driverName = "test-driver"
+	)
+	resource := v1.ResourceName(extendedResourceName)
+	celClass := &resourceapi.DeviceClass{
+		ObjectMeta: metav1.ObjectMeta{Name: "cel-class"},
+		Spec: resourceapi.DeviceClassSpec{
+			ExtendedResourceName: &extendedResourceName,
+			Selectors: []resourceapi.DeviceSelector{{
+				CEL: &resourceapi.CELDeviceSelector{
+					Expression: `device.driver == "test-driver" && device.attributes["test-driver"].model == "SOME-GOOD"`,
+				},
+			}},
+		},
+	}
+	draFeatures := structured.Features{
+		AdminAccess:          true,
+		PrioritizedList:      true,
+		PartitionableDevices: true,
+		DeviceTaints:         true,
+		ConsumableCapacity:   true,
+	}
+	var generation int64
+	sliceWithModel := func(model string) *resourceapi.ResourceSlice {
+		slice := st.MakeResourceSlice(nodeName, driverName).Obj()
+		generation++
+		slice.UID = "match-cache-slice"
+		slice.Generation = generation
+		slice.Spec.Devices = append(slice.Spec.Devices, resourceapi.Device{
+			Name: "device-1",
+			Attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+				"model": {StringValue: new(model)},
+			},
+		})
+		return slice
+	}
+	pod := st.MakePod().Name("pod").Obj()
+	podWithRequests := st.MakePod().Name("pod").Req(map[v1.ResourceName]string{v1.ResourceCPU: "100m"}).Obj()
+	node := st.MakeNode().Name(nodeName).Obj()
+	enableFeature := func(tCtx ktesting.TContext) {
+		featuregatetesting.SetFeatureGateDuringTest(tCtx, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, true)
+	}
+	capacityViaFit := func(tCtx ktesting.TContext, f *Fit, pod *v1.Pod, node *v1.Node) int64 {
+		cycleState := framework.NewCycleState()
+		if status := f.PreScore(tCtx, cycleState, pod, nil); !status.IsSuccess() {
+			tCtx.Fatalf("PreScore failed: %v", status)
+		}
+		state, err := getPreScoreState(cycleState)
+		if err != nil {
+			tCtx.Fatal(err)
+		}
+		nodeInfo := framework.NewNodeInfo()
+		nodeInfo.SetNode(node)
+		allocatable, _ := f.calculateResourceAllocatableRequest(tCtx, nodeInfo, resource, state.draPreScoreState)
+		return allocatable
+	}
+	capacityViaBalancedAllocation := func(tCtx ktesting.TContext, ba *BalancedAllocation, pod *v1.Pod, node *v1.Node) int64 {
+		cycleState := framework.NewCycleState()
+		if status := ba.PreScore(tCtx, cycleState, pod, nil); !status.IsSuccess() {
+			tCtx.Fatalf("PreScore failed: %v", status)
+		}
+		state, err := getBalancedAllocationPreScoreState(cycleState)
+		if err != nil {
+			tCtx.Fatal(err)
+		}
+		nodeInfo := framework.NewNodeInfo()
+		nodeInfo.SetNode(node)
+		allocatable, _ := ba.calculateResourceAllocatableRequest(tCtx, nodeInfo, resource, state.draPreScoreState)
+		return allocatable
+	}
+
+	tCtx.SyncTest("device attributes changed between cycles", func(tCtx ktesting.TContext) {
+		enableFeature(tCtx)
+		f := &Fit{
+			enableDRAExtendedResource: true,
+			resourceAllocationScorer: &resourceAllocationScorer{
+				enableDRAExtendedResource: true,
+				draManager:                newTestDRAManager(tCtx, celClass, sliceWithModel("SOME-GOOD")),
+				draFeatures:               draFeatures,
+				resources:                 []config.ResourceSpec{{Name: string(resource)}},
+				DRACaches:                 DRACaches{celCache: cel.NewCache(10, cel.Features{})},
+			},
+		}
+		if got := capacityViaFit(tCtx, f, pod, node); got != 1 {
+			tCtx.Errorf("first cycle: expected capacity 1, got %d", got)
+		}
+		before, ok := f.deviceMatchCache.Load(types.UID("match-cache-slice"))
+		if !ok {
+			tCtx.Fatal("first cycle did not cache the slice")
+		}
+		if got := capacityViaFit(tCtx, f, pod, node); got != 1 {
+			tCtx.Errorf("unchanged cycle: capacity %d, want 1", got)
+		}
+		after, _ := f.deviceMatchCache.Load(types.UID("match-cache-slice"))
+		if before != after {
+			tCtx.Error("PreScore discarded unchanged slice results")
+		}
+
+		// The driver re-publishes the slice for the same pool with a changed
+		// device attribute, so the device no longer matches the class.
+		f.draManager = newTestDRAManager(tCtx, celClass, sliceWithModel("SOME-BAD"))
+		if got := capacityViaFit(tCtx, f, pod, node); got != 0 {
+			tCtx.Errorf("after attribute change: expected capacity 0, got %d (stale match result reused)", got)
+		}
+	})
+
+	tCtx.SyncTest("node labels changed between cycles", func(tCtx ktesting.TContext) {
+		enableFeature(tCtx)
+		slice := st.MakeResourceSliceWithPerDeviceNodeSelection("match-cache-pool", driverName).Obj()
+		slice.Spec.Devices = append(slice.Spec.Devices, resourceapi.Device{
+			Name: "device-1",
+			NodeSelector: &v1.NodeSelector{
+				NodeSelectorTerms: []v1.NodeSelectorTerm{{
+					MatchExpressions: []v1.NodeSelectorRequirement{{
+						Key:      "zone",
+						Operator: v1.NodeSelectorOpIn,
+						Values:   []string{"us-east-1a"},
+					}},
+				}},
+			},
+			Attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+				"model": {StringValue: new("SOME-GOOD")},
+			},
+		})
+		draManager := newTestDRAManager(tCtx, celClass, slice)
+		f := &Fit{
+			enableDRAExtendedResource: true,
+			resourceAllocationScorer: &resourceAllocationScorer{
+				enableDRAExtendedResource: true,
+				draManager:                draManager,
+				draFeatures:               draFeatures,
+				resources:                 []config.ResourceSpec{{Name: string(resource)}},
+				DRACaches:                 DRACaches{celCache: cel.NewCache(10, cel.Features{})},
+			},
+		}
+		ba := &BalancedAllocation{resourceAllocationScorer: resourceAllocationScorer{
+			enableDRAExtendedResource: true,
+			draManager:                draManager,
+			draFeatures:               draFeatures,
+			resources:                 []config.ResourceSpec{{Name: string(v1.ResourceCPU)}, {Name: string(resource)}},
+			DRACaches:                 DRACaches{celCache: cel.NewCache(10, cel.Features{})},
+		}}
+		for _, step := range []struct {
+			label string
+			want  int64
+		}{
+			{"", 0}, {"us-east-1a", 1}, {"us-east-1b", 0}, {"us-east-1a", 1}, {"", 0},
+		} {
+			node := st.MakeNode().Name(nodeName).Obj()
+			if step.label != "" {
+				node.Labels = map[string]string{"zone": step.label}
+			}
+			if got := capacityViaFit(tCtx, f, pod, node); got != step.want {
+				tCtx.Errorf("Fit with zone %q: capacity %d, want %d", step.label, got, step.want)
+			}
+			if got := capacityViaBalancedAllocation(tCtx, ba, podWithRequests, node); got != step.want {
+				tCtx.Errorf("BalancedAllocation with zone %q: capacity %d, want %d", step.label, got, step.want)
+			}
+		}
+	})
+
+	tCtx.SyncTest("device attributes changed between cycles (balanced allocation)", func(tCtx ktesting.TContext) {
+		enableFeature(tCtx)
+		// The pod has a CPU request, so BalancedAllocation must not skip it
+		// as best-effort (it checks the requests of its own resource list).
+		ba := &BalancedAllocation{
+			resourceAllocationScorer: resourceAllocationScorer{
+				enableDRAExtendedResource: true,
+				draManager:                newTestDRAManager(tCtx, celClass, sliceWithModel("SOME-GOOD")),
+				draFeatures:               draFeatures,
+				resources:                 []config.ResourceSpec{{Name: string(v1.ResourceCPU)}, {Name: string(resource)}},
+				DRACaches:                 DRACaches{celCache: cel.NewCache(10, cel.Features{})},
+			},
+		}
+		if got := capacityViaBalancedAllocation(tCtx, ba, podWithRequests, node); got != 1 {
+			tCtx.Errorf("first cycle: expected capacity 1, got %d", got)
+		}
+		before, ok := ba.deviceMatchCache.Load(types.UID("match-cache-slice"))
+		if !ok {
+			tCtx.Fatal("first cycle did not cache the slice")
+		}
+		if got := capacityViaBalancedAllocation(tCtx, ba, podWithRequests, node); got != 1 {
+			tCtx.Errorf("unchanged cycle: capacity %d, want 1", got)
+		}
+		after, _ := ba.deviceMatchCache.Load(types.UID("match-cache-slice"))
+		if before != after {
+			tCtx.Error("PreScore discarded unchanged slice results")
+		}
+
+		ba.draManager = newTestDRAManager(tCtx, celClass, sliceWithModel("SOME-BAD"))
+		if got := capacityViaBalancedAllocation(tCtx, ba, podWithRequests, node); got != 0 {
+			tCtx.Errorf("after attribute change: expected capacity 0, got %d (stale match result reused)", got)
+		}
+	})
+}
+
+func TestDRAMatchCachesWithoutPreScore(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	for _, balanced := range []bool{false, true} {
+		name := "fit"
+		if balanced {
+			name = "balanced allocation"
+		}
+		tCtx.SyncTest(name, func(tCtx ktesting.TContext) {
+			featuregatetesting.SetFeatureGateDuringTest(tCtx, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, true)
+			class := &resourceapi.DeviceClass{
+				ObjectMeta: metav1.ObjectMeta{Name: "fallback-class"},
+				Spec: resourceapi.DeviceClassSpec{
+					ExtendedResourceName: &extendedResourceName,
+					Selectors: []resourceapi.DeviceSelector{{CEL: &resourceapi.CELDeviceSelector{
+						Expression: `device.attributes["test-driver"].model == "GOOD"`,
+					}}},
+				},
+			}
+			scorer := &resourceAllocationScorer{
+				enableDRAExtendedResource: true,
+				resources:                 []config.ResourceSpec{{Name: string(v1.ResourceCPU)}, {Name: extendedResourceName}},
+				// Expose DRA capacity through Score so the assertion does not depend on a scoring strategy.
+				scorer:    func(_, _, allocatable []int64) int64 { return allocatable[1] },
+				DRACaches: DRACaches{celCache: cel.NewCache(10, cel.Features{})},
+			}
+			pod := st.MakePod().Name("pod").Req(map[v1.ResourceName]string{v1.ResourceCPU: "100m", v1.ResourceName(extendedResourceName): "1"}).Obj()
+			nodeInfo := framework.NewNodeInfo()
+			nodeInfo.SetNode(st.MakeNode().Name("fallback-node").Obj())
+			fit := &Fit{enableDRAExtendedResource: true, resourceAllocationScorer: scorer}
+			ba := &BalancedAllocation{resourceAllocationScorer: resourceAllocationScorer{
+				enableDRAExtendedResource: true,
+				resources:                 scorer.resources,
+				scorer:                    scorer.scorer,
+				DRACaches:                 DRACaches{celCache: scorer.celCache},
+			}}
+			for i, tc := range []struct {
+				model string
+				want  int64
+			}{{"GOOD", 1}, {"BAD", 0}, {"GOOD", 1}} {
+				slice := st.MakeResourceSlice("fallback-node", "test-driver").Obj()
+				slice.Spec.Devices = []resourceapi.Device{{
+					Name: "device-1",
+					Attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						"model": {StringValue: new(tc.model)},
+					},
+				}}
+				slice.UID = "fallback-slice"
+				slice.Generation = int64(i + 1)
+				manager := newTestDRAManager(tCtx, class, slice)
+				fit.draManager = manager
+				ba.draManager = manager
+				var workers sync.WaitGroup
+				for range 8 {
+					workers.Go(func() {
+						state := framework.NewCycleState()
+						var got int64
+						var status *fwk.Status
+						if balanced {
+							got, status = ba.Score(tCtx, state, pod, nodeInfo)
+						} else {
+							got, status = fit.Score(tCtx, state, pod, nodeInfo)
+						}
+						if !status.IsSuccess() {
+							tCtx.Errorf("Score failed: %v", status)
+						}
+						if got != tc.want {
+							tCtx.Errorf("model %s: expected capacity %d, got %d", tc.model, tc.want, got)
+						}
+					})
+				}
+				workers.Wait()
+			}
+		})
+	}
+}
+
+func TestDeviceMatchCacheVersions(t *testing.T) {
+	for _, capacitySelector := range []bool{false, true} {
+		t.Run(fmt.Sprintf("capacity-selector=%t", capacitySelector), func(t *testing.T) {
+			scorer := &resourceAllocationScorer{DRACaches: DRACaches{celCache: cel.NewCache(10, cel.Features{})}}
+			expression := `device.attributes["test-driver"].model == "good"`
+			if capacitySelector {
+				expression = `device.capacity["test-driver"].memory.compareTo(quantity("8Gi")) >= 0`
+			}
+			class := &resourceapi.DeviceClass{
+				Spec: resourceapi.DeviceClassSpec{
+					Selectors: []resourceapi.DeviceSelector{{CEL: &resourceapi.CELDeviceSelector{Expression: expression}}},
+				},
+			}
+			makeSlice := func(uid types.UID, generation int64, matches bool) *draapi.ResourceSlice {
+				external := st.MakeResourceSlice("node", "test-driver").Obj()
+				external.UID, external.Generation = uid, generation
+				model, capacity := "bad", "4Gi"
+				if matches {
+					model, capacity = "good", "16Gi"
+				}
+				external.Spec.Devices = []resourceapi.Device{{
+					Name: "gpu",
+					Attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						"model": {StringValue: &model},
+					},
+					Capacity: map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{
+						"memory": {Value: resource.MustParse(capacity)},
+					},
+				}}
+				internal := &draapi.ResourceSlice{}
+				if err := draapi.Convert_v1_ResourceSlice_To_api_ResourceSlice(external, internal, nil); err != nil {
+					t.Fatal(err)
+				}
+				return internal
+			}
+			check := func(slice *draapi.ResourceSlice, want bool) {
+				t.Helper()
+				got, err := scorer.deviceMatchesClass(context.Background(), slice, slice.Spec.Devices[0], class)
+				if err != nil || got != want {
+					t.Fatalf("UID %s generation %d: match = %v, err = %v, want %v", slice.UID, slice.Generation, got, err, want)
+				}
+			}
+			// Slices without UIDs must not share results, even with identical keys.
+			for _, matches := range []bool{true, false, true} {
+				check(makeSlice("", 1, matches), matches)
+			}
+			if _, ok := scorer.deviceMatchCache.Load(types.UID("")); ok {
+				t.Fatal("slice without UID retained cached results")
+			}
+			old := makeSlice("slice-a", 1, true)
+			check(old, true)
+			oldResults := scorer.matchResultsForSlice(old)
+			scorer.invalidateDeviceMatchCache(&resourceapi.ResourceSlice{ObjectMeta: metav1.ObjectMeta{UID: old.UID, Generation: old.Generation - 1}})
+			check(old, true)
+			if scorer.matchResultsForSlice(old) != oldResults {
+				t.Fatal("unchanged slice lost cached results")
+			}
+			latest := makeSlice(old.UID, 2, false)
+			check(latest, false)
+			latestResults := scorer.matchResultsForSlice(latest)
+			check(old, true)
+			scorer.invalidateDeviceMatchCache(&resourceapi.ResourceSlice{ObjectMeta: metav1.ObjectMeta{UID: old.UID, Generation: old.Generation - 1}})
+			if scorer.matchResultsForSlice(latest) != latestResults {
+				t.Fatal("older snapshot evicted newer generation")
+			}
+			scorer.invalidateDeviceMatchCache(&resourceapi.ResourceSlice{ObjectMeta: metav1.ObjectMeta{UID: latest.UID, Generation: latest.Generation - 1}})
+			if v, _ := scorer.deviceMatchCache.Load(old.UID); v != latestResults {
+				t.Fatal("current generation was not retained")
+			}
+			key := deviceMatchKey{expression: expression, device: latest.Spec.Devices[0].Name}
+			if v, ok := latestResults.results.Load(key); !ok || v != false {
+				t.Fatal("negative match was not cached")
+			}
+			scorer.invalidateDeviceMatchCache(&resourceapi.ResourceSlice{ObjectMeta: metav1.ObjectMeta{UID: old.UID, Generation: latest.Generation}})
+			if _, ok := scorer.deviceMatchCache.Load(old.UID); ok {
+				t.Fatal("deleted slice retained")
+			}
+			recreated := makeSlice("slice-b", 1, true)
+			check(recreated, true)
+			for gen := int64(2); gen <= 100; gen++ {
+				slice := makeSlice(recreated.UID, gen, gen%2 == 0)
+				check(slice, gen%2 == 0)
+				scorer.invalidateDeviceMatchCache(&resourceapi.ResourceSlice{ObjectMeta: metav1.ObjectMeta{UID: slice.UID, Generation: slice.Generation - 1}})
+			}
+			count := 0
+			scorer.deviceMatchCache.Range(func(_, _ any) bool { count++; return true })
+			if count != 1 {
+				t.Fatalf("after repeated updates: got %d slices, want 1", count)
+			}
+			scorer.invalidateDeviceMatchCache(&resourceapi.ResourceSlice{ObjectMeta: metav1.ObjectMeta{UID: recreated.UID, Generation: 100}})
+			count = 0
+			scorer.deviceMatchCache.Range(func(_, _ any) bool { count++; return true })
+			if count != 0 {
+				t.Fatalf("after deletion: got %d slices, want 0", count)
+			}
+		})
+	}
+}
+
+func TestDRAMatchCachesConcurrentSnapshots(t *testing.T) {
+	scorer := &resourceAllocationScorer{DRACaches: DRACaches{celCache: cel.NewCache(10, cel.Features{})}}
+	class := &resourceapi.DeviceClass{
+		Spec: resourceapi.DeviceClassSpec{
+			Selectors: []resourceapi.DeviceSelector{{CEL: &resourceapi.CELDeviceSelector{
+				Expression: `device.attributes["test-driver"].enabled`,
+			}}},
+		},
+	}
+	snapshots := make([]*draapi.ResourceSlice, 2)
+	for i := range snapshots {
+		external := st.MakeResourceSlice("node", "test-driver").Obj()
+		external.UID, external.Generation = "shared-slice", int64(i+1)
+		external.Spec.Devices = []resourceapi.Device{{
+			Name: "gpu",
+			Attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+				"enabled": {BoolValue: new(i == 0)},
+			},
+		}}
+		snapshots[i] = &draapi.ResourceSlice{}
+		if err := draapi.Convert_v1_ResourceSlice_To_api_ResourceSlice(external, snapshots[i], nil); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var wg sync.WaitGroup
+	for worker := range 16 {
+		wg.Go(func() {
+			for j := range 100 {
+				i := (worker + j) % 2
+				slice := snapshots[i]
+				got, err := scorer.deviceMatchesClass(context.Background(), slice, slice.Spec.Devices[0], class)
+				if err != nil || got != (i == 0) {
+					t.Errorf("generation %d: match = %v, err = %v", slice.Generation, got, err)
+					return
+				}
+				scorer.invalidateDeviceMatchCache(&resourceapi.ResourceSlice{ObjectMeta: metav1.ObjectMeta{UID: snapshots[1].UID, Generation: snapshots[1].Generation - 1}})
+			}
+		})
+	}
+	wg.Wait()
+	scorer.matchResultsForSlice(snapshots[1])
+	scorer.invalidateDeviceMatchCache(&resourceapi.ResourceSlice{ObjectMeta: metav1.ObjectMeta{UID: snapshots[0].UID, Generation: snapshots[0].Generation - 1}})
+	if value, _ := scorer.deviceMatchCache.Load(snapshots[1].UID); value.(*sliceMatchResults).generation != 2 {
+		t.Fatal("older snapshot replaced or pruned newer generation")
+	}
+}
+
+func TestDeviceMatchCacheEvents(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	slice := &resourceapi.ResourceSlice{ObjectMeta: metav1.ObjectMeta{Name: "slice", UID: "uid", Generation: 10}}
+	client := fake.NewClientset(slice)
+	factory := informers.NewSharedInformerFactory(client, 0)
+	informer := factory.Resource().V1().ResourceSlices().TypedInformer()
+	caches := []*DRACaches{{}, {}}
+	for _, c := range caches {
+		if err := c.watchResourceSlices(ctx, informer); err != nil {
+			t.Fatal(err)
+		}
+	}
+	factory.Start(ctx.Done())
+	defer func() { cancel(); factory.Shutdown() }()
+	if !cache.WaitForCacheSync(ctx.Done(), informer.HasSynced) {
+		t.Fatal("ResourceSlice informer did not sync")
+	}
+	snapshot := &draapi.ResourceSlice{ObjectMeta: slice.ObjectMeta}
+	oldResults := make([]*sliceMatchResults, len(caches))
+	for i, c := range caches {
+		oldResults[i] = c.matchResultsForSlice(snapshot)
+		if c.matchResultsForSlice(snapshot) != oldResults[i] {
+			t.Fatal("stable slice lost cached results")
+		}
+	}
+	latest := slice.DeepCopy()
+	latest.Generation++
+	if _, err := client.ResourceV1().ResourceSlices().Update(ctx, latest, metav1.UpdateOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	awaitEmpty := func() {
+		t.Helper()
+		if err := wait.PollUntilContextTimeout(ctx, time.Millisecond, 5*time.Second, true, func(context.Context) (bool, error) {
+			for _, c := range caches {
+				if _, ok := c.deviceMatchCache.Load(slice.UID); ok {
+					return false, nil
+				}
+			}
+			return true, nil
+		}); err != nil {
+			t.Fatalf("cache invalidation was not delivered: %v", err)
+		}
+	}
+	awaitEmpty()
+	snapshot.Generation++
+	for _, c := range caches {
+		current := c.matchResultsForSlice(snapshot)
+		c.invalidateDeviceMatchCache(slice)
+		if c.matchResultsForSlice(snapshot) != current {
+			t.Fatal("delayed old event removed newer results")
+		}
+	}
+	if err := client.ResourceV1().ResourceSlices().Delete(ctx, slice.Name, metav1.DeleteOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	awaitEmpty()
+	var workers sync.WaitGroup
+	for _, c := range caches {
+		workers.Go(func() {
+			for range 100 {
+				c.matchResultsForSlice(snapshot)
+				c.invalidateDeviceMatchCache(latest)
+			}
+		})
+	}
+	workers.Wait()
+	awaitEmpty()
+	// A worker publishing after the final delete notification must clean up itself.
+	for _, c := range caches {
+		c.matchResultsForSlice(snapshot)
+		if _, ok := c.deviceMatchCache.Load(slice.UID); ok {
+			t.Fatal("old snapshot resurrected deleted UID")
+		}
+	}
+	recreated := latest.DeepCopy()
+	recreated.UID = "new-uid"
+	recreated.Generation = 1
+	if _, err := client.ResourceV1().ResourceSlices().Create(ctx, recreated, metav1.CreateOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	if err := wait.PollUntilContextTimeout(ctx, time.Millisecond, 5*time.Second, true, func(context.Context) (bool, error) {
+		obj, exists, err := informer.GetStore().GetByKey(slice.Name)
+		return exists && obj.(*resourceapi.ResourceSlice).UID == recreated.UID, err
+	}); err != nil {
+		t.Fatal(err)
+	}
+	for i, c := range caches {
+		result := c.matchResultsForSlice(&draapi.ResourceSlice{ObjectMeta: recreated.ObjectMeta})
+		if result == oldResults[i] {
+			t.Fatal("recreated slice reused deleted results")
+		}
+		if _, ok := c.deviceMatchCache.Load(recreated.UID); !ok {
+			t.Fatal("recreated slice was not cached")
+		}
+	}
+	cancel()
 }

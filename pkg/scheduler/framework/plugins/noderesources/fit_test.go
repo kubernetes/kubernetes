@@ -18,6 +18,8 @@ package noderesources
 
 import (
 	"fmt"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes/fake"
 	"math"
 	"slices"
 	"testing"
@@ -753,7 +755,7 @@ func testEnoughRequests(tCtx ktesting.TContext) {
 				test.args.ScoringStrategy = defaultScoringStrategy
 			}
 
-			runOpts := []runtime.Option{}
+			runOpts := []runtime.Option{runtime.WithInformerFactory(informers.NewSharedInformerFactory(fake.NewClientset(), 0))}
 			var testDRAManager *dynamicresources.DefaultDRAManager
 			if !test.nilDRAManager && test.draExtendedResourceEnabled {
 				testDRAManager = newTestDRAManager(tCtx, deviceClassWithExtendResourceName)
@@ -1297,7 +1299,7 @@ func testFitScore(tCtx ktesting.TContext) {
 			featuregatetesting.SetFeatureGateDuringTest(tCtx, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, test.draObjects != nil)
 			state := framework.NewCycleState()
 			snapshot := cache.NewSnapshot(test.existingPods, test.nodes)
-			fh, _ := runtime.NewFramework(tCtx, nil, nil, runtime.WithSnapshotSharedLister(snapshot))
+			fh, _ := runtime.NewFramework(tCtx, nil, nil, runtime.WithSnapshotSharedLister(snapshot), runtime.WithInformerFactory(informers.NewSharedInformerFactory(fake.NewClientset(), 0)))
 			tCtx.Cleanup(func() {
 				runtime.WaitForShutdown(fh)
 			})
@@ -2553,7 +2555,7 @@ func testFitSignPod(tCtx ktesting.TContext) {
 
 	for name, test := range tests {
 		tCtx.SyncTest(name, func(tCtx ktesting.TContext) {
-			runOpts := []runtime.Option{}
+			runOpts := []runtime.Option{runtime.WithInformerFactory(informers.NewSharedInformerFactory(fake.NewClientset(), 0))}
 			var testDRAManager *dynamicresources.DefaultDRAManager
 			if !test.disableDRAExtendedResource {
 				testDRAManager = newTestDRAManager(tCtx, deviceClassWithExtendResourceName)
@@ -4506,7 +4508,7 @@ func TestFitScoreFeatureGates(t *testing.T) {
 	for _, test := range tests {
 		testCtx.SyncTest(test.name, func(tCtx ktesting.TContext) {
 			snapshot := cache.NewSnapshot(nil, nodes)
-			fh, err := runtime.NewFramework(tCtx, nil, nil, runtime.WithSnapshotSharedLister(snapshot))
+			fh, err := runtime.NewFramework(tCtx, nil, nil, runtime.WithSnapshotSharedLister(snapshot), runtime.WithInformerFactory(informers.NewSharedInformerFactory(fake.NewClientset(), 0)))
 			tCtx.ExpectNoError(err, "create framework")
 			tCtx.Cleanup(func() {
 				runtime.WaitForShutdown(fh)
