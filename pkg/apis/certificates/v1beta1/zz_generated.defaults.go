@@ -62,8 +62,7 @@ func SetObjectDefaults_CertificateSigningRequestList(in *certificatesv1beta1.Cer
 
 func SetObjectDefaults_PodCertificateRequest(in *certificatesv1beta1.PodCertificateRequest) {
 	if in.Spec.MaxExpirationSeconds == nil {
-		var ptrVar1 int32 = 86400
-		in.Spec.MaxExpirationSeconds = &ptrVar1
+		in.Spec.MaxExpirationSeconds = new(int32(86400))
 	}
 }
 

@@ -87,20 +87,16 @@ func SetObjectDefaults_VolumeAttachment(in *storagev1.VolumeAttachment) {
 		}
 		if in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.AzureDisk != nil {
 			if in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.AzureDisk.CachingMode == nil {
-				ptrVar1 := corev1.AzureDataDiskCachingMode(corev1.AzureDataDiskCachingReadWrite)
-				in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.AzureDisk.CachingMode = &ptrVar1
+				in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.AzureDisk.CachingMode = new(corev1.AzureDataDiskCachingMode(corev1.AzureDataDiskCachingReadWrite))
 			}
 			if in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.AzureDisk.FSType == nil {
-				var ptrVar1 string = "ext4"
-				in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.AzureDisk.FSType = &ptrVar1
+				in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.AzureDisk.FSType = new(string("ext4"))
 			}
 			if in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.AzureDisk.ReadOnly == nil {
-				var ptrVar1 bool = false
-				in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.AzureDisk.ReadOnly = &ptrVar1
+				in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.AzureDisk.ReadOnly = new(bool(false))
 			}
 			if in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.AzureDisk.Kind == nil {
-				ptrVar1 := corev1.AzureDataDiskKind(corev1.AzureSharedBlobDisk)
-				in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.AzureDisk.Kind = &ptrVar1
+				in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.AzureDisk.Kind = new(corev1.AzureDataDiskKind(corev1.AzureSharedBlobDisk))
 			}
 		}
 		if in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.ScaleIO != nil {
