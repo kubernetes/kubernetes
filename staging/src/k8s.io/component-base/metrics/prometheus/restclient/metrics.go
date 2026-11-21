@@ -29,16 +29,16 @@ import (
 )
 
 var (
-	// requestLatency is a Prometheus Histogram metric type partitioned by
-	// "verb", and "host" labels. It is used for the rest client latency metrics.
+	// requestLatency is partitioned by name, verb, host, group, version,
+	// resource, and scope.
 	requestLatency = k8smetrics.NewHistogramVec(
 		&k8smetrics.HistogramOpts{
 			Name:           "rest_client_request_duration_seconds",
-			Help:           "Request latency in seconds. Broken down by verb, and host.",
+			Help:           "Request latency in seconds. Broken down by name, verb, host, group, version, resource, and scope.",
 			StabilityLevel: k8smetrics.ALPHA,
 			Buckets:        []float64{0.005, 0.025, 0.1, 0.25, 0.5, 1.0, 2.0, 4.0, 8.0, 15.0, 30.0, 60.0},
 		},
-		[]string{"verb", "host"},
+		[]string{"name", "verb", "host", "group", "version", "resource", "scope"},
 	)
 
 	// resolverLatency is a Prometheus Histogram metric type partitioned by
@@ -89,9 +89,9 @@ var (
 		&k8smetrics.CounterOpts{
 			Name:           "rest_client_requests_total",
 			StabilityLevel: k8smetrics.ALPHA,
-			Help:           "Number of HTTP requests, partitioned by status code, method, and host.",
+			Help:           "Number of HTTP requests, partitioned by name, status code, verb, host, group, version, resource, and scope.",
 		},
-		[]string{"code", "method", "host"},
+		[]string{"name", "code", "verb", "host", "group", "version", "resource", "scope"},
 	)
 
 	requestRetry = k8smetrics.NewCounterVec(
@@ -230,7 +230,7 @@ func init() {
 	metrics.Register(metrics.RegisterOpts{
 		ClientCertExpiry:             execPluginCertTTLAdapter,
 		ClientCertRotationAge:        &rotationAdapter{m: execPluginCertRotation},
-		RequestLatency:               &latencyAdapter{m: requestLatency},
+		RequestLatency:               &requestLatencyAdapter{m: requestLatency},
 		ResolverLatency:              &resolverLatencyAdapter{m: resolverLatency},
 		RequestSize:                  &sizeAdapter{m: requestSize},
 		ResponseSize:                 &sizeAdapter{m: responseSize},
@@ -264,6 +264,23 @@ func init() {
 	})
 }
 
+type requestLatencyAdapter struct {
+	m *k8smetrics.HistogramVec
+}
+
+func (r *requestLatencyAdapter) Observe(ctx context.Context, verb string, u url.URL, latency time.Duration) {
+	metrics.EnsureRegistered()
+
+	requestInfo, _ := metrics.RequestInfoFrom(ctx)
+	if requestInfo.Verb == "" {
+		requestInfo.Verb = verb
+	}
+
+	clientName, _ := metrics.ClientNameFrom(ctx)
+
+	r.m.WithContext(ctx).WithLabelValues(clientName, requestInfo.Verb, u.Host, requestInfo.Group, requestInfo.Version, requestInfo.Resource, requestInfo.Scope).Observe(latency.Seconds())
+}
+
 type latencyAdapter struct {
 	m *k8smetrics.HistogramVec
 }
@@ -295,9 +312,17 @@ type resultAdapter struct {
 	m *k8smetrics.CounterVec
 }
 
-func (r *resultAdapter) Increment(ctx context.Context, code, method, host string) {
+func (r *resultAdapter) Increment(ctx context.Context, code string, method string, host string) {
 	metrics.EnsureRegistered()
-	r.m.WithContext(ctx).WithLabelValues(code, method, host).Inc()
+
+	requestInfo, _ := metrics.RequestInfoFrom(ctx)
+	if requestInfo.Verb == "" {
+		requestInfo.Verb = method
+	}
+
+	clientName, _ := metrics.ClientNameFrom(ctx)
+
+	r.m.WithContext(ctx).WithLabelValues(clientName, code, requestInfo.Verb, host, requestInfo.Group, requestInfo.Version, requestInfo.Resource, requestInfo.Scope).Inc()
 }
 
 type expiryToTTLAdapter struct {

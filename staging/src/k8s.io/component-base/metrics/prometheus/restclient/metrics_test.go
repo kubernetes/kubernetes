@@ -18,6 +18,7 @@ package restclient
 
 import (
 	"context"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -47,17 +48,102 @@ func TestClientGOMetrics(t *testing.T) {
 		want        string
 	}{
 		{
-			description: "Number of HTTP requests, partitioned by status code, verb, and host.",
+			description: "Request latency partitioned by request information.",
+			name:        "rest_client_request_duration_seconds",
+			metric:      requestLatency,
+			update: func() {
+				ctx := metrics.WithRequestInfo(context.TODO(), metrics.RequestInfo{
+					Verb:     "LIST",
+					Group:    "apps",
+					Version:  "v1",
+					Resource: "deployments",
+					Scope:    "namespace",
+				})
+				ctx = metrics.WithClientName(ctx, "deployment-controller")
+
+				metrics.RequestLatency.Observe(ctx, "GET", url.URL{Host: "www.foo.com"}, time.Second)
+			},
+			want: `
+				# HELP rest_client_request_duration_seconds [ALPHA] Request latency in seconds. Broken down by name, verb, host, group, version, resource, and scope.
+				# TYPE rest_client_request_duration_seconds histogram
+				rest_client_request_duration_seconds_bucket{group="apps",host="www.foo.com",name="deployment-controller",resource="deployments",scope="namespace",verb="LIST",version="v1",le="0.005"} 0
+				rest_client_request_duration_seconds_bucket{group="apps",host="www.foo.com",name="deployment-controller",resource="deployments",scope="namespace",verb="LIST",version="v1",le="0.025"} 0
+				rest_client_request_duration_seconds_bucket{group="apps",host="www.foo.com",name="deployment-controller",resource="deployments",scope="namespace",verb="LIST",version="v1",le="0.1"} 0
+				rest_client_request_duration_seconds_bucket{group="apps",host="www.foo.com",name="deployment-controller",resource="deployments",scope="namespace",verb="LIST",version="v1",le="0.25"} 0
+				rest_client_request_duration_seconds_bucket{group="apps",host="www.foo.com",name="deployment-controller",resource="deployments",scope="namespace",verb="LIST",version="v1",le="0.5"} 0
+				rest_client_request_duration_seconds_bucket{group="apps",host="www.foo.com",name="deployment-controller",resource="deployments",scope="namespace",verb="LIST",version="v1",le="1"} 1
+				rest_client_request_duration_seconds_bucket{group="apps",host="www.foo.com",name="deployment-controller",resource="deployments",scope="namespace",verb="LIST",version="v1",le="2"} 1
+				rest_client_request_duration_seconds_bucket{group="apps",host="www.foo.com",name="deployment-controller",resource="deployments",scope="namespace",verb="LIST",version="v1",le="4"} 1
+				rest_client_request_duration_seconds_bucket{group="apps",host="www.foo.com",name="deployment-controller",resource="deployments",scope="namespace",verb="LIST",version="v1",le="8"} 1
+				rest_client_request_duration_seconds_bucket{group="apps",host="www.foo.com",name="deployment-controller",resource="deployments",scope="namespace",verb="LIST",version="v1",le="15"} 1
+				rest_client_request_duration_seconds_bucket{group="apps",host="www.foo.com",name="deployment-controller",resource="deployments",scope="namespace",verb="LIST",version="v1",le="30"} 1
+				rest_client_request_duration_seconds_bucket{group="apps",host="www.foo.com",name="deployment-controller",resource="deployments",scope="namespace",verb="LIST",version="v1",le="60"} 1
+				rest_client_request_duration_seconds_bucket{group="apps",host="www.foo.com",name="deployment-controller",resource="deployments",scope="namespace",verb="LIST",version="v1",le="+Inf"} 1
+				rest_client_request_duration_seconds_sum{group="apps",host="www.foo.com",name="deployment-controller",resource="deployments",scope="namespace",verb="LIST",version="v1"} 1
+				rest_client_request_duration_seconds_count{group="apps",host="www.foo.com",name="deployment-controller",resource="deployments",scope="namespace",verb="LIST",version="v1"} 1
+			`,
+		},
+		{
+			description: "Request latency falls back to the HTTP verb.",
+			name:        "rest_client_request_duration_seconds",
+			metric:      requestLatency,
+			update: func() {
+				metrics.RequestLatency.Observe(context.TODO(), "GET", url.URL{Host: "www.foo.com"}, time.Second)
+			},
+			want: `
+				# HELP rest_client_request_duration_seconds [ALPHA] Request latency in seconds. Broken down by name, verb, host, group, version, resource, and scope.
+				# TYPE rest_client_request_duration_seconds histogram
+				rest_client_request_duration_seconds_bucket{group="",host="www.foo.com",name="",resource="",scope="",verb="GET",version="",le="0.005"} 0
+				rest_client_request_duration_seconds_bucket{group="",host="www.foo.com",name="",resource="",scope="",verb="GET",version="",le="0.025"} 0
+				rest_client_request_duration_seconds_bucket{group="",host="www.foo.com",name="",resource="",scope="",verb="GET",version="",le="0.1"} 0
+				rest_client_request_duration_seconds_bucket{group="",host="www.foo.com",name="",resource="",scope="",verb="GET",version="",le="0.25"} 0
+				rest_client_request_duration_seconds_bucket{group="",host="www.foo.com",name="",resource="",scope="",verb="GET",version="",le="0.5"} 0
+				rest_client_request_duration_seconds_bucket{group="",host="www.foo.com",name="",resource="",scope="",verb="GET",version="",le="1"} 1
+				rest_client_request_duration_seconds_bucket{group="",host="www.foo.com",name="",resource="",scope="",verb="GET",version="",le="2"} 1
+				rest_client_request_duration_seconds_bucket{group="",host="www.foo.com",name="",resource="",scope="",verb="GET",version="",le="4"} 1
+				rest_client_request_duration_seconds_bucket{group="",host="www.foo.com",name="",resource="",scope="",verb="GET",version="",le="8"} 1
+				rest_client_request_duration_seconds_bucket{group="",host="www.foo.com",name="",resource="",scope="",verb="GET",version="",le="15"} 1
+				rest_client_request_duration_seconds_bucket{group="",host="www.foo.com",name="",resource="",scope="",verb="GET",version="",le="30"} 1
+				rest_client_request_duration_seconds_bucket{group="",host="www.foo.com",name="",resource="",scope="",verb="GET",version="",le="60"} 1
+				rest_client_request_duration_seconds_bucket{group="",host="www.foo.com",name="",resource="",scope="",verb="GET",version="",le="+Inf"} 1
+				rest_client_request_duration_seconds_sum{group="",host="www.foo.com",name="",resource="",scope="",verb="GET",version=""} 1
+				rest_client_request_duration_seconds_count{group="",host="www.foo.com",name="",resource="",scope="",verb="GET",version=""} 1
+			`,
+		},
+		{
+			description: "Number of HTTP requests, partitioned by name, status code, verb, host, group, version, resource, and scope.",
+			name:        "rest_client_requests_total",
+			metric:      requestResult,
+			update: func() {
+				ctx := metrics.WithRequestInfo(context.TODO(), metrics.RequestInfo{
+					Verb:     "LIST",
+					Group:    "apps",
+					Version:  "v1",
+					Resource: "deployments",
+					Scope:    "namespace",
+				})
+				ctx = metrics.WithClientName(ctx, "deployment-controller")
+
+				metrics.RequestResult.Increment(ctx, "200", "POST", "www.foo.com")
+			},
+			want: `
+			            # HELP rest_client_requests_total [ALPHA] Number of HTTP requests, partitioned by name, status code, verb, host, group, version, resource, and scope.
+			            # TYPE rest_client_requests_total counter
+				          rest_client_requests_total{code="200",group="apps",host="www.foo.com",name="deployment-controller",resource="deployments",scope="namespace",verb="LIST",version="v1"} 1
+				`,
+		},
+		{
+			description: "Number of HTTP requests falls back to the HTTP method.",
 			name:        "rest_client_requests_total",
 			metric:      requestResult,
 			update: func() {
 				metrics.RequestResult.Increment(context.TODO(), "200", "POST", "www.foo.com")
 			},
 			want: `
-			            # HELP rest_client_requests_total [ALPHA] Number of HTTP requests, partitioned by status code, method, and host.
-			            # TYPE rest_client_requests_total counter
-			            rest_client_requests_total{code="200",host="www.foo.com",method="POST"} 1
-				`,
+				# HELP rest_client_requests_total [ALPHA] Number of HTTP requests, partitioned by name, status code, verb, host, group, version, resource, and scope.
+				# TYPE rest_client_requests_total counter
+				rest_client_requests_total{code="200",group="",host="www.foo.com",name="",resource="",scope="",verb="POST",version=""} 1
+			`,
 		},
 		{
 			description: "Number of request retries, partitioned by status code, verb, and host.",
