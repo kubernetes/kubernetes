@@ -218,6 +218,39 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 		jobStillNotFoundInLister   bool
 		jobPresentInCJActiveStatus bool
 	}{
+		"catch up during weekend gap": {
+			concurrencyPolicy:       "Allow",
+			schedule:                "0 0 * * 1-5",
+			deadline:                noDead,
+			cronjobCreationTime:     time.Date(2026, time.October, 5, 0, 0, 0, 0, time.UTC),
+			now:                     time.Date(2026, time.October, 11, 12, 0, 0, 0, time.UTC),
+			expectCreate:            true,
+			expectActive:            1,
+			expectRequeueAfter:      true,
+			expectedRequeueDuration: 12*time.Hour + nextScheduleDelta,
+			expectUpdateStatus:      true,
+		},
+		"catch up during weekend gap within deadline": {
+			concurrencyPolicy:       "Allow",
+			schedule:                "0 0 * * 1-5",
+			deadline:                4 * 24 * 60 * 60,
+			cronjobCreationTime:     time.Date(2026, time.October, 5, 0, 0, 0, 0, time.UTC),
+			now:                     time.Date(2026, time.October, 11, 12, 0, 0, 0, time.UTC),
+			expectCreate:            true,
+			expectActive:            1,
+			expectRequeueAfter:      true,
+			expectedRequeueDuration: 12*time.Hour + nextScheduleDelta,
+			expectUpdateStatus:      true,
+		},
+		"do not catch up during weekend gap outside deadline": {
+			concurrencyPolicy:       "Allow",
+			schedule:                "0 0 * * 1-5",
+			deadline:                2 * 24 * 60 * 60,
+			cronjobCreationTime:     time.Date(2026, time.October, 5, 0, 0, 0, 0, time.UTC),
+			now:                     time.Date(2026, time.October, 11, 12, 0, 0, 0, time.UTC),
+			expectRequeueAfter:      true,
+			expectedRequeueDuration: 12*time.Hour + nextScheduleDelta,
+		},
 		"never ran, not valid schedule, A": {
 			concurrencyPolicy:          "Allow",
 			schedule:                   errorSchedule,
