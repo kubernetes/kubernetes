@@ -566,6 +566,8 @@ func TestSetEnvFromResource(t *testing.T) {
 	inputs := []struct {
 		name           string
 		args           []string
+		selector       string
+		filenames      []string
 		from           string
 		keys           []string
 		assertIncludes []string
@@ -648,6 +650,35 @@ func TestSetEnvFromResource(t *testing.T) {
 			assertExcludes: []string{`{"name":"TEST_KEY","valueFrom":{"secretKeyRef":{"key":"test-key","name":"testsecret"}}}`},
 			warning:        true,
 		},
+		{
+			name:     "test from configmap with workloads selected by label",
+			args:     []string{"deployments"},
+			selector: "app=nginx",
+			from:     "configmap/testconfigmap",
+			assertIncludes: []string{
+				`{"name":"ENV","valueFrom":{"configMapKeyRef":{"key":"env","name":"testconfigmap"}}}`,
+			},
+			warning: true,
+		},
+		{
+			name:     "test from configmap type with sources and workloads selected by label",
+			args:     []string{"deployments"},
+			selector: "app=nginx",
+			from:     "configmap",
+			assertIncludes: []string{
+				`{"name":"ENV","valueFrom":{"configMapKeyRef":{"key":"env","name":"testconfigmap"}}}`,
+			},
+			warning: true,
+		},
+		{
+			name:      "test from secret with workloads selected by filename",
+			filenames: []string{"../../../testdata/set/deployment.yaml"},
+			from:      "secret/testsecret",
+			assertIncludes: []string{
+				`{"name":"ENV","valueFrom":{"secretKeyRef":{"key":"env","name":"testsecret"}}}`,
+			},
+			warning: true,
+		},
 	}
 
 	for _, input := range inputs {
@@ -678,15 +709,21 @@ func TestSetEnvFromResource(t *testing.T) {
 					switch p, m := req.URL.Path, req.Method; {
 					case p == "/namespaces/test/configmaps/testconfigmap" && m == http.MethodGet:
 						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: objBody(mockConfigMap)}, nil
+					case p == "/namespaces/test/configmaps" && m == http.MethodGet:
+						assert.Equal(t, input.selector, req.URL.Query().Get("labelSelector"))
+						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: objBody(&corev1.ConfigMapList{Items: []corev1.ConfigMap{*mockConfigMap}})}, nil
 					case p == "/namespaces/test/configmaps/testconfigmapuppercasekey" && m == http.MethodGet:
 						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: objBody(mockConfigMapUpperCaseKey)}, nil
 					case p == "/namespaces/test/secrets/testsecret" && m == http.MethodGet:
 						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: objBody(mockSecret)}, nil
 					case p == "/namespaces/test/secrets/testsecretuppercasekey" && m == http.MethodGet:
 						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: objBody(mockSecretUpperCaseKey)}, nil
-					case p == "/namespaces/test/deployments/nginx" && m == http.MethodGet:
+					case p == "/namespaces/test/deployments" && m == http.MethodGet:
+						assert.Equal(t, input.selector, req.URL.Query().Get("labelSelector"))
+						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: objBody(&appsv1.DeploymentList{Items: []appsv1.Deployment{*mockDeployment}})}, nil
+					case (p == "/namespaces/test/deployments/nginx" || p == "/namespaces/test/deployments/nginx-deployment") && m == http.MethodGet:
 						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: objBody(mockDeployment)}, nil
-					case p == "/namespaces/test/deployments/nginx" && m == http.MethodPatch:
+					case (p == "/namespaces/test/deployments/nginx" || p == "/namespaces/test/deployments/nginx-deployment") && m == http.MethodPatch:
 						stream, err := req.GetBody()
 						if err != nil {
 							return nil, err
@@ -712,6 +749,8 @@ func TestSetEnvFromResource(t *testing.T) {
 			outputFormat := "yaml"
 			streams, _, _, errOut := genericiooptions.NewTestIOStreams()
 			opts := NewEnvOptions(streams)
+			opts.Selector = input.selector
+			opts.FilenameOptions = resource.FilenameOptions{Filenames: input.filenames}
 			opts.From = input.from
 			opts.Keys = input.keys
 			opts.PrintFlags = genericclioptions.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme)
@@ -728,6 +767,13 @@ func TestSetEnvFromResource(t *testing.T) {
 			assert.NoError(t, err)
 		})
 	}
+}
+
+func TestSetEnvFromResourceLocal(t *testing.T) {
+	opts := NewEnvOptions(genericiooptions.NewTestIOStreamsDiscard())
+	opts.Local = true
+	opts.From = "configmap/testconfigmap"
+	assert.ErrorContains(t, opts.Validate(), "cannot specify --local and --from")
 }
 
 func TestSetEnvRemoteWithSpecificContainers(t *testing.T) {

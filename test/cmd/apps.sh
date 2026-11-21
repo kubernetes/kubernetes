@@ -451,6 +451,14 @@ run_deployment_tests() {
   kubectl set env deployment nginx-deployment --from=configmap/test-set-env-config "${kube_flags[@]:?}"
   # Assert all values in deployment env
   kube::test::get_object_assert 'deploy nginx-deployment' "{{ len (index .spec.template.spec.containers 0).env }}" '2'
+  # Set env of deployments selected by label or by file from a configmap or secret
+  kubectl set env deployments -l name=nginx-deployment --from=configmap/test-set-env-config --prefix=SELECTOR_ "${kube_flags[@]:?}"
+  kube::test::get_object_assert 'deploy nginx-deployment' "{{ len (index .spec.template.spec.containers 0).env }}" '4'
+  kubectl set env -f hack/testdata/deployment-multicontainer.yaml --from=secret/test-set-env-secret --prefix=FILE_ "${kube_flags[@]:?}"
+  kube::test::get_object_assert 'deploy nginx-deployment' "{{ len (index .spec.template.spec.containers 0).env }}" '6'
+  # Assert that --from cannot be used with --local
+  output_message=$(! kubectl set env -f hack/testdata/deployment-multicontainer.yaml --local --from=configmap/test-set-env-config -o yaml 2>&1 "${kube_flags[@]:?}")
+  kube::test::if_has_string "${output_message}" 'cannot specify --local and --from'
   # Set env of deployments for all container
   kubectl set env deployment nginx-deployment env=prod "${kube_flags[@]:?}"
   # Set env of deployments for specific container
