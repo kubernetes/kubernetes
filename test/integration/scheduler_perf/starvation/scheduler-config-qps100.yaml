@@ -1,0 +1,5 @@
+apiVersion: kubescheduler.config.k8s.io/v1
+kind: KubeSchedulerConfiguration
+clientConnection:
+  qps: 100
+  burst: 100
