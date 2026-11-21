@@ -124,6 +124,14 @@ func PreferExternalAddresses(config *NetworkingTestConfig) {
 	config.PreferExternalAddresses = true
 }
 
+// UseStaticNodePorts allocate the NodePortService nodePorts from the static portion of
+// the NodePort range and keep them reserved for the whole test. Tests that delete the
+// NodePortService and then check that its nodePort stops serving traffic need this,
+// otherwise a Service from a test running in parallel can get the same nodePort.
+func UseStaticNodePorts(config *NetworkingTestConfig) {
+	config.StaticNodePorts = true
+}
+
 // NewNetworkingTestConfig creates and sets up a new test config helper.
 func NewNetworkingTestConfig(ctx context.Context, f *framework.Framework, setters ...Option) *NetworkingTestConfig {
 	// default options
@@ -176,6 +184,9 @@ type NetworkingTestConfig struct {
 	// if the test pods are listening on sctp port. We need this as sctp tests
 	// are marked as disruptive as they may load the sctp module.
 	SCTPEnabled bool
+	// StaticNodePorts assigns the NodePortService nodePorts from the static portion
+	// of the NodePort range and keeps them reserved for the whole test.
+	StaticNodePorts bool
 	// DualStackEnabled enables dual stack on services
 	DualStackEnabled bool
 	// EndpointPods are the pods belonging to the Service created by this
@@ -751,11 +762,56 @@ func (config *NetworkingTestConfig) createNodePortServiceSpec(svcName string, se
 		requireDual := v1.IPFamilyPolicyRequireDualStack
 		res.Spec.IPFamilyPolicy = &requireDual
 	}
+	if config.StaticNodePorts {
+		ports, err := staticPortAllocator.getUnusedPorts(len(res.Spec.Ports))
+		framework.ExpectNoError(err, "failed to find static nodeports for service %s", svcName)
+		for i := range res.Spec.Ports {
+			res.Spec.Ports[i].NodePort = ports[i]
+		}
+	}
 	return res
 }
 
+// staticNodePortRetries is how many times we try to create the NodePortService with
+// ports from the static range. The allocator only synchronizes tests in the same
+// process, so the apiserver can still reject a port taken by a parallel ginkgo process.
+const staticNodePortRetries = 5
+
 func (config *NetworkingTestConfig) createNodePortService(ctx context.Context, selector map[string]string) {
-	config.NodePortService = config.CreateService(ctx, config.createNodePortServiceSpec(nodePortServiceName, selector, false))
+	retries := 1
+	if config.StaticNodePorts {
+		retries = staticNodePortRetries
+	}
+	for range retries {
+		spec := config.createNodePortServiceSpec(nodePortServiceName, selector, false)
+		_, err := config.getServiceClient().Create(ctx, spec, metav1.CreateOptions{})
+		if err != nil {
+			if config.StaticNodePorts && apierrors.IsInvalid(err) {
+				framework.Logf("static node ports collision, retrying: %v", err)
+				continue
+			}
+			framework.Failf("Failed to create %s service: %v", spec.Name, err)
+		}
+
+		if config.StaticNodePorts {
+			// The service is using the ports now, so they can be reserved.
+			for _, port := range spec.Spec.Ports {
+				if !ReserveStaticNodePort(port.NodePort) {
+					framework.Failf("Failed to reserve node port %d", port.NodePort)
+				}
+			}
+			ginkgo.DeferCleanup(func(ctx context.Context) {
+				for _, port := range spec.Spec.Ports {
+					ReleaseStaticNodePort(port.NodePort)
+				}
+			})
+		}
+
+		config.NodePortService = config.waitForCreatedService(ctx, spec.Name)
+		return
+	}
+
+	framework.Failf("Failed to create %s service with node ports from the static range after %d attempts", nodePortServiceName, retries)
 }
 
 func (config *NetworkingTestConfig) createSessionAffinityService(ctx context.Context, selector map[string]string) {
@@ -800,11 +856,16 @@ func (config *NetworkingTestConfig) CreateService(ctx context.Context, serviceSp
 	_, err := config.getServiceClient().Create(ctx, serviceSpec, metav1.CreateOptions{})
 	framework.ExpectNoError(err, fmt.Sprintf("Failed to create %s service: %v", serviceSpec.Name, err))
 
-	err = WaitForService(ctx, config.f.ClientSet, config.Namespace, serviceSpec.Name, true, 5*time.Second, 45*time.Second)
-	framework.ExpectNoError(err, fmt.Sprintf("error while waiting for service:%s err: %v", serviceSpec.Name, err))
+	return config.waitForCreatedService(ctx, serviceSpec.Name)
+}
 
-	createdService, err := config.getServiceClient().Get(ctx, serviceSpec.Name, metav1.GetOptions{})
-	framework.ExpectNoError(err, fmt.Sprintf("Failed to create %s service: %v", serviceSpec.Name, err))
+// waitForCreatedService waits for the just created service to show up and returns it
+func (config *NetworkingTestConfig) waitForCreatedService(ctx context.Context, name string) *v1.Service {
+	err := WaitForService(ctx, config.f.ClientSet, config.Namespace, name, true, 5*time.Second, 45*time.Second)
+	framework.ExpectNoError(err, fmt.Sprintf("error while waiting for service:%s err: %v", name, err))
+
+	createdService, err := config.getServiceClient().Get(ctx, name, metav1.GetOptions{})
+	framework.ExpectNoError(err, fmt.Sprintf("Failed to create %s service: %v", name, err))
 
 	return createdService
 }
