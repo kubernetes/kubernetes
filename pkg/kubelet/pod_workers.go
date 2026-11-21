@@ -249,11 +249,9 @@ type PodWorkers interface {
 	// is deleted.
 	ShouldPodRuntimeBeRemoved(uid types.UID) bool
 	// ShouldPodContentBeRemoved returns true if resource managers within the Kubelet
-	// should aggressively cleanup all content related to the pod. This is true
-	// during pod eviction (when we wish to remove that content to free resources)
-	// as well as after the request to delete a pod has resulted in containers being
-	// stopped (which is a more graceful action). Note that a deleting pod can still
-	// be evicted.
+	// should aggressively clean up all content related to the pod. For a deleted
+	// or evicted pod, cleanup must wait until SyncTerminatingPod has collected
+	// the final container statuses from the runtime.
 	//
 	// Intended for use by subsystem sync loops to know when to start tearing down
 	// resources that are used by non-deleted pods. Content is generally preserved
@@ -742,7 +740,7 @@ func (p *podWorkers) ShouldPodContentBeRemoved(uid types.UID) bool {
 	p.podLock.Lock()
 	defer p.podLock.Unlock()
 	if status, ok := p.podSyncStatuses[uid]; ok {
-		return status.IsEvicted() || (status.IsDeleted() && status.IsTerminated())
+		return status.IsTerminated() && (status.IsEvicted() || status.IsDeleted())
 	}
 	// a pod that hasn't been sent to the pod worker yet should have no content on disk once we have
 	// synced all content.
