@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/utils/clock"
 )
 
 type rawWatchEventResult struct {
@@ -54,6 +55,7 @@ type ConcurrentWatchEventDecoder struct {
 	doneCh           chan struct{}
 	closeOnce        sync.Once
 	waitGroup        sync.WaitGroup
+	decodeLogger     *watch.BlockLogger
 }
 
 func NewConcurrentWatchEventDecoder(streamDecoder streaming.Decoder, objectDecoder runtime.Decoder) *ConcurrentWatchEventDecoder {
@@ -71,6 +73,14 @@ func newConcurrentWatchEventDecoder(streamDecoder streaming.Decoder, objectDecod
 		decodedResultsCh: make(chan *decodedWatchEventResult, decodedResultQueueSize),
 		pendingResultsCh: make(chan chan *decodedWatchEventResult, decodingConcurrency-1),
 		doneCh:           make(chan struct{}),
+		decodeLogger: watch.NewBlockLoggerWithOptions(
+			"Fast watcher, slow object decoding. Probably caused by CPU-intensive unmarshaling or large watch events",
+			watch.BlockLoggerOptions{
+				Threshold:       watch.DefaultDecodeLoggerThreshold,
+				SingleThreshold: watch.DefaultBlockLoggerSingleThreshold,
+				Clock:           clock.RealClock{},
+			},
+		),
 	}
 	d.waitGroup.Add(3)
 	go func() {
@@ -116,6 +126,7 @@ func (d *ConcurrentWatchEventDecoder) Close() {
 
 func (d *ConcurrentWatchEventDecoder) collectResults() {
 	defer close(d.decodedResultsCh)
+	defer d.decodeLogger.Flush()
 	var resultCh chan *decodedWatchEventResult
 	var ok bool
 
@@ -128,7 +139,21 @@ func (d *ConcurrentWatchEventDecoder) collectResults() {
 				return
 			}
 		}
+
+		// Decodes overlap, so summing their durations can exceed wall time. Time how long the
+		// ordered output waits on the head-of-line decode instead: the wait is serial, and
+		// without overlap it reduces to the decode time the non-concurrent Decoder records.
+		start := d.decodeLogger.Now()
 		result := <-resultCh
+		// Skip errored results: they also carry stream read failures, which never reach
+		// object decoding.
+		if result.err == nil {
+			if result.event.Type != watch.Error {
+				d.decodeLogger.EnsureResourceType(result.event.Object)
+			}
+			d.decodeLogger.RecordSince(start)
+		}
+
 		select {
 		case <-d.doneCh:
 			return
