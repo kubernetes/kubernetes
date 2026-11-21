@@ -75,8 +75,6 @@ func init() {
 }
 
 const (
-	// ControllerStartJitter is the jitter value used when starting controller managers.
-	ControllerStartJitter = 1.0
 	// ConfigzName is the name used for register cloud-controller manager /configz, same with GroupName.
 	ConfigzName = "cloudcontrollermanager.config.k8s.io"
 )
@@ -359,8 +357,6 @@ func startControllers(ctx context.Context, cloud cloudprovider.Interface, contro
 		}
 		controllerChecks = append(controllerChecks, check)
 		klog.Infof("Started %q", controllerName)
-
-		time.Sleep(wait.Jitter(c.ComponentConfig.Generic.ControllerStartInterval.Duration, ControllerStartJitter))
 	}
 
 	healthzHandler.AddHealthChecker(controllerChecks...)
