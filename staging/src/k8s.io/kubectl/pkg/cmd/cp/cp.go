@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
+	utilexec "k8s.io/utils/exec"
 )
 
 var (
@@ -368,6 +369,8 @@ type TarPipe struct {
 	outStream *io.PipeWriter
 	bytesRead uint64
 	retries   int
+	// bytesRead when the current attempt started
+	attemptStart uint64
 }
 
 func newTarPipe(src fileSpec, o *CopyOptions) *TarPipe {
@@ -379,6 +382,7 @@ func newTarPipe(src fileSpec, o *CopyOptions) *TarPipe {
 }
 
 func (t *TarPipe) initReadFrom(n uint64) {
+	t.attemptStart = t.bytesRead
 	t.reader, t.outStream = io.Pipe()
 	options := &exec.ExecOptions{
 		StreamOptions: exec.StreamOptions{
@@ -400,27 +404,46 @@ func (t *TarPipe) initReadFrom(n uint64) {
 		options.Command = []string{"sh", "-c", fmt.Sprintf("tar cf - '%s' | tail -c+%d", escapedPath, n)}
 	}
 
+	outStream := t.outStream
 	go func() {
-		defer t.outStream.Close()
-		cmdutil.CheckErr(t.o.execute(options))
+		err := t.o.execute(options)
+		if err != nil && t.o.MaxTries == 0 {
+			cmdutil.CheckErr(err)
+		}
+		// With retries, hand the error to Read, which decides whether to
+		// resume the copy.
+		outStream.CloseWithError(err)
 	}()
 }
 
 func (t *TarPipe) Read(p []byte) (n int, err error) {
 	n, err = t.reader.Read(p)
-	if err != nil {
-		if t.o.MaxTries < 0 || t.retries < t.o.MaxTries {
-			t.retries++
-			fmt.Printf("Resuming copy at %d bytes, retry %d/%d\n", t.bytesRead, t.retries, t.o.MaxTries)
-			t.initReadFrom(t.bytesRead + 1)
-			err = nil
-		} else {
-			fmt.Printf("Dropping out copy after %d retries\n", t.retries)
-		}
-	} else {
+	if err == nil {
 		t.bytesRead += uint64(n)
+		return
 	}
-	return
+	if !errors.Is(err, io.EOF) && !t.resumable(err) {
+		return n, err
+	}
+	if t.o.MaxTries >= 0 && t.retries >= t.o.MaxTries {
+		fmt.Printf("Dropping out copy after %d retries\n", t.retries)
+		return n, err
+	}
+	t.retries++
+	fmt.Printf("Resuming copy at %d bytes, retry %d/%d\n", t.bytesRead, t.retries, t.o.MaxTries)
+	t.initReadFrom(t.bytesRead + 1)
+	return 0, nil
+}
+
+// resumable reports whether the copy can resume after the exec failed with
+// err. Not if tar on the pod failed, and not if the attempt failed before
+// copying a byte: the pod being gone or the request being rejected would
+// fail every attempt the same way.
+func (t *TarPipe) resumable(err error) bool {
+	if _, ok := errors.AsType[utilexec.ExitError](err); ok {
+		return false
+	}
+	return t.bytesRead > t.attemptStart
 }
 
 func makeTar(src localPath, dest remotePath, writer io.Writer) error {
