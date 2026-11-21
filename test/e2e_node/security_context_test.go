@@ -222,7 +222,7 @@ var _ = SIGDescribe("Security Context", func() {
 		}
 		createAndWaitHostIPCPod := func(ctx context.Context, podName string, hostNetwork bool) {
 			podClient.Create(ctx, makeHostIPCPod(podName,
-				imageutils.GetE2EImage(imageutils.IpcUtils),
+				imageutils.GetE2EImage(imageutils.Agnhost),
 				[]string{"sh", "-c", "ipcs -m | awk '{print $2}'"},
 				hostNetwork,
 			))
