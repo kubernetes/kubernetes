@@ -82,6 +82,12 @@ var isCgroup2UnifiedMode = libcontainercgroups.IsCgroup2UnifiedMode
 // Make sure that podContainerManagerImpl implements the PodContainerManager interface
 var _ PodContainerManager = &podContainerManagerImpl{}
 
+// Validate checks whether the pod's cgroup exists and matches the manager's expectations.
+func (m *podContainerManagerImpl) Validate(pod *v1.Pod) error {
+	podContainerName, _ := m.GetPodContainerName(pod)
+	return m.cgroupManager.Validate(podContainerName)
+}
+
 // Exists checks if the pod's cgroup already exists
 func (m *podContainerManagerImpl) Exists(pod *v1.Pod) bool {
 	podContainerName, _ := m.GetPodContainerName(pod)
@@ -430,6 +436,10 @@ type podContainerManagerNoop struct {
 
 // Make sure that podContainerManagerStub implements the PodContainerManager interface
 var _ PodContainerManager = &podContainerManagerNoop{}
+
+func (m *podContainerManagerNoop) Validate(_ *v1.Pod) error {
+	return nil
+}
 
 func (m *podContainerManagerNoop) Exists(_ *v1.Pod) bool {
 	return true
