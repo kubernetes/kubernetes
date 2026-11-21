@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	errorsutil "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/server/healthz"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
@@ -117,7 +118,14 @@ type ManagerImpl struct {
 
 	// update channel for device health updates
 	update chan resourceupdates.Update
+
+	// stopChan signals the background reconciliation loop to stop.
+	stopChan chan struct{}
+	stopOnce sync.Once
 }
+
+// defaultReconcilePeriod is the default reconciliation period to keep device allocations in sync.
+const defaultReconcilePeriod = 30 * time.Second
 
 type endpointInfo struct {
 	e    endpoint
@@ -172,6 +180,7 @@ func newManagerImpl(logger klog.Logger, socketPath string, topology []cadvisorap
 		topologyAffinityStore: topologyAffinityStore,
 		devicesToReuse:        make(PodReusableDevices),
 		update:                make(chan resourceupdates.Update, 100),
+		stopChan:              make(chan struct{}),
 	}
 
 	server, err := plugin.NewServer(logger, socketPath, manager, manager)
@@ -410,6 +419,34 @@ func (m *ManagerImpl) Start(logger klog.Logger, activePods ActivePodsFunc, sourc
 		logger.Error(err, "Continue after failing to read checkpoint file. Device allocation info may NOT be up-to-date")
 	}
 
+	m.mutex.Lock()
+	if m.stopChan == nil {
+		m.stopChan = make(chan struct{})
+	}
+	stopChan := m.stopChan
+	m.mutex.Unlock()
+
+	// Reconcile allocated devices immediately if sources are already ready.
+	if m.sourcesReady != nil && m.sourcesReady.AllReady() {
+		m.UpdateAllocatedDevices(logger)
+	}
+
+	// Wait for sources to be ready, then trigger immediate reconciliation.
+	go func() {
+		_ = wait.PollUntilContextCancel(wait.ContextForChannel(stopChan), 1*time.Second, true, func(ctx context.Context) (done bool, err error) {
+			if m.sourcesReady != nil && m.sourcesReady.AllReady() {
+				m.UpdateAllocatedDevices(logger)
+				return true, nil
+			}
+			return false, nil
+		})
+	}()
+
+	// Periodically reconcile allocated devices and purge inactive pods from checkpointed state.
+	go wait.Until(func() {
+		m.UpdateAllocatedDevices(logger)
+	}, defaultReconcilePeriod, stopChan)
+
 	return m.server.Start(logger)
 }
 
@@ -417,6 +454,13 @@ func (m *ManagerImpl) Start(logger klog.Logger, activePods ActivePodsFunc, sourc
 // Can be called concurrently, more than once, and is safe to call
 // without a prior Start.
 func (m *ManagerImpl) Stop(logger klog.Logger) error {
+	m.stopOnce.Do(func() {
+		m.mutex.Lock()
+		if m.stopChan != nil {
+			close(m.stopChan)
+		}
+		m.mutex.Unlock()
+	})
 	return m.server.Stop(logger)
 }
 
@@ -575,6 +619,9 @@ func (m *ManagerImpl) writeCheckpoint(logger klog.Logger) error {
 	data := checkpoint.New(m.podDevices.toCheckpointData(logger),
 		registeredDevs)
 	m.mutex.Unlock()
+	if m.checkpointManager == nil {
+		return nil
+	}
 	err := m.checkpointManager.CreateCheckpoint(kubeletDeviceManagerCheckpoint, data)
 	if err != nil {
 		err2 := fmt.Errorf("failed to write checkpoint file %q: %v", kubeletDeviceManagerCheckpoint, err)
@@ -599,7 +646,6 @@ func (m *ManagerImpl) readCheckpoint(logger klog.Logger) error {
 	}
 
 	m.mutex.Lock()
-	defer m.mutex.Unlock()
 	podDevices, registeredDevs := cp.GetData()
 	m.podDevices.fromCheckpointData(logger, podDevices)
 	m.regenerateAllocatedDevicesLocked()
@@ -610,8 +656,10 @@ func (m *ManagerImpl) readCheckpoint(logger klog.Logger) error {
 		m.unhealthyDevices[resource] = sets.New[string]()
 		m.endpoints[resource] = endpointInfo{e: newStoppedEndpointImpl(resource), opts: nil}
 	}
+	m.mutex.Unlock()
 
 	logger.V(4).Info("Read data from checkpoint file", "checkpoint", kubeletDeviceManagerCheckpoint)
+	m.UpdateAllocatedDevices(logger)
 	return nil
 }
 
@@ -625,17 +673,20 @@ func (m *ManagerImpl) getCheckpoint() (checkpoint.DeviceManagerCheckpoint, error
 
 // UpdateAllocatedDevices frees any Devices that are bound to terminated pods.
 func (m *ManagerImpl) UpdateAllocatedDevices(logger klog.Logger) {
-	activePods := m.activePods()
-	if !m.sourcesReady.AllReady() {
+	if m.activePods == nil {
 		return
 	}
+	if m.sourcesReady != nil && !m.sourcesReady.AllReady() {
+		return
+	}
+	activePods := m.activePods()
 	m.mutex.Lock()
-	defer m.mutex.Unlock()
 	podsToBeRemoved := m.podDevices.pods()
 	for _, pod := range activePods {
 		podsToBeRemoved.Delete(string(pod.UID))
 	}
 	if len(podsToBeRemoved) <= 0 {
+		m.mutex.Unlock()
 		return
 	}
 	logger.V(3).Info("Pods to be removed", "podUIDs", sets.List(podsToBeRemoved))
@@ -645,6 +696,11 @@ func (m *ManagerImpl) UpdateAllocatedDevices(logger klog.Logger) {
 	}
 	// Regenerated allocatedDevices after we update pod allocation information.
 	m.regenerateAllocatedDevicesLocked()
+	m.mutex.Unlock()
+
+	if err := m.writeCheckpoint(logger); err != nil {
+		logger.Error(err, "Failed to write checkpoint file after updating allocated devices")
+	}
 }
 
 // Returns list of device Ids we need to allocate with Allocate rpc call.
