@@ -253,7 +253,7 @@ func (m *Manager) prepareResources(ctx context.Context, pod *v1.Pod) error {
 	logger := klog.FromContext(ctx).WithName("dra-manager")
 	logger = klog.LoggerWithValues(logger, "pod", klog.KObj(pod))
 	batches := make(map[*draplugin.DRAPlugin][]*drapb.Claim)
-	resourceClaims := make(map[types.UID]*resourceapi.ResourceClaim)
+	claimInfos := make(map[types.UID]*ClaimInfo)
 
 	// Do a validation pass *without* changing the claim info cache.
 	// If anything goes wrong, we don't proceed. This has the advantage
@@ -390,9 +390,9 @@ func (m *Manager) prepareResources(ctx context.Context, pod *v1.Pod) error {
 				continue
 			}
 
-			// This saved claim will be used to update ClaimInfo cache
-			// after NodePrepareResources GRPC succeeds
-			resourceClaims[claimInfo.ClaimUID] = resourceClaim
+			// Remember the cache entry that the NodePrepareResources
+			// result belongs to, see checkStillCached.
+			claimInfos[claimInfo.ClaimUID] = claimInfo
 
 			// Loop through all drivers and prepare for calling NodePrepareResources.
 			claim := &drapb.Claim{
@@ -437,7 +437,7 @@ func (m *Manager) prepareResources(ctx context.Context, pod *v1.Pod) error {
 				return fmt.Errorf("NodePrepareResources failed for ResourceClaim %s: %s", reqClaim.Name, result.Error)
 			}
 
-			claim := resourceClaims[types.UID(claimUID)]
+			claimInfo := claimInfos[types.UID(claimUID)]
 
 			// Add the prepared CDI devices to the claim info. The
 			// driver's response is authoritative for this (claim, driver)
@@ -447,13 +447,12 @@ func (m *Manager) prepareResources(ctx context.Context, pod *v1.Pod) error {
 			// another driver in the batch failed, setPrepared was
 			// skipped) would end up with the devices duplicated.
 			err := m.cache.withLock(logger, func() error {
-				info, exists := m.cache.get(claim.Name, claim.Namespace)
-				if !exists {
-					return fmt.Errorf("internal error: unable to get claim info for ResourceClaim %s in namespace %s", claim.Name, claim.Namespace)
+				if err := m.checkStillCached(claimInfo, pod.UID); err != nil {
+					return err
 				}
-				info.resetDevices(plugin.DriverName())
+				claimInfo.resetDevices(plugin.DriverName())
 				for _, device := range result.GetDevices() {
-					info.addDevice(plugin.DriverName(), state.Device{PoolName: device.PoolName,
+					claimInfo.addDevice(plugin.DriverName(), state.Device{PoolName: device.PoolName,
 						DeviceName: device.DeviceName, ShareID: (*types.UID)(device.ShareId),
 						RequestNames: device.RequestNames, CDIDeviceIDs: device.CdiDeviceIds})
 				}
@@ -473,13 +472,17 @@ func (m *Manager) prepareResources(ctx context.Context, pod *v1.Pod) error {
 
 	// Atomically perform some operations on the claimInfo cache.
 	err = m.cache.withLock(logger, func() error {
-		// Mark all pod claims as prepared.
-		for _, claim := range resourceClaims {
-			info, exists := m.cache.get(claim.Name, claim.Namespace)
-			if !exists {
-				return fmt.Errorf("internal error: unable to get claim info for ResourceClaim %s in namespace %s", claim.Name, claim.Namespace)
+		// Check all claims before modifying any of them, so that a failure
+		// does not leave some claims marked as prepared but not checkpointed.
+		for _, claimInfo := range claimInfos {
+			if err := m.checkStillCached(claimInfo, pod.UID); err != nil {
+				return err
 			}
-			info.setPrepared()
+		}
+
+		// Mark all pod claims as prepared.
+		for _, claimInfo := range claimInfos {
+			claimInfo.setPrepared()
 		}
 
 		// Checkpoint to ensure all prepared claims are tracked with their list
@@ -495,6 +498,23 @@ func (m *Manager) prepareResources(ctx context.Context, pod *v1.Pod) error {
 		return err
 	}
 
+	return nil
+}
+
+// checkStillCached verifies that info is still the cache entry for its claim,
+// that the claim is not being unprepared and that the pod still references it.
+// The cache lock is not held during NodePrepareResources, so the claim may have
+// been unprepared, or unprepared and prepared again, in the meantime, possibly
+// with a different allocation. Entries are only added when none exists for the
+// name and only removed by unprepare, so a different entry means the claim was
+// replaced, even if it has the same UID. A claim shared with other pods is not
+// marked as unpreparing, only the pod reference is dropped.
+// The caller must hold the cache lock.
+func (m *Manager) checkStillCached(info *ClaimInfo, podUID types.UID) error {
+	cached, exists := m.cache.get(info.ClaimName, info.Namespace)
+	if !exists || cached != info || cached.isUnpreparing() || !cached.hasPodReference(podUID) {
+		return fmt.Errorf("ResourceClaim %s was unprepared while being prepared", klog.KRef(info.Namespace, info.ClaimName))
+	}
 	return nil
 }
 
