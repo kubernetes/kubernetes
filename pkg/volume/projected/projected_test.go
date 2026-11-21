@@ -399,7 +399,7 @@ func TestCollectDataWithSecret(t *testing.T) {
 			source.Sources[0].Secret.Optional = &tc.optional
 
 			testPodUID := types.UID("test_pod_uid")
-			pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: testNamespace, UID: testPodUID}}
+			pod := &v1.Pod{Namespace: testNamespace, UID: testPodUID}
 			client := fake.NewSimpleClientset(tc.secret)
 			tempDir, host := newTestHost(t, client)
 			defer os.RemoveAll(tempDir)
@@ -787,7 +787,7 @@ func TestCollectDataWithConfigMap(t *testing.T) {
 			source.Sources[0].ConfigMap.Optional = &tc.optional
 
 			testPodUID := types.UID("test_pod_uid")
-			pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: testNamespace, UID: testPodUID}}
+			pod := &v1.Pod{Namespace: testNamespace, UID: testPodUID}
 			client := fake.NewSimpleClientset(tc.configMap)
 			tempDir, host := newTestHost(t, client)
 			defer os.RemoveAll(tempDir)
@@ -2133,7 +2133,7 @@ func TestPlugin(t *testing.T) {
 		t.Fatal("Can't find the plugin by name")
 	}
 
-	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: testNamespace, UID: testPodUID}}
+	pod := &v1.Pod{Namespace: testNamespace, UID: testPodUID}
 	mounter, err := plugin.NewMounter(volume.NewSpecFromVolume(volumeSpec), pod)
 	if err != nil {
 		t.Errorf("Failed to make a new Mounter: %v", err)
@@ -2198,7 +2198,7 @@ func TestInvalidPathProjected(t *testing.T) {
 		t.Fatal("Can't find the plugin by name")
 	}
 
-	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: testNamespace, UID: testPodUID}}
+	pod := &v1.Pod{Namespace: testNamespace, UID: testPodUID}
 	mounter, err := plugin.NewMounter(volume.NewSpecFromVolume(volumeSpec), pod)
 	if err != nil {
 		t.Errorf("Failed to make a new Mounter: %v", err)
@@ -2248,7 +2248,7 @@ func TestPluginReboot(t *testing.T) {
 		t.Fatal("Can't find the plugin by name")
 	}
 
-	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: testNamespace, UID: testPodUID}}
+	pod := &v1.Pod{Namespace: testNamespace, UID: testPodUID}
 	mounter, err := plugin.NewMounter(volume.NewSpecFromVolume(volumeSpec), pod)
 	if err != nil {
 		t.Errorf("Failed to make a new Mounter: %v", err)
@@ -2302,7 +2302,7 @@ func TestPluginOptional(t *testing.T) {
 		t.Fatal("Can't find the plugin by name")
 	}
 
-	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: testNamespace, UID: testPodUID}}
+	pod := &v1.Pod{Namespace: testNamespace, UID: testPodUID}
 	mounter, err := plugin.NewMounter(volume.NewSpecFromVolume(volumeSpec), pod)
 	if err != nil {
 		t.Errorf("Failed to make a new Mounter: %v", err)
@@ -2400,7 +2400,7 @@ func TestPluginOptionalKeys(t *testing.T) {
 		t.Fatal("Can't find the plugin by name")
 	}
 
-	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: testNamespace, UID: testPodUID}}
+	pod := &v1.Pod{Namespace: testNamespace, UID: testPodUID}
 	mounter, err := plugin.NewMounter(volume.NewSpecFromVolume(volumeSpec), pod)
 	if err != nil {
 		t.Errorf("Failed to make a new Mounter: %v", err)
@@ -2438,6 +2438,171 @@ func TestPluginOptionalKeys(t *testing.T) {
 	}
 	doTestSecretDataInVolume(volumePath, secret, t)
 	defer doTestCleanAndTeardown(plugin, testPodUID, testVolumeName, volumePath, t)
+}
+
+// TestSetUpWriteFailureDoesNotTearDownPopulatedVolume is a regression test for
+// https://github.com/kubernetes/kubernetes/issues/113242. Once a volume has been
+// successfully populated, its directory is bind-mounted into the running
+// container; a subsequent SetUp that fails to write (e.g. a resync that cannot
+// write because the disk is full) must NOT tear that directory down, because
+// removing it breaks the bind mount and leaves the volume permanently empty with
+// no automatic recovery. Two failure points are exercised deterministically: an
+// invalid payload key ("..evil"), which the atomic writer rejects before staging
+// anything, and a file/directory collision between item paths, which fails part
+// way through writing the new timestamp directory, as a full disk would.
+func TestSetUpWriteFailureDoesNotTearDownPopulatedVolume(t *testing.T) {
+	const (
+		testPodUID     = types.UID("test_pod_uid_113242")
+		testVolumeName = "test_volume_name"
+		testNamespace  = "test_projected_namespace"
+		goodName       = "good_secret_name"
+		badName        = "bad_secret_name"
+	)
+	tests := []struct {
+		name  string
+		bad   v1.Secret
+		items []v1.KeyToPath
+	}{
+		{
+			name: "invalid payload",
+			bad: v1.Secret{
+				Namespace: testNamespace, Name: badName,
+				Data: map[string][]byte{"..evil": []byte("boom")},
+			},
+		},
+		{
+			name: "partial write",
+			bad: v1.Secret{
+				Namespace: testNamespace, Name: badName,
+				Data: map[string][]byte{"a": []byte("x"), "b": []byte("y")},
+			},
+			// Either iteration order writes one entry before hitting the
+			// file/directory collision, leaving a partially written generation.
+			items: []v1.KeyToPath{{Key: "a", Path: "new"}, {Key: "b", Path: "new/child"}},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			var (
+				good          = makeSecret(testNamespace, goodName)
+				client        = fake.NewSimpleClientset(&good, &tc.bad)
+				pluginMgr     = volume.VolumePluginMgr{}
+				rootDir, host = newTestHost(t, client)
+			)
+			defer func() { _ = os.RemoveAll(rootDir) }()
+			if err := pluginMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, host); err != nil {
+				t.Fatal(err)
+			}
+
+			plugin, err := pluginMgr.FindPluginByName(projectedPluginName)
+			if err != nil {
+				t.Fatal("Can't find the plugin by name")
+			}
+			pod := &v1.Pod{Namespace: testNamespace, UID: testPodUID}
+
+			// Populate the volume successfully so it becomes "already populated" (..data exists).
+			goodMounter, err := plugin.NewMounter(volume.NewSpecFromVolume(makeVolumeSpec(testVolumeName, goodName, 0644)), pod)
+			if err != nil {
+				t.Fatalf("Failed to make a new Mounter: %v", err)
+			}
+			volumePath := goodMounter.GetPath()
+			if err := goodMounter.SetUp(volume.MounterArgs{}); err != nil {
+				t.Fatalf("initial SetUp failed: %v", err)
+			}
+			if !util.IsTargetPopulated(volumePath) {
+				t.Fatalf("expected volume %q to be populated after initial SetUp", volumePath)
+			}
+			before := dirEntryNames(t, volumePath)
+
+			// A mounter for the same volume name targets the same directory; projecting the
+			// bad payload forces writer.Write to fail on this already-populated volume.
+			badSpec := makeVolumeSpec(testVolumeName, badName, 0644)
+			badSpec.VolumeSource.Projected.Sources[0].Secret.Items = tc.items
+			badMounter, err := plugin.NewMounter(volume.NewSpecFromVolume(badSpec), pod)
+			if err != nil {
+				t.Fatalf("Failed to make a new Mounter: %v", err)
+			}
+			if badMounter.GetPath() != volumePath {
+				t.Fatalf("expected same target dir, got %q vs %q", badMounter.GetPath(), volumePath)
+			}
+			if err := badMounter.SetUp(volume.MounterArgs{}); err == nil {
+				t.Fatal("expected SetUp to fail on bad payload, but it succeeded")
+			}
+
+			// The failed resync must not have torn the volume down.
+			if _, err := os.Stat(volumePath); err != nil {
+				t.Fatalf("volume dir was removed after a failed resync (regression of #113242): %v", err)
+			}
+			if !util.IsTargetPopulated(volumePath) {
+				t.Fatal("volume data dir (..data) was removed after a failed resync (regression of #113242)")
+			}
+			// The original, valid content must still be present, and the failed
+			// write must not have left a partially written generation behind.
+			doTestSecretDataInVolume(volumePath, good, t)
+			if after := dirEntryNames(t, volumePath); !reflect.DeepEqual(before, after) {
+				t.Fatalf("volume dir entries changed after a failed resync: before %v, after %v", before, after)
+			}
+		})
+	}
+}
+
+func dirEntryNames(t *testing.T, dir string) []string {
+	t.Helper()
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	names := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		names = append(names, entry.Name())
+	}
+	return names
+}
+
+// TestSetUpFirstTimeWriteFailureCleansUp is the complement of the test above: it
+// pins the original cleanup behavior that must be preserved. When the *first* setup
+// of a volume fails (the volume was never populated, so nothing is bind-mounted into
+// a container yet), the half-created directory MUST be torn down. This guards against
+// an over-broad fix that suppresses cleanup unconditionally.
+func TestSetUpFirstTimeWriteFailureCleansUp(t *testing.T) {
+	var (
+		testPodUID     = types.UID("test_pod_uid_firsttime")
+		testVolumeName = "test_volume_name"
+		testNamespace  = "test_projected_namespace"
+		badName        = "bad_secret_name"
+
+		bad = v1.Secret{
+			Namespace: testNamespace, Name: badName,
+			Data: map[string][]byte{"..evil": []byte("boom")},
+		}
+		client        = fake.NewSimpleClientset(&bad)
+		pluginMgr     = volume.VolumePluginMgr{}
+		rootDir, host = newTestHost(t, client)
+	)
+	defer func() { _ = os.RemoveAll(rootDir) }()
+	if err := pluginMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, host); err != nil {
+		t.Fatal(err)
+	}
+
+	plugin, err := pluginMgr.FindPluginByName(projectedPluginName)
+	if err != nil {
+		t.Fatal("Can't find the plugin by name")
+	}
+	pod := &v1.Pod{Namespace: testNamespace, UID: testPodUID}
+
+	mounter, err := plugin.NewMounter(volume.NewSpecFromVolume(makeVolumeSpec(testVolumeName, badName, 0644)), pod)
+	if err != nil {
+		t.Fatalf("Failed to make a new Mounter: %v", err)
+	}
+	volumePath := mounter.GetPath()
+	if err := mounter.SetUp(volume.MounterArgs{}); err == nil {
+		t.Fatal("expected first-time SetUp to fail on invalid payload, but it succeeded")
+	}
+
+	// Never populated, so the failed first-time setup must have been cleaned up.
+	if _, err := os.Stat(volumePath); !os.IsNotExist(err) {
+		t.Fatalf("expected volume dir to be torn down after a failed first-time setup, stat err = %v", err)
+	}
 }
 
 func makeVolumeSpec(volumeName, name string, defaultMode int32) *v1.Volume {
