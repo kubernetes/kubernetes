@@ -288,7 +288,7 @@ func (s *storeWithPrefixTransformer) UnderlyingStorage() storage.Interface {
 
 func (s *storeWithPrefixTransformer) UpdatePrefixTransformer(modifier storagetesting.PrefixTransformerModifier) func() {
 	originalTransformer := s.transformer.(*storagetesting.PrefixTransformer)
-	transformer := *originalTransformer
+	transformer := *storagetesting.CopyPrefixTransformer(originalTransformer)
 	s.transformer = modifier(&transformer)
 	s.watcher.transformer = modifier(&transformer)
 	return func() {
