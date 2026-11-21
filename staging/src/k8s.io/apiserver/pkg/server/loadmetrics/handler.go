@@ -24,7 +24,9 @@ limitations under the License.
 package loadmetrics
 
 import (
+	"bufio"
 	"fmt"
+	"net"
 	"net/http"
 
 	"k8s.io/apiserver/pkg/endpoints/responsewriter"
@@ -95,12 +97,14 @@ func (h *endpointLoadMetricsHandler) ServeHTTP(w http.ResponseWriter, req *http.
 		requestedTextFormat: requestedTextFormat,
 	}
 	h.handler.ServeHTTP(responsewriter.WrapForHTTP1Or2(wrapped), req)
+	// A normal return can commit an implicit 200. Do not finalize on panic.
+	wrapped.finalizeHeaders(http.StatusOK)
 }
 
 var _ http.ResponseWriter = &loadMetricsResponseWriter{}
 var _ responsewriter.UserProvidedDecorator = &loadMetricsResponseWriter{}
 
-// loadMetricsResponseWriter intercepts WriteHeader and Write to attach the apiserver
+// loadMetricsResponseWriter intercepts response commits to attach the apiserver
 // load report and strip any ORCA response headers returned by proxied backends (such as aggregated API servers
 // or pod/node/service proxy subresources).
 type loadMetricsResponseWriter struct {
@@ -115,20 +119,35 @@ func (w *loadMetricsResponseWriter) Unwrap() http.ResponseWriter {
 }
 
 func (w *loadMetricsResponseWriter) WriteHeader(statusCode int) {
-	w.finalizeHeaders()
+	w.finalizeHeaders(statusCode)
 	w.ResponseWriter.WriteHeader(statusCode)
 }
 
 func (w *loadMetricsResponseWriter) Write(b []byte) (int, error) {
-	w.finalizeHeaders()
+	w.finalizeHeaders(http.StatusOK)
 	return w.ResponseWriter.Write(b)
 }
 
-func (w *loadMetricsResponseWriter) finalizeHeaders() {
+func (w *loadMetricsResponseWriter) Flush() {
+	w.finalizeHeaders(http.StatusOK)
+	w.ResponseWriter.(http.Flusher).Flush()
+}
+
+func (w *loadMetricsResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	conn, rw, err := w.ResponseWriter.(http.Hijacker).Hijack()
+	if err == nil {
+		// A hijacked response must not be finalized when the handler returns.
+		w.headerWritten = true
+	}
+	return conn, rw, err
+}
+
+func (w *loadMetricsResponseWriter) finalizeHeaders(statusCode int) {
 	if w.headerWritten {
 		return
 	}
-	w.headerWritten = true
+	// Informational responses, except protocol switches, leave headers writable.
+	w.headerWritten = statusCode == http.StatusSwitchingProtocols || statusCode >= http.StatusOK
 
 	// Strip gRPC ORCA binary protobuf header.
 	w.Header().Del(ResponseHeaderBin)
