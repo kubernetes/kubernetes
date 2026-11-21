@@ -18,7 +18,9 @@ package store
 
 import (
 	"fmt"
+	goruntime "runtime"
 	"testing"
+	"weak"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -217,6 +219,41 @@ func TestWatchCacheStorageOldestExactRVAfterCompact(t *testing.T) {
 	t.Log("Write after compact past last write")
 	write(40)
 	assert.Equal(t, "rv=22 keys=[10 20]", oldestExactSnapshot(t, s))
+}
+
+func TestMutationDetectorCompaction(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, true)
+
+	const (
+		key      = "/pods/ns/target"
+		addRV    = 42
+		deleteRV = 43
+	)
+	cacheStorage := NewWatchCacheStorage(nil, true)
+	element := &Element{
+		Key:    key,
+		Object: makePodFn("ns", "target", fmt.Sprint(addRV)),
+	}
+	_, err := cacheStorage.UpdateStore(watch.Added, element, addRV)
+	require.NoError(t, err)
+	elementRef := weak.Make(element)
+
+	// Drop the current entry so only the historical snapshot keeps the element alive.
+	_, err = cacheStorage.UpdateStore(watch.Deleted, &Element{Key: key}, deleteRV)
+	require.NoError(t, err)
+
+	// Verify that the historical snapshot keeps the element tracked across GC.
+	goruntime.GC()
+	cacheStorage.CheckMutations(t.Context())
+	_, tracked := cacheStorage.mutationDetector.baselines.Load(elementRef)
+	require.True(t, tracked, "the baseline should survive while the historical snapshot exists")
+
+	cacheStorage.Compact(deleteRV)
+	// Let GC clear the weak key so the next scan can remove its baseline.
+	goruntime.GC()
+	cacheStorage.CheckMutations(t.Context())
+	_, tracked = cacheStorage.mutationDetector.baselines.Load(elementRef)
+	require.False(t, tracked, "the baseline should be removed after compaction")
 }
 
 func oldestExactSnapshot(t *testing.T, s *WatchCacheStorage) string {
