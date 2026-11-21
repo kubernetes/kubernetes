@@ -17,6 +17,7 @@ limitations under the License.
 package labels
 
 import (
+	"errors"
 	"fmt"
 	"slices"
 	"sort"
@@ -267,11 +268,22 @@ func (r *Requirement) Matches(ls Labels) bool {
 		if !exists {
 			return false
 		}
+		// A label value may be up to 63 characters, so a valid integer can lie
+		// outside the int64 range even though the operand is an int64. ParseInt
+		// reports ErrRange only for a syntactically valid integer, and such a
+		// value is beyond every operand on the side of its sign.
+		outOfRange := 0
 		lsValue, err := strconv.ParseInt(val, 10, 64)
 		if err != nil {
-			//nolint:logcheck // Extending the API is not worth it for contextual, structured logging of this.
-			klog.V(10).InfoS("ParseInt failed", "value", val, "label", ls, "err", err)
-			return false
+			if !errors.Is(err, strconv.ErrRange) {
+				//nolint:logcheck // Extending the API is not worth it for contextual, structured logging of this.
+				klog.V(10).InfoS("ParseInt failed", "value", val, "label", ls, "err", err)
+				return false
+			}
+			outOfRange = 1
+			if val[0] == '-' {
+				outOfRange = -1
+			}
 		}
 
 		// There should be only one strValue in r.strValues, and can be converted to an integer.
@@ -289,6 +301,9 @@ func (r *Requirement) Matches(ls Labels) bool {
 				klog.V(10).InfoS("ParseInt failed: for 'Gt', 'Lt' operators, the value must be an integer", "value", r.strValues[i], "requirement", r, "err", err)
 				return false
 			}
+		}
+		if outOfRange != 0 {
+			return (r.operator == selection.GreaterThan && outOfRange > 0) || (r.operator == selection.LessThan && outOfRange < 0)
 		}
 		return (r.operator == selection.GreaterThan && lsValue > rValue) || (r.operator == selection.LessThan && lsValue < rValue)
 	default:
