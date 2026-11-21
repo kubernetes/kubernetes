@@ -118,3 +118,42 @@ func TestCreateCronJob(t *testing.T) {
 		})
 	}
 }
+
+func TestCreateCronJobValidate(t *testing.T) {
+	tests := map[string]struct {
+		restart     string
+		expectError bool
+	}{
+		"valid OnFailure restart policy": {
+			restart:     "OnFailure",
+			expectError: false,
+		},
+		"valid Never restart policy": {
+			restart:     "Never",
+			expectError: false,
+		},
+		"invalid Always restart policy": {
+			restart:     "Always",
+			expectError: true,
+		},
+		"invalid custom restart policy": {
+			restart:     "custom",
+			expectError: true,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			o := &CreateCronJobOptions{
+				Restart: tc.restart,
+			}
+			err := o.Validate()
+			if tc.expectError && err == nil {
+				t.Errorf("expected error, got nil")
+			}
+			if !tc.expectError && err != nil {
+				t.Errorf("expected no error, got %v", err)
+			}
+		})
+	}
+}
