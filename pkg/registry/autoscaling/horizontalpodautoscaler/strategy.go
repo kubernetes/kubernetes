@@ -189,17 +189,15 @@ func (autoscalerStatusStrategy) WarningsOnUpdate(ctx context.Context, obj, old r
 }
 
 func validationOptionsForHorizontalPodAutoscaler(newHPA, oldHPA *autoscaling.HorizontalPodAutoscaler) validation.HorizontalPodAutoscalerSpecValidationOptions {
+	// The minReplicas lower bound (0 or 1) is enforced by declarative validation via
+	// the +k8s:ifEnabled/ifDisabled(HPAScaleToZero) tags on the versioned types.
+	// DeclarativeValidationConfig sets that option, including keeping 0 allowed
+	// on update when the old object already has minReplicas == 0.
 	opts := validation.HorizontalPodAutoscalerSpecValidationOptions{
-		MinReplicasLowerBound:           1,
 		ScaleTargetRefValidationOptions: validation.CrossVersionObjectReferenceValidationOptions{AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: false, RequiredCoveredByDeclarative: true},
 		ObjectMetricsValidationOptions: validation.CrossVersionObjectReferenceValidationOptions{
 			AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: true,
 		},
-	}
-
-	oldHasZeroMinReplicas := oldHPA != nil && (oldHPA.Spec.MinReplicas != nil && *oldHPA.Spec.MinReplicas == 0)
-	if utilfeature.DefaultFeatureGate.Enabled(features.HPAScaleToZero) || oldHasZeroMinReplicas {
-		opts.MinReplicasLowerBound = 0
 	}
 
 	switch {
