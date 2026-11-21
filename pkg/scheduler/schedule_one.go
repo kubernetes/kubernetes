@@ -20,7 +20,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"math/rand"
+	"net"
 	"strconv"
 	"sync"
 	"time"
@@ -785,9 +787,48 @@ func (sched *Scheduler) bind(ctx context.Context, schedFramework framework.Frame
 
 	bound, err := sched.extendersBinding(logger, schedFramework, assumed, targetNode)
 	if bound {
-		return fwk.AsStatus(err)
+		status = fwk.AsStatus(err)
+	} else {
+		status = schedFramework.RunBindPlugins(ctx, state, assumed, targetNode)
 	}
-	return schedFramework.RunBindPlugins(ctx, state, assumed, targetNode)
+	if status.IsSuccess() {
+		return status
+	}
+	if !isIndeterminateBindError(status.AsError()) {
+		return status
+	}
+
+	// The binding may have been persisted even though the request returned an
+	// error, for example if the API server restarted while handling it. Look up
+	// the pod before reporting the failure, otherwise it can be running on a node
+	// while missing from the scheduler cache.
+	if podIsBound, err := podBoundToNode(ctx, schedFramework.ClientSet(), assumed, targetNode); err == nil && podIsBound {
+		logger.V(2).Info("Pod was bound to node although the bind request errored", "pod", klog.KObj(assumed), "node", targetNode)
+		return nil
+	}
+	return status
+}
+
+// isIndeterminateBindError returns true if the bind request may have been
+// processed by the API server even though the scheduler received an error.
+func isIndeterminateBindError(err error) bool {
+	var netErr net.Error
+	return errors.As(err, &netErr) ||
+		errors.Is(err, io.EOF) ||
+		errors.Is(err, io.ErrUnexpectedEOF) ||
+		errors.Is(err, context.DeadlineExceeded)
+}
+
+// podBoundToNode checks with the API server whether the pod is bound to the given node.
+func podBoundToNode(ctx context.Context, client clientset.Interface, assumedPod *v1.Pod, nodeName string) (bool, error) {
+	if client == nil {
+		return false, errors.New("no client configured")
+	}
+	pod, err := client.CoreV1().Pods(assumedPod.Namespace).Get(ctx, assumedPod.Name, metav1.GetOptions{})
+	if err != nil {
+		return false, err
+	}
+	return pod.UID == assumedPod.UID && pod.Spec.NodeName == nodeName, nil
 }
 
 // TODO(#87159): Move this to a Plugin.

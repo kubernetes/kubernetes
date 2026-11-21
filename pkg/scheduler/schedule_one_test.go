@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"math"
 	"math/rand"
 	"regexp"
@@ -118,6 +119,7 @@ type fakeExtender struct {
 	ignorable         bool
 	gotBind           bool
 	errBind           bool
+	bindErr           error
 	isPrioritizer     bool
 	isFilter          bool
 }
@@ -155,6 +157,9 @@ func (f *fakeExtender) Prioritize(
 
 func (f *fakeExtender) Bind(binding *v1.Binding) error {
 	if f.isBinder {
+		if f.bindErr != nil {
+			return f.bindErr
+		}
 		if f.errBind {
 			return errors.New("bind error")
 		}
@@ -3258,6 +3263,53 @@ func TestSchedulerBinding(t *testing.T) {
 
 			})
 		}
+	}
+}
+
+func TestBindChecksPodAfterBindError(t *testing.T) {
+	tests := []struct {
+		name      string
+		nodeName  string
+		wantError bool
+	}{
+		{
+			name:     "pod was bound although the bind request errored",
+			nodeName: "node",
+		},
+		{
+			name:      "pod was not bound",
+			wantError: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			assumedPod := st.MakePod().Name("pod0").Namespace("default").UID("uid0").Obj()
+			boundPod := assumedPod.DeepCopy()
+			boundPod.Spec.NodeName = test.nodeName
+
+			client := clientsetfake.NewClientset(boundPod)
+			informerFactory := informers.NewSharedInformerFactory(client, 0)
+			if err := informerFactory.Core().V1().Pods().Informer().GetIndexer().Add(assumedPod); err != nil {
+				t.Fatal(err)
+			}
+			_, ctx := ktesting.NewTestContext(t)
+
+			fwk, err := tf.NewFramework(ctx, []tf.RegisterPluginFunc{
+				tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+			}, "", frameworkruntime.WithClientSet(client), frameworkruntime.WithInformerFactory(informerFactory), frameworkruntime.WithEventRecorder(&events.FakeRecorder{}), frameworkruntime.WithExtenders([]fwk.Extender{
+				&fakeExtender{isBinder: true, bindErr: io.ErrUnexpectedEOF, interestedPodName: "pod0"},
+			}))
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			status := (&Scheduler{}).bind(ctx, fwk, assumedPod, "node", framework.NewCycleState())
+			if gotError := !status.IsSuccess(); gotError != test.wantError {
+				t.Errorf("bind() status = %v, wantError %v", status, test.wantError)
+			}
+		})
 	}
 }
 
