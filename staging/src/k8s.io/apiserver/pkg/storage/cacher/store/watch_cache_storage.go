@@ -30,7 +30,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
-func NewWatchCacheStorage(indexers *cache.Indexers) *WatchCacheStorage {
+func NewWatchCacheStorage(indexers *cache.Indexers, detectMutations bool) *WatchCacheStorage {
 	storage := &WatchCacheStorage{
 		store:     newBtreeStore(btreeDegree),
 		indexer:   newIndexer(ElementIndexers(indexers)),

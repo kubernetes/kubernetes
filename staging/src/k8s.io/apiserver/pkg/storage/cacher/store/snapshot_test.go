@@ -45,7 +45,7 @@ func TestSnapshotListPrefix(t *testing.T) {
 		{
 			name: "Indexer",
 			newSnapshot: func(t *testing.T) Snapshot {
-				indexer := NewWatchCacheStorage(nil)
+				indexer := NewWatchCacheStorage(nil, false)
 				for i, elem := range elements {
 					prev, err := indexer.UpdateStore(watch.Added, elem, uint64(i+1))
 					require.NoError(t, err)

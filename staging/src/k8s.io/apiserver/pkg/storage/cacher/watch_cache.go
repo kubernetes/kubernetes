@@ -123,6 +123,7 @@ func newWatchCache(
 	groupResource schema.GroupResource,
 	progressRequester *progress.ConditionalProgressRequester,
 	getCurrentRV func(context.Context) (uint64, error),
+	detectMutations bool,
 ) (*watchCache, error) {
 	config := &ImmutableWatchCacheConfig{
 		keyFunc:       keyFunc,
@@ -143,7 +144,7 @@ func newWatchCache(
 		resourceVersion: 0,
 		config:          config,
 		history:         history,
-		storage:         store.NewWatchCacheStorage(indexers),
+		storage:         store.NewWatchCacheStorage(indexers, detectMutations),
 	}
 	wc.freshness = newFreshnessWaiter(clock, groupResource, progressRequester)
 	wc.config.indexValidator = wc.history.isIndexValidLocked

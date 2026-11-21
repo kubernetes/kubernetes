@@ -135,7 +135,7 @@ func newTestWatchCache(capacity int, eventFreshDuration time.Duration, indexers 
 		return wc.resourceVersion, nil
 	}
 	var err error
-	wc.watchCache, err = newWatchCache(keyFunc, mockHandler, getAttrsFunc, versioner, indexers, testingclock.NewFakeClock(time.Now()), eventFreshDuration, 0, schema.GroupResource{Resource: "pods"}, pr, getCurrentRV)
+	wc.watchCache, err = newWatchCache(keyFunc, mockHandler, getAttrsFunc, versioner, indexers, testingclock.NewFakeClock(time.Now()), eventFreshDuration, 0, schema.GroupResource{Resource: "pods"}, pr, getCurrentRV, false)
 	if err != nil {
 		panic(err)
 	}

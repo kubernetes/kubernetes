@@ -36,7 +36,7 @@ func TestWatchCacheStorageMarkConsistent(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, true)
 
 	indexers := &cache.Indexers{}
-	s := NewWatchCacheStorage(indexers)
+	s := NewWatchCacheStorage(indexers, false)
 
 	assert.True(t, s.SnapshottingEnabled())
 
@@ -79,7 +79,7 @@ func TestLatestSnapshot(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, false)
 
 	indexers := &cache.Indexers{}
-	s := NewWatchCacheStorage(indexers)
+	s := NewWatchCacheStorage(indexers, false)
 
 	before := s.LatestSnapshot()
 	assert.Equal(t, uint64(0), before.ResourceVersion())
@@ -123,7 +123,7 @@ func TestWatchCacheStorageMatchExactResourceVersionFallback(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, true)
 
 	indexers := &cache.Indexers{}
-	s := NewWatchCacheStorage(indexers)
+	s := NewWatchCacheStorage(indexers, false)
 
 	t.Log("Initially no snapshots exist, should return ResourceExpired error")
 	assert.False(t, s.CanServeExactRV(20))
@@ -193,7 +193,7 @@ func TestWatchCacheStorageMatchExactResourceVersionFallback(t *testing.T) {
 // from the compacted one up to the latest one it observed.
 func TestWatchCacheStorageOldestExactRVAfterCompact(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, true)
-	s := NewWatchCacheStorage(&cache.Indexers{})
+	s := NewWatchCacheStorage(&cache.Indexers{}, false)
 	write := func(rv int) {
 		_, err := s.UpdateStore(watch.Added, testStorageElement(fmt.Sprint(rv), "", rv), uint64(rv))
 		require.NoError(t, err)
@@ -254,7 +254,7 @@ func TestWatchCacheStorageSnapshots(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, true)
 
 	indexers := &cache.Indexers{}
-	s := NewWatchCacheStorage(indexers)
+	s := NewWatchCacheStorage(indexers, false)
 
 	assert.True(t, s.SnapshottingEnabled(), "Expected snapshotting to be enabled when feature gate is active")
 
@@ -392,7 +392,7 @@ func TestWatchCacheStorageSnapshots(t *testing.T) {
 }
 
 func TestStoreSingleKey(t *testing.T) {
-	store := NewWatchCacheStorage(testStoreIndexers())
+	store := NewWatchCacheStorage(testStoreIndexers(), false)
 	assertStoreEmpty(t, store, "foo", 0)
 
 	prev, err := store.UpdateStore(watch.Added, testStorageElement("foo", "bar", 1), 1)
@@ -431,7 +431,7 @@ func TestStoreSingleKey(t *testing.T) {
 }
 
 func TestStoreIndexerSingleKey(t *testing.T) {
-	store := NewWatchCacheStorage(testStoreIndexers())
+	store := NewWatchCacheStorage(testStoreIndexers(), false)
 	snap, err := store.GetByIndexSnapshot("by_val", "bar")
 	require.NoError(t, err)
 	assert.Equal(t, uint64(0), snap.ResourceVersion())

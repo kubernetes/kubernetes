@@ -495,7 +495,7 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 	progressRequester := progress.NewConditionalProgressRequester(config.Storage.RequestWatchProgress, config.Clock, contextMetadata)
 	watchCache, err := newWatchCache(
 		config.KeyFunc, cacher.processEvent, config.GetAttrsFunc, config.Versioner, config.Indexers,
-		config.Clock, eventFreshDuration, config.WatchCacheMaxEvents, config.GroupResource, progressRequester, config.Storage.GetCurrentResourceVersion)
+		config.Clock, eventFreshDuration, config.WatchCacheMaxEvents, config.GroupResource, progressRequester, config.Storage.GetCurrentResourceVersion, false)
 	if err != nil {
 		return nil, err
 	}
