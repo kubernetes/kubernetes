@@ -55,6 +55,9 @@ Why do we need this?
     based on the time it was created. The timestamp follows the format "20060102-150405".
     For example, a backup created on June 2, 2006, at 3:04:05 PM would include this timestamp.
     * `<file-extension>`: The original file’s extension (e.g., .log) remains unchanged.
+    * `.N`: A counter inserted before the extension when a backup with that name
+    already exists, which happens when the log rotates more than once within the
+    same second. For example, `app-20060102-150405.1.log`.
   This naming convention ensures easy organization and retrieval of rotated log files based on their creation time.
 
 - -log-file-age
