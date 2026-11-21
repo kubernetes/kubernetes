@@ -4704,13 +4704,14 @@ func validateContainerOnlyForPod(ctr *core.Container, path *field.Path) field.Er
 	return allErrs
 }
 
-// validatePodMetadataAndSpec tests if required fields in the pod.metadata and pod.spec are set,
-// and is called by ValidatePodCreate and ValidatePodUpdate.
-func validatePodMetadataAndSpec(pod *core.Pod, opts PodValidationOptions) field.ErrorList {
+// validatePodMetadataAndSpec tests if required fields in the pod.metadata and pod.spec are set.
+// Update validators pass oldPod so shared Pod update checks also cover subresources.
+func validatePodMetadataAndSpec(pod, oldPod *core.Pod, opts PodValidationOptions) field.ErrorList {
 	metaPath := field.NewPath("metadata")
 	specPath := field.NewPath("spec")
 
-	allErrs := ValidateObjectMeta(&pod.ObjectMeta, true, ValidatePodName, metaPath)
+	allErrs := validatePodCheckpointingUpdate(pod, oldPod)
+	allErrs = append(allErrs, ValidateObjectMeta(&pod.ObjectMeta, true, ValidatePodName, metaPath)...)
 	allErrs = append(allErrs, ValidatePodSpecificAnnotations(pod.ObjectMeta.Annotations, &pod.Spec, metaPath.Child("annotations"), opts)...)
 	allErrs = append(allErrs, ValidatePodSpec(&pod.Spec, &pod.ObjectMeta, specPath, opts)...)
 
@@ -5929,7 +5930,7 @@ func validateContainerImage(image string, fldPath *field.Path) field.ErrorList {
 
 // ValidatePodCreate validates a pod in the context of its initial create
 func ValidatePodCreate(pod *core.Pod, opts PodValidationOptions) field.ErrorList {
-	allErrs := validatePodMetadataAndSpec(pod, opts)
+	allErrs := validatePodMetadataAndSpec(pod, nil, opts)
 
 	fldPath := field.NewPath("spec")
 	// EphemeralContainers can only be set on update using the ephemeralcontainers subresource
@@ -6032,7 +6033,7 @@ var updatablePodSpecFields = []string{
 func ValidatePodUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions) field.ErrorList {
 	fldPath := field.NewPath("metadata")
 	allErrs := ValidateObjectMetaUpdate(&newPod.ObjectMeta, &oldPod.ObjectMeta, fldPath)
-	allErrs = append(allErrs, validatePodMetadataAndSpec(newPod, opts)...)
+	allErrs = append(allErrs, validatePodMetadataAndSpec(newPod, oldPod, opts)...)
 	allErrs = append(allErrs, ValidatePodSpecificAnnotationUpdates(newPod, oldPod.Annotations, fldPath.Child("annotations"), opts)...)
 	allErrs = append(allErrs, validatePodSpecUpdate(newPod, oldPod, opts)...)
 	return allErrs
@@ -6355,7 +6356,7 @@ func ValidatePodStatusUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions
 	allErrs = append(allErrs, ValidatePodSpecificAnnotationUpdates(newPod, oldPod.Annotations, fldPath.Child("annotations"), opts)...)
 
 	fldPath = field.NewPath("status")
-	allErrs = append(allErrs, validatePodConditions(newPod.Status.Conditions, fldPath.Child("conditions"))...)
+	allErrs = append(allErrs, validatePodConditions(newPod.Status.Conditions, oldPod.Status.Conditions, fldPath.Child("conditions"))...)
 
 	if newPod.Spec.NodeName != oldPod.Spec.NodeName {
 		allErrs = append(allErrs, field.Forbidden(fldPath.Child("nodeName"), "may not be changed directly"))
@@ -6441,15 +6442,52 @@ func ValidatePodStatusUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions
 
 // validatePodConditions tests if the custom pod conditions are valid, and that the observedGeneration
 // is a non-negative integer.
-func validatePodConditions(conditions []core.PodCondition, fldPath *field.Path) field.ErrorList {
+func validatePodConditions(conditions, oldConditions []core.PodCondition, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	systemConditions := sets.New(
 		core.PodScheduled,
 		core.PodReady,
 		core.PodInitialized)
+	// Before PodCheckpointing became a built-in type, any client could set a
+	// condition with that name, so stored Pods may already carry invalid or
+	// duplicate ones. Only validate PodCheckpointing conditions that change.
+	oldCheckpointConditions := map[core.PodConditionType][]core.PodCondition{}
+	for _, condition := range oldConditions {
+		if condition.Type == core.PodCheckpointing {
+			oldCheckpointConditions[condition.Type] = append(oldCheckpointConditions[condition.Type], condition)
+		}
+	}
+	seenCheckpointConditions := sets.New[core.PodConditionType]()
 	for i, condition := range conditions {
 		if condition.ObservedGeneration < 0 {
 			allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("observedGeneration"), condition.ObservedGeneration, "must be a non-negative integer"))
+		}
+		if condition.Type == core.PodCheckpointing {
+			path := fldPath.Index(i)
+			if seenCheckpointConditions.Has(condition.Type) && len(oldCheckpointConditions[condition.Type]) < 2 {
+				allErrs = append(allErrs, field.Duplicate(path.Child("type"), condition.Type))
+			}
+			seenCheckpointConditions.Insert(condition.Type)
+			if slices.ContainsFunc(oldCheckpointConditions[condition.Type], func(old core.PodCondition) bool {
+				return apiequality.Semantic.DeepEqual(old, condition)
+			}) {
+				continue
+			}
+			// Apply metav1.Condition rules to this type only; other Pod condition
+			// types keep their existing, looser validation.
+			errs := unversionedvalidation.ValidateCondition(metav1.Condition{
+				Type:               string(condition.Type),
+				Status:             metav1.ConditionStatus(condition.Status),
+				LastTransitionTime: condition.LastTransitionTime,
+				Reason:             condition.Reason,
+				Message:            condition.Message,
+			}, path)
+			for _, err := range errs {
+				// PodCondition does not use metav1.Condition's declarative tags.
+				err.CoveredByDeclarative = false
+			}
+			allErrs = append(allErrs, errs...)
+			continue
 		}
 		if systemConditions.Has(condition.Type) {
 			continue
@@ -6637,7 +6675,7 @@ func ValidatePodEphemeralContainersUpdate(newPod, oldPod *core.Pod, opts PodVali
 	// Part 1: Validate newPod's spec and updates to metadata
 	fldPath := field.NewPath("metadata")
 	allErrs := ValidateObjectMetaUpdate(&newPod.ObjectMeta, &oldPod.ObjectMeta, fldPath)
-	allErrs = append(allErrs, validatePodMetadataAndSpec(newPod, opts)...)
+	allErrs = append(allErrs, validatePodMetadataAndSpec(newPod, oldPod, opts)...)
 	allErrs = append(allErrs, ValidatePodSpecificAnnotationUpdates(newPod, oldPod.Annotations, fldPath.Child("annotations"), opts)...)
 
 	// static pods don't support ephemeral containers #113935
@@ -6677,7 +6715,7 @@ func ValidatePodEphemeralContainersUpdate(newPod, oldPod *core.Pod, opts PodVali
 func ValidatePodResize(newPod, oldPod *core.Pod, opts PodValidationOptions) field.ErrorList {
 	fldPath := field.NewPath("metadata")
 	allErrs := ValidateObjectMetaUpdate(&newPod.ObjectMeta, &oldPod.ObjectMeta, fldPath)
-	allErrs = append(allErrs, validatePodMetadataAndSpec(newPod, opts)...)
+	allErrs = append(allErrs, validatePodMetadataAndSpec(newPod, oldPod, opts)...)
 
 	// static pods cannot be resized.
 	if _, ok := oldPod.Annotations[core.MirrorPodAnnotationKey]; ok {
@@ -6853,7 +6891,7 @@ func ValidatePodDynamicUpdate(newPod, oldPod *core.Pod, opts PodValidationOption
 	metaPath := field.NewPath("metadata")
 	specPath := field.NewPath("spec")
 	allErrs := ValidateObjectMetaUpdate(&newPod.ObjectMeta, &oldPod.ObjectMeta, metaPath)
-	allErrs = append(allErrs, validatePodMetadataAndSpec(newPod, opts)...)
+	allErrs = append(allErrs, validatePodMetadataAndSpec(newPod, oldPod, opts)...)
 	allErrs = append(allErrs, ValidatePodSpecificAnnotationUpdates(newPod, oldPod.Annotations, metaPath.Child("annotations"), opts)...)
 
 	containerErrs, containersChanged := validateDynamicContainerChanges(newPod, oldPod, specPath, opts)

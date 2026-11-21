@@ -63,6 +63,9 @@ type containerBoundManager struct {
 	// Keep labels after workers exit to delete metric series on pod removal.
 	probedMetrics map[probeKey]probeMetricLabels
 
+	// Workers for suspended pods skip probes while their containers are frozen.
+	suspendedPods sets.Set[types.UID]
+
 	// Outlive pod sync cancellation so readiness probes continue during termination.
 	ctx context.Context
 
@@ -87,6 +90,7 @@ func NewContainerBoundManager(
 		workers:          make(map[probeKey]*containerBoundWorker),
 		containers:       make(map[containerKey]kubecontainer.ContainerID),
 		probedMetrics:    make(map[probeKey]probeMetricLabels),
+		suspendedPods:    sets.New[types.UID](),
 		readinessManager: readinessManager,
 		livenessManager:  livenessManager,
 		startupManager:   startupManager,
@@ -136,6 +140,42 @@ func (m *containerBoundManager) SyncPod(ctx context.Context, pod *v1.Pod, podSta
 
 		m.adoptLocked(ctx, target)
 	}
+}
+
+// SuspendProbes pauses probes for a pod and waits for its current probes to finish.
+func (m *containerBoundManager) SuspendProbes(ctx context.Context, podUID types.UID) error {
+	m.mu.Lock()
+	m.suspendedPods.Insert(podUID)
+	var workers []*containerBoundWorker
+	for key, worker := range m.workers {
+		if key.podUID == podUID {
+			workers = append(workers, worker)
+		}
+	}
+	m.mu.Unlock()
+
+	for _, worker := range workers {
+		select {
+		case worker.probeLock <- struct{}{}:
+			<-worker.probeLock
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+	return ctx.Err()
+}
+
+// ResumeProbes allows workers to probe a pod again.
+func (m *containerBoundManager) ResumeProbes(podUID types.UID) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.suspendedPods.Delete(podUID)
+}
+
+func (m *containerBoundManager) isSuspended(podUID types.UID) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.suspendedPods.Has(podUID)
 }
 
 // adoptLocked restores probe state from API status until live probes take over.
@@ -273,6 +313,7 @@ func (m *containerBoundManager) ensureWorkerLocked(ctx context.Context, probeTyp
 		resultsManager: resultsManager,
 		adopted:        adopted,
 		onExit:         m.onWorkerExit,
+		isSuspended:    func() bool { return m.isSuspended(target.pod.UID) },
 	}
 	if probeType == kubecontainer.StartupProbe {
 		opts.onStartupSucceeded = m.onStartupSucceeded

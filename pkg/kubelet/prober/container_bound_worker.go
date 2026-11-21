@@ -55,6 +55,8 @@ type containerBoundWorkerOptions struct {
 	// Initial probe timing is jittered to prevent a thundering herd.
 	adopted bool
 
+	isSuspended func() bool
+
 	onExit             func(*containerBoundWorker)
 	onStartupSucceeded func(*containerBoundWorker)
 }
@@ -71,11 +73,13 @@ type containerBoundWorker struct {
 	resultsManager results.Manager
 
 	adopted            bool
+	isSuspended        func() bool
 	onExit             func(*containerBoundWorker)
 	onStartupSucceeded func(*containerBoundWorker)
 
-	ctx    context.Context
-	cancel context.CancelFunc
+	ctx       context.Context
+	cancel    context.CancelFunc
+	probeLock chan struct{}
 
 	probeResultState
 }
@@ -89,6 +93,8 @@ func newContainerBoundWorker(ctx context.Context, opts containerBoundWorkerOptio
 		prober:             opts.prober,
 		resultsManager:     opts.resultsManager,
 		adopted:            opts.adopted,
+		isSuspended:        opts.isSuspended,
+		probeLock:          make(chan struct{}, 1),
 		onExit:             opts.onExit,
 		onStartupSucceeded: opts.onStartupSucceeded,
 	}
@@ -163,6 +169,15 @@ func (w *containerBoundWorker) wait(d time.Duration) bool {
 // Returns whether the worker should continue.
 func (w *containerBoundWorker) doProbe() (keepGoing bool) {
 	ctx := w.ctx
+	select {
+	case w.probeLock <- struct{}{}:
+		defer func() { <-w.probeLock }()
+	case <-ctx.Done():
+		return false
+	}
+	if w.isSuspended != nil && w.isSuspended() {
+		return true
+	}
 	defer func() { _ = recover() }() // Actually eat panics (HandleCrash takes care of logging)
 	defer runtime.HandleCrashWithContext(ctx, func(ctx context.Context, _ interface{}) { keepGoing = true })
 

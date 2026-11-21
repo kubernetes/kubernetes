@@ -112,6 +112,11 @@ func (in MemorySwapConfiguration) OpenAPIModelName() string {
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
+func (in PodCheckpointStorageConfiguration) OpenAPIModelName() string {
+	return "io.k8s.kubelet.config.v1beta1.PodCheckpointStorageConfiguration"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in SerializedNodeConfigSource) OpenAPIModelName() string {
 	return "io.k8s.kubelet.config.v1beta1.SerializedNodeConfigSource"
 }
