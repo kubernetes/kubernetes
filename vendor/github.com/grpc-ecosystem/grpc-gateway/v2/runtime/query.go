@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -16,13 +15,41 @@ import (
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/reflect/protoregistry"
 	"google.golang.org/protobuf/types/known/durationpb"
+	"google.golang.org/protobuf/types/known/emptypb"
 	field_mask "google.golang.org/protobuf/types/known/fieldmaskpb"
 	"google.golang.org/protobuf/types/known/structpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 )
 
-var valuesKeyRegexp = regexp.MustCompile(`^(.*)\[(.*)\]$`)
+// splitMapKey splits a query parameter name of the form "field[key]" into the part before the
+// bracket and the key inside it, reporting whether the name has that shape at all.
+//
+// This replaces a FindStringSubmatch against `^(.*)\[(.*)\]$`, which ran for every query
+// parameter and cost two allocations each -- the submatch slice and the backtracker's state --
+// to answer a question that is two index operations. The returned strings are slices of the
+// caller's key, so nothing is copied; the caller rebuilds "[key]" as key[len(prefix):] rather
+// than concatenating it back together.
+//
+// The regexp is matched exactly, including two details worth spelling out:
+//
+//   - The first group is greedy, so the bracket that counts is the last one before the final
+//     "]". "a[b]c]" splits into "a" and "b]c", which is what LastIndexByte over everything but
+//     the final byte finds.
+//   - Go's regexp does not let "." match a newline and anchors ^ and $ at the ends of the text,
+//     so a key containing a newline could never match the pattern no matter where the brackets
+//     sat. The explicit newline check keeps that, rather than quietly starting to treat
+//     "a\n[b]" as a map key.
+func splitMapKey(key string) (prefix, inner string, ok bool) {
+	if len(key) < 2 || key[len(key)-1] != ']' || strings.IndexByte(key, '\n') >= 0 {
+		return "", "", false
+	}
+	open := strings.LastIndexByte(key[:len(key)-1], '[')
+	if open < 0 {
+		return "", "", false
+	}
+	return key[:open], key[open+1 : len(key)-1], true
+}
 
 var currentQueryParser QueryParameterParser = &DefaultQueryParser{}
 
@@ -44,30 +71,67 @@ func PopulateQueryParameters(msg proto.Message, values url.Values, filter *utili
 type DefaultQueryParser struct{}
 
 // Parse populates "values" into "msg".
-// A value is ignored if its key starts with one of the elements in "filter".
+// A value is ignored if its key starts with one of the elements in "filter",
+// or names a field that contains one of them.
 func (*DefaultQueryParser) Parse(msg proto.Message, values url.Values, filter *utilities.DoubleArray) error {
+	// A field is addressable by both its proto name and its JSON name, so two
+	// keys can set the same one. Record which fields have been set and refuse a
+	// second key for a field, the way protojson refuses a duplicate field in a
+	// body, instead of letting map iteration order pick the value that survives.
+	seen := make(map[string]struct{}, len(values))
 	for key, values := range values {
-		if match := valuesKeyRegexp.FindStringSubmatch(key); len(match) == 3 {
-			key = match[1]
-			values = append([]string{match[2]}, values...)
+		fieldKey, mapKey := key, ""
+		if prefix, inner, ok := splitMapKey(key); ok {
+			fieldKey, mapKey = prefix, key[len(prefix):]
+			values = append([]string{inner}, values...)
 		}
 
 		msgValue := msg.ProtoReflect()
-		fieldPath := normalizeFieldPath(msgValue, strings.Split(key, "."))
-		if filter.HasCommonPrefix(fieldPath) {
+		fieldPath := normalizeFieldPath(msgValue, strings.Split(fieldKey, "."))
+		if filter.HasCommonPrefix(fieldPath) || containsFilteredField(filter, fieldPath) {
 			continue
 		}
-		if err := populateFieldValueFromPath(msgValue, fieldPath, values); err != nil {
+		field := strings.Join(fieldPath, ".") + mapKey
+		if _, ok := seen[field]; ok {
+			return fmt.Errorf("duplicate field %q", field)
+		}
+		seen[field] = struct{}{}
+		if err := populateFieldValueFromPath(msgValue, fieldPath, values, mapKey != ""); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
+// containsFilteredField reports whether fieldPath names a field that contains
+// one of the sequences in filter, such as "id" for a path parameter bound to
+// "id.value". Setting such a field from the query, which the parser can do for
+// well-known types like wrappers and timestamps, would replace the whole
+// message and with it the value already bound from the path or body.
+func containsFilteredField(filter *utilities.DoubleArray, fieldPath []string) bool {
+	if len(filter.Base) == 0 {
+		return false
+	}
+
+	var i int
+	for _, t := range fieldPath {
+		code, ok := filter.Encoding[t]
+		if !ok {
+			return false
+		}
+		j := filter.Base[i] + code
+		if len(filter.Check) <= j || filter.Check[j] != i+1 {
+			return false
+		}
+		i = j
+	}
+	return true
+}
+
 // PopulateFieldFromPath sets a value in a nested Protobuf structure.
 func PopulateFieldFromPath(msg proto.Message, fieldPathString string, value string) error {
 	fieldPath := strings.Split(fieldPathString, ".")
-	return populateFieldValueFromPath(msg.ProtoReflect(), fieldPath, []string{value})
+	return populateFieldValueFromPath(msg.ProtoReflect(), fieldPath, []string{value}, false)
 }
 
 func normalizeFieldPath(msgValue protoreflect.Message, fieldPath []string) []string {
@@ -102,7 +166,7 @@ func normalizeFieldPath(msgValue protoreflect.Message, fieldPath []string) []str
 	return newFieldPath
 }
 
-func populateFieldValueFromPath(msgValue protoreflect.Message, fieldPath []string, values []string) error {
+func populateFieldValueFromPath(msgValue protoreflect.Message, fieldPath []string, values []string, hasMapKey bool) error {
 	if len(fieldPath) < 1 {
 		return errors.New("no field path")
 	}
@@ -147,6 +211,18 @@ func populateFieldValueFromPath(msgValue protoreflect.Message, fieldPath []strin
 
 		// Get the nested message
 		msgValue = msgValue.Mutable(fieldDescriptor).Message()
+	}
+
+	// A key using the map syntax (field[key]=value) must name a map field,
+	// or a repeated field of key/value messages laid out like map entries.
+	// Otherwise the bracket content would be bound as if it were a regular
+	// value: appended as a phantom element of a repeated field, or counted
+	// as a second value for a singular one.
+	if hasMapKey && !fieldDescriptor.IsMap() {
+		if isKeyValueList(fieldDescriptor) {
+			return populateKeyValueListField(fieldDescriptor, msgValue.Mutable(fieldDescriptor).List(), values)
+		}
+		return fmt.Errorf("field %q is not a map", fieldDescriptor.FullName().Name())
 	}
 
 	switch {
@@ -205,6 +281,48 @@ func populateMapField(fieldDescriptor protoreflect.FieldDescriptor, mp protorefl
 	return nil
 }
 
+// isKeyValueList reports whether fieldDescriptor is a repeated message field
+// whose message has exactly a singular "key" and a singular "value" field.
+// Such a field is shaped like a map entry list, but can hold more than one
+// value for a key.
+func isKeyValueList(fieldDescriptor protoreflect.FieldDescriptor) bool {
+	if !fieldDescriptor.IsList() || fieldDescriptor.Message() == nil {
+		return false
+	}
+	fields := fieldDescriptor.Message().Fields()
+	if fields.Len() != 2 {
+		return false
+	}
+	key, value := fields.ByName("key"), fields.ByName("value")
+	return key != nil && key.Cardinality() != protoreflect.Repeated &&
+		value != nil && value.Cardinality() != protoreflect.Repeated
+}
+
+// populateKeyValueListField appends one key/value message to list for each of
+// values[1:], all with the key values[0].
+func populateKeyValueListField(fieldDescriptor protoreflect.FieldDescriptor, list protoreflect.List, values []string) error {
+	fields := fieldDescriptor.Message().Fields()
+	keyField, valueField := fields.ByName("key"), fields.ByName("value")
+
+	key, err := parseField(keyField, values[0])
+	if err != nil {
+		return fmt.Errorf("parsing map key %q: %w", fieldDescriptor.FullName().Name(), err)
+	}
+
+	for _, value := range values[1:] {
+		v, err := parseField(valueField, value)
+		if err != nil {
+			return fmt.Errorf("parsing map value %q: %w", fieldDescriptor.FullName().Name(), err)
+		}
+		entry := list.NewElement()
+		entry.Message().Set(keyField, key)
+		entry.Message().Set(valueField, v)
+		list.Append(entry)
+	}
+
+	return nil
+}
+
 func parseField(fieldDescriptor protoreflect.FieldDescriptor, value string) (protoreflect.Value, error) {
 	switch fieldDescriptor.Kind() {
 	case protoreflect.BoolKind:
@@ -224,7 +342,7 @@ func parseField(fieldDescriptor protoreflect.FieldDescriptor, value string) (pro
 		// Look for enum by name
 		v := enum.Descriptor().Values().ByName(protoreflect.Name(value))
 		if v == nil {
-			i, err := strconv.Atoi(value)
+			i, err := strconv.ParseInt(value, 10, 32)
 			if err != nil {
 				return protoreflect.Value{}, fmt.Errorf("%q is not a valid value", value)
 			}
@@ -259,13 +377,13 @@ func parseField(fieldDescriptor protoreflect.FieldDescriptor, value string) (pro
 		}
 		return protoreflect.ValueOfUint64(v), nil
 	case protoreflect.FloatKind:
-		v, err := strconv.ParseFloat(value, 32)
+		v, err := parseFloat(value, 32)
 		if err != nil {
 			return protoreflect.Value{}, err
 		}
 		return protoreflect.ValueOfFloat32(float32(v)), nil
 	case protoreflect.DoubleKind:
-		v, err := strconv.ParseFloat(value, 64)
+		v, err := parseFloat(value, 64)
 		if err != nil {
 			return protoreflect.Value{}, err
 		}
@@ -305,13 +423,13 @@ func parseMessage(msgDescriptor protoreflect.MessageDescriptor, value string) (p
 		}
 		msg = durationpb.New(d)
 	case "google.protobuf.DoubleValue":
-		v, err := strconv.ParseFloat(value, 64)
+		v, err := parseFloat(value, 64)
 		if err != nil {
 			return protoreflect.Value{}, err
 		}
 		msg = wrapperspb.Double(v)
 	case "google.protobuf.FloatValue":
-		v, err := strconv.ParseFloat(value, 32)
+		v, err := parseFloat(value, 32)
 		if err != nil {
 			return protoreflect.Value{}, err
 		}
@@ -356,7 +474,9 @@ func parseMessage(msgDescriptor protoreflect.MessageDescriptor, value string) (p
 		msg = wrapperspb.Bytes(v)
 	case "google.protobuf.FieldMask":
 		fm := &field_mask.FieldMask{}
-		fm.Paths = append(fm.Paths, strings.Split(value, ",")...)
+		if value != "" {
+			fm.Paths = append(fm.Paths, strings.Split(value, ",")...)
+		}
 		msg = fm
 	case "google.protobuf.Value":
 		var v structpb.Value
@@ -370,6 +490,14 @@ func parseMessage(msgDescriptor protoreflect.MessageDescriptor, value string) (p
 			return protoreflect.Value{}, err
 		}
 		msg = &v
+	case "google.protobuf.Empty":
+		// An Empty carries nothing, so the only thing the value can say is that the
+		// field is present. Accept the two spellings of "no content" and reject
+		// anything else, rather than silently ignoring it.
+		if value != "" && value != "{}" {
+			return protoreflect.Value{}, fmt.Errorf("expected an empty value or %q, got %q", "{}", value)
+		}
+		msg = &emptypb.Empty{}
 	default:
 		return protoreflect.Value{}, fmt.Errorf("unsupported message type: %q", string(msgDescriptor.FullName()))
 	}

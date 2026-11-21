@@ -134,7 +134,8 @@ func DefaultHTTPErrorHandler(ctx context.Context, mux *ServeMux, marshaler Marsh
 	w.Header().Set("Content-Type", contentType)
 
 	if s.Code() == codes.Unauthenticated {
-		w.Header().Set("WWW-Authenticate", s.Message())
+		// Canonical spelling, so Header.Set does not have to build one.
+		w.Header().Set("Www-Authenticate", s.Message())
 	}
 
 	buf, merr := marshaler.Marshal(respRw)

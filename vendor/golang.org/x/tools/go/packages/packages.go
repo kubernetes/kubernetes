@@ -1251,9 +1251,17 @@ func (ld *loader) loadPackage(lpkg *loaderPackage) {
 	}
 	if lpkg.Module != nil && lpkg.Module.GoVersion != "" {
 		tc.GoVersion = "go" + lpkg.Module.GoVersion
-	} else if ld.externalDriver && lpkg.goVersion != 0 {
-		// Module information is missing when GOPACKAGESDRIVER is used,
-		// so use the go version from the driver response.
+	} else if lpkg.goVersion != 0 {
+		// No module (std, GOPATH mode, or GOPACKAGESDRIVER).
+		//
+		// Use the go version from the driver response,
+		// just as cmd/go uses the toolchain's version (-lang)
+		// when compiling packages that don't belong to a module.
+		//
+		// If go/types is older than the go command, it will
+		// report a "too new" error, just as it does for a module
+		// whose go.mod declares a newer version; the
+		// runtimeVersion check above suggests the remedy.
 		tc.GoVersion = fmt.Sprintf("go1.%d", lpkg.goVersion)
 	}
 	if (ld.Mode & typecheckCgo) != 0 {

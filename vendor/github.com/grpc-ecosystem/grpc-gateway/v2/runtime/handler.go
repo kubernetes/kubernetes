@@ -210,7 +210,10 @@ func ForwardResponseMessage(ctx context.Context, mux *ServeMux, marshaler Marsha
 }
 
 func requestAcceptsTrailers(req *http.Request) bool {
-	te := req.Header.Get("TE")
+	// "Te", not "TE": Header.Get canonicalises the key it is given, and a key that is already
+	// canonical is returned as is, while any other spelling costs an allocated copy on every
+	// call. This one runs once per response.
+	te := req.Header.Get("Te")
 	return strings.Contains(strings.ToLower(te), "trailers")
 }
 

@@ -75,7 +75,11 @@ type Conn interface {
 }
 
 // AlgorithmsConnMetadata is a ConnMetadata that can return the algorithms
-// negotiated between client and server.
+// negotiated between client and server in the last completed key exchange.
+// The ConnMetadata passed to the ServerConfig callbacks implements it, as do
+// the Conn returned by NewClientConn and the Conn embedded in Client and
+// ServerConn. For a Conn returned by NewControlClientConn, Algorithms returns
+// the zero value.
 type AlgorithmsConnMetadata interface {
 	ConnMetadata
 	Algorithms() NegotiatedAlgorithms
@@ -121,7 +125,6 @@ type sshConn struct {
 	sessionID     []byte
 	clientVersion []byte
 	serverVersion []byte
-	algorithms    NegotiatedAlgorithms
 }
 
 func dup(src []byte) []byte {
@@ -158,6 +161,6 @@ func (c *sshConn) ServerVersion() []byte {
 	return dup(c.serverVersion)
 }
 
-func (c *sshConn) Algorithms() NegotiatedAlgorithms {
-	return c.algorithms
+func (c *connection) Algorithms() NegotiatedAlgorithms {
+	return c.transport.getAlgorithms()
 }

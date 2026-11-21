@@ -232,6 +232,7 @@ func (i *Invocation) run(ctx context.Context, stdout, stderr io.Writer) error {
 		// mod needs the sub-verb before flags.
 		goArgs = append(goArgs, i.Args[0])
 		appendModFile()
+		appendOverlayFlag() // all 'go mod' subcommands accept -overlay
 		goArgs = append(goArgs, i.Args[1:]...)
 	case "get":
 		goArgs = append(goArgs, i.BuildFlags...)
@@ -246,6 +247,7 @@ func (i *Invocation) run(ctx context.Context, stdout, stderr io.Writer) error {
 		goArgs = append(goArgs, i.Args...)
 	}
 	cmd := exec.Command("go", goArgs...)
+	setProcessGroup(cmd)
 	cmd.Stdout = stdout
 	cmd.Stderr = stderr
 
@@ -402,7 +404,7 @@ func runCmdContext(ctx context.Context, cmd *exec.Cmd) (err error) {
 	}
 
 	// Cancelled. Interrupt and see if it ends voluntarily.
-	if err := cmd.Process.Signal(os.Interrupt); err == nil {
+	if err := interruptProcess(cmd); err == nil {
 		// (We used to wait only 1s but this proved
 		// fragile on loaded builder machines.)
 		timer := time.NewTimer(5 * time.Second)
@@ -415,7 +417,7 @@ func runCmdContext(ctx context.Context, cmd *exec.Cmd) (err error) {
 	}
 
 	// Didn't shut down in response to interrupt. Kill it hard.
-	if err := cmd.Process.Kill(); err != nil && !errors.Is(err, os.ErrProcessDone) && debug {
+	if err := killProcess(cmd); err != nil && !errors.Is(err, os.ErrProcessDone) && debug {
 		log.Printf("error killing the Go command: %v", err)
 	}
 
