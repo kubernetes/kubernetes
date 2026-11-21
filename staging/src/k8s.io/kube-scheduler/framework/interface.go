@@ -734,6 +734,47 @@ type PostBindPlugin interface {
 	PostBind(ctx context.Context, state CycleState, p *v1.Pod, nodeName string)
 }
 
+// Extension point names that plugins may return from RequiredExtensionPoints.
+const (
+	ExtensionPointPreFilter          = "PreFilter"
+	ExtensionPointFilter             = "Filter"
+	ExtensionPointPostFilter         = "PostFilter"
+	ExtensionPointReserve            = "Reserve"
+	ExtensionPointPreScore           = "PreScore"
+	ExtensionPointScore              = "Score"
+	ExtensionPointPreBind            = "PreBind"
+	ExtensionPointBind               = "Bind"
+	ExtensionPointPostBind           = "PostBind"
+	ExtensionPointPermit             = "Permit"
+	ExtensionPointPreEnqueue         = "PreEnqueue"
+	ExtensionPointQueueSort          = "QueueSort"
+	ExtensionPointPlacementGenerate  = "PlacementGenerate"
+	ExtensionPointPlacementScore     = "PlacementScore"
+	ExtensionPointPlacementFeasible  = "PlacementFeasible"
+	ExtensionPointPodGroupPostFilter = "PodGroupPostFilter"
+)
+
+// RequiredExtensionPointsPlugin is an optional interface that a plugin may
+// implement to declare a set of extension points that must be enabled together.
+// If the plugin is enabled at any one of the returned extension points, the
+// framework requires it to be enabled at all of them and fails initialization
+// otherwise. Enabling the plugin only at extension points outside the returned
+// set is allowed.
+//
+// This lets a plugin fail fast on a misconfiguration that would otherwise break
+// it at runtime. For example, a plugin that acquires a node-scoped lock in
+// PreBind and releases it only in PostBind (bind succeeded) or Unreserve (bind
+// failed) returns PreBind, PostBind and Reserve: enabling only PreBind would
+// leak the lock and block later pods on that node forever.
+type RequiredExtensionPointsPlugin interface {
+	Plugin
+	// RequiredExtensionPoints returns the extension point names (see the
+	// ExtensionPoint* constants) that must be enabled together for this plugin.
+	// The names must be valid and unique; the framework rejects unknown or
+	// duplicate names at initialization.
+	RequiredExtensionPoints() []string
+}
+
 // PermitPlugin is an interface that must be implemented by "Permit" plugins.
 // These plugins are called before a pod is bound to a node.
 type PermitPlugin interface {

@@ -141,6 +141,8 @@ type frameworkImpl struct {
 // point. This is used to simplify iterating over all extension points supported by the
 // frameworkImpl.
 type extensionPoint struct {
+	// name identifies the extension point (see fwk.ExtensionPoint* constants).
+	name string
 	// the set of plugins to be configured at this extension point.
 	plugins *config.PluginSet
 	// a pointer to the slice storing plugins implementations that will run at this
@@ -150,23 +152,86 @@ type extensionPoint struct {
 
 func (f *frameworkImpl) getExtensionPoints(plugins *config.Plugins) []extensionPoint {
 	return []extensionPoint{
-		{&plugins.PreFilter, &f.preFilterPlugins},
-		{&plugins.Filter, &f.filterPlugins},
-		{&plugins.PostFilter, &f.postFilterPlugins},
-		{&plugins.Reserve, &f.reservePlugins},
-		{&plugins.PreScore, &f.preScorePlugins},
-		{&plugins.Score, &f.scorePlugins},
-		{&plugins.PreBind, &f.preBindPlugins},
-		{&plugins.Bind, &f.bindPlugins},
-		{&plugins.PostBind, &f.postBindPlugins},
-		{&plugins.Permit, &f.permitPlugins},
-		{&plugins.PreEnqueue, &f.preEnqueuePlugins},
-		{&plugins.QueueSort, &f.queueSortPlugins},
-		{&plugins.PlacementGenerate, &f.placementGeneratePlugins},
-		{&plugins.PlacementScore, &f.placementScorePlugins},
-		{&plugins.PlacementFeasible, &f.placementFeasiblePlugins},
-		{&plugins.PodGroupPostFilter, &f.podGroupPostFilterPlugins},
+		{fwk.ExtensionPointPreFilter, &plugins.PreFilter, &f.preFilterPlugins},
+		{fwk.ExtensionPointFilter, &plugins.Filter, &f.filterPlugins},
+		{fwk.ExtensionPointPostFilter, &plugins.PostFilter, &f.postFilterPlugins},
+		{fwk.ExtensionPointReserve, &plugins.Reserve, &f.reservePlugins},
+		{fwk.ExtensionPointPreScore, &plugins.PreScore, &f.preScorePlugins},
+		{fwk.ExtensionPointScore, &plugins.Score, &f.scorePlugins},
+		{fwk.ExtensionPointPreBind, &plugins.PreBind, &f.preBindPlugins},
+		{fwk.ExtensionPointBind, &plugins.Bind, &f.bindPlugins},
+		{fwk.ExtensionPointPostBind, &plugins.PostBind, &f.postBindPlugins},
+		{fwk.ExtensionPointPermit, &plugins.Permit, &f.permitPlugins},
+		{fwk.ExtensionPointPreEnqueue, &plugins.PreEnqueue, &f.preEnqueuePlugins},
+		{fwk.ExtensionPointQueueSort, &plugins.QueueSort, &f.queueSortPlugins},
+		{fwk.ExtensionPointPlacementGenerate, &plugins.PlacementGenerate, &f.placementGeneratePlugins},
+		{fwk.ExtensionPointPlacementScore, &plugins.PlacementScore, &f.placementScorePlugins},
+		{fwk.ExtensionPointPlacementFeasible, &plugins.PlacementFeasible, &f.placementFeasiblePlugins},
+		{fwk.ExtensionPointPodGroupPostFilter, &plugins.PodGroupPostFilter, &f.podGroupPostFilterPlugins},
 	}
+}
+
+// validateRequiredExtensionPoints fails fast when a plugin implementing
+// fwk.RequiredExtensionPointsPlugin is enabled at one of its required extension
+// points but not at all of them. Such extension points must be enabled together;
+// e.g. a plugin holding a node lock from PreBind until PostBind/Unreserve would
+// leak the lock and permanently block later pods on that node if PostBind or
+// Reserve were disabled. Unknown or duplicate required names are also rejected.
+func (f *frameworkImpl) validateRequiredExtensionPoints() error {
+	enabled := map[string]sets.Set[string]{}
+	for _, ep := range f.getExtensionPoints(&config.Plugins{}) {
+		enabled[ep.name] = pluginNamesAt(ep.slicePtr)
+	}
+	for _, p := range f.pluginsMap {
+		rp, ok := p.(fwk.RequiredExtensionPointsPlugin)
+		if !ok {
+			continue
+		}
+		required := rp.RequiredExtensionPoints()
+		name := p.Name()
+		// Reject unknown or duplicate extension point names up front: a
+		// misspelled name would otherwise match no enabled set and silently
+		// skip the coupling check, defeating the fail-fast purpose.
+		seen := sets.New[string]()
+		for _, epName := range required {
+			if _, known := enabled[epName]; !known {
+				return fmt.Errorf("plugin %q declares unknown required extension point %q in profile %q", name, epName, f.profileName)
+			}
+			if seen.Has(epName) {
+				return fmt.Errorf("plugin %q declares duplicate required extension point %q in profile %q", name, epName, f.profileName)
+			}
+			seen.Insert(epName)
+		}
+		// Only enforce the coupling when the plugin actually uses one of the
+		// required extension points; enabling it elsewhere is unconstrained.
+		usesAny := false
+		for _, epName := range required {
+			if enabled[epName].Has(name) {
+				usesAny = true
+				break
+			}
+		}
+		if !usesAny {
+			continue
+		}
+		for _, epName := range required {
+			if !enabled[epName].Has(name) {
+				return fmt.Errorf("plugin %q requires extension points %v enabled together in profile %q, but %q is not enabled", name, required, f.profileName, epName)
+			}
+		}
+	}
+	return nil
+}
+
+// pluginNamesAt returns the names of the plugins in the extension point slice
+// pointed to by slicePtr.
+func pluginNamesAt(slicePtr interface{}) sets.Set[string] {
+	s := sets.New[string]()
+	v := reflect.ValueOf(slicePtr).Elem()
+	for i := 0; i < v.Len(); i++ {
+		s.Insert(v.Index(i).Interface().(fwk.Plugin).Name())
+	}
+	return s
 }
 
 // Extenders returns the registered extenders.
@@ -512,6 +577,9 @@ func NewFramework(ctx context.Context, r Registry, profile *config.KubeScheduler
 	}
 	if len(f.bindPlugins) == 0 {
 		return nil, fmt.Errorf("at least one bind plugin is needed for profile with scheduler name %q", profile.SchedulerName)
+	}
+	if err := f.validateRequiredExtensionPoints(); err != nil {
+		return nil, err
 	}
 
 	podScoreWeights, err := getValidScoreWeights(f, reflect.TypeFor[fwk.ScorePlugin](), append(profile.Plugins.Score.Enabled, profile.Plugins.MultiPoint.Enabled...))
