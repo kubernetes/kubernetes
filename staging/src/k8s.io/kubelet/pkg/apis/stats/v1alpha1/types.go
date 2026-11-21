@@ -289,7 +289,7 @@ type PSIStats struct {
 // PSI data for an individual resource.
 type PSIData struct {
 	// Total time duration for tasks in the cgroup have waited due to congestion.
-	// Unit: nanoseconds.
+	// Unit: microseconds.
 	Total uint64 `json:"total"`
 	// The average (in %) tasks have waited due to congestion over a 10 second window.
 	Avg10 float64 `json:"avg10"`
