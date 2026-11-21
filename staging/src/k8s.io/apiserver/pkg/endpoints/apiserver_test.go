@@ -20,11 +20,11 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	_ "embed"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"math/rand"
 	"net/http"
 	"net/http/httptest"
 	"net/http/httputil"
@@ -39,9 +39,10 @@ import (
 	"github.com/emicklei/go-restful/v3"
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/require"
+	"sigs.k8s.io/yaml"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/apitesting"
-	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -59,13 +60,13 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/managedfields"
 	"k8s.io/apimachinery/pkg/util/net"
+	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/admission"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	"k8s.io/apiserver/pkg/apis/example"
-	examplefuzzer "k8s.io/apiserver/pkg/apis/example/fuzzer"
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
 	"k8s.io/apiserver/pkg/audit"
 	auditpolicy "k8s.io/apiserver/pkg/audit/policy"
@@ -110,6 +111,11 @@ var newGroupVersion = schema.GroupVersion{Group: testAPIGroup, Version: "version
 var testGroup2Version = schema.GroupVersion{Group: testAPIGroup2, Version: "version"}
 var testInternalGroup2Version = schema.GroupVersion{Group: testAPIGroup2, Version: runtime.APIVersionInternal}
 var prefix = "apis"
+
+//go:embed handlers/responsewriters/testdata/exemplar_pod.yaml
+var benchmarkExemplarPodYAML []byte
+
+const benchmarkSeed int64 = 100
 
 var grouplessGroupVersion = schema.GroupVersion{Group: "", Version: "v1"}
 var grouplessInternalGroupVersion = schema.GroupVersion{Group: "", Version: runtime.APIVersionInternal}
@@ -4563,12 +4569,13 @@ func BenchmarkUpdateProtobuf(b *testing.B) {
 	simpleStorage := &SimpleRESTStorage{}
 	handler := handle(map[string]rest.Storage{"simples": simpleStorage})
 	server := httptest.NewServer(handler)
-	defer server.Close()
+	b.Cleanup(server.Close)
 	client := http.Client{}
 
 	dest, _ := url.Parse(server.URL)
 	dest.Path = "/" + prefix + "/" + newGroupVersion.Group + "/" + newGroupVersion.Version + "/namespaces/foo/simples/bar"
 	dest.RawQuery = ""
+	url := dest.String()
 
 	info, _ := runtime.SerializerInfoForMediaType(codecs.SupportedMediaTypes(), "application/vnd.kubernetes.protobuf")
 	e := codecs.EncoderForVersion(info.Serializer, newGroupVersion)
@@ -4577,29 +4584,33 @@ func BenchmarkUpdateProtobuf(b *testing.B) {
 		b.Fatal(err)
 	}
 
+	b.ReportAllocs()
+	benchmarkUpdateProtobuf(b, ctx, &client, url, data)
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		// Use a closure to execute defers before continuing
-		func() {
-			request, err := http.NewRequestWithContext(ctx, request.MethodPut, dest.String(), bytes.NewReader(data))
-			if err != nil {
-				b.Fatalf("unexpected error: %v", err)
-			}
-			request.Header.Set("Accept", "application/vnd.kubernetes.protobuf")
-			request.Header.Set("Content-Type", "application/vnd.kubernetes.protobuf")
-			response, err := client.Do(request)
-			if err != nil {
-				b.Fatalf("unexpected error: %v", err)
-			}
-			defer apitesting.Close(b, response.Body)
-			if response.StatusCode != http.StatusBadRequest {
-				body, _ := io.ReadAll(response.Body)
-				b.Fatalf("Unexpected response %#v\n%s", response, body)
-			}
-			_, _ = io.ReadAll(response.Body)
-		}()
+	for b.Loop() {
+		benchmarkUpdateProtobuf(b, ctx, &client, url, data)
 	}
 	b.StopTimer()
+}
+
+func benchmarkUpdateProtobuf(b *testing.B, ctx context.Context, client *http.Client, url string, data []byte) {
+	request, err := http.NewRequestWithContext(ctx, request.MethodPut, url, bytes.NewReader(data))
+	if err != nil {
+		b.Fatalf("unexpected error: %v", err)
+	}
+	request.Header.Set("Accept", "application/vnd.kubernetes.protobuf")
+	request.Header.Set("Content-Type", "application/vnd.kubernetes.protobuf")
+
+	response, err := client.Do(request)
+	if err != nil {
+		b.Fatalf("unexpected error: %v", err)
+	}
+	defer apitesting.Close(b, response.Body)
+	if response.StatusCode != http.StatusBadRequest {
+		body, _ := io.ReadAll(response.Body)
+		b.Fatalf("Unexpected response %#v\n%s", response, body)
+	}
+	_, _ = io.ReadAll(response.Body)
 }
 
 func newTestServer(handler http.Handler) *httptest.Server {
@@ -4614,13 +4625,79 @@ func newTestRequestInfoResolver() *request.RequestInfoFactory {
 	}
 }
 
-const benchmarkSeed = 100
-
 func benchmarkItems(b *testing.B) []example.Pod {
-	clientapiObjectFuzzer := fuzzer.FuzzerFor(examplefuzzer.Funcs, rand.NewSource(benchmarkSeed), codecs)
+	b.Helper()
+	exemplar := loadExemplarPod(b)
+	utilrand.Seed(benchmarkSeed)
+
+	nodeNames := make([]string, 5)
+	for i := range nodeNames {
+		nodeNames[i] = utilrand.String(10)
+	}
 	items := make([]example.Pod, 3)
 	for i := range items {
-		clientapiObjectFuzzer.Fill(&items[i])
+		namespace := utilrand.String(10)
+		nodeName := nodeNames[utilrand.Intn(len(nodeNames))]
+		items[i] = *exemplar.DeepCopy()
+		randomizePod(&items[i], namespace, nodeName)
 	}
 	return items
+}
+
+func loadExemplarPod(b *testing.B) *example.Pod {
+	b.Helper()
+
+	if len(benchmarkExemplarPodYAML) == 0 {
+		b.Fatal("benchmark exemplar pod is empty")
+	}
+	var src corev1.Pod
+	if err := yaml.UnmarshalStrict(benchmarkExemplarPodYAML, &src); err != nil {
+		b.Fatalf("decode benchmark exemplar pod: %v", err)
+	}
+	pod := &example.Pod{
+		TypeMeta:   src.TypeMeta,
+		ObjectMeta: src.ObjectMeta,
+		Spec: example.PodSpec{
+			RestartPolicy:                 example.RestartPolicy(src.Spec.RestartPolicy),
+			TerminationGracePeriodSeconds: src.Spec.TerminationGracePeriodSeconds,
+			ActiveDeadlineSeconds:         src.Spec.ActiveDeadlineSeconds,
+			NodeSelector:                  src.Spec.NodeSelector,
+			ServiceAccountName:            src.Spec.ServiceAccountName,
+			NodeName:                      src.Spec.NodeName,
+			Hostname:                      src.Spec.Hostname,
+			Subdomain:                     src.Spec.Subdomain,
+			SchedulerName:                 src.Spec.SchedulerName,
+		},
+		Status: example.PodStatus{
+			Phase:     example.PodPhase(src.Status.Phase),
+			Message:   src.Status.Message,
+			Reason:    src.Status.Reason,
+			HostIP:    src.Status.HostIP,
+			PodIP:     src.Status.PodIP,
+			StartTime: src.Status.StartTime,
+		},
+	}
+	for _, c := range src.Status.Conditions {
+		pod.Status.Conditions = append(pod.Status.Conditions, example.PodCondition{
+			Type:               example.PodConditionType(c.Type),
+			Status:             example.ConditionStatus(c.Status),
+			LastProbeTime:      c.LastProbeTime,
+			LastTransitionTime: c.LastTransitionTime,
+			Reason:             c.Reason,
+			Message:            c.Message,
+		})
+	}
+	return pod
+}
+
+func randomizePod(pod *example.Pod, ns string, nodeName string) {
+	pod.Namespace = ns
+	if pod.GenerateName != "" {
+		pod.Name = pod.GenerateName + utilrand.String(10)
+	} else {
+		pod.Name = "benchmark-pod-" + utilrand.String(10)
+	}
+	pod.UID = types.UID(utilrand.String(36))
+	pod.ResourceVersion = ""
+	pod.Spec.NodeName = nodeName
 }
