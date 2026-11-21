@@ -107,7 +107,7 @@ func (cm *containerManagerImpl) enforceNodeAllocatableCgroups(logger klog.Logger
 	if len(cm.cgroupRoot) > 0 {
 		go func() {
 			for {
-				err := cm.cgroupManager.Update(logger, cgroupConfig)
+				err := cm.updateNodeAllocatableCgroup(logger, cgroupConfig)
 				if err == nil {
 					cm.recorder.Event(nodeRef, v1.EventTypeNormal, events.SuccessfulNodeAllocatableEnforcement, "Updated Node Allocatable limit across pods")
 					return
@@ -158,6 +158,75 @@ func (cm *containerManagerImpl) enforceNodeAllocatableCgroups(logger klog.Logger
 		cm.recorder.Eventf(nodeRef, v1.EventTypeNormal, events.SuccessfulNodeAllocatableEnforcement, "Updated limits on kube reserved cgroup %v", nc.KubeReservedCgroupName)
 	}
 	return nil
+}
+
+// updateNodeAllocatableCgroup avoids lowering a cgroup v2 memory limit below
+// current usage. cgroup v2 may reclaim memory and invoke the memcg OOM killer
+// when memory.max is lowered below usage instead of rejecting the update.
+//
+// When the requested memory limit cannot be applied yet, the remaining resource
+// settings (CPU shares, pids limit, cpuset, unified settings) are still applied
+// on their own, and the memory limit is clamped to the current usage so that the
+// pod cgroup starts exercising pressure on the workload. Clamping keeps the
+// eviction signal moving: available memory is derived from the installed limit,
+// so leaving an older, looser limit in place would let the retry loop run forever
+// without ever creating the pressure it waits for.
+//
+// An error is still returned while the target limit has not been reached, so the
+// caller keeps retrying until usage drops below the requested value.
+//
+// The check is best-effort because usage may change before the cgroup update.
+func (cm *containerManagerImpl) updateNodeAllocatableCgroup(logger klog.Logger, config *CgroupConfig) error {
+	if cm.cgroupManager.Version() != 2 || config.ResourceParameters == nil {
+		return cm.cgroupManager.Update(logger, config)
+	}
+
+	memory := config.ResourceParameters.Memory
+	// Both cgroup v2 backends treat zero as "unset": the cgroupfs conversion
+	// writes an empty value and systemd only adds MemoryMax for a nonzero value.
+	// Negative values are already rejected by validateNodeAllocatable. Neither
+	// reaches memory.max, so there is nothing to guard against.
+	if memory == nil || *memory <= 0 {
+		return cm.cgroupManager.Update(logger, config)
+	}
+
+	usage, err := cm.cgroupManager.MemoryUsage(config.Name)
+	if err != nil {
+		// Apply everything except memory so an unrelated read failure does not
+		// hold back independent settings such as the CPU share correction.
+		if applyErr := cm.cgroupManager.Update(logger, configWithoutMemory(config)); applyErr != nil {
+			logger.Error(applyErr, "Failed to update Node Allocatable cgroup without memory", "cgroupName", config.Name)
+		}
+		return fmt.Errorf("failed to read current Node Allocatable memory usage for cgroup %q: %w", config.Name, err)
+	}
+
+	if usage <= *memory {
+		return cm.cgroupManager.Update(logger, config)
+	}
+
+	// Usage is already above the target. Lowering memory.max to the target now
+	// would reclaim and potentially OOM the node, so clamp to the current usage
+	// instead: the write is safe, it applies pressure to the pod cgroup, and
+	// eviction can then bring usage down towards the target on a later retry.
+	clamped := configWithoutMemory(config)
+	clamped.ResourceParameters.Memory = &usage
+
+	if err := cm.cgroupManager.Update(logger, clamped); err != nil {
+		return fmt.Errorf("failed to clamp Node Allocatable memory limit for cgroup %q to current usage %d: %w", config.Name, usage, err)
+	}
+	return fmt.Errorf("current memory usage %d exceeds requested limit %d, clamped to current usage", usage, *memory)
+}
+
+// configWithoutMemory returns a copy of config whose resource parameters carry no
+// memory limit, leaving memory.max untouched. The caller's configuration is never
+// mutated, so the retry loop keeps retrying the original target.
+func configWithoutMemory(config *CgroupConfig) *CgroupConfig {
+	params := *config.ResourceParameters
+	params.Memory = nil
+
+	copied := *config
+	copied.ResourceParameters = &params
+	return &copied
 }
 
 // enforceExistingCgroup updates the limits `rl` on existing cgroup `cName` using `cgroupManager` interface.

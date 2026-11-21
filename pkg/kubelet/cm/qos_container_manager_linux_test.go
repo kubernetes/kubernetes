@@ -680,10 +680,14 @@ func findCgroupConfig(configs []*CgroupConfig, name CgroupName) *CgroupConfig {
 // CgroupManager. All methods are stubbed so that Start() can
 // complete successfully without using real cgroups.
 type fakeCgroupManager struct {
-	mutex   sync.Mutex
-	created []*CgroupConfig
-	updates []*CgroupConfig
-	exists  bool
+	mutex     sync.Mutex
+	created   []*CgroupConfig
+	updates   []*CgroupConfig
+	exists    bool
+	version   int
+	usage     int64
+	usageErr  error
+	updateErr error
 }
 
 // Update() is the observation point for this test.
@@ -694,7 +698,7 @@ func (f *fakeCgroupManager) Update(_ klog.Logger, config *CgroupConfig) error {
 
 	copiedConfig := *config
 	f.updates = append(f.updates, &copiedConfig)
-	return nil
+	return f.updateErr
 }
 
 // Create() must succeed for Start() to construct QoS cgroups.
@@ -731,14 +735,19 @@ func (f *fakeCgroupManager) Pids(_ klog.Logger, _ CgroupName) []int { return nil
 func (f *fakeCgroupManager) ReduceCPULimits(_ klog.Logger, _ CgroupName) error {
 	return nil
 }
-func (f *fakeCgroupManager) MemoryUsage(_ CgroupName) (int64, error) { return int64(0), nil }
+func (f *fakeCgroupManager) MemoryUsage(_ CgroupName) (int64, error) { return f.usage, f.usageErr }
 func (f *fakeCgroupManager) GetCgroupConfig(_ CgroupName, _ v1.ResourceName) (*ResourceConfig, error) {
 	return nil, nil
 }
 func (f *fakeCgroupManager) SetCgroupConfig(_ klog.Logger, _ CgroupName, _ *ResourceConfig) error {
 	return nil
 }
-func (f *fakeCgroupManager) Version() int { return 1 }
+func (f *fakeCgroupManager) Version() int {
+	if f.version == 0 {
+		return 1
+	}
+	return f.version
+}
 
 // TestQOSCPUConfigUpdate verifies that UpdateCgroups() computes and
 // updates the correct CPU shares for each QoS class based on the
