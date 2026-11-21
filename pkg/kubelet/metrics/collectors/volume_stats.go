@@ -63,6 +63,47 @@ var (
 		[]string{"namespace", "persistentvolumeclaim"}, nil,
 		metrics.ALPHA, "",
 	)
+
+	// Pod-scoped volume metrics cover volumes that aren't backed by a PVC (e.g. emptyDir,
+	// secret, configMap, downwardAPI, projected), which the metrics above never report since
+	// they're keyed on PVCReference. Labeled by the pod-spec volume name instead of a claim
+	// name, since there is no claim to reference.
+	volumeStatsPodCapacityBytesDesc = metrics.NewDesc(
+		metrics.BuildFQName("", kubeletmetrics.KubeletSubsystem, kubeletmetrics.VolumeStatsPodCapacityBytesKey),
+		"Capacity in bytes of a pod-scoped (non-PVC) volume",
+		[]string{"namespace", "pod", "volume_name"}, nil,
+		metrics.ALPHA, "",
+	)
+	volumeStatsPodAvailableBytesDesc = metrics.NewDesc(
+		metrics.BuildFQName("", kubeletmetrics.KubeletSubsystem, kubeletmetrics.VolumeStatsPodAvailableBytesKey),
+		"Number of available bytes in a pod-scoped (non-PVC) volume",
+		[]string{"namespace", "pod", "volume_name"}, nil,
+		metrics.ALPHA, "",
+	)
+	volumeStatsPodUsedBytesDesc = metrics.NewDesc(
+		metrics.BuildFQName("", kubeletmetrics.KubeletSubsystem, kubeletmetrics.VolumeStatsPodUsedBytesKey),
+		"Number of used bytes in a pod-scoped (non-PVC) volume",
+		[]string{"namespace", "pod", "volume_name"}, nil,
+		metrics.ALPHA, "",
+	)
+	volumeStatsPodInodesDesc = metrics.NewDesc(
+		metrics.BuildFQName("", kubeletmetrics.KubeletSubsystem, kubeletmetrics.VolumeStatsPodInodesKey),
+		"Maximum number of inodes in a pod-scoped (non-PVC) volume",
+		[]string{"namespace", "pod", "volume_name"}, nil,
+		metrics.ALPHA, "",
+	)
+	volumeStatsPodInodesFreeDesc = metrics.NewDesc(
+		metrics.BuildFQName("", kubeletmetrics.KubeletSubsystem, kubeletmetrics.VolumeStatsPodInodesFreeKey),
+		"Number of free inodes in a pod-scoped (non-PVC) volume",
+		[]string{"namespace", "pod", "volume_name"}, nil,
+		metrics.ALPHA, "",
+	)
+	volumeStatsPodInodesUsedDesc = metrics.NewDesc(
+		metrics.BuildFQName("", kubeletmetrics.KubeletSubsystem, kubeletmetrics.VolumeStatsPodInodesUsedKey),
+		"Number of used inodes in a pod-scoped (non-PVC) volume",
+		[]string{"namespace", "pod", "volume_name"}, nil,
+		metrics.ALPHA, "",
+	)
 )
 
 type volumeStatsCollector struct {
@@ -87,6 +128,12 @@ func (collector *volumeStatsCollector) DescribeWithStability(ch chan<- *metrics.
 	ch <- volumeStatsInodesDesc
 	ch <- volumeStatsInodesFreeDesc
 	ch <- volumeStatsInodesUsedDesc
+	ch <- volumeStatsPodCapacityBytesDesc
+	ch <- volumeStatsPodAvailableBytesDesc
+	ch <- volumeStatsPodUsedBytesDesc
+	ch <- volumeStatsPodInodesDesc
+	ch <- volumeStatsPodInodesFreeDesc
+	ch <- volumeStatsPodInodesUsedDesc
 }
 
 // CollectWithStability implements the metrics.StableCollector interface.
@@ -102,6 +149,10 @@ func (collector *volumeStatsCollector) CollectWithStability(ch chan<- metrics.Me
 		lv = append([]string{pvcRef.Namespace, pvcRef.Name}, lv...)
 		ch <- metrics.NewLazyConstMetric(desc, metrics.GaugeValue, v, lv...)
 	}
+	addPodGauge := func(desc *metrics.Desc, podRef stats.PodReference, volumeName string, v float64, lv ...string) {
+		lv = append([]string{podRef.Namespace, podRef.Name, volumeName}, lv...)
+		ch <- metrics.NewLazyConstMetric(desc, metrics.GaugeValue, v, lv...)
+	}
 	allPVCs := sets.Set[stats.PVCReference]{}
 	for _, podStat := range podStats {
 		if podStat.VolumeStats == nil {
@@ -110,7 +161,15 @@ func (collector *volumeStatsCollector) CollectWithStability(ch chan<- metrics.Me
 		for _, volumeStat := range podStat.VolumeStats {
 			pvcRef := volumeStat.PVCRef
 			if pvcRef == nil {
-				// ignore if no PVC reference
+				// No PVC reference: a pod-scoped volume (emptyDir, secret, configMap,
+				// downwardAPI, projected, ...). Report it labeled by pod + volume name
+				// instead of skipping it entirely.
+				addPodGauge(volumeStatsPodCapacityBytesDesc, podStat.PodRef, volumeStat.Name, float64(*volumeStat.CapacityBytes))
+				addPodGauge(volumeStatsPodAvailableBytesDesc, podStat.PodRef, volumeStat.Name, float64(*volumeStat.AvailableBytes))
+				addPodGauge(volumeStatsPodUsedBytesDesc, podStat.PodRef, volumeStat.Name, float64(*volumeStat.UsedBytes))
+				addPodGauge(volumeStatsPodInodesDesc, podStat.PodRef, volumeStat.Name, float64(*volumeStat.Inodes))
+				addPodGauge(volumeStatsPodInodesFreeDesc, podStat.PodRef, volumeStat.Name, float64(*volumeStat.InodesFree))
+				addPodGauge(volumeStatsPodInodesUsedDesc, podStat.PodRef, volumeStat.Name, float64(*volumeStat.InodesUsed))
 				continue
 			}
 			if allPVCs.Has(*pvcRef) {
