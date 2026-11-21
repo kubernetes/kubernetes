@@ -172,7 +172,7 @@ func (spc *StatefulPodControl) CreateStatefulPod(ctx context.Context, set *apps.
 	return err
 }
 
-func (spc *StatefulPodControl) UpdateStatefulPod(ctx context.Context, set *apps.StatefulSet, pod *v1.Pod) error {
+func (spc *StatefulPodControl) UpdateStatefulPod(ctx context.Context, set *apps.StatefulSet, pod *v1.Pod, claimsReconciled bool) error {
 	attemptedUpdate := false
 	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		// assume the Pod is consistent
@@ -187,22 +187,26 @@ func (spc *StatefulPodControl) UpdateStatefulPod(ctx context.Context, set *apps.
 		if !storageMatches(set, pod) {
 			updateStorage(set, pod)
 			consistent = false
-			if err := spc.createPersistentVolumeClaims(set, pod); err != nil {
-				spc.recordPodEvent("update", set, pod, err)
-				return err
+			if !claimsReconciled {
+				if err := spc.createPersistentVolumeClaims(set, pod); err != nil {
+					spc.recordPodEvent("update", set, pod, err)
+					return err
+				}
 			}
 		}
 		// if the Pod's PVCs are not consistent with the StatefulSet's PVC deletion policy, update the PVC
 		// and dirty the pod.
-		if match, err := spc.ClaimsMatchRetentionPolicy(ctx, set, pod); err != nil {
-			spc.recordPodEvent("update", set, pod, err)
-			return err
-		} else if !match {
-			if err := spc.UpdatePodClaimForRetentionPolicy(ctx, set, pod); err != nil {
+		if !claimsReconciled {
+			if match, err := spc.ClaimsMatchRetentionPolicy(ctx, set, pod); err != nil {
 				spc.recordPodEvent("update", set, pod, err)
 				return err
+			} else if !match {
+				if err := spc.UpdatePodClaimForRetentionPolicy(ctx, set, pod); err != nil {
+					spc.recordPodEvent("update", set, pod, err)
+					return err
+				}
+				consistent = false
 			}
-			consistent = false
 		}
 
 		// if the Pod is not dirty, do nothing
@@ -377,13 +381,28 @@ func (spc *StatefulPodControl) createMissingPersistentVolumeClaims(ctx context.C
 // createPersistentVolumeClaims creates all of the required PersistentVolumeClaims for pod, which must be a member of
 // set. If all of the claims for Pod are successfully created, the returned error is nil. If creation fails, this method
 // may be called again until no error is returned, indicating the PersistentVolumeClaims for pod are consistent with
-// set's Spec.
+// set's Spec. When the apps.StatefulSet's WhenDeleted retention policy is Delete, the StatefulSet controller owner
+// reference is stamped onto each new PVC at creation time.
 func (spc *StatefulPodControl) createPersistentVolumeClaims(set *apps.StatefulSet, pod *v1.Pod) error {
 	var errs []error
 	for _, claim := range getPersistentVolumeClaims(set, pod) {
 		pvc, err := spc.objectMgr.GetClaim(claim.Namespace, claim.Name)
 		switch {
 		case apierrors.IsNotFound(err):
+			if getPersistentVolumeClaimRetentionPolicy(set).WhenDeleted == apps.DeletePersistentVolumeClaimRetentionPolicyType {
+				// Stamp the StatefulSet controller owner reference before the API write.
+				// Pod ownership requires a live Pod UID and is reconciled by UpdatePodClaimForRetentionPolicy.
+				if !hasUnexpectedController(&claim, set, pod) {
+					// addControllerRef exits early when a ref with the same UID already
+					// exists, without checking or upgrading its controller flag. Strip
+					// any existing ref for this set or pod first so the append always
+					// produces a single ref with controller=true.
+					claim.OwnerReferences = removeRefs(claim.OwnerReferences, func(ref *metav1.OwnerReference) bool {
+						return ref.UID == set.UID || ref.UID == pod.UID
+					})
+					claim.OwnerReferences = addControllerRef(claim.OwnerReferences, set, controllerKind)
+				}
+			}
 			err := spc.objectMgr.CreateClaim(&claim, set)
 			if err != nil {
 				errs = append(errs, fmt.Errorf("failed to create PVC %s: %w", claim.Name, err))
