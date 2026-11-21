@@ -340,3 +340,32 @@ func TestConvertToAPIPodLevelResourcesStatusMissingCgroup(t *testing.T) {
 		require.Empty(t, capturedErrorLogs(t, logger))
 	})
 }
+
+func TestConvertToAPIPodLevelResourcesStatusUnlimitedCgroup(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.PodLevelResources:                       true,
+		features.InPlacePodLevelResourcesVerticalScaling: true,
+	})
+	limits := v1.ResourceList{
+		v1.ResourceCPU:    resource.MustParse("200m"),
+		v1.ResourceMemory: resource.MustParse("128Mi"),
+	}
+	pod := &v1.Pod{Spec: v1.PodSpec{Containers: []v1.Container{
+		{Name: "limited", Resources: v1.ResourceRequirements{Limits: limits}},
+		{Name: "unlimited"},
+	}}}
+	logger := newBufferedTestLogger(t)
+	unlimited := int64(-1)
+	period := uint64(100000)
+	shares := uint64(1024)
+	pcm := cmtesting.NewMockPodContainerManager(t)
+	pcm.EXPECT().GetPodCgroupConfig(pod, v1.ResourceMemory).Return(&cm.ResourceConfig{Memory: &unlimited}, nil)
+	pcm.EXPECT().GetPodCgroupConfig(pod, v1.ResourceCPU).Return(&cm.ResourceConfig{CPUQuota: &unlimited, CPUPeriod: &period, CPUShares: &shares}, nil)
+	manager := cmtesting.NewMockContainerManager(t)
+	manager.EXPECT().NewPodContainerManager().Return(pcm)
+	kl := &Kubelet{containerManager: manager}
+
+	oldStatus := v1.PodStatus{Phase: v1.PodRunning, Resources: &v1.ResourceRequirements{Limits: limits}}
+	got := kl.convertToAPIPodLevelResourcesStatus(logger, pod, oldStatus, v1.PodRunning)
+	require.Empty(t, got.Limits)
+}

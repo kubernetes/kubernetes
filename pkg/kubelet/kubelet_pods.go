@@ -2342,18 +2342,18 @@ func (kl *Kubelet) convertToAPIPodLevelResourcesStatus(logger klog.Logger, alloc
 	// output inconsistent. We should decide if the information is useful enough to
 	//  outweigh the consistency issues,
 	pcm := kl.containerManager.NewPodContainerManager()
-	memoryConfig, err := pcm.GetPodCgroupConfig(allocatedPod, v1.ResourceMemory)
-	if err != nil {
-		if logPodCgroupReadError(logger, err, "failed to read memory cgroup config for the pod", allocatedPod) {
+	memoryConfig, memoryErr := pcm.GetPodCgroupConfig(allocatedPod, v1.ResourceMemory)
+	if memoryErr != nil {
+		if logPodCgroupReadError(logger, memoryErr, "failed to read memory cgroup config for the pod", allocatedPod) {
 			// Teardown removed the pod cgroup while the pod was still
 			// running: report the effective allocated resources instead of
 			// cgroup readback values.
 			return kl.getEffectiveAllocatedResources(allocatedPod)
 		}
 	}
-	cpuConfig, err := pcm.GetPodCgroupConfig(allocatedPod, v1.ResourceCPU)
-	if err != nil {
-		if logPodCgroupReadError(logger, err, "failed to read cpu cgroup config for the pod", allocatedPod) {
+	cpuConfig, cpuErr := pcm.GetPodCgroupConfig(allocatedPod, v1.ResourceCPU)
+	if cpuErr != nil {
+		if logPodCgroupReadError(logger, cpuErr, "failed to read cpu cgroup config for the pod", allocatedPod) {
 			return kl.getEffectiveAllocatedResources(allocatedPod)
 		}
 	}
@@ -2408,12 +2408,16 @@ func (kl *Kubelet) convertToAPIPodLevelResourcesStatus(logger klog.Logger, alloc
 		if cpuLimit.MilliValue() > cm.MinMilliCPULimit || resources.Limits.Cpu().MilliValue() > cm.MinMilliCPULimit {
 			resources.Limits[v1.ResourceCPU] = cpuLimit.DeepCopy()
 		}
+	} else if cpuErr == nil && cpuConfig != nil {
+		delete(resources.Limits, v1.ResourceCPU)
 	} else {
 		preserveOldResourcesValue(v1.ResourceCPU, oldPodStatus.Resources.Limits, resources.Limits)
 	}
 
 	if memoryLimit != nil {
 		resources.Limits[v1.ResourceMemory] = memoryLimit.DeepCopy()
+	} else if memoryErr == nil && memoryConfig != nil {
+		delete(resources.Limits, v1.ResourceMemory)
 	} else {
 		preserveOldResourcesValue(v1.ResourceMemory, oldPodStatus.Resources.Limits, resources.Limits)
 	}
