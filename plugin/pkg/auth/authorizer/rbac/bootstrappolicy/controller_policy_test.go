@@ -17,6 +17,7 @@ limitations under the License.
 package bootstrappolicy
 
 import (
+	"fmt"
 	"reflect"
 	"slices"
 	"testing"
@@ -191,6 +192,22 @@ func TestPodGroupProtectionControllerRBAC(t *testing.T) {
 			}
 			if got, want := foundBinding.Subjects[0].Namespace, "kube-system"; got != want {
 				t.Errorf("subject namespace = %q, want %q", got, want)
+			}
+		})
+	}
+}
+
+func TestPodCheckpointControllerRBAC(t *testing.T) {
+	roleName := saRolePrefix + "podcheckpoint-controller"
+	for _, enabled := range []bool{false, true} {
+		t.Run(fmt.Sprintf("PodLevelCheckpointRestore=%t", enabled), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelCheckpointRestore, enabled)
+			hasRole := slices.ContainsFunc(ControllerRoles(), func(role rbacv1.ClusterRole) bool { return role.Name == roleName })
+			hasBinding := slices.ContainsFunc(ControllerRoleBindings(), func(binding rbacv1.ClusterRoleBinding) bool {
+				return binding.RoleRef.Name == roleName
+			})
+			if hasRole != enabled || hasBinding != enabled {
+				t.Errorf("role present = %t, binding present = %t, want %t", hasRole, hasBinding, enabled)
 			}
 		})
 	}

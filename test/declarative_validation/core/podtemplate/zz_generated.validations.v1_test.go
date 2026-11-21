@@ -151,6 +151,10 @@ func init() {
 			"template.spec.podNetwork": {
 				{ErrorType: "FieldValueNotSupported"},
 			},
+			"template.spec.restoreFrom.name": {
+				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-long-name"},
+				{ErrorType: "FieldValueRequired"},
+			},
 			"template.spec.schedulingGroup": {
 				{ErrorType: "FieldValueForbidden", Origin: "dependentForbidden"},
 			},

@@ -147,6 +147,9 @@ func TestAllDefinitions(t *testing.T, testNamespace string, testFunc DefinitionT
 					Subresources:  subresources,
 				}
 
+				if err := etcd.CreatePrerequisites(context.TODO(), dynamicClient, testNamespace, storageData.Prerequisites); err != nil {
+					t.Fatal(err)
+				}
 				testFunc(t, setup)
 			})
 		}

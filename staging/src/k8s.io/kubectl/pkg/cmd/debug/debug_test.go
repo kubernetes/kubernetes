@@ -460,6 +460,64 @@ func TestGeneratePodCopyWithDebugContainer(t *testing.T) {
 			},
 		},
 		{
+			name: "restored pod with a new debug container",
+			opts: &DebugOptions{
+				CopyTo:     "debugger",
+				Container:  "debugger",
+				Image:      "busybox",
+				PullPolicy: corev1.PullIfNotPresent,
+				Profile:    ProfileLegacy,
+			},
+			havePod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "target"},
+				Spec: corev1.PodSpec{
+					RestoreFrom: &corev1.CheckpointReference{Name: "checkpoint"},
+					Containers:  []corev1.Container{{Name: "app", Image: "app-image"}},
+					NodeName:    "node-1",
+				},
+				Status: corev1.PodStatus{Conditions: []corev1.PodCondition{{Type: corev1.PodRestored, Status: corev1.ConditionTrue}}},
+			},
+			wantPod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "debugger"},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{Name: "app", Image: "app-image"},
+						{
+							Name:                     "debugger",
+							Image:                    "busybox",
+							ImagePullPolicy:          corev1.PullIfNotPresent,
+							TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "restored pod with image overrides on the same node",
+			opts: &DebugOptions{
+				CopyTo:    "debugger",
+				SetImages: map[string]string{"app": "busybox"},
+				SameNode:  true,
+				Profile:   ProfileLegacy,
+			},
+			havePod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "target"},
+				Spec: corev1.PodSpec{
+					RestoreFrom: &corev1.CheckpointReference{Name: "checkpoint"},
+					Containers:  []corev1.Container{{Name: "app", Image: "app-image"}},
+					NodeName:    "node-1",
+				},
+				Status: corev1.PodStatus{Conditions: []corev1.PodCondition{{Type: corev1.PodRestored, Status: corev1.ConditionTrue}}},
+			},
+			wantPod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "debugger"},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{{Name: "app", Image: "busybox"}},
+					NodeName:   "node-1",
+				},
+			},
+		},
+		{
 			name: "metadata stripping",
 			opts: &DebugOptions{
 				CopyTo:     "debugger",
@@ -1431,7 +1489,11 @@ func TestGeneratePodCopyWithDebugContainer(t *testing.T) {
 			if tc.havePod == nil {
 				tc.havePod = &corev1.Pod{}
 			}
+			originalSpec := tc.havePod.Spec.DeepCopy()
 			gotPod, _, _ := tc.opts.generatePodCopyWithDebugContainer(tc.havePod)
+			if diff := cmp.Diff(*originalSpec, tc.havePod.Spec); diff != "" {
+				t.Error("TestGeneratePodCopyWithDebugContainer: source spec changed: (-want +got):\n", diff)
+			}
 			if diff := cmp.Diff(tc.wantPod, gotPod); diff != "" {
 				t.Error("TestGeneratePodCopyWithDebugContainer: diff in generated object: (-want +got):\n", diff)
 			}

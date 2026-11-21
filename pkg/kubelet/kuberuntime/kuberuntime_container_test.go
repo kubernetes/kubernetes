@@ -18,6 +18,8 @@ package kuberuntime
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -30,19 +32,20 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/proto"
+	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/kubernetes/fake"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-
-	v1 "k8s.io/api/core/v1"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
-	"k8s.io/ktesting"
-
 	apitest "k8s.io/cri-api/pkg/apis/testing"
+	"k8s.io/ktesting"
 	kubelettypes "k8s.io/kubelet/pkg/types"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/features"
@@ -51,6 +54,8 @@ import (
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/logs"
+	"k8s.io/kubernetes/pkg/kubelet/runtimeclass"
+	rctest "k8s.io/kubernetes/pkg/kubelet/runtimeclass/testing"
 )
 
 type blockingLifecycleRunner struct {
@@ -64,6 +69,156 @@ func (r *blockingLifecycleRunner) Run(_ context.Context, _ kubecontainer.Contain
 	defer close(r.done)
 	<-r.release
 	return "", nil
+}
+
+type handlerImageService struct {
+	internalapi.ImageManagerService
+	images   map[string]*runtimeapi.Image
+	requests []*runtimeapi.ImageSpec
+	failAt   int
+	err      error
+}
+
+func (s *handlerImageService) ImageStatus(_ context.Context, spec *runtimeapi.ImageSpec, _ bool) (*runtimeapi.ImageStatusResponse, error) {
+	s.requests = append(s.requests, proto.Clone(spec).(*runtimeapi.ImageSpec))
+	if s.err != nil && (s.failAt == 0 || len(s.requests) == s.failAt) {
+		return nil, s.err
+	}
+	return &runtimeapi.ImageStatusResponse{Image: s.images[spec.RuntimeHandler]}, nil
+}
+
+type imageUserRuntimeRecorder struct {
+	internalapi.RuntimeService
+	configs []*runtimeapi.ContainerConfig
+}
+
+func (s *imageUserRuntimeRecorder) CreateContainer(ctx context.Context, sandboxID string, config *runtimeapi.ContainerConfig, sandbox *runtimeapi.PodSandboxConfig) (string, error) {
+	s.configs = append(s.configs, proto.Clone(config).(*runtimeapi.ContainerConfig))
+	return s.RuntimeService.CreateContainer(ctx, sandboxID, config, sandbox)
+}
+
+func TestOrdinaryContainerUsesHandlerImageUser(t *testing.T) {
+	if goruntime.GOOS != "linux" {
+		t.Skip("image-derived Linux credentials")
+	}
+	for _, enabled := range []bool{true, false} {
+		t.Run(fmt.Sprintf("image-handler=%t", enabled), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RuntimeClassInImageCriAPI, enabled)
+			ctx := ktesting.Init(t)
+			runtimeService, images, m, err := createTestRuntimeManager(ctx)
+			require.NoError(t, err)
+			classes := runtimeclass.NewManager(fake.NewClientset(rctest.NewRuntimeClass("class-a", "handler-a"), rctest.NewRuntimeClass("class-b", "handler-b")))
+			defer rctest.StartManagerSync(ktesting.Init(t), classes)()
+			m.runtimeClassManager = classes
+			imageService := &handlerImageService{ImageManagerService: images, images: map[string]*runtimeapi.Image{
+				"":          {Id: "image-default", Uid: &runtimeapi.Int64Value{Value: 1000}},
+				"handler-a": {Id: "image-a", Uid: &runtimeapi.Int64Value{Value: 1111}},
+				"handler-b": {Id: "image-b", Username: "handler-user"},
+			}}
+			m.imageService = imageService
+			recorder := &imageUserRuntimeRecorder{RuntimeService: runtimeService}
+			m.runtimeService = recorder
+			for _, class := range []string{"class-a", "class-b"} {
+				pod := newTestPod()
+				pod.Name = class
+				pod.UID = types.UID(class)
+				pod.Spec.RuntimeClassName = &class
+				pod.Spec.SecurityContext = nil
+				pod.Spec.Containers[0].SecurityContext = nil
+				pod.Spec.Containers[0].Image = "same-image:latest"
+				pod.Spec.Containers[0].ImagePullPolicy = v1.PullIfNotPresent
+				require.Nil(t, pod.Spec.RestoreFrom)
+				sandbox, err := m.generatePodSandboxConfig(ctx, pod, 0)
+				require.NoError(t, err)
+				id, err := m.runtimeService.RunPodSandbox(ctx, sandbox, "")
+				require.NoError(t, err)
+				_, err = m.startContainer(ctx, id, sandbox, containerStartSpec(&pod.Spec.Containers[0]), pod, &kubecontainer.PodStatus{}, nil, "", nil, nil)
+				require.NoError(t, err)
+			}
+			require.Len(t, recorder.configs, 2)
+			for i, handler := range []string{"handler-a", "handler-b"} {
+				want := handler
+				if !enabled {
+					want = ""
+				}
+				credentials := recorder.configs[i].GetLinux().GetSecurityContext()
+				image := imageService.images[want]
+				require.Equal(t, image.Uid, credentials.RunAsUser)
+				require.Equal(t, image.Username, credentials.RunAsUsername)
+				require.Equal(t, image.Id, recorder.configs[i].Image.Image)
+			}
+			for _, spec := range imageService.requests {
+				if enabled {
+					require.Contains(t, []string{"handler-a", "handler-b"}, spec.RuntimeHandler)
+				} else {
+					require.Empty(t, spec.RuntimeHandler)
+				}
+			}
+			require.Len(t, runtimeService.Containers, 2)
+			for _, container := range runtimeService.Containers {
+				require.Equal(t, runtimeapi.ContainerState_CONTAINER_RUNNING, container.State)
+			}
+		})
+	}
+}
+
+func TestImageUserLookupErrorsPreserveBoundary(t *testing.T) {
+	ctx := ktesting.Init(t)
+	_, images, m, err := createTestRuntimeManager(ctx)
+	require.NoError(t, err)
+	sentinel := errors.New("image metadata unavailable")
+	m.imageService = &handlerImageService{ImageManagerService: images, err: sentinel}
+	_, _, err = m.getImageUser(ctx, "image", "handler")
+	require.ErrorIs(t, err, sentinel)
+}
+
+func TestOrdinaryContainerMissingRuntimeClass(t *testing.T) {
+	for _, enabled := range []bool{true, false} {
+		t.Run(fmt.Sprintf("image-handler=%t", enabled), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RuntimeClassInImageCriAPI, enabled)
+			ctx := ktesting.Init(t)
+			runtimeService, _, m, err := createTestRuntimeManager(ctx)
+			require.NoError(t, err)
+			classes := runtimeclass.NewManager(rctest.NewPopulatedClient())
+			defer rctest.StartManagerSync(ktesting.Init(t), classes)()
+			m.runtimeClassManager = classes
+			pod := newTestPod()
+			sandbox, err := m.generatePodSandboxConfig(ctx, pod, 0)
+			require.NoError(t, err)
+			id, err := m.runtimeService.RunPodSandbox(ctx, sandbox, "")
+			require.NoError(t, err)
+			pod.Spec.RuntimeClassName = new("missing")
+			_, err = m.startContainer(ctx, id, sandbox, containerStartSpec(&pod.Spec.Containers[0]), pod, &kubecontainer.PodStatus{}, nil, "", nil, nil)
+			if enabled {
+				require.True(t, apierrors.IsNotFound(err), "%v", err)
+			} else {
+				require.ErrorIs(t, err, ErrCreateContainerConfig)
+			}
+			require.Empty(t, runtimeService.Containers)
+			require.NotContains(t, runtimeService.Called, "CreateContainer")
+			require.NotContains(t, runtimeService.Called, "StartContainer")
+		})
+	}
+}
+
+func TestOrdinaryContainerImageUserFailureDoesNotCreate(t *testing.T) {
+	ctx := ktesting.Init(t)
+	runtimeService, images, m, err := createTestRuntimeManager(ctx)
+	require.NoError(t, err)
+	sentinel := errors.New("image user metadata unavailable")
+	m.imageService = &handlerImageService{ImageManagerService: images, images: map[string]*runtimeapi.Image{"": {Id: "image"}}, failAt: 2, err: sentinel}
+	pod := newTestPod()
+	pod.Spec.Containers[0].ImagePullPolicy = v1.PullIfNotPresent
+	sandbox, err := m.generatePodSandboxConfig(ctx, pod, 0)
+	require.NoError(t, err)
+	id, err := m.runtimeService.RunPodSandbox(ctx, sandbox, "")
+	require.NoError(t, err)
+	message, err := m.startContainer(ctx, id, sandbox, containerStartSpec(&pod.Spec.Containers[0]), pod, &kubecontainer.PodStatus{}, nil, "", nil, nil)
+	require.ErrorIs(t, err, ErrCreateContainerConfig)
+	require.Contains(t, message, sentinel.Error())
+	require.Empty(t, runtimeService.Containers)
+	require.NotContains(t, runtimeService.Called, "CreateContainer")
+	require.NotContains(t, runtimeService.Called, "StartContainer")
 }
 
 // TestRemoveContainer tests removing the container and its corresponding container logs.
@@ -184,6 +339,71 @@ func TestRemoveContainer_keepLogs(t *testing.T) {
 	containers, err := fakeRuntime.ListContainers(tCtx, &runtimeapi.ContainerFilter{Id: containerID})
 	require.NoError(t, err)
 	require.Empty(t, containers)
+}
+
+func TestStartContainerLogSymlink(t *testing.T) {
+	for _, sidecar := range []bool{false, true} {
+		for _, tc := range []struct {
+			name       string
+			statErr    error
+			symlinkErr error
+			wantLink   bool
+		}{
+			{name: "log exists", wantLink: true},
+			{name: "log missing", statErr: os.ErrNotExist},
+			{name: "stat denied", statErr: os.ErrPermission, wantLink: true},
+			{name: "symlink denied", symlinkErr: os.ErrPermission, wantLink: true},
+		} {
+			containerName := "app"
+			if sidecar {
+				containerName = "sidecar"
+			}
+			t.Run(containerName+"/"+tc.name, func(t *testing.T) {
+				tCtx := ktesting.Init(t)
+				fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
+				require.NoError(t, err)
+				pod := newTestPod()
+				container := pod.Spec.Containers[0]
+				container.Name = containerName
+				pod.Spec.Containers = []v1.Container{container}
+				spec := containerStartSpec(&pod.Spec.Containers[0])
+				if sidecar {
+					container.RestartPolicy = &containerRestartPolicyAlways
+					container.Ports = nil
+					pod.Spec.InitContainers = []v1.Container{container}
+					spec = initContainerStartSpec(&pod.Spec.InitContainers[0])
+					pod.Spec.Containers[0].Name = "app"
+				}
+				sandboxConfig, err := m.generatePodSandboxConfig(tCtx, pod, 0)
+				require.NoError(t, err)
+				sandboxID, err := m.runtimeService.RunPodSandbox(tCtx, sandboxConfig, "")
+				require.NoError(t, err)
+				expectedLog := filepath.Join(sandboxConfig.LogDirectory, containerName, "0.log")
+				fakeOS := m.osInterface.(*containertest.FakeOS)
+				fakeOS.StatFn = func(path string) (os.FileInfo, error) {
+					assert.Equal(t, expectedLog, path)
+					return nil, tc.statErr
+				}
+				var links [][2]string
+				fakeOS.SymlinkFn = func(oldname, newname string) error {
+					links = append(links, [2]string{oldname, newname})
+					return tc.symlinkErr
+				}
+
+				_, err = m.startContainer(tCtx, sandboxID, sandboxConfig, spec, pod, &kubecontainer.PodStatus{}, nil, "", nil, nil)
+				require.NoError(t, err)
+				require.Len(t, fakeRuntime.Containers, 1)
+				for containerID, actual := range fakeRuntime.Containers {
+					assert.Equal(t, runtimeapi.ContainerState_CONTAINER_RUNNING, actual.State)
+					if tc.wantLink {
+						assert.Equal(t, [][2]string{{expectedLog, legacyLogSymlink(containerID, containerName, pod.Name, pod.Namespace)}}, links)
+					} else {
+						assert.Empty(t, links)
+					}
+				}
+			})
+		}
+	}
 }
 
 // TestKillContainer tests killing the container in a Pod.

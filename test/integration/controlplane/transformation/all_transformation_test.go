@@ -63,6 +63,9 @@ func createResources(t *testing.T, test *transformTest,
 		if err != nil {
 			t.Fatal(err)
 		}
+		if err := etcd.CreatePrerequisites(ctx, dynamic.NewForConfigOrDie(test.kubeAPIServer.ClientConfig), namespace, data.Prerequisites); err != nil {
+			t.Fatal(err)
+		}
 		_, err = dynamicClient.Create(ctx, obj, metav1.CreateOptions{})
 		if err != nil {
 			t.Fatal(err)

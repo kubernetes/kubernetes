@@ -93,4 +93,5 @@ const (
 	SELinuxWarningController                           = "selinux-warning-controller"
 	EvictionRequestController                          = "evictionrequest-controller"
 	ImperativeEvictionResponderController              = "imperative-eviction-responder-controller"
+	PodCheckpointController                            = "podcheckpoint-controller"
 )

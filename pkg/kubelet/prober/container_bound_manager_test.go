@@ -78,6 +78,66 @@ func TestContainerBoundManagerInitialResultsDoNotSendUpdates(t *testing.T) {
 	}
 }
 
+func TestContainerBoundManagerSuspendProbesDrainsInFlightProbe(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	m := newTestContainerBoundManager(tCtx)
+	defer m.CleanupPods(nil)
+	pod := probedTestPod(liveness)
+	pod.Spec.Containers[0].LivenessProbe.InitialDelaySeconds = 3600
+	startTestProbes(tCtx, m, pod, testID("running"))
+	w := mustGetWorker(tCtx, m, pod.UID, testContainerName, liveness)
+
+	probeStarted, finishProbe := make(chan struct{}), make(chan struct{})
+	m.prober.exec = blockingCheckpointProbe{started: probeStarted, finish: finishProbe}
+	probeDone := make(chan struct{})
+	go func() { w.doProbe(); close(probeDone) }()
+	select {
+	case <-probeStarted:
+	case <-time.After(5 * time.Second):
+		t.Fatal("probe did not start")
+	}
+
+	suspended := make(chan error, 1)
+	go func() { suspended <- m.SuspendProbes(tCtx, pod.UID) }()
+	deadline := time.NewTimer(5 * time.Second)
+	defer deadline.Stop()
+	for !m.isSuspended(pod.UID) {
+		select {
+		case <-deadline.C:
+			t.Fatal("probes did not become suspended")
+		case <-time.After(time.Millisecond):
+		}
+	}
+	select {
+	case err := <-suspended:
+		t.Fatalf("suspension returned while a probe was running: %v", err)
+	default:
+	}
+
+	close(finishProbe)
+	select {
+	case err := <-suspended:
+		if err != nil {
+			t.Fatalf("suspending probes: %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("suspension did not finish after the probe")
+	}
+	<-probeDone
+
+	counter := &countingExecProber{result: probe.Failure}
+	m.prober.exec = counter
+	w.doProbe()
+	if got := counter.count(); got != 0 {
+		t.Fatalf("suspended worker ran %d probes, want 0", got)
+	}
+	m.ResumeProbes(pod.UID)
+	w.doProbe()
+	if got := counter.count(); got != 1 {
+		t.Fatalf("resumed worker ran %d probes, want 1", got)
+	}
+}
+
 func TestRunningContainerStatusUsesNewestInstance(t *testing.T) {
 	for _, state := range []kubecontainer.State{kubecontainer.ContainerStateRunning, kubecontainer.ContainerStateExited, kubecontainer.ContainerStateCreated} {
 		t.Run(string(state), func(t *testing.T) {

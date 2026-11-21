@@ -1934,7 +1934,11 @@
             "priority": 2
           }
         ],
-        "podNetwork": "podNetworkValue"
+        "podNetwork": "podNetworkValue",
+        "restoreFrom": {
+          "name": "nameValue",
+          "uid": "uidValue"
+        }
       }
     }
   },

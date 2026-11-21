@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"hash/fnv"
+	"iter"
 	"slices"
 	"strings"
 
@@ -51,12 +52,26 @@ type HandlerRunner interface {
 // RuntimeHelper wraps kubelet to make container runtime
 // able to get necessary informations like the RunContainerOptions, DNS settings, Host IP.
 type RuntimeHelper interface {
-	GenerateRunContainerOptions(ctx context.Context, pod *v1.Pod, container *v1.Container, podIP string, podIPs []string, imageVolumes ImageVolumes) (contOpts *RunContainerOptions, cleanupAction func(), err error)
+	GenerateRunContainerOptions(ctx context.Context, pod *v1.Pod, container *v1.Container, podIP string, podIPs []string, imageVolumes ImageVolumes, runtimeHandler string) (contOpts *RunContainerOptions, cleanupAction func(), err error)
 	GetPodDNS(ctx context.Context, pod *v1.Pod) (dnsConfig *runtimeapi.DNSConfig, err error)
 	// GetPodCgroupParent returns the CgroupName identifier, and its literal cgroupfs form on the host
 	// of a pod.
 	GetPodCgroupParent(pod *v1.Pod) string
 	GetPodDir(podUID types.UID) string
+	// ValidateRestoreCheckpoint checks that the pod can restore from the
+	// PodCheckpoint named by spec.restoreFrom.name on this node and returns the
+	// on-node checkpoint directory. It returns an error if the checkpoint cannot
+	// be found, is not ready, was taken on a different node (cross-node restore
+	// is out of scope), or does not match the pod's spec. On success the caller
+	// must call release once the runtime no longer reads the checkpoint.
+	ValidateRestoreCheckpoint(ctx context.Context, pod *v1.Pod) (path string, release func(), err error)
+	// UpdatePodRestoreHosts refreshes the kubelet-managed /etc/hosts file after
+	// RestorePod has created the sandbox and CNI has assigned its IPs.
+	UpdatePodRestoreHosts(ctx context.Context, pod *v1.Pod, podIPs []string) error
+	// MarkPodRestoreStarted durably records that the kubelet is about to call
+	// RestorePod for the Pod. After a kubelet restart, the record separates a
+	// restore that may have reached the runtime from one that can start again.
+	MarkPodRestoreStarted(podUID types.UID) error
 	GeneratePodHostNameAndDomain(logger klog.Logger, pod *v1.Pod) (hostname string, hostDomain string, err error)
 	// GetExtraSupplementalGroupsForPod returns a list of the extra
 	// supplemental groups for the Pod. These extra supplemental groups come
@@ -93,6 +108,11 @@ type RuntimeHelper interface {
 
 	// CleanContainerSubPaths unmounts and removes any host subPath bind mounts for a container.
 	CleanContainerSubPaths(podUID types.UID, containerName string) error
+	// SetPodRestoreBlocked records whether a pod's restore-from-checkpoint is
+	// currently blocked waiting for another restore of the same (namespace, name)
+	// to finish, so the kubelet can surface PodRestored=Unknown/RestoreInProgress
+	// condition (KEP-5823).
+	SetPodRestoreBlocked(podUID types.UID, blocked bool)
 }
 
 // ShouldContainerBeRestarted checks whether a container needs to be restarted.
@@ -579,4 +599,21 @@ func nonRegularContainerNames(spec *v1.PodSpec) sets.Set[string] {
 		names.Insert(c.Name)
 	}
 	return names
+}
+
+// CheckpointableContainers yields the containers that a Pod-level checkpoint
+// captures and a restore recreates: restartable init (sidecar) containers in
+// spec order, followed by regular containers. Completed init containers and
+// ephemeral containers are not part of a checkpoint.
+func CheckpointableContainers(spec *v1.PodSpec) iter.Seq2[*v1.Container, podutil.ContainerType] {
+	return func(yield func(*v1.Container, podutil.ContainerType) bool) {
+		for container, containerType := range podutil.ContainerIter(spec, podutil.InitContainers|podutil.Containers) {
+			if containerType == podutil.InitContainers && !podutil.IsRestartableInitContainer(container) {
+				continue
+			}
+			if !yield(container, containerType) {
+				return
+			}
+		}
+	}
 }

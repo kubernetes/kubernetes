@@ -49,10 +49,14 @@ import (
 	"k8s.io/mount-utils"
 
 	v1 "k8s.io/api/core/v1"
+	nodev1alpha1 "k8s.io/api/node/v1alpha1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -73,6 +77,8 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/ktesting"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	nodeapi "k8s.io/kubernetes/pkg/apis/node"
+	checkpointutil "k8s.io/kubernetes/pkg/apis/node/util"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/allocation"
 	"k8s.io/kubernetes/pkg/kubelet/allocation/state"
@@ -242,6 +248,7 @@ func newTestKubeletWithImageList(
 	fakeRecorder := &record.FakeRecorder{}
 	fakeKubeClient := &fake.Clientset{}
 	kubelet := &Kubelet{}
+	kubelet.kubeletConfiguration.PodRestoreTimeout.Duration = 5 * time.Minute
 	kubelet.recorder = fakeRecorder
 	kubelet.kubeClient = fakeKubeClient
 	kubelet.heartbeatClient = fakeKubeClient
@@ -488,6 +495,7 @@ func newTestKubeletWithImageList(
 	kubelet.AddPodSyncLoopHandler(activeDeadlineHandler)
 	kubelet.AddPodSyncHandler(activeDeadlineHandler)
 	kubelet.kubeletConfiguration.LocalStorageCapacityIsolation = localStorageCapacityIsolation
+	kubelet.podCheckpointManager = &fakePodCheckpointManager{}
 	return &TestKubelet{
 		kubelet:              kubelet,
 		fakeRuntime:          fakeRuntime,
@@ -570,6 +578,7 @@ func createGenericRuntimeManager(ctx context.Context, kubelet *Kubelet, kubeCfg 
 		kubelet.containerManager.GetNodeAllocatableAbsolute,
 		kubeCfg.MemoryThrottlingFactor,
 		kubeCfg.MemoryReservationPolicy,
+		kubeCfg.PodRestoreTimeout.Duration,
 		kubelet.podStartupLatencyTracker,
 		tracerProvider,
 		token.NewManager(kubelet.kubeClient),
@@ -2021,6 +2030,464 @@ func TestCheckpointContainer(t *testing.T) {
 			)
 
 		})
+	}
+}
+
+// fakePodCheckpointManager reports a capture for each queued result.
+type fakePodCheckpointManager struct {
+	captures  []bool
+	synced    []types.UID
+	abandoned []types.UID
+	// missing is what CheckpointMissingFromNode reports.
+	missing bool
+	// inUse counts the users of each checkpoint's data.
+	inUse map[types.UID]int
+}
+
+func (*fakePodCheckpointManager) Run(context.Context) {}
+
+func (m *fakePodCheckpointManager) SyncPod(_ context.Context, pod *v1.Pod, _ *kubecontainer.PodStatus) bool {
+	m.synced = append(m.synced, pod.UID)
+	if len(m.captures) == 0 {
+		return false
+	}
+	captured := m.captures[0]
+	m.captures = m.captures[1:]
+	return captured
+}
+
+func (m *fakePodCheckpointManager) AbandonPod(pod *v1.Pod) {
+	m.abandoned = append(m.abandoned, pod.UID)
+}
+
+func (m *fakePodCheckpointManager) CheckpointMissingFromNode(string, string) bool {
+	return m.missing
+}
+
+func (m *fakePodCheckpointManager) UseCheckpointData(checkpointUID types.UID) func() {
+	if m.inUse == nil {
+		m.inUse = make(map[types.UID]int)
+	}
+	m.inUse[checkpointUID]++
+	return func() { m.inUse[checkpointUID]-- }
+}
+
+func TestValidateRestoreCheckpoint(t *testing.T) {
+	const thisNode = "testNode"
+	const capturedEnv = "captured-environment-secret"
+	const restoredEnv = "restored-environment-secret"
+	const capturedArg = "captured-argument-secret"
+	const restoredArg = "restored-argument-secret"
+	const restoredImage = "registry.example/restored-secret@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+
+	restorePod := func() *v1.Pod {
+		return &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: "p", Namespace: "ns", UID: "restore-uid"},
+			Spec: v1.PodSpec{
+				RestoreFrom: &v1.CheckpointReference{
+					Name: "ckpt",
+					UID:  "ckpt-uid",
+				},
+				InitContainers: []v1.Container{{
+					Name: "init", Image: "registry.example/init@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+					Args: []string{capturedArg},
+					Env:  []v1.EnvVar{{Name: "TOKEN", Value: capturedEnv}},
+					Resources: v1.ResourceRequirements{Requests: v1.ResourceList{
+						v1.ResourceMemory: resource.MustParse("128Mi"),
+					}},
+				}},
+				Containers: []v1.Container{{
+					Name: "app", Image: "registry.example/app@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+					Args: []string{capturedArg},
+					Env:  []v1.EnvVar{{Name: "TOKEN", Value: capturedEnv}},
+					Resources: v1.ResourceRequirements{Requests: v1.ResourceList{
+						v1.ResourceCPU: resource.MustParse("1"),
+					}},
+				}},
+			},
+		}
+	}
+	checkpoint := func(nodeName, location string, nilLoc, ready bool, tmpl *v1.PodTemplateSpec) *nodev1alpha1.PodCheckpoint {
+		conditionStatus := metav1.ConditionFalse
+		if ready {
+			conditionStatus = metav1.ConditionTrue
+		}
+		pc := &nodev1alpha1.PodCheckpoint{
+			ObjectMeta: metav1.ObjectMeta{Name: "ckpt", Namespace: "ns", UID: "ckpt-uid", Finalizers: []string{nodeapi.PodCheckpointRestoreProtectionFinalizer}},
+			Status: &nodev1alpha1.PodCheckpointStatus{
+				NodeName:                new(nodeName),
+				Conditions:              []metav1.Condition{{Type: nodev1alpha1.PodCheckpointConditionReady, Status: conditionStatus, Reason: "x"}},
+				CheckpointedPodTemplate: tmpl,
+			},
+		}
+		if !nilLoc {
+			pc.Status.CheckpointLocation = &nodev1alpha1.CheckpointSource{
+				Type:      nodev1alpha1.CheckpointSourceTypeNodeLocal,
+				NodeLocal: &nodev1alpha1.NodeLocalCheckpointSource{Path: location},
+			}
+		}
+		return pc
+	}
+
+	matchTmpl := checkpointutil.SanitizePodTemplate(restorePod())
+	httpProbe := func(protocol *v1.HTTPProtocol) *v1.Probe {
+		return &v1.Probe{ProbeHandler: v1.ProbeHandler{HTTPGet: &v1.HTTPGetAction{
+			Port: intstr.FromInt32(80), Protocol: protocol,
+		}}}
+	}
+	httpTemplate := func(protocol *v1.HTTPProtocol) *v1.PodTemplateSpec {
+		template := matchTmpl.DeepCopy()
+		template.Spec.Containers[0].ReadinessProbe = httpProbe(protocol)
+		return template
+	}
+	otherPod := restorePod()
+	otherPod.Spec.Containers[0].Image = "different"
+	mismatchTmpl := checkpointutil.SanitizePodTemplate(otherPod)
+	// The node authorizer denies a node's read of a checkpoint without a
+	// relationship to that node, such as a deleted one.
+	unrelated := apierrors.NewForbidden(nodev1alpha1.SchemeGroupVersion.WithResource("podcheckpoints").GroupResource(), "ckpt", errors.New("no relationship found between node 'testNode' and this object"))
+
+	tests := []struct {
+		name           string
+		image          string
+		nodeName       string
+		ready          bool
+		tmpl           *v1.PodTemplateSpec
+		missing        bool
+		lookupErr      error
+		statErr        error
+		loc            string
+		nilLoc         bool
+		absLoc         bool
+		createDir      bool
+		createFile     bool
+		symlinkOutside bool
+		wantReason     string
+		wantMismatch   bool
+		mutatePod      func(*v1.Pod)
+		removePin      bool
+		// useCache installs this node's PodCheckpoint watch. Without it, every
+		// lookup reads the API server.
+		useCache      bool
+		cacheUnsynced bool
+		cacheMissing  bool
+		cachedReady   bool
+		cachedTmpl    *v1.PodTemplateSpec
+	}{
+		{name: "ready, matching spec, relative location", nodeName: thisNode, ready: true, tmpl: matchTmpl, loc: "checkpoint", createDir: true},
+		{
+			name: "defaulted HTTP1 protocol matches captured omission", nodeName: thisNode, ready: true, tmpl: httpTemplate(nil), loc: "checkpoint", createDir: true,
+			mutatePod: func(pod *v1.Pod) { pod.Spec.Containers[0].ReadinessProbe = httpProbe(new(v1.HTTPProtocolHTTP1)) },
+		},
+		{
+			name: "omitted protocol matches captured HTTP1", nodeName: thisNode, ready: true, tmpl: httpTemplate(new(v1.HTTPProtocolHTTP1)), loc: "checkpoint", createDir: true,
+			mutatePod: func(pod *v1.Pod) { pod.Spec.Containers[0].ReadinessProbe = httpProbe(nil) },
+		},
+		{
+			name: "HTTP2 cannot replace captured omission", nodeName: thisNode, ready: true, tmpl: httpTemplate(nil), loc: "checkpoint",
+			mutatePod:  func(pod *v1.Pod) { pod.Spec.Containers[0].ReadinessProbe = httpProbe(new(v1.HTTPProtocolHTTP2)) },
+			wantReason: events.PodSpecMismatch, wantMismatch: true,
+		},
+		{
+			name: "omission cannot replace captured HTTP2", nodeName: thisNode, ready: true, tmpl: httpTemplate(new(v1.HTTPProtocolHTTP2)), loc: "checkpoint",
+			mutatePod:  func(pod *v1.Pod) { pod.Spec.Containers[0].ReadinessProbe = httpProbe(nil) },
+			wantReason: events.PodSpecMismatch, wantMismatch: true,
+		},
+		{name: "checkpoint UID must be pinned", nodeName: thisNode, ready: true, tmpl: matchTmpl, loc: "checkpoint", createDir: true, mutatePod: func(pod *v1.Pod) { pod.Spec.RestoreFrom.UID = "" }, wantReason: events.RestoreFailed},
+		{name: "same-name replacement cannot restore", nodeName: thisNode, ready: true, tmpl: matchTmpl, loc: "checkpoint", createDir: true, mutatePod: func(pod *v1.Pod) { pod.Spec.RestoreFrom.UID = "original-uid" }, wantReason: events.RestoreFailed},
+		{name: "cached checkpoint still requires an authoritative read", nodeName: thisNode, ready: true, tmpl: matchTmpl, loc: "checkpoint", createDir: true, useCache: true, cachedReady: true, cachedTmpl: matchTmpl},
+		{name: "unsynced cache reads API", nodeName: thisNode, ready: true, tmpl: matchTmpl, loc: "checkpoint", createDir: true, useCache: true, cacheUnsynced: true, cachedReady: true, cachedTmpl: matchTmpl},
+		{name: "stale cached readiness confirmed live", nodeName: thisNode, ready: true, tmpl: matchTmpl, loc: "checkpoint", createDir: true, useCache: true, cachedTmpl: matchTmpl},
+		{name: "stale cached template confirmed live", nodeName: thisNode, ready: true, tmpl: matchTmpl, loc: "checkpoint", createDir: true, useCache: true, cachedReady: true, cachedTmpl: mismatchTmpl},
+		{name: "cached mismatch confirmed live", nodeName: thisNode, ready: true, tmpl: mismatchTmpl, loc: "checkpoint", createDir: true, useCache: true, cachedReady: true, cachedTmpl: mismatchTmpl, wantReason: events.PodSpecMismatch},
+		{name: "checkpoint outside node cache read live", nodeName: "otherNode", ready: true, tmpl: matchTmpl, loc: "checkpoint", useCache: true, cacheMissing: true, wantReason: events.CheckpointWrongNode},
+		{name: "ready, nested relative location", nodeName: thisNode, ready: true, tmpl: matchTmpl, loc: "sub/checkpoint", createDir: true},
+		{name: "missing admission node pin", nodeName: thisNode, ready: true, tmpl: matchTmpl, loc: "checkpoint", createDir: true, removePin: true, wantReason: events.PodSpecMismatch},
+		{name: "ready, no template fails closed", nodeName: thisNode, ready: true, loc: "checkpoint", wantReason: events.PodSpecMismatch},
+		{name: "ready, mismatched spec", nodeName: thisNode, ready: true, tmpl: mismatchTmpl, loc: "checkpoint", wantReason: events.PodSpecMismatch, wantMismatch: true},
+		{name: "original image tag cannot replace captured digest", image: "registry.example/app:latest", nodeName: thisNode, ready: true, tmpl: matchTmpl, loc: "checkpoint", wantReason: events.PodSpecMismatch},
+		{name: "different digest cannot replace captured digest", image: "registry.example/app@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", nodeName: thisNode, ready: true, tmpl: matchTmpl, loc: "checkpoint", wantReason: events.PodSpecMismatch},
+		{
+			name: "init container image mismatch", nodeName: thisNode, ready: true, tmpl: matchTmpl, loc: "checkpoint",
+			mutatePod:  func(pod *v1.Pod) { pod.Spec.InitContainers[0].Image = restoredImage },
+			wantReason: events.PodSpecMismatch, wantMismatch: true,
+		},
+		{
+			name: "container environment mismatch", nodeName: thisNode, ready: true, tmpl: matchTmpl, loc: "checkpoint",
+			mutatePod:  func(pod *v1.Pod) { pod.Spec.Containers[0].Env[0].Value = restoredEnv },
+			wantReason: events.PodSpecMismatch, wantMismatch: true,
+		},
+		{
+			name: "init container environment mismatch", nodeName: thisNode, ready: true, tmpl: matchTmpl, loc: "checkpoint",
+			mutatePod:  func(pod *v1.Pod) { pod.Spec.InitContainers[0].Env[0].Value = restoredEnv },
+			wantReason: events.PodSpecMismatch, wantMismatch: true,
+		},
+		{
+			name: "container arguments mismatch", nodeName: thisNode, ready: true, tmpl: matchTmpl, loc: "checkpoint",
+			mutatePod:  func(pod *v1.Pod) { pod.Spec.Containers[0].Args[0] = restoredArg },
+			wantReason: events.PodSpecMismatch, wantMismatch: true,
+		},
+		{
+			name: "init container arguments mismatch", nodeName: thisNode, ready: true, tmpl: matchTmpl, loc: "checkpoint",
+			mutatePod:  func(pod *v1.Pod) { pod.Spec.InitContainers[0].Args[0] = restoredArg },
+			wantReason: events.PodSpecMismatch, wantMismatch: true,
+		},
+		{
+			name: "container resources mismatch", nodeName: thisNode, ready: true, tmpl: matchTmpl, loc: "checkpoint",
+			mutatePod:  func(pod *v1.Pod) { pod.Spec.Containers[0].Resources.Requests[v1.ResourceCPU] = resource.MustParse("2") },
+			wantReason: events.PodSpecMismatch, wantMismatch: true,
+		},
+		{
+			name: "init container resources mismatch", nodeName: thisNode, ready: true, tmpl: matchTmpl, loc: "checkpoint",
+			mutatePod: func(pod *v1.Pod) {
+				pod.Spec.InitContainers[0].Resources.Requests[v1.ResourceMemory] = resource.MustParse("256Mi")
+			},
+			wantReason: events.PodSpecMismatch, wantMismatch: true,
+		},
+		{
+			name: "multiple spec mismatches", nodeName: thisNode, ready: true, tmpl: matchTmpl, loc: "checkpoint",
+			mutatePod: func(pod *v1.Pod) {
+				pod.Spec.InitContainers[0].Image = restoredImage
+				pod.Spec.Containers[0].Env[0].Value = restoredEnv
+				pod.Spec.Containers[0].Args[0] = restoredArg
+			},
+			wantReason:   events.PodSpecMismatch,
+			wantMismatch: true,
+		},
+		{
+			name: "equivalent resource quantity", nodeName: thisNode, ready: true, tmpl: matchTmpl, loc: "checkpoint", createDir: true,
+			mutatePod: func(pod *v1.Pod) {
+				pod.Spec.Containers[0].Resources.Requests[v1.ResourceCPU] = resource.MustParse("1000m")
+			},
+		},
+		{name: "absolute location rejected", nodeName: thisNode, ready: true, tmpl: matchTmpl, loc: "checkpoint", absLoc: true, wantReason: events.PodSpecMismatch},
+		{name: "parent-escape location rejected", nodeName: thisNode, ready: true, tmpl: matchTmpl, loc: "../escape", wantReason: events.PodSpecMismatch},
+		{name: "empty location rejected", nodeName: thisNode, ready: true, tmpl: matchTmpl, wantReason: events.PodSpecMismatch},
+		{name: "checkpoint root rejected", nodeName: thisNode, ready: true, tmpl: matchTmpl, loc: ".", wantReason: events.PodSpecMismatch},
+		{name: "missing directory rejected", nodeName: thisNode, ready: true, tmpl: matchTmpl, loc: "missing", wantReason: events.CheckpointNotReady},
+		{name: "regular file rejected", nodeName: thisNode, ready: true, tmpl: matchTmpl, loc: "checkpoint", createFile: true, wantReason: events.CheckpointNotReady},
+		{name: "symlink escape rejected", nodeName: thisNode, ready: true, tmpl: matchTmpl, loc: "checkpoint", symlinkOutside: true, wantReason: events.PodSpecMismatch},
+		{name: "nil checkpoint location rejected", nodeName: thisNode, ready: true, tmpl: matchTmpl, loc: "checkpoint", nilLoc: true, wantReason: events.CheckpointNotReady},
+		{name: "not ready", nodeName: thisNode, ready: false, loc: "checkpoint", wantReason: events.CheckpointNotReady},
+		{name: "wrong node", nodeName: "otherNode", ready: true, tmpl: matchTmpl, loc: "checkpoint", wantReason: events.CheckpointWrongNode},
+		{name: "missing checkpoint", missing: true, loc: "checkpoint", wantReason: events.RestoreFailed},
+		{name: "deleted checkpoint with stale cached copy", missing: true, loc: "checkpoint", useCache: true, cachedTmpl: matchTmpl, wantReason: events.RestoreFailed},
+		{name: "deleted checkpoint denied by node authorization", missing: true, lookupErr: unrelated, useCache: true, cacheMissing: true, wantReason: events.RestoreFailed},
+		{name: "node authorization behind node watch", lookupErr: unrelated, useCache: true, cachedTmpl: matchTmpl},
+		{name: "node authorization denial before node watch sync", missing: true, lookupErr: unrelated, useCache: true, cacheUnsynced: true, cacheMissing: true},
+		{name: "checkpoint API unavailable", lookupErr: apierrors.NewServiceUnavailable("temporary outage")},
+		{name: "checkpoint API timeout", lookupErr: apierrors.NewTimeoutError("temporary timeout", 1)},
+		{name: "checkpoint API context canceled", lookupErr: context.Canceled},
+		{name: "checkpoint filesystem timeout", nodeName: thisNode, ready: true, tmpl: matchTmpl, loc: "checkpoint", createDir: true, statErr: os.ErrDeadlineExceeded, wantReason: events.CheckpointNotReady},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+			defer testKubelet.Cleanup()
+			kl := testKubelet.kubelet
+			kl.nodeName = thisNode
+			kl.os.(*containertest.FakeOS).StatFn = func(path string) (os.FileInfo, error) {
+				if tc.statErr != nil {
+					return nil, &os.PathError{Op: "stat", Path: path, Err: tc.statErr}
+				}
+				return os.Stat(path)
+			}
+
+			// status.checkpointLocation is relative to the pod-checkpoints root;
+			// ValidateRestoreCheckpoint resolves it against that root and rejects
+			// absolute or parent-escaping values.
+			loc := tc.loc
+			if tc.absLoc {
+				loc = filepath.Join(kl.getPodCheckpointsDir(), loc)
+			}
+			if tc.createDir {
+				require.NoError(t, os.MkdirAll(filepath.Join(kl.getPodCheckpointsDir(), tc.loc), 0o700))
+			}
+			if tc.createFile {
+				require.NoError(t, os.MkdirAll(kl.getPodCheckpointsDir(), 0o700))
+				require.NoError(t, os.WriteFile(filepath.Join(kl.getPodCheckpointsDir(), tc.loc), nil, 0o600))
+			}
+			if tc.symlinkOutside {
+				outside := t.TempDir()
+				require.NoError(t, os.MkdirAll(kl.getPodCheckpointsDir(), 0o700))
+				if err := os.Symlink(outside, filepath.Join(kl.getPodCheckpointsDir(), tc.loc)); err != nil {
+					t.Skipf("symlink creation is unavailable: %v", err)
+				}
+			}
+			var objs []apiruntime.Object
+			if !tc.missing {
+				objs = append(objs, checkpoint(tc.nodeName, loc, tc.nilLoc, tc.ready, tc.tmpl))
+			}
+			client := fake.NewClientset(objs...)
+			if tc.lookupErr != nil {
+				client.PrependReactor("get", "podcheckpoints", func(core.Action) (bool, apiruntime.Object, error) {
+					return true, nil, tc.lookupErr
+				})
+			}
+			gets := 0
+			client.PrependReactor("get", "podcheckpoints", func(core.Action) (bool, apiruntime.Object, error) {
+				gets++
+				return false, nil, nil
+			})
+			kl.kubeClient = client
+			checkpoints := &fakePodCheckpointManager{missing: tc.useCache && tc.cacheMissing && !tc.cacheUnsynced}
+			kl.podCheckpointManager = checkpoints
+
+			pod := restorePod()
+			checkpointutil.AddRestoreNodeAffinity(&pod.Spec, thisNode)
+			if tc.removePin {
+				pod.Spec.Affinity = nil
+			}
+			if tc.image != "" {
+				pod.Spec.Containers[0].Image = tc.image
+			}
+			if tc.mutatePod != nil {
+				tc.mutatePod(pod)
+			}
+			path, release, err := kl.ValidateRestoreCheckpoint(tCtx, pod)
+			if tc.useCache {
+				require.Equal(t, 1, gets, "a restore requires an authoritative checkpoint read")
+			}
+			if tc.wantReason != "" || tc.lookupErr != nil {
+				require.Nil(t, release)
+				require.Zero(t, checkpoints.inUse["ckpt-uid"], "a rejected checkpoint must not keep its data in use")
+				require.Error(t, err)
+				require.Equal(t, tc.wantReason, kubecontainer.RestoreErrorReason(err))
+				if tc.wantMismatch {
+					require.Equal(t, "restoring pod spec does not match PodCheckpoint \"ckpt\"", err.Error())
+					for _, value := range []string{capturedEnv, restoredEnv, capturedArg, restoredArg, restoredImage} {
+						require.NotContains(t, err.Error(), value)
+					}
+				}
+				if tc.lookupErr != nil {
+					require.ErrorIs(t, err, tc.lookupErr)
+				}
+				if tc.statErr != nil {
+					require.ErrorIs(t, err, tc.statErr)
+				}
+				return
+			}
+			require.NoError(t, err)
+			expected, err := filepath.EvalSymlinks(filepath.Join(kl.getPodCheckpointsDir(), loc))
+			require.NoError(t, err)
+			require.Equal(t, expected, path)
+			require.Equal(t, 1, checkpoints.inUse["ckpt-uid"], "the checkpoint data must stay until the restore releases it")
+			release()
+			require.Zero(t, checkpoints.inUse["ckpt-uid"])
+		})
+	}
+}
+
+func TestSyncPodResyncsAfterCheckpointCapture(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelCheckpointRestore, true)
+	for _, tc := range []struct {
+		name string
+		// runtimeActions are the actions the runtime sync took.
+		runtimeActions []*kubecontainer.SyncResult
+		wantCapture    bool
+	}{
+		{name: "runtime idle", wantCapture: true},
+		{name: "runtime acted", runtimeActions: []*kubecontainer.SyncResult{kubecontainer.NewSyncResult(kubecontainer.StartContainer, "app")}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+			defer testKubelet.Cleanup()
+			kl := testKubelet.kubelet
+			pod := podWithUIDNameNsSpec("pod-uid", "source", "ns", v1.PodSpec{NodeName: "testNode", Containers: []v1.Container{{Name: "app"}}})
+			kl.podManager.SetPods([]*v1.Pod{pod})
+			podStatus := &kubecontainer.PodStatus{ID: pod.UID, Name: pod.Name, Namespace: pod.Namespace}
+			checkpoints := &fakePodCheckpointManager{captures: []bool{true, false}}
+			kl.podCheckpointManager = checkpoints
+			syncs := 0
+			kl.podWorkers = &fakePodWorkers{
+				syncPodFn: func(context.Context, kubetypes.SyncPodType, *v1.Pod, *v1.Pod, *kubecontainer.PodStatus, int64) (bool, func(), error) {
+					syncs++
+					return false, nil, nil
+				},
+				cache: kl.podCache,
+				t:     t,
+			}
+			fakeRuntime := testKubelet.fakeRuntime
+			if tc.runtimeActions != nil {
+				fakeRuntime.SyncResults = &kubecontainer.PodSyncResult{SyncResults: tc.runtimeActions}
+			}
+
+			_, _, err := kl.SyncPod(tCtx, kubetypes.SyncPodSync, pod, nil, podStatus, 0)
+			require.NoError(t, err)
+			fakeRuntime.Lock()
+			require.Contains(t, fakeRuntime.CalledFunctions, "SyncPod", "the runtime sync runs before a capture")
+			fakeRuntime.Unlock()
+			if !tc.wantCapture {
+				require.Empty(t, checkpoints.synced, "a capture waits until the runtime sync takes no actions")
+				require.Zero(t, syncs)
+				return
+			}
+			require.Equal(t, []types.UID{pod.UID}, checkpoints.synced)
+			require.Equal(t, 1, syncs, "a capture must trigger a sync with a newer status")
+
+			_, _, err = kl.SyncPod(tCtx, kubetypes.SyncPodSync, pod, nil, podStatus, 0)
+			require.NoError(t, err)
+			require.Equal(t, []types.UID{pod.UID, pod.UID}, checkpoints.synced)
+			require.Equal(t, 1, syncs, "only a capture triggers another sync")
+		})
+	}
+}
+
+func TestSyncTerminatingPodAbandonsCheckpointRequest(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelCheckpointRestore, true)
+	tCtx := ktesting.Init(t)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+	kl := testKubelet.kubelet
+	pod := podWithUIDNameNsSpec("pod-uid", "source", "ns", v1.PodSpec{NodeName: "testNode", Containers: []v1.Container{{Name: "app"}}})
+	checkpoints := &fakePodCheckpointManager{}
+	kl.podCheckpointManager = checkpoints
+	gracePeriod := int64(0)
+	require.NoError(t, kl.SyncTerminatingPod(tCtx, pod, &kubecontainer.PodStatus{ID: pod.UID}, &gracePeriod, nil))
+	require.Equal(t, []types.UID{pod.UID}, checkpoints.abandoned)
+}
+
+func TestPrepareContainerPathsForRestoreWithoutInitialPodStatus(t *testing.T) {
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+	kl := testKubelet.kubelet
+	kl.dnsConfigurer = createDNSConfigurer()
+	always := v1.ContainerRestartPolicyAlways
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "restore-pod", Namespace: "ns", UID: "restore-uid"},
+		Spec: v1.PodSpec{
+			InitContainers: []v1.Container{
+				{Name: "completed-init"},
+				{Name: "sidecar", RestartPolicy: &always},
+			},
+			Containers: []v1.Container{{Name: "app"}},
+		},
+	}
+	require.NoError(t, os.MkdirAll(kl.getPodDir(pod.UID), 0o750))
+
+	tCtx := ktesting.Init(t)
+	require.NoError(t, kl.prepareContainerPathsForRestore(tCtx, pod, nil))
+	hostsPath := getEtcHostsPath(kl.getPodDir(pod.UID))
+	content, err := os.ReadFile(hostsPath)
+	require.NoError(t, err)
+	assert.NotContains(t, string(content), "10.0.0.2")
+	_, err = os.Stat(filepath.Join(kl.getPodDir(pod.UID), "containers", "sidecar", "0"))
+	require.NoError(t, err)
+	_, err = os.Stat(filepath.Join(kl.getPodDir(pod.UID), "containers", "app", "0"))
+	require.NoError(t, err)
+	_, err = os.Stat(filepath.Join(kl.getPodDir(pod.UID), "containers", "completed-init", "0"))
+	require.ErrorIs(t, err, os.ErrNotExist)
+
+	for _, podIPs := range [][]string{{"10.0.0.2"}, {"2001:db8::2"}, {"10.0.0.2", "2001:db8::2"}} {
+		require.NoError(t, kl.UpdatePodRestoreHosts(tCtx, pod, podIPs))
+		content, err = os.ReadFile(hostsPath)
+		require.NoError(t, err)
+		for _, ip := range podIPs {
+			assert.Contains(t, string(content), ip+"\trestore-pod")
+		}
 	}
 }
 
@@ -3504,6 +3971,83 @@ func TestSyncTerminatingPodKillPod(t *testing.T) {
 
 	// Check pod status stored in the status map.
 	checkPodStatus(t, kl, pod, v1.PodFailed)
+}
+
+func TestSyncTerminatingPodClearsRestoreState(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		stage       string
+		disableGate bool
+		killFailure bool
+	}{
+		{name: "preparation failure", stage: "preparation"},
+		{name: "retryable runtime failure", stage: "retryable"},
+		{name: "deferred runtime", stage: "deferred"},
+		{name: "gate disabled after deferral", stage: "deferred", disableGate: true},
+		{name: "kill failure before retry", stage: "deferred", killFailure: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelCheckpointRestore, true)
+			ctx := ktesting.Init(t)
+			testKubelet := newTestKubelet(t, false)
+			defer testKubelet.Cleanup()
+			kl := testKubelet.kubelet
+			kl.dnsConfigurer = createDNSConfigurer()
+			pod := podWithUIDNameNs("restore-uid", "restore", "ns")
+			pod.Spec.Containers = []v1.Container{{Name: "app", Image: "image"}}
+			pod.Spec.RestoreFrom = &v1.CheckpointReference{Name: "checkpoint"}
+			kl.podManager.SetPods([]*v1.Pod{pod})
+			runtimeStatus := &kubecontainer.PodStatus{ID: pod.UID}
+			switch tc.stage {
+			case "preparation":
+				blocked := kl.getPodDir(pod.UID)
+				require.NoError(t, os.WriteFile(blocked, []byte("blocks directory creation"), 0600))
+			case "retryable":
+				testKubelet.fakeRuntime.SyncResults = &kubecontainer.PodSyncResult{SyncResults: []*kubecontainer.SyncResult{{
+					Action: kubecontainer.RestorePodSandbox,
+					Target: pod.UID,
+					Error:  &kubecontainer.RestoreError{Reason: events.CheckpointNotReady, Err: errors.New("checkpoint not ready")},
+				}}}
+			case "deferred":
+				testKubelet.fakeRuntime.SyncResults = &kubecontainer.PodSyncResult{}
+			}
+			terminal, _, err := kl.SyncPod(ctx, kubetypes.SyncPodSync, pod, nil, runtimeStatus, 0)
+			if tc.stage == "deferred" {
+				require.NoError(t, err)
+			} else {
+				require.Error(t, err)
+			}
+			require.False(t, terminal)
+			if tc.stage == "preparation" {
+				require.True(t, testKubelet.fakeRuntime.AssertCallCounts("SyncPod", 0))
+				require.NoError(t, os.Remove(kl.getPodDir(pod.UID)))
+			}
+			kl.SetPodRestoreBlocked(pod.UID, true)
+			const otherUID types.UID = "other-restore-uid"
+			kl.SetPodRestoreBlocked(otherUID, true)
+			if tc.disableGate {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelCheckpointRestore, false)
+			}
+			pod.DeletionTimestamp = new(metav1.Now())
+			gracePeriod := int64(0)
+			if tc.killFailure {
+				failure := errors.New("kill failed")
+				testKubelet.fakeRuntime.Err = failure
+				err := kl.SyncTerminatingPod(ctx, pod, runtimeStatus, &gracePeriod, nil)
+				require.ErrorIs(t, err, failure)
+				require.True(t, kl.podRestoreBlocked(pod.UID))
+				testKubelet.fakeRuntime.Err = nil
+			}
+			for range 2 {
+				err := kl.SyncTerminatingPod(ctx, pod, runtimeStatus, &gracePeriod, func(status *v1.PodStatus) {
+					status.Phase = v1.PodFailed
+				})
+				require.NoError(t, err)
+				require.False(t, kl.podRestoreBlocked(pod.UID))
+				require.True(t, kl.podRestoreBlocked(otherUID))
+			}
+		})
+	}
 }
 
 // A pod the kubelet failed (an eviction) whose container handles SIGTERM and
@@ -8161,4 +8705,402 @@ func TestSyncLoopIteration_VolumePodSync(t *testing.T) {
 	ok := kl.syncLoopIteration(tCtx, make(chan kubetypes.PodUpdate), kl, make(chan time.Time), make(chan time.Time), make(chan *pleg.PodLifecycleEvent))
 	require.True(t, ok)
 	testKubelet.fakeRuntime.AssertStartedPods([]string{string(pod.UID)})
+}
+
+func TestSyncPodInterruptedRestore(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelCheckpointRestore, true)
+	for _, cached := range []bool{false, true} {
+		t.Run(fmt.Sprintf("cached=%t", cached), func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			testKubelet := newTestKubelet(t, false)
+			defer testKubelet.Cleanup()
+			kl := testKubelet.kubelet
+			recorder := record.NewFakeRecorder(20)
+			kl.recorder = recorder
+			pod := podWithUIDNameNs("restore-uid", "restore", "ns")
+			pod.Generation = 8
+			pod.Spec.RestoreFrom = &v1.CheckpointReference{Name: "checkpoint"}
+			recorded := v1.PodStatus{Conditions: []v1.PodCondition{{Type: v1.PodRestored, Status: v1.ConditionUnknown, Reason: "RestoreInProgress", ObservedGeneration: 3, LastTransitionTime: metav1.Now()}}}
+			// The previous kubelet process reached RestorePod.
+			require.NoError(t, kl.MarkPodRestoreStarted(pod.UID))
+			if cached {
+				kl.statusManager.SetPodStatus(klog.FromContext(tCtx), pod, recorded)
+			} else {
+				pod.Status = recorded
+			}
+			terminal, _, err := kl.SyncPod(tCtx, kubetypes.SyncPodSync, pod, nil, &kubecontainer.PodStatus{ID: pod.UID}, 0)
+			require.NoError(t, err)
+			require.True(t, terminal)
+			result, ok := kl.statusManager.GetPodStatus(pod.UID)
+			require.True(t, ok)
+			require.Equal(t, v1.PodFailed, result.Phase)
+			_, condition := podutil.GetPodCondition(&result, v1.PodRestored)
+			require.NotNil(t, condition)
+			assert.Equal(t, v1.ConditionFalse, condition.Status)
+			assert.Equal(t, events.RestoreInterrupted, condition.Reason)
+			assert.Equal(t, int64(3), condition.ObservedGeneration)
+			require.Len(t, recorder.Events, 1)
+			require.Contains(t, <-recorder.Events, "Warning "+events.RestoreInterrupted+" ")
+			// A repeat sync with the stale Pod watch must use the terminal cached result.
+			terminal, _, err = kl.SyncPod(tCtx, kubetypes.SyncPodSync, pod, nil, &kubecontainer.PodStatus{ID: pod.UID}, 0)
+			require.NoError(t, err)
+			require.True(t, terminal)
+			again, _ := kl.statusManager.GetPodStatus(pod.UID)
+			_, after := podutil.GetPodCondition(&again, v1.PodRestored)
+			assert.Equal(t, condition, after)
+			assert.True(t, testKubelet.fakeRuntime.AssertCallCounts("SyncPod", 0))
+			require.Empty(t, recorder.Events, "terminal restore must not repeat its event")
+		})
+	}
+}
+
+func TestSyncPodRestoreAfterKubeletRestart(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelCheckpointRestore, true)
+	for _, tc := range []struct {
+		name            string
+		recorded        bool
+		started         bool
+		wantInterrupted bool
+	}{
+		{name: "in progress before RestorePod", recorded: true},
+		{name: "started before status synced", started: true, wantInterrupted: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			testKubelet := newTestKubelet(t, false)
+			defer testKubelet.Cleanup()
+			kl := testKubelet.kubelet
+			kl.dnsConfigurer = createDNSConfigurer()
+			pod := podWithUIDNameNs("restore-uid", "restore", "ns")
+			pod.Spec.Containers = []v1.Container{{Name: "app", Image: "image"}}
+			pod.Spec.RestoreFrom = &v1.CheckpointReference{Name: "checkpoint"}
+			kl.podManager.SetPods([]*v1.Pod{pod})
+			if tc.recorded {
+				pod.Status.Conditions = []v1.PodCondition{{Type: v1.PodRestored, Status: v1.ConditionUnknown, Reason: "RestoreInProgress"}}
+			}
+			if tc.started {
+				require.NoError(t, kl.MarkPodRestoreStarted(pod.UID))
+			}
+
+			terminal, _, err := kl.SyncPod(tCtx, kubetypes.SyncPodSync, pod, nil, &kubecontainer.PodStatus{ID: pod.UID}, 0)
+			require.NoError(t, err)
+			require.Equal(t, tc.wantInterrupted, terminal)
+			result, ok := kl.statusManager.GetPodStatus(pod.UID)
+			require.True(t, ok)
+			_, condition := podutil.GetPodCondition(&result, v1.PodRestored)
+			require.NotNil(t, condition)
+			if tc.wantInterrupted {
+				assert.Equal(t, v1.ConditionFalse, condition.Status)
+				assert.Equal(t, events.RestoreInterrupted, condition.Reason)
+				assert.True(t, testKubelet.fakeRuntime.AssertCallCounts("SyncPod", 0))
+				return
+			}
+			assert.Equal(t, v1.ConditionUnknown, condition.Status)
+			assert.True(t, testKubelet.fakeRuntime.AssertCallCounts("SyncPod", 1), "a restore that never reached the runtime must start again")
+		})
+	}
+}
+
+func TestGenerateAPIPodStatusPodRestored(t *testing.T) {
+	for _, enabled := range []bool{false, true} {
+		for _, terminal := range []v1.ConditionStatus{v1.ConditionTrue, v1.ConditionFalse} {
+			t.Run(fmt.Sprintf("gate=%t/status=%s", enabled, terminal), func(t *testing.T) {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelCheckpointRestore, enabled)
+				tCtx := ktesting.Init(t)
+				testKubelet := newTestKubelet(t, false)
+				defer testKubelet.Cleanup()
+				pod := podWithUIDNameNs("restore-uid", "restore", "ns")
+				pod.Generation = 8
+				pod.Spec.RestoreFrom = &v1.CheckpointReference{Name: "checkpoint"}
+				condition := v1.PodCondition{Type: v1.PodRestored, Status: terminal, Reason: "Recorded", ObservedGeneration: 3, LastTransitionTime: metav1.Now()}
+				pod.Status.Conditions = []v1.PodCondition{condition}
+				got := testKubelet.kubelet.generateAPIPodStatus(tCtx, pod, &kubecontainer.PodStatus{ID: pod.UID}, SyncPod)
+				_, restored := podutil.GetPodCondition(&got, v1.PodRestored)
+				require.NotNil(t, restored)
+				assert.Equal(t, condition, *restored)
+				if enabled && terminal == v1.ConditionFalse {
+					assert.Equal(t, v1.PodFailed, got.Phase)
+				}
+			})
+		}
+	}
+}
+
+func TestSyncPodRestoreErrorOutcome(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelCheckpointRestore, true)
+	for _, reason := range []string{events.CheckpointNotReady, events.RestoreInProgress, events.RestorePreparationFailed, events.RestorePostProcessingFailed, events.CheckpointWrongNode, events.PodSpecMismatch, events.RestoreFailed, ""} {
+		t.Run(reason, func(t *testing.T) {
+			ctx := ktesting.Init(t)
+			testKubelet := newTestKubelet(t, false)
+			defer testKubelet.Cleanup()
+			kl := testKubelet.kubelet
+			kl.dnsConfigurer = createDNSConfigurer()
+			recorder := record.NewFakeRecorder(20)
+			kl.recorder = recorder
+			pod := podWithUIDNameNs("restore-uid", "restore", "ns")
+			pod.Spec.Containers = []v1.Container{{Name: "app", Image: "image"}}
+			pod.Spec.RestoreFrom = &v1.CheckpointReference{Name: "checkpoint"}
+			kl.podManager.SetPods([]*v1.Pod{pod})
+			if reason == events.RestoreFailed {
+				recorder.Event(pod, v1.EventTypeWarning, reason, "Runtime restore failed")
+			}
+			testKubelet.fakeRuntime.SyncResults = &kubecontainer.PodSyncResult{SyncResults: []*kubecontainer.SyncResult{{
+				Action: kubecontainer.RestorePodSandbox,
+				Target: pod.UID,
+				Error:  fmt.Errorf("%w: %w", kubecontainer.ErrCreatePodSandbox, &kubecontainer.RestoreError{Reason: reason, Err: errors.New("restore blocked")}),
+			}}}
+			terminal, _, err := kl.SyncPod(ctx, kubetypes.SyncPodSync, pod, nil, &kubecontainer.PodStatus{ID: pod.UID}, 0)
+			got, ok := kl.statusManager.GetPodStatus(pod.UID)
+			require.True(t, ok)
+			_, condition := podutil.GetPodCondition(&got, v1.PodRestored)
+			require.NotNil(t, condition)
+			if reason == events.CheckpointWrongNode || reason == events.PodSpecMismatch || reason == events.RestoreFailed || reason == "" {
+				wantReason := reason
+				if wantReason == "" {
+					wantReason = events.RestoreFailed
+				}
+				require.Equal(t, wantReason, condition.Reason)
+				require.NoError(t, err)
+				require.True(t, terminal)
+				require.Equal(t, v1.ConditionFalse, condition.Status)
+				require.Equal(t, v1.PodFailed, got.Phase)
+				if reason == "" || reason == events.RestoreFailed {
+					require.Len(t, recorder.Events, 1, "a restore failure must emit one warning across both layers")
+					require.Contains(t, <-recorder.Events, "Warning "+events.RestoreFailed+" ")
+				}
+				return
+			}
+			require.Error(t, err)
+			require.False(t, terminal)
+			require.Equal(t, v1.ConditionUnknown, condition.Status)
+			require.Equal(t, v1.PodPending, got.Phase)
+			// The lock is available on the next sync; the same attempt can finish.
+			kl.containerRuntime = &syncRestoreRuntime{Runtime: testKubelet.fakeRuntime, syncRestore: completeTestRestore(t, kl)}
+			terminal, _, err = kl.SyncPod(ctx, kubetypes.SyncPodSync, pod, nil, &kubecontainer.PodStatus{ID: pod.UID}, 0)
+			require.NoError(t, err)
+			require.False(t, terminal)
+			got, _ = kl.statusManager.GetPodStatus(pod.UID)
+			_, condition = podutil.GetPodCondition(&got, v1.PodRestored)
+			require.NotNil(t, condition)
+			require.Equal(t, v1.ConditionTrue, condition.Status)
+		})
+	}
+}
+
+func TestSyncPodRestorePreparationEvents(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelCheckpointRestore, true)
+	for _, stage := range []string{"pod directories", "container paths"} {
+		t.Run(stage, func(t *testing.T) {
+			ctx := ktesting.Init(t)
+			tk := newTestKubelet(t, false)
+			defer tk.Cleanup()
+			kl := tk.kubelet
+			kl.dnsConfigurer = createDNSConfigurer()
+			recorder := record.NewFakeRecorder(20)
+			kl.recorder = recorder
+			pod := podWithUIDNameNs("restore-uid", "restore", "ns")
+			pod.Spec.Containers = []v1.Container{{Name: "app", Image: "image"}}
+			pod.Spec.RestoreFrom = &v1.CheckpointReference{Name: "checkpoint"}
+			kl.podManager.SetPods([]*v1.Pod{pod})
+			blocked := kl.getPodDir(pod.UID)
+			if stage == "container paths" {
+				blocked = filepath.Join(blocked, "containers")
+			}
+			require.NoError(t, os.MkdirAll(filepath.Dir(blocked), 0750))
+			require.NoError(t, os.WriteFile(blocked, []byte("blocks directory creation"), 0600))
+			terminal, _, err := kl.SyncPod(ctx, kubetypes.SyncPodSync, pod, nil, &kubecontainer.PodStatus{ID: pod.UID}, 0)
+			require.Error(t, err)
+			require.False(t, terminal, "preparation failure must remain retryable")
+			require.True(t, tk.fakeRuntime.AssertCallCounts("SyncPod", 0))
+			cached, ok := kl.statusManager.GetPodStatus(pod.UID)
+			require.True(t, ok)
+			_, condition := podutil.GetPodCondition(&cached, v1.PodRestored)
+			require.NotNil(t, condition)
+			require.Equal(t, v1.ConditionUnknown, condition.Status)
+			require.Len(t, recorder.Events, 1)
+			require.Contains(t, <-recorder.Events, "Warning "+events.RestorePreparationFailed+" ")
+		})
+	}
+}
+
+// A runtime sync can return cleanly without restoring. That must not be
+// reported as a completed restore.
+func TestSyncPodRestoreDeferredByRuntime(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelCheckpointRestore, true)
+	ctx := ktesting.Init(t)
+	testKubelet := newTestKubelet(t, false)
+	defer testKubelet.Cleanup()
+	kl := testKubelet.kubelet
+	recorder := record.NewFakeRecorder(20)
+	kl.recorder = recorder
+	kl.dnsConfigurer = createDNSConfigurer()
+	pod := podWithUIDNameNs("restore-uid", "restore", "ns")
+	pod.Spec.Containers = []v1.Container{{Name: "app", Image: "image"}}
+	pod.Spec.RestoreFrom = &v1.CheckpointReference{Name: "checkpoint"}
+	kl.podManager.SetPods([]*v1.Pod{pod})
+	original := pod.DeepCopy()
+
+	for _, deferred := range []*kubecontainer.PodSyncResult{
+		{},
+		// A fresh sandbox is not a restored one.
+		{SyncResults: []*kubecontainer.SyncResult{{Action: kubecontainer.CreatePodSandbox, Target: pod.UID}}},
+	} {
+		testKubelet.fakeRuntime.SyncResults = deferred
+		terminal, _, err := kl.SyncPod(ctx, kubetypes.SyncPodSync, pod, nil, &kubecontainer.PodStatus{ID: pod.UID}, 0)
+		require.NoError(t, err)
+		require.False(t, terminal)
+		got, _ := kl.statusManager.GetPodStatus(pod.UID)
+		_, condition := podutil.GetPodCondition(&got, v1.PodRestored)
+		require.NotNil(t, condition)
+		require.Equal(t, v1.ConditionUnknown, condition.Status)
+		require.Empty(t, recorder.Events, "deferred restore must not report success")
+		require.Equal(t, original, pod, "sync must not mutate the Pod manager's object")
+	}
+
+	kl.containerRuntime = &syncRestoreRuntime{Runtime: testKubelet.fakeRuntime, syncRestore: completeTestRestore(t, kl)}
+	_, _, err := kl.SyncPod(ctx, kubetypes.SyncPodSync, pod, nil, &kubecontainer.PodStatus{ID: pod.UID}, 0)
+	require.NoError(t, err)
+	got, _ := kl.statusManager.GetPodStatus(pod.UID)
+	_, condition := podutil.GetPodCondition(&got, v1.PodRestored)
+	require.NotNil(t, condition)
+	require.Equal(t, v1.ConditionTrue, condition.Status)
+	require.Len(t, recorder.Events, 1)
+	require.Contains(t, <-recorder.Events, "Normal "+events.RestoreSucceeded+" ")
+	_, _, err = kl.SyncPod(ctx, kubetypes.SyncPodSync, pod, nil, &kubecontainer.PodStatus{ID: pod.UID}, 0)
+	require.NoError(t, err)
+	require.Empty(t, recorder.Events, "completed restore must not repeat its success event")
+	require.Equal(t, original, pod, "sync must not mutate the Pod manager's object")
+}
+
+// A sandbox that this kubelet process did not restore means a restore reached
+// the runtime before a kubelet restart, so the restore fails instead of
+// replaying the checkpoint.
+func TestSyncPodInterruptedRestoreWithPreparedSandbox(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelCheckpointRestore, true)
+	for _, recorded := range []bool{false, true} {
+		for _, state := range []kubecontainer.State{kubecontainer.ContainerStateCreated, kubecontainer.ContainerStateRunning} {
+			t.Run(fmt.Sprintf("recorded=%t/state=%s", recorded, state), func(t *testing.T) {
+				ctx := ktesting.Init(t)
+				tk := newTestKubelet(t, false)
+				defer tk.Cleanup()
+				pod := podWithUIDNameNs("restore-uid", "restore", "ns")
+				pod.Spec.RestoreFrom = &v1.CheckpointReference{Name: "checkpoint"}
+				pod.Spec.Containers = []v1.Container{{Name: "app"}}
+				if recorded {
+					pod.Status.Conditions = []v1.PodCondition{{Type: v1.PodRestored, Status: v1.ConditionUnknown}}
+				}
+				runtimeStatus := &kubecontainer.PodStatus{ID: pod.UID,
+					SandboxStatuses:   []*runtimeapi.PodSandboxStatus{{Id: "sandbox", Metadata: &runtimeapi.PodSandboxMetadata{}}},
+					ContainerStatuses: []*kubecontainer.Status{{ID: kubecontainer.ContainerID{Type: "test", ID: "container"}, Name: "app", State: state}},
+				}
+				terminal, _, err := tk.kubelet.SyncPod(ctx, kubetypes.SyncPodSync, pod, nil, runtimeStatus, 0)
+				require.NoError(t, err)
+				require.True(t, terminal)
+				got, ok := tk.kubelet.statusManager.GetPodStatus(pod.UID)
+				require.True(t, ok)
+				require.Equal(t, v1.PodFailed, got.Phase)
+				_, condition := podutil.GetPodCondition(&got, v1.PodRestored)
+				require.NotNil(t, condition)
+				require.Equal(t, v1.ConditionFalse, condition.Status)
+				require.Equal(t, events.RestoreInterrupted, condition.Reason)
+				require.True(t, tk.fakeRuntime.AssertCallCounts("SyncPod", 0))
+			})
+		}
+	}
+}
+
+type syncRestoreRuntime struct {
+	kubecontainer.Runtime
+	syncRestore func(context.Context, *v1.Pod) kubecontainer.PodSyncResult
+}
+
+func (r *syncRestoreRuntime) SyncPod(ctx context.Context, pod *v1.Pod, _ *kubecontainer.PodStatus, _ []v1.Secret, _ *flowcontrol.Backoff, _ bool) kubecontainer.PodSyncResult {
+	return r.syncRestore(ctx, pod)
+}
+
+// completeTestRestore records the restore start as restorePodSandbox does and
+// returns the sync result of a successful restore.
+func completeTestRestore(t *testing.T, kl *Kubelet) func(context.Context, *v1.Pod) kubecontainer.PodSyncResult {
+	return func(_ context.Context, pod *v1.Pod) kubecontainer.PodSyncResult {
+		require.NoError(t, kl.MarkPodRestoreStarted(pod.UID))
+		return kubecontainer.PodSyncResult{SyncResults: []*kubecontainer.SyncResult{{Action: kubecontainer.RestorePodSandbox, Target: pod.UID}}}
+	}
+}
+
+// Termination ends an unfinished restore: the runtime removes what an
+// interrupted RestorePod created, and killPod removes what was restored.
+func TestSyncTerminatingPodFailsUnfinishedRestore(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		condition *v1.PodCondition
+		want      v1.PodCondition
+	}{
+		{name: "not started", want: v1.PodCondition{Status: v1.ConditionFalse, Reason: events.RestoreFailed}},
+		{name: "in progress", condition: &v1.PodCondition{Type: v1.PodRestored, Status: v1.ConditionUnknown, Reason: events.RestoreInProgress}, want: v1.PodCondition{Status: v1.ConditionFalse, Reason: events.RestoreFailed}},
+		{name: "completed", condition: &v1.PodCondition{Type: v1.PodRestored, Status: v1.ConditionTrue, Reason: nodeapi.PodRestoreReasonCompleted}, want: v1.PodCondition{Status: v1.ConditionTrue, Reason: nodeapi.PodRestoreReasonCompleted}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelCheckpointRestore, true)
+			ctx := ktesting.Init(t)
+			tk := newTestKubelet(t, false)
+			defer tk.Cleanup()
+			kl := tk.kubelet
+			pod := podWithUIDNameNs("restore-uid", "restore", "ns")
+			pod.Spec.RestoreFrom = &v1.CheckpointReference{Name: "checkpoint"}
+			if tc.condition != nil {
+				pod.Status.Conditions = []v1.PodCondition{*tc.condition}
+			}
+			kl.podManager.SetPods([]*v1.Pod{pod})
+			kl.setPodRestoreInFlight(pod.UID, true)
+			grace := int64(0)
+			require.NoError(t, kl.SyncTerminatingPod(ctx, pod, &kubecontainer.PodStatus{ID: pod.UID}, &grace, nil))
+			got, ok := kl.statusManager.GetPodStatus(pod.UID)
+			require.True(t, ok)
+			_, condition := podutil.GetPodCondition(&got, v1.PodRestored)
+			require.NotNil(t, condition)
+			require.Equal(t, tc.want.Status, condition.Status)
+			require.Equal(t, tc.want.Reason, condition.Reason)
+			inFlight := kl.podRestoreInFlight(pod.UID)
+			require.False(t, inFlight)
+		})
+	}
+}
+
+func TestSyncPodRestoreAfterGateDisable(t *testing.T) {
+	for _, restored := range []bool{false, true} {
+		t.Run(fmt.Sprintf("restored=%t", restored), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelCheckpointRestore, false)
+			ctx := ktesting.Init(t)
+			tk := newTestKubelet(t, false)
+			defer tk.Cleanup()
+			kl := tk.kubelet
+			kl.dnsConfigurer = createDNSConfigurer()
+			pod := podWithUIDNameNs("restore-uid", "restore", "ns")
+			pod.Spec.Containers = []v1.Container{{Name: "app", Image: "image"}}
+			pod.Spec.RestoreFrom = &v1.CheckpointReference{Name: "checkpoint"}
+			pod.Spec.NodeName = "node-a"
+			podStatus := &kubecontainer.PodStatus{ID: pod.UID}
+			if restored {
+				pod.Status.Conditions = []v1.PodCondition{{Type: v1.PodRestored, Status: v1.ConditionTrue, Reason: nodeapi.PodRestoreReasonCompleted}}
+				podStatus.SandboxStatuses = []*runtimeapi.PodSandboxStatus{{Id: "restored-sandbox", Metadata: &runtimeapi.PodSandboxMetadata{}, State: runtimeapi.PodSandboxState_SANDBOX_READY}}
+			}
+			kl.podManager.SetPods([]*v1.Pod{pod})
+			terminal, _, err := kl.SyncPod(ctx, kubetypes.SyncPodSync, pod, nil, podStatus, 0)
+			require.NoError(t, err)
+			require.Equal(t, !restored, terminal)
+			got, ok := kl.statusManager.GetPodStatus(pod.UID)
+			require.True(t, ok)
+			_, condition := podutil.GetPodCondition(&got, v1.PodRestored)
+			require.NotNil(t, condition)
+			if restored {
+				require.Equal(t, v1.ConditionTrue, condition.Status)
+				require.True(t, tk.fakeRuntime.AssertCallCounts("SyncPod", 1), "restored Pods keep their ordinary lifecycle")
+				return
+			}
+			require.Equal(t, v1.PodFailed, got.Phase)
+			require.Equal(t, v1.ConditionFalse, condition.Status)
+			require.Equal(t, events.RestoreFailed, condition.Reason)
+			require.True(t, tk.fakeRuntime.AssertCallCounts("SyncPod", 0), "a disabled restore must not fall through to ordinary sandbox creation")
+		})
+	}
 }

@@ -39,6 +39,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	admissionregistrationv1client "k8s.io/client-go/kubernetes/typed/admissionregistration/v1"
 	networkingv1client "k8s.io/client-go/kubernetes/typed/networking/v1"
+	nodeclient "k8s.io/client-go/kubernetes/typed/node/v1alpha1"
 	policyclient "k8s.io/client-go/kubernetes/typed/policy/v1"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -77,6 +78,7 @@ type Config struct {
 
 	EndpointSliceGetter     proxy.EndpointSliceGetter
 	Authorizer              authorizer.Authorizer
+	PodCheckpoints          nodeclient.PodCheckpointsGetter
 	DisabledPodSubresources sets.Set[string]
 }
 
@@ -190,6 +192,7 @@ func (p *legacyProvider) NewRESTStorage(apiResourceConfigSource serverstorage.AP
 		p.Proxy.Transport,
 		podDisruptionClient,
 		p.authorizer,
+		p.PodCheckpoints,
 	)
 	if err != nil {
 		return genericapiserver.APIGroupInfo{}, err
