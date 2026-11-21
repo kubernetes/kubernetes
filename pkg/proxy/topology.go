@@ -40,9 +40,9 @@ import (
 // Serving-Terminating endpoints (independently for Cluster and Local) if no Ready
 // endpoints are available.
 //
-// Note: NodeTopologyConfig.handleNodeEvent (pkg/proxy/config) filters topology labels
-// before notifying proxiers. If you modify the logic over here to  watch other endpoint
-// types or labels, ensure the filtering logic in NodeTopologyConfig is updated accordingly.
+// Note: NodeManager (pkg/proxy/nodemanager) filters topology labels
+// before notifying proxiers. If you modify the logic over here to watch other endpoint
+// types or labels, ensure the filtering logic in NodeManager is updated accordingly.
 func CategorizeEndpoints(endpoints []Endpoint, svcInfo ServicePort, nodeName string, topologyLabels map[string]string) (clusterEndpoints, localEndpoints, allReachableEndpoints []Endpoint, hasAnyEndpoints bool) {
 	if len(endpoints) == 0 {
 		// If there are no endpoints, we have nothing to categorize

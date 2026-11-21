@@ -19,7 +19,6 @@ package config
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"sync"
 	"time"
 
@@ -257,98 +256,6 @@ func (c *ServiceConfig) handleDeleteService(obj interface{}) {
 	}
 }
 
-// NodeHandler is an abstract interface of objects which receive
-// notifications about node object changes.
-type NodeHandler interface {
-	// OnNodeChange is called whenever creation or modification
-	// of node object is observed.
-	OnNodeChange(node *v1.Node)
-	// OnNodeDelete is called whenever deletion of an existing node
-	// object is observed.
-	OnNodeDelete(node *v1.Node)
-	// OnNodeSynced is called once all the initial event handlers were
-	// called and the state is fully propagated to local cache.
-	OnNodeSynced()
-}
-
-// NodeConfig tracks a set of node configurations.
-// It accepts "set", "add" and "remove" operations of node via channels, and invokes registered handlers on change.
-type NodeConfig struct {
-	listerSynced  cache.InformerSynced
-	eventHandlers []NodeHandler
-	logger        klog.Logger
-}
-
-// NewNodeConfig creates a new NodeConfig.
-func NewNodeConfig(ctx context.Context, nodeInformer v1informers.NodeInformer, resyncPeriod time.Duration) *NodeConfig {
-	result := &NodeConfig{
-		logger: klog.FromContext(ctx),
-	}
-
-	handlerRegistration, _ := nodeInformer.Informer().AddEventHandlerWithResyncPeriod(
-		cache.ResourceEventHandlerFuncs{
-			AddFunc:    func(obj interface{}) { result.handleChangeNode(obj) },
-			UpdateFunc: func(_, newObj interface{}) { result.handleChangeNode(newObj) },
-			DeleteFunc: result.handleDeleteNode,
-		},
-		resyncPeriod,
-	)
-
-	result.listerSynced = handlerRegistration.HasSynced
-
-	return result
-}
-
-// RegisterEventHandler registers a handler which is called on every node change.
-func (c *NodeConfig) RegisterEventHandler(handler NodeHandler) {
-	c.eventHandlers = append(c.eventHandlers, handler)
-}
-
-// Run starts the goroutine responsible for calling registered handlers.
-func (c *NodeConfig) Run(stopCh <-chan struct{}) {
-	c.logger.Info("Starting node config controller")
-
-	if !cache.WaitForNamedCacheSync("node config", stopCh, c.listerSynced) {
-		return
-	}
-
-	for i := range c.eventHandlers {
-		c.logger.V(3).Info("Calling handler.OnNodeSynced()")
-		c.eventHandlers[i].OnNodeSynced()
-	}
-}
-
-func (c *NodeConfig) handleChangeNode(obj interface{}) {
-	node, ok := obj.(*v1.Node)
-	if !ok {
-		utilruntime.HandleError(fmt.Errorf("unexpected object type: %v", obj))
-		return
-	}
-	for i := range c.eventHandlers {
-		c.logger.V(4).Info("Calling handler.OnNodeChange")
-		c.eventHandlers[i].OnNodeChange(node)
-	}
-}
-
-func (c *NodeConfig) handleDeleteNode(obj interface{}) {
-	node, ok := obj.(*v1.Node)
-	if !ok {
-		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
-		if !ok {
-			utilruntime.HandleError(fmt.Errorf("unexpected object type: %v", obj))
-			return
-		}
-		if node, ok = tombstone.Obj.(*v1.Node); !ok {
-			utilruntime.HandleError(fmt.Errorf("unexpected object type: %v", obj))
-			return
-		}
-	}
-	for i := range c.eventHandlers {
-		c.logger.V(4).Info("Calling handler.OnNodeDelete")
-		c.eventHandlers[i].OnNodeDelete(node)
-	}
-}
-
 // ServiceCIDRHandler is an abstract interface of objects which receive
 // notifications about ServiceCIDR object changes.
 type ServiceCIDRHandler interface {
@@ -445,82 +352,4 @@ func (c *ServiceCIDRConfig) handleServiceCIDREvent(oldObj, newObj interface{}) {
 		c.logger.V(4).Info("Calling handler.OnServiceCIDRsChanged")
 		c.eventHandlers[i].OnServiceCIDRsChanged(c.cidrs.UnsortedList())
 	}
-}
-
-// NodeTopologyHandler is an abstract interface for objects which receive
-// notifications about changes in proxy relevant node topology labels.
-type NodeTopologyHandler interface {
-	// OnTopologyChange is called whenever a change is observed in proxy
-	// relevant node topology labels, and provides the observed change.
-	OnTopologyChange(topologyLabels map[string]string)
-}
-
-// NodeTopologyConfig tracks node topology labels.
-type NodeTopologyConfig struct {
-	listerSynced   cache.InformerSynced
-	eventHandler   NodeTopologyHandler
-	topologyLabels map[string]string
-	logger         klog.Logger
-}
-
-// NewNodeTopologyConfig creates a new NodeTopologyConfig. The handler is provided during construction
-// so a running informer cannot replay its cached Node before the handler is registered.
-func NewNodeTopologyConfig(ctx context.Context, nodeInformer v1informers.NodeInformer, resyncPeriod time.Duration, handler NodeTopologyHandler) *NodeTopologyConfig {
-	return newNodeTopologyConfig(ctx, nodeInformer, resyncPeriod, handler, nil)
-}
-
-// newNodeTopologyConfig implements NewNodeTopologyConfig by additionally consuming a callback function which is invoked when
-// event handler completes processing and is only used for testing.
-func newNodeTopologyConfig(ctx context.Context, nodeInformer v1informers.NodeInformer, resyncPeriod time.Duration, handler NodeTopologyHandler, callback func()) *NodeTopologyConfig {
-	result := &NodeTopologyConfig{
-		logger:         klog.FromContext(ctx),
-		eventHandler:   handler,
-		topologyLabels: make(map[string]string),
-	}
-
-	handlerRegistration, _ := nodeInformer.Informer().AddEventHandlerWithResyncPeriod(
-		cache.ResourceEventHandlerFuncs{
-			AddFunc: func(obj interface{}) {
-				result.handleNodeEvent(obj)
-				if callback != nil {
-					callback()
-				}
-			},
-			UpdateFunc: func(_, newObj interface{}) {
-				result.handleNodeEvent(newObj)
-				if callback != nil {
-					callback()
-				}
-			},
-			DeleteFunc: func(_ interface{}) {},
-		},
-		resyncPeriod,
-	)
-	result.listerSynced = handlerRegistration.HasSynced
-
-	return result
-}
-
-// handleNodeEvent is a helper function to handle Add, Update and Delete
-// events on Node objects and call downstream event handlers.
-func (n *NodeTopologyConfig) handleNodeEvent(obj interface{}) {
-	node, ok := obj.(*v1.Node)
-	if !ok {
-		utilruntime.HandleError(fmt.Errorf("unexpected object type: %v", obj))
-		return
-	}
-
-	topologyLabels := make(map[string]string)
-	if _, ok = node.Labels[v1.LabelTopologyZone]; ok {
-		topologyLabels[v1.LabelTopologyZone] = node.Labels[v1.LabelTopologyZone]
-	}
-
-	// skip calling event handlers when no change in topology labels
-	if reflect.DeepEqual(n.topologyLabels, topologyLabels) {
-		return
-	}
-
-	n.topologyLabels = topologyLabels
-	n.logger.V(4).Info("Calling handler.OnTopologyChange")
-	n.eventHandler.OnTopologyChange(n.topologyLabels)
 }
