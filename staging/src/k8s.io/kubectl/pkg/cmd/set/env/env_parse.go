@@ -114,8 +114,11 @@ func readEnv(r io.Reader, envVarType string) ([]v1.EnvVar, error) {
 	scanner := bufio.NewScanner(r)
 	for scanner.Scan() {
 		envSpec := scanner.Text()
-		if pos := strings.Index(envSpec, "#"); pos != -1 {
-			envSpec = envSpec[:pos]
+		// Only whole lines starting with '#' are comments, matching
+		// "kubectl create configmap --from-env-file". A '#' anywhere else
+		// is part of the value, e.g. TOKEN=ab#cd.
+		if strings.HasPrefix(strings.TrimSpace(envSpec), "#") {
+			continue
 		}
 
 		if strings.Contains(envSpec, "=") {
