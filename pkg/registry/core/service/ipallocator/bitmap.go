@@ -341,6 +341,9 @@ func (r *Range) Destroy() {
 func (r *Range) EnableMetrics() {
 	registerMetrics()
 	r.metrics = &metricsRecorder{}
+	// Seed gauges so metrics are non-zero before the first allocation.
+	r.metrics.setAllocated(r.net.String(), r.Used())
+	r.metrics.setAvailable(r.net.String(), r.Free())
 }
 
 // calculateIPOffset calculates the integer offset of ip from base such that
