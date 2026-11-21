@@ -130,11 +130,12 @@ func (m *mutatingWebhookConfigurationManager) getMutatingWebhookConfigurations(c
 	accessors := make([]webhook.WebhookAccessor, 0, size)
 
 	for _, c := range configurations {
-		cachedConfigurationAccessors, ok := m.configurationsCache.Load(c.Name)
-		if ok {
-			// Pick an already cached webhookAccessor
-			accessors = append(accessors, cachedConfigurationAccessors.([]webhook.WebhookAccessor)...)
-			continue
+		if cached, ok := m.configurationsCache.Load(c.Name); ok {
+			if entry, ok := cached.(configurationCacheEntry); ok && entry.resourceVersion == c.ResourceVersion {
+				// Pick an already cached webhookAccessor
+				accessors = append(accessors, entry.accessors...)
+				continue
+			}
 		}
 
 		logExcludedResourcesForMutatingWebhook(c.Name, c.Webhooks, m.excludedWebhookResources)
@@ -151,7 +152,10 @@ func (m *mutatingWebhookConfigurationManager) getMutatingWebhookConfigurations(c
 			configurationAccessors = append(configurationAccessors, configurationAccessor)
 		}
 		accessors = append(accessors, configurationAccessors...)
-		m.configurationsCache.Store(c.Name, configurationAccessors)
+		m.configurationsCache.Store(c.Name, configurationCacheEntry{
+			resourceVersion: c.ResourceVersion,
+			accessors:       configurationAccessors,
+		})
 	}
 	return accessors
 }

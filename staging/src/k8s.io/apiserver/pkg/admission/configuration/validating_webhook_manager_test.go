@@ -274,3 +274,54 @@ func TestGetValidatingWebhookConfigSmartReload(t *testing.T) {
 		})
 	}
 }
+
+func TestValidatingWebhookConfigurationStaleCache(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		cfg := &v1.ValidatingWebhookConfiguration{
+			ObjectMeta: metav1.ObjectMeta{Name: "cfg", ResourceVersion: "1"},
+			Webhooks:   []v1.ValidatingWebhook{{Name: "webhook.example.com"}},
+		}
+		client := fake.NewSimpleClientset(cfg)
+		factory := informers.NewSharedInformerFactory(client, 0)
+		m := NewValidatingWebhookConfigurationManager(factory, nil).(*validatingWebhookConfigurationManager)
+
+		release := make(chan struct{})
+		create := m.createValidatingWebhookAccessor
+		m.createValidatingWebhookAccessor = func(uid, name string, h *v1.ValidatingWebhook) webhook.WebhookAccessor {
+			if len(h.ClientConfig.CABundle) == 0 {
+				<-release
+			}
+			return create(uid, name, h)
+		}
+
+		factory.Start(ctx.Done())
+		factory.WaitForCacheSync(ctx.Done())
+		synctest.Wait()
+
+		// Hold the old evaluation across the configuration update.
+		go m.Webhooks()
+		synctest.Wait()
+
+		updated := cfg.DeepCopy()
+		updated.ResourceVersion = "2"
+		updated.Webhooks[0].ClientConfig.CABundle = []byte("injected-ca")
+		if _, err := client.AdmissionregistrationV1().ValidatingWebhookConfigurations().Update(ctx, updated, metav1.UpdateOptions{}); err != nil {
+			t.Fatal(err)
+		}
+		synctest.Wait()
+
+		close(release)
+		synctest.Wait()
+
+		got := m.Webhooks()
+		if len(got) != 1 {
+			t.Fatalf("expected 1 webhook, got %d", len(got))
+		}
+		if ca := string(got[0].GetClientConfig().CABundle); ca != "injected-ca" {
+			t.Fatalf("caBundle = %q, want %q", ca, "injected-ca")
+		}
+	})
+}
