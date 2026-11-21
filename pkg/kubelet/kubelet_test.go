@@ -378,7 +378,7 @@ func newTestKubeletWithImageList(
 		HighThresholdPercent: 90,
 		LowThresholdPercent:  80,
 	}
-	imageGCManager, err := images.NewImageGCManager(fakeRuntime, kubelet.StatsProvider, nil, fakeRecorder, fakeNodeRef, fakeImageGCPolicy, noopoteltrace.NewTracerProvider())
+	imageGCManager, err := images.NewImageGCManager(fakeRuntime, kubelet.StatsProvider, nil, fakeRecorder, fakeNodeRef, fakeImageGCPolicy, noopoteltrace.NewTracerProvider(), images.NewUseTracker())
 	assert.NoError(t, err)
 	kubelet.imageManager = &fakeImageGCManager{
 		fakeImageService: fakeRuntime,
@@ -571,6 +571,7 @@ func createGenericRuntimeManager(ctx context.Context, kubelet *Kubelet, kubeCfg 
 		kubeCfg.MemoryThrottlingFactor,
 		kubeCfg.MemoryReservationPolicy,
 		kubelet.podStartupLatencyTracker,
+		images.NewUseTracker(),
 		tracerProvider,
 		token.NewManager(kubelet.kubeClient),
 		func(string, string) (*v1.ServiceAccount, error) { return nil, nil },
