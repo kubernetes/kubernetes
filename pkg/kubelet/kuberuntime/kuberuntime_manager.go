@@ -1673,37 +1673,31 @@ func (m *kubeGenericRuntimeManager) updatePodContainerResources(ctx context.Cont
 
 	for _, cInfo := range containersToUpdate {
 		container := cInfo.container.DeepCopy()
+		if container.Resources.Limits == nil {
+			container.Resources.Limits = make(v1.ResourceList)
+		}
+		if container.Resources.Requests == nil {
+			container.Resources.Requests = make(v1.ResourceList)
+		}
 		// Each UpdateContainerResources call carries the full LinuxContainerResources,
 		// so the synthetic container holds the most recently configured value for
 		// every resource except the one being updated.
 		switch resourceName {
 		case v1.ResourceMemory:
-			container.Resources.Limits = v1.ResourceList{
-				v1.ResourceCPU:    *resource.NewMilliQuantity(cInfo.currentContainerResources.cpuLimit, resource.DecimalSI),
-				v1.ResourceMemory: *resource.NewQuantity(cInfo.desiredContainerResources.memoryLimit, resource.BinarySI),
-			}
-			container.Resources.Requests = v1.ResourceList{
-				v1.ResourceCPU:    *resource.NewMilliQuantity(cInfo.currentContainerResources.cpuRequest, resource.DecimalSI),
-				v1.ResourceMemory: *resource.NewQuantity(cInfo.desiredContainerResources.memoryRequest, resource.BinarySI),
-			}
+			container.Resources.Limits[v1.ResourceCPU] = *resource.NewMilliQuantity(cInfo.currentContainerResources.cpuLimit, resource.DecimalSI)
+			container.Resources.Limits[v1.ResourceMemory] = *resource.NewQuantity(cInfo.desiredContainerResources.memoryLimit, resource.BinarySI)
+			container.Resources.Requests[v1.ResourceCPU] = *resource.NewMilliQuantity(cInfo.currentContainerResources.cpuRequest, resource.DecimalSI)
+			container.Resources.Requests[v1.ResourceMemory] = *resource.NewQuantity(cInfo.desiredContainerResources.memoryRequest, resource.BinarySI)
 		case v1.ResourceCPU:
-			container.Resources.Limits = v1.ResourceList{
-				v1.ResourceCPU:    *resource.NewMilliQuantity(cInfo.desiredContainerResources.cpuLimit, resource.DecimalSI),
-				v1.ResourceMemory: *resource.NewQuantity(cInfo.currentContainerResources.memoryLimit, resource.BinarySI),
-			}
-			container.Resources.Requests = v1.ResourceList{
-				v1.ResourceCPU:    *resource.NewMilliQuantity(cInfo.desiredContainerResources.cpuRequest, resource.DecimalSI),
-				v1.ResourceMemory: *resource.NewQuantity(cInfo.currentContainerResources.memoryRequest, resource.BinarySI),
-			}
+			container.Resources.Limits[v1.ResourceCPU] = *resource.NewMilliQuantity(cInfo.desiredContainerResources.cpuLimit, resource.DecimalSI)
+			container.Resources.Limits[v1.ResourceMemory] = *resource.NewQuantity(cInfo.currentContainerResources.memoryLimit, resource.BinarySI)
+			container.Resources.Requests[v1.ResourceCPU] = *resource.NewMilliQuantity(cInfo.desiredContainerResources.cpuRequest, resource.DecimalSI)
+			container.Resources.Requests[v1.ResourceMemory] = *resource.NewQuantity(cInfo.currentContainerResources.memoryRequest, resource.BinarySI)
 		case v1.ResourceSwap:
-			container.Resources.Limits = v1.ResourceList{
-				v1.ResourceCPU:    *resource.NewMilliQuantity(cInfo.currentContainerResources.cpuLimit, resource.DecimalSI),
-				v1.ResourceMemory: *resource.NewQuantity(cInfo.currentContainerResources.memoryLimit, resource.BinarySI),
-			}
-			container.Resources.Requests = v1.ResourceList{
-				v1.ResourceCPU:    *resource.NewMilliQuantity(cInfo.currentContainerResources.cpuRequest, resource.DecimalSI),
-				v1.ResourceMemory: *resource.NewQuantity(cInfo.currentContainerResources.memoryRequest, resource.BinarySI),
-			}
+			container.Resources.Limits[v1.ResourceCPU] = *resource.NewMilliQuantity(cInfo.currentContainerResources.cpuLimit, resource.DecimalSI)
+			container.Resources.Limits[v1.ResourceMemory] = *resource.NewQuantity(cInfo.currentContainerResources.memoryLimit, resource.BinarySI)
+			container.Resources.Requests[v1.ResourceCPU] = *resource.NewMilliQuantity(cInfo.currentContainerResources.cpuRequest, resource.DecimalSI)
+			container.Resources.Requests[v1.ResourceMemory] = *resource.NewQuantity(cInfo.currentContainerResources.memoryRequest, resource.BinarySI)
 		}
 		actuated := container
 		if utilfeature.DefaultFeatureGate.Enabled(features.WorkloadControlledSwap) {
