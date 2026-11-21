@@ -17,10 +17,13 @@ limitations under the License.
 package conversion
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
+	"net/http/httptest"
 	"reflect"
 	"strings"
 	"sync"
@@ -334,7 +337,7 @@ func testWebhookConverter(t *testing.T, watchCache bool) {
 
 	for _, test := range tests {
 		t.Run(test.group, func(t *testing.T) {
-			upCh, handler := closeOnCall(test.handler)
+			upCh, handler := closeOnReviewVersionCall(test.handler, apiextensionsv1.GroupName+"/"+test.reviewVersions[0])
 
 			// Inject the logic for this specific test case
 			proxyHandler.set(handler)
@@ -344,7 +347,7 @@ func testWebhookConverter(t *testing.T, watchCache bool) {
 			ctc.setConversionWebhook(t, webhookClientConfig, test.reviewVersions)
 			defer ctc.removeConversionWebhook(t)
 
-			// wait until new webhook is called the first time
+			// Wait for the configured review version; the shared server can still receive calls from older CRD configurations.
 			if err := wait.PollUntilContextTimeout(context.Background(), time.Millisecond*100, wait.ForeverTestTimeout, true, func(ctx context.Context) (done bool, err error) {
 				_, getErr := ctc.versionedClient(marker.GetNamespace(), "v1alpha1").Get(ctx, marker.GetName(), metav1.GetOptions{})
 				select {
@@ -1505,6 +1508,68 @@ func verifyMultiVersionObject(t *testing.T, v string, obj *unstructured.Unstruct
 	if !reflect.DeepEqual(expected[v], j) {
 		t.Errorf("unexpected %s object: %s", v, cmp.Diff(expected[v], j))
 	}
+}
+
+func TestCloseOnReviewVersionCall(t *testing.T) {
+	for _, reject := range []bool{false, true} {
+		t.Run(fmt.Sprintf("reject=%t", reject), func(t *testing.T) {
+			var converter V1ReviewConverterFunc = emptyV1ResponseConverter
+			if reject {
+				converter = nil
+			}
+			ready, handler := closeOnReviewVersionCall(NewReviewWebhookHandler(t, nil, converter), "apiextensions.k8s.io/v1")
+			for _, version := range []string{"v1beta1", "v1", "v1"} {
+				request := httptest.NewRequest(http.MethodPost, "/convert", strings.NewReader(fmt.Sprintf(`{"apiVersion":"apiextensions.k8s.io/%s","kind":"ConversionReview","request":{"uid":"test"}}`, version)))
+				request.Header.Set("Content-Type", "application/json")
+				response := httptest.NewRecorder()
+				handler.ServeHTTP(response, request)
+
+				wantStatus := http.StatusOK
+				if version == "v1beta1" || reject {
+					wantStatus = http.StatusUnprocessableEntity
+				}
+				if response.Code != wantStatus {
+					t.Fatalf("review %s: expected HTTP %d, got %d: %s", version, wantStatus, response.Code, response.Body.String())
+				}
+				select {
+				case <-ready:
+					if version == "v1beta1" {
+						t.Fatal("obsolete review version signaled readiness before the CRD update became effective")
+					}
+				default:
+					if version == "v1" {
+						t.Fatal("configured review version did not signal readiness")
+					}
+				}
+			}
+		})
+	}
+}
+
+func closeOnReviewVersionCall(h http.Handler, apiVersion string) (chan struct{}, http.Handler) {
+	ch := make(chan struct{})
+	once := sync.Once{}
+	return ch, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		if closeErr := r.Body.Close(); err == nil {
+			err = closeErr
+		}
+		if err != nil {
+			http.Error(w, "cannot read conversion review: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+		r.Body = io.NopCloser(bytes.NewReader(body))
+		var review metav1.TypeMeta
+		matches := json.Unmarshal(body, &review) == nil && review.APIVersion == apiVersion && review.Kind == "ConversionReview"
+		h.ServeHTTP(w, r)
+
+		// HTTP errors can be intentional; the review version proves that the CRD update propagated.
+		if matches {
+			once.Do(func() {
+				close(ch)
+			})
+		}
+	})
 }
 
 func closeOnCall(h http.Handler) (chan struct{}, http.Handler) {
