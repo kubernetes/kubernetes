@@ -199,8 +199,6 @@ func (ev *PodGroupEvaluator) selectVictimsOnDomain(
 		return nil, status
 	}
 
-	numViolatingVictim := 0
-
 	validAssignment := make([]fwk.ProposedAssignment, 0, len(podGroupAssignments.ProposedAssignments))
 
 	// Prepare podInfos for each of the assigned preemptor pods
@@ -293,16 +291,14 @@ func (ev *PodGroupEvaluator) selectVictimsOnDomain(
 		return true, nil
 	}
 
-	// Try to reprieve as many pods as possible. The provided victims are ordered
-	// from least to most important, so we iterate in reverse to reprieve the most
-	// important victims first.
+	// Try to reprieve as many victims as possible, starting from violating victims to non-violating
+	// ones, each from the most to the least important.
 	var victimsToPreempt []fwk.PreemptionVictim
 	for _, v := range slices.Backward(potentialVictims) {
 		if fits, err := reprieveVictim(v, validAssignment); err != nil {
 			return nil, fwk.AsStatus(err)
 		} else if !fits {
 			victimsToPreempt = append(victimsToPreempt, v)
-			numViolatingVictim += v.NumPDBViolations()
 		}
 	}
 	disruptions := make(map[fwk.EntityKeyType]int)
@@ -315,8 +311,10 @@ func (ev *PodGroupEvaluator) selectVictimsOnDomain(
 	}
 
 	v := &extenderv1.Victims{
-		Pods:             podsToPreempt,
-		NumPDBViolations: int64(numViolatingVictim),
+		Pods: podsToPreempt,
+		// Because victims can share PodDisruptionBudgets, count violations over only the evicted victims. Their
+		// NumPDBViolations were computed once by GenerateVictims, before reprieval, as if every victim were evicted.
+		NumPDBViolations: int64(countPDBViolations(victimsToPreempt)),
 	}
 	n := make(map[types.NamespacedName]*fwk.NominatingInfo)
 	for _, p := range validAssignment {

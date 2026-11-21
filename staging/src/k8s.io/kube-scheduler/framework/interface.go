@@ -1019,16 +1019,12 @@ type PreemptionManager interface {
 
 	// CompareVictimSets compares the preemption cost of two sets of victims when ranking
 	// candidate nodes during PodGroup preemption evaluation.
-	// Each set contains the deduplicated subset of victims from [PreemptionManager.GenerateVictims]
-	// that have at least one pod on a candidate node and have not yet been condemned by earlier
-	// pods in the PodGroup, ordered in reverse of [PreemptionManager.GenerateVictims]
-	// (from least preferred to most preferred for preemption).
 	// Implementations must not mutate set1 or set2, and may assume that the provided
 	// PreemptionVictims have the same underlying type as returned by [PreemptionManager.GenerateVictims].
 	// Returns < 0 if set1 is more preferred to preempt than set2,
 	// > 0 if set1 is less preferred to preempt than set2,
 	// and 0 if both sets have equal preemption preference.
-	CompareVictimSets(ctx context.Context, set1, set2 []PreemptionVictim) int
+	CompareVictimSets(ctx context.Context, set1, set2 PreemptionVictimSet) int
 
 	// Executor returns a [PreemptionExecutor] that can be used to actuate preemption or check preemption status.
 	Executor() PreemptionExecutor
@@ -1041,6 +1037,21 @@ type PreemptionManager interface {
 	// The result should be non-nil, otherwise the preemption algorithm will abort evaluation without actuating preemption
 	// and return error status to the caller.
 	NewReprieveFilter(ctx context.Context, allVictims []PreemptionVictim) ReprieveFilter
+}
+
+// PreemptionVictimSet holds the victims that placing a pod on one candidate node would evict during
+// PodGroup preemption evaluation. [PreemptionManager.CompareVictimSets] compares them to rank the nodes.
+type PreemptionVictimSet interface {
+	// Victims returns the deduplicated subset of victims from [PreemptionManager.GenerateVictims]
+	// that have at least one pod on the candidate node and have not yet been condemned by earlier
+	// pods in the PodGroup, ordered from least to most preferred for preemption.
+	Victims() []PreemptionVictim
+
+	// NumPDBViolations returns the number of PDB violations that evicting all Victims would cause
+	// on top of the victims already condemned by earlier pods in the PodGroup.
+	// It is computed for every candidate node against the remaining PDB DisruptionsAllowed, so that
+	// [PreemptionManager.CompareVictimSets] can prefer nodes whose evictions cause fewer PDB violations.
+	NumPDBViolations() int
 }
 
 // ReprieveFilter controls whether candidate preemption victims can be reprieved during preemption evaluation,
@@ -1069,9 +1080,11 @@ type PreemptionVictim interface {
 	// Evicting this unit implies evicting all Pods in this list.
 	Pods() []PodInfo
 
-	// NumPDBViolations returns the number of PDB violations that evicting this victim would cause.
+	// NumPDBViolations returns the number of PDB violations that evicting this victim would cause,
+	// computed once by [PreemptionManager.GenerateVictims].
 	// Outside of [PreemptionManager] (which may use it when ordering or comparing victims),
-	// this value is only used to report metrics for the selected victims.
+	// this value is only used to report metrics for the selected victims and to compute
+	// [PreemptionVictimSet.NumPDBViolations].
 	NumPDBViolations() int
 
 	// Type returns the type of the preemption unit.

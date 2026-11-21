@@ -295,7 +295,7 @@ func TestDefaultPreemptionManager_GenerateVictims(t *testing.T) {
 			},
 		},
 		{
-			name: "ordering by PDB: budget consumption across victims marks excess victims as violating",
+			name: "ordering by PDB: least important victims consume the budget first and the more important excess victims are violating",
 			initPods: []*v1.Pod{
 				makeLabeledPod("mid-protected", midPriority, appLabels),
 				makeLabeledPod("low-protected", lowPriority, appLabels),
@@ -305,8 +305,8 @@ func TestDefaultPreemptionManager_GenerateVictims(t *testing.T) {
 			},
 			preemptor: makePreemptor(highPriority),
 			wantVictims: []wantVictim{
-				wantVic("mid-protected"),
-				wantViolatingVic(1, "low-protected"),
+				wantVic("low-protected"),
+				wantViolatingVic(1, "mid-protected"),
 			},
 		},
 		{
@@ -326,6 +326,26 @@ func TestDefaultPreemptionManager_GenerateVictims(t *testing.T) {
 			wantVictims: []wantVictim{
 				wantVic("mid-unprotected"),
 				wantViolatingVic(1, "all-protected", "all-unprotected"),
+			},
+		},
+		{
+			name: "ordering by PDB: pod matching multiple PDBs consumes disruptions from all of them",
+			initPods: []*v1.Pod{
+				makeLabeledPod("low-both", lowPriority, map[string]string{"app": "protected", "tier": "frontend"}),
+				makePod("low-unprotected", lowPriority+1),
+				makeLabeledPod("mid-frontend", midPriority, map[string]string{"tier": "frontend"}),
+			},
+			pdbs: []*policy.PodDisruptionBudget{
+				makePDB("pdb-app", 0, appLabels),
+				makePDB("pdb-frontend", 1, map[string]string{"tier": "frontend"}),
+			},
+			preemptor: makePreemptor(highPriority),
+			// low-both violates pdb-app and also uses up the only disruption of pdb-frontend,
+			// so mid-frontend violates pdb-frontend.
+			wantVictims: []wantVictim{
+				wantVic("low-unprotected"),
+				wantViolatingVic(1, "low-both"),
+				wantViolatingVic(1, "mid-frontend"),
 			},
 		},
 		{
@@ -578,100 +598,112 @@ func TestCompareVictimSets(t *testing.T) {
 	lowPrioPodGroupSize4 := makeVictim("pg-4", 10, fwk.PodGroupKeyType, 4, -10*time.Minute, 0)
 	youngerLowPrioPod := makeVictim("young-low-pod", 10, fwk.PodKeyType, 1, -1*time.Minute, 0)
 
+	// CompareVictimSets assumes the victims of each set are ordered from most to least important (as SurvivingVictimsOnNode
+	// returns them), so the victim sets provided in test cases must follow that order as well.
+	set := func(numPDBViolations int, victims ...fwk.PreemptionVictim) fwk.PreemptionVictimSet {
+		return &victimSet{victims: victims, numPDBViolations: numPDBViolations}
+	}
+
 	tests := []struct {
 		name      string
-		set1      []fwk.PreemptionVictim
-		set2      []fwk.PreemptionVictim
+		set1      fwk.PreemptionVictimSet
+		set2      fwk.PreemptionVictimSet
 		wantOrder int // -1 if set1 is strictly better to preempt than set2, 1 if worse, 0 if equal
 	}{
 		{
 			name:      "empty set strictly preferred over non-empty set",
-			set1:      nil,
-			set2:      []fwk.PreemptionVictim{lowPrioPod},
+			set1:      set(0),
+			set2:      set(0, lowPrioPod),
 			wantOrder: -1,
 		},
 		{
 			name:      "fewer PDB violations strictly preferred",
-			set1:      []fwk.PreemptionVictim{highPrioPod},
-			set2:      []fwk.PreemptionVictim{lowPrioPDBViolatingPod},
+			set1:      set(0, highPrioPod),
+			set2:      set(1, lowPrioPDBViolatingPod),
+			wantOrder: -1,
+		},
+		{
+			name:      "PDB violations of the set are compared instead of the ones reported by its victims",
+			set1:      set(0, lowPrioPDBViolatingPod),
+			set2:      set(1, lowPrioPod),
 			wantOrder: -1,
 		},
 		{
 			name:      "when PDB violations tie, highest priority across both violating and non-violating victims is compared",
-			set1:      []fwk.PreemptionVictim{midLowPrioPDBViolatingPod, veryLowPrioPod},
-			set2:      []fwk.PreemptionVictim{veryLowPrioPDBViolatingPod, highPrioPod},
+			set1:      set(1, midLowPrioPDBViolatingPod, veryLowPrioPod),
+			set2:      set(1, highPrioPod, veryLowPrioPDBViolatingPod),
 			wantOrder: -1,
 		},
 		{
 			name:      "when PDB violations tie, equal-priority bands merge violating and non-violating victims",
-			set1:      []fwk.PreemptionVictim{lowPrioPDBViolatingPod, midLowPrioPod, midLowPrioPod},
-			set2:      []fwk.PreemptionVictim{lowPrioPDBViolatingPod, lowPrioPod},
+			set1:      set(1, lowPrioPDBViolatingPod, midLowPrioPod, midLowPrioPod),
+			set2:      set(1, lowPrioPDBViolatingPod, lowPrioPod),
 			wantOrder: -1,
 		},
 		{
-			name:      "when PDB violations and priority bands tie, structural importance is compared in priority order across runs",
-			set1:      []fwk.PreemptionVictim{veryLowPrioPDBViolatingPodGroupSize1, highPrioPod},
-			set2:      []fwk.PreemptionVictim{veryLowPrioPDBViolatingPod, highPrioPodGroupSize1},
+			name:      "when PDB violations and priority bands tie, structural importance is compared in priority order",
+			set1:      set(1, highPrioPod, veryLowPrioPDBViolatingPodGroupSize1),
+			set2:      set(1, highPrioPodGroupSize1, veryLowPrioPDBViolatingPod),
 			wantOrder: -1,
 		},
 		{
 			name:      "lower priority victim preferred over higher priority victim",
-			set1:      []fwk.PreemptionVictim{lowPrioPod},
-			set2:      []fwk.PreemptionVictim{highPrioPod},
+			set1:      set(0, lowPrioPod),
+			set2:      set(0, highPrioPod),
 			wantOrder: -1,
 		},
 		{
 			name:      "priorities across the set compared before total pod count",
-			set1:      []fwk.PreemptionVictim{highPrioPod, veryLowPrioPodGroupSize3},
-			set2:      []fwk.PreemptionVictim{highPrioPod, midHighPrioPod},
+			set1:      set(0, highPrioPod, veryLowPrioPodGroupSize3),
+			set2:      set(0, highPrioPod, midHighPrioPod),
 			wantOrder: -1,
 		},
 		{
 			name:      "fewer evicted pods at highest priority preferred even with higher secondary priority",
-			set1:      []fwk.PreemptionVictim{lowPrioPod, midLowPrioPod},
-			set2:      []fwk.PreemptionVictim{lowPrioPodGroupSize3, veryLowPrioPod},
+			set1:      set(0, lowPrioPod, midLowPrioPod),
+			set2:      set(0, lowPrioPodGroupSize3, veryLowPrioPod),
 			wantOrder: -1,
 		},
 		{
 			name:      "fewer evicted pods at highest priority preferred over multi-pod group at same priority",
-			set1:      []fwk.PreemptionVictim{highPrioPod, midHighPrioPod},
-			set2:      []fwk.PreemptionVictim{highPrioPodGroupSize2, veryLowPrioPod},
+			set1:      set(0, highPrioPod, midHighPrioPod),
+			set2:      set(0, highPrioPodGroupSize2, veryLowPrioPod),
 			wantOrder: -1,
 		},
 		{
 			name:      "fewer evicted pods in a priority band preferred across different victim types",
-			set1:      []fwk.PreemptionVictim{lowPrioPodGroupSize2},
-			set2:      []fwk.PreemptionVictim{lowPrioPod, lowPrioPod, lowPrioPod},
+			set1:      set(0, lowPrioPodGroupSize2),
+			set2:      set(0, lowPrioPod, lowPrioPod, lowPrioPod),
 			wantOrder: -1,
 		},
 		{
 			name:      "one 4-pod PodGroup preferred over three 3-pod PodGroups of same priority",
-			set1:      []fwk.PreemptionVictim{lowPrioPodGroupSize4},
-			set2:      []fwk.PreemptionVictim{lowPrioPodGroupSize3, lowPrioPodGroupSize3, lowPrioPodGroupSize3},
+			set1:      set(0, lowPrioPodGroupSize4),
+			set2:      set(0, lowPrioPodGroupSize3, lowPrioPodGroupSize3, lowPrioPodGroupSize3),
 			wantOrder: -1,
 		},
 		{
 			name:      "set without additional lower-priority band preferred when higher priority bands tie",
-			set1:      []fwk.PreemptionVictim{highPrioPod},
-			set2:      []fwk.PreemptionVictim{highPrioPod, veryLowPrioPod},
+			set1:      set(0, highPrioPod),
+			set2:      set(0, highPrioPod, veryLowPrioPod),
 			wantOrder: -1,
 		},
 		{
 			name:      "standalone pod preferred over PodGroup of same priority and total pod count",
-			set1:      []fwk.PreemptionVictim{lowPrioPod},
-			set2:      []fwk.PreemptionVictim{lowPrioPodGroupSize1},
+			set1:      set(0, lowPrioPod),
+			set2:      set(0, lowPrioPodGroupSize1),
 			wantOrder: -1,
 		},
 		{
 			name:      "smaller PodGroups preferred over larger PodGroup when priority band pod counts tie",
-			set1:      []fwk.PreemptionVictim{lowPrioPodGroupSize2, lowPrioPodGroupSize2},
-			set2:      []fwk.PreemptionVictim{lowPrioPodGroupSize4},
+			set1:      set(0, lowPrioPodGroupSize2, lowPrioPodGroupSize2),
+			set2:      set(0, lowPrioPodGroupSize4),
 			wantOrder: -1,
 		},
 		{
 			name:      "equal cost when priority bands and structural importance tie",
-			set1:      []fwk.PreemptionVictim{youngerLowPrioPod},
-			set2:      []fwk.PreemptionVictim{lowPrioPod},
+			set1:      set(0, youngerLowPrioPod),
+			set2:      set(0, lowPrioPod),
 			wantOrder: 0,
 		},
 	}
