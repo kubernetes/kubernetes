@@ -21,6 +21,7 @@ import (
 	"sigs.k8s.io/structured-merge-diff/v7/fieldpath"
 	"sigs.k8s.io/structured-merge-diff/v7/merge"
 	"sigs.k8s.io/structured-merge-diff/v7/typed"
+	"sigs.k8s.io/structured-merge-diff/v7/value"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -28,6 +29,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
+
+var finalizersPath = fieldpath.MakePathOrDie("metadata", "finalizers")
 
 type structuredMergeManager struct {
 	typeConverter   TypeConverter
@@ -161,8 +164,9 @@ func (f *structuredMergeManager) Apply(liveObj, patchObj runtime.Object, managed
 		return nil, nil, fmt.Errorf("failed to create typed live object (%v): %v", objectGVKNN(liveObjVersioned), err)
 	}
 
+	beforeManagedFields := managed.Fields()
 	apiVersion := fieldpath.APIVersion(f.groupVersion.String())
-	newObjTyped, managedFields, err := f.updater.Apply(liveObjTyped, patchObjTyped, apiVersion, managed.Fields(), manager, force)
+	newObjTyped, managedFields, err := f.updater.Apply(liveObjTyped, patchObjTyped, apiVersion, beforeManagedFields, manager, force)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -187,7 +191,76 @@ func (f *structuredMergeManager) Apply(liveObj, patchObj runtime.Object, managed
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to convert to unversioned (%v): %v", objectGVKNN(patchObj), err)
 	}
+	if err := preserveUnmanagedFinalizers(liveObj, newObjUnversioned, beforeManagedFields, manager); err != nil {
+		return nil, nil, fmt.Errorf("failed to preserve unmanaged finalizers (%v): %w", objectGVKNN(patchObj), err)
+	}
 	return newObjUnversioned, managed, nil
+}
+
+func preserveUnmanagedFinalizers(liveObj, newObj runtime.Object, beforeManaged fieldpath.ManagedFields, manager string) error {
+	liveAccessor, err := meta.Accessor(liveObj)
+	if err != nil {
+		return err
+	}
+	newAccessor, err := meta.Accessor(newObj)
+	if err != nil {
+		return err
+	}
+
+	liveFinalizers := liveAccessor.GetFinalizers()
+	if len(liveFinalizers) == 0 {
+		return nil
+	}
+
+	newFinalizers := newAccessor.GetFinalizers()
+	newFinalizerSet := make(map[string]bool, len(newFinalizers))
+	for _, f := range newFinalizers {
+		newFinalizerSet[f] = true
+	}
+
+	var managerSet *fieldpath.Set
+	if vs, ok := beforeManaged[manager]; ok && vs != nil {
+		managerSet = vs.Set()
+	}
+
+	var toRestore []string
+	for _, f := range liveFinalizers {
+		if newFinalizerSet[f] {
+			continue
+		}
+		if managerSet != nil {
+			val := value.NewValueInterface(f)
+			p := append(finalizersPath.Copy(), fieldpath.PathElement{Value: &val})
+			if managerSet.Has(p) {
+				continue
+			}
+		}
+		toRestore = append(toRestore, f)
+	}
+
+	if len(toRestore) > 0 {
+		var result []string
+		restoredSet := make(map[string]bool, len(toRestore))
+		for _, f := range toRestore {
+			restoredSet[f] = true
+		}
+		for _, f := range liveFinalizers {
+			if newFinalizerSet[f] || restoredSet[f] {
+				result = append(result, f)
+			}
+		}
+		liveFinalizerSet := make(map[string]bool, len(liveFinalizers))
+		for _, f := range liveFinalizers {
+			liveFinalizerSet[f] = true
+		}
+		for _, f := range newFinalizers {
+			if !liveFinalizerSet[f] {
+				result = append(result, f)
+			}
+		}
+		newAccessor.SetFinalizers(result)
+	}
+	return nil
 }
 
 func (f *structuredMergeManager) toVersioned(obj runtime.Object) (runtime.Object, error) {
