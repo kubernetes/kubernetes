@@ -714,3 +714,51 @@ func TestValidateLeaderElectionRecoveryDeadline(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateNodeControllerOptions(t *testing.T) {
+	testCases := []struct {
+		name                        string
+		concurrentNodeSyncs         int32
+		concurrentNodeStatusUpdates int32
+		wantErr                     string
+	}{
+		{
+			name:                "valid defaults",
+			concurrentNodeSyncs: 1,
+		},
+		{
+			name:                "zero concurrent-node-syncs",
+			concurrentNodeSyncs: 0,
+			wantErr:             "concurrent-node-syncs must be a positive number",
+		},
+		{
+			name:                "negative concurrent-node-syncs",
+			concurrentNodeSyncs: -1,
+			wantErr:             "concurrent-node-syncs must be a positive number",
+		},
+		{
+			name:                        "negative concurrent-node-status-updates",
+			concurrentNodeSyncs:         1,
+			concurrentNodeStatusUpdates: -1,
+			wantErr:                     "concurrent-node-status-updates cannot be a negative number",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			o, err := NewCloudControllerManagerOptions()
+			require.NoError(t, err)
+			o.KubeCloudShared.CloudProvider.Name = "gce"
+			o.NodeController.ConcurrentNodeSyncs = tc.concurrentNodeSyncs
+			o.NodeController.ConcurrentNodeStatusUpdates = tc.concurrentNodeStatusUpdates
+
+			err = o.Validate(nil, nil, nil, nil, nil)
+			if tc.wantErr == "" {
+				require.NoError(t, err)
+				return
+			}
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tc.wantErr)
+		})
+	}
+}
