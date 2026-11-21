@@ -50,6 +50,7 @@ type DevicePlugin struct {
 	calls     []string
 	callsSync sync.Mutex
 
+	options       *kubeletdevicepluginv1beta1.DevicePluginOptions
 	errorInjector func(string) error
 	allocateFunc  func(context.Context, *kubeletdevicepluginv1beta1.AllocateRequest) error
 
@@ -71,9 +72,9 @@ func (dp *DevicePlugin) GetDevicePluginOptions(context.Context, *kubeletdevicepl
 	dp.callsSync.Unlock()
 
 	if dp.errorInjector != nil {
-		return &kubeletdevicepluginv1beta1.DevicePluginOptions{}, dp.errorInjector("GetDevicePluginOptions")
+		return dp.options, dp.errorInjector("GetDevicePluginOptions")
 	}
-	return &kubeletdevicepluginv1beta1.DevicePluginOptions{}, nil
+	return dp.options, nil
 }
 
 func (dp *DevicePlugin) sendDevices(stream kubeletdevicepluginv1beta1.DevicePlugin_ListAndWatchServer) error {
@@ -155,11 +156,19 @@ func (dp *DevicePlugin) Allocate(ctx context.Context, request *kubeletdeviceplug
 }
 
 func (dp *DevicePlugin) PreStartContainer(ctx context.Context, request *kubeletdevicepluginv1beta1.PreStartContainerRequest) (*kubeletdevicepluginv1beta1.PreStartContainerResponse, error) {
-	return nil, nil
+	dp.callsSync.Lock()
+	dp.calls = append(dp.calls, "PreStartContainer")
+	dp.callsSync.Unlock()
+	return &kubeletdevicepluginv1beta1.PreStartContainerResponse{}, nil
 }
 
 func (dp *DevicePlugin) GetPreferredAllocation(ctx context.Context, request *kubeletdevicepluginv1beta1.PreferredAllocationRequest) (*kubeletdevicepluginv1beta1.PreferredAllocationResponse, error) {
 	return nil, nil
+}
+
+// SetDevicePluginOptions must be called before registering the plugin.
+func (dp *DevicePlugin) SetDevicePluginOptions(options *kubeletdevicepluginv1beta1.DevicePluginOptions) {
+	dp.options = options
 }
 
 func (dp *DevicePlugin) SetAllocateFunc(allocateFunc func(context.Context, *kubeletdevicepluginv1beta1.AllocateRequest) error) {
