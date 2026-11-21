@@ -17,6 +17,7 @@ limitations under the License.
 package cp
 
 import (
+	"os"
 	"path"
 	"path/filepath"
 	"strings"
@@ -64,7 +65,13 @@ func (p localPath) Join(elem pathSpec) localPath {
 	return newLocalPath(filepath.Join(p.file, elem.String()))
 }
 
+// Glob returns the paths that match p. A path that exists exactly as written is
+// returned as is, because a real file name such as "[Draft] notes.md" would
+// otherwise be read as a pattern and not match itself.
 func (p localPath) Glob() (matches []string, err error) {
+	if _, statErr := os.Lstat(p.file); statErr == nil {
+		return []string{p.file}, nil
+	}
 	return filepath.Glob(p.file)
 }
 
