@@ -79,7 +79,7 @@ var ValidateServiceAccountName = NameIsDNSSubdomain
 // for more info.
 func maskTrailingDash(name string) string {
 	if len(name) > 1 && strings.HasSuffix(name, "-") {
-		return name[:len(name)-2] + "a"
+		return name[:len(name)-1] + "a"
 	}
 	return name
 }
