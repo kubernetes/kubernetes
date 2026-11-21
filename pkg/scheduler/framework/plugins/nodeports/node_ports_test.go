@@ -76,14 +76,14 @@ func TestNodePorts(t *testing.T) {
 			nodeInfo: framework.NewNodeInfo(
 				newPod("m1", "UDP/127.0.0.1/8080")),
 			name:             "same udp port",
-			wantFilterStatus: fwk.NewStatus(fwk.Unschedulable, ErrReason),
+			wantFilterStatus: fwk.NewStatus(fwk.Unschedulable, "node(s) port conflict for the requested pod ports (UDP/127.0.0.1:8080)"),
 		},
 		{
 			pod: newPod("m1", "TCP/127.0.0.1/8080"),
 			nodeInfo: framework.NewNodeInfo(
 				newPod("m1", "TCP/127.0.0.1/8080")),
 			name:             "same tcp port",
-			wantFilterStatus: fwk.NewStatus(fwk.Unschedulable, ErrReason),
+			wantFilterStatus: fwk.NewStatus(fwk.Unschedulable, "node(s) port conflict for the requested pod ports (TCP/127.0.0.1:8080)"),
 		},
 		{
 			pod: newPod("m1", "TCP/127.0.0.1/8080"),
@@ -102,35 +102,42 @@ func TestNodePorts(t *testing.T) {
 			nodeInfo: framework.NewNodeInfo(
 				newPod("m1", "UDP/127.0.0.1/8080")),
 			name:             "second udp port conflict",
-			wantFilterStatus: fwk.NewStatus(fwk.Unschedulable, ErrReason),
+			wantFilterStatus: fwk.NewStatus(fwk.Unschedulable, "node(s) port conflict for the requested pod ports (UDP/127.0.0.1:8080)"),
 		},
 		{
 			pod: newPod("m1", "TCP/127.0.0.1/8001", "UDP/127.0.0.1/8080"),
 			nodeInfo: framework.NewNodeInfo(
 				newPod("m1", "TCP/127.0.0.1/8001", "UDP/127.0.0.1/8081")),
 			name:             "first tcp port conflict",
-			wantFilterStatus: fwk.NewStatus(fwk.Unschedulable, ErrReason),
+			wantFilterStatus: fwk.NewStatus(fwk.Unschedulable, "node(s) port conflict for the requested pod ports (TCP/127.0.0.1:8001)"),
 		},
 		{
 			pod: newPod("m1", "TCP/0.0.0.0/8001"),
 			nodeInfo: framework.NewNodeInfo(
 				newPod("m1", "TCP/127.0.0.1/8001")),
 			name:             "first tcp port conflict due to 0.0.0.0 hostIP",
-			wantFilterStatus: fwk.NewStatus(fwk.Unschedulable, ErrReason),
+			wantFilterStatus: fwk.NewStatus(fwk.Unschedulable, "node(s) port conflict for the requested pod ports (TCP/0.0.0.0:8001 conflicts with TCP/127.0.0.1:8001)"),
 		},
 		{
 			pod: newPod("m1", "TCP/10.0.10.10/8001", "TCP/0.0.0.0/8001"),
 			nodeInfo: framework.NewNodeInfo(
 				newPod("m1", "TCP/127.0.0.1/8001")),
 			name:             "TCP hostPort conflict due to 0.0.0.0 hostIP",
-			wantFilterStatus: fwk.NewStatus(fwk.Unschedulable, ErrReason),
+			wantFilterStatus: fwk.NewStatus(fwk.Unschedulable, "node(s) port conflict for the requested pod ports (TCP/0.0.0.0:8001 conflicts with TCP/127.0.0.1:8001)"),
+		},
+		{
+			pod: newPod("m1", "TCP/127.0.0.1/8001", "UDP/127.0.0.1/8080", "TCP/127.0.0.1/9000"),
+			nodeInfo: framework.NewNodeInfo(
+				newPod("m1", "TCP/127.0.0.1/8001", "UDP/0.0.0.0/8080")),
+			name:             "only the first of multiple conflicts is reported",
+			wantFilterStatus: fwk.NewStatus(fwk.Unschedulable, "node(s) port conflict for the requested pod ports (TCP/127.0.0.1:8001)"),
 		},
 		{
 			pod: newPod("m1", "TCP/127.0.0.1/8001"),
 			nodeInfo: framework.NewNodeInfo(
 				newPod("m1", "TCP/0.0.0.0/8001")),
 			name:             "second tcp port conflict to 0.0.0.0 hostIP",
-			wantFilterStatus: fwk.NewStatus(fwk.Unschedulable, ErrReason),
+			wantFilterStatus: fwk.NewStatus(fwk.Unschedulable, "node(s) port conflict for the requested pod ports (TCP/127.0.0.1:8001 conflicts with TCP/0.0.0.0:8001)"),
 		},
 		{
 			pod: newPod("m1", "UDP/127.0.0.1/8001"),
@@ -143,7 +150,7 @@ func TestNodePorts(t *testing.T) {
 			nodeInfo: framework.NewNodeInfo(
 				newPod("m1", "TCP/0.0.0.0/8001", "UDP/0.0.0.0/8001")),
 			name:             "UDP hostPort conflict due to 0.0.0.0 hostIP",
-			wantFilterStatus: fwk.NewStatus(fwk.Unschedulable, ErrReason),
+			wantFilterStatus: fwk.NewStatus(fwk.Unschedulable, "node(s) port conflict for the requested pod ports (UDP/127.0.0.1:8001 conflicts with UDP/0.0.0.0:8001)"),
 		},
 		{
 			pod: st.MakePod().
@@ -171,7 +178,7 @@ func TestNodePorts(t *testing.T) {
 			nodeInfo: framework.NewNodeInfo(
 				newPod("m1", "TCP/0.0.0.0/8001")),
 			name:             "TCP hostPort conflict from sidecar initContainer",
-			wantFilterStatus: fwk.NewStatus(fwk.Unschedulable, ErrReason),
+			wantFilterStatus: fwk.NewStatus(fwk.Unschedulable, "node(s) port conflict for the requested pod ports (TCP/0.0.0.0:8001)"),
 		},
 	}
 
@@ -337,8 +344,8 @@ func TestFits(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
-			if Fits(test.pod, test.existing) != test.expect {
-				t.Errorf("expected %t; got %t", test.expect, !test.expect)
+			if fits := Fits(test.pod, test.existing); fits != test.expect {
+				t.Errorf("expected %t; got %t", test.expect, fits)
 			}
 		})
 	}
