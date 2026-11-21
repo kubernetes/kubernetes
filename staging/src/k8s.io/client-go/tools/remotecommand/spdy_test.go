@@ -365,6 +365,15 @@ func v4WriteStatusFunc(stream io.Writer) func(status *apierrors.StatusError) err
 	}
 }
 
+// writeSuccessStatus ends a fake v4 or v5 session the way a server does: with a
+// status on the error stream. Without it the client reports the session as cut.
+func writeSuccessStatus(t *testing.T, writeStatus func(*apierrors.StatusError) error) {
+	t.Helper()
+	if err := writeStatus(&apierrors.StatusError{ErrStatus: metav1.Status{Status: metav1.StatusSuccess}}); err != nil {
+		t.Errorf("error writing status: %v", err)
+	}
+}
+
 // writeDetector provides a helper method to block until the underlying writer written.
 type writeDetector struct {
 	written chan bool
@@ -451,6 +460,7 @@ func TestStreamRandomData(t *testing.T) {
 		defer ctx.conn.Close()
 
 		io.Copy(ctx.stdoutStream, ctx.stdinStream) //nolint:errcheck
+		writeSuccessStatus(t, ctx.writeStatus)
 	}))
 
 	defer server.Close()
