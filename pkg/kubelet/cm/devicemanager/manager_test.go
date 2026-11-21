@@ -1930,6 +1930,84 @@ func TestUpdatePluginResources(t *testing.T) {
 	as.Equal(2, int(allocatableScalarResources[v1.ResourceName(resourceName2)]))
 }
 
+func TestUpdatePluginResourcesOverhead(t *testing.T) {
+	const resourceName = "domain1.com/resource1"
+	started := metav1.Now()
+
+	newPod := func(uid string, startTime *metav1.Time) *v1.Pod {
+		return &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{UID: types.UID(uid)},
+			Spec: v1.PodSpec{
+				Overhead: v1.ResourceList{v1.ResourceName(resourceName): resource.MustParse("1")},
+			},
+			Status: v1.PodStatus{StartTime: startTime},
+		}
+	}
+
+	testCases := []struct {
+		name string
+		// registered is whether the resource is known to the device manager,
+		// as it is after a restart when restored from the checkpoint.
+		registered  bool
+		pod         *v1.Pod
+		otherPods   []*v1.Pod
+		allocatable int64
+		want        int64
+	}{
+		{
+			name:       "started pod, plugin not re-registered",
+			registered: true,
+			pod:        newPod("p1", &started),
+			want:       1,
+		},
+		{
+			name:       "started pod accounts for other pods using the resource",
+			registered: true,
+			pod:        newPod("p1", &started),
+			otherPods:  []*v1.Pod{newPod("p2", &started), newPod("p3", &started)},
+			want:       3,
+		},
+		{
+			name:        "enough allocatable is left alone",
+			registered:  true,
+			pod:         newPod("p1", &started),
+			allocatable: 4,
+			want:        4,
+		},
+		{
+			name:       "pod that never started waits for the plugin",
+			registered: true,
+			pod:        newPod("p1", nil),
+			want:       0,
+		},
+		{
+			name: "resource unknown to the device manager",
+			pod:  newPod("p1", &started),
+			want: 0,
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			m := &ManagerImpl{
+				allocatedDevices: make(map[string]sets.Set[string]),
+				healthyDevices:   make(map[string]sets.Set[string]),
+				podDevices:       newPodDevices(),
+			}
+			if tc.registered {
+				m.healthyDevices[resourceName] = sets.New[string]()
+			}
+			nodeInfo := schedulerframework.NewNodeInfo(tc.otherPods...)
+			nodeInfo.SetNode(&v1.Node{Status: v1.NodeStatus{Allocatable: v1.ResourceList{
+				v1.ResourceName(resourceName): *resource.NewQuantity(tc.allocatable, resource.DecimalSI),
+			}}})
+
+			require.NoError(t, m.UpdatePluginResources(nodeInfo, &lifecycle.PodAdmitAttributes{Pod: tc.pod, OtherPods: tc.otherPods}))
+
+			assert.Equal(t, tc.want, nodeInfo.Allocatable.ScalarResources[v1.ResourceName(resourceName)])
+		})
+	}
+}
+
 func TestDevicePreStartContainer(t *testing.T) {
 	logger, tCtx := ktesting.NewTestContext(t)
 	// Ensures that if device manager is indicated to invoke `PreStartContainer` RPC
