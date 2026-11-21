@@ -18,7 +18,9 @@ package clientcmd
 
 import (
 	"fmt"
+	"net/http"
 	"testing"
+	"time"
 
 	restclient "k8s.io/client-go/rest"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -88,11 +90,28 @@ func TestInClusterConfig(t *testing.T) {
 	}
 	config2 := &restclient.Config{Host: "config2"}
 	err1 := fmt.Errorf("unique error")
+	proxyURL, err := parseProxyURL("http://proxy.example")
+	if err != nil {
+		t.Fatal(err)
+	}
+	configWithTimeout := *config1
+	configWithTimeout.Timeout = 30 * time.Second
+	configWithDisableCompression := *config1
+	configWithDisableCompression.DisableCompression = true
+	configWithProxy := *config1
+	configWithProxy.Proxy = http.ProxyURL(proxyURL)
+	configWithServerAndTimeout := *config1
+	configWithServerAndTimeout.Host = "https://explicit.example.com"
+	configWithServerAndTimeout.Timeout = 30 * time.Second
+	configWithServerAndProxy := *config1
+	configWithServerAndProxy.Host = "https://explicit.example.com"
+	configWithServerAndProxy.Proxy = http.ProxyURL(proxyURL)
 
 	testCases := map[string]struct {
 		clientConfig  *testClientConfig
 		icc           *testICC
 		defaultConfig *DirectClientConfig
+		overrides     *ConfigOverrides
 
 		checkedICC bool
 		result     *restclient.Config
@@ -192,10 +211,95 @@ func TestInClusterConfig(t *testing.T) {
 			result:     config2,
 			err:        nil,
 		},
+
+		"in-cluster checked when config only differs from default by request timeout": {
+			defaultConfig: default1,
+			clientConfig:  &testClientConfig{config: &configWithTimeout},
+			overrides:     &ConfigOverrides{Timeout: "30s"},
+			icc:           &testICC{},
+
+			checkedICC: true,
+			result:     &configWithTimeout,
+			err:        nil,
+		},
+
+		"in-cluster returned when possible and config only differs from default by request timeout": {
+			defaultConfig: default1,
+			clientConfig:  &testClientConfig{config: &configWithTimeout},
+			overrides:     &ConfigOverrides{Timeout: "30s"},
+			icc:           &testICC{possible: true, testClientConfig: testClientConfig{config: config2}},
+
+			checkedICC: true,
+			result:     config2,
+			err:        nil,
+		},
+
+		"in-cluster checked when config only differs from default by disable compression": {
+			defaultConfig: default1,
+			clientConfig:  &testClientConfig{config: &configWithDisableCompression},
+			overrides:     &ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{DisableCompression: true}},
+			icc:           &testICC{},
+
+			checkedICC: true,
+			result:     &configWithDisableCompression,
+			err:        nil,
+		},
+
+		"in-cluster checked when config only differs from default by proxy url": {
+			defaultConfig: default1,
+			clientConfig:  &testClientConfig{config: &configWithProxy},
+			overrides:     &ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{ProxyURL: "http://proxy.example"}},
+			icc:           &testICC{},
+
+			checkedICC: true,
+			result:     &configWithProxy,
+			err:        nil,
+		},
+
+		"in-cluster returned when possible and config only differs from default by proxy url": {
+			defaultConfig: default1,
+			clientConfig:  &testClientConfig{config: &configWithProxy},
+			overrides:     &ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{ProxyURL: "http://proxy.example"}},
+			icc:           &testICC{possible: true, testClientConfig: testClientConfig{config: config2}},
+
+			checkedICC: true,
+			result:     config2,
+			err:        nil,
+		},
+
+		"in-cluster not checked when source selection differs from default even with request timeout": {
+			defaultConfig: default1,
+			clientConfig:  &testClientConfig{config: &configWithServerAndTimeout},
+			overrides: &ConfigOverrides{
+				Timeout:     "30s",
+				ClusterInfo: clientcmdapi.Cluster{Server: "https://explicit.example.com"},
+			},
+			icc: &testICC{},
+
+			checkedICC: false,
+			result:     &configWithServerAndTimeout,
+			err:        nil,
+		},
+
+		"in-cluster not checked when source selection differs from default even with proxy url": {
+			defaultConfig: default1,
+			clientConfig:  &testClientConfig{config: &configWithServerAndProxy},
+			overrides: &ConfigOverrides{
+				ClusterInfo: clientcmdapi.Cluster{
+					Server:   "https://explicit.example.com",
+					ProxyURL: "http://proxy.example",
+				},
+			},
+			icc: &testICC{},
+
+			checkedICC: false,
+			result:     &configWithServerAndProxy,
+			err:        nil,
+		},
 	}
 
 	for name, test := range testCases {
-		c := &DeferredLoadingClientConfig{icc: test.icc}
+		c := &DeferredLoadingClientConfig{icc: test.icc, overrides: test.overrides}
 		c.loader = &ClientConfigLoadingRules{DefaultClientConfig: test.defaultConfig}
 		c.clientConfig = test.clientConfig
 
