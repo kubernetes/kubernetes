@@ -188,6 +188,9 @@ func RestartNodes(c clientset.Interface, nodes []v1.Node) error {
 		if err := wait.Poll(30*time.Second, framework.RestartNodeReadyAgainTimeout, func() (bool, error) {
 			newNode, err := c.CoreV1().Nodes().Get(context.TODO(), node.Name, metav1.GetOptions{})
 			if err != nil {
+				if framework.IsRetryableAPIError(err) {
+					return false, nil
+				}
 				return false, fmt.Errorf("error getting node info after reboot: %w", err)
 			}
 			return node.Status.NodeInfo.BootID != newNode.Status.NodeInfo.BootID, nil
