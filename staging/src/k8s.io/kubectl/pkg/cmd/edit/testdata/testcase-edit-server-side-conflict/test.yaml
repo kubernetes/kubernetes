@@ -1,0 +1,32 @@
+# kubectl edit service dns --namespace=edit-test --server-side
+description: report a field manager conflict from server-side edit
+mode: edit
+args:
+- service
+- dns
+serverSide: "true"
+namespace: edit-test
+expectedStderr:
+- Apply failed with 1 conflict
+- --force-conflicts
+- Your changes have been saved to
+expectedExitCode: 1
+steps:
+- type: request
+  expectedMethod: GET
+  expectedPath: /api/v1/namespaces/edit-test/services/dns
+  expectedInput: 0.request
+  resultingStatusCode: 200
+  resultingOutput: 0.response
+- type: edit
+  expectedInput: 1.original
+  resultingOutput: 1.edited
+- type: request
+  expectedMethod: PATCH
+  expectedPath: /api/v1/namespaces/edit-test/services/dns
+  expectedContentType: application/apply-patch+yaml
+  expectedQuery:
+    fieldManager: kubectl-edit
+  expectedInput: 2.request
+  resultingStatusCode: 409
+  resultingOutput: 2.response
