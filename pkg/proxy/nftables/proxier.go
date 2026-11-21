@@ -841,7 +841,7 @@ func (proxier *Proxier) OnServiceSynced() {
 	proxier.mu.Unlock()
 
 	// Sync unconditionally - this is called once per lifetime.
-	proxier.syncProxyRules()
+	proxier.Sync()
 }
 
 // OnEndpointSliceAdd is called whenever creation of a new endpoint slice object
@@ -877,7 +877,7 @@ func (proxier *Proxier) OnEndpointSlicesSynced() {
 	proxier.mu.Unlock()
 
 	// Sync unconditionally - this is called once per lifetime.
-	proxier.syncProxyRules()
+	proxier.Sync()
 }
 
 // OnTopologyChange is called whenever this node's proxy relevant topology-related labels change.
