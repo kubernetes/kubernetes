@@ -118,7 +118,7 @@ func isCgroupv2Node(f *framework.Framework, ctx context.Context) (bool, error) {
 
 func makeObjectMetadata(name, namespace string) metav1.ObjectMeta {
 	return metav1.ObjectMeta{
-		Name: "testpod", Namespace: namespace,
+		Name: name, Namespace: namespace,
 		Labels: map[string]string{"time": strconv.Itoa(time.Now().Nanosecond())},
 	}
 }

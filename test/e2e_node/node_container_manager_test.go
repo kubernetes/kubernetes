@@ -309,6 +309,7 @@ func runTest(ctx context.Context, f *framework.Framework) error {
 	// Update the Kubelet configuration.
 	ginkgo.By("Stopping the kubelet")
 	restartKubelet := mustStopKubelet(ctx, f)
+	ginkgo.DeferCleanup(restartKubelet)
 
 	expectedNAPodCgroup := cm.NewCgroupName(cm.RootCgroupName, nodeAllocatableCgroup)
 
@@ -597,6 +598,7 @@ func run1GiHugepagesTest(ctx context.Context, f *framework.Framework) error {
 
 	ginkgo.By("Stopping the kubelet")
 	restartKubelet := mustStopKubelet(ctx, f)
+	ginkgo.DeferCleanup(restartKubelet)
 
 	expectedNAPodCgroup := cm.NewCgroupName(cm.RootCgroupName, nodeAllocatableCgroup)
 	// Destroy waits 30s; systemd can take 90s to kill a leftover container.
