@@ -33,8 +33,6 @@ import (
 	"strconv"
 	"strings"
 
-	securejoin "github.com/cyphar/filepath-securejoin"
-
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	apiresource "k8s.io/apimachinery/pkg/api/resource"
@@ -1003,15 +1001,17 @@ func (kl *Kubelet) makeEnvironmentVariables(ctx context.Context, pod *v1.Pod, co
 					return result, fmt.Errorf("failed to get host path for volume %q: %w", volume, err)
 				}
 
-				// Construct the full path to the environment variable file
-				// by combining hostPath with the specified path in FileKeyRef
-				envFilePath, err := securejoin.SecureJoin(hostPath, f.Path)
-				if err != nil {
-					return result, err
-				}
-
+				// Open the file relative to the volume root. os.OpenInRoot resolves
+				// every path component under hostPath, so a symlink that is
+				// swapped in while kubelet walks the path cannot redirect the
+				// read outside the volume.
+				envFilePath := filepath.Join(hostPath, f.Path)
 				var found bool
-				runtimeVal, found, err = envutil.ParseEnv(envFilePath, key)
+				envFile, err := os.OpenInRoot(hostPath, f.Path)
+				if err == nil {
+					runtimeVal, found, err = envutil.ParseEnvFromReader(envFile, envFilePath, key)
+					_ = envFile.Close()
+				}
 				if err != nil {
 					// A missing file is equivalent to a missing key: the env var is
 					// simply not published when the reference is optional.
