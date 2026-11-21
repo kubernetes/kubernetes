@@ -22,6 +22,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"reflect"
 	"strings"
@@ -29,6 +30,8 @@ import (
 	"time"
 
 	"golang.org/x/net/websocket"
+
+	"k8s.io/klog/v2/ktesting"
 )
 
 func TestStream(t *testing.T) {
@@ -299,4 +302,58 @@ func expectWebSocketFrames(r *Reader, t *testing.T, fn func(*websocket.Conn), fr
 		return fmt.Errorf("expected no more frames: %v (%v)", err, data)
 	}
 	return <-errCh
+}
+
+// TestStreamCopyReturnsWhenHandshakeFails checks that Copy returns when the
+// websocket server rejects the handshake. The handler never runs in that case,
+// so Copy must not wait for a result from it.
+func TestStreamCopyReturnsWhenHandshakeFails(t *testing.T) {
+	testCases := map[string]func(t *testing.T, addr string){
+		"unsupported subprotocol": func(t *testing.T, addr string) {
+			config, err := websocket.NewConfig("ws://"+addr, "http://"+addr)
+			if err != nil {
+				t.Fatal(err)
+			}
+			config.Protocol = []string{"not.supported.k8s.io"}
+			if client, err := websocket.DialConfig(config); err == nil {
+				client.Close() //nolint:errcheck
+				t.Fatal("expected the handshake to be rejected")
+			}
+		},
+		"unsupported websocket version": func(t *testing.T, addr string) {
+			conn, err := net.Dial("tcp", addr)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer conn.Close() //nolint:errcheck
+			req := "GET / HTTP/1.1\r\nHost: " + addr + "\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n" +
+				"Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 7\r\nOrigin: http://" + addr + "\r\n\r\n"
+			if _, err := conn.Write([]byte(req)); err != nil {
+				t.Fatal(err)
+			}
+			io.Copy(io.Discard, conn) //nolint:errcheck
+		},
+	}
+	for name, dial := range testCases {
+		t.Run(name, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
+			r := NewReaderWithLogger(logger, strings.NewReader("data"), false, NewDefaultReaderProtocols())
+			errCh := make(chan error, 1)
+			s, addr := newServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+				errCh <- r.Copy(w, req)
+			}))
+			defer s.Close()
+
+			dial(t, addr)
+
+			select {
+			case err := <-errCh:
+				if err == nil {
+					t.Fatal("expected an error from Copy after a rejected handshake")
+				}
+			case <-time.After(10 * time.Second):
+				t.Fatal("Copy did not return after the handshake was rejected")
+			}
+		})
+	}
 }
