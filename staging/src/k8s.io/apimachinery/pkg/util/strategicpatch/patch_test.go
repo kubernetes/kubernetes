@@ -769,6 +769,24 @@ nonMergingIntList:
 `),
 		},
 	},
+	{
+		Description: "$deleteFromPrimitiveList with a null value should not delete the primitive list",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+mergingIntList:
+  - 1
+  - 2
+`),
+			TwoWay: []byte(`
+$deleteFromPrimitiveList/mergingIntList: null
+`),
+			Modified: []byte(`
+mergingIntList:
+  - 1
+  - 2
+`),
+		},
+	},
 }
 
 func TestCustomStrategicMergePatch(t *testing.T) {
