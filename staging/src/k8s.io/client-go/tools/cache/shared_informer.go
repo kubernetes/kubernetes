@@ -296,6 +296,12 @@ type HandlerOptions struct {
 	//
 	// If nil, the default resync period of the shared informer is used.
 	ResyncPeriod *time.Duration
+
+	// InitialBufferSize overrides the initial capacity of the handler's pending
+	// notification buffer. If nil, the default of 1024 is used. Zero defers
+	// allocation until notifications need to be buffered. Must be non-negative.
+	// The buffer grows as needed; this does not limit the number of pending notifications.
+	InitialBufferSize *int
 }
 
 // SharedIndexInformer provides add and get Indexers ability based on SharedInformer.
@@ -1062,6 +1068,11 @@ func (s *sharedIndexInformer) AddEventHandlerWithOptions(handler ResourceEventHa
 		return nil, fmt.Errorf("handler %v was not added to shared informer because it has stopped already", handler)
 	}
 
+	bufferSize := ptr.Deref(options.InitialBufferSize, initialBufferSize)
+	if bufferSize < 0 {
+		return nil, fmt.Errorf("initial buffer size must be non-negative, got %d", bufferSize)
+	}
+
 	logger := ptr.Deref(options.Logger, klog.Background())
 	resyncPeriod := ptr.Deref(options.ResyncPeriod, s.defaultEventHandlerResyncPeriod)
 	if resyncPeriod > 0 {
@@ -1085,7 +1096,7 @@ func (s *sharedIndexInformer) AddEventHandlerWithOptions(handler ResourceEventHa
 		}
 	}
 
-	listener := newProcessListener(logger, handler, resyncPeriod, determineResyncPeriod(logger, resyncPeriod, s.resyncCheckPeriod), s.clock.Now(), initialBufferSize, s.HasSyncedChecker())
+	listener := newProcessListener(logger, handler, resyncPeriod, determineResyncPeriod(logger, resyncPeriod, s.resyncCheckPeriod), s.clock.Now(), bufferSize, s.HasSyncedChecker())
 
 	if !s.started {
 		handle, _ := s.processor.addListener(listener)
