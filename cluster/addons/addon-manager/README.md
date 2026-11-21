@@ -40,20 +40,20 @@ The `addon-manager` is built for multiple architectures.
 ```console
 # Build for linux/amd64 (default)
 $ make push ARCH=amd64
-# ---> staging-k8s.gcr.io/addon-manager/kube-addon-manager-amd64:VERSION
-# ---> staging-k8s.gcr.io/addon-manager/kube-addon-manager:VERSION (image with backwards-compatible naming)
+# ---> gcr.io/k8s-staging-addon-manager/kube-addon-manager-amd64:VERSION
+# ---> gcr.io/k8s-staging-addon-manager/kube-addon-manager:VERSION (image with backwards-compatible naming)
 
 $ make push ARCH=arm
-# ---> staging-k8s.gcr.io/addon-manager/kube-addon-manager-arm:VERSION
+# ---> gcr.io/k8s-staging-addon-manager/kube-addon-manager-arm:VERSION
 
 $ make push ARCH=arm64
-# ---> staging-k8s.gcr.io/addon-manager/kube-addon-manager-arm64:VERSION
+# ---> gcr.io/k8s-staging-addon-manager/kube-addon-manager-arm64:VERSION
 
 $ make push ARCH=ppc64le
-# ---> staging-k8s.gcr.io/addon-manager/kube-addon-manager-ppc64le:VERSION
+# ---> gcr.io/k8s-staging-addon-manager/kube-addon-manager-ppc64le:VERSION
 
 $ make push ARCH=s390x
-# ---> staging-k8s.gcr.io/addon-manager/kube-addon-manager-s390x:VERSION
+# ---> gcr.io/k8s-staging-addon-manager/kube-addon-manager-s390x:VERSION
 ```
 
 If you don't want to push the images, run `make` or `make build` instead
