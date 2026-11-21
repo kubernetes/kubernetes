@@ -24,6 +24,7 @@ import (
 	"net/http/httptest"
 	"regexp"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -38,14 +39,21 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/leaderelection"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/transport"
+	componentbaseconfig "k8s.io/component-base/config"
+	"k8s.io/component-base/configz"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/component-base/metrics/legacyregistry"
+	metricstestutil "k8s.io/component-base/metrics/testutil"
 	"k8s.io/controller-manager/pkg/clientbuilder"
 	cmfeatures "k8s.io/controller-manager/pkg/features"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app/config"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
+	lifecyclecontroller "k8s.io/kubernetes/pkg/controller/nodelifecycle"
+	nodelifecycleconfig "k8s.io/kubernetes/pkg/controller/nodelifecycle/config"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 )
 
@@ -516,4 +524,84 @@ func TestBuildControllersRecoveryOptIn(t *testing.T) {
 			t.Fatalf("unexpected error building controllers: %v", err)
 		}
 	})
+}
+
+func TestRunRecordsLivenessSourceBeforeLeaderElection(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeatures.ExternalNodeLivenessDetection, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeatures.CoordinatedLeaderElection, false)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, cmfeatures.ControllerManagerReleaseLeaderElectionLockOnExit, true)
+	t.Cleanup(func() { configz.Delete(ConfigzName) })
+
+	// Pre-seed with kubelet so we verify Run updates the gauge before acquiring leadership.
+	lifecyclecontroller.RecordLivenessSource(nodelifecycleconfig.NodeLivenessSourceKubelet)
+
+	var once sync.Once
+	leaseChecked := make(chan struct{})
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if strings.Contains(r.URL.Path, "/leases/") {
+			now := time.Now().UTC().Format(metav1.RFC3339Micro)
+			_, _ = fmt.Fprintf(w, `{"kind":"Lease","apiVersion":"coordination.k8s.io/v1","metadata":{"name":"kube-controller-manager","namespace":"kube-system","resourceVersion":"1"},"spec":{"holderIdentity":"active-leader","leaseDurationSeconds":3600,"acquireTime":%q,"renewTime":%q}}`, now, now)
+			once.Do(func() { close(leaseChecked) })
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{}`))
+	}))
+	t.Cleanup(server.Close)
+
+	_, tCtx := ktesting.NewTestContext(t)
+	runCtx, cancel := context.WithCancel(tCtx)
+	defer cancel()
+
+	kubeconfig := &restclient.Config{Host: server.URL}
+	c := &config.Config{
+		Kubeconfig:       kubeconfig,
+		Client:           clientset.NewForConfigOrDie(kubeconfig),
+		EventBroadcaster: record.NewBroadcaster(record.WithContext(runCtx)),
+	}
+	c.ComponentConfig.Generic.Controllers = []string{"*"}
+	c.ComponentConfig.Generic.LeaderElection = componentbaseconfig.LeaderElectionConfiguration{
+		LeaderElect:       true,
+		ResourceLock:      "leases",
+		ResourceNamespace: "kube-system",
+		ResourceName:      "kube-controller-manager",
+		LeaseDuration:     metav1.Duration{Duration: 15 * time.Second},
+		RenewDeadline:     metav1.Duration{Duration: 10 * time.Second},
+		RetryPeriod:       metav1.Duration{Duration: 2 * time.Second},
+	}
+	c.ComponentConfig.NodeLifecycleController.NodeLivenessSource = nodelifecycleconfig.NodeLivenessSourceExternal
+
+	done := make(chan error, 1)
+	go func() {
+		done <- Run(runCtx, c.Complete())
+	}()
+
+	select {
+	case <-leaseChecked:
+	case err := <-done:
+		t.Fatalf("Run exited unexpectedly before checking leader lease: %v", err)
+	case <-time.After(10 * time.Second):
+		t.Fatal("timed out waiting for standby replica to check leader lease")
+	}
+
+	wantMetric := `
+# HELP node_collector_liveness_source [ALPHA] Gauge set to 1 for the configured node liveness source.
+# TYPE node_collector_liveness_source gauge
+node_collector_liveness_source{source="external"} 1
+node_collector_liveness_source{source="kubelet"} 0
+`
+	if err := metricstestutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(wantMetric), "node_collector_liveness_source"); err != nil {
+		t.Errorf("standby KCM replica did not export expected liveness_source metric: %v", err)
+	}
+
+	cancel()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("Run returned unexpected error on shutdown: %v", err)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("timed out waiting for standby KCM Run to stop")
+	}
 }
