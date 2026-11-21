@@ -17,17 +17,20 @@ limitations under the License.
 package config
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
 
+	"go.uber.org/goleak"
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 	clientscheme "k8s.io/client-go/kubernetes/scheme"
 	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/ktesting"
@@ -38,9 +41,9 @@ import (
 )
 
 func TestURLErrorNotExistNoUpdate(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	_, ctx := ktesting.NewTestContext(t)
 	ch := make(chan sourceUpdate)
-	NewSourceURL(logger, "http://localhost:49575/_not_found_", http.Header{}, "localhost", time.Millisecond, ch)
+	NewSourceURL(ctx, "http://localhost:49575/_not_found_", http.Header{}, "localhost", time.Millisecond, ch)
 	select {
 	case got := <-ch:
 		t.Errorf("Expected no update, Got %#v", got)
@@ -48,18 +51,55 @@ func TestURLErrorNotExistNoUpdate(t *testing.T) {
 	}
 }
 
+func TestURLSourceStopsOnContextCancel(t *testing.T) {
+	_, tCtx := ktesting.NewTestContext(t)
+	// An empty response makes the source send an empty update on every sync.
+	requests := make(chan struct{}, 100)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Connection", "close")
+		requests <- struct{}{}
+	}))
+	defer server.Close()
+	ignoreCurrent := goleak.IgnoreCurrent()
+	ctx, cancel := context.WithCancel(tCtx)
+	defer cancel()
+
+	ch := make(chan sourceUpdate)
+	NewSourceURL(ctx, server.URL, http.Header{}, "localhost", time.Millisecond, ch)
+	select {
+	case <-ch:
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Fatalf("Expected update, timeout instead")
+	}
+
+	// Stop reading from ch. Wait until the server has seen the first sync and
+	// the next one, whose update nobody receives, and give the source time to
+	// block on sending it.
+	for range 2 {
+		select {
+		case <-requests:
+		case <-time.After(wait.ForeverTestTimeout):
+			t.Fatalf("Expected another sync, timeout instead")
+		}
+	}
+	time.Sleep(100 * time.Millisecond)
+
+	cancel()
+	goleak.VerifyNone(t, ignoreCurrent)
+}
+
 func TestExtractFromHttpBadness(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	_, ctx := ktesting.NewTestContext(t)
 	ch := make(chan sourceUpdate, 1)
 	c := sourceURL{"http://localhost:49575/_not_found_", http.Header{}, "other", ch, nil, 0, http.DefaultClient}
-	if err := c.extractFromURL(logger); err == nil {
+	if err := c.extractFromURL(ctx); err == nil {
 		t.Errorf("Expected error")
 	}
 	expectEmptyChannel(t, ch)
 }
 
 func TestExtractInvalidPods(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	_, ctx := ktesting.NewTestContext(t)
 	var testCases = []struct {
 		desc string
 		pod  *v1.Pod
@@ -122,14 +162,14 @@ func TestExtractInvalidPods(t *testing.T) {
 		defer testServer.Close()
 		ch := make(chan sourceUpdate, 1)
 		c := sourceURL{testServer.URL, http.Header{}, "localhost", ch, nil, 0, http.DefaultClient}
-		if err := c.extractFromURL(logger); err == nil {
+		if err := c.extractFromURL(ctx); err == nil {
 			t.Errorf("%s: Expected error", testCase.desc)
 		}
 	}
 }
 
 func TestExtractPodsFromHTTP(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	_, ctx := ktesting.NewTestContext(t)
 	nodeName := "different-value"
 
 	grace := int64(30)
@@ -304,7 +344,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 		defer testServer.Close()
 		ch := make(chan sourceUpdate, 1)
 		c := sourceURL{testServer.URL, http.Header{}, types.NodeName(nodeName), ch, nil, 0, http.DefaultClient}
-		if err := c.extractFromURL(logger); err != nil {
+		if err := c.extractFromURL(ctx); err != nil {
 			t.Errorf("%s: Unexpected error: %v", testCase.desc, err)
 			continue
 		}
@@ -353,12 +393,12 @@ func TestURLWithHeader(t *testing.T) {
 	testServer := httptest.NewServer(&fakeHandler)
 	defer testServer.Close()
 
-	logger, _ := ktesting.NewTestContext(t)
+	_, ctx := ktesting.NewTestContext(t)
 	ch := make(chan sourceUpdate, 1)
 	header := make(http.Header)
 	header.Set("Metadata-Flavor", "Google")
 	c := sourceURL{testServer.URL, header, "localhost", ch, nil, 0, http.DefaultClient}
-	if err := c.extractFromURL(logger); err != nil {
+	if err := c.extractFromURL(ctx); err != nil {
 		t.Fatalf("Unexpected error extracting from URL: %v", err)
 	}
 	update := <-ch
