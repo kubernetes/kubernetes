@@ -28,6 +28,7 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -109,6 +110,8 @@ type CoreResourceEnqueueTestCase struct {
 	// PrioritySort and DefaultPreemption are enabled by default because they are required by the framework.
 	// If empty, all plugins are enabled.
 	EnablePlugins []string
+	// PluginConfig is the list of plugin args to set on the scheduler profile.
+	PluginConfig []configv1.PluginConfig
 	// EnabledRAExtendedResource indicates wether the test case should run with feature gate
 	// DRAExtendedResource enabled or not.
 	EnableDRAExtendedResource bool
@@ -205,6 +208,38 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.Node, ActionType: fwk.UpdateNodeLabel}: 1}, nil
 		},
 		WantRequeuedPods: sets.Set[string]{},
+	},
+	{
+		Name:          "Pod rejected by the scheduler-enforced node affinity is requeued when a Node's label is updated to match it",
+		EnablePlugins: []string{names.NodeAffinity},
+		PluginConfig: []configv1.PluginConfig{{
+			Name: names.NodeAffinity,
+			Args: runtime.RawExtension{Object: &configv1.NodeAffinityArgs{
+				AddedAffinity: &v1.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+						NodeSelectorTerms: []v1.NodeSelectorTerm{{
+							MatchExpressions: []v1.NodeSelectorRequirement{{Key: "zone", Operator: v1.NodeSelectorOpIn, Values: []string{"a"}}},
+						}},
+					},
+				},
+			}},
+		}},
+		InitialNodes: []*v1.Node{st.MakeNode().Name("fake-node1").Label("group", "a").Obj()},
+		Pods: []*v1.Pod{
+			// - Pod1 matches the node by its own NodeAffinity, but is rejected by the scheduler-enforced node affinity.
+			st.MakePod().Name("pod1").NodeAffinityIn("group", []string{"a"}, st.NodeSelectorTypeMatchExpressions).Container("image").Obj(),
+			// - Pod2 has no NodeAffinity and is rejected by the scheduler-enforced node affinity only.
+			st.MakePod().Name("pod2").Container("image").Obj(),
+		},
+		TriggerFn: func(testCtx *schedulerutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+			// Trigger a NodeUpdate event that adds the label required by the scheduler-enforced node affinity.
+			// It causes both pods to be requeued, even though pod1 already matched the node before the update.
+			if _, err := testCtx.Client().CoreV1().Nodes().Update(testCtx, st.MakeNode().Name("fake-node1").Label("group", "a").Label("zone", "a").Obj(), metav1.UpdateOptions{}); err != nil {
+				return nil, fmt.Errorf("failed to update the node: %w", err)
+			}
+			return map[fwk.ClusterEvent]uint64{{Resource: fwk.Node, ActionType: fwk.UpdateNodeLabel}: 1}, nil
+		},
+		WantRequeuedPods: sets.New("pod1", "pod2"),
 	},
 	{
 		Name:          "Pod rejected by the NodeAffinity plugin is requeued when a Node is added",
@@ -2629,6 +2664,7 @@ func RunTestCoreResourceEnqueue(t *testing.T, tt *CoreResourceEnqueueTestCase) {
 					},
 				},
 			},
+			PluginConfig: tt.PluginConfig,
 		}
 		cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
 			Profiles: []configv1.KubeSchedulerProfile{profile},
