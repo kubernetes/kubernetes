@@ -901,16 +901,31 @@ func (c *EvictionRequestController) syncEvictionRequest(ctx context.Context, key
 		if err != nil {
 			return err
 		}
-		newEvictionApplyConfig := lifecycleapply.Eviction(newEvictionName(target, allEvictions), evictionRequest.Namespace).
-			WithOwnerReferences(evictionRequestAsOwnerReference(evictionRequest)).
-			WithLabels(map[string]string{
-				// labels are reconciled by the refreshEviction loop from now on according to the roles
-				evictionRequest.Spec.Requester: string(lifecyclev1alpha1.EvictionParticipantRoleRequester),
-			}).
-			WithSpec(lifecycleapply.EvictionSpec().
-				WithTarget(target.toEvictionTargetApply()),
-			)
-		if err := c.applyEviction(ctx, newEvictionApplyConfig); err != nil {
+		newEviction := &lifecyclev1alpha1.Eviction{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      newEvictionName(target, allEvictions),
+				Namespace: evictionRequest.Namespace,
+				OwnerReferences: []metav1.OwnerReference{{
+					APIVersion: lifecyclev1alpha1.SchemeGroupVersion.String(),
+					Kind:       "EvictionRequest",
+					Name:       evictionRequest.Name,
+					UID:        evictionRequest.UID,
+				}},
+				Labels: map[string]string{
+					// Labels are reconciled by the refreshEviction loop from now on according to the roles.
+					evictionRequest.Spec.Requester: string(lifecyclev1alpha1.EvictionParticipantRoleRequester),
+				},
+			},
+			Spec: lifecyclev1alpha1.EvictionSpec{
+				Target: lifecyclev1alpha1.EvictionTarget{
+					Pod: &lifecyclev1alpha1.EvictionPodReference{Name: target.targetName(), UID: target.targetUID()},
+				},
+			},
+		}
+		// The informer may not have observed another worker's creation yet. Applying
+		// here would replace its owners and labels with this request's metadata.
+		_, err = c.kubeClient.LifecycleV1alpha1().Evictions(namespace).Create(ctx, newEviction, metav1.CreateOptions{FieldManager: c.controllerName})
+		if err != nil && !errors.IsAlreadyExists(err) {
 			return err
 		}
 	}
