@@ -253,7 +253,7 @@ type EtcdServer struct {
 	be         backend.Backend
 	beHooks    *serverstorage.BackendHooks
 	authStore  auth.AuthStore
-	alarmStore *v3alarm.AlarmStore
+	alarmStore atomic.Pointer[v3alarm.AlarmStore]
 
 	stats  *stats.ServerStats
 	lstats *stats.LeaderStats
@@ -1147,7 +1147,7 @@ func (s *EtcdServer) NewUberApplier() apply.UberApplier {
 	opts := apply.ApplierOptions{
 		Logger:                       s.lg,
 		KV:                           s.KV(),
-		AlarmStore:                   s.alarmStore,
+		AlarmStore:                   s.alarmStore.Load(),
 		AuthStore:                    s.authStore,
 		Lessor:                       s.lessor,
 		Cluster:                      s.cluster,
@@ -1978,7 +1978,7 @@ func (s *EtcdServer) applyEntryNormal(e *raftpb.Entry, shouldApplyV3 membership.
 		return
 	}
 
-	if !errorspkg.Is(ar.Err, errors.ErrNoSpace) || len(s.alarmStore.Get(pb.AlarmType_NOSPACE)) > 0 {
+	if !errorspkg.Is(ar.Err, errors.ErrNoSpace) || len(s.alarmStore.Load().Get(pb.AlarmType_NOSPACE)) > 0 {
 		s.w.Trigger(id, ar)
 		return
 	}
@@ -2403,7 +2403,7 @@ func (s *EtcdServer) restoreAlarms() error {
 	if err != nil {
 		return err
 	}
-	s.alarmStore = as
+	s.alarmStore.Store(as)
 	return nil
 }
 
@@ -2430,7 +2430,7 @@ func (s *EtcdServer) GoAttach(f func()) {
 }
 
 func (s *EtcdServer) Alarms() []*pb.AlarmMember {
-	return s.alarmStore.Get(pb.AlarmType_NONE)
+	return s.alarmStore.Load().Get(pb.AlarmType_NONE)
 }
 
 // IsLearner returns if the local member is raft learner

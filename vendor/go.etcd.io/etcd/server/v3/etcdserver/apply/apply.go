@@ -16,17 +16,36 @@ package apply
 
 import (
 	"go.uber.org/zap"
+	"google.golang.org/protobuf/proto"
 
 	pb "go.etcd.io/etcd/api/v3/etcdserverpb"
-	"go.etcd.io/etcd/pkg/v3/pbutil"
 	"go.etcd.io/etcd/pkg/v3/wait"
 	"go.etcd.io/etcd/server/v3/etcdserver/api/membership"
+	"go.etcd.io/etcd/server/v3/internal/legacyv2"
 	"go.etcd.io/raft/v3/raftpb"
 )
 
 func Apply(lg *zap.Logger, e *raftpb.Entry, uberApply UberApplier, w wait.Wait, shouldApplyV3 membership.ShouldApplyV3) (ar *Result, id uint64) {
 	var raftReq pb.InternalRaftRequest
-	pbutil.MustUnmarshalMessage(&raftReq, e.Data)
+	if err := proto.Unmarshal(e.Data, &raftReq); err != nil {
+		var legacyReq legacyv2.Request
+		if lerr := legacyReq.Unmarshal(e.Data); lerr != nil {
+			lg.Panic("failed to unmarshal raft entry", zap.Error(err), zap.Error(lerr))
+		}
+		// Only the two metadata shapes written by etcd 3.5 and earlier are
+		// expected; anything else is WAL corruption and must panic rather
+		// than be dropped.
+		if !legacyReq.IsMetadataRequest() {
+			lg.Panic("unexpected non-metadata legacy v2 request",
+				zap.Stringer("request", &legacyReq), zap.Error(err))
+		}
+		// Legacy v2 requests are dropped: the v2 store has been removed,
+		// member attributes are re-published before the server starts
+		// serving requests, and the cluster version is maintained by the
+		// newer members.
+		lg.Info("dropping legacy v2 WAL request", zap.Stringer("request", &legacyReq))
+		return nil, legacyReq.ID
+	}
 	lg.Debug("Apply", zap.Stringer("raftReq", &raftReq))
 
 	id = raftReq.ID
