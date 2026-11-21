@@ -20,7 +20,6 @@ import (
 	"strings"
 	"testing"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
@@ -144,9 +143,7 @@ func TweakAttacher(attacher string) func(obj *storage.VolumeAttachment) {
 func mkValidVolumeAttachment(tweaks ...func(obj *storage.VolumeAttachment)) storage.VolumeAttachment {
 	pvName := "pv-001"
 	obj := storage.VolumeAttachment{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "valid-volume-attachment",
-		},
+		Name: "valid-volume-attachment",
 		Spec: storage.VolumeAttachmentSpec{
 			Attacher: "example.com",
 			Source: storage.VolumeAttachmentSource{
