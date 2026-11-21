@@ -24,8 +24,17 @@ import (
 	"net/url"
 	"time"
 
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
 )
+
+// Up to retryAfterJitterFactor of the retry wait is added at random, so
+// clients rejected with the same Retry-After do not retry as a thundering herd.
+const retryAfterJitterFactor = 0.1
+
+func jitterRetryAfter(delay time.Duration) time.Duration {
+	return wait.Jitter(delay, retryAfterJitterFactor)
+}
 
 // IsRetryableErrorFunc allows the client to provide its own function
 // that determines whether the specified err from the server is retryable.
@@ -215,10 +224,16 @@ func (r *withRetry) Before(ctx context.Context, request *Request) error {
 	}
 
 	// if we are here, we have made attempt(s) at least once before.
+	delay := r.retryAfter.Wait
 	if request.backoff != nil {
-		delay := request.backoff.CalculateBackoffWithContext(ctx, url)
-		if r.retryAfter.Wait > delay {
-			delay = r.retryAfter.Wait
+		if backoffDelay := request.backoff.CalculateBackoffWithContext(ctx, url); backoffDelay > delay {
+			delay = backoffDelay
+		}
+		// The jitter applies to the backoff delay too when it is larger, since
+		// clients at the same backoff maximum retry together as well. The sleep
+		// can exceed that maximum by up to retryAfterJitterFactor.
+		if request.retryAfterJitterFn != nil {
+			delay = request.retryAfterJitterFn(delay)
 		}
 		request.backoff.SleepWithContext(ctx, delay)
 	}
@@ -231,7 +246,8 @@ func (r *withRetry) Before(ctx context.Context, request *Request) error {
 		return err
 	}
 
-	klog.FromContext(ctx).V(4).Info("Got a Retry-After response", "delay", r.retryAfter.Wait, "attempt", r.retryAfter.Attempt, "url", request.URL())
+	klog.FromContext(ctx).V(4).Info("Got a Retry-After response",
+		"retryAfter", r.retryAfter.Wait, "delay", delay, "attempt", r.retryAfter.Attempt, "url", request.URL())
 	return nil
 }
 
