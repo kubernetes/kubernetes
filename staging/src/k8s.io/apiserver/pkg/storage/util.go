@@ -113,3 +113,13 @@ func HasInitialEventsEndBookmarkAnnotation(obj runtime.Object) (bool, error) {
 	objAnnotations := objMeta.GetAnnotations()
 	return objAnnotations[metav1.InitialEventsAnnotationKey] == "true", nil
 }
+
+func SetObjectIdentity(obj runtime.Object, versioner Versioner, name, namespace string, resourceVersion uint64) error {
+	accessor, err := meta.Accessor(obj)
+	if err != nil {
+		return err
+	}
+	accessor.SetName(name)
+	accessor.SetNamespace(namespace)
+	return versioner.UpdateObject(obj, resourceVersion)
+}

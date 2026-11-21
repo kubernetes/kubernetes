@@ -189,6 +189,7 @@ func (c *Checker) calculateStoreDigest(ctx context.Context, store getLister, res
 		Recursive:       true,
 		Predicate:       storage.Everything,
 		ResourceVersion: resourceVersion,
+		KeysOnly:        true,
 	}
 	opts.Predicate.Limit = limit
 	if resourceVersion == "0" {

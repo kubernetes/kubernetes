@@ -38,6 +38,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/apitesting"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -1122,6 +1123,7 @@ func withDefaults(options *setupOptions) {
 	options.codec = apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)
 	options.newFunc = newPod
 	options.newListFunc = newPodList
+	options.reverseKeyFunc = storagetesting.PodReverseKeyFunc("/pods/", true)
 	options.prefix = ""
 	options.resourcePrefix = "/pods/"
 	options.groupResource = schema.GroupResource{Resource: "pods"}
@@ -1556,4 +1558,41 @@ func TestCorrectness(t *testing.T) {
 		pod := obj.(*example.Pod)
 		return computePodKey(pod), nil
 	}, compactStorage(store, client.Client))
+}
+
+func TestGetListKeysOnly(t *testing.T) {
+	t.Run("missingReverseKeyFunc", func(t *testing.T) {
+		ctx, store, _ := testSetup(t, withReverseKeyFunc(nil))
+		err := store.GetList(ctx, "/pods/", storage.ListOptions{Recursive: true, Predicate: storage.Everything, KeysOnly: true}, &example.PodList{})
+		require.True(t, apierrors.IsInternalError(err), "expected internal error, got: %v", err)
+		require.ErrorContains(t, err, "keysOnly requires a reverseKeyFunc")
+	})
+	for _, rangeStream := range []bool{true, false} {
+		t.Run(fmt.Sprintf("rangeStream=%v", rangeStream), func(t *testing.T) {
+			resetFeatureSupportCheckerDuringTest(t)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EtcdRangeStream, rangeStream)
+			ctx, store, c := testSetup(t, withPrefix("/registry"), withResourcePrefix("/pods/"))
+
+			out := &example.Pod{}
+			require.NoError(t, store.Create(ctx, "/pods/ns1/pod1", &example.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "ns1", Name: "pod1"}}, out, 0))
+			// Raw corrupt value verifies that KeysOnly does not fetch or decode values.
+			putResp, err := c.KV.Put(ctx, "/registry/pods/ns2/pod2", "corrupt")
+			require.NoError(t, err)
+			kvRecorder := c.KV.(*storagetesting.KVRecorder)
+			kvRecorder.GetStreamReadsAndReset()
+
+			list := &example.PodList{}
+			require.NoError(t, store.GetList(ctx, "/pods/", storage.ListOptions{Recursive: true, Predicate: storage.Everything, KeysOnly: true}, list))
+			want := []example.Pod{
+				{ObjectMeta: metav1.ObjectMeta{Namespace: "ns1", Name: "pod1", ResourceVersion: out.ResourceVersion}},
+				{ObjectMeta: metav1.ObjectMeta{Namespace: "ns2", Name: "pod2", ResourceVersion: fmt.Sprintf("%d", putResp.Header.Revision)}},
+			}
+			if diff := cmp.Diff(want, list.Items); diff != "" {
+				t.Errorf("PodList diff (-want +got):\n%s", diff)
+			}
+			if rangeStream && kvRecorder.GetStreamReadsAndReset() == 0 {
+				t.Errorf("expected RangeStream read when rangeStream=true")
+			}
+		})
+	}
 }
