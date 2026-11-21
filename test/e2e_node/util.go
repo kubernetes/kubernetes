@@ -37,6 +37,7 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -57,6 +58,7 @@ import (
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/apis/podresources"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/util"
 
@@ -246,6 +248,31 @@ func getLocalNode(ctx context.Context, f *framework.Framework) *v1.Node {
 	framework.ExpectNoError(err)
 	gomega.Expect(nodeList.Items).Should(gomega.HaveLen(1), "Unexpected number of node objects for node e2e. Expects only one node.")
 	return &nodeList.Items[0]
+}
+
+// expectPodRejectedForMissingFeature creates a pod that requires a node
+// declared feature that the local node does not declare, and expects the pod
+// to be rejected. Pods in node e2e are created with spec.nodeName set: the
+// kube-apiserver rejects such a pod once it has observed the declared
+// features of the node, and the kubelet rejects it otherwise. It returns the
+// pod that the kubelet rejected, or nil when the kube-apiserver rejected it.
+func expectPodRejectedForMissingFeature(ctx context.Context, f *framework.Framework, podClient *e2epod.PodClient, pod *v1.Pod, featureName string) *v1.Pod {
+	ginkgo.GinkgoHelper()
+
+	created, err := podClient.TryCreate(ctx, pod)
+	if apierrors.IsForbidden(err) {
+		gomega.Expect(err.Error()).To(gomega.ContainSubstring(featureName), "the kube-apiserver must name the missing feature")
+		return nil
+	}
+	framework.ExpectNoError(err)
+
+	err = e2epod.WaitForPodFailedReason(ctx, f.ClientSet, created, lifecycle.PodFeatureUnsupported, framework.PodStartShortTimeout)
+	framework.ExpectNoError(err, "expected the pod to be rejected with reason %s", lifecycle.PodFeatureUnsupported)
+
+	created, err = podClient.Get(ctx, created.Name, metav1.GetOptions{})
+	framework.ExpectNoError(err)
+	gomega.Expect(created.Status.Message).To(gomega.ContainSubstring(featureName), "the kubelet must name the missing feature")
+	return created
 }
 
 // getLocalTestNode fetches the node object describing the local worker node set up by the e2e_node infra, alongside with its ready state.
