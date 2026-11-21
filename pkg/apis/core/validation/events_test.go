@@ -24,6 +24,7 @@ import (
 	eventsv1 "k8s.io/api/events/v1"
 	eventsv1beta1 "k8s.io/api/events/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/apis/core"
 )
 
@@ -1310,6 +1311,31 @@ func TestValidateEventUpdateForNewV1Events(t *testing.T) {
 		if e, a := item.valid, len(updateErrs) == 0; e != a {
 			t.Errorf("%v: expected %v, got %v: %v", item.msg, e, a, updateErrs)
 		}
+	}
+}
+
+func TestValidateEventUpdateReasonImmutableReportedOnce(t *testing.T) {
+	someTime := metav1.MicroTime{Time: time.Unix(1505828956, 0)}
+	newEvent := func(reason string) *core.Event {
+		return &core.Event{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:            "test",
+				Namespace:       metav1.NamespaceSystem,
+				ResourceVersion: "1",
+			},
+			InvolvedObject:      core.ObjectReference{APIVersion: "v1", Kind: "Node"},
+			EventTime:           someTime,
+			ReportingController: "k8s.io/my-controller",
+			ReportingInstance:   "node-xyz",
+			Action:              "Do",
+			Reason:              reason,
+			Type:                "Normal",
+		}
+	}
+
+	errs := ValidateEventUpdate(newEvent("Yeees-new"), newEvent("Yeees"), eventsv1.SchemeGroupVersion)
+	if len(errs) != 1 || errs[0].Type != field.ErrorTypeInvalid || errs[0].Field != "reason" {
+		t.Errorf("expected exactly one error for reason, got %d: %v", len(errs), errs)
 	}
 }
 
