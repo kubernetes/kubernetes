@@ -582,6 +582,13 @@ func testAggregatedAPIServer(t *testing.T, setWardleFeatureGate, banFlunder bool
 }
 
 func TestAggregatedAPIServerRejectRedirectResponse(t *testing.T) {
+	const (
+		availabilityGroup          = "availability.redirect.example.com"
+		availabilityVersion        = "v1alpha1"
+		availabilityAPIServiceName = availabilityVersion + "." + availabilityGroup
+		availabilityDiscoveryPath  = "/apis/" + availabilityGroup + "/" + availabilityVersion
+	)
+
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	t.Cleanup(cancel)
 
@@ -595,7 +602,7 @@ func TestAggregatedAPIServerRejectRedirectResponse(t *testing.T) {
 
 	redirectedURL := backendServer.URL
 	redirectServer := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if strings.HasSuffix(r.URL.Path, "tryRedirect") {
+		if strings.HasSuffix(r.URL.Path, "tryRedirect") || r.URL.Path == availabilityDiscoveryPath {
 			http.Redirect(w, r, redirectedURL+"/redirectTarget", http.StatusMovedPermanently)
 		} else {
 			w.WriteHeader(http.StatusOK)
@@ -692,6 +699,48 @@ func TestAggregatedAPIServerRejectRedirectResponse(t *testing.T) {
 		t.Errorf("expect server to reject redirect response, but forwarded")
 	} else if !strings.Contains(string(bytes), expectedMsg) {
 		t.Errorf("expect response contains %s, got %s", expectedMsg, string(bytes))
+	}
+
+	// Use a separate APIService so the discovery redirect does not make the
+	// APIService used by the proxy redirect check above unavailable.
+	_, err = aggregatorClient.ApiregistrationV1().APIServices().Create(ctx, &apiregistrationv1.APIService{
+		ObjectMeta: metav1.ObjectMeta{Name: availabilityAPIServiceName},
+		Spec: apiregistrationv1.APIServiceSpec{
+			Service: &apiregistrationv1.ServiceReference{
+				Namespace: "kube-redirect",
+				Name:      "api",
+			},
+			Group:                 availabilityGroup,
+			Version:               availabilityVersion,
+			GroupPriorityMinimum:  200,
+			VersionPriority:       200,
+			InsecureSkipTLSVerify: true,
+		},
+	}, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var lastConditions []apiregistrationv1.APIServiceCondition
+	err = wait.PollUntilContextTimeout(ctx, time.Second, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
+		apiService, err := aggregatorClient.ApiregistrationV1().APIServices().Get(ctx, availabilityAPIServiceName, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		lastConditions = apiService.Status.Conditions
+		for _, condition := range lastConditions {
+			if condition.Type == apiregistrationv1.Available {
+				// An unrelated discovery failure must not satisfy the redirect check.
+				return condition.Status == apiregistrationv1.ConditionFalse &&
+					condition.Reason == "FailedDiscoveryCheck" &&
+					strings.Contains(condition.Message, "bad status from ") &&
+					strings.HasSuffix(condition.Message, fmt.Sprintf(": %d", http.StatusMovedPermanently)), nil
+			}
+		}
+		return false, nil
+	})
+	if err != nil {
+		t.Fatalf("APIService %q did not report a rejected discovery redirect: %v; last conditions: %+v", availabilityAPIServiceName, err, lastConditions)
 	}
 }
 
