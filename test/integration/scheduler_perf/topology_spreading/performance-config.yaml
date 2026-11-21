@@ -147,8 +147,6 @@
       measurePods: 50000
 
 - name: SchedulingWithNodeInclusionPolicy
-  featureGates:
-    NodeInclusionPolicyInPodTopologySpread: true
   defaultPodTemplatePath: ../templates/pod-with-node-inclusion-policy.yaml
   workloadTemplate:
   - opcode: createNodes
