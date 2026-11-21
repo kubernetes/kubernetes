@@ -17,6 +17,7 @@ limitations under the License.
 package credentialprovider
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -40,7 +41,7 @@ import (
 //     most specific match for a given image
 //   - iterating a map does not yield predictable results
 type DockerKeyring interface {
-	Lookup(image string) ([]TrackedAuthConfig, bool)
+	Lookup(ctx context.Context, image string) ([]TrackedAuthConfig, bool)
 }
 
 // BasicDockerKeyring is a trivial map-backed implementation of DockerKeyring
@@ -291,7 +292,7 @@ func URLsMatch(globURL *url.URL, targetURL *url.URL) (bool, error) {
 // Lookup implements the DockerKeyring method for fetching credentials based on image name.
 // Multiple credentials may be returned if there are multiple potentially valid credentials
 // available.  This allows for rotation.
-func (dk *BasicDockerKeyring) Lookup(image string) ([]TrackedAuthConfig, bool) {
+func (dk *BasicDockerKeyring) Lookup(ctx context.Context, image string) ([]TrackedAuthConfig, bool) {
 	// range over the index as iterating over a map does not provide a predictable ordering
 	ret := []TrackedAuthConfig{}
 	for _, k := range dk.index {
@@ -318,14 +319,14 @@ func (dk *BasicDockerKeyring) Lookup(image string) ([]TrackedAuthConfig, bool) {
 
 // Lookup implements the DockerKeyring method for fetching credentials
 // based on image name.
-func (dk *providersDockerKeyring) Lookup(image string) ([]TrackedAuthConfig, bool) {
+func (dk *providersDockerKeyring) Lookup(ctx context.Context, image string) ([]TrackedAuthConfig, bool) {
 	keyring := &BasicDockerKeyring{}
 
 	for _, p := range dk.Providers {
 		keyring.Add(nil, p.Provide(image))
 	}
 
-	return keyring.Lookup(image)
+	return keyring.Lookup(ctx, image)
 }
 
 // FakeKeyring a fake config credentials
@@ -336,7 +337,7 @@ type FakeKeyring struct {
 
 // Lookup implements the DockerKeyring method for fetching credentials based on image name
 // return fake auth and ok
-func (f *FakeKeyring) Lookup(image string) ([]TrackedAuthConfig, bool) {
+func (f *FakeKeyring) Lookup(ctx context.Context, image string) ([]TrackedAuthConfig, bool) {
 	return f.auth, f.ok
 }
 
@@ -345,14 +346,14 @@ type UnionDockerKeyring []DockerKeyring
 
 // Lookup implements the DockerKeyring method for fetching credentials based on image name.
 // return each credentials
-func (k UnionDockerKeyring) Lookup(image string) ([]TrackedAuthConfig, bool) {
+func (k UnionDockerKeyring) Lookup(ctx context.Context, image string) ([]TrackedAuthConfig, bool) {
 	authConfigs := []TrackedAuthConfig{}
 	for _, subKeyring := range k {
 		if subKeyring == nil {
 			continue
 		}
 
-		currAuthResults, _ := subKeyring.Lookup(image)
+		currAuthResults, _ := subKeyring.Lookup(ctx, image)
 		authConfigs = append(authConfigs, currAuthResults...)
 	}
 
