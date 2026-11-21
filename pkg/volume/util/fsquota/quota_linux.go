@@ -230,11 +230,11 @@ func GetQuotaOnDir(m mount.Interface, path string) (common.QuotaID, error) {
 	return getApplier(path).GetQuotaOnDir(path)
 }
 
-func clearQuotaOnDir(m mount.Interface, path string, userNamespacesEnabled bool) error {
+func clearQuotaOnDir(m mount.Interface, path string) error {
 	// Since we may be called without path being in the map,
 	// we explicitly have to check in this case.
 	klog.V(4).Infof("clearQuotaOnDir %s", path)
-	supportsQuotas, err := SupportsQuotas(m, path, userNamespacesEnabled)
+	supportsQuotas, err := supportsQuotasForPath(m, path)
 	if err != nil {
 		// Log-and-continue instead of returning an error for now
 		// due to unspecified backwards compatibility concerns (a subject to revise)
@@ -269,11 +269,7 @@ func clearQuotaOnDir(m mount.Interface, path string, userNamespacesEnabled bool)
 	return nil
 }
 
-// SupportsQuotas -- Does the path support quotas
-// Cache the applier for paths that support quotas.  For paths that don't,
-// don't cache the result because nothing will clean it up.
-// However, do cache the device->applier map; the number of devices
-// is bounded.
+// SupportsQuotas -- Should quotas be applied to the path
 // User namespaces prevent changes to project IDs on the filesystem,
 // ensuring xfs-quota metrics' reliability; hence, userNamespacesEnabled is checked.
 func SupportsQuotas(m mount.Interface, path string, userNamespacesEnabled bool) (bool, error) {
@@ -283,6 +279,21 @@ func SupportsQuotas(m mount.Interface, path string, userNamespacesEnabled bool) 
 	}
 	if !userNamespacesEnabled {
 		klog.V(3).Info("SupportQuotas called and LocalStorageCapacityIsolationFSQuotaMonitoring enabled, but pod is not in a user namespace")
+		return false, nil
+	}
+	return supportsQuotasForPath(m, path)
+}
+
+// supportsQuotasForPath -- Does the filesystem backing the path support quotas
+// Unlike SupportsQuotas this ignores whether the pod runs in a user namespace,
+// so it can be used from cleanup paths, which do not have the pod spec.
+// Cache the applier for paths that support quotas.  For paths that don't,
+// don't cache the result because nothing will clean it up.
+// However, do cache the device->applier map; the number of devices
+// is bounded.
+func supportsQuotasForPath(m mount.Interface, path string) (bool, error) {
+	if !enabledQuotasForMonitoring() {
+		klog.V(3).Info("supportsQuotasForPath called, but quotas disabled")
 		return false, nil
 	}
 	supportsQuotasLock.Lock()
@@ -421,7 +432,11 @@ func GetInodes(path string) (*resource.Quantity, error) {
 }
 
 // ClearQuota -- remove the quota assigned to a directory
-func ClearQuota(m mount.Interface, path string, userNamespacesEnabled bool) error {
+// This is called from teardown paths, which only know the pod UID and cannot
+// tell whether the pod ran in a user namespace, so the quota is always cleared
+// when the feature is enabled.  Skipping it would leak the project ID that was
+// assigned when the volume was set up.
+func ClearQuota(m mount.Interface, path string) error {
 	klog.V(3).Infof("ClearQuota %s", path)
 	if !enabledQuotasForMonitoring() {
 		return fmt.Errorf("clearQuota called, but quotas disabled")
@@ -437,7 +452,7 @@ func ClearQuota(m mount.Interface, path string, userNamespacesEnabled bool) erro
 		// be found, which needs to be cleaned up.
 		defer clearSupportsQuotas(path)
 		defer clearApplier(path)
-		return clearQuotaOnDir(m, path, userNamespacesEnabled)
+		return clearQuotaOnDir(m, path)
 	}
 	_, ok = podQuotaMap[poduid]
 	if !ok {
@@ -454,7 +469,7 @@ func ClearQuota(m mount.Interface, path string, userNamespacesEnabled bool) erro
 	}
 	count, ok := podDirCountMap[poduid]
 	if count <= 1 || !ok {
-		err = clearQuotaOnDir(m, path, userNamespacesEnabled)
+		err = clearQuotaOnDir(m, path)
 		// This error should be noted; we still need to clean up
 		// and otherwise handle in the same way.
 		if err != nil {
