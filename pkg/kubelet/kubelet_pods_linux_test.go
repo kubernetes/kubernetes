@@ -449,6 +449,47 @@ func TestMakeMounts(t *testing.T) {
 			expectErr:      true,
 			expectedErrMsg: "cannot find volume \"disk\" to mount into container \"\"",
 		},
+		"volume requires SELinux relabel": {
+			imageVolumeFeatureEnabled: []bool{true, false},
+			podVolumes: kubecontainer.VolumeMap{
+				"disk": kubecontainer.VolumeInfo{
+					Mounter: &stubVolume{
+						path: "/mnt/disk",
+						attributes: volume.Attributes{
+							Managed:        true,
+							SELinuxRelabel: true,
+						},
+					},
+				},
+			},
+			container: v1.Container{
+				VolumeMounts: []v1.VolumeMount{
+					{
+						MountPath: "/mnt/path",
+						Name:      "disk",
+						ReadOnly:  false,
+					},
+				},
+			},
+			expectedMounts: []kubecontainer.Mount{
+				{
+					Name:           "disk",
+					ContainerPath:  "/mnt/path",
+					HostPath:       "/mnt/disk",
+					ReadOnly:       false,
+					SELinuxRelabel: true,
+					Propagation:    runtimeapi.MountPropagation_PROPAGATION_PRIVATE,
+				},
+				{
+					Name:           "k8s-managed-etc-hosts",
+					ContainerPath:  "/etc/hosts",
+					HostPath:       "/pod/etc-hosts",
+					ReadOnly:       false,
+					SELinuxRelabel: true,
+					Propagation:    runtimeapi.MountPropagation_PROPAGATION_PRIVATE,
+				},
+			},
+		},
 	}
 
 	for name, tc := range testCases {
@@ -462,13 +503,14 @@ func TestMakeMounts(t *testing.T) {
 				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ImageVolume, featureEnabled)
 				fhu := hostutil.NewFakeHostUtil(nil)
 				fsp := &subpath.FakeSubpath{}
+				podDir := t.TempDir()
 				pod := v1.Pod{
 					Spec: v1.PodSpec{
 						HostNetwork: true,
 					},
 				}
 
-				mounts, _, err := makeMounts(logger, &pod, "/pod", &tc.container, "fakepodname", "", []string{""}, tc.podVolumes, fhu, fsp, nil, tc.supportsRRO, tc.imageVolumes)
+				mounts, _, err := makeMounts(logger, &pod, podDir, &tc.container, "fakepodname", "", []string{""}, tc.podVolumes, fhu, fsp, nil, tc.supportsRRO, tc.imageVolumes)
 
 				// validate only the error if we expect an error
 				if tc.expectErr {
@@ -483,7 +525,17 @@ func TestMakeMounts(t *testing.T) {
 					t.Fatal(err)
 				}
 
-				assert.Equal(t, tc.expectedMounts, mounts, "mounts of container %+v", tc.container)
+				expectedMounts := tc.expectedMounts
+				if expectedMounts != nil {
+					expectedMounts = append([]kubecontainer.Mount(nil), expectedMounts...)
+					for i := range expectedMounts {
+						if expectedMounts[i].Name == "k8s-managed-etc-hosts" {
+							expectedMounts[i].HostPath = getEtcHostsPath(podDir)
+						}
+					}
+				}
+
+				assert.Equal(t, expectedMounts, mounts, "mounts of container %+v", tc.container)
 			})
 		}
 	}
