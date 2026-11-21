@@ -39,10 +39,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
 	pkgfeatures "k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 )
 
 func activeTestPods() []*v1.Pod {
@@ -442,48 +444,236 @@ func TestQoSContainerCgroup(t *testing.T) {
 			m.setMemoryQoS(logger, qosConfigs)
 
 			assert.Equal(t, tc.expectedGuaranteed, qosConfigs[v1.PodQOSGuaranteed].ResourceParameters.Unified[Cgroup2MemoryMin])
+			assert.Equal(t, tc.expectedBurstable, qosConfigs[v1.PodQOSGuaranteed].ResourceParameters.Unified[Cgroup2MemoryLow])
 			assert.Equal(t, tc.expectedBurstable, qosConfigs[v1.PodQOSBurstable].ResourceParameters.Unified[Cgroup2MemoryLow])
+			assert.NotContains(t, qosConfigs[v1.PodQOSBurstable].ResourceParameters.Unified, Cgroup2MemoryMin)
+			assert.Empty(t, qosConfigs[v1.PodQOSBestEffort].ResourceParameters.Unified)
 		})
 	}
 }
 
-func TestQoSContainerCgroupWithMemoryReservationPolicyNone(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
-	fakeCM := &fakeCgroupManager{}
-	cgroupRoot := ParseCgroupfsToCgroupName("/")
-	cgroupRoot = NewCgroupName(cgroupRoot, defaultNodeAllocatableCgroupName)
-	m := &qosContainerManagerImpl{
-		cgroupManager:           fakeCM,
-		cgroupRoot:              cgroupRoot,
-		activePods:              activeTestPods,
-		memoryReservationPolicy: kubeletconfig.NoneMemoryReservationPolicy,
-		qosContainersInfo: QOSContainersInfo{
-			Guaranteed: cgroupRoot,
-			Burstable:  NewCgroupName(cgroupRoot, "burstable"),
-			BestEffort: NewCgroupName(cgroupRoot, "besteffort"),
-		},
+func TestQoSContainerManagerInitQOSCgroupsResetsMemoryProtection(t *testing.T) {
+	if !libcontainercgroups.IsCgroup2UnifiedMode() {
+		t.Skip("memory protection configuration requires cgroup v2")
 	}
 
-	// memoryReservationPolicy defaults to NoneMemoryReservationPolicy, so memory.min should be explicitly reset.
-	qosConfigs := map[v1.PodQOSClass]*CgroupConfig{
-		v1.PodQOSGuaranteed: {
-			Name:               m.qosContainersInfo.Guaranteed,
-			ResourceParameters: &ResourceConfig{},
+	for _, tc := range []struct {
+		name                        string
+		policy                      kubeletconfig.MemoryReservationPolicy
+		memoryQoS                   bool
+		nodeMemoryReservationPolicy bool
+		wantBurstableMin            string
+		wantBurstableLow            string
+		wantRootReset               bool
+	}{
+		{
+			name:             "none policy",
+			policy:           kubeletconfig.NoneMemoryReservationPolicy,
+			memoryQoS:        true,
+			wantBurstableMin: "0",
+			wantBurstableLow: "0",
+			wantRootReset:    true,
 		},
-		v1.PodQOSBurstable: {
-			Name:               m.qosContainersInfo.Burstable,
-			ResourceParameters: &ResourceConfig{},
+		{
+			name:             "MemoryQoS disabled",
+			policy:           kubeletconfig.TieredReservationMemoryReservationPolicy,
+			wantBurstableMin: "0",
+			wantBurstableLow: "0",
+			wantRootReset:    true,
 		},
-		v1.PodQOSBestEffort: {
-			Name:               m.qosContainersInfo.BestEffort,
-			ResourceParameters: &ResourceConfig{},
+		{
+			name:             "TieredReservation clears Burstable memory.min",
+			policy:           kubeletconfig.TieredReservationMemoryReservationPolicy,
+			memoryQoS:        true,
+			wantBurstableMin: "0",
 		},
+		{
+			name:                        "Soft does not reset startup cgroups",
+			policy:                      kubeletconfig.SoftMemoryReservationPolicy,
+			memoryQoS:                   true,
+			nodeMemoryReservationPolicy: true,
+		},
+		{
+			name:                        "Hard does not reset startup cgroups",
+			policy:                      kubeletconfig.HardMemoryReservationPolicy,
+			memoryQoS:                   true,
+			nodeMemoryReservationPolicy: true,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.MemoryQoS, tc.memoryQoS)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.NodeMemoryReservationPolicy, tc.nodeMemoryReservationPolicy)
+			fakeCM := &fakeCgroupManager{}
+			cgroupRoot := NewCgroupName(ParseCgroupfsToCgroupName("/"), defaultNodeAllocatableCgroupName)
+			m := &qosContainerManagerImpl{
+				cgroupManager:           fakeCM,
+				cgroupRoot:              cgroupRoot,
+				memoryReservationPolicy: tc.policy,
+			}
+
+			require.NoError(t, m.initQOSCgroups(logger))
+
+			burstableConfig := findCgroupConfig(fakeCM.snapshotCreated(), m.qosContainersInfo.Burstable)
+			require.NotNil(t, burstableConfig, "missing Burstable cgroup config")
+			assert.Equal(t, tc.wantBurstableMin, burstableConfig.ResourceParameters.Unified[Cgroup2MemoryMin])
+			assert.Equal(t, tc.wantBurstableLow, burstableConfig.ResourceParameters.Unified[Cgroup2MemoryLow])
+
+			// Guaranteed QoS uses the kubepods root cgroup.
+			rootConfig := findCgroupConfig(fakeCM.snapshotUpdates(), m.qosContainersInfo.Guaranteed)
+			if tc.wantRootReset {
+				require.NotNil(t, rootConfig, "missing root cgroup reset")
+				assert.Equal(t, "0", rootConfig.ResourceParameters.Unified[Cgroup2MemoryMin])
+				assert.Equal(t, "0", rootConfig.ResourceParameters.Unified[Cgroup2MemoryLow])
+			} else {
+				assert.Nil(t, rootConfig, "root cgroup should not be reset during startup")
+			}
+		})
+	}
+}
+
+func TestQoSContainerManagerUpdateCgroupsMemoryReservationPolicy(t *testing.T) {
+	if !libcontainercgroups.IsCgroup2UnifiedMode() {
+		t.Skip("memory protection configuration requires cgroup v2")
 	}
 
-	m.setMemoryQoS(logger, qosConfigs)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.MemoryQoS, true)
+	kubeletmetrics.Register()
 
-	assert.Equal(t, "0", qosConfigs[v1.PodQOSGuaranteed].ResourceParameters.Unified[Cgroup2MemoryMin])
-	assert.Equal(t, "0", qosConfigs[v1.PodQOSBurstable].ResourceParameters.Unified[Cgroup2MemoryLow])
+	const (
+		guaranteedRequests = int64(128 * 1024 * 1024)
+		burstableRequests  = int64(384 * 1024 * 1024)
+		allRequests        = guaranteedRequests + burstableRequests
+	)
+	for _, tc := range []struct {
+		name                      string
+		policy                    kubeletconfig.MemoryReservationPolicy
+		draNodeAllocatableEnabled bool
+		podOverhead               v1.ResourceList
+		rootMin                   string
+		rootLow                   string
+		burstMin                  string
+		burstLow                  string
+		metricMin                 float64
+		metricLow                 float64
+	}{
+		{name: "none", policy: kubeletconfig.NoneMemoryReservationPolicy},
+		{name: "soft", policy: kubeletconfig.SoftMemoryReservationPolicy, rootMin: "0", rootLow: strconv.FormatInt(allRequests, 10), burstMin: "0", burstLow: strconv.FormatInt(burstableRequests, 10), metricLow: float64(allRequests)},
+		{name: "hard", policy: kubeletconfig.HardMemoryReservationPolicy, rootMin: strconv.FormatInt(allRequests, 10), rootLow: "0", burstMin: strconv.FormatInt(burstableRequests, 10), burstLow: "0", metricMin: float64(allRequests)},
+		{
+			name:                      "soft-with-dra",
+			policy:                    kubeletconfig.SoftMemoryReservationPolicy,
+			draNodeAllocatableEnabled: true,
+			rootMin:                   "0",
+			rootLow:                   strconv.FormatInt(608*1024*1024, 10),
+			burstMin:                  "0",
+			burstLow:                  strconv.FormatInt(448*1024*1024, 10),
+			metricLow:                 608 * 1024 * 1024,
+		},
+		{
+			name:                      "hard-with-dra",
+			policy:                    kubeletconfig.HardMemoryReservationPolicy,
+			draNodeAllocatableEnabled: true,
+			rootMin:                   strconv.FormatInt(608*1024*1024, 10),
+			rootLow:                   "0",
+			burstMin:                  strconv.FormatInt(448*1024*1024, 10),
+			burstLow:                  "0",
+			metricMin:                 608 * 1024 * 1024,
+		},
+		{
+			name:        "soft-with-runtimeclass-overhead",
+			policy:      kubeletconfig.SoftMemoryReservationPolicy,
+			podOverhead: v1.ResourceList{v1.ResourceMemory: resource.MustParse("16Mi")},
+			rootMin:     "0",
+			rootLow:     strconv.FormatInt(560*1024*1024, 10),
+			burstMin:    "0",
+			burstLow:    strconv.FormatInt(416*1024*1024, 10),
+			metricLow:   560 * 1024 * 1024,
+		},
+		{
+			name:        "hard-with-runtimeclass-overhead",
+			policy:      kubeletconfig.HardMemoryReservationPolicy,
+			podOverhead: v1.ResourceList{v1.ResourceMemory: resource.MustParse("16Mi")},
+			rootMin:     strconv.FormatInt(560*1024*1024, 10),
+			rootLow:     "0",
+			burstMin:    strconv.FormatInt(416*1024*1024, 10),
+			burstLow:    "0",
+			metricMin:   560 * 1024 * 1024,
+		},
+		{
+			name:      "tiered",
+			policy:    kubeletconfig.TieredReservationMemoryReservationPolicy,
+			rootLow:   strconv.FormatInt(burstableRequests, 10),
+			burstLow:  strconv.FormatInt(burstableRequests, 10),
+			metricMin: float64(guaranteedRequests),
+			metricLow: float64(burstableRequests),
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.DRANodeAllocatableResources, tc.draNodeAllocatableEnabled)
+			// Keep DRA allocations in the fixtures to also verify they are ignored when the gate is disabled.
+			pods := activeTestPods()
+			pods[0].Status.ExtraNodeAllocatableResources = []v1.ExtraNodeAllocatableResource{{
+				Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("32Mi")},
+			}}
+			pods[1].Status.ExtraNodeAllocatableResources = []v1.ExtraNodeAllocatableResource{{
+				Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("64Mi")},
+			}}
+			for _, pod := range pods {
+				pod.Spec.Overhead = tc.podOverhead
+			}
+			logger, _ := ktesting.NewTestContext(t)
+			fakeCM := &fakeCgroupManager{}
+			cgroupRoot := NewCgroupName(ParseCgroupfsToCgroupName("/"), defaultNodeAllocatableCgroupName)
+			m := &qosContainerManagerImpl{
+				cgroupManager:           fakeCM,
+				cgroupRoot:              cgroupRoot,
+				activePods:              func() []*v1.Pod { return pods },
+				memoryReservationPolicy: tc.policy,
+				qosContainersInfo: QOSContainersInfo{
+					Guaranteed: cgroupRoot,
+					Burstable:  NewCgroupName(cgroupRoot, "burstable"),
+					BestEffort: NewCgroupName(cgroupRoot, "besteffort"),
+				},
+			}
+
+			kubeletmetrics.MemoryQoSNodeMemoryMinBytes.Set(0)
+			kubeletmetrics.MemoryQoSNodeMemoryLowBytes.Set(0)
+
+			require.NoError(t, m.UpdateCgroups(logger))
+
+			updates := fakeCM.snapshotUpdates()
+			// Guaranteed QoS uses the kubepods root cgroup, which also receives the aggregate metrics.
+			rootConfig := findCgroupConfig(updates, cgroupRoot)
+			require.NotNil(t, rootConfig, "missing root cgroup update")
+			burstConfig := findCgroupConfig(updates, m.qosContainersInfo.Burstable)
+			require.NotNil(t, burstConfig, "missing burstable cgroup update")
+			root := rootConfig.ResourceParameters.Unified
+			burst := burstConfig.ResourceParameters.Unified
+			if tc.policy != kubeletconfig.TieredReservationMemoryReservationPolicy {
+				assert.Equal(t, tc.rootMin, root[Cgroup2MemoryMin])
+			}
+			assert.Equal(t, tc.rootLow, root[Cgroup2MemoryLow])
+			assert.Equal(t, tc.burstMin, burst[Cgroup2MemoryMin])
+			assert.Equal(t, tc.burstLow, burst[Cgroup2MemoryLow])
+
+			metricMin, err := testutil.GetGaugeMetricValue(kubeletmetrics.MemoryQoSNodeMemoryMinBytes)
+			require.NoError(t, err)
+			metricLow, err := testutil.GetGaugeMetricValue(kubeletmetrics.MemoryQoSNodeMemoryLowBytes)
+			require.NoError(t, err)
+			assert.InDelta(t, tc.metricMin, metricMin, 0)
+			assert.InDelta(t, tc.metricLow, metricLow, 0)
+		})
+	}
+}
+
+func findCgroupConfig(configs []*CgroupConfig, name CgroupName) *CgroupConfig {
+	for _, config := range configs {
+		if config.Name.ToCgroupfs() == name.ToCgroupfs() {
+			return config
+		}
+	}
+	return nil
 }
 
 // fakeCgroupManager is used because Start() requires a functional
@@ -516,6 +706,18 @@ func (f *fakeCgroupManager) Create(_ klog.Logger, config *CgroupConfig) error {
 	copiedConfig := *config
 	f.created = append(f.created, &copiedConfig)
 	return nil
+}
+
+func (f *fakeCgroupManager) snapshotCreated() []*CgroupConfig {
+	f.mutex.Lock()
+	defer f.mutex.Unlock()
+	return append([]*CgroupConfig(nil), f.created...)
+}
+
+func (f *fakeCgroupManager) snapshotUpdates() []*CgroupConfig {
+	f.mutex.Lock()
+	defer f.mutex.Unlock()
+	return append([]*CgroupConfig(nil), f.updates...)
 }
 
 func (f *fakeCgroupManager) Destroy(_ klog.Logger, _ *CgroupConfig) error { return nil }

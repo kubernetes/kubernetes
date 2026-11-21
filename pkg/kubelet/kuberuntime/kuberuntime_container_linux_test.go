@@ -555,7 +555,6 @@ func TestGenerateContainerConfigWithMemoryQoSEnforced(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	_, _, m, err := createTestRuntimeManager(tCtx)
 	assert.NoError(t, err)
-	m.memoryReservationPolicy = kubeletconfiginternal.TieredReservationMemoryReservationPolicy
 	m.memoryThrottlingFactor = new(float64(0.9))
 
 	pageSize := int64(os.Getpagesize())
@@ -750,7 +749,12 @@ func TestGenerateContainerConfigWithMemoryQoSEnforced(t *testing.T) {
 		},
 	}
 
+	// BestEffort with 64Mi per-container DRA overhead.
+	pod10 := pod9.DeepCopy()
+	pod10.Spec.Containers[0].Resources = v1.ResourceRequirements{}
+
 	type expectedResult struct {
+		memoryMin  int64 // set to -1 if skipped for the pod
 		memoryLow  int64 // set to -1 if skipped for the pod
 		memoryHigh int64 // set to -1 if skipped for the pod
 	}
@@ -758,14 +762,17 @@ func TestGenerateContainerConfigWithMemoryQoSEnforced(t *testing.T) {
 	tests := []struct {
 		name               string
 		pod                *v1.Pod
+		policy             kubeletconfiginternal.MemoryReservationPolicy
 		draNodeAllocatable bool
 		expected           *expectedResult
 	}{
 		{
 			name:               "Burstable pod (128Mi requests, 256Mi limits) - set memory.high based on limits",
 			pod:                pod1,
+			policy:             kubeletconfiginternal.TieredReservationMemoryReservationPolicy,
 			draNodeAllocatable: false,
 			expected: &expectedResult{
+				memoryMin:  -1,
 				memoryLow:  128 * 1024 * 1024,
 				memoryHigh: calculateMemoryHigh(128*1024*1024, 256*1024*1024),
 			},
@@ -773,8 +780,10 @@ func TestGenerateContainerConfigWithMemoryQoSEnforced(t *testing.T) {
 		{
 			name:               "Burstable pod (128Mi requests, no limits) - set memory.high based on node capacity",
 			pod:                pod2,
+			policy:             kubeletconfiginternal.TieredReservationMemoryReservationPolicy,
 			draNodeAllocatable: false,
 			expected: &expectedResult{
+				memoryMin:  -1,
 				memoryLow:  128 * 1024 * 1024,
 				memoryHigh: calculateMemoryHigh(128*1024*1024, memoryNodeAllocatable.Value()),
 			},
@@ -782,8 +791,10 @@ func TestGenerateContainerConfigWithMemoryQoSEnforced(t *testing.T) {
 		{
 			name:               "BestEffort pod - set memory.high based on node capacity",
 			pod:                pod3,
+			policy:             kubeletconfiginternal.TieredReservationMemoryReservationPolicy,
 			draNodeAllocatable: false,
 			expected: &expectedResult{
+				memoryMin:  0,
 				memoryLow:  0,
 				memoryHigh: calculateMemoryHigh(0, memoryNodeAllocatable.Value()),
 			},
@@ -791,8 +802,10 @@ func TestGenerateContainerConfigWithMemoryQoSEnforced(t *testing.T) {
 		{
 			name:               "Guaranteed pod (256Mi requests, 256Mi limits) - skip setting memory.high",
 			pod:                pod4,
+			policy:             kubeletconfiginternal.TieredReservationMemoryReservationPolicy,
 			draNodeAllocatable: false,
 			expected: &expectedResult{
+				memoryMin:  256 * 1024 * 1024,
 				memoryLow:  -1, // -1 is used to indicate that the setting is omitted
 				memoryHigh: -1, // -1 is used to indicate that the setting is omitted
 			},
@@ -800,8 +813,10 @@ func TestGenerateContainerConfigWithMemoryQoSEnforced(t *testing.T) {
 		{
 			name:               "Burstable pod with DRA (128Mi requests, 256Mi limits + 256Mi DRA) - set memory.high based on DRA-inflated limits",
 			pod:                pod5,
+			policy:             kubeletconfiginternal.TieredReservationMemoryReservationPolicy,
 			draNodeAllocatable: true,
 			expected: &expectedResult{
+				memoryMin:  -1,
 				memoryLow:  128 * 1024 * 1024,
 				memoryHigh: calculateMemoryHigh(128*1024*1024, 512*1024*1024),
 			},
@@ -809,8 +824,10 @@ func TestGenerateContainerConfigWithMemoryQoSEnforced(t *testing.T) {
 		{
 			name:               "BestEffort pod with DRA (no requests, no limits + 256Mi DRA) - set memory.high based on node capacity",
 			pod:                pod6,
+			policy:             kubeletconfiginternal.TieredReservationMemoryReservationPolicy,
 			draNodeAllocatable: true,
 			expected: &expectedResult{
+				memoryMin:  0,
 				memoryLow:  0,
 				memoryHigh: calculateMemoryHigh(0, memoryNodeAllocatable.Value()),
 			},
@@ -818,8 +835,10 @@ func TestGenerateContainerConfigWithMemoryQoSEnforced(t *testing.T) {
 		{
 			name:               "Guaranteed pod with DRA (256Mi requests, 256Mi limits + 256Mi DRA) - skip setting memory.high",
 			pod:                pod7,
+			policy:             kubeletconfiginternal.TieredReservationMemoryReservationPolicy,
 			draNodeAllocatable: true,
 			expected: &expectedResult{
+				memoryMin:  256 * 1024 * 1024,
 				memoryLow:  -1, // -1 is used to indicate that the setting is omitted
 				memoryHigh: -1, // -1 is used to indicate that the setting is omitted
 			},
@@ -827,8 +846,10 @@ func TestGenerateContainerConfigWithMemoryQoSEnforced(t *testing.T) {
 		{
 			name:               "Burstable pod with DRA (128Mi requests, no limits + 256Mi DRA) - set memory.high based on node capacity",
 			pod:                pod8,
+			policy:             kubeletconfiginternal.TieredReservationMemoryReservationPolicy,
 			draNodeAllocatable: true,
 			expected: &expectedResult{
+				memoryMin:  -1,
 				memoryLow:  128 * 1024 * 1024,
 				memoryHigh: calculateMemoryHigh(128*1024*1024, memoryNodeAllocatable.Value()),
 			},
@@ -836,20 +857,103 @@ func TestGenerateContainerConfigWithMemoryQoSEnforced(t *testing.T) {
 		{
 			name:               "Burstable pod with DRA (128Mi requests + 64Mi DRA, 256Mi limits + 256Mi DRA) - set memory.low and memory.high based on DRA-inflated requests and limits",
 			pod:                pod9,
+			policy:             kubeletconfiginternal.TieredReservationMemoryReservationPolicy,
 			draNodeAllocatable: true,
 			expected: &expectedResult{
+				memoryMin:  -1,
 				memoryLow:  192 * 1024 * 1024,
 				memoryHigh: calculateMemoryHigh(192*1024*1024, 512*1024*1024),
+			},
+		},
+		{
+			name:   "Burstable pod with soft reservation",
+			pod:    pod1,
+			policy: kubeletconfiginternal.SoftMemoryReservationPolicy,
+			expected: &expectedResult{
+				memoryMin:  -1,
+				memoryLow:  128 * 1024 * 1024,
+				memoryHigh: calculateMemoryHigh(128*1024*1024, 256*1024*1024),
+			},
+		},
+		{
+			name:   "Guaranteed pod with soft reservation",
+			pod:    pod4,
+			policy: kubeletconfiginternal.SoftMemoryReservationPolicy,
+			expected: &expectedResult{
+				memoryMin:  -1,
+				memoryLow:  256 * 1024 * 1024,
+				memoryHigh: -1,
+			},
+		},
+		{
+			name:   "Burstable pod with hard reservation",
+			pod:    pod1,
+			policy: kubeletconfiginternal.HardMemoryReservationPolicy,
+			expected: &expectedResult{
+				memoryMin:  128 * 1024 * 1024,
+				memoryLow:  -1,
+				memoryHigh: calculateMemoryHigh(128*1024*1024, 256*1024*1024),
+			},
+		},
+		{
+			name:   "Guaranteed pod with hard reservation",
+			pod:    pod4,
+			policy: kubeletconfiginternal.HardMemoryReservationPolicy,
+			expected: &expectedResult{
+				memoryMin:  256 * 1024 * 1024,
+				memoryLow:  -1,
+				memoryHigh: -1,
+			},
+		},
+		{
+			name:               "BestEffort pod with DRA requests and soft reservation",
+			pod:                pod10,
+			policy:             kubeletconfiginternal.SoftMemoryReservationPolicy,
+			draNodeAllocatable: true,
+			expected: &expectedResult{
+				memoryMin:  0,
+				memoryLow:  0,
+				memoryHigh: calculateMemoryHigh(64*1024*1024, memoryNodeAllocatable.Value()),
+			},
+		},
+		{
+			name:               "BestEffort pod with DRA requests and hard reservation",
+			pod:                pod10,
+			policy:             kubeletconfiginternal.HardMemoryReservationPolicy,
+			draNodeAllocatable: true,
+			expected: &expectedResult{
+				memoryMin:  0,
+				memoryLow:  0,
+				memoryHigh: calculateMemoryHigh(64*1024*1024, memoryNodeAllocatable.Value()),
+			},
+		},
+		{
+			name:               "BestEffort pod with DRA requests preserves tiered reservation behavior",
+			pod:                pod10,
+			policy:             kubeletconfiginternal.TieredReservationMemoryReservationPolicy,
+			draNodeAllocatable: true,
+			expected: &expectedResult{
+				memoryMin:  -1,
+				memoryLow:  64 * 1024 * 1024,
+				memoryHigh: calculateMemoryHigh(64*1024*1024, memoryNodeAllocatable.Value()),
 			},
 		},
 	}
 
 	for _, test := range tests {
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRANodeAllocatableResources, test.draNodeAllocatable)
+		m.memoryReservationPolicy = test.policy
 		linuxConfig, err := m.generateLinuxContainerConfig(tCtx, &test.pod.Spec.Containers[0], test.pod, new(int64), "", nil, true)
 		assert.NoError(t, err)
 
 		unified := linuxConfig.GetResources().GetUnified()
+
+		if test.expected.memoryMin == -1 {
+			_, exists := unified["memory.min"]
+			assert.False(t, exists, test.name)
+		} else {
+			assert.Equal(t, strconv.FormatInt(test.expected.memoryMin, 10), unified["memory.min"], test.name)
+		}
 
 		if test.expected.memoryLow == -1 {
 			_, exists := unified["memory.low"]

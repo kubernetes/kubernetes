@@ -313,17 +313,24 @@ func ResourceConfigForPod(allocatedPod *v1.Pod, enforceCPULimits bool, cpuPeriod
 	}
 	result.HugePageLimit = hugePageLimits
 
-	if enforceMemoryQoS && memoryReservationPolicy == kubeletconfig.TieredReservationMemoryReservationPolicy {
+	if enforceMemoryQoS && memoryReservationPolicy.EnforcesMemoryProtection() {
 		memoryRequest := int64(0)
 		if request, found := reqs[v1.ResourceMemory]; found {
 			memoryRequest = request.Value()
 		}
-		if memoryRequest > 0 {
-			// Guaranteed pods get memory.min (hard protection, kernel never reclaims).
-			// Burstable pods get memory.low (soft protection, kernel prefers not to reclaim).
+		// RuntimeClass overhead or DRA allocations can make requests positive even for BestEffort pods.
+		// Preserve the existing TieredReservation behavior for compatibility.
+		if memoryRequest > 0 && (qosClass != v1.PodQOSBestEffort ||
+			memoryReservationPolicy == kubeletconfig.TieredReservationMemoryReservationPolicy) {
+			// TieredReservation uses memory.min for Guaranteed pods and memory.low for Burstable pods.
 			cgroupKey := Cgroup2MemoryLow
-			if qosClass == v1.PodQOSGuaranteed {
+			switch memoryReservationPolicy {
+			case kubeletconfig.HardMemoryReservationPolicy:
 				cgroupKey = Cgroup2MemoryMin
+			case kubeletconfig.TieredReservationMemoryReservationPolicy:
+				if qosClass == v1.PodQOSGuaranteed {
+					cgroupKey = Cgroup2MemoryMin
+				}
 			}
 			result.Unified = map[string]string{
 				cgroupKey: strconv.FormatInt(memoryRequest, 10),
