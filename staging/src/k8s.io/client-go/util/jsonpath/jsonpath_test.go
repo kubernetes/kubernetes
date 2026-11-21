@@ -407,8 +407,22 @@ func TestEmptyRange(t *testing.T) {
 	tests := []jsonpathTest{
 		{"empty range", `{range .items[*]}{.metadata.name}{end}`, &emptyList, "", false},
 		{"empty nested range", `{range .items[*]}{.metadata.name}{":"}{range @.spec.containers[*]}{.name}{","}{end}{"+"}{end}`, &emptyList, "", false},
+		{"empty range with array index", `{range .items[*]}{[0]}{end}`, &emptyList, "", false},
+		{"empty range with trailing text", `{range .items[*]}{[0]}{"\n"}{end}{"done"}`, &emptyList, "done", false},
 	}
 	testJSONPath(tests, true, t)
+	testJSONPath(tests, false, t)
+
+	input = []byte(`{"items":[{"metadata":{"name":"pod1"},"spec":{"containers":[]}},{"metadata":{"name":"pod2"},"spec":{"containers":[{"command":["sh"]}]}}]}`)
+	var podList interface{}
+	if err := json.Unmarshal(input, &podList); err != nil {
+		t.Fatal(err)
+	}
+	nestedTests := []jsonpathTest{
+		{"empty inner range", `{range .items[*]}{.metadata.name}{":"}{range .spec.containers[*]}{.command[0]}{","}{end}{"\n"}{end}`, &podList, "pod1:\npod2:sh,\n", false},
+	}
+	testJSONPath(nestedTests, true, t)
+	testJSONPath(nestedTests, false, t)
 }
 
 func TestNestedRanges(t *testing.T) {

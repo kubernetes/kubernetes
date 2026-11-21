@@ -113,13 +113,8 @@ func (j *JSONPath) FindResults(data interface{}) ([][]reflect.Value, error) {
 					fullResult = append(fullResult, nextResults...)
 				}
 			} else {
-				// If the range has no results, we still need to process the nodes within the range
-				// so the position will advance to the end node
-				j.parser.Root.Nodes = nodes[i+1:]
-				_, err := j.FindResults(nil)
-				if err != nil {
-					return nil, err
-				}
+				// The body has nothing to evaluate against, so skip it instead of walking it.
+				j.lastEndNode = findRangeEnd(nodes[i+1:])
 			}
 			j.inRange--
 
@@ -135,6 +130,37 @@ func (j *JSONPath) FindResults(data interface{}) ([][]reflect.Value, error) {
 		fullResult = append(fullResult, results)
 	}
 	return fullResult, nil
+}
+
+// findRangeEnd returns the end node matching a range whose body starts at nodes[0].
+// An unterminated range runs to the last node.
+func findRangeEnd(nodes []Node) *Node {
+	depth := 0
+	for i := range nodes {
+		list, ok := nodes[i].(*ListNode)
+		if !ok {
+			continue
+		}
+		for _, node := range list.Nodes {
+			identifier, ok := node.(*IdentifierNode)
+			if !ok {
+				continue
+			}
+			switch identifier.Name {
+			case "range":
+				depth++
+			case "end":
+				if depth == 0 {
+					return &nodes[i]
+				}
+				depth--
+			}
+		}
+	}
+	if len(nodes) == 0 {
+		return nil
+	}
+	return &nodes[len(nodes)-1]
 }
 
 // EnableJSONOutput changes the PrintResults behavior to return a JSON array of results
