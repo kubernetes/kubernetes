@@ -93,6 +93,27 @@ func TestParseToLabelSelector(t *testing.T) {
 			selector:  "=bar",
 			expectErr: true,
 		},
+		{
+			// Conflicting equalities on the same key must not silently
+			// collapse into MatchLabels keeping only the last value:
+			// labels.Parse treats them as a contradiction (matches
+			// nothing), so keeping either value would widen the selector.
+			selector:  "tier=db,tier=web",
+			expectErr: true,
+		},
+		{
+			selector:  "tier=web,tier=db",
+			expectErr: true,
+		},
+		{
+			selector:  "tier=db,tier==web",
+			expectErr: true,
+		},
+		{
+			// A duplicate equality with the same value converts faithfully.
+			selector: "tier=db,tier=db",
+			out:      &LabelSelector{MatchLabels: map[string]string{"tier": "db"}, MatchExpressions: []LabelSelectorRequirement{}},
+		},
 	}
 
 	for _, tt := range tc {

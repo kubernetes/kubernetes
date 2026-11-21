@@ -126,6 +126,9 @@ func ParseToLabelSelector(selector string) (*LabelSelector, error) {
 			if !ok {
 				return nil, fmt.Errorf("equals operator has exactly one value but it cannot be retrieved")
 			}
+			if existingVal, exists := labelSelector.MatchLabels[req.Key()]; exists && existingVal != val {
+				return nil, fmt.Errorf("conflicting equality requirements for key %q: %q and %q", req.Key(), existingVal, val)
+			}
 			labelSelector.MatchLabels[req.Key()] = val
 			continue
 		case selection.In:
