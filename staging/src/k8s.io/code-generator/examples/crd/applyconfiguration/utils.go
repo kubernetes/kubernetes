@@ -44,6 +44,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &conflictingv1.TestTypeApplyConfiguration{}
 	case v1.SchemeGroupVersion.WithKind("TestTypeStatus"):
 		return &conflictingv1.TestTypeStatusApplyConfiguration{}
+	case v1.SchemeGroupVersion.WithKind("TestTypeWithShadowedField"):
+		return &conflictingv1.TestTypeWithShadowedFieldApplyConfiguration{}
 
 		// Group=example.crd.code-generator.k8s.io, Version=v1
 	case examplev1.SchemeGroupVersion.WithKind("ClusterTestType"):
