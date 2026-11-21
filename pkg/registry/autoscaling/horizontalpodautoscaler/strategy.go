@@ -228,6 +228,21 @@ func validationOptionsForHorizontalPodAutoscaler(newHPA, oldHPA *autoscaling.Hor
 // dropDisabledFields will drop any disabled fields that have not previously been
 // set on the old HPA. oldHPA is ignored if nil.
 func dropDisabledFields(newHPA, oldHPA *autoscaling.HorizontalPodAutoscaler) {
+	dropDisabledToleranceFields(newHPA, oldHPA)
+	dropDisabledSyncPeriodField(newHPA, oldHPA)
+}
+
+func dropDisabledSyncPeriodField(newHPA, oldHPA *autoscaling.HorizontalPodAutoscaler) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.HPAConfigurableSyncPeriod) {
+		return
+	}
+	if oldHPA != nil && oldHPA.Spec.SyncPeriodSeconds != nil {
+		return
+	}
+	newHPA.Spec.SyncPeriodSeconds = nil
+}
+
+func dropDisabledToleranceFields(newHPA, oldHPA *autoscaling.HorizontalPodAutoscaler) {
 	if utilfeature.DefaultFeatureGate.Enabled(features.HPAConfigurableTolerance) {
 		return
 	}

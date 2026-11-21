@@ -515,6 +515,11 @@ func (m *HorizontalPodAutoscalerSpec) MarshalToSizedBuffer(dAtA []byte) (int, er
 	_ = i
 	var l int
 	_ = l
+	if m.SyncPeriodSeconds != nil {
+		i = encodeVarintGenerated(dAtA, i, uint64(*m.SyncPeriodSeconds))
+		i--
+		dAtA[i] = 0x28
+	}
 	if m.TargetCPUUtilizationPercentage != nil {
 		i = encodeVarintGenerated(dAtA, i, uint64(*m.TargetCPUUtilizationPercentage))
 		i--
@@ -1387,6 +1392,9 @@ func (m *HorizontalPodAutoscalerSpec) Size() (n int) {
 	if m.TargetCPUUtilizationPercentage != nil {
 		n += 1 + sovGenerated(uint64(*m.TargetCPUUtilizationPercentage))
 	}
+	if m.SyncPeriodSeconds != nil {
+		n += 1 + sovGenerated(uint64(*m.SyncPeriodSeconds))
+	}
 	return n
 }
 
@@ -1746,6 +1754,7 @@ func (this *HorizontalPodAutoscalerSpec) String() string {
 		`MinReplicas:` + valueToStringGenerated(this.MinReplicas) + `,`,
 		`MaxReplicas:` + fmt.Sprintf("%v", this.MaxReplicas) + `,`,
 		`TargetCPUUtilizationPercentage:` + valueToStringGenerated(this.TargetCPUUtilizationPercentage) + `,`,
+		`SyncPeriodSeconds:` + valueToStringGenerated(this.SyncPeriodSeconds) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -3389,6 +3398,26 @@ func (m *HorizontalPodAutoscalerSpec) Unmarshal(dAtA []byte) error {
 				}
 			}
 			m.TargetCPUUtilizationPercentage = &v
+		case 5:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field SyncPeriodSeconds", wireType)
+			}
+			var v int32
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= int32(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.SyncPeriodSeconds = &v
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(dAtA[iNdEx:])
