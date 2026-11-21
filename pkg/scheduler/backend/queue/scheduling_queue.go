@@ -1047,6 +1047,10 @@ func (p *PriorityQueue) addPod(ctx context.Context, pod *v1.Pod) {
 	// Furthermore, this must be called before moveToActiveQ to prevent a potential data race,
 	// where an active scheduler loop could pop and process the pod before its nomination is recorded.
 	p.nominator.addNominatedPod(logger, pInfo.PodInfo, nil)
+	// Evict any leftover entry from a previous Pod with the same namespace/name that was
+	// deleted in flight and requeued before the replacement Pod arrived. moveToActiveQ
+	// does not clean up backoffQ, drop stale unschedulable metrics, or run for PodGroup members.
+	p.deletePod(pod)
 	if p.isPodGroupMember(pod) {
 		p.addPodGroupMember(logger, pInfo)
 		return
@@ -1066,6 +1070,9 @@ func (p *PriorityQueue) addPodGroupMember(logger klog.Logger, pInfo *framework.Q
 	if !hasRoot {
 		// If the PodGroup object cannot be fetched, the pod cannot be scheduled.
 		// It should be put into incompletePodGroupPods waiting for the pod group to be observed.
+		if oldPInfo := p.incompletePodGroupPods.delete(pInfo.Pod); oldPInfo != nil {
+			decreaseUnschedulableReasonMetric(oldPInfo)
+		}
 		p.incompletePodGroupPods.add(pInfo)
 		logger.V(5).Info("Pod with pod group added to incompletePodGroupPods, waiting for one or more parent pod group objects to be observed", "podGroup", pInfo.Pod.Spec.SchedulingGroup.PodGroupName, "pod", klog.KObj(pInfo))
 		return
@@ -1078,6 +1085,9 @@ func (p *PriorityQueue) addPodGroupMember(logger klog.Logger, pInfo *framework.Q
 	if p.activeQ.isLastPoppedEntity(rootInfoLookup) {
 		// If the last popped entity is the matching pod group, add the pod to the pending pod group pods,
 		// so it will be added to the pod group when it's requeued.
+		if oldPInfo := p.pendingPodGroupPods.delete(pInfo.Pod); oldPInfo != nil {
+			decreaseUnschedulableReasonMetric(oldPInfo)
+		}
 		p.pendingPodGroupPods.add(pInfo)
 		logger.V(5).Info("Pod added to pending pod group pods, waiting for its root group to be requeued", "rootType", rootInfoLookup.Type(), "root", klog.KObj(rootInfoLookup), "pod", klog.KObj(pInfo))
 		return
@@ -1118,6 +1128,14 @@ func (p *PriorityQueue) addToPodGroupIfExists(logger klog.Logger, pInfo *framewo
 		return false
 	}
 	rootInfo := entity.(*framework.QueuedPodGroupInfo)
+	if oldPInfo := rootInfo.RemovePod(pInfo.Pod); oldPInfo != nil {
+		decreaseUnschedulableReasonMetric(oldPInfo)
+		if !rootInfo.HasQueuedPodInfos() {
+			// Removing the stale Pod left the group empty; let addPodGroupMember create a
+			// fresh group in activeQ instead of inheriting the stale entry's queue state.
+			return false
+		}
+	}
 	rootInfo.AddPod(pInfo)
 	// Capture the root type and references before requeueing. Once the root is added to
 	// activeQ, it can be popped and processed before this goroutine logs the update.
