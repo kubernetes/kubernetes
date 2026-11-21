@@ -30,6 +30,7 @@
   workloadTemplate:
   - opcode: createNodes
     countParam: $nodesWithoutDRA
+    nodeTemplatePath: templates/node-without-dra-test-driver.yaml
   - opcode: createNodes
     nodeTemplatePath: ../templates/node-with-dra-test-driver.yaml
     countParam: $nodesWithDRA
@@ -176,6 +177,7 @@
   - opcode: createNodes
     nodeTemplatePath: ../templates/node-with-dra-test-driver.yaml
     countParam: $nodesWithDRA
+    nodeTemplatePath: templates/node-without-dra-test-driver.yaml
   - opcode: createAny
     templatePath: ../templates/resourceslice-partitionable-backtracking-countersets.yaml
     countParam: $nodesWithDRA

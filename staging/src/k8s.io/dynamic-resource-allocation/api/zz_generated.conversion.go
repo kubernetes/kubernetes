@@ -128,6 +128,11 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
+	if err := s.AddConversionFunc((*NodeSelector)(nil), (*corev1.NodeSelector)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_api_NodeSelector_To_v1_NodeSelector(a.(*NodeSelector), b.(*corev1.NodeSelector), scope)
+	}); err != nil {
+		return err
+	}
 	if err := s.AddConversionFunc((*ResourceSlice)(nil), (*v1.ResourceSlice)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_api_ResourceSlice_To_v1_ResourceSlice(a.(*ResourceSlice), b.(*v1.ResourceSlice), scope)
 	}); err != nil {
@@ -140,6 +145,11 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}
 	if err := s.AddConversionFunc((*string)(nil), (*UniqueString)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_string_To_api_UniqueString(a.(*string), b.(*UniqueString), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*corev1.NodeSelector)(nil), (*NodeSelector)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_NodeSelector_To_api_NodeSelector(a.(*corev1.NodeSelector), b.(*NodeSelector), scope)
 	}); err != nil {
 		return err
 	}
@@ -199,7 +209,15 @@ func autoConvert_api_Device_To_v1_Device(in *Device, out *v1.Device, s conversio
 		out.ConsumesCounters = nil
 	}
 	out.NodeName = (*string)(unsafe.Pointer(in.NodeName))
-	out.NodeSelector = (*corev1.NodeSelector)(unsafe.Pointer(in.NodeSelector))
+	if in.NodeSelector != nil {
+		in, out := &in.NodeSelector, &out.NodeSelector
+		*out = new(corev1.NodeSelector)
+		if err := Convert_api_NodeSelector_To_v1_NodeSelector(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.NodeSelector = nil
+	}
 	out.AllNodes = (*bool)(unsafe.Pointer(in.AllNodes))
 	out.Taints = *(*[]v1.DeviceTaint)(unsafe.Pointer(&in.Taints))
 	if err := metav1.Convert_bool_To_Pointer_bool(&in.BindsToNode, &out.BindsToNode, s); err != nil {
@@ -239,7 +257,15 @@ func autoConvert_v1_Device_To_api_Device(in *v1.Device, out *Device, s conversio
 		out.ConsumesCounters = nil
 	}
 	out.NodeName = (*string)(unsafe.Pointer(in.NodeName))
-	out.NodeSelector = (*corev1.NodeSelector)(unsafe.Pointer(in.NodeSelector))
+	if in.NodeSelector != nil {
+		in, out := &in.NodeSelector, &out.NodeSelector
+		*out = new(NodeSelector)
+		if err := Convert_v1_NodeSelector_To_api_NodeSelector(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.NodeSelector = nil
+	}
 	out.AllNodes = (*bool)(unsafe.Pointer(in.AllNodes))
 	out.Taints = *(*[]v1.DeviceTaint)(unsafe.Pointer(&in.Taints))
 	if err := metav1.Convert_Pointer_bool_To_bool(&in.BindsToNode, &out.BindsToNode, s); err != nil {
@@ -400,7 +426,15 @@ func autoConvert_api_ResourceSliceSpec_To_v1_ResourceSliceSpec(in *ResourceSlice
 		return err
 	}
 	out.NodeName = (*string)(unsafe.Pointer(in.NodeName))
-	out.NodeSelector = (*corev1.NodeSelector)(unsafe.Pointer(in.NodeSelector))
+	if in.NodeSelector != nil {
+		in, out := &in.NodeSelector, &out.NodeSelector
+		*out = new(corev1.NodeSelector)
+		if err := Convert_api_NodeSelector_To_v1_NodeSelector(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.NodeSelector = nil
+	}
 	if err := metav1.Convert_bool_To_Pointer_bool(&in.AllNodes, &out.AllNodes, s); err != nil {
 		return err
 	}
@@ -445,7 +479,15 @@ func autoConvert_v1_ResourceSliceSpec_To_api_ResourceSliceSpec(in *v1.ResourceSl
 		return err
 	}
 	out.NodeName = (*string)(unsafe.Pointer(in.NodeName))
-	out.NodeSelector = (*corev1.NodeSelector)(unsafe.Pointer(in.NodeSelector))
+	if in.NodeSelector != nil {
+		in, out := &in.NodeSelector, &out.NodeSelector
+		*out = new(NodeSelector)
+		if err := Convert_v1_NodeSelector_To_api_NodeSelector(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.NodeSelector = nil
+	}
 	if err := metav1.Convert_Pointer_bool_To_bool(&in.AllNodes, &out.AllNodes, s); err != nil {
 		return err
 	}

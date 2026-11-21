@@ -25,6 +25,7 @@
   workloadTemplate:
   - opcode: createNodes
     countParam: $nodesWithoutDRA
+    nodeTemplatePath: templates/node-without-dra-test-driver.yaml
   - opcode: createAny
     templatePath: ../templates/devicetaintrule.yaml
   - opcode: createNodes
