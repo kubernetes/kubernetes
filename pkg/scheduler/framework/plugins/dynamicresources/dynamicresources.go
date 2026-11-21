@@ -196,7 +196,9 @@ type informationForClaim struct {
 // nodeAllocation holds the allocation results and extended resource claim per node.
 type nodeAllocation struct {
 	// allocationResults has the allocation results, matching the order of
-	// claims which had to be allocated.
+	// claims which had to be allocated. It has no entry for the special claim
+	// when extendedResourceClaim is nil, because device plugins on the node
+	// provide all extended resources of the pod.
 	allocationResults []resourceapi.AllocationResult
 	// extendedResourceClaim has the special claim for extended resource backed by DRA
 	// created during Filter for the nodes.
@@ -1157,11 +1159,16 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 		var freshPositions, pendingPositions []int
 		extendedResourceClaim := state.claims.extendedResourceClaim()
 		for index, claim := range state.claims.toAllocate() {
-			position := numToAllocate
-			numToAllocate++
-			if claim == extendedResourceClaim && nodeExtendedResourceClaim != nil {
+			if claim == extendedResourceClaim {
+				if nodeExtendedResourceClaim == nil {
+					// Device plugins on this node provide all extended
+					// resources of the pod, so there is nothing to allocate.
+					continue
+				}
 				claim = nodeExtendedResourceClaim
 			}
+			position := numToAllocate
+			numToAllocate++
 			if pendingAlloc := state.informationsForClaim[index].allocation; pendingAlloc != nil {
 				if allocationResultRequiresDRAOptionalNodeOperations(pendingAlloc) && !slices.Contains(node.Status.DeclaredFeatures, draoptionalnodeoperations.DRAOptionalNodeOperationsFeatureGate) {
 					logger.V(5).Info("allocation's device requires DRAOptionalNodeOperations feature, but node lacks it", "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaim", klog.KObj(claim))
@@ -1584,7 +1591,13 @@ func (pl *DynamicResources) Score(ctx context.Context, cs fwk.CycleState, pod *v
 		return 0, nil
 	}
 
-	score, err := computeScore(state.claims.all(), allocations)
+	claims := state.claims.all()
+	if allocations.extendedResourceClaim == nil {
+		// Filter did not allocate the special claim, if there is one,
+		// because device plugins on this node provide the extended resources.
+		claims = state.claims.allUserClaims()
+	}
+	score, err := computeScore(claims, allocations)
 	if err != nil {
 		return 0, statusError(logger, err)
 	}
@@ -1708,6 +1721,14 @@ func (pl *DynamicResources) Reserve(ctx context.Context, cs fwk.CycleState, pod 
 			return statusError(logger, errors.New("claim allocation not found for node"))
 		}
 
+		// Filter did not allocate the special claim when device plugins
+		// on this node provide all extended resources of the pod.
+		skipExtendedResourceClaim := extendedResourceClaim != nil && allocations.extendedResourceClaim == nil
+		if skipExtendedResourceClaim {
+			numClaimsToAllocate--
+			numClaimsWithAllocator--
+		}
+
 		// Sanity check: do we have results for all pending claims?
 		if len(allocations.allocationResults) != numClaimsToAllocate ||
 			len(allocations.allocationResults) != numClaimsWithAllocator {
@@ -1716,6 +1737,9 @@ func (pl *DynamicResources) Reserve(ctx context.Context, cs fwk.CycleState, pod 
 
 		allocIndex := 0
 		for index, claim := range state.claims.toAllocate() {
+			if claim == extendedResourceClaim && skipExtendedResourceClaim {
+				continue
+			}
 			// The index returned is the original index in the underlying claim store, it
 			// may not be sequentially numbered (e.g. 0, 1, 2 ...).
 			allocation := &allocations.allocationResults[allocIndex]
@@ -1929,8 +1953,10 @@ func (pl *DynamicResources) PreBind(ctx context.Context, cs fwk.CycleState, pod 
 	if patchPodStatusBeforeClaimAllocation {
 		extendedResourceClaim := state.claims.extendedResourceClaim()
 		// The patch names the extended resource claim, so it is created first. Unreserve deletes it if a
-		// later step fails.
-		if extendedResourceClaim != nil && isSpecialClaimName(extendedResourceClaim.Name) {
+		// later step fails. Filter did not prepare it when device plugins on the node provide all
+		// extended resources of the pod.
+		if extendedResourceClaim != nil && isSpecialClaimName(extendedResourceClaim.Name) &&
+			state.nodeAllocations[nodeName].extendedResourceClaim != nil {
 			if _, err := pl.createExtendedResourceClaim(ctx, pod, nodeName, state); err != nil {
 				return statusError(logger, err)
 			}
@@ -2371,6 +2397,11 @@ func (pl *DynamicResources) isClaimTimeout(claim *resourceapi.ResourceClaim) boo
 // It returns an error if any binding failure condition is set.
 func (pl *DynamicResources) isPodReadyForBinding(state *stateData) (bool, error) {
 	for claimIndex, claim := range state.claims.all() {
+		// The extended resource claim keeps its special name when device plugins on the node provide all
+		// extended resources of the pod. Then it does not exist in the API and has no devices.
+		if isSpecialClaimName(claim.Name) {
+			continue
+		}
 		claim, err := pl.draManager.ResourceClaims().Get(claim.Namespace, claim.Name)
 		if err != nil {
 			return false, err

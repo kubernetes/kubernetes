@@ -197,6 +197,13 @@ var (
 			v1.ResourceName(extendedResourceName): "1",
 		}).
 		Obj()
+	podWithClaimNameAndExtendedResourceName = st.MakePod().Name(podName).Namespace(namespace).
+						UID(podUID).
+						PodResourceClaims(v1.PodResourceClaim{Name: resourceName, ResourceClaimName: &claimName}).
+						Req(map[v1.ResourceName]string{
+			v1.ResourceName(extendedResourceName): "1",
+		}).
+		Obj()
 	podWithExtendedResourceName2 = st.MakePod().Name(podName).Namespace(namespace).
 					UID(podUID).
 					Req(map[v1.ResourceName]string{
@@ -233,6 +240,13 @@ var (
 			},
 		}
 		pod.Spec.Containers = append(pod.Spec.Containers, container)
+		return pod
+	}()
+	podWithClaimReferenceInContainerAndExtendedResourceName = func() *v1.Pod {
+		pod := podWithClaimReferenceInContainer.DeepCopy()
+		pod.Spec.Containers[0].Resources.Requests = v1.ResourceList{
+			v1.ResourceName(extendedResourceName): apiresource.MustParse("1"),
+		}
 		return pod
 	}()
 	// podWithStaleExtraNodeAllocatableResources still has the status written by an earlier scheduling attempt.
@@ -325,6 +339,7 @@ var (
 	workerNode3Slice = st.MakeResourceSlice(node3Name, driver).Device("instance-1", map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{attrName: {BoolValue: ptr.To(true)}}).Obj()
 
 	workerNodeWithExtendedResource                = &st.MakeNode().Name(nodeName).Label("kubernetes.io/hostname", nodeName).Capacity(map[v1.ResourceName]string{v1.ResourceName(extendedResourceName): "1"}).Node
+	workerNodeWithCapacityAndExtendedResource     = &st.MakeNode().Name(nodeName).Label("kubernetes.io/hostname", nodeName).Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "10", v1.ResourceMemory: "10Gi", v1.ResourceName(extendedResourceName): "1"}).DeclaredFeatures([]string{dranodeallocatableresources.DRANodeAllocatableResourcesFeature}).Node
 	workerNodeWithExtendedResourceZeroAllocatable = &st.MakeNode().Name(nodeName).Label("kubernetes.io/hostname", nodeName).Capacity(map[v1.ResourceName]string{v1.ResourceName(extendedResourceName): "0"}).Node
 	workerNodeWithOptionalNodeOperations          = func() *v1.Node {
 		node := workerNode.DeepCopy()
@@ -3021,6 +3036,139 @@ func testPlugin(tCtx ktesting.TContext, preemption bool) {
 				require.ErrorContains(tCtx, err, "not found")
 			},
 		},
+		// Regression test for https://github.com/kubernetes/kubernetes/issues/144340.
+		// Before the fix, the special claim had no requests on this node but was
+		// still allocated, so PreBind created an empty claim and failed with
+		// "nil or empty request mappings".
+		"extended-resource-name-with-node-resource-and-claim": {
+			nodes:   []*v1.Node{workerNodeWithExtendedResource},
+			pod:     podWithClaimNameAndExtendedResourceName,
+			claims:  []*resourceapi.ResourceClaim{pendingClaim},
+			classes: []*resourceapi.DeviceClass{deviceClassWithExtendResourceName},
+			objs:    []apiruntime.Object{workerNodeSlice, podWithClaimNameAndExtendedResourceName},
+			want: want{
+				reserve: result{
+					inFlightClaims: []metav1.Object{allocatedClaim},
+				},
+				prebind: result{
+					assumedClaim: addAllocationTimestamp(reserve(allocatedClaim, podWithClaimNameAndExtendedResourceName)),
+					changes: change{
+						claim: func(claim *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
+							if claim.Name == claimName {
+								claim = claim.DeepCopy()
+								claim.Finalizers = allocatedClaim.Finalizers
+								claim.Status = inUseClaim.Status
+								claim = addAllocationTimestamp(claim)
+							}
+							return claim
+						},
+					},
+				},
+				postbind: result{
+					assumedClaim: reserve(allocatedClaim, podWithClaimNameAndExtendedResourceName),
+				},
+			},
+			metrics: func(tCtx ktesting.TContext, g compbasemetrics.Gatherer) {
+				_, err := testutil.GetCounterValuesFromGatherer(g, "dynamic_resource_allocation_resourceclaim_creates_total", map[string]string{}, "status")
+				require.ErrorContains(tCtx, err, "not found")
+			},
+		},
+		// Score runs only with more than one potential node. On the device
+		// plugin node, the special claim has no allocation result to score.
+		"extended-resource-name-with-node-resource-and-claim-two-nodes": {
+			nodes:   []*v1.Node{workerNodeWithExtendedResource, workerNode2},
+			pod:     podWithClaimNameAndExtendedResourceName,
+			claims:  []*resourceapi.ResourceClaim{pendingClaim},
+			classes: []*resourceapi.DeviceClass{deviceClassWithExtendResourceName},
+			objs: []apiruntime.Object{
+				workerNodeSlice,
+				// worker-2 has no device plugin, so it needs one device for
+				// the user claim and one for the special claim.
+				st.MakeResourceSlice(node2Name, driver).
+					Device("instance-1").
+					Device("instance-2").Obj(),
+				podWithClaimNameAndExtendedResourceName,
+			},
+			want: want{
+				normalizeScoreResult: fwk.NodeScoreList{
+					{
+						Name: workerNodeWithExtendedResource.Name,
+					},
+					{
+						Name: workerNode2.Name,
+					},
+				},
+				reserve: result{
+					inFlightClaims: []metav1.Object{allocatedClaim},
+				},
+				prebind: result{
+					assumedClaim: addAllocationTimestamp(reserve(allocatedClaim, podWithClaimNameAndExtendedResourceName)),
+					changes: change{
+						claim: func(claim *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
+							if claim.Name == claimName {
+								claim = claim.DeepCopy()
+								claim.Finalizers = allocatedClaim.Finalizers
+								claim.Status = inUseClaim.Status
+								claim = addAllocationTimestamp(claim)
+							}
+							return claim
+						},
+					},
+				},
+			},
+		},
+		// The user claim is already allocated, so only the special claim
+		// would need an allocation, and device plugins provide it.
+		"extended-resource-name-with-node-resource-and-allocated-claim": {
+			nodes:   []*v1.Node{workerNodeWithExtendedResource},
+			pod:     podWithClaimNameAndExtendedResourceName,
+			claims:  []*resourceapi.ResourceClaim{allocatedClaim},
+			classes: []*resourceapi.DeviceClass{deviceClassWithExtendResourceName},
+			objs:    []apiruntime.Object{workerNodeSlice, podWithClaimNameAndExtendedResourceName},
+			want: want{
+				prebind: result{
+					assumedClaim: addAllocationTimestamp(reserve(allocatedClaim, podWithClaimNameAndExtendedResourceName)),
+					changes: change{
+						claim: func(claim *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
+							if claim.Name == claimName {
+								claim = claim.DeepCopy()
+								claim.Status.ReservedFor = inUseClaim.Status.ReservedFor
+								claim = addAllocationTimestamp(claim)
+							}
+							return claim
+						},
+					},
+				},
+			},
+			metrics: func(tCtx ktesting.TContext, g compbasemetrics.Gatherer) {
+				_, err := testutil.GetCounterValuesFromGatherer(g, "dynamic_resource_allocation_resourceclaim_creates_total", map[string]string{}, "status")
+				require.ErrorContains(tCtx, err, "not found")
+			},
+		},
+		"extended-resource-name-with-node-resource-and-bound-claim": {
+			// The user claim has binding conditions, so PreBind waits for the claims of the pod.
+			nodes:   []*v1.Node{workerNodeWithExtendedResource},
+			pod:     podWithClaimNameAndExtendedResourceName,
+			claims:  []*resourceapi.ResourceClaim{boundClaim},
+			classes: []*resourceapi.DeviceClass{deviceClassWithExtendResourceName},
+			objs:    []apiruntime.Object{workerNodeSlice, podWithClaimNameAndExtendedResourceName},
+			want: want{
+				prebind: result{
+					assumedClaim: reserve(boundClaim, podWithClaimNameAndExtendedResourceName),
+					changes: change{
+						claim: func(in *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
+							return st.FromResourceClaim(in).
+								ReservedFor(resourceapi.ResourceClaimConsumerReference{Resource: "pods", Name: podName, UID: types.UID(podUID)}).
+								Obj()
+						},
+					},
+				},
+			},
+			metrics: func(tCtx ktesting.TContext, g compbasemetrics.Gatherer) {
+				_, err := testutil.GetCounterValuesFromGatherer(g, "dynamic_resource_allocation_resourceclaim_creates_total", map[string]string{}, "status")
+				require.ErrorContains(tCtx, err, "not found")
+			},
+		},
 		"extended-resource-one-device-plugin-one-dra": {
 			nodes:   []*v1.Node{workerNodeWithExtendedResource},
 			pod:     podWithExtendedResourceName2,
@@ -4708,6 +4856,98 @@ func testPlugin(tCtx ktesting.TContext, preemption bool) {
 						},
 					},
 				},
+			},
+		},
+		// The pod status is patched before claim allocation because of the
+		// node allocatable resources, while device plugins on the node provide
+		// the extended resource, so there is no extended resource claim to create.
+		"node-allocatable-resource-with-node-extended-resource": {
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRANodeAllocatableResources: true},
+			nodes:            []*v1.Node{workerNodeWithCapacityAndExtendedResource},
+			pod:              podWithClaimReferenceInContainerAndExtendedResourceName,
+			patchTestCase: func(tc *testPluginCase) {
+				// Simulate the Assume phase by pre-populating the status
+				tc.pod = tc.pod.DeepCopy()
+				tc.pod.Status.ExtraNodeAllocatableResources = []v1.ExtraNodeAllocatableResource{
+					{
+						ContainerName: "",
+						Requests:      v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1")},
+						Limits:        v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1")},
+					},
+					{
+						ContainerName: tc.pod.Spec.Containers[0].Name,
+						Limits:        v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1")},
+					},
+				}
+			},
+			claims:  []*resourceapi.ResourceClaim{st.FromResourceClaim(nodeAllocatableClaimWithCapacity).OwnerReference(podName, podUID, podKind).Obj()},
+			classes: []*resourceapi.DeviceClass{deviceClassWithExtendResourceName},
+			objs:    []apiruntime.Object{workerNodeSliceWithNodeAllocatableResource(), podWithClaimReferenceInContainerAndExtendedResourceName},
+			want: want{
+				filter: perNodeResult{
+					workerNodeWithCapacityAndExtendedResource.Name: {
+						status: nil,
+						extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+							{
+								ContainerName: "",
+								Requests:      v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1")},
+								Limits:        v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1")},
+							},
+							{
+								ContainerName: podWithClaimReferenceInContainerAndExtendedResourceName.Spec.Containers[0].Name,
+								Limits:        v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1")},
+							},
+						},
+					},
+				},
+				reserve: result{
+					inFlightClaims: []metav1.Object{
+						st.FromResourceClaim(pendingNodeAllocatableClaimWithCapacity).
+							Allocation(nodeAllocatableResAllocationResult).
+							Obj(),
+					},
+				},
+				prebind: result{
+					assumedClaim: addAllocationTimestamp(st.FromResourceClaim(pendingNodeAllocatableClaimWithCapacity).
+						Allocation(nodeAllocatableResAllocationResult).
+						ReservedForPod(podName, types.UID(podUID)).
+						Obj()),
+					changes: change{
+						claim: func(claim *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
+							if claim.Name == claimName {
+								c := claim.DeepCopy()
+								c.Finalizers = []string{resourceapi.Finalizer}
+								c.Status.Allocation = nodeAllocatableResAllocationResult.DeepCopy()
+								c.Status.ReservedFor = []resourceapi.ResourceClaimConsumerReference{{Resource: "pods", Name: podName, UID: types.UID(podUID)}}
+								c = addAllocationTimestamp(c)
+								return c
+							}
+							return claim
+						},
+						pod: func(pod *v1.Pod) *v1.Pod {
+							if pod.Name == podName {
+								p := pod.DeepCopy()
+								p.Status.ExtraNodeAllocatableResources = []v1.ExtraNodeAllocatableResource{
+									{
+										ContainerName: "",
+										Requests:      v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1")},
+										Limits:        v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1")},
+									},
+									{
+										ContainerName: podWithClaimReferenceInContainerAndExtendedResourceName.Spec.Containers[0].Name,
+										Limits:        v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1")},
+									},
+								}
+								return p
+							}
+							return pod
+						},
+					},
+				},
+			},
+			metrics: func(tCtx ktesting.TContext, g compbasemetrics.Gatherer) {
+				_, err := testutil.GetCounterValuesFromGatherer(g, "dynamic_resource_allocation_resourceclaim_creates_total", map[string]string{}, "status")
+				require.ErrorContains(tCtx, err, "not found")
 			},
 		},
 		"node-allocatable-resource-capacitykey-and-multiplier": {
