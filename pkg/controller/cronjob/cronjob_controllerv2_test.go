@@ -1898,6 +1898,83 @@ func TestControllerV2JobAlreadyExistsButDifferentOwner(t *testing.T) {
 	}
 }
 
+// TestControllerV2AdoptJobMissingFromActive validates adopting an unfinished owned Job
+// missing from status.active, and skipping Jobs with instantiate=manual.
+func TestControllerV2AdoptJobMissingFromActive(t *testing.T) {
+	tests := map[string]struct {
+		manualInstantiate bool
+		wantUpdates       int
+		wantActive        int
+	}{
+		"adopt unfinished owned job": {
+			wantUpdates: 1,
+			wantActive:  1,
+		},
+		"skip manual instantiate": {
+			manualInstantiate: true,
+			wantUpdates:       0,
+			wantActive:        0,
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+
+			cj := cronJob()
+			cj.Spec.Suspend = ptr.To(true)
+			cj.Status.Active = []v1.ObjectReference{}
+			cjCopy := cj.DeepCopy()
+
+			job, err := getJobFromTemplate2(&cj, justAfterThePriorHour())
+			if err != nil {
+				t.Fatalf("Unexpected error creating a job from template: %v", err)
+			}
+			job.UID = "1234"
+			job.Namespace = cj.Namespace
+			if tc.manualInstantiate {
+				if job.Annotations == nil {
+					job.Annotations = map[string]string{}
+				}
+				job.Annotations[cronJobInstantiateAnnotation] = "manual"
+			}
+
+			client := fake.NewSimpleClientset(cjCopy, job)
+			informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
+			jm, err := NewControllerV2(ctx, informerFactory.Batch().V1().Jobs(), informerFactory.Batch().V1().CronJobs(), client)
+			if err != nil {
+				t.Fatalf("unexpected error %v", err)
+			}
+			_ = informerFactory.Batch().V1().CronJobs().Informer().GetIndexer().Add(cjCopy)
+			_ = informerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
+
+			jm.jobControl = &fakeJobControl{Job: job}
+			cronJobControl := &fakeCJControl{CronJob: cjCopy}
+			jm.cronJobControl = cronJobControl
+			jm.now = justBeforeTheHour
+
+			jm.enqueueController(cjCopy)
+			jm.processNextWorkItem(ctx)
+
+			if len(cronJobControl.Updates) != tc.wantUpdates {
+				t.Fatalf("Unexpected updates to cronjob, got: %d, expected %d", len(cronJobControl.Updates), tc.wantUpdates)
+			}
+			if tc.wantUpdates == 0 {
+				return
+			}
+			if len(cronJobControl.Updates[0].Status.Active) != tc.wantActive {
+				t.Fatalf("Unexpected active jobs count, got: %d, expected %d", len(cronJobControl.Updates[0].Status.Active), tc.wantActive)
+			}
+			expectedActiveRef, err := getRef(job)
+			if err != nil {
+				t.Fatalf("Error getting expected job ref: %v", err)
+			}
+			if !reflect.DeepEqual(cronJobControl.Updates[0].Status.Active[0], *expectedActiveRef) {
+				t.Errorf("Unexpected job reference in cronjob active list, got: %v, expected: %v", cronJobControl.Updates[0].Status.Active[0], expectedActiveRef)
+			}
+		})
+	}
+}
+
 func TestControllerV2ProcessNextItemClearFailureRate(t *testing.T) {
 
 	t.Run("cronjob controller resets rate limiter successfully", func(t *testing.T) {

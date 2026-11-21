@@ -451,6 +451,7 @@ func (jm *ControllerV2) syncCronJob(
 	cronJob *batchv1.CronJob,
 	jobs []*batchv1.Job) (*time.Duration, bool, error) {
 
+	logger := klog.FromContext(ctx)
 	now := jm.now()
 	updateStatus := false
 
@@ -467,11 +468,18 @@ func (jm *ControllerV2) syncCronJob(
 				cronJob = cjCopy
 				continue
 			}
-			jm.recorder.Eventf(cronJob, corev1.EventTypeWarning, "UnexpectedJob", "Saw a job that the controller did not create or forgot: %s", j.Name)
-			// We found an unfinished job that has us as the parent, but it is not in our Active list.
-			// This could happen if we crashed right after creating the Job and before updating the status,
-			// or if our jobs list is newer than our cj status after a relist, or if someone intentionally created
-			// a job that they wanted us to adopt.
+			adopted, err := adoptJobIntoActive(logger, cronJob, j)
+			if err != nil {
+				return nil, updateStatus, err
+			}
+			if adopted {
+				updateStatus = true
+			} else {
+				// Unfinished Job has us as parent but is not in Active and was not adopted
+				// (e.g. cronjob.kubernetes.io/instantiate=manual from kubectl --from-cronjob).
+				// Controller-created Jobs missing from Active after create/status races are adopted above.
+				jm.recorder.Eventf(cronJob, corev1.EventTypeWarning, "UnexpectedJob", "Saw a job that the controller did not create or forgot: %s", j.Name)
+			}
 		} else if jobutil.IsJobFinished(j) {
 			if found {
 				_, condition := jobutil.FinishedCondition(j)
@@ -524,7 +532,6 @@ func (jm *ControllerV2) syncCronJob(
 		return nil, updateStatus, nil
 	}
 
-	logger := klog.FromContext(ctx)
 	if cronJob.Spec.TimeZone != nil {
 		timeZone := ptr.Deref(cronJob.Spec.TimeZone, "")
 		if _, err := time.LoadLocation(timeZone); err != nil {

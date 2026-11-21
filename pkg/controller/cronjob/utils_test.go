@@ -701,6 +701,55 @@ func TestNextScheduleTimeDuration(t *testing.T) {
 	}
 }
 
+func TestAdoptJobIntoActive(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	cj := cronJob()
+	job, err := getJobFromTemplate2(&cj, justAfterThePriorHour())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	job.UID = "job-uid"
+	job.Namespace = cj.Namespace
+
+	manualJob := job.DeepCopy()
+	manualJob.Annotations[cronJobInstantiateAnnotation] = "manual"
+
+	testCases := []struct {
+		name          string
+		job           *batchv1.Job
+		wantAdopted   bool
+		wantActiveLen int
+	}{
+		{
+			name:          "adopt controlled job",
+			job:           job,
+			wantAdopted:   true,
+			wantActiveLen: 1,
+		},
+		{
+			name:          "skip manual instantiate",
+			job:           manualJob,
+			wantAdopted:   false,
+			wantActiveLen: 0,
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			cjCopy := cj.DeepCopy()
+			adopted, err := adoptJobIntoActive(logger, cjCopy, tc.job)
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			if adopted != tc.wantAdopted {
+				t.Errorf("adopted = %v, want %v", adopted, tc.wantAdopted)
+			}
+			if got := len(cjCopy.Status.Active); got != tc.wantActiveLen {
+				t.Errorf("len(Active) = %d, want %d", got, tc.wantActiveLen)
+			}
+		})
+	}
+}
+
 func topOfTheHour() *time.Time {
 	T1, err := time.Parse(time.RFC3339, "2016-05-19T10:00:00Z")
 	if err != nil {
