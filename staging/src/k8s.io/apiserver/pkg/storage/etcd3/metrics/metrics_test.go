@@ -93,6 +93,11 @@ apiserver_storage_events_received_total{group="apps",resource="deployments"} 1
 }
 
 func TestRecordEtcdBookmark(t *testing.T) {
+	// etcdBookmarkTotal is package level and keeps counting across runs in the
+	// same binary, so the expected totals below only hold from a clean start.
+	etcdBookmarkTotal.Reset()
+	t.Cleanup(etcdBookmarkTotal.Reset)
+
 	registry := metrics.NewKubeRegistry()
 	registry.MustRegister(etcdBookmarkTotal)
 
@@ -290,6 +295,12 @@ etcd_request_errors_total{group="bar",operation="update",reason="Conflict",resou
 }
 
 func TestStorageSizeCollector(t *testing.T) {
+	// A StableCollector remembers the descriptors it was registered with, so
+	// handing the package level one to a second registry panics with
+	// "duplicate metrics". Clear it first, as resetStoreStatsMetrics does for
+	// the other collectors in this package.
+	storageMonitor.ClearState()
+
 	registry := metrics.NewKubeRegistry()
 	registry.CustomMustRegister(storageMonitor)
 

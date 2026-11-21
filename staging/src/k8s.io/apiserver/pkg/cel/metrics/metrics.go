@@ -30,14 +30,17 @@ const (
 )
 
 // Metrics provides access to CEL metrics.
-var Metrics = newCelMetrics()
+var Metrics = newCelMetrics(legacyregistry.MustRegister)
 
 type CelMetrics struct {
 	compilationTime *metrics.Histogram
 	evaluationTime  *metrics.Histogram
 }
 
-func newCelMetrics() *CelMetrics {
+// newCelMetrics builds the CEL metrics and hands them to registerer. Tests pass
+// their own registry's MustRegister, because a Histogram keeps its observations
+// for the lifetime of the process and legacyregistry.Reset cannot clear them.
+func newCelMetrics(registerer func(...metrics.Registerable)) *CelMetrics {
 	m := &CelMetrics{
 		compilationTime: metrics.NewHistogram(&metrics.HistogramOpts{
 			Namespace:      namespace,
@@ -55,8 +58,7 @@ func newCelMetrics() *CelMetrics {
 		}),
 	}
 
-	legacyregistry.MustRegister(m.compilationTime)
-	legacyregistry.MustRegister(m.evaluationTime)
+	registerer(m.compilationTime, m.evaluationTime)
 
 	return m
 }
