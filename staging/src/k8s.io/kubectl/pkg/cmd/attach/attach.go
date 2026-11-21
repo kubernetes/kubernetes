@@ -185,7 +185,7 @@ func NewCmdAttach(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.
 	}
 
 	flags.AddFlags(cmd)
-
+	cmdutil.CheckErr(cmd.RegisterFlagCompletionFunc("container", completion.ContainerCompletionFunc(f)))
 	return cmd
 }
 
