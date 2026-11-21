@@ -23,6 +23,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 
+	"k8s.io/klog/v2"
 	utiltrace "k8s.io/utils/trace"
 )
 
@@ -37,7 +38,7 @@ func Start(ctx context.Context, name string, attributes ...attribute.KeyValue) (
 	// If there is already a utiltrace span in the context, use that as our parent span.
 	utilSpan := utiltrace.FromContext(ctx).Nest(name, attributesToFields(attributes)...)
 	// Set the trace as active in the context so that subsequent Start calls create nested spans.
-	return utiltrace.ContextWithTrace(ctx, utilSpan), &Span{
+	return ContextWithSpanLogger(utiltrace.ContextWithTrace(ctx, utilSpan), otelSpan), &Span{
 		otelSpan: otelSpan,
 		utilSpan: utilSpan,
 	}
@@ -94,5 +95,20 @@ func SpanFromContext(ctx context.Context) *Span {
 
 // ContextWithSpan returns a context with the Span included in the context.
 func ContextWithSpan(ctx context.Context, s *Span) context.Context {
-	return trace.ContextWithSpan(utiltrace.ContextWithTrace(ctx, s.utilSpan), s.otelSpan)
+	if s == nil {
+		return ctx
+	}
+	return ContextWithSpanLogger(trace.ContextWithSpan(utiltrace.ContextWithTrace(ctx, s.utilSpan), s.otelSpan), s.otelSpan)
+}
+
+// ContextWithSpanLogger adds trace_id and span_id values to the logger in the
+// context if the span is sampled.
+func ContextWithSpanLogger(ctx context.Context, span trace.Span) context.Context {
+	if span == nil {
+		return ctx
+	}
+	if spanCtx := span.SpanContext(); spanCtx.IsValid() && spanCtx.IsSampled() {
+		return klog.NewContext(ctx, klog.LoggerWithValues(klog.FromContext(ctx), "trace_id", spanCtx.TraceID(), "span_id", spanCtx.SpanID()))
+	}
+	return ctx
 }

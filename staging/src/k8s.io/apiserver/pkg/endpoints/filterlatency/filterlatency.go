@@ -27,6 +27,7 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/server/httplog"
+	"k8s.io/component-base/tracing"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
 )
@@ -78,6 +79,7 @@ func trackStarted(handler http.Handler, tp trace.TracerProvider, name string, cl
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx, span := tracer.Start(r.Context(), name)
 		defer span.End()
+		ctx = tracing.ContextWithSpanLogger(ctx, span)
 		if fr := requestFilterRecordFrom(ctx); fr != nil {
 			fr.name = name
 			fr.startedTimestamp = clock.Now()

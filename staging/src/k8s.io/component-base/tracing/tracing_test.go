@@ -21,6 +21,10 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -28,7 +32,10 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
+	oteltrace "go.opentelemetry.io/otel/trace"
 	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/ktesting"
+	"k8s.io/klog/v2/textlogger"
 	utiltrace "k8s.io/utils/trace"
 )
 
@@ -183,4 +190,114 @@ func TestContextNoPanic(t *testing.T) {
 	// Make sure calling functions on spans from context doesn't panic
 	SpanFromContext(ctx).AddEvent("foo")
 	SpanFromContext(ctx).End(time.Minute)
+	_ = ContextWithSpan(ctx, nil)
+	_ = ContextWithSpanLogger(ctx, nil)
+}
+
+var logHeaderRe = regexp.MustCompile(`([IE])[[:digit:]]{4} [[:digit:]]{2}:[[:digit:]]{2}:[[:digit:]]{2}\.[[:digit:]]{6}\] `)
+
+func TestContextualLoggingWithTracing(t *testing.T) {
+	var buffer ktesting.BufferTL
+	baseLogger, ctx := ktesting.NewTestContext(&buffer)
+
+	// 1. Log without a span in context
+	klog.FromContext(ctx).Info("no span")
+
+	// 2. Log with an unsampled span
+	unsampledTP := trace.NewTracerProvider(trace.WithSampler(trace.NeverSample()))
+	unsampledCtx, unsampledSpan := unsampledTP.Tracer(instrumentationScope).Start(ctx, "unsampled parent")
+	unsampledCtx = ContextWithSpanLogger(unsampledCtx, unsampledSpan)
+	unsampledChildCtx, unsampledChild := Start(unsampledCtx, "unsampled child")
+	klog.FromContext(unsampledChildCtx).Info("unsampled span")
+	unsampledChild.End(10 * time.Second)
+	unsampledSpan.End()
+
+	// 3. Log with sampled HTTP handler and nested spans
+	fakeRecorder := tracetest.NewSpanRecorder()
+	sampledTP := trace.NewTracerProvider(
+		trace.WithSampler(trace.AlwaysSample()),
+		trace.WithSpanProcessor(fakeRecorder),
+	)
+
+	handler := WithTracing(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		reqCtx := r.Context()
+		klog.FromContext(reqCtx).Info("in http handler")
+
+		childCtx, childSpan := Start(reqCtx, "child operation")
+		defer childSpan.End(10 * time.Second)
+		klog.FromContext(childCtx).Info("in child span")
+
+		// Verify ContextWithSpan also attaches the span logger to a fresh context with baseLogger
+		transferredCtx := ContextWithSpan(klog.NewContext(context.Background(), baseLogger), childSpan)
+		klog.FromContext(transferredCtx).Info("in transferred context")
+	}), sampledTP, "http-request")
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://example.com/api/v1/pods", nil)
+	if err != nil {
+		t.Fatalf("failed to create request: %v", err)
+	}
+	handler.ServeHTTP(httptest.NewRecorder(), req)
+
+	ended := fakeRecorder.Ended()
+	if len(ended) != 2 {
+		t.Fatalf("expected 2 ended spans, got %d", len(ended))
+	}
+	childRecorded := ended[0]
+	httpRecorded := ended[1]
+	traceID := httpRecorded.SpanContext().TraceID().String()
+	httpSpanID := httpRecorded.SpanContext().SpanID().String()
+	childSpanID := childRecorded.SpanContext().SpanID().String()
+
+	actual := logHeaderRe.ReplaceAllString(buffer.String(), "${1}xxx] ")
+	expected := fmt.Sprintf(`Ixxx] no span
+Ixxx] unsampled span
+Ixxx] in http handler trace_id=%q span_id=%q
+Ixxx] in child span trace_id=%q span_id=%q
+Ixxx] in transferred context trace_id=%q span_id=%q
+`, traceID, httpSpanID, traceID, childSpanID, traceID, childSpanID)
+
+	if actual != expected {
+		t.Errorf("unexpected log output:\ngot:\n%s\nwant:\n%s", actual, expected)
+	}
+}
+
+func BenchmarkTracingContextualLogging(b *testing.B) {
+	noopTP := NewNoopTracerProvider()
+	unsampledTP := trace.NewTracerProvider(trace.WithSampler(trace.NeverSample()))
+	sampledTP := trace.NewTracerProvider(trace.WithSampler(trace.AlwaysSample()))
+
+	for _, tc := range []struct {
+		name string
+		tp   oteltrace.TracerProvider
+		log  bool
+	}{
+		{name: "noop_no_log", tp: noopTP, log: false},
+		{name: "unsampled_no_log", tp: unsampledTP, log: false},
+		{name: "sampled_no_log", tp: sampledTP, log: false},
+		{name: "noop_with_log", tp: noopTP, log: true},
+		{name: "unsampled_with_log", tp: unsampledTP, log: true},
+		{name: "sampled_with_log", tp: sampledTP, log: true},
+	} {
+		b.Run(tc.name, func(b *testing.B) {
+			cfg := textlogger.NewConfig(textlogger.Output(io.Discard))
+			logger := textlogger.NewLogger(cfg)
+			baseCtx := klog.NewContext(context.Background(), logger)
+			tracer := tc.tp.Tracer(instrumentationScope)
+
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				ctx, rootSpan := tracer.Start(baseCtx, "root")
+				ctx = ContextWithSpanLogger(ctx, rootSpan)
+				childCtx, childSpan := Start(ctx, "child")
+				if tc.log {
+					klog.FromContext(childCtx).Info("benchmark message", "iteration", i)
+				} else {
+					klog.FromContext(childCtx).V(5).Info("debug message", "iteration", i)
+				}
+				childSpan.End(time.Minute)
+				rootSpan.End()
+			}
+		})
+	}
 }
