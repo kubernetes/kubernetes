@@ -172,6 +172,7 @@ var _ = SIGDescribe("SchedulerPreemption", framework.WithSerial(), func() {
 				framework.Logf("Created pod: %v", pausePod.Name)
 			}
 		}
+		defer e2epod.DeletePodsWithWait(ctx, cs, pods)
 		if len(pods) < 2 {
 			framework.Failf("We need at least two pods to be created but " +
 				"all nodes are already heavily utilized, so preemption tests cannot be run")
@@ -186,7 +187,7 @@ var _ = SIGDescribe("SchedulerPreemption", framework.WithSerial(), func() {
 
 		ginkgo.By("Run a high priority pod that has same requirements as that of lower priority pod")
 		// Create a high priority pod and make sure it is scheduled on the same node as the low priority pod.
-		runPausePod(ctx, f, pausePodConfig{
+		preemptorPod := runPausePod(ctx, f, pausePodConfig{
 			Name:              "preemptor-pod",
 			PriorityClassName: highPriorityClassName,
 			Resources: &v1.ResourceRequirements{
@@ -194,6 +195,9 @@ var _ = SIGDescribe("SchedulerPreemption", framework.WithSerial(), func() {
 				Limits:   podRes,
 			},
 		})
+		defer func() {
+			framework.ExpectNoError(e2epod.DeletePodWithWait(ctx, cs, preemptorPod))
+		}()
 
 		preemptedPod, err := cs.CoreV1().Pods(pods[0].Namespace).Get(ctx, pods[0].Name, metav1.GetOptions{})
 		podPreempted := (err != nil && apierrors.IsNotFound(err)) ||
@@ -259,6 +263,7 @@ var _ = SIGDescribe("SchedulerPreemption", framework.WithSerial(), func() {
 				framework.Logf("Created pod: %v", pausePod.Name)
 			}
 		}
+		defer e2epod.DeletePodsWithWait(ctx, cs, pods)
 		if len(pods) < 2 {
 			framework.Failf("We need at least two pods to be created but " +
 				"all nodes are already heavily utilized, so preemption tests cannot be run")
@@ -275,10 +280,7 @@ var _ = SIGDescribe("SchedulerPreemption", framework.WithSerial(), func() {
 		defer func() {
 			// Clean-up the critical pod
 			// Always run cleanup to make sure the pod is properly cleaned up.
-			err := f.ClientSet.CoreV1().Pods(metav1.NamespaceSystem).Delete(ctx, "critical-pod", *metav1.NewDeleteOptions(0))
-			if err != nil && !apierrors.IsNotFound(err) {
-				framework.Failf("Error cleanup pod `%s/%s`: %v", metav1.NamespaceSystem, "critical-pod", err)
-			}
+			framework.ExpectNoError(e2epod.DeletePodWithWaitByName(ctx, f.ClientSet, "critical-pod", metav1.NamespaceSystem))
 		}()
 		runPausePod(ctx, f, pausePodConfig{
 			Name:              "critical-pod",
@@ -290,11 +292,6 @@ var _ = SIGDescribe("SchedulerPreemption", framework.WithSerial(), func() {
 			},
 		})
 
-		defer func() {
-			// Clean-up the critical pod
-			err := f.ClientSet.CoreV1().Pods(metav1.NamespaceSystem).Delete(ctx, "critical-pod", *metav1.NewDeleteOptions(0))
-			framework.ExpectNoError(err, "delete Pod %q in namespace %q", "critical-pod", metav1.NamespaceSystem)
-		}()
 		// Make sure that the lowest priority pod is deleted.
 		preemptedPod, err := cs.CoreV1().Pods(pods[0].Namespace).Get(ctx, pods[0].Name, metav1.GetOptions{})
 		podPreempted := (err != nil && apierrors.IsNotFound(err)) ||
@@ -366,6 +363,7 @@ var _ = SIGDescribe("SchedulerPreemption", framework.WithSerial(), func() {
 				framework.Logf("Created pod: %v", pausePod.Name)
 			}
 		}
+		defer e2epod.DeletePodsWithWait(ctx, cs, lowPriorityPods)
 
 		ginkgo.By("Wait for lower priority pods to be scheduled.")
 		for _, pod := range lowPriorityPods {
@@ -394,6 +392,7 @@ var _ = SIGDescribe("SchedulerPreemption", framework.WithSerial(), func() {
 				mediumPriorityPods = append(mediumPriorityPods, p)
 			}
 		}
+		defer e2epod.DeletePodsWithWait(ctx, cs, mediumPriorityPods)
 
 		// All low priority Pods should be the target of preemption.
 		// Those Pods have a finalizer and hence should not be deleted yet at this point.
@@ -423,6 +422,7 @@ var _ = SIGDescribe("SchedulerPreemption", framework.WithSerial(), func() {
 				highPriorityPods = append(highPriorityPods, p)
 			}
 		}
+		defer e2epod.DeletePodsWithWait(ctx, cs, highPriorityPods)
 
 		// All high priority Pods should be schedulable by removing the low priority Pods.
 		ginkgo.By("Wait for high priority pods to be ready for the preemption.")
@@ -519,7 +519,10 @@ var _ = SIGDescribe("SchedulerPreemption", framework.WithSerial(), func() {
 		framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, cs, victimPod), "wait for Pod %q in namespace %q to run", victimPod.Name, victimPod.Namespace)
 
 		// Remove the finalizer so that the victim pod can be GCed
-		defer e2epod.NewPodClient(f).RemoveFinalizer(ctx, victimPod.Name, testFinalizer)
+		defer func() {
+			e2epod.NewPodClient(f).RemoveFinalizer(ctx, victimPod.Name, testFinalizer)
+			framework.ExpectNoError(e2epod.DeletePodWithWait(ctx, cs, victimPod))
+		}()
 
 		ginkgo.By("Create a high priority pod to trigger preemption of the lower priority pod")
 		preemptorPod := createPausePod(ctx, f, pausePodConfig{
@@ -531,6 +534,9 @@ var _ = SIGDescribe("SchedulerPreemption", framework.WithSerial(), func() {
 			},
 			Affinity: &testNodeAffinity,
 		})
+		defer func() {
+			framework.ExpectNoError(e2epod.DeletePodWithWait(ctx, cs, preemptorPod))
+		}()
 		framework.Logf("Created pod: %v", preemptorPod.Name)
 
 		ginkgo.By("Waiting for the victim pod to be terminating")
@@ -617,10 +623,16 @@ var _ = SIGDescribe("SchedulerPreemption", framework.WithSerial(), func() {
 
 			ginkgo.By("Create 1 High Pod and 3 Low Pods to occupy 9/10 of fake resources on both nodes.")
 			// Prepare 1 High Pod and 3 Low Pods
-			runPausePod(ctx, f, highPodCfg)
+			highPod := runPausePod(ctx, f, highPodCfg)
+			defer func() {
+				framework.ExpectNoError(e2epod.DeletePodWithWait(ctx, cs, highPod))
+			}()
 			for i := 1; i <= 3; i++ {
 				lowPodCfg.Name = fmt.Sprintf("low-%v", i)
-				runPausePod(ctx, f, lowPodCfg)
+				lowPod := runPausePod(ctx, f, lowPodCfg)
+				defer func() {
+					framework.ExpectNoError(e2epod.DeletePodWithWait(ctx, cs, lowPod))
+				}()
 			}
 
 			ginkgo.By("Create 1 Medium Pod with TopologySpreadConstraints")
@@ -654,7 +666,10 @@ var _ = SIGDescribe("SchedulerPreemption", framework.WithSerial(), func() {
 			// However, in that case, the Pods spread becomes [<high>, <medium, low, low>], which doesn't
 			// satisfy the pod topology spread constraints. Hence it needs to preempt another low pod
 			// to make the Pods spread like [<high>, <medium, low>].
-			runPausePod(ctx, f, mediumPodCfg)
+			mediumPod := runPausePod(ctx, f, mediumPodCfg)
+			defer func() {
+				framework.ExpectNoError(e2epod.DeletePodWithWait(ctx, cs, mediumPod))
+			}()
 
 			ginkgo.By("Verify there are 3 Pods left in this namespace")
 			wantPods := sets.New("high", "medium", "low")
@@ -836,7 +851,8 @@ var _ = SIGDescribe("SchedulerPreemption", framework.WithSerial(), func() {
 			}
 			// create ReplicaSet{1,2,3} so as to occupy 950/1000 fake resource
 			for i := range rsConfs {
-				runPauseRS(ctx, f, rsConfs[i])
+				rs := runPauseRS(ctx, f, rsConfs[i])
+				defer deletePauseRS(ctx, f, rs)
 			}
 
 			framework.Logf(
@@ -860,6 +876,9 @@ var _ = SIGDescribe("SchedulerPreemption", framework.WithSerial(), func() {
 				},
 			}
 			preemptorPod := createPod(ctx, f, preemptorPodConf)
+			defer func() {
+				framework.ExpectNoError(e2epod.DeletePodWithWait(ctx, f.ClientSet, preemptorPod))
+			}()
 			waitForPreemptingWithTimeout(ctx, f, preemptorPod, framework.PodGetTimeout)
 
 			framework.Logf(
@@ -1043,6 +1062,22 @@ func runPauseRS(ctx context.Context, f *framework.Framework, conf pauseRSConfig)
 	rs := createPauseRS(ctx, f, conf)
 	framework.ExpectNoError(e2ereplicaset.WaitForReplicaSetTargetAvailableReplicasWithTimeout(ctx, f.ClientSet, rs, conf.Replicas, framework.PodGetTimeout), "wait for ReplicaSet %q to have %d available replicas", rs.Name, conf.Replicas)
 	return rs
+}
+
+func deletePauseRS(ctx context.Context, f *framework.Framework, rs *appsv1.ReplicaSet) {
+	err := f.ClientSet.AppsV1().ReplicaSets(rs.Namespace).Delete(ctx, rs.Name, metav1.DeleteOptions{})
+	if !apierrors.IsNotFound(err) {
+		framework.ExpectNoError(err, "delete ReplicaSet %q in namespace %q", rs.Name, rs.Namespace)
+	}
+	selector, err := metav1.LabelSelectorAsSelector(rs.Spec.Selector)
+	framework.ExpectNoError(err, "parse label selector for ReplicaSet %q", rs.Name)
+	podList, err := f.ClientSet.CoreV1().Pods(rs.Namespace).List(ctx, metav1.ListOptions{LabelSelector: selector.String()})
+	framework.ExpectNoError(err, "list Pods for ReplicaSet %q in namespace %q", rs.Name, rs.Namespace)
+	var pods []*v1.Pod
+	for i := range podList.Items {
+		pods = append(pods, &podList.Items[i])
+	}
+	e2epod.DeletePodsWithWait(ctx, f.ClientSet, pods)
 }
 
 func createPod(ctx context.Context, f *framework.Framework, conf pausePodConfig) *v1.Pod {

@@ -1253,6 +1253,7 @@ func doPodResizeDeferredPreemptionTests(f *framework.Framework) {
 
 		ginkgo.By(fmt.Sprintf("Create victim pod '%s' (50%% CPU), mid-pri pod '%s' (20%% CPU) and preemptor pod '%s' (20%% CPU) in batch", victim.Name, midPriPod.Name, preemptor.Name))
 		createdPods := podClient.CreateBatch(ctx, []*v1.Pod{victim, midPriPod, preemptor})
+		defer e2epod.DeletePodsWithWait(ctx, f.ClientSet, createdPods)
 		victim = createdPods[0]
 		midPriPod = createdPods[1]
 		preemptor = createdPods[2]
