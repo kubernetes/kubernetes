@@ -17,6 +17,7 @@ limitations under the License.
 package retry
 
 import (
+	"context"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -46,23 +47,9 @@ var DefaultBackoff = wait.Backoff{
 // according to the provided function. backoff defines the maximum retries and the wait
 // interval between two retries.
 func OnError(backoff wait.Backoff, retriable func(error) bool, fn func() error) error {
-	var lastErr error
-	err := wait.ExponentialBackoff(backoff, func() (bool, error) {
-		err := fn()
-		switch {
-		case err == nil:
-			return true, nil
-		case retriable(err):
-			lastErr = err
-			return false, nil
-		default:
-			return false, err
-		}
+	return OnErrorWithContext(context.Background(), backoff, retriable, func(_ context.Context) error {
+		return fn()
 	})
-	if wait.Interrupted(err) && lastErr != nil {
-		err = lastErr
-	}
-	return err
 }
 
 // RetryOnConflict is used to make an update to a resource when you have to worry about
@@ -102,4 +89,48 @@ func OnError(backoff wait.Backoff, retriable func(error) bool, fn func() error) 
 // TODO: Make Backoff an interface?
 func RetryOnConflict(backoff wait.Backoff, fn func() error) error {
 	return OnError(backoff, errors.IsConflict, fn)
+}
+
+// OnErrorWithContext is like OnError but accepts a context. If the context is
+// cancelled or its deadline is exceeded while waiting between retries, the
+// context error is returned immediately without waiting for the full backoff
+// duration to elapse. The context is passed into fn so that it can be used
+// to cancel in-flight operations (e.g. API calls) as well.
+func OnErrorWithContext(ctx context.Context, backoff wait.Backoff, retriable func(error) bool, fn func(ctx context.Context) error) error {
+	var lastErr error
+	err := wait.ExponentialBackoffWithContext(ctx, backoff, func(ctx context.Context) (bool, error) {
+		err := fn(ctx)
+		switch {
+		case err == nil:
+			return true, nil
+		case retriable(err):
+			lastErr = err
+			return false, nil
+		default:
+			return false, err
+		}
+	})
+	if wait.Interrupted(err) && lastErr != nil {
+		err = lastErr
+	}
+	return err
+}
+
+// RetryOnConflictWithContext is like RetryOnConflict but accepts a context. If
+// the context is cancelled or its deadline is exceeded while waiting between
+// retries, the context error is returned immediately without waiting for the
+// full backoff duration to elapse. The context is passed into fn so that it can
+// be used to cancel in-flight operations (e.g. API calls) as well.
+//
+//	err := retry.RetryOnConflictWithContext(ctx, retry.DefaultRetry, func(ctx context.Context) error {
+//	    pod, err := c.Pods("mynamespace").Get(ctx, name, metav1.GetOptions{})
+//	    if err != nil {
+//	        return err
+//	    }
+//	    pod.Status.Phase = v1.PodFailed
+//	    _, err = c.Pods("mynamespace").UpdateStatus(ctx, pod)
+//	    return err
+//	})
+func RetryOnConflictWithContext(ctx context.Context, backoff wait.Backoff, fn func(ctx context.Context) error) error {
+	return OnErrorWithContext(ctx, backoff, errors.IsConflict, fn)
 }
