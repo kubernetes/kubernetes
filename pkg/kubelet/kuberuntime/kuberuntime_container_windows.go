@@ -172,21 +172,22 @@ func toKubeContainerResources(statusResources *runtimeapi.ContainerResources) *k
 	var cStatusResources *kubecontainer.ContainerResources
 	runtimeStatusResources := statusResources.GetWindows()
 	if runtimeStatusResources != nil {
-		var memLimit, cpuLimit *resource.Quantity
+		var memLimit *resource.Quantity
 
-		// Used the reversed formula from the calculateCPUMaximum function
-		if runtimeStatusResources.CpuMaximum > 0 {
-			cpuLimitValue := runtimeStatusResources.CpuMaximum * int64(winstats.ProcessorCount()) / 10
-			cpuLimit = resource.NewMilliQuantity(cpuLimitValue, resource.DecimalSI)
-		}
+		// The cpu limit is deliberately not derived back from CpuMaximum. CpuMaximum is a
+		// hundredth of a percent of the whole machine, so calculateCPUMaximum discards
+		// everything the node cannot express at that granularity and the conversion cannot
+		// be inverted: reversing it reports a limit below the one the container was given,
+		// and by more the more processors the node has. In-place resize is not supported on
+		// Windows, so a container always runs with the resources it was created with, and
+		// the allocated limit that the caller falls back to is the accurate one.
 
 		if runtimeStatusResources.MemoryLimitInBytes > 0 {
 			memLimit = resource.NewQuantity(runtimeStatusResources.MemoryLimitInBytes, resource.BinarySI)
 		}
 
-		if cpuLimit != nil || memLimit != nil {
+		if memLimit != nil {
 			cStatusResources = &kubecontainer.ContainerResources{
-				CPULimit:    cpuLimit,
 				MemoryLimit: memLimit,
 			}
 		}
