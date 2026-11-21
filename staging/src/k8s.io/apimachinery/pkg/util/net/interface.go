@@ -222,7 +222,14 @@ func getMatchingGlobalIP(logger klog.Logger, addrs []net.Addr, family AddressFam
 	if len(addrs) > 0 {
 		for i := range addrs {
 			logger.V(4).Info("Checking for matching global IP", "address", addrs[i])
-			ip, _, err := netutils.ParseCIDRSloppy(addrs[i].String())
+			addrStr := addrs[i].String()
+			// Skip addresses with a zone ID (e.g. "fe80::1%eth0/64");
+			// ParseCIDRSloppy cannot handle the '%' delimiter.
+			if strings.Contains(addrStr, "%") {
+				logger.V(4).Info("Skipping IPv6 link-local address with zone ID", "address", addrStr)
+				continue
+			}
+			ip, _, err := netutils.ParseCIDRSloppy(addrStr)
 			if err != nil {
 				return nil, err
 			}
@@ -337,7 +344,14 @@ func chooseIPFromHostInterfaces(logger klog.Logger, nw networkInterfacer, addres
 				continue
 			}
 			for _, addr := range addrs {
-				ip, _, err := netutils.ParseCIDRSloppy(addr.String())
+				addrStr := addr.String()
+				// Skip addresses with a zone ID (e.g. "fe80::1%eth0/64");
+				// ParseCIDRSloppy cannot handle the '%' delimiter.
+				if strings.Contains(addrStr, "%") {
+					logger.V(4).Info("Skipping IPv6 link-local address with zone ID", "interface", intf.Name, "address", addrStr)
+					continue
+				}
+				ip, _, err := netutils.ParseCIDRSloppy(addrStr)
 				if err != nil {
 					return nil, fmt.Errorf("unable to parse CIDR for interface %q: %s", intf.Name, err)
 				}
