@@ -186,3 +186,74 @@ func TestConvert_autoscaling_HorizontalPodAutoscalerSpec_To_v1_HorizontalPodAuto
 		})
 	}
 }
+
+// Pins down how the v1 behavior annotation maps onto the internal Spec.Behavior.
+// Values that decode cleanly to an empty struct must produce a non-nil empty
+// Behavior so that a v2 `behavior: {}` survives a trip through v1.
+func TestConvert_v1_HorizontalPodAutoscaler_To_autoscaling_HorizontalPodAutoscaler_BehaviorAnnotation(t *testing.T) {
+	tests := []struct {
+		name           string
+		annotation     *string
+		expectBehavior *autoscaling.HorizontalPodAutoscalerBehavior
+	}{
+		{
+			name:           "no annotation",
+			annotation:     nil,
+			expectBehavior: nil,
+		},
+		{
+			name:           "malformed annotation is ignored",
+			annotation:     new("abc"),
+			expectBehavior: nil,
+		},
+		{
+			name:           "empty string is ignored",
+			annotation:     new(""),
+			expectBehavior: nil,
+		},
+		{
+			name:           "null decodes to empty behavior",
+			annotation:     new("null"),
+			expectBehavior: &autoscaling.HorizontalPodAutoscalerBehavior{},
+		},
+		{
+			name:           "empty object decodes to empty behavior",
+			annotation:     new("{}"),
+			expectBehavior: &autoscaling.HorizontalPodAutoscalerBehavior{},
+		},
+		{
+			name:           "empty behavior as serialized by internal to v1 conversion",
+			annotation:     new(`{"ScaleUp":null,"ScaleDown":null}`),
+			expectBehavior: &autoscaling.HorizontalPodAutoscalerBehavior{},
+		},
+		{
+			name:       "populated behavior",
+			annotation: new(`{"ScaleUp":{"StabilizationWindowSeconds":300,"Policies":[{"Type":"Pods","Value":2,"PeriodSeconds":60}]}}`),
+			expectBehavior: &autoscaling.HorizontalPodAutoscalerBehavior{
+				ScaleUp: &autoscaling.HPAScalingRules{
+					StabilizationWindowSeconds: ptr.To[int32](300),
+					Policies: []autoscaling.HPAScalingPolicy{{
+						Type:          autoscaling.PodsScalingPolicy,
+						Value:         2,
+						PeriodSeconds: 60,
+					}},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			in := &autoscalingv1.HorizontalPodAutoscaler{}
+			if tt.annotation != nil {
+				in.Annotations = map[string]string{autoscaling.BehaviorSpecsAnnotation: *tt.annotation}
+			}
+			out := &autoscaling.HorizontalPodAutoscaler{}
+			if err := Convert_v1_HorizontalPodAutoscaler_To_autoscaling_HorizontalPodAutoscaler(in, out, nil); err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			assert.Equal(t, tt.expectBehavior, out.Spec.Behavior)
+			assert.NotContains(t, out.Annotations, autoscaling.BehaviorSpecsAnnotation)
+		})
+	}
+}
