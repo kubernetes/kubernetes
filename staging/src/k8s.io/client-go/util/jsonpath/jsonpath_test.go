@@ -949,3 +949,99 @@ func TestStep(t *testing.T) {
 		t,
 	)
 }
+
+func TestFilterNilSlice(t *testing.T) {
+	var input = []byte(`{
+		"contexts": null,
+		"items": [
+			{
+				"subjects": null
+			},
+			{
+				"subjects": [
+					{
+						"kind": "Group",
+						"name": "g1"
+					},
+					{
+						"kind": "User",
+						"name": "u1"
+					}
+				]
+			}
+		]
+	}`)
+	var data interface{}
+	err := json.Unmarshal(input, &data)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	testJSONPath(
+		[]jsonpathTest{
+			{
+				"filter on null field directly",
+				`{.contexts[?(@.name=="dev")].context.namespace}`,
+				data,
+				"",
+				false,
+			},
+			{
+				"filter on items where some have null slice",
+				`{.items[*].subjects[?(@.kind=="Group")].name}`,
+				data,
+				"g1",
+				false,
+			},
+			{
+				"exists filter on items where some have null slice",
+				`{.items[*].subjects[?(@.kind)].name}`,
+				data,
+				"g1 u1",
+				false,
+			},
+		},
+		false,
+		t,
+	)
+
+	type subject struct {
+		Kind string
+		Name string
+	}
+	type item struct {
+		Subjects []subject
+	}
+	structData := struct {
+		Contexts []string
+		Items    []item
+	}{
+		Contexts: nil,
+		Items: []item{
+			{Subjects: nil},
+			{Subjects: []subject{{Kind: "Group", Name: "g1"}, {Kind: "User", Name: "u1"}}},
+		},
+	}
+
+	testJSONPath(
+		[]jsonpathTest{
+			{
+				"filter on struct with nil slice field directly",
+				`{.Contexts[?(@=="dev")]}`,
+				structData,
+				"",
+				false,
+			},
+			{
+				"filter on struct items where some have nil slice",
+				`{.Items[*].Subjects[?(@.Kind=="Group")].Name}`,
+				structData,
+				"g1",
+				false,
+			},
+		},
+		false,
+		t,
+	)
+}
+
