@@ -18,6 +18,7 @@ package volumebinding
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -36,6 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
+	schedulermetrics "k8s.io/kubernetes/pkg/scheduler/metrics"
 	tf "k8s.io/kubernetes/pkg/scheduler/testing/framework"
 	"k8s.io/utils/ptr"
 )
@@ -2075,6 +2077,114 @@ func TestIsSchedulableAfterCSIDriverChange(t *testing.T) {
 			}
 			if qhint != item.expect {
 				t.Errorf("QHint does not match: %v, want: %v", qhint, item.expect)
+			}
+		})
+	}
+}
+
+func BenchmarkFilter(b *testing.B) {
+	// Filter runs through the parallelizer, which records scheduler metrics.
+	schedulermetrics.Register()
+
+	// A StorageClass whose provisioner has no CSIDriver object, so the
+	// capacity check is skipped. Used as a baseline.
+	waitSCWithoutStorageCapacity := &storagev1.StorageClass{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "wait-sc-without-storage-capacity",
+		},
+		Provisioner:       "driver-without-storage-capacity",
+		VolumeBindingMode: &waitForFirstConsumer,
+	}
+
+	tests := []struct {
+		name         string
+		storageClass *storagev1.StorageClass
+		allNodesNum  int
+		// capacitiesNum is the number of CSIStorageCapacity objects. Capacity i
+		// is for node-i, like drivers for node-local storage publish. Capacities
+		// beyond allNodesNum are for nodes outside the filtered set, like the
+		// rest of a large cluster.
+		capacitiesNum int
+	}{
+		{
+			name:         "1000nodes/without-storage-capacity",
+			storageClass: waitSCWithoutStorageCapacity,
+			allNodesNum:  1000,
+		},
+		{
+			name:          "1000nodes/1000capacities",
+			storageClass:  waitSCWithStorageCapacity,
+			allNodesNum:   1000,
+			capacitiesNum: 1000,
+		},
+		{
+			name:          "5000nodes/5000capacities",
+			storageClass:  waitSCWithStorageCapacity,
+			allNodesNum:   5000,
+			capacitiesNum: 5000,
+		},
+	}
+
+	for _, tt := range tests {
+		b.Run(tt.name, func(b *testing.B) {
+			_, ctx := ktesting.NewTestContext(b)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+			client := fake.NewSimpleClientset()
+			informerFactory := informers.NewSharedInformerFactory(client, 0)
+			fh, err := runtime.NewFramework(ctx, nil, nil,
+				runtime.WithClientSet(client),
+				runtime.WithInformerFactory(informerFactory),
+			)
+			if err != nil {
+				b.Fatal(err)
+			}
+			pl, err := New(ctx, &config.VolumeBindingArgs{BindTimeoutSeconds: 300}, fh, feature.Features{})
+			if err != nil {
+				b.Fatal(err)
+			}
+
+			if _, err := client.StorageV1().StorageClasses().Create(ctx, tt.storageClass, metav1.CreateOptions{}); err != nil {
+				b.Fatal(err)
+			}
+			if _, err := client.StorageV1().CSIDrivers().Create(ctx, driverWithStorageCapacity, metav1.CreateOptions{}); err != nil {
+				b.Fatal(err)
+			}
+			pvc := makePVC("pvc-dynamic", tt.storageClass.Name).withRequestStorage(resource.MustParse("10Gi")).PersistentVolumeClaim
+			if _, err := client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(ctx, pvc, metav1.CreateOptions{}); err != nil {
+				b.Fatal(err)
+			}
+			nodes := make([]*v1.Node, tt.allNodesNum)
+			for i := range nodes {
+				name := fmt.Sprintf("node-%d", i)
+				nodes[i] = makeNode(name).withLabel(nodeLabelKey, name).Node
+			}
+			for i := range tt.capacitiesNum {
+				name := fmt.Sprintf("node-%d", i)
+				capacity := makeCapacity("capacity-"+name, tt.storageClass.Name, makeNode(name).withLabel(nodeLabelKey, name).Node, "100Gi", "")
+				if _, err := client.StorageV1().CSIStorageCapacities(capacity.Namespace).Create(ctx, capacity, metav1.CreateOptions{}); err != nil {
+					b.Fatal(err)
+				}
+			}
+			informerFactory.StartWithContext(ctx)
+			informerFactory.WaitForCacheSyncWithContext(ctx)
+
+			p := pl.(*VolumeBinding)
+			pod := makePod("pod-a").withPVCVolume(pvc.Name, "").Pod
+			nodeInfos := tf.BuildNodeInfos(nodes)
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				state := framework.NewCycleState()
+				if _, s := p.PreFilter(ctx, state, pod, nodeInfos); !s.IsSuccess() {
+					b.Fatal(s.AsError())
+				}
+				filterNode := func(i int) {
+					if s := p.Filter(ctx, state, pod, nodeInfos[i]); !s.IsSuccess() {
+						b.Errorf("node %s: %v", nodeInfos[i].Node().Name, s.AsError())
+					}
+				}
+				fh.Parallelizer().Until(ctx, len(nodeInfos), filterNode, "")
 			}
 		})
 	}
