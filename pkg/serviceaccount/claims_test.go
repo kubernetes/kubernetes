@@ -33,6 +33,7 @@ import (
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	podutil "k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/apis/authentication"
 	"k8s.io/kubernetes/pkg/apis/core"
 )
@@ -359,7 +360,7 @@ func TestClaims(t *testing.T) {
 				return string(b)
 			}
 
-			sc, pc, err := Claims(c.sa, c.pod, c.sec, c.node, c.validating, c.mutating, c.exp, c.warnafter, c.aud, c.attestations)
+			sc, pc, err := Claims(c.sa, podutil.MustAccessor(c.pod), c.sec, c.node, c.validating, c.mutating, c.exp, c.warnafter, c.aud, c.attestations)
 			if err != nil && err.Error() != c.err {
 				t.Errorf("expected error %q but got: %v", c.err, err)
 			}
