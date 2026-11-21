@@ -41,6 +41,7 @@ import (
 
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2ehostexec "k8s.io/kubernetes/test/e2e/framework/hostexec"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -49,7 +50,6 @@ import (
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
-	"k8s.io/kubernetes/test/e2e/storage/utils"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -791,7 +791,7 @@ func trimSpaceNewlineInString(s string) string {
 	return strings.ReplaceAll(s, " ", "")
 }
 
-func pidOfKubelet(ctx context.Context, hostExec utils.HostExec, node *v1.Node) int {
+func pidOfKubelet(ctx context.Context, hostExec e2ehostexec.HostExec, node *v1.Node) int {
 	cmd := "pidof kubelet"
 	kubeletPid, err := hostExec.IssueCommandWithResult(ctx, cmd, node)
 	framework.ExpectNoError(err, "Checking kubelet pid")
