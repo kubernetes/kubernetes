@@ -54,10 +54,14 @@ var _ = SIGDescribe("ServerSideApply", func() {
 	})
 
 	ginkgo.AfterEach(func(ctx context.Context) {
-		_ = client.AppsV1().Deployments(ns).Delete(ctx, "deployment", metav1.DeleteOptions{})
-		_ = client.AppsV1().Deployments(ns).Delete(ctx, "deployment-shared-unset", metav1.DeleteOptions{})
-		_ = client.AppsV1().Deployments(ns).Delete(ctx, "deployment-shared-map-item-removal", metav1.DeleteOptions{})
-		_ = client.CoreV1().Pods(ns).Delete(ctx, "test-pod", metav1.DeleteOptions{})
+		for _, name := range []string{"deployment", "deployment-shared-unset", "deployment-shared-map-item-removal"} {
+			if err := client.AppsV1().Deployments(ns).Delete(ctx, name, metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+				framework.Logf("Failed to delete deployment %s: %v", name, err)
+			}
+		}
+		if err := client.CoreV1().Pods(ns).Delete(ctx, "test-pod", metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+			framework.Logf("Failed to delete pod test-pod: %v", err)
+		}
 	})
 
 	/*
