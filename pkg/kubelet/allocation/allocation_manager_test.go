@@ -278,6 +278,9 @@ func TestUpdatePodFromAllocation(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			logger, _ := ktesting.NewTestContext(t)
+			if !test.inPlacePodLevelResizeEnabled {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, versionutil.MustParse("1.37"))
+			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodLevelResourcesVerticalScaling, test.inPlacePodLevelResizeEnabled)
 			allocationManager := makeAllocationManager(t, &containertest.FakeRuntime{}, nil, nil)
 			pod := test.pod.DeepCopy()
@@ -705,6 +708,9 @@ func TestUpdatePodFromAllocationPending(t *testing.T) {
 		for _, podLevelGate := range []bool{false, true} {
 			for _, memoryBackedGate := range []bool{false, true} {
 				t.Run(fmt.Sprintf("%s/podLevelGate=%t/memoryBackedGate=%t", test.name, podLevelGate, memoryBackedGate), func(t *testing.T) {
+					if !podLevelGate {
+						featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, versionutil.MustParse("1.37"))
+					}
 					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodLevelResourcesVerticalScaling, podLevelGate)
 					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingMemoryBackedVolumes, memoryBackedGate)
 					pod, allocated := newPod(), newPod()
@@ -2308,6 +2314,7 @@ func TestRetryPendingPodLevelResizesWithSwap(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.disablePLRScaling {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, versionutil.MustParse("1.37"))
 				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodLevelResourcesVerticalScaling, false)
 			}
 			metrics.PodInfeasibleResizes.Reset()
@@ -3941,6 +3948,9 @@ func TestAllocationManagerAddPodWithPLR(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			tCtx := ktesting.Init(t)
+			if !tc.ipprPLRFeatureGate {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, versionutil.MustParse("1.37"))
+			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodLevelResourcesVerticalScaling, tc.ipprPLRFeatureGate)
 			allocationManager := makeAllocationManager(t, &containertest.FakeRuntime{}, []*v1.Pod{}, nil)
 

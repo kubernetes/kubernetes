@@ -122,7 +122,6 @@ func TestDisallowResizeForSwappableContainers(t *testing.T) {
 	for _, tc := range []struct {
 		name       string
 		gate       bool
-		plrGate    bool
 		behavior   func(*v1.Pod, *v1.Container) kubetypes.SwapBehavior
 		allocated  *v1.Pod
 		desired    *v1.Pod
@@ -196,14 +195,14 @@ func TestDisallowResizeForSwappableContainers(t *testing.T) {
 		},
 		{
 			name: "gate on: pod-level swap limit resize on NoSwap node is infeasible",
-			gate: true, plrGate: true, behavior: noSwapNode,
+			gate: true, behavior: noSwapNode,
 			allocated:  withPodSwap(mkPod("", "1Gi", "4Gi", "", false), "1Gi"),
 			desired:    withPodSwap(mkPod(desiredMarker, "1Gi", "4Gi", "", false), "2Gi"),
 			disallowed: true,
 		},
 		{
 			name: "gate on: pod-level swap limit resize on WorkloadControlledSwap node is allowed",
-			gate: true, plrGate: true, behavior: workloadControlledNode,
+			gate: true, behavior: workloadControlledNode,
 			allocated:  withPodSwap(mkPod("", "1Gi", "4Gi", "", false), "1Gi"),
 			desired:    withPodSwap(mkPod(desiredMarker, "1Gi", "4Gi", "", false), "2Gi"),
 			disallowed: false,
@@ -224,35 +223,35 @@ func TestDisallowResizeForSwappableContainers(t *testing.T) {
 		},
 		{
 			name: "gate off: pod-level memory request change with LimitedSwap is infeasible",
-			gate: false, plrGate: true, behavior: limitedSwapNode,
+			gate: false, behavior: limitedSwapNode,
 			allocated:  withPodMemory(mkPod("", "1Gi", "4Gi", "", false), "1Gi", "4Gi"),
 			desired:    withPodMemory(mkPod(desiredMarker, "1Gi", "4Gi", "", false), "2Gi", "4Gi"),
 			disallowed: true,
 		},
 		{
 			name: "gate on: pod-level memory request change with LimitedSwap is infeasible",
-			gate: true, plrGate: true, behavior: limitedSwapNode,
+			gate: true, behavior: limitedSwapNode,
 			allocated:  withPodMemory(mkPod("", "1Gi", "4Gi", "", false), "1Gi", "4Gi"),
 			desired:    withPodMemory(mkPod(desiredMarker, "1Gi", "4Gi", "", false), "2Gi", "4Gi"),
 			disallowed: true,
 		},
 		{
 			name: "gate on: pod-level memory request change with pod-level limits.swap is allowed",
-			gate: true, plrGate: true, behavior: limitedSwapNode,
+			gate: true, behavior: limitedSwapNode,
 			allocated:  withPodMemory(withPodSwap(mkPod("", "1Gi", "4Gi", "", false), "1Gi"), "1Gi", "4Gi"),
 			desired:    withPodMemory(withPodSwap(mkPod(desiredMarker, "1Gi", "4Gi", "", false), "1Gi"), "2Gi", "4Gi"),
 			disallowed: false,
 		},
 		{
 			name: "gate on: adding a pod-level limits.swap on a LimitedSwap node is allowed",
-			gate: true, plrGate: true, behavior: limitedSwapNode,
+			gate: true, behavior: limitedSwapNode,
 			allocated:  withPodMemory(mkPod("", "1Gi", "4Gi", "", false), "1Gi", "4Gi"),
 			desired:    withPodMemory(withPodSwap(mkPod(desiredMarker, "1Gi", "4Gi", "", false), "1Gi"), "1Gi", "4Gi"),
 			disallowed: false,
 		},
 		{
 			name: "gate on: pod-level memory request change on WorkloadControlledSwap node is allowed",
-			gate: true, plrGate: true, behavior: workloadControlledNode,
+			gate: true, behavior: workloadControlledNode,
 			allocated:  withPodMemory(mkPod("", "1Gi", "4Gi", "256Mi", false), "1Gi", "4Gi"),
 			desired:    withPodMemory(mkPod(desiredMarker, "1Gi", "4Gi", "256Mi", false), "2Gi", "4Gi"),
 			disallowed: false,
@@ -280,7 +279,7 @@ func TestDisallowResizeForSwappableContainers(t *testing.T) {
 		},
 		{
 			name: "gate on: adding a container under pod-level limits.swap on WorkloadControlledSwap node is infeasible",
-			gate: true, plrGate: true, behavior: workloadControlledNode,
+			gate: true, behavior: workloadControlledNode,
 			allocated:  withPodSwap(mkPod("", "1Gi", "4Gi", "", false), "1Gi"),
 			desired:    withExtraContainer(withPodSwap(mkPod(desiredMarker, "1Gi", "4Gi", "", false), "1Gi"), ""),
 			disallowed: true,
@@ -288,7 +287,6 @@ func TestDisallowResizeForSwappableContainers(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WorkloadControlledSwap, tc.gate)
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodLevelResourcesVerticalScaling, tc.plrGate)
 			rt := &swapBehaviorRuntime{FakeRuntime: &containertest.FakeRuntime{}, behaviorFn: tc.behavior}
 			disallowed, msg := disallowResizeForSwappableContainers(rt, tc.desired, tc.allocated)
 			assert.Equal(t, tc.disallowed, disallowed, "disallowed (msg=%q)", msg)
