@@ -314,7 +314,7 @@ var _ = SIGDescribe("MirrorPod (Pod Generation)", func() {
 
 			ginkgo.By("wait for the mirror pod to be updated")
 			gomega.Eventually(ctx, func(ctx context.Context) error {
-				return checkMirrorPodRecreated(ctx, f.ClientSet, mirrorPodName, ns, uid)
+				return checkMirrorPodRecreatedAndRunning(ctx, f.ClientSet, mirrorPodName, ns, uid)
 			}, 2*time.Minute, time.Second*4).Should(gomega.Succeed())
 
 			ginkgo.By("check mirror pod generation remains at 1")
@@ -337,7 +337,7 @@ var _ = SIGDescribe("MirrorPod (Pod Generation)", func() {
 
 			ginkgo.By("wait for the mirror pod to be updated")
 			gomega.Eventually(ctx, func(ctx context.Context) error {
-				return checkMirrorPodRecreated(ctx, f.ClientSet, mirrorPodName, ns, uid)
+				return checkMirrorPodRecreatedAndRunning(ctx, f.ClientSet, mirrorPodName, ns, uid)
 			}, 2*time.Minute, time.Second*4).Should(gomega.Succeed())
 
 			ginkgo.By("check mirror pod generation remains at 1")
@@ -362,6 +362,8 @@ var _ = SIGDescribe("MirrorPod (Pod Generation)", func() {
 			gomega.Eventually(ctx, func(ctx context.Context) error {
 				return checkMirrorPodRecreated(ctx, f.ClientSet, mirrorPodName, ns, uid)
 			}, 2*time.Minute, time.Second*4).Should(gomega.Succeed())
+			// A pod deleted while its container is being created takes 2m to stop on CRI-O.
+			framework.ExpectNoError(e2epod.WaitForPodInitContainerStarted(ctx, f.ClientSet, ns, mirrorPodName, 0, f.Timeouts.PodStart))
 
 			ginkgo.By("check mirror pod generation remains at 1")
 			pod, err = f.ClientSet.CoreV1().Pods(ns).Get(ctx, mirrorPodName, metav1.GetOptions{})
