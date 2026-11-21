@@ -18,6 +18,7 @@ package statefulset
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"golang.org/x/text/cases"
@@ -29,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	errorutils "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	clientset "k8s.io/client-go/kubernetes"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/record"
@@ -102,14 +104,62 @@ func (om *realStatefulPodControlObjectManager) GetPod(namespace, podName string)
 }
 
 func (om *realStatefulPodControlObjectManager) UpdatePod(pod *v1.Pod, ss *apps.StatefulSet) error {
-	pod, err := om.client.CoreV1().Pods(pod.Namespace).Update(context.TODO(), pod, metav1.UpdateOptions{})
+	claims := getPersistentVolumeClaims(ss, pod)
+	var oldVolumes, newVolumes []v1.Volume
+	for i := range pod.Spec.Volumes {
+		if _, ok := claims[pod.Spec.Volumes[i].Name]; ok {
+			oldVolumes = append(oldVolumes, v1.Volume{Name: pod.Spec.Volumes[i].Name})
+			newVolumes = append(newVolumes, v1.Volume{
+				Name: pod.Spec.Volumes[i].Name,
+				VolumeSource: v1.VolumeSource{
+					PersistentVolumeClaim: pod.Spec.Volumes[i].PersistentVolumeClaim,
+				},
+			})
+		}
+	}
+	oldData, err := json.Marshal(v1.Pod{
+		Spec: v1.PodSpec{
+			Volumes: oldVolumes,
+		},
+	})
+	if err != nil {
+		return err
+	}
+	var newLabels map[string]string
+	if len(pod.Labels) > 0 {
+		newLabels = make(map[string]string, 2)
+		if v, ok := pod.Labels[apps.StatefulSetPodNameLabel]; ok {
+			newLabels[apps.StatefulSetPodNameLabel] = v
+		}
+		if v, ok := pod.Labels[apps.PodIndexLabel]; ok {
+			newLabels[apps.PodIndexLabel] = v
+		}
+	}
+	newData, err := json.Marshal(v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:             pod.UID,
+			ResourceVersion: pod.ResourceVersion,
+			Labels:          newLabels,
+		},
+		Spec: v1.PodSpec{
+			Volumes: newVolumes,
+		},
+	})
+	if err != nil {
+		return err
+	}
+	patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, v1.Pod{})
+	if err != nil {
+		return err
+	}
+	patchedPod, err := om.client.CoreV1().Pods(pod.Namespace).Patch(context.TODO(), pod.Name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{})
 	if err == nil {
 		ssNamespacedName := types.NamespacedName{Namespace: ss.Namespace, Name: ss.Name}
 		om.consistencyStore.WroteAt(
 			ssNamespacedName,
 			ss.UID,
 			podGroupResource,
-			pod.ResourceVersion,
+			patchedPod.ResourceVersion,
 		)
 	}
 	return err

@@ -24,6 +24,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/fake"
@@ -155,6 +156,67 @@ func TestPatchPodStatusVolumeHealth(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestPatchPodStatusWithResourceVersion(t *testing.T) {
+	ns := "ns"
+	name := "name"
+	uid := types.UID("myuid")
+	rv := "42"
+	client := fake.NewClientset(&v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace:       ns,
+			Name:            name,
+			UID:             uid,
+			ResourceVersion: rv,
+		},
+	})
+
+	testCases := []struct {
+		description        string
+		mutate             func(input v1.PodStatus) v1.PodStatus
+		expectUnchanged    bool
+		expectedPatchBytes []byte
+	}{
+		{
+			"no change",
+			func(input v1.PodStatus) v1.PodStatus { return input },
+			true,
+			[]byte(`{"metadata":{"resourceVersion":"42","uid":"myuid"}}`),
+		},
+		{
+			"pod condition change",
+			func(input v1.PodStatus) v1.PodStatus {
+				input.Conditions[0].Status = v1.ConditionFalse
+				return input
+			},
+			false,
+			[]byte(`{"metadata":{"resourceVersion":"42","uid":"myuid"},"status":{"$setElementOrder/conditions":[{"type":"Ready"},{"type":"PodScheduled"}],"conditions":[{"status":"False","type":"Ready"}]}}`),
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			_, patchBytes, unchanged, err := PatchPodStatusWithResourceVersion(context.TODO(), client, ns, name, uid, rv, getPodStatus(), tc.mutate(getPodStatus()))
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			if unchanged != tc.expectUnchanged {
+				t.Errorf("unexpected change: %t", unchanged)
+			}
+			if !reflect.DeepEqual(patchBytes, tc.expectedPatchBytes) {
+				t.Errorf("expect patchBytes: %q, got: %q\n", tc.expectedPatchBytes, patchBytes)
+			}
+		})
+	}
+
+	t.Run("not found error unwraps", func(t *testing.T) {
+		mutated := getPodStatus()
+		mutated.Conditions[0].Status = v1.ConditionFalse
+		_, _, _, err := PatchPodStatusWithResourceVersion(context.TODO(), client, ns, "missing-pod", uid, rv, getPodStatus(), mutated)
+		if !apierrors.IsNotFound(err) {
+			t.Errorf("expected IsNotFound error, got: %v", err)
+		}
+	})
 }
 
 func getPodStatus() v1.PodStatus {

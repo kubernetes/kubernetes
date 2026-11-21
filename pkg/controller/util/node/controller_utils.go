@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	nodepkg "k8s.io/kubernetes/pkg/util/node"
+	podutil "k8s.io/kubernetes/pkg/util/pod"
 
 	"k8s.io/klog/v2"
 )
@@ -129,20 +130,23 @@ func MarkPodsNotReady(ctx context.Context, kubeClient clientset.Interface, recor
 			continue
 		}
 
-		// Pod will be modified, so making copy is required.
-		pod := pods[i].DeepCopy()
+		pod := pods[i]
 		for _, cond := range pod.Status.Conditions {
 			if cond.Type != v1.PodReady {
 				continue
 			}
+			if cond.Status == v1.ConditionFalse {
+				break
+			}
 
 			cond.Status = v1.ConditionFalse
-			if !utilpod.UpdatePodCondition(&pod.Status, &cond) {
+			newStatus := pod.Status.DeepCopy()
+			if !utilpod.UpdatePodCondition(newStatus, &cond) {
 				break
 			}
 
 			logger.V(2).Info("Updating ready status of pod to false", "pod", klog.KObj(pod))
-			if _, err := kubeClient.CoreV1().Pods(pod.Namespace).UpdateStatus(ctx, pod, metav1.UpdateOptions{}); err != nil {
+			if _, _, _, err := podutil.PatchPodStatusWithResourceVersion(ctx, kubeClient, pod.Namespace, pod.Name, pod.UID, pod.ResourceVersion, pod.Status, *newStatus); err != nil {
 				if apierrors.IsNotFound(err) {
 					// NotFound error means that pod was already deleted.
 					// There is nothing left to do with this pod.
