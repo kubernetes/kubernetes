@@ -50,11 +50,29 @@ func (gc *GarbageCollector) apiResource(apiVersion, kind string) (schema.GroupVe
 	return mapping.Resource, mapping.Scope == meta.RESTScopeNamespace, nil
 }
 
-func (gc *GarbageCollector) deleteObject(item objectReference, resourceVersion string, ownersAtResourceVersion []metav1.OwnerReference, policy *metav1.DeletionPropagation) error {
-	resource, namespaced, err := gc.apiResource(item.APIVersion, item.Kind)
+// nodeResource resolves the resource used to read and write the object n represents.
+// The apiVersion of an observed node is just the version of the informer that first
+// saw the object, so if that version is no longer served, any served version of the
+// same group/kind addresses the same object. Virtual nodes take their apiVersion from
+// an ownerReference and are resolved strictly.
+func (gc *GarbageCollector) nodeResource(n *node) (schema.GroupVersionResource, bool, error) {
+	resource, namespaced, err := gc.apiResource(n.identity.APIVersion, n.identity.Kind)
+	if err == nil || !n.isObserved() {
+		return resource, namespaced, err
+	}
+	mapping, mappingErr := gc.restMapper.RESTMapping(schema.FromAPIVersionAndKind(n.identity.APIVersion, n.identity.Kind).GroupKind())
+	if mappingErr != nil {
+		return schema.GroupVersionResource{}, false, err
+	}
+	return mapping.Resource, mapping.Scope == meta.RESTScopeNamespace, nil
+}
+
+func (gc *GarbageCollector) deleteObject(n *node, resourceVersion string, ownersAtResourceVersion []metav1.OwnerReference, policy *metav1.DeletionPropagation) error {
+	resource, namespaced, err := gc.nodeResource(n)
 	if err != nil {
 		return err
 	}
+	item := n.identity
 	uid := item.UID
 	preconditions := metav1.Preconditions{UID: &uid}
 	if len(resourceVersion) > 0 {
@@ -73,17 +91,18 @@ func (gc *GarbageCollector) deleteObject(item objectReference, resourceVersion s
 		if liveErr == nil && liveObject.UID == item.UID && liveObject.ResourceVersion != resourceVersion && reflect.DeepEqual(liveObject.OwnerReferences, ownersAtResourceVersion) {
 			// object changed, causing a conflict error, but ownerReferences did not change.
 			// retry delete without resourceVersion precondition so rapid updates unrelated to ownerReferences don't starve GC
-			return gc.deleteObject(item, "", nil, policy)
+			return gc.deleteObject(n, "", nil, policy)
 		}
 	}
 	return err
 }
 
-func (gc *GarbageCollector) getObject(item objectReference) (*metav1.PartialObjectMetadata, error) {
-	resource, namespaced, err := gc.apiResource(item.APIVersion, item.Kind)
+func (gc *GarbageCollector) getObject(n *node) (*metav1.PartialObjectMetadata, error) {
+	resource, namespaced, err := gc.nodeResource(n)
 	if err != nil {
 		return nil, err
 	}
+	item := n.identity
 	namespace := resourceDefaultNamespace(namespaced, item.Namespace)
 	if namespaced && len(namespace) == 0 {
 		// the type is namespaced, but we have no namespace coordinate.
@@ -93,17 +112,18 @@ func (gc *GarbageCollector) getObject(item objectReference) (*metav1.PartialObje
 	return gc.metadataClient.Resource(resource).Namespace(namespace).Get(context.TODO(), item.Name, metav1.GetOptions{})
 }
 
-func (gc *GarbageCollector) patchObject(item objectReference, patch []byte, pt types.PatchType) (*metav1.PartialObjectMetadata, error) {
-	resource, namespaced, err := gc.apiResource(item.APIVersion, item.Kind)
+func (gc *GarbageCollector) patchObject(n *node, patch []byte, pt types.PatchType) (*metav1.PartialObjectMetadata, error) {
+	resource, namespaced, err := gc.nodeResource(n)
 	if err != nil {
 		return nil, err
 	}
+	item := n.identity
 	return gc.metadataClient.Resource(resource).Namespace(resourceDefaultNamespace(namespaced, item.Namespace)).Patch(context.TODO(), item.Name, pt, patch, metav1.PatchOptions{})
 }
 
 func (gc *GarbageCollector) removeFinalizer(logger klog.Logger, owner *node, targetFinalizer string) error {
 	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		ownerObject, err := gc.getObject(owner.identity)
+		ownerObject, err := gc.getObject(owner)
 		if errors.IsNotFound(err) {
 			return nil
 		}
@@ -139,7 +159,7 @@ func (gc *GarbageCollector) removeFinalizer(logger klog.Logger, owner *node, tar
 		if err != nil {
 			return fmt.Errorf("unable to finalize %s due to an error serializing patch: %v", owner.identity, err)
 		}
-		_, err = gc.patchObject(owner.identity, patch, types.MergePatchType)
+		_, err = gc.patchObject(owner, patch, types.MergePatchType)
 		return err
 	})
 	if errors.IsConflict(err) {
