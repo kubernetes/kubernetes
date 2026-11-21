@@ -676,6 +676,68 @@ func TestCSILimits(t *testing.T) {
 	}
 }
 
+func TestCSILimitsUnrelatedDrivers(t *testing.T) {
+	tests := []struct {
+		name                 string
+		pod                  *v1.Pod
+		wantStatus           *fwk.Status
+		wantAttachmentLookup bool
+	}{
+		{
+			name: "only unlimited drivers",
+			pod:  st.MakePod().PVC("csi-pd.csi.storage.gke.io-1").Obj(),
+		},
+		{
+			name:                 "limited and unlimited drivers",
+			pod:                  st.MakePod().PVC("csi-pd.csi.storage.gke.io-1").PVC("csi-ebs.csi.aws.com-1").Obj(),
+			wantStatus:           fwk.NewStatus(fwk.Unschedulable, ErrReasonMaxVolumeCountExceeded),
+			wantAttachmentLookup: true,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// EBS is limited to two volumes; GCE is unlimited. The existing pod and
+			// VolumeAttachment fill the EBS limit, so another EBS volume must be rejected.
+			runningPod := st.MakePod().PVC("csi-ebs.csi.aws.com-3").Obj()
+			node, csiNode := getNodeWithPodAndVolumeLimits("csinode", []*v1.Pod{runningPod}, 2, ebsCSIDriverName, gceCSIDriverName)
+			csiNode.Spec.Drivers[1].Allocatable = nil
+			vaIndexer := &trackingVolumeAttachmentIndexer{
+				Indexer: cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{vaIndexKey: volumeAttachmentIndexer}),
+			}
+			va := st.MakeVolumeAttachment().Name("va").NodeName(node.Node().Name).Attacher(ebsCSIDriverName).
+				Source(storagev1.VolumeAttachmentSource{PersistentVolumeName: ptr.To("csi-ebs.csi.aws.com-0")}).Obj()
+			if err := vaIndexer.Add(va); err != nil {
+				t.Fatal(err)
+			}
+			p := &CSILimits{
+				csiManager: NewCSIManager(getFakeCSINodeLister(csiNode)),
+				pvLister:   getFakeCSIPVLister("csi", ebsCSIDriverName, gceCSIDriverName),
+				pvcLister:  getFakeCSIPVCLister("csi", scName, ebsCSIDriverName, gceCSIDriverName),
+				vaIndexer:  vaIndexer,
+				translator: csitrans.New(),
+			}
+			_, ctx := ktesting.NewTestContext(t)
+			if diff := cmp.Diff(test.wantStatus, p.Filter(ctx, nil, test.pod, node), statusCmpOpts...); diff != "" {
+				t.Errorf("Filter status does not match (-want, +got):\n%s", diff)
+			}
+			if vaIndexer.lookupCalled != test.wantAttachmentLookup {
+				t.Errorf("VolumeAttachment lookup = %v, want %v", vaIndexer.lookupCalled, test.wantAttachmentLookup)
+			}
+		})
+	}
+}
+
+// Track lookups because the unlimited-driver pod succeeds with or without the guard.
+type trackingVolumeAttachmentIndexer struct {
+	cache.Indexer
+	lookupCalled bool
+}
+
+func (i *trackingVolumeAttachmentIndexer) ByIndex(indexName, indexedValue string) ([]interface{}, error) {
+	i.lookupCalled = true
+	return i.Indexer.ByIndex(indexName, indexedValue)
+}
+
 func TestCSILimitsQHint(t *testing.T) {
 	podEbs := st.MakePod().PVC("csi-ebs.csi.aws.com-2")
 
