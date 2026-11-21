@@ -25,6 +25,7 @@ import (
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/version"
@@ -199,6 +200,99 @@ func TestDownwardAPI(t *testing.T) {
 			step.run(test)
 		}
 		test.tearDown()
+	}
+}
+
+type volumeHostWithAllocatable struct {
+	volume.VolumeHost
+	allocatable v1.ResourceList
+}
+
+func (h volumeHostWithAllocatable) GetNodeAllocatable() (v1.ResourceList, error) {
+	return h.allocatable, nil
+}
+
+func TestCollectDataPodLevelLimits(t *testing.T) {
+	podResources := &v1.ResourceRequirements{Limits: v1.ResourceList{
+		v1.ResourceCPU:    resource.MustParse("2"),
+		v1.ResourceMemory: resource.MustParse("256Mi"),
+	}}
+	items := []v1.DownwardAPIVolumeFile{
+		{Path: "cpu", ResourceFieldRef: &v1.ResourceFieldSelector{
+			ContainerName: "app", Resource: "limits.cpu", Divisor: resource.MustParse("1m"),
+		}},
+		{Path: "memory", ResourceFieldRef: &v1.ResourceFieldSelector{
+			ContainerName: "app", Resource: "limits.memory", Divisor: resource.MustParse("1Mi"),
+		}},
+	}
+	cases := []struct {
+		name                     string
+		podLevelResourcesEnabled bool
+		podResources             *v1.ResourceRequirements
+		containerLimits          v1.ResourceList
+		wantCPU, wantMemory      string
+	}{
+		{
+			name:                     "pod limits only",
+			podLevelResourcesEnabled: true,
+			podResources:             podResources,
+			wantCPU:                  "2000",
+			wantMemory:               "256",
+		},
+		{
+			name:                     "container CPU limit and pod memory limit",
+			podLevelResourcesEnabled: true,
+			podResources:             podResources,
+			containerLimits:          v1.ResourceList{v1.ResourceCPU: resource.MustParse("500m")},
+			wantCPU:                  "500",
+			wantMemory:               "256",
+		},
+		{
+			name:                     "pod CPU limit and node allocatable memory",
+			podLevelResourcesEnabled: true,
+			podResources: &v1.ResourceRequirements{Limits: v1.ResourceList{
+				v1.ResourceCPU: resource.MustParse("2"),
+			}},
+			wantCPU:    "2000",
+			wantMemory: "16384",
+		},
+		{
+			name:                     "pod limits ignored when feature is disabled",
+			podLevelResourcesEnabled: false,
+			podResources:             podResources,
+			wantCPU:                  "8000",
+			wantMemory:               "16384",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if !tc.podLevelResourcesEnabled {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.37"))
+			}
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, tc.podLevelResourcesEnabled)
+			host := volumeHostWithAllocatable{allocatable: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("8"),
+				v1.ResourceMemory: resource.MustParse("16Gi"),
+			}}
+			pod := &v1.Pod{Spec: v1.PodSpec{
+				Resources: tc.podResources,
+				Containers: []v1.Container{{
+					Name:      "app",
+					Resources: v1.ResourceRequirements{Limits: tc.containerLimits},
+				}},
+			}}
+			mode := v1.DownwardAPIVolumeSourceDefaultMode
+			payload, err := CollectData(items, pod, host, &mode, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := string(payload["cpu"].Data); got != tc.wantCPU {
+				t.Errorf("limits.cpu: got %q, want %q (millicores)", got, tc.wantCPU)
+			}
+			if got := string(payload["memory"].Data); got != tc.wantMemory {
+				t.Errorf("limits.memory: got %q, want %q (MiB)", got, tc.wantMemory)
+			}
+		})
 	}
 }
 
