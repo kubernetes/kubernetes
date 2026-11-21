@@ -302,18 +302,20 @@ func TestStalledWatchersMetricSharedByCachers(t *testing.T) {
 func TestWatcherSkippedEventsMetric(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchCacheStallResume, true)
 	c := newResyncMetricsTest(t, newResyncMetricsRegistry(t), clock.RealClock{})
+	registered := c.rv
 	w := c.open()
 	defer w.Stop()
 	c.add(1)
 	c.read(w, c.rv)
 	c.expectMetrics(0, 0, 0)
 
+	// An event that was in the history when the watcher was registered.
 	c.processEvent(&watchCacheEvent{
 		Type:            watch.Added,
 		Object:          &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod", Namespace: "ns"}},
 		ObjFields:       map[string]string{"metadata.namespace": "ns", "metadata.name": "pod"},
 		Key:             "/pods/ns/pod",
-		ResourceVersion: c.rv,
+		ResourceVersion: registered,
 	})
 	// The dispatcher handles events in order, so it is done with the one above.
 	c.add(1)

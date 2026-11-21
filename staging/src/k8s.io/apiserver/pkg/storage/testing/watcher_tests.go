@@ -29,6 +29,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	clientv3 "go.etcd.io/etcd/client/v3"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -37,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/apis/example"
@@ -383,6 +385,61 @@ func RunTestDeleteTriggerWatch(ctx context.Context, t *testing.T, store storage.
 		t.Fatalf("Delete failed: %v", err)
 	}
 	testCheckEventType(t, w, watch.Deleted)
+}
+
+// RunTestWatchMultiKeyTransaction checks that an open watch gets every event of
+// one etcd transaction. These events share a resourceVersion.
+func RunTestWatchMultiKeyTransaction(ctx context.Context, t *testing.T, store storage.Interface, client *clientv3.Client) {
+	const namespace = "multi-key-transaction"
+	var lastPod *example.Pod
+	want := sets.New[string]()
+	for i := range 5 {
+		_, lastPod = testPropagateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("pod-%d", i), Namespace: namespace}})
+		want.Insert(lastPod.Name)
+	}
+	w, err := store.Watch(ctx, "/pods/"+namespace, storage.ListOptions{ResourceVersion: lastPod.ResourceVersion, Predicate: storage.Everything, Recursive: true})
+	if err != nil {
+		t.Fatalf("Watch failed: %v", err)
+	}
+	defer w.Stop()
+
+	resp, err := client.Get(ctx, "/", clientv3.WithPrefix(), clientv3.WithKeysOnly())
+	if err != nil {
+		t.Fatalf("Get failed: %v", err)
+	}
+	var deletes []clientv3.Op
+	for _, kv := range resp.Kvs {
+		if strings.Contains(string(kv.Key), "/pods/"+namespace+"/") {
+			deletes = append(deletes, clientv3.OpDelete(string(kv.Key)))
+		}
+	}
+	if len(deletes) != want.Len() {
+		t.Fatalf("Expected %d keys in etcd, got %d", want.Len(), len(deletes))
+	}
+	if _, err := client.Txn(ctx).Then(deletes...).Commit(); err != nil {
+		t.Fatalf("Txn failed: %v", err)
+	}
+
+	got := sets.New[string]()
+	for range want.Len() {
+		testCheckResultFunc(t, w, func(event watch.Event) {
+			if event.Type != watch.Deleted {
+				t.Errorf("event type want=%v, get=%v", watch.Deleted, event.Type)
+				return
+			}
+			got.Insert(event.Object.(*example.Pod).Name)
+		})
+		if t.Failed() {
+			break
+		}
+	}
+	if !got.Equal(want) {
+		t.Fatalf("watch missed events of one transaction: %v", sets.List(want.Difference(got)))
+	}
+
+	// The next write has a higher resourceVersion, so its event comes next.
+	_, nextPod := testPropagateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "next", Namespace: namespace}})
+	testCheckResult(t, w, &watch.Event{Type: watch.Added, Object: nextPod})
 }
 
 func RunTestWatchFromNonZero(ctx context.Context, t *testing.T, store storage.Interface) {
