@@ -47,6 +47,7 @@ message Event {
 
   // series is data about the Event series this event represents or nil if it's a singleton Event.
   // +optional
+  // +k8s:alpha(since: "1.38")=+k8s:optional
   optional EventSeries series = 3;
 
   // reportingController is the name of the controller that emitted this Event, e.g. `kubernetes.io/kubelet`.
@@ -128,6 +129,8 @@ message EventList {
 message EventSeries {
   // count is the number of occurrences in this series up to the last heartbeat time.
   // +required
+  // +k8s:alpha(since: "1.38")=+k8s:required
+  // +k8s:alpha(since: "1.38")=+k8s:minimum=2
   optional int32 count = 1;
 
   // lastObservedTime is the time when last Event from the series was seen before last heartbeat.
