@@ -219,13 +219,14 @@ func (p *ListPager) eachListChunkBuffered(ctx context.Context, options metav1.Li
 	chunkC := make(chan runtime.Object, p.PageBufferSize)
 	bgResultC := make(chan error, 1)
 	go func() {
-		defer utilruntime.HandleCrashWithContext(ctx)
-
 		var err error
 		defer func() {
 			close(chunkC)
 			bgResultC <- err
 		}()
+		defer utilruntime.HandleCrashWithContext(ctx, func(_ context.Context, panicReason interface{}) {
+			err = fmt.Errorf("pager background goroutine panicked: %v", panicReason)
+		})
 		err = p.eachListChunk(ctx, options, func(chunk runtime.Object) error {
 			select {
 			case chunkC <- chunk: // buffer the chunk, this can block

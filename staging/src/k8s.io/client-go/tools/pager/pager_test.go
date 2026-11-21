@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -28,6 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 )
 
 func list(count int, rv string) *metainternalversion.List {
@@ -467,5 +469,37 @@ func TestListPager_eachListPageBuffered(t *testing.T) {
 				t.Errorf("expected %d pages processed, got %d", tt.pagesProcessed, pagesProcessed)
 			}
 		})
+	}
+}
+
+func TestListPager_EachListItem_PageFnPanic(t *testing.T) {
+	utilruntime.ReallyCrash = false
+	defer func() { utilruntime.ReallyCrash = true }()
+
+	pgr := &testPager{t: t, expectPage: 10, remaining: 30, rv: "rv:20"}
+	pageCount := 0
+	panicErr := "deliberate PageFn panic"
+	p := &ListPager{
+		PageSize: 10,
+		PageFn: func(ctx context.Context, options metav1.ListOptions) (runtime.Object, error) {
+			pageCount++
+			if pageCount == 2 {
+				panic(panicErr)
+			}
+			return pgr.PagedList(ctx, options)
+		},
+	}
+
+	var items []runtime.Object
+	err := p.EachListItem(context.Background(), metav1.ListOptions{}, func(obj runtime.Object) error {
+		items = append(items, obj)
+		return nil
+	})
+
+	if err == nil {
+		t.Fatalf("expected error from EachListItem when PageFn panics, got nil (items processed: %d)", len(items))
+	}
+	if !strings.Contains(err.Error(), panicErr) {
+		t.Fatalf("expected error to contain %q, got: %v", panicErr, err)
 	}
 }
