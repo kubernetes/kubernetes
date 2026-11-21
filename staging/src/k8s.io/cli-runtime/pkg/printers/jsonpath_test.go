@@ -18,6 +18,7 @@ package printers
 
 import (
 	"bytes"
+	"fmt"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
@@ -70,6 +71,37 @@ func TestPrinters(t *testing.T) {
 				continue
 			}
 			t.Errorf("JSONPathPrinter jsonOutput error object '%v'; error: '%v'", oName, err)
+		}
+	}
+}
+
+func TestJSONPathPrinterEmptyRange(t *testing.T) {
+	tests := []struct {
+		name     string
+		template string
+		expected string
+	}{
+		{"field in body", `{range .items[*]}{.metadata.name}{"\n"}{end}`, ""},
+		{"array index in body", `{range .items[*]}{[0]}{end}`, ""},
+		{"nested array index in body", `{range .items[*].spec.containers[*].command}{[0]}{"\n"}{end}`, ""},
+		{"text after end", `{range .items[*]}{.metadata.name}{end}{"done"}`, "done"},
+	}
+	for _, test := range tests {
+		for _, allowMissingKeys := range []bool{true, false} {
+			t.Run(fmt.Sprintf("%s/allowMissingKeys=%t", test.name, allowMissingKeys), func(t *testing.T) {
+				printer, err := NewJSONPathPrinter(test.template)
+				if err != nil {
+					t.Fatal(err)
+				}
+				printer.AllowMissingKeys(allowMissingKeys)
+				b := &bytes.Buffer{}
+				if err := printer.PrintObj(&v1.PodList{}, b); err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+				if b.String() != test.expected {
+					t.Errorf("expected %q, got %q", test.expected, b.String())
+				}
+			})
 		}
 	}
 }
