@@ -24,6 +24,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	appsv1beta2 "k8s.io/api/apps/v1beta2"
@@ -728,6 +729,132 @@ func TestSetEnvFromResource(t *testing.T) {
 			assert.NoError(t, err)
 		})
 	}
+}
+
+// The --selector and --filename flags pick the workloads to update; they must
+// not be applied to the --from lookup.
+func TestSetEnvFromResourceWithWorkloadSelection(t *testing.T) {
+	mockConfigMap := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{Name: "testconfigmap"},
+		Data:       map[string]string{"env": "prod"},
+	}
+	mockDeployment := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{Name: "nginx", Labels: map[string]string{"app": "nginx"}},
+		Spec: appsv1.DeploymentSpec{
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{{Name: "nginx", Image: "nginx"}},
+				},
+			},
+		},
+	}
+	mockController := &corev1.ReplicationController{
+		ObjectMeta: metav1.ObjectMeta{Name: "cassandra"},
+		Spec: corev1.ReplicationControllerSpec{
+			Template: &corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{{Name: "cassandra", Image: "cassandra"}},
+				},
+			},
+		},
+	}
+	expectedEnv := `{"name":"ENV","valueFrom":{"configMapKeyRef":{"key":"env","name":"testconfigmap"}}}`
+
+	inputs := []struct {
+		name        string
+		args        []string
+		selector    string
+		filenames   []string
+		patchedPath string
+		patchedObj  runtime.Object
+	}{
+		{
+			name:        "workloads selected by label",
+			args:        []string{"deployments"},
+			selector:    "app=nginx",
+			patchedPath: "/namespaces/test/deployments/nginx",
+			patchedObj:  mockDeployment,
+		},
+		{
+			name:        "workloads selected by filename",
+			filenames:   []string{"../../../testdata/controller.yaml"},
+			patchedPath: "/namespaces/test/replicationcontrollers/cassandra",
+			patchedObj:  mockController,
+		},
+	}
+
+	for _, input := range inputs {
+		t.Run(input.name, func(t *testing.T) {
+			tf := cmdtesting.NewTestFactory().WithNamespace("test")
+			defer tf.Cleanup()
+
+			patched := false
+			tf.ClientConfigVal = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Version: ""}}}
+			tf.Client = &fake.RESTClient{
+				GroupVersion:         schema.GroupVersion{Group: "", Version: "v1"},
+				NegotiatedSerializer: scheme.Codecs.WithoutConversion(),
+				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+					switch p, m := req.URL.Path, req.Method; {
+					case p == "/namespaces/test/configmaps/testconfigmap" && m == http.MethodGet:
+						assert.Empty(t, req.URL.Query().Get("labelSelector"))
+						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: objBody(mockConfigMap)}, nil
+					case p == "/namespaces/test/deployments" && m == http.MethodGet:
+						assert.Equal(t, "app=nginx", req.URL.Query().Get("labelSelector"))
+						list := &appsv1.DeploymentList{Items: []appsv1.Deployment{*mockDeployment}}
+						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: objBody(list)}, nil
+					case p == "/namespaces/test/replicationcontrollers/cassandra" && m == http.MethodGet:
+						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: objBody(mockController)}, nil
+					case p == input.patchedPath && m == http.MethodPatch:
+						bytes, err := io.ReadAll(req.Body)
+						if err != nil {
+							return nil, err
+						}
+						assert.Contains(t, string(bytes), expectedEnv)
+						patched = true
+						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: objBody(input.patchedObj)}, nil
+					default:
+						t.Errorf("unexpected request: %s %#v", req.Method, req.URL)
+						return nil, nil
+					}
+				}),
+			}
+
+			streams, _, _, _ := genericiooptions.NewTestIOStreams()
+			opts := NewEnvOptions(streams)
+			opts.From = "configmap/testconfigmap"
+			opts.Selector = input.selector
+			opts.FilenameOptions = resource.FilenameOptions{Filenames: input.filenames}
+			opts.PrintFlags = genericclioptions.NewPrintFlags("").WithDefaultOutput("name").WithTypeSetter(scheme.Scheme)
+			require.NoError(t, opts.Complete(tf, NewCmdEnv(tf, streams), input.args))
+			require.NoError(t, opts.Validate())
+			require.NoError(t, opts.RunEnv())
+			assert.True(t, patched, "expected %s to be patched", input.patchedPath)
+		})
+	}
+}
+
+func TestSetEnvFromResourceLocal(t *testing.T) {
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+
+	tf.Client = &fake.RESTClient{
+		GroupVersion:         schema.GroupVersion{Version: ""},
+		NegotiatedSerializer: scheme.Codecs.WithoutConversion(),
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			t.Fatalf("unexpected request: %s %#v", req.Method, req.URL)
+			return nil, nil
+		}),
+	}
+	tf.ClientConfigVal = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Version: ""}}}
+
+	streams, _, _, _ := genericiooptions.NewTestIOStreams()
+	opts := NewEnvOptions(streams)
+	opts.From = "configmap/testconfigmap"
+	opts.Local = true
+	opts.FilenameOptions = resource.FilenameOptions{Filenames: []string{"../../../testdata/controller.yaml"}}
+	opts.PrintFlags = genericclioptions.NewPrintFlags("").WithDefaultOutput("name").WithTypeSetter(scheme.Scheme)
+	require.NoError(t, opts.Complete(tf, NewCmdEnv(tf, streams), nil))
+	assert.ErrorContains(t, opts.Validate(), "cannot specify --local and --from")
 }
 
 func TestSetEnvRemoteWithSpecificContainers(t *testing.T) {

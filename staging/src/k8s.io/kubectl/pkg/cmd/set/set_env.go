@@ -260,6 +260,9 @@ func (o *EnvOptions) Validate() error {
 	if o.Local && o.dryRunStrategy == cmdutil.DryRunServer {
 		return fmt.Errorf("cannot specify --local and --dry-run=server - did you mean --dry-run=client?")
 	}
+	if o.Local && len(o.From) > 0 {
+		return fmt.Errorf("cannot specify --local and --from - the --from resource must be read from the server")
+	}
 	if len(o.Filenames) == 0 && len(o.resources) < 1 {
 		return fmt.Errorf("one or more resources must be specified as <resource> <name> or <resource>/<name>")
 	}
@@ -288,12 +291,10 @@ func (o *EnvOptions) RunEnv() error {
 			LocalParam(o.Local).
 			ContinueOnError().
 			NamespaceParam(o.namespace).DefaultNamespace().
-			FilenameParam(o.enforceNamespace, &o.FilenameOptions).
 			Flatten()
 
 		if !o.Local {
 			b = b.
-				LabelSelectorParam(o.Selector).
 				ResourceTypeOrNameArgs(o.All, o.From).
 				Latest()
 		}
