@@ -1964,42 +1964,126 @@ func mergingMapFieldsHaveConflicts(
 
 func mapsHaveConflicts(typedLeft, typedRight map[string]interface{}, schema LookupPatchMeta) (bool, error) {
 	for key, leftValue := range typedLeft {
-		if key != directiveMarker && key != retainKeysDirective {
+		if key == directiveMarker || key == retainKeysDirective {
+			continue
+		}
+		if strings.HasPrefix(key, deleteFromPrimitiveListDirectivePrefix+"/") ||
+			strings.HasPrefix(key, setElementOrderDirectivePrefix+"/") {
+			// Parallel-list directive keys are not real struct fields, so the
+			// schema lookup below would fail for them. Compare their values
+			// directly instead, matching how mergeMap treats them when merging
+			// two patches (differing $setElementOrder lists are rejected and a
+			// later $deleteFromPrimitiveList overwrites an earlier one).
 			if rightValue, ok := typedRight[key]; ok {
-				var subschema LookupPatchMeta
-				var patchMeta PatchMeta
-				var patchStrategy string
-				var err error
-				switch leftValue.(type) {
-				case []interface{}:
-					subschema, patchMeta, err = schema.LookupPatchMetadataForSlice(key)
-					if err != nil {
-						return true, err
-					}
-					_, patchStrategy, err = extractRetainKeysPatchStrategy(patchMeta.patchStrategies)
-					if err != nil {
-						return true, err
-					}
-				case map[string]interface{}:
-					subschema, patchMeta, err = schema.LookupPatchMetadataForStruct(key)
-					if err != nil {
-						return true, err
-					}
-					_, patchStrategy, err = extractRetainKeysPatchStrategy(patchMeta.patchStrategies)
-					if err != nil {
-						return true, err
-					}
-				}
-
-				if hasConflicts, err := mergingMapFieldsHaveConflicts(leftValue, rightValue,
-					subschema, patchStrategy, patchMeta.GetPatchMergeKey()); hasConflicts {
+				hasConflict, err := parallelListDirectivesConflict(key, leftValue, rightValue)
+				if err != nil {
 					return true, err
 				}
+				if hasConflict {
+					return true, nil
+				}
+			}
+			continue
+		}
+		if rightValue, ok := typedRight[key]; ok {
+			var subschema LookupPatchMeta
+			var patchMeta PatchMeta
+			var patchStrategy string
+			var err error
+			switch leftValue.(type) {
+			case []interface{}:
+				subschema, patchMeta, err = schema.LookupPatchMetadataForSlice(key)
+				if err != nil {
+					return true, err
+				}
+				_, patchStrategy, err = extractRetainKeysPatchStrategy(patchMeta.patchStrategies)
+				if err != nil {
+					return true, err
+				}
+			case map[string]interface{}:
+				subschema, patchMeta, err = schema.LookupPatchMetadataForStruct(key)
+				if err != nil {
+					return true, err
+				}
+				_, patchStrategy, err = extractRetainKeysPatchStrategy(patchMeta.patchStrategies)
+				if err != nil {
+					return true, err
+				}
+			}
+
+			if hasConflicts, err := mergingMapFieldsHaveConflicts(leftValue, rightValue,
+				subschema, patchStrategy, patchMeta.GetPatchMergeKey()); hasConflicts {
+				return true, err
 			}
 		}
 	}
 
 	return false, nil
+}
+
+// parallelListDirectivesConflict reports whether two occurrences of the same
+// parallel-list directive key disagree.
+//
+// $setElementOrder lists are compared as-is, because their order is the meaning
+// of the directive. $deleteFromPrimitiveList lists are compared as sets,
+// because deleteFromSlice treats them as one: element order and duplicates do
+// not change the result. Any other difference is a conflict. The comparison is
+// symmetric on purpose: MergingMapsHaveConflicts also guards patch composition
+// (see MergeStrategicMergeMapPatchUsingLookupPatchMeta), where a later directive
+// overrides an earlier one, so any disagreement between the two deletion sets is
+// a conflict regardless of which side is larger.
+//
+// The elements of a $deleteFromPrimitiveList list are primitives. A non-scalar
+// element cannot be used as a set key (and deleteFromSlice would fail on it as
+// well), so report an error rather than let the comparison panic.
+func parallelListDirectivesConflict(key string, leftValue, rightValue interface{}) (bool, error) {
+	if strings.HasPrefix(key, deleteFromPrimitiveListDirectivePrefix+"/") {
+		leftList, leftOk := leftValue.([]interface{})
+		rightList, rightOk := rightValue.([]interface{})
+		if leftOk && rightOk {
+			leftSet, err := scalarSetForDirective(key, leftList)
+			if err != nil {
+				return true, err
+			}
+			rightSet, err := scalarSetForDirective(key, rightList)
+			if err != nil {
+				return true, err
+			}
+			return !scalarSetsEqual(leftSet, rightSet), nil
+		}
+	}
+	return !reflect.DeepEqual(leftValue, rightValue), nil
+}
+
+// scalarSetForDirective collects the distinct elements of a primitive-list
+// directive value into a set. A $deleteFromPrimitiveList element is meant to be
+// a scalar; a non-comparable element cannot be a set key, so recover from the
+// resulting panic and report it as an error instead, the way the schema lookup
+// this replaced reported an error for these directive keys.
+func scalarSetForDirective(key string, list []interface{}) (set map[interface{}]struct{}, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			set, err = nil, fmt.Errorf("%s contains a non-comparable element: %v", key, r)
+		}
+	}()
+	set = make(map[interface{}]struct{}, len(list))
+	for _, element := range list {
+		set[element] = struct{}{}
+	}
+	return set, nil
+}
+
+// scalarSetsEqual reports whether two scalar sets contain the same elements.
+func scalarSetsEqual(left, right map[interface{}]struct{}) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	for element := range left {
+		if _, ok := right[element]; !ok {
+			return false
+		}
+	}
+	return true
 }
 
 func slicesHaveConflicts(
