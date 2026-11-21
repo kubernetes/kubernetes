@@ -303,8 +303,6 @@ resources:
 		`apiserver_envelope_encryption_dek_source_cache_size{provider_name="` + kmsName + `"} 1`,
 		`apiserver_envelope_encryption_key_id_hash_last_timestamp_seconds{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",key_id_hash="sha256:6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",provider_name="` + kmsName + `",transformation_type="from_storage"} FP`,
 		`apiserver_envelope_encryption_key_id_hash_last_timestamp_seconds{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",key_id_hash="sha256:6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",provider_name="` + kmsName + `",transformation_type="to_storage"} FP`,
-		`apiserver_envelope_encryption_key_id_hash_total{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",key_id_hash="sha256:6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",provider_name="` + kmsName + `",transformation_type="from_storage"} 2`,
-		`apiserver_envelope_encryption_key_id_hash_total{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",key_id_hash="sha256:6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",provider_name="` + kmsName + `",transformation_type="to_storage"} 1`,
 		`apiserver_storage_transformation_operations_total{resource="secrets",status="OK",transformation_type="from_storage",transformer_prefix="k8s:enc:kms:v2:` + kmsName + `:"} 2`,
 		`apiserver_storage_transformation_operations_total{resource="secrets",status="OK",transformation_type="to_storage",transformer_prefix="k8s:enc:kms:v2:` + kmsName + `:"} 1`,
 	}
