@@ -478,10 +478,13 @@ func generalFilter(logger klog.Logger, pod *v1.Pod, nodeInfo *schedulerframework
 
 	// Check taint/toleration except for static pods
 	if !types.IsStaticPod(pod) {
-		_, isUntolerated := corev1.FindMatchingUntoleratedTaint(logger, nodeInfo.Node().Spec.Taints, pod.Spec.Tolerations, func(t *v1.Taint) bool {
+		_, isUntolerated, err := corev1.FindMatchingUntoleratedTaint(nodeInfo.Node().Spec.Taints, pod.Spec.Tolerations, func(t *v1.Taint) bool {
 			// Kubelet is only interested in the NoExecute taint.
 			return t.Effect == v1.TaintEffectNoExecute
 		}, utilfeature.DefaultFeatureGate.Enabled(features.TaintTolerationComparisonOperators))
+		if err != nil {
+			logger.V(4).Info("NoExecute taint value is not a valid integer for Gt/Lt comparison, treating taint as not tolerated", "pod", klog.KObj(pod), "node", klog.KObj(nodeInfo.Node()), "warning", err)
+		}
 		if isUntolerated {
 			reasons = append(reasons, &PredicateFailureError{tainttoleration.Name, tainttoleration.ErrReasonNotMatch})
 		}

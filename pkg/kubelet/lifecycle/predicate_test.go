@@ -645,6 +645,40 @@ func TestGeneralPredicates(t *testing.T) {
 	}
 }
 
+func TestGeneralFilterNumericTaintParseErrorUsesStableReason(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TaintTolerationComparisonOperators, true)
+	tCtx := ktesting.Init(t)
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "pod", Namespace: "ns"},
+		Spec: v1.PodSpec{
+			Tolerations: []v1.Toleration{{
+				Key:      "node.kubernetes.io/sla",
+				Operator: v1.TolerationOpGt,
+				Value:    "950",
+				Effect:   v1.TaintEffectNoExecute,
+			}},
+		},
+	}
+	nodeInfo := schedulerframework.NewNodeInfo()
+	nodeInfo.SetNode(&v1.Node{
+		ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
+		Spec: v1.NodeSpec{
+			Taints: []v1.Taint{{
+				Key:    "node.kubernetes.io/sla",
+				Value:  "high",
+				Effect: v1.TaintEffectNoExecute,
+			}},
+		},
+		Status: v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0), Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
+	})
+
+	reasons := generalFilter(tCtx.Logger(), pod, nodeInfo)
+	want := []PredicateFailureReason{&PredicateFailureError{tainttoleration.Name, tainttoleration.ErrReasonNotMatch}}
+	if diff := cmp.Diff(want, reasons); diff != "" {
+		t.Errorf("unexpected failure reasons (-want, +got):\n%s", diff)
+	}
+}
+
 func TestGeneralPredicatesDRANodeAllocatableResources(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	// The claim maps 8 CPUs to the pod on top of its 1 CPU request; the node has 8.

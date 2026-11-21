@@ -460,7 +460,10 @@ func (tc *Controller) processPodOnNode(
 	if len(taints) == 0 {
 		tc.cancelWorkWithEvent(logger, podNamespacedName)
 	}
-	allTolerated, usedTolerations := v1helper.GetMatchingTolerations(logger, taints, tolerations)
+	allTolerated, usedTolerations, err := v1helper.GetMatchingTolerations(taints, tolerations)
+	if err != nil {
+		logger.V(4).Info("NoExecute taint value is not a valid integer for Gt/Lt comparison, treating taint as not tolerated", "pod", podNamespacedName.String(), "node", klog.KRef("", nodeName), "warning", err)
+	}
 	if !allTolerated {
 		logger.V(2).Info("Not all taints are tolerated after update for pod on node", "pod", podNamespacedName.String(), "node", klog.KRef("", nodeName))
 		// We're canceling scheduled work (if any), as we're going to delete the Pod right away.
