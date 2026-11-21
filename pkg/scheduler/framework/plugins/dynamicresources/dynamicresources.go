@@ -2070,7 +2070,7 @@ func (pl *DynamicResources) patchPodStatus(
 	}
 
 	if len(draExtraNodeAllocatableResources) == 0 {
-		if err := schedutil.PatchPodStatus(ctx, pl.clientset, pod.Name, pod.Namespace, baseStatus, targetStatus); err != nil {
+		if err := schedutil.PatchPodStatus(ctx, pl.clientset, pod.Name, pod.Namespace, pod.UID, baseStatus, targetStatus); err != nil {
 			return statusError(logger, fmt.Errorf("updating pod %s/%s status: %w", pod.Namespace, pod.Name, err))
 		}
 		return nil
@@ -2085,7 +2085,7 @@ func (pl *DynamicResources) patchPodStatus(
 	// built and patched inside UpdatePersisted which serializes the plugin updates.
 	err = state.extraNodeAllocatableResources.UpdatePersisted(nodeName, Name, func(persisted []v1.ExtraNodeAllocatableResource) error {
 		targetStatus.ExtraNodeAllocatableResources = framework.MergeExtraNodeAllocatableResources(persisted, draExtraNodeAllocatableResources)
-		return schedutil.PatchPodStatus(ctx, pl.clientset, pod.Name, pod.Namespace, baseStatus, targetStatus)
+		return schedutil.PatchPodStatus(ctx, pl.clientset, pod.Name, pod.Namespace, pod.UID, baseStatus, targetStatus)
 	})
 	if err != nil {
 		return statusError(logger, fmt.Errorf("updating pod %s/%s status: %w", pod.Namespace, pod.Name, err))

@@ -39,11 +39,13 @@ import (
 	v1 "k8s.io/api/core/v1"
 	eventsv1 "k8s.io/api/events/v1"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
@@ -1330,18 +1332,30 @@ func TestSchedulerScheduleOne(t *testing.T) {
 	}
 }
 
-func TestHandleSchedulingFailureSkipsRecreatedPod(t *testing.T) {
+// unreserveAndForgetFromSnapshot restores the nomination that Assume had removed, working off the
+// Pod snapshot taken at Pop. It runs before the failure handler and outside the requeue path, so
+// neither the UID check in handleSchedulingFailure nor the one in
+// AddUnschedulablePodIfNotPresent can stop it from re-recording a nomination for a Pod that was
+// deleted and recreated meanwhile. Such an entry would be permanent, because the nominator is
+// keyed by UID and no future event for this name will ever carry the old one.
+func TestUnreserveAndForgetSkipsNominationForRecreatedPod(t *testing.T) {
 	logger, ctx := ktesting.NewTestContext(t)
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	oldPod := st.MakePod().Name("foo").Namespace("ns").UID("old-uid").SchedulerName(testSchedulerName).Obj()
-	recreatedPod := oldPod.DeepCopy()
+	assumedPod := st.MakePod().Name("foo").Namespace("ns").UID("old-uid").Node("node1").NominatedNodeName("node1").SchedulerName(testSchedulerName).Obj()
+	// The replacement is still pending, so the nominator's existing liveness checks - the Pod
+	// exists, and it is not scheduled yet - both pass. Only the UID tells them apart.
+	recreatedPod := assumedPod.DeepCopy()
 	recreatedPod.UID = "new-uid"
+	recreatedPod.Spec.NodeName = ""
 
 	client := clientsetfake.NewClientset(recreatedPod)
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
 	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1()})
+
+	ar := metrics.NewMetricsAsyncRecorder(10, time.Second, ctx.Done())
+	queue := internalqueue.NewSchedulingQueue(nil, informerFactory, internalqueue.WithMetricsRecorder(ar))
 
 	schedFramework, err := tf.NewFramework(ctx,
 		[]tf.RegisterPluginFunc{
@@ -1352,55 +1366,145 @@ func TestHandleSchedulingFailureSkipsRecreatedPod(t *testing.T) {
 		frameworkruntime.WithClientSet(client),
 		frameworkruntime.WithEventRecorder(eventBroadcaster.NewRecorder(scheme.Scheme, testSchedulerName)),
 		frameworkruntime.WithInformerFactory(informerFactory),
+		frameworkruntime.WithPodNominator(queue),
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	ar := metrics.NewMetricsAsyncRecorder(10, time.Second, ctx.Done())
-	queue := internalqueue.NewSchedulingQueue(nil, informerFactory, internalqueue.WithMetricsRecorder(ar))
-	sched := &Scheduler{
-		client:          client,
-		SchedulingQueue: queue,
+	snapshot := internalcache.NewEmptySnapshot()
+	alg := &SchedulingAlgorithm{
+		nodeInfoSnapshot: snapshot,
 	}
 
 	informerFactory.StartWithContext(ctx)
 	informerFactory.WaitForCacheSyncWithContext(ctx)
 
-	queue.Add(ctx, oldPod)
-	popped, err := queue.Pop(logger)
-	if err != nil {
-		t.Fatalf("Pop: %v", err)
-	}
-	if got := queue.InFlightPods(); !podListContainsPod(got, oldPod) {
-		t.Fatalf("expected popped pod to be in-flight before failure handling, got %v", got)
+	podInfo := mustNewPodInfo(t, assumedPod)
+	if err := snapshot.AssumePod(podInfo); err != nil {
+		t.Fatalf("AssumePod: %v", err)
 	}
 
-	nominatingInfo := &fwk.NominatingInfo{NominatingMode: fwk.ModeOverride, NominatedNodeName: "node1"}
-	poppedPod := popped.(*framework.QueuedPodInfo)
-	sched.handleSchedulingFailure(ctx, schedFramework, poppedPod, fwk.NewStatus(fwk.Unschedulable, "no fit"), nominatingInfo, time.Now())
+	state := framework.NewCycleState()
+	state.SetPodGroupCycleState(state)
 
-	if err := wait.PollUntilContextTimeout(ctx, time.Millisecond, wait.ForeverTestTimeout, false, func(context.Context) (bool, error) {
-		return len(queue.InFlightPods()) == 0, nil
-	}); err != nil {
-		t.Fatalf("in-flight pod was not cleared: %v", queue.InFlightPods())
+	if err := alg.unreserveAndForgetFromSnapshot(ctx, state, schedFramework, &framework.QueuedPodInfo{PodInfo: podInfo}, "node1"); err != nil {
+		t.Fatalf("unreserveAndForgetFromSnapshot: %v", err)
 	}
-	if got := queue.PodsInBackoffQ(); len(got) != 0 {
-		t.Fatalf("expected recreated pod to stay out of backoffQ, got %v", got)
-	}
-	if got := queue.UnschedulablePods(); len(got) != 0 {
-		t.Fatalf("expected recreated pod to stay out of unschedulablePods, got %v", got)
-	}
+
 	if got := queue.NominatedPodsForNode(logger, "node1"); len(got) != 0 {
-		t.Fatalf("expected recreated pod to stay out of nominated pods, got %v", got)
+		t.Errorf("expected the previous instance to stay out of the nominator, got %v", got)
+	}
+}
+
+func TestHandleSchedulingFailureSkipsRecreatedPod(t *testing.T) {
+	tests := []struct {
+		name         string
+		recreatedPod *v1.Pod
+	}{
+		{
+			name:         "recreated pod is still pending",
+			recreatedPod: st.MakePod().Name("foo").Namespace("ns").UID("new-uid").SchedulerName(testSchedulerName).Obj(),
+		},
+		{
+			// The UID check used to be nested inside the else branch of the NodeName check, so
+			// a recreated Pod that had already been bound skipped it entirely. The failure
+			// handler then fell through to a namespace/name-addressed status patch and stamped
+			// the previous instance's PodScheduled=False onto the recreated Pod.
+			name:         "recreated pod is already bound",
+			recreatedPod: st.MakePod().Name("foo").Namespace("ns").UID("new-uid").Node("node1").SchedulerName(testSchedulerName).Obj(),
+		},
 	}
 
-	updatedPod, err := client.CoreV1().Pods(recreatedPod.Namespace).Get(ctx, recreatedPod.Name, metav1.GetOptions{})
-	if err != nil {
-		t.Fatalf("Get pod: %v", err)
-	}
-	if diff := cmp.Diff(recreatedPod.Status, updatedPod.Status); diff != "" {
-		t.Fatalf("expected recreated pod status to remain unchanged (-want,+got):\n%s", diff)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			oldPod := st.MakePod().Name("foo").Namespace("ns").UID("old-uid").NominatedNodeName("node1").SchedulerName(testSchedulerName).Obj()
+
+			client := clientsetfake.NewClientset(oldPod)
+			informerFactory := informers.NewSharedInformerFactory(client, 0)
+			eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1()})
+
+			schedFramework, err := tf.NewFramework(ctx,
+				[]tf.RegisterPluginFunc{
+					tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+					tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+				},
+				testSchedulerName,
+				frameworkruntime.WithClientSet(client),
+				frameworkruntime.WithEventRecorder(eventBroadcaster.NewRecorder(scheme.Scheme, testSchedulerName)),
+				frameworkruntime.WithInformerFactory(informerFactory),
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			ar := metrics.NewMetricsAsyncRecorder(10, time.Second, ctx.Done())
+			queue := internalqueue.NewSchedulingQueue(nil, informerFactory, internalqueue.WithMetricsRecorder(ar))
+			sched := &Scheduler{
+				client:          client,
+				SchedulingQueue: queue,
+			}
+
+			informerFactory.StartWithContext(ctx)
+			informerFactory.WaitForCacheSyncWithContext(ctx)
+
+			queue.Add(ctx, oldPod)
+			popped, err := queue.Pop(logger)
+			if err != nil {
+				t.Fatalf("Pop: %v", err)
+			}
+			if got := queue.InFlightPods(); !podListContainsPod(got, oldPod) {
+				t.Fatalf("expected popped pod to be in-flight before failure handling, got %v", got)
+			}
+
+			if err := client.CoreV1().Pods(oldPod.Namespace).Delete(ctx, oldPod.Name, metav1.DeleteOptions{}); err != nil {
+				t.Fatalf("Delete old pod: %v", err)
+			}
+			if _, err := client.CoreV1().Pods(tt.recreatedPod.Namespace).Create(ctx, tt.recreatedPod, metav1.CreateOptions{}); err != nil {
+				t.Fatalf("Create recreated pod: %v", err)
+			}
+			podLister := informerFactory.Core().V1().Pods().Lister()
+			if err := wait.PollUntilContextTimeout(ctx, time.Millisecond, wait.ForeverTestTimeout, true, func(context.Context) (bool, error) {
+				p, err := podLister.Pods(tt.recreatedPod.Namespace).Get(tt.recreatedPod.Name)
+				return err == nil && p.UID == tt.recreatedPod.UID, nil
+			}); err != nil {
+				t.Fatalf("informer cache did not observe recreated pod: %v", err)
+			}
+			if got := queue.NominatedPodsForNode(logger, "node1"); len(got) != 1 || got[0].GetPod().UID != oldPod.UID {
+				t.Fatalf("expected old pod to remain nominated on node1 before failure handling, got %v", got)
+			}
+
+			nominatingInfo := &fwk.NominatingInfo{NominatingMode: fwk.ModeOverride, NominatedNodeName: "node1"}
+			poppedPod := popped.(*framework.QueuedPodInfo)
+			sched.handleSchedulingFailure(ctx, schedFramework, poppedPod, fwk.NewStatus(fwk.Unschedulable, "no fit"), nominatingInfo, time.Now())
+
+			if err := wait.PollUntilContextTimeout(ctx, time.Millisecond, wait.ForeverTestTimeout, false, func(context.Context) (bool, error) {
+				return len(queue.InFlightPods()) == 0, nil
+			}); err != nil {
+				t.Fatalf("in-flight pod was not cleared: %v", queue.InFlightPods())
+			}
+			if got := queue.PodsInBackoffQ(); len(got) != 0 {
+				t.Fatalf("expected recreated pod to stay out of backoffQ, got %v", got)
+			}
+			if got := queue.UnschedulablePods(); len(got) != 0 {
+				t.Fatalf("expected recreated pod to stay out of unschedulablePods, got %v", got)
+			}
+			if got := queue.NominatedPodsForNode(logger, "node1"); len(got) != 0 {
+				t.Fatalf("expected recreated pod to stay out of nominated pods, got %v", got)
+			}
+
+			updatedPod, err := client.CoreV1().Pods(tt.recreatedPod.Namespace).Get(ctx, tt.recreatedPod.Name, metav1.GetOptions{})
+			if err != nil {
+				t.Fatalf("Get pod: %v", err)
+			}
+			if diff := cmp.Diff(tt.recreatedPod.Status, updatedPod.Status); diff != "" {
+				t.Fatalf("expected recreated pod status to remain unchanged (-want,+got):\n%s", diff)
+			}
+		})
 	}
 }
 
@@ -3170,7 +3274,7 @@ func TestSchedulerBinding(t *testing.T) {
 		},
 		{
 			name:                           "extender binder is skipped for deferred resize pod",
-			pod:                            st.MakePod().Name("pod0").Node("node").Condition(v1.PodResizePending, v1.ConditionTrue, v1.PodReasonDeferred).Obj(),
+			pod:                            st.MakePod().Name("pod0").UID("pod0").Node("node").Condition(v1.PodResizePending, v1.ConditionTrue, v1.PodReasonDeferred).Obj(),
 			enableDeferredResizePreemption: true,
 			extenders: []fwk.Extender{
 				&fakeExtender{isBinder: true, interestedPodName: "pod0"},
@@ -3268,6 +3372,7 @@ func TestUpdatePodStatus(t *testing.T) {
 		newPodCondition          *v1.PodCondition
 		currentNominatedNodeName string
 		newNominatingInfo        *fwk.NominatingInfo
+		patchErr                 error
 		expectPatchRequest       bool
 		expectedPatchDataPattern string
 	}{
@@ -3283,7 +3388,7 @@ func TestUpdatePodStatus(t *testing.T) {
 				Message:            "newMessage",
 			},
 			expectPatchRequest:       true,
-			expectedPatchDataPattern: `{"status":{"conditions":\[{"lastProbeTime":"2020-05-13T01:01:01Z","lastTransitionTime":".*","message":"newMessage","reason":"newReason","status":"newStatus","type":"newType"}]}}`,
+			expectedPatchDataPattern: `{"metadata":{"uid":"foo-uid"},"status":{"conditions":\[{"lastProbeTime":"2020-05-13T01:01:01Z","lastTransitionTime":".*","message":"newMessage","reason":"newReason","status":"newStatus","type":"newType"}]}}`,
 		},
 		{
 			name: "Should make patch request to add a new pod condition when there is already one with another type",
@@ -3306,7 +3411,7 @@ func TestUpdatePodStatus(t *testing.T) {
 				Message:            "newMessage",
 			},
 			expectPatchRequest:       true,
-			expectedPatchDataPattern: `{"status":{"\$setElementOrder/conditions":\[{"type":"someOtherType"},{"type":"newType"}],"conditions":\[{"lastProbeTime":"2020-05-13T01:01:01Z","lastTransitionTime":".*","message":"newMessage","reason":"newReason","status":"newStatus","type":"newType"}]}}`,
+			expectedPatchDataPattern: `{"metadata":{"uid":"foo-uid"},"status":{"\$setElementOrder/conditions":\[{"type":"someOtherType"},{"type":"newType"}],"conditions":\[{"lastProbeTime":"2020-05-13T01:01:01Z","lastTransitionTime":".*","message":"newMessage","reason":"newReason","status":"newStatus","type":"newType"}]}}`,
 		},
 		{
 			name: "Should make patch request to update an existing pod condition",
@@ -3329,7 +3434,7 @@ func TestUpdatePodStatus(t *testing.T) {
 				Message:            "newMessage",
 			},
 			expectPatchRequest:       true,
-			expectedPatchDataPattern: `{"status":{"\$setElementOrder/conditions":\[{"type":"currentType"}],"conditions":\[{"lastProbeTime":"2020-05-13T01:01:01Z","lastTransitionTime":".*","message":"newMessage","reason":"newReason","status":"newStatus","type":"currentType"}]}}`,
+			expectedPatchDataPattern: `{"metadata":{"uid":"foo-uid"},"status":{"\$setElementOrder/conditions":\[{"type":"currentType"}],"conditions":\[{"lastProbeTime":"2020-05-13T01:01:01Z","lastTransitionTime":".*","message":"newMessage","reason":"newReason","status":"newStatus","type":"currentType"}]}}`,
 		},
 		{
 			name: "Should make patch request to update an existing pod condition, but the transition time should remain unchanged because the status is the same",
@@ -3352,7 +3457,7 @@ func TestUpdatePodStatus(t *testing.T) {
 				Message:            "newMessage",
 			},
 			expectPatchRequest:       true,
-			expectedPatchDataPattern: `{"status":{"\$setElementOrder/conditions":\[{"type":"currentType"}],"conditions":\[{"lastProbeTime":"2020-05-13T01:01:01Z","message":"newMessage","reason":"newReason","type":"currentType"}]}}`,
+			expectedPatchDataPattern: `{"metadata":{"uid":"foo-uid"},"status":{"\$setElementOrder/conditions":\[{"type":"currentType"}],"conditions":\[{"lastProbeTime":"2020-05-13T01:01:01Z","message":"newMessage","reason":"newReason","type":"currentType"}]}}`,
 		},
 		{
 			name: "Should not make patch request if pod condition already exists and is identical and nominated node name is not set",
@@ -3399,7 +3504,7 @@ func TestUpdatePodStatus(t *testing.T) {
 			},
 			newNominatingInfo:        &fwk.NominatingInfo{NominatingMode: fwk.ModeOverride, NominatedNodeName: "node1"},
 			expectPatchRequest:       true,
-			expectedPatchDataPattern: `{"status":{"nominatedNodeName":"node1"}}`,
+			expectedPatchDataPattern: `{"metadata":{"uid":"foo-uid"},"status":{"nominatedNodeName":"node1"}}`,
 		},
 		{
 			name: "Should not update nominated node name when nominatingInfo is nil",
@@ -3424,7 +3529,7 @@ func TestUpdatePodStatus(t *testing.T) {
 			currentNominatedNodeName: "existing-node",
 			newNominatingInfo:        nil,
 			expectPatchRequest:       true,
-			expectedPatchDataPattern: `{"status":{"\$setElementOrder/conditions":\[{"type":"currentType"}],"conditions":\[{"lastProbeTime":"2020-05-13T01:01:01Z","lastTransitionTime":".*","message":"newMessage","reason":"newReason","status":"newStatus","type":"currentType"}]}}`,
+			expectedPatchDataPattern: `{"metadata":{"uid":"foo-uid"},"status":{"\$setElementOrder/conditions":\[{"type":"currentType"}],"conditions":\[{"lastProbeTime":"2020-05-13T01:01:01Z","lastTransitionTime":".*","message":"newMessage","reason":"newReason","status":"newStatus","type":"currentType"}]}}`,
 		},
 		{
 			name: "Should not make patch request when nominatingInfo is nil and pod condition is unchanged",
@@ -3450,6 +3555,21 @@ func TestUpdatePodStatus(t *testing.T) {
 			newNominatingInfo:        nil,
 			expectPatchRequest:       false,
 		},
+		{
+			name:                     "Should ignore NotFound error when pod is already deleted",
+			newNominatingInfo:        &fwk.NominatingInfo{NominatingMode: fwk.ModeOverride, NominatedNodeName: "node1"},
+			patchErr:                 apierrors.NewNotFound(v1.Resource("pods"), "foo"),
+			expectPatchRequest:       true,
+			expectedPatchDataPattern: `{"metadata":{"uid":"foo-uid"},"status":{"nominatedNodeName":"node1"}}`,
+		},
+		{
+			name:              "Should ignore Invalid error on metadata.uid when pod was recreated",
+			newNominatingInfo: &fwk.NominatingInfo{NominatingMode: fwk.ModeOverride, NominatedNodeName: "node1"},
+			patchErr: apierrors.NewInvalid(v1.SchemeGroupVersion.WithKind("Pod").GroupKind(), "foo",
+				field.ErrorList{field.Invalid(field.NewPath("metadata").Child("uid"), "foo-uid", "field is immutable")}),
+			expectPatchRequest:       true,
+			expectedPatchDataPattern: `{"metadata":{"uid":"foo-uid"},"status":{"nominatedNodeName":"node1"}}`,
+		},
 	}
 	for _, asyncAPICallsEnabled := range []bool{true, false} {
 		for _, test := range tests {
@@ -3463,12 +3583,15 @@ func TestUpdatePodStatus(t *testing.T) {
 					patch := action.(clienttesting.PatchAction)
 					actualPatchData = string(patch.GetPatch())
 					patchCalled <- struct{}{}
+					if test.patchErr != nil {
+						return true, nil, test.patchErr
+					}
 					// For this test, we don't care about the result of the patched pod, just that we got the expected
 					// patch request, so just returning &v1.Pod{} here is OK because scheduler doesn't use the response.
 					return true, &v1.Pod{}, nil
 				})
 
-				pod := st.MakePod().Name("foo").NominatedNodeName(test.currentNominatedNodeName).Conditions(test.currentPodConditions).Obj()
+				pod := st.MakePod().Name("foo").UID("foo-uid").NominatedNodeName(test.currentNominatedNodeName).Conditions(test.currentPodConditions).Obj()
 
 				logger, ctx := ktesting.NewTestContext(t)
 				ctx, cancel := context.WithCancel(ctx)
