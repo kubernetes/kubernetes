@@ -972,7 +972,8 @@ func (qs *queueSet) removeQueueIfEmptyLocked(r *request) {
 	// requests then remove it
 	if len(qs.queues) > qs.qCfg.DesiredNumQueues &&
 		r.queue.requestsWaiting.Length() == 0 &&
-		r.queue.requestsExecuting.Len() == 0 {
+		r.queue.requestsExecuting.Len() == 0 &&
+		r.queue.seatsInUse == 0 {
 		qs.queues = removeQueueAndUpdateIndexes(qs.queues, r.queue.index)
 
 		// decrement here to maintain the invariant that (qs.robinIndex+1) % numQueues
