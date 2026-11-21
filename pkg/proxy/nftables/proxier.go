@@ -211,6 +211,19 @@ type Proxier struct {
 	// that kube-proxy rejects rather than serving.
 	localhostNodePortRejects *nftElementStorage
 
+	// servicePortStates records what each service port has programmed, so that a
+	// partial sync only needs to look at the service ports that changed. It is
+	// rebuilt by every full sync, and nil until the first one.
+	servicePortStates map[proxy.ServicePortName]*servicePortState
+	// The following are derived from servicePortStates, svcPortMap and endpointsMap,
+	// and kept up to date along with them so a partial sync doesn't recompute them.
+	totalEndpoints                       int
+	serviceNoLocalEndpointsTotalInternal int
+	serviceNoLocalEndpointsTotalExternal int
+	localhostNodePortSpecs               map[proxy.ServicePortName]localnodeportproxy.NodePortSpec
+	healthCheckNodePorts                 map[types.NamespacedName]uint16
+	localReadyEndpoints                  map[types.NamespacedName]int
+
 	// localhostNodePortProxy handles userspace proxying of NodePorts on localhost
 	localhostNodePortProxy *localnodeportproxy.LocalNodePortProxy
 
@@ -1042,12 +1055,37 @@ func isAffinitySetName(set string) bool {
 	return strings.HasPrefix(set, servicePortEndpointAffinityNamePrefix)
 }
 
-// nftElementStorage is an internal representation of nftables map or set.
+// nftElementStorage tracks the elements of one of our nftables maps or sets: which
+// elements exist in nftables, and which service ports want each of them. Since an
+// element can be wanted by more than one service port (e.g., the ClusterIP of a
+// multi-port Service, or a hairpin entry for an endpoint shared by two Services), a
+// partial sync can only delete an element once no service port wants it any more.
 type nftElementStorage struct {
-	elements      map[string]string
-	leftoverKeys  sets.Set[string]
 	containerType string
 	containerName string
+	elements      map[string]*nftElement
+	// dirty contains the keys of elements whose claims changed since the last
+	// reconcile.
+	dirty sets.Set[string]
+}
+
+// nftElement is the state of a single element, keyed in nftElementStorage by its
+// joined key.
+type nftElement struct {
+	// programmed is whether the element exists in nftables, with (joined) value
+	// value.
+	programmed bool
+	value      string
+	// claims lists the service ports that want the element, in the order they
+	// claimed it. The first claim's value wins, so that two Services conflicting
+	// over the same IP and port don't make the element flip back and forth.
+	claims []nftElementClaim
+}
+
+type nftElementClaim struct {
+	owner   proxy.ServicePortName
+	value   string
+	comment *string
 }
 
 // joinNFTSlice converts nft element key or value (type []string) to string to store in the nftElementStorage.
@@ -1062,22 +1100,22 @@ func splitNFTSlice(k string) []string {
 }
 
 // newNFTElementStorage creates an empty nftElementStorage.
-// nftElementStorage.reset() must be called before the first usage.
+// nftElementStorage.readOrReset() must be called before the first usage.
 func newNFTElementStorage(containerType, containerName string) *nftElementStorage {
-	c := &nftElementStorage{
-		elements:      make(map[string]string),
-		leftoverKeys:  sets.New[string](),
+	return &nftElementStorage{
 		containerType: containerType,
 		containerName: containerName,
+		elements:      make(map[string]*nftElement),
+		dirty:         sets.New[string](),
 	}
-	return c
 }
 
-// readOrReset updates the existing elements from the nftables map/set.
-// If reading fails, it clears the internal state and flushes the nftables map/set.
+// readOrReset drops all claims and reloads the existing elements from the nftables
+// map/set; the next reconcile deletes any of them that are not claimed again. If
+// reading fails, it clears the internal state and flushes the nftables map/set.
 func (s *nftElementStorage) readOrReset(tx *knftables.Transaction, nftables knftables.Interface, logger klog.Logger) {
 	clear(s.elements)
-	defer s.resetLeftoverKeys()
+	clear(s.dirty)
 	elems, err := nftables.ListElements(context.TODO(), s.containerType, s.containerName)
 	if err != nil && !knftables.IsNotFound(err) {
 		if s.containerType == "set" {
@@ -1093,54 +1131,116 @@ func (s *nftElementStorage) readOrReset(tx *knftables.Transaction, nftables knft
 		return
 	}
 	for _, elem := range elems {
-		newKey := joinNFTSlice(elem.Key)
-		newValue := joinNFTSlice(elem.Value)
-		s.elements[newKey] = newValue
+		key := joinNFTSlice(elem.Key)
+		s.elements[key] = &nftElement{programmed: true, value: joinNFTSlice(elem.Value)}
+		s.dirty.Insert(key)
 	}
 }
 
-// resetLeftoverKeys is only called internally by nftElementStorage methods.
-func (s *nftElementStorage) resetLeftoverKeys() {
-	clear(s.leftoverKeys)
-	for key := range s.elements {
-		s.leftoverKeys.Insert(key)
+// claim records that owner wants elem, and returns elem's key. If owner already
+// claimed the element, its claim is updated in place.
+func (s *nftElementStorage) claim(owner proxy.ServicePortName, elem *knftables.Element) string {
+	key := joinNFTSlice(elem.Key)
+	value := joinNFTSlice(elem.Value)
+	s.dirty.Insert(key)
+	e := s.elements[key]
+	if e == nil {
+		e = &nftElement{}
+		s.elements[key] = e
+	}
+	for i := range e.claims {
+		if e.claims[i].owner == owner {
+			e.claims[i].value = value
+			e.claims[i].comment = elem.Comment
+			return key
+		}
+	}
+	e.claims = append(e.claims, nftElementClaim{owner: owner, value: value, comment: elem.Comment})
+	return key
+}
+
+// release drops owner's claim on the element with the given key, if any.
+func (s *nftElementStorage) release(owner proxy.ServicePortName, key string) {
+	e := s.elements[key]
+	if e == nil {
+		return
+	}
+	for i := range e.claims {
+		if e.claims[i].owner == owner {
+			e.claims = slices.Delete(e.claims, i, i+1)
+			s.dirty.Insert(key)
+			return
+		}
 	}
 }
 
-// ensureElem adds elem to the transaction if elem is not present in the container, and updates internal
-// leftoverKeys set to track unused elements.
-func (s *nftElementStorage) ensureElem(tx *knftables.Transaction, elem *knftables.Element) {
-	newKey := joinNFTSlice(elem.Key)
-	newValue := joinNFTSlice(elem.Value)
-	existingValue, exists := s.elements[newKey]
-	if exists {
-		if existingValue != newValue {
+// reconcile adds operations to tx to bring every element whose claims changed since
+// the last reconcile in line with its first claim, or to delete it if it has none.
+func (s *nftElementStorage) reconcile(tx *knftables.Transaction) {
+	for key := range s.dirty {
+		e := s.elements[key]
+		if e == nil {
+			continue
+		}
+		if len(e.claims) == 0 {
+			if e.programmed {
+				tx.Delete(s.element(key, "", nil))
+			}
+			delete(s.elements, key)
+			continue
+		}
+		want := e.claims[0]
+		if e.programmed && e.value == want.value {
+			continue
+		}
+		elem := s.element(key, want.value, want.comment)
+		if e.programmed {
 			// value is different, delete and re-add
 			tx.Delete(elem)
-			tx.Add(elem)
-			s.elements[newKey] = newValue
 		}
-		delete(s.leftoverKeys, newKey)
-	} else {
 		tx.Add(elem)
-		s.elements[newKey] = newValue
+		e.programmed = true
+		e.value = want.value
 	}
+	// Not clear(): a map keeps its capacity, and iterating it costs time proportional
+	// to that, so after a full sync every partial sync would scan every element.
+	s.dirty = sets.New[string]()
 }
 
-func (s *nftElementStorage) cleanupLeftoverKeys(tx *knftables.Transaction) {
-	for key := range s.leftoverKeys {
-		e := &knftables.Element{
-			Key: splitNFTSlice(key),
-		}
-		if s.containerType == "set" {
-			e.Set = s.containerName
-		} else {
-			e.Map = s.containerName
-		}
-		tx.Delete(e)
-		delete(s.elements, key)
+func (s *nftElementStorage) element(key, value string, comment *string) *knftables.Element {
+	elem := &knftables.Element{
+		Key:     splitNFTSlice(key),
+		Comment: comment,
 	}
-	s.resetLeftoverKeys()
+	if s.containerType == "set" {
+		elem.Set = s.containerName
+	} else {
+		elem.Map = s.containerName
+		elem.Value = splitNFTSlice(value)
+	}
+	return elem
+}
+
+// nftElementRef identifies an element claimed by a service port.
+type nftElementRef struct {
+	storage *nftElementStorage
+	key     string
+}
+
+// servicePortState records what syncServicePort programmed for one service port, so
+// that a partial sync can update or remove it without looking at any other service
+// port.
+type servicePortState struct {
+	chains       []string
+	affinitySets []string
+	elements     []nftElementRef
+
+	// localhostNodePort is non-nil if the localhost NodePort proxy serves this port.
+	localhostNodePort *localnodeportproxy.NodePortSpec
+
+	numEndpoints             int
+	noLocalEndpointsInternal bool
+	noLocalEndpointsExternal bool
 }
 
 // logFailure logs the transaction and the full table with a rate limit.
@@ -1177,7 +1277,10 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 	// Below this point we will not return until we try to write the nftables rules.
 	//
 
-	doFullSync := proxier.needFullSync || (time.Since(proxier.lastFullSync) > proxyutil.FullSyncPeriod)
+	// A partial sync builds on the state recorded by the last full sync, so we need a
+	// full sync if there isn't any.
+	doFullSync := proxier.needFullSync || proxier.servicePortStates == nil ||
+		(time.Since(proxier.lastFullSync) > proxyutil.FullSyncPeriod)
 
 	defer func() {
 		metrics.SyncProxyRulesLatency.WithLabelValues(string(proxier.ipFamily)).Observe(metrics.SinceInSeconds(start))
@@ -1244,16 +1347,113 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 	tx := proxier.nftables.NewTransaction()
 	if doFullSync {
 		proxier.setupNFTables(tx)
+		proxier.syncAllServicePorts(tx, start)
+	} else {
+		// Everything else is already programmed, so only the ports of the Services
+		// that changed (or whose endpoints changed) need to be looked at.
+		updated := serviceUpdateResult.UpdatedServicePorts.Union(endpointUpdateResult.UpdatedServicePorts)
+		proxier.syncUpdatedServicePorts(tx, updated, start)
+		proxier.svcPortMap.UpdateHealthCheckNodePorts(proxier.healthCheckNodePorts, serviceUpdateResult.UpdatedServicePorts)
+		proxier.endpointsMap.UpdateLocalReadyEndpoints(proxier.localReadyEndpoints, endpointUpdateResult.UpdatedServicePorts)
 	}
 
-	// We need to use, eg, "ip daddr" for IPv4 but "ip6 daddr" for IPv6
-	ipX := "ip"
-	ipvX_addr := "ipv4_addr" //nolint:staticcheck // var name intentionally resembles value
-	if proxier.ipFamily == v1.IPv6Protocol {
-		ipX = "ip6"
-		ipvX_addr = "ipv6_addr"
+	for _, storage := range []*nftElementStorage{
+		proxier.clusterIPs,
+		proxier.serviceIPs,
+		proxier.firewallIPs,
+		proxier.noEndpointServices,
+		proxier.noEndpointNodePorts,
+		proxier.serviceNodePorts,
+		proxier.hairpinConnections,
+		proxier.localhostNodePortRejects,
+	} {
+		storage.reconcile(tx)
+	}
+	if doFullSync {
+		rejected := make(map[v1.Protocol]bool)
+		for _, protocol := range proxier.localhostNodePortRejectProtocols() {
+			rejected[protocol] = true
+		}
+		// The loop above will have removed stale reject-map elements, so now we can remove stale target chains
+		for _, protocol := range metrics.LocalhostNodePortRejectableProtocols {
+			if rejected[protocol] {
+				continue
+			}
+			rejectCounter := &knftables.Counter{Name: metrics.LocalhostNodePortRejectedCounterName(protocol)}
+			tx.Add(rejectCounter)
+			tx.Delete(rejectCounter)
+		}
 	}
 
+	// Sync rules.
+	proxier.logger.V(2).Info("Reloading service nftables data",
+		"numServices", len(proxier.svcPortMap),
+		"numEndpoints", proxier.totalEndpoints,
+	)
+
+	if klogV9 := klog.V(9); klogV9.Enabled() {
+		klogV9.InfoS("Running nftables transaction", "transaction", tx.String())
+	}
+
+	err := proxier.nftables.Run(context.TODO(), tx)
+	if err != nil {
+		proxier.logger.Error(err, "nftables sync failed")
+		metrics.NFTablesSyncFailuresTotal.WithLabelValues(string(proxier.ipFamily)).Inc()
+
+		// staleChains is now incorrect since we didn't actually flush the
+		// chains in it. We can recompute it next time.
+		clear(proxier.staleChains)
+		// Log failed transaction and list full kube-proxy table.
+		proxier.logFailure(tx)
+		return
+	}
+	success = true
+	proxier.needFullSync = false
+
+	for name, lastChangeTriggerTimes := range endpointUpdateResult.LastChangeTriggerTimes {
+		for _, lastChangeTriggerTime := range lastChangeTriggerTimes {
+			latency := metrics.SinceInSeconds(lastChangeTriggerTime)
+			metrics.NetworkProgrammingLatency.WithLabelValues(string(proxier.ipFamily)).Observe(latency)
+			proxier.logger.V(4).Info("Network programming", "endpoint", klog.KRef(name.Namespace, name.Name), "elapsed", latency)
+		}
+	}
+
+	metrics.SyncProxyRulesNoLocalEndpointsTotal.WithLabelValues("internal", string(proxier.ipFamily)).Set(float64(proxier.serviceNoLocalEndpointsTotalInternal))
+	metrics.SyncProxyRulesNoLocalEndpointsTotal.WithLabelValues("external", string(proxier.ipFamily)).Set(float64(proxier.serviceNoLocalEndpointsTotalExternal))
+	if proxier.healthzServer != nil {
+		proxier.healthzServer.Updated(proxier.ipFamily)
+	}
+	metrics.SyncProxyRulesLastTimestamp.WithLabelValues(string(proxier.ipFamily)).SetToCurrentTime()
+
+	// Update service healthchecks.  The endpoints list might include services that are
+	// not "OnlyLocal", but the services list will not, and the serviceHealthServer
+	// will just drop those endpoints.
+	if err := proxier.serviceHealthServer.SyncServices(proxier.healthCheckNodePorts); err != nil {
+		proxier.logger.Error(err, "Error syncing healthcheck services")
+	}
+	if err := proxier.serviceHealthServer.SyncEndpoints(proxier.localReadyEndpoints); err != nil {
+		proxier.logger.Error(err, "Error syncing healthcheck endpoints")
+	}
+
+	if proxier.localhostNodePortProxy != nil {
+		localhostNodePorts := make([]localnodeportproxy.NodePortSpec, 0, len(proxier.localhostNodePortSpecs))
+		for _, spec := range proxier.localhostNodePortSpecs {
+			localhostNodePorts = append(localhostNodePorts, spec)
+		}
+		proxier.localhostNodePortProxy.SyncNodePorts(localhostNodePorts)
+	}
+
+	if endpointUpdateResult.ConntrackCleanupRequired || serviceUpdateResult.ConntrackCleanupRequired {
+		// Finish housekeeping, clear stale conntrack entries for UDP Services
+		conntrack.CleanStaleEntries(proxier.conntrack, proxier.ipFamily, proxier.svcPortMap, proxier.endpointsMap, serviceUpdateResult.DeletedServices)
+	}
+	return
+}
+
+// syncAllServicePorts programs every service port from scratch, rebuilding
+// servicePortStates, and flushes the chains and deletes the affinity sets that exist in
+// nftables but are no longer used.
+func (proxier *Proxier) syncAllServicePorts(tx *knftables.Transaction, start time.Time) {
 	var existingChains sets.Set[string]
 	existingChainsList, err := proxier.nftables.List(context.TODO(), "chain")
 	if err == nil {
@@ -1283,536 +1483,24 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 	}
 	activeAffinitySets := sets.New[string]()
 
-	// Compute total number of endpoint chains across all services
-	// to get a sense of how big the cluster is.
-	totalEndpoints := 0
-	for svcName := range proxier.svcPortMap {
-		totalEndpoints += len(proxier.endpointsMap[svcName])
-	}
+	proxier.servicePortStates = make(map[proxy.ServicePortName]*servicePortState, len(proxier.svcPortMap))
+	proxier.totalEndpoints = 0
+	proxier.serviceNoLocalEndpointsTotalInternal = 0
+	proxier.serviceNoLocalEndpointsTotalExternal = 0
+	proxier.localhostNodePortSpecs = make(map[proxy.ServicePortName]localnodeportproxy.NodePortSpec)
+	proxier.healthCheckNodePorts = proxier.svcPortMap.HealthCheckNodePorts()
+	proxier.localReadyEndpoints = proxier.endpointsMap.LocalReadyEndpoints()
 
-	// These two variables are used to publish the sync_proxy_rules_no_endpoints_total
-	// metric.
-	serviceNoLocalEndpointsTotalInternal := 0
-	serviceNoLocalEndpointsTotalExternal := 0
-
-	var localhostNodePorts []localnodeportproxy.NodePortSpec
-
-	// Build rules for each service-port.
 	for svcName, svc := range proxier.svcPortMap {
 		svcInfo, ok := svc.(*servicePortInfo)
 		if !ok {
 			proxier.logger.Error(nil, "Failed to cast serviceInfo", "serviceName", svcName)
 			continue
 		}
-
-		protocol := strings.ToLower(string(svcInfo.Protocol()))
-		svcPortComment := truncateNFTablesComment(svcInfo.nameString)
-
-		// Figure out the endpoints for Cluster and Local traffic policy.
-		// allLocallyReachableEndpoints is the set of all endpoints that can be routed to
-		// from this node, given the service's traffic policies. hasEndpoints is true
-		// if the service has any usable endpoints on any node, not just this one.
-		allEndpoints := proxier.endpointsMap[svcName]
-		clusterEndpoints, localEndpoints, allLocallyReachableEndpoints, hasEndpoints := proxy.CategorizeEndpoints(allEndpoints, svcInfo, proxier.nodeName, proxier.topologyLabels)
-
-		// skipServiceUpdate is used for all service-related chains and their elements.
-		// If no changes were done to the service or its endpoints, these objects may be skipped.
-		skipServiceUpdate := !doFullSync &&
-			!serviceUpdateResult.UpdatedServices.Has(svcName.NamespacedName) &&
-			!endpointUpdateResult.UpdatedServices.Has(svcName.NamespacedName)
-
-		// We only use separate endpoint chains when adding affinity rules
-		serviceUsesAffinity := svcInfo.SessionAffinityType() == v1.ServiceAffinityClientIP
-
-		// Note the endpoints that will be used
-		for _, ep := range allLocallyReachableEndpoints {
-			epInfo, ok := ep.(*endpointInfo)
-			if !ok {
-				continue
-			}
-
-			// If using affinity, note the endpoint chain and affinity set
-			// names, and ensure that the chain exists.
-			if serviceUsesAffinity {
-				ensureChain(epInfo.chainName, tx, activeChains, skipServiceUpdate)
-				activeAffinitySets.Insert(epInfo.affinitySetName)
-			}
-
-			// Add local endpoints to the hairpin set.
-			if epInfo.IsLocal() {
-				proxier.hairpinConnections.ensureElem(tx, &knftables.Element{
-					Set: hairpinConnectionsSet,
-					Key: []string{
-						epInfo.IP(),
-						epInfo.IP(),
-						protocol,
-						strconv.Itoa(epInfo.Port()),
-					},
-				})
-			}
-		}
-
-		// clusterPolicyChain contains the endpoints used with "Cluster" traffic policy
-		clusterPolicyChain := svcInfo.clusterPolicyChainName
-		usesClusterPolicyChain := len(clusterEndpoints) > 0 && svcInfo.UsesClusterEndpoints()
-		if usesClusterPolicyChain {
-			ensureChain(clusterPolicyChain, tx, activeChains, skipServiceUpdate)
-		}
-
-		// localPolicyChain contains the endpoints used with "Local" traffic policy
-		localPolicyChain := svcInfo.localPolicyChainName
-		usesLocalPolicyChain := len(localEndpoints) > 0 && svcInfo.UsesLocalEndpoints()
-		if usesLocalPolicyChain {
-			ensureChain(localPolicyChain, tx, activeChains, skipServiceUpdate)
-		}
-
-		// internalPolicyChain is the chain containing the endpoints for
-		// "internal" (ClusterIP) traffic. internalTrafficChain is the chain that
-		// internal traffic is routed to (which is always the same as
-		// internalPolicyChain). hasInternalEndpoints is true if we should
-		// generate rules pointing to internalTrafficChain, or false if there are
-		// no available internal endpoints.
-		internalPolicyChain := clusterPolicyChain
-		hasInternalEndpoints := hasEndpoints
-		if svcInfo.InternalPolicyLocal() {
-			internalPolicyChain = localPolicyChain
-			if len(localEndpoints) == 0 {
-				hasInternalEndpoints = false
-			}
-		}
-		internalTrafficChain := internalPolicyChain
-
-		// Similarly, externalPolicyChain is the chain containing the endpoints
-		// for "external" (NodePort, LoadBalancer, and ExternalIP) traffic.
-		// externalTrafficChain is the chain that external traffic is routed to
-		// (which is always the service's "EXT" chain). hasExternalEndpoints is
-		// true if there are endpoints that will be reached by external traffic.
-		// (But we may still have to generate externalTrafficChain even if there
-		// are no external endpoints, to ensure that the short-circuit rules for
-		// local traffic are set up.)
-		externalPolicyChain := clusterPolicyChain
-		hasExternalEndpoints := hasEndpoints
-		if svcInfo.ExternalPolicyLocal() {
-			externalPolicyChain = localPolicyChain
-			if len(localEndpoints) == 0 {
-				hasExternalEndpoints = false
-			}
-		}
-		externalTrafficChain := svcInfo.externalChainName // eventually jumps to externalPolicyChain
-
-		// usesExternalTrafficChain is based on hasEndpoints, not hasExternalEndpoints,
-		// because we need the local-traffic-short-circuiting rules even when there
-		// are no externally-usable endpoints.
-		usesExternalTrafficChain := hasEndpoints && svcInfo.ExternallyAccessible()
-		if usesExternalTrafficChain {
-			ensureChain(externalTrafficChain, tx, activeChains, skipServiceUpdate)
-		}
-
-		var internalTrafficFilterVerdict, externalTrafficFilterVerdict string
-		if !hasEndpoints {
-			// The service has no endpoints at all; hasInternalEndpoints and
-			// hasExternalEndpoints will also be false, and we will not
-			// generate any chains in the "nat" table for the service; only
-			// rules in the "filter" table rejecting incoming packets for
-			// the service's IPs.
-			internalTrafficFilterVerdict = fmt.Sprintf("goto %s", rejectChain)
-			externalTrafficFilterVerdict = fmt.Sprintf("goto %s", rejectChain)
-		} else {
-			if !hasInternalEndpoints {
-				// The internalTrafficPolicy is "Local" but there are no local
-				// endpoints. Traffic to the clusterIP will be dropped, but
-				// external traffic may still be accepted.
-				internalTrafficFilterVerdict = "drop"
-				serviceNoLocalEndpointsTotalInternal++
-			}
-			if !hasExternalEndpoints {
-				// The externalTrafficPolicy is "Local" but there are no
-				// local endpoints. Traffic to "external" IPs from outside
-				// the cluster will be dropped, but traffic from inside
-				// the cluster may still be accepted.
-				externalTrafficFilterVerdict = "drop"
-				serviceNoLocalEndpointsTotalExternal++
-			}
-		}
-
-		// Capture the clusterIP.
-		proxier.clusterIPs.ensureElem(tx, &knftables.Element{
-			Set: clusterIPsSet,
-			Key: []string{svcInfo.ClusterIP().String()},
-		})
-		if hasInternalEndpoints {
-			proxier.serviceIPs.ensureElem(tx, &knftables.Element{
-				Map: serviceIPsMap,
-				Key: []string{
-					svcInfo.ClusterIP().String(),
-					protocol,
-					strconv.Itoa(svcInfo.Port()),
-				},
-				Value: []string{
-					fmt.Sprintf("goto %s", internalTrafficChain),
-				},
-			})
-		} else {
-			// No endpoints.
-			proxier.noEndpointServices.ensureElem(tx, &knftables.Element{
-				Map: noEndpointServicesMap,
-				Key: []string{
-					svcInfo.ClusterIP().String(),
-					protocol,
-					strconv.Itoa(svcInfo.Port()),
-				},
-				Value: []string{
-					internalTrafficFilterVerdict,
-				},
-				Comment: &svcPortComment,
-			})
-		}
-
-		// Capture externalIPs.
-		for _, externalIP := range svcInfo.ExternalIPs() {
-			if hasEndpoints {
-				// Send traffic bound for external IPs to the "external
-				// destinations" chain.
-				proxier.serviceIPs.ensureElem(tx, &knftables.Element{
-					Map: serviceIPsMap,
-					Key: []string{
-						externalIP.String(),
-						protocol,
-						strconv.Itoa(svcInfo.Port()),
-					},
-					Value: []string{
-						fmt.Sprintf("goto %s", externalTrafficChain),
-					},
-				})
-			}
-			if !hasExternalEndpoints {
-				// Either no endpoints at all (REJECT) or no endpoints for
-				// external traffic (DROP anything that didn't get
-				// short-circuited by the EXT chain.)
-				proxier.noEndpointServices.ensureElem(tx, &knftables.Element{
-					Map: noEndpointServicesMap,
-					Key: []string{
-						externalIP.String(),
-						protocol,
-						strconv.Itoa(svcInfo.Port()),
-					},
-					Value: []string{
-						externalTrafficFilterVerdict,
-					},
-					Comment: &svcPortComment,
-				})
-			}
-		}
-
-		usesFWChain := len(svcInfo.LoadBalancerVIPs()) > 0 && len(svcInfo.LoadBalancerSourceRanges()) > 0
-		fwChain := svcInfo.firewallChainName
-		if usesFWChain {
-			ensureChain(fwChain, tx, activeChains, skipServiceUpdate)
-		}
-
-		// Capture load-balancer ingress.
-		for _, lbip := range svcInfo.LoadBalancerVIPs() {
-			if hasEndpoints {
-				proxier.serviceIPs.ensureElem(tx, &knftables.Element{
-					Map: serviceIPsMap,
-					Key: []string{
-						lbip.String(),
-						protocol,
-						strconv.Itoa(svcInfo.Port()),
-					},
-					Value: []string{
-						fmt.Sprintf("goto %s", externalTrafficChain),
-					},
-				})
-			}
-
-			if usesFWChain {
-				proxier.firewallIPs.ensureElem(tx, &knftables.Element{
-					Map: firewallIPsMap,
-					Key: []string{
-						lbip.String(),
-						protocol,
-						strconv.Itoa(svcInfo.Port()),
-					},
-					Value: []string{
-						fmt.Sprintf("goto %s", fwChain),
-					},
-				})
-			}
-		}
-		if !hasExternalEndpoints {
-			// Either no endpoints at all (REJECT) or no endpoints for
-			// external traffic (DROP anything that didn't get short-circuited
-			// by the EXT chain.)
-			for _, lbip := range svcInfo.LoadBalancerVIPs() {
-				proxier.noEndpointServices.ensureElem(tx, &knftables.Element{
-					Map: noEndpointServicesMap,
-					Key: []string{
-						lbip.String(),
-						protocol,
-						strconv.Itoa(svcInfo.Port()),
-					},
-					Value: []string{
-						externalTrafficFilterVerdict,
-					},
-					Comment: &svcPortComment,
-				})
-			}
-		}
-
-		// Capture nodeports.
-		if svcInfo.NodePort() != 0 {
-			if proxier.localhostNodePortProxy != nil && svcInfo.Protocol() == v1.ProtocolTCP {
-				eps := clusterEndpoints
-				if svcInfo.ExternalPolicyLocal() {
-					eps = localEndpoints
-				}
-				epStrs := make([]string, 0, len(eps))
-				for _, ep := range eps {
-					epStrs = append(epStrs, ep.String())
-				}
-				localhostNodePorts = append(localhostNodePorts, localnodeportproxy.NodePortSpec{
-					ServicePortName:     svcName,
-					Protocol:            svcInfo.Protocol(),
-					NodePort:            svcInfo.NodePort(),
-					Endpoints:           epStrs,
-					SessionAffinityType: svcInfo.SessionAffinityType(),
-					StickyMaxAgeSeconds: svcInfo.StickyMaxAgeSeconds(),
-				})
-			}
-			if proxier.rejectsLocalhostNodePort(svcInfo.Protocol()) {
-				rejectChain := localhostNodePortRejectChainName(svcInfo.Protocol())
-				proxier.localhostNodePortRejects.ensureElem(tx, &knftables.Element{
-					Map: localhostNodePortRejectMap,
-					Key: []string{
-						protocol,
-						strconv.Itoa(svcInfo.NodePort()),
-					},
-					Value: []string{
-						fmt.Sprintf("goto %s", rejectChain),
-					},
-				})
-			}
-			if hasEndpoints {
-				// Jump to the external destination chain.  For better or for
-				// worse, nodeports are not subject to loadBalancerSourceRanges,
-				// and we can't change that.
-				proxier.serviceNodePorts.ensureElem(tx, &knftables.Element{
-					Map: serviceNodePortsMap,
-					Key: []string{
-						protocol,
-						strconv.Itoa(svcInfo.NodePort()),
-					},
-					Value: []string{
-						fmt.Sprintf("goto %s", externalTrafficChain),
-					},
-				})
-			}
-			if !hasExternalEndpoints {
-				// Either no endpoints at all (REJECT) or no endpoints for
-				// external traffic (DROP anything that didn't get
-				// short-circuited by the EXT chain.)
-				proxier.noEndpointNodePorts.ensureElem(tx, &knftables.Element{
-					Map: noEndpointNodePortsMap,
-					Key: []string{
-						protocol,
-						strconv.Itoa(svcInfo.NodePort()),
-					},
-					Value: []string{
-						externalTrafficFilterVerdict,
-					},
-					Comment: &svcPortComment,
-				})
-			}
-		}
-
-		// All the following operations are service-chain related and may be skipped if no svc or endpoint
-		// changes are required.
-		if skipServiceUpdate {
-			continue
-		}
-
-		// Set up external traffic handling (if any "external" destinations are
-		// enabled). All captured traffic for all external destinations should
-		// jump to externalTrafficChain, which will handle some special cases and
-		// then jump to externalPolicyChain.
-		if usesExternalTrafficChain {
-			if !svcInfo.ExternalPolicyLocal() {
-				// If we are using non-local endpoints we need to masquerade,
-				// in case we cross nodes.
-				tx.Add(&knftables.Rule{
-					Chain: externalTrafficChain,
-					Rule: knftables.Concat(
-						proxier.masqueradeRule,
-					),
-					Comment: ptr.To("masquerade"),
-				})
-			} else {
-				// If we are only using same-node endpoints, we can retain the
-				// source IP in most cases.
-
-				if proxier.localDetector.IsImplemented() {
-					// Treat all locally-originated pod -> external destination
-					// traffic as a special-case.  It is subject to neither
-					// form of traffic policy, which simulates going up-and-out
-					// to an external load-balancer and coming back in.
-					tx.Add(&knftables.Rule{
-						Chain: externalTrafficChain,
-						Rule: knftables.Concat(
-							proxier.localDetector.IfLocalNFT(),
-							"goto", clusterPolicyChain,
-						),
-						Comment: ptr.To("short-circuit pod traffic"),
-					})
-				}
-
-				// Locally originated traffic (not a pod, but the host node)
-				// still needs masquerade because the LBIP itself is a local
-				// address, so that will be the chosen source IP.
-				tx.Add(&knftables.Rule{
-					Chain: externalTrafficChain,
-					Rule: knftables.Concat(
-						"fib", "saddr", "type", "local",
-						proxier.masqueradeRule,
-					),
-					Comment: ptr.To("masquerade local traffic"),
-				})
-
-				// Redirect all src-type=LOCAL -> external destination to the
-				// policy=cluster chain. This allows traffic originating
-				// from the host to be redirected to the service correctly.
-				tx.Add(&knftables.Rule{
-					Chain: externalTrafficChain,
-					Rule: knftables.Concat(
-						"fib", "saddr", "type", "local",
-						"goto", clusterPolicyChain,
-					),
-					Comment: ptr.To("short-circuit local traffic"),
-				})
-			}
-
-			// Anything else falls thru to the appropriate policy chain.
-			if hasExternalEndpoints {
-				tx.Add(&knftables.Rule{
-					Chain: externalTrafficChain,
-					Rule: knftables.Concat(
-						"goto", externalPolicyChain,
-					),
-				})
-			}
-		}
-
-		if usesFWChain {
-			var sources []string
-			allowFromNode := false
-			for _, cidr := range svcInfo.LoadBalancerSourceRanges() {
-				if len(sources) > 0 {
-					sources = append(sources, ",")
-				}
-				sources = append(sources, cidr.String())
-				if cidr.Contains(proxier.nodeIP) {
-					allowFromNode = true
-				}
-			}
-			// For VIP-like LBs, the VIP is often added as a local
-			// address (via an IP route rule).  In that case, a request
-			// from a node to the VIP will not hit the loadbalancer but
-			// will loop back with the source IP set to the VIP.  We
-			// need the following rules to allow requests from this node.
-			if allowFromNode {
-				for _, lbip := range svcInfo.LoadBalancerVIPs() {
-					sources = append(sources, ",", lbip.String())
-				}
-			}
-			tx.Add(&knftables.Rule{
-				Chain: fwChain,
-				Rule: knftables.Concat(
-					ipX, "saddr", "!=", "{", sources, "}",
-					"drop",
-				),
-			})
-		}
-
-		if svcInfo.SessionAffinityType() == v1.ServiceAffinityClientIP {
-			// Generate the per-endpoint affinity sets
-			for _, ep := range allLocallyReachableEndpoints {
-				epInfo, ok := ep.(*endpointInfo)
-				if !ok {
-					proxier.logger.Error(nil, "Failed to cast endpointsInfo", "endpointsInfo", ep)
-					continue
-				}
-
-				// Create a set to store current affinity mappings. As
-				// with the iptables backend, endpoint affinity is
-				// recorded for connections from a particular source IP
-				// (without regard to source port) to a particular
-				// ServicePort (without regard to which service IP was
-				// used to reach the service). This may be changed in the
-				// future.
-				tx.Add(&knftables.Set{
-					Name: epInfo.affinitySetName,
-					Type: ipvX_addr,
-					Flags: []knftables.SetFlag{
-						// The nft docs say "dynamic" is only
-						// needed for sets containing stateful
-						// objects (eg counters), but (at least on
-						// RHEL8) if we create the set without
-						// "dynamic", it later gets mutated to
-						// have it, and then the next attempt to
-						// tx.Add() it here fails because it looks
-						// like we're trying to change the flags.
-						knftables.DynamicFlag,
-						knftables.TimeoutFlag,
-					},
-					Timeout: ptr.To(time.Duration(svcInfo.StickyMaxAgeSeconds()) * time.Second),
-				})
-			}
-		}
-
-		// Write the endpoint rules and/or chains
-		if !serviceUsesAffinity {
-			if usesClusterPolicyChain {
-				proxier.writeServiceToEndpointDNATs(tx, svcInfo, clusterPolicyChain, clusterEndpoints)
-			}
-			if usesLocalPolicyChain {
-				proxier.writeServiceToEndpointDNATs(tx, svcInfo, localPolicyChain, localEndpoints)
-			}
-		} else {
-			if usesClusterPolicyChain {
-				proxier.writeServiceToEndpointJumps(tx, svcInfo, clusterPolicyChain, clusterEndpoints)
-			}
-			if usesLocalPolicyChain {
-				proxier.writeServiceToEndpointJumps(tx, svcInfo, localPolicyChain, localEndpoints)
-			}
-
-			// And generate the per-endpoint chains and affinity sets
-			for _, ep := range allLocallyReachableEndpoints {
-				epInfo, ok := ep.(*endpointInfo)
-				if !ok {
-					continue
-				}
-
-				endpointChain := epInfo.chainName
-
-				// Handle session affinity
-				tx.Add(&knftables.Rule{
-					Chain: endpointChain,
-					Rule: knftables.Concat(
-						"update", "@", epInfo.affinitySetName,
-						"{", ipX, "saddr", "}",
-					),
-				})
-
-				// DNAT to final destination.
-				tx.Add(&knftables.Rule{
-					Chain: endpointChain,
-					Rule: knftables.Concat(
-						"meta l4proto", protocol,
-						"dnat to", epInfo.String(),
-					),
-				})
-			}
-		}
+		state := proxier.syncServicePort(tx, svcName, svcInfo)
+		proxier.addServicePortState(svcName, state)
+		activeChains.Insert(state.chains...)
+		activeAffinitySets.Insert(state.affinitySets...)
 	}
 
 	// Figure out which chains are now stale. Unfortunately, we can't delete them
@@ -1842,92 +1530,624 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 			})
 		}
 	}
+}
 
-	proxier.clusterIPs.cleanupLeftoverKeys(tx)
-	proxier.serviceIPs.cleanupLeftoverKeys(tx)
-	proxier.firewallIPs.cleanupLeftoverKeys(tx)
-	proxier.noEndpointServices.cleanupLeftoverKeys(tx)
-	proxier.noEndpointNodePorts.cleanupLeftoverKeys(tx)
-	proxier.serviceNodePorts.cleanupLeftoverKeys(tx)
-	proxier.hairpinConnections.cleanupLeftoverKeys(tx)
-	if proxier.localhostNodePortsEnabled {
-		proxier.localhostNodePortRejects.cleanupLeftoverKeys(tx)
-	}
-	if doFullSync {
-		rejected := make(map[v1.Protocol]bool)
-		for _, protocol := range proxier.localhostNodePortRejectProtocols() {
-			rejected[protocol] = true
+// syncUpdatedServicePorts reprograms the given service ports, and cleans up whatever
+// they programmed before that they no longer use (all of it, for ports that no longer
+// exist).
+func (proxier *Proxier) syncUpdatedServicePorts(tx *knftables.Transaction, svcPortNames sets.Set[proxy.ServicePortName], start time.Time) {
+	for svcName := range svcPortNames {
+		var state *servicePortState
+		if svc, ok := proxier.svcPortMap[svcName]; ok {
+			if svcInfo, ok := svc.(*servicePortInfo); ok {
+				state = proxier.syncServicePort(tx, svcName, svcInfo)
+			} else {
+				proxier.logger.Error(nil, "Failed to cast serviceInfo", "serviceName", svcName)
+			}
 		}
-		// The loop above will have removed stale reject-map elements, so now we can remove stale target chains
-		for _, protocol := range metrics.LocalhostNodePortRejectableProtocols {
-			if rejected[protocol] {
+		if old := proxier.servicePortStates[svcName]; old != nil {
+			proxier.removeServicePortState(tx, svcName, old, state, start)
+		}
+		if state != nil {
+			proxier.addServicePortState(svcName, state)
+		}
+	}
+}
+
+// addServicePortState records state as what svcName has programmed.
+func (proxier *Proxier) addServicePortState(svcName proxy.ServicePortName, state *servicePortState) {
+	proxier.servicePortStates[svcName] = state
+	proxier.totalEndpoints += state.numEndpoints
+	if state.noLocalEndpointsInternal {
+		proxier.serviceNoLocalEndpointsTotalInternal++
+	}
+	if state.noLocalEndpointsExternal {
+		proxier.serviceNoLocalEndpointsTotalExternal++
+	}
+	if state.localhostNodePort != nil {
+		proxier.localhostNodePortSpecs[svcName] = *state.localhostNodePort
+	}
+}
+
+// removeServicePortState forgets old, the state of svcName, flushing its chains,
+// deleting its affinity sets and releasing its elements, except for those that
+// replacement (which may be nil) still uses.
+func (proxier *Proxier) removeServicePortState(tx *knftables.Transaction, svcName proxy.ServicePortName, old, replacement *servicePortState, now time.Time) {
+	var keepChains, keepAffinitySets sets.Set[string]
+	var keepElements sets.Set[nftElementRef]
+	if replacement != nil {
+		keepChains = sets.New(replacement.chains...)
+		keepAffinitySets = sets.New(replacement.affinitySets...)
+		keepElements = sets.New(replacement.elements...)
+	}
+
+	// As in syncAllServicePorts, the chains are flushed now but only deleted once
+	// it's safe to do so. Rules that use the affinity sets are only in the chains
+	// that were rewritten or flushed by now, so the sets can be deleted immediately.
+	for _, chain := range old.chains {
+		if !keepChains.Has(chain) {
+			tx.Flush(&knftables.Chain{
+				Name: chain,
+			})
+			proxier.staleChains[chain] = now
+		}
+	}
+	for _, set := range old.affinitySets {
+		if !keepAffinitySets.Has(set) {
+			tx.Delete(&knftables.Set{
+				Name: set,
+			})
+		}
+	}
+	for _, ref := range old.elements {
+		if !keepElements.Has(ref) {
+			ref.storage.release(svcName, ref.key)
+		}
+	}
+
+	delete(proxier.servicePortStates, svcName)
+	proxier.totalEndpoints -= old.numEndpoints
+	if old.noLocalEndpointsInternal {
+		proxier.serviceNoLocalEndpointsTotalInternal--
+	}
+	if old.noLocalEndpointsExternal {
+		proxier.serviceNoLocalEndpointsTotalExternal--
+	}
+	delete(proxier.localhostNodePortSpecs, svcName)
+}
+
+// syncServicePort adds the chains, rules, and affinity sets of the service port svcName
+// to tx, claims its map and set elements, and returns what it programmed.
+func (proxier *Proxier) syncServicePort(tx *knftables.Transaction, svcName proxy.ServicePortName, svcInfo *servicePortInfo) *servicePortState {
+	state := &servicePortState{}
+
+	// ensureChain makes chain exist and contain only the rules added to it after this
+	// call. It is a no-op for a chain this service port already ensured, which would
+	// otherwise lose the rules added since.
+	ensureChain := func(chain string) {
+		if slices.Contains(state.chains, chain) {
+			return
+		}
+		state.chains = append(state.chains, chain)
+		delete(proxier.staleChains, chain)
+		tx.Add(&knftables.Chain{
+			Name: chain,
+		})
+		tx.Flush(&knftables.Chain{
+			Name: chain,
+		})
+	}
+	claim := func(storage *nftElementStorage, elem *knftables.Element) {
+		state.elements = append(state.elements, nftElementRef{storage: storage, key: storage.claim(svcName, elem)})
+	}
+
+	// We need to use, eg, "ip daddr" for IPv4 but "ip6 daddr" for IPv6
+	ipX := "ip"
+	ipvX_addr := "ipv4_addr" //nolint:staticcheck // var name intentionally resembles value
+	if proxier.ipFamily == v1.IPv6Protocol {
+		ipX = "ip6"
+		ipvX_addr = "ipv6_addr"
+	}
+
+	protocol := strings.ToLower(string(svcInfo.Protocol()))
+	svcPortComment := truncateNFTablesComment(svcInfo.nameString)
+
+	// Figure out the endpoints for Cluster and Local traffic policy.
+	// allLocallyReachableEndpoints is the set of all endpoints that can be routed to
+	// from this node, given the service's traffic policies. hasEndpoints is true
+	// if the service has any usable endpoints on any node, not just this one.
+	allEndpoints := proxier.endpointsMap[svcName]
+	state.numEndpoints = len(allEndpoints)
+	clusterEndpoints, localEndpoints, allLocallyReachableEndpoints, hasEndpoints := proxy.CategorizeEndpoints(allEndpoints, svcInfo, proxier.nodeName, proxier.topologyLabels)
+
+	// We only use separate endpoint chains when adding affinity rules
+	serviceUsesAffinity := svcInfo.SessionAffinityType() == v1.ServiceAffinityClientIP
+
+	// Note the endpoints that will be used
+	for _, ep := range allLocallyReachableEndpoints {
+		epInfo, ok := ep.(*endpointInfo)
+		if !ok {
+			continue
+		}
+
+		// If using affinity, note the endpoint chain and affinity set
+		// names, and ensure that the chain exists.
+		if serviceUsesAffinity {
+			ensureChain(epInfo.chainName)
+			state.affinitySets = append(state.affinitySets, epInfo.affinitySetName)
+		}
+
+		// Add local endpoints to the hairpin set.
+		if epInfo.IsLocal() {
+			claim(proxier.hairpinConnections, &knftables.Element{
+				Set: hairpinConnectionsSet,
+				Key: []string{
+					epInfo.IP(),
+					epInfo.IP(),
+					protocol,
+					strconv.Itoa(epInfo.Port()),
+				},
+			})
+		}
+	}
+
+	// clusterPolicyChain contains the endpoints used with "Cluster" traffic policy
+	clusterPolicyChain := svcInfo.clusterPolicyChainName
+	usesClusterPolicyChain := len(clusterEndpoints) > 0 && svcInfo.UsesClusterEndpoints()
+	if usesClusterPolicyChain {
+		ensureChain(clusterPolicyChain)
+	}
+
+	// localPolicyChain contains the endpoints used with "Local" traffic policy
+	localPolicyChain := svcInfo.localPolicyChainName
+	usesLocalPolicyChain := len(localEndpoints) > 0 && svcInfo.UsesLocalEndpoints()
+	if usesLocalPolicyChain {
+		ensureChain(localPolicyChain)
+	}
+
+	// internalPolicyChain is the chain containing the endpoints for
+	// "internal" (ClusterIP) traffic. internalTrafficChain is the chain that
+	// internal traffic is routed to (which is always the same as
+	// internalPolicyChain). hasInternalEndpoints is true if we should
+	// generate rules pointing to internalTrafficChain, or false if there are
+	// no available internal endpoints.
+	internalPolicyChain := clusterPolicyChain
+	hasInternalEndpoints := hasEndpoints
+	if svcInfo.InternalPolicyLocal() {
+		internalPolicyChain = localPolicyChain
+		if len(localEndpoints) == 0 {
+			hasInternalEndpoints = false
+		}
+	}
+	internalTrafficChain := internalPolicyChain
+
+	// Similarly, externalPolicyChain is the chain containing the endpoints
+	// for "external" (NodePort, LoadBalancer, and ExternalIP) traffic.
+	// externalTrafficChain is the chain that external traffic is routed to
+	// (which is always the service's "EXT" chain). hasExternalEndpoints is
+	// true if there are endpoints that will be reached by external traffic.
+	// (But we may still have to generate externalTrafficChain even if there
+	// are no external endpoints, to ensure that the short-circuit rules for
+	// local traffic are set up.)
+	externalPolicyChain := clusterPolicyChain
+	hasExternalEndpoints := hasEndpoints
+	if svcInfo.ExternalPolicyLocal() {
+		externalPolicyChain = localPolicyChain
+		if len(localEndpoints) == 0 {
+			hasExternalEndpoints = false
+		}
+	}
+	externalTrafficChain := svcInfo.externalChainName // eventually jumps to externalPolicyChain
+
+	// usesExternalTrafficChain is based on hasEndpoints, not hasExternalEndpoints,
+	// because we need the local-traffic-short-circuiting rules even when there
+	// are no externally-usable endpoints.
+	usesExternalTrafficChain := hasEndpoints && svcInfo.ExternallyAccessible()
+	if usesExternalTrafficChain {
+		ensureChain(externalTrafficChain)
+	}
+
+	var internalTrafficFilterVerdict, externalTrafficFilterVerdict string
+	if !hasEndpoints {
+		// The service has no endpoints at all; hasInternalEndpoints and
+		// hasExternalEndpoints will also be false, and we will not
+		// generate any chains in the "nat" table for the service; only
+		// rules in the "filter" table rejecting incoming packets for
+		// the service's IPs.
+		internalTrafficFilterVerdict = fmt.Sprintf("goto %s", rejectChain)
+		externalTrafficFilterVerdict = fmt.Sprintf("goto %s", rejectChain)
+	} else {
+		if !hasInternalEndpoints {
+			// The internalTrafficPolicy is "Local" but there are no local
+			// endpoints. Traffic to the clusterIP will be dropped, but
+			// external traffic may still be accepted.
+			internalTrafficFilterVerdict = "drop"
+			state.noLocalEndpointsInternal = true
+		}
+		if !hasExternalEndpoints {
+			// The externalTrafficPolicy is "Local" but there are no
+			// local endpoints. Traffic to "external" IPs from outside
+			// the cluster will be dropped, but traffic from inside
+			// the cluster may still be accepted.
+			externalTrafficFilterVerdict = "drop"
+			state.noLocalEndpointsExternal = true
+		}
+	}
+
+	// Capture the clusterIP.
+	claim(proxier.clusterIPs, &knftables.Element{
+		Set: clusterIPsSet,
+		Key: []string{svcInfo.ClusterIP().String()},
+	})
+	if hasInternalEndpoints {
+		claim(proxier.serviceIPs, &knftables.Element{
+			Map: serviceIPsMap,
+			Key: []string{
+				svcInfo.ClusterIP().String(),
+				protocol,
+				strconv.Itoa(svcInfo.Port()),
+			},
+			Value: []string{
+				fmt.Sprintf("goto %s", internalTrafficChain),
+			},
+		})
+	} else {
+		// No endpoints.
+		claim(proxier.noEndpointServices, &knftables.Element{
+			Map: noEndpointServicesMap,
+			Key: []string{
+				svcInfo.ClusterIP().String(),
+				protocol,
+				strconv.Itoa(svcInfo.Port()),
+			},
+			Value: []string{
+				internalTrafficFilterVerdict,
+			},
+			Comment: &svcPortComment,
+		})
+	}
+
+	// Capture externalIPs.
+	for _, externalIP := range svcInfo.ExternalIPs() {
+		if hasEndpoints {
+			// Send traffic bound for external IPs to the "external
+			// destinations" chain.
+			claim(proxier.serviceIPs, &knftables.Element{
+				Map: serviceIPsMap,
+				Key: []string{
+					externalIP.String(),
+					protocol,
+					strconv.Itoa(svcInfo.Port()),
+				},
+				Value: []string{
+					fmt.Sprintf("goto %s", externalTrafficChain),
+				},
+			})
+		}
+		if !hasExternalEndpoints {
+			// Either no endpoints at all (REJECT) or no endpoints for
+			// external traffic (DROP anything that didn't get
+			// short-circuited by the EXT chain.)
+			claim(proxier.noEndpointServices, &knftables.Element{
+				Map: noEndpointServicesMap,
+				Key: []string{
+					externalIP.String(),
+					protocol,
+					strconv.Itoa(svcInfo.Port()),
+				},
+				Value: []string{
+					externalTrafficFilterVerdict,
+				},
+				Comment: &svcPortComment,
+			})
+		}
+	}
+
+	usesFWChain := len(svcInfo.LoadBalancerVIPs()) > 0 && len(svcInfo.LoadBalancerSourceRanges()) > 0
+	fwChain := svcInfo.firewallChainName
+	if usesFWChain {
+		ensureChain(fwChain)
+	}
+
+	// Capture load-balancer ingress.
+	for _, lbip := range svcInfo.LoadBalancerVIPs() {
+		if hasEndpoints {
+			claim(proxier.serviceIPs, &knftables.Element{
+				Map: serviceIPsMap,
+				Key: []string{
+					lbip.String(),
+					protocol,
+					strconv.Itoa(svcInfo.Port()),
+				},
+				Value: []string{
+					fmt.Sprintf("goto %s", externalTrafficChain),
+				},
+			})
+		}
+
+		if usesFWChain {
+			claim(proxier.firewallIPs, &knftables.Element{
+				Map: firewallIPsMap,
+				Key: []string{
+					lbip.String(),
+					protocol,
+					strconv.Itoa(svcInfo.Port()),
+				},
+				Value: []string{
+					fmt.Sprintf("goto %s", fwChain),
+				},
+			})
+		}
+	}
+	if !hasExternalEndpoints {
+		// Either no endpoints at all (REJECT) or no endpoints for
+		// external traffic (DROP anything that didn't get short-circuited
+		// by the EXT chain.)
+		for _, lbip := range svcInfo.LoadBalancerVIPs() {
+			claim(proxier.noEndpointServices, &knftables.Element{
+				Map: noEndpointServicesMap,
+				Key: []string{
+					lbip.String(),
+					protocol,
+					strconv.Itoa(svcInfo.Port()),
+				},
+				Value: []string{
+					externalTrafficFilterVerdict,
+				},
+				Comment: &svcPortComment,
+			})
+		}
+	}
+
+	// Capture nodeports.
+	if svcInfo.NodePort() != 0 {
+		if proxier.localhostNodePortProxy != nil && svcInfo.Protocol() == v1.ProtocolTCP {
+			eps := clusterEndpoints
+			if svcInfo.ExternalPolicyLocal() {
+				eps = localEndpoints
+			}
+			epStrs := make([]string, 0, len(eps))
+			for _, ep := range eps {
+				epStrs = append(epStrs, ep.String())
+			}
+			state.localhostNodePort = &localnodeportproxy.NodePortSpec{
+				ServicePortName:     svcName,
+				Protocol:            svcInfo.Protocol(),
+				NodePort:            svcInfo.NodePort(),
+				Endpoints:           epStrs,
+				SessionAffinityType: svcInfo.SessionAffinityType(),
+				StickyMaxAgeSeconds: svcInfo.StickyMaxAgeSeconds(),
+			}
+		}
+		if proxier.rejectsLocalhostNodePort(svcInfo.Protocol()) {
+			rejectChain := localhostNodePortRejectChainName(svcInfo.Protocol())
+			claim(proxier.localhostNodePortRejects, &knftables.Element{
+				Map: localhostNodePortRejectMap,
+				Key: []string{
+					protocol,
+					strconv.Itoa(svcInfo.NodePort()),
+				},
+				Value: []string{
+					fmt.Sprintf("goto %s", rejectChain),
+				},
+			})
+		}
+		if hasEndpoints {
+			// Jump to the external destination chain.  For better or for
+			// worse, nodeports are not subject to loadBalancerSourceRanges,
+			// and we can't change that.
+			claim(proxier.serviceNodePorts, &knftables.Element{
+				Map: serviceNodePortsMap,
+				Key: []string{
+					protocol,
+					strconv.Itoa(svcInfo.NodePort()),
+				},
+				Value: []string{
+					fmt.Sprintf("goto %s", externalTrafficChain),
+				},
+			})
+		}
+		if !hasExternalEndpoints {
+			// Either no endpoints at all (REJECT) or no endpoints for
+			// external traffic (DROP anything that didn't get
+			// short-circuited by the EXT chain.)
+			claim(proxier.noEndpointNodePorts, &knftables.Element{
+				Map: noEndpointNodePortsMap,
+				Key: []string{
+					protocol,
+					strconv.Itoa(svcInfo.NodePort()),
+				},
+				Value: []string{
+					externalTrafficFilterVerdict,
+				},
+				Comment: &svcPortComment,
+			})
+		}
+	}
+
+	// Set up external traffic handling (if any "external" destinations are
+	// enabled). All captured traffic for all external destinations should
+	// jump to externalTrafficChain, which will handle some special cases and
+	// then jump to externalPolicyChain.
+	if usesExternalTrafficChain {
+		if !svcInfo.ExternalPolicyLocal() {
+			// If we are using non-local endpoints we need to masquerade,
+			// in case we cross nodes.
+			tx.Add(&knftables.Rule{
+				Chain: externalTrafficChain,
+				Rule: knftables.Concat(
+					proxier.masqueradeRule,
+				),
+				Comment: ptr.To("masquerade"),
+			})
+		} else {
+			// If we are only using same-node endpoints, we can retain the
+			// source IP in most cases.
+
+			if proxier.localDetector.IsImplemented() {
+				// Treat all locally-originated pod -> external destination
+				// traffic as a special-case.  It is subject to neither
+				// form of traffic policy, which simulates going up-and-out
+				// to an external load-balancer and coming back in.
+				tx.Add(&knftables.Rule{
+					Chain: externalTrafficChain,
+					Rule: knftables.Concat(
+						proxier.localDetector.IfLocalNFT(),
+						"goto", clusterPolicyChain,
+					),
+					Comment: ptr.To("short-circuit pod traffic"),
+				})
+			}
+
+			// Locally originated traffic (not a pod, but the host node)
+			// still needs masquerade because the LBIP itself is a local
+			// address, so that will be the chosen source IP.
+			tx.Add(&knftables.Rule{
+				Chain: externalTrafficChain,
+				Rule: knftables.Concat(
+					"fib", "saddr", "type", "local",
+					proxier.masqueradeRule,
+				),
+				Comment: ptr.To("masquerade local traffic"),
+			})
+
+			// Redirect all src-type=LOCAL -> external destination to the
+			// policy=cluster chain. This allows traffic originating
+			// from the host to be redirected to the service correctly.
+			tx.Add(&knftables.Rule{
+				Chain: externalTrafficChain,
+				Rule: knftables.Concat(
+					"fib", "saddr", "type", "local",
+					"goto", clusterPolicyChain,
+				),
+				Comment: ptr.To("short-circuit local traffic"),
+			})
+		}
+
+		// Anything else falls thru to the appropriate policy chain.
+		if hasExternalEndpoints {
+			tx.Add(&knftables.Rule{
+				Chain: externalTrafficChain,
+				Rule: knftables.Concat(
+					"goto", externalPolicyChain,
+				),
+			})
+		}
+	}
+
+	if usesFWChain {
+		var sources []string
+		allowFromNode := false
+		for _, cidr := range svcInfo.LoadBalancerSourceRanges() {
+			if len(sources) > 0 {
+				sources = append(sources, ",")
+			}
+			sources = append(sources, cidr.String())
+			if cidr.Contains(proxier.nodeIP) {
+				allowFromNode = true
+			}
+		}
+		// For VIP-like LBs, the VIP is often added as a local
+		// address (via an IP route rule).  In that case, a request
+		// from a node to the VIP will not hit the loadbalancer but
+		// will loop back with the source IP set to the VIP.  We
+		// need the following rules to allow requests from this node.
+		if allowFromNode {
+			for _, lbip := range svcInfo.LoadBalancerVIPs() {
+				sources = append(sources, ",", lbip.String())
+			}
+		}
+		tx.Add(&knftables.Rule{
+			Chain: fwChain,
+			Rule: knftables.Concat(
+				ipX, "saddr", "!=", "{", sources, "}",
+				"drop",
+			),
+		})
+	}
+
+	if svcInfo.SessionAffinityType() == v1.ServiceAffinityClientIP {
+		// Generate the per-endpoint affinity sets
+		for _, ep := range allLocallyReachableEndpoints {
+			epInfo, ok := ep.(*endpointInfo)
+			if !ok {
+				proxier.logger.Error(nil, "Failed to cast endpointsInfo", "endpointsInfo", ep)
 				continue
 			}
-			rejectCounter := &knftables.Counter{Name: metrics.LocalhostNodePortRejectedCounterName(protocol)}
-			tx.Add(rejectCounter)
-			tx.Delete(rejectCounter)
+
+			// Create a set to store current affinity mappings. As
+			// with the iptables backend, endpoint affinity is
+			// recorded for connections from a particular source IP
+			// (without regard to source port) to a particular
+			// ServicePort (without regard to which service IP was
+			// used to reach the service). This may be changed in the
+			// future.
+			tx.Add(&knftables.Set{
+				Name: epInfo.affinitySetName,
+				Type: ipvX_addr,
+				Flags: []knftables.SetFlag{
+					// The nft docs say "dynamic" is only
+					// needed for sets containing stateful
+					// objects (eg counters), but (at least on
+					// RHEL8) if we create the set without
+					// "dynamic", it later gets mutated to
+					// have it, and then the next attempt to
+					// tx.Add() it here fails because it looks
+					// like we're trying to change the flags.
+					knftables.DynamicFlag,
+					knftables.TimeoutFlag,
+				},
+				Timeout: ptr.To(time.Duration(svcInfo.StickyMaxAgeSeconds()) * time.Second),
+			})
 		}
 	}
 
-	// Sync rules.
-	proxier.logger.V(2).Info("Reloading service nftables data",
-		"numServices", len(proxier.svcPortMap),
-		"numEndpoints", totalEndpoints,
-	)
+	// Write the endpoint rules and/or chains
+	if !serviceUsesAffinity {
+		if usesClusterPolicyChain {
+			proxier.writeServiceToEndpointDNATs(tx, svcInfo, clusterPolicyChain, clusterEndpoints)
+		}
+		if usesLocalPolicyChain {
+			proxier.writeServiceToEndpointDNATs(tx, svcInfo, localPolicyChain, localEndpoints)
+		}
+	} else {
+		if usesClusterPolicyChain {
+			proxier.writeServiceToEndpointJumps(tx, svcInfo, clusterPolicyChain, clusterEndpoints)
+		}
+		if usesLocalPolicyChain {
+			proxier.writeServiceToEndpointJumps(tx, svcInfo, localPolicyChain, localEndpoints)
+		}
 
-	if klogV9 := klog.V(9); klogV9.Enabled() {
-		klogV9.InfoS("Running nftables transaction", "transaction", tx.String())
-	}
+		// And generate the per-endpoint chains and affinity sets
+		for _, ep := range allLocallyReachableEndpoints {
+			epInfo, ok := ep.(*endpointInfo)
+			if !ok {
+				continue
+			}
 
-	err = proxier.nftables.Run(context.TODO(), tx)
-	if err != nil {
-		proxier.logger.Error(err, "nftables sync failed")
-		metrics.NFTablesSyncFailuresTotal.WithLabelValues(string(proxier.ipFamily)).Inc()
+			endpointChain := epInfo.chainName
 
-		// staleChains is now incorrect since we didn't actually flush the
-		// chains in it. We can recompute it next time.
-		clear(proxier.staleChains)
-		// Log failed transaction and list full kube-proxy table.
-		proxier.logFailure(tx)
-		return
-	}
-	success = true
-	proxier.needFullSync = false
+			// Handle session affinity
+			tx.Add(&knftables.Rule{
+				Chain: endpointChain,
+				Rule: knftables.Concat(
+					"update", "@", epInfo.affinitySetName,
+					"{", ipX, "saddr", "}",
+				),
+			})
 
-	for name, lastChangeTriggerTimes := range endpointUpdateResult.LastChangeTriggerTimes {
-		for _, lastChangeTriggerTime := range lastChangeTriggerTimes {
-			latency := metrics.SinceInSeconds(lastChangeTriggerTime)
-			metrics.NetworkProgrammingLatency.WithLabelValues(string(proxier.ipFamily)).Observe(latency)
-			proxier.logger.V(4).Info("Network programming", "endpoint", klog.KRef(name.Namespace, name.Name), "elapsed", latency)
+			// DNAT to final destination.
+			tx.Add(&knftables.Rule{
+				Chain: endpointChain,
+				Rule: knftables.Concat(
+					"meta l4proto", protocol,
+					"dnat to", epInfo.String(),
+				),
+			})
 		}
 	}
 
-	metrics.SyncProxyRulesNoLocalEndpointsTotal.WithLabelValues("internal", string(proxier.ipFamily)).Set(float64(serviceNoLocalEndpointsTotalInternal))
-	metrics.SyncProxyRulesNoLocalEndpointsTotal.WithLabelValues("external", string(proxier.ipFamily)).Set(float64(serviceNoLocalEndpointsTotalExternal))
-	if proxier.healthzServer != nil {
-		proxier.healthzServer.Updated(proxier.ipFamily)
-	}
-	metrics.SyncProxyRulesLastTimestamp.WithLabelValues(string(proxier.ipFamily)).SetToCurrentTime()
-
-	// Update service healthchecks.  The endpoints list might include services that are
-	// not "OnlyLocal", but the services list will not, and the serviceHealthServer
-	// will just drop those endpoints.
-	if err := proxier.serviceHealthServer.SyncServices(proxier.svcPortMap.HealthCheckNodePorts()); err != nil {
-		proxier.logger.Error(err, "Error syncing healthcheck services")
-	}
-	if err := proxier.serviceHealthServer.SyncEndpoints(proxier.endpointsMap.LocalReadyEndpoints()); err != nil {
-		proxier.logger.Error(err, "Error syncing healthcheck endpoints")
-	}
-
-	if proxier.localhostNodePortProxy != nil {
-		proxier.localhostNodePortProxy.SyncNodePorts(localhostNodePorts)
-	}
-
-	if endpointUpdateResult.ConntrackCleanupRequired || serviceUpdateResult.ConntrackCleanupRequired {
-		// Finish housekeeping, clear stale conntrack entries for UDP Services
-		conntrack.CleanStaleEntries(proxier.conntrack, proxier.ipFamily, proxier.svcPortMap, proxier.endpointsMap, serviceUpdateResult.DeletedServices)
-	}
-	return
+	return state
 }
 
 func (proxier *Proxier) writeServiceToEndpointDNATs(tx *knftables.Transaction, svcInfo *servicePortInfo, svcChain string, endpoints []proxy.Endpoint) {
