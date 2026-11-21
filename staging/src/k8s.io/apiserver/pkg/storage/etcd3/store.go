@@ -501,12 +501,13 @@ func (s *store) updateOnce(ctx context.Context, preparedKey string, destination 
 		// etcd in order to be sure the data in the store is equivalent to
 		// our desired serialization before short-circuiting a write.
 		if !origState.FromStorage {
+			cachedRev := origState.Rev
 			origState, err = s.getCurrentState(ctx, "updateGet", preparedKey, v, ignoreNotFound, false)
 			if err != nil {
 				return origState, false, err
 			}
-			if !bytes.Equal(data, origState.Data) {
-				// original data changed, restart loop
+			if origState.Rev != cachedRev || !bytes.Equal(data, origState.Data) {
+				// original state changed, restart loop
 				if !getOnFailure {
 					return origState, false, storage.NewResourceVersionConflictsError(preparedKey, origState.Rev)
 				}

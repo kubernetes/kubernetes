@@ -4539,6 +4539,57 @@ func RunTestGuaranteedUpdateWithConflict(ctx context.Context, t *testing.T, stor
 	if out.Labels["recreated"] != "true" {
 		t.Errorf("Expected recreated pod label, got: %#v", out.Labels)
 	}
+
+	// Conflicting ABA background updates on a no-op update must not bypass ResourceVersion preconditions.
+	abaInitial := &example.Pod{}
+	if err := store.GuaranteedUpdate(ctx, key, abaInitial, false, nil,
+		storage.SimpleUpdate(func(obj runtime.Object) (runtime.Object, error) {
+			pod := obj.(*example.Pod)
+			pod.Spec.NodeName = "node-aba-1"
+			return pod, nil
+		}), nil); err != nil {
+		t.Fatalf("Setup GuaranteedUpdate for ABA test failed: %v", err)
+	}
+	abaInitialRV := abaInitial.ResourceVersion
+	if err := store.Get(ctx, key, storage.GetOptions{ResourceVersion: abaInitialRV}, &example.Pod{}); err != nil {
+		t.Fatalf("Get at %s failed: %v", abaInitialRV, err)
+	}
+	updateCount = 0
+	abaOut := &example.Pod{}
+	err = store.GuaranteedUpdate(ctx, key, abaOut, false, &storage.Preconditions{ResourceVersion: &abaInitialRV},
+		storage.SimpleUpdate(func(obj runtime.Object) (runtime.Object, error) {
+			updateCount++
+			if updateCount == 1 {
+				if err := store.GuaranteedUpdate(ctx, key, &example.Pod{}, false, nil,
+					storage.SimpleUpdate(func(inner runtime.Object) (runtime.Object, error) {
+						innerPod := inner.(*example.Pod)
+						innerPod.Spec.NodeName = "node-aba-2"
+						return innerPod, nil
+					}), nil); err != nil {
+					t.Errorf("Background ABA update 1 failed: %v", err)
+				}
+				if err := store.GuaranteedUpdate(ctx, key, &example.Pod{}, false, nil,
+					storage.SimpleUpdate(func(inner runtime.Object) (runtime.Object, error) {
+						innerPod := inner.(*example.Pod)
+						innerPod.Spec.NodeName = "node-aba-1"
+						return innerPod, nil
+					}), nil); err != nil {
+					t.Errorf("Background ABA update 2 failed: %v", err)
+				}
+			}
+			return obj, nil
+		}), nil)
+	switch {
+	case err == nil:
+		if abaOut.ResourceVersion != abaInitialRV {
+			t.Errorf("Expected ResourceVersion %s on no-op update with ResourceVersion precondition, got %s", abaInitialRV, abaOut.ResourceVersion)
+		}
+	case !storage.IsInvalidObj(err):
+		t.Errorf("Expected nil or invalid object error when ResourceVersion precondition fails after ABA conflict, got: %v", err)
+	}
+	if updateCount != 1 {
+		t.Errorf("Expected updateCount = 1, got %d", updateCount)
+	}
 }
 
 func RunTestGuaranteedUpdateWithSuggestionAndConflict(ctx context.Context, t *testing.T, store storage.Interface) {
@@ -4585,6 +4636,40 @@ func RunTestGuaranteedUpdateWithSuggestionAndConflict(ctx context.Context, t *te
 	)
 	if err != nil {
 		t.Fatalf("unexpected error when preconditions pass on live object: %v", err)
+	}
+
+	// Preconditions pass on outdated suggestion, live lookup after ABA update has matching bytes
+	// at a newer ResourceVersion and must fail ResourceVersion preconditions.
+	abaSuggestion := updatedPod.DeepCopy()
+	abaSuggestionRV := abaSuggestion.ResourceVersion
+	if err := store.GuaranteedUpdate(ctx, key, &example.Pod{}, false, nil,
+		storage.SimpleUpdate(func(obj runtime.Object) (runtime.Object, error) {
+			pod := obj.(*example.Pod)
+			pod.Spec.NodeName = "node-aba"
+			return pod, nil
+		}), nil); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	abaRestored := &example.Pod{}
+	if err := store.GuaranteedUpdate(ctx, key, abaRestored, false, nil,
+		storage.SimpleUpdate(func(obj runtime.Object) (runtime.Object, error) {
+			pod := obj.(*example.Pod)
+			pod.Spec.NodeName = ""
+			return pod, nil
+		}), nil); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if err := store.Get(ctx, key, storage.GetOptions{ResourceVersion: abaRestored.ResourceVersion}, &example.Pod{}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	err = store.GuaranteedUpdate(ctx, key, &example.Pod{}, false, &storage.Preconditions{ResourceVersion: &abaSuggestionRV},
+		storage.SimpleUpdate(func(obj runtime.Object) (runtime.Object, error) {
+			return obj, nil
+		}),
+		abaSuggestion,
+	)
+	if !storage.IsInvalidObj(err) {
+		t.Errorf("expected InvalidObj error when ResourceVersion precondition fails on live object after ABA update, got: %v", err)
 	}
 
 	// Second, update using the outdated originalPod as the suggestion. Return a conflict error when
