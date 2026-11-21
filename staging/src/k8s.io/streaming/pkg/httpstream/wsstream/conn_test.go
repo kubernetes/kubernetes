@@ -24,6 +24,7 @@ import (
 	"reflect"
 	"sync"
 	"testing"
+	"time"
 
 	"golang.org/x/net/websocket"
 )
@@ -417,5 +418,57 @@ func TestProtocolSupportsStreamClose(t *testing.T) {
 		if actual != test.expected {
 			t.Errorf("%s: expected (%t), got (%t)", name, test.expected, actual)
 		}
+	}
+}
+
+// CloseWrite sends the close frame without closing the socket: the client
+// reads everything written before it and then EOF, the server's PayloadType
+// is left as it was, and the connection is closed, and CloseChan with it, only
+// once the client has replied.
+func TestCloseWrite(t *testing.T) {
+	conn := NewConn(NewDefaultChannelProtocols([]ChannelType{WriteChannel}))
+	s, addr := newServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		_, _, _ = conn.Open(w, req)
+	}))
+	defer s.Close()
+
+	client, err := websocket.Dial("ws://"+addr, "", "http://localhost/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = client.Close() }()
+	<-conn.ready
+
+	if _, err := conn.channels[0].Write([]byte("last words")); err != nil {
+		t.Fatal(err)
+	}
+	payloadType := conn.ws.PayloadType
+	if err := conn.CloseWrite(); err != nil {
+		t.Fatal(err)
+	}
+	if conn.ws.PayloadType != payloadType {
+		t.Errorf("CloseWrite left PayloadType %d, want %d", conn.ws.PayloadType, payloadType)
+	}
+
+	data, err := io.ReadAll(client)
+	if err != nil {
+		t.Fatalf("client read: %v", err)
+	}
+	if !reflect.DeepEqual(data, append([]byte{0}, []byte("last words")...)) {
+		t.Errorf("unexpected client read: %q", data)
+	}
+
+	// The client has read up to the close frame but has not replied.
+	select {
+	case <-conn.CloseChan():
+		t.Fatal("the connection was closed before the client replied to the close frame")
+	case <-time.After(200 * time.Millisecond):
+	}
+
+	_ = client.Close()
+	select {
+	case <-conn.CloseChan():
+	case <-time.After(10 * time.Second):
+		t.Fatal("the connection was not closed after the client replied")
 	}
 }

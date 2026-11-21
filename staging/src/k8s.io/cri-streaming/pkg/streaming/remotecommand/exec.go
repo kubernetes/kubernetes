@@ -84,10 +84,11 @@ func ServeExec(w http.ResponseWriter, req *http.Request, executor Executor, podN
 	}
 	defer ctx.conn.Close()
 
+	var status *streamStatusError
 	err := executor.ExecInContainer(req.Context(), podName, uid, container, cmd, ctx.stdinStream, ctx.stdoutStream, ctx.stderrStream, ctx.tty, ctx.resizeChan, 0)
 	if err != nil {
 		if rc, ok := exitCode(err); ok {
-			_ = ctx.writeStatus(&streamStatusError{ErrStatus: streamStatus{
+			status = &streamStatusError{ErrStatus: streamStatus{
 				Status: statusFailure,
 				Reason: NonZeroExitCodeReason,
 				Details: &streamStatusDetails{
@@ -99,15 +100,16 @@ func ServeExec(w http.ResponseWriter, req *http.Request, executor Executor, podN
 					},
 				},
 				Message: fmt.Sprintf("command terminated with non-zero exit code: %v", err),
-			}})
+			}}
 		} else {
 			err = fmt.Errorf("error executing command in container: %v", err)
 			runtime.HandleError(err)
-			_ = ctx.writeStatus(newInternalError(err))
+			status = newInternalError(err)
 		}
 	} else {
-		_ = ctx.writeStatus(&streamStatusError{ErrStatus: streamStatus{
+		status = &streamStatusError{ErrStatus: streamStatus{
 			Status: statusSuccess,
-		}})
+		}}
 	}
+	ctx.finish(req.Context(), status)
 }

@@ -69,6 +69,10 @@ func TestWebSocketClient_LoopbackStdinToStdout(t *testing.T) {
 		if err != nil {
 			t.Fatalf("error copying STDIN to STDOUT: %v", err)
 		}
+		// A v5 server writes the command's status before it closes.
+		if err := conns.writeStatus(&apierrors.StatusError{ErrStatus: metav1.Status{Status: metav1.StatusSuccess}}); err != nil {
+			t.Errorf("error writing status: %v", err)
+		}
 	}))
 	defer websocketServer.Close()
 
@@ -144,6 +148,10 @@ func TestWebSocketClient_DifferentBufferSizes(t *testing.T) {
 			if err != nil {
 				t.Fatalf("error copying STDIN to STDOUT: %v", err)
 			}
+			// A v5 server writes the command's status before it closes.
+			if err := conns.writeStatus(&apierrors.StatusError{ErrStatus: metav1.Status{Status: metav1.StatusSuccess}}); err != nil {
+				t.Errorf("error writing status: %v", err)
+			}
 		}))
 		defer websocketServer.Close()
 
@@ -217,6 +225,10 @@ func TestWebSocketClient_LoopbackStdinAsPipe(t *testing.T) {
 		_, err = io.Copy(conns.stdoutStream, conns.stdinStream)
 		if err != nil {
 			t.Fatalf("error copying STDIN to STDOUT: %v", err)
+		}
+		// A v5 server writes the command's status before it closes.
+		if err := conns.writeStatus(&apierrors.StatusError{ErrStatus: metav1.Status{Status: metav1.StatusSuccess}}); err != nil {
+			t.Errorf("error writing status: %v", err)
 		}
 	}))
 	defer websocketServer.Close()
@@ -299,6 +311,10 @@ func TestWebSocketClient_LoopbackStdinToStderr(t *testing.T) {
 		if err != nil {
 			t.Fatalf("error copying STDIN to STDERR: %v", err)
 		}
+		// A v5 server writes the command's status before it closes.
+		if err := conns.writeStatus(&apierrors.StatusError{ErrStatus: metav1.Status{Status: metav1.StatusSuccess}}); err != nil {
+			t.Errorf("error writing status: %v", err)
+		}
 	}))
 	defer websocketServer.Close()
 
@@ -372,6 +388,10 @@ func TestWebSocketClient_MultipleReadChannels(t *testing.T) {
 		_, err = io.Copy(conns.stdoutStream, stdinReader)
 		if err != nil {
 			t.Errorf("error copying STDIN to STDOUT: %v", err)
+		}
+		// A v5 server writes the command's status before it closes.
+		if err := conns.writeStatus(&apierrors.StatusError{ErrStatus: metav1.Status{Status: metav1.StatusSuccess}}); err != nil {
+			t.Errorf("error writing status: %v", err)
 		}
 	}))
 	defer websocketServer.Close()
@@ -633,6 +653,10 @@ func TestWebSocketClient_MultipleWriteChannels(t *testing.T) {
 		}
 		stdinReader.Close() // Stops the random STDIN stream generation
 		wg.Wait()           // Wait for all bytes copied from STDIN to STDOUT
+		// A v5 server writes the command's status before it closes.
+		if err := conns.writeStatus(&apierrors.StatusError{ErrStatus: metav1.Status{Status: metav1.StatusSuccess}}); err != nil {
+			t.Errorf("error writing status: %v", err)
+		}
 	}))
 	defer websocketServer.Close()
 	// Now create the WebSocket client (executor), and point it to the "websocketServer".
@@ -1389,6 +1413,10 @@ func TestWebSocketClient_ProxySucceeds(t *testing.T) {
 			_, err = io.Copy(conns.stdoutStream, conns.stdinStream)
 			if err != nil {
 				t.Fatalf("error copying STDIN to STDOUT: %v", err)
+			}
+			// A v5 server writes the command's status before it closes.
+			if err := conns.writeStatus(&apierrors.StatusError{ErrStatus: metav1.Status{Status: metav1.StatusSuccess}}); err != nil {
+				t.Errorf("error writing status: %v", err)
 			}
 		}))
 		defer websocketServer.Close() //nolint:errcheck
