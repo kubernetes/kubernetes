@@ -31,6 +31,8 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 	"k8s.io/apimachinery/pkg/api/apitesting"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -484,6 +486,49 @@ apiserver_watch_events_total{group="group",resource="resource",version="version"
 
 			err = metricstestutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expected), "apiserver_watch_events_sizes", "apiserver_watch_events_total")
 			require.NoError(t, err)
+		})
+	}
+}
+
+func TestWatchServerTracing(t *testing.T) {
+	scenarios := []struct {
+		name               string
+		isWatchListRequest bool
+		expectedSpans      []string
+	}{
+		{name: "regular watch does not start a span", expectedSpans: []string{"parent"}},
+		{name: "watchlist ends the span when returning before the initial events end", isWatchListRequest: true, expectedSpans: []string{"WatchServer.HandleHTTP", "parent"}},
+	}
+
+	for _, scenario := range scenarios {
+		t.Run(scenario.name, func(t *testing.T) {
+			recorder := tracetest.NewSpanRecorder()
+			tp := sdktrace.NewTracerProvider(sdktrace.WithSpanProcessor(recorder))
+			// tracing.Start only records a span when the context already holds one.
+			ctx, parent := tp.Tracer("test").Start(t.Context(), "parent")
+
+			watcher := watch.NewFake()
+			// Closing the result channel makes HandleHTTP return.
+			watcher.Stop()
+
+			info, _ := runtime.SerializerInfoForMediaType(codecs.SupportedMediaTypes(), runtime.ContentTypeJSON)
+			watchServer := &WatchServer{
+				Scope:              &RequestScope{},
+				Watching:           watcher,
+				Framer:             info.StreamSerializer.Framer,
+				Encoder:            testCodecV2,
+				TimeoutFactory:     &fakeTimeoutFactory{done: make(chan struct{})},
+				isWatchListRequest: scenario.isWatchListRequest,
+			}
+			watchServer.HandleHTTP(httptest.NewRecorder(), httptest.NewRequestWithContext(ctx, http.MethodGet, "/", nil))
+			parent.End()
+
+			var ended []string
+			for _, span := range recorder.Ended() {
+				ended = append(ended, span.Name())
+			}
+			require.Len(t, recorder.Started(), len(ended), "every started span must be ended")
+			require.Equal(t, scenario.expectedSpans, ended)
 		})
 	}
 }
