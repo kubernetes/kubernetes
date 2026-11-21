@@ -268,7 +268,7 @@ var _ = SIGDescribe("CronJob", func() {
 	ginkgo.It("should set the cronjob-scheduled-timestamp annotation on a job", func(ctx context.Context) {
 		ginkgo.By("Creating a cronjob")
 		cronJob := newTestCronJob("concurrent", "*/1 * * * ?", batchv1.AllowConcurrent,
-			nil, nil, nil)
+			successCommand, nil, nil)
 		cronJob, err := createCronJob(ctx, f.ClientSet, f.Namespace.Name, cronJob)
 		framework.ExpectNoError(err, "Failed to create CronJob in namespace %s", f.Namespace.Name)
 
@@ -663,7 +663,7 @@ func newTestCronJob(name, schedule string, concurrencyPolicy batchv1.Concurrency
 							Containers: []v1.Container{
 								{
 									Name:  "c",
-									Image: imageutils.GetE2EImage(imageutils.BusyBox),
+									Image: imageutils.GetE2EImage(imageutils.Agnhost),
 									VolumeMounts: []v1.VolumeMount{
 										{
 											MountPath: "/data",
