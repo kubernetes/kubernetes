@@ -18,11 +18,17 @@ package rest
 
 import (
 	"errors"
+	"fmt"
+	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 
 	rbacapiv1 "k8s.io/api/rbac/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/fake"
@@ -248,8 +254,24 @@ func TestEnsureRBACPolicy(t *testing.T) {
 			for _, action := range client.Actions() {
 				requests = append(requests, requestString(action))
 			}
-			if diff := cmp.Diff(tc.wantRequests, requests); diff != "" {
-				t.Errorf("requests (-want +got):\n%s", diff)
+			if len(requests) < 2 {
+				t.Fatalf("missing initial policy Lists: %v", requests)
+			}
+			if diff := cmp.Diff(tc.wantRequests[:2], requests[:2]); diff != "" {
+				t.Errorf("initial Lists (-want +got):\n%s", diff)
+			}
+			// Different objects can now interleave, but each object's live-read
+			// and write sequence must remain exactly as before.
+			groupRequests := func(requests []string) map[string][]string {
+				byObject := map[string][]string{}
+				for _, request := range requests {
+					verb, object, _ := strings.Cut(request, " ")
+					byObject[object] = append(byObject[object], verb)
+				}
+				return byObject
+			}
+			if diff := cmp.Diff(groupRequests(tc.wantRequests[2:]), groupRequests(requests[2:])); diff != "" {
+				t.Errorf("per-object requests (-want +got):\n%s", diff)
 			}
 		})
 	}
@@ -268,6 +290,136 @@ func requestString(action clienttesting.Action) string {
 		request += " in " + namespace
 	}
 	return request
+}
+
+func TestReconcileBootstrapPolicyBoundsAndErrors(t *testing.T) {
+	objects := make([]int, 12)
+	for i := range objects {
+		objects[i] = i
+	}
+	var active, maximum atomic.Int32
+	visits := make([]atomic.Int32, len(objects))
+	started := make(chan int, len(objects))
+	release := make(chan struct{})
+	var releaseOnce sync.Once
+	defer releaseOnce.Do(func() { close(release) })
+	done := make(chan []error, 1)
+	wantErr := errors.New("reconcile failure")
+	go func() {
+		done <- reconcileBootstrapPolicy(objects, func(index int) error {
+			visits[index].Add(1)
+			n := active.Add(1)
+			defer active.Add(-1)
+			for old := maximum.Load(); n > old; old = maximum.Load() {
+				if maximum.CompareAndSwap(old, n) {
+					break
+				}
+			}
+			started <- index
+			<-release
+			if index == 3 {
+				return wantErr
+			}
+			return nil
+		})
+	}()
+	for range 4 {
+		select {
+		case <-started:
+		case <-time.After(5 * time.Second):
+			t.Fatal("four independent objects did not reconcile concurrently")
+		}
+	}
+	select {
+	case <-started:
+		t.Fatal("more than four reconciliations ran concurrently")
+	case <-time.After(20 * time.Millisecond):
+	}
+	releaseOnce.Do(func() { close(release) })
+	select {
+	case errs := <-done:
+		if len(errs) != len(objects) || !errors.Is(errs[3], wantErr) {
+			t.Fatalf("lost or misattributed reconciliation error: %v", errs)
+		}
+		for i := range objects {
+			if visits[i].Load() != 1 || (i != 3 && errs[i] != nil) {
+				t.Errorf("object %d: visits=%d error=%v", i, visits[i].Load(), errs[i])
+			}
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("reconciliation did not finish")
+	}
+	if maximum.Load() != 4 {
+		t.Errorf("maximum concurrent reconciliations = %d, want 4", maximum.Load())
+	}
+}
+
+func TestBootstrapRolesCompleteBeforeBindings(t *testing.T) {
+	policy := &PolicyData{}
+	for i := range 8 {
+		name := fmt.Sprintf("role-%d", i)
+		policy.ClusterRoles = append(policy.ClusterRoles, rbacapiv1.ClusterRole{ObjectMeta: metav1.ObjectMeta{Name: name}})
+		policy.ClusterRoleBindings = append(policy.ClusterRoleBindings, rbacapiv1.ClusterRoleBinding{
+			ObjectMeta: metav1.ObjectMeta{Name: name},
+			RoleRef:    rbacapiv1.RoleRef{APIGroup: rbacapiv1.GroupName, Kind: "ClusterRole", Name: name},
+		})
+	}
+	client := fake.NewSimpleClientset()
+	client.PrependReactor("create", "clusterrolebindings", func(clienttesting.Action) (bool, runtime.Object, error) {
+		for _, role := range policy.ClusterRoles {
+			if _, err := client.Tracker().Get(rbacapiv1.SchemeGroupVersion.WithResource("clusterroles"), "", role.Name); err != nil {
+				return true, nil, fmt.Errorf("binding phase started before role %s completed: %w", role.Name, err)
+			}
+		}
+		return false, nil, nil
+	})
+	if done, err := ensureRBACPolicy(policy, client); err != nil || !done {
+		t.Fatalf("bootstrap = (%v, %v), want (true, nil)", done, err)
+	}
+}
+
+func TestBootstrapPartialFailureStillReconcilesOtherObjects(t *testing.T) {
+	policy := &PolicyData{ClusterRoles: []rbacapiv1.ClusterRole{
+		{ObjectMeta: metav1.ObjectMeta{Name: "denied"}},
+		{ObjectMeta: metav1.ObjectMeta{Name: "allowed"}},
+	}}
+	client := fake.NewSimpleClientset()
+	client.PrependReactor("get", "clusterroles", func(action clienttesting.Action) (bool, runtime.Object, error) {
+		if action.(clienttesting.GetAction).GetName() == "denied" {
+			return true, nil, apierrors.NewForbidden(rbacapiv1.Resource("clusterroles"), "denied", errors.New("denied for test"))
+		}
+		return false, nil, nil
+	})
+	if done, err := ensureRBACPolicy(policy, client); err != nil || done {
+		t.Fatalf("partial failure must request another attempt: done=%v err=%v", done, err)
+	}
+	if _, err := client.Tracker().Get(rbacapiv1.SchemeGroupVersion.WithResource("clusterroles"), "", "allowed"); err != nil {
+		t.Fatalf("one failure prevented another independent role from reconciling: %v", err)
+	}
+}
+
+func TestBootstrapNamespaceChecksRemainLive(t *testing.T) {
+	policy := &PolicyData{Roles: bootstrappolicy.NamespaceRoles(), RoleBindings: bootstrappolicy.NamespaceRoleBindings()}
+	client := fake.NewSimpleClientset()
+	if done, err := ensureRBACPolicy(policy, client); err != nil || !done {
+		t.Fatalf("bootstrap = (%v, %v)", done, err)
+	}
+	want := 0
+	for _, roles := range policy.Roles {
+		want += len(roles)
+	}
+	for _, bindings := range policy.RoleBindings {
+		want += len(bindings)
+	}
+	got := 0
+	for _, action := range client.Actions() {
+		if action.GetVerb() == "get" && action.GetResource().Resource == "namespaces" {
+			got++
+		}
+	}
+	if got != want {
+		t.Errorf("namespace probes were cached or omitted: got %d live Gets, want %d", got, want)
+	}
 }
 
 // updateObject edits the named RBAC object in tracker. namespace is empty for
