@@ -345,6 +345,68 @@ func doBurstablePodResizeTests(f *framework.Framework) {
 	})
 }
 
+func doPodResizeDownwardAPITests(f *framework.Framework) {
+	ginkgo.DescribeTable("Downward API resources after a successful resize", feature.InPlacePodVerticalScaling, func(ctx context.Context, memoryPolicy v1.ResourceResizeRestartPolicy, wantRestarts int32, wantMemoryEnv string) {
+		original := []podresize.ResizableContainerInfo{{
+			Name:      "c1",
+			MemPolicy: &memoryPolicy,
+			Resources: &cgroups.ContainerResources{CPUReq: "100m", MemReq: "32Mi", MemLim: "64Mi"},
+		}}
+		desired := []podresize.ResizableContainerInfo{{
+			Name:         "c1",
+			MemPolicy:    &memoryPolicy,
+			RestartCount: wantRestarts,
+			Resources:    &cgroups.ContainerResources{CPUReq: "200m", MemReq: "32Mi", MemLim: "96Mi"},
+		}}
+		pod := podresize.MakePodWithResizableContainers(f.Namespace.Name, "downward-api", "", original, nil)
+		cpu := &v1.ResourceFieldSelector{ContainerName: "c1", Resource: "requests.cpu", Divisor: resource.MustParse("1m")}
+		memory := &v1.ResourceFieldSelector{ContainerName: "c1", Resource: "limits.memory", Divisor: resource.MustParse("1Mi")}
+		pod.Spec.Volumes = []v1.Volume{
+			{Name: "downward", VolumeSource: v1.VolumeSource{DownwardAPI: &v1.DownwardAPIVolumeSource{
+				Items: []v1.DownwardAPIVolumeFile{{Path: "cpu", ResourceFieldRef: cpu}},
+			}}},
+			{Name: "projected", VolumeSource: v1.VolumeSource{Projected: &v1.ProjectedVolumeSource{
+				Sources: []v1.VolumeProjection{{DownwardAPI: &v1.DownwardAPIProjection{
+					Items: []v1.DownwardAPIVolumeFile{{Path: "memory", ResourceFieldRef: memory}},
+				}}},
+			}}},
+		}
+		container := &pod.Spec.Containers[0]
+		container.VolumeMounts = []v1.VolumeMount{
+			{Name: "downward", MountPath: "/downward", ReadOnly: true},
+			{Name: "projected", MountPath: "/projected", ReadOnly: true},
+		}
+		container.Command = []string{"sh", "-ec", `
+while true; do
+	cpu=$(cat /downward/cpu)
+	memory=$(cat /projected/memory)
+	echo "cpu=$cpu memory=$memory env=$MEMORY_LIMIT"
+	sleep 1
+done`}
+		container.Args = nil
+		container.Env = []v1.EnvVar{{Name: "MEMORY_LIMIT", ValueFrom: &v1.EnvVarSource{ResourceFieldRef: memory}}}
+		podClient := e2epod.NewPodClient(f)
+		pod = podClient.CreateSync(ctx, e2epod.MustMixinRestrictedPodSecurity(pod))
+
+		logs := func(ctx context.Context) (string, error) {
+			return e2epod.GetPodLogs(ctx, f.ClientSet, pod.Namespace, pod.Name, "c1")
+		}
+		gomega.Eventually(ctx, logs, f.Timeouts.PodStart, framework.Poll).Should(gomega.ContainSubstring("cpu=100 memory=64 env=64\n"))
+
+		patch := podresize.MakeResizePatch(original, desired, nil, nil)
+		patchedPod, err := podClient.Patch(ctx, pod.Name, types.StrategicMergePatchType, patch, metav1.PatchOptions{}, "resize")
+		framework.ExpectNoError(err, "resize pod")
+		expected := podresize.UpdateExpectedContainerRestarts(ctx, pod, desired)
+		podresize.WaitForPodResizeActuation(ctx, f, podClient, patchedPod, expected)
+
+		// Volume remounts can lag behind resize actuation.
+		gomega.Eventually(ctx, logs, f.Timeouts.PodStart, framework.Poll).Should(gomega.ContainSubstring("cpu=200 memory=96 env=%s\n", wantMemoryEnv))
+	},
+		ginkgo.Entry("without a container restart", v1.NotRequired, int32(0), "64"),
+		ginkgo.Entry("with a container restart", v1.RestartContainer, int32(1), "96"),
+	)
+}
+
 func doPodResizePatchErrorTests(f *framework.Framework) {
 	ginkgo.DescribeTable("apply invalid resize patch requests", feature.InPlacePodVerticalScaling, func(ctx context.Context, originalContainers, desiredContainers []podresize.ResizableContainerInfo, patchError string, waitForStart bool) {
 		podClient := e2epod.NewPodClient(f)
@@ -1334,6 +1396,7 @@ var _ = SIGDescribe("Pod InPlace Resize Container", func() {
 	doBurstablePodResizeTests(f)
 	doPodResizeReadAndReplaceTests(f)
 	doPodResizePatchErrorTests(f)
+	doPodResizeDownwardAPITests(f)
 	doPodResizeMemoryLimitDecreaseTest(f)
 })
 
