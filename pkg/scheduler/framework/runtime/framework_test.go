@@ -1521,6 +1521,104 @@ func TestNewFramework_RankNodes(t *testing.T) {
 	}
 }
 
+type mockSigningRankNodesPlugin struct {
+	mockRankNodesPlugin
+	signFn func(pod *v1.Pod) ([]fwk.SignFragment, *fwk.Status)
+}
+
+func (p *mockSigningRankNodesPlugin) SignPod(_ context.Context, pod *v1.Pod) ([]fwk.SignFragment, *fwk.Status) {
+	return p.signFn(pod)
+}
+
+func TestSignPod_RankNodesPlugin(t *testing.T) {
+	tests := []struct {
+		name      string
+		signFn    func(pod *v1.Pod) ([]fwk.SignFragment, *fwk.Status)
+		podA      *v1.Pod
+		podB      *v1.Pod
+		wantSignA bool
+		wantEqual bool
+	}{
+		{
+			name:      "RankNodesPlugin without SignPlugin disables signatures",
+			podA:      &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "p1"}},
+			wantSignA: false,
+		},
+		{
+			name: "RankNodesPlugin SignPod fragments distinguish pods",
+			signFn: func(pod *v1.Pod) ([]fwk.SignFragment, *fwk.Status) {
+				return []fwk.SignFragment{{Key: "tier", Value: pod.Labels["tier"]}}, nil
+			},
+			podA:      &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "p1", Labels: map[string]string{"tier": "a"}}},
+			podB:      &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "p2", Labels: map[string]string{"tier": "b"}}},
+			wantSignA: true,
+			wantEqual: false,
+		},
+		{
+			name: "RankNodesPlugin SignPod with matching fragments produces identical signatures",
+			signFn: func(pod *v1.Pod) ([]fwk.SignFragment, *fwk.Status) {
+				return []fwk.SignFragment{{Key: "tier", Value: pod.Labels["tier"]}}, nil
+			},
+			podA:      &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "p1", Labels: map[string]string{"tier": "a"}}},
+			podB:      &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "p2", Labels: map[string]string{"tier": "a"}}},
+			wantSignA: true,
+			wantEqual: true,
+		},
+		{
+			name: "RankNodesPlugin SignPod returning Unschedulable marks pod unsignable",
+			signFn: func(_ *v1.Pod) ([]fwk.SignFragment, *fwk.Status) {
+				return nil, fwk.NewStatus(fwk.Unschedulable, "unsignable")
+			},
+			podA:      &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "p1"}},
+			wantSignA: false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.GenericWorkload:       true,
+				features.OpportunisticBatching: true,
+			})
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			const pluginName = names.DefaultPreemption
+			reg := Registry{
+				pluginName: func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+					base := mockRankNodesPlugin{name: pluginName}
+					if tc.signFn == nil {
+						return &base, nil
+					}
+					return &mockSigningRankNodesPlugin{mockRankNodesPlugin: base, signFn: tc.signFn}, nil
+				},
+			}
+			profile := config.KubeSchedulerProfile{
+				Plugins: &config.Plugins{
+					PodGroupPostFilter: config.PluginSet{Enabled: []config.Plugin{{Name: pluginName}}},
+					Reserve:            config.PluginSet{Enabled: []config.Plugin{{Name: pluginName}}},
+				},
+			}
+			f, err := newFrameworkWithQueueSortAndBind(ctx, reg, profile)
+			if err != nil {
+				t.Fatalf("Failed to create framework: %v", err)
+			}
+
+			sigA := f.SignPod(ctx, tc.podA)
+			if (sigA != nil) != tc.wantSignA {
+				t.Fatalf("SignPod(podA) = %v, want non-nil = %v", sigA, tc.wantSignA)
+			}
+			if tc.podB != nil {
+				sigB := f.SignPod(ctx, tc.podB)
+				if gotEqual := cmp.Equal(sigA, sigB); gotEqual != tc.wantEqual {
+					t.Errorf("cmp.Equal(sigA, sigB) = %v, want %v (sigA=%s, sigB=%s)", gotEqual, tc.wantEqual, sigA, sigB)
+				}
+			}
+		})
+	}
+}
+
 func TestRunRankNodesPlugins(t *testing.T) {
 	n1 := framework.NewNodeInfo()
 	n1.SetNode(&v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node1"}})

@@ -467,10 +467,11 @@ func (p *PodGroupSchedulingAlgorithm) podGroupSchedulingPlacementAlgorithm(ctx c
 	// Try the placement that contains the pods' NominatedNodeName first, as pod-by-pod scheduling
 	// tries a pod's nominated node first. Preemption sets NominatedNodeName on individual pods in a
 	// previous cycle, so the placement containing all nominated nodes is where preemption cleared space.
+	multiplePlacements := len(placements) > 1
 	nominatedFeasible := false
 	nominated := nominatedPlacement(ctx, placements, podGroupInfo)
 	if nominated != nil {
-		result := p.evaluatePlacement(ctx, schedFwk, podGroupCycleState, podGroupInfo, queuedPodGroupInfo, nominated)
+		result := p.evaluatePlacement(ctx, schedFwk, podGroupCycleState, podGroupInfo, queuedPodGroupInfo, nominated, multiplePlacements)
 		if result.status.IsError() {
 			return result
 		}
@@ -494,7 +495,7 @@ func (p *PodGroupSchedulingAlgorithm) podGroupSchedulingPlacementAlgorithm(ctx c
 			if placement == nominated {
 				continue
 			}
-			result := p.evaluatePlacement(ctx, schedFwk, podGroupCycleState, podGroupInfo, queuedPodGroupInfo, placement)
+			result := p.evaluatePlacement(ctx, schedFwk, podGroupCycleState, podGroupInfo, queuedPodGroupInfo, placement, multiplePlacements)
 			if result.status.IsError() {
 				return result
 			}
@@ -587,10 +588,11 @@ func (p *PodGroupSchedulingAlgorithm) compositePodGroupSchedulingPlacementAlgori
 
 	// Try the placement that contains all nominated nodes in this group's subtree first, matching
 	// podGroupSchedulingPlacementAlgorithm.
+	multiplePlacements := len(placements) > 1
 	nominatedFeasible := false
 	nominated := nominatedPlacement(ctx, placements, podGroupInfo)
 	if nominated != nil {
-		result, subtreeResult := p.evaluateCompositePlacement(ctx, schedFwk, podGroupCycleState, root, podGroupInfo, nominated)
+		result, subtreeResult := p.evaluateCompositePlacement(ctx, schedFwk, podGroupCycleState, root, podGroupInfo, nominated, multiplePlacements)
 		if result.status.IsError() {
 			// It is critical to copy the entire subtreeResult into results.
 			// If omitted, the pod results are reconstructed later using the generic parent error
@@ -615,7 +617,7 @@ func (p *PodGroupSchedulingAlgorithm) compositePodGroupSchedulingPlacementAlgori
 			if placement == nominated {
 				continue
 			}
-			result, subtreeResult := p.evaluateCompositePlacement(ctx, schedFwk, podGroupCycleState, root, podGroupInfo, placement)
+			result, subtreeResult := p.evaluateCompositePlacement(ctx, schedFwk, podGroupCycleState, root, podGroupInfo, placement, multiplePlacements)
 			if result.status.IsError() {
 				// It is critical to copy the entire subtreeResult into results.
 				// If omitted, the pod results are reconstructed later using the generic parent error
@@ -671,11 +673,22 @@ func (p *PodGroupSchedulingAlgorithm) compositePodGroupSchedulingPlacementAlgori
 
 // evaluateCompositePlacement simulates one placement so the caller can compare it
 // with other candidates and select the best one.
-func (p *PodGroupSchedulingAlgorithm) evaluateCompositePlacement(ctx context.Context, schedFwk framework.Framework, podGroupCycleState *framework.CycleState, root *framework.QueuedPodGroupInfo, podGroupInfo *framework.PodGroupInfo, placement *fwk.Placement) (*PodGroupScheduledResult, map[fwk.EntityKey]*PodGroupScheduledResult) {
+func (p *PodGroupSchedulingAlgorithm) evaluateCompositePlacement(ctx context.Context, schedFwk framework.Framework, podGroupCycleState *framework.CycleState, root *framework.QueuedPodGroupInfo, podGroupInfo *framework.PodGroupInfo, placement *fwk.Placement, multiplePlacements bool) (*PodGroupScheduledResult, map[fwk.EntityKey]*PodGroupScheduledResult) {
 	klog.FromContext(ctx).V(4).Info("Assuming placement in snapshot", "placement", placement.Name)
 	evaluationStart := time.Now()
 	if err := p.nodeInfoSnapshot.AssumePlacement(placement); err != nil {
 		return &PodGroupScheduledResult{podGroupInfo: podGroupInfo, status: fwk.AsStatus(fmt.Errorf("failed to assume pod group placement: %w", err))}, nil
+	}
+	narrowed := p.nodeInfoSnapshot.GetPlacement() != nil
+	if narrowed {
+		// The placement narrows down the nodes, and opportunistic batching only holds for the
+		// nodes it cached results from: nothing is carried into this evaluation.
+		schedFwk.FlushBatch()
+	}
+	if narrowed || multiplePlacements {
+		// Drop cached results on exit when the placement narrowed the nodes or is one of
+		// several candidates whose reverted reservations could otherwise leak out.
+		defer schedFwk.FlushBatch()
 	}
 	placementCycleState := newPlacementCycleState(podGroupCycleState, placement)
 	subtreeResult := map[fwk.EntityKey]*PodGroupScheduledResult{}
@@ -778,7 +791,7 @@ func (p *PodGroupSchedulingAlgorithm) findBestCompositePodGroupPlacement(ctx con
 
 // evaluatePlacement runs the pod group scheduling algorithm within a single placement,
 // assuming the placement in the snapshot for the duration of the simulation.
-func (p *PodGroupSchedulingAlgorithm) evaluatePlacement(ctx context.Context, schedFwk framework.Framework, podGroupCycleState *framework.CycleState, podGroupInfo *framework.PodGroupInfo, queuedPodGroupInfo *framework.QueuedPodGroupInfo, placement *fwk.Placement) *PodGroupScheduledResult {
+func (p *PodGroupSchedulingAlgorithm) evaluatePlacement(ctx context.Context, schedFwk framework.Framework, podGroupCycleState *framework.CycleState, podGroupInfo *framework.PodGroupInfo, queuedPodGroupInfo *framework.QueuedPodGroupInfo, placement *fwk.Placement, multiplePlacements bool) *PodGroupScheduledResult {
 	klog.FromContext(ctx).V(4).Info("Assuming placement in snapshot", "placement", placement.Name)
 	evaluationStart := time.Now()
 	if err := p.nodeInfoSnapshot.AssumePlacement(placement); err != nil {
@@ -786,6 +799,17 @@ func (p *PodGroupSchedulingAlgorithm) evaluatePlacement(ctx context.Context, sch
 			podGroupInfo: podGroupInfo,
 			status:       fwk.AsStatus(fmt.Errorf("failed to assume pod group placement: %w", err)),
 		}
+	}
+	narrowed := p.nodeInfoSnapshot.GetPlacement() != nil
+	if narrowed {
+		// The placement narrows down the nodes, and opportunistic batching only holds for the
+		// nodes it cached results from: nothing is carried into this evaluation.
+		schedFwk.FlushBatch()
+	}
+	if narrowed || multiplePlacements {
+		// Drop cached results on exit when the placement narrowed the nodes or is one of
+		// several candidates whose reverted reservations could otherwise leak out.
+		defer schedFwk.FlushBatch()
 	}
 	placementCycleState := newPlacementCycleState(podGroupCycleState, placement)
 	result := p.podGroupSchedulingDefaultAlgorithm(ctx, schedFwk, placementCycleState, podGroupInfo, queuedPodGroupInfo)

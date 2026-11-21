@@ -148,11 +148,17 @@ func NewSchedulingAlgorithm(snapshot *internalcache.Snapshot, cache internalcach
 }
 
 // opportunisticBatchingEnabled reports whether opportunistic batching can run. It needs the
-// feature gate, a cycle provider (batch state is keyed by scheduling cycle, so without a real
-// counter the batch cannot tell consecutive cycles apart), and batching not to be disabled on
-// the framework.
-func (a *SchedulingAlgorithm) opportunisticBatchingEnabled(schedFramework framework.Framework) bool {
-	return a.cycleProvider != nil && utilfeature.DefaultFeatureGate.Enabled(features.OpportunisticBatching) && !schedFramework.IsBatchingDisabled()
+// feature gate and a cycle provider (batch state is keyed by scheduling cycle, so without a real
+// counter the batch cannot tell consecutive cycles apart).
+func (a *SchedulingAlgorithm) opportunisticBatchingEnabled() bool {
+	return a.cycleProvider != nil && utilfeature.DefaultFeatureGate.Enabled(features.OpportunisticBatching)
+}
+
+// cachesScheduleResults reports whether opportunistic batching is going to keep the nodes found
+// for the pod for the pods that follow. Pods without a signature never start a batch, and neither
+// does firstFit, which skips scoring.
+func (a *SchedulingAlgorithm) cachesScheduleResults(podInfo *framework.QueuedPodInfo) bool {
+	return !a.firstFit && podInfo.PodSignature != nil && a.opportunisticBatchingEnabled()
 }
 
 // SchedulePod runs PreFilter, Filter, filter extenders and Score, and returns the
@@ -168,10 +174,13 @@ func (a *SchedulingAlgorithm) SchedulePod(ctx context.Context, schedFramework fr
 		return result, ErrNoNodesAvailable
 	}
 
-	feasibleNodes, diagnosis, nodeHint, err := a.findNodesThatFitPod(ctx, schedFramework, state, podInfo)
+	// A pod that seeds a batch keeps the nodes of all ranks for the pods that follow.
+	cacheResults := a.cachesScheduleResults(podInfo)
+	fit, err := a.findNodesThatFitPod(ctx, schedFramework, state, podInfo, cacheResults)
 	if err != nil {
 		return result, err
 	}
+	feasibleNodes, diagnosis, nodeHint := fit.nodes, fit.diagnosis, fit.nodeHint
 	trace.Step("Computing predicates done")
 
 	if len(feasibleNodes) == 0 {
@@ -191,7 +200,7 @@ func (a *SchedulingAlgorithm) SchedulePod(ctx context.Context, schedFramework fr
 			}
 		}
 		node := bestNode.NodeInfo.Node().Name
-		if a.opportunisticBatchingEnabled(schedFramework) {
+		if a.opportunisticBatchingEnabled() {
 			schedFramework.StoreScheduleResults(ctx, podInfo.PodSignature, nodeHint, node, nil, a.cycleProvider())
 		}
 		return ScheduleResult{
@@ -201,16 +210,22 @@ func (a *SchedulingAlgorithm) SchedulePod(ctx context.Context, schedFramework fr
 		}, nil
 	}
 
-	priorityList, err := prioritizeNodes(ctx, schedFramework, state, pod, feasibleNodes)
+	// The pod goes to a node of the lowest rank. Nodes of the other ranks are only
+	// worth scoring when they are cached.
+	nodesToScore := feasibleNodes
+	if fit.ranked && !cacheResults {
+		nodesToScore = lowestRankNodes(feasibleNodes)
+	}
+	priorityList, err := prioritizeNodes(ctx, schedFramework, state, pod, nodesToScore)
 	if err != nil {
 		return result, err
 	}
 
-	sortedPrioritizedNodes := framework.NewSortedScoredNodes(priorityList)
+	sortedPrioritizedNodes := sortScoredNodes(priorityList, nodesToScore, fit.ranked)
 	node := sortedPrioritizedNodes.Pop().Name
 	trace.Step("Prioritizing done")
 
-	if a.opportunisticBatchingEnabled(schedFramework) {
+	if a.opportunisticBatchingEnabled() {
 		schedFramework.StoreScheduleResults(ctx, podInfo.PodSignature, nodeHint, node, sortedPrioritizedNodes, a.cycleProvider())
 	}
 
@@ -219,6 +234,39 @@ func (a *SchedulingAlgorithm) SchedulePod(ctx context.Context, schedFramework fr
 		EvaluatedNodes: len(feasibleNodes) + diagnosis.NodeToStatus.Len(),
 		FeasibleNodes:  len(feasibleNodes),
 	}, nil
+}
+
+// lowestRankNodes returns the nodes that have the lowest, i.e. the best, rank.
+func lowestRankNodes(nodes []framework.NodeWithRank) []framework.NodeWithRank {
+	minRank, shared := nodes[0].Rank, true
+	for _, n := range nodes[1:] {
+		if n.Rank != minRank {
+			minRank, shared = min(minRank, n.Rank), false
+		}
+	}
+	if shared {
+		return nodes
+	}
+	lowest := make([]framework.NodeWithRank, 0, len(nodes))
+	for _, n := range nodes {
+		if n.Rank == minRank {
+			lowest = append(lowest, n)
+		}
+	}
+	return lowest
+}
+
+// sortScoredNodes orders the scored nodes by rank when ranked, and by score within a rank.
+// scores[i] has to be the scores of nodes[i].
+func sortScoredNodes(scores []fwk.NodePluginScores, nodes []framework.NodeWithRank, ranked bool) framework.SortedScoredNodes {
+	if !ranked {
+		return framework.NewSortedScoredNodes(scores)
+	}
+	ranks := make([]int, len(nodes))
+	for i, n := range nodes {
+		ranks[i] = n.Rank
+	}
+	return framework.NewSortedRankedNodes(scores, ranks)
 }
 
 // preFilterOutcome captures the state and intermediate results produced while running
@@ -346,24 +394,36 @@ func (a *SchedulingAlgorithm) filterWithExtenders(ctx context.Context, schedFram
 	return feasibleNodesAfterExtender, nil
 }
 
+// podFit is what findNodesThatFitPod found out about a pod.
+type podFit struct {
+	// nodes passed the filter plugins and the filter extenders.
+	nodes []framework.NodeWithRank
+	// ranked tells whether a RankNodes plugin ordered nodes.
+	ranked bool
+	// diagnosis tells why the other nodes were rejected.
+	diagnosis *framework.Diagnosis
+	// nodeHint is the node that opportunistic batching suggested for the pod, if any.
+	nodeHint string
+}
+
 // findNodesThatFitPod filters the nodes to find the ones that fit the pod based on the framework
-// filter plugins and filter extenders.
-func (a *SchedulingAlgorithm) findNodesThatFitPod(ctx context.Context, schedFramework framework.Framework, state fwk.CycleState, podInfo *framework.QueuedPodInfo) ([]framework.NodeWithRank, *framework.Diagnosis, string, error) {
+// filter plugins and filter extenders. With keepHigherRanks, the nodes that RankNodes plugins
+// rank behind the lowest feasible rank are kept as well.
+func (a *SchedulingAlgorithm) findNodesThatFitPod(ctx context.Context, schedFramework framework.Framework, state fwk.CycleState, podInfo *framework.QueuedPodInfo, keepHigherRanks bool) (podFit, error) {
 	pod := podInfo.Pod
 	preFilterOutcome, status := a.prefilterNodes(ctx, schedFramework, state, pod)
-	diagnosis := preFilterOutcome.diagnosis
+	fit := podFit{diagnosis: preFilterOutcome.diagnosis}
 	if !status.IsSuccess() {
 		if status.IsRejected() {
-			return nil, diagnosis, "", nil
+			return fit, nil
 		}
-		return nil, diagnosis, "", status.AsError()
+		return fit, status.AsError()
 	}
 
-	var nodeHint string
-	if a.opportunisticBatchingEnabled(schedFramework) {
+	if a.opportunisticBatchingEnabled() {
 		// We get the node hint even if we have a nominated name for simplicity, but we could potentially avoid it
 		// in this scenario in the future.
-		nodeHint = schedFramework.GetNodeHint(ctx, pod, podInfo.PodSignature, state, a.cycleProvider())
+		fit.nodeHint = schedFramework.GetNodeHint(ctx, pod, podInfo.PodSignature, state, a.cycleProvider())
 	}
 
 	// "NominatedNodeName" can potentially be set in a previous scheduling cycle as a result of preemption.
@@ -373,41 +433,43 @@ func (a *SchedulingAlgorithm) findNodesThatFitPod(ctx context.Context, schedFram
 	// lagging pod objects do not ignore or drop held DRA devices; when disabled, it returns
 	// pod.Status.NominatedNodeName.
 	nominatedNodeName := schedFramework.NominatedNodeName(pod)
-	if len(nominatedNodeName) > 0 || len(nodeHint) > 0 {
-		feasibleNodes, err := a.evaluateNominatedNode(ctx, pod, schedFramework, state, nominatedNodeName, nodeHint, diagnosis)
+	if len(nominatedNodeName) > 0 || len(fit.nodeHint) > 0 {
+		feasibleNodes, err := a.evaluateNominatedNode(ctx, pod, schedFramework, state, nominatedNodeName, fit.nodeHint, fit.diagnosis)
 		if err != nil {
 			utilruntime.HandleErrorWithContext(ctx, err, "Evaluation failed on nominated node", "pod", klog.KObj(pod), "node", nominatedNodeName)
 		}
 		// Nominated node passes all the filters, scheduler is good to assign this node to the pod.
 		if len(feasibleNodes) != 0 {
-			return feasibleNodes, diagnosis, nodeHint, nil
+			fit.nodes = feasibleNodes
+			return fit, nil
 		}
 	}
 
 	nodes := a.getCandidateNodes(preFilterOutcome)
 	if len(nodes) == 0 {
-		return nil, diagnosis, nodeHint, nil
+		return fit, nil
 	}
 
 	// The budget is computed from the candidate list, which PreFilter may have narrowed —
 	// not from allNodes.
 	numNodesToFind := a.numNodesToFind(schedFramework, int32(len(nodes)))
-	feasibleNodes, err := a.findNodesThatPassFilters(ctx, schedFramework, state, pod, diagnosis, nodes, numNodesToFind, true /* allowRankNodes */)
+	feasibleNodes, ranked, err := a.findNodesThatPassFilters(ctx, schedFramework, state, pod, fit.diagnosis, nodes, numNodesToFind, true /* allowRankNodes */, keepHigherRanks)
 	// always try to update the a.nextStartNodeIndex regardless of whether an error has occurred
 	// this is helpful to make sure that all the nodes have a chance to be searched
-	processedNodes := len(feasibleNodes) + diagnosis.NodeToStatus.Len()
+	processedNodes := len(feasibleNodes) + fit.diagnosis.NodeToStatus.Len()
 	if len(preFilterOutcome.allNodes) > 0 {
 		a.nextStartNodeIndex = (a.nextStartNodeIndex + processedNodes) % len(preFilterOutcome.allNodes)
 	}
 	if err != nil {
-		return nil, diagnosis, nodeHint, err
+		return fit, err
 	}
 
-	feasibleNodes, err = a.filterWithExtenders(ctx, schedFramework, pod, feasibleNodes, diagnosis)
+	feasibleNodes, err = a.filterWithExtenders(ctx, schedFramework, pod, feasibleNodes, fit.diagnosis)
 	if err != nil {
-		return nil, diagnosis, nodeHint, err
+		return fit, err
 	}
-	return feasibleNodes, diagnosis, nodeHint, nil
+	fit.nodes, fit.ranked = feasibleNodes, ranked
+	return fit, nil
 }
 
 // evaluateNominatedNode checks whether the pod fits its nominated node, or the
@@ -432,7 +494,7 @@ func (a *SchedulingAlgorithm) evaluateNominatedNode(ctx context.Context, pod *v1
 		return nil, nil
 	}
 	node := []fwk.NodeInfo{nodeInfo}
-	feasibleNodes, err := a.findNodesThatPassFilters(ctx, schedFramework, state, pod, diagnosis, node, int32(len(node)), false /* allowRankNodes */)
+	feasibleNodes, _, err := a.findNodesThatPassFilters(ctx, schedFramework, state, pod, diagnosis, node, int32(len(node)), false /* allowRankNodes */, false /* keepHigherRanks */)
 	if err != nil {
 		return nil, err
 	}
@@ -445,7 +507,11 @@ func (a *SchedulingAlgorithm) evaluateNominatedNode(ctx context.Context, pod *v1
 	return feasibleNodes, nil
 }
 
-// findNodesThatPassFilters finds the nodes that fit the filter plugins.
+// findNodesThatPassFilters finds the nodes that fit the filter plugins and reports whether
+// a RankNodes plugin ordered the evaluated candidates.
+// With allowRankNodes, nodes are evaluated in the order of RankNodes plugins, if any of them ranks
+// nodes for the pod. The search then ends with the lowest rank that has a feasible node, unless
+// keepHigherRanks asks to go on until numNodesToFind nodes are found.
 func (a *SchedulingAlgorithm) findNodesThatPassFilters(
 	ctx context.Context,
 	schedFramework framework.Framework,
@@ -454,10 +520,11 @@ func (a *SchedulingAlgorithm) findNodesThatPassFilters(
 	diagnosis *framework.Diagnosis,
 	nodes []fwk.NodeInfo,
 	numNodesToFind int32,
-	allowRankNodes bool) ([]framework.NodeWithRank, error) {
+	allowRankNodes bool,
+	keepHigherRanks bool) ([]framework.NodeWithRank, bool, error) {
 	numAllNodes := len(nodes)
 	if numAllNodes == 0 {
-		return nil, nil
+		return nil, false, nil
 	}
 
 	var rankedNodes []framework.NodeWithRank
@@ -470,14 +537,15 @@ func (a *SchedulingAlgorithm) findNodesThatPassFilters(
 		var status *fwk.Status
 		rankedNodes, status = schedFramework.RunRankNodesPlugins(ctx, state, pod, rotatedNodes)
 		if !status.IsSuccess() {
-			return nil, status.AsError()
+			return nil, false, status.AsError()
 		}
 		if len(rankedNodes) > 0 {
 			numAllNodes = len(rankedNodes)
 		}
 	}
+	ordered := len(rankedNodes) > 0
 	getRankedNode := func(i int) framework.NodeWithRank {
-		if len(rankedNodes) > 0 {
+		if ordered {
 			return rankedNodes[i]
 		}
 		return framework.NodeWithRank{NodeInfo: nodes[(a.nextStartNodeIndex+i)%numAllNodes]}
@@ -488,12 +556,12 @@ func (a *SchedulingAlgorithm) findNodesThatPassFilters(
 		for i := range feasibleNodes {
 			feasibleNodes[i] = getRankedNode(i)
 		}
-		return feasibleNodes, nil
+		return feasibleNodes, ordered, nil
 	}
 
 	errCh := parallelize.NewResultChannel[error]()
-	ordered := len(rankedNodes) > 0
-	stopOnHigherRank := ordered && !a.opportunisticBatchingEnabled(schedFramework) && !hasExtenderFilters(schedFramework)
+	// Extenders may still reject every node of the lowest rank.
+	stopOnHigherRank := ordered && !keepHigherRanks && !hasExtenderFilters(schedFramework)
 	ctx, cancel := context.WithCancelCause(ctx)
 	defer cancel(errors.New("findNodesThatPassFilters has completed"))
 
@@ -527,9 +595,9 @@ func (a *SchedulingAlgorithm) findNodesThatPassFilters(
 	schedFramework.Parallelizer().Until(ctx, numAllNodes, checkNode, metrics.Filter)
 	if err := errCh.Receive(); err != nil {
 		statusCode = fwk.Error
-		return coordinator.feasibleNodes, err
+		return coordinator.feasibleNodes, ordered, err
 	}
-	return coordinator.feasibleNodes, nil
+	return coordinator.feasibleNodes, ordered, nil
 }
 
 type nodeFilterResult struct {
@@ -750,7 +818,7 @@ func (a *SchedulingAlgorithm) FindAllNodesThatFitPod(ctx context.Context, state 
 		return nil, diagnosis, nil
 	}
 
-	rankedFeasibleNodes, err := a.findNodesThatPassFilters(ctx, schedFramework, state, pod, diagnosis, nodes, int32(len(nodes)), false /* allowRankNodes */)
+	rankedFeasibleNodes, _, err := a.findNodesThatPassFilters(ctx, schedFramework, state, pod, diagnosis, nodes, int32(len(nodes)), false /* allowRankNodes */, false /* keepHigherRanks */)
 	if err != nil {
 		return nil, diagnosis, err
 	}
