@@ -1808,12 +1808,37 @@ func readTestCases() []testStep {
 				}},
 			},
 			CorrectResponse: Response{
-				Object: newTestPodList("22", withLabel(pod4, "20", "version", "v2")),
+				Object: newTestPodList("18", withRV(pod4, "17")),
 			},
 			InvalidResponses: []Response{
-				{Object: newTestPodList("17", withRV(pod4, "17"))},
+				{Object: newTestPodList("22", withLabel(pod4, "20", "version", "v2"))},
 				{Object: newTestPodListWithContinue("18", new(int64(1)), withRV(pod4, "17"))},
 				{Object: newTestPodListWithContinue("22", new(int64(0)), withLabel(pod4, "20", "version", "v2"))},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List pod non-recursively with legacy compacted ResourceVersion=12 and Limit=1 returns ResourceExpired",
+			Request: Request{
+				Op:  OpList,
+				Key: pod3Key,
+				List: ListRequest{Options: storage.ListOptions{
+					ResourceVersion: "12",
+					Recursive:       false,
+					Predicate: storage.SelectionPredicate{
+						Label: labels.Everything(),
+						Field: fields.Everything(),
+						Limit: 1,
+					},
+				}},
+			},
+			CorrectResponse: Response{
+				Object: nil,
+				Err:    apierrors.NewResourceExpired("The resourceVersion for the provided list is too old."),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("12", withLabel(pod3, "12", "version", "v7"))},
+				{Object: newTestPodList("22")},
 				{Object: nil, Err: nil},
 			},
 		},

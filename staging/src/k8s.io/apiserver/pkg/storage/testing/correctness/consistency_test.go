@@ -140,3 +140,33 @@ func TestListReadConsistency(t *testing.T) {
 		})
 	}
 }
+
+func TestListReadConsistencyNonRecursive(t *testing.T) {
+	testCases := []struct {
+		rv              string
+		limit           int64
+		wantConsistency ReadConsistency
+		wantRV          uint64
+	}{
+		{rv: "100", limit: 10, wantConsistency: ConsistencyExact, wantRV: 100},
+		{rv: "100", limit: 0, wantConsistency: ConsistencyNotOlderThan, wantRV: 100},
+		{rv: "0", limit: 10, wantConsistency: ConsistencyNotOlderThan},
+	}
+	versioner := storage.APIObjectVersioner{}
+	for i := range testCases {
+		tc := &testCases[i]
+		name := fmt.Sprintf("rv=%q/limit=%d", tc.rv, tc.limit)
+		t.Run(name, func(t *testing.T) {
+			opts := storage.ListOptions{
+				ResourceVersion: tc.rv,
+				Predicate: storage.SelectionPredicate{
+					Limit: tc.limit,
+				},
+			}
+			gotConsistency, gotRV, _, err := ListReadConsistency("/pods/ns/p1", versioner, opts)
+			require.NoError(t, err)
+			require.Equal(t, tc.wantConsistency, gotConsistency)
+			require.Equal(t, tc.wantRV, gotRV)
+		})
+	}
+}
