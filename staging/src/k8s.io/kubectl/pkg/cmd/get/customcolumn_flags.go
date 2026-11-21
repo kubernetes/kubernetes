@@ -85,15 +85,20 @@ func (f *CustomColumnsPrintFlags) ToPrinter(templateFormat string) (printers.Res
 	// UniversalDecoder call must specify parameter versions; otherwise it will decode to internal versions.
 	decoder := scheme.Codecs.UniversalDecoder(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
-	var printer *CustomColumnsPrinter
 	if templateFormat == "custom-columns-file" {
 		file, err := os.Open(templateValue)
 		if err != nil {
 			return nil, fmt.Errorf("error reading template %s, %v\n", templateValue, err)
 		}
 		defer file.Close()
-		printer, err = NewCustomColumnsPrinterFromTemplate(file, decoder)
-		return printer, err
+		printer, err := NewCustomColumnsPrinterFromTemplate(file, decoder)
+		if err != nil {
+			return nil, err
+		}
+		// NewCustomColumnsPrinterFromTemplate hardcodes NoHeaders=false; honor the flag
+		// the same way NewCustomColumnsPrinterFromSpec does for -o custom-columns.
+		printer.NoHeaders = f.NoHeaders
+		return printer, nil
 	}
 
 	return NewCustomColumnsPrinterFromSpec(templateValue, decoder, f.NoHeaders)

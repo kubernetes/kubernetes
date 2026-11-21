@@ -46,9 +46,11 @@ func TestPrinterSupportsExpectedCustomColumnFormats(t *testing.T) {
 		name               string
 		outputFormat       string
 		templateArg        string
+		noHeaders          bool
 		expectedError      string
 		expectedParseError string
 		expectedOutput     string
+		expectNoHeader     bool
 		expectNoMatch      bool
 	}{
 		{
@@ -74,6 +76,21 @@ func TestPrinterSupportsExpectedCustomColumnFormats(t *testing.T) {
 			expectedOutput: "foo",
 		},
 		{
+			name:           "custom-columns-file honors --no-headers",
+			outputFormat:   "custom-columns-file",
+			templateArg:    customColumnsFile.Name(),
+			noHeaders:      true,
+			expectedOutput: "foo",
+			expectNoHeader: true,
+		},
+		{
+			name:           "custom-columns inline honors --no-headers",
+			outputFormat:   "custom-columns=NAME:.metadata.name",
+			noHeaders:      true,
+			expectedOutput: "foo",
+			expectNoHeader: true,
+		},
+		{
 			name:          "valid output format and invalid --template argument results in a parsing error from the printer",
 			outputFormat:  "custom-columns",
 			templateArg:   "invalid",
@@ -95,6 +112,7 @@ func TestPrinterSupportsExpectedCustomColumnFormats(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			printFlags := CustomColumnsPrintFlags{
 				TemplateArgument: tc.templateArg,
+				NoHeaders:        tc.noHeaders,
 			}
 
 			p, err := printFlags.ToPrinter(tc.outputFormat)
@@ -130,8 +148,12 @@ func TestPrinterSupportsExpectedCustomColumnFormats(t *testing.T) {
 				t.Errorf("unexpected error: %v", err)
 			}
 
-			if !strings.Contains(out.String(), tc.expectedOutput) {
-				t.Errorf("unexpected output: expecting %q, got %q", tc.expectedOutput, out.String())
+			got := out.String()
+			if !strings.Contains(got, tc.expectedOutput) {
+				t.Errorf("unexpected output: expecting %q, got %q", tc.expectedOutput, got)
+			}
+			if tc.expectNoHeader && strings.Contains(got, "NAME") {
+				t.Errorf("--no-headers still printed header row: %q", got)
 			}
 		})
 	}
