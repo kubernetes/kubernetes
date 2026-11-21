@@ -167,6 +167,65 @@ func (wm watchersMap) terminateAll(done func(*cacheWatcher)) {
 	}
 }
 
+// unsyncedWatchers holds the watchers that the dispatcher sends no events to:
+// new watchers that wait for their first interval, and stalled watchers. It
+// keeps the metrics of the stalled watchers. The map is not a watchersMap, so
+// that every change to the set goes through the methods that count.
+type unsyncedWatchers struct {
+	watchers      map[int]*cacheWatcher
+	resyncMetrics metrics.ResyncMetrics
+}
+
+func newUnsyncedWatchers(resyncMetrics metrics.ResyncMetrics) unsyncedWatchers {
+	return unsyncedWatchers{watchers: map[int]*cacheWatcher{}, resyncMetrics: resyncMetrics}
+}
+
+// isStalled tells a stalled watcher from a new one, which was never synced.
+func isStalled(w *cacheWatcher) bool {
+	return w.synced.IsNotified()
+}
+
+func (u *unsyncedWatchers) addWatcher(w *cacheWatcher) {
+	if u.has(w) {
+		return
+	}
+	u.watchers[w.id] = w
+	if isStalled(w) {
+		u.resyncMetrics.Stalls.Inc()
+		u.resyncMetrics.StalledWatchers.Inc()
+	}
+}
+
+func (u *unsyncedWatchers) deleteWatcher(w *cacheWatcher) {
+	if !u.has(w) {
+		return
+	}
+	delete(u.watchers, w.id)
+	if isStalled(w) {
+		u.resyncMetrics.StalledWatchers.Dec()
+	}
+}
+
+func (u *unsyncedWatchers) has(w *cacheWatcher) bool {
+	_, ok := u.watchers[w.id]
+	return ok
+}
+
+func (u *unsyncedWatchers) len() int {
+	return len(u.watchers)
+}
+
+// allWatchers yields every watcher. The loop body may delete the watcher that it got.
+func (u *unsyncedWatchers) allWatchers() iter.Seq[*cacheWatcher] {
+	return func(yield func(*cacheWatcher) bool) {
+		for _, watcher := range u.watchers {
+			if !yield(watcher) {
+				return
+			}
+		}
+	}
+}
+
 type indexedWatchers struct {
 	scopeWatchers map[namespacedName]watchersMap
 	indexWatchers map[string]watchersMap
@@ -360,8 +419,8 @@ type Cacher struct {
 	// watchersBuffer is a list of watchers potentially interested in currently
 	// dispatched event.
 	watchersBuffer []*cacheWatcher
-	// unsyncedWatchers is a map that need to be synchronized before sending events.
-	unsyncedWatchers watchersMap
+	// unsyncedWatchers need to be synchronized before sending events.
+	unsyncedWatchers unsyncedWatchers
 	// stalledResyncCh wakes background resynchronization when a stalled watcher
 	// drains its input buffer or a resync pass hits maxResyncEvents.
 	stalledResyncCh chan struct{}
@@ -434,6 +493,7 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 	if !strings.HasPrefix(resourcePrefix, "/") {
 		return nil, fmt.Errorf("resourcePrefix needs to start from /")
 	}
+	resyncMetrics := metrics.NewResyncMetrics(config.GroupResource)
 	cacher := &Cacher{
 		resourcePrefix: resourcePrefix,
 		ready:          newReady(config.Clock),
@@ -461,12 +521,12 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 		stopCh:                        stopCh,
 		clock:                         config.Clock,
 		timer:                         time.NewTimer(time.Duration(0)),
-		unsyncedWatchers:              make(watchersMap),
+		unsyncedWatchers:              newUnsyncedWatchers(resyncMetrics),
 		stalledResyncCh:               make(chan struct{}, 1),
 		maxResyncEvents:               maxResyncEvents,
 		bookmarkWatchers:              newTimeBucketWatchers(config.Clock, defaultBookmarkFrequency),
 		watcherMetrics:                metrics.NewWatcherMetricsObservers(config.GroupResource),
-		resyncMetrics:                 metrics.NewResyncMetrics(config.GroupResource),
+		resyncMetrics:                 resyncMetrics,
 		disableConsistentGetFromCache: config.DisableConsistentGetFromCache,
 	}
 
@@ -591,7 +651,7 @@ func (c *Cacher) startBackgroundResync() {
 
 func (c *Cacher) resyncWatchers() {
 	c.RLock()
-	hasUnsynced := len(c.unsyncedWatchers) > 0
+	hasUnsynced := c.unsyncedWatchers.len() > 0
 	c.RUnlock()
 	if !hasUnsynced {
 		return
@@ -634,13 +694,13 @@ func (c *Cacher) resyncWatchers() {
 
 func (c *Cacher) rsyncInitialWatchersAndReturnStalledLocked() []*cacheWatcher {
 	var stalled []*cacheWatcher
-	for _, watcher := range c.unsyncedWatchers {
+	for watcher := range c.unsyncedWatchers.allWatchers() {
 		if watcher.stopped {
-			c.deleteUnsyncedWatcherLocked(watcher)
+			c.unsyncedWatchers.deleteWatcher(watcher)
 			continue
 		}
 		if !watcher.synced.IsNotified() {
-			c.deleteUnsyncedWatcherLocked(watcher)
+			c.unsyncedWatchers.deleteWatcher(watcher)
 			cacheInterval, err := c.initWatcherIntervalLocked(watcher)
 			if err != nil {
 				watcher.input <- watcherInput{err: err}
@@ -658,7 +718,7 @@ func (c *Cacher) rsyncInitialWatchersAndReturnStalledLocked() []*cacheWatcher {
 			continue
 		}
 		if err := c.watchCache.history.checkResourceVersionLocked(watcher.dispatchedResourceVersion); err != nil {
-			c.deleteUnsyncedWatcherLocked(watcher)
+			c.unsyncedWatchers.deleteWatcher(watcher)
 			metrics.TerminatedWatchersCounter.WithLabelValues(c.groupResource.Group, c.groupResource.Resource).Inc()
 			watcher.input <- watcherInput{err: err}
 			c.stopWatcherLocked(watcher, true)
@@ -742,20 +802,8 @@ func (c *Cacher) resyncStalledWatchersLocked(stalledWatchers *indexedWatchers, m
 	c.nextResyncResourceVersion = 0
 	for watcher := range stalledWatchers.allWatchers() {
 		watcher.dispatchedResourceVersion = max(watcher.dispatchedResourceVersion, c.watchCache.resourceVersion)
-		c.deleteUnsyncedWatcherLocked(watcher)
+		c.unsyncedWatchers.deleteWatcher(watcher)
 		c.watchers.addWatcher(watcher)
-	}
-}
-
-// deleteUnsyncedWatcherLocked removes the watcher from unsyncedWatchers, where it
-// is either stalled or still waiting for its first interval.
-func (c *Cacher) deleteUnsyncedWatcherLocked(watcher *cacheWatcher) {
-	if _, ok := c.unsyncedWatchers[watcher.id]; !ok {
-		return
-	}
-	c.unsyncedWatchers.deleteWatcher(watcher)
-	if watcher.synced.IsNotified() {
-		c.resyncMetrics.StalledWatchers.Dec()
 	}
 }
 
@@ -1434,7 +1482,7 @@ func (c *Cacher) startDispatchingBookmarkEventsLocked() {
 				continue
 			}
 			c.expiredBookmarkWatchers = append(c.expiredBookmarkWatchers, watcher)
-			if _, unsynced := c.unsyncedWatchers[watcher.id]; unsynced {
+			if c.unsyncedWatchers.has(watcher) {
 				// Keep unsynced watchers scheduled for future bookmarks without
 				// writing to watcher.input concurrently with resyncWatchers.
 				continue
@@ -1565,8 +1613,6 @@ func (c *Cacher) finishDispatching() {
 			}
 			c.watchers.deleteWatcher(watcher)
 			c.unsyncedWatchers.addWatcher(watcher)
-			c.resyncMetrics.Stalls.Inc()
-			c.resyncMetrics.StalledWatchers.Inc()
 		}
 	}
 	clear(c.blockedWatchers)
@@ -1589,8 +1635,8 @@ func (c *Cacher) terminateAllWatchers() {
 	c.watchers.terminateAll(c.groupResource, func(watcher *cacheWatcher) {
 		c.stopWatcherLocked(watcher, false)
 	})
-	for _, watcher := range c.unsyncedWatchers {
-		c.deleteUnsyncedWatcherLocked(watcher)
+	for watcher := range c.unsyncedWatchers.allWatchers() {
+		c.unsyncedWatchers.deleteWatcher(watcher)
 		c.stopWatcherLocked(watcher, false)
 	}
 }
@@ -1659,7 +1705,7 @@ func forgetWatcher(c *Cacher, w *cacheWatcher) func(bool) {
 		// simultaneous Stop() and terminateAllWatchers(), but it is safe to call stopLocked()
 		// on a watcher multiple times.
 		c.watchers.deleteWatcher(w)
-		c.deleteUnsyncedWatcherLocked(w)
+		c.unsyncedWatchers.deleteWatcher(w)
 		c.stopWatcherLocked(w, drainWatcher)
 	}
 }
