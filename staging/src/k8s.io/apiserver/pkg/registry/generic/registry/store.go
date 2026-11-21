@@ -1611,7 +1611,11 @@ func (e *Store) WatchPredicate(ctx context.Context, p storage.SelectionPredicate
 		// optimization is skipped
 	}
 
-	return e.Storage.Watch(ctx, key, storageOpts)
+	w, err := e.Storage.Watch(ctx, key, storageOpts)
+	if err != nil {
+		return nil, storeerr.InterpretWatchError(err, e.qualifiedResourceFromContext(ctx), "")
+	}
+	return w, nil
 }
 
 // calculateTTL is a helper for retrieving the updated TTL for an object or
