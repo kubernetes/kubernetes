@@ -233,8 +233,6 @@ func (t *envelopeTransformer) TransformFromStorage(ctx context.Context, data []b
 			return nil, false, err
 		}
 	}
-	metrics.RecordKeyID(metrics.FromStorageLabel, t.providerName, encryptedObject.KeyID, t.apiServerID)
-
 	span.AddEvent("About to decrypt data using DEK")
 	out, stale, err := transformer.TransformFromStorage(ctx, encryptedObject.EncryptedData, dataCtx)
 	if err != nil {
@@ -293,8 +291,6 @@ func (t *envelopeTransformer) TransformToStorage(ctx context.Context, data []byt
 		return nil, err
 	}
 	span.AddEvent("Data encryption succeeded")
-
-	metrics.RecordKeyID(metrics.ToStorageLabel, t.providerName, state.EncryptedObjectKeyID, t.apiServerID)
 
 	encObjectCopy := &kmstypes.EncryptedObject{
 		KeyID:                  state.EncryptedObjectKeyID,
