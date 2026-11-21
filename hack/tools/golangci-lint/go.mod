@@ -7,7 +7,7 @@ require (
 	github.com/golangci/plugin-module-register v0.1.2
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2
 	golang.org/x/tools v0.52.0
-	sigs.k8s.io/kube-api-linter v0.0.0-20260716143926-092fe0c72997
+	sigs.k8s.io/kube-api-linter v0.0.0-20261009155318-ec17fa1c2713
 	sigs.k8s.io/logtools v0.11.0
 )
 
