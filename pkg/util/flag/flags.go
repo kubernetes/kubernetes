@@ -175,17 +175,13 @@ func (v *ReservedMemoryVar) Set(s string) error {
 	}
 
 	if s == "" {
-		v.Value = nil
+		*v.Value = nil
 		return nil
 	}
 
 	if !v.initialized || *v.Value == nil {
 		*v.Value = make([]kubeletconfig.MemoryReservation, 0)
 		v.initialized = true
-	}
-
-	if s == "" {
-		return nil
 	}
 
 	numaNodeReservations := strings.Split(s, ";")
