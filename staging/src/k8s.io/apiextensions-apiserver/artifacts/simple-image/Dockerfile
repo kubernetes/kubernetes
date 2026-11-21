@@ -12,6 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM gcr.io/distroless/base-debian10:latest
+FROM gcr.io/distroless/base:latest
 ADD apiextensions-apiserver /
 ENTRYPOINT ["/apiextensions-apiserver"]
