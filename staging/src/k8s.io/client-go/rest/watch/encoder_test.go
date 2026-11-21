@@ -25,6 +25,7 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	runtimejson "k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
 	"k8s.io/apimachinery/pkg/watch"
@@ -82,5 +83,22 @@ func TestEncodeDecodeRoundTrip(t *testing.T) {
 		if event != testCase.Type {
 			t.Errorf("%d: unexpected type: %#v", i, event)
 		}
+	}
+}
+
+// unencodableObject implements runtime.Object but cannot be serialized to JSON
+// because of the channel field.
+type unencodableObject struct {
+	Ch chan int `json:"ch"`
+}
+
+func (*unencodableObject) GetObjectKind() schema.ObjectKind { return schema.EmptyObjectKind }
+func (o *unencodableObject) DeepCopyObject() runtime.Object { return o }
+
+func TestEncode_EmbeddedEncodeError(t *testing.T) {
+	buf := &bytes.Buffer{}
+	encoder := NewEncoder(streaming.NewEncoder(buf, getEncoder()), getEncoder())
+	if err := encoder.Encode(&watch.Event{Type: watch.Added, Object: &unencodableObject{}}); err == nil {
+		t.Errorf("Expected error encoding unencodable object, got nil")
 	}
 }
