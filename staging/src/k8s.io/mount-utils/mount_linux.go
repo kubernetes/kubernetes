@@ -22,6 +22,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"os/exec"
@@ -674,10 +675,23 @@ func getDiskFormat(exec utilexec.Interface, disk string) (string, error) {
 	if err != nil {
 		if exit, ok := err.(utilexec.ExitError); ok {
 			if exit.ExitStatus() == 2 {
-				// Disk device is unformatted.
 				// For `blkid`, if the specified token (TYPE/PTTYPE, etc) was
 				// not found, or no (specified) devices could be identified, an
-				// exit code of 2 is returned.
+				// exit code of 2 is returned. This covers both a genuinely
+				// unformatted disk and a device whose data cannot be read
+				// (e.g. an I/O error on the data path).
+				//
+				// Before concluding the disk is unformatted, verify that the
+				// device data path is available: reject the blank-disk
+				// conclusion when the first block cannot be read at all.
+				// Otherwise callers may format an existing device with data
+				// on it. Note this guard is intentionally narrow; it does not
+				// rule out all other exit-2 failure modes. See
+				// checkDeviceReadable for the exact scope and limitations.
+				if err := checkDeviceReadable(disk); err != nil {
+					klog.Errorf("Disk %q probed as unformatted but is not readable (%v)", disk, err)
+					return "", err
+				}
 				return "", nil
 			}
 		}
@@ -714,6 +728,53 @@ func getDiskFormat(exec utilexec.Interface, disk string) (string, error) {
 	}
 
 	return fstype, nil
+}
+
+// checkDeviceReadable verifies that the first block of the device at
+// devicePath can be read before the caller concludes it is blank.
+//
+// blkid reports an unavailable data path (e.g. all reads fail with an I/O
+// error) identically to a genuinely blank disk, and getDiskFormat maps both
+// to ("", nil), so callers may enter a destructive initialization path
+// (mkfs) on an existing device. This guard covers the observed failure
+// mode where the data path is fully unavailable.
+//
+// Limitation: this is a narrow guard, not a complete blank-device proof.
+// It only rejects devices whose first block cannot be read at all. It does
+// not detect partial failures where the first block is readable while other
+// regions that blkid inspects are failing, and it does not verify that the
+// readable content is actually blank.
+//
+// A missing device node is not treated as an error to preserve the historical
+// behavior of getDiskFormat for callers probing paths that may not exist.
+func checkDeviceReadable(devicePath string) error {
+	f, err := os.Open(devicePath)
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return nil
+		}
+		return fmt.Errorf("failed to open device %s: %w", devicePath, err)
+	}
+	defer f.Close()
+
+	// Reading the first block is a cheap availability probe for the data
+	// path; filesystem validation itself remains blkid's job. The content
+	// of the block is intentionally not inspected.
+	buf := make([]byte, 4096)
+	n, err := f.ReadAt(buf, 0)
+	// Per the io.ReaderAt contract, a short read may return both a positive
+	// byte count and a non-nil error. A partial read ending in io.EOF means
+	// the device is merely smaller than the probe size, which is fine. Any
+	// other error (e.g. EIO, ENODATA) indicates part of the first block is
+	// unavailable, and zero bytes read means the data path is unavailable.
+	// Both must be rejected so the caller does not treat the device as blank.
+	if err != nil && !errors.Is(err, io.EOF) {
+		return fmt.Errorf("device %s is not readable: %w", devicePath, err)
+	}
+	if n == 0 {
+		return fmt.Errorf("device %s is not readable: no data returned", devicePath)
+	}
+	return nil
 }
 
 // GetDiskFormat uses 'blkid' to see if the given disk is unformatted
