@@ -896,7 +896,10 @@ func updateStatefulSetAfterInvariantEstablished(ctx context.Context, ssc *defaul
 	// up to (maxUnavailable - unavailable) pods in that range for termination, high ordinal first.
 	unavailablePods := 0
 	unavailablePodsTotal := 0
-	// For Parallel pod management, additionally count old and unavailable, within the maxUnavailable limit.
+	// Without rollingUpdate options, replacements can still use the current revision.
+	// Use the budget-limited update order to avoid repeatedly deleting those replacements.
+	updateUnavailablePods := set.Spec.PodManagementPolicy == apps.ParallelPodManagement &&
+		set.Spec.UpdateStrategy.RollingUpdate != nil
 	unavailablePodsNeedingUpdate := 0
 	for target := len(replicas) - 1; target >= 0; target-- {
 		pod := replicas[target]
@@ -908,7 +911,7 @@ func updateStatefulSetAfterInvariantEstablished(ctx context.Context, ssc *defaul
 			continue
 		}
 		unavailablePods++
-		if set.Spec.PodManagementPolicy == apps.ParallelPodManagement &&
+		if updateUnavailablePods &&
 			getPodRevision(pod) != updateRevision.Name &&
 			!isTerminating(pod) {
 			unavailablePodsNeedingUpdate++
@@ -930,7 +933,7 @@ func updateStatefulSetAfterInvariantEstablished(ctx context.Context, ssc *defaul
 		return &status, nil
 	}
 
-	if set.Spec.PodManagementPolicy == apps.ParallelPodManagement {
+	if updateUnavailablePods {
 		// Two-phase deletion for Parallel mode avoids excessive disruption when some
 		// pods are already unavailable on the old revision. A single high-to-low loop
 		// could spend the entire budget on good pods and never reach the already-
@@ -970,8 +973,8 @@ func updateStatefulSetAfterInvariantEstablished(ctx context.Context, ssc *defaul
 		return &status, nil
 	}
 
-	// OrderedReady pod management: original single-pass high-to-low logic.
-	// effectiveUnavailable == unavailablePods here (no exemption for unavailable pods).
+	// OrderedReady and Parallel without rollingUpdate options use a single-pass
+	// high-to-low update order, with no exemption for unavailable pods.
 	podsToDelete := maxUnavailable - unavailablePods
 	deletedPods := 0
 	for target := len(replicas) - 1; target >= updateMin && deletedPods < podsToDelete; target-- {
