@@ -1033,3 +1033,73 @@ func TestIsLikelyNotMountPoint(t *testing.T) {
 		}
 	}
 }
+
+func TestGetDiskFormatDevicePresence(t *testing.T) {
+	tmpFile, err := os.CreateTemp(t.TempDir(), "mount_utils_test_device_*")
+	if err != nil {
+		t.Fatalf("failed to create temp file: %v", err)
+	}
+
+	if err := tmpFile.Close(); err != nil {
+		t.Fatalf("failed to close temp file: %v", err)
+	}
+
+	tests := []struct {
+		name           string
+		disk           string
+		expectBlkidRun bool
+		blkidExitCode  int
+		expectError    bool
+		expectFmt      string
+	}{
+		{
+			name:           "device does not exist",
+			disk:           "/dev/nonexistent_device_test_12345",
+			expectBlkidRun: false,
+			expectError:    true,
+			expectFmt:      "",
+		},
+		{
+			name:           "device exists and blkid returns exit code 2 (unformatted)",
+			disk:           tmpFile.Name(),
+			expectBlkidRun: true,
+			blkidExitCode:  2,
+			expectError:    false,
+			expectFmt:      "",
+		},
+		{
+			name:           "device exists and blkid returns exit code 4 (error)",
+			disk:           tmpFile.Name(),
+			expectBlkidRun: true,
+			blkidExitCode:  4,
+			expectError:    true,
+			expectFmt:      "",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			fakeExec := &testexec.FakeExec{ExactOrder: true}
+			if tc.expectBlkidRun {
+				fakeExec.CommandScript = append(fakeExec.CommandScript,
+					makeFakeCommandAction("", &testexec.FakeExitError{Status: tc.blkidExitCode}, nil),
+				)
+			}
+
+			format, err := getDiskFormat(fakeExec, tc.disk)
+
+			if tc.expectError && err == nil {
+				t.Fatalf("expected error, got nil (format: %q)", format)
+			}
+			if !tc.expectError && err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if format != tc.expectFmt {
+				t.Fatalf("expected format %q, got %q", tc.expectFmt, format)
+			}
+			if fakeExec.CommandCalls != len(fakeExec.CommandScript) {
+				t.Fatalf("expected %d blkid calls, got %d", len(fakeExec.CommandScript), fakeExec.CommandCalls)
+			}
+		})
+	}
+}
