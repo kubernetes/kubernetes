@@ -74,7 +74,7 @@ func Validate(config *kubeproxyconfig.KubeProxyConfiguration) field.ErrorList {
 		allErrs = append(allErrs, field.Invalid(backendConfigPath.Child("minSyncPeriod"), config.MinSyncPeriod, "must be greater than or equal to 0"))
 	}
 	if config.MinSyncPeriod.Duration > config.SyncPeriod.Duration {
-		allErrs = append(allErrs, field.Invalid(backendConfigPath.Child("syncPeriod"), config.MinSyncPeriod, fmt.Sprintf("must be greater than or equal to %s", backendConfigPath.Child("minSyncPeriod").String())))
+		allErrs = append(allErrs, field.Invalid(backendConfigPath.Child("syncPeriod"), config.SyncPeriod, fmt.Sprintf("must be greater than or equal to %s", backendConfigPath.Child("minSyncPeriod").String())))
 	}
 
 	if netutils.ParseIPSloppy(config.BindAddress) == nil {
