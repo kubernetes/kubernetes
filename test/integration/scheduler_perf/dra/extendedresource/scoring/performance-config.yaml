@@ -90,3 +90,48 @@
       nodesWithoutDRA: 0
       initPods: 0
       measurePods: 5000
+
+# Keep slices and classes unchanged across scheduling cycles to measure the
+# scoring match cache with partitionable devices, including cross-cycle reuse.
+- name: PartitionableDeviceScoring
+  featureGates:
+    DRAExtendedResource: true
+    DRAPartitionableDevices: true
+  schedulerConfigPath: scheduler-config.yaml
+  workloadTemplate:
+  - opcode: createNodes
+    nodeTemplatePath: ../../templates/node-with-dra-test-driver.yaml
+    countParam: $nodes
+  - opcode: createAny
+    templatePath: ../../templates/resourceslice-partitionable-countersets.yaml
+    countParam: $nodes
+  - opcode: createAny
+    templatePath: ../../templates/resourceslice-partitionable-devices.yaml
+    countParam: $nodes
+  - opcode: createAny
+    templatePath: ../../templates/deviceclass-extended-resource-scoring.yaml
+    countParam: $classes
+  - opcode: createPods
+    namespace: init
+    countParam: $initPods
+    podTemplatePath: ../../templates/pod-with-extended-resource-scoring.yaml
+  - opcode: createPods
+    namespace: test
+    countParam: $measurePods
+    podTemplatePath: ../../templates/pod-with-extended-resource-scoring.yaml
+    collectMetrics: true
+  workloads:
+  - name: fast
+    labels: [integration-test, short]
+    params:
+      nodes: 4
+      classes: 1
+      initPods: 0
+      measurePods: 4
+  - name: 2000pods_1000nodes
+    labels: [performance, short]
+    params:
+      nodes: 1000
+      classes: 1
+      initPods: 0
+      measurePods: 2000
