@@ -41,6 +41,7 @@ import (
 	"k8s.io/client-go/tools/events"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	componentmetrics "k8s.io/component-base/metrics"
+	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2/ktesting"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/features"
@@ -51,6 +52,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/gangscheduling"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
@@ -5114,6 +5116,309 @@ func TestRunRootSchedulingAlgorithm_AssumeSubtrees(t *testing.T) {
 				}
 				if got := childRes.status.Code(); got != wantStatus {
 					t.Errorf("Unexpected status code for child %v: got %v, want %v", key, got, wantStatus)
+				}
+			}
+		})
+	}
+}
+
+func TestPodGroupPlacementOpportunisticBatching(t *testing.T) {
+	metrics.Register()
+	testRegistry := componentmetrics.NewKubeRegistry()
+	testRegistry.MustRegister(metrics.BatchAttemptStats, metrics.BatchCacheFlushed)
+
+	allNodeNames := []string{"node1", "node2", "node3", "node4", "node5", "node6"}
+	pgKey := fwk.PodGroupKey("default", "pg")
+	cpgKey := fwk.CompositePodGroupKey("default", "cpg")
+
+	tests := []struct {
+		name string
+		// seedPod schedules a pod on its own right before the PodGroup, which leaves
+		// a batch of all nodes behind.
+		seedPod           bool
+		compositePodGroup bool
+		podNames          []string
+		scoresByNode      map[string]int64
+		placements        map[fwk.EntityKey]map[string][]string
+		placementScores   map[fwk.EntityKey]map[string]int64
+		wantHosts         map[string]string
+		wantBatchedPods   int64
+		wantNextPodHost   string
+	}{
+		{
+			name:         "overlapping placements do not reuse unranked batch from earlier placement",
+			podNames:     []string{"p1", "p2"},
+			scoresByNode: map[string]int64{"node1": 50, "node2": 40, "node3": 30, "node4": 100},
+			placements: map[fwk.EntityKey]map[string][]string{
+				pgKey: {
+					"placement1": {"node1", "node2", "node3"},
+					"placement2": {"node2", "node3", "node4"},
+				},
+			},
+			placementScores: map[fwk.EntityKey]map[string]int64{
+				pgKey: {"placement1": 10, "placement2": 100},
+			},
+			wantHosts:       map[string]string{"p1": "node4", "p2": "node2"},
+			wantBatchedPods: 2,
+		},
+		{
+			name:         "restoring parent placement after PodGroup placement search flushes loser placement cache",
+			podNames:     []string{"p1"},
+			scoresByNode: map[string]int64{"node1": 50, "node2": 30, "node3": 20, "node4": 100},
+			placements: map[fwk.EntityKey]map[string][]string{
+				pgKey: {
+					"placement1": {"node1"},
+					"placement2": {"node2", "node3"},
+				},
+			},
+			placementScores: map[fwk.EntityKey]map[string]int64{
+				pgKey: {"placement1": 100, "placement2": 10},
+			},
+			wantHosts:       map[string]string{"p1": "node1"},
+			wantNextPodHost: "node4",
+		},
+		{
+			name:         "loser all-nodes placement flushes reverted batch",
+			podNames:     []string{"p1", "p2"},
+			scoresByNode: map[string]int64{"node1": 50, "node2": 40, "node3": 30, "node4": 100, "node5": 20, "node6": 10},
+			placements: map[fwk.EntityKey]map[string][]string{
+				pgKey: {
+					"placement1": {"node1", "node3"},
+					"placement2": allNodeNames,
+				},
+			},
+			placementScores: map[fwk.EntityKey]map[string]int64{
+				pgKey: {"placement1": 100, "placement2": 10},
+			},
+			wantHosts:       map[string]string{"p1": "node1", "p2": "node3"},
+			wantBatchedPods: 2,
+			wantNextPodHost: "node4",
+		},
+		{
+			name:         "multiple all-nodes placements do not reuse reverted batch from earlier placement",
+			podNames:     []string{"p1", "p2"},
+			scoresByNode: map[string]int64{"node1": 50, "node2": 40, "node3": 30, "node4": 100, "node5": 20, "node6": 10},
+			placements: map[fwk.EntityKey]map[string][]string{
+				pgKey: {
+					"placement1": allNodeNames,
+					"placement2": allNodeNames,
+				},
+			},
+			placementScores: map[fwk.EntityKey]map[string]int64{
+				pgKey: {"placement1": 10, "placement2": 100},
+			},
+			wantHosts:       map[string]string{"p1": "node4", "p2": "node1"},
+			wantBatchedPods: 2,
+		},
+		{
+			name:              "CompositePodGroup loser all-nodes placement flushes reverted batch",
+			compositePodGroup: true,
+			podNames:          []string{"p1", "p2"},
+			scoresByNode:      map[string]int64{"node1": 50, "node2": 40, "node3": 30, "node4": 100, "node5": 20, "node6": 10},
+			placements: map[fwk.EntityKey]map[string][]string{
+				cpgKey: {
+					"placement1": {"node1", "node3"},
+					"placement2": allNodeNames,
+				},
+				pgKey: {
+					"all": allNodeNames,
+				},
+			},
+			placementScores: map[fwk.EntityKey]map[string]int64{
+				cpgKey: {"placement1": 100, "placement2": 10},
+			},
+			wantHosts:       map[string]string{"p1": "node1", "p2": "node3"},
+			wantBatchedPods: 2,
+			wantNextPodHost: "node4",
+		},
+		{
+			// p1 has to search placement1 itself, only p2 is hinted.
+			name:         "batch of the previous cycle is not carried into a placement that narrows down the nodes",
+			seedPod:      true,
+			podNames:     []string{"p1", "p2"},
+			scoresByNode: map[string]int64{"node1": 50, "node2": 40, "node3": 30, "node4": 20, "node5": 10, "node6": 100},
+			placements: map[fwk.EntityKey]map[string][]string{
+				pgKey: {
+					"placement1": {"node1", "node2", "node3"},
+				},
+			},
+			wantHosts:       map[string]string{"p1": "node1", "p2": "node2"},
+			wantBatchedPods: 1,
+		},
+		{
+			name:         "batch of the previous cycle is carried into a placement of all nodes",
+			seedPod:      true,
+			podNames:     []string{"p1", "p2"},
+			scoresByNode: map[string]int64{"node1": 50, "node2": 40, "node3": 30, "node4": 20, "node5": 10, "node6": 100},
+			placements: map[fwk.EntityKey]map[string][]string{
+				pgKey: {
+					"all": allNodeNames,
+				},
+			},
+			wantHosts:       map[string]string{"p1": "node1", "p2": "node2"},
+			wantBatchedPods: 2,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.GenericWorkload:                 true,
+				features.TopologyAwareWorkloadScheduling: true,
+				features.CompositePodGroup:               tt.compositePodGroup,
+				features.OpportunisticBatching:           true,
+			})
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			cache := internalcache.New(ctx, nil, true, tt.compositePodGroup)
+			for _, name := range allNodeNames {
+				node := st.MakeNode().Name(name).UID(name).Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj()
+				cache.AddNode(logger, node)
+			}
+
+			sig := fwk.PodSignature("sig")
+			minCount := int32(len(tt.podNames))
+			pgWrapper := st.MakePodGroup().Name("pg").Namespace("default").MinCount(minCount)
+			if tt.compositePodGroup {
+				pgWrapper = pgWrapper.ParentCompositePodGroup("cpg")
+			}
+			pg := pgWrapper.Obj()
+			cache.AddGenericPodGroup(fwk.NewGenericPodGroup(pg))
+			qInfos := make([]*framework.QueuedPodInfo, 0, len(tt.podNames))
+			for _, name := range tt.podNames {
+				p := st.MakePod().Namespace("default").Name(name).UID(name).PodGroupName("pg").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj()
+				cache.AddPodGroupMember(p)
+				qInfo := queuedPodInfoForPod(p)
+				qInfo.PodSignature = sig
+				qInfos = append(qInfos, qInfo)
+			}
+			pgInfo := &framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericPodGroup(pg)}
+			rootInfo := pgInfo
+			if tt.compositePodGroup {
+				cpg := st.MakeCompositePodGroup().Name("cpg").Namespace("default").MinGroupCount(1).Obj()
+				cache.AddGenericPodGroup(fwk.NewGenericCompositePodGroup(cpg))
+				rootInfo = framework.NewPodGroupInfo(fwk.NewGenericCompositePodGroup(cpg), pgInfo)
+			}
+			root := newQueuedPodGroupInfo(rootInfo, qInfos...)
+
+			snapshot := internalcache.NewEmptySnapshot()
+			if err := cache.UpdateSnapshot(logger, snapshot); err != nil {
+				t.Fatalf("Failed to update snapshot: %v", err)
+			}
+
+			placementPlugin := &fakePlacementPlugin{
+				name:                     "FakePlacement",
+				generatePlacementsResult: tt.placements,
+				scorePlacementsResult:    tt.placementScores,
+			}
+			orderedPlacementGeneratePlugin := &orderedPlacementPlugin{placementPlugin}
+			scorePlugin := &rankNodesTestPlugin{
+				name:         "NodeScore",
+				scoresByNode: tt.scoresByNode,
+			}
+			fts := feature.NewSchedulerFeaturesFromGates(utilfeature.DefaultFeatureGate)
+			registrations := []tf.RegisterPluginFunc{
+				tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+				tf.RegisterPluginAsExtensions(noderesources.Name, frameworkruntime.FactoryAdapter(fts, noderesources.NewFit), "PreFilter", "Filter"),
+				tf.RegisterPluginAsExtensions(gangscheduling.Name, frameworkruntime.FactoryAdapter(fts, gangscheduling.New), "PlacementFeasible"),
+				tf.RegisterPlacementGeneratePlugin(orderedPlacementGeneratePlugin.Name(), func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+					return orderedPlacementGeneratePlugin, nil
+				}),
+				tf.RegisterPlacementScorePlugin(placementPlugin.Name(), func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+					return placementPlugin, nil
+				}, 1),
+				tf.RegisterScorePlugin(scorePlugin.Name(), func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+					return scorePlugin, nil
+				}, 1),
+			}
+
+			queue := internalqueue.NewTestQueue(ctx, nil)
+			const profileName = "test-scheduler"
+			schedFwk, err := tf.NewFramework(ctx, registrations, profileName,
+				frameworkruntime.WithSnapshotSharedLister(snapshot),
+				frameworkruntime.WithPodNominator(queue),
+				frameworkruntime.WithParallelism(1),
+				frameworkruntime.WithMaxBatchAge(time.Hour),
+			)
+			if err != nil {
+				t.Fatalf("Failed to create framework: %v", err)
+			}
+
+			cycle := int64(1)
+			alg, err := NewSchedulingAlgorithm(snapshot, cache, WithCurrentCycleProvider(func() int64 { return cycle }))
+			if err != nil {
+				t.Fatalf("Failed to create scheduling algorithm: %v", err)
+			}
+			pgAlg := NewPodGroupAlgorithm(snapshot, alg, WithShufflePlacements(nil), WithAlgorithmPercentageOfPlacementsToScore(100))
+
+			if tt.seedPod {
+				seedPod := st.MakePod().Namespace("default").Name("seed-pod").UID("seed-pod").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj()
+				seedInfo := queuedPodInfoForPod(seedPod)
+				seedInfo.PodSignature = sig
+				seedRes, err := alg.SchedulePod(ctx, schedFwk, framework.NewCycleState(), seedInfo)
+				if err != nil {
+					t.Fatalf("SchedulePod for seed-pod failed: %v", err)
+				}
+				boundSeed := seedPod.DeepCopy()
+				boundSeed.Spec.NodeName = seedRes.SuggestedHost
+				if err := cache.AddPod(logger, boundSeed); err != nil {
+					t.Fatalf("Failed to add seed-pod to cache: %v", err)
+				}
+				if err := cache.UpdateSnapshot(logger, snapshot); err != nil {
+					t.Fatalf("Failed to update snapshot after seed-pod: %v", err)
+				}
+				cycle++
+			}
+
+			metrics.BatchAttemptStats.Reset()
+			metrics.BatchCacheFlushed.Reset()
+
+			results := pgAlg.RunRootSchedulingAlgorithm(ctx, schedFwk, framework.NewCycleState(), root)
+			if status := results[root.GetKey()].status; !status.IsSuccess() {
+				t.Fatalf("RunRootSchedulingAlgorithm failed: %v", status)
+			}
+
+			gotHosts := make(map[string]string, len(tt.wantHosts))
+			for _, podRes := range results[pgKey].podResults {
+				gotHosts[podRes.podInfo.Pod.Name] = podRes.scheduleResult.SuggestedHost
+			}
+			if diff := cmp.Diff(tt.wantHosts, gotHosts); diff != "" {
+				t.Errorf("SuggestedHost mismatch (-want, +got):\n%s", diff)
+			}
+
+			gotBatched := schedFwk.(interface{ TotalBatchedPods() int64 }).TotalBatchedPods()
+			if gotBatched != tt.wantBatchedPods {
+				t.Errorf("TotalBatchedPods() = %d, want %d", gotBatched, tt.wantBatchedPods)
+			}
+			assertCounterValueFromGatherer(t, testRegistry, "scheduler_batch_attempts_total", map[string]string{"profile": profileName}, "result", metrics.BatchAttemptHintNotUsed, 0)
+			if err := testutil.GatherAndCompare(testRegistry, strings.NewReader(""), "scheduler_batch_cache_flushed_total"); err != nil {
+				t.Errorf("unexpected scheduler_batch_cache_flushed_total metric output:\n%v", err)
+			}
+
+			if tt.wantNextPodHost != "" {
+				for _, podRes := range results[pgKey].podResults {
+					bound := podRes.podInfo.Pod.DeepCopy()
+					bound.Spec.NodeName = podRes.scheduleResult.SuggestedHost
+					if err := cache.AddPod(logger, bound); err != nil {
+						t.Fatalf("Failed to add scheduled pod to cache: %v", err)
+					}
+				}
+				if err := cache.UpdateSnapshot(logger, snapshot); err != nil {
+					t.Fatalf("Failed to update snapshot for next cycle: %v", err)
+				}
+				cycle++
+				nextPod := st.MakePod().Namespace("default").Name("next-pod").UID("next-pod").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj()
+				nextInfo := queuedPodInfoForPod(nextPod)
+				nextInfo.PodSignature = sig
+				nextRes, err := alg.SchedulePod(ctx, schedFwk, framework.NewCycleState(), nextInfo)
+				if err != nil {
+					t.Fatalf("SchedulePod for next-pod failed: %v", err)
+				}
+				if nextRes.SuggestedHost != tt.wantNextPodHost {
+					t.Errorf("next-pod SuggestedHost = %q, want %q", nextRes.SuggestedHost, tt.wantNextPodHost)
 				}
 			}
 		})
