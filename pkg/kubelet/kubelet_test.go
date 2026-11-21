@@ -5345,10 +5345,209 @@ func TestHandlePodAdditionsBackfillsResizeConditionsBeforeSync(t *testing.T) {
 	assert.Equal(t, int64(1), synced[0].ObservedGeneration)
 }
 
+func assertRequestedResizes(t *testing.T, containerSeries, podSeries string) {
+	t.Helper()
+	for _, m := range []struct {
+		name, help, series string
+	}{{
+		name: "kubelet_container_requested_resizes_total",
+		help: `
+			# HELP kubelet_container_requested_resizes_total [ALPHA] Number of requested resizes, counted at the container level. Different resources on the same container are counted separately. The 'requirement' label refers to 'memory' or 'limits'; the 'operation' label can be one of 'add', 'remove', 'increase' or 'decrease'.
+			# TYPE kubelet_container_requested_resizes_total counter
+		`,
+		series: containerSeries,
+	}, {
+		name: "kubelet_pod_requested_resizes_total",
+		help: `
+			# HELP kubelet_pod_requested_resizes_total [ALPHA] Number of requested resizes, counted at the pod level. Different resources on the same pod are counted separately. The 'requirement' label refers to 'requests' or 'limits'; the 'operation' label can be one of 'add', 'remove', 'increase' or 'decrease'.
+			# TYPE kubelet_pod_requested_resizes_total counter
+		`,
+		series: podSeries,
+	}} {
+		expected := ""
+		if m.series != "" {
+			expected = m.help + m.series
+		}
+		require.NoError(t, testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expected), m.name), m.name)
+	}
+}
+
+func TestHandlePodUpdates_RecordPodRequestedResizes(t *testing.T) {
+	logger, tCtx := ktesting.NewTestContext(t)
+	metrics.Register()
+
+	resources := func(requests, limits v1.ResourceList) *v1.ResourceRequirements {
+		return &v1.ResourceRequirements{Requests: requests, Limits: limits}
+	}
+	cpuMemory := func(cpu, memory string) v1.ResourceList {
+		list := v1.ResourceList{}
+		if cpu != "" {
+			list[v1.ResourceCPU] = resource.MustParse(cpu)
+		}
+		if memory != "" {
+			list[v1.ResourceMemory] = resource.MustParse(memory)
+		}
+		return list
+	}
+	restartAlways := v1.ContainerRestartPolicyAlways
+
+	for _, tc := range []struct {
+		name       string
+		oldSpec    v1.PodSpec
+		newSpec    v1.PodSpec
+		newLabels  map[string]string
+		addOldPod  bool
+		podSeries  string
+		ctrsSeries string
+	}{{
+		name:      "pod-level resources added",
+		oldSpec:   v1.PodSpec{Containers: []v1.Container{{Name: "c1"}}},
+		newSpec:   v1.PodSpec{Resources: resources(cpuMemory("1", "1Gi"), cpuMemory("2", "")), Containers: []v1.Container{{Name: "c1"}}},
+		addOldPod: true,
+		podSeries: `
+			kubelet_pod_requested_resizes_total{operation="add",requirement="requests",resource="cpu"} 1
+			kubelet_pod_requested_resizes_total{operation="add",requirement="requests",resource="memory"} 1
+			kubelet_pod_requested_resizes_total{operation="add",requirement="limits",resource="cpu"} 1
+		`,
+	}, {
+		name:      "pod-level resources increased and decreased",
+		oldSpec:   v1.PodSpec{Resources: resources(cpuMemory("1", "1Gi"), cpuMemory("2", "2Gi")), Containers: []v1.Container{{Name: "c1"}}},
+		newSpec:   v1.PodSpec{Resources: resources(cpuMemory("2", "512Mi"), cpuMemory("2", "4Gi")), Containers: []v1.Container{{Name: "c1"}}},
+		addOldPod: true,
+		podSeries: `
+			kubelet_pod_requested_resizes_total{operation="increase",requirement="requests",resource="cpu"} 1
+			kubelet_pod_requested_resizes_total{operation="decrease",requirement="requests",resource="memory"} 1
+			kubelet_pod_requested_resizes_total{operation="increase",requirement="limits",resource="memory"} 1
+		`,
+	}, {
+		name:      "pod-level resources removed",
+		oldSpec:   v1.PodSpec{Resources: resources(cpuMemory("1", ""), cpuMemory("", "1Gi")), Containers: []v1.Container{{Name: "c1"}}},
+		newSpec:   v1.PodSpec{Containers: []v1.Container{{Name: "c1"}}},
+		addOldPod: true,
+		podSeries: `
+			kubelet_pod_requested_resizes_total{operation="remove",requirement="requests",resource="cpu"} 1
+			kubelet_pod_requested_resizes_total{operation="remove",requirement="limits",resource="memory"} 1
+		`,
+	}, {
+		name: "pod-level and container resources resized together",
+		oldSpec: v1.PodSpec{
+			Resources:  resources(cpuMemory("1", ""), nil),
+			Containers: []v1.Container{{Name: "c1", Resources: *resources(cpuMemory("500m", ""), nil)}},
+		},
+		newSpec: v1.PodSpec{
+			Resources:  resources(cpuMemory("2", ""), nil),
+			Containers: []v1.Container{{Name: "c1", Resources: *resources(cpuMemory("700m", ""), nil)}},
+		},
+		addOldPod: true,
+		podSeries: `
+			kubelet_pod_requested_resizes_total{operation="increase",requirement="requests",resource="cpu"} 1
+		`,
+		ctrsSeries: `
+			kubelet_container_requested_resizes_total{operation="increase",requirement="requests",resource="cpu"} 1
+		`,
+	}, {
+		name: "sidecar resized",
+		oldSpec: v1.PodSpec{
+			InitContainers: []v1.Container{{Name: "sidecar", RestartPolicy: &restartAlways, Resources: *resources(nil, cpuMemory("", "100Mi"))}},
+			Containers:     []v1.Container{{Name: "c1"}},
+		},
+		newSpec: v1.PodSpec{
+			InitContainers: []v1.Container{{Name: "sidecar", RestartPolicy: &restartAlways, Resources: *resources(nil, cpuMemory("", "50Mi"))}},
+			Containers:     []v1.Container{{Name: "c1"}},
+		},
+		addOldPod: true,
+		ctrsSeries: `
+			kubelet_container_requested_resizes_total{operation="decrease",requirement="limits",resource="memory"} 1
+		`,
+	}, {
+		name: "non-sidecar init container resized",
+		oldSpec: v1.PodSpec{
+			InitContainers: []v1.Container{{Name: "init", Resources: *resources(cpuMemory("100m", ""), nil)}},
+			Containers:     []v1.Container{{Name: "c1"}},
+		},
+		newSpec: v1.PodSpec{
+			InitContainers: []v1.Container{{Name: "init", Resources: *resources(cpuMemory("200m", ""), nil)}},
+			Containers:     []v1.Container{{Name: "c1"}},
+		},
+		addOldPod: true,
+		ctrsSeries: `
+			kubelet_container_requested_resizes_total{operation="increase",requirement="requests",resource="cpu"} 1
+		`,
+	}, {
+		name:      "pod-level resources in another unit",
+		oldSpec:   v1.PodSpec{Resources: resources(cpuMemory("1", "1Gi"), nil), Containers: []v1.Container{{Name: "c1"}}},
+		newSpec:   v1.PodSpec{Resources: resources(cpuMemory("1000m", "1024Mi"), nil), Containers: []v1.Container{{Name: "c1"}}},
+		addOldPod: true,
+	}, {
+		name:      "pod-level resources that aren't resizable",
+		oldSpec:   v1.PodSpec{Resources: resources(v1.ResourceList{v1.ResourceEphemeralStorage: resource.MustParse("1Gi")}, nil), Containers: []v1.Container{{Name: "c1"}}},
+		newSpec:   v1.PodSpec{Resources: resources(v1.ResourceList{v1.ResourceEphemeralStorage: resource.MustParse("2Gi")}, nil), Containers: []v1.Container{{Name: "c1"}}},
+		addOldPod: true,
+	}, {
+		name:      "update that isn't a resize",
+		oldSpec:   v1.PodSpec{Resources: resources(cpuMemory("1", "1Gi"), nil), Containers: []v1.Container{{Name: "c1", Resources: *resources(cpuMemory("500m", ""), nil)}}},
+		newSpec:   v1.PodSpec{Resources: resources(cpuMemory("1", "1Gi"), nil), Containers: []v1.Container{{Name: "c1", Resources: *resources(cpuMemory("500m", ""), nil)}}},
+		newLabels: map[string]string{"updated": "true"},
+		addOldPod: true,
+	}, {
+		// Without a previous version of the pod, there is nothing to compare the resources with.
+		name:    "pod not seen before",
+		oldSpec: v1.PodSpec{Resources: resources(cpuMemory("1", ""), nil), Containers: []v1.Container{{Name: "c1"}}},
+		newSpec: v1.PodSpec{Resources: resources(cpuMemory("2", ""), nil), Containers: []v1.Container{{Name: "c1"}}},
+	}} {
+		t.Run(tc.name, func(t *testing.T) {
+			metrics.ContainerRequestedResizes.Reset()
+			metrics.PodRequestedResizes.Reset()
+
+			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+			t.Cleanup(func() { testKubelet.Cleanup() })
+			kubelet := testKubelet.kubelet
+
+			oldPod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-pod", UID: "12345"}, Spec: tc.oldSpec}
+			newPod := oldPod.DeepCopy()
+			newPod.Labels = tc.newLabels
+			newPod.Spec = tc.newSpec
+			if tc.addOldPod {
+				kubelet.podManager.AddPod(oldPod)
+			}
+			require.NoError(t, kubelet.allocationManager.SetAllocatedPod(logger, oldPod))
+			kubelet.HandlePodUpdates(tCtx, []*v1.Pod{newPod})
+
+			assertRequestedResizes(t, strings.TrimLeft(tc.ctrsSeries, "\n"), strings.TrimLeft(tc.podSeries, "\n"))
+		})
+	}
+}
+
+func TestHandlePodAdditions_NoRequestedResizes(t *testing.T) {
+	_, tCtx := ktesting.NewTestContext(t)
+	metrics.Register()
+	metrics.ContainerRequestedResizes.Reset()
+	metrics.PodRequestedResizes.Reset()
+
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	t.Cleanup(func() { testKubelet.Cleanup() })
+	kubelet := testKubelet.kubelet
+
+	requests := v1.ResourceList{v1.ResourceCPU: resource.MustParse("100m"), v1.ResourceMemory: resource.MustParse("100Mi")}
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-pod", Namespace: "default", UID: "12345"},
+		Spec: v1.PodSpec{
+			Resources:  &v1.ResourceRequirements{Requests: requests, Limits: requests},
+			Containers: []v1.Container{{Name: "c1", Resources: v1.ResourceRequirements{Requests: requests, Limits: requests}}},
+		},
+	}
+	kubelet.HandlePodAdditions(tCtx, []*v1.Pod{pod})
+	// The update that follows the creation of the pod doesn't change its resources.
+	kubelet.HandlePodUpdates(tCtx, []*v1.Pod{pod.DeepCopy()})
+
+	assertRequestedResizes(t, "", "")
+}
+
 func TestHandlePodUpdates_RecordContainerRequestedResizes(t *testing.T) {
 	logger, tCtx := ktesting.NewTestContext(t)
 	metrics.Register()
 	metrics.ContainerRequestedResizes.Reset()
+	metrics.PodRequestedResizes.Reset()
 
 	type expectedMetricsStruct struct {
 		memoryLimitsCounter   map[string]int
@@ -5964,56 +6163,24 @@ func TestHandlePodUpdates_RecordContainerRequestedResizes(t *testing.T) {
 
 			tc.updateExpectedFunc(&expectedMetrics)
 
-			expectedFormat := `
-				# HELP kubelet_container_requested_resizes_total [ALPHA] Number of requested resizes, counted at the container level. Different resources on the same container are counted separately. The 'requirement' label refers to 'memory' or 'limits'; the 'operation' label can be one of 'add', 'remove', 'increase' or 'decrease'.
-				# TYPE kubelet_container_requested_resizes_total counter
-				kubelet_container_requested_resizes_total{operation="add",requirement="requests",resource="memory"} %d
-				kubelet_container_requested_resizes_total{operation="add",requirement="requests",resource="cpu"} %d
-				kubelet_container_requested_resizes_total{operation="add",requirement="limits",resource="memory"} %d
-				kubelet_container_requested_resizes_total{operation="add",requirement="limits",resource="cpu"} %d
-				kubelet_container_requested_resizes_total{operation="decrease",requirement="requests",resource="memory"} %d
-				kubelet_container_requested_resizes_total{operation="decrease",requirement="requests",resource="cpu"} %d
-				kubelet_container_requested_resizes_total{operation="decrease",requirement="limits",resource="memory"} %d
-				kubelet_container_requested_resizes_total{operation="decrease",requirement="limits",resource="cpu"} %d
-				kubelet_container_requested_resizes_total{operation="increase",requirement="requests",resource="memory"} %d
-				kubelet_container_requested_resizes_total{operation="increase",requirement="requests",resource="cpu"} %d
-				kubelet_container_requested_resizes_total{operation="increase",requirement="limits",resource="memory"} %d
-				kubelet_container_requested_resizes_total{operation="increase",requirement="limits",resource="cpu"} %d
-				kubelet_container_requested_resizes_total{operation="remove",requirement="requests",resource="memory"} %d
-				kubelet_container_requested_resizes_total{operation="remove",requirement="requests",resource="cpu"} %d
-				kubelet_container_requested_resizes_total{operation="remove",requirement="limits",resource="memory"} %d
-				kubelet_container_requested_resizes_total{operation="remove",requirement="limits",resource="cpu"} %d
-			`
-
-			expected := fmt.Sprintf(expectedFormat,
-				expectedMetrics.memoryRequestsCounter["add"],
-				expectedMetrics.cpuRequestsCounter["add"],
-				expectedMetrics.memoryLimitsCounter["add"],
-				expectedMetrics.cpuLimitsCounter["add"],
-
-				expectedMetrics.memoryRequestsCounter["decrease"],
-				expectedMetrics.cpuRequestsCounter["decrease"],
-				expectedMetrics.memoryLimitsCounter["decrease"],
-				expectedMetrics.cpuLimitsCounter["decrease"],
-
-				expectedMetrics.memoryRequestsCounter["increase"],
-				expectedMetrics.cpuRequestsCounter["increase"],
-				expectedMetrics.memoryLimitsCounter["increase"],
-				expectedMetrics.cpuLimitsCounter["increase"],
-
-				expectedMetrics.memoryRequestsCounter["remove"],
-				expectedMetrics.cpuRequestsCounter["remove"],
-				expectedMetrics.memoryLimitsCounter["remove"],
-				expectedMetrics.cpuLimitsCounter["remove"],
-			)
-
-			// Omit lines from the expected metrics string where the count is "0"
-			re := regexp.MustCompile("(?m)[\r\n]+^.*} 0.*$")
-			expected = re.ReplaceAllString(expected, "")
-
-			require.NoError(t, testutil.GatherAndCompare(
-				legacyregistry.DefaultGatherer, strings.NewReader(expected), "kubelet_container_requested_resizes_total",
-			))
+			// Container resizes increment only the container metric, leaving the pod-level metric empty.
+			var containerSeries strings.Builder
+			for _, op := range []string{"add", "decrease", "increase", "remove"} {
+				for _, c := range []struct {
+					resource, requirement string
+					counter               map[string]int
+				}{
+					{"memory", "requests", expectedMetrics.memoryRequestsCounter},
+					{"cpu", "requests", expectedMetrics.cpuRequestsCounter},
+					{"memory", "limits", expectedMetrics.memoryLimitsCounter},
+					{"cpu", "limits", expectedMetrics.cpuLimitsCounter},
+				} {
+					if count := c.counter[op]; count > 0 {
+						fmt.Fprintf(&containerSeries, "kubelet_container_requested_resizes_total{operation=%q,requirement=%q,resource=%q} %d\n", op, c.requirement, c.resource, count)
+					}
+				}
+			}
+			assertRequestedResizes(t, containerSeries.String(), "")
 		})
 	}
 }

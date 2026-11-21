@@ -78,6 +78,7 @@ import (
 	"k8s.io/client-go/util/certificate"
 	"k8s.io/client-go/util/flowcontrol"
 	cloudprovider "k8s.io/cloud-provider"
+	compbasemetrics "k8s.io/component-base/metrics"
 	"k8s.io/component-base/version"
 	"k8s.io/component-helpers/apimachinery/lease"
 	resourcehelper "k8s.io/component-helpers/resource"
@@ -3351,9 +3352,17 @@ func recordResizeOperations(oldPod, newPod *v1.Pod) {
 	recordVolumeResizeOperations(oldPod, newPod)
 }
 
-// recordPodLevelResourceResizeOperations records if any of the pod level resources need to be resized.
+// recordPodLevelResourceResizeOperations records the resizes that an update of a pod requests for its
+// pod-level resources.
 func recordPodLevelResourceResizeOperations(oldPod, newPod *v1.Pod) {
-	// TODO(ndixita): add metrics for pod-level resources resize.
+	oldResources, newResources := oldPod.Spec.Resources, newPod.Spec.Resources
+	if oldResources == nil {
+		oldResources = &v1.ResourceRequirements{}
+	}
+	if newResources == nil {
+		newResources = &v1.ResourceRequirements{}
+	}
+	recordResourceResizeOperations(metrics.PodRequestedResizes, newResources, oldResources)
 }
 
 // recordContainerResizeOperations records the resizes that an update of a pod requests for its
@@ -3367,21 +3376,24 @@ func recordContainerResizeOperations(oldPod, newPod *v1.Pod) {
 			continue
 		}
 
-		newResources := newContainer.Resources
-		oldResources := oldContainer.Resources
+		recordResourceResizeOperations(metrics.ContainerRequestedResizes, &newContainer.Resources, &oldContainer.Resources)
+	}
+}
 
-		if op := resizeOperationForResources(newResources.Requests.Memory(), oldResources.Requests.Memory()); op != "" {
-			metrics.ContainerRequestedResizes.WithLabelValues("memory", "requests", op).Inc()
-		}
-		if op := resizeOperationForResources(newResources.Limits.Memory(), oldResources.Limits.Memory()); op != "" {
-			metrics.ContainerRequestedResizes.WithLabelValues("memory", "limits", op).Inc()
-		}
-		if op := resizeOperationForResources(newResources.Requests.Cpu(), oldResources.Requests.Cpu()); op != "" {
-			metrics.ContainerRequestedResizes.WithLabelValues("cpu", "requests", op).Inc()
-		}
-		if op := resizeOperationForResources(newResources.Limits.Cpu(), oldResources.Limits.Cpu()); op != "" {
-			metrics.ContainerRequestedResizes.WithLabelValues("cpu", "limits", op).Inc()
-		}
+// recordResourceResizeOperations records each CPU and memory request and limit change from
+// oldResources to newResources in counter.
+func recordResourceResizeOperations(counter *compbasemetrics.CounterVec, newResources, oldResources *v1.ResourceRequirements) {
+	if op := resizeOperationForResources(newResources.Requests.Memory(), oldResources.Requests.Memory()); op != "" {
+		counter.WithLabelValues("memory", "requests", op).Inc()
+	}
+	if op := resizeOperationForResources(newResources.Limits.Memory(), oldResources.Limits.Memory()); op != "" {
+		counter.WithLabelValues("memory", "limits", op).Inc()
+	}
+	if op := resizeOperationForResources(newResources.Requests.Cpu(), oldResources.Requests.Cpu()); op != "" {
+		counter.WithLabelValues("cpu", "requests", op).Inc()
+	}
+	if op := resizeOperationForResources(newResources.Limits.Cpu(), oldResources.Limits.Cpu()); op != "" {
+		counter.WithLabelValues("cpu", "limits", op).Inc()
 	}
 }
 

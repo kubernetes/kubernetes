@@ -4324,10 +4324,14 @@
     endpoint: /metrics
 - name: pod_infeasible_resizes_total
   subsystem: kubelet
-  help: Number of infeasible resizes for pods.
+  help: Number of infeasible resizes for pods. Labels 'container_resources' and 'pod_resources'
+    report whether the resize changes container-level and pod-level spec resources,
+    respectively.
   type: Counter
   stabilityLevel: ALPHA
   labels:
+  - container_resources
+  - pod_resources
   - reason_detail
   componentEndpoints:
   - component: kubelet
@@ -4356,6 +4360,21 @@
   labels:
   - priority_bucket
   - reason
+  componentEndpoints:
+  - component: kubelet
+    endpoint: /metrics
+- name: pod_requested_resizes_total
+  subsystem: kubelet
+  help: Number of requested resizes, counted at the pod level. Different resources
+    on the same pod are counted separately. The 'requirement' label refers to 'requests'
+    or 'limits'; the 'operation' label can be one of 'add', 'remove', 'increase' or
+    'decrease'.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - operation
+  - requirement
+  - resource
   componentEndpoints:
   - component: kubelet
     endpoint: /metrics
@@ -4409,10 +4428,14 @@
     endpoint: /metrics
 - name: pod_resize_duration_milliseconds
   subsystem: kubelet
-  help: Duration in milliseconds to actuate a pod resize
+  help: Duration in milliseconds to actuate a pod resize. Label 'container_resources'
+    reports whether container resources were updated in-place; label 'pod_resources'
+    reports whether effective pod cgroup resources were updated.
   type: Histogram
   stabilityLevel: ALPHA
   labels:
+  - container_resources
+  - pod_resources
   - success
   buckets:
   - 10

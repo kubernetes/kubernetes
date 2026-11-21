@@ -24,6 +24,7 @@ import (
 	"reflect"
 	goruntime "runtime"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -5042,6 +5043,11 @@ func TestDoPodResizeAction(t *testing.T) {
 	metrics.Register()
 	metrics.PodResizeDurationMilliseconds.Reset()
 
+	type resizeSeries struct {
+		success, containerResources, podResources bool
+	}
+	expectedResizes := map[resizeSeries]int{}
+
 	for i, tc := range []struct {
 		// Metadata
 		testName string
@@ -5716,6 +5722,18 @@ func TestDoPodResizeAction(t *testing.T) {
 			mock.AssertExpectationsForObjects(t, mockPCM)
 
 			testutil.AssertHistogramTotalCount(t, "kubelet_pod_resize_duration_milliseconds", map[string]string{}, i+1)
+			expectedResizes[resizeSeries{
+				success:            tc.expectedError == "",
+				containerResources: len(tc.updatedResources) > 0,
+				podResources:       len(tc.podCgroupResourcesToUpdate) > 0,
+			}]++
+			for series, count := range expectedResizes {
+				testutil.AssertHistogramTotalCount(t, "kubelet_pod_resize_duration_milliseconds", map[string]string{
+					"success":             strconv.FormatBool(series.success),
+					"container_resources": strconv.FormatBool(series.containerResources),
+					"pod_resources":       strconv.FormatBool(series.podResources),
+				}, count)
+			}
 		})
 	}
 	metrics.PodResizeDurationMilliseconds.Reset()
@@ -6195,6 +6213,10 @@ func TestDoPodResizeAction_Volumes(t *testing.T) {
 				SandboxID:         "sandbox-id",
 			}
 
+			metrics.Register()
+			metrics.PodResizeDurationMilliseconds.Reset()
+			t.Cleanup(metrics.PodResizeDurationMilliseconds.Reset)
+
 			result := m.doPodResizeAction(tCtx, pod, podStatus, actions)
 
 			if tc.expectedResultErr {
@@ -6202,6 +6224,11 @@ func TestDoPodResizeAction_Volumes(t *testing.T) {
 			} else {
 				require.NoError(t, result.Error)
 			}
+			testutil.AssertHistogramTotalCount(t, "kubelet_pod_resize_duration_milliseconds", map[string]string{
+				"success":             strconv.FormatBool(!tc.expectedResultErr),
+				"container_resources": "false",
+				"pod_resources":       "false",
+			}, 1)
 
 			require.Len(t, helper.resizeCalls, len(tc.expectedCalls), "number of ResizeEphemeralVolume calls")
 			for idx, expectedCall := range tc.expectedCalls {
