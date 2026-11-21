@@ -3056,6 +3056,32 @@ func TestPrintJob(t *testing.T) {
 			// Columns: Name, Status, Completions, Duration, Age
 			expected: []metav1.TableRow{{Cells: []interface{}{"job6", "Failed", "0/1", "", "0s"}}},
 		},
+		// Failed Job: duration stops when the Failed condition was added.
+		{
+			job: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "job6-failed-duration",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(time.Duration(-10 * 365 * 24 * time.Hour))},
+				},
+				Spec: batch.JobSpec{
+					Completions: nil,
+				},
+				Status: batch.JobStatus{
+					Failed:    1,
+					StartTime: &metav1.Time{Time: now.Add(-30 * time.Minute)},
+					Conditions: []batch.JobCondition{
+						{
+							Type:               batch.JobFailed,
+							Status:             api.ConditionTrue,
+							LastTransitionTime: metav1.Time{Time: now.Add(-20 * time.Minute)},
+						},
+					},
+				},
+			},
+			options: printers.GenerateOptions{},
+			// Columns: Name, Status, Completions, Duration, Age
+			expected: []metav1.TableRow{{Cells: []interface{}{"job6-failed-duration", "Failed", "0/1", "10m", "10y"}}},
+		},
 		{
 			job: batch.Job{
 				ObjectMeta: metav1.ObjectMeta{
