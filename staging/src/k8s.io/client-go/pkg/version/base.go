@@ -18,41 +18,29 @@ package version
 
 // Base version information.
 //
-// This is the fallback data used when version information from git is not
-// provided via go ldflags. It provides an approximation of the Kubernetes
-// version for ad-hoc builds (e.g. `go build`) that cannot get the version
-// information from git.
+// The version itself is built from the constants below and the VCS information
+// recorded by the Go toolchain. The variables are optional overrides which
+// take precedence over that information. They are set with ldflags -X, but
+// only when building with KUBE_GIT_VERSION_FILE, i.e. when the build has to
+// use externally provided version information. gitCommit and gitRefs also get
+// replaced by "git archive", which works for GitHub tar downloads. buildDate
+// is always set with ldflags -X.
 //
-// If you are looking at these fields in the git tree, they look
-// strange. They are set by the build process with ldflags -X. The
-// in-tree values are dummy values used for "git archive", which also
-// works for GitHub tar downloads.
+// TODO: reconsider whether KUBE_GIT_VERSION_FILE is needed. Removing it would
+// simplify the source code because ldflags injection would no longer be
+// necessary for anything except buildDate.
 var (
-	// TODO: Deprecate gitMajor and gitMinor, use only gitVersion
-	// instead. First step in deprecation, keep the fields but make
-	// them irrelevant. (Next we'll take it out, which may muck with
-	// scripts consuming the kubectl version output - but most of
-	// these should be looking at gitVersion already anyways.)
-	gitMajor string = "" // major version, always numeric
-	gitMinor string = "" // minor version, numeric possibly followed by "+"
+	gitVersion   = ""            // complete semantic version, replaces the one built from the constants
+	gitCommit    = "$Format:%H$" // sha1 from git, ignored while it is still the unexpanded placeholder
+	gitRefs      = "$Format:%D$" // refs of the archived commit, e.g. "HEAD -> master, tag: v1.38.0"
+	gitTreeState = ""            // "clean" or "dirty"
 
-	// semantic version, derived by build scripts (see
-	// https://github.com/kubernetes/sig-release/blob/master/release-engineering/versioning.md#kubernetes-release-versioning
-	// https://kubernetes.io/releases/version-skew-policy/
-	// for a detailed discussion of this field)
-	//
-	// TODO: This field is still called "gitVersion" for legacy
-	// reasons. For prerelease versions, the build metadata on the
-	// semantic version is a git hash, but the version itself is no
-	// longer the direct output of "git describe", but a slight
-	// translation to be semver compliant.
+	buildDate = "1970-01-01T00:00:00Z" // build date in ISO8601 format, output of $(date -u +'%Y-%m-%dT%H:%M:%SZ')
+)
 
-	// NOTE: The $Format strings are replaced during 'git archive' thanks to the
-	// companion .gitattributes file containing 'export-subst' in this same
-	// directory.  See also https://git-scm.com/docs/gitattributes
-	gitVersion   string = "v0.0.0-master+$Format:%H$"
-	gitCommit    string = "$Format:%H$" // sha1 from git, output of $(git rev-parse HEAD)
-	gitTreeState string = ""            // state of git tree, either "clean" or "dirty"
-
-	buildDate string = "1970-01-01T00:00:00Z" // build date in ISO8601 format, output of $(date -u +'%Y-%m-%dT%H:%M:%SZ')
+// These must be kept in sync with k8s.io/component-base/version.
+const (
+	defaultKubeBinaryVersion = "1.38"
+	kubePatchVersion         = 0
+	kubePreReleaseVersion    = "beta.0"
 )
