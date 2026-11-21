@@ -1,4 +1,4 @@
-//go:build !go1.27
+//go:build go1.27
 
 /*
 Copyright The Kubernetes Authors.
@@ -16,9 +16,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package server
+package serving
 
 import "net/http"
 
-// Go versions before 1.27 do not limit the number of header values.
-func setMaxHeaderValueCount(*http.Server) {}
+// 1 MiB MaxHeaderBytes / 64 bytes per value (~16 for header and ~48 for value) bounds tiny-header floods
+// while allowing thousands of identity groups sent one per header line.
+const maxHeaderValueCount = 16384
+
+func SetMaxHeaderValueCount(server *http.Server) {
+	server.MaxHeaderValueCount = maxHeaderValueCount
+}

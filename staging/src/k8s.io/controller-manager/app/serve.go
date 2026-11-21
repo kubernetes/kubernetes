@@ -22,10 +22,10 @@ import (
 
 	genericapifilters "k8s.io/apiserver/pkg/endpoints/filters"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
-	apiserver "k8s.io/apiserver/pkg/server"
 	genericfilters "k8s.io/apiserver/pkg/server/filters"
 	"k8s.io/apiserver/pkg/server/mux"
 	"k8s.io/apiserver/pkg/server/routes"
+	apiserver "k8s.io/apiserver/pkg/server/serving"
 	"k8s.io/client-go/kubernetes/scheme"
 	componentbaseconfig "k8s.io/component-base/config"
 	"k8s.io/component-base/configz"

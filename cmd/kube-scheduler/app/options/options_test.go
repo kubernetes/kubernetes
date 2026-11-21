@@ -32,7 +32,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	apiserveroptions "k8s.io/apiserver/pkg/server/options"
+	apiserveroptions "k8s.io/apiserver/pkg/server/serving/options"
 	clientfeatures "k8s.io/client-go/features"
 	clientfeaturestesting "k8s.io/client-go/features/testing"
 	clientset "k8s.io/client-go/kubernetes"

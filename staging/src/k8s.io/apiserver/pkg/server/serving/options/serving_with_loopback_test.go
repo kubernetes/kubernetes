@@ -57,7 +57,7 @@ func TestEmptyMainCert(t *testing.T) {
 	}
 }
 
-func TestApplyToConfig(t *testing.T) {
+func TestApplyToWithHealthChecks(t *testing.T) {
 	type testcase struct {
 		name    string
 		expired bool
@@ -92,7 +92,7 @@ func TestApplyToConfig(t *testing.T) {
 			ssowlb.Listener = ln
 			ssowlb.BindPort = ln.Addr().(*net.TCPAddr).Port
 
-			if err := ssowlb.ApplyToConfig(cfg); err != nil {
+			if err := ssowlb.ApplyToWithHealthChecks(&cfg.SecureServing, &cfg.LoopbackClientConfig, cfg); err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
 
