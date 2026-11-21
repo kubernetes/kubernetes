@@ -31,8 +31,8 @@ import (
 func TestNumEndpointsAndSlices(t *testing.T) {
 	c := NewCache(int32(100))
 
-	pmKey80443 := endpointsliceutil.NewPortMapKey([]discovery.EndpointPort{{Port: ptr.To[int32](80)}, {Port: ptr.To[int32](443)}})
-	pmKey80 := endpointsliceutil.NewPortMapKey([]discovery.EndpointPort{{Port: ptr.To[int32](80)}})
+	pmKey80443 := endpointsliceutil.NewPortMapKey([]discovery.EndpointPort{{Port: ptr.To[int32](80)}, {Port: ptr.To[int32](443)}}, discovery.AddressTypeIPv4)
+	pmKey80 := endpointsliceutil.NewPortMapKey([]discovery.EndpointPort{{Port: ptr.To[int32](80)}}, discovery.AddressTypeIPv4)
 
 	spCacheEfficient := NewServicePortCache()
 	spCacheEfficient.Set(pmKey80, EfficiencyInfo{Endpoints: 45, Slices: 1})
@@ -61,8 +61,8 @@ func TestNumEndpointsAndSlices(t *testing.T) {
 func TestPlaceHolderSlice(t *testing.T) {
 	c := NewCache(int32(100))
 
-	pmKey80443 := endpointsliceutil.NewPortMapKey([]discovery.EndpointPort{{Port: ptr.To[int32](80)}, {Port: ptr.To[int32](443)}})
-	pmKey80 := endpointsliceutil.NewPortMapKey([]discovery.EndpointPort{{Port: ptr.To[int32](80)}})
+	pmKey80443 := endpointsliceutil.NewPortMapKey([]discovery.EndpointPort{{Port: ptr.To[int32](80)}, {Port: ptr.To[int32](443)}}, discovery.AddressTypeIPv4)
+	pmKey80 := endpointsliceutil.NewPortMapKey([]discovery.EndpointPort{{Port: ptr.To[int32](80)}}, discovery.AddressTypeIPv4)
 
 	sp := NewServicePortCache()
 	sp.Set(pmKey80, EfficiencyInfo{Endpoints: 0, Slices: 1})
@@ -175,8 +175,8 @@ func TestCache_ServicesByTrafficDistribution(t *testing.T) {
 func benchmarkUpdateServicePortCache(b *testing.B, num int) {
 	c := NewCache(int32(100))
 	ns := "benchmark"
-	httpKey := endpointsliceutil.NewPortMapKey([]discovery.EndpointPort{{Port: ptr.To[int32](80)}})
-	httpsKey := endpointsliceutil.NewPortMapKey([]discovery.EndpointPort{{Port: ptr.To[int32](443)}})
+	httpKey := endpointsliceutil.NewPortMapKey([]discovery.EndpointPort{{Port: ptr.To[int32](80)}}, discovery.AddressTypeIPv4)
+	httpsKey := endpointsliceutil.NewPortMapKey([]discovery.EndpointPort{{Port: ptr.To[int32](443)}}, discovery.AddressTypeIPv4)
 	spCache := &ServicePortCache{items: map[endpointsliceutil.PortMapKey]EfficiencyInfo{
 		httpKey: {
 			Endpoints: 182,
