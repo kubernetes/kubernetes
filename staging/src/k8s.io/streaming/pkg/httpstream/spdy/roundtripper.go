@@ -265,9 +265,11 @@ func (s *SpdyRoundTripper) dialWithHttpProxy(req *http.Request, proxyURL *url.UR
 	//nolint:staticcheck // SA1019 ignore deprecated httputil.ErrPersistEOF: it might be
 	// returned from the invocation of proxyClientConn.Do
 	if err != nil && err != httputil.ErrPersistEOF {
+		_ = proxyDialConn.Close()
 		return nil, err
 	}
 	if response != nil && response.StatusCode >= 300 || response.StatusCode < 200 {
+		_ = proxyDialConn.Close()
 		return nil, fmt.Errorf("CONNECT request to %s returned response: %s", proxyURL.Redacted(), response.Status)
 	}
 
