@@ -70,3 +70,8 @@ func NEQError[T any](disallowed T) string {
 	}
 	return fmt.Sprintf("must not be equal to "+format, disallowed)
 }
+
+// EqualToError returns a string explanation of a "must equal sibling field" validation failure.
+func EqualToError(siblingName string) string {
+	return fmt.Sprintf("must be equal to `%s`", siblingName)
+}
