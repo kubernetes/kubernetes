@@ -21,28 +21,25 @@ package fake
 import (
 	v1 "k8s.io/api/storage/v1"
 	storagev1 "k8s.io/client-go/applyconfigurations/storage/v1"
-	gentype "k8s.io/client-go/gentype"
+	v2fake "k8s.io/client-go/gentype/v2/fake"
 	typedstoragev1 "k8s.io/client-go/kubernetes/typed/storage/v1"
 )
 
 // fakeCSINodes implements CSINodeInterface
 type fakeCSINodes struct {
-	*gentype.FakeClientWithListAndApply[*v1.CSINode, *v1.CSINodeList, *storagev1.CSINodeApplyConfiguration]
+	*v2fake.FakeClientWithListAndApply[v1.CSINode, v1.CSINodeList, storagev1.CSINodeApplyConfiguration, *v1.CSINode, *v1.CSINodeList, *storagev1.CSINodeApplyConfiguration]
 	Fake *FakeStorageV1
 }
 
 func newFakeCSINodes(fake *FakeStorageV1) typedstoragev1.CSINodeInterface {
 	return &fakeCSINodes{
-		gentype.NewFakeClientWithListAndApply[*v1.CSINode, *v1.CSINodeList, *storagev1.CSINodeApplyConfiguration](
+		v2fake.NewFakeClientWithListAndApply[v1.CSINode, v1.CSINodeList, storagev1.CSINodeApplyConfiguration](
 			fake.Fake,
-			"",
-			v1.SchemeGroupVersion.WithResource("csinodes"),
-			v1.SchemeGroupVersion.WithKind("CSINode"),
-			func() *v1.CSINode { return &v1.CSINode{} },
-			func() *v1.CSINodeList { return &v1.CSINodeList{} },
-			func(dst, src *v1.CSINodeList) { dst.ListMeta = src.ListMeta },
-			func(list *v1.CSINodeList) []*v1.CSINode { return gentype.ToPointerSlice(list.Items) },
-			func(list *v1.CSINodeList, items []*v1.CSINode) { list.Items = gentype.FromPointerSlice(items) },
+			v2fake.ForResource(v1.SchemeGroupVersion.WithResource("csinodes")),
+			v2fake.ForKind(v1.SchemeGroupVersion.WithKind("CSINode")),
+			v2fake.WithListMetaCopier[v1.CSINode](func(dst, src *v1.CSINodeList) { dst.ListMeta = src.ListMeta }),
+			v2fake.WithItemsGetter(func(list *v1.CSINodeList) []v1.CSINode { return list.Items }),
+			v2fake.WithItemsSetter(func(list *v1.CSINodeList, items []v1.CSINode) { list.Items = items }),
 		),
 		fake,
 	}

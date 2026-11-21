@@ -24,33 +24,26 @@ import (
 	v1 "k8s.io/api/certificates/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	certificatesv1 "k8s.io/client-go/applyconfigurations/certificates/v1"
-	gentype "k8s.io/client-go/gentype"
+	v2fake "k8s.io/client-go/gentype/v2/fake"
 	typedcertificatesv1 "k8s.io/client-go/kubernetes/typed/certificates/v1"
 	testing "k8s.io/client-go/testing"
 )
 
 // fakeCertificateSigningRequests implements CertificateSigningRequestInterface
 type fakeCertificateSigningRequests struct {
-	*gentype.FakeClientWithListAndApply[*v1.CertificateSigningRequest, *v1.CertificateSigningRequestList, *certificatesv1.CertificateSigningRequestApplyConfiguration]
+	*v2fake.FakeClientWithListAndApply[v1.CertificateSigningRequest, v1.CertificateSigningRequestList, certificatesv1.CertificateSigningRequestApplyConfiguration, *v1.CertificateSigningRequest, *v1.CertificateSigningRequestList, *certificatesv1.CertificateSigningRequestApplyConfiguration]
 	Fake *FakeCertificatesV1
 }
 
 func newFakeCertificateSigningRequests(fake *FakeCertificatesV1) typedcertificatesv1.CertificateSigningRequestInterface {
 	return &fakeCertificateSigningRequests{
-		gentype.NewFakeClientWithListAndApply[*v1.CertificateSigningRequest, *v1.CertificateSigningRequestList, *certificatesv1.CertificateSigningRequestApplyConfiguration](
+		v2fake.NewFakeClientWithListAndApply[v1.CertificateSigningRequest, v1.CertificateSigningRequestList, certificatesv1.CertificateSigningRequestApplyConfiguration](
 			fake.Fake,
-			"",
-			v1.SchemeGroupVersion.WithResource("certificatesigningrequests"),
-			v1.SchemeGroupVersion.WithKind("CertificateSigningRequest"),
-			func() *v1.CertificateSigningRequest { return &v1.CertificateSigningRequest{} },
-			func() *v1.CertificateSigningRequestList { return &v1.CertificateSigningRequestList{} },
-			func(dst, src *v1.CertificateSigningRequestList) { dst.ListMeta = src.ListMeta },
-			func(list *v1.CertificateSigningRequestList) []*v1.CertificateSigningRequest {
-				return gentype.ToPointerSlice(list.Items)
-			},
-			func(list *v1.CertificateSigningRequestList, items []*v1.CertificateSigningRequest) {
-				list.Items = gentype.FromPointerSlice(items)
-			},
+			v2fake.ForResource(v1.SchemeGroupVersion.WithResource("certificatesigningrequests")),
+			v2fake.ForKind(v1.SchemeGroupVersion.WithKind("CertificateSigningRequest")),
+			v2fake.WithListMetaCopier[v1.CertificateSigningRequest](func(dst, src *v1.CertificateSigningRequestList) { dst.ListMeta = src.ListMeta }),
+			v2fake.WithItemsGetter(func(list *v1.CertificateSigningRequestList) []v1.CertificateSigningRequest { return list.Items }),
+			v2fake.WithItemsSetter(func(list *v1.CertificateSigningRequestList, items []v1.CertificateSigningRequest) { list.Items = items }),
 		),
 		fake,
 	}

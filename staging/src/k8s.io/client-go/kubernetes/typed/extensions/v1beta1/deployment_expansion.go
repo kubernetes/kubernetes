@@ -21,7 +21,6 @@ import (
 
 	"k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	scheme "k8s.io/client-go/kubernetes/scheme"
 )
 
 // The DeploymentExpansion interface allows manually adding extra methods to the DeploymentInterface.
@@ -29,7 +28,8 @@ type DeploymentExpansion interface {
 	Rollback(context.Context, *v1beta1.DeploymentRollback, metav1.CreateOptions) error
 }
 
-// Rollback applied the provided DeploymentRollback to the named deployment in the current namespace.
+// Rollback applies the provided DeploymentRollback to the named deployment in the current namespace.
 func (c *deployments) Rollback(ctx context.Context, deploymentRollback *v1beta1.DeploymentRollback, opts metav1.CreateOptions) error {
-	return c.GetClient().Post().Namespace(c.GetNamespace()).Resource("deployments").Name(deploymentRollback.Name).VersionedParams(&opts, scheme.ParameterCodec).SubResource("rollback").Body(deploymentRollback).Do(ctx).Error()
+	_, err := c.SubResourceCreate(ctx, deploymentRollback.Name, "rollback", deploymentRollback, opts)
+	return err
 }

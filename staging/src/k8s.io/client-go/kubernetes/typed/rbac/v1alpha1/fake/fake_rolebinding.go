@@ -21,32 +21,26 @@ package fake
 import (
 	v1alpha1 "k8s.io/api/rbac/v1alpha1"
 	rbacv1alpha1 "k8s.io/client-go/applyconfigurations/rbac/v1alpha1"
-	gentype "k8s.io/client-go/gentype"
+	v2fake "k8s.io/client-go/gentype/v2/fake"
 	typedrbacv1alpha1 "k8s.io/client-go/kubernetes/typed/rbac/v1alpha1"
 )
 
 // fakeRoleBindings implements RoleBindingInterface
 type fakeRoleBindings struct {
-	*gentype.FakeClientWithListAndApply[*v1alpha1.RoleBinding, *v1alpha1.RoleBindingList, *rbacv1alpha1.RoleBindingApplyConfiguration]
+	*v2fake.FakeClientWithListAndApply[v1alpha1.RoleBinding, v1alpha1.RoleBindingList, rbacv1alpha1.RoleBindingApplyConfiguration, *v1alpha1.RoleBinding, *v1alpha1.RoleBindingList, *rbacv1alpha1.RoleBindingApplyConfiguration]
 	Fake *FakeRbacV1alpha1
 }
 
 func newFakeRoleBindings(fake *FakeRbacV1alpha1, namespace string) typedrbacv1alpha1.RoleBindingInterface {
 	return &fakeRoleBindings{
-		gentype.NewFakeClientWithListAndApply[*v1alpha1.RoleBinding, *v1alpha1.RoleBindingList, *rbacv1alpha1.RoleBindingApplyConfiguration](
+		v2fake.NewFakeClientWithListAndApply[v1alpha1.RoleBinding, v1alpha1.RoleBindingList, rbacv1alpha1.RoleBindingApplyConfiguration](
 			fake.Fake,
-			namespace,
-			v1alpha1.SchemeGroupVersion.WithResource("rolebindings"),
-			v1alpha1.SchemeGroupVersion.WithKind("RoleBinding"),
-			func() *v1alpha1.RoleBinding { return &v1alpha1.RoleBinding{} },
-			func() *v1alpha1.RoleBindingList { return &v1alpha1.RoleBindingList{} },
-			func(dst, src *v1alpha1.RoleBindingList) { dst.ListMeta = src.ListMeta },
-			func(list *v1alpha1.RoleBindingList) []*v1alpha1.RoleBinding {
-				return gentype.ToPointerSlice(list.Items)
-			},
-			func(list *v1alpha1.RoleBindingList, items []*v1alpha1.RoleBinding) {
-				list.Items = gentype.FromPointerSlice(items)
-			},
+			v2fake.InNamespace(namespace),
+			v2fake.ForResource(v1alpha1.SchemeGroupVersion.WithResource("rolebindings")),
+			v2fake.ForKind(v1alpha1.SchemeGroupVersion.WithKind("RoleBinding")),
+			v2fake.WithListMetaCopier[v1alpha1.RoleBinding](func(dst, src *v1alpha1.RoleBindingList) { dst.ListMeta = src.ListMeta }),
+			v2fake.WithItemsGetter(func(list *v1alpha1.RoleBindingList) []v1alpha1.RoleBinding { return list.Items }),
+			v2fake.WithItemsSetter(func(list *v1alpha1.RoleBindingList, items []v1alpha1.RoleBinding) { list.Items = items }),
 		),
 		fake,
 	}

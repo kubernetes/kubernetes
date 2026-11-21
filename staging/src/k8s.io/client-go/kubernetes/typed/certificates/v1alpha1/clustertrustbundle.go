@@ -26,7 +26,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	applyconfigurationscertificatesv1alpha1 "k8s.io/client-go/applyconfigurations/certificates/v1alpha1"
-	gentype "k8s.io/client-go/gentype"
+	v2 "k8s.io/client-go/gentype/v2"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
 
@@ -53,22 +53,17 @@ type ClusterTrustBundleInterface interface {
 
 // clusterTrustBundles implements ClusterTrustBundleInterface
 type clusterTrustBundles struct {
-	*gentype.ClientWithListAndApply[*certificatesv1alpha1.ClusterTrustBundle, *certificatesv1alpha1.ClusterTrustBundleList, *applyconfigurationscertificatesv1alpha1.ClusterTrustBundleApplyConfiguration]
+	*v2.TypedClientWithListAndApply[certificatesv1alpha1.ClusterTrustBundle, certificatesv1alpha1.ClusterTrustBundleList, applyconfigurationscertificatesv1alpha1.ClusterTrustBundleApplyConfiguration, *certificatesv1alpha1.ClusterTrustBundle, *certificatesv1alpha1.ClusterTrustBundleList, *applyconfigurationscertificatesv1alpha1.ClusterTrustBundleApplyConfiguration]
 }
 
 // newClusterTrustBundles returns a ClusterTrustBundles
 func newClusterTrustBundles(c *CertificatesV1alpha1Client) *clusterTrustBundles {
 	return &clusterTrustBundles{
-		gentype.NewClientWithListAndApply[*certificatesv1alpha1.ClusterTrustBundle, *certificatesv1alpha1.ClusterTrustBundleList, *applyconfigurationscertificatesv1alpha1.ClusterTrustBundleApplyConfiguration](
-			"clustertrustbundles",
-			c.RESTClient(),
-			scheme.ParameterCodec,
-			"",
-			func() *certificatesv1alpha1.ClusterTrustBundle { return &certificatesv1alpha1.ClusterTrustBundle{} },
-			func() *certificatesv1alpha1.ClusterTrustBundleList {
-				return &certificatesv1alpha1.ClusterTrustBundleList{}
-			},
-			gentype.PrefersProtobuf[*certificatesv1alpha1.ClusterTrustBundle](),
+		v2.NewTypedClientWithListAndApply[certificatesv1alpha1.ClusterTrustBundle, certificatesv1alpha1.ClusterTrustBundleList, applyconfigurationscertificatesv1alpha1.ClusterTrustBundleApplyConfiguration](
+			v2.ForResource("clustertrustbundles"),
+			v2.UsingClient(c.RESTClient()),
+			v2.UsingParameterCodec(scheme.ParameterCodec),
+			v2.PrefersProtobuf(),
 		),
 	}
 }

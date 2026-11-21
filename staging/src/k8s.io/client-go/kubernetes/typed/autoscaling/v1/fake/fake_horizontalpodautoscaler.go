@@ -21,32 +21,26 @@ package fake
 import (
 	v1 "k8s.io/api/autoscaling/v1"
 	autoscalingv1 "k8s.io/client-go/applyconfigurations/autoscaling/v1"
-	gentype "k8s.io/client-go/gentype"
+	v2fake "k8s.io/client-go/gentype/v2/fake"
 	typedautoscalingv1 "k8s.io/client-go/kubernetes/typed/autoscaling/v1"
 )
 
 // fakeHorizontalPodAutoscalers implements HorizontalPodAutoscalerInterface
 type fakeHorizontalPodAutoscalers struct {
-	*gentype.FakeClientWithListAndApply[*v1.HorizontalPodAutoscaler, *v1.HorizontalPodAutoscalerList, *autoscalingv1.HorizontalPodAutoscalerApplyConfiguration]
+	*v2fake.FakeClientWithListAndApply[v1.HorizontalPodAutoscaler, v1.HorizontalPodAutoscalerList, autoscalingv1.HorizontalPodAutoscalerApplyConfiguration, *v1.HorizontalPodAutoscaler, *v1.HorizontalPodAutoscalerList, *autoscalingv1.HorizontalPodAutoscalerApplyConfiguration]
 	Fake *FakeAutoscalingV1
 }
 
 func newFakeHorizontalPodAutoscalers(fake *FakeAutoscalingV1, namespace string) typedautoscalingv1.HorizontalPodAutoscalerInterface {
 	return &fakeHorizontalPodAutoscalers{
-		gentype.NewFakeClientWithListAndApply[*v1.HorizontalPodAutoscaler, *v1.HorizontalPodAutoscalerList, *autoscalingv1.HorizontalPodAutoscalerApplyConfiguration](
+		v2fake.NewFakeClientWithListAndApply[v1.HorizontalPodAutoscaler, v1.HorizontalPodAutoscalerList, autoscalingv1.HorizontalPodAutoscalerApplyConfiguration](
 			fake.Fake,
-			namespace,
-			v1.SchemeGroupVersion.WithResource("horizontalpodautoscalers"),
-			v1.SchemeGroupVersion.WithKind("HorizontalPodAutoscaler"),
-			func() *v1.HorizontalPodAutoscaler { return &v1.HorizontalPodAutoscaler{} },
-			func() *v1.HorizontalPodAutoscalerList { return &v1.HorizontalPodAutoscalerList{} },
-			func(dst, src *v1.HorizontalPodAutoscalerList) { dst.ListMeta = src.ListMeta },
-			func(list *v1.HorizontalPodAutoscalerList) []*v1.HorizontalPodAutoscaler {
-				return gentype.ToPointerSlice(list.Items)
-			},
-			func(list *v1.HorizontalPodAutoscalerList, items []*v1.HorizontalPodAutoscaler) {
-				list.Items = gentype.FromPointerSlice(items)
-			},
+			v2fake.InNamespace(namespace),
+			v2fake.ForResource(v1.SchemeGroupVersion.WithResource("horizontalpodautoscalers")),
+			v2fake.ForKind(v1.SchemeGroupVersion.WithKind("HorizontalPodAutoscaler")),
+			v2fake.WithListMetaCopier[v1.HorizontalPodAutoscaler](func(dst, src *v1.HorizontalPodAutoscalerList) { dst.ListMeta = src.ListMeta }),
+			v2fake.WithItemsGetter(func(list *v1.HorizontalPodAutoscalerList) []v1.HorizontalPodAutoscaler { return list.Items }),
+			v2fake.WithItemsSetter(func(list *v1.HorizontalPodAutoscalerList, items []v1.HorizontalPodAutoscaler) { list.Items = items }),
 		),
 		fake,
 	}

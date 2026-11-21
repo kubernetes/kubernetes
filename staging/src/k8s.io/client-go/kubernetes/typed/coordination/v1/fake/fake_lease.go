@@ -21,28 +21,26 @@ package fake
 import (
 	v1 "k8s.io/api/coordination/v1"
 	coordinationv1 "k8s.io/client-go/applyconfigurations/coordination/v1"
-	gentype "k8s.io/client-go/gentype"
+	v2fake "k8s.io/client-go/gentype/v2/fake"
 	typedcoordinationv1 "k8s.io/client-go/kubernetes/typed/coordination/v1"
 )
 
 // fakeLeases implements LeaseInterface
 type fakeLeases struct {
-	*gentype.FakeClientWithListAndApply[*v1.Lease, *v1.LeaseList, *coordinationv1.LeaseApplyConfiguration]
+	*v2fake.FakeClientWithListAndApply[v1.Lease, v1.LeaseList, coordinationv1.LeaseApplyConfiguration, *v1.Lease, *v1.LeaseList, *coordinationv1.LeaseApplyConfiguration]
 	Fake *FakeCoordinationV1
 }
 
 func newFakeLeases(fake *FakeCoordinationV1, namespace string) typedcoordinationv1.LeaseInterface {
 	return &fakeLeases{
-		gentype.NewFakeClientWithListAndApply[*v1.Lease, *v1.LeaseList, *coordinationv1.LeaseApplyConfiguration](
+		v2fake.NewFakeClientWithListAndApply[v1.Lease, v1.LeaseList, coordinationv1.LeaseApplyConfiguration](
 			fake.Fake,
-			namespace,
-			v1.SchemeGroupVersion.WithResource("leases"),
-			v1.SchemeGroupVersion.WithKind("Lease"),
-			func() *v1.Lease { return &v1.Lease{} },
-			func() *v1.LeaseList { return &v1.LeaseList{} },
-			func(dst, src *v1.LeaseList) { dst.ListMeta = src.ListMeta },
-			func(list *v1.LeaseList) []*v1.Lease { return gentype.ToPointerSlice(list.Items) },
-			func(list *v1.LeaseList, items []*v1.Lease) { list.Items = gentype.FromPointerSlice(items) },
+			v2fake.InNamespace(namespace),
+			v2fake.ForResource(v1.SchemeGroupVersion.WithResource("leases")),
+			v2fake.ForKind(v1.SchemeGroupVersion.WithKind("Lease")),
+			v2fake.WithListMetaCopier[v1.Lease](func(dst, src *v1.LeaseList) { dst.ListMeta = src.ListMeta }),
+			v2fake.WithItemsGetter(func(list *v1.LeaseList) []v1.Lease { return list.Items }),
+			v2fake.WithItemsSetter(func(list *v1.LeaseList, items []v1.Lease) { list.Items = items }),
 		),
 		fake,
 	}

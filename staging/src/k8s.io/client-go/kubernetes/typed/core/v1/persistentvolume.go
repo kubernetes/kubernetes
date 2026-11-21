@@ -26,7 +26,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	applyconfigurationscorev1 "k8s.io/client-go/applyconfigurations/core/v1"
-	gentype "k8s.io/client-go/gentype"
+	v2 "k8s.io/client-go/gentype/v2"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
 
@@ -57,20 +57,17 @@ type PersistentVolumeInterface interface {
 
 // persistentVolumes implements PersistentVolumeInterface
 type persistentVolumes struct {
-	*gentype.ClientWithListAndApply[*corev1.PersistentVolume, *corev1.PersistentVolumeList, *applyconfigurationscorev1.PersistentVolumeApplyConfiguration]
+	*v2.TypedClientWithListAndApply[corev1.PersistentVolume, corev1.PersistentVolumeList, applyconfigurationscorev1.PersistentVolumeApplyConfiguration, *corev1.PersistentVolume, *corev1.PersistentVolumeList, *applyconfigurationscorev1.PersistentVolumeApplyConfiguration]
 }
 
 // newPersistentVolumes returns a PersistentVolumes
 func newPersistentVolumes(c *CoreV1Client) *persistentVolumes {
 	return &persistentVolumes{
-		gentype.NewClientWithListAndApply[*corev1.PersistentVolume, *corev1.PersistentVolumeList, *applyconfigurationscorev1.PersistentVolumeApplyConfiguration](
-			"persistentvolumes",
-			c.RESTClient(),
-			scheme.ParameterCodec,
-			"",
-			func() *corev1.PersistentVolume { return &corev1.PersistentVolume{} },
-			func() *corev1.PersistentVolumeList { return &corev1.PersistentVolumeList{} },
-			gentype.PrefersProtobuf[*corev1.PersistentVolume](),
+		v2.NewTypedClientWithListAndApply[corev1.PersistentVolume, corev1.PersistentVolumeList, applyconfigurationscorev1.PersistentVolumeApplyConfiguration](
+			v2.ForResource("persistentvolumes"),
+			v2.UsingClient(c.RESTClient()),
+			v2.UsingParameterCodec(scheme.ParameterCodec),
+			v2.PrefersProtobuf(),
 		),
 	}
 }

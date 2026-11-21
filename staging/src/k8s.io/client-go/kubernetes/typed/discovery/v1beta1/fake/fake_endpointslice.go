@@ -21,32 +21,26 @@ package fake
 import (
 	v1beta1 "k8s.io/api/discovery/v1beta1"
 	discoveryv1beta1 "k8s.io/client-go/applyconfigurations/discovery/v1beta1"
-	gentype "k8s.io/client-go/gentype"
+	v2fake "k8s.io/client-go/gentype/v2/fake"
 	typeddiscoveryv1beta1 "k8s.io/client-go/kubernetes/typed/discovery/v1beta1"
 )
 
 // fakeEndpointSlices implements EndpointSliceInterface
 type fakeEndpointSlices struct {
-	*gentype.FakeClientWithListAndApply[*v1beta1.EndpointSlice, *v1beta1.EndpointSliceList, *discoveryv1beta1.EndpointSliceApplyConfiguration]
+	*v2fake.FakeClientWithListAndApply[v1beta1.EndpointSlice, v1beta1.EndpointSliceList, discoveryv1beta1.EndpointSliceApplyConfiguration, *v1beta1.EndpointSlice, *v1beta1.EndpointSliceList, *discoveryv1beta1.EndpointSliceApplyConfiguration]
 	Fake *FakeDiscoveryV1beta1
 }
 
 func newFakeEndpointSlices(fake *FakeDiscoveryV1beta1, namespace string) typeddiscoveryv1beta1.EndpointSliceInterface {
 	return &fakeEndpointSlices{
-		gentype.NewFakeClientWithListAndApply[*v1beta1.EndpointSlice, *v1beta1.EndpointSliceList, *discoveryv1beta1.EndpointSliceApplyConfiguration](
+		v2fake.NewFakeClientWithListAndApply[v1beta1.EndpointSlice, v1beta1.EndpointSliceList, discoveryv1beta1.EndpointSliceApplyConfiguration](
 			fake.Fake,
-			namespace,
-			v1beta1.SchemeGroupVersion.WithResource("endpointslices"),
-			v1beta1.SchemeGroupVersion.WithKind("EndpointSlice"),
-			func() *v1beta1.EndpointSlice { return &v1beta1.EndpointSlice{} },
-			func() *v1beta1.EndpointSliceList { return &v1beta1.EndpointSliceList{} },
-			func(dst, src *v1beta1.EndpointSliceList) { dst.ListMeta = src.ListMeta },
-			func(list *v1beta1.EndpointSliceList) []*v1beta1.EndpointSlice {
-				return gentype.ToPointerSlice(list.Items)
-			},
-			func(list *v1beta1.EndpointSliceList, items []*v1beta1.EndpointSlice) {
-				list.Items = gentype.FromPointerSlice(items)
-			},
+			v2fake.InNamespace(namespace),
+			v2fake.ForResource(v1beta1.SchemeGroupVersion.WithResource("endpointslices")),
+			v2fake.ForKind(v1beta1.SchemeGroupVersion.WithKind("EndpointSlice")),
+			v2fake.WithListMetaCopier[v1beta1.EndpointSlice](func(dst, src *v1beta1.EndpointSliceList) { dst.ListMeta = src.ListMeta }),
+			v2fake.WithItemsGetter(func(list *v1beta1.EndpointSliceList) []v1beta1.EndpointSlice { return list.Items }),
+			v2fake.WithItemsSetter(func(list *v1beta1.EndpointSliceList, items []v1beta1.EndpointSlice) { list.Items = items }),
 		),
 		fake,
 	}

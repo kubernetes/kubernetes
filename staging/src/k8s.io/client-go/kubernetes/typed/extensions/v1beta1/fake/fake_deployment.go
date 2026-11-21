@@ -27,31 +27,27 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	extensionsv1beta1 "k8s.io/client-go/applyconfigurations/extensions/v1beta1"
-	gentype "k8s.io/client-go/gentype"
+	v2fake "k8s.io/client-go/gentype/v2/fake"
 	typedextensionsv1beta1 "k8s.io/client-go/kubernetes/typed/extensions/v1beta1"
 	testing "k8s.io/client-go/testing"
 )
 
 // fakeDeployments implements DeploymentInterface
 type fakeDeployments struct {
-	*gentype.FakeClientWithListAndApply[*v1beta1.Deployment, *v1beta1.DeploymentList, *extensionsv1beta1.DeploymentApplyConfiguration]
+	*v2fake.FakeClientWithListAndApply[v1beta1.Deployment, v1beta1.DeploymentList, extensionsv1beta1.DeploymentApplyConfiguration, *v1beta1.Deployment, *v1beta1.DeploymentList, *extensionsv1beta1.DeploymentApplyConfiguration]
 	Fake *FakeExtensionsV1beta1
 }
 
 func newFakeDeployments(fake *FakeExtensionsV1beta1, namespace string) typedextensionsv1beta1.DeploymentInterface {
 	return &fakeDeployments{
-		gentype.NewFakeClientWithListAndApply[*v1beta1.Deployment, *v1beta1.DeploymentList, *extensionsv1beta1.DeploymentApplyConfiguration](
+		v2fake.NewFakeClientWithListAndApply[v1beta1.Deployment, v1beta1.DeploymentList, extensionsv1beta1.DeploymentApplyConfiguration](
 			fake.Fake,
-			namespace,
-			v1beta1.SchemeGroupVersion.WithResource("deployments"),
-			v1beta1.SchemeGroupVersion.WithKind("Deployment"),
-			func() *v1beta1.Deployment { return &v1beta1.Deployment{} },
-			func() *v1beta1.DeploymentList { return &v1beta1.DeploymentList{} },
-			func(dst, src *v1beta1.DeploymentList) { dst.ListMeta = src.ListMeta },
-			func(list *v1beta1.DeploymentList) []*v1beta1.Deployment { return gentype.ToPointerSlice(list.Items) },
-			func(list *v1beta1.DeploymentList, items []*v1beta1.Deployment) {
-				list.Items = gentype.FromPointerSlice(items)
-			},
+			v2fake.InNamespace(namespace),
+			v2fake.ForResource(v1beta1.SchemeGroupVersion.WithResource("deployments")),
+			v2fake.ForKind(v1beta1.SchemeGroupVersion.WithKind("Deployment")),
+			v2fake.WithListMetaCopier[v1beta1.Deployment](func(dst, src *v1beta1.DeploymentList) { dst.ListMeta = src.ListMeta }),
+			v2fake.WithItemsGetter(func(list *v1beta1.DeploymentList) []v1beta1.Deployment { return list.Items }),
+			v2fake.WithItemsSetter(func(list *v1beta1.DeploymentList, items []v1beta1.Deployment) { list.Items = items }),
 		),
 		fake,
 	}

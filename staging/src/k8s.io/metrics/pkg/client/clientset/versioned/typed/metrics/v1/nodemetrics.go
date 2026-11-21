@@ -23,7 +23,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	watch "k8s.io/apimachinery/pkg/watch"
-	gentype "k8s.io/client-go/gentype"
+	v2 "k8s.io/client-go/gentype/v2"
 	metricsv1 "k8s.io/metrics/pkg/apis/metrics/v1"
 	scheme "k8s.io/metrics/pkg/client/clientset/versioned/scheme"
 )
@@ -44,20 +44,17 @@ type NodeMetricsInterface interface {
 
 // nodeMetricses implements NodeMetricsInterface
 type nodeMetricses struct {
-	*gentype.ClientWithList[*metricsv1.NodeMetrics, *metricsv1.NodeMetricsList]
+	*v2.TypedClientWithList[metricsv1.NodeMetrics, metricsv1.NodeMetricsList, *metricsv1.NodeMetrics, *metricsv1.NodeMetricsList]
 }
 
 // newNodeMetricses returns a NodeMetricses
 func newNodeMetricses(c *MetricsV1Client) *nodeMetricses {
 	return &nodeMetricses{
-		gentype.NewClientWithList[*metricsv1.NodeMetrics, *metricsv1.NodeMetricsList](
-			"nodes",
-			c.RESTClient(),
-			scheme.ParameterCodec,
-			"",
-			func() *metricsv1.NodeMetrics { return &metricsv1.NodeMetrics{} },
-			func() *metricsv1.NodeMetricsList { return &metricsv1.NodeMetricsList{} },
-			gentype.PrefersProtobuf[*metricsv1.NodeMetrics](),
+		v2.NewTypedClientWithList[metricsv1.NodeMetrics, metricsv1.NodeMetricsList](
+			v2.ForResource("nodes"),
+			v2.UsingClient(c.RESTClient()),
+			v2.UsingParameterCodec(scheme.ParameterCodec),
+			v2.PrefersProtobuf(),
 		),
 	}
 }

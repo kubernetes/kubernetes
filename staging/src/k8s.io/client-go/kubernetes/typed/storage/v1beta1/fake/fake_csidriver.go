@@ -21,30 +21,25 @@ package fake
 import (
 	v1beta1 "k8s.io/api/storage/v1beta1"
 	storagev1beta1 "k8s.io/client-go/applyconfigurations/storage/v1beta1"
-	gentype "k8s.io/client-go/gentype"
+	v2fake "k8s.io/client-go/gentype/v2/fake"
 	typedstoragev1beta1 "k8s.io/client-go/kubernetes/typed/storage/v1beta1"
 )
 
 // fakeCSIDrivers implements CSIDriverInterface
 type fakeCSIDrivers struct {
-	*gentype.FakeClientWithListAndApply[*v1beta1.CSIDriver, *v1beta1.CSIDriverList, *storagev1beta1.CSIDriverApplyConfiguration]
+	*v2fake.FakeClientWithListAndApply[v1beta1.CSIDriver, v1beta1.CSIDriverList, storagev1beta1.CSIDriverApplyConfiguration, *v1beta1.CSIDriver, *v1beta1.CSIDriverList, *storagev1beta1.CSIDriverApplyConfiguration]
 	Fake *FakeStorageV1beta1
 }
 
 func newFakeCSIDrivers(fake *FakeStorageV1beta1) typedstoragev1beta1.CSIDriverInterface {
 	return &fakeCSIDrivers{
-		gentype.NewFakeClientWithListAndApply[*v1beta1.CSIDriver, *v1beta1.CSIDriverList, *storagev1beta1.CSIDriverApplyConfiguration](
+		v2fake.NewFakeClientWithListAndApply[v1beta1.CSIDriver, v1beta1.CSIDriverList, storagev1beta1.CSIDriverApplyConfiguration](
 			fake.Fake,
-			"",
-			v1beta1.SchemeGroupVersion.WithResource("csidrivers"),
-			v1beta1.SchemeGroupVersion.WithKind("CSIDriver"),
-			func() *v1beta1.CSIDriver { return &v1beta1.CSIDriver{} },
-			func() *v1beta1.CSIDriverList { return &v1beta1.CSIDriverList{} },
-			func(dst, src *v1beta1.CSIDriverList) { dst.ListMeta = src.ListMeta },
-			func(list *v1beta1.CSIDriverList) []*v1beta1.CSIDriver { return gentype.ToPointerSlice(list.Items) },
-			func(list *v1beta1.CSIDriverList, items []*v1beta1.CSIDriver) {
-				list.Items = gentype.FromPointerSlice(items)
-			},
+			v2fake.ForResource(v1beta1.SchemeGroupVersion.WithResource("csidrivers")),
+			v2fake.ForKind(v1beta1.SchemeGroupVersion.WithKind("CSIDriver")),
+			v2fake.WithListMetaCopier[v1beta1.CSIDriver](func(dst, src *v1beta1.CSIDriverList) { dst.ListMeta = src.ListMeta }),
+			v2fake.WithItemsGetter(func(list *v1beta1.CSIDriverList) []v1beta1.CSIDriver { return list.Items }),
+			v2fake.WithItemsSetter(func(list *v1beta1.CSIDriverList, items []v1beta1.CSIDriver) { list.Items = items }),
 		),
 		fake,
 	}

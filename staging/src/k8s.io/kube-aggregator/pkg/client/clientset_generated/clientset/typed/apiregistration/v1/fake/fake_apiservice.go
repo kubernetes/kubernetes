@@ -19,7 +19,7 @@ limitations under the License.
 package fake
 
 import (
-	gentype "k8s.io/client-go/gentype"
+	v2fake "k8s.io/client-go/gentype/v2/fake"
 	v1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/client/applyconfiguration/apiregistration/v1"
 	typedapiregistrationv1 "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1"
@@ -27,22 +27,19 @@ import (
 
 // fakeAPIServices implements APIServiceInterface
 type fakeAPIServices struct {
-	*gentype.FakeClientWithListAndApply[*v1.APIService, *v1.APIServiceList, *apiregistrationv1.APIServiceApplyConfiguration]
+	*v2fake.FakeClientWithListAndApply[v1.APIService, v1.APIServiceList, apiregistrationv1.APIServiceApplyConfiguration, *v1.APIService, *v1.APIServiceList, *apiregistrationv1.APIServiceApplyConfiguration]
 	Fake *FakeApiregistrationV1
 }
 
 func newFakeAPIServices(fake *FakeApiregistrationV1) typedapiregistrationv1.APIServiceInterface {
 	return &fakeAPIServices{
-		gentype.NewFakeClientWithListAndApply[*v1.APIService, *v1.APIServiceList, *apiregistrationv1.APIServiceApplyConfiguration](
+		v2fake.NewFakeClientWithListAndApply[v1.APIService, v1.APIServiceList, apiregistrationv1.APIServiceApplyConfiguration](
 			fake.Fake,
-			"",
-			v1.SchemeGroupVersion.WithResource("apiservices"),
-			v1.SchemeGroupVersion.WithKind("APIService"),
-			func() *v1.APIService { return &v1.APIService{} },
-			func() *v1.APIServiceList { return &v1.APIServiceList{} },
-			func(dst, src *v1.APIServiceList) { dst.ListMeta = src.ListMeta },
-			func(list *v1.APIServiceList) []*v1.APIService { return gentype.ToPointerSlice(list.Items) },
-			func(list *v1.APIServiceList, items []*v1.APIService) { list.Items = gentype.FromPointerSlice(items) },
+			v2fake.ForResource(v1.SchemeGroupVersion.WithResource("apiservices")),
+			v2fake.ForKind(v1.SchemeGroupVersion.WithKind("APIService")),
+			v2fake.WithListMetaCopier[v1.APIService](func(dst, src *v1.APIServiceList) { dst.ListMeta = src.ListMeta }),
+			v2fake.WithItemsGetter(func(list *v1.APIServiceList) []v1.APIService { return list.Items }),
+			v2fake.WithItemsSetter(func(list *v1.APIServiceList, items []v1.APIService) { list.Items = items }),
 		),
 		fake,
 	}

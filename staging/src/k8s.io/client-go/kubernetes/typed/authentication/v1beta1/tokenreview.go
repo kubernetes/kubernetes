@@ -23,7 +23,7 @@ import (
 
 	authenticationv1beta1 "k8s.io/api/authentication/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	gentype "k8s.io/client-go/gentype"
+	v2 "k8s.io/client-go/gentype/v2"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
 
@@ -41,19 +41,17 @@ type TokenReviewInterface interface {
 
 // tokenReviews implements TokenReviewInterface
 type tokenReviews struct {
-	*gentype.Client[*authenticationv1beta1.TokenReview]
+	*v2.TypedClient[authenticationv1beta1.TokenReview, *authenticationv1beta1.TokenReview]
 }
 
 // newTokenReviews returns a TokenReviews
 func newTokenReviews(c *AuthenticationV1beta1Client) *tokenReviews {
 	return &tokenReviews{
-		gentype.NewClient[*authenticationv1beta1.TokenReview](
-			"tokenreviews",
-			c.RESTClient(),
-			scheme.ParameterCodec,
-			"",
-			func() *authenticationv1beta1.TokenReview { return &authenticationv1beta1.TokenReview{} },
-			gentype.PrefersProtobuf[*authenticationv1beta1.TokenReview](),
+		v2.NewTypedClient[authenticationv1beta1.TokenReview](
+			v2.ForResource("tokenreviews"),
+			v2.UsingClient(c.RESTClient()),
+			v2.UsingParameterCodec(scheme.ParameterCodec),
+			v2.PrefersProtobuf(),
 		),
 	}
 }

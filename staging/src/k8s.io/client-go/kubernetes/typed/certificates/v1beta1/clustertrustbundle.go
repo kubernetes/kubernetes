@@ -26,7 +26,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	applyconfigurationscertificatesv1beta1 "k8s.io/client-go/applyconfigurations/certificates/v1beta1"
-	gentype "k8s.io/client-go/gentype"
+	v2 "k8s.io/client-go/gentype/v2"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
 
@@ -53,22 +53,17 @@ type ClusterTrustBundleInterface interface {
 
 // clusterTrustBundles implements ClusterTrustBundleInterface
 type clusterTrustBundles struct {
-	*gentype.ClientWithListAndApply[*certificatesv1beta1.ClusterTrustBundle, *certificatesv1beta1.ClusterTrustBundleList, *applyconfigurationscertificatesv1beta1.ClusterTrustBundleApplyConfiguration]
+	*v2.TypedClientWithListAndApply[certificatesv1beta1.ClusterTrustBundle, certificatesv1beta1.ClusterTrustBundleList, applyconfigurationscertificatesv1beta1.ClusterTrustBundleApplyConfiguration, *certificatesv1beta1.ClusterTrustBundle, *certificatesv1beta1.ClusterTrustBundleList, *applyconfigurationscertificatesv1beta1.ClusterTrustBundleApplyConfiguration]
 }
 
 // newClusterTrustBundles returns a ClusterTrustBundles
 func newClusterTrustBundles(c *CertificatesV1beta1Client) *clusterTrustBundles {
 	return &clusterTrustBundles{
-		gentype.NewClientWithListAndApply[*certificatesv1beta1.ClusterTrustBundle, *certificatesv1beta1.ClusterTrustBundleList, *applyconfigurationscertificatesv1beta1.ClusterTrustBundleApplyConfiguration](
-			"clustertrustbundles",
-			c.RESTClient(),
-			scheme.ParameterCodec,
-			"",
-			func() *certificatesv1beta1.ClusterTrustBundle { return &certificatesv1beta1.ClusterTrustBundle{} },
-			func() *certificatesv1beta1.ClusterTrustBundleList {
-				return &certificatesv1beta1.ClusterTrustBundleList{}
-			},
-			gentype.PrefersProtobuf[*certificatesv1beta1.ClusterTrustBundle](),
+		v2.NewTypedClientWithListAndApply[certificatesv1beta1.ClusterTrustBundle, certificatesv1beta1.ClusterTrustBundleList, applyconfigurationscertificatesv1beta1.ClusterTrustBundleApplyConfiguration](
+			v2.ForResource("clustertrustbundles"),
+			v2.UsingClient(c.RESTClient()),
+			v2.UsingParameterCodec(scheme.ParameterCodec),
+			v2.PrefersProtobuf(),
 		),
 	}
 }

@@ -26,7 +26,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	applyconfigurationscertificatesv1 "k8s.io/client-go/applyconfigurations/certificates/v1"
-	gentype "k8s.io/client-go/gentype"
+	v2 "k8s.io/client-go/gentype/v2"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
 
@@ -53,20 +53,17 @@ type ClusterTrustBundleInterface interface {
 
 // clusterTrustBundles implements ClusterTrustBundleInterface
 type clusterTrustBundles struct {
-	*gentype.ClientWithListAndApply[*certificatesv1.ClusterTrustBundle, *certificatesv1.ClusterTrustBundleList, *applyconfigurationscertificatesv1.ClusterTrustBundleApplyConfiguration]
+	*v2.TypedClientWithListAndApply[certificatesv1.ClusterTrustBundle, certificatesv1.ClusterTrustBundleList, applyconfigurationscertificatesv1.ClusterTrustBundleApplyConfiguration, *certificatesv1.ClusterTrustBundle, *certificatesv1.ClusterTrustBundleList, *applyconfigurationscertificatesv1.ClusterTrustBundleApplyConfiguration]
 }
 
 // newClusterTrustBundles returns a ClusterTrustBundles
 func newClusterTrustBundles(c *CertificatesV1Client) *clusterTrustBundles {
 	return &clusterTrustBundles{
-		gentype.NewClientWithListAndApply[*certificatesv1.ClusterTrustBundle, *certificatesv1.ClusterTrustBundleList, *applyconfigurationscertificatesv1.ClusterTrustBundleApplyConfiguration](
-			"clustertrustbundles",
-			c.RESTClient(),
-			scheme.ParameterCodec,
-			"",
-			func() *certificatesv1.ClusterTrustBundle { return &certificatesv1.ClusterTrustBundle{} },
-			func() *certificatesv1.ClusterTrustBundleList { return &certificatesv1.ClusterTrustBundleList{} },
-			gentype.PrefersProtobuf[*certificatesv1.ClusterTrustBundle](),
+		v2.NewTypedClientWithListAndApply[certificatesv1.ClusterTrustBundle, certificatesv1.ClusterTrustBundleList, applyconfigurationscertificatesv1.ClusterTrustBundleApplyConfiguration](
+			v2.ForResource("clustertrustbundles"),
+			v2.UsingClient(c.RESTClient()),
+			v2.UsingParameterCodec(scheme.ParameterCodec),
+			v2.PrefersProtobuf(),
 		),
 	}
 }

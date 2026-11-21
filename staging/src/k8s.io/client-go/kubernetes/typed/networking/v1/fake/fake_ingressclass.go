@@ -21,30 +21,25 @@ package fake
 import (
 	v1 "k8s.io/api/networking/v1"
 	networkingv1 "k8s.io/client-go/applyconfigurations/networking/v1"
-	gentype "k8s.io/client-go/gentype"
+	v2fake "k8s.io/client-go/gentype/v2/fake"
 	typednetworkingv1 "k8s.io/client-go/kubernetes/typed/networking/v1"
 )
 
 // fakeIngressClasses implements IngressClassInterface
 type fakeIngressClasses struct {
-	*gentype.FakeClientWithListAndApply[*v1.IngressClass, *v1.IngressClassList, *networkingv1.IngressClassApplyConfiguration]
+	*v2fake.FakeClientWithListAndApply[v1.IngressClass, v1.IngressClassList, networkingv1.IngressClassApplyConfiguration, *v1.IngressClass, *v1.IngressClassList, *networkingv1.IngressClassApplyConfiguration]
 	Fake *FakeNetworkingV1
 }
 
 func newFakeIngressClasses(fake *FakeNetworkingV1) typednetworkingv1.IngressClassInterface {
 	return &fakeIngressClasses{
-		gentype.NewFakeClientWithListAndApply[*v1.IngressClass, *v1.IngressClassList, *networkingv1.IngressClassApplyConfiguration](
+		v2fake.NewFakeClientWithListAndApply[v1.IngressClass, v1.IngressClassList, networkingv1.IngressClassApplyConfiguration](
 			fake.Fake,
-			"",
-			v1.SchemeGroupVersion.WithResource("ingressclasses"),
-			v1.SchemeGroupVersion.WithKind("IngressClass"),
-			func() *v1.IngressClass { return &v1.IngressClass{} },
-			func() *v1.IngressClassList { return &v1.IngressClassList{} },
-			func(dst, src *v1.IngressClassList) { dst.ListMeta = src.ListMeta },
-			func(list *v1.IngressClassList) []*v1.IngressClass { return gentype.ToPointerSlice(list.Items) },
-			func(list *v1.IngressClassList, items []*v1.IngressClass) {
-				list.Items = gentype.FromPointerSlice(items)
-			},
+			v2fake.ForResource(v1.SchemeGroupVersion.WithResource("ingressclasses")),
+			v2fake.ForKind(v1.SchemeGroupVersion.WithKind("IngressClass")),
+			v2fake.WithListMetaCopier[v1.IngressClass](func(dst, src *v1.IngressClassList) { dst.ListMeta = src.ListMeta }),
+			v2fake.WithItemsGetter(func(list *v1.IngressClassList) []v1.IngressClass { return list.Items }),
+			v2fake.WithItemsSetter(func(list *v1.IngressClassList, items []v1.IngressClass) { list.Items = items }),
 		),
 		fake,
 	}

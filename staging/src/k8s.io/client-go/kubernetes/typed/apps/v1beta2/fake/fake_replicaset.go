@@ -21,30 +21,26 @@ package fake
 import (
 	v1beta2 "k8s.io/api/apps/v1beta2"
 	appsv1beta2 "k8s.io/client-go/applyconfigurations/apps/v1beta2"
-	gentype "k8s.io/client-go/gentype"
+	v2fake "k8s.io/client-go/gentype/v2/fake"
 	typedappsv1beta2 "k8s.io/client-go/kubernetes/typed/apps/v1beta2"
 )
 
 // fakeReplicaSets implements ReplicaSetInterface
 type fakeReplicaSets struct {
-	*gentype.FakeClientWithListAndApply[*v1beta2.ReplicaSet, *v1beta2.ReplicaSetList, *appsv1beta2.ReplicaSetApplyConfiguration]
+	*v2fake.FakeClientWithListAndApply[v1beta2.ReplicaSet, v1beta2.ReplicaSetList, appsv1beta2.ReplicaSetApplyConfiguration, *v1beta2.ReplicaSet, *v1beta2.ReplicaSetList, *appsv1beta2.ReplicaSetApplyConfiguration]
 	Fake *FakeAppsV1beta2
 }
 
 func newFakeReplicaSets(fake *FakeAppsV1beta2, namespace string) typedappsv1beta2.ReplicaSetInterface {
 	return &fakeReplicaSets{
-		gentype.NewFakeClientWithListAndApply[*v1beta2.ReplicaSet, *v1beta2.ReplicaSetList, *appsv1beta2.ReplicaSetApplyConfiguration](
+		v2fake.NewFakeClientWithListAndApply[v1beta2.ReplicaSet, v1beta2.ReplicaSetList, appsv1beta2.ReplicaSetApplyConfiguration](
 			fake.Fake,
-			namespace,
-			v1beta2.SchemeGroupVersion.WithResource("replicasets"),
-			v1beta2.SchemeGroupVersion.WithKind("ReplicaSet"),
-			func() *v1beta2.ReplicaSet { return &v1beta2.ReplicaSet{} },
-			func() *v1beta2.ReplicaSetList { return &v1beta2.ReplicaSetList{} },
-			func(dst, src *v1beta2.ReplicaSetList) { dst.ListMeta = src.ListMeta },
-			func(list *v1beta2.ReplicaSetList) []*v1beta2.ReplicaSet { return gentype.ToPointerSlice(list.Items) },
-			func(list *v1beta2.ReplicaSetList, items []*v1beta2.ReplicaSet) {
-				list.Items = gentype.FromPointerSlice(items)
-			},
+			v2fake.InNamespace(namespace),
+			v2fake.ForResource(v1beta2.SchemeGroupVersion.WithResource("replicasets")),
+			v2fake.ForKind(v1beta2.SchemeGroupVersion.WithKind("ReplicaSet")),
+			v2fake.WithListMetaCopier[v1beta2.ReplicaSet](func(dst, src *v1beta2.ReplicaSetList) { dst.ListMeta = src.ListMeta }),
+			v2fake.WithItemsGetter(func(list *v1beta2.ReplicaSetList) []v1beta2.ReplicaSet { return list.Items }),
+			v2fake.WithItemsSetter(func(list *v1beta2.ReplicaSetList, items []v1beta2.ReplicaSet) { list.Items = items }),
 		),
 		fake,
 	}

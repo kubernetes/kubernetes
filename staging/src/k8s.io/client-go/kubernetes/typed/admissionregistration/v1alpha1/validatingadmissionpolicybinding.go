@@ -26,7 +26,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	applyconfigurationsadmissionregistrationv1alpha1 "k8s.io/client-go/applyconfigurations/admissionregistration/v1alpha1"
-	gentype "k8s.io/client-go/gentype"
+	v2 "k8s.io/client-go/gentype/v2"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
 
@@ -53,24 +53,17 @@ type ValidatingAdmissionPolicyBindingInterface interface {
 
 // validatingAdmissionPolicyBindings implements ValidatingAdmissionPolicyBindingInterface
 type validatingAdmissionPolicyBindings struct {
-	*gentype.ClientWithListAndApply[*admissionregistrationv1alpha1.ValidatingAdmissionPolicyBinding, *admissionregistrationv1alpha1.ValidatingAdmissionPolicyBindingList, *applyconfigurationsadmissionregistrationv1alpha1.ValidatingAdmissionPolicyBindingApplyConfiguration]
+	*v2.TypedClientWithListAndApply[admissionregistrationv1alpha1.ValidatingAdmissionPolicyBinding, admissionregistrationv1alpha1.ValidatingAdmissionPolicyBindingList, applyconfigurationsadmissionregistrationv1alpha1.ValidatingAdmissionPolicyBindingApplyConfiguration, *admissionregistrationv1alpha1.ValidatingAdmissionPolicyBinding, *admissionregistrationv1alpha1.ValidatingAdmissionPolicyBindingList, *applyconfigurationsadmissionregistrationv1alpha1.ValidatingAdmissionPolicyBindingApplyConfiguration]
 }
 
 // newValidatingAdmissionPolicyBindings returns a ValidatingAdmissionPolicyBindings
 func newValidatingAdmissionPolicyBindings(c *AdmissionregistrationV1alpha1Client) *validatingAdmissionPolicyBindings {
 	return &validatingAdmissionPolicyBindings{
-		gentype.NewClientWithListAndApply[*admissionregistrationv1alpha1.ValidatingAdmissionPolicyBinding, *admissionregistrationv1alpha1.ValidatingAdmissionPolicyBindingList, *applyconfigurationsadmissionregistrationv1alpha1.ValidatingAdmissionPolicyBindingApplyConfiguration](
-			"validatingadmissionpolicybindings",
-			c.RESTClient(),
-			scheme.ParameterCodec,
-			"",
-			func() *admissionregistrationv1alpha1.ValidatingAdmissionPolicyBinding {
-				return &admissionregistrationv1alpha1.ValidatingAdmissionPolicyBinding{}
-			},
-			func() *admissionregistrationv1alpha1.ValidatingAdmissionPolicyBindingList {
-				return &admissionregistrationv1alpha1.ValidatingAdmissionPolicyBindingList{}
-			},
-			gentype.PrefersProtobuf[*admissionregistrationv1alpha1.ValidatingAdmissionPolicyBinding](),
+		v2.NewTypedClientWithListAndApply[admissionregistrationv1alpha1.ValidatingAdmissionPolicyBinding, admissionregistrationv1alpha1.ValidatingAdmissionPolicyBindingList, applyconfigurationsadmissionregistrationv1alpha1.ValidatingAdmissionPolicyBindingApplyConfiguration](
+			v2.ForResource("validatingadmissionpolicybindings"),
+			v2.UsingClient(c.RESTClient()),
+			v2.UsingParameterCodec(scheme.ParameterCodec),
+			v2.PrefersProtobuf(),
 		),
 	}
 }

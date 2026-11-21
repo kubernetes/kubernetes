@@ -26,7 +26,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	applyconfigurationsadmissionregistrationv1 "k8s.io/client-go/applyconfigurations/admissionregistration/v1"
-	gentype "k8s.io/client-go/gentype"
+	v2 "k8s.io/client-go/gentype/v2"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
 
@@ -53,24 +53,17 @@ type MutatingAdmissionPolicyBindingInterface interface {
 
 // mutatingAdmissionPolicyBindings implements MutatingAdmissionPolicyBindingInterface
 type mutatingAdmissionPolicyBindings struct {
-	*gentype.ClientWithListAndApply[*admissionregistrationv1.MutatingAdmissionPolicyBinding, *admissionregistrationv1.MutatingAdmissionPolicyBindingList, *applyconfigurationsadmissionregistrationv1.MutatingAdmissionPolicyBindingApplyConfiguration]
+	*v2.TypedClientWithListAndApply[admissionregistrationv1.MutatingAdmissionPolicyBinding, admissionregistrationv1.MutatingAdmissionPolicyBindingList, applyconfigurationsadmissionregistrationv1.MutatingAdmissionPolicyBindingApplyConfiguration, *admissionregistrationv1.MutatingAdmissionPolicyBinding, *admissionregistrationv1.MutatingAdmissionPolicyBindingList, *applyconfigurationsadmissionregistrationv1.MutatingAdmissionPolicyBindingApplyConfiguration]
 }
 
 // newMutatingAdmissionPolicyBindings returns a MutatingAdmissionPolicyBindings
 func newMutatingAdmissionPolicyBindings(c *AdmissionregistrationV1Client) *mutatingAdmissionPolicyBindings {
 	return &mutatingAdmissionPolicyBindings{
-		gentype.NewClientWithListAndApply[*admissionregistrationv1.MutatingAdmissionPolicyBinding, *admissionregistrationv1.MutatingAdmissionPolicyBindingList, *applyconfigurationsadmissionregistrationv1.MutatingAdmissionPolicyBindingApplyConfiguration](
-			"mutatingadmissionpolicybindings",
-			c.RESTClient(),
-			scheme.ParameterCodec,
-			"",
-			func() *admissionregistrationv1.MutatingAdmissionPolicyBinding {
-				return &admissionregistrationv1.MutatingAdmissionPolicyBinding{}
-			},
-			func() *admissionregistrationv1.MutatingAdmissionPolicyBindingList {
-				return &admissionregistrationv1.MutatingAdmissionPolicyBindingList{}
-			},
-			gentype.PrefersProtobuf[*admissionregistrationv1.MutatingAdmissionPolicyBinding](),
+		v2.NewTypedClientWithListAndApply[admissionregistrationv1.MutatingAdmissionPolicyBinding, admissionregistrationv1.MutatingAdmissionPolicyBindingList, applyconfigurationsadmissionregistrationv1.MutatingAdmissionPolicyBindingApplyConfiguration](
+			v2.ForResource("mutatingadmissionpolicybindings"),
+			v2.UsingClient(c.RESTClient()),
+			v2.UsingParameterCodec(scheme.ParameterCodec),
+			v2.PrefersProtobuf(),
 		),
 	}
 }

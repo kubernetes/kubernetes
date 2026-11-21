@@ -21,28 +21,26 @@ package fake
 import (
 	v1 "k8s.io/api/core/v1"
 	corev1 "k8s.io/client-go/applyconfigurations/core/v1"
-	gentype "k8s.io/client-go/gentype"
+	v2fake "k8s.io/client-go/gentype/v2/fake"
 	typedcorev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 )
 
 // fakeEndpoints implements EndpointsInterface
 type fakeEndpoints struct {
-	*gentype.FakeClientWithListAndApply[*v1.Endpoints, *v1.EndpointsList, *corev1.EndpointsApplyConfiguration]
+	*v2fake.FakeClientWithListAndApply[v1.Endpoints, v1.EndpointsList, corev1.EndpointsApplyConfiguration, *v1.Endpoints, *v1.EndpointsList, *corev1.EndpointsApplyConfiguration]
 	Fake *FakeCoreV1
 }
 
 func newFakeEndpoints(fake *FakeCoreV1, namespace string) typedcorev1.EndpointsInterface {
 	return &fakeEndpoints{
-		gentype.NewFakeClientWithListAndApply[*v1.Endpoints, *v1.EndpointsList, *corev1.EndpointsApplyConfiguration](
+		v2fake.NewFakeClientWithListAndApply[v1.Endpoints, v1.EndpointsList, corev1.EndpointsApplyConfiguration](
 			fake.Fake,
-			namespace,
-			v1.SchemeGroupVersion.WithResource("endpoints"),
-			v1.SchemeGroupVersion.WithKind("Endpoints"),
-			func() *v1.Endpoints { return &v1.Endpoints{} },
-			func() *v1.EndpointsList { return &v1.EndpointsList{} },
-			func(dst, src *v1.EndpointsList) { dst.ListMeta = src.ListMeta },
-			func(list *v1.EndpointsList) []*v1.Endpoints { return gentype.ToPointerSlice(list.Items) },
-			func(list *v1.EndpointsList, items []*v1.Endpoints) { list.Items = gentype.FromPointerSlice(items) },
+			v2fake.InNamespace(namespace),
+			v2fake.ForResource(v1.SchemeGroupVersion.WithResource("endpoints")),
+			v2fake.ForKind(v1.SchemeGroupVersion.WithKind("Endpoints")),
+			v2fake.WithListMetaCopier[v1.Endpoints](func(dst, src *v1.EndpointsList) { dst.ListMeta = src.ListMeta }),
+			v2fake.WithItemsGetter(func(list *v1.EndpointsList) []v1.Endpoints { return list.Items }),
+			v2fake.WithItemsSetter(func(list *v1.EndpointsList, items []v1.Endpoints) { list.Items = items }),
 		),
 		fake,
 	}

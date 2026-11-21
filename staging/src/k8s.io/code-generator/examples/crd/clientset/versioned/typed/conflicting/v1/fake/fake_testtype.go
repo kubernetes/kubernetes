@@ -19,7 +19,7 @@ limitations under the License.
 package fake
 
 import (
-	gentype "k8s.io/client-go/gentype"
+	v2fake "k8s.io/client-go/gentype/v2/fake"
 	v1 "k8s.io/code-generator/examples/crd/apis/conflicting/v1"
 	conflictingv1 "k8s.io/code-generator/examples/crd/applyconfiguration/conflicting/v1"
 	typedconflictingv1 "k8s.io/code-generator/examples/crd/clientset/versioned/typed/conflicting/v1"
@@ -27,22 +27,20 @@ import (
 
 // fakeTestTypes implements TestTypeInterface
 type fakeTestTypes struct {
-	*gentype.FakeClientWithListAndApply[*v1.TestType, *v1.TestTypeList, *conflictingv1.TestTypeApplyConfiguration]
+	*v2fake.FakeClientWithListAndApply[v1.TestType, v1.TestTypeList, conflictingv1.TestTypeApplyConfiguration, *v1.TestType, *v1.TestTypeList, *conflictingv1.TestTypeApplyConfiguration]
 	Fake *FakeConflictingExampleV1
 }
 
 func newFakeTestTypes(fake *FakeConflictingExampleV1, namespace string) typedconflictingv1.TestTypeInterface {
 	return &fakeTestTypes{
-		gentype.NewFakeClientWithListAndApply[*v1.TestType, *v1.TestTypeList, *conflictingv1.TestTypeApplyConfiguration](
+		v2fake.NewFakeClientWithListAndApply[v1.TestType, v1.TestTypeList, conflictingv1.TestTypeApplyConfiguration](
 			fake.Fake,
-			namespace,
-			v1.SchemeGroupVersion.WithResource("testtypes"),
-			v1.SchemeGroupVersion.WithKind("TestType"),
-			func() *v1.TestType { return &v1.TestType{} },
-			func() *v1.TestTypeList { return &v1.TestTypeList{} },
-			func(dst, src *v1.TestTypeList) { dst.ListMeta = src.ListMeta },
-			func(list *v1.TestTypeList) []*v1.TestType { return gentype.ToPointerSlice(list.Items) },
-			func(list *v1.TestTypeList, items []*v1.TestType) { list.Items = gentype.FromPointerSlice(items) },
+			v2fake.InNamespace(namespace),
+			v2fake.ForResource(v1.SchemeGroupVersion.WithResource("testtypes")),
+			v2fake.ForKind(v1.SchemeGroupVersion.WithKind("TestType")),
+			v2fake.WithListMetaCopier[v1.TestType](func(dst, src *v1.TestTypeList) { dst.ListMeta = src.ListMeta }),
+			v2fake.WithItemsGetter(func(list *v1.TestTypeList) []v1.TestType { return list.Items }),
+			v2fake.WithItemsSetter(func(list *v1.TestTypeList, items []v1.TestType) { list.Items = items }),
 		),
 		fake,
 	}

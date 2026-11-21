@@ -26,7 +26,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	applyconfigurationsstoragev1alpha1 "k8s.io/client-go/applyconfigurations/storage/v1alpha1"
-	gentype "k8s.io/client-go/gentype"
+	v2 "k8s.io/client-go/gentype/v2"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
 
@@ -53,20 +53,17 @@ type VolumeAttributesClassInterface interface {
 
 // volumeAttributesClasses implements VolumeAttributesClassInterface
 type volumeAttributesClasses struct {
-	*gentype.ClientWithListAndApply[*storagev1alpha1.VolumeAttributesClass, *storagev1alpha1.VolumeAttributesClassList, *applyconfigurationsstoragev1alpha1.VolumeAttributesClassApplyConfiguration]
+	*v2.TypedClientWithListAndApply[storagev1alpha1.VolumeAttributesClass, storagev1alpha1.VolumeAttributesClassList, applyconfigurationsstoragev1alpha1.VolumeAttributesClassApplyConfiguration, *storagev1alpha1.VolumeAttributesClass, *storagev1alpha1.VolumeAttributesClassList, *applyconfigurationsstoragev1alpha1.VolumeAttributesClassApplyConfiguration]
 }
 
 // newVolumeAttributesClasses returns a VolumeAttributesClasses
 func newVolumeAttributesClasses(c *StorageV1alpha1Client) *volumeAttributesClasses {
 	return &volumeAttributesClasses{
-		gentype.NewClientWithListAndApply[*storagev1alpha1.VolumeAttributesClass, *storagev1alpha1.VolumeAttributesClassList, *applyconfigurationsstoragev1alpha1.VolumeAttributesClassApplyConfiguration](
-			"volumeattributesclasses",
-			c.RESTClient(),
-			scheme.ParameterCodec,
-			"",
-			func() *storagev1alpha1.VolumeAttributesClass { return &storagev1alpha1.VolumeAttributesClass{} },
-			func() *storagev1alpha1.VolumeAttributesClassList { return &storagev1alpha1.VolumeAttributesClassList{} },
-			gentype.PrefersProtobuf[*storagev1alpha1.VolumeAttributesClass](),
+		v2.NewTypedClientWithListAndApply[storagev1alpha1.VolumeAttributesClass, storagev1alpha1.VolumeAttributesClassList, applyconfigurationsstoragev1alpha1.VolumeAttributesClassApplyConfiguration](
+			v2.ForResource("volumeattributesclasses"),
+			v2.UsingClient(c.RESTClient()),
+			v2.UsingParameterCodec(scheme.ParameterCodec),
+			v2.PrefersProtobuf(),
 		),
 	}
 }

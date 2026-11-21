@@ -26,7 +26,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	applyconfigurationscorev1 "k8s.io/client-go/applyconfigurations/core/v1"
-	gentype "k8s.io/client-go/gentype"
+	v2 "k8s.io/client-go/gentype/v2"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
 
@@ -61,54 +61,30 @@ type PodInterface interface {
 
 // pods implements PodInterface
 type pods struct {
-	*gentype.ClientWithListAndApply[*corev1.Pod, *corev1.PodList, *applyconfigurationscorev1.PodApplyConfiguration]
+	*v2.TypedClientWithListAndApply[corev1.Pod, corev1.PodList, applyconfigurationscorev1.PodApplyConfiguration, *corev1.Pod, *corev1.PodList, *applyconfigurationscorev1.PodApplyConfiguration]
 }
 
 // newPods returns a Pods
 func newPods(c *CoreV1Client, namespace string) *pods {
 	return &pods{
-		gentype.NewClientWithListAndApply[*corev1.Pod, *corev1.PodList, *applyconfigurationscorev1.PodApplyConfiguration](
-			"pods",
-			c.RESTClient(),
-			scheme.ParameterCodec,
-			namespace,
-			func() *corev1.Pod { return &corev1.Pod{} },
-			func() *corev1.PodList { return &corev1.PodList{} },
-			gentype.PrefersProtobuf[*corev1.Pod](),
+		v2.NewTypedClientWithListAndApply[corev1.Pod, corev1.PodList, applyconfigurationscorev1.PodApplyConfiguration](
+			v2.ForResource("pods"),
+			v2.UsingClient(c.RESTClient()),
+			v2.UsingParameterCodec(scheme.ParameterCodec),
+			v2.InNamespace(namespace),
+			v2.PrefersProtobuf(),
 		),
 	}
 }
 
 // UpdateEphemeralContainers takes the top resource name and the representation of a pod and updates it. Returns the server's representation of the pod, and an error, if there is any.
-func (c *pods) UpdateEphemeralContainers(ctx context.Context, podName string, pod *corev1.Pod, opts metav1.UpdateOptions) (result *corev1.Pod, err error) {
-	result = &corev1.Pod{}
-	err = c.GetClient().Put().
-		UseProtobufAsDefault().
-		Namespace(c.GetNamespace()).
-		Resource("pods").
-		Name(podName).
-		SubResource("ephemeralcontainers").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(pod).
-		Do(ctx).
-		Into(result)
-	return
+func (c *pods) UpdateEphemeralContainers(ctx context.Context, podName string, pod *corev1.Pod, opts metav1.UpdateOptions) (*corev1.Pod, error) {
+	return c.SubResourceUpdate(ctx, podName, "ephemeralcontainers", pod, opts)
 }
 
 // UpdateResize takes the top resource name and the representation of a pod and updates it. Returns the server's representation of the pod, and an error, if there is any.
-func (c *pods) UpdateResize(ctx context.Context, podName string, pod *corev1.Pod, opts metav1.UpdateOptions) (result *corev1.Pod, err error) {
-	result = &corev1.Pod{}
-	err = c.GetClient().Put().
-		UseProtobufAsDefault().
-		Namespace(c.GetNamespace()).
-		Resource("pods").
-		Name(podName).
-		SubResource("resize").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(pod).
-		Do(ctx).
-		Into(result)
-	return
+func (c *pods) UpdateResize(ctx context.Context, podName string, pod *corev1.Pod, opts metav1.UpdateOptions) (*corev1.Pod, error) {
+	return c.SubResourceUpdate(ctx, podName, "resize", pod, opts)
 }
 
 // UpdateDynamic takes the top resource name and the representation of a pod and updates it. Returns the server's representation of the pod, and an error, if there is any.

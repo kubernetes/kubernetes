@@ -21,32 +21,29 @@ package fake
 import (
 	v1alpha3 "k8s.io/api/resource/v1alpha3"
 	resourcev1alpha3 "k8s.io/client-go/applyconfigurations/resource/v1alpha3"
-	gentype "k8s.io/client-go/gentype"
+	v2fake "k8s.io/client-go/gentype/v2/fake"
 	typedresourcev1alpha3 "k8s.io/client-go/kubernetes/typed/resource/v1alpha3"
 )
 
 // fakeResourcePoolStatusRequests implements ResourcePoolStatusRequestInterface
 type fakeResourcePoolStatusRequests struct {
-	*gentype.FakeClientWithListAndApply[*v1alpha3.ResourcePoolStatusRequest, *v1alpha3.ResourcePoolStatusRequestList, *resourcev1alpha3.ResourcePoolStatusRequestApplyConfiguration]
+	*v2fake.FakeClientWithListAndApply[v1alpha3.ResourcePoolStatusRequest, v1alpha3.ResourcePoolStatusRequestList, resourcev1alpha3.ResourcePoolStatusRequestApplyConfiguration, *v1alpha3.ResourcePoolStatusRequest, *v1alpha3.ResourcePoolStatusRequestList, *resourcev1alpha3.ResourcePoolStatusRequestApplyConfiguration]
 	Fake *FakeResourceV1alpha3
 }
 
 func newFakeResourcePoolStatusRequests(fake *FakeResourceV1alpha3) typedresourcev1alpha3.ResourcePoolStatusRequestInterface {
 	return &fakeResourcePoolStatusRequests{
-		gentype.NewFakeClientWithListAndApply[*v1alpha3.ResourcePoolStatusRequest, *v1alpha3.ResourcePoolStatusRequestList, *resourcev1alpha3.ResourcePoolStatusRequestApplyConfiguration](
+		v2fake.NewFakeClientWithListAndApply[v1alpha3.ResourcePoolStatusRequest, v1alpha3.ResourcePoolStatusRequestList, resourcev1alpha3.ResourcePoolStatusRequestApplyConfiguration](
 			fake.Fake,
-			"",
-			v1alpha3.SchemeGroupVersion.WithResource("resourcepoolstatusrequests"),
-			v1alpha3.SchemeGroupVersion.WithKind("ResourcePoolStatusRequest"),
-			func() *v1alpha3.ResourcePoolStatusRequest { return &v1alpha3.ResourcePoolStatusRequest{} },
-			func() *v1alpha3.ResourcePoolStatusRequestList { return &v1alpha3.ResourcePoolStatusRequestList{} },
-			func(dst, src *v1alpha3.ResourcePoolStatusRequestList) { dst.ListMeta = src.ListMeta },
-			func(list *v1alpha3.ResourcePoolStatusRequestList) []*v1alpha3.ResourcePoolStatusRequest {
-				return gentype.ToPointerSlice(list.Items)
-			},
-			func(list *v1alpha3.ResourcePoolStatusRequestList, items []*v1alpha3.ResourcePoolStatusRequest) {
-				list.Items = gentype.FromPointerSlice(items)
-			},
+			v2fake.ForResource(v1alpha3.SchemeGroupVersion.WithResource("resourcepoolstatusrequests")),
+			v2fake.ForKind(v1alpha3.SchemeGroupVersion.WithKind("ResourcePoolStatusRequest")),
+			v2fake.WithListMetaCopier[v1alpha3.ResourcePoolStatusRequest](func(dst, src *v1alpha3.ResourcePoolStatusRequestList) { dst.ListMeta = src.ListMeta }),
+			v2fake.WithItemsGetter(func(list *v1alpha3.ResourcePoolStatusRequestList) []v1alpha3.ResourcePoolStatusRequest {
+				return list.Items
+			}),
+			v2fake.WithItemsSetter(func(list *v1alpha3.ResourcePoolStatusRequestList, items []v1alpha3.ResourcePoolStatusRequest) {
+				list.Items = items
+			}),
 		),
 		fake,
 	}

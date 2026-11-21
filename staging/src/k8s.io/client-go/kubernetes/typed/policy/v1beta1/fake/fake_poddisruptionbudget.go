@@ -21,32 +21,26 @@ package fake
 import (
 	v1beta1 "k8s.io/api/policy/v1beta1"
 	policyv1beta1 "k8s.io/client-go/applyconfigurations/policy/v1beta1"
-	gentype "k8s.io/client-go/gentype"
+	v2fake "k8s.io/client-go/gentype/v2/fake"
 	typedpolicyv1beta1 "k8s.io/client-go/kubernetes/typed/policy/v1beta1"
 )
 
 // fakePodDisruptionBudgets implements PodDisruptionBudgetInterface
 type fakePodDisruptionBudgets struct {
-	*gentype.FakeClientWithListAndApply[*v1beta1.PodDisruptionBudget, *v1beta1.PodDisruptionBudgetList, *policyv1beta1.PodDisruptionBudgetApplyConfiguration]
+	*v2fake.FakeClientWithListAndApply[v1beta1.PodDisruptionBudget, v1beta1.PodDisruptionBudgetList, policyv1beta1.PodDisruptionBudgetApplyConfiguration, *v1beta1.PodDisruptionBudget, *v1beta1.PodDisruptionBudgetList, *policyv1beta1.PodDisruptionBudgetApplyConfiguration]
 	Fake *FakePolicyV1beta1
 }
 
 func newFakePodDisruptionBudgets(fake *FakePolicyV1beta1, namespace string) typedpolicyv1beta1.PodDisruptionBudgetInterface {
 	return &fakePodDisruptionBudgets{
-		gentype.NewFakeClientWithListAndApply[*v1beta1.PodDisruptionBudget, *v1beta1.PodDisruptionBudgetList, *policyv1beta1.PodDisruptionBudgetApplyConfiguration](
+		v2fake.NewFakeClientWithListAndApply[v1beta1.PodDisruptionBudget, v1beta1.PodDisruptionBudgetList, policyv1beta1.PodDisruptionBudgetApplyConfiguration](
 			fake.Fake,
-			namespace,
-			v1beta1.SchemeGroupVersion.WithResource("poddisruptionbudgets"),
-			v1beta1.SchemeGroupVersion.WithKind("PodDisruptionBudget"),
-			func() *v1beta1.PodDisruptionBudget { return &v1beta1.PodDisruptionBudget{} },
-			func() *v1beta1.PodDisruptionBudgetList { return &v1beta1.PodDisruptionBudgetList{} },
-			func(dst, src *v1beta1.PodDisruptionBudgetList) { dst.ListMeta = src.ListMeta },
-			func(list *v1beta1.PodDisruptionBudgetList) []*v1beta1.PodDisruptionBudget {
-				return gentype.ToPointerSlice(list.Items)
-			},
-			func(list *v1beta1.PodDisruptionBudgetList, items []*v1beta1.PodDisruptionBudget) {
-				list.Items = gentype.FromPointerSlice(items)
-			},
+			v2fake.InNamespace(namespace),
+			v2fake.ForResource(v1beta1.SchemeGroupVersion.WithResource("poddisruptionbudgets")),
+			v2fake.ForKind(v1beta1.SchemeGroupVersion.WithKind("PodDisruptionBudget")),
+			v2fake.WithListMetaCopier[v1beta1.PodDisruptionBudget](func(dst, src *v1beta1.PodDisruptionBudgetList) { dst.ListMeta = src.ListMeta }),
+			v2fake.WithItemsGetter(func(list *v1beta1.PodDisruptionBudgetList) []v1beta1.PodDisruptionBudget { return list.Items }),
+			v2fake.WithItemsSetter(func(list *v1beta1.PodDisruptionBudgetList, items []v1beta1.PodDisruptionBudget) { list.Items = items }),
 		),
 		fake,
 	}

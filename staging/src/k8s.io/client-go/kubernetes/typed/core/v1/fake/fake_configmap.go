@@ -21,28 +21,26 @@ package fake
 import (
 	v1 "k8s.io/api/core/v1"
 	corev1 "k8s.io/client-go/applyconfigurations/core/v1"
-	gentype "k8s.io/client-go/gentype"
+	v2fake "k8s.io/client-go/gentype/v2/fake"
 	typedcorev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 )
 
 // fakeConfigMaps implements ConfigMapInterface
 type fakeConfigMaps struct {
-	*gentype.FakeClientWithListAndApply[*v1.ConfigMap, *v1.ConfigMapList, *corev1.ConfigMapApplyConfiguration]
+	*v2fake.FakeClientWithListAndApply[v1.ConfigMap, v1.ConfigMapList, corev1.ConfigMapApplyConfiguration, *v1.ConfigMap, *v1.ConfigMapList, *corev1.ConfigMapApplyConfiguration]
 	Fake *FakeCoreV1
 }
 
 func newFakeConfigMaps(fake *FakeCoreV1, namespace string) typedcorev1.ConfigMapInterface {
 	return &fakeConfigMaps{
-		gentype.NewFakeClientWithListAndApply[*v1.ConfigMap, *v1.ConfigMapList, *corev1.ConfigMapApplyConfiguration](
+		v2fake.NewFakeClientWithListAndApply[v1.ConfigMap, v1.ConfigMapList, corev1.ConfigMapApplyConfiguration](
 			fake.Fake,
-			namespace,
-			v1.SchemeGroupVersion.WithResource("configmaps"),
-			v1.SchemeGroupVersion.WithKind("ConfigMap"),
-			func() *v1.ConfigMap { return &v1.ConfigMap{} },
-			func() *v1.ConfigMapList { return &v1.ConfigMapList{} },
-			func(dst, src *v1.ConfigMapList) { dst.ListMeta = src.ListMeta },
-			func(list *v1.ConfigMapList) []*v1.ConfigMap { return gentype.ToPointerSlice(list.Items) },
-			func(list *v1.ConfigMapList, items []*v1.ConfigMap) { list.Items = gentype.FromPointerSlice(items) },
+			v2fake.InNamespace(namespace),
+			v2fake.ForResource(v1.SchemeGroupVersion.WithResource("configmaps")),
+			v2fake.ForKind(v1.SchemeGroupVersion.WithKind("ConfigMap")),
+			v2fake.WithListMetaCopier[v1.ConfigMap](func(dst, src *v1.ConfigMapList) { dst.ListMeta = src.ListMeta }),
+			v2fake.WithItemsGetter(func(list *v1.ConfigMapList) []v1.ConfigMap { return list.Items }),
+			v2fake.WithItemsSetter(func(list *v1.ConfigMapList, items []v1.ConfigMap) { list.Items = items }),
 		),
 		fake,
 	}

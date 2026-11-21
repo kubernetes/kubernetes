@@ -26,7 +26,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	applyconfigurationsresourcev1alpha3 "k8s.io/client-go/applyconfigurations/resource/v1alpha3"
-	gentype "k8s.io/client-go/gentype"
+	v2 "k8s.io/client-go/gentype/v2"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
 
@@ -57,24 +57,17 @@ type ResourcePoolStatusRequestInterface interface {
 
 // resourcePoolStatusRequests implements ResourcePoolStatusRequestInterface
 type resourcePoolStatusRequests struct {
-	*gentype.ClientWithListAndApply[*resourcev1alpha3.ResourcePoolStatusRequest, *resourcev1alpha3.ResourcePoolStatusRequestList, *applyconfigurationsresourcev1alpha3.ResourcePoolStatusRequestApplyConfiguration]
+	*v2.TypedClientWithListAndApply[resourcev1alpha3.ResourcePoolStatusRequest, resourcev1alpha3.ResourcePoolStatusRequestList, applyconfigurationsresourcev1alpha3.ResourcePoolStatusRequestApplyConfiguration, *resourcev1alpha3.ResourcePoolStatusRequest, *resourcev1alpha3.ResourcePoolStatusRequestList, *applyconfigurationsresourcev1alpha3.ResourcePoolStatusRequestApplyConfiguration]
 }
 
 // newResourcePoolStatusRequests returns a ResourcePoolStatusRequests
 func newResourcePoolStatusRequests(c *ResourceV1alpha3Client) *resourcePoolStatusRequests {
 	return &resourcePoolStatusRequests{
-		gentype.NewClientWithListAndApply[*resourcev1alpha3.ResourcePoolStatusRequest, *resourcev1alpha3.ResourcePoolStatusRequestList, *applyconfigurationsresourcev1alpha3.ResourcePoolStatusRequestApplyConfiguration](
-			"resourcepoolstatusrequests",
-			c.RESTClient(),
-			scheme.ParameterCodec,
-			"",
-			func() *resourcev1alpha3.ResourcePoolStatusRequest {
-				return &resourcev1alpha3.ResourcePoolStatusRequest{}
-			},
-			func() *resourcev1alpha3.ResourcePoolStatusRequestList {
-				return &resourcev1alpha3.ResourcePoolStatusRequestList{}
-			},
-			gentype.PrefersProtobuf[*resourcev1alpha3.ResourcePoolStatusRequest](),
+		v2.NewTypedClientWithListAndApply[resourcev1alpha3.ResourcePoolStatusRequest, resourcev1alpha3.ResourcePoolStatusRequestList, applyconfigurationsresourcev1alpha3.ResourcePoolStatusRequestApplyConfiguration](
+			v2.ForResource("resourcepoolstatusrequests"),
+			v2.UsingClient(c.RESTClient()),
+			v2.UsingParameterCodec(scheme.ParameterCodec),
+			v2.PrefersProtobuf(),
 		),
 	}
 }

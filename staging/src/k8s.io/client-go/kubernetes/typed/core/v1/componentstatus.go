@@ -26,7 +26,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	applyconfigurationscorev1 "k8s.io/client-go/applyconfigurations/core/v1"
-	gentype "k8s.io/client-go/gentype"
+	v2 "k8s.io/client-go/gentype/v2"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
 
@@ -53,20 +53,17 @@ type ComponentStatusInterface interface {
 
 // componentStatuses implements ComponentStatusInterface
 type componentStatuses struct {
-	*gentype.ClientWithListAndApply[*corev1.ComponentStatus, *corev1.ComponentStatusList, *applyconfigurationscorev1.ComponentStatusApplyConfiguration]
+	*v2.TypedClientWithListAndApply[corev1.ComponentStatus, corev1.ComponentStatusList, applyconfigurationscorev1.ComponentStatusApplyConfiguration, *corev1.ComponentStatus, *corev1.ComponentStatusList, *applyconfigurationscorev1.ComponentStatusApplyConfiguration]
 }
 
 // newComponentStatuses returns a ComponentStatuses
 func newComponentStatuses(c *CoreV1Client) *componentStatuses {
 	return &componentStatuses{
-		gentype.NewClientWithListAndApply[*corev1.ComponentStatus, *corev1.ComponentStatusList, *applyconfigurationscorev1.ComponentStatusApplyConfiguration](
-			"componentstatuses",
-			c.RESTClient(),
-			scheme.ParameterCodec,
-			"",
-			func() *corev1.ComponentStatus { return &corev1.ComponentStatus{} },
-			func() *corev1.ComponentStatusList { return &corev1.ComponentStatusList{} },
-			gentype.PrefersProtobuf[*corev1.ComponentStatus](),
+		v2.NewTypedClientWithListAndApply[corev1.ComponentStatus, corev1.ComponentStatusList, applyconfigurationscorev1.ComponentStatusApplyConfiguration](
+			v2.ForResource("componentstatuses"),
+			v2.UsingClient(c.RESTClient()),
+			v2.UsingParameterCodec(scheme.ParameterCodec),
+			v2.PrefersProtobuf(),
 		),
 	}
 }

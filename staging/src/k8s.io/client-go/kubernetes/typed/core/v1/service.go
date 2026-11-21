@@ -26,7 +26,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	applyconfigurationscorev1 "k8s.io/client-go/applyconfigurations/core/v1"
-	gentype "k8s.io/client-go/gentype"
+	v2 "k8s.io/client-go/gentype/v2"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
 
@@ -56,20 +56,18 @@ type ServiceInterface interface {
 
 // services implements ServiceInterface
 type services struct {
-	*gentype.ClientWithListAndApply[*corev1.Service, *corev1.ServiceList, *applyconfigurationscorev1.ServiceApplyConfiguration]
+	*v2.TypedClientWithListAndApply[corev1.Service, corev1.ServiceList, applyconfigurationscorev1.ServiceApplyConfiguration, *corev1.Service, *corev1.ServiceList, *applyconfigurationscorev1.ServiceApplyConfiguration]
 }
 
 // newServices returns a Services
 func newServices(c *CoreV1Client, namespace string) *services {
 	return &services{
-		gentype.NewClientWithListAndApply[*corev1.Service, *corev1.ServiceList, *applyconfigurationscorev1.ServiceApplyConfiguration](
-			"services",
-			c.RESTClient(),
-			scheme.ParameterCodec,
-			namespace,
-			func() *corev1.Service { return &corev1.Service{} },
-			func() *corev1.ServiceList { return &corev1.ServiceList{} },
-			gentype.PrefersProtobuf[*corev1.Service](),
+		v2.NewTypedClientWithListAndApply[corev1.Service, corev1.ServiceList, applyconfigurationscorev1.ServiceApplyConfiguration](
+			v2.ForResource("services"),
+			v2.UsingClient(c.RESTClient()),
+			v2.UsingParameterCodec(scheme.ParameterCodec),
+			v2.InNamespace(namespace),
+			v2.PrefersProtobuf(),
 		),
 	}
 }

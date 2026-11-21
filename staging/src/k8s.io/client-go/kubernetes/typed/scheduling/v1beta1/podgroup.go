@@ -26,7 +26,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	applyconfigurationsschedulingv1beta1 "k8s.io/client-go/applyconfigurations/scheduling/v1beta1"
-	gentype "k8s.io/client-go/gentype"
+	v2 "k8s.io/client-go/gentype/v2"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
 
@@ -57,20 +57,18 @@ type PodGroupInterface interface {
 
 // podGroups implements PodGroupInterface
 type podGroups struct {
-	*gentype.ClientWithListAndApply[*schedulingv1beta1.PodGroup, *schedulingv1beta1.PodGroupList, *applyconfigurationsschedulingv1beta1.PodGroupApplyConfiguration]
+	*v2.TypedClientWithListAndApply[schedulingv1beta1.PodGroup, schedulingv1beta1.PodGroupList, applyconfigurationsschedulingv1beta1.PodGroupApplyConfiguration, *schedulingv1beta1.PodGroup, *schedulingv1beta1.PodGroupList, *applyconfigurationsschedulingv1beta1.PodGroupApplyConfiguration]
 }
 
 // newPodGroups returns a PodGroups
 func newPodGroups(c *SchedulingV1beta1Client, namespace string) *podGroups {
 	return &podGroups{
-		gentype.NewClientWithListAndApply[*schedulingv1beta1.PodGroup, *schedulingv1beta1.PodGroupList, *applyconfigurationsschedulingv1beta1.PodGroupApplyConfiguration](
-			"podgroups",
-			c.RESTClient(),
-			scheme.ParameterCodec,
-			namespace,
-			func() *schedulingv1beta1.PodGroup { return &schedulingv1beta1.PodGroup{} },
-			func() *schedulingv1beta1.PodGroupList { return &schedulingv1beta1.PodGroupList{} },
-			gentype.PrefersProtobuf[*schedulingv1beta1.PodGroup](),
+		v2.NewTypedClientWithListAndApply[schedulingv1beta1.PodGroup, schedulingv1beta1.PodGroupList, applyconfigurationsschedulingv1beta1.PodGroupApplyConfiguration](
+			v2.ForResource("podgroups"),
+			v2.UsingClient(c.RESTClient()),
+			v2.UsingParameterCodec(scheme.ParameterCodec),
+			v2.InNamespace(namespace),
+			v2.PrefersProtobuf(),
 		),
 	}
 }

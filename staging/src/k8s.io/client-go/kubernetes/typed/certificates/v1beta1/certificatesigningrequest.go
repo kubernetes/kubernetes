@@ -26,7 +26,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	applyconfigurationscertificatesv1beta1 "k8s.io/client-go/applyconfigurations/certificates/v1beta1"
-	gentype "k8s.io/client-go/gentype"
+	v2 "k8s.io/client-go/gentype/v2"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
 
@@ -57,24 +57,17 @@ type CertificateSigningRequestInterface interface {
 
 // certificateSigningRequests implements CertificateSigningRequestInterface
 type certificateSigningRequests struct {
-	*gentype.ClientWithListAndApply[*certificatesv1beta1.CertificateSigningRequest, *certificatesv1beta1.CertificateSigningRequestList, *applyconfigurationscertificatesv1beta1.CertificateSigningRequestApplyConfiguration]
+	*v2.TypedClientWithListAndApply[certificatesv1beta1.CertificateSigningRequest, certificatesv1beta1.CertificateSigningRequestList, applyconfigurationscertificatesv1beta1.CertificateSigningRequestApplyConfiguration, *certificatesv1beta1.CertificateSigningRequest, *certificatesv1beta1.CertificateSigningRequestList, *applyconfigurationscertificatesv1beta1.CertificateSigningRequestApplyConfiguration]
 }
 
 // newCertificateSigningRequests returns a CertificateSigningRequests
 func newCertificateSigningRequests(c *CertificatesV1beta1Client) *certificateSigningRequests {
 	return &certificateSigningRequests{
-		gentype.NewClientWithListAndApply[*certificatesv1beta1.CertificateSigningRequest, *certificatesv1beta1.CertificateSigningRequestList, *applyconfigurationscertificatesv1beta1.CertificateSigningRequestApplyConfiguration](
-			"certificatesigningrequests",
-			c.RESTClient(),
-			scheme.ParameterCodec,
-			"",
-			func() *certificatesv1beta1.CertificateSigningRequest {
-				return &certificatesv1beta1.CertificateSigningRequest{}
-			},
-			func() *certificatesv1beta1.CertificateSigningRequestList {
-				return &certificatesv1beta1.CertificateSigningRequestList{}
-			},
-			gentype.PrefersProtobuf[*certificatesv1beta1.CertificateSigningRequest](),
+		v2.NewTypedClientWithListAndApply[certificatesv1beta1.CertificateSigningRequest, certificatesv1beta1.CertificateSigningRequestList, applyconfigurationscertificatesv1beta1.CertificateSigningRequestApplyConfiguration](
+			v2.ForResource("certificatesigningrequests"),
+			v2.UsingClient(c.RESTClient()),
+			v2.UsingParameterCodec(scheme.ParameterCodec),
+			v2.PrefersProtobuf(),
 		),
 	}
 }

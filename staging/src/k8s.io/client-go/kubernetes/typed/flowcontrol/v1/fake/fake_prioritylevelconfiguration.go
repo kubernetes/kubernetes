@@ -21,32 +21,27 @@ package fake
 import (
 	v1 "k8s.io/api/flowcontrol/v1"
 	flowcontrolv1 "k8s.io/client-go/applyconfigurations/flowcontrol/v1"
-	gentype "k8s.io/client-go/gentype"
+	v2fake "k8s.io/client-go/gentype/v2/fake"
 	typedflowcontrolv1 "k8s.io/client-go/kubernetes/typed/flowcontrol/v1"
 )
 
 // fakePriorityLevelConfigurations implements PriorityLevelConfigurationInterface
 type fakePriorityLevelConfigurations struct {
-	*gentype.FakeClientWithListAndApply[*v1.PriorityLevelConfiguration, *v1.PriorityLevelConfigurationList, *flowcontrolv1.PriorityLevelConfigurationApplyConfiguration]
+	*v2fake.FakeClientWithListAndApply[v1.PriorityLevelConfiguration, v1.PriorityLevelConfigurationList, flowcontrolv1.PriorityLevelConfigurationApplyConfiguration, *v1.PriorityLevelConfiguration, *v1.PriorityLevelConfigurationList, *flowcontrolv1.PriorityLevelConfigurationApplyConfiguration]
 	Fake *FakeFlowcontrolV1
 }
 
 func newFakePriorityLevelConfigurations(fake *FakeFlowcontrolV1) typedflowcontrolv1.PriorityLevelConfigurationInterface {
 	return &fakePriorityLevelConfigurations{
-		gentype.NewFakeClientWithListAndApply[*v1.PriorityLevelConfiguration, *v1.PriorityLevelConfigurationList, *flowcontrolv1.PriorityLevelConfigurationApplyConfiguration](
+		v2fake.NewFakeClientWithListAndApply[v1.PriorityLevelConfiguration, v1.PriorityLevelConfigurationList, flowcontrolv1.PriorityLevelConfigurationApplyConfiguration](
 			fake.Fake,
-			"",
-			v1.SchemeGroupVersion.WithResource("prioritylevelconfigurations"),
-			v1.SchemeGroupVersion.WithKind("PriorityLevelConfiguration"),
-			func() *v1.PriorityLevelConfiguration { return &v1.PriorityLevelConfiguration{} },
-			func() *v1.PriorityLevelConfigurationList { return &v1.PriorityLevelConfigurationList{} },
-			func(dst, src *v1.PriorityLevelConfigurationList) { dst.ListMeta = src.ListMeta },
-			func(list *v1.PriorityLevelConfigurationList) []*v1.PriorityLevelConfiguration {
-				return gentype.ToPointerSlice(list.Items)
-			},
-			func(list *v1.PriorityLevelConfigurationList, items []*v1.PriorityLevelConfiguration) {
-				list.Items = gentype.FromPointerSlice(items)
-			},
+			v2fake.ForResource(v1.SchemeGroupVersion.WithResource("prioritylevelconfigurations")),
+			v2fake.ForKind(v1.SchemeGroupVersion.WithKind("PriorityLevelConfiguration")),
+			v2fake.WithListMetaCopier[v1.PriorityLevelConfiguration](func(dst, src *v1.PriorityLevelConfigurationList) { dst.ListMeta = src.ListMeta }),
+			v2fake.WithItemsGetter(func(list *v1.PriorityLevelConfigurationList) []v1.PriorityLevelConfiguration { return list.Items }),
+			v2fake.WithItemsSetter(func(list *v1.PriorityLevelConfigurationList, items []v1.PriorityLevelConfiguration) {
+				list.Items = items
+			}),
 		),
 		fake,
 	}

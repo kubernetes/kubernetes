@@ -21,32 +21,25 @@ package fake
 import (
 	v1beta1 "k8s.io/api/rbac/v1beta1"
 	rbacv1beta1 "k8s.io/client-go/applyconfigurations/rbac/v1beta1"
-	gentype "k8s.io/client-go/gentype"
+	v2fake "k8s.io/client-go/gentype/v2/fake"
 	typedrbacv1beta1 "k8s.io/client-go/kubernetes/typed/rbac/v1beta1"
 )
 
 // fakeClusterRoleBindings implements ClusterRoleBindingInterface
 type fakeClusterRoleBindings struct {
-	*gentype.FakeClientWithListAndApply[*v1beta1.ClusterRoleBinding, *v1beta1.ClusterRoleBindingList, *rbacv1beta1.ClusterRoleBindingApplyConfiguration]
+	*v2fake.FakeClientWithListAndApply[v1beta1.ClusterRoleBinding, v1beta1.ClusterRoleBindingList, rbacv1beta1.ClusterRoleBindingApplyConfiguration, *v1beta1.ClusterRoleBinding, *v1beta1.ClusterRoleBindingList, *rbacv1beta1.ClusterRoleBindingApplyConfiguration]
 	Fake *FakeRbacV1beta1
 }
 
 func newFakeClusterRoleBindings(fake *FakeRbacV1beta1) typedrbacv1beta1.ClusterRoleBindingInterface {
 	return &fakeClusterRoleBindings{
-		gentype.NewFakeClientWithListAndApply[*v1beta1.ClusterRoleBinding, *v1beta1.ClusterRoleBindingList, *rbacv1beta1.ClusterRoleBindingApplyConfiguration](
+		v2fake.NewFakeClientWithListAndApply[v1beta1.ClusterRoleBinding, v1beta1.ClusterRoleBindingList, rbacv1beta1.ClusterRoleBindingApplyConfiguration](
 			fake.Fake,
-			"",
-			v1beta1.SchemeGroupVersion.WithResource("clusterrolebindings"),
-			v1beta1.SchemeGroupVersion.WithKind("ClusterRoleBinding"),
-			func() *v1beta1.ClusterRoleBinding { return &v1beta1.ClusterRoleBinding{} },
-			func() *v1beta1.ClusterRoleBindingList { return &v1beta1.ClusterRoleBindingList{} },
-			func(dst, src *v1beta1.ClusterRoleBindingList) { dst.ListMeta = src.ListMeta },
-			func(list *v1beta1.ClusterRoleBindingList) []*v1beta1.ClusterRoleBinding {
-				return gentype.ToPointerSlice(list.Items)
-			},
-			func(list *v1beta1.ClusterRoleBindingList, items []*v1beta1.ClusterRoleBinding) {
-				list.Items = gentype.FromPointerSlice(items)
-			},
+			v2fake.ForResource(v1beta1.SchemeGroupVersion.WithResource("clusterrolebindings")),
+			v2fake.ForKind(v1beta1.SchemeGroupVersion.WithKind("ClusterRoleBinding")),
+			v2fake.WithListMetaCopier[v1beta1.ClusterRoleBinding](func(dst, src *v1beta1.ClusterRoleBindingList) { dst.ListMeta = src.ListMeta }),
+			v2fake.WithItemsGetter(func(list *v1beta1.ClusterRoleBindingList) []v1beta1.ClusterRoleBinding { return list.Items }),
+			v2fake.WithItemsSetter(func(list *v1beta1.ClusterRoleBindingList, items []v1beta1.ClusterRoleBinding) { list.Items = items }),
 		),
 		fake,
 	}

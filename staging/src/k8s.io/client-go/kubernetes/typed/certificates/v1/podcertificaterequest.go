@@ -26,7 +26,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	applyconfigurationscertificatesv1 "k8s.io/client-go/applyconfigurations/certificates/v1"
-	gentype "k8s.io/client-go/gentype"
+	v2 "k8s.io/client-go/gentype/v2"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
 
@@ -57,20 +57,18 @@ type PodCertificateRequestInterface interface {
 
 // podCertificateRequests implements PodCertificateRequestInterface
 type podCertificateRequests struct {
-	*gentype.ClientWithListAndApply[*certificatesv1.PodCertificateRequest, *certificatesv1.PodCertificateRequestList, *applyconfigurationscertificatesv1.PodCertificateRequestApplyConfiguration]
+	*v2.TypedClientWithListAndApply[certificatesv1.PodCertificateRequest, certificatesv1.PodCertificateRequestList, applyconfigurationscertificatesv1.PodCertificateRequestApplyConfiguration, *certificatesv1.PodCertificateRequest, *certificatesv1.PodCertificateRequestList, *applyconfigurationscertificatesv1.PodCertificateRequestApplyConfiguration]
 }
 
 // newPodCertificateRequests returns a PodCertificateRequests
 func newPodCertificateRequests(c *CertificatesV1Client, namespace string) *podCertificateRequests {
 	return &podCertificateRequests{
-		gentype.NewClientWithListAndApply[*certificatesv1.PodCertificateRequest, *certificatesv1.PodCertificateRequestList, *applyconfigurationscertificatesv1.PodCertificateRequestApplyConfiguration](
-			"podcertificaterequests",
-			c.RESTClient(),
-			scheme.ParameterCodec,
-			namespace,
-			func() *certificatesv1.PodCertificateRequest { return &certificatesv1.PodCertificateRequest{} },
-			func() *certificatesv1.PodCertificateRequestList { return &certificatesv1.PodCertificateRequestList{} },
-			gentype.PrefersProtobuf[*certificatesv1.PodCertificateRequest](),
+		v2.NewTypedClientWithListAndApply[certificatesv1.PodCertificateRequest, certificatesv1.PodCertificateRequestList, applyconfigurationscertificatesv1.PodCertificateRequestApplyConfiguration](
+			v2.ForResource("podcertificaterequests"),
+			v2.UsingClient(c.RESTClient()),
+			v2.UsingParameterCodec(scheme.ParameterCodec),
+			v2.InNamespace(namespace),
+			v2.PrefersProtobuf(),
 		),
 	}
 }

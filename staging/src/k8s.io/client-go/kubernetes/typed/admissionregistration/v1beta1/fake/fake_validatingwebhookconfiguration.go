@@ -21,34 +21,29 @@ package fake
 import (
 	v1beta1 "k8s.io/api/admissionregistration/v1beta1"
 	admissionregistrationv1beta1 "k8s.io/client-go/applyconfigurations/admissionregistration/v1beta1"
-	gentype "k8s.io/client-go/gentype"
+	v2fake "k8s.io/client-go/gentype/v2/fake"
 	typedadmissionregistrationv1beta1 "k8s.io/client-go/kubernetes/typed/admissionregistration/v1beta1"
 )
 
 // fakeValidatingWebhookConfigurations implements ValidatingWebhookConfigurationInterface
 type fakeValidatingWebhookConfigurations struct {
-	*gentype.FakeClientWithListAndApply[*v1beta1.ValidatingWebhookConfiguration, *v1beta1.ValidatingWebhookConfigurationList, *admissionregistrationv1beta1.ValidatingWebhookConfigurationApplyConfiguration]
+	*v2fake.FakeClientWithListAndApply[v1beta1.ValidatingWebhookConfiguration, v1beta1.ValidatingWebhookConfigurationList, admissionregistrationv1beta1.ValidatingWebhookConfigurationApplyConfiguration, *v1beta1.ValidatingWebhookConfiguration, *v1beta1.ValidatingWebhookConfigurationList, *admissionregistrationv1beta1.ValidatingWebhookConfigurationApplyConfiguration]
 	Fake *FakeAdmissionregistrationV1beta1
 }
 
 func newFakeValidatingWebhookConfigurations(fake *FakeAdmissionregistrationV1beta1) typedadmissionregistrationv1beta1.ValidatingWebhookConfigurationInterface {
 	return &fakeValidatingWebhookConfigurations{
-		gentype.NewFakeClientWithListAndApply[*v1beta1.ValidatingWebhookConfiguration, *v1beta1.ValidatingWebhookConfigurationList, *admissionregistrationv1beta1.ValidatingWebhookConfigurationApplyConfiguration](
+		v2fake.NewFakeClientWithListAndApply[v1beta1.ValidatingWebhookConfiguration, v1beta1.ValidatingWebhookConfigurationList, admissionregistrationv1beta1.ValidatingWebhookConfigurationApplyConfiguration](
 			fake.Fake,
-			"",
-			v1beta1.SchemeGroupVersion.WithResource("validatingwebhookconfigurations"),
-			v1beta1.SchemeGroupVersion.WithKind("ValidatingWebhookConfiguration"),
-			func() *v1beta1.ValidatingWebhookConfiguration { return &v1beta1.ValidatingWebhookConfiguration{} },
-			func() *v1beta1.ValidatingWebhookConfigurationList {
-				return &v1beta1.ValidatingWebhookConfigurationList{}
-			},
-			func(dst, src *v1beta1.ValidatingWebhookConfigurationList) { dst.ListMeta = src.ListMeta },
-			func(list *v1beta1.ValidatingWebhookConfigurationList) []*v1beta1.ValidatingWebhookConfiguration {
-				return gentype.ToPointerSlice(list.Items)
-			},
-			func(list *v1beta1.ValidatingWebhookConfigurationList, items []*v1beta1.ValidatingWebhookConfiguration) {
-				list.Items = gentype.FromPointerSlice(items)
-			},
+			v2fake.ForResource(v1beta1.SchemeGroupVersion.WithResource("validatingwebhookconfigurations")),
+			v2fake.ForKind(v1beta1.SchemeGroupVersion.WithKind("ValidatingWebhookConfiguration")),
+			v2fake.WithListMetaCopier[v1beta1.ValidatingWebhookConfiguration](func(dst, src *v1beta1.ValidatingWebhookConfigurationList) { dst.ListMeta = src.ListMeta }),
+			v2fake.WithItemsGetter(func(list *v1beta1.ValidatingWebhookConfigurationList) []v1beta1.ValidatingWebhookConfiguration {
+				return list.Items
+			}),
+			v2fake.WithItemsSetter(func(list *v1beta1.ValidatingWebhookConfigurationList, items []v1beta1.ValidatingWebhookConfiguration) {
+				list.Items = items
+			}),
 		),
 		fake,
 	}

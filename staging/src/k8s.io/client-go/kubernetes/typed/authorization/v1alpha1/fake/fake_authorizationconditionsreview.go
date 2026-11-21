@@ -20,24 +20,22 @@ package fake
 
 import (
 	v1alpha1 "k8s.io/api/authorization/v1alpha1"
-	gentype "k8s.io/client-go/gentype"
+	v2fake "k8s.io/client-go/gentype/v2/fake"
 	authorizationv1alpha1 "k8s.io/client-go/kubernetes/typed/authorization/v1alpha1"
 )
 
 // fakeAuthorizationConditionsReviews implements AuthorizationConditionsReviewInterface
 type fakeAuthorizationConditionsReviews struct {
-	*gentype.FakeClient[*v1alpha1.AuthorizationConditionsReview]
+	*v2fake.FakeClient[v1alpha1.AuthorizationConditionsReview, *v1alpha1.AuthorizationConditionsReview]
 	Fake *FakeAuthorizationV1alpha1
 }
 
 func newFakeAuthorizationConditionsReviews(fake *FakeAuthorizationV1alpha1) authorizationv1alpha1.AuthorizationConditionsReviewInterface {
 	return &fakeAuthorizationConditionsReviews{
-		gentype.NewFakeClient[*v1alpha1.AuthorizationConditionsReview](
+		v2fake.NewFakeClient[v1alpha1.AuthorizationConditionsReview](
 			fake.Fake,
-			"",
-			v1alpha1.SchemeGroupVersion.WithResource("authorizationconditionsreviews"),
-			v1alpha1.SchemeGroupVersion.WithKind("AuthorizationConditionsReview"),
-			func() *v1alpha1.AuthorizationConditionsReview { return &v1alpha1.AuthorizationConditionsReview{} },
+			v2fake.ForResource(v1alpha1.SchemeGroupVersion.WithResource("authorizationconditionsreviews")),
+			v2fake.ForKind(v1alpha1.SchemeGroupVersion.WithKind("AuthorizationConditionsReview")),
 		),
 		fake,
 	}

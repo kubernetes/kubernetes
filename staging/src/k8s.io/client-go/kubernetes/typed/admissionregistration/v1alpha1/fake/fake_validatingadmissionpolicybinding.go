@@ -21,34 +21,29 @@ package fake
 import (
 	v1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
 	admissionregistrationv1alpha1 "k8s.io/client-go/applyconfigurations/admissionregistration/v1alpha1"
-	gentype "k8s.io/client-go/gentype"
+	v2fake "k8s.io/client-go/gentype/v2/fake"
 	typedadmissionregistrationv1alpha1 "k8s.io/client-go/kubernetes/typed/admissionregistration/v1alpha1"
 )
 
 // fakeValidatingAdmissionPolicyBindings implements ValidatingAdmissionPolicyBindingInterface
 type fakeValidatingAdmissionPolicyBindings struct {
-	*gentype.FakeClientWithListAndApply[*v1alpha1.ValidatingAdmissionPolicyBinding, *v1alpha1.ValidatingAdmissionPolicyBindingList, *admissionregistrationv1alpha1.ValidatingAdmissionPolicyBindingApplyConfiguration]
+	*v2fake.FakeClientWithListAndApply[v1alpha1.ValidatingAdmissionPolicyBinding, v1alpha1.ValidatingAdmissionPolicyBindingList, admissionregistrationv1alpha1.ValidatingAdmissionPolicyBindingApplyConfiguration, *v1alpha1.ValidatingAdmissionPolicyBinding, *v1alpha1.ValidatingAdmissionPolicyBindingList, *admissionregistrationv1alpha1.ValidatingAdmissionPolicyBindingApplyConfiguration]
 	Fake *FakeAdmissionregistrationV1alpha1
 }
 
 func newFakeValidatingAdmissionPolicyBindings(fake *FakeAdmissionregistrationV1alpha1) typedadmissionregistrationv1alpha1.ValidatingAdmissionPolicyBindingInterface {
 	return &fakeValidatingAdmissionPolicyBindings{
-		gentype.NewFakeClientWithListAndApply[*v1alpha1.ValidatingAdmissionPolicyBinding, *v1alpha1.ValidatingAdmissionPolicyBindingList, *admissionregistrationv1alpha1.ValidatingAdmissionPolicyBindingApplyConfiguration](
+		v2fake.NewFakeClientWithListAndApply[v1alpha1.ValidatingAdmissionPolicyBinding, v1alpha1.ValidatingAdmissionPolicyBindingList, admissionregistrationv1alpha1.ValidatingAdmissionPolicyBindingApplyConfiguration](
 			fake.Fake,
-			"",
-			v1alpha1.SchemeGroupVersion.WithResource("validatingadmissionpolicybindings"),
-			v1alpha1.SchemeGroupVersion.WithKind("ValidatingAdmissionPolicyBinding"),
-			func() *v1alpha1.ValidatingAdmissionPolicyBinding { return &v1alpha1.ValidatingAdmissionPolicyBinding{} },
-			func() *v1alpha1.ValidatingAdmissionPolicyBindingList {
-				return &v1alpha1.ValidatingAdmissionPolicyBindingList{}
-			},
-			func(dst, src *v1alpha1.ValidatingAdmissionPolicyBindingList) { dst.ListMeta = src.ListMeta },
-			func(list *v1alpha1.ValidatingAdmissionPolicyBindingList) []*v1alpha1.ValidatingAdmissionPolicyBinding {
-				return gentype.ToPointerSlice(list.Items)
-			},
-			func(list *v1alpha1.ValidatingAdmissionPolicyBindingList, items []*v1alpha1.ValidatingAdmissionPolicyBinding) {
-				list.Items = gentype.FromPointerSlice(items)
-			},
+			v2fake.ForResource(v1alpha1.SchemeGroupVersion.WithResource("validatingadmissionpolicybindings")),
+			v2fake.ForKind(v1alpha1.SchemeGroupVersion.WithKind("ValidatingAdmissionPolicyBinding")),
+			v2fake.WithListMetaCopier[v1alpha1.ValidatingAdmissionPolicyBinding](func(dst, src *v1alpha1.ValidatingAdmissionPolicyBindingList) { dst.ListMeta = src.ListMeta }),
+			v2fake.WithItemsGetter(func(list *v1alpha1.ValidatingAdmissionPolicyBindingList) []v1alpha1.ValidatingAdmissionPolicyBinding {
+				return list.Items
+			}),
+			v2fake.WithItemsSetter(func(list *v1alpha1.ValidatingAdmissionPolicyBindingList, items []v1alpha1.ValidatingAdmissionPolicyBinding) {
+				list.Items = items
+			}),
 		),
 		fake,
 	}

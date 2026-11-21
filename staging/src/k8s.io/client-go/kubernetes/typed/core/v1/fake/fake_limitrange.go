@@ -21,28 +21,26 @@ package fake
 import (
 	v1 "k8s.io/api/core/v1"
 	corev1 "k8s.io/client-go/applyconfigurations/core/v1"
-	gentype "k8s.io/client-go/gentype"
+	v2fake "k8s.io/client-go/gentype/v2/fake"
 	typedcorev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 )
 
 // fakeLimitRanges implements LimitRangeInterface
 type fakeLimitRanges struct {
-	*gentype.FakeClientWithListAndApply[*v1.LimitRange, *v1.LimitRangeList, *corev1.LimitRangeApplyConfiguration]
+	*v2fake.FakeClientWithListAndApply[v1.LimitRange, v1.LimitRangeList, corev1.LimitRangeApplyConfiguration, *v1.LimitRange, *v1.LimitRangeList, *corev1.LimitRangeApplyConfiguration]
 	Fake *FakeCoreV1
 }
 
 func newFakeLimitRanges(fake *FakeCoreV1, namespace string) typedcorev1.LimitRangeInterface {
 	return &fakeLimitRanges{
-		gentype.NewFakeClientWithListAndApply[*v1.LimitRange, *v1.LimitRangeList, *corev1.LimitRangeApplyConfiguration](
+		v2fake.NewFakeClientWithListAndApply[v1.LimitRange, v1.LimitRangeList, corev1.LimitRangeApplyConfiguration](
 			fake.Fake,
-			namespace,
-			v1.SchemeGroupVersion.WithResource("limitranges"),
-			v1.SchemeGroupVersion.WithKind("LimitRange"),
-			func() *v1.LimitRange { return &v1.LimitRange{} },
-			func() *v1.LimitRangeList { return &v1.LimitRangeList{} },
-			func(dst, src *v1.LimitRangeList) { dst.ListMeta = src.ListMeta },
-			func(list *v1.LimitRangeList) []*v1.LimitRange { return gentype.ToPointerSlice(list.Items) },
-			func(list *v1.LimitRangeList, items []*v1.LimitRange) { list.Items = gentype.FromPointerSlice(items) },
+			v2fake.InNamespace(namespace),
+			v2fake.ForResource(v1.SchemeGroupVersion.WithResource("limitranges")),
+			v2fake.ForKind(v1.SchemeGroupVersion.WithKind("LimitRange")),
+			v2fake.WithListMetaCopier[v1.LimitRange](func(dst, src *v1.LimitRangeList) { dst.ListMeta = src.ListMeta }),
+			v2fake.WithItemsGetter(func(list *v1.LimitRangeList) []v1.LimitRange { return list.Items }),
+			v2fake.WithItemsSetter(func(list *v1.LimitRangeList, items []v1.LimitRange) { list.Items = items }),
 		),
 		fake,
 	}

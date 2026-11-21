@@ -19,7 +19,7 @@ limitations under the License.
 package fake
 
 import (
-	gentype "k8s.io/client-go/gentype"
+	v2fake "k8s.io/client-go/gentype/v2/fake"
 	v1alpha1 "k8s.io/sample-controller/pkg/apis/samplecontroller/v1alpha1"
 	samplecontrollerv1alpha1 "k8s.io/sample-controller/pkg/generated/applyconfiguration/samplecontroller/v1alpha1"
 	typedsamplecontrollerv1alpha1 "k8s.io/sample-controller/pkg/generated/clientset/versioned/typed/samplecontroller/v1alpha1"
@@ -27,22 +27,20 @@ import (
 
 // fakeFoos implements FooInterface
 type fakeFoos struct {
-	*gentype.FakeClientWithListAndApply[*v1alpha1.Foo, *v1alpha1.FooList, *samplecontrollerv1alpha1.FooApplyConfiguration]
+	*v2fake.FakeClientWithListAndApply[v1alpha1.Foo, v1alpha1.FooList, samplecontrollerv1alpha1.FooApplyConfiguration, *v1alpha1.Foo, *v1alpha1.FooList, *samplecontrollerv1alpha1.FooApplyConfiguration]
 	Fake *FakeSamplecontrollerV1alpha1
 }
 
 func newFakeFoos(fake *FakeSamplecontrollerV1alpha1, namespace string) typedsamplecontrollerv1alpha1.FooInterface {
 	return &fakeFoos{
-		gentype.NewFakeClientWithListAndApply[*v1alpha1.Foo, *v1alpha1.FooList, *samplecontrollerv1alpha1.FooApplyConfiguration](
+		v2fake.NewFakeClientWithListAndApply[v1alpha1.Foo, v1alpha1.FooList, samplecontrollerv1alpha1.FooApplyConfiguration](
 			fake.Fake,
-			namespace,
-			v1alpha1.SchemeGroupVersion.WithResource("foos"),
-			v1alpha1.SchemeGroupVersion.WithKind("Foo"),
-			func() *v1alpha1.Foo { return &v1alpha1.Foo{} },
-			func() *v1alpha1.FooList { return &v1alpha1.FooList{} },
-			func(dst, src *v1alpha1.FooList) { dst.ListMeta = src.ListMeta },
-			func(list *v1alpha1.FooList) []*v1alpha1.Foo { return gentype.ToPointerSlice(list.Items) },
-			func(list *v1alpha1.FooList, items []*v1alpha1.Foo) { list.Items = gentype.FromPointerSlice(items) },
+			v2fake.InNamespace(namespace),
+			v2fake.ForResource(v1alpha1.SchemeGroupVersion.WithResource("foos")),
+			v2fake.ForKind(v1alpha1.SchemeGroupVersion.WithKind("Foo")),
+			v2fake.WithListMetaCopier[v1alpha1.Foo](func(dst, src *v1alpha1.FooList) { dst.ListMeta = src.ListMeta }),
+			v2fake.WithItemsGetter(func(list *v1alpha1.FooList) []v1alpha1.Foo { return list.Items }),
+			v2fake.WithItemsSetter(func(list *v1alpha1.FooList, items []v1alpha1.Foo) { list.Items = items }),
 		),
 		fake,
 	}

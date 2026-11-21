@@ -21,32 +21,29 @@ package fake
 import (
 	v1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
 	admissionregistrationv1alpha1 "k8s.io/client-go/applyconfigurations/admissionregistration/v1alpha1"
-	gentype "k8s.io/client-go/gentype"
+	v2fake "k8s.io/client-go/gentype/v2/fake"
 	typedadmissionregistrationv1alpha1 "k8s.io/client-go/kubernetes/typed/admissionregistration/v1alpha1"
 )
 
 // fakeValidatingAdmissionPolicies implements ValidatingAdmissionPolicyInterface
 type fakeValidatingAdmissionPolicies struct {
-	*gentype.FakeClientWithListAndApply[*v1alpha1.ValidatingAdmissionPolicy, *v1alpha1.ValidatingAdmissionPolicyList, *admissionregistrationv1alpha1.ValidatingAdmissionPolicyApplyConfiguration]
+	*v2fake.FakeClientWithListAndApply[v1alpha1.ValidatingAdmissionPolicy, v1alpha1.ValidatingAdmissionPolicyList, admissionregistrationv1alpha1.ValidatingAdmissionPolicyApplyConfiguration, *v1alpha1.ValidatingAdmissionPolicy, *v1alpha1.ValidatingAdmissionPolicyList, *admissionregistrationv1alpha1.ValidatingAdmissionPolicyApplyConfiguration]
 	Fake *FakeAdmissionregistrationV1alpha1
 }
 
 func newFakeValidatingAdmissionPolicies(fake *FakeAdmissionregistrationV1alpha1) typedadmissionregistrationv1alpha1.ValidatingAdmissionPolicyInterface {
 	return &fakeValidatingAdmissionPolicies{
-		gentype.NewFakeClientWithListAndApply[*v1alpha1.ValidatingAdmissionPolicy, *v1alpha1.ValidatingAdmissionPolicyList, *admissionregistrationv1alpha1.ValidatingAdmissionPolicyApplyConfiguration](
+		v2fake.NewFakeClientWithListAndApply[v1alpha1.ValidatingAdmissionPolicy, v1alpha1.ValidatingAdmissionPolicyList, admissionregistrationv1alpha1.ValidatingAdmissionPolicyApplyConfiguration](
 			fake.Fake,
-			"",
-			v1alpha1.SchemeGroupVersion.WithResource("validatingadmissionpolicies"),
-			v1alpha1.SchemeGroupVersion.WithKind("ValidatingAdmissionPolicy"),
-			func() *v1alpha1.ValidatingAdmissionPolicy { return &v1alpha1.ValidatingAdmissionPolicy{} },
-			func() *v1alpha1.ValidatingAdmissionPolicyList { return &v1alpha1.ValidatingAdmissionPolicyList{} },
-			func(dst, src *v1alpha1.ValidatingAdmissionPolicyList) { dst.ListMeta = src.ListMeta },
-			func(list *v1alpha1.ValidatingAdmissionPolicyList) []*v1alpha1.ValidatingAdmissionPolicy {
-				return gentype.ToPointerSlice(list.Items)
-			},
-			func(list *v1alpha1.ValidatingAdmissionPolicyList, items []*v1alpha1.ValidatingAdmissionPolicy) {
-				list.Items = gentype.FromPointerSlice(items)
-			},
+			v2fake.ForResource(v1alpha1.SchemeGroupVersion.WithResource("validatingadmissionpolicies")),
+			v2fake.ForKind(v1alpha1.SchemeGroupVersion.WithKind("ValidatingAdmissionPolicy")),
+			v2fake.WithListMetaCopier[v1alpha1.ValidatingAdmissionPolicy](func(dst, src *v1alpha1.ValidatingAdmissionPolicyList) { dst.ListMeta = src.ListMeta }),
+			v2fake.WithItemsGetter(func(list *v1alpha1.ValidatingAdmissionPolicyList) []v1alpha1.ValidatingAdmissionPolicy {
+				return list.Items
+			}),
+			v2fake.WithItemsSetter(func(list *v1alpha1.ValidatingAdmissionPolicyList, items []v1alpha1.ValidatingAdmissionPolicy) {
+				list.Items = items
+			}),
 		),
 		fake,
 	}

@@ -21,28 +21,26 @@ package fake
 import (
 	v1 "k8s.io/api/rbac/v1"
 	rbacv1 "k8s.io/client-go/applyconfigurations/rbac/v1"
-	gentype "k8s.io/client-go/gentype"
+	v2fake "k8s.io/client-go/gentype/v2/fake"
 	typedrbacv1 "k8s.io/client-go/kubernetes/typed/rbac/v1"
 )
 
 // fakeRoles implements RoleInterface
 type fakeRoles struct {
-	*gentype.FakeClientWithListAndApply[*v1.Role, *v1.RoleList, *rbacv1.RoleApplyConfiguration]
+	*v2fake.FakeClientWithListAndApply[v1.Role, v1.RoleList, rbacv1.RoleApplyConfiguration, *v1.Role, *v1.RoleList, *rbacv1.RoleApplyConfiguration]
 	Fake *FakeRbacV1
 }
 
 func newFakeRoles(fake *FakeRbacV1, namespace string) typedrbacv1.RoleInterface {
 	return &fakeRoles{
-		gentype.NewFakeClientWithListAndApply[*v1.Role, *v1.RoleList, *rbacv1.RoleApplyConfiguration](
+		v2fake.NewFakeClientWithListAndApply[v1.Role, v1.RoleList, rbacv1.RoleApplyConfiguration](
 			fake.Fake,
-			namespace,
-			v1.SchemeGroupVersion.WithResource("roles"),
-			v1.SchemeGroupVersion.WithKind("Role"),
-			func() *v1.Role { return &v1.Role{} },
-			func() *v1.RoleList { return &v1.RoleList{} },
-			func(dst, src *v1.RoleList) { dst.ListMeta = src.ListMeta },
-			func(list *v1.RoleList) []*v1.Role { return gentype.ToPointerSlice(list.Items) },
-			func(list *v1.RoleList, items []*v1.Role) { list.Items = gentype.FromPointerSlice(items) },
+			v2fake.InNamespace(namespace),
+			v2fake.ForResource(v1.SchemeGroupVersion.WithResource("roles")),
+			v2fake.ForKind(v1.SchemeGroupVersion.WithKind("Role")),
+			v2fake.WithListMetaCopier[v1.Role](func(dst, src *v1.RoleList) { dst.ListMeta = src.ListMeta }),
+			v2fake.WithItemsGetter(func(list *v1.RoleList) []v1.Role { return list.Items }),
+			v2fake.WithItemsSetter(func(list *v1.RoleList, items []v1.Role) { list.Items = items }),
 		),
 		fake,
 	}

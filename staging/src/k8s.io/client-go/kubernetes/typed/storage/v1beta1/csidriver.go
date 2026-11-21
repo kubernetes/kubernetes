@@ -26,7 +26,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	applyconfigurationsstoragev1beta1 "k8s.io/client-go/applyconfigurations/storage/v1beta1"
-	gentype "k8s.io/client-go/gentype"
+	v2 "k8s.io/client-go/gentype/v2"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
 
@@ -53,20 +53,17 @@ type CSIDriverInterface interface {
 
 // cSIDrivers implements CSIDriverInterface
 type cSIDrivers struct {
-	*gentype.ClientWithListAndApply[*storagev1beta1.CSIDriver, *storagev1beta1.CSIDriverList, *applyconfigurationsstoragev1beta1.CSIDriverApplyConfiguration]
+	*v2.TypedClientWithListAndApply[storagev1beta1.CSIDriver, storagev1beta1.CSIDriverList, applyconfigurationsstoragev1beta1.CSIDriverApplyConfiguration, *storagev1beta1.CSIDriver, *storagev1beta1.CSIDriverList, *applyconfigurationsstoragev1beta1.CSIDriverApplyConfiguration]
 }
 
 // newCSIDrivers returns a CSIDrivers
 func newCSIDrivers(c *StorageV1beta1Client) *cSIDrivers {
 	return &cSIDrivers{
-		gentype.NewClientWithListAndApply[*storagev1beta1.CSIDriver, *storagev1beta1.CSIDriverList, *applyconfigurationsstoragev1beta1.CSIDriverApplyConfiguration](
-			"csidrivers",
-			c.RESTClient(),
-			scheme.ParameterCodec,
-			"",
-			func() *storagev1beta1.CSIDriver { return &storagev1beta1.CSIDriver{} },
-			func() *storagev1beta1.CSIDriverList { return &storagev1beta1.CSIDriverList{} },
-			gentype.PrefersProtobuf[*storagev1beta1.CSIDriver](),
+		v2.NewTypedClientWithListAndApply[storagev1beta1.CSIDriver, storagev1beta1.CSIDriverList, applyconfigurationsstoragev1beta1.CSIDriverApplyConfiguration](
+			v2.ForResource("csidrivers"),
+			v2.UsingClient(c.RESTClient()),
+			v2.UsingParameterCodec(scheme.ParameterCodec),
+			v2.PrefersProtobuf(),
 		),
 	}
 }

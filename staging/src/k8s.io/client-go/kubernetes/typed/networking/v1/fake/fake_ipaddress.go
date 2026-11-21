@@ -21,28 +21,25 @@ package fake
 import (
 	v1 "k8s.io/api/networking/v1"
 	networkingv1 "k8s.io/client-go/applyconfigurations/networking/v1"
-	gentype "k8s.io/client-go/gentype"
+	v2fake "k8s.io/client-go/gentype/v2/fake"
 	typednetworkingv1 "k8s.io/client-go/kubernetes/typed/networking/v1"
 )
 
 // fakeIPAddresses implements IPAddressInterface
 type fakeIPAddresses struct {
-	*gentype.FakeClientWithListAndApply[*v1.IPAddress, *v1.IPAddressList, *networkingv1.IPAddressApplyConfiguration]
+	*v2fake.FakeClientWithListAndApply[v1.IPAddress, v1.IPAddressList, networkingv1.IPAddressApplyConfiguration, *v1.IPAddress, *v1.IPAddressList, *networkingv1.IPAddressApplyConfiguration]
 	Fake *FakeNetworkingV1
 }
 
 func newFakeIPAddresses(fake *FakeNetworkingV1) typednetworkingv1.IPAddressInterface {
 	return &fakeIPAddresses{
-		gentype.NewFakeClientWithListAndApply[*v1.IPAddress, *v1.IPAddressList, *networkingv1.IPAddressApplyConfiguration](
+		v2fake.NewFakeClientWithListAndApply[v1.IPAddress, v1.IPAddressList, networkingv1.IPAddressApplyConfiguration](
 			fake.Fake,
-			"",
-			v1.SchemeGroupVersion.WithResource("ipaddresses"),
-			v1.SchemeGroupVersion.WithKind("IPAddress"),
-			func() *v1.IPAddress { return &v1.IPAddress{} },
-			func() *v1.IPAddressList { return &v1.IPAddressList{} },
-			func(dst, src *v1.IPAddressList) { dst.ListMeta = src.ListMeta },
-			func(list *v1.IPAddressList) []*v1.IPAddress { return gentype.ToPointerSlice(list.Items) },
-			func(list *v1.IPAddressList, items []*v1.IPAddress) { list.Items = gentype.FromPointerSlice(items) },
+			v2fake.ForResource(v1.SchemeGroupVersion.WithResource("ipaddresses")),
+			v2fake.ForKind(v1.SchemeGroupVersion.WithKind("IPAddress")),
+			v2fake.WithListMetaCopier[v1.IPAddress](func(dst, src *v1.IPAddressList) { dst.ListMeta = src.ListMeta }),
+			v2fake.WithItemsGetter(func(list *v1.IPAddressList) []v1.IPAddress { return list.Items }),
+			v2fake.WithItemsSetter(func(list *v1.IPAddressList, items []v1.IPAddress) { list.Items = items }),
 		),
 		fake,
 	}

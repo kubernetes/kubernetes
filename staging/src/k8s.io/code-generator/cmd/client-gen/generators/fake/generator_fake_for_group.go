@@ -77,8 +77,6 @@ func (g *genFakeForGroup) GenerateType(c *generator.Context, t *types.Type, w io
 		"Fake":                c.Universe.Type(types.Name{Package: "k8s.io/client-go/testing", Name: "Fake"}),
 		"RESTClientInterface": c.Universe.Type(types.Name{Package: "k8s.io/client-go/rest", Name: "Interface"}),
 		"RESTClient":          c.Universe.Type(types.Name{Package: "k8s.io/client-go/rest", Name: "RESTClient"}),
-		"FakeClient":          c.Universe.Type(types.Name{Package: "k8s.io/client-go/gentype", Name: "FakeClient"}),
-		"NewFakeClient":       c.Universe.Function(types.Name{Package: "k8s.io/client-go/gentype", Name: "NewFakeClient"}),
 	}
 
 	sw.Do(groupClientTemplate, m)

@@ -21,30 +21,25 @@ package fake
 import (
 	v1 "k8s.io/api/storage/v1"
 	storagev1 "k8s.io/client-go/applyconfigurations/storage/v1"
-	gentype "k8s.io/client-go/gentype"
+	v2fake "k8s.io/client-go/gentype/v2/fake"
 	typedstoragev1 "k8s.io/client-go/kubernetes/typed/storage/v1"
 )
 
 // fakeStorageClasses implements StorageClassInterface
 type fakeStorageClasses struct {
-	*gentype.FakeClientWithListAndApply[*v1.StorageClass, *v1.StorageClassList, *storagev1.StorageClassApplyConfiguration]
+	*v2fake.FakeClientWithListAndApply[v1.StorageClass, v1.StorageClassList, storagev1.StorageClassApplyConfiguration, *v1.StorageClass, *v1.StorageClassList, *storagev1.StorageClassApplyConfiguration]
 	Fake *FakeStorageV1
 }
 
 func newFakeStorageClasses(fake *FakeStorageV1) typedstoragev1.StorageClassInterface {
 	return &fakeStorageClasses{
-		gentype.NewFakeClientWithListAndApply[*v1.StorageClass, *v1.StorageClassList, *storagev1.StorageClassApplyConfiguration](
+		v2fake.NewFakeClientWithListAndApply[v1.StorageClass, v1.StorageClassList, storagev1.StorageClassApplyConfiguration](
 			fake.Fake,
-			"",
-			v1.SchemeGroupVersion.WithResource("storageclasses"),
-			v1.SchemeGroupVersion.WithKind("StorageClass"),
-			func() *v1.StorageClass { return &v1.StorageClass{} },
-			func() *v1.StorageClassList { return &v1.StorageClassList{} },
-			func(dst, src *v1.StorageClassList) { dst.ListMeta = src.ListMeta },
-			func(list *v1.StorageClassList) []*v1.StorageClass { return gentype.ToPointerSlice(list.Items) },
-			func(list *v1.StorageClassList, items []*v1.StorageClass) {
-				list.Items = gentype.FromPointerSlice(items)
-			},
+			v2fake.ForResource(v1.SchemeGroupVersion.WithResource("storageclasses")),
+			v2fake.ForKind(v1.SchemeGroupVersion.WithKind("StorageClass")),
+			v2fake.WithListMetaCopier[v1.StorageClass](func(dst, src *v1.StorageClassList) { dst.ListMeta = src.ListMeta }),
+			v2fake.WithItemsGetter(func(list *v1.StorageClassList) []v1.StorageClass { return list.Items }),
+			v2fake.WithItemsSetter(func(list *v1.StorageClassList, items []v1.StorageClass) { list.Items = items }),
 		),
 		fake,
 	}

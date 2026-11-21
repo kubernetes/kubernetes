@@ -26,7 +26,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	applyconfigurationslifecyclev1alpha1 "k8s.io/client-go/applyconfigurations/lifecycle/v1alpha1"
-	gentype "k8s.io/client-go/gentype"
+	v2 "k8s.io/client-go/gentype/v2"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
 
@@ -57,20 +57,18 @@ type EvictionInterface interface {
 
 // evictions implements EvictionInterface
 type evictions struct {
-	*gentype.ClientWithListAndApply[*lifecyclev1alpha1.Eviction, *lifecyclev1alpha1.EvictionList, *applyconfigurationslifecyclev1alpha1.EvictionApplyConfiguration]
+	*v2.TypedClientWithListAndApply[lifecyclev1alpha1.Eviction, lifecyclev1alpha1.EvictionList, applyconfigurationslifecyclev1alpha1.EvictionApplyConfiguration, *lifecyclev1alpha1.Eviction, *lifecyclev1alpha1.EvictionList, *applyconfigurationslifecyclev1alpha1.EvictionApplyConfiguration]
 }
 
 // newEvictions returns a Evictions
 func newEvictions(c *LifecycleV1alpha1Client, namespace string) *evictions {
 	return &evictions{
-		gentype.NewClientWithListAndApply[*lifecyclev1alpha1.Eviction, *lifecyclev1alpha1.EvictionList, *applyconfigurationslifecyclev1alpha1.EvictionApplyConfiguration](
-			"evictions",
-			c.RESTClient(),
-			scheme.ParameterCodec,
-			namespace,
-			func() *lifecyclev1alpha1.Eviction { return &lifecyclev1alpha1.Eviction{} },
-			func() *lifecyclev1alpha1.EvictionList { return &lifecyclev1alpha1.EvictionList{} },
-			gentype.PrefersProtobuf[*lifecyclev1alpha1.Eviction](),
+		v2.NewTypedClientWithListAndApply[lifecyclev1alpha1.Eviction, lifecyclev1alpha1.EvictionList, applyconfigurationslifecyclev1alpha1.EvictionApplyConfiguration](
+			v2.ForResource("evictions"),
+			v2.UsingClient(c.RESTClient()),
+			v2.UsingParameterCodec(scheme.ParameterCodec),
+			v2.InNamespace(namespace),
+			v2.PrefersProtobuf(),
 		),
 	}
 }

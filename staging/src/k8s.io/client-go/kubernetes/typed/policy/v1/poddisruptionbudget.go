@@ -26,7 +26,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	applyconfigurationspolicyv1 "k8s.io/client-go/applyconfigurations/policy/v1"
-	gentype "k8s.io/client-go/gentype"
+	v2 "k8s.io/client-go/gentype/v2"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
 
@@ -57,20 +57,18 @@ type PodDisruptionBudgetInterface interface {
 
 // podDisruptionBudgets implements PodDisruptionBudgetInterface
 type podDisruptionBudgets struct {
-	*gentype.ClientWithListAndApply[*policyv1.PodDisruptionBudget, *policyv1.PodDisruptionBudgetList, *applyconfigurationspolicyv1.PodDisruptionBudgetApplyConfiguration]
+	*v2.TypedClientWithListAndApply[policyv1.PodDisruptionBudget, policyv1.PodDisruptionBudgetList, applyconfigurationspolicyv1.PodDisruptionBudgetApplyConfiguration, *policyv1.PodDisruptionBudget, *policyv1.PodDisruptionBudgetList, *applyconfigurationspolicyv1.PodDisruptionBudgetApplyConfiguration]
 }
 
 // newPodDisruptionBudgets returns a PodDisruptionBudgets
 func newPodDisruptionBudgets(c *PolicyV1Client, namespace string) *podDisruptionBudgets {
 	return &podDisruptionBudgets{
-		gentype.NewClientWithListAndApply[*policyv1.PodDisruptionBudget, *policyv1.PodDisruptionBudgetList, *applyconfigurationspolicyv1.PodDisruptionBudgetApplyConfiguration](
-			"poddisruptionbudgets",
-			c.RESTClient(),
-			scheme.ParameterCodec,
-			namespace,
-			func() *policyv1.PodDisruptionBudget { return &policyv1.PodDisruptionBudget{} },
-			func() *policyv1.PodDisruptionBudgetList { return &policyv1.PodDisruptionBudgetList{} },
-			gentype.PrefersProtobuf[*policyv1.PodDisruptionBudget](),
+		v2.NewTypedClientWithListAndApply[policyv1.PodDisruptionBudget, policyv1.PodDisruptionBudgetList, applyconfigurationspolicyv1.PodDisruptionBudgetApplyConfiguration](
+			v2.ForResource("poddisruptionbudgets"),
+			v2.UsingClient(c.RESTClient()),
+			v2.UsingParameterCodec(scheme.ParameterCodec),
+			v2.InNamespace(namespace),
+			v2.PrefersProtobuf(),
 		),
 	}
 }

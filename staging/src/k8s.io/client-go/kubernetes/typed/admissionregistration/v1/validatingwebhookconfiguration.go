@@ -26,7 +26,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	applyconfigurationsadmissionregistrationv1 "k8s.io/client-go/applyconfigurations/admissionregistration/v1"
-	gentype "k8s.io/client-go/gentype"
+	v2 "k8s.io/client-go/gentype/v2"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
 
@@ -53,24 +53,17 @@ type ValidatingWebhookConfigurationInterface interface {
 
 // validatingWebhookConfigurations implements ValidatingWebhookConfigurationInterface
 type validatingWebhookConfigurations struct {
-	*gentype.ClientWithListAndApply[*admissionregistrationv1.ValidatingWebhookConfiguration, *admissionregistrationv1.ValidatingWebhookConfigurationList, *applyconfigurationsadmissionregistrationv1.ValidatingWebhookConfigurationApplyConfiguration]
+	*v2.TypedClientWithListAndApply[admissionregistrationv1.ValidatingWebhookConfiguration, admissionregistrationv1.ValidatingWebhookConfigurationList, applyconfigurationsadmissionregistrationv1.ValidatingWebhookConfigurationApplyConfiguration, *admissionregistrationv1.ValidatingWebhookConfiguration, *admissionregistrationv1.ValidatingWebhookConfigurationList, *applyconfigurationsadmissionregistrationv1.ValidatingWebhookConfigurationApplyConfiguration]
 }
 
 // newValidatingWebhookConfigurations returns a ValidatingWebhookConfigurations
 func newValidatingWebhookConfigurations(c *AdmissionregistrationV1Client) *validatingWebhookConfigurations {
 	return &validatingWebhookConfigurations{
-		gentype.NewClientWithListAndApply[*admissionregistrationv1.ValidatingWebhookConfiguration, *admissionregistrationv1.ValidatingWebhookConfigurationList, *applyconfigurationsadmissionregistrationv1.ValidatingWebhookConfigurationApplyConfiguration](
-			"validatingwebhookconfigurations",
-			c.RESTClient(),
-			scheme.ParameterCodec,
-			"",
-			func() *admissionregistrationv1.ValidatingWebhookConfiguration {
-				return &admissionregistrationv1.ValidatingWebhookConfiguration{}
-			},
-			func() *admissionregistrationv1.ValidatingWebhookConfigurationList {
-				return &admissionregistrationv1.ValidatingWebhookConfigurationList{}
-			},
-			gentype.PrefersProtobuf[*admissionregistrationv1.ValidatingWebhookConfiguration](),
+		v2.NewTypedClientWithListAndApply[admissionregistrationv1.ValidatingWebhookConfiguration, admissionregistrationv1.ValidatingWebhookConfigurationList, applyconfigurationsadmissionregistrationv1.ValidatingWebhookConfigurationApplyConfiguration](
+			v2.ForResource("validatingwebhookconfigurations"),
+			v2.UsingClient(c.RESTClient()),
+			v2.UsingParameterCodec(scheme.ParameterCodec),
+			v2.PrefersProtobuf(),
 		),
 	}
 }

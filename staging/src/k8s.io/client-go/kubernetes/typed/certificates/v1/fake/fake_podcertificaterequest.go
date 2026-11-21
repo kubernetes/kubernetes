@@ -21,32 +21,26 @@ package fake
 import (
 	v1 "k8s.io/api/certificates/v1"
 	certificatesv1 "k8s.io/client-go/applyconfigurations/certificates/v1"
-	gentype "k8s.io/client-go/gentype"
+	v2fake "k8s.io/client-go/gentype/v2/fake"
 	typedcertificatesv1 "k8s.io/client-go/kubernetes/typed/certificates/v1"
 )
 
 // fakePodCertificateRequests implements PodCertificateRequestInterface
 type fakePodCertificateRequests struct {
-	*gentype.FakeClientWithListAndApply[*v1.PodCertificateRequest, *v1.PodCertificateRequestList, *certificatesv1.PodCertificateRequestApplyConfiguration]
+	*v2fake.FakeClientWithListAndApply[v1.PodCertificateRequest, v1.PodCertificateRequestList, certificatesv1.PodCertificateRequestApplyConfiguration, *v1.PodCertificateRequest, *v1.PodCertificateRequestList, *certificatesv1.PodCertificateRequestApplyConfiguration]
 	Fake *FakeCertificatesV1
 }
 
 func newFakePodCertificateRequests(fake *FakeCertificatesV1, namespace string) typedcertificatesv1.PodCertificateRequestInterface {
 	return &fakePodCertificateRequests{
-		gentype.NewFakeClientWithListAndApply[*v1.PodCertificateRequest, *v1.PodCertificateRequestList, *certificatesv1.PodCertificateRequestApplyConfiguration](
+		v2fake.NewFakeClientWithListAndApply[v1.PodCertificateRequest, v1.PodCertificateRequestList, certificatesv1.PodCertificateRequestApplyConfiguration](
 			fake.Fake,
-			namespace,
-			v1.SchemeGroupVersion.WithResource("podcertificaterequests"),
-			v1.SchemeGroupVersion.WithKind("PodCertificateRequest"),
-			func() *v1.PodCertificateRequest { return &v1.PodCertificateRequest{} },
-			func() *v1.PodCertificateRequestList { return &v1.PodCertificateRequestList{} },
-			func(dst, src *v1.PodCertificateRequestList) { dst.ListMeta = src.ListMeta },
-			func(list *v1.PodCertificateRequestList) []*v1.PodCertificateRequest {
-				return gentype.ToPointerSlice(list.Items)
-			},
-			func(list *v1.PodCertificateRequestList, items []*v1.PodCertificateRequest) {
-				list.Items = gentype.FromPointerSlice(items)
-			},
+			v2fake.InNamespace(namespace),
+			v2fake.ForResource(v1.SchemeGroupVersion.WithResource("podcertificaterequests")),
+			v2fake.ForKind(v1.SchemeGroupVersion.WithKind("PodCertificateRequest")),
+			v2fake.WithListMetaCopier[v1.PodCertificateRequest](func(dst, src *v1.PodCertificateRequestList) { dst.ListMeta = src.ListMeta }),
+			v2fake.WithItemsGetter(func(list *v1.PodCertificateRequestList) []v1.PodCertificateRequest { return list.Items }),
+			v2fake.WithItemsSetter(func(list *v1.PodCertificateRequestList, items []v1.PodCertificateRequest) { list.Items = items }),
 		),
 		fake,
 	}

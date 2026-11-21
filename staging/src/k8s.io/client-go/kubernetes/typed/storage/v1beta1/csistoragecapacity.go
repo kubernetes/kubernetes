@@ -26,7 +26,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	applyconfigurationsstoragev1beta1 "k8s.io/client-go/applyconfigurations/storage/v1beta1"
-	gentype "k8s.io/client-go/gentype"
+	v2 "k8s.io/client-go/gentype/v2"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
 
@@ -53,20 +53,18 @@ type CSIStorageCapacityInterface interface {
 
 // cSIStorageCapacities implements CSIStorageCapacityInterface
 type cSIStorageCapacities struct {
-	*gentype.ClientWithListAndApply[*storagev1beta1.CSIStorageCapacity, *storagev1beta1.CSIStorageCapacityList, *applyconfigurationsstoragev1beta1.CSIStorageCapacityApplyConfiguration]
+	*v2.TypedClientWithListAndApply[storagev1beta1.CSIStorageCapacity, storagev1beta1.CSIStorageCapacityList, applyconfigurationsstoragev1beta1.CSIStorageCapacityApplyConfiguration, *storagev1beta1.CSIStorageCapacity, *storagev1beta1.CSIStorageCapacityList, *applyconfigurationsstoragev1beta1.CSIStorageCapacityApplyConfiguration]
 }
 
 // newCSIStorageCapacities returns a CSIStorageCapacities
 func newCSIStorageCapacities(c *StorageV1beta1Client, namespace string) *cSIStorageCapacities {
 	return &cSIStorageCapacities{
-		gentype.NewClientWithListAndApply[*storagev1beta1.CSIStorageCapacity, *storagev1beta1.CSIStorageCapacityList, *applyconfigurationsstoragev1beta1.CSIStorageCapacityApplyConfiguration](
-			"csistoragecapacities",
-			c.RESTClient(),
-			scheme.ParameterCodec,
-			namespace,
-			func() *storagev1beta1.CSIStorageCapacity { return &storagev1beta1.CSIStorageCapacity{} },
-			func() *storagev1beta1.CSIStorageCapacityList { return &storagev1beta1.CSIStorageCapacityList{} },
-			gentype.PrefersProtobuf[*storagev1beta1.CSIStorageCapacity](),
+		v2.NewTypedClientWithListAndApply[storagev1beta1.CSIStorageCapacity, storagev1beta1.CSIStorageCapacityList, applyconfigurationsstoragev1beta1.CSIStorageCapacityApplyConfiguration](
+			v2.ForResource("csistoragecapacities"),
+			v2.UsingClient(c.RESTClient()),
+			v2.UsingParameterCodec(scheme.ParameterCodec),
+			v2.InNamespace(namespace),
+			v2.PrefersProtobuf(),
 		),
 	}
 }

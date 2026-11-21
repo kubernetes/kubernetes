@@ -26,7 +26,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	applyconfigurationsadmissionregistrationv1 "k8s.io/client-go/applyconfigurations/admissionregistration/v1"
-	gentype "k8s.io/client-go/gentype"
+	v2 "k8s.io/client-go/gentype/v2"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
 
@@ -57,24 +57,17 @@ type ValidatingAdmissionPolicyInterface interface {
 
 // validatingAdmissionPolicies implements ValidatingAdmissionPolicyInterface
 type validatingAdmissionPolicies struct {
-	*gentype.ClientWithListAndApply[*admissionregistrationv1.ValidatingAdmissionPolicy, *admissionregistrationv1.ValidatingAdmissionPolicyList, *applyconfigurationsadmissionregistrationv1.ValidatingAdmissionPolicyApplyConfiguration]
+	*v2.TypedClientWithListAndApply[admissionregistrationv1.ValidatingAdmissionPolicy, admissionregistrationv1.ValidatingAdmissionPolicyList, applyconfigurationsadmissionregistrationv1.ValidatingAdmissionPolicyApplyConfiguration, *admissionregistrationv1.ValidatingAdmissionPolicy, *admissionregistrationv1.ValidatingAdmissionPolicyList, *applyconfigurationsadmissionregistrationv1.ValidatingAdmissionPolicyApplyConfiguration]
 }
 
 // newValidatingAdmissionPolicies returns a ValidatingAdmissionPolicies
 func newValidatingAdmissionPolicies(c *AdmissionregistrationV1Client) *validatingAdmissionPolicies {
 	return &validatingAdmissionPolicies{
-		gentype.NewClientWithListAndApply[*admissionregistrationv1.ValidatingAdmissionPolicy, *admissionregistrationv1.ValidatingAdmissionPolicyList, *applyconfigurationsadmissionregistrationv1.ValidatingAdmissionPolicyApplyConfiguration](
-			"validatingadmissionpolicies",
-			c.RESTClient(),
-			scheme.ParameterCodec,
-			"",
-			func() *admissionregistrationv1.ValidatingAdmissionPolicy {
-				return &admissionregistrationv1.ValidatingAdmissionPolicy{}
-			},
-			func() *admissionregistrationv1.ValidatingAdmissionPolicyList {
-				return &admissionregistrationv1.ValidatingAdmissionPolicyList{}
-			},
-			gentype.PrefersProtobuf[*admissionregistrationv1.ValidatingAdmissionPolicy](),
+		v2.NewTypedClientWithListAndApply[admissionregistrationv1.ValidatingAdmissionPolicy, admissionregistrationv1.ValidatingAdmissionPolicyList, applyconfigurationsadmissionregistrationv1.ValidatingAdmissionPolicyApplyConfiguration](
+			v2.ForResource("validatingadmissionpolicies"),
+			v2.UsingClient(c.RESTClient()),
+			v2.UsingParameterCodec(scheme.ParameterCodec),
+			v2.PrefersProtobuf(),
 		),
 	}
 }

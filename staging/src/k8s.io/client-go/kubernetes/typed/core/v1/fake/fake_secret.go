@@ -21,28 +21,26 @@ package fake
 import (
 	v1 "k8s.io/api/core/v1"
 	corev1 "k8s.io/client-go/applyconfigurations/core/v1"
-	gentype "k8s.io/client-go/gentype"
+	v2fake "k8s.io/client-go/gentype/v2/fake"
 	typedcorev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 )
 
 // fakeSecrets implements SecretInterface
 type fakeSecrets struct {
-	*gentype.FakeClientWithListAndApply[*v1.Secret, *v1.SecretList, *corev1.SecretApplyConfiguration]
+	*v2fake.FakeClientWithListAndApply[v1.Secret, v1.SecretList, corev1.SecretApplyConfiguration, *v1.Secret, *v1.SecretList, *corev1.SecretApplyConfiguration]
 	Fake *FakeCoreV1
 }
 
 func newFakeSecrets(fake *FakeCoreV1, namespace string) typedcorev1.SecretInterface {
 	return &fakeSecrets{
-		gentype.NewFakeClientWithListAndApply[*v1.Secret, *v1.SecretList, *corev1.SecretApplyConfiguration](
+		v2fake.NewFakeClientWithListAndApply[v1.Secret, v1.SecretList, corev1.SecretApplyConfiguration](
 			fake.Fake,
-			namespace,
-			v1.SchemeGroupVersion.WithResource("secrets"),
-			v1.SchemeGroupVersion.WithKind("Secret"),
-			func() *v1.Secret { return &v1.Secret{} },
-			func() *v1.SecretList { return &v1.SecretList{} },
-			func(dst, src *v1.SecretList) { dst.ListMeta = src.ListMeta },
-			func(list *v1.SecretList) []*v1.Secret { return gentype.ToPointerSlice(list.Items) },
-			func(list *v1.SecretList, items []*v1.Secret) { list.Items = gentype.FromPointerSlice(items) },
+			v2fake.InNamespace(namespace),
+			v2fake.ForResource(v1.SchemeGroupVersion.WithResource("secrets")),
+			v2fake.ForKind(v1.SchemeGroupVersion.WithKind("Secret")),
+			v2fake.WithListMetaCopier[v1.Secret](func(dst, src *v1.SecretList) { dst.ListMeta = src.ListMeta }),
+			v2fake.WithItemsGetter(func(list *v1.SecretList) []v1.Secret { return list.Items }),
+			v2fake.WithItemsSetter(func(list *v1.SecretList, items []v1.Secret) { list.Items = items }),
 		),
 		fake,
 	}

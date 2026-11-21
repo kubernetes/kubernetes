@@ -26,7 +26,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	applyconfigurationsrbacv1alpha1 "k8s.io/client-go/applyconfigurations/rbac/v1alpha1"
-	gentype "k8s.io/client-go/gentype"
+	v2 "k8s.io/client-go/gentype/v2"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
 
@@ -53,20 +53,17 @@ type ClusterRoleInterface interface {
 
 // clusterRoles implements ClusterRoleInterface
 type clusterRoles struct {
-	*gentype.ClientWithListAndApply[*rbacv1alpha1.ClusterRole, *rbacv1alpha1.ClusterRoleList, *applyconfigurationsrbacv1alpha1.ClusterRoleApplyConfiguration]
+	*v2.TypedClientWithListAndApply[rbacv1alpha1.ClusterRole, rbacv1alpha1.ClusterRoleList, applyconfigurationsrbacv1alpha1.ClusterRoleApplyConfiguration, *rbacv1alpha1.ClusterRole, *rbacv1alpha1.ClusterRoleList, *applyconfigurationsrbacv1alpha1.ClusterRoleApplyConfiguration]
 }
 
 // newClusterRoles returns a ClusterRoles
 func newClusterRoles(c *RbacV1alpha1Client) *clusterRoles {
 	return &clusterRoles{
-		gentype.NewClientWithListAndApply[*rbacv1alpha1.ClusterRole, *rbacv1alpha1.ClusterRoleList, *applyconfigurationsrbacv1alpha1.ClusterRoleApplyConfiguration](
-			"clusterroles",
-			c.RESTClient(),
-			scheme.ParameterCodec,
-			"",
-			func() *rbacv1alpha1.ClusterRole { return &rbacv1alpha1.ClusterRole{} },
-			func() *rbacv1alpha1.ClusterRoleList { return &rbacv1alpha1.ClusterRoleList{} },
-			gentype.PrefersProtobuf[*rbacv1alpha1.ClusterRole](),
+		v2.NewTypedClientWithListAndApply[rbacv1alpha1.ClusterRole, rbacv1alpha1.ClusterRoleList, applyconfigurationsrbacv1alpha1.ClusterRoleApplyConfiguration](
+			v2.ForResource("clusterroles"),
+			v2.UsingClient(c.RESTClient()),
+			v2.UsingParameterCodec(scheme.ParameterCodec),
+			v2.PrefersProtobuf(),
 		),
 	}
 }

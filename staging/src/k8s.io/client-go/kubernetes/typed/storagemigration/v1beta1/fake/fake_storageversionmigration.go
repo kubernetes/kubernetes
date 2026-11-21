@@ -21,32 +21,27 @@ package fake
 import (
 	v1beta1 "k8s.io/api/storagemigration/v1beta1"
 	storagemigrationv1beta1 "k8s.io/client-go/applyconfigurations/storagemigration/v1beta1"
-	gentype "k8s.io/client-go/gentype"
+	v2fake "k8s.io/client-go/gentype/v2/fake"
 	typedstoragemigrationv1beta1 "k8s.io/client-go/kubernetes/typed/storagemigration/v1beta1"
 )
 
 // fakeStorageVersionMigrations implements StorageVersionMigrationInterface
 type fakeStorageVersionMigrations struct {
-	*gentype.FakeClientWithListAndApply[*v1beta1.StorageVersionMigration, *v1beta1.StorageVersionMigrationList, *storagemigrationv1beta1.StorageVersionMigrationApplyConfiguration]
+	*v2fake.FakeClientWithListAndApply[v1beta1.StorageVersionMigration, v1beta1.StorageVersionMigrationList, storagemigrationv1beta1.StorageVersionMigrationApplyConfiguration, *v1beta1.StorageVersionMigration, *v1beta1.StorageVersionMigrationList, *storagemigrationv1beta1.StorageVersionMigrationApplyConfiguration]
 	Fake *FakeStoragemigrationV1beta1
 }
 
 func newFakeStorageVersionMigrations(fake *FakeStoragemigrationV1beta1) typedstoragemigrationv1beta1.StorageVersionMigrationInterface {
 	return &fakeStorageVersionMigrations{
-		gentype.NewFakeClientWithListAndApply[*v1beta1.StorageVersionMigration, *v1beta1.StorageVersionMigrationList, *storagemigrationv1beta1.StorageVersionMigrationApplyConfiguration](
+		v2fake.NewFakeClientWithListAndApply[v1beta1.StorageVersionMigration, v1beta1.StorageVersionMigrationList, storagemigrationv1beta1.StorageVersionMigrationApplyConfiguration](
 			fake.Fake,
-			"",
-			v1beta1.SchemeGroupVersion.WithResource("storageversionmigrations"),
-			v1beta1.SchemeGroupVersion.WithKind("StorageVersionMigration"),
-			func() *v1beta1.StorageVersionMigration { return &v1beta1.StorageVersionMigration{} },
-			func() *v1beta1.StorageVersionMigrationList { return &v1beta1.StorageVersionMigrationList{} },
-			func(dst, src *v1beta1.StorageVersionMigrationList) { dst.ListMeta = src.ListMeta },
-			func(list *v1beta1.StorageVersionMigrationList) []*v1beta1.StorageVersionMigration {
-				return gentype.ToPointerSlice(list.Items)
-			},
-			func(list *v1beta1.StorageVersionMigrationList, items []*v1beta1.StorageVersionMigration) {
-				list.Items = gentype.FromPointerSlice(items)
-			},
+			v2fake.ForResource(v1beta1.SchemeGroupVersion.WithResource("storageversionmigrations")),
+			v2fake.ForKind(v1beta1.SchemeGroupVersion.WithKind("StorageVersionMigration")),
+			v2fake.WithListMetaCopier[v1beta1.StorageVersionMigration](func(dst, src *v1beta1.StorageVersionMigrationList) { dst.ListMeta = src.ListMeta }),
+			v2fake.WithItemsGetter(func(list *v1beta1.StorageVersionMigrationList) []v1beta1.StorageVersionMigration { return list.Items }),
+			v2fake.WithItemsSetter(func(list *v1beta1.StorageVersionMigrationList, items []v1beta1.StorageVersionMigration) {
+				list.Items = items
+			}),
 		),
 		fake,
 	}

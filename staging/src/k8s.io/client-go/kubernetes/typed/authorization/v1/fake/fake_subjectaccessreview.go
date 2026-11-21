@@ -20,24 +20,22 @@ package fake
 
 import (
 	v1 "k8s.io/api/authorization/v1"
-	gentype "k8s.io/client-go/gentype"
+	v2fake "k8s.io/client-go/gentype/v2/fake"
 	authorizationv1 "k8s.io/client-go/kubernetes/typed/authorization/v1"
 )
 
 // fakeSubjectAccessReviews implements SubjectAccessReviewInterface
 type fakeSubjectAccessReviews struct {
-	*gentype.FakeClient[*v1.SubjectAccessReview]
+	*v2fake.FakeClient[v1.SubjectAccessReview, *v1.SubjectAccessReview]
 	Fake *FakeAuthorizationV1
 }
 
 func newFakeSubjectAccessReviews(fake *FakeAuthorizationV1) authorizationv1.SubjectAccessReviewInterface {
 	return &fakeSubjectAccessReviews{
-		gentype.NewFakeClient[*v1.SubjectAccessReview](
+		v2fake.NewFakeClient[v1.SubjectAccessReview](
 			fake.Fake,
-			"",
-			v1.SchemeGroupVersion.WithResource("subjectaccessreviews"),
-			v1.SchemeGroupVersion.WithKind("SubjectAccessReview"),
-			func() *v1.SubjectAccessReview { return &v1.SubjectAccessReview{} },
+			v2fake.ForResource(v1.SchemeGroupVersion.WithResource("subjectaccessreviews")),
+			v2fake.ForKind(v1.SchemeGroupVersion.WithKind("SubjectAccessReview")),
 		),
 		fake,
 	}

@@ -26,7 +26,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	applyconfigurationscoordinationv1beta1 "k8s.io/client-go/applyconfigurations/coordination/v1beta1"
-	gentype "k8s.io/client-go/gentype"
+	v2 "k8s.io/client-go/gentype/v2"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
 
@@ -53,20 +53,18 @@ type LeaseCandidateInterface interface {
 
 // leaseCandidates implements LeaseCandidateInterface
 type leaseCandidates struct {
-	*gentype.ClientWithListAndApply[*coordinationv1beta1.LeaseCandidate, *coordinationv1beta1.LeaseCandidateList, *applyconfigurationscoordinationv1beta1.LeaseCandidateApplyConfiguration]
+	*v2.TypedClientWithListAndApply[coordinationv1beta1.LeaseCandidate, coordinationv1beta1.LeaseCandidateList, applyconfigurationscoordinationv1beta1.LeaseCandidateApplyConfiguration, *coordinationv1beta1.LeaseCandidate, *coordinationv1beta1.LeaseCandidateList, *applyconfigurationscoordinationv1beta1.LeaseCandidateApplyConfiguration]
 }
 
 // newLeaseCandidates returns a LeaseCandidates
 func newLeaseCandidates(c *CoordinationV1beta1Client, namespace string) *leaseCandidates {
 	return &leaseCandidates{
-		gentype.NewClientWithListAndApply[*coordinationv1beta1.LeaseCandidate, *coordinationv1beta1.LeaseCandidateList, *applyconfigurationscoordinationv1beta1.LeaseCandidateApplyConfiguration](
-			"leasecandidates",
-			c.RESTClient(),
-			scheme.ParameterCodec,
-			namespace,
-			func() *coordinationv1beta1.LeaseCandidate { return &coordinationv1beta1.LeaseCandidate{} },
-			func() *coordinationv1beta1.LeaseCandidateList { return &coordinationv1beta1.LeaseCandidateList{} },
-			gentype.PrefersProtobuf[*coordinationv1beta1.LeaseCandidate](),
+		v2.NewTypedClientWithListAndApply[coordinationv1beta1.LeaseCandidate, coordinationv1beta1.LeaseCandidateList, applyconfigurationscoordinationv1beta1.LeaseCandidateApplyConfiguration](
+			v2.ForResource("leasecandidates"),
+			v2.UsingClient(c.RESTClient()),
+			v2.UsingParameterCodec(scheme.ParameterCodec),
+			v2.InNamespace(namespace),
+			v2.PrefersProtobuf(),
 		),
 	}
 }

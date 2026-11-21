@@ -21,32 +21,27 @@ package fake
 import (
 	v1beta1 "k8s.io/api/admissionregistration/v1beta1"
 	admissionregistrationv1beta1 "k8s.io/client-go/applyconfigurations/admissionregistration/v1beta1"
-	gentype "k8s.io/client-go/gentype"
+	v2fake "k8s.io/client-go/gentype/v2/fake"
 	typedadmissionregistrationv1beta1 "k8s.io/client-go/kubernetes/typed/admissionregistration/v1beta1"
 )
 
 // fakeMutatingAdmissionPolicies implements MutatingAdmissionPolicyInterface
 type fakeMutatingAdmissionPolicies struct {
-	*gentype.FakeClientWithListAndApply[*v1beta1.MutatingAdmissionPolicy, *v1beta1.MutatingAdmissionPolicyList, *admissionregistrationv1beta1.MutatingAdmissionPolicyApplyConfiguration]
+	*v2fake.FakeClientWithListAndApply[v1beta1.MutatingAdmissionPolicy, v1beta1.MutatingAdmissionPolicyList, admissionregistrationv1beta1.MutatingAdmissionPolicyApplyConfiguration, *v1beta1.MutatingAdmissionPolicy, *v1beta1.MutatingAdmissionPolicyList, *admissionregistrationv1beta1.MutatingAdmissionPolicyApplyConfiguration]
 	Fake *FakeAdmissionregistrationV1beta1
 }
 
 func newFakeMutatingAdmissionPolicies(fake *FakeAdmissionregistrationV1beta1) typedadmissionregistrationv1beta1.MutatingAdmissionPolicyInterface {
 	return &fakeMutatingAdmissionPolicies{
-		gentype.NewFakeClientWithListAndApply[*v1beta1.MutatingAdmissionPolicy, *v1beta1.MutatingAdmissionPolicyList, *admissionregistrationv1beta1.MutatingAdmissionPolicyApplyConfiguration](
+		v2fake.NewFakeClientWithListAndApply[v1beta1.MutatingAdmissionPolicy, v1beta1.MutatingAdmissionPolicyList, admissionregistrationv1beta1.MutatingAdmissionPolicyApplyConfiguration](
 			fake.Fake,
-			"",
-			v1beta1.SchemeGroupVersion.WithResource("mutatingadmissionpolicies"),
-			v1beta1.SchemeGroupVersion.WithKind("MutatingAdmissionPolicy"),
-			func() *v1beta1.MutatingAdmissionPolicy { return &v1beta1.MutatingAdmissionPolicy{} },
-			func() *v1beta1.MutatingAdmissionPolicyList { return &v1beta1.MutatingAdmissionPolicyList{} },
-			func(dst, src *v1beta1.MutatingAdmissionPolicyList) { dst.ListMeta = src.ListMeta },
-			func(list *v1beta1.MutatingAdmissionPolicyList) []*v1beta1.MutatingAdmissionPolicy {
-				return gentype.ToPointerSlice(list.Items)
-			},
-			func(list *v1beta1.MutatingAdmissionPolicyList, items []*v1beta1.MutatingAdmissionPolicy) {
-				list.Items = gentype.FromPointerSlice(items)
-			},
+			v2fake.ForResource(v1beta1.SchemeGroupVersion.WithResource("mutatingadmissionpolicies")),
+			v2fake.ForKind(v1beta1.SchemeGroupVersion.WithKind("MutatingAdmissionPolicy")),
+			v2fake.WithListMetaCopier[v1beta1.MutatingAdmissionPolicy](func(dst, src *v1beta1.MutatingAdmissionPolicyList) { dst.ListMeta = src.ListMeta }),
+			v2fake.WithItemsGetter(func(list *v1beta1.MutatingAdmissionPolicyList) []v1beta1.MutatingAdmissionPolicy { return list.Items }),
+			v2fake.WithItemsSetter(func(list *v1beta1.MutatingAdmissionPolicyList, items []v1beta1.MutatingAdmissionPolicy) {
+				list.Items = items
+			}),
 		),
 		fake,
 	}

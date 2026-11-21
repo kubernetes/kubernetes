@@ -21,28 +21,26 @@ package fake
 import (
 	v1 "k8s.io/api/rbac/v1"
 	rbacv1 "k8s.io/client-go/applyconfigurations/rbac/v1"
-	gentype "k8s.io/client-go/gentype"
+	v2fake "k8s.io/client-go/gentype/v2/fake"
 	typedrbacv1 "k8s.io/client-go/kubernetes/typed/rbac/v1"
 )
 
 // fakeRoleBindings implements RoleBindingInterface
 type fakeRoleBindings struct {
-	*gentype.FakeClientWithListAndApply[*v1.RoleBinding, *v1.RoleBindingList, *rbacv1.RoleBindingApplyConfiguration]
+	*v2fake.FakeClientWithListAndApply[v1.RoleBinding, v1.RoleBindingList, rbacv1.RoleBindingApplyConfiguration, *v1.RoleBinding, *v1.RoleBindingList, *rbacv1.RoleBindingApplyConfiguration]
 	Fake *FakeRbacV1
 }
 
 func newFakeRoleBindings(fake *FakeRbacV1, namespace string) typedrbacv1.RoleBindingInterface {
 	return &fakeRoleBindings{
-		gentype.NewFakeClientWithListAndApply[*v1.RoleBinding, *v1.RoleBindingList, *rbacv1.RoleBindingApplyConfiguration](
+		v2fake.NewFakeClientWithListAndApply[v1.RoleBinding, v1.RoleBindingList, rbacv1.RoleBindingApplyConfiguration](
 			fake.Fake,
-			namespace,
-			v1.SchemeGroupVersion.WithResource("rolebindings"),
-			v1.SchemeGroupVersion.WithKind("RoleBinding"),
-			func() *v1.RoleBinding { return &v1.RoleBinding{} },
-			func() *v1.RoleBindingList { return &v1.RoleBindingList{} },
-			func(dst, src *v1.RoleBindingList) { dst.ListMeta = src.ListMeta },
-			func(list *v1.RoleBindingList) []*v1.RoleBinding { return gentype.ToPointerSlice(list.Items) },
-			func(list *v1.RoleBindingList, items []*v1.RoleBinding) { list.Items = gentype.FromPointerSlice(items) },
+			v2fake.InNamespace(namespace),
+			v2fake.ForResource(v1.SchemeGroupVersion.WithResource("rolebindings")),
+			v2fake.ForKind(v1.SchemeGroupVersion.WithKind("RoleBinding")),
+			v2fake.WithListMetaCopier[v1.RoleBinding](func(dst, src *v1.RoleBindingList) { dst.ListMeta = src.ListMeta }),
+			v2fake.WithItemsGetter(func(list *v1.RoleBindingList) []v1.RoleBinding { return list.Items }),
+			v2fake.WithItemsSetter(func(list *v1.RoleBindingList, items []v1.RoleBinding) { list.Items = items }),
 		),
 		fake,
 	}
