@@ -498,7 +498,7 @@ func doSafeMakeDir(pathname string, base string, perm os.FileMode) error {
 	for _, dir := range toCreate {
 		currentPath = filepath.Join(currentPath, dir)
 		klog.V(4).Infof("Creating %s", dir)
-		err = syscall.Mkdirat(parentFD, currentPath, uint32(perm))
+		err = syscall.Mkdirat(parentFD, dir, uint32(perm))
 		if err != nil {
 			return fmt.Errorf("cannot create directory %s: %w", currentPath, err)
 		}
