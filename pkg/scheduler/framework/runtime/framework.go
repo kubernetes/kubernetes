@@ -373,11 +373,10 @@ func WithMaxBatchAge(maxBatchAge time.Duration) Option {
 }
 
 // defaultFrameworkOptions are applied when no option corresponding to those fields exist.
-func defaultFrameworkOptions(stopCh <-chan struct{}) frameworkOptions {
+func defaultFrameworkOptions() frameworkOptions {
 	return frameworkOptions{
-		metricsRecorder: metrics.NewMetricsAsyncRecorder(1000, time.Second, stopCh),
-		parallelizer:    parallelize.NewParallelizer(parallelize.DefaultParallelism),
-		maxBatchAge:     DefaultMaxBatchAge,
+		parallelizer: parallelize.NewParallelizer(parallelize.DefaultParallelism),
+		maxBatchAge:  DefaultMaxBatchAge,
 	}
 }
 
@@ -386,13 +385,16 @@ var _ framework.NominatedNodeNameGetter = &frameworkImpl{}
 
 // NewFramework initializes plugins given the configuration and the registry.
 //
-// It creates background goroutines (for example, via defaultFrameworkOptions -> metrics.NewMetricsAsyncRecorder)
-// which continue running until the context gets canceled. WaitForShutdown can be used to block
-// until they have terminated.
+// It may create background goroutines (for example, a default metrics.NewMetricsAsyncRecorder
+// when WithMetricsRecorder is not provided) which continue running until the context gets
+// canceled. WaitForShutdown can be used to block until they have terminated.
 func NewFramework(ctx context.Context, r Registry, profile *config.KubeSchedulerProfile, opts ...Option) (framework.Framework, error) {
-	options := defaultFrameworkOptions(ctx.Done())
+	options := defaultFrameworkOptions()
 	for _, opt := range opts {
 		opt(&options)
+	}
+	if options.metricsRecorder == nil {
+		options.metricsRecorder = metrics.NewMetricsAsyncRecorder(1000, time.Second, ctx.Done())
 	}
 
 	logger := klog.FromContext(ctx)
