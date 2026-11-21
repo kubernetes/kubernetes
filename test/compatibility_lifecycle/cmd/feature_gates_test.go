@@ -694,7 +694,7 @@ func TestParseFeatureSpec(t *testing.T) {
 		{
 			name: "spec by field name",
 			expectedFeatureSpec: featureSpec{
-				Default: true, LockToDefault: true, PreRelease: "Beta", Version: "1.31",
+				Default: true, LockToDefault: true, EmulationExempt: true, PreRelease: "Beta", Version: "1.31",
 			},
 			val: &ast.CompositeLit{
 				Elts: []ast.Expr{
@@ -730,6 +730,14 @@ func TestParseFeatureSpec(t *testing.T) {
 					&ast.KeyValueExpr{
 						Key: &ast.Ident{
 							Name: "LockToDefault",
+						},
+						Value: &ast.Ident{
+							Name: "true",
+						},
+					},
+					&ast.KeyValueExpr{
+						Key: &ast.Ident{
+							Name: "EmulationExempt",
 						},
 						Value: &ast.Ident{
 							Name: "true",
@@ -888,6 +896,18 @@ func TestVerifyFeatureRemoval(t *testing.T) {
 			currentVersion: version.MustParse("1.4"),
 			expectErr:      true,
 			expectedErrMsg: "feature FeatureD cannot be removed because it is in GA or Deprecated state and is not locked to default",
+		},
+		{
+			name: "GA feature removed early with kubelet-only EmulationExempt",
+			featureList: []featureInfo{
+				{Name: "FeatureA", VersionedSpecs: []featureSpec{{Version: "1.0", PreRelease: "Alpha"}}},
+			},
+			baseFeatureList: []featureInfo{
+				{Name: "FeatureA", VersionedSpecs: []featureSpec{{Version: "1.0", PreRelease: "Alpha"}}},
+				{Name: "FeatureC", VersionedSpecs: []featureSpec{{Version: "1.0", PreRelease: "GA", LockToDefault: true, EmulationExempt: true}}},
+			},
+			currentVersion: version.MustParse("1.2"),
+			expectErr:      false,
 		},
 	}
 	for _, tc := range tests {
