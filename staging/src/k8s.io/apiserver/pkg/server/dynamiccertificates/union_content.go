@@ -65,7 +65,9 @@ func (c unionCAContent) VerifyOptions() (x509.VerifyOptions, bool) {
 
 	// TODO make more efficient.  This isn't actually used in any of our mainline paths.  It's called to build the TLSConfig
 	// TODO on file changes, but the actual authentication runs against the individual items, not the union.
-	ret, err := newCABundleAndVerifier(c.Name(), c.CurrentCABundleContent())
+	// parse the bundle observed above: a member may drop its content concurrently, so a second read
+	// could come back empty and would not be a coding error
+	ret, err := newCABundleAndVerifier(c.Name(), currCABundle)
 	if err != nil {
 		// because we're made up of already vetted values, this indicates some kind of coding error
 		panic(err)
