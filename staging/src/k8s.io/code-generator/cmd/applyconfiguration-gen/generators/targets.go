@@ -56,6 +56,10 @@ func DefaultNameSystem() string {
 	return "public"
 }
 
+func applyConfigurationName(t *types.Type) string {
+	return namer.NewPublicNamer(0).Name(t) + ApplyConfigurationTypeSuffix
+}
+
 // GetTargets makes the client target definition.
 func GetTargets(context *generator.Context, args *args.Args) []generator.Target {
 	boilerplate, err := gengo.GoBoilerplate(args.GoHeaderFile, "", gengo.StdGeneratedBy)
@@ -102,7 +106,7 @@ func GetTargets(context *generator.Context, args *args.Args) []generator.Target 
 			if typePkg, ok := refs[t.Name]; ok {
 				toGenerate = append(toGenerate, applyConfig{
 					Type:               t,
-					ApplyConfiguration: types.Ref(typePkg, t.Name.Name+ApplyConfigurationTypeSuffix),
+					ApplyConfiguration: types.Ref(typePkg, applyConfigurationName(t)),
 					OpenAPIName:        openAPIName,
 				})
 			}
