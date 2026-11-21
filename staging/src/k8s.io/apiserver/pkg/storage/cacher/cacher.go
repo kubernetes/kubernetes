@@ -21,7 +21,9 @@ import (
 	"fmt"
 	"iter"
 	"net/http"
+	"os"
 	"reflect"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -493,9 +495,10 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 	}
 
 	progressRequester := progress.NewConditionalProgressRequester(config.Storage.RequestWatchProgress, config.Clock, contextMetadata)
+	detectMutations, _ := strconv.ParseBool(os.Getenv("KUBE_CACHE_MUTATION_DETECTOR"))
 	watchCache, err := newWatchCache(
 		config.KeyFunc, cacher.processEvent, config.GetAttrsFunc, config.Versioner, config.Indexers,
-		config.Clock, eventFreshDuration, config.WatchCacheMaxEvents, config.GroupResource, progressRequester, config.Storage.GetCurrentResourceVersion, false)
+		config.Clock, eventFreshDuration, config.WatchCacheMaxEvents, config.GroupResource, progressRequester, config.Storage.GetCurrentResourceVersion, detectMutations)
 	if err != nil {
 		return nil, err
 	}
@@ -532,6 +535,10 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 	}
 	go progressRequester.Run(stopCh)
 	go watchCache.freshness.Run(stopCh)
+	if detectMutations {
+		cacher.stopWg.Add(1)
+		go cacher.runMutationDetector()
+	}
 
 	cacher.stopWg.Add(1)
 	go func() {
@@ -546,6 +553,21 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 		)
 	}()
 	return cacher, nil
+}
+
+func (c *Cacher) runMutationDetector() {
+	defer c.stopWg.Done()
+	ctx := wait.ContextForChannel(c.stopCh)
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			c.watchCache.storage.CheckMutations(ctx)
+		}
+	}
 }
 
 func (c *Cacher) startCaching(stopChannel <-chan struct{}) {
