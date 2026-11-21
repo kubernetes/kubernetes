@@ -1087,6 +1087,7 @@ func (m *ManagerImpl) GetDeviceRunContainerOptions(ctx context.Context, pod *v1.
 	podUID := string(pod.UID)
 	contName := container.Name
 	needsReAllocate := false
+	var resources []string
 	for k, v := range container.Resources.Limits {
 		resource := string(k)
 		// A DRA-backed extended resource won't have device plugin state.
@@ -1098,10 +1099,7 @@ func (m *ManagerImpl) GetDeviceRunContainerOptions(ctx context.Context, pod *v1.
 		if !m.isDevicePluginResource(resource) || v.Value() == 0 {
 			continue
 		}
-		err := m.callPreStartContainerIfNeeded(ctx, podUID, contName, resource)
-		if err != nil {
-			return nil, err
-		}
+		resources = append(resources, resource)
 
 		if !m.checkPodActive(pod) {
 			logger.V(5).Info("Pod deleted from activePods, skip to reAllocate", "pod", klog.KObj(pod), "podUID", podUID, "containerName", container.Name)
@@ -1119,6 +1117,12 @@ func (m *ManagerImpl) GetDeviceRunContainerOptions(ctx context.Context, pod *v1.
 		logger.V(2).Info("Needs to re-allocate device plugin resources for pod", "pod", klog.KObj(pod), "containerName", container.Name)
 		// Device Manager support only Allocate(add)
 		if err := m.Allocate(ctx, pod, container, lifecycle.AddOperation); err != nil {
+			return nil, err
+		}
+	}
+	// PreStartContainer requires cached device IDs, including those allocated by the fallback above.
+	for _, resource := range resources {
+		if err := m.callPreStartContainerIfNeeded(ctx, podUID, contName, resource); err != nil {
 			return nil, err
 		}
 	}
