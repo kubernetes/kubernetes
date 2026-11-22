@@ -42,7 +42,9 @@ import (
 	csitesting "k8s.io/kubernetes/pkg/volume/csi/testing"
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
+	hostutil "k8s.io/kubernetes/pkg/volume/util/hostutil"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
+	"k8s.io/mount-utils"
 )
 
 // this method just tests the volume plugin name that's used in CompleteFunc, the same plugin is also used inside the
@@ -812,4 +814,75 @@ func initTestPlugins(t *testing.T, plugs []volume.VolumePlugin, pluginName strin
 	}
 
 	return pluginMgr, tmpDir
+}
+
+// unmapDeviceASW is a minimal ActualStateOfWorldMounterUpdater for
+// TestOperationGenerator_GenerateUnmapDeviceFunc_EBUSYDoesNotDeleteVolData.
+// Only the methods called on the EBUSY code path are implemented.
+type unmapDeviceASW struct{ fakeActualStateOfWorld }
+
+func (u *unmapDeviceASW) MarkDeviceAsUncertain(v1.UniqueVolumeName, string, string, string) error {
+	return nil
+}
+func (u *unmapDeviceASW) MarkDeviceAsUnmounted(v1.UniqueVolumeName) error { return nil }
+
+// TestOperationGenerator_GenerateUnmapDeviceFunc_EBUSYDoesNotDeleteVolData verifies
+// that when isDeviceOpened reports the block device is still in use (simulating EBUSY),
+// TearDownDevice is NOT called. Prior to the fix, TearDownDevice ran first and deleted
+// vol_data.json; the subsequent EBUSY then left the volume stuck in a permanent retry
+// loop because the next attempt could no longer reconstruct the unmapper (issue #144389).
+func TestOperationGenerator_GenerateUnmapDeviceFunc_EBUSYDoesNotDeleteVolData(t *testing.T) {
+	plugs := volumetesting.ProbeVolumePlugins(volume.VolumeConfig{})
+	pluginMgr, tmpDir := initTestPlugins(t, plugs, "fake-plugin")
+	defer os.RemoveAll(tmpDir)
+
+	operationGenerator := getTestOperationGenerator(pluginMgr)
+
+	blockMode := v1.PersistentVolumeBlock
+	volumeSpec := &volume.Spec{
+		PersistentVolume: &v1.PersistentVolume{
+			Spec: v1.PersistentVolumeSpec{VolumeMode: &blockMode},
+		},
+	}
+	devicePath := "/dev/fake0"
+	attachedVolume := AttachedVolume{
+		VolumeName:      v1.UniqueVolumeName("fake-volume"),
+		PluginName:      "fake-plugin",
+		DevicePath:      devicePath,
+		DeviceMountPath: tmpDir,
+		VolumeSpec:      volumeSpec,
+	}
+
+	// Simulate the device being held open (EBUSY): DeviceOpened returns true when
+	// the path appears in MountPoints.
+	fakeHostUtil := hostutil.NewFakeHostUtil(nil)
+	fakeHostUtil.MountPoints = []mount.MountPoint{{Device: devicePath}}
+
+	ops, err := operationGenerator.GenerateUnmapDeviceFunc(attachedVolume, &unmapDeviceASW{}, fakeHostUtil)
+	if err != nil {
+		t.Fatalf("GenerateUnmapDeviceFunc: %v", err)
+	}
+
+	opCtx := ops.OperationFunc()
+	if opCtx.DetailedErr == nil {
+		t.Fatal("expected an error when device is in use, got nil")
+	}
+
+	// TearDownDevice must NOT have been called: if it had run it would have
+	// deleted vol_data.json, making every subsequent retry fail permanently.
+	plugin, err := pluginMgr.FindMapperPluginByName("fake-plugin")
+	if err != nil || plugin == nil {
+		t.Fatalf("FindMapperPluginByName: %v", err)
+	}
+	unmapper, err := plugin.NewBlockVolumeUnmapper(volumeSpec.Name(), "")
+	if err != nil {
+		t.Fatalf("NewBlockVolumeUnmapper: %v", err)
+	}
+	fakeVol, ok := unmapper.(*volumetesting.FakeVolume)
+	if !ok {
+		t.Fatalf("unexpected unmapper type %T", unmapper)
+	}
+	if count := fakeVol.GetTearDownDeviceCallCount(); count != 0 {
+		t.Errorf("TearDownDevice called %d time(s), want 0 — must not run before the in-use check", count)
+	}
 }
