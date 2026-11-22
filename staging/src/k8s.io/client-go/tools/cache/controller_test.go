@@ -40,6 +40,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	fcache "k8s.io/client-go/tools/cache/testing"
+	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
 
 	"sigs.k8s.io/randfill"
@@ -1253,7 +1254,8 @@ func TestProcessLoopUnkeyableObject(t *testing.T) {
 	for _, tc := range testCases {
 		for _, batch := range []bool{false, true} {
 			t.Run(fmt.Sprintf("%s/batch=%v", tc.name, batch), func(t *testing.T) {
-				logger, ctx := ktesting.NewTestContext(t)
+				logger := ktesting.NewLogger(t, ktesting.NewConfig(ktesting.BufferLogs(true)))
+				ctx := klog.NewContext(context.Background(), logger)
 
 				store := NewStore(keyFunc)
 				recorder := newEventRecorder(store, keyFunc)
@@ -1282,6 +1284,19 @@ func TestProcessLoopUnkeyableObject(t *testing.T) {
 
 				// processLoop returns once the closed queue is drained.
 				c.processLoop(ctx)
+
+				var loggedErrors []error
+				for _, entry := range logger.GetSink().(ktesting.Underlier).GetBuffer().Data() {
+					if entry.Type == ktesting.LogError {
+						loggedErrors = append(loggedErrors, entry.Err)
+					}
+				}
+				require.NotEmpty(t, loggedErrors, "processing errors must be reported")
+				for _, err := range loggedErrors {
+					var keyErr KeyError
+					require.ErrorAs(t, err, &keyErr)
+					assert.EqualError(t, keyErr.Err, "test key func error")
+				}
 
 				// What a handler observes in the store during its callback depends on how the
 				// Deltas are batched, so only the final store state is compared.
