@@ -535,6 +535,7 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 	}
 	go progressRequester.Run(stopCh)
 	go watchCache.freshness.Run(stopCh)
+	klog.InfoS("Watch cache mutation detector configured", "enabled", detectMutations, "group", config.GroupResource.Group, "resource", config.GroupResource.Resource)
 	if detectMutations {
 		cacher.stopWg.Add(1)
 		go cacher.runMutationDetector()
