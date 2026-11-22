@@ -3663,8 +3663,10 @@ func TestUpdateJobPodResources(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, version.MustParse("1.36"))
-			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.MutablePodResourcesForSuspendedJobs, tc.enableFeatureGate)
+			if !tc.enableFeatureGate {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, version.MustParse("1.36"))
+				featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.MutablePodResourcesForSuspendedJobs, false)
+			}
 
 			closeFn, restConfig, cs, ns := setup(t, "update-job-pod-resources")
 			defer closeFn()
@@ -3923,8 +3925,6 @@ func TestDelayedJobUpdateEvent(t *testing.T) {
 // TestMutableSchedulingDirectivesForSuspendedJobs verifies that scheduling directives
 // can be mutated when the feature is enabled for a suspended JOb.
 func TestMutableSchedulingDirectivesForSuspendedJobs(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.MutableSchedulingDirectivesForSuspendedJobs, true)
-
 	closeFn, restConfig, clientSet, ns := setup(t, "mutable-scheduling-directives-for-suspended-jobs")
 	t.Cleanup(closeFn)
 	ctx, cancel := startJobControllerAndWaitForCaches(t, restConfig)
@@ -4036,8 +4036,6 @@ func TestMutableSchedulingDirectivesForSuspendedJobs(t *testing.T) {
 // scheduling directives can be mutated on a suspended Job that has never started,
 // even before the JobSuspended condition is set by the job controller.
 func TestMutableSchedulingDirectivesForSuspendedJobsNotYetStarted(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.MutableSchedulingDirectivesForSuspendedJobs, true)
-
 	closeFn, restConfig, clientSet, ns := setup(t, "mutable-scheduling-directives-not-started")
 	t.Cleanup(closeFn)
 	ctx, cancel := startJobControllerAndWaitForCaches(t, restConfig)
@@ -4070,8 +4068,6 @@ func TestMutableSchedulingDirectivesForSuspendedJobsNotYetStarted(t *testing.T) 
 // pod resources can be mutated on a suspended Job that has never started,
 // even before the JobSuspended condition is set by the job controller.
 func TestMutablePodResourcesForSuspendedJobsNotYetStarted(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.MutablePodResourcesForSuspendedJobs, true)
-
 	closeFn, restConfig, clientSet, ns := setup(t, "mutable-pod-resources-not-started")
 	t.Cleanup(closeFn)
 	ctx, cancel := startJobControllerAndWaitForCaches(t, restConfig)
@@ -4757,9 +4753,6 @@ func failTerminatingPods(ctx context.Context, t *testing.T, clientSet clientset.
 // The new pods should have the updated resources.
 func TestMutablePodResourcesWithPodReplacementPolicyFailed(t *testing.T) {
 	const blockDeletionFinalizerForTest string = "fake.example.com/blockDeletion"
-
-	// Enable MutablePodResourcesForSuspendedJobs feature gate
-	featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.MutablePodResourcesForSuspendedJobs, true)
 
 	closeFn, restConfig, cs, ns := setup(t, "mutable-resources-pod-replacement")
 	defer closeFn()
