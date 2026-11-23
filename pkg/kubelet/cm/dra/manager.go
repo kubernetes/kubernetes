@@ -353,6 +353,11 @@ func (m *Manager) prepareResources(ctx context.Context, pod *v1.Pod) error {
 				logger.V(5).Info("No need to prepare resources, no claim generated", "podClaim", podClaim.Name)
 				continue
 			}
+			// Multiple pod claim aliases can resolve to the same claim UID.
+			// The driver's response is keyed by UID, so prepare it only once.
+			if _, queued := resourceClaims[resourceClaim.UID]; queued {
+				continue
+			}
 			// Get a reference to the claim info for this claim from the cache.
 			// If there isn't one yet, then add it to the cache.
 			claimInfo, exists := m.cache.get(resourceClaim.Name, resourceClaim.Namespace)

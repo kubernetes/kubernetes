@@ -22,6 +22,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
+	schedulingapi "k8s.io/api/scheduling/v1beta1"
 	"k8s.io/apimachinery/pkg/types"
 )
 
@@ -47,11 +48,28 @@ type claimStore struct {
 // newClaimStore stores the list of user-owned claims and the optional claim owned by the scheduler.
 func newClaimStore(claims []*resourceapi.ResourceClaim, extendedResourceClaim *resourceapi.ResourceClaim, claimBindings []resourceapi.ResourceClaimConsumerReference) claimStore {
 	cs := claimStore{
-		claims:                          claims,
-		bindTo:                          claimBindings,
-		numUserOwned:                    len(claims),
+		claims:                          make([]*resourceapi.ResourceClaim, 0, len(claims)),
 		initialExtendedResourceClaimUID: "",
 	}
+	// Pod claim aliases may reference the same ResourceClaim. Keep each
+	// claim and its corresponding binding once to avoid allocating or reserving it twice.
+	seen := make(map[string]int, len(claims))
+	for i, claim := range claims {
+		if index, ok := seen[claim.Name]; ok {
+			// A PodGroup reservation also covers this Pod and must outlive
+			// its individual reservation when other group members need the claim.
+			if i < len(claimBindings) && claimBindings[i].APIGroup == schedulingapi.GroupName && claimBindings[i].Resource == "podgroups" {
+				cs.bindTo[index] = claimBindings[i]
+			}
+			continue
+		}
+		seen[claim.Name] = len(cs.claims)
+		cs.claims = append(cs.claims, claim)
+		if i < len(claimBindings) {
+			cs.bindTo = append(cs.bindTo, claimBindings[i])
+		}
+	}
+	cs.numUserOwned = len(cs.claims)
 	if extendedResourceClaim != nil {
 		cs.claims = append(cs.claims, extendedResourceClaim)
 		cs.initialExtendedResourceClaimUID = extendedResourceClaim.UID

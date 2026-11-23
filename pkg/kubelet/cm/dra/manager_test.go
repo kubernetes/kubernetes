@@ -86,6 +86,11 @@ type fakeDRADriverGRPCServer struct {
 	unprepareResourcesResponse *drapb.NodeUnprepareResourcesResponse
 	watchResourcesResponses    chan *drahealthv1.NodeWatchResourcesResponse
 	watchResourcesError        error
+
+	prepareRequestUIDsMutex sync.Mutex
+	// One entry per received NodePrepareResources request, holding the claim
+	// UIDs of that request in order, duplicates included.
+	prepareRequestUIDs [][]string
 }
 
 var gatherWithoutDurations = metricstestutil.GathererFunc(func() ([]*metricstestutil.MetricFamily, error) {
@@ -105,6 +110,14 @@ var gatherWithoutDurations = metricstestutil.GathererFunc(func() ([]*metricstest
 
 func (s *fakeDRADriverGRPCServer) NodePrepareResources(ctx context.Context, req *drapb.NodePrepareResourcesRequest) (*drapb.NodePrepareResourcesResponse, error) {
 	s.prepareResourceCalls.Add(1)
+
+	uids := make([]string, len(req.Claims))
+	for i, claim := range req.Claims {
+		uids[i] = claim.Uid
+	}
+	s.prepareRequestUIDsMutex.Lock()
+	s.prepareRequestUIDs = append(s.prepareRequestUIDs, uids)
+	s.prepareRequestUIDsMutex.Unlock()
 
 	if s.timeout != nil {
 		time.Sleep(*s.timeout)
@@ -130,6 +143,14 @@ func (s *fakeDRADriverGRPCServer) NodePrepareResources(ctx context.Context, req 
 	}
 
 	return s.prepareResourcesResponse, nil
+}
+
+// receivedPrepareRequestUIDs returns the claim UIDs of each
+// NodePrepareResources request received so far, one slice per request.
+func (s *fakeDRADriverGRPCServer) receivedPrepareRequestUIDs() [][]string {
+	s.prepareRequestUIDsMutex.Lock()
+	defer s.prepareRequestUIDsMutex.Unlock()
+	return append([][]string{}, s.prepareRequestUIDs...)
 }
 
 func (s *fakeDRADriverGRPCServer) NodeUnprepareResources(ctx context.Context, req *drapb.NodeUnprepareResourcesRequest) (*drapb.NodeUnprepareResourcesResponse, error) {

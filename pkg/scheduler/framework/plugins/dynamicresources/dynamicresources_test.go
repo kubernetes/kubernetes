@@ -7831,3 +7831,103 @@ func TestNew_PodResourceClaimIndex(t *testing.T) {
 		})
 	}
 }
+
+func TestDuplicateResourceClaimAliases(t *testing.T) {
+	for _, tc := range []struct {
+		name           string
+		workloadClaims bool
+		podGroup       bool
+		sharedBinding  bool
+		groupFirst     bool
+	}{
+		{name: "workload-claims-disabled"},
+		{name: "workload-claims-enabled", workloadClaims: true},
+		{name: "podgroup-binding-after-duplicate", workloadClaims: true, podGroup: true},
+		{name: "same-claim-pod-binding-first", workloadClaims: true, sharedBinding: true},
+		{name: "same-claim-podgroup-binding-first", workloadClaims: true, sharedBinding: true, groupFirst: true},
+	} {
+		for _, allocated := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/allocated=%t", tc.name, allocated), func(t *testing.T) {
+				tCtx := ktesting.Init(t)
+				featuregatetesting.SetFeatureGatesDuringTest(tCtx, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+					features.DRAWorkloadResourceClaims: tc.workloadClaims,
+					features.GenericWorkload:           true,
+				})
+				pod := podWithClaimName.DeepCopy()
+				pod.Spec.ResourceClaims = append(pod.Spec.ResourceClaims, v1.PodResourceClaim{Name: "second", ResourceClaimName: &claimName})
+				claim := pendingClaim.DeepCopy()
+				if allocated {
+					claim = allocatedClaim.DeepCopy()
+				}
+				claims := []*resourceapi.ResourceClaim{claim}
+				var groups []*schedulingapi.PodGroup
+				deviceSlice := workerNodeSlice
+				if tc.podGroup {
+					pod.Spec.SchedulingGroup = &v1.PodSchedulingGroup{PodGroupName: new(podGroupName)}
+					pod.Spec.ResourceClaims = append(pod.Spec.ResourceClaims, v1.PodResourceClaim{Name: resourceName2, ResourceClaimName: &claimName2})
+					group := podGroupWithClaimName.DeepCopy()
+					group.Spec.ResourceClaims = []schedulingapi.PodGroupResourceClaim{{Name: resourceName2, ResourceClaimName: &claimName2}}
+					groups = append(groups, group)
+					claims = append(claims, pendingClaim2.DeepCopy())
+					deviceSlice = largeWorkerNodeSlice.DeepCopy()
+					deviceSlice.Spec.Devices = deviceSlice.Spec.Devices[:2]
+				}
+				if tc.sharedBinding {
+					pod.Spec.SchedulingGroup = &v1.PodSchedulingGroup{PodGroupName: new(podGroupName)}
+					group := podGroupWithClaimName.DeepCopy()
+					group.Spec.ResourceClaims[0].Name = "second"
+					if tc.groupFirst {
+						slices.Reverse(pod.Spec.ResourceClaims)
+					}
+					groups = append(groups, group)
+				}
+				testCtx := setup(tCtx, nil, []*v1.Node{workerNode}, claims, []*resourceapi.DeviceClass{deviceClass}, groups, []apiruntime.Object{deviceSlice}, feature.Features{
+					EnableDRAWorkloadResourceClaims:    tc.workloadClaims,
+					EnableDRADeviceBindingConditions:   true,
+					EnableDRAResourceClaimDeviceStatus: true,
+					EnableDRASchedulerFilterTimeout:    true,
+				}, false, nil)
+				_, status := testCtx.p.PreFilter(tCtx, testCtx.state, pod, testCtx.nodeInfos)
+				require.True(t, status.IsSuccess(), "PreFilter: %v", status.AsError())
+				status = testCtx.p.Filter(tCtx, testCtx.state, pod, testCtx.nodeInfos[0])
+				require.True(t, status.IsSuccess(), "Filter: %v", status.AsError())
+				status = testCtx.p.Reserve(tCtx, testCtx.state, pod, nodeName)
+				require.True(t, status.IsSuccess(), "Reserve: %v", status.AsError())
+				status = testCtx.p.PreBind(tCtx, testCtx.state, pod, nodeName)
+				require.True(t, status.IsSuccess(), "PreBind: %v", status.AsError())
+				stored, err := testCtx.client.ResourceV1().ResourceClaims(namespace).Get(tCtx, claim.Name, metav1.GetOptions{})
+				require.NoError(t, err)
+				require.NotNil(t, stored.Status.Allocation)
+				assert.Len(t, stored.Status.Allocation.Devices.Results, 1)
+				require.Len(t, stored.Status.ReservedFor, 1)
+				if tc.sharedBinding {
+					assert.Equal(t, []resourceapi.ResourceClaimConsumerReference{podGroupReservation}, stored.Status.ReservedFor)
+				} else {
+					assert.Equal(t, pod.UID, stored.Status.ReservedFor[0].UID)
+				}
+
+				otherConsumer := resourceapi.ResourceClaimConsumerReference{Resource: "pods", Name: "other-pod", UID: "other-pod-uid"}
+				stored.Status.ReservedFor = append(stored.Status.ReservedFor, otherConsumer)
+				_, err = testCtx.client.ResourceV1().ResourceClaims(namespace).UpdateStatus(tCtx, stored, metav1.UpdateOptions{})
+				require.NoError(t, err)
+				testCtx.p.Unreserve(tCtx, testCtx.state, pod, nodeName)
+				testCtx.p.Unreserve(tCtx, testCtx.state, pod, nodeName)
+				stored, err = testCtx.client.ResourceV1().ResourceClaims(namespace).Get(tCtx, claim.Name, metav1.GetOptions{})
+				require.NoError(t, err)
+				require.NotNil(t, stored.Status.Allocation)
+				expectedReservations := []resourceapi.ResourceClaimConsumerReference{otherConsumer}
+				if tc.sharedBinding {
+					expectedReservations = append([]resourceapi.ResourceClaimConsumerReference{podGroupReservation}, expectedReservations...)
+				}
+				assert.Equal(t, expectedReservations, stored.Status.ReservedFor)
+				assert.Empty(t, testCtx.listInFlightClaims())
+				if tc.podGroup {
+					stored, err := testCtx.client.ResourceV1().ResourceClaims(namespace).Get(tCtx, claimName2, metav1.GetOptions{})
+					require.NoError(t, err)
+					require.NotNil(t, stored.Status.Allocation)
+					assert.Equal(t, []resourceapi.ResourceClaimConsumerReference{podGroupReservation}, stored.Status.ReservedFor)
+				}
+			})
+		}
+	}
+}
