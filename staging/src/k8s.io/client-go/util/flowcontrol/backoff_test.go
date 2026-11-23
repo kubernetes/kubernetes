@@ -17,6 +17,7 @@ limitations under the License.
 package flowcontrol
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -373,5 +374,91 @@ func TestAlternateHasExpiredFunc(t *testing.T) {
 
 		clock.SetTime(time.Now())
 		b.Reset(id)
+	}
+}
+
+func TestBackoffInitialCappedAtMaxDuration(t *testing.T) {
+	cases := []struct {
+		name            string
+		initial         time.Duration
+		maxDuration     time.Duration
+		maxJitterFactor float64
+		minExpected     time.Duration
+	}{
+		{
+			name:            "initial exceeds maxDuration without jitter",
+			initial:         10 * time.Second,
+			maxDuration:     5 * time.Second,
+			maxJitterFactor: 0,
+			minExpected:     5 * time.Second,
+		},
+		{
+			name:            "initial exceeds maxDuration with jitter",
+			initial:         10 * time.Second,
+			maxDuration:     5 * time.Second,
+			maxJitterFactor: 0.5,
+			minExpected:     5 * time.Second,
+		},
+		{
+			name:            "initial equals maxDuration with jitter",
+			initial:         10 * time.Second,
+			maxDuration:     10 * time.Second,
+			maxJitterFactor: 1.0,
+			minExpected:     10 * time.Second,
+		},
+		{
+			name:            "initial plus jitter can exceed maxDuration",
+			initial:         8 * time.Second,
+			maxDuration:     10 * time.Second,
+			maxJitterFactor: 1.0,
+			minExpected:     8 * time.Second,
+		},
+		{
+			name:            "zero maxDuration caps initial backoff without jitter",
+			initial:         5 * time.Second,
+			maxDuration:     0,
+			maxJitterFactor: 0,
+			minExpected:     0,
+		},
+		{
+			name:            "zero maxDuration caps initial backoff with jitter",
+			initial:         5 * time.Second,
+			maxDuration:     0,
+			maxJitterFactor: 0.5,
+			minExpected:     0,
+		},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			tc := testingclock.NewFakeClock(time.Unix(1_700_000_000, 0))
+			var b *Backoff
+			if tt.maxJitterFactor == 0 {
+				b = NewFakeBackOff(tt.initial, tt.maxDuration, tc)
+			} else {
+				b = NewFakeBackOffWithJitter(tt.initial, tt.maxDuration, tc, tt.maxJitterFactor)
+			}
+
+			iterations := 1
+			if tt.maxJitterFactor > 0 {
+				iterations = 100
+			}
+			for i := 0; i < iterations; i++ {
+				id := fmt.Sprintf("item-%d", i)
+				b.Next(id, tc.Now())
+				got := b.Get(id)
+				if got < tt.minExpected || got > tt.maxDuration {
+					t.Fatalf("initial backoff = %s, want within [%s, %s]", got, tt.minExpected, tt.maxDuration)
+				}
+			}
+
+			// Verify cap also applies after entry expiration resets the backoff.
+			tc.Step(2*tt.maxDuration + time.Second)
+			b.Next("item-0", tc.Now())
+			got := b.Get("item-0")
+			if got < tt.minExpected || got > tt.maxDuration {
+				t.Fatalf("post-expiry backoff = %s, want within [%s, %s]", got, tt.minExpected, tt.maxDuration)
+			}
+		})
 	}
 }

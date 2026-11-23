@@ -99,7 +99,7 @@ func (p *Backoff) Next(id string, eventTime time.Time) {
 	entry, ok := p.perItemBackoff[id]
 	if !ok || p.hasExpired(eventTime, entry.lastUpdate, p.maxDuration) {
 		entry = p.initEntryUnsafe(id)
-		entry.backoff += p.jitter(entry.backoff)
+		entry.backoff = min(entry.backoff+p.jitter(entry.backoff), p.maxDuration)
 	} else {
 		delay := entry.backoff * 2       // exponential
 		delay += p.jitter(entry.backoff) // add some jitter to the delay
