@@ -212,10 +212,6 @@ type Proxier struct {
 
 	// localhostNodePortProxy handles userspace proxying of NodePorts on localhost
 	localhostNodePortProxy *localnodeportproxy.LocalNodePortProxy
-
-	// localhostNodePortsEnabled is set when the KubeProxyNFTablesLocalhostNodePorts
-	// feature is enabled
-	localhostNodePortsEnabled bool
 }
 
 // Proxier implements proxy.Provider
@@ -290,7 +286,6 @@ func NewProxier(ctx context.Context,
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.KubeProxyNFTablesLocalhostNodePorts) {
-		proxier.localhostNodePortsEnabled = true
 		if useLocalhostNodePortProxy(nodePortAddresses) {
 			proxier.localhostNodePortProxy = localnodeportproxy.NewLocalNodePortProxy(ctx, ipFamily)
 		}

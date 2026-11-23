@@ -284,11 +284,6 @@ func TestOverallNFTablesRules(t *testing.T) {
 	nft, fp := NewFakeProxier(v1.IPv4Protocol)
 	metrics.RegisterMetrics(kubeproxyconfig.ProxyModeNFTables)
 
-	// The localhost NodePort feature is enabled but loopback is not in
-	// nodePortAddresses, so kube-proxy rejects and counts localhost NodePort
-	// traffic for every protocol.
-	fp.localhostNodePortsEnabled = true
-
 	makeServiceMap(fp,
 		// create ClusterIP service
 		makeTestService("ns1", "svc1", func(svc *v1.Service) {
@@ -539,11 +534,6 @@ func TestOverallNFTablesRules(t *testing.T) {
 func TestOverallNFTablesRulesIPv6(t *testing.T) {
 	nft, fp := NewFakeProxier(v1.IPv6Protocol)
 	metrics.RegisterMetrics(kubeproxyconfig.ProxyModeNFTables)
-
-	// The localhost NodePort feature is enabled but loopback is not in
-	// nodePortAddresses, so kube-proxy rejects and counts localhost NodePort
-	// traffic for every protocol.
-	fp.localhostNodePortsEnabled = true
 
 	makeServiceMap(fp,
 		// create ClusterIP service
@@ -5464,7 +5454,6 @@ func TestLocalhostNodePortRejectTransitionToEnabled(t *testing.T) {
 
 	// Create an "old" kube-proxy process that does not serve localhost NodePorts.
 	nft, oldProxier := NewFakeProxier(v1.IPv4Protocol)
-	oldProxier.localhostNodePortsEnabled = true
 	service := makeTestService("ns1", "svc-udp", func(svc *v1.Service) {
 		svc.Spec.Type = v1.ServiceTypeNodePort
 		svc.Spec.ClusterIP = "172.30.0.41"
@@ -5491,7 +5480,6 @@ func TestLocalhostNodePortRejectTransitionToEnabled(t *testing.T) {
 	_, fp := NewFakeProxier(v1.IPv4Protocol)
 	fp.nftables = nft
 	fp.nodePortAddresses = proxyutil.NewNodePortAddresses(v1.IPv4Protocol, []string{"127.0.0.0/8"})
-	fp.localhostNodePortsEnabled = true
 	fp.localhostNodePortProxy = localnodeportproxy.NewLocalNodePortProxy(context.Background(), v1.IPv4Protocol)
 	defer fp.localhostNodePortProxy.Shutdown()
 	makeServiceMap(fp, service)
@@ -5513,7 +5501,6 @@ func TestLocalhostNodePortRejectTransitionToDisabled(t *testing.T) {
 	// Create an "old" kube-proxy process that serves localhost NodePorts.
 	nft, oldProxier := NewFakeProxier(v1.IPv4Protocol)
 	oldProxier.nodePortAddresses = proxyutil.NewNodePortAddresses(v1.IPv4Protocol, []string{"127.0.0.0/8"})
-	oldProxier.localhostNodePortsEnabled = true
 	oldProxier.localhostNodePortProxy = localnodeportproxy.NewLocalNodePortProxy(context.Background(), v1.IPv4Protocol)
 	defer oldProxier.localhostNodePortProxy.Shutdown()
 	service := makeTestService("ns1", "svc-udp", func(svc *v1.Service) {
@@ -5541,7 +5528,6 @@ func TestLocalhostNodePortRejectTransitionToDisabled(t *testing.T) {
 	// "Restart" kube-proxy with localhost NodePorts disabled.
 	_, fp := NewFakeProxier(v1.IPv4Protocol)
 	fp.nftables = nft
-	fp.localhostNodePortsEnabled = true
 	makeServiceMap(fp, service)
 	if err := fp.syncProxyRules(); err != nil {
 		t.Fatalf("restarted syncProxyRules failed: %v", err)
@@ -5562,7 +5548,6 @@ func TestLocalhostNodePortProxy(t *testing.T) {
 	// Activate the localhost NodePort proxy: loopback is in nodePortAddresses, so
 	// the userspace proxy serves TCP localhost NodePorts while UDP/SCTP are rejected.
 	fp.nodePortAddresses = proxyutil.NewNodePortAddresses(v1.IPv4Protocol, []string{fmt.Sprintf("%s/32", testNodeIP), "127.0.0.0/8"})
-	fp.localhostNodePortsEnabled = true
 	fp.localhostNodePortProxy = localnodeportproxy.NewLocalNodePortProxy(context.Background(), v1.IPv4Protocol)
 	defer fp.localhostNodePortProxy.Shutdown()
 
