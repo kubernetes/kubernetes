@@ -659,12 +659,7 @@ func TestUnauthenticatedHTTP2ClientConnectionClose(t *testing.T) {
 
 				tr.MaxIdleConnsPerHost = 1 // allow http1 to have keep alive connections open
 				if nextProto == http2.NextProtoTLS {
-					// Disable connection pooling to avoid additional connections
-					// that cause the test to flake
-					tr.MaxIdleConnsPerHost = -1
-					if err := http2.ConfigureTransport(tr); err != nil {
-						t.Fatal(err)
-					}
+					tr.ForceAttemptHTTP2 = true
 				}
 
 				client := &http.Client{
