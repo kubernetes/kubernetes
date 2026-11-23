@@ -25,7 +25,6 @@ import (
 	resourcev1 "k8s.io/api/resource/v1"
 	resourcev1alpha3 "k8s.io/api/resource/v1alpha3"
 	"k8s.io/apimachinery/pkg/api/resource"
-	draapi "k8s.io/dynamic-resource-allocation/api"
 	"k8s.io/dynamic-resource-allocation/structured"
 	"k8s.io/utils/ptr"
 )
@@ -319,12 +318,26 @@ func resolveCounterCosts(cost []resourcev1.DeviceCounterConsumption, counterSets
 	return resolved, policyAllows, nil
 }
 
+// poolCapacityKey resolves names in a single device or allocation before summing
+// across the pool. An explicit driver-qualified entry overrides its bare alias.
+func poolCapacityKey[T any](driver string, values map[resourcev1.QualifiedName]T, name resourcev1.QualifiedName) (resourcev1.QualifiedName, bool) {
+	domain, id, qualified := strings.Cut(string(name), "/")
+	if qualified {
+		if domain == driver {
+			return resourcev1.QualifiedName(id), true
+		}
+		return name, true
+	}
+	_, overridden := values[resourcev1.QualifiedName(driver+"/"+string(name))]
+	return name, !overridden
+}
+
 // computeShareableSummary reports aggregate capacity for pools containing devices
 // with allowMultipleAllocations. It returns nil when the pool has no shareable
 // devices.
 func computeShareableSummary(in poolViewInput) (*resourcev1alpha3.ShareableSummaryStatus, string) {
 	var full, partial int32
-	total := map[resourcev1.QualifiedName]resource.Quantity{}
+	byKey := map[resourcev1.QualifiedName]*resourcev1alpha3.ShareableCapacityStatus{}
 	any := false
 	for i := range in.devices {
 		d := in.devices[i]
@@ -337,41 +350,40 @@ func computeShareableSummary(in poolViewInput) (*resourcev1alpha3.ShareableSumma
 		} else {
 			full++
 		}
-		for key, capacity := range d.capacity {
-			cur := total[key].DeepCopy()
-			cur.Add(capacity.Value)
-			total[key] = cur
+		for name, capacity := range d.capacity {
+			key, use := poolCapacityKey(in.driver, d.capacity, name)
+			if !use {
+				continue
+			}
+			entry := byKey[key]
+			if entry == nil {
+				entry = &resourcev1alpha3.ShareableCapacityStatus{Name: string(name), Total: &resource.Quantity{}}
+				byKey[key] = entry
+			} else if name == key {
+				// Keep the published spelling for uniform pools and prefer the bare name in mixed pools.
+				entry.Name = string(name)
+			}
+			entry.Total.Add(capacity.Value)
 		}
 	}
 	if !any {
 		return nil, ""
 	}
 
-	keys := make([]resourcev1.QualifiedName, 0, len(total))
-	for key := range total {
-		keys = append(keys, key)
-	}
-	slices.Sort(keys)
-
-	capacities := make([]resourcev1alpha3.ShareableCapacityStatus, 0, len(keys))
-	for _, key := range keys {
-		t := total[key]
-		cons := resource.Quantity{}
-		if q, ok := draapi.LookupByQualifiedName(in.consumedCapacity, key, in.driver); ok {
-			cons = q.DeepCopy()
-		}
-		avail := nonNegativeDiff(t, cons)
-		capacities = append(capacities, resourcev1alpha3.ShareableCapacityStatus{
-			Name:      string(key),
-			Total:     &t,
-			Consumed:  &cons,
-			Available: &avail,
-		})
-	}
-	if len(capacities) > maxStatusListItems {
+	if len(byKey) > maxStatusListItems {
 		return nil, fmt.Sprintf("%s pool %s/%s has %d shareable capacity keys, exceeding the maximum of %d",
-			prefixShareableOverCap, in.driver, in.poolName, len(capacities), maxStatusListItems)
+			prefixShareableOverCap, in.driver, in.poolName, len(byKey), maxStatusListItems)
 	}
+	capacities := make([]resourcev1alpha3.ShareableCapacityStatus, 0, len(byKey))
+	for key, entry := range byKey {
+		consumed := in.consumedCapacity[key].DeepCopy()
+		entry.Consumed = &consumed
+		entry.Available = new(nonNegativeDiff(*entry.Total, consumed))
+		capacities = append(capacities, *entry)
+	}
+	slices.SortFunc(capacities, func(a, b resourcev1alpha3.ShareableCapacityStatus) int {
+		return strings.Compare(a.Name, b.Name)
+	})
 
 	return &resourcev1alpha3.ShareableSummaryStatus{
 		FullyAvailableDevices:     ptr.To(full),

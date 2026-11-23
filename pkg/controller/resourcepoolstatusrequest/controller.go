@@ -636,7 +636,11 @@ func (c *Controller) calculatePoolStatus(ctx context.Context, request *resourcev
 			devices[result.Device] = struct{}{}
 			allocations[key] = append(allocations[key], result)
 
-			for capacityName, quantity := range result.ConsumedCapacity {
+			for name, quantity := range result.ConsumedCapacity {
+				capacityName, use := poolCapacityKey(result.Driver, result.ConsumedCapacity, name)
+				if !use {
+					continue
+				}
 				m := consumedCapacity[key]
 				if m == nil {
 					m = make(map[resourcev1.QualifiedName]resource.Quantity)
