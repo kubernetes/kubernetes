@@ -122,6 +122,69 @@ func TestSemanticVersions(t *testing.T) {
 	}
 }
 
+func TestSemanticVersionPreReleaseOrdering(t *testing.T) {
+	// Strictly increasing versions per SemVer 2.0.0 §11.4, including cases where
+	// numeric identifiers must precede non-numeric identifiers whose leading ASCII
+	// characters are hyphens or smaller digits (e.g., 2 < 10 < -1 < 0a < 1a).
+	ordered := []string{
+		"1.0.0-0",
+		"1.0.0-2",
+		"1.0.0-10",
+		"1.0.0--",
+		"1.0.0--1",
+		"1.0.0-0a",
+		"1.0.0-1a",
+		"1.0.0-2a",
+		"1.0.0-alpha",
+		"1.0.0-alpha.0",
+		"1.0.0-alpha.2",
+		"1.0.0-alpha.10",
+		"1.0.0-alpha.-1",
+		"1.0.0-alpha.1a",
+		"1.0.0-alpha.beta",
+		"1.0.0",
+	}
+
+	parsed := make([]*Version, len(ordered))
+	for i, s := range ordered {
+		v, err := ParseSemantic(s)
+		if err != nil {
+			t.Fatalf("unexpected parse error for %q: %v", s, err)
+		}
+		parsed[i] = v
+	}
+
+	for i, vi := range parsed {
+		for j, vj := range parsed {
+			want := 0
+			if i < j {
+				want = -1
+			} else if i > j {
+				want = 1
+			}
+			got, err := vi.Compare(ordered[j])
+			if err != nil {
+				t.Fatalf("Compare(%q, %q) returned unexpected error: %v", ordered[i], ordered[j], err)
+			}
+			if got != want {
+				t.Errorf("Compare(%q, %q) = %d, want %d", ordered[i], ordered[j], got, want)
+			}
+			if vi.LessThan(vj) != (want == -1) {
+				t.Errorf("%q.LessThan(%q) = %v, want %v", ordered[i], ordered[j], vi.LessThan(vj), want == -1)
+			}
+			if vi.GreaterThan(vj) != (want == 1) {
+				t.Errorf("%q.GreaterThan(%q) = %v, want %v", ordered[i], ordered[j], vi.GreaterThan(vj), want == 1)
+			}
+			if vi.EqualTo(vj) != (want == 0) {
+				t.Errorf("%q.EqualTo(%q) = %v, want %v", ordered[i], ordered[j], vi.EqualTo(vj), want == 0)
+			}
+			if vi.AtLeast(vj) != (want >= 0) {
+				t.Errorf("%q.AtLeast(%q) = %v, want %v", ordered[i], ordered[j], vi.AtLeast(vj), want >= 0)
+			}
+		}
+	}
+}
+
 func TestBadSemanticVersions(t *testing.T) {
 	tests := []string{
 		// "MUST take the form X.Y.Z"
