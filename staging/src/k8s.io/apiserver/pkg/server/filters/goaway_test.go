@@ -18,14 +18,13 @@ package filters
 
 import (
 	"bytes"
-	"context"
 	"crypto/tls"
 	"fmt"
 	"io"
 	"math/rand"
-	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/http/httptrace"
 	"reflect"
 	"sync"
 	"testing"
@@ -187,7 +186,9 @@ type watchResponse struct {
 
 // requestGOAWAYServer request test GOAWAY server using specified method and data according to the given url.
 // A non-nil channel will be returned if the request is watch, and a watchResponse can be got from the channel when watch done.
-func requestGOAWAYServer(client *http.Client, serverBaseURL, url string) (<-chan watchResponse, error) {
+// If trace is non-nil, it is attached to each request so the caller can observe
+// which connections serve the requests.
+func requestGOAWAYServer(client *http.Client, serverBaseURL, url string, trace *httptrace.ClientTrace) (<-chan watchResponse, error) {
 	method := http.MethodGet
 	var reqBody io.Reader
 
@@ -199,6 +200,9 @@ func requestGOAWAYServer(client *http.Client, serverBaseURL, url string) (<-chan
 	req, err := http.NewRequest(method, serverBaseURL+url, reqBody)
 	if err != nil {
 		return nil, fmt.Errorf("unexpect new request error: %v", err)
+	}
+	if trace != nil {
+		req = req.WithContext(httptrace.WithClientTrace(req.Context(), trace))
 	}
 	resp, err := client.Do(req)
 	if err != nil {
@@ -305,19 +309,26 @@ func TestClientReceivedGOAWAY(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			// localAddr indicates how many TCP connection set up
-			localAddr := make([]string, 0)
+			// servedConns records the distinct TCP connections that
+			// actually served a request, observed via httptrace GotConn.
+			// Counting dials instead is racy: the transport dials on a
+			// separate goroutine and may dial a connection that never
+			// serves a request (e.g. a dial started while an idle
+			// connection is handed to the waiting request instead), so
+			// the dial count can exceed the number of connections the
+			// requests used, and the dial goroutine's append raced with
+			// the count check below.
+			var mu sync.Mutex
+			servedConns := make(map[string]struct{})
+			trace := &httptrace.ClientTrace{
+				GotConn: func(info httptrace.GotConnInfo) {
+					mu.Lock()
+					defer mu.Unlock()
+					servedConns[info.Conn.LocalAddr().String()] = struct{}{}
+				},
+			}
 
 			// create the http client
-			dialFn := func(network, addr string, cfg *tls.Config) (conn net.Conn, err error) {
-				conn, err = tls.Dial(network, addr, cfg)
-				if err != nil {
-					t.Fatalf("unexpect connection err: %v", err)
-				}
-
-				localAddr = append(localAddr, conn.LocalAddr().String())
-				return
-			}
 			tlsConfig := &tls.Config{
 				InsecureSkipVerify: true,
 				NextProtos:         []string{http2.NextProtoTLS},
@@ -326,9 +337,6 @@ func TestClientReceivedGOAWAY(t *testing.T) {
 				TLSHandshakeTimeout: 10 * time.Second,
 				TLSClientConfig:     tlsConfig,
 				ForceAttemptHTTP2:   true,
-				DialTLSContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-					return dialFn(network, addr, tlsConfig)
-				},
 			}
 
 			client := &http.Client{
@@ -337,7 +345,7 @@ func TestClientReceivedGOAWAY(t *testing.T) {
 
 			watchChs := make([]<-chan watchResponse, 0)
 			for _, url := range tc.reqs {
-				w, err := requestGOAWAYServer(client, s.URL, url)
+				w, err := requestGOAWAYServer(client, s.URL, url, trace)
 				if err != nil {
 					t.Fatalf("failed to request server, err: %v", err)
 				}
@@ -347,8 +355,11 @@ func TestClientReceivedGOAWAY(t *testing.T) {
 			}
 
 			// check TCP connection count
-			if tc.expectConnections != len(localAddr) {
-				t.Fatalf("expect TCP connection: %d, actual: %d", tc.expectConnections, len(localAddr))
+			mu.Lock()
+			actualConnections := len(servedConns)
+			mu.Unlock()
+			if tc.expectConnections != actualConnections {
+				t.Fatalf("expect TCP connection: %d, actual: %d", tc.expectConnections, actualConnections)
 			}
 
 			// check if watch request is broken by GOAWAY frame
@@ -475,7 +486,7 @@ func TestGOAWAYConcurrency(t *testing.T) {
 					return
 				}
 
-				w, err := requestGOAWAYServer(client, s.URL, url)
+				w, err := requestGOAWAYServer(client, s.URL, url, nil)
 				if err != nil {
 					t.Errorf("failed to request %q, err: %v", url, err)
 				}
