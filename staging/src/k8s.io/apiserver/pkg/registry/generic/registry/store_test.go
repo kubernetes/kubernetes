@@ -497,11 +497,8 @@ func TestNewStoreKeyFuncsPreservesCustomReverseKeyFunc(t *testing.T) {
 }
 
 func getPodAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
-	accessor, err := meta.Accessor(obj)
-	if err != nil {
-		return nil, nil, err
-	}
-	return labels.Set{"name": accessor.GetName()}, nil, nil
+	pod := obj.(*example.Pod)
+	return labels.Set{"name": pod.ObjectMeta.Name}, nil, nil
 }
 
 // matchPodName returns selection predicate that matches any pod with name in the set.
@@ -2719,23 +2716,15 @@ func TestStoreWatch(t *testing.T) {
 }
 
 func newTestGenericStoreRegistry(t *testing.T, scheme *runtime.Scheme, hasCacheEnabled bool) (factory.DestroyFunc, *Store) {
-	return newTestStoreRegistry(
-		t,
-		scheme,
-		apitesting.TestStorageCodec(codecs, examplev1.SchemeGroupVersion),
-		func() runtime.Object { return &example.Pod{} },
-		func() runtime.Object { return &example.PodList{} },
-		hasCacheEnabled,
-	)
-}
-
-func newTestStoreRegistry(t *testing.T, scheme *runtime.Scheme, codec runtime.Codec, newFunc, newListFunc func() runtime.Object, hasCacheEnabled bool) (factory.DestroyFunc, *Store) {
 	podPrefix := "/pods/"
 	server, sc := etcd3testing.NewUnsecuredEtcd3TestClientServer(t)
 	strategy := &testRESTStrategy{scheme, names.SimpleNameGenerator, true, false, true}
 	keyFuncs := defaultStoreKeyFuncs(strings.TrimSuffix(podPrefix, "/"), strategy.NamespaceScoped())
 
-	sc.Codec = codec
+	newFunc := func() runtime.Object { return &example.Pod{} }
+	newListFunc := func() runtime.Object { return &example.PodList{} }
+
+	sc.Codec = apitesting.TestStorageCodec(codecs, examplev1.SchemeGroupVersion)
 	s, dFunc, err := factory.Create(*sc.ForResource(schema.GroupResource{Resource: "pods"}), newFunc, newListFunc, keyFuncs.reverseKeyFunc, "/pods")
 	if err != nil {
 		t.Fatalf("Error creating storage: %v", err)
@@ -2778,8 +2767,8 @@ func newTestStoreRegistry(t *testing.T, scheme *runtime.Scheme, codec runtime.Co
 	}
 
 	return destroyFunc, &Store{
-		NewFunc:                   newFunc,
-		NewListFunc:               newListFunc,
+		NewFunc:                   func() runtime.Object { return &example.Pod{} },
+		NewListFunc:               func() runtime.Object { return &example.PodList{} },
 		DefaultQualifiedResource:  example.Resource("pods"),
 		SingularQualifiedResource: example.Resource("pod"),
 		CreateStrategy:            strategy,
@@ -2788,21 +2777,21 @@ func newTestStoreRegistry(t *testing.T, scheme *runtime.Scheme, codec runtime.Co
 		KeyRootFunc:               keyFuncs.requestKeyRootFunc,
 		KeyFunc:                   keyFuncs.requestKeyFunc,
 		ReverseKeyFunc:            keyFuncs.reverseKeyFunc,
-		ObjectNameFunc: func(obj runtime.Object) (string, error) {
-			accessor, err := meta.Accessor(obj)
-			if err != nil {
-				return "", err
-			}
-			return accessor.GetName(), nil
-		},
+		ObjectNameFunc:            func(obj runtime.Object) (string, error) { return obj.(*example.Pod).Name, nil },
 		PredicateFunc: func(label labels.Selector, field fields.Selector) storage.SelectionPredicate {
 			return storage.SelectionPredicate{
-				Label:    label,
-				Field:    field,
-				GetAttrs: storage.DefaultNamespaceScopedAttr,
+				Label: label,
+				Field: field,
+				GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
+					pod, ok := obj.(*example.Pod)
+					if !ok {
+						return nil, nil, fmt.Errorf("not a pod")
+					}
+					return labels.Set(pod.ObjectMeta.Labels), generic.ObjectMetaFieldsSet(&pod.ObjectMeta, true), nil
+				},
 			}
 		},
-		Storage: DryRunnableStorage{Storage: s, Codec: sc.Codec},
+		Storage: DryRunnableStorage{Storage: s},
 	}
 }
 
