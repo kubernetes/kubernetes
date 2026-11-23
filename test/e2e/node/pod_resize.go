@@ -1516,7 +1516,7 @@ func doPodResizeMemoryVolumeDeferredTests(f *framework.Framework) {
 		gomega.Expect(podB.Status.Phase).To(gomega.Equal(v1.PodRunning))
 
 		ginkgo.By("verifying initial mounted emptyDir volume size via df inside container")
-		stdout, _, err := e2epod.ExecCommandInContainerWithFullOutput(f, podB.Name, "c1", "df", "-m", "/cache")
+		stdout, err := podresize.RunDfInContainer(ctx, f, podB.Name, "c1", "/cache")
 		framework.ExpectNoError(err, "failed to run df")
 		gomega.Expect(stdout).To(gomega.ContainSubstring(strconv.FormatInt(qty64Mi.Value()/(1024*1024), 10)))
 
@@ -1556,7 +1556,7 @@ func doPodResizeMemoryVolumeDeferredTests(f *framework.Framework) {
 		waitForPodDeferred(ctx, f, patchedPod)
 
 		ginkgo.By("verifying that the volume mount inside the container remains at 64Mi (atomic isolation)")
-		stdout, _, err = e2epod.ExecCommandInContainerWithFullOutput(f, patchedPod.Name, "c1", "df", "-m", "/cache")
+		stdout, err = podresize.RunDfInContainer(ctx, f, patchedPod.Name, "c1", "/cache")
 		framework.ExpectNoError(err, "failed to run df inside container")
 		gomega.Expect(stdout).To(gomega.ContainSubstring(strconv.FormatInt(qty64Mi.Value()/(1024*1024), 10)))
 		gomega.Expect(stdout).ToNot(gomega.ContainSubstring(strconv.FormatInt(qty128Mi.Value()/(1024*1024), 10)))

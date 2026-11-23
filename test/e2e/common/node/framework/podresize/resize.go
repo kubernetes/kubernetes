@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubectl/pkg/util/podutils"
 	kubeqos "k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/test/e2e/common/node/framework/cgroups"
+	"k8s.io/kubernetes/test/e2e/common/node/framework/podexec"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 
@@ -318,7 +319,7 @@ func addResourceList(des, src v1.ResourceList) {
 func VerifyPodContainersCgroupValues(ctx context.Context, f *framework.Framework, pod *v1.Pod, tcInfo []ResizableContainerInfo) error {
 	ginkgo.GinkgoHelper()
 
-	onCgroupv2, err := cgroups.IsPodOnCgroupv2Node(f, pod, pod.Spec.Containers[0].Name)
+	onCgroupv2, err := cgroups.IsPodOnCgroupv2Node(ctx, f, pod, pod.Spec.Containers[0].Name)
 	if err != nil {
 		return err
 	}
@@ -383,7 +384,7 @@ func verifyOomScoreAdj(ctx context.Context, f *framework.Framework, pod *v1.Pod,
 	expectedOomScoreAdj := strconv.FormatInt(int64(oomScoreAdj), 10)
 
 	return framework.Gomega().Eventually(ctx, framework.HandleRetry(func(ctx context.Context) (error, error) {
-		return cgroups.VerifyOomScoreAdjValue(f, pod, container.Name, expectedOomScoreAdj), nil
+		return cgroups.VerifyOomScoreAdjValue(ctx, f, pod, container.Name, expectedOomScoreAdj), nil
 	})).WithTimeout(framework.PollShortTimeout).Should(gomega.Succeed())
 }
 
@@ -542,4 +543,11 @@ func formatErrors(err error) error {
 		errStrings[i] = err.Error()
 	}
 	return fmt.Errorf("[\n%s\n]", strings.Join(errStrings, ",\n"))
+}
+
+// RunDfInContainer executes `df -m <mountPath>` inside the specified container,
+// retrying exec errors (other than non-zero command exit codes) up to PollShortTimeout.
+func RunDfInContainer(ctx context.Context, f *framework.Framework, podName, containerName, mountPath string) (string, error) {
+	stdout, _, err := podexec.ExecCommandInContainerWithRetry(ctx, f, podName, containerName, "df", "-m", mountPath)
+	return stdout, err
 }

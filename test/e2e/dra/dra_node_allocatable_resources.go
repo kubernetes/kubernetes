@@ -672,7 +672,7 @@ func doNodeAllocatableCgroupsTests(f *framework.Framework) {
 			framework.ExpectNoError(err, "verify pod cgroup values for Pod %q", pod.Name)
 
 			ginkgo.By("verifying containers cgroup limits on the node")
-			onCgroupV2, err := cgroups.IsPodOnCgroupv2Node(f, pod, pod.Spec.Containers[0].Name)
+			onCgroupV2, err := cgroups.IsPodOnCgroupv2Node(ctx, f, pod, pod.Spec.Containers[0].Name)
 			framework.ExpectNoError(err)
 			for i, container := range pod.Spec.Containers {
 				expectedContainer := &v1.Container{
@@ -715,7 +715,7 @@ func doNodeAllocatableCgroupsTests(f *framework.Framework) {
 				case v1.PodQOSBurstable:
 					expectedScore = computeExpectedOomScoreAdj(tc.expectedContainersScoreMemRequest[i], nodeMemBytes)
 				}
-				err = cgroups.VerifyOomScoreAdjValue(f, pod, container.Name, fmt.Sprintf("%d", expectedScore))
+				err = cgroups.VerifyOomScoreAdjValue(ctx, f, pod, container.Name, fmt.Sprintf("%d", expectedScore))
 				framework.ExpectNoError(err, "verify container OOM score adjustment for Pod %q", pod.Name)
 			}
 
@@ -944,7 +944,7 @@ func doNodeAllocatableResizeTests(f *framework.Framework) {
 			framework.ExpectNoError(err, "verify pod cgroup values for Pod %q", resizedPod.Name)
 
 			ginkgo.By("verifying updated container cgroup limits after resize")
-			onCgroupV2, err := cgroups.IsPodOnCgroupv2Node(f, resizedPod, resizedPod.Spec.Containers[0].Name)
+			onCgroupV2, err := cgroups.IsPodOnCgroupv2Node(ctx, f, resizedPod, resizedPod.Spec.Containers[0].Name)
 			framework.ExpectNoError(err)
 			for i, container := range resizedPod.Spec.Containers {
 				expectedContainer := &v1.Container{

@@ -17,13 +17,16 @@ limitations under the License.
 package cgroups
 
 import (
+	"context"
 	"errors"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/client-go/util/exec"
 )
 
 func TestIsPodOnCgroupv2Node(t *testing.T) {
@@ -132,6 +135,52 @@ func TestIsPodOnCgroupv2NodeCache(t *testing.T) {
 		assert.Equal(t, step.wantV2, onCgroupV2, step.name)
 		assert.Equal(t, step.wantProbes, probeCount, "%s: probe count", step.name)
 	}
+}
+
+func TestIsPodOnCgroupv2NodeWithRetry(t *testing.T) {
+	v2Output := "cgroup2 on /sys/fs/cgroup type cgroup2 (ro,nosuid,nodev,noexec,relatime)"
+
+	t.Run("retries transient exec errors and caches eventual success", func(t *testing.T) {
+		cache := &sync.Map{}
+		attempts := 0
+		onCgroupV2, err := isPodOnCgroupv2NodeWithRetry(context.Background(), cache, "node-a", 5*time.Second, 10*time.Millisecond, func() (string, string, error) {
+			attempts++
+			if attempts < 3 {
+				return "", "", errors.New("read: connection reset by peer")
+			}
+			return v2Output, "", nil
+		})
+		require.NoError(t, err)
+		assert.True(t, onCgroupV2)
+		assert.Equal(t, 3, attempts)
+
+		cached, ok := cache.Load("node-a")
+		require.True(t, ok)
+		assert.Equal(t, true, cached)
+	})
+
+	t.Run("stops immediately on command exit error without caching", func(t *testing.T) {
+		cache := &sync.Map{}
+		attempts := 0
+		_, err := isPodOnCgroupv2NodeWithRetry(context.Background(), cache, "node-b", 5*time.Second, 10*time.Millisecond, func() (string, string, error) {
+			attempts++
+			return "", "mount: not found", exec.CodeExitError{Err: errors.New("exit status 127"), Code: 127}
+		})
+		require.Error(t, err)
+		assert.Equal(t, 1, attempts)
+		_, ok := cache.Load("node-b")
+		assert.False(t, ok)
+	})
+
+	t.Run("fails after timeout on persistent transient error without caching", func(t *testing.T) {
+		cache := &sync.Map{}
+		_, err := isPodOnCgroupv2NodeWithRetry(context.Background(), cache, "node-c", 50*time.Millisecond, 10*time.Millisecond, func() (string, string, error) {
+			return "", "", errors.New("read: connection reset by peer")
+		})
+		require.Error(t, err)
+		_, ok := cache.Load("node-c")
+		assert.False(t, ok)
+	})
 }
 
 func TestGetCPULimitCgroupExpectations(t *testing.T) {
