@@ -22,13 +22,16 @@ import (
 	"strings"
 	"testing"
 
+	libcontainercgroups "github.com/opencontainers/cgroups"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
 func TestIsCgroupPod(t *testing.T) {
@@ -292,6 +295,109 @@ func TestGetPodContainerName(t *testing.T) {
 			actualCgroupName, actualLiteralCgroupfs := pcm.GetPodContainerName(tt.args.pod)
 			require.Equalf(t, tt.wantCgroupName, actualCgroupName, "Unexpected cgroup name for pod with UID %s, container resources: %v", tt.args.pod.UID, tt.args.pod.Spec.Containers[0].Resources)
 			require.Equalf(t, tt.wantLiteralCgroupfs, actualLiteralCgroupfs, "Unexpected literal cgroupfs for pod with UID %s, container resources: %v", tt.args.pod.UID, tt.args.pod.Spec.Containers[0].Resources)
+		})
+	}
+}
+
+// recordingCgroupManager captures the CgroupConfig passed to Create so the
+// test can inspect the ResourceParameters without touching the real cgroup fs.
+type recordingCgroupManager struct {
+	unsupportedCgroupManager // satisfies all unneeded interface methods
+	created []*CgroupConfig
+}
+
+func (r *recordingCgroupManager) Create(_ klog.Logger, cfg *CgroupConfig) error {
+	r.created = append(r.created, cfg)
+	return nil
+}
+func (r *recordingCgroupManager) Exists(CgroupName) bool    { return false }
+func (r *recordingCgroupManager) Name(n CgroupName) string  { return n.ToCgroupfs() }
+func (r *recordingCgroupManager) CgroupName(s string) CgroupName {
+	return CgroupName([]string{s})
+}
+
+// TestEnsureExists_NoSwap_SetsPodCgroupSwapMaxZero verifies that EnsureExists
+// writes memory.swap.max=0 in the pod cgroup Unified map when memorySwapBehavior
+// is NoSwap on a cgroup v2 node.
+//
+// Before this fix the pod cgroup was left at the kernel default (max), which
+// allowed the sandbox (pause process, Kata VM, etc.) to swap even though the
+// per-container memory.swap.max was 0.
+func TestEnsureExists_NoSwap_SetsPodCgroupSwapMaxZero(t *testing.T) {
+	// This test relies on cgroup v2 mode; skip if the kernel is cgroup v1 only.
+	if !libcontainercgroups.IsCgroup2UnifiedMode() {
+		t.Skip("cgroup v2 not available on this host")
+	}
+
+	logger, _ := ktesting.NewTestContext(t)
+	qosContainersInfo := QOSContainersInfo{
+		Guaranteed: RootCgroupName,
+		Burstable:  NewCgroupName(RootCgroupName, strings.ToLower(string(v1.PodQOSBurstable))),
+		BestEffort: NewCgroupName(RootCgroupName, strings.ToLower(string(v1.PodQOSBestEffort))),
+	}
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{UID: "test-uid-noswap"},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name: "app",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("128Mi")},
+						Limits:   v1.ResourceList{v1.ResourceMemory: resource.MustParse("128Mi")},
+					},
+				},
+			},
+		},
+	}
+
+	tests := []struct {
+		name             string
+		swapBehavior     string
+		wantSwapMaxZero  bool
+	}{
+		{
+			name:            "NoSwap sets memory.swap.max=0 on pod cgroup",
+			swapBehavior:    string(kubetypes.NoSwap),
+			wantSwapMaxZero: true,
+		},
+		{
+			name:            "LimitedSwap leaves memory.swap.max unset on pod cgroup",
+			swapBehavior:    string(kubetypes.LimitedSwap),
+			wantSwapMaxZero: false,
+		},
+		{
+			name:            "empty swap behavior leaves memory.swap.max unset on pod cgroup",
+			swapBehavior:    "",
+			wantSwapMaxZero: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rec := &recordingCgroupManager{}
+			pcm := &podContainerManagerImpl{
+				cgroupManager:      NewCgroupManager(logger, nil, "cgroupfs"),
+				qosContainersInfo:  qosContainersInfo,
+				enforceCPULimits:   true,
+				memorySwapBehavior: tt.swapBehavior,
+			}
+			// Override the cgroup manager with our recorder after construction so
+			// IsPodCgroup / Name still work via the real manager, but Create is captured.
+			pcm.cgroupManager = rec
+
+			err := pcm.EnsureExists(logger, pod)
+			require.NoError(t, err)
+			require.Len(t, rec.created, 1, "expected exactly one cgroup Create call")
+
+			cfg := rec.created[0]
+			swapVal, hasSwap := cfg.ResourceParameters.Unified[Cgroup2MaxSwapFilename]
+			if tt.wantSwapMaxZero {
+				require.True(t, hasSwap, "expected memory.swap.max in Unified map for %s", tt.swapBehavior)
+				require.Equal(t, "0", swapVal, "expected memory.swap.max=0 for %s", tt.swapBehavior)
+			} else {
+				require.False(t, hasSwap, "expected memory.swap.max absent from Unified map for %s", tt.swapBehavior)
+			}
 		})
 	}
 }

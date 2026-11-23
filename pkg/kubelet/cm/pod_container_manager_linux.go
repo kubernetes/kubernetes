@@ -32,6 +32,7 @@ import (
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
 const (
@@ -62,6 +63,11 @@ type podContainerManagerImpl struct {
 	memoryReservationPolicy kubeletconfig.MemoryReservationPolicy
 	// memoryThrottlingFactor is used to compute pod-level memory.high
 	memoryThrottlingFactor *float64
+	// memorySwapBehavior holds the node-level swap setting (NoSwap or LimitedSwap).
+	// When NoSwap is set on a cgroup v2 node, EnsureExists writes memory.swap.max=0
+	// on the pod cgroup so the sandbox (pause container, Kata VM, etc.) cannot swap,
+	// matching the per-container guarantee documented in the swap memory management docs.
+	memorySwapBehavior string
 }
 
 // Make sure that podContainerManagerImpl implements the PodContainerManager interface
@@ -102,6 +108,14 @@ func (m *podContainerManagerImpl) EnsureExists(logger klog.Logger, pod *v1.Pod) 
 		if enforceMemoryQoS {
 			m.applyPodLevelMemoryHigh(pod, containerConfig.ResourceParameters)
 			logger.V(4).Info("MemoryQoS config for pod", "pod", klog.KObj(pod), "unified", containerConfig.ResourceParameters.Unified)
+		}
+		if libcontainercgroups.IsCgroup2UnifiedMode() &&
+			kubetypes.SwapBehavior(m.memorySwapBehavior) == kubetypes.NoSwap {
+			if containerConfig.ResourceParameters.Unified == nil {
+				containerConfig.ResourceParameters.Unified = make(map[string]string)
+			}
+			containerConfig.ResourceParameters.Unified[Cgroup2MaxSwapFilename] = "0"
+			logger.V(4).Info("NoSwap: set memory.swap.max=0 on pod cgroup", "pod", klog.KObj(pod))
 		}
 		if err := m.cgroupManager.Create(logger, containerConfig); err != nil {
 			return fmt.Errorf("failed to create container for %v : %v", podContainerName, err)
