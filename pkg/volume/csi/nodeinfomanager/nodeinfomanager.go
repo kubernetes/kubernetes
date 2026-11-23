@@ -204,6 +204,8 @@ func (nim *nodeInfoManager) tryUpdateNode(updateFuncs ...nodeUpdateFunc) error {
 	if err != nil {
 		return err
 	}
+	// Refresh cached node UID in case the Node was recreated with the same name since startup.
+	nim.nodeID = originalNode.UID
 	node := originalNode.DeepCopy()
 
 	needUpdate := false
@@ -407,7 +409,7 @@ func (nim *nodeInfoManager) tryUpdateCSINode(
 		return err
 	}
 
-	if err = nim.ensureNodeOwnsCSINode(nodeInfo); err != nil {
+	if err = nim.ensureNodeOwnsCSINode(csiKubeClient, nodeInfo); err != nil {
 		return err
 	}
 
@@ -454,7 +456,7 @@ func (nim *nodeInfoManager) tryInitializeCSINodeWithAnnotation(csiKubeClient cli
 		return err
 	}
 
-	if err = nim.ensureNodeOwnsCSINode(nodeInfo); err != nil {
+	if err = nim.ensureNodeOwnsCSINode(csiKubeClient, nodeInfo); err != nil {
 		return err
 	}
 
@@ -470,17 +472,29 @@ func (nim *nodeInfoManager) tryInitializeCSINodeWithAnnotation(csiKubeClient cli
 
 // ensureNodeOwnsCSINode will ensure that the current CSINode object is owned by the node represented by this nodeInfoManager.
 // If not, it will delete the existing CSINode object and return an error.
-func (nim *nodeInfoManager) ensureNodeOwnsCSINode(nodeInfo *storagev1.CSINode) error {
-	if ok, csiNodeOwnerID := nim.nodeOwnsCSINode(nodeInfo); !ok {
-		klog.V(2).Infof("existing CSINode %q is owned by different node (oldNodeID=%q, newNodeID=%q), cleaning up...", nodeInfo.Name, csiNodeOwnerID, nim.nodeID)
-		err := nim.DeleteCSINode()
-		if err != nil {
-			return fmt.Errorf("error deleting existing CSINode %q: %w", nodeInfo.Name, err)
-		}
-		// Returning now so that the next attempt can create a new CSINode object
-		return fmt.Errorf("CSINode %q was owned by different node (oldNodeID=%q, newNodeID=%q), deleted it", nodeInfo.Name, csiNodeOwnerID, nim.nodeID)
+func (nim *nodeInfoManager) ensureNodeOwnsCSINode(csiKubeClient clientset.Interface, nodeInfo *storagev1.CSINode) error {
+	owned, csiNodeOwnerID := nim.nodeOwnsCSINode(nodeInfo)
+	if owned {
+		return nil
 	}
-	return nil
+
+	// Re-fetch Node UID before deleting in case the Node was recreated with the
+	// same name and nim.nodeID still holds a predecessor Node's UID.
+	node, err := csiKubeClient.CoreV1().Nodes().Get(context.TODO(), string(nim.nodeName), metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	nim.nodeID = node.UID
+	if owned, _ := nim.nodeOwnsCSINode(nodeInfo); owned {
+		return nil
+	}
+
+	klog.V(2).Infof("existing CSINode %q is owned by different node (oldNodeID=%q, newNodeID=%q), cleaning up...", nodeInfo.Name, csiNodeOwnerID, nim.nodeID)
+	if err := nim.DeleteCSINode(); err != nil {
+		return fmt.Errorf("error deleting existing CSINode %q: %w", nodeInfo.Name, err)
+	}
+	// Returning now so that the next attempt can create a new CSINode object
+	return fmt.Errorf("CSINode %q was owned by different node (oldNodeID=%q, newNodeID=%q), deleted it", nodeInfo.Name, csiNodeOwnerID, nim.nodeID)
 }
 
 // nodeOwnsCSINode checks if the CSINode object is owned by the node represented by this nodeInfoManager.
@@ -513,6 +527,11 @@ func (nim *nodeInfoManager) CreateCSINode() (*storagev1.CSINode, error) {
 		return nil, fmt.Errorf("error getting CSI client")
 	}
 
+	node, err := csiKubeClient.CoreV1().Nodes().Get(context.TODO(), string(nim.nodeName), metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+
 	nodeInfo := &storagev1.CSINode{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: string(nim.nodeName),
@@ -520,8 +539,8 @@ func (nim *nodeInfoManager) CreateCSINode() (*storagev1.CSINode, error) {
 				{
 					APIVersion: nodeKind.Version,
 					Kind:       nodeKind.Kind,
-					Name:       string(nim.nodeName),
-					UID:        nim.nodeID,
+					Name:       node.Name,
+					UID:        node.UID,
 				},
 			},
 		},
@@ -759,7 +778,7 @@ func (nim *nodeInfoManager) tryUpdateCSINodeStorageHealth(
 		return err
 	}
 
-	if err = nim.ensureNodeOwnsCSINode(nodeInfo); err != nil {
+	if err = nim.ensureNodeOwnsCSINode(csiKubeClient, nodeInfo); err != nil {
 		return err
 	}
 
