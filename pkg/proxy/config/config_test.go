@@ -37,6 +37,7 @@ import (
 	informers "k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	ktesting "k8s.io/client-go/testing"
+	"k8s.io/client-go/tools/cache"
 	klogtesting "k8s.io/klog/v2/ktesting"
 	"k8s.io/utils/ptr"
 )
@@ -757,17 +758,15 @@ func TestNewNodeTopologyConfig(t *testing.T) {
 	sharedInformers := informers.NewSharedInformerFactory(client, time.Minute)
 	nodeInformer := sharedInformers.Core().V1().Nodes()
 	invoked := make(chan struct{})
-	config := newNodeTopologyConfig(ctx, nodeInformer, time.Minute, func() {
+	handler := &nodeTopologyHandlerMock{
+		topologyLabels: make(map[string]string),
+	}
+	newNodeTopologyConfig(ctx, nodeInformer, time.Minute, handler, func() {
 		// The callback is invoked after the event has been processed by the
 		// handlers. For this unit test, we write to the channel here and wait
 		// for it in waitForInvocation() which is called before doing assertions.
 		invoked <- struct{}{}
 	})
-
-	handler := &nodeTopologyHandlerMock{
-		topologyLabels: make(map[string]string),
-	}
-	config.RegisterEventHandler(handler)
 	sharedInformers.Start(stopCh)
 
 	testNodeName := "test-node"
@@ -855,6 +854,40 @@ func TestNewNodeTopologyConfig(t *testing.T) {
 	err = waitForInvocation(invoked)
 	require.NoError(t, err)
 	require.Len(t, handler.topologyLabels, 1)
+}
+
+func TestNewNodeTopologyConfigWithRunningInformer(t *testing.T) {
+	_, ctx := klogtesting.NewTestContext(t)
+	client := fake.NewClientset(&v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-node",
+			Labels: map[string]string{
+				v1.LabelTopologyZone: "us-west-2a",
+			},
+		},
+	})
+
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+
+	sharedInformers := informers.NewSharedInformerFactory(client, time.Minute)
+	nodeInformer := sharedInformers.Core().V1().Nodes()
+	informer := nodeInformer.Informer()
+	sharedInformers.Start(stopCh)
+	require.True(t, cache.WaitForCacheSync(stopCh, informer.HasSynced))
+
+	handler := &nodeTopologyHandlerMock{
+		topologyLabels: make(map[string]string),
+	}
+	invoked := make(chan struct{})
+	newNodeTopologyConfig(ctx, nodeInformer, time.Minute, handler, func() {
+		invoked <- struct{}{}
+	})
+
+	require.NoError(t, waitForInvocation(invoked))
+	require.Equal(t, map[string]string{
+		v1.LabelTopologyZone: "us-west-2a",
+	}, handler.topologyLabels)
 }
 
 // TODO: Add a unittest for interrupts getting processed in a timely manner.
