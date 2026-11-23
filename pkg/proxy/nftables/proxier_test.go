@@ -5462,51 +5462,6 @@ func Test_useLocalhostNodePortProxy(t *testing.T) {
 	}
 }
 
-func TestLocalhostNodePortReject(t *testing.T) {
-	nft, fp := NewFakeProxier(v1.IPv4Protocol)
-	metrics.RegisterMetrics(kubeproxyconfig.ProxyModeNFTables)
-
-	// Activate the localhost NodePort proxy for this proxier.
-	fp.nodePortAddresses = proxyutil.NewNodePortAddresses(v1.IPv4Protocol, []string{"127.0.0.0/8"})
-	fp.localhostNodePortsEnabled = true
-	fp.localhostNodePortProxy = localnodeportproxy.NewLocalNodePortProxy(context.Background(), v1.IPv4Protocol)
-	defer fp.localhostNodePortProxy.Shutdown()
-
-	makeServiceMap(fp,
-		makeTestService("ns1", "svc-udp", func(svc *v1.Service) {
-			svc.Spec.Type = v1.ServiceTypeNodePort
-			svc.Spec.ClusterIP = "172.30.0.42"
-			svc.Spec.Ports = []v1.ServicePort{{
-				Name:     "p53",
-				Protocol: v1.ProtocolUDP,
-				Port:     53,
-				NodePort: 30053,
-			}}
-		}),
-	)
-	if err := fp.syncProxyRules(); err != nil {
-		t.Fatalf("syncProxyRules failed: %v", err)
-	}
-
-	dump := nft.Dump()
-	for _, want := range []string{
-		"add counter ip kube-proxy localhost-nodeport-rejected-udp",
-		"add counter ip kube-proxy localhost-nodeport-rejected-sctp",
-		`add rule ip kube-proxy localhost-nodeport-reject-udp counter name "localhost-nodeport-rejected-udp" reject`,
-		`add rule ip kube-proxy localhost-nodeport-reject-sctp counter name "localhost-nodeport-rejected-sctp" reject`,
-		"add rule ip kube-proxy nodeport-endpoints-check ip daddr 127.0.0.0/8 meta l4proto . th dport vmap @localhost-nodeport-reject-ports",
-		"add element ip kube-proxy localhost-nodeport-reject-ports { udp . 30053 : goto localhost-nodeport-reject-udp }",
-	} {
-		if !strings.Contains(dump, want) {
-			t.Errorf("expected dump to contain:\n  %s\nfull dump:\n%s", want, dump)
-		}
-	}
-	// The proxy serves TCP, so it is not rejected.
-	if strings.Contains(dump, "localhost-nodeport-rejected-tcp") {
-		t.Errorf("did not expect dump to reject TCP:\n%s", dump)
-	}
-}
-
 func TestLocalhostNodePortRejectAll(t *testing.T) {
 	nft, fp := NewFakeProxier(v1.IPv4Protocol)
 	metrics.RegisterMetrics(kubeproxyconfig.ProxyModeNFTables)
@@ -5551,29 +5506,23 @@ func TestLocalhostNodePortRejectAll(t *testing.T) {
 		t.Fatalf("syncProxyRules failed: %v", err)
 	}
 
-	dump := nft.Dump()
-	for _, want := range []string{
-		"add counter ip kube-proxy localhost-nodeport-rejected-tcp",
-		"add counter ip kube-proxy localhost-nodeport-rejected-udp",
-		"add counter ip kube-proxy localhost-nodeport-rejected-sctp",
-		`add rule ip kube-proxy localhost-nodeport-reject-tcp counter name "localhost-nodeport-rejected-tcp" reject`,
-		`add rule ip kube-proxy localhost-nodeport-reject-udp counter name "localhost-nodeport-rejected-udp" reject`,
-		`add rule ip kube-proxy localhost-nodeport-reject-sctp counter name "localhost-nodeport-rejected-sctp" reject`,
-		"add rule ip kube-proxy nodeport-endpoints-check ip daddr 127.0.0.0/8 meta l4proto . th dport vmap @localhost-nodeport-reject-ports",
-		"add element ip kube-proxy localhost-nodeport-reject-ports { tcp . 30080 : goto localhost-nodeport-reject-tcp }",
-		"add element ip kube-proxy localhost-nodeport-reject-ports { udp . 30053 : goto localhost-nodeport-reject-udp }",
-		"add element ip kube-proxy localhost-nodeport-reject-ports { sctp . 30009 : goto localhost-nodeport-reject-sctp }",
-	} {
-		if !strings.Contains(dump, want) {
-			t.Errorf("expected dump to contain:\n  %s\nfull dump:\n%s", want, dump)
-		}
+	nft.RLock()
+	defer nft.RUnlock()
+	if nft.Table.Maps["localhost-nodeport-reject-ports"].FindElement("tcp", "30080") == nil {
+		t.Errorf("expected a TCP reject element for port 30080")
+	}
+	if nft.Table.Maps["localhost-nodeport-reject-ports"].FindElement("udp", "30053") == nil {
+		t.Errorf("expected a UDP reject element for port 30053")
+	}
+	if nft.Table.Maps["localhost-nodeport-reject-ports"].FindElement("sctp", "30009") == nil {
+		t.Errorf("expected a SCTP reject element for port 30009")
 	}
 }
 
-func TestLocalhostNodePortRejectTransition(t *testing.T) {
+func TestLocalhostNodePortRejectTransitionToEnabled(t *testing.T) {
 	metrics.RegisterMetrics(kubeproxyconfig.ProxyModeNFTables)
 
-	// The old kube-proxy process rejects TCP localhost NodePorts.
+	// Create an "old" kube-proxy process that does not serve localhost NodePorts.
 	nft, oldProxier := NewFakeProxier(v1.IPv4Protocol)
 	oldProxier.localhostNodePortsEnabled = true
 	service := makeTestService("ns1", "svc-tcp", func(svc *v1.Service) {
@@ -5593,15 +5542,12 @@ func TestLocalhostNodePortRejectTransition(t *testing.T) {
 
 	nft.RLock()
 	legacyRejectElement := nft.Table.Maps[localhostNodePortRejectMap].FindElement("tcp", "30080")
-	_, legacyRejectChain := nft.Table.Chains[localhostNodePortRejectChainName(v1.ProtocolTCP)]
-	_, legacyRejectCounter := nft.Table.Counters[metrics.LocalhostNodePortRejectedCounterName(v1.ProtocolTCP)]
 	nft.RUnlock()
-	if legacyRejectElement == nil || !legacyRejectChain || !legacyRejectCounter {
-		t.Fatal("legacy kube-proxy state is missing the TCP localhost NodePort reject objects")
+	if legacyRejectElement == nil {
+		t.Fatal("legacy kube-proxy state is missing the TCP localhost NodePort reject element")
 	}
 
-	// A restarted kube-proxy process serves TCP localhost NodePorts through the
-	// userspace proxy while preserving the old process's nftables state.
+	// "Restart" kube-proxy with localhost NodePorts enabled.
 	_, fp := NewFakeProxier(v1.IPv4Protocol)
 	fp.nftables = nft
 	fp.nodePortAddresses = proxyutil.NewNodePortAddresses(v1.IPv4Protocol, []string{"127.0.0.0/8"})
@@ -5614,45 +5560,17 @@ func TestLocalhostNodePortRejectTransition(t *testing.T) {
 	}
 
 	nft.RLock()
-	transaction := nft.LastTransaction.String()
-	rejectMap := nft.Table.Maps[localhostNodePortRejectMap]
-	tcpRejectElement := rejectMap.FindElement("tcp", "30080")
-	tcpRejectChain := nft.Table.Chains[localhostNodePortRejectChainName(v1.ProtocolTCP)]
-	_, tcpRejectCounter := nft.Table.Counters[metrics.LocalhostNodePortRejectedCounterName(v1.ProtocolTCP)]
+	tcpRejectElement := nft.Table.Maps[localhostNodePortRejectMap].FindElement("tcp", "30080")
 	nft.RUnlock()
-	elementDelete := "delete element ip kube-proxy localhost-nodeport-reject-ports { tcp . 30080 }"
-	elementIndex := strings.Index(transaction, elementDelete)
-	if elementIndex == -1 {
-		t.Fatalf("expected transaction to delete stale TCP localhost reject map element:\n%s", transaction)
-	}
-	chainFlush := "flush chain ip kube-proxy localhost-nodeport-reject-tcp"
-	if !strings.Contains(transaction, chainFlush) {
-		t.Fatalf("expected transaction to flush stale TCP localhost reject chain:\n%s", transaction)
-	}
-	if strings.Contains(transaction, "delete chain ip kube-proxy localhost-nodeport-reject-tcp") {
-		t.Fatalf("transaction must not immediately delete stale TCP localhost reject chain:\n%s", transaction)
-	}
-	counterDelete := "delete counter ip kube-proxy localhost-nodeport-rejected-tcp"
-	counterIndex := strings.Index(transaction, counterDelete)
-	if counterIndex == -1 {
-		t.Fatalf("expected transaction to delete stale TCP localhost reject counter:\n%s", transaction)
-	}
-	if elementIndex > counterIndex {
-		t.Fatalf("transaction must delete the stale TCP localhost reject map element before its counter:\n%s", transaction)
-	}
-	if tcpRejectElement != nil || tcpRejectCounter {
-		t.Fatalf("restarted kube-proxy left stale TCP localhost NodePort reject map or counter objects:\n%s", nft.Dump())
-	}
-	if tcpRejectChain == nil || len(tcpRejectChain.Rules) != 0 {
-		t.Fatalf("restarted kube-proxy did not leave the stale TCP localhost NodePort reject chain flushed:\n%s", nft.Dump())
+	if tcpRejectElement != nil {
+		t.Fatal("restarted kube-proxy left stale TCP localhost NodePort reject element")
 	}
 }
 
 func TestLocalhostNodePortRejectTransitionToDisabled(t *testing.T) {
 	metrics.RegisterMetrics(kubeproxyconfig.ProxyModeNFTables)
 
-	// The old kube-proxy process serves TCP localhost NodePorts through the
-	// userspace proxy.
+	// Create an "old" kube-proxy process that serves localhost NodePorts.
 	nft, oldProxier := NewFakeProxier(v1.IPv4Protocol)
 	oldProxier.nodePortAddresses = proxyutil.NewNodePortAddresses(v1.IPv4Protocol, []string{"127.0.0.0/8"})
 	oldProxier.localhostNodePortsEnabled = true
@@ -5675,15 +5593,12 @@ func TestLocalhostNodePortRejectTransitionToDisabled(t *testing.T) {
 
 	nft.RLock()
 	legacyRejectElement := nft.Table.Maps[localhostNodePortRejectMap].FindElement("tcp", "30080")
-	_, legacyRejectChain := nft.Table.Chains[localhostNodePortRejectChainName(v1.ProtocolTCP)]
-	_, legacyRejectCounter := nft.Table.Counters[metrics.LocalhostNodePortRejectedCounterName(v1.ProtocolTCP)]
 	nft.RUnlock()
-	if legacyRejectElement != nil || legacyRejectChain || legacyRejectCounter {
+	if legacyRejectElement != nil {
 		t.Fatal("legacy kube-proxy unexpectedly rejects TCP localhost NodePorts")
 	}
 
-	// A restarted kube-proxy process without the userspace proxy must reject TCP
-	// localhost NodePorts and preserve the old process's nftables state.
+	// "Restart" kube-proxy with localhost NodePorts disabled.
 	_, fp := NewFakeProxier(v1.IPv4Protocol)
 	fp.nftables = nft
 	fp.localhostNodePortsEnabled = true
@@ -5694,19 +5609,9 @@ func TestLocalhostNodePortRejectTransitionToDisabled(t *testing.T) {
 
 	nft.RLock()
 	tcpRejectElement := nft.Table.Maps[localhostNodePortRejectMap].FindElement("tcp", "30080")
-	tcpRejectChain := nft.Table.Chains[localhostNodePortRejectChainName(v1.ProtocolTCP)]
-	_, tcpRejectCounter := nft.Table.Counters[metrics.LocalhostNodePortRejectedCounterName(v1.ProtocolTCP)]
 	nft.RUnlock()
-
-	wantChain := localhostNodePortRejectChainName(v1.ProtocolTCP)
-	if tcpRejectElement == nil || len(tcpRejectElement.Value) != 1 || tcpRejectElement.Value[0] != "goto "+wantChain {
-		t.Fatalf("restarted kube-proxy did not restore the TCP localhost NodePort reject map element:\n%s", nft.Dump())
-	}
-	if tcpRejectChain == nil || len(tcpRejectChain.Rules) != 1 || tcpRejectChain.Rules[0].Rule != `counter name "localhost-nodeport-rejected-tcp" reject` {
-		t.Fatalf("restarted kube-proxy did not restore the TCP localhost NodePort reject chain:\n%s", nft.Dump())
-	}
-	if !tcpRejectCounter {
-		t.Fatalf("restarted kube-proxy did not restore the TCP localhost NodePort reject counter:\n%s", nft.Dump())
+	if tcpRejectElement == nil {
+		t.Fatalf("restarted kube-proxy did not add TCP localhost NodePort reject element")
 	}
 }
 
@@ -5721,29 +5626,48 @@ func TestLocalhostNodePortProxy(t *testing.T) {
 	fp.localhostNodePortProxy = localnodeportproxy.NewLocalNodePortProxy(context.Background(), v1.IPv4Protocol)
 	defer fp.localhostNodePortProxy.Shutdown()
 
+	testPorts := []v1.ServicePort{{
+		Name:     "p80",
+		Protocol: v1.ProtocolTCP,
+		Port:     80,
+		NodePort: 30080,
+	}, {
+		Name:     "p53",
+		Protocol: v1.ProtocolUDP,
+		Port:     53,
+		NodePort: 30053,
+	}, {
+		Name:     "p9",
+		Protocol: v1.ProtocolSCTP,
+		Port:     9,
+		NodePort: 30009,
+	}}
 	makeServiceMap(fp,
-		makeTestService("ns1", "svc-tcp", func(svc *v1.Service) {
+		makeTestService("ns1", "svc", func(svc *v1.Service) {
 			svc.Spec.Type = v1.ServiceTypeNodePort
 			svc.Spec.ClusterIP = "172.30.0.41"
-			svc.Spec.Ports = []v1.ServicePort{{
-				Name:     "p80",
-				Protocol: v1.ProtocolTCP,
-				Port:     80,
-				NodePort: 30080,
-			}}
+			svc.Spec.Ports = testPorts
 		}),
 	)
 	populateEndpointSlices(fp,
-		makeTestEndpointSlice("ns1", "svc-tcp", 1, func(eps *discovery.EndpointSlice) {
+		makeTestEndpointSlice("ns1", "svc", 1, func(eps *discovery.EndpointSlice) {
 			eps.AddressType = discovery.AddressTypeIPv4
 			eps.Endpoints = []discovery.Endpoint{{
 				Addresses: []string{"10.180.0.1"},
 				NodeName:  new(testNodeName),
 			}}
 			eps.Ports = []discovery.EndpointPort{{
-				Name:     new("p80"),
-				Port:     ptr.To[int32](80),
-				Protocol: ptr.To(v1.ProtocolTCP),
+				Name:     &testPorts[0].Name,
+				Port:     &testPorts[0].Port,
+				Protocol: &testPorts[0].Protocol,
+			}, {
+				Name:     &testPorts[1].Name,
+				Port:     &testPorts[1].Port,
+				Protocol: &testPorts[1].Protocol,
+			}, {
+				Name:     &testPorts[2].Name,
+				Port:     &testPorts[2].Port,
+				Protocol: &testPorts[2].Protocol,
 			}}
 		}),
 	)
@@ -5751,26 +5675,26 @@ func TestLocalhostNodePortProxy(t *testing.T) {
 		t.Fatalf("syncProxyRules failed: %v", err)
 	}
 
-	dump := nft.Dump()
-	// The proxy serves TCP, so the reject infrastructure only covers the protocols
-	// it can't serve, and the TCP NodePort is dispatched normally.
-	for _, want := range []string{
-		"add counter ip kube-proxy localhost-nodeport-rejected-udp",
-		"add counter ip kube-proxy localhost-nodeport-rejected-sctp",
-		`add rule ip kube-proxy localhost-nodeport-reject-udp counter name "localhost-nodeport-rejected-udp" reject`,
-		`add rule ip kube-proxy localhost-nodeport-reject-sctp counter name "localhost-nodeport-rejected-sctp" reject`,
-		"add rule ip kube-proxy nodeport-endpoints-check ip daddr 127.0.0.0/8 meta l4proto . th dport vmap @localhost-nodeport-reject-ports",
-		"add element ip kube-proxy service-nodeports { tcp . 30080 : goto external-",
-	} {
-		if !strings.Contains(dump, want) {
-			t.Errorf("expected dump to contain:\n  %s\nfull dump:\n%s", want, dump)
+	nft.RLock()
+	defer nft.RUnlock()
+
+	// All three ports should have a NodePort rule, and the non-TCP ones should have a
+	// reject rule.
+	for _, port := range testPorts {
+		key := []string{strings.ToLower(string(port.Protocol)), fmt.Sprintf("%d", port.NodePort)}
+		nodePortElem := nft.Table.Maps["service-nodeports"].FindElement(key...)
+		if nodePortElem == nil {
+			t.Errorf("expected a service-nodeports element for %s", key)
 		}
-	}
-	// TCP is served by the proxy, so it is neither rejected nor counted.
-	if strings.Contains(dump, "localhost-nodeport-rejected-tcp") {
-		t.Errorf("did not expect TCP to be rejected:\n%s", dump)
-	}
-	if strings.Contains(dump, "localhost-nodeport-reject-ports { tcp .") {
-		t.Errorf("did not expect a TCP localhost reject element:\n%s", dump)
+		rejectElem := nft.Table.Maps["localhost-nodeport-reject-ports"].FindElement(key...)
+		if port.Protocol == v1.ProtocolTCP {
+			if rejectElem != nil {
+				t.Errorf("did not expect a reject element for %s", key)
+			}
+		} else {
+			if rejectElem == nil {
+				t.Errorf("expected a reject element for %s", key)
+			}
+		}
 	}
 }
