@@ -25,7 +25,6 @@ import (
 	"fmt"
 	"net"
 	"os/exec"
-	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -308,25 +307,13 @@ func useLocalhostNodePortProxy(nodePortAddresses *proxyutil.NodePortAddresses) b
 	return nodePortAddresses.ContainsExplicitLoopback()
 }
 
-// localhostNodePortRejectProtocols returns the localhost NodePort protocols whose
-// traffic kube-proxy rejects and counts, or nil if it rejects none. When the
-// userspace proxy serves localhost NodePorts only the protocols it cannot serve
-// are rejected; when the feature is enabled without the proxy, all are rejected.
-func (proxier *Proxier) localhostNodePortRejectProtocols() []v1.Protocol {
-	switch {
-	case !proxier.localhostNodePortsEnabled:
-		return nil
-	case proxier.localhostNodePortProxy != nil:
-		return metrics.LocalhostNodePortRejectedProtocols
-	default:
-		return metrics.LocalhostNodePortRejectableProtocols
-	}
-}
-
 // rejectsLocalhostNodePort reports whether kube-proxy rejects localhost NodePort
 // traffic for the given protocol.
 func (proxier *Proxier) rejectsLocalhostNodePort(protocol v1.Protocol) bool {
-	return slices.Contains(proxier.localhostNodePortRejectProtocols(), protocol)
+	if proxier.localhostNodePortProxy == nil {
+		return false
+	}
+	return protocol == v1.ProtocolUDP || protocol == v1.ProtocolSCTP
 }
 
 // internal struct for string service information
@@ -662,7 +649,7 @@ func (proxier *Proxier) setupNFTables(tx *knftables.Transaction) {
 		Type:    "inet_proto . inet_service : verdict",
 		Comment: new("localhost NodePorts rejected by kube-proxy"),
 	})
-	for _, protocol := range metrics.LocalhostNodePortRejectableProtocols {
+	for _, protocol := range []v1.Protocol{v1.ProtocolUDP, v1.ProtocolSCTP} {
 		counter := metrics.LocalhostNodePortRejectedCounterName(protocol)
 		tx.Add(&knftables.Counter{Name: counter})
 		chain := localhostNodePortRejectChainName(protocol)

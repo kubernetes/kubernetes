@@ -374,15 +374,6 @@ var (
 	)
 )
 
-// LocalhostNodePortRejectedProtocols are the NodePort protocols the userspace
-// proxy cannot serve; localhost traffic for them is rejected and counted.
-var LocalhostNodePortRejectedProtocols = []v1.Protocol{v1.ProtocolUDP, v1.ProtocolSCTP}
-
-// LocalhostNodePortRejectableProtocols are all NodePort protocols whose localhost
-// traffic kube-proxy may reject and count. UDP / SCTP are always rejected, TCP
-// is rejected when the localhost NodePort proxy is not running.
-var LocalhostNodePortRejectableProtocols = []v1.Protocol{v1.ProtocolTCP, v1.ProtocolUDP, v1.ProtocolSCTP}
-
 // LocalhostNodePortRejectedCounterName returns the name of the nftables named
 // counter that the kube-proxy table increments for localhost NodePort packets
 // rejected because their protocol is unsupported.
@@ -442,8 +433,8 @@ func RegisterMetrics(mode kubeproxyconfig.ProxyMode) {
 			if utilfeature.DefaultFeatureGate.Enabled(features.KubeProxyNFTablesLocalhostNodePorts) {
 				legacyregistry.MustRegister(LocalhostNodePortListeners)
 				legacyregistry.MustRegister(LocalhostNodePortListenerCreationFailuresTotal)
-				rejectedCounters := make(map[string]string, len(LocalhostNodePortRejectableProtocols))
-				for _, protocol := range LocalhostNodePortRejectableProtocols {
+				rejectedCounters := make(map[string]string)
+				for _, protocol := range []v1.Protocol{v1.ProtocolTCP, v1.ProtocolUDP, v1.ProtocolSCTP} {
 					rejectedCounters[LocalhostNodePortRejectedCounterName(protocol)] = string(protocol)
 				}
 				if c := newNFTablesCounterMetricCollector(rejectedCounters, localhostNodePortRejectedPacketsDescription); c != nil {

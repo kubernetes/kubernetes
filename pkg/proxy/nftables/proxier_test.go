@@ -164,7 +164,6 @@ var baseRules = dedent.Dedent(`
 	add map ip kube-proxy service-ips { type ipv4_addr . inet_proto . inet_service : verdict ; comment "ClusterIP, ExternalIP and LoadBalancer IP traffic" ; }
 	add map ip kube-proxy service-nodeports { type inet_proto . inet_service : verdict ; comment "NodePort traffic" ; }
 
-	add counter ip kube-proxy localhost-nodeport-rejected-tcp
 	add counter ip kube-proxy localhost-nodeport-rejected-udp
 	add counter ip kube-proxy localhost-nodeport-rejected-sctp
 
@@ -175,7 +174,6 @@ var baseRules = dedent.Dedent(`
 	add chain ip kube-proxy filter-input { type filter hook input priority 0 ; }
 	add chain ip kube-proxy filter-output { type filter hook output priority 0 ; }
 	add chain ip kube-proxy firewall-check
-	add chain ip kube-proxy localhost-nodeport-reject-tcp
 	add chain ip kube-proxy localhost-nodeport-reject-udp
 	add chain ip kube-proxy localhost-nodeport-reject-sctp
 	add chain ip kube-proxy masquerading
@@ -198,7 +196,6 @@ var baseRules = dedent.Dedent(`
 	add rule ip kube-proxy filter-output-pre-dnat ct state new jump firewall-check
 	add rule ip kube-proxy filter-output ct state new jump cluster-ips-check
 	add rule ip kube-proxy firewall-check ip daddr . meta l4proto . th dport vmap @firewall-ips
-	add rule ip kube-proxy localhost-nodeport-reject-tcp counter name "localhost-nodeport-rejected-tcp" reject
 	add rule ip kube-proxy localhost-nodeport-reject-udp counter name "localhost-nodeport-rejected-udp" reject
 	add rule ip kube-proxy localhost-nodeport-reject-sctp counter name "localhost-nodeport-rejected-sctp" reject
 	add rule ip kube-proxy masquerading mark and 0x4000 != 0 mark set mark xor 0x4000 masquerade fully-random
@@ -231,7 +228,6 @@ var baseRulesV6 = dedent.Dedent(`
 	add map ip6 kube-proxy service-ips { type ipv6_addr . inet_proto . inet_service : verdict ; comment "ClusterIP, ExternalIP and LoadBalancer IP traffic" ; }
 	add map ip6 kube-proxy service-nodeports { type inet_proto . inet_service : verdict ; comment "NodePort traffic" ; }
 
-	add counter ip6 kube-proxy localhost-nodeport-rejected-tcp
 	add counter ip6 kube-proxy localhost-nodeport-rejected-udp
 	add counter ip6 kube-proxy localhost-nodeport-rejected-sctp
 
@@ -242,7 +238,6 @@ var baseRulesV6 = dedent.Dedent(`
 	add chain ip6 kube-proxy filter-input { type filter hook input priority 0 ; }
 	add chain ip6 kube-proxy filter-output { type filter hook output priority 0 ; }
 	add chain ip6 kube-proxy firewall-check
-	add chain ip6 kube-proxy localhost-nodeport-reject-tcp
 	add chain ip6 kube-proxy localhost-nodeport-reject-udp
 	add chain ip6 kube-proxy localhost-nodeport-reject-sctp
 	add chain ip6 kube-proxy masquerading
@@ -265,7 +260,6 @@ var baseRulesV6 = dedent.Dedent(`
 	add rule ip6 kube-proxy filter-output-pre-dnat ct state new jump firewall-check
 	add rule ip6 kube-proxy filter-output ct state new jump cluster-ips-check
 	add rule ip6 kube-proxy firewall-check ip6 daddr . meta l4proto . th dport vmap @firewall-ips
-	add rule ip6 kube-proxy localhost-nodeport-reject-tcp counter name "localhost-nodeport-rejected-tcp" reject
 	add rule ip6 kube-proxy localhost-nodeport-reject-udp counter name "localhost-nodeport-rejected-udp" reject
 	add rule ip6 kube-proxy localhost-nodeport-reject-sctp counter name "localhost-nodeport-rejected-sctp" reject
 	add rule ip6 kube-proxy masquerading mark and 0x4000 != 0 mark set mark xor 0x4000 masquerade fully-random
@@ -486,8 +480,6 @@ func TestOverallNFTablesRules(t *testing.T) {
 		add element ip kube-proxy no-endpoint-services { 1.2.3.4 . tcp . 80 comment "ns2/svc2:p80" : drop }
 		add element ip kube-proxy no-endpoint-services { 192.168.99.22 . tcp . 80 comment "ns2/svc2:p80" : drop }
 
-		add element ip kube-proxy localhost-nodeport-reject-ports { tcp . 3001 : goto localhost-nodeport-reject-tcp }
-
 		# svc3
 		add chain ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80
 		add rule ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80 meta l4proto tcp dnat to 10.180.0.3:80
@@ -499,8 +491,6 @@ func TestOverallNFTablesRules(t *testing.T) {
 		add element ip kube-proxy service-ips { 172.30.0.43 . tcp . 80 : goto service-4AT6LBPK-ns3/svc3/tcp/p80 }
 		add element ip kube-proxy service-nodeports { tcp . 3003 : goto external-4AT6LBPK-ns3/svc3/tcp/p80 }
 		add element ip kube-proxy hairpin-connections { 10.180.0.3 . 10.180.0.3 . tcp . 80 }
-
-		add element ip kube-proxy localhost-nodeport-reject-ports { tcp . 3003 : goto localhost-nodeport-reject-tcp }
 
 		# svc4
 		add chain ip kube-proxy service-LAUZTJTB-ns4/svc4/tcp/p80
@@ -536,8 +526,6 @@ func TestOverallNFTablesRules(t *testing.T) {
 		add element ip kube-proxy service-nodeports { tcp . 3002 : goto external-HVFWP5L3-ns5/svc5/tcp/p80 }
 		add element ip kube-proxy firewall-ips { 5.6.7.8 . tcp . 80 : goto firewall-HVFWP5L3-ns5/svc5/tcp/p80 }
 		# 10.180.0.3:80 is already in hairpin-connections, so we don't want another "add element" line...
-
-		add element ip kube-proxy localhost-nodeport-reject-ports { tcp . 3002 : goto localhost-nodeport-reject-tcp }
 
 		# svc6
 		add element ip kube-proxy cluster-ips { 172.30.0.46 }
@@ -750,8 +738,6 @@ func TestOverallNFTablesRulesIPv6(t *testing.T) {
 		add element ip6 kube-proxy no-endpoint-services { 5555::1 . tcp . 80 comment "ns2/svc2:p80" : drop }
 		add element ip6 kube-proxy no-endpoint-services { 2001:db8:99::22 . tcp . 80 comment "ns2/svc2:p80" : drop }
 
-		add element ip6 kube-proxy localhost-nodeport-reject-ports { tcp . 3001 : goto localhost-nodeport-reject-tcp }
-
 		# svc3
 		add chain ip6 kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80
 		add rule ip6 kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80 meta l4proto tcp dnat to [fd00:10:180::3]:80
@@ -763,8 +749,6 @@ func TestOverallNFTablesRulesIPv6(t *testing.T) {
 		add element ip6 kube-proxy service-ips { fd00:172:30::43 . tcp . 80 : goto service-4AT6LBPK-ns3/svc3/tcp/p80 }
 		add element ip6 kube-proxy service-nodeports { tcp . 3003 : goto external-4AT6LBPK-ns3/svc3/tcp/p80 }
 		add element ip6 kube-proxy hairpin-connections { fd00:10:180::3 . fd00:10:180::3 . tcp . 80 }
-
-		add element ip6 kube-proxy localhost-nodeport-reject-ports { tcp . 3003 : goto localhost-nodeport-reject-tcp }
 
 		# svc4
 		add chain ip6 kube-proxy service-LAUZTJTB-ns4/svc4/tcp/p80
@@ -800,8 +784,6 @@ func TestOverallNFTablesRulesIPv6(t *testing.T) {
 		add element ip6 kube-proxy service-nodeports { tcp . 3002 : goto external-HVFWP5L3-ns5/svc5/tcp/p80 }
 		add element ip6 kube-proxy firewall-ips { 5555::2 . tcp . 80 : goto firewall-HVFWP5L3-ns5/svc5/tcp/p80 }
 		# [fd00:10:180::3]:80 is already in hairpin-connections, so we don't want another "add element" line...
-
-		add element ip6 kube-proxy localhost-nodeport-reject-ports { tcp . 3002 : goto localhost-nodeport-reject-tcp }
 
 		# svc6
 		add element ip6 kube-proxy cluster-ips { fd00:172:30::46 }
@@ -5477,75 +5459,18 @@ func Test_useLocalhostNodePortProxy(t *testing.T) {
 	}
 }
 
-func TestLocalhostNodePortRejectAll(t *testing.T) {
-	nft, fp := NewFakeProxier(v1.IPv4Protocol)
-	metrics.RegisterMetrics(kubeproxyconfig.ProxyModeNFTables)
-
-	// Feature enabled but loopback is not in nodePortAddresses, so kube-proxy
-	// rejects all localhost NodePort traffic rather than serving any of it.
-	fp.localhostNodePortsEnabled = true
-
-	makeServiceMap(fp,
-		makeTestService("ns1", "svc-tcp", func(svc *v1.Service) {
-			svc.Spec.Type = v1.ServiceTypeNodePort
-			svc.Spec.ClusterIP = "172.30.0.41"
-			svc.Spec.Ports = []v1.ServicePort{{
-				Name:     "p80",
-				Protocol: v1.ProtocolTCP,
-				Port:     80,
-				NodePort: 30080,
-			}}
-		}),
-		makeTestService("ns2", "svc-udp", func(svc *v1.Service) {
-			svc.Spec.Type = v1.ServiceTypeNodePort
-			svc.Spec.ClusterIP = "172.30.0.42"
-			svc.Spec.Ports = []v1.ServicePort{{
-				Name:     "p53",
-				Protocol: v1.ProtocolUDP,
-				Port:     53,
-				NodePort: 30053,
-			}}
-		}),
-		makeTestService("ns3", "svc-sctp", func(svc *v1.Service) {
-			svc.Spec.Type = v1.ServiceTypeNodePort
-			svc.Spec.ClusterIP = "172.30.0.43"
-			svc.Spec.Ports = []v1.ServicePort{{
-				Name:     "p9",
-				Protocol: v1.ProtocolSCTP,
-				Port:     9,
-				NodePort: 30009,
-			}}
-		}),
-	)
-	if err := fp.syncProxyRules(); err != nil {
-		t.Fatalf("syncProxyRules failed: %v", err)
-	}
-
-	nft.RLock()
-	defer nft.RUnlock()
-	if nft.Table.Maps["localhost-nodeport-reject-ports"].FindElement("tcp", "30080") == nil {
-		t.Errorf("expected a TCP reject element for port 30080")
-	}
-	if nft.Table.Maps["localhost-nodeport-reject-ports"].FindElement("udp", "30053") == nil {
-		t.Errorf("expected a UDP reject element for port 30053")
-	}
-	if nft.Table.Maps["localhost-nodeport-reject-ports"].FindElement("sctp", "30009") == nil {
-		t.Errorf("expected a SCTP reject element for port 30009")
-	}
-}
-
 func TestLocalhostNodePortRejectTransitionToEnabled(t *testing.T) {
 	metrics.RegisterMetrics(kubeproxyconfig.ProxyModeNFTables)
 
 	// Create an "old" kube-proxy process that does not serve localhost NodePorts.
 	nft, oldProxier := NewFakeProxier(v1.IPv4Protocol)
 	oldProxier.localhostNodePortsEnabled = true
-	service := makeTestService("ns1", "svc-tcp", func(svc *v1.Service) {
+	service := makeTestService("ns1", "svc-udp", func(svc *v1.Service) {
 		svc.Spec.Type = v1.ServiceTypeNodePort
 		svc.Spec.ClusterIP = "172.30.0.41"
 		svc.Spec.Ports = []v1.ServicePort{{
 			Name:     "p80",
-			Protocol: v1.ProtocolTCP,
+			Protocol: v1.ProtocolUDP,
 			Port:     80,
 			NodePort: 30080,
 		}}
@@ -5556,10 +5481,10 @@ func TestLocalhostNodePortRejectTransitionToEnabled(t *testing.T) {
 	}
 
 	nft.RLock()
-	legacyRejectElement := nft.Table.Maps[localhostNodePortRejectMap].FindElement("tcp", "30080")
+	legacyRejectElement := nft.Table.Maps[localhostNodePortRejectMap].FindElement("udp", "30080")
 	nft.RUnlock()
-	if legacyRejectElement == nil {
-		t.Fatal("legacy kube-proxy state is missing the TCP localhost NodePort reject element")
+	if legacyRejectElement != nil {
+		t.Fatal("legacy kube-proxy unexpectedly rejects UDP localhost NodePorts")
 	}
 
 	// "Restart" kube-proxy with localhost NodePorts enabled.
@@ -5575,10 +5500,10 @@ func TestLocalhostNodePortRejectTransitionToEnabled(t *testing.T) {
 	}
 
 	nft.RLock()
-	tcpRejectElement := nft.Table.Maps[localhostNodePortRejectMap].FindElement("tcp", "30080")
+	udpRejectElement := nft.Table.Maps[localhostNodePortRejectMap].FindElement("udp", "30080")
 	nft.RUnlock()
-	if tcpRejectElement != nil {
-		t.Fatal("restarted kube-proxy left stale TCP localhost NodePort reject element")
+	if udpRejectElement == nil {
+		t.Fatalf("restarted kube-proxy did not create the UDP localhost NodePort reject map element")
 	}
 }
 
@@ -5591,12 +5516,12 @@ func TestLocalhostNodePortRejectTransitionToDisabled(t *testing.T) {
 	oldProxier.localhostNodePortsEnabled = true
 	oldProxier.localhostNodePortProxy = localnodeportproxy.NewLocalNodePortProxy(context.Background(), v1.IPv4Protocol)
 	defer oldProxier.localhostNodePortProxy.Shutdown()
-	service := makeTestService("ns1", "svc-tcp", func(svc *v1.Service) {
+	service := makeTestService("ns1", "svc-udp", func(svc *v1.Service) {
 		svc.Spec.Type = v1.ServiceTypeNodePort
 		svc.Spec.ClusterIP = "172.30.0.41"
 		svc.Spec.Ports = []v1.ServicePort{{
 			Name:     "p80",
-			Protocol: v1.ProtocolTCP,
+			Protocol: v1.ProtocolUDP,
 			Port:     80,
 			NodePort: 30080,
 		}}
@@ -5607,10 +5532,10 @@ func TestLocalhostNodePortRejectTransitionToDisabled(t *testing.T) {
 	}
 
 	nft.RLock()
-	legacyRejectElement := nft.Table.Maps[localhostNodePortRejectMap].FindElement("tcp", "30080")
+	legacyRejectElement := nft.Table.Maps[localhostNodePortRejectMap].FindElement("udp", "30080")
 	nft.RUnlock()
-	if legacyRejectElement != nil {
-		t.Fatal("legacy kube-proxy unexpectedly rejects TCP localhost NodePorts")
+	if legacyRejectElement == nil {
+		t.Fatal("kube-proxy with localhost nodeport proxy is missing the UDP localhost NodePort reject element")
 	}
 
 	// "Restart" kube-proxy with localhost NodePorts disabled.
@@ -5623,10 +5548,10 @@ func TestLocalhostNodePortRejectTransitionToDisabled(t *testing.T) {
 	}
 
 	nft.RLock()
-	tcpRejectElement := nft.Table.Maps[localhostNodePortRejectMap].FindElement("tcp", "30080")
+	udpRejectElement := nft.Table.Maps[localhostNodePortRejectMap].FindElement("udp", "30080")
 	nft.RUnlock()
-	if tcpRejectElement == nil {
-		t.Fatalf("restarted kube-proxy did not add TCP localhost NodePort reject element")
+	if udpRejectElement != nil {
+		t.Fatalf("restarted kube-proxy left stale UDP localhost NodePort reject map element:\n%s", nft.Dump())
 	}
 }
 
