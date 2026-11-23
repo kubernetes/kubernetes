@@ -31,7 +31,4 @@ set -o pipefail
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 
 source "${KUBE_ROOT}/hack/lib/verify-generated.sh"
-(
-  kube::verify::generated "Generated files failed strict alpha check and MAY need be updated" "Running verification again without strict alpha check" hack/update-openapi-spec.sh "$@"
-) || \
-KUBE_APISERVER_STRICT_REMOVED_API_HANDLING_IN_ALPHA=false kube::verify::generated "Generated files need to be updated" "Please run 'hack/update-openapi-spec.sh'" hack/update-openapi-spec.sh "$@"
+kube::verify::generated "Generated files need to be updated" "Please run 'hack/update-openapi-spec.sh'" hack/update-openapi-spec.sh "$@"

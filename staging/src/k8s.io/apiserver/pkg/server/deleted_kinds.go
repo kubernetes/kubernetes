@@ -43,13 +43,6 @@ type resourceExpirationEvaluator struct {
 	emulationForwardCompatible              bool
 	runtimeConfigEmulationForwardCompatible bool
 	isAlpha                                 bool
-	// Special flag checking for the existence of alpha.0
-	// alpha.0 is a special case where everything merged to master is auto propagated to the release-1.n branch
-	isAlphaZero bool
-	// This is usually set for testing for which tests need to be removed.  This prevent insta-failing CI.
-	// Set KUBE_APISERVER_STRICT_REMOVED_API_HANDLING_IN_ALPHA to see what will be removed when we tag beta
-	// This flag only takes effect during alpha but not alphaZero.
-	strictRemovedHandlingInAlpha bool
 	// This is usually set by a cluster-admin looking for a short-term escape hatch after something bad happened.
 	// This should be made a flag before merge
 	// Set KUBE_APISERVER_SERVE_REMOVED_APIS_FOR_ONE_RELEASE to prevent removing APIs for one more release.
@@ -95,22 +88,12 @@ func NewResourceExpirationEvaluatorFromOptions(opts ResourceExpirationEvaluatorO
 	}
 	klog.V(1).Infof("NewResourceExpirationEvaluator with currentVersion: %s.", currentVersion)
 	ret := &resourceExpirationEvaluator{
-		strictRemovedHandlingInAlpha:            false,
 		emulationForwardCompatible:              opts.EmulationForwardCompatible,
 		runtimeConfigEmulationForwardCompatible: opts.RuntimeConfigEmulationForwardCompatible,
 	}
 	// Only keeps the major and minor versions from input version.
 	ret.currentVersion = apimachineryversion.MajorMinor(currentVersion.Major(), currentVersion.Minor())
 	ret.isAlpha = strings.Contains(opts.Prerelease, "alpha")
-	ret.isAlphaZero = strings.Contains(opts.Prerelease, "alpha.0")
-
-	if envString, ok := os.LookupEnv("KUBE_APISERVER_STRICT_REMOVED_API_HANDLING_IN_ALPHA"); !ok {
-		// do nothing
-	} else if envBool, err := strconv.ParseBool(envString); err != nil {
-		return nil, err
-	} else {
-		ret.strictRemovedHandlingInAlpha = envBool
-	}
 
 	if envString, ok := os.LookupEnv("KUBE_APISERVER_SERVE_REMOVED_APIS_FOR_ONE_RELEASE"); !ok {
 		// do nothing
@@ -158,9 +141,6 @@ func (e *resourceExpirationEvaluator) ShouldServeForVersion(majorRemoved, minorR
 	// at this point major and minor are equal, so this API should be removed when the current release GAs.
 	// If this is an alpha tag, don't remove by default, but allow the option.
 	// If the cluster-admin has requested serving one more release, allow it.
-	if e.isAlpha && !e.isAlphaZero && e.strictRemovedHandlingInAlpha { // don't serve in alpha.1+ if we want strict handling
-		return false
-	}
 	if e.isAlpha { // alphas are allowed to continue serving expired betas while we clean up the test
 		return true
 	}
