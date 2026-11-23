@@ -146,8 +146,8 @@ func (t *vSphereCSITranslator) TranslateInTreeInlineVolumeToCSI(logger klog.Logg
 			AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
 		},
 	}
-	if volume.VsphereVolume.StoragePolicyName != "" {
-		pv.Spec.CSI.VolumeAttributes[paramStoragePolicyName] = pv.Spec.VsphereVolume.StoragePolicyName
+	if policyName := volume.VsphereVolume.StoragePolicyName; policyName != "" {
+		pv.Spec.CSI.VolumeAttributes[paramStoragePolicyName] = policyName
 	}
 	return pv, nil
 }
