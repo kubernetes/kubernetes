@@ -303,6 +303,10 @@ func makeCompositePodGroup(name string, priority int32) *schedulingv1beta1.Compo
 	return st.MakeCompositePodGroup().Name(name).Priority(priority).BasicPolicy().WorkloadRef("wl1", "t1").Obj()
 }
 
+func makeGangCompositePodGroup(name string, priority, minGroupCount int32) *schedulingv1beta1.CompositePodGroup {
+	return st.MakeCompositePodGroup().Name(name).Priority(priority).MinGroupCount(minGroupCount).WorkloadRef("wl1", "t1").Obj()
+}
+
 func makeChildGangPodGroup(name, parentCPGName string, priority, minCount int32) *schedulingv1beta1.PodGroup {
 	return st.MakePodGroup().Name(name).Priority(priority).MinCount(minCount).ParentCompositePodGroup(parentCPGName).WorkloadRef("wl1", "t1").Obj()
 }
@@ -1279,6 +1283,284 @@ func TestPodGroupPreemptionAndNominatedNodeNameScenarios(t *testing.T) {
 					verifyPodsScheduled: &verifyPodsScheduled{
 						podNames:              []string{"fits-1"},
 						expectedScheduledNode: "node1",
+					},
+				},
+			},
+		},
+		{
+			name: "partial CPG scheduling that triggers preemption sets NNN on placed child and clears stale NNN on rejected child",
+			scenarios: []scenario{
+				{
+					name:       "create node1",
+					createNode: makeNode("node1", "4"),
+				},
+				{
+					name:       "create node2",
+					createNode: makeNode("node2", "1"),
+				},
+				{
+					name: "create victim on node1 and high-priority blocker on node2",
+					createPods: &createPods{
+						pods: []*v1.Pod{
+							makeScheduledPod("low-1", "node1", lowPriority, "3"),
+							makeScheduledPod("blocker", "node2", highPriority, "1"),
+						},
+					},
+				},
+				{
+					name: "create preemptor basic composite pod group cpg1",
+					createCompositePodGroup: &createCompositePodGroup{
+						compositePodGroup: makeCompositePodGroup("cpg1", highPriority),
+					},
+				},
+				{
+					name: "create child gang pg-child-1 with minCount 2",
+					createPodGroup: &createPodGroup{
+						podGroup: makeChildGangPodGroup("pg-child-1", "cpg1", highPriority, 2),
+					},
+				},
+				{
+					name: "create child gang pg-child-2 with minCount 2",
+					createPodGroup: &createPodGroup{
+						podGroup: makeChildGangPodGroup("pg-child-2", "cpg1", highPriority, 2),
+					},
+				},
+				{
+					name: "create pods in pg-child-1 and pg-child-2 with stale NNN set to node2",
+					createPods: &createPods{
+						pods: []*v1.Pod{
+							makePodGroupPod("c1-pod1", "pg-child-1", highPriority, "1"),
+							makePodGroupPod("c1-pod2", "pg-child-1", highPriority, "2"),
+							makePodGroupPod("c2-pod1", "pg-child-2", highPriority, "1"),
+							makePodGroupPod("c2-pod2", "pg-child-2", highPriority, "2"),
+						},
+						nominatedNodeName: "node2",
+					},
+				},
+				{
+					name: "schedule the preemptor CompositePodGroup cpg1",
+					schedulePodGroup: &schedulePodGroup{
+						podGroupName: "cpg1",
+						podNames:     []string{"c1-pod1", "c1-pod2", "c2-pod1", "c2-pod2"},
+					},
+				},
+				{
+					name: "verify the preemptor CompositePodGroup pods are unschedulable",
+					verifyPodsUnschedulable: &verifyPodsUnschedulable{
+						podNames: []string{"c1-pod1", "c1-pod2", "c2-pod1", "c2-pod2"},
+					},
+				},
+				{
+					name: "check placed child pods get NNN updated to node1",
+					checkNNN: &checkNNN{
+						podNames:    []string{"c1-pod1", "c1-pod2"},
+						expectedNNN: "node1",
+					},
+				},
+				{
+					name: "check rejected child pods have stale NNN cleared",
+					checkNNN: &checkNNN{
+						podNames:    []string{"c2-pod1", "c2-pod2"},
+						expectedNNN: "",
+					},
+				},
+				{
+					name:               "complete the preemption API calls",
+					completePreemption: "cpg1",
+				},
+				{
+					name: "re-enter cpg1 in the scheduling cycle",
+					schedulePodGroup: &schedulePodGroup{
+						podGroupName: "cpg1",
+						podNames:     []string{"c1-pod1", "c1-pod2", "c2-pod1", "c2-pod2"},
+					},
+				},
+				{
+					name: "verify placed child pods are scheduled on node1",
+					verifyPodsScheduled: &verifyPodsScheduled{
+						podNames:              []string{"c1-pod1", "c1-pod2"},
+						expectedScheduledNode: "node1",
+						validateNNNCleared:    true,
+					},
+				},
+				{
+					name: "check rejected child pods still have empty NNN",
+					checkNNN: &checkNNN{
+						podNames:    []string{"c2-pod1", "c2-pod2"},
+						expectedNNN: "",
+					},
+				},
+			},
+		},
+		{
+			name: "failed gang CPG scheduling clears NNN even for child that fit on its own",
+			scenarios: []scenario{
+				{
+					name:       "create node1",
+					createNode: makeNode("node1", "4"),
+				},
+				{
+					name: "create gang composite pod group cpg with minGroupCount 2",
+					createCompositePodGroup: &createCompositePodGroup{
+						compositePodGroup: makeGangCompositePodGroup("cpg", lowPriority, 2),
+					},
+				},
+				{
+					name: "create child gang pg-child-1 with minCount 1",
+					createPodGroup: &createPodGroup{
+						podGroup: makeChildGangPodGroup("pg-child-1", "cpg", lowPriority, 1),
+					},
+				},
+				{
+					name: "create child gang pg-child-2 with minCount 1",
+					createPodGroup: &createPodGroup{
+						podGroup: makeChildGangPodGroup("pg-child-2", "cpg", lowPriority, 1),
+					},
+				},
+				{
+					name: "create child pods with NNN on node1 where only pg-child-1 fits",
+					createPods: &createPods{
+						pods: []*v1.Pod{
+							makePodGroupPod("c1-pod1", "pg-child-1", lowPriority, "2"),
+							makePodGroupPod("c2-pod1", "pg-child-2", lowPriority, "3"),
+						},
+						nominatedNodeName: "node1",
+					},
+				},
+				{
+					name: "schedule cpg",
+					schedulePodGroup: &schedulePodGroup{
+						podGroupName: "cpg",
+						podNames:     []string{"c1-pod1", "c2-pod1"},
+					},
+				},
+				{
+					name: "check NNN in both child pods gets cleared upon scheduling failure",
+					checkNNN: &checkNNN{
+						podNames:    []string{"c1-pod1", "c2-pod1"},
+						expectedNNN: "",
+					},
+				},
+			},
+		},
+		{
+			name: "preemption clears NNN of lower-priority podgroups only on target nodes",
+			scenarios: []scenario{
+				{
+					name:       "create node1",
+					createNode: makeNode("node1", "2"),
+				},
+				{
+					name:       "create node2",
+					createNode: makeNode("node2", "1"),
+				},
+				{
+					name: "create victims on node1 and high-priority blocker on node2",
+					createPods: &createPods{
+						pods: []*v1.Pod{
+							makeScheduledPod("victim-1", "node1", lowPriority, "1"),
+							makeScheduledPod("victim-2", "node1", lowPriority, "1"),
+							makeScheduledPod("blocker", "node2", highPriority, "1"),
+						},
+					},
+				},
+				{
+					name: "create unscheduled low priority gang pg-low",
+					createPodGroup: &createPodGroup{
+						podGroup: makeGangPodGroup("pg-low", lowPriority, 2),
+					},
+				},
+				{
+					name: "create low-1 nominated on target node1",
+					createPods: &createPods{
+						pods: []*v1.Pod{
+							makePodGroupPod("low-1", "pg-low", lowPriority, "1"),
+						},
+						nominatedNodeName: "node1",
+					},
+				},
+				{
+					name: "create low-2 nominated on non-target node2",
+					createPods: &createPods{
+						pods: []*v1.Pod{
+							makePodGroupPod("low-2", "pg-low", lowPriority, "1"),
+						},
+						nominatedNodeName: "node2",
+					},
+				},
+				{
+					name: "create high priority preemptor gang pg-high",
+					createPodGroup: &createPodGroup{
+						podGroup: makeGangPodGroup("pg-high", highPriority, 2),
+					},
+				},
+				{
+					name: "create high priority preemptor pods in pg-high",
+					createPods: &createPods{
+						pods: []*v1.Pod{
+							makePodGroupPod("high-1", "pg-high", highPriority, "1"),
+							makePodGroupPod("high-2", "pg-high", highPriority, "1"),
+						},
+					},
+				},
+				{
+					name: "schedule the preemptor PodGroup pg-high",
+					schedulePodGroup: &schedulePodGroup{
+						podGroupName: "pg-high",
+						podNames:     []string{"high-1", "high-2"},
+					},
+				},
+				{
+					name: "verify the preemptor PodGroup pods are unschedulable",
+					verifyPodsUnschedulable: &verifyPodsUnschedulable{
+						podNames: []string{"high-1", "high-2"},
+					},
+				},
+				{
+					name: "check NNN is set on preemptor pods for node1",
+					checkNNN: &checkNNN{
+						podNames:    []string{"high-1", "high-2"},
+						expectedNNN: "node1",
+					},
+				},
+				{
+					name: "check lower-priority pod nominated on target node1 has NNN cleared",
+					checkNNN: &checkNNN{
+						podNames:    []string{"low-1"},
+						expectedNNN: "",
+					},
+				},
+				{
+					name: "check lower-priority pod nominated on non-target node2 retains NNN",
+					checkNNN: &checkNNN{
+						podNames:    []string{"low-2"},
+						expectedNNN: "node2",
+					},
+				},
+				{
+					name:               "complete the preemption API calls",
+					completePreemption: "pg-high",
+				},
+				{
+					name: "re-enter pg-high in the scheduling cycle",
+					schedulePodGroup: &schedulePodGroup{
+						podGroupName: "pg-high",
+						podNames:     []string{"high-1", "high-2"},
+					},
+				},
+				{
+					name: "verify pg-high pods are scheduled on node1",
+					verifyPodsScheduled: &verifyPodsScheduled{
+						podNames:              []string{"high-1", "high-2"},
+						expectedScheduledNode: "node1",
+						validateNNNCleared:    true,
+					},
+				},
+				{
+					name: "re-check lower-priority pod nominated on non-target node2 still retains NNN",
+					checkNNN: &checkNNN{
+						podNames:    []string{"low-2"},
+						expectedNNN: "node2",
 					},
 				},
 			},
