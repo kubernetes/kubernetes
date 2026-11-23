@@ -102,7 +102,7 @@
     labels: [performance]
     threshold:
       # https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=SchedulingThroughput&Name=BenchmarkPerfScheduling%2FConsumableCapacity%2Fempty_500nodes%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
-      dra_consumablecapacity: 144 # 20% below median of last 20 runs
+      dra_consumablecapacity: 103 # 40% below median of last 30 runs
     params:
       nodesWithDRA: 500
       nodesWithoutDRA: 0
@@ -114,7 +114,7 @@
     labels: [performance]
     threshold:
       # https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=SchedulingThroughput&Name=BenchmarkPerfScheduling%2FConsumableCapacity%2Fhalf_500nodes%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
-      dra_consumablecapacity: 115 # 20% below median of last 20 runs
+      dra_consumablecapacity: 110 # 20% below median of last 30 runs
     params:
       nodesWithDRA: 500
       nodesWithoutDRA: 0
@@ -126,7 +126,7 @@
     labels: [performance]
     threshold:
       # https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=SchedulingThroughput&Name=BenchmarkPerfScheduling%2FConsumableCapacity%2Ffull_500nodes%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
-      dra_consumablecapacity: 88 # 20% below median of last 20 runs
+      dra_consumablecapacity: 83 # 20% below median of last 30 runs
     params:
       nodesWithDRA: 500
       nodesWithoutDRA: 0
@@ -138,7 +138,7 @@
     labels: [performance]
     threshold:
       # https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=SchedulingThroughput&Name=BenchmarkPerfScheduling%2FConsumableCapacity%2Fempty_1000nodes%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
-      dra_consumablecapacity: 114 # 20% below median of last 20 runs
+      dra_consumablecapacity: 112 # 20% below median of last 30 runs
     params:
       nodesWithDRA: 1000
       nodesWithoutDRA: 0
@@ -150,7 +150,7 @@
     labels: [performance]
     threshold:
       # https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=SchedulingThroughput&Name=BenchmarkPerfScheduling%2FConsumableCapacity%2Fhalf_1000nodes%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
-      dra_consumablecapacity: 79 # 20% below median of last 20 runs
+      dra_consumablecapacity: 75 # 20% below median of last 30 runs
     params:
       nodesWithDRA: 1000
       nodesWithoutDRA: 0
@@ -162,7 +162,7 @@
     labels: [performance]
     threshold:
       # https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=SchedulingThroughput&Name=BenchmarkPerfScheduling%2FConsumableCapacity%2Ffull_1000nodes%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
-      dra_consumablecapacity: 47 # 20% below median of last 20 runs
+      dra_consumablecapacity: 38 # 20% below median of last 30 runs
     params:
       nodesWithDRA: 1000
       nodesWithoutDRA: 0
