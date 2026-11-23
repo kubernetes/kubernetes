@@ -48,5 +48,5 @@ const (
 	// KubePreReleaseVersion is the semver pre-release identifier of the current development
 	// version, empty for a final release (e.g. "beta.0").
 	// Should update for each pre-release and release!
-	KubePreReleaseVersion = ""
+	KubePreReleaseVersion = "alpha.0"
 )

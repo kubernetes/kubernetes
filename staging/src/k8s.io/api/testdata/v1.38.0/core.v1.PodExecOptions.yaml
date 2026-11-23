@@ -1,0 +1,9 @@
+apiVersion: v1
+command:
+- commandValue
+container: containerValue
+kind: PodExecOptions
+stderr: true
+stdin: true
+stdout: true
+tty: true

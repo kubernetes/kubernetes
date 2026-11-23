@@ -36,7 +36,7 @@ var (
 
 // These must be kept in sync with k8s.io/component-base/version.
 const (
-	defaultKubeBinaryVersion = "1.38"
+	defaultKubeBinaryVersion = "1.39"
 	kubePatchVersion         = 0
-	kubePreReleaseVersion    = ""
+	kubePreReleaseVersion    = "alpha.0"
 )
