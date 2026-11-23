@@ -4465,14 +4465,18 @@ func TestMutablePodResourcesForSuspendedJobsNotYetStarted(t *testing.T) {
 	// Immediately update the pod resources without waiting for the JobSuspended
 	// condition to be set. This simulates external controllers (e.g. MultiKueue)
 	// that inject resource requirements right after creating a suspended Job.
+	// The job controller can sync the Job concurrently (for example, adding the
+	// JobSuspended condition) between the creation and this update, so retry on
+	// conflict, as an external controller would.
 	wantResources := v1.ResourceRequirements{
 		Requests: v1.ResourceList{
 			v1.ResourceCPU:    resource.MustParse("200m"),
 			v1.ResourceMemory: resource.MustParse("256Mi"),
 		},
 	}
-	job.Spec.Template.Spec.Containers[0].Resources = wantResources
-	_, err = clientSet.BatchV1().Jobs(ns.Name).Update(ctx, job, metav1.UpdateOptions{})
+	_, err = updateJob(ctx, clientSet.BatchV1().Jobs(ns.Name), job.Name, func(j *batchv1.Job) {
+		j.Spec.Template.Spec.Containers[0].Resources = wantResources
+	})
 	if err != nil {
 		t.Fatalf("Failed to update pod resources on suspended Job that was never started: %v", err)
 	}
