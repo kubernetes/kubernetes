@@ -59,10 +59,12 @@ func WithTracing(handler http.Handler, tp trace.TracerProvider) http.Handler {
 		}
 		// Add auditID attribute if available. This helps us connect traces to audit log entries
 		span.SetAttributes(attribute.String("audit-id", audit.GetAuditIDTruncated(ctx)))
-		if spanCtx := span.SpanContext(); spanCtx.IsValid() && spanCtx.IsSampled() {
-			ctx = tracing.ContextWithSpanLogger(ctx, span)
-			httplog.AddKeyValue(ctx, "trace_id", spanCtx.TraceID())
-			httplog.AddKeyValue(ctx, "span_id", spanCtx.SpanID())
+		ctx = tracing.ContextWithSpanLogger(ctx, span)
+		if span.IsRecording() {
+			if spanCtx := span.SpanContext(); spanCtx.IsValid() && spanCtx.IsSampled() {
+				httplog.AddKeyValue(ctx, "trace_id", spanCtx.TraceID())
+				httplog.AddKeyValue(ctx, "span_id", spanCtx.SpanID())
+			}
 		}
 		if ctx != r.Context() {
 			r = r.WithContext(ctx)
