@@ -42,6 +42,7 @@ import (
 	"k8s.io/client-go/util/retry"
 	apimachineryutils "k8s.io/kubernetes/test/e2e/common/apimachinery"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/utils/crd"
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
@@ -51,6 +52,51 @@ var _ = SIGDescribe("CustomResourceDefinition resources [Privileged:ClusterAdmin
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.Context("Simple CustomResourceDefinition", func() {
+		ginkgo.It("should leave a custom resource with a finalizer unchanged after dry-run DELETE", func(ctx context.Context) {
+			testCRD, err := crd.CreateTestCRD(f)
+			framework.ExpectNoError(err, "creating CustomResourceDefinition")
+			ginkgo.DeferCleanup(testCRD.CleanUp)
+
+			client := testCRD.DynamicClients["v1"]
+			resource := &unstructured.Unstructured{}
+			resource.SetAPIVersion(testCRD.Crd.Spec.Group + "/v1")
+			resource.SetKind(testCRD.Crd.Spec.Names.Kind)
+			resource.SetName("untouched-resource")
+			resourceTwo, err := instantiateCustomResource(ctx, resource, client, testCRD.Crd)
+			framework.ExpectNoError(err, "creating the untouched custom resource")
+
+			resource.SetName("delete-target")
+			// The finalizer forces DELETE through the update path that sets deletionTimestamp.
+			resource.SetFinalizers([]string{"example.com/hold"})
+			resourceOne, err := instantiateCustomResource(ctx, resource, client, testCRD.Crd)
+			framework.ExpectNoError(err, "creating the dry-run DELETE target with a finalizer")
+			ginkgo.DeferCleanup(client.Patch, resourceOne.GetName(), types.MergePatchType,
+				[]byte(`{"metadata":{"finalizers":null}}`), metav1.PatchOptions{})
+
+			pollWatchCacheList := func() []unstructured.Unstructured {
+				// For resourceVersion=0, the watch cache ignores the page limit and etcd honors it.
+				// See TestListOptions in test/integration/apiserver/apiserver_test.go.
+				listWithLimitOne := framework.RetryNotFound(framework.ListObjects(client.List, metav1.ListOptions{ResourceVersion: "0", Limit: 1}))
+				var items []unstructured.Unstructured
+				err := framework.Gomega().Eventually(ctx, listWithLimitOne).WithTimeout(30 * time.Second).Should(
+					gomega.WithTransform(func(result *unstructured.UnstructuredList) []unstructured.Unstructured {
+						items = result.Items
+						return items
+					}, gomega.HaveLen(2)))
+				framework.ExpectNoError(err, "waiting for the watch-cache LIST to return both custom resources despite the page limit of one")
+				return items
+			}
+			expectedResources := []unstructured.Unstructured{*resourceOne, *resourceTwo}
+			gomega.Expect(pollWatchCacheList()).To(gomega.ConsistOf(expectedResources),
+				"watch-cache LIST before dry-run DELETE should match both created resources")
+
+			err = client.Delete(ctx, resourceOne.GetName(), metav1.DeleteOptions{DryRun: []string{metav1.DryRunAll}})
+			framework.ExpectNoError(err, "dry-run deleting the custom resource")
+
+			gomega.Expect(pollWatchCacheList()).To(gomega.ConsistOf(expectedResources),
+				"watch-cache LIST after dry-run DELETE should match both created resources")
+		})
+
 		/*
 			Release: v1.9
 			Testname: Custom Resource Definition, create
