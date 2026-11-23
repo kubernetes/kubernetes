@@ -158,10 +158,15 @@ var baseRules = dedent.Dedent(`
 	add set ip kube-proxy hairpin-connections { type ipv4_addr . ipv4_addr . inet_proto . inet_service ; comment "service hairpin connections" ; }
 
 	add map ip kube-proxy firewall-ips { type ipv4_addr . inet_proto . inet_service : verdict ; comment "destinations that are subject to LoadBalancerSourceRanges" ; }
+	add map ip kube-proxy localhost-nodeport-reject-ports { type inet_proto . inet_service : verdict ; comment "localhost NodePorts rejected by kube-proxy" ; }
 	add map ip kube-proxy no-endpoint-nodeports { type inet_proto . inet_service : verdict ; comment "vmap to drop or reject packets to service nodeports with no endpoints" ; }
 	add map ip kube-proxy no-endpoint-services { type ipv4_addr . inet_proto . inet_service : verdict ; comment "vmap to drop or reject packets to services with no endpoints" ; }
 	add map ip kube-proxy service-ips { type ipv4_addr . inet_proto . inet_service : verdict ; comment "ClusterIP, ExternalIP and LoadBalancer IP traffic" ; }
 	add map ip kube-proxy service-nodeports { type inet_proto . inet_service : verdict ; comment "NodePort traffic" ; }
+
+	add counter ip kube-proxy localhost-nodeport-rejected-tcp
+	add counter ip kube-proxy localhost-nodeport-rejected-udp
+	add counter ip kube-proxy localhost-nodeport-rejected-sctp
 
 	add chain ip kube-proxy cluster-ips-check
 	add chain ip kube-proxy filter-prerouting-pre-dnat { type filter hook prerouting priority -110 ; }
@@ -170,6 +175,9 @@ var baseRules = dedent.Dedent(`
 	add chain ip kube-proxy filter-input { type filter hook input priority 0 ; }
 	add chain ip kube-proxy filter-output { type filter hook output priority 0 ; }
 	add chain ip kube-proxy firewall-check
+	add chain ip kube-proxy localhost-nodeport-reject-tcp
+	add chain ip kube-proxy localhost-nodeport-reject-udp
+	add chain ip kube-proxy localhost-nodeport-reject-sctp
 	add chain ip kube-proxy masquerading
 	add chain ip kube-proxy nat-output { type nat hook output priority -100 ; }
 	add chain ip kube-proxy nat-postrouting { type nat hook postrouting priority 100 ; }
@@ -190,12 +198,16 @@ var baseRules = dedent.Dedent(`
 	add rule ip kube-proxy filter-output-pre-dnat ct state new jump firewall-check
 	add rule ip kube-proxy filter-output ct state new jump cluster-ips-check
 	add rule ip kube-proxy firewall-check ip daddr . meta l4proto . th dport vmap @firewall-ips
+	add rule ip kube-proxy localhost-nodeport-reject-tcp counter name "localhost-nodeport-rejected-tcp" reject
+	add rule ip kube-proxy localhost-nodeport-reject-udp counter name "localhost-nodeport-rejected-udp" reject
+	add rule ip kube-proxy localhost-nodeport-reject-sctp counter name "localhost-nodeport-rejected-sctp" reject
 	add rule ip kube-proxy masquerading mark and 0x4000 != 0 mark set mark xor 0x4000 masquerade fully-random
 	add rule ip kube-proxy masquerading ct status dnat ip saddr . ip daddr . meta l4proto . th dport @hairpin-connections masquerade fully-random
 	add rule ip kube-proxy nat-output jump services
 	add rule ip kube-proxy nat-postrouting jump masquerading
 	add rule ip kube-proxy nat-prerouting jump services
 	add rule ip kube-proxy nodeport-endpoints-check ip daddr @nodeport-ips meta l4proto . th dport vmap @no-endpoint-nodeports
+	add rule ip kube-proxy nodeport-endpoints-check ip daddr 127.0.0.0/8 meta l4proto . th dport vmap @localhost-nodeport-reject-ports
 	add rule ip kube-proxy reject-chain reject
 	add rule ip kube-proxy services ip daddr @cluster-ips ip saddr != 10.0.0.0/8 mark set mark or 0x4000 comment "masquerade clusterIP traffic from outside cluster"
 	add rule ip kube-proxy services ip daddr . meta l4proto . th dport vmap @service-ips
@@ -213,10 +225,15 @@ var baseRulesV6 = dedent.Dedent(`
 	add set ip6 kube-proxy hairpin-connections { type ipv6_addr . ipv6_addr . inet_proto . inet_service ; comment "service hairpin connections" ; }
 
 	add map ip6 kube-proxy firewall-ips { type ipv6_addr . inet_proto . inet_service : verdict ; comment "destinations that are subject to LoadBalancerSourceRanges" ; }
+	add map ip6 kube-proxy localhost-nodeport-reject-ports { type inet_proto . inet_service : verdict ; comment "localhost NodePorts rejected by kube-proxy" ; }
 	add map ip6 kube-proxy no-endpoint-nodeports { type inet_proto . inet_service : verdict ; comment "vmap to drop or reject packets to service nodeports with no endpoints" ; }
 	add map ip6 kube-proxy no-endpoint-services { type ipv6_addr . inet_proto . inet_service : verdict ; comment "vmap to drop or reject packets to services with no endpoints" ; }
 	add map ip6 kube-proxy service-ips { type ipv6_addr . inet_proto . inet_service : verdict ; comment "ClusterIP, ExternalIP and LoadBalancer IP traffic" ; }
 	add map ip6 kube-proxy service-nodeports { type inet_proto . inet_service : verdict ; comment "NodePort traffic" ; }
+
+	add counter ip6 kube-proxy localhost-nodeport-rejected-tcp
+	add counter ip6 kube-proxy localhost-nodeport-rejected-udp
+	add counter ip6 kube-proxy localhost-nodeport-rejected-sctp
 
 	add chain ip6 kube-proxy cluster-ips-check
 	add chain ip6 kube-proxy filter-prerouting-pre-dnat { type filter hook prerouting priority -110 ; }
@@ -225,6 +242,9 @@ var baseRulesV6 = dedent.Dedent(`
 	add chain ip6 kube-proxy filter-input { type filter hook input priority 0 ; }
 	add chain ip6 kube-proxy filter-output { type filter hook output priority 0 ; }
 	add chain ip6 kube-proxy firewall-check
+	add chain ip6 kube-proxy localhost-nodeport-reject-tcp
+	add chain ip6 kube-proxy localhost-nodeport-reject-udp
+	add chain ip6 kube-proxy localhost-nodeport-reject-sctp
 	add chain ip6 kube-proxy masquerading
 	add chain ip6 kube-proxy nat-output { type nat hook output priority -100 ; }
 	add chain ip6 kube-proxy nat-postrouting { type nat hook postrouting priority 100 ; }
@@ -245,12 +265,16 @@ var baseRulesV6 = dedent.Dedent(`
 	add rule ip6 kube-proxy filter-output-pre-dnat ct state new jump firewall-check
 	add rule ip6 kube-proxy filter-output ct state new jump cluster-ips-check
 	add rule ip6 kube-proxy firewall-check ip6 daddr . meta l4proto . th dport vmap @firewall-ips
+	add rule ip6 kube-proxy localhost-nodeport-reject-tcp counter name "localhost-nodeport-rejected-tcp" reject
+	add rule ip6 kube-proxy localhost-nodeport-reject-udp counter name "localhost-nodeport-rejected-udp" reject
+	add rule ip6 kube-proxy localhost-nodeport-reject-sctp counter name "localhost-nodeport-rejected-sctp" reject
 	add rule ip6 kube-proxy masquerading mark and 0x4000 != 0 mark set mark xor 0x4000 masquerade fully-random
 	add rule ip6 kube-proxy masquerading ct status dnat ip6 saddr . ip6 daddr . meta l4proto . th dport @hairpin-connections masquerade fully-random
 	add rule ip6 kube-proxy nat-output jump services
 	add rule ip6 kube-proxy nat-postrouting jump masquerading
 	add rule ip6 kube-proxy nat-prerouting jump services
 	add rule ip6 kube-proxy nodeport-endpoints-check ip6 daddr @nodeport-ips meta l4proto . th dport vmap @no-endpoint-nodeports
+	add rule ip6 kube-proxy nodeport-endpoints-check ip6 daddr ::1 meta l4proto . th dport vmap @localhost-nodeport-reject-ports
 	add rule ip6 kube-proxy reject-chain reject
 	add rule ip6 kube-proxy services ip6 daddr @cluster-ips ip6 saddr != fd00:10::/64 mark set mark or 0x4000 comment "masquerade clusterIP traffic from outside cluster"
 	add rule ip6 kube-proxy services ip6 daddr . meta l4proto . th dport vmap @service-ips
@@ -462,6 +486,8 @@ func TestOverallNFTablesRules(t *testing.T) {
 		add element ip kube-proxy no-endpoint-services { 1.2.3.4 . tcp . 80 comment "ns2/svc2:p80" : drop }
 		add element ip kube-proxy no-endpoint-services { 192.168.99.22 . tcp . 80 comment "ns2/svc2:p80" : drop }
 
+		add element ip kube-proxy localhost-nodeport-reject-ports { tcp . 3001 : goto localhost-nodeport-reject-tcp }
+
 		# svc3
 		add chain ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80
 		add rule ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80 meta l4proto tcp dnat to 10.180.0.3:80
@@ -473,6 +499,8 @@ func TestOverallNFTablesRules(t *testing.T) {
 		add element ip kube-proxy service-ips { 172.30.0.43 . tcp . 80 : goto service-4AT6LBPK-ns3/svc3/tcp/p80 }
 		add element ip kube-proxy service-nodeports { tcp . 3003 : goto external-4AT6LBPK-ns3/svc3/tcp/p80 }
 		add element ip kube-proxy hairpin-connections { 10.180.0.3 . 10.180.0.3 . tcp . 80 }
+
+		add element ip kube-proxy localhost-nodeport-reject-ports { tcp . 3003 : goto localhost-nodeport-reject-tcp }
 
 		# svc4
 		add chain ip kube-proxy service-LAUZTJTB-ns4/svc4/tcp/p80
@@ -509,25 +537,11 @@ func TestOverallNFTablesRules(t *testing.T) {
 		add element ip kube-proxy firewall-ips { 5.6.7.8 . tcp . 80 : goto firewall-HVFWP5L3-ns5/svc5/tcp/p80 }
 		# 10.180.0.3:80 is already in hairpin-connections, so we don't want another "add element" line...
 
+		add element ip kube-proxy localhost-nodeport-reject-ports { tcp . 3002 : goto localhost-nodeport-reject-tcp }
+
 		# svc6
 		add element ip kube-proxy cluster-ips { 172.30.0.46 }
 		add element ip kube-proxy no-endpoint-services { 172.30.0.46 . tcp . 80 comment "ns6/svc6:p80" : goto reject-chain }
-
-		# localhost NodePort rejects
-		add map ip kube-proxy localhost-nodeport-reject-ports { type inet_proto . inet_service : verdict ; comment "localhost NodePorts rejected by kube-proxy" ; }
-		add counter ip kube-proxy localhost-nodeport-rejected-tcp
-		add counter ip kube-proxy localhost-nodeport-rejected-udp
-		add counter ip kube-proxy localhost-nodeport-rejected-sctp
-		add chain ip kube-proxy localhost-nodeport-reject-tcp
-		add chain ip kube-proxy localhost-nodeport-reject-udp
-		add chain ip kube-proxy localhost-nodeport-reject-sctp
-		add rule ip kube-proxy localhost-nodeport-reject-tcp counter name "localhost-nodeport-rejected-tcp" reject
-		add rule ip kube-proxy localhost-nodeport-reject-udp counter name "localhost-nodeport-rejected-udp" reject
-		add rule ip kube-proxy localhost-nodeport-reject-sctp counter name "localhost-nodeport-rejected-sctp" reject
-		add rule ip kube-proxy nodeport-endpoints-check ip daddr 127.0.0.0/8 meta l4proto . th dport vmap @localhost-nodeport-reject-ports
-		add element ip kube-proxy localhost-nodeport-reject-ports { tcp . 3001 : goto localhost-nodeport-reject-tcp }
-		add element ip kube-proxy localhost-nodeport-reject-ports { tcp . 3002 : goto localhost-nodeport-reject-tcp }
-		add element ip kube-proxy localhost-nodeport-reject-ports { tcp . 3003 : goto localhost-nodeport-reject-tcp }
 		`)
 
 	assertNFTablesTransactionEqual(t, getLine(), expected, nft.Dump())
@@ -736,6 +750,8 @@ func TestOverallNFTablesRulesIPv6(t *testing.T) {
 		add element ip6 kube-proxy no-endpoint-services { 5555::1 . tcp . 80 comment "ns2/svc2:p80" : drop }
 		add element ip6 kube-proxy no-endpoint-services { 2001:db8:99::22 . tcp . 80 comment "ns2/svc2:p80" : drop }
 
+		add element ip6 kube-proxy localhost-nodeport-reject-ports { tcp . 3001 : goto localhost-nodeport-reject-tcp }
+
 		# svc3
 		add chain ip6 kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80
 		add rule ip6 kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80 meta l4proto tcp dnat to [fd00:10:180::3]:80
@@ -747,6 +763,8 @@ func TestOverallNFTablesRulesIPv6(t *testing.T) {
 		add element ip6 kube-proxy service-ips { fd00:172:30::43 . tcp . 80 : goto service-4AT6LBPK-ns3/svc3/tcp/p80 }
 		add element ip6 kube-proxy service-nodeports { tcp . 3003 : goto external-4AT6LBPK-ns3/svc3/tcp/p80 }
 		add element ip6 kube-proxy hairpin-connections { fd00:10:180::3 . fd00:10:180::3 . tcp . 80 }
+
+		add element ip6 kube-proxy localhost-nodeport-reject-ports { tcp . 3003 : goto localhost-nodeport-reject-tcp }
 
 		# svc4
 		add chain ip6 kube-proxy service-LAUZTJTB-ns4/svc4/tcp/p80
@@ -783,25 +801,11 @@ func TestOverallNFTablesRulesIPv6(t *testing.T) {
 		add element ip6 kube-proxy firewall-ips { 5555::2 . tcp . 80 : goto firewall-HVFWP5L3-ns5/svc5/tcp/p80 }
 		# [fd00:10:180::3]:80 is already in hairpin-connections, so we don't want another "add element" line...
 
+		add element ip6 kube-proxy localhost-nodeport-reject-ports { tcp . 3002 : goto localhost-nodeport-reject-tcp }
+
 		# svc6
 		add element ip6 kube-proxy cluster-ips { fd00:172:30::46 }
 		add element ip6 kube-proxy no-endpoint-services { fd00:172:30::46 . tcp . 80 comment "ns6/svc6:p80" : goto reject-chain }
-
-		# localhost NodePort rejects
-		add map ip6 kube-proxy localhost-nodeport-reject-ports { type inet_proto . inet_service : verdict ; comment "localhost NodePorts rejected by kube-proxy" ; }
-		add counter ip6 kube-proxy localhost-nodeport-rejected-tcp
-		add counter ip6 kube-proxy localhost-nodeport-rejected-udp
-		add counter ip6 kube-proxy localhost-nodeport-rejected-sctp
-		add chain ip6 kube-proxy localhost-nodeport-reject-tcp
-		add chain ip6 kube-proxy localhost-nodeport-reject-udp
-		add chain ip6 kube-proxy localhost-nodeport-reject-sctp
-		add rule ip6 kube-proxy localhost-nodeport-reject-tcp counter name "localhost-nodeport-rejected-tcp" reject
-		add rule ip6 kube-proxy localhost-nodeport-reject-udp counter name "localhost-nodeport-rejected-udp" reject
-		add rule ip6 kube-proxy localhost-nodeport-reject-sctp counter name "localhost-nodeport-rejected-sctp" reject
-		add rule ip6 kube-proxy nodeport-endpoints-check ip6 daddr ::1 meta l4proto . th dport vmap @localhost-nodeport-reject-ports
-		add element ip6 kube-proxy localhost-nodeport-reject-ports { tcp . 3001 : goto localhost-nodeport-reject-tcp }
-		add element ip6 kube-proxy localhost-nodeport-reject-ports { tcp . 3002 : goto localhost-nodeport-reject-tcp }
-		add element ip6 kube-proxy localhost-nodeport-reject-ports { tcp . 3003 : goto localhost-nodeport-reject-tcp }
 		`)
 
 	assertNFTablesTransactionEqual(t, getLine(), expected, nft.Dump())
@@ -4791,8 +4795,19 @@ func TestSyncProxyRulesStartup(t *testing.T) {
 	// now create a new proxier and start from scratch
 	nft, fp = NewFakeProxier(v1.IPv4Protocol)
 
+	// FIXME: nft.ParseDump in knftables v0.0.22 does not correctly handle rules with
+	// quotes in the non-comment part. Note that NOT using quotes here is
+	// grammatically incorrect, but knftables.Fake won't notice.
+	baseRuleLines := strings.Split(baseRules, "\n")
+	for i, rule := range baseRuleLines {
+		if strings.Contains(rule, "counter") {
+			baseRuleLines[i] = strings.ReplaceAll(rule, `"`, ``)
+		}
+	}
+	hackedBaseRules := strings.Join(baseRuleLines, "\n")
+
 	// put a part of desired state to nftables
-	err := nft.ParseDump(baseRules + dedent.Dedent(`
+	err := nft.ParseDump(hackedBaseRules + dedent.Dedent(`
 		add chain ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80
 		add chain ip kube-proxy service-MHHHYRWA-ns2/svc2/tcp/p8080
 		
