@@ -236,18 +236,40 @@ func TestToPromHistogramOptsWithNativeHistograms(t *testing.T) {
 	tests := []struct {
 		name                                string
 		enableNativeHistograms              bool
+		buckets                             []float64
+		expectedBuckets                     []float64
 		expectedNativeHistogramBucketFactor float64
 		expectedNativeHistogramMaxBuckets   uint32
 	}{
 		{
-			name:                                "native histograms disabled",
+			name:                                "native histograms disabled with explicit buckets",
 			enableNativeHistograms:              false,
+			buckets:                             []float64{0.1, 0.5, 1, 2, 5},
+			expectedBuckets:                     []float64{0.1, 0.5, 1, 2, 5},
 			expectedNativeHistogramBucketFactor: 0,
 			expectedNativeHistogramMaxBuckets:   0,
 		},
 		{
-			name:                                "native histograms enabled",
+			name:                                "native histograms enabled with explicit buckets",
 			enableNativeHistograms:              true,
+			buckets:                             []float64{0.1, 0.5, 1, 2, 5},
+			expectedBuckets:                     []float64{0.1, 0.5, 1, 2, 5},
+			expectedNativeHistogramBucketFactor: 1.1,
+			expectedNativeHistogramMaxBuckets:   160,
+		},
+		{
+			name:                                "native histograms disabled with nil buckets",
+			enableNativeHistograms:              false,
+			buckets:                             nil,
+			expectedBuckets:                     nil,
+			expectedNativeHistogramBucketFactor: 0,
+			expectedNativeHistogramMaxBuckets:   0,
+		},
+		{
+			name:                                "native histograms enabled with nil buckets defaults to DefBuckets",
+			enableNativeHistograms:              true,
+			buckets:                             nil,
+			expectedBuckets:                     DefBuckets,
 			expectedNativeHistogramBucketFactor: 1.1,
 			expectedNativeHistogramMaxBuckets:   160,
 		},
@@ -261,7 +283,7 @@ func TestToPromHistogramOptsWithNativeHistograms(t *testing.T) {
 				Namespace: "test",
 				Name:      "histogram",
 				Help:      "test histogram",
-				Buckets:   []float64{0.1, 0.5, 1, 2, 5},
+				Buckets:   tc.buckets,
 			}
 
 			promOpts := opts.toPromHistogramOpts()
@@ -271,8 +293,8 @@ func TestToPromHistogramOptsWithNativeHistograms(t *testing.T) {
 			assert.Equal(t, tc.expectedNativeHistogramMaxBuckets, promOpts.NativeHistogramMaxBucketNumber,
 				"NativeHistogramMaxBucketNumber mismatch")
 
-			// Verify classic buckets are always present
-			assert.Equal(t, opts.Buckets, promOpts.Buckets, "Classic buckets should always be present")
+			// Verify classic buckets are preserved or defaulted to DefBuckets when native histograms are enabled
+			assert.Equal(t, tc.expectedBuckets, promOpts.Buckets, "Classic buckets mismatch")
 		})
 	}
 }
