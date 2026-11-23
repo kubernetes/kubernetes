@@ -1258,7 +1258,7 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 	existingChainsList, err := proxier.nftables.List(context.TODO(), "chain")
 	if err == nil {
 		existingChains = sets.New(existingChainsList...)
-	} else {
+	} else if !knftables.IsNotFound(err) {
 		proxier.logger.Error(err, "Failed to list existing chains")
 	}
 	var existingAffinitySets sets.Set[string]
@@ -1270,7 +1270,7 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 				existingAffinitySets.Insert(set)
 			}
 		}
-	} else {
+	} else if !knftables.IsNotFound(err) {
 		proxier.logger.Error(err, "Failed to list existing sets")
 	}
 

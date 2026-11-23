@@ -38,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/component-base/metrics/testutil"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/proxy"
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 	"k8s.io/kubernetes/pkg/proxy/conntrack"
@@ -132,6 +133,7 @@ func NewFakeProxier(ipFamily v1.IPFamily) (*knftables.Fake, *Proxier) {
 		networkInterfacer:        networkInterfacer,
 		staleChains:              make(map[string]time.Time),
 		serviceCIDRs:             serviceCIDRs,
+		logger:                   klog.TODO(), // klog.FromContext(t.Context())
 		logRateLimiter:           rate.NewLimiter(rate.Every(24*time.Hour), 1),
 		clusterIPs:               newNFTElementStorage("set", clusterIPsSet),
 		serviceIPs:               newNFTElementStorage("map", serviceIPsMap),
