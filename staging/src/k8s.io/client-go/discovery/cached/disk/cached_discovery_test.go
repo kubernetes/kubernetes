@@ -90,6 +90,31 @@ func TestCachedDiscoveryClient_Fresh(t *testing.T) {
 	assert.Equal(2, c.resourceCalls)
 }
 
+func TestCachedDiscoveryClient_EmptyResourceList(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	assert := assert.New(t)
+
+	d, err := os.MkdirTemp("", "")
+	assert.NoError(err)
+	defer os.RemoveAll(d)
+
+	c := fakeDiscoveryClient{}
+	cdc := newCachedDiscoveryClient(discovery.ToDiscoveryInterfaceWithContext(&c), d, 60*time.Second)
+
+	list, err := cdc.ServerResourcesForGroupVersionWithContext(tCtx, "empty/v1")
+	assert.NoError(err)
+	assert.Empty(list.APIResources)
+	assert.Equal(1, c.resourceCalls)
+
+	// A second client over the same directory, as a new process would be.
+	cdc = newCachedDiscoveryClient(discovery.ToDiscoveryInterfaceWithContext(&c), d, 60*time.Second)
+	list, err = cdc.ServerResourcesForGroupVersionWithContext(tCtx, "empty/v1")
+	assert.NoError(err)
+	assert.Equal("empty/v1", list.GroupVersion)
+	assert.Empty(list.APIResources)
+	assert.Equal(1, c.resourceCalls, "an empty resource list should be served from the cache")
+}
+
 func TestNewCachedDiscoveryClient_TTL(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	assert := assert.New(t)
@@ -751,6 +776,9 @@ func (c *fakeDiscoveryClient) ServerResourcesForGroupVersion(groupVersion string
 	c.resourceCalls = c.resourceCalls + 1
 	if groupVersion == "a/v1" {
 		return &metav1.APIResourceList{APIResources: []metav1.APIResource{{Name: "widgets", Kind: "Widget"}}}, nil
+	}
+	if groupVersion == "empty/v1" {
+		return &metav1.APIResourceList{GroupVersion: "empty/v1"}, nil
 	}
 
 	return nil, errors.NewNotFound(schema.GroupResource{}, "")
