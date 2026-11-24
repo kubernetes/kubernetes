@@ -423,14 +423,40 @@ func (o LogsOptions) parallelConsumeRequest(ctx context.Context, requests map[co
 }
 
 func (o LogsOptions) sequentialConsumeRequest(ctx context.Context, requests map[corev1.ObjectReference]rest.ResponseWrapper) error {
+	output := &streamBoundaryWriter{out: o.Out}
 	for objRef, request := range requests {
-		out := o.addPrefixIfNeeded(objRef, o.Out)
-		if err := o.consumeWithRetry(ctx, request, out, o.Out); err != nil {
+		output.newStream = true
+		out := o.addPrefixIfNeeded(objRef, output)
+		if err := o.consumeWithRetry(ctx, request, out, output); err != nil {
 			return err
 		}
 	}
 
 	return nil
+}
+
+type streamBoundaryWriter struct {
+	out       io.Writer
+	newStream bool
+	partial   bool
+}
+
+func (w *streamBoundaryWriter) Write(p []byte) (int, error) {
+	if len(p) == 0 {
+		return 0, nil
+	}
+	// Wait for output from the next stream so an empty stream cannot add a newline.
+	if w.newStream && w.partial {
+		if _, err := io.WriteString(w.out, "\n"); err != nil {
+			return 0, err
+		}
+	}
+	w.newStream = false
+	n, err := w.out.Write(p)
+	if n > 0 {
+		w.partial = p[n-1] != '\n'
+	}
+	return n, err
 }
 
 func (o LogsOptions) consumeWithRetry(ctx context.Context, request rest.ResponseWrapper, out io.Writer, internalErrOut io.Writer) error {

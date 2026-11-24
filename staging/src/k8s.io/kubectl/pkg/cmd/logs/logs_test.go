@@ -870,6 +870,64 @@ func TestLogComplete(t *testing.T) {
 	}
 }
 
+func TestSequentialConsumeRequestStreamBoundaries(t *testing.T) {
+	tests := []struct {
+		name    string
+		streams []string
+		prefix  bool
+		want    []string
+	}{
+		{
+			name:    "partial streams with prefixes",
+			streams: []string{"first", "second"},
+			prefix:  true,
+			want:    []string{"[pod/pod-0/main] first\n[pod/pod-1/main] second", "[pod/pod-1/main] second\n[pod/pod-0/main] first"},
+		},
+		{
+			name:    "partial streams without prefixes",
+			streams: []string{"first", "second"},
+			want:    []string{"first\nsecond", "second\nfirst"},
+		},
+		{
+			name:    "complete streams",
+			streams: []string{"first\n", "second\n"},
+			want:    []string{"first\nsecond\n", "second\nfirst\n"},
+		},
+		{
+			name:    "empty streams",
+			streams: []string{"", "first", "", "second", ""},
+			want:    []string{"first\nsecond", "second\nfirst"},
+		},
+		{
+			name:    "single stream",
+			streams: []string{"first\nsecond"},
+			want:    []string{"first\nsecond"},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			streams, _, out, _ := genericiooptions.NewTestIOStreams()
+			o := NewLogsOptions(streams)
+			o.ConsumeRequestFn = DefaultConsumeRequest
+			o.Prefix = tc.prefix
+			requests := make(map[corev1.ObjectReference]restclient.ResponseWrapper)
+			for i, data := range tc.streams {
+				ref := corev1.ObjectReference{Name: fmt.Sprintf("pod-%d", i), FieldPath: "spec.containers{main}"}
+				requests[ref] = &responseWrapperMock{data: strings.NewReader(data)}
+			}
+			if err := o.sequentialConsumeRequest(context.Background(), requests); err != nil {
+				t.Fatal(err)
+			}
+			for _, want := range tc.want {
+				if out.String() == want {
+					return
+				}
+			}
+			t.Errorf("got output %q, want one of %q", out.String(), tc.want)
+		})
+	}
+}
+
 func TestDefaultConsumeRequest(t *testing.T) {
 	tests := []struct {
 		name        string
