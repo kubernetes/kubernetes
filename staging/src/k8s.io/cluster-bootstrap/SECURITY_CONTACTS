@@ -1,6 +1,6 @@
 # Defined below are the security contacts for this repo.
 #
-# They are the contact point for the Product Security Committee to reach out
+# They are the contact point for the Security Response Committee to reach out
 # to for triaging and handling of incoming issues.
 #
 # The below names agree to abide by the
@@ -10,8 +10,15 @@
 # DO NOT REPORT SECURITY VULNERABILITIES DIRECTLY TO THESE NAMES, FOLLOW THE
 # INSTRUCTIONS AT https://kubernetes.io/security/
 
-cjcullen
-joelsmith
-liggitt
-philips
-tallclair
+# Primary contacts (kubeadm approvers)
+neolit123
+SataQiu
+pacoxu
+carlory
+HirazawaUi
+
+# Additional contacts (SIG Cluster Lifecycle leads)
+fabriziopandini
+hakman
+justinsb
+sbueringer
