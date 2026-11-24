@@ -206,6 +206,9 @@ const (
 	// capacity information for it.
 	CapCapacity Capability = "capacity"
 
+	// The driver cannot publish a raw block volume read-only to a Pod.
+	CapReadOnlyBlockNotSupported Capability = "readOnlyBlockNotSupported"
+
 	// Anti-capability for drivers that do not support filesystem resizing of PVCs
 	// that are cloned or restored from a snapshot.
 	CapFSResizeFromSourceNotSupported Capability = "FSResizeFromSourceNotSupported"

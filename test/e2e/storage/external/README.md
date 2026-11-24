@@ -20,6 +20,10 @@ Here is a minimal example for the CSI hostpath driver:
       Capabilities:
         persistence: true
 
+Drivers that support raw block volumes but cannot publish them read-only to a Pod
+can set `DriverInfo.Capabilities.readOnlyBlockNotSupported` to `true` to skip
+the same-node read-only block volume test.
+
 The `prow.sh` script of the different CSI hostpath driver releases
 generates the actual definition that is used during CI testing, for
 example in
