@@ -371,6 +371,7 @@ func TestSchedulerDefaults(t *testing.T) {
 									{Name: names.TaintToleration, Weight: ptr.To[int32](3)},
 									{Name: names.NodeAffinity, Weight: ptr.To[int32](2)},
 									{Name: names.NodePorts},
+									{Name: names.DeferredPodScheduling},
 									{Name: names.NodeResourcesFit, Weight: ptr.To[int32](1)},
 									{Name: names.VolumeRestrictions},
 									{Name: names.NodeVolumeLimits},

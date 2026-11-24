@@ -32,6 +32,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -1584,6 +1585,48 @@ func TestPodResourcesDefaults(t *testing.T) {
 							Limits: v1.ResourceList{
 								"cpu":                              resource.MustParse("1m"),
 								v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("2Mi"),
+							},
+						},
+					},
+				},
+			},
+		}, {
+			// pids is limit-only: a pod whose only pod-level entry is
+			// limits.pids must not have pod-level requests materialized from
+			// container aggregates (that would alter QOS classification).
+			name:                     "pod limits=pids only, container requests=set",
+			podLevelResourcesEnabled: true,
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							"cpu":    resource.MustParse("2m"),
+							"memory": resource.MustParse("1Mi"),
+						},
+						Limits: v1.ResourceList{
+							"cpu":    resource.MustParse("2m"),
+							"memory": resource.MustParse("1Mi"),
+						},
+					},
+				},
+			},
+			podResources: &v1.ResourceRequirements{
+				Limits: v1.ResourceList{v1.ResourcePID: resource.MustParse("2048")},
+			},
+			expectedPodSpec: v1.PodSpec{
+				Resources: &v1.ResourceRequirements{
+					Limits: v1.ResourceList{v1.ResourcePID: resource.MustParse("2048")},
+				},
+				Containers: []v1.Container{
+					{
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								"cpu":    resource.MustParse("2m"),
+								"memory": resource.MustParse("1Mi"),
+							},
+							Limits: v1.ResourceList{
+								"cpu":    resource.MustParse("2m"),
+								"memory": resource.MustParse("1Mi"),
 							},
 						},
 					},
@@ -3529,4 +3572,90 @@ func TestSetDefaultPodTerminationGracePeriodSeconds(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestSetDefaultsPodLimitOnlyResources(t *testing.T) {
+	// SetDefaults_Pod only defaults pod-level requests with
+	// PodLevelResourcesFixDefaulting off, which is locked on from 1.38.
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.37"))
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourcesFixDefaulting, false)
+
+	t.Run("container with only swap limits keeps nil requests", func(t *testing.T) {
+		pod := &v1.Pod{
+			Spec: v1.PodSpec{
+				Resources: &v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourceSwap: resource.MustParse("2Gi"),
+					},
+				},
+				InitContainers: []v1.Container{
+					{
+						Name: "init-c",
+						Resources: v1.ResourceRequirements{
+							Limits: v1.ResourceList{
+								v1.ResourceSwap: resource.MustParse("512Mi"),
+							},
+						},
+					},
+				},
+				Containers: []v1.Container{
+					{
+						Name: "app",
+						Resources: v1.ResourceRequirements{
+							Limits: v1.ResourceList{
+								v1.ResourceSwap: resource.MustParse("1Gi"),
+							},
+						},
+					},
+				},
+			},
+		}
+		corev1.SetObjectDefaults_Pod(pod)
+
+		if pod.Spec.Containers[0].Resources.Requests != nil {
+			t.Errorf("expected container Requests to remain nil when only limit-only resources are in Limits, got %v", pod.Spec.Containers[0].Resources.Requests)
+		}
+		if pod.Spec.InitContainers[0].Resources.Requests != nil {
+			t.Errorf("expected initContainer Requests to remain nil when only limit-only resources are in Limits, got %v", pod.Spec.InitContainers[0].Resources.Requests)
+		}
+		if pod.Spec.Resources.Requests != nil {
+			t.Errorf("expected pod-level Requests to remain nil when only limit-only resources are in pod Limits, got %v", pod.Spec.Resources.Requests)
+		}
+	})
+
+	t.Run("container with cpu and swap limits only defaults cpu request and does not trigger pod-level request defaulting", func(t *testing.T) {
+		pod := &v1.Pod{
+			Spec: v1.PodSpec{
+				Resources: &v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourceSwap: resource.MustParse("2Gi"),
+					},
+				},
+				Containers: []v1.Container{
+					{
+						Name: "app",
+						Resources: v1.ResourceRequirements{
+							Limits: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("500m"),
+								v1.ResourceMemory: resource.MustParse("1Gi"),
+								v1.ResourceSwap:   resource.MustParse("1Gi"),
+							},
+						},
+					},
+				},
+			},
+		}
+		corev1.SetObjectDefaults_Pod(pod)
+
+		wantCtrReqs := v1.ResourceList{
+			v1.ResourceCPU:    resource.MustParse("500m"),
+			v1.ResourceMemory: resource.MustParse("1Gi"),
+		}
+		if !cmp.Equal(pod.Spec.Containers[0].Resources.Requests, wantCtrReqs) {
+			t.Errorf("unexpected container Requests (-want +got):\n%s", cmp.Diff(wantCtrReqs, pod.Spec.Containers[0].Resources.Requests))
+		}
+		if pod.Spec.Resources.Requests != nil {
+			t.Errorf("expected pod-level Requests to remain nil when pod.Spec.Resources only specifies swap limit, got %v", pod.Spec.Resources.Requests)
+		}
+	})
 }

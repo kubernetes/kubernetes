@@ -44,8 +44,11 @@ import (
 	"k8s.io/client-go/tools/record"
 	utiltesting "k8s.io/client-go/util/testing"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/klog/v2"
 	"k8s.io/ktesting"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/allocation/state"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/volume"
@@ -53,6 +56,7 @@ import (
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
+	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
 	"k8s.io/kubernetes/pkg/volume/util/types"
 	"k8s.io/mount-utils"
 )
@@ -324,7 +328,9 @@ func TestWaitForAttachAndMountVolumeAttachLimitExceededError(t *testing.T) {
 		&record.FakeRecorder{},
 		volumetest.NewBlockVolumePathHandler(),
 		nil,
-		0)
+		0,
+		nil,
+		nil)
 
 	tCtx := ktesting.Init(t)
 	sourcesReady := config.NewSourcesReady(func(_ sets.Set[string]) bool { return true })
@@ -531,7 +537,9 @@ func newTestVolumeManager(t *testing.T, tmpDir string, podManager kubepod.Manage
 		fakeRecorder,
 		fakePathHandler,
 		nil,
-		0)
+		0,
+		nil,
+		nil)
 
 	return vm
 }
@@ -916,13 +924,13 @@ func TestVolumeManager_ResizeEphemeralVolume(t *testing.T) {
 					Name: "vol1",
 					VolumeSource: v1.VolumeSource{
 						EmptyDir: &v1.EmptyDirVolumeSource{
-							Medium: v1.StorageMediumMemory,
+							Medium:    v1.StorageMediumMemory,
+							SizeLimit: &quantity200Mi,
 						},
 					},
 				},
 			},
 			isMounted:         false,
-			newSize:           &quantity200Mi,
 			expectedErrSubstr: "is not yet mounted; deferring resize",
 		},
 		{
@@ -932,13 +940,13 @@ func TestVolumeManager_ResizeEphemeralVolume(t *testing.T) {
 					Name: "vol1",
 					VolumeSource: v1.VolumeSource{
 						EmptyDir: &v1.EmptyDirVolumeSource{
-							Medium: v1.StorageMediumMemory,
+							Medium:    v1.StorageMediumMemory,
+							SizeLimit: &quantity200Mi,
 						},
 					},
 				},
 			},
 			isMounted:         true,
-			newSize:           &quantity200Mi,
 			expectedErrSubstr: "",
 			expectedMountOpts: []string{"remount", "size=209715200"},
 		},
@@ -949,13 +957,13 @@ func TestVolumeManager_ResizeEphemeralVolume(t *testing.T) {
 					Name: "vol1",
 					VolumeSource: v1.VolumeSource{
 						EmptyDir: &v1.EmptyDirVolumeSource{
-							Medium: v1.StorageMediumDefault,
+							Medium:    v1.StorageMediumDefault,
+							SizeLimit: &quantity200Mi,
 						},
 					},
 				},
 			},
 			isMounted:         false,
-			newSize:           &quantity200Mi,
 			expectedErrSubstr: "only memory-backed emptyDir volumes support direct resize",
 		},
 		{
@@ -971,14 +979,12 @@ func TestVolumeManager_ResizeEphemeralVolume(t *testing.T) {
 				},
 			},
 			isMounted:         false,
-			newSize:           &quantity200Mi,
 			expectedErrSubstr: "does not support direct resizing",
 		},
 		{
 			name:              "volume not found in pod spec (error path)",
 			volumes:           []v1.Volume{},
 			isMounted:         false,
-			newSize:           &quantity200Mi,
 			expectedErrSubstr: "volume vol1 not found in pod test-pod",
 		},
 	}
@@ -1034,10 +1040,12 @@ func TestVolumeManager_ResizeEphemeralVolume(t *testing.T) {
 				&record.FakeRecorder{},
 				volumetest.NewBlockVolumePathHandler(),
 				nil,
-				0)
+				0,
+				nil,
+				nil)
 
 			// Test ResizeEphemeralVolume
-			err = manager.ResizeEphemeralVolume(pod, "vol1", tt.newSize)
+			err = manager.ResizeEphemeralVolume(pod, "vol1")
 			if tt.expectedErrSubstr != "" {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.expectedErrSubstr)
@@ -1060,4 +1068,521 @@ func TestVolumeManager_ResizeEphemeralVolume(t *testing.T) {
 
 		})
 	}
+}
+
+func TestWaitForAttachAndMount_DynamicVolumes(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicNodeLocalEphemeralVolumes, true)
+	logger, tCtx := ktesting.NewTestContext(t)
+
+	tmpDir := t.TempDir()
+	plugMgr := &volume.VolumePluginMgr{}
+	fakeVolumeHost := volumetest.NewFakeKubeletVolumeHost(t, tmpDir, nil, nil)
+	require.NoError(t, plugMgr.InitPlugins(emptydir.ProbeVolumePlugins(), nil, fakeVolumeHost))
+
+	actuatedState := state.NewStateMemory(logger, nil, nil)
+	podManager := kubepod.NewBasicPodManager()
+
+	vm := NewVolumeManager(
+		true,
+		testHostname,
+		podManager,
+		&fakePodStateProvider{},
+		nil,
+		plugMgr,
+		mount.NewFakeMounter(nil),
+		hostutil.NewFakeHostUtil(nil),
+		tmpDir,
+		&record.FakeRecorder{},
+		volumetest.NewBlockVolumePathHandler(),
+		nil,
+		0,
+		actuatedState,
+		nil).(*volumeManager)
+
+	vol1 := v1.Volume{Name: "vol1", VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}}
+	vol2 := v1.Volume{Name: "vol2", VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}}
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "dyn-vm-pod",
+			Namespace: "default",
+			UID:       "dyn-vm-uid",
+		},
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{vol1},
+			Containers: []v1.Container{
+				{
+					Name:         "c1",
+					VolumeMounts: []v1.VolumeMount{{Name: "vol1", MountPath: "/mnt/vol1"}},
+				},
+			},
+		},
+	}
+
+	// Initial startup (actuatedPod not yet initialized): blocks and fails on timeout when vol1 is not mounted.
+	shortCtx, cancel := context.WithTimeout(tCtx, 50*time.Millisecond)
+	defer cancel()
+	require.Error(t, vm.WaitForAttachAndMount(shortCtx, pod))
+
+	// Simulate vol1 mounted in DSW/ASW and pod initialized in actuatedState.
+	uniquePodName := util.GetUniquePodName(pod)
+	volSpec1 := volume.NewSpecFromVolume(&vol1)
+	uniqueVol1, err := vm.desiredStateOfWorld.AddPodToVolume(logger, uniquePodName, pod, volSpec1, vol1.Name, "", nil)
+	require.NoError(t, err)
+	plugin1, err := plugMgr.FindPluginBySpec(volSpec1)
+	require.NoError(t, err)
+	mounter1, err := plugin1.NewMounter(volSpec1, pod)
+	require.NoError(t, err)
+	require.NoError(t, vm.actualStateOfWorld.MarkVolumeAsAttached(logger, uniqueVol1, volSpec1, testHostname, ""))
+	require.NoError(t, vm.actualStateOfWorld.MarkVolumeAsMounted(operationexecutor.MarkVolumeOpts{
+		PodName:          uniquePodName,
+		PodUID:           pod.UID,
+		Pod:              pod,
+		VolumeName:       uniqueVol1,
+		Mounter:          mounter1,
+		VolumeSpec:       volSpec1,
+		VolumeMountState: operationexecutor.VolumeMounted,
+	}))
+	require.NoError(t, actuatedState.SetPod(logger, pod))
+
+	// Dynamically add unmounted vol2 with dynamic container c2: WaitForAttachAndMount verifies vol1 and does not block on vol2.
+	updatedPod := pod.DeepCopy()
+	updatedPod.Spec.Volumes = []v1.Volume{vol1, vol2}
+	updatedPod.Spec.Containers = append(updatedPod.Spec.Containers, v1.Container{
+		Name:  "c2",
+		Image: "busybox",
+		VolumeMounts: []v1.VolumeMount{{
+			Name:      "vol2",
+			MountPath: "/mnt/vol2",
+		}},
+	})
+	shortCtx2, cancel2 := context.WithTimeout(tCtx, 50*time.Millisecond)
+	defer cancel2()
+	require.NoError(t, vm.WaitForAttachAndMount(shortCtx2, updatedPod))
+
+	// Post-reboot simulation: a pod with an actuated checkpoint and a raw-block PVC (VolumeDevices) or
+	// non-dynamic volume source that has not yet been remounted must still block WaitForAttachAndMount.
+	rawBlockPod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "raw-block-pod",
+			Namespace: "default",
+			UID:       "raw-block-uid",
+		},
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{
+				{
+					Name: "block-pvc",
+					VolumeSource: v1.VolumeSource{
+						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{ClaimName: "my-block-pvc"},
+					},
+				},
+			},
+			Containers: []v1.Container{
+				{
+					Name:          "c1",
+					VolumeDevices: []v1.VolumeDevice{{Name: "block-pvc", DevicePath: "/dev/xvda"}},
+				},
+			},
+		},
+	}
+	require.NoError(t, actuatedState.SetPod(logger, rawBlockPod))
+	shortCtx3, cancel3 := context.WithTimeout(tCtx, 50*time.Millisecond)
+	defer cancel3()
+	require.Error(t, vm.WaitForAttachAndMount(shortCtx3, rawBlockPod), "unmapped raw-block PVC must still block WaitForAttachAndMount after reboot")
+
+	// Likewise, a dynamic volume already recorded in actuatedState before a reboot must be remounted
+	// into actualStateOfWorld before WaitForAttachAndMount returns (mount vol1 first so the timeout
+	// specifically exercises vol2).
+	rebootedDynPod := updatedPod.DeepCopy()
+	rebootedDynPod.UID = "rebooted-dyn-uid"
+	rebootedUniquePodName := util.GetUniquePodName(rebootedDynPod)
+	rebootedUniqueVol1, err := vm.desiredStateOfWorld.AddPodToVolume(logger, rebootedUniquePodName, rebootedDynPod, volSpec1, vol1.Name, "", nil)
+	require.NoError(t, err)
+	rebootedMounter1, err := plugin1.NewMounter(volSpec1, rebootedDynPod)
+	require.NoError(t, err)
+	require.NoError(t, vm.actualStateOfWorld.MarkVolumeAsAttached(logger, rebootedUniqueVol1, volSpec1, testHostname, ""))
+	require.NoError(t, vm.actualStateOfWorld.MarkVolumeAsMounted(operationexecutor.MarkVolumeOpts{
+		PodName:          rebootedUniquePodName,
+		PodUID:           rebootedDynPod.UID,
+		Pod:              rebootedDynPod,
+		VolumeName:       rebootedUniqueVol1,
+		Mounter:          rebootedMounter1,
+		VolumeSpec:       volSpec1,
+		VolumeMountState: operationexecutor.VolumeMounted,
+	}))
+	require.NoError(t, actuatedState.SetPod(logger, podWithUID(pod, rebootedDynPod.UID)))
+	require.NoError(t, actuatedState.SetPodVolume(logger, rebootedDynPod.UID, vol2))
+	shortCtx4, cancel4 := context.WithTimeout(tCtx, 50*time.Millisecond)
+	defer cancel4()
+	require.Error(t, vm.WaitForAttachAndMount(shortCtx4, rebootedDynPod), "volume already recorded in actuatedState before reboot must be remounted")
+
+	// Ephemeral container referencing a volume absent from the allocated pod's Spec.Volumes (vol == nil)
+	// is skipped in WaitForAttachAndMount rather than blocking for 2 minutes, including when actuatedState
+	// has no entry yet or DynamicNodeLocalEphemeralVolumes is disabled (gate rollback).
+	podWithUnallocatedEphemeralMount := pod.DeepCopy()
+	podWithUnallocatedEphemeralMount.Spec.EphemeralContainers = []v1.EphemeralContainer{{
+		EphemeralContainerCommon: v1.EphemeralContainerCommon{
+			Name:         "ec-unallocated",
+			Image:        "busybox",
+			VolumeMounts: []v1.VolumeMount{{Name: "unallocated-vol", MountPath: "/mnt/unallocated"}},
+		},
+	}}
+	shortCtx5, cancel5 := context.WithTimeout(tCtx, 50*time.Millisecond)
+	defer cancel5()
+	require.NoError(t, vm.WaitForAttachAndMount(shortCtx5, podWithUnallocatedEphemeralMount))
+
+	// Verify gate-rollback and missing-actuatedPod paths also skip volumes absent from pod.Spec.Volumes.
+	require.NoError(t, actuatedState.RemovePod(logger, pod.UID))
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicNodeLocalEphemeralVolumes, false)
+	shortCtx5b, cancel5b := context.WithTimeout(tCtx, 50*time.Millisecond)
+	defer cancel5b()
+	require.NoError(t, vm.WaitForAttachAndMount(shortCtx5b, podWithUnallocatedEphemeralMount))
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicNodeLocalEphemeralVolumes, true)
+	require.NoError(t, actuatedState.SetPod(logger, pod))
+
+	// Dynamically added Image volume is not deferred in WaitForAttachAndMount so its no-op plugin
+	// SetUp populates actualStateOfWorld before kuberuntime calls makeMounts.
+	imgVol := v1.Volume{
+		Name:         "img-vol",
+		VolumeSource: v1.VolumeSource{Image: &v1.ImageVolumeSource{Reference: "registry.k8s.io/pause:3.10"}},
+	}
+	podWithImageVol := pod.DeepCopy()
+	podWithImageVol.Spec.Volumes = []v1.Volume{vol1, imgVol}
+	podWithImageVol.Spec.Containers = append(podWithImageVol.Spec.Containers, v1.Container{
+		Name:  "c-img",
+		Image: "busybox",
+		VolumeMounts: []v1.VolumeMount{{
+			Name:      "img-vol",
+			MountPath: "/mnt/img",
+		}},
+	})
+	shortCtx6, cancel6 := context.WithTimeout(tCtx, 50*time.Millisecond)
+	defer cancel6()
+	require.Error(t, vm.WaitForAttachAndMount(shortCtx6, podWithImageVol), "Image volume must not be skipped before actualStateOfWorld has its entry")
+}
+
+func podWithUID(p *v1.Pod, uid kubetypes.UID) *v1.Pod {
+	cp := p.DeepCopy()
+	cp.UID = uid
+	return cp
+}
+
+func TestGetPodVolumeStatuses(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	tmpDir := t.TempDir()
+
+	plugMgr := &volume.VolumePluginMgr{}
+	fakeVolumeHost := volumetest.NewFakeKubeletVolumeHost(t, tmpDir, nil, nil)
+	require.NoError(t, plugMgr.InitPlugins(emptydir.ProbeVolumePlugins(), nil, fakeVolumeHost))
+
+	actuatedState, err := state.NewStateCheckpoint(logger, tmpDir, "test_actuated_state_status", nil)
+	require.NoError(t, err)
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-pod",
+			Namespace: "default",
+			UID:       "pod-uid-status-1",
+		},
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{
+				{
+					Name: "vol-mounted",
+					VolumeSource: v1.VolumeSource{
+						EmptyDir: &v1.EmptyDirVolumeSource{},
+					},
+				},
+				{
+					Name: "vol-pending",
+					VolumeSource: v1.VolumeSource{
+						EmptyDir: &v1.EmptyDirVolumeSource{},
+					},
+				},
+				{
+					Name: "vol-hostpath",
+					VolumeSource: v1.VolumeSource{
+						HostPath: &v1.HostPathVolumeSource{Path: "/tmp/host"},
+					},
+				},
+				{
+					Name: "vol-unreferenced",
+					VolumeSource: v1.VolumeSource{
+						EmptyDir: &v1.EmptyDirVolumeSource{},
+					},
+				},
+			},
+			Containers: []v1.Container{
+				{
+					Name:  "c1",
+					Image: "busybox",
+					VolumeMounts: []v1.VolumeMount{
+						{Name: "vol-hostpath", MountPath: "/mnt/host"},
+					},
+				},
+				{
+					Name:  "c-mounted",
+					Image: "busybox",
+					VolumeMounts: []v1.VolumeMount{
+						{Name: "vol-mounted", MountPath: "/mnt/mounted"},
+					},
+				},
+				{
+					Name:  "c-pending",
+					Image: "busybox",
+					VolumeMounts: []v1.VolumeMount{
+						{Name: "vol-pending", MountPath: "/mnt/pending"},
+					},
+				},
+			},
+		},
+	}
+
+	desiredPod := pod.DeepCopy()
+	desiredPod.Spec.Volumes = append(desiredPod.Spec.Volumes,
+		v1.Volume{
+			Name: "vol-deferred",
+			VolumeSource: v1.VolumeSource{
+				ConfigMap: &v1.ConfigMapVolumeSource{LocalObjectReference: v1.LocalObjectReference{Name: "cm-deferred"}},
+			},
+		},
+		v1.Volume{
+			Name: "vol-deferred-unreferenced",
+			VolumeSource: v1.VolumeSource{
+				EmptyDir: &v1.EmptyDirVolumeSource{},
+			},
+		},
+		v1.Volume{
+			Name: "vol-desired-hostpath",
+			VolumeSource: v1.VolumeSource{
+				HostPath: &v1.HostPathVolumeSource{Path: "/tmp/desired-host"},
+			},
+		},
+	)
+	desiredPod.Spec.Containers = append(desiredPod.Spec.Containers, v1.Container{
+		Name:  "c-deferred",
+		Image: "busybox",
+		VolumeMounts: []v1.VolumeMount{{
+			Name:      "vol-deferred",
+			MountPath: "/mnt/deferred",
+		}},
+	})
+
+	podManager := kubepod.NewBasicPodManager()
+	podManager.SetPods([]*v1.Pod{pod})
+
+	var syncNotified []kubetypes.UID
+	vm := NewVolumeManager(
+		true,
+		testHostname,
+		podManager,
+		&fakePodStateProvider{},
+		nil,
+		plugMgr,
+		fakeVolumeHost.GetMounter(),
+		hostutil.NewFakeHostUtil(nil),
+		tmpDir,
+		&record.FakeRecorder{},
+		volumetest.NewBlockVolumePathHandler(),
+		nil,
+		0,
+		actuatedState,
+		func(_ klog.Logger, podUID kubetypes.UID) {
+			syncNotified = append(syncNotified, podUID)
+		},
+	).(*volumeManager)
+
+	// Record initial pod (without Spec.Volumes, matching KeepOnlyResourceValues) and mount vol-mounted via SetPodVolume.
+	vmState := vm.actuatedState.(state.State)
+	initialPod := pod.DeepCopy()
+	initialPod.Spec.Volumes = nil
+	require.NoError(t, vmState.SetPod(logger, initialPod))
+	require.NoError(t, vmState.SetContainer(logger, pod.UID, podutil.Containers, pod.Spec.Containers[1]))
+	require.NoError(t, vmState.SetPodVolume(logger, pod.UID, pod.Spec.Volumes[0]))
+	require.Equal(t, []kubetypes.UID{pod.UID}, syncNotified, "first SetPodVolume should notify pod sync")
+
+	// Remounting an already-recorded volume must not re-trigger pod sync.
+	require.NoError(t, vmState.SetPodVolume(logger, pod.UID, pod.Spec.Volumes[0]))
+	require.Equal(t, []kubetypes.UID{pod.UID}, syncNotified, "remount of already-recorded volume should not notify pod sync")
+
+	require.NoError(t, actuatedState.SetPodVolume(logger, pod.UID, pod.Spec.Volumes[2]))
+
+	statuses := vm.GetPodVolumeStatuses(pod, desiredPod, false)
+	expected := []v1.PodVolumeStatus{
+		{
+			Name:      "vol-deferred",
+			HostPhase: v1.PodVolumeHostPending,
+		},
+		{
+			Name:      "vol-mounted",
+			HostPhase: v1.PodVolumeHostMounted,
+		},
+		{
+			Name:      "vol-pending",
+			HostPhase: v1.PodVolumeHostPending,
+		},
+	}
+	require.Equal(t, expected, statuses)
+
+	// For a terminal pod, only dynamic volumes still mounted in actuatedState are reported (as Unmounting);
+	// unmounted and deferred volumes are omitted rather than reported as Pending.
+	require.Equal(t, []v1.PodVolumeStatus{
+		{Name: "vol-mounted", HostPhase: v1.PodVolumeHostUnmounting},
+	}, vm.GetPodVolumeStatuses(pod, desiredPod, true))
+
+	// If desiredPod removes c-mounted and vol-mounted while allocation is deferred (allocatedPod still retains them),
+	// HostPhase remains HostMounted rather than transitioning to Unmounting prematurely.
+	deferredRemoveDesired := pod.DeepCopy()
+	deferredRemoveDesired.Spec.Volumes = deferredRemoveDesired.Spec.Volumes[1:]
+	deferredRemoveDesired.Spec.Containers = []v1.Container{pod.Spec.Containers[0], pod.Spec.Containers[2]}
+	require.Equal(t, []v1.PodVolumeStatus{
+		{Name: "vol-mounted", HostPhase: v1.PodVolumeHostMounted},
+		{Name: "vol-pending", HostPhase: v1.PodVolumeHostPending},
+	}, vm.GetPodVolumeStatuses(pod, deferredRemoveDesired, false))
+
+	// Jointly remove c-mounted and vol-mounted from allocatedPod while vol-mounted is still in actuatedState -> Unmounting.
+	podAfterRemove := pod.DeepCopy()
+	podAfterRemove.Spec.Volumes = podAfterRemove.Spec.Volumes[1:]
+	podAfterRemove.Spec.Containers = []v1.Container{pod.Spec.Containers[0], pod.Spec.Containers[2]}
+
+	statusesAfterRemove := vm.GetPodVolumeStatuses(podAfterRemove, podAfterRemove, false)
+	expectedAfterRemove := []v1.PodVolumeStatus{
+		{
+			Name:      "vol-mounted",
+			HostPhase: v1.PodVolumeHostUnmounting,
+		},
+		{
+			Name:      "vol-pending",
+			HostPhase: v1.PodVolumeHostPending,
+		},
+	}
+	require.Equal(t, expectedAfterRemove, statusesAfterRemove)
+
+	// Once removed container c-mounted stops (clearing its actuated mounts) and ASOW removes vol-mounted from actuatedState -> pruned, and pod sync fires.
+	require.NoError(t, vmState.SetContainer(logger, pod.UID, podutil.Containers, v1.Container{Name: "c-mounted", Image: "busybox"}))
+	require.NoError(t, vmState.RemovePodVolume(logger, pod.UID, "vol-mounted"))
+	require.Equal(t, []kubetypes.UID{pod.UID, pod.UID}, syncNotified, "RemovePodVolume of mounted volume should notify pod sync")
+
+	// Removing an already-absent volume must not re-trigger pod sync.
+	require.NoError(t, vmState.RemovePodVolume(logger, pod.UID, "vol-mounted"))
+	require.Equal(t, []kubetypes.UID{pod.UID, pod.UID}, syncNotified)
+
+	statusesAfterTeardown := vm.GetPodVolumeStatuses(podAfterRemove, podAfterRemove, false)
+	expectedAfterTeardown := []v1.PodVolumeStatus{
+		{
+			Name:      "vol-pending",
+			HostPhase: v1.PodVolumeHostPending,
+		},
+	}
+	require.Equal(t, expectedAfterTeardown, statusesAfterTeardown)
+
+	// Once all dynamic volumes are removed from actuatedState, a terminal pod reports nil VolumeStatuses.
+	require.Nil(t, vm.GetPodVolumeStatuses(podAfterRemove, podAfterRemove, true))
+
+	// A never-actuated dynamic volume (e.g. failed Secret/ConfigMap SetUp or unpulled Image volume)
+	// that is still present in DSW or ASW when removed with its dynamic container from allocatedPod
+	// must report Unmounting until cleared from both DSW and ASW, firing triggerPodSync as DSW and ASW release it.
+	pendingVolSpec := volume.NewSpecFromVolume(&podAfterRemove.Spec.Volumes[0])
+	uniquePodName := util.GetUniquePodName(podAfterRemove)
+	uniqueVolName, err := vm.desiredStateOfWorld.AddPodToVolume(logger, uniquePodName, podAfterRemove, pendingVolSpec, pendingVolSpec.Name(), "", nil)
+	require.NoError(t, err)
+	require.NoError(t, vm.actualStateOfWorld.MarkVolumeAsAttached(logger, uniqueVolName, pendingVolSpec, testHostname, ""))
+
+	podWithoutPending := podAfterRemove.DeepCopy()
+	podWithoutPending.Spec.Volumes = podWithoutPending.Spec.Volumes[1:]
+	podWithoutPending.Spec.Containers = []v1.Container{pod.Spec.Containers[0]}
+
+	prevNotified := len(syncNotified)
+	require.Equal(t, []v1.PodVolumeStatus{
+		{Name: "vol-pending", HostPhase: v1.PodVolumeHostUnmounting},
+	}, vm.GetPodVolumeStatuses(podWithoutPending, podWithoutPending, false))
+
+	vm.desiredStateOfWorld.DeletePodFromVolume(uniquePodName, uniqueVolName)
+	require.Len(t, syncNotified, prevNotified+1, "DeletePodFromVolume of dynamic volume should notify pod sync")
+	require.Equal(t, []v1.PodVolumeStatus{
+		{Name: "vol-pending", HostPhase: v1.PodVolumeHostUnmounting},
+	}, vm.GetPodVolumeStatuses(podWithoutPending, podWithoutPending, false), "volume still in ASW must stay Unmounting")
+
+	require.NoError(t, vm.actualStateOfWorld.DeleteVolume(uniqueVolName))
+	require.Len(t, syncNotified, prevNotified+2, "DeleteVolume of pod-scoped dynamic volume should notify pod sync")
+	require.Nil(t, vm.GetPodVolumeStatuses(podWithoutPending, podWithoutPending, false))
+
+	// Edge case 1: An unreferenced Pending volume still present in pod.Spec.Volumes continues reporting
+	// Pending while tracked in DSW or ASW so apiserver validation does not allow premature name reuse.
+	podUnrefPending := podWithoutPending.DeepCopy()
+	podUnrefPending.Spec.Volumes = []v1.Volume{{
+		Name:         "vol-unref-pending",
+		VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}},
+	}}
+	require.Nil(t, vm.GetPodVolumeStatuses(podUnrefPending, podUnrefPending, false), "unreferenced volume not in DSW/ASW is omitted")
+
+	unrefSpec := volume.NewSpecFromVolume(&podUnrefPending.Spec.Volumes[0])
+	unrefUniqueVol, err := vm.desiredStateOfWorld.AddPodToVolume(logger, uniquePodName, podUnrefPending, unrefSpec, unrefSpec.Name(), "", nil)
+	require.NoError(t, err)
+	require.Equal(t, []v1.PodVolumeStatus{
+		{Name: "vol-unref-pending", HostPhase: v1.PodVolumeHostPending},
+	}, vm.GetPodVolumeStatuses(podUnrefPending, podUnrefPending, false), "unreferenced volume still in DSW must report Pending")
+	vm.desiredStateOfWorld.DeletePodFromVolume(uniquePodName, unrefUniqueVol)
+
+	// Edge case 2: An already-allocated unreferenced volume whose first dynamic container volumeMount
+	// arrives alongside a deferred allocation (desiredPod != allocatedPod) must emit Pending status.
+	desiredMountingUnref := podUnrefPending.DeepCopy()
+	desiredMountingUnref.Spec.Containers = append(desiredMountingUnref.Spec.Containers, v1.Container{
+		Name:  "c-unref",
+		Image: "busybox",
+		VolumeMounts: []v1.VolumeMount{{
+			Name:      "vol-unref-pending",
+			MountPath: "/mnt/unref",
+		}},
+	})
+	require.Equal(t, []v1.PodVolumeStatus{
+		{Name: "vol-unref-pending", HostPhase: v1.PodVolumeHostPending},
+	}, vm.GetPodVolumeStatuses(podUnrefPending, desiredMountingUnref, false))
+
+	// Edge case 3: An OCI Image volume mounted by an actuated container while absent from
+	// actuatedPod.Spec.Volumes (e.g. a V2 checkpoint whose container started with the gate disabled)
+	// must still report HostPhase Mounted once the gate is enabled.
+	podGateUpgradeImg := podWithoutPending.DeepCopy()
+	podGateUpgradeImg.Spec.Volumes = []v1.Volume{{
+		Name:         "vol-img-v2",
+		VolumeSource: v1.VolumeSource{Image: &v1.ImageVolumeSource{Reference: "busybox:latest"}},
+	}}
+	podGateUpgradeImg.Spec.Containers = []v1.Container{{
+		Name:         "c-img-v2",
+		Image:        "busybox",
+		VolumeMounts: []v1.VolumeMount{{Name: "vol-img-v2", MountPath: "/img"}},
+	}}
+	require.NoError(t, vmState.SetContainer(logger, podGateUpgradeImg.UID, podutil.Containers, podGateUpgradeImg.Spec.Containers[0]))
+	require.Equal(t, []v1.PodVolumeStatus{
+		{Name: "vol-img-v2", HostPhase: v1.PodVolumeHostMounted},
+	}, vm.GetPodVolumeStatuses(podGateUpgradeImg, podGateUpgradeImg, false))
+
+	// Edge case 4: Sharing NewNotifyingActuatedState between kuberuntime and NewVolumeManager
+	// triggers pod sync once when kuberuntime records an OCI Image volume (no double-wrapping).
+	var sharedNotified []kubetypes.UID
+	sharedTrigger := func(_ klog.Logger, uid kubetypes.UID) {
+		sharedNotified = append(sharedNotified, uid)
+	}
+	sharedState := NewNotifyingActuatedState(state.NewStateMemory(logger, nil, nil), sharedTrigger)
+	_ = NewVolumeManager(
+		true,
+		testHostname,
+		podManager,
+		&fakePodStateProvider{},
+		nil,
+		plugMgr,
+		fakeVolumeHost.GetMounter(),
+		hostutil.NewFakeHostUtil(nil),
+		tmpDir,
+		&record.FakeRecorder{},
+		volumetest.NewBlockVolumePathHandler(),
+		nil,
+		0,
+		sharedState,
+		sharedTrigger,
+	)
+	require.NoError(t, sharedState.SetPodVolume(logger, podGateUpgradeImg.UID, podGateUpgradeImg.Spec.Volumes[0]))
+	require.Equal(t, []kubetypes.UID{podGateUpgradeImg.UID}, sharedNotified, "kuberuntime SetPodVolume must trigger pod sync exactly once")
+	require.NoError(t, sharedState.SetPodVolume(logger, podGateUpgradeImg.UID, podGateUpgradeImg.Spec.Volumes[0]))
+	require.Len(t, sharedNotified, 1, "re-recording an already-actuated volume must not re-trigger pod sync")
+	require.NoError(t, sharedState.RemovePodVolume(logger, podGateUpgradeImg.UID, "vol-img-v2"))
+	require.Len(t, sharedNotified, 2, "removing an actuated volume must trigger pod sync once")
 }

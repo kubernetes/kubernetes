@@ -301,6 +301,25 @@ func TestSyncStatus(t *testing.T) {
 			expectedConditions:    []v1.PodCondition{{Type: v1.PodScheduled, Status: v1.ConditionTrue}},
 		},
 		{
+			name: "Condition ObservedGeneration needs update",
+			oldPodStatus: &v1.PodStatus{
+				NominatedNodeName: "node-a",
+				Conditions: []v1.PodCondition{
+					{
+						Type:               v1.SchedulerEvaluationCompleted,
+						Status:             v1.ConditionTrue,
+						Reason:             v1.PodReasonDeferredPodResize,
+						ObservedGeneration: 1,
+					},
+				},
+			},
+			conditions:            []*v1.PodCondition{{Type: v1.SchedulerEvaluationCompleted, Status: v1.ConditionTrue, Reason: v1.PodReasonDeferredPodResize, ObservedGeneration: 2}},
+			nominatingInfo:        &fwk.NominatingInfo{NominatedNodeName: "node-a", NominatingMode: fwk.ModeNoop},
+			expectUpdated:         true,
+			expectedNominatedNode: "node-a",
+			expectedConditions:    []v1.PodCondition{{Type: v1.SchedulerEvaluationCompleted, Status: v1.ConditionTrue, Reason: v1.PodReasonDeferredPodResize, ObservedGeneration: 2}},
+		},
+		{
 			name: "Nominated node name needs update",
 			oldPodStatus: &v1.PodStatus{
 				NominatedNodeName: "node-a",

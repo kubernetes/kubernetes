@@ -2,9 +2,9 @@
 
 module k8s.io/cri-streaming
 
-go 1.27.0
+go 1.26.0
 
-godebug default=go1.27
+godebug default=go1.26
 
 require (
 	github.com/emicklei/go-restful/v3 v3.14.0

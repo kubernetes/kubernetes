@@ -40,6 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	appsvalidation "k8s.io/kubernetes/pkg/apis/apps/validation"
+	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/features"
 )
 
@@ -95,6 +96,7 @@ func (rsStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object)
 	newRS.Status = oldRS.Status
 
 	pod.DropDisabledTemplateFields(&newRS.Spec.Template, &oldRS.Spec.Template)
+	pod.SyncPodNetworkOnTemplateUpdate(&newRS.Spec.Template, &oldRS.Spec.Template)
 
 	// Any changes to the spec increment the generation number, any changes to the
 	// status should reflect the generation number of the corresponding object. We push
@@ -112,7 +114,7 @@ func (rsStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object)
 // Validate validates a new ReplicaSet.
 func (rsStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	rs := obj.(*apps.ReplicaSet)
-	opts := pod.GetValidationOptionsFromPodTemplate(&rs.Spec.Template, nil)
+	opts := corevalidation.GetValidationOptionsFromPodTemplate(&rs.Spec.Template, nil)
 	return appsvalidation.ValidateReplicaSet(rs, opts)
 }
 
@@ -142,7 +144,7 @@ func (rsStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) f
 	newReplicaSet := obj.(*apps.ReplicaSet)
 	oldReplicaSet := old.(*apps.ReplicaSet)
 
-	opts := pod.GetValidationOptionsFromPodTemplate(&newReplicaSet.Spec.Template, &oldReplicaSet.Spec.Template)
+	opts := corevalidation.GetValidationOptionsFromPodTemplate(&newReplicaSet.Spec.Template, &oldReplicaSet.Spec.Template)
 	return appsvalidation.ValidateReplicaSetUpdate(newReplicaSet, oldReplicaSet, opts)
 }
 

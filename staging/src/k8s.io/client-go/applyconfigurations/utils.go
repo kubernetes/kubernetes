@@ -316,6 +316,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsappsv1.DeploymentApplyConfiguration{}
 	case appsv1.SchemeGroupVersion.WithKind("DeploymentCondition"):
 		return &applyconfigurationsappsv1.DeploymentConditionApplyConfiguration{}
+	case appsv1.SchemeGroupVersion.WithKind("DeploymentSchedulingConfiguration"):
+		return &applyconfigurationsappsv1.DeploymentSchedulingConfigurationApplyConfiguration{}
 	case appsv1.SchemeGroupVersion.WithKind("DeploymentSpec"):
 		return &applyconfigurationsappsv1.DeploymentSpecApplyConfiguration{}
 	case appsv1.SchemeGroupVersion.WithKind("DeploymentStatus"):
@@ -358,6 +360,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsappsv1beta1.DeploymentApplyConfiguration{}
 	case appsv1beta1.SchemeGroupVersion.WithKind("DeploymentCondition"):
 		return &applyconfigurationsappsv1beta1.DeploymentConditionApplyConfiguration{}
+	case appsv1beta1.SchemeGroupVersion.WithKind("DeploymentSchedulingConfiguration"):
+		return &applyconfigurationsappsv1beta1.DeploymentSchedulingConfigurationApplyConfiguration{}
 	case appsv1beta1.SchemeGroupVersion.WithKind("DeploymentSpec"):
 		return &applyconfigurationsappsv1beta1.DeploymentSpecApplyConfiguration{}
 	case appsv1beta1.SchemeGroupVersion.WithKind("DeploymentStatus"):
@@ -402,6 +406,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &appsv1beta2.DeploymentApplyConfiguration{}
 	case v1beta2.SchemeGroupVersion.WithKind("DeploymentCondition"):
 		return &appsv1beta2.DeploymentConditionApplyConfiguration{}
+	case v1beta2.SchemeGroupVersion.WithKind("DeploymentSchedulingConfiguration"):
+		return &appsv1beta2.DeploymentSchedulingConfigurationApplyConfiguration{}
 	case v1beta2.SchemeGroupVersion.WithKind("DeploymentSpec"):
 		return &appsv1beta2.DeploymentSpecApplyConfiguration{}
 	case v1beta2.SchemeGroupVersion.WithKind("DeploymentStatus"):
@@ -636,6 +642,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.CephFSPersistentVolumeSourceApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("CephFSVolumeSource"):
 		return &applyconfigurationscorev1.CephFSVolumeSourceApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("CgroupOptions"):
+		return &applyconfigurationscorev1.CgroupOptionsApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("CinderPersistentVolumeSource"):
 		return &applyconfigurationscorev1.CinderPersistentVolumeSourceApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("CinderVolumeSource"):
@@ -730,6 +738,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.EvictionResponderApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("ExecAction"):
 		return &applyconfigurationscorev1.ExecActionApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("ExtraNodeAllocatableResource"):
+		return &applyconfigurationscorev1.ExtraNodeAllocatableResourceApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("FCVolumeSource"):
 		return &applyconfigurationscorev1.FCVolumeSourceApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("FileKeySelector"):
@@ -808,12 +818,6 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.NodeAddressApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("NodeAffinity"):
 		return &applyconfigurationscorev1.NodeAffinityApplyConfiguration{}
-	case corev1.SchemeGroupVersion.WithKind("NodeAllocatableMappedResources"):
-		return &applyconfigurationscorev1.NodeAllocatableMappedResourcesApplyConfiguration{}
-	case corev1.SchemeGroupVersion.WithKind("NodeAllocatableOverheadResources"):
-		return &applyconfigurationscorev1.NodeAllocatableOverheadResourcesApplyConfiguration{}
-	case corev1.SchemeGroupVersion.WithKind("NodeAllocatableResourceClaimStatus"):
-		return &applyconfigurationscorev1.NodeAllocatableResourceClaimStatusApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("NodeCondition"):
 		return &applyconfigurationscorev1.NodeConditionApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("NodeConfigSource"):
@@ -912,8 +916,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.PodTemplateApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("PodTemplateSpec"):
 		return &applyconfigurationscorev1.PodTemplateSpecApplyConfiguration{}
-	case corev1.SchemeGroupVersion.WithKind("PodVolumeHealth"):
-		return &applyconfigurationscorev1.PodVolumeHealthApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("PodVolumeStatus"):
+		return &applyconfigurationscorev1.PodVolumeStatusApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("PortStatus"):
 		return &applyconfigurationscorev1.PortStatusApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("PortworxVolumeSource"):
@@ -980,6 +984,10 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.SecretVolumeSourceApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("SecurityContext"):
 		return &applyconfigurationscorev1.SecurityContextApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("SecurityProfileOCI"):
+		return &applyconfigurationscorev1.SecurityProfileOCIApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("SecurityProfileOCIBase"):
+		return &applyconfigurationscorev1.SecurityProfileOCIBaseApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("SELinuxOptions"):
 		return &applyconfigurationscorev1.SELinuxOptionsApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("Service"):
@@ -1108,6 +1116,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsextensionsv1beta1.DeploymentApplyConfiguration{}
 	case extensionsv1beta1.SchemeGroupVersion.WithKind("DeploymentCondition"):
 		return &applyconfigurationsextensionsv1beta1.DeploymentConditionApplyConfiguration{}
+	case extensionsv1beta1.SchemeGroupVersion.WithKind("DeploymentSchedulingConfiguration"):
+		return &applyconfigurationsextensionsv1beta1.DeploymentSchedulingConfigurationApplyConfiguration{}
 	case extensionsv1beta1.SchemeGroupVersion.WithKind("DeploymentSpec"):
 		return &applyconfigurationsextensionsv1beta1.DeploymentSpecApplyConfiguration{}
 	case extensionsv1beta1.SchemeGroupVersion.WithKind("DeploymentStatus"):
@@ -1636,8 +1646,14 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsresourcev1.CELDeviceSelectorApplyConfiguration{}
 	case resourcev1.SchemeGroupVersion.WithKind("Counter"):
 		return &applyconfigurationsresourcev1.CounterApplyConfiguration{}
+	case resourcev1.SchemeGroupVersion.WithKind("CounterRequirement"):
+		return &applyconfigurationsresourcev1.CounterRequirementApplyConfiguration{}
 	case resourcev1.SchemeGroupVersion.WithKind("CounterSet"):
 		return &applyconfigurationsresourcev1.CounterSetApplyConfiguration{}
+	case resourcev1.SchemeGroupVersion.WithKind("CounterSetConsumption"):
+		return &applyconfigurationsresourcev1.CounterSetConsumptionApplyConfiguration{}
+	case resourcev1.SchemeGroupVersion.WithKind("CounterValueFrom"):
+		return &applyconfigurationsresourcev1.CounterValueFromApplyConfiguration{}
 	case resourcev1.SchemeGroupVersion.WithKind("Device"):
 		return &applyconfigurationsresourcev1.DeviceApplyConfiguration{}
 	case resourcev1.SchemeGroupVersion.WithKind("DeviceAllocationConfiguration"):
@@ -1688,6 +1704,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsresourcev1.DeviceTolerationApplyConfiguration{}
 	case resourcev1.SchemeGroupVersion.WithKind("ExactDeviceRequest"):
 		return &applyconfigurationsresourcev1.ExactDeviceRequestApplyConfiguration{}
+	case resourcev1.SchemeGroupVersion.WithKind("ExtendedResourceRequest"):
+		return &applyconfigurationsresourcev1.ExtendedResourceRequestApplyConfiguration{}
 	case resourcev1.SchemeGroupVersion.WithKind("NetworkDeviceData"):
 		return &applyconfigurationsresourcev1.NetworkDeviceDataApplyConfiguration{}
 	case resourcev1.SchemeGroupVersion.WithKind("NodeAllocatableMapping"):
@@ -1760,8 +1778,14 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsresourcev1beta1.CELDeviceSelectorApplyConfiguration{}
 	case resourcev1beta1.SchemeGroupVersion.WithKind("Counter"):
 		return &applyconfigurationsresourcev1beta1.CounterApplyConfiguration{}
+	case resourcev1beta1.SchemeGroupVersion.WithKind("CounterRequirement"):
+		return &applyconfigurationsresourcev1beta1.CounterRequirementApplyConfiguration{}
 	case resourcev1beta1.SchemeGroupVersion.WithKind("CounterSet"):
 		return &applyconfigurationsresourcev1beta1.CounterSetApplyConfiguration{}
+	case resourcev1beta1.SchemeGroupVersion.WithKind("CounterSetConsumption"):
+		return &applyconfigurationsresourcev1beta1.CounterSetConsumptionApplyConfiguration{}
+	case resourcev1beta1.SchemeGroupVersion.WithKind("CounterValueFrom"):
+		return &applyconfigurationsresourcev1beta1.CounterValueFromApplyConfiguration{}
 	case resourcev1beta1.SchemeGroupVersion.WithKind("Device"):
 		return &applyconfigurationsresourcev1beta1.DeviceApplyConfiguration{}
 	case resourcev1beta1.SchemeGroupVersion.WithKind("DeviceAllocationConfiguration"):
@@ -1802,6 +1826,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsresourcev1beta1.DeviceTaintApplyConfiguration{}
 	case resourcev1beta1.SchemeGroupVersion.WithKind("DeviceToleration"):
 		return &applyconfigurationsresourcev1beta1.DeviceTolerationApplyConfiguration{}
+	case resourcev1beta1.SchemeGroupVersion.WithKind("ExtendedResourceRequest"):
+		return &applyconfigurationsresourcev1beta1.ExtendedResourceRequestApplyConfiguration{}
 	case resourcev1beta1.SchemeGroupVersion.WithKind("NetworkDeviceData"):
 		return &applyconfigurationsresourcev1beta1.NetworkDeviceDataApplyConfiguration{}
 	case resourcev1beta1.SchemeGroupVersion.WithKind("NodeAllocatableMapping"):
@@ -1846,8 +1872,14 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsresourcev1beta2.CELDeviceSelectorApplyConfiguration{}
 	case resourcev1beta2.SchemeGroupVersion.WithKind("Counter"):
 		return &applyconfigurationsresourcev1beta2.CounterApplyConfiguration{}
+	case resourcev1beta2.SchemeGroupVersion.WithKind("CounterRequirement"):
+		return &applyconfigurationsresourcev1beta2.CounterRequirementApplyConfiguration{}
 	case resourcev1beta2.SchemeGroupVersion.WithKind("CounterSet"):
 		return &applyconfigurationsresourcev1beta2.CounterSetApplyConfiguration{}
+	case resourcev1beta2.SchemeGroupVersion.WithKind("CounterSetConsumption"):
+		return &applyconfigurationsresourcev1beta2.CounterSetConsumptionApplyConfiguration{}
+	case resourcev1beta2.SchemeGroupVersion.WithKind("CounterValueFrom"):
+		return &applyconfigurationsresourcev1beta2.CounterValueFromApplyConfiguration{}
 	case resourcev1beta2.SchemeGroupVersion.WithKind("Device"):
 		return &applyconfigurationsresourcev1beta2.DeviceApplyConfiguration{}
 	case resourcev1beta2.SchemeGroupVersion.WithKind("DeviceAllocationConfiguration"):
@@ -1898,6 +1930,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsresourcev1beta2.DeviceTolerationApplyConfiguration{}
 	case resourcev1beta2.SchemeGroupVersion.WithKind("ExactDeviceRequest"):
 		return &applyconfigurationsresourcev1beta2.ExactDeviceRequestApplyConfiguration{}
+	case resourcev1beta2.SchemeGroupVersion.WithKind("ExtendedResourceRequest"):
+		return &applyconfigurationsresourcev1beta2.ExtendedResourceRequestApplyConfiguration{}
 	case resourcev1beta2.SchemeGroupVersion.WithKind("NetworkDeviceData"):
 		return &applyconfigurationsresourcev1beta2.NetworkDeviceDataApplyConfiguration{}
 	case resourcev1beta2.SchemeGroupVersion.WithKind("NodeAllocatableMapping"):
@@ -2050,6 +2084,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsstoragev1.CSINodeApplyConfiguration{}
 	case storagev1.SchemeGroupVersion.WithKind("CSINodeDriver"):
 		return &applyconfigurationsstoragev1.CSINodeDriverApplyConfiguration{}
+	case storagev1.SchemeGroupVersion.WithKind("CSINodeDriverRegistration"):
+		return &applyconfigurationsstoragev1.CSINodeDriverRegistrationApplyConfiguration{}
 	case storagev1.SchemeGroupVersion.WithKind("CSINodeSpec"):
 		return &applyconfigurationsstoragev1.CSINodeSpecApplyConfiguration{}
 	case storagev1.SchemeGroupVersion.WithKind("CSINodeStatus"):
@@ -2104,6 +2140,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsstoragev1beta1.CSINodeApplyConfiguration{}
 	case storagev1beta1.SchemeGroupVersion.WithKind("CSINodeDriver"):
 		return &applyconfigurationsstoragev1beta1.CSINodeDriverApplyConfiguration{}
+	case storagev1beta1.SchemeGroupVersion.WithKind("CSINodeDriverRegistration"):
+		return &applyconfigurationsstoragev1beta1.CSINodeDriverRegistrationApplyConfiguration{}
 	case storagev1beta1.SchemeGroupVersion.WithKind("CSINodeSpec"):
 		return &applyconfigurationsstoragev1beta1.CSINodeSpecApplyConfiguration{}
 	case storagev1beta1.SchemeGroupVersion.WithKind("CSINodeStatus"):

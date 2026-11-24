@@ -20,10 +20,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	goruntime "runtime"
 	"sort"
 	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
+	"weak"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -53,6 +56,31 @@ type lwDoesNotSupportWatchListSemantics struct{ fakeListWatcher }
 func (lw *lwDoesNotSupportWatchListSemantics) IsWatchListSemanticsUnSupported() bool { return true }
 
 type lwNoWatchListSemanticsUnSupportedExposed struct{ fakeListWatcher }
+
+func TestWatchListStopsWatcherOnReplaceError(t *testing.T) {
+	logger, ctx := ktesting.NewTestContext(t)
+	clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.WatchListClient, true)
+	w := watch.NewFakeWithOptions(watch.FakeOptions{Logger: &logger, ChannelSize: 2})
+	w.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod", ResourceVersion: "1"}})
+	w.Action(watch.Bookmark, &v1.Pod{ObjectMeta: metav1.ObjectMeta{
+		ResourceVersion: "1",
+		Annotations:     map[string]string{metav1.InitialEventsAnnotationKey: "true"},
+	}})
+
+	store := NewStore(func(interface{}) (string, error) { return "", errors.New("store key unavailable") })
+	lw := &ListWatch{
+		WatchFunc: func(metav1.ListOptions) (watch.Interface, error) {
+			return w, nil
+		},
+		ListFunc: func(metav1.ListOptions) (runtime.Object, error) {
+			return nil, errors.New("fallback list failed")
+		},
+	}
+	r := NewReflectorWithOptions(lw, &v1.Pod{}, store, ReflectorOptions{})
+
+	require.Error(t, r.ListAndWatchWithContext(ctx))
+	require.True(t, w.IsStopped(), "watcher must be stopped after Replace fails")
+}
 
 func TestNewReflectorWithDisablementWatchList(t *testing.T) {
 	scenarios := []struct {
@@ -765,4 +793,57 @@ func (lw *fakeListWatcher) ResultChan() <-chan watch.Event {
 	lw.lock.Lock()
 	defer lw.lock.Unlock()
 	return lw.fakeWatcher.ResultChan()
+}
+
+// TestWatchListDoesNotRetainInitialWatcher checks that the watcher that served the
+// initial watch-list stream can be garbage collected once its watch has ended and the
+// reflector has restarted the watch, while ListAndWatchWithContext is still running.
+// A real watcher holds decode buffers sized for the largest object in the initial stream.
+func TestWatchListDoesNotRetainInitialWatcher(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		logger, ctx := ktesting.NewTestContext(t)
+		clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.WatchListClient, true)
+		ctx, cancel := context.WithCancel(ctx)
+		defer cancel()
+
+		var initialRef weak.Pointer[watch.FakeWatcher]
+		replacementStarted := false
+
+		lw := &ListWatch{
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				if !ptr.Deref(options.SendInitialEvents, false) {
+					replacementStarted = true
+					return watch.NewFakeWithOptions(watch.FakeOptions{Logger: &logger}), nil
+				}
+				initial := watch.NewFakeWithOptions(watch.FakeOptions{Logger: &logger, ChannelSize: 1})
+				initial.Action(watch.Bookmark, &v1.Pod{ObjectMeta: metav1.ObjectMeta{
+					ResourceVersion: "1",
+					Annotations:     map[string]string{metav1.InitialEventsAnnotationKey: "true"},
+				}})
+				initialRef = weak.Make(initial)
+				return initial, nil
+			},
+		}
+		r := NewReflectorWithOptions(lw, &v1.Pod{}, NewStore(MetaNamespaceKeyFunc), ReflectorOptions{Logger: &logger})
+		returned := false
+		go func() {
+			if err := r.ListAndWatchWithContext(ctx); err != nil {
+				t.Errorf("ListAndWatch failed: %v", err)
+			}
+			returned = true
+		}()
+
+		// Wait until the reflector has consumed the initialization bookmark.
+		synctest.Wait()
+		// Advance virtual time so closing the stream does not cause a short-watch error.
+		time.Sleep(time.Second)
+		initialRef.Value().Stop()
+
+		// Wait until the reflector is blocked waiting for events from the replacement watch.
+		synctest.Wait()
+		require.True(t, replacementStarted, "the reflector must open a replacement watch")
+		goruntime.GC()
+		require.Nil(t, initialRef.Value(), "the initial watcher must be collectible")
+		require.False(t, returned, "ListAndWatch must still be running")
+	})
 }

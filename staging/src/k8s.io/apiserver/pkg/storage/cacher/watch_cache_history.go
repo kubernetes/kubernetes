@@ -18,6 +18,7 @@ package cacher
 
 import (
 	"fmt"
+	"iter"
 	"math"
 	"sort"
 	"sync"
@@ -35,21 +36,33 @@ const (
 
 	// defaultUpperBoundCapacity should be able to keep the required history.
 	defaultUpperBoundCapacity = 100 * 1024
+
+	// MinWatchCacheMaxEvents is the smallest allowed explicit override of the
+	// capacity upper bound; it cannot be below the initial capacity.
+	MinWatchCacheMaxEvents = defaultLowerBoundCapacity
 )
 
-func newWatchCacheHistory(config *ImmutableWatchCacheConfig, eventFreshDuration time.Duration) *watchCacheHistory {
+func newWatchCacheHistory(config *ImmutableWatchCacheConfig, eventFreshDuration time.Duration, maxEvents int) (*watchCacheHistory, error) {
+	upperBoundCapacity := capacityUpperBound(eventFreshDuration)
+	if maxEvents != 0 {
+		upperBoundCapacity = maxEvents
+	}
+	if upperBoundCapacity < defaultLowerBoundCapacity {
+		return nil, fmt.Errorf("watch cache capacity upper bound (%d) must not be below the lower bound (%d)", upperBoundCapacity, defaultLowerBoundCapacity)
+	}
+
 	h := &watchCacheHistory{
 		config:             config,
 		capacity:           defaultLowerBoundCapacity,
 		cache:              make([]*watchCacheEvent, defaultLowerBoundCapacity),
 		lowerBoundCapacity: defaultLowerBoundCapacity,
-		upperBoundCapacity: capacityUpperBound(eventFreshDuration),
+		upperBoundCapacity: upperBoundCapacity,
 		startIndex:         0,
 		endIndex:           0,
 		eventFreshDuration: eventFreshDuration,
 	}
 	metrics.WatchCacheCapacity.WithLabelValues(config.groupResource.Group, config.groupResource.Resource).Set(float64(h.capacity))
-	return h
+	return h, nil
 }
 
 // capacityUpperBound denotes the maximum possible capacity of the watch cache
@@ -219,26 +232,52 @@ func (w *watchCacheHistory) suggestedWatchChannelSize(indexExists, triggerUsed b
 // retrieve events since a certain resourceVersion. This function assumes to
 // be called under the lock.
 func (w *watchCacheHistory) GetIntervalLocked(resourceVersion uint64, locker sync.Locker) (*watchCacheInterval, error) {
-	size := w.endIndex - w.startIndex
-	oldest, ok := w.oldestServableLocked()
-	if !ok {
-		return nil, fmt.Errorf("watch cache isn't correctly initialized")
+	if err := w.checkResourceVersionLocked(resourceVersion); err != nil {
+		return nil, err
 	}
-
-	if resourceVersion < oldest-1 {
-		return nil, errors.NewResourceExpired(fmt.Sprintf("too old resource version: %d (%d)", resourceVersion, oldest-1))
-	}
-
-	// Binary search the smallest index at which resourceVersion is greater than the given one.
-	f := func(i int) bool {
-		return w.cache[(w.startIndex+i)%w.capacity].ResourceVersion > resourceVersion
-	}
-	first := sort.Search(size, f)
+	first := w.firstIndexAfterLocked(resourceVersion)
 	indexerFunc := func(i int) *watchCacheEvent {
 		return w.cache[i%w.capacity]
 	}
-	ci := newCacheInterval(w.startIndex+first, w.endIndex, indexerFunc, w.config.indexValidator, resourceVersion, locker)
+	ci := newCacheInterval(first, w.endIndex, indexerFunc, w.config.indexValidator, resourceVersion, locker)
 	return ci, nil
+}
+
+// eventsAfterLocked yields buffered events with ResourceVersion > resourceVersion
+// in ascending ResourceVersion order. This function assumes to be called under
+// the lock.
+func (w *watchCacheHistory) eventsAfterLocked(resourceVersion uint64) iter.Seq[*watchCacheEvent] {
+	return func(yield func(*watchCacheEvent) bool) {
+		for i := w.firstIndexAfterLocked(resourceVersion); i < w.endIndex; i++ {
+			if !yield(w.cache[i%w.capacity]) {
+				return
+			}
+		}
+	}
+}
+
+// checkResourceVersionLocked verifies that history is initialized and can
+// still serve events strictly after resourceVersion. This function assumes to
+// be called under the lock.
+func (w *watchCacheHistory) checkResourceVersionLocked(resourceVersion uint64) error {
+	oldest, ok := w.oldestServableLocked()
+	if !ok {
+		return fmt.Errorf("watch cache isn't correctly initialized")
+	}
+	if resourceVersion < oldest-1 {
+		return errors.NewResourceExpired(fmt.Sprintf("too old resource version: %d (%d)", resourceVersion, oldest-1))
+	}
+	return nil
+}
+
+// firstIndexAfterLocked returns the cyclic buffer index of the first buffered
+// event with ResourceVersion > resourceVersion, or w.endIndex if none exists.
+// This function assumes to be called under the lock.
+func (w *watchCacheHistory) firstIndexAfterLocked(resourceVersion uint64) int {
+	size := w.endIndex - w.startIndex
+	return w.startIndex + sort.Search(size, func(i int) bool {
+		return w.cache[(w.startIndex+i)%w.capacity].ResourceVersion > resourceVersion
+	})
 }
 
 // oldestServableLocked returns the oldest resourceVersion of a watch event

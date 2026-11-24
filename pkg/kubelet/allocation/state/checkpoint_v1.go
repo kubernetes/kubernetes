@@ -130,8 +130,9 @@ func migrateV1ToV2(data string) (*v1.PodList, error) {
 // The result is a superset of what V1 recorded (V1 skipped, for example, non-resizable containers),
 // which V1 readers tolerate because they only look entries up by name. Non-memory emptyDir volumes
 // and volumes without a size limit are left out, since legacy kubelet only stored sizeLimits for
-// memory-backed volumes and dereferences the stored limit.
-func podListToV1Entries(podList *v1.PodList) PodResourceInfoMap {
+// memory-backed volumes and dereferences the stored limit. Pod-level resources are left out if
+// omitPodLevelResources is set.
+func podListToV1Entries(podList *v1.PodList, omitPodLevelResources bool) PodResourceInfoMap {
 	entries := make(PodResourceInfoMap, len(podList.Items))
 	for _, pod := range podList.Items {
 		info := PodResourceInfo{
@@ -146,7 +147,7 @@ func podListToV1Entries(podList *v1.PodList) PodResourceInfoMap {
 		for _, c := range pod.Spec.EphemeralContainers {
 			info.ContainerResources[c.Name] = *c.Resources.DeepCopy()
 		}
-		if pod.Spec.Resources != nil {
+		if pod.Spec.Resources != nil && !omitPodLevelResources {
 			info.PodLevelResources = pod.Spec.Resources.DeepCopy()
 		}
 		for _, vol := range pod.Spec.Volumes {
@@ -222,6 +223,9 @@ func updateContainerResourcesFromV1(pod *v1.Pod, stored *v1.Pod, alreadyUpdated 
 
 func updatePodLevelResourcesFromV1(pod *v1.Pod, stored *v1.Pod) (*v1.Pod, bool) {
 	pAlloc := stored.Spec.Resources
+	if pAlloc == nil {
+		return pod, false
+	}
 	if !apiequality.Semantic.DeepEqual(pod.Spec.Resources, pAlloc) {
 		pod = pod.DeepCopy()
 		pod.Spec.Resources = pAlloc.DeepCopy()
@@ -233,14 +237,14 @@ func updatePodLevelResourcesFromV1(pod *v1.Pod, stored *v1.Pod) (*v1.Pod, bool) 
 func updateEmptyDirVolumeLimitsFromV1(pod *v1.Pod, stored *v1.Pod, alreadyUpdated bool) (*v1.Pod, bool) {
 	updated := alreadyUpdated
 	for i, vol := range pod.Spec.Volumes {
-		if vol.EmptyDir == nil || vol.EmptyDir.Medium != v1.StorageMediumMemory || vol.EmptyDir.SizeLimit == nil || vol.EmptyDir.SizeLimit.IsZero() {
+		if vol.EmptyDir == nil || vol.EmptyDir.Medium != v1.StorageMediumMemory {
 			continue
 		}
 		for _, storedVol := range stored.Spec.Volumes {
-			if storedVol.Name != vol.Name || storedVol.EmptyDir == nil || storedVol.EmptyDir.SizeLimit == nil {
+			if storedVol.Name != vol.Name || storedVol.EmptyDir == nil || storedVol.EmptyDir.Medium != v1.StorageMediumMemory || storedVol.EmptyDir.SizeLimit == nil {
 				continue
 			}
-			if alloc := storedVol.EmptyDir.SizeLimit; alloc.Cmp(*vol.EmptyDir.SizeLimit) != 0 {
+			if alloc := storedVol.EmptyDir.SizeLimit; vol.EmptyDir.SizeLimit == nil || !alloc.Equal(*vol.EmptyDir.SizeLimit) {
 				if !updated {
 					pod = pod.DeepCopy()
 					updated = true

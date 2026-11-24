@@ -43,7 +43,9 @@ type podTopologyHints map[string]map[string]TopologyHint
 type Scope interface {
 	Name() string
 	GetPolicy() Policy
-	Admit(ctx context.Context, pod *v1.Pod, operation lifecycle.Operation) lifecycle.PodAdmitResult
+	// Admit calculates the topology affinity of the pod and, unless dryRun is set, stores the
+	// resulting hints and allocates the aligned resources.
+	Admit(ctx context.Context, pod *v1.Pod, operation lifecycle.Operation, dryRun bool) lifecycle.PodAdmitResult
 	// AddHintProvider adds a hint provider to manager to indicate the hint provider
 	// wants to be consoluted with when making topology hints
 	AddHintProvider(logger klog.Logger, h HintProvider)
@@ -53,6 +55,9 @@ type Scope interface {
 	RemoveContainer(logger klog.Logger, containerID string) error
 	// Store is the interface for storing pod topology hints
 	Store
+	// Scope forwards the admission transaction to the hint providers, so it has
+	// the methods of AdmitTransactionalHintProvider.
+	AdmitTransactionalHintProvider
 }
 
 type scope struct {
@@ -137,7 +142,10 @@ func (s *scope) RemoveContainer(logger klog.Logger, containerID string) error {
 	return nil
 }
 
-func (s *scope) admitPolicyNone(ctx context.Context, pod *v1.Pod, operation lifecycle.Operation) lifecycle.PodAdmitResult {
+func (s *scope) admitPolicyNone(ctx context.Context, pod *v1.Pod, operation lifecycle.Operation, dryRun bool) lifecycle.PodAdmitResult {
+	if dryRun {
+		return admission.GetPodAdmitResult(nil)
+	}
 	for container := range podutil.ContainerIter(&pod.Spec, podutil.InitContainers|podutil.Containers) {
 		err := s.allocateAlignedResources(ctx, pod, container, operation)
 		if err != nil {
@@ -167,4 +175,18 @@ func (s *scope) allocatePodAlignedResources(logger klog.Logger, pod *v1.Pod, ope
 		}
 	}
 	return nil
+}
+
+// CompleteAdmit completes the admission of the pod in every hint provider that
+// implements AdmitTransactionalHintProvider, whether Admit was called for the
+// pod, called in dry run, or not called.
+// Hints written by an admission that failed are not restored: they
+// are only read by Allocate and AllocatePod, after the next admission of the
+// pod has rewritten them.
+func (s *scope) CompleteAdmit(ctx context.Context, pod *v1.Pod, operation lifecycle.Operation, result lifecycle.AdmitResult) {
+	for _, provider := range s.hintProviders {
+		if tx, ok := provider.(AdmitTransactionalHintProvider); ok {
+			tx.CompleteAdmit(ctx, pod, operation, result)
+		}
+	}
 }

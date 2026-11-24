@@ -80,10 +80,13 @@ const (
 	CgroupVersionKey           = "cgroup_version"
 	CRILosingSupportKey        = "cri_losing_support"
 
+	SecurityProfilePullDurationKey = "security_profile_pull_duration_seconds"
+
 	// Metrics keys of remote runtime operations
 	RuntimeOperationsKey         = "runtime_operations_total"
 	RuntimeOperationsDurationKey = "runtime_operations_duration_seconds"
 	RuntimeOperationsErrorsKey   = "runtime_operations_errors_total"
+	CRIListStreamingTotalKey     = "cri_list_streaming_total"
 	// Metrics keys of device plugin operations
 	DevicePluginRegistrationCountKey  = "device_plugin_registration_total"
 	DevicePluginAllocationDurationKey = "device_plugin_alloc_duration_seconds"
@@ -149,9 +152,15 @@ const (
 	MemoryManagerPinningErrorsTotalKey   = "memory_manager_pinning_errors_total"
 
 	// Metrics to track the Topology manager behavior
-	TopologyManagerAdmissionRequestsTotalKey = "topology_manager_admission_requests_total"
-	TopologyManagerAdmissionErrorsTotalKey   = "topology_manager_admission_errors_total"
-	TopologyManagerAdmissionDurationKey      = "topology_manager_admission_duration_ms"
+	TopologyManagerAdmissionRequestsTotalKey  = "topology_manager_admission_requests_total"
+	TopologyManagerAdmissionErrorsTotalKey    = "topology_manager_admission_errors_total"
+	TopologyManagerAdmissionDurationKey       = "topology_manager_admission_duration_ms"
+	TopologyManagerNUMAScoreSelectionTotalKey = "topology_manager_numa_score_selection_total"
+
+	// TopologyManagerNUMAAllocationStrategyLabelKey carries the value of the
+	// numa-allocation-strategy topology manager policy option which was in
+	// effect for the selection being counted.
+	TopologyManagerNUMAAllocationStrategyLabelKey = "numa_allocation_strategy"
 
 	// Metrics to track orphan pod cleanup
 	orphanPodCleanedVolumesKey       = "orphan_pod_cleaned_volumes"
@@ -199,6 +208,8 @@ const (
 
 	// Metric keys for in-place pod resize operations.
 	ContainerRequestedResizesKey        = "container_requested_resizes_total"
+	PodRequestedResizesKey              = "pod_requested_resizes_total"
+	VolumeRequestedResizesKey           = "volume_requested_resizes_total"
 	PodResizeDurationMillisecondsKey    = "pod_resize_duration_milliseconds"
 	PodPendingResizesKey                = "pod_pending_resizes"
 	PodInfeasibleResizesKey             = "pod_infeasible_resizes_total"
@@ -546,6 +557,16 @@ var (
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"operation_type"},
+	)
+	// CRIListStreamingTotal counts streaming attempts, including calls that fall back to unary.
+	CRIListStreamingTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           CRIListStreamingTotalKey,
+			Help:           "Cumulative number of CRI list streaming RPC attempts by operation type and result (success, error, fallback).",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"operation_type", "result"},
 	)
 	// Evictions is a Counter that tracks the cumulative number of pod evictions initiated by the kubelet.
 	// Broken down by eviction signal.
@@ -1031,22 +1052,22 @@ var (
 		},
 	)
 
-	// MemoryQoSNodeMemoryMinBytes tracks total cgroup v2 memory.min (hard protection) for Guaranteed pods.
+	// MemoryQoSNodeMemoryMinBytes tracks requested memory protected by cgroup v2 memory.min.
 	MemoryQoSNodeMemoryMinBytes = metrics.NewGauge(
 		&metrics.GaugeOpts{
 			Subsystem:      KubeletSubsystem,
 			Name:           MemoryQoSNodeMemoryMinBytesKey,
-			Help:           "Total cgroup v2 memory.min in bytes for Guaranteed pods. This memory is hard-reserved and never reclaimed by the kernel.",
+			Help:           "Total requested memory in bytes protected by cgroup v2 memory.min. This memory is hard-reserved and never reclaimed by the kernel.",
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
 
-	// MemoryQoSNodeMemoryLowBytes tracks total cgroup v2 memory.low (soft protection) for Burstable pods.
+	// MemoryQoSNodeMemoryLowBytes tracks requested memory protected by cgroup v2 memory.low.
 	MemoryQoSNodeMemoryLowBytes = metrics.NewGauge(
 		&metrics.GaugeOpts{
 			Subsystem:      KubeletSubsystem,
 			Name:           MemoryQoSNodeMemoryLowBytesKey,
-			Help:           "Total cgroup v2 memory.low in bytes for Burstable pods. This memory is soft-reserved and may be reclaimed under extreme pressure.",
+			Help:           "Total requested memory in bytes protected by cgroup v2 memory.low. This memory is soft-reserved and may be reclaimed under extreme pressure.",
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
@@ -1080,6 +1101,22 @@ var (
 			Buckets:        metrics.ExponentialBuckets(.05, 2, 15),
 			StabilityLevel: metrics.ALPHA,
 		},
+	)
+
+	// TopologyManagerNUMAScoreSelectionTotal tracks how often the
+	// numa-allocation-strategy policy option changed the outcome of a NUMA node
+	// selection. A rising counter is what tells an operator that the option is
+	// not merely configured but actually steering placement; a counter which
+	// stays at zero means every selection so far was already settled before the
+	// strategy got a say, not that the option is broken.
+	TopologyManagerNUMAScoreSelectionTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           TopologyManagerNUMAScoreSelectionTotalKey,
+			Help:           "The number of NUMA node selections in which the numa-allocation-strategy policy option changed the outcome, that is the selected hint differs from the one the narrowest/closest tiebreak would have picked. Counted once per hint merge: once per admitted container under the container scope, once per admitted pod under the pod scope.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{TopologyManagerNUMAAllocationStrategyLabelKey},
 	)
 
 	// OrphanPodCleanedVolumes is number of orphaned Pods that times that removeOrphanedPodVolumeDirs was called during the last sweep.
@@ -1168,6 +1205,21 @@ var (
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"image_size_in_bytes"},
+	)
+
+	// SecurityProfilePullDuration is a Histogram that tracks the duration (in seconds) of
+	// PullSecurityProfile calls, including the time spent in the waiting queue of the puller.
+	// The cached label is true if the runtime served the profile from its storage, and the
+	// result label is "success" or the reason of the failure.
+	SecurityProfilePullDuration = metrics.NewHistogramVec(
+		&metrics.HistogramOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           SecurityProfilePullDurationKey,
+			Help:           "Duration in seconds to pull a security profile. The 'cached' label is true if the runtime served the profile from its storage; the 'result' label is 'success' or the failure reason: 'registry_unavailable', 'signature_validation_failed', 'security_profile_invalid', 'unauthenticated' or 'other'.",
+			Buckets:        metrics.ExponentialBuckets(0.001, 4, 10),
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"cached", "result"},
 	)
 
 	LifecycleHandlerSleepTerminated = metrics.NewCounter(
@@ -1303,16 +1355,38 @@ var (
 		[]string{"resource", "requirement", "operation"},
 	)
 
+	// PodRequestedResizes tracks the cumulative number of requested resizes at the pod level.
+	PodRequestedResizes = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           PodRequestedResizesKey,
+			Help:           "Number of requested resizes, counted at the pod level. Different resources on the same pod are counted separately. The 'requirement' label refers to 'requests' or 'limits'; the 'operation' label can be one of 'add', 'remove', 'increase' or 'decrease'.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"resource", "requirement", "operation"},
+	)
+
+	// VolumeRequestedResizes tracks the cumulative number of requested resizes at the volume level.
+	VolumeRequestedResizes = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           VolumeRequestedResizesKey,
+			Help:           "Number of requested resizes, counted at the volume level. The 'medium' label refers to the volume storage medium (e.g. 'memory'); the 'operation' label can be one of 'add', 'remove', 'increase' or 'decrease'.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"medium", "operation"},
+	)
+
 	// PodResizeDurationMilliseconds tracks the duration (in milliseconds) it takes to resize a pod.
 	PodResizeDurationMilliseconds = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
 			Subsystem:      KubeletSubsystem,
 			Name:           PodResizeDurationMillisecondsKey,
-			Help:           "Duration in milliseconds to actuate a pod resize",
+			Help:           "Duration in milliseconds to actuate a pod resize. Label 'container_resources' reports whether container resources were updated in-place; label 'pod_resources' reports whether effective pod cgroup resources were updated.",
 			Buckets:        podResizeDurationBuckets,
 			StabilityLevel: metrics.ALPHA,
 		},
-		[]string{"success"},
+		[]string{"success", "container_resources", "pod_resources"},
 	)
 
 	// PodPendingResizes tracks the number of pending resizes for pods.
@@ -1331,10 +1405,10 @@ var (
 		&metrics.CounterOpts{
 			Subsystem:      KubeletSubsystem,
 			Name:           PodInfeasibleResizesKey,
-			Help:           "Number of infeasible resizes for pods.",
+			Help:           "Number of infeasible resizes for pods. Labels 'container_resources' and 'pod_resources' report whether the resize changes container-level and pod-level spec resources, respectively.",
 			StabilityLevel: metrics.ALPHA,
 		},
-		[]string{"reason_detail"},
+		[]string{"reason_detail", "container_resources", "pod_resources"},
 	)
 
 	// PodInProgressResizes tracks the number of in-progress resizes for pods.
@@ -1570,6 +1644,7 @@ func Register() {
 		legacyregistry.MustRegister(TopologyManagerAdmissionRequestsTotal)
 		legacyregistry.MustRegister(TopologyManagerAdmissionErrorsTotal)
 		legacyregistry.MustRegister(TopologyManagerAdmissionDuration)
+		legacyregistry.MustRegister(TopologyManagerNUMAScoreSelectionTotal)
 		legacyregistry.MustRegister(OrphanPodCleanedVolumes)
 		legacyregistry.MustRegister(OrphanPodCleanedVolumesErrors)
 
@@ -1592,20 +1667,27 @@ func Register() {
 
 		legacyregistry.MustRegister(AdmissionRejectionsTotal)
 
+		if utilfeature.DefaultFeatureGate.Enabled(features.SecurityProfileOCI) {
+			legacyregistry.MustRegister(SecurityProfilePullDuration)
+		}
+
 		if utilfeature.DefaultFeatureGate.Enabled(features.ImageVolume) {
 			legacyregistry.MustRegister(ImageVolumeRequestedTotal)
 			legacyregistry.MustRegister(ImageVolumeMountedSucceedTotal)
 			legacyregistry.MustRegister(ImageVolumeMountedErrorsTotal)
 		}
 
-		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-			legacyregistry.MustRegister(ContainerRequestedResizes)
-			legacyregistry.MustRegister(PodResizeDurationMilliseconds)
-			legacyregistry.MustRegister(PodPendingResizes)
-			legacyregistry.MustRegister(PodInfeasibleResizes)
-			legacyregistry.MustRegister(PodInProgressResizes)
-			legacyregistry.MustRegister(PodDeferredAcceptedResizes)
-			legacyregistry.MustRegister(PodDeferredResizeDurationSeconds)
+		legacyregistry.MustRegister(ContainerRequestedResizes)
+		legacyregistry.MustRegister(PodRequestedResizes)
+		legacyregistry.MustRegister(PodResizeDurationMilliseconds)
+		legacyregistry.MustRegister(PodPendingResizes)
+		legacyregistry.MustRegister(PodInfeasibleResizes)
+		legacyregistry.MustRegister(PodInProgressResizes)
+		legacyregistry.MustRegister(PodDeferredAcceptedResizes)
+		legacyregistry.MustRegister(PodDeferredResizeDurationSeconds)
+
+		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingMemoryBackedVolumes) {
+			legacyregistry.MustRegister(VolumeRequestedResizes)
 		}
 
 		if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) {
@@ -1622,6 +1704,8 @@ func Register() {
 		if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) {
 			legacyregistry.MustRegister(PodLevelResourcesAdmissionTotal)
 		}
+
+		RegisterCRIStreamingMetrics()
 	})
 }
 

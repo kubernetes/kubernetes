@@ -1,41 +1,28 @@
 diff --git a/staging/src/k8s.io/apiserver/pkg/storage/cacher/cacher.go b/staging/src/k8s.io/apiserver/pkg/storage/cacher/cacher.go
-index 9df8cdd9e34..4019a2bc110 100644
+index 92628f8e2df..8ac4b0bb2df 100644
 --- a/staging/src/k8s.io/apiserver/pkg/storage/cacher/cacher.go
 +++ b/staging/src/k8s.io/apiserver/pkg/storage/cacher/cacher.go
-@@ -1365,26 +1365,9 @@ func (c *Cacher) getWatchCacheResourceVersion(ctx context.Context, parsedWatchRe
- // otherwise, we allow for establishing the connection because the clients
- // can wait for events without unnecessary blocking.
- func (c *Cacher) waitUntilWatchCacheFreshAndForceAllEvents(ctx context.Context, requestedWatchRV uint64, opts storage.ListOptions) error {
+@@ -813,13 +813,8 @@ func (c *Cacher) watch(ctx context.Context, key string, requestedWatchRV uint64,
+ 	span.AddEvent("watchCache locked acquired")
+ 	defer c.watchCache.RUnlock()
+ 
 -	if opts.SendInitialEvents != nil && *opts.SendInitialEvents {
--		// Here be dragons:
--		// Since the etcd feature checker needs to check all members
--		// to determine whether a given feature is supported,
--		// we may receive a positive response even if the feature is not supported.
--		//
--		// In this very rare scenario, the worst case will be that this
--		// request will wait for 3 seconds before it fails.
--		span := tracing.SpanFromContext(ctx)
--		c.watchCache.RLock()
--		span.AddEvent("watchCache locked acquired")
--		defer c.watchCache.RUnlock()
--		err := c.watchCache.waitUntilFreshLocked(ctx, requestedWatchRV)
+-		err := c.watchCache.waitUntilFreshLocked(ctx, requiredResourceVersion)
 -		if err != nil {
--			return err
+-			return nil, err
 -		}
 -		span.AddEvent("watchCache fresh enough")
--		return nil
 -	}
-+	// BUG REVERT (#135452): do not fail with TooLargeResourceVersionError when
-+	// watching from an unrecognized (too large) resourceVersion.
- 	return nil
- }
++	// BUG REVERT (#135452): do not wait for watchCache freshness or fail with
++	// TooLargeResourceVersionError when WatchList requests a newer/unrecognized RV.
  
- // Wait blocks until the cacher is Ready or Stopped, it returns an error if Stopped.
+ 	// requiredResourceVersion = 0 means that we don't require any specific starting point
+ 	// and we would like to start watching from ~now.
 diff --git a/staging/src/k8s.io/apiserver/pkg/storage/etcd3/watcher.go b/staging/src/k8s.io/apiserver/pkg/storage/etcd3/watcher.go
-index 1e7094a21c3..5129ab4f021 100644
+index abdbb258124..f68982cb5b9 100644
 --- a/staging/src/k8s.io/apiserver/pkg/storage/etcd3/watcher.go
 +++ b/staging/src/k8s.io/apiserver/pkg/storage/etcd3/watcher.go
-@@ -453,7 +453,9 @@ func logWatchChannelErr(err error) {
+@@ -466,7 +466,9 @@ func logWatchChannelErr(err error) {
  // it means we don't have any specific
  // preferences for delivering bookmark events.
  func (wc *watchChan) startWatching(watchClosedCh chan struct{}, initialEventsEndBookmarkRequired, forceInitialEvents bool) {

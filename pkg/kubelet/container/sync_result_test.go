@@ -246,6 +246,7 @@ func TestIsBackoffError(t *testing.T) {
 		{name: "crash loop backoff", err: ErrCrashLoopBackOff, expected: true},
 		{name: "image pull backoff", err: ErrImagePullBackOff, expected: true},
 		{name: "wrapped image pull backoff", err: fmt.Errorf("wrapped: %w", ErrImagePullBackOff), expected: true},
+		{name: "wrapped security profile pull backoff", err: fmt.Errorf("wrapped: %w", ErrSecurityProfilePullBackOff), expected: true},
 		{name: "empty aggregate", err: utilerrors.NewAggregate([]error{nil})},
 		{
 			name:     "aggregate of backoff errors",

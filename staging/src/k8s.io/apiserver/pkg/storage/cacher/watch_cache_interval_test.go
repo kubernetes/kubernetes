@@ -414,7 +414,7 @@ func TestCacheIntervalFromStoreSorted(t *testing.T) {
 			}
 
 			wc.RLock()
-			wci, indexUsed, err := wc.getIntervalFromStoreLocked(context.Background(), "/prefix/", tc.opts)
+			wci, indexUsed, err := wc.getIntervalFromStoreLocked("/prefix/", tc.opts, tc.opts.Predicate.MatcherIndex(context.Background()))
 			wc.RUnlock()
 			if err != nil {
 				t.Fatal(err)
@@ -755,7 +755,7 @@ func TestCacheIntervalSourceSelection(t *testing.T) {
 			}
 
 			wc.Lock()
-			wci, indexUsed, err := wc.getIntervalFromStoreLocked(context.Background(), tc.key, tc.opts)
+			wci, indexUsed, err := wc.getIntervalFromStoreLocked(tc.key, tc.opts, tc.opts.Predicate.MatcherIndex(context.Background()))
 			wc.Unlock()
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)

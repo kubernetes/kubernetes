@@ -215,6 +215,7 @@ func crdTestCases(server *kubeapiservertesting.TestServer) []conditionalAuthzTes
 			},
 			expectAllowed:             true,
 			expectAllowedWhenDisabled: new(false),
+			webhookEvaluations:        1,
 		},
 		{
 			name:        "crd v1 replicas - create denied",
@@ -243,7 +244,8 @@ func crdTestCases(server *kubeapiservertesting.TestServer) []conditionalAuthzTes
 				}, metav1.CreateOptions{})
 				return err
 			},
-			expectAllowed: false,
+			expectAllowed:      false,
+			webhookEvaluations: 1,
 		},
 		{
 			name:        "crd v2 replicas.max - create allowed",
@@ -276,6 +278,7 @@ func crdTestCases(server *kubeapiservertesting.TestServer) []conditionalAuthzTes
 			},
 			expectAllowed:             true,
 			expectAllowedWhenDisabled: new(false),
+			webhookEvaluations:        1,
 		},
 		{
 			name:        "crd v2 replicas.max - create denied",
@@ -306,7 +309,8 @@ func crdTestCases(server *kubeapiservertesting.TestServer) []conditionalAuthzTes
 				}, metav1.CreateOptions{})
 				return err
 			},
-			expectAllowed: false,
+			expectAllowed:      false,
+			webhookEvaluations: 1,
 		},
 		{
 			name:        "crd v1 replicas - update allowed",
@@ -344,6 +348,7 @@ func crdTestCases(server *kubeapiservertesting.TestServer) []conditionalAuthzTes
 			},
 			expectAllowed:             true,
 			expectAllowedWhenDisabled: new(false),
+			webhookEvaluations:        2,
 		},
 		{
 			name:        "crd v1 replicas - update denied",
@@ -379,7 +384,8 @@ func crdTestCases(server *kubeapiservertesting.TestServer) []conditionalAuthzTes
 				_, err = dynClient.Resource(gvr).Namespace("test-ns").Update(context.TODO(), created, metav1.UpdateOptions{})
 				return err
 			},
-			expectAllowed: false,
+			expectAllowed:      false,
+			webhookEvaluations: 2,
 		},
 		{
 			name:        "crd v2 replicas.max - update allowed",
@@ -423,6 +429,7 @@ func crdTestCases(server *kubeapiservertesting.TestServer) []conditionalAuthzTes
 			},
 			expectAllowed:             true,
 			expectAllowedWhenDisabled: new(false),
+			webhookEvaluations:        2,
 		},
 		{
 			name:        "crd v2 replicas.max - update denied",
@@ -464,7 +471,8 @@ func crdTestCases(server *kubeapiservertesting.TestServer) []conditionalAuthzTes
 				_, err = dynClient.Resource(gvr).Namespace("test-ns").Update(context.TODO(), created, metav1.UpdateOptions{})
 				return err
 			},
-			expectAllowed: false,
+			expectAllowed:      false,
+			webhookEvaluations: 2,
 		},
 	}
 }

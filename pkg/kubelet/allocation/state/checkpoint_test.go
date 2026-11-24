@@ -58,7 +58,7 @@ func TestCheckpointV2_RoundTrip(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			given := tt.list.DeepCopy()
 
-			cp, err := NewCheckpointV2(tt.list)
+			cp, err := NewCheckpointV2(tt.list, false)
 			require.NoError(t, err)
 			assert.Equal(t, checkpointVersionV2, cp.Version)
 			requireNoDiff(t, given, tt.list, "change to the list passed to NewCheckpointV2")
@@ -89,7 +89,7 @@ func TestCheckpointV2_DeterministicEncoding(t *testing.T) {
 		for _, uid := range order {
 			list.Items = append(list.Items, newFullPod(types.UID(string(uid))))
 		}
-		cp, err := NewCheckpointV2(list)
+		cp, err := NewCheckpointV2(list, false)
 		require.NoError(t, err)
 		return cp
 	}
@@ -186,7 +186,7 @@ func TestCheckpointV2_LegacyEntries(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cp, err := NewCheckpointV2(&v1.PodList{Items: tt.pods})
+			cp, err := NewCheckpointV2(&v1.PodList{Items: tt.pods}, false)
 			require.NoError(t, err)
 			file, err := cp.MarshalCheckpoint()
 			require.NoError(t, err)
@@ -205,7 +205,7 @@ func TestCheckpointV2_RollForwardAfterRollback(t *testing.T) {
 		Containers:     []v1.Container{container("app", "250m", "256Mi")},
 		Resources:      new(requirements("500m", "512Mi")),
 		Volumes:        []v1.Volume{emptyDirVolume("mem", v1.StorageMediumMemory, quantity("64Mi"))},
-	})}})
+	})}}, false)
 	require.NoError(t, err)
 	v2File, err := cp.MarshalCheckpoint()
 	require.NoError(t, err)

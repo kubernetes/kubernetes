@@ -253,8 +253,12 @@ func (c *NamingConditionController) sync(ctx context.Context, key string) error 
 		return err
 	}
 
-	// Skip checking names if Spec and Status names are same.
-	if equality.Semantic.DeepEqual(inCustomResourceDefinition.Spec.Names, inCustomResourceDefinition.Status.AcceptedNames) {
+	// Skip checking names if Spec and Status names are same and they were accepted.
+	// After a conflict, AcceptedNames keeps the previous names, so removing the
+	// conflicting name from spec makes spec equal status while NamesAccepted is
+	// still False; the names must be re-checked to clear that condition.
+	if equality.Semantic.DeepEqual(inCustomResourceDefinition.Spec.Names, inCustomResourceDefinition.Status.AcceptedNames) &&
+		apiextensionshelpers.IsCRDConditionTrue(inCustomResourceDefinition, apiextensionsv1.NamesAccepted) {
 		return nil
 	}
 

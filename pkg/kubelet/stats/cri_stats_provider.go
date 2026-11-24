@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"sync"
@@ -316,6 +317,7 @@ func (p *criStatsProvider) PodCPUAndMemoryStats(ctx context.Context, pod *v1.Pod
 		}
 		ps.CPU = fallbackStats.CPU
 		ps.Memory = fallbackStats.Memory
+		ps.Swap = fallbackStats.Swap
 
 		for _, fb := range fallbackStats.Containers {
 			var container *statsapi.ContainerStats
@@ -332,13 +334,34 @@ func (p *criStatsProvider) PodCPUAndMemoryStats(ctx context.Context, pod *v1.Pod
 				if container.Memory == nil {
 					container.Memory = fb.Memory
 				}
+				if container.Swap == nil {
+					container.Swap = fb.Swap
+				}
 			} else {
 				ps.Containers = append(ps.Containers, fb)
 			}
 		}
 	}
 
+	// Pod-level swap usage feeds the in-place resize swap-decrease validation
+	// (KEP-5359). CRI sandbox stats carry no swap field, so aggregate from
+	// containers (the pod cgroup's memory.swap.current is hierarchical and would
+	// be the exact source; see cgroupManager.MemoryUsage for the pattern).
+	if utilfeature.DefaultFeatureGate.Enabled(features.WorkloadControlledSwap) && ps.Swap == nil {
+		aggregatePodSwapStats(ps)
+	}
+
 	return ps, nil
+}
+
+// PodSwapStats returns swap usage for the pod and its containers. Runtimes may
+// leave ContainerStats.Swap empty over CRI, so read it from cAdvisor when a
+// fallback provider is configured.
+func (p *criStatsProvider) PodSwapStats(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus) (*statsapi.PodStats, error) {
+	if p.fallbackStatsProvider != nil {
+		return p.fallbackStatsProvider.PodCPUAndMemoryStats(ctx, pod, podStatus)
+	}
+	return p.PodCPUAndMemoryStats(ctx, pod, podStatus)
 }
 
 // ListPodCPUAndMemoryStats returns the CPU and Memory stats of all the pod-managed containers.
@@ -595,6 +618,10 @@ func (p *criStatsProvider) addPodCPUMemoryStats(
 	}
 
 	// Sum Pod cpu and memory stats from containers stats.
+	// Windows resource metrics require a complete committed-memory total, not a
+	// partial sum or a synthesized zero when any container's usage is missing.
+	missingUsage := runtime.GOOS == "windows" && (cs.Memory == nil || cs.Memory.UsageBytes == nil ||
+		(ps.Memory != nil && ps.Memory.UsageBytes == nil))
 	if cs.CPU != nil {
 		if ps.CPU == nil {
 			ps.CPU = &statsapi.CPUStats{}
@@ -627,6 +654,12 @@ func (p *criStatsProvider) addPodCPUMemoryStats(
 		ps.Memory.PageFaults = &pageFaults
 		ps.Memory.MajorPageFaults = &majorPageFaults
 		// Pod level PSI stats cannot be calculated from container level
+	}
+	if missingUsage {
+		if ps.Memory == nil {
+			ps.Memory = &statsapi.MemoryStats{}
+		}
+		ps.Memory.UsageBytes = nil
 	}
 }
 
@@ -778,7 +811,9 @@ func (p *criStatsProvider) makeContainerStats(
 	} else {
 		result.Memory.Time = metav1.NewTime(time.Unix(0, time.Now().UnixNano()))
 		result.Memory.WorkingSetBytes = ptr.To[uint64](0)
-		result.Memory.UsageBytes = ptr.To[uint64](0)
+		if runtime.GOOS != "windows" {
+			result.Memory.UsageBytes = ptr.To[uint64](0)
+		}
 		result.Memory.RSSBytes = ptr.To[uint64](0)
 	}
 	if stats.Swap != nil {
@@ -899,6 +934,10 @@ func (p *criStatsProvider) makeContainerCPUAndMemoryStats(
 			PageFaults:      ptr.To[uint64](0),
 			MajorPageFaults: ptr.To[uint64](0),
 		}
+	}
+	if runtime.GOOS == "windows" && result.Memory != nil {
+		// Missing committed memory must remain distinguishable from a real zero.
+		result.Memory.UsageBytes = valueOfUInt64Value(stats.GetMemory().GetUsageBytes())
 	}
 	if stats.Swap != nil {
 		result.Swap = &statsapi.SwapStats{

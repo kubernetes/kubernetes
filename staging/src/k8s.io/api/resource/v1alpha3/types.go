@@ -241,6 +241,7 @@ type DeviceTaintRuleSpec struct {
 	// a selector, no devices are matches.
 	//
 	// +optional
+	// +k8s:optional
 	DeviceSelector *DeviceTaintSelector `json:"deviceSelector,omitempty" protobuf:"bytes,1,opt,name=deviceSelector"`
 
 	// taint is the taint that gets applied to matching devices.
@@ -304,6 +305,23 @@ type DeviceTaintSelector struct {
 	// result. Without that the eviction controller cannot evaluate these CEL expressions.
 	//
 	// Selectors []DeviceSelector `json:"selectors,omitempty" protobuf:"bytes,5,rep,name=selectors"`
+
+	// all explicitly selects every device from every driver in the
+	// cluster when set to true. It must not be combined with driver, pool,
+	// or device: those must all be unset when all is true.
+	//
+	// Leaving driver, pool, and device all unset also selects every
+	// device, for historical reasons, but doing so without setting all
+	// is deprecated and may be rejected in a future release. Set all
+	// explicitly instead.
+	//
+	// +optional
+	// +k8s:optional
+	// +k8s:neq=false
+	// +k8s:dependentForbidden("driver")
+	// +k8s:dependentForbidden("pool")
+	// +k8s:dependentForbidden("device")
+	All *bool `json:"all,omitempty" protobuf:"varint,6,opt,name=all"`
 }
 
 // DeviceTaintRuleStatus provides information about an on-going pod eviction.
@@ -334,9 +352,9 @@ type DeviceTaintRuleStatus struct {
 	// +listMapKey=type
 	// +patchStrategy=merge
 	// +patchMergeKey=type
-	// +k8s:alpha(since: "1.37")=+k8s:optional
-	// +k8s:alpha(since: "1.37")=+k8s:listType=map
-	// +k8s:alpha(since: "1.37")=+k8s:listMapKey=type
+	// +k8s:beta(since: "1.38")=+k8s:optional
+	// +k8s:beta(since: "1.38")=+k8s:listType=map
+	// +k8s:beta(since: "1.38")=+k8s:listMapKey=type
 	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
 }
 
@@ -368,7 +386,7 @@ type DeviceTaintRuleList struct {
 // +k8s:supportsSubresource="/status"
 
 // ResourcePoolStatusRequest triggers a one-time calculation of resource pool status
-// based on the provided filters. Once status is set, the request is considered complete and will not be reprocessed.
+// based on the provided filters. Once status has a Complete or Failed condition, the request will not be reprocessed.
 // Users should delete and recreate requests to get updated information.
 type ResourcePoolStatusRequest struct {
 	metav1.TypeMeta `json:""`
@@ -384,8 +402,9 @@ type ResourcePoolStatusRequest struct {
 	Spec ResourcePoolStatusRequestSpec `json:"spec" protobuf:"bytes,2,name=spec"`
 
 	// status is populated by the controller with the calculated pool status.
-	// When status is non-nil, the request is considered complete and the
-	// entire object becomes immutable.
+	// While pools are still being published, the controller may first set a
+	// status with only a WaitingForPools condition. Once status has a
+	// Complete or Failed condition, the entire object becomes immutable.
 	//
 	// +optional
 	// +k8s:optional
@@ -479,12 +498,14 @@ type ResourcePoolStatusRequestStatus struct {
 	Pools []PoolStatus `json:"pools,omitempty" protobuf:"bytes,2,rep,name=pools"`
 
 	// conditions provide information about the state of the request.
-	// A condition with type=Complete or type=Failed will always be set
-	// when the status is populated.
+	// The final status always has a condition with type=Complete or
+	// type=Failed. Before that, a status with only WaitingForPools=True may
+	// be set; its poolCount is 0 and pools is empty.
 	//
 	// Known condition types:
 	// - "Complete": True when the request has been processed successfully
 	// - "Failed": True when the request could not be processed
+	// - "WaitingForPools": True while the controller waits for incomplete pools
 	//
 	// +optional
 	// +k8s:optional
@@ -493,8 +514,8 @@ type ResourcePoolStatusRequestStatus struct {
 	// +patchStrategy=merge
 	// +patchMergeKey=type
 	// +k8s:maxItems=10
-	// +k8s:alpha(since: "1.37")=+k8s:listType=map
-	// +k8s:alpha(since: "1.37")=+k8s:listMapKey=type
+	// +k8s:beta(since: "1.38")=+k8s:listType=map
+	// +k8s:beta(since: "1.38")=+k8s:listMapKey=type
 	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,3,rep,name=conditions"`
 }
 
@@ -656,15 +677,16 @@ type PartitionTypeStatus struct {
 // devices with AllowMultipleAllocations.
 type ShareableSummaryStatus struct {
 	// fullyAvailableDevices is the number of shareable devices with no
-	// capacity consumed.
+	// allocation other than for admin access.
 	//
 	// +required
 	// +k8s:required
 	// +k8s:minimum=0
 	FullyAvailableDevices *int32 `json:"fullyAvailableDevices,omitempty" protobuf:"varint,1,opt,name=fullyAvailableDevices"`
 
-	// partiallyAvailableDevices is the number of shareable devices with some
-	// but not all capacity consumed.
+	// partiallyAvailableDevices is the number of shareable devices with at
+	// least one allocation other than for admin access, regardless of
+	// remaining capacity.
 	//
 	// +required
 	// +k8s:required
@@ -714,6 +736,11 @@ const ResourcePoolStatusRequestConditionComplete = "Complete"
 
 // ResourcePoolStatusRequestConditionFailed is the condition type for failed requests.
 const ResourcePoolStatusRequestConditionFailed = "Failed"
+
+// ResourcePoolStatusRequestConditionWaitingForPools is the condition type for
+// requests waiting for incomplete pools to finish publishing. Its
+// lastTransitionTime marks when the wait started.
+const ResourcePoolStatusRequestConditionWaitingForPools = "WaitingForPools"
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.36

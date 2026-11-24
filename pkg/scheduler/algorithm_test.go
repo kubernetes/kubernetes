@@ -18,13 +18,17 @@ package scheduler
 
 import (
 	"context"
+	"fmt"
 	"slices"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/util/feature"
@@ -40,11 +44,15 @@ import (
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/backend/queue"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
+	plfeature "k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
+	"k8s.io/kubernetes/pkg/scheduler/profile"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	tf "k8s.io/kubernetes/pkg/scheduler/testing/framework"
+	"k8s.io/utils/ptr"
 )
 
 // assumeReserveFixture wires up the pieces every assume/reserve test needs: a cache
@@ -53,10 +61,20 @@ import (
 type assumeReserveFixture struct {
 	algorithm *SchedulingAlgorithm
 	fwk       framework.Framework
+	queue     internalqueue.SchedulingQueue
 }
 
 func newAssumeReserveFixture(t *testing.T, ctx context.Context, node *v1.Node,
 	plugin *assumeReserveTestPlugin, pods ...*v1.Pod) *assumeReserveFixture {
+	t.Helper()
+	return newAssumeReserveFixtureWithNominations(t, ctx, node, plugin, nil, pods...)
+}
+
+// newAssumeReserveFixtureWithNominations additionally enables
+// nominationExtensions, if not nil, and reports nomination changes to it
+// like the scheduler does.
+func newAssumeReserveFixtureWithNominations(t *testing.T, ctx context.Context, node *v1.Node,
+	plugin *assumeReserveTestPlugin, nominationExtensions *tf.FakeNominationExtensionsPlugin, pods ...*v1.Pod) *assumeReserveFixture {
 	t.Helper()
 
 	logger := klog.FromContext(ctx)
@@ -72,7 +90,9 @@ func newAssumeReserveFixture(t *testing.T, ctx context.Context, node *v1.Node,
 	cache := internalcache.New(ctx, nil, true, false)
 	cache.AddNode(logger, node)
 	snapshot := internalcache.NewEmptySnapshot()
-	queue := internalqueue.NewTestQueueWithObjects(ctx, nil, queued)
+	// Filled in once the framework exists.
+	profiles := profile.Map{}
+	queue := internalqueue.NewTestQueueWithObjects(ctx, nil, queued, internalqueue.WithNominationChangeHandler(newNominationChangeHandler(profiles)))
 
 	registry := frameworkruntime.Registry{
 		queuesort.Name:     queuesort.New,
@@ -87,18 +107,25 @@ func newAssumeReserveFixture(t *testing.T, ctx context.Context, node *v1.Node,
 			QueueSort: schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: queuesort.Name}}},
 			Filter:    schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "AssumeReserveTestPlugin"}}},
 			Reserve:   schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "AssumeReserveTestPlugin"}}},
+			Permit:    schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "AssumeReserveTestPlugin"}}},
 			Bind:      schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: defaultbinder.Name}}},
 		},
+	}
+	if nominationExtensions != nil {
+		registry[nominationExtensions.Name()] = tf.NewFakeNominationExtensionsPlugin(nominationExtensions)
+		profileCfg.Plugins.PreFilter = schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: nominationExtensions.Name()}}}
 	}
 
 	schedFwk, err := frameworkruntime.NewFramework(ctx, registry, &profileCfg,
 		frameworkruntime.WithInformerFactory(informerFactory),
 		frameworkruntime.WithSnapshotSharedLister(snapshot),
 		frameworkruntime.WithPodNominator(queue),
+		frameworkruntime.WithWaitingPods(frameworkruntime.NewWaitingPodsMap()),
 	)
 	if err != nil {
 		t.Fatalf("Failed to create framework: %v", err)
 	}
+	profiles[profileCfg.SchedulerName] = schedFwk
 	if err := cache.UpdateSnapshot(logger, snapshot); err != nil {
 		t.Fatalf("Failed to update snapshot: %v", err)
 	}
@@ -108,6 +135,7 @@ func newAssumeReserveFixture(t *testing.T, ctx context.Context, node *v1.Node,
 	return &assumeReserveFixture{
 		algorithm: algorithm,
 		fwk:       schedFwk,
+		queue:     queue,
 	}
 }
 
@@ -217,17 +245,228 @@ func TestAssumeAndReserveInCache(t *testing.T) {
 	}
 }
 
+// TestAssumeAndReserveInCacheDeferredResize covers a deferred resize, where the pod is already
+// bound and counted in the cache, so there's nothing to assume, reserve, or roll back.
+func TestAssumeAndReserveInCacheDeferredResize(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.InPlacePodVerticalScalingSchedulerPreemption, true)
+	_, ctx := ktesting.NewTestContext(t)
+
+	node1 := st.MakeNode().Name("node1").Obj()
+	pod1 := st.MakePod().Name("pod1").Namespace("default").UID("pod1").Node(node1.Name).
+		Condition(v1.PodResizePending, v1.ConditionTrue, v1.PodReasonDeferred).Obj()
+	plugin := &assumeReserveTestPlugin{
+		fakePodGroupPlugin: &fakePodGroupPlugin{},
+		// Fails the assume if Reserve runs at all.
+		reserveStatus: fwk.NewStatus(fwk.Error, "Reserve ran for a deferred resize"),
+	}
+	f := newAssumeReserveFixture(t, ctx, node1, plugin, pod1)
+	if err := f.algorithm.cache.AddPod(klog.FromContext(ctx), pod1); err != nil {
+		t.Fatalf("Failed to add the bound pod to the cache: %v", err)
+	}
+
+	podInfo, err := framework.NewPodInfo(pod1)
+	if err != nil {
+		t.Fatalf("Failed to create PodInfo: %v", err)
+	}
+	queuedPodInfo := &framework.QueuedPodInfo{PodInfo: podInfo}
+	state := framework.NewCycleState()
+
+	assumedPodInfo, status := f.algorithm.AssumeAndReserveInCache(ctx, state, f.fwk, queuedPodInfo, ScheduleResult{SuggestedHost: node1.Name})
+	if !status.IsSuccess() {
+		t.Fatalf("AssumeAndReserveInCache status = %v, want success", status)
+	}
+	if assumedPodInfo.Pod == pod1 {
+		t.Error("expected assumedPodInfo.Pod to be a deep copy of the input pod, got the same pointer")
+	}
+	if err := f.algorithm.UnreserveAndForgetFromCache(ctx, state, f.fwk, assumedPodInfo, node1.Name); err != nil {
+		t.Errorf("UnreserveAndForgetFromCache error: %v", err)
+	}
+	if plugin.unreserved {
+		t.Error("expected Unreserve not to be called")
+	}
+	if _, err := f.algorithm.cache.GetPod(pod1); err != nil {
+		t.Errorf("expected the bound pod to stay in the cache: %v", err)
+	}
+}
+
+// TestNominationEndsAfterPermit checks that with the DRAPreemption feature
+// gate, the nomination of an assumed pod ends only after Reserve and Permit
+// succeeded or Permit returned Wait, so that NominationExtensions can compare
+// it with what the pod reserved. If Reserve or Permit rejects the pod, the
+// nomination is kept, so that handleSchedulingFailure still finds it. Without
+// the feature gate, and for a pod of a pod group, the nomination ends when the
+// pod is assumed, and NominationExtensions are not called.
+func TestNominationEndsAfterPermit(t *testing.T) {
+	node1 := st.MakeNode().Name("node1").Obj()
+
+	for _, tt := range []struct {
+		name          string
+		reserveStatus *fwk.Status
+		permitStatus  *fwk.Status
+		// schedulingGroup gives the pod a scheduling group. That makes it a
+		// pod of a pod group if genericWorkload enables the GenericWorkload
+		// feature gate.
+		schedulingGroup bool
+		genericWorkload bool
+		// wantCalls are the NominationExtensions calls with the feature gate.
+		wantCalls []string
+	}{
+		{
+			name: "success",
+			wantCalls: []string{
+				"AddNomination default/pod1 node1 assigned= prepared=<nil>",
+				"RemoveNomination default/pod1 node1 assigned=node1",
+			},
+		},
+		{
+			name:          "reserve failure",
+			reserveStatus: fwk.NewStatus(fwk.Error, "reserve fake failure"),
+			wantCalls: []string{
+				"AddNomination default/pod1 node1 assigned= prepared=<nil>",
+				"RemoveNomination default/pod1 node1 assigned=",
+			},
+		},
+		{
+			name:         "permit rejection",
+			permitStatus: fwk.NewStatus(fwk.Unschedulable, "permit fake rejection"),
+			wantCalls: []string{
+				"AddNomination default/pod1 node1 assigned= prepared=<nil>",
+				"RemoveNomination default/pod1 node1 assigned=",
+			},
+		},
+		{
+			name:         "permit wait",
+			permitStatus: fwk.NewStatus(fwk.Wait, "permit fake wait"),
+			wantCalls: []string{
+				"AddNomination default/pod1 node1 assigned= prepared=<nil>",
+				"RemoveNomination default/pod1 node1 assigned=node1",
+			},
+		},
+		{
+			name:            "pod group pod, success",
+			schedulingGroup: true,
+			genericWorkload: true,
+		},
+		{
+			name:            "pod group pod, reserve failure",
+			reserveStatus:   fwk.NewStatus(fwk.Error, "reserve fake failure"),
+			schedulingGroup: true,
+			genericWorkload: true,
+		},
+		{
+			name:            "scheduling group without GenericWorkload, reserve failure",
+			reserveStatus:   fwk.NewStatus(fwk.Error, "reserve fake failure"),
+			schedulingGroup: true,
+			wantCalls: []string{
+				"AddNomination default/pod1 node1 assigned= prepared=<nil>",
+				"RemoveNomination default/pod1 node1 assigned=",
+			},
+		},
+	} {
+		for _, draPreemption := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/DRAPreemption=%v", tt.name, draPreemption), func(t *testing.T) {
+				featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+					features.DRAPreemption:   draPreemption,
+					features.GenericWorkload: tt.genericWorkload,
+				})
+				logger, ctx := ktesting.NewTestContext(t)
+				pod1 := st.MakePod().Name("pod1").Namespace("default").UID("pod1").SchedulerName("default-scheduler").Obj()
+				if tt.schedulingGroup {
+					pod1 = st.MakePod().Name("pod1").Namespace("default").UID("pod1").SchedulerName("default-scheduler").PodGroupName("pg").Obj()
+				}
+				endsAfterPermit := draPreemption && (!tt.schedulingGroup || !tt.genericWorkload)
+				// Permit only runs after Reserve succeeded.
+				permitRuns := tt.reserveStatus == nil
+				wantSuccess := tt.reserveStatus == nil && (tt.permitStatus == nil || tt.permitStatus.IsWait())
+
+				var f *assumeReserveFixture
+				var nominatedDuringReserve, nominatedDuringPermit bool
+				plugin := &assumeReserveTestPlugin{
+					fakePodGroupPlugin: &fakePodGroupPlugin{
+						filterStatus: map[string]*fwk.Status{pod1.Name: fwk.NewStatus(fwk.Success)},
+					},
+					reserveStatus: tt.reserveStatus,
+					permitStatus:  tt.permitStatus,
+					onReserve: func() {
+						nominatedDuringReserve = len(f.fwk.NominatedPodsForNode(logger, node1.Name)) > 0
+					},
+					onPermit: func() {
+						nominatedDuringPermit = len(f.fwk.NominatedPodsForNode(logger, node1.Name)) > 0
+					},
+				}
+				nominationExtensions := &tf.FakeNominationExtensionsPlugin{}
+				f = newAssumeReserveFixtureWithNominations(t, ctx, node1, plugin, nominationExtensions, pod1)
+				podInfo, err := framework.NewPodInfo(pod1)
+				if err != nil {
+					t.Fatalf("Failed to create PodInfo: %v", err)
+				}
+				f.fwk.AddNominatedPod(logger, podInfo, &fwk.NominatingInfo{NominatedNodeName: node1.Name, NominatingMode: fwk.ModeOverride})
+				queuedPodInfo := &framework.QueuedPodInfo{PodInfo: podInfo}
+				state := framework.NewCycleState()
+				scheduleResult, err := f.algorithm.SchedulePod(ctx, f.fwk, state, queuedPodInfo)
+				if err != nil {
+					t.Fatalf("SchedulePod failed: %v", err)
+				}
+
+				sched := &Scheduler{algorithm: f.algorithm, SchedulingQueue: f.queue}
+				_, status := sched.prepareForBindingCycle(ctx, state, f.fwk, queuedPodInfo, framework.NewPodsToActivate(), scheduleResult)
+				if status.IsSuccess() != wantSuccess {
+					t.Fatalf("Unexpected status of prepareForBindingCycle: %v", status)
+				}
+				if tt.permitStatus.IsWait() {
+					// Stop the timer of the waiting pod.
+					defer f.fwk.RejectWaitingPod(pod1.UID)
+				}
+				if nominatedDuringReserve != endsAfterPermit {
+					t.Errorf("Pod nominated during Reserve: got %v, want %v", nominatedDuringReserve, endsAfterPermit)
+				}
+				if want := endsAfterPermit && permitRuns; nominatedDuringPermit != want {
+					t.Errorf("Pod nominated during Permit: got %v, want %v", nominatedDuringPermit, want)
+				}
+				if plugin.unreserved == wantSuccess {
+					t.Errorf("Unreserve called: got %v, want %v", plugin.unreserved, !wantSuccess)
+				}
+				// After a rejection, the nomination survives Unreserve, and
+				// handleSchedulingFailure clears it.
+				wantNominated := endsAfterPermit && !wantSuccess
+				if nominated := len(f.fwk.NominatedPodsForNode(logger, node1.Name)) > 0; nominated != wantNominated {
+					t.Errorf("Pod nominated after prepareForBindingCycle: got %v, want %v", nominated, wantNominated)
+				}
+				if !status.IsSuccess() {
+					// What handleSchedulingFailure does.
+					f.fwk.AddNominatedPod(logger, podInfo, clearNominatedNode)
+				}
+				var wantCalls []string
+				if draPreemption {
+					wantCalls = tt.wantCalls
+				}
+				if diff := cmp.Diff(wantCalls, nominationExtensions.Calls()); diff != "" {
+					t.Errorf("Unexpected NominationExtensions calls (-want,+got):\n%s", diff)
+				}
+			})
+		}
+	}
+}
+
 // TestAssumeAndReserveInSnapshot covers the pod group scheduling cycle, where the
 // placement is only tentative: it goes into the snapshot rather than the cache, and
-// the returned revert function has to undo every part of it.
+// the returned revert function has to undo every part of it. That removes and
+// restores the nomination of the pod, also with the DRAPreemption feature gate,
+// which doesn't cover pods of pod groups: plugins with NominationExtensions don't
+// get called for them.
 func TestAssumeAndReserveInSnapshot(t *testing.T) {
 	node1 := st.MakeNode().Name("node1").Obj()
 	pod1 := st.MakePod().Name("pod1").Namespace("default").UID("pod1").Obj()
 	podWithNomination := st.MakePod().Name("pod-nominated").Namespace("default").UID("pod-nominated").NominatedNodeName("node1").Obj()
+	podGroupPodWithNomination := st.MakePod().Name("pod-nominated").Namespace("default").UID("pod-nominated").SchedulerName("default-scheduler").
+		NominatedNodeName("node1").PodGroupName("pg").Obj()
 
 	tests := []struct {
 		name string
 		pod  *v1.Pod
+		// draPreemption and genericWorkload enable the feature gates.
+		draPreemption   bool
+		genericWorkload bool
 	}{
 		{
 			name: "pod group cycle with cache: still assumed in the snapshot only",
@@ -237,10 +476,20 @@ func TestAssumeAndReserveInSnapshot(t *testing.T) {
 			name: "pod group cycle: nomination is dropped on assume and restored on revert",
 			pod:  podWithNomination,
 		},
+		{
+			name:            "pod group cycle with DRAPreemption: nomination is dropped on assume and restored on revert",
+			pod:             podGroupPodWithNomination,
+			draPreemption:   true,
+			genericWorkload: true,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.DRAPreemption:   tt.draPreemption,
+				features.GenericWorkload: tt.genericWorkload,
+			})
 			logger, ctx := ktesting.NewTestContext(t)
 
 			plugin := &assumeReserveTestPlugin{
@@ -248,7 +497,8 @@ func TestAssumeAndReserveInSnapshot(t *testing.T) {
 					filterStatus: map[string]*fwk.Status{tt.pod.Name: fwk.NewStatus(fwk.Success)},
 				},
 			}
-			f := newAssumeReserveFixture(t, ctx, node1, plugin, tt.pod)
+			nominationExtensions := &tf.FakeNominationExtensionsPlugin{}
+			f := newAssumeReserveFixtureWithNominations(t, ctx, node1, plugin, nominationExtensions, tt.pod)
 
 			podInfo, err := framework.NewPodInfo(tt.pod)
 			if err != nil {
@@ -307,6 +557,9 @@ func TestAssumeAndReserveInSnapshot(t *testing.T) {
 			}
 			if nominated != "" && len(f.fwk.NominatedPodsForNode(logger, nominated)) == 0 {
 				t.Error("expected the nomination to be restored on revert")
+			}
+			if calls := nominationExtensions.Calls(); len(calls) != 0 {
+				t.Errorf("Unexpected NominationExtensions calls for a pod of a pod group: %v", calls)
 			}
 		})
 	}
@@ -402,7 +655,6 @@ func TestSchedulingAlgorithmDriver(t *testing.T) {
 		filterStatus         *fwk.Status
 		postFilterStatus     *fwk.Status
 		postFilterResult     *fwk.PostFilterResult
-		podGroupCycle        bool
 		wantStatusCode       fwk.Code
 		wantNominatingInfo   *fwk.NominatingInfo
 		wantPostFilterCalled bool
@@ -413,15 +665,6 @@ func TestSchedulingAlgorithmDriver(t *testing.T) {
 			postFilterStatus:     fwk.NewStatus(fwk.Unschedulable),
 			wantStatusCode:       fwk.Unschedulable,
 			wantPostFilterCalled: true,
-		},
-		{
-			name:                 "pod group cycle: per-pod PostFilter is not run (PodGroupPostFilter handles it)",
-			filterStatus:         fwk.NewStatus(fwk.Unschedulable, "no fit"),
-			postFilterStatus:     fwk.NewStatus(fwk.Success),
-			postFilterResult:     &fwk.PostFilterResult{NominatingInfo: &fwk.NominatingInfo{NominatedNodeName: "node1", NominatingMode: fwk.ModeOverride}},
-			podGroupCycle:        true,
-			wantStatusCode:       fwk.Unschedulable,
-			wantPostFilterCalled: false,
 		},
 		{
 			name:             "failure: algorithm fails but PostFilter nominates a node",
@@ -506,9 +749,6 @@ func TestSchedulingAlgorithmDriver(t *testing.T) {
 			sched.applyDefaultHandlers()
 
 			state := framework.NewCycleState()
-			if tt.podGroupCycle {
-				state.SetPodGroupCycleState(framework.NewCycleState())
-			}
 
 			scheduleResult, status := sched.schedulingAlgorithm(ctx, state, schedFwk, queuedPodInfo, time.Now())
 
@@ -817,7 +1057,7 @@ func TestFindNodesThatPassFiltersBudget(t *testing.T) {
 			}
 
 			got, err := algo.findNodesThatPassFilters(
-				ctx, schedFwk, framework.NewCycleState(), pod, &diagnosis, nodes, tt.numNodesToFind)
+				ctx, schedFwk, framework.NewCycleState(), pod, &diagnosis, nodes, tt.numNodesToFind, true /* allowRankNodes */)
 			if err != nil {
 				t.Fatalf("findNodesThatPassFilters returned error: %v", err)
 			}
@@ -876,7 +1116,7 @@ func TestFindNodesThatPassFiltersEmptyNodes(t *testing.T) {
 			diagnosis := framework.Diagnosis{
 				NodeToStatus: framework.NewDefaultNodeToStatus(),
 			}
-			res, err := algo.findNodesThatPassFilters(ctx, schedFwk, framework.NewCycleState(), pod, &diagnosis, nil, 1)
+			res, err := algo.findNodesThatPassFilters(ctx, schedFwk, framework.NewCycleState(), pod, &diagnosis, nil, 1, true /* allowRankNodes */)
 			if err != nil {
 				t.Fatalf("findNodesThatPassFilters returned unexpected error: %v", err)
 			}
@@ -957,16 +1197,26 @@ func (f *cycleRecordingFramework) GetNodeHint(ctx context.Context, pod *v1.Pod, 
 }
 
 var _ fwk.ReservePlugin = &assumeReserveTestPlugin{}
+var _ fwk.PermitPlugin = &assumeReserveTestPlugin{}
 
 // assumeReserveTestPlugin embeds fakePodGroupPlugin so a single mock instance can test both standard cache assumption
 // and pod-group snapshot assumption paths without duplicating plugin registration logic across subtests.
 type assumeReserveTestPlugin struct {
 	*fakePodGroupPlugin
 	reserveStatus *fwk.Status
-	unreserved    bool
+	// permitStatus is returned by Permit, Success if nil.
+	permitStatus *fwk.Status
+	unreserved   bool
+	// onReserve, if set, gets called by Reserve.
+	onReserve func()
+	// onPermit, if set, gets called by Permit.
+	onPermit func()
 }
 
 func (p *assumeReserveTestPlugin) Reserve(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) *fwk.Status {
+	if p.onReserve != nil {
+		p.onReserve()
+	}
 	if p.reserveStatus != nil {
 		return p.reserveStatus
 	}
@@ -975,6 +1225,16 @@ func (p *assumeReserveTestPlugin) Reserve(ctx context.Context, state fwk.CycleSt
 
 func (p *assumeReserveTestPlugin) Unreserve(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) {
 	p.unreserved = true
+}
+
+func (p *assumeReserveTestPlugin) Permit(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) (*fwk.Status, time.Duration) {
+	if p.onPermit != nil {
+		p.onPermit()
+	}
+	if p.permitStatus != nil {
+		return p.permitStatus, time.Minute
+	}
+	return fwk.NewStatus(fwk.Success), 0
 }
 
 func isPodInSnapshot(snapshot *internalcache.Snapshot, nodeName, podName string) bool {
@@ -995,12 +1255,13 @@ func newPodGroupCycleState() *framework.CycleState {
 }
 
 type rankNodesTestPlugin struct {
+	lock             sync.Mutex
 	name             string
 	ranksByNode      map[string]int
-	rankStatus       *fwk.Status
 	preFilterResult  *fwk.PreFilterResult
 	rejectedNodes    sets.Set[string]
 	scoresByNode     map[string]int64
+	filterHook       func(ctx context.Context, nodeName string)
 	rankInputOrder   []string
 	filteredNodes    []string
 	rankNodesInvoked bool
@@ -1032,9 +1293,6 @@ func (p *rankNodesTestPlugin) RankNodes(ctx context.Context, state fwk.CycleStat
 	for i, n := range nodes {
 		p.rankInputOrder[i] = n.Node().Name
 	}
-	if p.rankStatus != nil {
-		return nil, p.rankStatus
-	}
 	ranked := make([]framework.NodeWithRank, len(nodes))
 	for i, n := range nodes {
 		ranked[i] = framework.NodeWithRank{
@@ -1056,7 +1314,12 @@ func (p *rankNodesTestPlugin) PreFilterExtensions() fwk.PreFilterExtensions { re
 
 func (p *rankNodesTestPlugin) Filter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
 	nodeName := nodeInfo.Node().Name
+	p.lock.Lock()
 	p.filteredNodes = append(p.filteredNodes, nodeName)
+	p.lock.Unlock()
+	if p.filterHook != nil {
+		p.filterHook(ctx, nodeName)
+	}
 	if p.rejectedNodes.Has(nodeName) {
 		return fwk.NewStatus(fwk.Unschedulable, "rejected by rankNodesTestPlugin")
 	}
@@ -1079,15 +1342,19 @@ func TestSchedulePodWithRankNodes(t *testing.T) {
 
 	tests := []struct {
 		name                 string
+		extraNodes           []*v1.Node
 		podGroupCycle        bool
+		findAllNodes         bool
+		parallelism          int
 		nominatedNodeName    string
 		initialStartNodeIdx  int
 		ranksByNode          map[string]int
-		rankStatus           *fwk.Status
 		preFilterResult      *fwk.PreFilterResult
 		rejectedNodes        sets.Set[string]
 		scoresByNode         map[string]int64
+		filterHook           func(ctx context.Context, nodeName string)
 		wantSuggestedHost    string
+		wantFeasibleNodes    int
 		wantFilteredNodes    []string
 		wantRankInputOrder   []string
 		wantRankInputSet     sets.Set[string]
@@ -1107,7 +1374,7 @@ func TestSchedulePodWithRankNodes(t *testing.T) {
 				"node3": 10,
 			},
 			wantSuggestedHost:    "node3",
-			wantFilteredNodes:    []string{"node3", "node1", "node2"},
+			wantFilteredNodes:    []string{"node3"},
 			wantRankInputOrder:   []string{"node1", "node2", "node3"},
 			wantRankNodesInvoked: true,
 		},
@@ -1146,7 +1413,7 @@ func TestSchedulePodWithRankNodes(t *testing.T) {
 				"node2": 10,
 			},
 			wantSuggestedHost:    "node2",
-			wantFilteredNodes:    []string{"node2", "node1"},
+			wantFilteredNodes:    []string{"node2"},
 			wantRankInputSet:     sets.New("node1", "node2"),
 			wantRankNodesInvoked: true,
 		},
@@ -1165,7 +1432,7 @@ func TestSchedulePodWithRankNodes(t *testing.T) {
 				"node3": 10,
 			},
 			wantSuggestedHost:    "node2",
-			wantFilteredNodes:    []string{"node2", "node1", "node3"},
+			wantFilteredNodes:    []string{"node2", "node1"},
 			wantRankInputOrder:   []string{"node2", "node3", "node1"},
 			wantRankNodesInvoked: true,
 		},
@@ -1199,6 +1466,77 @@ func TestSchedulePodWithRankNodes(t *testing.T) {
 			wantFilteredNodes:    []string{"node2"},
 			wantRankNodesInvoked: false,
 		},
+		{
+			name:          "parallel Filter commits lower-rank node even when higher-rank node finishes Filter first",
+			extraNodes:    []*v1.Node{st.MakeNode().Name("node4").Obj()},
+			podGroupCycle: true,
+			parallelism:   2,
+			ranksByNode: map[string]int{
+				"node1": 0,
+				"node2": 1,
+				"node3": 1,
+				"node4": 2,
+			},
+			scoresByNode: map[string]int64{
+				"node1": 10,
+				"node2": 100,
+				"node3": 100,
+				"node4": 100,
+			},
+			filterHook: func() func(ctx context.Context, nodeName string) {
+				otherNodeCompleted := make(chan struct{})
+				var otherNodesStarted atomic.Int32
+				return func(_ context.Context, nodeName string) {
+					if nodeName == "node1" {
+						// Block the rank-0 node until the second worker has completely
+						// finished checkNode for node2 (rank 1) and started node3.
+						<-otherNodeCompleted
+						return
+					}
+					if otherNodesStarted.Add(1) == 2 {
+						close(otherNodeCompleted)
+					}
+				}
+			}(),
+			wantSuggestedHost:    "node1",
+			wantFeasibleNodes:    1,
+			wantFilteredNodes:    []string{"node1", "node2", "node3"},
+			wantRankInputOrder:   []string{"node1", "node2", "node3", "node4"},
+			wantRankNodesInvoked: true,
+		},
+		{
+			name:        "unranked parallel Filter commits immediately and cancels without waiting for lagging earlier node",
+			extraNodes:  []*v1.Node{st.MakeNode().Name("node4").Obj()},
+			parallelism: 2,
+			filterHook: func() func(ctx context.Context, nodeName string) {
+				node1Started := make(chan struct{})
+				return func(ctx context.Context, nodeName string) {
+					if nodeName == "node1" {
+						close(node1Started)
+						// Block index 0 until the second worker commits a feasible node and cancels ctx.
+						<-ctx.Done()
+						return
+					}
+					<-node1Started
+				}
+			}(),
+			wantSuggestedHost:    "node3",
+			wantFeasibleNodes:    1,
+			wantFilteredNodes:    []string{"node1", "node3"},
+			wantRankNodesInvoked: false,
+		},
+		{
+			name:          "FindAllNodesThatFitPod skips RankNodes and evaluates all nodes in pod group cycle",
+			podGroupCycle: true,
+			findAllNodes:  true,
+			ranksByNode: map[string]int{
+				"node1": 1,
+				"node2": 1,
+				"node3": 0,
+			},
+			wantFilteredNodes:    []string{"node1", "node2", "node3"},
+			wantRankNodesInvoked: false,
+		},
 	}
 
 	for _, tt := range tests {
@@ -1209,14 +1547,14 @@ func TestSchedulePodWithRankNodes(t *testing.T) {
 			plugin := &rankNodesTestPlugin{
 				name:            names.DefaultPreemption,
 				ranksByNode:     tt.ranksByNode,
-				rankStatus:      tt.rankStatus,
 				preFilterResult: tt.preFilterResult,
 				rejectedNodes:   tt.rejectedNodes,
 				scoresByNode:    tt.scoresByNode,
+				filterHook:      tt.filterHook,
 			}
 
 			cache := internalcache.New(ctx, nil, true, false)
-			for _, node := range allNodes {
+			for _, node := range slices.Concat(allNodes, tt.extraNodes) {
 				cache.AddNode(logger, node)
 			}
 			snapshot := internalcache.NewEmptySnapshot()
@@ -1247,16 +1585,21 @@ func TestSchedulePodWithRankNodes(t *testing.T) {
 				},
 			}
 
+			parallelism := 1
+			if tt.parallelism > 0 {
+				parallelism = tt.parallelism
+			}
 			schedFwk, err := frameworkruntime.NewFramework(ctx, registry, &profileCfg,
 				frameworkruntime.WithSnapshotSharedLister(snapshot),
 				frameworkruntime.WithPodNominator(internalqueue.NewTestQueue(ctx, nil)),
-				frameworkruntime.WithParallelism(1),
+				frameworkruntime.WithParallelism(parallelism),
 			)
 			if err != nil {
 				t.Fatalf("Failed to create framework: %v", err)
 			}
+			schedFwk.SetBatchingDisabled(true)
 
-			algo, err := NewSchedulingAlgorithm(snapshot, internalcache.New(ctx, nil, true, false))
+			algo, err := NewSchedulingAlgorithm(snapshot, internalcache.New(ctx, nil, true, false), WithCurrentCycleProvider(func() int64 { return 1 }))
 			if err != nil {
 				t.Fatalf("Failed to create algorithm: %v", err)
 			}
@@ -1275,12 +1618,25 @@ func TestSchedulePodWithRankNodes(t *testing.T) {
 				state = newPodGroupCycleState()
 			}
 
-			res, err := algo.SchedulePod(ctx, schedFwk, state, queuedPodInfo)
-			if err != nil {
-				t.Fatalf("SchedulePod failed: %v", err)
-			}
-			if res.SuggestedHost != tt.wantSuggestedHost {
-				t.Errorf("SuggestedHost = %q, want %q", res.SuggestedHost, tt.wantSuggestedHost)
+			if tt.findAllNodes {
+				feasibleNodes, _, err := algo.FindAllNodesThatFitPod(ctx, state, schedFwk, queuedPodInfo)
+				if err != nil {
+					t.Fatalf("FindAllNodesThatFitPod failed: %v", err)
+				}
+				if len(feasibleNodes) != len(tt.wantFilteredNodes) {
+					t.Errorf("len(feasibleNodes) = %d, want %d", len(feasibleNodes), len(tt.wantFilteredNodes))
+				}
+			} else {
+				res, err := algo.SchedulePod(ctx, schedFwk, state, queuedPodInfo)
+				if err != nil {
+					t.Fatalf("SchedulePod failed: %v", err)
+				}
+				if res.SuggestedHost != tt.wantSuggestedHost {
+					t.Errorf("SuggestedHost = %q, want %q", res.SuggestedHost, tt.wantSuggestedHost)
+				}
+				if tt.wantFeasibleNodes > 0 && res.FeasibleNodes != tt.wantFeasibleNodes {
+					t.Errorf("FeasibleNodes = %d, want %d", res.FeasibleNodes, tt.wantFeasibleNodes)
+				}
 			}
 			if plugin.rankNodesInvoked != tt.wantRankNodesInvoked {
 				t.Errorf("rankNodesInvoked = %v, want %v", plugin.rankNodesInvoked, tt.wantRankNodesInvoked)
@@ -1295,8 +1651,410 @@ func TestSchedulePodWithRankNodes(t *testing.T) {
 					t.Errorf("Unexpected rankInputSet (-want, +got):\n%s", diff)
 				}
 			}
-			if diff := cmp.Diff(tt.wantFilteredNodes, plugin.filteredNodes); diff != "" {
-				t.Errorf("Unexpected filteredNodes (-want, +got):\n%s", diff)
+			if tt.wantFilteredNodes != nil {
+				if tt.parallelism > 1 {
+					if diff := cmp.Diff(sets.New(tt.wantFilteredNodes...), sets.New(plugin.filteredNodes...)); diff != "" {
+						t.Errorf("Unexpected filteredNodes set (-want, +got):\n%s", diff)
+					}
+				} else if diff := cmp.Diff(tt.wantFilteredNodes, plugin.filteredNodes); diff != "" {
+					t.Errorf("Unexpected filteredNodes (-want, +got):\n%s", diff)
+				}
+			}
+		})
+	}
+}
+
+func TestPrepareAssumedPodExtraNodeAllocatableResources(t *testing.T) {
+	const host = "node-1"
+	entries := []v1.ExtraNodeAllocatableResource{
+		{
+			ContainerName: "",
+			Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
+			Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
+		},
+		{
+			ContainerName: "c1",
+			Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
+		},
+	}
+
+	tests := []struct {
+		name        string
+		enableGate  bool
+		createStore bool
+		setOnNode   string
+		want        []v1.ExtraNodeAllocatableResource
+	}{
+		{
+			name:        "gate enabled, entries recorded for host",
+			enableGate:  true,
+			createStore: true,
+			setOnNode:   host,
+			want:        entries,
+		},
+		{
+			name:        "gate enabled, entries recorded for another node",
+			enableGate:  true,
+			createStore: true,
+			setOnNode:   "node-2",
+		},
+		{
+			name:       "gate enabled, no store in cycle state",
+			enableGate: true,
+		},
+		{
+			name:        "gate disabled",
+			createStore: true,
+			setOnNode:   host,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.DRANodeAllocatableResources, tc.enableGate)
+
+			state := framework.NewCycleState()
+			if tc.createStore {
+				framework.GetOrCreateExtraNodeAllocatableResourcesState(state).Set(tc.setOnNode, "TestPlugin", entries)
+			}
+			podInfo, err := framework.NewPodInfo(st.MakePod().Name("pod").Namespace("ns").Obj())
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			assumed := (&SchedulingAlgorithm{}).prepareAssumedPod(state, &framework.QueuedPodInfo{PodInfo: podInfo}, host)
+			if diff := cmp.Diff(tc.want, assumed.Pod.Status.ExtraNodeAllocatableResources); diff != "" {
+				t.Errorf("assumed pod ExtraNodeAllocatableResources mismatch (-want +got):\n%s", diff)
+			}
+			if podInfo.Pod.Status.ExtraNodeAllocatableResources != nil {
+				t.Error("prepareAssumedPod modified the original pod")
+			}
+		})
+	}
+}
+
+type countingPlugin struct {
+	filtered atomic.Int32
+	scored   atomic.Int32
+}
+
+var (
+	_ fwk.FilterPlugin = &countingPlugin{}
+	_ fwk.ScorePlugin  = &countingPlugin{}
+	_ fwk.SignPlugin   = &countingPlugin{}
+)
+
+func (p *countingPlugin) Name() string { return "Counting" }
+
+func (p *countingPlugin) Filter(context.Context, fwk.CycleState, *v1.Pod, fwk.NodeInfo) *fwk.Status {
+	p.filtered.Add(1)
+	return nil
+}
+
+func (p *countingPlugin) Score(context.Context, fwk.CycleState, *v1.Pod, fwk.NodeInfo) (int64, *fwk.Status) {
+	p.scored.Add(1)
+	return 0, nil
+}
+
+func (p *countingPlugin) ScoreExtensions() fwk.ScoreExtensions { return nil }
+
+func (p *countingPlugin) SignPod(context.Context, *v1.Pod) ([]fwk.SignFragment, *fwk.Status) {
+	return nil, nil
+}
+
+// TestSchedulePodFeasibleNodes checks how many feasible nodes a scheduling attempt
+// collects and scores across PercentageOfNodesToScore and WithFirstFit options.
+func TestSchedulePodFeasibleNodes(t *testing.T) {
+	const totalNodes = 300
+	nodes := make([]*v1.Node, totalNodes)
+	for i := range totalNodes {
+		nodes[i] = st.MakeNode().Name(fmt.Sprintf("node-%03d", i)).Obj()
+	}
+	pod := st.MakePod().Name("pod1").Namespace("default").UID("pod1").Obj()
+
+	tests := []struct {
+		name              string
+		profilePercentage *int32
+		opts              []AlgorithmOption
+		extenders         []fwk.Extender
+		wantFilteredNodes int32
+		wantFeasibleNodes int
+		wantScoredNodes   int32
+		wantSuggestedHost string
+	}{
+		{
+			name: "adaptive percentage by default",
+			// Adaptive percentage for 300 nodes: 50 - 300/125 = 48%, so 300 * 48 / 100 = 144.
+			wantFilteredNodes: 144,
+			wantFeasibleNodes: 144,
+			wantScoredNodes:   144,
+		},
+		{
+			name: "global percentage",
+			opts: []AlgorithmOption{WithAlgorithmPercentageOfNodesToScore(10)},
+			// 10% of 300 is 30, raised to minFeasibleNodesToFind (100).
+			wantFilteredNodes: 100,
+			wantFeasibleNodes: 100,
+			wantScoredNodes:   100,
+		},
+		{
+			name:              "global 100% evaluates every node",
+			opts:              []AlgorithmOption{WithAlgorithmPercentageOfNodesToScore(100)},
+			wantFilteredNodes: totalNodes,
+			wantFeasibleNodes: totalNodes,
+			wantScoredNodes:   totalNodes,
+		},
+		{
+			name:              "profile percentage overrides the global one",
+			profilePercentage: ptr.To[int32](100),
+			opts:              []AlgorithmOption{WithAlgorithmPercentageOfNodesToScore(10)},
+			wantFilteredNodes: totalNodes,
+			wantFeasibleNodes: totalNodes,
+			wantScoredNodes:   totalNodes,
+		},
+		{
+			name:              "first fit stops at the first feasible node and skips scoring",
+			profilePercentage: ptr.To[int32](100),
+			opts:              []AlgorithmOption{WithFirstFit(), WithAlgorithmPercentageOfNodesToScore(100)},
+			wantFilteredNodes: 1,
+			wantFeasibleNodes: 1,
+			wantScoredNodes:   0,
+		},
+		{
+			name: "first fit with filter extender rejecting first candidate still schedules on another node and skips scoring",
+			opts: []AlgorithmOption{WithFirstFit()},
+			extenders: []fwk.Extender{
+				&tf.FakeExtender{
+					ExtenderName: "RejectFirstNodeExtender",
+					Predicates: []tf.FitPredicate{
+						func(_ *v1.Pod, node fwk.NodeInfo) *fwk.Status {
+							if node.Node().Name == "node-000" {
+								return fwk.NewStatus(fwk.Unschedulable, "rejected by extender")
+							}
+							return fwk.NewStatus(fwk.Success)
+						},
+					},
+				},
+			},
+			// Filter collects 144 candidates (adaptive percentage for 300 nodes);
+			// the extender rejects node-000, leaving 143 feasible nodes without scoring.
+			wantFilteredNodes: 144,
+			wantFeasibleNodes: 143,
+			wantScoredNodes:   0,
+			wantSuggestedHost: "node-001",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			snapshot := internalcache.NewSnapshot(nil, nodes)
+			counter := &countingPlugin{}
+
+			registerPlugins := []tf.RegisterPluginFunc{
+				tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+				tf.RegisterPluginAsExtensions(counter.Name(), func(context.Context, runtime.Object, fwk.Handle) (fwk.Plugin, error) {
+					return counter, nil
+				}, "Filter", "Score"),
+				func(_ *frameworkruntime.Registry, profile *schedulerapi.KubeSchedulerProfile) {
+					profile.PercentageOfNodesToScore = tt.profilePercentage
+				},
+			}
+
+			schedFwk, err := tf.NewFramework(ctx, registerPlugins, "default-scheduler",
+				frameworkruntime.WithSnapshotSharedLister(snapshot),
+				frameworkruntime.WithPodNominator(internalqueue.NewTestQueue(ctx, nil)),
+				frameworkruntime.WithExtenders(tt.extenders),
+				frameworkruntime.WithParallelism(1),
+			)
+			if err != nil {
+				t.Fatalf("Failed to create framework: %v", err)
+			}
+
+			algo, err := NewSchedulingAlgorithm(snapshot, internalcache.New(ctx, nil, true, false), tt.opts...)
+			if err != nil {
+				t.Fatalf("Failed to create algorithm: %v", err)
+			}
+			podInfo, err := framework.NewPodInfo(pod)
+			if err != nil {
+				t.Fatalf("Failed to create PodInfo: %v", err)
+			}
+			queuedPodInfo := &framework.QueuedPodInfo{PodInfo: podInfo}
+
+			res, err := algo.SchedulePod(ctx, schedFwk, framework.NewCycleState(), queuedPodInfo)
+			if err != nil {
+				t.Fatalf("SchedulePod failed: %v", err)
+			}
+			if got := counter.filtered.Load(); got != tt.wantFilteredNodes {
+				t.Errorf("filtered nodes = %d, want %d", got, tt.wantFilteredNodes)
+			}
+			if res.FeasibleNodes != tt.wantFeasibleNodes {
+				t.Errorf("FeasibleNodes = %d, want %d", res.FeasibleNodes, tt.wantFeasibleNodes)
+			}
+			if got := counter.scored.Load(); got != tt.wantScoredNodes {
+				t.Errorf("scored nodes = %d, want %d", got, tt.wantScoredNodes)
+			}
+			if tt.wantSuggestedHost != "" && res.SuggestedHost != tt.wantSuggestedHost {
+				t.Errorf("SuggestedHost = %q, want %q", res.SuggestedHost, tt.wantSuggestedHost)
+			}
+		})
+	}
+}
+
+// TestSchedulePodOpportunisticBatching verifies that opportunistic batching continues to
+// reuse hints across consecutive cycles for the default algorithm and does not score or
+// fail when WithFirstFit is enabled.
+func TestSchedulePodOpportunisticBatching(t *testing.T) {
+	rejectNode1Extender := &tf.FakeExtender{
+		ExtenderName: "RejectNode1Extender",
+		Predicates: []tf.FitPredicate{
+			func(_ *v1.Pod, node fwk.NodeInfo) *fwk.Status {
+				if node.Node().Name == "node1" {
+					return fwk.NewStatus(fwk.Unschedulable, "rejected by extender")
+				}
+				return fwk.NewStatus(fwk.Success)
+			},
+		},
+	}
+
+	tests := []struct {
+		name                string
+		nodeCPU             string
+		opts                []AlgorithmOption
+		extenders           []fwk.Extender
+		wantEvaluatedPerPod []int
+		wantTotalScored     int32
+		wantScheduledHosts  sets.Set[string]
+	}{
+		{
+			name:    "default algorithm reuses batch hints across consecutive cycles",
+			nodeCPU: "1",
+			// Pod 0 filters and scores all 3 nodes; pods 1 and 2 each consume a cached hint
+			// after the previously chosen node fills up, evaluating 1 node and skipping scoring.
+			wantEvaluatedPerPod: []int{3, 1, 1},
+			wantTotalScored:     3,
+			wantScheduledHosts:  sets.New("node1", "node2", "node3"),
+		},
+		{
+			name:    "default algorithm rescores last chosen node when still feasible",
+			nodeCPU: "2",
+			// Pod 0 scores all 3 nodes; pods 1 and 2 each rescore only the previously chosen
+			// node (3 + 1 + 1 = 5) and pick an unallocated node via the batch hint.
+			wantEvaluatedPerPod: []int{3, 1, 1},
+			wantTotalScored:     5,
+			wantScheduledHosts:  sets.New("node1", "node2", "node3"),
+		},
+		{
+			name:                "first fit schedules consecutive pods without scoring when batching is enabled",
+			nodeCPU:             "1",
+			opts:                []AlgorithmOption{WithFirstFit()},
+			wantEvaluatedPerPod: []int{1, 1, 1},
+			wantTotalScored:     0,
+			wantScheduledHosts:  sets.New("node1", "node2", "node3"),
+		},
+		{
+			name:                "first fit with filter extender schedules consecutive pods without scoring when batching is enabled",
+			nodeCPU:             "1",
+			opts:                []AlgorithmOption{WithFirstFit()},
+			extenders:           []fwk.Extender{rejectNode1Extender},
+			wantEvaluatedPerPod: []int{3, 3},
+			wantTotalScored:     0,
+			wantScheduledHosts:  sets.New("node2", "node3"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.OpportunisticBatching, true)
+			logger, ctx := ktesting.NewTestContext(t)
+
+			cache := internalcache.New(ctx, nil, false, false)
+			for _, name := range []string{"node1", "node2", "node3"} {
+				node := st.MakeNode().Name(name).Capacity(map[v1.ResourceName]string{v1.ResourceCPU: tt.nodeCPU}).Obj()
+				cache.AddNode(logger, node)
+			}
+			snapshot := internalcache.NewEmptySnapshot()
+			if err := cache.UpdateSnapshot(logger, snapshot); err != nil {
+				t.Fatalf("Failed to update snapshot: %v", err)
+			}
+
+			counter := &countingPlugin{}
+			registerPlugins := []tf.RegisterPluginFunc{
+				tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+				tf.RegisterPluginAsExtensions(noderesources.Name, frameworkruntime.FactoryAdapter(plfeature.Features{}, noderesources.NewFit), "PreFilter", "Filter", "Score"),
+				tf.RegisterScorePlugin(counter.Name(), func(context.Context, runtime.Object, fwk.Handle) (fwk.Plugin, error) {
+					return counter, nil
+				}, 1),
+			}
+
+			schedFwk, err := tf.NewFramework(ctx, registerPlugins, "default-scheduler",
+				frameworkruntime.WithSnapshotSharedLister(snapshot),
+				frameworkruntime.WithPodNominator(internalqueue.NewTestQueue(ctx, nil)),
+				frameworkruntime.WithExtenders(tt.extenders),
+				frameworkruntime.WithParallelism(1),
+			)
+			if err != nil {
+				t.Fatalf("Failed to create framework: %v", err)
+			}
+
+			var cycle int64
+			algoOpts := append(slices.Clone(tt.opts), WithCurrentCycleProvider(func() int64 { return cycle }))
+			algo, err := NewSchedulingAlgorithm(snapshot, cache, algoOpts...)
+			if err != nil {
+				t.Fatalf("Failed to create algorithm: %v", err)
+			}
+
+			var gotEvaluated []int
+			gotHosts := sets.New[string]()
+			for i := range len(tt.wantEvaluatedPerPod) {
+				cycle = int64(i + 1)
+				pod := st.MakePod().
+					Name(fmt.Sprintf("pod-%d", i)).
+					UID(fmt.Sprintf("pod-%d", i)).
+					Namespace(v1.NamespaceDefault).
+					SchedulerName("default-scheduler").
+					Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).
+					Obj()
+
+				sig := schedFwk.SignPod(ctx, pod)
+				if len(tt.extenders) == 0 && len(sig) == 0 {
+					t.Fatal("SignPod returned empty signature, want batchable pod")
+				}
+
+				podInfo, err := framework.NewPodInfo(pod)
+				if err != nil {
+					t.Fatalf("Failed to create PodInfo: %v", err)
+				}
+				queuedPodInfo := &framework.QueuedPodInfo{
+					PodInfo:      podInfo,
+					PodSignature: sig,
+				}
+
+				res, err := algo.SchedulePod(ctx, schedFwk, framework.NewCycleState(), queuedPodInfo)
+				if err != nil {
+					t.Fatalf("SchedulePod(pod-%d) failed: %v", i, err)
+				}
+				gotEvaluated = append(gotEvaluated, res.EvaluatedNodes)
+				gotHosts.Insert(res.SuggestedHost)
+
+				if _, status := algo.AssumeAndReserveInCache(ctx, framework.NewCycleState(), schedFwk, queuedPodInfo, res); !status.IsSuccess() {
+					t.Fatalf("AssumeAndReserveInCache(pod-%d) failed: %v", i, status.AsError())
+				}
+				if err := cache.UpdateSnapshot(logger, snapshot); err != nil {
+					t.Fatalf("UpdateSnapshot(pod-%d) failed: %v", i, err)
+				}
+			}
+
+			if diff := cmp.Diff(tt.wantEvaluatedPerPod, gotEvaluated); diff != "" {
+				t.Errorf("EvaluatedNodes per pod (-want,+got):\n%s", diff)
+			}
+			if got := counter.scored.Load(); got != tt.wantTotalScored {
+				t.Errorf("total scored nodes = %d, want %d", got, tt.wantTotalScored)
+			}
+			if diff := cmp.Diff(tt.wantScheduledHosts, gotHosts); diff != "" {
+				t.Errorf("scheduled hosts (-want,+got):\n%s", diff)
 			}
 		})
 	}

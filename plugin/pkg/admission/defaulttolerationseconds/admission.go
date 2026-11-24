@@ -127,8 +127,8 @@ func (p *Plugin) Admit(ctx context.Context, attributes admission.Attributes, o a
 		return nil
 	}
 
-	if len(attributes.GetSubresource()) > 0 {
-		// only run the checks below on pods proper and not subresources
+	if len(attributes.GetSubresource()) > 0 && attributes.GetSubresource() != "dynamic" {
+		// only run the checks below on pods proper and the dynamic subresource
 		return nil
 	}
 

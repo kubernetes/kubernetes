@@ -71,19 +71,10 @@ func (m *Matcher) ValidateInitialization() error {
 	return nil
 }
 
+// Matches reports whether the request matches criteria. Resource rules are
+// checked before the selectors because they are much cheaper to evaluate;
+// selector errors are only returned if the rules match.
 func (m *Matcher) Matches(attr admission.Attributes, o admission.ObjectInterfaces, criteria MatchCriteria) (bool, schema.GroupVersionResource, schema.GroupVersionKind, error) {
-	matches, matchNsErr := m.namespaceMatcher.MatchNamespaceSelector(criteria, attr)
-	// Should not return an error here for policy which do not apply to the request, even if err is an unexpected scenario.
-	if !matches && matchNsErr == nil {
-		return false, schema.GroupVersionResource{}, schema.GroupVersionKind{}, nil
-	}
-
-	matches, matchObjErr := m.objectMatcher.MatchObjectSelector(criteria, attr)
-	// Should not return an error here for policy which do not apply to the request, even if err is an unexpected scenario.
-	if !matches && matchObjErr == nil {
-		return false, schema.GroupVersionResource{}, schema.GroupVersionKind{}, nil
-	}
-
 	matchResources := criteria.GetMatchResources()
 	matchPolicy := matchResources.MatchPolicy
 	if isExcluded, _, _, err := matchesResourceRules(matchResources.ExcludeResourceRules, matchPolicy, attr, o); isExcluded || err != nil {
@@ -110,7 +101,20 @@ func (m *Matcher) Matches(attr admission.Attributes, o admission.ObjectInterface
 		return false, schema.GroupVersionResource{}, schema.GroupVersionKind{}, nil
 	}
 
-	// now that we know this applies to this request otherwise, if there were selector errors, return them
+	// Rules match. Selectors are checked last because parsing them is the
+	// expensive part and most requests never get this far.
+	matches, matchNsErr := m.namespaceMatcher.MatchNamespaceSelector(criteria, attr)
+	// Should not return an error here for policy which do not apply to the request, even if err is an unexpected scenario.
+	if !matches && matchNsErr == nil {
+		return false, schema.GroupVersionResource{}, schema.GroupVersionKind{}, nil
+	}
+
+	matches, matchObjErr := m.objectMatcher.MatchObjectSelector(criteria, attr)
+	// Should not return an error here for policy which do not apply to the request, even if err is an unexpected scenario.
+	if !matches && matchObjErr == nil {
+		return false, schema.GroupVersionResource{}, schema.GroupVersionKind{}, nil
+	}
+
 	if matchNsErr != nil {
 		return false, schema.GroupVersionResource{}, schema.GroupVersionKind{}, matchNsErr
 	}
@@ -122,6 +126,11 @@ func (m *Matcher) Matches(attr admission.Attributes, o admission.ObjectInterface
 }
 
 func matchesResourceRules(namedRules []v1.NamedRuleWithOperations, matchPolicy *v1.MatchPolicyType, attr admission.Attributes, o admission.ObjectInterfaces) (bool, schema.GroupVersionResource, schema.GroupVersionKind, error) {
+	// Empty rules never match; return before the equivalence lookup allocates.
+	if len(namedRules) == 0 {
+		return false, schema.GroupVersionResource{}, schema.GroupVersionKind{}, nil
+	}
+
 	matchKind := attr.GetKind()
 	matchResource := attr.GetResource()
 

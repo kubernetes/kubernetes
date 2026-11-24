@@ -70,15 +70,9 @@ type DeviceRequestAllocationResultApplyConfiguration struct {
 	Tolerations []DeviceTolerationApplyConfiguration `json:"tolerations,omitempty"`
 	// bindingConditions contains a copy of the BindingConditions
 	// from the corresponding ResourceSlice at the time of allocation.
-	//
-	// This is a beta field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
-	// feature gates.
 	BindingConditions []string `json:"bindingConditions,omitempty"`
 	// bindingFailureConditions contains a copy of the BindingFailureConditions
 	// from the corresponding ResourceSlice at the time of allocation.
-	//
-	// This is a beta field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
-	// feature gates.
 	BindingFailureConditions []string `json:"bindingFailureConditions,omitempty"`
 	// shareID uniquely identifies an individual allocation share of the device,
 	// used when the device supports multiple simultaneous allocations.
@@ -104,6 +98,57 @@ type DeviceRequestAllocationResultApplyConfiguration struct {
 	// a claim skip an operation, that gRPC call will be skipped. It is a copy of
 	// the ResourceSlice.spec.skipNodeOperations value at the time when the device was allocated.
 	SkipNodeOperations []resourcev1.SkipNodeOperation `json:"skipNodeOperations,omitempty"`
+	// consumedCounters records resolved valueFrom consumption for the single device
+	// identified by this allocation result, grouped by counter set in that
+	// device's pool. Each result records only its own request-dependent amounts.
+	// The scheduler sums these amounts across non-admin allocation results,
+	// including multiple shares of the same device. Releasing one allocation
+	// releases its recorded amounts without changing those of other allocations.
+	//
+	// Quantities are resolved at allocation time from the matching claim capacity
+	// requests, including consumptionPolicy rounding. They may therefore be greater
+	// than the requested amounts. If the claim omits a mapped capacity request,
+	// consumption uses the shared counter's policy default, or its full value
+	// when no default is defined. All resolved valueFrom counters are included,
+	// even when their quantity is zero.
+	//
+	// The recorded amounts and counter set references remain authoritative if
+	// ResourceSlice mappings, defaults, or policies change. A mapping change does
+	// not move an existing allocation's consumption to a different counter set.
+	// DRA drivers can use these amounts without access to ResourceSlices.
+	//
+	// Fixed counter consumption is not recorded here. The scheduler determines
+	// fixed consumption from current ResourceSlices, including consumptionPolicy
+	// rounding, and counts it once per (driver, pool, device) with at least one
+	// non-admin allocation. If the device definition is missing, its fixed
+	// consumption is not counted.
+	// Current fixed consumption is added to the recorded request-dependent
+	// consumption; changing a counter from valueFrom to value does not replace
+	// the recorded amounts.
+	//
+	// Current counter values still define the total budget. Reducing a
+	// counter below its recorded consumption prevents further counter consumption;
+	// existing allocation results are not changed.
+	// Recorded amounts are still counted if the allocated device is no longer
+	// present in current ResourceSlices. Amounts that refer to a missing counter
+	// set or counter are ignored.
+	//
+	// ResourceSlice updates do not resize or revoke existing allocations.
+	// Drivers must ensure that updates remain compatible with existing allocations,
+	// or arrange for affected allocations to be released first.
+	//
+	// This field is populated only for non-admin allocations when
+	// DRASharedConsumableCapacity is enabled. An absent field means that no
+	// request-dependent consumption was recorded, including for allocations
+	// made before the feature was enabled.
+	// If this field is absent, the scheduler counts this allocation's
+	// request-dependent counter consumption as zero. It does not reconstruct
+	// that consumption from the device's current valueFrom mappings.
+	//
+	// The list contains at most 2 counter sets (the maximum a device may consume
+	// in a ResourceSlice), keyed by counter set name. Its order has no correspondence
+	// to the order of counter sets or devices in ResourceSlices.
+	ConsumedCounters []CounterSetConsumptionApplyConfiguration `json:"consumedCounters,omitempty"`
 }
 
 // DeviceRequestAllocationResultApplyConfiguration constructs a declarative configuration of the DeviceRequestAllocationResult type for use with
@@ -213,6 +258,19 @@ func (b *DeviceRequestAllocationResultApplyConfiguration) WithConsumedCapacity(e
 func (b *DeviceRequestAllocationResultApplyConfiguration) WithSkipNodeOperations(values ...resourcev1.SkipNodeOperation) *DeviceRequestAllocationResultApplyConfiguration {
 	for i := range values {
 		b.SkipNodeOperations = append(b.SkipNodeOperations, values[i])
+	}
+	return b
+}
+
+// WithConsumedCounters adds the given value to the ConsumedCounters field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the ConsumedCounters field.
+func (b *DeviceRequestAllocationResultApplyConfiguration) WithConsumedCounters(values ...*CounterSetConsumptionApplyConfiguration) *DeviceRequestAllocationResultApplyConfiguration {
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithConsumedCounters")
+		}
+		b.ConsumedCounters = append(b.ConsumedCounters, *values[i])
 	}
 	return b
 }

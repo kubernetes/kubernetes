@@ -306,7 +306,7 @@ func (p *Preferences) applyAliases(rootCmd *cobra.Command, kuberc *config.Prefer
 		for _, fl := range aliasArgs.flags {
 			existingFlag := foundAliasCmd.Flag(fl.Name)
 			if existingFlag == nil {
-				return args, fmt.Errorf("invalid alias flag %s in alias %s", fl.Name, args[0])
+				return args, fmt.Errorf("invalid alias flag %s in alias %s", fl.Name, alias.Name)
 			}
 			if searchInArgs(existingFlag.Name, existingFlag.Shorthand, allShorthands, args) {
 				// Don't modify the value implicitly, if it is passed in args explicitly
@@ -314,7 +314,7 @@ func (p *Preferences) applyAliases(rootCmd *cobra.Command, kuberc *config.Prefer
 			}
 			err = foundAliasCmd.Flags().Set(fl.Name, fl.Default)
 			if err != nil {
-				return args, fmt.Errorf("could not apply value %s to flag %s in alias %s err: %w", fl.Default, fl.Name, args[0], err)
+				return args, fmt.Errorf("could not apply value %s to flag %s in alias %s err: %w", fl.Default, fl.Name, alias.Name, err)
 			}
 			aliasArgs.originalCommand.WriteString(fmt.Sprintf(" --%s=%s", fl.Name, fl.Default))
 		}
@@ -437,7 +437,7 @@ func getExplicitKuberc(args []string) (string, error) {
 				break
 			}
 			return "", fmt.Errorf("kuberc file is not found")
-		} else if strings.Contains(arg, "--kuberc=") {
+		} else if strings.HasPrefix(arg, "--kuberc=") {
 			// Split only on the first "=", since the path itself may contain "=".
 			parg := strings.SplitN(arg, "=", 2)
 			if len(parg) > 1 && parg[1] != "" {

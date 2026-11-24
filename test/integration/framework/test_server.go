@@ -250,8 +250,8 @@ func StartTestServer(ctx context.Context, t utils.TB, setup TestServerSetup) (cl
 	kubeAPIServerClientConfig.CAData = nil
 	kubeAPIServerClientConfig.ServerName = ""
 
-	// wait for health
-	err = wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 10*time.Second, true, func(ctx context.Context) (done bool, err error) {
+	// Allow slow CI workers enough time to finish post-start hooks and create the bootstrap namespaces.
+	err = wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, time.Minute, true, func(ctx context.Context) (done bool, err error) {
 		select {
 		case err := <-errCh:
 			return false, err

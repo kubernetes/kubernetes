@@ -662,12 +662,31 @@ func BenchmarkMatcher(b *testing.B) {
 	}
 
 	criteria := &fakeCriteria{matchResources: mr}
-	attrs := admission.NewAttributesRecord(nil, nil, gvk("autoscaling", "v1", "Scale"), "ns", "name", gvr("apps", "v1", "deployments"), "scale", admission.Create, &metav1.CreateOptions{}, false, nil)
 	interfaces := &admission.RuntimeObjectInterfaces{EquivalentResourceMapper: mapper}
 	matcher := &Matcher{namespaceMatcher: &namespace.Matcher{NamespaceLister: namespaceLister}, objectMatcher: &object.Matcher{}}
 
-	for i := 0; i < b.N; i++ {
-		matcher.Matches(attrs, interfaces, criteria)
+	for _, tc := range []struct {
+		name  string
+		attrs admission.Attributes
+	}{
+		{
+			name:  "rules match",
+			attrs: admission.NewAttributesRecord(nil, nil, gvk("autoscaling", "v1", "Scale"), "ns", "name", gvr("apps", "v1", "deployments"), "scale", admission.Create, &metav1.CreateOptions{}, false, nil),
+		},
+		{
+			// Most requests on a busy cluster match none of a policy's rules.
+			name:  "rules do not match",
+			attrs: admission.NewAttributesRecord(nil, nil, gvk("coordination.k8s.io", "v1", "Lease"), "ns", "name", gvr("coordination.k8s.io", "v1", "leases"), "", admission.Update, &metav1.UpdateOptions{}, false, nil),
+		},
+	} {
+		b.Run(tc.name, func(b *testing.B) {
+			b.ReportAllocs()
+			for i := 0; i < b.N; i++ {
+				if _, _, _, err := matcher.Matches(tc.attrs, interfaces, criteria); err != nil {
+					b.Fatal(err)
+				}
+			}
+		})
 	}
 }
 
@@ -813,5 +832,43 @@ func BenchmarkShouldCallHookWithComplexSelectorAndRule(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		matcher.Matches(attrs, interfaces, criteria)
+	}
+}
+
+// failingSelectorCriteria fails the test if a selector is parsed.
+type failingSelectorCriteria struct {
+	fakeCriteria
+	t *testing.T
+}
+
+func (c *failingSelectorCriteria) GetParsedNamespaceSelector() (labels.Selector, error) {
+	c.t.Fatal("namespace selector parsed for a request that matches no rule")
+	return nil, nil
+}
+
+func (c *failingSelectorCriteria) GetParsedObjectSelector() (labels.Selector, error) {
+	c.t.Fatal("object selector parsed for a request that matches no rule")
+	return nil, nil
+}
+
+// TestMatcherSkipsSelectorsWhenRulesDoNotMatch verifies that selectors are not
+// evaluated for requests that match no resource rule.
+func TestMatcherSkipsSelectorsWhenRulesDoNotMatch(t *testing.T) {
+	allScopes := v1.AllScopes
+	criteria := &failingSelectorCriteria{t: t, fakeCriteria: fakeCriteria{matchResources: v1.MatchResources{
+		NamespaceSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"a": "b"}},
+		ObjectSelector:    &metav1.LabelSelector{MatchLabels: map[string]string{"a": "b"}},
+		ResourceRules: []v1.NamedRuleWithOperations{{RuleWithOperations: v1.RuleWithOperations{
+			Operations: []v1.OperationType{v1.Create},
+			Rule:       v1.Rule{APIGroups: []string{""}, APIVersions: []string{"*"}, Resources: []string{"pods"}, Scope: &allScopes},
+		}}},
+	}}}
+	matcher := &Matcher{namespaceMatcher: &namespace.Matcher{}, objectMatcher: &object.Matcher{}}
+	interfaces := &admission.RuntimeObjectInterfaces{EquivalentResourceMapper: runtime.NewEquivalentResourceRegistry()}
+	attrs := admission.NewAttributesRecord(nil, nil, gvk("coordination.k8s.io", "v1", "Lease"), "ns", "name", gvr("coordination.k8s.io", "v1", "leases"), "", admission.Update, &metav1.UpdateOptions{}, false, nil)
+
+	matches, _, _, err := matcher.Matches(attrs, interfaces, criteria)
+	if err != nil || matches {
+		t.Fatalf("expected no match and no error, got matches=%v err=%v", matches, err)
 	}
 }

@@ -42,7 +42,7 @@ type NodeSpecApplyConfiguration struct {
 	// see: https://issues.k8s.io/61966
 	DoNotUseExternalID *string `json:"externalID,omitempty"`
 	// podPreemptionPolicy controls the node-level preemption behaviors for pods on this node.
-	// This is an alpha field and requires enabling the InPlacePodVerticalScalingSchedulerPreemption feature gate.
+	// This is a beta field and requires the InPlacePodVerticalScalingSchedulerPreemption feature gate to be enabled (enabled by default).
 	PodPreemptionPolicy *NodePodPreemptionPolicyApplyConfiguration `json:"podPreemptionPolicy,omitempty"`
 }
 

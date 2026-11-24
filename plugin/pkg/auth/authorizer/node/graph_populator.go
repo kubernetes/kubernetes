@@ -43,6 +43,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	"k8s.io/klog/v2"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/utils/ptr"
 )
 
@@ -194,8 +195,17 @@ func podSpecChanged(oldPod, newPod *corev1.Pod) bool {
 	if len(newPod.Spec.EphemeralContainers) > len(oldPod.Spec.EphemeralContainers) {
 		return true
 	}
-	if !apiequality.Semantic.DeepEqual(oldPod.Spec.Volumes, newPod.Spec.Volumes) {
-		return true
+	// Containers added through pods/dynamic can reference new secrets or config maps, and the
+	// references of removed containers must be dropped.
+	for pair := range podutil.ContainerPairs(newPod, oldPod, podutil.Containers) {
+		if pair.New == nil || pair.Old == nil || !apiequality.Semantic.DeepEqual(pair.New, pair.Old) {
+			return true
+		}
+	}
+	for pair := range podutil.VolumePairs(newPod, oldPod) {
+		if pair.New == nil || pair.Old == nil || !apiequality.Semantic.DeepEqual(pair.New, pair.Old) {
+			return true
+		}
 	}
 	return false
 }

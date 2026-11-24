@@ -2502,15 +2502,16 @@ var (
 
 func TestPodInfoCalculateResources(t *testing.T) {
 	testCases := []struct {
-		name                                 string
-		containers                           []v1.Container
-		podResources                         *v1.ResourceRequirements
-		podLevelResourcesEnabled             bool
-		nodeAllocatableResourcesDRAEnabled   bool
-		nodeAllocatableResourceClaimStatuses []v1.NodeAllocatableResourceClaimStatus
-		expectedResource                     fwk.PodResource
-		initContainers                       []v1.Container
-		overhead                             *v1.ResourceList
+		name                               string
+		containers                         []v1.Container
+		podResources                       *v1.ResourceRequirements
+		podLevelResourcesEnabled           bool
+		nodeAllocatableResourcesDRAEnabled bool
+		extraNodeAllocatableResources      []v1.ExtraNodeAllocatableResource
+		unbound                            bool
+		expectedResource                   fwk.PodResource
+		initContainers                     []v1.Container
+		overhead                           *v1.ResourceList
 	}{
 		{
 			name:       "requestless container",
@@ -2701,6 +2702,36 @@ func TestPodInfoCalculateResources(t *testing.T) {
 			},
 		},
 		{
+			name:                     "pod-level memory requests and 1X container missing cpu request",
+			podLevelResourcesEnabled: true,
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU: cpu500m,
+						},
+					},
+				},
+				{
+					Resources: v1.ResourceRequirements{},
+				},
+			},
+			podResources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceMemory: mem1200M,
+				},
+			},
+			expectedResource: fwk.PodResource{
+				Resource: &Resource{
+					MilliCPU: cpu500m.MilliValue(),
+					Memory:   mem1200M.Value(),
+				},
+				// cpu falls back to containers, so the requestless one gets the default.
+				Non0CPU: cpu500m.MilliValue() + schedutil.DefaultMilliCPURequest,
+				Non0Mem: mem1200M.Value(),
+			},
+		},
+		{
 			name:                     "1X container unsupported resources and pod-level supported resources",
 			podLevelResourcesEnabled: true,
 			initContainers: []v1.Container{
@@ -2755,13 +2786,41 @@ func TestPodInfoCalculateResources(t *testing.T) {
 					},
 				},
 			},
-			nodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+			extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 				{
-					ResourceClaimName: "node-allocatable-claim",
-					Mapping: []v1.NodeAllocatableMappedResources{
-						{Name: v1.ResourceCPU, Quantity: new(cpu100m)},
-						{Name: v1.ResourceMemory, Quantity: new(mem200M)},
+					ContainerName: "",
+					Requests:      v1.ResourceList{v1.ResourceCPU: cpu100m, v1.ResourceMemory: mem200M},
+					Limits:        v1.ResourceList{v1.ResourceCPU: cpu100m, v1.ResourceMemory: mem200M},
+				},
+			},
+			expectedResource: fwk.PodResource{
+				Resource: &Resource{
+					MilliCPU: cpu500m.MilliValue(),
+					Memory:   mem500M.Value(),
+				},
+				Non0CPU: cpu500m.MilliValue(),
+				Non0Mem: mem500M.Value(),
+			},
+		},
+		{
+			name:                               "unbound pod ignores stale extra node allocatable resources",
+			nodeAllocatableResourcesDRAEnabled: true,
+			unbound:                            true,
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    cpu500m,
+							v1.ResourceMemory: mem500M,
+						},
 					},
+				},
+			},
+			extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+				{
+					ContainerName: "",
+					Requests:      v1.ResourceList{v1.ResourceCPU: cpu100m, v1.ResourceMemory: mem200M},
+					Limits:        v1.ResourceList{v1.ResourceCPU: cpu100m, v1.ResourceMemory: mem200M},
 				},
 			},
 			expectedResource: fwk.PodResource{
@@ -2791,13 +2850,11 @@ func TestPodInfoCalculateResources(t *testing.T) {
 					},
 				},
 			},
-			nodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+			extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 				{
-					ResourceClaimName: "node-allocatable-claim",
-					Mapping: []v1.NodeAllocatableMappedResources{
-						{Name: v1.ResourceCPU, Quantity: new(cpu100m)},
-						{Name: v1.ResourceMemory, Quantity: new(mem200M)},
-					},
+					ContainerName: "",
+					Requests:      v1.ResourceList{v1.ResourceCPU: cpu100m, v1.ResourceMemory: mem200M},
+					Limits:        v1.ResourceList{v1.ResourceCPU: cpu100m, v1.ResourceMemory: mem200M},
 				},
 			},
 			expectedResource: fwk.PodResource{
@@ -2830,19 +2887,11 @@ func TestPodInfoCalculateResources(t *testing.T) {
 					},
 				},
 			},
-			nodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+			extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 				{
-					ResourceClaimName: "node-allocatable-claim-1",
-					Mapping: []v1.NodeAllocatableMappedResources{
-						{Name: v1.ResourceCPU, Quantity: new(cpu100m)},
-						{Name: v1.ResourceMemory, Quantity: new(mem200M)},
-					},
-				},
-				{
-					ResourceClaimName: "node-allocatable-claim-2",
-					Mapping: []v1.NodeAllocatableMappedResources{
-						{Name: v1.ResourceCPU, Quantity: new(cpu100m)},
-					},
+					ContainerName: "",
+					Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("200m"), v1.ResourceMemory: mem200M},
+					Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("200m"), v1.ResourceMemory: mem200M},
 				},
 			},
 			expectedResource: fwk.PodResource{
@@ -2872,13 +2921,11 @@ func TestPodInfoCalculateResources(t *testing.T) {
 					},
 				},
 			},
-			nodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+			extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 				{
-					ResourceClaimName: "node-allocatable-claim-1",
-					Mapping: []v1.NodeAllocatableMappedResources{
-						{Name: v1.ResourceCPU, Quantity: new(cpu1000m)},
-						{Name: v1.ResourceMemory, Quantity: new(mem200M)},
-					},
+					ContainerName: "",
+					Requests:      v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem200M},
+					Limits:        v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem200M},
 				},
 			},
 			expectedResource: fwk.PodResource{
@@ -2923,13 +2970,11 @@ func TestPodInfoCalculateResources(t *testing.T) {
 					},
 				},
 			},
-			nodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+			extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 				{
-					ResourceClaimName: "node-allocatable-claim-1",
-					Mapping: []v1.NodeAllocatableMappedResources{
-						{Name: v1.ResourceCPU, Quantity: new(cpu100m)},
-						{Name: v1.ResourceMemory, Quantity: new(mem200M)},
-					},
+					ContainerName: "",
+					Requests:      v1.ResourceList{v1.ResourceCPU: cpu100m, v1.ResourceMemory: mem200M},
+					Limits:        v1.ResourceList{v1.ResourceCPU: cpu100m, v1.ResourceMemory: mem200M},
 				},
 			},
 			expectedResource: fwk.PodResource{
@@ -2966,13 +3011,11 @@ func TestPodInfoCalculateResources(t *testing.T) {
 					v1.ResourceMemory: mem800M,
 				},
 			},
-			nodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+			extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 				{
-					ResourceClaimName: "node-allocatable-claim-1",
-					Mapping: []v1.NodeAllocatableMappedResources{
-						{Name: v1.ResourceCPU, Quantity: new(cpu100m)},
-						{Name: v1.ResourceMemory, Quantity: new(mem200M)},
-					},
+					ContainerName: "",
+					Requests:      v1.ResourceList{v1.ResourceCPU: cpu100m, v1.ResourceMemory: mem200M},
+					Limits:        v1.ResourceList{v1.ResourceCPU: cpu100m, v1.ResourceMemory: mem200M},
 				},
 			},
 			expectedResource: fwk.PodResource{
@@ -3002,13 +3045,11 @@ func TestPodInfoCalculateResources(t *testing.T) {
 					},
 				},
 			},
-			nodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+			extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 				{
-					ResourceClaimName: "node-allocatable-claim-1",
-					Mapping: []v1.NodeAllocatableMappedResources{
-						{Name: v1.ResourceCPU, Quantity: new(cpu100m)},
-						{Name: v1.ResourceMemory, Quantity: new(mem200M)},
-					},
+					ContainerName: "",
+					Requests:      v1.ResourceList{v1.ResourceCPU: cpu100m, v1.ResourceMemory: mem200M},
+					Limits:        v1.ResourceList{v1.ResourceCPU: cpu100m, v1.ResourceMemory: mem200M},
 				},
 			},
 			// Pod Overhead
@@ -3044,22 +3085,16 @@ func TestPodInfoCalculateResources(t *testing.T) {
 					},
 				},
 			},
-			nodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+			extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 				{
-					ResourceClaimName: "node-allocatable-claim",
-					Containers:        []string{"c1"},
-					Overhead: []v1.NodeAllocatableOverheadResources{
-						{
-							Name:         v1.ResourceCPU,
-							PerPod:       &cpu100m,
-							PerContainer: &cpu100m,
-						},
-						{
-							Name:         v1.ResourceMemory,
-							PerPod:       &mem200M,
-							PerContainer: &mem200M,
-						},
-					},
+					ContainerName: "",
+					Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("200m"), v1.ResourceMemory: resource.MustParse("400Mi")},
+					Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("200m"), v1.ResourceMemory: resource.MustParse("400Mi")},
+				},
+				{
+					ContainerName: "c1",
+					Requests:      v1.ResourceList{v1.ResourceCPU: cpu100m, v1.ResourceMemory: mem200M},
+					Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("200m"), v1.ResourceMemory: resource.MustParse("400Mi")},
 				},
 			},
 			expectedResource: fwk.PodResource{
@@ -3090,32 +3125,16 @@ func TestPodInfoCalculateResources(t *testing.T) {
 					},
 				},
 			},
-			nodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+			extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 				{
-					ResourceClaimName: "node-allocatable-claim",
-					Containers:        []string{"c1"},
-					Mapping: []v1.NodeAllocatableMappedResources{
-						{
-							Name:     v1.ResourceCPU,
-							Quantity: new(cpu100m),
-						},
-						{
-							Name:     v1.ResourceMemory,
-							Quantity: new(mem200M),
-						},
-					},
-					Overhead: []v1.NodeAllocatableOverheadResources{
-						{
-							Name:         v1.ResourceCPU,
-							PerPod:       &cpu100m,
-							PerContainer: &cpu100m,
-						},
-						{
-							Name:         v1.ResourceMemory,
-							PerPod:       &mem200M,
-							PerContainer: &mem200M,
-						},
-					},
+					ContainerName: "",
+					Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("300m"), v1.ResourceMemory: resource.MustParse("600Mi")},
+					Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("300m"), v1.ResourceMemory: resource.MustParse("600Mi")},
+				},
+				{
+					ContainerName: "c1",
+					Requests:      v1.ResourceList{v1.ResourceCPU: cpu100m, v1.ResourceMemory: mem200M},
+					Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("300m"), v1.ResourceMemory: resource.MustParse("600Mi")},
 				},
 			},
 			expectedResource: fwk.PodResource{
@@ -3130,6 +3149,9 @@ func TestPodInfoCalculateResources(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			if !tc.podLevelResourcesEnabled {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.37"))
+			}
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 				features.PodLevelResources:           tc.podLevelResourcesEnabled,
 				features.DRANodeAllocatableResources: tc.nodeAllocatableResourcesDRAEnabled,
@@ -3139,6 +3161,9 @@ func TestPodInfoCalculateResources(t *testing.T) {
 				Containers:     tc.containers,
 				InitContainers: tc.initContainers,
 			}
+			if !tc.unbound {
+				podSpec.NodeName = "node"
+			}
 			if tc.overhead != nil {
 				podSpec.Overhead = *tc.overhead
 			}
@@ -3146,7 +3171,7 @@ func TestPodInfoCalculateResources(t *testing.T) {
 				Pod: &v1.Pod{
 					Spec: podSpec,
 					Status: v1.PodStatus{
-						NodeAllocatableResourceClaimStatuses: tc.nodeAllocatableResourceClaimStatuses,
+						ExtraNodeAllocatableResources: tc.extraNodeAllocatableResources,
 					},
 				},
 			}
@@ -3158,8 +3183,101 @@ func TestPodInfoCalculateResources(t *testing.T) {
 	}
 }
 
+func TestCalculateResourceRuntimeClassOverheadCountedOnce(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodLevelResourcesVerticalScaling, true)
+
+	mem32Mi := resource.MustParse("32Mi")
+	mem64Mi := resource.MustParse("64Mi")
+	mem96Mi := resource.MustParse("96Mi")
+	overhead := v1.ResourceList{
+		v1.ResourceCPU:    resource.MustParse("250m"),
+		v1.ResourceMemory: mem64Mi,
+	}
+
+	for _, tc := range []struct {
+		name     string
+		pod      *v1.Pod
+		expected fwk.PodResource
+	}{
+		{
+			name: "container-level requests",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Overhead: overhead,
+					Containers: []v1.Container{{
+						Name: "c",
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("10m"),
+								v1.ResourceMemory: mem32Mi,
+							},
+						},
+					}},
+				},
+				Status: v1.PodStatus{
+					AllocatedResources: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("260m"),
+						v1.ResourceMemory: mem96Mi,
+					},
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("260m"),
+							v1.ResourceMemory: mem96Mi,
+						},
+					},
+				},
+			},
+			expected: fwk.PodResource{
+				Resource: &Resource{MilliCPU: 260, Memory: mem96Mi.Value()},
+				Non0CPU:  260,
+				Non0Mem:  mem96Mi.Value(),
+			},
+		},
+		{
+			name: "pod-level requests",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Overhead: overhead,
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("100m"),
+							v1.ResourceMemory: mem32Mi,
+						},
+					},
+					Containers: []v1.Container{{Name: "c"}},
+				},
+				Status: v1.PodStatus{
+					AllocatedResources: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("350m"),
+						v1.ResourceMemory: mem96Mi,
+					},
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("350m"),
+							v1.ResourceMemory: mem96Mi,
+						},
+					},
+				},
+			},
+			expected: fwk.PodResource{
+				Resource: &Resource{MilliCPU: 350, Memory: mem96Mi.Value()},
+				Non0CPU:  350,
+				Non0Mem:  mem96Mi.Value(),
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			podInfo := PodInfo{Pod: tc.pod}
+			got := podInfo.CalculateResource()
+			if diff := cmp.Diff(tc.expected, got, nodeInfoCmpOpts...); diff != "" {
+				t.Errorf("Unexpected resource (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
 func TestCalculatePodResourcesWithResize(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, true)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodLevelResourcesVerticalScaling, true)
 

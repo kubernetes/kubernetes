@@ -23,7 +23,9 @@ import (
 	"slices"
 	"sort"
 
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/kubelet/cm/admission"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
 	"k8s.io/utils/cpuset"
 )
@@ -805,7 +807,7 @@ func takeByTopologyNUMAPacked(logger klog.Logger, topo *topology.CPUTopology, av
 		return acc.result, nil
 	}
 	if acc.isFailed() {
-		return cpuset.New(), fmt.Errorf("not enough cpus available to satisfy request: requested=%d, available=%d", numCPUs, availableCPUs.Size())
+		return cpuset.New(), admission.NewOutOfResourceError(v1.ResourceCPU, fmt.Errorf("not enough cpus available to satisfy request: requested=%d, available=%d", numCPUs, availableCPUs.Size()))
 	}
 
 	// Algorithm: topology-aware best-fit
@@ -850,7 +852,7 @@ func takeByTopologyNUMAPacked(logger klog.Logger, topo *topology.CPUTopology, av
 		return acc.result, nil
 	}
 
-	return cpuset.New(), fmt.Errorf("failed to allocate cpus")
+	return cpuset.New(), admission.NewOutOfResourceError(v1.ResourceCPU, fmt.Errorf("failed to allocate cpus"))
 }
 
 // takeByTopologyNUMADistributed returns a CPUSet of size 'numCPUs'.
@@ -937,7 +939,7 @@ func takeByTopologyNUMADistributed(logger klog.Logger, topo *topology.CPUTopolog
 		return acc.result, nil
 	}
 	if acc.isFailed() {
-		return cpuset.New(), fmt.Errorf("not enough cpus available to satisfy request: requested=%d, available=%d", numCPUs, availableCPUs.Size())
+		return cpuset.New(), admission.NewOutOfResourceError(v1.ResourceCPU, fmt.Errorf("not enough cpus available to satisfy request: requested=%d, available=%d", numCPUs, availableCPUs.Size()))
 	}
 
 	// Get the list of NUMA nodes represented by the set of CPUs in 'availableCPUs'.

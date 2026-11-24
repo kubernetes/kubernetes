@@ -61,15 +61,18 @@ standard where possible. The Godoc reference has a list of constants.
 
 <sup>1. Not supported in multi-recipient mode</sup>
 
-| Signing / MAC     | Algorithm identifier(s) |
-|:------------------|:------------------------|
-| RSASSA-PKCS#1v1.5 | RS256, RS384, RS512     |
-| RSASSA-PSS        | PS256, PS384, PS512     |
-| HMAC              | HS256, HS384, HS512     |
-| ECDSA             | ES256, ES384, ES512     |
-| Ed25519           | EdDSA<sup>2</sup>       |
+| Signing / MAC     | Algorithm identifier(s)                     |
+|:------------------|:--------------------------------------------|
+| RSASSA-PKCS#1v1.5 | RS256, RS384, RS512                         |
+| RSASSA-PSS        | PS256, PS384, PS512                         |
+| HMAC              | HS256, HS384, HS512                         |
+| ECDSA             | ES256, ES384, ES512                         |
+| Ed25519           | EdDSA<sup>2</sup>                           |
+| ML-DSA            | ML-DSA-44, ML-DSA-65, ML-DSA-87<sup>3</sup> |
 
 <sup>2. Only available in version 2 of the package</sup>
+
+<sup>3. Requires Go 1.27 or later</sup>
 
 | Content encryption | Algorithm identifier(s)                     |
 |:-------------------|:--------------------------------------------|
@@ -87,14 +90,17 @@ library, and can be passed to corresponding functions such as `NewEncrypter` or
 `NewSigner`. Each of these keys can also be wrapped in a JWK if desired, which
 allows attaching a key id.
 
-| Algorithm(s)      | Corresponding types                                                                                                                  |
-|:------------------|--------------------------------------------------------------------------------------------------------------------------------------|
-| RSA               | *[rsa.PublicKey](https://pkg.go.dev/crypto/rsa/#PublicKey), *[rsa.PrivateKey](https://pkg.go.dev/crypto/rsa/#PrivateKey)             |
-| ECDH, ECDSA       | *[ecdsa.PublicKey](https://pkg.go.dev/crypto/ecdsa/#PublicKey), *[ecdsa.PrivateKey](https://pkg.go.dev/crypto/ecdsa/#PrivateKey)     |
-| EdDSA<sup>1</sup> | [ed25519.PublicKey](https://pkg.go.dev/crypto/ed25519#PublicKey), [ed25519.PrivateKey](https://pkg.go.dev/crypto/ed25519#PrivateKey) |
-| AES, HMAC         | []byte                                                                                                                               |
+| Algorithm(s)       | Corresponding types                                                                                                                  |
+|:-------------------|--------------------------------------------------------------------------------------------------------------------------------------|
+| RSA                | *[rsa.PublicKey](https://pkg.go.dev/crypto/rsa/#PublicKey), *[rsa.PrivateKey](https://pkg.go.dev/crypto/rsa/#PrivateKey)             |
+| ECDH, ECDSA        | *[ecdsa.PublicKey](https://pkg.go.dev/crypto/ecdsa/#PublicKey), *[ecdsa.PrivateKey](https://pkg.go.dev/crypto/ecdsa/#PrivateKey)     |
+| EdDSA<sup>1</sup>  | [ed25519.PublicKey](https://pkg.go.dev/crypto/ed25519#PublicKey), [ed25519.PrivateKey](https://pkg.go.dev/crypto/ed25519#PrivateKey) |
+| ML-DSA<sup>2</sup> | *[mldsa.PublicKey](https://pkg.go.dev/crypto/mldsa#PublicKey), *[mldsa.PrivateKey](https://pkg.go.dev/crypto/mldsa#PrivateKey)       |
+| AES, HMAC          | []byte                                                                                                                               |
 
 <sup>1. Only available in version 2 or later of the package</sup>
+
+<sup>2. Requires Go 1.27 or later</sup>
 
 ## Examples
 

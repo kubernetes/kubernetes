@@ -17,18 +17,27 @@ limitations under the License.
 package transport
 
 import (
+	"bytes"
+	"context"
 	"crypto/x509"
 	"errors"
+	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"os"
 	"strings"
+	"syscall"
 	"testing"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	clientgofeaturegate "k8s.io/client-go/features"
+	clientfeaturestesting "k8s.io/client-go/features/testing"
 )
 
 type fakePoolMemberRT struct {
 	calls       int
+	bodies      []string
 	idleClosed  int
 	err         error
 	upgradeBody bool
@@ -44,6 +53,10 @@ func (f *fakePoolMemberRT) SetRootCAs(pool *x509.CertPool) { f.rootCAs = pool }
 
 func (f *fakePoolMemberRT) RoundTrip(req *http.Request) (*http.Response, error) {
 	f.calls++
+	if req.Body != nil {
+		b, _ := io.ReadAll(req.Body)
+		f.bodies = append(f.bodies, string(b))
+	}
 	if f.err != nil {
 		return nil, f.err
 	}
@@ -220,5 +233,130 @@ func TestConnectionPoolCloneAndSetRootCAs(t *testing.T) {
 	}
 	if clone.GetRootCAs() != newCAs || pool.GetRootCAs() != oldCAs {
 		t.Error("expected GetRootCAs to return the root CAs of the members")
+	}
+}
+
+func dialError() error {
+	return &net.OpError{Op: "dial", Net: "tcp", Err: syscall.ECONNREFUSED}
+}
+
+func TestConnectionPoolFailureAvoidanceFeatureGate(t *testing.T) {
+	for _, enabled := range []bool{true, false} {
+		t.Run(fmt.Sprintf("enabled=%v", enabled), func(t *testing.T) {
+			clientfeaturestesting.SetFeatureDuringTest(t, clientgofeaturegate.ClientsAllowConnectionPoolFailureAvoidance, enabled)
+			pool, _ := newFakePool(2)
+			if pool.retryConnectionFailures != enabled {
+				t.Errorf("expected retryConnectionFailures=%v, got %v", enabled, pool.retryConnectionFailures)
+			}
+			if clone := pool.Clone().(*connectionPool); clone.retryConnectionFailures != enabled {
+				t.Errorf("expected the clone to have retryConnectionFailures=%v", enabled)
+			}
+		})
+	}
+}
+
+func TestConnectionPoolRetriesConnectionFailures(t *testing.T) {
+	canceled, cancel := context.WithCancel(context.Background())
+	cancel()
+	for name, tc := range map[string]struct {
+		err       error
+		ctx       context.Context
+		disabled  bool
+		wantRetry bool
+	}{
+		"connection refused":   {err: dialError(), wantRetry: true},
+		"dial timeout":         {err: &net.OpError{Op: "dial", Net: "tcp", Err: os.ErrDeadlineExceeded}, wantRetry: true},
+		"connection reset":     {err: &net.OpError{Op: "read", Net: "tcp", Err: syscall.ECONNRESET}},
+		"request failed":       {err: errors.New("stream error: stream ID 3; INTERNAL_ERROR")},
+		"request was canceled": {err: dialError(), ctx: canceled},
+		"retries disabled":     {err: dialError(), disabled: true},
+	} {
+		t.Run(name, func(t *testing.T) {
+			pool, fakes := newFakePool(2)
+			pool.retryConnectionFailures = !tc.disabled
+			pool.intn = func(int) int { return 0 } // pick member 0 first
+			fakes[0].err = tc.err
+			req := newPoolTestRequest(t)
+			if tc.ctx != nil {
+				req = req.WithContext(tc.ctx)
+			}
+			resp, err := pool.RoundTrip(req)
+			if tc.wantRetry {
+				if err != nil {
+					t.Fatalf("expected the retry to succeed, got %v", err)
+				}
+				_ = resp.Body.Close()
+			} else if err == nil {
+				t.Fatal("expected an error")
+			}
+			wantCalls := 0
+			if tc.wantRetry {
+				wantCalls = 1
+			}
+			if fakes[0].calls != 1 || fakes[1].calls != wantCalls {
+				t.Errorf("expected 1 call to member 0 and %d to member 1, got %d and %d", wantCalls, fakes[0].calls, fakes[1].calls)
+			}
+			for i, m := range pool.members {
+				if n := m.inFlight.Load(); n != 0 {
+					t.Errorf("expected no requests in flight on member %d, got %d", i, n)
+				}
+			}
+		})
+	}
+}
+
+func TestConnectionPoolRetriesOnlyOnce(t *testing.T) {
+	pool, fakes := newFakePool(3)
+	pool.retryConnectionFailures = true
+	for _, f := range fakes {
+		f.err = dialError()
+	}
+	if _, err := pool.RoundTrip(newPoolTestRequest(t)); !isConnectionFailure(err) {
+		t.Fatalf("expected a connection failure, got %v", err)
+	}
+	calls := 0
+	for _, f := range fakes {
+		calls += f.calls
+	}
+	if calls != 2 {
+		t.Errorf("expected 2 attempts, got %d", calls)
+	}
+}
+
+func TestConnectionPoolRetryResendsBody(t *testing.T) {
+	for name, tc := range map[string]struct {
+		getBody   bool
+		wantRetry bool
+	}{
+		"body can be read again":   {getBody: true, wantRetry: true},
+		"body can't be read again": {getBody: false, wantRetry: false},
+	} {
+		t.Run(name, func(t *testing.T) {
+			pool, fakes := newFakePool(2)
+			pool.retryConnectionFailures = true
+			pool.intn = func(int) int { return 0 } // pick member 0 first
+			fakes[0].err = dialError()
+			req, err := http.NewRequest(http.MethodPost, "https://example.com", bytes.NewReader([]byte("payload")))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !tc.getBody {
+				req.GetBody = nil
+			}
+			resp, err := pool.RoundTrip(req)
+			if !tc.wantRetry {
+				if err == nil || fakes[1].calls != 0 {
+					t.Fatalf("expected no retry, got err=%v and %d calls to member 1", err, fakes[1].calls)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			_ = resp.Body.Close()
+			if len(fakes[1].bodies) != 1 || fakes[1].bodies[0] != "payload" {
+				t.Errorf("expected the retry to send the full body, got %q", fakes[1].bodies)
+			}
+		})
 	}
 }

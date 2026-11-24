@@ -250,17 +250,16 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featur
 			allErrors = append(allErrors, fmt.Errorf("invalid configuration: Specifying shutdownGracePeriodByPodPriority requires feature gate GracefulNodeShutdownBasedOnPodPriority"))
 		}
 	}
-	if localFeatureGate.Enabled(features.NodeSwap) {
-		switch kc.MemorySwap.SwapBehavior {
-		case "":
-		case string(kubetypes.NoSwap):
-		case string(kubetypes.LimitedSwap):
-		default:
-			allErrors = append(allErrors, fmt.Errorf("invalid configuration: memorySwap.swapBehavior %q must be one of: \"\", %q or %q", kc.MemorySwap.SwapBehavior, kubetypes.LimitedSwap, kubetypes.NoSwap))
+	switch kc.MemorySwap.SwapBehavior {
+	case "":
+	case string(kubetypes.NoSwap):
+	case string(kubetypes.LimitedSwap):
+	case string(kubetypes.WorkloadControlledSwap):
+		if !localFeatureGate.Enabled(features.WorkloadControlledSwap) {
+			allErrors = append(allErrors, fmt.Errorf("invalid configuration: memorySwap.swapBehavior %q requires feature gate WorkloadControlledSwap", kc.MemorySwap.SwapBehavior))
 		}
-	}
-	if !localFeatureGate.Enabled(features.NodeSwap) && kc.MemorySwap != (kubeletconfig.MemorySwapConfiguration{}) {
-		allErrors = append(allErrors, fmt.Errorf("invalid configuration: memorySwap.swapBehavior cannot be set when NodeSwap feature flag is disabled"))
+	default:
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: memorySwap.swapBehavior %q must be one of: \"\", %q, %q or %q", kc.MemorySwap.SwapBehavior, kubetypes.LimitedSwap, kubetypes.NoSwap, kubetypes.WorkloadControlledSwap))
 	}
 
 	if localFeatureGate.Enabled(features.KubeletCrashLoopBackOffMax) {
@@ -403,8 +402,16 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featur
 	}
 	switch kc.MemoryReservationPolicy {
 	case kubeletconfig.NoneMemoryReservationPolicy, kubeletconfig.TieredReservationMemoryReservationPolicy:
+	case kubeletconfig.SoftMemoryReservationPolicy, kubeletconfig.HardMemoryReservationPolicy:
+		if !localFeatureGate.Enabled(features.NodeMemoryReservationPolicy) {
+			allErrors = append(allErrors, fmt.Errorf("invalid configuration: memoryReservationPolicy %q requires NodeMemoryReservationPolicy feature gate to be enabled", kc.MemoryReservationPolicy))
+		}
 	default:
-		allErrors = append(allErrors, fmt.Errorf("invalid configuration: option %q specified for memoryReservationPolicy. Valid options are %q or %q", kc.MemoryReservationPolicy, kubeletconfig.NoneMemoryReservationPolicy, kubeletconfig.TieredReservationMemoryReservationPolicy))
+		if localFeatureGate.Enabled(features.NodeMemoryReservationPolicy) {
+			allErrors = append(allErrors, fmt.Errorf("invalid configuration: %q specified for memoryReservationPolicy. Valid options are %q, %q, %q or %q", kc.MemoryReservationPolicy, kubeletconfig.NoneMemoryReservationPolicy, kubeletconfig.TieredReservationMemoryReservationPolicy, kubeletconfig.SoftMemoryReservationPolicy, kubeletconfig.HardMemoryReservationPolicy))
+		} else {
+			allErrors = append(allErrors, fmt.Errorf("invalid configuration: %q specified for memoryReservationPolicy. Valid options are %q or %q", kc.MemoryReservationPolicy, kubeletconfig.NoneMemoryReservationPolicy, kubeletconfig.TieredReservationMemoryReservationPolicy))
+		}
 	}
 
 	if kc.ContainerRuntimeEndpoint == "" {

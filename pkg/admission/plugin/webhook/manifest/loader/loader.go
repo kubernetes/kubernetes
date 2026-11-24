@@ -25,13 +25,10 @@ import (
 	"fmt"
 
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
-	"k8s.io/apimachinery/pkg/api/operation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
-	"k8s.io/apimachinery/pkg/util/validation/field"
 	stagingloader "k8s.io/apiserver/pkg/admission/plugin/webhook/manifest/loader"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	admissionregistration "k8s.io/kubernetes/pkg/apis/admissionregistration"
 	admissionregistrationinstall "k8s.io/kubernetes/pkg/apis/admissionregistration/install"
@@ -56,12 +53,14 @@ func init() {
 // and parses them as ValidatingWebhookConfiguration resources.
 // Files containing MutatingWebhookConfiguration cause an error.
 // Files are processed in alphabetical order for deterministic behavior.
+// The returned result is never nil. On error it only carries the Hash of the
+// content that failed to load, which is empty if the content could not be read.
 func LoadValidatingManifests(dir string) (*ValidatingLoadResult, error) {
 	configs, hash, err := stagingloader.LoadManifests(dir, codecs.UniversalDeserializer(), func(obj runtime.Object) ([]*admissionregistrationv1.ValidatingWebhookConfiguration, error) {
 		return acceptObject(obj, extractValidating, defaultAndValidateVWC)
 	})
 	if err != nil {
-		return nil, err
+		return &ValidatingLoadResult{Hash: hash}, err
 	}
 	return &ValidatingLoadResult{Configurations: configs, Hash: hash}, nil
 }
@@ -70,12 +69,14 @@ func LoadValidatingManifests(dir string) (*ValidatingLoadResult, error) {
 // and parses them as MutatingWebhookConfiguration resources.
 // Files containing ValidatingWebhookConfiguration cause an error.
 // Files are processed in alphabetical order for deterministic behavior.
+// The returned result is never nil. On error it only carries the Hash of the
+// content that failed to load, which is empty if the content could not be read.
 func LoadMutatingManifests(dir string) (*MutatingLoadResult, error) {
 	configs, hash, err := stagingloader.LoadManifests(dir, codecs.UniversalDeserializer(), func(obj runtime.Object) ([]*admissionregistrationv1.MutatingWebhookConfiguration, error) {
 		return acceptObject(obj, extractMutating, defaultAndValidateMWC)
 	})
 	if err != nil {
-		return nil, err
+		return &MutatingLoadResult{Hash: hash}, err
 	}
 	return &MutatingLoadResult{Configurations: configs, Hash: hash}, nil
 }
@@ -140,7 +141,7 @@ func defaultAndValidateVWC(config *admissionregistrationv1.ValidatingWebhookConf
 		return fmt.Errorf("ValidatingWebhookConfiguration %q: conversion error: %w", config.Name, err)
 	}
 	errs := validation.ValidateValidatingWebhookConfiguration(internalObj)
-	errs = validateDeclaratively(internalObj, errs)
+	errs = rest.ValidateDeclarativelyForManifest(context.Background(), scheme, admissionregistrationv1.SchemeGroupVersion, internalObj, errs, rest.DeclarativeValidationConfig{})
 	if len(errs) > 0 {
 		return fmt.Errorf("ValidatingWebhookConfiguration %q: %w", config.Name, errs.ToAggregate())
 	}
@@ -162,7 +163,7 @@ func defaultAndValidateMWC(config *admissionregistrationv1.MutatingWebhookConfig
 		return fmt.Errorf("MutatingWebhookConfiguration %q: conversion error: %w", config.Name, err)
 	}
 	errs := validation.ValidateMutatingWebhookConfiguration(internalObj)
-	errs = validateDeclaratively(internalObj, errs)
+	errs = rest.ValidateDeclarativelyForManifest(context.Background(), scheme, admissionregistrationv1.SchemeGroupVersion, internalObj, errs, rest.DeclarativeValidationConfig{})
 	if len(errs) > 0 {
 		return fmt.Errorf("MutatingWebhookConfiguration %q: %w", config.Name, errs.ToAggregate())
 	}
@@ -172,12 +173,4 @@ func defaultAndValidateMWC(config *admissionregistrationv1.MutatingWebhookConfig
 	}
 	*config = *resultConfig
 	return nil
-}
-
-func validateDeclaratively(obj runtime.Object, errs field.ErrorList) field.ErrorList {
-	ctx := genericapirequest.WithRequestInfo(context.Background(), &genericapirequest.RequestInfo{
-		APIGroup:   admissionregistrationv1.GroupName,
-		APIVersion: admissionregistrationv1.SchemeGroupVersion.Version,
-	})
-	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, scheme, obj, nil, errs, operation.Create, rest.DeclarativeValidationConfig{})
 }

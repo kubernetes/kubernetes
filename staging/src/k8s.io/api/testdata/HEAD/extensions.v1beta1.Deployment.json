@@ -837,13 +837,24 @@
               "procMount": "procMountValue",
               "seccompProfile": {
                 "type": "typeValue",
-                "localhostProfile": "localhostProfileValue"
+                "localhostProfile": "localhostProfileValue",
+                "oci": {
+                  "ref": "refValue",
+                  "baseProfile": {
+                    "type": "typeValue",
+                    "localhostProfile": "localhostProfileValue"
+                  }
+                }
               },
               "appArmorProfile": {
                 "type": "typeValue",
                 "localhostProfile": "localhostProfileValue"
+              },
+              "cgroupOptions": {
+                "mountMode": "mountModeValue"
               }
             },
+            "hostCgroupNamespace": true,
             "stdin": true,
             "stdinOnce": true,
             "tty": true
@@ -1162,13 +1173,24 @@
               "procMount": "procMountValue",
               "seccompProfile": {
                 "type": "typeValue",
-                "localhostProfile": "localhostProfileValue"
+                "localhostProfile": "localhostProfileValue",
+                "oci": {
+                  "ref": "refValue",
+                  "baseProfile": {
+                    "type": "typeValue",
+                    "localhostProfile": "localhostProfileValue"
+                  }
+                }
               },
               "appArmorProfile": {
                 "type": "typeValue",
                 "localhostProfile": "localhostProfileValue"
+              },
+              "cgroupOptions": {
+                "mountMode": "mountModeValue"
               }
             },
+            "hostCgroupNamespace": true,
             "stdin": true,
             "stdinOnce": true,
             "tty": true
@@ -1487,13 +1509,24 @@
               "procMount": "procMountValue",
               "seccompProfile": {
                 "type": "typeValue",
-                "localhostProfile": "localhostProfileValue"
+                "localhostProfile": "localhostProfileValue",
+                "oci": {
+                  "ref": "refValue",
+                  "baseProfile": {
+                    "type": "typeValue",
+                    "localhostProfile": "localhostProfileValue"
+                  }
+                }
               },
               "appArmorProfile": {
                 "type": "typeValue",
                 "localhostProfile": "localhostProfileValue"
+              },
+              "cgroupOptions": {
+                "mountMode": "mountModeValue"
               }
             },
+            "hostCgroupNamespace": true,
             "stdin": true,
             "stdinOnce": true,
             "tty": true,
@@ -1545,7 +1578,14 @@
           "fsGroupChangePolicy": "fsGroupChangePolicyValue",
           "seccompProfile": {
             "type": "typeValue",
-            "localhostProfile": "localhostProfileValue"
+            "localhostProfile": "localhostProfileValue",
+            "oci": {
+              "ref": "refValue",
+              "baseProfile": {
+                "type": "typeValue",
+                "localhostProfile": "localhostProfileValue"
+              }
+            }
           },
           "appArmorProfile": {
             "type": "typeValue",
@@ -1903,7 +1943,8 @@
             "name": "nameValue",
             "priority": 2
           }
-        ]
+        ],
+        "podNetwork": "podNetworkValue"
       }
     },
     "strategy": {
@@ -1919,7 +1960,33 @@
     "rollbackTo": {
       "revision": 1
     },
-    "progressDeadlineSeconds": 9
+    "progressDeadlineSeconds": 9,
+    "scheduling": {
+      "schedulingPolicy": {
+        "basic": {},
+        "gang": {
+          "minCount": 1
+        }
+      },
+      "schedulingConstraints": {
+        "topology": [
+          {
+            "key": "keyValue"
+          }
+        ]
+      },
+      "disruptionMode": {
+        "single": {},
+        "all": {}
+      },
+      "resourceClaims": [
+        {
+          "name": "nameValue",
+          "resourceClaimName": "resourceClaimNameValue",
+          "resourceClaimTemplateName": "resourceClaimTemplateNameValue"
+        }
+      ]
+    }
   },
   "status": {
     "observedGeneration": 1,

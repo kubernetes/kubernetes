@@ -2725,8 +2725,8 @@ func TestLifecycleAllocate(t *testing.T) {
 			skipped:     false,
 		},
 		{
-			description: "DeviceManager skips ResizeOperation",
-			operation:   lifecycle.ResizeOperation,
+			description: "DeviceManager skips UpdateOperation",
+			operation:   lifecycle.UpdateOperation,
 			skipped:     true,
 		},
 		{
@@ -2800,8 +2800,8 @@ func TestLifecycleAllocatePod(t *testing.T) {
 			skipped:     true,
 		},
 		{
-			description: "DeviceManager skips all pod-level operations including ResizeOperation",
-			operation:   lifecycle.ResizeOperation,
+			description: "DeviceManager skips all pod-level operations including UpdateOperation",
+			operation:   lifecycle.UpdateOperation,
 			skipped:     true,
 		},
 		{

@@ -47,6 +47,10 @@ type DelegatingAuthorizerConfig struct {
 	// AuthorizationConditionsReviewClient points to client interface for the authorization.k8s.io API version
 	// that supports AuthorizationConditionsReview.
 	AuthorizationConditionsReviewClient authorizationv1alpha1client.AuthorizationV1alpha1Interface
+
+	// BuiltinConditionsEvaluatorBuilder provides an (optional) mechanism to evaluate some
+	// authorization conditions in-process.
+	BuiltinConditionsEvaluatorBuilder authorizer.BuiltinConditionsEvaluatorBuilder
 }
 
 func (c DelegatingAuthorizerConfig) New() (authorizer.Authorizer, error) {
@@ -61,5 +65,6 @@ func (c DelegatingAuthorizerConfig) New() (authorizer.Authorizer, error) {
 		authorizer.DecisionNoOpinion,
 		NewDelegatingAuthorizerMetrics(),
 		c.AuthorizationConditionsReviewClient,
+		c.BuiltinConditionsEvaluatorBuilder,
 	)
 }

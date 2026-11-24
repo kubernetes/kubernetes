@@ -59,7 +59,8 @@ var _ = utils.SIGDescribe("CSI Mock Node Volume Health", framework.WithFeatureGa
 			expectedCalls            []csiCall
 			forbiddenCalls           []string
 			nodeVolumeHealthRequired bool
-			nodeAbnormalVolumeHealth bool
+			volumeHealth             *csipbv1.VolumeHealth_VolumeHealthEntry
+			expectedHealth           v1.VolumeHealthCondition
 		}{
 			{
 				name: "return normal volume health",
@@ -74,7 +75,11 @@ var _ = utils.SIGDescribe("CSI Mock Node Volume Health", framework.WithFeatureGa
 					},
 				},
 				nodeVolumeHealthRequired: true,
-				nodeAbnormalVolumeHealth: false,
+				expectedHealth: v1.VolumeHealthCondition{
+					Status:  v1.VolumeHealthHealthy,
+					Reason:  "VolumeHealthy",
+					Message: "Volume is healthy",
+				},
 			},
 			{
 				name: "return normal volume stats without volume health",
@@ -86,7 +91,6 @@ var _ = utils.SIGDescribe("CSI Mock Node Volume Health", framework.WithFeatureGa
 				},
 				forbiddenCalls:           []string{"NodeGetVolumeHealth"},
 				nodeVolumeHealthRequired: false,
-				nodeAbnormalVolumeHealth: false,
 			},
 			{
 				name: "return abnormal volume health",
@@ -101,7 +105,40 @@ var _ = utils.SIGDescribe("CSI Mock Node Volume Health", framework.WithFeatureGa
 					},
 				},
 				nodeVolumeHealthRequired: true,
-				nodeAbnormalVolumeHealth: true,
+				volumeHealth: &csipbv1.VolumeHealth_VolumeHealthEntry{
+					Status:  csipbv1.VolumeHealthErrorType_INACCESSIBLE,
+					Reason:  "AbnormalVolumeHealth",
+					Message: "The target path of the volume doesn't exist",
+				},
+				expectedHealth: v1.VolumeHealthCondition{
+					Status:  v1.VolumeHealthInaccessible,
+					Reason:  "AbnormalVolumeHealth",
+					Message: "The target path of the volume doesn't exist",
+				},
+			},
+			{
+				name: "persist unrecognized volume health as Unknown",
+				expectedCalls: []csiCall{
+					{
+						expectedMethod: "NodeGetVolumeStats",
+						expectedError:  codes.OK,
+					},
+					{
+						expectedMethod: "NodeGetVolumeHealth",
+						expectedError:  codes.OK,
+					},
+				},
+				nodeVolumeHealthRequired: true,
+				volumeHealth: &csipbv1.VolumeHealth_VolumeHealthEntry{
+					Status:  csipbv1.VolumeHealthErrorType(999),
+					Reason:  "FutureHealth",
+					Message: "The driver reports an unrecognized volume health status",
+				},
+				expectedHealth: v1.VolumeHealthCondition{
+					Status:  v1.VolumeHealthUnknown,
+					Reason:  "FutureHealth",
+					Message: "The driver reports an unrecognized volume health status",
+				},
 			},
 		}
 		for _, test := range tests {
@@ -109,7 +146,7 @@ var _ = utils.SIGDescribe("CSI Mock Node Volume Health", framework.WithFeatureGa
 				m.init(ctx, testParameters{
 					registerDriver:            true,
 					enableNodeVolumeCondition: test.nodeVolumeHealthRequired,
-					hooks:                     createVolumeHealthHook(test.nodeAbnormalVolumeHealth),
+					hooks:                     createVolumeHealthHook(test.volumeHealth),
 				})
 				ginkgo.DeferCleanup(m.cleanup)
 				_, claim, pod := m.createPod(ctx, pvcReference)
@@ -139,9 +176,9 @@ var _ = utils.SIGDescribe("CSI Mock Node Volume Health", framework.WithFeatureGa
 						if err != nil {
 							return false, err
 						}
-						return podVolumeHealthMatches(updated, test.nodeAbnormalVolumeHealth), nil
+						return podVolumeHealthMatches(updated, test.expectedHealth), nil
 					})
-					framework.ExpectNoError(waitErr, "pod.status.volumeHealth should reflect NodeGetVolumeHealth")
+					framework.ExpectNoError(waitErr, "pod.status.volumeStatuses[*].healthStatus should reflect NodeGetVolumeHealth")
 				}
 			})
 		}
@@ -149,42 +186,101 @@ var _ = utils.SIGDescribe("CSI Mock Node Volume Health", framework.WithFeatureGa
 	})
 
 	f.Context("CSI Mock Node Storage Health", f.WithSlow(), func() {
-		ginkgo.It("should mark CSINode unhealthy and then healthy", func(ctx context.Context) {
-			var unhealthy atomic.Bool
-			unhealthy.Store(true)
-			m.init(ctx, testParameters{
-				registerDriver:          true,
-				enableNodeStorageHealth: true,
-				hooks:                   createStorageHealthHook(&unhealthy),
-			})
-			ginkgo.DeferCleanup(m.cleanup)
+		healthyCondition := storagev1.StorageHealthCondition{
+			Status:  storagev1.StorageHealthy,
+			Reason:  "StorageHealthy",
+			Message: "Storage subsystems are healthy",
+		}
 
-			nodeName := m.config.ClientNodeSelection.Name
-			driverName := m.config.GetUniqueDriverName()
+		type storageHealthStep struct {
+			description    string
+			backendHealth  *csipbv1.NodeGetStorageHealthResponse_StorageBackendHealth
+			expectedHealth storagev1.StorageHealthCondition
+		}
+		tests := []struct {
+			name  string
+			steps []storageHealthStep
+		}{
+			{
+				name: "should mark CSINode unhealthy and then healthy",
+				steps: []storageHealthStep{
+					{
+						description: "storage backend is unreachable",
+						backendHealth: &csipbv1.NodeGetStorageHealthResponse_StorageBackendHealth{
+							Status:  csipbv1.StorageHealthErrorType_STORAGE_UNREACHABLE,
+							Reason:  "BackendUnavailable",
+							Message: "The storage backend is unreachable",
+						},
+						expectedHealth: storagev1.StorageHealthCondition{
+							Status:  storagev1.StorageUnreachable,
+							Reason:  "BackendUnavailable",
+							Message: "The storage backend is unreachable",
+						},
+					},
+					{
+						description:    "storage backend is healthy",
+						expectedHealth: healthyCondition,
+					},
+				},
+			},
+			{
+				name: "should persist unrecognized storage health as StorageHealthUnknown",
+				steps: []storageHealthStep{
+					{
+						description: "storage backend reports an unrecognized status",
+						backendHealth: &csipbv1.NodeGetStorageHealthResponse_StorageBackendHealth{
+							Status:  csipbv1.StorageHealthErrorType(999),
+							Reason:  "FutureHealth",
+							Message: "The driver reports an unrecognized storage health status",
+						},
+						expectedHealth: storagev1.StorageHealthCondition{
+							Status:  storagev1.StorageHealthUnknown,
+							Reason:  "FutureHealth",
+							Message: "The driver reports an unrecognized storage health status",
+						},
+					},
+					{
+						description:    "storage backend is healthy",
+						expectedHealth: healthyCondition,
+					},
+				},
+			},
+		}
+		for _, test := range tests {
+			ginkgo.It(test.name, func(ctx context.Context) {
+				var nodeName, driverName string
+				// Register before m.init so this runs after the driver's deferred
+				// teardown. DeferCleanup callbacks run in reverse registration order.
+				ginkgo.DeferCleanup(func(ctx context.Context) {
+					checkCSINodeDriverRemoved(ctx, f, nodeName, driverName)
+				})
 
-			ginkgo.By("Waiting for CSINode to report the storage backend as unreachable")
-			err := wait.PollUntilContextTimeout(ctx, time.Second, csiNodeVolumeStatWaitPeriod, true, func(ctx context.Context) (bool, error) {
-				csiNode, err := f.ClientSet.StorageV1().CSINodes().Get(ctx, nodeName, metav1.GetOptions{})
-				if err != nil {
-					return false, err
+				var backendHealth atomic.Pointer[csipbv1.NodeGetStorageHealthResponse_StorageBackendHealth]
+				backendHealth.Store(test.steps[0].backendHealth)
+				m.init(ctx, testParameters{
+					registerDriver:          true,
+					enableNodeStorageHealth: true,
+					hooks:                   createStorageHealthHook(&backendHealth),
+				})
+				ginkgo.DeferCleanup(m.cleanup)
+
+				nodeName = m.config.ClientNodeSelection.Name
+				driverName = m.config.GetUniqueDriverName()
+
+				for _, step := range test.steps {
+					backendHealth.Store(step.backendHealth)
+					ginkgo.By(fmt.Sprintf("Waiting for CSINode to report %s: %s/%s", step.description, step.expectedHealth.Status, step.expectedHealth.Reason))
+					err := wait.PollUntilContextTimeout(ctx, time.Second, csiNodeVolumeStatWaitPeriod, true, func(ctx context.Context) (bool, error) {
+						csiNode, err := f.ClientSet.StorageV1().CSINodes().Get(ctx, nodeName, metav1.GetOptions{})
+						if err != nil {
+							return false, err
+						}
+						return csiNodeStorageHealthMatches(csiNode, driverName, step.expectedHealth), nil
+					})
+					framework.ExpectNoError(err, "CSINode.status.storageHealth should reflect NodeGetStorageHealth when %s", step.description)
 				}
-				return csiNodeStorageHealthMatches(csiNode, driverName, true), nil
 			})
-			framework.ExpectNoError(err, "CSINode should report the driver's storage backend as unreachable")
-
-			ginkgo.By("Making the storage backend healthy")
-			unhealthy.Store(false)
-
-			ginkgo.By("Waiting for CSINode to clear the storage health condition")
-			err = wait.PollUntilContextTimeout(ctx, time.Second, csiNodeVolumeStatWaitPeriod, true, func(ctx context.Context) (bool, error) {
-				csiNode, err := f.ClientSet.StorageV1().CSINodes().Get(ctx, nodeName, metav1.GetOptions{})
-				if err != nil {
-					return false, err
-				}
-				return csiNodeStorageHealthMatches(csiNode, driverName, false), nil
-			})
-			framework.ExpectNoError(err, "CSINode should clear the driver's storage health condition")
-		})
+		}
 	})
 })
 
@@ -228,66 +324,77 @@ func expectedCSICallsSeen(
 	return true, nil
 }
 
-func podVolumeHealthMatches(pod *v1.Pod, abnormal bool) bool {
-	var entry *v1.PodVolumeHealth
-	for i := range pod.Status.VolumeHealth {
-		vh := &pod.Status.VolumeHealth[i]
-		if vh.Name != "" {
-			entry = vh
+func podVolumeHealthMatches(pod *v1.Pod, expected v1.VolumeHealthCondition) bool {
+	if len(pod.Status.VolumeStatuses) == 0 {
+		return false
+	}
+	var entry *v1.VolumeHealthStatus
+	for i := range pod.Status.VolumeStatuses {
+		vh := &pod.Status.VolumeStatuses[i]
+		if vh.Name != "" && vh.HealthStatus != nil {
+			entry = vh.HealthStatus
 			break
 		}
 	}
-	if !abnormal {
-		// Healthy: either no VolumeHealth entry, or an entry with empty conditions.
-		return entry == nil || len(entry.HealthConditions) == 0
-	}
-	if entry == nil || len(entry.HealthConditions) == 0 {
-		return false
-	}
-
-	for _, c := range entry.HealthConditions {
-		if c.Status == v1.VolumeHealthInaccessible && c.Reason == "AbnormalVolumeHealth" {
-			return true
-		}
-	}
-	return false
+	return entry != nil && len(entry.HealthConditions) == 1 && entry.HealthConditions[0] == expected
 }
 
-func csiNodeStorageHealthMatches(csiNode *storagev1.CSINode, driverName string, unhealthy bool) bool {
+// csiNodeStorageHealthMatches reports whether the driver's CSINode storage health
+// consists of exactly the expected condition. LastTransitionTime is ignored.
+func csiNodeStorageHealthMatches(csiNode *storagev1.CSINode, driverName string, expected storagev1.StorageHealthCondition) bool {
 	for _, health := range csiNode.Status.StorageHealth {
 		if health.Name != driverName {
 			continue
 		}
-		if !unhealthy {
-			return len(health.HealthConditions) == 0
+		if len(health.HealthConditions) != 1 {
+			return false
 		}
-		for _, condition := range health.HealthConditions {
-			if condition.Status == storagev1.StorageUnreachable && condition.Reason == "BackendUnavailable" {
-				return true
-			}
-		}
-		return false
+		got := health.HealthConditions[0]
+		return got.Status == expected.Status &&
+			got.Reason == expected.Reason &&
+			got.Message == expected.Message &&
+			got.AccessMode == nil &&
+			got.VolumeMode == nil
 	}
-	return !unhealthy
+	return false
 }
 
-func createVolumeHealthHook(abnormalVolumeHealth bool) *drivers.Hooks {
+func checkCSINodeDriverRemoved(ctx context.Context, f *framework.Framework, nodeName, driverName string) {
+	if driverName == "" {
+		return
+	}
+	ginkgo.By("Waiting for the uninstalled driver's registration and storage health to be removed from CSINode")
+	err := wait.PollUntilContextTimeout(ctx, time.Second, csiNodeVolumeStatWaitPeriod, true, func(ctx context.Context) (bool, error) {
+		csiNode, err := f.ClientSet.StorageV1().CSINodes().Get(ctx, nodeName, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		for _, driver := range csiNode.Spec.Drivers {
+			if driver.Name == driverName {
+				return false, nil
+			}
+		}
+		for _, health := range csiNode.Status.StorageHealth {
+			if health.Name == driverName {
+				return false, nil
+			}
+		}
+		return true, nil
+	})
+	framework.ExpectNoError(err, "driver %q should be removed from CSINode %q spec.drivers and status.storageHealth after uninstall", driverName, nodeName)
+}
+
+func createVolumeHealthHook(health *csipbv1.VolumeHealth_VolumeHealthEntry) *drivers.Hooks {
 	return &drivers.Hooks{
 		Post: func(ctx context.Context, fullMethod string, request, reply interface{}, err error) (interface{}, error) {
 			if !strings.Contains(fullMethod, "NodeGetVolumeHealth") {
 				return reply, err
 			}
-			if resp, ok := reply.(*csipbv1.NodeGetVolumeHealthResponse); ok && abnormalVolumeHealth {
+			if resp, ok := reply.(*csipbv1.NodeGetVolumeHealthResponse); ok && health != nil {
 				if resp.VolumeHealth == nil {
 					resp.VolumeHealth = &csipbv1.VolumeHealth{}
 				}
-				resp.VolumeHealth.HealthStatuses = []*csipbv1.VolumeHealth_VolumeHealthEntry{
-					{
-						Status:  csipbv1.VolumeHealthErrorType_INACCESSIBLE,
-						Reason:  "AbnormalVolumeHealth",
-						Message: "The target path of the volume doesn't exist",
-					},
-				}
+				resp.VolumeHealth.HealthStatuses = []*csipbv1.VolumeHealth_VolumeHealthEntry{health}
 				return resp, nil
 			}
 			return reply, err
@@ -295,23 +402,24 @@ func createVolumeHealthHook(abnormalVolumeHealth bool) *drivers.Hooks {
 	}
 }
 
-func createStorageHealthHook(unhealthy *atomic.Bool) *drivers.Hooks {
+// createStorageHealthHook replaces the NodeGetStorageHealth response with the entry
+// currently stored in backendHealth. A nil entry leaves the mock driver's empty
+// response untouched, which kubelet reports as Healthy.
+func createStorageHealthHook(backendHealth *atomic.Pointer[csipbv1.NodeGetStorageHealthResponse_StorageBackendHealth]) *drivers.Hooks {
 	return &drivers.Hooks{
 		Post: func(ctx context.Context, fullMethod string, request, reply interface{}, err error) (interface{}, error) {
-			if !strings.Contains(fullMethod, "NodeGetStorageHealth") || !unhealthy.Load() {
+			if !strings.Contains(fullMethod, "NodeGetStorageHealth") {
+				return reply, err
+			}
+			entry := backendHealth.Load()
+			if entry == nil {
 				return reply, err
 			}
 			resp, ok := reply.(*csipbv1.NodeGetStorageHealthResponse)
 			if !ok {
 				return reply, err
 			}
-			resp.BackendHealth = []*csipbv1.NodeGetStorageHealthResponse_StorageBackendHealth{
-				{
-					Status:  csipbv1.StorageHealthErrorType_STORAGE_UNREACHABLE,
-					Reason:  "BackendUnavailable",
-					Message: "The storage backend is unreachable",
-				},
-			}
+			resp.BackendHealth = []*csipbv1.NodeGetStorageHealthResponse_StorageBackendHealth{entry}
 			return resp, err
 		},
 	}

@@ -103,6 +103,8 @@ type PodSpecApplyConfiguration struct {
 	// When `hostNetwork` is true, specified `hostPort` fields in port definitions must match `containerPort`,
 	// and unspecified `hostPort` fields in port definitions are defaulted to match `containerPort`.
 	// Default to false.
+	// When true, podNetwork may not be set: the pod has no network namespace
+	// of its own.
 	HostNetwork *bool `json:"hostNetwork,omitempty"`
 	// hostPID uses the host's pid namespace.
 	// Optional: Default to false.
@@ -228,6 +230,7 @@ type PodSpecApplyConfiguration struct {
 	// - spec.containers[*].securityContext.procMount
 	// - spec.containers[*].securityContext.runAsUser
 	// - spec.containers[*].securityContext.runAsGroup
+	// - spec.containers[*].securityContext.cgroupOptions
 	OS *PodOSApplyConfiguration `json:"os,omitempty"`
 	// hostUsers specifies whether to use the host's user namespace.
 	// Optional: Default to true.
@@ -306,6 +309,16 @@ type PodSpecApplyConfiguration struct {
 	// Responders are not supported when the pod is part of a PodGroup (.spec.schedulingGroup is set).
 	// This field can only be set on creation and is immutable afterwards.
 	EvictionResponders []EvictionResponderApplyConfiguration `json:"evictionResponders,omitempty"`
+	// podNetwork selects whether a non-hostNetwork pod is attached to the pod network.
+	// "Default" attaches the pod to the pod network. "Isolated" gives
+	// the pod an isolated network namespace with only the loopback interface
+	// configured, not attached to the pod network.
+	// This field must be unset if hostNetwork is true. For non-hostNetwork
+	// pods, this behaves as if it was set to "Default" if it is not set.
+	// If a pod is "Isolated", hostPort and network-based probes and lifecycle
+	// handlers are not allowed.
+	// This field is immutable on Pods.
+	PodNetwork *corev1.PodNetwork `json:"podNetwork,omitempty"`
 }
 
 // PodSpecApplyConfiguration constructs a declarative configuration of the PodSpec type for use with
@@ -721,5 +734,13 @@ func (b *PodSpecApplyConfiguration) WithEvictionResponders(values ...*EvictionRe
 		}
 		b.EvictionResponders = append(b.EvictionResponders, *values[i])
 	}
+	return b
+}
+
+// WithPodNetwork sets the PodNetwork field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the PodNetwork field is set to the value of the last call.
+func (b *PodSpecApplyConfiguration) WithPodNetwork(value corev1.PodNetwork) *PodSpecApplyConfiguration {
+	b.PodNetwork = &value
 	return b
 }

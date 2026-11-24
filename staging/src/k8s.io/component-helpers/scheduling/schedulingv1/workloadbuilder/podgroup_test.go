@@ -39,6 +39,7 @@ func gangWorkload() *schedulingv1beta1.Workload {
 					ResourceClaims:    []schedulingv1beta1.PodGroupResourceClaim{{Name: "gpu", ResourceClaimName: new("shared-gpu")}},
 					PriorityClassName: "high",
 					Priority:          ptr.To[int32](1000),
+					PreemptionPolicy:  new(schedulingv1beta1.PreemptNever),
 				},
 			},
 		},
@@ -97,6 +98,27 @@ func TestNewPodGroup(t *testing.T) {
 				if pg.Spec.Priority == nil || *pg.Spec.Priority != 1000 {
 					t.Error("expected priority copied from template")
 				}
+				if pg.Spec.PreemptionPolicy == nil || *pg.Spec.PreemptionPolicy != schedulingv1beta1.PreemptNever {
+					t.Error("expected preemptionPolicy copied from template")
+				}
+			},
+		},
+		{
+			name: "leaves preemptionPolicy unset when the template omits it",
+			workload: func() *schedulingv1beta1.Workload {
+				wl := gangWorkload()
+				wl.Spec.PodGroupTemplates[0].PreemptionPolicy = nil
+				return wl
+			}(),
+			pickTemplate: func(wl *schedulingv1beta1.Workload) *schedulingv1beta1.PodGroupTemplate {
+				return &wl.Spec.PodGroupTemplates[0]
+			},
+			podGroupName: "pg",
+			verify: func(t *testing.T, _ *schedulingv1beta1.Workload, pg *schedulingv1beta1.PodGroup) {
+				// Priority admission resolves it from the PriorityClass.
+				if pg.Spec.PreemptionPolicy != nil {
+					t.Errorf("expected preemptionPolicy left unset, got %q", *pg.Spec.PreemptionPolicy)
+				}
 			},
 		},
 		{
@@ -112,6 +134,7 @@ func TestNewPodGroup(t *testing.T) {
 				pg.Spec.SchedulingConstraints.Topology[0].Key = "changed"
 				pg.Spec.ResourceClaims[0].Name = "changed"
 				*pg.Spec.Priority = 1
+				*pg.Spec.PreemptionPolicy = schedulingv1beta1.PreemptLowerPriority
 
 				tmpl := wl.Spec.PodGroupTemplates[0]
 				if tmpl.SchedulingPolicy.Gang.MinCount != 4 {
@@ -125,6 +148,9 @@ func TestNewPodGroup(t *testing.T) {
 				}
 				if *tmpl.Priority != 1000 {
 					t.Error("template priority mutated through the PodGroup")
+				}
+				if *tmpl.PreemptionPolicy != schedulingv1beta1.PreemptNever {
+					t.Error("template preemptionPolicy mutated through the PodGroup")
 				}
 			},
 		},
@@ -148,6 +174,7 @@ func compositeWorkload() *schedulingv1beta1.Workload {
 					SchedulingPolicy:  schedulingv1beta1.CompositePodGroupSchedulingPolicy{Gang: &schedulingv1beta1.CompositeGangSchedulingPolicy{MinGroupCount: 2}},
 					PriorityClassName: "high",
 					Priority:          ptr.To[int32](1000),
+					PreemptionPolicy:  new(schedulingv1beta1.PreemptNever),
 					CompositePodGroupTemplates: []schedulingv1beta1.CompositePodGroupTemplate{
 						{
 							Name:             "nested",
@@ -201,6 +228,9 @@ func TestNewCompositePodGroup(t *testing.T) {
 				if cpg.Spec.Priority == nil || *cpg.Spec.Priority != 1000 {
 					t.Error("expected priority copied from template")
 				}
+				if cpg.Spec.PreemptionPolicy == nil || *cpg.Spec.PreemptionPolicy != schedulingv1beta1.PreemptNever {
+					t.Error("expected preemptionPolicy copied from template")
+				}
 			},
 		},
 		{
@@ -214,6 +244,9 @@ func TestNewCompositePodGroup(t *testing.T) {
 
 				if cpg.Spec.SchedulingPolicy.Basic == nil {
 					t.Error("expected basic policy copied from the nested template")
+				}
+				if cpg.Spec.PreemptionPolicy != nil {
+					t.Errorf("expected preemptionPolicy left unset, got %q", *cpg.Spec.PreemptionPolicy)
 				}
 			},
 		},
@@ -241,6 +274,7 @@ func TestNewCompositePodGroup(t *testing.T) {
 				// Mutating the CompositePodGroup must not leak back into the template.
 				cpg.Spec.SchedulingPolicy.Gang.MinGroupCount = 99
 				*cpg.Spec.Priority = 1
+				*cpg.Spec.PreemptionPolicy = schedulingv1beta1.PreemptLowerPriority
 
 				tmpl := wl.Spec.CompositePodGroupTemplates[0]
 				if tmpl.SchedulingPolicy.Gang.MinGroupCount != 2 {
@@ -248,6 +282,9 @@ func TestNewCompositePodGroup(t *testing.T) {
 				}
 				if *tmpl.Priority != 1000 {
 					t.Error("template priority mutated through the CompositePodGroup")
+				}
+				if *tmpl.PreemptionPolicy != schedulingv1beta1.PreemptNever {
+					t.Error("template preemptionPolicy mutated through the CompositePodGroup")
 				}
 			},
 		},

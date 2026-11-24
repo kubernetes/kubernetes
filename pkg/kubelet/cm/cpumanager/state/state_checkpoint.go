@@ -467,3 +467,15 @@ func (sc *stateCheckpoint) SetCPUBaselines(a ContainerCPUBaselines) {
 		sc.logger.Error(err, "Failed to store state to checkpoint")
 	}
 }
+
+// CommitPendingResize applies the pending resize with a single write of the
+// checkpoint, so that a kubelet restart never sees the resize half applied.
+func (sc *stateCheckpoint) CommitPendingResize(pending PendingResize) {
+	sc.mux.Lock()
+	defer sc.mux.Unlock()
+	sc.cache.CommitPendingResize(pending)
+	err := sc.storeState()
+	if err != nil {
+		sc.logger.Error(err, "Failed to store state to checkpoint", "podUID", pending.PodUID)
+	}
+}

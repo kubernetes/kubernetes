@@ -43,7 +43,6 @@ import (
 	e2epodoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/network/common"
-	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 	netutils "k8s.io/utils/net"
 )
@@ -59,8 +58,6 @@ func expandIPv6ForConntrack(ipStr string) string {
 		ip[0], ip[1], ip[2], ip[3], ip[4], ip[5], ip[6], ip[7],
 		ip[8], ip[9], ip[10], ip[11], ip[12], ip[13], ip[14], ip[15])
 }
-
-var kubeProxyE2eImage = imageutils.GetE2EImage(imageutils.Agnhost)
 
 var _ = common.SIGDescribe("KubeProxy", func() {
 	const (
@@ -111,99 +108,44 @@ var _ = common.SIGDescribe("KubeProxy", func() {
 			nodeIP: ips[0],
 		}
 
-		// Create a pod to check the conntrack entries on the host node
-		privileged := true
-
-		hostExecPod := &v1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "e2e-net-exec",
-				Namespace: fr.Namespace.Name,
-				Labels:    map[string]string{"app": "e2e-net-exec"},
-			},
-			Spec: v1.PodSpec{
-				HostNetwork: true,
-				NodeName:    clientNodeInfo.name,
-				Containers: []v1.Container{
-					{
-						Name:            "e2e-net-exec",
-						Image:           imageutils.GetE2EImage(imageutils.DistrolessIptables),
-						ImagePullPolicy: v1.PullIfNotPresent,
-						Command:         []string{"sleep", "600"},
-						SecurityContext: &v1.SecurityContext{
-							Privileged: &privileged,
-						},
-					},
-				},
-			},
-		}
+		// Create a pod to check the conntrack entries on the host node. We need
+		// a privileged pod because /proc/net/nf_conntrack is not world-readable.
+		hostExecPod := e2epod.NewExecPodSpec(fr.Namespace.Name, "e2e-net-exec", true)
+		hostExecPod.Spec.Containers[0].SecurityContext.Privileged = new(true)
+		e2epod.SetNodeSelection(&hostExecPod.Spec, e2epod.NodeSelection{Name: clientNodeInfo.name})
 		e2epod.NewPodClient(fr).CreateSync(ctx, hostExecPod)
 
 		// Create the client and server pods
-		clientPodSpec := &v1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "e2e-net-client",
-				Namespace: fr.Namespace.Name,
-				Labels:    map[string]string{"app": "e2e-net-client"},
-			},
-			Spec: v1.PodSpec{
-				NodeName: clientNodeInfo.name,
-				Containers: []v1.Container{
-					{
-						Name:            "e2e-net-client",
-						Image:           kubeProxyE2eImage,
-						ImagePullPolicy: v1.PullIfNotPresent,
-						Args: []string{
-							"net",
-							"--runner", "nat-closewait-client",
-							"--options",
-							fmt.Sprintf(`{"RemoteAddr":"%v", "PostFinTimeoutSeconds":%v, "TimeoutSeconds":%v, "LeakConnection":true}`,
-								net.JoinHostPort(serverNodeInfo.nodeIP, strconv.Itoa(testDaemonTCPPort)),
-								postFinTimeoutSeconds,
-								0),
-						},
-					},
-				},
-			},
-		}
+		clientPodSpec := e2epod.NewAgnhostPod(fr.Namespace.Name, "e2e-net-client", nil, nil, nil,
+			"net",
+			"--runner", "nat-closewait-client",
+			"--options",
+			fmt.Sprintf(`{"RemoteAddr":"%v", "PostFinTimeoutSeconds":%v, "TimeoutSeconds":%v, "LeakConnection":true}`,
+				net.JoinHostPort(serverNodeInfo.nodeIP, strconv.Itoa(testDaemonTCPPort)),
+				postFinTimeoutSeconds,
+				0),
+		)
+		e2epod.SetNodeSelection(&clientPodSpec.Spec, e2epod.NodeSelection{Name: clientNodeInfo.name})
 
-		serverPodSpec := &v1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "e2e-net-server",
-				Namespace: fr.Namespace.Name,
-				Labels:    map[string]string{"app": "e2e-net-server"},
-			},
-			Spec: v1.PodSpec{
-				NodeName: serverNodeInfo.name,
-				Containers: []v1.Container{
-					{
-						Name:            "e2e-net-server",
-						Image:           kubeProxyE2eImage,
-						ImagePullPolicy: v1.PullIfNotPresent,
-						Args: []string{
-							"net",
-							"--runner", "nat-closewait-server",
-							"--options",
-							fmt.Sprintf(`{"LocalAddr":":%v", "PostFinTimeoutSeconds":%v}`,
-								testDaemonTCPPort,
-								postFinTimeoutSeconds),
-						},
-						Ports: []v1.ContainerPort{
-							{
-								Name:          "tcp",
-								ContainerPort: testDaemonTCPPort,
-								HostPort:      testDaemonTCPPort,
-							},
-						},
-					},
-				},
-			},
-		}
+		serverPodSpec := e2epod.NewAgnhostPod(fr.Namespace.Name, "e2e-net-server", nil, nil,
+			[]v1.ContainerPort{{
+				Name:          "tcp",
+				ContainerPort: testDaemonTCPPort,
+				HostPort:      testDaemonTCPPort,
+			}},
+			"net",
+			"--runner", "nat-closewait-server",
+			"--options",
+			fmt.Sprintf(`{"LocalAddr":":%v", "PostFinTimeoutSeconds":%v}`,
+				testDaemonTCPPort,
+				postFinTimeoutSeconds),
+		)
+		e2epod.SetNodeSelection(&serverPodSpec.Spec, e2epod.NodeSelection{Name: serverNodeInfo.name})
 
 		ginkgo.By(fmt.Sprintf(
-			"Launching a server daemon on node %v (node ip: %v, image: %v)",
+			"Launching a server daemon on node %v (node ip: %v)",
 			serverNodeInfo.name,
-			serverNodeInfo.nodeIP,
-			kubeProxyE2eImage))
+			serverNodeInfo.nodeIP))
 		e2epod.NewPodClient(fr).CreateSync(ctx, serverPodSpec)
 
 		// The server should be listening before spawning the client pod
@@ -212,10 +154,9 @@ var _ = common.SIGDescribe("KubeProxy", func() {
 		}
 		// Connect to the server and leak the connection
 		ginkgo.By(fmt.Sprintf(
-			"Launching a client connection on node %v (node ip: %v, image: %v)",
+			"Launching a client connection on node %v (node ip: %v)",
 			clientNodeInfo.name,
-			clientNodeInfo.nodeIP,
-			kubeProxyE2eImage))
+			clientNodeInfo.nodeIP))
 		e2epod.NewPodClient(fr).CreateSync(ctx, clientPodSpec)
 
 		ginkgo.By("Checking conntrack entries for the timeout")
@@ -239,12 +180,8 @@ var _ = common.SIGDescribe("KubeProxy", func() {
 			cmd = fmt.Sprintf("cat /proc/net/nf_conntrack | grep -m 1 -E 'CLOSE_WAIT.*dst=%s.*dport=%d'", procIP, testDaemonTCPPort)
 			dumpCmd = "cat /proc/net/nf_conntrack"
 			timeoutIdx = 4 // ipv4 2 tcp 6 <timeout> CLOSE_WAIT ...
-		} else if _, err := e2epodoutput.RunHostCmd(fr.Namespace.Name, "e2e-net-exec", "which conntrack"); err == nil {
-			cmd = fmt.Sprintf("conntrack -L -f %s -d %s 2>/dev/null | grep -m 1 'CLOSE_WAIT.*dport=%d'", ipFamily, ip, testDaemonTCPPort)
-			dumpCmd = "conntrack -L 2>/dev/null"
-			timeoutIdx = 2 // tcp 6 <timeout> CLOSE_WAIT ...
 		} else {
-			e2eskipper.Skipf("Neither /proc/net/nf_conntrack nor conntrack binary available")
+			e2eskipper.Skipf("/proc/net/nf_conntrack not available")
 		}
 
 		if err := wait.PollImmediate(2*time.Second, epsilonSeconds*time.Second, func() (bool, error) {

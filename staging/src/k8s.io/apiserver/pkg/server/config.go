@@ -72,6 +72,7 @@ import (
 	"k8s.io/apiserver/pkg/server/routine"
 	serverstore "k8s.io/apiserver/pkg/server/storage"
 	storagevalue "k8s.io/apiserver/pkg/storage/value"
+	"k8s.io/apiserver/pkg/storage/value/compression"
 	"k8s.io/apiserver/pkg/storageversion"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
@@ -223,6 +224,11 @@ type Config struct {
 
 	// ResourceTransformers are used to transform resources from and to etcd, e.g. encryption.
 	ResourceTransformers storagevalue.ResourceTransformers
+	// StorageCompressionRules gives each resource's store its compression Rule.
+	// When it's nil, every store gets the zero Rule and writes nothing compressed.
+	// EtcdOptions.ApplyTo fills it from --storage-compression-config only while it's
+	// nil, so a value set before then takes precedence over the flag.
+	StorageCompressionRules compression.ResourceRules
 	// RESTOptionsGetter is used to construct RESTStorage types via the generic registry.
 	RESTOptionsGetter genericregistry.RESTOptionsGetter
 
@@ -416,10 +422,9 @@ func init() {
 // bytes, retained by the process-wide protobuf serialization pool
 // (runtime.AllocatorPool) when the AllocatorPoolBufferCap feature gate is
 // enabled: large enough to keep pooling typical single-object and
-// streamed-list item responses, small enough that a burst of near-limit
-// objects (the etcd object limit is 1.5MiB) cannot pin many megabytes of
-// encode buffers for the life of the process.
-const DefaultMaxPooledEncodeBufferSize = 256 * 1024
+// streamed-list item responses, small enough that larger objects cannot pin
+// many megabytes of encode buffers for the life of the process.
+const DefaultMaxPooledEncodeBufferSize = 32 * 1024
 
 // NewConfig returns a Config struct with the default values
 func NewConfig(codecs serializer.CodecFactory) *Config {

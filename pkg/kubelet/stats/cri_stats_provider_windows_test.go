@@ -574,3 +574,71 @@ func Test_criStatsProvider_makeWinContainerStats(t *testing.T) {
 	assert.Equal(t, *got.Logs.UsedBytes, logStatsUsed, "Logs.UsedBytes does not match expected value")
 	assert.Equal(t, *got.Logs.InodesUsed, logStatsInodesUsed, "Logs.InodesUsed does not match expected value")
 }
+
+func TestMakeWinContainerStatsCommittedMemory(t *testing.T) {
+	tests := []struct {
+		name           string
+		memory         *runtimeapi.WindowsMemoryUsage
+		wantUsageBytes *uint64
+	}{
+		{
+			name: "committed memory differs from working set",
+			memory: &runtimeapi.WindowsMemoryUsage{
+				CommitMemoryBytes: &runtimeapi.UInt64Value{Value: 200},
+				WorkingSetBytes:   &runtimeapi.UInt64Value{Value: 100},
+			},
+			wantUsageBytes: ptr.To[uint64](200),
+		},
+		{
+			name: "missing committed memory",
+			memory: &runtimeapi.WindowsMemoryUsage{
+				WorkingSetBytes: &runtimeapi.UInt64Value{Value: 100},
+			},
+		},
+		{
+			name: "zero committed memory",
+			memory: &runtimeapi.WindowsMemoryUsage{
+				CommitMemoryBytes: &runtimeapi.UInt64Value{Value: 0},
+				WorkingSetBytes:   &runtimeapi.UInt64Value{Value: 100},
+			},
+			wantUsageBytes: ptr.To[uint64](0),
+		},
+		{
+			name: "missing memory stats",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			logStats := map[string]*volume.Metrics{
+				kuberuntime.BuildContainerLogsDirectory(testPodLogDirectory, "namespace", "pod", types.UID("uid"), "container"): {
+					Used:       resource.NewQuantity(0, resource.BinarySI),
+					InodesUsed: resource.NewQuantity(0, resource.BinarySI),
+				},
+			}
+			p := &criStatsProvider{
+				hostStatsProvider: NewFakeHostStatsProviderWithData(logStats, &kubecontainertest.FakeOS{}),
+			}
+			stats := &runtimeapi.WindowsContainerStats{
+				Attributes: &runtimeapi.ContainerAttributes{
+					Metadata: &runtimeapi.ContainerMetadata{Name: "container"},
+				},
+				Memory: tc.memory,
+			}
+			t.Run("CPU and memory stats", func(t *testing.T) {
+				got := p.makeWinContainerCPUAndMemoryStats(stats, time.Unix(123, 0))
+				assert.Equal(t, tc.wantUsageBytes, got.Memory.UsageBytes)
+			})
+			t.Run("full stats", func(t *testing.T) {
+				logger, _ := ktesting.NewTestContext(t)
+				got, err := p.makeWinContainerStats(logger, stats,
+					&runtimeapi.Container{Metadata: &runtimeapi.ContainerMetadata{Name: "container"}},
+					&cadvisorapi.FsInfo{}, map[string]*cadvisorapi.FsInfo{},
+					&runtimeapi.PodSandboxMetadata{Namespace: "namespace", Name: "pod", Uid: "uid"})
+				if err != nil {
+					t.Fatal(err)
+				}
+				assert.Equal(t, tc.wantUsageBytes, got.Memory.UsageBytes)
+			})
+		})
+	}
+}

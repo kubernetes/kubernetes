@@ -67,7 +67,7 @@ func (CSIDriverSpec) SwaggerDoc() map[string]string {
 }
 
 var map_CSINode = map[string]string{
-	"":         "CSINode holds information about all CSI drivers installed on a node. CSI drivers do not need to create the CSINode object directly. As long as they use the node-driver-registrar sidecar container, the kubelet will automatically populate the CSINode object for the CSI driver as part of kubelet plugin registration. CSINode has the same name as a node. If the object is missing, it means either there are no CSI Drivers available on the node, or the Kubelet version is low enough that it doesn't create this object. CSINode has an OwnerReference that points to the corresponding node object.",
+	"":         "CSINode holds information about all CSI drivers installed on a node. CSI drivers do not need to create the CSINode object directly. As long as they use the node-driver-registrar sidecar container, the kubelet will automatically populate the CSINode object for the CSI driver as part of kubelet plugin registration. For a driver in spec.driverRegistrations, the kubelet only adds the registration, and external-attacher populates its spec.drivers entry. CSINode has the same name as a node. If the object is missing, it means either there are no CSI Drivers available on the node, or the Kubelet version is low enough that it doesn't create this object. CSINode has an OwnerReference that points to the corresponding node object.",
 	"metadata": "metadata is the standard object metadata. metadata.name must be the Kubernetes node name.",
 	"spec":     "spec is the specification of CSINode",
 	"status":   "status contains health and status information for the node's storage.",
@@ -81,12 +81,22 @@ var map_CSINodeDriver = map[string]string{
 	"":             "CSINodeDriver holds information about the specification of one CSI driver installed on a node",
 	"name":         "name represents the name of the CSI driver that this object refers to. This MUST be the same name returned by the CSI GetPluginName() call for that driver.",
 	"nodeID":       "nodeID of the node from the driver point of view. This field enables Kubernetes to communicate with storage systems that do not share the same nomenclature for nodes. For example, Kubernetes may refer to a given node as \"node1\", but the storage system may refer to the same node as \"nodeA\". When Kubernetes issues a command to the storage system to attach a volume to a specific node, it can use this field to refer to the node name using the ID that the storage system will understand, e.g. \"nodeA\" instead of \"node1\". This field is required.",
-	"topologyKeys": "topologyKeys is the list of keys supported by the driver. When a driver is initialized on a cluster, it provides a set of topology keys that it understands (e.g. \"company.com/zone\", \"company.com/region\"). When a driver is initialized on a node, it provides the same topology keys along with values. Kubelet will expose these topology keys as labels on its own node object. When Kubernetes does topology aware provisioning, it can use this list to determine which labels it should retrieve from the node object and pass back to the driver. It is possible for different nodes to use different topology keys. This can be empty if driver does not support topology.",
+	"topologyKeys": "topologyKeys is the list of keys supported by the driver. When a driver is initialized on a cluster, it provides a set of topology keys that it understands (e.g. \"company.com/zone\", \"company.com/region\"). When a driver is initialized on a node, it provides the same topology keys along with values. Kubelet will expose these topology keys as labels on its own node object. For a driver in spec.driverRegistrations, external-attacher adds these labels instead. When Kubernetes does topology aware provisioning, it can use this list to determine which labels it should retrieve from the node object and pass back to the driver. It is possible for different nodes to use different topology keys. This can be empty if driver does not support topology.",
 	"allocatable":  "allocatable represents the volume resources of a node that are available for scheduling. This field is beta.",
 }
 
 func (CSINodeDriver) SwaggerDoc() map[string]string {
 	return map_CSINodeDriver
+}
+
+var map_CSINodeDriverRegistration = map[string]string{
+	"":       "CSINodeDriverRegistration holds the node ID of a CSI driver whose topology and volume attachment limit are reported by the CSI controller.",
+	"name":   "name is the name of the CSI driver. This MUST be the same name returned by the CSI GetPluginInfo() call for that driver. This field is required.",
+	"nodeID": "nodeID is the ID of the node from the driver's point of view, as returned by the driver's NodeGetInfo call. This field is required.",
+}
+
+func (CSINodeDriverRegistration) SwaggerDoc() map[string]string {
+	return map_CSINodeDriverRegistration
 }
 
 var map_CSINodeList = map[string]string{
@@ -100,8 +110,9 @@ func (CSINodeList) SwaggerDoc() map[string]string {
 }
 
 var map_CSINodeSpec = map[string]string{
-	"":        "CSINodeSpec holds information about the specification of all CSI drivers installed on a node",
-	"drivers": "drivers is a list of information of all CSI Drivers existing on a node. If all drivers in the list are uninstalled, this can become empty.",
+	"":                    "CSINodeSpec holds information about the specification of all CSI drivers installed on a node",
+	"drivers":             "drivers is a list of information of all CSI Drivers existing on a node. If all drivers in the list are uninstalled, this can become empty. A driver in driverRegistrations may be missing from this list until external-attacher adds it.",
+	"driverRegistrations": "driverRegistrations lists CSI drivers on this node whose topology and volume attachment limit are reported by the CSI controller instead of the node. kubelet adds an entry with the node ID returned by the driver's NodeGetInfo call, and external-attacher then adds the driver to drivers using ControllerGetNodeInfo. An entry's nodeID must match the nodeID of the drivers entry with the same name, if one exists. This is an alpha field and requires enabling the CSIControllerGetNodeInfo feature gate.",
 }
 
 func (CSINodeSpec) SwaggerDoc() map[string]string {
@@ -110,7 +121,7 @@ func (CSINodeSpec) SwaggerDoc() map[string]string {
 
 var map_CSINodeStatus = map[string]string{
 	"":              "CSINodeStatus contains health and status information for storage on a node.",
-	"storageHealth": "storageHealth contains backend health reports for CSI drivers registered on the node.",
+	"storageHealth": "storageHealth contains backend health reports for CSI drivers registered on the node. This is an alpha field and requires enabling the CSIVolumeHealth feature gate.",
 }
 
 func (CSINodeStatus) SwaggerDoc() map[string]string {
@@ -169,7 +180,7 @@ func (StorageClassList) SwaggerDoc() map[string]string {
 var map_StorageHealth = map[string]string{
 	"":                 "StorageHealth contains storage backend health reported by a CSI driver on a node.",
 	"name":             "name is the CSI driver name, matching CSINodeDriver.name.",
-	"healthConditions": "healthConditions are the adverse storage backend conditions reported by the CSI driver. At most 16 conditions may be reported.",
+	"healthConditions": "healthConditions are the storage backend conditions reported by the CSI driver. At most 16 conditions may be reported. An empty list means the CSI driver either does not support storage health or has not reported it yet. If the driver supports storage health and its storage backend is healthy, the kubelet reports a StorageHealthy condition.",
 }
 
 func (StorageHealth) SwaggerDoc() map[string]string {
@@ -177,13 +188,13 @@ func (StorageHealth) SwaggerDoc() map[string]string {
 }
 
 var map_StorageHealthCondition = map[string]string{
-	"":                   "StorageHealthCondition represents an adverse health condition reported by a CSI driver for its storage backend on a node.",
-	"status":             "status is the health status category. One of \"StorageUnreachable\", \"StorageDegraded\".",
+	"":                   "StorageHealthCondition represents a health condition reported by a CSI driver for its storage backend on a node.",
+	"status":             "status is the health status category. Possible values are: - \"StorageHealthUnknown\": the driver reported an unknown health status, or a status Kubernetes does not recognize; the backend must not be considered healthy. - \"StorageUnreachable\": the storage backend is unreachable. - \"StorageDegraded\": the storage backend is functioning with reduced capability. - \"StorageHealthy\": the storage backend is healthy as seen from this node.\n\nAdditional values may be introduced as the CSI specification evolves. Writers that do not recognize a status may classify it as StorageHealthUnknown. Readers that do not recognize a status must use it only for health reporting and observability.",
 	"reason":             "reason is a brief CamelCase machine-parseable reason. Maximum permitted length of a reason is 256 bytes.",
 	"message":            "message is a human-readable description. Maximum permitted length of a message is 1024 bytes.",
 	"accessMode":         "accessMode is the access mode affected. Nil means all access modes are affected.",
 	"volumeMode":         "volumeMode is the volume mode affected. Nil means both are affected.",
-	"lastTransitionTime": "lastTransitionTime is when this condition first appeared at its current state.",
+	"lastTransitionTime": "lastTransitionTime is when this condition first appeared at its current state. lastTransitionTime remains unchanged when only the message changes.",
 }
 
 func (StorageHealthCondition) SwaggerDoc() map[string]string {

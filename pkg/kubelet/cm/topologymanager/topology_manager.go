@@ -23,7 +23,9 @@ import (
 
 	cadvisorapi "github.com/google/cadvisor/lib/model"
 	v1 "k8s.io/api/core/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
@@ -44,11 +46,13 @@ const (
 )
 
 // TopologyAffinityError represents an resource alignment error
-type TopologyAffinityError struct{}
+type TopologyAffinityError struct {
+	operation lifecycle.Operation
+}
 
-// NewTopologyAffinityError returns a new TopologyAffinityError.
-func NewTopologyAffinityError() *TopologyAffinityError {
-	return &TopologyAffinityError{}
+// NewTopologyAffinityError returns a new TopologyAffinityError for the given operation.
+func NewTopologyAffinityError(operation lifecycle.Operation) *TopologyAffinityError {
+	return &TopologyAffinityError{operation: operation}
 }
 
 func (e TopologyAffinityError) Error() string {
@@ -59,14 +63,30 @@ func (e TopologyAffinityError) Type() string {
 	return ErrorTopologyAffinity
 }
 
-// PodLevelTopologyAffinityError represents a pod-level resource alignment error.
-type PodLevelTopologyAffinityError struct {
-	message string
+// RejectionType returns RejectionBlocked for a pod add because topology hints are generated from
+// the currently available resources, so alignment may succeed once other pods release resources.
+// It returns RejectionInfeasible for a pod update when InPlacePodVerticalScalingExclusiveCPUs is
+// enabled, so a resize that can't be aligned is rejected and not retried. With the feature gate
+// disabled, a pod update is rejected with RejectionBlocked, like a pod add.
+// TODO: Return RejectionInfeasible when the resources can't be aligned even on an otherwise empty node.
+// TODO: Return RejectionBlocked for a pod update when alignment may succeed once other pods
+// release resources.
+// TODO: Return RejectionInfeasible only for a pod update that resizes exclusive CPUs. With the
+// feature gate enabled, other pod updates get it as well, e.g. a container added with
+// DynamicContainers or a resize with InPlacePodVerticalScalingExclusiveMemory.
+func (e TopologyAffinityError) RejectionType() lifecycle.RejectionType {
+	return rejectionTypeForOperation(e.operation)
 }
 
-// NewPodLevelTopologyAffinityError returns a new PodLevelTopologyAffinityError.
-func NewPodLevelTopologyAffinityError(message string) *PodLevelTopologyAffinityError {
-	return &PodLevelTopologyAffinityError{message: message}
+// PodLevelTopologyAffinityError represents a pod-level resource alignment error.
+type PodLevelTopologyAffinityError struct {
+	message   string
+	operation lifecycle.Operation
+}
+
+// NewPodLevelTopologyAffinityError returns a new PodLevelTopologyAffinityError for the given operation.
+func NewPodLevelTopologyAffinityError(message string, operation lifecycle.Operation) *PodLevelTopologyAffinityError {
+	return &PodLevelTopologyAffinityError{message: message, operation: operation}
 }
 
 func (e *PodLevelTopologyAffinityError) Error() string {
@@ -80,10 +100,28 @@ func (e *PodLevelTopologyAffinityError) Type() string {
 	return ErrorTopologyAffinity
 }
 
+// RejectionType returns the same rejection type as TopologyAffinityError.RejectionType, for the
+// same reasons.
+func (e *PodLevelTopologyAffinityError) RejectionType() lifecycle.RejectionType {
+	return rejectionTypeForOperation(e.operation)
+}
+
+// rejectionTypeForOperation returns the rejection type of a resource alignment error raised by
+// the given operation.
+func rejectionTypeForOperation(operation lifecycle.Operation) lifecycle.RejectionType {
+	if operation == lifecycle.UpdateOperation && utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingExclusiveCPUs) {
+		return lifecycle.RejectionInfeasible
+	}
+	return lifecycle.RejectionBlocked
+}
+
 // Manager interface provides methods for Kubelet to manage pod topology hints
 type Manager interface {
 	// PodAdmitHandler is implemented by Manager
 	lifecycle.PodAdmitHandler
+	// PodAdmitTransactionalHandler is implemented by Manager, so that hint providers
+	// can take part in the transaction of an admission.
+	lifecycle.PodAdmitTransactionalHandler
 	// AddHintProvider adds a hint provider to manager to indicate the hint provider
 	// wants to be consulted with when making topology hints
 	AddHintProvider(logger klog.Logger, h HintProvider)
@@ -121,6 +159,25 @@ type HintProvider interface {
 	// all hints have been gathered and the aggregated Hint is available via a
 	// call to Store.GetAffinity().
 	Allocate(ctx context.Context, pod *v1.Pod, container *v1.Container, operation lifecycle.Operation) error
+}
+
+// AdmitTransactionalHintProvider is an optional extension of HintProvider for providers
+// that only prepare an assignment in Allocate and AllocatePod when the
+// operation is lifecycle.UpdateOperation. The Topology Manager forwards to
+// them the calls of lifecycle.PodAdmitTransactionalHandler, which are made
+// only for that operation. For lifecycle.AddOperation, CompleteAdmit is not
+// called, so the assignment made in Allocate and AllocatePod must be
+// effective at once.
+type AdmitTransactionalHintProvider interface {
+	// CompleteAdmit makes the assignment prepared for the pod effective on
+	// lifecycle.AdmitSuccess, and discards it on lifecycle.AdmitFailure. It
+	// cannot fail, like lifecycle.PodAdmitTransactionalHandler.CompleteAdmit:
+	// an inconsistency found here is an implementation bug, which the
+	// provider logs. On lifecycle.AdmitFailure, it must do nothing if nothing
+	// was prepared for the pod, also when the Topology Manager did not get
+	// the hints of the pod or did not call Allocate and AllocatePod for it,
+	// as in a dry run.
+	CompleteAdmit(ctx context.Context, pod *v1.Pod, operation lifecycle.Operation, result lifecycle.AdmitResult)
 }
 
 // Store interface is to allow Hint Providers to retrieve pod affinity
@@ -283,9 +340,20 @@ func (m *manager) Admit(ctx context.Context, attrs *lifecycle.PodAdmitAttributes
 	metrics.TopologyManagerAdmissionRequestsTotal.Inc()
 
 	startTime := time.Now()
-	podAdmitResult := m.scope.Admit(ctx, attrs.Pod, attrs.Operation)
+	// In dry run, the hint providers still garbage collect the state of inactive pods when
+	// generating hints, but no hints are stored and no resources are allocated.
+	podAdmitResult := m.scope.Admit(ctx, attrs.Pod, attrs.Operation, attrs.DryRun)
 	metrics.TopologyManagerAdmissionDuration.Observe(float64(time.Since(startTime).Milliseconds()))
 
 	logger.V(4).Info("Pod Admit Result", "Message", podAdmitResult.Message, "pod", klog.KObj(attrs.Pod))
 	return podAdmitResult
+}
+
+func (m *manager) CompleteAdmit(ctx context.Context, attrs *lifecycle.PodAdmitAttributes, result lifecycle.AdmitResult) {
+	logger := klog.FromContext(ctx)
+	logger.V(4).Info("Topology manager admission transaction completion started", "pod", klog.KObj(attrs.Pod), "result", result)
+
+	m.scope.CompleteAdmit(ctx, attrs.Pod, attrs.Operation, result)
+
+	logger.V(4).Info("Topology manager admission transaction completion finished", "pod", klog.KObj(attrs.Pod), "result", result)
 }

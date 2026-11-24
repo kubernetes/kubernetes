@@ -1660,3 +1660,107 @@ func validateFileExists(file string) error {
 	}
 	return nil
 }
+
+func TestSubPathFileDirTypeSwitchAndCleanContainerSubPaths(t *testing.T) {
+	base := t.TempDir()
+	volPath := filepath.Join(base, "vol")
+	podDir := filepath.Join(base, "pod0")
+	if err := os.MkdirAll(filepath.Join(volPath, "subdir"), 0750); err != nil {
+		t.Fatal(err)
+	}
+	subFile := filepath.Join(volPath, "subfile")
+	if err := os.WriteFile(subFile, []byte("hello"), 0640); err != nil {
+		t.Fatal(err)
+	}
+
+	origLazyUnmount := lazyUnmountFn
+	t.Cleanup(func() { lazyUnmountFn = origLazyUnmount })
+	fm := mount.NewFakeMounter(nil)
+	lazyUnmountFn = func(p string) error {
+		return fm.Unmount(p)
+	}
+
+	// 1. Bind file subpath at index 0, then switch index 0 to directory subpath (must not fail with ENOTDIR).
+	spFile := Subpath{
+		VolumeMountIndex: 0,
+		Path:             subFile,
+		VolumeName:       "v1",
+		VolumePath:       volPath,
+		PodDir:           podDir,
+		ContainerName:    "c1",
+	}
+	target0, err := doBindSubPath(fm, spFile)
+	if err != nil {
+		t.Fatalf("doBindSubPath(file) failed: %v", err)
+	}
+	spDir := spFile
+	spDir.Path = filepath.Join(volPath, "subdir")
+	if _, err := doBindSubPath(fm, spDir); err != nil {
+		t.Fatalf("doBindSubPath(file -> dir) failed: %v", err)
+	}
+	info, err := os.Lstat(target0)
+	if err != nil || !info.IsDir() {
+		t.Fatalf("expected directory stub after file->dir switch, err=%v", err)
+	}
+
+	// 2. Switch index 0 back from directory subpath to file subpath (must not fail with EISDIR).
+	if _, err := doBindSubPath(fm, spFile); err != nil {
+		t.Fatalf("doBindSubPath(dir -> file) failed: %v", err)
+	}
+	info, err = os.Lstat(target0)
+	if err != nil || info.IsDir() {
+		t.Fatalf("expected file stub after dir->file switch, err=%v", err)
+	}
+
+	// 3. Bind a second subpath for another container c2, then clean c1's subpaths while preserving c2's.
+	spC2 := spDir
+	spC2.ContainerName = "c2"
+	targetC2, err := doBindSubPath(fm, spC2)
+	if err != nil {
+		t.Fatalf("doBindSubPath(c2) failed: %v", err)
+	}
+	if err := doCleanContainerSubPaths(fm, podDir, "c1"); err != nil {
+		t.Fatalf("doCleanContainerSubPaths failed: %v", err)
+	}
+	if _, err := os.Lstat(target0); !os.IsNotExist(err) {
+		t.Fatalf("expected c1 target %s to be removed, got err=%v", target0, err)
+	}
+	if _, err := os.Lstat(targetC2); err != nil {
+		t.Fatalf("expected sibling container c2 target %s to remain, got err=%v", targetC2, err)
+	}
+
+	// 4. Non-directory entry at fullContainerDirPath is skipped without error.
+	nonDirEntry := filepath.Join(podDir, containerSubPathDirectoryName, "v1", "not-a-dir")
+	if err := os.WriteFile(nonDirEntry, []byte("x"), 0640); err != nil {
+		t.Fatal(err)
+	}
+	if err := doCleanContainerSubPaths(fm, podDir, "not-a-dir"); err != nil {
+		t.Fatalf("expected non-directory entry to be skipped, got err=%v", err)
+	}
+	if err := os.Remove(nonDirEntry); err != nil {
+		t.Fatal(err)
+	}
+
+	// 5. Concurrent doCleanSubPaths(v1) and doCleanContainerSubPaths(c3 on v2) racing on podSubPathDir removal must both succeed.
+	lazyUnmountFn = func(p string) error { return nil }
+	for i := range 20 {
+		racePodDir := filepath.Join(base, fmt.Sprintf("race-pod-%d", i))
+		for _, pair := range [][2]string{{"v1", "c1"}, {"v2", "c3"}} {
+			target := filepath.Join(racePodDir, containerSubPathDirectoryName, pair[0], pair[1], "0")
+			if err := os.MkdirAll(filepath.Dir(target), 0750); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(target, []byte{}, 0640); err != nil {
+				t.Fatal(err)
+			}
+		}
+		errCh := make(chan error, 2)
+		go func() { errCh <- doCleanSubPaths(mount.NewFakeMounter(nil), racePodDir, "v1") }()
+		go func() { errCh <- doCleanContainerSubPaths(mount.NewFakeMounter(nil), racePodDir, "c3") }()
+		for range 2 {
+			if err := <-errCh; err != nil {
+				t.Fatalf("concurrent subpath cleanup failed on iter %d: %v", i, err)
+			}
+		}
+	}
+}

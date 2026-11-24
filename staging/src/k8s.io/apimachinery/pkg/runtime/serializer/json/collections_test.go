@@ -18,9 +18,13 @@ package json
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
+	"io"
+	"math"
 	"math/rand"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -31,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	testapigroupv1 "k8s.io/apimachinery/pkg/apis/testapigroup/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 func TestCollectionsEncoding(t *testing.T) {
@@ -804,6 +809,67 @@ func TestFuzzCollectionsEncoding(t *testing.T) {
 	})
 }
 
+// TestStreamEncodeReusesBuffer verifies that reusing one buffer across items
+// does not leak bytes from a larger item into later, smaller ones, and that
+// item marshaling errors are returned.
+func TestStreamEncodeReusesBuffer(t *testing.T) {
+	list := &testapigroupv1.CarpList{
+		TypeMeta: metav1.TypeMeta{Kind: "CarpList", APIVersion: "testapigroup.k8s.io/v1"},
+		Items: []testapigroupv1.Carp{
+			{ObjectMeta: metav1.ObjectMeta{Name: "large"}, Spec: testapigroupv1.CarpSpec{NodeSelector: map[string]string{"payload": strings.Repeat("x", 128<<10)}}},
+			{ObjectMeta: metav1.ObjectMeta{Name: "small"}},
+			{ObjectMeta: metav1.ObjectMeta{Name: "escaped"}, Spec: testapigroupv1.CarpSpec{NodeName: "<>&"}},
+		},
+	}
+	var want, got bytes.Buffer
+	if err := json.NewEncoder(&want).Encode(list); err != nil {
+		t.Fatal(err)
+	}
+	ok, err := streamEncodeCollections(list, &got)
+	if err != nil || !ok {
+		t.Fatalf("streamEncodeCollections() = %v, %v", ok, err)
+	}
+	if diff := cmp.Diff(want.String(), got.String()); diff != "" {
+		t.Errorf("streaming output differs from encoding/json (-want +got):\n%s", diff)
+	}
+
+	invalid := &unstructured.UnstructuredList{
+		Object: map[string]any{"kind": "List", "apiVersion": "v1"},
+		Items:  []unstructured.Unstructured{{Object: map[string]any{"bad": math.Inf(1)}}},
+	}
+	if _, err := streamEncodeCollections(invalid, &bytes.Buffer{}); err == nil {
+		t.Error("expected an error encoding an infinite number")
+	}
+}
+
+type benchmarkIntOrStringItem struct {
+	metav1.TypeMeta `json:""`
+	Ports           []intstr.IntOrString `json:"ports"`
+}
+
+func (in *benchmarkIntOrStringItem) DeepCopyObject() runtime.Object {
+	out := *in
+	out.Ports = append([]intstr.IntOrString(nil), in.Ports...)
+	return &out
+}
+
+type benchmarkIntOrStringList struct {
+	metav1.TypeMeta `json:""`
+	metav1.ListMeta `json:"metadata,omitempty"`
+	Items           []benchmarkIntOrStringItem `json:"items"`
+}
+
+func (in *benchmarkIntOrStringList) DeepCopyObject() runtime.Object {
+	out := *in
+	out.Items = append([]benchmarkIntOrStringItem(nil), in.Items...)
+	for i := range out.Items {
+		out.Items[i].Ports = append([]intstr.IntOrString(nil), in.Items[i].Ports...)
+	}
+	return &out
+}
+
+// BenchmarkStreamEncodeCollections compares typed and unstructured lists, including
+// IntOrString custom marshalers and one oversized item to expose buffer growth.
 func BenchmarkStreamEncodeCollections(b *testing.B) {
 	disableFuzzFieldsV1 := func(field *metav1.FieldsV1, c randfill.Continue) {}
 	fuzzMap := func(kvs map[string]interface{}, c randfill.Continue) {
@@ -836,34 +902,96 @@ func BenchmarkStreamEncodeCollections(b *testing.B) {
 		}
 		unstructuredList.Items[i] = unstructured.Unstructured{Object: unstrMap}
 	}
-	b.Run("CarpList", func(b *testing.B) {
-		var buf bytes.Buffer
-		b.ReportAllocs()
-		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
-			buf.Reset()
-			ok, err := streamEncodeCollections(carpList, &buf)
-			if err != nil {
-				b.Fatal(err)
+	intOrStringList := &benchmarkIntOrStringList{
+		TypeMeta: metav1.TypeMeta{Kind: "IntOrStringList", APIVersion: "v1"},
+		Items:    make([]benchmarkIntOrStringItem, 1000),
+	}
+	ports := []intstr.IntOrString{
+		intstr.FromInt32(80),
+		intstr.FromString("http"),
+		intstr.FromInt32(443),
+		intstr.FromString("https"),
+		intstr.FromInt32(8080),
+		intstr.FromString("metrics"),
+	}
+	for i := range intOrStringList.Items {
+		intOrStringList.Items[i].Ports = ports
+	}
+	carpListWithLargeItem := carpList.DeepCopy()
+	carpListWithLargeItem.Items[len(carpListWithLargeItem.Items)/2].Spec.NodeSelector = map[string]string{"payload": strings.Repeat("x", 1<<20)}
+
+	for _, tc := range []struct {
+		name string
+		list runtime.Object
+	}{
+		{name: "CarpList", list: carpList},
+		{name: "UnstructuredList", list: unstructuredList},
+		{name: "IntOrStringList", list: intOrStringList},
+		{name: "CarpListWithLargeItem", list: carpListWithLargeItem},
+	} {
+		b.Run(tc.name, func(b *testing.B) {
+			var buf bytes.Buffer
+			b.ReportAllocs()
+			b.ResetTimer()
+			for b.Loop() {
+				buf.Reset()
+				ok, err := streamEncodeCollections(tc.list, &buf)
+				if err != nil {
+					b.Fatal(err)
+				}
+				if !ok {
+					b.Fatal("not ok")
+				}
 			}
-			if !ok {
-				b.Fatal("not ok")
-			}
+		})
+	}
+}
+
+func chunkyCarpList(n int, selector func(i int) map[string]string) *testapigroupv1.CarpList {
+	l := &testapigroupv1.CarpList{Items: make([]testapigroupv1.Carp, n)}
+	l.Kind, l.APIVersion, l.ResourceVersion = "CarpList", "testapigroup.k8s.io/v1", "1"
+	for i := range l.Items {
+		l.Items[i].Name = fmt.Sprintf("carp-%d", i)
+		l.Items[i].Spec.NodeSelector = selector(i)
+	}
+	return l
+}
+
+// BenchmarkStreamEncodeCollectionsLargeItems covers lists whose items exceed
+// json/v2's 64KiB pooled-buffer cap.
+func BenchmarkStreamEncodeCollectionsLargeItems(b *testing.B) {
+	big := strings.Repeat("x", 128<<10)
+	manySmall := func(int) map[string]string {
+		m := make(map[string]string, 2000)
+		for k := range 2000 {
+			m[fmt.Sprintf("key-%04d", k)] = strings.Repeat("v", 56)
 		}
-	})
-	b.Run("UnstructuredList", func(b *testing.B) {
-		var buf bytes.Buffer
-		b.ReportAllocs()
-		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
-			buf.Reset()
-			ok, err := streamEncodeCollections(unstructuredList, &buf)
-			if err != nil {
-				b.Fatal(err)
+		return m
+	}
+	small := strings.Repeat("s", 512)
+	for _, tc := range []struct {
+		name string
+		list *testapigroupv1.CarpList
+	}{
+		// Every item carries one >64KiB token (e.g. a large ConfigMap/Secret value).
+		{"AllItems128KiBSingleToken", chunkyCarpList(200, func(int) map[string]string { return map[string]string{"payload": big} })},
+		// Every item is ~128KiB but made of many small tokens.
+		{"AllItems128KiBManyTokens", chunkyCarpList(200, manySmall)},
+		// Mostly small items with every 10th item carrying a 128KiB token.
+		{"Every10th128KiBToken", chunkyCarpList(1000, func(i int) map[string]string {
+			if i%10 == 0 {
+				return map[string]string{"payload": big}
 			}
-			if !ok {
-				b.Fatal("not ok")
+			return map[string]string{"payload": small}
+		})},
+	} {
+		b.Run(tc.name, func(b *testing.B) {
+			b.ReportAllocs()
+			for b.Loop() {
+				if ok, err := streamEncodeCollections(tc.list, io.Discard); err != nil || !ok {
+					b.Fatal(ok, err)
+				}
 			}
-		}
-	})
+		})
+	}
 }

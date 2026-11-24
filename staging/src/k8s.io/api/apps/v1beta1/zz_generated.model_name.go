@@ -52,6 +52,11 @@ func (in DeploymentRollback) OpenAPIModelName() string {
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
+func (in DeploymentSchedulingConfiguration) OpenAPIModelName() string {
+	return "io.k8s.api.apps.v1beta1.DeploymentSchedulingConfiguration"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in DeploymentSpec) OpenAPIModelName() string {
 	return "io.k8s.api.apps.v1beta1.DeploymentSpec"
 }

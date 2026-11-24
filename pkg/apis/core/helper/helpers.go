@@ -215,9 +215,8 @@ func IsStandardContainerResourceName(name core.ResourceName) bool {
 }
 
 // IsNodeAllocatableResourceName returns true if the resource name is valid for DRA NodeAllocatableResources.
-// Currently, only cpu, memory, and hugepages are supported (excluding ephemeral-storage for alpha).
 func IsNodeAllocatableResourceName(name core.ResourceName) bool {
-	return name == core.ResourceCPU || name == core.ResourceMemory || IsHugePageResourceName(name)
+	return name == core.ResourceCPU || name == core.ResourceMemory || name == core.ResourceEphemeralStorage || IsHugePageResourceName(name)
 }
 
 // IsExtendedResourceName returns true if:
@@ -329,6 +328,7 @@ var integerResources = sets.New(
 	core.ResourcePersistentVolumeClaims,
 	core.ResourceServicesNodePorts,
 	core.ResourceServicesLoadBalancers,
+	core.ResourcePID,
 )
 
 // IsIntegerResourceName returns true if the resource is measured in integer values

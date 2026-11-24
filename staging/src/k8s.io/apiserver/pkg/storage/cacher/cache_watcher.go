@@ -57,16 +57,20 @@ const (
 type watcherInput struct {
 	event    *watchCacheEvent
 	interval *watchCacheInterval
+	resyncCh chan<- struct{}
+	err      error
 }
 
 // cacheWatcher implements watch.Interface
 // this is not thread-safe
 type cacheWatcher struct {
+	id        int
 	input     chan watcherInput
 	result    chan watch.Event
 	done      chan struct{}
 	filter    watchEventFilter
 	stopped   bool
+	synced    notifier
 	forget    func(bool)
 	versioner storage.Versioner
 	// The watcher will be closed by server after the deadline,
@@ -99,8 +103,14 @@ type cacheWatcher struct {
 	// state holds a numeric value indicating the current state of the watcher
 	state int
 
-	selector                watchSelector
-	requiredResourceVersion uint64
+	selector                  watchSelector
+	requiredResourceVersion   uint64
+	matchedValues             []storage.MatchValue
+	dispatchedResourceVersion uint64
+	// syncedResourceVersion is the resourceVersion of the watch cache when the
+	// watcher was registered or last resynced. The watcher got the events up to
+	// it from the watch cache, and the dispatcher can still have them in its queue.
+	syncedResourceVersion uint64
 }
 
 func newCacheWatcher(
@@ -116,6 +126,7 @@ func newCacheWatcher(
 	identifier string,
 	selector watchSelector,
 	requiredResourceVersion uint64,
+	matchedValues []storage.MatchValue,
 ) *cacheWatcher {
 	if clk == nil {
 		clk = clock.RealClock{}
@@ -124,6 +135,7 @@ func newCacheWatcher(
 		input:                   make(chan watcherInput, max(chanSize, 1)),
 		result:                  make(chan watch.Event, chanSize),
 		done:                    make(chan struct{}),
+		synced:                  *newNotifier(),
 		filter:                  filter,
 		stopped:                 false,
 		forget:                  forget,
@@ -136,6 +148,7 @@ func newCacheWatcher(
 		identifier:              identifier,
 		selector:                selector,
 		requiredResourceVersion: requiredResourceVersion,
+		matchedValues:           matchedValues,
 	}
 }
 
@@ -172,6 +185,10 @@ func (c *cacheWatcher) stopLocked() {
 }
 
 func (c *cacheWatcher) nonblockingAdd(event *watchCacheEvent) bool {
+	return c.nonblockingAddWithResync(event, nil)
+}
+
+func (c *cacheWatcher) nonblockingAddWithResync(event *watchCacheEvent, resyncCh chan<- struct{}) bool {
 	// if the bookmarkAfterResourceVersion hasn't been seen
 	// we will try to deliver a bookmark event every second.
 	// the following check will discard a bookmark event
@@ -181,10 +198,18 @@ func (c *cacheWatcher) nonblockingAdd(event *watchCacheEvent) bool {
 		return false
 	}
 	select {
-	case c.input <- watcherInput{event: event}:
+	case c.input <- watcherInput{event: event, resyncCh: resyncCh}:
 		c.markBookmarkAfterRvAsReceived(event)
+		c.dispatchedResourceVersion = max(c.dispatchedResourceVersion, event.ResourceVersion)
 		return true
 	default:
+		if event.ResourceVersion > 0 {
+			// Safe to advance to event.ResourceVersion - 1: callers ensure no events
+			// after dispatchedResourceVersion were compacted, all earlier matching
+			// events were already enqueued in ascending order, and on failure the
+			// caller stops dispatching subsequent events to this watcher until resynced.
+			c.dispatchedResourceVersion = max(c.dispatchedResourceVersion, event.ResourceVersion-1)
+		}
 		return false
 	}
 }
@@ -239,6 +264,7 @@ func (c *cacheWatcher) add(event *watchCacheEvent, timer *time.Timer) bool {
 	// OK, block sending, but only until timer fires.
 	select {
 	case c.input <- watcherInput{event: event}:
+		c.dispatchedResourceVersion = max(c.dispatchedResourceVersion, event.ResourceVersion)
 		return true
 	case <-timer.C:
 		closeFunc()
@@ -469,6 +495,20 @@ func (c *cacheWatcher) sendWatchCacheEvent(event *watchCacheEvent) (builtAt, sen
 	return builtAt, sentAt
 }
 
+func (c *cacheWatcher) sendWatchError(err error) {
+	select {
+	case <-c.done:
+		return
+	default:
+	}
+
+	watchEvent := newWatchErrorEvent(err)
+	select {
+	case c.result <- watchEvent:
+	case <-c.done:
+	}
+}
+
 func (c *cacheWatcher) process(ctx context.Context) {
 	defer utilruntime.HandleCrashWithContext(ctx)
 	defer close(c.result)
@@ -512,6 +552,18 @@ func (c *cacheWatcher) process(ctx context.Context) {
 					return
 				}
 				c.processEvent(item.event, resourceVersion)
+				// Wait until the input buffer is empty rather than signaling on every
+				// consumed event to batch catchup refills and avoid waking resyncWatchers
+				// (and acquiring watchCache/cacher locks) per event.
+				if item.resyncCh != nil && len(c.input) == 0 {
+					select {
+					case item.resyncCh <- struct{}{}:
+					default:
+					}
+				}
+			case item.err != nil:
+				c.sendWatchError(item.err)
+				return
 			default:
 				klog.ErrorS(nil, "Unexpected item in watch input", "resource", c.groupResource, "identifier", c.identifier)
 				if consistency.PanicOnCacheInconsistency {
@@ -645,4 +697,33 @@ func (c *cacheWatcher) observeDispatchMetrics(event *watchCacheEvent, dequeuedAt
 	tl.MarkAt(metrics.PointEventBuilt, builtAt)
 	tl.MarkAt(metrics.PointSentToClient, sentAt)
 	c.watcherMetrics.ObserveTimeline(&tl)
+}
+
+type notifier struct {
+	once sync.Once
+	done chan struct{}
+}
+
+func newNotifier() *notifier {
+	return &notifier{
+		once: sync.Once{},
+		done: make(chan struct{}),
+	}
+}
+
+func (s *notifier) Notify() {
+	s.once.Do(func() { close(s.done) })
+}
+
+func (s *notifier) Wait() <-chan struct{} {
+	return s.done
+}
+
+func (s *notifier) IsNotified() bool {
+	select {
+	case <-s.done:
+		return true
+	default:
+		return false
+	}
 }

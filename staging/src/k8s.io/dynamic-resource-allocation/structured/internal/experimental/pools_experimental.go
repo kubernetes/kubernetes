@@ -63,6 +63,12 @@ func GatherPools(ctx context.Context, slicesForNode []*draapi.ResourceSlice, nod
 			continue
 		}
 
+		// Ignoring unsupported consumption makes the pool incomplete, preventing under-accounting for its other devices.
+		if !features.SharedConsumableCapacity && sliceUsesSharedConsumableCapacity(slice) {
+			klog.FromContext(ctx).V(5).Info("Ignoring resource slice because it uses valueFrom or consumptionPolicy while the DRASharedConsumableCapacity feature is disabled; its pool will be treated as incomplete", "resourceslice", klog.KObj(slice))
+			continue
+		}
+
 		// While the DRADeviceCompatibilityGroups feature is disabled, this
 		// allocator cannot validate co-allocation against compatibility
 		// groups, so slices with devices which declare them get ignored.
@@ -133,7 +139,7 @@ func GatherPools(ctx context.Context, slicesForNode []*draapi.ResourceSlice, nod
 			if err != nil {
 				return nil, err
 			}
-			if poolHasBindingConditions(*pool) {
+			if features.DeviceBindingAndStatus && poolHasBindingConditions(*pool) {
 				resultWithBindingConditions = append(resultWithBindingConditions, pool)
 				continue
 			}
@@ -160,6 +166,10 @@ func GatherPools(ctx context.Context, slicesForNode []*draapi.ResourceSlice, nod
 			// groups are not visible to the allocator.
 			allSlicesForPool = slicesWithoutCompatibilityGroups(allSlicesForPool)
 		}
+		if !features.SharedConsumableCapacity {
+			// The fallback must not restore slices excluded for unsupported consumption.
+			allSlicesForPool = slices.DeleteFunc(allSlicesForPool, sliceUsesSharedConsumableCapacity)
+		}
 		// Use the more complete number of slices to check for "incomplete pool".
 		//
 		// The slices that we return to the caller still don't represent the whole
@@ -182,7 +192,7 @@ func GatherPools(ctx context.Context, slicesForNode []*draapi.ResourceSlice, nod
 			return nil, err
 		}
 		// if pool has binding conditions, add the pool to the end of the result
-		if poolHasBindingConditions(*pool) {
+		if features.DeviceBindingAndStatus && poolHasBindingConditions(*pool) {
 			resultWithBindingConditions = append(resultWithBindingConditions, pool)
 			continue
 		}
@@ -215,6 +225,26 @@ func sortPoolsByID(pools []*Pool) {
 		}
 		return cmp.Compare(a.PoolID.Pool.String(), b.PoolID.Pool.String())
 	})
+}
+
+func sliceUsesSharedConsumableCapacity(slice *draapi.ResourceSlice) bool {
+	for _, set := range slice.Spec.SharedCounters {
+		for _, counter := range set.Counters {
+			if counter.ConsumptionPolicy != nil {
+				return true
+			}
+		}
+	}
+	for _, device := range slice.Spec.Devices {
+		for _, consumption := range device.ConsumesCounters {
+			for _, counter := range consumption.Counters {
+				if counter.ValueFrom != nil {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
 
 func addSlice(pools map[PoolID][]*draapi.ResourceSlice, slice *draapi.ResourceSlice) error {
@@ -342,6 +372,11 @@ func getAndValidateCounterSets(slices []*draapi.ResourceSlice) (map[draapi.Uniqu
 			if _, found := counterSets[counterSet.Name]; found {
 				return nil, fmt.Errorf("duplicate counter set name %s", counterSet.Name)
 			}
+			for counterName, counter := range counterSet.Counters {
+				if counter.Value.Sign() < 0 {
+					return nil, fmt.Errorf("counter %s in counter set %s has negative value %s", counterName, counterSet.Name, &counter.Value)
+				}
+			}
 			counterSets[counterSet.Name] = &counterSet
 		}
 	}
@@ -373,9 +408,12 @@ func validateDeviceCounterConsumption(counterSets map[draapi.UniqueString]*draap
 					return fmt.Errorf("counter set %s not found", deviceCounterConsumption.CounterSet)
 				}
 
-				for counterName := range deviceCounterConsumption.Counters {
+				for counterName, counter := range deviceCounterConsumption.Counters {
 					if _, found := counterSet.Counters[counterName]; !found {
 						return fmt.Errorf("counter %s not found in counter set %s", counterName, counterSet.Name)
+					}
+					if counter.Value != nil && counter.Value.Sign() < 0 {
+						return fmt.Errorf("consumed counter %s in counter set %s has negative value %s", counterName, deviceCounterConsumption.CounterSet, counter.Value)
 					}
 				}
 			}

@@ -62,9 +62,9 @@ var partitionableDeviceList = []resourceapi.Device{
 		ConsumesCounters: []resourceapi.DeviceCounterConsumption{
 			{
 				CounterSet: "memory-pool",
-				Counters: map[string]resourceapi.Counter{
+				Counters: map[string]resourceapi.CounterRequirement{
 					"memory": {
-						Value: resource.MustParse("2Gi"),
+						Value: new(resource.MustParse("2Gi")),
 					},
 				},
 			},
@@ -78,9 +78,9 @@ var partitionableDeviceList = []resourceapi.Device{
 		ConsumesCounters: []resourceapi.DeviceCounterConsumption{
 			{
 				CounterSet: "memory-pool",
-				Counters: map[string]resourceapi.Counter{
+				Counters: map[string]resourceapi.CounterRequirement{
 					"memory": {
-						Value: resource.MustParse("2Gi"),
+						Value: new(resource.MustParse("2Gi")),
 					},
 				},
 			},
@@ -94,9 +94,9 @@ var partitionableDeviceList = []resourceapi.Device{
 		ConsumesCounters: []resourceapi.DeviceCounterConsumption{
 			{
 				CounterSet: "memory-pool",
-				Counters: map[string]resourceapi.Counter{
+				Counters: map[string]resourceapi.CounterRequirement{
 					"memory": {
-						Value: resource.MustParse("2Gi"),
+						Value: new(resource.MustParse("2Gi")),
 					},
 				},
 			},
@@ -110,9 +110,9 @@ var partitionableDeviceList = []resourceapi.Device{
 		ConsumesCounters: []resourceapi.DeviceCounterConsumption{
 			{
 				CounterSet: "memory-pool",
-				Counters: map[string]resourceapi.Counter{
+				Counters: map[string]resourceapi.CounterRequirement{
 					"memory": {
-						Value: resource.MustParse("2Gi"),
+						Value: new(resource.MustParse("2Gi")),
 					},
 				},
 			},
@@ -126,9 +126,9 @@ var partitionableDeviceList = []resourceapi.Device{
 		ConsumesCounters: []resourceapi.DeviceCounterConsumption{
 			{
 				CounterSet: "memory-pool",
-				Counters: map[string]resourceapi.Counter{
+				Counters: map[string]resourceapi.CounterRequirement{
 					"memory": {
-						Value: resource.MustParse("4Gi"),
+						Value: new(resource.MustParse("4Gi")),
 					},
 				},
 			},
@@ -142,9 +142,9 @@ var partitionableDeviceList = []resourceapi.Device{
 		ConsumesCounters: []resourceapi.DeviceCounterConsumption{
 			{
 				CounterSet: "memory-pool",
-				Counters: map[string]resourceapi.Counter{
+				Counters: map[string]resourceapi.CounterRequirement{
 					"memory": {
-						Value: resource.MustParse("4Gi"),
+						Value: new(resource.MustParse("4Gi")),
 					},
 				},
 			},

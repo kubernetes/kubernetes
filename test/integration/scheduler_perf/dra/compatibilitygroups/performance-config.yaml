@@ -68,6 +68,9 @@
       duration: 10s
   - name: empty_500nodes
     labels: [performance]
+    threshold:
+      # https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=SchedulingThroughput&Name=BenchmarkPerfScheduling%2FCompatibilityGroups%2Fempty_500nodes%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
+      dra_compatibilitygroups: 153 # 20% below median of last 20 runs
     params:
       nodesWithDRA: 500
       nodesWithoutDRA: 0
@@ -77,6 +80,9 @@
       duration: 10s
   - name: half_500nodes
     labels: [performance]
+    threshold:
+      # https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=SchedulingThroughput&Name=BenchmarkPerfScheduling%2FCompatibilityGroups%2Fhalf_500nodes%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
+      dra_compatibilitygroups: 141 # 20% below median of last 20 runs
     params:
       nodesWithDRA: 500
       nodesWithoutDRA: 0
@@ -86,6 +92,9 @@
       duration: 10s
   - name: full_500nodes
     labels: [performance]
+    threshold:
+      # https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=SchedulingThroughput&Name=BenchmarkPerfScheduling%2FCompatibilityGroups%2Ffull_500nodes%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
+      dra_compatibilitygroups: 170 # 20% below median of last 20 runs
     params:
       nodesWithDRA: 500
       nodesWithoutDRA: 0
@@ -95,6 +104,9 @@
       duration: 10s
   - name: empty_1000nodes
     labels: [performance]
+    threshold:
+      # https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=SchedulingThroughput&Name=BenchmarkPerfScheduling%2FCompatibilityGroups%2Fempty_1000nodes%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
+      dra_compatibilitygroups: 119 # 20% below median of last 20 runs
     params:
       nodesWithDRA: 1000
       nodesWithoutDRA: 0
@@ -104,6 +116,9 @@
       duration: 10s
   - name: half_1000nodes
     labels: [performance]
+    threshold:
+      # https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=SchedulingThroughput&Name=BenchmarkPerfScheduling%2FCompatibilityGroups%2Fhalf_1000nodes%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
+      dra_compatibilitygroups: 104 # 20% below median of last 20 runs
     params:
       nodesWithDRA: 1000
       nodesWithoutDRA: 0
@@ -113,6 +128,9 @@
       duration: 10s
   - name: full_1000nodes
     labels: [performance]
+    threshold:
+      # https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=SchedulingThroughput&Name=BenchmarkPerfScheduling%2FCompatibilityGroups%2Ffull_1000nodes%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
+      dra_compatibilitygroups: 139 # 20% below median of last 20 runs
     params:
       nodesWithDRA: 1000
       nodesWithoutDRA: 0

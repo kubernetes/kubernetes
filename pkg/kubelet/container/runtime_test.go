@@ -146,6 +146,26 @@ func TestPodStatusFindContainerStatusByName(t *testing.T) {
 	}
 }
 
+func TestPodStatusHasRunningOrUnknownContainer(t *testing.T) {
+	podStatus := &PodStatus{
+		ContainerStatuses: []*Status{
+			{Name: "newer-exited-older-unknown", State: ContainerStateExited},
+			{Name: "newer-exited-older-unknown", State: ContainerStateUnknown},
+			{Name: "newer-created-older-running", State: ContainerStateCreated},
+			{Name: "newer-created-older-running", State: ContainerStateRunning},
+			{Name: "only-stopped", State: ContainerStateExited},
+			{Name: "only-stopped", State: ContainerStateCreated},
+		},
+	}
+
+	var nilStatus *PodStatus
+	assert.False(t, nilStatus.HasRunningOrUnknownContainer("newer-exited-older-unknown"))
+	assert.True(t, podStatus.HasRunningOrUnknownContainer("newer-exited-older-unknown"))
+	assert.True(t, podStatus.HasRunningOrUnknownContainer("newer-created-older-running"))
+	assert.False(t, podStatus.HasRunningOrUnknownContainer("only-stopped"))
+	assert.False(t, podStatus.HasRunningOrUnknownContainer("missing"))
+}
+
 func TestPodStatusFindActiveContainerStatusByName(t *testing.T) {
 	podStatus := &PodStatus{
 		ActiveContainerStatuses: []*Status{
@@ -654,7 +674,7 @@ func TestRuntimeStatusString(t *testing.T) {
 	}
 
 	result := status.String()
-	expected := "Runtime Conditions: RuntimeReady=true reason:ready message:runtime is ready, NetworkReady=false reason:not ready message:network is not ready; Handlers: Name=handler1 SupportsRecursiveReadOnlyMounts: true SupportsUserNamespaces: false, Name=handler2 SupportsRecursiveReadOnlyMounts: false SupportsUserNamespaces: true, Features: SupplementalGroupsPolicy: true UserNamespacesHostNetwork: true MountOptions: false"
+	expected := "Runtime Conditions: RuntimeReady=true reason:ready message:runtime is ready, NetworkReady=false reason:not ready message:network is not ready; Handlers: Name=handler1 SupportsRecursiveReadOnlyMounts: true SupportsUserNamespaces: false SupportsCgroupNamespaces: false, Name=handler2 SupportsRecursiveReadOnlyMounts: false SupportsUserNamespaces: true SupportsCgroupNamespaces: false, Features: SupplementalGroupsPolicy: true UserNamespacesHostNetwork: true MountOptions: false SeccompProfileOCI: false CgroupMountMode: false PodNetworkIsolated: false"
 	assert.Equal(t, expected, result, "String()")
 }
 
@@ -670,8 +690,9 @@ func TestRuntimeHandlerString(t *testing.T) {
 				Name:                            "test-handler",
 				SupportsRecursiveReadOnlyMounts: true,
 				SupportsUserNamespaces:          true,
+				SupportsCgroupNamespaces:        true,
 			},
-			expected: "Name=test-handler SupportsRecursiveReadOnlyMounts: true SupportsUserNamespaces: true",
+			expected: "Name=test-handler SupportsRecursiveReadOnlyMounts: true SupportsUserNamespaces: true SupportsCgroupNamespaces: true",
 		},
 		{
 			name: "handler with no features",
@@ -679,8 +700,9 @@ func TestRuntimeHandlerString(t *testing.T) {
 				Name:                            "test-handler",
 				SupportsRecursiveReadOnlyMounts: false,
 				SupportsUserNamespaces:          false,
+				SupportsCgroupNamespaces:        false,
 			},
-			expected: "Name=test-handler SupportsRecursiveReadOnlyMounts: false SupportsUserNamespaces: false",
+			expected: "Name=test-handler SupportsRecursiveReadOnlyMounts: false SupportsUserNamespaces: false SupportsCgroupNamespaces: false",
 		},
 	}
 
@@ -740,7 +762,7 @@ func TestRuntimeFeaturesString(t *testing.T) {
 				SupplementalGroupsPolicy:  true,
 				UserNamespacesHostNetwork: true,
 			},
-			expected: "SupplementalGroupsPolicy: true UserNamespacesHostNetwork: true MountOptions: false",
+			expected: "SupplementalGroupsPolicy: true UserNamespacesHostNetwork: true MountOptions: false SeccompProfileOCI: false CgroupMountMode: false PodNetworkIsolated: false",
 		},
 		{
 			name: "features with both flags false",
@@ -748,7 +770,7 @@ func TestRuntimeFeaturesString(t *testing.T) {
 				SupplementalGroupsPolicy:  false,
 				UserNamespacesHostNetwork: false,
 			},
-			expected: "SupplementalGroupsPolicy: false UserNamespacesHostNetwork: false MountOptions: false",
+			expected: "SupplementalGroupsPolicy: false UserNamespacesHostNetwork: false MountOptions: false SeccompProfileOCI: false CgroupMountMode: false PodNetworkIsolated: false",
 		},
 		{
 			name:     "nil features",

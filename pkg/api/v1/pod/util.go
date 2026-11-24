@@ -24,6 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/util/slice"
 )
 
 // ContainerType signifies container type
@@ -104,6 +105,85 @@ func ContainerIter(podSpec *v1.PodSpec, mask ContainerType) iter.Seq2[*v1.Contai
 			}
 		}
 	}
+}
+
+// ContainerPair is a container in two versions of a pod, matched by name. Old is nil for a
+// container that is only in the new pod (added), and New is nil for one that is only in the old
+// pod (removed).
+type ContainerPair = slice.Pair[v1.Container]
+
+// ContainerPairs yields the containers of pod and oldPod of the types in mask, paired by name,
+// with their type. Containers are only matched within their type, where names are assumed to be
+// unique. The iteration order is InitContainers, then main Containers, then EphemeralContainers;
+// within each type, the containers of pod are yielded in order, followed by removed containers
+// from oldPod in order.
+func ContainerPairs(pod, oldPod *v1.Pod, mask ContainerType) iter.Seq2[ContainerPair, ContainerType] {
+	return func(yield func(ContainerPair, ContainerType) bool) {
+		containerPairs(pod, oldPod, mask, yield)
+	}
+}
+
+// containerPairs implements ContainerPairs. It keeps the calls to the generic slice.PairByKey out
+// of the iterator, which is inlined into callers: called from another package, a generic function
+// makes the closures passed to it escape, and allocate.
+func containerPairs(pod, oldPod *v1.Pod, mask ContainerType, yield func(ContainerPair, ContainerType) bool) {
+	if mask&InitContainers != 0 && !slice.PairByKey(pod.Spec.InitContainers, oldPod.Spec.InitContainers, identityContainer, containerName, func(p ContainerPair) bool {
+		return yield(p, InitContainers)
+	}) {
+		return
+	}
+	if mask&Containers != 0 && !slice.PairByKey(pod.Spec.Containers, oldPod.Spec.Containers, identityContainer, containerName, func(p ContainerPair) bool {
+		return yield(p, Containers)
+	}) {
+		return
+	}
+	if mask&EphemeralContainers != 0 {
+		slice.PairByKey(pod.Spec.EphemeralContainers, oldPod.Spec.EphemeralContainers, ephemeralAsContainer, containerName, func(p ContainerPair) bool {
+			return yield(p, EphemeralContainers)
+		})
+	}
+}
+
+func identityContainer(c *v1.Container) *v1.Container {
+	return c
+}
+
+func ephemeralAsContainer(ec *v1.EphemeralContainer) *v1.Container {
+	return (*v1.Container)(&ec.EphemeralContainerCommon)
+}
+
+func containerName(c *v1.Container) string {
+	return c.Name
+}
+
+// VolumePair is a volume in two versions of a pod, matched by name. Old is nil for a volume
+// that is only in the new pod (added), and New is nil for one that is only in the old pod
+// (removed).
+type VolumePair = slice.Pair[v1.Volume]
+
+// VolumePairs yields the volumes of pod and oldPod (which may be nil on create), paired by name,
+// where names are assumed to be unique. The volumes of pod are yielded in order, followed by
+// removed volumes from oldPod in order.
+func VolumePairs(pod, oldPod *v1.Pod) iter.Seq[VolumePair] {
+	return func(yield func(VolumePair) bool) {
+		volumePairs(pod, oldPod, yield)
+	}
+}
+
+func volumePairs(pod, oldPod *v1.Pod, yield func(VolumePair) bool) {
+	var oldVolumes []v1.Volume
+	if oldPod != nil {
+		oldVolumes = oldPod.Spec.Volumes
+	}
+	slice.PairByKey(pod.Spec.Volumes, oldVolumes, identityVolume, volumeName, yield)
+}
+
+func identityVolume(v *v1.Volume) *v1.Volume {
+	return v
+}
+
+func volumeName(v *v1.Volume) string {
+	return v.Name
 }
 
 // VisitPodSecretNames invokes the visitor function with the name of every secret
@@ -379,7 +459,8 @@ func UpdatePodCondition(status *v1.PodStatus, condition *v1.PodCondition) bool {
 		condition.Reason == oldCondition.Reason &&
 		condition.Message == oldCondition.Message &&
 		condition.LastProbeTime.Equal(&oldCondition.LastProbeTime) &&
-		condition.LastTransitionTime.Equal(&oldCondition.LastTransitionTime)
+		condition.LastTransitionTime.Equal(&oldCondition.LastTransitionTime) &&
+		condition.ObservedGeneration == oldCondition.ObservedGeneration
 
 	status.Conditions[conditionIndex] = *condition
 	// Return true if one of the fields have changed.
@@ -543,4 +624,18 @@ func CalculatePodConditionObservedGeneration(podStatus *v1.PodStatus, generation
 		}
 	}
 	return 0
+}
+
+// IsSupportedDynamicVolumeSource reports whether vs is a node-local ephemeral volume source
+// supported by DynamicNodeLocalEphemeralVolumes (ConfigMap, Secret, Projected, EmptyDir, or Image).
+// Note: keep this in sync with k8s.io/kubernetes/pkg/api/pod.IsSupportedDynamicVolumeSource.
+func IsSupportedDynamicVolumeSource(vs *v1.VolumeSource) bool {
+	if vs == nil {
+		return false
+	}
+	return vs.ConfigMap != nil ||
+		vs.Secret != nil ||
+		vs.Projected != nil ||
+		vs.EmptyDir != nil ||
+		vs.Image != nil
 }

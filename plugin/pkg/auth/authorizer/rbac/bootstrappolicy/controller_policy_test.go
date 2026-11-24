@@ -209,20 +209,22 @@ func TestControllerRoleVerbsConsistency(t *testing.T) {
 }
 
 func TestJobControllerSchedulingRules(t *testing.T) {
+	roleName := saRolePrefix + "job-controller"
 	cases := []struct {
-		name                string
-		workloadWithJob     bool
-		wantSchedulingRules bool
+		name               string
+		workloadWithJob    bool
+		wantWorkloadsVerbs []string
+		wantPodGroupsVerbs []string
 	}{
 		{
-			name:                "feature gate disabled",
-			workloadWithJob:     false,
-			wantSchedulingRules: false,
+			name:            "feature gate disabled",
+			workloadWithJob: false,
 		},
 		{
-			name:                "feature gate enabled",
-			workloadWithJob:     true,
-			wantSchedulingRules: true,
+			name:               "feature gate enabled",
+			workloadWithJob:    true,
+			wantWorkloadsVerbs: []string{"create", "get", "list", "patch", "update", "watch"},
+			wantPodGroupsVerbs: []string{"create", "delete", "get", "list", "patch", "update", "watch"},
 		},
 	}
 
@@ -232,26 +234,64 @@ func TestJobControllerSchedulingRules(t *testing.T) {
 				features.GenericWorkload: tc.workloadWithJob,
 				features.WorkloadWithJob: tc.workloadWithJob,
 			})
-			got := hasSchedulingRules(ControllerRoles())
-			if got != tc.wantSchedulingRules {
-				t.Errorf("hasSchedulingRules() = %v, want %v", got, tc.wantSchedulingRules)
+			roles := ControllerRoles()
+			if got := resourceRuleVerbs(roles, roleName, "workloads"); !slices.Equal(got, tc.wantWorkloadsVerbs) {
+				t.Errorf("job-controller workloads verbs = %v, want %v", got, tc.wantWorkloadsVerbs)
+			}
+			if got := resourceRuleVerbs(roles, roleName, "podgroups"); !slices.Equal(got, tc.wantPodGroupsVerbs) {
+				t.Errorf("job-controller podgroups verbs = %v, want %v", got, tc.wantPodGroupsVerbs)
 			}
 		})
 	}
 }
 
-func hasSchedulingRules(roles []rbacv1.ClusterRole) bool {
+func TestDeploymentReplicaSetControllerSchedulingRules(t *testing.T) {
+	cases := []struct {
+		name                   string
+		workloadWithDeployment bool
+		wantSchedulingRules    bool
+	}{
+		{name: "feature gate disabled", workloadWithDeployment: false, wantSchedulingRules: false},
+		{name: "feature gate enabled", workloadWithDeployment: true, wantSchedulingRules: true},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.GenericWorkload:        tc.workloadWithDeployment,
+				features.WorkloadWithDeployment: tc.workloadWithDeployment,
+			})
+			roles := ControllerRoles()
+			if got := hasResourceRule(roles, saRolePrefix+"deployment-controller", "workloads"); got != tc.wantSchedulingRules {
+				t.Errorf("deployment-controller workloads rule = %v, want %v", got, tc.wantSchedulingRules)
+			}
+			if got := hasResourceRule(roles, saRolePrefix+"replicaset-controller", "workloads"); got != tc.wantSchedulingRules {
+				t.Errorf("replicaset-controller workloads rule = %v, want %v", got, tc.wantSchedulingRules)
+			}
+			if got := hasResourceRule(roles, saRolePrefix+"replicaset-controller", "podgroups"); got != tc.wantSchedulingRules {
+				t.Errorf("replicaset-controller podgroups rule = %v, want %v", got, tc.wantSchedulingRules)
+			}
+			if hasResourceRule(roles, saRolePrefix+"deployment-controller", "podgroups") {
+				t.Errorf("deployment-controller should not have a podgroups rule")
+			}
+		})
+	}
+}
+
+func hasResourceRule(roles []rbacv1.ClusterRole, roleName, resource string) bool {
+	return len(resourceRuleVerbs(roles, roleName, resource)) > 0
+}
+
+func resourceRuleVerbs(roles []rbacv1.ClusterRole, roleName, resource string) []string {
 	for _, role := range roles {
-		if role.Name != saRolePrefix+"job-controller" {
+		if role.Name != roleName {
 			continue
 		}
 		for _, rule := range role.Rules {
-			if slices.Contains(rule.APIGroups, "scheduling.k8s.io") &&
-				slices.Contains(rule.Resources, "workloads") &&
-				slices.Contains(rule.Resources, "podgroups") {
-				return true
+			if slices.Contains(rule.APIGroups, "scheduling.k8s.io") && slices.Contains(rule.Resources, resource) {
+				return rule.Verbs
 			}
 		}
 	}
-	return false
+	return nil
 }

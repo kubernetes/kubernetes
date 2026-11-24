@@ -19,19 +19,56 @@ limitations under the License.
 package lifecycle
 
 import (
+	"fmt"
+
+	libcontainercgroups "github.com/opencontainers/cgroups"
+
 	v1 "k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-helpers/resource"
 	"k8s.io/kubernetes/pkg/features"
 )
 
+// isCgroupV2 is a package-level variable that defaults to the real cgroup check.
+// Tests can override it to simulate cgroupsv1 environments.
+var isCgroupV2 = libcontainercgroups.IsCgroup2UnifiedMode
+
 func isPodLevelResourcesSupported(pod *v1.Pod) PodAdmitResult {
 	podLevelResourcesEnabled := utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources)
 	if resource.IsPodLevelResourcesSet(pod) && !podLevelResourcesEnabled {
 		return PodAdmitResult{
+			Admit:         false,
+			Reason:        PodLevelResourcesNotAdmittedReason,
+			Message:       "PodLevelResources feature gate is disabled",
+			RejectionType: RejectionInfeasible,
+		}
+	}
+	return PodAdmitResult{Admit: true}
+}
+
+// Leave range checks to API validation (including static pods) to allow version skew.
+func isPerPodPIDLimitSupported(pod *v1.Pod) PodAdmitResult {
+	if pod.Spec.Resources == nil {
+		return PodAdmitResult{Admit: true}
+	}
+	_, ok := pod.Spec.Resources.Limits[v1.ResourcePID]
+	if !ok {
+		return PodAdmitResult{Admit: true}
+	}
+	// Fail closed: a pod that requested a PID limit must not run without it.
+	// This mirrors isPodLevelResourcesSupported above.
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PerPodPIDLimit) {
+		return PodAdmitResult{
 			Admit:   false,
-			Reason:  PodLevelResourcesNotAdmittedReason,
-			Message: "PodLevelResources feature gate is disabled",
+			Reason:  PerPodPIDLimitNotAdmittedReason,
+			Message: fmt.Sprintf("pod %s specifies spec.resources.limits.pids, but the PerPodPIDLimit feature gate is disabled on this node", pod.Name),
+		}
+	}
+	if !isCgroupV2() {
+		return PodAdmitResult{
+			Admit:   false,
+			Reason:  PerPodPIDLimitNotAdmittedReason,
+			Message: fmt.Sprintf("per-pod PID limit requires cgroupsv2, but this node is running cgroupsv1; pod %s specifies spec.resources.limits.pids", pod.Name),
 		}
 	}
 	return PodAdmitResult{Admit: true}

@@ -136,11 +136,13 @@ func getConntrackMax(ctx context.Context, config *kubeproxyconfig.KubeProxyConnt
 			floor = int(*config.Min)
 		}
 		scaled := int(*config.MaxPerCore) * numCPU
-		// Cap the value to 1M to avoid excessive memory usage on high-core machines
+		// Cap the scaled value to 1M to avoid excessive memory usage on
+		// high-core machines. The cap only bounds the per-core calculation;
+		// an explicitly configured conntrack-min still takes precedence.
 		const maxLimit = 1048576
 		if scaled > maxLimit {
 			logger.V(3).Info("GetConntrackMax: capping scaled conntrack-max-per-core", "scaled", scaled, "limit", maxLimit)
-			return maxLimit, nil
+			scaled = maxLimit
 		}
 		if scaled > floor {
 			logger.V(3).Info("GetConntrackMax: using scaled conntrack-max-per-core")

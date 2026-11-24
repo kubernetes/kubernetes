@@ -1,15 +1,15 @@
 diff --git a/staging/src/k8s.io/apiserver/pkg/storage/etcd3/store.go b/staging/src/k8s.io/apiserver/pkg/storage/etcd3/store.go
-index 0cb165fb4ec..67b1f3c2d9a 100644
+index 05ae1e5ef8e..54deeb7650b 100644
 --- a/staging/src/k8s.io/apiserver/pkg/storage/etcd3/store.go
 +++ b/staging/src/k8s.io/apiserver/pkg/storage/etcd3/store.go
-@@ -476,7 +476,9 @@ func (s *store) conditionalDelete(
- 		}
+@@ -424,7 +424,9 @@ func (s *store) deleteOnce(ctx context.Context, key string, out runtime.Object,
+ 	}
  
- 		if !expectTransformOrDecodeError {
--			err = s.decoder.Decode(origState.data, out, txnResp.Revision)
-+			// BUG REVERT (unary analog of #58545): the returned object carries the
-+			// revision it had before the delete, not the revision of the delete.
-+			err = s.decoder.Decode(origState.data, out, origState.rev)
- 			if err != nil {
- 				recordDecodeError(s.groupResource, key)
- 				return err
+ 	if !expectTransformOrDecodeError {
+-		err = s.decoder.Decode(origState.Data, out, txnResp.Revision)
++		// BUG REVERT (unary analog of #58545): the returned object carries the
++		// revision it had before the delete, not the revision of the delete.
++		err = s.decoder.Decode(origState.Data, out, origState.Rev)
+ 		if err != nil {
+ 			recordDecodeError(s.groupResource, key)
+ 			return origState, success, err

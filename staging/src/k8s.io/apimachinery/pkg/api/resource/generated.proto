@@ -63,8 +63,11 @@ option go_package = "k8s.io/apimachinery/pkg/api/resource";
 // Parsing keeps at most 29 significant digits, enough for any int64 value at
 // nano precision, and rounds any precision beyond this away from zero.
 // Parsing also preserves a value only down to nano, rounding a finer non-zero
-// value away from zero, so "0.9n" becomes "1n". The int64 accessors round and
-// may overflow on top of that: see Value, MilliValue and ScaledValue.
+// value away from zero, so "0.9n" becomes "1n". Parsing saturates the exponent
+// to [-2147483647, 2147483647] after accounting for any digits after the
+// decimal point, so "0.01e2147483649" keeps its value but "1e4294967297"
+// parses as 1e2147483647. The int64 accessors round and may overflow on top
+// of that: see Value, MilliValue and ScaledValue.
 //
 // When a Quantity is parsed from a string, it will remember the type of suffix
 // it had, and will use the same type again when it is serialized.

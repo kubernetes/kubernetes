@@ -33,10 +33,11 @@ func isExistingSocket(path string) bool {
 	}
 
 	// the dial path must be without "npipe://"
-	_, err = winio.DialPipe(u.Path, nil)
+	c, err := winio.DialPipe(u.Path, nil)
 	if err != nil {
 		return false
 	}
+	defer c.Close()
 
 	return true
 }

@@ -25,9 +25,11 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientscheme "k8s.io/client-go/kubernetes/scheme"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -529,5 +531,65 @@ func TestGetStaticPodPriorityWarning(t *testing.T) {
 		if tc.shouldWarn && warning != tc.warning {
 			t.Errorf("unexpected error: %v (%s)", warning, pod)
 		}
+	}
+}
+
+func TestValidateStaticPodPIDLimit(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PerPodPIDLimit, true)
+	logger, _ := ktesting.NewTestContext(t)
+	fldPath := field.NewPath("spec", "resources", "limits").Key("pids")
+	matcher := field.ErrorMatcher{}.ByType().ByField().ByDetailSubstring()
+	for _, tc := range []struct {
+		limit   string
+		wantErr string
+	}{
+		{limit: "64", wantErr: "pids limit must be between 128 and 16384"},
+		{limit: "128"},
+		{limit: "16384"},
+		{limit: "32768", wantErr: "pids limit must be between 128 and 16384"},
+		{limit: "128500m", wantErr: "must be an integer"},
+	} {
+		t.Run(tc.limit, func(t *testing.T) {
+			pod := podtest.MakePod("test",
+				podtest.SetPodResources(&core.ResourceRequirements{
+					Limits: core.ResourceList{core.ResourcePID: resource.MustParse(tc.limit)},
+				}),
+			)
+			var wantErrs field.ErrorList
+			if tc.wantErr != "" {
+				wantErrs = field.ErrorList{field.Invalid(fldPath, tc.limit, tc.wantErr)}
+			}
+			matcher.Test(t, wantErrs, validateStaticPod(logger, pod))
+		})
+	}
+}
+
+func TestDecodeStaticPodRunsDeclarativeValidation(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EvictionRequestAPI, true)
+	logger, _ := ktesting.NewTestContext(t)
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "mynamespace"},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{{Name: "image", Image: "test/image"}},
+			// Only declarative validation enforces the priority bounds.
+			EvictionResponders: []v1.EvictionResponder{{Name: "acme.io/foo", Priority: new(int32(100001))}},
+		},
+	}
+	const wantErr = "spec.evictionResponders[0].priority"
+
+	single, err := runtime.Encode(clientscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), pod)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if _, _, err := tryDecodeSinglePod(logger, single, noDefault); err == nil || !strings.Contains(err.Error(), wantErr) {
+		t.Errorf("tryDecodeSinglePod: got error %v, want one containing %q", err, wantErr)
+	}
+
+	list, err := runtime.Encode(clientscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), &v1.PodList{Items: []v1.Pod{*pod}})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if _, _, err := tryDecodePodList(logger, list, noDefault); err == nil || !strings.Contains(err.Error(), wantErr) {
+		t.Errorf("tryDecodePodList: got error %v, want one containing %q", err, wantErr)
 	}
 }

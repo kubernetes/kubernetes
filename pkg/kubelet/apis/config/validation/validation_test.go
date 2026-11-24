@@ -396,11 +396,25 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 	}, {
 		name: "invalid MemorySwap.SwapBehavior",
 		configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
-			conf.FeatureGates = map[string]bool{"NodeSwap": true}
 			conf.MemorySwap.SwapBehavior = "invalid-behavior"
 			return conf
 		},
-		errMsg: "invalid configuration: memorySwap.swapBehavior \"invalid-behavior\" must be one of: \"\", \"LimitedSwap\" or \"NoSwap\"",
+		errMsg: "invalid configuration: memorySwap.swapBehavior \"invalid-behavior\" must be one of: \"\", \"LimitedSwap\", \"NoSwap\" or \"WorkloadControlledSwap\"",
+	}, {
+		name: "MemorySwap.SwapBehavior WorkloadControlledSwap without feature gate enabled",
+		configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+			conf.FeatureGates = map[string]bool{"WorkloadControlledSwap": false}
+			conf.MemorySwap.SwapBehavior = "WorkloadControlledSwap"
+			return conf
+		},
+		errMsg: "invalid configuration: memorySwap.swapBehavior \"WorkloadControlledSwap\" requires feature gate WorkloadControlledSwap",
+	}, {
+		name: "MemorySwap.SwapBehavior WorkloadControlledSwap with feature gate enabled",
+		configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+			conf.FeatureGates = map[string]bool{"WorkloadControlledSwap": true}
+			conf.MemorySwap.SwapBehavior = "WorkloadControlledSwap"
+			return conf
+		},
 	}, {
 		name: "CrashLoopBackOff.MaxContainerRestartPeriod too low",
 		configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
@@ -581,12 +595,41 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 			},
 			errMsg: "invalid configuration: memoryReservationPolicy \"TieredReservation\" requires MemoryQoS feature gate to be enabled",
 		}, {
+			name: "Soft requires NodeMemoryReservationPolicy",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				conf.MemoryReservationPolicy = "Soft"
+				return conf
+			},
+			errMsg: "invalid configuration: memoryReservationPolicy \"Soft\" requires NodeMemoryReservationPolicy feature gate to be enabled",
+		}, {
+			name: "valid Soft reservation",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				conf.FeatureGates = map[string]bool{"NodeMemoryReservationPolicy": true}
+				conf.MemoryReservationPolicy = "Soft"
+				return conf
+			},
+		}, {
+			name: "valid Hard reservation",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				conf.FeatureGates = map[string]bool{"NodeMemoryReservationPolicy": true}
+				conf.MemoryReservationPolicy = "Hard"
+				return conf
+			},
+		}, {
 			name: "invalid MemoryReservationPolicy",
 			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
 				conf.MemoryReservationPolicy = "invalid"
 				return conf
 			},
-			errMsg: "invalid configuration: option \"invalid\" specified for memoryReservationPolicy. Valid options are \"None\" or \"TieredReservation\"",
+			errMsg: "invalid configuration: \"invalid\" specified for memoryReservationPolicy. Valid options are \"None\" or \"TieredReservation\"",
+		}, {
+			name: "invalid MemoryReservationPolicy with NodeMemoryReservationPolicy enabled",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				conf.FeatureGates = map[string]bool{"NodeMemoryReservationPolicy": true}
+				conf.MemoryReservationPolicy = "invalid"
+				return conf
+			},
+			errMsg: "invalid configuration: \"invalid\" specified for memoryReservationPolicy. Valid options are \"None\", \"TieredReservation\", \"Soft\" or \"Hard\"",
 		}, {
 			name: "invalid Taint.TimeAdded",
 			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
@@ -808,6 +851,10 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 		}, {
 			name: "DefaultPodSysctls configured with feature gate disabled",
 			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				if conf.FeatureGates == nil {
+					conf.FeatureGates = make(map[string]bool)
+				}
+				conf.FeatureGates[string(features.DefaultPodSysctls)] = false
 				conf.DefaultPodSysctls = map[string]string{"net.ipv4.ip_forward": "1"}
 				return conf
 			},

@@ -126,7 +126,7 @@ const (
 	// WorkloadMaxPodGroupTemplates is the maximum number of pod group templates per Workload.
 	WorkloadMaxPodGroupTemplates = 8
 	// WorkloadMaxTreeDepth is the maximum allowed depth for a tree of (composite) pod group templates in a Workload.
-	WorkloadMaxTreeDepth = 4
+	WorkloadMaxTreeDepth = 5
 )
 
 // WorkloadSpec defines the desired state of a Workload.
@@ -293,13 +293,10 @@ type PodGroupTemplate struct {
 	// preemptionPolicy is the Policy for preempting pods/podgroups with lower priority.
 	// One of Never, PreemptLowerPriority.
 	// This field is immutable.
-	// This field is available only when the PodGroupPreemptionPolicy feature gate is enabled.
 	//
-	// +featureGate=PodGroupPreemptionPolicy
 	// +optional
+	// +k8s:optional
 	// +k8s:immutable
-	// +k8s:ifDisabled("PodGroupPreemptionPolicy")=+k8s:forbidden
-	// +k8s:ifEnabled("PodGroupPreemptionPolicy")=+k8s:optional
 	PreemptionPolicy *PreemptionPolicy `json:"preemptionPolicy,omitempty" protobuf:"bytes,8,opt,name=preemptionPolicy"`
 }
 
@@ -336,10 +333,7 @@ type CompositePodGroupTemplate struct {
 	DisruptionMode *CompositeDisruptionMode `json:"disruptionMode,omitempty" protobuf:"bytes,4,opt,name=disruptionMode"`
 
 	// priorityClassName indicates the priority that should be considered when scheduling
-	// a composite pod group created from this template. If no priority class is specified,
-	// admission control can set this to the global default priority class if it exists.
-	// Otherwise, composite pod groups created from this template will have the priority set
-	// to zero.
+	// a composite pod group created from this template.
 	// This field is immutable.
 	//
 	// +optional
@@ -350,8 +344,6 @@ type CompositePodGroupTemplate struct {
 
 	// priority is the value of priority of composite pod groups created from this template.
 	// Various system components use this field to find the priority of the composite pod group.
-	// When Priority Admission Controller is enabled, it prevents users from setting this field.
-	// The admission controller populates this field from PriorityClassName.
 	// The higher the value, the higher the priority.
 	// This field is immutable.
 	//
@@ -363,13 +355,10 @@ type CompositePodGroupTemplate struct {
 	// preemptionPolicy is the Policy for preempting pods/podgroups with lower priority.
 	// One of Never, PreemptLowerPriority.
 	// This field is immutable.
-	// This field is available only when the PodGroupPreemptionPolicy feature gate is enabled.
 	//
-	// +featureGate=PodGroupPreemptionPolicy
 	// +optional
+	// +k8s:optional
 	// +k8s:immutable
-	// +k8s:ifDisabled("PodGroupPreemptionPolicy")=+k8s:forbidden
-	// +k8s:ifEnabled("PodGroupPreemptionPolicy")=+k8s:optional
 	PreemptionPolicy *PreemptionPolicy `json:"preemptionPolicy,omitempty" protobuf:"bytes,7,opt,name=preemptionPolicy"`
 
 	// podGroupTemplates is the list of templates for children PodGroups.
@@ -614,7 +603,7 @@ type PodGroupSpec struct {
 	// +k8s:ifEnabled(CompositePodGroup)=+k8s:optional
 	// +k8s:immutable
 	// +k8s:format=k8s-long-name
-	// +k8s:alpha(since: "1.37")=+k8s:dependentRequired("workloadRef")
+	// +k8s:beta(since: "1.38")=+k8s:dependentRequired("workloadRef")
 	ParentCompositePodGroupName *string `json:"parentCompositePodGroupName,omitempty" protobuf:"bytes,1,opt,name=parentCompositePodGroupName"`
 
 	// workloadRef references an optional PodGroup template within the Workload
@@ -681,7 +670,7 @@ type PodGroupSpec struct {
 
 	// priorityClassName defines the priority that should be considered when scheduling this pod group.
 	// Controllers are expected to fill this field by copying it from a PodGroupTemplate.
-	// Otherwise, it is validated and resolved similarly to the PriorityClassName on PodGroupTemplate
+	// Otherwise, it is validated and resolved similarly to the PriorityClassName in Pods
 	// (i.e. if no priority class is specified, admission control can set this to the global default
 	// priority class if it exists. Otherwise, the pod group's priority will be zero).
 	// This field is immutable.
@@ -709,13 +698,10 @@ type PodGroupSpec struct {
 	// When Priority Admission Controller is enabled, it populates this field from PriorityClassName,
 	// and defaults to PreemptLowerPriority if value is unset in PriorityClass.
 	// This field is immutable.
-	// This field is available only when the PodGroupPreemptionPolicy feature gate is enabled.
 	//
-	// +featureGate=PodGroupPreemptionPolicy
 	// +optional
+	// +k8s:optional
 	// +k8s:immutable
-	// +k8s:ifDisabled("PodGroupPreemptionPolicy")=+k8s:forbidden
-	// +k8s:ifEnabled("PodGroupPreemptionPolicy")=+k8s:optional
 	PreemptionPolicy *PreemptionPolicy `json:"preemptionPolicy,omitempty" protobuf:"bytes,9,opt,name=preemptionPolicy"`
 }
 
@@ -748,9 +734,9 @@ type PodGroupStatus struct {
 	// +patchStrategy=merge
 	// +listType=map
 	// +listMapKey=type
-	// +k8s:alpha(since: "1.37")=+k8s:optional
-	// +k8s:alpha(since: "1.37")=+k8s:listType=map
-	// +k8s:alpha(since: "1.37")=+k8s:listMapKey=type
+	// +k8s:beta(since: "1.38")=+k8s:optional
+	// +k8s:beta(since: "1.38")=+k8s:listType=map
+	// +k8s:beta(since: "1.38")=+k8s:listMapKey=type
 	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
 
 	// resourceClaimStatuses is status of resource claims.
@@ -1097,13 +1083,10 @@ type CompositePodGroupSpec struct {
 	// When Priority Admission Controller is enabled, it populates this field from PriorityClassName,
 	// and defaults to PreemptLowerPriority if value is unset in PriorityClass.
 	// This field is immutable.
-	// This field is available only when the PodGroupPreemptionPolicy feature gate is enabled.
 	//
-	// +featureGate=PodGroupPreemptionPolicy
 	// +optional
+	// +k8s:optional
 	// +k8s:immutable
-	// +k8s:ifDisabled("PodGroupPreemptionPolicy")=+k8s:forbidden
-	// +k8s:ifEnabled("PodGroupPreemptionPolicy")=+k8s:optional
 	PreemptionPolicy *PreemptionPolicy `json:"preemptionPolicy,omitempty" protobuf:"bytes,8,opt,name=preemptionPolicy"`
 }
 
@@ -1127,7 +1110,7 @@ type CompositePodGroupStatus struct {
 	//   that occurred during scheduling.
 	// - "CompositePodGroupError": The CompositePodGroup cannot be scheduled due to an invalid group layout
 	//   detected during runtime validation. The `message` field details the specific layout violation (such as
-	//   a detected cycle, exceeding the maximum depth of 4, or referencing multiple distinct Workloads).
+	//   a detected cycle, exceeding the maximum depth of 5, or referencing multiple distinct Workloads).
 	//
 	// Known reasons for the DisruptionTarget condition:
 	// - "PreemptionByScheduler": The CompositePodGroup was preempted by the scheduler to make room for
@@ -1138,9 +1121,9 @@ type CompositePodGroupStatus struct {
 	// +patchStrategy=merge
 	// +listType=map
 	// +listMapKey=type
-	// +k8s:alpha(since: "1.37")=+k8s:optional
-	// +k8s:alpha(since: "1.37")=+k8s:listType=map
-	// +k8s:alpha(since: "1.37")=+k8s:listMapKey=type
+	// +k8s:beta(since: "1.38")=+k8s:optional
+	// +k8s:beta(since: "1.38")=+k8s:listType=map
+	// +k8s:beta(since: "1.38")=+k8s:listMapKey=type
 	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
 }
 

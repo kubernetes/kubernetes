@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	policylisters "k8s.io/client-go/listers/policy/v1"
 	fwk "k8s.io/kube-scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
 // PodTerminatingByPreemption returns true if the pod is in the termination state caused by scheduler preemption.
@@ -39,6 +40,17 @@ func PodTerminatingByPreemption(p *v1.Pod) bool {
 		}
 	}
 	return false
+}
+
+// NominatedNodeName returns the node that pod is nominated to. When fh
+// implements framework.NominatedNodeNameGetter (which returns the in-memory
+// nomination from PodNominator when DRAPreemption is enabled), it delegates to
+// fh. Otherwise, it returns pod.Status.NominatedNodeName.
+func NominatedNodeName(fh fwk.Handle, pod *v1.Pod) string {
+	if nominator, ok := fh.(framework.NominatedNodeNameGetter); ok {
+		return nominator.NominatedNodeName(pod)
+	}
+	return pod.Status.NominatedNodeName
 }
 
 // MoreImportantVictim decides which of two preemption units is considered more critical.
@@ -104,89 +116,6 @@ func compareVictimStructuralImportance(vi1, vi2 Victim) int {
 		return c
 	}
 	return cmp.Compare(len(vi1.Pods()), len(vi2.Pods()))
-}
-
-// CompareVictimSets compares the preemption cost of two sets of victims (each sorted
-// descending by MoreImportantVictim).
-// Returns < 0 if set1 is less costly (better to preempt) than set2,
-// > 0 if set1 is more costly (worse to preempt) than set2,
-// and 0 if both sets have equal preemption cost.
-func CompareVictimSets(set1, set2 []fwk.PreemptionVictim) int {
-	if len(set1) == 0 || len(set2) == 0 {
-		return cmp.Compare(len(set1), len(set2))
-	}
-
-	// TODO(#142718): NumPDBViolations() is computed statically across all potential victims
-	// in the domain, which is exact for DisruptionsAllowed == 0 but can miscount when
-	// DisruptionsAllowed > 0 and earlier victims sharing the same PDB were not condemned.
-	// Track DisruptionsAllowed dynamically in PodGroupPreemptionState.
-	var pdb1, pdb2 int
-	for _, v := range set1 {
-		pdb1 += v.NumPDBViolations()
-	}
-	for _, v := range set2 {
-		pdb2 += v.NumPDBViolations()
-	}
-	if c := cmp.Compare(pdb1, pdb2); c != 0 {
-		return c
-	}
-
-	for i1, i2 := 0, 0; i1 < len(set1) && i2 < len(set2); {
-		vi1, ok1 := set1[i1].(Victim)
-		vi2, ok2 := set2[i2].(Victim)
-		if !ok1 || !ok2 {
-			break
-		}
-		p1, p2 := vi1.Priority(), vi2.Priority()
-		if c := cmp.Compare(p1, p2); c != 0 {
-			return c
-		}
-		var prioPods1, prioPods2 int
-		for ; i1 < len(set1); i1++ {
-			v, ok := set1[i1].(Victim)
-			if !ok || v.Priority() != p1 {
-				break
-			}
-			prioPods1 += len(v.Pods())
-		}
-		for ; i2 < len(set2); i2++ {
-			v, ok := set2[i2].(Victim)
-			if !ok || v.Priority() != p2 {
-				break
-			}
-			prioPods2 += len(v.Pods())
-		}
-		if c := cmp.Compare(prioPods1, prioPods2); c != 0 {
-			return c
-		}
-	}
-
-	var pods1, pods2 int
-	for _, v := range set1 {
-		pods1 += len(v.Pods())
-	}
-	for _, v := range set2 {
-		pods2 += len(v.Pods())
-	}
-	if c := cmp.Compare(pods1, pods2); c != 0 {
-		return c
-	}
-
-	minLen := min(len(set1), len(set2))
-	for i := range minLen {
-		vi1, ok1 := set1[i].(Victim)
-		vi2, ok2 := set2[i].(Victim)
-		if ok1 && ok2 {
-			if c := cmp.Compare(victimRank(vi1), victimRank(vi2)); c != 0 {
-				return c
-			}
-			if c := cmp.Compare(len(vi1.Pods()), len(vi2.Pods())); c != 0 {
-				return c
-			}
-		}
-	}
-
-	return cmp.Compare(len(set1), len(set2))
 }
 
 // FilterVictimsWithPDBViolation groups "victims" into "violatingVictims"

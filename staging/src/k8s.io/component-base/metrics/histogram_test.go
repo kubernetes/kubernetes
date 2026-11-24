@@ -783,21 +783,44 @@ func TestNativeHistogramMetricCollection(t *testing.T) {
 		GitVersion: "v1.30.0",
 	}
 
+	explicitBuckets := []float64{0.1, 0.5, 1, 2, 5, 10}
 	tests := []struct {
 		name                   string
 		enableNativeHistograms bool
+		buckets                []float64
+		expectedBuckets        []float64
 		observeValues          []float64
 		expectNativeHistogram  bool
 	}{
 		{
 			name:                   "native histograms disabled - no native histogram data",
 			enableNativeHistograms: false,
+			buckets:                explicitBuckets,
+			expectedBuckets:        explicitBuckets,
 			observeValues:          []float64{0.1, 0.5, 1.0, 2.5},
 			expectNativeHistogram:  false,
 		},
 		{
 			name:                   "native histograms enabled - should have native histogram data",
 			enableNativeHistograms: true,
+			buckets:                explicitBuckets,
+			expectedBuckets:        explicitBuckets,
+			observeValues:          []float64{0.1, 0.5, 1.0, 2.5},
+			expectNativeHistogram:  true,
+		},
+		{
+			name:                   "native histograms disabled with nil buckets - uses DefBuckets",
+			enableNativeHistograms: false,
+			buckets:                nil,
+			expectedBuckets:        prometheus.DefBuckets,
+			observeValues:          []float64{0.1, 0.5, 1.0, 2.5},
+			expectNativeHistogram:  false,
+		},
+		{
+			name:                   "native histograms enabled with nil buckets - preserves classic DefBuckets and native histogram data",
+			enableNativeHistograms: true,
+			buckets:                nil,
+			expectedBuckets:        prometheus.DefBuckets,
 			observeValues:          []float64{0.1, 0.5, 1.0, 2.5},
 			expectNativeHistogram:  true,
 		},
@@ -811,7 +834,7 @@ func TestNativeHistogramMetricCollection(t *testing.T) {
 			hist := NewHistogram(&HistogramOpts{
 				Name:           "test_native_histogram",
 				Help:           "Test histogram for native histogram support",
-				Buckets:        []float64{0.1, 0.5, 1, 2, 5, 10},
+				Buckets:        tc.buckets,
 				StabilityLevel: ALPHA,
 			})
 			registry.MustRegister(hist)
@@ -832,8 +855,11 @@ func TestNativeHistogramMetricCollection(t *testing.T) {
 			histogram := mf.GetMetric()[0].GetHistogram()
 			require.NotNil(t, histogram, "Expected histogram metric")
 
-			// Verify classic buckets are always present
-			assert.NotEmpty(t, histogram.GetBucket(), "Classic buckets should always be present")
+			// Verify classic buckets are always present and match expected upper bounds
+			require.Len(t, histogram.GetBucket(), len(tc.expectedBuckets), "Classic bucket count mismatch")
+			for i, b := range histogram.GetBucket() {
+				assert.InDelta(t, tc.expectedBuckets[i], b.GetUpperBound(), 0.0, "Classic bucket %d upper bound mismatch", i)
+			}
 
 			// Verify sample count matches observed values
 			assert.Equal(t, uint64(len(tc.observeValues)), histogram.GetSampleCount(),

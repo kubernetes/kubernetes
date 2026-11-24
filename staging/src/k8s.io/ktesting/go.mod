@@ -2,9 +2,9 @@
 
 module k8s.io/ktesting
 
-go 1.27.0
+go 1.26.0
 
-godebug default=go1.27
+godebug default=go1.26
 
 require (
 	github.com/onsi/gomega v1.44.0

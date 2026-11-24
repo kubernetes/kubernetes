@@ -26,14 +26,18 @@ import (
 
 func TestHintMergerMergePreferredFound(t *testing.T) {
 	numaInfo := commonNUMAInfoTwoNodes()
-	hints := [][]TopologyHint{
+	hints := []resourceHints{
 		{
-			{NUMANodeAffinity: NewTestBitMask(0), Preferred: true},
+			hints: []TopologyHint{
+				{NUMANodeAffinity: NewTestBitMask(0), Preferred: true},
+			},
 		},
 		{
-			{NUMANodeAffinity: NewTestBitMask(1), Preferred: true},
-			{NUMANodeAffinity: nil, Preferred: true},
-			{NUMANodeAffinity: NewTestBitMask(0), Preferred: true},
+			hints: []TopologyHint{
+				{NUMANodeAffinity: NewTestBitMask(1), Preferred: true},
+				{NUMANodeAffinity: nil, Preferred: true},
+				{NUMANodeAffinity: NewTestBitMask(0), Preferred: true},
+			},
 		},
 	}
 
@@ -52,12 +56,16 @@ func TestHintMergerMergePreferredFound(t *testing.T) {
 
 func TestHintMergerMergePreferredNotFound(t *testing.T) {
 	numaInfo := commonNUMAInfoTwoNodes()
-	hints := [][]TopologyHint{
+	hints := []resourceHints{
 		{
-			{NUMANodeAffinity: NewTestBitMask(0, 1), Preferred: true},
+			hints: []TopologyHint{
+				{NUMANodeAffinity: NewTestBitMask(0, 1), Preferred: true},
+			},
 		},
 		{
-			{NUMANodeAffinity: NewTestBitMask(1), Preferred: true},
+			hints: []TopologyHint{
+				{NUMANodeAffinity: NewTestBitMask(1), Preferred: true},
+			},
 		},
 	}
 
@@ -70,12 +78,16 @@ func TestHintMergerMergePreferredNotFound(t *testing.T) {
 
 func TestHintMergerMergePreferredNoPreferredDimension(t *testing.T) {
 	numaInfo := commonNUMAInfoTwoNodes()
-	hints := [][]TopologyHint{
+	hints := []resourceHints{
 		{
-			{NUMANodeAffinity: NewTestBitMask(0), Preferred: false},
+			hints: []TopologyHint{
+				{NUMANodeAffinity: NewTestBitMask(0), Preferred: false},
+			},
 		},
 		{
-			{NUMANodeAffinity: NewTestBitMask(0), Preferred: true},
+			hints: []TopologyHint{
+				{NUMANodeAffinity: NewTestBitMask(0), Preferred: true},
+			},
 		},
 	}
 
@@ -88,12 +100,16 @@ func TestHintMergerMergePreferredNoPreferredDimension(t *testing.T) {
 
 func TestHintMergerMergePreferredEmptyMergedAffinity(t *testing.T) {
 	numaInfo := commonNUMAInfoTwoNodes()
-	hints := [][]TopologyHint{
+	hints := []resourceHints{
 		{
-			{NUMANodeAffinity: NewTestBitMask(2), Preferred: true},
+			hints: []TopologyHint{
+				{NUMANodeAffinity: NewTestBitMask(2), Preferred: true},
+			},
 		},
 		{
-			{NUMANodeAffinity: nil, Preferred: true},
+			hints: []TopologyHint{
+				{NUMANodeAffinity: nil, Preferred: true},
+			},
 		},
 	}
 
@@ -106,12 +122,16 @@ func TestHintMergerMergePreferredEmptyMergedAffinity(t *testing.T) {
 
 func TestHintMergerMergePreferredAllNilPreferred(t *testing.T) {
 	numaInfo := commonNUMAInfoTwoNodes()
-	hints := [][]TopologyHint{
+	hints := []resourceHints{
 		{
-			{NUMANodeAffinity: nil, Preferred: true},
+			hints: []TopologyHint{
+				{NUMANodeAffinity: nil, Preferred: true},
+			},
 		},
 		{
-			{NUMANodeAffinity: nil, Preferred: true},
+			hints: []TopologyHint{
+				{NUMANodeAffinity: nil, Preferred: true},
+			},
 		},
 	}
 
@@ -127,15 +147,21 @@ func TestHintMergerMergePreferredAllNilPreferred(t *testing.T) {
 
 func TestHintMergerMergePreferredMixedNilAndMask(t *testing.T) {
 	numaInfo := commonNUMAInfoTwoNodes()
-	hints := [][]TopologyHint{
+	hints := []resourceHints{
 		{
-			{NUMANodeAffinity: nil, Preferred: true},
+			hints: []TopologyHint{
+				{NUMANodeAffinity: nil, Preferred: true},
+			},
 		},
 		{
-			{NUMANodeAffinity: NewTestBitMask(0), Preferred: true},
+			hints: []TopologyHint{
+				{NUMANodeAffinity: NewTestBitMask(0), Preferred: true},
+			},
 		},
 		{
-			{NUMANodeAffinity: nil, Preferred: true},
+			hints: []TopologyHint{
+				{NUMANodeAffinity: nil, Preferred: true},
+			},
 		},
 	}
 
@@ -151,16 +177,22 @@ func TestHintMergerMergePreferredMixedNilAndMask(t *testing.T) {
 
 func TestHintMergerMergePreferredComplexPreferredHints(t *testing.T) {
 	numaInfo := commonNUMAInfoTwoNodes()
-	hints := [][]TopologyHint{
+	hints := []resourceHints{
 		{
-			{NUMANodeAffinity: NewTestBitMask(0), Preferred: true},
-			{NUMANodeAffinity: NewTestBitMask(1), Preferred: true},
+			hints: []TopologyHint{
+				{NUMANodeAffinity: NewTestBitMask(0), Preferred: true},
+				{NUMANodeAffinity: NewTestBitMask(1), Preferred: true},
+			},
 		},
 		{
-			{NUMANodeAffinity: NewTestBitMask(0), Preferred: true},
+			hints: []TopologyHint{
+				{NUMANodeAffinity: NewTestBitMask(0), Preferred: true},
+			},
 		},
 		{
-			{NUMANodeAffinity: nil, Preferred: true},
+			hints: []TopologyHint{
+				{NUMANodeAffinity: nil, Preferred: true},
+			},
 		},
 	}
 
@@ -176,19 +208,29 @@ func TestHintMergerMergePreferredComplexPreferredHints(t *testing.T) {
 
 func TestHintMergerMergePreferredAggregatesScore(t *testing.T) {
 	numaInfo := commonNUMAInfoTwoNodes()
-	hints := [][]TopologyHint{
+	hints := []resourceHints{
 		{
-			{NUMANodeAffinity: NewTestBitMask(0), Preferred: true, Score: 40},
+			resource: "cpu",
+			hints: []TopologyHint{
+				{NUMANodeAffinity: NewTestBitMask(0), Preferred: true, Score: 40},
+			},
 		},
 		{
-			{NUMANodeAffinity: NewTestBitMask(0), Preferred: true, Score: 80},
+			resource: "memory",
+			hints: []TopologyHint{
+				{NUMANodeAffinity: NewTestBitMask(0), Preferred: true, Score: 80},
+			},
 		},
 		{
-			{NUMANodeAffinity: nil, Preferred: true, Score: 100},
+			resource: "devices",
+			hints: []TopologyHint{
+				{NUMANodeAffinity: nil, Preferred: true, Score: 100},
+			},
 		},
 	}
 
-	merger := NewHintMerger(numaInfo, hints, PolicyRestricted, PolicyOptions{})
+	opts := PolicyOptions{NUMAScoreWeights: map[string]int{"cpu": 1, "memory": 1}}
+	merger := NewHintMerger(numaInfo, hints, PolicyRestricted, opts)
 	best, ok := merger.mergePreferred(klog.Background())
 	if !ok {
 		t.Fatalf("expected a preferred hint, got nil")
@@ -239,7 +281,7 @@ func TestHintMergerMergePreferredEquivalentToMerge(t *testing.T) {
 
 				for range iterations {
 					numDimensions := r.Intn(maxDimensions) + 1
-					hints := make([][]TopologyHint, 0, numDimensions)
+					hints := make([]resourceHints, 0, numDimensions)
 					for range numDimensions {
 						numHints := r.Intn(maxHintsPerDimension) + 1
 						hintsForDim := make([]TopologyHint, 0, numHints)
@@ -260,7 +302,7 @@ func TestHintMergerMergePreferredEquivalentToMerge(t *testing.T) {
 								Score:            int64(r.Intn(scoreValueCount)),
 							})
 						}
-						hints = append(hints, hintsForDim)
+						hints = append(hints, resourceHints{hints: hintsForDim})
 					}
 
 					merger := NewHintMerger(numaInfo, hints, policyName, optionSet.opts)
@@ -283,7 +325,7 @@ func TestHintMergerMergePreferredEquivalentToMerge(t *testing.T) {
 
 func TestHintMergerMergePreferredEmptyHints(t *testing.T) {
 	numaInfo := commonNUMAInfoTwoNodes()
-	hints := [][]TopologyHint{}
+	hints := []resourceHints{}
 
 	merger := NewHintMerger(numaInfo, hints, PolicyBestEffort, PolicyOptions{})
 	preferred, ok := merger.mergePreferred(klog.Background())

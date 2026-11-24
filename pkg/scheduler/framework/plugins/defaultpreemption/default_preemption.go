@@ -27,6 +27,7 @@ import (
 	policy "k8s.io/api/policy/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	resourcehelper "k8s.io/component-helpers/resource"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
@@ -70,7 +71,7 @@ type IsEligiblePodFunc func(nodeInfo fwk.NodeInfo, victim preemption.Victim, pre
 type MoreImportantVictimFunc func(victim1, victim2 preemption.Victim) bool
 
 type podGroupEvaluator interface {
-	Preempt(ctx context.Context, state fwk.PodGroupCycleState, pgInfo fwk.PodGroupInfo, podGroupSchedulingFunc fwk.PodGroupSchedulingFunc) (*fwk.PodGroupPostFilterResult, *fwk.Status)
+	Preempt(ctx context.Context, pgInfo fwk.PodGroupInfo, podGroupSchedulingFunc fwk.PodGroupSchedulingFunc) (*fwk.PodGroupPostFilterResult, *fwk.Status)
 }
 
 // DefaultPreemption is a PostFilter plugin implements the preemption logic.
@@ -106,10 +107,17 @@ var _ fwk.PreEnqueuePlugin = &DefaultPreemption{}
 var _ fwk.PodGroupPostFilterPlugin = &DefaultPreemption{}
 var _ framework.RankNodesPlugin = &DefaultPreemption{}
 var _ fwk.ReservePlugin = &DefaultPreemption{}
+var _ fwk.RelevancePlugin = &DefaultPreemption{}
 
 // Name returns name of the plugin. It is used in logs, etc.
 func (pl *DefaultPreemption) Name() string {
 	return Name
+}
+
+// IsRelevantForPodResize returns true to indicate that DefaultPreemption is relevant for pod resizes,
+// as it evaluates and executes preemption on the pod's node to make room for the deferred resize.
+func (pl *DefaultPreemption) IsRelevantForPodResize() bool {
+	return true
 }
 
 // New initializes a new plugin and returns it. The plugin type is retained to allow modification.
@@ -154,7 +162,11 @@ func New(_ context.Context, dpArgs runtime.Object, fh fwk.Handle, fts feature.Fe
 // PostFilter invoked at the postFilter extension point.
 func (pl *DefaultPreemption) PostFilter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, m fwk.NodeToStatusReader) (*fwk.PostFilterResult, *fwk.Status) {
 	defer func() {
-		metrics.PreemptionAttempts.Inc()
+		if pl.fts.EnableInPlacePodVerticalScalingSchedulerPreemption && resourcehelper.IsPodResizeDeferred(pod) {
+			metrics.ResizePreemptionAttempts.Inc()
+		} else {
+			metrics.PreemptionAttempts.Inc()
+		}
 	}()
 
 	result, status := pl.Evaluator.Preempt(ctx, state, pod, m)
@@ -169,7 +181,10 @@ func (pl *DefaultPreemption) PreEnqueue(ctx context.Context, p *v1.Pod) *fwk.Sta
 	if !pl.fts.EnableAsyncPreemption {
 		return nil
 	}
-	if p.Spec.SchedulingGroup != nil && pl.fts.EnableGenericWorkload {
+	// A deferred resize preempts as an individual pod (see PriorityQueue.isPodGroupMember),
+	// so its preemption is tracked under the pod's UID, not the group's.
+	isResize := pl.fts.EnableInPlacePodVerticalScalingSchedulerPreemption && resourcehelper.IsPodResizeDeferred(p)
+	if p.Spec.SchedulingGroup != nil && pl.fts.EnableGenericWorkload && !isResize {
 		var rootUID types.UID
 		if !pl.fts.EnableCompositePodGroup {
 			pg, err := pl.pgLister.Get(p.Namespace, *p.Spec.SchedulingGroup.PodGroupName)
@@ -333,6 +348,9 @@ func (pl *DefaultPreemption) SelectVictimsOnNode(
 
 	// No preemption victims found for incoming preemptor, and so we don't need to evaluate the node again since its state didn't change.
 	if len(potentialVictims) == 0 {
+		if pl.fts.EnableInPlacePodVerticalScalingSchedulerPreemption && resourcehelper.IsPodResizeDeferred(preemptor) {
+			return nil, 0, fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "No preemption victims found for pod resize")
+		}
 		return nil, 0, fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "No preemption victims found for incoming pod")
 	}
 
@@ -432,30 +450,53 @@ func (pl *DefaultPreemption) SelectVictimsOnNode(
 // There're several reasons:
 //  1. The pod has a preemptionPolicy of Never.
 //  2. The pod has already preempted other pods and the victims are in their graceful termination period.
-//     Currently we check the node that is nominated for this pod, and as long as there are
-//     terminating pods on this node, we don't attempt to preempt more pods.
-func (pl *DefaultPreemption) PodEligibleToPreemptOthers(_ context.Context, pod *v1.Pod, nominatedNodeStatus *fwk.Status) (bool, string) {
+//     Currently we check the node that is nominated for this pod (or the assigned node for a deferred
+//     in-place resize pod), and as long as there are terminating pods on this node, we don't attempt to
+//     preempt more pods.
+//  3. A plugin implementing framework.VictimExtensions reports that resources freed by
+//     an earlier preemption are still being reclaimed.
+func (pl *DefaultPreemption) PodEligibleToPreemptOthers(ctx context.Context, pod *v1.Pod, nominatedNodeStatus *fwk.Status) (bool, string) {
 	if pod.Spec.PreemptionPolicy != nil && *pod.Spec.PreemptionPolicy == v1.PreemptNever {
 		return false, "not eligible due to preemptionPolicy=Never."
 	}
 
 	nodeInfos := pl.fh.MutableSnapshotSharedLister().NodeInfos()
-	nomNodeName := pod.Status.NominatedNodeName
-	if len(nomNodeName) > 0 {
+	nomNodeName := preemption.NominatedNodeName(pl.fh, pod)
+	isResize := pl.fts.EnableInPlacePodVerticalScalingSchedulerPreemption && len(pod.Spec.NodeName) > 0 && resourcehelper.IsPodResizeDeferred(pod)
+	targetNodeName := nomNodeName
+	if isResize {
+		// Deferred resize pods are already bound to a node. Check their assigned node (even if a
+		// stale NominatedNodeName remains) so they do not trigger another round of preemption while
+		// previously preempted victims on that node are still terminating.
+		targetNodeName = pod.Spec.NodeName
+	} else if len(nomNodeName) > 0 {
 		// If the pod's nominated node is considered as UnschedulableAndUnresolvable by the filters,
 		// then the pod should be considered for preempting again.
 		if nominatedNodeStatus.Code() == fwk.UnschedulableAndUnresolvable {
 			return true, ""
 		}
+	}
 
-		if nodeInfo, _ := nodeInfos.Get(nomNodeName); nodeInfo != nil {
+	if len(targetNodeName) > 0 {
+		if nodeInfo, _ := nodeInfos.Get(targetNodeName); nodeInfo != nil {
 			for _, p := range nodeInfo.GetPods() {
 				victim := preemption.NewPodVictim(p)
 				if pl.isPreemptionAllowed(nodeInfo, victim, pod) && preemption.PodTerminatingByPreemption(p.GetPod()) {
+					if isResize {
+						return false, "not eligible due to a terminating pod on the assigned node."
+					}
 					// There is a terminating pod on the nominated node.
 					return false, "not eligible due to a terminating pod on the nominated node."
 				}
 			}
+		}
+	}
+
+	// VictimExtensions also runs with an empty nomNodeName because plugins can
+	// track pending resource release that is not tied to a single node.
+	if runner, ok := pl.fh.(framework.VictimExtensionsRunner); ok {
+		if eligible, reason := runner.RunVictimExtensionsPodEligibleToPreempt(ctx, pod, nomNodeName); !eligible {
+			return false, reason
 		}
 	}
 	return true, ""
@@ -488,7 +529,7 @@ func (pl *DefaultPreemption) isPreemptionAllowedAcrossAllVictimNodes(victim *pre
 }
 
 // PodGroupPostFilter runs a default preemption for the pod group.
-func (pl *DefaultPreemption) PodGroupPostFilter(ctx context.Context, state fwk.PodGroupCycleState, pgInfo fwk.PodGroupInfo, pgSchedulingFunc fwk.PodGroupSchedulingFunc) (postFilterResult *fwk.PodGroupPostFilterResult, status *fwk.Status) {
+func (pl *DefaultPreemption) PodGroupPostFilter(ctx context.Context, _ fwk.PodGroupCycleState, pgInfo fwk.PodGroupInfo, pgSchedulingFunc fwk.PodGroupSchedulingFunc) (postFilterResult *fwk.PodGroupPostFilterResult, status *fwk.Status) {
 	defer func() {
 		metrics.WorkloadPreemptionAttempts.WithLabelValues(metrics.EntityTypeToLabel(pgInfo.GetType()), status.Code().String()).Inc()
 	}()
@@ -504,7 +545,7 @@ func (pl *DefaultPreemption) PodGroupPostFilter(ctx context.Context, state fwk.P
 		}
 	}()
 
-	res, status := pl.podGroupEvaluator.Preempt(ctx, state, pgInfo, pgSchedulingFunc)
+	res, status := pl.podGroupEvaluator.Preempt(ctx, pgInfo, pgSchedulingFunc)
 	msg := status.Message()
 	if len(msg) > 0 {
 		return res, fwk.NewStatus(status.Code(), "pod group preemption: "+msg)
@@ -558,13 +599,14 @@ func (pl *DefaultPreemption) RankNodes(ctx context.Context, cycleState fwk.Cycle
 		})
 	}
 
+	preemptionManager := pl.fh.PreemptionManager()
 	slices.SortStableFunc(evals, func(a, b nodeVictimEval) int {
-		return preemption.CompareVictimSets(a.victims, b.victims)
+		return preemptionManager.CompareVictimSets(ctx, a.victims, b.victims)
 	})
 
 	rank := 0
 	for i := range evals {
-		if i == 0 || preemption.CompareVictimSets(evals[i-1].victims, evals[i].victims) != 0 {
+		if i == 0 || preemptionManager.CompareVictimSets(ctx, evals[i-1].victims, evals[i].victims) != 0 {
 			rank++
 		}
 		rankedNodes = append(rankedNodes, framework.NodeWithRank{
@@ -617,7 +659,7 @@ func (pl *DefaultPreemption) Unreserve(ctx context.Context, state fwk.CycleState
 }
 
 // computeDeltaVictimsOnNode returns the surviving victims on nodeName that would be
-// newly condemned if a preemptor pod is placed on it, sorted from most to least important.
+// newly condemned if a preemptor pod is placed on it, sorted from least to most preferred for preemption.
 //
 // TODO(#142718): Currently, this returns all surviving victims on nodeName without checking
 // whether the preemptor pod already fits alongside some or all of them (because all potential
@@ -625,7 +667,7 @@ func (pl *DefaultPreemption) Unreserve(ctx context.Context, state fwk.CycleState
 // While selectVictimsOnDomain still reprieves unnecessary victims after the inner cycle finishes,
 // returning all surviving victims here can overestimate a partially occupied node's victim cost
 // during RankNodes and Reserve. In a follow-up, we should greedily reprieve surviving
-// victims on nodeName from most to least important (re-adding each victim to a cloned NodeInfo
+// victims on nodeName from least to most preferred for preemption (re-adding each victim to a cloned NodeInfo
 // and running Filter plugins via RunFilterPluginsWithNominatedPods) and return only the minimal
 // subset of surviving victims whose removal is actually required for the preemptor pod to fit.
 func (pl *DefaultPreemption) computeDeltaVictimsOnNode(nodeName string, preemptionState *preemption.PodGroupPreemptionState) []fwk.PreemptionVictim {

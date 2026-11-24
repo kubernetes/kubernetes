@@ -288,6 +288,8 @@ func (d *compositePodGroupStateData) getChildren() []fwk.EntityKey {
 type podGroupState struct {
 	lock sync.RWMutex
 	podGroupStateData
+	// initiallyScheduledUID is the UID of the PodGroup that the scheduler set the InitiallyScheduled condition to True for.
+	initiallyScheduledUID types.UID
 }
 
 func newPodGroupState() *podGroupState {
@@ -376,6 +378,22 @@ func (pgs *podGroupState) removePodGroup() {
 	pgs.podGroupStateData.generation = nextPodGroupGeneration()
 }
 
+// setInitiallyScheduledUID sets the UID of the PodGroup that the scheduler set the InitiallyScheduled condition to True for.
+func (pgs *podGroupState) setInitiallyScheduledUID(uid types.UID) {
+	pgs.lock.Lock()
+	defer pgs.lock.Unlock()
+
+	pgs.initiallyScheduledUID = uid
+}
+
+// getInitiallyScheduledUID returns the UID of the PodGroup that the scheduler set the InitiallyScheduled condition to True for.
+func (pgs *podGroupState) getInitiallyScheduledUID() types.UID {
+	pgs.lock.RLock()
+	defer pgs.lock.RUnlock()
+
+	return pgs.initiallyScheduledUID
+}
+
 // AllPods returns the UIDs of all pods known to the scheduler for this group.
 func (pgs *podGroupState) AllPods() sets.Set[types.UID] {
 	pgs.lock.RLock()
@@ -447,6 +465,8 @@ func (pgs *podGroupState) PodGroup() *schedulingv1beta1.PodGroup {
 type compositePodGroupState struct {
 	lock sync.RWMutex
 	compositePodGroupStateData
+	// initiallyScheduledUID is the UID of the CompositePodGroup that the scheduler set the InitiallyScheduled condition to True for.
+	initiallyScheduledUID types.UID
 }
 
 // newCompositePodGroupState creates a new compositePodGroupState.
@@ -485,6 +505,22 @@ func (cpgs *compositePodGroupState) removeCompositePodGroup() {
 	defer cpgs.lock.Unlock()
 
 	cpgs.compositePodGroupStateData.removeCompositePodGroup()
+}
+
+// setInitiallyScheduledUID sets the UID of the CompositePodGroup that the scheduler set the InitiallyScheduled condition to True for.
+func (cpgs *compositePodGroupState) setInitiallyScheduledUID(uid types.UID) {
+	cpgs.lock.Lock()
+	defer cpgs.lock.Unlock()
+
+	cpgs.initiallyScheduledUID = uid
+}
+
+// getInitiallyScheduledUID returns the UID of the CompositePodGroup that the scheduler set the InitiallyScheduled condition to True for.
+func (cpgs *compositePodGroupState) getInitiallyScheduledUID() types.UID {
+	cpgs.lock.RLock()
+	defer cpgs.lock.RUnlock()
+
+	return cpgs.initiallyScheduledUID
 }
 
 // CompositePodGroup returns the CompositePodGroup API object.

@@ -84,7 +84,6 @@ func (*podGroupStrategy) DeclarativeValidationConfig(ctx context.Context, obj, o
 	return rest.DeclarativeValidationConfig{Options: map[string]bool{
 		string(features.TopologyAwareWorkloadScheduling): utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareWorkloadScheduling),
 		string(features.DRAWorkloadResourceClaims):       utilfeature.DefaultFeatureGate.Enabled(features.DRAWorkloadResourceClaims),
-		string(features.PodGroupPreemptionPolicy):        utilfeature.DefaultFeatureGate.Enabled(features.PodGroupPreemptionPolicy),
 		string(features.CompositePodGroup):               utilfeature.DefaultFeatureGate.Enabled(features.CompositePodGroup),
 	}}
 }
@@ -180,7 +179,6 @@ func dropDisabledPodGroupFields(podGroup, oldPodGroup *scheduling.PodGroup) {
 func dropDisabledPodGroupSpecFields(podGroupSpec, oldPodGroupSpec *scheduling.PodGroupSpec) {
 	dropDisabledSchedulingConstraintsFields(podGroupSpec, oldPodGroupSpec)
 	dropDisabledDRAWorkloadResourceClaimsFields(podGroupSpec, oldPodGroupSpec)
-	dropDisabledPreemptionPolicyField(podGroupSpec, oldPodGroupSpec)
 	dropDisabledParentCompositePodGroupNameField(podGroupSpec, oldPodGroupSpec)
 }
 
@@ -217,26 +215,12 @@ func dropDisabledDRAWorkloadResourceClaimsFields(podGroupSpec, oldPodGroupSpec *
 	podGroupSpec.ResourceClaims = nil
 }
 
-// dropDisabledPreemptionPolicyField removes the PreemptionPolicy field unless it is
-// already used in the old PodGroup spec.
-func dropDisabledPreemptionPolicyField(podGroupSpec, oldPodGroupSpec *scheduling.PodGroupSpec) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.PodGroupPreemptionPolicy) || preemptionPolicyInUse(oldPodGroupSpec) {
-		// No need to drop anything.
-		return
-	}
-	podGroupSpec.PreemptionPolicy = nil
-}
-
 func schedulingConstraintsInUse(podGroupSpec *scheduling.PodGroupSpec) bool {
 	return podGroupSpec != nil && podGroupSpec.SchedulingConstraints != nil
 }
 
 func draWorkloadResourceClaimsInUse(podGroupSpec *scheduling.PodGroupSpec) bool {
 	return podGroupSpec != nil && len(podGroupSpec.ResourceClaims) > 0
-}
-
-func preemptionPolicyInUse(podGroupSpec *scheduling.PodGroupSpec) bool {
-	return podGroupSpec != nil && podGroupSpec.PreemptionPolicy != nil
 }
 
 func parentCompositePodGroupNameInUse(podGroupSpec *scheduling.PodGroupSpec) bool {

@@ -26,6 +26,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -189,14 +190,15 @@ func TestApplySandboxResources(t *testing.T) {
 					},
 				},
 				Status: v1.PodStatus{
-					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+					ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 						{
-							ResourceClaimName: "direct-claim",
-							Containers:        []string{"c1"},
-							Mapping: []v1.NodeAllocatableMappedResources{
-								{Name: v1.ResourceCPU, Quantity: new(resource.MustParse("200m"))},
-								{Name: v1.ResourceMemory, Quantity: new(resource.MustParse("128Mi"))},
-							},
+							ContainerName: "",
+							Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("200m"), v1.ResourceMemory: resource.MustParse("128Mi")},
+							Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("200m"), v1.ResourceMemory: resource.MustParse("128Mi")},
+						},
+						{
+							ContainerName: "c1",
+							Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("200m"), v1.ResourceMemory: resource.MustParse("128Mi")},
 						},
 					},
 				},
@@ -229,14 +231,15 @@ func TestApplySandboxResources(t *testing.T) {
 					},
 				},
 				Status: v1.PodStatus{
-					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+					ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 						{
-							ResourceClaimName: "direct-claim",
-							Containers:        []string{"c1"},
-							Mapping: []v1.NodeAllocatableMappedResources{
-								{Name: v1.ResourceCPU, Quantity: new(resource.MustParse("200m"))},
-								{Name: v1.ResourceMemory, Quantity: new(resource.MustParse("128Mi"))},
-							},
+							ContainerName: "",
+							Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("200m"), v1.ResourceMemory: resource.MustParse("128Mi")},
+							Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("200m"), v1.ResourceMemory: resource.MustParse("128Mi")},
+						},
+						{
+							ContainerName: "c1",
+							Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("200m"), v1.ResourceMemory: resource.MustParse("128Mi")},
 						},
 					},
 				},
@@ -273,14 +276,15 @@ func TestApplySandboxResources(t *testing.T) {
 					},
 				},
 				Status: v1.PodStatus{
-					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+					ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 						{
-							ResourceClaimName: "direct-claim",
-							Containers:        []string{"c1"},
-							Mapping: []v1.NodeAllocatableMappedResources{
-								{Name: v1.ResourceCPU, Quantity: new(resource.MustParse("200m"))},
-								{Name: v1.ResourceMemory, Quantity: new(resource.MustParse("128Mi"))},
-							},
+							ContainerName: "",
+							Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("200m"), v1.ResourceMemory: resource.MustParse("128Mi")},
+							Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("200m"), v1.ResourceMemory: resource.MustParse("128Mi")},
+						},
+						{
+							ContainerName: "c1",
+							Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("200m"), v1.ResourceMemory: resource.MustParse("128Mi")},
 						},
 					},
 				},
@@ -327,14 +331,15 @@ func TestApplySandboxResources(t *testing.T) {
 					},
 				},
 				Status: v1.PodStatus{
-					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+					ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 						{
-							ResourceClaimName: "direct-claim",
-							Containers:        []string{"c1"},
-							Mapping: []v1.NodeAllocatableMappedResources{
-								{Name: v1.ResourceCPU, Quantity: new(resource.MustParse("200m"))},
-								{Name: v1.ResourceMemory, Quantity: new(resource.MustParse("128Mi"))},
-							},
+							ContainerName: "",
+							Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("200m"), v1.ResourceMemory: resource.MustParse("128Mi")},
+							Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("200m"), v1.ResourceMemory: resource.MustParse("128Mi")},
+						},
+						{
+							ContainerName: "c1",
+							Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("200m"), v1.ResourceMemory: resource.MustParse("128Mi")},
 						},
 					},
 				},
@@ -372,26 +377,16 @@ func TestApplySandboxResources(t *testing.T) {
 					},
 				},
 				Status: v1.PodStatus{
-					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+					ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 						{
-							ResourceClaimName: "combined-claim",
-							Containers:        []string{"c1"},
-							Mapping: []v1.NodeAllocatableMappedResources{
-								{Name: v1.ResourceCPU, Quantity: new(resource.MustParse("200m"))},
-								{Name: v1.ResourceMemory, Quantity: new(resource.MustParse("128Mi"))},
-							},
-							Overhead: []v1.NodeAllocatableOverheadResources{
-								{
-									Name:         v1.ResourceCPU,
-									PerPod:       new(resource.MustParse("100m")),
-									PerContainer: new(resource.MustParse("50m")),
-								},
-								{
-									Name:         v1.ResourceMemory,
-									PerPod:       new(resource.MustParse("100Mi")),
-									PerContainer: new(resource.MustParse("50Mi")),
-								},
-							},
+							ContainerName: "",
+							Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("350m"), v1.ResourceMemory: resource.MustParse("278Mi")},
+							Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("350m"), v1.ResourceMemory: resource.MustParse("278Mi")},
+						},
+						{
+							ContainerName: "c1",
+							Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("50m"), v1.ResourceMemory: resource.MustParse("50Mi")},
+							Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("350m"), v1.ResourceMemory: resource.MustParse("278Mi")},
 						},
 					},
 				},
@@ -480,14 +475,15 @@ func TestApplySandboxResources(t *testing.T) {
 					},
 				},
 				Status: v1.PodStatus{
-					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+					ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 						{
-							ResourceClaimName: "direct-claim",
-							Containers:        []string{"c1"},
-							Mapping: []v1.NodeAllocatableMappedResources{
-								{Name: v1.ResourceCPU, Quantity: new(resource.MustParse("200m"))},
-								{Name: v1.ResourceMemory, Quantity: new(resource.MustParse("128Mi"))},
-							},
+							ContainerName: "",
+							Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("200m"), v1.ResourceMemory: resource.MustParse("128Mi")},
+							Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("200m"), v1.ResourceMemory: resource.MustParse("128Mi")},
+						},
+						{
+							ContainerName: "c1",
+							Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("200m"), v1.ResourceMemory: resource.MustParse("128Mi")},
 						},
 					},
 				},
@@ -506,14 +502,19 @@ func TestApplySandboxResources(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		setCgroupVersionDuringTest(test.cgroupVersion)
-		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRANodeAllocatableResources, test.draEnabled)
-		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, test.podLevelResourcesEnabled)
+		t.Run(test.description, func(t *testing.T) {
+			setCgroupVersionDuringTest(test.cgroupVersion)
+			if !test.podLevelResourcesEnabled {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.37"))
+			}
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRANodeAllocatableResources, test.draEnabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, test.podLevelResourcesEnabled)
 
-		err = m.applySandboxResources(tCtx, test.pod, config)
-		require.NoError(t, err)
-		assert.Equal(t, test.expectedResource, config.Linux.Resources, "TestCase[%d]: %s", i, test.description)
-		assert.Equal(t, test.expectedOverhead, config.Linux.Overhead, "TestCase[%d]: %s", i, test.description)
+			err = m.applySandboxResources(tCtx, test.pod, config)
+			require.NoError(t, err)
+			assert.Equal(t, test.expectedResource, config.Linux.Resources, "TestCase[%d]: %s", i, test.description)
+			assert.Equal(t, test.expectedOverhead, config.Linux.Overhead, "TestCase[%d]: %s", i, test.description)
+		})
 	}
 }
 

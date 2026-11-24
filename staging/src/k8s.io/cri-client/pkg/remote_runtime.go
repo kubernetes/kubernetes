@@ -41,6 +41,7 @@ import (
 	"k8s.io/klog/v2"
 	utilexec "k8s.io/utils/exec"
 
+	crimetrics "k8s.io/cri-client/pkg/metrics"
 	"k8s.io/cri-client/pkg/util"
 )
 
@@ -448,6 +449,7 @@ func (r *remoteRuntimeService) streamPodSandboxesV1(ctx context.Context, filter 
 	})
 	if err != nil {
 		logger.Error(err, "StreamPodSandboxes from runtime service failed", "filter", filter)
+		crimetrics.ListStreamingTotal.Increment(ctx, "list_podsandbox", "error")
 		return nil, err
 	}
 
@@ -455,6 +457,7 @@ func (r *remoteRuntimeService) streamPodSandboxesV1(ctx context.Context, filter 
 	for {
 		resp, err := stream.Recv()
 		if errors.Is(err, io.EOF) {
+			crimetrics.ListStreamingTotal.Increment(ctx, "list_podsandbox", "success")
 			break
 		}
 		if err != nil {
@@ -464,9 +467,11 @@ func (r *remoteRuntimeService) streamPodSandboxesV1(ctx context.Context, filter 
 			if status.Code(err) == codes.Unimplemented {
 				logger.Info("StreamPodSandboxes not implemented, falling back to ListPodSandbox", "filter", filter)
 				r.useStreaming.Store(false)
+				crimetrics.ListStreamingTotal.Increment(ctx, "list_podsandbox", "fallback")
 				return r.listPodSandboxV1(ctx, filter)
 			}
 			logger.Error(err, "StreamPodSandboxes recv failed", "filter", filter, "itemsReceived", len(items))
+			crimetrics.ListStreamingTotal.Increment(ctx, "list_podsandbox", "error")
 			return nil, err
 		}
 		items = append(items, resp.PodSandboxes...)
@@ -606,6 +611,7 @@ func (r *remoteRuntimeService) streamContainersV1(ctx context.Context, filter *r
 	})
 	if err != nil {
 		logger.Error(err, "StreamContainers from runtime service failed", "filter", filter)
+		crimetrics.ListStreamingTotal.Increment(ctx, "list_containers", "error")
 		return nil, err
 	}
 
@@ -613,6 +619,7 @@ func (r *remoteRuntimeService) streamContainersV1(ctx context.Context, filter *r
 	for {
 		resp, err := stream.Recv()
 		if errors.Is(err, io.EOF) {
+			crimetrics.ListStreamingTotal.Increment(ctx, "list_containers", "success")
 			break
 		}
 		if err != nil {
@@ -622,9 +629,11 @@ func (r *remoteRuntimeService) streamContainersV1(ctx context.Context, filter *r
 			if status.Code(err) == codes.Unimplemented {
 				logger.Info("StreamContainers not implemented, falling back to ListContainers", "filter", filter)
 				r.useStreaming.Store(false)
+				crimetrics.ListStreamingTotal.Increment(ctx, "list_containers", "fallback")
 				return r.listContainersV1(ctx, filter)
 			}
 			logger.Error(err, "StreamContainers recv failed", "filter", filter, "itemsReceived", len(containers))
+			crimetrics.ListStreamingTotal.Increment(ctx, "list_containers", "error")
 			return nil, err
 		}
 		containers = append(containers, resp.Containers...)
@@ -963,6 +972,7 @@ func (r *remoteRuntimeService) streamContainerStatsV1(ctx context.Context, filte
 	})
 	if err != nil {
 		logger.Error(err, "StreamContainerStats from runtime service failed", "filter", filter)
+		crimetrics.ListStreamingTotal.Increment(ctx, "list_container_stats", "error")
 		return nil, err
 	}
 
@@ -970,6 +980,7 @@ func (r *remoteRuntimeService) streamContainerStatsV1(ctx context.Context, filte
 	for {
 		resp, err := stream.Recv()
 		if errors.Is(err, io.EOF) {
+			crimetrics.ListStreamingTotal.Increment(ctx, "list_container_stats", "success")
 			break
 		}
 		if err != nil {
@@ -979,9 +990,11 @@ func (r *remoteRuntimeService) streamContainerStatsV1(ctx context.Context, filte
 			if status.Code(err) == codes.Unimplemented {
 				logger.Info("StreamContainerStats not implemented, falling back to ListContainerStats", "filter", filter)
 				r.useStreaming.Store(false)
+				crimetrics.ListStreamingTotal.Increment(ctx, "list_container_stats", "fallback")
 				return r.listContainerStatsV1(ctx, filter)
 			}
 			logger.Error(err, "StreamContainerStats recv failed", "filter", filter, "itemsReceived", len(stats))
+			crimetrics.ListStreamingTotal.Increment(ctx, "list_container_stats", "error")
 			return nil, err
 		}
 		stats = append(stats, resp.ContainerStats...)
@@ -1054,6 +1067,7 @@ func (r *remoteRuntimeService) streamPodSandboxStatsV1(ctx context.Context, filt
 	})
 	if err != nil {
 		logger.Error(err, "StreamPodSandboxStats from runtime service failed", "filter", filter)
+		crimetrics.ListStreamingTotal.Increment(ctx, "list_podsandbox_stats", "error")
 		return nil, err
 	}
 
@@ -1061,6 +1075,7 @@ func (r *remoteRuntimeService) streamPodSandboxStatsV1(ctx context.Context, filt
 	for {
 		resp, err := stream.Recv()
 		if errors.Is(err, io.EOF) {
+			crimetrics.ListStreamingTotal.Increment(ctx, "list_podsandbox_stats", "success")
 			break
 		}
 		if err != nil {
@@ -1070,9 +1085,11 @@ func (r *remoteRuntimeService) streamPodSandboxStatsV1(ctx context.Context, filt
 			if status.Code(err) == codes.Unimplemented {
 				logger.Info("StreamPodSandboxStats not implemented, falling back to ListPodSandboxStats", "filter", filter)
 				r.useStreaming.Store(false)
+				crimetrics.ListStreamingTotal.Increment(ctx, "list_podsandbox_stats", "fallback")
 				return r.listPodSandboxStatsV1(ctx, filter)
 			}
 			logger.Error(err, "StreamPodSandboxStats recv failed", "filter", filter, "itemsReceived", len(stats))
+			crimetrics.ListStreamingTotal.Increment(ctx, "list_podsandbox_stats", "error")
 			return nil, err
 		}
 		stats = append(stats, resp.PodSandboxStats...)
@@ -1319,6 +1336,7 @@ func (r *remoteRuntimeService) streamPodSandboxMetricsV1(ctx context.Context) ([
 	stream, err := r.runtimeClient.StreamPodSandboxMetrics(ctx, &runtimeapi.StreamPodSandboxMetricsRequest{})
 	if err != nil {
 		logger.Error(err, "StreamPodSandboxMetrics from runtime service failed")
+		crimetrics.ListStreamingTotal.Increment(ctx, "list_podsandbox_metrics", "error")
 		return nil, err
 	}
 
@@ -1326,6 +1344,7 @@ func (r *remoteRuntimeService) streamPodSandboxMetricsV1(ctx context.Context) ([
 	for {
 		resp, err := stream.Recv()
 		if errors.Is(err, io.EOF) {
+			crimetrics.ListStreamingTotal.Increment(ctx, "list_podsandbox_metrics", "success")
 			break
 		}
 		if err != nil {
@@ -1335,9 +1354,11 @@ func (r *remoteRuntimeService) streamPodSandboxMetricsV1(ctx context.Context) ([
 			if status.Code(err) == codes.Unimplemented {
 				logger.Info("StreamPodSandboxMetrics not implemented, falling back to ListPodSandboxMetrics")
 				r.useStreaming.Store(false)
+				crimetrics.ListStreamingTotal.Increment(ctx, "list_podsandbox_metrics", "fallback")
 				return r.listPodSandboxMetricsV1(ctx)
 			}
 			logger.Error(err, "StreamPodSandboxMetrics recv failed", "itemsReceived", len(metrics))
+			crimetrics.ListStreamingTotal.Increment(ctx, "list_podsandbox_metrics", "error")
 			return nil, err
 		}
 		metrics = append(metrics, resp.PodSandboxMetrics...)

@@ -1177,7 +1177,10 @@ func (s *store) stateFromEtcdResponse(ctx context.Context, kv *mvccpb.KeyValue, 
 
 	data, stale, err := s.transformer.TransformFromStorage(ctx, kv.Value, authenticatedDataString(key))
 	if err != nil {
-		if !expectTransformOrDecodeError {
+		// Unsafe deletion sets expectTransformOrDecodeError without first checking for a
+		// corrupt object error, so the read has to fail here when the error isn't data
+		// corruption.
+		if !expectTransformOrDecodeError || !value.IsDataCorruption(err) {
 			return nil, storage.NewInternalError(err)
 		}
 

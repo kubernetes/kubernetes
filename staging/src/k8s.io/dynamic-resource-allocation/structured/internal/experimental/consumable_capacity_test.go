@@ -158,6 +158,13 @@ func testConsumableCapacity(tCtx ktesting.TContext) {
 		}
 	})
 
+	tCtx.Run("resolve-qualified-name-uses-driver-domain", func(tCtx ktesting.TContext) {
+
+		driver := draapi.MakeUniqueString(driverA)
+		tCtx.Require(draapi.MakeFullyQualifiedName("memory", driver, draapi.MakeUniqueString).String()).To(g.Equal(driverA + "/memory"))
+		tCtx.Require(draapi.MakeFullyQualifiedName(resourceapi.QualifiedName(driverA+"/memory"), driver, draapi.MakeUniqueString).String()).To(g.Equal(driverA + "/memory"))
+	})
+
 	tCtx.Run("violate-capacity-sharing", testViolateCapacityRequestPolicy)
 
 	tCtx.Run("calculate-consumed-capacity", testCalculateConsumedCapacity)
@@ -167,6 +174,8 @@ func testConsumableCapacity(tCtx ktesting.TContext) {
 	tCtx.Run("use-milli", testUseMilli)
 
 	tCtx.Run("cmp-request-over-capacity-fatal-beats-soft", testCmpRequestOverCapacityFatalBeatsSoft)
+	tCtx.Run("cmp-request-over-capacity-conflict-beats-missing", testCmpRequestOverCapacityConflictBeatsMissing)
+	tCtx.Run("cmp-request-over-capacity-admin-access", testCmpRequestOverCapacityAdminAccess)
 }
 
 // testCmpRequestOverCapacityFatalBeatsSoft pins that a representability error takes
@@ -208,10 +217,104 @@ func testCmpRequestOverCapacityFatalBeatsSoft(tCtx ktesting.TContext) {
 	// Go's map order is unspecified, so run the check repeatedly to make an
 	// order-dependent regression very likely to surface rather than to rely on one order.
 	for range 64 {
-		_, ok, err := cmpRequestOverCapacity(NewConsumedCapacity(), request, device, NewConsumedCapacity(), false)
+		_, ok, err := cmpRequestOverCapacity(NewConsumedCapacity(), request, device, NewConsumedCapacity(), false, false)
 		tCtx.Require(ok).To(g.BeFalseBecause("an unrepresentable request must not be considered satisfiable"))
 		tCtx.Require(err).To(g.MatchError(errCapacityRequestNotRepresentable), "a representability error must take precedence over the soft over-capacity mismatch")
 	}
+}
+
+// testCmpRequestOverCapacityConflictBeatsMissing pins that a capacity requested with and
+// without the driver domain is an error even if another requested capacity is missing.
+func testCmpRequestOverCapacityConflictBeatsMissing(tCtx ktesting.TContext) {
+	slice := &draapi.ResourceSlice{}
+	driverName := slice.MakeUniqueString(driverA)
+	device := deviceWithID{
+		Device: &draapi.Device{
+			Capacity: draapi.DeviceCapacities{
+				Nested: map[draapi.UniqueString]map[draapi.UniqueString]*draapi.DeviceCapacity{
+					driverName: {
+						slice.MakeUniqueString(capacity0): {Value: one},
+					},
+				},
+				DriverName: driverName,
+			},
+		},
+		id: DeviceID{
+			Driver: driverName,
+		},
+		slice: slice,
+	}
+	request := &resourceapi.CapacityRequirements{
+		Requests: map[resourceapi.QualifiedName]resource.Quantity{
+			capacity0:                 one,
+			driverA + "/" + capacity0: one,
+			capacity1:                 one, // not defined by the device
+		},
+	}
+	// Go's map order is unspecified, so run the check repeatedly.
+	for range 64 {
+		_, ok, err := cmpRequestOverCapacity(NewConsumedCapacity(), request, device, NewConsumedCapacity(), false, false)
+		tCtx.Require(ok).To(g.BeFalseBecause("a conflicting request must not be considered satisfiable"))
+		tCtx.Require(err).To(g.MatchError(g.ContainSubstring("requested both as")), "the conflict must take precedence over the missing capacity")
+	}
+}
+
+func testCmpRequestOverCapacityAdminAccess(tCtx ktesting.TContext) {
+	slice := &draapi.ResourceSlice{}
+	driverName := slice.MakeUniqueString(driverA)
+	device := deviceWithID{
+		Device: &draapi.Device{
+			Capacity: draapi.DeviceCapacities{
+				Nested: map[draapi.UniqueString]map[draapi.UniqueString]*draapi.DeviceCapacity{
+					driverName: {
+						slice.MakeUniqueString(capacity0): {
+							Value: two,
+							RequestPolicy: &resourceapi.CapacityRequestPolicy{
+								ValidValues: []resource.Quantity{two},
+							},
+						},
+					},
+				},
+				DriverName: driverName,
+			},
+		},
+		id: DeviceID{
+			Driver: driverName,
+		},
+		slice: slice,
+	}
+	// Requesting 1 violates the policy (ValidValues is [2]), but admin access skips the policy check
+	// and only requires that the requested quantity fits the device's total capacity of 2.
+	requestFitting := &resourceapi.CapacityRequirements{
+		Requests: map[resourceapi.QualifiedName]resource.Quantity{
+			capacity0: one,
+		},
+	}
+	res, ok, err := cmpRequestOverCapacity(NewConsumedCapacity(), requestFitting, device, NewConsumedCapacity(), false, true)
+	tCtx.Require(err).NotTo(g.HaveOccurred())
+	tCtx.Require(ok).To(g.BeTrueBecause("admin access should skip policy check and fit within total capacity"))
+	tCtx.Require(res).To(g.HaveLen(1))
+
+	// Requesting 3 exceeds the device's total capacity of 2, so it must not be satisfied.
+	requestExceeding := &resourceapi.CapacityRequirements{
+		Requests: map[resourceapi.QualifiedName]resource.Quantity{
+			capacity0: three,
+		},
+	}
+	res, ok, err = cmpRequestOverCapacity(NewConsumedCapacity(), requestExceeding, device, NewConsumedCapacity(), false, true)
+	tCtx.Require(err).NotTo(g.HaveOccurred())
+	tCtx.Require(ok).To(g.BeFalseBecause("admin access requesting more than total capacity must fail"))
+	tCtx.Require(res).To(g.BeNil())
+
+	// Requesting a negative value is rejected with errNegativeCapacity.
+	requestNegative := &resourceapi.CapacityRequirements{
+		Requests: map[resourceapi.QualifiedName]resource.Quantity{
+			capacity0: negativeOne,
+		},
+	}
+	_, ok, err = cmpRequestOverCapacity(NewConsumedCapacity(), requestNegative, device, NewConsumedCapacity(), false, true)
+	tCtx.Require(ok).To(g.BeFalseBecause("negative capacity request must not be satisfiable"))
+	tCtx.Require(err).To(g.MatchError(errNegativeCapacity))
 }
 
 func testSafeMilliValue(tCtx ktesting.TContext) {
@@ -679,6 +782,75 @@ func testCalculateConsumedCapacity(tCtx ktesting.TContext) {
 			} else {
 				tCtx.Require(err).NotTo(g.HaveOccurred())
 				tCtx.Require(consumedCapacity.Cmp(tc.expectResult)).To(g.BeZero())
+			}
+		})
+	}
+}
+
+// TestResolveConsumedCountersFatalBeatsSoft verifies that an unrepresentable
+// counter request is reported as an error even when another counter exceeds its
+// policy limit, for both fixed and valueFrom consumption, regardless of map iteration order.
+func TestResolveConsumedCountersFatalBeatsSoft(t *testing.T) {
+	testResolveConsumedCountersFatalBeatsSoft(ktesting.Init(t))
+}
+func testResolveConsumedCountersFatalBeatsSoft(tCtx ktesting.TContext) {
+
+	setName := draapi.MakeUniqueString("shared-counters")
+	device := deviceWithID{
+		Device: &draapi.Device{
+			ConsumesCounters: []draapi.DeviceCounterConsumption{{
+				CounterSet: setName,
+				Counters: map[string]resourceapi.CounterRequirement{
+					"soft":  {ValueFrom: &resourceapi.CounterValueFrom{CapacityName: capacity0}},
+					"fatal": {ValueFrom: &resourceapi.CounterValueFrom{CapacityName: capacity1}},
+				},
+			}},
+		},
+		id: MakeDeviceID(driverA, pool1, device1),
+		pool: &Pool{
+			CounterSets: map[draapi.UniqueString]*draapi.CounterSet{
+				setName: {
+					Name: setName,
+					Counters: map[string]resourceapi.Counter{
+						"soft": {
+							Value: two,
+							ConsumptionPolicy: &resourceapi.CapacityRequestPolicy{
+								Default:    &one,
+								ValidRange: &resourceapi.CapacityRequestPolicyRange{Min: &one, Max: &two, Step: &one},
+							},
+						},
+						"fatal": {
+							Value: maxInt64Q,
+							ConsumptionPolicy: &resourceapi.CapacityRequestPolicy{
+								Default:    &two,
+								ValidRange: &resourceapi.CapacityRequestPolicyRange{Min: &zero, Step: &two},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	request := &resourceapi.CapacityRequirements{
+		Requests: map[resourceapi.QualifiedName]resource.Quantity{
+			capacity0: three,
+			capacity1: maxInt64Q,
+		},
+	}
+	accessor := &exactDeviceRequestAccessor{request: &resourceapi.DeviceRequest{Exactly: &resourceapi.ExactDeviceRequest{Capacity: request}}}
+	alloc := &allocator{Allocator: &Allocator{features: Features{SharedConsumableCapacity: true}}}
+	for _, mode := range []string{"valueFrom", "fixed"} {
+		tCtx.Run(mode, func(tCtx ktesting.TContext) {
+			if mode == "fixed" {
+				device.ConsumesCounters[0].Counters = map[string]resourceapi.CounterRequirement{
+					"soft": {Value: &three}, "fatal": {Value: &maxInt64Q},
+				}
+			}
+			// Repeat to expose a regression regardless of the map's initial iteration order.
+			for range 64 {
+				_, _, ok, err := alloc.resolveConsumedCounters(device, accessor, false)
+				tCtx.Require(ok).To(g.BeFalseBecause("an unrepresentable counter request must not be considered satisfiable"))
+				tCtx.Require(err).To(g.MatchError(errCapacityRequestNotRepresentable))
 			}
 		})
 	}

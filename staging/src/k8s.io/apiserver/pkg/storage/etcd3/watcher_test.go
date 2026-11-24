@@ -90,6 +90,10 @@ func TestWatch(t *testing.T) {
 		ctx, store, _ := testSetup(t)
 		storagetesting.RunTestDeleteTriggerWatch(ctx, t, store)
 	})
+	t.Run("WatchMultiKeyTransaction", func(t *testing.T) {
+		ctx, store, client := testSetup(t)
+		storagetesting.RunTestWatchMultiKeyTransaction(ctx, t, store, client.Client)
+	})
 	t.Run("WatchFromZero", func(t *testing.T) {
 		ctx, store, client := testSetup(t)
 		storagetesting.RunTestWatchFromZero(ctx, t, store, compactStorage(store, client.Client))
@@ -174,7 +178,7 @@ func TestWatch(t *testing.T) {
 	})
 	t.Run("WatchResync", func(t *testing.T) {
 		ctx, store, client := testSetup(t)
-		storagetesting.RunTestWatchResync(ctx, t, store, false, compactStorage(store, client.Client), nil, nil)
+		storagetesting.RunTestWatchResync(ctx, t, store, false, false, compactStorage(store, client.Client), nil, nil)
 	})
 }
 

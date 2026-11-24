@@ -196,37 +196,33 @@ var _ = SIGDescribe("MemoryQoS", framework.WithSerial(), func() {
 		cgroupDriver = oldCfg.CgroupDriver
 	})
 
-	// configureMemoryQoS restarts kubelet with MemoryQoS enabled and specified settings.
-	configureMemoryQoS := func(ctx context.Context, throttlingFactor float64) {
+	newMemoryQoSConfig := func(policy kubeletconfig.MemoryReservationPolicy) *kubeletconfig.KubeletConfiguration {
 		newCfg := oldCfg.DeepCopy()
 		if newCfg.FeatureGates == nil {
 			newCfg.FeatureGates = make(map[string]bool)
 		}
 		newCfg.FeatureGates["MemoryQoS"] = true
-		newCfg.MemoryThrottlingFactor = &throttlingFactor
+		if policy == kubeletconfig.SoftMemoryReservationPolicy || policy == kubeletconfig.HardMemoryReservationPolicy {
+			newCfg.FeatureGates["NodeMemoryReservationPolicy"] = true
+		}
+		newCfg.MemoryReservationPolicy = policy
 		newCfg.CgroupsPerQOS = true
 		newCfg.EnforceNodeAllocatable = []string{"pods"}
+		return newCfg
+	}
 
+	// configureMemoryQoSWithPolicy restarts kubelet with MemoryQoS and a specific memoryReservationPolicy.
+	configureMemoryQoSWithPolicy := func(ctx context.Context, throttlingFactor float64, policy kubeletconfig.MemoryReservationPolicy) {
+		newCfg := newMemoryQoSConfig(policy)
+		newCfg.MemoryThrottlingFactor = &throttlingFactor
 		framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(newCfg))
 		restartKubelet(ctx, true)
 		waitForKubeletToStart(ctx, f)
 	}
 
-	// configureMemoryQoSWithPolicy restarts kubelet with MemoryQoS and a specific memoryReservationPolicy.
-	configureMemoryQoSWithPolicy := func(ctx context.Context, throttlingFactor float64, policy kubeletconfig.MemoryReservationPolicy) {
-		newCfg := oldCfg.DeepCopy()
-		if newCfg.FeatureGates == nil {
-			newCfg.FeatureGates = make(map[string]bool)
-		}
-		newCfg.FeatureGates["MemoryQoS"] = true
-		newCfg.MemoryThrottlingFactor = &throttlingFactor
-		newCfg.MemoryReservationPolicy = policy
-		newCfg.CgroupsPerQOS = true
-		newCfg.EnforceNodeAllocatable = []string{"pods"}
-
-		framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(newCfg))
-		restartKubelet(ctx, true)
-		waitForKubeletToStart(ctx, f)
+	// configureMemoryQoS restarts kubelet with MemoryQoS enabled and specified settings.
+	configureMemoryQoS := func(ctx context.Context, throttlingFactor float64) {
+		configureMemoryQoSWithPolicy(ctx, throttlingFactor, oldCfg.MemoryReservationPolicy)
 	}
 
 	restoreConfig := func(ctx context.Context) {
@@ -710,6 +706,7 @@ var _ = SIGDescribe("MemoryQoS", framework.WithSerial(), func() {
 				newCfg.FeatureGates = make(map[string]bool)
 			}
 			newCfg.FeatureGates["MemoryQoS"] = false
+			newCfg.FeatureGates["NodeMemoryReservationPolicy"] = false
 			newCfg.MemoryReservationPolicy = kubeletconfig.NoneMemoryReservationPolicy
 			updateKubeletConfig(ctx, f, newCfg, true)
 
@@ -728,6 +725,121 @@ var _ = SIGDescribe("MemoryQoS", framework.WithSerial(), func() {
 
 			// Pod and container memory.low values persist but have no effect
 			// since cgroup v2 memory protection is hierarchical (parent=0 wins).
+		})
+
+		ginkgo.It("should clear stale Burstable memory.min when switching from Hard to TieredReservation", func(ctx context.Context) {
+			hardCfg := newMemoryQoSConfig(kubeletconfig.HardMemoryReservationPolicy)
+			updateKubeletConfig(ctx, f, hardCfg, true)
+
+			requestsMem := resource.MustParse("128Mi")
+			pod := memqosMakePod("memqos-hard-to-tiered", f.Namespace.Name,
+				v1.ResourceList{v1.ResourceMemory: requestsMem},
+				v1.ResourceList{v1.ResourceMemory: resource.MustParse("256Mi")},
+			)
+			pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
+			podCgroupPath := memqosGetPodCgroupPath(pod, cgroupDriver)
+			containerCgroupPath := memqosGetContainerCgroupPath(podCgroupPath, pod.Status.ContainerStatuses[0].ContainerID, cgroupDriver)
+
+			var burstableCgroupPath string
+			if cgroupDriver == "systemd" {
+				burstableCgroupPath = filepath.Join(cgroupRoot, "kubepods.slice", "kubepods-burstable.slice")
+			} else {
+				burstableCgroupPath = filepath.Join(cgroupRoot, "kubepods", "burstable")
+			}
+			gomega.Eventually(ctx, func() (int64, error) {
+				return memqosReadCgroupInt64(burstableCgroupPath, cgroupMemoryMin)
+			}).WithTimeout(2*time.Minute).WithPolling(5*time.Second).Should(gomega.BeNumerically(">", 0),
+				"Hard should set Burstable QoS memory.min")
+			podMemoryMinBeforeRestart, err := memqosReadCgroupInt64(podCgroupPath, cgroupMemoryMin)
+			framework.ExpectNoError(err)
+			gomega.Expect(podMemoryMinBeforeRestart).To(gomega.Equal(requestsMem.Value()))
+			containerMemoryMinBeforeRestart, err := memqosReadCgroupInt64(containerCgroupPath, cgroupMemoryMin)
+			framework.ExpectNoError(err)
+			gomega.Expect(containerMemoryMinBeforeRestart).To(gomega.Equal(requestsMem.Value()))
+
+			ginkgo.By("Disabling NodeMemoryReservationPolicy and switching to TieredReservation")
+			tieredCfg := hardCfg.DeepCopy()
+			tieredCfg.FeatureGates["NodeMemoryReservationPolicy"] = false
+			tieredCfg.MemoryReservationPolicy = kubeletconfig.TieredReservationMemoryReservationPolicy
+			updateKubeletConfig(ctx, f, tieredCfg, true)
+
+			gomega.Eventually(ctx, func() (int64, error) {
+				return memqosReadCgroupInt64(burstableCgroupPath, cgroupMemoryMin)
+			}).WithTimeout(2*time.Minute).WithPolling(5*time.Second).Should(gomega.Equal(int64(0)),
+				"TieredReservation should clear stale Burstable QoS memory.min")
+			gomega.Eventually(ctx, func() (int64, error) {
+				return memqosReadCgroupInt64(burstableCgroupPath, cgroupMemoryLow)
+			}).WithTimeout(2*time.Minute).WithPolling(5*time.Second).Should(gomega.BeNumerically(">", 0),
+				"TieredReservation should set Burstable QoS memory.low")
+
+			// Existing pod and container cgroups are not reconciled after a policy change.
+			// Their Hard policy memory.min values remain until the pods are recreated.
+			gomega.Eventually(ctx, func() (int64, error) {
+				return memqosReadCgroupInt64(podCgroupPath, cgroupMemoryMin)
+			}).WithTimeout(2*time.Minute).WithPolling(5*time.Second).Should(gomega.Equal(podMemoryMinBeforeRestart),
+				"pod memory.min should remain unchanged after switching to TieredReservation")
+			gomega.Eventually(ctx, func() (int64, error) {
+				return memqosReadCgroupInt64(containerCgroupPath, cgroupMemoryMin)
+			}).WithTimeout(2*time.Minute).WithPolling(5*time.Second).Should(gomega.Equal(containerMemoryMinBeforeRestart),
+				"container memory.min should remain unchanged after switching to TieredReservation")
+		})
+
+		ginkgo.It("should reset Hard memory protection at QoS level when switching to None", func(ctx context.Context) {
+			hardCfg := newMemoryQoSConfig(kubeletconfig.HardMemoryReservationPolicy)
+			updateKubeletConfig(ctx, f, hardCfg, true)
+
+			requestsMem := resource.MustParse("128Mi")
+			pod := memqosMakePod("memqos-hard-to-none", f.Namespace.Name,
+				v1.ResourceList{v1.ResourceMemory: requestsMem},
+				v1.ResourceList{v1.ResourceMemory: resource.MustParse("256Mi")},
+			)
+			pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
+			podCgroupPath := memqosGetPodCgroupPath(pod, cgroupDriver)
+			containerCgroupPath := memqosGetContainerCgroupPath(podCgroupPath, pod.Status.ContainerStatuses[0].ContainerID, cgroupDriver)
+
+			kubepodsCgroupPath := filepath.Join(cgroupRoot, "kubepods")
+			burstableCgroupPath := filepath.Join(cgroupRoot, "kubepods", "burstable")
+			if cgroupDriver == "systemd" {
+				kubepodsCgroupPath = filepath.Join(cgroupRoot, "kubepods.slice")
+				burstableCgroupPath = filepath.Join(cgroupRoot, "kubepods.slice", "kubepods-burstable.slice")
+			}
+
+			gomega.Eventually(ctx, func() (int64, error) {
+				return memqosReadCgroupInt64(kubepodsCgroupPath, cgroupMemoryMin)
+			}).WithTimeout(2*time.Minute).WithPolling(5*time.Second).Should(gomega.BeNumerically(">", 0),
+				"Hard should set kubepods memory.min")
+			gomega.Eventually(ctx, func() (int64, error) {
+				return memqosReadCgroupInt64(burstableCgroupPath, cgroupMemoryMin)
+			}).WithTimeout(2*time.Minute).WithPolling(5*time.Second).Should(gomega.BeNumerically(">", 0),
+				"Hard should set Burstable QoS memory.min")
+
+			ginkgo.By("Switching to None")
+			noneCfg := hardCfg.DeepCopy()
+			noneCfg.FeatureGates["NodeMemoryReservationPolicy"] = false
+			noneCfg.MemoryReservationPolicy = kubeletconfig.NoneMemoryReservationPolicy
+			updateKubeletConfig(ctx, f, noneCfg, true)
+
+			gomega.Eventually(ctx, func() (int64, error) {
+				return memqosReadCgroupInt64(kubepodsCgroupPath, cgroupMemoryMin)
+			}).WithTimeout(2*time.Minute).WithPolling(5*time.Second).Should(gomega.Equal(int64(0)),
+				"None should reset kubepods memory.min")
+			gomega.Eventually(ctx, func() (int64, error) {
+				return memqosReadCgroupInt64(burstableCgroupPath, cgroupMemoryMin)
+			}).WithTimeout(2*time.Minute).WithPolling(5*time.Second).Should(gomega.Equal(int64(0)),
+				"None should reset Burstable QoS memory.min")
+			gomega.Eventually(ctx, func() (int64, error) {
+				return memqosReadCgroupInt64(burstableCgroupPath, cgroupMemoryLow)
+			}).WithTimeout(2*time.Minute).WithPolling(5*time.Second).Should(gomega.Equal(int64(0)),
+				"None should reset Burstable QoS memory.low")
+
+			// Existing pod and container cgroups are not reconciled, but their stale
+			// memory.min values are neutralized by the zeroed QoS parent cgroups.
+			podMemoryMin, err := memqosReadCgroupInt64(podCgroupPath, cgroupMemoryMin)
+			framework.ExpectNoError(err)
+			gomega.Expect(podMemoryMin).To(gomega.Equal(requestsMem.Value()))
+			containerMemoryMin, err := memqosReadCgroupInt64(containerCgroupPath, cgroupMemoryMin)
+			framework.ExpectNoError(err)
+			gomega.Expect(containerMemoryMin).To(gomega.Equal(requestsMem.Value()))
 		})
 
 		ginkgo.It("should clear stale memory.high when MemoryQoS is disabled and container is resized", func(ctx context.Context) {
@@ -764,6 +876,7 @@ var _ = SIGDescribe("MemoryQoS", framework.WithSerial(), func() {
 				newCfg.FeatureGates = make(map[string]bool)
 			}
 			newCfg.FeatureGates["MemoryQoS"] = false
+			newCfg.FeatureGates["NodeMemoryReservationPolicy"] = false
 			newCfg.MemoryReservationPolicy = kubeletconfig.NoneMemoryReservationPolicy
 			updateKubeletConfig(ctx, f, newCfg, true)
 
@@ -904,6 +1017,7 @@ var _ = SIGDescribe("MemoryQoS", framework.WithSerial(), func() {
 				newCfg.FeatureGates = make(map[string]bool)
 			}
 			newCfg.FeatureGates["MemoryQoS"] = false
+			newCfg.FeatureGates["NodeMemoryReservationPolicy"] = false
 			newCfg.MemoryReservationPolicy = kubeletconfig.NoneMemoryReservationPolicy
 			updateKubeletConfig(ctx, f, newCfg, true)
 
@@ -1063,6 +1177,95 @@ var _ = SIGDescribe("MemoryQoS", framework.WithSerial(), func() {
 			framework.Logf("Policy=TieredReservation: pod memory.low=%d, expected=%d", podMemMin, requestsMem.Value())
 			gomega.Expect(podMemMin).To(gomega.Equal(requestsMem.Value()))
 		})
+
+		ginkgo.DescribeTable("should reconcile QoS memory protection when switching", func(ctx context.Context, policy kubeletconfig.MemoryReservationPolicy, wantPodMemoryLow int64) {
+			cfg := newMemoryQoSConfig(policy)
+			cfg.FeatureGates["NodeMemoryReservationPolicy"] = true
+			updateKubeletConfig(ctx, f, cfg, true)
+
+			requestsMem := resource.MustParse("128Mi")
+			resources := v1.ResourceList{
+				v1.ResourceMemory: requestsMem,
+				v1.ResourceCPU:    resource.MustParse("100m"),
+			}
+			pod := memqosMakePod("memqos-"+strings.ToLower(string(policy))+"-to-tiered", f.Namespace.Name, resources, resources)
+			pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
+			gomega.Expect(pod.Status.QOSClass).To(gomega.Equal(v1.PodQOSGuaranteed))
+
+			burstableRequestsMem := resource.MustParse("64Mi")
+			burstablePod := memqosMakePod(pod.Name+"-burstable", f.Namespace.Name,
+				v1.ResourceList{v1.ResourceMemory: burstableRequestsMem},
+				v1.ResourceList{v1.ResourceMemory: resource.MustParse("128Mi")},
+			)
+			burstablePod = e2epod.NewPodClient(f).CreateSync(ctx, burstablePod)
+			gomega.Expect(burstablePod.Status.QOSClass).To(gomega.Equal(v1.PodQOSBurstable))
+
+			podCgroupPath := memqosGetPodCgroupPath(pod, cgroupDriver)
+			containerCgroupPath := memqosGetContainerCgroupPath(podCgroupPath, pod.Status.ContainerStatuses[0].ContainerID, cgroupDriver)
+			kubepodsCgroupPath := filepath.Join(cgroupRoot, "kubepods")
+			burstableCgroupPath := filepath.Join(kubepodsCgroupPath, "burstable")
+			if cgroupDriver == "systemd" {
+				kubepodsCgroupPath = filepath.Join(cgroupRoot, "kubepods.slice")
+				burstableCgroupPath = filepath.Join(kubepodsCgroupPath, "kubepods-burstable.slice")
+			}
+
+			ginkgo.By("Verifying memory protection under the initial policy")
+			gomega.Eventually(ctx, func(g gomega.Gomega) {
+				memoryLow, err := memqosReadCgroupInt64(kubepodsCgroupPath, cgroupMemoryLow)
+				g.Expect(err).To(gomega.Succeed())
+				if policy == kubeletconfig.SoftMemoryReservationPolicy {
+					g.Expect(memoryLow).To(gomega.BeNumerically(">=", requestsMem.Value()+burstableRequestsMem.Value()),
+						"Soft should cover both test pods in kubepods memory.low")
+				} else {
+					g.Expect(memoryLow).To(gomega.Equal(int64(0)), "None should clear kubepods memory.low")
+				}
+				for _, path := range []string{kubepodsCgroupPath, podCgroupPath, containerCgroupPath} {
+					memoryMin, err := memqosReadCgroupInt64(path, cgroupMemoryMin)
+					g.Expect(err).To(gomega.Succeed())
+					g.Expect(memoryMin).To(gomega.Equal(int64(0)), "memory.min at %s under %s", path, policy)
+				}
+				for _, path := range []string{podCgroupPath, containerCgroupPath} {
+					memoryLow, err := memqosReadCgroupInt64(path, cgroupMemoryLow)
+					g.Expect(err).To(gomega.Succeed())
+					g.Expect(memoryLow).To(gomega.Equal(wantPodMemoryLow), "memory.low at %s under %s", path, policy)
+				}
+			}).WithTimeout(2 * time.Minute).WithPolling(5 * time.Second).Should(gomega.Succeed())
+
+			ginkgo.By("Switching to TieredReservation")
+			cfg.MemoryReservationPolicy = kubeletconfig.TieredReservationMemoryReservationPolicy
+			updateKubeletConfig(ctx, f, cfg, true)
+
+			ginkgo.By("Verifying QoS-level memory protection follows TieredReservation")
+			gomega.Eventually(ctx, func(g gomega.Gomega) {
+				memoryMin, err := memqosReadCgroupInt64(kubepodsCgroupPath, cgroupMemoryMin)
+				g.Expect(err).To(gomega.Succeed())
+
+				g.Expect(memoryMin).To(gomega.BeNumerically(">=", requestsMem.Value()),
+					"TieredReservation should cover the test Guaranteed request in kubepods memory.min")
+				memoryLow, err := memqosReadCgroupInt64(kubepodsCgroupPath, cgroupMemoryLow)
+				g.Expect(err).To(gomega.Succeed())
+				burstableMemoryLow, err := memqosReadCgroupInt64(burstableCgroupPath, cgroupMemoryLow)
+				g.Expect(err).To(gomega.Succeed())
+				g.Expect(burstableMemoryLow).To(gomega.BeNumerically(">=", burstableRequestsMem.Value()),
+					"TieredReservation should cover the test Burstable request in Burstable QoS memory.low")
+				g.Expect(memoryLow).To(gomega.Equal(burstableMemoryLow),
+					"TieredReservation should set the same memory.low on kubepods and Burstable QoS cgroups")
+			}).WithTimeout(2 * time.Minute).WithPolling(5 * time.Second).Should(gomega.Succeed())
+
+			ginkgo.By("Verifying existing Guaranteed pod cgroups are not reconciled")
+			// Pod and container cgroups retain their creation-time protection until the pod is recreated.
+			for _, path := range []string{podCgroupPath, containerCgroupPath} {
+				memoryMin, err := memqosReadCgroupInt64(path, cgroupMemoryMin)
+				framework.ExpectNoError(err)
+				memoryLow, err := memqosReadCgroupInt64(path, cgroupMemoryLow)
+				framework.ExpectNoError(err)
+				gomega.Expect(memoryMin).To(gomega.Equal(int64(0)), "memory.min at %s after switching from %s", path, policy)
+				gomega.Expect(memoryLow).To(gomega.Equal(wantPodMemoryLow), "memory.low at %s after switching from %s", path, policy)
+			}
+		},
+			ginkgo.Entry("from Soft to TieredReservation", kubeletconfig.SoftMemoryReservationPolicy, int64(128*1024*1024)),
+			ginkgo.Entry("from None to TieredReservation", kubeletconfig.NoneMemoryReservationPolicy, int64(0)),
+		)
 
 		ginkgo.It("should clear memory protection at QoS level when switching from TieredReservation to None", func(ctx context.Context) {
 			configureMemoryQoSWithPolicy(ctx, 0.9, kubeletconfig.TieredReservationMemoryReservationPolicy)
@@ -1348,6 +1551,7 @@ var _ = SIGDescribe("MemoryQoS", framework.WithSerial(), func() {
 				newCfg.FeatureGates = make(map[string]bool)
 			}
 			newCfg.FeatureGates["MemoryQoS"] = false
+			newCfg.FeatureGates["NodeMemoryReservationPolicy"] = false
 			newCfg.MemoryReservationPolicy = kubeletconfig.NoneMemoryReservationPolicy
 			framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(newCfg))
 			restartKubelet(ctx, true)

@@ -235,6 +235,7 @@ func BuildGenericConfig(
 		genericConfig.EgressSelector,
 		genericConfig.APIServerID,
 		versionedInformers,
+		clientgoExternalClient,
 	)
 	if err != nil {
 		lastErr = fmt.Errorf("invalid authorization config: %w", err)
@@ -259,8 +260,8 @@ func BuildGenericConfig(
 }
 
 // BuildAuthorizer constructs the authorizer. If authorization is not set in s, it returns nil, nil, false, nil
-func BuildAuthorizer(ctx context.Context, s options.CompletedOptions, egressSelector *egressselector.EgressSelector, apiserverID string, versionedInformers clientgoinformers.SharedInformerFactory) (authorizer.Authorizer, authorizer.RuleResolver, bool, error) {
-	authorizationConfig, err := s.Authorization.ToAuthorizationConfig(versionedInformers)
+func BuildAuthorizer(ctx context.Context, s options.CompletedOptions, egressSelector *egressselector.EgressSelector, apiserverID string, versionedInformers clientgoinformers.SharedInformerFactory, client clientgoclientset.Interface) (authorizer.Authorizer, authorizer.RuleResolver, bool, error) {
+	authorizationConfig, err := s.Authorization.ToAuthorizationConfig(versionedInformers, client)
 	if err != nil {
 		return nil, nil, false, err
 	}
@@ -308,8 +309,16 @@ func conditionalRequestClassifier(attrs authorizer.Attributes) bool {
 	if excludedFromAdmission.Has(gr) {
 		return false
 	}
+
 	// If the verb is one which is subject to admission, the ConditionsEnforcer will catch the
 	// request, and thus is the request conditions-aware.
+	//
+	// There is one special case, however. Delete options might be specified in the
+	// request body, and an "unsafe delete" might allow deleting an object that cannot be
+	// read, which skips the whole admission chain. We cannot know whether that is the case
+	// here, but if that happens, we reject conditional decisions in the unsafe delete code.
+	// For more info see: k8s.io/apiserver/pkg/endpoints/handlers/delete.go
+	//
 	// TODO(luxas): Inspect whether the API group belongs to an aggregated API server, and in that case,
 	// always consider the request to be conditions-aware, as the aggregated API server could support
 	// conditions for any kind of request.

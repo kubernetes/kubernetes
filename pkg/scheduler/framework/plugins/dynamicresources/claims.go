@@ -128,6 +128,16 @@ func (cs claimStore) get(i int) *resourceapi.ResourceClaim {
 	return cs.claims[i]
 }
 
+// lookupByUID returns the claim with the UID, nil if there is none.
+func (cs *claimStore) lookupByUID(uid types.UID) *resourceapi.ResourceClaim {
+	for _, claim := range cs.claims {
+		if claim.UID == uid {
+			return claim
+		}
+	}
+	return nil
+}
+
 // set sets the input claim at the input index for the internal claims slice.
 func (cs claimStore) set(i int, c *resourceapi.ResourceClaim) {
 	cs.claims[i] = c

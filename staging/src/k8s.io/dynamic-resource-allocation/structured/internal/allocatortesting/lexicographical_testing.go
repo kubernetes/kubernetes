@@ -50,7 +50,7 @@ func TestLexicographicalAllocator(t *testing.T,
 			),
 			node: node(node1, region1),
 
-			expectResults: []any{allocationResult(
+			expectResults: []any{matchAllocationResult(
 				localNodeSelector(node1),
 				deviceAllocationResult(req0, driverA, pool1, device1, false),
 				deviceAllocationResult(req0, driverA, pool2, device1, false),
@@ -72,7 +72,13 @@ func TestLexicographicalAllocator(t *testing.T,
 			),
 			node: node(node1, region1),
 
-			expectResults: []any{allocationResult(
+			expectResults: []any{matchAllocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool2, device2, false),
+				deviceAllocationResult(req0, driverA, pool3, device3, false),
+			)},
+			// Without the feature, devices with binding conditions are skipped.
+			expectResultsWithoutFeatures: []any{matchAllocationResult(
 				localNodeSelector(node1),
 				deviceAllocationResult(req0, driverA, pool2, device2, false),
 				deviceAllocationResult(req0, driverA, pool3, device3, false),
@@ -89,7 +95,7 @@ func TestLexicographicalAllocator(t *testing.T,
 			),
 			node: node(node1, region1),
 
-			expectResults: []any{allocationResult(
+			expectResults: []any{matchAllocationResult(
 				localNodeSelector(node1),
 				deviceAllocationResult(req0, driverA, pool1, device1, false),
 				deviceAllocationResult(req0, driverA, pool1, device2, false),
@@ -121,6 +127,12 @@ func TestLexicographicalAllocator(t *testing.T,
 					NodeSelector: localNodeSelector(node1),
 				},
 			},
+			// Without the feature, devices with binding conditions are skipped.
+			expectResultsWithoutFeatures: []any{matchAllocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device2, false),
+				deviceAllocationResult(req0, driverA, pool1, device3, false),
+			)},
 		},
 	}
 

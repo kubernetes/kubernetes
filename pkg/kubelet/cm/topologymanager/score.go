@@ -16,6 +16,22 @@ limitations under the License.
 
 package topologymanager
 
+// HintScoresNeeded reports whether the policy behind the given store reads
+// hint scores. Providers call it to skip the work of computing a score when
+// no allocation strategy is selected, which is the default.
+//
+// Skipping leaves the hint at Score 0, which the merge already treats as "no
+// signal", so the outcome is the same as computing a score nothing reads.
+//
+// A store without a policy reads nothing: the fakes the resource managers test
+// against have no policy at all.
+func HintScoresNeeded(store Store) bool {
+	if store == nil || store.GetPolicy() == nil {
+		return false
+	}
+	return store.GetPolicy().UsesHintScores()
+}
+
 // UtilizationScore turns a pair of resource counts into the Score of a
 // TopologyHint: the share of the allocatable resources on the hint's NUMA
 // node(s) that is already assigned, as a percentage.

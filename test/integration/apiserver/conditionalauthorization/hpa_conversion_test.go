@@ -56,6 +56,7 @@ func hpaTestCases() []conditionalAuthzTestCase {
 			},
 			expectAllowed:             true,
 			expectAllowedWhenDisabled: new(false),
+			webhookEvaluations:        1,
 		},
 		{
 			name:        "hpa v1 cpu utilization - deny",
@@ -76,11 +77,12 @@ func hpaTestCases() []conditionalAuthzTestCase {
 				}, metav1.CreateOptions{})
 				return err
 			},
-			expectAllowed: false,
+			expectAllowed:      false,
+			webhookEvaluations: 1,
 		},
 		{
 			name:        "hpa v2 cpu utilization - allow",
-			user:        "hpa-cpu-allow-user",
+			user:        "hpa-cpu-allow-v2-user",
 			authorizers: celConditionalAuthorizerVariants(hpaCPUUtilizationDecision),
 			makeRequest: func(t *testing.T, client *clientset.Clientset, suffix string) error {
 				_, err := client.AutoscalingV2().HorizontalPodAutoscalers("test-ns").Create(context.TODO(), &autoscalingv2.HorizontalPodAutoscaler{
@@ -110,10 +112,11 @@ func hpaTestCases() []conditionalAuthzTestCase {
 			},
 			expectAllowed:             true,
 			expectAllowedWhenDisabled: new(false),
+			webhookEvaluations:        1,
 		},
 		{
 			name:        "hpa v2 cpu utilization - deny",
-			user:        "hpa-cpu-deny-user",
+			user:        "hpa-cpu-deny-v2-user",
 			authorizers: celConditionalAuthorizerVariants(hpaCPUUtilizationDecision),
 			makeRequest: func(t *testing.T, client *clientset.Clientset, suffix string) error {
 				_, err := client.AutoscalingV2().HorizontalPodAutoscalers("test-ns").Create(context.TODO(), &autoscalingv2.HorizontalPodAutoscaler{
@@ -141,7 +144,8 @@ func hpaTestCases() []conditionalAuthzTestCase {
 				}, metav1.CreateOptions{})
 				return err
 			},
-			expectAllowed: false,
+			expectAllowed:      false,
+			webhookEvaluations: 1,
 		},
 		{
 			name:        "hpa v1 cpu utilization - update allowed",
@@ -171,6 +175,7 @@ func hpaTestCases() []conditionalAuthzTestCase {
 			},
 			expectAllowed:             true,
 			expectAllowedWhenDisabled: new(false),
+			webhookEvaluations:        2,
 		},
 		{
 			name:        "hpa v1 cpu utilization - update denied",
@@ -198,7 +203,8 @@ func hpaTestCases() []conditionalAuthzTestCase {
 				_, err = client.AutoscalingV1().HorizontalPodAutoscalers("test-ns").Update(context.TODO(), created, metav1.UpdateOptions{})
 				return err
 			},
-			expectAllowed: false,
+			expectAllowed:      false,
+			webhookEvaluations: 2,
 		},
 		{
 			name:        "hpa v2 cpu utilization - update allowed",
@@ -239,6 +245,7 @@ func hpaTestCases() []conditionalAuthzTestCase {
 			},
 			expectAllowed:             true,
 			expectAllowedWhenDisabled: new(false),
+			webhookEvaluations:        2,
 		},
 		{
 			name:        "hpa v2 cpu utilization - update denied",
@@ -277,7 +284,8 @@ func hpaTestCases() []conditionalAuthzTestCase {
 				_, err = client.AutoscalingV2().HorizontalPodAutoscalers("test-ns").Update(context.TODO(), created, metav1.UpdateOptions{})
 				return err
 			},
-			expectAllowed: false,
+			expectAllowed:      false,
+			webhookEvaluations: 2,
 		},
 	}
 }

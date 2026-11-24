@@ -253,11 +253,19 @@ type svmTest struct {
 	discoveryClient             *discovery.DiscoveryClient
 	storageConfig               *storagebackend.Config
 	server                      *kubeapiservertesting.TestServer
+	kcm                         *kubecontrollermanagertesting.TestServer
 	apiextensionsclient         *apiextensionsclientset.Clientset
 	filePathForEncryptionConfig string
 }
 
 func svmSetup(ctx context.Context, t ktesting.TB, allowedCodes ...int32) *svmTest {
+	t.Helper()
+	return svmSetupWithFlags(ctx, t, nil, allowedCodes...)
+}
+
+// svmSetupWithFlags is svmSetup with extra kube-apiserver flags. restart can
+// change them later on the same etcd data.
+func svmSetupWithFlags(ctx context.Context, t ktesting.TB, extraAPIServerFlags []string, allowedCodes ...int32) *svmTest {
 	t.Helper()
 
 	filePathForEncryptionConfig, err := createEncryptionConfig(t, resources["initialEncryptionConfig"])
@@ -266,58 +274,17 @@ func svmSetup(ctx context.Context, t ktesting.TB, allowedCodes ...int32) *svmTes
 	}
 
 	policyFile, logFile := setupAudit(t)
-	apiServerFlags := []string{
-		"--encryption-provider-config", filepath.Join(filePathForEncryptionConfig, encryptionConfigFileName),
-		"--encryption-provider-config-automatic-reload=true",
-		"--disable-admission-plugins", "ServiceAccount",
-		"--audit-policy-file", policyFile.Name(),
-		"--audit-log-version", "audit.k8s.io/v1",
-		"--audit-log-mode", "blocking",
-		"--audit-log-path", logFile.Name(),
-		"--authorization-mode=RBAC",
-		fmt.Sprintf("--runtime-config=%s=true", svmv1.SchemeGroupVersion),
-	}
-	storageConfig := framework.SharedEtcd()
-	server := kubeapiservertesting.StartTestServerOrDie(t, nil, apiServerFlags, storageConfig)
-
-	kubeConfigFile := createKubeConfigFileForRestConfig(t, server.ClientConfig)
-
-	kcm := kubecontrollermanagertesting.StartTestServerOrDie(t, ctx, []string{
-		"--kubeconfig=" + kubeConfigFile,
-		"--controllers=garbagecollector,svm",     // these are the only controllers needed for this test
-		"--use-service-account-credentials=true", // exercise RBAC of SVM controller
-		"--leader-elect=false",                   // KCM leader election calls os.Exit when it ends, so it is easier to just turn it off altogether
-	})
-
-	clientSet, err := clientset.NewForConfig(server.ClientConfig)
-	if err != nil {
-		t.Fatalf("error in create clientset: %v", err)
-	}
-	rvDiscoveryClient, err := discovery.NewDiscoveryClientForConfig(server.ClientConfig)
-	if err != nil {
-		t.Fatalf("failed to create discovery client: %v", err)
-	}
-	dynamicClient, err := dynamic.NewForConfig(server.ClientConfig)
-	if err != nil {
-		t.Fatalf("error in create dynamic client: %v", err)
-	}
-
 	svmTest := &svmTest{
-		storageConfig:               storageConfig,
-		server:                      server,
-		client:                      clientSet,
-		clientConfig:                server.ClientConfig,
-		dynamicClient:               dynamicClient,
-		discoveryClient:             rvDiscoveryClient,
+		storageConfig:               framework.SharedEtcd(),
 		policyFile:                  policyFile,
 		logFile:                     logFile,
 		filePathForEncryptionConfig: filePathForEncryptionConfig,
 	}
+	svmTest.start(ctx, t, extraAPIServerFlags)
 
 	t.Cleanup(func() {
 		svmTest.assertNoInvalidSVMControllerResponses(t, allowedCodes...)
-		kcm.TearDownFn()
-		server.TearDownFn()
+		svmTest.stop()
 		utiltesting.CloseAndRemove(t, svmTest.logFile)
 		utiltesting.CloseAndRemove(t, svmTest.policyFile)
 		err = os.RemoveAll(svmTest.filePathForEncryptionConfig)
@@ -327,6 +294,63 @@ func svmSetup(ctx context.Context, t ktesting.TB, allowedCodes ...int32) *svmTes
 	})
 
 	return svmTest
+}
+
+// start starts kube-apiserver on svm.storageConfig, then a kube-controller-manager
+// with only the controllers a migration needs. It also creates the test's
+// clients for the new kube-apiserver.
+func (svm *svmTest) start(ctx context.Context, t ktesting.TB, extraAPIServerFlags []string) {
+	t.Helper()
+
+	apiServerFlags := []string{
+		"--encryption-provider-config", filepath.Join(svm.filePathForEncryptionConfig, encryptionConfigFileName),
+		"--encryption-provider-config-automatic-reload=true",
+		"--disable-admission-plugins", "ServiceAccount",
+		"--audit-policy-file", svm.policyFile.Name(),
+		"--audit-log-version", "audit.k8s.io/v1",
+		"--audit-log-mode", "blocking",
+		"--audit-log-path", svm.logFile.Name(),
+		"--authorization-mode=RBAC",
+		fmt.Sprintf("--runtime-config=%s=true", svmv1.SchemeGroupVersion),
+	}
+	apiServerFlags = append(apiServerFlags, extraAPIServerFlags...)
+	svm.server = kubeapiservertesting.StartTestServerOrDie(t, nil, apiServerFlags, svm.storageConfig)
+
+	kubeConfigFile := createKubeConfigFileForRestConfig(t, svm.server.ClientConfig)
+
+	svm.kcm = kubecontrollermanagertesting.StartTestServerOrDie(t, ctx, []string{
+		"--kubeconfig=" + kubeConfigFile,
+		"--controllers=garbagecollector,svm",     // these are the only controllers needed for this test
+		"--use-service-account-credentials=true", // exercise RBAC of SVM controller
+		"--leader-elect=false",                   // KCM leader election calls os.Exit when it ends, so it is easier to just turn it off altogether
+	})
+
+	var err error
+	svm.clientConfig = svm.server.ClientConfig
+	if svm.client, err = clientset.NewForConfig(svm.clientConfig); err != nil {
+		t.Fatalf("error in create clientset: %v", err)
+	}
+	if svm.discoveryClient, err = discovery.NewDiscoveryClientForConfig(svm.clientConfig); err != nil {
+		t.Fatalf("failed to create discovery client: %v", err)
+	}
+	if svm.dynamicClient, err = dynamic.NewForConfig(svm.clientConfig); err != nil {
+		t.Fatalf("error in create dynamic client: %v", err)
+	}
+}
+
+// stop tears down the controller manager first, so it doesn't spend the
+// shutdown retrying against a kube-apiserver that's gone.
+func (svm *svmTest) stop() {
+	svm.kcm.TearDownFn()
+	svm.server.TearDownFn()
+}
+
+// restart replaces both servers with new ones on the same etcd data. It's for
+// kube-apiserver flags that are only read at startup.
+func (svm *svmTest) restart(ctx context.Context, t ktesting.TB, extraAPIServerFlags []string) {
+	t.Helper()
+	svm.stop()
+	svm.start(ctx, t, extraAPIServerFlags)
 }
 
 func createKubeConfigFileForRestConfig(t utils.TB, restConfig *rest.Config) string {

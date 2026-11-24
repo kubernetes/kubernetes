@@ -819,21 +819,38 @@ type PersistentVolumeClaimCondition struct {
 type VolumeHealthStatusType string
 
 const (
+	// VolumeHealthUnknown indicates that the driver reported an unknown health status, or a status
+	// Kubernetes does not recognize. The volume must not be considered healthy.
+	VolumeHealthUnknown VolumeHealthStatusType = "Unknown"
 	// VolumeHealthInaccessible indicates the volume cannot be accessed.
 	VolumeHealthInaccessible VolumeHealthStatusType = "Inaccessible"
 	// VolumeHealthDataLoss indicates data loss has been detected on the volume.
 	VolumeHealthDataLoss VolumeHealthStatusType = "DataLoss"
 	// VolumeHealthDegraded indicates the volume is functioning but with reduced capability.
 	VolumeHealthDegraded VolumeHealthStatusType = "Degraded"
+	// VolumeHealthHealthy indicates the volume is healthy and there are no issues with it.
+	VolumeHealthHealthy VolumeHealthStatusType = "Healthy"
 )
 
-// VolumeHealthCondition represents an adverse health condition reported for a volume.
+// VolumeHealthCondition represents a health condition reported for a volume.
+// Both pod and PVC reuse this type to report volume health in their status fields.
 type VolumeHealthCondition struct {
 	// status is the machine-parseable health category.
-	// Possible values:
+	// Possible values are:
+	// - "Unknown": the driver reported an unknown health status, or a status Kubernetes does not recognize. The volume must not be considered healthy.
 	// - "Inaccessible": the volume cannot be accessed.
 	// - "DataLoss": data loss has been detected on the volume.
 	// - "Degraded": the volume is functioning with reduced capability.
+	// - "Healthy": the volume is healthy.
+	//
+	// This field allows additional enum values to be added to VolumeHealthStatusType via CSI spec change.
+	// A future version of a CSI driver may emit health conditions that Kubernetes components are not aware of.
+	//
+	// A writer which does not know how to handle incoming new VolumeHealthStatusType may classify the status
+	// as unknown.
+	//
+	// A reader which does not know how to handle new VolumeHealthStatusType MUST only use it for health reporting
+	// purposes.
 	// +required
 	// +k8s:required
 	Status VolumeHealthStatusType `json:"status" protobuf:"bytes,1,opt,name=status,casttype=VolumeHealthStatusType"`
@@ -853,53 +870,27 @@ type VolumeHealthCondition struct {
 }
 
 // VolumeHealthStatus contains health information for a volume reported
-// by the CSI controller plugin.
+// by a CSI controller or node plugin.
 type VolumeHealthStatus struct {
-	// healthConditions is the set of adverse conditions reported by
-	// the CSI controller plugin. An empty list means no adverse condition.
-	// At most 16 conditions may be reported.
+	// healthConditions is the set of health conditions reported by
+	// a CSI plugin. At most 16 conditions may be reported.
+	// An empty list means the CSI driver either does not support volume health
+	// or has not reported it yet. If the driver supports volume health and the
+	// volume is healthy, a Healthy condition is reported.
 	// +optional
 	// +listType=map
 	// +listMapKey=status
-	// +patchMergeKey=status
-	// +patchStrategy=merge
 	// +listMapKey=reason
 	// +k8s:optional
 	// +k8s:listType=map
 	// +k8s:listMapKey=status
 	// +k8s:listMapKey=reason
 	// +k8s:maxItems=16
-	HealthConditions []VolumeHealthCondition `json:"healthConditions,omitempty" patchStrategy:"merge" patchMergeKey:"status" protobuf:"bytes,1,rep,name=healthConditions"`
-	// lastTransitionTime is when the current set of conditions first appeared.
+	HealthConditions []VolumeHealthCondition `json:"healthConditions,omitempty" protobuf:"bytes,1,rep,name=healthConditions"`
+	// lastTransitionTime is when the current set of (status, reason) pairs first appeared.
+	// lastTransitionTime remains unchanged when only message associated with healthConditions change.
 	// +optional
 	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty" protobuf:"bytes,2,opt,name=lastTransitionTime"`
-}
-
-// PodVolumeHealth contains health information for a volume used by a pod,
-// reported by the CSI node plugin via the kubelet.
-type PodVolumeHealth struct {
-	// name matches an entry in pod.spec.volumes.
-	// +required
-	// +k8s:required
-	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
-	// healthConditions is the set of adverse conditions reported by
-	// the CSI node plugin for this volume on this node.
-	// At most 16 conditions may be reported.
-	// +optional
-	// +listType=map
-	// +listMapKey=status
-	// +patchMergeKey=status
-	// +patchStrategy=merge
-	// +listMapKey=reason
-	// +k8s:optional
-	// +k8s:listType=map
-	// +k8s:listMapKey=status
-	// +k8s:listMapKey=reason
-	// +k8s:maxItems=16
-	HealthConditions []VolumeHealthCondition `json:"healthConditions,omitempty" patchStrategy:"merge" patchMergeKey:"status" protobuf:"bytes,2,rep,name=healthConditions"`
-	// lastTransitionTime is when the current set of conditions first appeared.
-	// +optional
-	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty" protobuf:"bytes,3,opt,name=lastTransitionTime"`
 }
 
 // PersistentVolumeClaimStatus is the current status of a persistent volume claim.
@@ -997,6 +988,7 @@ type PersistentVolumeClaimStatus struct {
 	ModifyVolumeStatus *ModifyVolumeStatus `json:"modifyVolumeStatus,omitempty" protobuf:"bytes,9,opt,name=modifyVolumeStatus"`
 	// healthStatus contains the latest controller-reported health information
 	// for the volume bound to this claim.
+	// This is an alpha field and requires enabling the CSIVolumeHealth feature gate.
 	// +featureGate=CSIVolumeHealth
 	// +optional
 	// +k8s:optional
@@ -1636,7 +1628,7 @@ type SecretVolumeSource struct {
 	Optional *bool `json:"optional,omitempty" protobuf:"varint,4,opt,name=optional"`
 	// defaultUser is Optional: The owner UID of the created files by default.
 	// The defaultUser field is only used as a fallback when the item-level user field is unset.
-	// (Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
+	// (Beta) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
 	// +featureGate=AtomicWriteVolumeUserFields
 	// +optional
 	DefaultUser *int64 `json:"defaultUser,omitempty" protobuf:"varint,5,opt,name=defaultUser"`
@@ -2120,7 +2112,7 @@ type ConfigMapVolumeSource struct {
 	Optional *bool `json:"optional,omitempty" protobuf:"varint,4,opt,name=optional"`
 	// defaultUser is Optional: The owner UID of the created files by default.
 	// The defaultUser field is only used as a fallback when the item-level user field is unset.
-	// (Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
+	// (Beta) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
 	// +featureGate=AtomicWriteVolumeUserFields
 	// +optional
 	DefaultUser *int64 `json:"defaultUser,omitempty" protobuf:"varint,5,opt,name=defaultUser"`
@@ -2179,7 +2171,7 @@ type ServiceAccountTokenProjection struct {
 	Path string `json:"path" protobuf:"bytes,3,opt,name=path"`
 	// user is Optional: The owner UID of the created file.
 	// If specified, the item-level user field takes precedence over defaultUser.
-	// (Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
+	// (Beta) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
 	// +featureGate=AtomicWriteVolumeUserFields
 	// +optional
 	User *int64 `json:"user,omitempty" protobuf:"varint,4,opt,name=user"`
@@ -2221,7 +2213,7 @@ type ClusterTrustBundleProjection struct {
 
 	// user is Optional: The owner UID of the created file.
 	// If specified, the item-level user field takes precedence over defaultUser.
-	// (Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
+	// (Beta) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
 	// +featureGate=AtomicWriteVolumeUserFields
 	// +optional
 	User *int64 `json:"user,omitempty" protobuf:"varint,6,opt,name=user"`
@@ -2319,7 +2311,7 @@ type PodCertificateProjection struct {
 
 	// user is Optional: The owner UID of the created file.
 	// If specified, the item-level user field takes precedence over defaultUser.
-	// (Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
+	// (Beta) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
 	// +featureGate=AtomicWriteVolumeUserFields
 	// +optional
 	User *int64 `json:"user,omitempty" protobuf:"varint,8,opt,name=user"`
@@ -2342,7 +2334,7 @@ type ProjectedVolumeSource struct {
 	DefaultMode *int32 `json:"defaultMode,omitempty" protobuf:"varint,2,opt,name=defaultMode"`
 	// defaultUser is Optional: The owner UID of the created files by default.
 	// The defaultUser field is only used as a fallback when the item-level user field is unset.
-	// (Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
+	// (Beta) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
 	// +featureGate=AtomicWriteVolumeUserFields
 	// +optional
 	DefaultUser *int64 `json:"defaultUser,omitempty" protobuf:"varint,3,opt,name=defaultUser"`
@@ -2448,7 +2440,7 @@ type KeyToPath struct {
 	Mode *int32 `json:"mode,omitempty" protobuf:"varint,3,opt,name=mode"`
 	// user is Optional: The owner UID of the created file.
 	// If specified, the item-level user field takes precedence over defaultUser.
-	// (Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
+	// (Beta) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
 	// +featureGate=AtomicWriteVolumeUserFields
 	// +optional
 	User *int64 `json:"user,omitempty" protobuf:"varint,4,opt,name=user"`
@@ -3327,7 +3319,6 @@ type Container struct {
 	Resources ResourceRequirements `json:"resources,omitempty" protobuf:"bytes,8,opt,name=resources"`
 	// resizePolicy is the resize policy for the container.
 	// This field cannot be set on ephemeral containers.
-	// +featureGate=InPlacePodVerticalScaling
 	// +optional
 	// +listType=atomic
 	ResizePolicy []ContainerResizePolicy `json:"resizePolicy,omitempty" protobuf:"bytes,23,rep,name=resizePolicy"`
@@ -3432,7 +3423,24 @@ type Container struct {
 	// If set, the fields of SecurityContext override the equivalent fields of PodSecurityContext.
 	// More info: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
 	// +optional
+	// +k8s:alpha(since: "1.38")=+k8s:optional
 	SecurityContext *SecurityContext `json:"securityContext,omitempty" protobuf:"bytes,15,opt,name=securityContext"`
+	// hostCgroupNamespace specifies whether the container uses the host's cgroup namespace.
+	// If true, the container shares the cgroup namespace with the host, so cgroups
+	// other than the container's own cgroup are visible to the container.
+	// If false, a new cgroup namespace rooted at the container's own cgroup is created
+	// for the container.
+	// If unset, the container runtime selects the behavior.
+	// Must not be set to true when the pod uses user namespaces (spec.hostUsers is false).
+	// Must not be set to true with securityContext.cgroupOptions.mountMode set to ReadWrite,
+	// unless securityContext.privileged is true.
+	// Must not be set when spec.os.name is windows.
+	// The runtime handler must support cgroup namespaces, otherwise the container will
+	// fail to start.
+	// Cannot be updated.
+	// +featureGate=CgroupNamespacesSupport
+	// +optional
+	HostCgroupNamespace *bool `json:"hostCgroupNamespace,omitempty" protobuf:"varint,26,opt,name=hostCgroupNamespace"`
 
 	// Variables for interactive containers, these have very specialized use-cases (e.g. debugging)
 	// and shouldn't be used for general purpose containers.
@@ -3720,7 +3728,6 @@ type ContainerStatus struct {
 	AllocatedResources ResourceList `json:"allocatedResources,omitempty" protobuf:"bytes,10,rep,name=allocatedResources,casttype=ResourceList,castkey=ResourceName"`
 	// resources represents the compute resource requests and limits that have been successfully
 	// enacted on the running container after it has been started or has been successfully resized.
-	// +featureGate=InPlacePodVerticalScaling
 	// +optional
 	Resources *ResourceRequirements `json:"resources,omitempty" protobuf:"bytes,11,opt,name=resources"`
 	// volumeMounts represents the status of volume mounts.
@@ -3897,6 +3904,11 @@ const (
 	// If both PodResizePending and PodResizeInProgress are set, it means that a new resize was
 	// requested in the middle of a previous pod resize that is still in progress.
 	PodResizeInProgress PodConditionType = "PodResizeInProgress"
+	// SchedulerEvaluationCompleted indicates that the scheduler has completed its evaluation
+	// (and any required preemption) for a deferred resize of an already-scheduled pod.
+	// This condition is only ever set with status True. Rather than transitioning to False, it is
+	// removed by the kubelet once it re-evaluates the resize, or if the resize is no longer deferred.
+	SchedulerEvaluationCompleted PodConditionType = "SchedulerEvaluationCompleted"
 	// AllContainersRestarting indicates that all containers of the pod is being restarted.
 	AllContainersRestarting PodConditionType = "AllContainersRestarting"
 )
@@ -3934,6 +3946,10 @@ const (
 	// PodReasonError reason in PodResizeInProgress pod condition indicates that an error occurred while
 	// actuating the resize.
 	PodReasonError = "Error"
+
+	// PodReasonDeferredPodResize reason in SchedulerEvaluationCompleted pod condition indicates
+	// that the scheduler has completed feasibility evaluation or preemption for a deferred pod resize.
+	PodReasonDeferredPodResize = "DeferredPodResize"
 )
 
 // PodCondition contains details for the current condition of this pod.
@@ -4113,6 +4129,25 @@ const (
 	// parameters such as nameservers and search paths should be defined via
 	// DNSConfig.
 	DNSNone DNSPolicy = "None"
+)
+
+// PodNetwork selects whether a pod is attached to the pod network.
+// +enum
+// +k8s:enum
+type PodNetwork string
+
+const (
+	// PodNetworkDefault attaches the pod to the pod network (the network that
+	// Kubernetes connects every pod to unless the pod opts out). The container
+	// runtime performs its configured network plumbing and the pod is assigned
+	// pod IPs. This is the historical behavior (for non-hostNetwork pods).
+	PodNetworkDefault PodNetwork = "Default"
+
+	// PodNetworkIsolated does not attach the pod to the pod network. The pod gets
+	// an isolated network namespace with only the loopback interface
+	// configured. The pod's podIPs are left unset and the pod is never
+	// selected into Services.
+	PodNetworkIsolated PodNetwork = "Isolated"
 )
 
 const (
@@ -4450,8 +4485,8 @@ type Toleration struct {
 	// key is the taint key that the toleration applies to. Empty means match all taint keys.
 	// If the key is empty, operator must be Exists; this combination means to match all values and all keys.
 	// +optional
-	// +k8s:alpha(since: "1.37")=+k8s:optional
-	// +k8s:alpha(since: "1.37")=+k8s:format=k8s-label-key
+	// +k8s:beta(since: "1.38")=+k8s:optional
+	// +k8s:beta(since: "1.38")=+k8s:format=k8s-label-key
 	Key string `json:"key,omitempty" protobuf:"bytes,1,opt,name=key"`
 	// operator represents a key's relationship to the value.
 	// Valid operators are Exists, Equal, Lt, and Gt. Defaults to Equal.
@@ -4521,6 +4556,7 @@ type PodSpec struct {
 	// +patchStrategy=merge
 	// +listType=map
 	// +listMapKey=name
+	// +k8s:alpha(since: "1.38")=+k8s:optional
 	InitContainers []Container `json:"initContainers,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,20,rep,name=initContainers"`
 	// containers is the list of containers belonging to the pod.
 	// Containers cannot currently be added or removed.
@@ -4541,6 +4577,7 @@ type PodSpec struct {
 	// +patchStrategy=merge
 	// +listType=map
 	// +listMapKey=name
+	// +k8s:alpha(since: "1.38")=+k8s:optional
 	EphemeralContainers []EphemeralContainer `json:"ephemeralContainers,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,34,rep,name=ephemeralContainers"`
 	// restartPolicy is the restart policy for all containers within the pod.
 	// One of Always, OnFailure, Never. In some contexts, only a subset of those values may be permitted.
@@ -4606,6 +4643,8 @@ type PodSpec struct {
 	// When `hostNetwork` is true, specified `hostPort` fields in port definitions must match `containerPort`,
 	// and unspecified `hostPort` fields in port definitions are defaulted to match `containerPort`.
 	// Default to false.
+	// When true, podNetwork may not be set: the pod has no network namespace
+	// of its own.
 	// +optional
 	HostNetwork bool `json:"hostNetwork,omitempty" protobuf:"varint,11,opt,name=hostNetwork"`
 	// hostPID uses the host's pid namespace.
@@ -4626,6 +4665,7 @@ type PodSpec struct {
 	// securityContext holds pod-level security attributes and common container settings.
 	// Optional: Defaults to empty.  See type description for default values of each field.
 	// +optional
+	// +k8s:alpha(since: "1.38")=+k8s:optional
 	SecurityContext *PodSecurityContext `json:"securityContext,omitempty" protobuf:"bytes,14,opt,name=securityContext"`
 	// imagePullSecrets is an optional list of references to secrets in the same namespace to use for pulling any of the images used by this PodSpec.
 	// If specified, these secrets will be passed to individual puller implementations for them to use.
@@ -4655,7 +4695,7 @@ type PodSpec struct {
 	// tolerations specifies the pod's tolerations.
 	// +optional
 	// +listType=atomic
-	// +k8s:alpha(since: "1.37")=+k8s:optional
+	// +k8s:beta(since: "1.38")=+k8s:optional
 	Tolerations []Toleration `json:"tolerations,omitempty" protobuf:"bytes,22,opt,name=tolerations"`
 	// hostAliases is an optional list of hosts and IPs that will be injected into the pod's hosts
 	// file if specified.
@@ -4769,6 +4809,7 @@ type PodSpec struct {
 	// - spec.containers[*].securityContext.procMount
 	// - spec.containers[*].securityContext.runAsUser
 	// - spec.containers[*].securityContext.runAsGroup
+	// - spec.containers[*].securityContext.cgroupOptions
 	// +optional
 	OS *PodOS `json:"os,omitempty" protobuf:"bytes,36,opt,name=os"`
 
@@ -4887,8 +4928,22 @@ type PodSpec struct {
 	// +k8s:listType=map
 	// +k8s:listMapKey=name
 	// +k8s:maxItems=10
-	// +k8s:alpha(since: "1.37")=+k8s:dependentForbidden("schedulingGroup")
+	// +k8s:beta(since: "1.38")=+k8s:dependentForbidden("schedulingGroup")
 	EvictionResponders []EvictionResponder `json:"evictionResponders,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,44,rep,name=evictionResponders"`
+
+	// podNetwork selects whether a non-hostNetwork pod is attached to the pod network.
+	// "Default" attaches the pod to the pod network. "Isolated" gives
+	// the pod an isolated network namespace with only the loopback interface
+	// configured, not attached to the pod network.
+	// This field must be unset if hostNetwork is true. For non-hostNetwork
+	// pods, this behaves as if it was set to "Default" if it is not set.
+	// If a pod is "Isolated", hostPort and network-based probes and lifecycle
+	// handlers are not allowed.
+	// This field is immutable on Pods.
+	// +featureGate=NetworkIsolatedPods
+	// +optional
+	// +k8s:optional
+	PodNetwork *PodNetwork `json:"podNetwork,omitempty" protobuf:"bytes,45,opt,name=podNetwork,casttype=PodNetwork"`
 }
 
 // PodResourceClaim references exactly one ResourceClaim, either directly
@@ -5339,6 +5394,7 @@ type PodSecurityContext struct {
 	// seccompProfile is the seccomp options to use by the containers in this pod.
 	// Note that this field cannot be set when spec.os.name is windows.
 	// +optional
+	// +k8s:alpha(since: "1.38")=+k8s:optional
 	SeccompProfile *SeccompProfile `json:"seccompProfile,omitempty" protobuf:"bytes,10,opt,name=seccompProfile"`
 	// appArmorProfile is the AppArmor options to use by the containers in this pod.
 	// Note that this field cannot be set when spec.os.name is windows.
@@ -5379,7 +5435,13 @@ type SeccompProfile struct {
 	// Localhost - a profile defined in a file on the node should be used.
 	// RuntimeDefault - the container runtime default profile should be used.
 	// Unconfined - no profile should be applied.
+	// OCI - a profile pulled from an OCI registry should be used, merged with a
+	// base profile (see oci.baseProfile). Privileged containers cannot use it,
+	// whether it is set on the container or inherited from the pod. This is an
+	// alpha value and requires enabling the SecurityProfileOCI feature gate.
 	// +unionDiscriminator
+	// +k8s:alpha(since: "1.38")=+k8s:required
+	// +k8s:unionDiscriminator
 	Type SeccompProfileType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=SeccompProfileType"`
 	// localhostProfile indicates a profile defined in a file on the node should be used.
 	// The profile must be preconfigured on the node to work.
@@ -5387,7 +5449,82 @@ type SeccompProfile struct {
 	// Must be set if type is "Localhost". Must NOT be set for any other type.
 	// +optional
 	LocalhostProfile *string `json:"localhostProfile,omitempty" protobuf:"bytes,2,opt,name=localhostProfile"`
+	// oci specifies a seccomp profile stored as an artifact in an OCI registry.
+	// The container runtime merges the profile with a base profile, so the
+	// effective profile permits an operation only if both permit it.
+	// Must be set if type is "OCI". Must NOT be set for any other type.
+	// This is an alpha field and requires enabling the SecurityProfileOCI feature gate.
+	// +featureGate=SecurityProfileOCI
+	// +optional
+	// +k8s:optional
+	// +k8s:unionMember
+	OCI *SecurityProfileOCI `json:"oci,omitempty" protobuf:"bytes,3,opt,name=oci"`
 }
+
+// SecurityProfileOCI references a security profile stored as an artifact in an
+// OCI registry, with an optional base profile.
+type SecurityProfileOCI struct {
+	// ref is the OCI reference of the profile.
+	// It must be a digest-pinned reference in canonical form,
+	// registry/repository@<algorithm>:<digest>, with the registry spelled out
+	// (for example docker.io/library/profile, not profile or docker.io/profile).
+	// Tags are rejected. The digest algorithm must be sha256, sha384, or sha512.
+	// The maximum length is 1024 characters.
+	// Pull secrets are assembled in the same way as for the container image by
+	// looking up node credentials, service account image pull secrets, and pod spec image pull secrets.
+	// +required
+	// +k8s:required
+	// +k8s:maxLength=1024
+	// +k8s:customValidation
+	Ref string `json:"ref" protobuf:"bytes,1,opt,name=ref"`
+	// baseProfile optionally specifies the base profile that the container
+	// runtime merges with the OCI profile. The effective profile permits an
+	// operation only if both permit it. When omitted, the container runtime
+	// default profile is the base; a Localhost base profile takes its place.
+	// +optional
+	// +k8s:optional
+	BaseProfile *SecurityProfileOCIBase `json:"baseProfile,omitempty" protobuf:"bytes,2,opt,name=baseProfile"`
+}
+
+// SecurityProfileOCIBase specifies the base profile of an OCI security profile.
+// +union
+type SecurityProfileOCIBase struct {
+	// type indicates which kind of base profile will be applied.
+	// Valid options are:
+	//
+	// Localhost - a profile defined in a file on the node should be used.
+	// RuntimeDefault - the container runtime default profile should be used.
+	// +unionDiscriminator
+	// +required
+	// +k8s:required
+	// +k8s:unionDiscriminator
+	Type SecurityProfileOCIBaseType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=SecurityProfileOCIBaseType"`
+	// localhostProfile indicates a base profile defined in a file on the node
+	// should be used. The profile must be preconfigured on the node to work.
+	// Must be a non-empty descending path, relative to the kubelet's configured seccomp profile location,
+	// of at most 4096 characters.
+	// Must be set if type is "Localhost". Must NOT be set for any other type.
+	// +optional
+	// +k8s:optional
+	// +k8s:unionMember(memberName: "Localhost")
+	// +k8s:maxLength=4096
+	// +k8s:customValidation
+	LocalhostProfile *string `json:"localhostProfile,omitempty" protobuf:"bytes,2,opt,name=localhostProfile"`
+}
+
+// SecurityProfileOCIBaseType defines the supported base profile types of an
+// OCI security profile.
+// +enum
+// +k8s:enum
+type SecurityProfileOCIBaseType string
+
+const (
+	// SecurityProfileOCIBaseTypeRuntimeDefault represents the default container runtime profile.
+	SecurityProfileOCIBaseTypeRuntimeDefault SecurityProfileOCIBaseType = "RuntimeDefault"
+	// SecurityProfileOCIBaseTypeLocalhost indicates a profile defined in a file on the node should be used.
+	// For seccomp, the file's location is relative to <kubelet-root-dir>/seccomp.
+	SecurityProfileOCIBaseTypeLocalhost SecurityProfileOCIBaseType = "Localhost"
+)
 
 // SeccompProfileType defines the supported seccomp profile types.
 // +enum
@@ -5402,6 +5539,8 @@ const (
 	// SeccompProfileTypeLocalhost indicates a profile defined in a file on the node should be used.
 	// The file's location relative to <kubelet-root-dir>/seccomp.
 	SeccompProfileTypeLocalhost SeccompProfileType = "Localhost"
+	// SeccompProfileTypeOCI indicates a profile pulled from an OCI registry should be used.
+	SeccompProfileTypeOCI SeccompProfileType = "OCI"
 )
 
 // AppArmorProfile defines a pod or container's AppArmor settings.
@@ -5568,7 +5707,6 @@ type EphemeralContainerCommon struct {
 	// +optional
 	Resources ResourceRequirements `json:"resources,omitempty" protobuf:"bytes,8,opt,name=resources"`
 	// resizePolicy is the resources resize policy for the container.
-	// +featureGate=InPlacePodVerticalScaling
 	// +optional
 	// +listType=atomic
 	ResizePolicy []ContainerResizePolicy `json:"resizePolicy,omitempty" protobuf:"bytes,23,rep,name=resizePolicy"`
@@ -5639,7 +5777,12 @@ type EphemeralContainerCommon struct {
 	// securityContext is optional: SecurityContext defines the security options the ephemeral container should be run with.
 	// If set, the fields of SecurityContext override the equivalent fields of PodSecurityContext.
 	// +optional
+	// +k8s:alpha(since: "1.38")=+k8s:optional
 	SecurityContext *SecurityContext `json:"securityContext,omitempty" protobuf:"bytes,15,opt,name=securityContext"`
+	// hostCgroupNamespace is not allowed for ephemeral containers.
+	// +featureGate=CgroupNamespacesSupport
+	// +optional
+	HostCgroupNamespace *bool `json:"hostCgroupNamespace,omitempty" protobuf:"varint,26,opt,name=hostCgroupNamespace"`
 
 	// Variables for interactive containers, these have very specialized use-cases (e.g. debugging)
 	// and shouldn't be used for general purpose containers.
@@ -5728,6 +5871,51 @@ type EvictionResponder struct {
 	// +k8s:maximum=100000
 	// +k8s:customValidation
 	Priority *int32 `json:"priority" protobuf:"varint,2,opt,name=priority"`
+}
+
+// PodVolumeHostPhase represents the host preparation phase of a volume mounted to a pod.
+// +enum
+// +k8s:enum
+type PodVolumeHostPhase string
+
+const (
+	// PodVolumeHostPending indicates that the volume has been added to pod.Spec.Volumes,
+	// and is waiting node allocation or host preparation/mounting by VolumeManager.
+	PodVolumeHostPending PodVolumeHostPhase = "Pending"
+
+	// PodVolumeHostMounted indicates that VolumeManager has successfully prepared and
+	// mounted the volume on the node host (marked ready in ActualStateOfWorld).
+	PodVolumeHostMounted PodVolumeHostPhase = "HostMounted"
+
+	// PodVolumeHostUnmounting indicates that volume removal has been admitted and allocated
+	// by Kubelet, and Kubelet is waiting for any removed containers referencing the volume to
+	// terminate and tearing down the host mount.
+	PodVolumeHostUnmounting PodVolumeHostPhase = "Unmounting"
+)
+
+// PodVolumeStatus represents the status of an individual volume used by a pod.
+type PodVolumeStatus struct {
+	// name matches an entry in pod.spec.volumes, or the name of a dynamically removed
+	// volume that is still unmounting on the node.
+	// +required
+	// +k8s:required
+	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
+	// healthStatus contains health reported by the CSI node plugin for this volume
+	// on the pod's node. Populated by the kubelet.
+	// This is an alpha field and requires enabling the CSIVolumeHealth feature gate.
+	// +featureGate=CSIVolumeHealth
+	// +optional
+	// +k8s:optional
+	HealthStatus *VolumeHealthStatus `json:"healthStatus,omitempty" protobuf:"bytes,2,opt,name=healthStatus"`
+	// hostPhase represents the host-level preparation phase of the volume:
+	// Pending, HostMounted, Unmounting. Currently populated only for node-local
+	// ephemeral volume types supported for dynamic updates (configMap, secret,
+	// projected, emptyDir, and image).
+	// This is an alpha field and requires enabling the DynamicNodeLocalEphemeralVolumes feature gate.
+	// +featureGate=DynamicNodeLocalEphemeralVolumes
+	// +optional
+	// +k8s:optional
+	HostPhase PodVolumeHostPhase `json:"hostPhase,omitempty" protobuf:"bytes,3,opt,name=hostPhase,casttype=PodVolumeHostPhase"`
 }
 
 // PodStatus represents information about the status of a pod. Status may trail the actual
@@ -5869,7 +6057,6 @@ type PodStatus struct {
 	// Deprecated: Resize status is moved to two pod conditions PodResizePending and PodResizeInProgress.
 	// PodResizePending will track states where the spec has been resized, but the Kubelet has not yet allocated the resources.
 	// PodResizeInProgress will track in-progress resizes, and should be present whenever allocated resources != acknowledged resources.
-	// +featureGate=InPlacePodVerticalScaling
 	// +optional
 	Resize PodResizeStatus `json:"resize,omitempty" protobuf:"bytes,14,opt,name=resize,casttype=PodResizeStatus"`
 
@@ -5885,51 +6072,67 @@ type PodStatus struct {
 	// +optional
 	ExtendedResourceClaimStatus *PodExtendedResourceClaimStatus `json:"extendedResourceClaimStatus,omitempty" protobuf:"bytes,18,opt,name=extendedResourceClaimStatus"`
 
-	// AllocatedResources is the total requests allocated for this pod by the node.
+	// AllocatedResources is the total requests allocated for this pod by the node, including pod.spec.overhead.
 	// If pod-level requests are not set, this will be the total requests aggregated
-	// across containers in the pod.
+	// across containers in the pod, plus pod.spec.overhead if specified.
 	// +featureGate=InPlacePodLevelResourcesVerticalScaling
 	// +optional
 	AllocatedResources ResourceList `json:"allocatedResources,omitempty" protobuf:"bytes,19,rep,name=allocatedResources,casttype=ResourceList,castkey=ResourceName"`
 
 	// Resources represents the compute resource requests and limits that have been
 	// applied at the pod level if pod-level requests or limits are set in
-	// PodSpec.Resources
+	// PodSpec.Resources, plus pod.spec.overhead if specified (for limits, only added
+	// to non-zero limits; kubelets prior to v1.38 may omit overhead from memory and
+	// hugepages requests when set in PodSpec.Resources).
 	// +featureGate=InPlacePodLevelResourcesVerticalScaling
 	// +optional
 	Resources *ResourceRequirements `json:"resources,omitempty" protobuf:"bytes,20,opt,name=resources"`
 
-	// NodeAllocatableResourceClaimStatuses contains the status of node-allocatable resources
-	// that were allocated for this pod through DRA claims. This includes resources currently
-	// reported in v1.Node `status.allocatable` that are not extended resources
-	// (see https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#extended-resources).
-	// Examples include "cpu", "memory", "ephemeral-storage", and hugepages.
+	// NodeAllocatableResourceClaimStatuses is tombstoned since it got replaced with ExtraNodeAllocatableResources.
+	// NodeAllocatableResourceClaimStatuses []NodeAllocatableResourceClaimStatus `json:"nodeAllocatableResourceClaimStatuses,omitempty" patchStrategy:"merge" patchMergeKey:"resourceClaimName" protobuf:"bytes,21,rep,name=nodeAllocatableResourceClaimStatuses"`
+
+	// extraNodeAllocatableResources lists node allocatable resources that the pod and its containers
+	// use in addition to their spec, for example for the devices allocated to the pod's DRA claims.
+	// The scheduler sets them before it binds the pod. Allowed are the resources that v1.Node reports
+	// in `status.allocatable` that are not extended resources
+	// (see https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#extended-resources),
+	// such as "cpu", "memory", "ephemeral-storage", and "hugepages-<size>".
+	//
+	// The list has one pod entry, with an empty containerName, and at most one entry for each init
+	// or regular container. The pod's total footprint is its spec plus the pod entry, so the pod entry
+	// must cover what the container entries add to the peak of the spec, across the init, sidecar,
+	// and regular containers. For resources that the pod level resources (`spec.resources`) set, that
+	// value is the footprint and must already include the extra resources.
 	// +featureGate=DRANodeAllocatableResources
 	// +optional
-	// +patchStrategy=merge
-	// +patchMergeKey=resourceClaimName
 	// +listType=map
-	// +listMapKey=resourceClaimName
+	// +listMapKey=containerName
 	// +k8s:optional
 	// +k8s:listType=map
-	// +k8s:listMapKey=resourceClaimName
-	NodeAllocatableResourceClaimStatuses []NodeAllocatableResourceClaimStatus `json:"nodeAllocatableResourceClaimStatuses,omitempty" patchStrategy:"merge" patchMergeKey:"resourceClaimName" protobuf:"bytes,21,rep,name=nodeAllocatableResourceClaimStatuses"`
+	// +k8s:listMapKey=containerName
+	ExtraNodeAllocatableResources []ExtraNodeAllocatableResource `json:"extraNodeAllocatableResources,omitempty" protobuf:"bytes,24,rep,name=extraNodeAllocatableResources"`
 
-	// volumeHealth contains node-reported health for each volume the pod is using.
-	// Populated by the kubelet on the pod's node.
-	// +featureGate=CSIVolumeHealth
+	// VolumeHealth is tombstoned because it moved into VolumeStatuses.
+	// VolumeHealth []PodVolumeHealth `json:"volumeHealth,omitempty" protobuf:"bytes,22,rep,name=volumeHealth"`
+
+	// VolumeStatuses contains the status of individual volumes used by this pod.
+	// This is an alpha field and requires enabling the CSIVolumeHealth or DynamicNodeLocalEphemeralVolumes feature gate.
+	// +featureGate=CSIVolumeHealth,DynamicNodeLocalEphemeralVolumes
 	// +optional
+	// +patchMergeKey=name
+	// +patchStrategy=merge
 	// +listType=map
 	// +listMapKey=name
 	// +k8s:optional
 	// +k8s:listType=map
 	// +k8s:listMapKey=name
-	VolumeHealth []PodVolumeHealth `json:"volumeHealth,omitempty" protobuf:"bytes,22,rep,name=volumeHealth"`
+	VolumeStatuses []PodVolumeStatus `json:"volumeStatuses,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,23,rep,name=volumeStatuses"`
 }
 
 // +genclient
 // +genclient:method=UpdateEphemeralContainers,verb=update,subresource=ephemeralcontainers
 // +genclient:method=UpdateResize,verb=update,subresource=resize
+// +genclient:method=UpdateDynamic,verb=update,subresource=dynamic
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.0
 
@@ -5938,6 +6141,7 @@ type PodStatus struct {
 // +k8s:supportsSubresource="/status"
 // +k8s:supportsSubresource="/ephemeralcontainers"
 // +k8s:supportsSubresource="/resize"
+// +k8s:supportsSubresource="/dynamic"
 // +k8s:supportsSubresource="/eviction"
 type Pod struct {
 	metav1.TypeMeta `json:""`
@@ -6064,7 +6268,7 @@ type ReplicationControllerSpec struct {
 	// The only allowed template.spec.restartPolicy value is "Always".
 	// More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller#pod-template
 	// +optional
-	// +k8s:alpha(since: "1.37")=+k8s:optional
+	// +k8s:beta(since: "1.38")=+k8s:optional
 	// +k8s:alpha(since: "1.38")=+k8s:subfield(spec)=+k8s:subfield(restartPolicy)=+k8s:eq="Always"
 	Template *PodTemplateSpec `json:"template,omitempty" protobuf:"bytes,3,opt,name=template"`
 }
@@ -6334,7 +6538,7 @@ type ServiceStatus struct {
 	// +patchStrategy=merge
 	// +listType=map
 	// +listMapKey=type
-	// +k8s:alpha(since: "1.37")=+k8s:eachVal=+k8s:opaqueType
+	// +k8s:beta(since: "1.38")=+k8s:eachVal=+k8s:opaqueType
 	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,2,rep,name=conditions"`
 }
 
@@ -7005,9 +7209,9 @@ type NodeSpec struct {
 
 	// providerID is the ID of the node assigned by the cloud provider in the format: <ProviderName>://<ProviderSpecificNodeID>
 	// +optional
-	// +k8s:alpha(since: "1.36")=+k8s:optional
-	// +k8s:alpha(since: "1.36")=+k8s:update=NoModify
-	// +k8s:alpha(since: "1.36")=+k8s:update=NoUnset
+	// +k8s:beta(since: "1.38")=+k8s:optional
+	// +k8s:beta(since: "1.38")=+k8s:update=NoModify
+	// +k8s:beta(since: "1.38")=+k8s:update=NoUnset
 	ProviderID string `json:"providerID,omitempty" protobuf:"bytes,3,opt,name=providerID"`
 	// unschedulable controls node schedulability of new pods. By default, node is schedulable.
 	// More info: https://kubernetes.io/docs/concepts/nodes/node/#manual-node-administration
@@ -7028,7 +7232,7 @@ type NodeSpec struct {
 	DoNotUseExternalID string `json:"externalID,omitempty" protobuf:"bytes,2,opt,name=externalID"`
 
 	// podPreemptionPolicy controls the node-level preemption behaviors for pods on this node.
-	// This is an alpha field and requires enabling the InPlacePodVerticalScalingSchedulerPreemption feature gate.
+	// This is a beta field and requires the InPlacePodVerticalScalingSchedulerPreemption feature gate to be enabled (enabled by default).
 	// +featureGate=InPlacePodVerticalScalingSchedulerPreemption
 	// +optional
 	// +k8s:optional
@@ -7041,7 +7245,7 @@ type NodePodPreemptionPolicy struct {
 	// disableResizePreemption lists the owners (e.g., autoscalers, operators, administrators)
 	// that have requested to disable scheduler and Kubelet preemption for in-place pod resize on this node.
 	// If this list is non-empty, resize-induced preemption is disabled on this node.
-	// This is an alpha field and requires enabling the InPlacePodVerticalScalingSchedulerPreemption feature gate.
+	// This is a beta field and requires the InPlacePodVerticalScalingSchedulerPreemption feature gate to be enabled (enabled by default).
 	// +listType=set
 	// +k8s:listType=set
 	// +optional
@@ -7122,6 +7326,11 @@ type NodeRuntimeHandlerFeatures struct {
 	// userNamespaces is set to true if the runtime handler supports UserNamespaces, including for volumes.
 	// +optional
 	UserNamespaces *bool `json:"userNamespaces,omitempty" protobuf:"varint,2,opt,name=userNamespaces"`
+	// cgroupNamespaces is set to true if the runtime handler supports specifying
+	// whether to use the host cgroup namespace for privileged and non-privileged containers.
+	// +featureGate=CgroupNamespacesSupport
+	// +optional
+	CgroupNamespaces *bool `json:"cgroupNamespaces,omitempty" protobuf:"varint,3,opt,name=cgroupNamespaces"`
 }
 
 // NodeRuntimeHandler is a set of runtime handler information.
@@ -7519,6 +7728,17 @@ const (
 	ResourceStorage ResourceName = "storage"
 	// Local ephemeral storage, in bytes. (500Gi = 500GiB = 500 * 1024 * 1024 * 1024)
 	ResourceEphemeralStorage ResourceName = "ephemeral-storage"
+	// Swap limit, in bytes. Only valid in limits (containers[*].resources.limits.swap
+	// and pod.spec.resources.limits.swap); requests.swap is forbidden.
+	ResourceSwap ResourceName = "swap"
+	// PID limit for a pod (integer count of processes).
+	// ResourcePID is a pod-level PID limit set via spec.resources.limits.pids.
+	// Valid range: 128-16384.
+	// Only limits are accepted; requests.pids is forbidden. The effective
+	// limit enforced by the kubelet is min(node podPidsLimit, pod pid limit).
+	// Requires the PerPodPIDLimit feature gate and cgroupsv2.
+	// When omitted, the node-level --pod-pids-limit applies.
+	ResourcePID ResourceName = "pids"
 )
 
 const (
@@ -7709,7 +7929,7 @@ type NamespaceList struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.0
 
-// Binding ties one object to another; for example, a pod is bound to a node by a scheduler.
+// Binding assigns a pod to a node.
 type Binding struct {
 	metav1.TypeMeta `json:""`
 	// metadata is the standard object's metadata.
@@ -7718,7 +7938,7 @@ type Binding struct {
 	// +k8s:opaqueType
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	// target is the target object that you want to bind to the standard object.
+	// target is the node that you want to bind the pod to.
 	Target ObjectReference `json:"target" protobuf:"bytes,2,opt,name=target"`
 }
 
@@ -8484,7 +8704,7 @@ type Secret struct {
 	// More info: https://kubernetes.io/docs/concepts/configuration/secret/#secret-types
 	// +optional
 	// +k8s:optional
-	// +k8s:alpha(since: "1.37")=+k8s:immutable
+	// +k8s:beta(since: "1.38")=+k8s:immutable
 	Type SecretType `json:"type,omitempty" protobuf:"bytes,3,opt,name=type,casttype=SecretType"`
 }
 
@@ -8729,7 +8949,7 @@ type DownwardAPIVolumeSource struct {
 	DefaultMode *int32 `json:"defaultMode,omitempty" protobuf:"varint,2,opt,name=defaultMode"`
 	// defaultUser is Optional: The owner UID of the created files by default.
 	// The defaultUser field is only used as a fallback when the item-level user field is unset.
-	// (Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
+	// (Beta) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
 	// +featureGate=AtomicWriteVolumeUserFields
 	// +optional
 	DefaultUser *int64 `json:"defaultUser,omitempty" protobuf:"varint,3,opt,name=defaultUser"`
@@ -8761,7 +8981,7 @@ type DownwardAPIVolumeFile struct {
 	Mode *int32 `json:"mode,omitempty" protobuf:"varint,4,opt,name=mode"`
 	// user is Optional: The owner UID of the created file.
 	// If specified, the item-level user field takes precedence over defaultUser.
-	// (Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
+	// (Beta) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
 	// +featureGate=AtomicWriteVolumeUserFields
 	// +optional
 	User *int64 `json:"user,omitempty" protobuf:"varint,5,opt,name=user"`
@@ -8852,13 +9072,49 @@ type SecurityContext struct {
 	// override the pod options.
 	// Note that this field cannot be set when spec.os.name is windows.
 	// +optional
+	// +k8s:alpha(since: "1.38")=+k8s:optional
 	SeccompProfile *SeccompProfile `json:"seccompProfile,omitempty" protobuf:"bytes,11,opt,name=seccompProfile"`
 	// appArmorProfile is the AppArmor options to use by this container. If set, this profile
 	// overrides the pod's appArmorProfile.
 	// Note that this field cannot be set when spec.os.name is windows.
 	// +optional
 	AppArmorProfile *AppArmorProfile `json:"appArmorProfile,omitempty" protobuf:"bytes,12,opt,name=appArmorProfile"`
+	// cgroupOptions holds the cgroup options for this container.
+	// If mountMode is specified, the scheduler only places the pod on a node
+	// whose status.declaredFeatures includes CgroupOptions.
+	// (Alpha) This field requires the CgroupOptions feature gate to be enabled.
+	// This field cannot be set for ephemeral containers or when spec.os.name is windows.
+	// +featureGate=CgroupOptions
+	// +optional
+	// +k8s:optional
+	CgroupOptions *CgroupOptions `json:"cgroupOptions,omitempty" protobuf:"bytes,13,opt,name=cgroupOptions"`
 }
+
+// CgroupOptions defines options for cgroup filesystem access.
+type CgroupOptions struct {
+	// mountMode controls how the cgroup filesystem is mounted in the container.
+	// Valid values are "ReadOnly" and "ReadWrite". If not specified, the
+	// container runtime's default mount mode is used.
+	// The kubelet refuses to create a container with an unrecognized value.
+	// "ReadOnly" cannot be set when the container's privileged field is true.
+	// "ReadWrite" cannot be set when spec.hostNetwork is true and
+	// spec.hostUsers is false.
+	// +optional
+	// +k8s:optional
+	MountMode *CgroupMountMode `json:"mountMode,omitempty" protobuf:"bytes,1,opt,name=mountMode"`
+}
+
+// CgroupMountMode defines how the cgroup filesystem is mounted in a container.
+// +enum
+// +k8s:enum
+type CgroupMountMode string
+
+const (
+	// CgroupMountModeReadOnly mounts the cgroup filesystem read-only.
+	CgroupMountModeReadOnly CgroupMountMode = "ReadOnly"
+	// CgroupMountModeReadWrite mounts the cgroup filesystem read-write.
+	CgroupMountModeReadWrite CgroupMountMode = "ReadWrite"
+)
 
 // +enum
 // +k8s:validation-gen-nolint
@@ -9051,84 +9307,61 @@ type ImageVolumeSource struct {
 	PullPolicy PullPolicy `json:"pullPolicy,omitempty" protobuf:"bytes,2,opt,name=pullPolicy,casttype=PullPolicy"`
 }
 
-// NodeAllocatableResourceClaimStatus describes the status of node allocatable resources allocated via DRA.
-type NodeAllocatableResourceClaimStatus struct {
-	// resourceClaimName is the resource claim referenced by the pod that resulted in this node allocatable resource allocation.
+// ExtraNodeAllocatableResource describes node allocatable resources that are added to the
+// resources of a pod or of one of its containers.
+//
+// A list that is not empty must satisfy:
+//   - It has exactly one pod entry (empty containerName).
+//   - Each container entry names an init or regular container.
+//   - No two entries have the same containerName.
+//   - In each entry, requests must not exceed limits for the resources that have both.
+//   - The sum of the requests of the regular and sidecar container entries must not exceed the
+//     pod entry's requests.
+//   - The limits of each regular and sidecar container entry must not exceed the pod entry's limits
+//     for the resources that the pod entry limits.
+//
+// Non-restartable init container entries are not checked against the pod entry, because the spec
+// of the containers that run after them may already cover them.
+//
+// For DRA, the scheduler fills the entries from the `nodeAllocatableResources` of the devices
+// allocated to the pod's claims:
+//   - Each container entry, summed over the devices that the container uses:
+//     `overhead.perContainer` in requests, and `mapping` + `overhead.perPod` +
+//     `overhead.perContainer` in limits.
+//   - The pod entry: `mapping` + `overhead.perPod`, summed over all devices, plus what the
+//     container entries' requests add to the peak of the spec requests and limits.
+//
+// A container can use all the resources of its devices, while the pod entry caps the extra
+// resources that the containers use together.
+type ExtraNodeAllocatableResource struct {
+	// containerName is the name of the init or regular container that these resources are added to.
+	// An empty name marks the pod entry, whose requests and limits apply to the entire pod.
+	// +required
+	ContainerName string `json:"containerName" protobuf:"bytes,1,opt,name=containerName"`
+
+	// requests are added to the requests of the pod or container, as described in containerName.
+	// A resource that is missing from requests counts as zero; it is not defaulted from limits.
+	// The kubelet applies them as follows:
+	// - Pod cgroup: the requests of the pod entry are added to the aggregate of the containers'
+	//   spec requests, unless the pod level resources (`spec.resources`) set the resource. That value
+	//   is then used as is and must already include the extra resources.
+	// - Container cgroup: the requests of the container entry are added to the container's spec
+	//   requests.
+	// +optional
+	// +k8s:optional
+	Requests ResourceList `json:"requests,omitempty" protobuf:"bytes,2,rep,name=requests,casttype=ResourceList,castkey=ResourceName"`
+
+	// limits are added to the limits of the pod or container, as described in containerName.
+	// The kubelet applies them as follows:
+	// - Pod cgroup: the limits of the pod entry are added to the aggregate of the containers' spec
+	//   limits when they are set, unless the pod level resources (`spec.resources`) set the resource.
+	//   That value is then used as is and must already include the extra resources.
+	// - Container cgroup: the limits of the container entry are added to the container's spec limits.
+	//   For cpu and memory only when the container spec sets a limit; for hugepages also when it does
+	//   not, unless the pod level resources (`spec.resources`) set a hugepages limit.
+	// - Ephemeral-storage is not enforced through cgroups. The limits are added to the container's
+	//   and the pod's limits that kubelet eviction uses, when the spec sets one.
 	// +required
 	// +k8s:required
-	ResourceClaimName string `json:"resourceClaimName" protobuf:"bytes,1,opt,name=resourceClaimName"`
-	// containers lists the names of all containers in this pod that reference the claim.
-	// +optional
-	// +listType=set
-	// +k8s:optional
-	// +k8s:listType=set
-	Containers []string `json:"containers,omitempty" protobuf:"bytes,2,rep,name=containers"`
-
-	// Resources is tombstoned since it got replaced with more granular Mapping and Overhead fields.
-	// Resources map[ResourceName]resource.Quantity `json:"resources,omitempty" protobuf:"bytes,3,rep,name=resources"`
-
-	// mapping contains allocations through devices mapped in the device spec's `nodeAllocatableResources[...].mapping` field.
-	// This is used by kubelet for pod level and container-level cgroup enforcement.
-	// +optional
-	// +patchStrategy=merge
-	// +patchMergeKey=name
-	// +listType=map
-	// +listMapKey=name
-	// +k8s:optional
-	// +k8s:listType=map
-	// +k8s:listMapKey=name
-	Mapping []NodeAllocatableMappedResources `json:"mapping,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,4,rep,name=mapping"`
-	// overhead contains allocations through devices mapped in the device spec's `nodeAllocatableResources[...].overhead` field.
-	// This is used by kubelet for pod level and container-level cgroup enforcement.
-	// +optional
-	// +patchStrategy=merge
-	// +patchMergeKey=name
-	// +listType=map
-	// +listMapKey=name
-	// +k8s:optional
-	// +k8s:listType=map
-	// +k8s:listMapKey=name
-	Overhead []NodeAllocatableOverheadResources `json:"overhead,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,5,rep,name=overhead"`
-}
-
-// NodeAllocatableMappedResources describes mapped node allocatable resource allocations.
-type NodeAllocatableMappedResources struct {
-	// name is the name of the resource (e.g., cpu, memory).
-	// +required
-	// +k8s:required
-	Name ResourceName `json:"name" protobuf:"bytes,1,opt,name=name,casttype=ResourceName"`
-	// quantity is the total node allocatable resource capacity allocated for the claim.
-	// This claim's allocated devices is shared by all the containers referencing the claim.
-	// Kubelet adds this value to both requests and limits at the pod-level cgroup, and to limits at the container-level cgroup for each container referencing the claim.
-	// +required
-	// +k8s:required
-	Quantity *resource.Quantity `json:"quantity" protobuf:"bytes,2,opt,name=quantity"`
-}
-
-// NodeAllocatableOverheadResources describes auxiliary overhead resource allocations.
-type NodeAllocatableOverheadResources struct {
-	// name is the name of the resource (e.g., cpu, memory).
-	// +required
-	// +k8s:required
-	Name ResourceName `json:"name" protobuf:"bytes,1,opt,name=name,casttype=ResourceName"`
-	// perPod is the flat overhead quantity allocated per pod.
-	// Adding to each container limit allows individual containers to utilize the overhead, while the parent pod-level cgroup limit caps the total usage at the pod boundary where the overhead is accounted for exactly once.
-	// At least one of PerPod or PerContainer must be specified. Specifying neither is an invalid configuration.
-	// +optional
-	// +k8s:optional
-	PerPod *resource.Quantity `json:"perPod,omitempty" protobuf:"bytes,2,opt,name=perPod"`
-	// perContainer is the variable overhead quantity applied for each container referencing the claim.
-	// The container references are recorded in `nodeAllocatableResourceClaimStatuses.containers`.
-	// The total overhead quantity allocated for the claim is computed as:
-	// Quantity = PerPod + (PerContainer * NumReferences)
-	// Kubelet accounts for this overhead in cgroups:
-	// - Pod-level cgroup (requests and limits): Kubelet adds PerPod + (PerContainer * NumReferences).
-	// - Container-level cgroup (limits only): Kubelet adds PerPod + PerContainer for each referencing container.
-	// This allows any single container to access the pod-level overhead, while the parent cgroup caps the total usage to account for PerPod exactly once.
-	// At least one of PerPod or PerContainer must be specified. Specifying neither is an invalid configuration.
-	// PerContainer overhead of a claim referenced by a non-restartable init container is counted towards
-	// the pod's peak resource calculation (see Pod `spec.initContainers`), not for the pod's entire duration.
-	// +optional
-	// +k8s:optional
-	PerContainer *resource.Quantity `json:"perContainer,omitempty" protobuf:"bytes,3,opt,name=perContainer"`
+	Limits ResourceList `json:"limits,omitempty" protobuf:"bytes,3,rep,name=limits,casttype=ResourceList,castkey=ResourceName"`
 }

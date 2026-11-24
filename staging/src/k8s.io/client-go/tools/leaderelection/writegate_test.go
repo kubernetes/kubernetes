@@ -22,6 +22,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -250,5 +251,90 @@ func TestWriteGateWrappedRoundTripper(t *testing.T) {
 	}
 	if _, ok := wrapper.WrappedRoundTripper().(roundTripperFunc); !ok {
 		t.Fatalf("WrappedRoundTripper returned %T", wrapper.WrappedRoundTripper())
+	}
+}
+
+type fakePausable struct {
+	paused  bool
+	pauses  int
+	resumes int
+}
+
+func (p *fakePausable) Pause() {
+	p.paused = true
+	p.pauses++
+}
+
+func (p *fakePausable) Resume() {
+	p.paused = false
+	p.resumes++
+}
+
+func TestWriteGateRegisterPausable(t *testing.T) {
+	le := &LeaderElector{writeGate: &writeGate{}}
+	le.RegisterPausable(nil) // no-op
+
+	// Registering while closed immediately pauses.
+	p1 := &fakePausable{}
+	le.RegisterPausable(p1)
+	if !p1.paused || p1.pauses != 1 || p1.resumes != 0 {
+		t.Fatalf("expected p1 paused immediately when gate is closed, got %+v", p1)
+	}
+
+	// Opening resumes p1.
+	le.writeGate.open()
+	if p1.paused || p1.resumes != 1 {
+		t.Fatalf("expected p1 resumed on gate open, got %+v", p1)
+	}
+
+	// Registering while open does not pause.
+	p2 := &fakePausable{}
+	le.RegisterPausable(p2)
+	if p2.paused || p2.pauses != 0 || p2.resumes != 0 {
+		t.Fatalf("expected p2 untouched when registered on open gate, got %+v", p2)
+	}
+
+	// Closing pauses both.
+	le.writeGate.close()
+	if !p1.paused || !p2.paused || p1.pauses != 2 || p2.pauses != 1 {
+		t.Fatalf("expected both paused on gate close, got p1=%+v p2=%+v", p1, p2)
+	}
+}
+
+// TestWriteGateRegisterPausableConcurrentWithTransitions registers pausables
+// while the gate is flipping. Whatever the interleaving, every registrant must
+// end up in the state matching the gate once everything has settled.
+func TestWriteGateRegisterPausableConcurrentWithTransitions(t *testing.T) {
+	const registrants, transitions = 64, 200
+	gate := &writeGate{}
+	pausables := make([]*fakePausable, registrants)
+
+	var wg sync.WaitGroup
+	wg.Go(func() {
+		for range transitions {
+			gate.open()
+			gate.close()
+		}
+	})
+	for i := range pausables {
+		p := &fakePausable{}
+		pausables[i] = p
+		wg.Go(func() {
+			gate.registerPausable(p)
+		})
+	}
+	wg.Wait()
+
+	// The transition goroutine always ends on close, so all must be paused.
+	for i, p := range pausables {
+		if !p.paused {
+			t.Errorf("pausable %d is resumed while the gate is closed: %+v", i, p)
+		}
+	}
+	gate.open()
+	for i, p := range pausables {
+		if p.paused {
+			t.Errorf("pausable %d is paused while the gate is open: %+v", i, p)
+		}
 	}
 }

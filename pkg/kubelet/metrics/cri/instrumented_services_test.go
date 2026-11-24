@@ -17,8 +17,10 @@ limitations under the License.
 package cri
 
 import (
+	"errors"
 	"net"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -26,6 +28,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	compbasemetrics "k8s.io/component-base/metrics"
+	"k8s.io/component-base/metrics/testutil"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	critesting "k8s.io/cri-api/pkg/apis/testing"
 	"k8s.io/ktesting"
@@ -70,6 +73,33 @@ func TestRecordOperation(t *testing.T) {
 	assert.HTTPBodyContains(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		mux.ServeHTTP(w, r)
 	}), "GET", prometheusURL, nil, runtimeOperationsDurationExpected)
+}
+
+func TestRecordErrorExposesZeroCount(t *testing.T) {
+	registry := compbasemetrics.NewKubeRegistry()
+	registry.MustRegister(metrics.RuntimeOperationsErrors)
+	registry.Reset()
+
+	tCtx := ktesting.Init(t)
+	fakeRuntime := critesting.NewFakeRuntimeService()
+	irs := NewInstrumentedRuntimeService(fakeRuntime)
+
+	const header = `
+# HELP kubelet_runtime_operations_errors_total [ALPHA] Cumulative number of runtime operation errors by operation type.
+# TYPE kubelet_runtime_operations_errors_total counter
+`
+	// The series must exist before the first error so that error-rate
+	// queries don't see it as absent on healthy nodes.
+	_, err := irs.Version(tCtx, "1")
+	require.NoError(t, err)
+	expected := header + `kubelet_runtime_operations_errors_total{operation_type="version"} 0` + "\n"
+	require.NoError(t, testutil.GatherAndCompare(registry, strings.NewReader(expected), "kubelet_runtime_operations_errors_total"))
+
+	fakeRuntime.InjectError("Version", errors.New("injected"))
+	_, err = irs.Version(tCtx, "1")
+	require.Error(t, err)
+	expected = header + `kubelet_runtime_operations_errors_total{operation_type="version"} 1` + "\n"
+	require.NoError(t, testutil.GatherAndCompare(registry, strings.NewReader(expected), "kubelet_runtime_operations_errors_total"))
 }
 
 func TestInstrumentedVersion(t *testing.T) {

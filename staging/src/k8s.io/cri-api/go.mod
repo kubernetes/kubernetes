@@ -2,9 +2,9 @@
 
 module k8s.io/cri-api
 
-go 1.27.0
+go 1.26.0
 
-godebug default=go1.27
+godebug default=go1.26
 
 require (
 	google.golang.org/grpc v1.85.0

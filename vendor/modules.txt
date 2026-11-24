@@ -2,7 +2,7 @@
 # bitbucket.org/bertimus9/systemstat v0.5.0
 ## explicit; go 1.17
 bitbucket.org/bertimus9/systemstat
-# cel.dev/cel-go v0.33.2
+# cel.dev/cel-go v0.33.4
 ## explicit; go 1.23.0
 cel.dev/cel-go/cel
 cel.dev/cel-go/cel/async
@@ -94,7 +94,7 @@ github.com/chai2010/gettext-go
 github.com/chai2010/gettext-go/mo
 github.com/chai2010/gettext-go/plural
 github.com/chai2010/gettext-go/po
-# github.com/container-storage-interface/spec v1.13.0
+# github.com/container-storage-interface/spec v1.14.0
 ## explicit; go 1.25.0
 github.com/container-storage-interface/spec/lib/go/csi
 # github.com/containerd/containerd/api v1.12.0
@@ -153,9 +153,6 @@ github.com/davecgh/go-spew/spew
 # github.com/distribution/reference v0.6.0
 ## explicit; go 1.20
 github.com/distribution/reference
-# github.com/docker/go-units v0.5.0
-## explicit
-github.com/docker/go-units
 # github.com/dustin/go-humanize v1.0.1
 ## explicit; go 1.16
 github.com/dustin/go-humanize
@@ -182,7 +179,7 @@ github.com/fxamacker/cbor/v2
 # github.com/go-errors/errors v1.5.1
 ## explicit; go 1.14
 github.com/go-errors/errors
-# github.com/go-jose/go-jose/v4 v4.1.5
+# github.com/go-jose/go-jose/v4 v4.1.9
 ## explicit; go 1.24.0
 github.com/go-jose/go-jose/v4
 github.com/go-jose/go-jose/v4/cipher
@@ -265,7 +262,7 @@ github.com/golang/protobuf/proto
 # github.com/google/btree v1.1.3
 ## explicit; go 1.18
 github.com/google/btree
-# github.com/google/cadvisor/lib v0.60.6
+# github.com/google/cadvisor/lib v0.61.0
 ## explicit; go 1.25.0
 github.com/google/cadvisor/lib/cache/memory
 github.com/google/cadvisor/lib/cadvisorflags
@@ -1064,11 +1061,11 @@ gopkg.in/natefinch/lumberjack.v2
 # k8s.io/controller-manager v0.0.0 => ./staging/src/k8s.io/controller-manager
 ## explicit; go 1.27.0
 # k8s.io/cri-api v0.0.0 => ./staging/src/k8s.io/cri-api
-## explicit; go 1.27.0
+## explicit; go 1.26.0
 # k8s.io/cri-client v0.0.0 => ./staging/src/k8s.io/cri-client
 ## explicit; go 1.27.0
 # k8s.io/cri-streaming v0.0.0 => ./staging/src/k8s.io/cri-streaming
-## explicit; go 1.27.0
+## explicit; go 1.26.0
 # k8s.io/csi-translation-lib v0.0.0 => ./staging/src/k8s.io/csi-translation-lib
 ## explicit; go 1.27.0
 # k8s.io/dynamic-resource-allocation v0.0.0 => ./staging/src/k8s.io/dynamic-resource-allocation
@@ -1076,7 +1073,7 @@ gopkg.in/natefinch/lumberjack.v2
 # k8s.io/endpointslice v0.0.0 => ./staging/src/k8s.io/endpointslice
 ## explicit; go 1.27.0
 # k8s.io/externaljwt v0.0.0 => ./staging/src/k8s.io/externaljwt
-## explicit; go 1.27.0
+## explicit; go 1.26.0
 # k8s.io/gengo/v2 v2.0.0-20260408192533-25e2208e0dc3
 ## explicit; go 1.24.0
 k8s.io/gengo/v2
@@ -1101,9 +1098,9 @@ k8s.io/klog/v2/ktesting/init
 k8s.io/klog/v2/test
 k8s.io/klog/v2/textlogger
 # k8s.io/kms v0.0.0 => ./staging/src/k8s.io/kms
-## explicit; go 1.27.0
+## explicit; go 1.26.0
 # k8s.io/ktesting v0.0.0 => ./staging/src/k8s.io/ktesting
-## explicit; go 1.27.0
+## explicit; go 1.26.0
 # k8s.io/kube-aggregator v0.0.0 => ./staging/src/k8s.io/kube-aggregator
 ## explicit; go 1.27.0
 # k8s.io/kube-controller-manager v0.0.0 => ./staging/src/k8s.io/kube-controller-manager
@@ -1151,13 +1148,13 @@ k8s.io/kube-openapi/pkg/validation/validate
 # k8s.io/metrics v0.0.0 => ./staging/src/k8s.io/metrics
 ## explicit; go 1.27.0
 # k8s.io/mount-utils v0.0.0 => ./staging/src/k8s.io/mount-utils
-## explicit; go 1.27.0
+## explicit; go 1.26.0
 # k8s.io/pod-security-admission v0.0.0 => ./staging/src/k8s.io/pod-security-admission
 ## explicit; go 1.27.0
 # k8s.io/sample-apiserver v0.0.0 => ./staging/src/k8s.io/sample-apiserver
 ## explicit; go 1.27.0
 # k8s.io/streaming v0.0.0 => ./staging/src/k8s.io/streaming
-## explicit; go 1.27.0
+## explicit; go 1.26.0
 # k8s.io/system-validators v1.12.1
 ## explicit; go 1.16
 k8s.io/system-validators/validators
@@ -1183,7 +1180,7 @@ k8s.io/utils/set
 k8s.io/utils/strings
 k8s.io/utils/third_party/forked/golang/btree
 k8s.io/utils/trace
-# sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.37.0
+# sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.37.1
 ## explicit; go 1.25.0
 sigs.k8s.io/apiserver-network-proxy/konnectivity-client/pkg/client
 sigs.k8s.io/apiserver-network-proxy/konnectivity-client/pkg/client/metrics

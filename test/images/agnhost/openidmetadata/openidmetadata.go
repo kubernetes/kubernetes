@@ -30,6 +30,7 @@ import (
 	"time"
 
 	"github.com/coreos/go-oidc/v3/oidc"
+	"github.com/go-jose/go-jose/v4"
 	"github.com/go-jose/go-jose/v4/jwt"
 	"github.com/spf13/cobra"
 	"golang.org/x/oauth2"
@@ -128,12 +129,13 @@ func validate(ctx context.Context, raw string) error {
 	// - pkg/serviceaccount/externaljwt/plugin/plugin.go validateJWTHeader
 	// - pkg/serviceaccount/jwt.go signerFromRSAPrivateKey
 	// - pkg/serviceaccount/jwt.go signerFromECDSAPrivateKey
+	// - pkg/serviceaccount/jwt.go signerFromMLDSAPrivateKey
 	// - pkg/serviceaccount/jwt.go AcceptableServiceAccountSignatureAlgorithms
 	// - test/images/agnhost/openidmetadata/openidmetadata.go validate SupportedSigningAlgs
 
 	validTok, err := iss.Verifier(&oidc.Config{
 		ClientID:             audience,
-		SupportedSigningAlgs: []string{oidc.RS256, oidc.ES256, oidc.ES384, oidc.ES512},
+		SupportedSigningAlgs: []string{oidc.RS256, oidc.ES256, oidc.ES384, oidc.ES512, string(jose.MLDSA44), string(jose.MLDSA65), string(jose.MLDSA87)},
 	}).Verify(ctx, raw)
 	if err != nil {
 		return err

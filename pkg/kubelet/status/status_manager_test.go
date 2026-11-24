@@ -530,14 +530,15 @@ func TestStatusEquality(t *testing.T) {
 	}
 	oldPodStatus.ResourceClaimStatuses = []v1.PodResourceClaimStatus{claimStatusA}
 	oldPodStatus.ExtendedResourceClaimStatus = extendedClaimStatusA
-	oldPodStatus.NodeAllocatableResourceClaimStatuses = []v1.NodeAllocatableResourceClaimStatus{
+	oldPodStatus.ExtraNodeAllocatableResources = []v1.ExtraNodeAllocatableResource{
 		{
-			ResourceClaimName: "my-claim",
-			Containers:        []string{"ctr0"},
-			Mapping: []v1.NodeAllocatableMappedResources{{
-				Name:     v1.ResourceMemory,
-				Quantity: new(resource.MustParse("100Mi")),
-			}},
+			ContainerName: "",
+			Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("100Mi")},
+			Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("100Mi")},
+		},
+		{
+			ContainerName: "ctr0",
+			Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("100Mi")},
 		},
 	}
 
@@ -572,7 +573,7 @@ func TestIsPodStatusByKubeletEqualFutureProof(t *testing.T) {
 		"AllocatedResources",
 		"ObservedGeneration",
 		"Resources",
-		"VolumeHealth",
+		"VolumeStatuses",
 	)
 
 	// kubeletIgnoredFields are fields in v1.PodStatus not owned by the kubelet.
@@ -580,7 +581,7 @@ func TestIsPodStatusByKubeletEqualFutureProof(t *testing.T) {
 	kubeletIgnoredFields := sets.NewString(
 		"ResourceClaimStatuses",
 		"ExtendedResourceClaimStatus",
-		"NodeAllocatableResourceClaimStatuses",
+		"ExtraNodeAllocatableResources",
 	)
 
 	// Get all fields in v1.PodStatus.
@@ -625,14 +626,15 @@ func TestIsPodStatusByKubeletEqualFutureProof(t *testing.T) {
 			t.Error("ExtendedResourceClaimStatus: change should be ignored but was detected")
 		}
 
-		// Test NodeAllocatableResourceClaimStatuses
+		// Test ExtraNodeAllocatableResources
 		modified = base.DeepCopy()
-		modified.NodeAllocatableResourceClaimStatuses = []v1.NodeAllocatableResourceClaimStatus{{
-			ResourceClaimName: "test-node-claim",
-			Containers:        []string{"ctr0"},
-		}}
+		modified.ExtraNodeAllocatableResources = []v1.ExtraNodeAllocatableResource{
+			{
+				ContainerName: "ctr0",
+			},
+		}
 		if !isPodStatusByKubeletEqual(base, modified) {
-			t.Error("NodeAllocatableResourceClaimStatuses: change should be ignored but was detected")
+			t.Error("ExtraNodeAllocatableResources: change should be ignored but was detected")
 		}
 	})
 
@@ -656,6 +658,18 @@ func TestIsPodStatusByKubeletEqualFutureProof(t *testing.T) {
 		})
 		if isPodStatusByKubeletEqual(base, modified) {
 			t.Error("Conditions: change should be detected but was ignored")
+		}
+
+		// Test a condition's ObservedGeneration, e.g. of PodResizeInProgress for a new resize.
+		base.Conditions = append(base.Conditions, v1.PodCondition{
+			Type:               v1.PodResizeInProgress,
+			Status:             v1.ConditionTrue,
+			ObservedGeneration: 1,
+		})
+		modified = base.DeepCopy()
+		modified.Conditions[len(modified.Conditions)-1].ObservedGeneration = 2
+		if isPodStatusByKubeletEqual(base, modified) {
+			t.Error("Conditions: a change of observedGeneration should be detected but was ignored")
 		}
 
 		// Test Message
@@ -825,6 +839,36 @@ func TestStatusNormalizationEnforcesMaxBytes(t *testing.T) {
 	}
 	if count > kubecontainer.MaxPodTerminationMessageLogLength {
 		t.Errorf("message length not truncated")
+	}
+}
+
+func TestStatusNormalizationBudgetsRemovedContainers(t *testing.T) {
+	message := strings.Repeat("x", kubecontainer.MaxPodTerminationMessageLogLength)
+	terminated := func(name string) v1.ContainerStatus {
+		return v1.ContainerStatus{
+			Name:  name,
+			State: v1.ContainerState{Terminated: &v1.ContainerStateTerminated{Message: message}},
+		}
+	}
+	for _, tc := range []struct {
+		name          string
+		enabled       bool
+		expectedBytes int
+	}{
+		{name: "gate enabled", enabled: true, expectedBytes: kubecontainer.MaxPodTerminationMessageLogLength / 3},
+		{name: "gate disabled", enabled: false, expectedBytes: kubecontainer.MaxPodTerminationMessageLogLength},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicContainers, tc.enabled)
+			pod := &v1.Pod{Spec: v1.PodSpec{Containers: []v1.Container{{Name: "a"}}}}
+			status := &v1.PodStatus{ContainerStatuses: []v1.ContainerStatus{
+				terminated("a"), terminated("removed-1"), terminated("removed-2"),
+			}}
+			normalizeStatus(pod, status)
+			for _, s := range status.ContainerStatuses {
+				assert.Len(t, s.State.Terminated.Message, tc.expectedBytes, s.Name)
+			}
+		})
 	}
 }
 
@@ -1590,6 +1634,7 @@ func TestSetPodVolumeHealth(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIVolumeHealth, true)
 
 	pod := getTestPod()
+	pod.Spec.Volumes = []v1.Volume{{Name: "vol1"}, {Name: "vol2"}}
 	m := newTestManager(&fake.Clientset{})
 	m.podManager.(mutablePodManager).AddPod(pod)
 
@@ -1623,19 +1668,20 @@ func TestSetPodVolumeHealth(t *testing.T) {
 	}
 	verifyUpdates(t, m, 1)
 	status := expectPodStatus(t, m, pod)
-	if len(status.VolumeHealth) != 1 {
-		t.Fatalf("expected 1 VolumeHealth entry, got %d", len(status.VolumeHealth))
+	require.NotNil(t, status.VolumeStatuses)
+	if len(status.VolumeStatuses) != 1 {
+		t.Fatalf("expected 1 volume status entry, got %d", len(status.VolumeStatuses))
 	}
-	if status.VolumeHealth[0].Name != "vol1" {
-		t.Errorf("unexpected volume name: %q", status.VolumeHealth[0].Name)
+	if status.VolumeStatuses[0].Name != "vol1" {
+		t.Errorf("unexpected volume name: %q", status.VolumeStatuses[0].Name)
 	}
-	if !reflect.DeepEqual(status.VolumeHealth[0].HealthConditions, unhealthy) {
-		t.Errorf("unexpected conditions: %+v", status.VolumeHealth[0].HealthConditions)
+	if !reflect.DeepEqual(status.VolumeStatuses[0].HealthStatus.HealthConditions, unhealthy) {
+		t.Errorf("unexpected conditions: %+v", status.VolumeStatuses[0].HealthStatus.HealthConditions)
 	}
-	if status.VolumeHealth[0].LastTransitionTime.IsZero() {
+	if status.VolumeStatuses[0].HealthStatus.LastTransitionTime.IsZero() {
 		t.Error("expected LastTransitionTime to be set")
 	}
-	firstTransition := status.VolumeHealth[0].LastTransitionTime
+	firstTransition := status.VolumeStatuses[0].HealthStatus.LastTransitionTime
 
 	t.Log("Same (status,reason) with different message should be a no-op.")
 	sameIdentity := []v1.VolumeHealthCondition{{
@@ -1648,10 +1694,10 @@ func TestSetPodVolumeHealth(t *testing.T) {
 	}
 	verifyUpdates(t, m, 0)
 	status = expectPodStatus(t, m, pod)
-	if status.VolumeHealth[0].HealthConditions[0].Message != "volume path missing" {
-		t.Errorf("message should be unchanged, got %q", status.VolumeHealth[0].HealthConditions[0].Message)
+	if status.VolumeStatuses[0].HealthStatus.HealthConditions[0].Message != "volume path missing" {
+		t.Errorf("message should be unchanged, got %q", status.VolumeStatuses[0].HealthStatus.HealthConditions[0].Message)
 	}
-	if !status.VolumeHealth[0].LastTransitionTime.Equal(&firstTransition) {
+	if !status.VolumeStatuses[0].HealthStatus.LastTransitionTime.Equal(&firstTransition) {
 		t.Error("LastTransitionTime should be unchanged on no-op")
 	}
 
@@ -1660,11 +1706,12 @@ func TestSetPodVolumeHealth(t *testing.T) {
 		t.Fatal("expected update when (status,reason) changes")
 	}
 	verifyUpdates(t, m, 1)
+	assert.Equal(t, unhealthy, status.VolumeStatuses[0].HealthStatus.HealthConditions, "previous cached status must not be mutated")
 	status = expectPodStatus(t, m, pod)
-	if !reflect.DeepEqual(status.VolumeHealth[0].HealthConditions, degraded) {
-		t.Errorf("unexpected conditions after update: %+v", status.VolumeHealth[0].HealthConditions)
+	if !reflect.DeepEqual(status.VolumeStatuses[0].HealthStatus.HealthConditions, degraded) {
+		t.Errorf("unexpected conditions after update: %+v", status.VolumeStatuses[0].HealthStatus.HealthConditions)
 	}
-	if status.VolumeHealth[0].LastTransitionTime.IsZero() {
+	if status.VolumeStatuses[0].HealthStatus.LastTransitionTime.IsZero() {
 		t.Error("expected LastTransitionTime to be set after condition change")
 	}
 
@@ -1674,8 +1721,8 @@ func TestSetPodVolumeHealth(t *testing.T) {
 	}
 	verifyUpdates(t, m, 1)
 	status = expectPodStatus(t, m, pod)
-	if len(status.VolumeHealth[0].HealthConditions) != 0 {
-		t.Errorf("expected empty conditions, got %+v", status.VolumeHealth[0].HealthConditions)
+	if len(status.VolumeStatuses[0].HealthStatus.HealthConditions) != 0 {
+		t.Errorf("expected empty conditions, got %+v", status.VolumeStatuses[0].HealthStatus.HealthConditions)
 	}
 
 	t.Log("Multiple volumes on one pod.")
@@ -1688,18 +1735,58 @@ func TestSetPodVolumeHealth(t *testing.T) {
 	}
 	verifyUpdates(t, m, 1)
 	status = expectPodStatus(t, m, pod)
-	if len(status.VolumeHealth) != 2 {
-		t.Fatalf("expected 2 VolumeHealth entries, got %d", len(status.VolumeHealth))
+	if len(status.VolumeStatuses) != 2 {
+		t.Fatalf("expected 2 volume status entries, got %d", len(status.VolumeStatuses))
 	}
-	byName := map[string]v1.PodVolumeHealth{}
-	for _, vh := range status.VolumeHealth {
+	byName := map[string]v1.PodVolumeStatus{}
+	for _, vh := range status.VolumeStatuses {
 		byName[vh.Name] = vh
 	}
-	if !reflect.DeepEqual(byName["vol1"].HealthConditions, unhealthy) {
-		t.Errorf("vol1 conditions: %+v", byName["vol1"].HealthConditions)
+	if !reflect.DeepEqual(byName["vol1"].HealthStatus.HealthConditions, unhealthy) {
+		t.Errorf("vol1 conditions: %+v", byName["vol1"].HealthStatus.HealthConditions)
 	}
-	if !reflect.DeepEqual(byName["vol2"].HealthConditions, degraded) {
-		t.Errorf("vol2 conditions: %+v", byName["vol2"].HealthConditions)
+	if !reflect.DeepEqual(byName["vol2"].HealthStatus.HealthConditions, degraded) {
+		t.Errorf("vol2 conditions: %+v", byName["vol2"].HealthStatus.HealthConditions)
+	}
+}
+
+func TestSetPodVolumeHealthEmptyConditions(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	for _, tc := range []struct {
+		name           string
+		volumeStatuses []v1.PodVolumeStatus
+	}{
+		{name: "nil volume status"},
+		{name: "empty volume statuses", volumeStatuses: []v1.PodVolumeStatus{}},
+		{name: "volume without health", volumeStatuses: []v1.PodVolumeStatus{{Name: "vol1"}}},
+		{name: "empty health status", volumeStatuses: []v1.PodVolumeStatus{{Name: "vol1", HealthStatus: &v1.VolumeHealthStatus{}}}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			pod := getTestPod()
+			pod.Spec.Volumes = []v1.Volume{{Name: "vol1"}}
+			m := newTestManager(&fake.Clientset{})
+			m.podManager.(mutablePodManager).AddPod(pod)
+			m.SetPodStatus(logger, pod, v1.PodStatus{VolumeStatuses: tc.volumeStatuses})
+			verifyUpdates(t, m, 1)
+			before := expectPodStatus(t, m, pod)
+			beforeCopy := before.DeepCopy()
+
+			for _, conditions := range [][]v1.VolumeHealthCondition{nil, {}} {
+				assert.False(t, m.SetPodVolumeHealth(logger, pod.UID, "vol1", conditions))
+				verifyUpdates(t, m, 0)
+				assert.Equal(t, *beforeCopy, expectPodStatus(t, m, pod))
+			}
+
+			conditions := []v1.VolumeHealthCondition{{Status: v1.VolumeHealthDegraded, Reason: "SlowIO"}}
+			require.True(t, m.SetPodVolumeHealth(logger, pod.UID, "vol1", conditions))
+			verifyUpdates(t, m, 1)
+			status := expectPodStatus(t, m, pod)
+			require.NotNil(t, status.VolumeStatuses)
+			require.Len(t, status.VolumeStatuses, 1)
+			assert.Equal(t, conditions, status.VolumeStatuses[0].HealthStatus.HealthConditions)
+			assert.Equal(t, tc.volumeStatuses, before.VolumeStatuses, "input volume status must not be mutated")
+			assert.Equal(t, *beforeCopy, before, "previous cached status must not be mutated")
+		})
 	}
 }
 
@@ -1708,6 +1795,7 @@ func TestVolumeHealthSurvivesPodStatusUpdate(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIVolumeHealth, true)
 
 	pod := getTestPod()
+	pod.Spec.Volumes = []v1.Volume{{Name: "vol1"}}
 	m := newTestManager(&fake.Clientset{})
 	m.podManager.(mutablePodManager).AddPod(pod)
 
@@ -1725,28 +1813,252 @@ func TestVolumeHealthSurvivesPodStatusUpdate(t *testing.T) {
 	verifyUpdates(t, m, 1)
 
 	status := expectPodStatus(t, m, pod)
-	if len(status.VolumeHealth) != 1 {
-		t.Fatalf("expected 1 VolumeHealth entry, got %d", len(status.VolumeHealth))
+	require.NotNil(t, status.VolumeStatuses)
+	if len(status.VolumeStatuses) != 1 {
+		t.Fatalf("expected 1 volume status entry, got %d", len(status.VolumeStatuses))
 	}
 
-	// Simulate what happens on the next pod sync: SetPodStatus is called
-	// with a freshly generated status that has no VolumeHealth.
-	m.SetPodStatus(logger, pod, v1.PodStatus{Phase: v1.PodRunning})
+	for _, tc := range []struct {
+		name           string
+		volumeStatuses []v1.PodVolumeStatus
+	}{
+		{name: "nil volume status"},
+		{name: "empty volume statuses", volumeStatuses: []v1.PodVolumeStatus{}},
+		{name: "same volume without health", volumeStatuses: []v1.PodVolumeStatus{{Name: "vol1"}}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			m.SetPodStatus(logger, pod, v1.PodStatus{Phase: v1.PodRunning, VolumeStatuses: tc.volumeStatuses})
+			verifyUpdates(t, m, 0)
 
-	status = expectPodStatus(t, m, pod)
-	if len(status.VolumeHealth) != 1 {
-		t.Fatalf("VolumeHealth should survive SetPodStatus, got %d entries", len(status.VolumeHealth))
+			updated := expectPodStatus(t, m, pod)
+			require.NotNil(t, updated.VolumeStatuses)
+			assert.Equal(t, status.VolumeStatuses, updated.VolumeStatuses)
+		})
 	}
-	if status.VolumeHealth[0].Name != "vol1" {
-		t.Errorf("unexpected volume name: %q", status.VolumeHealth[0].Name)
+
+	degraded := []v1.VolumeHealthCondition{{Status: v1.VolumeHealthDegraded, Reason: "SlowIO"}}
+	m.SetPodStatus(logger, pod, v1.PodStatus{
+		Phase: v1.PodRunning,
+		VolumeStatuses: []v1.PodVolumeStatus{{
+			Name:         "vol1",
+			HealthStatus: &v1.VolumeHealthStatus{HealthConditions: degraded},
+		}},
+	})
+	verifyUpdates(t, m, 1)
+	updated := expectPodStatus(t, m, pod)
+	require.NotNil(t, updated.VolumeStatuses)
+	require.Len(t, updated.VolumeStatuses, 1)
+	assert.Equal(t, degraded, updated.VolumeStatuses[0].HealthStatus.HealthConditions)
+	assert.Equal(t, unhealthy, status.VolumeStatuses[0].HealthStatus.HealthConditions)
+}
+
+func TestVolumeHealthPreservedWithFeatureGateDisabled(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIVolumeHealth, false)
+
+	for _, tc := range []struct {
+		name           string
+		volumeStatuses []v1.PodVolumeStatus
+	}{
+		{name: "nil volume statuses"},
+		{name: "empty volume statuses", volumeStatuses: []v1.PodVolumeStatus{}},
+		{name: "same volume without health", volumeStatuses: []v1.PodVolumeStatus{{Name: "vol1"}}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
+			pod := getTestPod()
+			pod.Spec.Volumes = []v1.Volume{{Name: "vol1"}}
+			pod.Status.VolumeStatuses = []v1.PodVolumeStatus{{
+				Name: "vol1",
+				HealthStatus: &v1.VolumeHealthStatus{
+					HealthConditions:   []v1.VolumeHealthCondition{{Status: v1.VolumeHealthDegraded, Reason: "SlowIO"}},
+					LastTransitionTime: metav1.NewTime(time.Unix(123, 0)),
+				},
+			}}
+			m := newTestManager(&fake.Clientset{})
+			m.podManager.(mutablePodManager).AddPod(pod)
+
+			// The first update reads persisted status; subsequent updates read the cache.
+			for _, message := range []string{"first update after restart", "cached status update"} {
+				m.SetPodStatus(logger, pod, v1.PodStatus{
+					Phase:          v1.PodRunning,
+					Message:        message,
+					VolumeStatuses: tc.volumeStatuses,
+				})
+				updated := expectPodStatus(t, m, pod)
+				assert.Equal(t, message, updated.Message)
+				assert.Equal(t, pod.Status.VolumeStatuses, updated.VolumeStatuses)
+			}
+		})
 	}
-	if !reflect.DeepEqual(status.VolumeHealth[0].HealthConditions, unhealthy) {
-		t.Errorf("unexpected conditions after SetPodStatus: %+v", status.VolumeHealth[0].HealthConditions)
+}
+
+func TestPodVolumeHealthTransitionTime(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	initialConditions := []v1.VolumeHealthCondition{
+		{Status: v1.VolumeHealthDegraded, Reason: "SlowIO"},
+		{Status: v1.VolumeHealthInaccessible, Reason: "PathMissing"},
+	}
+	initialTime := metav1.NewTime(time.Unix(123, 0))
+	for _, tc := range []struct {
+		name       string
+		conditions []v1.VolumeHealthCondition
+		changed    bool
+	}{
+		{name: "unchanged", conditions: initialConditions},
+		{name: "reordered", conditions: []v1.VolumeHealthCondition{initialConditions[1], initialConditions[0]}},
+		{name: "message only", conditions: []v1.VolumeHealthCondition{
+			{Status: v1.VolumeHealthDegraded, Reason: "SlowIO", Message: "new message"},
+			initialConditions[1],
+		}},
+		{name: "reason changed", conditions: []v1.VolumeHealthCondition{
+			{Status: v1.VolumeHealthDegraded, Reason: "DiskSlow"},
+			initialConditions[1],
+		}, changed: true},
+		{name: "recovered", changed: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			pod := getTestPod()
+			pod.Spec.Volumes = []v1.Volume{{Name: "vol1"}}
+			m := newTestManager(&fake.Clientset{})
+			m.podManager.(mutablePodManager).AddPod(pod)
+			initialStatus := v1.PodStatus{VolumeStatuses: []v1.PodVolumeStatus{
+				{Name: "other"},
+				{Name: "vol1", HealthStatus: &v1.VolumeHealthStatus{
+					HealthConditions:   initialConditions,
+					LastTransitionTime: initialTime,
+				}},
+			}}
+			m.SetPodStatus(logger, pod, initialStatus)
+			verifyUpdates(t, m, 1)
+			assert.Equal(t, tc.changed, m.SetPodVolumeHealth(logger, pod.UID, "vol1", tc.conditions))
+			status := expectPodStatus(t, m, pod)
+			require.Len(t, status.VolumeStatuses, 2)
+			assert.Equal(t, initialStatus.VolumeStatuses[0], status.VolumeStatuses[0])
+			health := status.VolumeStatuses[1].HealthStatus
+			require.NotNil(t, health)
+			if tc.changed {
+				assert.True(t, health.LastTransitionTime.After(initialTime.Time))
+				assert.Equal(t, tc.conditions, health.HealthConditions)
+			} else {
+				assert.Equal(t, initialStatus.VolumeStatuses[1].HealthStatus, health)
+			}
+			assert.Equal(t, initialTime, initialStatus.VolumeStatuses[1].HealthStatus.LastTransitionTime)
+		})
+	}
+}
+
+func TestVolumeHealthMergesByName(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	pod := getTestPod()
+	pod.Spec.Volumes = []v1.Volume{{Name: "vol1"}, {Name: "vol2"}}
+	m := newTestManager(&fake.Clientset{})
+	m.podManager.(mutablePodManager).AddPod(pod)
+	health := &v1.VolumeHealthStatus{
+		HealthConditions:   []v1.VolumeHealthCondition{{Status: v1.VolumeHealthDegraded, Reason: "SlowIO"}},
+		LastTransitionTime: metav1.NewTime(time.Unix(123, 0)),
+	}
+	m.SetPodStatus(logger, pod, v1.PodStatus{VolumeStatuses: []v1.PodVolumeStatus{
+		{Name: "vol1", HealthStatus: health},
+		{Name: "vol2", HealthStatus: health.DeepCopy()},
+	}})
+	verifyUpdates(t, m, 1)
+	incoming := v1.PodStatus{VolumeStatuses: []v1.PodVolumeStatus{{Name: "other"}, {Name: "vol1"}}}
+	m.SetPodStatus(logger, pod, incoming)
+	verifyUpdates(t, m, 1)
+	status := expectPodStatus(t, m, pod)
+	require.Len(t, status.VolumeStatuses, 3)
+	assert.Equal(t, v1.PodVolumeStatus{Name: "other"}, status.VolumeStatuses[0])
+	assert.Equal(t, v1.PodVolumeStatus{Name: "vol1", HealthStatus: health}, status.VolumeStatuses[1])
+	assert.Equal(t, v1.PodVolumeStatus{Name: "vol2", HealthStatus: health}, status.VolumeStatuses[2])
+	assert.Nil(t, incoming.VolumeStatuses[1].HealthStatus, "input status must not be mutated")
+	status.VolumeStatuses[1].HealthStatus.HealthConditions[0].Reason = "Changed"
+	assert.Equal(t, "SlowIO", health.HealthConditions[0].Reason)
+	assert.Equal(t, "SlowIO", status.VolumeStatuses[2].HealthStatus.HealthConditions[0].Reason)
+}
+
+func TestVolumeHealthIsNotRestoredForRemovedVolumes(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIVolumeHealth, true)
+	for _, cached := range []bool{false, true} {
+		for _, tc := range []struct {
+			name           string
+			volumeStatuses []v1.PodVolumeStatus
+		}{
+			{name: "nil volume statuses"},
+			{name: "empty volume statuses", volumeStatuses: []v1.PodVolumeStatus{}},
+			{name: "retained lifecycle entry", volumeStatuses: []v1.PodVolumeStatus{{Name: "vol1"}}},
+		} {
+			t.Run(fmt.Sprintf("cached=%t/%s", cached, tc.name), func(t *testing.T) {
+				logger, _ := ktesting.NewTestContext(t)
+				pod := getTestPod()
+				pod.Spec.Volumes = []v1.Volume{{Name: "vol1"}, {Name: "vol2"}}
+				health := &v1.VolumeHealthStatus{
+					HealthConditions:   []v1.VolumeHealthCondition{{Status: v1.VolumeHealthDegraded, Reason: "SlowIO"}},
+					LastTransitionTime: metav1.NewTime(time.Unix(123, 0).UTC()),
+				}
+				pod.Status.VolumeStatuses = []v1.PodVolumeStatus{
+					{Name: "vol1", HealthStatus: health},
+					{Name: "vol2", HealthStatus: health.DeepCopy()},
+				}
+				m := newTestManager(&fake.Clientset{})
+				m.podManager.(mutablePodManager).AddPod(pod)
+				if cached {
+					m.SetPodStatus(logger, pod, pod.Status)
+					verifyUpdates(t, m, 1)
+				}
+
+				pod = pod.DeepCopy()
+				pod.Spec.Volumes = pod.Spec.Volumes[1:]
+				m.podManager.(mutablePodManager).UpdatePod(pod)
+				incoming := v1.PodStatus{VolumeStatuses: tc.volumeStatuses}
+				before := incoming.DeepCopy()
+				m.SetPodStatus(logger, pod, incoming)
+				verifyUpdates(t, m, 1)
+
+				want := append([]v1.PodVolumeStatus(nil), tc.volumeStatuses...)
+				want = append(want, v1.PodVolumeStatus{Name: "vol2", HealthStatus: health})
+				assert.Equal(t, want, expectPodStatus(t, m, pod).VolumeStatuses)
+				assert.Equal(t, *before, incoming, "input status must not be mutated")
+				assert.Equal(t, health, pod.Status.VolumeStatuses[0].HealthStatus, "persisted health must not be mutated")
+			})
+		}
+	}
+}
+
+func TestSetPodVolumeHealthIgnoresRemovedVolume(t *testing.T) {
+	for _, tc := range []struct {
+		name           string
+		volumeStatuses []v1.PodVolumeStatus
+	}{
+		{name: "entry already pruned"},
+		{name: "retained lifecycle entry", volumeStatuses: []v1.PodVolumeStatus{{Name: "vol1"}}},
+		{name: "cached health", volumeStatuses: []v1.PodVolumeStatus{{Name: "vol1", HealthStatus: &v1.VolumeHealthStatus{
+			HealthConditions: []v1.VolumeHealthCondition{{Status: v1.VolumeHealthDegraded, Reason: "SlowIO"}},
+		}}}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
+			pod := getTestPod()
+			pod.Spec.Volumes = []v1.Volume{{Name: "vol1"}}
+			m := newTestManager(&fake.Clientset{})
+			m.podManager.(mutablePodManager).AddPod(pod)
+			m.SetPodStatus(logger, pod, v1.PodStatus{VolumeStatuses: tc.volumeStatuses})
+			verifyUpdates(t, m, 1)
+			before := expectPodStatus(t, m, pod)
+			beforeCopy := before.DeepCopy()
+
+			pod = pod.DeepCopy()
+			pod.Spec.Volumes = nil
+			m.podManager.(mutablePodManager).UpdatePod(pod)
+			conditions := []v1.VolumeHealthCondition{{Status: v1.VolumeHealthInaccessible, Reason: "PathMissing"}}
+			assert.False(t, m.SetPodVolumeHealth(logger, pod.UID, "vol1", conditions))
+			verifyUpdates(t, m, 0)
+			assert.Equal(t, *beforeCopy, expectPodStatus(t, m, pod))
+		})
 	}
 }
 
 func TestNormalizeStatusVolumeHealth(t *testing.T) {
-	now := metav1.Now()
+	now := metav1.NewTime(time.Date(2026, time.November, 2, 12, 0, 0, 123456789, time.UTC))
 	expectedTime := now.DeepCopy().Rfc3339Copy()
 
 	tests := []struct {
@@ -1772,23 +2084,90 @@ func TestNormalizeStatusVolumeHealth(t *testing.T) {
 
 			pod := getTestPod()
 			status := v1.PodStatus{
-				VolumeHealth: []v1.PodVolumeHealth{
+				VolumeStatuses: []v1.PodVolumeStatus{
+					{Name: "without-health"},
+					{Name: "empty-health", HealthStatus: &v1.VolumeHealthStatus{}},
 					{
-						Name:               "vol1",
-						LastTransitionTime: now,
+						Name: "vol1",
+						HealthStatus: &v1.VolumeHealthStatus{
+							LastTransitionTime: now,
+						},
+					},
+					{
+						Name: "vol2",
+						HealthStatus: &v1.VolumeHealthStatus{
+							LastTransitionTime: now,
+						},
 					},
 				},
 			}
 
 			normalized := normalizeStatus(pod, &status)
-			if len(normalized.VolumeHealth) != 1 {
-				t.Fatalf("expected 1 VolumeHealth, got %d", len(normalized.VolumeHealth))
-			}
-			if normalized.VolumeHealth[0].LastTransitionTime != tc.expectedTime {
-				t.Errorf("expected LastTransitionTime %v, got %v", tc.expectedTime, normalized.VolumeHealth[0].LastTransitionTime)
+			require.Len(t, normalized.VolumeStatuses, 4)
+			assert.Nil(t, normalized.VolumeStatuses[0].HealthStatus)
+			assert.Equal(t, &v1.VolumeHealthStatus{}, normalized.VolumeStatuses[1].HealthStatus)
+			for _, volumeStatus := range normalized.VolumeStatuses[2:] {
+				require.NotNil(t, volumeStatus.HealthStatus)
+				assert.Equal(t, tc.expectedTime, volumeStatus.HealthStatus.LastTransitionTime, "volume %s", volumeStatus.Name)
 			}
 		})
 	}
+}
+
+func TestVolumeStatusesHealthAndHostPhaseCoexist(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIVolumeHealth, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicNodeLocalEphemeralVolumes, true)
+
+	logger, _ := ktesting.NewTestContext(t)
+	pod := getTestPod()
+	pod.Spec.Volumes = []v1.Volume{{Name: "z-csi"}, {Name: "a-dyn"}}
+	m := newTestManager(&fake.Clientset{})
+	m.podManager.(mutablePodManager).AddPod(pod)
+
+	// VolumeManager reports HostPhase for dynamic volume a-dyn.
+	m.SetPodStatus(logger, pod, v1.PodStatus{
+		VolumeStatuses: []v1.PodVolumeStatus{
+			{Name: "a-dyn", HostPhase: v1.PodVolumeHostMounted},
+		},
+	})
+	verifyUpdates(t, m, 1)
+
+	// CSI health probe reports HealthStatus for z-csi without clobbering a-dyn HostPhase.
+	conditions := []v1.VolumeHealthCondition{{Status: v1.VolumeHealthDegraded, Reason: "SlowIO"}}
+	require.True(t, m.SetPodVolumeHealth(logger, pod.UID, "z-csi", conditions))
+	verifyUpdates(t, m, 1)
+
+	got := expectPodStatus(t, m, pod)
+	require.Len(t, got.VolumeStatuses, 2)
+	assert.Equal(t, "a-dyn", got.VolumeStatuses[0].Name)
+	assert.Equal(t, v1.PodVolumeHostMounted, got.VolumeStatuses[0].HostPhase)
+	assert.Nil(t, got.VolumeStatuses[0].HealthStatus)
+	assert.Equal(t, "z-csi", got.VolumeStatuses[1].Name)
+	require.NotNil(t, got.VolumeStatuses[1].HealthStatus)
+	assert.Equal(t, conditions, got.VolumeStatuses[1].HealthStatus.HealthConditions)
+
+	// Subsequent runtime status update omitting HealthStatus preserves z-csi HealthStatus alongside a-dyn HostPhase.
+	m.SetPodStatus(logger, pod, v1.PodStatus{
+		VolumeStatuses: []v1.PodVolumeStatus{
+			{Name: "a-dyn", HostPhase: v1.PodVolumeHostUnmounting},
+		},
+	})
+	verifyUpdates(t, m, 1)
+	gotAfter := expectPodStatus(t, m, pod)
+	require.Len(t, gotAfter.VolumeStatuses, 2)
+	assert.Equal(t, v1.PodVolumeHostUnmounting, gotAfter.VolumeStatuses[0].HostPhase)
+	require.NotNil(t, gotAfter.VolumeStatuses[1].HealthStatus)
+	assert.Equal(t, conditions, gotAfter.VolumeStatuses[1].HealthStatus.HealthConditions)
+
+	// TerminatePod clears dynamic HostPhase entries while preserving CSI HealthStatus.
+	m.TerminatePod(logger, pod)
+	verifyUpdates(t, m, 1)
+	gotTerminated := expectPodStatus(t, m, pod)
+	require.Len(t, gotTerminated.VolumeStatuses, 1)
+	assert.Equal(t, "z-csi", gotTerminated.VolumeStatuses[0].Name)
+	assert.Empty(t, gotTerminated.VolumeStatuses[0].HostPhase)
+	require.NotNil(t, gotTerminated.VolumeStatuses[0].HealthStatus)
+	assert.Equal(t, conditions, gotTerminated.VolumeStatuses[0].HealthStatus.HealthConditions)
 }
 
 func TestSetContainerStartup(t *testing.T) {
@@ -2551,7 +2930,7 @@ func TestMergePodStatus(t *testing.T) {
 		t.Run(tc.desc, func(t *testing.T) {
 			oldPodStatus := tc.oldPodStatus(getPodStatus())
 			pod := &v1.Pod{Status: oldPodStatus}
-			output := mergePodStatus(pod, oldPodStatus, tc.newPodStatus(getPodStatus()), tc.hasRunningContainers)
+			output := mergePodStatus(pod, oldPodStatus, tc.newPodStatus(getPodStatus()), tc.hasRunningContainers, false)
 			if !conditionsEqual(output.Conditions, tc.expectPodStatus.Conditions) || !statusEqual(output, tc.expectPodStatus) {
 				t.Fatalf("unexpected output: %s", cmp.Diff(tc.expectPodStatus, output))
 			}
@@ -2653,6 +3032,98 @@ func TestContainerTerminationMetric(t *testing.T) {
 	assert.InDelta(t, 1.0, count, 0)
 }
 
+// TestSetPodResizeInProgressCondition checks when setting the PodResizeInProgress condition starts
+// a new resize, and what it keeps of the previous condition.
+func TestSetPodResizeInProgressCondition(t *testing.T) {
+	m := NewManager(&fake.Clientset{}, kubepod.NewBasicPodManager(), &statustest.FakePodDeletionSafetyProvider{}, util.NewPodStartupLatencyTracker()).(*manager)
+	podUID := types.UID("12345")
+	condition := func() v1.PodCondition {
+		t.Helper()
+		c := m.podResizeConditions[podUID].PodResizeInProgress
+		require.NotNil(t, c)
+		return *c
+	}
+	past := metav1.NewTime(time.Now().Add(-time.Hour))
+	backdate := func() {
+		m.podResizeConditions[podUID].PodResizeInProgress.LastTransitionTime = past
+	}
+
+	updated, started := m.SetPodResizeInProgressCondition(podUID, "", "", 1)
+	assert.True(t, updated, "created")
+	assert.True(t, started, "a new condition starts a resize")
+
+	backdate()
+	updated, started = m.SetPodResizeInProgressCondition(podUID, "", "", 1)
+	assert.False(t, updated, "unchanged")
+	assert.False(t, started, "same generation")
+	assert.Equal(t, past, condition().LastTransitionTime, "the same resize keeps the transition time")
+
+	updated, started = m.SetPodResizeInProgressCondition(podUID, v1.PodReasonError, "failed", 1)
+	assert.True(t, updated, "error set")
+	assert.False(t, started, "same generation")
+
+	updated, started = m.SetPodResizeInProgressCondition(podUID, "", "", 1)
+	assert.False(t, updated, "the error of the same resize is kept")
+	assert.False(t, started)
+	assert.Equal(t, v1.PodReasonError, condition().Reason)
+	assert.Equal(t, "failed", condition().Message)
+
+	backdate()
+	updated, started = m.SetPodResizeInProgressCondition(podUID, "", "", 2)
+	assert.True(t, updated, "new generation")
+	assert.True(t, started, "a new generation starts a resize")
+	assert.Empty(t, condition().Reason, "a new resize resets the error")
+	assert.Empty(t, condition().Message)
+	assert.Equal(t, int64(2), condition().ObservedGeneration)
+
+	updated, started = m.SetPodResizeInProgressCondition(podUID, v1.PodReasonError, "failed again", 3)
+	assert.True(t, updated)
+	assert.True(t, started, "an error for a new generation starts a resize too")
+	assert.Equal(t, v1.PodReasonError, condition().Reason)
+	assert.Equal(t, int64(3), condition().ObservedGeneration)
+
+	updated, started = m.SetPodResizeInProgressCondition(podUID, "", "", 4)
+	assert.True(t, updated)
+	assert.True(t, started)
+	backdate()
+	updated, started = m.SetPodResizeInProgressCondition(podUID, v1.PodReasonError, "stale", 3)
+	assert.False(t, updated, "an update for an older generation is ignored")
+	assert.False(t, started)
+	assert.Empty(t, condition().Reason)
+	assert.Equal(t, int64(4), condition().ObservedGeneration)
+
+	updated, started = m.SetPodResizeInProgressCondition(podUID, "", "", 0)
+	assert.False(t, updated, "an update for an unknown generation applies to the resize in progress")
+	assert.False(t, started, "an unknown generation doesn't start a resize")
+	assert.Equal(t, past, condition().LastTransitionTime)
+	assert.Equal(t, int64(4), condition().ObservedGeneration)
+
+	updated, started = m.SetPodResizeInProgressCondition(podUID, v1.PodReasonError, "unknown", 0)
+	assert.True(t, updated, "an update for an unknown generation applies to the resize in progress")
+	assert.False(t, started, "an unknown generation doesn't start a resize")
+	assert.Equal(t, "unknown", condition().Message)
+	assert.Equal(t, int64(4), condition().ObservedGeneration)
+
+	_, cleared := m.ClearPodResizeInProgressCondition(podUID, 3)
+	assert.False(t, cleared, "a clear for an older generation is ignored")
+	generation, cleared := m.ClearPodResizeInProgressCondition(podUID, 0)
+	assert.True(t, cleared, "a clear for an unknown generation clears the condition")
+	assert.Equal(t, int64(4), generation)
+
+	updated, started = m.SetPodResizeInProgressCondition(podUID, "", "", 0)
+	assert.True(t, updated, "created")
+	assert.True(t, started)
+	assert.Equal(t, int64(0), condition().ObservedGeneration)
+
+	backdate()
+	updated, started = m.SetPodResizeInProgressCondition(podUID, "", "", 5)
+	assert.True(t, updated)
+	assert.True(t, started)
+	assert.True(t, condition().LastTransitionTime.After(past.Time), "a new resize resets the transition time")
+	_, cleared = m.ClearPodResizeInProgressCondition(podUID, 6)
+	assert.True(t, cleared, "a clear for a newer generation clears the condition")
+}
+
 func TestPodResizeConditions(t *testing.T) {
 	m := NewManager(&fake.Clientset{}, kubepod.NewBasicPodManager(), &statustest.FakePodDeletionSafetyProvider{}, util.NewPodStartupLatencyTracker())
 	podUID := types.UID("12345")
@@ -2673,7 +3144,7 @@ func TestPodResizeConditions(t *testing.T) {
 		{
 			name: "set pod resize in progress condition with reason and message",
 			updateFunc: func(podUID types.UID) bool {
-				_, b := m.SetPodResizeInProgressCondition(podUID, "some-reason", "some-message", 1)
+				b, _ := m.SetPodResizeInProgressCondition(podUID, "some-reason", "some-message", 1)
 				return b
 			},
 			expectedUpdateFuncReturnVal: true,
@@ -2690,7 +3161,7 @@ func TestPodResizeConditions(t *testing.T) {
 		{
 			name: "set pod resize in progress condition without reason and message",
 			updateFunc: func(podUID types.UID) bool {
-				_, b := m.SetPodResizeInProgressCondition(podUID, "", "", 1)
+				b, _ := m.SetPodResizeInProgressCondition(podUID, "", "", 1)
 				return b
 			},
 			expectedUpdateFuncReturnVal: false,
@@ -2705,28 +3176,26 @@ func TestPodResizeConditions(t *testing.T) {
 			},
 		},
 		{
-			name: "attempt to overwrite pod resize in progress condition with a new observedGeneration",
+			name: "set pod resize in progress condition with a new observedGeneration resets reason and message",
 			updateFunc: func(podUID types.UID) bool {
-				_, b := m.SetPodResizeInProgressCondition(podUID, "", "", 2)
+				b, _ := m.SetPodResizeInProgressCondition(podUID, "", "", 2)
 				return b
 			},
-			expectedUpdateFuncReturnVal: false,
+			expectedUpdateFuncReturnVal: true,
 			expected: []*v1.PodCondition{
 				{
 					Type:               v1.PodResizeInProgress,
 					Status:             v1.ConditionTrue,
-					Reason:             "some-reason",
-					Message:            "some-message",
-					ObservedGeneration: 1,
+					ObservedGeneration: 2,
 				},
 			},
 		},
 		{
 			name: "clear the pod resize in progress condition and set a new one",
 			updateFunc: func(podUID types.UID) bool {
-				m.ClearPodResizeInProgressCondition(podUID)
+				m.ClearPodResizeInProgressCondition(podUID, 0)
 				// Set a new condition with a different observedGeneration
-				_, b := m.SetPodResizeInProgressCondition(podUID, "", "", 2)
+				b, _ := m.SetPodResizeInProgressCondition(podUID, "", "", 2)
 				return b
 			},
 			expectedUpdateFuncReturnVal: true,
@@ -2807,7 +3276,7 @@ func TestPodResizeConditions(t *testing.T) {
 		{
 			name: "clear pod resize in progress condition",
 			updateFunc: func(podUID types.UID) bool {
-				_, b := m.ClearPodResizeInProgressCondition(podUID)
+				_, b := m.ClearPodResizeInProgressCondition(podUID, 0)
 				return b
 			},
 			expectedUpdateFuncReturnVal: true,
@@ -2887,7 +3356,7 @@ func TestClearPodResizeInProgressCondition(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			m.(*manager).podResizeConditions[podUID] = tc.existingConditions
-			gen, b := m.ClearPodResizeInProgressCondition(podUID)
+			gen, b := m.ClearPodResizeInProgressCondition(podUID, 0)
 			assert.Equal(t, tc.expectedGeneration, gen)
 			assert.Equal(t, tc.expectedBool, b)
 			resizeConditions := m.GetPodResizeConditions(podUID)
@@ -3601,4 +4070,210 @@ func TestSyncBatch_EvictionPublishedAfterCleanExit(t *testing.T) {
 	require.Len(t, published.Status.ContainerStatuses, 1)
 	require.NotNil(t, published.Status.ContainerStatuses[0].State.Terminated)
 	assert.Equal(t, int32(0), published.Status.ContainerStatuses[0].State.Terminated.ExitCode)
+}
+
+func TestMergePodStatusSchedulerEvaluationCompleted(t *testing.T) {
+	testCases := []struct {
+		desc           string
+		featureEnabled bool
+		reason         string
+		dropSEC        bool
+		deferred       bool
+		expectSEC      bool
+	}{
+		{desc: "removed when the resize was re-evaluated due to insufficient resources", featureEnabled: true, reason: v1.PodReasonDeferredPodResize, dropSEC: true, deferred: true},
+		{desc: "kept while the resize is deferred", featureEnabled: true, reason: v1.PodReasonDeferredPodResize, deferred: true, expectSEC: true},
+		{desc: "removed when the resize is not deferred", featureEnabled: true, reason: v1.PodReasonDeferredPodResize},
+		{desc: "kept when reason is not DeferredPodResize", featureEnabled: true, reason: "Other", dropSEC: true, deferred: true, expectSEC: true},
+		{desc: "kept when the feature is disabled", reason: v1.PodReasonDeferredPodResize, dropSEC: true, expectSEC: true},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingSchedulerPreemption, tc.featureEnabled)
+
+			oldPodStatus := getPodStatus()
+			oldPodStatus.Conditions = append(oldPodStatus.Conditions, v1.PodCondition{Type: v1.SchedulerEvaluationCompleted, Status: v1.ConditionTrue, Reason: tc.reason})
+			pod := getTestPod()
+			pod.Status = oldPodStatus
+			m := newTestManager(fake.NewSimpleClientset())
+			m.podManager.(mutablePodManager).AddPod(pod)
+			if tc.deferred {
+				m.SetPodResizePendingCondition(pod.UID, v1.PodReasonDeferred, "", pod.Generation)
+				if tc.dropSEC {
+					m.ClearSchedulerEvaluationCompletedCondition(pod.UID)
+				}
+			}
+
+			merged := mergePodStatus(pod, oldPodStatus, getPodStatus(), false, m.getClearSchedEvalCond(pod.UID))
+
+			_, cond := podutil.GetPodCondition(&merged, v1.SchedulerEvaluationCompleted)
+			assert.Equal(t, tc.expectSEC, cond != nil)
+		})
+	}
+}
+
+func TestSchedulerEvaluationCompletedRemoval(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingSchedulerPreemption, true)
+
+	deferred := v1.PodCondition{Type: v1.PodResizePending, Status: v1.ConditionTrue, Reason: v1.PodReasonDeferred, Message: "insufficient cpu"}
+	sec := v1.PodCondition{Type: v1.SchedulerEvaluationCompleted, Status: v1.ConditionTrue, Reason: v1.PodReasonDeferredPodResize}
+	hasSEC := func(t *testing.T, ctx context.Context, client clientset.Interface, pod *v1.Pod) bool {
+		apiPod, err := client.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
+		require.NoError(t, err)
+		_, cond := podutil.GetPodCondition(&apiPod.Status, v1.SchedulerEvaluationCompleted)
+		return cond != nil
+	}
+
+	t.Run("re-evaluated deferred resize", func(t *testing.T) {
+		logger, ctx := ktesting.NewTestContext(t)
+		pod := getTestPod()
+		pod.Status.Conditions = []v1.PodCondition{deferred}
+		client := fake.NewSimpleClientset(pod)
+		m := newTestManager(client)
+		m.podManager.(mutablePodManager).AddPod(pod)
+
+		// Initial kubelet status before the scheduler sets SchedulerEvaluationCompleted.
+		m.SetPodResizePendingCondition(pod.UID, v1.PodReasonDeferred, "insufficient cpu", pod.Generation)
+		m.ClearSchedulerEvaluationCompletedCondition(pod.UID)
+		m.SetPodStatus(logger, pod, v1.PodStatus{Phase: v1.PodRunning, Conditions: []v1.PodCondition{deferred}})
+		m.syncBatch(ctx, false)
+
+		// Re-evaluating the deferred resize before SchedulerEvaluationCompleted is set must not arm clearSchedEvalCond.
+		m.SetPodResizePendingCondition(pod.UID, v1.PodReasonDeferred, "insufficient cpu", pod.Generation)
+		m.ClearSchedulerEvaluationCompletedCondition(pod.UID)
+		m.SetPodStatus(logger, pod, v1.PodStatus{Phase: v1.PodRunning, Conditions: []v1.PodCondition{deferred}})
+		m.syncBatch(ctx, false)
+
+		// Scheduler sets SchedulerEvaluationCompleted on the API pod; HandlePodReconcile updates podManager.
+		apiPod, err := client.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
+		require.NoError(t, err)
+		apiPod.Status.Conditions = append(apiPod.Status.Conditions, sec)
+		apiPod, err = client.CoreV1().Pods(pod.Namespace).UpdateStatus(ctx, apiPod, metav1.UpdateOptions{})
+		require.NoError(t, err)
+		m.podManager.(mutablePodManager).UpdatePod(apiPod)
+
+		// Periodic reconciliation should not fire while the pod stays Deferred.
+		require.Equal(t, 0, m.syncBatch(ctx, true), "expected no reconcile while resize remains deferred")
+		require.True(t, hasSEC(t, ctx, client, pod), "expected the condition to be kept while the resize is deferred")
+
+		// Re-evaluating the resize sets clearSchedEvalCond; generateAPIPodStatus copies non-kubelet conditions
+		// from apiPod, and SetPodStatus strips SchedulerEvaluationCompleted and forces an immediate status sync.
+		m.SetPodResizePendingCondition(pod.UID, v1.PodReasonDeferred, "insufficient cpu", pod.Generation)
+		m.ClearSchedulerEvaluationCompletedCondition(pod.UID)
+		m.SetPodStatus(logger, apiPod, v1.PodStatus{Phase: v1.PodRunning, Conditions: []v1.PodCondition{deferred, sec}})
+
+		failPatch := true
+		client.PrependReactor("patch", "pods", func(action core.Action) (bool, runtime.Object, error) {
+			if failPatch {
+				return true, nil, fmt.Errorf("patch failed")
+			}
+			return false, nil, nil
+		})
+		m.syncBatch(ctx, false)
+		assert.True(t, hasSEC(t, ctx, client, pod), "expected the condition to remain when patch fails")
+
+		failPatch = false
+		m.syncBatch(ctx, false)
+		assert.False(t, hasSEC(t, ctx, client, pod), "expected the condition to be removed on retry after failed patch")
+	})
+
+	t.Run("non-capacity deferred resize preserves condition", func(t *testing.T) {
+		logger, ctx := ktesting.NewTestContext(t)
+		pod := getTestPod()
+		pod.Status.Conditions = []v1.PodCondition{deferred}
+		client := fake.NewSimpleClientset(pod)
+		m := newTestManager(client)
+		m.podManager.(mutablePodManager).AddPod(pod)
+
+		m.SetPodResizePendingCondition(pod.UID, "TopologyAffinityError", "Resources cannot be allocated with Topology locality", pod.Generation)
+		m.SetPodStatus(logger, pod, v1.PodStatus{Phase: v1.PodRunning, Conditions: []v1.PodCondition{deferred}})
+		m.syncBatch(ctx, false)
+
+		apiPod, err := client.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
+		require.NoError(t, err)
+		apiPod.Status.Conditions = append(apiPod.Status.Conditions, sec)
+		apiPod, err = client.CoreV1().Pods(pod.Namespace).UpdateStatus(ctx, apiPod, metav1.UpdateOptions{})
+		require.NoError(t, err)
+		m.podManager.(mutablePodManager).UpdatePod(apiPod)
+
+		// Re-evaluating with a non-capacity deferral reason does not set clearSchedEvalCond.
+		m.SetPodResizePendingCondition(pod.UID, "TopologyAffinityError", "Resources cannot be allocated with Topology locality", pod.Generation)
+		m.SetPodStatus(logger, apiPod, v1.PodStatus{Phase: v1.PodRunning, Conditions: []v1.PodCondition{deferred, sec}})
+		m.syncBatch(ctx, true)
+		assert.True(t, hasSEC(t, ctx, client, pod), "expected the condition to be kept when deferral is not due to insufficient resources")
+	})
+
+	t.Run("resize not deferred", func(t *testing.T) {
+		logger, ctx := ktesting.NewTestContext(t)
+		pod := getTestPod()
+		client := fake.NewSimpleClientset(pod)
+		m := newTestManager(client)
+		m.podManager.(mutablePodManager).AddPod(pod)
+		m.SetPodStatus(logger, pod, v1.PodStatus{Phase: v1.PodRunning})
+		m.syncBatch(ctx, true)
+
+		// The scheduler's condition lands after the kubelet cleared Deferred.
+		apiPod, err := client.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
+		require.NoError(t, err)
+		apiPod.Status.Conditions = append(apiPod.Status.Conditions, sec)
+		apiPod, err = client.CoreV1().Pods(pod.Namespace).UpdateStatus(ctx, apiPod, metav1.UpdateOptions{})
+		require.NoError(t, err)
+		m.podManager.(mutablePodManager).UpdatePod(apiPod)
+
+		m.syncBatch(ctx, true)
+		assert.False(t, hasSEC(t, ctx, client, pod), "expected the condition to be removed from a pod that isn't deferred")
+	})
+
+	t.Run("non-DeferredPodResize reason preserved", func(t *testing.T) {
+		logger, ctx := ktesting.NewTestContext(t)
+		pod := getTestPod()
+		otherSEC := v1.PodCondition{Type: v1.SchedulerEvaluationCompleted, Status: v1.ConditionTrue, Reason: "Other"}
+		pod.Status.Conditions = []v1.PodCondition{otherSEC}
+		client := fake.NewSimpleClientset(pod)
+		m := newTestManager(client)
+		m.podManager.(mutablePodManager).AddPod(pod)
+
+		m.SetPodResizePendingCondition(pod.UID, v1.PodReasonDeferred, "insufficient cpu", pod.Generation)
+		m.ClearSchedulerEvaluationCompletedCondition(pod.UID)
+		m.SetPodStatus(logger, pod, v1.PodStatus{Phase: v1.PodRunning, Conditions: []v1.PodCondition{otherSEC}})
+		m.syncBatch(ctx, true)
+		assert.True(t, hasSEC(t, ctx, client, pod), "expected SchedulerEvaluationCompleted with non-DeferredPodResize reason to be preserved")
+	})
+}
+
+// A removed-container status that the kubelet stops reporting (pruned, or its
+// runtime container was garbage collected) must be dropped from the API, not
+// merged back in from the old API status.
+func TestSyncPodDropsRemovedContainerStatus(t *testing.T) {
+	logger, ctx := ktesting.NewTestContext(t)
+	running := v1.ContainerStatus{
+		Name:  "main",
+		State: v1.ContainerState{Running: &v1.ContainerStateRunning{}},
+	}
+	removed := v1.ContainerStatus{
+		Name:  "removed",
+		State: v1.ContainerState{Terminated: &v1.ContainerStateTerminated{ExitCode: 0}},
+	}
+
+	pod := getTestPod()
+	pod.Spec.Containers = []v1.Container{{Name: "main"}}
+	pod.Status.ContainerStatuses = []v1.ContainerStatus{running, removed}
+
+	syncer := newTestManager(&fake.Clientset{})
+	syncer.podManager.(mutablePodManager).AddPod(pod)
+	client := fake.NewSimpleClientset(pod)
+	syncer.kubeClient = client
+
+	status := *pod.Status.DeepCopy()
+	status.ContainerStatuses = []v1.ContainerStatus{running}
+	syncer.SetPodStatus(logger, pod, status)
+	verifyActions(t, syncer, []core.Action{getAction(), patchAction()})
+
+	updated, err := client.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
+	require.NoError(t, err)
+	var names []string
+	for _, s := range updated.Status.ContainerStatuses {
+		names = append(names, s.Name)
+	}
+	assert.Equal(t, []string{"main"}, names)
 }

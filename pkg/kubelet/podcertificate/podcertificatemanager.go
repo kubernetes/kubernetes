@@ -35,6 +35,7 @@ import (
 
 	certificatesv1 "k8s.io/api/certificates/v1"
 	corev1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -125,7 +126,7 @@ type IssuingManager struct {
 	clock clock.PassiveClock
 
 	// lock covers credStore
-	lock      sync.Mutex
+	lock      sync.RWMutex
 	credStore map[projectionKey]*projectionRecord
 }
 
@@ -140,6 +141,11 @@ type projectionKey struct {
 type projectionRecord struct {
 	// lock covers all fields within projectionRecord.
 	lock sync.Mutex
+
+	// source is an immutable copy of the PodCertificateProjection spec this record was
+	// initialized for. When the projection spec at (VolumeName, SourceIndex) changes, credStore
+	// replaces the map entry with a new projectionRecord.
+	source *corev1.PodCertificateProjection
 
 	// The state machine for this projection:
 	//
@@ -267,13 +273,20 @@ func (c *credStateWaitRefresh) metricsState(now time.Time) string {
 
 var _ Manager = (*IssuingManager)(nil)
 
-func NewIssuingManager(kc kubernetes.Interface, podManager PodManager, recorder record.EventRecorder, pcrInformer certinformersv1.PodCertificateRequestInformer, nodeInformer coreinformersv1.NodeInformer, nodeName types.NodeName, clock clock.WithTicker) *IssuingManager {
+func NewIssuingManager(logger klog.Logger, kc kubernetes.Interface, podManager PodManager, recorder record.EventRecorder, pcrInformer certinformersv1.PodCertificateRequestInformer, nodeInformer coreinformersv1.NodeInformer, nodeName types.NodeName, clock clock.WithTicker) *IssuingManager {
+	name := "podcertificate_projection"
 	m := &IssuingManager{
 		kc: kc,
 
-		podManager:      podManager,
-		recorder:        recorder,
-		projectionQueue: workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[projectionKey]()),
+		podManager: podManager,
+		recorder:   recorder,
+		projectionQueue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[projectionKey](),
+			workqueue.TypedRateLimitingQueueConfig[projectionKey]{
+				Logger: new(klog.LoggerWithName(logger, name)),
+				Name:   name,
+			},
+		),
 
 		pcrInformer:  pcrInformer.Informer(),
 		pcrLister:    pcrInformer.Lister(),
@@ -290,7 +303,7 @@ func NewIssuingManager(kc kubernetes.Interface, podManager PodManager, recorder 
 	// This is not needed for correctness, since volumeSourceQueue backoffs will
 	// eventually trigger the volume to be inspected.  However, it's a better UX
 	// for us to notice immediately once the certificate is issued.
-	m.pcrInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, _ = m.pcrInformer.AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj any) {
 			pcr := obj.(*certificatesv1.PodCertificateRequest)
 			m.queueAllProjectionsForPod(pcr.Spec.PodUID)
@@ -303,6 +316,8 @@ func NewIssuingManager(kc kubernetes.Interface, podManager PodManager, recorder 
 			pcr := obj.(*certificatesv1.PodCertificateRequest)
 			m.queueAllProjectionsForPod(pcr.Spec.PodUID)
 		},
+	}, cache.HandlerOptions{
+		Logger: &logger,
 	})
 
 	return m
@@ -313,7 +328,34 @@ func (m *IssuingManager) queueAllProjectionsForPod(uid types.UID) {
 	if !ok {
 		return
 	}
+	m.syncPodProjections(pod, true /* enqueueExisting */)
+}
 
+func findPodCertificateProjection(pod *corev1.Pod, volumeName string, sourceIndex int) *corev1.PodCertificateProjection {
+	if pod == nil {
+		return nil
+	}
+	for _, vol := range pod.Spec.Volumes {
+		if vol.Name == volumeName && vol.Projected != nil {
+			if sourceIndex >= 0 && sourceIndex < len(vol.Projected.Sources) {
+				return vol.Projected.Sources[sourceIndex].PodCertificate
+			}
+		}
+	}
+	return nil
+}
+
+func (m *IssuingManager) syncPodProjections(pod *corev1.Pod, enqueueExisting bool) {
+	if pod == nil {
+		return
+	}
+
+	type activeProjection struct {
+		key    projectionKey
+		source *corev1.PodCertificateProjection
+	}
+	var active []activeProjection
+	var activeKeys map[projectionKey]*corev1.PodCertificateProjection
 	for _, v := range pod.Spec.Volumes {
 		if v.Projected == nil {
 			continue
@@ -331,8 +373,79 @@ func (m *IssuingManager) queueAllProjectionsForPod(uid types.UID) {
 				VolumeName:  v.Name,
 				SourceIndex: sourceIndex,
 			}
-			m.projectionQueue.Add(key)
+			if activeKeys == nil {
+				activeKeys = make(map[projectionKey]*corev1.PodCertificateProjection)
+			}
+			activeKeys[key] = source.PodCertificate
+			active = append(active, activeProjection{key: key, source: source.PodCertificate})
 		}
+	}
+
+	podUID := string(pod.ObjectMeta.UID)
+	needsWrite := false
+	m.lock.RLock()
+	for k := range m.credStore {
+		if k.PodUID == podUID {
+			if _, ok := activeKeys[k]; !ok {
+				needsWrite = true
+				break
+			}
+		}
+	}
+	if !needsWrite {
+		for _, item := range active {
+			rec := m.credStore[item.key]
+			if rec == nil || (rec.source != nil && !apiequality.Semantic.DeepEqual(rec.source, item.source)) {
+				needsWrite = true
+				break
+			}
+		}
+	}
+	m.lock.RUnlock()
+
+	if !needsWrite {
+		if enqueueExisting {
+			for _, item := range active {
+				m.projectionQueue.Add(item.key)
+			}
+		}
+		return
+	}
+
+	var toForget []projectionKey
+	var toAdd []projectionKey
+
+	m.lock.Lock()
+	for k := range m.credStore {
+		if k.PodUID == podUID {
+			if _, ok := activeKeys[k]; !ok {
+				delete(m.credStore, k)
+				toForget = append(toForget, k)
+			}
+		}
+	}
+	for _, item := range active {
+		rec := m.credStore[item.key]
+		if rec == nil || (rec.source != nil && !apiequality.Semantic.DeepEqual(rec.source, item.source)) {
+			if rec != nil {
+				toForget = append(toForget, item.key)
+			}
+			m.credStore[item.key] = &projectionRecord{
+				source:   item.source.DeepCopy(),
+				curState: &credStateInitial{},
+			}
+			toAdd = append(toAdd, item.key)
+		} else if enqueueExisting {
+			toAdd = append(toAdd, item.key)
+		}
+	}
+	m.lock.Unlock()
+
+	for _, key := range toForget {
+		m.projectionQueue.Forget(key)
+	}
+	for _, key := range toAdd {
+		m.projectionQueue.Add(key)
 	}
 }
 
@@ -391,36 +504,61 @@ func (m *IssuingManager) handleProjection(ctx context.Context, key projectionKey
 		return nil
 	}
 
-	var source *corev1.PodCertificateProjection
-	for _, vol := range pod.Spec.Volumes {
-		if vol.Name == key.VolumeName && vol.Projected != nil {
-			for i, volumeSource := range vol.Projected.Sources {
-				if i == key.SourceIndex && volumeSource.PodCertificate != nil {
-					source = volumeSource.PodCertificate
-				}
-			}
-		}
-	}
+	source := findPodCertificateProjection(pod, key.VolumeName, key.SourceIndex)
 	if source == nil {
+		m.lock.Lock()
+		delete(m.credStore, key)
+		m.lock.Unlock()
 		// No amount of retrying will fix this problem.  Log it and return nil.
 		utilruntime.HandleErrorWithContext(ctx, nil, "pod does not contain the named podCertificate projected volume source", "key", key)
 		return nil
 	}
 
 	var rec *projectionRecord
+	aborted := false
 	func() {
 		m.lock.Lock()
 		defer m.lock.Unlock()
 
 		rec = m.credStore[key]
 
-		if rec == nil {
+		if rec == nil || (rec.source != nil && !apiequality.Semantic.DeepEqual(rec.source, source)) {
+			// Re-verify the pod and projection under m.lock so a worker that read an older pod
+			// snapshot before a concurrent ForgetPod or TrackPod update cannot resurrect a pruned
+			// entry or overwrite a newer replacement record.
+			if m.podManager != nil {
+				latestPod, ok := m.podManager.GetPodByUID(types.UID(key.PodUID))
+				if !ok || latestPod == nil {
+					for k := range m.credStore {
+						if k.Namespace == key.Namespace && k.PodName == key.PodName && k.PodUID == key.PodUID {
+							delete(m.credStore, k)
+						}
+					}
+					aborted = true
+					return
+				}
+				latestSource := findPodCertificateProjection(latestPod, key.VolumeName, key.SourceIndex)
+				if latestSource == nil {
+					delete(m.credStore, key)
+					aborted = true
+					return
+				}
+				pod = latestPod
+				source = latestSource
+				if rec != nil && rec.source != nil && apiequality.Semantic.DeepEqual(rec.source, source) {
+					return
+				}
+			}
 			rec = &projectionRecord{
+				source:   source.DeepCopy(),
 				curState: &credStateInitial{},
 			}
 			m.credStore[key] = rec
 		}
 	}()
+	if aborted {
+		return nil
+	}
 
 	// Lock the record for the remainder of the function.
 	rec.lock.Lock()
@@ -708,10 +846,23 @@ func (m *IssuingManager) runRefreshPass(ctx context.Context) {
 	}
 }
 
-// TrackPod queues the pod's podCertificate projected volume sources for
-// processing.
+// TrackPod queues any new or modified podCertificate projected volume sources for
+// processing and prunes removed projections from credStore.
 func (m *IssuingManager) TrackPod(ctx context.Context, pod *corev1.Pod) {
-	m.queueAllProjectionsForPod(pod.ObjectMeta.UID)
+	if pod == nil {
+		return
+	}
+	// Resolve the pod from podManager so TrackPod observes the same allocated pod view as
+	// handleProjection and GetPodCertificateCredentialBundle, preventing an in-flight SyncPod's
+	// stale pod snapshot from reverting a record to an old source or tracking an already-deleted pod.
+	if m.podManager != nil {
+		latest, ok := m.podManager.GetPodByUID(pod.UID)
+		if !ok || latest == nil {
+			return
+		}
+		pod = latest
+	}
+	m.syncPodProjections(pod, false /* enqueueExisting */)
 }
 
 // cleanupCredStoreForPod removes all credStore entries for the specified pod.
@@ -801,13 +952,22 @@ func (m *IssuingManager) GetPodCertificateCredentialBundle(ctx context.Context, 
 
 	var rec *projectionRecord
 	func() {
-		m.lock.Lock()
-		defer m.lock.Unlock()
+		m.lock.RLock()
+		defer m.lock.RUnlock()
 		rec = m.credStore[credKey]
 	}()
 
 	if rec == nil {
 		return nil, nil, fmt.Errorf("no credentials yet for key=%v", credKey)
+	}
+
+	if m.podManager != nil {
+		if pod, ok := m.podManager.GetPodByUID(types.UID(podUID)); ok {
+			currentSource := findPodCertificateProjection(pod, volumeName, sourceIndex)
+			if currentSource == nil || (rec.source != nil && !apiequality.Semantic.DeepEqual(rec.source, currentSource)) {
+				return nil, nil, fmt.Errorf("no credentials yet for key=%v", credKey)
+			}
+		}
 	}
 
 	rec.lock.Lock()
@@ -846,8 +1006,8 @@ func (m *IssuingManager) MetricReport() *MetricReport {
 
 				var rec *projectionRecord
 				func() {
-					m.lock.Lock()
-					defer m.lock.Unlock()
+					m.lock.RLock()
+					defer m.lock.RUnlock()
 					rec = m.credStore[key]
 				}()
 				if rec == nil {

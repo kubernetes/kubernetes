@@ -88,6 +88,7 @@ func (*resourceClaimTemplateStrategy) AllowCreateOnUpdate(ctx context.Context) b
 func (*resourceClaimTemplateStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	claimTemplate, oldClaimTemplate := obj.(*resource.ResourceClaimTemplate), old.(*resource.ResourceClaimTemplate)
 	dropDisabledFields(claimTemplate, oldClaimTemplate)
+	resourceclaimspec.PreserveOpaqueParameters(&claimTemplate.Spec.Spec, &oldClaimTemplate.Spec.Spec)
 }
 
 func (s *resourceClaimTemplateStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {

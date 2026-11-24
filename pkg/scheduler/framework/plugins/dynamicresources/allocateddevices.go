@@ -35,54 +35,21 @@ import (
 	"k8s.io/utils/ptr"
 )
 
-// foreachAllocatedDevice invokes the provided callback for each
-// device in the claim's allocation result which was allocated
-// exclusively for the claim.
-//
-// Devices allocated with admin access can be shared with other
-// claims and are skipped without invoking the callback.
-//
-// foreachAllocatedDevice does nothing if the claim is not allocated.
-func foreachAllocatedDevice(claim *resourceapi.ResourceClaim,
-	dedicatedDeviceCallback func(deviceID structured.DeviceID),
-	enabledConsumableCapacity bool,
-	sharedDeviceCallback func(structured.SharedDeviceID),
-	consumedCapacityCallback func(structured.DeviceConsumedCapacity)) {
-	if claim.Status.Allocation == nil {
+// foreachConsumedCounters invokes callback for each non-admin allocation result
+// with recorded non-empty ConsumedCounters.
+func foreachConsumedCounters(allocation *resourceapi.AllocationResult, callback func(structured.SharedDeviceID, []resourceapi.CounterSetConsumption)) {
+	if allocation == nil || callback == nil {
 		return
 	}
-	for _, result := range claim.Status.Allocation.Devices.Results {
-		// Kubernetes 1.31 did not set this, 1.32 always does.
-		// Supporting 1.31 is not worth the additional code that
-		// would have to be written (= looking up in request) because
-		// it is extremely unlikely that there really is a result
-		// that still exists in a cluster from 1.31 where this matters.
+	for _, result := range allocation.Devices.Results {
 		if ptr.Deref(result.AdminAccess, false) {
-			// Is not considered as allocated.
 			continue
 		}
-		deviceID := structured.MakeDeviceID(result.Driver, result.Pool, result.Device)
-
-		// None of the users of this helper need to abort iterating,
-		// therefore it's not supported as it only would add overhead.
-
-		// Execute sharedDeviceCallback and consumedCapacityCallback correspondingly
-		// if DRAConsumableCapacity feature is enabled
-		if enabledConsumableCapacity {
-			shared := result.ShareID != nil
-			if shared {
-				sharedDeviceID := structured.MakeSharedDeviceID(deviceID, result.ShareID)
-				sharedDeviceCallback(sharedDeviceID)
-				if result.ConsumedCapacity != nil {
-					deviceConsumedCapacity := structured.NewDeviceConsumedCapacity(deviceID, result.ConsumedCapacity)
-					consumedCapacityCallback(deviceConsumedCapacity)
-				}
-				continue
-			}
+		if len(result.ConsumedCounters) == 0 {
+			continue
 		}
-
-		// Otherwise, execute dedicatedDeviceCallback
-		dedicatedDeviceCallback(deviceID)
+		id := structured.MakeDeviceID(result.Driver, result.Pool, result.Device)
+		callback(structured.MakeSharedDeviceID(id, result.ShareID), result.ConsumedCounters)
 	}
 }
 
@@ -120,23 +87,26 @@ func consumedCapacityError(claim *resourceapi.ResourceClaim) error {
 type allocatedDevices struct {
 	logger klog.Logger
 
-	mutex                     sync.RWMutex
-	revision                  int64
-	ids                       sets.Set[structured.DeviceID]
-	shareIDs                  sets.Set[structured.SharedDeviceID]
-	capacities                structured.ConsumedCapacityCollection
-	invalidCapacities         map[types.UID]error
-	enabledConsumableCapacity bool
+	mutex                           sync.RWMutex
+	revision                        int64
+	ids                             sets.Set[structured.DeviceID]
+	shareIDs                        sets.Set[structured.SharedDeviceID]
+	capacities                      structured.ConsumedCapacityCollection
+	invalidCapacities               map[types.UID]error
+	enabledConsumableCapacity       bool
+	enabledSharedConsumableCapacity bool
+	counters                        map[structured.SharedDeviceID][]resourceapi.CounterSetConsumption
 }
 
 func newAllocatedDevices(logger klog.Logger) *allocatedDevices {
 	return &allocatedDevices{
-		logger:                    logger,
-		ids:                       sets.New[structured.DeviceID](),
-		shareIDs:                  sets.New[structured.SharedDeviceID](),
-		capacities:                structured.NewConsumedCapacityCollection(),
-		invalidCapacities:         make(map[types.UID]error),
-		enabledConsumableCapacity: utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity),
+		logger:                          logger,
+		ids:                             sets.New[structured.DeviceID](),
+		shareIDs:                        sets.New[structured.SharedDeviceID](),
+		capacities:                      structured.NewConsumedCapacityCollection(),
+		invalidCapacities:               make(map[types.UID]error),
+		enabledConsumableCapacity:       utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity),
+		enabledSharedConsumableCapacity: utilfeature.DefaultFeatureGate.Enabled(features.DRASharedConsumableCapacity),
 	}
 }
 
@@ -147,15 +117,18 @@ func (a *allocatedDevices) get() (sets.Set[structured.DeviceID], int64) {
 	return a.ids.Clone(), a.revision
 }
 
-func (a *allocatedDevices) getSharedDeviceIDs() (sets.Set[structured.DeviceID], int64) {
+func (a *allocatedDevices) getSharedDeviceIDs() (sets.Set[structured.SharedDeviceID], int64) {
 	a.mutex.RLock()
 	defer a.mutex.RUnlock()
 
-	result := make(sets.Set[structured.DeviceID], a.shareIDs.Len())
-	for sharedDeviceID := range a.shareIDs {
-		result.Insert(sharedDeviceID.GetDeviceID())
-	}
-	return result, a.revision
+	return a.shareIDs.Clone(), a.revision
+}
+
+// getCounters returns saved snapshots; their contents remain immutable after insertion.
+func (a *allocatedDevices) getCounters() (map[structured.SharedDeviceID][]resourceapi.CounterSetConsumption, int64) {
+	a.mutex.RLock()
+	defer a.mutex.RUnlock()
+	return maps.Clone(a.counters), a.revision
 }
 
 // getCapacities returns an error instead of the capacities if some allocated claim
@@ -245,12 +218,22 @@ func (a *allocatedDevices) addDevices(claim *resourceapi.ResourceClaim) {
 	var shareIDs []structured.SharedDeviceID
 	var deviceCapacities []structured.DeviceConsumedCapacity
 	var capacityErr error
+	var counters map[structured.SharedDeviceID][]resourceapi.CounterSetConsumption
+	var counterCallback func(structured.SharedDeviceID, []resourceapi.CounterSetConsumption)
+	if a.enabledSharedConsumableCapacity {
+		counterCallback = func(id structured.SharedDeviceID, consumption []resourceapi.CounterSetConsumption) {
+			if counters == nil {
+				counters = make(map[structured.SharedDeviceID][]resourceapi.CounterSetConsumption)
+			}
+			counters[id] = consumption
+		}
+	}
 	if a.enabledConsumableCapacity {
 		shareIDs = make([]structured.SharedDeviceID, 0, 20)
 		deviceCapacities = make([]structured.DeviceConsumedCapacity, 0, 20)
 		capacityErr = consumedCapacityError(claim)
 	}
-	foreachAllocatedDevice(claim,
+	structured.ForEachAllocatedDevice(claim.Status.Allocation,
 		func(deviceID structured.DeviceID) {
 			a.logger.V(6).Info("Observed device allocation", "device", deviceID, "claim", klog.KObj(claim))
 			deviceIDs = append(deviceIDs, deviceID)
@@ -269,8 +252,9 @@ func (a *allocatedDevices) addDevices(claim *resourceapi.ResourceClaim) {
 			}
 		},
 	)
+	foreachConsumedCounters(claim.Status.Allocation, counterCallback)
 
-	if len(deviceIDs) == 0 && len(shareIDs) == 0 && len(deviceCapacities) == 0 && capacityErr == nil {
+	if len(deviceIDs) == 0 && len(shareIDs) == 0 && len(deviceCapacities) == 0 && capacityErr == nil && len(counters) == 0 {
 		return
 	}
 
@@ -285,6 +269,12 @@ func (a *allocatedDevices) addDevices(claim *resourceapi.ResourceClaim) {
 	}
 	for _, capacity := range deviceCapacities {
 		a.capacities.Insert(capacity)
+	}
+	if len(counters) > 0 {
+		if a.counters == nil {
+			a.counters = make(map[structured.SharedDeviceID][]resourceapi.CounterSetConsumption)
+		}
+		maps.Copy(a.counters, counters)
 	}
 	if capacityErr != nil {
 		a.invalidCapacities[claim.UID] = capacityErr
@@ -302,12 +292,19 @@ func (a *allocatedDevices) removeDevices(claim *resourceapi.ResourceClaim) {
 	var shareIDs []structured.SharedDeviceID
 	var deviceCapacities []structured.DeviceConsumedCapacity
 	var capacityErr error
+	var counters []structured.SharedDeviceID
+	var counterCallback func(structured.SharedDeviceID, []resourceapi.CounterSetConsumption)
+	if a.enabledSharedConsumableCapacity {
+		counterCallback = func(id structured.SharedDeviceID, _ []resourceapi.CounterSetConsumption) {
+			counters = append(counters, id)
+		}
+	}
 	if a.enabledConsumableCapacity {
 		shareIDs = make([]structured.SharedDeviceID, 0, 20)
 		deviceCapacities = make([]structured.DeviceConsumedCapacity, 0, 20)
 		capacityErr = consumedCapacityError(claim)
 	}
-	foreachAllocatedDevice(claim,
+	structured.ForEachAllocatedDevice(claim.Status.Allocation,
 		func(deviceID structured.DeviceID) {
 			a.logger.V(6).Info("Observed device deallocation", "device", deviceID, "claim", klog.KObj(claim))
 			deviceIDs = append(deviceIDs, deviceID)
@@ -324,8 +321,9 @@ func (a *allocatedDevices) removeDevices(claim *resourceapi.ResourceClaim) {
 				deviceCapacities = append(deviceCapacities, capacity)
 			}
 		})
+	foreachConsumedCounters(claim.Status.Allocation, counterCallback)
 
-	if len(deviceIDs) == 0 && len(shareIDs) == 0 && len(deviceCapacities) == 0 && capacityErr == nil {
+	if len(deviceIDs) == 0 && len(shareIDs) == 0 && len(deviceCapacities) == 0 && capacityErr == nil && len(counters) == 0 {
 		return
 	}
 
@@ -340,6 +338,12 @@ func (a *allocatedDevices) removeDevices(claim *resourceapi.ResourceClaim) {
 	}
 	for _, capacity := range deviceCapacities {
 		a.capacities.Remove(capacity)
+	}
+	for _, id := range counters {
+		delete(a.counters, id)
+	}
+	if len(a.counters) == 0 {
+		a.counters = nil
 	}
 	delete(a.invalidCapacities, claim.UID)
 }

@@ -99,6 +99,12 @@ const (
 	// conditions are enforced during the validating admission phase.
 	ConditionalAuthorization featuregate.Feature = "ConditionalAuthorization"
 
+	// owner: @serathius
+	// kep: https://kep.k8s.io/6404
+	//
+	// Enables serving consistent GET requests from watch cache.
+	ConsistentGetFromCache featuregate.Feature = "ConsistentGetFromCache"
+
 	// owner: @yedou37
 	//
 	// Skip the timeout fallback to storage when a consistent LIST from cache cannot be served,
@@ -325,6 +331,12 @@ const (
 	// Enables post-start-hook for storage readiness
 	WatchCacheInitializationPostStartHook featuregate.Feature = "WatchCacheInitializationPostStartHook"
 
+	// owner: @serathius
+	// kep: https://kep.k8s.io/6268
+	//
+	// Enables watch cache to pause and resume stalled watchers instead of closing them.
+	WatchCacheStallResume featuregate.Feature = "WatchCacheStallResume"
+
 	// owner: @shadowofs
 	//
 	// Enables watch cache ingestion without fetching previous values from etcd.
@@ -403,6 +415,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 
 	ConditionalAuthorization: {
 		{Version: version.MustParse("1.38"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
+	ConsistentGetFromCache: {
+		{Version: version.MustParse("1.38"), Default: true, PreRelease: featuregate.Beta},
 	},
 
 	ConsistentListFromCacheSkipTimeoutFallback: {
@@ -542,6 +558,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	},
 
+	WatchCacheStallResume: {
+		{Version: version.MustParse("1.38"), Default: true, PreRelease: featuregate.Beta},
+	},
+
 	WatchFromStorageWithoutPrevKV: {
 		{Version: version.MustParse("1.38"), Default: true, PreRelease: featuregate.Beta},
 	},
@@ -552,6 +572,7 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		// switch this back to false because the json and proto streaming encoders appear to work better.
 		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Beta},
 		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.38"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	},
 
 	WatchListCompression: {

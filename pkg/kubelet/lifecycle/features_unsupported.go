@@ -26,9 +26,26 @@ import (
 func isPodLevelResourcesSupported(pod *v1.Pod) PodAdmitResult {
 	if resource.IsPodLevelResourcesSet(pod) {
 		return PodAdmitResult{
-			Admit:   false,
-			Reason:  PodLevelResourcesNotAdmittedReason,
-			Message: "pod-level resources are not supported on the node",
+			Admit:         false,
+			Reason:        PodLevelResourcesNotAdmittedReason,
+			Message:       "pod-level resources are not supported on the node",
+			RejectionType: RejectionInfeasible,
+		}
+	}
+	return PodAdmitResult{Admit: true}
+}
+
+func isPerPodPIDLimitSupported(pod *v1.Pod) PodAdmitResult {
+	// This platform can never enforce a pod-level PID limit, so reject
+	// regardless of feature gate state rather than run the pod without its
+	// requested limit.
+	if pod.Spec.Resources != nil {
+		if _, ok := pod.Spec.Resources.Limits[v1.ResourcePID]; ok {
+			return PodAdmitResult{
+				Admit:   false,
+				Reason:  PerPodPIDLimitNotAdmittedReason,
+				Message: "per-pod PID limits are not supported on this platform",
+			}
 		}
 	}
 	return PodAdmitResult{Admit: true}

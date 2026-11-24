@@ -52,6 +52,8 @@ type AuthorizationConditionsReview struct {
 // AuthorizationConditionsRequest describes the authorization conditions request.
 type AuthorizationConditionsRequest struct {
 	// decision contains the conditional decision the authorizer authored at authorization time.
+	// The API server may refine the decision before sending it, by evaluating some of the conditions in-process,
+	// e.g. removing conditions that evaluated to false.
 	// +required
 	Decision authorizationv1.ConditionsAwareDecision `json:"decision" protobuf:"bytes,1,opt,name=decision"`
 

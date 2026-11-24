@@ -31,8 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
-	clientfeatures "k8s.io/client-go/features"
-	clientfeaturestesting "k8s.io/client-go/features/testing"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2/ktesting"
@@ -69,15 +67,7 @@ func TestReflectorWatchListFallback(t *testing.T) {
 	store := &wrappedStore{Store: cache.NewStore(cache.DeletionHandlingMetaNamespaceKeyFunc)}
 	lw := &wrappedListWatch{&cache.ListWatch{}}
 	lw.SetClient(ctx, clientSet, ns)
-	var target *cache.Reflector
-	func() {
-		// Enable ListWatchClient only for this reflector.
-		// We rely on the fact that instantiation of whether watchlist is used or not is done once
-		// during reflector creation in NewReflectorWithOptions
-		clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.WatchListClient, true)
-		defer clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.WatchListClient, false)
-		target = cache.NewReflector(lw, &v1.Secret{}, store, time.Duration(0))
-	}()
+	target := cache.NewReflector(lw, &v1.Secret{}, store, time.Duration(0))
 
 	t.Log("Waiting until the secret reflector synchronises to the store (call to the Replace method)")
 	reflectorCtx, reflectorCtxCancel := context.WithCancel(context.Background())
@@ -90,7 +80,7 @@ func TestReflectorWatchListFallback(t *testing.T) {
 	verifyStore(t, ctx, clientSet, store, ns)
 
 	t.Log("Starting the second server with the WatchList feature disabled")
-	server2 := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--feature-gates=WatchList=false"}, &etcdOptions.StorageConfig)
+	server2 := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--emulated-version=kube=1.37", "--feature-gates=WatchList=false"}, &etcdOptions.StorageConfig)
 	defer server2.TearDownFn()
 	clientSet2, err := kubernetes.NewForConfig(server2.ClientConfig)
 	require.NoError(t, err)

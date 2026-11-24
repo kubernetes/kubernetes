@@ -18,6 +18,7 @@ package cache
 
 import (
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
@@ -127,6 +128,13 @@ type Cache interface {
 
 	// CompositePodGroups returns a CompositePodGroupLister used to access the cached CompositePodGroup objects.
 	CompositePodGroups() fwk.CompositePodGroupLister
+
+	// AssumeGroupInitiallyScheduled records that the InitiallyScheduled condition of the group with the given key and UID is set to True.
+	AssumeGroupInitiallyScheduled(logger klog.Logger, key fwk.EntityKey, uid types.UID)
+
+	// IsGroupInitiallyScheduled returns the cached group with the given key, or nil if it isn't in the cache,
+	// and whether its InitiallyScheduled condition is True in the cached object or was set to True by the scheduler.
+	IsGroupInitiallyScheduled(logger klog.Logger, key fwk.EntityKey) (*fwk.GenericPodGroup, bool)
 
 	// AddPodGroupMember adds not assigned and not assumed pod to its pod group state.
 	AddPodGroupMember(pod *v1.Pod)

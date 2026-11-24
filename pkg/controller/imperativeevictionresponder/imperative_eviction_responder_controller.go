@@ -41,6 +41,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
 	apiv1pod "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/kubernetes/pkg/controller/imperativeevictionresponder/metrics"
 	"k8s.io/utils/clock"
 	"k8s.io/utils/ptr"
 )
@@ -191,6 +192,8 @@ func NewController(
 	}, cache.HandlerOptions{Logger: &logger}); err != nil {
 		return nil, err
 	}
+
+	metrics.Register()
 
 	return c, nil
 }
@@ -411,6 +414,12 @@ func (c *ImperativeEvictionResponderController) sync(ctx context.Context, key st
 		// update last eviction attempt only once we have a confirmation that the status update has gone through
 		if lastEvictionAttemptTime != nil {
 			c.lastEvictionAttempts.set(evictionIndexValueForPod(pod), *lastEvictionAttemptTime)
+
+			if getRecordedAttempts(lastEvictionMessage) == 2 && getRecordedAttempts(evictionMessage) == 3 {
+				// Only record eviction as failing after observing 3 failures.
+				// This is done to prevent tracking of intermittent API request errors (e.g. conflicts).
+				metrics.FailedEvictionsTotal.Inc()
+			}
 		} else if pod != nil {
 			c.lastEvictionAttempts.remove(evictionIndexValueForPod(pod))
 		}

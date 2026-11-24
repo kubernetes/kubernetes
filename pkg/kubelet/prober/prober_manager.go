@@ -18,6 +18,7 @@ package prober
 
 import (
 	"context"
+	"slices"
 
 	"sync"
 	"time"
@@ -68,14 +69,31 @@ var ProberDuration = metrics.NewHistogramVec(
 		"namespace"},
 )
 
+// ActiveProbes tracks the number of currently active HTTP probes by wire protocol,
+// independent of ProberResults' per-pod/container labels, so cluster admins can watch H2C
+// migration progress.
+var ActiveProbes = metrics.NewGaugeVec(
+	&metrics.GaugeOpts{
+		Subsystem:      "kubelet",
+		Name:           "active_probes",
+		Help:           "Number of currently active HTTP probes by protocol.",
+		StabilityLevel: metrics.ALPHA,
+	},
+	[]string{"protocol"},
+)
+
 // Manager manages pod probing. It creates a probe "worker" for every container that specifies a
-// probe (AddPod). The worker periodically probes its assigned container and caches the results. The
+// probe. The worker periodically probes its assigned container and caches the results. The
 // manager use the cached probe results to set the appropriate Ready state in the PodStatus when
 // requested (UpdatePodStatus). Updating probe parameters is not currently supported.
 type Manager interface {
-	// AddPod creates new probe workers for every container probe. This should be called for every
-	// pod created.
-	AddPod(ctx context.Context, pod *v1.Pod)
+	// ContainerProbeLifecycle handles container lifecycle hooks from the runtime.
+	// Methods are no-ops when ContainerScopedProbes is disabled.
+	kubecontainer.ContainerProbeLifecycle
+
+	// SyncPod ensures probe workers match the runtime's observed containers.
+	// Called on every pod sync. The pod and podStatus are read-only.
+	SyncPod(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus)
 
 	// StopLivenessAndStartup handles stopping liveness and startup probes during termination.
 	StopLivenessAndStartup(pod *v1.Pod)
@@ -90,10 +108,19 @@ type Manager interface {
 
 	// UpdatePodStatus modifies the given PodStatus with the appropriate Ready state for each
 	// container based on container running status, cached probe results and worker states.
-	UpdatePodStatus(context.Context, *v1.Pod, *v1.PodStatus)
+	// oldPodStatus is read-only and supplies the previous API status for preserving
+	// readiness after a kubelet restart.
+	UpdatePodStatus(ctx context.Context, pod *v1.Pod, oldPodStatus, podStatus *v1.PodStatus)
 }
 
+var (
+	_ Manager = &manager{}
+	_ Manager = &containerBoundManager{}
+)
+
 type manager struct {
+	kubecontainer.NoopContainerProbeLifecycle
+
 	// Map of active workers for probes
 	workers map[probeKey]*worker
 	// Lock for accessing & mutating workers
@@ -146,33 +173,21 @@ type probeKey struct {
 }
 
 // Type of probe (liveness, readiness or startup)
-type probeType int
+type probeType = kubecontainer.ProbeType
 
 const (
-	liveness probeType = iota
-	readiness
-	startup
+	liveness  = kubecontainer.LivenessProbe
+	readiness = kubecontainer.ReadinessProbe
+	startup   = kubecontainer.StartupProbe
 
 	probeResultSuccessful string = "successful"
 	probeResultFailed     string = "failed"
 	probeResultUnknown    string = "unknown"
 )
 
-// For debugging.
-func (t probeType) String() string {
-	switch t {
-	case readiness:
-		return "Readiness"
-	case liveness:
-		return "Liveness"
-	case startup:
-		return "Startup"
-	default:
-		return "UNKNOWN"
-	}
-}
-
-func (m *manager) AddPod(ctx context.Context, pod *v1.Pod) {
+// SyncPod creates a probe worker for every container probe that does not
+// have one yet.
+func (m *manager) SyncPod(ctx context.Context, pod *v1.Pod, _ *kubecontainer.PodStatus) {
 	m.workerLock.Lock()
 	defer m.workerLock.Unlock()
 
@@ -183,54 +198,54 @@ func (m *manager) AddPod(ctx context.Context, pod *v1.Pod) {
 	// the pod NotReady during graceful termination. Workers are stopped
 	// explicitly via their stop channel (RemovePod/CleanupPods).
 	//
-	// TODO(#140977): This also means nothing cancels an in-flight probe. worker.stop()
-	// only signals stopCh, which is checked between probes, so an exec probe that is
-	// already running keeps executing in a container that is being killed until its
-	// own TimeoutSeconds elapses. The fix is a per-worker cancellable context
-	// cancelled by stop(), not the pod sync context, which cancels too early.
+	// In-flight probes are aborted by the worker's own derived context, which
+	// stop() cancels; see worker.run.
 	ctx = context.WithoutCancel(ctx)
+	wanted := sets.New[probeKey]()
 	key := probeKey{podUID: pod.UID}
 	for c, containerType := range podutil.ContainerIter(&pod.Spec, podutil.InitContainers|podutil.Containers) {
 		if containerType == podutil.InitContainers && !podutil.IsRestartableInitContainer(c) {
 			continue
 		}
 		key.containerName = c.Name
-
-		if c.StartupProbe != nil {
-			key.probeType = startup
-			if _, ok := m.workers[key]; ok {
-				logger.V(8).Info("Startup probe already exists for container",
-					"pod", klog.KObj(pod), "containerName", c.Name)
+		for _, probeType := range [...]probeType{startup, readiness, liveness} {
+			probe := getProbe(c, probeType)
+			if probe == nil {
 				continue
 			}
-			w := newWorker(m, startup, pod, *c)
-			m.workers[key] = w
-			go w.run(ctx)
-		}
-
-		if c.ReadinessProbe != nil {
-			key.probeType = readiness
-			if _, ok := m.workers[key]; ok {
-				logger.V(8).Info("Readiness probe already exists for container",
-					"pod", klog.KObj(pod), "containerName", c.Name)
-				continue
+			key.probeType = probeType
+			wanted.Insert(key)
+			if _, ok := m.workers[key]; !ok {
+				w := newWorker(m, probeType, pod, *c)
+				m.workers[key] = w
+				go w.run(ctx)
 			}
-			w := newWorker(m, readiness, pod, *c)
-			m.workers[key] = w
-			go w.run(ctx)
 		}
+	}
 
-		if c.LivenessProbe != nil {
-			key.probeType = liveness
-			if _, ok := m.workers[key]; ok {
-				logger.V(8).Info("Liveness probe already exists for container",
-					"pod", klog.KObj(pod), "containerName", c.Name)
-				continue
-			}
-			w := newWorker(m, liveness, pod, *c)
-			m.workers[key] = w
-			go w.run(ctx)
+	// Stop workers for containers that were removed from the spec.
+	for key, w := range m.workers {
+		if key.podUID != pod.UID || wanted.Has(key) {
+			continue
 		}
+		logger.V(4).Info("Stopping probe for container removed from pod spec",
+			"pod", klog.KObj(pod), "containerName", key.containerName, "probeType", key.probeType)
+		w.stop()
+		// A container added back under the same name gets a new worker, even before this one exits.
+		delete(m.workers, key)
+	}
+}
+
+func getProbe(c *v1.Container, probeType probeType) *v1.Probe {
+	switch probeType {
+	case startup:
+		return c.StartupProbe
+	case readiness:
+		return c.ReadinessProbe
+	case liveness:
+		return c.LivenessProbe
+	default:
+		return nil
 	}
 }
 
@@ -238,17 +253,9 @@ func (m *manager) StopLivenessAndStartup(pod *v1.Pod) {
 	m.workerLock.RLock()
 	defer m.workerLock.RUnlock()
 
-	key := probeKey{podUID: pod.UID}
-	for c, containerType := range podutil.ContainerIter(&pod.Spec, podutil.InitContainers|podutil.Containers) {
-		if containerType == podutil.InitContainers && !podutil.IsRestartableInitContainer(c) {
-			continue
-		}
-		key.containerName = c.Name
-		for _, probeType := range [...]probeType{liveness, startup} {
-			key.probeType = probeType
-			if worker, ok := m.workers[key]; ok {
-				worker.stop()
-			}
+	for key, worker := range m.workers {
+		if key.podUID == pod.UID && (key.probeType == liveness || key.probeType == startup) {
+			worker.stop()
 		}
 	}
 }
@@ -257,17 +264,9 @@ func (m *manager) RemovePod(pod *v1.Pod) {
 	m.workerLock.RLock()
 	defer m.workerLock.RUnlock()
 
-	key := probeKey{podUID: pod.UID}
-	for c, containerType := range podutil.ContainerIter(&pod.Spec, podutil.InitContainers|podutil.Containers) {
-		if containerType == podutil.InitContainers && !podutil.IsRestartableInitContainer(c) {
-			continue
-		}
-		key.containerName = c.Name
-		for _, probeType := range [...]probeType{readiness, liveness, startup} {
-			key.probeType = probeType
-			if worker, ok := m.workers[key]; ok {
-				worker.stop()
-			}
+	for key, worker := range m.workers {
+		if key.podUID == pod.UID {
+			worker.stop()
 		}
 	}
 }
@@ -309,7 +308,7 @@ func (m *manager) isContainerStarted(logger klog.Logger, pod *v1.Pod, containerS
 // setReadyStateOnKubeletRestart sets the ready state of a container to false if it was started
 // before kubelet restarted and has a readiness probe, but the pod is not ready yet.
 // This is to avoid flapping ready status of containers that were ready before kubelet restarted.
-func (m *manager) setReadyStateOnKubeletRestart(logger klog.Logger, ready *bool, pod *v1.Pod, apiContainerStatuses []v1.ContainerStatus, containerStatus *v1.ContainerStatus, containerSpec *v1.Container) {
+func (m *manager) setReadyStateOnKubeletRestart(logger klog.Logger, ready *bool, oldPodStatus *v1.PodStatus, apiContainerStatuses []v1.ContainerStatus, containerStatus *v1.ContainerStatus, containerSpec *v1.Container) {
 	if !canInheritProbeState(apiContainerStatuses, containerStatus.Name, containerStatus.ContainerID) {
 		// The caller defaults to ready while no readiness worker is registered, which is
 		// the case on the first sync after a kubelet restart, so clear it explicitly.
@@ -336,7 +335,7 @@ func (m *manager) setReadyStateOnKubeletRestart(logger klog.Logger, ready *bool,
 		}
 		if containerSpec.ReadinessProbe != nil {
 			podIsReady := false
-			for _, c := range pod.Status.Conditions {
+			for _, c := range oldPodStatus.Conditions {
 				if c.Type == v1.PodReady && c.Status == v1.ConditionTrue {
 					podIsReady = true
 					break
@@ -349,13 +348,19 @@ func (m *manager) setReadyStateOnKubeletRestart(logger klog.Logger, ready *bool,
 	}
 }
 
-func (m *manager) UpdatePodStatus(ctx context.Context, pod *v1.Pod, podStatus *v1.PodStatus) {
+func (m *manager) UpdatePodStatus(ctx context.Context, pod *v1.Pod, oldPodStatus, podStatus *v1.PodStatus) {
 	logger := klog.FromContext(ctx)
 	for i, c := range podStatus.ContainerStatuses {
 		started := m.isContainerStarted(logger, pod, &podStatus.ContainerStatuses[i])
 		podStatus.ContainerStatuses[i].Started = &started
 
 		if !started {
+			continue
+		}
+
+		// A container removed from the spec is being killed, so it isn't ready.
+		if !slices.ContainsFunc(pod.Spec.Containers, func(sc v1.Container) bool { return sc.Name == c.Name }) {
+			podStatus.ContainerStatuses[i].Ready = false
 			continue
 		}
 
@@ -387,7 +392,7 @@ func (m *manager) UpdatePodStatus(ctx context.Context, pod *v1.Pod, podStatus *v
 					}
 				}
 				if containerSpec != nil {
-					m.setReadyStateOnKubeletRestart(logger, &ready, pod, pod.Status.ContainerStatuses, &podStatus.ContainerStatuses[i], containerSpec)
+					m.setReadyStateOnKubeletRestart(logger, &ready, oldPodStatus, oldPodStatus.ContainerStatuses, &podStatus.ContainerStatuses[i], containerSpec)
 				}
 			}
 		}
@@ -432,7 +437,7 @@ func (m *manager) UpdatePodStatus(ctx context.Context, pod *v1.Pod, podStatus *v
 				}
 			}
 			if !utilfeature.DefaultFeatureGate.Enabled(features.ChangeContainerStatusOnKubeletRestart) {
-				m.setReadyStateOnKubeletRestart(logger, &ready, pod, pod.Status.InitContainerStatuses, &podStatus.InitContainerStatuses[i], &initContainer)
+				m.setReadyStateOnKubeletRestart(logger, &ready, oldPodStatus, oldPodStatus.InitContainerStatuses, &podStatus.InitContainerStatuses[i], &initContainer)
 			}
 		}
 		podStatus.InitContainerStatuses[i].Ready = ready
@@ -447,10 +452,17 @@ func (m *manager) getWorker(podUID types.UID, containerName string, probeType pr
 }
 
 // Called by the worker after exiting.
-func (m *manager) removeWorker(podUID types.UID, containerName string, probeType probeType) {
+// removeWorker removes the worker from the map, unless another worker has replaced it, and returns
+// whether one has.
+func (m *manager) removeWorker(w *worker) (replaced bool) {
 	m.workerLock.Lock()
 	defer m.workerLock.Unlock()
-	delete(m.workers, probeKey{podUID, containerName, probeType})
+	key := probeKey{w.pod.UID, w.container.Name, w.probeType}
+	if current, ok := m.workers[key]; ok && current != w {
+		return true
+	}
+	delete(m.workers, key)
+	return false
 }
 
 // workerCount returns the total number of probe workers. For testing.

@@ -38,6 +38,7 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	"k8s.io/apiserver/pkg/endpoints/filters"
 	"k8s.io/apiserver/pkg/endpoints/handlers/finisher"
 	requestmetrics "k8s.io/apiserver/pkg/endpoints/handlers/metrics"
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
@@ -351,9 +352,13 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope *RequestSc
 	}
 }
 
+const conditionalUnsafeDeleteRefusal = "ignoreStoreReadErrorWithClusterBreakingPotential is not allowed for a conditionally authorized request: the object cannot be read, so its authorization conditions cannot be evaluated"
+
 // authorizeUnsafeDelete ensures that the user has permission to do
 // 'unsafe-delete-ignore-read-errors' on the resource being deleted when
-// ignoreStoreReadErrorWithClusterBreakingPotential is enabled
+// ignoreStoreReadErrorWithClusterBreakingPotential is enabled.
+// It refuses the request if the primary delete decision is conditional,
+// as unsafe deletion of objects skips the admission chain.
 func authorizeUnsafeDelete(ctx context.Context, attr admission.Attributes, authz authorizer.UnconditionalAuthorizer) (err error) {
 	if attr.GetOperation() != admission.Delete || attr.GetOperationOptions() == nil {
 		return nil
@@ -364,6 +369,20 @@ func authorizeUnsafeDelete(ctx context.Context, attr admission.Attributes, authz
 	}
 	if !ptr.Deref(options.IgnoreStoreReadErrorWithClusterBreakingPotential, false) {
 		return nil
+	}
+	// refuse the unsafe delete if the delete is conditionally authorized,
+	// as the condition is written over something we cannot read.
+	if utilfeature.DefaultFeatureGate.Enabled(features.ConditionalAuthorization) {
+		_, decision, ok := request.ConditionallyAuthorizedDecisionFrom(ctx)
+		if !ok {
+			return errors.NewInternalError(fmt.Errorf("when the ConditionalAuthorization feature gate is on, a decision must be part of the context"))
+		}
+		if !decision.IsAllow() {
+			audit.AddAuditAnnotations(ctx,
+				filters.DecisionAnnotationKey, filters.DecisionForbid,
+				filters.ReasonAnnotationKey, conditionalUnsafeDeleteRefusal)
+			return admission.NewForbidden(attr, fmt.Errorf("%s", conditionalUnsafeDeleteRefusal))
+		}
 	}
 
 	requestInfo, found := request.RequestInfoFrom(ctx)

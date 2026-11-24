@@ -23,6 +23,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/utils/clock"
 )
@@ -159,7 +160,7 @@ func (p *basicPodStartupLatencyTracker) ObservedPodOnWatch(logger klog.Logger, p
 			metrics.PodStartSLIDuration.WithLabelValues().Observe(podStartSLOduration.Seconds())
 			// if is the first Pod with network track the start values
 			// these metrics will help to identify problems with the CNI plugin
-			if !pod.Spec.HostNetwork && !p.firstNetworkPodSeen {
+			if !pod.Spec.HostNetwork && !kubecontainer.IsNetworkIsolatedPod(pod) && !p.firstNetworkPodSeen {
 				metrics.FirstNetworkPodStartSLIDuration.Set(podStartSLOduration.Seconds())
 				p.firstNetworkPodSeen = true
 			}

@@ -1112,11 +1112,18 @@ func unknownSize() *cost.SizeEstimate {
 	return &u
 }
 
-// estimateListDistinct estimates l.distinct() under ModelVersion0.
+// estimateListDistinct estimates l.distinct() in the legacy cost model.
+//
+// When legacy is true (ModelVersion(0)), lists v3 estimates a flat factor of 2 per pair of
+// elements (note that the runtime tracker charges StringTraversalCostFactor for string and bytes
+// elements). Otherwise, it scales by the element equality cost.
 func estimateListDistinct(legacy bool) cost.FunctionEstimator {
 	return func(estimator cost.Estimator, target *cost.AstNode, args []cost.AstNode) *cost.CallEstimate {
 		if target == nil || len(args) != 0 {
 			return nil
+		}
+		if legacy {
+			return estimateLegacySelfCompareCost(estimator, *target, *target, 2)
 		}
 		elemType := types.DynType
 		if t := (*target).Type(); t.Kind() == types.ListKind && len(t.Parameters()) > 0 {
@@ -1151,8 +1158,7 @@ func estimateSelfCompareCost(estimator cost.Estimator, keysNode, targetNode cost
 	targetSize := cost.EstimateSize(estimator, targetNode)
 	costSize := sz.Multiply(sz)
 	if legacy {
-		costSize.Elem = targetSize.Elem
-		return cost.NewListCallEstimate(costSize.MultiplyByCostFactor(selfCompareFactor(elemType)), costSize)
+		return estimateLegacySelfCompareCost(estimator, keysNode, targetNode, selfCompareFactor(elemType))
 	}
 	elemCost := estimateElementEqualityCost(elemType, estimateItemSize(estimator, targetNode))
 	c := costSize.MultiplyByCost(elemCost).MultiplyByCostFactor(2.0)
@@ -1162,6 +1168,16 @@ func estimateSelfCompareCost(estimator cost.Estimator, keysNode, targetNode cost
 	}
 	resSize.Elem = targetSize.Elem
 	return cost.NewListCallEstimate(c, resSize)
+}
+
+// estimateLegacySelfCompareCost is the lists v3 ModelVersion0 estimate of comparing every pair of
+// keysNode's elements at the given factor per pair. Its result size is the number of pairs, with
+// the elements of targetNode.
+func estimateLegacySelfCompareCost(estimator cost.Estimator, keysNode, targetNode cost.AstNode, factor float64) *cost.CallEstimate {
+	sz := cost.EstimateSize(estimator, keysNode)
+	costSize := sz.Multiply(sz)
+	costSize.Elem = cost.EstimateSize(estimator, targetNode).Elem
+	return cost.NewListCallEstimate(costSize.MultiplyByCostFactor(factor), costSize)
 }
 
 func estimateItemSize(estimator cost.Estimator, node cost.AstNode) cost.SizeEstimate {

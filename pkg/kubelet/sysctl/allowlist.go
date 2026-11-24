@@ -124,9 +124,10 @@ func (w *patternAllowlist) Admit(_ context.Context, attrs *lifecycle.PodAdmitAtt
 	for _, s := range pod.Spec.SecurityContext.Sysctls {
 		if err := w.validateSysctl(s.Name, pod.Spec.HostNetwork, pod.Spec.HostIPC, hostUsers); err != nil {
 			return lifecycle.PodAdmitResult{
-				Admit:   false,
-				Reason:  ForbiddenReason,
-				Message: fmt.Sprintf("forbidden sysctl: %v", err),
+				Admit:         false,
+				Reason:        ForbiddenReason,
+				Message:       fmt.Sprintf("forbidden sysctl: %v", err),
+				RejectionType: lifecycle.RejectionInfeasible,
 			}
 		}
 	}

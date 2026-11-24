@@ -282,6 +282,10 @@ type storeWithPrefixTransformer struct {
 	*store
 }
 
+func (s *storeWithPrefixTransformer) UnderlyingStorage() storage.Interface {
+	return s.store
+}
+
 func (s *storeWithPrefixTransformer) UpdatePrefixTransformer(modifier storagetesting.PrefixTransformerModifier) func() {
 	originalTransformer := s.transformer.(*storagetesting.PrefixTransformer)
 	transformer := *originalTransformer

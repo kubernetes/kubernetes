@@ -245,6 +245,19 @@ type PodFailurePolicyRule struct {
 	// +listType=atomic
 	// +optional
 	OnPodConditions []PodFailurePolicyOnPodConditionsPattern
+
+	// Name of the pod failure policy rule. When a rule with the FailJob action
+	// fails the Job, its name is included in the Job failure condition message.
+	// The condition reason remains PodFailurePolicy. Unnamed rules are identified
+	// by their zero-based index in the message.
+	// The name must be a non-empty DNS label of at most 63 characters, containing
+	// only lowercase alphanumeric characters or hyphens, starting and ending with
+	// an alphanumeric character, and must be unique within the Job.
+	// This field is alpha-level and is only honored by servers that enable the
+	// PodFailurePolicyName feature gate.
+	// +featureGate=PodFailurePolicyName
+	// +optional
+	Name *string
 }
 
 // PodFailurePolicy describes how failed pods influence the backoffLimit.
@@ -475,9 +488,9 @@ type JobSpec struct {
 	// When set, it specifies the scheduling policy (basic or gang), topology
 	// constraints, disruption mode, and shared resource claims.
 	// When omitted, the Job defaults to the basic scheduling policy, which behaves
-	// as standard pod-by-pod scheduling.
-	// This field is alpha-level and requires the WorkloadWithJob feature gate.
-	// Once set, this field is immutable except for the policy.gang.minCount.
+	// as standard pod-by-pod scheduling. This field is gated by the WorkloadWithJob
+	// feature gate. Once set, this field is immutable except for the
+	// policy.gang.minCount.
 	//
 	// +featureGate=WorkloadWithJob
 	// +optional
@@ -656,6 +669,10 @@ const (
 	JobFailureTarget JobConditionType = "FailureTarget"
 	// JobSuccessCriteriaMet means the Job has reached a success state and will be marked as Completed
 	JobSuccessCriteriaMet JobConditionType = "SuccessCriteriaMet"
+	// JobSchedulingBlocked means the controller cannot safely create pods because
+	// the scheduling objects for the Job are missing or have an unsupported
+	// structure.
+	JobSchedulingBlocked JobConditionType = "SchedulingBlocked"
 )
 
 // JobCondition describes current state of a job.

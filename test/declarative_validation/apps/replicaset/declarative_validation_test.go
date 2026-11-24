@@ -83,7 +83,7 @@ func TestDeclarativeValidate(t *testing.T) {
 			"invalid toleration key format": {
 				input: mkReplicaSet(tweakPodSpec(podtest.SetTolerations(api.Toleration{Key: "invalid key", Operator: api.TolerationOpExists}))),
 				expectedErrs: field.ErrorList{
-					field.Invalid(field.NewPath("spec", "template", "spec", "tolerations").Index(0).Child("key"), nil, "").WithOrigin("format=k8s-label-key").MarkAlpha(),
+					field.Invalid(field.NewPath("spec", "template", "spec", "tolerations").Index(0).Child("key"), nil, "").WithOrigin("format=k8s-label-key").MarkBeta(),
 				},
 			},
 			"activeDeadlineSeconds minimum boundary violation": {

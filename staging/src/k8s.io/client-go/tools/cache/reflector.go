@@ -476,12 +476,6 @@ func (r *Reflector) ListAndWatchWithContext(ctx context.Context) error {
 	var w watch.Interface
 	fallbackToList := !r.useWatchList
 
-	defer func() {
-		if w != nil {
-			w.Stop()
-		}
-	}()
-
 	if r.useWatchList {
 		w, err = r.watchList(ctx)
 		if w == nil && err == nil {
@@ -495,6 +489,9 @@ func (r *Reflector) ListAndWatchWithContext(ctx context.Context) error {
 			)
 			fallbackToList = true
 			// ensure that we won't accidentally pass some garbage down the watch.
+			if w != nil {
+				w.Stop()
+			}
 			w = nil
 		}
 	}
@@ -538,6 +535,7 @@ func (r *Reflector) startResync(ctx context.Context, resyncerrc chan error) {
 }
 
 // watchWithResync runs watch with startResync in the background.
+// It takes ownership of w: watch stops it before returning.
 func (r *Reflector) watchWithResync(ctx context.Context, w watch.Interface) error {
 	resyncerrc := make(chan error, 1)
 	cancelCtx, cancel := context.WithCancel(ctx)
@@ -559,7 +557,8 @@ func (r *Reflector) watchWithResync(ctx context.Context, w watch.Interface) erro
 // restarts the watch until an exit scenario is reached.
 //
 // If a watch is provided, it will be used, otherwise another will be started.
-// If the watcher has started, it will always be stopped before returning.
+// watch takes ownership of the provided watch: once started, a watcher is
+// always stopped before returning.
 func (r *Reflector) watch(ctx context.Context, w watch.Interface, resyncerrc chan error) error {
 	stopCh := ctx.Done()
 	logger := klog.FromContext(ctx)
@@ -901,7 +900,7 @@ func (r *Reflector) watchList(ctx context.Context) (watch.Interface, error) {
 	checkWatchListDataConsistencyIfRequested(ctx, r.name, resourceVersion, r.listerWatcher.ListWithContext, transformer, temporaryStore.List)
 
 	if err := r.store.Replace(temporaryStore.List(), resourceVersion); err != nil {
-		return nil, fmt.Errorf("unable to sync watch-list result: %w", err)
+		return w, fmt.Errorf("unable to sync watch-list result: %w", err)
 	}
 	initTrace.Step("SyncWith done")
 	r.setLastSyncResourceVersion(resourceVersion)

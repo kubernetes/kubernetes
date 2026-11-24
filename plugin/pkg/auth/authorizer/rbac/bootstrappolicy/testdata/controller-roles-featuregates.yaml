@@ -352,6 +352,17 @@ items:
     - create
     - patch
     - update
+  - apiGroups:
+    - scheduling.k8s.io
+    resources:
+    - workloads
+    verbs:
+    - create
+    - get
+    - list
+    - patch
+    - update
+    - watch
 - apiVersion: rbac.authorization.k8s.io/v1
   kind: ClusterRole
   metadata:
@@ -984,10 +995,21 @@ items:
   - apiGroups:
     - scheduling.k8s.io
     resources:
-    - podgroups
     - workloads
     verbs:
     - create
+    - get
+    - list
+    - patch
+    - update
+    - watch
+  - apiGroups:
+    - scheduling.k8s.io
+    resources:
+    - podgroups
+    verbs:
+    - create
+    - delete
     - get
     - list
     - patch
@@ -1010,6 +1032,72 @@ items:
     - signers
     verbs:
     - attest
+  - apiGroups:
+    - certificates.k8s.io
+    resources:
+    - clustertrustbundles
+    verbs:
+    - create
+    - delete
+    - list
+    - update
+    - watch
+  - apiGroups:
+    - ""
+    - events.k8s.io
+    resources:
+    - events
+    verbs:
+    - create
+    - patch
+    - update
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: ClusterRole
+  metadata:
+    annotations:
+      rbac.authorization.kubernetes.io/autoupdate: "true"
+    labels:
+      kubernetes.io/bootstrapping: rbac-defaults
+    name: system:controller:kube-service-serving-signer
+  rules:
+  - apiGroups:
+    - ""
+    resources:
+    - services
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - certificates.k8s.io
+    resources:
+    - podcertificaterequests
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - certificates.k8s.io
+    resources:
+    - podcertificaterequests/status
+    verbs:
+    - update
+  - apiGroups:
+    - certificates.k8s.io
+    resourceNames:
+    - kubernetes.io/service-serving
+    resources:
+    - signers
+    verbs:
+    - attest
+  - apiGroups:
+    - certificates.k8s.io
+    resourceNames:
+    - kubernetes.io/service-serving
+    resources:
+    - signers
+    verbs:
+    - sign
   - apiGroups:
     - certificates.k8s.io
     resources:
@@ -1433,6 +1521,26 @@ items:
     - create
     - patch
     - update
+  - apiGroups:
+    - scheduling.k8s.io
+    resources:
+    - workloads
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - scheduling.k8s.io
+    resources:
+    - podgroups
+    verbs:
+    - create
+    - delete
+    - get
+    - list
+    - patch
+    - update
+    - watch
 - apiVersion: rbac.authorization.k8s.io/v1
   kind: ClusterRole
   metadata:

@@ -50,7 +50,7 @@ func NewContainerScope(policy Policy) Scope {
 	}
 }
 
-func (s *containerScope) Admit(ctx context.Context, pod *v1.Pod, operation lifecycle.Operation) lifecycle.PodAdmitResult {
+func (s *containerScope) Admit(ctx context.Context, pod *v1.Pod, operation lifecycle.Operation, dryRun bool) lifecycle.PodAdmitResult {
 	logger := klog.FromContext(ctx)
 
 	for container := range podutil.ContainerIter(&pod.Spec, podutil.InitContainers|podutil.Containers) {
@@ -63,9 +63,15 @@ func (s *containerScope) Admit(ctx context.Context, pod *v1.Pod, operation lifec
 			}
 			metrics.TopologyManagerAdmissionErrorsTotal.Inc()
 			if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) && resourcehelper.IsPodLevelResourcesSet(pod) {
-				return admission.GetPodAdmitResult(NewPodLevelTopologyAffinityError("pod with pod-level resources failed admission with a container-level topology manager"))
+				return admission.GetPodAdmitResult(NewPodLevelTopologyAffinityError("pod with pod-level resources failed admission with a container-level topology manager", operation))
 			}
-			return admission.GetPodAdmitResult(&TopologyAffinityError{})
+			return admission.GetPodAdmitResult(NewTopologyAffinityError(operation))
+		}
+		if dryRun {
+			// Without allocating, the hints of the next containers don't account for the
+			// resources this container would get, so a dry run may admit pods that can't be
+			// aligned.
+			continue
 		}
 		logger.Info("Topology Affinity", "bestHint", bestHint, "pod", klog.KObj(pod), "containerName", container.Name, "operation", operation)
 		s.setTopologyHints(string(pod.UID), container.Name, bestHint)

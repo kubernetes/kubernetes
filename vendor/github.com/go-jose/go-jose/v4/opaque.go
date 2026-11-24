@@ -16,6 +16,12 @@
 
 package jose
 
+import (
+	"crypto/ecdsa"
+	"crypto/ed25519"
+	"crypto/rsa"
+)
+
 // OpaqueSigner is an interface that supports signing payloads with opaque
 // private key(s). Private key operations performed by implementers may, for
 // example, occur in a hardware module. An OpaqueSigner may rotate signing keys
@@ -46,8 +52,7 @@ func newOpaqueSigner(alg SignatureAlgorithm, signer OpaqueSigner) (recipientSigI
 		return recipientSigInfo{}, ErrUnsupportedAlgorithm
 	}
 
-	pk := signer.Public()
-	if pk != nil && !pk.IsPublic() {
+	if pk := signer.Public(); pk != nil && isKnownPrivateKeyType(pk.Key) {
 		return recipientSigInfo{}, ErrNotPublic
 	}
 
@@ -58,6 +63,19 @@ func newOpaqueSigner(alg SignatureAlgorithm, signer OpaqueSigner) (recipientSigI
 			signer: signer,
 		},
 	}, nil
+}
+
+// isKnownPrivateKeyType reports whether key is a private key of one of the
+// supported signing algorithms. Other key types are allowed, since an
+// OpaqueSigner may use a key type that go-jose does not know about.
+func isKnownPrivateKeyType(key any) bool {
+	switch key.(type) {
+	case *ecdsa.PrivateKey, *rsa.PrivateKey, ed25519.PrivateKey:
+		return true
+	default:
+		_, ok := mldsaPublicOf(key)
+		return ok
+	}
 }
 
 func (o *opaqueSigner) signPayload(payload []byte, alg SignatureAlgorithm) (Signature, error) {

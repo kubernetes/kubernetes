@@ -29,6 +29,13 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 )
 
+// MinPodPIDLimit and MaxPodPIDLimit define the valid range for
+// spec.resources.limits.pids.
+const (
+	MinPodPIDLimit = 128
+	MaxPodPIDLimit = 16384
+)
+
 // GetResourceRequestQuantity finds and returns the request quantity for a specific resource.
 func GetResourceRequestQuantity(pod *v1.Pod, resourceName v1.ResourceName) resource.Quantity {
 	requestQuantity := resource.Quantity{}
@@ -42,11 +49,12 @@ func GetResourceRequestQuantity(pod *v1.Pod, resourceName v1.ResourceName) resou
 		requestQuantity = resource.Quantity{Format: resource.DecimalSI}
 	}
 
-	// Supported pod level resources will be used instead of container level ones when available
-	hasPodLevelResources := utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) && resourcehelper.IsPodLevelResourcesSet(pod)
-
-	// TODO(pravk03): considering DRA Node Allocatable resources for eviction ranking.
-	if rQuantity, ok := resourcehelper.PodRequests(pod, resourcehelper.PodResourcesOptions{SkipContainerLevelResources: hasPodLevelResources, ExcludeOverhead: true})[resourceName]; ok {
+	opts := resourcehelper.PodResourcesOptions{
+		SkipPodLevelResources:            !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
+		ExcludeOverhead:                  true,
+		UseExtraNodeAllocatableResources: utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources),
+	}
+	if rQuantity, ok := resourcehelper.PodRequests(pod, opts)[resourceName]; ok {
 		requestQuantity.Add(rQuantity)
 	}
 

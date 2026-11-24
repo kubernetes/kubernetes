@@ -103,6 +103,8 @@ func (c *conditionsEnforcer) Validate(ctx context.Context, a admission.Attribute
 		return apierrors.NewInternalError(fmt.Errorf("did not expect decision %s to be attached to the RequestInfo context, only Allow or conditional allow", possiblyConditionalDecision.String()))
 	}
 
+	// TODO(luxas): Right now k8s.io/apiserver/pkg/admission/plugin/cel/authorization_conditions.go depends on VersionedAttributes being passed
+	// as the ConditionsData. Keep doing this, but fix the direct dependency.
 	versionedAttributes, err := admission.NewVersionedAttributes(a, a.GetKind(), o)
 	if err != nil {
 		return fmt.Errorf("failed to convert objects to request version: %w", err)

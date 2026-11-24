@@ -63,6 +63,13 @@ const (
 	// Disabling it restores a single shared transport per config.
 	ClientsAllowConnectionPool Feature = "ClientsAllowConnectionPool"
 
+	// owner: @mborsz
+	// beta: v1.38
+	//
+	// If enabled, a connection pool (see ClientsAllowConnectionPool) sends a request through
+	// another member when the member it picked fails to connect to the server.
+	ClientsAllowConnectionPoolFailureAvoidance Feature = "ClientsAllowConnectionPoolFailureAvoidance"
+
 	// owner: @enj
 	// beta: v1.36
 	//
@@ -114,9 +121,15 @@ const (
 
 	// owner: @p0lyn0mial
 	// beta: v1.30
+	// GA: v1.38
 	//
 	// Allow the client to get a stream of individual items instead of chunking from the server.
 	WatchListClient Feature = "WatchListClient"
+
+	// beta: v1.38
+	//
+	// Decode objects in WatchList responses concurrently while preserving event order.
+	WatchListClientConcurrentDecoding Feature = "WatchListClientConcurrentDecoding"
 )
 
 // defaultVersionedKubernetesFeatureGates consists of all known Kubernetes-specific feature keys.
@@ -135,6 +148,9 @@ var defaultVersionedKubernetesFeatureGates = map[Feature]VersionedSpecs{
 		{Version: version.MustParse("1.32"), Default: false, PreRelease: Alpha},
 	},
 	ClientsAllowConnectionPool: {
+		{Version: version.MustParse("1.38"), Default: true, PreRelease: Beta},
+	},
+	ClientsAllowConnectionPoolFailureAvoidance: {
 		{Version: version.MustParse("1.38"), Default: true, PreRelease: Beta},
 	},
 	ClientsAllowTLSCacheGC: {
@@ -163,5 +179,9 @@ var defaultVersionedKubernetesFeatureGates = map[Feature]VersionedSpecs{
 	WatchListClient: {
 		{Version: version.MustParse("1.30"), Default: false, PreRelease: Beta},
 		{Version: version.MustParse("1.35"), Default: true, PreRelease: Beta},
+		{Version: version.MustParse("1.38"), Default: true, PreRelease: GA, LockToDefault: true},
+	},
+	WatchListClientConcurrentDecoding: {
+		{Version: version.MustParse("1.38"), Default: true, PreRelease: Beta},
 	},
 }

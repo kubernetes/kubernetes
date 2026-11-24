@@ -71,13 +71,11 @@ func (m *distinctAttributeConstraint) add(request *requestData, device *draapi.D
 		return false, nil
 	}
 
-	// Check value and convert to a set if needed.
-	var newSet *deviceAttributeListAsSet
+	// Check the value.
 	if m.features.ListTypeAttributes {
-		newSet = attributeAsSet(attribute)
-		if newSet == nil {
-			// Internal error: attribute was already validated above (non-nil), so
-			// attributeAsSet must recognize its type. This should never be reached.
+		if !comparableAttributeValue(attribute) {
+			// Internal error: attribute was already validated above (non-nil),
+			// so its type must be one we know. This should never be reached.
 			return false, fmt.Errorf("internal error: unexpected attribute type %T", attribute)
 		}
 	} else {
@@ -95,7 +93,7 @@ func (m *distinctAttributeConstraint) add(request *requestData, device *draapi.D
 		}
 	}
 
-	if !m.matchesAttribute(attribute, newSet) {
+	if !m.matchesAttribute(attribute) {
 		if m.loggerV7 != nil {
 			m.loggerV7.Info("Constraint not satisfied, has some duplicated attributes")
 		}
@@ -131,17 +129,11 @@ func (m *distinctAttributeConstraint) matches(request *requestData) bool {
 	}
 }
 
-func (m *distinctAttributeConstraint) matchesAttribute(attribute any, newSet *deviceAttributeListAsSet) bool {
+func (m *distinctAttributeConstraint) matchesAttribute(attribute any) bool {
 	if m.features.ListTypeAttributes {
 		// Check that the new device is disjoint from each existing device
 		for _, attr := range m.attributes {
-			existingSet := attributeAsSet(attr)
-			if existingSet == nil {
-				// Should not happen, all existing attributes where already converted when adding them.
-				// TODO: avoid repeated conversions.
-				continue
-			}
-			if newSet.intersection(existingSet) != nil {
+			if overlaps(attr, attribute) {
 				// New device has common elements with an existing device.
 				// This violates the distinct constraint.
 				if m.loggerV7 != nil {

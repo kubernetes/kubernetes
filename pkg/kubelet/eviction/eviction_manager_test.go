@@ -1150,6 +1150,103 @@ func TestPIDPressure(t *testing.T) {
 	}
 }
 
+func TestPIDPressureUnaffectedByPerPodPIDLimits(t *testing.T) {
+	if goruntime.GOOS == "windows" {
+		t.Skip("PID pressure is not supported on Windows")
+	}
+
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PerPodPIDLimit, true)
+
+	tCtx := ktesting.Init(t)
+
+	podWithPIDLimit, podWithPIDLimitStats := makePodWithPIDStats("pod-with-pid-limit", defaultPriority, 600)
+	podWithPIDLimit.Spec.Resources = &v1.ResourceRequirements{
+		Limits: v1.ResourceList{
+			v1.ResourcePID: resource.MustParse("2048"),
+		},
+	}
+
+	podWithoutPIDLimit, podWithoutPIDLimitStats := makePodWithPIDStats("pod-without-pid-limit", defaultPriority, 400)
+
+	podLowPriority, podLowPriorityStats := makePodWithPIDStats("low-priority-pod", lowPriority, 800)
+	podLowPriority.Spec.Resources = &v1.ResourceRequirements{
+		Limits: v1.ResourceList{
+			v1.ResourcePID: resource.MustParse("1024"),
+		},
+	}
+
+	pods := []*v1.Pod{podWithPIDLimit, podWithoutPIDLimit, podLowPriority}
+	podStats := map[*v1.Pod]statsapi.PodStats{
+		podWithPIDLimit:    podWithPIDLimitStats,
+		podWithoutPIDLimit: podWithoutPIDLimitStats,
+		podLowPriority:     podLowPriorityStats,
+	}
+
+	activePodsFunc := func() []*v1.Pod { return pods }
+	fakeClock := testingclock.NewFakeClock(time.Now())
+	podKiller := &mockPodKiller{}
+	diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: new(bool)}
+	diskGC := &mockDiskGC{err: nil}
+	nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
+
+	config := Config{
+		MaxPodGracePeriodSeconds: 5,
+		PressureTransitionPeriod: time.Minute * 5,
+		Thresholds: []evictionapi.Threshold{
+			{
+				Signal:   evictionapi.SignalPIDAvailable,
+				Operator: evictionapi.OpLessThan,
+				Value: evictionapi.ThresholdValue{
+					Quantity: quantityMustParse("500"),
+				},
+			},
+		},
+	}
+
+	// Node has 2000 max PIDs, 1500 running = 500 available (at threshold boundary)
+	summaryProvider := &fakeSummaryProvider{result: makePIDStats("2000", "1500", podStats)}
+	manager := &managerImpl{
+		clock:                        fakeClock,
+		killPodFunc:                  podKiller.killPodNow,
+		imageGC:                      diskGC,
+		containerGC:                  diskGC,
+		config:                       config,
+		recorder:                     &record.FakeRecorder{},
+		summaryProvider:              summaryProvider,
+		nodeRef:                      nodeRef,
+		nodeConditionsLastObservedAt: nodeConditionsObservedAt{},
+		thresholdsFirstObservedAt:    thresholdsObservedAt{},
+	}
+
+	// No pressure yet (500 available, threshold < 500)
+	_, err := manager.synchronize(tCtx, diskInfoProvider, activePodsFunc)
+	if err != nil {
+		t.Fatalf("Manager expects no error but got %v", err)
+	}
+	if manager.IsUnderPIDPressure() {
+		t.Fatalf("Manager should not report PID pressure when available PIDs are at threshold boundary")
+	}
+
+	// Induce PID pressure: 1600 running = 400 available (below 500 threshold)
+	fakeClock.Step(1 * time.Minute)
+	summaryProvider.result = makePIDStats("2000", "1600", podStats)
+	_, err = manager.synchronize(tCtx, diskInfoProvider, activePodsFunc)
+	if err != nil {
+		t.Fatalf("Manager expects no error but got %v", err)
+	}
+
+	if !manager.IsUnderPIDPressure() {
+		t.Errorf("Manager should report PID pressure when node-level available PIDs drop below threshold")
+	}
+
+	// Eviction manager should evict the low-priority pod (highest process count
+	// among lowest priority), regardless of whether it has spec.resources.limits.pids
+	if podKiller.pod != podLowPriority {
+		t.Errorf("Manager chose to kill pod: %v, but should have chosen %v (lowest priority, highest PID usage)",
+			podKiller.pod.Name, podLowPriority.Name)
+	}
+}
+
 func TestAdmitUnderNodeConditions(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	manager := &managerImpl{}
@@ -1177,8 +1274,12 @@ func TestAdmitUnderNodeConditions(t *testing.T) {
 	manager.nodeConditions = []v1.NodeConditionType{v1.NodeMemoryPressure, v1.NodeDiskPressure}
 	expected = []bool{false, false, false}
 	for i, pod := range pods {
-		if result := manager.Admit(tCtx, &lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
+		result := manager.Admit(tCtx, &lifecycle.PodAdmitAttributes{Pod: pod})
+		if expected[i] != result.Admit {
 			t.Errorf("Admit pod: %v, expected: %v, actual: %v", pod, expected[i], result.Admit)
+		}
+		if result.RejectionType != lifecycle.RejectionBlocked {
+			t.Errorf("Admit pod: %v, expected rejection type: %v, actual: %v", pod, lifecycle.RejectionBlocked, result.RejectionType)
 		}
 	}
 }
@@ -3294,5 +3395,248 @@ func TestContainerEphemeralStorageLimitEvictionForRestartableInitContainers(t *t
 	}
 	if len(evictedPods) != 1 || evictedPods[0].Name != pod.Name {
 		t.Fatalf("Expected evicted pod %q, got %v", pod.Name, evictedPods)
+	}
+}
+
+func TestLocalStorageCapacityIsolationWithDRA(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRANodeAllocatableResources, true)
+
+	draEphemeral := func(containers []string, qty string) []v1.ExtraNodeAllocatableResource {
+		entries := []v1.ExtraNodeAllocatableResource{{
+			ContainerName: "",
+			Requests:      v1.ResourceList{v1.ResourceEphemeralStorage: resource.MustParse(qty)},
+			Limits:        v1.ResourceList{v1.ResourceEphemeralStorage: resource.MustParse(qty)},
+		}}
+		for _, container := range containers {
+			entries = append(entries, v1.ExtraNodeAllocatableResource{
+				ContainerName: container,
+				Limits:        v1.ResourceList{v1.ResourceEphemeralStorage: resource.MustParse(qty)},
+			})
+		}
+		return entries
+	}
+
+	tests := []struct {
+		name                                string
+		initContainers                      []v1.Container
+		containers                          []v1.Container
+		draResources                        []v1.ExtraNodeAllocatableResource
+		podUsed                             string
+		containerUsed                       map[string]string
+		draNodeAllocatableResourcesDisabled bool
+		wantEvicted                         bool
+	}{
+		{
+			name: "container within effective limit (spec + DRA) is not evicted",
+			containers: []v1.Container{
+				newContainer("c1", newResourceList("", "", "800Mi"), newResourceList("", "", "800Mi")),
+			},
+			draResources:  draEphemeral([]string{"c1"}, "1Gi"),
+			podUsed:       "1600Mi",
+			containerUsed: map[string]string{"c1": "1600Mi"},
+			wantEvicted:   false,
+		},
+		{
+			name: "container exceeding effective limit (spec + DRA) is evicted",
+			containers: []v1.Container{
+				newContainer("c1", newResourceList("", "", "800Mi"), newResourceList("", "", "800Mi")),
+				newContainer("c2", newResourceList("", "", "800Mi"), newResourceList("", "", "800Mi")),
+			},
+			draResources:  draEphemeral([]string{"c1"}, "500Mi"),
+			podUsed:       "1600Mi",
+			containerUsed: map[string]string{"c1": "1600Mi", "c2": "0"},
+			wantEvicted:   true,
+		},
+		{
+			name: "pod within effective limit is not evicted",
+			containers: []v1.Container{
+				newContainer("c1", newResourceList("", "", "800Mi"), newResourceList("", "", "800Mi")),
+			},
+			draResources:  draEphemeral([]string{"c1"}, "1Gi"),
+			podUsed:       "1600Mi",
+			containerUsed: map[string]string{"c1": "800Mi"},
+			wantEvicted:   false,
+		},
+		{
+			name: "pod exceeding effective limit is evicted",
+			containers: []v1.Container{
+				newContainer("c1", newResourceList("", "", "800Mi"), newResourceList("", "", "800Mi")),
+			},
+			draResources:  draEphemeral([]string{"c1"}, "500Mi"),
+			podUsed:       "1600Mi",
+			containerUsed: map[string]string{"c1": "800Mi"},
+			wantEvicted:   true,
+		},
+		{
+			name: "pod with only DRA allocation stays unbounded and is not evicted",
+			containers: []v1.Container{
+				newContainer("c1", newResourceList("", "", "100Mi"), newResourceList("", "", "")),
+			},
+			draResources:  draEphemeral([]string{"c1"}, "500Mi"),
+			podUsed:       "1600Mi",
+			containerUsed: map[string]string{"c1": "1600Mi"},
+			wantEvicted:   false,
+		},
+		{
+			name: "multi container shared DRA claim within pod limit is not evicted",
+			containers: []v1.Container{
+				newContainer("c1", newResourceList("", "", "800Mi"), newResourceList("", "", "800Mi")),
+				newContainer("c2", newResourceList("", "", "800Mi"), newResourceList("", "", "800Mi")),
+			},
+			draResources:  draEphemeral([]string{"c1", "c2"}, "1Gi"),
+			podUsed:       "2000Mi",
+			containerUsed: map[string]string{"c1": "1600Mi", "c2": "400Mi"},
+			wantEvicted:   false,
+		},
+		{
+			name: "multi container shared DRA claim exceeding pod limit is evicted",
+			containers: []v1.Container{
+				newContainer("c1", newResourceList("", "", "800Mi"), newResourceList("", "", "800Mi")),
+				newContainer("c2", newResourceList("", "", "800Mi"), newResourceList("", "", "800Mi")),
+			},
+			draResources:  draEphemeral([]string{"c1", "c2"}, "1Gi"),
+			podUsed:       "3200Mi",
+			containerUsed: map[string]string{"c1": "1600Mi", "c2": "1600Mi"},
+			wantEvicted:   true,
+		},
+		{
+			name: "partial limits (c1 has spec limit, c2 spec unset with DRA) within pod limit is not evicted",
+			containers: []v1.Container{
+				newContainer("c1", newResourceList("", "", "800Mi"), newResourceList("", "", "800Mi")),
+				newContainer("c2", newResourceList("", "", ""), newResourceList("", "", "")),
+			},
+			draResources:  draEphemeral([]string{"c2"}, "1Gi"),
+			podUsed:       "1600Mi",
+			containerUsed: map[string]string{"c1": "400Mi", "c2": "1200Mi"},
+			wantEvicted:   false,
+		},
+		{
+			name: "partial limits (c1 has spec limit, c2 spec unset with DRA) exceeding pod limit is evicted",
+			containers: []v1.Container{
+				newContainer("c1", newResourceList("", "", "800Mi"), newResourceList("", "", "800Mi")),
+				newContainer("c2", newResourceList("", "", ""), newResourceList("", "", "")),
+			},
+			draResources:  draEphemeral([]string{"c2"}, "1Gi"),
+			podUsed:       "2000Mi",
+			containerUsed: map[string]string{"c1": "400Mi", "c2": "1600Mi"},
+			wantEvicted:   true,
+		},
+		{
+			name: "restartable init container within effective DRA limit is not evicted",
+			initContainers: []v1.Container{
+				newRestartableInitContainer("sidecar", newResourceList("", "", "10Mi"), newResourceList("", "", "10Mi")),
+			},
+			containers: []v1.Container{
+				newContainer("main", newResourceList("", "", ""), newResourceList("", "", "")),
+			},
+			draResources:  draEphemeral([]string{"sidecar"}, "100Mi"),
+			podUsed:       "100Mi",
+			containerUsed: map[string]string{"sidecar": "100Mi", "main": "0"},
+			wantEvicted:   false,
+		},
+		{
+			name: "restartable init container exceeding effective DRA limit is evicted",
+			initContainers: []v1.Container{
+				newRestartableInitContainer("sidecar", newResourceList("", "", "10Mi"), newResourceList("", "", "10Mi")),
+			},
+			containers: []v1.Container{
+				newContainer("main", newResourceList("", "", "800Mi"), newResourceList("", "", "800Mi")),
+			},
+			draResources:  draEphemeral([]string{"sidecar"}, "20Mi"),
+			podUsed:       "100Mi",
+			containerUsed: map[string]string{"sidecar": "100Mi", "main": "0"},
+			wantEvicted:   true,
+		},
+		{
+			name: "pod exceeding spec limit is evicted with the feature disabled",
+			containers: []v1.Container{
+				newContainer("c1", newResourceList("", "", "800Mi"), newResourceList("", "", "800Mi")),
+			},
+			draResources:                        draEphemeral([]string{"c1"}, "1Gi"),
+			podUsed:                             "1600Mi",
+			containerUsed:                       map[string]string{"c1": "800Mi"},
+			draNodeAllocatableResourcesDisabled: true,
+			wantEvicted:                         true,
+		},
+		{
+			name: "container exceeding spec limit is evicted with the feature disabled",
+			containers: []v1.Container{
+				newContainer("c1", newResourceList("", "", "800Mi"), newResourceList("", "", "800Mi")),
+				newContainer("c2", newResourceList("", "", "800Mi"), newResourceList("", "", "800Mi")),
+			},
+			draResources:                        draEphemeral([]string{"c1"}, "1Gi"),
+			podUsed:                             "1600Mi",
+			containerUsed:                       map[string]string{"c1": "1600Mi", "c2": "0"},
+			draNodeAllocatableResourcesDisabled: true,
+			wantEvicted:                         true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			if tc.draNodeAllocatableResourcesDisabled {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRANodeAllocatableResources, false)
+			}
+
+			pod := newPod("test-pod", defaultPriority, tc.containers, nil)
+			pod.Spec.InitContainers = tc.initContainers
+			pod.Status.ExtraNodeAllocatableResources = tc.draResources
+
+			podUsedBytes := uint64(quantityMustParse(tc.podUsed).Value())
+			var containerStats []statsapi.ContainerStats
+			for name, used := range tc.containerUsed {
+				usedBytes := uint64(quantityMustParse(used).Value())
+				containerStats = append(containerStats, statsapi.ContainerStats{
+					Name:   name,
+					Rootfs: &statsapi.FsStats{UsedBytes: &usedBytes},
+				})
+			}
+
+			podStat := statsapi.PodStats{
+				PodRef: statsapi.PodReference{
+					Name: pod.Name, Namespace: pod.Namespace, UID: string(pod.UID),
+				},
+				EphemeralStorage: &statsapi.FsStats{UsedBytes: &podUsedBytes},
+				Containers:       containerStats,
+			}
+
+			diskStat := diskStats{
+				rootFsAvailableBytes:  "1Gi",
+				imageFsAvailableBytes: "200Mi",
+				podStats:              map[*v1.Pod]statsapi.PodStats{pod: podStat},
+			}
+			summaryProvider := &fakeSummaryProvider{result: makeDiskStats(diskStat)}
+
+			podKiller := &mockPodKiller{}
+			mgr := &managerImpl{
+				clock:                         testingclock.NewFakeClock(time.Now()),
+				killPodFunc:                   podKiller.killPodNow,
+				imageGC:                       &mockDiskGC{err: nil},
+				containerGC:                   &mockDiskGC{err: nil},
+				config:                        Config{MaxPodGracePeriodSeconds: 5, PressureTransitionPeriod: time.Minute * 5},
+				recorder:                      &record.FakeRecorder{},
+				summaryProvider:               summaryProvider,
+				nodeRef:                       &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test")},
+				localStorageCapacityIsolation: true,
+				dedicatedImageFs:              new(false),
+			}
+
+			evictedPods, err := mgr.synchronize(tCtx, &mockDiskInfoProvider{dedicatedImageFs: new(false)}, func() []*v1.Pod {
+				return []*v1.Pod{pod}
+			})
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+			if tc.wantEvicted {
+				if len(evictedPods) != 1 || evictedPods[0].Name != pod.Name {
+					t.Fatalf("Expected pod %q to be evicted, got %v", pod.Name, evictedPods)
+				}
+			} else {
+				if len(evictedPods) != 0 {
+					t.Fatalf("Expected no pods to be evicted, got %v", evictedPods)
+				}
+			}
+		})
 	}
 }

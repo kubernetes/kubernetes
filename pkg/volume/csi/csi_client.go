@@ -24,6 +24,7 @@ import (
 	"net"
 	"strconv"
 	"sync"
+	"unicode/utf8"
 
 	csipbv1 "github.com/container-storage-interface/spec/lib/go/csi"
 	"google.golang.org/grpc"
@@ -33,13 +34,18 @@ import (
 	api "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 )
 
 type csiClient interface {
-	NodeGetInfo(ctx context.Context) (
+	// NodeGetInfo sets controller_get_node_info in the request to controllerGetNodeInfo.
+	// The caller is responsible for checking that the driver has the NODE_INFO_FROM_CONTROLLER
+	// node capability before setting it. If it is true, the caller must ignore maxVolumePerNode
+	// and accessibleTopology.
+	NodeGetInfo(ctx context.Context, controllerGetNodeInfo bool) (
 		nodeID string,
 		maxVolumePerNode int64,
 		accessibleTopology map[string]string,
@@ -143,6 +149,18 @@ type csiResizeOptions struct {
 
 var _ csiClient = &csiDriverClient{}
 
+const (
+	maxVolumeHealthConditions = 16
+	// Volume and storage health conditions share the same reason and message limits.
+	maxHealthReasonLen  = 256
+	maxHealthMessageLen = 1024
+	// invalidHealthReason replaces driver reasons the API server would reject.
+	// A rejected reason fails the whole pod or CSINode status update.
+	invalidHealthReason = "InvalidDriverReason"
+
+	maxStorageHealthConditions = 16
+)
+
 type nodeV1ClientCreator func(addr csiAddr, metricsManager *MetricsManager) (
 	nodeClient csipbv1.NodeClient,
 	closer io.Closer,
@@ -167,6 +185,10 @@ func newV1NodeClient(addr csiAddr, metricsManager *MetricsManager) (nodeClient c
 	return nodeClient, conn, nil
 }
 
+// defaultNodeV1ClientCreator is the nodeV1ClientCreator used by newCsiDriverClient.
+// Unit tests replace it with a fake.
+var defaultNodeV1ClientCreator nodeV1ClientCreator = newV1NodeClient
+
 func newCsiDriverClient(driverName csiDriverName) (*csiDriverClient, error) {
 	if driverName == "" {
 		return nil, fmt.Errorf("driver name is empty")
@@ -177,16 +199,19 @@ func newCsiDriverClient(driverName csiDriverName) (*csiDriverClient, error) {
 		return nil, fmt.Errorf("driver name %s not found in the list of registered CSI drivers", driverName)
 	}
 
-	nodeV1ClientCreator := newV1NodeClient
-	return &csiDriverClient{
-		driverName:          driverName,
-		addr:                csiAddr(existingDriver.endpoint),
-		nodeV1ClientCreator: nodeV1ClientCreator,
-		metricsManager:      NewCSIMetricsManager(string(driverName)),
-	}, nil
+	return newCsiDriverClientForEndpoint(driverName, existingDriver.endpoint), nil
 }
 
-func (c *csiDriverClient) NodeGetInfo(ctx context.Context) (
+func newCsiDriverClientForEndpoint(driverName csiDriverName, endpoint string) *csiDriverClient {
+	return &csiDriverClient{
+		driverName:          driverName,
+		addr:                csiAddr(endpoint),
+		nodeV1ClientCreator: defaultNodeV1ClientCreator,
+		metricsManager:      NewCSIMetricsManager(string(driverName)),
+	}
+}
+
+func (c *csiDriverClient) NodeGetInfo(ctx context.Context, controllerGetNodeInfo bool) (
 	nodeID string,
 	maxVolumePerNode int64,
 	accessibleTopology map[string]string,
@@ -194,14 +219,14 @@ func (c *csiDriverClient) NodeGetInfo(ctx context.Context) (
 	klog.V(4).InfoS(log("calling NodeGetInfo rpc"))
 
 	var getNodeInfoError error
-	nodeID, maxVolumePerNode, accessibleTopology, getNodeInfoError = c.nodeGetInfoV1(ctx)
+	nodeID, maxVolumePerNode, accessibleTopology, getNodeInfoError = c.nodeGetInfoV1(ctx, controllerGetNodeInfo)
 	if getNodeInfoError != nil {
 		klog.InfoS("Error calling CSI NodeGetInfo()", "err", getNodeInfoError.Error())
 	}
 	return nodeID, maxVolumePerNode, accessibleTopology, getNodeInfoError
 }
 
-func (c *csiDriverClient) nodeGetInfoV1(ctx context.Context) (
+func (c *csiDriverClient) nodeGetInfoV1(ctx context.Context, controllerGetNodeInfo bool) (
 	nodeID string,
 	maxVolumePerNode int64,
 	accessibleTopology map[string]string,
@@ -213,7 +238,7 @@ func (c *csiDriverClient) nodeGetInfoV1(ctx context.Context) (
 	}
 	defer closer.Close()
 
-	res, err := nodeClient.NodeGetInfo(ctx, &csipbv1.NodeGetInfoRequest{})
+	res, err := nodeClient.NodeGetInfo(ctx, &csipbv1.NodeGetInfoRequest{ControllerGetNodeInfo: controllerGetNodeInfo})
 	if err != nil {
 		return "", 0, nil, err
 	}
@@ -736,8 +761,6 @@ func (c *csiDriverClient) NodeGetStorageHealth(ctx context.Context, secrets map[
 	return mapStorageBackendHealth(resp.GetBackendHealth())
 }
 
-const maxVolumeHealthConditions = 16
-
 func mapVolumeHealthConditions(vh *csipbv1.VolumeHealth) []api.VolumeHealthCondition {
 	if vh == nil {
 		return nil
@@ -756,19 +779,17 @@ func mapVolumeHealthConditions(vh *csipbv1.VolumeHealth) []api.VolumeHealthCondi
 		if entry == nil {
 			continue
 		}
-		status, ok := mapVolumeHealthStatus(entry.GetStatus())
-		if !ok {
-			continue
-		}
-		key := conditionKey{status: status, reason: entry.GetReason()}
+		status := mapVolumeHealthStatus(entry.GetStatus())
+		reason := mapHealthReason(entry.GetReason())
+		key := conditionKey{status: status, reason: reason}
 		if _, exists := seen[key]; exists {
 			continue
 		}
 		seen[key] = struct{}{}
 		out = append(out, api.VolumeHealthCondition{
 			Status:  status,
-			Reason:  entry.GetReason(),
-			Message: entry.GetMessage(),
+			Reason:  reason,
+			Message: truncateHealthMessage(entry.GetMessage()),
 		})
 		if len(out) == maxVolumeHealthConditions {
 			break
@@ -777,41 +798,53 @@ func mapVolumeHealthConditions(vh *csipbv1.VolumeHealth) []api.VolumeHealthCondi
 	return out
 }
 
-func mapVolumeHealthStatus(status csipbv1.VolumeHealthErrorType) (api.VolumeHealthStatusType, bool) {
-	switch status {
-	case csipbv1.VolumeHealthErrorType_INACCESSIBLE:
-		return api.VolumeHealthInaccessible, true
-	case csipbv1.VolumeHealthErrorType_DATA_LOSS:
-		return api.VolumeHealthDataLoss, true
-	case csipbv1.VolumeHealthErrorType_DEGRADED:
-		return api.VolumeHealthDegraded, true
-	default:
-		return "", false
+func mapHealthReason(reason string) string {
+	if len(reason) == 0 || len(reason) > maxHealthReasonLen || len(metav1validation.IsValidConditionReason(reason)) > 0 {
+		klog.V(4).Info(log("replacing invalid health reason %q with %q", reason, invalidHealthReason))
+		return invalidHealthReason
 	}
+	return reason
 }
 
-const maxStorageHealthConditions = 16
+// truncateHealthMessage cuts message to the API limit without splitting
+// a multi-byte UTF-8 character.
+func truncateHealthMessage(message string) string {
+	if len(message) <= maxHealthMessageLen {
+		return message
+	}
+	n := maxHealthMessageLen
+	for n > 0 && !utf8.RuneStart(message[n]) {
+		n--
+	}
+	return message[:n]
+}
+
+func mapVolumeHealthStatus(status csipbv1.VolumeHealthErrorType) api.VolumeHealthStatusType {
+	switch status {
+	case csipbv1.VolumeHealthErrorType_INACCESSIBLE:
+		return api.VolumeHealthInaccessible
+	case csipbv1.VolumeHealthErrorType_DATA_LOSS:
+		return api.VolumeHealthDataLoss
+	case csipbv1.VolumeHealthErrorType_DEGRADED:
+		return api.VolumeHealthDegraded
+	default:
+		return api.VolumeHealthUnknown
+	}
+}
 
 func mapStorageBackendHealth(entries []*csipbv1.NodeGetStorageHealthResponse_StorageBackendHealth) ([]storagev1.StorageHealthCondition, error) {
 	if len(entries) == 0 {
 		return nil, nil
-	}
-	if len(entries) > maxStorageHealthConditions {
-		return nil, fmt.Errorf("NodeGetStorageHealth returned %d conditions, maximum is %d", len(entries), maxStorageHealthConditions)
 	}
 	out := make([]storagev1.StorageHealthCondition, 0, len(entries))
 	for i, entry := range entries {
 		if entry == nil {
 			continue
 		}
-		status, ok := mapStorageHealthStatus(entry.GetStatus())
-		if !ok {
-			continue
-		}
 		condition := storagev1.StorageHealthCondition{
-			Status:  status,
-			Reason:  entry.GetReason(),
-			Message: entry.GetMessage(),
+			Status:  mapStorageHealthStatus(entry.GetStatus()),
+			Reason:  mapHealthReason(entry.GetReason()),
+			Message: truncateHealthMessage(entry.GetMessage()),
 		}
 		if capability := entry.GetVolumeCapability(); capability != nil {
 			accessMode, volumeMode, err := mapStorageHealthVolumeCapability(capability)
@@ -822,6 +855,9 @@ func mapStorageBackendHealth(entries []*csipbv1.NodeGetStorageHealthResponse_Sto
 			condition.VolumeMode = &volumeMode
 		}
 		out = append(out, condition)
+		if len(out) == maxStorageHealthConditions {
+			break
+		}
 	}
 	return out, nil
 }
@@ -859,19 +895,23 @@ func mapStorageHealthVolumeCapability(capability *csipbv1.VolumeCapability) (api
 	return accessMode, volumeMode, nil
 }
 
-func mapStorageHealthStatus(status csipbv1.StorageHealthErrorType) (storagev1.StorageHealthStatusType, bool) {
+func mapStorageHealthStatus(status csipbv1.StorageHealthErrorType) storagev1.StorageHealthStatusType {
 	switch status {
 	case csipbv1.StorageHealthErrorType_STORAGE_UNREACHABLE:
-		return storagev1.StorageUnreachable, true
+		return storagev1.StorageUnreachable
 	case csipbv1.StorageHealthErrorType_STORAGE_DEGRADED:
-		return storagev1.StorageDegraded, true
+		return storagev1.StorageDegraded
 	default:
-		return "", false
+		return storagev1.StorageHealthUnknown
 	}
 }
 
 func (c *csiDriverClient) NodeSupportsVolumeMountGroup(ctx context.Context) (bool, error) {
 	return c.nodeSupportsCapability(ctx, csipbv1.NodeServiceCapability_RPC_VOLUME_MOUNT_GROUP)
+}
+
+func (c *csiDriverClient) NodeSupportsNodeInfoFromController(ctx context.Context) (bool, error) {
+	return c.nodeSupportsCapability(ctx, csipbv1.NodeServiceCapability_RPC_NODE_INFO_FROM_CONTROLLER)
 }
 
 func (c *csiDriverClient) nodeSupportsCapability(ctx context.Context, capabilityType csipbv1.NodeServiceCapability_RPC_Type) (bool, error) {

@@ -69,8 +69,11 @@ import (
 // Parsing keeps at most 29 significant digits, enough for any int64 value at
 // nano precision, and rounds any precision beyond this away from zero.
 // Parsing also preserves a value only down to nano, rounding a finer non-zero
-// value away from zero, so "0.9n" becomes "1n". The int64 accessors round and
-// may overflow on top of that: see Value, MilliValue and ScaledValue.
+// value away from zero, so "0.9n" becomes "1n". Parsing saturates the exponent
+// to [-2147483647, 2147483647] after accounting for any digits after the
+// decimal point, so "0.01e2147483649" keeps its value but "1e4294967297"
+// parses as 1e2147483647. The int64 accessors round and may overflow on top
+// of that: see Value, MilliValue and ScaledValue.
 //
 // When a Quantity is parsed from a string, it will remember the type of suffix
 // it had, and will use the same type again when it is serialized.
@@ -378,9 +381,27 @@ func ParseQuantity(str string) (Quantity, error) {
 		return Quantity{}, err
 	}
 
-	base, exponent, format, ok := quantitySuffixer.interpret(suffix(suf))
+	base, parsedExponent, format, ok := quantitySuffixer.interpret(suffix(suf))
 	if !ok {
 		return Quantity{}, ErrSuffix
+	}
+	// Earlier releases narrowed the exponent to int32. An exponent too big for
+	// int32 wrapped around. We track this in maybeOverflowedExponent so we can
+	// preserve the error-returning behavior of earlier releases in the below parser code.
+	maybeOverflowedExponent := int32(parsedExponent)
+	// Saturate so scale arithmetic can't overflow. The 2x multiplier to math.MaxInt32
+	// gives room for an out of range exponent that is reduced by digits after the decimal point.
+	exponent := min(max(parsedExponent, math.MinInt32), 2*math.MaxInt32)
+	// Earlier releases always accepted zero regardless of the exponent. We
+	// track if we got a zero to more easily handle compatibility with earlier
+	// releases.
+	isZero := num == "0" && strings.TrimLeft(denom, "0") == ""
+	if isZero {
+		// To preserve the behavior of earlier releases, a zero keeps the possibly wrapped
+		// exponent. A number with no digits then parses or fails as before, and a
+		// zero keeps the small scale earlier releases gave it (a huge scale makes
+		// AsFloat64Slow very slow).
+		exponent = int64(maybeOverflowedExponent)
 	}
 
 	precision := int32(0)
@@ -389,7 +410,9 @@ func ParseQuantity(str string) (Quantity, error) {
 	forceRecanonicalize := false
 	switch format {
 	case DecimalExponent, DecimalSI:
-		scale = exponent
+		// if we have a denominator, shift the entire value to the left by the number of places in the
+		// denominator. We do this before we saturate.
+		scale = int32(min(max(exponent-int64(len(denom)), math.MinInt32), math.MaxInt32))
 		precision = maxInt64Factors - int32(len(num)+len(denom))
 		// preserves compatibility with recanonicalizing integers >18 digits long, even if they are in int64 range
 		forceRecanonicalize = precision <= 0
@@ -404,13 +427,19 @@ func ParseQuantity(str string) (Quantity, error) {
 		default:
 			precision = -1
 		}
+	default:
+		return Quantity{}, ErrFormatWrong
 	}
 
 	if precision >= 0 {
-		// if we have a denominator, shift the entire value to the left by the number of places in the
-		// denominator
-		scale -= int32(len(denom))
-		if scale >= int32(Nano) {
+		if scale >= int32(Nano) { // fast path: build an int64Amount directly, without inf.Dec.
+			// Before exponents saturated, ParseQuantity rejected "1e2147483648" but accepted
+			// "1.25e2147483648". To preserve that, we reject only when
+			// len(denom) == 0, where there are no digits after the decimal
+			// point.
+			if !Scale(maybeOverflowedExponent).canInfScale() && len(denom) == 0 {
+				return Quantity{}, ErrSuffix
+			}
 			shifted := num + denom
 
 			uvalue, err := strconv.ParseUint(shifted, 10, 64)
@@ -469,13 +498,16 @@ func ParseQuantity(str string) (Quantity, error) {
 
 	// So that no one but us has to think about suffixes, remove it.
 	if base == 10 {
-		if !Scale(exponent).canInfScale() {
-			// Return an error if the exponent is math.MinInt32 rather than
-			// rounding it to 1n.
-			return Quantity{}, ErrSuffix
+		// Keep returning this error when the narrowed exponent is math.MinInt32,
+		// except for the inputs the int64 fast path above took before exponents
+		// saturated: digits after the decimal point, at most 19 digits, and an
+		// int64 value, as in "1.25e-2147483648".
+		if !Scale(maybeOverflowedExponent).canInfScale() && !isZero {
+			if _, fitsInt64 := amount.Unscaled(); len(denom) == 0 || precision < 0 || !fitsInt64 {
+				return Quantity{}, ErrSuffix
+			}
 		}
-		// This is guaranteed to fit within inf.Scale because of the above check.
-		widenedExponentScale := widenScale(Scale(exponent))
+		widenedExponentScale := widenedScale(exponent)
 
 		// amount only contains the whole number part+fractional part at this point (with no exponent / suffix).
 		// Values that kept fractional digits have scale < 0.
@@ -494,8 +526,8 @@ func ParseQuantity(str string) (Quantity, error) {
 			// yet, we figure out the scale we need to round to, so that when the
 			// exponent is later set, we end with nano scale precision.
 
-			// The exponent is negative here, so the result (-9 minus a negative exponent)
-			// always fits.
+			// The exponent is negative here, and the clamp above keeps it at
+			// least math.MinInt32, so the subtraction below fits.
 			scaleBeforeExponent, fits := narrowScale(widenScale(Nano) - widenedExponentScale)
 			if !fits {
 				assertUnreachable("scaleBeforeExponent did not fit")
@@ -645,6 +677,13 @@ func (_ Quantity) OpenAPISchemaFormat() string { return "" }
 // the OpenAPI v3 spec of this type.
 func (Quantity) OpenAPIV3OneOfTypes() []string { return []string{"string", "number"} }
 
+// exponentNotationBinarySIShortCircuitThreshold is Scale well all values that CanonicalizeBytes
+// will serialize with a BinarySI suffix.
+// 10^70 is value is well above 1024^7 (and the smallest base 10 exponent that 1024^7
+// divides into evenly) but low enough that all scales below this value can safely
+// be handled by CanonicalizeBytes without short-circuiting.
+const exponentNotationBinarySIShortCircuitThreshold = 70
+
 // CanonicalizeBytes returns the canonical form of q and its suffix (see comment on Quantity).
 //
 // Note about BinarySI:
@@ -665,6 +704,9 @@ func (q *Quantity) CanonicalizeBytes(out []byte) (result, suffix []byte) {
 		if q.CmpInt64(-1024) > 0 && q.CmpInt64(1024) < 0 {
 			// This avoids rounding and hopefully confusion, too.
 			format = DecimalSI
+		} else if q.widenedScale() >= exponentNotationBinarySIShortCircuitThreshold {
+			// Short-circuit the base-1024 computation since q must be written in base1024Exponent notation.
+			format = DecimalExponent
 		} else {
 			var exact bool
 			if rounded, exact = q.AsScale(0); !exact {
@@ -694,18 +736,15 @@ func (q *Quantity) CanonicalizeBytes(out []byte) (result, suffix []byte) {
 		return number, suffix
 	default:
 		// format must be BinarySI
-		number, exponent := rounded.AsCanonicalBase1024Bytes(out)
-		suffix, ok := quantitySuffixer.constructBytes(2, exponent*10, format)
-		if !ok && exponent != 0 {
-			// BinarySI only defines suffixes up to "Ei" (2^60). For a larger
-			// exponent there is no suffix, so fall back to decimal exponent
-			// notation ("e") instead of dropping the suffix, which would
-			// silently corrupt the value (e.g. 2^70 serializing to "1").
-			// The base-1024 mantissa/exponent cannot be reused for "e"
-			// notation, so recompute the canonical mantissa and exponent in
-			// base 10.
-			number, exponent := rounded.AsCanonicalBytes(out)
-			suffix, ok := quantitySuffixer.constructBytes(10, exponent, DecimalExponent)
+		number, base1024Exponent := rounded.AsCanonicalBase1024Bytes(out)
+		base2Exponent := base1024Exponent * 10
+		suffix, ok := quantitySuffixer.constructBytes(2, base2Exponent, format)
+		if !ok && base1024Exponent != 0 {
+			// A BinarySI that is below a scale of
+			// exponentNotationBinarySIShortCircuitThreshold but mantissa large enough so
+			// that the effective scale is above 1024^7 we still write it in decimal format.
+			number, base10Exponent := rounded.AsCanonicalBytes(out)
+			suffix, ok := quantitySuffixer.constructBytes(10, base10Exponent, DecimalExponent)
 			if !ok {
 				assertUnreachable("CanonicalizeBytes: no DecimalExponent suffix")
 			}
@@ -724,7 +763,7 @@ func (q *Quantity) AsApproximateFloat64() float64 {
 	var exponent int
 	if q.d.Dec != nil {
 		base, _ = big.NewFloat(0).SetInt(q.d.Dec.UnscaledBig()).Float64()
-		exponent = int(-q.d.Dec.Scale())
+		exponent = -int(q.d.Dec.Scale())
 	} else {
 		base = float64(q.i.value)
 		exponent = int(q.i.scale)
@@ -742,24 +781,48 @@ func (q *Quantity) AsApproximateFloat64() float64 {
 // value of the quantity is outside the range of a float64 +Inf/-Inf will be
 // returned.
 func (q *Quantity) AsFloat64Slow() float64 {
+	scale := q.widenedScale()
+	sign := q.Sign()
+
+	// special case 0 regardless of scale
+	if sign == 0 {
+		return 0.0
+	}
+
 	infDec := q.internalReadOnlyDec()
+	unscaledBig := new(big.Int).Set(infDec.UnscaledBig())
+
+	// Move factors of 10 from the value into the scale.
+	unscaledBig, scaleFromValue := removeBigIntFactors(unscaledBig, bigTen)
+	scale += widenedScale(scaleFromValue)
+
+	// smaller than the smallest representable non-zero float
+	if scale < -324 {
+		return 0.0
+	}
+
+	// outside float range limits, return +Inf/-Inf
+	if scale > 309 {
+		return math.Inf(sign)
+	}
 
 	var absScale int64
-	if infDec.Scale() < 0 {
-		absScale = int64(-infDec.Scale())
+	if scale < 0 {
+		absScale = -int64(scale)
 	} else {
-		absScale = int64(infDec.Scale())
+		absScale = int64(scale)
 	}
+
 	pow10AbsScale := big.NewInt(10)
 	pow10AbsScale = pow10AbsScale.Exp(pow10AbsScale, big.NewInt(absScale), nil)
 
 	var resultBigFloat *big.Float
-	if infDec.Scale() < 0 {
-		resultBigInt := new(big.Int).Mul(infDec.UnscaledBig(), pow10AbsScale)
+	if scale > 0 {
+		resultBigInt := new(big.Int).Mul(unscaledBig, pow10AbsScale)
 		resultBigFloat = new(big.Float).SetInt(resultBigInt)
 	} else {
 		pow10AbsScaleFloat := new(big.Float).SetInt(pow10AbsScale)
-		resultBigFloat = new(big.Float).SetInt(infDec.UnscaledBig())
+		resultBigFloat = new(big.Float).SetInt(unscaledBig)
 		resultBigFloat = resultBigFloat.Quo(resultBigFloat, pow10AbsScaleFloat)
 	}
 

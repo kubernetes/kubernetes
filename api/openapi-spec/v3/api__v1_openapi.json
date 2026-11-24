@@ -402,7 +402,7 @@
         "type": "object"
       },
       "io.k8s.api.core.v1.Binding": {
-        "description": "Binding ties one object to another; for example, a pod is bound to a node by a scheduler.",
+        "description": "Binding assigns a pod to a node.",
         "properties": {
           "apiVersion": {
             "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
@@ -428,7 +428,7 @@
               }
             ],
             "default": {},
-            "description": "target is the target object that you want to bind to the standard object."
+            "description": "target is the node that you want to bind the pod to."
           }
         },
         "required": [
@@ -659,6 +659,16 @@
         ],
         "type": "object"
       },
+      "io.k8s.api.core.v1.CgroupOptions": {
+        "description": "CgroupOptions defines options for cgroup filesystem access.",
+        "properties": {
+          "mountMode": {
+            "description": "mountMode controls how the cgroup filesystem is mounted in the container. Valid values are \"ReadOnly\" and \"ReadWrite\". If not specified, the container runtime's default mount mode is used. The kubelet refuses to create a container with an unrecognized value. \"ReadOnly\" cannot be set when the container's privileged field is true. \"ReadWrite\" cannot be set when spec.hostNetwork is true and spec.hostUsers is false.",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "io.k8s.api.core.v1.CinderPersistentVolumeSource": {
         "description": "Represents a cinder volume resource in Openstack. A Cinder volume must exist before mounting to a container. The volume must also be in the same region as the kubelet. Cinder volumes support ownership management and SELinux relabeling.",
         "properties": {
@@ -759,7 +769,7 @@
             "type": "string"
           },
           "user": {
-            "description": "user is Optional: The owner UID of the created file. If specified, the item-level user field takes precedence over defaultUser. (Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
+            "description": "user is Optional: The owner UID of the created file. If specified, the item-level user field takes precedence over defaultUser. (Beta) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
             "format": "int64",
             "type": "integer"
           }
@@ -1074,7 +1084,7 @@
             "type": "integer"
           },
           "defaultUser": {
-            "description": "defaultUser is Optional: The owner UID of the created files by default. The defaultUser field is only used as a fallback when the item-level user field is unset. (Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
+            "description": "defaultUser is Optional: The owner UID of the created files by default. The defaultUser field is only used as a fallback when the item-level user field is unset. (Beta) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
             "format": "int64",
             "type": "integer"
           },
@@ -1137,6 +1147,10 @@
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
+          },
+          "hostCgroupNamespace": {
+            "description": "hostCgroupNamespace specifies whether the container uses the host's cgroup namespace. If true, the container shares the cgroup namespace with the host, so cgroups other than the container's own cgroup are visible to the container. If false, a new cgroup namespace rooted at the container's own cgroup is created for the container. If unset, the container runtime selects the behavior. Must not be set to true when the pod uses user namespaces (spec.hostUsers is false). Must not be set to true with securityContext.cgroupOptions.mountMode set to ReadWrite, unless securityContext.privileged is true. Must not be set when spec.os.name is windows. The runtime handler must support cgroup namespaces, otherwise the container will fail to start. Cannot be updated.",
+            "type": "boolean"
           },
           "image": {
             "description": "image is the container image name. More info: https://kubernetes.io/docs/concepts/containers/images This field is optional to allow higher level config management to default or override container images in workload controllers like Deployments and StatefulSets.",
@@ -1728,7 +1742,7 @@
             "description": "resourceFieldRef selects a resource of the container: only resources limits and requests (limits.cpu, limits.memory, requests.cpu and requests.memory) are currently supported."
           },
           "user": {
-            "description": "user is Optional: The owner UID of the created file. If specified, the item-level user field takes precedence over defaultUser. (Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
+            "description": "user is Optional: The owner UID of the created file. If specified, the item-level user field takes precedence over defaultUser. (Beta) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
             "format": "int64",
             "type": "integer"
           }
@@ -1747,7 +1761,7 @@
             "type": "integer"
           },
           "defaultUser": {
-            "description": "defaultUser is Optional: The owner UID of the created files by default. The defaultUser field is only used as a fallback when the item-level user field is unset. (Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
+            "description": "defaultUser is Optional: The owner UID of the created files by default. The defaultUser field is only used as a fallback when the item-level user field is unset. (Beta) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
             "format": "int64",
             "type": "integer"
           },
@@ -2089,6 +2103,10 @@
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
+          },
+          "hostCgroupNamespace": {
+            "description": "hostCgroupNamespace is not allowed for ephemeral containers.",
+            "type": "boolean"
           },
           "image": {
             "description": "image is the container image name. More info: https://kubernetes.io/docs/concepts/containers/images",
@@ -2493,6 +2511,35 @@
             "x-kubernetes-list-type": "atomic"
           }
         },
+        "type": "object"
+      },
+      "io.k8s.api.core.v1.ExtraNodeAllocatableResource": {
+        "description": "ExtraNodeAllocatableResource describes node allocatable resources that are added to the resources of a pod or of one of its containers.\n\nA list that is not empty must satisfy:\n  - It has exactly one pod entry (empty containerName).\n  - Each container entry names an init or regular container.\n  - No two entries have the same containerName.\n  - In each entry, requests must not exceed limits for the resources that have both.\n  - The sum of the requests of the regular and sidecar container entries must not exceed the\n    pod entry's requests.\n  - The limits of each regular and sidecar container entry must not exceed the pod entry's limits\n    for the resources that the pod entry limits.\n\nNon-restartable init container entries are not checked against the pod entry, because the spec of the containers that run after them may already cover them.\n\nFor DRA, the scheduler fills the entries from the `nodeAllocatableResources` of the devices allocated to the pod's claims:\n  - Each container entry, summed over the devices that the container uses:\n    `overhead.perContainer` in requests, and `mapping` + `overhead.perPod` +\n    `overhead.perContainer` in limits.\n  - The pod entry: `mapping` + `overhead.perPod`, summed over all devices, plus what the\n    container entries' requests add to the peak of the spec requests and limits.\n\nA container can use all the resources of its devices, while the pod entry caps the extra resources that the containers use together.",
+        "properties": {
+          "containerName": {
+            "default": "",
+            "description": "containerName is the name of the init or regular container that these resources are added to. An empty name marks the pod entry, whose requests and limits apply to the entire pod.",
+            "type": "string"
+          },
+          "limits": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.api.resource.Quantity"
+            },
+            "description": "limits are added to the limits of the pod or container, as described in containerName. The kubelet applies them as follows: - Pod cgroup: the limits of the pod entry are added to the aggregate of the containers' spec\n  limits when they are set, unless the pod level resources (`spec.resources`) set the resource.\n  That value is then used as is and must already include the extra resources.\n- Container cgroup: the limits of the container entry are added to the container's spec limits.\n  For cpu and memory only when the container spec sets a limit; for hugepages also when it does\n  not, unless the pod level resources (`spec.resources`) set a hugepages limit.\n- Ephemeral-storage is not enforced through cgroups. The limits are added to the container's\n  and the pod's limits that kubelet eviction uses, when the spec sets one.",
+            "type": "object"
+          },
+          "requests": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.api.resource.Quantity"
+            },
+            "description": "requests are added to the requests of the pod or container, as described in containerName. A resource that is missing from requests counts as zero; it is not defaulted from limits. The kubelet applies them as follows: - Pod cgroup: the requests of the pod entry are added to the aggregate of the containers'\n  spec requests, unless the pod level resources (`spec.resources`) set the resource. That value\n  is then used as is and must already include the extra resources.\n- Container cgroup: the requests of the container entry are added to the container's spec\n  requests.",
+            "type": "object"
+          }
+        },
+        "required": [
+          "containerName",
+          "limits"
+        ],
         "type": "object"
       },
       "io.k8s.api.core.v1.FCVolumeSource": {
@@ -3070,7 +3117,7 @@
             "type": "string"
           },
           "user": {
-            "description": "user is Optional: The owner UID of the created file. If specified, the item-level user field takes precedence over defaultUser. (Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
+            "description": "user is Optional: The owner UID of the created file. If specified, the item-level user field takes precedence over defaultUser. (Beta) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
             "format": "int64",
             "type": "integer"
           }
@@ -3681,107 +3728,6 @@
         },
         "type": "object"
       },
-      "io.k8s.api.core.v1.NodeAllocatableMappedResources": {
-        "description": "NodeAllocatableMappedResources describes mapped node allocatable resource allocations.",
-        "properties": {
-          "name": {
-            "default": "",
-            "description": "name is the name of the resource (e.g., cpu, memory).",
-            "type": "string"
-          },
-          "quantity": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.api.resource.Quantity"
-              }
-            ],
-            "description": "quantity is the total node allocatable resource capacity allocated for the claim. This claim's allocated devices is shared by all the containers referencing the claim. Kubelet adds this value to both requests and limits at the pod-level cgroup, and to limits at the container-level cgroup for each container referencing the claim."
-          }
-        },
-        "required": [
-          "name",
-          "quantity"
-        ],
-        "type": "object"
-      },
-      "io.k8s.api.core.v1.NodeAllocatableOverheadResources": {
-        "description": "NodeAllocatableOverheadResources describes auxiliary overhead resource allocations.",
-        "properties": {
-          "name": {
-            "default": "",
-            "description": "name is the name of the resource (e.g., cpu, memory).",
-            "type": "string"
-          },
-          "perContainer": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.api.resource.Quantity"
-              }
-            ],
-            "description": "perContainer is the variable overhead quantity applied for each container referencing the claim. The container references are recorded in `nodeAllocatableResourceClaimStatuses.containers`. The total overhead quantity allocated for the claim is computed as: Quantity = PerPod + (PerContainer * NumReferences) Kubelet accounts for this overhead in cgroups: - Pod-level cgroup (requests and limits): Kubelet adds PerPod + (PerContainer * NumReferences). - Container-level cgroup (limits only): Kubelet adds PerPod + PerContainer for each referencing container. This allows any single container to access the pod-level overhead, while the parent cgroup caps the total usage to account for PerPod exactly once. At least one of PerPod or PerContainer must be specified. Specifying neither is an invalid configuration. PerContainer overhead of a claim referenced by a non-restartable init container is counted towards the pod's peak resource calculation (see Pod `spec.initContainers`), not for the pod's entire duration."
-          },
-          "perPod": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.api.resource.Quantity"
-              }
-            ],
-            "description": "perPod is the flat overhead quantity allocated per pod. Adding to each container limit allows individual containers to utilize the overhead, while the parent pod-level cgroup limit caps the total usage at the pod boundary where the overhead is accounted for exactly once. At least one of PerPod or PerContainer must be specified. Specifying neither is an invalid configuration."
-          }
-        },
-        "required": [
-          "name"
-        ],
-        "type": "object"
-      },
-      "io.k8s.api.core.v1.NodeAllocatableResourceClaimStatus": {
-        "description": "NodeAllocatableResourceClaimStatus describes the status of node allocatable resources allocated via DRA.",
-        "properties": {
-          "containers": {
-            "description": "containers lists the names of all containers in this pod that reference the claim.",
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "x-kubernetes-list-type": "set"
-          },
-          "mapping": {
-            "description": "mapping contains allocations through devices mapped in the device spec's `nodeAllocatableResources[...].mapping` field. This is used by kubelet for pod level and container-level cgroup enforcement.",
-            "items": {
-              "$ref": "#/components/schemas/io.k8s.api.core.v1.NodeAllocatableMappedResources"
-            },
-            "type": "array",
-            "x-kubernetes-list-map-keys": [
-              "name"
-            ],
-            "x-kubernetes-list-type": "map",
-            "x-kubernetes-patch-merge-key": "name",
-            "x-kubernetes-patch-strategy": "merge"
-          },
-          "overhead": {
-            "description": "overhead contains allocations through devices mapped in the device spec's `nodeAllocatableResources[...].overhead` field. This is used by kubelet for pod level and container-level cgroup enforcement.",
-            "items": {
-              "$ref": "#/components/schemas/io.k8s.api.core.v1.NodeAllocatableOverheadResources"
-            },
-            "type": "array",
-            "x-kubernetes-list-map-keys": [
-              "name"
-            ],
-            "x-kubernetes-list-type": "map",
-            "x-kubernetes-patch-merge-key": "name",
-            "x-kubernetes-patch-strategy": "merge"
-          },
-          "resourceClaimName": {
-            "default": "",
-            "description": "resourceClaimName is the resource claim referenced by the pod that resulted in this node allocatable resource allocation.",
-            "type": "string"
-          }
-        },
-        "required": [
-          "resourceClaimName"
-        ],
-        "type": "object"
-      },
       "io.k8s.api.core.v1.NodeCondition": {
         "description": "NodeCondition contains condition information for a node.",
         "properties": {
@@ -3943,7 +3889,7 @@
         "description": "NodePodPreemptionPolicy defines the node-level policies governing preemption for pods on this node.",
         "properties": {
           "disableResizePreemption": {
-            "description": "disableResizePreemption lists the owners (e.g., autoscalers, operators, administrators) that have requested to disable scheduler and Kubelet preemption for in-place pod resize on this node. If this list is non-empty, resize-induced preemption is disabled on this node. This is an alpha field and requires enabling the InPlacePodVerticalScalingSchedulerPreemption feature gate.",
+            "description": "disableResizePreemption lists the owners (e.g., autoscalers, operators, administrators) that have requested to disable scheduler and Kubelet preemption for in-place pod resize on this node. If this list is non-empty, resize-induced preemption is disabled on this node. This is a beta field and requires the InPlacePodVerticalScalingSchedulerPreemption feature gate to be enabled (enabled by default).",
             "items": {
               "type": "string"
             },
@@ -3975,6 +3921,10 @@
       "io.k8s.api.core.v1.NodeRuntimeHandlerFeatures": {
         "description": "NodeRuntimeHandlerFeatures is a set of features implemented by the runtime handler.",
         "properties": {
+          "cgroupNamespaces": {
+            "description": "cgroupNamespaces is set to true if the runtime handler supports specifying whether to use the host cgroup namespace for privileged and non-privileged containers.",
+            "type": "boolean"
+          },
           "recursiveReadOnlyMounts": {
             "description": "recursiveReadOnlyMounts is set to true if the runtime handler supports RecursiveReadOnlyMounts.",
             "type": "boolean"
@@ -4089,7 +4039,7 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.NodePodPreemptionPolicy"
               }
             ],
-            "description": "podPreemptionPolicy controls the node-level preemption behaviors for pods on this node. This is an alpha field and requires enabling the InPlacePodVerticalScalingSchedulerPreemption feature gate."
+            "description": "podPreemptionPolicy controls the node-level preemption behaviors for pods on this node. This is a beta field and requires the InPlacePodVerticalScalingSchedulerPreemption feature gate to be enabled (enabled by default)."
           },
           "providerID": {
             "description": "providerID is the ID of the node assigned by the cloud provider in the format: <ProviderName>://<ProviderSpecificNodeID>",
@@ -4678,7 +4628,7 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.VolumeHealthStatus"
               }
             ],
-            "description": "healthStatus contains the latest controller-reported health information for the volume bound to this claim."
+            "description": "healthStatus contains the latest controller-reported health information for the volume bound to this claim. This is an alpha field and requires enabling the CSIVolumeHealth feature gate."
           },
           "modifyVolumeStatus": {
             "allOf": [
@@ -5237,7 +5187,7 @@
             "type": "string"
           },
           "user": {
-            "description": "user is Optional: The owner UID of the created file. If specified, the item-level user field takes precedence over defaultUser. (Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
+            "description": "user is Optional: The owner UID of the created file. If specified, the item-level user field takes precedence over defaultUser. (Beta) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
             "format": "int64",
             "type": "integer"
           },
@@ -5703,7 +5653,7 @@
             "type": "boolean"
           },
           "hostNetwork": {
-            "description": "hostNetwork indicates that the pod should use the host's network namespace. When using hostNetwork you should specify ports so the scheduler is aware. When `hostNetwork` is true, specified `hostPort` fields in port definitions must match `containerPort`, and unspecified `hostPort` fields in port definitions are defaulted to match `containerPort`. Default to false.",
+            "description": "hostNetwork indicates that the pod should use the host's network namespace. When using hostNetwork you should specify ports so the scheduler is aware. When `hostNetwork` is true, specified `hostPort` fields in port definitions must match `containerPort`, and unspecified `hostPort` fields in port definitions are defaulted to match `containerPort`. Default to false. When true, podNetwork may not be set: the pod has no network namespace of its own.",
             "type": "boolean"
           },
           "hostPID": {
@@ -5766,7 +5716,7 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.PodOS"
               }
             ],
-            "description": "os specifies the OS of the containers in the pod. Some pod and container fields are restricted if this is set.\n\nIf the OS field is set to linux, the following fields must be unset: -securityContext.windowsOptions\n\nIf the OS field is set to windows, following fields must be unset: - spec.hostPID - spec.hostIPC - spec.hostUsers - spec.resources - spec.securityContext.appArmorProfile - spec.securityContext.seLinuxOptions - spec.securityContext.seccompProfile - spec.securityContext.fsGroup - spec.securityContext.fsGroupChangePolicy - spec.securityContext.sysctls - spec.shareProcessNamespace - spec.securityContext.runAsUser - spec.securityContext.runAsGroup - spec.securityContext.supplementalGroups - spec.securityContext.supplementalGroupsPolicy - spec.containers[*].securityContext.appArmorProfile - spec.containers[*].securityContext.seLinuxOptions - spec.containers[*].securityContext.seccompProfile - spec.containers[*].securityContext.capabilities - spec.containers[*].securityContext.readOnlyRootFilesystem - spec.containers[*].securityContext.privileged - spec.containers[*].securityContext.allowPrivilegeEscalation - spec.containers[*].securityContext.procMount - spec.containers[*].securityContext.runAsUser - spec.containers[*].securityContext.runAsGroup"
+            "description": "os specifies the OS of the containers in the pod. Some pod and container fields are restricted if this is set.\n\nIf the OS field is set to linux, the following fields must be unset: -securityContext.windowsOptions\n\nIf the OS field is set to windows, following fields must be unset: - spec.hostPID - spec.hostIPC - spec.hostUsers - spec.resources - spec.securityContext.appArmorProfile - spec.securityContext.seLinuxOptions - spec.securityContext.seccompProfile - spec.securityContext.fsGroup - spec.securityContext.fsGroupChangePolicy - spec.securityContext.sysctls - spec.shareProcessNamespace - spec.securityContext.runAsUser - spec.securityContext.runAsGroup - spec.securityContext.supplementalGroups - spec.securityContext.supplementalGroupsPolicy - spec.containers[*].securityContext.appArmorProfile - spec.containers[*].securityContext.seLinuxOptions - spec.containers[*].securityContext.seccompProfile - spec.containers[*].securityContext.capabilities - spec.containers[*].securityContext.readOnlyRootFilesystem - spec.containers[*].securityContext.privileged - spec.containers[*].securityContext.allowPrivilegeEscalation - spec.containers[*].securityContext.procMount - spec.containers[*].securityContext.runAsUser - spec.containers[*].securityContext.runAsGroup - spec.containers[*].securityContext.cgroupOptions"
           },
           "overhead": {
             "additionalProperties": {
@@ -5774,6 +5724,10 @@
             },
             "description": "overhead represents the resource overhead associated with running a pod for a given RuntimeClass. This field will be autopopulated at admission time by the RuntimeClass admission controller. If the RuntimeClass admission controller is enabled, overhead must not be set in Pod create requests. The RuntimeClass admission controller will reject Pod create requests which have the overhead already set. If RuntimeClass is configured and selected in the PodSpec, Overhead will be set to the value defined in the corresponding RuntimeClass, otherwise it will remain unset and treated as zero. More info: https://git.k8s.io/enhancements/keps/sig-node/688-pod-overhead/README.md",
             "type": "object"
+          },
+          "podNetwork": {
+            "description": "podNetwork selects whether a non-hostNetwork pod is attached to the pod network. \"Default\" attaches the pod to the pod network. \"Isolated\" gives the pod an isolated network namespace with only the loopback interface configured, not attached to the pod network. This field must be unset if hostNetwork is true. For non-hostNetwork pods, this behaves as if it was set to \"Default\" if it is not set. If a pod is \"Isolated\", hostPort and network-based probes and lifecycle handlers are not allowed. This field is immutable on Pods.",
+            "type": "string"
           },
           "preemptionPolicy": {
             "description": "preemptionPolicy is the Policy for preempting pods with lower priority. One of Never, PreemptLowerPriority. When Priority Admission Controller is enabled, it prevents users from setting this field. The admission controller populates this field from PriorityClassName. Defaults to PreemptLowerPriority if unset.",
@@ -5931,7 +5885,7 @@
             "additionalProperties": {
               "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.api.resource.Quantity"
             },
-            "description": "AllocatedResources is the total requests allocated for this pod by the node. If pod-level requests are not set, this will be the total requests aggregated across containers in the pod.",
+            "description": "AllocatedResources is the total requests allocated for this pod by the node, including pod.spec.overhead. If pod-level requests are not set, this will be the total requests aggregated across containers in the pod, plus pod.spec.overhead if specified.",
             "type": "object"
           },
           "conditions": {
@@ -5971,6 +5925,17 @@
             ],
             "description": "Status of extended resource claim backed by DRA."
           },
+          "extraNodeAllocatableResources": {
+            "description": "extraNodeAllocatableResources lists node allocatable resources that the pod and its containers use in addition to their spec, for example for the devices allocated to the pod's DRA claims. The scheduler sets them before it binds the pod. Allowed are the resources that v1.Node reports in `status.allocatable` that are not extended resources (see https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#extended-resources), such as \"cpu\", \"memory\", \"ephemeral-storage\", and \"hugepages-<size>\".\n\nThe list has one pod entry, with an empty containerName, and at most one entry for each init or regular container. The pod's total footprint is its spec plus the pod entry, so the pod entry must cover what the container entries add to the peak of the spec, across the init, sidecar, and regular containers. For resources that the pod level resources (`spec.resources`) set, that value is the footprint and must already include the extra resources.",
+            "items": {
+              "$ref": "#/components/schemas/io.k8s.api.core.v1.ExtraNodeAllocatableResource"
+            },
+            "type": "array",
+            "x-kubernetes-list-map-keys": [
+              "containerName"
+            ],
+            "x-kubernetes-list-type": "map"
+          },
           "hostIP": {
             "description": "hostIP holds the IP address of the host to which the pod is assigned. Empty if the pod has not started yet. A pod can be assigned to a node that has a problem in kubelet which in turns mean that HostIP will not be updated even if there is a node is assigned to pod",
             "type": "string"
@@ -5996,19 +5961,6 @@
           "message": {
             "description": "A human readable message indicating details about why the pod is in this condition.",
             "type": "string"
-          },
-          "nodeAllocatableResourceClaimStatuses": {
-            "description": "NodeAllocatableResourceClaimStatuses contains the status of node-allocatable resources that were allocated for this pod through DRA claims. This includes resources currently reported in v1.Node `status.allocatable` that are not extended resources (see https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#extended-resources). Examples include \"cpu\", \"memory\", \"ephemeral-storage\", and hugepages.",
-            "items": {
-              "$ref": "#/components/schemas/io.k8s.api.core.v1.NodeAllocatableResourceClaimStatus"
-            },
-            "type": "array",
-            "x-kubernetes-list-map-keys": [
-              "resourceClaimName"
-            ],
-            "x-kubernetes-list-type": "map",
-            "x-kubernetes-patch-merge-key": "resourceClaimName",
-            "x-kubernetes-patch-strategy": "merge"
           },
           "nominatedNodeName": {
             "description": "nominatedNodeName is set only when this pod preempts other pods on the node, but it cannot be scheduled right away as preemption victims receive their graceful termination periods. This field does not guarantee that the pod will be scheduled on this node. Scheduler may decide to place the pod elsewhere if other nodes become available sooner. Scheduler may also decide to give the resources on this node to a higher priority pod that is created after preemption. As a result, this field may be different than PodSpec.nodeName when the pod is scheduled.",
@@ -6071,7 +6023,7 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.ResourceRequirements"
               }
             ],
-            "description": "Resources represents the compute resource requests and limits that have been applied at the pod level if pod-level requests or limits are set in PodSpec.Resources"
+            "description": "Resources represents the compute resource requests and limits that have been applied at the pod level if pod-level requests or limits are set in PodSpec.Resources, plus pod.spec.overhead if specified (for limits, only added to non-zero limits; kubelets prior to v1.38 may omit overhead from memory and hugepages requests when set in PodSpec.Resources)."
           },
           "startTime": {
             "allOf": [
@@ -6081,16 +6033,18 @@
             ],
             "description": "RFC 3339 date and time at which the object was acknowledged by the Kubelet. This is before the Kubelet pulled the container image(s) for the pod."
           },
-          "volumeHealth": {
-            "description": "volumeHealth contains node-reported health for each volume the pod is using. Populated by the kubelet on the pod's node.",
+          "volumeStatuses": {
+            "description": "VolumeStatuses contains the status of individual volumes used by this pod. This is an alpha field and requires enabling the CSIVolumeHealth or DynamicNodeLocalEphemeralVolumes feature gate.",
             "items": {
-              "$ref": "#/components/schemas/io.k8s.api.core.v1.PodVolumeHealth"
+              "$ref": "#/components/schemas/io.k8s.api.core.v1.PodVolumeStatus"
             },
             "type": "array",
             "x-kubernetes-list-map-keys": [
               "name"
             ],
-            "x-kubernetes-list-type": "map"
+            "x-kubernetes-list-type": "map",
+            "x-kubernetes-patch-merge-key": "name",
+            "x-kubernetes-patch-strategy": "merge"
           }
         },
         "type": "object"
@@ -6198,34 +6152,24 @@
         },
         "type": "object"
       },
-      "io.k8s.api.core.v1.PodVolumeHealth": {
-        "description": "PodVolumeHealth contains health information for a volume used by a pod, reported by the CSI node plugin via the kubelet.",
+      "io.k8s.api.core.v1.PodVolumeStatus": {
+        "description": "PodVolumeStatus represents the status of an individual volume used by a pod.",
         "properties": {
-          "healthConditions": {
-            "description": "healthConditions is the set of adverse conditions reported by the CSI node plugin for this volume on this node. At most 16 conditions may be reported.",
-            "items": {
-              "$ref": "#/components/schemas/io.k8s.api.core.v1.VolumeHealthCondition"
-            },
-            "type": "array",
-            "x-kubernetes-list-map-keys": [
-              "status",
-              "reason"
-            ],
-            "x-kubernetes-list-type": "map",
-            "x-kubernetes-patch-merge-key": "status",
-            "x-kubernetes-patch-strategy": "merge"
-          },
-          "lastTransitionTime": {
+          "healthStatus": {
             "allOf": [
               {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.VolumeHealthStatus"
               }
             ],
-            "description": "lastTransitionTime is when the current set of conditions first appeared."
+            "description": "healthStatus contains health reported by the CSI node plugin for this volume on the pod's node. Populated by the kubelet. This is an alpha field and requires enabling the CSIVolumeHealth feature gate."
+          },
+          "hostPhase": {
+            "description": "hostPhase represents the host-level preparation phase of the volume: Pending, HostMounted, Unmounting. Currently populated only for node-local ephemeral volume types supported for dynamic updates (configMap, secret, projected, emptyDir, and image). This is an alpha field and requires enabling the DynamicNodeLocalEphemeralVolumes feature gate.",
+            "type": "string"
           },
           "name": {
             "default": "",
-            "description": "name matches an entry in pod.spec.volumes.",
+            "description": "name matches an entry in pod.spec.volumes, or the name of a dynamically removed volume that is still unmounting on the node.",
             "type": "string"
           }
         },
@@ -6383,7 +6327,7 @@
             "type": "integer"
           },
           "defaultUser": {
-            "description": "defaultUser is Optional: The owner UID of the created files by default. The defaultUser field is only used as a fallback when the item-level user field is unset. (Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
+            "description": "defaultUser is Optional: The owner UID of the created files by default. The defaultUser field is only used as a fallback when the item-level user field is unset. (Beta) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
             "format": "int64",
             "type": "integer"
           },
@@ -7198,9 +7142,17 @@
             "description": "localhostProfile indicates a profile defined in a file on the node should be used. The profile must be preconfigured on the node to work. Must be a descending path, relative to the kubelet's configured seccomp profile location. Must be set if type is \"Localhost\". Must NOT be set for any other type.",
             "type": "string"
           },
+          "oci": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.SecurityProfileOCI"
+              }
+            ],
+            "description": "oci specifies a seccomp profile stored as an artifact in an OCI registry. The container runtime merges the profile with a base profile, so the effective profile permits an operation only if both permit it. Must be set if type is \"OCI\". Must NOT be set for any other type. This is an alpha field and requires enabling the SecurityProfileOCI feature gate."
+          },
           "type": {
             "default": "",
-            "description": "type indicates which kind of seccomp profile will be applied. Valid options are:\n\nLocalhost - a profile defined in a file on the node should be used. RuntimeDefault - the container runtime default profile should be used. Unconfined - no profile should be applied.",
+            "description": "type indicates which kind of seccomp profile will be applied. Valid options are:\n\nLocalhost - a profile defined in a file on the node should be used. RuntimeDefault - the container runtime default profile should be used. Unconfined - no profile should be applied. OCI - a profile pulled from an OCI registry should be used, merged with a base profile (see oci.baseProfile). Privileged containers cannot use it, whether it is set on the container or inherited from the pod. This is an alpha value and requires enabling the SecurityProfileOCI feature gate.",
             "type": "string"
           }
         },
@@ -7212,7 +7164,8 @@
           {
             "discriminator": "type",
             "fields-to-discriminateBy": {
-              "localhostProfile": "LocalhostProfile"
+              "localhostProfile": "LocalhostProfile",
+              "oci": "OCI"
             }
           }
         ]
@@ -7396,7 +7349,7 @@
             "type": "integer"
           },
           "defaultUser": {
-            "description": "defaultUser is Optional: The owner UID of the created files by default. The defaultUser field is only used as a fallback when the item-level user field is unset. (Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
+            "description": "defaultUser is Optional: The owner UID of the created files by default. The defaultUser field is only used as a fallback when the item-level user field is unset. (Beta) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
             "format": "int64",
             "type": "integer"
           },
@@ -7441,6 +7394,14 @@
               }
             ],
             "description": "capabilities is the capabilities to add/drop when running containers. Defaults to the default set of capabilities granted by the container runtime. Note that this field cannot be set when spec.os.name is windows."
+          },
+          "cgroupOptions": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.CgroupOptions"
+              }
+            ],
+            "description": "cgroupOptions holds the cgroup options for this container. If mountMode is specified, the scheduler only places the pod on a node whose status.declaredFeatures includes CgroupOptions. (Alpha) This field requires the CgroupOptions feature gate to be enabled. This field cannot be set for ephemeral containers or when spec.os.name is windows."
           },
           "privileged": {
             "description": "privileged indicates whether to run container in privileged mode. Processes in privileged containers are essentially equivalent to root on the host. Defaults to false. Note that this field cannot be set when spec.os.name is windows.",
@@ -7494,6 +7455,54 @@
           }
         },
         "type": "object"
+      },
+      "io.k8s.api.core.v1.SecurityProfileOCI": {
+        "description": "SecurityProfileOCI references a security profile stored as an artifact in an OCI registry, with an optional base profile.",
+        "properties": {
+          "baseProfile": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.SecurityProfileOCIBase"
+              }
+            ],
+            "description": "baseProfile optionally specifies the base profile that the container runtime merges with the OCI profile. The effective profile permits an operation only if both permit it. When omitted, the container runtime default profile is the base; a Localhost base profile takes its place."
+          },
+          "ref": {
+            "default": "",
+            "description": "ref is the OCI reference of the profile. It must be a digest-pinned reference in canonical form, registry/repository@<algorithm>:<digest>, with the registry spelled out (for example docker.io/library/profile, not profile or docker.io/profile). Tags are rejected. The digest algorithm must be sha256, sha384, or sha512. The maximum length is 1024 characters. Pull secrets are assembled in the same way as for the container image by looking up node credentials, service account image pull secrets, and pod spec image pull secrets.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ref"
+        ],
+        "type": "object"
+      },
+      "io.k8s.api.core.v1.SecurityProfileOCIBase": {
+        "description": "SecurityProfileOCIBase specifies the base profile of an OCI security profile.",
+        "properties": {
+          "localhostProfile": {
+            "description": "localhostProfile indicates a base profile defined in a file on the node should be used. The profile must be preconfigured on the node to work. Must be a non-empty descending path, relative to the kubelet's configured seccomp profile location, of at most 4096 characters. Must be set if type is \"Localhost\". Must NOT be set for any other type.",
+            "type": "string"
+          },
+          "type": {
+            "default": "",
+            "description": "type indicates which kind of base profile will be applied. Valid options are:\n\nLocalhost - a profile defined in a file on the node should be used. RuntimeDefault - the container runtime default profile should be used.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type"
+        ],
+        "type": "object",
+        "x-kubernetes-unions": [
+          {
+            "discriminator": "type",
+            "fields-to-discriminateBy": {
+              "localhostProfile": "LocalhostProfile"
+            }
+          }
+        ]
       },
       "io.k8s.api.core.v1.Service": {
         "description": "Service is a named abstraction of software service (for example, mysql) consisting of local port (for example 3306) that the proxy listens on, and the selector that determines which pods will answer requests sent through the proxy.",
@@ -7656,7 +7665,7 @@
             "type": "string"
           },
           "user": {
-            "description": "user is Optional: The owner UID of the created file. If specified, the item-level user field takes precedence over defaultUser. (Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
+            "description": "user is Optional: The owner UID of the created file. If specified, the item-level user field takes precedence over defaultUser. (Beta) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
             "format": "int64",
             "type": "integer"
           }
@@ -8475,7 +8484,7 @@
         "type": "object"
       },
       "io.k8s.api.core.v1.VolumeHealthCondition": {
-        "description": "VolumeHealthCondition represents an adverse health condition reported for a volume.",
+        "description": "VolumeHealthCondition represents a health condition reported for a volume. Both pod and PVC reuse this type to report volume health in their status fields.",
         "properties": {
           "message": {
             "description": "message is a human-readable description. Maximum permitted length of a message is 1024 bytes.",
@@ -8488,7 +8497,7 @@
           },
           "status": {
             "default": "",
-            "description": "status is the machine-parseable health category. Possible values: - \"Inaccessible\": the volume cannot be accessed. - \"DataLoss\": data loss has been detected on the volume. - \"Degraded\": the volume is functioning with reduced capability.",
+            "description": "status is the machine-parseable health category. Possible values are: - \"Unknown\": the driver reported an unknown health status, or a status Kubernetes does not recognize. The volume must not be considered healthy. - \"Inaccessible\": the volume cannot be accessed. - \"DataLoss\": data loss has been detected on the volume. - \"Degraded\": the volume is functioning with reduced capability. - \"Healthy\": the volume is healthy.\n\nThis field allows additional enum values to be added to VolumeHealthStatusType via CSI spec change. A future version of a CSI driver may emit health conditions that Kubernetes components are not aware of.\n\nA writer which does not know how to handle incoming new VolumeHealthStatusType may classify the status as unknown.\n\nA reader which does not know how to handle new VolumeHealthStatusType MUST only use it for health reporting purposes.",
             "type": "string"
           }
         },
@@ -8499,10 +8508,10 @@
         "type": "object"
       },
       "io.k8s.api.core.v1.VolumeHealthStatus": {
-        "description": "VolumeHealthStatus contains health information for a volume reported by the CSI controller plugin.",
+        "description": "VolumeHealthStatus contains health information for a volume reported by a CSI controller or node plugin.",
         "properties": {
           "healthConditions": {
-            "description": "healthConditions is the set of adverse conditions reported by the CSI controller plugin. An empty list means no adverse condition. At most 16 conditions may be reported.",
+            "description": "healthConditions is the set of health conditions reported by a CSI plugin. At most 16 conditions may be reported. An empty list means the CSI driver either does not support volume health or has not reported it yet. If the driver supports volume health and the volume is healthy, a Healthy condition is reported.",
             "items": {
               "$ref": "#/components/schemas/io.k8s.api.core.v1.VolumeHealthCondition"
             },
@@ -8511,9 +8520,7 @@
               "status",
               "reason"
             ],
-            "x-kubernetes-list-type": "map",
-            "x-kubernetes-patch-merge-key": "status",
-            "x-kubernetes-patch-strategy": "merge"
+            "x-kubernetes-list-type": "map"
           },
           "lastTransitionTime": {
             "allOf": [
@@ -8521,7 +8528,7 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
               }
             ],
-            "description": "lastTransitionTime is when the current set of conditions first appeared."
+            "description": "lastTransitionTime is when the current set of (status, reason) pairs first appeared. lastTransitionTime remains unchanged when only message associated with healthConditions change."
           }
         },
         "type": "object"
@@ -8827,7 +8834,7 @@
         ]
       },
       "io.k8s.apimachinery.pkg.api.resource.Quantity": {
-        "description": "Quantity is a fixed-point representation of a number. It provides convenient marshaling/unmarshaling in JSON and YAML, in addition to String() and AsInt64() accessors.\n\nThe serialization format is:\n\n- `<quantity>`: `<signedNumber><suffix>`\n\n- `<digit>`: `0 | 1 | ... | 9`\n\n- `<digits>`: `<digit> | <digit><digits>`\n\n- `<number>`: `<digits> | <digits>.<digits> | <digits>. | .<digits>`\n\n- `<sign>`: `\"+\" | \"-\"`\n\n- `<signedNumber>`: `<number> | <sign><number>`\n\n- `<signedDigits>`: `<digits> | <sign><digits>`\n\n- `<suffix>`: `<binarySI> | <decimalExponent> | <decimalSI>`\n\n- `<binarySI>`: `Ki | Mi | Gi | Ti | Pi | Ei`\n\n- `<decimalSI>`: `n | u | m | \"\" | k | M | G | T | P | E`\n\n- `<decimalExponent>`: `\"e\" <signedDigits> | \"E\" <signedDigits>`\n\nNote that `<suffix>` may be empty, from the `\"\"` case in `<decimalSI>`. For `<binarySI>`, 1024 = 1Ki but 1000 = 1k; I didn't choose the capitalization. See http://physics.nist.gov/cuu/Units/binary.html.\n\nA decimal quantity is not capped at 2^63-1 in magnitude, and no quantity is limited to three decimal places: \"18446744073709551616\" keeps its value, and \"1.2345\" keeps its precision (String reports it as \"1234500u\"). Parsing does cap a binarySI quantity, silently, at 2^63-1: \"8Ei\" parses as 2^63-1. Parsing keeps at most 29 significant digits, enough for any int64 value at nano precision, and rounds any precision beyond this away from zero. Parsing also preserves a value only down to nano, rounding a finer non-zero value away from zero, so \"0.9n\" becomes \"1n\". The int64 accessors round and may overflow on top of that: see Value, MilliValue and ScaledValue.\n\nWhen a Quantity is parsed from a string, it will remember the type of suffix it had, and will use the same type again when it is serialized.\n\nBefore serializing, Quantity will be put in \"canonical form\". This means that Exponent/suffix will be adjusted up or down (with a corresponding increase or decrease in Mantissa) such that:\n\n- No precision is lost\n\n- No fractional digits will be emitted\n\n- The exponent (or suffix) is as large as possible.\n\nThe sign will be omitted unless the number is negative.\n\nExamples:\n\n- 1.5 will be serialized as \"1500m\"\n\n- 1.5Gi will be serialized as \"1536Mi\"\n\nNote that the quantity will NEVER be internally represented by a floating point number. That is the whole point of this exercise.\n\nNon-canonical values will still parse as long as they are well formed, but will be re-emitted in their canonical form. (So always use canonical form, or don't diff.)\n\nThis format is intended to make it difficult to use these numbers without writing some sort of special handling code in the hopes that that will cause implementors to also use a fixed point implementation.",
+        "description": "Quantity is a fixed-point representation of a number. It provides convenient marshaling/unmarshaling in JSON and YAML, in addition to String() and AsInt64() accessors.\n\nThe serialization format is:\n\n- `<quantity>`: `<signedNumber><suffix>`\n\n- `<digit>`: `0 | 1 | ... | 9`\n\n- `<digits>`: `<digit> | <digit><digits>`\n\n- `<number>`: `<digits> | <digits>.<digits> | <digits>. | .<digits>`\n\n- `<sign>`: `\"+\" | \"-\"`\n\n- `<signedNumber>`: `<number> | <sign><number>`\n\n- `<signedDigits>`: `<digits> | <sign><digits>`\n\n- `<suffix>`: `<binarySI> | <decimalExponent> | <decimalSI>`\n\n- `<binarySI>`: `Ki | Mi | Gi | Ti | Pi | Ei`\n\n- `<decimalSI>`: `n | u | m | \"\" | k | M | G | T | P | E`\n\n- `<decimalExponent>`: `\"e\" <signedDigits> | \"E\" <signedDigits>`\n\nNote that `<suffix>` may be empty, from the `\"\"` case in `<decimalSI>`. For `<binarySI>`, 1024 = 1Ki but 1000 = 1k; I didn't choose the capitalization. See http://physics.nist.gov/cuu/Units/binary.html.\n\nA decimal quantity is not capped at 2^63-1 in magnitude, and no quantity is limited to three decimal places: \"18446744073709551616\" keeps its value, and \"1.2345\" keeps its precision (String reports it as \"1234500u\"). Parsing does cap a binarySI quantity, silently, at 2^63-1: \"8Ei\" parses as 2^63-1. Parsing keeps at most 29 significant digits, enough for any int64 value at nano precision, and rounds any precision beyond this away from zero. Parsing also preserves a value only down to nano, rounding a finer non-zero value away from zero, so \"0.9n\" becomes \"1n\". Parsing saturates the exponent to [-2147483647, 2147483647] after accounting for any digits after the decimal point, so \"0.01e2147483649\" keeps its value but \"1e4294967297\" parses as 1e2147483647. The int64 accessors round and may overflow on top of that: see Value, MilliValue and ScaledValue.\n\nWhen a Quantity is parsed from a string, it will remember the type of suffix it had, and will use the same type again when it is serialized.\n\nBefore serializing, Quantity will be put in \"canonical form\". This means that Exponent/suffix will be adjusted up or down (with a corresponding increase or decrease in Mantissa) such that:\n\n- No precision is lost\n\n- No fractional digits will be emitted\n\n- The exponent (or suffix) is as large as possible.\n\nThe sign will be omitted unless the number is negative.\n\nExamples:\n\n- 1.5 will be serialized as \"1500m\"\n\n- 1.5Gi will be serialized as \"1536Mi\"\n\nNote that the quantity will NEVER be internally represented by a floating point number. That is the whole point of this exercise.\n\nNon-canonical values will still parse as long as they are well formed, but will be re-emitted in their canonical form. (So always use canonical form, or don't diff.)\n\nThis format is intended to make it difficult to use these numbers without writing some sort of special handling code in the hopes that that will cause implementors to also use a fixed point implementation.",
         "oneOf": [
           {
             "type": "string"
@@ -17158,6 +17165,325 @@
         "x-kubernetes-group-version-kind": {
           "group": "",
           "kind": "Binding",
+          "version": "v1"
+        }
+      }
+    },
+    "/api/v1/namespaces/{namespace}/pods/{name}/dynamic": {
+      "get": {
+        "description": "read dynamic of the specified Pod",
+        "operationId": "readCoreV1NamespacedPodDynamic",
+        "responses": {
+          "200": {
+            "content": {
+              "application/cbor": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.core.v1.Pod"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.core.v1.Pod"
+                }
+              },
+              "application/vnd.kubernetes.protobuf": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.core.v1.Pod"
+                }
+              },
+              "application/yaml": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.core.v1.Pod"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "tags": [
+          "core_v1"
+        ],
+        "x-kubernetes-action": "get",
+        "x-kubernetes-group-version-kind": {
+          "group": "",
+          "kind": "Pod",
+          "version": "v1"
+        }
+      },
+      "parameters": [
+        {
+          "description": "name of the Pod",
+          "in": "path",
+          "name": "name",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "uniqueItems": true
+          }
+        },
+        {
+          "description": "object name and auth scope, such as for teams and projects",
+          "in": "path",
+          "name": "namespace",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "uniqueItems": true
+          }
+        },
+        {
+          "description": "If 'true', then the output is pretty printed. Defaults to 'false' unless the user-agent indicates a browser or command-line HTTP tool (curl and wget).",
+          "in": "query",
+          "name": "pretty",
+          "schema": {
+            "type": "string",
+            "uniqueItems": true
+          }
+        }
+      ],
+      "patch": {
+        "description": "partially update dynamic of the specified Pod",
+        "operationId": "patchCoreV1NamespacedPodDynamic",
+        "parameters": [
+          {
+            "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+            "in": "query",
+            "name": "dryRun",
+            "schema": {
+              "type": "string",
+              "uniqueItems": true
+            }
+          },
+          {
+            "description": "fieldManager is a name associated with the actor or entity that is making these changes. The value must be less than or 128 characters long, and only contain printable characters, as defined by https://golang.org/pkg/unicode/#IsPrint. This field is required for apply requests (application/apply-patch) but optional for non-apply patch types (JsonPatch, MergePatch, StrategicMergePatch).",
+            "in": "query",
+            "name": "fieldManager",
+            "schema": {
+              "type": "string",
+              "uniqueItems": true
+            }
+          },
+          {
+            "description": "fieldValidation instructs the server on how to handle objects in the request (POST/PUT/PATCH) containing unknown or duplicate fields. Valid values are: - Ignore: This will ignore any unknown fields that are silently dropped from the object, and will ignore all but the last duplicate field that the decoder encounters. This is the default behavior prior to v1.23. - Warn: This will send a warning via the standard warning response header for each unknown field that is dropped from the object, and for each duplicate field that is encountered. The request will still succeed if there are no other errors, and will only persist the last of any duplicate fields. This is the default in v1.23+ - Strict: This will fail the request with a BadRequest error if any unknown fields would be dropped from the object, or if any duplicate fields are present. The error returned from the server will contain all unknown and duplicate fields encountered.",
+            "in": "query",
+            "name": "fieldValidation",
+            "schema": {
+              "type": "string",
+              "uniqueItems": true
+            }
+          },
+          {
+            "description": "Force is going to \"force\" Apply requests. It means user will re-acquire conflicting fields owned by other people. Force flag must be unset for non-apply patch requests.",
+            "in": "query",
+            "name": "force",
+            "schema": {
+              "type": "boolean",
+              "uniqueItems": true
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/apply-patch+cbor": {
+              "schema": {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+              }
+            },
+            "application/apply-patch+yaml": {
+              "schema": {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+              }
+            },
+            "application/json-patch+json": {
+              "schema": {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+              }
+            },
+            "application/merge-patch+json": {
+              "schema": {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+              }
+            },
+            "application/strategic-merge-patch+json": {
+              "schema": {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/cbor": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.core.v1.Pod"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.core.v1.Pod"
+                }
+              },
+              "application/vnd.kubernetes.protobuf": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.core.v1.Pod"
+                }
+              },
+              "application/yaml": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.core.v1.Pod"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "201": {
+            "content": {
+              "application/cbor": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.core.v1.Pod"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.core.v1.Pod"
+                }
+              },
+              "application/vnd.kubernetes.protobuf": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.core.v1.Pod"
+                }
+              },
+              "application/yaml": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.core.v1.Pod"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "tags": [
+          "core_v1"
+        ],
+        "x-kubernetes-action": "patch",
+        "x-kubernetes-group-version-kind": {
+          "group": "",
+          "kind": "Pod",
+          "version": "v1"
+        }
+      },
+      "put": {
+        "description": "replace dynamic of the specified Pod",
+        "operationId": "replaceCoreV1NamespacedPodDynamic",
+        "parameters": [
+          {
+            "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+            "in": "query",
+            "name": "dryRun",
+            "schema": {
+              "type": "string",
+              "uniqueItems": true
+            }
+          },
+          {
+            "description": "fieldManager is a name associated with the actor or entity that is making these changes. The value must be less than or 128 characters long, and only contain printable characters, as defined by https://golang.org/pkg/unicode/#IsPrint.",
+            "in": "query",
+            "name": "fieldManager",
+            "schema": {
+              "type": "string",
+              "uniqueItems": true
+            }
+          },
+          {
+            "description": "fieldValidation instructs the server on how to handle objects in the request (POST/PUT/PATCH) containing unknown or duplicate fields. Valid values are: - Ignore: This will ignore any unknown fields that are silently dropped from the object, and will ignore all but the last duplicate field that the decoder encounters. This is the default behavior prior to v1.23. - Warn: This will send a warning via the standard warning response header for each unknown field that is dropped from the object, and for each duplicate field that is encountered. The request will still succeed if there are no other errors, and will only persist the last of any duplicate fields. This is the default in v1.23+ - Strict: This will fail the request with a BadRequest error if any unknown fields would be dropped from the object, or if any duplicate fields are present. The error returned from the server will contain all unknown and duplicate fields encountered.",
+            "in": "query",
+            "name": "fieldValidation",
+            "schema": {
+              "type": "string",
+              "uniqueItems": true
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "*/*": {
+              "schema": {
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.Pod"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/cbor": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.core.v1.Pod"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.core.v1.Pod"
+                }
+              },
+              "application/vnd.kubernetes.protobuf": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.core.v1.Pod"
+                }
+              },
+              "application/yaml": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.core.v1.Pod"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "201": {
+            "content": {
+              "application/cbor": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.core.v1.Pod"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.core.v1.Pod"
+                }
+              },
+              "application/vnd.kubernetes.protobuf": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.core.v1.Pod"
+                }
+              },
+              "application/yaml": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.core.v1.Pod"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "tags": [
+          "core_v1"
+        ],
+        "x-kubernetes-action": "put",
+        "x-kubernetes-group-version-kind": {
+          "group": "",
+          "kind": "Pod",
           "version": "v1"
         }
       }

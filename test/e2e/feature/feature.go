@@ -80,10 +80,6 @@ var (
 	// Enables configuring per-container restart policy and restart policy rules.
 	ContainerRestartRules = framework.WithFeature(framework.ValidFeatures.Add("ContainerRestartRules"))
 
-	// Owner: sig-node
-	// Enables configuring custom stop signals for containers from container lifecycle
-	ContainerStopSignals = framework.WithFeature(framework.ValidFeatures.Add("ContainerStopSignals"))
-
 	// Owner: sig-api-machinery
 	// Marks tests that require coordinated leader election
 	CoordinatedLeaderElection = framework.WithFeature(framework.ValidFeatures.Add("CoordinatedLeaderElection"))
@@ -129,10 +125,6 @@ var (
 	// In addition, tests must be labeled with framework.WithFeatureGate to document
 	// their dependency on specific feature gates and the corresponding API groups.
 	DynamicResourceAllocation = framework.WithFeature(framework.ValidFeatures.Add("DynamicResourceAllocation"))
-
-	// Owner: sig-storage
-	// EmptyDirVolumeMode is used for tests that require the EmptyDirVolumeMode feature gate.
-	EmptyDirVolumeMode = framework.WithFeature(framework.ValidFeatures.Add("EmptyDirVolumeMode"))
 
 	// Owner: sig-node
 	// EnvFiles is used for testing the EnvFiles feature (file-based environment variables).
@@ -207,6 +199,11 @@ var (
 	// InPlacePodVerticalScaling is used for testing in-place pod vertical scaling (https://kep.k8s.io/1287).
 	InPlacePodVerticalScaling = framework.WithFeature(framework.ValidFeatures.Add("InPlacePodVerticalScaling"))
 
+	// Owner: sig-node
+	// Marks a test for InPlacePodVerticalScalingExclusiveCPUs feature that requires
+	// InPlacePodVerticalScalingExclusiveCPUs feature gate to be enabled.
+	InPlacePodVerticalScalingExclusiveCPUs = framework.WithFeature(framework.ValidFeatures.Add("InPlacePodVerticalScalingExclusiveCPUs"))
+
 	// Owner: sig-storage
 	// Marks tests that only work with a sigs.k8s.io/kind cluster
 	Kind = framework.WithFeature(framework.ValidFeatures.Add("Kind"))
@@ -266,6 +263,12 @@ var (
 	// Owner: sig-node
 	// TODO: document the feature (when to use this feature for a test)
 	MemoryManager = framework.WithFeature(framework.ValidFeatures.Add("MemoryManager"))
+
+	// NetworkIsolatedPodsSupport is in test-infra nodes whose container
+	// runtime reports the pod_network_isolated CRI capability, i.e. it can
+	// create sandboxes with spec.podNetwork "Isolated" (https://kep.k8s.io/6313).
+	// Owner: sig-network
+	NetworkIsolatedPodsSupport = framework.WithFeature(framework.ValidFeatures.Add("NetworkIsolatedPodsSupport"))
 
 	// Owner: sig-network
 	// Marks tests that require a conforming implementation of
@@ -382,6 +385,19 @@ var (
 	// Owner: sig-scheduling
 	// Marks tests of the asynchronous preemption (KEP-4832) that require the `SchedulerAsyncPreemption` feature gate.
 	SchedulerAsyncPreemption = framework.WithFeature(framework.ValidFeatures.Add("SchedulerAsyncPreemption"))
+
+	// Owner: sig-node
+	// KEP: https://kep.k8s.io/6061
+	// Marks tests of seccomp profiles of type OCI, which require the
+	// `SecurityProfileOCI` feature gate and a container runtime that supports
+	// the PullSecurityProfile CRI call.
+	SecurityProfileOCI = framework.WithFeature(framework.ValidFeatures.Add("SecurityProfileOCI"))
+
+	// Owner: sig-auth
+	// Marks tests of the service-serving certificate signer, which need kube-controller-manager
+	// to be given a signer CA keypair and trust bundle (--service-serving-signer-cert,
+	// --service-serving-signer-key and --service-serving-trust-bundle).
+	ServiceServingSigner = framework.WithFeature(framework.ValidFeatures.Add("ServiceServingSigner"))
 
 	// Owner: sig-storage
 	// KEP: https://kep.k8s.io/3314

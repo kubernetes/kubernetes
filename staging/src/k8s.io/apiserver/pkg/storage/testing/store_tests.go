@@ -126,10 +126,9 @@ func RunTestGet(ctx context.Context, t *testing.T, store storage.Interface, incr
 	updateObj.Annotations = map[string]string{"test-annotation": "1"}
 	storedObj := &example.Pod{}
 	err := store.GuaranteedUpdate(ctx, key, storedObj, true, nil,
-		func(_ runtime.Object, _ storage.ResponseMeta) (runtime.Object, *uint64, error) {
-			ttl := uint64(1)
-			return updateObj, &ttl, nil
-		}, nil)
+		storage.SimpleUpdate(func(_ runtime.Object) (runtime.Object, error) {
+			return updateObj, nil
+		}), nil)
 	if err != nil {
 		t.Fatalf("Update failed: %v", err)
 	}
@@ -1564,6 +1563,63 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			expectContinue: false,
 			expectCacherRequestsToEtcd: func() []RecordedList {
 				return nil
+			},
+		},
+		{
+			name:   "test List with indexed field selector and inconsistent continue returning single matching item, ensure only a single page returned",
+			prefix: "/pods/",
+			pred: storage.SelectionPredicate{
+				Field:       fields.OneTermEqualSelector("spec.nodeName", "fakeNode"),
+				Label:       labels.Everything(),
+				IndexFields: []string{"spec.nodeName"},
+				Limit:       1,
+				Continue:    encodeContinueOrDie("a", -1),
+			},
+			expectedOut:    []example.Pod{*updatedPod},
+			expectRV:       currentRV,
+			expectContinue: !watchCacheEnabled || !utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot),
+			expectContinueExact: func() string {
+				if watchCacheEnabled && utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return ""
+				}
+				return encodeContinueOrDie(updatedPod.Namespace+"/"+updatedPod.Name+"\x00", int64(mustAtoi(currentRV)))
+			}(),
+			expectCacherRequestsToEtcd: func() []RecordedList {
+				if utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return nil
+				}
+				return []RecordedList{
+					{
+						Key:   "/registry/pods/a",
+						Limit: 1,
+					},
+				}
+			},
+		},
+		{
+			name:   "test List with indexed field selector and inconsistent continue skipping first match, more pages in index",
+			prefix: "/pods/",
+			pred: storage.SelectionPredicate{
+				Field:       fields.OneTermEqualSelector("spec.nodeName", ""),
+				Label:       labels.Everything(),
+				IndexFields: []string{"spec.nodeName"},
+				Limit:       1,
+				Continue:    encodeContinueOrDie(createdPods[1].Namespace+"/"+createdPods[1].Name+"\x00", -1),
+			},
+			expectedOut:         []example.Pod{*createdPods[2]},
+			expectRV:            currentRV,
+			expectContinue:      true,
+			expectContinueExact: encodeContinueOrDie(createdPods[2].Namespace+"/"+createdPods[2].Name+"\x00", int64(mustAtoi(currentRV))),
+			expectCacherRequestsToEtcd: func() []RecordedList {
+				if utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return nil
+				}
+				return []RecordedList{
+					{
+						Key:   "/registry/pods/" + createdPods[1].Namespace + "/" + createdPods[1].Name + "\x00",
+						Limit: 1,
+					},
+				}
 			},
 		},
 		{
@@ -3981,6 +4037,7 @@ type PrefixTransformerModifier func(*PrefixTransformer) value.Transformer
 type InterfaceWithPrefixTransformer interface {
 	storage.Interface
 
+	UnderlyingStorage() storage.Interface
 	UpdatePrefixTransformer(PrefixTransformerModifier) func()
 }
 
@@ -5839,9 +5896,15 @@ func RunTestCompactRevision(ctx context.Context, t *testing.T, store storage.Int
 		t.Errorf("Unexpected error: %v", err)
 	}
 	increaseRV(ctx, t)
+	// A consistent list returns once the watch is synced. Compacting past the watch start before
+	// that makes etcd cancel the watch with ErrCompacted and the cacher reinitializes.
+	if err := store.GetList(ctx, "/pods/", storage.ListOptions{Predicate: storage.Everything, Recursive: true}, &example.PodList{}); err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
 	increaseRV(ctx, t)
-	compactedFutureRV := currentRV + 1
-	expectCompactedRV := currentRV + 2
+	increaseRV(ctx, t)
+	compactedFutureRV := currentRV + 2
+	expectCompactedRV := currentRV + 3
 	compact(ctx, t, fmt.Sprintf("%d", expectCompactedRV))
 	if err := store.GetList(ctx, "/pods/", storage.ListOptions{
 		Predicate:            storage.Everything,
@@ -6351,8 +6414,8 @@ func runOptimisticConcurrencyOp(ctx context.Context, t *testing.T, store Interfa
 	if revertTransformer != nil {
 		revertTransformer()
 		if !isDelete {
-			// Stored bytes now carry the rotated prefix and cannot be read with the original prefix alone.
-			require.True(t, storage.IsInternalError(store.Get(ctx, key, storage.GetOptions{}, &example.Pod{})))
+			// Stored bytes now carry the rotated prefix and cannot be read from underlying storage with the original prefix alone.
+			require.True(t, storage.IsInternalError(store.UnderlyingStorage().Get(ctx, key, storage.GetOptions{}, &example.Pod{})))
 		}
 	}
 }

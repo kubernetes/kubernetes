@@ -128,11 +128,13 @@ API rule violation: names_match,k8s.io/apimachinery/pkg/util/intstr,IntOrString,
 API rule violation: names_match,k8s.io/client-go/pkg/apis/clientauthentication/v1,Cluster,CertificateAuthorityData
 API rule violation: names_match,k8s.io/client-go/pkg/apis/clientauthentication/v1,Cluster,DisableCompression
 API rule violation: names_match,k8s.io/client-go/pkg/apis/clientauthentication/v1,Cluster,InsecureSkipTLSVerify
+API rule violation: names_match,k8s.io/client-go/pkg/apis/clientauthentication/v1,Cluster,MinConnectionPoolSize
 API rule violation: names_match,k8s.io/client-go/pkg/apis/clientauthentication/v1,Cluster,ProxyURL
 API rule violation: names_match,k8s.io/client-go/pkg/apis/clientauthentication/v1,Cluster,TLSServerName
 API rule violation: names_match,k8s.io/client-go/pkg/apis/clientauthentication/v1beta1,Cluster,CertificateAuthorityData
 API rule violation: names_match,k8s.io/client-go/pkg/apis/clientauthentication/v1beta1,Cluster,DisableCompression
 API rule violation: names_match,k8s.io/client-go/pkg/apis/clientauthentication/v1beta1,Cluster,InsecureSkipTLSVerify
+API rule violation: names_match,k8s.io/client-go/pkg/apis/clientauthentication/v1beta1,Cluster,MinConnectionPoolSize
 API rule violation: names_match,k8s.io/client-go/pkg/apis/clientauthentication/v1beta1,Cluster,ProxyURL
 API rule violation: names_match,k8s.io/client-go/pkg/apis/clientauthentication/v1beta1,Cluster,TLSServerName
 API rule violation: names_match,k8s.io/cloud-provider/config/v1alpha1,CloudControllerManagerConfiguration,Generic
@@ -167,6 +169,7 @@ API rule violation: names_match,k8s.io/controller-manager/config/v1alpha1,Generi
 API rule violation: names_match,k8s.io/controller-manager/config/v1alpha1,GenericControllerManagerConfiguration,Controllers
 API rule violation: names_match,k8s.io/controller-manager/config/v1alpha1,GenericControllerManagerConfiguration,Debugging
 API rule violation: names_match,k8s.io/controller-manager/config/v1alpha1,GenericControllerManagerConfiguration,LeaderElection
+API rule violation: names_match,k8s.io/controller-manager/config/v1alpha1,GenericControllerManagerConfiguration,LeaderElectionRecoveryDeadline
 API rule violation: names_match,k8s.io/controller-manager/config/v1alpha1,GenericControllerManagerConfiguration,LeaderMigration
 API rule violation: names_match,k8s.io/controller-manager/config/v1alpha1,GenericControllerManagerConfiguration,LeaderMigrationEnabled
 API rule violation: names_match,k8s.io/controller-manager/config/v1alpha1,GenericControllerManagerConfiguration,MinResyncPeriod
@@ -241,6 +244,7 @@ API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,K
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,KubeControllerManagerConfiguration,ResourceQuotaController
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,KubeControllerManagerConfiguration,SAController
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,KubeControllerManagerConfiguration,ServiceController
+API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,KubeControllerManagerConfiguration,ServiceServingSigner
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,KubeControllerManagerConfiguration,StatefulSetController
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,KubeControllerManagerConfiguration,TTLAfterFinishedController
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,KubeControllerManagerConfiguration,ValidatingAdmissionPolicyStatusController
@@ -278,6 +282,10 @@ API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,R
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,SAControllerConfiguration,ConcurrentSATokenSyncs
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,SAControllerConfiguration,RootCAFile
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,SAControllerConfiguration,ServiceAccountKeyFile
+API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,ServiceServingSignerConfiguration,CABundlePath
+API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,ServiceServingSignerConfiguration,CACertPath
+API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,ServiceServingSignerConfiguration,CAKeyPath
+API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,ServiceServingSignerConfiguration,ClusterDomain
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,StatefulSetControllerConfiguration,ConcurrentStatefulSetSyncs
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,TTLAfterFinishedControllerConfiguration,ConcurrentTTLSyncs
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,ValidatingAdmissionPolicyStatusControllerConfiguration,ConcurrentPolicySyncs

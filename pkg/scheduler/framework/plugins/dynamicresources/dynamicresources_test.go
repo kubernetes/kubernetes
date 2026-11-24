@@ -56,6 +56,7 @@ import (
 	compbasemetrics "k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/testutil"
 	baseversion "k8s.io/component-base/version"
+	"k8s.io/component-helpers/nodedeclaredfeatures/features/dranodeallocatableresources"
 	"k8s.io/component-helpers/nodedeclaredfeatures/features/draoptionalnodeoperations"
 	draapi "k8s.io/dynamic-resource-allocation/api"
 	"k8s.io/dynamic-resource-allocation/deviceclass/extendedresourcecache"
@@ -139,6 +140,21 @@ var (
 			ExtendedResourceName: &extendedResourceName,
 		},
 	}
+	deviceClassWithExtendedResourceCapacity = &resourceapi.DeviceClass{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: className,
+		},
+		Spec: resourceapi.DeviceClassSpec{
+			ExtendedResourceName: &extendedResourceName,
+			ExtendedResourceRequest: &resourceapi.ExtendedResourceRequest{
+				Capacity: &resourceapi.CapacityRequirements{
+					Requests: map[resourceapi.QualifiedName]apiresource.Quantity{
+						"shares": apiresource.MustParse("1"),
+					},
+				},
+			},
+		},
+	}
 	deviceClassWithExtendResourceName2 = &resourceapi.DeviceClass{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: className + "2",
@@ -219,6 +235,22 @@ var (
 		pod.Spec.Containers = append(pod.Spec.Containers, container)
 		return pod
 	}()
+	// podWithStaleExtraNodeAllocatableResources still has the status written by an earlier scheduling attempt.
+	podWithStaleExtraNodeAllocatableResources = func() *v1.Pod {
+		pod := podWithClaimReferenceInContainer.DeepCopy()
+		pod.Status.ExtraNodeAllocatableResources = []v1.ExtraNodeAllocatableResource{
+			{
+				ContainerName: "",
+				Requests:      v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1")},
+				Limits:        v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1")},
+			},
+			{
+				ContainerName: "c1",
+				Limits:        v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1")},
+			},
+		}
+		return pod
+	}()
 	groupedPodWithClaimName = st.MakePod().Name(podName).Namespace(namespace).
 				UID(podUID).
 				PodResourceClaims(v1.PodResourceClaim{Name: resourceName, ResourceClaimName: &claimName}).
@@ -266,7 +298,7 @@ var (
 	workerNode                                 = &st.MakeNode().Name(nodeName).Label("kubernetes.io/hostname", nodeName).Node
 	workerNodeSlice                            = st.MakeResourceSlice(nodeName, driver).Device("instance-1").Obj()
 	largeWorkerNodeSlice                       = st.MakeResourceSlice(nodeName, driver).Device("instance-1").Device("instance-2").Device("instance-3").Device("instance-4").Obj()
-	workerNodeWithCapacity                     = &st.MakeNode().Name(nodeName).Label("kubernetes.io/hostname", nodeName).Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "10", v1.ResourceMemory: "10Gi"}).Node
+	workerNodeWithCapacity                     = &st.MakeNode().Name(nodeName).Label("kubernetes.io/hostname", nodeName).Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "10", v1.ResourceMemory: "10Gi"}).DeclaredFeatures([]string{dranodeallocatableresources.DRANodeAllocatableResourcesFeature}).Node
 	workerNodeSliceWithNodeAllocatableResource = func() *resourceapi.ResourceSlice {
 		nativeSlice := st.MakeResourceSlice(nodeName, nodeAllocatableResourceDriver).Device("numa-0-cpus",
 			map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{
@@ -1080,6 +1112,32 @@ func taintDevices(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice {
 	return slice
 }
 
+var (
+	// Node with one "instance-1" device that several claims can share, with 4 "shares".
+	workerNodeSliceWithShares = func() *resourceapi.ResourceSlice {
+		slice := st.MakeResourceSlice(nodeName, driver).Device("instance-1",
+			map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{
+				"shares": {Value: apiresource.MustParse("4")},
+			},
+		).Obj()
+		slice.Spec.Devices[0].AllowMultipleAllocations = new(true)
+		return slice
+	}()
+	extendedResourceClaimWithCapacity       = withExtendedResourceCapacity(extendedResourceClaim)
+	extendedResourceClaimWithCapacityNoName = withExtendedResourceCapacity(extendedResourceClaimNoName)
+)
+
+// withExtendedResourceCapacity returns claim with the capacity request of
+// deviceClassWithExtendedResourceCapacity, and that capacity consumed from
+// the device allocated for it.
+func withExtendedResourceCapacity(claim *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
+	claim = claim.DeepCopy()
+	capacity := deviceClassWithExtendedResourceCapacity.Spec.ExtendedResourceRequest.Capacity
+	claim.Spec.Devices.Requests[0].Exactly.Capacity = capacity
+	claim.Status.Allocation.Devices.Results[0].ConsumedCapacity = capacity.Requests
+	return claim
+}
+
 func reserve(claim *resourceapi.ResourceClaim, pod *v1.Pod) *resourceapi.ResourceClaim {
 	return st.FromResourceClaim(claim).
 		ReservedForPod(pod.Name, types.UID(pod.UID)).
@@ -1189,6 +1247,11 @@ type result struct {
 	// inFlightClaims is a list of claims which are expected to be tracked as
 	// in flight, nil if none.
 	inFlightClaims []metav1.Object
+
+	// extraNodeAllocatableResources is the list of extra node
+	// allocatable resources expected to be recorded in CycleState for the node
+	// during Filter.
+	extraNodeAllocatableResources []v1.ExtraNodeAllocatableResource
 }
 
 // change contains functions for modifying objects of a certain type. These
@@ -1239,6 +1302,10 @@ type want struct {
 	// after PreBind, as if the actual Bind had failed.
 	unreserveAfterBindFailure *result
 
+	// unreserveAfterBindFailureWithPreemption, if set, overrides
+	// unreserveAfterBindFailure in TestPluginWithPreemption.
+	unreserveAfterBindFailureWithPreemption *result
+
 	// unreserveBeforePreBind, if set, triggers a call to Unreserve
 	// before PreBind, as if the some other PreBind plugin had failed.
 	unreserveBeforePreBind *result
@@ -1284,33 +1351,251 @@ type testPluginCase struct {
 	prepare prepare
 	want    want
 
+	// otherPluginNodeAllocatableEntries are recorded per node by another plugin before Filter runs.
+	otherPluginNodeAllocatableEntries map[string][]v1.ExtraNodeAllocatableResource
+
 	// Invoke Filter with a canceled context.
 	cancelFilter bool
 
-	// disableDRAAdminAccess is set to true to test behavior with the DRAAdminAccess feature gate disabled (emulates v1.35).
-	disableDRAAdminAccess bool
-	// disableDRADeviceBindingConditions is set to true if the DRADeviceBindingConditions feature gate is disabled.
-	disableDRADeviceBindingConditions bool
-	// disableDRAResourceClaimDeviceStatus is set to true if the DRAResourceClaimDeviceStatus feature gate is disabled.
-	disableDRAResourceClaimDeviceStatus bool
-	// enableDRANodeAllocatableResourcesis set to true if the DRANodeAllocatableResources feature gate is enabled.
-	enableDRANodeAllocatableResources bool
-	// enableDRAConsumableCapacity is set to true if the DRAConsumableCapacity feature gate is enabled.
-	enableDRAConsumableCapacity bool
+	emulatedVersion  string
+	featureOverrides featuregatetesting.FeatureOverrides
+	skipOnWindows    string
+	failPatch        bool
+	reactors         []cgotesting.Reactor
+	metrics          func(ktesting.TContext, compbasemetrics.Gatherer)
+}
 
-	enableDRAExtendedResource        bool
-	enableDRAPrioritizedList         bool
-	enableDRADeviceTaints            bool
-	enableDRAWorkloadResourceClaims  bool
-	disableDRASchedulerFilterTimeout bool
-	skipOnWindows                    string
-	failPatch                        bool
-	reactors                         []cgotesting.Reactor
-	metrics                          func(ktesting.TContext, compbasemetrics.Gatherer)
+// TestConsumedCapacityPreBindHandoff checks that a second claim fits before,
+// during, and after the first allocation moves from pending to persisted.
+// PreBind can defer pending-allocation cleanup while waiting for binding conditions.
+func TestConsumedCapacityPreBindHandoff(t *testing.T) {
+	testConsumedCapacityPreBindHandoff(ktesting.Init(t))
+}
+
+func testConsumedCapacityPreBindHandoff(tCtx ktesting.TContext) {
+	featuregatetesting.SetFeatureGateDuringTest(tCtx, utilfeature.DefaultFeatureGate, features.DRAConsumableCapacity, true)
+	first, second := pendingClaim.DeepCopy(), pendingClaim2.DeepCopy()
+	for _, claim := range []*resourceapi.ResourceClaim{first, second} {
+		claim.Spec.Devices.Requests[0].Exactly.Capacity = &resourceapi.CapacityRequirements{Requests: map[resourceapi.QualifiedName]apiresource.Quantity{"shares": apiresource.MustParse("2")}}
+	}
+	tc := setup(tCtx, nil, []*v1.Node{workerNode}, []*resourceapi.ResourceClaim{first, second}, []*resourceapi.DeviceClass{deviceClass}, nil, []apiruntime.Object{workerNodeSliceWithShares.DeepCopy()}, feature.NewSchedulerFeaturesFromGates(utilfeature.DefaultFeatureGate), false, nil)
+	secondPod := podWithClaimName.DeepCopy()
+	secondPod.Name += "-second"
+	secondPod.UID += "-second"
+	secondPod.Spec.ResourceClaims[0].ResourceClaimName = &claimName2
+	filter := func(pod *v1.Pod) (fwk.CycleState, *fwk.Status) {
+		state := framework.NewCycleState()
+		_, status := tc.p.PreFilter(tCtx, state, pod, tc.nodeInfos)
+		require.True(tCtx, status.IsSuccess(), "PreFilter: %v", status)
+		return state, tc.p.Filter(tCtx, state, pod, tc.nodeInfos[0])
+	}
+	cycle, status := filter(podWithClaimName)
+	require.True(tCtx, status.IsSuccess())
+	require.True(tCtx, tc.p.Reserve(tCtx, cycle, podWithClaimName, nodeName).IsSuccess())
+	_, status = filter(secondPod)
+	require.True(tCtx, status.IsSuccess(), "one pending allocation consumes two of four shares: %v", status)
+	state, err := getStateData(cycle)
+	require.NoError(tCtx, err)
+	// PreBind may wait for binding conditions after persisting the allocation.
+	persisted, cleanup, err := tc.p.bindClaim(tCtx, state, 0, podWithClaimName, nodeName)
+	require.NoError(tCtx, err)
+	require.NotNil(tCtx, persisted.Status.Allocation)
+	require.NotNil(tCtx, cleanup)
+	_, status = filter(secondPod)
+	require.True(tCtx, status.IsSuccess(), "the persisted allocation must not be counted again while still pending: %v", status)
+	cleanup()
+	_, status = filter(secondPod)
+	require.True(tCtx, status.IsSuccess(), "the persisted allocation remains counted once after cleanup: %v", status)
+}
+
+// TestSharedCounterPreBindHandoff checks that capacity and counter consumption
+// remain counted once while an allocation moves from pending to persisted and
+// PreBind finally removes its pending copy.
+func TestSharedCounterPreBindHandoff(t *testing.T) {
+	testSharedCounterPreBindHandoff(ktesting.Init(t))
+}
+
+func testSharedCounterPreBindHandoff(tCtx ktesting.TContext) {
+	featuregatetesting.SetFeatureGatesDuringTest(tCtx, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.DRAPartitionableDevices:     true,
+		features.DRAConsumableCapacity:       true,
+		features.DRASharedConsumableCapacity: true,
+	})
+	claim := pendingClaim.DeepCopy()
+	claim.Spec.Devices.Requests[0].Exactly.Capacity = &resourceapi.CapacityRequirements{
+		Requests: map[resourceapi.QualifiedName]apiresource.Quantity{
+			"shares":    apiresource.MustParse("2"),
+			"bandwidth": apiresource.MustParse("3"),
+		},
+	}
+	deviceSlice := workerNodeSliceWithShares.DeepCopy()
+	deviceSlice.Spec.Pool.ResourceSliceCount = 2
+	deviceSlice.Spec.Devices[0].ConsumesCounters = []resourceapi.DeviceCounterConsumption{{
+		CounterSet: "shared",
+		Counters: map[string]resourceapi.CounterRequirement{
+			"bandwidth": {ValueFrom: &resourceapi.CounterValueFrom{CapacityName: "bandwidth"}},
+		},
+	}}
+	counterSlice := &resourceapi.ResourceSlice{
+		ObjectMeta: metav1.ObjectMeta{Name: "counter-slice", UID: "counter-slice-uid", ResourceVersion: "1"},
+		Spec: resourceapi.ResourceSliceSpec{
+			Driver: driver, NodeName: &nodeName, Pool: deviceSlice.Spec.Pool,
+			SharedCounters: []resourceapi.CounterSet{{
+				Name: "shared", Counters: map[string]resourceapi.Counter{"bandwidth": {Value: apiresource.MustParse("6")}},
+			}},
+		},
+	}
+	tc := setup(tCtx, nil, []*v1.Node{workerNode}, []*resourceapi.ResourceClaim{claim}, []*resourceapi.DeviceClass{deviceClass}, nil, []apiruntime.Object{deviceSlice, counterSlice}, feature.NewSchedulerFeaturesFromGates(utilfeature.DefaultFeatureGate), false, nil)
+	checkConsumption := func(stage string) {
+		tCtx.Helper()
+		allocated, err := tc.draManager.ResourceClaims().GatherAllocatedState()
+		require.NoError(tCtx, err)
+		deviceID := structured.MakeDeviceID(driver, deviceSlice.Spec.Pool.Name, "instance-1")
+		require.Len(tCtx, allocated.AggregatedCapacity, 1, stage)
+		capacity := allocated.AggregatedCapacity[deviceID][draapi.MakeFullyQualifiedName("shares", deviceID.Driver, draapi.MakeUniqueString)]
+		require.NotNil(tCtx, capacity, stage)
+		require.Equal(tCtx, "2", capacity.String(), stage)
+		require.Equal(tCtx, schedulerapi.CounterConsumptionByDevice{
+			deviceID: {{
+				{CounterSet: "shared", Counters: map[string]apiresource.Quantity{"bandwidth": apiresource.MustParse("3")}},
+			}},
+		}, allocated.ConsumedCounters, stage)
+	}
+	cycle := framework.NewCycleState()
+	_, status := tc.p.PreFilter(tCtx, cycle, podWithClaimName, tc.nodeInfos)
+	require.True(tCtx, status.IsSuccess(), "PreFilter: %v", status)
+	require.True(tCtx, tc.p.Filter(tCtx, cycle, podWithClaimName, tc.nodeInfos[0]).IsSuccess())
+	require.True(tCtx, tc.p.Reserve(tCtx, cycle, podWithClaimName, nodeName).IsSuccess())
+	checkConsumption("pending")
+	state, err := getStateData(cycle)
+	require.NoError(tCtx, err)
+	persisted, cleanup, err := tc.p.bindClaim(tCtx, state, 0, podWithClaimName, nodeName)
+	require.NoError(tCtx, err)
+	require.NotNil(tCtx, persisted.Status.Allocation)
+	require.NotNil(tCtx, cleanup)
+	checkConsumption("persisted but still pending")
+	cleanup()
+	checkConsumption("after cleanup")
+}
+
+// TestResourceSliceUpdatePreservesSharedCounterAllocation verifies that slice
+// updates do not resize or revoke existing allocations. A saved charge of 7
+// and a new request for 4 initially fit a budget of 12. Reducing the budget to 6
+// and removing the allocated device must preserve the existing allocation and
+// its recorded charge, blocking the new request. Releasing that allocation
+// must then allow the new request.
+func TestResourceSliceUpdatePreservesSharedCounterAllocation(t *testing.T) {
+	testResourceSliceUpdatePreservesSharedCounterAllocation(ktesting.Init(t))
+}
+
+func testResourceSliceUpdatePreservesSharedCounterAllocation(tCtx ktesting.TContext) {
+	featuregatetesting.SetFeatureGatesDuringTest(tCtx, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.DRAPartitionableDevices:     true,
+		features.DRAConsumableCapacity:       true,
+		features.DRASharedConsumableCapacity: true,
+	})
+	allocated := pendingClaim.DeepCopy()
+	allocated.Spec.Devices.Requests[0].Exactly.Capacity = &resourceapi.CapacityRequirements{
+		Requests: map[resourceapi.QualifiedName]apiresource.Quantity{"bandwidth": apiresource.MustParse("7")},
+	}
+	allocated.Status.Allocation = allocationResult.DeepCopy()
+	allocated.Status.Allocation.Devices.Results[0].ConsumedCounters = []resourceapi.CounterSetConsumption{{
+		CounterSet: "shared", Counters: map[string]apiresource.Quantity{"bandwidth": apiresource.MustParse("7")},
+	}}
+	allocated = addAllocationTimestamp(allocated)
+	candidate := pendingClaim2.DeepCopy()
+	candidate.Spec.Devices.Requests[0].Exactly.Capacity = &resourceapi.CapacityRequirements{
+		Requests: map[resourceapi.QualifiedName]apiresource.Quantity{"bandwidth": apiresource.MustParse("4")},
+	}
+	pool := resourceapi.ResourcePool{Name: nodeName, Generation: 1, ResourceSliceCount: 2}
+	counterSlice := &resourceapi.ResourceSlice{
+		ObjectMeta: metav1.ObjectMeta{Name: "counter-slice", UID: "counter-slice-uid", ResourceVersion: "1"},
+		Spec: resourceapi.ResourceSliceSpec{Driver: driver, NodeName: &nodeName, Pool: pool,
+			SharedCounters: []resourceapi.CounterSet{{Name: "shared", Counters: map[string]resourceapi.Counter{"bandwidth": {Value: apiresource.MustParse("12")}}}},
+		},
+	}
+	deviceSlice := &resourceapi.ResourceSlice{
+		ObjectMeta: metav1.ObjectMeta{Name: "device-slice", UID: "device-slice-uid", ResourceVersion: "1"},
+		Spec:       resourceapi.ResourceSliceSpec{Driver: driver, NodeName: &nodeName, Pool: pool},
+	}
+	for _, name := range []string{"instance-1", "instance-2"} {
+		deviceSlice.Spec.Devices = append(deviceSlice.Spec.Devices, resourceapi.Device{
+			Name: name,
+			ConsumesCounters: []resourceapi.DeviceCounterConsumption{{
+				CounterSet: "shared",
+				Counters: map[string]resourceapi.CounterRequirement{"bandwidth": {
+					ValueFrom: &resourceapi.CounterValueFrom{CapacityName: "bandwidth"},
+				}},
+			}},
+		})
+	}
+	feats := feature.NewSchedulerFeaturesFromGates(utilfeature.DefaultFeatureGate)
+	testCtx := setup(tCtx, nil, []*v1.Node{workerNode}, []*resourceapi.ResourceClaim{allocated, candidate}, []*resourceapi.DeviceClass{deviceClass}, nil, []apiruntime.Object{counterSlice, deviceSlice}, feats, false, nil)
+	candidatePod := podWithClaimName.DeepCopy()
+	candidatePod.Spec.ResourceClaims[0].ResourceClaimName = &claimName2
+	filter := func(pod *v1.Pod) (fwk.CycleState, *fwk.Status) {
+		state := framework.NewCycleState()
+		_, status := testCtx.p.PreFilter(tCtx, state, pod, testCtx.nodeInfos)
+		require.True(tCtx, status.IsSuccess(), "PreFilter: %v", status)
+		return state, testCtx.p.Filter(tCtx, state, pod, testCtx.nodeInfos[0])
+	}
+	_, status := filter(candidatePod)
+	require.True(tCtx, status.IsSuccess(), "the new request fits the original budget: %v", status)
+
+	counterSlice = counterSlice.DeepCopy()
+	deviceSlice = deviceSlice.DeepCopy()
+	counterSlice.Spec.Pool.Generation++
+	deviceSlice.Spec.Pool.Generation++
+	counterSlice.Spec.SharedCounters[0].Counters["bandwidth"] = resourceapi.Counter{Value: apiresource.MustParse("6")}
+	deviceSlice.Spec.Devices = deviceSlice.Spec.Devices[1:]
+	var err error
+	counterSlice, err = testCtx.client.ResourceV1().ResourceSlices().Update(tCtx, counterSlice, metav1.UpdateOptions{})
+	require.NoError(tCtx, err)
+	_, err = testCtx.client.ResourceV1().ResourceSlices().Update(tCtx, deviceSlice, metav1.UpdateOptions{})
+	require.NoError(tCtx, err)
+	require.NoError(tCtx, wait.PollUntilContextTimeout(tCtx, time.Millisecond, 10*time.Second, true, func(context.Context) (bool, error) {
+		sliceList, err := testCtx.draManager.ResourceSlices().ListWithDeviceTaintRules()
+		if err != nil {
+			return false, err
+		}
+		for _, slice := range sliceList {
+			if slice.Spec.Pool.Generation != counterSlice.Spec.Pool.Generation {
+				return false, nil
+			}
+		}
+		return len(sliceList) == 2, nil
+	}))
+
+	state, status := filter(podWithClaimName)
+	require.True(tCtx, status.IsSuccess(), "the allocated claim remains usable after the slice update: %v", status)
+	require.True(tCtx, testCtx.p.Reserve(tCtx, state, podWithClaimName, nodeName).IsSuccess())
+	require.True(tCtx, testCtx.p.PreBind(tCtx, state, podWithClaimName, nodeName).IsSuccess())
+	unchanged, err := testCtx.client.ResourceV1().ResourceClaims(namespace).Get(tCtx, claimName, metav1.GetOptions{})
+	require.NoError(tCtx, err)
+	require.Equal(tCtx, allocated.Status.Allocation, unchanged.Status.Allocation, "slice updates must not resize or revoke the existing allocation")
+	_, status = filter(candidatePod)
+	require.True(tCtx, status.IsRejected(), "the saved charge of 7 exceeds the new budget of 6, including after its device disappears: %v", status)
+
+	// Releasing the old allocation frees its saved charge; slice updates alone did not.
+	released, err := testCtx.client.ResourceV1().ResourceClaims(namespace).Get(tCtx, claimName, metav1.GetOptions{})
+	require.NoError(tCtx, err)
+	released.Status.Allocation = nil
+	released.Status.ReservedFor = nil
+	released, err = testCtx.client.ResourceV1().ResourceClaims(namespace).UpdateStatus(tCtx, released, metav1.UpdateOptions{})
+	require.NoError(tCtx, err)
+	require.NoError(tCtx, testCtx.draManager.ResourceClaims().AssumeClaimAfterAPICall(released))
+	_, status = filter(candidatePod)
+	require.True(tCtx, status.IsSuccess(), "the new request fits the reduced budget after release: %v", status)
 }
 
 func TestPlugin(t *testing.T) {
-	testPlugin(ktesting.Init(t))
+	testPlugin(ktesting.Init(t), false /* preemption */)
+}
+
+// TestPluginWithPreemption re-runs TestPlugin cases with DRAPreemption enabled,
+// verifying identical behavior apart from expected DRAPreemption differences.
+func TestPluginWithPreemption(t *testing.T) {
+	testPlugin(ktesting.Init(t), true /* preemption */)
 }
 
 func TestPreFilterReusesPendingAllocationWithNilNodeSelector(t *testing.T) {
@@ -1430,6 +1715,76 @@ func TestFilterReusesPendingAllocationRequiresDRAOptionalNodeOperations(t *testi
 
 	statusWithFeature := testCtx.p.Filter(context.Background(), testCtx.state, groupedPodWithClaimName, nodeInfoWithFeature)
 	assert.True(t, statusWithFeature.IsSuccess(), "expected success when node has DRAOptionalNodeOperations feature")
+}
+
+// TestReserveMixedPendingAndFreshClaims covers a Pod whose first claim reuses
+// a pending allocation made by another Pod of the same PodGroup, while its
+// second claim needs a fresh allocation. Reserve maps the results collected in
+// Filter onto the claims by position, so each result must end up on its own
+// claim: the pending claim keeps the pending allocation's device, the fresh
+// claim gets a different one.
+func TestReserveMixedPendingAndFreshClaims(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	featuregatetesting.SetFeatureGatesDuringTest(tCtx, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.DRAWorkloadResourceClaims: true,
+		features.GenericWorkload:           true,
+	})
+
+	feats := feature.Features{
+		EnableDRAWorkloadResourceClaims: true,
+	}
+
+	pod := st.MakePod().Name(podName).Namespace(namespace).
+		UID(podUID).
+		PodResourceClaims(v1.PodResourceClaim{Name: resourceName, ResourceClaimName: &claimName}).
+		PodResourceClaims(v1.PodResourceClaim{Name: resourceName2, ResourceClaimName: &claimName2}).
+		PodGroupName(podGroupName).
+		Obj()
+
+	testCtx := setup(tCtx, &config.DynamicResourcesArgs{}, []*v1.Node{workerNode}, []*resourceapi.ResourceClaim{pendingPodGroupClaim, claim2}, []*resourceapi.DeviceClass{deviceClass}, []*schedulingapi.PodGroup{podGroupWithClaimName}, []apiruntime.Object{largeWorkerNodeSlice}, feats, false, nil)
+
+	pendingClaim, err := testCtx.draManager.ResourceClaims().Get(namespace, claimName)
+	if err != nil {
+		t.Fatalf("Get claim: %v", err)
+	}
+	pendingClaimAllocated := pendingClaim.DeepCopy()
+	// "instance-1" is the device the other Pod reserved for the shared claim.
+	pendingClaimAllocated.Status.Allocation = allocationResult.DeepCopy()
+	tCtx.ExpectNoError(testCtx.draManager.ResourceClaims().SignalClaimPendingAllocation(pendingClaimAllocated.UID, pendingClaimAllocated))
+
+	podGroupCycleState := framework.NewCycleState()
+	podGroupCycleState.Write(stateKey, &podGroupStateData{
+		pendingAllocations: map[types.UID]sets.Set[types.UID]{
+			pendingClaimAllocated.UID: sets.New(types.UID("previous-pod")),
+		},
+	})
+	cycleState := framework.NewCycleState()
+	cycleState.SetPodGroupCycleState(podGroupCycleState)
+	testCtx.state = cycleState
+
+	nodeInfo := framework.NewNodeInfo()
+	nodeInfo.SetNode(workerNode)
+
+	if _, status := testCtx.p.PreFilter(tCtx, testCtx.state, pod, []fwk.NodeInfo{nodeInfo}); !status.IsSuccess() {
+		t.Fatalf("PreFilter status: %v", status)
+	}
+	if status := testCtx.p.Filter(tCtx, testCtx.state, pod, nodeInfo); !status.IsSuccess() {
+		t.Fatalf("Filter status: %v", status)
+	}
+	if status := testCtx.p.Reserve(tCtx, testCtx.state, pod, nodeName); !status.IsSuccess() {
+		t.Fatalf("Reserve status: %v", status)
+	}
+
+	pluginState, err := getStateData(testCtx.state)
+	if err != nil {
+		t.Fatalf("getStateData: %v", err)
+	}
+	if got := pluginState.informationsForClaim[0].allocation.Devices.Results[0].Device; got != "instance-1" {
+		t.Errorf("claim with pending allocation: got device %q, want instance-1", got)
+	}
+	if got := pluginState.informationsForClaim[1].allocation.Devices.Results[0].Device; got != "instance-2" {
+		t.Errorf("claim needing fresh allocation: got device %q, want instance-2", got)
+	}
 }
 
 // TestUnreserveSharedPendingAllocation covers two Pods of a PodGroup which
@@ -1562,10 +1917,12 @@ func TestUnreserveExtendedResourceClaimAfterAllocationInPreBind(t *testing.T) {
 	assert.True(tCtx, allocatedDevices.Has(schedulerapi.MakeDeviceID(device.Driver, device.Pool, device.Device)), "allocated devices: %v", allocatedDevices.UnsortedList())
 }
 
-func testPlugin(tCtx ktesting.TContext) {
+func testPlugin(tCtx ktesting.TContext, preemption bool) {
 	testcases := map[string]testPluginCase{
-		"empty": {
-			pod: st.MakePod().Name("foo").Namespace("default").Obj(),
+		"empty-with-extended-resources-disabled": {
+			emulatedVersion:  "1.36",
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAExtendedResource: false},
+			pod:              st.MakePod().Name("foo").Namespace("default").Obj(),
 			want: want{
 				prefilter: result{
 					status: fwk.NewStatus(fwk.Skip),
@@ -1577,8 +1934,7 @@ func testPlugin(tCtx ktesting.TContext) {
 			},
 		},
 		"empty-with-extended-resources-enabled": {
-			enableDRAExtendedResource: true,
-			pod:                       st.MakePod().Name("foo").Namespace("default").Obj(),
+			pod: st.MakePod().Name("foo").Namespace("default").Obj(),
 			want: want{
 				prefilter: result{
 					status: fwk.NewStatus(fwk.Skip),
@@ -1628,10 +1984,10 @@ func testPlugin(tCtx ktesting.TContext) {
 			},
 		},
 		"podgroup-claim-reference-feature-disabled-reserves-for-pod": {
-			enableDRAWorkloadResourceClaims: false,
-			pod:                             groupedPodWithClaimName,
-			podGroups:                       []*schedulingapi.PodGroup{podGroupWithClaimName},
-			claims:                          []*resourceapi.ResourceClaim{allocatedPodGroupClaim, otherClaim},
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAWorkloadResourceClaims: false},
+			pod:              groupedPodWithClaimName,
+			podGroups:        []*schedulingapi.PodGroup{podGroupWithClaimName},
+			claims:           []*resourceapi.ResourceClaim{allocatedPodGroupClaim, otherClaim},
 			want: want{
 				prebind: result{
 					assumedClaim: addAllocationTimestamp(reserve(allocatedPodGroupClaim, groupedPodWithClaimName)),
@@ -1649,10 +2005,10 @@ func testPlugin(tCtx ktesting.TContext) {
 			},
 		},
 		"podgroup-claim-reference": {
-			enableDRAWorkloadResourceClaims: true,
-			pod:                             groupedPodWithClaimName,
-			podGroups:                       []*schedulingapi.PodGroup{podGroupWithClaimName},
-			claims:                          []*resourceapi.ResourceClaim{allocatedPodGroupClaim, otherClaim},
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAWorkloadResourceClaims: true, features.GenericWorkload: true},
+			pod:              groupedPodWithClaimName,
+			podGroups:        []*schedulingapi.PodGroup{podGroupWithClaimName},
+			claims:           []*resourceapi.ResourceClaim{allocatedPodGroupClaim, otherClaim},
 			want: want{
 				prebind: result{
 					assumedClaim: addAllocationTimestamp(reserveFor(allocatedPodGroupClaim, podGroupReservation)),
@@ -1670,10 +2026,10 @@ func testPlugin(tCtx ktesting.TContext) {
 			},
 		},
 		"podgroup-claim-template": {
-			enableDRAWorkloadResourceClaims: true,
-			pod:                             groupedPodWithClaimTemplateInStatus,
-			podGroups:                       []*schedulingapi.PodGroup{podGroupWithClaimTemplate},
-			claims:                          []*resourceapi.ResourceClaim{allocatedPodGroupClaim, otherClaim},
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAWorkloadResourceClaims: true, features.GenericWorkload: true},
+			pod:              groupedPodWithClaimTemplateInStatus,
+			podGroups:        []*schedulingapi.PodGroup{podGroupWithClaimTemplate},
+			claims:           []*resourceapi.ResourceClaim{allocatedPodGroupClaim, otherClaim},
 			want: want{
 				prebind: result{
 					assumedClaim: addAllocationTimestamp(reserveFor(allocatedPodGroupClaim, podGroupReservation)),
@@ -1769,12 +2125,12 @@ func testPlugin(tCtx ktesting.TContext) {
 			},
 		},
 		"podgroup-with-resources": {
-			enableDRAWorkloadResourceClaims: true,
-			pod:                             groupedPodWithClaimName,
-			podGroups:                       []*schedulingapi.PodGroup{podGroupWithClaimName},
-			claims:                          []*resourceapi.ResourceClaim{pendingPodGroupClaim},
-			classes:                         []*resourceapi.DeviceClass{deviceClass},
-			objs:                            []apiruntime.Object{workerNodeSlice},
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAWorkloadResourceClaims: true, features.GenericWorkload: true},
+			pod:              groupedPodWithClaimName,
+			podGroups:        []*schedulingapi.PodGroup{podGroupWithClaimName},
+			claims:           []*resourceapi.ResourceClaim{pendingPodGroupClaim},
+			classes:          []*resourceapi.DeviceClass{deviceClass},
+			objs:             []apiruntime.Object{workerNodeSlice},
 			want: want{
 				reserve: result{
 					inFlightClaims: []metav1.Object{allocatedPodGroupClaim},
@@ -1796,12 +2152,12 @@ func testPlugin(tCtx ktesting.TContext) {
 			},
 		},
 		"podgroup-with-resources-feature-disabled-reserves-for-pod": {
-			enableDRAWorkloadResourceClaims: false,
-			pod:                             groupedPodWithClaimName,
-			podGroups:                       []*schedulingapi.PodGroup{podGroupWithClaimName},
-			claims:                          []*resourceapi.ResourceClaim{pendingPodGroupClaim},
-			classes:                         []*resourceapi.DeviceClass{deviceClass},
-			objs:                            []apiruntime.Object{workerNodeSlice},
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAWorkloadResourceClaims: false},
+			pod:              groupedPodWithClaimName,
+			podGroups:        []*schedulingapi.PodGroup{podGroupWithClaimName},
+			claims:           []*resourceapi.ResourceClaim{pendingPodGroupClaim},
+			classes:          []*resourceapi.DeviceClass{deviceClass},
+			objs:             []apiruntime.Object{workerNodeSlice},
 			want: want{
 				reserve: result{
 					inFlightClaims: []metav1.Object{allocatedPodGroupClaim},
@@ -2034,11 +2390,12 @@ func testPlugin(tCtx ktesting.TContext) {
 		// correctly. The actual logic around device taints and allocation
 		// is in the allocator.
 		"tainted-device-disabled": {
-			enableDRADeviceTaints: false,
-			pod:                   podWithClaimName,
-			claims:                []*resourceapi.ResourceClaim{pendingClaim},
-			classes:               []*resourceapi.DeviceClass{deviceClass},
-			objs:                  []apiruntime.Object{taintDevices(workerNodeSlice)},
+			emulatedVersion:  "1.37",
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRADeviceTaints: false},
+			pod:              podWithClaimName,
+			claims:           []*resourceapi.ResourceClaim{pendingClaim},
+			classes:          []*resourceapi.DeviceClass{deviceClass},
+			objs:             []apiruntime.Object{taintDevices(workerNodeSlice)},
 			want: want{
 				reserve: result{
 					inFlightClaims: []metav1.Object{allocatedClaim},
@@ -2063,11 +2420,10 @@ func testPlugin(tCtx ktesting.TContext) {
 			},
 		},
 		"tainted-device-enabled": {
-			enableDRADeviceTaints: true,
-			pod:                   podWithClaimName,
-			claims:                []*resourceapi.ResourceClaim{pendingClaim},
-			classes:               []*resourceapi.DeviceClass{deviceClass},
-			objs:                  []apiruntime.Object{taintDevices(workerNodeSlice)},
+			pod:     podWithClaimName,
+			claims:  []*resourceapi.ResourceClaim{pendingClaim},
+			classes: []*resourceapi.DeviceClass{deviceClass},
+			objs:    []apiruntime.Object{taintDevices(workerNodeSlice)},
 			want: want{
 				filter: perNodeResult{
 					workerNode.Name: {
@@ -2112,9 +2468,11 @@ func testPlugin(tCtx ktesting.TContext) {
 			},
 		},
 		"request-admin-access-without-DRAAdminAccess-featuregate": {
+			emulatedVersion:  "1.35",
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAAdminAccess: false},
 			// When the DRAAdminAccess feature gate is disabled,
 			// even though the pending claim requests admin access,
-			// the scheduler returns an unschedulable status.
+			// the scheduler returns an error.
 			pod:     podWithClaimName,
 			claims:  []*resourceapi.ResourceClaim{adminAccess(pendingClaim), otherAllocatedClaim},
 			classes: []*resourceapi.DeviceClass{deviceClass},
@@ -2122,11 +2480,10 @@ func testPlugin(tCtx ktesting.TContext) {
 			want: want{
 				filter: perNodeResult{
 					workerNode.Name: {
-						status: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, `claim default/my-pod-my-resource, request req-1: admin access is requested, but the feature is disabled`),
+						status: fwk.NewStatus(fwk.Error, `claim default/my-pod-my-resource, request req-1: admin access is requested, but the feature is disabled`),
 					},
 				},
 			},
-			disableDRAAdminAccess: true,
 		},
 
 		"structured-ignore-allocated-admin-access": {
@@ -2218,7 +2575,7 @@ func testPlugin(tCtx ktesting.TContext) {
 			want: want{
 				filter: perNodeResult{
 					workerNode.Name: {
-						status: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, `claim default/my-pod-my-resource: selector #0 on device some-driver/worker/instance-1: CEL runtime error: no such key: `+string(attrName)+`. consider using CEL optional chaining (.? followed by orValue()) or guarding the check with has() for optional fields`),
+						status: fwk.NewStatus(fwk.Error, `claim default/my-pod-my-resource: selector #0 on device some-driver/worker/instance-1: CEL runtime error: no such key: `+string(attrName)+`. consider using CEL optional chaining (.? followed by orValue()) or guarding the check with has() for optional fields`),
 					},
 				},
 				prescore: result{
@@ -2355,7 +2712,7 @@ func testPlugin(tCtx ktesting.TContext) {
 				},
 				prebind: result{
 					inFlightClaims: []metav1.Object{addAllocationTimestamp(allocatedClaim)},
-					status:         fwk.NewStatus(fwk.Unschedulable, `claim bind error`),
+					status:         fwk.NewStatus(fwk.Error, `claim bind error`),
 				},
 				unreserveAfterBindFailure: &result{},
 			},
@@ -2369,11 +2726,88 @@ func testPlugin(tCtx ktesting.TContext) {
 				},
 			},
 		},
+		"bind-failure-after-allocation": {
+			// PreBind stores the allocation made in this cycle, then binding
+			// fails. Unreserve only removes the pod from ReservedFor, even under
+			// DRAPreemption, because Bind may have bound the pod despite failing.
+			pod:     podWithClaimName,
+			claims:  []*resourceapi.ResourceClaim{pendingClaim},
+			classes: []*resourceapi.DeviceClass{deviceClass},
+			objs:    []apiruntime.Object{workerNodeSlice},
+			want: want{
+				reserve: result{
+					inFlightClaims: []metav1.Object{allocatedClaim},
+				},
+				prebind: result{
+					assumedClaim: addAllocationTimestamp(reserve(allocatedClaim, podWithClaimName)),
+					changes: change{
+						claim: func(claim *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
+							if claim.Name == claimName {
+								claim = claim.DeepCopy()
+								claim.Finalizers = allocatedClaim.Finalizers
+								claim.Status = inUseClaim.Status
+								claim = addAllocationTimestamp(claim)
+							}
+							return claim
+						},
+					},
+				},
+				unreserveAfterBindFailure: &result{
+					assumedClaim: addAllocationTimestamp(reserve(allocatedClaim, podWithClaimName)),
+					changes: change{
+						claim: func(in *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
+							out := in.DeepCopy()
+							out.Status.ReservedFor = []resourceapi.ResourceClaimConsumerReference{}
+							return out
+						},
+					},
+				},
+			},
+		},
+		"bind-failure-after-allocation-in-podgroup": {
+			// PreBind succeeds for a PodGroup member, then binding fails.
+			// Unreserve only removes the pod from ReservedFor.
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAWorkloadResourceClaims: false, features.GenericWorkload: true},
+			pod:              groupedPodWithClaimName,
+			podGroups:        []*schedulingapi.PodGroup{podGroupWithClaimName},
+			claims:           []*resourceapi.ResourceClaim{pendingPodGroupClaim},
+			classes:          []*resourceapi.DeviceClass{deviceClass},
+			objs:             []apiruntime.Object{workerNodeSlice},
+			want: want{
+				reserve: result{
+					inFlightClaims: []metav1.Object{allocatedPodGroupClaim},
+				},
+				prebind: result{
+					assumedClaim: addAllocationTimestamp(reserve(allocatedPodGroupClaim, groupedPodWithClaimName)),
+					changes: change{
+						claim: func(claim *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
+							if claim.Name == claimName {
+								claim = claim.DeepCopy()
+								claim.Finalizers = allocatedClaim.Finalizers
+								claim.Status = inUseClaim.Status
+								claim = addAllocationTimestamp(claim)
+							}
+							return claim
+						},
+					},
+				},
+				unreserveAfterBindFailure: &result{
+					assumedClaim: addAllocationTimestamp(reserve(allocatedPodGroupClaim, groupedPodWithClaimName)),
+					changes: change{
+						claim: func(in *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
+							out := in.DeepCopy()
+							out.Status.ReservedFor = []resourceapi.ResourceClaimConsumerReference{}
+							return out
+						},
+					},
+				},
+			},
+		},
 		"bind-podgroup-failure": {
-			enableDRAWorkloadResourceClaims: true,
-			pod:                             groupedPodWithClaimName,
-			podGroups:                       []*schedulingapi.PodGroup{podGroupWithClaimName},
-			claims:                          []*resourceapi.ResourceClaim{allocatedPodGroupClaim},
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAWorkloadResourceClaims: true, features.GenericWorkload: true},
+			pod:              groupedPodWithClaimName,
+			podGroups:        []*schedulingapi.PodGroup{podGroupWithClaimName},
+			claims:           []*resourceapi.ResourceClaim{allocatedPodGroupClaim},
 			want: want{
 				prebind: result{
 					assumedClaim: addAllocationTimestamp(reserveFor(allocatedPodGroupClaim, podGroupReservation)),
@@ -2394,9 +2828,9 @@ func testPlugin(tCtx ktesting.TContext) {
 			},
 		},
 		"postfilter-deallocate-reserved-podgroup": {
-			enableDRAWorkloadResourceClaims: true,
-			pod:                             groupedPodWithClaimName,
-			podGroups:                       []*schedulingapi.PodGroup{podGroupWithClaimName},
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAWorkloadResourceClaims: true, features.GenericWorkload: true},
+			pod:              groupedPodWithClaimName,
+			podGroups:        []*schedulingapi.PodGroup{podGroupWithClaimName},
 			objs: []apiruntime.Object{
 				// Pods in the PodGroup
 				groupedPodWithClaimName,
@@ -2423,9 +2857,9 @@ func testPlugin(tCtx ktesting.TContext) {
 			},
 		},
 		"postfilter-skip-deallocate-reserved-podgroup-feature-disabled": {
-			enableDRAWorkloadResourceClaims: false,
-			pod:                             groupedPodWithClaimName,
-			podGroups:                       []*schedulingapi.PodGroup{podGroupWithClaimName},
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAWorkloadResourceClaims: false},
+			pod:              groupedPodWithClaimName,
+			podGroups:        []*schedulingapi.PodGroup{podGroupWithClaimName},
 			objs: []apiruntime.Object{
 				// Pods in the PodGroup
 				groupedPodWithClaimName,
@@ -2444,9 +2878,9 @@ func testPlugin(tCtx ktesting.TContext) {
 			},
 		},
 		"postfilter-deallocate-unreserved-podgroup": {
-			enableDRAWorkloadResourceClaims: true,
-			pod:                             groupedPodWithClaimName,
-			podGroups:                       []*schedulingapi.PodGroup{podGroupWithClaimName},
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAWorkloadResourceClaims: true, features.GenericWorkload: true},
+			pod:              groupedPodWithClaimName,
+			podGroups:        []*schedulingapi.PodGroup{podGroupWithClaimName},
 			objs: []apiruntime.Object{
 				// Pods in the PodGroup
 				groupedPodWithClaimName,
@@ -2479,9 +2913,9 @@ func testPlugin(tCtx ktesting.TContext) {
 			},
 		},
 		"postfilter-skip-deallocate-reserved-podgroup-when-pods-active": {
-			enableDRAWorkloadResourceClaims: true,
-			pod:                             groupedPodWithClaimName,
-			podGroups:                       []*schedulingapi.PodGroup{podGroupWithClaimName},
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAWorkloadResourceClaims: true, features.GenericWorkload: true},
+			pod:              groupedPodWithClaimName,
+			podGroups:        []*schedulingapi.PodGroup{podGroupWithClaimName},
 			objs: []apiruntime.Object{
 				// Pods in the PodGroup
 				groupedPodWithClaimName,
@@ -2508,17 +2942,17 @@ func testPlugin(tCtx ktesting.TContext) {
 			claims: []*resourceapi.ResourceClaim{inUseClaim},
 		},
 		"reserved-okay-podgroup": {
-			enableDRAWorkloadResourceClaims: true,
-			pod:                             groupedPodWithClaimName,
-			podGroups:                       []*schedulingapi.PodGroup{podGroupWithClaimName},
-			claims:                          []*resourceapi.ResourceClaim{inUseClaimByPodGroup},
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAWorkloadResourceClaims: true, features.GenericWorkload: true},
+			pod:              groupedPodWithClaimName,
+			podGroups:        []*schedulingapi.PodGroup{podGroupWithClaimName},
+			claims:           []*resourceapi.ResourceClaim{inUseClaimByPodGroup},
 		},
 		"claim-with-request-with-unknown-device-class": {
 			pod:    podWithClaimName,
 			claims: []*resourceapi.ResourceClaim{updateDeviceClassName(claim, "does-not-exist")},
 			want: want{
 				prefilter: result{
-					status: fwk.NewStatus(fwk.Unschedulable, `request req-1: device class does-not-exist does not exist`),
+					status: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, `request req-1: device class does-not-exist does not exist`),
 				},
 				postfilter: result{
 					status: fwk.NewStatus(fwk.Unschedulable),
@@ -2526,10 +2960,11 @@ func testPlugin(tCtx ktesting.TContext) {
 			},
 		},
 		"claim-with-prioritized-list-feature-disabled": {
-			enableDRAPrioritizedList: false,
-			pod:                      podWithClaimName,
-			claims:                   []*resourceapi.ResourceClaim{claimWithPrioritzedList},
-			classes:                  []*resourceapi.DeviceClass{deviceClass},
+			emulatedVersion:  "1.36",
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAPrioritizedList: false},
+			pod:              podWithClaimName,
+			claims:           []*resourceapi.ResourceClaim{claimWithPrioritzedList},
+			classes:          []*resourceapi.DeviceClass{deviceClass},
 			want: want{
 				prefilter: result{
 					status: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, `claim default/my-pod-my-resource, request req-1: has subrequests, but the DRAPrioritizedList feature is disabled`),
@@ -2540,12 +2975,11 @@ func testPlugin(tCtx ktesting.TContext) {
 			},
 		},
 		"claim-with-prioritized-list-unknown-device-class": {
-			enableDRAPrioritizedList: true,
-			pod:                      podWithClaimName,
-			claims:                   []*resourceapi.ResourceClaim{updateDeviceClassName(claimWithPrioritzedList, "does-not-exist")},
+			pod:    podWithClaimName,
+			claims: []*resourceapi.ResourceClaim{updateDeviceClassName(claimWithPrioritzedList, "does-not-exist")},
 			want: want{
 				prefilter: result{
-					status: fwk.NewStatus(fwk.Unschedulable, `request req-1/subreq-1: device class does-not-exist does not exist`),
+					status: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, `request req-1/subreq-1: device class does-not-exist does not exist`),
 				},
 				postfilter: result{
 					status: fwk.NewStatus(fwk.Unschedulable),
@@ -2553,11 +2987,10 @@ func testPlugin(tCtx ktesting.TContext) {
 			},
 		},
 		"claim-with-prioritized-list": {
-			enableDRAPrioritizedList: true,
-			pod:                      podWithClaimName,
-			claims:                   []*resourceapi.ResourceClaim{pendingClaimWithPrioritizedList},
-			classes:                  []*resourceapi.DeviceClass{deviceClass},
-			objs:                     []apiruntime.Object{workerNodeSlice},
+			pod:     podWithClaimName,
+			claims:  []*resourceapi.ResourceClaim{pendingClaimWithPrioritizedList},
+			classes: []*resourceapi.DeviceClass{deviceClass},
+			objs:    []apiruntime.Object{workerNodeSlice},
 			want: want{
 				reserve: result{
 					inFlightClaims: []metav1.Object{allocatedClaimWithPrioritizedList},
@@ -2579,22 +3012,20 @@ func testPlugin(tCtx ktesting.TContext) {
 			},
 		},
 		"extended-resource-name-with-node-resource": {
-			enableDRAExtendedResource: true,
-			nodes:                     []*v1.Node{workerNodeWithExtendedResource},
-			pod:                       podWithExtendedResourceName,
-			classes:                   []*resourceapi.DeviceClass{deviceClassWithExtendResourceName},
-			want:                      want{},
+			nodes:   []*v1.Node{workerNodeWithExtendedResource},
+			pod:     podWithExtendedResourceName,
+			classes: []*resourceapi.DeviceClass{deviceClassWithExtendResourceName},
+			want:    want{},
 			metrics: func(tCtx ktesting.TContext, g compbasemetrics.Gatherer) {
 				_, err := testutil.GetCounterValuesFromGatherer(g, "dynamic_resource_allocation_resourceclaim_creates_total", map[string]string{}, "status")
 				require.ErrorContains(tCtx, err, "not found")
 			},
 		},
 		"extended-resource-one-device-plugin-one-dra": {
-			enableDRAExtendedResource: true,
-			nodes:                     []*v1.Node{workerNodeWithExtendedResource},
-			pod:                       podWithExtendedResourceName2,
-			classes:                   []*resourceapi.DeviceClass{deviceClassWithExtendResourceName, deviceClassWithExtendResourceName2},
-			objs:                      []apiruntime.Object{workerNodeSlice, podWithExtendedResourceName2},
+			nodes:   []*v1.Node{workerNodeWithExtendedResource},
+			pod:     podWithExtendedResourceName2,
+			classes: []*resourceapi.DeviceClass{deviceClassWithExtendResourceName, deviceClassWithExtendResourceName2},
+			objs:    []apiruntime.Object{workerNodeSlice, podWithExtendedResourceName2},
 			want: want{
 				reserve: result{
 					inFlightClaims: []metav1.Object{extendedResourceClaimNoName2},
@@ -2609,11 +3040,10 @@ func testPlugin(tCtx ktesting.TContext) {
 			},
 		},
 		"extended-resource-name-with-zero-allocatable": {
-			enableDRAExtendedResource: true,
-			nodes:                     []*v1.Node{workerNodeWithExtendedResourceZeroAllocatable},
-			pod:                       podWithExtendedResourceName,
-			classes:                   []*resourceapi.DeviceClass{deviceClassWithExtendResourceName},
-			objs:                      []apiruntime.Object{workerNodeSlice, podWithExtendedResourceName},
+			nodes:   []*v1.Node{workerNodeWithExtendedResourceZeroAllocatable},
+			pod:     podWithExtendedResourceName,
+			classes: []*resourceapi.DeviceClass{deviceClassWithExtendResourceName},
+			objs:    []apiruntime.Object{workerNodeSlice, podWithExtendedResourceName},
 			want: want{
 				reserve: result{
 					inFlightClaims: []metav1.Object{extendedResourceClaimNoName},
@@ -2627,12 +3057,52 @@ func testPlugin(tCtx ktesting.TContext) {
 				},
 			},
 		},
+		"extended-resource-capacity-requests": {
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAConsumableCapacity: true, features.DRAExtendedResourceCapacity: true},
+			nodes:            []*v1.Node{workerNodeWithExtendedResourceZeroAllocatable},
+			pod:              podWithExtendedResourceName,
+			classes:          []*resourceapi.DeviceClass{deviceClassWithExtendedResourceCapacity},
+			objs:             []apiruntime.Object{workerNodeSliceWithShares, podWithExtendedResourceName},
+			want: want{
+				reserve: result{
+					inFlightClaims: []metav1.Object{extendedResourceClaimWithCapacityNoName},
+				},
+				prebind: result{
+					assumedClaim: addAllocationTimestamp(reserve(extendedResourceClaimWithCapacity, podWithExtendedResourceName)),
+					added:        []metav1.Object{addAllocationTimestamp(reserve(extendedResourceClaimWithCapacity, podWithExtendedResourceName))},
+				},
+				postbind: result{
+					assumedClaim: reserve(extendedResourceClaimWithCapacity, podWithExtendedResourceName),
+				},
+			},
+		},
+		"extended-resource-capacity-requests-feature-disabled": {
+			nodes:   []*v1.Node{workerNodeWithExtendedResourceZeroAllocatable},
+			pod:     podWithExtendedResourceName,
+			classes: []*resourceapi.DeviceClass{deviceClassWithExtendedResourceCapacity},
+			objs:    []apiruntime.Object{workerNodeSlice, podWithExtendedResourceName},
+			want: want{
+				filter: perNodeResult{
+					nodeName: {
+						status: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "device class my-resource-class sets extendedResourceRequest, which requires the DRAExtendedResourceCapacity feature"),
+					},
+				},
+				postfilter: result{
+					status: fwk.NewStatus(fwk.Unschedulable),
+				},
+			},
+		},
+		"extended-resource-capacity-requests-feature-disabled-node-resource": {
+			nodes:   []*v1.Node{workerNodeWithExtendedResource},
+			pod:     podWithExtendedResourceName,
+			classes: []*resourceapi.DeviceClass{deviceClassWithExtendedResourceCapacity},
+			want:    want{},
+		},
 		"non-DRA-extended-resource-name-with-zero-allocatable": {
-			enableDRAExtendedResource: true,
-			nodes:                     []*v1.Node{workerNodeWithExtendedResourceZeroAllocatable},
-			pod:                       podWithExtendedResourceName,
-			classes:                   []*resourceapi.DeviceClass{deviceClass},
-			objs:                      []apiruntime.Object{workerNodeSlice, podWithExtendedResourceName},
+			nodes:   []*v1.Node{workerNodeWithExtendedResourceZeroAllocatable},
+			pod:     podWithExtendedResourceName,
+			classes: []*resourceapi.DeviceClass{deviceClass},
+			objs:    []apiruntime.Object{workerNodeSlice, podWithExtendedResourceName},
 			want: want{
 				prefilter: result{
 					status: fwk.NewStatus(fwk.Skip),
@@ -2641,9 +3111,8 @@ func testPlugin(tCtx ktesting.TContext) {
 			},
 		},
 		"extended-resource-name-no-resource": {
-			enableDRAExtendedResource: true,
-			pod:                       podWithExtendedResourceName,
-			classes:                   []*resourceapi.DeviceClass{deviceClassWithExtendResourceName},
+			pod:     podWithExtendedResourceName,
+			classes: []*resourceapi.DeviceClass{deviceClassWithExtendResourceName},
 			want: want{
 				filter: perNodeResult{
 					workerNode.Name: {
@@ -2660,10 +3129,9 @@ func testPlugin(tCtx ktesting.TContext) {
 			},
 		},
 		"extended-resource-name-with-resources": {
-			enableDRAExtendedResource: true,
-			pod:                       podWithExtendedResourceName,
-			classes:                   []*resourceapi.DeviceClass{deviceClassWithExtendResourceName},
-			objs:                      []apiruntime.Object{workerNodeSlice, podWithExtendedResourceName},
+			pod:     podWithExtendedResourceName,
+			classes: []*resourceapi.DeviceClass{deviceClassWithExtendResourceName},
+			objs:    []apiruntime.Object{workerNodeSlice, podWithExtendedResourceName},
 			want: want{
 				reserve: result{
 					inFlightClaims: []metav1.Object{extendedResourceClaimNoName},
@@ -2683,10 +3151,9 @@ func testPlugin(tCtx ktesting.TContext) {
 			},
 		},
 		"implicit-extended-resource-name-with-resources": {
-			enableDRAExtendedResource: true,
-			pod:                       podWithImplicitExtendedResourceName,
-			classes:                   []*resourceapi.DeviceClass{deviceClassWithExtendResourceName},
-			objs:                      []apiruntime.Object{largeWorkerNodeSlice, podWithImplicitExtendedResourceName},
+			pod:     podWithImplicitExtendedResourceName,
+			classes: []*resourceapi.DeviceClass{deviceClassWithExtendResourceName},
+			objs:    []apiruntime.Object{largeWorkerNodeSlice, podWithImplicitExtendedResourceName},
 			want: want{
 				reserve: result{
 					inFlightClaims: []metav1.Object{implicitExtendedResourceClaimNoName},
@@ -2706,10 +3173,9 @@ func testPlugin(tCtx ktesting.TContext) {
 			},
 		},
 		"implicit-extended-resource-name-two-containers-with-resources": {
-			enableDRAExtendedResource: true,
-			pod:                       podWithImplicitExtendedResourceNameTwoContainers,
-			classes:                   []*resourceapi.DeviceClass{deviceClassWithExtendResourceName},
-			objs:                      []apiruntime.Object{largeWorkerNodeSlice, podWithImplicitExtendedResourceNameTwoContainers},
+			pod:     podWithImplicitExtendedResourceNameTwoContainers,
+			classes: []*resourceapi.DeviceClass{deviceClassWithExtendResourceName},
+			objs:    []apiruntime.Object{largeWorkerNodeSlice, podWithImplicitExtendedResourceNameTwoContainers},
 			want: want{
 				reserve: result{
 					inFlightClaims: []metav1.Object{implicitExtendedResourceClaimNoNameTwoContainers},
@@ -2729,11 +3195,10 @@ func testPlugin(tCtx ktesting.TContext) {
 			},
 		},
 		"extended-resource-name-with-resources-fail-patch": {
-			enableDRAExtendedResource: true,
-			failPatch:                 true,
-			pod:                       podWithExtendedResourceName,
-			classes:                   []*resourceapi.DeviceClass{deviceClassWithExtendResourceName},
-			objs:                      []apiruntime.Object{workerNodeSlice, podWithExtendedResourceName},
+			failPatch: true,
+			pod:       podWithExtendedResourceName,
+			classes:   []*resourceapi.DeviceClass{deviceClassWithExtendResourceName},
+			objs:      []apiruntime.Object{workerNodeSlice, podWithExtendedResourceName},
 			want: want{
 				reserve: result{
 					inFlightClaims: []metav1.Object{extendedResourceClaimNoName},
@@ -2742,7 +3207,7 @@ func testPlugin(tCtx ktesting.TContext) {
 					inFlightClaims: []metav1.Object{addAllocationTimestamp(extendedResourceClaimNoName)},
 					assumedClaim:   addAllocationTimestamp(reserve(extendedResourceClaim, podWithExtendedResourceName)),
 					added:          []metav1.Object{addAllocationTimestamp(reserve(extendedResourceClaim, podWithExtendedResourceName))},
-					status:         fwk.NewStatus(fwk.Unschedulable, `patch error`),
+					status:         fwk.NewStatus(fwk.Error, `patch error`),
 				},
 				postbind: result{
 					assumedClaim: reserve(extendedResourceClaim, podWithExtendedResourceName),
@@ -2758,10 +3223,9 @@ func testPlugin(tCtx ktesting.TContext) {
 			// PreBind creates the claim and adds the finalizer, then storing
 			// the allocation fails. Unreserve cannot delete the claim. The
 			// allocation must never show up in the assume cache.
-			enableDRAExtendedResource: true,
-			pod:                       podWithExtendedResourceName,
-			classes:                   []*resourceapi.DeviceClass{deviceClassWithExtendResourceName},
-			objs:                      []apiruntime.Object{workerNodeSlice, podWithExtendedResourceName},
+			pod:     podWithExtendedResourceName,
+			classes: []*resourceapi.DeviceClass{deviceClassWithExtendResourceName},
+			objs:    []apiruntime.Object{workerNodeSlice, podWithExtendedResourceName},
 			reactors: []cgotesting.Reactor{
 				&cgotesting.SimpleReactor{
 					Verb:     "update",
@@ -2793,11 +3257,10 @@ func testPlugin(tCtx ktesting.TContext) {
 			},
 		},
 		"extended-resource-name-with-resources-has-claim": {
-			enableDRAExtendedResource: true,
-			pod:                       podWithExtendedResourceName,
-			claims:                    []*resourceapi.ResourceClaim{extendedResourceClaim},
-			classes:                   []*resourceapi.DeviceClass{deviceClassWithExtendResourceName},
-			objs:                      []apiruntime.Object{workerNodeSlice, podWithExtendedResourceName},
+			pod:     podWithExtendedResourceName,
+			claims:  []*resourceapi.ResourceClaim{extendedResourceClaim},
+			classes: []*resourceapi.DeviceClass{deviceClassWithExtendResourceName},
+			objs:    []apiruntime.Object{workerNodeSlice, podWithExtendedResourceName},
 			want: want{
 				filter: perNodeResult{
 					workerNode.Name: {
@@ -2815,11 +3278,10 @@ func testPlugin(tCtx ktesting.TContext) {
 			},
 		},
 		"extended-resource-name-with-resources-delete-claim": {
-			enableDRAExtendedResource: true,
-			pod:                       podWithExtendedResourceName,
-			claims:                    []*resourceapi.ResourceClaim{extendedResourceClaimNode2},
-			classes:                   []*resourceapi.DeviceClass{deviceClassWithExtendResourceName},
-			objs:                      []apiruntime.Object{workerNodeSlice, podWithExtendedResourceName},
+			pod:     podWithExtendedResourceName,
+			claims:  []*resourceapi.ResourceClaim{extendedResourceClaimNode2},
+			classes: []*resourceapi.DeviceClass{deviceClassWithExtendResourceName},
+			objs:    []apiruntime.Object{workerNodeSlice, podWithExtendedResourceName},
 			want: want{
 				filter: perNodeResult{
 					workerNode.Name: {
@@ -2837,10 +3299,9 @@ func testPlugin(tCtx ktesting.TContext) {
 			},
 		},
 		"extended-resource-name-bind-failure": {
-			enableDRAExtendedResource: true,
-			pod:                       podWithExtendedResourceName,
-			classes:                   []*resourceapi.DeviceClass{deviceClassWithExtendResourceName},
-			objs:                      []apiruntime.Object{workerNodeSlice, podWithExtendedResourceName},
+			pod:     podWithExtendedResourceName,
+			classes: []*resourceapi.DeviceClass{deviceClassWithExtendResourceName},
+			objs:    []apiruntime.Object{workerNodeSlice, podWithExtendedResourceName},
 			want: want{
 				reserve: result{
 					inFlightClaims: []metav1.Object{extendedResourceClaimNoName},
@@ -2860,10 +3321,9 @@ func testPlugin(tCtx ktesting.TContext) {
 			},
 		},
 		"extended-resource-name-skip-bind": {
-			enableDRAExtendedResource: true,
-			pod:                       podWithExtendedResourceName,
-			classes:                   []*resourceapi.DeviceClass{deviceClassWithExtendResourceName},
-			objs:                      []apiruntime.Object{workerNodeSlice, podWithExtendedResourceName},
+			pod:     podWithExtendedResourceName,
+			classes: []*resourceapi.DeviceClass{deviceClassWithExtendResourceName},
+			objs:    []apiruntime.Object{workerNodeSlice, podWithExtendedResourceName},
 			want: want{
 				reserve: result{
 					inFlightClaims: []metav1.Object{extendedResourceClaimNoName},
@@ -2877,17 +3337,16 @@ func testPlugin(tCtx ktesting.TContext) {
 			},
 		},
 		"extended-resource-name-claim-creation-failure": {
-			enableDRAExtendedResource: true,
-			pod:                       podWithExtendedResourceName,
-			classes:                   []*resourceapi.DeviceClass{deviceClassWithExtendResourceName},
-			objs:                      []apiruntime.Object{workerNodeSlice, podWithExtendedResourceName},
+			pod:     podWithExtendedResourceName,
+			classes: []*resourceapi.DeviceClass{deviceClassWithExtendResourceName},
+			objs:    []apiruntime.Object{workerNodeSlice, podWithExtendedResourceName},
 			want: want{
 				reserve: result{
 					inFlightClaims: []metav1.Object{extendedResourceClaimNoName},
 				},
 				prebind: result{
 					inFlightClaims: []metav1.Object{extendedResourceClaimNoName},
-					status:         fwk.NewStatus(fwk.Unschedulable, `claim creation errors`),
+					status:         fwk.NewStatus(fwk.Error, `claim creation errors`),
 				},
 				unreserveAfterBindFailure: &result{
 					removed: []metav1.Object{reserve(extendedResourceClaim, podWithExtendedResourceName)},
@@ -2955,12 +3414,12 @@ func testPlugin(tCtx ktesting.TContext) {
 			// It could theoretically pass even though the 1 ns limit is enforced
 			// although it shouldn't be (which then would be a false positive),
 			// but that's unlikely.
-			disableDRASchedulerFilterTimeout: true,
-			args:                             &config.DynamicResourcesArgs{},
-			pod:                              podWithClaimName,
-			claims:                           []*resourceapi.ResourceClaim{pendingClaim},
-			classes:                          []*resourceapi.DeviceClass{deviceClass},
-			objs:                             []apiruntime.Object{workerNodeSlice},
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRASchedulerFilterTimeout: false},
+			args:             &config.DynamicResourcesArgs{},
+			pod:              podWithClaimName,
+			claims:           []*resourceapi.ResourceClaim{pendingClaim},
+			classes:          []*resourceapi.DeviceClass{deviceClass},
+			objs:             []apiruntime.Object{workerNodeSlice},
 			want: want{
 				reserve: result{
 					inFlightClaims: []metav1.Object{allocatedClaim},
@@ -3016,11 +3475,12 @@ func testPlugin(tCtx ktesting.TContext) {
 			},
 		},
 		"dont-add-allocation-timestamp": {
-			disableDRADeviceBindingConditions: true,
-			pod:                               podWithClaimName,
-			claims:                            []*resourceapi.ResourceClaim{pendingClaim},
-			classes:                           []*resourceapi.DeviceClass{deviceClass},
-			objs:                              []apiruntime.Object{workerNodeSlice},
+			emulatedVersion:  "1.37",
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRADeviceBindingConditions: false},
+			pod:              podWithClaimName,
+			claims:           []*resourceapi.ResourceClaim{pendingClaim},
+			classes:          []*resourceapi.DeviceClass{deviceClass},
+			objs:             []apiruntime.Object{workerNodeSlice},
 			want: want{
 				reserve: result{
 					inFlightClaims: []metav1.Object{allocatedClaim},
@@ -3138,10 +3598,11 @@ func testPlugin(tCtx ktesting.TContext) {
 			},
 		},
 		"unreserve-after-allocation-in-prebind-other-claim-fails": {
-			// PreBind stores the allocation of the first claim, then fails
-			// for the second one. Unreserve cannot remove the reservation,
-			// so the allocation of the first claim must stay in the assume
-			// cache.
+			// PreBind stores the first claim's allocation, then fails on the
+			// second. Without DRAPreemption, Unreserve's ReservedFor patch
+			// fails (failPatch) and the first claim's allocation stays in the
+			// assume cache; with DRAPreemption, Unreserve deallocates it via
+			// UpdateStatus instead.
 			pod:       podWithTwoClaimNames,
 			claims:    []*resourceapi.ResourceClaim{pendingClaim, pendingClaim2},
 			classes:   []*resourceapi.DeviceClass{deviceClass},
@@ -3188,6 +3649,86 @@ func testPlugin(tCtx ktesting.TContext) {
 				},
 				unreserveAfterBindFailure: &result{
 					assumedClaim: addAllocationTimestamp(reserve(allocatedClaim, podWithTwoClaimNames)),
+				},
+				unreserveAfterBindFailureWithPreemption: &result{
+					assumedClaim: st.FromResourceClaim(allocatedClaim).Allocation(nil).Obj(),
+					changes: change{
+						claim: func(claim *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
+							if claim.Name == claimName {
+								claim = claim.DeepCopy()
+								claim.Status = resourceapi.ResourceClaimStatus{}
+							}
+							return claim
+						},
+					},
+				},
+			},
+		},
+		"unreserve-after-allocation-in-prebind-deallocation-conflict": {
+			// Like unreserve-after-allocation-in-prebind-other-claim-fails,
+			// but deallocating the first claim conflicts, so Unreserve falls
+			// back to removing the pod from ReservedFor.
+			pod:     podWithTwoClaimNames,
+			claims:  []*resourceapi.ResourceClaim{pendingClaim, pendingClaim2},
+			classes: []*resourceapi.DeviceClass{deviceClass},
+			objs:    []apiruntime.Object{largeWorkerNodeSlice},
+			reactors: []cgotesting.Reactor{
+				&cgotesting.SimpleReactor{
+					Verb:     "update",
+					Resource: "resourceclaims",
+					Reaction: func(action cgotesting.Action) (handled bool, ret apiruntime.Object, err error) {
+						claim, ok := action.(cgotesting.UpdateAction).GetObject().(*resourceapi.ResourceClaim)
+						if !ok || action.GetSubresource() != "status" {
+							return false, nil, nil
+						}
+						switch {
+						case claim.Name == claimName2:
+							return true, nil, apierrors.NewBadRequest("claim status update error")
+						case claim.Status.Allocation == nil:
+							return true, nil, apierrors.NewConflict(resourceapi.Resource("resourceclaims"), claim.Name, errors.New("claim changed"))
+						}
+						return false, nil, nil
+					},
+				},
+			},
+			want: want{
+				reserve: result{
+					inFlightClaims: []metav1.Object{
+						allocatedClaim,
+						st.FromResourceClaim(pendingClaim2).Allocation(allocationResult).Obj(),
+					},
+				},
+				prebind: result{
+					inFlightClaims: []metav1.Object{
+						addAllocationTimestamp(allocatedClaim),
+						addAllocationTimestamp(st.FromResourceClaim(pendingClaim2).Allocation(allocationResult).Obj()),
+					},
+					assumedClaim: addAllocationTimestamp(reserve(allocatedClaim, podWithTwoClaimNames)),
+					changes: change{
+						claim: func(in *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
+							if in.Name == claimName2 {
+								// Only the finalizer got added before the status update failed.
+								out := in.DeepCopy()
+								out.Finalizers = append(out.Finalizers, resourceapi.Finalizer)
+								return out
+							}
+							return addAllocationTimestamp(reserve(allocatedClaim, podWithTwoClaimNames))
+						},
+					},
+					status: fwk.AsStatus(errors.New("claim status update error")),
+				},
+				unreserveAfterBindFailure: &result{
+					assumedClaim: addAllocationTimestamp(reserve(allocatedClaim, podWithTwoClaimNames)),
+					changes: change{
+						claim: func(in *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
+							if in.Name != claimName {
+								return in
+							}
+							out := in.DeepCopy()
+							out.Status.ReservedFor = []resourceapi.ResourceClaimConsumerReference{}
+							return out
+						},
+					},
 				},
 			},
 		},
@@ -3493,11 +4034,10 @@ func testPlugin(tCtx ktesting.TContext) {
 			},
 		},
 		"single-claim-prioritized-list-scoring": {
-			enableDRAPrioritizedList: true,
-			pod:                      podWithClaimName,
-			claims:                   []*resourceapi.ResourceClaim{pendingClaimWithPrioritizedListAndSelector},
-			classes:                  []*resourceapi.DeviceClass{deviceClass},
-			nodes:                    []*v1.Node{workerNode, workerNode2},
+			pod:     podWithClaimName,
+			claims:  []*resourceapi.ResourceClaim{pendingClaimWithPrioritizedListAndSelector},
+			classes: []*resourceapi.DeviceClass{deviceClass},
+			nodes:   []*v1.Node{workerNode, workerNode2},
 			objs: []apiruntime.Object{
 				st.MakeResourceSlice(nodeName, driver).Device("instance-1", map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{attrName: {BoolValue: ptr.To(true)}}).Obj(),
 				st.MakeResourceSlice(node2Name, driver).Device("instance-1", map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{attrName: {BoolValue: ptr.To(false)}}).Obj(),
@@ -3537,11 +4077,10 @@ func testPlugin(tCtx ktesting.TContext) {
 			},
 		},
 		"multiple-claims-prioritized-list-scoring": {
-			enableDRAPrioritizedList: true,
-			pod:                      podWithTwoClaimNames,
-			claims:                   []*resourceapi.ResourceClaim{pendingClaimWithPrioritizedList, pendingClaim2WithPrioritizedListAndMultipleSubrequests},
-			classes:                  []*resourceapi.DeviceClass{deviceClass},
-			nodes:                    []*v1.Node{workerNode, workerNode2, workerNode3},
+			pod:     podWithTwoClaimNames,
+			claims:  []*resourceapi.ResourceClaim{pendingClaimWithPrioritizedList, pendingClaim2WithPrioritizedListAndMultipleSubrequests},
+			classes: []*resourceapi.DeviceClass{deviceClass},
+			nodes:   []*v1.Node{workerNode, workerNode2, workerNode3},
 			objs: []apiruntime.Object{
 				st.MakeResourceSlice(nodeName, driver).
 					Device("instance-1").
@@ -3600,11 +4139,10 @@ func testPlugin(tCtx ktesting.TContext) {
 			},
 		},
 		"multiple-requests-prioritized-list-scoring": {
-			enableDRAPrioritizedList: true,
-			pod:                      podWithClaimName,
-			claims:                   []*resourceapi.ResourceClaim{pendingClaimWithMultiplePrioritizedListRequests},
-			classes:                  []*resourceapi.DeviceClass{deviceClass},
-			nodes:                    []*v1.Node{workerNode, workerNode2, workerNode3},
+			pod:     podWithClaimName,
+			claims:  []*resourceapi.ResourceClaim{pendingClaimWithMultiplePrioritizedListRequests},
+			classes: []*resourceapi.DeviceClass{deviceClass},
+			nodes:   []*v1.Node{workerNode, workerNode2, workerNode3},
 			objs: []apiruntime.Object{
 				st.MakeResourceSlice(nodeName, driver).
 					Device("instance-1").
@@ -3659,27 +4197,25 @@ func testPlugin(tCtx ktesting.TContext) {
 			},
 		},
 		"node-allocatable-resource-multiplier": {
-			enableDRANodeAllocatableResources: true,
-			nodes:                             []*v1.Node{workerNodeWithCapacity},
-			pod:                               podWithClaimReferenceInContainer,
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRANodeAllocatableResources: true},
+			nodes:            []*v1.Node{workerNodeWithCapacity},
+			pod:              podWithClaimReferenceInContainer,
 			patchTestCase: func(tc *testPluginCase) {
 				// In a real scheduling cycle, the Assume phase pre-populates the Pod's
-				// NodeAllocatableResourceClaimStatuses in the cache before PreBind runs.
+				// ExtraNodeAllocatableResources in the cache before PreBind runs.
 				// Because this plugin unit test skips the Assume phase, we must manually
 				// inject the expected status into the mock Pod to satisfy the equality check
-				// in patchNodeAllocatableResourceClaimStatus.
+				// in patchPodStatus.
 				tc.pod = tc.pod.DeepCopy()
-				tc.pod.Status.NodeAllocatableResourceClaimStatuses = []v1.NodeAllocatableResourceClaimStatus{
+				tc.pod.Status.ExtraNodeAllocatableResources = []v1.ExtraNodeAllocatableResource{
 					{
-						ResourceClaimName: claimName,
-						Containers:        []string{tc.pod.Spec.Containers[0].Name},
-						Mapping: []v1.NodeAllocatableMappedResources{{
-							Name:     v1.ResourceCPU,
-							Quantity: new(apiresource.MustParse("1")),
-						}, {
-							Name:     v1.ResourceMemory,
-							Quantity: new(apiresource.MustParse("1Gi")),
-						}},
+						ContainerName: "",
+						Requests:      v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1"), v1.ResourceMemory: apiresource.MustParse("1Gi")},
+						Limits:        v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1"), v1.ResourceMemory: apiresource.MustParse("1Gi")},
+					},
+					{
+						ContainerName: tc.pod.Spec.Containers[0].Name,
+						Limits:        v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1"), v1.ResourceMemory: apiresource.MustParse("1Gi")},
 					},
 				}
 			},
@@ -3695,7 +4231,20 @@ func testPlugin(tCtx ktesting.TContext) {
 			}(),
 			want: want{
 				filter: perNodeResult{
-					workerNodeWithCapacity.Name: {status: nil}, // Expect Success
+					workerNodeWithCapacity.Name: {
+						status: nil, // Expect Success
+						extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+							{
+								ContainerName: "",
+								Requests:      v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1"), v1.ResourceMemory: apiresource.MustParse("1Gi")},
+								Limits:        v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1"), v1.ResourceMemory: apiresource.MustParse("1Gi")},
+							},
+							{
+								ContainerName: podWithClaimReferenceInContainer.Spec.Containers[0].Name,
+								Limits:        v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1"), v1.ResourceMemory: apiresource.MustParse("1Gi")},
+							},
+						},
+					},
 				},
 				reserve: result{
 					inFlightClaims: []metav1.Object{allocatedClaim},
@@ -3716,17 +4265,15 @@ func testPlugin(tCtx ktesting.TContext) {
 						pod: func(pod *v1.Pod) *v1.Pod {
 							if pod.Name == podName {
 								p := pod.DeepCopy()
-								p.Status.NodeAllocatableResourceClaimStatuses = []v1.NodeAllocatableResourceClaimStatus{
+								p.Status.ExtraNodeAllocatableResources = []v1.ExtraNodeAllocatableResource{
 									{
-										ResourceClaimName: claimName,
-										Containers:        []string{podWithClaimReferenceInContainer.Spec.Containers[0].Name},
-										Mapping: []v1.NodeAllocatableMappedResources{{
-											Name:     v1.ResourceCPU,
-											Quantity: new(apiresource.MustParse("1")),
-										}, {
-											Name:     v1.ResourceMemory,
-											Quantity: new(apiresource.MustParse("1Gi")),
-										}},
+										ContainerName: "",
+										Requests:      v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1"), v1.ResourceMemory: apiresource.MustParse("1Gi")},
+										Limits:        v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1"), v1.ResourceMemory: apiresource.MustParse("1Gi")},
+									},
+									{
+										ContainerName: podWithClaimReferenceInContainer.Spec.Containers[0].Name,
+										Limits:        v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1"), v1.ResourceMemory: apiresource.MustParse("1Gi")},
 									},
 								}
 								return p
@@ -3737,24 +4284,278 @@ func testPlugin(tCtx ktesting.TContext) {
 				},
 			},
 		},
-		"node-allocatable-mapping-and-overhead-in-same-device": {
-			enableDRANodeAllocatableResources: true,
-			nodes:                             []*v1.Node{workerNodeWithCapacity},
-			pod:                               podWithClaimReferenceInContainer,
+		"node-allocatable-status-rejected-before-claim-writes": {
+			// ResourceQuota can reject the status write, which then must not leave an allocation behind.
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRANodeAllocatableResources: true},
+			failPatch:        true,
+			nodes:            []*v1.Node{workerNodeWithCapacity},
+			pod:              podWithClaimReferenceInContainer,
 			patchTestCase: func(tc *testPluginCase) {
 				tc.pod = tc.pod.DeepCopy()
-				tc.pod.Status.NodeAllocatableResourceClaimStatuses = []v1.NodeAllocatableResourceClaimStatus{
+				tc.pod.Status.ExtraNodeAllocatableResources = []v1.ExtraNodeAllocatableResource{
 					{
-						ResourceClaimName: claimName,
-						Containers:        []string{tc.pod.Spec.Containers[0].Name},
-						Mapping: []v1.NodeAllocatableMappedResources{{
-							Name:     v1.ResourceCPU,
-							Quantity: new(apiresource.MustParse("1")),
-						}},
-						Overhead: []v1.NodeAllocatableOverheadResources{{
-							Name:   v1.ResourceMemory,
-							PerPod: apiresource.NewQuantity(100, apiresource.DecimalSI),
-						}},
+						ContainerName: "",
+						Requests:      v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1")},
+						Limits:        v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1")},
+					},
+					{
+						ContainerName: tc.pod.Spec.Containers[0].Name,
+						Limits:        v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1")},
+					},
+				}
+			},
+			claims:  []*resourceapi.ResourceClaim{pendingClaim},
+			classes: []*resourceapi.DeviceClass{deviceClass},
+			objs: func() []apiruntime.Object {
+				slice := st.MakeResourceSlice(nodeName, driver).Device("instance-1").Obj()
+				slice.Spec.Devices[0].NodeAllocatableResources = map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+					v1.ResourceCPU: {Mapping: &resourceapi.NodeAllocatableMapping{DeviceMultiplier: new(apiresource.MustParse("1"))}},
+				}
+				return []apiruntime.Object{slice, podWithClaimReferenceInContainer}
+			}(),
+			want: want{
+				filter: perNodeResult{
+					workerNodeWithCapacity.Name: {
+						extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+							{
+								Requests: v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1")},
+								Limits:   v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1")},
+							},
+							{
+								ContainerName: podWithClaimReferenceInContainer.Spec.Containers[0].Name,
+								Limits:        v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1")},
+							},
+						},
+					},
+				},
+				reserve: result{
+					inFlightClaims: []metav1.Object{allocatedClaim},
+				},
+				prebind: result{
+					inFlightClaims: []metav1.Object{allocatedClaim},
+					status:         fwk.NewStatus(fwk.Error, `patch error`),
+				},
+			},
+		},
+		"node-allocatable-unreserve-without-prebind": {
+			// Unreserve also undoes simulations in which PreBind never ran, so it sends no request. The pod in
+			// the API server has entries only so that a request would show up as a change.
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRANodeAllocatableResources: true},
+			nodes:            []*v1.Node{workerNodeWithCapacity},
+			pod:              podWithClaimReferenceInContainer,
+			claims:           []*resourceapi.ResourceClaim{pendingClaim},
+			classes:          []*resourceapi.DeviceClass{deviceClass},
+			objs: func() []apiruntime.Object {
+				slice := st.MakeResourceSlice(nodeName, driver).Device("instance-1").Obj()
+				slice.Spec.Devices[0].NodeAllocatableResources = map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+					v1.ResourceCPU:    {Mapping: &resourceapi.NodeAllocatableMapping{DeviceMultiplier: new(apiresource.MustParse("1"))}},
+					v1.ResourceMemory: {Mapping: &resourceapi.NodeAllocatableMapping{DeviceMultiplier: new(apiresource.MustParse("1Gi"))}},
+				}
+				return []apiruntime.Object{slice, podWithStaleExtraNodeAllocatableResources}
+			}(),
+			want: want{
+				filter: perNodeResult{
+					workerNodeWithCapacity.Name: {
+						extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+							{
+								ContainerName: "",
+								Requests:      v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1"), v1.ResourceMemory: apiresource.MustParse("1Gi")},
+								Limits:        v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1"), v1.ResourceMemory: apiresource.MustParse("1Gi")},
+							},
+							{
+								ContainerName: podWithClaimReferenceInContainer.Spec.Containers[0].Name,
+								Limits:        v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1"), v1.ResourceMemory: apiresource.MustParse("1Gi")},
+							},
+						},
+					},
+				},
+				reserve: result{
+					inFlightClaims: []metav1.Object{allocatedClaim},
+				},
+				unreserveBeforePreBind: &result{
+					changes: change{
+						pod: func(*v1.Pod) *v1.Pod {
+							return podWithStaleExtraNodeAllocatableResources.DeepCopy()
+						},
+					},
+				},
+			},
+		},
+		"node-allocatable-stale-entries-cleared-in-prebind": {
+			// No device on the chosen node maps node allocatable resources, so no write
+			// would replace the entries of the earlier attempt.
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRANodeAllocatableResources: true},
+			pod:              podWithStaleExtraNodeAllocatableResources,
+			claims:           []*resourceapi.ResourceClaim{pendingClaim},
+			classes:          []*resourceapi.DeviceClass{deviceClass},
+			objs:             []apiruntime.Object{workerNodeSlice, podWithStaleExtraNodeAllocatableResources},
+			want: want{
+				reserve: result{
+					inFlightClaims: []metav1.Object{allocatedClaim},
+				},
+				prebind: result{
+					assumedClaim: addAllocationTimestamp(reserve(allocatedClaim, podWithStaleExtraNodeAllocatableResources)),
+					changes: change{
+						claim: func(claim *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
+							if claim.Name == claimName {
+								claim = claim.DeepCopy()
+								claim.Status.Allocation = allocationResult
+								claim.Status.ReservedFor = inUseClaim.Status.ReservedFor
+								claim.Finalizers = allocatedClaim.Finalizers
+								claim = addAllocationTimestamp(claim)
+							}
+							return claim
+						},
+						pod: func(pod *v1.Pod) *v1.Pod {
+							if pod.Name == podName {
+								pod = pod.DeepCopy()
+								pod.Status.ExtraNodeAllocatableResources = []v1.ExtraNodeAllocatableResource{}
+							}
+							return pod
+						},
+					},
+				},
+			},
+		},
+		"node-allocatable-stale-entries-clear-failure": {
+			// Binding with the entries of the earlier attempt would account for them.
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRANodeAllocatableResources: true},
+			failPatch:        true,
+			pod:              podWithStaleExtraNodeAllocatableResources,
+			claims:           []*resourceapi.ResourceClaim{pendingClaim},
+			classes:          []*resourceapi.DeviceClass{deviceClass},
+			objs:             []apiruntime.Object{workerNodeSlice, podWithStaleExtraNodeAllocatableResources},
+			want: want{
+				reserve: result{
+					inFlightClaims: []metav1.Object{allocatedClaim},
+				},
+				prebind: result{
+					inFlightClaims: []metav1.Object{allocatedClaim},
+					status:         fwk.NewStatus(fwk.Error, `clear extraNodeAllocatableResources of pod default/my-pod: patch error`),
+				},
+			},
+		},
+		"node-allocatable-stale-entries-cleared-for-pod-without-claims": {
+			// The pod has no claims in this attempt, for example because its extended resources are
+			// now served by a device plugin, so PreFilter returns Skip and PreBind still clears.
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRANodeAllocatableResources: true},
+			nodes:            []*v1.Node{workerNode},
+			patchTestCase: func(tc *testPluginCase) {
+				tc.pod = podWithStaleExtraNodeAllocatableResources.DeepCopy()
+				tc.pod.Spec.ResourceClaims = nil
+				for i := range tc.pod.Spec.Containers {
+					tc.pod.Spec.Containers[i].Resources.Claims = nil
+				}
+				tc.objs = []apiruntime.Object{tc.pod}
+			},
+			want: want{
+				prefilter: result{
+					status: fwk.NewStatus(fwk.Skip),
+				},
+				prebind: result{
+					changes: change{
+						pod: func(pod *v1.Pod) *v1.Pod {
+							if pod.Name == podName {
+								pod = pod.DeepCopy()
+								pod.Status.ExtraNodeAllocatableResources = []v1.ExtraNodeAllocatableResource{}
+							}
+							return pod
+						},
+					},
+				},
+			},
+		},
+		"node-allocatable-stale-entries-cleared-in-postfilter": {
+			// The pod is unschedulable, so no PreBind would clear the entries of the earlier attempt.
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRANodeAllocatableResources: true},
+			pod:              podWithStaleExtraNodeAllocatableResources,
+			claims:           []*resourceapi.ResourceClaim{pendingClaim},
+			classes:          []*resourceapi.DeviceClass{deviceClass},
+			objs:             []apiruntime.Object{podWithStaleExtraNodeAllocatableResources},
+			want: want{
+				filter: perNodeResult{
+					workerNode.Name: {
+						status: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, `cannot allocate all claims`),
+					},
+				},
+				postfilter: result{
+					changes: change{
+						pod: func(pod *v1.Pod) *v1.Pod {
+							if pod.Name == podName {
+								pod = pod.DeepCopy()
+								pod.Status.ExtraNodeAllocatableResources = []v1.ExtraNodeAllocatableResource{}
+							}
+							return pod
+						},
+					},
+					status: fwk.NewStatus(fwk.Unschedulable),
+				},
+			},
+		},
+		"node-allocatable-stale-entries-postfilter-clear-failure": {
+			// Failing to clear does not fail PostFilter, which would also skip preemption.
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRANodeAllocatableResources: true},
+			failPatch:        true,
+			pod:              podWithStaleExtraNodeAllocatableResources,
+			claims:           []*resourceapi.ResourceClaim{pendingClaim},
+			classes:          []*resourceapi.DeviceClass{deviceClass},
+			objs:             []apiruntime.Object{podWithStaleExtraNodeAllocatableResources},
+			want: want{
+				filter: perNodeResult{
+					workerNode.Name: {
+						status: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, `cannot allocate all claims`),
+					},
+				},
+				postfilter: result{
+					status: fwk.NewStatus(fwk.Unschedulable),
+				},
+			},
+		},
+		"node-allocatable-stale-entries-cleared-in-podgroup-postfilter": {
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRANodeAllocatableResources: true, features.GenericWorkload: true},
+			podGroups:        []*schedulingapi.PodGroup{podGroupWithClaimName},
+			claims:           []*resourceapi.ResourceClaim{pendingClaim},
+			classes:          []*resourceapi.DeviceClass{deviceClass},
+			patchTestCase: func(tc *testPluginCase) {
+				tc.pod = groupedPodWithClaimName.DeepCopy()
+				tc.pod.Status.ExtraNodeAllocatableResources = podWithStaleExtraNodeAllocatableResources.Status.ExtraNodeAllocatableResources
+				tc.objs = []apiruntime.Object{tc.pod}
+			},
+			want: want{
+				filter: perNodeResult{
+					workerNode.Name: {
+						status: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, `cannot allocate all claims`),
+					},
+				},
+				postfilter: result{
+					changes: change{
+						pod: func(pod *v1.Pod) *v1.Pod {
+							if pod.Name == podName {
+								pod = pod.DeepCopy()
+								pod.Status.ExtraNodeAllocatableResources = []v1.ExtraNodeAllocatableResource{}
+							}
+							return pod
+						},
+					},
+					status: fwk.NewStatus(fwk.Unschedulable, `deallocation and deletion of ResourceClaims completed`),
+				},
+			},
+		},
+		"node-allocatable-mapping-and-overhead-in-same-device": {
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRANodeAllocatableResources: true},
+			nodes:            []*v1.Node{workerNodeWithCapacity},
+			pod:              podWithClaimReferenceInContainer,
+			patchTestCase: func(tc *testPluginCase) {
+				tc.pod = tc.pod.DeepCopy()
+				tc.pod.Status.ExtraNodeAllocatableResources = []v1.ExtraNodeAllocatableResource{
+					{
+						ContainerName: "",
+						Requests:      v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1"), v1.ResourceMemory: *apiresource.NewQuantity(100, apiresource.DecimalSI)},
+						Limits:        v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1"), v1.ResourceMemory: *apiresource.NewQuantity(100, apiresource.DecimalSI)},
+					},
+					{
+						ContainerName: tc.pod.Spec.Containers[0].Name,
+						Limits:        v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1"), v1.ResourceMemory: *apiresource.NewQuantity(100, apiresource.DecimalSI)},
 					},
 				}
 			},
@@ -3770,7 +4571,20 @@ func testPlugin(tCtx ktesting.TContext) {
 			}(),
 			want: want{
 				filter: perNodeResult{
-					workerNodeWithCapacity.Name: {status: nil},
+					workerNodeWithCapacity.Name: {
+						status: nil,
+						extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+							{
+								ContainerName: "",
+								Requests:      v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1"), v1.ResourceMemory: apiresource.MustParse("100")},
+								Limits:        v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1"), v1.ResourceMemory: apiresource.MustParse("100")},
+							},
+							{
+								ContainerName: podWithClaimReferenceInContainer.Spec.Containers[0].Name,
+								Limits:        v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1"), v1.ResourceMemory: apiresource.MustParse("100")},
+							},
+						},
+					},
 				},
 				reserve: result{
 					inFlightClaims: []metav1.Object{allocatedClaim},
@@ -3791,18 +4605,15 @@ func testPlugin(tCtx ktesting.TContext) {
 						pod: func(pod *v1.Pod) *v1.Pod {
 							if pod.Name == podName {
 								p := pod.DeepCopy()
-								p.Status.NodeAllocatableResourceClaimStatuses = []v1.NodeAllocatableResourceClaimStatus{
+								p.Status.ExtraNodeAllocatableResources = []v1.ExtraNodeAllocatableResource{
 									{
-										ResourceClaimName: claimName,
-										Containers:        []string{podWithClaimReferenceInContainer.Spec.Containers[0].Name},
-										Mapping: []v1.NodeAllocatableMappedResources{{
-											Name:     v1.ResourceCPU,
-											Quantity: new(apiresource.MustParse("1")),
-										}},
-										Overhead: []v1.NodeAllocatableOverheadResources{{
-											Name:   v1.ResourceMemory,
-											PerPod: apiresource.NewQuantity(100, apiresource.DecimalSI),
-										}},
+										ContainerName: "",
+										Requests:      v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1"), v1.ResourceMemory: *apiresource.NewQuantity(100, apiresource.DecimalSI)},
+										Limits:        v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1"), v1.ResourceMemory: *apiresource.NewQuantity(100, apiresource.DecimalSI)},
+									},
+									{
+										ContainerName: podWithClaimReferenceInContainer.Spec.Containers[0].Name,
+										Limits:        v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1"), v1.ResourceMemory: *apiresource.NewQuantity(100, apiresource.DecimalSI)},
 									},
 								}
 								return p
@@ -3814,21 +4625,21 @@ func testPlugin(tCtx ktesting.TContext) {
 			},
 		},
 		"node-allocatable-resource-capacitykey": {
-			enableDRANodeAllocatableResources: true,
-			enableDRAConsumableCapacity:       true,
-			nodes:                             []*v1.Node{workerNodeWithCapacity},
-			pod:                               podWithClaimReferenceInContainer,
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRANodeAllocatableResources: true},
+			nodes:            []*v1.Node{workerNodeWithCapacity},
+			pod:              podWithClaimReferenceInContainer,
 			patchTestCase: func(tc *testPluginCase) {
 				// Simulate the Assume phase by pre-populating the status
 				tc.pod = tc.pod.DeepCopy()
-				tc.pod.Status.NodeAllocatableResourceClaimStatuses = []v1.NodeAllocatableResourceClaimStatus{
+				tc.pod.Status.ExtraNodeAllocatableResources = []v1.ExtraNodeAllocatableResource{
 					{
-						ResourceClaimName: claimName,
-						Containers:        []string{tc.pod.Spec.Containers[0].Name},
-						Mapping: []v1.NodeAllocatableMappedResources{{
-							Name:     v1.ResourceCPU,
-							Quantity: new(apiresource.MustParse("1")),
-						}},
+						ContainerName: "",
+						Requests:      v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1")},
+						Limits:        v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1")},
+					},
+					{
+						ContainerName: tc.pod.Spec.Containers[0].Name,
+						Limits:        v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1")},
 					},
 				}
 			},
@@ -3837,7 +4648,20 @@ func testPlugin(tCtx ktesting.TContext) {
 			objs:    []apiruntime.Object{workerNodeSliceWithNodeAllocatableResource(), podWithClaimReferenceInContainer},
 			want: want{
 				filter: perNodeResult{
-					workerNodeWithCapacity.Name: {status: nil},
+					workerNodeWithCapacity.Name: {
+						status: nil,
+						extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+							{
+								ContainerName: "",
+								Requests:      v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1")},
+								Limits:        v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1")},
+							},
+							{
+								ContainerName: podWithClaimReferenceInContainer.Spec.Containers[0].Name,
+								Limits:        v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1")},
+							},
+						},
+					},
 				},
 				reserve: result{
 					inFlightClaims: []metav1.Object{
@@ -3867,14 +4691,15 @@ func testPlugin(tCtx ktesting.TContext) {
 						pod: func(pod *v1.Pod) *v1.Pod {
 							if pod.Name == podName {
 								p := pod.DeepCopy()
-								p.Status.NodeAllocatableResourceClaimStatuses = []v1.NodeAllocatableResourceClaimStatus{
+								p.Status.ExtraNodeAllocatableResources = []v1.ExtraNodeAllocatableResource{
 									{
-										ResourceClaimName: claimName,
-										Containers:        []string{podWithClaimReferenceInContainer.Spec.Containers[0].Name},
-										Mapping: []v1.NodeAllocatableMappedResources{{
-											Name:     v1.ResourceCPU,
-											Quantity: new(apiresource.MustParse("1")),
-										}},
+										ContainerName: "",
+										Requests:      v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1")},
+										Limits:        v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1")},
+									},
+									{
+										ContainerName: podWithClaimReferenceInContainer.Spec.Containers[0].Name,
+										Limits:        v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1")},
 									},
 								}
 								return p
@@ -3886,24 +4711,21 @@ func testPlugin(tCtx ktesting.TContext) {
 			},
 		},
 		"node-allocatable-resource-capacitykey-and-multiplier": {
-			enableDRANodeAllocatableResources: true,
-			enableDRAConsumableCapacity:       true,
-			nodes:                             []*v1.Node{workerNodeWithCapacity},
-			pod:                               podWithClaimReferenceInContainer,
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRANodeAllocatableResources: true},
+			nodes:            []*v1.Node{workerNodeWithCapacity},
+			pod:              podWithClaimReferenceInContainer,
 			patchTestCase: func(tc *testPluginCase) {
 				// Simulate the Assume phase by pre-populating the status
 				tc.pod = tc.pod.DeepCopy()
-				tc.pod.Status.NodeAllocatableResourceClaimStatuses = []v1.NodeAllocatableResourceClaimStatus{
+				tc.pod.Status.ExtraNodeAllocatableResources = []v1.ExtraNodeAllocatableResource{
 					{
-						ResourceClaimName: claimName,
-						Containers:        []string{tc.pod.Spec.Containers[0].Name},
-						Mapping: []v1.NodeAllocatableMappedResources{{
-							Name:     v1.ResourceCPU,
-							Quantity: new(apiresource.MustParse("1")),
-						}, {
-							Name:     v1.ResourceMemory,
-							Quantity: new(apiresource.MustParse("1Gi")),
-						}},
+						ContainerName: "",
+						Requests:      v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1"), v1.ResourceMemory: apiresource.MustParse("1Gi")},
+						Limits:        v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1"), v1.ResourceMemory: apiresource.MustParse("1Gi")},
+					},
+					{
+						ContainerName: tc.pod.Spec.Containers[0].Name,
+						Limits:        v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1"), v1.ResourceMemory: apiresource.MustParse("1Gi")},
 					},
 				}
 			},
@@ -3920,7 +4742,20 @@ func testPlugin(tCtx ktesting.TContext) {
 			}(),
 			want: want{
 				filter: perNodeResult{
-					workerNodeWithCapacity.Name: {status: nil},
+					workerNodeWithCapacity.Name: {
+						status: nil,
+						extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+							{
+								ContainerName: "",
+								Requests:      v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1"), v1.ResourceMemory: apiresource.MustParse("1Gi")},
+								Limits:        v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1"), v1.ResourceMemory: apiresource.MustParse("1Gi")},
+							},
+							{
+								ContainerName: podWithClaimReferenceInContainer.Spec.Containers[0].Name,
+								Limits:        v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1"), v1.ResourceMemory: apiresource.MustParse("1Gi")},
+							},
+						},
+					},
 				},
 				reserve: result{
 					inFlightClaims: []metav1.Object{
@@ -3950,17 +4785,15 @@ func testPlugin(tCtx ktesting.TContext) {
 						pod: func(pod *v1.Pod) *v1.Pod {
 							if pod.Name == podName {
 								p := pod.DeepCopy()
-								p.Status.NodeAllocatableResourceClaimStatuses = []v1.NodeAllocatableResourceClaimStatus{
+								p.Status.ExtraNodeAllocatableResources = []v1.ExtraNodeAllocatableResource{
 									{
-										ResourceClaimName: claimName,
-										Containers:        []string{podWithClaimReferenceInContainer.Spec.Containers[0].Name},
-										Mapping: []v1.NodeAllocatableMappedResources{{
-											Name:     v1.ResourceCPU,
-											Quantity: new(apiresource.MustParse("1")),
-										}, {
-											Name:     v1.ResourceMemory,
-											Quantity: new(apiresource.MustParse("1Gi")),
-										}},
+										ContainerName: "",
+										Requests:      v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1"), v1.ResourceMemory: apiresource.MustParse("1Gi")},
+										Limits:        v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1"), v1.ResourceMemory: apiresource.MustParse("1Gi")},
+									},
+									{
+										ContainerName: podWithClaimReferenceInContainer.Spec.Containers[0].Name,
+										Limits:        v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1"), v1.ResourceMemory: apiresource.MustParse("1Gi")},
 									},
 								}
 								return p
@@ -3972,11 +4805,11 @@ func testPlugin(tCtx ktesting.TContext) {
 			},
 		},
 		"node-allocatable-resource-insufficient-resources-with-multiplier": {
-			enableDRANodeAllocatableResources: true,
-			nodes:                             []*v1.Node{workerNodeWithCapacity},
-			pod:                               podWithClaimReferenceInContainer,
-			claims:                            []*resourceapi.ResourceClaim{pendingClaim},
-			classes:                           []*resourceapi.DeviceClass{deviceClass},
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRANodeAllocatableResources: true},
+			nodes:            []*v1.Node{workerNodeWithCapacity},
+			pod:              podWithClaimReferenceInContainer,
+			claims:           []*resourceapi.ResourceClaim{pendingClaim},
+			classes:          []*resourceapi.DeviceClass{deviceClass},
 			objs: func() []apiruntime.Object {
 				slice := st.MakeResourceSlice(nodeName, driver).Device("instance-1").Obj()
 				slice.Spec.Devices[0].NodeAllocatableResources = map[v1.ResourceName]resourceapi.NodeAllocatableResource{
@@ -3986,7 +4819,68 @@ func testPlugin(tCtx ktesting.TContext) {
 			}(),
 			want: want{
 				filter: perNodeResult{
-					workerNodeWithCapacity.Name: {status: fwk.NewStatus(fwk.Unschedulable, `Insufficient cpu`)},
+					workerNodeWithCapacity.Name: {status: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, `Insufficient cpu`)},
+				},
+				postfilter: result{
+					status: fwk.NewStatus(fwk.Unschedulable),
+				},
+			},
+		},
+		"node-allocatable-node-without-declared-feature": {
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRANodeAllocatableResources: true},
+			nodes: []*v1.Node{func() *v1.Node {
+				node := workerNodeWithCapacity.DeepCopy()
+				node.Status.DeclaredFeatures = []string{dranodeallocatableresources.DRANodeAllocatableResourcesFeatureGate}
+				return node
+			}()},
+			pod:     podWithClaimReferenceInContainer,
+			claims:  []*resourceapi.ResourceClaim{pendingClaim},
+			classes: []*resourceapi.DeviceClass{deviceClass},
+			objs: func() []apiruntime.Object {
+				slice := st.MakeResourceSlice(nodeName, driver).Device("instance-1").Obj()
+				slice.Spec.Devices[0].NodeAllocatableResources = map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+					v1.ResourceCPU: {Mapping: &resourceapi.NodeAllocatableMapping{DeviceMultiplier: new(apiresource.MustParse("1"))}},
+				}
+				return []apiruntime.Object{slice, podWithClaimReferenceInContainer}
+			}(),
+			want: want{
+				filter: perNodeResult{
+					workerNodeWithCapacity.Name: {status: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "node does not declare the "+dranodeallocatableresources.DRANodeAllocatableResourcesFeature+" feature (requires a kubelet with the "+dranodeallocatableresources.DRANodeAllocatableResourcesFeatureGate+" feature gate enabled)")},
+				},
+				postfilter: result{
+					status: fwk.NewStatus(fwk.Unschedulable),
+				},
+			},
+		},
+		"node-allocatable-resource-insufficient-with-other-plugin-entries": {
+			// The claim's CPU fits the node alone, but not on top of what another plugin recorded.
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRANodeAllocatableResources: true},
+			nodes:            []*v1.Node{workerNodeWithCapacity},
+			pod:              podWithClaimReferenceInContainer,
+			claims:           []*resourceapi.ResourceClaim{pendingClaim},
+			classes:          []*resourceapi.DeviceClass{deviceClass},
+			objs: func() []apiruntime.Object {
+				slice := st.MakeResourceSlice(nodeName, driver).Device("instance-1").Obj()
+				slice.Spec.Devices[0].NodeAllocatableResources = map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+					v1.ResourceCPU: {Mapping: &resourceapi.NodeAllocatableMapping{DeviceMultiplier: new(apiresource.MustParse("1"))}},
+				}
+				return []apiruntime.Object{slice, podWithClaimReferenceInContainer}
+			}(),
+			otherPluginNodeAllocatableEntries: map[string][]v1.ExtraNodeAllocatableResource{workerNodeWithCapacity.Name: {{
+				ContainerName: "",
+				Requests:      v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("10")},
+				Limits:        v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("10")},
+			}}},
+			want: want{
+				filter: perNodeResult{
+					workerNodeWithCapacity.Name: {
+						status: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, `Insufficient cpu`),
+						extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{{
+							ContainerName: "",
+							Requests:      v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("10")},
+							Limits:        v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("10")},
+						}},
+					},
 				},
 				postfilter: result{
 					status: fwk.NewStatus(fwk.Unschedulable),
@@ -3994,10 +4888,9 @@ func testPlugin(tCtx ktesting.TContext) {
 			},
 		},
 		"node-allocatable-resource-insufficient-with-capacityKey": {
-			enableDRANodeAllocatableResources: true,
-			enableDRAConsumableCapacity:       true,
-			nodes:                             []*v1.Node{workerNodeWithCapacity},
-			pod:                               podWithClaimReferenceInContainer,
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRANodeAllocatableResources: true},
+			nodes:            []*v1.Node{workerNodeWithCapacity},
+			pod:              podWithClaimReferenceInContainer,
 			claims: func() []*resourceapi.ResourceClaim {
 				claim := nodeAllocatableClaimWithCapacity.DeepCopy()
 				claim.Spec.Devices.Requests[0].Exactly.Capacity.Requests[nodeAllocatableResourceCapacityName] = apiresource.MustParse("11") // Exceeds node capacity of 10
@@ -4007,7 +4900,7 @@ func testPlugin(tCtx ktesting.TContext) {
 			objs:    []apiruntime.Object{workerNodeSliceWithNodeAllocatableResource(), podWithClaimReferenceInContainer},
 			want: want{
 				filter: perNodeResult{
-					workerNodeWithCapacity.Name: {status: fwk.NewStatus(fwk.Unschedulable, `cannot allocate all claims`)},
+					workerNodeWithCapacity.Name: {status: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, `cannot allocate all claims`)},
 				},
 				postfilter: result{
 					status: fwk.NewStatus(fwk.Unschedulable),
@@ -4015,9 +4908,9 @@ func testPlugin(tCtx ktesting.TContext) {
 			},
 		},
 		"node-allocatable-direct-mapped-sharing-rejected": {
-			enableDRANodeAllocatableResources: true,
-			nodes:                             []*v1.Node{workerNode},
-			pod:                               podWithClaimReferenceInContainer,
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRANodeAllocatableResources: true},
+			nodes:            []*v1.Node{workerNode},
+			pod:              podWithClaimReferenceInContainer,
 			claims: func() []*resourceapi.ResourceClaim {
 				claim := allocatedClaim.DeepCopy()
 				claim.Status.ReservedFor = []resourceapi.ResourceClaimConsumerReference{
@@ -4062,9 +4955,9 @@ func testPlugin(tCtx ktesting.TContext) {
 			},
 		},
 		"node-allocatable-mapping-and-overhead-sharing-rejected": {
-			enableDRANodeAllocatableResources: true,
-			nodes:                             []*v1.Node{workerNode},
-			pod:                               podWithClaimReferenceInContainer,
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRANodeAllocatableResources: true},
+			nodes:            []*v1.Node{workerNode},
+			pod:              podWithClaimReferenceInContainer,
 			claims: func() []*resourceapi.ResourceClaim {
 				claim := allocatedClaim.DeepCopy()
 				claim.Status.ReservedFor = []resourceapi.ResourceClaimConsumerReference{
@@ -4112,21 +5005,20 @@ func testPlugin(tCtx ktesting.TContext) {
 			},
 		},
 		"node-allocatable-overhead-only-sharing-allowed": {
-			enableDRANodeAllocatableResources: true,
-			nodes:                             []*v1.Node{workerNodeWithCapacity},
-			pod:                               podWithClaimReferenceInContainer,
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRANodeAllocatableResources: true},
+			nodes:            []*v1.Node{workerNodeWithCapacity},
+			pod:              podWithClaimReferenceInContainer,
 			patchTestCase: func(tc *testPluginCase) {
 				tc.pod = tc.pod.DeepCopy()
-				tc.pod.Status.NodeAllocatableResourceClaimStatuses = []v1.NodeAllocatableResourceClaimStatus{
+				tc.pod.Status.ExtraNodeAllocatableResources = []v1.ExtraNodeAllocatableResource{
 					{
-						ResourceClaimName: claimName,
-						Containers:        []string{"c1"},
-						Overhead: []v1.NodeAllocatableOverheadResources{
-							{
-								Name:   v1.ResourceMemory,
-								PerPod: new(apiresource.MustParse("100")),
-							},
-						},
+						ContainerName: "",
+						Requests:      v1.ResourceList{v1.ResourceMemory: apiresource.MustParse("100")},
+						Limits:        v1.ResourceList{v1.ResourceMemory: apiresource.MustParse("100")},
+					},
+					{
+						ContainerName: "c1",
+						Limits:        v1.ResourceList{v1.ResourceMemory: apiresource.MustParse("100")},
 					},
 				}
 			},
@@ -4158,7 +5050,20 @@ func testPlugin(tCtx ktesting.TContext) {
 			}(),
 			want: want{
 				filter: perNodeResult{
-					workerNodeWithCapacity.Name: {status: nil},
+					workerNodeWithCapacity.Name: {
+						status: nil,
+						extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+							{
+								ContainerName: "",
+								Requests:      v1.ResourceList{v1.ResourceMemory: apiresource.MustParse("100")},
+								Limits:        v1.ResourceList{v1.ResourceMemory: apiresource.MustParse("100")},
+							},
+							{
+								ContainerName: "c1",
+								Limits:        v1.ResourceList{v1.ResourceMemory: apiresource.MustParse("100")},
+							},
+						},
+					},
 				},
 				prebind: result{
 					assumedClaim: addAllocationTimestamp(reserve(allocatedClaim, podWithClaimReferenceInContainer)),
@@ -4174,16 +5079,15 @@ func testPlugin(tCtx ktesting.TContext) {
 						pod: func(pod *v1.Pod) *v1.Pod {
 							if pod.Name == podName {
 								p := pod.DeepCopy()
-								p.Status.NodeAllocatableResourceClaimStatuses = []v1.NodeAllocatableResourceClaimStatus{
+								p.Status.ExtraNodeAllocatableResources = []v1.ExtraNodeAllocatableResource{
 									{
-										ResourceClaimName: claimName,
-										Containers:        []string{"c1"},
-										Overhead: []v1.NodeAllocatableOverheadResources{
-											{
-												Name:   v1.ResourceMemory,
-												PerPod: new(apiresource.MustParse("100")),
-											},
-										},
+										ContainerName: "",
+										Requests:      v1.ResourceList{v1.ResourceMemory: apiresource.MustParse("100")},
+										Limits:        v1.ResourceList{v1.ResourceMemory: apiresource.MustParse("100")},
+									},
+									{
+										ContainerName: "c1",
+										Limits:        v1.ResourceList{v1.ResourceMemory: apiresource.MustParse("100")},
 									},
 								}
 								return p
@@ -4195,21 +5099,16 @@ func testPlugin(tCtx ktesting.TContext) {
 			},
 		},
 		"node-allocatable-unreferenced-claim-direct-mapped": {
-			enableDRANodeAllocatableResources: true,
-			nodes:                             []*v1.Node{workerNodeWithCapacity},
-			pod:                               podWithClaimName, // claim not referenced in any container
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRANodeAllocatableResources: true},
+			nodes:            []*v1.Node{workerNodeWithCapacity},
+			pod:              podWithClaimName, // claim not referenced in any container
 			patchTestCase: func(tc *testPluginCase) {
 				tc.pod = tc.pod.DeepCopy()
-				tc.pod.Status.NodeAllocatableResourceClaimStatuses = []v1.NodeAllocatableResourceClaimStatus{
+				tc.pod.Status.ExtraNodeAllocatableResources = []v1.ExtraNodeAllocatableResource{
 					{
-						ResourceClaimName: claimName,
-						Containers:        []string{},
-						Mapping: []v1.NodeAllocatableMappedResources{
-							{
-								Name:     v1.ResourceCPU,
-								Quantity: new(apiresource.MustParse("1")),
-							},
-						},
+						ContainerName: "",
+						Requests:      v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1")},
+						Limits:        v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1")},
 					},
 				}
 			},
@@ -4224,7 +5123,16 @@ func testPlugin(tCtx ktesting.TContext) {
 			}(),
 			want: want{
 				filter: perNodeResult{
-					workerNodeWithCapacity.Name: {status: nil},
+					workerNodeWithCapacity.Name: {
+						status: nil,
+						extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+							{
+								ContainerName: "",
+								Requests:      v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1")},
+								Limits:        v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1")},
+							},
+						},
+					},
 				},
 				prebind: result{
 					assumedClaim: addAllocationTimestamp(reserve(allocatedClaim, podWithClaimName)),
@@ -4240,16 +5148,11 @@ func testPlugin(tCtx ktesting.TContext) {
 						pod: func(pod *v1.Pod) *v1.Pod {
 							if pod.Name == podName {
 								p := pod.DeepCopy()
-								p.Status.NodeAllocatableResourceClaimStatuses = []v1.NodeAllocatableResourceClaimStatus{
+								p.Status.ExtraNodeAllocatableResources = []v1.ExtraNodeAllocatableResource{
 									{
-										ResourceClaimName: claimName,
-										Containers:        []string{},
-										Mapping: []v1.NodeAllocatableMappedResources{
-											{
-												Name:     v1.ResourceCPU,
-												Quantity: new(apiresource.MustParse("1")),
-											},
-										},
+										ContainerName: "",
+										Requests:      v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1")},
+										Limits:        v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1")},
 									},
 								}
 								return p
@@ -4261,21 +5164,16 @@ func testPlugin(tCtx ktesting.TContext) {
 			},
 		},
 		"node-allocatable-unreferenced-claim-overhead": {
-			enableDRANodeAllocatableResources: true,
-			nodes:                             []*v1.Node{workerNodeWithCapacity},
-			pod:                               podWithClaimName, // claim not referenced in any container
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRANodeAllocatableResources: true},
+			nodes:            []*v1.Node{workerNodeWithCapacity},
+			pod:              podWithClaimName, // claim not referenced in any container
 			patchTestCase: func(tc *testPluginCase) {
 				tc.pod = tc.pod.DeepCopy()
-				tc.pod.Status.NodeAllocatableResourceClaimStatuses = []v1.NodeAllocatableResourceClaimStatus{
+				tc.pod.Status.ExtraNodeAllocatableResources = []v1.ExtraNodeAllocatableResource{
 					{
-						ResourceClaimName: claimName,
-						Containers:        []string{},
-						Overhead: []v1.NodeAllocatableOverheadResources{
-							{
-								Name:   v1.ResourceMemory,
-								PerPod: new(apiresource.MustParse("1Gi")),
-							},
-						},
+						ContainerName: "",
+						Requests:      v1.ResourceList{v1.ResourceMemory: apiresource.MustParse("1Gi")},
+						Limits:        v1.ResourceList{v1.ResourceMemory: apiresource.MustParse("1Gi")},
 					},
 				}
 			},
@@ -4290,7 +5188,16 @@ func testPlugin(tCtx ktesting.TContext) {
 			}(),
 			want: want{
 				filter: perNodeResult{
-					workerNodeWithCapacity.Name: {status: nil},
+					workerNodeWithCapacity.Name: {
+						status: nil,
+						extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+							{
+								ContainerName: "",
+								Requests:      v1.ResourceList{v1.ResourceMemory: apiresource.MustParse("1Gi")},
+								Limits:        v1.ResourceList{v1.ResourceMemory: apiresource.MustParse("1Gi")},
+							},
+						},
+					},
 				},
 				prebind: result{
 					assumedClaim: addAllocationTimestamp(reserve(allocatedClaim, podWithClaimName)),
@@ -4306,17 +5213,106 @@ func testPlugin(tCtx ktesting.TContext) {
 						pod: func(pod *v1.Pod) *v1.Pod {
 							if pod.Name == podName {
 								p := pod.DeepCopy()
-								p.Status.NodeAllocatableResourceClaimStatuses = []v1.NodeAllocatableResourceClaimStatus{
+								p.Status.ExtraNodeAllocatableResources = []v1.ExtraNodeAllocatableResource{
 									{
-										ResourceClaimName: claimName,
-										Containers:        []string{},
-										Overhead: []v1.NodeAllocatableOverheadResources{
-											{
-												Name:   v1.ResourceMemory,
-												PerPod: new(apiresource.MustParse("1Gi")),
-											},
-										},
+										ContainerName: "",
+										Requests:      v1.ResourceList{v1.ResourceMemory: apiresource.MustParse("1Gi")},
+										Limits:        v1.ResourceList{v1.ResourceMemory: apiresource.MustParse("1Gi")},
 									},
+								}
+								return p
+							}
+							return pod
+						},
+					},
+				},
+			},
+		},
+		"node-allocatable-extended-resource": {
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRANodeAllocatableResources: true},
+			nodes:            []*v1.Node{workerNodeWithCapacity},
+			pod:              podWithExtendedResourceName,
+			patchTestCase: func(tc *testPluginCase) {
+				tc.pod = tc.pod.DeepCopy()
+				tc.pod.Status.ExtraNodeAllocatableResources = []v1.ExtraNodeAllocatableResource{
+					{
+						ContainerName: "",
+						Requests:      v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1")},
+						Limits:        v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1")},
+					},
+					{
+						ContainerName: tc.pod.Spec.Containers[0].Name,
+						Limits:        v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1")},
+					},
+				}
+				var podStatusPatches int
+				tc.reactors = []cgotesting.Reactor{
+					&cgotesting.SimpleReactor{
+						Verb:     "patch",
+						Resource: "pods",
+						Reaction: func(action cgotesting.Action) (handled bool, ret apiruntime.Object, err error) {
+							if action.GetSubresource() == "status" {
+								podStatusPatches++
+								if podStatusPatches > 1 {
+									return true, nil, fmt.Errorf("expected a single pod status patch, got %d", podStatusPatches)
+								}
+							}
+							return false, nil, nil
+						},
+					},
+				}
+			},
+			classes: []*resourceapi.DeviceClass{deviceClassWithExtendResourceName},
+			objs: func() []apiruntime.Object {
+				slice := st.MakeResourceSlice(nodeName, driver).Device("instance-1").Obj()
+				slice.Spec.Devices[0].NodeAllocatableResources = map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+					v1.ResourceCPU: {Mapping: &resourceapi.NodeAllocatableMapping{DeviceMultiplier: new(apiresource.MustParse("1"))}},
+				}
+				return []apiruntime.Object{slice, podWithExtendedResourceName}
+			}(),
+			want: want{
+				filter: perNodeResult{
+					workerNodeWithCapacity.Name: {
+						status: nil,
+						extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+							{
+								ContainerName: "",
+								Requests:      v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1")},
+								Limits:        v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1")},
+							},
+							{
+								ContainerName: podWithExtendedResourceName.Spec.Containers[0].Name,
+								Limits:        v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1")},
+							},
+						},
+					},
+				},
+				reserve: result{
+					inFlightClaims: []metav1.Object{extendedResourceClaimNoName},
+				},
+				prebind: result{
+					assumedClaim: addAllocationTimestamp(reserve(extendedResourceClaim, podWithExtendedResourceName)),
+					added:        []metav1.Object{addAllocationTimestamp(reserve(extendedResourceClaim, podWithExtendedResourceName))},
+					changes: change{
+						pod: func(pod *v1.Pod) *v1.Pod {
+							if pod.Name == podName {
+								p := pod.DeepCopy()
+								p.Status.ExtraNodeAllocatableResources = []v1.ExtraNodeAllocatableResource{
+									{
+										ContainerName: "",
+										Requests:      v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1")},
+										Limits:        v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1")},
+									},
+									{
+										ContainerName: p.Spec.Containers[0].Name,
+										Limits:        v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1")},
+									},
+								}
+								p.Status.ExtendedResourceClaimStatus = &v1.PodExtendedResourceClaimStatus{
+									RequestMappings: []v1.ContainerExtendedResourceRequest{
+										{ContainerName: p.Spec.Containers[0].Name, ResourceName: extendedResourceName, RequestName: "container-0-request-0"},
+									},
+									ResourceClaimName: extendedResourceClaim.Name,
 								}
 								return p
 							}
@@ -4340,38 +5336,18 @@ func testPlugin(tCtx ktesting.TContext) {
 			if nodes == nil {
 				nodes = []*v1.Node{workerNode}
 			}
-			feats := feature.Features{
-				EnableDRAAdminAccess:               !tc.disableDRAAdminAccess,
-				EnableDRADeviceBindingConditions:   !tc.disableDRADeviceBindingConditions,
-				EnableDRAResourceClaimDeviceStatus: !tc.disableDRAResourceClaimDeviceStatus,
-				EnableDRADeviceTaints:              tc.enableDRADeviceTaints,
-				EnableDRASchedulerFilterTimeout:    !tc.disableDRASchedulerFilterTimeout,
-				EnableDRAPrioritizedList:           tc.enableDRAPrioritizedList,
-				EnableDRAExtendedResource:          tc.enableDRAExtendedResource,
-				EnableDRANodeAllocatableResources:  tc.enableDRANodeAllocatableResources,
-				EnableDRAConsumableCapacity:        tc.enableDRAConsumableCapacity,
-				EnableDRAWorkloadResourceClaims:    tc.enableDRAWorkloadResourceClaims,
+			if preemption && tc.emulatedVersion != "" {
+				// DRAPreemption was introduced in 1.38 and cannot be enabled at older emulated versions.
+				tCtx.Skipf("DRAPreemption needs version 1.38, the test case emulates %s", tc.emulatedVersion)
 			}
-			if !tc.enableDRAExtendedResource {
-				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(tCtx, utilfeature.DefaultFeatureGate, version.MustParse("1.36"))
+			if tc.emulatedVersion != "" {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(tCtx, utilfeature.DefaultFeatureGate, version.MustParse(tc.emulatedVersion))
 			}
-			featuregatetesting.SetFeatureGateDuringTest(tCtx, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, tc.enableDRAExtendedResource)
-			if tc.disableDRAAdminAccess {
-				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(tCtx, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
-				featuregatetesting.SetFeatureGateDuringTest(tCtx, utilfeature.DefaultFeatureGate, features.DRAAdminAccess, false)
-
-				require.False(tCtx, tc.enableDRAWorkloadResourceClaims, "DRAWorkloadResourceClaims cannot be enabled when DRAAdminAccess is disabled")
-			} else {
-				// These features can't be set with pre-1.36 emulation
-				featuregatetesting.SetFeatureGatesDuringTest(tCtx, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-					features.DRAWorkloadResourceClaims: tc.enableDRAWorkloadResourceClaims,
-					features.GenericWorkload:           tc.enableDRAWorkloadResourceClaims, // dependency of DRAWorkloadResourceClaims
-				})
+			featuregatetesting.SetFeatureGatesDuringTest(tCtx, utilfeature.DefaultFeatureGate, tc.featureOverrides)
+			if preemption {
+				featuregatetesting.SetFeatureGateDuringTest(tCtx, utilfeature.DefaultFeatureGate, features.DRAPreemption, true)
 			}
-			if tc.disableDRADeviceBindingConditions {
-				featuregatetesting.SetFeatureGateDuringTest(tCtx, utilfeature.DefaultFeatureGate, features.DRADeviceBindingConditions, false)
-			}
-			featuregatetesting.SetFeatureGateDuringTest(tCtx, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, tc.enableDRAExtendedResource)
+			feats := feature.NewSchedulerFeaturesFromGates(utilfeature.DefaultFeatureGate)
 			testCtx := setup(tCtx, tc.args, nodes, tc.claims, tc.classes, tc.podGroups, tc.objs, feats, tc.failPatch, tc.reactors)
 			for _, pod := range tc.existingPods {
 				for _, nodeInfo := range testCtx.nodeInfos {
@@ -4414,6 +5390,9 @@ func testPlugin(tCtx ktesting.TContext) {
 
 			initialObjects = testCtx.listAll(tCtx)
 			testCtx.updateAPIServer(tCtx, initialObjects, tc.prepare.filter)
+			for nodeName, entries := range tc.otherPluginNodeAllocatableEntries {
+				framework.GetExtraNodeAllocatableResourcesState(testCtx.state).Set(nodeName, "OtherPlugin", entries)
+			}
 			if !unschedulable {
 				for _, nodeInfo := range testCtx.nodeInfos {
 					var status *fwk.Status
@@ -4427,7 +5406,15 @@ func testPlugin(tCtx ktesting.TContext) {
 						}
 						status = testCtx.p.Filter(ctx, testCtx.state, tc.pod, nodeInfo)
 						nodeName := nodeInfo.Node().Name
-						testCtx.verify(tCtx, tc.want.filter.forNode(nodeName), initialObjects, tc.pod, nil, status)
+						nodeResult := tc.want.filter.forNode(nodeName)
+						testCtx.verify(tCtx, nodeResult, initialObjects, tc.pod, nil, status)
+						var gotResources []v1.ExtraNodeAllocatableResource
+						if state := framework.GetExtraNodeAllocatableResourcesState(testCtx.state); state != nil {
+							gotResources = state.Get(nodeName)
+						}
+						if diff := cmp.Diff(nodeResult.extraNodeAllocatableResources, gotResources, cmpopts.EquateEmpty()); diff != "" {
+							tCtx.Errorf("ExtraNodeAllocatableResourcesState for node %s mismatch (-want +got):\n%s", nodeName, diff)
+						}
 					})
 					if status.Code() == fwk.Success {
 						potentialNodes = append(potentialNodes, nodeInfo)
@@ -4525,11 +5512,15 @@ func testPlugin(tCtx ktesting.TContext) {
 					tCtx.Run("prebind", func(tCtx ktesting.TContext) {
 						testCtx.verify(tCtx, tc.want.prebind, initialObjects, tc.pod, nil, preBindStatus)
 					})
-					if tc.want.unreserveAfterBindFailure != nil {
+					wantUnreserve := tc.want.unreserveAfterBindFailure
+					if preemption && tc.want.unreserveAfterBindFailureWithPreemption != nil {
+						wantUnreserve = tc.want.unreserveAfterBindFailureWithPreemption
+					}
+					if wantUnreserve != nil {
 						initialObjects = testCtx.listAll(tCtx)
 						testCtx.p.Unreserve(tCtx, testCtx.state, tc.pod, selectedNodeName)
 						tCtx.Run("unreserverAfterBindFailure", func(tCtx ktesting.TContext) {
-							testCtx.verify(tCtx, *tc.want.unreserveAfterBindFailure, initialObjects, tc.pod, nil, status)
+							testCtx.verify(tCtx, *wantUnreserve, initialObjects, tc.pod, nil, status)
 						})
 					} else if status.IsSuccess() {
 						initialObjects = testCtx.listAll(tCtx)
@@ -4544,7 +5535,7 @@ func testPlugin(tCtx ktesting.TContext) {
 						GenericPodGroup: fwk.NewGenericPodGroup(tc.podGroups[0]),
 						UnscheduledPods: []*v1.Pod{tc.pod},
 					}
-					mockSchedulingFunc := func(ctx context.Context) (*fwk.PodGroupAssignments, *fwk.Status) {
+					mockSchedulingFunc := func(ctx context.Context, _ fwk.PodGroupCycleState) (*fwk.PodGroupAssignments, *fwk.Status) {
 						return nil, fwk.NewStatus(fwk.Unschedulable)
 					}
 					podGroupCycleState := testCtx.state.GetPodGroupCycleState()
@@ -4555,9 +5546,15 @@ func testPlugin(tCtx ktesting.TContext) {
 					})
 				} else {
 					result, status := testCtx.p.PostFilter(tCtx, testCtx.state, tc.pod, nil /* filteredNodeStatusMap not used by plugin */)
+					wantPostFilter := tc.want.postfilter
+					if preemption && wantPostFilter.status != nil && wantPostFilter.status.Code() == fwk.Unschedulable && len(wantPostFilter.status.Reasons()) > 0 {
+						// Under DRAPreemption, PostFilter returns UnschedulableAndUnresolvable
+						// after deallocating or deleting a claim to skip preemption for the cycle.
+						wantPostFilter.status = fwk.NewStatus(fwk.UnschedulableAndUnresolvable, wantPostFilter.status.Reasons()...)
+					}
 					tCtx.Run("postfilter", func(tCtx ktesting.TContext) {
 						assert.Equal(tCtx, tc.want.postFilterResult, result)
-						testCtx.verify(tCtx, tc.want.postfilter, initialObjects, tc.pod, nil, status)
+						testCtx.verify(tCtx, wantPostFilter, initialObjects, tc.pod, nil, status)
 					})
 				}
 			}
@@ -4602,8 +5599,9 @@ func (tc *testContext) verify(tCtx ktesting.TContext, expected result, initialOb
 	if expected.status == nil {
 		assert.Nil(tCtx, status, status.AsError())
 	} else if actualErr := status.AsError(); actualErr != nil {
-		// Compare only the error strings.
+		// Compare only the error strings and the code.
 		assert.ErrorContains(tCtx, actualErr, expected.status.AsError().Error())
+		assert.Equal(tCtx, expected.status.Code().String(), status.Code().String(), "status code")
 	} else {
 		assert.Equal(tCtx, expected.status, status)
 	}
@@ -4855,32 +5853,41 @@ func update(objects []metav1.Object, updates change) []metav1.Object {
 	return updated
 }
 
-func setup(tCtx ktesting.TContext, args *config.DynamicResourcesArgs, nodes []*v1.Node, claims []*resourceapi.ResourceClaim, classes []*resourceapi.DeviceClass, podGroups []*schedulingapi.PodGroup, objs []apiruntime.Object, features feature.Features, failPatch bool, apiReactors []cgotesting.Reactor) (result *testContext) {
+// draTestEnv holds the client, informer factory, and DefaultDRAManager shared
+// across test setups that build their own Framework (such as DefaultPreemption
+// tests) without constructing a throwaway Framework and plugin instance.
+type draTestEnv struct {
+	client          *fake.Clientset
+	informerFactory informers.SharedInformerFactory
+	draManager      *DefaultDRAManager
+	doneCheckers    []cache.DoneChecker
+}
+
+func setupDRAManager(tCtx ktesting.TContext, claims []*resourceapi.ResourceClaim, classes []*resourceapi.DeviceClass, podGroups []*schedulingapi.PodGroup, objs []apiruntime.Object, features feature.Features, failPatch bool, apiReactors []cgotesting.Reactor) *draTestEnv {
 	tCtx.Helper()
 
-	tc := &testContext{}
-	tc.client = fake.NewSimpleClientset(objs...)
-	reactor := createReactor(tc.client.Tracker(), failPatch)
-	tc.client.PrependReactor("*", "*", reactor)
+	env := &draTestEnv{}
+	env.client = fake.NewSimpleClientset(objs...)
+	reactor := createReactor(env.client.Tracker(), failPatch)
+	env.client.PrependReactor("*", "*", reactor)
 	// Prepends reactors to the client.
-	tc.client.ReactionChain = append(apiReactors, tc.client.ReactionChain...)
+	env.client.ReactionChain = append(apiReactors, env.client.ReactionChain...)
 
-	tc.informerFactory = informers.NewSharedInformerFactory(tc.client, 0)
-	sliceInformer := draapi.NewInformerForResourceSlice(tc.informerFactory)
+	env.informerFactory = informers.NewSharedInformerFactory(env.client, 0)
+	sliceInformer := draapi.NewInformerForResourceSlice(env.informerFactory)
 
-	var doneCheckers []cache.DoneChecker
 	resourceSliceTrackerOpts := resourceslicetracker.Options{
 		EnableDeviceTaintRules: true,
 		SliceLister:            draapi.NewResourceSliceLister(sliceInformer.GetIndexer()),
 		SliceInformer:          sliceInformer,
-		TaintInformer:          tc.informerFactory.Resource().V1().DeviceTaintRules(),
-		KubeClient:             tc.client,
+		TaintInformer:          env.informerFactory.Resource().V1().DeviceTaintRules(),
+		KubeClient:             env.client,
 	}
 	resourceSliceTracker, err := resourceslicetracker.StartTracker(tCtx, resourceSliceTrackerOpts)
 	require.NoError(tCtx, err, "couldn't start resource slice tracker")
-	doneCheckers = append(doneCheckers, resourceSliceTracker.HasSyncedChecker())
+	env.doneCheckers = append(env.doneCheckers, resourceSliceTracker.HasSyncedChecker())
 
-	claimsCache := assumecache.NewAssumeCache(tCtx.Logger(), tc.informerFactory.Resource().V1().ResourceClaims().Informer(), "resource claim", "", nil)
+	claimsCache := assumecache.NewAssumeCache(tCtx.Logger(), env.informerFactory.Resource().V1().ResourceClaims().Informer(), "resource claim", "", nil)
 	// NewAssumeCache calls the informer's AddEventHandler method to register
 	// a handler in order to stay in sync with the informer's store, but
 	// NewAssumeCache does not return the ResourceEventHandlerRegistration.
@@ -4891,19 +5898,60 @@ func setup(tCtx ktesting.TContext, args *config.DynamicResourcesArgs, nodes []*v
 	// This is not the registered handler that is used by the DRA
 	// manager, but it is close enough because the assume cache
 	// uses a single boolean for "is synced" for all handlers.
-	doneCheckers = append(doneCheckers, claimsCache.AddEventHandler(cache.ResourceEventHandlerFuncs{}).HasSyncedChecker())
+	env.doneCheckers = append(env.doneCheckers, claimsCache.AddEventHandler(cache.ResourceEventHandlerFuncs{}).HasSyncedChecker())
 
-	tc.draManager = NewDRAManager(tCtx, claimsCache, resourceSliceTracker, tc.informerFactory)
+	env.draManager = NewDRAManager(tCtx, claimsCache, resourceSliceTracker, env.informerFactory)
 	if features.EnableDRAExtendedResource {
 		logger := tCtx.Logger()
 		handlerOptions := cache.HandlerOptions{Logger: &logger}
-		cache := tc.draManager.DeviceClassResolver().(*extendedresourcecache.ExtendedResourceCache)
-		deviceClassHandlerRegistration, err := tc.informerFactory.Resource().V1().DeviceClasses().Informer().AddEventHandlerWithOptions(cache, handlerOptions)
+		extCache := env.draManager.DeviceClassResolver().(*extendedresourcecache.ExtendedResourceCache)
+		deviceClassHandlerRegistration, err := env.informerFactory.Resource().V1().DeviceClasses().Informer().AddEventHandlerWithOptions(extCache, handlerOptions)
 		require.NoError(tCtx, err, "failed to add device class informer event handler")
-		doneCheckers = append(doneCheckers, deviceClassHandlerRegistration.HasSyncedChecker())
+		env.doneCheckers = append(env.doneCheckers, deviceClassHandlerRegistration.HasSyncedChecker())
 	}
 
-	tc.podGroupManager = internalcache.New(tCtx, nil, true, false)
+	// The tests use the API to create the objects because then reactors
+	// get triggered.
+	for _, claim := range claims {
+		_, err := env.client.ResourceV1().ResourceClaims(claim.Namespace).Create(tCtx, claim, metav1.CreateOptions{})
+		tCtx.ExpectNoError(err, "create resource claim")
+	}
+	for _, class := range classes {
+		_, err := env.client.ResourceV1().DeviceClasses().Create(tCtx, class, metav1.CreateOptions{})
+		tCtx.ExpectNoError(err, "create resource class")
+	}
+	for _, podGroup := range podGroups {
+		_, err := env.client.SchedulingV1beta1().PodGroups(podGroup.Namespace).Create(tCtx, podGroup, metav1.CreateOptions{})
+		tCtx.ExpectNoError(err, "create pod group")
+	}
+
+	return env
+}
+
+func (e *draTestEnv) startAndSync(tCtx ktesting.TContext) {
+	tCtx.Helper()
+	e.informerFactory.StartWithContext(tCtx)
+	tCtx.Cleanup(e.informerFactory.Shutdown)
+
+	e.informerFactory.WaitForCacheSyncWithContext(tCtx)
+	// The above does not tell us if the registered handlers (e.g. from NewAssumeCache)
+	// are synced, we need to wait until the event handlers confirm that they are synced.
+	// This ensures that the assume cache is in sync with the informer's
+	// store which has been informed by at least one full LIST of the underlying storage.
+	cache.WaitFor(tCtx, "event handlers", e.doneCheckers...)
+}
+
+func setup(tCtx ktesting.TContext, args *config.DynamicResourcesArgs, nodes []*v1.Node, claims []*resourceapi.ResourceClaim, classes []*resourceapi.DeviceClass, podGroups []*schedulingapi.PodGroup, objs []apiruntime.Object, features feature.Features, failPatch bool, apiReactors []cgotesting.Reactor) (result *testContext) {
+	tCtx.Helper()
+
+	env := setupDRAManager(tCtx, claims, classes, podGroups, objs, features, failPatch, apiReactors)
+	tc := &testContext{
+		client:          env.client,
+		informerFactory: env.informerFactory,
+		draManager:      env.draManager,
+	}
+
+	tc.podGroupManager = internalcache.New(tCtx, nil, true /* genericWorkloadEnabled */, false /* compositePodGroupEnabled */)
 	for _, obj := range objs {
 		if pod, ok := obj.(*v1.Pod); ok {
 			tc.podGroupManager.AddPodGroupMember(pod)
@@ -4935,30 +5983,7 @@ func setup(tCtx ktesting.TContext, args *config.DynamicResourcesArgs, nodes []*v
 	tCtx.ExpectNoError(err, "create plugin")
 	tc.p = pl.(*DynamicResources)
 
-	// The tests use the API to create the objects because then reactors
-	// get triggered.
-	for _, claim := range claims {
-		_, err := tc.client.ResourceV1().ResourceClaims(claim.Namespace).Create(tCtx, claim, metav1.CreateOptions{})
-		tCtx.ExpectNoError(err, "create resource claim")
-	}
-	for _, class := range classes {
-		_, err := tc.client.ResourceV1().DeviceClasses().Create(tCtx, class, metav1.CreateOptions{})
-		tCtx.ExpectNoError(err, "create resource class")
-	}
-	for _, podGroup := range podGroups {
-		_, err := tc.client.SchedulingV1beta1().PodGroups(podGroup.Namespace).Create(tCtx, podGroup, metav1.CreateOptions{})
-		tCtx.ExpectNoError(err, "create pod group")
-	}
-
-	tc.informerFactory.StartWithContext(tCtx)
-	tCtx.Cleanup(tc.informerFactory.Shutdown)
-
-	tc.informerFactory.WaitForCacheSyncWithContext(tCtx)
-	// The above does not tell us if the registered handlers (e.g. from NewAssumeCache)
-	// are synced, we need to wait until the event handlers confirm that they are synced.
-	// This ensures that the assume cache is in sync with the informer's
-	// store which has been informed by at least one full LIST of the underlying storage.
-	cache.WaitFor(tCtx, "event handlers", doneCheckers...)
+	env.startAndSync(tCtx)
 
 	for _, node := range nodes {
 		nodeInfo := framework.NewNodeInfo()
@@ -5323,6 +6348,85 @@ func testIsSchedulableAfterTargetPodUpdate(tCtx ktesting.TContext) {
 	}
 }
 
+func TestIsSchedulableAfterNodeDeclaredFeaturesChange(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	nodeWithFeatures := func(features ...string) *v1.Node {
+		node := workerNode.DeepCopy()
+		node.Status.DeclaredFeatures = features
+		return node
+	}
+	optionalNodeOps := draoptionalnodeoperations.DRAOptionalNodeOperationsFeatureGate
+
+	testcases := map[string]struct {
+		oldObj, newObj interface{}
+		wantHint       fwk.QueueingHint
+		wantErr        bool
+	}{
+		"wrong-object": {
+			oldObj:  nodeWithFeatures(),
+			newObj:  "not-a-node",
+			wantErr: true,
+		},
+		"starts-declaring": {
+			oldObj:   nodeWithFeatures("OtherFeature"),
+			newObj:   nodeWithFeatures(optionalNodeOps, "OtherFeature"),
+			wantHint: fwk.Queue,
+		},
+		"already-declared": {
+			oldObj:   nodeWithFeatures(optionalNodeOps),
+			newObj:   nodeWithFeatures(optionalNodeOps, "OtherFeature"),
+			wantHint: fwk.QueueSkip,
+		},
+		"stops-declaring": {
+			oldObj:   nodeWithFeatures(optionalNodeOps),
+			newObj:   nodeWithFeatures(),
+			wantHint: fwk.QueueSkip,
+		},
+		"other-feature": {
+			oldObj:   nodeWithFeatures(),
+			newObj:   nodeWithFeatures("OtherFeature"),
+			wantHint: fwk.QueueSkip,
+		},
+	}
+
+	for name, tc := range testcases {
+		tCtx.Run(name, func(tCtx ktesting.TContext) {
+			pl := &DynamicResources{fts: feature.Features{EnableDRAOptionalNodeOperations: true}}
+			gotHint, err := pl.isSchedulableAfterNodeDeclaredFeaturesChange(tCtx.Logger(), podWithClaimName, tc.oldObj, tc.newObj)
+			if tc.wantErr {
+				if err == nil {
+					tCtx.Fatal("want an error, got none")
+				}
+				return
+			}
+			tCtx.ExpectNoError(err)
+			if gotHint != tc.wantHint {
+				tCtx.Fatalf("want %s, got %s", tc.wantHint, gotHint)
+			}
+		})
+	}
+}
+
+func TestEventsToRegisterOptionalNodeOperations(t *testing.T) {
+	for _, enabled := range []bool{true, false} {
+		t.Run(fmt.Sprintf("DRAOptionalNodeOperations=%v", enabled), func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			pl := &DynamicResources{fts: feature.Features{EnableDRAOptionalNodeOperations: enabled}}
+			events, err := pl.EventsToRegister(tCtx)
+			tCtx.ExpectNoError(err, "EventsToRegister")
+			registered := false
+			for _, event := range events {
+				if event.Event.Resource == fwk.Node && event.Event.ActionType&fwk.UpdateNodeDeclaredFeature != 0 {
+					registered = true
+				}
+			}
+			if registered != enabled {
+				tCtx.Errorf("UpdateNodeDeclaredFeature registered = %v, want %v", registered, enabled)
+			}
+		})
+	}
+}
+
 // mockDeviceClassResolver is a simple mock implementation of fwk.DeviceClassResolver for testing
 type mockDeviceClassResolver struct {
 	mapping map[v1.ResourceName]*resourceapi.DeviceClass
@@ -5385,7 +6489,7 @@ func TestAllocatorSelection(t *testing.T) {
 		"default": {
 			features:             "",
 			usingFeatureGroup:    true,
-			expectImplementation: "stable",
+			expectImplementation: "incubating",
 		},
 
 		// Alpha features may need the experimental implementation, if there are any
@@ -5393,7 +6497,7 @@ func TestAllocatorSelection(t *testing.T) {
 		"alpha": {
 			features:             "AllAlpha=true,AllBeta=true",
 			usingFeatureGroup:    true,
-			expectImplementation: "incubating", // This needs to become "experimental" again when adding a new alpha feature.
+			expectImplementation: "experimental",
 		},
 
 		// Let's also determine which allocator is picked for each of the
@@ -5443,6 +6547,10 @@ func TestAllocatorSelection(t *testing.T) {
 		"DerivedAttributes": {
 			features:             "AllAlpha=false,AllBeta=false,DRADerivedAttributes=true",
 			expectImplementation: "incubating",
+		},
+		"SharedConsumableCapacity": {
+			features:             "AllAlpha=false,AllBeta=false,DRAConsumableCapacity=true,DRAPartitionableDevices=true,DRASharedConsumableCapacity=true",
+			expectImplementation: "experimental",
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -6223,28 +7331,6 @@ func testGatherAllocatedState(tCtx ktesting.TContext) {
 
 }
 
-func TestDynamicResources_DeferredResizeSkipped(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingSchedulerPreemption, true)
-	ctx := context.Background()
-	pod := st.MakePod().Name("p").UID("p").Condition(v1.PodResizePending, v1.ConditionTrue, v1.PodReasonDeferred).Obj()
-	nodeInfo := framework.NewNodeInfo()
-	nodeInfo.SetNode(st.MakeNode().Name("node1").Obj())
-
-	pl := &DynamicResources{fts: feature.Features{EnableInPlacePodVerticalScalingSchedulerPreemption: true}}
-
-	if preRes, preStatus := pl.PreFilter(ctx, nil, pod, nil); preStatus.Code() != fwk.Skip || preRes != nil {
-		t.Errorf("PreFilter: got (res: %v, status: %v), want (nil, Skip)", preRes, preStatus.Code())
-	}
-
-	if filterStatus := pl.Filter(ctx, nil, pod, nodeInfo); filterStatus.Code() != fwk.Success {
-		t.Errorf("Filter: got status %v, want Success (nil)", filterStatus.Code())
-	}
-
-	if _, postStatus := pl.PostFilter(ctx, nil, pod, nil); postStatus.Code() != fwk.Unschedulable || postStatus.Message() != "" {
-		t.Errorf("PostFilter: got status (code: %v, msg: %q), want (Unschedulable, \"\")", postStatus.Code(), postStatus.Message())
-	}
-}
-
 func TestPodGroupPostFilter(t *testing.T) {
 	tCtx := ktesting.Init(t)
 
@@ -6304,9 +7390,8 @@ func TestPodGroupPostFilter(t *testing.T) {
 			},
 		},
 		"delete-pod-level-extended-claim": {
-			enableDRAExtendedResource: true,
-			podGroups:                 []*schedulingapi.PodGroup{podGroupWithClaimName},
-			unscheduledPods:           []*v1.Pod{groupedPodWithClaimName},
+			podGroups:       []*schedulingapi.PodGroup{podGroupWithClaimName},
+			unscheduledPods: []*v1.Pod{groupedPodWithClaimName},
 			claims: func() []*resourceapi.ResourceClaim {
 				// Create an extended resource claim owned by the pod
 				claim := inUseClaim.DeepCopy()
@@ -6469,7 +7554,7 @@ func TestPodGroupPostFilter(t *testing.T) {
 				UnscheduledPods: tc.unscheduledPods,
 			}
 
-			mockSchedulingFunc := func(ctx context.Context) (*fwk.PodGroupAssignments, *fwk.Status) {
+			mockSchedulingFunc := func(ctx context.Context, _ fwk.PodGroupCycleState) (*fwk.PodGroupAssignments, *fwk.Status) {
 				return nil, fwk.NewStatus(fwk.Unschedulable)
 			}
 

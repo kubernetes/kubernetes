@@ -153,21 +153,20 @@ func newNodeLifecycleControllerFromClient(
 	daemonSetInformer := factory.Apps().V1().DaemonSets()
 	podInformer := factory.Core().V1().Pods()
 
-	nc, err := NewNodeLifecycleController(
-		ctx,
-		leaseInformer,
-		podInformer,
-		nodeInformer,
-		daemonSetInformer,
-		kubeClient,
-		nodeMonitorPeriod,
-		nodeStartupGracePeriod,
-		nodeMonitorGracePeriod,
-		evictionLimiterQPS,
-		secondaryEvictionLimiterQPS,
-		largeClusterThreshold,
-		unhealthyZoneThreshold,
-	)
+	nc, err := NewNodeLifecycleController(ctx, ControllerOptions{
+		LeaseInformer:               leaseInformer,
+		PodInformer:                 podInformer,
+		NodeInformer:                nodeInformer,
+		DaemonSetInformer:           daemonSetInformer,
+		KubeClient:                  kubeClient,
+		NodeMonitorPeriod:           nodeMonitorPeriod,
+		NodeStartupGracePeriod:      nodeStartupGracePeriod,
+		NodeMonitorGracePeriod:      nodeMonitorGracePeriod,
+		EvictionLimiterQPS:          evictionLimiterQPS,
+		SecondaryEvictionLimiterQPS: secondaryEvictionLimiterQPS,
+		LargeClusterThreshold:       largeClusterThreshold,
+		UnhealthyZoneThreshold:      unhealthyZoneThreshold,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -4152,6 +4151,91 @@ func TestProcessPodMarkPodNotReady(t *testing.T) {
 			}
 			if podStatusUpdated != item.expectedPodStatusUpdate {
 				t.Errorf("expect pod status updated to be %v, but got %v", item.expectedPodStatusUpdate, podStatusUpdated)
+			}
+		})
+	}
+}
+
+func TestNewNodeLifecycleControllerValidation(t *testing.T) {
+	validOpts := func(kubeClient clientset.Interface) (ControllerOptions, informers.SharedInformerFactory) {
+		factory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
+		return ControllerOptions{
+			LeaseInformer:               factory.Coordination().V1().Leases(),
+			PodInformer:                 factory.Core().V1().Pods(),
+			NodeInformer:                factory.Core().V1().Nodes(),
+			DaemonSetInformer:           factory.Apps().V1().DaemonSets(),
+			KubeClient:                  kubeClient,
+			NodeMonitorPeriod:           testNodeMonitorPeriod,
+			NodeStartupGracePeriod:      testNodeStartupGracePeriod,
+			NodeMonitorGracePeriod:      testNodeMonitorGracePeriod,
+			EvictionLimiterQPS:          testRateLimiterQPS,
+			SecondaryEvictionLimiterQPS: testRateLimiterQPS,
+			LargeClusterThreshold:       testLargeClusterThreshold,
+			UnhealthyZoneThreshold:      testUnhealthyThreshold,
+		}, factory
+	}
+
+	cases := []struct {
+		name    string
+		mutate  func(t *testing.T, ctx context.Context, opts *ControllerOptions, factory informers.SharedInformerFactory)
+		wantErr bool
+	}{
+		{
+			name:    "valid options",
+			mutate:  func(_ *testing.T, _ context.Context, _ *ControllerOptions, _ informers.SharedInformerFactory) {},
+			wantErr: false,
+		},
+		{
+			name: "nil LeaseInformer",
+			mutate: func(_ *testing.T, _ context.Context, opts *ControllerOptions, _ informers.SharedInformerFactory) {
+				opts.LeaseInformer = nil
+			},
+			wantErr: true,
+		},
+		{
+			name: "nil PodInformer",
+			mutate: func(_ *testing.T, _ context.Context, opts *ControllerOptions, _ informers.SharedInformerFactory) {
+				opts.PodInformer = nil
+			},
+			wantErr: true,
+		},
+		{
+			name: "nil NodeInformer",
+			mutate: func(_ *testing.T, _ context.Context, opts *ControllerOptions, _ informers.SharedInformerFactory) {
+				opts.NodeInformer = nil
+			},
+			wantErr: true,
+		},
+		{
+			name: "nil DaemonSetInformer",
+			mutate: func(_ *testing.T, _ context.Context, opts *ControllerOptions, _ informers.SharedInformerFactory) {
+				opts.DaemonSetInformer = nil
+			},
+			wantErr: true,
+		},
+		{
+			name: "stopped pod informer without nodeName indexer",
+			mutate: func(_ *testing.T, _ context.Context, opts *ControllerOptions, factory informers.SharedInformerFactory) {
+				_ = opts.PodInformer.Informer()
+				stopCh := make(chan struct{})
+				factory.Start(stopCh)
+				close(stopCh)
+				factory.Shutdown()
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			kubeClient := fake.NewSimpleClientset()
+			opts, factory := validOpts(kubeClient)
+			tc.mutate(t, tCtx, &opts, factory)
+
+			_, err := NewNodeLifecycleController(tCtx, opts)
+			if (err != nil) != tc.wantErr {
+				t.Fatalf("NewNodeLifecycleController() error = %v, wantErr %v", err, tc.wantErr)
 			}
 		})
 	}

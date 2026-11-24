@@ -778,13 +778,24 @@
           "procMount": "procMountValue",
           "seccompProfile": {
             "type": "typeValue",
-            "localhostProfile": "localhostProfileValue"
+            "localhostProfile": "localhostProfileValue",
+            "oci": {
+              "ref": "refValue",
+              "baseProfile": {
+                "type": "typeValue",
+                "localhostProfile": "localhostProfileValue"
+              }
+            }
           },
           "appArmorProfile": {
             "type": "typeValue",
             "localhostProfile": "localhostProfileValue"
+          },
+          "cgroupOptions": {
+            "mountMode": "mountModeValue"
           }
         },
+        "hostCgroupNamespace": true,
         "stdin": true,
         "stdinOnce": true,
         "tty": true
@@ -1103,13 +1114,24 @@
           "procMount": "procMountValue",
           "seccompProfile": {
             "type": "typeValue",
-            "localhostProfile": "localhostProfileValue"
+            "localhostProfile": "localhostProfileValue",
+            "oci": {
+              "ref": "refValue",
+              "baseProfile": {
+                "type": "typeValue",
+                "localhostProfile": "localhostProfileValue"
+              }
+            }
           },
           "appArmorProfile": {
             "type": "typeValue",
             "localhostProfile": "localhostProfileValue"
+          },
+          "cgroupOptions": {
+            "mountMode": "mountModeValue"
           }
         },
+        "hostCgroupNamespace": true,
         "stdin": true,
         "stdinOnce": true,
         "tty": true
@@ -1428,13 +1450,24 @@
           "procMount": "procMountValue",
           "seccompProfile": {
             "type": "typeValue",
-            "localhostProfile": "localhostProfileValue"
+            "localhostProfile": "localhostProfileValue",
+            "oci": {
+              "ref": "refValue",
+              "baseProfile": {
+                "type": "typeValue",
+                "localhostProfile": "localhostProfileValue"
+              }
+            }
           },
           "appArmorProfile": {
             "type": "typeValue",
             "localhostProfile": "localhostProfileValue"
+          },
+          "cgroupOptions": {
+            "mountMode": "mountModeValue"
           }
         },
+        "hostCgroupNamespace": true,
         "stdin": true,
         "stdinOnce": true,
         "tty": true,
@@ -1486,7 +1519,14 @@
       "fsGroupChangePolicy": "fsGroupChangePolicyValue",
       "seccompProfile": {
         "type": "typeValue",
-        "localhostProfile": "localhostProfileValue"
+        "localhostProfile": "localhostProfileValue",
+        "oci": {
+          "ref": "refValue",
+          "baseProfile": {
+            "type": "typeValue",
+            "localhostProfile": "localhostProfileValue"
+          }
+        }
       },
       "appArmorProfile": {
         "type": "typeValue",
@@ -1844,7 +1884,8 @@
         "name": "nameValue",
         "priority": 2
       }
-    ]
+    ],
+    "podNetwork": "podNetworkValue"
   },
   "status": {
     "observedGeneration": 17,
@@ -2208,38 +2249,31 @@
         }
       ]
     },
-    "nodeAllocatableResourceClaimStatuses": [
+    "extraNodeAllocatableResources": [
       {
-        "resourceClaimName": "resourceClaimNameValue",
-        "containers": [
-          "containersValue"
-        ],
-        "mapping": [
-          {
-            "name": "nameValue",
-            "quantity": "0"
-          }
-        ],
-        "overhead": [
-          {
-            "name": "nameValue",
-            "perPod": "0",
-            "perContainer": "0"
-          }
-        ]
+        "containerName": "containerNameValue",
+        "requests": {
+          "requestsKey": "0"
+        },
+        "limits": {
+          "limitsKey": "0"
+        }
       }
     ],
-    "volumeHealth": [
+    "volumeStatuses": [
       {
         "name": "nameValue",
-        "healthConditions": [
-          {
-            "status": "statusValue",
-            "reason": "reasonValue",
-            "message": "messageValue"
-          }
-        ],
-        "lastTransitionTime": "2003-01-01T01:01:01Z"
+        "healthStatus": {
+          "healthConditions": [
+            {
+              "status": "statusValue",
+              "reason": "reasonValue",
+              "message": "messageValue"
+            }
+          ],
+          "lastTransitionTime": "2002-01-01T01:01:01Z"
+        },
+        "hostPhase": "hostPhaseValue"
       }
     ]
   }

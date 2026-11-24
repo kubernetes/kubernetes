@@ -505,7 +505,13 @@ func TestBuildWorkload(t *testing.T) {
 								Name:          "cpg-3",
 								DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}},
 								Children: []*WorkloadItem{
-									{Name: "leaf", DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}}},
+									{
+										Name:          "cpg-4",
+										DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}},
+										Children: []*WorkloadItem{
+											{Name: "leaf", DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}}},
+										},
+									},
 								},
 							},
 						},
@@ -531,7 +537,13 @@ func TestBuildWorkload(t *testing.T) {
 										Name:          "cpg-4",
 										DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}},
 										Children: []*WorkloadItem{
-											{Name: "leaf", DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}}},
+											{
+												Name:          "cpg-5",
+												DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}},
+												Children: []*WorkloadItem{
+													{Name: "leaf", DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}}},
+												},
+											},
 										},
 									},
 								},
@@ -969,6 +981,9 @@ func TestNewBuilderFromExistingWorkload(t *testing.T) {
 		if pg.Spec.Priority == nil || *pg.Spec.Priority != 1000 {
 			t.Errorf("expected priority copied, got %v", pg.Spec.Priority)
 		}
+		if pg.Spec.PreemptionPolicy == nil || *pg.Spec.PreemptionPolicy != schedulingv1beta1.PreemptNever {
+			t.Errorf("expected preemptionPolicy copied, got %v", pg.Spec.PreemptionPolicy)
+		}
 		if pg.Spec.WorkloadRef == nil || pg.Spec.WorkloadRef.WorkloadName != "parent-wl" {
 			t.Errorf("unexpected workloadRef: %+v", pg.Spec.WorkloadRef)
 		}
@@ -1043,6 +1058,7 @@ func existingWorkload() *schedulingv1beta1.Workload {
 				SchedulingPolicy:  schedulingv1beta1.PodGroupSchedulingPolicy{Gang: &schedulingv1beta1.GangSchedulingPolicy{MinCount: 4}},
 				PriorityClassName: "high-priority",
 				Priority:          ptr.To[int32](1000),
+				PreemptionPolicy:  new(schedulingv1beta1.PreemptNever),
 			}},
 		},
 	}

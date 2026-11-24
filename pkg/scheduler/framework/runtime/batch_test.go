@@ -203,6 +203,19 @@ func newTestNodes(n []string) *testSortedScoredNodes {
 	return &testSortedScoredNodes{Nodes: n}
 }
 
+type fakeBatchPodNominator struct {
+	fwk.PodNominator
+	nominatedNodeName string
+}
+
+func (n *fakeBatchPodNominator) NominatedNodeName(*v1.Pod) string {
+	return n.nominatedNodeName
+}
+
+func (n *fakeBatchPodNominator) TracksNominationInMemory(*v1.Pod) bool {
+	return true
+}
+
 const (
 	batchAttemptsHelp        = "Counts of results when we attempt to use batching, by scheduler profile. 'no_hint' covers every pod that asked for a hint and got none, including pods that later fail to schedule. 'hint_used' and 'hint_not_used' are recorded only when a node is selected, and say whether it was the hinted one."
 	batchCacheFlushedHelp    = "Counts of batch cache flushes by reason and scheduler profile. A flush is counted when an existing batch state is dropped instead of providing a hint. 'pod_skipped' means the previous pod was handled by another profile or failed to schedule, 'pod_nominated' means the pod has a nominated node, 'pod_incompatible' means the pod's signature is missing or differs from the batch's, 'expired' means the state is older than the maximum batch age, 'node_missing' means a node needed to reuse the state is no longer in the snapshot, and 'filter_error', 'prescore_error', 'rescore_error' and 'normalize_error' mean that phase failed while rescoring."
@@ -297,6 +310,8 @@ func TestBatchBasic(t *testing.T) {
 		skipPod                    bool
 		secondPodID                string
 		secondPodNominatedNodeName string
+		useInMemoryNomination      bool
+		inMemoryNominatedNodeName  string
 		secondSig                  string
 		secondChosenNode           string
 		secondOtherNodes           framework.SortedScoredNodes
@@ -467,6 +482,41 @@ func TestBatchBasic(t *testing.T) {
 			expectedFlushes:               map[string]int{metrics.BatchFlushPodNominated: 1},
 			expectedStoreResults:          map[string]int{metrics.StoreResultStored: 1, metrics.StoreResultEmptyList: 1},
 		},
+		{
+			name:                          "a second pod nominated only in memory does not get a hint",
+			firstPodID:                    blockingPodID("1"),
+			firstSig:                      "sig",
+			firstChosenNode:               "n3",
+			firstOtherNodes:               newTestNodes([]string{"n1"}),
+			firstPodScheduledSuccessfully: true,
+			secondPodID:                   blockingPodID("2"),
+			useInMemoryNomination:         true,
+			inMemoryNominatedNodeName:     "n1",
+			secondSig:                     "sig",
+			secondChosenNode:              "n1",
+			expectedHint:                  "",
+			expectedAttempts:              map[string]int{metrics.BatchAttemptNoHint: 2},
+			expectedFlushes:               map[string]int{metrics.BatchFlushPodNominated: 1},
+			expectedStoreResults:          map[string]int{metrics.StoreResultStored: 1, metrics.StoreResultEmptyList: 1},
+		},
+		{
+			name:                          "a second pod whose nomination was cleared in memory still gets a hint",
+			firstPodID:                    blockingPodID("1"),
+			firstSig:                      "sig",
+			firstChosenNode:               "n3",
+			firstOtherNodes:               newTestNodes([]string{"n1"}),
+			firstPodScheduledSuccessfully: true,
+			secondPodID:                   blockingPodID("2"),
+			secondPodNominatedNodeName:    "n1",
+			useInMemoryNomination:         true,
+			inMemoryNominatedNodeName:     "",
+			secondSig:                     "sig",
+			secondChosenNode:              "n1",
+			expectedHint:                  "n1",
+			expectedAttempts:              map[string]int{metrics.BatchAttemptNoHint: 1, metrics.BatchAttemptHintUsed: 1},
+			expectedFlushes:               nil,
+			expectedStoreResults:          map[string]int{metrics.StoreResultStored: 1},
+		},
 	}
 
 	for _, tt := range tests {
@@ -508,6 +558,9 @@ func TestBatchBasic(t *testing.T) {
 			}
 
 			// Run the second pod
+			if tt.useInMemoryNomination {
+				testFwk.SetPodNominator(&fakeBatchPodNominator{nominatedNodeName: tt.inMemoryNominatedNodeName})
+			}
 			pod2 := &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "pod2",
@@ -790,7 +843,7 @@ func TestBatchRescore(t *testing.T) {
 			assertBatchCounters(t, profile, wantAttempts, wantFlushes, tt.wantRescoreAttempts)
 			assertHistogramCount(t, metrics.BatchRescoreDuration.Name, metrics.BatchRescoreDuration.WithLabelValues(profile), uint64(tt.wantRescoreAttempts))
 
-			// Every flush in this test discards a usable state, so GetNodeHint must drop it.
+			// Every flush in this test discards the state, so GetNodeHint must drop it.
 			if tt.wantFlushReason != "" && batch.state != nil {
 				t.Fatal("expected batch state to be dropped")
 			}
@@ -895,7 +948,7 @@ func TestBatchMetricsOtherPaths(t *testing.T) {
 			wantStoreResults: map[string]int{metrics.StoreResultStored: 1},
 		},
 		{
-			name: "pod without a signature replaces clears a usable state",
+			name: "pod without a signature clears the state",
 			run: func(ctx context.Context, batch *OpportunisticBatch) {
 				batch.StoreScheduleResults(ctx, sig, "", "n2", otherNodes(), 1)
 				batch.StoreScheduleResults(ctx, nil, "", "n3", otherNodes(), 2)
@@ -903,7 +956,7 @@ func TestBatchMetricsOtherPaths(t *testing.T) {
 			wantStoreResults: map[string]int{metrics.StoreResultStored: 1, metrics.StoreResultPodNotBatchable: 1},
 		},
 		{
-			name: "pod with no other nodes replaces a usable state",
+			name: "pod with no other nodes clears the state",
 			run: func(ctx context.Context, batch *OpportunisticBatch) {
 				batch.StoreScheduleResults(ctx, sig, "", "n2", otherNodes(), 1)
 				batch.StoreScheduleResults(ctx, sig, "", "n3", nil, 2)
@@ -1019,6 +1072,7 @@ func TestBatchSetDisabled(t *testing.T) {
 
 type podGroupPostFilterCallbackPlugin struct {
 	name string
+	fh   fwk.Handle
 }
 
 func (pl *podGroupPostFilterCallbackPlugin) Name() string {
@@ -1026,7 +1080,7 @@ func (pl *podGroupPostFilterCallbackPlugin) Name() string {
 }
 
 func (pl *podGroupPostFilterCallbackPlugin) PodGroupPostFilter(ctx context.Context, _ fwk.PodGroupCycleState, _ fwk.PodGroupInfo, pgSchedulingFunc fwk.PodGroupSchedulingFunc) (*fwk.PodGroupPostFilterResult, *fwk.Status) {
-	if _, status := pgSchedulingFunc(ctx); !status.IsSuccess() {
+	if _, status := pgSchedulingFunc(ctx, pl.fh.NewPodGroupCycleState()); !status.IsSuccess() {
 		return nil, status
 	}
 	return &fwk.PodGroupPostFilterResult{}, fwk.NewStatus(fwk.Success)
@@ -1056,8 +1110,8 @@ func TestRunPodGroupPostFilterPluginsBatching(t *testing.T) {
 				"batchTest":     newBatchTestPlugin,
 				queueSortPlugin: newQueueSortPlugin,
 				bindPlugin:      newBindPlugin,
-				pgPostFilterPluginName: func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
-					return &podGroupPostFilterCallbackPlugin{name: pgPostFilterPluginName}, nil
+				pgPostFilterPluginName: func(_ context.Context, _ runtime.Object, fh fwk.Handle) (fwk.Plugin, error) {
+					return &podGroupPostFilterCallbackPlugin{name: pgPostFilterPluginName, fh: fh}, nil
 				},
 			}
 			profile := config.KubeSchedulerProfile{
@@ -1092,7 +1146,7 @@ func TestRunPodGroupPostFilterPluginsBatching(t *testing.T) {
 			}
 
 			schedulingFuncCalled := false
-			pgSchedulingFunc := func(ctx context.Context) (*fwk.PodGroupAssignments, *fwk.Status) {
+			pgSchedulingFunc := func(ctx context.Context, _ fwk.PodGroupCycleState) (*fwk.PodGroupAssignments, *fwk.Status) {
 				schedulingFuncCalled = true
 				if opportunisticBatchingEnabled {
 					if !fwkImpl.batch.disabled {

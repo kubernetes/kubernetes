@@ -40,6 +40,7 @@ import (
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/testutil"
+	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/features"
@@ -72,6 +73,10 @@ const (
 	placementGeneratePlugin           = "placement-generate-plugin"
 	placementGeneratePlugin2          = "placement-generate-plugin-2"
 	defaultPreemptionPlugin           = names.DefaultPreemption
+	postFilterOnlyPlugin1             = "post-filter-only-plugin-1"
+	postFilterOnlyPlugin2             = "post-filter-only-plugin-2"
+	filterAndPostFilterPlugin         = "filter-and-post-filter-plugin"
+	bothPostFilterPlugin              = "post-filter-and-pod-group-post-filter-plugin"
 
 	testProfileName                   = "test-profile"
 	testPercentageOfNodesToScore      = 35
@@ -496,6 +501,10 @@ var registry = func() Registry {
 	r.Register(placementGeneratePlugin2, newTestPlacementGeneratePlugin2)
 	r.Register(placementScorePlugin1, newPlacementScorePluginFactory(placementScorePlugin1))
 	r.Register(defaultPreemptionPlugin, newMockDefaultPreemptionPlugin)
+	r.Register(postFilterOnlyPlugin1, newPostFilterOnlyPluginFactory(postFilterOnlyPlugin1))
+	r.Register(postFilterOnlyPlugin2, newPostFilterOnlyPluginFactory(postFilterOnlyPlugin2))
+	r.Register(filterAndPostFilterPlugin, newFilterAndPostFilterPlugin)
+	r.Register(bothPostFilterPlugin, newBothPostFilterPlugin)
 	return r
 }()
 
@@ -802,6 +811,220 @@ func TestPodGroupPostFilterPlugins(t *testing.T) {
 	}
 }
 
+func TestPostFilterWithoutPodGroupPostFilterWarning(t *testing.T) {
+	const (
+		wantNotImplementedMsg = "PostFilter plugin does not implement PodGroupPostFilterPlugin; it will not be run for PodGroups or CompositePodGroups"
+		wantNotEnabledMsg     = "PostFilter plugin implements PodGroupPostFilterPlugin but is not enabled; it will not be run for PodGroups or CompositePodGroups"
+	)
+	tests := []struct {
+		name                       string
+		genericWorkloadEnabled     bool
+		multiPointPlugins          []config.Plugin
+		filterPlugins              []config.Plugin
+		postFilterPlugins          []config.Plugin
+		podGroupPostFilterPlugins  []config.Plugin
+		podGroupPostFilterDisabled []config.Plugin
+		wantErrorLogs              []ktesting.LogEntry
+	}{
+		{
+			name:                   "GenericWorkload enabled, PostFilter plugin is also enabled at PodGroupPostFilter",
+			genericWorkloadEnabled: true,
+			postFilterPlugins: []config.Plugin{
+				{Name: defaultPreemptionPlugin},
+			},
+			podGroupPostFilterPlugins: []config.Plugin{
+				{Name: defaultPreemptionPlugin},
+			},
+		},
+		{
+			name:                   "GenericWorkload enabled, PostFilter plugin implementing PodGroupPostFilterPlugin is enabled only at PostFilter",
+			genericWorkloadEnabled: true,
+			postFilterPlugins: []config.Plugin{
+				{Name: defaultPreemptionPlugin},
+			},
+			wantErrorLogs: []ktesting.LogEntry{
+				{Type: ktesting.LogError, Message: wantNotEnabledMsg, ParameterKVList: []any{"plugin", defaultPreemptionPlugin, "profile", testProfileName}},
+			},
+		},
+		{
+			name:                   "GenericWorkload enabled, PostFilter plugin does not implement PodGroupPostFilterPlugin",
+			genericWorkloadEnabled: true,
+			postFilterPlugins: []config.Plugin{
+				{Name: postFilterOnlyPlugin1},
+			},
+			wantErrorLogs: []ktesting.LogEntry{
+				{Type: ktesting.LogError, Message: wantNotImplementedMsg, ParameterKVList: []any{"plugin", postFilterOnlyPlugin1, "profile", testProfileName}},
+			},
+		},
+		{
+			name:                   "GenericWorkload enabled, multiple PostFilter plugins with and without PodGroupPostFilterPlugin",
+			genericWorkloadEnabled: true,
+			postFilterPlugins: []config.Plugin{
+				{Name: defaultPreemptionPlugin},
+				{Name: postFilterOnlyPlugin1},
+				{Name: postFilterOnlyPlugin2},
+			},
+			podGroupPostFilterPlugins: []config.Plugin{
+				{Name: defaultPreemptionPlugin},
+			},
+			wantErrorLogs: []ktesting.LogEntry{
+				{Type: ktesting.LogError, Message: wantNotImplementedMsg, ParameterKVList: []any{"plugin", postFilterOnlyPlugin1, "profile", testProfileName}},
+				{Type: ktesting.LogError, Message: wantNotImplementedMsg, ParameterKVList: []any{"plugin", postFilterOnlyPlugin2, "profile", testProfileName}},
+			},
+		},
+		{
+			name:                   "GenericWorkload disabled, PostFilter plugin is also enabled at PodGroupPostFilter",
+			genericWorkloadEnabled: false,
+			postFilterPlugins: []config.Plugin{
+				{Name: defaultPreemptionPlugin},
+			},
+			podGroupPostFilterPlugins: []config.Plugin{
+				{Name: defaultPreemptionPlugin},
+			},
+		},
+		{
+			name:                   "GenericWorkload disabled, PostFilter plugin implementing PodGroupPostFilterPlugin is enabled only at PostFilter",
+			genericWorkloadEnabled: false,
+			postFilterPlugins: []config.Plugin{
+				{Name: defaultPreemptionPlugin},
+			},
+		},
+		{
+			name:                   "GenericWorkload disabled, PostFilter plugin does not implement PodGroupPostFilterPlugin",
+			genericWorkloadEnabled: false,
+			postFilterPlugins: []config.Plugin{
+				{Name: postFilterOnlyPlugin1},
+			},
+		},
+		{
+			name:                   "GenericWorkload enabled, MultiPoint plugin does not implement PodGroupPostFilterPlugin",
+			genericWorkloadEnabled: true,
+			multiPointPlugins: []config.Plugin{
+				{Name: postFilterOnlyPlugin1},
+				{Name: bothPostFilterPlugin},
+			},
+			wantErrorLogs: []ktesting.LogEntry{
+				{Type: ktesting.LogError, Message: wantNotImplementedMsg, ParameterKVList: []any{"plugin", postFilterOnlyPlugin1, "profile", testProfileName}},
+			},
+		},
+		{
+			name:                   "GenericWorkload enabled, MultiPoint plugin disabled at PodGroupPostFilter",
+			genericWorkloadEnabled: true,
+			multiPointPlugins: []config.Plugin{
+				{Name: bothPostFilterPlugin},
+			},
+			podGroupPostFilterDisabled: []config.Plugin{
+				{Name: bothPostFilterPlugin},
+			},
+			wantErrorLogs: []ktesting.LogEntry{
+				{Type: ktesting.LogError, Message: wantNotEnabledMsg, ParameterKVList: []any{"plugin", bothPostFilterPlugin, "profile", testProfileName}},
+			},
+		},
+		{
+			name:                   "GenericWorkload enabled, plugin implementing PostFilter is enabled only at Filter",
+			genericWorkloadEnabled: true,
+			filterPlugins: []config.Plugin{
+				{Name: filterAndPostFilterPlugin},
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, tc.genericWorkloadEnabled)
+
+			logger := ktesting.NewLogger(t, ktesting.NewConfig(ktesting.BufferLogs(true)))
+			ctx, cancel := context.WithCancel(klog.NewContext(context.Background(), logger))
+			defer cancel()
+
+			profile := config.KubeSchedulerProfile{
+				SchedulerName: testProfileName,
+				Plugins: &config.Plugins{
+					MultiPoint: config.PluginSet{
+						Enabled: tc.multiPointPlugins,
+					},
+					Filter: config.PluginSet{
+						Enabled: tc.filterPlugins,
+					},
+					PostFilter: config.PluginSet{
+						Enabled: tc.postFilterPlugins,
+					},
+					PodGroupPostFilter: config.PluginSet{
+						Enabled:  tc.podGroupPostFilterPlugins,
+						Disabled: tc.podGroupPostFilterDisabled,
+					},
+				},
+			}
+			if _, err := newFrameworkWithQueueSortAndBind(ctx, registry, profile); err != nil {
+				t.Fatalf("Unexpected framework initialization error: %v", err)
+			}
+			var gotErrorLogs []ktesting.LogEntry
+			for _, entry := range logger.GetSink().(ktesting.Underlier).GetBuffer().Data() {
+				if entry.Type == ktesting.LogError {
+					gotErrorLogs = append(gotErrorLogs, entry)
+				}
+			}
+			if diff := cmp.Diff(tc.wantErrorLogs, gotErrorLogs, cmpopts.IgnoreFields(ktesting.LogEntry{}, "Timestamp")); diff != "" {
+				t.Errorf("Unexpected error logs (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+type testPostFilterOnlyPlugin struct {
+	name string
+}
+
+func (pl *testPostFilterOnlyPlugin) Name() string {
+	return pl.name
+}
+
+func (pl *testPostFilterOnlyPlugin) PostFilter(_ context.Context, _ fwk.CycleState, _ *v1.Pod, _ fwk.NodeToStatusReader) (*fwk.PostFilterResult, *fwk.Status) {
+	return nil, nil
+}
+
+var _ fwk.PostFilterPlugin = &testPostFilterOnlyPlugin{}
+
+func newPostFilterOnlyPluginFactory(name string) func(context.Context, runtime.Object, fwk.Handle) (fwk.Plugin, error) {
+	return func(context.Context, runtime.Object, fwk.Handle) (fwk.Plugin, error) {
+		return &testPostFilterOnlyPlugin{name: name}, nil
+	}
+}
+
+// testFilterAndPostFilterPlugin implements FilterPlugin and PostFilterPlugin, but not PodGroupPostFilterPlugin.
+type testFilterAndPostFilterPlugin struct {
+	testPostFilterOnlyPlugin
+}
+
+func (pl *testFilterAndPostFilterPlugin) Filter(_ context.Context, _ fwk.CycleState, _ *v1.Pod, _ fwk.NodeInfo) *fwk.Status {
+	return nil
+}
+
+var (
+	_ fwk.FilterPlugin     = &testFilterAndPostFilterPlugin{}
+	_ fwk.PostFilterPlugin = &testFilterAndPostFilterPlugin{}
+)
+
+func newFilterAndPostFilterPlugin(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+	return &testFilterAndPostFilterPlugin{testPostFilterOnlyPlugin: testPostFilterOnlyPlugin{name: filterAndPostFilterPlugin}}, nil
+}
+
+// testBothPostFilterPlugin implements PostFilterPlugin and PodGroupPostFilterPlugin only, so
+// MultiPoint expansion does not add it to QueueSort or Bind.
+type testBothPostFilterPlugin struct {
+	testPostFilterOnlyPlugin
+}
+
+func (pl *testBothPostFilterPlugin) PodGroupPostFilter(_ context.Context, _ fwk.PodGroupCycleState, _ fwk.PodGroupInfo, _ fwk.PodGroupSchedulingFunc) (*fwk.PodGroupPostFilterResult, *fwk.Status) {
+	return nil, nil
+}
+
+var _ fwk.PodGroupPostFilterPlugin = &testBothPostFilterPlugin{}
+
+func newBothPostFilterPlugin(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+	return &testBothPostFilterPlugin{testPostFilterOnlyPlugin: testPostFilterOnlyPlugin{name: bothPostFilterPlugin}}, nil
+}
+
 // mockDefaultPreemptionPlugin is used to simulate a default preemption plugin that implements PodGroupPostFilterPlugin
 type mockDefaultPreemptionPlugin struct {
 	TestPlugin
@@ -1020,7 +1243,7 @@ func TestRunPodGroupPostFilterPlugins(t *testing.T) {
 			}
 			fwkImpl.podGroupPostFilterPlugins = postFilterPlugins
 
-			var pgSchedulingFunc fwk.PodGroupSchedulingFunc = func(_ context.Context) (*fwk.PodGroupAssignments, *fwk.Status) {
+			var pgSchedulingFunc fwk.PodGroupSchedulingFunc = func(_ context.Context, _ fwk.PodGroupCycleState) (*fwk.PodGroupAssignments, *fwk.Status) {
 				return &fwk.PodGroupAssignments{}, nil
 			}
 
@@ -4776,7 +4999,7 @@ func TestRecordingMetrics(t *testing.T) {
 		{
 			name: "PodGroupPostFilter - Success",
 			action: func(ctx context.Context, f framework.Framework) {
-				var pgSchedulingFunc fwk.PodGroupSchedulingFunc = func(_ context.Context) (*fwk.PodGroupAssignments, *fwk.Status) {
+				var pgSchedulingFunc fwk.PodGroupSchedulingFunc = func(_ context.Context, _ fwk.PodGroupCycleState) (*fwk.PodGroupAssignments, *fwk.Status) {
 					return &fwk.PodGroupAssignments{}, nil
 				}
 				f.RunPodGroupPostFilterPlugins(ctx, state, newQueuedPodGroupInfoForTest("", ""), pgSchedulingFunc)
@@ -4882,7 +5105,7 @@ func TestRecordingMetrics(t *testing.T) {
 		{
 			name: "PodGroupPostFilter - Error",
 			action: func(ctx context.Context, f framework.Framework) {
-				var pgSchedulingFunc fwk.PodGroupSchedulingFunc = func(_ context.Context) (*fwk.PodGroupAssignments, *fwk.Status) {
+				var pgSchedulingFunc fwk.PodGroupSchedulingFunc = func(_ context.Context, _ fwk.PodGroupCycleState) (*fwk.PodGroupAssignments, *fwk.Status) {
 					return &fwk.PodGroupAssignments{}, nil
 				}
 				f.RunPodGroupPostFilterPlugins(ctx, state, newQueuedPodGroupInfoForTest("", ""), pgSchedulingFunc)
@@ -6154,4 +6377,119 @@ func newQueuedPodGroupInfoForTest(ns, name string) *framework.QueuedPodGroupInfo
 			}),
 		},
 	}
+}
+
+type relevanceTestPlugin struct {
+	*TestPlugin
+	relevant bool
+}
+
+var _ fwk.RelevancePlugin = &relevanceTestPlugin{}
+
+func (p *relevanceTestPlugin) IsRelevantForPodResize() bool {
+	return p.relevant
+}
+
+func TestResizePlugins(t *testing.T) {
+	regularPod := st.MakePod().Name("regular").UID("regular").Obj()
+	deferredResizePod := st.MakePod().Name("deferred").UID("deferred").Node("node").
+		Condition(v1.PodResizePending, v1.ConditionTrue, v1.PodReasonDeferred).Obj()
+	// Both irrelevant plugins reject every node, so a filter run that doesn't skip them fails.
+	rejectAll := injectedResult{FilterStatus: int(fwk.Unschedulable)}
+	notImplementing := &TestPlugin{name: "not-implementing", inj: rejectAll}
+	optedOut := &relevanceTestPlugin{TestPlugin: &TestPlugin{name: "opted-out", inj: rejectAll}, relevant: false}
+	relevant := &relevanceTestPlugin{TestPlugin: &TestPlugin{name: "relevant"}, relevant: true}
+	allPlugins := []fwk.Plugin{notImplementing, optedOut, relevant}
+	allNames := []string{notImplementing.Name(), optedOut.Name(), relevant.Name()}
+
+	tests := []struct {
+		name              string
+		enableFeatureGate bool
+		pod               *v1.Pod
+		wantPlugins       []string
+	}{
+		{
+			name:        "feature gate disabled, deferred resize pod: all plugins run",
+			pod:         deferredResizePod,
+			wantPlugins: allNames,
+		},
+		{
+			name:              "regular pod: all plugins run",
+			enableFeatureGate: true,
+			pod:               regularPod,
+			wantPlugins:       allNames,
+		},
+		{
+			name:              "deferred resize pod: only relevant plugins run",
+			enableFeatureGate: true,
+			pod:               deferredResizePod,
+			wantPlugins:       []string{relevant.Name()},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingSchedulerPreemption, tt.enableFeatureGate)
+			_, ctx := ktesting.NewTestContext(t)
+
+			f := &frameworkImpl{
+				snapshotSharedLister: cache.NewEmptySnapshot(),
+				pluginsMap:           map[string]fwk.Plugin{},
+				enableInPlacePodVerticalScalingSchedulerPreemption: tt.enableFeatureGate,
+			}
+			for _, pl := range allPlugins {
+				f.pluginsMap[pl.Name()] = pl
+				f.preFilterPlugins = append(f.preFilterPlugins, pl.(fwk.PreFilterPlugin))
+				f.filterPlugins = append(f.filterPlugins, pl.(fwk.FilterPlugin))
+				f.postFilterPlugins = append(f.postFilterPlugins, pl.(fwk.PostFilterPlugin))
+				f.preScorePlugins = append(f.preScorePlugins, pl.(fwk.PreScorePlugin))
+				f.scorePlugins = append(f.scorePlugins, pl.(fwk.ScorePlugin))
+				f.reservePlugins = append(f.reservePlugins, pl.(fwk.ReservePlugin))
+				f.permitPlugins = append(f.permitPlugins, pl.(fwk.PermitPlugin))
+				f.preBindPlugins = append(f.preBindPlugins, pl.(fwk.PreBindPlugin))
+				f.bindPlugins = append(f.bindPlugins, pl.(fwk.BindPlugin))
+				f.postBindPlugins = append(f.postBindPlugins, pl.(fwk.PostBindPlugin))
+			}
+			f.setResizePlugins()
+
+			for extensionPoint, got := range map[string][]string{
+				"PreFilter":  pluginNames(pluginsForPod(f, tt.pod, f.preFilterPlugins, f.resizePreFilterPlugins)),
+				"Filter":     pluginNames(pluginsForPod(f, tt.pod, f.filterPlugins, f.resizeFilterPlugins)),
+				"PostFilter": pluginNames(pluginsForPod(f, tt.pod, f.postFilterPlugins, f.resizePostFilterPlugins)),
+				"PreScore":   pluginNames(pluginsForPod(f, tt.pod, f.preScorePlugins, f.resizePreScorePlugins)),
+				"Score":      pluginNames(pluginsForPod(f, tt.pod, f.scorePlugins, f.resizeScorePlugins)),
+				"Reserve":    pluginNames(pluginsForPod(f, tt.pod, f.reservePlugins, f.resizeReservePlugins)),
+				"Permit":     pluginNames(pluginsForPod(f, tt.pod, f.permitPlugins, f.resizePermitPlugins)),
+				"PreBind":    pluginNames(pluginsForPod(f, tt.pod, f.preBindPlugins, f.resizePreBindPlugins)),
+				"Bind":       pluginNames(pluginsForPod(f, tt.pod, f.bindPlugins, f.resizeBindPlugins)),
+				"PostBind":   pluginNames(pluginsForPod(f, tt.pod, f.postBindPlugins, f.resizePostBindPlugins)),
+			} {
+				if diff := cmp.Diff(tt.wantPlugins, got); diff != "" {
+					t.Errorf("Unexpected %s plugins (-want,+got):\n%s", extensionPoint, diff)
+				}
+			}
+
+			state := framework.NewCycleState()
+			if _, status, _ := f.RunPreFilterPlugins(ctx, state, tt.pod); !status.IsSuccess() {
+				t.Fatalf("RunPreFilterPlugins failed: %v", status)
+			}
+			if skipped := state.GetSkipFilterPlugins(); len(skipped) != 0 {
+				t.Errorf("Expected SkipFilterPlugins to be empty, got %v", skipped)
+			}
+			nodeInfo := framework.NewNodeInfo()
+			nodeInfo.SetNode(st.MakeNode().Name(nodeName).Obj())
+			status := f.RunFilterPlugins(ctx, state, tt.pod, nodeInfo)
+			if wantRejected := len(tt.wantPlugins) == len(allNames); status.IsRejected() != wantRejected {
+				t.Errorf("RunFilterPlugins status = %v, want rejected = %v", status, wantRejected)
+			}
+		})
+	}
+}
+
+func pluginNames[T fwk.Plugin](plugins []T) []string {
+	var names []string
+	for _, pl := range plugins {
+		names = append(names, pl.Name())
+	}
+	return names
 }

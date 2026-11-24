@@ -78,12 +78,12 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		},
 		"neither": {
 			obj:          mkSelfSAR(clearResourceAttributes()),
-			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec"), "", "").WithOrigin("union").MarkAlpha()},
+			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec"), "", "").WithOrigin("union").MarkBeta()},
 		},
 		"both": {
 			obj: mkSelfSAR(setNonResourceAttributes()),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec"), "", "").WithOrigin("union").MarkAlpha(),
+				field.Invalid(field.NewPath("spec"), "", "").WithOrigin("union").MarkBeta(),
 			},
 		},
 		"spec.authorizationOptions forbidden when feature gate disabled": {

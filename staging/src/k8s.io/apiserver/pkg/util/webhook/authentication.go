@@ -173,6 +173,8 @@ func (c *defaultAuthenticationInfoResolver) clientConfig(target string) (*rest.C
 		}
 	}
 
+	ipv6 := strings.Contains(target, "]")
+
 	// If target included the default https port (443), search again without the port
 	if target, port, err := net.SplitHostPort(target); err == nil && port == "443" {
 		// exact match without port
@@ -184,6 +186,9 @@ func (c *defaultAuthenticationInfoResolver) clientConfig(target string) (*rest.C
 		serverSteps := strings.Split(target, ".")
 		for i := 1; i < len(serverSteps); i++ {
 			nickName := "*." + strings.Join(serverSteps[i:], ".")
+			if ipv6 {
+				nickName += "]"
+			}
 			if authConfig, ok := c.kubeconfig.AuthInfos[nickName]; ok {
 				return restConfigFromKubeconfig(authConfig)
 			}

@@ -95,7 +95,8 @@ func IsBackoffError(err error) bool {
 	_, isBackoffErr := errors.AsType[*BackoffError](err)
 	return isBackoffErr ||
 		errors.Is(err, ErrCrashLoopBackOff) ||
-		errors.Is(err, ErrImagePullBackOff)
+		errors.Is(err, ErrImagePullBackOff) ||
+		errors.Is(err, ErrSecurityProfilePullBackOff)
 }
 
 // TODO(random-liu): We need to better organize runtime errors for introspection.
@@ -105,6 +106,8 @@ var (
 	ErrCrashLoopBackOff = errors.New("CrashLoopBackOff")
 	// ErrImagePullBackOff returned when a container image pull failed and Kubelet is backing off the pull.
 	ErrImagePullBackOff = errors.New("ImagePullBackOff")
+	// ErrSecurityProfilePullBackOff returned when a security profile pull failed and Kubelet is backing off the pull.
+	ErrSecurityProfilePullBackOff = errors.New("SecurityProfilePullBackOff")
 )
 
 var (

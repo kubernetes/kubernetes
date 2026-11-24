@@ -186,7 +186,8 @@ func AddSystemPriorityClasses() genericapiserver.PostStartHookFunc {
 	return func(hookContext genericapiserver.PostStartHookContext) error {
 		// Adding system priority classes is important. If they fail to add, many critical system
 		// components may fail and cluster may break.
-		err := wait.Poll(1*time.Second, 30*time.Second, func() (done bool, err error) {
+		// The first attempt is made immediately so that a healthy start does not wait out the polling interval.
+		err := wait.PollUntilContextTimeout(context.Background(), 1*time.Second, 30*time.Second, true, func(context.Context) (done bool, err error) {
 			schedClientSet, err := schedulingclient.NewForConfig(hookContext.LoopbackClientConfig)
 			if err != nil {
 				utilruntime.HandleError(fmt.Errorf("unable to initialize client: %v", err))

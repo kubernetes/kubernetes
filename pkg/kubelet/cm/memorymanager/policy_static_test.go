@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -179,12 +180,27 @@ type requiredMetrics struct {
 	expPodSharedPoolAssignments int
 }
 
+// scoringStore reports a policy which reads hint scores, leaving the rest of
+// the store it wraps alone. Hint providers skip computing a score when the
+// configured policy selects no NUMA allocation strategy, which is the
+// default, so a test that asserts scores has to ask for one.
+type scoringStore struct {
+	topologymanager.Store
+}
+
+func (s scoringStore) GetPolicy() topologymanager.Policy {
+	return topologymanager.NewBestEffortPolicy(nil, topologymanager.PolicyOptions{
+		NUMAAllocationStrategy: topologymanager.NUMAAllocationStrategyMostAllocated,
+	})
+}
+
 func initTests(t *testing.T, testCase *testStaticPolicy, hint *topologymanager.TopologyHint, initContainersReusableMemory reusableMemory) (Policy, state.State, error) {
 	logger, _ := ktesting.NewTestContext(t)
-	manager := topologymanager.NewFakeManager(logger)
+	var manager topologymanager.Store = topologymanager.NewFakeManager(logger)
 	if hint != nil {
 		manager = topologymanager.NewFakeManagerWithHint(logger, hint)
 	}
+	manager = scoringStore{manager}
 
 	p, err := NewPolicyStatic(logger, testCase.machineInfo, testCase.systemReserved, manager)
 	if err != nil {
@@ -1470,7 +1486,7 @@ func TestStaticPolicyAllocate(t *testing.T) {
 				},
 			},
 			pod:           getPod("pod2", "container2", requirementsGuaranteed),
-			expectedError: fmt.Errorf("[memorymanager] failed to get the default NUMA affinity, no NUMA nodes with enough memory is available"),
+			expectedError: admission.NewOutOfResourceError(v1.ResourceMemory, fmt.Errorf("[memorymanager] failed to get the default NUMA affinity, no NUMA nodes with enough memory is available")),
 			topologyHint:  &topologymanager.TopologyHint{},
 		},
 		{
@@ -1560,7 +1576,7 @@ func TestStaticPolicyAllocate(t *testing.T) {
 				},
 			},
 			pod:           getPod("pod2", "container2", requirementsGuaranteed),
-			expectedError: fmt.Errorf("[memorymanager] failed to find the default preferred hint"),
+			expectedError: admission.NewOutOfResourceError(v1.ResourceMemory, fmt.Errorf("[memorymanager] failed to find the default preferred hint")),
 			topologyHint:  &topologymanager.TopologyHint{Preferred: true},
 		},
 		{
@@ -1639,7 +1655,7 @@ func TestStaticPolicyAllocate(t *testing.T) {
 				},
 			},
 			pod:           getPod("pod1", "container1", requirementsGuaranteed),
-			expectedError: fmt.Errorf("[memorymanager] failed to find NUMA nodes to extend the current topology hint"),
+			expectedError: admission.NewOutOfResourceError(v1.ResourceMemory, fmt.Errorf("[memorymanager] failed to find NUMA nodes to extend the current topology hint")),
 			topologyHint:  &topologymanager.TopologyHint{NUMANodeAffinity: newNUMAAffinity(0), Preferred: false},
 		},
 		{
@@ -1729,7 +1745,7 @@ func TestStaticPolicyAllocate(t *testing.T) {
 				},
 			},
 			pod:           getPod("pod2", "container2", requirementsGuaranteed),
-			expectedError: fmt.Errorf("[memorymanager] failed to find the extended preferred hint"),
+			expectedError: admission.NewOutOfResourceError(v1.ResourceMemory, fmt.Errorf("[memorymanager] failed to find the extended preferred hint")),
 			topologyHint:  &topologymanager.TopologyHint{NUMANodeAffinity: newNUMAAffinity(1), Preferred: true},
 		},
 		{
@@ -2050,7 +2066,7 @@ func TestStaticPolicyAllocate(t *testing.T) {
 			},
 			pod:           getPod("pod2", "container1", requirementsGuaranteed),
 			topologyHint:  &topologymanager.TopologyHint{NUMANodeAffinity: newNUMAAffinity(0, 1), Preferred: true},
-			expectedError: fmt.Errorf("[memorymanager] preferred hint violates NUMA node allocation"),
+			expectedError: admission.NewOutOfResourceError(v1.ResourceMemory, fmt.Errorf("[memorymanager] preferred hint violates NUMA node allocation")),
 		},
 		{
 			description:         "should do nothing for guaranteed pod with pod level resources",
@@ -2113,6 +2129,9 @@ func TestStaticPolicyAllocate(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
+			if !testCase.podLevelResourcesEnabled {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.37"))
+			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, testCase.podLevelResourcesEnabled)
 			if testCase.podLevelResourcesEnabled && !testCase.podLevelResourceManagersEnabled {
 				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourceManagers, false)
@@ -4018,6 +4037,9 @@ func TestStaticPolicyGetTopologyHints(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
+			if !testCase.podLevelResourcesEnabled {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.37"))
+			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, testCase.podLevelResourcesEnabled)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourceManagers, testCase.podLevelResourceManagersEnabled)
 
@@ -4435,6 +4457,9 @@ func TestStaticPolicyGetPodTopologyHints(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
+			if !testCase.podLevelResourcesEnabled {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.37"))
+			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, testCase.podLevelResourcesEnabled)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourceManagers, testCase.podLevelResourceManagersEnabled)
 
@@ -4664,7 +4689,8 @@ func TestCalculateHintsScore(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
-			p := &staticPolicy{}
+			logger, _ := ktesting.NewTestContext(t)
+			p := &staticPolicy{affinity: scoringStore{topologymanager.NewFakeManager(logger)}}
 			hints := p.calculateHints(tc.machineState, pod, tc.requestedResources)
 
 			for resourceName, expectedMasks := range tc.expectedScores {
@@ -6078,6 +6104,9 @@ func TestStaticPolicyAllocatePod(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
+			if !testCase.podLevelResourcesEnabled {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.37"))
+			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, testCase.podLevelResourcesEnabled)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourceManagers, testCase.podLevelResourceManagersEnabled)
 
@@ -6154,8 +6183,8 @@ func TestStaticPolicyLifecycleAllocate(t *testing.T) {
 			skipped:     false,
 		},
 		{
-			description: "MemoryManager static policy skips ResizeOperation",
-			operation:   lifecycle.ResizeOperation,
+			description: "MemoryManager static policy skips UpdateOperation",
+			operation:   lifecycle.UpdateOperation,
 			skipped:     true,
 		},
 		{
@@ -6233,8 +6262,8 @@ func TestStaticPolicyLifecycleAllocatePod(t *testing.T) {
 			skipped:     false,
 		},
 		{
-			description: "MemoryManager static policy skips ResizeOperation",
-			operation:   lifecycle.ResizeOperation,
+			description: "MemoryManager static policy skips UpdateOperation",
+			operation:   lifecycle.UpdateOperation,
 			skipped:     true,
 		},
 		{
@@ -6312,8 +6341,8 @@ func TestStaticPolicyLifecycleGetTopologyHints(t *testing.T) {
 			skipped:     false,
 		},
 		{
-			description: "MemoryManager static policy skips ResizeOperation",
-			operation:   lifecycle.ResizeOperation,
+			description: "MemoryManager static policy skips UpdateOperation",
+			operation:   lifecycle.UpdateOperation,
 			skipped:     true,
 		},
 		{
@@ -6394,8 +6423,8 @@ func TestStaticPolicyLifecycleGetPodTopologyHints(t *testing.T) {
 			skipped:     false,
 		},
 		{
-			description: "MemoryManager static policy skips ResizeOperation",
-			operation:   lifecycle.ResizeOperation,
+			description: "MemoryManager static policy skips UpdateOperation",
+			operation:   lifecycle.UpdateOperation,
 			skipped:     true,
 		},
 		{
@@ -6462,4 +6491,43 @@ func TestStaticPolicyLifecycleGetPodTopologyHints(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestStaticPolicyAdmissionRejectionType(t *testing.T) {
+	ctx := ktesting.Init(t)
+	logger := ctx.Logger()
+	systemReserved := systemReservedMemory{
+		0: map[v1.ResourceName]uint64{
+			v1.ResourceMemory: 512 * mb,
+		},
+	}
+	policy, err := NewPolicyStatic(logger, nil, systemReserved, topologymanager.NewFakeManagerWithHint(logger, &topologymanager.TopologyHint{}))
+	require.NoError(t, err)
+
+	st := state.NewMemoryState(logger)
+	st.SetMachineState(state.NUMANodeMap{
+		0: &state.NUMANodeState{
+			MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+				v1.ResourceMemory: {
+					Allocatable:    gb,
+					Free:           256 * mb,
+					Reserved:       768 * mb,
+					SystemReserved: 512 * mb,
+					TotalMemSize:   1536 * mb,
+				},
+				hugepages1Gi: {
+					Allocatable:  gb,
+					Free:         gb,
+					TotalMemSize: gb,
+				},
+			},
+			Cells: []int{0},
+		},
+	})
+
+	pod := getPod("pod1", "container1", requirementsGuaranteed)
+	res := admission.GetPodAdmitResult(policy.Allocate(ctx, st, pod, &pod.Spec.Containers[0], lifecycle.AddOperation))
+	require.False(t, res.Admit)
+	require.Equal(t, lifecycle.OutOfMemory, res.Reason)
+	require.Equal(t, lifecycle.RejectionBlocked, res.RejectionType)
 }

@@ -226,9 +226,14 @@ func (v *ObjectVal) IsZeroValue() bool {
 // It will return an error if the request type is a map but the key
 // is not a string.
 func convertField(value ref.Val) (any, error) {
+	// ObjectVal handles its own fast path and returns map[string]any directly via ConvertToNative
+	if objVal, isObj := value.(*ObjectVal); isObj {
+		return objVal.ConvertToNative(reflect.TypeFor[map[string]any]())
+	}
+	rawVal := value.Value()
 	// special handling for lists, where the elements are converted with Value() instead of ConvertToNative
 	// to allow them to become native value of any type.
-	if listOfVal, ok := value.Value().([]ref.Val); ok {
+	if listOfVal, ok := rawVal.([]ref.Val); ok {
 		var result []any
 		for _, v := range listOfVal {
 			result = append(result, v.Value())
@@ -237,7 +242,7 @@ func convertField(value ref.Val) (any, error) {
 	}
 	// unstructured maps, as seen in annotations
 	// map keys must be strings
-	if mapOfVal, ok := value.Value().(map[ref.Val]ref.Val); ok {
+	if mapOfVal, ok := rawVal.(map[ref.Val]ref.Val); ok {
 		result := make(map[string]any, len(mapOfVal))
 		for k, v := range mapOfVal {
 			stringKey, ok := k.Value().(string)
@@ -262,15 +267,6 @@ func convertField(value ref.Val) (any, error) {
 		return result, nil
 	}
 	if mapper, ok := value.(traits.Mapper); ok {
-		// ObjectVal handles its own fast path and returns map[string]any directly via ConvertToNative
-		if objVal, isObj := value.(*ObjectVal); isObj {
-			native, err := objVal.ConvertToNative(reflect.TypeFor[map[string]any]())
-			if err != nil {
-				return nil, err
-			}
-			return native, nil
-		}
-
 		result := make(map[string]any)
 		it := mapper.Iterator()
 		for it.HasNext() == types.True {
@@ -288,5 +284,5 @@ func convertField(value ref.Val) (any, error) {
 		}
 		return result, nil
 	}
-	return value.Value(), nil
+	return rawVal, nil
 }

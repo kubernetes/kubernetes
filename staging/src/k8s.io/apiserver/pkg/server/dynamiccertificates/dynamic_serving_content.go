@@ -18,7 +18,9 @@ package dynamiccertificates
 
 import (
 	"context"
+	"crypto"
 	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"os"
 	"sync/atomic"
@@ -96,14 +98,16 @@ func (c *DynamicCertKeyPairContent) loadCertKeyPair() error {
 	}
 
 	// Ensure that the key matches the cert and both are valid
-	_, err = tls.X509KeyPair(cert, key)
+	certKeyPair, err := tls.X509KeyPair(cert, key)
 	if err != nil {
 		return err
 	}
 
 	newCertKey := &certKeyContent{
-		cert: cert,
-		key:  key,
+		cert:    cert,
+		key:     key,
+		certObj: certKeyPair.Leaf,
+		keyObj:  certKeyPair.PrivateKey,
 	}
 
 	// check to see if we have a change. If the values are the same, do nothing.
@@ -233,4 +237,9 @@ func (c *DynamicCertKeyPairContent) Name() string {
 func (c *DynamicCertKeyPairContent) CurrentCertKeyContent() ([]byte, []byte) {
 	certKeyContent := c.certKeyPair.Load().(*certKeyContent)
 	return certKeyContent.cert, certKeyContent.key
+}
+
+func (c *DynamicCertKeyPairContent) CurrentCertKeyDeserialized() (*x509.Certificate, crypto.PrivateKey) {
+	certKeyContent := c.certKeyPair.Load().(*certKeyContent)
+	return certKeyContent.certObj, certKeyContent.keyObj
 }

@@ -263,7 +263,7 @@ func (m *UsernsManager) record(logger klog.Logger, pod types.UID, from, length u
 		// A mapping only lands outside the range if it was allocated under a
 		// different one. Its pod may still be running on those IDs, which is
 		// why the range may only change on a drained node.
-		// uint64 because the default range ends at 2^32.
+		// Widen before adding length to an ID from a persisted mapping.
 		first := uint64(m.off) * uint64(m.userNsLength)
 		end := uint64(m.off+m.len) * uint64(m.userNsLength)
 		return fmt.Errorf("user namespace IDs [%d, %d) are out of range [%d, %d) available to the kubelet: the range was changed while pods with user namespaces were on the node; drain the node before changing it",

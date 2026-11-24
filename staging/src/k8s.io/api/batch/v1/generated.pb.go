@@ -988,6 +988,13 @@ func (m *PodFailurePolicyRule) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if m.Name != nil {
+		i -= len(*m.Name)
+		copy(dAtA[i:], *m.Name)
+		i = encodeVarintGenerated(dAtA, i, uint64(len(*m.Name)))
+		i--
+		dAtA[i] = 0x22
+	}
 	if len(m.OnPodConditions) > 0 {
 		for iNdEx := len(m.OnPodConditions) - 1; iNdEx >= 0; iNdEx-- {
 			{
@@ -1499,6 +1506,10 @@ func (m *PodFailurePolicyRule) Size() (n int) {
 			n += 1 + l + sovGenerated(uint64(l))
 		}
 	}
+	if m.Name != nil {
+		l = len(*m.Name)
+		n += 1 + l + sovGenerated(uint64(l))
+	}
 	return n
 }
 
@@ -1796,6 +1807,7 @@ func (this *PodFailurePolicyRule) String() string {
 		`Action:` + fmt.Sprintf("%v", this.Action) + `,`,
 		`OnExitCodes:` + strings.Replace(this.OnExitCodes.String(), "PodFailurePolicyOnExitCodesRequirement", "PodFailurePolicyOnExitCodesRequirement", 1) + `,`,
 		`OnPodConditions:` + repeatedStringForOnPodConditions + `,`,
+		`Name:` + valueToStringGenerated(this.Name) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -4727,6 +4739,39 @@ func (m *PodFailurePolicyRule) Unmarshal(dAtA []byte) error {
 			if err := m.OnPodConditions[len(m.OnPodConditions)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
+			iNdEx = postIndex
+		case 4:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Name", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			s := string(dAtA[iNdEx:postIndex])
+			m.Name = &s
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex

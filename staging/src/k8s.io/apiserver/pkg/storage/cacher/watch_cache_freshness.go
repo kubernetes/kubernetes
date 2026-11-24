@@ -17,11 +17,14 @@ limitations under the License.
 package cacher
 
 import (
+	"container/heap"
 	"context"
 	"sync"
 	"time"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/cacher/metrics"
 	"k8s.io/apiserver/pkg/storage/cacher/progress"
@@ -40,30 +43,45 @@ const (
 	resourceVersionTooHighRetrySeconds = 1
 )
 
-func newFreshnessWaiter(rLocker sync.Locker, resourceVersion *uint64, c clock.Clock, groupResource schema.GroupResource, pr *progress.ConditionalProgressRequester) *freshnessWaiter {
-	return &freshnessWaiter{
-		cond:              sync.NewCond(rLocker),
-		resourceVersion:   resourceVersion,
+func newFreshnessWaiter(c clock.Clock, groupResource schema.GroupResource, pr *progress.ConditionalProgressRequester) *freshnessWaiter {
+	w := &freshnessWaiter{
 		clock:             c,
 		groupResource:     groupResource,
 		progressRequester: pr,
 	}
+	w.cond = sync.NewCond(&w.lock)
+	return w
 }
 
 type freshnessWaiter struct {
-	cond              *sync.Cond
-	resourceVersion   *uint64
 	clock             clock.Clock
 	groupResource     schema.GroupResource
 	progressRequester *progress.ConditionalProgressRequester
+
+	lock       sync.Mutex
+	cond       *sync.Cond
+	latestRV   uint64
+	waiterHeap rvWaiterHeap
+	stopped    bool
 }
 
-func (w *freshnessWaiter) broadcast() {
-	w.cond.Broadcast()
+type rvWaiter struct {
+	targetRV    uint64
+	satisfiedCh chan struct{}
+	heapIndex   int
 }
 
-func (w *freshnessWaiter) waitUntilFreshLocked(ctx context.Context, resourceVersion uint64) error {
-	if resourceVersion == 0 || resourceVersion <= *w.resourceVersion {
+func (w *freshnessWaiter) broadcast(resourceVersion uint64) {
+	w.lock.Lock()
+	defer w.lock.Unlock()
+	w.latestRV = resourceVersion
+	if w.waiterReadyLocked() {
+		w.cond.Signal()
+	}
+}
+
+func (w *freshnessWaiter) waitUntilFreshLockedWithLocker(ctx context.Context, resourceVersion uint64, locker sync.Locker) error {
+	if resourceVersion == 0 || resourceVersion <= w.latestRV {
 		return nil
 	}
 	w.progressRequester.Add()
@@ -75,33 +93,97 @@ func (w *freshnessWaiter) waitUntilFreshLocked(ctx context.Context, resourceVers
 		}
 	}()
 
-	// In case resourceVersion is 0, we accept arbitrarily stale result.
-	// As a result, the condition in the below for loop will never be
-	// satisfied (w.resourceVersion is never negative), this call will
-	// never hit the w.cond.Wait().
-	// As a result - we can optimize the code by not firing the wakeup
-	// function (and avoid starting a gorotuine), especially given that
-	// resourceVersion=0 is the most common case.
-	if resourceVersion > 0 {
-		go func() {
-			// Wake us up when the time limit has expired.  The docs
-			// promise that time.After (well, NewTimer, which it calls)
-			// will wait *at least* the duration given. Since this go
-			// routine starts sometime after we record the start time, and
-			// it will wake up the loop below sometime after the broadcast,
-			// we don't need to worry about waking it up before the time
-			// has expired accidentally.
-			<-w.clock.After(blockTimeout)
-			w.cond.Broadcast()
-		}()
-	}
+	timer := w.clock.NewTimer(blockTimeout)
+	defer timer.Stop()
 
-	for *w.resourceVersion < resourceVersion {
-		if w.clock.Since(startTime) >= blockTimeout {
-			// Request that the client retry after 'resourceVersionTooHighRetrySeconds' seconds.
-			return storage.NewTooLargeResourceVersionError(resourceVersion, *w.resourceVersion, resourceVersionTooHighRetrySeconds)
+	waiter := w.registerWaiter(resourceVersion)
+	locker.Unlock()
+	select {
+	case <-waiter.satisfiedCh:
+		locker.Lock()
+		return nil
+	case <-timer.C():
+		w.unregisterWaiter(waiter)
+		locker.Lock()
+		if w.latestRV >= resourceVersion {
+			return nil
+		}
+		return storage.NewTooLargeResourceVersionError(resourceVersion, w.latestRV, resourceVersionTooHighRetrySeconds)
+	}
+}
+
+func (w *freshnessWaiter) registerWaiter(targetRV uint64) *rvWaiter {
+	waiter := &rvWaiter{
+		targetRV:    targetRV,
+		satisfiedCh: make(chan struct{}),
+	}
+	w.lock.Lock()
+	defer w.lock.Unlock()
+	heap.Push(&w.waiterHeap, waiter)
+	if w.waiterHeap[0].targetRV <= w.latestRV {
+		w.cond.Signal()
+	}
+	return waiter
+}
+
+func (w *freshnessWaiter) unregisterWaiter(waiter *rvWaiter) {
+	w.lock.Lock()
+	defer w.lock.Unlock()
+	if waiter.heapIndex >= 0 {
+		heap.Remove(&w.waiterHeap, waiter.heapIndex)
+	}
+}
+
+func (w *freshnessWaiter) Run(stopCh <-chan struct{}) {
+	ctx := wait.ContextForChannel(stopCh)
+	go func() {
+		defer utilruntime.HandleCrashWithContext(ctx)
+		<-stopCh
+		w.lock.Lock()
+		defer w.lock.Unlock()
+		w.stopped = true
+		w.cond.Signal()
+	}()
+
+	w.lock.Lock()
+	defer w.lock.Unlock()
+	for !w.stopped {
+		for w.waiterReadyLocked() {
+			waiter := heap.Pop(&w.waiterHeap).(*rvWaiter)
+			close(waiter.satisfiedCh)
 		}
 		w.cond.Wait()
 	}
-	return nil
+}
+
+func (w *freshnessWaiter) waiterReadyLocked() bool {
+	return len(w.waiterHeap) > 0 && w.waiterHeap[0].targetRV <= w.latestRV
+}
+
+type rvWaiterHeap []*rvWaiter
+
+func (h rvWaiterHeap) Len() int { return len(h) }
+
+func (h rvWaiterHeap) Less(i, j int) bool { return h[i].targetRV < h[j].targetRV }
+
+func (h rvWaiterHeap) Swap(i, j int) {
+	h[i], h[j] = h[j], h[i]
+	h[i].heapIndex = i
+	h[j].heapIndex = j
+}
+
+func (h *rvWaiterHeap) Push(x any) {
+	waiter := x.(*rvWaiter)
+	waiter.heapIndex = len(*h)
+	*h = append(*h, waiter)
+}
+
+func (h *rvWaiterHeap) Pop() any {
+	old := *h
+	n := len(old)
+	waiter := old[n-1]
+	old[n-1] = nil
+	waiter.heapIndex = -1
+	*h = old[:n-1]
+	return waiter
 }

@@ -222,7 +222,7 @@ linters:
       ## For ResourceList fields in the core API.
       - text: "field (PersistentVolumeSpec.Capacity|ContainerStatus.AllocatedResources|PodSpec.Overhead|ResourceQuotaSpec.Hard) type ResourceList should not use a map type, use a list type with a unique name/identifier instead"
         path: "staging/src/k8s.io/api/core/v1/types.go"
-      - text: "field (ResourceRequirements|VolumeResourceRequirements).(Limits|Requests) type ResourceList should not use a map type, use a list type with a unique name/identifier instead"
+      - text: "field (ResourceRequirements|VolumeResourceRequirements|ExtraNodeAllocatableResource).(Limits|Requests) type ResourceList should not use a map type, use a list type with a unique name/identifier instead"
         path: "staging/src/k8s.io/api/core/v1/types.go"
       - text: "field LimitRangeItem.(Max|Min|Default|DefaultRequest|MaxLimitRequestRatio) type ResourceList should not use a map type, use a list type with a unique name/identifier instead"
         path: "staging/src/k8s.io/api/core/v1/types.go"
@@ -256,7 +256,7 @@ linters:
       # OptionalOrRequired is being enabled over time. For now, each API group should be added to this list until we comb through each group and fix the missing tags.
       # The nonpointerstructs linter is included here as well as these two should be enabled hand-in-hand on each API group.
       - text: "must be marked as optional or required|is a non-pointer struct with no required fields."
-        path: "staging/src/k8s.io/api/(admissionregistration|certificates|core|extensions)"
+        path: "staging/src/k8s.io/api/(admissionregistration|core|extensions)"
       
       # nonpointerstructs/optionalorrequired - IngressBackend and ServiceBackendPort are "oneOf"-shaped
       # structs (validation requires exactly one of Resource/Service, or Name/Number, to be set) but
@@ -335,6 +335,23 @@ linters:
         path: "staging/src/k8s.io/api/autoscaling/v2/types.go"
       - text: "nonpointerstructs: field ExternalMetricStatus.Metric is a non-pointer struct with required fields. It must be marked as required."
         path: "staging/src/k8s.io/api/autoscaling/v2/types.go"
+      
+      # forbiddenmarkers: approved uses of +k8s:customValidation, where no declarative tag fits.
+      # EvictionResponder.Name rejects the reserved *.k8s.io and *.kubernetes.io domains.
+      - text: 'forbiddenmarkers: field EvictionResponder.Name has forbidden marker "k8s:customValidation"'
+        path: "staging/src/k8s.io/api/core/v1/types.go"
+      # EvictionResponder.Priority reserves priorities 0-999 for *.k8s.io responders.
+      - text: 'forbiddenmarkers: field EvictionResponder.Priority has forbidden marker "k8s:customValidation"'
+        path: "staging/src/k8s.io/api/core/v1/types.go"
+      # SecurityProfileOCI.Ref must be a canonical, digest-pinned OCI reference without a tag.
+      - text: 'forbiddenmarkers: field SecurityProfileOCI.Ref has forbidden marker "k8s:customValidation"'
+        path: "staging/src/k8s.io/api/core/v1/types.go"
+      # SecurityProfileOCIBase.LocalhostProfile must be a relative path without ".." elements.
+      - text: 'forbiddenmarkers: field SecurityProfileOCIBase.LocalhostProfile has forbidden marker "k8s:customValidation"'
+        path: "staging/src/k8s.io/api/core/v1/types.go"
+      # EvictionRequestSpec.Requester has the same reserved-domain rule as EvictionResponder.Name.
+      - text: 'forbiddenmarkers: field EvictionRequestSpec.Requester has forbidden marker "k8s:customValidation"'
+        path: "staging/src/k8s.io/api/lifecycle/v1alpha1/types.go"
 
       - linters:
         - forbidigo
@@ -467,6 +484,7 @@ linters:
               - "conditions" # Ensure conditions have the correct json tags and markers.
               - "conflictingmarkers" # Detect mutually exclusive markers on the same field.
               - "defaultorrequired" # Prevent the usage of default tags with required fields.
+              - "forbiddenmarkers" # Prevent the usage of the markers listed in lintersConfig.
               - "integers" # Ensure only int32 and int64 are used for integers.
               - "jsontags" # Ensure every field has a json tag.
               # - "maxlength" # Ensure all strings and arrays have maximum lengths/maximum items. ONLY for CRDs until declarative markers exist in core types.
@@ -504,6 +522,10 @@ linters:
                   type: "All"
                   dependsOn:
                     - "k8s:optional"
+            forbiddenmarkers:
+              markers:
+                # Validation should use declarative tags; approved exceptions are in exceptions.yaml.
+                - identifier: "k8s:customValidation"
             # jsonTags:
             #   jsonTagRegex: "^[a-z][a-z0-9]*(?:[A-Z][a-z0-9]*)*$" # The default regex is appropriate for our use case.
             # nomaps:

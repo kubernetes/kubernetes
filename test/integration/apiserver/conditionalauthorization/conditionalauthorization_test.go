@@ -22,10 +22,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"iter"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path"
 	"path/filepath"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -108,6 +111,10 @@ type conditionalAuthzTestCase struct {
 	// expectAllowedWhenDisabled overrides expectAllowed when the feature is disabled.
 	// If nil, uses expectAllowed.
 	expectAllowedWhenDisabled *bool
+	// webhookEvaluations is the number of AuthorizationConditionsReviews the webhook must receive for
+	// the user of a variant whose conditions cannot be evaluated in-process, when conditional
+	// authorization is active. In all other cases, the webhook must receive none.
+	webhookEvaluations int
 }
 
 func runConditionalAuthorizationTests(t *testing.T, featureEnabled, conditionsEnforcerEnabled bool) {
@@ -299,7 +306,8 @@ authorizers:
 				}, metav1.CreateOptions{})
 				return err
 			},
-			expectAllowed: true,
+			expectAllowed:      true,
+			webhookEvaluations: 1,
 			// When disabled, the conditional decision is treated as NoOpinion,
 			// falling through to RBAC which denies (no RBAC rules for this user).
 			expectAllowedWhenDisabled: new(false),
@@ -334,7 +342,8 @@ authorizers:
 				}, metav1.CreateOptions{})
 				return err
 			},
-			expectAllowed: false,
+			expectAllowed:      false,
+			webhookEvaluations: 1,
 		},
 		{
 			name: "conditional no-opinion falls through to RBAC allow",
@@ -367,12 +376,14 @@ authorizers:
 			},
 			// The conditional response is NoOpinion, so both when enabled and disabled does this fall through to RBAC which allows.
 			expectAllowed: true,
+			// A ConditionsMap with only NoOpinion conditions folds to NoOpinion when constructed, so there is nothing to evaluate.
+			webhookEvaluations: 0,
 		},
 
 		// CEL-based conditional authorization tests.
 		// These test that CEL expressions flow through the SAR -> Decision -> conditions
 		// evaluation pipeline. The assertions are the same whether conditions are evaluated
-		// in-tree (k8s.io/authorization-cel) or out-of-tree (opaque type via webhook).
+		// in-tree (authorizer.kubernetes.io/cel) or out-of-tree (opaque type via webhook).
 		{
 			name: "cel allow by name pattern",
 			user: "cel-name-user",
@@ -397,6 +408,7 @@ authorizers:
 			},
 			expectAllowed:             true,
 			expectAllowedWhenDisabled: new(false),
+			webhookEvaluations:        1,
 		},
 		{
 			name: "cel deny by name pattern mismatch",
@@ -420,7 +432,8 @@ authorizers:
 				}, metav1.CreateOptions{})
 				return err
 			},
-			expectAllowed: false,
+			expectAllowed:      false,
+			webhookEvaluations: 1,
 		},
 		{
 			name: "cel deny by label overrides allow",
@@ -457,7 +470,8 @@ authorizers:
 				}, metav1.CreateOptions{})
 				return err
 			},
-			expectAllowed: false,
+			expectAllowed:      false,
+			webhookEvaluations: 1,
 		},
 		{
 			name: "cel allow by data content",
@@ -486,6 +500,7 @@ authorizers:
 			},
 			expectAllowed:             true,
 			expectAllowedWhenDisabled: new(false),
+			webhookEvaluations:        1,
 		},
 		{
 			name: "cel deny by data content missing",
@@ -512,7 +527,8 @@ authorizers:
 				}, metav1.CreateOptions{})
 				return err
 			},
-			expectAllowed: false,
+			expectAllowed:      false,
+			webhookEvaluations: 1,
 		},
 		{
 			name: "cel operation-aware deny update",
@@ -554,6 +570,7 @@ authorizers:
 			},
 			expectAllowed:             false,
 			expectAllowedWhenDisabled: new(false),
+			webhookEvaluations:        2,
 		},
 		{
 			name: "cel deny overrides allow and noopinion",
@@ -592,7 +609,8 @@ authorizers:
 				}, metav1.CreateOptions{})
 				return err
 			},
-			expectAllowed: false,
+			expectAllowed:      false,
+			webhookEvaluations: 1,
 		},
 		{
 			name: "cel noopinion overrides allow",
@@ -629,7 +647,8 @@ authorizers:
 				}, metav1.CreateOptions{})
 				return err
 			},
-			expectAllowed: false,
+			expectAllowed:      false,
+			webhookEvaluations: 1,
 		},
 
 		// TODO(luxas): Reactivate this when we add support for update/patch -> create conditions.
@@ -811,135 +830,96 @@ authorizers:
 				expectAllowed: false,
 			},
 		*/
-		// TODO(luxas): Reactivate this when we support in-tree evaluation.
-		/*
-			// Tests for the builtin authorizer function in k8s authorization CEL.
-			// The "compound authorization" pattern: creating an object with the "protected-label"
-			// label requires the additional permission "verb=use apigroup=example.com
-			// resource=protectedlabels name=protected-label", which is checked via the
-			// authorizer CEL function.
-			{
-				name: "cel authorizer compound authorization - allow",
-				user: "compound-authz-allow-user",
-				webhookBehaviors: map[string]func(ws *webhookServerHandler){
-					"in-process-eval-only": func(ws *webhookServerHandler) {
-						ws.sarHandler = compoundAuthzSARHandler("configmaps")
-						ws.acrHandler = acrEvaluateCEL(ws.t, "nonexistent-panic-on-ACR-webhook")
-					},
-				},
-				makeRequest: func(t *testing.T, client *clientset.Clientset, suffix string) error {
-					_, err := client.CoreV1().ConfigMaps("test-ns").Create(context.TODO(), &corev1.ConfigMap{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:   "protected-cm-allow" + suffix,
-							Labels: map[string]string{"protected-label": "yes"},
-						},
-					}, metav1.CreateOptions{})
-					return err
-				},
-				expectAllowed:             true,
-				expectAllowedWhenDisabled: new(false),
+		// Tests for the builtin authorizer function in k8s authorization CEL.
+		// The "compound authorization" pattern: creating an object with the "protected-label"
+		// label requires the additional permission "verb=use apigroup=example.com
+		// resource=protectedlabels name=protected-label", which is checked via the
+		// authorizer CEL function. Only compound-authz-allow-user is granted that permission.
+		{
+			name: "cel authorizer compound authorization - allow",
+			user: "compound-authz-allow-user",
+			authorizers: map[string]authorizer.Authorizer{
+				"in-process-eval-only": inProcessOnlyAuthorizer{configmapsConditionalAllow(compoundAuthzCondition)},
 			},
-			{
-				name: "cel authorizer compound authorization - deny",
-				user: "compound-authz-deny-user",
-				webhookBehaviors: map[string]func(ws *webhookServerHandler){
-					"in-process-eval-only": func(ws *webhookServerHandler) {
-						ws.sarHandler = compoundAuthzSARHandler("configmaps")
-						ws.acrHandler = acrEvaluateCEL(ws.t, "nonexistent-panic-on-ACR-webhook")
+			makeRequest: func(t *testing.T, client *clientset.Clientset, suffix string) error {
+				_, err := client.CoreV1().ConfigMaps("test-ns").Create(context.TODO(), &corev1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:   "protected-cm-allow" + suffix,
+						Labels: map[string]string{"protected-label": "yes"},
 					},
-				},
-				makeRequest: func(t *testing.T, client *clientset.Clientset, suffix string) error {
-					_, err := client.CoreV1().ConfigMaps("test-ns").Create(context.TODO(), &corev1.ConfigMap{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:   "protected-cm-deny" + suffix,
-							Labels: map[string]string{"protected-label": "yes"},
-						},
-					}, metav1.CreateOptions{})
-					return err
-				},
-				expectAllowed: false,
+				}, metav1.CreateOptions{})
+				return err
 			},
+			expectAllowed:             true,
+			expectAllowedWhenDisabled: new(false),
+		},
+		{
+			name: "cel authorizer compound authorization - deny",
+			user: "compound-authz-deny-user",
+			authorizers: map[string]authorizer.Authorizer{
+				"in-process-eval-only": inProcessOnlyAuthorizer{configmapsConditionalAllow(compoundAuthzCondition)},
+			},
+			makeRequest: func(t *testing.T, client *clientset.Clientset, suffix string) error {
+				_, err := client.CoreV1().ConfigMaps("test-ns").Create(context.TODO(), &corev1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:   "protected-cm-deny" + suffix,
+						Labels: map[string]string{"protected-label": "yes"},
+					},
+				}, metav1.CreateOptions{})
+				return err
+			},
+			expectAllowed: false,
+		},
 
-			// Tests for the namespaceObject variable in k8s authorization CEL.
-			// The "test-ns" namespace is created with labels {env: production, team: platform}.
-			{
-				name: "cel namespaceObject - positive match",
-				user: "ns-label-match-user",
-				webhookBehaviors: map[string]func(ws *webhookServerHandler){
-					"in-process-eval-only": func(ws *webhookServerHandler) {
-						ws.sarHandler = func(sar *authorizationv1.SubjectAccessReview) {
-							if sar.Spec.ResourceAttributes == nil || sar.Spec.ResourceAttributes.Resource != "configmaps" {
-								return
-							}
-							sar.Status.ConditionalDecision = &authorizationv1.ConditionsAwareDecision{
-								Type: authorizationv1.ConditionsAwareDecisionTypeConditionsMap,
-								ConditionsMap: &authorizationv1.ConditionsMap{
-									AllowConditions: []authorizationv1.Condition{
-										{
-											ID: "example.com/require-production-namespace",
-											Condition: `namespaceObject != null && ` +
-												`has(namespaceObject.metadata) && ` +
-												`has(namespaceObject.metadata.labels) && ` +
-												`'env' in namespaceObject.metadata.labels && ` +
-												`namespaceObject.metadata.labels['env'] == 'production'`,
-											Type:        "k8s.io/authorization-cel",
-											Description: "only allow in production namespaces",
-										},
-									},
-								},
-							}
-						}
-						ws.acrHandler = acrEvaluateCEL(ws.t, "nonexistent-panic-on-ACR-webhook")
-					},
-				},
-				makeRequest: func(t *testing.T, client *clientset.Clientset, suffix string) error {
-					_, err := client.CoreV1().ConfigMaps("test-ns").Create(context.TODO(), &corev1.ConfigMap{
-						ObjectMeta: metav1.ObjectMeta{Name: "ns-match-cm" + suffix},
-					}, metav1.CreateOptions{})
-					return err
-				},
-				expectAllowed:             true,
-				expectAllowedWhenDisabled: new(false),
+		// Tests for the namespaceObject variable in k8s authorization CEL.
+		// The "test-ns" namespace is created with labels {env: production, team: platform}.
+		{
+			name: "cel namespaceObject - positive match",
+			user: "ns-label-match-user",
+			authorizers: map[string]authorizer.Authorizer{
+				"in-process-eval-only": inProcessOnlyAuthorizer{configmapsConditionalAllow(authorizer.GenericCondition{
+					ID: "example.com/require-production-namespace",
+					Condition: `namespaceObject != null && ` +
+						`has(namespaceObject.metadata) && ` +
+						`has(namespaceObject.metadata.labels) && ` +
+						`'env' in namespaceObject.metadata.labels && ` +
+						`namespaceObject.metadata.labels['env'] == 'production'`,
+					Type:        builtinCELConditionType,
+					Description: "only allow in production namespaces",
+				})},
 			},
-			{
-				name: "cel namespaceObject - negative match",
-				user: "ns-label-nomatch-user",
-				webhookBehaviors: map[string]func(ws *webhookServerHandler){
-					"in-process-eval-only": func(ws *webhookServerHandler) {
-						ws.sarHandler = func(sar *authorizationv1.SubjectAccessReview) {
-							if sar.Spec.ResourceAttributes == nil || sar.Spec.ResourceAttributes.Resource != "configmaps" {
-								return
-							}
-							sar.Status.ConditionalDecision = &authorizationv1.ConditionsAwareDecision{
-								Type: authorizationv1.ConditionsAwareDecisionTypeConditionsMap,
-								ConditionsMap: &authorizationv1.ConditionsMap{
-									AllowConditions: []authorizationv1.Condition{
-										{
-											ID: "example.com/require-staging-namespace",
-											Condition: `namespaceObject != null && ` +
-												`has(namespaceObject.metadata) && ` +
-												`has(namespaceObject.metadata.labels) && ` +
-												`'env' in namespaceObject.metadata.labels && ` +
-												`namespaceObject.metadata.labels['env'] == 'staging'`,
-											Type:        "k8s.io/authorization-cel",
-											Description: "only allow in staging namespaces",
-										},
-									},
-								},
-							}
-						}
-						ws.acrHandler = acrEvaluateCEL(ws.t, "nonexistent-panic-on-ACR-webhook")
-					},
-				},
-				makeRequest: func(t *testing.T, client *clientset.Clientset, suffix string) error {
-					// test-ns has env=production, not staging, so this should be denied
-					_, err := client.CoreV1().ConfigMaps("test-ns").Create(context.TODO(), &corev1.ConfigMap{
-						ObjectMeta: metav1.ObjectMeta{Name: "ns-nomatch-cm" + suffix},
-					}, metav1.CreateOptions{})
-					return err
-				},
-				expectAllowed: false,
-			},*/
+			makeRequest: func(t *testing.T, client *clientset.Clientset, suffix string) error {
+				_, err := client.CoreV1().ConfigMaps("test-ns").Create(context.TODO(), &corev1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{Name: "ns-match-cm" + suffix},
+				}, metav1.CreateOptions{})
+				return err
+			},
+			expectAllowed:             true,
+			expectAllowedWhenDisabled: new(false),
+		},
+		{
+			name: "cel namespaceObject - negative match",
+			user: "ns-label-nomatch-user",
+			authorizers: map[string]authorizer.Authorizer{
+				"in-process-eval-only": inProcessOnlyAuthorizer{configmapsConditionalAllow(authorizer.GenericCondition{
+					ID: "example.com/require-staging-namespace",
+					Condition: `namespaceObject != null && ` +
+						`has(namespaceObject.metadata) && ` +
+						`has(namespaceObject.metadata.labels) && ` +
+						`'env' in namespaceObject.metadata.labels && ` +
+						`namespaceObject.metadata.labels['env'] == 'staging'`,
+					Type:        builtinCELConditionType,
+					Description: "only allow in staging namespaces",
+				})},
+			},
+			makeRequest: func(t *testing.T, client *clientset.Clientset, suffix string) error {
+				_, err := client.CoreV1().ConfigMaps("test-ns").Create(context.TODO(), &corev1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{Name: "ns-nomatch-cm" + suffix},
+				}, metav1.CreateOptions{})
+				return err
+			},
+			expectAllowed: false,
+		},
 	}
 
 	testCases = append(testCases, crdTestCases(server)...)
@@ -1005,6 +985,14 @@ authorizers:
 							t.Fatalf("expected Forbidden error, got: %v", err)
 						}
 					}
+
+					wantEvaluations := tc.webhookEvaluations
+					if _, inProcessOnly := authz.(inProcessOnlyAuthorizer); inProcessOnly || !conditionalAuthorizationActive {
+						wantEvaluations = 0
+					}
+					if got := webhookServer.handler.acrCountForUser(userName); got != wantEvaluations {
+						t.Errorf("expected %d AuthorizationConditionsReviews for user %q, got %d", wantEvaluations, userName, got)
+					}
 				})
 			}
 		})
@@ -1023,6 +1011,10 @@ authorizers:
 			testValidatingAdmissionPolicyRunsBeforeConditionsEnforcer(t, adminClient, server.ClientConfig, webhookServer)
 		})
 	}
+
+	t.Run("unsafe delete requires an unconditional decision", func(t *testing.T) {
+		testUnsafeDeleteRequiresUnconditionalDecision(t, server, adminClient, webhookServer, conditionalAuthorizationActive)
+	})
 
 	// The SubjectAccessReview endpoints and the fold-down only depend on the feature gate, not on the
 	// admission plugin, so they behave the same whether or not the AuthorizationConditionsEnforcer is enabled.
@@ -1522,36 +1514,176 @@ authorizers:
 	}
 }
 
-// TODO(luxas): Reactivate this when we add support for in-tree evaluation.
-/*
-// compoundAuthzSARHandler returns a SAR handler that implements compound
-// authorization: creating a resource with the "protected-label" label
-// requires the additional "use protectedlabels" permission, checked via the
-// authorizer CEL function. The handler returns NoOpinion for non-matching SARs
-// (e.g. the authorizer function's internal permission check).
-func compoundAuthzSARHandler(matchResource string) func(sar *authorizationv1.SubjectAccessReview) {
-	return func(sar *authorizationv1.SubjectAccessReview) {
-		if sar.Spec.ResourceAttributes == nil || sar.Spec.ResourceAttributes.Resource != matchResource {
-			return // NoOpinion for non-matching SARs (e.g. the authorizer function's internal check)
+// compoundAuthzCondition implements compound authorization: creating a resource with the "protected-label" label
+// requires the additional "use protectedlabels" permission, checked via the authorizer CEL function.
+var compoundAuthzCondition = authorizer.GenericCondition{
+	ID: "example.com/require-protectedlabel-permission",
+	Condition: `!has(object.metadata.labels) || !('protected-label' in object.metadata.labels) || ` +
+		`authorizer.group('example.com').resource('protectedlabels').name('protected-label').check('use').allowed()`,
+	Type:        builtinCELConditionType,
+	Description: "compound authorization: require 'use' permission on protectedlabels resource when protected-label is set",
+}
+
+// testUnsafeDeleteRequiresUnconditionalDecision verifies that a delete with
+// ignoreStoreReadErrorWithClusterBreakingPotential=true is refused when the
+// delete itself was only conditionally authorized: the corrupt-object deleter
+// skips admission, so the conditions would otherwise never be enforced.
+func testUnsafeDeleteRequiresUnconditionalDecision(t *testing.T, server *kubeapiservertesting.TestServer, adminClient *clientset.Clientset, webhookServer *webhookServer, conditionalAuthorizationActive bool) {
+	const (
+		namespace         = "test-ns"
+		unsafeDeleteVerb  = "unsafe-delete-ignore-read-errors"
+		conditionalUser   = "unsafe-delete-conditional-user"
+		unconditionalUser = "unsafe-delete-unconditional-user"
+		guardMessage      = "ignoreStoreReadErrorWithClusterBreakingPotential is not allowed for a conditionally authorized request"
+	)
+	webhookServer.handler.setAuthorizer(t, testAuthorizer(func(_ context.Context, a authorizer.Attributes) authorizer.ConditionsAwareDecision {
+		if a.GetResource() != "configmaps" || a.GetNamespace() != namespace {
+			return authorizer.ConditionsAwareDecisionNoOpinion("", nil)
 		}
-		sar.Status.ConditionalDecision = &authorizationv1.ConditionsAwareDecision{
-			Type: authorizationv1.ConditionsAwareDecisionTypeConditionsMap,
-			ConditionsMap: &authorizationv1.ConditionsMap{
-				Conditions: []authorizationv1.Condition{
-					{
-						ID: "example.com/require-protectedlabel-permission",
-						Effect: authorizationv1.ConditionEffectAllow,
-						Condition: `!has(object.metadata.labels) || !('protected-label' in object.metadata.labels) || ` +
-							`authorizer.group('example.com').resource('protectedlabels').name('protected-label').check('use').allowed()`,
-						Type:        "k8s.io/authorization-cel",
-						Description: "compound authorization: require 'use' permission on protectedlabels resource when protected-label is set",
-					},
+		switch {
+		case a.GetVerb() == unsafeDeleteVerb && (a.GetUser().GetName() == conditionalUser || a.GetUser().GetName() == unconditionalUser):
+			return authorizer.ConditionsAwareDecisionAllow("may unsafe-delete", nil)
+		case a.GetVerb() == "delete" && a.GetUser().GetName() == unconditionalUser:
+			return authorizer.ConditionsAwareDecisionAllow("may delete", nil)
+		case a.GetVerb() == "delete" && a.GetUser().GetName() == conditionalUser:
+			return authorizer.ConditionsAwareDecisionConditionsMap(nil, nil, []authorizer.Condition{
+				authorizer.GenericCondition{
+					ID:          "example.com/always-allow",
+					Condition:   "true",
+					Type:        opaqueCELConditionType,
+					Description: "would allow, if it could be evaluated",
 				},
+			})
+		}
+		return authorizer.ConditionsAwareDecisionNoOpinion("", nil)
+	}))
+
+	etcdKey := func(name string) string {
+		return "/" + path.Join(server.EtcdStoragePrefix, "configmaps", namespace, name)
+	}
+
+	type verifyFunc func(t *testing.T, err error)
+	expectSuccess := func(t *testing.T, err error) {
+		t.Helper()
+		if err != nil {
+			t.Fatalf("expected the unsafe delete to succeed, got: %v", err)
+		}
+	}
+	expectGuardRefusal := func(t *testing.T, err error) {
+		t.Helper()
+		if !apierrors.IsForbidden(err) || !strings.Contains(err.Error(), guardMessage) {
+			t.Fatalf("expected a Forbidden error containing %q, got: %v", guardMessage, err)
+		}
+	}
+	// When conditional authorization is not active, the conditional decision folds to
+	// NoOpinion, RBAC has no opinion either, and the authorization filter refuses the request.
+	expectFilterRefusal := func(t *testing.T, err error) {
+		t.Helper()
+		if !apierrors.IsForbidden(err) || strings.Contains(err.Error(), guardMessage) {
+			t.Fatalf("expected a Forbidden error from the authorization filter, got: %v", err)
+		}
+	}
+	// The corrupt-object deleter refuses decodable objects. Getting this error for a
+	// conditional user would mean the guard did not run before the deleter.
+	expectNotCorruptConflict := func(t *testing.T, err error) {
+		t.Helper()
+		if !apierrors.IsConflict(err) {
+			t.Fatalf("expected a Conflict from the corrupt-object deleter, got: %v", err)
+		}
+	}
+
+	objects := []struct {
+		name   string
+		create func(t *testing.T, name string)
+	}{
+		{
+			name: "readable",
+			create: func(t *testing.T, name string) {
+				if _, err := adminClient.CoreV1().ConfigMaps(namespace).Create(t.Context(), &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: name}}, metav1.CreateOptions{}); err != nil {
+					t.Fatal(err)
+				}
 			},
+		},
+		{
+			name: "unreadable",
+			create: func(t *testing.T, name string) {
+				if _, err := server.EtcdClient.Put(t.Context(), etcdKey(name), "undecodable"); err != nil {
+					t.Fatal(err)
+				}
+				if _, err := adminClient.CoreV1().ConfigMaps(namespace).Get(t.Context(), name, metav1.GetOptions{}); !apierrors.IsInternalError(err) {
+					t.Fatalf("expected the corrupt object to be unreadable, got: %v", err)
+				}
+			},
+		},
+	}
+	type expectation struct {
+		active   verifyFunc // ConditionalAuthorization gate on and AuthorizationConditionsEnforcer enabled
+		inactive verifyFunc // otherwise
+	}
+	expectations := map[string]map[string]expectation{
+		"readable": {
+			unconditionalUser: {active: expectNotCorruptConflict, inactive: expectNotCorruptConflict},
+			conditionalUser:   {active: expectGuardRefusal, inactive: expectFilterRefusal},
+		},
+		"unreadable": {
+			unconditionalUser: {active: expectSuccess, inactive: expectSuccess},
+			conditionalUser:   {active: expectGuardRefusal, inactive: expectFilterRefusal},
+		},
+	}
+
+	for _, object := range objects {
+		for _, userName := range []string{unconditionalUser, conditionalUser} {
+			t.Run(object.name+"/"+userName, func(t *testing.T) {
+				expect := expectations[object.name][userName]
+				verify := expect.inactive
+				if conditionalAuthorizationActive {
+					verify = expect.active
+				}
+
+				name := "unsafe-delete-" + object.name + "-" + strings.TrimPrefix(userName, "unsafe-delete-")
+				t.Cleanup(func() {
+					_, _ = server.EtcdClient.Delete(context.Background(), etcdKey(name))
+				})
+				object.create(t, name)
+
+				config := rest.CopyConfig(server.ClientConfig)
+				config.Impersonate.UserName = userName
+				client := clientset.NewForConfigOrDie(config)
+
+				var err error
+				for _, dryRun := range []bool{true, false} {
+					opts := metav1.DeleteOptions{IgnoreStoreReadErrorWithClusterBreakingPotential: new(true)}
+					if dryRun {
+						opts.DryRun = []string{metav1.DryRunAll}
+					}
+					err = client.CoreV1().ConfigMaps(namespace).Delete(t.Context(), name, opts)
+					t.Logf("dryRun=%t: %v", dryRun, err)
+					verify(t, err)
+				}
+
+				// The object must be gone from storage if and only if the real delete succeeded.
+				resp, getErr := server.EtcdClient.Get(t.Context(), etcdKey(name))
+				if getErr != nil {
+					t.Fatal(getErr)
+				}
+				if want, got := err != nil, len(resp.Kvs) == 1; want != got {
+					t.Fatalf("expected the object to be in storage: %t, got: %t", want, got)
+				}
+			})
 		}
 	}
 }
-*/
+
+// configmapsConditionalAllow returns an authorizer that conditionally allows configmaps requests using the given
+// allow condition, and has no opinion on other requests (e.g. the authorizer function's internal permission check).
+func configmapsConditionalAllow(cond authorizer.Condition) testAuthorizer {
+	return func(_ context.Context, a authorizer.Attributes) authorizer.ConditionsAwareDecision {
+		if a.GetResource() != "configmaps" {
+			return authorizer.ConditionsAwareDecisionNoOpinion("", nil)
+		}
+		return authorizer.ConditionsAwareDecisionConditionsMap(nil, nil, []authorizer.Condition{cond})
+	}
+}
 
 // The condition Type installed on all in-tree "using-webhook-only" variants.
 // This tells the apiserver to consult the webhook for evaluation, as the
@@ -1564,10 +1696,9 @@ const opaqueCELConditionType = "example.com/opaque-cel-condition-type"
 type decisionFunc func(a authorizer.Attributes, conditionsType string) authorizer.ConditionsAwareDecision
 
 // celConditionalAuthorizerVariants returns a map of variant-name -> Authorizer
-// for a conditional-authorization test case. Today only the out-of-tree
-// ("using-webhook-only") variant is active; when in-tree CEL evaluation lands
-// upstream, additional variants (in-process-eval-only,
-// if-in-process-fails-call-webhook) can be added here.
+// for a conditional-authorization test case: out-of-tree evaluation ("using-webhook-only"),
+// in-tree CEL evaluation ("in-process-eval-only"), and in-tree evaluation failure falling
+// back to the webhook ("if-in-process-fails-call-webhook").
 func celConditionalAuthorizerVariants(fn decisionFunc) map[string]authorizer.Authorizer {
 	return map[string]authorizer.Authorizer{
 		// When the condition type is opaque, the webhook must be called to
@@ -1576,44 +1707,56 @@ func celConditionalAuthorizerVariants(fn decisionFunc) map[string]authorizer.Aut
 		"using-webhook-only": testAuthorizer(func(_ context.Context, a authorizer.Attributes) authorizer.ConditionsAwareDecision {
 			return fn(a, opaqueCELConditionType)
 		}),
-		// TODO(luxas): Reactivate this when we support in-tree evaluation.
-		// When the condition type is k8s.io/authorization-cel, in-tree evaluation handles it.
-		/*"in-process-eval-only": func(ws *webhookServerHandler) {
-			ws.sarHandler = func(sar *authorizationv1.SubjectAccessReview) {
-				processSAR(sar, "k8s.io/authorization-cel")
-			}
-			// Ensure no calls to ACR are made, as the above should be handled in-tree only.
-			// If Kubernetes did webhook out to us, the test panics as the conditions type does not match.
-			ws.acrHandler = acrEvaluateCEL(ws.t, "nonexistent-panic-on-ACR-webhook")
-		},
+		// When the condition type is authorizer.kubernetes.io/cel, in-tree evaluation handles it,
+		// and the webhook must not be called.
+		"in-process-eval-only": inProcessOnlyAuthorizer{testAuthorizer(func(_ context.Context, a authorizer.Attributes) authorizer.ConditionsAwareDecision {
+			return fn(a, builtinCELConditionType)
+		})},
 		// When in-tree evaluation fails (e.g. newer CEL syntax), it falls back to the webhook.
-		"if-in-process-fails-call-webhook": func(ws *webhookServerHandler) {
-			ws.sarHandler = func(sar *authorizationv1.SubjectAccessReview) {
-				processSAR(sar, "k8s.io/authorization-cel")
-
-				if d := sar.Status.ConditionalDecision; d != nil {
-					if d.ConditionsMap == nil {
-						ws.t.Fatal("current test expects a ConditionsMap")
-					}
-					// Corrupt each condition with an invalid prefix so in-tree evaluation fails.
-					for j := range d.ConditionsMap.Conditions {
-						d.ConditionsMap.Conditions[j].Condition = "unsupported_in_tree && " + d.ConditionsMap.Conditions[j].Condition
-					}
-				}
-			}
-			// The webhook should be called as fallback. Strip the prefix and evaluate.
-			ws.acrHandler = func(acr *authorizationv1alpha1.AuthorizationConditionsReview) {
-				decision := &acr.Request.Decision
-				if decision.ConditionsMap == nil {
-					ws.t.Fatal("current test expects a conditionset")
-				}
-				for i := range decision.ConditionsMap.Conditions {
-					decision.ConditionsMap.Conditions[i].Condition = strings.TrimPrefix(decision.ConditionsMap.Conditions[i].Condition, "unsupported_in_tree && ")
-				}
-				acrEvaluateCEL(ws.t, "k8s.io/authorization-cel")(acr)
-			}
-		},*/
+		"if-in-process-fails-call-webhook": webhookFallbackAuthorizer{testAuthorizer(func(_ context.Context, a authorizer.Attributes) authorizer.ConditionsAwareDecision {
+			// Corrupt each condition with an unknown identifier, so in-tree evaluation fails.
+			return rewriteConditions(fn(a, builtinCELConditionType), func(cond string) string {
+				return unsupportedInTreePrefix + cond
+			})
+		})},
 	}
+}
+
+// builtinCELConditionType is the condition type evaluated in-tree by the AuthorizationConditionsEnforcer.
+const builtinCELConditionType = authorizer.ConditionTypeAuthorizationCEL
+
+// unsupportedInTreePrefix makes in-tree CEL compilation fail, as the identifier is unknown.
+const unsupportedInTreePrefix = "unsupported_in_tree && "
+
+// inProcessOnlyAuthorizer is a testAuthorizer whose conditions must be evaluated in-process by the
+// API server. The webhook server flags any AuthorizationConditionsReview sent while it is installed.
+type inProcessOnlyAuthorizer struct{ testAuthorizer }
+
+// webhookFallbackAuthorizer is a testAuthorizer whose conditions fail in-tree evaluation due to
+// unsupportedInTreePrefix, which it strips before evaluating the conditions in the webhook.
+type webhookFallbackAuthorizer struct{ testAuthorizer }
+
+func (a webhookFallbackAuthorizer) EvaluateConditions(ctx context.Context, decision authorizer.ConditionsAwareDecision, data authorizer.ConditionsData) (authorizer.Decision, string, error) {
+	return a.testAuthorizer.EvaluateConditions(ctx, rewriteConditions(decision, func(cond string) string {
+		return strings.TrimPrefix(cond, unsupportedInTreePrefix)
+	}), data)
+}
+
+// rewriteConditions returns a copy of the ConditionsMap decision d, where each condition expression is rewritten.
+// Other decisions are returned as-is.
+func rewriteConditions(d authorizer.ConditionsAwareDecision, rewrite func(string) string) authorizer.ConditionsAwareDecision {
+	if !d.IsConditionsMap() {
+		return d
+	}
+	rewriteAll := func(conds iter.Seq[authorizer.Condition]) []authorizer.Condition {
+		var out []authorizer.Condition
+		for c := range conds {
+			out = append(out, authorizer.GenericCondition{ID: c.GetID(), Condition: rewrite(c.GetCondition()), Type: c.GetType(), Description: c.GetDescription()})
+		}
+		return out
+	}
+	cm := d.ConditionsMap()
+	return authorizer.ConditionsAwareDecisionConditionsMap(rewriteAll(cm.DenyConditions()), rewriteAll(cm.NoOpinionConditions()), rewriteAll(cm.AllowConditions()))
 }
 
 // webhookServer wraps an httptest.Server serving both SubjectAccessReview and
@@ -1638,6 +1781,8 @@ type webhookServerHandler struct {
 
 	// acrCount is the number of AuthorizationConditionsReviews received.
 	acrCount atomic.Int64
+	// acrCountByUser is the number of AuthorizationConditionsReviews received per requesting user, guarded by mu.
+	acrCountByUser map[string]int
 }
 
 // setAuthorizer swaps in the authorizer to be used by the SAR and ACR handlers
@@ -1661,6 +1806,12 @@ func (h *webhookServerHandler) setAuthorizer(t *testing.T, a authorizer.Authoriz
 		h.authz = prev
 		h.mu.Unlock()
 	})
+}
+
+func (h *webhookServerHandler) acrCountForUser(user string) int {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return h.acrCountByUser[user]
 }
 
 // getAuthorizer returns the currently installed authorizer, or the
@@ -1707,7 +1858,7 @@ var noOpinionAuthorizer authorizer.Authorizer = testAuthorizer(func(_ context.Co
 })
 
 func newWebhookServer(t *testing.T) *webhookServer {
-	handler := &webhookServerHandler{t: t}
+	handler := &webhookServerHandler{t: t, acrCountByUser: map[string]int{}}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/authorize", handler.serveSAR)
 	mux.HandleFunc("/conditionsreview", handler.serveACR)
@@ -1801,6 +1952,11 @@ func (h *webhookServerHandler) handleACR(ctx context.Context, w http.ResponseWri
 		http.Error(w, "nil ACR request", http.StatusBadRequest)
 		return
 	}
+	if acr.Request.AdmissionRequest != nil {
+		h.mu.Lock()
+		h.acrCountByUser[acr.Request.AdmissionRequest.UserInfo.Username]++
+		h.mu.Unlock()
+	}
 
 	// Deserialize the wire decision into the internal ConditionsAwareDecision
 	// and delegate evaluation to the same authorizer that issued it. The
@@ -1820,7 +1976,11 @@ func (h *webhookServerHandler) handleACR(ctx context.Context, w http.ResponseWri
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	decision, reason, err := h.getAuthorizer().EvaluateConditions(ctx, internalDecision, data)
+	authz := h.getAuthorizer()
+	if _, ok := authz.(inProcessOnlyAuthorizer); ok {
+		h.t.Errorf("unexpected AuthorizationConditionsReview, the conditions should have been evaluated in-process: %v", internalDecision.String())
+	}
+	decision, reason, err := authz.EvaluateConditions(ctx, internalDecision, data)
 
 	evaluated := authorizer.ConditionsAwareDecisionFromParts(decision, reason, err)
 

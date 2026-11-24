@@ -40,6 +40,21 @@ spec:
   revisionHistoryLimit: 6
   rollbackTo:
     revision: 1
+  scheduling:
+    disruptionMode:
+      all: {}
+      single: {}
+    resourceClaims:
+    - name: nameValue
+      resourceClaimName: resourceClaimNameValue
+      resourceClaimTemplateName: resourceClaimTemplateNameValue
+    schedulingConstraints:
+      topology:
+      - key: keyValue
+    schedulingPolicy:
+      basic: {}
+      gang:
+        minCount: 1
   selector:
     matchExpressions:
     - key: keyValue
@@ -255,6 +270,7 @@ spec:
           secretRef:
             name: nameValue
             optional: true
+        hostCgroupNamespace: true
         image: imageValue
         imagePullPolicy: imagePullPolicyValue
         lifecycle:
@@ -382,6 +398,8 @@ spec:
             - addValue
             drop:
             - dropValue
+          cgroupOptions:
+            mountMode: mountModeValue
           privileged: true
           procMount: procMountValue
           readOnlyRootFilesystem: true
@@ -395,6 +413,11 @@ spec:
             user: userValue
           seccompProfile:
             localhostProfile: localhostProfileValue
+            oci:
+              baseProfile:
+                localhostProfile: localhostProfileValue
+                type: typeValue
+              ref: refValue
             type: typeValue
           windowsOptions:
             gmsaCredentialSpec: gmsaCredentialSpecValue
@@ -493,6 +516,7 @@ spec:
           secretRef:
             name: nameValue
             optional: true
+        hostCgroupNamespace: true
         image: imageValue
         imagePullPolicy: imagePullPolicyValue
         lifecycle:
@@ -620,6 +644,8 @@ spec:
             - addValue
             drop:
             - dropValue
+          cgroupOptions:
+            mountMode: mountModeValue
           privileged: true
           procMount: procMountValue
           readOnlyRootFilesystem: true
@@ -633,6 +659,11 @@ spec:
             user: userValue
           seccompProfile:
             localhostProfile: localhostProfileValue
+            oci:
+              baseProfile:
+                localhostProfile: localhostProfileValue
+                type: typeValue
+              ref: refValue
             type: typeValue
           windowsOptions:
             gmsaCredentialSpec: gmsaCredentialSpecValue
@@ -737,6 +768,7 @@ spec:
           secretRef:
             name: nameValue
             optional: true
+        hostCgroupNamespace: true
         image: imageValue
         imagePullPolicy: imagePullPolicyValue
         lifecycle:
@@ -864,6 +896,8 @@ spec:
             - addValue
             drop:
             - dropValue
+          cgroupOptions:
+            mountMode: mountModeValue
           privileged: true
           procMount: procMountValue
           readOnlyRootFilesystem: true
@@ -877,6 +911,11 @@ spec:
             user: userValue
           seccompProfile:
             localhostProfile: localhostProfileValue
+            oci:
+              baseProfile:
+                localhostProfile: localhostProfileValue
+                type: typeValue
+              ref: refValue
             type: typeValue
           windowsOptions:
             gmsaCredentialSpec: gmsaCredentialSpecValue
@@ -935,6 +974,7 @@ spec:
         name: nameValue
       overhead:
         overheadKey: "0"
+      podNetwork: podNetworkValue
       preemptionPolicy: preemptionPolicyValue
       priority: 25
       priorityClassName: priorityClassNameValue
@@ -976,6 +1016,11 @@ spec:
           user: userValue
         seccompProfile:
           localhostProfile: localhostProfileValue
+          oci:
+            baseProfile:
+              localhostProfile: localhostProfileValue
+              type: typeValue
+            ref: refValue
           type: typeValue
         supplementalGroups:
         - 4

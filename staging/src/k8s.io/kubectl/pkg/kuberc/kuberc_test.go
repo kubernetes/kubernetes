@@ -2595,6 +2595,45 @@ func TestApplyAlias(t *testing.T) {
 			expectedCmd:  "alias",
 			expectedArgs: []string{},
 		},
+		{
+			name: "alias with non-existent flag reports alias name in error",
+			nestedCmds: []fakeCmds[string]{
+				{
+					name: "command1",
+					flags: []fakeFlag[string]{
+						{
+							name:  "validflag",
+							value: "test",
+						},
+					},
+				},
+			},
+			args: []string{
+				"root",
+				"myalias",
+			},
+			getPreferencesFunc: func(kuberc string, errOut io.Writer) (*config.Preference, error) {
+				return &config.Preference{
+					TypeMeta: metav1.TypeMeta{
+						Kind:       "Preference",
+						APIVersion: "kubectl.config.k8s.io/v1alpha1",
+					},
+					Aliases: []config.AliasOverride{
+						{
+							Name:    "myalias",
+							Command: "command1",
+							Options: []config.CommandOptionDefault{
+								{
+									Name:    "nonexistentflag",
+									Default: "val",
+								},
+							},
+						},
+					},
+				}, nil
+			},
+			expectedErr: fmt.Errorf("invalid alias flag nonexistentflag in alias myalias"),
+		},
 	}
 
 	for _, test := range tests {
@@ -2708,6 +2747,18 @@ func TestGetExplicitKuberc(t *testing.T) {
 		{
 			args:     []string{"kubectl", "get", "--", "/bin/bash", "--kuberc", "anotherpath"},
 			expected: "",
+		},
+		{
+			args:     []string{"kubectl", "create", "configmap", "cm", "--from-literal=flags=--kuberc=/tmp/x"},
+			expected: "",
+		},
+		{
+			args:     []string{"kubectl", "set", "env", "deploy/x", "ARGS=--kuberc=/tmp/x"},
+			expected: "",
+		},
+		{
+			args:     []string{"kubectl", "create", "configmap", "cm", "--from-literal=flags=--kuberc=/tmp/x", "--kuberc=/tmp/filepath"},
+			expected: "/tmp/filepath",
 		},
 	}
 	for _, test := range tests {

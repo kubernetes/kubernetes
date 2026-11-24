@@ -29,11 +29,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/allocation"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
@@ -101,6 +99,9 @@ type UpdatePodOptions struct {
 	// and later kills have an opportunity to override the status (i.e. a preemption
 	// may be later turned into an eviction).
 	KillPodOptions *KillPodOptions
+	// AllocatedGeneration is the generation of the allocation that Pod was updated from, or 0 if
+	// unknown. It is set by the pod worker.
+	AllocatedGeneration int64
 }
 
 // PodWorkType classifies the status of pod as seen by the pod worker - setup (sync),
@@ -267,6 +268,15 @@ type PodWorkers interface {
 	IsPodForMirrorPodTerminatingByFullName(podFullname string) bool
 }
 
+// podRelistSuspender suspends PLEG relist observations for a pod while the pod worker syncs it.
+// Changes made by the sync itself are then observed once, after the sync, instead of once per
+// intermediate runtime event.
+type podRelistSuspender interface {
+	SuspendRelist(podUID types.UID)
+	ResumeRelist(podUID types.UID) (relistDeferred bool)
+	RequestPodRelist(logger klog.Logger, podUID types.UID)
+}
+
 // podSyncer describes the core lifecyle operations of the pod state machine. A pod is first
 // synced until it naturally reaches termination (true is returned) or an external agent decides
 // the pod should be terminated. Once a pod should be terminating, SyncTerminatingPod is invoked
@@ -278,7 +288,7 @@ type podSyncer interface {
 	// pod has reached a terminal state and the presence of the error indicates succeeded or failed.
 	// If an error is returned, the sync was not successful and should be rerun in the future. This
 	// is a long running method and should exit early with context.Canceled if the context is canceled.
-	SyncPod(ctx context.Context, updateType kubetypes.SyncPodType, pod *v1.Pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus) (bool, func(), error)
+	SyncPod(ctx context.Context, updateType kubetypes.SyncPodType, pod *v1.Pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus, allocatedGeneration int64) (bool, func(), error)
 	// SyncTerminatingPod attempts to ensure the pod's containers are no longer running and to collect
 	// any final status. This method is repeatedly invoked with diminishing grace periods until it exits
 	// without error. Once this method exits with no error other components are allowed to tear down
@@ -296,7 +306,7 @@ type podSyncer interface {
 	SyncTerminatedPod(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus) error
 }
 
-type syncPodFnType func(ctx context.Context, updateType kubetypes.SyncPodType, pod *v1.Pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus) (bool, func(), error)
+type syncPodFnType func(ctx context.Context, updateType kubetypes.SyncPodType, pod *v1.Pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus, allocatedGeneration int64) (bool, func(), error)
 type syncTerminatingPodFnType func(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, gracePeriod *int64, podStatusFn func(*v1.PodStatus)) error
 type syncTerminatingRuntimePodFnType func(ctx context.Context, runningPod *kubecontainer.Pod) error
 type syncTerminatedPodFnType func(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus) error
@@ -320,8 +330,8 @@ func newPodSyncerFuncs(s podSyncer) podSyncerFuncs {
 
 var _ podSyncer = podSyncerFuncs{}
 
-func (f podSyncerFuncs) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType, pod *v1.Pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus) (bool, func(), error) {
-	return f.syncPod(ctx, updateType, pod, mirrorPod, podStatus)
+func (f podSyncerFuncs) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType, pod *v1.Pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus, allocatedGeneration int64) (bool, func(), error) {
+	return f.syncPod(ctx, updateType, pod, mirrorPod, podStatus, allocatedGeneration)
 }
 func (f podSyncerFuncs) SyncTerminatingPod(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, gracePeriod *int64, podStatusFn func(*v1.PodStatus)) error {
 	return f.syncTerminatingPod(ctx, pod, podStatus, gracePeriod, podStatusFn)
@@ -608,6 +618,9 @@ type podWorkers struct {
 	// different pods at the same time.
 	podSyncer podSyncer
 
+	// relistSuspender, if set, suspends PLEG relist observations for a pod while SyncPod runs.
+	relistSuspender podRelistSuspender
+
 	// workerChannelFn is exposed for testing to allow unit tests to impose delays
 	// in channel communication. The function is invoked once each time a new worker
 	// goroutine starts.
@@ -639,6 +652,7 @@ func newPodWorkers(
 	resyncInterval, backOffPeriod time.Duration,
 	podCache kubecontainer.ROCache,
 	allocationManager allocation.Manager,
+	relistSuspender podRelistSuspender,
 ) PodWorkers {
 	return &podWorkers{
 		podSyncStatuses:                    map[types.UID]*podSyncStatus{},
@@ -652,6 +666,7 @@ func newPodWorkers(
 		backOffPeriod:                      backOffPeriod,
 		podCache:                           podCache,
 		allocationManager:                  allocationManager,
+		relistSuspender:                    relistSuspender,
 		clock:                              clock.RealClock{},
 	}
 }
@@ -984,7 +999,7 @@ func (p *podWorkers) UpdatePod(ctx context.Context, options UpdatePodOptions) {
 		go func() {
 			// TODO: this should be a wait.Until with backoff to handle panics, and
 			// accept a context for shutdown
-			defer runtime.HandleCrash()
+			defer runtime.HandleCrashWithContext(ctx)
 			defer logger.V(3).Info("Pod worker has stopped", "podUID", uid)
 			p.podWorkerLoop(ctx, uid, outCh)
 		}()
@@ -998,9 +1013,7 @@ func (p *podWorkers) UpdatePod(ctx context.Context, options UpdatePodOptions) {
 
 	// notify the pod worker there is a pending update
 	status.pendingUpdate = &options
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-		status.pendingUpdate.Pod, _ = p.allocationManager.UpdatePodFromAllocation(options.Pod)
-	}
+	status.pendingUpdate.Pod, status.pendingUpdate.AllocatedGeneration = p.allocationManager.GetAllocatedPod(options.Pod)
 	status.working = true
 	updateLogger.V(4).Info("Notifying pod of pending update", "workType", status.WorkType())
 	select {
@@ -1308,6 +1321,7 @@ func (p *podWorkers) podWorkerLoop(parentCtx context.Context, podUID types.UID, 
 
 			// Take the appropriate action (illegal phases are prevented by UpdatePod)
 			var postSync func()
+			var relistSuspended bool
 			switch {
 			case update.WorkType == TerminatedPod:
 				err = p.podSyncer.SyncTerminatedPod(ctx, update.Options.Pod, status)
@@ -1327,12 +1341,28 @@ func (p *podWorkers) podWorkerLoop(parentCtx context.Context, podUID types.UID, 
 				}
 
 			default:
-				isTerminal, postSync, err = p.podSyncer.SyncPod(ctx, update.Options.UpdateType, update.Options.Pod, update.Options.MirrorPod, status)
+				if p.relistSuspender != nil {
+					p.relistSuspender.SuspendRelist(podUID)
+					relistSuspended = true
+				}
+				isTerminal, postSync, err = p.podSyncer.SyncPod(ctx, update.Options.UpdateType, update.Options.Pod, update.Options.MirrorPod, status, update.Options.AllocatedGeneration)
 			}
 
+			// Resume *before* setting lastSyncTime: any relist that starts after lastSyncTime then
+			// sees the pod as unsuspended and reconciles it, so a relist that skipped the pod can
+			// never advance a cache timestamp past lastSyncTime. Request the follow-up relist
+			// *after* setting lastSyncTime, so its cache update unblocks the next sync. A non-nil
+			// postSync means the sync changed the pod and requests its own relist, which also
+			// observes anything deferred during the suspension.
+			var relistDeferred bool
+			if relistSuspended {
+				relistDeferred = p.relistSuspender.ResumeRelist(podUID)
+			}
 			lastSyncTime = p.clock.Now()
 			if postSync != nil {
 				postSync()
+			} else if relistDeferred {
+				p.relistSuspender.RequestPodRelist(logger, podUID)
 			}
 
 			return err

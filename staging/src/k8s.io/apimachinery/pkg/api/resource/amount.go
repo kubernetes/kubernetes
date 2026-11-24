@@ -37,8 +37,11 @@ type Scale int32
 // infScale adapts a Scale value to an inf.Scale value, returning false in overflow cases.
 func (s Scale) infScale() (inf.Scale, bool) {
 	// inf.Scale is upside-down
-	// TODO: saturate instead of wrap in overflow cases
-	return inf.Scale(-s), s != math.MinInt32
+	if s == math.MinInt32 {
+		// saturate instead of wrap in overflow cases
+		return inf.Scale(math.MaxInt32), false
+	}
+	return inf.Scale(-s), true
 }
 
 // canInfScale reports whether infScale is faithful for s. Scale is int32 and

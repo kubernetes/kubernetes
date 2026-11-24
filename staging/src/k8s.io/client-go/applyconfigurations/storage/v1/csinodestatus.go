@@ -24,6 +24,7 @@ package v1
 // CSINodeStatus contains health and status information for storage on a node.
 type CSINodeStatusApplyConfiguration struct {
 	// storageHealth contains backend health reports for CSI drivers registered on the node.
+	// This is an alpha field and requires enabling the CSIVolumeHealth feature gate.
 	StorageHealth []StorageHealthApplyConfiguration `json:"storageHealth,omitempty"`
 }
 

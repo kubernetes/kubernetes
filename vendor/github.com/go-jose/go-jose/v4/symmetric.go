@@ -421,7 +421,7 @@ func (ctx *symmetricKeyCipher) decryptKey(headers rawHeader, recipient *recipien
 		if err != nil {
 			return nil, fmt.Errorf("go-jose/go-jose: invalid P2S: %v", err)
 		}
-		if p2s == nil || len(p2s.data) == 0 {
+		if p2s == nil || len(p2s.bytes()) == 0 {
 			return nil, fmt.Errorf("go-jose/go-jose: invalid P2S: must be present")
 		}
 

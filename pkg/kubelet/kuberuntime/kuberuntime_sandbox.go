@@ -19,6 +19,7 @@ package kuberuntime
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/url"
 	"runtime"
 	"sort"
@@ -93,6 +94,10 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxConfig(ctx context.Context
 		},
 		Labels:      newPodLabels(pod),
 		Annotations: newPodAnnotations(pod),
+	}
+
+	if kubecontainer.IsNetworkIsolatedPod(pod) {
+		podSandboxConfig.PodNetwork = runtimeapi.PodNetwork_POD_NETWORK_ISOLATED
 	}
 
 	dnsConfig, err := m.runtimeHelper.GetPodDNS(ctx, pod)
@@ -285,7 +290,8 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxWindowsConfig(pod *v1.Pod)
 	return wc, nil
 }
 
-// determinePodSandboxIP determines the IP addresses of the given pod sandbox.
+// determinePodSandboxIPs determines the IP addresses of the given pod sandbox,
+// sorted and truncated by the node IP family preference.
 func (m *kubeGenericRuntimeManager) determinePodSandboxIPs(ctx context.Context, podNamespace, podName string, podSandbox *runtimeapi.PodSandboxStatus) []string {
 	logger := klog.FromContext(ctx)
 	podIPs := make([]string, 0)
@@ -315,7 +321,40 @@ func (m *kubeGenericRuntimeManager) determinePodSandboxIPs(ctx context.Context, 
 		podIPs = append(podIPs, podIP.Ip)
 	}
 
-	return podIPs
+	return m.sortPodIPs(podIPs)
+}
+
+// sortPodIPs returns the PodIPs sorted and truncated by the cluster IP family preference.
+// The runtime pod status may have an arbitrary number of IPs, in an arbitrary order.
+// Pick out the first returned IP of the same IP family as the node IP
+// first, followed by the first IP of the opposite IP family (if any).
+func (m *kubeGenericRuntimeManager) sortPodIPs(podIPs []string) []string {
+	ips := make([]string, 0, 2)
+	var validPrimaryIP, validSecondaryIP func(ip net.IP) bool
+	if len(m.nodeIPs) == 0 || netutils.IsIPv4(m.nodeIPs[0]) {
+		validPrimaryIP = netutils.IsIPv4
+		validSecondaryIP = netutils.IsIPv6
+	} else {
+		validPrimaryIP = netutils.IsIPv6
+		validSecondaryIP = netutils.IsIPv4
+	}
+
+	// We parse and re-stringify the IPs in case the values from CRI use an irregular format.
+	for _, ipStr := range podIPs {
+		ip := netutils.ParseIPSloppy(ipStr)
+		if validPrimaryIP(ip) {
+			ips = append(ips, ip.String())
+			break
+		}
+	}
+	for _, ipStr := range podIPs {
+		ip := netutils.ParseIPSloppy(ipStr)
+		if validSecondaryIP(ip) {
+			ips = append(ips, ip.String())
+			break
+		}
+	}
+	return ips
 }
 
 // getPodSandboxIDByPodUID gets the sandbox id by podUID and returns ([]sandboxID, error).

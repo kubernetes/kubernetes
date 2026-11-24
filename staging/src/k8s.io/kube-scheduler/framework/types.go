@@ -68,8 +68,6 @@ const (
 	UpdatePodLabel
 	// UpdatePodScaleDown is an update for pod's scale down (i.e., any resource request is reduced).
 	UpdatePodScaleDown
-	// UpdatePodScaleUp is an update for pod's scale up (i.e., any resource request is increased).
-	UpdatePodScaleUp
 	// UpdatePodToleration is an addition for pod's tolerations.
 	// (Due to API validation, we can add, but cannot modify or remove tolerations.)
 	UpdatePodToleration
@@ -81,7 +79,7 @@ const (
 	All ActionType = 1<<iota - 1
 
 	// Use the general Update type if you don't either know or care the specific sub-Update type to use.
-	Update = UpdateNodeAllocatable | UpdateNodeLabel | UpdateNodeTaint | UpdateNodeCondition | UpdateNodeAnnotation | UpdateNodeDeclaredFeature | UpdateNodePreemptionPolicy | UpdatePodLabel | UpdatePodScaleDown | UpdatePodScaleUp | UpdatePodToleration | UpdatePodSchedulingGatesEliminated | UpdatePodGeneratedResourceClaim
+	Update = UpdateNodeAllocatable | UpdateNodeLabel | UpdateNodeTaint | UpdateNodeCondition | UpdateNodeAnnotation | UpdateNodeDeclaredFeature | UpdateNodePreemptionPolicy | UpdatePodLabel | UpdatePodScaleDown | UpdatePodToleration | UpdatePodSchedulingGatesEliminated | UpdatePodGeneratedResourceClaim
 
 	// None is a special ActionType that is only used internally.
 	None ActionType = 0
@@ -111,8 +109,6 @@ func (a ActionType) String() string {
 		return "UpdatePodLabel"
 	case UpdatePodScaleDown:
 		return "UpdatePodScaleDown"
-	case UpdatePodScaleUp:
-		return "UpdatePodScaleUp"
 	case UpdatePodToleration:
 		return "UpdatePodToleration"
 	case UpdatePodSchedulingGatesEliminated:
@@ -717,9 +713,8 @@ type PodGroupInfo interface {
 	GetChildren() []PodGroupInfo
 	// GetPriority returns the priority of the inner pod group or composite pod group.
 	GetPriority() int32
-	// GetPreemptionPolicy returns the PreemptionPolicy set in the inner pod group or composite pod group,
-	// or the default policy (PreemptLowerPriority) if not set.
-	// It should be used only when the PodGroupPreemptionPolicy feature gate is enabled.
+	// GetPreemptionPolicy returns the PreemptionPolicy of the inner pod group or composite pod group,
+	// or an empty string if not set.
 	GetPreemptionPolicy() v1.PreemptionPolicy
 	// GetMinCount returns the minimum number of pods or child groups required
 	// to satisfy the group's scheduling policy requirements.
@@ -955,9 +950,8 @@ func (gpg *GenericPodGroup) GetCreationTimestamp() time.Time {
 	return gpg.CompositePodGroup.CreationTimestamp.Time
 }
 
-// GetPreemptionPolicy returns the PreemptionPolicy set in the inner pod group or composite pod group,
-// or the default policy (PreemptLowerPriority) if not set.
-// It should be used only when the PodGroupPreemptionPolicy feature gate is enabled.
+// GetPreemptionPolicy returns the PreemptionPolicy of the inner PodGroup or CompositePodGroup,
+// or an empty string if not set.
 func (gpg *GenericPodGroup) GetPreemptionPolicy() v1.PreemptionPolicy {
 	if pg := gpg.PodGroup; pg != nil && pg.Spec.PreemptionPolicy != nil {
 		return v1.PreemptionPolicy(*pg.Spec.PreemptionPolicy)
@@ -965,7 +959,7 @@ func (gpg *GenericPodGroup) GetPreemptionPolicy() v1.PreemptionPolicy {
 	if cpg := gpg.CompositePodGroup; cpg != nil && cpg.Spec.PreemptionPolicy != nil {
 		return v1.PreemptionPolicy(*cpg.Spec.PreemptionPolicy)
 	}
-	return v1.PreemptLowerPriority
+	return ""
 }
 
 // HasDisruptionModeAll returns true if the wrapped object has disruption mode All.

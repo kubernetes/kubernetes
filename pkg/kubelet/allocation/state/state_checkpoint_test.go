@@ -34,6 +34,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
@@ -157,6 +158,16 @@ func Test_stateCheckpoint_storeState(t *testing.T) {
 			tests = append(tests, testCase{
 				name: fmt.Sprintf("resource - %s - container and volume limits", qStr),
 				args: args{podMap: PodMap{"pod1": newTestPod("pod1", qStr, false, true)}},
+			})
+
+			// Test case 3b: Container resources and volume limits populated with nil limit
+			podWithNilVolLimit := newTestPod("pod1", qStr, false, false)
+			podWithNilVolLimit.Spec.Volumes = []v1.Volume{
+				{Name: "volume1", VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{Medium: v1.StorageMediumMemory, SizeLimit: nil}}},
+			}
+			tests = append(tests, testCase{
+				name: fmt.Sprintf("resource - %s - container and nil volume limits", qStr),
+				args: args{podMap: PodMap{"pod1": podWithNilVolLimit}},
 			})
 
 			// Test case 4: Container resources and pod level resources populated (volume limits is nil)
@@ -304,6 +315,24 @@ func Test_stateCheckpoint_currentFormatIsNotRewritten(t *testing.T) {
 	actual, err := os.ReadFile(checkpointPath)
 	require.NoError(t, err)
 	require.Equal(t, blob, actual, "a checkpoint in the current format should not be rewritten on startup")
+}
+
+// Test_stateCheckpoint_keepsGeneration checks that the generation of a pod survives a restore from
+// the checkpoint.
+func Test_stateCheckpoint_keepsGeneration(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	testDir := getTestDir(t)
+	sc, err := NewStateCheckpoint(logger, testDir, testCheckpoint, nil)
+	require.NoError(t, err)
+	pod := newTestPod("pod1", "1", false, false)
+	pod.Generation = 5
+	require.NoError(t, sc.SetPod(logger, pod))
+
+	restored, err := NewStateCheckpoint(logger, testDir, testCheckpoint, nil)
+	require.NoError(t, err)
+	stored, ok := restored.GetPod(pod.UID)
+	require.True(t, ok)
+	assert.Equal(t, int64(5), stored.Generation)
 }
 
 // blockingCheckpointManager holds every write of a checkpoint until release is called, as a slow disk
@@ -463,6 +492,9 @@ func Test_stateCheckpoint_concurrentUpdates(t *testing.T) {
 				sc.GetPodUIDs()
 				sc.HasPod(podUID)
 				sc.GetPod(podUID)
+				if roPod, ok := sc.GetPodReadOnly(podUID); ok {
+					_ = len(roPod.Spec.Containers)
+				}
 				sc.GetContainerResources(podUID, "container1")
 				sc.GetPodLevelResources(podUID)
 				sc.GetEmptyDirVolumeLimit(podUID, "volume1")
@@ -479,4 +511,62 @@ func Test_stateCheckpoint_concurrentUpdates(t *testing.T) {
 	expected, actual := getPodMap(sc), getPodMap(restored)
 	require.Len(t, expected, pods)
 	verifyPodResourceAllocation(t, &expected, &actual, "the checkpoint does not have the latest state")
+}
+
+// The V2 checkpoint stores whole containers, so a full container spec survives a restart without
+// a format change.
+func Test_stateCheckpoint_containersSurviveRestart(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	testDir := getTestDir(t)
+	podUID := types.UID("pod-1")
+	main := &v1.Container{
+		Name:         "main",
+		Image:        "image",
+		VolumeMounts: []v1.VolumeMount{{Name: "vol", MountPath: "/vol"}},
+		Lifecycle:    &v1.Lifecycle{PreStop: &v1.LifecycleHandler{Exec: &v1.ExecAction{Command: []string{"stop"}}}},
+	}
+
+	sc, err := NewStateCheckpoint(logger, testDir, testCheckpoint, nil)
+	require.NoError(t, err)
+	require.NoError(t, sc.SetContainer(logger, podUID, podutil.Containers, *main))
+	require.NoError(t, sc.SetContainer(logger, podUID, podutil.Containers, v1.Container{Name: "removed", Image: "image"}))
+	require.NoError(t, sc.RemoveContainers(logger, podUID, podutil.Containers, "removed"))
+
+	restored, err := NewStateCheckpoint(logger, testDir, testCheckpoint, nil)
+	require.NoError(t, err)
+	got, ok := restored.GetContainer(podUID, "main", podutil.Containers)
+	require.True(t, ok)
+	assert.Equal(t, main, got)
+	_, ok = restored.GetContainer(podUID, "removed", podutil.Containers)
+	assert.False(t, ok)
+}
+
+// The actuated state keeps pod-level resources in its V2 pod list but leaves them out of the
+// legacy V1 entries, which the allocated state still writes them to.
+func Test_stateCheckpoint_v1PodLevelResources(t *testing.T) {
+	podResources := requirements("500m", "512Mi")
+	for name, tc := range map[string]struct {
+		newState func(klog.Logger, string, string, func(*v1.Pod)) (State, error)
+		wantV1   *v1.ResourceRequirements
+	}{
+		"allocated": {newState: NewStateCheckpoint, wantV1: &podResources},
+		"actuated":  {newState: NewActuatedStateCheckpoint},
+	} {
+		t.Run(name, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
+			testDir := getTestDir(t)
+			sc, err := tc.newState(logger, testDir, testCheckpoint, nil)
+			require.NoError(t, err)
+			require.NoError(t, sc.SetPodLevelResources(logger, "pod-1", &podResources))
+
+			restored, err := tc.newState(logger, testDir, testCheckpoint, nil)
+			require.NoError(t, err)
+			got, _ := restored.GetPodLevelResources("pod-1")
+			requireNoDiff(t, &podResources, got, "pod-level resources restored from the V2 pod list")
+
+			file, err := os.ReadFile(filepath.Join(testDir, testCheckpoint))
+			require.NoError(t, err)
+			requireNoDiff(t, tc.wantV1, readLegacyFile(t, file)["pod-1"].PodLevelResources, "pod-level resources in the V1 entries")
+		})
+	}
 }

@@ -28,6 +28,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	k8stypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/metrics"
@@ -35,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/csi"
 
 	resourcehelper "k8s.io/component-helpers/resource"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
@@ -102,6 +104,14 @@ type DesiredStateOfWorld interface {
 
 	// GetVolumeName returns the UniqueVolumeName for the given pod, indexed by outerVolumeSpecName.
 	GetVolumeNamesForPod(podName types.UniquePodName) map[string]v1.UniqueVolumeName
+
+	// GetDynamicVolumeNamesForPod returns the pod-level volume names of supported dynamic
+	// volumes currently present in DSW for the given pod.
+	GetDynamicVolumeNamesForPod(podName types.UniquePodName) sets.Set[string]
+
+	// SetOnDynamicVolumeRemoved registers a callback invoked after DeletePodFromVolume
+	// removes a supported dynamic volume for a pod.
+	SetOnDynamicVolumeRemoved(fn func(k8stypes.UID))
 
 	// GetVolumesToMount generates and returns a list of volumes that should be
 	// attached to this node and the pods they should be mounted to based on the
@@ -173,6 +183,8 @@ type desiredStateOfWorld struct {
 	podErrors map[types.UniquePodName]sets.Set[string]
 	// seLinuxTranslator translates v1.SELinuxOptions to a file SELinux label.
 	seLinuxTranslator util.SELinuxLabelTranslator
+	// onDynamicVolumeRemoved is notified after a supported dynamic volume is removed for a pod.
+	onDynamicVolumeRemoved func(k8stypes.UID)
 
 	sync.RWMutex
 }
@@ -313,7 +325,9 @@ func (dsw *desiredStateOfWorld) AddPodToVolume(
 		var sizeLimit *resource.Quantity
 		if volumeSpec.Volume != nil {
 			if util.IsLocalEphemeralVolume(*volumeSpec.Volume) {
-				podLimits := resourcehelper.PodLimits(pod, resourcehelper.PodResourcesOptions{})
+				podLimits := resourcehelper.PodLimits(pod, resourcehelper.PodResourcesOptions{
+					UseExtraNodeAllocatableResources: feature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources),
+				})
 				ephemeralStorageLimit := podLimits[v1.ResourceEphemeralStorage]
 				sizeLimit = resource.NewQuantity(ephemeralStorageLimit.Value(), resource.BinarySI)
 				if volumeSpec.Volume.EmptyDir != nil &&
@@ -455,21 +469,35 @@ func (dsw *desiredStateOfWorld) MarkVolumesReportedInUse(
 	}
 }
 
+func (dsw *desiredStateOfWorld) SetOnDynamicVolumeRemoved(fn func(k8stypes.UID)) {
+	dsw.Lock()
+	defer dsw.Unlock()
+	dsw.onDynamicVolumeRemoved = fn
+}
+
 func (dsw *desiredStateOfWorld) DeletePodFromVolume(
 	podName types.UniquePodName, volumeName v1.UniqueVolumeName) {
 	dsw.Lock()
-	defer dsw.Unlock()
 
 	delete(dsw.podErrors, podName)
 
 	volumeObj, volumeExists := dsw.volumesToMount[volumeName]
 	if !volumeExists {
+		dsw.Unlock()
 		return
 	}
 
-	if _, podExists := volumeObj.podsToMount[podName]; !podExists {
+	podObj, podExists := volumeObj.podsToMount[podName]
+	if !podExists {
+		dsw.Unlock()
 		return
 	}
+
+	notify := dsw.onDynamicVolumeRemoved != nil &&
+		podObj.volumeSpec != nil &&
+		podObj.volumeSpec.Volume != nil &&
+		podutil.IsSupportedDynamicVolumeSource(&podObj.volumeSpec.Volume.VolumeSource)
+	onRemoved := dsw.onDynamicVolumeRemoved
 
 	// Delete pod if it exists
 	delete(dsw.volumesToMount[volumeName].podsToMount, podName)
@@ -477,6 +505,11 @@ func (dsw *desiredStateOfWorld) DeletePodFromVolume(
 	if len(dsw.volumesToMount[volumeName].podsToMount) == 0 {
 		// Delete volume if no child pods left
 		delete(dsw.volumesToMount, volumeName)
+	}
+	dsw.Unlock()
+
+	if notify {
+		onRemoved(k8stypes.UID(podName))
 	}
 }
 
@@ -581,6 +614,27 @@ func (dsw *desiredStateOfWorld) GetVolumeNamesForPod(podName types.UniquePodName
 		}
 	}
 	return volumeNames
+}
+
+func (dsw *desiredStateOfWorld) GetDynamicVolumeNamesForPod(podName types.UniquePodName) sets.Set[string] {
+	dsw.RLock()
+	defer dsw.RUnlock()
+
+	var names sets.Set[string]
+	for _, volumeObj := range dsw.volumesToMount {
+		podObj, ok := volumeObj.podsToMount[podName]
+		if !ok || podObj.volumeSpec == nil || podObj.volumeSpec.Volume == nil ||
+			!podutil.IsSupportedDynamicVolumeSource(&podObj.volumeSpec.Volume.VolumeSource) {
+			continue
+		}
+		if names == nil {
+			names = sets.New[string]()
+		}
+		for _, outerName := range podObj.outerVolumeSpecNames {
+			names.Insert(outerName)
+		}
+	}
+	return names
 }
 
 func (dsw *desiredStateOfWorld) GetVolumesToMount() []VolumeToMount {

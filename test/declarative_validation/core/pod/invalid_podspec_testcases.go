@@ -19,6 +19,7 @@ package pod
 import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	podtest "k8s.io/kubernetes/pkg/api/pod/testing"
+	"k8s.io/kubernetes/pkg/apis/core"
 )
 
 // PodSpecTestcase holds a declarative validation testcase for podspec validation
@@ -32,7 +33,7 @@ type PodSpecTestcase struct {
 }
 
 func InvalidPodSpecTestcases(fldPath *field.Path) []PodSpecTestcase {
-	return []PodSpecTestcase{
+	testcases := []PodSpecTestcase{
 		{
 			ID:     "containers_required",
 			Tweaks: []podtest.Tweak{podtest.SetContainers()},
@@ -40,5 +41,31 @@ func InvalidPodSpecTestcases(fldPath *field.Path) []PodSpecTestcase {
 				field.Required(fldPath.Child("containers"), "").MarkAlpha(),
 			},
 		},
+		{
+			ID: "securityContext_cgroupOptions_mountMode_notSupported",
+			Tweaks: []podtest.Tweak{func(pod *core.Pod) {
+				c := pod.Spec.Containers[0]
+				c.SecurityContext = &core.SecurityContext{CgroupOptions: &core.CgroupOptions{MountMode: new(core.CgroupMountMode("Invalid"))}}
+
+				c.Name = "container0"
+				pod.Spec.Containers = []core.Container{c}
+
+				c.Name = "initcontainer0"
+				pod.Spec.InitContainers = []core.Container{c}
+			}},
+			ExpectedErrs: field.ErrorList{
+				field.NotSupported(fldPath.Child("containers").Index(0).Child("securityContext", "cgroupOptions", "mountMode"), "Invalid", []string{}),
+				field.NotSupported(fldPath.Child("initContainers").Index(0).Child("securityContext", "cgroupOptions", "mountMode"), "Invalid", []string{}),
+			},
+		},
+		{
+			ID:     "podNetwork_unsupported_value",
+			Tweaks: []podtest.Tweak{podtest.SetPodNetwork(core.PodNetwork("Bridge"))},
+			ExpectedErrs: field.ErrorList{
+				field.Forbidden(fldPath.Child("podNetwork"), "").MarkFromImperative(),
+				field.NotSupported(fldPath.Child("podNetwork"), core.PodNetwork("Bridge"), []core.PodNetwork{}),
+			},
+		},
 	}
+	return append(testcases, securityProfileOCITestcases(fldPath)...)
 }

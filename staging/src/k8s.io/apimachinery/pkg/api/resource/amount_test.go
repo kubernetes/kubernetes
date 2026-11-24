@@ -252,13 +252,7 @@ func TestScaleInfScale(t *testing.T) {
 		{"negative scale flips sign", -3, 3, true},
 		{"zero", 0, 0, true},
 		{"MinInt32+1 flips sign", math.MinInt32 + 1, math.MaxInt32, true},
-		// Scale is an int32 and infScale returns inf.Scale(-s). Negating
-		// math.MinInt32 does not fit in an int32, so the sign is not flipped
-		// and the value stays math.MinInt32 - the same int-negation edge as
-		// -mostNegative for int64. This asserts that behavior of infScale
-		// directly (it is exercised on the inf.Dec path, e.g. ScaledValue on
-		// a Dec-backed Quantity; the int64 backend does not call it).
-		{"MinInt32 does not flip sign", math.MinInt32, math.MinInt32, false},
+		{"MinInt32 flips sign", math.MinInt32, math.MaxInt32, false},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			if got, gotOK := test.scale.infScale(); got != test.result || gotOK != test.resultOK {

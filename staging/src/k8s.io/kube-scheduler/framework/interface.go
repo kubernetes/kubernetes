@@ -443,6 +443,21 @@ type Plugin interface {
 	Name() string
 }
 
+// RelevancePlugin allows a scheduling plugin to declare whether it has been adapted
+// to evaluate pods with a deferred in-place resize. When the
+// InPlacePodVerticalScalingSchedulerPreemption feature is enabled, the framework
+// skips plugins that don't implement this interface or return false from
+// IsRelevantForPodResize when evaluating such pods.
+type RelevancePlugin interface {
+	Plugin
+	// IsRelevantForPodResize reports whether this plugin is adapted to evaluate
+	// pods with a deferred in-place resize. When it returns false, the framework
+	// skips all of its extension points during the scheduling cycle and preemption,
+	// and skips its PreEnqueue check. QueueSort, Sign and EnqueueExtensions are unaffected.
+	// Reserve and Unreserve never run for a pod with a deferred resize, relevant or not.
+	IsRelevantForPodResize() bool
+}
+
 // PreEnqueuePlugin is an interface that must be implemented by "PreEnqueue" plugins.
 // These plugins are called prior to adding Pods to activeQ or backoffQ.
 // Note: an preEnqueue plugin is expected to be lightweight and efficient, so it's not expected to
@@ -602,11 +617,17 @@ type PostFilterPlugin interface {
 }
 
 // PodGroupSchedulingFunc is a function that will be run to check feasibility of a pod group scheduling.
-type PodGroupSchedulingFunc func(ctx context.Context) (*PodGroupAssignments, *Status)
+// Callers should pass a fresh PodGroupCycleState from Handle.NewPodGroupCycleState() (or nil when no
+// pre-populated state is needed) rather than the outer cycle's PodGroupCycleState so inner per-pod
+// plugins do not overwrite state from the initial cycle.
+type PodGroupSchedulingFunc func(ctx context.Context, state PodGroupCycleState) (*PodGroupAssignments, *Status)
 
 // PodGroupPostFilterResult stores information about nominated nodes for a pod group.
 type PodGroupPostFilterResult struct {
-	// NominatingInfos maps pods in the pod group to their nominated node info. It only contains pods that have a nominated node.
+	// NominatingInfos maps pods in the pod group to their nominated node info.
+	// When PodGroupPostFilter returns Success, pods absent from NominatingInfos (or mapped to nil,
+	// including when PodGroupPostFilterResult itself is nil) have their existing nomination cleared;
+	// plugins can specify ModeNoop to leave a pod's existing nomination unchanged.
 	NominatingInfos map[types.NamespacedName]*NominatingInfo
 }
 
@@ -913,6 +934,10 @@ type Handle interface {
 	// Only PodGroupPostFilter extension point can use this.
 	MutableSnapshotSharedLister() MutableSnapshotSharedLister
 
+	// NewPodGroupCycleState returns a fresh, empty PodGroupCycleState that can be populated
+	// and passed to PodGroupSchedulingFunc during PodGroupPostFilter evaluation.
+	NewPodGroupCycleState() PodGroupCycleState
+
 	// IterateOverWaitingPods acquires a read lock and iterates over the WaitingPods map.
 	IterateOverWaitingPods(callback func(WaitingPod))
 
@@ -987,10 +1012,23 @@ type Handle interface {
 
 // PreemptionManager is an interface that allows customization of the preemption logic.
 type PreemptionManager interface {
-	// GenerateVictims generates candidate victims for the PodGroup preemption.
+	// GenerateVictims generates candidate victims for the PodGroup preemption in order from most to least preferred for preemption.
 	// The preemption algorithm attempts to reprieve victims in reverse order, from last to first.
 	// The preemption algorithm will pass through unsuccessful status to the caller.
 	GenerateVictims(ctx context.Context, pgInfo PodGroupInfo) ([]PreemptionVictim, *Status)
+
+	// CompareVictimSets compares the preemption cost of two sets of victims when ranking
+	// candidate nodes during PodGroup preemption evaluation.
+	// Each set contains the deduplicated subset of victims from [PreemptionManager.GenerateVictims]
+	// that have at least one pod on a candidate node and have not yet been condemned by earlier
+	// pods in the PodGroup, ordered in reverse of [PreemptionManager.GenerateVictims]
+	// (from least preferred to most preferred for preemption).
+	// Implementations must not mutate set1 or set2, and may assume that the provided
+	// PreemptionVictims have the same underlying type as returned by [PreemptionManager.GenerateVictims].
+	// Returns < 0 if set1 is more preferred to preempt than set2,
+	// > 0 if set1 is less preferred to preempt than set2,
+	// and 0 if both sets have equal preemption preference.
+	CompareVictimSets(ctx context.Context, set1, set2 []PreemptionVictim) int
 
 	// Executor returns a [PreemptionExecutor] that can be used to actuate preemption or check preemption status.
 	Executor() PreemptionExecutor
@@ -1022,17 +1060,23 @@ type ReprieveFilter interface {
 
 // PreemptionVictim represents a preemption unit that abstracts individual Pods and PodGroups,
 // ensuring that atomic entities are treated as a single unit during eviction.
+// Implementations must be comparable at runtime so they can be used as map/set keys
+// (for example, pointer types), and distinct victim units must not compare equal.
+// [PreemptionManager] implementations may also assert their own concrete type to access
+// additional properties beyond this interface.
 type PreemptionVictim interface {
 	// Pods returns the list of all Pods that belong to this preemption unit.
 	// Evicting this unit implies evicting all Pods in this list.
 	Pods() []PodInfo
 
 	// NumPDBViolations returns the number of PDB violations that evicting this victim would cause.
-	// This value is used for metrics and doesn't impact victim selection.
+	// Outside of [PreemptionManager] (which may use it when ordering or comparing victims),
+	// this value is only used to report metrics for the selected victims.
 	NumPDBViolations() int
 
 	// Type returns the type of the preemption unit.
-	// This value is used for metrics and doesn't impact victim selection.
+	// Outside of [PreemptionManager] (which may use it when ordering or comparing victims),
+	// this value is only used to report metrics for the selected victims.
 	Type() EntityKeyType
 }
 

@@ -1,10 +1,10 @@
 diff --git a/staging/src/k8s.io/apiserver/pkg/storage/cacher/cache_watcher.go b/staging/src/k8s.io/apiserver/pkg/storage/cacher/cache_watcher.go
-index d2f388d1fb4..7e6a3210b19 100644
+index 7e6030d263a..a462bdfebae 100644
 --- a/staging/src/k8s.io/apiserver/pkg/storage/cacher/cache_watcher.go
 +++ b/staging/src/k8s.io/apiserver/pkg/storage/cacher/cache_watcher.go
-@@ -398,13 +398,10 @@ func (c *cacheWatcher) convertToWatchEvent(event *watchCacheEvent) *watch.Event
+@@ -437,13 +437,10 @@ func (c *cacheWatcher) convertToWatchEvent(event *watchCacheEvent) *watch.Event
  	case curObjPasses && oldObjPasses:
- 		return &watch.Event{Type: watch.Modified, Object: getMutableObject(event.Object)}
+ 		return &watch.Event{Type: watch.Modified, Object: getShallowCopyObject(event.Object)}
  	case !curObjPasses && oldObjPasses:
 -		// return a delete event with the previous object content, but with the event's resource version
 +		// BUG REVERT (#58545): deliberately omit stamping the event's resource version

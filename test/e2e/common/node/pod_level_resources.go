@@ -28,9 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/common/node/framework/cgroups"
-	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -43,7 +41,29 @@ var (
 	cmd = e2epod.InfiniteSleepCommand
 )
 
-var _ = SIGDescribe("Pod Level Resources", framework.WithSerial(), feature.PodLevelResources, framework.WithFeatureGate(features.PodLevelResources), func() {
+var _ = SIGDescribe("Pod Level Resources", func() {
+	f := framework.NewDefaultFramework("pod-level-resources-conformance")
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+
+	/*
+		Release : v1.38
+		Testname: Pod Level Resources Spec and QoS
+		Description: Ensure pods created with pod-level resources (requests and limits) are successfully created with correct pod-level resources defaulted and assigned appropriate QoS class.
+		[LinuxOnly]: This test is marked as LinuxOnly since the Windows kubelet rejects pods that set pod-level resources.
+	*/
+	framework.ConformanceIt("should support pod-level resource limits and requests specification [LinuxOnly]", func(ctx context.Context) {
+		podMetadata := makeObjectMetadata("testpod", f.Namespace.Name)
+		testPod := makePod(&podMetadata, &cgroups.ContainerResources{CPUReq: "100m", CPULim: "100m", MemReq: "100Mi", MemLim: "100Mi"}, []containerInfo{{Name: "c1"}, {Name: "c2"}}, false)
+
+		podClient := e2epod.NewPodClient(f)
+		pod := podClient.CreateSync(ctx, testPod)
+
+		verifyPodResources(*pod, &cgroups.ContainerResources{CPUReq: "100m", CPULim: "100m", MemReq: "100Mi", MemLim: "100Mi"}, &cgroups.ContainerResources{CPUReq: "100m", CPULim: "100m", MemReq: "100Mi", MemLim: "100Mi"})
+		verifyQoS(*pod, v1.PodQOSGuaranteed)
+	})
+})
+
+var _ = SIGDescribe("Pod Level Resources Node Cgroups", framework.WithSerial(), func() {
 	f := framework.NewDefaultFramework("pod-level-resources-tests")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
@@ -56,18 +76,20 @@ var _ = SIGDescribe("Pod Level Resources", framework.WithSerial(), feature.PodLe
 		}
 
 		// skip the test on nodes with cgroupv2 not enabled.
-		if !isCgroupv2Node(f, ctx) {
+		onCgroupV2, err := isCgroupv2Node(f, ctx)
+		framework.ExpectNoError(err)
+		if !onCgroupV2 {
 			e2eskipper.Skipf("not supported on cgroupv1 -- skipping")
 		}
 	})
-	podLevelResourcesTests(f)
+	podLevelResourcesTests(f, true)
 })
 
 // isCgroupv2Node creates a small pod and check if it is running on a node
 // with cgroupv2 enabled.
 // TODO: refactor to mark this test with cgroupv2 label, and rather check
 // the label in the test job, to tun this test on a node with cgroupv2.
-func isCgroupv2Node(f *framework.Framework, ctx context.Context) bool {
+func isCgroupv2Node(f *framework.Framework, ctx context.Context) (bool, error) {
 	podClient := e2epod.NewPodClient(f)
 	containerResources := cgroups.ContainerResources{CPULim: "1m", MemReq: "1Mi"}
 	cgroupv2Testpod := &v1.Pod{
@@ -91,12 +113,12 @@ func isCgroupv2Node(f *framework.Framework, ctx context.Context) bool {
 		framework.ExpectNoError(delErr, "delete pod %s", delErr)
 	}()
 
-	return cgroups.IsPodOnCgroupv2Node(f, pod.Name, pod.Spec.Containers[0].Name)
+	return cgroups.IsPodOnCgroupv2Node(f, pod, pod.Spec.Containers[0].Name)
 }
 
 func makeObjectMetadata(name, namespace string) metav1.ObjectMeta {
 	return metav1.ObjectMeta{
-		Name: "testpod", Namespace: namespace,
+		Name: name, Namespace: namespace,
 		Labels: map[string]string{"time": strconv.Itoa(time.Now().Nanosecond())},
 	}
 }
@@ -106,7 +128,7 @@ type containerInfo struct {
 	Resources *cgroups.ContainerResources
 }
 
-func makePod(metadata *metav1.ObjectMeta, podResources *cgroups.ContainerResources, containers []containerInfo) *v1.Pod {
+func makePod(metadata *metav1.ObjectMeta, podResources *cgroups.ContainerResources, containers []containerInfo, verifyCgroups bool) *v1.Pod {
 	var testContainers []v1.Container
 	for _, container := range containers {
 		c := cgroups.MakeContainerWithResources(container.Name, container.Resources, cmd)
@@ -120,7 +142,9 @@ func makePod(metadata *metav1.ObjectMeta, podResources *cgroups.ContainerResourc
 			Containers: testContainers,
 		},
 	}
-	cgroups.ConfigureHostPathForPodCgroup(pod)
+	if verifyCgroups {
+		cgroups.ConfigureHostPathForPodCgroup(pod)
+	}
 
 	if podResources != nil {
 		res := podResources.ResourceRequirements()
@@ -146,7 +170,7 @@ func verifyQoS(gotPod v1.Pod, expectedQoS v1.PodQOSClass) {
 	gomega.Expect(expectedQoS).To(gomega.Equal(gotPod.Status.QOSClass))
 }
 
-func podLevelResourcesTests(f *framework.Framework) {
+func podLevelResourcesTests(f *framework.Framework, verifyCgroups bool) {
 	type expectedPodConfig struct {
 		qos v1.PodQOSClass
 		// totalPodResources represents the aggregate resource requests
@@ -413,7 +437,7 @@ func podLevelResourcesTests(f *framework.Framework) {
 	for _, tc := range tests {
 		ginkgo.It(tc.name, func(ctx context.Context) {
 			podMetadata := makeObjectMetadata("testpod", f.Namespace.Name)
-			testPod := makePod(&podMetadata, tc.podResources, tc.containers)
+			testPod := makePod(&podMetadata, tc.podResources, tc.containers, verifyCgroups)
 
 			ginkgo.By("creating pods")
 			podClient := e2epod.NewPodClient(f)
@@ -429,13 +453,15 @@ func podLevelResourcesTests(f *framework.Framework) {
 			ginkgo.By("verifying pod QoS as expected")
 			verifyQoS(*pod, tc.expected.qos)
 
-			ginkgo.By("verifying pod cgroup values")
-			err := cgroups.VerifyPodCgroups(ctx, f, pod, tc.expected.totalPodResources)
-			framework.ExpectNoError(err, "verify pod's cgroup values: %v", err)
+			if verifyCgroups {
+				ginkgo.By("verifying pod cgroup values")
+				err := cgroups.VerifyPodCgroups(ctx, f, pod, tc.expected.totalPodResources)
+				framework.ExpectNoError(err, "verify pod's cgroup values: %v", err)
 
-			ginkgo.By("verifying containers cgroup limits are same as pod container's cgroup limits")
-			err = verifyContainersCgroupLimits(ctx, f, pod)
-			framework.ExpectNoError(err, "verify containers cgroup values: %v", err)
+				ginkgo.By("verifying containers cgroup limits are same as pod container's cgroup limits")
+				err = verifyContainersCgroupLimits(ctx, f, pod)
+				framework.ExpectNoError(err, "verify containers cgroup values: %v", err)
+			}
 
 			ginkgo.By("deleting pods")
 			delErr := e2epod.DeletePodWithWait(ctx, f.ClientSet, pod)
@@ -481,7 +507,7 @@ func podLevelResourcesFixDefaultingTests(f *framework.Framework) {
 		expectedResources := &cgroups.ContainerResources{CPUReq: "100m", CPULim: "100m", MemReq: "100Mi", MemLim: "100Mi"}
 
 		podMetadata := makeObjectMetadata("testpod", f.Namespace.Name)
-		testPod := makePod(&podMetadata, podResources, containers)
+		testPod := makePod(&podMetadata, podResources, containers, true)
 
 		ginkgo.By("creating pod")
 		podClient := e2epod.NewPodClient(f)
@@ -520,7 +546,7 @@ func podLevelResourcesFixDefaultingTests(f *framework.Framework) {
 		expectedResources := &cgroups.ContainerResources{CPUReq: "50m", CPULim: "50m", MemReq: "50Mi", MemLim: "50Mi"}
 
 		podMetadata := makeObjectMetadata("testpod-partial-req", f.Namespace.Name)
-		testPod := makePod(&podMetadata, podResources, containers)
+		testPod := makePod(&podMetadata, podResources, containers, true)
 
 		ginkgo.By("creating pod")
 		podClient := e2epod.NewPodClient(f)
@@ -544,7 +570,7 @@ func podLevelResourcesFixDefaultingTests(f *framework.Framework) {
 	})
 }
 
-var _ = SIGDescribe("Pod Level Resources Fix Defaulting", framework.WithSerial(), framework.WithFeatureGate(features.PodLevelResources), framework.WithFeatureGate(features.PodLevelResourcesFixDefaulting), func() {
+var _ = SIGDescribe("Pod Level Resources Fix Defaulting", framework.WithSerial(), func() {
 	f := framework.NewDefaultFramework("pod-level-resources-fix-defaulting-tests")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
@@ -556,7 +582,9 @@ var _ = SIGDescribe("Pod Level Resources Fix Defaulting", framework.WithSerial()
 			e2eskipper.Skipf("not supported on windows -- skipping")
 		}
 
-		if !isCgroupv2Node(f, ctx) {
+		onCgroupV2, err := isCgroupv2Node(f, ctx)
+		framework.ExpectNoError(err)
+		if !onCgroupV2 {
 			e2eskipper.Skipf("not supported on cgroupv1 -- skipping")
 		}
 	})

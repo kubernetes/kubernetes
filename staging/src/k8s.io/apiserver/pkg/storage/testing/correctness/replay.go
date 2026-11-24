@@ -19,23 +19,19 @@ package correctness
 import (
 	"fmt"
 	"reflect"
-	"strconv"
 
 	"github.com/google/go-cmp/cmp"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/storage"
 )
 
-// Replay stores historical model states keyed by ResourceVersion and the
-// sequence of changes produced by replaying history.
+// Replay is a single-threaded history of monotonically advancing Model states
+// and changes, supporting reads and watch replay at arbitrary resource versions.
 type Replay struct {
-	newFunc   func() runtime.Object
-	versioner storage.Versioner
-
+	state   *Model
 	states  map[uint64]*Model
 	changes []Change
 }
@@ -43,27 +39,57 @@ type Replay struct {
 // NewReplay creates a Replay initialized with initialState and replays history on it.
 func NewReplay(initialState *Model, history []Operation) (*Replay, error) {
 	state := initialState.Clone()
-	states := map[uint64]*Model{
-		state.ResourceVersion: state,
+	r := &Replay{
+		state:  state,
+		states: map[uint64]*Model{state.ResourceVersion: state},
 	}
-	var changes []Change
 	for i, op := range history {
-		ok, next, change := state.Step(op.Request, op.Response)
+		ok, next, change := r.state.Step(op.Request, op.Response)
 		if !ok {
 			return nil, fmt.Errorf("operation %d failed model step: req=%+v resp=%+v", i, op.Request, op.Response)
 		}
-		state = next
-		states[state.ResourceVersion] = state
-		if change != nil {
-			changes = append(changes, *change)
+		r.recordState(next, change)
+	}
+	return r, nil
+}
+
+func (r *Replay) recordState(next *Model, change *Change) {
+	if next.ResourceVersion < r.state.ResourceVersion {
+		panic(fmt.Sprintf("resource version went backwards from %d to %d", r.state.ResourceVersion, next.ResourceVersion))
+	}
+	if next.CompactResourceVersion < r.state.CompactResourceVersion {
+		panic(fmt.Sprintf("compact resource version went backwards from %d to %d", r.state.CompactResourceVersion, next.CompactResourceVersion))
+	}
+	if change != nil {
+		if change.ResourceVersion != next.ResourceVersion || change.ResourceVersion <= r.state.ResourceVersion {
+			panic(fmt.Sprintf("invalid change resource version %d (prev=%d, next=%d)", change.ResourceVersion, r.state.ResourceVersion, next.ResourceVersion))
+		}
+		r.changes = append(r.changes, *change)
+	}
+	r.state = next
+	r.states[next.ResourceVersion] = next
+}
+
+func (r *Replay) execute(req Request) (Response, *Change) {
+	resp, next, change := r.state.execute(req)
+	if resp.Err == nil {
+		r.recordState(next, change)
+	}
+	if resp.Err == nil && req.Op == OpList {
+		if consistency, rv, _, err := ListReadConsistency("", r.state.Versioner, req.List.Options); err == nil && consistency == ConsistencyExact {
+			if state, ok := r.states[rv]; ok {
+				resp = state.list(req.Key, req.List.Options)
+			}
 		}
 	}
-	return &Replay{
-		newFunc:   initialState.NewFunc,
-		versioner: initialState.Versioner,
-		states:    states,
-		changes:   changes,
-	}, nil
+	return resp, change
+}
+
+func (r *Replay) increaseRV() uint64 {
+	next := r.state.Clone()
+	next.ResourceVersion++
+	r.recordState(next, nil)
+	return r.state.ResourceVersion
 }
 
 // Validate checks that the response of a non-consistent read matches the
@@ -85,7 +111,7 @@ func (r *Replay) validateGet(req Request, resp Response) error {
 	if consistency == ConsistencyConsistent {
 		return nil
 	}
-	reqRV, err := r.versioner.ParseResourceVersion(opts.ResourceVersion)
+	reqRV, err := r.state.Versioner.ParseResourceVersion(opts.ResourceVersion)
 	if err != nil || storage.IsTooLargeResourceVersion(resp.Err) {
 		return nil
 	}
@@ -107,7 +133,7 @@ func (r *Replay) validateList(req Request, resp Response) error {
 	if resp.Err != nil {
 		return nil
 	}
-	consistency, _, _, err := ListReadConsistency("", r.versioner, req.List.Options)
+	consistency, _, _, err := ListReadConsistency("", r.state.Versioner, req.List.Options)
 	if err != nil {
 		return err
 	}
@@ -121,7 +147,7 @@ func (r *Replay) validateList(req Request, resp Response) error {
 	if err != nil {
 		return err
 	}
-	respRV, err := r.versioner.ParseResourceVersion(accessor.GetResourceVersion())
+	respRV, err := r.state.Versioner.ParseResourceVersion(accessor.GetResourceVersion())
 	if err != nil {
 		return err
 	}
@@ -136,35 +162,78 @@ func (r *Replay) validateList(req Request, resp Response) error {
 	return nil
 }
 
-func (r *Replay) Watch(request WatchRequest) ([]watch.Event, error) {
-	var events []watch.Event
-	rv := r.ResourceVersion()
-	requestedRV, err := r.versioner.ParseResourceVersion(request.Options.ResourceVersion)
+// Watch opens request against the historical state at openRV and replays all
+// subsequent matching events up to r.ResourceVersion().
+func (r *Replay) Watch(request WatchRequest, openRV uint64) ([]watch.Event, error) {
+	events, nextRV, closed, err := r.watch(request, openRV)
+	if err != nil || closed {
+		return events, err
+	}
+	rest, err := r.EventsForRVs(request, &ResourceVersionRange{Min: nextRV, Max: r.ResourceVersion() + 1})
+	events = append(events, rest...)
 	if err != nil {
-		return nil, err
+		events = append(events, errorWatchEvent(err))
 	}
-	if request.Options.SendInitialEvents != nil && *request.Options.SendInitialEvents {
-		initialEvents, err := r.InitialEvents(request, rv)
-		if err != nil {
-			return nil, err
-		}
-		events = append(events, initialEvents...)
-		bookmark := r.newFunc()
-		accessor, err := meta.Accessor(bookmark)
-		if err != nil {
-			return nil, err
-		}
-		accessor.SetResourceVersion(strconv.FormatUint(rv, 10))
-		accessor.SetAnnotations(map[string]string{metav1.InitialEventsAnnotationKey: "true"})
-		events = append(events, watch.Event{Type: watch.Bookmark, Object: bookmark})
-		requestedRV = rv
-	}
-	streamEvents, err := r.EventsForRVs(request, &ResourceVersionRange{Min: requestedRV + 1, Max: rv + 1})
-	if err != nil {
-		return nil, err
-	}
-	events = append(events, streamEvents...)
 	return events, nil
+}
+
+// watch evaluates opening request against the historical state at openRV,
+// returning initial or catchup events up to openRV, the next resource version
+// to stream after openRV, and whether the watch terminates after those events.
+func (r *Replay) watch(request WatchRequest, openRV uint64) (events []watch.Event, nextRV uint64, closed bool, err error) {
+	openState, ok := r.states[openRV]
+	if !ok {
+		return nil, 0, false, fmt.Errorf("resource version %d not found in history", openRV)
+	}
+	if err := checkWatchOptions(openState.Versioner, request); err != nil {
+		return nil, 0, false, err
+	}
+	opts := request.Options
+	requestedRV, err := openState.Versioner.ParseResourceVersion(opts.ResourceVersion)
+	if err != nil {
+		return nil, 0, false, err
+	}
+	sendInitial := opts.SendInitialEvents != nil && *opts.SendInitialEvents
+	legacyInitial := opts.SendInitialEvents == nil && requestedRV == 0
+	if sendInitial || legacyInitial {
+		if sendInitial && requestedRV > openRV {
+			return []watch.Event{errorWatchEvent(storage.NewTooLargeResourceVersionError(requestedRV, openRV, 1))}, 0, true, nil
+		}
+		initial, err := openState.initialEvents(request)
+		if err != nil {
+			return []watch.Event{errorWatchEvent(err)}, 0, true, nil
+		}
+		events = append(events, initial...)
+		if sendInitial && opts.Predicate.AllowWatchBookmarks {
+			bookmark, err := newBookmarkEvent(openState.NewFunc, openState.Versioner, openRV, true)
+			if err != nil {
+				return []watch.Event{errorWatchEvent(err)}, 0, true, nil
+			}
+			events = append(events, bookmark)
+		}
+		return events, openRV + 1, false, nil
+	}
+	if requestedRV == 0 {
+		return nil, openRV + 1, false, nil
+	}
+	if requestedRV < openState.CompactResourceVersion {
+		return []watch.Event{errorWatchEvent(apierrors.NewResourceExpired("The resourceVersion for the provided watch is too old."))}, 0, true, nil
+	}
+	catchup, err := r.EventsForRVs(request, &ResourceVersionRange{Min: requestedRV + 1, Max: openRV + 1})
+	events = append(events, catchup...)
+	if err != nil {
+		events = append(events, errorWatchEvent(err))
+		return events, 0, true, nil
+	}
+	if opts.ProgressNotify && openRV > requestedRV {
+		bookmark, err := newBookmarkEvent(openState.NewFunc, openState.Versioner, openRV, false)
+		if err != nil {
+			events = append(events, errorWatchEvent(err))
+			return events, 0, true, nil
+		}
+		events = append(events, bookmark)
+	}
+	return events, max(requestedRV, openRV) + 1, false, nil
 }
 
 func (r *Replay) InitialEvents(request WatchRequest, rv uint64) ([]watch.Event, error) {
@@ -184,9 +253,9 @@ func (r *Replay) EventsForRVs(request WatchRequest, rvRange *ResourceVersionRang
 		if !keyInScope(request.Key, request.Options.Recursive, change.Key) {
 			continue
 		}
-		watchEvent, err := change.toWatchEvent(r.versioner, request.Options.Predicate)
+		watchEvent, err := change.toWatchEvent(r.state.NewFunc, r.state.Versioner, r.state.ReverseKeyFunc, request.Options)
 		if err != nil {
-			return nil, err
+			return filtered, err
 		}
 		if watchEvent != nil {
 			filtered = append(filtered, *watchEvent)
@@ -196,5 +265,5 @@ func (r *Replay) EventsForRVs(request WatchRequest, rvRange *ResourceVersionRang
 }
 
 func (r *Replay) ResourceVersion() uint64 {
-	return r.changes[len(r.changes)-1].ResourceVersion
+	return r.state.ResourceVersion
 }

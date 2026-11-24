@@ -9,7 +9,6 @@
 #       private image pulls
 gcr.io/k8s-authenticated-test/agnhost
 invalid.registry.k8s.io/invalid/alpine
-registry.k8s.io/build-image/distroless-iptables
 registry.k8s.io/cloud-provider-gcp/gcp-compute-persistent-disk-csi-driver
 registry.k8s.io/e2e-test-images/agnhost
 registry.k8s.io/e2e-test-images/apparmor-loader

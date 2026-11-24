@@ -56,6 +56,7 @@ func minRegularContainerMemory(pod *v1.Pod) int64 {
 // calculate oom score adjustment.
 // See https://github.com/kubernetes/enhancements/blob/master/keps/sig-node/2837-pod-level-resource-spec/README.md#oom-score-adjustment
 // for more details.
+// pod.Spec.Resources must be non-nil. Returns 0 if the pod-level memory request is unset.
 func remainingPodMemReqPerContainer(pod *v1.Pod) int64 {
 	var remainingMemory int64
 	if pod.Spec.Resources.Requests.Memory().IsZero() {
@@ -64,7 +65,7 @@ func remainingPodMemReqPerContainer(pod *v1.Pod) int64 {
 	numContainers := len(pod.Spec.Containers) + len(pod.Spec.InitContainers)
 	// Aggregated requests of all containers (including DRA if enabled).
 	opts := resourcehelper.PodResourcesOptions{
-		UseDRANodeAllocatableResourceClaimStatus: utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources),
+		UseExtraNodeAllocatableResources: utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources),
 	}
 	aggrContainerReqs := resourcehelper.AggregateContainerRequests(pod, opts)
 	remainingMemory = pod.Spec.Resources.Requests.Memory().Value() - aggrContainerReqs.Memory().Value()

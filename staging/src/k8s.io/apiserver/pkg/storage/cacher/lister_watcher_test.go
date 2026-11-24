@@ -24,6 +24,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/apis/example"
 	"k8s.io/apiserver/pkg/features"
@@ -64,7 +65,7 @@ func TestListerWatcherWatchOptions(t *testing.T) {
 				capturedOpts = opts
 				return watch.NewEmptyWatch(), nil
 			}}
-			lw := NewListerWatcher(backingStorage, "/pods/", newPodList, nil)
+			lw := NewListerWatcher(backingStorage, "/pods/", cachertesting.NewPodList, nil)
 			w, err := cache.ToListerWatcherWithContext(lw).WatchWithContext(context.Background(), tc.options)
 			require.NoError(t, err)
 			defer w.Stop()
@@ -85,7 +86,7 @@ func TestDoesClientSupportWatchListSemanticsForKubeClient(t *testing.T) {
 		t.Fatalf("cachertesting.MockStorage should NOT support WatchList semantics")
 	}
 
-	server, target2 := newEtcdTestStorage(t, "/pods/")
+	server, target2 := cachertesting.NewEtcdTestStorage(t, "/pods/")
 	defer server.Terminate(t)
 
 	if watchlist.DoesClientNotSupportWatchListSemantics(target2) {
@@ -96,7 +97,7 @@ func TestDoesClientSupportWatchListSemanticsForKubeClient(t *testing.T) {
 func TestCacherListerWatcher(t *testing.T) {
 	prefix := "/pods/"
 	fn := func() runtime.Object { return &example.PodList{} }
-	server, store := newEtcdTestStorage(t, prefix)
+	server, store := cachertesting.NewEtcdTestStorage(t, prefix)
 	defer server.Terminate(t)
 
 	objects := []*example.Pod{
@@ -106,7 +107,7 @@ func TestCacherListerWatcher(t *testing.T) {
 	}
 	for _, obj := range objects {
 		out := &example.Pod{}
-		key := computePodKey(obj)
+		key := cachertesting.ComputePodKey(obj)
 		if err := store.Create(context.Background(), key, obj, out, 0); err != nil {
 			t.Fatalf("Create failed: %v", err)
 		}
@@ -130,7 +131,7 @@ func TestCacherListerWatcher(t *testing.T) {
 func TestCacherListerWatcherPagination(t *testing.T) {
 	prefix := "/pods/"
 	fn := func() runtime.Object { return &example.PodList{} }
-	server, store := newEtcdTestStorage(t, prefix)
+	server, store := cachertesting.NewEtcdTestStorage(t, prefix)
 	defer server.Terminate(t)
 
 	// We need the list to be sorted by name to later check the alphabetical order of
@@ -142,7 +143,7 @@ func TestCacherListerWatcherPagination(t *testing.T) {
 	}
 	for _, obj := range objects {
 		out := &example.Pod{}
-		key := computePodKey(obj)
+		key := cachertesting.ComputePodKey(obj)
 		if err := store.Create(context.Background(), key, obj, out, 0); err != nil {
 			t.Fatalf("Create failed: %v", err)
 		}
@@ -193,7 +194,7 @@ func TestCacherListerWatcherListWatch(t *testing.T) {
 
 	prefix := "/pods/"
 	fn := func() runtime.Object { return &example.PodList{} }
-	server, store := newEtcdTestStorage(t, prefix)
+	server, store := cachertesting.NewEtcdTestStorage(t, prefix)
 	defer server.Terminate(t)
 
 	makePodFn := func() *example.Pod {
@@ -203,7 +204,7 @@ func TestCacherListerWatcherListWatch(t *testing.T) {
 	}
 	ctx := context.TODO()
 	pod := makePodFn()
-	key := computePodKey(pod)
+	key := cachertesting.ComputePodKey(pod)
 	createdPod := &example.Pod{}
 	if err := store.Create(ctx, key, makePodFn(), createdPod, 0); err != nil {
 		t.Fatalf("Create failed: %v", err)
@@ -235,16 +236,17 @@ func TestCacherListerWatcherListWatch(t *testing.T) {
 		},
 	}
 
-	storagetesting.TestCheckResultsInStrictOrder(t, w, expectedWatchEvents)
+	storagetesting.ExpectWatchEventsExact(expectedWatchEvents).Check(t, w)
 	storagetesting.TestCheckNoMoreResultsWithIgnoreFunc(t, w, nil)
 }
 
 func TestCacherListerWatcherWhenListWatchDisabled(t *testing.T) {
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.37"))
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchList, false)
 
 	prefix := "/pods/"
 	fn := func() runtime.Object { return &example.PodList{} }
-	server, store := newEtcdTestStorage(t, prefix)
+	server, store := cachertesting.NewEtcdTestStorage(t, prefix)
 	defer server.Terminate(t)
 
 	lw := NewListerWatcher(store, prefix, fn, nil)
@@ -268,13 +270,15 @@ func TestCacherListerWatcherWhenListWatchDisabled(t *testing.T) {
 func TestListerWatcherListResourceVersionPropagation(t *testing.T) {
 	scenarios := []struct {
 		name                             string
+		emulationVersion                 string
 		options                          metav1.ListOptions
 		watchListEnabled                 bool
 		watchListConsistencyCheckEnabled bool
 		expectedStorageResourceVer       string
 	}{
 		{
-			name: "WatchList FG disabled - RV not propagated",
+			name:             "WatchList FG disabled - RV not propagated",
+			emulationVersion: "1.37",
 			options: metav1.ListOptions{
 				ResourceVersion:      "123",
 				ResourceVersionMatch: metav1.ResourceVersionMatchExact,
@@ -317,6 +321,9 @@ func TestListerWatcherListResourceVersionPropagation(t *testing.T) {
 
 	for _, scenario := range scenarios {
 		t.Run(scenario.name, func(t *testing.T) {
+			if scenario.emulationVersion != "" {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse(scenario.emulationVersion))
+			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchList, scenario.watchListEnabled)
 
 			backingStorage := &cachertesting.MockStorage{}

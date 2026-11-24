@@ -1380,6 +1380,44 @@ func TestUpdatePodGroupStateSnapshot(t *testing.T) {
 	}
 }
 
+// TestUpdateSnapshotRevertsSnapshotPodGroupMemberChanges verifies that pod group member changes
+// made directly on the snapshot are reverted by the next UpdateSnapshot.
+func TestUpdateSnapshotRevertsSnapshotPodGroupMemberChanges(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, true)
+	pod1 := st.MakePod().Namespace("ns").Name("pod1").UID("uid1").PodGroupName("pg1").Obj()
+	pod1Bound := st.MakePod().Namespace("ns").Name("pod1").UID("uid1").PodGroupName("pg1").Node("node1").Obj()
+	pod2 := st.MakePod().Namespace("ns").Name("pod2").UID("uid2").PodGroupName("pg2").Obj()
+	pod3 := st.MakePod().Namespace("ns").Name("pod3").UID("uid3").PodGroupName("pg3").Obj()
+
+	logger, ctx := ktesting.NewTestContext(t)
+	cache := newCache(ctx, time.Second, nil, true, false)
+	cache.AddPodGroupMember(pod1)
+	cache.AddPodGroupMember(pod2)
+	snapshot := NewEmptySnapshot()
+	if err := cache.UpdateSnapshot(logger, snapshot); err != nil {
+		t.Fatalf("UpdateSnapshot failed: %v", err)
+	}
+
+	// Modify pg1, delete pg2 and create pg3 in the snapshot only.
+	if err := snapshot.UpdatePodGroupMember(pod1, pod1Bound); err != nil {
+		t.Fatalf("UpdatePodGroupMember failed: %v", err)
+	}
+	if err := snapshot.RemovePodGroupMember(pod2); err != nil {
+		t.Fatalf("RemovePodGroupMember failed: %v", err)
+	}
+	if err := snapshot.AddPodGroupMember(pod3); err != nil {
+		t.Fatalf("AddPodGroupMember failed: %v", err)
+	}
+
+	if err := cache.UpdateSnapshot(logger, snapshot); err != nil {
+		t.Fatalf("UpdateSnapshot failed: %v", err)
+	}
+	want := createPodGroupStates([]*v1.Pod{pod1, pod2})
+	if diff := cmp.Diff(want, snapshot.podGroupStates, podGroupStateCmpOpts...); diff != "" {
+		t.Errorf("Unexpected pod group states (-want +got):\n%s", diff)
+	}
+}
+
 // TestBindingPodGroupMember simulates binding and tests that when an assumed or
 // unscheduled pod gets bound, its state within pod group becomes assigned.
 func TestBindingPodGroupMember(t *testing.T) {
@@ -1810,6 +1848,195 @@ func TestAssumePodGroupMember(t *testing.T) {
 				}
 				if inAssumed := pgs.AssumedPods().Has(tt.pod.UID); inAssumed != tt.expectInAssumed {
 					t.Errorf("pod in assumedPods: got %v, want %v", inAssumed, tt.expectInAssumed)
+				}
+			})
+		}
+	}
+}
+
+// initiallyScheduledUID returns the initiallyScheduledUID of the group state with the given key, and whether the state exists.
+func initiallyScheduledUID(cache *cacheImpl, key fwk.EntityKey) (types.UID, bool) {
+	if key.Type == fwk.CompositePodGroupKeyType {
+		cpgs, exists := cache.compositePodGroupStates[key]
+		if !exists {
+			return "", false
+		}
+		return cpgs.initiallyScheduledUID, true
+	}
+	pgs, exists := cache.podGroupStates[key]
+	if !exists {
+		return "", false
+	}
+	return pgs.initiallyScheduledUID, true
+}
+
+func TestAssumeGroupInitiallyScheduled(t *testing.T) {
+	groups := []struct {
+		group *fwk.GenericPodGroup
+		// updatedGroup is the group as observed from the informer, without the True condition set by the scheduler.
+		updatedGroup *fwk.GenericPodGroup
+	}{
+		{
+			group: fwk.NewGenericPodGroup(st.MakePodGroup().Namespace("ns").Name("pg").UID("uid").Obj()),
+			updatedGroup: fwk.NewGenericPodGroup(st.MakePodGroup().Namespace("ns").Name("pg").UID("uid").Conditions(metav1.Condition{
+				Type:   schedulingv1beta1.PodGroupInitiallyScheduled,
+				Status: metav1.ConditionFalse,
+				Reason: schedulingv1beta1.PodGroupReasonUnschedulable,
+			}).Obj()),
+		},
+		{
+			group: fwk.NewGenericCompositePodGroup(st.MakeCompositePodGroup().Namespace("ns").Name("cpg").UID("uid").Obj()),
+			updatedGroup: fwk.NewGenericCompositePodGroup(st.MakeCompositePodGroup().Namespace("ns").Name("cpg").UID("uid").Conditions(metav1.Condition{
+				Type:   schedulingv1beta1.CompositePodGroupInitiallyScheduled,
+				Status: metav1.ConditionFalse,
+				Reason: schedulingv1beta1.CompositePodGroupReasonUnschedulable,
+			}).Obj()),
+		},
+	}
+
+	tests := []struct {
+		name    string
+		inCache bool
+		// updated updates the group in the cache after AssumeGroupInitiallyScheduled.
+		updated    bool
+		wantExists bool
+		wantUID    types.UID
+	}{
+		{
+			name:       "group in the cache",
+			inCache:    true,
+			wantExists: true,
+			wantUID:    "uid",
+		},
+		{
+			name:       "group updated by the informer afterwards",
+			inCache:    true,
+			updated:    true,
+			wantExists: true,
+			wantUID:    "uid",
+		},
+		{
+			name: "group not in the cache",
+		},
+	}
+
+	for _, g := range groups {
+		for _, tt := range tests {
+			t.Run(fmt.Sprintf("%v, %v", g.group.GetType(), tt.name), func(t *testing.T) {
+				logger, ctx := ktesting.NewTestContext(t)
+				cache := newCache(ctx, time.Second, nil, true, true)
+				if tt.inCache {
+					cache.AddGenericPodGroup(g.group)
+				}
+
+				cache.AssumeGroupInitiallyScheduled(logger, g.group.GetKey(), "uid")
+
+				if tt.updated {
+					cache.UpdateGenericPodGroup(logger, g.updatedGroup)
+				}
+				uid, exists := initiallyScheduledUID(cache, g.group.GetKey())
+				if exists != tt.wantExists {
+					t.Fatalf("Expected group state to exist: %v, got %v", tt.wantExists, exists)
+				}
+				if uid != tt.wantUID {
+					t.Errorf("Expected initiallyScheduledUID %q, got %q", tt.wantUID, uid)
+				}
+			})
+		}
+	}
+}
+
+func TestIsGroupInitiallyScheduled(t *testing.T) {
+	groups := []struct {
+		group *fwk.GenericPodGroup
+		// groupWithoutUID is the group without a UID, as in test objects.
+		groupWithoutUID *fwk.GenericPodGroup
+		// scheduledGroup is the group with the True condition.
+		scheduledGroup *fwk.GenericPodGroup
+	}{
+		{
+			group:           fwk.NewGenericPodGroup(st.MakePodGroup().Namespace("ns").Name("pg").UID("uid").Obj()),
+			groupWithoutUID: fwk.NewGenericPodGroup(st.MakePodGroup().Namespace("ns").Name("pg").Obj()),
+			scheduledGroup: fwk.NewGenericPodGroup(st.MakePodGroup().Namespace("ns").Name("pg").UID("uid").Conditions(metav1.Condition{
+				Type:   schedulingv1beta1.PodGroupInitiallyScheduled,
+				Status: metav1.ConditionTrue,
+				Reason: schedulingv1beta1.PodGroupReasonScheduled,
+			}).Obj()),
+		},
+		{
+			group:           fwk.NewGenericCompositePodGroup(st.MakeCompositePodGroup().Namespace("ns").Name("cpg").UID("uid").Obj()),
+			groupWithoutUID: fwk.NewGenericCompositePodGroup(st.MakeCompositePodGroup().Namespace("ns").Name("cpg").Obj()),
+			scheduledGroup: fwk.NewGenericCompositePodGroup(st.MakeCompositePodGroup().Namespace("ns").Name("cpg").UID("uid").Conditions(metav1.Condition{
+				Type:   schedulingv1beta1.CompositePodGroupInitiallyScheduled,
+				Status: metav1.ConditionTrue,
+				Reason: schedulingv1beta1.CompositePodGroupReasonScheduled,
+			}).Obj()),
+		},
+	}
+
+	tests := []struct {
+		name string
+		// cachedGroup returns the group object stored in the cache, or nil to store none.
+		cachedGroup           func(group, groupWithoutUID, scheduledGroup *fwk.GenericPodGroup) *fwk.GenericPodGroup
+		initiallyScheduledUID types.UID
+		wantGroup             bool
+		want                  bool
+	}{
+		{
+			name:        "not set",
+			cachedGroup: func(group, _, _ *fwk.GenericPodGroup) *fwk.GenericPodGroup { return group },
+			wantGroup:   true,
+		},
+		{
+			name:                  "set for the group UID",
+			cachedGroup:           func(group, _, _ *fwk.GenericPodGroup) *fwk.GenericPodGroup { return group },
+			initiallyScheduledUID: "uid",
+			wantGroup:             true,
+			want:                  true,
+		},
+		{
+			name:                  "set for another UID",
+			cachedGroup:           func(group, _, _ *fwk.GenericPodGroup) *fwk.GenericPodGroup { return group },
+			initiallyScheduledUID: "recreated-uid",
+			wantGroup:             true,
+		},
+		{
+			name:        "not set for a group without a UID",
+			cachedGroup: func(_, groupWithoutUID, _ *fwk.GenericPodGroup) *fwk.GenericPodGroup { return groupWithoutUID },
+			wantGroup:   true,
+		},
+		{
+			name:        "True condition in the cached group",
+			cachedGroup: func(_, _, scheduledGroup *fwk.GenericPodGroup) *fwk.GenericPodGroup { return scheduledGroup },
+			wantGroup:   true,
+			want:        true,
+		},
+		{
+			name:        "group not in the cache",
+			cachedGroup: func(_, _, _ *fwk.GenericPodGroup) *fwk.GenericPodGroup { return nil },
+		},
+	}
+
+	for _, g := range groups {
+		for _, tt := range tests {
+			t.Run(fmt.Sprintf("%v, %v", g.group.GetType(), tt.name), func(t *testing.T) {
+				logger, ctx := ktesting.NewTestContext(t)
+				cache := newCache(ctx, time.Second, nil, true, true)
+				if cached := tt.cachedGroup(g.group, g.groupWithoutUID, g.scheduledGroup); cached != nil {
+					cache.AddGenericPodGroup(cached)
+					if cached.GetType() == fwk.CompositePodGroupKeyType {
+						cache.compositePodGroupStates[cached.GetKey()].initiallyScheduledUID = tt.initiallyScheduledUID
+					} else {
+						cache.podGroupStates[cached.GetKey()].initiallyScheduledUID = tt.initiallyScheduledUID
+					}
+				}
+
+				gpg, got := cache.IsGroupInitiallyScheduled(logger, g.group.GetKey())
+				if (gpg != nil) != tt.wantGroup {
+					t.Fatalf("IsGroupInitiallyScheduled(%v) returned group %v, want a group: %v", g.group.GetKey(), gpg, tt.wantGroup)
+				}
+				if got != tt.want {
+					t.Errorf("IsGroupInitiallyScheduled(%v) = %v, want %v", g.group.GetKey(), got, tt.want)
 				}
 			})
 		}

@@ -33,6 +33,7 @@ import (
 type batchHandle interface {
 	ProfileName() string
 	SnapshotSharedLister() fwk.SharedLister
+	NominatedNodeName(pod *v1.Pod) string
 	RunFilterPlugins(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status
 	RunPreScorePlugins(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) *fwk.Status
 	RunRawScorePlugins(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) ([]fwk.PluginScore, *fwk.Status)
@@ -79,6 +80,11 @@ func (b *OpportunisticBatch) SetDisabled(disabled bool) {
 	b.disabled = disabled
 	b.state = nil
 	b.lastCycle = schedulingCycle{}
+}
+
+// IsDisabled reports whether opportunistic batching is currently disabled.
+func (b *OpportunisticBatch) IsDisabled() bool {
+	return b == nil || b.disabled
 }
 
 // GetNodeHint provides a hint for the pod based on the filtering and scoring results of previous cycles. Caching works
@@ -219,7 +225,7 @@ func (b *OpportunisticBatch) batchStateCompatible(ctx context.Context, pod *v1.P
 	}
 
 	// Pods with a nominated node should bypass opportunistic batching.
-	if pod.Status.NominatedNodeName != "" {
+	if b.handle.NominatedNodeName(pod) != "" {
 		b.logUnusableState(logger, cycleCount, metrics.BatchFlushPodNominated)
 		return false
 	}

@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/klog/v2"
+	podutil "k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/pods"
 )
@@ -68,17 +69,15 @@ func (a *AlwaysPullImages) Admit(ctx context.Context, attributes admission.Attri
 		return apierrors.NewBadRequest("Resource was marked with kind Pod but was unable to be converted")
 	}
 
-	pods.VisitContainersWithPath(&pod.Spec, field.NewPath("spec"), func(c *api.Container, _ *field.Path) bool {
+	visitPulledContainers(attributes, pod, func(c *api.Container, _ *field.Path) bool {
 		c.ImagePullPolicy = api.PullAlways
 		return true
 	})
 
 	// See: https://kep.k8s.io/4639
-	for _, v := range pod.Spec.Volumes {
-		if v.Image != nil {
-			v.Image.PullPolicy = api.PullAlways
-		}
-	}
+	visitNewPulledImageVolumes(attributes, pod, func(img *api.ImageVolumeSource, _ *field.Path) {
+		img.PullPolicy = api.PullAlways
+	})
 
 	return nil
 }
@@ -95,7 +94,7 @@ func (*AlwaysPullImages) Validate(ctx context.Context, attributes admission.Attr
 	}
 
 	var allErrs []error
-	pods.VisitContainersWithPath(&pod.Spec, field.NewPath("spec"), func(c *api.Container, p *field.Path) bool {
+	visitPulledContainers(attributes, pod, func(c *api.Container, p *field.Path) bool {
 		if c.ImagePullPolicy != api.PullAlways {
 			allErrs = append(allErrs, admission.NewForbidden(attributes,
 				field.NotSupported(p.Child("imagePullPolicy"), c.ImagePullPolicy, []string{string(api.PullAlways)}),
@@ -105,17 +104,13 @@ func (*AlwaysPullImages) Validate(ctx context.Context, attributes admission.Attr
 	})
 
 	// See: https://kep.k8s.io/4639
-	for i, v := range pod.Spec.Volumes {
-		if v.Image != nil && v.Image.PullPolicy != api.PullAlways {
+	visitNewPulledImageVolumes(attributes, pod, func(img *api.ImageVolumeSource, p *field.Path) {
+		if img.PullPolicy != api.PullAlways {
 			allErrs = append(allErrs, admission.NewForbidden(attributes,
-				field.NotSupported(
-					field.NewPath("spec").Child("volumes").Index(i).Child("image").Child("pullPolicy"),
-					v.Image.PullPolicy,
-					[]string{string(api.PullAlways)},
-				),
+				field.NotSupported(p.Child("pullPolicy"), img.PullPolicy, []string{string(api.PullAlways)}),
 			))
 		}
-	}
+	})
 
 	if len(allErrs) > 0 {
 		return utilerrors.NewAggregate(allErrs)
@@ -124,7 +119,65 @@ func (*AlwaysPullImages) Validate(ctx context.Context, attributes admission.Attr
 	return nil
 }
 
-// check if it's update and it doesn't change the images referenced by the pod spec
+// visitPulledContainers visits the containers whose images must always be pulled, with their
+// paths. On a pods/dynamic update, these are only the containers it adds or changes the image of,
+// so that other existing containers, whose pull policy is immutable, aren't mutated. Ephemeral
+// containers can't change through pods/dynamic.
+func visitPulledContainers(attributes admission.Attributes, pod *api.Pod, visitor pods.ContainerVisitorWithPath) {
+	oldPod, ok := attributes.GetOldObject().(*api.Pod)
+	if attributes.GetSubresource() != "dynamic" || !ok {
+		pods.VisitContainersWithPath(&pod.Spec, field.NewPath("spec"), visitor)
+		return
+	}
+	initIndex, index := 0, 0
+	for pair, containerType := range podutil.ContainerPairs(pod, oldPod, podutil.InitContainers|podutil.Containers) {
+		if pair.New == nil {
+			continue
+		}
+		var path *field.Path
+		if containerType == podutil.InitContainers {
+			path = field.NewPath("spec", "initContainers").Index(initIndex)
+			initIndex++
+		} else {
+			path = field.NewPath("spec", "containers").Index(index)
+			index++
+		}
+		if pair.Old != nil && pair.Old.Image == pair.New.Image {
+			continue
+		}
+		if !visitor(pair.New, path) {
+			return
+		}
+	}
+}
+
+// visitNewPulledImageVolumes visits the image volumes whose images must always be pulled, with
+// their paths. On a pods/dynamic update, these are only the image volumes added or whose reference
+// changed, so that existing volumes, whose pull policy is immutable, aren't mutated.
+func visitNewPulledImageVolumes(attributes admission.Attributes, pod *api.Pod, visitor func(*api.ImageVolumeSource, *field.Path)) {
+	var oldPod *api.Pod
+	if attributes.GetSubresource() == "dynamic" {
+		oldPod, _ = attributes.GetOldObject().(*api.Pod)
+	}
+	volsPath := field.NewPath("spec", "volumes")
+	index := 0
+	for pair := range podutil.VolumePairs(pod, oldPod) {
+		if pair.New == nil {
+			continue
+		}
+		path := volsPath.Index(index).Child("image")
+		index++
+		if pair.New.Image == nil {
+			continue
+		}
+		if pair.Old != nil && pair.Old.Image != nil && pair.Old.Image.Reference == pair.New.Image.Reference {
+			continue
+		}
+		visitor(pair.New.Image, path)
+	}
+}
+
+// check if it's update and it doesn't add containers or image volumes or change the images referenced by the pod spec
 func isUpdateWithNoNewImages(attributes admission.Attributes) bool {
 	if attributes.GetOperation() != admission.Update {
 		return false
@@ -140,6 +193,19 @@ func isUpdateWithNoNewImages(attributes admission.Attributes) bool {
 	if !ok {
 		klog.Warningf("Resource was marked with kind Pod but old pod was unable to be converted.")
 		return false
+	}
+
+	// A container or image volume added through the dynamic subresource must always pull, even if
+	// it reuses an image that is already in the pod.
+	for pair := range podutil.ContainerPairs(pod, oldPod, podutil.Containers) {
+		if pair.Old == nil {
+			return false
+		}
+	}
+	for pair := range podutil.VolumePairs(pod, oldPod) {
+		if pair.New != nil && pair.New.Image != nil && (pair.Old == nil || pair.Old.Image == nil || pair.Old.Image.Reference != pair.New.Image.Reference) {
+			return false
+		}
 	}
 
 	oldImages := sets.NewString()
@@ -159,8 +225,11 @@ func isUpdateWithNoNewImages(attributes admission.Attributes) bool {
 }
 
 func shouldIgnore(attributes admission.Attributes) bool {
-	// Ignore all calls to subresources or resources other than pods.
-	if len(attributes.GetSubresource()) != 0 || attributes.GetResource().GroupResource() != api.Resource("pods") {
+	// Ignore calls to resources other than pods, and to subresources that can't modify images.
+	// TODO: ephemeral containers added through the ephemeralcontainers subresource aren't forced
+	// to always pull.
+	subresource := attributes.GetSubresource()
+	if (len(subresource) != 0 && subresource != "dynamic") || attributes.GetResource().GroupResource() != api.Resource("pods") {
 		return true
 	}
 

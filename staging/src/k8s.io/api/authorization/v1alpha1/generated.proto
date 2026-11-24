@@ -33,6 +33,8 @@ option go_package = "k8s.io/api/authorization/v1alpha1";
 // AuthorizationConditionsRequest describes the authorization conditions request.
 message AuthorizationConditionsRequest {
   // decision contains the conditional decision the authorizer authored at authorization time.
+  // The API server may refine the decision before sending it, by evaluating some of the conditions in-process,
+  // e.g. removing conditions that evaluated to false.
   // +required
   optional .k8s.io.api.authorization.v1.ConditionsAwareDecision decision = 1;
 

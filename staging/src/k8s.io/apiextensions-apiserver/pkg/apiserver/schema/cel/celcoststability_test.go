@@ -1350,6 +1350,54 @@ func TestCelEstimatedCostStability(t *testing.T) {
 				"self.val1.lowerAscii() == self.val1.lowerAscii()": 943723,
 			},
 		},
+		// At cost model version 0, the element of an indexed split() or findAll() result is sized from the
+		// schema path hint of the rule's root (as in cel-go v0.29), not from the element size that the
+		// Kubernetes cost estimator reports for the call result. These are the Kubernetes 1.37 estimates.
+		{name: "split result elements",
+			schema: schemas(stringType),
+			expectCost: map[string]uint64{
+				`self.val1.split('/')[1].matches('^[a-z]+$')`:                                   629151,
+				`self.val1.split('/', 2)[1].matches('^[a-z]+$')`:                                629151,
+				`self.val1.split('/')[1].trim().matches('^[a-z]+$')`:                            629151,
+				`self.val1.split('/')[1].matches('^[A-Za-z0-9]([-A-Za-z0-9_.]*[A-Za-z0-9])?$')`: 629160,
+			},
+		},
+		{name: "split result elements with bounded string",
+			schema: schemas(withMaxLength(stringType, ptr.To[int64](10))),
+			expectCost: map[string]uint64{
+				`self.val1.split('/')[1].matches('^[a-z]+$')`:        13,
+				`self.val1.split('/', 2)[1].matches('^[a-z]+$')`:     13,
+				`self.val1.split('/')[1].trim().matches('^[a-z]+$')`: 13,
+			},
+		},
+		{name: "split result elements at root",
+			schema: &stringType,
+			expectCost: map[string]uint64{
+				`self.split('/')[1].matches('^[a-z]+$')`: 1258294,
+			},
+		},
+		{name: "findAll result elements",
+			schema: schemas(stringType),
+			expectCost: map[string]uint64{
+				`self.val1.findAll('[a-z]+')[0].matches('^[a-z]+$')`:        629151,
+				`self.val1.findAll('[a-z]+', 1)[0].matches('^[a-z]+$')`:     629151,
+				`self.val1.findAll('[a-z]+')[0].trim().matches('^[a-z]+$')`: 629151,
+			},
+		},
+		{name: "findAll result elements with bounded string",
+			schema: schemas(withMaxLength(stringType, ptr.To[int64](10))),
+			expectCost: map[string]uint64{
+				`self.val1.findAll('[a-z]+')[0].matches('^[a-z]+$')`:        15,
+				`self.val1.findAll('[a-z]+', 1)[0].matches('^[a-z]+$')`:     15,
+				`self.val1.findAll('[a-z]+')[0].trim().matches('^[a-z]+$')`: 15,
+			},
+		},
+		{name: "findAll result elements at root",
+			schema: &stringType,
+			expectCost: map[string]uint64{
+				`self.findAll('[a-z]+')[0].matches('^[a-z]+$')`: 1258294,
+			},
+		},
 		{name: "escaped strings",
 			schema: schemas(stringType, stringType),
 			expectCost: map[string]uint64{
@@ -2097,6 +2145,32 @@ func TestCelEstimatedCostStability(t *testing.T) {
 				`url(self.val1).getScheme().matches('^[a-z]+$')`:       365,
 				`url(self.val1).getHostname().matches('^[a-z]+$')`:     365,
 				`url(self.val1).getEscapedPath().matches('^/[a-z]+$')`: 1206,
+			},
+		},
+		// A has() style presence check returns a bool and comparison operations of the result are cheap.
+		{name: "has() test comparisons",
+			schema: objectTypePtr(map[string]schema.Structural{
+				"str1":   stringType,
+				"str2":   stringType,
+				"short1": withMaxLength(stringType, ptr.To[int64](10)),
+				"short2": withMaxLength(stringType, ptr.To[int64](10)),
+				"items":  listType(&stringType),
+				"labels": mapType(&stringType),
+				"count":  integerType,
+				"child":  objectType(map[string]schema.Structural{"str": stringType}),
+				"budgets": withMaxItems(listType(objectTypePtr(map[string]schema.Structural{
+					"schedule": stringType,
+					"duration": stringType,
+				})), ptr.To[int64](50)),
+			}),
+			expectCost: map[string]uint64{
+				"has(self.str1) == has(self.str2)":                        3,
+				"has(self.str1) != has(self.str2)":                        3,
+				"has(self.str1) == has(oldSelf.str1)":                     3,
+				"has(self.short1) == has(self.short2)":                    3,
+				"has(self.items) != has(self.labels)":                     3,
+				"has(self.count) == has(self.child)":                      3,
+				"self.budgets.all(b, has(b.schedule) == has(b.duration))": 303,
 			},
 		},
 	}

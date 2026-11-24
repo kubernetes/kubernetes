@@ -394,6 +394,13 @@ func TestIsConfigMapKey(t *testing.T) {
 	}
 }
 
+func BenchmarkIsWildcardDNS1123Subdomain(b *testing.B) {
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		IsWildcardDNS1123Subdomain("*.foo.example.com")
+	}
+}
+
 func TestIsWildcardDNS1123Subdomain(t *testing.T) {
 	goodValues := []string{
 		"*.example.com",

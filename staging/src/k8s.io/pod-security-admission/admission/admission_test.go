@@ -33,6 +33,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -663,6 +664,68 @@ func TestValidatePodAndController(t *testing.T) {
 	differentRestrictedPod := *restrictedPod.DeepCopy()
 	differentRestrictedPod.Spec.Containers[0].Image = "https://example.com/a-different-image"
 
+	// Pods for pods/dynamic updates, which add and remove containers.
+	twoContainerRestrictedPod := *restrictedPod.DeepCopy()
+	sidecar := *restrictedPod.Spec.Containers[0].DeepCopy()
+	sidecar.Name = "sidecar"
+	twoContainerRestrictedPod.Spec.Containers = append(twoContainerRestrictedPod.Spec.Containers, sidecar)
+
+	// Same container count and images as twoContainerRestrictedPod, but the sidecar is replaced by
+	// a privileged container.
+	swappedPrivilegedPod := *twoContainerRestrictedPod.DeepCopy()
+	swappedPrivilegedPod.Spec.Containers[1].Name = "added"
+	swappedPrivilegedPod.Spec.Containers[1].SecurityContext.Privileged = new(true)
+
+	addedPrivilegedPod := *twoContainerRestrictedPod.DeepCopy()
+	addedPrivilegedPod.Spec.Containers = append(addedPrivilegedPod.Spec.Containers, swappedPrivilegedPod.Spec.Containers[1])
+
+	addedRestrictedPod := *twoContainerRestrictedPod.DeepCopy()
+	added := *sidecar.DeepCopy()
+	added.Name = "added"
+	addedRestrictedPod.Spec.Containers = append(addedRestrictedPod.Spec.Containers, added)
+
+	// The remaining container violates the policy, but removing a container is never significant.
+	removedContainerPod := *twoContainerRestrictedPod.DeepCopy()
+	removedContainerPod.Spec.Containers[0].SecurityContext.Privileged = new(true)
+	oldRemovedContainerPod := *removedContainerPod.DeepCopy()
+	removedContainerPod.Spec.Containers = removedContainerPod.Spec.Containers[:1]
+
+	reorderedContainerPod := *oldRemovedContainerPod.DeepCopy()
+	reorderedContainerPod.Spec.Containers[0], reorderedContainerPod.Spec.Containers[1] = reorderedContainerPod.Spec.Containers[1], reorderedContainerPod.Spec.Containers[0]
+
+	// Pods for pods/dynamic volume updates.
+	privilegedPodWithAddedVolume := *privilegedPod.DeepCopy()
+	privilegedPodWithAddedVolume.Spec.Volumes = append(privilegedPodWithAddedVolume.Spec.Volumes, corev1.Volume{
+		Name:         "dyn-vol",
+		VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}},
+	})
+
+	restrictedPodWithAddedVolumeAndContainer := *restrictedPod.DeepCopy()
+	restrictedPodWithAddedVolumeAndContainer.Spec.Volumes = append(restrictedPodWithAddedVolumeAndContainer.Spec.Volumes, corev1.Volume{
+		Name:         "dyn-vol",
+		VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}},
+	})
+	addedRestrictedCtr := *restrictedPod.Spec.Containers[0].DeepCopy()
+	addedRestrictedCtr.Name = "dyn-ctr"
+	addedRestrictedCtr.VolumeMounts = append(addedRestrictedCtr.VolumeMounts, corev1.VolumeMount{
+		Name:      "dyn-vol",
+		MountPath: "/mnt/dyn",
+	})
+	restrictedPodWithAddedVolumeAndContainer.Spec.Containers = append(restrictedPodWithAddedVolumeAndContainer.Spec.Containers, addedRestrictedCtr)
+
+	q64Mi := resource.MustParse("64Mi")
+	q128Mi := resource.MustParse("128Mi")
+	privilegedPodMemVol64 := *privilegedPod.DeepCopy()
+	privilegedPodMemVol64.Spec.Volumes = append(privilegedPodMemVol64.Spec.Volumes, corev1.Volume{
+		Name:         "mem-vol",
+		VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{Medium: corev1.StorageMediumMemory, SizeLimit: &q64Mi}},
+	})
+	privilegedPodMemVol128 := *privilegedPod.DeepCopy()
+	privilegedPodMemVol128.Spec.Volumes = append(privilegedPodMemVol128.Spec.Volumes, corev1.Volume{
+		Name:         "mem-vol",
+		VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{Medium: corev1.StorageMediumMemory, SizeLimit: &q128Mi}},
+	})
+
 	emptyDeployment := appsv1.Deployment{
 		ObjectMeta: *objMetadata.DeepCopy(),
 		Spec:       appsv1.DeploymentSpec{},
@@ -856,6 +919,120 @@ func TestValidatePodAndController(t *testing.T) {
 			oldPod:        restrictedPod,
 			expectAllowed: true,
 			expectEnforce: api.LevelRestricted,
+		},
+		{
+			desc:           "dynamic: swapped in privileged container denied",
+			namespace:      restrictedNs,
+			operation:      admissionv1.Update,
+			subresource:    "dynamic",
+			pod:            swappedPrivilegedPod.DeepCopy(),
+			oldPod:         twoContainerRestrictedPod.DeepCopy(),
+			expectAllowed:  false,
+			expectReason:   metav1.StatusReasonForbidden,
+			expectEnforce:  api.LevelRestricted,
+			expectWarning:  api.LevelRestricted,
+			expectAudit:    api.LevelRestricted,
+			skipDeployment: true,
+		},
+		{
+			desc:           "dynamic: added privileged container denied",
+			namespace:      restrictedNs,
+			operation:      admissionv1.Update,
+			subresource:    "dynamic",
+			pod:            addedPrivilegedPod.DeepCopy(),
+			oldPod:         twoContainerRestrictedPod.DeepCopy(),
+			expectAllowed:  false,
+			expectReason:   metav1.StatusReasonForbidden,
+			expectEnforce:  api.LevelRestricted,
+			expectWarning:  api.LevelRestricted,
+			expectAudit:    api.LevelRestricted,
+			skipDeployment: true,
+		},
+		{
+			desc:           "dynamic: added restricted container allowed",
+			namespace:      restrictedNs,
+			operation:      admissionv1.Update,
+			subresource:    "dynamic",
+			pod:            addedRestrictedPod.DeepCopy(),
+			oldPod:         twoContainerRestrictedPod.DeepCopy(),
+			expectAllowed:  true,
+			expectEnforce:  api.LevelRestricted,
+			skipDeployment: true,
+		},
+		{
+			desc:           "dynamic: removed container is insignificant",
+			namespace:      restrictedNs,
+			operation:      admissionv1.Update,
+			subresource:    "dynamic",
+			pod:            removedContainerPod.DeepCopy(),
+			oldPod:         oldRemovedContainerPod.DeepCopy(),
+			expectAllowed:  true,
+			skipDeployment: true,
+		},
+		{
+			desc:           "dynamic: reordered containers are insignificant",
+			namespace:      restrictedNs,
+			operation:      admissionv1.Update,
+			subresource:    "dynamic",
+			pod:            reorderedContainerPod.DeepCopy(),
+			oldPod:         oldRemovedContainerPod.DeepCopy(),
+			expectAllowed:  true,
+			skipDeployment: true,
+		},
+		{
+			desc:           "dynamic: added volume on privileged pod denied",
+			namespace:      restrictedNs,
+			operation:      admissionv1.Update,
+			subresource:    "dynamic",
+			pod:            privilegedPodWithAddedVolume.DeepCopy(),
+			oldPod:         privilegedPod.DeepCopy(),
+			expectAllowed:  false,
+			expectReason:   metav1.StatusReasonForbidden,
+			expectEnforce:  api.LevelRestricted,
+			expectWarning:  api.LevelRestricted,
+			expectAudit:    api.LevelRestricted,
+			skipDeployment: true,
+		},
+		{
+			desc:           "dynamic: added volume and container on restricted pod allowed",
+			namespace:      restrictedNs,
+			operation:      admissionv1.Update,
+			subresource:    "dynamic",
+			pod:            restrictedPodWithAddedVolumeAndContainer.DeepCopy(),
+			oldPod:         restrictedPod.DeepCopy(),
+			expectAllowed:  true,
+			expectEnforce:  api.LevelRestricted,
+			skipDeployment: true,
+		},
+		{
+			desc:           "dynamic: removed unreferenced volume is insignificant",
+			namespace:      restrictedNs,
+			operation:      admissionv1.Update,
+			subresource:    "dynamic",
+			pod:            privilegedPod.DeepCopy(),
+			oldPod:         privilegedPodWithAddedVolume.DeepCopy(),
+			expectAllowed:  true,
+			skipDeployment: true,
+		},
+		{
+			desc:           "dynamic: removed volume and container on restricted pod is insignificant",
+			namespace:      restrictedNs,
+			operation:      admissionv1.Update,
+			subresource:    "dynamic",
+			pod:            restrictedPod.DeepCopy(),
+			oldPod:         restrictedPodWithAddedVolumeAndContainer.DeepCopy(),
+			expectAllowed:  true,
+			skipDeployment: true,
+		},
+		{
+			desc:           "resize: emptyDir sizeLimit update is insignificant",
+			namespace:      restrictedNs,
+			operation:      admissionv1.Update,
+			subresource:    "resize",
+			pod:            privilegedPodMemVol128.DeepCopy(),
+			oldPod:         privilegedPodMemVol64.DeepCopy(),
+			expectAllowed:  true,
+			skipDeployment: true,
 		},
 		{
 			desc:          "invalid namespace labels",

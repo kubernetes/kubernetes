@@ -40,6 +40,11 @@ const (
 	ResizeStarted                   = "ResizeStarted"
 	ResizeError                     = "ResizeError"
 	FailedNodeDeclaredFeaturesCheck = "FailedNodeDeclaredFeaturesCheck"
+	PIDLimitCapped                  = "PIDLimitCapped"
+	// SwapLimitNotEnforced is emitted when a pod declares resources.limits.swap
+	// but the node cannot honor it (NoSwap, cgroup v1, or no swap controller), or
+	// when the LimitedSwap limit of the pod cgroup caps a container's limit.
+	SwapLimitNotEnforced = "SwapLimitNotEnforced"
 )
 
 // Image event reason list
@@ -50,6 +55,12 @@ const (
 	FailedToInspectImage    = "InspectFailed"
 	ErrImageNeverPullPolicy = "ErrImageNeverPull"
 	BackOffPullImage        = "BackOff"
+)
+
+// Security profile event reason list
+const (
+	PulledSecurityProfile       = "SecurityProfilePulled"
+	FailedToPullSecurityProfile = "SecurityProfilePullFailed"
 )
 
 // kubelet event reason list

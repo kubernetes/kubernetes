@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apiserver/pkg/admission/plugin/manifest"
 )
 
 func TestValidateWebhookClientConfig(t *testing.T) {
@@ -180,6 +181,15 @@ webhooks:
 			wantErr:        true,
 			wantErrContain: "duplicate",
 		},
+		{
+			name: "malformed document",
+			files: map[string]string{
+				"bad.yaml": `kind: [unterminated
+`,
+			},
+			wantErr:        true,
+			wantErrContain: "error loading",
+		},
 	}
 
 	for _, tt := range tests {
@@ -195,9 +205,15 @@ webhooks:
 
 			if tt.wantErr {
 				if err == nil {
-					t.Error("expected error but got none")
-				} else if tt.wantErrContain != "" && !strings.Contains(err.Error(), tt.wantErrContain) {
+					t.Fatal("expected error but got none")
+				}
+				if tt.wantErrContain != "" && !strings.Contains(err.Error(), tt.wantErrContain) {
 					t.Errorf("expected error containing %q, got %q", tt.wantErrContain, err.Error())
+				}
+				// The hash identifies the rejected content, so reload callers
+				// can skip it until it changes.
+				if _, wantHash, _ := manifest.LoadFiles(dir); len(wantHash) == 0 || hash != wantHash {
+					t.Errorf("hash = %q, want the content hash %q", hash, wantHash)
 				}
 				return
 			}

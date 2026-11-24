@@ -43,13 +43,6 @@ import (
 
 var maxPodStartTime = metav1.NewTime(time.Unix(0, math.MaxInt64).UTC())
 
-// GetPodFullName returns a name that uniquely identifies a pod.
-func GetPodFullName(pod *v1.Pod) string {
-	// Use underscore as the delimiter because it is not allowed in pod name
-	// (DNS subdomain format).
-	return pod.Name + "_" + pod.Namespace
-}
-
 // GetPodStartTime returns start time of the given pod or a stable maximum timestamp
 // if it hasn't started yet.
 func GetPodStartTime(pod *v1.Pod) *metav1.Time {
@@ -323,4 +316,17 @@ func PodPreemptionPolicy(pod *v1.Pod) v1.PreemptionPolicy {
 		return *pod.Spec.PreemptionPolicy
 	}
 	return v1.PreemptLowerPriority
+}
+
+// IsPodResizeSchedulerEvaluationCompleted returns true if the pod condition SchedulerEvaluationCompleted
+// is set to true with reason DeferredPodResize for the pod's current generation.
+func IsPodResizeSchedulerEvaluationCompleted(pod *v1.Pod) bool {
+	for _, condition := range pod.Status.Conditions {
+		if condition.Type == v1.SchedulerEvaluationCompleted {
+			return condition.Status == v1.ConditionTrue &&
+				condition.Reason == v1.PodReasonDeferredPodResize &&
+				condition.ObservedGeneration == pod.Generation
+		}
+	}
+	return false
 }

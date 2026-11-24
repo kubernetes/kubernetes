@@ -569,13 +569,13 @@ func TestMakeUserNsManagerMappingOutsideRange(t *testing.T) {
 			wantRange:      "[65536, 7274496)",
 		},
 		{
-			// The default range ends at 2^32; the bound must not wrap to 0.
+			// The default range reserves one block at each end of the ID space.
 			name:           "below the start of the default range",
 			hostID:         0,
 			mappingFirstID: testUserNsLength,
-			mappingLen:     uint32((1 << 32) - uint64(testUserNsLength)),
+			mappingLen:     uint32((1 << 32) - 2*uint64(testUserNsLength)),
 			wantMapping:    "[0, 65536)",
-			wantRange:      "[65536, 4294967296)",
+			wantRange:      "[65536, 4294901760)",
 		},
 	}
 

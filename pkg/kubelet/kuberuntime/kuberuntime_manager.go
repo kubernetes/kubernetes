@@ -20,8 +20,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
+	"net"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -37,17 +40,20 @@ import (
 	kubetypes "k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	utilversion "k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	ref "k8s.io/client-go/tools/reference"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/component-base/logs/logreduction"
+	resourcehelper "k8s.io/component-helpers/resource"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	crierror "k8s.io/cri-api/pkg/errors"
 	remote "k8s.io/cri-client/pkg"
 	"k8s.io/klog/v2"
+	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/credentialprovider"
@@ -73,6 +79,7 @@ import (
 	kubeutil "k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/pkg/kubelet/util/cache"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
+	"k8s.io/kubernetes/pkg/kubelet/volumemanager/reconciler"
 	sc "k8s.io/kubernetes/pkg/securitycontext"
 	"k8s.io/utils/ptr"
 )
@@ -89,8 +96,6 @@ const (
 	identicalErrorDelay = 1 * time.Minute
 	// OpenTelemetry instrumentation scope name
 	instrumentationScope = "k8s.io/kubernetes/pkg/kubelet/kuberuntime"
-
-	actuatedPodsStateFile = "actuated_pods_state"
 )
 
 var (
@@ -132,6 +137,9 @@ type kubeGenericRuntimeManager struct {
 	livenessManager  proberesults.Manager
 	readinessManager proberesults.Manager
 	startupManager   proberesults.Manager
+
+	// probeLifecycle handles container start/stop events for the probe manager.
+	probeLifecycle kubecontainer.ContainerProbeLifecycle
 
 	// If false, pass "memory.oom.group" to container cgroups when using cgroups v2 to cause processes
 	// in those cgroups to be killed as a unit by the OOM killer.
@@ -200,6 +208,9 @@ type kubeGenericRuntimeManager struct {
 	// Root directory used to store pod logs
 	podLogsDirectory string
 
+	// nodeIPs are the IP addresses of the node.
+	nodeIPs []net.IP
+
 	// Swap controller availability check function (Linux only)
 	// Uses sync.OnceValue for lazy initialization
 	getSwapControllerAvailable func() bool
@@ -221,6 +232,7 @@ func NewKubeGenericRuntimeManager(
 	livenessManager proberesults.Manager,
 	readinessManager proberesults.Manager,
 	startupManager proberesults.Manager,
+	probeLifecycle kubecontainer.ContainerProbeLifecycle,
 	rootDirectory string,
 	podLogsDirectory string,
 	machineInfo *cadvisorapi.MachineInfo,
@@ -257,6 +269,8 @@ func NewKubeGenericRuntimeManager(
 	tokenManager *token.Manager,
 	getServiceAccount plugin.GetServiceAccountFunc,
 	podInitContainerTimeRecorder PodInitContainerTimeRecorder,
+	actuatedState state.State,
+	nodeIPs []net.IP,
 ) (KubeGenericRuntime, []images.PostImageGCHook, error) {
 	logger := klog.FromContext(ctx)
 
@@ -271,6 +285,7 @@ func NewKubeGenericRuntimeManager(
 		livenessManager:              livenessManager,
 		readinessManager:             readinessManager,
 		startupManager:               startupManager,
+		probeLifecycle:               probeLifecycle,
 		machineInfo:                  machineInfo,
 		osInterface:                  osInterface,
 		runtimeHelper:                runtimeHelper,
@@ -287,6 +302,7 @@ func NewKubeGenericRuntimeManager(
 		memoryThrottlingFactor:       memoryThrottlingFactor,
 		memoryReservationPolicy:      memoryReservationPolicy,
 		podLogsDirectory:             podLogsDirectory,
+		nodeIPs:                      nodeIPs,
 		podInitContainerTimeRecorder: podInitContainerTimeRecorder,
 	}
 
@@ -376,10 +392,7 @@ func NewKubeGenericRuntimeManager(
 		versionCacheTTL,
 	)
 
-	kubeRuntimeManager.actuatedState, err = state.NewStateCheckpoint(logger, rootDirectory, actuatedPodsStateFile, keepOnlyResourceValues)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to initialize actuated state checkpoint: %w", err)
-	}
+	kubeRuntimeManager.actuatedState = actuatedState
 
 	return kubeRuntimeManager, imageGCHooks, nil
 }
@@ -641,14 +654,13 @@ type podActions struct {
 	VolumesToUpsize []v1.Volume
 	// VolumesToDownsize keeps a list of volumes needing size decrease.
 	VolumesToDownsize []v1.Volume
-	// UpdatePodResources is true if container(s) need resource update with restart
-	UpdatePodResources bool
+	// PodCgroupResourcesToUpdate is the set of resources (cpu, memory, and swap for a
+	// pod-level swap limit) whose pod-level cgroup configuration needs to be updated.
+	PodCgroupResourcesToUpdate sets.Set[v1.ResourceName]
 	// ContainersToReset is a list of containers to be killed (if running) and removed from
 	// runtime for RestartAllContainers. The container that triggered RestartAllContainers
 	// will be reset the last.
 	ContainersToReset []containerToRemoveInfo
-	// UpdatePodLevelResources is true if pod-level resources need to be updated
-	UpdatePodLevelResources bool
 }
 
 // resourceRequirements summarizes the set of resources applicable to the
@@ -658,11 +670,16 @@ type resourceRequirements struct {
 	memoryRequest int64
 	cpuLimit      int64
 	cpuRequest    int64
+	// swapLimit is the effective memory.swap.max of a container (KEP-5359), not
+	// the raw limits.swap entry: it already folds in pod-level inheritance and
+	// the LimitedSwap recalculation, so comparing two of these tells whether the
+	// cgroup value must change.
+	swapLimit int64
 }
 
 func (p podActions) String() string {
-	return fmt.Sprintf("KillPod: %t, CreateSandbox: %t, UpdatePodResources: %t, UpdatePodLevelResources: %t, Attempt: %d, InitContainersToStart: %v, ContainersToStart: %v, EphemeralContainersToStart: %v, ContainersToUpdate: %v, VolumesToUpsize: %v, VolumesToDownsize: %v, ContainersToKill: %v, ContainersToRemove: %v",
-		p.KillPod, p.CreateSandbox, p.UpdatePodResources, p.UpdatePodLevelResources, p.Attempt, p.InitContainersToStart, p.ContainersToStart, p.EphemeralContainersToStart, p.ContainersToUpdate, p.VolumesToUpsize, p.VolumesToDownsize, p.ContainersToKill, p.ContainersToReset)
+	return fmt.Sprintf("KillPod: %t, CreateSandbox: %t, PodCgroupResourcesToUpdate: %v, Attempt: %d, InitContainersToStart: %v, ContainersToStart: %v, EphemeralContainersToStart: %v, ContainersToUpdate: %v, VolumesToUpsize: %v, VolumesToDownsize: %v, ContainersToKill: %v, ContainersToRemove: %v",
+		p.KillPod, p.CreateSandbox, p.PodCgroupResourcesToUpdate, p.Attempt, p.InitContainersToStart, p.ContainersToStart, p.EphemeralContainersToStart, p.ContainersToUpdate, p.VolumesToUpsize, p.VolumesToDownsize, p.ContainersToKill, p.ContainersToReset)
 }
 
 // containerChanged will determine whether the container has changed based on the fields that will affect the running of the container.
@@ -695,7 +712,7 @@ func containerResourcesFromRequirements(podRequirements, containerRequirements *
 		cpuRequest:    containerRequirements.Requests.Cpu().MilliValue(),
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) {
 		return resources
 	}
 
@@ -705,17 +722,105 @@ func containerResourcesFromRequirements(podRequirements, containerRequirements *
 	return resources
 }
 
-func podResourcesFromRequirements(requirements *v1.ResourceRequirements) resourceRequirements {
-	if requirements == nil {
-		return resourceRequirements{}
-	}
+// unlimitedCgroupLimit is the pod cgroup memory limit or CPU quota that sets no limit.
+const unlimitedCgroupLimit int64 = -1
 
-	return resourceRequirements{
-		memoryLimit:   requirements.Limits.Memory().Value(),
-		memoryRequest: requirements.Requests.Memory().Value(),
-		cpuLimit:      requirements.Limits.Cpu().MilliValue(),
-		cpuRequest:    requirements.Requests.Cpu().MilliValue(),
+// cgroupLimit returns the given pod cgroup limit for comparison, treating unlimited as the maximum.
+func cgroupLimit(limit int64) int64 {
+	if limit < 0 {
+		return math.MaxInt64
 	}
+	return limit
+}
+
+// setResourceQuantity returns dst with the quantity of name copied from src, or removed if src
+// doesn't have it. It returns nil instead of an empty list.
+func setResourceQuantity(dst, src v1.ResourceList, name v1.ResourceName) v1.ResourceList {
+	if qty, ok := src[name]; ok {
+		if dst == nil {
+			dst = v1.ResourceList{}
+		}
+		dst[name] = qty
+	} else {
+		delete(dst, name)
+	}
+	if len(dst) == 0 {
+		return nil
+	}
+	return dst
+}
+
+// workloadSwapLimitsEnabled reports whether workload-specified limits.swap, and
+// in-place resize of swap, are honored on this node: the WorkloadControlledSwap
+// gate is on and the node can configure swap. With the gate off a LimitedSwap
+// node still gets its node-derived swap limits, and this returns false.
+func (m *kubeGenericRuntimeManager) workloadSwapLimitsEnabled() bool {
+	return utilfeature.DefaultFeatureGate.Enabled(features.WorkloadControlledSwap) && m.nodeSwapEnabled()
+}
+
+// podSwapLimitEqual compares pod-level limits.swap. Presence matters because
+// an unset pod-level swap limit means unlimited.
+func podSwapLimitEqual(a, b *v1.ResourceRequirements) bool {
+	var aSwap, bSwap resource.Quantity
+	var aHas, bHas bool
+	if a != nil {
+		aSwap, aHas = a.Limits[v1.ResourceSwap]
+	}
+	if b != nil {
+		bSwap, bHas = b.Limits[v1.ResourceSwap]
+	}
+	return aHas == bHas && aSwap.Equal(bSwap)
+}
+
+// actuatedPodLevelResources returns the pod-level resources to record as actuated for pod: the
+// effective cpu and memory that size the pod cgroup, plus the pod-level swap limit (KEP-5359),
+// which is only ever set explicitly.
+func actuatedPodLevelResources(pod *v1.Pod) *v1.ResourceRequirements {
+	return withPodSwapLimit(cm.EffectivePodResources(pod), pod.Spec.Resources)
+}
+
+// withPodSwapLimit returns resources with the pod-level swap limit of src, if it has one.
+func withPodSwapLimit(resources, src *v1.ResourceRequirements) *v1.ResourceRequirements {
+	if src == nil {
+		return resources
+	}
+	swapLimit, ok := src.Limits[v1.ResourceSwap]
+	if !ok {
+		return resources
+	}
+	if resources == nil {
+		resources = &v1.ResourceRequirements{}
+	}
+	if resources.Limits == nil {
+		resources.Limits = v1.ResourceList{}
+	}
+	resources.Limits[v1.ResourceSwap] = swapLimit
+	return resources
+}
+
+// actuatedSwapLimit returns the swap limit container currently runs with. It is derived from the
+// actuated container resources and the actuated pod-level swap limit in the same way that
+// effectiveSwapLimit derives the desired one from the pod spec.
+func (m *kubeGenericRuntimeManager) actuatedSwapLimit(pod *v1.Pod, container *v1.Container, actuatedContainerResources *v1.ResourceRequirements) int64 {
+	podCtx := pod
+	if actuatedPodResources, _ := m.actuatedState.GetPodLevelResources(pod.UID); !podSwapLimitEqual(pod.Spec.Resources, actuatedPodResources) {
+		// Shallow copies: only the pod-level swap limit differs from the pod spec.
+		podCopy := *pod
+		var podResources v1.ResourceRequirements
+		if pod.Spec.Resources != nil {
+			podResources = *pod.Spec.Resources
+		}
+		var actuatedLimits v1.ResourceList
+		if actuatedPodResources != nil {
+			actuatedLimits = actuatedPodResources.Limits
+		}
+		podResources.Limits = setResourceQuantity(podResources.Limits.DeepCopy(), actuatedLimits, v1.ResourceSwap)
+		podCopy.Spec.Resources = &podResources
+		podCtx = &podCopy
+	}
+	containerCtx := *container
+	containerCtx.Resources = *actuatedContainerResources
+	return m.effectiveSwapLimit(podCtx, &containerCtx)
 }
 
 // computePodResizeAction determines the actions required (if any) to resize the given container.
@@ -752,13 +857,13 @@ func (m *kubeGenericRuntimeManager) computePodResizeAction(ctx context.Context, 
 		// For RestartContainer, this may trigger a container restart.
 	}
 
-	var actuatedPodResources *v1.ResourceRequirements
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling) {
-		actuatedPodResources, _ = m.actuatedState.GetPodLevelResources(pod.UID)
-	}
-
 	desiredResources := containerResourcesFromRequirements(pod.Spec.Resources, &container.Resources)
-	currentResources := containerResourcesFromRequirements(actuatedPodResources, &actuatedContainerResources)
+	// The actuated container limits already include any limits applied from pod-level limits.
+	currentResources := containerResourcesFromRequirements(nil, &actuatedContainerResources)
+	if utilfeature.DefaultFeatureGate.Enabled(features.WorkloadControlledSwap) {
+		desiredResources.swapLimit = m.effectiveSwapLimit(pod, &container)
+		currentResources.swapLimit = m.actuatedSwapLimit(pod, &container, &actuatedContainerResources)
+	}
 
 	if currentResources == desiredResources {
 		// No resize required.
@@ -775,6 +880,8 @@ func (m *kubeGenericRuntimeManager) computePodResizeAction(ctx context.Context, 
 			}
 		}
 		// If a resource policy isn't set, the implicit default is NotRequired.
+		// Note: `swap` is not accepted in resizePolicy today, so swap changes are
+		// always NotRequired (KEP-5359 open question D6).
 		return true, false
 	}
 	markContainerForUpdate := func(rName v1.ResourceName, desiredValue, currentValue int64) {
@@ -799,6 +906,12 @@ func (m *kubeGenericRuntimeManager) computePodResizeAction(ctx context.Context, 
 	resizeMemReq, restartMemReq := determineContainerResize(v1.ResourceMemory, desiredResources.memoryRequest, currentResources.memoryRequest)
 	resizeCPULim, restartCPULim := determineContainerResize(v1.ResourceCPU, desiredResources.cpuLimit, currentResources.cpuLimit)
 	resizeCPUReq, restartCPUReq := determineContainerResize(v1.ResourceCPU, desiredResources.cpuRequest, currentResources.cpuRequest)
+	// A swap delta can come from a user change to limits.swap, from a pod-level
+	// limit change, or from LimitedSwap recalculating after a memory request
+	// change. All three are actuated the same way (own ordered pass, see
+	// doPodResizeAction); admission decides which are allowed (see
+	// allocation/handlers.go).
+	resizeSwapLim, _ := determineContainerResize(v1.ResourceSwap, desiredResources.swapLimit, currentResources.swapLimit)
 	if restartCPULim || restartCPUReq || restartMemLim || restartMemReq {
 		// resize policy requires this container to restart
 		changes.ContainersToKill[kubeContainerStatus.ID] = containerToKillInfo{
@@ -813,7 +926,6 @@ func (m *kubeGenericRuntimeManager) computePodResizeAction(ctx context.Context, 
 		} else {
 			changes.ContainersToStart = append(changes.ContainersToStart, containerIdx)
 		}
-		changes.UpdatePodResources = true
 		return false
 	} else {
 		if resizeMemLim {
@@ -826,72 +938,136 @@ func (m *kubeGenericRuntimeManager) computePodResizeAction(ctx context.Context, 
 		} else if resizeCPUReq {
 			markContainerForUpdate(v1.ResourceCPU, desiredResources.cpuRequest, currentResources.cpuRequest)
 		}
+		if resizeSwapLim {
+			markContainerForUpdate(v1.ResourceSwap, desiredResources.swapLimit, currentResources.swapLimit)
+		}
 	}
 	return true
 }
 
-func (m *kubeGenericRuntimeManager) InitializeActuatedPod(logger klog.Logger, allocatedPod *v1.Pod) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-		return
-	}
+// TODO: Move InitializeActuatedPod, UpdateActuatedPodLevelResources, and IsPodResizeInProgress
+// out of the runtime now that actuatedState is owned by the Kubelet.
+func (m *kubeGenericRuntimeManager) InitializeActuatedPod(logger klog.Logger, allocatedPod *v1.Pod, podStatus *kubecontainer.PodStatus) {
 	stored, hasPod := m.actuatedState.GetPod(allocatedPod.UID)
 	// TODO: In v1.39, when the V1 checkpoint format is no longer supported, we will still need to
-	// check stored.Name == "" (and preserve stored.Spec.Resources below) because SyncPod calls
-	// UpdateActuatedPodLevelResources before InitializeActuatedPod, which creates a nameless pod
-	// entry with only pod-level resources populated.
+	// check stored.Name == "" (and preserve stored.Spec.Resources and stored.Spec.Volumes below)
+	// because SyncPod calls UpdateActuatedPodLevelResources and WaitForAttachAndMount before
+	// InitializeActuatedPod, which creates a nameless pod entry.
 	if hasPod && !state.IsMigratedFromV1(stored) {
 		return
 	}
 	// If there is no actuated checkpoint for the pod, seed it with the allocated pod.
-	actuatedPod := allocatedPod
+	// TODO(KEP-5972): Revisit what is seeded for containers that haven't started yet (only their
+	// resources, see KeepOnlyResourceValues) together with tracking the actual pod-level resources,
+	// which depend on which containers are running.
+	actuatedPod := *allocatedPod.DeepCopy()
+	for c := range podutil.ContainerIter(&actuatedPod.Spec, podutil.InitContainers|podutil.Containers) {
+		c.Resources = actuatedContainerResources(allocatedPod, c)
+	}
 	if hasPod {
 		// TODO: Remove V1 overlay in v1.39 when the V1 checkpoint format is no longer supported,
 		// while still preserving stored.Spec.Resources set by UpdateActuatedPodLevelResources.
-		actuatedPod, _ = state.UpdatePodFromV1(allocatedPod, stored)
+		if updatedPod, updated := state.UpdatePodFromV1(&actuatedPod, stored); updated {
+			actuatedPod = *updatedPod
+		}
 	}
-	if err := m.actuatedState.SetPod(logger, actuatedPod); err != nil {
-		logger.Error(err, "Failed to initialize actuated pod resource info checkpoint", "pod", klog.KObj(actuatedPod))
+	if hasPod && stored.Spec.Resources != nil {
+		actuatedPod.Spec.Resources = withPodSwapLimit(cm.ResizableResources(stored.Spec.Resources), stored.Spec.Resources)
+	} else {
+		actuatedPod.Spec.Resources = actuatedPodLevelResources(&actuatedPod)
+	}
+	if err := m.actuatedState.SetPod(logger, &actuatedPod); err != nil {
+		logger.Error(err, "Failed to initialize actuated pod resource info checkpoint", "pod", klog.KObj(&actuatedPod))
+	}
+	m.backfillActuatedFromV1(logger, allocatedPod, &actuatedPod, podStatus)
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingMemoryBackedVolumes) && hasPod {
+		for _, vol := range stored.Spec.Volumes {
+			if !allocation.VolHasMemoryBackedEmptyDir(&vol) {
+				continue
+			}
+			effectiveLimit, err := m.runtimeHelper.EffectiveEphemeralVolumeLimit(&actuatedPod, vol.Name)
+			if err != nil {
+				logger.Error(err, "Failed to calculate effective emptyDir volume limit", "pod", klog.KObj(&actuatedPod), "volume", vol.Name)
+				continue
+			}
+			if vol.EmptyDir.SizeLimit != nil && effectiveLimit != nil && vol.EmptyDir.SizeLimit.Equal(*effectiveLimit) {
+				continue
+			}
+			actuatedEmptyDir := &v1.EmptyDirVolumeSource{
+				Medium:    vol.EmptyDir.Medium,
+				SizeLimit: effectiveLimit,
+			}
+			if err := m.actuatedState.SetEmptyDirVolumeLimit(logger, allocatedPod.UID, vol.Name, actuatedEmptyDir); err != nil {
+				logger.Error(err, "Failed to initialize actuated emptyDir volume limit checkpoint", "pod", klog.KObj(&actuatedPod), "volume", vol.Name)
+			}
+		}
 	}
 }
 
-// keepOnlyResourceValues strips everything from pod.Spec except the resizable resources, because
-// those are all the actuated state holds.
-func keepOnlyResourceValues(pod *v1.Pod) {
-	var spec v1.PodSpec
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling) {
-		spec.Resources = pod.Spec.Resources
+// backfillActuatedFromV1 populates actuated container specs and mounted OCI Image volumes for
+// containers that had already been created when no complete V2 actuated checkpoint exists yet
+// (e.g. upgrading from a V1 checkpoint or initializing a BestEffort pod that had no V1 entry).
+// It runs after SetPod rather than inside state.UpdatePodFromV1 because SetPod applies
+// KeepOnlyResourceValues and requires runtime podStatus.
+// TODO: Remove in v1.39 when the V1 checkpoint format is no longer supported.
+func (m *kubeGenericRuntimeManager) backfillActuatedFromV1(logger klog.Logger, allocatedPod, actuatedPod *v1.Pod, podStatus *kubecontainer.PodStatus) {
+	dynamicVolumesEnabled := utilfeature.DefaultFeatureGate.Enabled(features.DynamicNodeLocalEphemeralVolumes)
+	if podStatus == nil || (!dynamicVolumesEnabled && !utilfeature.DefaultFeatureGate.Enabled(features.DynamicContainers)) {
+		return
+	}
+	hasRegularCreated := HasAnyRegularContainerCreated(allocatedPod, podStatus)
+	for specCtr, cType := range podutil.ContainerIter(&allocatedPod.Spec, podutil.AllContainers) {
+		cs := podStatus.FindContainerStatusByName(specCtr.Name)
+		if cs == nil && (cType != podutil.InitContainers || !hasRegularCreated) {
+			continue
+		}
+		backfilled := *specCtr.DeepCopy()
+		if actCtr := findContainerInPodSpec(&actuatedPod.Spec, specCtr.Name, cType); actCtr != nil {
+			backfilled.Resources = actCtr.Resources
+		} else {
+			backfilled.Resources = actuatedContainerResources(allocatedPod, specCtr)
+		}
+		if err := m.actuatedState.SetContainer(logger, allocatedPod.UID, cType, backfilled); err != nil {
+			logger.Error(err, "Failed to backfill actuated container spec from V1 checkpoint", "pod", klog.KObj(actuatedPod), "containerName", specCtr.Name)
+		}
+		if dynamicVolumesEnabled {
+			for _, vm := range backfilled.VolumeMounts {
+				volIdx := slices.IndexFunc(allocatedPod.Spec.Volumes, func(v v1.Volume) bool { return v.Name == vm.Name })
+				if volIdx < 0 || allocatedPod.Spec.Volumes[volIdx].Image == nil {
+					continue
+				}
+				if err := m.actuatedState.SetPodVolume(logger, allocatedPod.UID, allocatedPod.Spec.Volumes[volIdx]); err != nil {
+					logger.Error(err, "Failed to backfill actuated image volume from V1 checkpoint", "pod", klog.KObj(actuatedPod), "volumeName", vm.Name)
+				}
+			}
+		}
+	}
+}
+
+// KeepOnlyResourceValues strips everything from pod.Spec except the resizable resources, because
+// those are all SetPod initializes in the actuated state (mounted volumes are recorded via
+// SetPodVolume and preserved by SetPod, and container VolumeMounts are recorded when each
+// container starts).
+func KeepOnlyResourceValues(pod *v1.Pod) {
+	pod.Generation = 0
+	spec := v1.PodSpec{
+		Resources: pod.Spec.Resources,
 	}
 	for container, containerType := range podutil.ContainerIter(&pod.Spec, podutil.InitContainers|podutil.Containers) {
 		if !allocation.IsResizableContainer(container, containerType) {
 			continue
 		}
-		actuated := v1.Container{Name: container.Name, Resources: container.Resources}
+		actuated := v1.Container{
+			Name:      container.Name,
+			Resources: container.Resources,
+		}
 		if containerType == podutil.InitContainers {
 			spec.InitContainers = append(spec.InitContainers, actuated)
 		} else {
 			spec.Containers = append(spec.Containers, actuated)
 		}
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingMemoryBackedVolumes) {
-		for _, vol := range pod.Spec.Volumes {
-			if !allocation.VolHasMemoryBackedEmptyDirSizeLimit(&vol) {
-				continue
-			}
-			spec.Volumes = append(spec.Volumes, v1.Volume{
-				Name:         vol.Name,
-				VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{Medium: vol.EmptyDir.Medium, SizeLimit: vol.EmptyDir.SizeLimit}},
-			})
-		}
-	}
 	pod.Spec = spec
-}
-
-func (m *kubeGenericRuntimeManager) getActuatedEmptyDirVolumeLimit(logger klog.Logger, pod *v1.Pod, volName string) *resource.Quantity {
-	if size, found := m.actuatedState.GetEmptyDirVolumeLimit(pod.UID, volName); found {
-		return size
-	}
-	logger.Error(nil, "Failed to read actuated empty dir volume limit", "pod", klog.KObj(pod), "volume", volName)
-	return nil
 }
 
 // computeVolumeResizeAction determines the actions required (if any) to resize volumes.
@@ -899,13 +1075,26 @@ func (m *kubeGenericRuntimeManager) computeVolumeResizeAction(ctx context.Contex
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingMemoryBackedVolumes) {
 		logger := klog.FromContext(ctx)
 		for _, vol := range pod.Spec.Volumes {
-			if !allocation.VolHasMemoryBackedEmptyDirSizeLimit(&vol) {
+			if !allocation.VolHasMemoryBackedEmptyDir(&vol) {
 				continue
 			}
-			actuatedSize := m.getActuatedEmptyDirVolumeLimit(logger, pod, vol.Name)
-			desiredSize := vol.EmptyDir.SizeLimit
+			actuatedSize, found := m.actuatedState.GetEmptyDirVolumeLimit(pod.UID, vol.Name)
+			if !found {
+				// If the volume is not in the actuated state, it is not mounted yet,
+				// so there is nothing to resize.
+				continue
+			}
+			desiredSize, err := m.runtimeHelper.EffectiveEphemeralVolumeLimit(pod, vol.Name)
+
+			if err != nil || desiredSize == nil {
+				// This should never happen because EffectiveEphemeralVolumeLimit defaults
+				// to node allocatable memory when no pod or volume limit is specified.
+				logger.Error(err, "Failed to calculate desired empty dir volume limit", "pod", klog.KObj(pod), "volume", vol.Name)
+				continue
+			}
 
 			if actuatedSize == nil {
+				logger.V(2).Info("Failed to read actuated empty dir volume limit", "pod", klog.KObj(pod), "volume", vol.Name)
 				// If the actuation checkpoint is missing, force a sync to apply
 				// the limit and write the checkpoint. We treat it as an upsize
 				// (safer order) to ensure cgroup limits are expanded first.
@@ -913,7 +1102,6 @@ func (m *kubeGenericRuntimeManager) computeVolumeResizeAction(ctx context.Contex
 				continue
 			}
 
-			// Compare current (actuated) size with new size
 			cmp := desiredSize.Cmp(*actuatedSize)
 			if cmp > 0 {
 				changes.VolumesToUpsize = append(changes.VolumesToUpsize, vol)
@@ -928,8 +1116,14 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 	logger := klog.FromContext(ctx)
 	start := time.Now()
 	success := false
+	containerResized := len(podContainerChanges.ContainersToUpdate) > 0
+	podResized := len(podContainerChanges.PodCgroupResourcesToUpdate) > 0
 	defer func() {
-		metrics.PodResizeDurationMilliseconds.WithLabelValues(strconv.FormatBool(success)).Observe(float64(time.Since(start).Milliseconds()))
+		metrics.PodResizeDurationMilliseconds.WithLabelValues(
+			strconv.FormatBool(success),
+			strconv.FormatBool(containerResized),
+			strconv.FormatBool(podResized),
+		).Observe(float64(time.Since(start).Milliseconds()))
 	}()
 
 	resizeResult := kubecontainer.NewSyncResult(kubecontainer.ResizePodInPlace, format.Pod(pod))
@@ -944,6 +1138,17 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 		logger.Error(nil, "Unable to get resource configuration", "pod", klog.KObj(pod))
 		resizeResult.Fail(kubecontainer.ErrResizePodInPlace, fmt.Sprintf("unable to get resource configuration processing resize for pod %q", format.Pod(pod)))
 		return resizeResult
+	}
+	// A pod has no effective limit for a resource if any container lacks one. Since resizes can't
+	// remove container limits, an effective limit only goes away when a container without limits is
+	// added, which requires DynamicContainers.
+	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicContainers) {
+		if podResources.Memory == nil {
+			podResources.Memory = new(unlimitedCgroupLimit)
+		}
+		if podResources.CPUQuota == nil {
+			podResources.CPUQuota = new(unlimitedCgroupLimit)
+		}
 	}
 	if m.isMemoryQoSEnforced() {
 		m.applyPodLevelMemoryHigh(pod, podResources)
@@ -961,9 +1166,45 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 		return resizeResult
 	}
 
+	// KEP-5359: swap is actuated in its own pass. Read the pod cgroup's current
+	// memory.swap.max so pod-level increases/decreases can be ordered against
+	// the container writes. swapLimitsEnabled is false when the node cannot swap, in
+	// which case effectiveSwapLimit already yields no container deltas.
+	swapLimitsEnabled := m.workloadSwapLimitsEnabled()
+	var currentPodSwapLimit, desiredPodSwapLimit int64
+	var currentPodSwapSet, desiredPodSwapSet bool
+	if swapLimitsEnabled {
+		currentPodSwapConfig, err := pcm.GetPodCgroupConfig(pod, v1.ResourceSwap)
+		if err != nil {
+			logger.Error(err, "Unable to get pod cgroup swap config", "pod", klog.KObj(pod))
+			resizeResult.Fail(kubecontainer.ErrResizePodInPlace, fmt.Sprintf("unable to get pod cgroup swap config for pod %q", format.Pod(pod)))
+			return resizeResult
+		}
+		currentPodSwapLimit, currentPodSwapSet = cm.SwapLimitFromConfig(currentPodSwapConfig)
+		desiredPodSwapLimit, desiredPodSwapSet = cm.SwapLimitFromConfig(podResources)
+	} else {
+		podResources.Unified = cm.UnifiedWithoutSwap(podResources.Unified)
+	}
+	// "unset" is +inf, so adding a pod-level limit is a decrease. API validation
+	// rejects removing a pod-level limit, so there is no unset-after-set case.
+	podSwapResize := swapLimitsEnabled && podContainerChanges.PodCgroupResourcesToUpdate.Has(v1.ResourceSwap)
+	podSwapIncreasing := podSwapResize && currentPodSwapSet && desiredPodSwapSet && desiredPodSwapLimit > currentPodSwapLimit
+	podSwapDecreasing := podSwapResize && desiredPodSwapSet && (!currentPodSwapSet || desiredPodSwapLimit < currentPodSwapLimit)
+
 	currentPodResources := podResources
 	currentPodResources = mergeResourceConfig(currentPodResources, currentPodMemoryConfig)
 	currentPodResources = mergeResourceConfig(currentPodResources, currentPodCPUConfig)
+	if swapLimitsEnabled {
+		// podResources carries the *desired* memory.swap.max in Unified; the
+		// "current" view must reflect the cgroup. UnifiedWithoutSwap copies the
+		// map so podResources.Unified is not mutated through the shared reference.
+		currentPodResources.Unified = cm.UnifiedWithoutSwap(currentPodResources.Unified)
+		if currentPodSwapSet {
+			cm.SetSwapLimit(currentPodResources, &currentPodSwapLimit)
+		} else {
+			cm.SetSwapLimit(currentPodResources, nil)
+		}
+	}
 
 	// Before proceeding with the resize, perform a best-effort check to catch potential resize
 	// errors in order to avoid a partial-resize state.
@@ -973,52 +1214,31 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 		return resizeResult
 	}
 
-	updateActuatedPodLevelResources := func(resourceName v1.ResourceName) error {
-		allocatedResources := pod.Spec.Resources
-		if allocatedResources == nil {
-			return nil
+	effectivePodResources := cm.EffectivePodResources(pod)
+	actuatedPodResources, found := m.actuatedState.GetPodLevelResources(pod.UID)
+	if !found {
+		logger.Error(nil, "Missing actuated resource record", "pod", klog.KObj(pod))
+	}
+	if actuatedPodResources == nil {
+		// Proceed with the zero-value actuated resources.
+		actuatedPodResources = &v1.ResourceRequirements{}
+	}
+	// updateActuatedPodLevelResources records the effective pod-level requests and/or limits of
+	// resourceName as actuated.
+	updateActuatedPodLevelResources := func(resourceName v1.ResourceName, requests, limits bool) error {
+		if requests {
+			actuatedPodResources.Requests = setResourceQuantity(actuatedPodResources.Requests, effectivePodResources.Requests, resourceName)
 		}
-
-		// allocated resources will never be nil
-		actuatedPodResources, found := m.actuatedState.GetPodLevelResources(pod.UID)
-		if !found || actuatedPodResources == nil {
-			logger.Error(nil, "Missing actuated resource record", "pod", klog.KObj(pod), "pod", pod.Name)
-			// Proceed with the zero-value actuated resources.
-			actuatedPodResources = &v1.ResourceRequirements{}
+		if limits {
+			effectiveLimits := effectivePodResources.Limits
+			if resourceName == v1.ResourceSwap && pod.Spec.Resources != nil {
+				// The pod-level swap limit is only ever explicit.
+				effectiveLimits = pod.Spec.Resources.Limits
+			}
+			actuatedPodResources.Limits = setResourceQuantity(actuatedPodResources.Limits, effectiveLimits, resourceName)
 		}
-
-		defaultResourceListIfNil := func(rl v1.ResourceList) v1.ResourceList {
-			if rl == nil {
-				return make(v1.ResourceList)
-			}
-
-			return rl
-		}
-
-		switch resourceName {
-		case v1.ResourceMemory:
-			if allocatedResources.Requests != nil {
-				actuatedPodResources.Requests = defaultResourceListIfNil(actuatedPodResources.Requests)
-				actuatedPodResources.Requests[v1.ResourceMemory] = allocatedResources.Requests[v1.ResourceMemory]
-			}
-			if allocatedResources.Limits != nil {
-				actuatedPodResources.Limits = defaultResourceListIfNil(actuatedPodResources.Limits)
-				actuatedPodResources.Limits[v1.ResourceMemory] = allocatedResources.Limits[v1.ResourceMemory]
-			}
-		case v1.ResourceCPU:
-			if allocatedResources.Requests != nil {
-				actuatedPodResources.Requests = defaultResourceListIfNil(actuatedPodResources.Requests)
-				actuatedPodResources.Requests[v1.ResourceCPU] = allocatedResources.Requests[v1.ResourceCPU]
-			}
-			if allocatedResources.Limits != nil {
-				actuatedPodResources.Limits = defaultResourceListIfNil(actuatedPodResources.Limits)
-				actuatedPodResources.Limits[v1.ResourceCPU] = allocatedResources.Limits[v1.ResourceCPU]
-			}
-
-		}
-		if err = m.actuatedState.SetPodLevelResources(logger, pod.UID, actuatedPodResources); err != nil {
-			logger.Error(err, "SetPodLevelResources failed", "pod", pod.Name, "UID", pod.UID,
-				"pod", format.Pod(pod), "resourceName", resourceName)
+		if err := m.actuatedState.SetPodLevelResources(logger, pod.UID, actuatedPodResources); err != nil {
+			logger.Error(err, "SetPodLevelResources failed", "pod", klog.KObj(pod), "resourceName", resourceName)
 			return err
 		}
 		return nil
@@ -1036,12 +1256,19 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 				resizedResources.CPUShares = podResources.CPUShares
 			}
 		case v1.ResourceMemory:
-			if !setLimitValue {
-				// Memory requests aren't written to cgroups.
+			// memory.high/min/low travel with the memory pass; memory.swap.max has
+			// its own ordered pass (2a/2c below) and must not be written here.
+			memoryUnified := cm.UnifiedWithoutSwap(podResources.Unified)
+			if setLimitValue {
+				resizedResources.Memory = podResources.Memory
+			} else if len(memoryUnified) == 0 {
+				// Memory requests are only written to cgroups by MemoryQoS.
 				return nil
 			}
-			resizedResources.Memory = podResources.Memory
-			resizedResources.Unified = podResources.Unified
+			resizedResources.Unified = memoryUnified
+		case v1.ResourceSwap:
+			// Only memory.swap.max. Called only when a pod-level limit is desired.
+			cm.SetSwapLimit(resizedResources, &desiredPodSwapLimit)
 		}
 
 		// Notify the runtime first. If this fails, the runtime has rejected the resize.
@@ -1063,7 +1290,7 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 
 		// Update our tracking of the current state.
 		currentPodResources = mergedPodResources
-		return nil
+		return updateActuatedPodLevelResources(rName, !setLimitValue, setLimitValue)
 	}
 
 	// Memory, CPU and volume sizes are updated in a coordinated order:
@@ -1078,11 +1305,18 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 	updateVolumeSize := func(volumes []v1.Volume) error {
 		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingMemoryBackedVolumes) {
 			for _, vol := range volumes {
-				desiredSize := vol.EmptyDir.SizeLimit
-				if err := m.runtimeHelper.ResizeEphemeralVolume(pod, vol.Name, desiredSize); err != nil {
+				if err := m.runtimeHelper.ResizeEphemeralVolume(pod, vol.Name); err != nil {
 					return fmt.Errorf("failed to resize volume %s: %w", vol.Name, err)
 				}
-				if err := m.actuatedState.SetEmptyDirVolumeLimit(logger, pod.UID, vol.Name, vol.EmptyDir); err != nil {
+				effectiveLimit, err := m.runtimeHelper.EffectiveEphemeralVolumeLimit(pod, vol.Name)
+				if err != nil {
+					return fmt.Errorf("failed to calculate effective emptyDir volume limit for %s: %w", vol.Name, err)
+				}
+				actuatedEmptyDir := &v1.EmptyDirVolumeSource{
+					Medium:    vol.EmptyDir.Medium,
+					SizeLimit: effectiveLimit,
+				}
+				if err := m.actuatedState.SetEmptyDirVolumeLimit(logger, pod.UID, vol.Name, actuatedEmptyDir); err != nil {
 					return fmt.Errorf("failed to update actuated emptyDir volume limit checkpoint for %s: %w", vol.Name, err)
 				}
 			}
@@ -1092,6 +1326,7 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 
 	resizeContainers := func(rName v1.ResourceName, currPodCgLimValue, newPodCgLimValue, currPodCgReqValue, newPodCgReqValue int64) error {
 		var err error
+		currPodCgLimValue, newPodCgLimValue = cgroupLimit(currPodCgLimValue), cgroupLimit(newPodCgLimValue)
 		// At upsizing, limits should expand prior to requests in order to keep "requests <= limits".
 		if newPodCgLimValue > currPodCgLimValue {
 			if err = setPodCgroupConfig(logger, rName, true); err != nil {
@@ -1122,10 +1357,9 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 			}
 		}
 
-		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling) && podContainerChanges.UpdatePodLevelResources {
-			if err = updateActuatedPodLevelResources(rName); err != nil {
-				logger.Error(err, "Failed to update pod-level actuated resources", "resource", rName, "pod", klog.KObj(pod))
-			}
+		// Record both sides, including those that needed no cgroup write.
+		if err = updateActuatedPodLevelResources(rName, true, true); err != nil {
+			logger.Error(err, "Failed to update pod-level actuated resources", "resource", rName, "pod", klog.KObj(pod))
 		}
 		return err
 	}
@@ -1142,16 +1376,73 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 		}
 	}
 
-	// 2. Memory cgroups
-	if len(podContainerChanges.ContainersToUpdate[v1.ResourceMemory]) > 0 || podContainerChanges.UpdatePodResources || podContainerChanges.UpdatePodLevelResources {
+	// 2. Memory family: swap and memory are independent cgroup v2 limits, but
+	// reclaim triggered by a tighter memory.max (or memory.high under MemoryQoS)
+	// needs swap headroom to make progress. Every intermediate state is kept at
+	// least as permissive as both endpoints:
+	//   2a. swap increases   (pod cgroup up, then containers)
+	//   2b. memory           (existing: pod up -> containers -> pod down)
+	//   2c. swap decreases   (containers, then pod cgroup down)
+	// If a step fails, SyncPod retries from the top; a partially applied state
+	// (more swap than the final value) is safe.
+	var swapIncreases, swapDecreases []containerToUpdateInfo
+	for _, cUpdate := range podContainerChanges.ContainersToUpdate[v1.ResourceSwap] {
+		if cUpdate.desiredContainerResources.swapLimit > cUpdate.currentContainerResources.swapLimit {
+			swapIncreases = append(swapIncreases, cUpdate)
+		} else {
+			swapDecreases = append(swapDecreases, cUpdate)
+		}
+	}
+	// 2a. Swap increases
+	if swapLimitsEnabled && (podSwapIncreasing || len(swapIncreases) > 0) {
+		if podSwapIncreasing {
+			if err := setPodCgroupConfig(logger, v1.ResourceSwap, true); err != nil {
+				resizeResult.Fail(kubecontainer.ErrResizePodInPlace, err.Error())
+				return resizeResult
+			}
+		}
+		if len(swapIncreases) > 0 {
+			if err := m.updatePodContainerResources(ctx, pod, v1.ResourceSwap, swapIncreases); err != nil {
+				logger.Error(err, "updatePodContainerResources failed", "pod", format.Pod(pod), "resource", v1.ResourceSwap)
+				resizeResult.Fail(kubecontainer.ErrResizePodInPlace, err.Error())
+				return resizeResult
+			}
+		}
+	}
+
+	// 2b. Memory cgroups
+	if len(podContainerChanges.ContainersToUpdate[v1.ResourceMemory]) > 0 || podContainerChanges.PodCgroupResourcesToUpdate.Has(v1.ResourceMemory) {
 		if podResources.Memory == nil {
 			// Default pod memory limit to the current memory limit if unset to prevent it from updating.
-			// TODO(#128675): This does not support removing limits.
 			podResources.Memory = currentPodMemoryConfig.Memory
 		}
-		if errResize := resizeContainers(v1.ResourceMemory, int64(*currentPodMemoryConfig.Memory), *podResources.Memory, 0, 0); errResize != nil {
+		if errResize := resizeContainers(v1.ResourceMemory, int64(*currentPodMemoryConfig.Memory), *podResources.Memory,
+			actuatedPodResources.Requests.Memory().Value(), effectivePodResources.Requests.Memory().Value()); errResize != nil {
 			resizeResult.Fail(kubecontainer.ErrResizePodInPlace, errResize.Error())
 			return resizeResult
+		}
+	}
+
+	// 2c. Swap decreases
+	if swapLimitsEnabled && (podSwapDecreasing || len(swapDecreases) > 0) {
+		if len(swapDecreases) > 0 {
+			if err := m.updatePodContainerResources(ctx, pod, v1.ResourceSwap, swapDecreases); err != nil {
+				logger.Error(err, "updatePodContainerResources failed", "pod", format.Pod(pod), "resource", v1.ResourceSwap)
+				resizeResult.Fail(kubecontainer.ErrResizePodInPlace, err.Error())
+				return resizeResult
+			}
+		}
+		if podSwapDecreasing {
+			if err := setPodCgroupConfig(logger, v1.ResourceSwap, true); err != nil {
+				resizeResult.Fail(kubecontainer.ErrResizePodInPlace, err.Error())
+				return resizeResult
+			}
+		}
+	}
+	if podSwapResize {
+		// Record the limit, including when it needed no cgroup write.
+		if err := updateActuatedPodLevelResources(v1.ResourceSwap, false, true); err != nil {
+			logger.Error(err, "Failed to update pod-level actuated resources", "resource", v1.ResourceSwap, "pod", klog.KObj(pod))
 		}
 	}
 
@@ -1164,7 +1455,7 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 	}
 
 	// 4. CPU cgroups
-	if len(podContainerChanges.ContainersToUpdate[v1.ResourceCPU]) > 0 || podContainerChanges.UpdatePodResources || podContainerChanges.UpdatePodLevelResources {
+	if len(podContainerChanges.ContainersToUpdate[v1.ResourceCPU]) > 0 || podContainerChanges.PodCgroupResourcesToUpdate.Has(v1.ResourceCPU) {
 		if podResources.CPUShares == nil {
 			// This shouldn't happen: ResourceConfigForPod always returns a non-nil value for CPUShares.
 			logger.Error(nil, "podResources.CPUShares is nil", "pod", pod.Name)
@@ -1174,7 +1465,6 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 
 		// Default pod CPUQuota to the current CPUQuota if no limit is set to prevent the pod limit
 		// from updating.
-		// TODO(#128675): This does not support removing limits.
 		if podResources.CPUQuota == nil {
 			podResources.CPUQuota = currentPodCPUConfig.CPUQuota
 		}
@@ -1197,13 +1487,34 @@ func (m *kubeGenericRuntimeManager) validatePodResizeAction(
 	currentPodResources, desiredPodResources *cm.ResourceConfig,
 	podContainerChanges podActions,
 ) error {
-	if len(podContainerChanges.ContainersToUpdate[v1.ResourceMemory]) > 0 || podContainerChanges.UpdatePodResources {
+	memoryChanging := len(podContainerChanges.ContainersToUpdate[v1.ResourceMemory]) > 0 || podContainerChanges.PodCgroupResourcesToUpdate.Has(v1.ResourceMemory)
+	// Swap limits only change where the kubelet honors workload swap limits.
+	swapChanging := m.workloadSwapLimitsEnabled() &&
+		(len(podContainerChanges.ContainersToUpdate[v1.ResourceSwap]) > 0 || podContainerChanges.PodCgroupResourcesToUpdate.Has(v1.ResourceSwap))
+	if memoryChanging || swapChanging {
 		return m.validateMemoryResizeAction(ctx, pod, podStatus, currentPodResources, desiredPodResources, podContainerChanges)
 	}
 
 	return nil
 }
 
+// extraNodeAllocatableMemoryLimit returns the memory that getMemoryLimit adds to the container's
+// memory limit for its extra node allocatable resources.
+func extraNodeAllocatableMemoryLimit(pod *v1.Pod, container *v1.Container) int64 {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources) || container.Resources.Limits.Memory().IsZero() {
+		return 0
+	}
+	limits := resourcehelper.GetExtraNodeAllocatableResourcesLimits(pod, container.Name)
+	return limits.Memory().Value()
+}
+
+// validateMemoryResizeAction defers a resize while any memory-family limit
+// would be set at or below current usage. Memory: the kernel would reclaim and
+// possibly OOM-kill. Swap (KEP-5359): the kernel accepts memory.swap.max below
+// memory.swap.current without reclaim, but the workload would then be one
+// memory.max touch away from OOM with no swap-out possible, and status would
+// report a limit the cgroup is already over. The swap check applies equally
+// to user-declared and LimitedSwap-recalculated limits.
 func (m *kubeGenericRuntimeManager) validateMemoryResizeAction(
 	ctx context.Context,
 	pod *v1.Pod,
@@ -1214,20 +1525,40 @@ func (m *kubeGenericRuntimeManager) validateMemoryResizeAction(
 	// Determine which memory limits are decreasing.
 	podLimitDecreasing := desiredPodResources.Memory != nil &&
 		(currentPodResources.Memory == nil || // Pod memory limit added
-			*desiredPodResources.Memory < *currentPodResources.Memory) // Pod memory limit decreasing
+			cgroupLimit(*desiredPodResources.Memory) < cgroupLimit(*currentPodResources.Memory)) // Pod memory limit decreasing
 
 	decreasingContainerLimits := map[string]int64{} // Map of container name to desired memory limit.
 	for _, cUpdate := range podContainerChanges.ContainersToUpdate[v1.ResourceMemory] {
 		if cUpdate.desiredContainerResources.memoryLimit != 0 {
 			if cUpdate.currentContainerResources == nil || cUpdate.currentContainerResources.memoryLimit == 0 || // Limit added
 				cUpdate.desiredContainerResources.memoryLimit < cUpdate.currentContainerResources.memoryLimit { // Limit decreasing
-				decreasingContainerLimits[cUpdate.container.Name] = cUpdate.desiredContainerResources.memoryLimit
+				decreasingContainerLimits[cUpdate.container.Name] = cUpdate.desiredContainerResources.memoryLimit + extraNodeAllocatableMemoryLimit(pod, cUpdate.container)
 			}
 		}
 	}
 
-	if !podLimitDecreasing && len(decreasingContainerLimits) == 0 {
-		// No memory limits are decreasing: nothing else to check here.
+	// Determine which swap limits are decreasing. "unset" (max) counts as +inf,
+	// so adding a pod-level swap limit is a decrease.
+	swapLimitsEnabled := m.workloadSwapLimitsEnabled()
+	podSwapDecreasing := false
+	var desiredPodSwap int64
+	if swapLimitsEnabled && podContainerChanges.PodCgroupResourcesToUpdate.Has(v1.ResourceSwap) {
+		currentSwap, currentSet := cm.SwapLimitFromConfig(currentPodResources)
+		desiredSwap, desiredSet := cm.SwapLimitFromConfig(desiredPodResources)
+		if desiredSet && (!currentSet || desiredSwap < currentSwap) {
+			podSwapDecreasing = true
+			desiredPodSwap = desiredSwap
+		}
+	}
+	decreasingContainerSwap := map[string]int64{} // Map of container name to desired swap limit.
+	for _, cUpdate := range podContainerChanges.ContainersToUpdate[v1.ResourceSwap] {
+		if cUpdate.currentContainerResources == nil || cUpdate.desiredContainerResources.swapLimit < cUpdate.currentContainerResources.swapLimit {
+			decreasingContainerSwap[cUpdate.container.Name] = cUpdate.desiredContainerResources.swapLimit
+		}
+	}
+
+	if !podLimitDecreasing && len(decreasingContainerLimits) == 0 && !podSwapDecreasing && len(decreasingContainerSwap) == 0 {
+		// No memory or swap limits are decreasing: nothing else to check here.
 		return nil
 	}
 
@@ -1235,6 +1566,13 @@ func (m *kubeGenericRuntimeManager) validateMemoryResizeAction(
 	podUsageStats, err := m.runtimeHelper.PodCPUAndMemoryStats(ctx, pod, podStatus)
 	if err != nil {
 		return fmt.Errorf("unable to read memory usage for pod %q", format.Pod(pod))
+	}
+	if missingSwapUsage(podUsageStats, podSwapDecreasing, decreasingContainerSwap) {
+		// Some runtimes leave swap out of CRI stats. Only pay for the extra
+		// stats read when a swap limit is actually being lowered.
+		if swapStats, err := m.runtimeHelper.PodSwapStats(ctx, pod, podStatus); err == nil {
+			mergeSwapUsage(podUsageStats, swapStats)
+		}
 	}
 
 	var errs []error
@@ -1246,6 +1584,15 @@ func (m *kubeGenericRuntimeManager) validateMemoryResizeAction(
 				*desiredPodResources.Memory, *podUsageStats.Memory.UsageBytes))
 		}
 	}
+	// Swap usage 0 under a limit of 0 is fine (no swap in use), hence ">" not ">=".
+	if podSwapDecreasing {
+		if podUsageStats.Swap == nil || podUsageStats.Swap.SwapUsageBytes == nil {
+			errs = append(errs, fmt.Errorf("missing pod swap usage"))
+		} else if *podUsageStats.Swap.SwapUsageBytes > uint64(desiredPodSwap) {
+			errs = append(errs, fmt.Errorf("attempting to set pod swap limit (%d) below current swap usage (%d)",
+				desiredPodSwap, *podUsageStats.Swap.SwapUsageBytes))
+		}
+	}
 	for _, cStats := range podUsageStats.Containers {
 		if desiredLimit, ok := decreasingContainerLimits[cStats.Name]; ok {
 			if cStats.Memory == nil || cStats.Memory.UsageBytes == nil {
@@ -1255,14 +1602,69 @@ func (m *kubeGenericRuntimeManager) validateMemoryResizeAction(
 					cStats.Name, desiredLimit, *cStats.Memory.UsageBytes))
 			}
 		}
+		if desiredSwap, ok := decreasingContainerSwap[cStats.Name]; ok {
+			if cStats.Swap == nil || cStats.Swap.SwapUsageBytes == nil {
+				errs = append(errs, fmt.Errorf("missing container %q swap usage", cStats.Name))
+			} else if *cStats.Swap.SwapUsageBytes > uint64(desiredSwap) {
+				errs = append(errs, fmt.Errorf("attempting to set container %q swap limit (%d) below current swap usage (%d)",
+					cStats.Name, desiredSwap, *cStats.Swap.SwapUsageBytes))
+			}
+		}
 	}
 
 	if len(errs) > 0 {
 		agg := utilerrors.NewAggregate(errs)
+		if podSwapDecreasing || len(decreasingContainerSwap) > 0 {
+			return fmt.Errorf("cannot decrease memory or swap limits: %w", agg)
+		}
 		return fmt.Errorf("cannot decrease memory limits: %w", agg)
 	}
 
 	return nil
+}
+
+// missingSwapUsage reports whether a swap limit is being lowered for the pod or
+// a container whose swap usage is absent from stats.
+func missingSwapUsage(stats *statsapi.PodStats, podSwapDecreasing bool, decreasingContainerSwap map[string]int64) bool {
+	if podSwapDecreasing && (stats.Swap == nil || stats.Swap.SwapUsageBytes == nil) {
+		return true
+	}
+	if len(decreasingContainerSwap) == 0 {
+		return false
+	}
+	found := map[string]bool{}
+	for _, cs := range stats.Containers {
+		if cs.Swap != nil && cs.Swap.SwapUsageBytes != nil {
+			found[cs.Name] = true
+		}
+	}
+	for name := range decreasingContainerSwap {
+		if !found[name] {
+			return true
+		}
+	}
+	return false
+}
+
+// mergeSwapUsage fills swap usage missing from stats with the values in swapStats.
+func mergeSwapUsage(stats, swapStats *statsapi.PodStats) {
+	if swapStats == nil {
+		return
+	}
+	if stats.Swap == nil || stats.Swap.SwapUsageBytes == nil {
+		stats.Swap = swapStats.Swap
+	}
+	for _, fb := range swapStats.Containers {
+		for i := range stats.Containers {
+			if stats.Containers[i].Name != fb.Name {
+				continue
+			}
+			if stats.Containers[i].Swap == nil || stats.Containers[i].Swap.SwapUsageBytes == nil {
+				stats.Containers[i].Swap = fb.Swap
+			}
+			break
+		}
+	}
 }
 
 func (m *kubeGenericRuntimeManager) updatePodContainerResources(ctx context.Context, pod *v1.Pod, resourceName v1.ResourceName, containersToUpdate []containerToUpdateInfo) error {
@@ -1271,8 +1673,9 @@ func (m *kubeGenericRuntimeManager) updatePodContainerResources(ctx context.Cont
 
 	for _, cInfo := range containersToUpdate {
 		container := cInfo.container.DeepCopy()
-		// If updating memory limit, use most recently configured CPU request and limit values.
-		// If updating CPU request and limit, use most recently configured memory request and limit values.
+		// Each UpdateContainerResources call carries the full LinuxContainerResources,
+		// so the synthetic container holds the most recently configured value for
+		// every resource except the one being updated.
 		switch resourceName {
 		case v1.ResourceMemory:
 			container.Resources.Limits = v1.ResourceList{
@@ -1292,8 +1695,49 @@ func (m *kubeGenericRuntimeManager) updatePodContainerResources(ctx context.Cont
 				v1.ResourceCPU:    *resource.NewMilliQuantity(cInfo.desiredContainerResources.cpuRequest, resource.DecimalSI),
 				v1.ResourceMemory: *resource.NewQuantity(cInfo.currentContainerResources.memoryRequest, resource.BinarySI),
 			}
+		case v1.ResourceSwap:
+			container.Resources.Limits = v1.ResourceList{
+				v1.ResourceCPU:    *resource.NewMilliQuantity(cInfo.currentContainerResources.cpuLimit, resource.DecimalSI),
+				v1.ResourceMemory: *resource.NewQuantity(cInfo.currentContainerResources.memoryLimit, resource.BinarySI),
+			}
+			container.Resources.Requests = v1.ResourceList{
+				v1.ResourceCPU:    *resource.NewMilliQuantity(cInfo.currentContainerResources.cpuRequest, resource.DecimalSI),
+				v1.ResourceMemory: *resource.NewQuantity(cInfo.currentContainerResources.memoryRequest, resource.BinarySI),
+			}
 		}
-		if err := m.updateContainerResources(ctx, pod, container, cInfo.kubeContainerID, cInfo.containerType); err != nil {
+		actuated := container
+		if utilfeature.DefaultFeatureGate.Enabled(features.WorkloadControlledSwap) {
+			// KEP-5359: pin the swap limit explicitly. generateLinuxContainerResources
+			// re-derives memory.swap.max from the container it is handed; without
+			// this a cpu/memory update would reset swap to the mode default (0 under
+			// WorkloadControlledSwap) or recompute LimitedSwap from the synthetic
+			// memory request. The explicit value takes precedence in
+			// effectiveSwapLimit, so the number written is exactly the one chosen in
+			// computePodResizeAction.
+			swapLimit := cInfo.currentContainerResources.swapLimit
+			if resourceName == v1.ResourceSwap {
+				swapLimit = cInfo.desiredContainerResources.swapLimit
+			}
+			container.Resources.Limits[v1.ResourceSwap] = *resource.NewQuantity(swapLimit, resource.BinarySI)
+			// The pin is only for the CRI request. The actuated checkpoint records
+			// limits.swap only for a container that declares it, and only once the
+			// swap pass has applied it. A container that inherits its swap limit
+			// (pod-level, LimitedSwap, or the node default) must not get one, or it
+			// would stop following later pod-level or LimitedSwap changes.
+			actuated = container.DeepCopy()
+			delete(actuated.Resources.Limits, v1.ResourceSwap)
+			if resourceName == v1.ResourceSwap {
+				if _, declared := cInfo.container.Resources.Limits[v1.ResourceSwap]; declared {
+					actuated.Resources.Limits[v1.ResourceSwap] = container.Resources.Limits[v1.ResourceSwap]
+				}
+			} else if previous, found := m.actuatedState.GetContainerResources(pod.UID, container.Name); found {
+				// cpu and memory passes leave the recorded swap limit as it was.
+				if q, recorded := previous.Limits[v1.ResourceSwap]; recorded {
+					actuated.Resources.Limits[v1.ResourceSwap] = q
+				}
+			}
+		}
+		if err := m.updateContainerResourcesAndRecord(ctx, pod, container, actuated, cInfo.kubeContainerID, cInfo.containerType); err != nil {
 			// Log error and abort as container updates need to succeed in the order determined by computePodResizeAction.
 			// The recovery path is for SyncPod to keep retrying at later times until it succeeds.
 			logger.Error(err, "updateContainerResources failed", "container", container.Name, "cID", cInfo.kubeContainerID,
@@ -1311,9 +1755,104 @@ func (m *kubeGenericRuntimeManager) updatePodContainerResources(ctx context.Cont
 		case v1.ResourceCPU:
 			cInfo.currentContainerResources.cpuLimit = cInfo.desiredContainerResources.cpuLimit
 			cInfo.currentContainerResources.cpuRequest = cInfo.desiredContainerResources.cpuRequest
+		case v1.ResourceSwap:
+			cInfo.currentContainerResources.swapLimit = cInfo.desiredContainerResources.swapLimit
+			m.warnSwapLimitAbovePodLimit(ctx, pod, cInfo.container)
 		}
 	}
 	return nil
+}
+
+func findContainerInPodSpec(spec *v1.PodSpec, name string, containerType podutil.ContainerType) *v1.Container {
+	for c := range podutil.ContainerIter(spec, containerType) {
+		if c.Name == name {
+			return c
+		}
+	}
+	return nil
+}
+
+func hasSubPathVolumeMount(mounts []v1.VolumeMount) bool {
+	return slices.ContainsFunc(mounts, func(vm v1.VolumeMount) bool {
+		return vm.SubPath != "" || vm.SubPathExpr != ""
+	})
+}
+
+func isVolumeMountedInPodSpec(spec *v1.PodSpec, volumeName string) bool {
+	for c := range podutil.ContainerIter(spec, podutil.AllContainers) {
+		if slices.ContainsFunc(c.VolumeMounts, func(vm v1.VolumeMount) bool { return vm.Name == volumeName }) {
+			return true
+		}
+	}
+	return false
+}
+
+// containerVolumesReady reports whether every volume mounted by container is ready on the node.
+func containerVolumesReady(pod *v1.Pod, container *v1.Container, actuatedPod *v1.Pod) (string, bool) {
+	if actuatedPod == nil || !utilfeature.DefaultFeatureGate.Enabled(features.DynamicNodeLocalEphemeralVolumes) {
+		return "", true
+	}
+	for _, vm := range container.VolumeMounts {
+		volIdx := slices.IndexFunc(pod.Spec.Volumes, func(v v1.Volume) bool { return v.Name == vm.Name })
+		if volIdx < 0 {
+			return vm.Name, false
+		}
+		// Non-dynamic volume sources are never deferred by WaitForAttachAndMount, and PVC-backed
+		// volumes have nil volumeSpec.Volume so they are not recorded in actuatedPod.Spec.Volumes.
+		// Image volumes pull their OCI image in startContainer after WaitForAttachAndMount ensures
+		// their plugin entry exists in actualStateOfWorld.
+		if !podutil.IsSupportedDynamicVolumeSource(&pod.Spec.Volumes[volIdx].VolumeSource) || pod.Spec.Volumes[volIdx].Image != nil {
+			continue
+		}
+		if isVolumeMountedInPodSpec(&actuatedPod.Spec, vm.Name) ||
+			slices.ContainsFunc(actuatedPod.Spec.Volumes, func(v v1.Volume) bool { return v.Name == vm.Name }) {
+			continue
+		}
+		return vm.Name, false
+	}
+	return "", true
+}
+
+// reconcileNonRunningActuatedContainers clears actuated container VolumeMounts and VolumeDevices
+// for removed containers once they are no longer running, so dynamically removed volumes can
+// unmount from the host and removed containers' terminated statuses drop stale VolumeMounts.
+func (m *kubeGenericRuntimeManager) reconcileNonRunningActuatedContainers(logger klog.Logger, pod *v1.Pod, podStatus *kubecontainer.PodStatus, actuatedPod *v1.Pod) *v1.Pod {
+	if actuatedPod == nil || podStatus == nil {
+		return actuatedPod
+	}
+	updated := false
+	for actCtr, cType := range podutil.ContainerIter(&actuatedPod.Spec, podutil.AllContainers) {
+		if len(actCtr.VolumeMounts) == 0 && len(actCtr.VolumeDevices) == 0 {
+			continue
+		}
+		if podStatus.HasRunningOrUnknownContainer(actCtr.Name) {
+			continue
+		}
+		specCtr := findContainerInPodSpec(&pod.Spec, actCtr.Name, cType)
+		if specCtr != nil {
+			continue
+		}
+		if hasSubPathVolumeMount(actCtr.VolumeMounts) && m.runtimeHelper != nil {
+			if err := m.runtimeHelper.CleanContainerSubPaths(pod.UID, actCtr.Name); err != nil {
+				logger.Error(err, "Failed to clean container subPath mounts for stopped container", "pod", klog.KObj(pod), "containerName", actCtr.Name)
+				continue
+			}
+		}
+		cleared := *actCtr
+		cleared.VolumeMounts = nil
+		cleared.VolumeDevices = nil
+		if err := m.actuatedState.SetContainer(logger, pod.UID, cType, cleared); err != nil {
+			logger.Error(err, "Failed to clear actuated volume mounts for stopped container", "pod", klog.KObj(pod), "containerName", actCtr.Name)
+		} else {
+			updated = true
+		}
+	}
+	if updated {
+		if refreshed, ok := m.actuatedState.GetPodReadOnly(pod.UID); ok {
+			return refreshed
+		}
+	}
+	return actuatedPod
 }
 
 // computePodActions checks whether the pod spec has changed and returns the changes if true.
@@ -1342,7 +1881,16 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 		changes.ContainersToReset = append(changes.ContainersToReset, targetInitContainers...)
 		changes.ContainersToReset = append(changes.ContainersToReset, sourceContainers...)
 		changes.ContainersToReset = append(changes.ContainersToReset, sourceInitContainers...)
+		// Containers removed from the pod spec are killed, but never restarted.
+		m.killRemovedContainers(logger, pod, podStatus, &changes)
 		return changes
+	}
+
+	var actuatedPod *v1.Pod
+	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicNodeLocalEphemeralVolumes) || utilfeature.DefaultFeatureGate.Enabled(features.DynamicContainers) {
+		if p, ok := m.actuatedState.GetPodReadOnly(pod.UID); ok && p != nil && p.Name != "" {
+			actuatedPod = m.reconcileNonRunningActuatedContainers(logger, pod, podStatus, p)
+		}
 	}
 
 	// If we need to (re-)create the pod sandbox, everything will need to be
@@ -1404,7 +1952,17 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 
 			return changes
 		}
-		changes.ContainersToStart = containersToStart
+		var readyContainersToStart []int
+		for _, idx := range containersToStart {
+			c := &pod.Spec.Containers[idx]
+			if unreadyVol, ready := containerVolumesReady(pod, c, actuatedPod); !ready {
+				logger.Info("Deferring container start during sandbox creation until dynamic volume is ready",
+					"pod", klog.KObj(pod), "containerName", c.Name, "volumeName", unreadyVol)
+				continue
+			}
+			readyContainersToStart = append(readyContainersToStart, idx)
+		}
+		changes.ContainersToStart = readyContainersToStart
 		return changes
 	}
 
@@ -1414,6 +1972,11 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 
 		// Ephemeral Containers are never restarted
 		if podStatus.FindContainerStatusByName(c.Name) == nil {
+			if volName, ready := containerVolumesReady(pod, c, actuatedPod); !ready {
+				logger.Info("Deferring ephemeral container start until dynamic volume is ready",
+					"pod", klog.KObj(pod), "containerName", c.Name, "volumeName", volName)
+				continue
+			}
 			changes.EphemeralContainersToStart = append(changes.EphemeralContainersToStart, i)
 		}
 	}
@@ -1426,6 +1989,9 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 	// TODO: Remove this code path as logically it is the subset of the next
 	// code path.
 	hasInitialized := m.computeInitContainerActions(ctx, pod, podStatus, &changes)
+	if !changes.KillPod {
+		changes.PodCgroupResourcesToUpdate = m.computePodLevelResourcesResizeAction(ctx, pod)
+	}
 	if changes.KillPod || !hasInitialized {
 		// Initialization failed or still in progress. Skip inspecting non-init
 		// containers.
@@ -1434,6 +2000,7 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 
 	// Number of running containers to keep.
 	keepCount := 0
+	hasDeferredContainerStart := false
 	// check the status of containers.
 	for idx, container := range pod.Spec.Containers {
 		containerStatus := podStatus.FindContainerStatusByName(container.Name)
@@ -1452,8 +2019,6 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 		// need to restart it.
 		if containerStatus == nil || containerStatus.State != kubecontainer.ContainerStateRunning {
 			if kubecontainer.ShouldContainerBeRestarted(logger, &container, pod, podStatus) {
-				logger.V(3).Info("Container of pod is not in the desired state and shall be started", "containerName", container.Name, "pod", klog.KObj(pod))
-				changes.ContainersToStart = append(changes.ContainersToStart, idx)
 				if containerStatus != nil && containerStatus.State == kubecontainer.ContainerStateUnknown {
 					// If container is in unknown state, we don't know whether it
 					// is actually running or not, always try killing it before
@@ -1466,6 +2031,14 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 						reason: reasonUnknown,
 					}
 				}
+				if unreadyVolName, ready := containerVolumesReady(pod, &container, actuatedPod); !ready {
+					logger.Info("Deferring container start until dynamic volume is ready",
+						"pod", klog.KObj(pod), "containerName", container.Name, "volumeName", unreadyVolName)
+					hasDeferredContainerStart = true
+					continue
+				}
+				logger.V(3).Info("Container of pod is not in the desired state and shall be started", "containerName", container.Name, "pod", klog.KObj(pod))
+				changes.ContainersToStart = append(changes.ContainersToStart, idx)
 			}
 			continue
 		}
@@ -1519,44 +2092,194 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 		logger.V(2).Info("Message for Container of pod", "containerName", container.Name, "containerStatusID", containerStatus.ID, "pod", klog.KObj(pod), "containerMessage", message)
 	}
 
+	m.killRemovedContainers(logger, pod, podStatus, &changes)
+	m.dropRemovedActuatedContainers(logger, pod, podStatus)
+
 	// Check for volume resize actions
 	m.computeVolumeResizeAction(ctx, pod, &changes)
 
-	if keepCount == 0 && len(changes.ContainersToStart) == 0 {
+	if keepCount == 0 && len(changes.ContainersToStart) == 0 && !hasDeferredContainerStart {
 		changes.KillPod = true
 		// To prevent the restartable init containers to keep pod alive, we should
 		// not restart them.
 		changes.InitContainersToStart = nil
-	}
-
-	changes.UpdatePodLevelResources = m.computePodLevelResourcesResizeAction(ctx, pod)
-	if !changes.UpdatePodLevelResources && !changes.UpdatePodResources {
-		// If any starting containers have resized, we need to resize the pod resources.
-		changes.UpdatePodResources = m.startingResizedContainer(logger, pod, pod.Spec.Containers, changes.ContainersToStart)
+		changes.PodCgroupResourcesToUpdate = nil
 	}
 
 	return changes
 }
 
-// startingResizedContainer reports whether any of the contaniersToStart have been resized.
-func (m *kubeGenericRuntimeManager) startingResizedContainer(logger klog.Logger, pod *v1.Pod, containers []v1.Container, containersToStart []int) bool {
-	for _, i := range containersToStart {
-		c := containers[i]
-		actuatedResources, ok := m.actuatedState.GetContainerResources(pod.UID, c.Name)
-		if !ok {
-			logger.V(4).Info("Actuated resources missing for container", "pod", format.Pod(pod), "container", c.Name)
+// killRemovedContainers adds the running containers that were removed from the pod spec to the
+// containers to kill. A removed container must not keep running. Only regular containers can be
+// removed from the spec, and API validation doesn't let an added container reuse the name of a
+// removed one while the pod reports its status, which it does while the removed container has
+// runtime containers. So a container that isn't in the pod spec is a regular container that was
+// removed from it.
+//
+// TODO: The CPU and memory managers' removeStaleState works from the API pods, so they release the
+// exclusive CPUs and memory of a removed container while it still runs (until it is killed, or
+// while its removal isn't allocated yet). Have them keep the allocations of running containers.
+func (m *kubeGenericRuntimeManager) killRemovedContainers(logger klog.Logger, pod *v1.Pod, podStatus *kubecontainer.PodStatus, changes *podActions) {
+	for _, containerStatus := range podStatus.ContainerStatuses {
+		if kubecontainer.GetContainerSpec(pod, containerStatus.Name) != nil {
+			continue
 		}
-		var actuatedPodResources *v1.ResourceRequirements
-		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling) {
-			actuatedPodResources, _ = m.actuatedState.GetPodLevelResources(pod.UID)
+		if containerStatus.State != kubecontainer.ContainerStateRunning {
+			// As for containers in the spec, drop the topology hints of the container as
+			// soon as it stops rather than when it is garbage collected.
+			if err := m.internalLifecycle.PostStopContainer(logger, containerStatus.ID.ID); err != nil {
+				logger.Error(err, "Internal container post-stop lifecycle hook failed for removed container in pod with error",
+					"containerName", containerStatus.Name, "pod", klog.KObj(pod))
+			}
 		}
-		desired := containerResourcesFromRequirements(pod.Spec.Resources, &c.Resources)
-		actuated := containerResourcesFromRequirements(actuatedPodResources, &actuatedResources)
-		if desired != actuated {
-			return true
+		if containerStatus.State != kubecontainer.ContainerStateRunning && containerStatus.State != kubecontainer.ContainerStateUnknown {
+			continue
+		}
+		message := fmt.Sprintf("Container %s removed from pod spec", containerStatus.Name)
+		changes.ContainersToKill[containerStatus.ID] = containerToKillInfo{
+			name:    containerStatus.Name,
+			message: message,
+		}
+		logger.V(2).Info("Message for Container of pod", "containerName", containerStatus.Name, "containerStatusID", containerStatus.ID, "pod", klog.KObj(pod), "containerMessage", message)
+	}
+}
+
+// dropRemovedActuatedContainers drops the actuated records of containers removed from the pod spec that
+// have no runtime container left (it was pruned, garbage collected, or never created). A record
+// thus lasts as long as the status of the removed container, which is generated from its runtime
+// container.
+func (m *kubeGenericRuntimeManager) dropRemovedActuatedContainers(logger klog.Logger, pod *v1.Pod, podStatus *kubecontainer.PodStatus) {
+	actuated, ok := m.actuatedState.GetPod(pod.UID)
+	if !ok {
+		return
+	}
+	var forget []string
+	for pair := range podutil.ContainerPairs(pod, actuated, podutil.Containers) {
+		if pair.New == nil && podStatus.FindContainerStatusByName(pair.Old.Name) == nil {
+			if hasSubPathVolumeMount(pair.Old.VolumeMounts) && m.runtimeHelper != nil {
+				if err := m.runtimeHelper.CleanContainerSubPaths(pod.UID, pair.Old.Name); err != nil {
+					logger.Error(err, "Failed to clean container subPath mounts for dropped container", "pod", klog.KObj(pod), "containerName", pair.Old.Name)
+					continue
+				}
+			}
+			forget = append(forget, pair.Old.Name)
 		}
 	}
-	return false
+	if len(forget) == 0 {
+		return
+	}
+	if err := m.actuatedState.RemoveContainers(logger, pod.UID, podutil.Containers, forget...); err != nil {
+		logger.Error(err, "Failed to drop actuated records of containers removed from the pod spec", "pod", klog.KObj(pod), "containers", forget)
+	}
+}
+
+// pruneRemovedContainers removes the runtime containers of containers removed from the pod spec
+// beyond the newest maxRemovedContainers (see removedContainersToPrune), and returns a result for
+// each. Once all the runtime containers of a removed container are removed, its actuated record is
+// dropped too, so that a container added later under the same name doesn't find it.
+func (m *kubeGenericRuntimeManager) pruneRemovedContainers(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus) []*kubecontainer.SyncResult {
+	containerIDs := removedContainersToPrune(pod, podStatus)
+	if len(containerIDs) == 0 {
+		return nil
+	}
+	logger := klog.FromContext(ctx)
+	var results []*kubecontainer.SyncResult
+	removed := sets.New[kubecontainer.ContainerID]()
+	for _, containerID := range containerIDs {
+		logger.V(3).Info("Removing container removed from pod spec", "containerID", containerID, "pod", klog.KObj(pod))
+		result := kubecontainer.NewSyncResult(kubecontainer.RemoveContainer, containerID.ID)
+		results = append(results, result)
+		if err := m.removeContainer(ctx, containerID.ID, false); err != nil {
+			result.Fail(kubecontainer.ErrRemoveContainer, err.Error())
+			logger.Error(err, "Failed to remove container removed from pod spec", "containerID", containerID, "pod", klog.KObj(pod))
+			continue
+		}
+		removed.Insert(containerID)
+	}
+	gone := sets.New[string]()
+	remaining := sets.New[string]()
+	for _, s := range podStatus.ContainerStatuses {
+		if removed.Has(s.ID) {
+			gone.Insert(s.Name)
+		} else {
+			remaining.Insert(s.Name)
+		}
+	}
+	if names := sets.List(gone.Difference(remaining)); len(names) > 0 {
+		var cleaned []string
+		for _, name := range names {
+			if m.runtimeHelper != nil {
+				if err := m.runtimeHelper.CleanContainerSubPaths(pod.UID, name); err != nil {
+					logger.Error(err, "Failed to clean container subPath mounts for pruned container", "pod", klog.KObj(pod), "containerName", name)
+					continue
+				}
+			}
+			cleaned = append(cleaned, name)
+		}
+		if len(cleaned) > 0 {
+			if err := m.actuatedState.RemoveContainers(logger, pod.UID, podutil.Containers, cleaned...); err != nil {
+				logger.Error(err, "Failed to drop actuated records of pruned containers", "pod", klog.KObj(pod), "containers", cleaned)
+			}
+		}
+	}
+	return results
+}
+
+// maxRemovedContainers is the number of containers removed from the pod spec
+// whose runtime containers, and so statuses and logs, are kept. It bounds the
+// pod status size for pods that churn containers.
+const maxRemovedContainers = 10
+
+// removedContainersToPrune returns the runtime containers of the containers
+// removed from the pod spec that finished longest ago, beyond the newest
+// maxRemovedContainers removed containers. Removed containers that are still
+// running count toward the limit but are never pruned.
+//
+// The status of a removed container is generated from its runtime container,
+// so pruning the runtime container drops the status too. Keeping the two in
+// sync matters: the API allows a name to be reused once its status is gone,
+// and a leftover runtime container would be mistaken for the new container.
+func removedContainersToPrune(pod *v1.Pod, podStatus *kubecontainer.PodStatus) []kubecontainer.ContainerID {
+	// The most recent runtime container for each removed container name.
+	latest := map[string]*kubecontainer.Status{}
+	for _, s := range podStatus.ContainerStatuses {
+		if kubecontainer.GetContainerSpec(pod, s.Name) != nil {
+			continue
+		}
+		if l, ok := latest[s.Name]; !ok || s.CreatedAt.After(l.CreatedAt) {
+			latest[s.Name] = s
+		}
+	}
+	if len(latest) <= maxRemovedContainers {
+		return nil
+	}
+
+	var stopped []*kubecontainer.Status
+	for _, s := range latest {
+		if s.State != kubecontainer.ContainerStateRunning && s.State != kubecontainer.ContainerStateUnknown {
+			stopped = append(stopped, s)
+		}
+	}
+	// Oldest finished first; names break ties for determinism.
+	sort.Slice(stopped, func(i, j int) bool {
+		if !stopped[i].FinishedAt.Equal(stopped[j].FinishedAt) {
+			return stopped[i].FinishedAt.Before(stopped[j].FinishedAt)
+		}
+		return stopped[i].Name < stopped[j].Name
+	})
+	toPrune := min(len(latest)-maxRemovedContainers, len(stopped))
+	names := sets.New[string]()
+	for _, s := range stopped[:toPrune] {
+		names.Insert(s.Name)
+	}
+
+	var ids []kubecontainer.ContainerID
+	for _, s := range podStatus.ContainerStatuses {
+		if names.Has(s.Name) && kubecontainer.GetContainerSpec(pod, s.Name) == nil {
+			ids = append(ids, s.ID)
+		}
+	}
+	return ids
 }
 
 // getContainersToReset returns container info about the containers to remove from the runtime.
@@ -1591,23 +2314,41 @@ func (m *kubeGenericRuntimeManager) getContainersToReset(containers []v1.Contain
 	return
 }
 
-func (m *kubeGenericRuntimeManager) computePodLevelResourcesResizeAction(ctx context.Context, pod *v1.Pod) bool {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling) {
-		return false
+func (m *kubeGenericRuntimeManager) computePodLevelResourcesResizeAction(ctx context.Context, pod *v1.Pod) sets.Set[v1.ResourceName] {
+	if resizable, _, _ := allocation.IsInPlacePodVerticalScalingAllowed(pod); !resizable {
+		return nil
 	}
-	logger := klog.FromContext(ctx)
 
 	actuatedPodLevelResources, found := m.actuatedState.GetPodLevelResources(pod.UID)
-	if !found {
-		logger.Error(nil, "Missing actuated pod level resource record", "pod", klog.KObj(pod), "pod", pod.Name)
-		// Proceed with the zero-value actuated resources. For restart NotRequired, this may
-		// result in an extra call to UpdateContainerResources, but that call should be idempotent.
-		// For RestartContainer, this may trigger a container restart.
+	if !found || actuatedPodLevelResources == nil {
+		klog.FromContext(ctx).Error(nil, "Missing actuated pod level resource record", "pod", klog.KObj(pod))
+		return nil
 	}
 
-	desiredPodLevelResources := podResourcesFromRequirements(pod.Spec.Resources)
-	currentPodLevelResources := podResourcesFromRequirements(actuatedPodLevelResources)
-	return currentPodLevelResources != desiredPodLevelResources
+	toUpdate := podCgroupResourcesToUpdate(cm.EffectivePodResources(pod), actuatedPodLevelResources)
+	// KEP-5359: the pod-level swap limit is a pod cgroup limit of its own.
+	if m.workloadSwapLimitsEnabled() && !podSwapLimitEqual(pod.Spec.Resources, actuatedPodLevelResources) {
+		if toUpdate == nil {
+			toUpdate = sets.New[v1.ResourceName]()
+		}
+		toUpdate.Insert(v1.ResourceSwap)
+	}
+	return toUpdate
+}
+
+// podCgroupResourcesToUpdate returns the resources (cpu, memory) whose desired pod cgroup requests
+// or limits differ from the actuated ones.
+func podCgroupResourcesToUpdate(desired, actuated *v1.ResourceRequirements) sets.Set[v1.ResourceName] {
+	var toUpdate sets.Set[v1.ResourceName]
+	for _, rName := range []v1.ResourceName{v1.ResourceCPU, v1.ResourceMemory} {
+		if !desired.Requests[rName].Equal(actuated.Requests[rName]) || !desired.Limits[rName].Equal(actuated.Limits[rName]) {
+			if toUpdate == nil {
+				toUpdate = sets.New[v1.ResourceName]()
+			}
+			toUpdate.Insert(rName)
+		}
+	}
+	return toUpdate
 }
 
 // SyncPod syncs the running pod into the desired pod by executing following steps:
@@ -1671,14 +2412,20 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 		// Step 3: kill any running containers in this pod which are not to keep.
 		for containerID, containerInfo := range podContainerChanges.ContainersToKill {
 			logger.V(3).Info("Killing unwanted container for pod", "containerName", containerInfo.name, "containerID", containerID, "pod", klog.KObj(pod))
-			killContainerResult := kubecontainer.NewSyncResult(kubecontainer.KillContainer, containerInfo.name)
-			result.AddSyncResult(killContainerResult)
-			if err := m.killContainer(ctx, pod, containerID, containerInfo.name, containerInfo.message, containerInfo.reason, nil, nil); err != nil {
-				killContainerResult.Fail(kubecontainer.ErrKillContainer, err.Error())
-				logger.Error(err, "killContainer for pod failed", "containerName", containerInfo.name, "containerID", containerID, "pod", klog.KObj(pod))
-				return
-			}
 		}
+		// Termination ordering (e.g. for sidecars) only applies when the whole pod is
+		// shutting down. Here we are only killing individual containers, so no
+		// ordering is enforced between them.
+		// TODO: Killing a container removed from the pod spec blocks the sync for its whole grace
+		// period, which delays other changes to the pod, and its deletion. Kill removed containers
+		// without blocking the sync.
+		result.AddSyncResult(m.killContainers(ctx, pod, podContainerChanges.ContainersToKill, nil, nil)...)
+		if result.Error() != nil {
+			return
+		}
+
+		// Failures are retried on the next sync, and don't block the rest of this one.
+		result.AddSyncResult(m.pruneRemovedContainers(ctx, pod, podStatus)...)
 
 		// Removes the containers if they are marked for removal (for in-place restart)
 		if utilfeature.DefaultFeatureGate.Enabled(features.RestartAllContainersOnContainerExits) {
@@ -1828,6 +2575,26 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 			logger.V(4).Info("Determined the ip for pod after sandbox changed", "IPs", podIPs, "pod", klog.KObj(pod))
 		}
 
+		// A runtime that reported the pod_network_isolated capability but
+		// attached the sandbox to the pod network anyway must not get any
+		// container started in it: the pod asked for isolation. Stop the
+		// sandbox and fail; the API server also rejects a status with IPs.
+		if kubecontainer.IsNetworkIsolatedPod(pod) && len(podIPs) > 0 {
+			msg := fmt.Sprintf("runtime attached the sandbox of a pod with podNetwork %q to the pod network (IPs %v)", v1.PodNetworkIsolated, podIPs)
+			if err := m.runtimeService.StopPodSandbox(ctx, podSandboxID); err != nil && !crierror.IsNotFound(err) {
+				logger.Error(err, "Failed to stop sandbox with unexpected IPs", "pod", klog.KObj(pod), "podSandboxID", podSandboxID)
+			}
+			metrics.StartedPodsErrorsTotal.Inc()
+			createSandboxResult.Fail(kubecontainer.ErrCreatePodSandbox, msg)
+			logger.Error(nil, "CreatePodSandbox for pod produced a sandbox with IPs for a network isolated pod", "pod", klog.KObj(pod), "podSandboxID", podSandboxID, "IPs", podIPs)
+			ref, referr := ref.GetReference(legacyscheme.Scheme, pod)
+			if referr != nil {
+				logger.Error(referr, "Couldn't make a ref to pod", "pod", klog.KObj(pod))
+			}
+			m.recorder.WithLogger(logger).Eventf(ref, v1.EventTypeWarning, events.FailedCreatePodSandBox, "Failed to create pod sandbox: %s", msg)
+			return
+		}
+
 		// Step 5: invoke the sandbox ready callback before image pulling .
 		// At this point, dynamic resources are prepared (at PrepareDynamicResources() call above)
 		// and volumes are already mounted (at the kubelet SyncPod() level), so,
@@ -1851,7 +2618,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 	if resizable, _, _ := allocation.IsInPlacePodVerticalScalingAllowed(pod); resizable {
 		updateVolumes := utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingMemoryBackedVolumes) &&
 			(len(podContainerChanges.VolumesToUpsize) > 0 || len(podContainerChanges.VolumesToDownsize) > 0)
-		if len(podContainerChanges.ContainersToUpdate) > 0 || podContainerChanges.UpdatePodResources || podContainerChanges.UpdatePodLevelResources || updateVolumes {
+		if len(podContainerChanges.ContainersToUpdate) > 0 || len(podContainerChanges.PodCgroupResourcesToUpdate) > 0 || updateVolumes {
 			result.AddSyncResult(m.doPodResizeAction(ctx, pod, podStatus, podContainerChanges))
 		}
 	}
@@ -1898,7 +2665,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 			// known errors that are logged in other places are logged at higher levels here to avoid
 			// repetitive log spam
 			switch {
-			case err == images.ErrImagePullBackOff:
+			case errors.Is(err, images.ErrImagePullBackOff), errors.Is(err, kubecontainer.ErrSecurityProfilePullBackOff):
 				logger.V(3).Info("Container start failed in pod", "containerType", typeName, "container", spec.container.Name, "pod", klog.KObj(pod), "containerMessage", msg, "err", err)
 			default:
 				utilruntime.HandleError(fmt.Errorf("%v %v start failed in pod %v: %w: %s", typeName, spec.container.Name, format.Pod(pod), err, msg))
@@ -2094,9 +2861,10 @@ func (m *kubeGenericRuntimeManager) getImageVolumes(ctx context.Context, pod *v1
 		return nil, err
 	}
 
+	dynamicVolumesEnabled := utilfeature.DefaultFeatureGate.Enabled(features.DynamicNodeLocalEphemeralVolumes)
 	res := make(imageVolumePulls)
 	for _, volume := range pod.Spec.Volumes {
-		if volume.Image == nil {
+		if volume.Image == nil || (dynamicVolumesEnabled && !isVolumeMountedInPodSpec(&pod.Spec, volume.Name)) {
 			continue
 		}
 
@@ -2105,12 +2873,17 @@ func (m *kubeGenericRuntimeManager) getImageVolumes(ctx context.Context, pod *v1
 			ctx, objectRef, pod, volume.Image.Reference, pullSecrets, podSandboxConfig, podRuntimeHandler, volume.Image.PullPolicy,
 		)
 		if err != nil {
-			logger.Error(err, "Failed to ensure image", "pod", klog.KObj(pod))
+			logger.Error(err, "Failed to ensure image", "pod", klog.KObj(pod), "volumeName", volume.Name)
 			res[volume.Name] = imageVolumePullResult{err: err, msg: msg}
 			continue
 		}
 
-		logger.V(4).Info("Pulled image", "ref", ref, "pod", klog.KObj(pod))
+		logger.V(4).Info("Pulled image", "ref", ref, "pod", klog.KObj(pod), "volumeName", volume.Name)
+		if dynamicVolumesEnabled && m.actuatedState != nil {
+			if setErr := m.actuatedState.SetPodVolume(logger, pod.UID, volume); setErr != nil {
+				logger.Error(setErr, "Failed to record image volume in actuated state", "pod", klog.KObj(pod), "volumeName", volume.Name)
+			}
+		}
 		res[volume.Name] = imageVolumePullResult{spec: &runtimeapi.ImageSpec{
 			Image:              ref,
 			UserSpecifiedImage: volume.Image.Reference,
@@ -2158,7 +2931,7 @@ func (m *kubeGenericRuntimeManager) doBackOff(ctx context.Context, pod *v1.Pod, 
 	return false, "", nil
 }
 
-// KillPod kills all the containers of a pod. Pod may be nil, running pod must not be.
+// KillPod kills all the containers of a pod. pod must not be nil.
 // gracePeriodOverride if specified allows the caller to override the pod default grace period.
 // only hard kill paths are allowed to specify a gracePeriodOverride in the kubelet in order to not corrupt user data.
 // it is useful when doing SIGKILL for hard eviction scenarios, or max grace period during soft eviction scenarios.
@@ -2168,13 +2941,11 @@ func (m *kubeGenericRuntimeManager) KillPod(ctx context.Context, pod *v1.Pod, ru
 }
 
 // killPodWithSyncResult kills a runningPod and returns SyncResult.
-// Note: The pod passed in could be *nil* when kubelet restarted.
+// pod must not be nil. For a pod the kubelet has no spec for (e.g. an orphaned
+// pod found after a kubelet restart), callers should pass runningPod.ToAPIPod().
 func (m *kubeGenericRuntimeManager) killPodWithSyncResult(ctx context.Context, pod *v1.Pod, runningPod kubecontainer.Pod, gracePeriodOverride *int64) (result kubecontainer.PodSyncResult) {
 	logger := klog.FromContext(ctx)
-	killContainerResults := m.killContainersWithSyncResult(ctx, pod, runningPod, gracePeriodOverride)
-	for _, containerResult := range killContainerResults {
-		result.AddSyncResult(containerResult)
-	}
+	result.AddSyncResult(m.killRunningPodContainers(ctx, pod, runningPod, gracePeriodOverride)...)
 
 	// stop sandbox, the sandbox will be removed in GarbageCollect
 	killSandboxResult := kubecontainer.NewSyncResult(kubecontainer.KillPodSandbox, runningPod.ID)
@@ -2342,13 +3113,23 @@ func (m *kubeGenericRuntimeManager) GetContainerStatus(ctx context.Context, podU
 // GarbageCollect removes dead containers using the specified container gc policy.
 func (m *kubeGenericRuntimeManager) GarbageCollect(ctx context.Context, gcPolicy kubecontainer.GCPolicy, allSourcesReady bool, evictNonDeletedPods bool) error {
 	logger := klog.FromContext(ctx)
-	// Remove terminated pods from the actuated state.
+	// Remove terminated pods from the actuated state once all their volumes are unmounted.
+	// If a pod has been removed from podManager while its inline volumes are still mounted on
+	// disk, keeping its actuated state entry until VolumeManager unmounts those volumes ensures
+	// reconstructVolume still has the pod metadata and volume spec if the kubelet restarts before
+	// unmount completes.
 	for _, uid := range m.actuatedState.GetPodUIDs() {
-		if m.podStateProvider.ShouldPodContentBeRemoved(uid) {
-			if err := m.actuatedState.RemovePod(logger, uid); err != nil {
-				// No need to act on the error beyond logging it here.
-				logger.Error(err, "Failed to remove pod from actuated state", "podUID", uid)
-			}
+		if !m.podStateProvider.ShouldPodContentBeRemoved(uid) {
+			continue
+		}
+		vols, _ := m.actuatedState.GetPodVolumes(uid)
+		needsUnmount := slices.ContainsFunc(vols, reconciler.VolumeRequiresUnmount)
+		if needsUnmount {
+			continue
+		}
+		if err := m.actuatedState.RemovePod(logger, uid); err != nil {
+			// No need to act on the error beyond logging it here.
+			logger.Error(err, "Failed to remove pod from actuated state", "podUID", uid)
 		}
 	}
 
@@ -2383,20 +3164,7 @@ func (m *kubeGenericRuntimeManager) ListPodSandboxMetrics(ctx context.Context) (
 }
 
 func (m *kubeGenericRuntimeManager) UpdateActuatedPodLevelResources(logger klog.Logger, actuatedPod *v1.Pod) error {
-
-	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-		return nil
-	}
-
-	if actuatedPod.Spec.Resources == nil {
-		return nil
-	}
-
-	if actuatedPod.Spec.Resources.Requests == nil && actuatedPod.Spec.Resources.Limits == nil {
-		return nil
-	}
-
-	return m.actuatedState.SetPodLevelResources(logger, actuatedPod.UID, actuatedPod.Spec.Resources)
+	return m.actuatedState.SetPodLevelResources(logger, actuatedPod.UID, actuatedPodLevelResources(actuatedPod))
 }
 
 // isPodResizeInProgress checks whether the actuated resizable resources differ from
@@ -2405,7 +3173,9 @@ func (m *kubeGenericRuntimeManager) UpdateActuatedPodLevelResources(logger klog.
 // - Non-resizable containers: non-restartable init containers, ephemeral containers
 // - Non-resizable resources: only CPU & memory are resizable
 // - Non-running containers: they will be sized correctly when (re)started
-// * any running pod if InPlacePodLevelResourcesVerticalScaling is enabled.
+// * any running containers removed from the pod spec, which run with resources that are no longer
+// allocated.
+// * the pod cgroup.
 // * any running pod if InPlacePodVerticalScalingMemoryBackedVolumes is enabled.
 func (m *kubeGenericRuntimeManager) IsPodResizeInProgress(allocatedPod *v1.Pod, podStatus *kubecontainer.PodStatus) bool {
 	if m.isContainerResourceResizeInProgress(allocatedPod, podStatus) {
@@ -2422,18 +3192,24 @@ func (m *kubeGenericRuntimeManager) IsPodResizeInProgress(allocatedPod *v1.Pod, 
 func (m *kubeGenericRuntimeManager) isMemoryBackedVolumeResizeInProgress(allocatedPod *v1.Pod) bool {
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingMemoryBackedVolumes) {
 		for _, volume := range allocatedPod.Spec.Volumes {
-			if !allocation.VolHasMemoryBackedEmptyDirSizeLimit(&volume) {
+			if !allocation.VolHasMemoryBackedEmptyDir(&volume) {
 				continue
 			}
 
-			desiredLimit := volume.EmptyDir.SizeLimit
+			allocatedLimit, _ := m.runtimeHelper.EffectiveEphemeralVolumeLimit(allocatedPod, volume.Name)
 			actuatedLimit, found := m.actuatedState.GetEmptyDirVolumeLimit(allocatedPod.UID, volume.Name)
 			if !found {
 				// No actuation checkpoint yet.
 				continue
 			}
 
-			if desiredLimit != nil && !desiredLimit.Equal(*actuatedLimit) {
+			hasDesiredLimit := allocatedLimit != nil && !allocatedLimit.IsZero()
+			hasActuatedLimit := actuatedLimit != nil && !actuatedLimit.IsZero()
+			if !hasDesiredLimit && !hasActuatedLimit {
+				// nil and 0 are considered equivalent for sizeLimit
+				continue
+			}
+			if hasDesiredLimit != hasActuatedLimit || !allocatedLimit.Equal(*actuatedLimit) {
 				return true
 			}
 		}
@@ -2442,6 +3218,9 @@ func (m *kubeGenericRuntimeManager) isMemoryBackedVolumeResizeInProgress(allocat
 }
 
 func (m *kubeGenericRuntimeManager) isContainerResourceResizeInProgress(allocatedPod *v1.Pod, podStatus *kubecontainer.PodStatus) bool {
+	if m.isRemovedContainerRunningWithResources(allocatedPod, podStatus) {
+		return true
+	}
 	return !podutil.VisitContainers(&allocatedPod.Spec, podutil.InitContainers|podutil.Containers,
 		func(allocatedContainer *v1.Container, containerType podutil.ContainerType) (shouldContinue bool) {
 			if !isResizableContainer(allocatedContainer, containerType) {
@@ -2456,8 +3235,18 @@ func (m *kubeGenericRuntimeManager) isContainerResourceResizeInProgress(allocate
 
 			actuatedResources, _ := m.actuatedState.GetContainerResources(allocatedPod.UID, allocatedContainer.Name)
 			allocatedResources := allocatedContainer.Resources
-			if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling) {
+			if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) {
 				allocatedResources.Limits = kubeutil.GetLimits(&kubeutil.ResourceOpts{PodResources: allocatedPod.Spec.Resources, ContainerResources: &allocatedContainer.Resources})
+			}
+
+			if utilfeature.DefaultFeatureGate.Enabled(features.WorkloadControlledSwap) {
+				// Compare effective swap, not raw map entries: a container without
+				// limits.swap derives its value from the pod-level limit or LimitedSwap.
+				allocatedSwap := m.effectiveSwapLimit(allocatedPod, allocatedContainer)
+				actuatedSwap := m.actuatedSwapLimit(allocatedPod, allocatedContainer, &actuatedResources)
+				if allocatedSwap != actuatedSwap {
+					return false
+				}
 			}
 
 			return allocatedResources.Requests[v1.ResourceCPU].Equal(actuatedResources.Requests[v1.ResourceCPU]) &&
@@ -2467,12 +3256,36 @@ func (m *kubeGenericRuntimeManager) isContainerResourceResizeInProgress(allocate
 		})
 }
 
+// isRemovedContainerRunningWithResources returns whether a container removed from the pod spec is
+// still running with CPU or memory resources, which the pod no longer allocates.
+func (m *kubeGenericRuntimeManager) isRemovedContainerRunningWithResources(allocatedPod *v1.Pod, podStatus *kubecontainer.PodStatus) bool {
+	if podStatus == nil {
+		return false
+	}
+	for _, cs := range podStatus.ContainerStatuses {
+		if cs.State != kubecontainer.ContainerStateRunning || kubecontainer.GetContainerSpec(allocatedPod, cs.Name) != nil {
+			continue
+		}
+		resources, ok := m.actuatedState.GetContainerResources(allocatedPod.UID, cs.Name)
+		if !ok {
+			continue
+		}
+		for _, list := range []v1.ResourceList{resources.Requests, resources.Limits} {
+			if !list.Cpu().IsZero() || !list.Memory().IsZero() {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func (m *kubeGenericRuntimeManager) isPodLevelResourcesResizeInProgress(allocatedPod *v1.Pod, podStatus *kubecontainer.PodStatus) bool {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling) {
+	if resizable, _, _ := allocation.IsInPlacePodVerticalScalingAllowed(allocatedPod); !resizable {
 		return false
 	}
 
-	if allocatedPod.Spec.Resources == nil || podStatus == nil {
+	// Without running containers, the pod cgroup doesn't need to be resized.
+	if podStatus == nil || len(podStatus.GetRunningContainerStatuses()) == 0 {
 		return false
 	}
 
@@ -2481,29 +3294,12 @@ func (m *kubeGenericRuntimeManager) isPodLevelResourcesResizeInProgress(allocate
 		return false
 	}
 
-	allocatedPodResources := allocatedPod.Spec.Resources
-
-	return !cpuMemoryResourcesEqual(actuatedPodResources, allocatedPodResources)
-}
-
-func cpuMemoryResourcesEqual(actuatedPodResources, allocatedPodResources *v1.ResourceRequirements) bool {
-	if actuatedPodResources == nil && allocatedPodResources == nil {
+	if podCgroupResourcesToUpdate(cm.EffectivePodResources(allocatedPod), actuatedPodResources).Len() > 0 {
 		return true
 	}
-
-	cmpResources := func(actuated, allocated v1.ResourceList) bool {
-		return actuated[v1.ResourceCPU].Equal(allocated[v1.ResourceCPU]) && actuated[v1.ResourceMemory].Equal(allocated[v1.ResourceMemory])
-	}
-
-	if actuatedPodResources == nil {
-		return cmpResources(nil, allocatedPodResources.Requests) && cmpResources(nil, allocatedPodResources.Limits)
-	}
-
-	if allocatedPodResources == nil {
-		return cmpResources(actuatedPodResources.Requests, nil) && cmpResources(actuatedPodResources.Limits, nil)
-
-	}
-	return cmpResources(actuatedPodResources.Requests, allocatedPodResources.Requests) && cmpResources(actuatedPodResources.Limits, allocatedPodResources.Limits)
+	// Pod-level swap is only actuated when the node manages swap; comparing it
+	// otherwise would leave the resize in progress forever.
+	return m.workloadSwapLimitsEnabled() && !podSwapLimitEqual(actuatedPodResources, allocatedPod.Spec.Resources)
 }
 
 func isResizableContainer(container *v1.Container, containerType podutil.ContainerType) bool {

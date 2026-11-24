@@ -93,6 +93,7 @@ type transformTestConfig struct {
 	configDir             string
 	storageConfig         *storagebackend.Config
 	runtimeConfig         []string
+	extraFlags            []string
 }
 
 func newTransformTest(tb testing.TB, config transformTestConfig) (*transformTest, error) {
@@ -117,17 +118,21 @@ func newTransformTest(tb testing.TB, config transformTestConfig) (*transformTest
 		// configDir already exists. api-server must be restarting with existing encryption config
 		e.configDir = config.configDir
 	}
-	configFile := filepath.Join(e.configDir, encryptionConfigFileName)
-	_, err = os.ReadFile(configFile)
-	if err != nil {
-		e.cleanUp()
-		return nil, fmt.Errorf("failed to read config file: %w", err)
+	// With neither a config nor a configDir, the server runs without encryption at rest.
+	if e.configDir != "" {
+		configFile := filepath.Join(e.configDir, encryptionConfigFileName)
+		_, err = os.ReadFile(configFile)
+		if err != nil {
+			e.cleanUp()
+			return nil, fmt.Errorf("failed to read config file: %w", err)
+		}
 	}
 
 	flags := e.getEncryptionOptions(config.reload)
 	if len(config.runtimeConfig) > 0 {
 		flags = append(flags, "--runtime-config="+strings.Join(config.runtimeConfig, ","))
 	}
+	flags = append(flags, config.extraFlags...)
 	if e.kubeAPIServer, err = kubeapiservertesting.StartTestServer(
 		tb, nil,
 		flags, e.storageConfig); err != nil {

@@ -18,6 +18,7 @@ package v1
 
 import (
 	v1 "k8s.io/api/core/v1"
+	schedulingv1 "k8s.io/api/scheduling/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -118,7 +119,7 @@ const (
 	// RecreateStatefulSetStrategyType indicates that all existing pods will be
 	// deleted and fully terminated before any new-revision pods are created.
 	// This ensures that old and new revision Pods never run at the same time.
-	// This is an alpha type and requires enabling StatefulSetRecreateStrategy feature gate.
+	// This is a beta type and requires enabling StatefulSetRecreateStrategy feature gate.
 	// Switching to the Recreate strategy is allowed when the feature gate is enabled,
 	// and switching away from it to a different update strategy is also allowed.
 	//
@@ -214,8 +215,8 @@ type StatefulSetSpec struct {
 	// It must match the pod template's labels.
 	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors
 	// +required
-	// +k8s:alpha(since: "1.37")=+k8s:required
-	// +k8s:alpha(since: "1.37")=+k8s:immutable
+	// +k8s:beta(since: "1.38")=+k8s:required
+	// +k8s:beta(since: "1.38")=+k8s:immutable
 	Selector *metav1.LabelSelector `json:"selector" protobuf:"bytes,2,opt,name=selector"`
 
 	// template is the object that describes the pod that will be created if
@@ -237,9 +238,9 @@ type StatefulSetSpec struct {
 	// any volumes in the template, with the same name.
 	// TODO: Define the behavior if a claim already exists with the same name.
 	// +optional
-	// +k8s:alpha(since: "1.37")=+k8s:immutable
-	// +k8s:alpha(since: "1.37")=+k8s:optional
-	// +k8s:alpha(since: "1.37")=+k8s:eachVal=+k8s:opaqueType
+	// +k8s:beta(since: "1.38")=+k8s:immutable
+	// +k8s:beta(since: "1.38")=+k8s:optional
+	// +k8s:beta(since: "1.38")=+k8s:eachVal=+k8s:opaqueType
 	// +listType=atomic
 	VolumeClaimTemplates []v1.PersistentVolumeClaim `json:"volumeClaimTemplates,omitempty" protobuf:"bytes,4,rep,name=volumeClaimTemplates"`
 
@@ -249,8 +250,8 @@ type StatefulSetSpec struct {
 	// pattern: pod-specific-string.serviceName.default.svc.cluster.local
 	// where "pod-specific-string" is managed by the StatefulSet controller.
 	// +optional
-	// +k8s:alpha(since: "1.37")=+k8s:immutable
-	// +k8s:alpha(since: "1.37")=+k8s:optional
+	// +k8s:beta(since: "1.38")=+k8s:immutable
+	// +k8s:beta(since: "1.38")=+k8s:optional
 	ServiceName string `json:"serviceName" protobuf:"bytes,5,opt,name=serviceName"`
 
 	// podManagementPolicy controls how pods are created during initial scale up,
@@ -262,8 +263,8 @@ type StatefulSetSpec struct {
 	// to match the desired scale without waiting, and on scale down will delete
 	// all pods at once.
 	// +optional
-	// +k8s:alpha(since: "1.37")=+k8s:immutable
-	// +k8s:alpha(since: "1.37")=+k8s:optional
+	// +k8s:beta(since: "1.38")=+k8s:immutable
+	// +k8s:beta(since: "1.38")=+k8s:optional
 	PodManagementPolicy PodManagementPolicyType `json:"podManagementPolicy,omitempty" protobuf:"bytes,6,opt,name=podManagementPolicy,casttype=PodManagementPolicyType"`
 
 	// updateStrategy indicates the StatefulSetUpdateStrategy that will be
@@ -354,7 +355,7 @@ type StatefulSetConditionType string
 
 const (
 	// StatefulSetProgressing means the StatefulSet is progressing through an update.
-	// This condition is an alpha type and requires enabling StatefulSetRecreateStrategy feature gate.
+	// This condition is a beta type and requires enabling StatefulSetRecreateStrategy feature gate.
 	StatefulSetProgressing StatefulSetConditionType = "Progressing"
 )
 
@@ -465,6 +466,27 @@ type DeploymentSpec struct {
 	// Defaults to 600s.
 	// +optional
 	ProgressDeadlineSeconds *int32 `json:"progressDeadlineSeconds,omitempty" protobuf:"varint,9,opt,name=progressDeadlineSeconds"`
+
+	// scheduling defines the Workload-aware Scheduling configuration for this Deployment.
+	// When set, it specifies the scheduling policy (basic or gang), topology
+	// constraints, disruption mode, and shared resource claims.
+	// When spec.scheduling is omitted, no Workload or PodGroup is created and the
+	// Deployment uses standard pod-by-pod scheduling.
+	// This field is gated by the WorkloadWithDeployment feature gate.
+	// Once set, this field is immutable except for schedulingPolicy.gang.minCount.
+	//
+	// - The scheduling field can only be set when the Deployment is created.
+	// - A gang schedulingPolicy requires strategy.type Recreate.
+	// - When schedulingPolicy.gang.minCount is set, replicas must be 0 or at least minCount.
+	// - template.spec.schedulingGroup must be unset.
+	//
+	// +featureGate=WorkloadWithDeployment
+	// +optional
+	// +k8s:ifDisabled(WorkloadWithDeployment)=+k8s:forbidden
+	// +k8s:optional
+	// +k8s:update=NoSet
+	// +k8s:update=NoUnset
+	Scheduling *DeploymentSchedulingConfiguration `json:"scheduling,omitempty" protobuf:"bytes,10,opt,name=scheduling"`
 }
 
 const (
@@ -526,6 +548,60 @@ type RollingUpdateDeployment struct {
 	// at any time during the update is at most 130% of desired pods.
 	// +optional
 	MaxSurge *intstr.IntOrString `json:"maxSurge,omitempty" protobuf:"bytes,2,opt,name=maxSurge"`
+}
+
+// DeploymentSchedulingConfiguration composes the reusable scheduling building blocks
+// from scheduling.k8s.io for use on a Deployment.
+type DeploymentSchedulingConfiguration struct {
+	// schedulingPolicy defines the scheduling policy for this Deployment. If
+	// spec.scheduling.schedulingPolicy is omitted, the Basic policy is used.
+	// Otherwise, exactly one of Basic or Gang must be set. For Gang, minCount may
+	// be omitted to derive it from replicas.
+	//
+	// +optional
+	// +k8s:optional
+	// +k8s:update=NoSet
+	// +k8s:update=NoUnset
+	SchedulingPolicy *schedulingv1.WorkloadPodGroupSchedulingPolicy `json:"schedulingPolicy,omitempty" protobuf:"bytes,1,opt,name=schedulingPolicy"`
+
+	// schedulingConstraints defines optional scheduling constraints (e.g. topology)
+	// for the Deployment's pods.
+	//
+	// +optional
+	// +k8s:optional
+	// +k8s:immutable
+	SchedulingConstraints *schedulingv1.WorkloadPodGroupSchedulingConstraints `json:"schedulingConstraints,omitempty" protobuf:"bytes,2,opt,name=schedulingConstraints"`
+
+	// disruptionMode defines the mode in which the Deployment's pods can be disrupted.
+	// One of Single or All.
+	// If omitted, standard per-pod disruption behavior is used.
+	// The All mode requires a gang schedulingPolicy.
+	// disruptionMode affects scheduler preemption only. It does not affect
+	// eviction or PodDisruptionBudgets.
+	//
+	// +optional
+	// +k8s:optional
+	// +k8s:immutable
+	DisruptionMode *schedulingv1.WorkloadPodGroupDisruptionMode `json:"disruptionMode,omitempty" protobuf:"bytes,3,opt,name=disruptionMode"`
+
+	// resourceClaims defines which ResourceClaims may be shared among Pods in
+	// the Deployment. Pods consume the devices allocated to a PodGroup's claim by
+	// defining a claim in its own Spec.ResourceClaims that matches the
+	// PodGroup's claim exactly. The claim must have the same name and refer to
+	// the same ResourceClaim or ResourceClaimTemplate.
+	// At most 4 claims may be set, matching the limit on the resulting PodGroup.
+	//
+	// +optional
+	// +patchMergeKey=name
+	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=name
+	// +k8s:optional
+	// +k8s:listType=map
+	// +k8s:listMapKey=name
+	// +k8s:maxItems=4
+	// +k8s:immutable
+	ResourceClaims []schedulingv1.WorkloadPodGroupResourceClaim `json:"resourceClaims,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,4,rep,name=resourceClaims"`
 }
 
 // DeploymentStatus is the most recently observed status of the Deployment.

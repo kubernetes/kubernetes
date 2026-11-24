@@ -43,7 +43,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	clientfeatures "k8s.io/client-go/features"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/ktesting"
 	clientset "k8s.io/client-go/kubernetes"
@@ -69,18 +68,6 @@ func init() {
 		string(features.DRAWorkloadResourceClaims): true,
 		string(features.GenericWorkload):           true, // Dependency of DRAWorkloadResourceClaims
 	}); err != nil {
-		panic(err)
-	}
-
-	// Disabled because we not only use the fake client, we also wrap it:
-	// that prevents auto-detection via IsWatchListSemanticsUnSupported.
-	// This here is simpler than implementing IsWatchListSemanticsUnSupported.
-	//
-	// We cannot use clientfeaturestesting.SetFeatureDuringTest (needs testing.TB),
-	// so here we just do it ourselves.
-	if err := clientfeatures.FeatureGates().(interface {
-		Set(clientfeatures.Feature, bool) error
-	}).Set(clientfeatures.WatchListClient, false); err != nil {
 		panic(err)
 	}
 }
@@ -2674,6 +2661,11 @@ type myFakeClient struct {
 	deletePodCallback func()
 }
 
+// The wrapper must preserve the fake client's opt-out of watch-list semantics.
+func (mf *myFakeClient) IsWatchListSemanticsUnSupported() bool {
+	return true
+}
+
 func (mf *myFakeClient) CoreV1() corev1.CoreV1Interface {
 	return &myFakeCoreV1{mf.Interface.CoreV1(), mf.deletePodCallback}
 }
@@ -2819,13 +2811,14 @@ func doCancelEviction(tCtx ktesting.TContext, deletePod bool) {
 }
 
 // TestParallelPodDeletion covers the scenario that a pod gets deleted right before
-// trying to evict it.
+// trying to evict it, either completely or with deletion still in progress.
 func TestParallelPodDeletion(t *testing.T) { testParallelPodDeletion(ktesting.Init(t)) }
 func testParallelPodDeletion(tCtx ktesting.TContext) {
 	tCtx.Parallel()
-	tCtx.SyncTest("", synctestParallelPodDeletion)
+	tCtx.SyncTest("deleted", func(tCtx ktesting.TContext) { synctestParallelPodDeletion(tCtx, false) })
+	tCtx.SyncTest("terminating", func(tCtx ktesting.TContext) { synctestParallelPodDeletion(tCtx, true) })
 }
-func synctestParallelPodDeletion(tCtx ktesting.TContext) {
+func synctestParallelPodDeletion(tCtx ktesting.TContext, terminating bool) {
 	// This scenario is the same as "evict-pod-resourceclaim" above.
 	pod := podWithClaimName.DeepCopy()
 	fakeClientset := fake.NewClientset(
@@ -2847,6 +2840,15 @@ func synctestParallelPodDeletion(tCtx ktesting.TContext) {
 		podGets++
 		podName := action.(core.GetAction).GetName()
 		tCtx.Assert(podName).Should(gomega.Equal(podWithClaimName.Name), "name of patched pod")
+
+		if terminating {
+			// Regression test for https://github.com/kubernetes/kubernetes/issues/143789.
+			// Someone else already started deleting the pod, for example with a grace period
+			// or a finalizer. The controller must leave it alone and not count it as evicted.
+			terminatingPod := pod.DeepCopy()
+			terminatingPod.DeletionTimestamp = metav1Time(time.Now())
+			return true, terminatingPod, nil
+		}
 
 		// This gets called directly before eviction. Pretend that it is deleted.
 		err = fakeClientset.Tracker().Delete(v1.SchemeGroupVersion.WithResource("pods"), pod.Namespace, pod.Name)

@@ -28,7 +28,6 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	"gopkg.in/inf.v0"
 
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -804,7 +803,17 @@ func validateDeviceClassSpec(spec, oldSpec *resource.DeviceClassSpec, fldPath *f
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("extendedResourceName"), *spec.ExtendedResourceName,
 			"must be a valid extended resource name").MarkCoveredByDeclarative().WithOrigin("format=k8s-extended-resource-name"))
 	}
+	if spec.ExtendedResourceRequest != nil {
+		allErrs = append(allErrs, validateCapacityRequirements(spec.ExtendedResourceRequest.Capacity, oldExtendedResourceCapacity(oldSpec), fldPath.Child("extendedResourceRequest", "capacity"))...)
+	}
 	return allErrs
+}
+
+func oldExtendedResourceCapacity(oldSpec *resource.DeviceClassSpec) *resource.CapacityRequirements {
+	if oldSpec == nil || oldSpec.ExtendedResourceRequest == nil {
+		return nil
+	}
+	return oldSpec.ExtendedResourceRequest.Capacity
 }
 
 func validateDeviceClassConfiguration(config resource.DeviceClassConfiguration, fldPath *field.Path, stored bool) field.ErrorList {
@@ -945,11 +954,15 @@ func validateResourceSliceSpec(spec, oldSpec *resource.ResourceSliceSpec, fldPat
 		}
 	}
 
-	allErrs = append(allErrs, validateSet(spec.SharedCounters, resource.ResourceSliceMaxCounterSets,
-		validateCounterSet,
-		func(counterSet resource.CounterSet) string {
-			return counterSet.Name
-		}, fldPath.Child("sharedCounters"), sizeCovered, uniquenessCovered)...)
+	// An unchanged consumptionPolicy may no longer validate if
+	// DRAFractionalCapacityRange was disabled after the policy was stored.
+	if oldSpec == nil || !apiequality.Semantic.DeepEqual(spec.SharedCounters, oldSpec.SharedCounters) {
+		allErrs = append(allErrs, validateSet(spec.SharedCounters, resource.ResourceSliceMaxCounterSets,
+			validateCounterSet,
+			func(counterSet resource.CounterSet) string {
+				return counterSet.Name
+			}, fldPath.Child("sharedCounters"), sizeCovered, uniquenessCovered)...)
+	}
 
 	// The name format is validated declaratively; see the field's tags.
 	if spec.PartitionTypeAttribute != nil {
@@ -1304,7 +1317,7 @@ func validateDeviceCounterConsumption(deviceCounterConsumption resource.DeviceCo
 		allErrs = append(allErrs, field.Required(fldPath.Child("counters"), "").MarkCoveredByDeclarative())
 	} else {
 		allErrs = append(allErrs, validateMap(deviceCounterConsumption.Counters, resource.ResourceSliceMaxCountersPerDeviceCounterConsumption,
-			validation.DNS1123LabelMaxLength, validateCounterName, validateDeviceCounter, fldPath.Child("counters"), keysCovered)...)
+			validation.DNS1123LabelMaxLength, validateCounterName, validateDeviceCounterRequirement, fldPath.Child("counters"), keysCovered)...)
 	}
 	return allErrs
 }
@@ -1670,15 +1683,28 @@ func rangeHasFractional(r resource.CapacityRequestPolicyRange) bool {
 
 // isFractionalQuantity reports whether q has sub-integer precision.
 func isFractionalQuantity(q apiresource.Quantity) bool {
-	dec := q.AsDec()
-	infDec := inf.Dec{}
-	rounded := infDec.Round(dec, 0, inf.RoundDown)
-	return dec.Cmp(rounded) != 0
+	return !q.RoundUp(0)
 }
 
+// validateDeviceCounter validates counters in new or changed shared counter lists.
 func validateDeviceCounter(counter resource.Counter, fldPath *field.Path) field.ErrorList {
-	// Any parsed quantity is valid.
-	return nil
+	var allErrs field.ErrorList
+	if counter.ConsumptionPolicy != nil {
+		allErrs = append(allErrs, validateRequestPolicy(counter.Value, counter.ConsumptionPolicy, fldPath.Child("consumptionPolicy"))...)
+	}
+	return allErrs
+}
+
+// validateDeviceCounterRequirement validates counters in new or changed device lists.
+func validateDeviceCounterRequirement(counter resource.CounterRequirement, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	// The quantity minimum and Value/ValueFrom union are enforced declaratively.
+
+	// Empty capacity names are rejected by declarative validation.
+	if counter.ValueFrom != nil && counter.ValueFrom.CapacityName != "" {
+		allErrs = append(allErrs, validateQualifiedName(counter.ValueFrom.CapacityName, fldPath.Child("valueFrom", "capacityName"))...)
+	}
+	return allErrs
 }
 
 func validateQualifiedName(name resource.QualifiedName, fldPath *field.Path) field.ErrorList {
@@ -1813,10 +1839,12 @@ func stringKey(item string) string {
 	return item
 }
 
-// quantityKeyAsDec uses a scaled inf.Dec of the item as itself
+// quantityKeyAsDec uses the canonical DecimalSI form of the item
 // as a key for validateSet.
 func quantityKeyAsDec(item apiresource.Quantity) string {
-	return item.AsDec().String()
+	item.Format = apiresource.DecimalSI
+	number, suffix := item.CanonicalizeBytes(nil)
+	return string(number) + string(suffix)
 }
 
 // quantityKeyInt uses base-10 integer of the item itself

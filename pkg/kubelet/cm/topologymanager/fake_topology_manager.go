@@ -44,6 +44,14 @@ func NewFakeManagerWithScope(scope string) Manager {
 	}
 }
 
+// NewFakeManagerWithScopeAndPolicy returns an instance of fake topology manager with specified scope and policy
+func NewFakeManagerWithScopeAndPolicy(scope string, policy Policy) Manager {
+	return &fakeManager{
+		scope:  scope,
+		policy: policy,
+	}
+}
+
 // NewFakeManagerWithHint returns an instance of fake topology manager with specified topology hints
 func NewFakeManagerWithHint(logger klog.Logger, hint *TopologyHint) Manager {
 	logger.Info("NewFakeManagerWithHint")
@@ -89,6 +97,9 @@ func (m *fakeManager) AddContainer(logger klog.Logger, pod *v1.Pod, container *v
 func (m *fakeManager) RemoveContainer(logger klog.Logger, containerID string) error {
 	logger.Info("RemoveContainer", "containerID", containerID)
 	return nil
+}
+
+func (m *fakeManager) CompleteAdmit(context.Context, *lifecycle.PodAdmitAttributes, lifecycle.AdmitResult) {
 }
 
 func (m *fakeManager) Admit(ctx context.Context, _ *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {

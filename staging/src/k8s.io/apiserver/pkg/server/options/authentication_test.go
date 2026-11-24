@@ -18,10 +18,13 @@ package options
 
 import (
 	"net/http"
+	"net/url"
 	"os"
 	"reflect"
+	"strings"
 	"testing"
 
+	apisapiserver "k8s.io/apiserver/pkg/apis/apiserver"
 	"k8s.io/apiserver/pkg/authentication/authenticatorfactory"
 	"k8s.io/apiserver/pkg/authentication/request/headerrequest"
 	"k8s.io/apiserver/pkg/server"
@@ -110,24 +113,27 @@ current-context: cluster
 	}
 	remoteKubeconfig := f.Name()
 
+	requestPath := "/healthz"
+
 	testcases := []struct {
 		name                 string
 		options              *DelegatingAuthenticationOptions
-		expectError          bool
+		expectError          string
 		expectAuthenticator  bool
-		expectTokenAnonymous bool
-		expectTokenErrors    bool
+		expectAnonymous      bool // anonymous request to /healthz authenticates as anonymous
+		expectTokenAnonymous bool // token request to /healthz authenticates as anonymous
+		expectTokenErrors    bool // token request to /healthz errors
 	}{
 		{
 			name:                "empty",
 			options:             nil,
-			expectError:         false,
+			expectError:         "",
 			expectAuthenticator: false,
 		},
 		{
 			name:                "default",
 			options:             NewDelegatingAuthenticationOptions(),
-			expectError:         true, // in-cluster client building fails, no kubeconfig provided
+			expectError:         "failed to get delegated authentication kubeconfig", // in-cluster client building fails, no kubeconfig provided
 			expectAuthenticator: false,
 		},
 		{
@@ -137,8 +143,9 @@ current-context: cluster
 				opts.RemoteKubeConfigFileOptional = true
 				return opts
 			}(),
-			expectError:          false, // in-cluster client building fails, no kubeconfig required
+			expectError:          "", // in-cluster client building fails, no kubeconfig required
 			expectAuthenticator:  true,
+			expectAnonymous:      true,
 			expectTokenAnonymous: true, // no token validator available
 		},
 		{
@@ -148,7 +155,7 @@ current-context: cluster
 				opts.RemoteKubeConfigFile = remoteKubeconfig
 				return opts
 			}(),
-			expectError:         true, // client building is valid, remote config lookup fails
+			expectError:         "unable to load configmap", // client building is valid, remote config lookup fails
 			expectAuthenticator: false,
 		},
 		{
@@ -159,8 +166,9 @@ current-context: cluster
 				opts.SkipInClusterLookup = true
 				return opts
 			}(),
-			expectError:         false, // client building is valid, skipped cluster lookup
+			expectError:         "", // client building is valid, skipped cluster lookup
 			expectAuthenticator: true,
+			expectAnonymous:     true,
 			expectTokenErrors:   true, // client fails making tokenreview calls
 		},
 		{
@@ -171,9 +179,68 @@ current-context: cluster
 				opts.TolerateInClusterLookupFailure = true
 				return opts
 			}(),
-			expectError:         false, // client is valid, skipped cluster lookup
-			expectAuthenticator: true,  // anonymous auth
-			expectTokenErrors:   true,  // client fails making tokenreview calls
+			expectError:         "",   // client is valid, skipped cluster lookup
+			expectAuthenticator: true, // anonymous auth
+			expectAnonymous:     true,
+			expectTokenErrors:   true, // client fails making tokenreview calls
+		},
+		{
+			name: "disabled anonymous auth",
+			options: func() *DelegatingAuthenticationOptions {
+				opts := NewDelegatingAuthenticationOptions()
+				opts.RemoteKubeConfigFile = remoteKubeconfig
+				opts.SkipInClusterLookup = true
+				opts.Anonymous.Enabled = false
+				return opts
+			}(),
+			expectError:         "",   // client is valid, skipped cluster lookup
+			expectAuthenticator: true, // anonymous auth
+			expectAnonymous:     false,
+			expectTokenErrors:   true, // client fails making tokenreview calls
+		},
+		{
+			name: "scoped anonymous auth allowed",
+			options: func() *DelegatingAuthenticationOptions {
+				opts := NewDelegatingAuthenticationOptions()
+				opts.RemoteKubeConfigFile = remoteKubeconfig
+				opts.SkipInClusterLookup = true
+				opts.Anonymous.Conditions = []apisapiserver.AnonymousAuthCondition{{Path: requestPath}}
+				return opts
+			}(),
+			expectError:         "",   // client is valid, skipped cluster lookup
+			expectAuthenticator: true, // anonymous auth
+			expectAnonymous:     true,
+			expectTokenErrors:   true, // client fails making tokenreview calls
+		},
+		{
+			name: "scoped anonymous auth disallowed",
+			options: func() *DelegatingAuthenticationOptions {
+				opts := NewDelegatingAuthenticationOptions()
+				opts.RemoteKubeConfigFile = remoteKubeconfig
+				opts.SkipInClusterLookup = true
+				opts.Anonymous.Conditions = []apisapiserver.AnonymousAuthCondition{{Path: "/otherpath"}}
+				return opts
+			}(),
+			expectError:         "",   // client is valid, skipped cluster lookup
+			expectAuthenticator: true, // anonymous auth
+			expectAnonymous:     false,
+			expectTokenErrors:   true, // client fails making tokenreview calls
+		},
+		{
+			name: "no authenticator, no anonymous auth",
+			options: func() *DelegatingAuthenticationOptions {
+				opts := NewDelegatingAuthenticationOptions()
+				opts.RemoteKubeConfigFile = ""
+				opts.RemoteKubeConfigFileOptional = true
+				opts.TolerateInClusterLookupFailure = true
+				opts.SkipInClusterLookup = true
+				opts.Anonymous.Enabled = false
+				return opts
+			}(),
+			expectError:         "no authentication method configured",
+			expectAuthenticator: false,
+			expectAnonymous:     false,
+			expectTokenErrors:   true, // client fails making tokenreview calls
 		},
 	}
 
@@ -184,21 +251,30 @@ current-context: cluster
 			openAPIConfig := &openapicommon.Config{}
 
 			err := tc.options.ApplyTo(c, servingInfo, openAPIConfig)
-			if (err != nil) != tc.expectError {
-				t.Errorf("expected error=%v, got %v", tc.expectError, err)
+			switch {
+			case err == nil && tc.expectError != "":
+				t.Errorf("expected error=%s, got none", tc.expectError)
+			case err != nil && tc.expectError == "":
+				t.Errorf("expected no error, got %v", err)
+			case err != nil && tc.expectError != "" && !strings.Contains(err.Error(), tc.expectError):
+				t.Errorf("expected error containing %q, got %v", tc.expectError, err)
 			}
 			if (c.Authenticator != nil) != tc.expectAuthenticator {
 				t.Errorf("expected authenticator=%v, got %#v", tc.expectError, c.Authenticator)
 			}
 			if c.Authenticator != nil {
 				{
-					result, ok, err := c.Authenticator.AuthenticateRequest(&http.Request{})
-					if err != nil || !ok || result == nil || result.User.GetName() != "system:anonymous" {
-						t.Errorf("expected anonymous, got %#v, %#v, %#v", result, ok, err)
+					result, ok, err := c.Authenticator.AuthenticateRequest(&http.Request{URL: &url.URL{Path: requestPath}})
+					gotAnonymous := err == nil && ok && result != nil && result.User.GetName() == "system:anonymous"
+					switch {
+					case err != nil:
+						t.Errorf("expected non-error result, got %#v, %#v, %#v", result, ok, err)
+					case gotAnonymous != tc.expectAnonymous:
+						t.Errorf("expected anonymous=%v, got %#v, %#v, %#v", tc.expectAnonymous, result, ok, err)
 					}
 				}
 				{
-					result, ok, err := c.Authenticator.AuthenticateRequest(&http.Request{Header: http.Header{"Authorization": []string{"Bearer foo"}}})
+					result, ok, err := c.Authenticator.AuthenticateRequest(&http.Request{URL: &url.URL{Path: requestPath}, Header: http.Header{"Authorization": []string{"Bearer foo"}}})
 					if tc.expectTokenAnonymous {
 						if err != nil || !ok || result == nil || result.User.GetName() != "system:anonymous" {
 							t.Errorf("expected anonymous, got %#v, %#v, %#v", result, ok, err)

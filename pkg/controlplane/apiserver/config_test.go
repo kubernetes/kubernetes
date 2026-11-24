@@ -21,24 +21,38 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	extensionsapiserver "k8s.io/apiextensions-apiserver/pkg/apiserver"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/version"
 	genericapifilters "k8s.io/apiserver/pkg/endpoints/filters"
 	"k8s.io/apiserver/pkg/endpoints/request"
+	genericregistry "k8s.io/apiserver/pkg/registry/generic"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
+	"k8s.io/apiserver/pkg/storage/storagebackend"
+	"k8s.io/apiserver/pkg/storage/value/compression"
+	"k8s.io/apiserver/pkg/util/compatibility"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	basecompatibility "k8s.io/component-base/compatibility"
 	aggregatorscheme "k8s.io/kube-aggregator/pkg/apiserver/scheme"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/controlplane/apiserver/options"
 	generatedopenapi "k8s.io/kubernetes/pkg/generated/openapi"
 	netutils "k8s.io/utils/net"
 )
 
-func TestBuildGenericConfig(t *testing.T) {
+// newCompletedOptions completes the default options, serving on a free
+// loopback port. A non-nil configure edits the options before they're completed.
+func newCompletedOptions(t *testing.T, configure func(*options.Options)) options.CompletedOptions {
+	t.Helper()
 	opts := options.NewOptions()
 	s := (&apiserveroptions.SecureServingOptions{
 		BindAddress: netutils.ParseIPSloppy("127.0.0.1"),
@@ -47,16 +61,23 @@ func TestBuildGenericConfig(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to listen on 127.0.0.1:0")
 	}
-	defer ln.Close()
+	t.Cleanup(func() { _ = ln.Close() })
 	s.Listener = ln
 	s.BindPort = ln.Addr().(*net.TCPAddr).Port
 	opts.SecureServing = s
+	if configure != nil {
+		configure(opts)
+	}
 
 	completedOptions, err := opts.Complete(context.TODO(), nil, nil)
 	if err != nil {
 		t.Fatalf("Failed to complete apiserver options: %v", err)
 	}
+	return completedOptions
+}
 
+func TestBuildGenericConfig(t *testing.T) {
+	completedOptions := newCompletedOptions(t, nil)
 	genericConfig, _, storageFactory, err := BuildGenericConfig(
 		completedOptions,
 		[]*runtime.Scheme{legacyscheme.Scheme, extensionsapiserver.Scheme, aggregatorscheme.Scheme},
@@ -80,6 +101,111 @@ func TestBuildGenericConfig(t *testing.T) {
 	}
 	if restOptions.StorageConfig.StorageObjectCountTracker != genericConfig.StorageObjectCountTracker {
 		t.Errorf("There are different StorageObjectCountTracker in restOptions and serverConfig")
+	}
+}
+
+// TestStorageCompressionReachesEveryConfig checks that built-in, custom resource and
+// APIService stores get the file's Rule and a raw storage factory store doesn't. It
+// deletes the file after BuildGenericConfig, so the other configs can't reread it.
+func TestStorageCompressionReachesEveryConfig(t *testing.T) {
+	deflate := compression.Rule{Algorithm: compression.AlgorithmDeflate, MinSize: 1024}
+	tests := []struct {
+		name             string
+		setFlag          bool
+		minCompatibility *version.Version
+		wantErr          string
+	}{
+		{name: "unset", minCompatibility: version.MajorMinor(1, 37)},
+		{name: "Deflate at 1.37", setFlag: true, minCompatibility: version.MajorMinor(1, 37), wantErr: "the server's is 1.37"},
+		{name: "Deflate at 1.38", setFlag: true, minCompatibility: version.MajorMinor(1, 38)},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			var path string
+			if tc.setFlag {
+				path = filepath.Join(t.TempDir(), "compression.yaml")
+				content := `apiVersion: apiserver.config.k8s.io/v1alpha1
+kind: StorageCompressionConfiguration
+compressionResources:
+- resources: ["*.*"]
+  algorithm: Deflate
+`
+				if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			completedOptions := newCompletedOptions(t, func(opts *options.Options) {
+				opts.Etcd.StorageCompressionConfigFilepath = path
+				// A private registry sets the kube min compatibility version without changing the
+				// process-wide one.
+				effectiveVersion := compatibility.DefaultKubeEffectiveVersionForTest()
+				effectiveVersion.SetMinCompatibilityVersion(tc.minCompatibility)
+				registry := basecompatibility.NewComponentGlobalsRegistry()
+				if err := registry.Register(basecompatibility.DefaultKubeComponent, effectiveVersion, utilfeature.DefaultFeatureGate.DeepCopy()); err != nil {
+					t.Fatal(err)
+				}
+				opts.GenericServerRunOptions.ComponentGlobalsRegistry = registry
+			})
+
+			genericConfig, _, storageFactory, err := BuildGenericConfig(
+				completedOptions,
+				[]*runtime.Scheme{legacyscheme.Scheme, extensionsapiserver.Scheme, aggregatorscheme.Scheme},
+				nil,
+				generatedopenapi.GetOpenAPIDefinitions,
+				nil,
+			)
+			if tc.wantErr != "" {
+				if err == nil || !strings.Contains(err.Error(), tc.wantErr) || !strings.Contains(err.Error(), path) {
+					t.Fatalf("got %v, want an error naming %s and containing %q", err, path, tc.wantErr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("Failed to build generic config: %v", err)
+			}
+			if tc.setFlag {
+				if err := os.Remove(path); err != nil {
+					t.Fatal(err)
+				}
+			}
+			apiExtensionsConfig, err := CreateAPIExtensionsConfig(*genericConfig, nil, nil, completedOptions, 1, nil, nil)
+			if err != nil {
+				t.Fatalf("Failed to create the apiextensions config: %v", err)
+			}
+			aggregatorConfig, err := CreateAggregatorConfig(*genericConfig, completedOptions, nil, nil, nil, nil, nil)
+			if err != nil {
+				t.Fatalf("Failed to create the aggregator config: %v", err)
+			}
+			storageConfig := func(getter genericregistry.RESTOptionsGetter, gr schema.GroupResource) *storagebackend.ConfigForResource {
+				t.Helper()
+				restOptions, err := getter.GetRESTOptions(gr, nil)
+				if err != nil {
+					t.Fatal(err)
+				}
+				return restOptions.StorageConfig
+			}
+			want := compression.Rule{}
+			if tc.setFlag {
+				want = deflate
+			}
+			for name, config := range map[string]*storagebackend.ConfigForResource{
+				"configmaps":  storageConfig(genericConfig.RESTOptionsGetter, schema.GroupResource{Resource: "configmaps"}),
+				"widgets":     storageConfig(apiExtensionsConfig.ExtraConfig.CRDRESTOptionsGetter, schema.GroupResource{Group: "example.com", Resource: "widgets"}),
+				"apiservices": storageConfig(aggregatorConfig.GenericConfig.RESTOptionsGetter, schema.GroupResource{Group: "apiregistration.k8s.io", Resource: "apiservices"}),
+			} {
+				if config.CompressionRule != want {
+					t.Errorf("%s: got Rule %+v, want %+v", name, config.CompressionRule, want)
+				}
+			}
+			// Stores built straight from the storage factory never see the rules.
+			apiServerIPInfo, err := storageFactory.NewConfig(api.Resource("apiServerIPInfo"), &api.Endpoints{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if apiServerIPInfo.CompressionRule != (compression.Rule{}) {
+				t.Errorf("apiServerIPInfo: got Rule %+v, want the zero Rule", apiServerIPInfo.CompressionRule)
+			}
+		})
 	}
 }
 

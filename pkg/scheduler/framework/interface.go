@@ -179,10 +179,210 @@ type RankNodesPlugin interface {
 	RankNodes(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) ([]NodeWithRank, *fwk.Status)
 }
 
+// NominationEvent describes resources which became available, as the
+// informer would report it if a pod had released them, for example a
+// ResourceClaim update which removes an allocation.
+//
+// TODO(KEP-5690): before beta, address two gaps of these synthetic events:
+//   - OldObj and NewObj are fabricated API objects which the scheduling queue
+//     passes to the queueing hints of all plugins registered for the event,
+//     out of sync with the informers. Use a dedicated ClusterEvent for
+//     nominations (with the pod and the node name) instead, or route a
+//     NominationEvent only to the plugin which returned it.
+//   - The scheduling queue moves pods for these events synchronously, while
+//     it is locked, also in the scheduling goroutine. Only the state updates
+//     of AddNomination and RemoveNomination need to be synchronous; moving
+//     pods, which scans all unschedulable pods, should happen outside of it.
+type NominationEvent struct {
+	Event  fwk.ClusterEvent
+	OldObj any
+	NewObj any
+}
+
+// NominationChangeResult is what a plugin returns when a nomination got
+// added, replaced or removed.
+type NominationChangeResult struct {
+	// Events describe resources which became available because of the
+	// change. The scheduler lets pods with lower or equal priority than the
+	// nominated pod retry with them, like after a real release of those
+	// resources.
+	Events []NominationEvent
+}
+
+// NominationExtensions is an optional interface for plugins which keep
+// in-memory state about the resources that a pod is going to get on the node
+// which the PodNominator nominates it to, like devices which preemption freed
+// for the pod. A change of the nominated node is a removal followed by an
+// addition. A nomination to the same node again, by a PostFilter plugin, is
+// an addition which replaces the previous one.
+//
+// When a nominated pod gets assumed, its nomination only ends once Reserve
+// and Permit let it through, so plugins can compare the resources of the
+// nomination with what the pod reserved and return events only for resources
+// which the pod does not keep. If Reserve or Permit reject the pod, the
+// nomination ends when it gets cleared afterwards, after Unreserve. Assumed
+// pods are accounted for by Reserve and Unreserve, as usual.
+//
+// None of these calls applies nominations for scheduling. That is left to
+// PreFilterExtensions: the framework calls AddPod for the nominated pods
+// with priority >= priority(pod) (excluding pod itself), and plugins apply
+// the nomination of such a pod there.
+//
+// PrepareNomination runs on the scheduling goroutine after PostFilter (while
+// CycleState is still live) when a failed scheduling cycle nominates a node.
+// AddNomination and RemoveNomination run under PriorityQueue.lock, from any
+// goroutine, when PodNominator adds, replaces, or removes a nomination (in
+// FailureHandler, prepareForBindingCycle, or informer handlers). All three
+// methods must stay fast, and AddNomination and RemoveNomination must not call
+// back into the scheduling queue or the API server.
+//
+// Pods of pod groups and shared claims are not supported yet: none of these
+// get called for a pod of a pod group, whose nomination a pod group
+// scheduling cycle removes and restores for every placement which it tries.
+//
+// The interface is internal to kube-scheduler and only used when the
+// DRAPreemption feature gate is enabled. It may change or move into the
+// framework before KEP-5690 graduates.
+type NominationExtensions interface {
+	fwk.Plugin
+	// PrepareNomination is called after PostFilter when a failed scheduling
+	// cycle nominates pod to nodeName, while the CycleState of the cycle is
+	// still live. It extracts and returns opaque nomination data (or nil) for
+	// pod on nodeName outside PriorityQueue.lock; like AddNomination and
+	// RemoveNomination, it runs synchronously and must stay fast.
+	//
+	// If PodNominator commits that nomination right afterwards, the framework
+	// passes this value as nominationData to AddNomination of the same plugin;
+	// otherwise it drops the value, for example if the pod got deleted. It
+	// exists because the PodNominator doesn't have the CycleState. It may go
+	// away once nominations carry the information which a cycle selected
+	// besides the node, which may be more than resources, e.g. a topology
+	// placement.
+	//
+	// PrepareNomination must not change the state of the plugin: when the
+	// framework drops the value, the plugin gets neither an AddNomination nor
+	// a RemoveNomination call to clean up.
+	PrepareNomination(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) any
+	// AddNomination is called when pod got nominated to nodeName.
+	// nominationData is the opaque nomination data that PrepareNomination
+	// returned for this nomination, nil if nothing was prepared for it, for
+	// example for nominations read from the API. Each value returned by
+	// PrepareNomination gets passed at most once.
+	//
+	// If the pod was nominated to nodeName already, plugins replace the
+	// previous nomination and return events for its resources which the new
+	// one doesn't keep, like RemoveNomination.
+	AddNomination(ctx context.Context, pod *v1.Pod, nodeName string, nominationData any) NominationChangeResult
+	// RemoveNomination is called when the nomination of pod to nodeName
+	// ended, including when the pod got assumed, bound or deleted. Plugins
+	// return events for the resources of the nomination which become
+	// available, as if a pod using them got removed, e.g. ResourceClaim
+	// updates which clear the allocation, and drop it.
+	//
+	// When the nomination ends because the pod got assumed and Reserve and
+	// Permit succeeded, pod.Spec.NodeName is the node that the pod is assumed
+	// on, so plugins can compare the nomination with what the pod reserved
+	// there. Otherwise pod.Spec.NodeName is empty.
+	RemoveNomination(ctx context.Context, pod *v1.Pod, nodeName string) NominationChangeResult
+}
+
+// NominationExtensionsRunner runs the NominationExtensions of the plugins of
+// a profile. All methods are no-ops when no plugin implements them, and for
+// pods of pod groups.
+type NominationExtensionsRunner interface {
+	// RunNominationExtensionsPrepareNomination calls PrepareNomination of all
+	// plugins and buffers the returned nomination data for pod on nodeName
+	// until AddNomination consumes it or done is called.
+	RunNominationExtensionsPrepareNomination(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) (done func())
+	// RunNominationExtensionsAddNomination calls AddNomination of all plugins,
+	// passing each plugin its pending nomination data for pod on nodeName (if
+	// any), and returns all emitted events.
+	RunNominationExtensionsAddNomination(ctx context.Context, pod *v1.Pod, nodeName string) []NominationEvent
+	// RunNominationExtensionsRemoveNomination calls RemoveNomination of all
+	// plugins and returns all emitted events.
+	RunNominationExtensionsRemoveNomination(ctx context.Context, pod *v1.Pod, nodeName string) []NominationEvent
+}
+
+// VictimExtensions is an optional interface for plugins which manage
+// resources that preempted pods release asynchronously, after the pods are
+// gone, for example ResourceClaims which the resourceclaim controller
+// deallocates.
+//
+// Tracking victims is independent of nominations and of which pod preempted
+// them: the plugins only use it to keep pods from starting another
+// preemption while resources released by an earlier one are still being
+// reclaimed. Victims are not treated as removed in later scheduling cycles
+// or preemption simulations.
+//
+// The interface is internal to kube-scheduler and only used when the
+// DRAPreemption feature gate is enabled. It may change or move into the
+// framework before KEP-5690 graduates.
+type VictimExtensions interface {
+	fwk.Plugin
+	// AssumeVictim is called once the preemption of victim is under way: the
+	// API call which deletes it succeeded, it got rejected in memory, or its
+	// deletion had started already. Plugins track what the victim releases
+	// asynchronously until it got released. Victims whose preemption failed
+	// are not reported, so nothing needs to be undone. A preemptor which
+	// preempts asynchronously doesn't get scheduled again before
+	// AssumeVictim was called for its victims whose preemption is under way.
+	//
+	// It may be called concurrently, also after the scheduling cycle which
+	// selected the victim ended, and more than once for the same victim (for
+	// example, when a later preemption selects an already-terminating
+	// victim). Plugin implementations must therefore be idempotent.
+	//
+	// When it is called, the victim may be gone already (the delete call
+	// returned NotFound), and what it released asynchronously may have been
+	// released already, too. Plugins must therefore check the current state
+	// of those resources instead of only waiting for future informer events.
+	AssumeVictim(ctx context.Context, victim *v1.Pod)
+	// PodEligibleToPreempt reports whether pod may start another preemption,
+	// or whether resources released by an earlier preemption on
+	// nominatedNodeName are still being reclaimed. nominatedNodeName is the
+	// node the pod is currently nominated to, if any. If not eligible, the
+	// string explains why.
+	PodEligibleToPreempt(ctx context.Context, pod *v1.Pod, nominatedNodeName string) (bool, string)
+}
+
+// VictimExtensionsRunner runs the VictimExtensions of the plugins of a
+// profile. All methods are no-ops when no plugin implements them.
+type VictimExtensionsRunner interface {
+	// RunVictimExtensionsAssumeVictim calls AssumeVictim of all plugins.
+	RunVictimExtensionsAssumeVictim(ctx context.Context, victim *v1.Pod)
+	// RunVictimExtensionsPodEligibleToPreempt returns the result of the
+	// first plugin which reports that the pod is not eligible.
+	RunVictimExtensionsPodEligibleToPreempt(ctx context.Context, pod *v1.Pod, nominatedNodeName string) (bool, string)
+}
+
+// NominatedNodeNameGetter provides the nominated node of a pod as the
+// PodNominator knows it. The scheduling queue implements it as the
+// PodNominator of kube-scheduler, and Framework implements it by delegating
+// to its PodNominator.
+//
+// The interface is internal to kube-scheduler.
+type NominatedNodeNameGetter interface {
+	// NominatedNodeName returns the node that pod is nominated to. If the
+	// DRAPreemption feature gate is enabled and pod is not a pod of a pod
+	// group, it returns the nomination in the PodNominator, which the
+	// scheduler sets or clears before it patches the pod. Otherwise it
+	// returns pod.Status.NominatedNodeName.
+	NominatedNodeName(pod *v1.Pod) string
+	// TracksNominationInMemory reports whether the PodNominator tracks the
+	// nomination of pod in memory: the DRAPreemption feature gate is enabled
+	// and pod is not a pod of a pod group. For such a pod, the scheduling
+	// queue requeues the pods blocked by the nomination when it ends, and the
+	// nomination of the assumed pod is kept until Reserve and Permit succeed.
+	TracksNominationInMemory(pod *v1.Pod) bool
+}
+
 // Framework manages the set of plugins in use by the scheduling framework.
 // Configured plugins are called at specified points in a scheduling context.
 type Framework interface {
 	fwk.Handle
+	NominatedNodeNameGetter
+	NominationExtensionsRunner
+	VictimExtensionsRunner
 
 	// PreEnqueuePlugins returns the registered preEnqueue plugins.
 	PreEnqueuePlugins() []fwk.PreEnqueuePlugin
@@ -232,6 +432,12 @@ type Framework interface {
 
 	// StoreScheduleResults stores the results after we have sorted and filtered nodes.
 	StoreScheduleResults(ctx context.Context, signature fwk.PodSignature, hintedNode, chosenNode string, otherNodes SortedScoredNodes, cycleCount int64)
+
+	// IsBatchingDisabled reports whether opportunistic batching is currently disabled on the framework.
+	IsBatchingDisabled() bool
+
+	// SetBatchingDisabled disables or re-enables opportunistic batching on the framework.
+	SetBatchingDisabled(disabled bool)
 
 	// RunRawScorePlugins runs only the Score() phase of each active scoring plugin for a single node,
 	// without NormalizeScore or weighting and returns pre-NormalizeScore values.
@@ -344,4 +550,11 @@ func NewPostFilterResultWithNominatedNode(name string) *fwk.PostFilterResult {
 			NominatingMode:    fwk.ModeOverride,
 		},
 	}
+}
+
+// IsRelevantForPodResize reports whether the plugin runs for a pod with a deferred resize:
+// only plugins that implement fwk.RelevancePlugin and return true do.
+func IsRelevantForPodResize(pl fwk.Plugin) bool {
+	rp, ok := pl.(fwk.RelevancePlugin)
+	return ok && rp.IsRelevantForPodResize()
 }

@@ -68,6 +68,9 @@
     featureGates:
       DRAExtendedResource: true
     labels: [integration-test, performance]
+    threshold:
+      # https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=SchedulingThroughput&Name=BenchmarkPerfScheduling%2FExtendedResourceScoring%2F2000pods_200nodes%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
+      dra_extendedresource_scoring: 116 # 40% below median of last 20 runs
     params:
       classes: 10
       nodesWithDRA: 200
@@ -78,7 +81,9 @@
     featureGates:
       DRAExtendedResource: true
     labels: [integration-test, performance]
-    threshold: 70
+    threshold:
+      # https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=SchedulingThroughput&Name=BenchmarkPerfScheduling%2FExtendedResourceScoring%2F5000pods_500nodes%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
+      dra_extendedresource_scoring: 118 # 40% below median of last 20 runs
     params:
       classes: 20
       nodesWithDRA: 500

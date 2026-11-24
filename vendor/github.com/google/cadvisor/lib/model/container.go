@@ -1098,13 +1098,40 @@ func (a *ContainerStats) Eq(b *ContainerStats) bool {
 	return a.StatsEq(b)
 }
 
+// memoryStatsUsageEq compares memory stats fields that represent current usage,
+// excluding monotonic counters (Pgscan, Pgsteal, WorkingsetRefault*, Failcnt,
+// Events, PSI, ContainerData, HierarchicalData) that change continuously when
+// cgroup v2 memory.high is active.  Treating counter churn as "unchanged" lets
+// cadvisor back off to longer housekeeping intervals instead of staying pinned
+// at the minimum 1 s tick.
+func memoryStatsUsageEq(a, b *MemoryStats) bool {
+	if a == b {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+	return a.Usage == b.Usage &&
+		a.MaxUsage == b.MaxUsage &&
+		a.Cache == b.Cache &&
+		a.RSS == b.RSS &&
+		a.Swap == b.Swap &&
+		a.MappedFile == b.MappedFile &&
+		a.WorkingSet == b.WorkingSet &&
+		a.TotalActiveFile == b.TotalActiveFile &&
+		a.TotalInactiveFile == b.TotalInactiveFile &&
+		a.FileDirty == b.FileDirty &&
+		a.FileWriteback == b.FileWriteback &&
+		a.KernelUsage == b.KernelUsage
+}
+
 // Checks equality of the stats values.
 func (a *ContainerStats) StatsEq(b *ContainerStats) bool {
 	// TODO(vmarmol): Consider using this through reflection.
 	if !reflect.DeepEqual(a.Cpu, b.Cpu) {
 		return false
 	}
-	if !reflect.DeepEqual(a.Memory, b.Memory) {
+	if !memoryStatsUsageEq(a.Memory, b.Memory) {
 		return false
 	}
 	if !reflect.DeepEqual(a.Hugetlb, b.Hugetlb) {
