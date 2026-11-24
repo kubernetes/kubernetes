@@ -23,11 +23,12 @@ import (
 	"fmt"
 	"io"
 	"math/rand"
-	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/http/httptrace"
 	"reflect"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -187,7 +188,7 @@ type watchResponse struct {
 
 // requestGOAWAYServer request test GOAWAY server using specified method and data according to the given url.
 // A non-nil channel will be returned if the request is watch, and a watchResponse can be got from the channel when watch done.
-func requestGOAWAYServer(client *http.Client, serverBaseURL, url string) (<-chan watchResponse, error) {
+func requestGOAWAYServer(ctx context.Context, client *http.Client, serverBaseURL, url string) (<-chan watchResponse, error) {
 	method := http.MethodGet
 	var reqBody io.Reader
 
@@ -196,7 +197,7 @@ func requestGOAWAYServer(client *http.Client, serverBaseURL, url string) (<-chan
 		reqBody = bytes.NewReader(requestPostBody)
 	}
 
-	req, err := http.NewRequest(method, serverBaseURL+url, reqBody)
+	req, err := http.NewRequestWithContext(ctx, method, serverBaseURL+url, reqBody)
 	if err != nil {
 		return nil, fmt.Errorf("unexpect new request error: %v", err)
 	}
@@ -305,19 +306,18 @@ func TestClientReceivedGOAWAY(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			// localAddr indicates how many TCP connection set up
-			localAddr := make([]string, 0)
+			// conns counts the connections that the requests use and not the dials,
+			// because the transport can dial a connection that no request uses.
+			var conns atomic.Int64
+			ctx := httptrace.WithClientTrace(t.Context(), &httptrace.ClientTrace{
+				GotConn: func(info httptrace.GotConnInfo) {
+					if !info.Reused {
+						conns.Add(1)
+					}
+				},
+			})
 
 			// create the http client
-			dialFn := func(network, addr string, cfg *tls.Config) (conn net.Conn, err error) {
-				conn, err = tls.Dial(network, addr, cfg)
-				if err != nil {
-					t.Fatalf("unexpect connection err: %v", err)
-				}
-
-				localAddr = append(localAddr, conn.LocalAddr().String())
-				return
-			}
 			tlsConfig := &tls.Config{
 				InsecureSkipVerify: true,
 				NextProtos:         []string{http2.NextProtoTLS},
@@ -326,9 +326,6 @@ func TestClientReceivedGOAWAY(t *testing.T) {
 				TLSHandshakeTimeout: 10 * time.Second,
 				TLSClientConfig:     tlsConfig,
 				ForceAttemptHTTP2:   true,
-				DialTLSContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-					return dialFn(network, addr, tlsConfig)
-				},
 			}
 
 			client := &http.Client{
@@ -337,7 +334,7 @@ func TestClientReceivedGOAWAY(t *testing.T) {
 
 			watchChs := make([]<-chan watchResponse, 0)
 			for _, url := range tc.reqs {
-				w, err := requestGOAWAYServer(client, s.URL, url)
+				w, err := requestGOAWAYServer(ctx, client, s.URL, url)
 				if err != nil {
 					t.Fatalf("failed to request server, err: %v", err)
 				}
@@ -347,8 +344,8 @@ func TestClientReceivedGOAWAY(t *testing.T) {
 			}
 
 			// check TCP connection count
-			if tc.expectConnections != len(localAddr) {
-				t.Fatalf("expect TCP connection: %d, actual: %d", tc.expectConnections, len(localAddr))
+			if int64(tc.expectConnections) != conns.Load() {
+				t.Fatalf("expect TCP connection: %d, actual: %d", tc.expectConnections, conns.Load())
 			}
 
 			// check if watch request is broken by GOAWAY frame
@@ -475,7 +472,7 @@ func TestGOAWAYConcurrency(t *testing.T) {
 					return
 				}
 
-				w, err := requestGOAWAYServer(client, s.URL, url)
+				w, err := requestGOAWAYServer(t.Context(), client, s.URL, url)
 				if err != nil {
 					t.Errorf("failed to request %q, err: %v", url, err)
 				}

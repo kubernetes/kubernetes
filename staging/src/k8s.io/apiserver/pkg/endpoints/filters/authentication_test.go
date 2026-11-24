@@ -22,9 +22,9 @@ import (
 	"crypto/x509"
 	"errors"
 	"io"
-	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/http/httptrace"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -633,28 +633,24 @@ func TestUnauthenticatedHTTP2ClientConnectionClose(t *testing.T) {
 
 				var localAddrs atomic.Uint64 // indicates how many TCP connection set up
 
+				// Count the connections that the requests use and not the dials,
+				// because the transport can dial a connection that no request uses.
+				ctx = httptrace.WithClientTrace(ctx, &httptrace.ClientTrace{
+					GotConn: func(info httptrace.GotConnInfo) {
+						if !info.Reused {
+							localAddrs.Add(1)
+						}
+					},
+				})
+
 				tlsConfig := &tls.Config{
 					RootCAs:    rootCAs,
 					NextProtos: []string{nextProto},
 				}
 
-				dailer := tls.Dialer{
-					Config: tlsConfig,
-				}
-
 				tr := &http.Transport{
 					TLSHandshakeTimeout: 10 * time.Second,
 					TLSClientConfig:     tlsConfig,
-					DialTLSContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-						conn, err := dailer.DialContext(ctx, network, addr)
-						if err != nil {
-							return nil, err
-						}
-
-						localAddrs.Add(1)
-
-						return conn, nil
-					},
 				}
 
 				tr.MaxIdleConnsPerHost = 1 // allow http1 to have keep alive connections open
