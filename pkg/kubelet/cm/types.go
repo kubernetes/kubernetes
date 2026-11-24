@@ -112,7 +112,9 @@ type PodContainerManager interface {
 
 	// EnsureExists takes a pod as argument and makes sure that
 	// pod cgroup exists if qos cgroup hierarchy flag is enabled.
-	// If the pod cgroup doesn't already exist this method creates it.
+	// If the pod cgroup doesn't already exist this method creates it;
+	// otherwise it reapplies the pod's resource parameters. Callers must
+	// only call it before the pod has a ready sandbox or running containers.
 	EnsureExists(logger klog.Logger, pod *v1.Pod) error
 
 	// Exists returns true if the pod cgroup exists.

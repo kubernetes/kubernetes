@@ -88,65 +88,70 @@ func (m *podContainerManagerImpl) Exists(pod *v1.Pod) bool {
 	return m.cgroupManager.Exists(podContainerName)
 }
 
-// EnsureExists takes a pod as argument and makes sure that
-// pod cgroup exists if qos cgroup hierarchy flag is enabled.
-// If the pod level container doesn't already exist it is created.
+// EnsureExists makes sure the pod's cgroup exists and that the pod's resource
+// parameters are applied to it. If the cgroup does not exist it is created;
+// if it already exists, the parameters are reapplied. Reapplying is only safe
+// while nothing runs in the pod cgroup: callers must not call it for a pod that
+// has a ready sandbox or running containers, since in-place resize owns the
+// pod cgroup's parameters from then on.
 func (m *podContainerManagerImpl) EnsureExists(logger klog.Logger, pod *v1.Pod) error {
-	// check if container already exist
-	alreadyExists := m.Exists(pod)
-	if !alreadyExists {
-		enforceCPULimits := m.enforceCPULimits
-		if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DisableCPUQuotaWithExclusiveCPUs) && m.podContainerManager.PodHasExclusiveCPUs(logger, pod) {
-			logger.V(2).Info("Disabled CFS quota", "pod", klog.KObj(pod))
-			enforceCPULimits = false
-		}
-		enforceMemoryQoS := false
-		if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.MemoryQoS) &&
-			isCgroup2UnifiedMode() {
-			enforceMemoryQoS = true
-		}
-		// Create the pod container
-		podContainerName, _ := m.GetPodContainerName(pod)
-		containerConfig := &CgroupConfig{
-			Name:               podContainerName,
-			ResourceParameters: ResourceConfigForPod(pod, enforceCPULimits, m.cpuCFSQuotaPeriod, enforceMemoryQoS, m.memoryReservationPolicy),
-		}
-		if !m.isNodeSwapEnabled() {
-			containerConfig.ResourceParameters.Unified = UnifiedWithoutSwap(containerConfig.ResourceParameters.Unified)
-		}
-		effectivePidLimit := m.podPidsLimit
-		pidLimitCapped := false
-		var requestedPidLimit int64
-		if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PerPodPIDLimit) {
-			if podPid := getPodPIDLimit(pod); podPid > 0 {
-				if podPid < effectivePidLimit || effectivePidLimit <= 0 {
-					effectivePidLimit = podPid
-				} else if podPid > effectivePidLimit {
-					pidLimitCapped = true
-					requestedPidLimit = podPid
-				}
+	enforceCPULimits := m.enforceCPULimits
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DisableCPUQuotaWithExclusiveCPUs) && m.podContainerManager.PodHasExclusiveCPUs(logger, pod) {
+		logger.V(2).Info("Disabled CFS quota", "pod", klog.KObj(pod))
+		enforceCPULimits = false
+	}
+	enforceMemoryQoS := utilfeature.DefaultFeatureGate.Enabled(kubefeatures.MemoryQoS) &&
+		isCgroup2UnifiedMode()
+	podContainerName, _ := m.GetPodContainerName(pod)
+	containerConfig := &CgroupConfig{
+		Name:               podContainerName,
+		ResourceParameters: ResourceConfigForPod(pod, enforceCPULimits, m.cpuCFSQuotaPeriod, enforceMemoryQoS, m.memoryReservationPolicy),
+	}
+	if !m.isNodeSwapEnabled() {
+		containerConfig.ResourceParameters.Unified = UnifiedWithoutSwap(containerConfig.ResourceParameters.Unified)
+	}
+	effectivePidLimit := m.podPidsLimit
+	pidLimitCapped := false
+	var requestedPidLimit int64
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PerPodPIDLimit) {
+		if podPid := getPodPIDLimit(pod); podPid > 0 {
+			if podPid < effectivePidLimit || effectivePidLimit <= 0 {
+				effectivePidLimit = podPid
+			} else if podPid > effectivePidLimit {
+				pidLimitCapped = true
+				requestedPidLimit = podPid
 			}
 		}
-		if effectivePidLimit > 0 {
-			containerConfig.ResourceParameters.PidsLimit = &effectivePidLimit
+	}
+	if effectivePidLimit > 0 {
+		containerConfig.ResourceParameters.PidsLimit = &effectivePidLimit
+	}
+	if enforceMemoryQoS {
+		m.applyPodLevelMemoryHigh(pod, containerConfig.ResourceParameters)
+		logger.V(4).Info("MemoryQoS config for pod", "pod", klog.KObj(pod), "unified", containerConfig.ResourceParameters.Unified)
+	}
+	applyWritableCgroupLimits(pod, containerConfig.ResourceParameters)
+	m.applyPodLevelSwapConfig(logger, pod, containerConfig.ResourceParameters)
+
+	if m.Exists(pod) {
+		// The cgroup may have been left without its parameters by an earlier
+		// failed Create, or by a kubelet restart between creating the cgroup
+		// and applying its parameters.
+		if err := m.cgroupManager.Update(logger, containerConfig); err != nil {
+			return fmt.Errorf("failed to update container for %v : %w", podContainerName, err)
 		}
-		if enforceMemoryQoS {
-			m.applyPodLevelMemoryHigh(pod, containerConfig.ResourceParameters)
-			logger.V(4).Info("MemoryQoS config for pod", "pod", klog.KObj(pod), "unified", containerConfig.ResourceParameters.Unified)
-		}
-		applyWritableCgroupLimits(pod, containerConfig.ResourceParameters)
-		m.applyPodLevelSwapConfig(logger, pod, containerConfig.ResourceParameters)
-		if err := m.cgroupManager.Create(logger, containerConfig); err != nil {
-			return fmt.Errorf("failed to create container for %v : %v", podContainerName, err)
-		}
-		// Report capping only once the limit has actually been applied, so a
-		// failing cgroup creation does not emit misleading (and repeated) events.
-		if pidLimitCapped {
-			logger.V(4).Info("Pod PID limit capped by node podPidsLimit", "pod", klog.KObj(pod), "requested", requestedPidLimit, "effective", effectivePidLimit)
-			m.recorder.Eventf(pod, v1.EventTypeWarning, kubeevents.PIDLimitCapped,
-				"Requested PID limit %d exceeds node podPidsLimit; capped to %d",
-				requestedPidLimit, effectivePidLimit)
-		}
+		return nil
+	}
+	if err := m.cgroupManager.Create(logger, containerConfig); err != nil {
+		return fmt.Errorf("failed to create container for %v : %w", podContainerName, err)
+	}
+	// Report capping only once the limit has actually been applied, so a
+	// failing cgroup creation does not emit misleading (and repeated) events.
+	if pidLimitCapped {
+		logger.V(4).Info("Pod PID limit capped by node podPidsLimit", "pod", klog.KObj(pod), "requested", requestedPidLimit, "effective", effectivePidLimit)
+		m.recorder.Eventf(pod, v1.EventTypeWarning, kubeevents.PIDLimitCapped,
+			"Requested PID limit %d exceeds node podPidsLimit; capped to %d",
+			requestedPidLimit, effectivePidLimit)
 	}
 	return nil
 }
@@ -202,10 +207,10 @@ func podRequestsWritableCgroups(pod *v1.Pod) bool {
 	return false
 }
 
-// applyPodLevelSwapConfig sets memory.swap.max on the pod cgroup when the cgroup is created.
-// Since EnsureExists only invokes this when the pod cgroup does not already exist, an existing
-// pod cgroup never has memory.swap.max recomputed (for example, if kubelet restarts with a
-// different swapBehavior).
+// applyPodLevelSwapConfig sets memory.swap.max on the pod cgroup when EnsureExists creates or
+// configures it. Since EnsureExists is not called once the pod has a ready sandbox or a running
+// container, a running pod's cgroup never has memory.swap.max recomputed (for example, if
+// kubelet restarts with a different swapBehavior).
 func (m *podContainerManagerImpl) applyPodLevelSwapConfig(logger klog.Logger, pod *v1.Pod, rc *ResourceConfig) {
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.WorkloadControlledSwap) && m.isNodeSwapEnabled() {
 		// KEP-5359: a pod-level limits.swap, already set by ResourceConfigForPod,
