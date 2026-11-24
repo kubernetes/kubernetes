@@ -44,7 +44,7 @@ func MatchNodeSelectorTerms(
 	if node == nil {
 		return false, nil
 	}
-	return nodeaffinity.NewLazyErrorNodeSelector(nodeSelector).Match(node)
+	return nodeaffinity.MatchNodeSelectorTerms(node, nodeSelector)
 }
 
 // GetAvoidPodsFromNodeAnnotations scans the list of annotations and

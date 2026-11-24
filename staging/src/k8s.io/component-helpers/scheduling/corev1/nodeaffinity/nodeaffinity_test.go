@@ -1054,3 +1054,146 @@ func TestPodMatchesNodeSelectorAndAffinityTerms(t *testing.T) {
 		})
 	}
 }
+
+func TestStreamingAndMatchLabelsParity(t *testing.T) {
+	node := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "node-1",
+			Labels: map[string]string{
+				"topology.kubernetes.io/zone": "us-central1-a",
+				"kubernetes.io/arch":          "amd64",
+				"tier":                        "5",
+			},
+		},
+	}
+	selectors := []struct {
+		name string
+		ns   v1.NodeSelector
+	}{
+		{
+			name: "matching In expression",
+			ns: v1.NodeSelector{NodeSelectorTerms: []v1.NodeSelectorTerm{{
+				MatchExpressions: []v1.NodeSelectorRequirement{{
+					Key: "topology.kubernetes.io/zone", Operator: v1.NodeSelectorOpIn, Values: []string{"us-central1-a", "us-central1-b"},
+				}},
+			}}},
+		},
+		{
+			name: "non-matching In expression",
+			ns: v1.NodeSelector{NodeSelectorTerms: []v1.NodeSelectorTerm{{
+				MatchExpressions: []v1.NodeSelectorRequirement{{
+					Key: "topology.kubernetes.io/zone", Operator: v1.NodeSelectorOpIn, Values: []string{"us-east1-b"},
+				}},
+			}}},
+		},
+		{
+			name: "NotIn Exists DoesNotExist Gt Lt",
+			ns: v1.NodeSelector{NodeSelectorTerms: []v1.NodeSelectorTerm{{
+				MatchExpressions: []v1.NodeSelectorRequirement{
+					{Key: "kubernetes.io/arch", Operator: v1.NodeSelectorOpNotIn, Values: []string{"arm64"}},
+					{Key: "topology.kubernetes.io/zone", Operator: v1.NodeSelectorOpExists},
+					{Key: "missing-label", Operator: v1.NodeSelectorOpDoesNotExist},
+					{Key: "tier", Operator: v1.NodeSelectorOpGt, Values: []string{"3"}},
+					{Key: "tier", Operator: v1.NodeSelectorOpLt, Values: []string{"10"}},
+				},
+			}}},
+		},
+		{
+			name: "matchFields metadata.name",
+			ns: v1.NodeSelector{NodeSelectorTerms: []v1.NodeSelectorTerm{{
+				MatchFields: []v1.NodeSelectorRequirement{{
+					Key: metav1.ObjectNameField, Operator: v1.NodeSelectorOpIn, Values: []string{"node-1"},
+				}},
+			}}},
+		},
+		{
+			name: "invalid first term OR valid second term",
+			ns: v1.NodeSelector{NodeSelectorTerms: []v1.NodeSelectorTerm{
+				{MatchExpressions: []v1.NodeSelectorRequirement{{Key: "bad//key", Operator: v1.NodeSelectorOpIn, Values: []string{"v"}}}},
+				{MatchExpressions: []v1.NodeSelectorRequirement{{Key: "kubernetes.io/arch", Operator: v1.NodeSelectorOpIn, Values: []string{"amd64"}}}},
+			}},
+		},
+		{
+			name: "only invalid term returns identical error",
+			ns: v1.NodeSelector{NodeSelectorTerms: []v1.NodeSelectorTerm{
+				{MatchExpressions: []v1.NodeSelectorRequirement{{Key: "bad//key", Operator: v1.NodeSelectorOpIn, Values: []string{"-bad-"}}}},
+			}},
+		},
+		{
+			name: "empty term",
+			ns:   v1.NodeSelector{NodeSelectorTerms: []v1.NodeSelectorTerm{{}}},
+		},
+	}
+
+	for _, tc := range selectors {
+		t.Run(tc.name, func(t *testing.T) {
+			wantMatch, wantErr := NewLazyErrorNodeSelector(&tc.ns).Match(node)
+			gotMatch, gotErr := MatchNodeSelectorTerms(node, &tc.ns)
+			if gotMatch != wantMatch || (gotErr == nil) != (wantErr == nil) || (gotErr != nil && gotErr.Error() != wantErr.Error()) {
+				t.Errorf("MatchNodeSelectorTerms() = (%v, %v), want (%v, %v)", gotMatch, gotErr, wantMatch, wantErr)
+			}
+
+			// Verify MatchNodeLabels and LazyErrorNodeSelector.MatchLabels match an unnamed node with same labels.
+			unnamedNode := &v1.Node{ObjectMeta: metav1.ObjectMeta{Labels: node.Labels}}
+			wantLblMatch, wantLblErr := NewLazyErrorNodeSelector(&tc.ns).Match(unnamedNode)
+			gotStreamMatch, gotStreamErr := MatchNodeLabels(node.Labels, &tc.ns)
+			if gotStreamMatch != wantLblMatch || (gotStreamErr == nil) != (wantLblErr == nil) || (gotStreamErr != nil && gotStreamErr.Error() != wantLblErr.Error()) {
+				t.Errorf("MatchNodeLabels() = (%v, %v), want (%v, %v)", gotStreamMatch, gotStreamErr, wantLblMatch, wantLblErr)
+			}
+			gotLazyMatch, gotLazyErr := NewLazyErrorNodeSelector(&tc.ns).MatchLabels(labels.Set(node.Labels))
+			if gotLazyMatch != wantLblMatch || (gotLazyErr == nil) != (wantLblErr == nil) || (gotLazyErr != nil && gotLazyErr.Error() != wantLblErr.Error()) {
+				t.Errorf("LazyErrorNodeSelector.MatchLabels() = (%v, %v), want (%v, %v)", gotLazyMatch, gotLazyErr, wantLblMatch, wantLblErr)
+			}
+		})
+	}
+}
+
+func BenchmarkMatchNodeSelectorTerms(b *testing.B) {
+	node := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "node-1",
+			Labels: map[string]string{
+				"topology.kubernetes.io/zone": "us-central1-a",
+				"kubernetes.io/arch":          "amd64",
+			},
+		},
+	}
+	ns := &v1.NodeSelector{
+		NodeSelectorTerms: []v1.NodeSelectorTerm{{
+			MatchExpressions: []v1.NodeSelectorRequirement{{
+				Key:      "topology.kubernetes.io/zone",
+				Operator: v1.NodeSelectorOpIn,
+				Values:   []string{"us-central1-a"},
+			}},
+		}},
+	}
+	b.Run("Streaming", func(b *testing.B) {
+		b.ReportAllocs()
+		for b.Loop() {
+			ok, err := MatchNodeSelectorTerms(node, ns)
+			if err != nil || !ok {
+				b.Fatalf("unexpected result: %v, %v", ok, err)
+			}
+		}
+	})
+	b.Run("LazySelectorCompileAndMatch", func(b *testing.B) {
+		b.ReportAllocs()
+		for b.Loop() {
+			ok, err := NewLazyErrorNodeSelector(ns).Match(node)
+			if err != nil || !ok {
+				b.Fatalf("unexpected result: %v, %v", ok, err)
+			}
+		}
+	})
+	b.Run("LazySelectorPrecompiledMatchLabels", func(b *testing.B) {
+		sel := NewLazyErrorNodeSelector(ns)
+		lbls := labels.Set(node.Labels)
+		b.ReportAllocs()
+		for b.Loop() {
+			ok, err := sel.MatchLabels(lbls)
+			if err != nil || !ok {
+				b.Fatalf("unexpected result: %v, %v", ok, err)
+			}
+		}
+	})
+}
