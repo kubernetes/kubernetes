@@ -113,7 +113,7 @@ func isCgroupv2Node(f *framework.Framework, ctx context.Context) (bool, error) {
 		framework.ExpectNoError(delErr, "delete pod %s", delErr)
 	}()
 
-	return cgroups.IsPodOnCgroupv2Node(f, pod, pod.Spec.Containers[0].Name)
+	return cgroups.IsPodOnCgroupv2Node(ctx, f, pod, pod.Spec.Containers[0].Name)
 }
 
 func makeObjectMetadata(name, namespace string) metav1.ObjectMeta {

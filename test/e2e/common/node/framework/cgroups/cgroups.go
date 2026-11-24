@@ -18,14 +18,18 @@ package cgroups
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	clientexec "k8s.io/client-go/util/exec"
+	"k8s.io/kubernetes/test/e2e/common/node/framework/podexec"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -131,7 +135,7 @@ func ConfigureHostPathForPodCgroup(pod *v1.Pod) {
 	})
 }
 
-func getPodCgroupPath(f *framework.Framework, pod *v1.Pod, podOnCgroupv2 bool, subsystem string) (string, error) {
+func getPodCgroupPath(ctx context.Context, f *framework.Framework, pod *v1.Pod, podOnCgroupv2 bool, subsystem string) (string, error) {
 	rootPath := cgroupMountPath
 	if !podOnCgroupv2 {
 		rootPath += "/" + subsystem
@@ -139,14 +143,28 @@ func getPodCgroupPath(f *framework.Framework, pod *v1.Pod, podOnCgroupv2 bool, s
 	// search path for both systemd driver and cgroupfs driver
 	cmd := fmt.Sprintf("find %s -name '*%s*' -o -name '*%s*'", rootPath, strings.ReplaceAll(string(pod.UID), "-", "_"), string(pod.UID))
 	framework.Logf("Namespace %s Pod %s - looking for Pod cgroup directory path: %q", f.Namespace, pod.Name, cmd)
-	podCgPath, stderr, err := e2epod.ExecCommandInContainerWithFullOutput(f, pod.Name, pod.Spec.Containers[0].Name, []string{"/bin/sh", "-c", cmd}...)
-	if podCgPath == "" {
-		// This command may hit 'No such file or directory' for another cgroup if another test running in parallel has deleted a pod.
-		// We ignore errors if podCgPath is found.
-		if err != nil || len(stderr) > 0 {
-			return "", fmt.Errorf("encountered error while running command: %q, \nerr: %w \nstdErr: %q", cmd, err, stderr)
+
+	var podCgPath string
+	err := framework.Gomega().Eventually(ctx, framework.HandleRetry(func(ctx context.Context) (error, error) {
+		out, stderr, err := e2epod.ExecCommandInContainerWithFullOutput(f, pod.Name, pod.Spec.Containers[0].Name, "/bin/sh", "-c", cmd)
+		if err != nil {
+			if _, cmdExited := errors.AsType[clientexec.CodeExitError](err); !cmdExited {
+				return fmt.Errorf("encountered error while running command: %q, \nerr: %w \nstdErr: %q", cmd, err, stderr), nil
+			}
 		}
-		return "", fmt.Errorf("pod cgroup dirctory not found by command: %q", cmd)
+		if out != "" {
+			// This command may hit 'No such file or directory' for another cgroup if another test running in parallel has deleted a pod.
+			// We ignore exit errors if podCgPath is found.
+			podCgPath = out
+			return nil, nil
+		}
+		if err != nil || len(stderr) > 0 {
+			return nil, fmt.Errorf("encountered error while running command: %q, \nerr: %w \nstdErr: %q", cmd, err, stderr)
+		}
+		return nil, fmt.Errorf("pod cgroup dirctory not found by command: %q", cmd)
+	})).WithTimeout(framework.PollShortTimeout).WithPolling(framework.Poll).Should(gomega.Succeed())
+	if err != nil {
+		return "", err
 	}
 	return podCgPath, nil
 }
@@ -282,9 +300,9 @@ func VerifyContainerCgroupValues(ctx context.Context, f *framework.Framework, po
 }
 
 func verifyPodCPUWeight(ctx context.Context, f *framework.Framework, pod *v1.Pod, expectedResources *v1.ResourceRequirements, podOnCgroupv2 bool) error {
-	podCgPath, err := getPodCgroupPath(f, pod, podOnCgroupv2, "cpu")
+	podCgPath, err := getPodCgroupPath(ctx, f, pod, podOnCgroupv2, "cpu")
 	if err != nil {
-		if podCgPath, err = getPodCgroupPath(f, pod, podOnCgroupv2, "cpu,cpuacct"); err != nil {
+		if podCgPath, err = getPodCgroupPath(ctx, f, pod, podOnCgroupv2, "cpu,cpuacct"); err != nil {
 			return err
 		}
 	}
@@ -308,9 +326,9 @@ func RetrieveContainerCPUWeight(ctx context.Context, f *framework.Framework, pod
 
 // RetrievePodCPUWeight reads the cpu.weight or cpu.shares value for the pod cgroup.
 func RetrievePodCPUWeight(ctx context.Context, f *framework.Framework, pod *v1.Pod, podOnCgroupv2 bool) (int64, error) {
-	podCgPath, err := getPodCgroupPath(f, pod, podOnCgroupv2, "cpu")
+	podCgPath, err := getPodCgroupPath(ctx, f, pod, podOnCgroupv2, "cpu")
 	if err != nil {
-		if podCgPath, err = getPodCgroupPath(f, pod, podOnCgroupv2, "cpu,cpuacct"); err != nil {
+		if podCgPath, err = getPodCgroupPath(ctx, f, pod, podOnCgroupv2, "cpu,cpuacct"); err != nil {
 			return 0, err
 		}
 	}
@@ -360,9 +378,9 @@ func GetEffectiveCPUMilli(reqs, lims v1.ResourceList) int64 {
 }
 
 func verifyPodCPULimit(ctx context.Context, f *framework.Framework, pod *v1.Pod, expectedResources *v1.ResourceRequirements, podOnCgroupv2 bool) error {
-	podCgPath, err := getPodCgroupPath(f, pod, podOnCgroupv2, "cpu")
+	podCgPath, err := getPodCgroupPath(ctx, f, pod, podOnCgroupv2, "cpu")
 	if err != nil {
-		if podCgPath, err = getPodCgroupPath(f, pod, podOnCgroupv2, "cpu,cpuacct"); err != nil {
+		if podCgPath, err = getPodCgroupPath(ctx, f, pod, podOnCgroupv2, "cpu,cpuacct"); err != nil {
 			return err
 		}
 	}
@@ -381,7 +399,7 @@ func verifyPodCPULimit(ctx context.Context, f *framework.Framework, pod *v1.Pod,
 }
 
 func verifyPodMemoryLimit(ctx context.Context, f *framework.Framework, pod *v1.Pod, expectedResources *v1.ResourceRequirements, podOnCgroupv2 bool) error {
-	podCgPath, err := getPodCgroupPath(f, pod, podOnCgroupv2, "memory")
+	podCgPath, err := getPodCgroupPath(ctx, f, pod, podOnCgroupv2, "memory")
 	if err != nil {
 		return err
 	}
@@ -407,7 +425,7 @@ func verifyPodMemoryLimit(ctx context.Context, f *framework.Framework, pod *v1.P
 func VerifyPodCgroups(ctx context.Context, f *framework.Framework, pod *v1.Pod, info *ContainerResources) error {
 	ginkgo.GinkgoHelper()
 
-	onCgroupV2, err := IsPodOnCgroupv2Node(f, pod, pod.Spec.Containers[0].Name)
+	onCgroupV2, err := IsPodOnCgroupv2Node(ctx, f, pod, pod.Spec.Containers[0].Name)
 	if err != nil {
 		return err
 	}
@@ -461,30 +479,33 @@ func VerifyCgroupValue(ctx context.Context, f *framework.Framework, pod *v1.Pod,
 // VerifyOomScoreAdjValue verifies that oom_score_adj for pid 1 (pidof init/systemd -> app)
 // has the expected value in specified container of the pod. It execs into the container,
 // reads the oom_score_adj value from procfs, and compares it against the expected value.
-func VerifyOomScoreAdjValue(f *framework.Framework, pod *v1.Pod, cName, expectedOomScoreAdj string) error {
+func VerifyOomScoreAdjValue(ctx context.Context, f *framework.Framework, pod *v1.Pod, cName, expectedOomScoreAdj string) error {
 	cmd := "cat /proc/1/oom_score_adj"
 	framework.Logf("Namespace %s Pod %s Container %s - looking for oom_score_adj value %s",
 		pod.Namespace, pod.Name, cName, expectedOomScoreAdj)
-	oomScoreAdj, _, err := e2epod.ExecCommandInContainerWithFullOutput(f, pod.Name, cName, "/bin/sh", "-c", cmd)
-	if err != nil {
-		return fmt.Errorf("failed to find expected oom_score_adj value %s for container %s in pod %s", expectedOomScoreAdj, cName, pod.Name)
-	}
-	oomScoreAdj = strings.Trim(oomScoreAdj, "\n")
-	if oomScoreAdj != expectedOomScoreAdj {
-		return fmt.Errorf("oom_score_adj value %s not equal to expected %s for container %s in pod %s", oomScoreAdj, expectedOomScoreAdj, cName, pod.Name)
-	}
-	return nil
+	return framework.Gomega().Eventually(ctx, framework.HandleRetry(func(ctx context.Context) (error, error) {
+		oomScoreAdj, _, err := e2epod.ExecCommandInContainerWithFullOutput(f, pod.Name, cName, "/bin/sh", "-c", cmd)
+		if err != nil {
+			return fmt.Errorf("failed to find expected oom_score_adj value %s for container %s in pod %s: %w", expectedOomScoreAdj, cName, pod.Name, err), nil
+		}
+		oomScoreAdj = strings.Trim(oomScoreAdj, "\n")
+		if oomScoreAdj != expectedOomScoreAdj {
+			return nil, fmt.Errorf("oom_score_adj value %s not equal to expected %s for container %s in pod %s", oomScoreAdj, expectedOomScoreAdj, cName, pod.Name)
+		}
+		return nil, nil
+	})).WithTimeout(framework.PollShortTimeout).WithPolling(framework.Poll).Should(gomega.Succeed())
 }
 
 // IsPodOnCgroupv2Node checks whether the pod is running on cgroupv2 node.
 // Successful results are cached per node name because nodes in one cluster may
-// use different cgroup versions. Probe failures are returned as errors and are
-// never cached, so a transient exec failure cannot select cgroup paths for
-// later checks.
+// use different cgroup versions. Exec errors (other than non-zero command exit
+// codes) are retried up to PollShortTimeout; unrecovered probe failures are
+// returned as errors and are never cached, so a failed probe cannot select
+// cgroup paths for later checks.
 // TODO: Deduplicate this function with NPD cluster e2e test:
 // https://github.com/kubernetes/kubernetes/blob/2049360379bcc5d6467769cef112e6e492d3d2f0/test/e2e/node/node_problem_detector.go#L369
-func IsPodOnCgroupv2Node(f *framework.Framework, pod *v1.Pod, containerName string) (bool, error) {
-	onCgroupV2, err := isPodOnCgroupv2Node(&cgroupv2ByNode, pod.Spec.NodeName, func() (string, string, error) {
+func IsPodOnCgroupv2Node(ctx context.Context, f *framework.Framework, pod *v1.Pod, containerName string) (bool, error) {
+	onCgroupV2, err := isPodOnCgroupv2NodeWithRetry(ctx, &cgroupv2ByNode, pod.Spec.NodeName, framework.PollShortTimeout, framework.Poll, func() (string, string, error) {
 		return e2epod.ExecCommandInContainerWithFullOutput(f, pod.Name, containerName, "/bin/sh", "-c", "mount -t cgroup2")
 	})
 	if err != nil {
@@ -495,6 +516,12 @@ func IsPodOnCgroupv2Node(f *framework.Framework, pod *v1.Pod, containerName stri
 
 // cgroupv2ByNode maps a node name to the result of a successful cgroup probe.
 var cgroupv2ByNode sync.Map
+
+func isPodOnCgroupv2NodeWithRetry(ctx context.Context, cache *sync.Map, nodeName string, timeout, pollInterval time.Duration, exec func() (string, string, error)) (bool, error) {
+	return isPodOnCgroupv2Node(cache, nodeName, func() (string, string, error) {
+		return podexec.ExecWithRetry(ctx, timeout, pollInterval, exec)
+	})
+}
 
 func isPodOnCgroupv2Node(cache *sync.Map, nodeName string, exec func() (string, string, error)) (bool, error) {
 	if nodeName != "" {
@@ -519,7 +546,7 @@ func isPodOnCgroupv2Node(cache *sync.Map, nodeName string, exec func() (string, 
 
 // VerifyPodHugepagesLimit verifies the pod-level hugepages limit.
 func VerifyPodHugepagesLimit(ctx context.Context, f *framework.Framework, pod *v1.Pod, pageSize string, expectedLimit string, onCgroupV2 bool) error {
-	podCgPath, err := getPodCgroupPath(f, pod, onCgroupV2, "hugetlb")
+	podCgPath, err := getPodCgroupPath(ctx, f, pod, onCgroupV2, "hugetlb")
 	if err != nil {
 		return err
 	}

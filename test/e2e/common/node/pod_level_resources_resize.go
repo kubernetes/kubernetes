@@ -717,7 +717,7 @@ func doPatchAndRollbackPLR(ctx context.Context, f *framework.Framework, original
 }
 
 func patchAndVerifyPLR(ctx context.Context, f *framework.Framework, podClient *e2epod.PodClient, newPod *v1.Pod, originalContainers, expectedContainers []podresize.ResizableContainerInfo, originalPodResources, expectedPodResources *v1.ResourceRequirements, opStr string, mountPodCgroup bool) {
-	onCgroupv2, err := cgroups.IsPodOnCgroupv2Node(f, newPod, newPod.Spec.Containers[0].Name)
+	onCgroupv2, err := cgroups.IsPodOnCgroupv2Node(ctx, f, newPod, newPod.Spec.Containers[0].Name)
 	framework.ExpectNoError(err)
 	oldWeights := make(map[string]int64)
 	for _, ci := range originalContainers {
