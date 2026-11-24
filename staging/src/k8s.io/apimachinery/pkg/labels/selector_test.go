@@ -1225,3 +1225,27 @@ func expectMatchNothing(t *testing.T, selector Selector, want bool) {
 		t.Errorf("Wanted %s to MatchNothing '%t', but it did not.\n", selector, want)
 	}
 }
+
+func BenchmarkNewRequirement(b *testing.B) {
+	vals := []string{"us-central1-a", "us-central1-b"}
+	b.ReportAllocs()
+	for b.Loop() {
+		req, err := NewRequirement("topology.kubernetes.io/zone", selection.In, vals)
+		if err != nil || req == nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkSelectorAdd(b *testing.B) {
+	r1, _ := NewRequirement("topology.kubernetes.io/zone", selection.In, []string{"us-central1-a"})
+	r2, _ := NewRequirement("kubernetes.io/arch", selection.In, []string{"amd64"})
+	base := NewSelector()
+	b.ReportAllocs()
+	for b.Loop() {
+		sel := base.Add(*r1, *r2)
+		if sel.Empty() {
+			b.Fatal("unexpected empty selector")
+		}
+	}
+}

@@ -18,6 +18,8 @@ package validation
 
 import (
 	"reflect"
+	"regexp"
+	"slices"
 	"strings"
 	"testing"
 
@@ -767,5 +769,62 @@ func TestIsDomainPrefixedKey(t *testing.T) {
 				t.Errorf("IsDomainPrefixedKey(%q) = %v; want %v", tt.value, result, tt.expected)
 			}
 		})
+	}
+}
+
+func FuzzIsDNS1123Label(f *testing.F) {
+	refLabel := regexp.MustCompile("^" + dns1123LabelFmt + "$")
+	refSubdomain := regexp.MustCompile("^" + dns1123SubdomainFmt + "$")
+	for _, seed := range []string{"", "a", "my-name", "a.b", "A", "-a", "a-", strings.Repeat("a", 63), strings.Repeat("a", 64), "a\u00e9"} {
+		f.Add(seed)
+	}
+	f.Fuzz(func(t *testing.T, value string) {
+		var want []string
+		if len(value) > DNS1123LabelMaxLength {
+			want = append(want, MaxLenError(DNS1123LabelMaxLength))
+		}
+		if !refLabel.MatchString(value) {
+			if refSubdomain.MatchString(value) {
+				want = append(want, "must not contain dots")
+			} else {
+				want = append(want, RegexError(dns1123LabelErrMsg, dns1123LabelFmt, "my-name", "123-abc"))
+			}
+		}
+		if got := IsDNS1123Label(value); !slices.Equal(got, want) {
+			t.Fatalf("IsDNS1123Label(%q) = %v, want %v", value, got, want)
+		}
+	})
+}
+
+func FuzzIsDNS1123Subdomain(f *testing.F) {
+	refSubdomain := regexp.MustCompile("^" + dns1123SubdomainFmt + "$")
+	for _, seed := range []string{"", "a", "example.com", "a..b", ".a", "a.", "A.b", strings.Repeat("a", 253), strings.Repeat("a", 254), "a.\u00e9"} {
+		f.Add(seed)
+	}
+	f.Fuzz(func(t *testing.T, value string) {
+		var want []string
+		if len(value) > DNS1123SubdomainMaxLength {
+			want = append(want, MaxLenError(DNS1123SubdomainMaxLength))
+		}
+		if !refSubdomain.MatchString(value) {
+			want = append(want, RegexError(dns1123SubdomainErrorMsg, dns1123SubdomainFmt, "example.com"))
+		}
+		if got := IsDNS1123Subdomain(value); !slices.Equal(got, want) {
+			t.Fatalf("IsDNS1123Subdomain(%q) = %v, want %v", value, got, want)
+		}
+	})
+}
+
+func BenchmarkIsDNS1123Label(b *testing.B) {
+	b.ReportAllocs()
+	for b.Loop() {
+		_ = IsDNS1123Label("my-node-pool-us-central1-a-001")
+	}
+}
+
+func BenchmarkIsDNS1123Subdomain(b *testing.B) {
+	b.ReportAllocs()
+	for b.Loop() {
+		_ = IsDNS1123Subdomain("topology.kubernetes.io")
 	}
 }

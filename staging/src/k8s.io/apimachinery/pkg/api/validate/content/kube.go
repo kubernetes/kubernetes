@@ -17,7 +17,6 @@ limitations under the License.
 package content
 
 import (
-	"regexp"
 	"strings"
 )
 
@@ -27,7 +26,23 @@ const labelKeyFmt string = "(" + labelKeyCharFmt + labelKeyExtCharFmt + "*)?" + 
 const labelKeyErrMsg string = "must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character"
 const labelKeyMaxLength int = 63
 
-var labelKeyRegexp = regexp.MustCompile("^" + labelKeyFmt + "$")
+// matchesLabelName reports whether value matches ^([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]$.
+func matchesLabelName(value string) bool {
+	n := len(value)
+	if n == 0 {
+		return false
+	}
+	if !isASCIIAlnum(value[0]) || !isASCIIAlnum(value[n-1]) {
+		return false
+	}
+	for i := 1; i < n-1; i++ {
+		b := value[i]
+		if !isASCIIAlnum(b) && b != '-' && b != '_' && b != '.' {
+			return false
+		}
+	}
+	return true
+}
 
 // IsQualifiedName tests whether the value passed is what Kubernetes calls a
 // "qualified name", which is the same as a label key.
@@ -41,23 +56,38 @@ var IsQualifiedName = IsLabelKey
 // If the value is not valid, a list of error strings is returned. Otherwise, an
 // empty list (or nil) is returned.
 func IsLabelKey(value string) []string {
-	var errs []string
-	parts := strings.Split(value, "/")
-	var name string
-	switch len(parts) {
-	case 1:
-		name = parts[0]
-	case 2:
-		var prefix string
-		prefix, name = parts[0], parts[1]
-		if len(prefix) == 0 {
-			errs = append(errs, "prefix part "+EmptyError())
-		} else if msgs := IsDNS1123Subdomain(prefix); len(msgs) != 0 {
-			errs = append(errs, prefixEach(msgs, "prefix part ")...)
+	prefix, name, hasSlash := strings.Cut(value, "/")
+	if !hasSlash {
+		if len(value) <= labelKeyMaxLength && matchesLabelName(value) {
+			return nil
 		}
-	default:
-		return append(errs, "a valid label key "+RegexError(labelKeyErrMsg, labelKeyFmt, "MyName", "my.name", "123-abc")+
-			" with an optional DNS subdomain prefix and '/' (e.g. 'example.com/MyName')")
+		var errs []string
+		if len(value) == 0 {
+			errs = append(errs, "name part "+EmptyError())
+		} else if len(value) > labelKeyMaxLength {
+			errs = append(errs, "name part "+MaxLenError(labelKeyMaxLength))
+		}
+		if !matchesLabelName(value) {
+			errs = append(errs, "name part "+RegexError(labelKeyErrMsg, labelKeyFmt, "MyName", "my.name", "123-abc"))
+		}
+		return errs
+	}
+
+	if strings.IndexByte(name, '/') != -1 {
+		return []string{"a valid label key " + RegexError(labelKeyErrMsg, labelKeyFmt, "MyName", "my.name", "123-abc") +
+			" with an optional DNS subdomain prefix and '/' (e.g. 'example.com/MyName')"}
+	}
+
+	if len(prefix) > 0 && len(prefix) <= DNS1123SubdomainMaxLength && matchesDNS1123Subdomain(prefix, false) &&
+		len(name) <= labelKeyMaxLength && matchesLabelName(name) {
+		return nil
+	}
+
+	var errs []string
+	if len(prefix) == 0 {
+		errs = append(errs, "prefix part "+EmptyError())
+	} else if msgs := IsDNS1123Subdomain(prefix); len(msgs) != 0 {
+		errs = append(errs, prefixEach(msgs, "prefix part ")...)
 	}
 
 	if len(name) == 0 {
@@ -65,7 +95,7 @@ func IsLabelKey(value string) []string {
 	} else if len(name) > labelKeyMaxLength {
 		errs = append(errs, "name part "+MaxLenError(labelKeyMaxLength))
 	}
-	if !labelKeyRegexp.MatchString(name) {
+	if !matchesLabelName(name) {
 		errs = append(errs, "name part "+RegexError(labelKeyErrMsg, labelKeyFmt, "MyName", "my.name", "123-abc"))
 	}
 	return errs
@@ -77,17 +107,18 @@ const labelValueErrMsg string = "a valid label must be an empty string or consis
 // LabelValueMaxLength is a label's max length
 const LabelValueMaxLength int = 63
 
-var labelValueRegexp = regexp.MustCompile("^" + labelValueFmt + "$")
-
 // IsLabelValue tests whether the value passed is a valid label value.  If
 // the value is not valid, a list of error strings is returned.  Otherwise an
 // empty list (or nil) is returned.
 func IsLabelValue(value string) []string {
+	if len(value) == 0 || (len(value) <= LabelValueMaxLength && matchesLabelName(value)) {
+		return nil
+	}
 	var errs []string
 	if len(value) > LabelValueMaxLength {
 		errs = append(errs, MaxLenError(LabelValueMaxLength))
 	}
-	if !labelValueRegexp.MatchString(value) {
+	if len(value) > 0 && !matchesLabelName(value) {
 		errs = append(errs, RegexError(labelValueErrMsg, labelValueFmt, "MyValue", "my_value", "12345"))
 	}
 	return errs
@@ -109,8 +140,7 @@ func IsPrefixedLabelKey(value string) []string {
 		return errs
 	}
 
-	segments := strings.Split(value, "/")
-	if len(segments) != 2 {
+	if strings.IndexByte(value, '/') == -1 {
 		return []string{"must include a prefix (e.g. 'example.com/key')"}
 	}
 	return nil

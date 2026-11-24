@@ -163,17 +163,53 @@ const dns1123LabelErrMsg string = "a lowercase RFC 1123 label must consist of lo
 // DNS1123LabelMaxLength is a label's max length in DNS (RFC 1123)
 const DNS1123LabelMaxLength int = 63
 
-var dns1123LabelRegexp = regexp.MustCompile("^" + dns1123LabelFmt + "$")
+func isLowerAlnum(b byte) bool {
+	return (b >= 'a' && b <= 'z') || (b >= '0' && b <= '9')
+}
+
+func matchesDNS1123Label(value string) bool {
+	n := len(value)
+	if n == 0 || !isLowerAlnum(value[0]) || !isLowerAlnum(value[n-1]) {
+		return false
+	}
+	for i := 1; i < n-1; i++ {
+		b := value[i]
+		if !isLowerAlnum(b) && b != '-' {
+			return false
+		}
+	}
+	return true
+}
+
+func matchesDNS1123Subdomain(value string) bool {
+	n := len(value)
+	if n == 0 {
+		return false
+	}
+	start := 0
+	for i := range n {
+		if value[i] == '.' {
+			if !matchesDNS1123Label(value[start:i]) {
+				return false
+			}
+			start = i + 1
+		}
+	}
+	return matchesDNS1123Label(value[start:])
+}
 
 // IsDNS1123Label tests for a string that conforms to the definition of a label in
 // DNS (RFC 1123).
 func IsDNS1123Label(value string) []string {
+	if len(value) <= DNS1123LabelMaxLength && matchesDNS1123Label(value) {
+		return nil
+	}
 	var errs []string
 	if len(value) > DNS1123LabelMaxLength {
 		errs = append(errs, MaxLenError(DNS1123LabelMaxLength))
 	}
-	if !dns1123LabelRegexp.MatchString(value) {
-		if dns1123SubdomainRegexp.MatchString(value) {
+	if !matchesDNS1123Label(value) {
+		if matchesDNS1123Subdomain(value) {
 			// It was a valid subdomain and not a valid label.  Since we
 			// already checked length, it must be dots.
 			errs = append(errs, "must not contain dots")
@@ -193,17 +229,19 @@ const dns1123SubdomainErrorMsgFG string = "a lowercase RFC 1123 subdomain must c
 // DNS1123SubdomainMaxLength is a subdomain's max length in DNS (RFC 1123)
 const DNS1123SubdomainMaxLength int = 253
 
-var dns1123SubdomainRegexp = regexp.MustCompile("^" + dns1123SubdomainFmt + "$")
 var dns1123SubdomainRegexpWithUnderscore = regexp.MustCompile("^" + dns1123SubdomainFmtWithUnderscore + "$")
 
 // IsDNS1123Subdomain tests for a string that conforms to the definition of a
 // subdomain in DNS (RFC 1123).
 func IsDNS1123Subdomain(value string) []string {
+	if len(value) <= DNS1123SubdomainMaxLength && matchesDNS1123Subdomain(value) {
+		return nil
+	}
 	var errs []string
 	if len(value) > DNS1123SubdomainMaxLength {
 		errs = append(errs, MaxLenError(DNS1123SubdomainMaxLength))
 	}
-	if !dns1123SubdomainRegexp.MatchString(value) {
+	if !matchesDNS1123Subdomain(value) {
 		errs = append(errs, RegexError(dns1123SubdomainErrorMsg, dns1123SubdomainFmt, "example.com"))
 	}
 	return errs

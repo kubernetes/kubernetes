@@ -184,42 +184,43 @@ type Requirement struct {
 // Returned error, if not nil, is guaranteed to be an aggregated field.ErrorList
 func NewRequirement(key string, op selection.Operator, vals []string, opts ...field.PathOption) (*Requirement, error) {
 	var allErrs field.ErrorList
-	path := field.ToPath(opts...)
-	if err := validateLabelKey(key, path.Child("key")); err != nil {
-		allErrs = append(allErrs, err)
+	if errs := content.IsLabelKey(key); len(errs) != 0 {
+		allErrs = append(allErrs, field.Invalid(field.ToPath(opts...).Child("key"), key, strings.Join(errs, "; ")))
 	}
 
-	valuePath := path.Child("values")
 	switch op {
 	case selection.In, selection.NotIn:
 		if len(vals) == 0 {
-			allErrs = append(allErrs, field.Invalid(valuePath, vals, "for 'in', 'notin' operators, values set can't be empty"))
+			allErrs = append(allErrs, field.Invalid(field.ToPath(opts...).Child("values"), vals, "for 'in', 'notin' operators, values set can't be empty"))
 		}
 	case selection.Equals, selection.DoubleEquals, selection.NotEquals:
 		if len(vals) != 1 {
-			allErrs = append(allErrs, field.Invalid(valuePath, vals, "exact-match compatibility requires one single value"))
+			allErrs = append(allErrs, field.Invalid(field.ToPath(opts...).Child("values"), vals, "exact-match compatibility requires one single value"))
 		}
 	case selection.Exists, selection.DoesNotExist:
 		if len(vals) != 0 {
-			allErrs = append(allErrs, field.Invalid(valuePath, vals, "values set must be empty for exists and does not exist"))
+			allErrs = append(allErrs, field.Invalid(field.ToPath(opts...).Child("values"), vals, "values set must be empty for exists and does not exist"))
 		}
 	case selection.GreaterThan, selection.LessThan:
 		if len(vals) != 1 {
-			allErrs = append(allErrs, field.Invalid(valuePath, vals, "for 'Gt', 'Lt' operators, exactly one value is required"))
+			allErrs = append(allErrs, field.Invalid(field.ToPath(opts...).Child("values"), vals, "for 'Gt', 'Lt' operators, exactly one value is required"))
 		}
 		for i := range vals {
 			if _, err := strconv.ParseInt(vals[i], 10, 64); err != nil {
-				allErrs = append(allErrs, field.Invalid(valuePath.Index(i), vals[i], "for 'Gt', 'Lt' operators, the value must be an integer"))
+				allErrs = append(allErrs, field.Invalid(field.ToPath(opts...).Child("values").Index(i), vals[i], "for 'Gt', 'Lt' operators, the value must be an integer"))
 			}
 		}
 	default:
-		allErrs = append(allErrs, field.NotSupported(path.Child("operator"), op, validRequirementOperators))
+		allErrs = append(allErrs, field.NotSupported(field.ToPath(opts...).Child("operator"), op, validRequirementOperators))
 	}
 
 	for i := range vals {
-		if err := validateLabelValue(key, vals[i], valuePath.Index(i)); err != nil {
-			allErrs = append(allErrs, err)
+		if errs := content.IsLabelValue(vals[i]); len(errs) != 0 {
+			allErrs = append(allErrs, field.Invalid(field.ToPath(opts...).Child("values").Index(i).Key(key), vals[i], strings.Join(errs, "; ")))
 		}
+	}
+	if len(allErrs) == 0 {
+		return &Requirement{key: key, operator: op, strValues: vals}, nil
 	}
 	return &Requirement{key: key, operator: op, strValues: vals}, allErrs.ToAggregate()
 }
@@ -412,7 +413,11 @@ func (s internalSelector) Add(reqs ...Requirement) Selector {
 	ret := make(internalSelector, 0, len(s)+len(reqs))
 	ret = append(ret, s...)
 	ret = append(ret, reqs...)
-	sort.Sort(ByKey(ret))
+	if len(ret) > 1 {
+		slices.SortStableFunc(ret, func(a, b Requirement) int {
+			return strings.Compare(a.key, b.key)
+		})
+	}
 	return ret
 }
 
