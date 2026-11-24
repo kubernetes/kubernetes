@@ -317,10 +317,17 @@ func (state *golistState) adhocPackage(pattern, query string) (*DriverResponse, 
 	if err != nil {
 		return nil, err
 	}
-	// If we get nothing back from `go list`,
-	// try to make this file into its own ad-hoc package.
-	// TODO(rstambler): Should this check against the original response?
-	if len(response.Packages) == 0 {
+	// Only .go files can form ad-hoc packages (command-line-arguments);
+	// non-Go files cannot be compiled as Go packages (golang.org/issue/54815).
+	if filepath.Ext(query) != ".go" {
+		return response, nil
+	}
+
+	switch len(response.Packages) {
+	case 0:
+		// If we get nothing back from `go list`,
+		// try to make this file into its own ad-hoc package.
+		// TODO(rstambler): Should this check against the original response?
 		response.Packages = append(response.Packages, &Package{
 			ID:              "command-line-arguments",
 			PkgPath:         query,
@@ -329,22 +336,23 @@ func (state *golistState) adhocPackage(pattern, query string) (*DriverResponse, 
 			Imports:         make(map[string]*Package),
 		})
 		response.Roots = append(response.Roots, "command-line-arguments")
-	}
-	// Handle special cases.
-	if len(response.Packages) == 1 {
+
+	case 1:
+		// Handle special cases.
 		// golang/go#33482: If this is a file= query for ad-hoc packages where
 		// the file only exists on an overlay, and exists outside of a module,
 		// add the file to the package and remove the errors.
-		if response.Packages[0].ID == "command-line-arguments" ||
-			filepath.ToSlash(response.Packages[0].PkgPath) == filepath.ToSlash(query) {
-			if len(response.Packages[0].GoFiles) == 0 {
+		pkg := response.Packages[0]
+		if pkg.ID == "command-line-arguments" ||
+			filepath.ToSlash(pkg.PkgPath) == filepath.ToSlash(query) {
+			if len(pkg.GoFiles) == 0 {
 				filename := filepath.Join(pattern, filepath.Base(query)) // avoid recomputing abspath
 				// TODO(matloob): check if the file is outside of a root dir?
 				for path := range state.cfg.Overlay {
 					if path == filename {
-						response.Packages[0].Errors = nil
-						response.Packages[0].GoFiles = []string{path}
-						response.Packages[0].CompiledGoFiles = []string{path}
+						pkg.Errors = nil
+						pkg.GoFiles = []string{path}
+						pkg.CompiledGoFiles = []string{path}
 					}
 				}
 			}
@@ -683,9 +691,14 @@ func (state *golistState) createDriverResponse(words ...string) (*DriverResponse
 
 		if p.Error != nil {
 			msg := strings.TrimSpace(p.Error.Err) // Trim to work around golang.org/issue/32363.
-			// Address golang.org/issue/35964 by appending import stack to error message.
-			if msg == "import cycle not allowed" && len(p.Error.ImportStack) != 0 {
-				msg += fmt.Sprintf(": import stack: %v", p.Error.ImportStack)
+			// Address golang.org/issue/35964 and golang.org/issue/38826 by appending import stack to error message.
+			// Address golang/go#38826 by removing " (test)"
+			if (msg == "import cycle not allowed" || msg == "import cycle not allowed in test") && len(p.Error.ImportStack) != 0 {
+				stack := make([]string, len(p.Error.ImportStack))
+				for i, s := range p.Error.ImportStack {
+					stack[i] = strings.TrimSuffix(s, " (test)")
+				}
+				msg += fmt.Sprintf(": import stack: %v", stack)
 			}
 			pkg.Errors = append(pkg.Errors, Error{
 				Pos:  p.Error.Pos,
@@ -752,29 +765,27 @@ func (state *golistState) getPkgPath(dir string) (string, bool, error) {
 		return "", false, err
 	}
 
+	// A directory can be contained in multiple roots, for example when a
+	// replaced module is nested inside the main module. Choose the most
+	// specific root, breaking ties lexically for deterministic behavior.
+	var bestRoot, bestPath, bestRel string
 	for rdir, rpath := range roots {
-		// Make sure that the directory is in the module,
-		// to avoid creating a path relative to another module.
-		if !strings.HasPrefix(dir, rdir) {
-			continue
-		}
 		// TODO(matloob): This doesn't properly handle symlinks.
 		r, err := filepath.Rel(rdir, dir)
-		if err != nil {
+		if err != nil || !filepath.IsLocal(r) {
 			continue
 		}
-		if rpath != "" {
-			// We choose only one root even though the directory even it can belong in multiple modules
-			// or GOPATH entries. This is okay because we only need to work with absolute dirs when a
-			// file is missing from disk, for instance when gopls calls go/packages in an overlay.
-			// Once the file is saved, gopls, or the next invocation of the tool will get the correct
-			// result straight from golist.
-			// TODO(matloob): Implement module tiebreaking?
-			return path.Join(rpath, filepath.ToSlash(r)), true, nil
+		if bestRoot == "" || len(rdir) > len(bestRoot) || len(rdir) == len(bestRoot) && rdir < bestRoot {
+			bestRoot, bestPath, bestRel = rdir, rpath, r
 		}
-		return filepath.ToSlash(r), true, nil
 	}
-	return "", false, nil
+	if bestRoot == "" {
+		return "", false, nil
+	}
+	if bestPath != "" {
+		return path.Join(bestPath, filepath.ToSlash(bestRel)), true, nil
+	}
+	return filepath.ToSlash(bestRel), true, nil
 }
 
 // absJoin absolutizes and flattens the lists of files.
@@ -996,9 +1007,12 @@ func (state *golistState) invokeGo(verb string, args ...string) (*bytes.Buffer, 
 			return bytes.NewBufferString(output), nil
 		}
 
-		// Workaround for #29280: go list -e has incorrect behavior when an ad-hoc package doesn't exist.
+		// Workaround for #29280 and #31344: go list -e has incorrect behavior when an ad-hoc package doesn't exist.
 		// Note that the error message we look for in this case is different that the one looked for above.
-		if len(stderr.String()) > 0 && strings.Contains(stderr.String(), "no such file or directory") {
+		// "no such file or directory" is emitted on Unix,
+		if len(stderr.String()) > 0 && (strings.Contains(stderr.String(), "no such file or directory") || // Unix
+			strings.Contains(stderr.String(), "The system cannot find the file specified") || // Windows ERROR_FILE_NOT_FOUND
+			strings.Contains(stderr.String(), "The system cannot find the path specified")) { // Windows ERROR_PATH_NOT_FOUND
 			output := fmt.Sprintf(`{"ImportPath": "command-line-arguments","Incomplete": true,"Error": {"Pos": "","Err": %q}}`,
 				strings.Trim(stderr.String(), "\n"))
 			return bytes.NewBufferString(output), nil

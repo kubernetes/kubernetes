@@ -933,6 +933,29 @@ type OpenHow struct {
 
 const SizeofOpenHow = 0x18
 
+type NsIdReq struct {
+	Size       uint32
+	Spare      uint32
+	Ns_id      uint64
+	Ns_type    uint32
+	Spare2     uint32
+	User_ns_id uint64
+}
+
+const (
+	NS_ID_REQ_SIZE_VER0 = 0x20
+	LISTNS_CURRENT_USER = 0xffffffffffffffff
+
+	TIME_NS   = 0x80
+	MNT_NS    = 0x20000
+	CGROUP_NS = 0x2000000
+	UTS_NS    = 0x4000000
+	IPC_NS    = 0x8000000
+	USER_NS   = 0x10000000
+	PID_NS    = 0x20000000
+	NET_NS    = 0x40000000
+)
+
 const (
 	RESOLVE_BENEATH       = 0x8
 	RESOLVE_IN_ROOT       = 0x10
@@ -3579,7 +3602,7 @@ const (
 	DEVLINK_ATTR_LINECARD_SUPPORTED_TYPES              = 0xae
 	DEVLINK_ATTR_NESTED_DEVLINK                        = 0xaf
 	DEVLINK_ATTR_SELFTESTS                             = 0xb0
-	DEVLINK_ATTR_MAX                                   = 0xb7
+	DEVLINK_ATTR_MAX                                   = 0xb9
 	DEVLINK_DPIPE_FIELD_MAPPING_TYPE_NONE              = 0x0
 	DEVLINK_DPIPE_FIELD_MAPPING_TYPE_IFINDEX           = 0x1
 	DEVLINK_DPIPE_MATCH_TYPE_FIELD_EXACT               = 0x0
@@ -4101,7 +4124,7 @@ const (
 	ETHTOOL_A_COALESCE_RATE_SAMPLE_INTERVAL   = 0x17
 	ETHTOOL_A_COALESCE_USE_CQE_MODE_TX        = 0x18
 	ETHTOOL_A_COALESCE_USE_CQE_MODE_RX        = 0x19
-	ETHTOOL_A_COALESCE_MAX                    = 0x1e
+	ETHTOOL_A_COALESCE_MAX                    = 0x20
 	ETHTOOL_A_PAUSE_UNSPEC                    = 0x0
 	ETHTOOL_A_PAUSE_HEADER                    = 0x1
 	ETHTOOL_A_PAUSE_AUTONEG                   = 0x2
@@ -4113,7 +4136,7 @@ const (
 	ETHTOOL_A_PAUSE_STAT_PAD                  = 0x1
 	ETHTOOL_A_PAUSE_STAT_TX_FRAMES            = 0x2
 	ETHTOOL_A_PAUSE_STAT_RX_FRAMES            = 0x3
-	ETHTOOL_A_PAUSE_STAT_MAX                  = 0x3
+	ETHTOOL_A_PAUSE_STAT_MAX                  = 0x4
 	ETHTOOL_A_EEE_UNSPEC                      = 0x0
 	ETHTOOL_A_EEE_HEADER                      = 0x1
 	ETHTOOL_A_EEE_MODES_OURS                  = 0x2
@@ -4264,19 +4287,29 @@ type HwTstampConfig struct {
 }
 
 const (
-	HWTSTAMP_FILTER_NONE            = 0x0
-	HWTSTAMP_FILTER_ALL             = 0x1
-	HWTSTAMP_FILTER_SOME            = 0x2
-	HWTSTAMP_FILTER_PTP_V1_L4_EVENT = 0x3
-	HWTSTAMP_FILTER_PTP_V2_L4_EVENT = 0x6
-	HWTSTAMP_FILTER_PTP_V2_L2_EVENT = 0x9
-	HWTSTAMP_FILTER_PTP_V2_EVENT    = 0xc
+	HWTSTAMP_FILTER_NONE                = 0x0
+	HWTSTAMP_FILTER_ALL                 = 0x1
+	HWTSTAMP_FILTER_SOME                = 0x2
+	HWTSTAMP_FILTER_PTP_V1_L4_EVENT     = 0x3
+	HWTSTAMP_FILTER_PTP_V1_L4_SYNC      = 0x4
+	HWTSTAMP_FILTER_PTP_V1_L4_DELAY_REQ = 0x5
+	HWTSTAMP_FILTER_PTP_V2_L4_EVENT     = 0x6
+	HWTSTAMP_FILTER_PTP_V2_L4_SYNC      = 0x7
+	HWTSTAMP_FILTER_PTP_V2_L4_DELAY_REQ = 0x8
+	HWTSTAMP_FILTER_PTP_V2_L2_EVENT     = 0x9
+	HWTSTAMP_FILTER_PTP_V2_L2_SYNC      = 0xa
+	HWTSTAMP_FILTER_PTP_V2_L2_DELAY_REQ = 0xb
+	HWTSTAMP_FILTER_PTP_V2_EVENT        = 0xc
+	HWTSTAMP_FILTER_PTP_V2_SYNC         = 0xd
+	HWTSTAMP_FILTER_PTP_V2_DELAY_REQ    = 0xe
+	HWTSTAMP_FILTER_NTP_ALL             = 0xf
 )
 
 const (
 	HWTSTAMP_TX_OFF          = 0x0
 	HWTSTAMP_TX_ON           = 0x1
 	HWTSTAMP_TX_ONESTEP_SYNC = 0x2
+	HWTSTAMP_TX_ONESTEP_P2P  = 0x3
 )
 
 type (
@@ -4527,9 +4560,12 @@ const (
 )
 
 type LandlockRulesetAttr struct {
-	Access_fs  uint64
-	Access_net uint64
-	Scoped     uint64
+	Handled_access_fs  uint64
+	Handled_access_net uint64
+	Scoped             uint64
+	Quiet_access_fs    uint64
+	Quiet_access_net   uint64
+	Quiet_scoped       uint64
 }
 
 type LandlockPathBeneathAttr struct {
@@ -4540,6 +4576,51 @@ type LandlockPathBeneathAttr struct {
 const (
 	LANDLOCK_RULE_PATH_BENEATH = 0x1
 )
+
+const (
+	PIDFD_SIGNAL_THREAD        = 0x1
+	PIDFD_SIGNAL_THREAD_GROUP  = 0x2
+	PIDFD_SIGNAL_PROCESS_GROUP = 0x4
+	PIDFD_SELF_THREAD          = -0x2710
+	PIDFD_SELF_THREAD_GROUP    = -0x2711
+	PIDFD_SELF                 = -0x2710
+	PIDFD_SELF_PROCESS         = -0x2711
+	PIDFD_INFO_PID             = 0x1
+	PIDFD_INFO_CREDS           = 0x2
+	PIDFD_INFO_CGROUPID        = 0x4
+	PIDFD_INFO_EXIT            = 0x8
+	PIDFD_INFO_COREDUMP        = 0x10
+	PIDFD_COREDUMPED           = 0x1
+	PIDFD_COREDUMP_SKIP        = 0x2
+	PIDFD_COREDUMP_USER        = 0x4
+	PIDFD_COREDUMP_ROOT        = 0x8
+	PIDFD_INFO_SIZE_VER0       = 0x40
+	PIDFD_GET_INFO             = 0xc058ff0b
+)
+
+const SizeofPidfdInfo = 0x58
+
+type PidfdInfo struct {
+	Mask            uint64
+	Cgroupid        uint64
+	Pid             uint32
+	Tgid            uint32
+	Ppid            uint32
+	Ruid            uint32
+	Rgid            uint32
+	Euid            uint32
+	Egid            uint32
+	Suid            uint32
+	Sgid            uint32
+	Fsuid           uint32
+	Fsgid           uint32
+	Exit_code       int32
+	Coredump_mask   uint32
+	Coredump_signal uint32
+	Coredump_code   uint32
+	Coredump_pad    uint32
+	Supported_mask  uint64
+}
 
 const (
 	IPC_CREAT   = 0x200
@@ -4880,7 +4961,7 @@ const (
 	NL80211_ATTR_MAC_HINT                                   = 0xc8
 	NL80211_ATTR_MAC_MASK                                   = 0xd7
 	NL80211_ATTR_MAX_AP_ASSOC_STA                           = 0xca
-	NL80211_ATTR_MAX                                        = 0x15c
+	NL80211_ATTR_MAX                                        = 0x16e
 	NL80211_ATTR_MAX_CRIT_PROT_DURATION                     = 0xb4
 	NL80211_ATTR_MAX_CSA_COUNTERS                           = 0xce
 	NL80211_ATTR_MAX_HW_TIMESTAMP_PEERS                     = 0x143
@@ -5095,12 +5176,12 @@ const (
 	NL80211_ATTR_WOWLAN_TRIGGERS                            = 0x75
 	NL80211_ATTR_WOWLAN_TRIGGERS_SUPPORTED                  = 0x76
 	NL80211_ATTR_WPA_VERSIONS                               = 0x4b
-	NL80211_AUTHTYPE_AUTOMATIC                              = 0x9
+	NL80211_AUTHTYPE_AUTOMATIC                              = 0xa
 	NL80211_AUTHTYPE_FILS_PK                                = 0x7
 	NL80211_AUTHTYPE_FILS_SK                                = 0x5
 	NL80211_AUTHTYPE_FILS_SK_PFS                            = 0x6
 	NL80211_AUTHTYPE_FT                                     = 0x2
-	NL80211_AUTHTYPE_MAX                                    = 0x8
+	NL80211_AUTHTYPE_MAX                                    = 0x9
 	NL80211_AUTHTYPE_NETWORK_EAP                            = 0x3
 	NL80211_AUTHTYPE_OPEN_SYSTEM                            = 0x0
 	NL80211_AUTHTYPE_SAE                                    = 0x4
@@ -5268,7 +5349,7 @@ const (
 	NL80211_CMD_LEAVE_MESH                                  = 0x45
 	NL80211_CMD_LEAVE_OCB                                   = 0x6d
 	NL80211_CMD_LINKS_REMOVED                               = 0x9a
-	NL80211_CMD_MAX                                         = 0x9f
+	NL80211_CMD_MAX                                         = 0xa7
 	NL80211_CMD_MICHAEL_MIC_FAILURE                         = 0x29
 	NL80211_CMD_MODIFY_LINK_STA                             = 0x97
 	NL80211_CMD_NAN_MATCH                                   = 0x78
@@ -5514,7 +5595,7 @@ const (
 	NL80211_FREQUENCY_ATTR_GO_CONCURRENT                    = 0xf
 	NL80211_FREQUENCY_ATTR_INDOOR_ONLY                      = 0xe
 	NL80211_FREQUENCY_ATTR_IR_CONCURRENT                    = 0xf
-	NL80211_FREQUENCY_ATTR_MAX                              = 0x27
+	NL80211_FREQUENCY_ATTR_MAX                              = 0x29
 	NL80211_FREQUENCY_ATTR_MAX_TX_POWER                     = 0x6
 	NL80211_FREQUENCY_ATTR_NO_10MHZ                         = 0x11
 	NL80211_FREQUENCY_ATTR_NO_160MHZ                        = 0xc
@@ -5587,7 +5668,7 @@ const (
 	NL80211_IFTYPE_AKM_ATTR_SUITES                          = 0x2
 	NL80211_IFTYPE_AP                                       = 0x3
 	NL80211_IFTYPE_AP_VLAN                                  = 0x4
-	NL80211_IFTYPE_MAX                                      = 0xc
+	NL80211_IFTYPE_MAX                                      = 0xe
 	NL80211_IFTYPE_MESH_POINT                               = 0x7
 	NL80211_IFTYPE_MONITOR                                  = 0x6
 	NL80211_IFTYPE_NAN                                      = 0xc
@@ -5612,7 +5693,7 @@ const (
 	NL80211_KEY_DEFAULT_TYPES                               = 0x8
 	NL80211_KEY_DEFAULT_TYPE_UNICAST                        = 0x1
 	NL80211_KEY_IDX                                         = 0x2
-	NL80211_KEY_MAX                                         = 0xa
+	NL80211_KEY_MAX                                         = 0xb
 	NL80211_KEY_MODE                                        = 0x9
 	NL80211_KEY_NO_TX                                       = 0x1
 	NL80211_KEY_RX_TX                                       = 0x0
@@ -5770,7 +5851,7 @@ const (
 	NL80211_PMKSA_CANDIDATE_BSSID                           = 0x2
 	NL80211_PMKSA_CANDIDATE_INDEX                           = 0x1
 	NL80211_PMKSA_CANDIDATE_PREAUTH                         = 0x3
-	NL80211_PMSR_ATTR_MAX                                   = 0x5
+	NL80211_PMSR_ATTR_MAX                                   = 0x7
 	NL80211_PMSR_ATTR_MAX_PEERS                             = 0x1
 	NL80211_PMSR_ATTR_PEERS                                 = 0x5
 	NL80211_PMSR_ATTR_RANDOMIZE_MAC_ADDR                    = 0x3
@@ -5779,7 +5860,7 @@ const (
 	NL80211_PMSR_FTM_CAPA_ATTR_ASAP                         = 0x1
 	NL80211_PMSR_FTM_CAPA_ATTR_BANDWIDTHS                   = 0x6
 	NL80211_PMSR_FTM_CAPA_ATTR_MAX_BURSTS_EXPONENT          = 0x7
-	NL80211_PMSR_FTM_CAPA_ATTR_MAX                          = 0x12
+	NL80211_PMSR_FTM_CAPA_ATTR_MAX                          = 0x1f
 	NL80211_PMSR_FTM_CAPA_ATTR_MAX_FTMS_PER_BURST           = 0x8
 	NL80211_PMSR_FTM_CAPA_ATTR_NON_ASAP                     = 0x2
 	NL80211_PMSR_FTM_CAPA_ATTR_NON_TRIGGER_BASED            = 0xa
@@ -5801,7 +5882,7 @@ const (
 	NL80211_PMSR_FTM_REQ_ATTR_BURST_PERIOD                  = 0x4
 	NL80211_PMSR_FTM_REQ_ATTR_FTMS_PER_BURST                = 0x6
 	NL80211_PMSR_FTM_REQ_ATTR_LMR_FEEDBACK                  = 0xc
-	NL80211_PMSR_FTM_REQ_ATTR_MAX                           = 0xe
+	NL80211_PMSR_FTM_REQ_ATTR_MAX                           = 0x17
 	NL80211_PMSR_FTM_REQ_ATTR_NON_TRIGGER_BASED             = 0xb
 	NL80211_PMSR_FTM_REQ_ATTR_NUM_BURSTS_EXP                = 0x3
 	NL80211_PMSR_FTM_REQ_ATTR_NUM_FTMR_RETRIES              = 0x7
@@ -5819,7 +5900,7 @@ const (
 	NL80211_PMSR_FTM_RESP_ATTR_FAIL_REASON                  = 0x1
 	NL80211_PMSR_FTM_RESP_ATTR_FTMS_PER_BURST               = 0x8
 	NL80211_PMSR_FTM_RESP_ATTR_LCI                          = 0x13
-	NL80211_PMSR_FTM_RESP_ATTR_MAX                          = 0x16
+	NL80211_PMSR_FTM_RESP_ATTR_MAX                          = 0x21
 	NL80211_PMSR_FTM_RESP_ATTR_NUM_BURSTS_EXP               = 0x6
 	NL80211_PMSR_FTM_RESP_ATTR_NUM_FTMR_ATTEMPTS            = 0x3
 	NL80211_PMSR_FTM_RESP_ATTR_NUM_FTMR_SUCCESSES           = 0x4
@@ -5833,7 +5914,7 @@ const (
 	NL80211_PMSR_FTM_RESP_ATTR_TX_RATE                      = 0xb
 	NL80211_PMSR_PEER_ATTR_ADDR                             = 0x1
 	NL80211_PMSR_PEER_ATTR_CHAN                             = 0x2
-	NL80211_PMSR_PEER_ATTR_MAX                              = 0x4
+	NL80211_PMSR_PEER_ATTR_MAX                              = 0x5
 	NL80211_PMSR_PEER_ATTR_REQ                              = 0x3
 	NL80211_PMSR_PEER_ATTR_RESP                             = 0x4
 	NL80211_PMSR_REQ_ATTR_DATA                              = 0x1
@@ -6472,4 +6553,24 @@ type GPIOV2LineEvent struct {
 	Seqno        uint32
 	Line_seqno   uint32
 	_            [6]uint32
+}
+
+const (
+	IPMI_MAX_ADDR_SIZE              = 0x20
+	IPMI_SYSTEM_INTERFACE_ADDR_TYPE = 0xc
+	IPMI_BMC_CHANNEL                = 0xf
+	IPMI_RESPONSE_RECV_TYPE         = 0x1
+)
+
+type IPMISystemInterfaceAddr struct {
+	Type    int32
+	Channel int16
+	Lun     uint8
+	_       [1]byte
+}
+type IPMIMsg struct {
+	Netfn uint8
+	Cmd   uint8
+	Len   uint16
+	Data  *uint8
 }
