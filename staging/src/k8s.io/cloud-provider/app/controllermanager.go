@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -244,8 +245,9 @@ func Run(c *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface
 		}
 	}
 
+	ctx := wait.ContextForChannel(stopCh)
+
 	if !c.ComponentConfig.Generic.LeaderElection.LeaderElect {
-		ctx := wait.ContextForChannel(stopCh)
 		run(ctx, controllerInitializers, nil)
 		<-stopCh
 		return nil
@@ -272,30 +274,44 @@ func Run(c *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface
 			"cloud-controller-manager")
 	}
 
+	// The leader election loops only stop on shutdown when the lock is to be
+	// released on exit. Otherwise they keep running until the process exits,
+	// as they always have.
+	releaseOnExit := utilfeature.DefaultFeatureGate.Enabled(cmfeatures.ControllerManagerReleaseLeaderElectionLockOnExit)
+	electionCtx := context.Background()
+	if releaseOnExit {
+		electionCtx = ctx
+	}
+	var electionWG sync.WaitGroup
+
 	// Start the main lock
 	mainRun := &electionRun{}
-	go leaderElectAndRun(c, id, electionChecker,
-		c.ComponentConfig.Generic.LeaderElection.ResourceLock,
-		c.ComponentConfig.Generic.LeaderElection.ResourceName,
-		leaderelection.LeaderCallbacks{
-			OnStartedLeading: func(ctx context.Context) {
-				initializers := controllerInitializers
-				if leaderMigrator != nil {
-					// If leader migration is enabled, we should start only non-migrated controllers
-					//  for the main lock.
-					initializers = filterInitializers(controllerInitializers, leaderMigrator.FilterFunc, leadermigration.ControllerNonMigrated)
-					klog.Info("leader migration: starting main controllers.")
-					// Signal the main lock is acquired, and thus migration lock is ready to attempt.
-					close(leaderMigrator.MigrationReady)
-				}
-				run(ctx, initializers, mainRun)
+	electionWG.Go(func() {
+		leaderElectAndRun(electionCtx, c, id, electionChecker,
+			c.ComponentConfig.Generic.LeaderElection.ResourceLock,
+			c.ComponentConfig.Generic.LeaderElection.ResourceName,
+			leaderelection.LeaderCallbacks{
+				OnStartedLeading: func(ctx context.Context) {
+					initializers := controllerInitializers
+					if leaderMigrator != nil {
+						// If leader migration is enabled, we should start only non-migrated controllers
+						//  for the main lock.
+						initializers = filterInitializers(controllerInitializers, leaderMigrator.FilterFunc, leadermigration.ControllerNonMigrated)
+						klog.Info("leader migration: starting main controllers.")
+						// Signal the main lock is acquired, and thus migration lock is ready to attempt.
+						close(leaderMigrator.MigrationReady)
+					}
+					run(ctx, initializers, mainRun)
+				},
+				OnStoppedLeading: func() {
+					klog.ErrorS(nil, "leaderelection lost")
+					if !releaseOnExit {
+						klog.FlushAndExit(klog.ExitFlushTimeout, 1)
+					}
+				},
 			},
-			OnStoppedLeading: func() {
-				klog.ErrorS(nil, "leaderelection lost")
-				klog.FlushAndExit(klog.ExitFlushTimeout, 1)
-			},
-		},
-		recoveryEnabled, mainRun)
+			recoveryEnabled, mainRun)
+	})
 
 	// If Leader Migration is enabled, proceed to attempt the migration lock.
 	if leaderMigrator != nil {
@@ -304,23 +320,32 @@ func Run(c *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface
 
 		// Start the migration lock.
 		migrationRun := &electionRun{}
-		go leaderElectAndRun(c, id, electionChecker,
-			c.ComponentConfig.Generic.LeaderMigration.ResourceLock,
-			c.ComponentConfig.Generic.LeaderMigration.LeaderName,
-			leaderelection.LeaderCallbacks{
-				OnStartedLeading: func(ctx context.Context) {
-					klog.Info("leader migration: starting migrated controllers.")
-					run(ctx, filterInitializers(controllerInitializers, leaderMigrator.FilterFunc, leadermigration.ControllerMigrated), migrationRun)
+		electionWG.Go(func() {
+			leaderElectAndRun(electionCtx, c, id, electionChecker,
+				c.ComponentConfig.Generic.LeaderMigration.ResourceLock,
+				c.ComponentConfig.Generic.LeaderMigration.LeaderName,
+				leaderelection.LeaderCallbacks{
+					OnStartedLeading: func(ctx context.Context) {
+						klog.Info("leader migration: starting migrated controllers.")
+						run(ctx, filterInitializers(controllerInitializers, leaderMigrator.FilterFunc, leadermigration.ControllerMigrated), migrationRun)
+					},
+					OnStoppedLeading: func() {
+						klog.ErrorS(nil, "migration leaderelection lost")
+						if !releaseOnExit {
+							klog.FlushAndExit(klog.ExitFlushTimeout, 1)
+						}
+					},
 				},
-				OnStoppedLeading: func() {
-					klog.ErrorS(nil, "migration leaderelection lost")
-					klog.FlushAndExit(klog.ExitFlushTimeout, 1)
-				},
-			},
-			recoveryEnabled, migrationRun)
+				recoveryEnabled, migrationRun)
+		})
 	}
 
 	<-stopCh
+	// Wait for the leader election loops to release their locks. They only
+	// stop on shutdown when the lock is released on exit.
+	if releaseOnExit {
+		electionWG.Wait()
+	}
 	return nil
 }
 
@@ -558,7 +583,7 @@ func ResyncPeriod(c *cloudcontrollerconfig.CompletedConfig) func() time.Duration
 
 // leaderElectAndRun runs the leader election, and runs the callbacks once the leader lease is acquired.
 // TODO: extract this function into staging/controller-manager
-func leaderElectAndRun(c *cloudcontrollerconfig.CompletedConfig, lockIdentity string, electionChecker *leaderelection.HealthzAdaptor, resourceLock string, leaseName string, callbacks leaderelection.LeaderCallbacks, recoveryEnabled bool, run *electionRun) {
+func leaderElectAndRun(ctx context.Context, c *cloudcontrollerconfig.CompletedConfig, lockIdentity string, electionChecker *leaderelection.HealthzAdaptor, resourceLock string, leaseName string, callbacks leaderelection.LeaderCallbacks, recoveryEnabled bool, run *electionRun) {
 	rl, err := resourcelock.NewFromKubeconfig(resourceLock,
 		c.ComponentConfig.Generic.LeaderElection.ResourceNamespace,
 		leaseName,
@@ -572,18 +597,11 @@ func leaderElectAndRun(c *cloudcontrollerconfig.CompletedConfig, lockIdentity st
 		klog.Fatalf("error creating lock: %v", err)
 	}
 
-	lec := leaderelection.LeaderElectionConfig{
-		Lock:          rl,
-		LeaseDuration: c.ComponentConfig.Generic.LeaderElection.LeaseDuration.Duration,
-		RenewDeadline: c.ComponentConfig.Generic.LeaderElection.RenewDeadline.Duration,
-		RetryPeriod:   c.ComponentConfig.Generic.LeaderElection.RetryPeriod.Duration,
-		Callbacks:     callbacks,
-		WatchDog:      electionChecker,
-		Name:          leaseName,
-	}
+	lec := leaderElectionConfigFor(c, rl, leaseName, callbacks, electionChecker)
 	if !recoveryEnabled {
-		leaderelection.RunOrDie(context.TODO(), lec)
-		panic("leaderelection.RunOrDie returned instead of exiting")
+		leaderelection.RunOrDie(ctx, lec)
+		exitUnlessShuttingDown(ctx, leaseName)
+		return
 	}
 
 	// Recovery mode: the elector keeps renewing after a failed renew deadline
@@ -597,9 +615,35 @@ func leaderElectAndRun(c *cloudcontrollerconfig.CompletedConfig, lockIdentity st
 		electionChecker.SetLeaderElection(le)
 	}
 	run.elector = le
-	le.Run(context.TODO())
+	le.Run(ctx)
+	exitUnlessShuttingDown(ctx, leaseName)
+}
 
-	panic("leader election ended without the controller manager exiting")
+// leaderElectionConfigFor returns the config for one leader election loop. The
+// lock is released when the loop's context is cancelled if the
+// ControllerManagerReleaseLeaderElectionLockOnExit feature gate is enabled.
+func leaderElectionConfigFor(c *cloudcontrollerconfig.CompletedConfig, lock resourcelock.Interface, leaseName string, callbacks leaderelection.LeaderCallbacks, electionChecker *leaderelection.HealthzAdaptor) leaderelection.LeaderElectionConfig {
+	return leaderelection.LeaderElectionConfig{
+		Lock:            lock,
+		LeaseDuration:   c.ComponentConfig.Generic.LeaderElection.LeaseDuration.Duration,
+		RenewDeadline:   c.ComponentConfig.Generic.LeaderElection.RenewDeadline.Duration,
+		RetryPeriod:     c.ComponentConfig.Generic.LeaderElection.RetryPeriod.Duration,
+		Callbacks:       callbacks,
+		WatchDog:        electionChecker,
+		ReleaseOnCancel: utilfeature.DefaultFeatureGate.Enabled(cmfeatures.ControllerManagerReleaseLeaderElectionLockOnExit),
+		Name:            leaseName,
+	}
+}
+
+// exitUnlessShuttingDown exits the process when a leader election loop has
+// ended while the controller manager is not shutting down, which means
+// leadership was lost for good. Exit as a lost lease always has. On shutdown
+// the loop ends after releasing the lock, and the caller returns.
+func exitUnlessShuttingDown(ctx context.Context, leaseName string) {
+	if ctx.Err() == nil {
+		klog.ErrorS(nil, "leader election ended, exiting", "lease", leaseName)
+		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
+	}
 }
 
 // clientBuildersFor returns the builder for the controller context's informers
