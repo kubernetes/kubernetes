@@ -544,13 +544,13 @@ func TestSpanLogSinkEdgeCases(t *testing.T) {
 				wg.Add(2)
 				go func() {
 					defer wg.Done()
-					for i := 0; i < 20; i++ {
+					for i := range 20 {
 						klog.FromContext(parentCtx).Info("parent log", "i", i)
 					}
 				}()
 				go func() {
 					defer wg.Done()
-					for i := 0; i < 20; i++ {
+					for i := range 20 {
 						roundTripped := logr.FromSlogHandler(logr.ToSlogHandler(klog.FromContext(childCtx)))
 						roundTripped.Info("round-tripped log", "i", i)
 					}
