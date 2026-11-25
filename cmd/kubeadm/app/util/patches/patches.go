@@ -299,8 +299,8 @@ func CreatePatchSet(targetName string, patchType types.PatchType, data string) (
 	}, nil
 }
 
-// getPatchSetsFromPath walks a path, ignores sub-directories and non-patch files, and
-// returns a list of patchFile objects.
+// getPatchSetsFromPath walks a path, including its sub-directories, in lexical order,
+// ignores non-patch files, and returns a list of patchFile objects.
 func getPatchSetsFromPath(targetPath string, knownTargets []string, output io.Writer) ([]*PatchSet, []string, []string, error) {
 	patchFiles := []string{}
 	ignoredFiles := []string{}
@@ -325,7 +325,7 @@ func getPatchSetsFromPath(targetPath string, knownTargets []string, output io.Wr
 			return err
 		}
 
-		// Sub-directories and "." are ignored.
+		// Directories are not patch files, but filepath.Walk still reads their contents.
 		if info.IsDir() {
 			return nil
 		}

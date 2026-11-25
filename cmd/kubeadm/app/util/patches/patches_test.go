@@ -219,6 +219,25 @@ func TestGetPatchSetsForPath(t *testing.T) {
 			expectedIgnoredFiles: []string{"bar.json", "foo"},
 		},
 		{
+			name:         "valid: patch files in sub-directories are loaded in lexical, depth-first order",
+			filesToWrite: []string{"kube-scheduler.json", filepath.Join("a", "etcd.yaml"), filepath.Join("a", "foo")},
+			patchData:    patchData,
+			expectedPatchSets: []*PatchSet{
+				{
+					targetName: "etcd",
+					patchType:  types.StrategicMergePatchType,
+					patches:    []string{patchData},
+				},
+				{
+					targetName: "kube-scheduler",
+					patchType:  types.StrategicMergePatchType,
+					patches:    []string{patchData},
+				},
+			},
+			expectedPatchFiles:   []string{"etcd.yaml", "kube-scheduler.json"},
+			expectedIgnoredFiles: []string{"foo"},
+		},
+		{
 			name:                 "valid: empty files are ignored",
 			patchData:            "",
 			filesToWrite:         []string{"kube-scheduler.json"},
@@ -243,6 +262,9 @@ func TestGetPatchSetsForPath(t *testing.T) {
 
 			for _, file := range tc.filesToWrite {
 				filePath := filepath.Join(tempDir, file)
+				if err := os.MkdirAll(filepath.Dir(filePath), 0755); err != nil {
+					t.Fatalf("could not create directory for %q: %v", filePath, err)
+				}
 				err := os.WriteFile(filePath, []byte(tc.patchData), 0644)
 				if err != nil {
 					t.Fatalf("could not write temporary file %q", filePath)
