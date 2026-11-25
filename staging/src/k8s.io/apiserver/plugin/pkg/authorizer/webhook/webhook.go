@@ -885,7 +885,7 @@ func shouldCache(attr authorizer.Attributes) bool {
 	labelRequirements, _ := attr.GetLabelSelector()
 	for _, requirement := range labelRequirements {
 		controlledAttrSize += int64(len(requirement.Key()))
-		controlledAttrSize += int64(len(requirement.Operator))
+		controlledAttrSize += int64(len(requirement.Operator()))
 		for value := range requirement.ValuesIter() {
 			controlledAttrSize += int64(len(value))
 		}
