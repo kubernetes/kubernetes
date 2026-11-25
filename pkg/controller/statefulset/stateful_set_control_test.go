@@ -3906,10 +3906,9 @@ func parallelScaleUpStatefulSetControl(set *apps.StatefulSet,
 		return err
 	}
 
-	// Give up after 2 loops.
-	// 2 * 500 pods per loop = 1000 max pods <- this should be enough for all test cases.
-	// Anything slower than that (requiring more iterations) indicates a problem and should fail the test.
-	maxLoops := 2
+	// A sync creates at most MaxBatchSize Pods, and the final status needs one
+	// more loop to converge. Anything slower indicates a problem.
+	maxLoops := int(*set.Spec.Replicas)/MaxBatchSize + 2
 	loops := maxLoops
 	for set.Status.Replicas < *set.Spec.Replicas {
 		if loops < 1 {
@@ -4879,4 +4878,99 @@ func TestStatefulSetMetrics(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestStatefulSetControlBoundsPodCreation(t *testing.T) {
+	// A single StatefulSet with a huge spec.replicas must not make the
+	// controller allocate a Pod object per ordinal before any API call.
+	for _, tc := range []struct {
+		name             string
+		burst            bool
+		expectedPodCount int
+	}{
+		{name: "OrderedReady", expectedPodCount: 1},
+		{name: "Parallel", burst: true, expectedPodCount: MaxBatchSize},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			set := newStatefulSet(0)
+			if tc.burst {
+				set = burst(set)
+			}
+			*set.Spec.Replicas = 50_000_000
+			client := fake.NewSimpleClientset(set)
+			om, _, ssc := setupController(client)
+
+			selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
+			if err != nil {
+				t.Fatal(err)
+			}
+			pods, err := om.podsLister.Pods(set.Namespace).List(selector)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := ssc.UpdateStatefulSet(context.TODO(), set, pods, time.Now()); err != nil {
+				t.Fatal(err)
+			}
+			pods, err = om.podsLister.Pods(set.Namespace).List(selector)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(pods) != tc.expectedPodCount {
+				t.Fatalf("created %d pods, want %d", len(pods), tc.expectedPodCount)
+			}
+		})
+	}
+}
+
+// A fresh controller per iteration keeps Pod creations from one sync from
+// affecting the next.
+func benchSyncSetup(replicas int32, existing int) (*apps.StatefulSet, []*v1.Pod, StatefulSetControlInterface) {
+	set := newStatefulSet(replicas)
+	client := fake.NewSimpleClientset(set)
+	_, _, ssc := setupController(client)
+	pods := make([]*v1.Pod, 0, existing)
+	for i := 0; i < existing; i++ {
+		pods = append(pods, newStatefulSetPod(set, i))
+	}
+	return set, pods, ssc
+}
+
+func benchSync(b *testing.B, replicas int32, existing int) {
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		b.StopTimer()
+		set, pods, ssc := benchSyncSetup(replicas, existing)
+		b.StartTimer()
+		if _, err := ssc.UpdateStatefulSet(context.TODO(), set, pods, time.Now()); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+// BenchmarkSyncEmpty measures a sync with no existing Pods. Without a bounded
+// working window the controller builds one Pod object per ordinal before
+// making a single API call, so the cost grows with spec.replicas.
+func BenchmarkSyncEmpty(b *testing.B) {
+	for _, n := range []int32{1_000, 10_000, 100_000} {
+		b.Run(fmt.Sprintf("replicas=%d", n), func(b *testing.B) {
+			benchSync(b, n, 0)
+		})
+	}
+}
+
+// BenchmarkSyncSteady guards the common case, where every ordinal already has
+// a Pod and the working window is the full range. It should stay equivalent to
+// the unbounded implementation.
+func BenchmarkSyncSteady(b *testing.B) {
+	for _, n := range []int32{100, 1_000, 5_000} {
+		b.Run(fmt.Sprintf("replicas=%d", n), func(b *testing.B) {
+			benchSync(b, n, int(n))
+		})
+	}
+}
+
+// BenchmarkSyncHuge is deliberately extreme: a single StatefulSet object must
+// not make the controller allocate a Pod per ordinal.
+func BenchmarkSyncHuge(b *testing.B) {
+	benchSync(b, 50_000_000, 0)
 }
