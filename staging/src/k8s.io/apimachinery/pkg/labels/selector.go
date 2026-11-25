@@ -323,6 +323,11 @@ func (r *Requirement) ValuesUnsorted() []string {
 	return ret
 }
 
+// ValuesIter returns an iterator over the requirement values as passed to NewRequirement, without sorting or copying.
+func (r *Requirement) ValuesIter() iter.Seq[string] {
+	return slices.Values(r.strValues)
+}
+
 // Equal checks the equality of requirement.
 func (r Requirement) Equal(x Requirement) bool {
 	if r.key != x.key {
