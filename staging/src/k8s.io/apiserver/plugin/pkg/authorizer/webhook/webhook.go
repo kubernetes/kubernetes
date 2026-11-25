@@ -884,8 +884,11 @@ func shouldCache(attr authorizer.Attributes) bool {
 	labelRequirements, _ := attr.GetLabelSelector();
 	for _, requirement := range labelRequirements {
 		controlledAttrSize += int64(len(requirement.Key()))
-		for _, value := range requirement.ValuesUnsorted() {
+		for _, value := range requirement.ValuesIter() {
 			controlledAttrSize += int64(len(value))
+		}
+		if controlledAttrSize >= maxControlledAttrCacheSize {
+			return false
 		}
 	}
 	
