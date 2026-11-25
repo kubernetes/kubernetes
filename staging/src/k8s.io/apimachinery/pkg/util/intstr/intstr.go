@@ -18,6 +18,7 @@ package intstr
 
 import (
 	"encoding/json"
+	"encoding/json/jsontext"
 	"errors"
 	"fmt"
 	"math"
@@ -141,6 +142,18 @@ func (intstr IntOrString) MarshalJSON() ([]byte, error) {
 		return json.Marshal(intstr.StrVal)
 	default:
 		return []byte{}, fmt.Errorf("impossible IntOrString.Type")
+	}
+}
+
+// MarshalJSONTo implements the [json/v2.MarshalerTo] interface.
+func (intstr IntOrString) MarshalJSONTo(enc *jsontext.Encoder) error {
+	switch intstr.Type {
+	case Int:
+		return enc.WriteToken(jsontext.Int(int64(intstr.IntVal)))
+	case String:
+		return enc.WriteToken(jsontext.String(intstr.StrVal))
+	default:
+		return fmt.Errorf("impossible IntOrString.Type")
 	}
 }
 
