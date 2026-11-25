@@ -4411,10 +4411,10 @@ func TestMutableSchedulingDirectivesForSuspendedJobs(t *testing.T) {
 func TestMutableSchedulingDirectivesForSuspendedJobsNotYetStarted(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.MutableSchedulingDirectivesForSuspendedJobs, true)
 
-	closeFn, restConfig, clientSet, ns := setup(t, "mutable-scheduling-directives-not-started")
+	closeFn, _, clientSet, ns := setup(t, "mutable-scheduling-directives-not-started")
 	t.Cleanup(closeFn)
-	ctx, cancel := startJobControllerAndWaitForCaches(t, restConfig)
-	t.Cleanup(cancel)
+	// No job controller: its status write sets the JobSuspended condition and conflicts with the update below.
+	_, ctx := ktesting.NewTestContext(t)
 
 	// Create a suspended Job.
 	job, err := createJobWithDefaults(ctx, clientSet, ns.Name, &batchv1.Job{
@@ -4445,10 +4445,10 @@ func TestMutableSchedulingDirectivesForSuspendedJobsNotYetStarted(t *testing.T) 
 func TestMutablePodResourcesForSuspendedJobsNotYetStarted(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.MutablePodResourcesForSuspendedJobs, true)
 
-	closeFn, restConfig, clientSet, ns := setup(t, "mutable-pod-resources-not-started")
+	closeFn, _, clientSet, ns := setup(t, "mutable-pod-resources-not-started")
 	t.Cleanup(closeFn)
-	ctx, cancel := startJobControllerAndWaitForCaches(t, restConfig)
-	t.Cleanup(cancel)
+	// No job controller: its status write sets the JobSuspended condition and conflicts with the update below.
+	_, ctx := ktesting.NewTestContext(t)
 
 	// Create a suspended Job.
 	job, err := createJobWithDefaults(ctx, clientSet, ns.Name, &batchv1.Job{
