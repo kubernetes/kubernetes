@@ -17,14 +17,12 @@ limitations under the License.
 package intstr
 
 import (
-	"encoding/json"
 	"fmt"
 	"math"
-	"reflect"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/internal/encodingtest"
 	cbor "k8s.io/apimachinery/pkg/runtime/serializer/cbor/direct"
-	"sigs.k8s.io/yaml"
 
 	"github.com/google/go-cmp/cmp"
 	"sigs.k8s.io/randfill"
@@ -51,76 +49,71 @@ func TestFromString(t *testing.T) {
 	}
 }
 
-type IntOrStringHolder struct {
-	IOrS IntOrString `json:"val"`
+func intOrStringUnmarshalJSONCases() []encodingtest.UnmarshalCase[IntOrString] {
+	//nolint:govet // Unkeyed fields are fine for test cases.
+	return []encodingtest.UnmarshalCase[IntOrString]{
+		{"123", FromInt32(123)},
+		{"\"123\"", FromString("123")},
+		{`-5`, FromInt32(-5)},
+		{`2147483647`, FromInt32(math.MaxInt32)},
+		{`-2147483648`, FromInt32(math.MinInt32)},
+		{`""`, FromString("")},
+		{`"a\"b\u0041"`, FromString(`a"bA`)},
+		{`null`, FromInt32(0)},
+	}
 }
 
 func TestIntOrStringUnmarshalJSON(t *testing.T) {
-	cases := []struct {
-		input  string
-		result IntOrString
-	}{
-		{"{\"val\": 123}", FromInt32(123)},
-		{"{\"val\": \"123\"}", FromString("123")},
-	}
+	encodingtest.UnmarshalJSON(t, intOrStringUnmarshalJSONCases())
+	encodingtest.UnmarshalJSONErrors[IntOrString](t, []string{
+		`2147483648`,
+		`-2147483649`,
+		`1.5`,
+		`1e2`,
+		`true`,
+		`{}`,
+		`[]`,
+	})
+}
 
-	for _, c := range cases {
-		var result IntOrStringHolder
-		if err := json.Unmarshal([]byte(c.input), &result); err != nil {
-			t.Errorf("Failed to unmarshal input '%v': %v", c.input, err)
-		}
-		if result.IOrS != c.result {
-			t.Errorf("Failed to unmarshal input '%v': expected %+v, got %+v", c.input, c.result, result)
-		}
+func BenchmarkIntOrStringUnmarshalJSON(b *testing.B) {
+	encodingtest.BenchmarkUnmarshalJSON(b, intOrStringUnmarshalJSONCases())
+}
+
+func intOrStringMarshalJSONCases() []encodingtest.MarshalCase[IntOrString] {
+	//nolint:govet // Unkeyed fields are fine for test cases.
+	return []encodingtest.MarshalCase[IntOrString]{
+		{FromInt32(123), "123"},
+		{FromString("123"), "\"123\""},
+		{FromInt32(0), `0`},
+		{IntOrString{}, `0`},
+		{FromInt32(-5), `-5`},
+		{FromInt32(math.MaxInt32), `2147483647`},
+		{FromInt32(math.MinInt32), `-2147483648`},
+		{FromString(""), `""`},
+		{FromString("a\"b\n"), `"a\"b\n"`},
+		{IntOrString{Type: String, IntVal: 7, StrVal: "x"}, `"x"`},
 	}
 }
 
 func TestIntOrStringMarshalJSON(t *testing.T) {
-	cases := []struct {
-		input  IntOrString
-		result string
-	}{
-		{FromInt32(123), "{\"val\":123}"},
-		{FromString("123"), "{\"val\":\"123\"}"},
-	}
+	encodingtest.MarshalJSON(t, intOrStringMarshalJSONCases())
+	encodingtest.MarshalJSONErrors(t, []IntOrString{
+		{Type: 2},
+	})
+}
 
-	for _, c := range cases {
-		input := IntOrStringHolder{c.input}
-		result, err := json.Marshal(&input)
-		if err != nil {
-			t.Errorf("Failed to marshal input '%v': %v", input, err)
-		}
-		if string(result) != c.result {
-			t.Errorf("Failed to marshal input '%v': expected: %+v, got %q", input, c.result, string(result))
-		}
-	}
+func BenchmarkIntOrStringMarshalJSON(b *testing.B) {
+	encodingtest.BenchmarkMarshalJSON(b, intOrStringMarshalJSONCases())
 }
 
 func TestIntOrStringMarshalJSONUnmarshalYAML(t *testing.T) {
-	cases := []struct {
-		input IntOrString
-	}{
-		{FromInt32(123)},
-		{FromString("123")},
+	inputs := []IntOrString{
+		FromInt32(123),
+		FromString("123"),
 	}
 
-	for _, c := range cases {
-		input := IntOrStringHolder{c.input}
-		jsonMarshalled, err := json.Marshal(&input)
-		if err != nil {
-			t.Errorf("1: Failed to marshal input: '%v': %v", input, err)
-		}
-
-		var result IntOrStringHolder
-		err = yaml.Unmarshal(jsonMarshalled, &result)
-		if err != nil {
-			t.Errorf("2: Failed to unmarshal '%+v': %v", string(jsonMarshalled), err)
-		}
-
-		if !reflect.DeepEqual(input, result) {
-			t.Errorf("3: Failed to marshal input '%+v': got %+v", input, result)
-		}
-	}
+	encodingtest.JSONToYAML(t, inputs, nil)
 }
 
 func TestGetIntFromIntOrString(t *testing.T) {

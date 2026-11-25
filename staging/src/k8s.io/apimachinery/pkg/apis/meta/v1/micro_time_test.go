@@ -17,105 +17,82 @@ limitations under the License.
 package v1
 
 import (
-	"encoding/json"
 	"fmt"
 	"reflect"
 	"testing"
 	"time"
 
+	"k8s.io/apimachinery/pkg/internal/encodingtest"
 	cbor "k8s.io/apimachinery/pkg/runtime/serializer/cbor/direct"
-	"sigs.k8s.io/yaml"
 
 	"github.com/google/go-cmp/cmp"
 	"sigs.k8s.io/randfill"
 )
 
-type MicroTimeHolder struct {
-	T MicroTime `json:"t"`
-}
-
 func TestMicroTimeMarshalYAML(t *testing.T) {
-	cases := []struct {
-		input  MicroTime
-		result string
-	}{
-		{MicroTime{}, "t: null\n"},
-		{DateMicro(1998, time.May, 5, 1, 5, 5, 50, time.FixedZone("test", -4*60*60)), "t: \"1998-05-05T05:05:05.000000Z\"\n"},
-		{DateMicro(1998, time.May, 5, 5, 5, 5, 0, time.UTC), "t: \"1998-05-05T05:05:05.000000Z\"\n"},
+	//nolint:govet // Unkeyed fields are fine for test cases.
+	cases := []encodingtest.MarshalCase[MicroTime]{
+		{MicroTime{}, "null\n"},
+		{DateMicro(1998, time.May, 5, 1, 5, 5, 50, time.FixedZone("test", -4*60*60)), "\"1998-05-05T05:05:05.000000Z\"\n"},
+		{DateMicro(1998, time.May, 5, 5, 5, 5, 0, time.UTC), "\"1998-05-05T05:05:05.000000Z\"\n"},
 	}
 
-	for _, c := range cases {
-		input := MicroTimeHolder{c.input}
-		result, err := yaml.Marshal(&input)
-		if err != nil {
-			t.Errorf("Failed to marshal input: '%v': %v", input, err)
-		}
-		if string(result) != c.result {
-			t.Errorf("Failed to marshal input: '%v': expected %+v, got %q", input, c.result, string(result))
-		}
-	}
+	encodingtest.MarshalYAML(t, cases)
 }
 
 func TestMicroTimeUnmarshalYAML(t *testing.T) {
-	cases := []struct {
-		input  string
-		result MicroTime
-	}{
-		{"t: null\n", MicroTime{}},
-		{"t: 1998-05-05T05:05:05.000000Z\n", MicroTime{Date(1998, time.May, 5, 5, 5, 5, 0, time.UTC).Local()}},
+	//nolint:govet // Unkeyed fields are fine for test cases.
+	cases := []encodingtest.UnmarshalCase[MicroTime]{
+		{"null\n", MicroTime{}},
+		{"1998-05-05T05:05:05.000000Z\n", MicroTime{Date(1998, time.May, 5, 5, 5, 5, 0, time.UTC).Local()}},
 	}
 
-	for _, c := range cases {
-		var result MicroTimeHolder
-		if err := yaml.Unmarshal([]byte(c.input), &result); err != nil {
-			t.Errorf("Failed to unmarshal input '%v': %v", c.input, err)
-		}
-		if result.T != c.result {
-			t.Errorf("Failed to unmarshal input '%v': expected %+v, got %+v", c.input, c.result, result)
-		}
+	encodingtest.UnmarshalYAML(t, cases)
+}
+
+func microTimeMarshalJSONCases() []encodingtest.MarshalCase[MicroTime] {
+	//nolint:govet // Unkeyed fields are fine for test cases.
+	return []encodingtest.MarshalCase[MicroTime]{
+		{MicroTime{}, "null"},
+		{DateMicro(1998, time.May, 5, 5, 5, 5, 50, time.UTC), "\"1998-05-05T05:05:05.000000Z\""},
+		{DateMicro(1998, time.May, 5, 5, 5, 5, 0, time.UTC), "\"1998-05-05T05:05:05.000000Z\""},
+		{DateMicro(1998, time.May, 5, 5, 5, 5, 123456000, time.UTC), `"1998-05-05T05:05:05.123456Z"`},
+		{DateMicro(1998, time.May, 5, 5, 5, 5, 0, time.FixedZone("x", 2*3600)), `"1998-05-05T03:05:05.000000Z"`},
 	}
 }
 
 func TestMicroTimeMarshalJSON(t *testing.T) {
-	cases := []struct {
-		input  MicroTime
-		result string
-	}{
-		{MicroTime{}, "{\"t\":null}"},
-		{DateMicro(1998, time.May, 5, 5, 5, 5, 50, time.UTC), "{\"t\":\"1998-05-05T05:05:05.000000Z\"}"},
-		{DateMicro(1998, time.May, 5, 5, 5, 5, 0, time.UTC), "{\"t\":\"1998-05-05T05:05:05.000000Z\"}"},
-	}
+	encodingtest.MarshalJSON(t, microTimeMarshalJSONCases())
+}
 
-	for _, c := range cases {
-		input := MicroTimeHolder{c.input}
-		result, err := json.Marshal(&input)
-		if err != nil {
-			t.Errorf("Failed to marshal input: '%v': %v", input, err)
-		}
-		if string(result) != c.result {
-			t.Errorf("Failed to marshal input: '%v': expected %+v, got %q", input, c.result, string(result))
-		}
+func microTimeUnmarshalJSONCases() []encodingtest.UnmarshalCase[MicroTime] {
+	//nolint:govet // Unkeyed fields are fine for test cases.
+	return []encodingtest.UnmarshalCase[MicroTime]{
+		{"null", MicroTime{}},
+		{"\"1998-05-05T05:05:05.000000Z\"", MicroTime{Date(1998, time.May, 5, 5, 5, 5, 0, time.UTC).Local()}},
+		{`"1998-05-05T05:05:05.123456Z"`, MicroTime{Date(1998, time.May, 5, 5, 5, 5, 123456000, time.UTC).Local()}},
+		{`"1998-05-05T05:05:05.000000+02:00"`, MicroTime{Date(1998, time.May, 5, 3, 5, 5, 0, time.UTC).Local()}},
 	}
 }
 
 func TestMicroTimeUnmarshalJSON(t *testing.T) {
-	cases := []struct {
-		input  string
-		result MicroTime
-	}{
-		{"{\"t\":null}", MicroTime{}},
-		{"{\"t\":\"1998-05-05T05:05:05.000000Z\"}", MicroTime{Date(1998, time.May, 5, 5, 5, 5, 0, time.UTC).Local()}},
-	}
+	encodingtest.UnmarshalJSON(t, microTimeUnmarshalJSONCases())
+	encodingtest.UnmarshalJSONErrors[MicroTime](t, []string{
+		`5`,
+		`true`,
+		`{}`,
+		`[]`,
+		`""`,
+		`"garbage"`,
+	})
+}
 
-	for _, c := range cases {
-		var result MicroTimeHolder
-		if err := json.Unmarshal([]byte(c.input), &result); err != nil {
-			t.Errorf("Failed to unmarshal input '%v': %v", c.input, err)
-		}
-		if result.T != c.result {
-			t.Errorf("Failed to unmarshal input '%v': expected %+v, got %+v", c.input, c.result, result)
-		}
-	}
+func BenchmarkMicroTimeUnmarshalJSON(b *testing.B) {
+	encodingtest.BenchmarkUnmarshalJSON(b, microTimeUnmarshalJSONCases())
+}
+
+func BenchmarkMicroTimeMarshalJSON(b *testing.B) {
+	encodingtest.BenchmarkMarshalJSON(b, microTimeMarshalJSONCases())
 }
 
 func TestMicroTimeMarshalCBOR(t *testing.T) {

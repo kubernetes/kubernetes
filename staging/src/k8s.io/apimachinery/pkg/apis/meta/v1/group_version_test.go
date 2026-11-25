@@ -17,62 +17,57 @@ limitations under the License.
 package v1
 
 import (
-	gojson "encoding/json"
-	"reflect"
 	"testing"
 
-	utiljson "k8s.io/apimachinery/pkg/util/json"
+	"k8s.io/apimachinery/pkg/internal/encodingtest"
 )
 
-type GroupVersionHolder struct {
-	GV GroupVersion `json:"val"`
+func groupVersionUnmarshalJSONCases() []encodingtest.UnmarshalCase[GroupVersion] {
+	//nolint:govet // Unkeyed fields are fine for test cases.
+	return []encodingtest.UnmarshalCase[GroupVersion]{
+		{`"v1"`, GroupVersion{"", "v1"}},
+		{`"apps/v1"`, GroupVersion{"apps", "v1"}},
+		{`""`, GroupVersion{}},
+		{`null`, GroupVersion{}},
+		{`"apps/"`, GroupVersion{"apps", ""}},
+		{`"apps\/v1"`, GroupVersion{"apps", "v1"}},
+	}
 }
 
 func TestGroupVersionUnmarshalJSON(t *testing.T) {
-	cases := []struct {
-		input  []byte
-		expect GroupVersion
-	}{
-		{[]byte(`{"val": "v1"}`), GroupVersion{"", "v1"}},
-		{[]byte(`{"val": "apps/v1"}`), GroupVersion{"apps", "v1"}},
-	}
+	encodingtest.UnmarshalJSON(t, groupVersionUnmarshalJSONCases())
+	encodingtest.UnmarshalJSONErrors[GroupVersion](t, []string{
+		`"a/b/c"`,
+		`5`,
+		`true`,
+		`{}`,
+		`[]`,
+	})
 
-	for _, c := range cases {
-		var result GroupVersionHolder
-		// test golang lib's JSON codec
-		if err := gojson.Unmarshal([]byte(c.input), &result); err != nil {
-			t.Errorf("JSON codec failed to unmarshal input '%v': %v", c.input, err)
-		}
-		if !reflect.DeepEqual(result.GV, c.expect) {
-			t.Errorf("JSON codec failed to unmarshal input '%s': expected %+v, got %+v", c.input, c.expect, result.GV)
-		}
-		// test the utiljson codec
-		if err := utiljson.Unmarshal(c.input, &result); err != nil {
-			t.Errorf("util/json codec failed to unmarshal input '%v': %v", c.input, err)
-		}
-		if !reflect.DeepEqual(result.GV, c.expect) {
-			t.Errorf("util/json codec failed to unmarshal input '%s': expected %+v, got %+v", c.input, c.expect, result.GV)
-		}
+}
+
+func BenchmarkGroupVersionUnmarshalJSON(b *testing.B) {
+	encodingtest.BenchmarkUnmarshalJSON(b, groupVersionUnmarshalJSONCases())
+}
+
+func groupVersionMarshalJSONCases() []encodingtest.MarshalCase[GroupVersion] {
+	//nolint:govet // Unkeyed fields are fine for test cases.
+	return []encodingtest.MarshalCase[GroupVersion]{
+		{GroupVersion{"", "v1"}, `"v1"`},
+		{GroupVersion{"apps", "v1"}, `"apps/v1"`},
+		{GroupVersion{}, `""`},
+		{GroupVersion{"apps", ""}, `"apps/"`},
 	}
 }
 
 func TestGroupVersionMarshalJSON(t *testing.T) {
-	cases := []struct {
-		input  GroupVersion
-		expect []byte
-	}{
-		{GroupVersion{"", "v1"}, []byte(`{"val":"v1"}`)},
-		{GroupVersion{"apps", "v1"}, []byte(`{"val":"apps/v1"}`)},
-	}
+	encodingtest.MarshalJSON(t, groupVersionMarshalJSONCases())
+	encodingtest.MarshalJSONErrors(t, []GroupVersion{
+		{"a/b", "v1"},
+		{"apps", "v1/beta"},
+	})
+}
 
-	for _, c := range cases {
-		input := GroupVersionHolder{c.input}
-		result, err := gojson.Marshal(&input)
-		if err != nil {
-			t.Errorf("Failed to marshal input '%v': %v", input, err)
-		}
-		if !reflect.DeepEqual(result, c.expect) {
-			t.Errorf("Failed to marshal input '%+v': expected: %s, got: %s", input, c.expect, result)
-		}
-	}
+func BenchmarkGroupVersionMarshalJSON(b *testing.B) {
+	encodingtest.BenchmarkMarshalJSON(b, groupVersionMarshalJSONCases())
 }

@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"k8s.io/apimachinery/pkg/internal/encodingtest"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/randfill"
@@ -411,6 +412,56 @@ func TestFieldsV1MarshalJSON(t *testing.T) {
 			}
 		})
 	}
+}
+
+func fieldsV1MarshalJSONCases() []encodingtest.MarshalCase[FieldsV1] {
+	//nolint:govet // Unkeyed fields are fine for test cases.
+	return []encodingtest.MarshalCase[FieldsV1]{
+		{FieldsV1{}, `null`},
+		{*NewFieldsV1(string([]byte{0xf6})), `null`}, // cbor null
+		{*NewFieldsV1(`null`), `null`},
+		{*NewFieldsV1(string([]byte{0x30})), `0`}, // valid CBOR and JSON
+		{*NewFieldsV1(`{"foo":"bar"}`), `{"foo":"bar"}`},
+		{*NewFieldsV1(`{"f:a":{".":{},"f:b":{}}}`), `{"f:a":{".":{},"f:b":{}}}`},
+		{*NewFieldsV1(`{}`), `{}`},
+		{*NewFieldsV1(" \t\r\n{\"foo\":\"bar\"}"), `{"foo":"bar"}`},
+		{*NewFieldsV1(string([]byte{0xd9, 0xd9, 0xf7, 0xa1, 0x43, 'f', 'o', 'o', 0x43, 'b', 'a', 'r'})), `{"foo":"bar"}`},
+		{*NewFieldsV1(string([]byte{0xd9, 0xd9, 0xf7, 0xa0})), `{}`},
+		{*NewFieldsV1(string([]byte{0xa2, 0x41, 'b', 0x01, 0x41, 'a', 0x02})), `{"a":2,"b":1}`}, // keys get sorted
+	}
+}
+
+func TestFieldsV1MarshalJSONVariants(t *testing.T) {
+	encodingtest.MarshalJSON(t, fieldsV1MarshalJSONCases())
+	encodingtest.MarshalJSONErrors(t, []FieldsV1{
+		*NewFieldsV1(`{{`),
+		*NewFieldsV1(string([]byte{0xa1})),
+	})
+}
+
+func BenchmarkFieldsV1MarshalJSON(b *testing.B) {
+	encodingtest.BenchmarkMarshalJSON(b, fieldsV1MarshalJSONCases())
+}
+
+func fieldsV1UnmarshalJSONCases() []encodingtest.UnmarshalCase[FieldsV1] {
+	//nolint:govet // Unkeyed fields are fine for test cases.
+	return []encodingtest.UnmarshalCase[FieldsV1]{
+		{`null`, FieldsV1{}},
+		{`{"foo":"bar"}`, *NewFieldsV1(`{"foo":"bar"}`)},
+		{`{}`, *NewFieldsV1(`{}`)},
+		{`{"f:a":{".":{},"f:b":{}}}`, *NewFieldsV1(`{"f:a":{".":{},"f:b":{}}}`)},
+		{" \n{\"foo\": \"bar\"} \t", *NewFieldsV1(`{"foo": "bar"}`)},
+		{`0`, *NewFieldsV1(`0`)},
+		{`"foo"`, *NewFieldsV1(`"foo"`)},
+	}
+}
+
+func TestFieldsV1UnmarshalJSONVariants(t *testing.T) {
+	encodingtest.UnmarshalJSON(t, fieldsV1UnmarshalJSONCases())
+}
+
+func BenchmarkFieldsV1UnmarshalJSON(b *testing.B) {
+	encodingtest.BenchmarkUnmarshalJSON(b, fieldsV1UnmarshalJSONCases())
 }
 
 func TestFieldsV1MarshalCBOR(t *testing.T) {

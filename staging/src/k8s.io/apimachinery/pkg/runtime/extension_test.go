@@ -22,6 +22,7 @@ import (
 	"reflect"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/internal/encodingtest"
 	"k8s.io/apimachinery/pkg/runtime"
 	runtimetesting "k8s.io/apimachinery/pkg/runtime/testing"
 
@@ -261,4 +262,64 @@ func TestRawExtensionUnmarshalCBOR(t *testing.T) {
 			}
 		})
 	}
+}
+
+func rawExtensionMarshalJSONCases() []encodingtest.MarshalCase[runtime.RawExtension] {
+	//nolint:govet // Unkeyed fields are fine for test cases.
+	return []encodingtest.MarshalCase[runtime.RawExtension]{
+		{runtime.RawExtension{}, `null`},
+		{runtime.RawExtension{Object: &runtimetesting.ExternalSimple{TestString: "foo"}}, `{"testString":"foo"}`},
+		{runtime.RawExtension{Raw: []byte(`{"foo":"bar"}`)}, `{"foo":"bar"}`},
+		{runtime.RawExtension{Raw: []byte(`[1,"a",null]`)}, `[1,"a",null]`},
+		{runtime.RawExtension{Raw: []byte(`"foo"`)}, `"foo"`},
+		{runtime.RawExtension{Raw: []byte(`-1.5e3`)}, `-1.5e3`},
+		{runtime.RawExtension{Raw: []byte(`true`)}, `true`},
+		{runtime.RawExtension{Raw: []byte(`null`)}, `null`},
+		{runtime.RawExtension{Raw: []byte(" \n{\"foo\" : \"bar\"}\t")}, `{"foo":"bar"}`},
+		// Raw takes precedence over Object.
+		{runtime.RawExtension{Raw: []byte(`"raw"`), Object: &runtimetesting.ExternalSimple{TestString: "foo"}}, `"raw"`},
+		{runtime.RawExtension{Raw: []byte{0xd9, 0xd9, 0xf7, 0x43, 'f', 'o', 'o'}}, `"foo"`},
+		{runtime.RawExtension{Raw: []byte{0xd9, 0xd9, 0xf7, 0xa1, 0x43, 'f', 'o', 'o', 0x43, 'b', 'a', 'r'}}, `{"foo":"bar"}`},
+		{runtime.RawExtension{Raw: []byte{0xd9, 0xd9, 0xf7, 0xa2, 0x41, 'b', 0x01, 0x41, 'a', 0x02}}, `{"a":2,"b":1}`}, // keys get sorted
+		{runtime.RawExtension{Raw: []byte{0xd9, 0xd9, 0xf7, 0xf6}}, `null`},
+		{runtime.RawExtension{Raw: []byte{'0'}}, `0`},                     // ambiguous, treated as JSON
+		{runtime.RawExtension{Raw: []byte{0xd9, 0xd9, 0xf7, '0'}}, `-17`}, // ambiguous, but self-described CBOR
+	}
+}
+
+func TestRawExtensionMarshalJSONVariants(t *testing.T) {
+	encodingtest.MarshalJSON(t, rawExtensionMarshalJSONCases())
+	encodingtest.MarshalJSONErrors(t, []runtime.RawExtension{
+		{Raw: []byte{0x43, 'f', 'o', 'o'}}, // CBOR without self-described tag
+		{Raw: []byte{0xff}},
+		{Raw: []byte{}},
+		{Raw: []byte(`{`)},
+		{Raw: []byte{0xd9, 0xd9, 0xf7, 0xa1}},
+	})
+}
+
+func BenchmarkRawExtensionMarshalJSON(b *testing.B) {
+	encodingtest.BenchmarkMarshalJSON(b, rawExtensionMarshalJSONCases())
+}
+
+func rawExtensionUnmarshalJSONCases() []encodingtest.UnmarshalCase[runtime.RawExtension] {
+	//nolint:govet // Unkeyed fields are fine for test cases.
+	return []encodingtest.UnmarshalCase[runtime.RawExtension]{
+		{`null`, runtime.RawExtension{}},
+		{`{"foo":"bar"}`, runtime.RawExtension{Raw: []byte(`{"foo":"bar"}`)}},
+		{`[1,"a",null]`, runtime.RawExtension{Raw: []byte(`[1,"a",null]`)}},
+		{`"foo"`, runtime.RawExtension{Raw: []byte(`"foo"`)}},
+		{`-1.5e3`, runtime.RawExtension{Raw: []byte(`-1.5e3`)}},
+		{`false`, runtime.RawExtension{Raw: []byte(`false`)}},
+		{`{"foo": "bar"}`, runtime.RawExtension{Raw: []byte(`{"foo": "bar"}`)}},
+		{" \n{\"foo\":\"bar\"}\t", runtime.RawExtension{Raw: []byte(`{"foo":"bar"}`)}},
+	}
+}
+
+func TestRawExtensionUnmarshalJSONVariants(t *testing.T) {
+	encodingtest.UnmarshalJSON(t, rawExtensionUnmarshalJSONCases())
+}
+
+func BenchmarkRawExtensionUnmarshalJSON(b *testing.B) {
+	encodingtest.BenchmarkUnmarshalJSON(b, rawExtensionUnmarshalJSONCases())
 }
