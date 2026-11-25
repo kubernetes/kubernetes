@@ -91,7 +91,6 @@ type fakeDRADriverGRPCServer struct {
 var gatherWithoutDurations = metricstestutil.GathererFunc(func() ([]*metricstestutil.MetricFamily, error) {
 	got, err := kubeletmetrics.GetGather().Gather()
 	for _, mf := range got {
-
 		for _, m := range mf.Metric {
 			if m.Histogram == nil {
 				continue
@@ -220,6 +219,7 @@ func (m *mockWatchResourcesClient) CloseSend() error             { return nil }
 func (m *mockWatchResourcesClient) RecvMsg(v interface{}) error {
 	return fmt.Errorf("RecvMsg not implemented")
 }
+
 func (m *mockWatchResourcesClient) SendMsg(v interface{}) error {
 	return fmt.Errorf("SendMsg not implemented")
 }
@@ -1196,8 +1196,10 @@ dra_operations_duration_seconds_count{is_error="false",operation_name="PrepareRe
 			kubeletmetrics.DRAOperationsDuration.Reset()
 			kubeletmetrics.DRAGRPCOperationsDuration.Reset()
 			defer func() {
-				require.NoError(t,
-					metricstestutil.GatherAndCompare(gatherWithoutDurations,
+				require.NoError(
+					t,
+					metricstestutil.GatherAndCompare(
+						gatherWithoutDurations,
 						strings.NewReader(test.expectedMetric),
 						kubeletmetrics.DRAOperationsDuration.FQName(),
 						kubeletmetrics.DRAGRPCOperationsDuration.FQName(),
@@ -1329,7 +1331,8 @@ func TestPrepareResourcesWithPreparedAndNewClaim(t *testing.T) {
 	err = manager.PrepareResources(tCtx, firstPod)
 	require.NoError(t, err)
 
-	assert.Equal(t, uint32(1),
+	assert.Equal(
+		t, uint32(1),
 		draServerInfo.server.prepareResourceCalls.Load(),
 		"first pod should trigger one prepare call",
 	)
@@ -1341,7 +1344,8 @@ func TestPrepareResourcesWithPreparedAndNewClaim(t *testing.T) {
 	require.NoError(t, err)
 
 	// second pod triggered exactly one prepare call (new claim only) + previous one call
-	assert.Equal(t, uint32(2),
+	assert.Equal(
+		t, uint32(2),
 		draServerInfo.server.prepareResourceCalls.Load(),
 		"second pod should trigger one prepare call for the new claim",
 	)
@@ -1519,8 +1523,10 @@ dra_operations_duration_seconds_count{is_error="false",operation_name="Unprepare
 			kubeletmetrics.DRAOperationsDuration.Reset()
 			kubeletmetrics.DRAGRPCOperationsDuration.Reset()
 			defer func() {
-				require.NoError(t,
-					metricstestutil.GatherAndCompare(gatherWithoutDurations,
+				require.NoError(
+					t,
+					metricstestutil.GatherAndCompare(
+						gatherWithoutDurations,
 						strings.NewReader(test.expectedMetric),
 						kubeletmetrics.DRAOperationsDuration.FQName(),
 						kubeletmetrics.DRAGRPCOperationsDuration.FQName(),
@@ -1787,7 +1793,6 @@ func TestParallelPrepareUnprepareResources(t *testing.T) {
 				t.Errorf("GoRoutine %d: pod: %s: UnprepareResources failed: %+v", goRoutineNum, pod.Name, err)
 				return
 			}
-
 		}(t, i)
 	}
 	wgStart.Done() // Start executing goroutines
@@ -2338,17 +2343,35 @@ func TestUpdateAllocatedResourcesStatus(t *testing.T) {
 						ClaimName: directClaimName,
 						PodUIDs:   sets.New("pod-direct-uid"),
 						DriverState: map[string]state.DriverState{
-							"test-driver": {Devices: []state.Device{{PoolName: "pool", DeviceName: "dev-a"}}},
+							"test-driver-b": {Devices: []state.Device{{PoolName: "pool", DeviceName: "dev-b"}}},
+							"test-driver-a": {Devices: []state.Device{{PoolName: "pool", DeviceName: "dev-a"}}},
 						},
 					},
 				},
 			},
-			initialStatus: &v1.PodStatus{ContainerStatuses: []v1.ContainerStatus{{Name: "container1"}}},
+			initialStatus: &v1.PodStatus{ContainerStatuses: []v1.ContainerStatus{{
+				Name: "container1",
+				AllocatedResourcesStatus: []v1.ResourceStatus{{
+					Name: "vendor.com/device",
+					Resources: []v1.ResourceHealth{
+						{ResourceID: "dev-b", Health: v1.ResourceHealthStatusHealthy},
+						{ResourceID: "dev-a", Health: v1.ResourceHealthStatusHealthy},
+					},
+				}},
+			}}},
 			expectedAllocatedResourcesStatus: []v1.ResourceStatus{
 				{
 					Name: "claim:claim1",
 					Resources: []v1.ResourceHealth{
-						{ResourceID: "test-driver/pool/dev-a", Health: v1.ResourceHealthStatusHealthy, Message: ptr.To("Device is operating normally")},
+						{ResourceID: "test-driver-a/pool/dev-a", Health: v1.ResourceHealthStatusHealthy, Message: new("Device is operating normally")},
+						{ResourceID: "test-driver-b/pool/dev-b", Health: v1.ResourceHealthStatusHealthy, Message: new("Device is operating normally")},
+					},
+				},
+				{
+					Name: "vendor.com/device",
+					Resources: []v1.ResourceHealth{
+						{ResourceID: "dev-a", Health: v1.ResourceHealthStatusHealthy},
+						{ResourceID: "dev-b", Health: v1.ResourceHealthStatusHealthy},
 					},
 				},
 			},
