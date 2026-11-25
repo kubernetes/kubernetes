@@ -18,8 +18,10 @@ package resource
 
 import (
 	"encoding/json"
+	"encoding/json/jsontext"
 	"errors"
 	"fmt"
+	"io"
 	"math"
 	"math/big"
 	"math/rand"
@@ -2033,6 +2035,11 @@ func TestQuantityMutate(t *testing.T) {
 		"MarshalJSON": {
 			calls: []func(q *Quantity, y Quantity){
 				func(q *Quantity, _ Quantity) { _, _ = q.MarshalJSON() },
+			},
+		},
+		"MarshalJSONTo": {
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, _ Quantity) { _ = q.MarshalJSONTo(jsontext.NewEncoder(io.Discard)) },
 			},
 		},
 		"MarshalTo": {
