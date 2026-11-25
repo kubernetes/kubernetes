@@ -19,6 +19,7 @@ package v1
 import (
 	"bytes"
 	"encoding/json"
+	"encoding/json/jsontext"
 	"errors"
 	"fmt"
 
@@ -295,6 +296,26 @@ func (f FieldsV1) MarshalJSON() ([]byte, error) {
 		return utiljson.Marshal(u)
 	}
 	return raw, nil
+}
+
+// MarshalJSONTo implements the [json/v2.MarshalerTo] interface.
+func (f FieldsV1) MarshalJSONTo(enc *jsontext.Encoder) error {
+	raw := f.GetRawBytes()
+	if len(raw) == 0 {
+		return enc.WriteToken(jsontext.Null)
+	}
+	if f.getContentType() == fieldsV1InvalidOrValidCBORObject {
+		var u map[string]interface{}
+		if err := cbor.Unmarshal(raw, &u); err != nil {
+			return fmt.Errorf("metav1.FieldsV1 cbor invalid: %w", err)
+		}
+		b, err := utiljson.Marshal(u)
+		if err != nil {
+			return err
+		}
+		return enc.WriteValue(b)
+	}
+	return enc.WriteValue(raw)
 }
 
 // UnmarshalJSON implements json.Unmarshaler
