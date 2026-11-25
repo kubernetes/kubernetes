@@ -17,6 +17,7 @@ limitations under the License.
 package resource
 
 import (
+	"bytes"
 	"encoding/json"
 	"encoding/json/jsontext"
 	"errors"
@@ -2180,6 +2181,15 @@ func TestQuantityMutate(t *testing.T) {
 				func(q *Quantity, y Quantity) {
 					b, _ := y.MarshalJSON()
 					_ = q.UnmarshalJSON(b)
+				},
+			},
+		},
+		"UnmarshalJSONFrom": {
+			mutatesQuantity: true,
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, y Quantity) {
+					b, _ := y.MarshalJSON()
+					_ = q.UnmarshalJSONFrom(jsontext.NewDecoder(bytes.NewReader(b)))
 				},
 			},
 		},

@@ -1189,6 +1189,19 @@ func (q *Quantity) UnmarshalJSON(value []byte) error {
 	return nil
 }
 
+// UnmarshalJSONFrom implements the [json/v2.UnmarshalerFrom] interface.
+// It accepts the same input as UnmarshalJSON, including unquoted numbers.
+//
+// This function is unsafe to call concurrently with method calls from other
+// goroutines (even to read-only methods).
+func (q *Quantity) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
+	value, err := dec.ReadValue()
+	if err != nil {
+		return err
+	}
+	return q.UnmarshalJSON(value)
+}
+
 // UnmarshalCBOR implements the cbor.Unmarshaler interface.
 //
 // This function is unsafe to call concurrently with method calls from other
