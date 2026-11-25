@@ -18,6 +18,7 @@ package v1
 
 import (
 	"encoding/json"
+	"encoding/json/jsontext"
 	"time"
 )
 
@@ -47,6 +48,11 @@ func (d *Duration) UnmarshalJSON(b []byte) error {
 // MarshalJSON implements the json.Marshaler interface.
 func (d Duration) MarshalJSON() ([]byte, error) {
 	return json.Marshal(d.Duration.String())
+}
+
+// MarshalJSONTo implements the [json/v2.MarshalerTo] interface.
+func (d Duration) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return enc.WriteToken(jsontext.String(d.Duration.String()))
 }
 
 // ToUnstructured implements the value.UnstructuredConverter interface.
