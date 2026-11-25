@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"iter"
 	"net/http"
 	"reflect"
 	"strconv"
@@ -886,7 +887,7 @@ func shouldCache(attr authorizer.Attributes) bool {
 	for _, requirement := range labelRequirements {
 		controlledAttrSize += int64(len(requirement.Key()))
 		controlledAttrSize += int64(len(requirement.Operator))
-		for _, value := range requirement.ValuesIter() {
+		for value := range requirement.ValuesIter() {
 			controlledAttrSize += int64(len(value))
 		}
 		if controlledAttrSize >= maxControlledAttrCacheSize {
