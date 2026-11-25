@@ -18,9 +18,9 @@ package labels
 
 import (
 	"fmt"
+	"iter"
 	"slices"
 	"sort"
-	"iter"
 	"strconv"
 	"strings"
 
