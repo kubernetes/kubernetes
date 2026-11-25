@@ -18,6 +18,7 @@ package v1
 
 import (
 	"encoding/json"
+	"encoding/json/jsontext"
 	"fmt"
 	"strings"
 
@@ -131,6 +132,15 @@ func (gv GroupVersion) MarshalJSON() ([]byte, error) {
 		return []byte{}, fmt.Errorf("illegal GroupVersion %v: contains more than one /", s)
 	}
 	return json.Marshal(s)
+}
+
+// MarshalJSONTo implements the [json/v2.MarshalerTo] interface.
+func (gv GroupVersion) MarshalJSONTo(enc *jsontext.Encoder) error {
+	s := gv.String()
+	if strings.Count(s, "/") > 1 {
+		return fmt.Errorf("illegal GroupVersion %v: contains more than one /", s)
+	}
+	return enc.WriteToken(jsontext.String(s))
 }
 
 func (gv *GroupVersion) unmarshal(value []byte) error {
