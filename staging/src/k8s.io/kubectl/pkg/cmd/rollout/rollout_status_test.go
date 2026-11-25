@@ -18,20 +18,27 @@ package rollout
 
 import (
 	"bytes"
+	"errors"
 	"io"
+	"net/http"
+	"strings"
+	"sync/atomic"
+	"testing"
+	"time"
+
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/cli-runtime/pkg/genericiooptions"
-	"k8s.io/client-go/rest/fake"
-	cgtesting "k8s.io/client-go/testing"
-	"k8s.io/kubectl/pkg/scheme"
-	"net/http"
-	"testing"
-
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/rest/fake"
+	cgtesting "k8s.io/client-go/testing"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
+	"k8s.io/kubectl/pkg/scheme"
 )
 
 var rolloutStatusGroupVersionEncoder = schema.GroupVersion{Group: "apps", Version: "v1"}
@@ -282,5 +289,51 @@ func TestRolloutStatusEmptyList(t *testing.T) {
 	expectedMsg := "No resources found in test namespace.\n"
 	if err.String() != expectedMsg {
 		t.Errorf("expected output: %s, but got: %s", expectedMsg, err.String())
+	}
+}
+
+func TestRolloutStatusTimeoutCancelsWatchRequest(t *testing.T) {
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	t.Cleanup(tf.Cleanup)
+	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
+	tf.Client = &fake.RESTClient{
+		GroupVersion:         rolloutStatusGroupVersionEncoder,
+		NegotiatedSerializer: scheme.Codecs.WithoutConversion(),
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			body := `{"apiVersion":"apps/v1","kind":"Deployment","metadata":{"name":"nginx","namespace":"test"}}`
+			return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: io.NopCloser(strings.NewReader(body))}, nil
+		}),
+	}
+
+	var watchCanceled atomic.Bool
+	client, err := dynamic.NewForConfigAndClient(&rest.Config{Host: "http://example.com"}, fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+		if req.URL.Query().Get("watch") != "true" {
+			body := `{"apiVersion":"apps/v1","kind":"DeploymentList","metadata":{"resourceVersion":"1"},"items":[]}`
+			return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: io.NopCloser(strings.NewReader(body))}, nil
+		}
+		select {
+		case <-req.Context().Done():
+			watchCanceled.Store(true)
+			return nil, req.Context().Err()
+		case <-time.After(3 * time.Second):
+			return nil, errors.New("watch request was not canceled")
+		}
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	streams, _, _, _ := genericiooptions.NewTestIOStreams()
+	o := NewRolloutStatusOptions(streams)
+	o.Timeout = time.Second
+	if err := o.Complete(tf, []string{"deployment/nginx"}); err != nil {
+		t.Fatal(err)
+	}
+	o.DynamicClient = client
+	if err := o.Run(); !wait.Interrupted(err) {
+		t.Fatalf("expected rollout status to time out, got %v", err)
+	}
+	if !watchCanceled.Load() {
+		t.Fatal("rollout status timed out without canceling the watch request")
 	}
 }
