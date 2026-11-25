@@ -129,12 +129,12 @@ func (s *ValidationTestBuilder) ValidateFixtures() {
 	for t := range s.s.validationFuncs {
 		var v any
 		// TODO: this should handle maps and slices
-		if t.Kind() == reflect.Ptr {
+		if t.Kind() == reflect.Pointer {
 			v = reflect.New(t.Elem()).Interface()
 		} else {
 			v = reflect.Indirect(reflect.New(t)).Interface()
 		}
-		if reflect.TypeOf(v).Kind() != reflect.Ptr {
+		if reflect.TypeOf(v).Kind() != reflect.Pointer {
 			v = &v
 		}
 		s.ValueFuzzed(v)
