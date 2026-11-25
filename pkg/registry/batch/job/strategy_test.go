@@ -945,7 +945,10 @@ func TestJobStrategy_ValidateUpdate(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MutablePodResourcesForSuspendedJobs, tc.enableMutablePodResourcesForSuspendedJobs)
+			if !tc.enableMutablePodResourcesForSuspendedJobs {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, utilversion.MustParse("1.35"))
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MutablePodResourcesForSuspendedJobs, false)
+			}
 			newJob := tc.job.DeepCopy()
 			tc.update(newJob)
 			errs := Strategy.ValidateUpdate(ctx, newJob, tc.job)
@@ -1270,8 +1273,10 @@ func TestJobStrategy_ValidateUpdate_MutablePodResources(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, utilversion.MustParse("1.35"))
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MutablePodResourcesForSuspendedJobs, tc.enableFeatureGate)
+			if !tc.enableFeatureGate {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, utilversion.MustParse("1.35"))
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MutablePodResourcesForSuspendedJobs, false)
+			}
 
 			newJob := tc.job.DeepCopy()
 			tc.update(newJob)
@@ -3853,8 +3858,10 @@ func TestJobStrategy_ValidateUpdate_MutableSchedulingDirectives(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, utilversion.MustParse("1.35"))
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MutableSchedulingDirectivesForSuspendedJobs, tc.enableFeatureGate)
+			if !tc.enableFeatureGate {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, utilversion.MustParse("1.35"))
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MutableSchedulingDirectivesForSuspendedJobs, false)
+			}
 
 			newJob := tc.job.DeepCopy()
 			tc.update(newJob)
