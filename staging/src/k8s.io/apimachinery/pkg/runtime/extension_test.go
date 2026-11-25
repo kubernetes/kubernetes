@@ -19,7 +19,9 @@ package runtime_test
 import (
 	"bytes"
 	"encoding/json"
+	"encoding/json/jsontext"
 	"reflect"
+	"strings"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/internal/encodingtest"
@@ -322,4 +324,39 @@ func TestRawExtensionUnmarshalJSONVariants(t *testing.T) {
 
 func BenchmarkRawExtensionUnmarshalJSON(b *testing.B) {
 	encodingtest.BenchmarkUnmarshalJSON(b, rawExtensionUnmarshalJSONCases())
+}
+
+// UnmarshalJSONFrom shares the receiver semantics of UnmarshalJSON.
+func TestRawExtensionUnmarshalJSONFromReceiver(t *testing.T) {
+	decoder := func(s string) *jsontext.Decoder { return jsontext.NewDecoder(strings.NewReader(s)) }
+
+	t.Run("nil-receiver", func(t *testing.T) {
+		var re *runtime.RawExtension
+		if err := re.UnmarshalJSONFrom(decoder(`{}`)); err == nil {
+			t.Error("expected error")
+		}
+	})
+	t.Run("null-does-not-modify-receiver", func(t *testing.T) {
+		re := &runtime.RawExtension{Raw: []byte(`unmodified`)}
+		if err := re.UnmarshalJSONFrom(decoder(`null`)); err != nil {
+			t.Fatal(err)
+		}
+		if got := string(re.Raw); got != `unmodified` {
+			t.Errorf("expected receiver to be unmodified, got %q", got)
+		}
+	})
+	t.Run("overwrites-and-copies-input", func(t *testing.T) {
+		re := &runtime.RawExtension{Raw: []byte(`{"old":{}}`)}
+		dec := decoder(`{"a":{}} {"b":{}}`)
+		if err := re.UnmarshalJSONFrom(dec); err != nil {
+			t.Fatal(err)
+		}
+		// Reading the next value must not clobber the stored bytes.
+		if _, err := dec.ReadValue(); err != nil {
+			t.Fatal(err)
+		}
+		if got := string(re.Raw); got != `{"a":{}}` {
+			t.Errorf("unexpected value %q", got)
+		}
+	})
 }

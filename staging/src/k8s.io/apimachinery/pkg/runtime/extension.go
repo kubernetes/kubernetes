@@ -73,6 +73,22 @@ func (re *RawExtension) UnmarshalJSON(in []byte) error {
 	return nil
 }
 
+// UnmarshalJSONFrom implements the [json/v2.UnmarshalerFrom] interface.
+func (re *RawExtension) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
+	if re == nil {
+		return errors.New("runtime.RawExtension: UnmarshalJSONFrom on nil pointer")
+	}
+	val, err := dec.ReadValue()
+	if err != nil {
+		return err
+	}
+	if val.Kind() == jsontext.KindNull {
+		return nil
+	}
+	re.Raw = append(re.Raw[0:0], val...)
+	return nil
+}
+
 var (
 	cborNull          = []byte{0xf6}
 	cborSelfDescribed = []byte{0xd9, 0xd9, 0xf7}
