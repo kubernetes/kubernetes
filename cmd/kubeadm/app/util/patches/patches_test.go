@@ -234,8 +234,8 @@ func TestGetPatchSetsForPath(t *testing.T) {
 					patches:    []string{patchData},
 				},
 			},
-			expectedPatchFiles:   []string{"etcd.yaml", "kube-scheduler.json"},
-			expectedIgnoredFiles: []string{"foo"},
+			expectedPatchFiles:   []string{filepath.Join("a", "etcd.yaml"), "kube-scheduler.json"},
+			expectedIgnoredFiles: []string{filepath.Join("a", "foo")},
 		},
 		{
 			name:                 "valid: empty files are ignored",

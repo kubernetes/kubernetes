@@ -331,6 +331,10 @@ func getPatchSetsFromPath(targetPath string, knownTargets []string, output io.Wr
 		}
 
 		baseName := info.Name()
+		relPath, err := filepath.Rel(targetPath, path)
+		if err != nil {
+			return err
+		}
 
 		// Parse the filename and retrieve the target and patch type
 		targetName, patchType, warn, err := parseFilename(baseName, knownTargets)
@@ -338,8 +342,8 @@ func getPatchSetsFromPath(targetPath string, knownTargets []string, output io.Wr
 			return err
 		}
 		if warn != nil {
-			fmt.Fprintf(output, "[patches] Ignoring file %q: %v\n", baseName, warn)
-			ignoredFiles = append(ignoredFiles, baseName)
+			_, _ = fmt.Fprintf(output, "[patches] Ignoring file %q: %v\n", relPath, warn)
+			ignoredFiles = append(ignoredFiles, relPath)
 			return nil
 		}
 
@@ -350,8 +354,8 @@ func getPatchSetsFromPath(targetPath string, knownTargets []string, output io.Wr
 		}
 
 		if len(data) == 0 {
-			fmt.Fprintf(output, "[patches] Ignoring empty file: %q\n", baseName)
-			ignoredFiles = append(ignoredFiles, baseName)
+			_, _ = fmt.Fprintf(output, "[patches] Ignoring empty file: %q\n", relPath)
+			ignoredFiles = append(ignoredFiles, relPath)
 			return nil
 		}
 
@@ -361,7 +365,7 @@ func getPatchSetsFromPath(targetPath string, knownTargets []string, output io.Wr
 			return err
 		}
 
-		patchFiles = append(patchFiles, baseName)
+		patchFiles = append(patchFiles, relPath)
 		patchSets = append(patchSets, patchSet)
 		return nil
 	})
