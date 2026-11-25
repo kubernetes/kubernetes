@@ -260,7 +260,7 @@ func (o *AutoscaleOptions) Run() error {
 				"Falling back to try the autoscaling/v1 HorizontalPodAutoscaler", err)
 			// check if the HPA can be created using v1 API.
 			if !o.canCreateHPAV1() {
-				return fmt.Errorf("failed to create autoscaling/v2 HPA and the configuration is incompatible with autoscaling/v1: %w", err)
+				return fmt.Errorf("failed to create autoscaling/v2 HPA and the configuration is incompatible with autoscaling/v1")
 			}
 			hpaV1 := o.createHorizontalPodAutoscalerV1(info.Name, mapping)
 			if err := o.handleHPA(hpaV1); err != nil {
