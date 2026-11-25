@@ -184,8 +184,14 @@ func testNvidiaCLIPod() *v1.Pod {
 		Spec: v1.PodSpec{
 			Containers: []v1.Container{
 				{
-					Name:  "nvidia-smi",
-					Image: "nvidia/cuda:12.5.0-devel-ubuntu22.04",
+					Name: "nvidia-smi",
+					// The devel image is ~3.9GB with a ~2.5GB layer. Unpacking it can
+					// outlast containerd's image_pull_progress_timeout, which then
+					// cancels the pull and throws away the downloaded layers
+					// (containerd/containerd#13909). cuda-demo-suite binaries link
+					// cudart statically and libcuda comes from the driver, so the base
+					// image (which has the CUDA apt repo) is enough.
+					Image: "nvidia/cuda:12.5.0-base-ubuntu22.04",
 					Command: []string{
 						"bash",
 						"-c",
