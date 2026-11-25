@@ -191,6 +191,11 @@ type informationForClaim struct {
 	// May be set by PreFilter if this allocation was made by a previous Pod's
 	// Reserve but not yet published in PreBind.
 	allocation *resourceapi.AllocationResult
+
+	// Set while this pod holds a share of the pending allocation, from Reserve until
+	// bindClaim stored the claim or Unreserve, so that each pod releases exactly the
+	// share it took, once.
+	pendingAllocationHeld bool
 }
 
 // nodeAllocation holds the allocation results and extended resource claim per node.
@@ -1747,6 +1752,12 @@ func (pl *DynamicResources) Reserve(ctx context.Context, cs fwk.CycleState, pod 
 			if err != nil {
 				return statusError(logger, fmt.Errorf("internal error, couldn't signal allocation for claim %s: %w", claim.Name, err))
 			}
+			// To check if a share of pending allocation was added, we check if the
+			// pending allocation exists here: it does unless the signal was skipped
+			// for a claim already allocated in the assume cache.
+			// A signal for the same claim by another pod between the two calls can
+			// still make this a false positive.
+			state.informationsForClaim[index].pendingAllocationHeld = pl.draManager.ResourceClaims().GetPendingAllocation(claim.UID) != nil
 			logger.V(5).Info("Reserved resource in allocation result", "claim", klog.KObj(claim), "uid", claim.UID, "resourceVersion", claim.ResourceVersion, "allocation", klog.Format(allocation))
 			allocIndex++
 
@@ -1793,7 +1804,9 @@ func (pl *DynamicResources) Unreserve(ctx context.Context, cs fwk.CycleState, po
 		// informer events whose ResourceVersion is not newer than the assumed
 		// claim, so restoring could drop an allocation stored by PreBind of
 		// this or another Pod sharing the claim and make its devices look free.
-		if deleted := pl.draManager.ResourceClaims().MaybeRemoveClaimPendingAllocation(claim.UID, false); deleted {
+		//
+		// Only the share this pod took and still holds may be released.
+		if pl.releasePendingAllocation(state, index, claim.UID) {
 			logger.V(5).Info("Released resource in allocation result", "claim", klog.KObj(claim), "uid", claim.UID, "resourceVersion", claim.ResourceVersion, "allocation", klog.Format(claim.Status.Allocation))
 			// If this is a victim claim, preemptionTracker keeps it because
 			// PreBind may have stored the allocation although its request
@@ -1880,6 +1893,17 @@ func (pl *DynamicResources) deallocateUnreservedClaim(ctx context.Context, pod *
 		logger.V(5).Info("Claim not stored in assume cache", "err", err, "resourceclaim", klog.KObj(updated))
 	}
 	return true
+}
+
+// releasePendingAllocation releases the share of the pending allocation which the pod holds and returns whether that removed the pending allocation.
+func (pl *DynamicResources) releasePendingAllocation(state *stateData, index int, claimUID types.UID) bool {
+	info := &state.informationsForClaim[index]
+	if !info.pendingAllocationHeld {
+		return false
+	}
+	info.pendingAllocationHeld = false
+
+	return pl.draManager.ResourceClaims().MaybeRemoveClaimPendingAllocation(claimUID, false)
 }
 
 // PreBind gets called in a separate goroutine after it has been determined
@@ -2177,7 +2201,7 @@ func (pl *DynamicResources) bindClaim(ctx context.Context, state *stateData, ind
 	prebindSuccessCleanup := func() {
 		if allocation != nil {
 			for _, claimUID := range claimUIDs {
-				if deleted := pl.draManager.ResourceClaims().MaybeRemoveClaimPendingAllocation(claimUID, true); deleted {
+				if pl.releasePendingAllocation(state, index, claimUID) {
 					// Since PodGroup cycle state is not set during asynchronous
 					// binding, pendingAllocations does not need to be updated.
 					// New PodGroup scheduling cycles will start
