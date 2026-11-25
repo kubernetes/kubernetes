@@ -19,7 +19,9 @@ package v1
 import (
 	"encoding/json"
 	"encoding/json/jsontext"
+	jsonv2 "encoding/json/v2"
 	"fmt"
+	"reflect"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -159,6 +161,31 @@ func (gv *GroupVersion) unmarshal(value []byte) error {
 // UnmarshalJSON implements the json.Unmarshaller interface.
 func (gv *GroupVersion) UnmarshalJSON(value []byte) error {
 	return gv.unmarshal(value)
+}
+
+// UnmarshalJSONFrom implements the [json/v2.UnmarshalerFrom] interface.
+func (gv *GroupVersion) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
+	val, err := dec.ReadValue()
+	if err != nil {
+		return err
+	}
+	var s string
+	switch val.Kind() {
+	case jsontext.KindNull:
+		// Same as UnmarshalJSON: null is handled like an empty string.
+	case jsontext.KindString:
+		if err := jsonv2.Unmarshal(val, &s); err != nil {
+			return err
+		}
+	default:
+		return &json.UnmarshalTypeError{Value: val.Kind().String(), Type: reflect.TypeFor[GroupVersion]()}
+	}
+	parsed, err := schema.ParseGroupVersion(s)
+	if err != nil {
+		return err
+	}
+	gv.Group, gv.Version = parsed.Group, parsed.Version
+	return nil
 }
 
 // UnmarshalTEXT implements the Ugorji's encoding.TextUnmarshaler interface.
