@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	goruntime "runtime"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -60,13 +61,14 @@ type mockPodKiller struct {
 	gracePeriodOverride *int64
 }
 
-// killPodNow records the pod that was killed
-func (m *mockPodKiller) killPodNow(pod *v1.Pod, evict bool, gracePeriodOverride *int64, statusFn func(*v1.PodStatus)) error {
+func (m *mockPodKiller) startPodEviction(pod *v1.Pod, gracePeriodOverride int64, statusFn func(*v1.PodStatus), _ <-chan struct{}) (<-chan struct{}, time.Duration) {
 	m.pod = pod
 	m.statusFn = statusFn
-	m.evict = evict
-	m.gracePeriodOverride = gracePeriodOverride
-	return nil
+	m.evict = true
+	m.gracePeriodOverride = &gracePeriodOverride
+	done := make(chan struct{})
+	close(done)
+	return done, 10 * time.Second
 }
 
 // mockDiskInfoProvider is used to simulate testing.
@@ -282,6 +284,99 @@ type podToMake struct {
 	perLocalVolumeInodesUsed string
 }
 
+type diskPressureSummary struct {
+	fakeSummaryProvider
+	clock     *testingclock.FakeClock
+	available atomic.Uint64
+	samples   chan uint64
+}
+
+func (s *diskPressureSummary) Get(_ context.Context, _ bool) (*statsapi.Summary, error) {
+	s.clock.Step(time.Second)
+	available := s.available.Load()
+	select {
+	case s.samples <- available:
+	default:
+	}
+	return &statsapi.Summary{Node: statsapi.NodeStats{Fs: &statsapi.FsStats{
+		Time:           metav1.NewTime(s.clock.Now()),
+		AvailableBytes: &available,
+		CapacityBytes:  ptr.To(uint64(100)),
+	}}}, nil
+}
+
+func TestHardPressureShortensInFlightSoftEviction(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	ctx, cancel := context.WithCancel(tCtx)
+	defer cancel()
+	clock := testingclock.NewFakeClock(time.Now())
+	summary := &diskPressureSummary{clock: clock, samples: make(chan uint64, 16)}
+	summary.available.Store(15)
+	config := Config{
+		MaxPodGracePeriodSeconds: 60,
+		Thresholds: []evictionapi.Threshold{
+			{Signal: evictionapi.SignalNodeFsAvailable, Operator: evictionapi.OpLessThan, Value: evictionapi.ThresholdValue{Quantity: quantityMustParse("20")}, GracePeriod: time.Second},
+			{Signal: evictionapi.SignalNodeFsAvailable, Operator: evictionapi.OpLessThan, Value: evictionapi.ThresholdValue{Quantity: quantityMustParse("10")}},
+		},
+	}
+	type request struct {
+		pod          types.UID
+		grace        int64
+		updateStatus bool
+	}
+	requests := make(chan request, 4)
+	terminated := make(chan struct{})
+	startPodEviction := func(pod *v1.Pod, grace int64, statusFn func(*v1.PodStatus), pending <-chan struct{}) (<-chan struct{}, time.Duration) {
+		select {
+		case requests <- request{pod.UID, grace, statusFn != nil}:
+		case <-ctx.Done():
+		}
+		if pending != nil {
+			return pending, 10 * time.Second
+		}
+		return terminated, 90 * time.Second
+	}
+	pod := newPod("soft-eviction", lowPriority, nil, nil)
+	other := newPod("other", highPriority, nil, nil)
+	diskGC := &mockDiskGC{}
+	manager, _ := NewManager(summary, config, startPodEviction, diskGC, diskGC, record.NewFakeRecorder(100), &v1.ObjectReference{}, clock, false)
+	manager.Start(ctx, &mockDiskInfoProvider{}, func() []*v1.Pod { return []*v1.Pod{pod, other} }, func(*v1.Pod) bool { return false }, 10*time.Millisecond)
+
+	select {
+	case first := <-requests:
+		assert.Equal(t, request{pod.UID, 60, true}, first)
+	case <-time.After(time.Second):
+		t.Fatal("soft threshold did not start an eviction")
+	}
+	assertObservesWithoutEvicting := func(available uint64) {
+		t.Helper()
+		summary.available.Store(available)
+		deadline := time.After(time.Second)
+		for samples := 0; samples < 3; {
+			select {
+			case sample := <-summary.samples:
+				if sample == available {
+					samples++
+				}
+			case unexpected := <-requests:
+				t.Fatalf("unexpected eviction request while awaiting the same pod: %+v", unexpected)
+			case <-deadline:
+				t.Fatalf("monitoring stopped while waiting for pod termination")
+			}
+		}
+	}
+	assertObservesWithoutEvicting(14)
+
+	summary.available.Store(5)
+	select {
+	case second := <-requests:
+		assert.Equal(t, request{pod.UID, immediateEvictionGracePeriodSeconds, false}, second)
+	case <-time.After(time.Second):
+		t.Fatal("hard threshold did not shorten the in-flight soft eviction")
+	}
+	assertObservesWithoutEvicting(4)
+}
+
 func TestMemoryPressure_VerifyPodStatus(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	podMaker := makePodWithMemoryStats
@@ -322,7 +417,7 @@ func TestMemoryPressure_VerifyPodStatus(t *testing.T) {
 	summaryProvider := &fakeSummaryProvider{result: summaryStatsMaker("1500Mi", podStats)}
 	manager := &managerImpl{
 		clock:                        fakeClock,
-		killPodFunc:                  podKiller.killPodNow,
+		startPodEviction:             podKiller.startPodEviction,
 		imageGC:                      diskGC,
 		containerGC:                  diskGC,
 		config:                       config,
@@ -423,7 +518,7 @@ func TestPIDPressure_VerifyPodStatus(t *testing.T) {
 		summaryProvider := &fakeSummaryProvider{result: summaryStatsMaker("1500", "1000", podStats)}
 		manager := &managerImpl{
 			clock:                        fakeClock,
-			killPodFunc:                  podKiller.killPodNow,
+			startPodEviction:             podKiller.startPodEviction,
 			imageGC:                      diskGC,
 			containerGC:                  diskGC,
 			config:                       config,
@@ -600,7 +695,7 @@ func TestDiskPressureNodeFs_VerifyPodStatus(t *testing.T) {
 		summaryProvider := &fakeSummaryProvider{result: summaryStatsMaker(diskStat)}
 		manager := &managerImpl{
 			clock:                        fakeClock,
-			killPodFunc:                  podKiller.killPodNow,
+			startPodEviction:             podKiller.startPodEviction,
 			imageGC:                      diskGC,
 			containerGC:                  diskGC,
 			config:                       config,
@@ -701,7 +796,7 @@ func TestMemoryPressure(t *testing.T) {
 	summaryProvider := &fakeSummaryProvider{result: summaryStatsMaker("2Gi", podStats)}
 	manager := &managerImpl{
 		clock:                        fakeClock,
-		killPodFunc:                  podKiller.killPodNow,
+		startPodEviction:             podKiller.startPodEviction,
 		imageGC:                      diskGC,
 		containerGC:                  diskGC,
 		config:                       config,
@@ -973,7 +1068,7 @@ func TestPIDPressure(t *testing.T) {
 			summaryProvider := &fakeSummaryProvider{result: summaryStatsMaker(tc.totalPID, tc.noPressurePIDUsage, podStats)}
 			manager := &managerImpl{
 				clock:                        fakeClock,
-				killPodFunc:                  podKiller.killPodNow,
+				startPodEviction:             podKiller.startPodEviction,
 				imageGC:                      diskGC,
 				containerGC:                  diskGC,
 				config:                       config,
@@ -1207,7 +1302,7 @@ func TestPIDPressureUnaffectedByPerPodPIDLimits(t *testing.T) {
 	summaryProvider := &fakeSummaryProvider{result: makePIDStats("2000", "1500", podStats)}
 	manager := &managerImpl{
 		clock:                        fakeClock,
-		killPodFunc:                  podKiller.killPodNow,
+		startPodEviction:             podKiller.startPodEviction,
 		imageGC:                      diskGC,
 		containerGC:                  diskGC,
 		config:                       config,
@@ -1453,7 +1548,7 @@ func TestDiskPressureNodeFs(t *testing.T) {
 			summaryProvider := &fakeSummaryProvider{result: summaryStatsMaker(diskStatStart)}
 			manager := &managerImpl{
 				clock:                        fakeClock,
-				killPodFunc:                  podKiller.killPodNow,
+				startPodEviction:             podKiller.startPodEviction,
 				imageGC:                      diskGC,
 				containerGC:                  diskGC,
 				config:                       config,
@@ -1691,7 +1786,7 @@ func TestMinReclaim(t *testing.T) {
 	summaryProvider := &fakeSummaryProvider{result: summaryStatsMaker("2Gi", podStats)}
 	manager := &managerImpl{
 		clock:                        fakeClock,
-		killPodFunc:                  podKiller.killPodNow,
+		startPodEviction:             podKiller.startPodEviction,
 		imageGC:                      diskGC,
 		containerGC:                  diskGC,
 		config:                       config,
@@ -1977,7 +2072,7 @@ func TestNodeReclaimFuncs(t *testing.T) {
 			diskGC := &mockDiskGC{fakeSummaryProvider: summaryProvider, err: nil}
 			manager := &managerImpl{
 				clock:                        fakeClock,
-				killPodFunc:                  podKiller.killPodNow,
+				startPodEviction:             podKiller.startPodEviction,
 				imageGC:                      diskGC,
 				containerGC:                  diskGC,
 				config:                       config,
@@ -2435,7 +2530,7 @@ func TestInodePressureFsInodes(t *testing.T) {
 			summaryProvider := &fakeSummaryProvider{result: startingStatsModified}
 			manager := &managerImpl{
 				clock:                        fakeClock,
-				killPodFunc:                  podKiller.killPodNow,
+				startPodEviction:             podKiller.startPodEviction,
 				imageGC:                      diskGC,
 				containerGC:                  diskGC,
 				config:                       config,
@@ -2670,7 +2765,7 @@ func TestStaticCriticalPodsAreNotEvicted(t *testing.T) {
 	summaryProvider := &fakeSummaryProvider{result: summaryStatsMaker("2Gi", podStats)}
 	manager := &managerImpl{
 		clock:                        fakeClock,
-		killPodFunc:                  podKiller.killPodNow,
+		startPodEviction:             podKiller.startPodEviction,
 		imageGC:                      diskGC,
 		containerGC:                  diskGC,
 		config:                       config,
@@ -2832,7 +2927,7 @@ func TestStorageLimitEvictions(t *testing.T) {
 			summaryProvider := &fakeSummaryProvider{result: summaryStatsMaker(diskStat)}
 			manager := &managerImpl{
 				clock:                         fakeClock,
-				killPodFunc:                   podKiller.killPodNow,
+				startPodEviction:              podKiller.startPodEviction,
 				imageGC:                       diskGC,
 				containerGC:                   diskGC,
 				config:                        config,
@@ -2967,8 +3062,8 @@ func TestEmptyDirLimitEviction(t *testing.T) {
 
 			podKiller := &mockPodKiller{}
 			m := &managerImpl{
-				killPodFunc: podKiller.killPodNow,
-				recorder:    &record.FakeRecorder{},
+				startPodEviction: podKiller.startPodEviction,
+				recorder:         &record.FakeRecorder{},
 			}
 
 			evicted := m.emptyDirLimitEviction(logger, podStats, pod)
@@ -3030,7 +3125,7 @@ func TestAllocatableMemoryPressure(t *testing.T) {
 	summaryProvider := &fakeSummaryProvider{result: summaryStatsMaker("4Gi", podStats)}
 	manager := &managerImpl{
 		clock:                        fakeClock,
-		killPodFunc:                  podKiller.killPodNow,
+		startPodEviction:             podKiller.startPodEviction,
 		imageGC:                      diskGC,
 		containerGC:                  diskGC,
 		config:                       config,
@@ -3196,7 +3291,7 @@ func TestUpdateMemcgThreshold(t *testing.T) {
 
 	manager := &managerImpl{
 		clock:                        fakeClock,
-		killPodFunc:                  podKiller.killPodNow,
+		startPodEviction:             podKiller.startPodEviction,
 		imageGC:                      diskGC,
 		containerGC:                  diskGC,
 		config:                       config,
@@ -3293,7 +3388,7 @@ func TestManagerWithLocalStorageCapacityIsolationOpen(t *testing.T) {
 
 	mgr := &managerImpl{
 		clock:                         fakeClock,
-		killPodFunc:                   podKiller.killPodNow,
+		startPodEviction:              podKiller.startPodEviction,
 		imageGC:                       diskGC,
 		containerGC:                   diskGC,
 		config:                        config,
@@ -3371,7 +3466,7 @@ func TestContainerEphemeralStorageLimitEvictionForRestartableInitContainers(t *t
 
 	mgr := &managerImpl{
 		clock:                         fakeClock,
-		killPodFunc:                   podKiller.killPodNow,
+		startPodEviction:              podKiller.startPodEviction,
 		imageGC:                       &mockDiskGC{err: nil},
 		containerGC:                   &mockDiskGC{err: nil},
 		config:                        config,
@@ -3611,7 +3706,7 @@ func TestLocalStorageCapacityIsolationWithDRA(t *testing.T) {
 			podKiller := &mockPodKiller{}
 			mgr := &managerImpl{
 				clock:                         testingclock.NewFakeClock(time.Now()),
-				killPodFunc:                   podKiller.killPodNow,
+				startPodEviction:              podKiller.startPodEviction,
 				imageGC:                       &mockDiskGC{err: nil},
 				containerGC:                   &mockDiskGC{err: nil},
 				config:                        Config{MaxPodGracePeriodSeconds: 5, PressureTransitionPeriod: time.Minute * 5},

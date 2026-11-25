@@ -64,6 +64,9 @@ type KillPodOptions struct {
 	PodStatusFunc PodStatusFunc
 	// PodTerminationGracePeriodSecondsOverride is optional override to use if a pod is being killed as part of kill operation.
 	PodTerminationGracePeriodSecondsOverride *int64
+	// onlyWhilePending prevents a follow-up from starting a new termination
+	// if the original eviction has already completed.
+	onlyWhilePending <-chan struct{}
 }
 
 func (k *KillPodOptions) MarshalJSON() ([]byte, error) {
@@ -818,6 +821,16 @@ func (p *podWorkers) UpdatePod(ctx context.Context, options UpdatePodOptions) {
 	var firstTime bool
 	now := p.clock.Now()
 	status, ok := p.podSyncStatuses[uid]
+	if kill := options.KillPodOptions; kill != nil && kill.onlyWhilePending != nil {
+		if !ok || !status.IsTerminationRequested() || status.IsTerminated() {
+			return
+		}
+		select {
+		case <-kill.onlyWhilePending:
+			return
+		default:
+		}
+	}
 	if !ok {
 		updateLogger.V(4).Info("Pod is being synced for the first time")
 		firstTime = true
@@ -1740,47 +1753,54 @@ func (p *podWorkers) removeTerminatedWorker(logger klog.Logger, uid types.UID, s
 // It is intended to be injected into other modules that need to kill a pod.
 func killPodNow(ctx context.Context, podWorkers PodWorkers, recorder record.EventRecorder) eviction.KillPodFunc {
 	return func(pod *v1.Pod, isEvicted bool, gracePeriodOverride *int64, statusFn func(*v1.PodStatus)) error {
-		// determine the grace period to use when killing the pod
-		gracePeriod := int64(0)
-		if gracePeriodOverride != nil {
-			gracePeriod = *gracePeriodOverride
-		} else if pod.Spec.TerminationGracePeriodSeconds != nil {
-			gracePeriod = *pod.Spec.TerminationGracePeriodSeconds
-		}
-
-		// we timeout and return an error if we don't get a callback within a reasonable time.
-		// the default timeout is relative to the grace period (we settle on 10s to wait for kubelet->runtime traffic to complete in sigkill)
-		timeout := gracePeriod + (gracePeriod / 2)
-		minTimeout := int64(10)
-		if timeout < minTimeout {
-			timeout = minTimeout
-		}
-		timeoutDuration := time.Duration(timeout) * time.Second
-
-		// open a channel we block against until we get a result
-		ch := make(chan struct{}, 1)
-		podWorkers.UpdatePod(
-			ctx,
-			UpdatePodOptions{
-				Pod:        pod,
-				UpdateType: kubetypes.SyncPodKill,
-				KillPodOptions: &KillPodOptions{
-					CompletedCh:                              ch,
-					Evict:                                    isEvicted,
-					PodStatusFunc:                            statusFn,
-					PodTerminationGracePeriodSecondsOverride: gracePeriodOverride,
-				},
-			})
-
-		// wait for either a response, or a timeout
+		done, timeout := requestPodTermination(ctx, podWorkers, pod, KillPodOptions{
+			Evict:                                    isEvicted,
+			PodStatusFunc:                            statusFn,
+			PodTerminationGracePeriodSecondsOverride: gracePeriodOverride,
+		})
 		select {
-		case <-ch:
+		case <-done:
 			return nil
-		case <-time.After(timeoutDuration):
+		case <-time.After(timeout):
 			recorder.Eventf(pod, v1.EventTypeWarning, events.ExceededGracePeriod, "Container runtime did not kill the pod within specified grace period.")
 			return fmt.Errorf("timeout waiting to kill pod")
 		}
 	}
+}
+
+func startPodEviction(ctx context.Context, podWorkers PodWorkers) eviction.StartPodEvictionFunc {
+	return func(pod *v1.Pod, gracePeriod int64, statusFn func(*v1.PodStatus), pending <-chan struct{}) (<-chan struct{}, time.Duration) {
+		return requestPodTermination(ctx, podWorkers, pod, KillPodOptions{
+			Evict:                                    true,
+			PodStatusFunc:                            statusFn,
+			PodTerminationGracePeriodSecondsOverride: &gracePeriod,
+			onlyWhilePending:                         pending,
+		})
+	}
+}
+
+func requestPodTermination(ctx context.Context, podWorkers PodWorkers, pod *v1.Pod, options KillPodOptions) (<-chan struct{}, time.Duration) {
+	gracePeriod := int64(0)
+	if options.PodTerminationGracePeriodSecondsOverride != nil {
+		gracePeriod = *options.PodTerminationGracePeriodSecondsOverride
+	} else if pod.Spec.TerminationGracePeriodSeconds != nil {
+		gracePeriod = *pod.Spec.TerminationGracePeriodSeconds
+	}
+	// Allow at least 10 seconds for communication with the runtime.
+	timeout := time.Duration(max(10, gracePeriod+gracePeriod/2)) * time.Second
+
+	done := options.onlyWhilePending
+	if done == nil {
+		completed := make(chan struct{}, 1)
+		options.CompletedCh = completed
+		done = completed
+	}
+	podWorkers.UpdatePod(ctx, UpdatePodOptions{
+		Pod:            pod,
+		UpdateType:     kubetypes.SyncPodKill,
+		KillPodOptions: &options,
+	})
+	return done, timeout
 }
 
 // cleanupPodUpdates closes the podUpdates channel and removes it from

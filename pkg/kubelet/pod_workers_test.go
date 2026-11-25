@@ -2263,6 +2263,58 @@ func TestKillPodNowFunc(t *testing.T) {
 	}
 }
 
+func TestStartPodEvictionShortensGracePeriod(t *testing.T) {
+	logger, tCtx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithTimeout(tCtx, 5*time.Second)
+	defer cancel()
+	podWorkers, _, _ := createPodWorkers(logger)
+	pod := newNamedPod("test", "ns", "test", false)
+
+	type termination struct {
+		gracePeriod int64
+		reason      string
+	}
+	attempts := make(chan termination, 2)
+	syncer := podWorkers.podSyncer.(*podSyncerFuncs)
+	syncer.syncTerminatingPod = func(ctx context.Context, _ *v1.Pod, _ *kubecontainer.PodStatus, gracePeriod *int64, statusFn func(*v1.PodStatus)) error {
+		var status v1.PodStatus
+		if statusFn != nil {
+			statusFn(&status)
+		}
+		attempts <- termination{*gracePeriod, status.Reason}
+		if *gracePeriod != 1 {
+			<-ctx.Done()
+			return ctx.Err()
+		}
+		return nil
+	}
+	wantAttempt := func(wantGrace int64) {
+		t.Helper()
+		select {
+		case actual := <-attempts:
+			require.Equal(t, termination{wantGrace, "Evicted"}, actual)
+		case <-ctx.Done():
+			t.Fatalf("pod worker did not start terminating with grace period %d", wantGrace)
+		}
+	}
+
+	evictPod := startPodEviction(ctx, podWorkers)
+	done, _ := evictPod(pod, 60, func(status *v1.PodStatus) { status.Reason = "Evicted" }, nil)
+	wantAttempt(60)
+	evictPod(pod, 1, nil, done)
+	wantAttempt(1)
+	select {
+	case <-done:
+	case <-ctx.Done():
+		t.Fatal("original Pod eviction request did not receive completion")
+	}
+	drainAllWorkers(podWorkers)
+	require.Empty(t, podWorkers.SyncKnownPods(logger, nil))
+
+	evictPod(pod, 1, nil, done)
+	require.False(t, podWorkers.IsPodTerminationRequested(pod.UID), "a stale escalation must not recreate the pod worker")
+}
+
 func Test_allowPodStart(t *testing.T) {
 	testCases := []struct {
 		desc                               string
