@@ -25,7 +25,6 @@ import (
 	"fmt"
 	"net"
 	"os/exec"
-	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -213,10 +212,6 @@ type Proxier struct {
 
 	// localhostNodePortProxy handles userspace proxying of NodePorts on localhost
 	localhostNodePortProxy *localnodeportproxy.LocalNodePortProxy
-
-	// localhostNodePortsEnabled is set when the KubeProxyNFTablesLocalhostNodePorts
-	// feature is enabled
-	localhostNodePortsEnabled bool
 }
 
 // Proxier implements proxy.Provider
@@ -291,7 +286,6 @@ func NewProxier(ctx context.Context,
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.KubeProxyNFTablesLocalhostNodePorts) {
-		proxier.localhostNodePortsEnabled = true
 		if useLocalhostNodePortProxy(nodePortAddresses) {
 			proxier.localhostNodePortProxy = localnodeportproxy.NewLocalNodePortProxy(ctx, ipFamily)
 		}
@@ -308,25 +302,13 @@ func useLocalhostNodePortProxy(nodePortAddresses *proxyutil.NodePortAddresses) b
 	return nodePortAddresses.ContainsExplicitLoopback()
 }
 
-// localhostNodePortRejectProtocols returns the localhost NodePort protocols whose
-// traffic kube-proxy rejects and counts, or nil if it rejects none. When the
-// userspace proxy serves localhost NodePorts only the protocols it cannot serve
-// are rejected; when the feature is enabled without the proxy, all are rejected.
-func (proxier *Proxier) localhostNodePortRejectProtocols() []v1.Protocol {
-	switch {
-	case !proxier.localhostNodePortsEnabled:
-		return nil
-	case proxier.localhostNodePortProxy != nil:
-		return metrics.LocalhostNodePortRejectedProtocols
-	default:
-		return metrics.LocalhostNodePortRejectableProtocols
-	}
-}
-
 // rejectsLocalhostNodePort reports whether kube-proxy rejects localhost NodePort
 // traffic for the given protocol.
 func (proxier *Proxier) rejectsLocalhostNodePort(protocol v1.Protocol) bool {
-	return slices.Contains(proxier.localhostNodePortRejectProtocols(), protocol)
+	if proxier.localhostNodePortProxy == nil {
+		return false
+	}
+	return protocol == v1.ProtocolUDP || protocol == v1.ProtocolSCTP
 }
 
 // internal struct for string service information
@@ -656,34 +638,31 @@ func (proxier *Proxier) setupNFTables(tx *knftables.Transaction) {
 		})
 	}
 
-	rejectProtocols := proxier.localhostNodePortRejectProtocols()
+	// Set up localhost nodeport reject handling
 	tx.Add(&knftables.Map{
 		Name:    localhostNodePortRejectMap,
 		Type:    "inet_proto . inet_service : verdict",
 		Comment: new("localhost NodePorts rejected by kube-proxy"),
 	})
-	if len(rejectProtocols) > 0 {
-		for _, protocol := range rejectProtocols {
-			counter := metrics.LocalhostNodePortRejectedCounterName(protocol)
-			tx.Add(&knftables.Counter{Name: counter})
-			chain := localhostNodePortRejectChainName(protocol)
-			ensureChain(chain, tx, createdChains, false)
-			tx.Add(&knftables.Rule{
-				Chain: chain,
-				Rule:  knftables.Concat("counter name", fmt.Sprintf("%q", counter), "reject"),
-			})
-		}
+	for _, protocol := range []v1.Protocol{v1.ProtocolUDP, v1.ProtocolSCTP} {
+		counter := metrics.LocalhostNodePortRejectedCounterName(protocol)
+		tx.Add(&knftables.Counter{Name: counter})
+		chain := localhostNodePortRejectChainName(protocol)
+		ensureChain(chain, tx, createdChains, false)
 		tx.Add(&knftables.Rule{
-			Chain: nodePortEndpointsCheckChain,
-			Rule: knftables.Concat(
-				matchLocalhost,
-				"meta l4proto . th dport",
-				"vmap", "@", localhostNodePortRejectMap,
-			),
+			Chain: chain,
+			Rule:  knftables.Concat("counter name", fmt.Sprintf("%q", counter), "reject"),
 		})
-	} else {
-		tx.Delete(&knftables.Map{Name: localhostNodePortRejectMap})
 	}
+	tx.Add(&knftables.Rule{
+		Chain: nodePortEndpointsCheckChain,
+		Rule: knftables.Concat(
+			matchLocalhost,
+			"meta l4proto . th dport",
+			"vmap", "@", localhostNodePortRejectMap,
+		),
+	})
+
 	// Set up LoadBalancerSourceRanges firewalling
 	tx.Add(&knftables.Map{
 		Name:    firewallIPsMap,
@@ -774,9 +753,7 @@ func (proxier *Proxier) setupNFTables(tx *knftables.Transaction) {
 	proxier.noEndpointNodePorts.readOrReset(tx, proxier.nftables, proxier.logger)
 	proxier.serviceNodePorts.readOrReset(tx, proxier.nftables, proxier.logger)
 	proxier.hairpinConnections.readOrReset(tx, proxier.nftables, proxier.logger)
-	if proxier.localhostNodePortsEnabled {
-		proxier.localhostNodePortRejects.readOrReset(tx, proxier.nftables, proxier.logger)
-	}
+	proxier.localhostNodePortRejects.readOrReset(tx, proxier.nftables, proxier.logger)
 }
 
 // Sync is called to synchronize the proxier state to nftables as soon as possible.
@@ -1029,15 +1006,6 @@ func isServiceChainName(chainString string) bool {
 	return strings.Contains(chainString, "/")
 }
 
-func isLocalhostNodePortRejectChainName(chain string) bool {
-	for _, protocol := range metrics.LocalhostNodePortRejectableProtocols {
-		if chain == localhostNodePortRejectChainName(protocol) {
-			return true
-		}
-	}
-	return false
-}
-
 func isAffinitySetName(set string) bool {
 	return strings.HasPrefix(set, servicePortEndpointAffinityNamePrefix)
 }
@@ -1258,7 +1226,7 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 	existingChainsList, err := proxier.nftables.List(context.TODO(), "chain")
 	if err == nil {
 		existingChains = sets.New(existingChainsList...)
-	} else {
+	} else if !knftables.IsNotFound(err) {
 		proxier.logger.Error(err, "Failed to list existing chains")
 	}
 	var existingAffinitySets sets.Set[string]
@@ -1270,17 +1238,12 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 				existingAffinitySets.Insert(set)
 			}
 		}
-	} else {
+	} else if !knftables.IsNotFound(err) {
 		proxier.logger.Error(err, "Failed to list existing sets")
 	}
 
 	// Accumulate service/endpoint chains and affinity sets to keep.
 	activeChains := sets.New[string]()
-	// setupNFTables creates these chains even if no Service currently uses them.
-	// Keep them available for map elements added by later partial syncs.
-	for _, protocol := range proxier.localhostNodePortRejectProtocols() {
-		activeChains.Insert(localhostNodePortRejectChainName(protocol))
-	}
 	activeAffinitySets := sets.New[string]()
 
 	// Compute total number of endpoint chains across all services
@@ -1822,7 +1785,7 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 	// now, and record the time that they become stale in staleChains so they can be
 	// deleted later.
 	for chain := range existingChains {
-		if isServiceChainName(chain) || isLocalhostNodePortRejectChainName(chain) {
+		if isServiceChainName(chain) {
 			if !activeChains.Has(chain) {
 				tx.Flush(&knftables.Chain{
 					Name: chain,
@@ -1850,24 +1813,7 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 	proxier.noEndpointNodePorts.cleanupLeftoverKeys(tx)
 	proxier.serviceNodePorts.cleanupLeftoverKeys(tx)
 	proxier.hairpinConnections.cleanupLeftoverKeys(tx)
-	if proxier.localhostNodePortsEnabled {
-		proxier.localhostNodePortRejects.cleanupLeftoverKeys(tx)
-	}
-	if doFullSync {
-		rejected := make(map[v1.Protocol]bool)
-		for _, protocol := range proxier.localhostNodePortRejectProtocols() {
-			rejected[protocol] = true
-		}
-		// The loop above will have removed stale reject-map elements, so now we can remove stale target chains
-		for _, protocol := range metrics.LocalhostNodePortRejectableProtocols {
-			if rejected[protocol] {
-				continue
-			}
-			rejectCounter := &knftables.Counter{Name: metrics.LocalhostNodePortRejectedCounterName(protocol)}
-			tx.Add(rejectCounter)
-			tx.Delete(rejectCounter)
-		}
-	}
+	proxier.localhostNodePortRejects.cleanupLeftoverKeys(tx)
 
 	// Sync rules.
 	proxier.logger.V(2).Info("Reloading service nftables data",
