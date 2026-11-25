@@ -18,8 +18,10 @@ package events
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"sort"
 	"strings"
 	"time"
@@ -27,6 +29,7 @@ import (
 	"github.com/spf13/cobra"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -40,6 +43,7 @@ import (
 	runtimeresource "k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/tools/cache"
 	watchtools "k8s.io/client-go/tools/watch"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/i18n"
@@ -292,40 +296,109 @@ func (o *EventsOptions) Run() error {
 }
 
 func (o *EventsOptions) runWatch(ctx context.Context, namespace string, listOptions metav1.ListOptions) error {
-	eventWatch, err := o.client.CoreV1().Events(namespace).Watch(ctx, listOptions)
-	if err != nil {
-		return err
-	}
+	client := o.client.CoreV1().Events(namespace)
 	w := printers.GetNewTabWriter(o.Out)
+	printEvent := func(event *corev1.Event) error {
+		if !o.filteredEventType(event.Type) {
+			return nil
+		}
+		if event.GetObjectKind().GroupVersionKind().Empty() {
+			event.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("Event"))
+		}
+		if err := o.PrintObj(event, w); err != nil {
+			return err
+		}
+		return w.Flush()
+	}
 
-	cctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	intr := interrupt.New(nil, cancel)
-	intr.Run(func() error {
-		_, err := watchtools.UntilWithoutRetry(cctx, eventWatch, func(e watch.Event) (bool, error) {
-			if e.Type == watch.Deleted { // events are deleted after 1 hour; don't print that
-				return false, nil
+	handleEvent := func(event watch.Event) (bool, error) {
+		switch event.Type {
+		case watch.Error:
+			return false, apierrors.FromObject(event.Object)
+		case watch.Added, watch.Modified:
+			if ev, ok := event.Object.(*corev1.Event); ok {
+				return false, printEvent(ev)
 			}
+		}
+		return false, nil
+	}
 
-			if ev, ok := e.Object.(*corev1.Event); !ok || !o.filteredEventType(ev.Type) {
-				return false, nil
+	ctx, cancel := context.WithCancelCause(ctx)
+	defer cancel(nil)
+	return interrupt.New(nil, func() { cancel(nil) }).Run(func() error {
+		// Start observing changes from the list snapshot so none are missed between listing and watching.
+		var resourceVersion string
+		err := runtimeresource.FollowContinue(&listOptions, func(options metav1.ListOptions) (runtime.Object, error) {
+			eventList, err := client.List(ctx, options)
+			if err != nil {
+				return nil, runtimeresource.EnhanceListError(err, options, "events")
 			}
-
-			if e.Object.GetObjectKind().GroupVersionKind().Empty() {
-				e.Object.GetObjectKind().SetGroupVersionKind(schema.GroupVersionKind{
-					Version: "v1",
-					Kind:    "Event",
-				})
+			resourceVersion = eventList.ResourceVersion
+			for i := range eventList.Items {
+				if err := printEvent(&eventList.Items[i]); err != nil {
+					return nil, err
+				}
 			}
-
-			o.PrintObj(e.Object, w)
-			w.Flush()
-			return false, nil
+			return eventList, nil
 		})
+		if apierrors.IsForbidden(err) && resourceVersion == "" {
+			// Watch-only users can get a checkpoint from a bookmark after the initial events.
+			listOptions.AllowWatchBookmarks = true
+			initialWatch, err := client.Watch(ctx, listOptions)
+			if err != nil {
+				return err
+			}
+			_, err = watchtools.UntilWithoutRetry(ctx, initialWatch, func(event watch.Event) (bool, error) {
+				if event.Type != watch.Bookmark {
+					return handleEvent(event)
+				}
+				object, err := meta.Accessor(event.Object)
+				if err != nil {
+					return false, err
+				}
+				resourceVersion = object.GetResourceVersion()
+				return resourceVersion != "" && resourceVersion != "0", nil
+			})
+			if errors.Is(err, watchtools.ErrWatchClosed) {
+				return errors.New("event watch closed before receiving a resource version bookmark")
+			}
+			if err != nil {
+				return err
+			}
+		} else if err != nil {
+			return err
+		}
+
+		eventWatch, err := watchtools.NewRetryWatcherWithContext(ctx, resourceVersion, &cache.ListWatch{
+			WatchFuncWithContext: func(ctx context.Context, options metav1.ListOptions) (watch.Interface, error) {
+				options.FieldSelector = listOptions.FieldSelector
+				watcher, err := client.Watch(ctx, options)
+				var status apierrors.APIStatus
+				var negotiationError runtime.NegotiateError
+				switch {
+				case errors.As(err, &negotiationError):
+					cancel(err)
+				case errors.As(err, &status):
+					code := status.Status().Code
+					// RetryWatcher can keep retrying permanent failures when opening the watch.
+					if code >= http.StatusBadRequest && code < http.StatusInternalServerError &&
+						code != http.StatusRequestTimeout && code != http.StatusTooManyRequests {
+						cancel(err)
+					}
+				}
+				return watcher, err
+			},
+		})
+		if err != nil {
+			return err
+		}
+
+		_, err = watchtools.UntilWithoutRetry(ctx, eventWatch, handleEvent)
+		if cause := context.Cause(ctx); cause != nil {
+			return cause
+		}
 		return err
 	})
-
-	return nil
 }
 
 // filteredEventType checks given event can be printed
