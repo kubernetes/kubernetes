@@ -2184,6 +2184,168 @@ func TestAllocator(t *testing.T,
 				),
 			},
 		},
+		"admin-access-before-regular-claim-single-device": {
+			features: Features{
+				AdminAccess: true,
+			},
+			claimsToAllocate: func() []wrapResourceClaim {
+				admin := claimWithRequest(claim0, req0, classA)
+				admin.Spec.Devices.Requests[0].Exactly.AdminAccess = new(true)
+				return []wrapResourceClaim{admin, claimWithRequest(claim1, req0, classA)}
+			}(),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, pool1, driverA, device(device1, nil, nil)),
+			),
+			node: node(node1, region1),
+			expectResults: []any{
+				allocationResult(
+					localNodeSelector(node1),
+					deviceAllocationResult(req0, driverA, pool1, device1, true),
+				),
+				allocationResult(
+					localNodeSelector(node1),
+					deviceAllocationResult(req0, driverA, pool1, device1, false),
+				),
+			},
+		},
+		"admin-access-before-regular-request-same-claim-single-device": {
+			features: Features{
+				AdminAccess: true,
+			},
+			claimsToAllocate: func() []wrapResourceClaim {
+				c := claim(claim0).withRequests(deviceRequest(req0, classA, 1), allDeviceRequest(req1, classA))
+				c.Spec.Devices.Requests[0].Exactly.AdminAccess = new(true)
+				return []wrapResourceClaim{c}
+			}(),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, pool1, driverA, device(device1, nil, nil)),
+			),
+			node: node(node1, region1),
+			// A claim must not get the same exclusive device twice.
+			expectResults: nil,
+		},
+		"admin-access-after-regular-request-same-claim-single-device": {
+			features: Features{
+				AdminAccess: true,
+			},
+			claimsToAllocate: func() []wrapResourceClaim {
+				c := claim(claim0).withRequests(deviceRequest(req0, classA, 1), allDeviceRequest(req1, classA))
+				c.Spec.Devices.Requests[1].Exactly.AdminAccess = new(true)
+				return []wrapResourceClaim{c}
+			}(),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, pool1, driverA, device(device1, nil, nil)),
+			),
+			node: node(node1, region1),
+			// A claim must not get the same exclusive device twice.
+			expectResults: nil,
+		},
+		"admin-access-before-regular-request-same-claim-two-devices": {
+			features: Features{
+				AdminAccess: true,
+			},
+			claimsToAllocate: func() []wrapResourceClaim {
+				c := claimWithRequests(claim0, nil, request(req0, classA, 1), request(req1, classA, 1))
+				c.Spec.Devices.Requests[0].Exactly.AdminAccess = new(true)
+				return []wrapResourceClaim{c}
+			}(),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, pool1, driverA, device(device1, nil, nil), device(device2, nil, nil)),
+			),
+			node: node(node1, region1),
+			// A claim does not get the same device twice, so the second request moves on.
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device1, true),
+				deviceAllocationResult(req1, driverA, pool1, device2, false),
+			)},
+		},
+		"admin-access-after-regular-request-same-claim-two-devices": {
+			features: Features{
+				AdminAccess: true,
+			},
+			claimsToAllocate: func() []wrapResourceClaim {
+				c := claimWithRequests(claim0, nil, request(req0, classA, 1), request(req1, classA, 1))
+				c.Spec.Devices.Requests[1].Exactly.AdminAccess = new(true)
+				return []wrapResourceClaim{c}
+			}(),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, pool1, driverA, device(device1, nil, nil), device(device2, nil, nil)),
+			),
+			node: node(node1, region1),
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device1, false),
+				deviceAllocationResult(req1, driverA, pool1, device2, true),
+			)},
+		},
+		"admin-access-consumable-capacity-twice-in-same-claim": {
+			features: Features{
+				AdminAccess:        true,
+				ConsumableCapacity: true,
+			},
+			claimsToAllocate: func() []wrapResourceClaim {
+				c := claimWithRequests(claim0, nil, request(req0, classA, 1), request(req1, classA, 1))
+				c.Spec.Devices.Requests[0].Exactly.AdminAccess = new(true)
+				c.Spec.Devices.Requests[1].Exactly.AdminAccess = new(true)
+				return []wrapResourceClaim{c}
+			}(),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, pool1, driverA, device(device1, nil, nil).withAllowMultipleAllocations()),
+			),
+			node: node(node1, region1),
+			// Devices which allow multiple allocations are not marked, so admin access
+			// may get the same device for different requests of the same claim.
+			expectResults: func() []any {
+				r0 := deviceAllocationResult(req0, driverA, pool1, device1, true)
+				r0.ShareID = &fixedShareID
+				r1 := deviceAllocationResult(req1, driverA, pool1, device1, true)
+				r1.ShareID = &fixedShareID
+				return []any{allocationResult(localNodeSelector(node1), r0, r1)}
+			}(),
+		},
+		"admin-access-backtrack-releases-device": {
+			features: Features{
+				AdminAccess: true,
+			},
+			claimsToAllocate: func() []wrapResourceClaim {
+				c := claimWithRequests(claim0, nil,
+					request(req0, classA, 1),
+					// Only fits on device1 if req0 releases it when backtracking.
+					request(req1, classA, 1, resourceapi.DeviceSelector{
+						CEL: &resourceapi.CELDeviceSelector{
+							Expression: fmt.Sprintf(`device.attributes["%s"].stringAttribute == "stringAttributeValue1"`, driverA),
+						},
+					}),
+				)
+				c.Spec.Devices.Requests[0].Exactly.AdminAccess = new(true)
+				c.Spec.Devices.Requests[1].Exactly.AdminAccess = new(true)
+				return []wrapResourceClaim{c}
+			}(),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, pool1, driverA,
+					device(device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						"stringAttribute": {StringValue: new("stringAttributeValue1")},
+					}),
+					device(device2, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						"stringAttribute": {StringValue: new("stringAttributeValue2")},
+					}),
+				),
+			),
+			node: node(node1, region1),
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device2, true),
+				deviceAllocationResult(req1, driverA, pool1, device1, true),
+			)},
+		},
 		"all-devices-slice-without-devices-prioritized-list": {
 			features: Features{
 				PrioritizedList: true,
