@@ -18,6 +18,7 @@ package v1
 
 import (
 	"encoding/json"
+	"encoding/json/jsontext"
 	"time"
 
 	cbor "k8s.io/apimachinery/pkg/runtime/serializer/cbor/direct"
@@ -170,6 +171,14 @@ func (t Time) MarshalJSON() ([]byte, error) {
 	buf = t.UTC().AppendFormat(buf, time.RFC3339)
 	buf = append(buf, '"')
 	return buf, nil
+}
+
+// MarshalJSONTo implements the [json/v2.MarshalerTo] interface.
+func (t Time) MarshalJSONTo(enc *jsontext.Encoder) error {
+	if t.IsZero() {
+		return enc.WriteToken(jsontext.Null)
+	}
+	return enc.WriteToken(jsontext.String(t.UTC().Format(time.RFC3339)))
 }
 
 func (t Time) MarshalCBOR() ([]byte, error) {
