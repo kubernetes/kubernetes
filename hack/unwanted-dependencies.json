@@ -92,6 +92,7 @@
       "github.com/xeipuuv/gojsonschema": "unmaintained",
       "go.mongodb.org/mongo-driver": "",
       "go.opencensus.io": "unmaintained, https://github.com/census-instrumentation/opencensus-go archive mode",
+      "go.opentelemetry.io/auto/sdk": "unmaintained, https://github.com/open-telemetry/opentelemetry-go-instrumentation archive mode",
       "golang.org/x/exp": "This subrepository holds experimental and deprecated packages",
       "golang.org/x/lint": "unmaintained, archive mode",
       "google.golang.org/api": "cloud dependency",
@@ -165,6 +166,19 @@
       "github.com/planetscale/vtprotobuf": [
         "google.golang.org/grpc"
       ],
+      "go.opentelemetry.io/auto/sdk": [
+        "go.etcd.io/etcd/server/v3",
+        "go.opentelemetry.io/contrib/instrumentation/github.com/emicklei/go-restful/otelrestful",
+        "go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc",
+        "go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp",
+        "go.opentelemetry.io/otel",
+        "go.opentelemetry.io/otel/exporters/otlp/otlptrace",
+        "go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc",
+        "go.opentelemetry.io/otel/log",
+        "go.opentelemetry.io/otel/metric",
+        "go.opentelemetry.io/otel/sdk",
+        "google.golang.org/grpc"
+      ],
       "golang.org/x/exp": [
         "cel.dev/cel-go",
         "github.com/antlr4-go/antlr/v4",
@@ -197,6 +211,7 @@
       "github.com/gogo/protobuf",
       "github.com/golang/protobuf",
       "github.com/google/btree",
+      "go.opentelemetry.io/auto/sdk",
       "golang.org/x/exp"
     ]
   }
