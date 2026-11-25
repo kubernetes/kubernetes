@@ -17,7 +17,7 @@ type OpenChannelError struct {
 }
 
 func (e *OpenChannelError) Error() string {
-	return fmt.Sprintf("ssh: rejected: %s (%s)", e.Reason, e.Message)
+	return fmt.Sprintf("ssh: rejected: %s (%q)", e.Reason, e.Message)
 }
 
 // ConnMetadata holds metadata for the connection.

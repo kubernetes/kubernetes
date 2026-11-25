@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"slices"
 	"sort"
 	"time"
 )
@@ -33,6 +34,15 @@ const (
 	CertAlgoSKECDSA256v01  = "sk-ecdsa-sha2-nistp256-cert-v01@openssh.com"
 	CertAlgoED25519v01     = "ssh-ed25519-cert-v01@openssh.com"
 	CertAlgoSKED25519v01   = "sk-ssh-ed25519-cert-v01@openssh.com"
+
+	// CertAlgoMLDSA44v01Go, CertAlgoMLDSA65v01Go and CertAlgoMLDSA87v01Go
+	// are certificate algorithms based on ML-DSA. No specification defines
+	// them, so these are vendor names as per RFC 4251, Section 4.2. The
+	// format is that of [SSH-CERTS], with the public key encoded as in
+	// [SSH-MLDSA], Section 4.
+	CertAlgoMLDSA44v01Go = "ssh-mldsa-44-cert-v01@golang.org"
+	CertAlgoMLDSA65v01Go = "ssh-mldsa-65-cert-v01@golang.org"
+	CertAlgoMLDSA87v01Go = "ssh-mldsa-87-cert-v01@golang.org"
 
 	// CertAlgoRSASHA256v01 and CertAlgoRSASHA512v01 can't appear as a
 	// Certificate.Type (or PublicKey.Type), but only in
@@ -229,14 +239,19 @@ func parseCert(in []byte, privAlgo string) (*Certificate, error) {
 		return nil, err
 	}
 	c.Reserved = g.Reserved
+	// Reject a certificate whose signature key is itself a certificate before
+	// parsing it. Certificates signed by certificates are not supported (see
+	// PROTOCOL.certkeys), and rejecting after ParsePublicKey returns would allow
+	// a chain of nested certificates to recurse once per level, exhausting the
+	// goroutine stack.
+	if sigAlgo, _, ok := parseString(g.SignatureKey); !ok {
+		return nil, errShortRead
+	} else if _, ok := certKeyAlgoNames[string(sigAlgo)]; ok {
+		return nil, fmt.Errorf("ssh: the signature key type %q is invalid for certificates", sigAlgo)
+	}
 	k, err := ParsePublicKey(g.SignatureKey)
 	if err != nil {
 		return nil, err
-	}
-	// The Type() function is intended to return only certificate key types, but
-	// we use certKeyAlgoNames anyway for safety, to match [Certificate.Type].
-	if _, ok := certKeyAlgoNames[k.Type()]; ok {
-		return nil, fmt.Errorf("ssh: the signature key type %q is invalid for certificates", k.Type())
 	}
 	c.SignatureKey = k
 	c.Signature, rest, ok = parseSignatureBody(g.Signature)
@@ -300,8 +315,11 @@ const sourceAddressCriticalOption = "source-address"
 // minimally, the IsAuthority callback should be set.
 type CertChecker struct {
 	// SupportedCriticalOptions lists the CriticalOptions that the
-	// server application layer understands. These are only used
-	// for user certificates.
+	// application layer understands. A certificate carrying a critical
+	// option that is not listed here is rejected.
+	// CertChecker.Authenticate additionally accepts the source-address
+	// option, which the server enforces on the Permissions that
+	// Authenticate returns.
 	SupportedCriticalOptions []string
 
 	// IsUserAuthority should return true if the key is recognized as an
@@ -364,8 +382,9 @@ func (c *CertChecker) CheckHostKey(addr string, remote net.Addr, key PublicKey) 
 	return c.CheckCert(hostname, cert)
 }
 
-// Authenticate checks a user certificate. Authenticate can be used as
-// a value for ServerConfig.PublicKeyCallback.
+// Authenticate checks a user certificate. Authenticate can be used as a value
+// for ServerConfig.PublicKeyCallback. The source-address critical option is
+// allowed, as it will be enforced by the server.
 func (c *CertChecker) Authenticate(conn ConnMetadata, pubKey PublicKey) (*Permissions, error) {
 	cert, ok := pubKey.(*Certificate)
 	if !ok {
@@ -384,8 +403,11 @@ func (c *CertChecker) Authenticate(conn ConnMetadata, pubKey PublicKey) (*Permis
 	if !c.IsUserAuthority(cert.SignatureKey) {
 		return nil, fmt.Errorf("ssh: certificate signed by unrecognized authority")
 	}
-
-	if err := c.CheckCert(conn.User(), cert); err != nil {
+	// The source-address critical option is enforced by serverAuthenticate,
+	// so it is supported regardless of SupportedCriticalOptions
+	cc := *c
+	cc.SupportedCriticalOptions = append(slices.Clip(cc.SupportedCriticalOptions), sourceAddressCriticalOption)
+	if err := cc.CheckCert(conn.User(), cert); err != nil {
 		return nil, err
 	}
 
@@ -393,27 +415,15 @@ func (c *CertChecker) Authenticate(conn ConnMetadata, pubKey PublicKey) (*Permis
 }
 
 // CheckCert checks CriticalOptions, ValidPrincipals, revocation, timestamp and
-// the signature of the certificate.
+// the signature of the certificate. Critical options that are not listed in
+// SupportedCriticalOptions are rejected.
 func (c *CertChecker) CheckCert(principal string, cert *Certificate) error {
 	if c.IsRevoked != nil && c.IsRevoked(cert) {
 		return fmt.Errorf("ssh: certificate serial %d revoked", cert.Serial)
 	}
 
 	for opt := range cert.CriticalOptions {
-		// sourceAddressCriticalOption will be enforced by
-		// serverAuthenticate
-		if opt == sourceAddressCriticalOption {
-			continue
-		}
-
-		found := false
-		for _, supp := range c.SupportedCriticalOptions {
-			if supp == opt {
-				found = true
-				break
-			}
-		}
-		if !found {
+		if !slices.Contains(c.SupportedCriticalOptions, opt) {
 			return fmt.Errorf("ssh: unsupported critical option %q in certificate", opt)
 		}
 	}
@@ -524,6 +534,9 @@ var certKeyAlgoNames = map[string]string{
 	CertAlgoSKECDSA256v01:  KeyAlgoSKECDSA256,
 	CertAlgoED25519v01:     KeyAlgoED25519,
 	CertAlgoSKED25519v01:   KeyAlgoSKED25519,
+	CertAlgoMLDSA44v01Go:   KeyAlgoMLDSA44,
+	CertAlgoMLDSA65v01Go:   KeyAlgoMLDSA65,
+	CertAlgoMLDSA87v01Go:   KeyAlgoMLDSA87,
 }
 
 // underlyingAlgo returns the signature algorithm associated with algo (which is

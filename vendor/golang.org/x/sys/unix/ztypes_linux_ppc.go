@@ -169,6 +169,11 @@ type Msghdr struct {
 	Flags      int32
 }
 
+type Mmsghdr struct {
+	Hdr Msghdr
+	Len uint32
+}
+
 type Cmsghdr struct {
 	Len   uint32
 	Level int32
@@ -184,6 +189,7 @@ const (
 	SizeofSockaddrNFCLLCP = 0x58
 	SizeofIovec           = 0x8
 	SizeofMsghdr          = 0x1c
+	SizeofMmsghdr         = 0x20
 	SizeofCmsghdr         = 0xc
 )
 
@@ -686,7 +692,18 @@ const (
 )
 
 const (
-	PIDFD_NONBLOCK = 0x800
+	PIDFD_NONBLOCK                        = 0x800
+	PIDFD_THREAD                          = 0x80
+	PIDFD_GET_CGROUP_NAMESPACE            = 0x2000ff01
+	PIDFD_GET_IPC_NAMESPACE               = 0x2000ff02
+	PIDFD_GET_MNT_NAMESPACE               = 0x2000ff03
+	PIDFD_GET_NET_NAMESPACE               = 0x2000ff04
+	PIDFD_GET_PID_NAMESPACE               = 0x2000ff05
+	PIDFD_GET_PID_FOR_CHILDREN_NAMESPACE  = 0x2000ff06
+	PIDFD_GET_TIME_NAMESPACE              = 0x2000ff07
+	PIDFD_GET_TIME_FOR_CHILDREN_NAMESPACE = 0x2000ff08
+	PIDFD_GET_USER_NAMESPACE              = 0x2000ff09
+	PIDFD_GET_UTS_NAMESPACE               = 0x2000ff0a
 )
 
 type SysvIpcPerm struct {
@@ -722,3 +739,22 @@ type SysvShmDesc struct {
 const (
 	GPIO_GET_CHIPINFO_IOCTL = 0x4044b401
 )
+
+const (
+	IPMICTL_SEND_COMMAND = 0x4014690d
+	IPMICTL_RECEIVE_MSG  = 0xc018690c
+)
+
+type IPMIReq struct {
+	Addr  *uint8
+	Len   uint32
+	Msgid int32
+	Msg   IPMIMsg
+}
+type IPMIRecv struct {
+	Recv_type int32
+	Addr      *uint8
+	Addr_len  uint32
+	Msgid     int32
+	Msg       IPMIMsg
+}
