@@ -329,6 +329,21 @@ func (f *FieldsV1) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
+// UnmarshalJSONFrom implements the [json/v2.UnmarshalerFrom] interface.
+func (f *FieldsV1) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
+	if f == nil {
+		return errors.New("metav1.FieldsV1: UnmarshalJSONFrom on nil pointer")
+	}
+	val, err := dec.ReadValue()
+	if err != nil {
+		return err
+	}
+	if val.Kind() != jsontext.KindNull {
+		f.SetRawBytes(val)
+	}
+	return nil
+}
+
 var _ json.Marshaler = FieldsV1{}
 var _ json.Unmarshaler = &FieldsV1{}
 

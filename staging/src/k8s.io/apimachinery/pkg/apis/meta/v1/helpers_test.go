@@ -17,6 +17,7 @@ limitations under the License.
 package v1
 
 import (
+	"encoding/json/jsontext"
 	"fmt"
 	"reflect"
 	"strings"
@@ -462,6 +463,41 @@ func TestFieldsV1UnmarshalJSONVariants(t *testing.T) {
 
 func BenchmarkFieldsV1UnmarshalJSON(b *testing.B) {
 	encodingtest.BenchmarkUnmarshalJSON(b, fieldsV1UnmarshalJSONCases())
+}
+
+// UnmarshalJSONFrom shares the receiver semantics of UnmarshalJSON.
+func TestFieldsV1UnmarshalJSONFromReceiver(t *testing.T) {
+	decoder := func(s string) *jsontext.Decoder { return jsontext.NewDecoder(strings.NewReader(s)) }
+
+	t.Run("nil-receiver", func(t *testing.T) {
+		var f *FieldsV1
+		if err := f.UnmarshalJSONFrom(decoder(`{}`)); err == nil {
+			t.Error("expected error")
+		}
+	})
+	t.Run("null-does-not-modify-receiver", func(t *testing.T) {
+		f := NewFieldsV1(`unmodified`)
+		if err := f.UnmarshalJSONFrom(decoder(`null`)); err != nil {
+			t.Fatal(err)
+		}
+		if got := f.String(); got != `unmodified` {
+			t.Errorf("expected receiver to be unmodified, got %q", got)
+		}
+	})
+	t.Run("overwrites-and-copies-input", func(t *testing.T) {
+		f := NewFieldsV1(`{"old":{}}`)
+		dec := decoder(`{"a":{}} {"b":{}}`)
+		if err := f.UnmarshalJSONFrom(dec); err != nil {
+			t.Fatal(err)
+		}
+		// Reading the next value must not clobber the stored bytes.
+		if _, err := dec.ReadValue(); err != nil {
+			t.Fatal(err)
+		}
+		if got := f.String(); got != `{"a":{}}` {
+			t.Errorf("unexpected value %q", got)
+		}
+	})
 }
 
 func TestFieldsV1MarshalCBOR(t *testing.T) {
