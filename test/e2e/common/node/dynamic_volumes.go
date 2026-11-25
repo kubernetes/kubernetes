@@ -473,6 +473,8 @@ var _ = SIGDescribe("Dynamic Node-Local Ephemeral Volumes", framework.WithFeatur
 				cleaned.Spec.Volumes = keptVols
 			})
 
+			// TODO(KEP-6395): Reduce back to 60s once WaitForAttachAndMount stops waiting on
+			// OCI Image volumes concurrently removed from the allocated pod (2m3s timeout).
 			gomega.Eventually(ctx, func(g gomega.Gomega) {
 				p, getErr := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, pod.Name, metav1.GetOptions{})
 				g.Expect(getErr).To(gomega.Succeed())
@@ -483,7 +485,7 @@ var _ = SIGDescribe("Dynamic Node-Local Ephemeral Volumes", framework.WithFeatur
 				g.Expect(p.Status.VolumeStatuses).To(gomega.ContainElement(
 					v1.PodVolumeStatus{Name: "good-img", HostPhase: v1.PodVolumeHostMounted},
 				))
-			}, 60*time.Second, 2*time.Second).Should(gomega.Succeed())
+			}, 3*time.Minute, 2*time.Second).Should(gomega.Succeed())
 		})
 	})
 })
