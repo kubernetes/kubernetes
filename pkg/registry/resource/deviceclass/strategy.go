@@ -17,10 +17,12 @@ limitations under the License.
 package deviceclass
 
 import (
+	"bytes"
 	"context"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime"
+	jsonutil "k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
@@ -70,6 +72,7 @@ func (deviceClassStrategy) PrepareForUpdate(ctx context.Context, obj, old runtim
 	oldClass := old.(*resource.DeviceClass)
 
 	dropDisabledFields(class, oldClass)
+	preserveOpaqueParameters(&class.Spec, &oldClass.Spec)
 
 	// Any changes to the spec increment the generation number.
 	if !apiequality.Semantic.DeepEqual(oldClass.Spec, class.Spec) {
@@ -136,4 +139,32 @@ func draExtendedResourceCapacityInUse(class *resource.DeviceClass) bool {
 	}
 
 	return false
+}
+
+// Preserve the original bytes of semantically equivalent opaque parameters
+// to avoid unnecessary generation increments after a JSON round-trip.
+func preserveOpaqueParameters(new, old *resource.DeviceClassSpec) {
+	if len(new.Config) != len(old.Config) {
+		return
+	}
+	for i := range new.Config {
+		newConfig, oldConfig := &new.Config[i], &old.Config[i]
+		if newConfig.Opaque == nil || oldConfig.Opaque == nil || bytes.Equal(newConfig.Opaque.Parameters.Raw, oldConfig.Opaque.Parameters.Raw) {
+			continue
+		}
+		newOpaque, oldOpaque := *newConfig.Opaque, *oldConfig.Opaque
+		newRaw, oldRaw := newOpaque.Parameters.Raw, oldOpaque.Parameters.Raw
+
+		// Pair atomic, ordered configurations only when their surrounding fields
+		// (including any decoded Object) are unchanged, as for ResourceClaims.
+		newOpaque.Parameters.Raw, oldOpaque.Parameters.Raw = nil, nil
+		newIdentity, oldIdentity := *newConfig, *oldConfig
+		newIdentity.Opaque, oldIdentity.Opaque = &newOpaque, &oldOpaque
+		if !apiequality.Semantic.DeepEqual(newIdentity, oldIdentity) {
+			continue
+		}
+		if jsonutil.EqualWhenNormalized(oldRaw, newRaw) {
+			newConfig.Opaque.Parameters.Raw = bytes.Clone(oldRaw)
+		}
+	}
 }

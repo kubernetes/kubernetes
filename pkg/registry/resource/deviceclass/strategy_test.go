@@ -24,6 +24,7 @@ import (
 
 	apiresource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/version"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -159,6 +160,17 @@ func TestStrategyCreate(t *testing.T) {
 func TestStrategyUpdate(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
 
+	classWithOpaqueParameters := func(driver, parameters string) *resource.DeviceClass {
+		class := obj.DeepCopy()
+		class.Spec.Config = []resource.DeviceClassConfiguration{{
+			DeviceConfiguration: resource.DeviceConfiguration{Opaque: &resource.OpaqueDeviceConfiguration{
+				Driver:     driver,
+				Parameters: runtime.RawExtension{Raw: []byte(parameters)},
+			}},
+		}}
+		return class
+	}
+
 	testcases := map[string]struct {
 		oldObj                      *resource.DeviceClass
 		newObj                      *resource.DeviceClass
@@ -249,6 +261,39 @@ func TestStrategyUpdate(t *testing.T) {
 				obj.Spec.ExtendedResourceRequest.Capacity.Requests["shares"] = apiresource.MustParse("2")
 				obj.Generation += 1
 				return obj
+			}(),
+		},
+		"equivalent-opaque-parameters": {
+			oldObj: classWithOpaqueParameters("gpu.example.com", `{"value":"<>&"}`),
+			newObj: func() *resource.DeviceClass {
+				class := classWithOpaqueParameters("gpu.example.com", `{"value":"\u003c\u003e\u0026"}`)
+				class.Labels = map[string]string{"x": "y"}
+				return class
+			}(),
+			// Formatting-only difference: the stored bytes must be kept and the
+			// generation must not change.
+			expectObj: func() *resource.DeviceClass {
+				class := classWithOpaqueParameters("gpu.example.com", `{"value":"<>&"}`)
+				class.Labels = map[string]string{"x": "y"}
+				return class
+			}(),
+		},
+		"changed-opaque-parameters": {
+			oldObj: classWithOpaqueParameters("gpu.example.com", `{"mode":"shared"}`),
+			newObj: classWithOpaqueParameters("gpu.example.com", `{"mode":"exclusive"}`),
+			expectObj: func() *resource.DeviceClass {
+				class := classWithOpaqueParameters("gpu.example.com", `{"mode":"exclusive"}`)
+				class.Generation++
+				return class
+			}(),
+		},
+		"changed-driver-with-equivalent-parameters": {
+			oldObj: classWithOpaqueParameters("old.example.com", `{"value":"<>&"}`),
+			newObj: classWithOpaqueParameters("new.example.com", `{"value":"\u003c\u003e\u0026"}`),
+			expectObj: func() *resource.DeviceClass {
+				class := classWithOpaqueParameters("new.example.com", `{"value":"\u003c\u003e\u0026"}`)
+				class.Generation++
+				return class
 			}(),
 		},
 	}
