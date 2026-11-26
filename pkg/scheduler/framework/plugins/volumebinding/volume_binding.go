@@ -377,6 +377,7 @@ func (pl *VolumeBinding) PreFilter(ctx context.Context, state fwk.CycleState, po
 			boundClaims:                podVolumeClaims.boundClaims,
 			unboundClaimsDelayBinding:  podVolumeClaims.unboundClaimsDelayBinding,
 			unboundVolumesDelayBinding: podVolumeClaims.unboundVolumesDelayBinding,
+			getStorageCapacities:       podVolumeClaims.getStorageCapacities,
 		},
 	})
 	return nil, nil
@@ -572,6 +573,8 @@ func (pl *VolumeBinding) PreBind(ctx context.Context, cs fwk.CycleState, pod *v1
 	if err != nil {
 		return fwk.AsStatus(err)
 	}
+	// Release the Filter snapshot before waiting for the volume binding API updates.
+	s.podVolumeClaims = nil
 	if s.allBound {
 		// no need to bind volumes
 		return nil
