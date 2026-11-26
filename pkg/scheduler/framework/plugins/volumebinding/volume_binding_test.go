@@ -28,13 +28,16 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
+	storagelisters "k8s.io/client-go/listers/storage/v1"
 	"k8s.io/klog/v2/ktesting"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
 	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	tf "k8s.io/kubernetes/pkg/scheduler/testing/framework"
 	"k8s.io/utils/ptr"
@@ -89,6 +92,91 @@ var (
 		},
 	}
 )
+
+type orderedStorageCapacityLister struct {
+	storagelisters.CSIStorageCapacityLister
+	capacities []*storagev1.CSIStorageCapacity
+	listCalls  int
+}
+
+func (l *orderedStorageCapacityLister) List(_ labels.Selector) ([]*storagev1.CSIStorageCapacity, error) {
+	l.listCalls++
+	return l.capacities, nil
+}
+
+func TestStorageCapacitySnapshot(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	env := newTestBinder(t, ctx)
+	env.addCSIDriver(makeCSIDriver(provisioner, true))
+	claims := []*v1.PersistentVolumeClaim{provisionedPVC}
+	env.initClaims(t, claims, claims)
+
+	secondNode := makeNode("node2").withLabel(nodeLabelKey, "reference-value").Node
+	nodes := tf.BuildNodeInfos([]*v1.Node{node1, secondNode})
+	pod := makePod("test-pod").withNamespace("testns").withPVCSVolume(claims).Pod
+
+	otherClass := makeCapacity("other-class", waitClass, nil, "8Gi", "")
+	noTopology := makeCapacity("no-topology", waitClassWithProvisioner, nil, "8Gi", "")
+	noTopology.NodeTopology = nil
+	tooSmall := makeCapacity("max-volume-too-small", waitClassWithProvisioner, nil, "8Gi", "512Mi")
+	preferred := makeCapacity("preferred", waitClassWithProvisioner, nil, "2Gi", "")
+	preferred.NodeTopology.MatchExpressions = []metav1.LabelSelectorRequirement{{
+		Key:      nodeLabelKey,
+		Operator: metav1.LabelSelectorOpIn,
+		Values:   []string{node1.Labels[nodeLabelKey]},
+	}}
+	overlapping := makeCapacity("overlapping", waitClassWithProvisioner, node1, "4Gi", "")
+	lister := &orderedStorageCapacityLister{
+		capacities: []*storagev1.CSIStorageCapacity{otherClass, noTopology, tooSmall, preferred, overlapping},
+	}
+	env.internalBinder.csiStorageCapacityLister = lister
+
+	pl := &VolumeBinding{
+		Binder:    env.binder,
+		PVCLister: env.internalPVCInformer.Lister(),
+		scorer: buildScorerFunction(helper.FunctionShape{
+			{Utilization: 0, Score: fwk.MaxNodeScore},
+			{Utilization: 100, Score: 0},
+		}),
+		fts: feature.Features{EnableStorageCapacityScoring: true},
+	}
+	newCycle := func() fwk.CycleState {
+		t.Helper()
+		state := framework.NewCycleState()
+		if _, status := pl.PreFilter(ctx, state, pod, nodes); !status.IsSuccess() {
+			t.Fatalf("PreFilter failed: %v", status)
+		}
+		return state
+	}
+	checkScore := func(state fwk.CycleState, node fwk.NodeInfo, want int64) {
+		t.Helper()
+		if status := pl.Filter(ctx, state, pod, node); !status.IsSuccess() {
+			t.Fatalf("Filter failed on %s: %v", node.Node().Name, status)
+		}
+		got, status := pl.Score(ctx, state, pod, node)
+		if !status.IsSuccess() || got != want {
+			t.Errorf("Score on %s = (%d, %v), want (%d, success)", node.Node().Name, got, status, want)
+		}
+	}
+
+	firstCycle := newCycle()
+	assert.Zero(t, lister.listCalls, "capacity should be read lazily")
+	checkScore(firstCycle, nodes[0], 50)
+
+	updated := preferred.DeepCopy()
+	updated.NodeTopology.MatchExpressions[0].Values = []string{secondNode.Labels[nodeLabelKey]}
+	lister.capacities = []*storagev1.CSIStorageCapacity{otherClass, noTopology, tooSmall, updated, overlapping}
+
+	wantStatus := fwk.NewStatus(fwk.UnschedulableAndUnresolvable, string(ErrReasonNotEnoughSpace))
+	assert.Equal(t, wantStatus, pl.Filter(ctx, firstCycle, pod, nodes[1]))
+	checkScore(firstCycle, nodes[0], 50)
+	assert.Equal(t, 1, lister.listCalls, "Filter calls should share the snapshot")
+
+	nextCycle := newCycle()
+	checkScore(nextCycle, nodes[0], 75)
+	checkScore(nextCycle, nodes[1], 50)
+	assert.Equal(t, 2, lister.listCalls, "the next cycle should read a fresh snapshot")
+}
 
 func TestVolumeBinding(t *testing.T) {
 	table := []struct {
@@ -1274,6 +1362,7 @@ func TestVolumeBinding(t *testing.T) {
 			stateCmpOpts := []cmp.Option{
 				cmp.AllowUnexported(stateData{}),
 				cmp.AllowUnexported(PodVolumeClaims{}),
+				cmpopts.IgnoreFields(PodVolumeClaims{}, "getStorageCapacities"),
 				cmpopts.IgnoreFields(stateData{}, "Mutex"),
 				cmpopts.SortSlices(func(a *v1.PersistentVolume, b *v1.PersistentVolume) bool {
 					return a.Name < b.Name

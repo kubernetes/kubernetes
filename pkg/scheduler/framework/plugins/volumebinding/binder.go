@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -204,6 +205,26 @@ type PodVolumeClaims struct {
 	unboundClaimsImmediate []*v1.PersistentVolumeClaim
 	// unboundVolumesDelayBinding are PVs that belong to storage classes of the pod's unbound PVCs with delayed binding.
 	unboundVolumesDelayBinding map[string][]*v1.PersistentVolume
+	// getStorageCapacities shares a lazily loaded snapshot across the parallel Filter calls.
+	getStorageCapacities func() (map[string][]capacityWithTopology, error)
+}
+
+type capacityWithTopology struct {
+	capacity *storagev1.CSIStorageCapacity
+	topology labels.Selector
+	once     sync.Once
+}
+
+func (c *capacityWithTopology) matchesTopology(logger klog.Logger, nodeLabels labels.Set) bool {
+	c.once.Do(func() {
+		topology, err := metav1.LabelSelectorAsSelector(c.capacity.NodeTopology)
+		if err != nil {
+			logger.Error(err, "Invalid topology selector on CSIStorageCapacity", "capacity", klog.KObj(c.capacity), "nodeTopology", c.capacity.NodeTopology)
+			return
+		}
+		c.topology = topology
+	})
+	return c.topology != nil && c.topology.Matches(nodeLabels)
 }
 
 type volumeBinder struct {
@@ -376,7 +397,7 @@ func (b *volumeBinder) FindPodVolumes(logger klog.Logger, pod *v1.Pod, podVolume
 		// Check for claims to provision. This is the first time where we potentially
 		// find out that storage is not sufficient for the node.
 		if len(claimsToProvision) > 0 {
-			unboundVolumesSatisfied, sufficientStorage, dynamicProvisions, err = b.checkVolumeProvisions(logger, pod, claimsToProvision, node)
+			unboundVolumesSatisfied, sufficientStorage, dynamicProvisions, err = b.checkVolumeProvisions(logger, pod, claimsToProvision, node, podVolumeClaims)
 			if err != nil {
 				return
 			}
@@ -831,6 +852,23 @@ func (b *volumeBinder) GetPodVolumeClaims(logger klog.Logger, pod *v1.Pod) (podV
 		}
 		podVolumeClaims.unboundVolumesDelayBinding[storageClassName] = pvs
 	}
+	storageClasses := podVolumeClaims.unboundVolumesDelayBinding
+	if len(storageClasses) > 0 {
+		podVolumeClaims.getStorageCapacities = sync.OnceValues(func() (map[string][]capacityWithTopology, error) {
+			capacities, err := b.csiStorageCapacityLister.List(labels.Everything())
+			if err != nil {
+				return nil, err
+			}
+			byClass := make(map[string][]capacityWithTopology)
+			for _, capacity := range capacities {
+				if _, needed := storageClasses[capacity.StorageClassName]; !needed || capacity.NodeTopology == nil {
+					continue
+				}
+				byClass[capacity.StorageClassName] = append(byClass[capacity.StorageClassName], capacityWithTopology{capacity: capacity})
+			}
+			return byClass, nil
+		})
+	}
 	return podVolumeClaims, nil
 }
 
@@ -911,7 +949,7 @@ func (b *volumeBinder) findMatchingVolumes(logger klog.Logger, pod *v1.Pod, clai
 // checkVolumeProvisions checks given unbound claims (the claims have gone through func
 // findMatchingVolumes, and do not have matching volumes for binding), and return true
 // if all of the claims are eligible for dynamic provision.
-func (b *volumeBinder) checkVolumeProvisions(logger klog.Logger, pod *v1.Pod, claimsToProvision []*v1.PersistentVolumeClaim, node *v1.Node) (provisionSatisfied, sufficientStorage bool, dynamicProvisions []*DynamicProvision, err error) {
+func (b *volumeBinder) checkVolumeProvisions(logger klog.Logger, pod *v1.Pod, claimsToProvision []*v1.PersistentVolumeClaim, node *v1.Node, podVolumeClaims *PodVolumeClaims) (provisionSatisfied, sufficientStorage bool, dynamicProvisions []*DynamicProvision, err error) {
 	dynamicProvisions = []*DynamicProvision{}
 
 	// We return early with provisionedClaims == nil if a check
@@ -940,7 +978,7 @@ func (b *volumeBinder) checkVolumeProvisions(logger klog.Logger, pod *v1.Pod, cl
 		}
 
 		// Check storage capacity.
-		sufficient, capacity, err := b.hasEnoughCapacity(logger, provisioner, claim, class, node)
+		sufficient, capacity, err := b.hasEnoughCapacity(logger, provisioner, claim, class, node, podVolumeClaims)
 		if err != nil {
 			return false, false, nil, err
 		}
@@ -973,7 +1011,7 @@ func (b *volumeBinder) revertAssumedPVCs(claims []*v1.PersistentVolumeClaim) {
 
 // hasEnoughCapacity checks whether the provisioner has enough capacity left for a new volume of the given size
 // that is available from the node. This function returns the node capacity based on the PVC's storage class.
-func (b *volumeBinder) hasEnoughCapacity(logger klog.Logger, provisioner string, claim *v1.PersistentVolumeClaim, storageClass *storagev1.StorageClass, node *v1.Node) (bool, *storagev1.CSIStorageCapacity, error) {
+func (b *volumeBinder) hasEnoughCapacity(logger klog.Logger, provisioner string, claim *v1.PersistentVolumeClaim, storageClass *storagev1.StorageClass, node *v1.Node, podVolumeClaims *PodVolumeClaims) (bool, *storagev1.CSIStorageCapacity, error) {
 	quantity, ok := claim.Spec.Resources.Requests[v1.ResourceStorage]
 	if !ok {
 		// No capacity to check for.
@@ -995,19 +1033,17 @@ func (b *volumeBinder) hasEnoughCapacity(logger klog.Logger, provisioner string,
 		return true, nil, nil
 	}
 
-	// Look for a matching CSIStorageCapacity object(s).
-	// TODO (for beta): benchmark this and potentially introduce some kind of lookup structure (https://github.com/kubernetes/enhancements/issues/1698#issuecomment-654356718).
-	capacities, err := b.csiStorageCapacityLister.List(labels.Everything())
+	capacities, err := podVolumeClaims.getStorageCapacities()
 	if err != nil {
 		return false, nil, err
 	}
 
-	for _, capacity := range capacities {
-		if capacity.StorageClassName == storageClass.Name &&
-			capacitySufficient(capacity, quantity) &&
-			b.nodeHasAccess(logger, node, capacity) {
-			// Enough capacity found.
-			return true, capacity, nil
+	nodeLabels := labels.Set(node.Labels)
+	candidates := capacities[storageClass.Name]
+	for i := range candidates {
+		candidate := &candidates[i]
+		if capacitySufficient(candidate.capacity, quantity) && candidate.matchesTopology(logger, nodeLabels) {
+			return true, candidate.capacity, nil
 		}
 	}
 
@@ -1031,20 +1067,6 @@ func volumeLimit(capacity *storagev1.CSIStorageCapacity) *resource.Quantity {
 		return capacity.MaximumVolumeSize
 	}
 	return capacity.Capacity
-}
-
-func (b *volumeBinder) nodeHasAccess(logger klog.Logger, node *v1.Node, capacity *storagev1.CSIStorageCapacity) bool {
-	if capacity.NodeTopology == nil {
-		// Unavailable
-		return false
-	}
-	// Only matching by label is supported.
-	selector, err := metav1.LabelSelectorAsSelector(capacity.NodeTopology)
-	if err != nil {
-		logger.Error(err, "Unexpected error converting to a label selector", "nodeTopology", capacity.NodeTopology)
-		return false
-	}
-	return selector.Matches(labels.Set(node.Labels))
 }
 
 type byPVCSize []*v1.PersistentVolumeClaim
