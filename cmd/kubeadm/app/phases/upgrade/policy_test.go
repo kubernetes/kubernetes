@@ -29,6 +29,12 @@ func TestEnforceVersionPolicies(t *testing.T) {
 	minimumKubeletVersion := version.MustParseSemantic("v1.3.0")
 	minimumControlPlaneVersion := version.MustParseSemantic("v1.3.0")
 	currentKubernetesVersion := version.MustParseSemantic("v1.4.0")
+
+	// The cases below use fixed versions that don't depend on the build version.
+	origMinimumControlPlaneVersion := constants.MinimumControlPlaneVersion
+	constants.MinimumControlPlaneVersion = minimumControlPlaneVersion
+	t.Cleanup(func() { constants.MinimumControlPlaneVersion = origMinimumControlPlaneVersion })
+
 	tests := []struct {
 		name                        string
 		vg                          *fakeVersionGetter

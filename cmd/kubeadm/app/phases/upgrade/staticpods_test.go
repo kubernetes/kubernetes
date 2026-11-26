@@ -30,6 +30,7 @@ import (
 	"go.etcd.io/etcd/client/pkg/v3/transport"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/client-go/tools/clientcmd"
 	certutil "k8s.io/client-go/util/cert"
 
@@ -305,6 +306,15 @@ func (c fakePodManifestEtcdClient) RemoveMember(id uint64) ([]etcdutil.Member, e
 }
 
 func TestStaticPodControlPlane(t *testing.T) {
+	// The old and new configs must differ and pass the minimum version check,
+	// regardless of the build version.
+	origMin, origCurrent := constants.MinimumControlPlaneVersion, constants.CurrentKubernetesVersion
+	constants.MinimumControlPlaneVersion = version.MustParseSemantic("v1.3.0")
+	constants.CurrentKubernetesVersion = version.MustParseSemantic("v1.4.0")
+	t.Cleanup(func() {
+		constants.MinimumControlPlaneVersion, constants.CurrentKubernetesVersion = origMin, origCurrent
+	})
+
 	tests := []struct {
 		description          string
 		waitErrsToReturn     map[string]error

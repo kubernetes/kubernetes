@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	apimachineryversion "k8s.io/apimachinery/pkg/version"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/testutil"
@@ -344,7 +345,17 @@ func resetStoreStatsMetrics() {
 	resourceSizeEstimate.setClock(clock.RealClock{})
 }
 
+// pinBuildVersion makes metrics deprecated in earlier releases visible, independent of the build version.
+func pinBuildVersion(t *testing.T) {
+	orig := metrics.BuildVersion
+	t.Cleanup(func() { metrics.BuildVersion = orig })
+	metrics.BuildVersion = func() apimachineryversion.Info {
+		return apimachineryversion.Info{GitVersion: "v1.0.0"}
+	}
+}
+
 func TestUpdateStoreStats(t *testing.T) {
+	pinBuildVersion(t)
 	resetStoreStatsMetrics()
 	defer resetStoreStatsMetrics()
 
@@ -430,6 +441,7 @@ apiserver_storage_objects{resource="bar.foo"} -1
 }
 
 func TestDeleteStoreStats(t *testing.T) {
+	pinBuildVersion(t)
 	resetStoreStatsMetrics()
 	defer resetStoreStatsMetrics()
 
