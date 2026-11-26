@@ -29,7 +29,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/features"
-	e2efeature "k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -67,7 +66,7 @@ var _ = utils.SIGDescribe("CSI Mock volume storage capacity scoring", func() {
 	//
 	// The mock CSI driver is deployed on one node. To keep the tests deterministic,
 	// capacities are configured so that scoring prefers that node.
-	ginkgo.Context("storage capacity scoring", e2efeature.StorageCapacityScoring, func() {
+	ginkgo.Context("storage capacity scoring", func() {
 		var (
 			yes = true
 		)
