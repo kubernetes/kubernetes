@@ -945,6 +945,119 @@ func TestStaticPolicyDoNotReuseCPUs(t *testing.T) {
 	}
 }
 
+// hintStore hands out the hint the test merged for the container being allocated,
+// so that hint generation, topology manager merge and allocation run in sequence
+// as they do during admission.
+type hintStore struct {
+	policy topologymanager.Policy
+	hint   topologymanager.TopologyHint
+}
+
+func (s *hintStore) GetAffinity(logger klog.Logger, podUID string, containerName string) topologymanager.TopologyHint {
+	return s.hint
+}
+
+func (s *hintStore) GetPolicy() topologymanager.Policy {
+	return s.policy
+}
+
+func (s *hintStore) Name() string {
+	return "hintStore"
+}
+
+func TestStaticPolicyReuseInitContainerCPUsSingleNUMANode(t *testing.T) {
+	// topoDualSocketHT: NUMA node 0 is CPUs 0,2,4,6,8,10 and NUMA node 1 is CPUs 1,3,5,7,9,11.
+	numa0 := topoDualSocketHT.CPUDetails.CPUsInNUMANodes(0)
+	numa1 := topoDualSocketHT.CPUDetails.CPUsInNUMANodes(1)
+
+	testCases := []struct {
+		description string
+		// otherPod is what another pod already holds on NUMA node 0.
+		otherPod state.ContainerCPUAssignments
+		pod      *v1.Pod
+		// expAppCPUs is the NUMA node the app container must be confined to.
+		expAppCPUs cpuset.CPUSet
+		// expReuse is whether the app container must take over the init container CPU.
+		expReuse bool
+	}{
+		{
+			description: "app container fits on the NUMA node of the init container",
+			otherPod: state.ContainerCPUAssignments{
+				"otherPod": map[string]cpuset.CPUSet{"app": cpuset.New(0, 2)},
+			},
+			pod: makeMultiContainerPod(
+				[]struct{ request, limit string }{{"1000m", "1000m"}},
+				[]struct{ request, limit string }{{"4000m", "4000m"}}),
+			expAppCPUs: numa0,
+			expReuse:   true,
+		},
+		{
+			description: "app container only fits on another NUMA node",
+			otherPod: state.ContainerCPUAssignments{
+				"otherPod": map[string]cpuset.CPUSet{
+					"init": cpuset.New(8),
+					"app":  cpuset.New(0, 2, 4, 6),
+				},
+			},
+			pod: makeMultiContainerPod(
+				[]struct{ request, limit string }{{"1000m", "1000m"}},
+				[]struct{ request, limit string }{{"5000m", "5000m"}}),
+			expAppCPUs: numa1,
+			expReuse:   false,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.description, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
+			numaInfo := &topologymanager.NUMAInfo{
+				Nodes: []int{0, 1},
+				NUMADistances: topologymanager.NUMADistances{
+					0: {10, 20},
+					1: {20, 10},
+				},
+			}
+			store := &hintStore{policy: topologymanager.NewSingleNumaNodePolicy(numaInfo, topologymanager.PolicyOptions{})}
+			policy, err := NewStaticPolicy(logger, topoDualSocketHT, 0, cpuset.New(), store, nil)
+			require.NoError(t, err)
+
+			held := cpuset.New()
+			for _, containers := range testCase.otherPod {
+				for _, cset := range containers {
+					held = held.Union(cset)
+				}
+			}
+			st := &mockState{
+				assignments:   testCase.otherPod.Clone(),
+				defaultCPUSet: topoDualSocketHT.CPUDetails.CPUs().Difference(held),
+			}
+
+			pod := testCase.pod
+			for container := range podutil.ContainerIter(&pod.Spec, podutil.InitContainers|podutil.Containers) {
+				hints := policy.GetTopologyHints(logger, st, pod, container, lifecycle.AddOperation)
+				hint, admit := store.policy.Merge(logger, []map[string][]topologymanager.TopologyHint{hints})
+				if !admit {
+					t.Fatalf("container %s not admitted, hints %v merged to %v", container.Name, hints, hint)
+				}
+				store.hint = hint
+				require.NoError(t, policy.Allocate(logger, st, pod, container, lifecycle.AddOperation))
+			}
+
+			initCPUs := st.assignments[string(pod.UID)]["initContainer-0"]
+			if !initCPUs.IsSubsetOf(numa0) {
+				t.Fatalf("expected the init container on NUMA node 0, got CPUs %s", initCPUs)
+			}
+			appCPUs := st.assignments[string(pod.UID)]["appContainer-0"]
+			if !appCPUs.IsSubsetOf(testCase.expAppCPUs) {
+				t.Errorf("expected app container CPUs within %s, got %s", testCase.expAppCPUs, appCPUs)
+			}
+			if reused := initCPUs.IsSubsetOf(appCPUs); reused != testCase.expReuse {
+				t.Errorf("expected init container CPUs %s reused=%t, app container got %s", initCPUs, testCase.expReuse, appCPUs)
+			}
+		})
+	}
+}
+
 func TestStaticPolicyRemove(t *testing.T) {
 	testCases := []staticPolicyTest{
 		{

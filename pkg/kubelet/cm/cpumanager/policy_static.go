@@ -18,6 +18,7 @@ package cpumanager
 
 import (
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -1545,6 +1546,16 @@ func (p *staticPolicy) getTopologyHintsForAdd(logger klog.Logger, s state.State,
 	// Generate hints. Outside of regeneration the usable CPUs are exactly the
 	// free ones, so the same set drives both feasibility and the Score.
 	cpuHints := p.generateCPUTopologyHints(available, reusable, available, requested)
+
+	// Requiring the hints to cover the reusable CPUs is how the CPUs of the
+	// init containers get handed over. When the container does not fit next to
+	// them, that would leave only wider hints, which the restricted and
+	// single-numa-node policies reject even if the container fits on another
+	// NUMA node. The init containers have completed by now, so their CPUs are
+	// a preference, not a constraint: count them as usable instead.
+	if !reusable.IsEmpty() && !slices.ContainsFunc(cpuHints, func(hint topologymanager.TopologyHint) bool { return hint.Preferred }) {
+		cpuHints = p.generateCPUTopologyHints(available.Union(reusable), cpuset.New(), available, requested)
+	}
 	logger.Info("TopologyHints generated", "cpuHints", cpuHints)
 
 	return map[string][]topologymanager.TopologyHint{
