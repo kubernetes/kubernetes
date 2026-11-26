@@ -1185,7 +1185,7 @@ func (s unstructuredNegotiatedSerializer) EncoderForVersion(encoder runtime.Enco
 
 func (s unstructuredNegotiatedSerializer) DecoderToVersion(decoder runtime.Decoder, gv runtime.GroupVersioner) runtime.Decoder {
 	returnUnknownFieldPaths := false
-	if serializer, ok := decoder.(*json.Serializer); ok {
+	if serializer, ok := decoder.(interface{ IsStrict() bool }); ok {
 		returnUnknownFieldPaths = serializer.IsStrict()
 	}
 	d := schemaCoercingDecoder{delegate: decoder, validator: unstructuredSchemaCoercer{structuralSchemas: s.structuralSchemas, structuralSchemaGK: s.structuralSchemaGK, preserveUnknownFields: s.preserveUnknownFields, returnUnknownFieldPaths: returnUnknownFieldPaths}}
