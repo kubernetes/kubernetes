@@ -262,13 +262,14 @@ func TestDaemonSetStatusViewerStatus(t *testing.T) {
 
 func TestStatefulSetStatusViewerStatus(t *testing.T) {
 	tests := []struct {
-		name       string
-		generation int64
-		strategy   apps.StatefulSetUpdateStrategy
-		status     apps.StatefulSetStatus
-		msg        string
-		done       bool
-		err        bool
+		name            string
+		generation      int64
+		minReadySeconds int32
+		strategy        apps.StatefulSetUpdateStrategy
+		status          apps.StatefulSetStatus
+		msg             string
+		done            bool
+		err             bool
 	}{
 		{
 			name:       "on delete returns an error",
@@ -359,6 +360,54 @@ func TestStatefulSetStatusViewerStatus(t *testing.T) {
 			err:  false,
 		},
 		{
+			name:            "update is not complete until ready pods are available for minReadySeconds",
+			generation:      1,
+			minReadySeconds: 30,
+			strategy: apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType,
+				RollingUpdate: func() *apps.RollingUpdateStatefulSetStrategy {
+					partition := int32(0)
+					return &apps.RollingUpdateStatefulSetStrategy{Partition: &partition}
+				}()},
+			status: apps.StatefulSetStatus{
+				ObservedGeneration: 2,
+				Replicas:           3,
+				ReadyReplicas:      3,
+				AvailableReplicas:  2,
+				CurrentReplicas:    0,
+				UpdatedReplicas:    3,
+				CurrentRevision:    "foo",
+				UpdateRevision:     "bar",
+			},
+
+			msg:  fmt.Sprintf("Waiting for %d pods to be available...\n", 1),
+			done: false,
+			err:  false,
+		},
+		{
+			name:            "update completes when pods are available for minReadySeconds",
+			generation:      1,
+			minReadySeconds: 30,
+			strategy: apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType,
+				RollingUpdate: func() *apps.RollingUpdateStatefulSetStrategy {
+					partition := int32(0)
+					return &apps.RollingUpdateStatefulSetStrategy{Partition: &partition}
+				}()},
+			status: apps.StatefulSetStatus{
+				ObservedGeneration: 2,
+				Replicas:           3,
+				ReadyReplicas:      3,
+				AvailableReplicas:  3,
+				CurrentReplicas:    0,
+				UpdatedReplicas:    3,
+				CurrentRevision:    "foo",
+				UpdateRevision:     "bar",
+			},
+
+			msg:  fmt.Sprintf("partitioned roll out complete: %d new pods have been updated...\n", 3),
+			done: true,
+			err:  false,
+		},
+		{
 			name:       "update completes when all replicas are current",
 			generation: 1,
 			strategy:   apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
@@ -384,6 +433,7 @@ func TestStatefulSetStatusViewerStatus(t *testing.T) {
 			s.Status = test.status
 			s.Spec.UpdateStrategy = test.strategy
 			s.Generation = test.generation
+			s.Spec.MinReadySeconds = test.minReadySeconds
 
 			unstructuredS := &unstructured.Unstructured{}
 			var err error

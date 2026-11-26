@@ -133,6 +133,10 @@ func (s *StatefulSetStatusViewer) Status(obj runtime.Unstructured, revision int6
 	if sts.Spec.Replicas != nil && sts.Status.ReadyReplicas < *sts.Spec.Replicas {
 		return fmt.Sprintf("Waiting for %d pods to be ready...\n", *sts.Spec.Replicas-sts.Status.ReadyReplicas), false, nil
 	}
+	// The controller waits for pods to be available (ready for minReadySeconds), not just ready.
+	if sts.Spec.Replicas != nil && sts.Spec.MinReadySeconds > 0 && sts.Status.AvailableReplicas < *sts.Spec.Replicas {
+		return fmt.Sprintf("Waiting for %d pods to be available...\n", *sts.Spec.Replicas-sts.Status.AvailableReplicas), false, nil
+	}
 	if sts.Spec.UpdateStrategy.Type == appsv1.RollingUpdateStatefulSetStrategyType && sts.Spec.UpdateStrategy.RollingUpdate != nil {
 		if sts.Spec.Replicas != nil && sts.Spec.UpdateStrategy.RollingUpdate.Partition != nil {
 			if sts.Status.UpdatedReplicas < (*sts.Spec.Replicas - *sts.Spec.UpdateStrategy.RollingUpdate.Partition) {
