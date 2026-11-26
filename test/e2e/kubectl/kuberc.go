@@ -143,14 +143,14 @@ var _ = SIGDescribe("kubectl kuberc", func() {
 			gomega.Expect(namespace.Name).To(gomega.Equal(ns))
 
 			ginkgo.By("verifying that explicitly passed flag surpasses the flag in kuberc alias")
-			args = []string{"runx", fmt.Sprintf("--kuberc=%s", kubercFile), fmt.Sprintf("--image=%s", imageutils.GetE2EImage(imageutils.Nginx))}
+			args = []string{"runx", fmt.Sprintf("--kuberc=%s", kubercFile), fmt.Sprintf("--image=%s", imageutils.GetE2EImage(imageutils.Agnhost))}
 			e2ekubectl.NewKubectlCommand(ns, args...).ExecOrDie(ns)
 			args = []string{"get", "pod/test-pod-2", fmt.Sprintf("--kuberc=%s", kubercFile), "-oyaml"}
 			podOutput := e2ekubectl.NewKubectlCommand(ns, args...).ExecOrDie(ns)
 			var pod v1.Pod
 			err = yaml.Unmarshal([]byte(podOutput), &pod)
 			framework.ExpectNoError(err)
-			gomega.Expect(pod.Spec.Containers[0].Image).To(gomega.Equal(imageutils.GetE2EImage(imageutils.Nginx)))
+			gomega.Expect(pod.Spec.Containers[0].Image).To(gomega.Equal(imageutils.GetE2EImage(imageutils.Agnhost)))
 			gomega.Expect(pod.Labels).To(gomega.HaveKeyWithValue("app", "test"))
 			gomega.Expect(pod.Labels).To(gomega.HaveKeyWithValue("env", "test"))
 			gomega.Expect(strings.Join(pod.Spec.Containers[0].Args, ",")).To(gomega.ContainSubstring("custom-arg1"))
