@@ -483,6 +483,8 @@ func TestValidateCertificateSigningRequestCreate(t *testing.T) {
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
+			// Gates are opt-in per test case, regardless of their default in the current release.
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CertificateSigningRequestMLDSA, false)
 			for _, gate := range test.enabledGates {
 				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, gate, true)
 			}
@@ -627,6 +629,7 @@ func Test_getValidationOptions(t *testing.T) {
 	}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CertificateSigningRequestMLDSA, false)
 			if got := getValidationOptions(tt.newCSR, tt.oldCSR); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("got  %#v\nwant %#v", got, tt.want)
 			}

@@ -1738,9 +1738,7 @@ func TestDryRunPreemption(t *testing.T) {
 	labelKeys := []string{"hostname", "zone", "region"}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if tt.enableDRANodeAllocatableResources {
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRANodeAllocatableResources, true)
-			}
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRANodeAllocatableResources, tt.enableDRANodeAllocatableResources)
 			nodes := make([]*v1.Node, len(tt.nodeNames))
 			fakeFilterRCMap := make(map[string]fwk.Code, len(tt.nodeNames))
 			for i, nodeName := range tt.nodeNames {
