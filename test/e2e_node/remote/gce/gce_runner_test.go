@@ -512,12 +512,12 @@ func TestGCEImageListArgs(t *testing.T) {
 			name:        "a family adds a server-side filter",
 			project:     "proj",
 			imageFamily: "fam",
-			want:        []string{"compute", "images", "list", "--format=json(name,family,creationTimestamp)", "--project=proj", "--filter=family=fam"},
+			want:        []string{"compute", "images", "list", "--format=json(name,family,creationTimestamp)", "--project=proj", "--filter=family=fam status=(READY)"},
 		},
 		{
-			name:    "no family adds no filter",
+			name:    "no family filters on the status only",
 			project: "proj",
-			want:    []string{"compute", "images", "list", "--format=json(name,family,creationTimestamp)", "--project=proj"},
+			want:    []string{"compute", "images", "list", "--format=json(name,family,creationTimestamp)", "--project=proj", "--filter=status=(READY)"},
 		},
 	}
 	for _, tc := range tests {
