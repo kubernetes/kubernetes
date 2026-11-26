@@ -18,8 +18,8 @@ a lot of logs, it may be useful to reduce the amount of resources consumed by
 fluentd-gcp, making these resources available to other applications. To learn
 more about Kubernetes resource requests and limits, see the official
 documentation ([CPU][cpu], [memory][memory]). The amount of resources requested
-by fluentd-gcp on every node in the cluster can be fetched by running following
-command:
+by fluentd-gcp on every node in the cluster can be fetched by running the
+following command:
 
 ```
 $ kubectl get ds -n kube-system -l k8s-app=fluentd-gcp \
