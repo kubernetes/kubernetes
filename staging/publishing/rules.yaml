@@ -391,9 +391,6 @@ rules:
 - destination: kms
   branches:
   - name: master
-    dependencies:
-    - repository: apimachinery
-      branch: master
     source:
       branch: master
       dirs:

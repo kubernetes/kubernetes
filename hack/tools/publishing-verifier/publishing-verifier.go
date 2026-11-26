@@ -134,11 +134,15 @@ func checkMasterBranch(rule config.RepositoryRule) error {
 func checkDependencies(rule config.RepositoryRule, gomodDependencies map[string][]string) error {
 	var processedDeps []string
 	branch := rule.Branches[0]
+	// Collected here and not in the loop below, which does not run for a
+	// module without staging dependencies.
+	for _, dep2 := range branch.Dependencies {
+		processedDeps = append(processedDeps, dep2.Repository)
+	}
 	for _, dep := range gomodDependencies[rule.DestinationRepository] {
 		found := false
 		if len(branch.Dependencies) > 0 {
 			for _, dep2 := range branch.Dependencies {
-				processedDeps = append(processedDeps, dep2.Repository)
 				if dep2.Branch != "master" {
 					return fmt.Errorf("looking for master branch of %s and found : %s for destination", dep2.Repository, rule.DestinationRepository)
 				}
