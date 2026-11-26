@@ -91,7 +91,7 @@
       initNodes: 5000
       initPods: 1000
       measurePods: 5000
-    threshold: 540
+    threshold: 454 # 40% below median of last 30 runs
 
 - name: SchedulingPodAffinity
   defaultPodTemplatePath: ../templates/pod-with-pod-affinity.yaml
@@ -213,7 +213,7 @@
       measurePods: 1000
   - name: 5000Nodes_5000Pods
     labels: [performance]
-    threshold: 190
+    threshold: 153 # 40% below median of last 30 runs
     params:
       initNodes: 5000
       initPods: 5000

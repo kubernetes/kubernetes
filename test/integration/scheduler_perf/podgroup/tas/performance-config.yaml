@@ -99,8 +99,7 @@
       CompositePodGroup: true
   - name: 5000Nodes_50Racks_2250Groups_9000Pods
     labels: [performance]
-    # Calibrated (adaptive ~547 pods/sec vs ~109 with the limit disabled).
-    threshold: 350
+    threshold: 331 # 40% below median of last 30 runs
     params:
       initNodes: 5000
       nodesPerRack: 100
