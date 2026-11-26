@@ -240,14 +240,16 @@ func (g *GCERunner) getGCEImage(imageRegex, imageExcludeRegex, imageFamily strin
 func gceImageListArgs(project, imageFamily string) []string {
 	// Print only the fields pickNewestImage reads, so the runner buffers less.
 	args := []string{"compute", "images", "list", "--format=json(name,family,creationTimestamp)", "--project=" + project}
+	// GCE lists a new image before it is READY, and creating an instance from it fails until then.
+	filter := "status=(READY)"
 	if imageFamily != "" {
 		// Narrow to the family so gcloud does not return the whole project.
 		// For large projects that can take a long time and consume significant
 		// amounts of RAM. It was the reason why the memory requirements of
 		// jobs using Ubuntu had to be raised (https://github.com/kubernetes/kubernetes/issues/141434).
-		args = append(args, "--filter=family="+imageFamily)
+		filter = "family=" + imageFamily + " " + filter
 	}
-	return args
+	return append(args, "--filter="+filter)
 }
 
 // regexpString returns re's pattern for logging, or "" when re is nil.
