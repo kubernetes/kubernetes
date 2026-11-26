@@ -282,8 +282,8 @@ func TestMigrateOldConfig(t *testing.T) {
 			oldCfg: dedent.Dedent(fmt.Sprintf(`
 			apiVersion: %s
 			kind: ClusterConfiguration
-			kubernetesVersion: v1.10.0
-			`, gv)),
+			kubernetesVersion: %s
+			`, gv, constants.MinimumControlPlaneVersion)),
 			expectedKinds: []string{
 				constants.InitConfigurationKind,
 				constants.ClusterConfigurationKind,
@@ -314,8 +314,8 @@ func TestMigrateOldConfig(t *testing.T) {
 			---
 			apiVersion: %[1]s
 			kind: ClusterConfiguration
-			kubernetesVersion: v1.10.0
-			`, gv)),
+			kubernetesVersion: %s
+			`, gv, constants.MinimumControlPlaneVersion)),
 			expectedKinds: []string{
 				constants.InitConfigurationKind,
 				constants.ClusterConfigurationKind,
@@ -348,7 +348,7 @@ func TestMigrateOldConfig(t *testing.T) {
 			oldCfg: dedent.Dedent(fmt.Sprintf(`
 			apiVersion: %s
 			kind: ClusterConfiguration
-			kubernetesVersion: v1.10.0
+			kubernetesVersion: %s
 			---
 			apiVersion: %[1]s
 			kind: JoinConfiguration
@@ -357,7 +357,7 @@ func TestMigrateOldConfig(t *testing.T) {
 			    token: abcdef.0123456789abcdef
 			    apiServerEndpoint: kube-apiserver:6443
 			    unsafeSkipCAVerification: true
-			`, gv)),
+			`, gv, constants.MinimumControlPlaneVersion)),
 			expectedKinds: []string{
 				constants.InitConfigurationKind,
 				constants.ClusterConfigurationKind,
@@ -373,7 +373,7 @@ func TestMigrateOldConfig(t *testing.T) {
 			---
 			apiVersion: %[1]s
 			kind: ClusterConfiguration
-			kubernetesVersion: v1.10.0
+			kubernetesVersion: %s
 			---
 			apiVersion: %[1]s
 			kind: JoinConfiguration
@@ -382,7 +382,7 @@ func TestMigrateOldConfig(t *testing.T) {
 			    token: abcdef.0123456789abcdef
 			    apiServerEndpoint: kube-apiserver:6443
 			    unsafeSkipCAVerification: true
-			`, gv)),
+			`, gv, constants.MinimumControlPlaneVersion)),
 			expectedKinds: []string{
 				constants.InitConfigurationKind,
 				constants.ClusterConfigurationKind,
@@ -398,7 +398,7 @@ func TestMigrateOldConfig(t *testing.T) {
 			---
 			apiVersion: %[1]s
 			kind: ClusterConfiguration
-			kubernetesVersion: v1.10.0
+			kubernetesVersion: %s
 			---
 			apiVersion: %[1]s
 			kind: JoinConfiguration
@@ -413,7 +413,7 @@ func TestMigrateOldConfig(t *testing.T) {
 			---
 			apiVersion: kubelet.config.k8s.io/v1beta1
 			kind: KubeletConfiguration
-			`, gv)),
+			`, gv, constants.MinimumControlPlaneVersion)),
 			expectedKinds: []string{
 				constants.InitConfigurationKind,
 				constants.ClusterConfigurationKind,

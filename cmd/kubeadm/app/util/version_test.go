@@ -26,6 +26,7 @@ import (
 	"testing"
 	"time"
 
+	pkgversion "k8s.io/component-base/version"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 )
@@ -153,10 +154,15 @@ func TestVersionFromNetwork(t *testing.T) {
 		ErrorExpected        bool
 	}
 
-	currentVersion := normalizedBuildVersion(constants.CurrentKubernetesVersion.String())
+	// On fetcher errors the client version is used, if there is one.
+	clientVersion, err := kubeadmVersion(pkgversion.Get().String())
+	if err != nil {
+		clientVersion = constants.CurrentKubernetesVersion.String()
+	}
+	currentVersion := normalizedBuildVersion(clientVersion)
 
 	cases := map[string]T{
-		"stable":          {"stable-1", "v1.4.6", false, false}, // recursive pointer to stable-1
+		"stable":          {"v1.4.6", "v1.4.6", false, false},
 		"stable-1":        {"v1.4.6", "v1.4.6", false, false},
 		"stable-1.3":      {"v1.3.10", "v1.3.10", false, false},
 		"latest":          {"v1.6.0-alpha.0", "v1.6.0-alpha.0", false, false},
