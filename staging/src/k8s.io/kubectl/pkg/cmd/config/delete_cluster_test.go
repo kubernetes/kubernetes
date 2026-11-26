@@ -21,7 +21,9 @@ import (
 	"fmt"
 	utiltesting "k8s.io/client-go/util/testing"
 	"os"
+	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"k8s.io/client-go/tools/clientcmd"
@@ -93,5 +95,21 @@ func (test deleteClusterTest) run(t *testing.T) {
 
 	if !reflect.DeepEqual(test.expectedClusters, clusters) {
 		t.Errorf("expected clusters %v, but found %v in kubeconfig", test.expectedClusters, clusters)
+	}
+}
+
+func TestDeleteClusterInvalidArgs(t *testing.T) {
+	for _, args := range [][]string{{}, {"minikube", "otherkube"}} {
+		pathOptions := clientcmd.NewDefaultPathOptions()
+		pathOptions.GlobalFile = filepath.Join(t.TempDir(), "config")
+		pathOptions.EnvVar = ""
+		cmd := NewCmdConfigDeleteCluster(bytes.NewBuffer(nil), pathOptions)
+		if err := cmd.Flags().Parse(args); err != nil {
+			t.Fatalf("unexpected error parsing args: %v", err)
+		}
+		err := runDeleteCluster(bytes.NewBuffer(nil), pathOptions, cmd)
+		if err == nil || !strings.Contains(err.Error(), "cluster to delete is required") {
+			t.Errorf("args %v: expected usage error, got %v", args, err)
+		}
 	}
 }
