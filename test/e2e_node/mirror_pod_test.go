@@ -264,6 +264,129 @@ var _ = SIGDescribe("MirrorPod", func() {
 			}, 5*time.Minute, 5*time.Second).Should(gomega.BeNil())
 		})
 
+		f.It("it should start a replacement while the previous instance's volume is failing to unmount", f.WithNodeConformance(), f.WithSerial(), f.WithSlow(), func(ctx context.Context) {
+			node := getNodeName(ctx, f)
+			ns = f.Namespace.Name
+			c := f.ClientSet
+			nfsTestConfig, nfsServerPod, nfsServerHost := e2evolume.NewNFSServerWithNodeName(ctx, c, ns, []string{"-G", "777", "/exports"}, node)
+			ginkgo.DeferCleanup(func(ctx context.Context) {
+				framework.Logf("Cleaning up NFS server pod")
+				e2evolume.TestServerCleanup(ctx, f, nfsTestConfig)
+			})
+
+			podPath = kubeletCfg.StaticPodPath
+			staticPodName = "static-pod-nfs-replace-" + string(uuid.NewUUID())
+			mirrorPodName = staticPodName + "-" + framework.TestContext.NodeName
+
+			ginkgo.By(fmt.Sprintf("Creating the NFS-backed static pod %s", staticPodName))
+			err := createStaticPodUsingNfs(nfsServerHost, node, "sleep 999999", podPath, staticPodName, ns)
+			framework.ExpectNoError(err)
+			gomega.Eventually(ctx, func(ctx context.Context) error {
+				return checkMirrorPodRunning(ctx, c, mirrorPodName, ns)
+			}, 2*time.Minute, 4*time.Second).Should(gomega.Succeed())
+
+			oldMirrorPod, err := c.CoreV1().Pods(ns).Get(ctx, mirrorPodName, metav1.GetOptions{})
+			framework.ExpectNoError(err)
+			oldUID := types.UID(oldMirrorPod.Annotations[kubetypes.ConfigHashAnnotationKey])
+			if oldUID == "" {
+				framework.Failf("mirror pod %s has no %s annotation", mirrorPodName, kubetypes.ConfigHashAnnotationKey)
+			}
+
+			ginkgo.By("Stopping the NFS server")
+			e2evolume.StopNFSServer(ctx, f, nfsServerPod)
+			nfsStopped := true
+			// Registered after the server cleanup so it runs first: a hung NFS mount left
+			// behind by a failed run would poison the serial tests that follow.
+			ginkgo.DeferCleanup(func(ctx context.Context) {
+				if nfsStopped {
+					e2evolume.RestartNFSServer(ctx, f, nfsServerPod)
+				}
+			})
+
+			// A different spec gives a new static pod UID under the same fullname, which
+			// is what a kubeadm upgrade does to the etcd manifest. The replacement must not
+			// depend on the stopped NFS server, or it could never start regardless of the
+			// pod worker.
+			const containerName, mountPath = "replacement", "/data"
+			replacementSpec := v1.PodSpec{
+				NodeName: node,
+				Containers: []v1.Container{{
+					Name:         containerName,
+					Image:        imageutils.GetE2EImage(imageutils.BusyBox),
+					Command:      []string{"/bin/sh", "-c", "sleep 999999"},
+					VolumeMounts: []v1.VolumeMount{{Name: "data", MountPath: mountPath}},
+				}},
+				RestartPolicy: v1.RestartPolicyNever,
+				Volumes: []v1.Volume{{
+					Name:         "data",
+					VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}},
+				}},
+			}
+			ginkgo.By("Replacing the static pod manifest while the NFS server is stopped")
+			err = createStaticPodWithSpec(podPath, staticPodName, ns, replacementSpec)
+			framework.ExpectNoError(err)
+
+			ginkgo.By("Waiting for the replacement to be running")
+			gomega.Eventually(ctx, func(ctx context.Context) error {
+				return checkMirrorPodRecreatedAndRunning(ctx, c, mirrorPodName, ns, oldMirrorPod.UID)
+			}, 2*time.Minute, 4*time.Second).Should(gomega.Succeed())
+
+			// Without this the test would also pass if cleanup happened to finish early,
+			// which is not the scenario under test.
+			gomega.Expect(podVolumeDirectoryExists(oldUID)).To(gomega.BeTrueBecause("old pod's volume directory should still exist while the NFS server is stopped"))
+
+			replacement, err := c.CoreV1().Pods(ns).Get(ctx, mirrorPodName, metav1.GetOptions{})
+			framework.ExpectNoError(err)
+			if newUID := types.UID(replacement.Annotations[kubetypes.ConfigHashAnnotationKey]); newUID == oldUID {
+				framework.Failf("expected the replacement to have a new static pod UID, still %s", oldUID)
+			}
+			initialStatus, err := mirrorPodContainerStatus(replacement, containerName)
+			framework.ExpectNoError(err)
+
+			const marker = mountPath + "/written-before-old-pod-cleanup"
+			ginkgo.By("Writing to the replacement's volume before the old pod is cleaned up")
+			e2epod.ExecShellInContainer(f, mirrorPodName, containerName, "echo ok > "+marker)
+
+			ginkgo.By("Starting the NFS server")
+			e2evolume.RestartNFSServer(ctx, f, nfsServerPod)
+			nfsStopped = false
+
+			ginkgo.By("Waiting for the old pod's volume directory to be removed")
+			gomega.Eventually(func() bool {
+				return podVolumeDirectoryExists(oldUID)
+			}, 5*time.Minute, 10*time.Second).Should(gomega.BeFalseBecause("old pod's volume directory should be removed after the NFS server is started"))
+
+			// The old pod worker is forgotten on a later housekeeping pass; give that time
+			// to happen while checking that it does not disturb the replacement.
+			ginkgo.By("Checking that the replacement was not restarted")
+			gomega.Consistently(ctx, func(ctx context.Context) error {
+				pod, err := c.CoreV1().Pods(ns).Get(ctx, mirrorPodName, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+				if pod.UID != replacement.UID {
+					return fmt.Errorf("mirror pod was recreated: UID %s, expected %s", pod.UID, replacement.UID)
+				}
+				if pod.Status.Phase != v1.PodRunning {
+					return fmt.Errorf("replacement is %s, expected %s", pod.Status.Phase, v1.PodRunning)
+				}
+				status, err := mirrorPodContainerStatus(pod, containerName)
+				if err != nil {
+					return err
+				}
+				if status.ContainerID != initialStatus.ContainerID || status.RestartCount != initialStatus.RestartCount {
+					return fmt.Errorf("replacement container was restarted: %s (restarts %d), expected %s (restarts %d)",
+						status.ContainerID, status.RestartCount, initialStatus.ContainerID, initialStatus.RestartCount)
+				}
+				return nil
+			}, 60*time.Second, 5*time.Second).Should(gomega.Succeed())
+
+			ginkgo.By("Checking that the replacement's volume is still usable")
+			out := e2epod.ExecShellInContainer(f, mirrorPodName, containerName,
+				"cat "+marker+" && echo ok > "+mountPath+"/written-after-old-pod-cleanup && cat "+mountPath+"/written-after-old-pod-cleanup")
+			gomega.Expect(out).To(gomega.Equal("ok\nok"), "unexpected contents of the replacement's volume")
+		})
+
 		ginkgo.AfterEach(func(ctx context.Context) {
 			ginkgo.By("delete the static pod")
 			err := deleteStaticPod(podPath, staticPodName, ns)
@@ -491,6 +614,15 @@ func podVolumeDirectoryExists(uid types.UID) bool {
 	}
 
 	return podVolumeDirectoryExists
+}
+
+func mirrorPodContainerStatus(pod *v1.Pod, containerName string) (v1.ContainerStatus, error) {
+	for _, status := range pod.Status.ContainerStatuses {
+		if status.Name == containerName {
+			return status, nil
+		}
+	}
+	return v1.ContainerStatus{}, fmt.Errorf("pod %s/%s has no status for container %q", pod.Namespace, pod.Name, containerName)
 }
 
 func createStaticPodUsingNfs(nfsIP string, nodeName string, cmd string, dir string, name string, ns string) error {
