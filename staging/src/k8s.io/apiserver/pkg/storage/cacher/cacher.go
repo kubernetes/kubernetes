@@ -991,6 +991,9 @@ func (c *Cacher) initWatcherIntervalLocked(watcher *cacheWatcher) (*watchCacheIn
 }
 
 func (c *Cacher) watchSelector(ctx context.Context, pred storage.SelectionPredicate) watchSelector {
+	if pred.Field == nil {
+		pred.Field = fields.Everything()
+	}
 	// determine the namespace and name scope of the watch, first from the request, secondarily from the field selector
 	scope := namespacedName{}
 	if requestNamespace, ok := request.NamespaceFrom(ctx); ok && len(requestNamespace) > 0 {
