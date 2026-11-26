@@ -1218,12 +1218,12 @@ func TestInstallCSIDriverExistingAnnotation(t *testing.T) {
 		nim := NewNodeInfoManager(types.NodeName(nodeName), host, nil)
 
 		// Act
-		_, err = nim.CreateCSINode()
+		_, err = nim.CreateCSINode(t.Context())
 		if err != nil {
 			t.Errorf("expected no error from creating CSINodeinfo but got: %v", err)
 			continue
 		}
-		err = nim.InstallCSIDriver(driverName, nodeID, 0 /* maxVolumeLimit */, nil) // TODO test maxVolumeLimit
+		err = nim.InstallCSIDriver(t.Context(), driverName, nodeID, 0 /* maxVolumeLimit */, nil) // TODO test maxVolumeLimit
 		if err != nil {
 			t.Errorf("expected no error from InstallCSIDriver call but got: %v", err)
 			continue
@@ -1278,11 +1278,11 @@ func test(t *testing.T, addNodeInfo bool, testcases []testcase) {
 		nim := NewNodeInfoManager(types.NodeName(nodeName), host, tc.migratedPlugins)
 
 		//// Act
-		nim.CreateCSINode()
+		_, _ = nim.CreateCSINode(t.Context())
 		if addNodeInfo {
-			err = nim.InstallCSIDriver(tc.driverName, tc.inputNodeID, tc.inputVolumeLimit, tc.inputTopology)
+			err = nim.InstallCSIDriver(t.Context(), tc.driverName, tc.inputNodeID, tc.inputVolumeLimit, tc.inputTopology)
 		} else {
-			err = nim.UninstallCSIDriver(tc.driverName)
+			err = nim.UninstallCSIDriver(t.Context(), tc.driverName)
 		}
 
 		//// Assert
@@ -1713,7 +1713,7 @@ func TestNodeRecreatedSameNameRefreshesCSINodeOwnerUID(t *testing.T) {
 			name:            "InstallCSIDriver after GC deleted predecessor CSINode",
 			gcDeletedOldCSI: true,
 			act: func(nim Interface) error {
-				return nim.InstallCSIDriver(driverName, driverID, 0, nil)
+				return nim.InstallCSIDriver(t.Context(), driverName, driverID, 0, nil)
 			},
 			verify: func(t *testing.T, csiNode *storage.CSINode, _ []clienttesting.Action) {
 				assert.Len(t, csiNode.Spec.Drivers, 1)
@@ -1724,7 +1724,7 @@ func TestNodeRecreatedSameNameRefreshesCSINodeOwnerUID(t *testing.T) {
 			name:            "InstallCSIDriver before GC deleted predecessor CSINode",
 			gcDeletedOldCSI: false,
 			act: func(nim Interface) error {
-				return nim.InstallCSIDriver(driverName, driverID, 0, nil)
+				return nim.InstallCSIDriver(t.Context(), driverName, driverID, 0, nil)
 			},
 			verify: func(t *testing.T, csiNode *storage.CSINode, _ []clienttesting.Action) {
 				// Predecessor driver entry must be gone after replacing the old CSINode.
@@ -1748,7 +1748,7 @@ func TestNodeRecreatedSameNameRefreshesCSINodeOwnerUID(t *testing.T) {
 			name:            "UpdateCSIDriver after GC deleted predecessor CSINode",
 			gcDeletedOldCSI: true,
 			act: func(nim Interface) error {
-				return nim.UpdateCSIDriver(driverName, driverID, 16, nil)
+				return nim.UpdateCSIDriver(t.Context(), driverName, driverID, 16, nil)
 			},
 		},
 		{
@@ -1785,7 +1785,7 @@ func TestNodeRecreatedSameNameRefreshesCSINodeOwnerUID(t *testing.T) {
 			host := volumetest.NewFakeVolumeHostWithCSINodeName(t, t.TempDir(), client, nil, nodeName, nil, nil)
 			nim := NewNodeInfoManager(nodeName, host, nil).(*nodeInfoManager)
 
-			if err := nim.InitializeCSINodeWithAnnotation(); err != nil {
+			if err := nim.InitializeCSINodeWithAnnotation(t.Context()); err != nil {
 				t.Fatalf("InitializeCSINodeWithAnnotation failed: %v", err)
 			}
 			assert.Equal(t, oldNodeUID, nim.nodeID)
@@ -1961,7 +1961,7 @@ func TestUninstallCSIDriverRemovesStorageHealth(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			nim, client, nodeName := newStorageHealthTestManager(t, tc.installed, tc.stored)
 
-			if err := nim.uninstallDriverFromCSINode(driver1); err != nil {
+			if err := nim.uninstallDriverFromCSINode(t.Context(), driver1); err != nil {
 				t.Fatalf("uninstallDriverFromCSINode returned error: %v", err)
 			}
 
@@ -2016,7 +2016,7 @@ func TestUninstallCSIDriverRemovesDriverRegistrationAndStorageHealth(t *testing.
 	host := volumetest.NewFakeVolumeHostWithCSINodeName(t, t.TempDir(), client, nil, csiNode.Name, nil, nil)
 	nim := NewNodeInfoManager(types.NodeName(csiNode.Name), host, nil)
 
-	if err := nim.UninstallCSIDriver(driver1); err != nil {
+	if err := nim.UninstallCSIDriver(t.Context(), driver1); err != nil {
 		t.Fatalf("UninstallCSIDriver returned error: %v", err)
 	}
 
@@ -2303,7 +2303,7 @@ func TestUpdateCSIDriver(t *testing.T) {
 			host := volumetest.NewFakeVolumeHostWithCSINodeName(t, t.TempDir(), client, nil, nodeName, nil, nil)
 			nim := NewNodeInfoManager(nodeName, host, nil)
 
-			if err := nim.UpdateCSIDriver(driverName, driverID, 20, topology); err != nil {
+			if err := nim.UpdateCSIDriver(t.Context(), driverName, driverID, 20, topology); err != nil {
 				t.Fatalf("UpdateCSIDriver returned error: %v", err)
 			}
 

@@ -75,7 +75,7 @@ func TestCSINodeDriverRegistrations(t *testing.T) {
 		nodeName := "node-flow-transitions"
 		createNode(t, client, nodeName)
 		nim := newNodeInfoManager(t, client, nodeName)
-		err := nim.InstallCSIDriver(driverName, "id-1", maxVolumes, topology)
+		err := nim.InstallCSIDriver(t.Context(), driverName, "id-1", maxVolumes, topology)
 		if err != nil {
 			t.Fatalf("InstallCSIDriver failed: %v", err)
 		}
@@ -102,7 +102,7 @@ func TestCSINodeDriverRegistrations(t *testing.T) {
 		// kubelet restarts with the traditional flow, for example after its feature gate
 		// is disabled. It removes the registration and keeps the matching drivers entry.
 		nim = newNodeInfoManager(t, client, nodeName)
-		err = nim.InstallCSIDriver(driverName, "id-1", maxVolumes, topology)
+		err = nim.InstallCSIDriver(t.Context(), driverName, "id-1", maxVolumes, topology)
 		if err != nil {
 			t.Fatalf("InstallCSIDriver after the controller-side flow failed: %v", err)
 		}
@@ -113,7 +113,7 @@ func TestCSINodeDriverRegistrations(t *testing.T) {
 		nodeName := "node-controller-side-node-id-change"
 		createNode(t, client, nodeName)
 		nim := newNodeInfoManager(t, client, nodeName)
-		err := nim.InstallCSIDriver(driverName, "id-1", maxVolumes, topology)
+		err := nim.InstallCSIDriver(t.Context(), driverName, "id-1", maxVolumes, topology)
 		if err != nil {
 			t.Fatalf("InstallCSIDriver failed: %v", err)
 		}
@@ -132,7 +132,7 @@ func TestCSINodeDriverRegistrations(t *testing.T) {
 
 		// kubelet unregisters the driver after the failed registration, and the
 		// registration is retried.
-		err = nim.UninstallCSIDriver(driverName)
+		err = nim.UninstallCSIDriver(t.Context(), driverName)
 		if err != nil {
 			t.Fatalf("UninstallCSIDriver failed: %v", err)
 		}
@@ -164,7 +164,7 @@ func TestCSINodeDriverRegistrations(t *testing.T) {
 
 		// kubelet restarts with the traditional flow, and the driver reports another node ID.
 		nim = newNodeInfoManager(t, client, nodeName)
-		err = nim.InstallCSIDriver(driverName, "id-2", maxVolumes, topology)
+		err = nim.InstallCSIDriver(t.Context(), driverName, "id-2", maxVolumes, topology)
 		if err == nil {
 			t.Fatal("InstallCSIDriver with a changed node ID succeeded, want a validation error")
 		}
@@ -175,12 +175,12 @@ func TestCSINodeDriverRegistrations(t *testing.T) {
 
 		// kubelet unregisters the driver after the failed registration, and the
 		// registration is retried.
-		err = nim.UninstallCSIDriver(driverName)
+		err = nim.UninstallCSIDriver(t.Context(), driverName)
 		if err != nil {
 			t.Fatalf("UninstallCSIDriver failed: %v", err)
 		}
 		expectCSINodeSpec(t, getCSINode(t, client, nodeName), nil, nil)
-		err = nim.InstallCSIDriver(driverName, "id-2", maxVolumes, topology)
+		err = nim.InstallCSIDriver(t.Context(), driverName, "id-2", maxVolumes, topology)
 		if err != nil {
 			t.Fatalf("InstallCSIDriver after UninstallCSIDriver failed: %v", err)
 		}
@@ -221,7 +221,7 @@ func TestCSINodeDriverRegistrations(t *testing.T) {
 
 		// kubelet restarts with the traditional flow after the feature gate is disabled.
 		nim := newNodeInfoManager(t, client, pendingNodeName)
-		err := nim.InstallCSIDriver(driverName, "id-1", maxVolumes, topology)
+		err := nim.InstallCSIDriver(t.Context(), driverName, "id-1", maxVolumes, topology)
 		if err != nil {
 			t.Fatalf("InstallCSIDriver failed: %v", err)
 		}
