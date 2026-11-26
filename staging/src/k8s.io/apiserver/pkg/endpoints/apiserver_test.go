@@ -358,6 +358,9 @@ type SimpleRESTStorage struct {
 
 	expectedResourceNamespace string
 
+	// Result channel size of the watcher returned by Watch.
+	watchChanSize int
+
 	// If non-nil, called inside the WorkFunc when answering update, delete, create.
 	// obj receives the original input to the update, delete, or create call.
 	injectedFunction func(obj runtime.Object) (returnObj runtime.Object, err error)
@@ -525,7 +528,7 @@ func (storage *SimpleRESTStorage) Watch(ctx context.Context, options *metaintern
 	if err := storage.errors["watch"]; err != nil {
 		return nil, err
 	}
-	storage.fakeWatch = watch.NewFake()
+	storage.fakeWatch = watch.NewFakeWithChanSize(storage.watchChanSize, false)
 	return storage.fakeWatch, nil
 }
 

@@ -665,12 +665,22 @@ func toObjectSlice(in []example.Pod) []runtime.Object {
 }
 
 func runWatchHTTPBenchmark(b *testing.B, items []runtime.Object, contentType string) {
+	runWatchBenchmark(b, items, contentType, false, 0)
+}
+
+func runWatchBenchmark(b *testing.B, items []runtime.Object, contentType string, useHTTP2 bool, watchChanSize int) {
 	ctx := b.Context()
-	simpleStorage := &SimpleRESTStorage{}
+	simpleStorage := &SimpleRESTStorage{watchChanSize: watchChanSize}
 	handler := handle(map[string]rest.Storage{"simples": simpleStorage})
-	server := httptest.NewServer(handler)
+	server := httptest.NewUnstartedServer(handler)
+	if useHTTP2 {
+		server.EnableHTTP2 = true
+		server.StartTLS()
+	} else {
+		server.Start()
+	}
 	defer server.Close()
-	client := http.Client{}
+	client := server.Client()
 
 	dest, _ := url.Parse(server.URL)
 	dest.Path = "/" + prefix + "/" + newGroupVersion.Group + "/" + newGroupVersion.Version + "/watch/simples"
@@ -692,11 +702,14 @@ func runWatchHTTPBenchmark(b *testing.B, items []runtime.Object, contentType str
 
 	wg := sync.WaitGroup{}
 	wg.Add(1)
+	var read int64
 	go func() {
 		defer apitesting.Close(b, response.Body)
-		if _, err := io.Copy(io.Discard, response.Body); err != nil {
+		n, err := io.Copy(io.Discard, response.Body)
+		if err != nil {
 			b.Error(err)
 		}
+		read = n
 		wg.Done()
 	}()
 
@@ -709,6 +722,7 @@ func runWatchHTTPBenchmark(b *testing.B, items []runtime.Object, contentType str
 	simpleStorage.fakeWatch.Stop()
 	wg.Wait()
 	b.StopTimer()
+	b.SetBytes(read / int64(b.N))
 }
 
 // BenchmarkWatchWebsocket measures the cost of serving a watch.
@@ -807,11 +821,21 @@ func wrapCachingObject(in []example.Pod) []runtime.Object {
 func BenchmarkWatchCachingObjectJSON(b *testing.B) {
 	items := benchmarkItems(b)
 
-	runWatchHTTPBenchmark(b, wrapCachingObject(items), "")
+	runWatchTransportBenchmarks(b, wrapCachingObject(items), "")
 }
 
 func BenchmarkWatchCachingObjectProtobuf(b *testing.B) {
 	items := benchmarkItems(b)
 
-	runWatchHTTPBenchmark(b, wrapCachingObject(items), "application/vnd.kubernetes.protobuf")
+	runWatchTransportBenchmarks(b, wrapCachingObject(items), "application/vnd.kubernetes.protobuf")
+}
+
+func runWatchTransportBenchmarks(b *testing.B, items []runtime.Object, contentType string) {
+	for _, protocol := range []string{"HTTP1", "HTTP2"} {
+		for _, watchChanSize := range []int{0, 10, 100, 1000} {
+			b.Run(fmt.Sprintf("%s/chanSize=%d", protocol, watchChanSize), func(b *testing.B) {
+				runWatchBenchmark(b, items, contentType, protocol == "HTTP2", watchChanSize)
+			})
+		}
+	}
 }
