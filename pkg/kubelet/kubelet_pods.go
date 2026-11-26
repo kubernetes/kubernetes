@@ -202,13 +202,8 @@ func userExists(name string) (bool, error) {
 	getent, err := exec.LookPath("getent")
 	if err != nil {
 		_, err := user.Lookup(name)
-		var unknownUserErr user.UnknownUserError
 		switch {
-		// os/user package when built with cgo returns user.UnknownUser if /etc/passwd
-		// doesn't exist. But when built without cgo, it returns os.ErrNotExist. So, let's
-		// check for both errors, so we have the same behavior we had before, no matter if
-		// compiled with or without cgo.
-		case goerrors.As(err, &unknownUserErr), goerrors.Is(err, os.ErrNotExist):
+		case errIsUnknownUser(err):
 			// No user found, same as not configured.
 			return false, nil
 		case err != nil:
@@ -225,6 +220,17 @@ func userExists(name string) (bool, error) {
 		return false, nil // getent(1): 2 = key not found
 	}
 	return false, fmt.Errorf("looking up user %q via getent: %w", name, err)
+}
+
+// errIsUnknownUser reports whether err from user.Lookup means "no such user".
+//
+// os/user package when built with cgo returns user.UnknownUserError if /etc/passwd
+// doesn't exist. But when built without cgo, it returns os.ErrNotExist. So, let's
+// check for both errors, so we have the same behavior we had before, no matter if
+// compiled with or without cgo.
+func errIsUnknownUser(err error) bool {
+	var unknownUserErr user.UnknownUserError
+	return goerrors.As(err, &unknownUserErr) || goerrors.Is(err, os.ErrNotExist)
 }
 
 // Get a list of pods that have data directories.

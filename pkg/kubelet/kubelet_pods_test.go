@@ -20,9 +20,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"math"
 	"net"
 	"os"
+	"os/user"
 	"path/filepath"
 	"reflect"
 	goruntime "runtime"
@@ -9060,6 +9062,42 @@ func TestUserExists(t *testing.T) {
 			}
 			if found != tc.wantFound {
 				t.Errorf("%s: got found=%v, want %v", tc.name, found, tc.wantFound)
+			}
+		})
+	}
+}
+
+func TestErrIsUnknownUser(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{
+			name: "nil",
+			err:  nil,
+			want: false,
+		},
+		{
+			name: "unknown user (cgo, or /etc/passwd present)",
+			err:  user.UnknownUserError("kubelet"),
+			want: true,
+		},
+		{
+			name: "/etc/passwd missing (no cgo)",
+			err:  &fs.PathError{Op: "open", Path: "/etc/passwd", Err: fs.ErrNotExist},
+			want: true,
+		},
+		{
+			name: "/etc/passwd not readable",
+			err:  &fs.PathError{Op: "open", Path: "/etc/passwd", Err: fs.ErrPermission},
+			want: false,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := errIsUnknownUser(tc.err); got != tc.want {
+				t.Errorf("errIsUnknownUser(%v) = %v, want %v", tc.err, got, tc.want)
 			}
 		})
 	}
