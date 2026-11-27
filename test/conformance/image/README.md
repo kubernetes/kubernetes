@@ -38,3 +38,24 @@ If you don't want to push the images, run `make` or `make build` instead
 kubectl create -f conformance-e2e.yaml
 ```
 
+#### Pass additional test arguments
+
+The conformance runner accepts additional command-line arguments through
+environment variables:
+
+- `E2E_EXTRA_GINKGO_ARGS` passes arguments to Ginkgo before the test binary.
+- `E2E_EXTRA_ARGS` passes arguments to `e2e.test` after the `--` separator.
+- `E2E_EXTRA_ARGS_SEP` changes how both values are split. The default separator
+  is a space.
+
+For example, when the kube-apiserver uses a non-default
+`--service-node-port-range`, pass the same range to `e2e.test`:
+
+```yaml
+env:
+- name: E2E_EXTRA_ARGS
+  value: "--service-node-port-range=20000-22767"
+```
+
+The configured range must match the kube-apiserver setting. If the environment
+variable is omitted, the test binary uses the default range `30000-32767`.
