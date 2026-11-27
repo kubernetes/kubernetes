@@ -611,10 +611,15 @@ func (e *Store) create(ctx context.Context, obj runtime.Object, createValidation
 			return nil, err
 		}
 		finishCreate = fn
-		defer func() {
-			finishCreate(ctx, false)
-		}()
 	}
+	finishCreateNow := func(success bool) {
+		fn := finishCreate
+		finishCreate = finishNothing
+		fn(ctx, success)
+	}
+	defer func() {
+		finishCreateNow(false)
+	}()
 
 	if err := rest.BeforeCreate(e.CreateStrategy, ctx, obj); err != nil {
 		return nil, err
@@ -645,11 +650,17 @@ func (e *Store) create(ctx context.Context, obj runtime.Object, createValidation
 		err = storeerr.InterpretCreateError(err, qualifiedResource, name)
 		err = rest.CheckGeneratedNameError(ctx, e.CreateStrategy, err, obj)
 		if !apierrors.IsAlreadyExists(err) {
+			finishCreateNow(true)
 			return nil, err
 		}
 		if errGet := e.Storage.Get(ctx, key, storage.GetOptions{}, out); errGet != nil {
+			finishCreateNow(true)
 			return nil, err
 		}
+		objMeta, errObj := meta.Accessor(obj)
+		outMeta, errOut := meta.Accessor(out)
+		created := errObj == nil && errOut == nil && objMeta.GetUID() != "" && objMeta.GetUID() == outMeta.GetUID()
+		finishCreateNow(created)
 		accessor, errGetAcc := meta.Accessor(out)
 		if errGetAcc != nil {
 			return nil, err
@@ -662,9 +673,7 @@ func (e *Store) create(ctx context.Context, obj runtime.Object, createValidation
 	}
 	// The operation has succeeded.  Call the finish function if there is one,
 	// and then make sure the defer doesn't call it again.
-	fn := finishCreate
-	finishCreate = finishNothing
-	fn(ctx, true)
+	finishCreateNow(true)
 
 	if e.AfterCreate != nil {
 		e.AfterCreate(out, options)
