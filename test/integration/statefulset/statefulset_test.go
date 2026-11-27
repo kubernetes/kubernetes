@@ -1057,3 +1057,41 @@ func TestStatefulSetUpdateStrategySwitch(t *testing.T) {
 		})
 	}
 }
+
+// TestStatefulSetScalesBeyondMaxBatchSize checks that the controller keeps
+// extending its working window across syncs when spec.replicas exceeds the
+// per-sync pod creation budget, instead of stalling after the first batch.
+func TestStatefulSetScalesBeyondMaxBatchSize(t *testing.T) {
+	const replicas = statefulset.MaxBatchSize + 100
+
+	tCtx, rm, informers, c := scSetup(t)
+	ns := framework.CreateNamespaceOrDie(c, "test-scale-beyond-batch", t)
+	defer framework.DeleteNamespaceOrDie(c, ns, t)
+	cancel := runControllerAndInformers(tCtx, rm, informers)
+	defer cancel()
+
+	createHeadlessService(t, c, newHeadlessService(ns.Name))
+	sts := newSTS("sts", ns.Name, replicas)
+	stss, _ := createSTSsPods(t, c, []*appsv1.StatefulSet{sts}, []*v1.Pod{})
+	sts = stss[0]
+
+	stsClient := c.AppsV1().StatefulSets(ns.Name)
+	podClient := c.CoreV1().Pods(ns.Name)
+	// This many Pods needs several sync rounds plus informer propagation.
+	if err := wait.PollImmediate(interval, 3*time.Minute, func() (bool, error) {
+		current, err := stsClient.Get(context.TODO(), sts.Name, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		if current.Status.Replicas != replicas || current.Status.ObservedGeneration < sts.Generation {
+			return false, nil
+		}
+		pods, err := podClient.List(context.TODO(), metav1.ListOptions{})
+		if err != nil {
+			return false, err
+		}
+		return len(pods.Items) == replicas, nil
+	}); err != nil {
+		t.Fatalf("StatefulSet did not converge to %d replicas: %v", replicas, err)
+	}
+}

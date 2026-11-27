@@ -638,8 +638,23 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(ctx context.Context, set
 	updateStatus(&status, set.Spec.MinReadySeconds, currentRevision, updateRevision, now, pods)
 
 	replicaCount := int(*set.Spec.Replicas)
-	// slice that will contain all Pods such that getStartOrdinal(set) <= getOrdinal(pod) <= getEndOrdinal(set)
-	replicas := make([]*v1.Pod, replicaCount)
+	start := getStartOrdinal(set)
+	workingCount := replicaCount
+	// Sizing the working set to spec.replicas allocates a Pod per ordinal before
+	// any API call, which lets a single StatefulSet OOM the controller manager.
+	// Bound it only when this sync would build more than MaxBatchSize Pods:
+	// finding the highest existing ordinal costs a regex match per Pod, which is
+	// wasted work once nearly every ordinal already has one.
+	if replicaCount-len(pods) > MaxBatchSize {
+		existingCount := 0
+		for _, pod := range pods {
+			if podInOrdinalRange(pod, set) {
+				existingCount = max(existingCount, getOrdinal(pod)-start+1)
+			}
+		}
+		workingCount = existingCount + min(MaxBatchSize, replicaCount-existingCount)
+	}
+	replicas := make([]*v1.Pod, workingCount)
 	// slice that will contain all Pods such that getOrdinal(pod) < getStartOrdinal(set) OR getOrdinal(pod) > getEndOrdinal(set)
 	condemned := make([]*v1.Pod, 0, len(pods))
 	unavailable := 0
@@ -658,9 +673,8 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(ctx context.Context, set
 		// If the ordinal could not be parsed (ord < 0), ignore the Pod.
 	}
 
-	// for any empty indices in the sequence [0,set.Spec.Replicas) create a new Pod at the correct revision
-	start, end := getStartOrdinal(set), getEndOrdinal(set)
-	for ord := start; ord <= end; ord++ {
+	// for any empty indices in the working range create a new Pod at the correct revision
+	for ord := start; ord < start+workingCount; ord++ {
 		replicaIdx := ord - start
 		if replicas[replicaIdx] == nil {
 			replicas[replicaIdx] = newVersionedStatefulSetPod(
@@ -890,7 +904,7 @@ func updateStatefulSetAfterInvariantEstablished(ctx context.Context, ssc *defaul
 		}
 	}
 
-	// Walk all replicas for UnavailableReplicas (whole StatefulSet). Only pods in the
+	// Walk the working range for UnavailableReplicas. Only pods in the
 	// update range (ordinals >= partition / updateMin) consume the maxUnavailable budget
 	// (KEP-961); pods below the partition are not rolling-update candidates. Then select
 	// up to (maxUnavailable - unavailable) pods in that range for termination, high ordinal first.
