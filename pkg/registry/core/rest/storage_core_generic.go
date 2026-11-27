@@ -18,6 +18,8 @@ package rest
 
 import (
 	"context"
+	"fmt"
+	"sync"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -53,7 +55,6 @@ import (
 // for generic resources in core. It implements the "normal" RESTStorageProvider interface.
 type GenericConfig struct {
 	StorageFactory serverstorage.StorageFactory
-	EventTTL       time.Duration
 
 	ServiceAccountIssuer        serviceaccount.TokenGenerator
 	ServiceAccountMaxExpiration time.Duration
@@ -64,6 +65,8 @@ type GenericConfig struct {
 
 	LoopbackClientConfig *restclient.Config
 	Informers            informers.SharedInformerFactory
+
+	EventStorage *EventStorageProvider
 }
 
 func (c *GenericConfig) NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, error) {
@@ -88,7 +91,10 @@ func (c *GenericConfig) NewRESTStorage(apiResourceConfigSource serverstorage.API
 	storage := map[string]rest.Storage{}
 
 	if resource := "events"; apiResourceConfigSource.ResourceEnabled(corev1.SchemeGroupVersion.WithResource(resource)) {
-		eventStorage, err := eventstore.NewREST(restOptionsGetter, uint64(c.EventTTL.Seconds()))
+		if c.EventStorage == nil {
+			return genericapiserver.APIGroupInfo{}, fmt.Errorf("core/v1 storage requires EventStorage to be set so events storage is shared with events.k8s.io/v1")
+		}
+		eventStorage, err := c.EventStorage.Storage(restOptionsGetter)
 		if err != nil {
 			return genericapiserver.APIGroupInfo{}, err
 		}
@@ -181,4 +187,28 @@ type notFoundGetter struct {
 
 func (g notFoundGetter) Get(ctx context.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
 	return nil, errors.NewNotFound(g.gr, name)
+}
+
+// EventStorageProvider builds the events storage at most once, so core/v1 and
+// events.k8s.io/v1 serve the same etcd store rather than opening one each.
+type EventStorageProvider struct {
+	ttl time.Duration
+
+	once  sync.Once
+	store *eventstore.REST
+	err   error
+}
+
+func NewEventStorageProvider(ttl time.Duration) *EventStorageProvider {
+	return &EventStorageProvider{ttl: ttl}
+}
+
+// Storage returns the shared event storage, building it on the first call.
+// All callers must pass the same optsGetter: the store is built once, so
+// an optsGetter passed by later caller is ignored.
+func (p *EventStorageProvider) Storage(optsGetter generic.RESTOptionsGetter) (*eventstore.REST, error) {
+	p.once.Do(func() {
+		p.store, p.err = eventstore.NewREST(optsGetter, uint64(p.ttl.Seconds()))
+	})
+	return p.store, p.err
 }
