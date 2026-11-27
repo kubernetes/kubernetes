@@ -42,6 +42,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2ehostexec "k8s.io/kubernetes/test/e2e/framework/hostexec"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
@@ -61,7 +62,7 @@ type localTestConfig struct {
 	timeouts     *framework.TimeoutContext
 	scName       string
 	discoveryDir string
-	hostExec     utils.HostExec
+	hostExec     e2ehostexec.HostExec
 	ltrMgr       utils.LocalTestResourceManager
 }
 
@@ -166,7 +167,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local", func() {
 		// Choose a random node
 		randomNode := &nodes.Items[rand.Intn(len(nodes.Items))]
 
-		hostExec := utils.NewHostExec(f)
+		hostExec := e2ehostexec.New(f)
 		ltrMgr := utils.NewLocalResourceManager("local-volume-test", hostExec, hostBase)
 		config = &localTestConfig{
 			ns:           f.Namespace.Name,
@@ -1187,7 +1188,7 @@ func validateStatefulSet(ctx context.Context, config *localTestConfig, ss *appsv
 func SkipUnlessLocalSSDExists(ctx context.Context, config *localTestConfig, ssdInterface, filesystemType string, node *v1.Node) {
 	ssdCmd := fmt.Sprintf("ls -1 /mnt/disks/by-uuid/google-local-ssds-%s-%s/ | wc -l", ssdInterface, filesystemType)
 	res, err := config.hostExec.Execute(ctx, ssdCmd, node)
-	utils.LogResult(res)
+	e2ehostexec.LogResult(res)
 	framework.ExpectNoError(err)
 	num, err := strconv.Atoi(strings.TrimSpace(res.Stdout))
 	framework.ExpectNoError(err)

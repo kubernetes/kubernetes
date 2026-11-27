@@ -25,9 +25,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2ehostexec "k8s.io/kubernetes/test/e2e/framework/hostexec"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	"k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
@@ -91,7 +91,7 @@ var _ = SIGDescribe("Mount propagation", func() {
 		// tmpfs to a subdirectory there. We check that these mounts are
 		// propagated to the right places.
 
-		hostExec := utils.NewHostExec(f)
+		hostExec := e2ehostexec.New(f)
 		ginkgo.DeferCleanup(hostExec.Cleanup)
 
 		// Pick a node where all pods will run.
