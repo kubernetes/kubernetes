@@ -46,7 +46,12 @@ type Executor interface {
 	// transport any non-nil stream to a remote system, and return an error if a problem
 	// occurs. If tty is set, the stderr stream is not used (raw TTY manages stdout and
 	// stderr over the stdout stream).
-	// The context controls the entire lifetime of stream execution.
+	//
+	// The context controls the transport session. When the WebSocket or SPDY
+	// executor returns because the context ends, writes to [StreamOptions.Stdout]
+	// or [StreamOptions.Stderr] may still be in progress. Callers that inspect
+	// or reuse an output destination after cancellation must synchronize access
+	// with those writes.
 	StreamWithContext(ctx context.Context, options StreamOptions) error
 }
 
