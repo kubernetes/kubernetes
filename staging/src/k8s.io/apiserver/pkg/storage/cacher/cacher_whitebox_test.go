@@ -49,6 +49,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/apis/example"
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
+	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/cacher/delegator"
@@ -4271,6 +4272,92 @@ func TestGetListWithShardedListAndWatch(t *testing.T) {
 				}
 			} else if result.ShardInfo != nil {
 				t.Errorf("expected no ShardInfo on the list, got %+v", result.ShardInfo)
+			}
+		})
+	}
+}
+
+// TestWatchSelectorNilField verifies that watchSelector handles nil Predicate.Field without panicking (#144471).
+func TestWatchSelectorNilField(t *testing.T) {
+	nodeTrigger := &indexedTriggerFunc{
+		indexName: "spec.nodeName",
+		indexerFunc: func(obj runtime.Object) string {
+			if pod, ok := obj.(*example.Pod); ok {
+				return pod.Spec.NodeName
+			}
+			return ""
+		},
+	}
+	cacher := &Cacher{
+		groupResource:  schema.GroupResource{Resource: "pods"},
+		indexedTrigger: nodeTrigger,
+	}
+
+	testCases := []struct {
+		name          string
+		cacher        *Cacher
+		ctx           context.Context
+		predicate     storage.SelectionPredicate
+		expectedScope namespacedName
+		expectedIndex *string
+	}{
+		{
+			name:   "nil field selector with empty context does not panic",
+			cacher: cacher,
+			ctx:    context.Background(),
+			predicate: storage.SelectionPredicate{
+				IndexFields: []string{"spec.nodeName"},
+			},
+			expectedScope: namespacedName{},
+			expectedIndex: nil,
+		},
+		{
+			name:   "nil field selector with request context",
+			cacher: cacher,
+			ctx: request.WithRequestInfo(
+				request.WithNamespace(context.Background(), "test-ns"),
+				&request.RequestInfo{Name: "test-pod"},
+			),
+			predicate: storage.SelectionPredicate{
+				IndexFields: []string{"spec.nodeName"},
+			},
+			expectedScope: namespacedName{namespace: "test-ns", name: "test-pod"},
+			expectedIndex: nil,
+		},
+		{
+			name:   "exact match from field selector",
+			cacher: cacher,
+			ctx:    context.Background(),
+			predicate: storage.SelectionPredicate{
+				Field:       fields.Set{"metadata.namespace": "field-ns", "metadata.name": "field-pod", "spec.nodeName": "node-1"}.AsSelector(),
+				IndexFields: []string{"spec.nodeName"},
+			},
+			expectedScope: namespacedName{namespace: "field-ns", name: "field-pod"},
+			expectedIndex: new("node-1"),
+		},
+		{
+			name: "core namespace resource with matching namespace and name clears namespace",
+			cacher: &Cacher{
+				groupResource: coreNamespaceResource,
+			},
+			ctx: context.Background(),
+			predicate: storage.SelectionPredicate{
+				Field: fields.Set{"metadata.namespace": "foo", "metadata.name": "foo"}.AsSelector(),
+			},
+			expectedScope: namespacedName{name: "foo"},
+			expectedIndex: nil,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := tc.cacher.watchSelector(tc.ctx, tc.predicate)
+			require.Equal(t, tc.expectedScope, got.scope)
+			if tc.expectedIndex == nil {
+				require.Nil(t, got.indexValue)
+			} else {
+				require.NotNil(t, got.indexValue)
+				require.Equal(t, *tc.expectedIndex, *got.indexValue)
 			}
 		})
 	}
