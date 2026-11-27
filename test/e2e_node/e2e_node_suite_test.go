@@ -338,6 +338,12 @@ var _ = ginkgo.SynchronizedBeforeSuite(func(ctx context.Context) []byte {
 	var err error
 	kubeletCfg, err = getCurrentKubeletConfig(ctx)
 	framework.ExpectNoError(err)
+
+	// The kubelet configuration no longer carries the cgroup driver; resolve it
+	// from the container runtime once and share it with all tests.
+	cgroupDriver, err = getCgroupDriverFromRuntime(ctx)
+	framework.ExpectNoError(err)
+	klog.Infof("Detected cgroup driver: %s (source: CRI runtime)", cgroupDriver)
 })
 
 // Tear down the kubelet on the node

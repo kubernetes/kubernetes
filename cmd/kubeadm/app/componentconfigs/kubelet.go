@@ -191,8 +191,25 @@ func (kc *kubeletConfig) Default(cfg *kubeadmapi.ClusterConfiguration, _ *kubead
 	// There is no way to determine if the user has set this or not, given the field is a non-pointer.
 	kc.config.RotateCertificates = kubeletRotateCertificates
 
-	if len(kc.config.CgroupDriver) == 0 {
-		klog.V(1).Infof("the value of KubeletConfiguration.cgroupDriver is empty; setting it to %q", constants.CgroupDriverSystemd)
-		kc.config.CgroupDriver = constants.CgroupDriverSystemd
+	// Default() runs on two kinds of input:
+	// - kubeadm init/join: the user-supplied KubeletConfiguration from --config
+	//   (possibly empty).
+	// - kubeadm upgrade apply/plan/node: FetchInitConfigurationFromCluster()
+	//   reads the kubelet-config ConfigMap from the cluster, re-runs Default()
+	//   on it, and uploads the result back as the new ConfigMap.
+	// The clear below exists for the second path: kubeadm <= 1.37 defaulted
+	// cgroupDriver to systemd when the user left the field unset, so the value
+	// in that ConfigMap is usually kubeadm-written, not user-chosen. kubelet
+	// 1.38 rejects a non-empty cgroupDriver when LegacyCgroupDriverFallback is
+	// disabled, so without clearing, an upgrade would re-publish the stale
+	// systemd and every kubelet would fail to start afterwards. With the gate
+	// explicitly enabled, the value is left untouched.
+	// TODO: remove this block once the LegacyCgroupDriverFallback feature gate is removed.
+	// https://github.com/kubernetes/kubeadm/issues/3229
+	if kc.config.CgroupDriver != "" {
+		if fallbackEnabled, ok := kc.config.FeatureGates["LegacyCgroupDriverFallback"]; !ok || !fallbackEnabled {
+			klog.V(1).Infof("the KubeletConfiguration.cgroupDriver must be empty. The value is %q instead. Remove it from configuration or enable feature gate LegacyCgroupDriverFallback for the fallback behavior. Setting it to an empty string", kc.config.CgroupDriver)
+			kc.config.CgroupDriver = ""
+		}
 	}
 }

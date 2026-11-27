@@ -156,7 +156,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 		e2enodeCgroupV2Enabled = IsCgroup2UnifiedMode()
 		framework.Logf("cgroup V2 enabled: %v", e2enodeCgroupV2Enabled)
 
-		e2enodeCgroupDriver = oldCfg.CgroupDriver
+		e2enodeCgroupDriver = cgroupDriver
 		framework.Logf("cgroup driver: %s", e2enodeCgroupDriver)
 
 		runtime, _, err := getCRIClient(ctx)
@@ -2204,7 +2204,7 @@ var _ = SIGDescribe("CPU Manager Pod Level Resources", ginkgo.Ordered, ginkgo.Co
 		e2enodeCgroupV2Enabled = IsCgroup2UnifiedMode()
 		framework.Logf("cgroup V2 enabled: %v", e2enodeCgroupV2Enabled)
 
-		e2enodeCgroupDriver = oldCfg.CgroupDriver
+		e2enodeCgroupDriver = cgroupDriver
 		framework.Logf("cgroup driver: %s", e2enodeCgroupDriver)
 
 		runtime, _, err := getCRIClient(ctx)
