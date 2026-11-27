@@ -203,23 +203,22 @@ func (pl *DeferredPodScheduling) Bind(ctx context.Context, state fwk.CycleState,
 		ObservedGeneration: podutil.CalculatePodConditionObservedGeneration(&p.Status, p.Generation, v1.SchedulerEvaluationCompleted),
 	}
 
+	var patchErr error
 	if pl.handle.APICacher() != nil {
 		onFinish, err := pl.handle.APICacher().PatchPodStatus(p, []*v1.PodCondition{condition}, nil)
 		if err != nil {
 			return fwk.AsStatus(err)
 		}
-		if err := pl.handle.APICacher().WaitOnFinish(ctx, onFinish); err != nil {
-			return fwk.AsStatus(err)
+		patchErr = pl.handle.APICacher().WaitOnFinish(ctx, onFinish)
+	} else {
+		podStatusCopy := p.Status.DeepCopy()
+		if !podutil.UpdatePodCondition(podStatusCopy, condition) {
+			return nil
 		}
-		return nil
+		patchErr = util.PatchPodStatus(ctx, pl.handle.ClientSet(), p.Name, p.Namespace, p.UID, &p.Status, podStatusCopy)
 	}
-
-	podStatusCopy := p.Status.DeepCopy()
-	if !podutil.UpdatePodCondition(podStatusCopy, condition) {
-		return nil
-	}
-	if err := util.PatchPodStatus(ctx, pl.handle.ClientSet(), p.Name, p.Namespace, &p.Status, podStatusCopy); err != nil {
-		return fwk.AsStatus(err)
+	if patchErr != nil && !apierrors.IsNotFound(patchErr) && !util.IsPodUIDPreconditionError(patchErr) {
+		return fwk.AsStatus(patchErr)
 	}
 	return nil
 }
