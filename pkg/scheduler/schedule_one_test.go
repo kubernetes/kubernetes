@@ -4685,10 +4685,11 @@ func TestFindFitAllError(t *testing.T) {
 	}
 
 	podInfo := queuedPodInfoForPod(&v1.Pod{})
-	_, diagnosis, _, err := scheduler.algorithm.findNodesThatFitPod(ctx, schedFramework, framework.NewCycleState(), podInfo)
+	fit, err := scheduler.algorithm.findNodesThatFitPod(ctx, schedFramework, framework.NewCycleState(), podInfo, false)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
+	diagnosis := fit.diagnosis
 
 	expected := &framework.Diagnosis{
 		NodeToStatus: framework.NewNodeToStatus(map[string]*fwk.Status{
@@ -4732,10 +4733,11 @@ func TestFindFitSomeError(t *testing.T) {
 
 	pod := st.MakePod().Name("1").UID("1").Obj()
 	podInfo := queuedPodInfoForPod(pod)
-	_, diagnosis, _, err := scheduler.algorithm.findNodesThatFitPod(ctx, fwk, framework.NewCycleState(), podInfo)
+	fit, err := scheduler.algorithm.findNodesThatFitPod(ctx, fwk, framework.NewCycleState(), podInfo, false)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
+	diagnosis := fit.diagnosis
 
 	if diagnosis.NodeToStatus.Len() != len(nodes)-1 {
 		t.Errorf("unexpected failed status map: %v", diagnosis.NodeToStatus)
@@ -4828,7 +4830,7 @@ func TestFindFitPredicateCallCounts(t *testing.T) {
 			schedFramework.AddNominatedPod(logger, podinfo, &fwk.NominatingInfo{NominatingMode: fwk.ModeOverride, NominatedNodeName: "1"})
 
 			podInfo := queuedPodInfoForPod(test.pod)
-			_, _, _, err = scheduler.algorithm.findNodesThatFitPod(ctx, schedFramework, framework.NewCycleState(), podInfo)
+			_, err = scheduler.algorithm.findNodesThatFitPod(ctx, schedFramework, framework.NewCycleState(), podInfo, false)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -5473,12 +5475,12 @@ func TestFairEvaluationForNodes(t *testing.T) {
 	// Iterating over all nodes more than twice
 	for i := 0; i < 2*(numAllNodes/nodesToFind+1); i++ {
 		podInfo := queuedPodInfoForPod(&v1.Pod{})
-		nodesThatFit, _, _, err := sched.algorithm.findNodesThatFitPod(ctx, fwk, framework.NewCycleState(), podInfo)
+		fit, err := sched.algorithm.findNodesThatFitPod(ctx, fwk, framework.NewCycleState(), podInfo, false)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		if len(nodesThatFit) != nodesToFind {
-			t.Errorf("got %d nodes filtered, want %d", len(nodesThatFit), nodesToFind)
+		if len(fit.nodes) != nodesToFind {
+			t.Errorf("got %d nodes filtered, want %d", len(fit.nodes), nodesToFind)
 		}
 		expectedNextStartNodeIndex := (i + 1) * nodesToFind % numAllNodes
 		if sched.algorithm.nextStartNodeIndex != expectedNextStartNodeIndex {
@@ -5572,7 +5574,7 @@ func TestPreferNominatedNodeFilterCallCounts(t *testing.T) {
 			sched.applyDefaultHandlers()
 
 			podInfo := queuedPodInfoForPod(test.pod)
-			_, _, _, err = sched.algorithm.findNodesThatFitPod(ctx, fwk, framework.NewCycleState(), podInfo)
+			_, err = sched.algorithm.findNodesThatFitPod(ctx, fwk, framework.NewCycleState(), podInfo, false)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}

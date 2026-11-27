@@ -90,6 +90,9 @@ func TestSortedScoredNodes_Pop(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			s := NewSortedScoredNodes(tc.input)
+			if s.Ranked() {
+				t.Errorf("Ranked() = true, want false")
+			}
 			var got []fwk.NodePluginScores
 			for s.Len() > 0 {
 				got = append(got, s.Pop())
@@ -97,6 +100,96 @@ func TestSortedScoredNodes_Pop(t *testing.T) {
 			if diff := cmp.Diff(tc.expected, got, cmpopts.EquateEmpty()); diff != "" {
 				t.Errorf("pop order mismatch (-want +got):\n%s", diff)
 			}
+		})
+	}
+}
+
+func TestSortedRankedNodes_Pop(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    []fwk.NodePluginScores
+		ranks    []int
+		expected []string
+	}{
+		{
+			name:     "empty",
+			input:    []fwk.NodePluginScores{},
+			ranks:    []int{},
+			expected: nil,
+		},
+		{
+			name: "nil ranks leave the order to the scores",
+			input: []fwk.NodePluginScores{
+				{Name: "node1", TotalScore: 1},
+				{Name: "node3", TotalScore: 3},
+				{Name: "node2", TotalScore: 2},
+			},
+			expected: []string{"node3", "node2", "node1"},
+		},
+		{
+			name: "lower rank goes first regardless of the score",
+			input: []fwk.NodePluginScores{
+				{Name: "node1", TotalScore: 100},
+				{Name: "node2", TotalScore: 50},
+				{Name: "node3", TotalScore: 1},
+			},
+			ranks:    []int{2, 1, 0},
+			expected: []string{"node3", "node2", "node1"},
+		},
+		{
+			name: "score and then Randomizer order the nodes of a rank",
+			input: []fwk.NodePluginScores{
+				{Name: "node1", TotalScore: 5, Randomizer: 1},
+				{Name: "node2", TotalScore: 100},
+				{Name: "node3", TotalScore: 7},
+				{Name: "node4", TotalScore: 5, Randomizer: 2},
+				{Name: "node5", TotalScore: 90},
+			},
+			ranks:    []int{0, 1, 0, 0, 1},
+			expected: []string{"node3", "node4", "node1", "node2", "node5"},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			s := NewSortedRankedNodes(tc.input, tc.ranks)
+			wantRanked := tc.ranks != nil
+			if got := s.Ranked(); got != wantRanked {
+				t.Errorf("Ranked() = %v, want %v", got, wantRanked)
+			}
+			if got := len(s.UnorderedList()); got != len(tc.input) {
+				t.Errorf("len(UnorderedList()) = %d, want %d", got, len(tc.input))
+			}
+			var got []string
+			for s.Len() > 0 {
+				got = append(got, s.Pop().Name)
+			}
+			if got := s.Ranked(); got != wantRanked {
+				t.Errorf("Ranked() after draining = %v, want %v", got, wantRanked)
+			}
+			if diff := cmp.Diff(tc.expected, got); diff != "" {
+				t.Errorf("pop order mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestNewSortedRankedNodes_PanicsOnLengthMismatch(t *testing.T) {
+	scores := []fwk.NodePluginScores{{Name: "node1", TotalScore: 10}}
+	for _, tc := range []struct {
+		name  string
+		ranks []int
+	}{
+		{name: "fewer ranks than scores", ranks: []int{}},
+		{name: "more ranks than scores", ranks: []int{0, 1}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			defer func() {
+				if recover() == nil {
+					t.Fatal("expected NewSortedRankedNodes to panic on mismatched ranks length")
+				}
+			}()
+			NewSortedRankedNodes(scores, tc.ranks)
 		})
 	}
 }

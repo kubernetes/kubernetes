@@ -542,10 +542,6 @@ func NewFramework(ctx context.Context, r Registry, profile *config.KubeScheduler
 		}
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.OpportunisticBatching) {
-		f.computeBatchablePlugins()
-	}
-
 	// Put default preemption as the only RankNodesPlugin and check that all PostFilter
 	// plugins are also enabled at PodGroupPostFilter, as PodGroups only run the latter.
 	if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
@@ -576,6 +572,10 @@ func NewFramework(ctx context.Context, r Registry, profile *config.KubeScheduler
 				logger.Error(nil, msg, "plugin", pl.Name(), "profile", f.profileName)
 			}
 		}
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.OpportunisticBatching) {
+		f.computeBatchablePlugins()
 	}
 
 	if options.captureProfile != nil {
@@ -967,7 +967,7 @@ func (f *frameworkImpl) QueueSortFunc() fwk.LessFunc {
 	return f.queueSortPlugins[0].Less
 }
 
-// If any of our preFilter, filter, preScore or score plugins haven't
+// If any of our preFilter, filter, preScore, score or rankNodes plugins haven't
 // implemented a signature, then disable the cache.
 func (f *frameworkImpl) computeBatchablePlugins() {
 	f.enableSignatures = true
@@ -991,6 +991,9 @@ func (f *frameworkImpl) computeBatchablePlugins() {
 		candidatePlugins = append(candidatePlugins, pl)
 	}
 	for _, pl := range f.scorePlugins {
+		candidatePlugins = append(candidatePlugins, pl)
+	}
+	for _, pl := range f.rankNodesPlugins {
 		candidatePlugins = append(candidatePlugins, pl)
 	}
 
@@ -1404,12 +1407,14 @@ func (f *frameworkImpl) RunPodGroupPostFilterPlugins(ctx context.Context, state 
 		metrics.FrameworkExtensionPointDuration.WithLabelValues(metrics.PodGroupPostFilter, status.Code().String(), f.profileName).Observe(metrics.SinceInSeconds(startTime))
 	}()
 
-	// Disable opportunistic batching during PodGroupPostFilter so preemption evaluations
-	// neither reuse node hints cached from the normal pass nor bypass RankNodes when
-	// dynamic victim condemnations change node ranks across pods in the group.
-	// TODO(#142718): Implement support for batching with RankNodes during preemption.
-	f.batch.SetDisabled(true)
-	defer f.batch.SetDisabled(false)
+	// Plugins call pgSchedulingFunc on a snapshot they changed, e.g. with victims removed.
+	// What opportunistic batching cached in the regular pass doesn't hold there, and what
+	// it caches there holds neither for the next call nor back in the regular pass.
+	defer f.batch.flush()
+	schedulingFunc := func(ctx context.Context, state fwk.PodGroupCycleState) (*fwk.PodGroupAssignments, *fwk.Status) {
+		f.batch.flush()
+		return pgSchedulingFunc(ctx, state)
+	}
 
 	logger := klog.FromContext(ctx)
 	verboseLogs := logger.V(4).Enabled()
@@ -1425,7 +1430,7 @@ func (f *frameworkImpl) RunPodGroupPostFilterPlugins(ctx context.Context, state 
 			logger := klog.LoggerWithName(logger, pl.Name())
 			ctx = klog.NewContext(ctx, logger)
 		}
-		res, status := f.runPodGroupPostFilterPlugin(ctx, pl, state, podGroupInfo, pgSchedulingFunc)
+		res, status := f.runPodGroupPostFilterPlugin(ctx, pl, state, podGroupInfo, schedulingFunc)
 		if status.IsSuccess() {
 			return res, status
 		} else if status.Code() == fwk.UnschedulableAndUnresolvable {
@@ -1953,12 +1958,13 @@ func (f *frameworkImpl) StoreScheduleResults(ctx context.Context, signature fwk.
 	f.batch.StoreScheduleResults(ctx, signature, hintedNode, chosenNode, otherNodes, cycleCount)
 }
 
-func (f *frameworkImpl) IsBatchingDisabled() bool {
-	return f.batch.IsDisabled()
+func (f *frameworkImpl) FlushBatch() {
+	f.batch.flush()
 }
 
-func (f *frameworkImpl) SetBatchingDisabled(disabled bool) {
-	f.batch.SetDisabled(disabled)
+// InvalidateNodeRanks implements framework.NodeRankInvalidator.
+func (f *frameworkImpl) InvalidateNodeRanks() {
+	f.batch.InvalidateNodeRanks()
 }
 
 // RunPreBindPlugins runs the set of configured prebind plugins. It returns a
