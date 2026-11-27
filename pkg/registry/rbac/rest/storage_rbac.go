@@ -39,6 +39,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	rbacv1client "k8s.io/client-go/kubernetes/typed/rbac/v1"
 	"k8s.io/client-go/util/retry"
+	"k8s.io/client-go/util/workqueue"
 	"k8s.io/component-helpers/auth/rbac/reconciliation"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/rbac"
@@ -212,6 +213,18 @@ func (listedObjects[T]) Delete(string, string, types.UID) error {
 	return errors.New("dry-run reconcile attempted a write")
 }
 
+// Independent bootstrap objects can share watch-cache progress instead of paying
+// serial freshness waits after writes advance etcd's global revision. Bound the
+// concurrency to avoid an unbounded burst of startup requests. Each phase waits
+// for all its objects, so roles are still reconciled before their bindings.
+func reconcileBootstrapPolicy[T any](objects []T, reconcile func(T) error) []error {
+	errs := make([]error, len(objects))
+	workqueue.ParallelizeUntil(context.Background(), 4, len(objects), func(index int) {
+		errs[index] = reconcile(objects[index])
+	})
+	return errs
+}
+
 func ensureRBACPolicy(p *PolicyData, client clientset.Interface) (done bool, err error) {
 	failedReconciliation := false
 	// Make sure etcd is responding before we start reconciling
@@ -251,7 +264,7 @@ func ensureRBACPolicy(p *PolicyData, client clientset.Interface) (done bool, err
 	}
 
 	// ensure bootstrap roles are created or reconciled
-	for _, clusterRole := range p.ClusterRoles {
+	for _, err := range reconcileBootstrapPolicy(p.ClusterRoles, func(clusterRole rbacapiv1.ClusterRole) error {
 		opts := reconciliation.ReconcileRoleOptions{
 			Role:    reconciliation.ClusterRoleRuleOwner{ClusterRole: &clusterRole},
 			Client:  reconciliation.ClusterRoleModifier{Client: client.RbacV1().ClusterRoles()},
@@ -262,7 +275,7 @@ func ensureRBACPolicy(p *PolicyData, client clientset.Interface) (done bool, err
 		dryRun.Client = listedRoles
 		dryRun.Confirm = false
 		if result, err := dryRun.Run(); err == nil && result.Operation == reconciliation.ReconcileNone {
-			continue
+			return nil
 		}
 
 		// ServiceUnavailble error is returned when the API server is blocked by storage version updates
@@ -283,13 +296,18 @@ func ensureRBACPolicy(p *PolicyData, client clientset.Interface) (done bool, err
 		})
 		if err != nil {
 			// don't fail on failures, try to create as many as you can
-			utilruntime.HandleError(fmt.Errorf("unable to reconcile clusterrole.%s/%s: %v", rbac.GroupName, clusterRole.Name, err))
+			return fmt.Errorf("unable to reconcile clusterrole.%s/%s: %w", rbac.GroupName, clusterRole.Name, err)
+		}
+		return nil
+	}) {
+		if err != nil {
+			utilruntime.HandleError(err)
 			failedReconciliation = true
 		}
 	}
 
 	// ensure bootstrap rolebindings are created or reconciled
-	for _, clusterRoleBinding := range p.ClusterRoleBindings {
+	for _, err := range reconcileBootstrapPolicy(p.ClusterRoleBindings, func(clusterRoleBinding rbacapiv1.ClusterRoleBinding) error {
 		opts := reconciliation.ReconcileRoleBindingOptions{
 			RoleBinding: reconciliation.ClusterRoleBindingAdapter{ClusterRoleBinding: &clusterRoleBinding},
 			Client:      reconciliation.ClusterRoleBindingClientAdapter{Client: client.RbacV1().ClusterRoleBindings()},
@@ -300,7 +318,7 @@ func ensureRBACPolicy(p *PolicyData, client clientset.Interface) (done bool, err
 		dryRun.Client = listedBindings
 		dryRun.Confirm = false
 		if result, err := dryRun.Run(); err == nil && result.Operation == reconciliation.ReconcileNone {
-			continue
+			return nil
 		}
 
 		// ServiceUnavailble error is returned when the API server is blocked by storage version updates
@@ -323,7 +341,12 @@ func ensureRBACPolicy(p *PolicyData, client clientset.Interface) (done bool, err
 		})
 		if err != nil {
 			// don't fail on failures, try to create as many as you can
-			utilruntime.HandleError(fmt.Errorf("unable to reconcile clusterrolebinding.%s/%s: %v", rbac.GroupName, clusterRoleBinding.Name, err))
+			return fmt.Errorf("unable to reconcile clusterrolebinding.%s/%s: %w", rbac.GroupName, clusterRoleBinding.Name, err)
+		}
+		return nil
+	}) {
+		if err != nil {
+			utilruntime.HandleError(err)
 			failedReconciliation = true
 		}
 	}
@@ -341,7 +364,7 @@ func ensureRBACPolicy(p *PolicyData, client clientset.Interface) (done bool, err
 			}
 		}
 
-		for _, role := range roles {
+		for _, err := range reconcileBootstrapPolicy(roles, func(role rbacapiv1.Role) error {
 			opts := reconciliation.ReconcileRoleOptions{
 				Role:    reconciliation.RoleRuleOwner{Role: &role},
 				Client:  reconciliation.RoleModifier{Client: client.RbacV1(), NamespaceClient: client.CoreV1().Namespaces()},
@@ -352,7 +375,7 @@ func ensureRBACPolicy(p *PolicyData, client clientset.Interface) (done bool, err
 			dryRun.Client = listedNamespacedRoles
 			dryRun.Confirm = false
 			if result, err := dryRun.Run(); err == nil && result.Operation == reconciliation.ReconcileNone {
-				continue
+				return nil
 			}
 
 			// ServiceUnavailble error is returned when the API server is blocked by storage version updates
@@ -373,7 +396,12 @@ func ensureRBACPolicy(p *PolicyData, client clientset.Interface) (done bool, err
 			})
 			if err != nil {
 				// don't fail on failures, try to create as many as you can
-				utilruntime.HandleError(fmt.Errorf("unable to reconcile role.%s/%s in %v: %v", rbac.GroupName, role.Name, namespace, err))
+				return fmt.Errorf("unable to reconcile role.%s/%s in %v: %w", rbac.GroupName, role.Name, namespace, err)
+			}
+			return nil
+		}) {
+			if err != nil {
+				utilruntime.HandleError(err)
 				failedReconciliation = true
 			}
 		}
@@ -392,7 +420,7 @@ func ensureRBACPolicy(p *PolicyData, client clientset.Interface) (done bool, err
 			}
 		}
 
-		for _, roleBinding := range roleBindings {
+		for _, err := range reconcileBootstrapPolicy(roleBindings, func(roleBinding rbacapiv1.RoleBinding) error {
 			opts := reconciliation.ReconcileRoleBindingOptions{
 				RoleBinding: reconciliation.RoleBindingAdapter{RoleBinding: &roleBinding},
 				Client:      reconciliation.RoleBindingClientAdapter{Client: client.RbacV1(), NamespaceClient: client.CoreV1().Namespaces()},
@@ -403,7 +431,7 @@ func ensureRBACPolicy(p *PolicyData, client clientset.Interface) (done bool, err
 			dryRun.Client = listedNamespacedBindings
 			dryRun.Confirm = false
 			if result, err := dryRun.Run(); err == nil && result.Operation == reconciliation.ReconcileNone {
-				continue
+				return nil
 			}
 
 			// ServiceUnavailble error is returned when the API server is blocked by storage version updates
@@ -426,7 +454,12 @@ func ensureRBACPolicy(p *PolicyData, client clientset.Interface) (done bool, err
 			})
 			if err != nil {
 				// don't fail on failures, try to create as many as you can
-				utilruntime.HandleError(fmt.Errorf("unable to reconcile rolebinding.%s/%s in %v: %v", rbac.GroupName, roleBinding.Name, namespace, err))
+				return fmt.Errorf("unable to reconcile rolebinding.%s/%s in %v: %w", rbac.GroupName, roleBinding.Name, namespace, err)
+			}
+			return nil
+		}) {
+			if err != nil {
+				utilruntime.HandleError(err)
 				failedReconciliation = true
 			}
 		}
