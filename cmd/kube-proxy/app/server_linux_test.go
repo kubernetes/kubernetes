@@ -19,15 +19,12 @@ limitations under the License.
 package app
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/spf13/pflag"
-	"k8s.io/ktesting"
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 )
 
@@ -94,119 +91,88 @@ func Test_platformApplyDefaults(t *testing.T) {
 	}
 }
 
-func TestConfigChange(t *testing.T) {
-	setUp := func() (*os.File, string, error) {
-		tempDir, err := os.MkdirTemp("", "kubeproxy-config-change")
-		if err != nil {
-			return nil, "", fmt.Errorf("unable to create temporary directory: %v", err)
-		}
-		fullPath := filepath.Join(tempDir, "kube-proxy-config")
-		file, err := os.Create(fullPath)
-		if err != nil {
-			return nil, "", fmt.Errorf("unexpected error when creating temp file: %v", err)
-		}
-
-		_, err = file.WriteString(`apiVersion: kubeproxy.config.k8s.io/v1alpha1
-bindAddress: 0.0.0.0
-bindAddressHardFail: false
-clientConnection:
-  acceptContentTypes: ""
-  burst: 10
-  contentType: application/vnd.kubernetes.protobuf
-  kubeconfig: /var/lib/kube-proxy/kubeconfig.conf
-  qps: 5
-clusterCIDR: 10.244.0.0/16
-configSyncPeriod: 15m0s
-conntrack:
-  maxPerCore: 32768
-  min: 131072
-  tcpCloseWaitTimeout: 1h0m0s
-  tcpEstablishedTimeout: 24h0m0s
-enableProfiling: false
-healthzBindAddress: 0.0.0.0:10256
-hostnameOverride: ""
-iptables:
-  masqueradeAll: false
-  masqueradeBit: 14
-  minSyncPeriod: 0s
-  syncPeriod: 30s
-ipvs:
-  excludeCIDRs: null
-  minSyncPeriod: 0s
-  scheduler: ""
-  syncPeriod: 30s
+// Configuration is a startup snapshot: file updates must not change the running
+// proxy's configuration. A replacement process loads the updated contents.
+func TestConfigChangeRequiresRestart(t *testing.T) {
+	const initial = `apiVersion: kubeproxy.config.k8s.io/v1alpha1
 kind: KubeProxyConfiguration
-metricsBindAddress: 127.0.0.1:10249
-mode: ""
-nodePortAddresses: null
-oomScoreAdj: -999
-portRange: ""
-detectLocalMode: "BridgeInterface"`)
-		if err != nil {
-			return nil, "", fmt.Errorf("unexpected error when writing content to temp kube-proxy config file: %v", err)
-		}
-
-		return file, tempDir, nil
-	}
-
-	tearDown := func(file *os.File, tempDir string) {
-		file.Close()
-		os.RemoveAll(tempDir)
-	}
-
-	testCases := []struct {
-		name        string
-		proxyServer proxyRun
-		append      bool
-		expectedErr string
-	}{
-		{
-			name:        "update config file",
-			proxyServer: new(fakeProxyServerLongRun),
-			append:      true,
-			expectedErr: "content of the proxy server's configuration file was updated",
-		},
-		{
-			name:        "fake error",
-			proxyServer: new(fakeProxyServerError),
-			expectedErr: "mocking error from ProxyServer.Run()",
-		},
-	}
-
-	for _, tc := range testCases {
-		_, ctx := ktesting.NewTestContext(t)
-		file, tempDir, err := setUp()
-		if err != nil {
-			t.Fatalf("unexpected error when setting up environment: %v", err)
-		}
-
-		opt := NewOptions()
-		opt.ConfigFile = file.Name()
-		err = opt.Complete(new(pflag.FlagSet))
-		if err != nil {
-			t.Fatal(err)
-		}
-		opt.proxyServer = tc.proxyServer
-
-		errCh := make(chan error, 1)
-		go func() {
-			errCh <- opt.runLoop(ctx)
-		}()
-
-		if tc.append {
-			file.WriteString("append fake content")
-		}
-
-		select {
-		case err := <-errCh:
-			if err != nil {
-				if !strings.Contains(err.Error(), tc.expectedErr) {
-					t.Errorf("[%s] Expected error containing %v, got %v", tc.name, tc.expectedErr, err)
+bindAddress: 0.0.0.0
+logging:
+  verbosity: 0
+`
+	updated := strings.Replace(initial, "verbosity: 0", "verbosity: 1", 1)
+	for _, mutation := range []string{"direct write", "atomic replacement", "ConfigMap projection"} {
+		t.Run(mutation, func(t *testing.T) {
+			dir := t.TempDir()
+			configFile := filepath.Join(dir, "config.conf")
+			write := func(path, content string) {
+				t.Helper()
+				if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+					t.Fatal(err)
 				}
 			}
-		case <-time.After(10 * time.Second):
-			t.Errorf("[%s] Timeout: unable to get any events or internal timeout.", tc.name)
-		}
-		tearDown(file, tempDir)
+			if mutation == "ConfigMap projection" {
+				oldDir := filepath.Join(dir, "..old")
+				if err := os.Mkdir(oldDir, 0755); err != nil {
+					t.Fatal(err)
+				}
+				write(filepath.Join(oldDir, "config.conf"), initial)
+				if err := os.Symlink("..old", filepath.Join(dir, "..data")); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.Symlink("..data/config.conf", configFile); err != nil {
+					t.Fatal(err)
+				}
+			} else {
+				write(configFile, initial)
+			}
+			load := func() *Options {
+				t.Helper()
+				opt := NewOptions()
+				opt.ConfigFile = configFile
+				if err := opt.Complete(new(pflag.FlagSet)); err != nil {
+					t.Fatal(err)
+				}
+				if err := opt.Validate(); err != nil {
+					t.Fatal(err)
+				}
+				return opt
+			}
+			opt := load()
+			if opt.config.Logging.Verbosity != 0 {
+				t.Fatalf("initial verbosity = %d, want 0", opt.config.Logging.Verbosity)
+			}
+			switch mutation {
+			case "direct write":
+				write(configFile, updated)
+			case "atomic replacement":
+				replacement := filepath.Join(dir, "config.tmp")
+				write(replacement, updated)
+				if err := os.Rename(replacement, configFile); err != nil {
+					t.Fatal(err)
+				}
+			case "ConfigMap projection":
+				newDir := filepath.Join(dir, "..new")
+				if err := os.Mkdir(newDir, 0755); err != nil {
+					t.Fatal(err)
+				}
+				write(filepath.Join(newDir, "config.conf"), updated)
+				if err := os.Symlink("..new", filepath.Join(dir, "..data_tmp")); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.Rename(filepath.Join(dir, "..data_tmp"), filepath.Join(dir, "..data")); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.RemoveAll(filepath.Join(dir, "..old")); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if opt.config.Logging.Verbosity != 0 {
+				t.Fatalf("running config changed without restart: verbosity = %d", opt.config.Logging.Verbosity)
+			}
+			if restarted := load(); restarted.config.Logging.Verbosity != 1 {
+				t.Fatalf("verbosity after restart = %d, want 1", restarted.config.Logging.Verbosity)
+			}
+		})
 	}
 }
