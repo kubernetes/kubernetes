@@ -1274,7 +1274,11 @@ metadata:
 	ginkgo.Describe("Kubectl cluster-info dump", func() {
 		ginkgo.It("should check if cluster-info dump succeeds", func(ctx context.Context) {
 			ginkgo.By("running cluster-info dump")
-			e2ekubectl.RunKubectlOrDie(ns, "cluster-info", "dump")
+			tk := e2ekubectl.NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, ns)
+			cmd := tk.KubectlCmd("cluster-info", "dump")
+			// Only the exit status matters. Leave stdout unset so the test does not buffer the entire dump.
+			cmd.Stderr = ginkgo.GinkgoWriter
+			framework.ExpectNoError(cmd.Run())
 		})
 	})
 
