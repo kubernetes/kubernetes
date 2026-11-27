@@ -40,6 +40,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/apiserver/pkg/server"
 	"k8s.io/client-go/discovery"
@@ -521,4 +522,52 @@ func generateSelfSignedCertKey(host string, alternateIPs []net.IP, alternateDNS 
 	}
 
 	return certBuffer.Bytes(), keyBuffer.Bytes(), nil
+}
+
+func TestSecureServingOptionsValidate(t *testing.T) {
+	testCases := []struct {
+		name        string
+		testOptions *SecureServingOptions
+		expectErr   string
+	}{
+		{
+			name:        "http2-read-idle-timeout and http2-ping-timeout unset",
+			testOptions: &SecureServingOptions{},
+		},
+		{
+			name:        "http2-read-idle-timeout only",
+			testOptions: &SecureServingOptions{HTTP2ReadIdleTimeout: 30 * time.Second},
+		},
+		{
+			name:        "http2-read-idle-timeout and http2-ping-timeout set",
+			testOptions: &SecureServingOptions{HTTP2ReadIdleTimeout: 30 * time.Second, HTTP2PingTimeout: 10 * time.Second},
+		},
+		{
+			name:        "negative http2-read-idle-timeout",
+			testOptions: &SecureServingOptions{HTTP2ReadIdleTimeout: -time.Second},
+			expectErr:   "--http2-read-idle-timeout can not be negative value",
+		},
+		{
+			name:        "negative http2-ping-timeout",
+			testOptions: &SecureServingOptions{HTTP2ReadIdleTimeout: 30 * time.Second, HTTP2PingTimeout: -time.Second},
+			expectErr:   "--http2-ping-timeout can not be negative value",
+		},
+		{
+			name:        "http2-ping-timeout without http2-read-idle-timeout",
+			testOptions: &SecureServingOptions{HTTP2PingTimeout: 10 * time.Second},
+			expectErr:   "--http2-ping-timeout requires --http2-read-idle-timeout to be set",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			errs := tc.testOptions.Validate()
+			if len(tc.expectErr) != 0 && !strings.Contains(utilerrors.NewAggregate(errs).Error(), tc.expectErr) {
+				t.Errorf("got err: %v, expected err: %s", errs, tc.expectErr)
+			}
+			if len(tc.expectErr) == 0 && len(errs) != 0 {
+				t.Errorf("got err: %s, expected err nil", errs)
+			}
+		})
+	}
 }
