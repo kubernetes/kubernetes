@@ -359,6 +359,12 @@ func warningsForPodSpecAndMeta(fieldPath *field.Path, podSpec *api.PodSpec, meta
 	if podSpec.TerminationGracePeriodSeconds != nil && *podSpec.TerminationGracePeriodSeconds < 0 {
 		warnings = append(warnings, fmt.Sprintf("%s: must be >= 0; negative values are invalid and will be treated as 1", fieldPath.Child("spec", "terminationGracePeriodSeconds")))
 	}
+	// 0 makes a delete that starts the deletion without a grace period a force deletion (#120671).
+	// Warn once, on create or when an update sets it, not on every update of a stored 0.
+	if podSpec.TerminationGracePeriodSeconds != nil && *podSpec.TerminationGracePeriodSeconds == 0 &&
+		(oldPodSpec == nil || oldPodSpec.TerminationGracePeriodSeconds == nil || *oldPodSpec.TerminationGracePeriodSeconds != 0) {
+		warnings = append(warnings, fmt.Sprintf("%s: 0 turns pod deletions without an explicit grace period into force deletions; use a positive value for graceful deletion", fieldPath.Child("spec", "terminationGracePeriodSeconds")))
+	}
 
 	if podSpec.Affinity != nil {
 		if affinity := podSpec.Affinity.PodAffinity; affinity != nil {

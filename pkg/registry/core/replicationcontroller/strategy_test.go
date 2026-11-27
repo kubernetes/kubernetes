@@ -227,6 +227,7 @@ func TestWarningsOnUpdate(t *testing.T) {
 		}
 	}
 	negative := "spec.template.spec.terminationGracePeriodSeconds: must be >= 0; negative values are invalid and will be treated as 1"
+	zero := "spec.template.spec.terminationGracePeriodSeconds: 0 turns pod deletions without an explicit grace period into force deletions; use a positive value for graceful deletion"
 	testCases := []struct {
 		name     string
 		old, new *api.ReplicationController
@@ -235,6 +236,9 @@ func TestWarningsOnUpdate(t *testing.T) {
 		{name: "new template warns", old: rcWithGrace(1, 30), new: rcWithGrace(2, -1), expected: []string{negative}},
 		{name: "old template does not warn", old: rcWithGrace(1, -1), new: rcWithGrace(2, 30)},
 		{name: "generation unchanged", old: rcWithGrace(1, 30), new: rcWithGrace(1, -1)},
+		{name: "new zero template warns", old: rcWithGrace(1, 1), new: rcWithGrace(2, 0), expected: []string{zero}},
+		{name: "old zero template does not warn", old: rcWithGrace(1, 0), new: rcWithGrace(2, 1)},
+		{name: "stored zero is not warned again on a later update", old: rcWithGrace(1, 0), new: rcWithGrace(2, 0)},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
