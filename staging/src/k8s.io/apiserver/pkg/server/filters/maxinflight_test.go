@@ -147,7 +147,7 @@ func TestMaxInFlightNonMutating(t *testing.T) {
 
 	// Do this multiple times to show that rate limit rejected requests don't block.
 	for i := 0; i < 2; i++ {
-		if err := expectHTTPGet(server.URL, http.StatusTooManyRequests); err != nil {
+		if err := expectOverloadRejectedGet(server.URL); err != nil {
 			t.Error(err)
 		}
 	}
@@ -244,6 +244,22 @@ func expectHTTPGet(url string, code int) error {
 	}
 	if r.StatusCode != code {
 		return fmt.Errorf("unexpected response: %v", r.StatusCode)
+	}
+	return nil
+}
+
+// expectOverloadRejectedGet expects a 429 that is marked as load shedding.
+func expectOverloadRejectedGet(url string) error {
+	r, err := http.Get(url)
+	if err != nil {
+		return fmt.Errorf("unexpected error: %v", err)
+	}
+	defer r.Body.Close()
+	if r.StatusCode != http.StatusTooManyRequests {
+		return fmt.Errorf("unexpected response: %v", r.StatusCode)
+	}
+	if got := r.Header.Get(overloadRejectedHeader); got != "true" {
+		return fmt.Errorf("expected %s: true on the 429, got %q", overloadRejectedHeader, got)
 	}
 	return nil
 }

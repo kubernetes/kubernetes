@@ -250,7 +250,10 @@ func (r *withRetry) After(ctx context.Context, request *Request, resp *http.Resp
 	//    metric (current behavior).
 	//  - every attempt after the first (2..N) are counted to the
 	//    rest_client_request_retries_total metric.
+	//  - every attempt the server rejected because it is overloaded (1..N)
+	//    is counted to the rest_client_requests_rejected_total metric.
 	updateRequestResultMetric(ctx, request, resp, err)
+	updateRequestRejectedMetric(ctx, request, resp)
 	if isRetry {
 		// this is attempt 2 or later
 		updateRequestRetryMetric(ctx, request, resp, err)

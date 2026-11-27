@@ -3320,8 +3320,9 @@ func testRetryWithRateLimiterBackoffAndMetrics(t *testing.T, key string, doFunc 
 				calculateBackoffFn: test.calculateBackoffFn,
 			}
 
-			// TODO: today this is the only site where a test overrides the
-			//  default metric interfaces, in future if we other tests want
+			// TODO: today this and TestRequestRejectedMetric are the only sites
+			//  where a test overrides the default metric interfaces, in future
+			//  if we other tests want
 			//  to override as well, and we want tests to be able to run in
 			//  parallel then we will need to provide a way for tests to
 			//  register/deregister their own metric inerfaces.
