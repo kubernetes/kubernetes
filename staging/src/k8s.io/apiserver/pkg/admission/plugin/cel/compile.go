@@ -18,6 +18,7 @@ package cel
 
 import (
 	"fmt"
+	"sync"
 
 	"cel.dev/cel-go/cel"
 
@@ -222,7 +223,14 @@ func (c compiler) CompileCELExpression(expressionAccessor ExpressionAccessor, op
 	}
 }
 
+var builtEnvsCache sync.Map // map[*environment.EnvSet]variableDeclEnvs
+
 func mustBuildEnvs(baseEnv *environment.EnvSet) variableDeclEnvs {
+	if baseEnv != nil {
+		if cached, ok := builtEnvsCache.Load(baseEnv); ok {
+			return cached.(variableDeclEnvs)
+		}
+	}
 	requestType := BuildRequestType()
 	namespaceType := BuildNamespaceType()
 	envs := make(variableDeclEnvs, 8) // since the number of variable combinations is small, pre-build a environment for each
@@ -244,6 +252,10 @@ func mustBuildEnvs(baseEnv *environment.EnvSet) variableDeclEnvs {
 				}
 			}
 		}
+	}
+	if baseEnv != nil {
+		actual, _ := builtEnvsCache.LoadOrStore(baseEnv, envs)
+		return actual.(variableDeclEnvs)
 	}
 	return envs
 }
