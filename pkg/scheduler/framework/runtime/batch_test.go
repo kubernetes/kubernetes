@@ -1070,6 +1070,113 @@ func TestBatchSetDisabled(t *testing.T) {
 	}
 }
 
+func TestBatchFlush(t *testing.T) {
+	var nilBatch *OpportunisticBatch
+	nilBatch.flush()
+
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	resetBatchMetrics()
+
+	testFwk, lister, err := newBatchTestFramework(ctx, nil, nil)
+	if err != nil {
+		t.Fatalf("Failed to create framework: %v", err)
+	}
+
+	pod1 := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1", UID: types.UID(blockingPodID("1"))}}
+	pod2 := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod2", UID: types.UID(blockingPodID("2"))}}
+	pod3 := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod3", UID: types.UID(blockingPodID("3"))}}
+	n3Info := framework.NewNodeInfo(pod1)
+	n3Info.SetNode(&v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "n3", UID: "n3"}})
+	lister.nodes = nodeInfoLister{n3Info}
+
+	sig := fwk.PodSignature("sig")
+	batch := newOpportunisticBatch(testFwk, true, time.Minute)
+	state := framework.NewCycleState()
+
+	batch.StoreScheduleResults(ctx, sig, "", "n3", newTestNodes([]string{"n1", "n2"}), 1)
+	if batch.state == nil || batch.lastCycle == (schedulingCycle{}) {
+		t.Fatal("expected populated batch state and lastCycle before flush")
+	}
+
+	batch.flush()
+	if batch.state != nil {
+		t.Fatal("expected nil batch state after flush")
+	}
+	if batch.lastCycle != (schedulingCycle{}) {
+		t.Fatalf("expected zero lastCycle after flush, got %+v", batch.lastCycle)
+	}
+	if batch.disabled {
+		t.Fatal("expected flush to keep disabled=false")
+	}
+	if hint := batch.GetNodeHint(ctx, pod2, sig, state, 1); hint != "" {
+		t.Fatalf("expected empty hint after flush, got %q", hint)
+	}
+	assertBatchCounters(t, testFwk.ProfileName(), map[string]int{metrics.BatchAttemptNoHint: 1}, nil, 0)
+
+	// Batching remains usable after flush.
+	batch.StoreScheduleResults(ctx, sig, "", "n3", newTestNodes([]string{"n1"}), 2)
+	if hint := batch.GetNodeHint(ctx, pod3, sig, state, 2); hint != "n1" {
+		t.Fatalf("expected hint %q after re-seeding post-flush, got %q", "n1", hint)
+	}
+
+	// Flushing while disabled preserves disabled=true.
+	batch.SetDisabled(true)
+	batch.flush()
+	if !batch.disabled {
+		t.Fatal("expected flush to keep disabled=true")
+	}
+
+	// Framework.FlushBatch is safe when OpportunisticBatching is disabled (batch == nil)
+	// and clears cached state when enabled.
+	for _, opportunisticBatchingEnabled := range []bool{true, false} {
+		t.Run(fmt.Sprintf("Framework.FlushBatch/OpportunisticBatching=%v", opportunisticBatchingEnabled), func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.OpportunisticBatching: opportunisticBatchingEnabled,
+			})
+			resetBatchMetrics()
+
+			r := Registry{
+				"batchTest":     newBatchTestPlugin,
+				queueSortPlugin: newQueueSortPlugin,
+				bindPlugin:      newBindPlugin,
+			}
+			profile := config.KubeSchedulerProfile{
+				Plugins: &config.Plugins{
+					QueueSort: config.PluginSet{Enabled: []config.Plugin{{Name: queueSortPlugin}}},
+					Bind:      config.PluginSet{Enabled: []config.Plugin{{Name: bindPlugin}}},
+					Filter:    config.PluginSet{Enabled: []config.Plugin{{Name: "batchTest"}}},
+				},
+			}
+			f, err := NewFramework(ctx, r, &profile, WithSnapshotSharedLister(lister))
+			if err != nil {
+				t.Fatalf("Failed to create framework: %v", err)
+			}
+			defer func() { _ = f.Close() }()
+
+			fwkImpl := f.(*frameworkImpl)
+			if opportunisticBatchingEnabled {
+				f.StoreScheduleResults(ctx, sig, "", "n3", newTestNodes([]string{"n1", "n2"}), 1)
+				if fwkImpl.batch.state == nil {
+					t.Fatal("expected non-nil batch state before FlushBatch")
+				}
+			} else if fwkImpl.batch != nil {
+				t.Fatal("expected nil batch when OpportunisticBatching is disabled")
+			}
+
+			f.FlushBatch()
+
+			if opportunisticBatchingEnabled {
+				if fwkImpl.batch.state != nil || fwkImpl.batch.lastCycle != (schedulingCycle{}) {
+					t.Fatalf("expected cleared batch state and lastCycle after FlushBatch, got state=%v lastCycle=%+v", fwkImpl.batch.state, fwkImpl.batch.lastCycle)
+				}
+				assertBatchCounters(t, f.ProfileName(), nil, nil, 0)
+			}
+		})
+	}
+}
+
 type podGroupPostFilterCallbackPlugin struct {
 	name string
 	fh   fwk.Handle
