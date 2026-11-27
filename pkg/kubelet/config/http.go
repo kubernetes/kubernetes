@@ -18,6 +18,7 @@ package config
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"net/http"
 	"time"
@@ -41,8 +42,9 @@ type sourceURL struct {
 	client      *http.Client
 }
 
-// NewSourceURL specifies the URL where to read the Pod configuration from, then watches it for changes.
-func NewSourceURL(logger klog.Logger, url string, header http.Header, nodeName types.NodeName, period time.Duration, updates chan<- sourceUpdate) {
+// NewSourceURL specifies the URL where to read the Pod configuration from, then
+// watches it for changes. The watch stops when ctx is canceled.
+func NewSourceURL(ctx context.Context, url string, header http.Header, nodeName types.NodeName, period time.Duration, updates chan<- sourceUpdate) {
 	config := &sourceURL{
 		url:      url,
 		header:   header,
@@ -53,12 +55,13 @@ func NewSourceURL(logger klog.Logger, url string, header http.Header, nodeName t
 		// read the manifest URL passed to kubelet.
 		client: &http.Client{Timeout: 10 * time.Second},
 	}
-	logger.V(1).Info("Watching URL", "URL", url)
-	go wait.Until(func() { config.run(logger) }, period, wait.NeverStop)
+	klog.FromContext(ctx).V(1).Info("Watching URL", "URL", url)
+	go wait.UntilWithContext(ctx, config.run, period)
 }
 
-func (s *sourceURL) run(logger klog.Logger) {
-	if err := s.extractFromURL(logger); err != nil {
+func (s *sourceURL) run(ctx context.Context) {
+	logger := klog.FromContext(ctx)
+	if err := s.extractFromURL(ctx); err != nil {
 		// Don't log this multiple times per minute. The first few entries should be
 		// enough to get the point across.
 		if s.failureLogs < 3 {
@@ -81,8 +84,18 @@ func (s *sourceURL) applyDefaults(logger klog.Logger, pod *api.Pod) error {
 	return applyDefaults(logger, pod, s.url, false, s.nodeName)
 }
 
-func (s *sourceURL) extractFromURL(logger klog.Logger) error {
-	req, err := http.NewRequest("GET", s.url, nil)
+// sendUpdate delivers update unless ctx is canceled first, so that a stopped
+// source never blocks forever on a channel nobody reads anymore.
+func (s *sourceURL) sendUpdate(ctx context.Context, update sourceUpdate) {
+	select {
+	case s.updates <- update:
+	case <-ctx.Done():
+	}
+}
+
+func (s *sourceURL) extractFromURL(ctx context.Context) error {
+	logger := klog.FromContext(ctx)
+	req, err := http.NewRequestWithContext(ctx, "GET", s.url, nil)
 	if err != nil {
 		return err
 	}
@@ -101,7 +114,7 @@ func (s *sourceURL) extractFromURL(logger klog.Logger) error {
 	}
 	if len(data) == 0 {
 		// Emit an update with an empty PodList to allow HTTPSource to be marked as seen
-		s.updates <- sourceUpdate{Pods: []*v1.Pod{}}
+		s.sendUpdate(ctx, sourceUpdate{Pods: []*v1.Pod{}})
 		return fmt.Errorf("zero-length data received from %v", s.url)
 	}
 	// Short circuit if the data has not changed since the last time it was read.
@@ -117,7 +130,7 @@ func (s *sourceURL) extractFromURL(logger klog.Logger) error {
 			// It parsed but could not be used.
 			return singlePodErr
 		}
-		s.updates <- sourceUpdate{Pods: []*v1.Pod{pod}}
+		s.sendUpdate(ctx, sourceUpdate{Pods: []*v1.Pod{pod}})
 		return nil
 	}
 
@@ -132,7 +145,7 @@ func (s *sourceURL) extractFromURL(logger klog.Logger) error {
 		for i := range podList.Items {
 			pods = append(pods, &podList.Items[i])
 		}
-		s.updates <- sourceUpdate{Pods: pods}
+		s.sendUpdate(ctx, sourceUpdate{Pods: pods})
 		return nil
 	}
 
